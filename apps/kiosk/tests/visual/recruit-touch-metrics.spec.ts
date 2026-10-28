@@ -426,3 +426,43 @@ test('岗位详情：AI 整条不可用时结果区写「AI 暂时无法使用�
   await expect(page.getByRole('button', { name: '去来源平台投递' })).toBeVisible()
   await expect(page.getByText('前端工程师').first()).toBeVisible()
 })
+
+// ── 手机宽度（390×844）：共享底栏在手机宽下收紧，本包不能再把整屏横向推出去 ─────────────────────
+test.describe('手机宽度：底栏与整页不越出视口', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+  const MOBILE: Array<{ name: string; url: string; setup: (api: ApiRouter) => void }> = [
+    { name: '社会招聘台', url: '/jobs-service', setup: w6() },
+    { name: '岗位详情（四件底栏）', url: '/jobs/job-001', setup: w6() },
+    { name: '企业详情（三件底栏）', url: '/companies/company-001', setup: w6() },
+    { name: '校园招聘数据（三件底栏）', url: '/campus/freshman-insights', setup: w6() },
+    { name: '招聘会详情（四件底栏）', url: F(''), setup: fair() },
+    { name: '活动物料·读取失败', url: F('/materials'), setup: fair({ materials: 'error' }) },
+  ]
+  for (const c of MOBILE) {
+    test(`${c.name}：390 宽不横向溢出，底栏按钮都在屏内 @w4`, async ({ page, api }) => {
+      c.setup(api)
+      await page.goto(c.url)
+      await expect(page.locator('[data-qxt-screen]')).toHaveCount(1)
+      await expect(page.locator('.qxt-dock .qxt-askq')).toHaveCount(1)
+      await page.waitForLoadState('networkidle')
+      await page.waitForTimeout(300)
+      const report = await page.evaluate(() => {
+        const width = document.documentElement.clientWidth
+        const dock = document.querySelector('.qxt-dock') as HTMLElement
+        const kids = [...dock.children].map((k) => { const r = k.getBoundingClientRect(); return { left: r.left, right: r.right, w: r.width } })
+        return {
+          width,
+          overflowX: document.documentElement.scrollWidth - width,
+          dockKids: kids.length,
+          outside: kids.filter((k) => k.left < -0.5 || k.right > width + 0.5).length,
+          askWidth: Math.round((document.querySelector('.qxt-dock .qxt-askq') as HTMLElement).getBoundingClientRect().width),
+        }
+      })
+      expect(report.width).toBe(390)
+      expect(report.dockKids, '底栏没量到按钮').toBeGreaterThanOrEqual(2)
+      expect(report.overflowX, '整页横向溢出').toBeLessThanOrEqual(1)
+      expect(report.outside, '底栏有按钮越出视口').toBe(0)
+      expect(report.askWidth, '问小青被挤得只剩话筒').toBeGreaterThanOrEqual(120)
+    })
+  }
+})

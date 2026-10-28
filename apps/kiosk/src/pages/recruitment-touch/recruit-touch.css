@@ -279,11 +279,14 @@
 }
 
 /* 底栏一条：返回、问小青、本页次主操作同在一行，照稿 .fj-dock 把按钮收紧（左右 16px、24px 字）。
-   高度仍是 88px、字不小于 20px；问小青放不下时照稿用省略号收尾，不换行。 */
-.qxt-screen[data-qx-page='recruit'] .qxt-dock .qxt-btn {
-  padding: 0 16px;
-  min-width: 0;
-  font-size: 24px;
+   高度仍是 88px、字不小于 20px；问小青放不下时照稿用省略号收尾，不换行。
+   只管一体机宽度；手机宽度（≤760px）交给共享底栏的收紧规则（touch-hero.css）。 */
+@media (min-width: 761px) {
+  .qxt-screen[data-qx-page='recruit'] .qxt-dock .qxt-btn {
+    padding: 0 16px;
+    min-width: 0;
+    font-size: 24px;
+  }
 }
 
 /* 可点区不小于 64×64：旧内芯里的小按钮、下拉、输入框、标签页一并抬上来。 */
@@ -367,9 +370,10 @@
   }
   .qxt-screen[data-qx-page='recruit'] .qxt-band { padding-left: 16px; padding-right: 16px; }
   .qxt-screen[data-qx-page='recruit'] .qxt-body { padding-left: 16px; padding-right: 16px; }
-  /* 手机宽度放不下一行：问小青独占第一行，返回与本页操作排第二行。一体机 1080 宽仍是单行。 */
-  .qxt-screen[data-qx-page='recruit'] .qxt-dock { padding-left: 12px; padding-right: 12px; flex-wrap: wrap; }
-  .qxt-screen[data-qx-page='recruit'] .qxt-dock .qxt-askq { flex: 1 1 100%; order: -1; }
+  /* 手机宽度：只有返回与问小青两件时交给共享底栏收进一行；三件以上（加本页操作、次操作）共享的一行会把问小青
+     挤成只剩话筒，所以问小青独占第一行，其余排第二行。一体机 1080 宽仍是单行。 */
+  .qxt-screen[data-qx-page='recruit'] .qxt-dock:has(> :nth-child(3)) { flex-wrap: wrap; }
+  .qxt-screen[data-qx-page='recruit'] .qxt-dock:has(> :nth-child(3)) .qxt-askq { flex: 1 1 100%; order: -1; }
   .qxt-screen[data-qx-page='recruit'] .qxt-btn-pri { min-width: 0; max-width: 100%; }
   .qxt-screen[data-qx-page='recruit'] .qxt-dock .qxt-btn,
   .qxt-screen[data-qx-page='recruit'] .qxt-dock .qxt-askq { max-width: 100%; }
