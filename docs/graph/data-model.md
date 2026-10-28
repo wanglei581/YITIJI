@@ -2,9 +2,9 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # 数据模型图谱
 
-`119` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
+`120` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
 
-下图只画**关系度数最高的 18 个模型**：全量 119 个节点的
+下图只画**关系度数最高的 18 个模型**：全量 120 个节点的
 ER 图人是读不了的。全量关系见下方表格和 `graph.json`。
 
 ```mermaid
@@ -70,6 +70,7 @@ flowchart TD
 | **AiQuotaDaily** | 4 | — | 2 个文件<br/>`ai/quota/ai-quota.service.ts`<br/>`member-privacy/member-closure.service.ts` |
 | **AiQuotaReservation** | 12 | — | 2 个文件<br/>`ai/quota/ai-quota.service.ts`<br/>`member-privacy/member-closure.service.ts` |
 | **AiResumeResult** | 16 | EndUser | 15 个文件<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>`ai/resume-parse-submission.service.ts`<br/>… |
+| **AiServiceFact** | 6 | — | 2 个文件<br/>`ai/usage/ai-service-fact.ts`<br/>`console-screen/console-screen.partner-ai.ts` |
 | **AiServiceLog** | 13 | EndUser | 5 个文件<br/>`ai/ai-log.service.ts`<br/>`ai/ai-result.cleanup.task.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **AiUsageMonthlySummary** | 10 | — | 1 个文件<br/>`ai/usage/ai-usage-retention.ts` |
 | **AiUsageRecord** | 18 | EndUser | 4 个文件<br/>`ai/usage/ai-budget.service.ts`<br/>`ai/usage/ai-usage-retention.ts`<br/>`ai/usage/ai-usage-summary.ts`<br/>… |
@@ -116,7 +117,7 @@ flowchart TD
 | **KioskJobBoardConfig** | 6 | — | 1 个文件<br/>`terminals/kiosk-job-board.service.ts` |
 | **KioskSession** | 14 | — | 7 个文件<br/>`ai/resume/resume-draft-source.service.ts`<br/>`console-screen/console-screen.visits.ts`<br/>`first-order/first-order-report-builder.ts`<br/>… |
 | **LegalDocVersion** | 10 | — | 3 个文件<br/>`ai/resume/resume-unlabeled-export.ts`<br/>`legal/legal.service.ts`<br/>`member-auth/member-auth.service.ts` |
-| **License** | 20 | Organization | 3 个文件<br/>`licenses/license-gate.ts`<br/>`licenses/license-queries.ts`<br/>`licenses/license.service.ts` |
+| **License** | 21 | Organization | 4 个文件<br/>`licenses/license-gate.ts`<br/>`licenses/license-queries.ts`<br/>`licenses/license-write.ts`<br/>… |
 | **MemberLegalConsent** | 10 | EndUser | 3 个文件<br/>`ai/resume/resume-unlabeled-export.ts`<br/>`member-auth/member-auth.service.ts`<br/>`member-privacy/member-closure-retention.ts` |
 | **MemberNotification** | 12 | EndUser | 2 个文件<br/>`member-notifications/member-notifications.service.ts`<br/>`member-privacy/member-data-export.mapper.ts` |
 | **MockInterviewReport** | 6 | MockInterviewSession | 2 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/mock-interview.service.ts` |
@@ -130,7 +131,7 @@ flowchart TD
 | **Order** | 42 | OrderItem、PaymentAttempt、PrintTask、Refund | 31 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>… |
 | **OrderItem** | 15 | Order | 7 个文件<br/>`console-screen/console-screen.printed-pages.ts`<br/>`member-print-orders/package-order-fulfillment.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>… |
 | **OrderSubmissionLedger** | 11 | — | 2 个文件<br/>`member-print-orders/order-submission-ledger.ts`<br/>`member-privacy/member-closure-retention.ts` |
-| **Organization** | 34 | CompanyProfile、Job、JobDataQualitySnapshot、JobFair、JobSource、License、OfflineAgencyProfile、OnlinePlatformDirectory、PolicyPost、QualificationRecord、ServiceProject、Terminal、User | 26 个文件<br/>`ai/usage/ai-usage-summary.ts`<br/>`auth/auth.service.ts`<br/>`auth/partner-account-action.service.ts`<br/>… |
+| **Organization** | 34 | CompanyProfile、Job、JobDataQualitySnapshot、JobFair、JobSource、License、OfflineAgencyProfile、OnlinePlatformDirectory、PolicyPost、QualificationRecord、ServiceProject、Terminal、User | 28 个文件<br/>`ai/usage/ai-usage-summary.ts`<br/>`auth/auth.service.ts`<br/>`auth/partner-account-action.service.ts`<br/>… |
 | **PartnerOrgNotice** | 8 | — | 2 个文件<br/>`policies/policies.service.ts`<br/>`recruitment-hosting/recruitment-emergency.service.ts` |
 | **PaymentAttempt** | 13 | Order | 5 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>`payment/online-payment.service.ts`<br/>… |
 | **PiiFinding** | 11 | DocumentProcessTask | 2 个文件<br/>`materials/materials.service.ts`<br/>`member-privacy/member-closure.service.ts` |
