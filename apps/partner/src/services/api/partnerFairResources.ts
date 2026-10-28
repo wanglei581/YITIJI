@@ -42,6 +42,18 @@ const http = {
   deleteVenueGuide: async (fairId: string) => { await request('DELETE', path(fairId, '/venue-guide')) },
 }
 
-const unavailable = () => Promise.reject(new ApiHttpError('API_UNAVAILABLE', 'Mock 模式不支持招聘会配置', 503))
-const mock = { getZones: unavailable, createZone: unavailable, updateZone: unavailable, deleteZone: unavailable, getMaterials: unavailable, uploadMaterial: unavailable, updateMaterial: unavailable, deleteMaterial: unavailable, getVenueGuide: unavailable, saveVenueGuide: unavailable, deleteVenueGuide: unavailable }
+const demoReadonly = () => Promise.reject(new ApiHttpError('DEMO_MODE_READONLY', '演示模式不执行', 501))
+const mock = {
+  getZones: async () => [],
+  createZone: demoReadonly,
+  updateZone: demoReadonly,
+  deleteZone: demoReadonly,
+  getMaterials: async () => [],
+  uploadMaterial: demoReadonly,
+  updateMaterial: demoReadonly,
+  deleteMaterial: demoReadonly,
+  getVenueGuide: async () => null,
+  saveVenueGuide: demoReadonly,
+  deleteVenueGuide: demoReadonly,
+}
 export const partnerFairResources = API_MODE === 'http' ? http : mock

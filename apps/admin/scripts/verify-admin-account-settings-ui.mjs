@@ -310,6 +310,10 @@ for (const token of [
   if (!page.includes(token)) fail(`账号设置页缺少 ${token}`)
 }
 pass('修改密码表单包含当前密码、新密码和确认密码字段')
+if (!page.includes('loadLoginLogs') || !page.includes('重新加载') || !page.includes('onClick={loadLoginLogs}')) {
+  fail('最近登录加载失败必须能重新加载')
+}
+pass('最近登录加载失败可以重新加载')
 
 const phoneBoundDeclaration = findNode(
   pageSourceFile,

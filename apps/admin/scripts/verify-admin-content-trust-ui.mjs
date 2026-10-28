@@ -43,7 +43,7 @@ const RULES = join(adminRoot, 'src/routes/partners/contentTrustRules.ts')
 const PANEL = join(adminRoot, 'src/routes/partners/OrgContentTrustPanel.tsx')
 const PARTNERS_PAGE = join(adminRoot, 'src/routes/partners/index.tsx')
 const BULK_BUTTON = join(adminRoot, 'src/routes/components/BulkPublishButton.tsx')
-const NAV = join(adminRoot, 'src/layouts/AdminLayoutWrapper.tsx')
+const NAV = join(adminRoot, 'src/layouts/adminNav.ts')
 const SERVER_SERVICE = join(repoRoot, 'services/api/src/orgs/admin-org-content-trust.service.ts')
 const SERVER_CONTROLLER = join(repoRoot, 'services/api/src/orgs/admin-orgs.controller.ts')
 

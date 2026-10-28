@@ -240,9 +240,10 @@ const PARKED_ONLY_FROM = {
   const closedKpi = stock.recruitmentStockKpi({ hostingOpen: false, jobs: 5, fairs: 2, printers })
   const closedTodo = stock.recruitmentStockTodo({ hostingOpen: false, jobs: 5, fairs: 2 })
   if (closedKpi.label !== '招聘类存量' || closedKpi.value !== '7' || closedKpi.failed) fail(`托管关闭有存量时指标卡应为「招聘类存量 7」，实际 ${JSON.stringify(closedKpi)}`)
-  if (!closedTodo || closedTodo.title !== '招聘类存量 7 条（托管关闭，不再审核）' || closedTodo.href !== '/job-sources') {
-    fail(`托管关闭有存量时待办应为「招聘类存量 7 条（托管关闭，不再审核）」并链到岗位信息源，实际 ${JSON.stringify(closedTodo)}`)
+  if (!closedTodo || closedTodo.title !== '存量 7 条，机构自审自发，违法违规才紧急下架' || closedTodo.actionLabel !== '去查看' || closedTodo.href !== '/job-sources') {
+    fail(`托管关闭有存量时待办应为「存量 7 条，机构自审自发，违法违规才紧急下架」并链到岗位信息源，实际 ${JSON.stringify(closedTodo)}`)
   }
+  if (stock.recruitmentStockTodo({ hostingOpen: false, jobs: null, fairs: 2 }) !== null) fail('岗位或招聘会没读到时待办不能按 0 计')
   const fairOnly = stock.recruitmentStockTodo({ hostingOpen: false, jobs: 0, fairs: 3 })
   if (fairOnly?.href !== '/fair-sources') fail('只有招聘会存量时应链到招聘会信息源（能逐条紧急下架的页面）')
   ban(JSON.stringify([closedKpi, closedTodo]), '（托管关闭）')
@@ -257,7 +258,9 @@ const PARKED_ONLY_FROM = {
   const openKpi = stock.recruitmentStockKpi({ hostingOpen: true, jobs: 4, fairs: 0, printers })
   const openTodo = stock.recruitmentStockTodo({ hostingOpen: true, jobs: 4, fairs: 0 })
   if (openKpi.label !== '招聘类内容' || !openKpi.sub.includes('发布机构')) fail(`托管打开时指标卡应写「招聘类内容 … 由发布机构自审自发」，实际 ${JSON.stringify(openKpi)}`)
-  if (!openTodo?.title.includes('由发布机构自审自发')) fail(`托管打开时待办应写由发布机构自审自发，实际 ${JSON.stringify(openTodo)}`)
+  if (openTodo?.title !== '存量 4 条，机构自审自发，违法违规才紧急下架' || openTodo.actionLabel !== '去查看' || openTodo.href !== '/job-sources') {
+    fail(`托管打开时待办应写「存量 N 条，机构自审自发，违法违规才紧急下架」，实际 ${JSON.stringify(openTodo)}`)
+  }
   ban(JSON.stringify([openKpi, openTodo]), '（托管打开）')
 
   const dashPath = R('dashboard/index.tsx')
@@ -272,7 +275,7 @@ const PARKED_ONLY_FROM = {
     fail(`${rel(dashPath)} 的意见反馈告警行没有链到 /member-feedback?category=ai_content`)
   }
   if (!/alert\.type === 'feedback_pending'\s*\?\s*`意见反馈 · /.test(dash)) fail(`${rel(dashPath)} 的意见反馈告警行仍显示终端号（会落成「未知终端」）`)
-  pass('工作台：托管关闭只在有存量时写「招聘类存量 N 条（托管关闭，不再审核）」并链到可紧急下架的页；打开时写由发布机构自审自发；意见反馈行链到反馈页')
+  pass('工作台：有存量时待办写「存量 N 条，机构自审自发，违法违规才紧急下架」并链到可紧急下架的页；指标卡打开时仍写由发布机构自审自发；意见反馈行链到反馈页')
 }
 
 // ---------------------------------------------------------------------------
@@ -288,6 +291,13 @@ const PARKED_ONLY_FROM = {
     fail(`${rel(path)} 没有在托管关闭时把这三项标成「托管关闭，不可用」`)
   }
   pass(`${rel(path)} 托管关闭时招聘会行程 / 岗位推荐 / 岗位解读标「托管关闭，不可用」`)
+  if (!code.includes("currentFeature?.status === 'planned'") || !code.includes('规划中，暂不生效') || !code.includes('保存后没有任何功能会读取这项配置')) {
+    fail(`${rel(path)} 规划中的功能必须标出暂不生效，并禁用保存`)
+  }
+  if (!code.includes("currentFeature?.key === 'print_param_prefill'") || !code.includes('本功能按规则预填，不调用大模型，只有启用开关生效')) {
+    fail(`${rel(path)} 打印参数预填必须说明只有启用开关生效`)
+  }
+  pass(`${rel(path)} 规划中的功能不能保存；打印参数预填只让启用开关生效`)
 }
 
 console.log('\nALL PASS')

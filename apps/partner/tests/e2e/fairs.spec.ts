@@ -34,6 +34,18 @@ test.describe('招聘会信息管理（mock 口径）', () => {
     await assertPageHonest(page, errors)
   })
 
+  test('演示模式招聘会配置保存、上传与删除都写明不执行', async ({ page }) => {
+    await gotoPartner(page, '/fairs', '招聘会信息管理')
+    await waitForMockList(page)
+    await page.getByRole('row', { name: /互联网行业专场招聘/ }).getByRole('button', { name: '配置' }).click()
+    const drawer = page.getByRole('dialog', { name: /配置：/ })
+    await expect(drawer.getByRole('status')).toHaveText('演示模式不执行')
+    await drawer.getByRole('button', { name: '新增展区' }).click()
+    await drawer.getByPlaceholder('展区名称').fill('演示展区')
+    await drawer.getByRole('button', { name: '保存', exact: true }).click()
+    await expect(drawer.getByText('演示模式不执行').first()).toBeVisible()
+  })
+
   test('下架二次确认：取消后仍已发布', async ({ page }) => {
     await gotoPartner(page, '/fairs', '招聘会信息管理')
     await waitForMockList(page)

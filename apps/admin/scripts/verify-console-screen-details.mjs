@@ -86,8 +86,10 @@ check(
 // ── 15. 路由与侧栏接线 ────────────────────────────────────────────────────
 const adminRoutes = read('apps/admin/src/routes/index.tsx')
 const adminLayout = read('apps/admin/src/layouts/AdminLayoutWrapper.tsx')
+const adminNav = read('apps/admin/src/layouts/adminNav.ts')
 const partnerRoutes = read('apps/partner/src/routes/index.tsx')
 const partnerLayout = read('apps/partner/src/layouts/PartnerLayoutWrapper.tsx')
+const partnerNav = read('apps/partner/src/layouts/partnerNav.ts')
 check(/path: 'screen',\s*element: <ScreenPage \/>/.test(adminRoutes), '管理员 /screen 路由已注册')
 check(/path: 'screen',\s*element: <ScreenPage \/>/.test(partnerRoutes), '机构 /screen 路由已注册')
 check(
@@ -103,11 +105,11 @@ check(
     && /return raw === 'usage' \|\| raw === 'terminal' \? raw : 'overview'/.test(read('apps/partner/src/routes/screen/screenTabs.ts')),
   '非法页签在前端纠正为默认页签，不渲染未知视图',
 )
-check(/'\/screen':\s*'screen'/.test(adminLayout) && /key: 'screen'/.test(adminLayout), '管理员侧栏有数据大屏入口')
-check(/'\/screen':\s*'screen'/.test(partnerLayout) && /key: 'screen'/.test(partnerLayout), '机构侧栏有数据大屏入口')
+check(/'\/screen':\s*'screen'/.test(adminNav) && /key: 'screen'/.test(adminNav), '管理员侧栏有数据大屏入口')
+check(/'\/screen':\s*'screen'/.test(partnerNav) && /key: 'screen'/.test(partnerNav), '机构侧栏有数据大屏入口')
 check(
-  (adminLayout.match(/key: 'screen'/g) ?? []).length === 1
-    && (partnerLayout.match(/key: 'screen'/g) ?? []).length === 1,
+  (adminNav.match(/key: 'screen'/g) ?? []).length === 1
+    && (partnerNav.match(/key: 'screen'/g) ?? []).length === 1,
   '两侧各只有一个数据大屏入口，没有重复导航',
 )
 check(
