@@ -79,7 +79,7 @@ export function SignStampPreview({
     return (
       <section className="ss-pvcol" aria-label="文档完整页预览">
         <div className="ss-pv-empty" data-testid="sign-stamp-pv-unavailable">
-          <FileTextIcon size={44} />
+          <span className="ss-pv-badge" aria-hidden="true"><FileTextIcon size={48} /></span>
           <b>{outErr === 'expired' ? '预览链接已过期' : '这份预览暂时打不开'}</b>
           <span>
             {outErr === 'expired'

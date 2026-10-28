@@ -230,7 +230,7 @@
 }
 
 .i2p-sample .vis {
-  flex: 0 1 40%;
+  flex: 0 1 52%;
   min-width: 0;
   min-height: 0;
   display: flex;
@@ -240,6 +240,13 @@
 
 .i2p-sample.is-art-only .vis {
   flex: 0 1 auto;
+}
+
+/* 手机宽度（舞台不缩放）：一整行只有 300 多像素，插画占一半字就挤了，回到四成。 */
+@media (max-width: 760px) {
+  [data-kiosk-stage-fit='off'] .i2p-sample:not(.is-art-only) .vis {
+    flex-basis: 40%;
+  }
 }
 
 .i2p-sample .vis .sx-art {

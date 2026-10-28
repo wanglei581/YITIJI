@@ -266,6 +266,21 @@
 
 .ss-pv-empty b { font-size: 24px; color: var(--qxt-ink); }
 
+/* 预览打不开：井被页面余量撑到三百多像素高，一枚小图标和两行字上下各剩一百多像素的空。
+ * 图标放进一枚大圆章里、标题放大一档，用真东西把这块填起来，不加没用的字。 */
+.ss-pv-badge {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--qxt-well);
+  color: var(--qxt-ink-2);
+}
+
+.ss-pv-empty .ss-pv-badge + b { font-size: 28px; }
+
 .ss-pv-cap {
   flex: none;
   display: flex;
