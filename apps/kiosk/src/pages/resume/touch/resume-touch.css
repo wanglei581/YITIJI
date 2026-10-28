@@ -460,6 +460,37 @@
   color: var(--qxt-teal-ink);
 }
 
+/* 预览核对：整页一起滚动。原来生成页的样式把表单卡压成「剩余高度」并 overflow:hidden，
+   整份简历比屏高时卡片内部被切掉半截；这里让卡片按内容高度排，由外层滚动区滚。 */
+.qxt-screen .qx-resume-generate .qx-rg-review {
+  flex: none;
+}
+
+.qxt-screen .qx-resume-generate .qx-rg-review > .qx-card {
+  flex: none;
+  overflow: visible;
+  justify-content: flex-start;
+}
+
+.qxt-screen .qx-rg-review > .rtp-hero {
+  flex: none;
+}
+
+.qxt-screen .rtp-hero.rtp-hero-min .rtp-hero-art {
+  min-height: 190px;
+}
+
+.qxt-screen .qx-rg-review .qx-rd-pending {
+  margin: 0;
+  padding: 16px 22px;
+  border-radius: 24px;
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+  font-size: var(--qxt-fs-body);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 /* 放不下整张时收成一行（只留眉题和标题），一行也放不下就不画：滚动区下沿不再切出半张卡。 */
 .qxt-screen .rtp-hero[data-fit='row'] .rtp-hero-art,
 .qxt-screen .rtp-hero[data-fit='row'] .rtp-hero-tx span,

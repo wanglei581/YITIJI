@@ -20,7 +20,11 @@ import { useAuth } from '../../auth/useAuth'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 
+import { QxTouchSection, QxTouchTile } from './touch/ResumeMaterialsTouch'
+import { ResumeStepPreview } from './touch/ResumeStepPreview'
+import { ResumeTouchArt, type ResumeTouchArtKind } from './touch/ResumeTouchArt'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
+import './touch/resume-materials-touch.css'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { DEMO_MODE_NO_REAL_FILE_REASON } from '../../lib/capabilityReasons'
 import { generateJobMaterial, getJobMaterialTemplates } from '../../services/api/jobMaterials'
@@ -107,6 +111,11 @@ function formatTime(iso: string | null): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+/** 目录卡上的纸张小样：只表示这一类材料的版式形状，不是任何人的内容。 */
+const ART_OF: Record<JobMaterialTemplateType, ResumeTouchArtKind> = {
+  cover_letter: 'resume', thank_you: 'resume', resume_template: 'resume', portfolio_cover: 'report', materials_checklist: 'checklist',
+}
+
 function typeFilterLabel(type: JobMaterialDocumentTemplate['type']): Filter {
   if (type === 'cover_letter') return '求职信'
   if (type === 'thank_you') return '感谢信'
@@ -145,7 +154,7 @@ function FileCard({ file, demo, onPreview, previewBusy, previewError }: {
   return (
     <div className="qx-rm-file" data-tone={demo ? 'demo' : canPrint ? 'ok' : 'warn'} data-print-ready={canPrint ? '1' : '0'} data-testid="material-workshop-file">
       <div className="qx-rm-file-h">
-        <FileTextIcon size={28} aria-hidden="true" />
+        <span className="qx-rm-file-art" aria-hidden="true"><ResumeTouchArt kind={ART_OF[file.documentType]} /></span>
         <span className="tx">
           <b>{head}</b>
           <span>{demo ? `已生成 ${file.filename} 的演示结果；演示模式未保存真实文件，暂不可打印。` : `已生成 ${file.filename}，文件已进入我的文档。`}</span>
@@ -487,7 +496,15 @@ export function JobMaterialLibraryPage() {
   } else {
     body = (
       <>
-        {generated ? null : afterFlow}
+        {signedOutSelect ? (
+          <ResumeStepPreview
+            className="rtp-hero-min"
+            art="checklist"
+            kicker="登录后继续"
+            title="填过的内容会留在这台机器上"
+            lines={['点「登录后生成」时才需要登录，草稿不会丢。', '模板目录随便看，不登录也能选、能填。']}
+          />
+        ) : generated ? null : afterFlow}
         <nav className="qx-rm-filters" aria-label="求职材料分类">
           {FILTERS.map((item) => (
             <button key={item} type="button" aria-pressed={filter === item} onClick={() => setFilter(item)}>{item}</button>
@@ -495,7 +512,6 @@ export function JobMaterialLibraryPage() {
         </nav>
         <div className="qx-rm-workspace">
           <section className="qx-rm-catalog" aria-label="可选求职材料" tabIndex={0}>
-            <p className="qx-rm-catalog-hint">上下滑动，查看全部模板</p>
             {visible.length === 0 ? (
               <StateBlock kind="warn" size="sm" icon={<InfoIcon size={24} aria-hidden="true" />} title="该分类暂无求职材料">
                 请切换其他分类查看；空列表不使用内置假模板填充。
@@ -503,6 +519,8 @@ export function JobMaterialLibraryPage() {
             ) : visible.map((template) => (
               <button key={template.id} type="button" className="qx-rm-template" aria-pressed={selected?.id === template.id} disabled={submitting}
                 onClick={() => selectTemplate(template)} data-testid={`material-workshop-template-${template.id}`}>
+                <span className="qx-rm-art" aria-hidden="true"><ResumeTouchArt kind={ART_OF[template.type]} /></span>
+                <span className="qx-rm-sample">示例</span>
                 <b>{template.title}</b>
                 <span className="qx-rm-desc">{template.description}</span>
                 <span className="qx-rm-use">带走：{template.outputFilename}</span>
@@ -531,6 +549,16 @@ export function JobMaterialLibraryPage() {
             )}
           </aside>
         </div>
+        {signedOutSelect ? (
+          <>
+            <QxTouchSection title="不登录也能办" />
+            <div className="qxt-tools">
+              <QxTouchTile layout="stack" icon="printer" title="打印" desc="打印现有简历" onClick={() => navigate('/print-scan')} />
+              <QxTouchTile layout="stack" icon="scan" title="扫描" desc="扫描纸质简历" onClick={() => navigate('/scan/start')} />
+              <QxTouchTile layout="stack" icon="landmark" title="查政策" desc="查看公开的政策" onClick={() => navigate('/policy-service')} />
+            </div>
+          </>
+        ) : null}
       </>
     )
     cta = generated && !submitting && !submitError ? (

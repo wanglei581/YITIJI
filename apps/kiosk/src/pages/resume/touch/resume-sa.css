@@ -1,10 +1,6 @@
 /* 自我探索结果页（SaResultParts）：头部一张纸，其下五个方向各一行（强度 n/5 加一条细线，依据题号）。
    颜色只走 var(--qxt-*) / var(--qx-*)。 */
 
-.qxt-screen .rtp-hero.rtp-hero-min .rtp-hero-art {
-  min-height: 190px;
-}
-
 .qxt-screen .rtp-sa-rows {
   display: flex;
   flex-direction: column;

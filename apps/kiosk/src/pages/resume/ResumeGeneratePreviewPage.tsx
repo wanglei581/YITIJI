@@ -8,7 +8,9 @@ import type {
   ResumeGenerateResponse,
   ResumeTemplate,
 } from '@ai-job-print/shared'
+import { maskEmail, maskPhone } from '../../utils/maskPii'
 import { ResumeHelpLine } from './touch/ResumeHelpLine'
+import { ResumeStepPreview } from './touch/ResumeStepPreview'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { useAuth } from '../../auth/useAuth'
@@ -322,8 +324,8 @@ export function ResumeGeneratePreviewPage() {
   return (
     <ResumeTouchFrame
       eyebrow="从零生成 · 核对"
-      title="简历预览"
-      subtitle="核对内容后带走"
+      title={onExportScreen ? '简历预览' : advisor.ask}
+      subtitle={onExportScreen ? '核对内容后带走' : advisor.doing}
       status={{
         tone: view === 'preview-failed' || view === 'illegal' || view === 'export-failed' ? 'bad' : view === 'preview-loading' || view === 'export-exporting' ? 'warn' : view === 'preview-ready' || view === 'export-ready' ? 'ok' : 'unknown',
         label: statusLabel,
@@ -348,7 +350,8 @@ export function ResumeGeneratePreviewPage() {
         data-fallback={resolved.fallback ? '1' : undefined}
         data-synthetic={resolved.synthetic ? '1' : undefined}
       >
-        <ResumeGenerateAdvisor eyebrow={advisor.eyebrow} ask={advisor.ask} doing={advisor.doing} />
+        {/* 核对屏与空状态的问句已经在意图带上；选格式 / 出文件那几屏的正文靠这张横幅撑起高度，仍然画。 */}
+        {onExportScreen ? <ResumeGenerateAdvisor eyebrow={advisor.eyebrow} ask={advisor.ask} doing={advisor.doing} /> : null}
         <ResumeAigcBadge synthetic={resolved.synthetic} />
         {!showWorkspace && (
           <>
@@ -366,6 +369,24 @@ export function ResumeGeneratePreviewPage() {
         )}
         {showWorkspace && resume && result && !onExportScreen && (
           <div className="qx-rg-review">
+            <ResumeStepPreview
+              className="rtp-hero-min"
+              kicker="核对这一份"
+              title={resume.basic.name.trim() || '姓名未填'}
+              lines={[
+                [resume.intention.position, resume.intention.city].filter(Boolean).join(' · ') || '求职意向未填',
+                [resume.basic.phone ? maskPhone(resume.basic.phone) : '', resume.basic.email ? maskEmail(resume.basic.email) : ''].filter(Boolean).join(' · ') || '联系方式未填',
+                `教育 ${resume.education.length} 段 · 经历 ${resume.experience.length} 段 · 项目 ${resume.projects.length} 个 · 技能 ${resume.skills.length} 项`,
+              ]}
+              note="公共屏上手机号、邮箱打码显示，导出的简历里是完整的"
+            />
+            {unconfirmed.length > 0 && <p className="qx-rd-pending">待本人确认：{unconfirmed.join('、')}</p>}
+            <div className="qxt-exits">
+              <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={focusSummary}>改一段描述</button>
+              <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={() => document.getElementById('resume-generate-preview-hints')?.scrollIntoView({ block: 'center' })}>
+                {hints.length > 0 ? `看这 ${hints.length} 处` : '看缺失提示'}
+              </button>
+            </div>
             <div className="qx-card">
               <div className="qx-sec-h">
                 <span className="qx-rg-no">01</span>
@@ -381,16 +402,11 @@ export function ResumeGeneratePreviewPage() {
                 onEditingChange={setEditing}
               />
             </div>
-            {unconfirmed.length > 0 && <p className="qx-rd-pending">待本人确认：{unconfirmed.join('、')}</p>}
             <div className="qx-rg-help">
               <p>
                 润色只动个人简介和各段描述。学校、专业、公司和职务可以在这一页改；学历、时间段、项目名和证书仍按你填的保留。
                 {hints.length > 0 ? `另外还有 ${hints.length} 处建议补充。` : ''}
               </p>
-              <button type="button" className="qx-rg-hbtn" onClick={focusSummary}>改一段描述</button>
-              <button type="button" className="qx-rg-hbtn" onClick={() => document.getElementById('resume-generate-preview-hints')?.scrollIntoView({ block: 'center' })}>
-                {hints.length > 0 ? `看这 ${hints.length} 处` : '看缺失提示'}
-              </button>
             </div>
             <div id="resume-generate-preview-hints" className="qx-rg-hints">
               {hints.length > 0 ? hints.map((hint) => <p key={hint}>{hint}</p>) : <p>按当前内容，没有要补充的项。不补也能导出。</p>}
