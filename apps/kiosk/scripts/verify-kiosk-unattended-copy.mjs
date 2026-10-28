@@ -12,7 +12,7 @@
  * 扫 apps/kiosk/src 全部文本源码（.ts/.tsx/.js/.css/.json 等，注释也算），两条规则：
  *
  *   ① 共享模块（src/pages/ 以外的一切：copy、services、hooks、components、auth、layouts……）零容忍。
- *      词表里任何一条出现就红。词表覆盖不到「请叫现场工作人员」「工作人员会核实」这类变体，
+ *      词表里任何一条出现就红。词表是字面匹配，总会漏网（换个说法就绕过去），
  *      所以共享模块里「工作人员」三个字本身也不许出现；隐私类说明这种不是求助指引的句子，
  *      在下面的 NOT_HELP_GUIDANCE 里按「文件 + 整行原文」精确放行并写明理由。
  *      src/copy/unattendedCopy.ts 是词表本体，只免「三个字」这一条，词表条目照扫。
