@@ -943,7 +943,9 @@ test('hard clear stops active print polling without cancelling the backend task 
     )
   }, PRINT_TASK_ID)
   await page.reload({ waitUntil: 'domcontentloaded' })
-  await expect(page.getByText('任务已进入队列，终端尚未领取，请留在机器旁', { exact: true })).toBeVisible()
+  // 触屏版出纸页：这句话既是意图带的副题，也写进只给读屏的实时状态区（.pfp-lead-doing，1px 隐藏、不可见）。
+  // 定位收窄到意图带，断言强度不变；读屏实时区保留（状态变化要读给视障用户）。
+  await expect(page.locator('.qxt-band').getByText('任务已进入队列，终端尚未领取，请留在机器旁', { exact: true })).toBeVisible()
   await expect.poll(() => pollRequests).toBeGreaterThan(0)
 
   await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)

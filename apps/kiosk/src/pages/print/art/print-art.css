@@ -1,0 +1,64 @@
+/* 打印流程实物小样的样式（照第 5 版稿 ui.js 的画法）。色值全在 print-art-tokens.css 的 --pa-* 令牌里（PrintArt.tsx 先引令牌再引本文件），
+   TSX 与 SVG 字符串里不出现色值，本文件也不写裸色值。 */
+.pa {
+  display: inline-flex;
+  line-height: 0;
+}
+.pa .pa-svg { display: block; }
+.pa .pa-shadow { filter: drop-shadow(0 6px 14px rgba(11, 36, 30, 0.14)); }
+.pa .a-w { fill: var(--pa-white); }
+.pa .a-w2 { fill: var(--pa-white-2); }
+.pa .a-paper { fill: var(--pa-paper); }
+.pa .a-ink { fill: var(--pa-ink); }
+.pa .a-ink2 { fill: var(--pa-ink-2); }
+.pa .a-deep { fill: var(--pa-deep); }
+.pa .a-g1 { fill: var(--pa-line); }
+.pa .a-g2 { fill: var(--pa-line-2); }
+.pa .a-t { fill: var(--pa-teal); }
+.pa .a-mint { fill: var(--pa-mint); }
+.pa .a-m1 { fill: var(--pa-metal-1); }
+.pa .a-m2 { fill: var(--pa-metal-2); }
+.pa .a-m3 { fill: var(--pa-metal-3); }
+.pa .a-m4 { fill: var(--pa-metal-4); }
+.pa .a-m4a { fill: var(--pa-metal-6); }
+.pa .a-m5 { fill: var(--pa-metal-5); }
+.pa .a-edge { stroke: var(--pa-edge); stroke-width: 1.5; }
+.pa .a-edge2 { stroke: var(--pa-edge-2); stroke-width: 2; }
+.pa .a-edge3 { stroke: var(--pa-metal-2); stroke-width: 2; }
+.pa .a-edge4 { stroke: var(--pa-metal-4); stroke-width: 2; }
+.pa .a-edge5 { stroke: var(--pa-metal-4); stroke-width: 2; }
+.pa .a-nofill { fill: none; }
+.pa .a-arrow { fill: none; stroke: var(--pa-white); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.pa .a-arrow-clay { fill: none; stroke: var(--pa-clay); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+.pa .a-dim { opacity: 0.85; }
+.pa .a-glow { opacity: 0.35; }
+.pa .a-grad-a { stop-color: var(--pa-grad-a); }
+.pa .a-grad-b { stop-color: var(--pa-grad-b); }
+.pa .a-ring-track { stroke: var(--pa-ring-track); }
+.pa .a-ring-arc { stroke: var(--pa-teal); transition: stroke-dashoffset 1s linear; }
+
+/* 状态屏的填充小样（PrintFillArt）：吃掉剩下的高度，小样按高度缩放；内容够长时高度为 0。 */
+.pfa {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  container-type: size;
+}
+
+.pfa .pa,
+.pfa .pa svg {
+  display: block;
+  height: 100cqh;
+  max-height: 100cqh;
+  width: auto;
+  max-width: calc(100cqw - 72px);
+}
+
+/* 剩下的高度放不下一幅完整的小样时就不画，免得只露半截。 */
+@container (max-height: 56px) {
+  .pfa .pa {
+    display: none;
+  }
+}

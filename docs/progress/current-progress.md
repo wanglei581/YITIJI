@@ -1,5 +1,28 @@
 # 当前开发进度
 
+## 2026-10-28：触屏版第 5 版 · 第 3 包「打印整条流程」（分支 `claude/kiosk-touch-p3`，未合并、未部署、真机未验）
+
+- 范围：一体机打印整条流程的正文按触屏版第 5 版重做——打印扫描服务台、材料检查、预览与参数、核对价格、收银台、出纸进度、打印完成、结果未确认、到机码输码、核对订单，以及选文件三页（来源选择、手机传文件、U 盘）；路由 `/print-scan`、`/print/upload`、`/print/desk`（`/print/material-check`、`/print/preview`、`/print/params` 仍重定向）、`/print/confirm`、`/print/cashier`、`/print/progress`、`/print/done`、`/print/pickup-claim`。不碰后端、数据库、硬件链路、小程序。
+- 产品负责人 10/26 三件：完成页「我拿走了，结束使用」一按就结束（60 秒空闲到点结束、点屏重新计时保留）；打印步骤统一为四步（选文件、材料检查、预览与参数、核对价格，含服务台步骤轴）；收银台、到机码、结果未确认、缺纸与失败各态与金额规则以运行页为准，稿只改版式与字。
+- 删除与改名记录（均有证据：无路由、无 import、无门禁引用，已跑相关门禁）：删除 `PickupWinCard`（到机码成功卡，由 `PickupOkBody` 取代）；样式文件 `print-fulfill-touch.css`（970 行）拆成 `print-progress-touch.css`、`print-done-touch.css`、`print-pickup-touch.css`，规则内容不变；`printArt.ts` 因与 `PrintArt.tsx` 在不区分大小写的文件系统里重名，改为 `printArtSvg.ts`。
+- 门禁与单测改到稿的真值（不放宽，每条都做了反向检查）：`verify:fusion-w2`、`verify:scan-input-safety`（扫码枪入口改认「用扫码枪扫」，说明原句只在 `PickupHidGuide` 写一份）、`verify:device-status-honest`（W-117 改认新结构）、`verify:pii-redaction-contract`、`verify:print-done-truth`（倒计时措辞）、`print-walk-copy` 单测（补 PrintIcon、PrintArt 映射，页数核定与免费摘要的断言按稿分状态，W-117 提示条按新结构）。
+- 稿与运行页的差异处理：选文件来源页没有主按钮；扫码枪说明在说明卡里原地展开，不另起一屏；到机码页键盘下面只留一行折叠「两种码的区别 · 码找不到了」；核对价格页用这一份文件自己的第一页做小样（读不出来退成文件图标）；打印各页补底部导航（稿里首页、选文件、手机传文件亮「首页」，其余不亮）。
+- 同时修了随这批改版暴露的两处运行页问题：收银页失败固定句末尾「请联系现场工作人员」改为只拿掉这一截并保留原因前半句（安全校验失败不再被泛化成创建任务失败）；免费单核对价格页不再出现优惠券卡、收银页免费单摘要不再说「付款」。
+- 仍未做到与已知差异见 `/Users/wanglei/.cache/claude-lanes/touch-impl-1025/grok/out-CL-p3.md`。
+## 2026-10-28（夜）：第 3 包按审查意见修改（分批推送到 `claude/kiosk-touch-p3`，未合并、未部署、真机未验）
+
+- 范围：Claude 审查子代理在合并提交 `1fc2a36dd` 上提的 13 条代码审查加 2 条反方审查意见，逐条返工；并入第一包新头 `aed1b6512`（触屏底栏在手机宽下收进一屏），390×844 的「价格变动提示与再确认键」用例转绿。
+- 做了什么：①打印实物小样的色值挪进只含令牌声明的 `art/print-art-tokens.css`（`verify:kiosk-visual-unity` 转绿，色值一个不改）；②w5「派生产物直达核对价格」接上小样要取的文件内容、privacy 的严格模式冲突收窄到意图带；③出纸页、完成页没拿到任务信息时不再说「没有订单、没有扣费」（`PrintMissResume` 必传 `orderMayExist`，订单可能已建已付就只说说不准并给出路，付款之前的空态保留原句）；④打印链上「去我的文档选一份来打印」收成一个 hook，落点带 `?pick=print`，登录回跳也带；⑤收银台第一屏订单摘要收成三行、其余事实折进「更多订单信息」、「退出支付」挪到收款码卡下面，底栏三个键的字不再被截，稿的问句「问小青：这笔账看不懂」原样保留；⑥完成页普通失败、卡纸、缺纸、费用说明与出纸页查询超时、已知失败，照稿 st-unconfirmed 的骨架重做（三步 + 摘要 + 出口 + 小字，底栏触屏三槽，「文件带走」做成触屏卡），真实状态与分支一个不丢；⑦上传类八种出错屏收成同一块出错板件（稿 st-error）；⑧服务台可点卡读屏名只取标题、说明句进描述；⑨取件页「历史 10 位码」键读屏名取可见文字；完成页「查看打印订单」副题只在建单响应确认关联账号时才写「这一单的记录」。
+- 拆分（拆分只搬不改行为，门禁只改读取范围）：`PrintDonePage` 820 → 620 行（失败各态进 `components/PrintDoneFailed.tsx`，文案与摘要行是纯函数 `printDoneFailedModel.ts`），`PrintProgressPage` 848 → 701 行（轮询常量与三态话术进 `printProgressStatus.ts`，缺任务两支进 `PrintProgressMissing.tsx`），`FileSourceBits` 833 → 约 450 行（手机各态进 `FileSourcePhone.tsx`、U 盘各态进 `FileSourceUsb.tsx`、出错板件 `FileSourceError.tsx` 与纯文案 `fileSourceErrorModel.ts`）。
+- 删除记录（均有证据：无路由、无 import、无门禁与用例引用、无文档声明，已跑相关门禁与图谱）：`components/PrintDeskChrome.tsx`（材料检查与预览改用触屏意图带后成了孤儿，图谱孤儿清单第一条）；`PrintDoneSections` 里只给旧失败版式用的 `PrintDoneXq` / `PrintFeeBoundaryBar` / `PrintOutOfPaperPanel` / `PrintJamGuide`；`printProgressModel` 里只给旧小青区用的 `outOfPaperDoing` / `failureStaffDoing`；`FileSourceBits` 里的 `FileSourceHero` / `FileSourceReason` / `ExistingSourceLinks` / `RejectBoard` 与 `fileSourceModel` 里只给 `FileSourceHero` 用的 `FILE_SOURCE_ASK` / `fileSourceEyebrow`。Git 历史保留。
+- 门禁与用例（强度不变，改过的逐条做了反向检查）：`verify-print-done-truth` 三处锚点改读新文件，`verify-fusion-w2-print-scan` / `verify-print-confirm-honest` / `verify-file-display-truth` 只加读取范围；`print-fulfill-qx` / `print-done-truth` 的选择器改到新结构；新增用例：来源页与空态「我的文档」带 `pick=print`、完成页订单磁贴副题、收银台第一屏、缺纸版面、五种出错屏共用一块板件、问小青交接补回真检查态；`print-walk-copy` 单测加失败文案模型、出错文案模型与版式要点。
+- 反向检查发现的一处覆盖缺口：隐去服务台缺纸版面里的「先传、稍后打印」，所有既有用例照样绿；已补一条 `print-hub-qx` 用例，缺纸版与离线版各验过。
+- 反向检查发现的另两处覆盖缺口：①把 `local-upload-failed` 出错屏出口卡的标题改名，用例仍绿（只看了底栏主键的字）——已补断言「第一张出口卡必须含主键的字」；②出纸页「暂时查不到打印结果」要连续 10 分钟没拿到终态才出现，此前没有任何浏览器用例（夹具里一直标「本轮不加速时钟」）——已补一条，用页面时钟快进到达，验三步、订单摘要、底栏三槽、不下结论、不找人、点「重新查询状态」回到进行中。出错板件用例同时补到 7 屏（加 `local-unreadable`、`local-upload-failed`；`local-oversize` 要 15MB 文件，由文案单测与截图守着）。
+- 小清理：`displayFileName` 从组件文件 `FileSourceBits.tsx` 挪进纯 TS 的 `fileSourceModel.ts`（A8 拆分时为复用把它导出，给组件文件新增了一条 react-refresh 警告；挪后 lint 回到 28 条警告、0 error，函数体一字不动，`verify:file-display-truth` 读取范围加上 `fileSourceModel.ts`、断言不动）。
+- 总指挥追加的小改：`COPY_ID_CARD_PLACEMENT_PENDING`（服务台复印说明里的身份证占位句）由「身份证怎么放、怎么翻面，请看打印机屏幕提示。」改成稿上的「身份证怎么放、怎么翻面，请看打印机屏幕上的图示。」，与第九包逐字一致；钉着旧句的 `print-hub-qx.spec.ts`「copy card opens the panel copy guide and returns to the hub」同步改，反向检查（源码改回旧句）转红。仍是占位句——手册没写放置位置，只指路、不编造位置、不让用户去找人。
+- 10/29 补做的尾巴：完成页 `/print/done` 的「正在核验打印结果」「无法确认打印结果」两态原先还是旧小号 ctabar（没有触屏底栏、没有问小青），现换成触屏三槽底栏（新 `components/PrintDoneUnverified.tsx`，文案常量在 `printDoneUnverifiedCopy.ts`；失败各态的做法）。无法确认补问小青「结果没确认怎么办」，草稿如实说没能确认、订单可能已建立，并写明不要假装查过我的订单、不要替我判断有没有扣款、不要猜成功或失败、不要让我重复打印；正在核验的主键「正在核验…」置灰，旁边写明「正在核对这一单的打印结果，核对完才能继续。」（`aria-describedby` 连着；原句「核验期间主按钮暂不能点：还没拿到这一单的真实状态，不知道下一步该做什么。」是写给开发看的，10/29 晚改成对办事的人说的话，稿里没有这一态，口吻照同页其他状态与稿「要等系统确认才能继续」的说法；只改字、版式不动，用例与单测同步改、旧句放回去的反向检查转红）；原 ctabar 里的「反馈问题」「查看打印订单」挪进正文出口一排，没有任务号时仍没有这两个。新增浏览器用例 3 条（`print-fulfill-qx.spec.ts`）与 `print-walk-copy` 静态断言 3 条，`PrintMissResume` 调用点计数那条改读新组件；改过的断言都做了反向检查，红行见 `/Users/wanglei/.cache/claude-lanes/touch-impl-1025/grok/out-tails.md`。另把第 3 包第一节「范围」那句里选文件三页的括号挪到句尾，避开 `verify:print-scan-first-release` 的过度宣称正则（门禁一字未动，本机已过）。
+- 验证与已知差异见 `/Users/wanglei/.cache/claude-lanes/touch-impl-1025/grok/out-CL-p3-fix.md`。
+
 ## 2026-10-28：触屏版共享层补样式——旧共享弹窗与面板在触屏屏里掉样式（第一包补一块，未推送，待总指挥审）
 
 - 问题：触屏屏里的按钮重置 `.qxt-screen:where(.qxt-btn-reset) button`（0,1,1）盖掉了旧共享件用 Tailwind 工具类写的边、底、内距、字号。行业 / 筛选选择弹窗的 20 个选项变成一片纯文字、选中态看不出；手机扫码、U 盘面板里的按钮只剩文字；Tailwind 的 14px / 12px 小字、48–58px 的按钮都低于触屏下限（正文 20px、可点区 64×64）。第八包原先在自己的页面样式里从外面补，第四、九、十、十一包也会遇到。

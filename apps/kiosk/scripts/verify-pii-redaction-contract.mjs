@@ -414,7 +414,8 @@ check('材料检查页不再把「当前版本不生成新文件」当默认文�
   assert.ok(!pageCode.includes('已完成遮挡产物评估，当前版本不生成新文件'))
 })
 check('材料检查页保留 main 的诚实预检横幅,不把源分支假文案带回来', () => {
-  assert.match(pageCode, /feature="文件预检"/)
+  // 2026-10-28 触屏版第 5 版：横幅标记随呈现层移到 MaterialCheckPresentation（稿 pii 顶部说明条），页面只传文案。
+  assert.match(stripComments(read('src/pages/print/components/MaterialCheckPresentation.tsx')), /data-feature="文件预检"/)
   assert.match(pageCode, /检查格式、大小、页数与图片质量/)
   assert.ok(!pageCode.includes('自动检查格式、边距与打印风险'))
   assert.ok(!pageCode.includes('AI文件预检'))

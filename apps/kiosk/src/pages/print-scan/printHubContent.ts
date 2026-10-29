@@ -188,7 +188,7 @@ export const PRINT_HUB_DEVICE_OFF_BAND: PrintHubBandCopy = {
     { k: '代价', v: '这一趟拿不到纸。文件传上来、拼好、签好之后要换一台机器才出得了纸。' },
     {
       k: '备选',
-      v: '先把材料存进「我的文档」，或找现场工作人员。离线已自动上报运维，本机不替系统承诺恢复时间。',
+      v: '先把材料存进「我的文档」。离线已自动上报运维，本机不替系统承诺恢复时间。',
     },
   ],
 }
@@ -201,7 +201,7 @@ export const PRINT_HUB_PROBE_UNKNOWN_BAND: PrintHubBandCopy = {
   lines: [
     {
       k: '还能做什么',
-      v: '「我的打印记录」三个入口不受影响；已存进「我的文档」的文件换机也能取回来打，或找现场工作人员。',
+      v: '「我的打印记录」三个入口不受影响；已存进「我的文档」的文件换机也能取回来打。',
     },
   ],
 }
@@ -213,7 +213,7 @@ export const PRINT_HUB_PROBE_UNKNOWN_BAND: PrintHubBandCopy = {
  * 「暂时无法确认这台机器开放了哪些服务」口径写。
  */
 export const PRINT_HUB_PROBE_UNKNOWN_TECH_NOTE =
-  '暂时查不到这台机器能用哪些功能，所以先都不开放，免得你点进去才发现办不了。请点「重新检测」，或找工作人员；已经下过单的，到机码照常能用。'
+  '暂时查不到这台机器能用哪些功能，所以先都不开放，免得你点进去才发现办不了。请点「重新检测」；已经下过单的，到机码照常能用。'
 
 // ── 分组标题右侧的副文案（随两条轴切换） ─────────────────────
 
@@ -274,7 +274,7 @@ export const HUB_TRUTH = [
  */
 export function arrivalCodeHint(signedIn: boolean, probe: ProbeStatus, mfp: MfpStatus): string {
   if (probe !== 'ok') return '本机服务状态无法确认 · 核销前先确认这台能不能出纸'
-  if (mfp === 'unavailable') return '这台出不了纸 · 核销前先换一台空闲机器'
+  if (mfp === 'unavailable') return '这台出不了纸 · 核销完也拿不到纸，请稍后再来'
   if (!signedIn) return '凭码办理 · 不登录也能核销'
   return '输到机码，直接认领这一单'
 }
@@ -285,7 +285,7 @@ export function arrivalCodeStateNote(probe: ProbeStatus, mfp: MfpStatus): string
   if (probe !== 'ok')
     return '本机连能不能出纸都读不到：核销能办，但这一趟可能拿不到纸。'
   if (mfp === 'unavailable')
-    return '这台机器现在出不了纸。核销完也拿不到纸，建议换一台空闲机器再核销。'
+    return '这台机器现在出不了纸，核销完也拿不到纸；订单还在，请稍后再来。'
   return undefined
 }
 
@@ -359,7 +359,7 @@ export const COPY_GUIDE_STEPS: readonly CopyGuideStep[] = [
  * 手册只写了「点身份证复印 → 调好设置 → 点复印」，没写证件放在玻璃哪里、正反面怎么翻、
  * 屏幕会不会提示翻面。【待 Windows 窗口现场核实后填写】在那之前不编造位置，只给一句指路。
  */
-export const COPY_ID_CARD_PLACEMENT_PENDING = '身份证怎么放、怎么翻面，请看打印机屏幕提示或找工作人员。'
+export const COPY_ID_CARD_PLACEMENT_PENDING = '身份证怎么放、怎么翻面，请看打印机屏幕上的图示。'
 
 export interface CopyGuideCase {
   key: 'id-card' | 'receipt' | 'duplex'

@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { QRCodeSVG } from 'qrcode.react'
 import {
   AlertCircleIcon,
   CheckCircle2Icon,
@@ -7,52 +6,16 @@ import {
   FolderIcon,
   HelpCircleIcon,
   InfoIcon,
-  Loader2Icon,
-  ScanLineIcon,
   SmartphoneIcon,
   UsbIcon,
   XCircleIcon,
 } from 'lucide-react'
-import { FILE_NAME_BUDGET_CARD, truncateFileNameMiddle } from '../../../lib/fileName'
-import type { FileSourceScreen, UploadTab } from './fileSourceModel'
+import { QxTouchCallout } from '../../../components/qingxu/touch/QxTouchCallout'
+import { QxTouchIcon, type QxTouchIconName } from '../../../components/qingxu/touch/QxTouchIcon'
+import { QxTouchSlab } from '../../../components/qingxu/touch/QxTouchSlab'
+import { PrintArt } from '../art/PrintArt'
+import { displayFileName, type FileSourceScreen, type UploadTab } from './fileSourceModel'
 import type { UsbImportHold } from '../../../hooks/useUsbImportGate'
-import { FILE_SOURCE_ASK, fileSourceEyebrow } from './fileSourceModel'
-
-const USB_HOLD_ASK: Record<UsbImportHold['state'], { lead: string; em: string; tail: string; doing: string }> = {
-  loading: { lead: '先确认', em: '能不能用 U 盘', tail: '。', doing: '还没确认前，不读盘，也不列出文件。' },
-  blocked: { lead: 'U 盘这条', em: '现在不能用', tail: '。', doing: '原因写在下面。可以改用手机上传。' },
-  unknown: { lead: '暂时', em: '确认不了', tail: '。', doing: '读不到开通情况时，不把 U 盘当成能用。' },
-}
-
-export function FileSourceHero({
-  screen,
-  isResume,
-  hold = null,
-}: {
-  screen: FileSourceScreen
-  isResume: boolean
-  hold?: UsbImportHold['state'] | null
-}) {
-  const ask = hold ? USB_HOLD_ASK[hold] : FILE_SOURCE_ASK[screen]
-  const doing =
-    !hold && isResume && screen === 'source-chooser'
-      ? '上传已有简历，检查后带走打印件。'
-      : ask.doing
-  return (
-    <section className="fs-hero" data-testid="file-source-hero">
-      <div className="fs-hero-row">
-        <div className="fs-hero-face" aria-hidden="true">青</div>
-        <div className="fs-hero-main">
-          <div className="fs-hero-eyebrow">{fileSourceEyebrow(screen)}</div>
-          <div className="fs-hero-ask">
-            {ask.lead}<em>{ask.em}</em>{ask.tail}
-          </div>
-          <div className="fs-hero-doing">{doing}</div>
-        </div>
-      </div>
-    </section>
-  )
-}
 
 export function FileSourceStatus({
   kind,
@@ -143,19 +106,6 @@ export function FileSourceSteps({ title, items }: { title?: string; items: strin
   )
 }
 
-export function FileSourceReason({ children }: { children: ReactNode }) {
-  return (
-    <div className="fs-reason" data-testid="file-source-disabled-reason">
-      <InfoIcon size={22} aria-hidden="true" />
-      <span>{children}</span>
-    </div>
-  )
-}
-
-function displayFileName(name: string): string {
-  return truncateFileNameMiddle(name, { maxLength: FILE_NAME_BUDGET_CARD })
-}
-
 export function FileRow({
   name,
   meta,
@@ -164,6 +114,7 @@ export function FileRow({
   bad,
   on,
   dim,
+  mark,
   onClick,
   testId,
 }: {
@@ -174,18 +125,20 @@ export function FileRow({
   bad?: boolean
   on?: boolean
   dim?: boolean
+  /** 左侧类型字，例如 PDF。不传时仍是文件图标。 */
+  mark?: string
   onClick?: () => void
   testId?: string
 }) {
   const className = ['fs-frow', on ? 'on' : '', dim ? 'dim' : ''].filter(Boolean).join(' ')
   const inner = (
     <>
-      <span className={`fs-f-ic${bad ? ' bad' : ''}`}><FileTextIcon size={26} aria-hidden="true" /></span>
+      <span className={`fs-f-ic${bad ? ' bad' : ''}`} data-mark={mark || undefined}>{mark ? <b>{mark}</b> : <FileTextIcon size={26} aria-hidden="true" />}</span>
       <span className="fs-f-m">
         <span className="fs-f-n" title={name}>{displayFileName(name)}</span>
         <span className="fs-f-s">{meta}</span>
       </span>
-      <span className={`fs-f-tag ${tagTone}`}>{tag}</span>
+      {tag ? <span className={`fs-f-tag ${tagTone}`}>{tag}</span> : null}
     </>
   )
   if (!onClick) {
@@ -216,7 +169,7 @@ export function NowFileCard({
   previewLabel?: string
 }) {
   return (
-    <div className="qx-card qx-grow fs-file-work" data-testid="file-source-file-card" data-live="true">
+    <div className="qx-card fs-file-work" data-testid="file-source-file-card" data-live="true">
       <div className="fs-now">
         <span className="fs-now-ic"><FileTextIcon size={38} aria-hidden="true" /></span>
         <span className="fs-now-m">
@@ -265,13 +218,13 @@ const CHANNEL_COPY: Record<UploadTab, { name: string; desc: string; limit: strin
   },
   qr: {
     name: '手机扫码上传',
-    desc: '手机扫屏幕上的码，打开上传页选文件。不用登录，也不用装软件。',
+    desc: '不用登录、不用装软件。单份不超过 10MB',
     limit: 'PDF / JPG / PNG · 单份 ≤ 10MB',
     tone: 'teal',
   },
   usb: {
     name: 'U 盘导入',
-    desc: '插右侧 USB 口，本地服务列出根目录里的文件，你在屏幕上选。',
+    desc: '只读根目录，只读取你主动选择的文件',
     limit: 'PDF / JPG / PNG · 单份 ≤ 15MB',
     tone: 'slate',
   },
@@ -338,85 +291,12 @@ export function ChannelGrid({
   )
 }
 
-export function ExistingSourceLinks({
-  showScan,
-  onScan,
-  onDocuments,
-}: {
-  showScan: boolean
-  onScan: () => void
-  onDocuments: () => void
-}) {
-  return (
-    <section className="fs-sec">
-      <div className="fs-sec-h">
-        <span className="no">02</span>
-        <span className="t">文件不在手机或 U 盘？</span>
-        <span className="hint">继续准备材料</span>
-      </div>
-      <div className="fs-split">
-        {showScan ? (
-          <button type="button" className="fs-mini" onClick={onScan} data-testid="file-source-scan-source" aria-label="扫描纸质原件">
-            <h4><ScanLineIcon size={22} aria-hidden="true" /><span>扫描纸质原件</span></h4>
-            <p>先开始扫描办理，再去<b>奔图操作面板</b>扫描。完成后取得 PDF；网页不能远程启动扫描仪。</p>
-          </button>
-        ) : null}
-        <button type="button" className="fs-mini" onClick={onDocuments} data-testid="file-source-member-source" aria-label="从我的文档或最近打印文件选择">
-          <h4><FileTextIcon size={22} aria-hidden="true" /><span>我的文档 / 最近打印</span></h4>
-          <p>登录后查看已保存材料和最近打印文件。进入打印前会重新取得<b>有效访问链接</b>，过期或失败会明确提示。</p>
-        </button>
-      </div>
-    </section>
-  )
-}
-
 export function HelpMini({ onHelp, text }: { onHelp: () => void; text: string }) {
   return (
-    <button type="button" className="fs-mini" onClick={onHelp} data-testid="file-source-help-link" aria-label="联系工作人员">
-      <h4><HelpCircleIcon size={22} aria-hidden="true" /><span>卡住了？找人帮忙</span></h4>
+    <button type="button" className="fs-mini" onClick={onHelp} data-testid="file-source-help-link" aria-label="使用帮助">
+      <h4><HelpCircleIcon size={22} aria-hidden="true" /><span>卡住了？看使用帮助</span></h4>
       <p>{text}</p>
     </button>
-  )
-}
-
-export function PhoneQrSlot({
-  qrUrl,
-  loading,
-  failed,
-  expiresLabel,
-  inactive = false,
-}: {
-  qrUrl: string | null
-  loading: boolean
-  failed: boolean
-  expiresLabel: string
-  inactive?: boolean
-}) {
-  if (inactive) {
-    return <div className="fs-qr-blank"><InfoIcon size={38} aria-hidden="true" /><strong>这张上传码已失效</strong><span>旧码不再接收文件，请重新出一张码。</span></div>
-  }
-  if (qrUrl) {
-    return (
-      <div className="fs-qr-live" data-testid="file-source-qr">
-        <QRCodeSVG value={qrUrl} size={396} level="M" marginSize={1} />
-        <span>
-          {expiresLabel
-            ? `二维码有效期 ${expiresLabel}，文件最大 10MB。`
-            : '文件最大 10MB，请上传后回到这里确认。'}
-        </span>
-      </div>
-    )
-  }
-  return (
-    <div className="fs-qr-blank" data-testid="file-source-qr">
-      {loading ? <Loader2Icon size={36} aria-hidden="true" /> : null}
-      <strong>{failed ? '码没出来' : '码还没出来'}</strong>
-      <span>
-        {failed
-          ? '请重新生成二维码，或换一种上传方式。'
-          : '正在准备上传二维码，请稍候。'}
-      </span>
-    </div>
   )
 }
 
@@ -425,5 +305,146 @@ export function FileSourceTruth() {
     <div className="fs-truth" data-testid="file-source-truth">
       <p>结束办理或闲置超时会清除本机临时信息；已上传文件按留存期限管理。</p>
     </div>
+  )
+}
+
+function SourceCard({
+  testId,
+  title,
+  desc,
+  icon,
+  art,
+  disabled = false,
+  onClick,
+}: {
+  testId: string
+  title: string
+  desc: string
+  icon: QxTouchIconName
+  /** 稿里的实物小样：手机 / U 盘 / 扫描件。没有就退回图标（本机选文件）。 */
+  art?: 'phone' | 'usb' | 'scan-paper'
+  disabled?: boolean
+  onClick: () => void
+}) {
+  const slab = (
+    <QxTouchSlab
+      title={title}
+      desc={desc}
+      row
+      off={disabled}
+      visual={art ? <PrintArt name={art} size={art === 'phone' ? 78 : 120} /> : <QxTouchIcon name={icon} size={64} />}
+      onClick={disabled ? undefined : onClick}
+    />
+  )
+  return (
+    <div className="fs-ch" data-testid={testId}>
+      {disabled ? (
+        <button type="button" className="fs-touch-hit" disabled>
+          {slab}
+        </button>
+      ) : slab}
+    </div>
+  )
+}
+
+export function SourceEntry({
+  screen,
+  showFileChannel,
+  showScan,
+  usbMode,
+  wordText,
+  miniappLine,
+  onSelectChannel,
+  onScan,
+  onDocuments,
+}: {
+  screen: FileSourceScreen
+  showFileChannel: boolean
+  showScan: boolean
+  usbMode: 'ok' | 'unavailable' | 'offline'
+  wordText: string
+  miniappLine: string
+  onSelectChannel: (key: UploadTab) => void
+  onScan: () => void
+  onDocuments: () => void
+}) {
+  const usbDesc =
+    usbMode === 'unavailable'
+      ? '本机暂未开通 U 盘导入，请改用手机上传。'
+      : usbMode === 'offline'
+        ? '暂时无法读取 U 盘，可以重新连接或改用手机上传。'
+        : CHANNEL_COPY.usb.desc
+  const count = 2 + (showScan ? 1 : 0) + (showFileChannel ? 1 : 0)
+  return (
+    <>
+      {screen === 'missing-file' ? (
+        <QxTouchCallout kind="howto">这一步没有文件。请重新选一种方式，不会替你挑一份。</QxTouchCallout>
+      ) : null}
+      {screen === 'unknown' ? (
+        <QxTouchCallout kind="remind" icon="alert">请重新选择文件从哪里来。</QxTouchCallout>
+      ) : null}
+      <div className="w2-print-upload-source-grid fs-chs" data-count={count} data-testid="file-source-channels">
+        <SourceCard
+          testId="file-source-ch-qr"
+          title={CHANNEL_COPY.qr.name}
+          desc={CHANNEL_COPY.qr.desc}
+          icon="phone"
+          art="phone"
+          onClick={() => onSelectChannel('qr')}
+        />
+        <SourceCard
+          testId="file-source-ch-usb"
+          title={CHANNEL_COPY.usb.name}
+          desc={usbDesc}
+          icon="usb"
+          art="usb"
+          disabled={usbMode !== 'ok'}
+          onClick={() => onSelectChannel('usb')}
+        />
+        {showScan ? (
+          <SourceCard
+            testId="file-source-scan-source"
+            title="是纸质的 · 放到打印机上扫描"
+            desc="扫描纸质原件，扫成 PDF 后可以存、可以打。"
+            icon="scan"
+            art="scan-paper"
+            onClick={onScan}
+          />
+        ) : null}
+        {showFileChannel ? (
+          <SourceCard
+            testId="file-source-ch-file"
+            title={CHANNEL_COPY.file.name}
+            desc={CHANNEL_COPY.file.desc}
+            icon="folder"
+            onClick={() => onSelectChannel('file')}
+          />
+        ) : null}
+      </div>
+      <button
+        type="button"
+        className="qxt-rowlink fs-doc-row"
+        data-testid="file-source-member-source"
+        aria-label="我的文档 / 最近打印"
+        onClick={onDocuments}
+      >
+        <QxTouchIcon name="folder" size={32} strokeWidth={2} />
+        <span>
+          <b>我的文档</b>
+          {miniappLine ? <small>{miniappLine}</small> : null}
+        </span>
+        <span className="qxt-chev"><QxTouchIcon name="chevR" size={28} strokeWidth={2.2} /></span>
+      </button>
+      <div className="fs-fmt">
+        <div className="fs-fmt-t">能打印的文件</div>
+        <div className="fs-fmt-row">
+          <div><b>PDF</b><span>.pdf</span></div>
+          <div><b>图片</b><span>.jpg .png</span></div>
+          <div className="no"><b>Word</b><span>{wordText}</span></div>
+        </div>
+        <small>手机上传不超过 10MB · U 盘不超过 15MB</small>
+      </div>
+      <p className="fs-cloud">第三方网盘尚未接入。公共终端不做网盘授权登录。</p>
+    </>
   )
 }

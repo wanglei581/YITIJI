@@ -314,7 +314,7 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
         <div className="cashier-qr-panel">
           {/* 真实收款码只来自服务端 qrCodeContent；四角取景框只是版式，不参与编码。 */}
           <div className="cashier-qr-frame">
-            <QRCodeSVG value={qrContent} size={292} level="M" marginSize={1} />
+            <QRCodeSVG value={qrContent} size={400} level="M" marginSize={1} />
             <span className="cashier-qr-corner" data-at="tl" aria-hidden="true" />
             <span className="cashier-qr-corner" data-at="tr" aria-hidden="true" />
             <span className="cashier-qr-corner" data-at="bl" aria-hidden="true" />

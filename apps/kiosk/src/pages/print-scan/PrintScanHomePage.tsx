@@ -44,27 +44,28 @@ import {
   type ConfiguredCapabilityMap,
 } from '../../services/api/printScanCapabilities'
 import { KioskFeedbackDialog } from '../../components/KioskFeedbackDialog'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { helpNeededLine, machineCannotPrintLine, preferUnattended } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
+import { PrintTouchFrame, printAsk } from '../print/PrintTouchFrame'
 import { PRINT_HUB_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
 import {
   COPY_GUIDE_KEY,
   COPY_GUIDE_ROUTE,
+  HUB_ASK,
   HUB_PILL,
   arrivalCodeStateNote,
-  capabilityGroupHint,
   colorDuplexChip,
   deriveHubUiState,
-  recordsGroupHint,
   type MfpStatus,
   type PrintHubCap,
   type ProbeStatus,
 } from './printHubContent'
 import {
-  PrintHubNavbar,
   QxPrintHubView,
   type QxPrintQuickLinkView,
 } from './components/QxPrintHubView'
 import './styles/print-hub-qx.css'
+import './styles/print-hub-touch.css'
 
 interface CapabilityDefinition {
   key: string
@@ -135,7 +136,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     // 运行时由 describeDocPrintFoot 按本机彩色 / 双面登记改写；这里是未登记时的口径。
     stateNote: '带走：打印件',
     mfpOffBadge: '这台机器现在出不了纸',
-    mfpOffNote: '文件可以先传上来存着，换一台再打。',
+    mfpOffNote: '这次出不了纸。文件可以先从下面传上来。',
   },
   {
     key: 'phone-upload',
@@ -319,6 +320,7 @@ export function PrintScanHomePage() {
   // Hub 只选办理入口，使用中性文案；价目由后续打印确认页读取，离开扫描不额外取价。
   const terminalId = useSyncExternalStore(subscribeTerminalIdentity, getTerminalId, () => '')
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const contact = useSupportContact()
   const [capabilityLoad, setCapabilityLoad] = useState<
     CapabilitiesLoadResult | { status: 'loading'; map: ConfiguredCapabilityMap }
   >({ status: 'loading', map: {} })
@@ -419,7 +421,7 @@ export function PrintScanHomePage() {
               to: '',
               state: undefined,
               stateNote: undefined,
-              note: orderPaused ? device.printerNotice : (resolved.mfpOffNote ?? resolved.note),
+              note: orderPaused ? device.printerNotice && preferUnattended(device.printerNotice, machineCannotPrintLine(contact)) : (resolved.mfpOffNote ?? resolved.note),
               unavailableBadge: orderPaused
                 ? device.printerLabel
                 : (resolved.mfpOffBadge ?? `暂停 · ${device.printerLabel}`),
@@ -433,6 +435,7 @@ export function PrintScanHomePage() {
     [
       capabilityLoad,
       confirmed,
+      contact,
       device.printerLabel,
       device.printerNotice,
       mfp,
@@ -469,28 +472,42 @@ export function PrintScanHomePage() {
     )
   const hubState = deriveHubUiState({ probe, mfp, locked })
   const pill = HUB_PILL[hubState]
+  // 稿：状态由顶栏胶囊和卡片角标说一次，提醒条只留标准句。
   const printerUnavailable = {
     label: device.printerLabel,
-    notice: device.printer.errorCode === 'paperEmpty'
-      ? '打印机缺纸，请找现场工作人员加纸'
-      : device.kind === 'offline'
-        ? '打印机当前无法连接，请找现场工作人员'
-        : '打印机异常，请找现场工作人员检查',
+    notice: machineCannotPrintLine(contact),
   }
 
+  // 稿 st-device-off：确定缺纸时是另一版面（眉题「打印 · 扫描 · 复印」、无步骤轴、无印章）；离线、异常、暂停接单仍是 print?printer=down 的版面。
+  const paperOff = hubState === 'device-off' && device.printer.errorCode === 'paperEmpty' && !device.printerNotice
+  // 稿：st-loading「问小青：怎么选打印方式？」、st-device-off「问小青：缺纸了文件还要传吗？」、默认「问小青：怎么选打印方式 →」。
+  const askLabel = paperOff
+    ? '问小青：缺纸了文件还要传吗？'
+    : hubState === 'capability-loading'
+      ? '问小青：怎么选打印方式？'
+      : '问小青：怎么选打印方式 →'
+  const hubSubtitle = hubState === 'capability-loading'
+    ? '确认前，打印、扫描这几项先不进入；到机码、复印照常可用。'
+    : paperOff
+      ? '缺纸了。打印和扫描先停，订单还在。'
+      : undefined
+
   return (
-    <QxPageFrame
-      back={{ label: '返回首页', onBack: () => navigate('/') }}
-      title="打印扫描服务"
-      status={device.printerNotice ? { tone: 'bad', label: device.printerLabel } : hubState === 'device-off' ? { tone: 'warn', label: `${device.printerLabel} · 出纸类暂停` } : pill}
-      terminalLabel="就业服务大厅"
-      navbar={
-        <PrintHubNavbar
-          onHome={() => navigate('/')}
-          onAdvisor={() => navigate('/assistant')}
-          onProfile={() => navigate('/profile')}
-        />
-      }
+    <PrintTouchFrame
+      page="print-hub"
+      legacyBody={false}
+      nav
+      navCurrent="home"
+      kind="std"
+      seal={paperOff ? null : 'idle'}
+      back={{ label: paperOff ? '返回' : '上一步', onBack: () => navigate('/') }}
+      title={HUB_ASK[hubState].text}
+      subtitle={hubSubtitle}
+      eyebrow={paperOff ? '打印 · 扫描 · 复印' : '打印扫描服务'}
+      railNow={paperOff ? undefined : -1}
+      bodyClassName={paperOff ? 'qxt-body-hub' : 'qxt-body-print'}
+      status={device.printerNotice ? { tone: 'warn', label: device.printerLabel } : hubState === 'device-off' ? { tone: 'warn', label: `${device.printerLabel} · 出纸类暂停` } : pill}
+      ask={printAsk(askLabel, '我想打印一份文件，应该选手机上传、U 盘还是扫描？请帮我选一种方式。')}
     >
       <QxPrintHubView
         hubState={hubState}
@@ -499,7 +516,7 @@ export function PrintScanHomePage() {
         printerUnavailable={printerUnavailable}
         orderPaused={
           hubState === 'device-off' && device.printerNotice
-            ? { label: device.printerLabel, notice: device.printerNotice }
+            ? { label: device.printerLabel, notice: preferUnattended(device.printerNotice, machineCannotPrintLine(contact)) }
             : undefined
         }
         colorDuplexLabel={colorDuplexChip(
@@ -515,6 +532,7 @@ export function PrintScanHomePage() {
           wide: capability.wide,
           available: capability.available,
           actionable: Boolean(capability.to),
+          deviceOff: mfp === 'unavailable' && capability.needsMfp && !capability.available,
           stateNote: capability.stateNote,
           unavailableBadge: capability.unavailableBadge,
           note: capability.note,
@@ -522,12 +540,10 @@ export function PrintScanHomePage() {
         arrivalCode={{
           ...ARRIVAL_CODE_ENTRY,
           stateNote: probe === 'ok' && device.printerNotice
-            ? device.printerNotice
+            ? preferUnattended(device.printerNotice, machineCannotPrintLine(contact))
             : arrivalCodeStateNote(probe, mfp),
         }}
         quickLinks={QUICK_LINKS}
-        capabilityGroupHint={mfp === 'unavailable' && confirmed ? device.printerLabel : capabilityGroupHint(probe, mfp, locked)}
-        recordsGroupHint={recordsGroupHint()}
         notices={[
           COMPLIANCE_COPY.KIOSK_PRINT_SCAN_SENSITIVE,
           COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE,
@@ -537,14 +553,13 @@ export function PrintScanHomePage() {
         onCapability={handleCapability}
         onArrivalCode={() => navigate(ARRIVAL_CODE_ENTRY.to)}
         onQuickLink={handleQuickLink}
-        onBack={() => navigate('/')}
       />
       <KioskFeedbackDialog
         open={feedbackOpen}
         onClose={() => setFeedbackOpen(false)}
         issueOptions={PRINT_HUB_ISSUE_OPTIONS}
-        description="选择这次遇到的问题，工作人员会核实后现场处理"
+        description={`选择这次遇到的问题。${helpNeededLine(contact)}`}
       />
-    </QxPageFrame>
+    </PrintTouchFrame>
   )
 }

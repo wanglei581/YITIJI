@@ -362,7 +362,8 @@ test('还在的公告可以进入上传自备材料 @kiosk', async ({ page }) =>
   await expect(upload).toHaveAttribute('data-upload-target', 'notice-listed')
   await upload.click()
   await page.waitForURL((url) => url.pathname === '/print/upload')
-  await expect(page.getByText('怎么进来')).toBeVisible()
+  // 2026-10-28 稿 print-src：来源选择页的标题是「文件在哪里？」（原「文件怎么进来」）。
+  await expect(page.getByText('文件在哪里？')).toBeVisible()
   await expect(page.getByText('选文件').first()).toBeVisible()
   await shot(page, 'W-90-upload-entry-open.png')
 })

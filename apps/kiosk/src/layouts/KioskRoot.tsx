@@ -235,6 +235,16 @@ const QX_TOUCH_ROUTES = new Set<string>([
   // 第二包 首页
   '/', // 首页仍留在 QX_MIGRATED_ROUTES，避免旧壳漏出
   // 第三包 打印
+  '/print-scan',
+  '/print/upload',
+  '/print/desk',
+  '/print/material-check',
+  '/print/preview',
+  '/print/confirm',
+  '/print/cashier',
+  '/print/progress',
+  '/print/done',
+  '/print/pickup-claim',
   // 第四包 简历三条主路
   // 第五包 公共与系统
   // 第六包 我的与权益

@@ -1,7 +1,7 @@
 import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
-import { setReactRouterState, W2_ORDER } from './fixtures/fusion-w2-state'
+import { setReactRouterState, W2_FILE, W2_ORDER, W2_PRINT_PARAMS } from './fixtures/fusion-w2-state'
 
 const LATER = '2099-07-24T00:10:00.000Z'
 const CASHIER_STATE = {
@@ -92,6 +92,81 @@ test('cashier renders real channels and sends the selected channel in the pay pa
   await expect(page.locator('[data-qx-state="pending-qr"]')).toBeVisible()
   await expect(page.getByText('请使用支付宝扫码支付', { exact: true })).toBeVisible()
   expect(payPayload).toEqual({ channel: 'alipay' })
+})
+
+test('cashier pending-qr first screen: payment card, exit and dock labels all sit above the fold and stay whole @w2', async ({ page, api }) => {
+  // 稿 cashier：通道说明行 + 方式分段 + 订单摘要（三行）+ 收款码卡（含标题与两行说明）+「退出支付」整块落在底栏之上，不靠滚动；
+  // 出过码之后返回键是很长的「改参数需重新下单」，底栏三个键的字都不得被省略号截掉。
+  // 「支付通道」「支付状态」「参数」在顶栏胶囊和收款码标题里已经说过，收进页底「更多订单信息」，一个事实不删。
+  registerShell(api)
+  api.respond('GET', '/api/v1/payment/channels', { status: 200, json: { channels: ['wechat'] } })
+  api.respond('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, { status: 200, json: payStatus('unpaid') })
+  await routeExactJson(page, 'POST', `/api/v1/orders/${W2_ORDER.orderId}/pay`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        attemptId: 'qx-wechat-attempt',
+        orderId: W2_ORDER.orderId,
+        orderNo: W2_ORDER.orderNo,
+        channel: 'wechat',
+        amountCents: W2_ORDER.amountCents,
+        status: 'pending',
+        qrCodeContent: 'weixin://qx-cashier-test',
+        expiresAt: LATER,
+        orderPayStatus: 'paying',
+        orderExpiresAt: LATER,
+      }),
+    })
+  })
+
+  await page.goto('/print/cashier')
+  await setReactRouterState(page, '/print/cashier', { ...CASHIER_STATE, file: W2_FILE, params: W2_PRINT_PARAMS })
+  await expect(page.locator('[data-qx-state="channel-selected"]')).toBeVisible()
+  await page.getByRole('button', { name: '手机扫屏幕上的码' }).click()
+  await expect(page.locator('[data-qx-state="pending-qr"]')).toBeVisible()
+  await expect(page.locator('.cashier-qr-title')).toHaveText('请使用微信支付扫码支付')
+
+  // 订单摘要首屏只有三行：订单号、内容（文件名 · 页数 · 颜色）、应付。
+  const summary = page.locator('.pct-sum')
+  await expect(summary.locator('dt')).toHaveText(['订单号', '内容', '应付'])
+  await expect(summary.locator('dd').nth(1)).toContainText(W2_FILE.name)
+  await expect(summary.getByText('支付状态')).toHaveCount(0)
+  await expect(summary.getByText('支付通道')).toHaveCount(0)
+  // 折叠里的事实一个不少（展开前文字不可见，但在 DOM 里）。
+  const more = page.locator('.cashier-qx-moreinfo')
+  await expect(more.locator('summary')).toHaveText('更多订单信息')
+  await expect(more.locator('dt')).toContainText(['参数', '份数', '支付通道', '支付状态'])
+  await expect(more.locator('dd')).toContainText(['微信支付', '等待付款'])
+
+  // 整块落在底栏之上。
+  const dockTop = (await page.locator('.qxt-dock').boundingBox())!.y
+  const mustSitAboveDock: Array<[string, ReturnType<typeof page.locator>]> = [
+    ['通道说明行', page.locator('.pct-chline')],
+    ['方式分段', page.locator('.cashier-qx-picker[data-kind="methods"]')],
+    ['订单摘要', summary],
+    ['收款码', page.locator('.cashier-qr-frame')],
+    ['收款码标题', page.locator('.cashier-qr-title')],
+    ['说明第一行', page.locator('.cashier-qr-sub')],
+    ['说明第二行', page.locator('.cashier-qr-badge')],
+    ['退出支付', page.locator('[data-cashier-exit]')],
+  ]
+  for (const [label, locator] of mustSitAboveDock) {
+    const box = await locator.boundingBox()
+    expect(box, `${label} 必须在页面上`).not.toBeNull()
+    expect(box!.y + box!.height, `${label} 要整块落在底栏之上，不靠滚动`).toBeLessThanOrEqual(dockTop)
+  }
+
+  // 底栏三个键的字都不被省略号截掉（问小青曾被截成「问小青：这笔账看…」）。
+  const clipped = await page.locator('.qxt-dock').evaluate((dock) =>
+    [...dock.querySelectorAll('button, button *')]
+      .filter((el) => el.scrollWidth > el.clientWidth + 1)
+      .map((el) => (el.textContent ?? '').trim()),
+  )
+  expect(clipped, '底栏的字不得被省略号截断').toEqual([])
+  await expect(page.locator('.qxt-dock').getByRole('button', { name: /改参数需重新下单/ })).toBeVisible()
+  await expect(page.locator('.qxt-dock').getByRole('button', { name: /问小青/ })).toBeVisible()
+  await page.screenshot({ path: test.info().outputPath('cashier-pending-qr-first-screen.png') })
 })
 
 test('channel outcome unconfirmed must say do-not-repay, never claim acceptance or plain retry @w2', async ({ page, api }) => {

@@ -54,9 +54,9 @@ test('tool center honors terminal capability configuration @w2', async ({ page, 
   })
 
   await page.goto('/print-scan')
-  await expect(page.getByRole('button', { name: /材料扫描/ })).toBeDisabled()
+  await expect(page.getByRole('button', { name: /扫描纸质材料/ })).toBeDisabled()
   await expect(page.getByText('扫描仪正在保养', { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: /格式转换/ })).toBeEnabled()
+  await expect(page.getByRole('button', { name: /照片合成 PDF/ })).toBeEnabled()
   await expectHealthy(page, errors, 'print-scan-home')
 })
 
@@ -78,7 +78,7 @@ test('tool center exposes the miniapp arrival-code claim entry @w2', async ({ pa
   // 2.0 卡面用徽标「不是取件码」区分（稿 10），不再重复长句。
   await expect(entry).toContainText('不是取件码')
   // 它不占「七件事」栅格的格子 —— 标题写着七件事，就必须只有七张能力卡。
-  await expect(page.locator('[data-testid^="print-hub-cap-"]')).toHaveCount(8)
+  await expect(page.locator('[data-testid^="print-hub-cap-"]')).toHaveCount(6)
   await entry.click()
 
   await expect(page).toHaveURL(/\/print\/pickup-claim$/)

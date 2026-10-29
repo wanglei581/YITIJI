@@ -274,7 +274,7 @@ assert.doesNotMatch(printScanFeature, /KioskPageFrame/, 'feature info page has l
 const printScanHome = read('src/pages/print-scan/PrintScanHomePage.tsx')
 const printScanHomeView = read('src/pages/print-scan/components/QxPrintHubView.tsx')
 const printHubQxCss = read('src/pages/print-scan/styles/print-hub-qx.css')
-assert.match(printScanHome, /QxPageFrame/, 'print-scan hub uses Qingxu page frame')
+assert.match(printScanHome, /PrintTouchFrame/, 'print-scan hub uses the touch screen frame')
 assert.match(
   printScanHome,
   /QxPrintHubView/,
@@ -527,7 +527,7 @@ assert.match(
 assert.match(printUpload, /data-w2-page=["']print-upload["']/, 'print upload exposes its W2 marker')
 assert.match(printUpload, /w2-print-upload-source-grid/, 'print upload exposes the 2x2 source grid')
 assert.match(printUpload, /print-upload-footer/, 'print upload exposes a semantic footer selector')
-assert.match(printUploadView, /QxPageFrame/, 'print upload uses Qingxu page frame')
+assert.match(printUploadView, /PrintTouchFrame/, 'print upload uses the touch screen frame')
 assert.match(
   read('src/layouts/KioskRoot.tsx'),
   /['"]\/print\/upload['"]/,
@@ -647,7 +647,7 @@ assert.match(
   /data-w2-page=["']print-confirm["']/,
   'src/pages/print/PrintConfirmPage.tsx exposes print-confirm',
 )
-assert.match(printConfirmQx, /QxPageFrame/, 'PrintConfirmPage uses the Qingxu page frame')
+assert.match(printConfirmQx, /PrintTouchFrame/, 'PrintConfirmPage uses the touch screen frame')
 assert.match(printConfirmQx, /qx-btn/, 'PrintConfirmPage uses Qingxu action buttons')
 assert.doesNotMatch(printConfirmQx, /KioskPageFrame/, 'print-confirm has left the V6 frame')
 assert.doesNotMatch(printConfirmQx, /PrintPageFrame/, 'print-confirm has left the V6 print frame')
@@ -756,7 +756,8 @@ assert.match(
 for (const phase of ['failed', 'closed', 'expired', 'refunded']) {
   assert.match(cashierPanel, new RegExp(`["']${phase}["']`), `cashier panel maps ${phase}`)
 }
-const printProgress = read('src/pages/print/PrintProgressPage.tsx')
+// 轮询参数与三态话术在 printProgressStatus.ts（拆分只搬不改行为），门禁连同页面一起取证。
+const printProgress = read('src/pages/print/PrintProgressPage.tsx') + '\n' + read('src/pages/print/printProgressStatus.ts')
 for (const marker of [
   'POLL_INTERVAL_MS = 3000',
   'REAL_POLL_TIMEOUT_MS = 10 \* 60 \* 1000',
@@ -788,8 +789,8 @@ const printDone = read('src/pages/print/PrintDonePage.tsx')
 assert.match(printDone, /已在本机出纸/, 'print done says the paper is already out on this machine')
 assert.doesNotMatch(printDone, /getPayStatus|取件码/, 'print done does not fetch or show a pickup code')
 assert.ok(!/Math\.random|randomUUID/.test(printDone), 'print done never fabricates a pickup code')
-assert.match(printProgress, /QxPageFrame/, 'print progress uses Qingxu page frame')
-assert.match(printDone, /QxPageFrame/, 'print done uses Qingxu page frame')
+assert.match(printProgress, /PrintTouchFrame/, 'print progress uses the touch screen frame')
+assert.match(printDone, /PrintTouchFrame/, 'print done uses the touch screen frame')
 assert.doesNotMatch(printProgress, /KioskPageFrame/, 'print progress has left the V6 frame')
 assert.doesNotMatch(printDone, /KioskPageFrame/, 'print done has left the V6 frame')
 assert.doesNotMatch(printProgress, /PrintPageFrame/, 'print progress has left the V6 print frame')
@@ -862,8 +863,9 @@ for (const marker of [
   // 这条断言保护的实质是「页面必须告诉用户扫码这条路存在」，不是保护某句原文。
   // 2026-09-02 按 11-arrival-code.html 迁移后本页重定位为「输入到机码」页，
   // 扫码降为兜底出口，措辞由「扫描小程序二维码」改为「用机身扫码区」。
-  // 断言随之改指新措辞，强度不变：删掉扫码入口仍然会红。
-  '机身扫码区',
+  // 2026-10-28 触屏版第 5 版（稿 pickup）把入口收成键盘下面的「用扫码枪扫」开关，说明在说明卡里原地展开；
+  // 断言随之改指稿的措辞，强度不变：删掉扫码入口仍然会红。
+  '用扫码枪扫',
   // hid 指引屏的 echo 文案（11-arrival-code.html #hid-echo-code）。
   // 2026-09-07 补了独立 hid 屏之后这句仍必须在源码里，删掉仍然会红。
   '等待扫码输入',
@@ -924,8 +926,8 @@ assert.match(
 )
 assert.match(pickupClaim, /还是手输吧/, 'hid guidance keeps the draft "type instead" control')
 assert.match(pickupClaim, /扫不出来？求助/, 'hid guidance keeps the draft help control')
-assert.match(pickupClaim, /机身侧面的扫码区/, 'hid guidance names the scanner location on the kiosk body')
-assert.match(pickupClaim, /亮度调高/, 'hid guidance includes the real-machine brightness condition')
+// 2026-10-28：扫码原句只在 PickupHidGuide 里写一份（下方两条断言守着它），页面这边守「确实渲染了这张说明卡」。
+assert.match(pickupClaim, /<PickupHidGuide\b/, 'pickup claim page renders the hid guidance card in place')
 assert.doesNotMatch(
   pickupClaim,
   /扫码器就绪|扫码器在线|扫码器正常/,
@@ -939,7 +941,7 @@ assert.doesNotMatch(
   'pickup claim CSS must not use margin:-1px sr-only (fusion-w6 left=-1 overflow)'
 )
 const pickupHidGuide = read('src/pages/print/components/PickupHidGuide.tsx')
-assert.match(pickupHidGuide, /请出示手机上的码/, 'hid guide screen keeps the draft headline')
+assert.match(pickupHidGuide, /用扫码枪扫/, 'hid guide keeps the draft headline (稿 pickup 说明卡展开态标题)')
 assert.match(pickupHidGuide, /机身侧面的扫码区/, 'hid guide screen names the body-side scanner')
 assert.match(pickupHidGuide, /亮度调高/, 'hid guide screen includes the real-machine brightness condition')
 assert.doesNotMatch(

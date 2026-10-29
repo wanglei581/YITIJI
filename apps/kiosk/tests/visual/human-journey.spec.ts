@@ -116,7 +116,7 @@ test.describe('真人走查（模拟数据）', () => {
     await step(page, s, 'print-hub')
 
     // Hub 上「文档打印」卡：点了必须真的走到选择文件来源
-    const docCard = page.getByRole('button', { name: /文档打印/ }).first()
+    const docCard = page.getByRole('button', { name: /打印文件/ }).first()
     await expect(docCard).toBeVisible()
     await docCard.click()
     await page.waitForURL((u) => u.pathname !== '/print-scan', { timeout: 10000 })
@@ -350,7 +350,7 @@ test.describe('真人走查（模拟数据）', () => {
     await page.waitForURL((u) => u.pathname === '/print-scan')
     await step(page, s, 'D-hub')
 
-    await page.getByRole('button', { name: /文档打印/ }).first().click()
+    await page.getByRole('button', { name: /打印文件/ }).first().click()
     await page.waitForURL((u) => u.pathname === '/print/upload', { timeout: 10000 })
     await step(page, s, 'D-file-source')
 
@@ -636,10 +636,10 @@ test.describe('真人走查（模拟数据）', () => {
     page.on('console', (m) => { if (m.type() === 'error') pageErrors.push(`console: ${m.text().slice(0, 200)}`) })
 
     await page.goto('/print-scan')
-    await expect(page.getByRole('button', { name: /材料扫描/ })).toBeVisible({ timeout: 15000 })
+    await expect(page.getByRole('button', { name: /扫描纸质材料/ })).toBeVisible({ timeout: 15000 })
     await step(page, s, 'F-hub')
 
-    await page.getByRole('button', { name: /材料扫描/ }).first().click()
+    await page.getByRole('button', { name: /扫描纸质材料/ }).first().click()
     await page.waitForTimeout(3000)
     await step(page, s, 'F-scan-entry')
 

@@ -15,6 +15,7 @@
 // 截图：1080×1920，写进 testInfo().outputPath()，验收证据另行归档到
 // tests/visual/evidence/qx-fair-workbench/。
 import { expect, test } from '../fixtures/kiosk-test'
+import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 import {
   FAIR_ID,
   FAIR_MATERIAL,
@@ -495,6 +496,9 @@ test('关键事务：物料打印成功时只消费服务端签发的 printFileU
   // /print/confirm 落地时读本机能力（彩色 / 双面按登记决定可用性）。
   // 夹具 fail-closed：不登记就是 Unhandled API request，而症状看起来像打印链路坏了。
   registerPrintConfirm(api)
+  // 2026-10-28 稿 confirm：核对价格页的小样会取这一份文件的第一页，接到一份最小 PDF，不留未接的请求。
+  await page.route((url) => url.pathname === '/api/v1/files/file-fair-material-001/content', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }))
   await page.goto(`/job-fairs/${FAIR_ID}/materials`)
   await page.getByRole('button', { name: /去打印/ }).first().click()
   await expect(page).toHaveURL(/\/print\/confirm$/)
