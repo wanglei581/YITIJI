@@ -718,7 +718,7 @@ test('signature inspect renders server pages and compose sends placement payload
 
 // 走查 I-14：「签名」第 2 步点「手机扫码上传图片」，二维码此前必败（POST /upload-sessions 带 signature_image 回 400，
 // 弹层写「二维码生成失败」、确认键灰着）。后端放行后，这一步要真的走通：开会话 → 手机传 → 一体机确认 → 这张图成为签名。
-test('signature step 2: the phone QR opens a signature_image upload session and the confirmed picture becomes the stamp @w2', async ({ page, api }) => {
+test('signature step 2: the phone QR opens a signature_image upload session and the confirmed picture becomes the stamp @w2', async ({ page, api }, testInfo) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerSignCapabilities(api)
@@ -760,6 +760,7 @@ test('signature step 2: the phone QR opens a signature_image upload session and 
   // 手机传上来之后，一体机上确认，这张图就成了签名
   const confirm = layer.getByRole('button', { name: '确认使用该图片', exact: true })
   await expect(confirm).toBeEnabled({ timeout: 8_000 })
+  await page.screenshot({ path: testInfo.outputPath('sign-step2-phone-qr-uploaded.png'), fullPage: false })
   await confirm.click()
   await expect(layer).toHaveCount(0)
   await expect(page.getByTestId('sign-stamp-stamp-tag')).toContainText('手写签名.png')

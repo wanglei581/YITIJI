@@ -1049,7 +1049,7 @@ test('phone upload does not call an uploaded status without a file receipt succe
 
 // 走查 I-14：一体机「签名」第 2 步的二维码现在能开出 signature_image 会话（后端 DTO 放行了），
 // 手机页因此要真的收签名图：只放行 JPG / PNG、被拒时不叫人转 PDF、回执认 signature_image，不再有「手机端不可用」的死胡同。
-test('phone upload takes a handwritten-signature image: JPG/PNG only, honest refusals, receipt purpose is signature_image @w5-mobile', async ({ page, api }) => {
+test('phone upload takes a handwritten-signature image: JPG/PNG only, honest refusals, receipt purpose is signature_image @w5-mobile', async ({ page, api }, testInfo) => {
   const errors = runtimeErrors(page)
   api.respond('GET', '/api/v1/document-conversion/capabilities', {
     status: 200, json: { data: { wordToPdf: true, engine: 'libreoffice', cjkFonts: true } },
@@ -1076,9 +1076,11 @@ test('phone upload takes a handwritten-signature image: JPG/PNG only, honest ref
   const chips = root.locator('.ph-up-hint')
   await expect(chips).toContainText('支持 JPG / PNG')
   await expect(root.getByText('链接里写着这次可能是「本人手写签名图片」', { exact: false })).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('phone-upload-signature-ready-390.png'), animations: 'disabled' })
   // 选了 PDF：手机上就拦下，说的是签名图只收 JPG / PNG，不叫人把签名图转成 PDF
   await input.setInputFiles({ name: '合同.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w5-sign-fixture') })
   await expect(root).toHaveAttribute('data-phone-upload-state', 'type-error')
+  await page.screenshot({ path: testInfo.outputPath('phone-upload-signature-refused-390.png'), animations: 'disabled' })
   await expect(root.getByText('签名图片只收', { exact: false })).toBeVisible()
   await expect(root.getByText('转成 PDF', { exact: false })).toHaveCount(0)
   expect(api.requestCount('POST', '/api/v1/upload-sessions/w5-sign-session/files')).toBe(0)

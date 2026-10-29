@@ -319,7 +319,7 @@ test('scan start creates only after explicit continuation @w2', async ({ page, a
 
 // 走查 I-16（回归，#1326 改过）：扫描类型一进来不预选。想扫证件的人不点类型直接「下一步」，原来会被建成简历扫描。
 // 走查 I-18：这一页的字不写死打印机品牌（CLAUDE.md §3，型号走 printerName 配置）。
-test('scan start pre-selects nothing, blocks next until a type is chosen, and never names a printer brand @w2', async ({ page, api }) => {
+test('scan start pre-selects nothing, blocks next until a type is chosen, and never names a printer brand @w2', async ({ page, api }, testInfo) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerScanCapability(api, 'available')
@@ -343,6 +343,7 @@ test('scan start pre-selects nothing, blocks next until a type is chosen, and ne
   await expect(page.getByRole('button', { name: /下一步 · 建立这次扫描/ })).toHaveCount(0)
   await expect(page.getByText('已选「简历扫描」')).toHaveCount(0)
   expect(createdBody).toBeNull()
+  await page.screenshot({ path: testInfo.outputPath('qx-scan-start-unselected.png'), fullPage: false })
   // I-18：「奔图」「面板」之外的品牌词都不该出现在这一页（只说「打印机屏幕」「打印机面板」）
   await expect(page.locator('main, [data-w2-page="scan-start"]').first()).not.toContainText(/奔图|Pantum|CM28\d0/)
   // 点「证件扫描」才可以往下走，建出来的就是证件扫描
@@ -946,7 +947,7 @@ test('successful scan tells a guest the file will not reach 我的文档 @w2', a
 })
 
 // 走查 I-15：游客扫完纸质材料原来只能「拿去打印」，拿不到电子版。扫描件事后补不进账号，所以当场给「扫码带走」。
-test('guest scan result lets the phone take the e-copy away by QR (resume and document) @w2', async ({ page, api }) => {
+test('guest scan result lets the phone take the e-copy away by QR (resume and document) @w2', async ({ page, api }, testInfo) => {
   const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
   const binary = new FusionW2BinaryRoute(page)
   await binary.install()
@@ -960,11 +961,13 @@ test('guest scan result lets the phone take the e-copy away by QR (resume and do
   await expect(take).toBeEnabled()
   await expect(take).toContainText('扫码带走电子版')
   await expect(page.getByTestId('scan-takeaway-layer')).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath('qx-scan-result-guest.png'), fullPage: false })
   await take.click()
   const layer = page.getByTestId('scan-takeaway-layer')
   await expect(layer.getByText('扫码带走这份扫描件', { exact: true })).toBeVisible()
   const qr = layer.getByTestId('scan-takeaway-qr')
   await expect(qr.locator('svg')).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('qx-scan-takeaway-layer.png'), fullPage: false })
   // 码里是完整地址（手机要打开得有域名），指向本系统的内容端点；签名不进 DOM 属性
   await expect(qr).toHaveAttribute('data-qr-origin', /^http:\/\/127\.0\.0\.1:\d+$/)
   await expect(qr).toHaveAttribute('data-qr-path', W2_FILE.fileUrl)
@@ -987,7 +990,7 @@ test('guest scan result lets the phone take the e-copy away by QR (resume and do
 })
 
 // 证件是高敏感材料：公共屏幕上不放它的下载码（链接有效期内谁拍到谁就能下）。
-test('guest ID scan result never shows a download QR and says how to get the e-copy @w2', async ({ page, api }) => {
+test('guest ID scan result never shows a download QR and says how to get the e-copy @w2', async ({ page, api }, testInfo) => {
   const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
   const binary = new FusionW2BinaryRoute(page)
   await binary.install()
@@ -998,6 +1001,7 @@ test('guest ID scan result never shows a download QR and says how to get the e-c
 
   const take = page.getByTestId('scan-takeaway-open')
   await expect(take).toBeDisabled()
+  await page.screenshot({ path: testInfo.outputPath('qx-scan-result-guest-id.png'), fullPage: false })
   await expect(take).toContainText('证件扫描不提供扫码带走')
   await expect(take).toContainText('要电子版：先登录，再重新扫一次')
   await take.click({ force: true })
