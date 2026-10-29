@@ -139,6 +139,13 @@ test('cashier pending-qr first screen: payment card, exit and dock labels all si
   await expect(more.locator('summary')).toHaveText('更多订单信息')
   await expect(more.locator('dt')).toContainText(['参数', '份数', '支付通道', '支付状态'])
   await expect(more.locator('dd')).toContainText(['微信支付', '等待付款'])
+  // 关着的折叠不占版面：Chromium 对关着的 <details> 内容只跳过绘制，仍给它一份几何，页底会冒出一行看不见的字压在屏幕下沿
+  // （去掉苹方的字体栈下，「支付通道」那一行的字体内容区正好骑在 1920 线上，版式体检把它报成被裁）。关着时这些行不该有任何盒子，展开后才有。
+  const rects = () => more.locator('dt').evaluateAll((rows) => rows.map((row) => row.getClientRects().length))
+  expect((await rects()).every((count) => count === 0), '关着的「更多订单信息」不该给内容排版').toBe(true)
+  await more.locator('summary').click()
+  expect((await rects()).every((count) => count > 0), '展开后每一行都要排上版').toBe(true)
+  await more.locator('summary').click()
 
   // 整块落在底栏之上。
   const dockTop = (await page.locator('.qxt-dock').boundingBox())!.y

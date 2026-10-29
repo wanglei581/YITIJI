@@ -2,7 +2,8 @@ import type { Locator, Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
 import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
-import { assertNoHorizontalOverflow } from './assert-layout'
+import { assertNoHorizontalOverflow, findClippedText } from './assert-layout'
+import { registerW6Api } from './fixtures/fusion-w6-api'
 
 function homeFair(): Record<string, unknown> {
   const startTime = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
@@ -553,4 +554,16 @@ test('home does not invent a price when the published price request fails @w1-ki
   const home = page.getByTestId('qx-home')
   await expect(home.locator('[data-action="print-hub"]').getByText('先选材料再出纸 · 带走：打印件', { exact: true })).toBeVisible()
   await expect(home.getByText(/免费|价格|报价|收费/)).toHaveCount(0)
+})
+
+test('home tiles: every sub-line keeps its font content area inside its own clipped box @w1-kiosk', async ({ page, api }) => {
+  // 磁贴说明行（small）用 line-clamp 的 overflow:hidden 裁行数。行高写 1.35 时，Qingxu Sans（CI、真机 Windows 的字体栈，内容区 1.448em）的字形上下
+  // 各被削掉约 1px；Mac 苹方量不出来。夹具用 w6 那套：托管打开、百宝箱、智慧校园都开，六块磁贴的说明行都在页上。
+  registerW6Api(api)
+  await page.goto('/')
+  await expect(page.locator('[data-qx-page="home"] .qxt-home-tiles .qxt-tile')).toHaveCount(6)
+  await page.waitForLoadState('networkidle')
+  const sublines = await page.locator('[data-qx-page="home"] .qxt-home-tiles .qxt-tx small').count()
+  expect(sublines, '六块磁贴都有说明行').toBeGreaterThanOrEqual(6)
+  expect(await findClippedText(page), '首页磁贴的字不得被 overflow:hidden 贴着裁').toEqual([])
 })

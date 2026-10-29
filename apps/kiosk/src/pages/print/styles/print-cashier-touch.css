@@ -447,6 +447,12 @@
   text-align: left;
 }
 
+/* 关着的折叠不排版。Chromium 对关着的 <details> 内容只跳过绘制，仍给它一份几何；本页页底的「更多订单信息」「付款说明」关着时，
+   里面的行（如「支付通道」）会在屏幕下沿冒出看不见的盒子，去掉苹方的字体栈下正好骑在 1920 线上，版式体检把它报成被裁。展开才排版。 */
+[data-qx-page='print-cashier'] .cashier-qx-more:not([open]) > :not(summary) {
+  display: none;
+}
+
 [data-qx-page='print-cashier'] .cashier-qx-more > summary {
   min-height: 64px;
   display: flex;
