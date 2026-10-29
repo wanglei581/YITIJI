@@ -65,9 +65,9 @@ check('standby empty playlist still exits home and does not invent media', () =>
 })
 
 check('login gate has a leave-without-login exit and no 已登录 overlay', () => {
-  assert.match(files.loginPage, /QxPageFrame/)
-  // 规则 1：顶栏返回键保留，底部也要有回退。03 / 30 三张稿顶栏都有返回键。
-  assert.match(files.loginPage, /<QxStepActions onPrev=\{goHome\} prevLabel="返回首页"/)
+  assert.match(files.loginPage, /PublicTouchFrame/)
+  // 规则 1：顶栏返回键保留，底部也要有回退。触屏稿顶栏与底栏都回首页。
+  assert.match(files.loginPage, /data-testid="login-gate-back"[\s\S]{0,40}onClick=\{goHome\}>返回首页/)
   assert.match(files.loginPage, /back=\{\{\s*label:\s*'返回首页',\s*onBack:\s*goHome\s*\}\}/)
   assert.match(files.profilePage, /back=\{\{\s*label:\s*'返回首页'/)
   assert.match(files.profilePage, /<QxStepActions onPrev=/)
@@ -126,9 +126,9 @@ check('clearing overlay tells the truth while it waits for the server, and stays
   assert.match(files.clearingOverlay, /data-testid="session-guard-cleanup-status"/)
   assert.match(files.clearingOverlay, /data-testid="session-guard-cleanup-deadline"/)
   assert.match(files.clearingOverlay, /data-testid="session-guard-cleanup-retry"/)
-  // CLAUDE.md §9：27 寸竖屏触控，主要按钮不小于 56px。这颗「立即重试」是这一屏
-  // 唯一可点的东西 —— 它按不准，用户就只剩「等」这一个选项。
-  assert.match(files.clearingOverlayCss, /\.qx-clearing-retry \{[\s\S]*?min-height: 56px/)
+  // CLAUDE.md §9：27 寸竖屏触控，主要按钮不小于 56px；触屏版第 5 包起可点区不小于 64×64。
+  // 这颗「立即重试」是这一屏唯一可点的东西 —— 它按不准，用户就只剩「等」这一个选项。
+  assert.match(files.clearingOverlayCss, /\.qx-clearing-retry \{[\s\S]*?min-height: 64px/)
 })
 
 check('session resume maps only cashier/progress and fail-closes invalid rows', () => {

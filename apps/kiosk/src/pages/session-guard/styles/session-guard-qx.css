@@ -66,9 +66,9 @@
   margin: 0; font-size: 20px; line-height: 1.5; font-weight: 400;
   color: rgba(242, 239, 228, 0.9); font-variant-numeric: tabular-nums;
 }
-/* 触控最小尺寸按 CLAUDE.md §9：主要按钮不小于 56px，可点击区域不小于 48px。 */
+/* 触控最小尺寸：CLAUDE.md §9 的底线是主要按钮 56、可点区 48；触屏版第 5 包把这一屏唯一可点的按钮抬到 64（可点区不小于 64×64）。 */
 .qx-clearing-retry {
-  margin-top: 6px; min-height: 56px; min-width: 240px; padding: 0 32px;
+  margin-top: 6px; min-height: 64px; min-width: 240px; padding: 0 32px;
   border-radius: 16px; border: 1px solid rgba(46, 230, 168, 0.4);
   background: rgba(46, 230, 168, 0.14); color: var(--qx-paper);
   font-size: 22px; font-weight: 700; cursor: pointer;

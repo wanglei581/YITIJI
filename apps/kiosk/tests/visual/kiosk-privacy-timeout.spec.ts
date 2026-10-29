@@ -1665,10 +1665,14 @@ test('hard clear will not hand the machine over until the server confirms the ca
   const overlayText = (await clearing.innerText()).replace(/\s+/g, '')
   expect(overlayText).not.toContain(SCAN_CONTROL_TOKEN)
   expect(overlayText).not.toContain(SCAN_TASK_ID)
-  // 5) 主行动按钮是真能按的尺寸（CLAUDE.md §9：不小于 56px）。
+  // 5) 主行动按钮是真能按的尺寸（CLAUDE.md §9：不小于 56px；触屏版第 5 包起可点区不小于 64×64）。
   const retry = page.getByTestId('session-guard-cleanup-retry')
   const box = await retry.boundingBox()
-  expect(box?.height ?? 0).toBeGreaterThanOrEqual(56)
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(64)
+  expect(box?.width ?? 0).toBeGreaterThanOrEqual(64)
+  // 6) 现场没有人可叫：清场遮罩里不许出现「工作人员」；需要帮助只给服务电话，号码读不到就不写这一行。
+  expect(overlayText).not.toContain('工作人员')
+  await expect(page.getByTestId('session-guard-cleanup-help')).toContainText('拨打服务电话 18369161921')
 
   // 第一次撤销失败：服务端没给结论 —— 不许据此放行。
   revoke.release(0, 'server-error')

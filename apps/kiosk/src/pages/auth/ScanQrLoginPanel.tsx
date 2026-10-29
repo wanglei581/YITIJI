@@ -259,7 +259,7 @@ export function ScanQrLoginPanel({
 
 function localQrErrorMessage(error: unknown): string {
   if (!(error instanceof MemberApiError)) return '扫码登录服务不可用，请使用手机号登录'
-  if (error.code === 'LOCAL_QR_BRIDGE_TOKEN_MISSING') return accountErrorMessage(error, '这台机器暂未开通扫码登录，请联系工作人员或使用手机号登录')
+  if (error.code === 'LOCAL_QR_BRIDGE_TOKEN_MISSING') return accountErrorMessage(error, '这台机器暂未开通扫码登录，请使用手机号登录')
   if (error.code === 'LOCAL_QR_ORIGIN_FORBIDDEN') return accountErrorMessage(error, '扫码登录暂不可用，请使用手机号登录')
   if (error.code === 'LOCAL_QR_BRIDGE_TOKEN_INVALID') return accountErrorMessage(error, '扫码登录暂不可用，请使用手机号登录')
   if (error.status === 0 || error.code === 'NETWORK_ERROR') return accountErrorMessage(error, '本机扫码登录服务未连接，请使用手机号登录')

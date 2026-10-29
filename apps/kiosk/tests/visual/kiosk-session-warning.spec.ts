@@ -214,6 +214,8 @@ test('ordinary idle warns before clearing and can resume the previous route', as
   await expect(from).toContainText('继续后回到 练面试')
   await expect(from).not.toContainText('/')
   await expect(page.getByRole('button', { name: '我还在，继续使用，回到练面试', exact: true })).toBeVisible()
+  await expect(page.getByTestId('session-guard-primary')).toHaveText('我还在，继续使用')
+  await expect(page.getByTestId('session-guard-clear')).toHaveText('现在结束使用')
   await page.getByRole('button', { name: /我还在，继续使用/ }).click()
 
   await expect(page).toHaveURL(/\/interview\?stage=tips/)
@@ -440,10 +442,12 @@ test('orphan /session-timeout shows the clearing overlay on first frame and neve
       const heading = document.querySelector('#session-timeout-title')
       const buttons = Array.from(document.querySelectorAll('button'))
       const exitButton = buttons.find((button) =>
-        /结束并清除这台机器上的这次使用记录/.test(button.textContent ?? '')
+        /现在结束使用/.test(button.textContent ?? '')
+        && /结束并清除这台机器上的这次使用记录/.test(button.getAttribute('aria-label') ?? '')
       )
       const continueButton = buttons.find((button) =>
-        /我还在，继续使用|结束并清除这台机器上的这次使用记录/.test(button.textContent ?? '')
+        /我还在，继续使用/.test(button.textContent ?? '')
+        && /我还在，继续使用/.test(button.getAttribute('aria-label') ?? '')
       )
       const accountLabel = Array.from(document.querySelectorAll('p, span, b')).find((el) =>
         /当前登录：|当前会话：/.test(el.textContent ?? '')

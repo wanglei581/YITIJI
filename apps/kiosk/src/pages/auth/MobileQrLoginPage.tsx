@@ -28,6 +28,7 @@ import {
 } from './mobileQrLoginCopy'
 import { DeviceCard, Facts, QrForm, QrIcon, StateCard, Steps } from './components/MobileQrLoginParts'
 import './mobile-qr-service-desk.css'
+import './mobile-qr-touch.css'
 
 /* 手机确认登录（/member/qr-login）。视觉与口径真值：稿 51-phone-relay.html screen=qr-login。
  * 手机端从头到尾拿不到登录态：服务端只回 confirmed，一体机还要自己 claim。
@@ -221,7 +222,7 @@ export function MobileQrLoginPage() {
   const chrome = chromeCopy(s.state)
 
   return (
-    <main className="fusion-w5 fusion-w5--auth service-desk k1-mobile-qr-login" data-kiosk-screen="member-qr-login" data-visual-theme="service-desk" data-ux-density="touch" data-kiosk-presentation="fusion-youth" data-kiosk-viewport="mobile" data-mobile-qr-state={s.state}>
+    <main className="fusion-w5 fusion-w5--auth service-desk k1-mobile-qr-login" data-qx-page="phone-login" data-kiosk-screen="member-qr-login" data-visual-theme="service-desk" data-ux-density="touch" data-kiosk-presentation="fusion-youth" data-kiosk-viewport="mobile" data-mobile-qr-state={s.state}>
       <section className="k1-mobile-qr-content">
         <header className="k1-mobile-qr-relaybar">
           <span className="k1-mobile-qr-seal" aria-hidden="true">职</span>

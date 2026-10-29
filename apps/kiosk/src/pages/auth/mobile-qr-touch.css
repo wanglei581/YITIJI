@@ -1,0 +1,14 @@
+/* 手机确认登录。只挂在本页，按手机宽度排，不套一体机外框。 */
+
+[data-qx-page='phone-login'] {
+  font-size: 20px;
+}
+
+[data-qx-page='phone-login'] .k1-mobile-qr-grow {
+  flex: 0 0 16px;
+}
+
+[data-qx-page='phone-login'] button {
+  min-height: 64px;
+  min-width: 64px;
+}

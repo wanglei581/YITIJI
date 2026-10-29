@@ -253,6 +253,14 @@ const QX_TOUCH_ROUTES = new Set<string>([
   '/resume/optimize',
   '/resume/optimize/compare',
   // 第五包 公共与系统
+  '/assistant',
+  '/help',
+  '/official-channels',
+  '/login',
+  '/screensaver',
+  '/session-timeout',
+  '/session-resume',
+  '/error-offline',
   // 第六包 我的与权益
   // 第七包 简历其余页
   // 第八包 练面试

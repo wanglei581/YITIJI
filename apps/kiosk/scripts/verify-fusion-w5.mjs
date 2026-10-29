@@ -239,11 +239,11 @@ for (const marker of ['config.enabled', 'items.length > 0', '<QrLaunchModal', '<
 }
 assert.doesNotMatch(toolbox, /<\/?main\b/, 'toolbox leaves the main landmark to KioskLayout')
 /* 2026-09-25 稿 08-legal 迁入青序流光，同强度替换三条：
- * ① 页壳 KioskPageFrame/KioskPageHeader → QxPageFrame（并断言已退出 V6 壳）；
+ * ① 页壳 KioskPageFrame/KioskPageHeader → 触屏 PublicTouchFrame（并断言已退出 V6 壳）；
  * ② 旧页用 `apiContent ? ( … )` / `!apiContent && ( … )` 两支表达「服务端正文 / 本机留存文本」，
  *    新页拆成显式视图：ready 只渲染服务端正文分出的章节，fallback 渲染本机留存文本且必须挂「不作为正式版本」标注；
- * ③ 内容区留白中和器从旧壳的 .ui-kiosk-page-content 换到青序壳的 .qx-body（稿自带 44px 页边）。 */
-assert.match(legalDoc, /<QxPageFrame\b/, 'LegalDocPage uses the Qingxu page frame')
+ * ③ 内容区留白中和器从旧壳的 .ui-kiosk-page-content 换到触屏壳的 .qxt-body（稿自带 40px 页边，由 .legal-doc-scroll 自己给）。 */
+assert.match(legalDoc, /<PublicTouchFrame\b/, 'LegalDocPage uses the Qingxu touch page frame')
 assert.doesNotMatch(legalDoc, /KioskPageFrame|KioskPageHeader/, 'LegalDocPage has left the V6 frame')
 assert.match(legalDoc, /data-kiosk-screen="legal-doc"/, 'legal document keeps its stable screen marker')
 assert.match(
@@ -266,7 +266,7 @@ assertSinglePaddingNeutralizer(
   'activities-detail-inkpaper.css',
   /\.k8-act-detail\b/,
 )
-assertSinglePaddingNeutralizer(legalDocCss, 'legal-service-desk.css', /\.k1-legal-doc\b/, '.qx-body')
+assertSinglePaddingNeutralizer(legalDocCss, 'legal-service-desk.css', /\.k1-legal-doc\b/, '.qxt-body')
 assert.doesNotMatch(legalDocCss, /\.ui-kiosk-page-content/, 'legal-service-desk.css carries no dead selector for the retired V6 content wrapper')
 assertSinglePaddingNeutralizer(toolboxCss, 'toolbox-zone.css', /\.kpv1\.ktoolbox\b/)
 assert.match(
@@ -448,5 +448,60 @@ for (const path of ['src/pages/profile/me/MyResumesPage.tsx', 'src/pages/profile
 const errorOfflineSrc = read('src/pages/placeholders/ErrorOfflinePage.tsx')
 assert.match(errorOfflineSrc, /key: 'jobs'[^\n]*name: '机构官方渠道'/, 'system state item 8 is 机构官方渠道 (hosting a)')
 assert.doesNotMatch(errorOfflineSrc, /name: '岗位与招聘会信息'|AI、岗位信息没有/, 'system state no longer lists recruitment info')
+
+/* 触屏版第 5 包（2026-10-28）：稿上的小标题、问答标题在读屏里仍是标题层级，不是 <p> / <b>。
+ * 画面由 .qxp-k / .qxp-note 类名保持（1080 宽改前改后逐像素比对一致），所以这里只钉标签。
+ * 对照旧版页内标题数：帮助 7、机器状态 6、登录 2、协议 5、闲置提醒 4，改版曾把它们都压成了 0 或 1。 */
+const publicBlocksSrc = read('src/pages/public-touch/PublicBlocks.tsx')
+assert.match(publicBlocksSrc, /export function K\(\{ children, as: Tag = 'p', id \}/, 'K：小标题标签可选，默认仍是 p，老调用不变')
+assert.match(publicBlocksSrc, /export function SrHeading\(/, 'SrHeading：稿上没有字的那一组内容，给读屏一个标题')
+const helpSrc = read('src/pages/help/HelpCenterPage.tsx')
+assert.match(helpSrc, /<h2 className="qxp-note" id=\{`\$\{answerId\}-q`\}><b>\{item\.q\}<\/b><\/h2>/, '帮助页：每条问答的问题是 h2')
+assert.match(helpSrc, /<K as="h2">卡住了，先自己试这三步<\/K>/, '帮助页：自助三步的小标题是 h2')
+assert.match(helpSrc, /<K as="h2">直接去办<\/K>/, '帮助页：直接去办的小标题是 h2')
+assert.match(
+  errorOfflineSrc,
+  /<SrHeading id="of-list-title">这台机器的八项状态<\/SrHeading>\s*<ul className="of-list"[^>]*aria-labelledby="of-list-title"/,
+  '机器状态页：八项状态清单有 h2 标题，清单用它命名',
+)
+const loginSrc = read('src/pages/auth/LoginPage.tsx')
+assert.ok((loginSrc.match(/<K as="h3">/g) ?? []).length >= 4, '登录页：四张「记在哪」卡的标题是 h3')
+assert.match(loginSrc, /<h2 className="t">不登录也能办<\/h2>/, '登录页：「不登录也能办」是 h2')
+assert.match(loginSrc, /<SrHeading id="lg-facts-title">登录之后记在哪<\/SrHeading>/, '登录页：四张卡这一组有 h2 标题')
+const legalViewsSrc = read('src/pages/legal/LegalDocViews.tsx')
+assert.match(legalViewsSrc, /<h2 className="legal-doc-toc-title">章节目录<\/h2>/, '协议页：章节目录有 h2 标题')
+assert.match(legalViewsSrc, /<h3>\{section\.title\}<\/h3>/, '协议页：章节标题仍是 h3（用例按 .legal-doc-body h3 取）')
+const guardViewSrc = read('src/pages/session-guard/SessionGuardView.tsx')
+assert.match(guardViewSrc, /<K as="h3">\{card\.title\}<\/K>/, '闲置提醒：两张清单卡的标题是 h3')
+assert.match(guardViewSrc, /<h3>\{ask\.title\}<\/h3>/, '闲置提醒：三个常问的问题是 h3')
+
+/* 触屏版第 5 包（2026-10-28）：改版时被删掉的说明句，稿上没画，按「稿上没画的也保留」放回。
+ * 登录步骤、身份说明只给读屏（默认态一屏放不下可见的字）；帮助与机器状态的说明是小字，运行页没有它们就是少了一条交代。 */
+assert.match(
+  loginSrc,
+  /<ol className="qxp-sr-h" aria-label="登录步骤"><li>01 选择登录方式<\/li><li>02 核对本人身份<\/li><li>03 回到刚才的办理<\/li><\/ol>/,
+  '登录页：三步（选择登录方式、核对本人身份、回到刚才的办理）留给读屏的有序列表',
+)
+assert.match(loginSrc, /这台机器不生成、也不代填。这一步不用 AI 核对是不是你。/, '登录页：验证码来源与「不用 AI 核对」的说明还在')
+assert.match(helpSrc, /data-testid="help-truth"[\s\S]{0,120}?只写本机已经上线的做法；帮助内容随应用一起发布，不是实时服务状态。/, '帮助页：「这页写的是什么」还在')
+assert.ok((helpSrc.match(/<HelpTruth \/>/g) ?? []).length >= 4, '帮助页：弹层与三个分支的插画卡里都放着「这页写的是什么」')
+assert.match(
+  errorOfflineSrc,
+  /data-testid="system-state-truth"[\s\S]{0,200}?八项状态一项不少地列出来；只有能真检测的才给结果，其余照实写未检测或随请求确认，不会默认写成正常。/,
+  '机器状态页：「怎么判断」还在',
+)
+const resumeViewSrc = read('src/pages/session-resume/SessionResumeView.tsx')
+assert.match(resumeViewSrc, /const RESUME_BOUNDARY = '这一页不重新建单，也不删除系统里的订单或文件。'/, '继续打印页：边界那一句还在')
+assert.strictEqual((resumeViewSrc.match(/\{RESUME_BOUNDARY\}/g) ?? []).length, 3, '继续打印页：空、读不到、列表三种结论卡都带着边界那一句')
+
+/* 点击区与插画（同一包）：协议行那颗勾选框原来只有 48，登录页四张「记在哪」卡的插画原来被压成一条缝。 */
+const loginCss = read('src/pages/auth/login-touch.css')
+assert.match(
+  loginCss,
+  /\.k-agree \.k-agree-check,\s*\n[^\n]*\.k-agree \.doclink \{[^}]*min-height: 64px;[^}]*min-width: 64px;/,
+  '登录页：协议勾选框和两个协议链接的可点区不小于 64×64',
+)
+assert.match(loginCss, /\.lg-fact \.qxp-artbox \{ min-height: 96px; \}/, '登录页：四张「记在哪」卡的插画保底 96 高，放不下由页面滚动，不压插画')
+assert.match(loginCss, /\.lg-fact \{ min-height: 224px; overflow: hidden; \}/, '登录页：「记在哪」卡保底 224 高')
 
 console.log('ALL PASS fusion W5 route, boundary, and presentation contract')

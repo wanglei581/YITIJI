@@ -1,5 +1,6 @@
 import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
 import './phone-upload-service-desk.css'
+import './phone-upload-touch.css'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import {
@@ -264,7 +265,7 @@ export function PhoneUploadPage() {
   }
 
   return (
-    <main className="fusion-w5 fusion-w5--auth k1-phone-upload service-desk" data-kiosk-screen="phone-upload" data-visual-theme="service-desk" data-ux-density="touch" data-kiosk-presentation="fusion-youth" data-kiosk-viewport="mobile" data-phone-upload-state={issue ?? s.state} data-purpose={s.confirmed ?? 'unconfirmed'} data-purpose-confirmed={s.confirmed ? '1' : '0'}>
+    <main className="fusion-w5 fusion-w5--auth k1-phone-upload service-desk" data-qx-page="phone-upload" data-kiosk-screen="phone-upload" data-visual-theme="service-desk" data-ux-density="touch" data-kiosk-presentation="fusion-youth" data-kiosk-viewport="mobile" data-phone-upload-state={issue ?? s.state} data-purpose={s.confirmed ?? 'unconfirmed'} data-purpose-confirmed={s.confirmed ? '1' : '0'}>
       <section className="k1-phone-upload-content">
         <header className="ph-up-relaybar">
           <span className="ph-up-seal" aria-hidden="true">职</span>

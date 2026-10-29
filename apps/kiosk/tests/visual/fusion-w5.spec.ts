@@ -64,7 +64,7 @@ async function freezeClock(page: Page): Promise<void> {
 /** 稿 08-legal 迁入青序流光后的页壳：QxPageFrame + 页内文档头标题（h1「协议与隐私」只留给读屏）。 */
 async function expectQingxuLegalShell(page: Page, title: string): Promise<void> {
   await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
-  await expect(page.locator('.qx-topbar .qx-topbar-back')).toBeVisible()
+  await expect(page.locator('.qxt-band .qxt-back')).toBeVisible()
   await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible()
 }
 
@@ -605,12 +605,14 @@ test('legal document never passes local or missing text off as the official vers
   api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
 
   await page.goto('/legal/terms')
-  await expect(page.getByRole('heading', { name: '正文没取到', exact: true })).toBeVisible()
+  // 触屏稿 legal error：标题写明是哪一份没取回来，底栏主按钮是「重新读取」。
+  await expect(page.getByRole('heading', { level: 1, name: '这次没能把《用户服务协议》的正文取回来' })).toBeVisible()
   await expect(page.getByText('本终端为「AI求职打印服务终端」', { exact: false })).toHaveCount(0)
   await expect(page.getByTestId('legal-doc-fallback-warning')).toHaveCount(0)
-  await expect(page.getByTestId('legal-primary')).toHaveText('重新取正文')
+  await expect(page.getByTestId('legal-primary')).toHaveText('重新读取')
 
-  await page.getByRole('button', { name: '看本机留存文本（非正式版本）', exact: true }).click()
+  // 触屏稿里这是一行「标题 + 说明」入口，可访问名带说明，按开头匹配。
+  await page.getByRole('button', { name: /^看本机留存文本（非正式版本）/ }).click()
   await expect(page.getByTestId('legal-doc-fallback-warning')).toContainText('不作为正式版本')
   await expect(page.getByText('本终端为「AI求职打印服务终端」', { exact: false })).toBeVisible()
   await expect(page.getByTestId('legal-ai-explain')).toBeDisabled()
@@ -637,9 +639,12 @@ test('legal document returns to the page it was opened from @w5-kiosk', async ({
   api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
 
   await page.goto('/help')
-  await page.getByRole('group', { name: '按分类筛选常见问题' }).getByRole('button', { name: /隐私与留存/ }).click()
-  await page.getByRole('button', { name: /文件会保存多久/ }).click()
-  await page.getByRole('button', { name: '隐私政策', exact: true }).click()
+  // 触屏稿默认分类不含隐私；隐私与留存在「隐私、设备与备案」弹层里，仍要点进去再打开隐私政策。
+  await page.getByRole('button', { name: /^隐私、设备与备案/ }).click()
+  await page.getByRole('dialog', { name: '隐私、设备与备案' }).getByRole('button', { name: /隐私与留存/ }).click()
+  // 触屏稿 help：分类下的问答是「问 + 答」一起摆出的卡片，不用再点开。
+  await expect(page.getByText('文件会保存多久？', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: /^隐私政策/ }).click()
   await expect(page).toHaveURL(/\/legal\/privacy$/)
   await expect(page.getByRole('heading', { name: '一、我们收集的信息', exact: true })).toBeVisible()
   const back = page.getByRole('button', { name: '返回上一页', exact: true }).first()
@@ -647,7 +652,7 @@ test('legal document returns to the page it was opened from @w5-kiosk', async ({
   await back.click()
   // 帮助页照稿 06 把所选分类写进地址（?topic=）；「打开时的那一页」就是隐私分类，不是帮助首页。
   await expect(page).toHaveURL(/\/help\?topic=privacy$/)
-  await expect(page.getByRole('button', { name: /文件会保存多久/ })).toBeVisible()
+  await expect(page.getByText('文件会保存多久？', { exact: true })).toBeVisible()
   expect(errors).toEqual([])
 })
 
@@ -661,8 +666,8 @@ test('legal document back button says where it goes, with and without in-app his
     json: { success: true, data: { content: '一、服务说明\n\n本终端提供打印与 AI 简历服务。', publishedAt: '2026-07-24T00:00:00.000Z' } },
   })
   api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
-  const topbarBack = page.locator('.qx-topbar-back')
-  const ctaBack = page.locator('.legal-doc-cta .legal-doc-btn').first()
+  const topbarBack = page.locator('.qxt-back')
+  const ctaBack = page.locator('.legal-doc-cta .qxt-btn-sec').first()
 
   // 分支一：站内有上一页（/help），地址又带 ?from=login。现有入口不会这样拼地址，
   // 用 pushState + popstate 模拟一次站内前进（与 kiosk-privacy-timeout 的做法相同）。
@@ -710,9 +715,10 @@ test('legal document keeps its header usable at 390x844 @w5-mobile', async ({ pa
   const root = page.locator('[data-kiosk-screen="legal-doc"]')
   // 2026-09-25 迁入稿 08-legal：页头由青序顶栏（返回槽）+ 页内文档头承担，字号控件落在「按章节读」一行。
   // 断言意图不变：窄屏下标题可读、返回键与字号控件互不遮挡、页头不吃掉整屏。
-  const topbar = root.locator('.qx-topbar')
-  const title = root.locator('.legal-doc-title')
-  const back = topbar.locator('.qx-topbar-back')
+  const topbar = root.locator('.qxt-hdr')
+  // 触屏稿：文档名在意图带的 h1 里，页内不再另画一块文档头。
+  const title = root.locator('.qxt-ask h1')
+  const back = root.locator('.qxt-back')
   const tools = root.locator('.legal-doc-tools')
   await expectQingxuLegalShell(page, '隐私政策')
   await expect(root.locator('[data-kiosk-stage-fit="off"]')).toHaveCount(1)
@@ -835,7 +841,8 @@ test('offline page retains the 8177 state after an aborted health request @w5-ki
   await page.goto('/error-offline')
   await page.getByRole('button', { name: '重新检测', exact: true }).click()
   await expect(page).toHaveURL(/\/error-offline$/)
-  await expect(page.getByText(/已重试 1 次/)).toBeVisible()
+  // 触屏稿 09：屏上只说各项读到没读到，不写重测次数和秒数；次数只留给读屏（.qxp-sr），状态没丢。
+  await expect(page.getByTestId('system-state-auto')).toContainText('已重试 1 次')
   await expectFusionAcceptance(page, errors)
 })
 
@@ -873,20 +880,21 @@ test('offline page backs off its automatic re-checks and resets on the online ev
   expect(api.requestCount('GET', '/api/v1/health')).toBe(0)
 
   await page.clock.runFor(10_000)
-  await expect(page.getByText('已重试 1 次，约 20 秒后自动再试', { exact: false })).toBeVisible()
+  await expect(page.locator('.qxp-sr', { hasText: '已重试 1 次，约 20 秒后自动再试' })).toBeAttached()
+  await expect(page.getByText('约 20 秒后自动再试')).toBeHidden()
   await page.clock.runFor(19_000)
   await page.waitForTimeout(300)
   expect(api.requestCount('GET', '/api/v1/health')).toBe(1)
   await page.clock.runFor(1_000)
-  await expect(page.getByText('已重试 2 次，约 40 秒后自动再试', { exact: false })).toBeVisible()
+  await expect(page.locator('.qxp-sr', { hasText: '已重试 2 次，约 40 秒后自动再试' })).toBeAttached()
 
   await page.getByRole('button', { name: '重新检测', exact: true }).click()
-  await expect(page.getByText('已重试 3 次，约 60 秒后自动再试', { exact: false })).toBeVisible()
+  await expect(page.locator('.qxp-sr', { hasText: '已重试 3 次，约 60 秒后自动再试' })).toBeAttached()
   await page.getByRole('button', { name: '重新检测', exact: true }).click()
-  await expect(page.getByText('已重试 4 次，约 60 秒后自动再试', { exact: false })).toBeVisible()
+  await expect(page.locator('.qxp-sr', { hasText: '已重试 4 次，约 60 秒后自动再试' })).toBeAttached()
 
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
-  await expect(page.getByText('已重试 5 次，约 20 秒后自动再试', { exact: false })).toBeVisible()
+  await expect(page.locator('.qxp-sr', { hasText: '已重试 5 次，约 20 秒后自动再试' })).toBeAttached()
   expect(api.requestCount('GET', '/api/v1/health')).toBe(5)
   expect(errors).toEqual([])
 })

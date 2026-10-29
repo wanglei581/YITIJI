@@ -20,6 +20,12 @@ const files = {
   tools: read('src/pages/assistant/AdvisorTools.tsx'),
   conversation: read('src/pages/assistant/AdvisorConversation.tsx'),
   scenes: read('src/pages/assistant/advisorScenes.ts'),
+  touchCss: read('src/pages/assistant/assistant-touch.css'),
+  picker: read('src/pages/assistant/AssistantTaskPicker.tsx'),
+  login: read('src/pages/auth/LoginPage.tsx'),
+  help: read('src/pages/help/HelpCenterPage.tsx'),
+  channels: read('src/pages/official-channels/OfficialChannelsPage.tsx'),
+  legal: read('src/pages/legal/LegalDocPage.tsx'),
   routes: read('src/routes/index.tsx'),
 }
 
@@ -81,7 +87,45 @@ for (const timer of ['setTimeout', 'setInterval']) {
 // ── ④ 降级：AI 是加速器不是前置条件 ───────────────────────────────────────
 must('page', /mode: 'manual'/, 'P25 的降级必须是 manual —— 用户的目标不依赖模型')
 must('page', /manualPath:/, 'manual 降级必须给出具体的手动路径')
-must('page', /advisorTask\.isFailed && <AdvisorManualEntries \/>/, '降级时必须给出可点的真实入口，而不只是一句安慰话')
+// 触屏稿：本轮失败 / 不是 AI 回复 / AI 暂停三种版式，正文都落在「这些都不需要 AI · 现在就能做」的四个手动入口上。
+must('page', /\(body === 'notai' \|\| body === 'error' \|\| body === 'locked'\) && \([\s\S]{0,800}?<AdvisorManualEntries \/>/, '降级时必须给出可点的真实入口，而不只是一句安慰话')
+// 稿 xq ai-down 通知条的原话：先说小青没接上，再说下面这些事不用问也能办（改版时被丢过一次，写成「页头说明」的说法并不成立）。
+must(
+  'page',
+  /body === 'locked' \? \([\s\S]{0,120}?<QxTouchCallout kind="howto" icon="alert">小青这会儿没有接上。下面这些事不用问也能办。<\/QxTouchCallout>/,
+  'AI 暂停时通知条必须是稿上的原话：小青这会儿没有接上。下面这些事不用问也能办。',
+)
+// 降级卡里的动作（去打印扫描）旧样式给 56，触屏稿要求可点区不小于 64×64；只在问小青页作用域里抬，ai/ 共享件的默认不动。
+must('touchCss', /\[data-qx-page='assistant'\] \.kassist \.assistant-ai-status \.kiosk-ai-fallback__action \{ min-height: 64px; min-width: 64px; \}/, '降级卡动作的可点区不小于 64×64')
+// 补上通知条之后这一屏会比屏幕高：locked 态用共享的紧凑样式 qxt-body-aidown，对话区行距收紧，
+// 四张入口的箭头圆钮挪到卡片右侧（卡高装不下「标题 + 说明 + 底部圆钮」，圆钮会探出卡底被下一张压住）。
+must('page', /bodyClassName=\{body === 'locked' \? 'qxt-body-aidown' : undefined\}/, 'AI 暂停时页壳用 qxt-body-aidown 紧凑通知条，求助句才不被挤出这一屏')
+must('touchCss', /\.assistant-conversation\[data-turn='locked'\] \{ gap: 8px; \}/, 'AI 暂停时对话区行距收紧到 8')
+must('touchCss', /\.assistant-manual-entries\[data-variant='full'\] \.qxt-slab \.qxt-take \{ position: absolute; right: 22px; top: 50%;/, '四张入口的箭头圆钮在卡片右侧垂直居中，不探出卡底')
+
+// ── 稿上本包每屏的 AI 元素一个不许少（产品负责人 10/28：AI 和这些功能结合在一起）──────────
+// 回答态：稿「这一主题还可以问」——给下一问的提示，只列不替用户发；已经问过的那句不重复。
+must('page', /<ReplyBounds more=\{quickQuestions\.filter\(\(question\) => question !== lastUserText\)\} \/>/, '回答态必须列出「这一主题还可以问」（去掉已问过的那一句）')
+must('conversation', /<K as="h3">这一主题还可以问<\/K>/, '回答态：「这一主题还可以问」是小标题')
+must('conversation', /<K as="h3">这一轮不替你决定<\/K>/, '回答态：「这一轮不替你决定」不得丢')
+// 场景态：稿 xq 场景屏的标题就是场景名（AI 求职方向探索），并有一颗「点了就发给小青」的起手问句；没有起手句的场景不画。
+must('scenes', /starter\?: string/, '场景可以带起手问句（starter）')
+must('scenes', /career_explore: \{[\s\S]{0,900}?starter: '我还不确定适合做什么',/, 'AI 求职方向探索的起手问句照稿：我还不确定适合做什么')
+must('picker', /\{scene\.starter \? \(\s*<Hit title=\{scene\.starter\} sub="点了就发给小青" testId="cockpit-scene-starter" disabled=\{loading\} onClick=\{\(\) => onQuestion\(scene\.starter \?\? ''\)\} \/>/, '场景态：起手问句是一颗点了就发给小青的按钮，等回答时停住')
+must('page', /title=\{toolboxScene && body === 'picker' \? toolboxScene\.title : cockpitCopy\.title\.join\(''\)\}/, '场景态：页头标题是场景名（稿：AI 求职方向探索）')
+must('page', /sub=\{toolboxScene && body === 'picker' \? `\$\{toolboxScene\.disclaimer\}。` : cockpitCopy\.lede\}/, '场景态：页头说明是「仅供参考」那一句')
+// 登录页底栏的问小青：label 照稿「问小青：不登录能办什么」，话筒圆钮，带本屏专属问句，只预填不自动发送。
+must('login', /label: '问小青：不登录能办什么', draft: '不登录可以办理哪些服务？登录之后又多出什么？'/, '登录页问小青的 label 与预填问句照稿')
+must('login', /<span className="qxt-mic"><QxTouchIcon name="mic" size=\{30\} strokeWidth=\{2\.2\} \/><\/span>/, '登录页问小青带话筒圆钮')
+must('login', /rememberAssistantDraft\(LOGIN_ASK\.draft\); navigate\('\/assistant'\)/, '登录页问小青：预填后去顾问页，不自动发送')
+// 其余带底栏问小青的屏（稿 fix-public.js）：label 逐字照稿、带话筒、各带本屏专属问句；点了只预填，不自动发送（共享底栏的约定）。
+must('help', /label: '问小青：帮助页打不开', draft: '帮助页打不开，我该怎么继续？', voice: true/, '帮助页（打不开）问小青的 label 与预填问句照稿，带话筒')
+must('help', /label: '问小青：分类里没有我的问题', draft: '这一页的分类里没有我的问题，我该怎么继续？', voice: true/, '帮助页（没有这个分类）问小青的 label 与预填问句照稿，带话筒')
+must('help', /label: '问小青：这里没看懂', draft: view === 'topic' && topic \? `帮助页「\$\{topic\.label\}」这一类里我没看懂，请帮我说明。` : '帮助页里我没看懂，请帮我说明。', voice: true/, '帮助页（首页与分类）问小青的 label 照稿，分类页的预填问句带分类名')
+must('channels', /label: '问小青：这个码怎么用', draft: CHANNEL_ASK_DRAFT, voice: true/, '官方渠道问小青的 label 照稿，带话筒')
+must('channels', /<PairCard title="问小青" desc="渠道还没有码，仍可以问别的事"/, '官方渠道没有码时仍留一张「问小青」卡（稿：渠道还没有码，仍可以问别的事）')
+must('legal', /label: '问小青：看不懂这一章', draft: `《\$\{meta\.title\}》里「\$\{sections\[activeChapter\]\?\.title \?\? ''\}」这一章我没看懂，请只做通俗转述，不要给法律结论。`, voice: true/, '协议页问小青的 label 照稿，预填问句带书名与章名并写明只做通俗转述')
+must('legal', /\{ label: '看不懂这一章', disabled: true, testId: 'legal-ai-explain' \}/, '协议正文没取回来时，问小青只置灰（唯一产出是对这一章的转述，没有正文就没有可转述的）')
 must('scenes', /ADVISOR_MANUAL_ENTRIES/, '手动入口必须集中声明，便于逐条核对路由真实性')
 
 // 手动路径必须指向**真实注册**的路由，否则「不用等 AI 也能办」就是空话。
@@ -94,16 +138,20 @@ for (const route of manualRoutes) {
 // ── ⑤ 置灰一律 aria-disabled ─────────────────────────────────────────────
 // 原生 disabled 会把控件踢出 Tab 序、读屏直接跳过，用户永远读不到「为什么灰」；
 // 触屏也没有 hover 可以补这层解释。
-must('page', /aria-disabled=\{aiLocked \|\| undefined\}/, 'AI 锁定态必须用 aria-disabled 表达')
+// 触屏稿里 AI 暂停 / 非 AI 回复 / 本轮失败三态不画输入坞（底栏只放返回、投诉 AI 内容、重新检查），
+// 所以不再有「一个被锁住的输入框」可以 aria-disabled / readOnly。要守住的是同一条底线：
+// 这三态里不得有一个按不出结果的发送键，锁定时快捷问题也发不出请求，且置灰一律不用原生 disabled。
+must('page', /const showComposer = body === 'picker' \|\| body === 'submitting' \|\| body === 'reply'$/m, '锁定 / 非 AI 回复 / 失败三态不得画输入坞（不留按不出结果的发送键）')
 mustNot('page', /(?<!aria-)disabled=\{aiLocked/, 'AI 锁定态不得使用原生 disabled')
-must('page', /readOnly=\{aiLocked\}/, '输入框锁定用 readOnly，保持可聚焦可读')
+must('page', /if \(loading \|\| aiLocked\) return/, '锁定时快捷问题点了也不得发出请求')
 must('tools', /aria-disabled=\{degraded \|\| undefined\}/, '专项工具置灰必须用 aria-disabled')
 mustNot('tools', /(?<!aria-)disabled=\{degraded/, '专项工具置灰不得使用原生 disabled')
 must('tools', /aria-describedby=\{degraded \? reasonId : undefined\}/, '置灰按钮必须指向常驻可见的原因')
-must('page', /assistant-composer-lock/, '锁定原因必须常驻可见在输入区旁')
+must('scenes', /lede: '四个入口不经过 AI，照常能办。'/, '锁定原因常驻在页头说明里，不靠输入框旁的小字')
 
 // 锁死不能是终局：配置修好后用户得有办法再试。
 must('page', /重新检查 AI 顾问/, '锁定态必须留一条显式的重新检查路径')
+must('page', /label: '重新检查', onClick: recheckAdvisor/, '锁定态底栏的主按钮必须是重新检查（稿 xq ai-down）')
 
 // ── ⑥ 合规文案白名单（CLAUDE.md §2）────────────────────────────────────────
 for (const key of ['page', 'conversation', 'tools', 'scenes']) {

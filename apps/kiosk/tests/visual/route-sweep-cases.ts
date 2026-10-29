@@ -38,13 +38,13 @@ const PARAM_SAMPLES = {
  *
  * - /session-timeout：孤立访问视为清场，硬切首页（KioskPrivacyGuard）
  * - /screensaver：夹具 playlist.enabled=false，无素材则退出回首页
- * - /session-resume：未登录切登录页
+ * - /session-resume：未登录留在本页，由「去登录」带回跳；登录成功回到这一页
  * - /contract-review*：生产默认关闭，Navigate 回首页
  */
 const FAIL_CLOSED_LANDINGS = {
   '/session-timeout': '/',
   '/screensaver': '/',
-  '/session-resume': '/login',
+  '/session-resume': '/session-resume',
   '/contract-review': '/',
   '/contract-review/processing': '/',
   '/contract-review/result': '/',

@@ -460,10 +460,11 @@ check('W2-W5 state coverage', () => {
     "page.getByText('还没有登录后保存的简历', { exact: true })",
   ])
   // 稿 09-system-state（2026-09-25 迁入）：主操作按稿叫「重新检测」（旧页叫「重试连接」），证据锚点随稿换字，判据不变。
+  // 2026-10-28 触屏稿：屏上不写重测次数和秒数，次数只留给读屏（.qxp-sr），证据锚点换成读屏文字节点；判据仍是「失败后状态还在、次数 1」。
   assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'offline page retains the 8177 state after an aborted health request @w5-kiosk'", [
     "api.abort('GET', '/api/v1/health', 'internetdisconnected')",
     "page.getByRole('button', { name: '重新检测', exact: true }).click()",
-    "page.getByText(/已重试 1 次/)",
+    "page.getByTestId('system-state-auto')).toContainText('已重试 1 次')",
   ])
   assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'profile permission state uses the canonical fusion shell @w5-kiosk'", [
     "page.goto('/profile')",

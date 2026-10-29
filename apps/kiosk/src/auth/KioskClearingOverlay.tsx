@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { helpNeededLine } from '../copy/unattendedCopy'
+import { useSupportContact } from '../hooks/useSupportContact'
 import {
   retryScanCleanupNow,
   type ScanCleanupOutcome,
@@ -34,6 +36,9 @@ function formatRemaining(deadlineAt: number, now: number): string {
 
 function CleanupHoldPanel({ status }: { status: ScanCleanupStatus }) {
   const [now, setNow] = useState(() => Date.now())
+  // 现场没有人可叫：需要帮助只给服务电话，后台读不到号码就不写这一行。
+  const contact = useSupportContact()
+  const helpLine = contact.servicePhone ? helpNeededLine(contact) : null
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(timer)
@@ -66,7 +71,7 @@ function CleanupHoldPanel({ status }: { status: ScanCleanupStatus }) {
       >
         立即重试
       </button>
-      <p className="qx-clearing-note">一直不成，请叫现场工作人员看一眼这台机器的网络。</p>
+      {helpLine ? <p className="qx-clearing-note" data-testid="session-guard-cleanup-help">{helpLine}</p> : null}
     </div>
   )
 }
