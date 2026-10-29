@@ -92,3 +92,39 @@ export const interviewReport = {
     },
   } satisfies InterviewReportResponse,
 } satisfies { data: InterviewReportResponse }
+/**
+ * 条目多的练习报告：每个维度三条、五道预测题、八条清单、三条摘录（其中一条跳过）。
+ * 条数都在服务端报告的取值范围内（预测题 3–5、清单 5–8）。
+ * 上面那份只有一条一条，装得进任何版式；这份主视图和「更多」都比一屏高，用来证明
+ * 条目多时卡片不被压扁、最后一条滚得到、切到「更多」从顶开始读。
+ */
+export const interviewReportRich = {
+  data: {
+    ...interviewReport.data,
+    report: {
+      ...interviewReport.data.report,
+      overall: { level: 'pass', summary: '整体回答顺序清楚，能说出自己负责的部分；结果部分还缺少能核实的数字，追问时略显犹豫。' },
+      expression: ['回答顺序清楚，先讲背景再讲行动', '个别句子偏长，可以拆成两句说', '结尾能回到岗位要求，但略显仓促'],
+      positionFit: ['能联系目标岗位的日常工作内容', '提到了与岗位相关的工具，但没有说明熟练程度', '对团队协作的描述与岗位要求一致'],
+      credibility: ['只保留本人真实经历', '时间线前后一致', '数字来源没有说明，建议准备可核实的依据'],
+      professional: ['术语使用基本准确', '能说出常见问题的排查思路', '对新工具的了解停留在名称层面'],
+      adaptability: ['能回应追问', '被打断后能回到主线', '遇到不会的问题时没有说明打算怎么补'],
+      risks: ['结果量化不足，容易被追问', '个人贡献与团队成果区分不够清楚', '回答时间偏长，超过一分钟'],
+      predictedQuestions: [
+        { question: '你的具体贡献是什么？', why: '核实个人职责', approach: '用真实行动回答，只说自己做的部分' },
+        { question: '遇到过最难的问题是什么？怎么解决的？', why: '看解决问题的思路', approach: '按 STAR 讲一件真实经历' },
+        { question: '为什么想做这个岗位？', why: '看动机与稳定性', approach: '结合自己的经历和岗位日常' },
+        { question: '你怎么保证登记不漏项？', why: '看细节和流程意识', approach: '说清分栏登记和离开时间核对这两步' },
+        { question: '遇到来访人员不配合怎么办？', why: '看沟通与应变', approach: '先说明用途，再说你怎么处理' },
+      ],
+      starAdvice: { s: '开学周来访集中，登记本只有一本。', t: '你负责当天的来访登记。', a: '你按院系把表格分开，人走时核对离开时间。', r: '当天有没有漏项，由你自己核对。', reminder: '数字和成果不用编造。' },
+      checklist: ['复核简历事实', '准备真实项目例子', '练习 1 分钟自我介绍', '核对面试时间与路线', '准备两个想问面试官的问题', '带上身份证件和纸质简历', '提前十分钟到场', '想好薪资期待的区间'],
+    },
+    qaExcerpts: [
+      { question: '请用一分钟介绍与你目标岗位相关的真实经历。', answerExcerpt: '我做过一个可访问性改造项目，负责把表单的读屏提示补全，并和测试同学一起回归。', skipped: false },
+      { question: '请说明一次解决困难的真实经历。', answerExcerpt: null, skipped: true },
+      { question: '你为什么想做这个岗位？', answerExcerpt: '我想把前端无障碍做成日常工作，而不是只在项目收尾时补。', skipped: false },
+    ],
+    includeAnswersInPrint: true,
+  },
+}

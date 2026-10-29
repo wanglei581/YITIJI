@@ -1,19 +1,20 @@
 import type { Page, Route } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
+import { KIOSK_AI_CAPABILITIES_PATH, kioskAiCapabilitiesResponse } from '../fixtures/ai-capabilities'
 import { RECRUITMENT_HOSTING_OFF, RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointerHit, readEnabledStageScale } from './assert-layout'
 import {
   ASSISTANT_MOCK_FALLBACK_REPLY_TEXT, assistantMockFallbackReply,
   assistantReply, diagnosis, interviewAnswered, interviewCreated,
-  interviewReport, interviewStarted, uploadedResume,
+  interviewReport, interviewReportRich, interviewStarted, uploadedResume,
 } from './fixtures/fusion-w3-states'
 import { longestBlankRun } from './fixtures/blank-run'
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 import { registerW6Api } from './fixtures/fusion-w6-api'
 import { changeStoredResumeFileId, clearResumeParseIntents, readResumeParseIntents } from './fixtures/resume-parse-intent-state'
 import { mockAssistantVoice } from './fixtures/assistant-voice'
-import { chooseGenericResumeDirection, chooseTargetedResumeDirection, expectResumeDirectionUnselected, expectInterviewDirectionUnselected, chooseInterviewExperience, openResumeDirection, startResumeDiagnosis, startResumeOptimize } from './fixtures/direction-selection'
+import { chooseGenericResumeDirection, chooseTargetedResumeDirection, expectResumeDirectionUnselected, expectInterviewDirectionUnselected, chooseInterviewExperience, openResumeDirection, startResumeDiagnosis, startResumeOptimize, advanceInterviewSetupToStart } from './fixtures/direction-selection'
 
 function terminalBaseline(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
@@ -1945,7 +1946,6 @@ test('interview setup → text answer → report @w3-kiosk', async ({ page, api 
   api.respond('POST', '/api/v1/mock-interviews/interview-w3-public-fixture/end', { status: 200, json: interviewReport })
   api.respond('GET', '/api/v1/mock-interviews/interview-w3-public-fixture/report', { status: 200, json: interviewReport })
   await page.goto('/interview/setup')
-  await expect(page.getByRole('button', { name: 'HR 面试', exact: true })).toBeVisible()
   await expect(page.getByText('HR 初筛')).toHaveCount(0)
   await assertKioskShellFillsViewport(page)
   await expectInterviewDirectionUnselected(page)
@@ -1959,12 +1959,13 @@ test('interview setup → text answer → report @w3-kiosk', async ({ page, api 
   await interviewIndustryDialog.getByRole('button', { name: '完成' }).click()
   await chooseInterviewExperience(page)
   await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
+  await advanceInterviewSetupToStart(page)
   await page.getByRole('button', { name: '创建并开始练习' }).click()
   await page.waitForURL(/\/interview\?stage=session/)
   await page.reload()
   await expect(page).toHaveURL(/\/interview\?stage=session/)
   await page.getByRole('textbox').fill('我基于真实经历完成了一个可访问性项目。')
-  await page.locator('.interview-session__answer-dock').getByRole('button', { name: '提交回答', exact: true }).click()
+  await page.getByRole('button', { name: '提交回答', exact: true }).click()
   await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
   await page.waitForURL(/\/interview\?stage=report/)
   // 3.5c：横幅以 AI 可见标识开头（审计表一「模拟面试报告（一体机）」），不发给企业的边界不变。
@@ -1973,7 +1974,12 @@ test('interview setup → text answer → report @w3-kiosk', async ({ page, api 
   await expect(reportNote).toContainText('也不会发送给任何企业。')
   await expect(page.getByText('模拟练习结果，仅供练习参考，不代表任何用人单位的评价或录用意见。')).toBeVisible()
   await expect(page.getByRole('heading', { name: '和目标岗位要求的对照' })).toBeVisible()
-  await expect(page.getByText('前端开发工程师 · 互联网/科技 · HR 面试')).toHaveCount(2)
+  await expect(page.getByText('前端开发工程师 · 互联网/科技 · HR 面试')).toHaveCount(1)
+  await page.getByRole('button', { name: '预测题、STAR、清单、摘录' }).click()
+  await expect(page.getByRole('heading', { name: '高频问题预测' })).toBeVisible()
+  await page.getByRole('button', { name: '返回', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '和目标岗位要求的对照' })).toBeVisible()
+  await expect(page).toHaveURL(/\/interview\?stage=report/)
   await expect(page.getByText('岗位匹配度参考')).toHaveCount(0)
   await expect(page.getByText('HR 初筛')).toHaveCount(0)
   await expect(page.getByText('基础达标')).toHaveCount(0)
@@ -1999,6 +2005,7 @@ async function beginTextInterview(page: Page): Promise<void> {
   await dialog.getByRole('button', { name: '完成' }).click()
   await chooseInterviewExperience(page)
   await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
+  await advanceInterviewSetupToStart(page)
   await page.getByRole('button', { name: '创建并开始练习' }).click()
   await page.waitForURL(/\/interview\?stage=session/)
 }
@@ -2011,12 +2018,68 @@ test('interview answer outage drops the unsent turn and restores the draft @w3-k
   })
   await beginTextInterview(page)
   await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
-  await page.locator('.interview-session__answer-dock').getByRole('button', { name: '提交回答', exact: true }).click()
+  await page.getByRole('button', { name: '提交回答', exact: true }).click()
   const alert = page.locator('.interview-session__error')
   await expect(alert).toContainText('你刚才的回答还在输入框里')
   await expect(alert).toContainText('AI 现在停用')
   await expect(page.locator('.interview-session__history')).not.toContainText(INTERVIEW_ANSWER)
   await expect(page.getByRole('textbox', { name: '本题回答' })).toHaveValue(INTERVIEW_ANSWER)
+  // 作答故障同步到顶栏；本场还没有已保存的回答，出口是「看面试要点 / 离开」，不写「稍后再试生成报告」。
+  await expect(page.locator('.qxt-status')).toHaveText('AI 暂时不能出题')
+  const recovery = page.getByTestId('interview-finish-recovery')
+  await expect(recovery.getByRole('button', { name: '看面试要点', exact: true })).toBeVisible()
+  await expect(recovery.getByRole('button', { name: '离开', exact: true })).toBeVisible()
+  await expect(recovery.getByRole('button', { name: '稍后再试生成报告', exact: true })).toHaveCount(0)
+  // AI_PAUSED 是服务端 AI 闸门，小青这次也用不了：底栏问小青换停用态，位置不动，文字作答照常。
+  await expect(page.locator('[data-qxt-ask="off"]')).toHaveText('小青暂时不可用，可继续作答')
+  await expect(page.getByRole('button', { name: '提交回答', exact: true })).toBeEnabled()
+})
+
+test('interview answer outage after a saved answer offers the report retry, and only a gate-class outage disables 小青 @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  // 第一次成功（记下一条回答），第二次起模型没配：能力级故障，但不是服务端 AI 闸门。
+  api.respondWith('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, (n) => (n === 1
+    ? { status: 200, json: interviewAnswered }
+    : { status: 503, json: { success: false, error: { code: 'AI_NOT_CONFIGURED', message: 'x' } } }))
+  await beginTextInterview(page)
+  await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
+  await page.getByRole('button', { name: '提交回答', exact: true }).click()
+  await expect(page.locator('.interview-session__history')).toContainText(INTERVIEW_ANSWER)
+  await page.getByRole('textbox', { name: '本题回答' }).fill('第二次回答')
+  await page.getByRole('button', { name: '提交回答', exact: true }).click()
+  await expect(page.locator('.qxt-status')).toHaveText('AI 暂时不能出题')
+  // 有已保存的回答：出口是「看面试要点 / 稍后再试生成报告」，不再出现「离开」。
+  const recovery = page.getByTestId('interview-finish-recovery')
+  await expect(recovery.getByRole('button', { name: '看面试要点', exact: true })).toBeVisible()
+  await expect(recovery.getByRole('button', { name: '稍后再试生成报告', exact: true })).toBeVisible()
+  await expect(recovery.getByRole('button', { name: '离开', exact: true })).toHaveCount(0)
+  // 只是「这一项没配」，不是服务端 AI 闸门：不拿它去判小青，问小青照常可点。
+  await expect(page.getByRole('button', { name: '问小青：这一题怎么答' })).toBeEnabled()
+  await expect(page.locator('[data-qxt-ask="off"]')).toHaveCount(0)
+})
+
+test('interview 最近对话 lists only the user own last two answers, with the draft empty line before the first @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  const questions = ['请说明一次解决困难的真实经历。', '你怎么保证开学周高峰时登记不漏项？', '最后，你有什么想问我们的吗？']
+  api.respondWith('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, (n) => ({
+    status: 200,
+    json: { data: { done: false, question: questions[Math.min(n - 1, questions.length - 1)], qType: 'experience', questionIndex: n + 1, questionTarget: 5 } },
+  }))
+  await beginTextInterview(page)
+  const history = page.locator('.interview-session__history')
+  await expect(history).toContainText('这场还没有记下的对话')
+  for (const [n, answer] of ['第一次回答', '第二次回答', '第三次回答'].entries()) {
+    await page.getByRole('textbox', { name: '本题回答' }).fill(answer)
+    await page.getByRole('button', { name: '提交回答', exact: true }).click()
+    await expect(page.locator('.interview-session__question-text')).toContainText(questions[n]!)
+  }
+  // 稿 slice(-2)：只留本人最近两次回答；第一次回答、面试官的题都不在这块里（题在题目卡）。
+  await expect(history).toContainText('第三次回答')
+  await expect(history).toContainText('第二次回答')
+  await expect(history).not.toContainText('第一次回答')
+  await expect(history).not.toContainText(questions[2]!)
+  await expect(history).not.toContainText('这场还没有记下的对话')
+  await expect(history.locator(':scope > span')).toHaveCount(3)
 })
 
 test('ending an interview with no saved answers does not say retry @w3-kiosk', async ({ page, api }) => {
@@ -2049,11 +2112,16 @@ test('ending an interview during an AI outage keeps the saved answers and offers
   })
   await beginTextInterview(page)
   await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
-  await page.locator('.interview-session__answer-dock').getByRole('button', { name: '提交回答', exact: true }).click()
-  await expect(page.locator('.interview-session__history')).toContainText('请说明一次解决困难的真实经历。')
+  await page.getByRole('button', { name: '提交回答', exact: true }).click()
+  // 下一题进题目卡；「最近对话」只列本人记下的回答（稿 slice(-2)），不再重复面试官的题。
+  await expect(page.locator('.interview-session__question-text')).toContainText('请说明一次解决困难的真实经历。')
+  await expect(page.locator('.interview-session__history')).toContainText(INTERVIEW_ANSWER)
   await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
   const alert = page.locator('.interview-session__error')
   await expect(alert).toContainText('你的回答已保存')
+  // 出报告的故障同步到顶栏；AI_PAUSED 是服务端 AI 闸门，小青这次也用不了。
+  await expect(page.locator('.qxt-status')).toHaveText('AI 暂时不能出题')
+  await expect(page.locator('[data-qxt-ask="off"]')).toHaveText('小青暂时不可用，可继续作答')
   const recovery = page.getByTestId('interview-finish-recovery')
   await recovery.getByRole('button', { name: '稍后再试生成报告', exact: true }).click()
   await expect.poll(() => api.requestCount('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`)).toBe(2)
@@ -2066,6 +2134,8 @@ test('ending an interview during an AI outage keeps the saved answers and offers
 
 test('ending an interview during an AI outage does not claim answers were saved when none succeeded @w3-kiosk', async ({ page, api }) => {
   armInterviewSession(api)
+  // 「离开」回到的面试服务台会查一次服务健康状态。
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
   api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`, {
     status: 503,
     json: { success: false, error: { code: 'AI_PAUSED', message: 'AI 服务暂停中' } },
@@ -2074,7 +2144,158 @@ test('ending an interview during an AI outage does not claim answers were saved 
   await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
   await expect(page.locator('.interview-session__error')).toContainText('AI 暂时用不了，报告现在生成不了')
   await expect(page.getByText('你的回答已保存')).toHaveCount(0)
-  await expect(page.getByTestId('interview-finish-recovery').getByRole('button', { name: '看面试要点', exact: true })).toBeVisible()
+  const recovery = page.getByTestId('interview-finish-recovery')
+  await expect(recovery.getByRole('button', { name: '看面试要点', exact: true })).toBeVisible()
+  // 没有已保存的回答就没有报告可以「稍后再试」：出口是离开，不写重试。
+  await expect(recovery.getByRole('button', { name: '稍后再试生成报告', exact: true })).toHaveCount(0)
+  await expect(page.locator('.qxt-status')).toHaveText('AI 暂时不能出题')
+  await recovery.getByRole('button', { name: '离开', exact: true }).click()
+  await page.waitForURL(/\/interview-service\/?$/)
+})
+
+/** 触屏练面试页里真正在滚的容器：整页只能有这一个。 */
+const INTERVIEW_SCROLLERS = '.interview-flow__scroll, .interview-session__content, .qxt-ivhub'
+
+/** 页内可见的滚动容器（内容超出一屏的才算）。 */
+async function interviewScrollContainers(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const out: string[] = []
+    for (const el of document.querySelectorAll('.qxt-screen *')) {
+      const cs = getComputedStyle(el)
+      if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 1) out.push(el.className.toString())
+    }
+    return out
+  })
+}
+
+/** 每张说明卡、维度行、宽按钮都装得下自己的字：scrollHeight 不大于 clientHeight（被压扁的卡会大于）。 */
+async function expectInterviewCardsWhole(page: Page): Promise<void> {
+  const squeezed = await page.evaluate(() => [...document.querySelectorAll('.qxt-iv-note, .qxt-iv-ab, .qxt-iv-wide, .qxt-iv-banner, .qxt-iv-cells > div')]
+    .filter((el) => el.scrollHeight > el.clientHeight + 1)
+    .map((el) => `${el.className} ${el.scrollHeight}>${el.clientHeight} ${(el.textContent ?? '').slice(0, 16)}`))
+  expect(squeezed, '说明卡里的字被压出盒子').toEqual([])
+}
+
+/** 这一行字在滚动容器的可见范围里，而且中点没有被别的元素盖住（不在底栏、提示条后面）。 */
+async function expectVisibleInInterviewScroller(page: Page, text: string): Promise<void> {
+  const target = page.getByText(text, { exact: false }).last()
+  await target.scrollIntoViewIfNeeded()
+  const probe = await target.evaluate((el, selector) => {
+    const scroller = el.closest(selector) as HTMLElement | null
+    const box = el.getBoundingClientRect()
+    const area = scroller?.getBoundingClientRect()
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+    return {
+      inside: Boolean(area && box.top >= area.top - 1 && box.bottom <= area.bottom + 1),
+      covered: !(hit && (el === hit || el.contains(hit) || hit.contains(el))),
+    }
+  }, INTERVIEW_SCROLLERS)
+  expect(probe, `「${text}」应在可见范围内且没被盖住`).toEqual({ inside: true, covered: false })
+}
+
+test('interview report with many items keeps every card whole and reachable, 更多 opens at its first question @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, { status: 200, json: interviewAnswered })
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`, { status: 200, json: interviewReportRich })
+  api.respond('GET', `/api/v1/mock-interviews/${INTERVIEW_ID}/report`, { status: 200, json: interviewReportRich })
+  await beginTextInterview(page)
+  await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
+  await page.getByRole('button', { name: '提交回答', exact: true }).click()
+  await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
+  await page.waitForURL(/\/interview\?stage=report/)
+
+  // 主视图：条目多，超出一屏。只有一个滚动容器，提示出现，每张卡都完整。
+  await expect(page.getByRole('heading', { name: '风险点与改进建议' })).toBeVisible()
+  await expectInterviewCardsWhole(page)
+  expect(await interviewScrollContainers(page)).toHaveLength(1)
+  await expect(page.locator('.iv-scrollcue')).toBeVisible()
+  // 滑到底：最后一句看得见，提示收起；风险点卡里三条都在。
+  await page.locator('.interview-flow__scroll').evaluate((el) => el.scrollTo(0, el.scrollHeight))
+  await expect(page.locator('.iv-scrollcue')).toBeHidden()
+  await expectVisibleInInterviewScroller(page, '失败时仍停在报告页并写明原因')
+  await expectVisibleInInterviewScroller(page, '回答时间偏长，超过一分钟')
+
+  // 从底部点进「更多」：第一屏就是「高频问题预测」和第一道题，不停在中间。
+  await page.getByRole('button', { name: '预测题、STAR、清单、摘录' }).click()
+  await expect(page.getByRole('heading', { name: '高频问题预测' })).toBeFocused()
+  expect(await page.locator('.interview-flow__scroll').evaluate((el) => el.scrollTop)).toBe(0)
+  await expectVisibleInInterviewScroller(page, '1. 你的具体贡献是什么？')
+  // 四张卡的每一条都完整：第五道题、清单第八条、跳过的摘录与第三条摘录、STAR 的 R 与提醒。
+  await expectInterviewCardsWhole(page)
+  for (const text of ['3. 为什么想做这个岗位？', '5. 遇到来访人员不配合怎么办？', '想好薪资期待的区间', '回答：（跳过）', '3. 你为什么想做这个岗位？', 'R 结果：', '数字和成果不用编造。']) {
+    await expectVisibleInInterviewScroller(page, text)
+  }
+
+  // 返回仍回主视图，不是离开报告。
+  await page.getByRole('button', { name: '返回', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '风险点与改进建议' })).toBeVisible()
+  await expect(page).toHaveURL(/\/interview\?stage=report/)
+})
+
+test('interview pages that overflow show the swipe cue, and it goes away at the end @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, { status: 200, json: interviewAnswered })
+  await beginTextInterview(page)
+  // 麦克风探测落定后，语音原因卡常显；再答完一题，最近对话多出一条本人回答。作答页比一屏高一截（不靠刚好卡线）。
+  // 整页只有 .interview-session__content 一个滚动容器。
+  await expect(page.locator('[data-mic-reason]')).toBeVisible()
+  await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
+  await page.getByRole('button', { name: '提交回答', exact: true }).click()
+  // 下一题进题目卡；「最近对话」只列本人记下的回答（稿 slice(-2)），不再重复面试官的题。
+  await expect(page.locator('.interview-session__question-text')).toContainText('请说明一次解决困难的真实经历。')
+  await expect(page.locator('.interview-session__history')).toContainText(INTERVIEW_ANSWER)
+  expect(await interviewScrollContainers(page)).toEqual(['interview-session__content'])
+  const overflow = await page.locator('.interview-session__content').evaluate((el) => el.scrollHeight - el.clientHeight)
+  expect(overflow, '作答页要明显超出一屏，滑动提示才有判据').toBeGreaterThan(60)
+  const cue = page.locator('.iv-scrollcue')
+  await expect(cue).toBeVisible()
+  await page.locator('.interview-session__content').evaluate((el) => el.scrollTo(0, el.scrollHeight))
+  await expect(cue).toBeHidden()
+  // 回到顶又出现：提示盯的是真正在滚的那一层，不是外面一层。
+  await page.locator('.interview-session__content').evaluate((el) => el.scrollTo(0, 0))
+  await expect(cue).toBeVisible()
+})
+
+test('interview setup industry picker keeps readable text, 64px taps and a visible chosen state @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await page.goto('/interview/setup')
+  await page.getByRole('button', { name: '选择行业 (20)' }).click()
+  const dialog = page.getByRole('dialog', { name: '选择面试行业' })
+  const picked = dialog.getByRole('button', { name: '制造业', exact: true })
+  const idle = dialog.getByRole('button', { name: '采矿业', exact: true })
+  await picked.click()
+  // 选中态要看得出来：选中的是深底，没选的是卡片底，没选的也有边。
+  await expect(picked).toHaveAttribute('aria-pressed', 'true')
+  const look = (button: typeof picked) => button.evaluate((el) => {
+    const style = getComputedStyle(el)
+    return { background: style.backgroundColor, border: style.borderTopWidth }
+  })
+  const chosenLook = await look(picked)
+  const idleLook = await look(idle)
+  expect(chosenLook.background, '选中的行业要有和其他选项不同的底色').not.toBe(idleLook.background)
+  expect(idleLook.border, '没选的行业也要看得出是个按钮').not.toBe('0px')
+  // 字不小于 20px，可点的不小于 64×64（只量看得见的文字和按钮）。
+  const found = await dialog.evaluate((root) => {
+    const smallText: string[] = []
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    while (walker.nextNode()) {
+      const node = walker.currentNode as Text
+      const label = (node.textContent ?? '').trim()
+      const host = node.parentElement
+      if (!label || !host) continue
+      const box = host.getBoundingClientRect()
+      if (box.width < 2 || box.height < 2) continue
+      const size = parseFloat(getComputedStyle(host).fontSize)
+      if (size < 20) smallText.push(`${size}px ${label.slice(0, 16)}`)
+    }
+    const smallTaps = [...root.querySelectorAll('button')]
+      .map((button) => ({ label: (button.textContent ?? '').trim().slice(0, 12), box: button.getBoundingClientRect() }))
+      .filter(({ box }) => box.width < 63.5 || box.height < 63.5)
+      .map(({ label, box }) => `${label || '关闭'} ${Math.round(box.width)}×${Math.round(box.height)}`)
+    return { smallText, smallTaps }
+  })
+  expect(found.smallText, '行业弹窗里的字不小于 20px').toEqual([])
+  expect(found.smallTaps, '行业弹窗里的按钮不小于 64×64').toEqual([])
 })
 
 test('interview setup failure stays inside the first screen @w3-kiosk', async ({ page, api }) => {
@@ -2090,14 +2311,201 @@ test('interview setup failure stays inside the first screen @w3-kiosk', async ({
   await dialog.getByRole('button', { name: '完成' }).click()
   await chooseInterviewExperience(page)
   await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
+  await advanceInterviewSetupToStart(page)
   await page.getByRole('button', { name: '创建并开始练习' }).click()
-  const alert = page.locator('.qx-ctabar [role="alert"]')
+  const alert = page.locator('[data-testid="interview-setup-error"]')
   await expect(alert).toBeVisible()
   await expect(alert).toBeInViewport()
   await expect(alert).toContainText('AI 服务暂停中')
+  // AI_PAUSED 是服务端 AI 闸门：小青这次也用不了，底栏问小青换停用态，设置仍可继续手动改。
+  await expect(page.locator('[data-qxt-ask="off"]')).toHaveText('小青暂时不可用，可继续手动设置')
 })
 
-const COVERED_EVIDENCE = '我做过两年社群运营，最多同时管 6 个群'
+// ── 练面试设置页 / 作答页按各 AI 能力的配置状态放行（GET /kiosk/ai/capabilities） ──
+// 读不到按没确认处理，不当成可用；服务端给的内部原因（管理员关闭）不上屏。
+
+const CAPABILITY_OFF = { status: 'off', reason: '管理员已关闭该能力' } as const
+const CAPABILITIES_UNREADABLE = { status: 503, json: { success: false, error: { code: 'CAPABILITIES_UNAVAILABLE', message: 'x' } } }
+
+async function fillInterviewSetupToStep3(page: Page): Promise<void> {
+  await page.goto('/interview/setup')
+  await page.getByRole('button', { name: '选择行业 (20)' }).click()
+  const dialog = page.getByRole('dialog', { name: '选择面试行业' })
+  await dialog.getByRole('button', { name: '制造业', exact: true }).click()
+  await dialog.getByRole('button', { name: '完成' }).click()
+  await chooseInterviewExperience(page)
+  await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
+  await advanceInterviewSetupToStart(page)
+}
+
+test('interview setup: mock_interview off keeps creation shut, says why, and sends no create request @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respond('GET', KIOSK_AI_CAPABILITIES_PATH, { status: 200, json: kioskAiCapabilitiesResponse({ mock_interview: CAPABILITY_OFF }) })
+  await fillInterviewSetupToStep3(page)
+  const primary = page.getByTestId('interview-primary')
+  await expect(primary).toBeDisabled()
+  await expect(page.locator('.qxt-status')).toHaveText('AI 暂时不能出题')
+  const note = page.locator('.qxt-iv-note', { hasText: '暂时不能开始 AI 面试' })
+  await expect(note).toContainText('AI能力当前不可用')
+  await expect(page.getByText('管理员已关闭')).toHaveCount(0)
+  // 出口：页内不依赖 AI 的面试技巧。问小青没关（assistant_chat 可用），照常可点。
+  await expect(page.getByRole('button', { name: /先看面试技巧/ })).toBeVisible()
+  await expect(page.locator('[data-qxt-ask="on"]')).toHaveText('问小青：这场练习怎么设')
+  await primary.dispatchEvent('click')
+  expect(api.requestCount('POST', '/api/v1/mock-interviews')).toBe(0)
+})
+
+test('interview setup: the not-ready note shows from step 1, so nobody fills three steps before finding out @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respond('GET', KIOSK_AI_CAPABILITIES_PATH, { status: 200, json: kioskAiCapabilitiesResponse({ mock_interview: CAPABILITY_OFF }) })
+  await page.goto('/interview/setup')
+  const note = page.locator('.qxt-iv-note', { hasText: '暂时不能开始 AI 面试' })
+  await expect(note).toBeVisible()
+  await expect(note).toContainText('AI能力当前不可用')
+  await expect(page.locator('.qxt-status')).toHaveText('AI 暂时不能出题')
+  // 第 1 步照常能填、能往下走（手填不依赖 AI）；只是创建在第 3 步不放行。
+  await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
+  await expect(page.getByRole('button', { name: '下一步', exact: true })).toBeEnabled()
+})
+
+test('interview setup: unreadable capabilities count as unconfirmed, not available, for creation and 小青 @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respond('GET', KIOSK_AI_CAPABILITIES_PATH, CAPABILITIES_UNREADABLE)
+  await fillInterviewSetupToStep3(page)
+  await expect(page.getByTestId('interview-primary')).toBeDisabled()
+  await expect(page.locator('.qxt-status')).toHaveText('AI 状态未确认')
+  await expect(page.locator('.qxt-iv-note', { hasText: '暂时不能开始 AI 面试' })).toContainText('暂时无法确认AI能力状态')
+  await expect(page.locator('[data-qxt-ask="off"]')).toHaveText('小青状态未确认，可继续手动设置')
+  expect(api.requestCount('POST', '/api/v1/mock-interviews')).toBe(0)
+})
+
+test('interview setup: positive control, available capabilities let the same button create @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  await fillInterviewSetupToStep3(page)
+  const primary = page.getByTestId('interview-primary')
+  await expect(primary).toBeEnabled()
+  await expect(page.locator('.qxt-status')).toHaveText('AI 模拟面试')
+  await primary.click()
+  await page.waitForURL(/\/interview\?stage=session/)
+  expect(api.requestCount('POST', '/api/v1/mock-interviews')).toBe(1)
+})
+
+test('interview setup: while creating, the task region is data-aitask=running with the preparing copy @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respondWith('POST', '/api/v1/mock-interviews', async () => {
+    await new Promise((resolve) => setTimeout(resolve, 30_000))
+    return { status: 200, json: interviewCreated }
+  })
+  await fillInterviewSetupToStep3(page)
+  await page.getByTestId('interview-primary').click()
+  const region = page.locator('section.kiosk-ai-task')
+  await expect(region).toHaveAttribute('data-aitask', 'running')
+  await expect(region).toContainText('正在为你准备面试官…')
+  await expect(page.getByTestId('interview-primary')).toBeDisabled()
+})
+
+test('interview setup: a non-outage start failure says only what happened, never that the AI service is fine @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  // 建会话成功、出第一题时上游这一次没成（不是能力级故障）。
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/start`, {
+    status: 502,
+    json: { success: false, error: { code: 'AI_PROVIDER_ERROR', message: 'x' } },
+  })
+  await fillInterviewSetupToStep3(page)
+  await page.getByTestId('interview-primary').click()
+  const region = page.locator('section.kiosk-ai-task')
+  await expect(region).toHaveAttribute('data-aitask', 'failed')
+  await expect(region).toContainText('本次没有进入面试间')
+  await expect(page.getByText('本身是通的')).toHaveCount(0)
+  await expect(page.getByText('服务本身')).toHaveCount(0)
+  // 不是能力级故障：创建键仍可再点，问小青也不受影响。
+  await expect(page.getByTestId('interview-primary')).toBeEnabled()
+  await expect(page.locator('[data-qxt-ask="on"]')).toBeVisible()
+})
+
+test('interview session: mock_interview off or unreadable shows on the top bar, 小青 off follows its own capability @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  let reads = 0
+  // 设置页读到的都可用；进入作答页那一次：模拟面试关闭、小青关闭。
+  api.respondWith('GET', KIOSK_AI_CAPABILITIES_PATH, () => {
+    reads += 1
+    return { status: 200, json: kioskAiCapabilitiesResponse(reads >= 2 ? { mock_interview: CAPABILITY_OFF, assistant_chat: CAPABILITY_OFF } : {}) }
+  })
+  await beginTextInterview(page)
+  await expect(page.locator('.qxt-status')).toHaveText('AI 暂时不能出题')
+  await expect(page.locator('[data-qxt-ask="off"]')).toHaveText('小青暂时不可用，可继续作答')
+  // 已建好的这一场照常能作答：提交键不被停用。
+  await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
+  await expect(page.getByRole('button', { name: '提交回答', exact: true })).toBeEnabled()
+})
+
+test('interview session: unreadable capabilities show unconfirmed on the top bar and the 小青 dock @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  let reads = 0
+  api.respondWith('GET', KIOSK_AI_CAPABILITIES_PATH, () => {
+    reads += 1
+    return reads >= 2 ? CAPABILITIES_UNREADABLE : { status: 200, json: kioskAiCapabilitiesResponse() }
+  })
+  await beginTextInterview(page)
+  await expect(page.locator('.qxt-status')).toHaveText('AI 状态未确认')
+  await expect(page.locator('[data-qxt-ask="off"]')).toHaveText('小青状态未确认，可继续作答')
+  await expect(page.getByRole('button', { name: '提交回答', exact: true })).toBeVisible()
+})
+
+test('interview session: capabilities still loading do not flash the top bar or the 小青 dock; unreadable ones do show up @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  let reads = 0
+  // 设置页读得到；进入作答页这一次一直不回（读取中），4 秒后 hook 自己按「没确认」处理。
+  api.respondWith('GET', KIOSK_AI_CAPABILITIES_PATH, async () => {
+    reads += 1
+    if (reads < 2) return { status: 200, json: kioskAiCapabilitiesResponse() }
+    await new Promise((resolve) => setTimeout(resolve, 30_000))
+    return { status: 200, json: kioskAiCapabilitiesResponse() }
+  })
+  await beginTextInterview(page)
+  // 会话刚建好、正在作答：还没读回来时不闪「确认中」，作答不受影响。
+  await expect(page.locator('.qxt-status')).toHaveText('AI 模拟面试')
+  await expect(page.locator('[data-qxt-ask="on"]')).toHaveText('问小青：这一题怎么答')
+  // 读不回来才写没确认。
+  await expect(page.locator('.qxt-status')).toHaveText('AI 状态未确认', { timeout: 8_000 })
+  await expect(page.locator('[data-qxt-ask="off"]')).toHaveText('小青状态未确认，可继续作答')
+})
+
+test('interview session: a gate-class outage turns 小青 off, and the next successful answer turns it back on @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respondWith('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, (n) => (n === 1
+    ? { status: 503, json: { success: false, error: { code: 'AI_PAUSED', message: 'AI 服务暂停中' } } }
+    : { status: 200, json: interviewAnswered }))
+  await beginTextInterview(page)
+  await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
+  await page.getByRole('button', { name: '提交回答', exact: true }).click()
+  await expect(page.locator('[data-qxt-ask="off"]')).toHaveText('小青暂时不可用，可继续作答')
+  await expect(page.locator('.qxt-status')).toHaveText('AI 暂时不能出题')
+  // 输入框里还留着刚才的回答；再提交一次成功：顶栏与小青都恢复。
+  await expect(page.getByRole('textbox', { name: '本题回答' })).toHaveValue(INTERVIEW_ANSWER)
+  await page.getByRole('button', { name: '提交回答', exact: true }).click()
+  await expect(page.locator('.interview-session__history')).toContainText(INTERVIEW_ANSWER)
+  await expect(page.locator('.qxt-status')).toHaveText('AI 模拟面试')
+  await expect(page.locator('[data-qxt-ask="on"]')).toHaveText('问小青：这一题怎么答')
+  await expect(page.locator('[data-qxt-ask="off"]')).toHaveCount(0)
+})
+
+test('interview session: while analysing the answer, the task region is data-aitask=running and the copy is kept @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respondWith('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, async () => {
+    await new Promise((resolve) => setTimeout(resolve, 30_000))
+    return { status: 200, json: interviewAnswered }
+  })
+  await beginTextInterview(page)
+  await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
+  await page.getByRole('button', { name: '提交回答', exact: true }).click()
+  const region = page.locator('section.kiosk-ai-task')
+  await expect(region).toHaveAttribute('data-aitask', 'running')
+  await expect(region).toContainText('面试官正在分析你的回答…')
+  await expect(page.getByRole('button', { name: '正在分析你的回答…' })).toBeDisabled()
+})
+
+const COVERED_EVIDENCE ='我做过两年社群运营，最多同时管 6 个群'
 
 function advisorCompareSession() {
   return {

@@ -43,7 +43,7 @@ export const INTERVIEW_STAGE_COPY: Record<InterviewStage, { title: string; title
   session: {
     title: '用真实经历回答。',
     titleEm: '用真实经历回答',
-    subtitle: '文字输入始终可用；题目、剩余时间与下一题只按这场练习返回，不用固定内容冒充进度。',
+    subtitle: '文字输入始终可用。题目、剩余时间和下一题，都按这场练习显示。',
   },
   report: {
     title: '报告用来复盘练习。',

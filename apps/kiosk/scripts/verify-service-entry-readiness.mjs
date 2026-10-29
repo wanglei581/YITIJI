@@ -186,8 +186,10 @@ check(
   for (const local of ['面试前准备清单', '高频问题应对', 'STAR', '自我介绍结构建议']) {
     check(tips.includes(local), `在线服务不可用不影响本地技巧内容「${local}」仍然渲染`)
   }
+  // 触屏版按稿 iv-tips：「重新检测」是一颗宽按钮（qxt-iv-wide qxt-iv-recheck），不再是旧的 qx-btn。
+  // 要的事一样：它在、接着 retryApi、写着「重新检测」。
   check(
-    /className="qx-btn"[\s\S]{0,200}?onClick=\{retryApi\}/.test(tips),
+    /className="qxt-iv-wide qxt-iv-recheck"[\s\S]{0,200}?onClick=\{retryApi\}[\s\S]{0,60}?<b>重新检测<\/b>/.test(tips),
     '面试技巧页在线服务不可用时保留「重新检测」，不让用户只能退出去'
   )
 }

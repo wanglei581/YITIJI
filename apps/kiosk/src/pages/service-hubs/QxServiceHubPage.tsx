@@ -24,6 +24,7 @@ import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useApiReadiness } from '../../hooks/useApiReadiness'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
+import { InterviewHubTouch } from '../interview/touch/InterviewHubTouch'
 import { ResumeTouchHub } from '../resume/touch/ResumeTouchHub'
 import { SERVICE_HUB_SPECS } from './serviceHubSpecs'
 import {
@@ -226,6 +227,19 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
   }
   const apiBlocked = apiStatus !== 'ready'
   const notice = noticeCopy(availability)
+
+  // 练面试单独走触屏版。其余服务台仍用下面的青序页，字符串和降级卡片不能从本文件拿走。
+  if (hub === 'interview') {
+    return (
+      <InterviewHubTouch
+        availability={availability}
+        apiBlocked={apiBlocked}
+        onRetry={retryApi}
+        status={statusPill(availability)}
+        notice={notice}
+      />
+    )
+  }
 
   // 合同审查只在下面它自己的「签约与权益」分区渲染，不混进能力网格。
   const showContractReview = hub === 'resume' && contractReviewEnabled

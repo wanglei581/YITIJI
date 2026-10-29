@@ -282,6 +282,8 @@ const QX_TOUCH_ROUTES = new Set<string>([
   '/resume/templates',
   '/resume/materials',
   // 第八包 练面试
+  '/interview',
+  '/interview-service',
   // 第九包 扫描复印
   // 第十包 政策与受控扩展
   // 第十一包 私有化版招聘

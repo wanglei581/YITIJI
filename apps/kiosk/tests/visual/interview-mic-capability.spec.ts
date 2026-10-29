@@ -13,7 +13,7 @@
 import { test, expect, type Page } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { interviewCreated, interviewStarted } from './fixtures/fusion-w3-states'
-import { expectInterviewDirectionUnselected, chooseInterviewExperience } from './fixtures/direction-selection'
+import { expectInterviewDirectionUnselected, chooseInterviewExperience, advanceInterviewSetupToStart } from './fixtures/direction-selection'
 
 function terminalBaseline(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
@@ -85,6 +85,7 @@ async function gotoSession(page: Page): Promise<void> {
   await dialog.getByRole('button', { name: '完成' }).click()
   await chooseInterviewExperience(page)
   await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
+  await advanceInterviewSetupToStart(page)
   await page.getByRole('button', { name: '创建并开始练习' }).click()
   await page.waitForURL(/\/interview\?stage=session/)
 }
