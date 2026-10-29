@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`603` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`604` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -316,8 +316,8 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/screen/usage` | UsageRangeQueryDto.getAdminUsage | admin | ConsoleScreenUsageService | AiServiceLog<br/>AuditLog<br/>BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Favorite<br/>Job<br/>JobFair<br/>KioskSession<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal |
-| GET | `/api/v1/partner/screen/usage` | UsageRangeQueryDto.getPartnerUsage | admin | ConsoleScreenUsageService | AiServiceLog<br/>AuditLog<br/>BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Favorite<br/>Job<br/>JobFair<br/>KioskSession<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal |
+| GET | `/api/v1/admin/screen/usage` | UsageRangeQueryDto.getAdminUsage | admin | ConsoleScreenUsageService | AiServiceFact<br/>AiServiceLog<br/>AuditLog<br/>BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Favorite<br/>Job<br/>JobFair<br/>KioskSession<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal |
+| GET | `/api/v1/partner/screen/usage` | UsageRangeQueryDto.getPartnerUsage | admin | ConsoleScreenUsageService | AiServiceFact<br/>AiServiceLog<br/>AuditLog<br/>BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Favorite<br/>Job<br/>JobFair<br/>KioskSession<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal |
 
 ## `services/api/src/content/ai-poster.controller.ts`
 
@@ -1137,9 +1137,10 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/upload-sessions` | UploadSessionsController.create | — | UploadSessionsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| DELETE | `/api/v1/upload-sessions/:sessionId` | UploadSessionsController.cancel | — | UploadSessionsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| GET | `/api/v1/upload-sessions/:sessionId` | UploadSessionsController.status | — | UploadSessionsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/upload-sessions/:sessionId/confirm` | UploadSessionsController.confirm | — | UploadSessionsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/upload-sessions/:sessionId/files` | UploadSessionsController.upload | — | UploadSessionsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/upload-sessions/scene/resolve` | UploadSessionsController.resolveScene | — | UploadSessionsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| POST | `/api/v1/upload-sessions` | UploadSessionsController.create | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| DELETE | `/api/v1/upload-sessions/:sessionId` | UploadSessionsController.cancel | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| GET | `/api/v1/upload-sessions/:sessionId` | UploadSessionsController.status | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| POST | `/api/v1/upload-sessions/:sessionId/confirm` | UploadSessionsController.confirm | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| POST | `/api/v1/upload-sessions/:sessionId/files` | UploadSessionsController.upload | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| POST | `/api/v1/upload-sessions/:sessionId/member-file` | UploadSessionsController.uploadMemberFile | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| POST | `/api/v1/upload-sessions/scene/resolve` | UploadSessionsController.resolveScene | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |

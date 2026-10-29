@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 603,
+    "endpointCount": 604,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -4458,6 +4458,7 @@
         "handler": "UsageRangeQueryDto.getAdminUsage",
         "method": "GET",
         "models": [
+          "AiServiceFact",
           "AiServiceLog",
           "AuditLog",
           "BrowseLog",
@@ -10828,6 +10829,7 @@
         "handler": "UsageRangeQueryDto.getPartnerUsage",
         "method": "GET",
         "models": [
+          "AiServiceFact",
           "AiServiceLog",
           "AuditLog",
           "BrowseLog",
@@ -12676,9 +12678,12 @@
         "handler": "UploadSessionsController.create",
         "method": "POST",
         "models": [
+          "AdvisorArtifact",
+          "AiResumeResult",
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
+          "JobAiSession",
           "PrintTask"
         ],
         "path": "/api/v1/upload-sessions",
@@ -12695,9 +12700,12 @@
         "handler": "UploadSessionsController.cancel",
         "method": "DELETE",
         "models": [
+          "AdvisorArtifact",
+          "AiResumeResult",
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
+          "JobAiSession",
           "PrintTask"
         ],
         "path": "/api/v1/upload-sessions/:sessionId",
@@ -12714,9 +12722,12 @@
         "handler": "UploadSessionsController.status",
         "method": "GET",
         "models": [
+          "AdvisorArtifact",
+          "AiResumeResult",
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
+          "JobAiSession",
           "PrintTask"
         ],
         "path": "/api/v1/upload-sessions/:sessionId",
@@ -12733,9 +12744,12 @@
         "handler": "UploadSessionsController.confirm",
         "method": "POST",
         "models": [
+          "AdvisorArtifact",
+          "AiResumeResult",
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
+          "JobAiSession",
           "PrintTask"
         ],
         "path": "/api/v1/upload-sessions/:sessionId/confirm",
@@ -12752,9 +12766,12 @@
         "handler": "UploadSessionsController.upload",
         "method": "POST",
         "models": [
+          "AdvisorArtifact",
+          "AiResumeResult",
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
+          "JobAiSession",
           "PrintTask"
         ],
         "path": "/api/v1/upload-sessions/:sessionId/files",
@@ -12768,12 +12785,37 @@
       },
       {
         "controller": "services/api/src/upload-sessions/upload-sessions.controller.ts",
-        "handler": "UploadSessionsController.resolveScene",
+        "handler": "UploadSessionsController.uploadMemberFile",
         "method": "POST",
         "models": [
+          "AdvisorArtifact",
+          "AiResumeResult",
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
+          "JobAiSession",
+          "PrintTask"
+        ],
+        "path": "/api/v1/upload-sessions/:sessionId/member-file",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/upload-sessions/upload-sessions.service.ts"
+        ],
+        "services": [
+          "UploadSessionsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/upload-sessions/upload-sessions.controller.ts",
+        "handler": "UploadSessionsController.resolveScene",
+        "method": "POST",
+        "models": [
+          "AdvisorArtifact",
+          "AiResumeResult",
+          "AuditLog",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "JobAiSession",
           "PrintTask"
         ],
         "path": "/api/v1/upload-sessions/scene/resolve",
@@ -13567,7 +13609,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 663,
+      "reachableFileCount": 667,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -14590,6 +14632,52 @@
           ],
           "path": "/jobs/online-platforms",
           "styles": [],
+          "wrappers": []
+        },
+        {
+          "component": "LoginTicketEntry",
+          "endpoints": [
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
+          "file": "apps/kiosk/src/pages/upload/KioskCodeEntryPage.tsx",
+          "layout": [],
+          "path": "/k/l/:ticketId",
+          "styles": [
+            "apps/kiosk/src/pages/upload/kiosk-code-entry.css",
+            "apps/kiosk/src/pages/upload/phone-upload-service-desk.css"
+          ],
+          "wrappers": []
+        },
+        {
+          "component": "UploadSceneEntry",
+          "endpoints": [
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
+          "file": "apps/kiosk/src/pages/upload/KioskCodeEntryPage.tsx",
+          "layout": [],
+          "path": "/k/u/:scene",
+          "styles": [
+            "apps/kiosk/src/pages/upload/kiosk-code-entry.css",
+            "apps/kiosk/src/pages/upload/phone-upload-service-desk.css"
+          ],
           "wrappers": []
         },
         {
@@ -16543,11 +16631,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 760
+      "sourceFileCount": 763
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 92,
+      "reachableFileCount": 93,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -17062,11 +17150,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 93
+      "sourceFileCount": 94
     }
   },
   "dataModel": {
-    "modelCount": 117,
+    "modelCount": 118,
     "models": [
       {
         "fieldCount": 7,
@@ -17226,6 +17314,15 @@
           "services/api/src/job-ai/job-ai.service.ts",
           "services/api/src/member-assets/member-assets.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts"
+        ]
+      },
+      {
+        "fieldCount": 6,
+        "name": "AiServiceFact",
+        "relations": [],
+        "usedBy": [
+          "services/api/src/ai/usage/ai-service-fact.ts",
+          "services/api/src/console-screen/console-screen.partner-ai.ts"
         ]
       },
       {
@@ -21809,6 +21906,11 @@
     "apps/kiosk/src/pages/toolbox/toolbox-zone.css": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
+    "apps/kiosk/src/pages/upload/KioskCodeEntryPage.tsx": [
+      "apps/kiosk/scripts/verify-fusion-shell.mjs",
+      "apps/kiosk/scripts/verify-fusion-w6.mjs",
+      "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs"
+    ],
     "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-shell.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
@@ -21828,6 +21930,9 @@
     ],
     "apps/kiosk/src/pages/upload/hooks/useUploadSession.ts": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
+    "apps/kiosk/src/pages/upload/kiosk-code-entry.css": [
+      "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs"
     ],
     "apps/kiosk/src/pages/upload/phone-upload-service-desk.css": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
@@ -22437,6 +22542,9 @@
     ],
     "apps/partner/src/routes/companies/index.tsx": [
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
+    ],
+    "apps/partner/src/routes/dashboard/PartnerAiServices.tsx": [
+      "apps/partner/scripts/verify-partner-stats-contract.mjs"
     ],
     "apps/partner/src/routes/dashboard/index.tsx": [
       "apps/partner/scripts/verify-partner-refresh-safe.mjs",
@@ -23859,6 +23967,7 @@
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
+      "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ],
     "services/api/scripts/support/llm-pii-callsite-checks.ts": [
@@ -23885,6 +23994,7 @@
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
+      "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
@@ -23927,6 +24037,7 @@
     "services/api/scripts/support/upload-session-verifier.ts": [
       "services/api/scripts/verify-upload-sessions-bind.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
+      "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ],
     "services/api/scripts/unpublish-demo-companies.ts": [
@@ -25333,6 +25444,7 @@
       "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-sessions-http.ts",
+      "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ],
     "services/api/src/common/guards/end-user-auth.guard.ts": [
@@ -25356,7 +25468,8 @@
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
-      "services/api/scripts/verify-upload-sessions-http.ts"
+      "services/api/scripts/verify-upload-sessions-http.ts",
+      "services/api/scripts/verify-upload-sessions-member-file.ts"
     ],
     "services/api/src/common/guards/jwt-auth.guard.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts",
@@ -25405,7 +25518,8 @@
     ],
     "services/api/src/common/jwt-verifier.module.ts": [
       "services/api/scripts/verify-production-runtime-gates.ts",
-      "services/api/scripts/verify-upload-sessions-http.ts"
+      "services/api/scripts/verify-upload-sessions-http.ts",
+      "services/api/scripts/verify-upload-sessions-member-file.ts"
     ],
     "services/api/src/common/middleware/request-id.middleware.ts": [
       "services/api/scripts/verify-error-observability.ts",
@@ -25540,7 +25654,8 @@
       "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-scene.ts",
-      "services/api/scripts/verify-upload-sessions-faults.ts"
+      "services/api/scripts/verify-upload-sessions-faults.ts",
+      "services/api/scripts/verify-upload-sessions-member-file.ts"
     ],
     "services/api/src/common/throttler/terminal-throttle.ts": [
       "services/api/scripts/verify-ai-throttle-dimension.ts",
@@ -25757,7 +25872,8 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-member-data-export-files.ts",
-      "services/api/scripts/verify-member-data-retention.ts"
+      "services/api/scripts/verify-member-data-retention.ts",
+      "services/api/scripts/verify-upload-sessions-member-file.ts"
     ],
     "services/api/src/files/files.cleanup.task.ts": [
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
@@ -25818,6 +25934,7 @@
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
+      "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ],
     "services/api/src/files/lifecycle-summary.ts": [
@@ -26397,6 +26514,7 @@
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-report-export.ts",
+      "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-assets/member-assets.types.ts": [
@@ -27500,6 +27618,7 @@
       "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions-http.ts",
+      "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions.ts",
       "services/api/scripts/verify-wave3-print-aftercare.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
@@ -27694,6 +27813,7 @@
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-screensaver-content.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
+      "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
@@ -27993,12 +28113,14 @@
     "services/api/src/upload-sessions/upload-sessions.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts",
+      "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ],
     "services/api/src/upload-sessions/upload-sessions.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-upload-scene.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
+      "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ]
   },
@@ -29665,6 +29787,7 @@
           "apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx",
           "apps/kiosk/src/pages/legal/LegalDocPage.tsx",
           "apps/kiosk/src/pages/resume/JobFitPage.tsx",
+          "apps/kiosk/src/pages/upload/KioskCodeEntryPage.tsx",
           "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/tests/visual/fixtures/fusion-w6-route-cases.ts",
@@ -29973,6 +30096,7 @@
           "apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx",
           "apps/kiosk/src/pages/home/HomePage.tsx",
           "apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx",
+          "apps/kiosk/src/pages/upload/KioskCodeEntryPage.tsx",
           "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/tests/visual/fixtures/fusion-w6-api.ts",
@@ -30807,7 +30931,9 @@
           "apps/kiosk/src/pages/legal/legal-service-desk.css",
           "apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx",
           "apps/kiosk/src/pages/screensaver/screensaver-service-desk.css",
+          "apps/kiosk/src/pages/upload/KioskCodeEntryPage.tsx",
           "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
+          "apps/kiosk/src/pages/upload/kiosk-code-entry.css",
           "apps/kiosk/src/pages/upload/phone-upload-service-desk.css",
           "apps/kiosk/src/routes/index.tsx"
         ],
@@ -32976,6 +33102,7 @@
           "apps/partner/src/layouts/partnerNav.ts",
           "apps/partner/src/lib/csv.ts",
           "apps/partner/src/routes/account/index.tsx",
+          "apps/partner/src/routes/dashboard/PartnerAiServices.tsx",
           "apps/partner/src/routes/dashboard/index.tsx",
           "apps/partner/src/routes/stats/index.tsx",
           "apps/partner/src/routes/terminals/TerminalOpsCards.tsx",
@@ -43428,6 +43555,37 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/upload-session-verifier.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/common/jwt-verifier.module.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/files/file.types.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/member-assets/member-assets.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/upload-sessions/upload-sessions.controller.ts",
+          "services/api/src/upload-sessions/upload-sessions.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-upload-sessions-member-file.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:upload-sessions"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/upload-session-verifier.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/files/content-sniff.ts",
@@ -43973,18 +44131,6 @@
         "risk": "medium",
         "scope": "kiosk",
         "why": "仅被文档提及：docs/progress/archive/2026-06-20-current-progress-pre-normalization.md"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/copy/unattendedCopy.ts",
-        "kind": "component",
-        "mentions": [
-          "apps/kiosk/scripts/tests/unattended-copy.test.mjs",
-          "docs/progress/current-progress.md"
-        ],
-        "risk": "high",
-        "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/unattended-copy.test.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

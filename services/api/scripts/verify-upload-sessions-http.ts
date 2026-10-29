@@ -153,7 +153,8 @@ function assertPhoneErrorEnvelopeSafe(
 
 function assertNoSignedUrl(file: FileView | null | undefined, label: string): void {
   assert.ok(file, `${label}: file is required`)
-  const allowed = new Set(['fileId', 'filename', 'sizeBytes', 'mimeType', 'sha256', 'fileExpiresAt'])
+  // source：文件从哪来（miniapp_documents / miniapp / web），只作一体机确认屏提示，不是凭据（2026-10-29）。
+  const allowed = new Set(['fileId', 'filename', 'sizeBytes', 'mimeType', 'sha256', 'fileExpiresAt', 'source'])
   const unexpected = Object.keys(file).filter((key) => !allowed.has(key))
   assert.deepEqual(unexpected, [], `${label}: unexpected file fields exposed: ${unexpected.join(', ')}`)
   assert.ok(file.sha256, `${label}: sha256 is required`)
@@ -162,7 +163,7 @@ function assertNoSignedUrl(file: FileView | null | undefined, label: string): vo
 
 function assertKioskConfirmFile(file: FileView | null | undefined, label: string): void {
   assert.ok(file, `${label}: file is required`)
-  const allowed = new Set(['fileId', 'filename', 'sizeBytes', 'mimeType', 'sha256', 'fileExpiresAt', 'fileUrl'])
+  const allowed = new Set(['fileId', 'filename', 'sizeBytes', 'mimeType', 'sha256', 'fileExpiresAt', 'fileUrl', 'source'])
   const unexpected = Object.keys(file).filter((key) => !allowed.has(key))
   assert.deepEqual(unexpected, [], `${label}: unexpected file fields exposed: ${unexpected.join(', ')}`)
   assert.ok(file.sha256, `${label}: sha256 is required`)
