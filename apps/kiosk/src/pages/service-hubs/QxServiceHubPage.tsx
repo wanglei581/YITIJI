@@ -24,6 +24,7 @@ import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useApiReadiness } from '../../hooks/useApiReadiness'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
+import { ResumeTouchHub } from '../resume/touch/ResumeTouchHub'
 import { SERVICE_HUB_SPECS } from './serviceHubSpecs'
 import {
   capabilityKindFor,
@@ -297,6 +298,23 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
   const truthTitle = hub === 'resume' ? '简历用不用，由你本人决定。' : spec.truthTitle
   const note = hub === 'resume' ? '生成的内容会标明供参考，不会覆盖原文件。' : spec.note
   const chips = capChips(availability)
+
+  // Boolean 包一层，避免被收窄成类型谓词，四个服务台的原返回仍能写 hub === 'resume'。
+  const resumeTouch = Boolean((hub as string) === 'resume')
+  if (resumeTouch) {
+    return (
+      <ResumeTouchHub
+        spec={spec}
+        availability={availability}
+        apiBlocked={apiBlocked}
+        deviceProbe={deviceAware ? 'on' : 'off'}
+        retryApi={retryApi}
+        contract={showContractReview ? CONTRACT_REVIEW_CAPABILITY : null}
+        notice={notice}
+        pill={statusPill(availability)}
+      />
+    )
+  }
 
   return (
     <QxPageFrame

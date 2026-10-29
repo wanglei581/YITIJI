@@ -13,14 +13,12 @@
 //      （商用收口 P0-5）。拿不到 fileId 或打印链接时按钮如实置灰并写明原因。
 //   3. 置灰一律 aria-disabled，不用原生 disabled ——
 //      原生 disabled 会退出 Tab 序列、读屏跳过，触屏也没有 hover 读不到 title。
-// 样式只用报告页既有的 rrp-exits / rrp-row / rrp-checks（resume-report-qx.css，行高 88px）。
+// 样式：触屏版出路行（ExitRow，可点 ≥64px）与自查清单，页面样式在 touch/report.css。
 // ============================================================
 
-import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpenIcon, ChevronRightIcon, QrCodeIcon, PrinterIcon } from 'lucide-react'
 import { useStartPrintHandoff } from '../../print/usePrintHandoff'
-import { MANUAL_CHECKS } from '../resume-report-model'
+import { ExitRow, ManualChecks } from './resume-report/ResumeReportExits'
 
 export interface ResumeDiagnosisFailFile {
   name: string
@@ -40,14 +38,6 @@ interface Props {
 /** 拿不到这份原件时的真实原因。写在按钮旁边常驻可见，不放 tooltip。 */
 const NO_PRINT_URL_REASON =
   '这里拿不到你刚上传的那份原件（离开这一页再回来就拿不到了）。请回到简历来源重新选取文件，再去打印。'
-
-function RowIcon({ children }: { children: ReactNode }) {
-  return <span className="rrp-ic" aria-hidden="true">{children}</span>
-}
-
-function RowGo() {
-  return <span className="rrp-go" aria-hidden="true"><ChevronRightIcon size={22} /></span>
-}
 
 export function ResumeDiagnosisFailExits({ file, fileId }: Props) {
   const navigate = useNavigate()
@@ -72,67 +62,26 @@ export function ResumeDiagnosisFailExits({ file, fileId }: Props) {
 
   return (
     <>
-      <section className="rrp-exits resume-report-fail-exits" data-testid="resume-report-fail-exits">
-        <div className="rrp-zh">这些都不需要 AI<span>现在就能做</span></div>
-        <p className="rrp-export-reason" style={{ marginBottom: 12 }}>
-          {file?.name ? `「${file.name}」的解析没有完成。` : '这次没有生成诊断报告。'}
-          这一屏不给任何诊断结论 —— 没跑出来就是没有，不拿通用建议顶替。
-        </p>
-        <div className="rows" style={{ display: 'grid', gap: 10 }}>
-          {canPrintOriginal ? (
-            <button type="button" className="rrp-row" onClick={printOriginal} data-route="/print/material-check">
-              <RowIcon><PrinterIcon size={26} /></RowIcon>
-              <span className="tx"><b>打印我上传的原件</b><span>不需要 AI，先检查个人信息再打印</span></span>
-              <RowGo />
-            </button>
-          ) : (
-            <div>
-              {/*
-                真 <button> + aria-disabled，不加原生 disabled：
-                置灰的按钮也必须能被 Tab 到、被读屏读到，并且读得到「为什么点不动」。
-                这里刻意不绑 onClick，按下去不会有任何副作用。
-              */}
-              <button
-                type="button"
-                className="rrp-row"
-                aria-disabled="true"
-                aria-describedby="resume-fail-print-reason"
-              >
-                <RowIcon><PrinterIcon size={26} /></RowIcon>
-                <span className="tx"><b>打印我上传的原件</b><span>本次不可用</span></span>
-              </button>
-              <p id="resume-fail-print-reason" className="rrp-export-reason" style={{ marginTop: 8 }}>
-                {NO_PRINT_URL_REASON}
-              </p>
-            </div>
-          )}
-          <button type="button" className="rrp-row" onClick={() => navigate('/print-scan')} data-route="/print-scan">
-            <RowIcon><PrinterIcon size={26} /></RowIcon>
-            <span className="tx"><b>去打印 / 扫描其他材料</b><span>打印扫描不依赖 AI，照常可用</span></span>
-            <RowGo />
-          </button>
-          <>
-              <button type="button" className="rrp-row" onClick={() => navigate('/policy-service')} data-route="/policy-service">
-                <RowIcon><BookOpenIcon size={26} /></RowIcon>
-                <span className="tx"><b>查政策</b><span>查看本机构发布的政策与办理说明</span></span>
-                <RowGo />
-              </button>
-              <button type="button" className="rrp-row" onClick={() => navigate('/official-channels')} data-route="/official-channels">
-                <RowIcon><QrCodeIcon size={26} /></RowIcon>
-                <span className="tx"><b>本机构官方渠道</b><span>扫码查看本机构官网或官方账号</span></span>
-                <RowGo />
-              </button>
-</>
-        </div>
-      </section>
-      <section className="rrp-checks" data-testid="resume-report-fallback">
-        <div className="rrp-zh">不等 AI，先自己核一遍<span>6 项 · 纸质简历同样适用</span></div>
-        <div className="list" data-testid="resume-report-list">
-          {MANUAL_CHECKS.map((item, i) => (
-            <div key={item}><i>{i + 1}</i><span>{item}</span></div>
-          ))}
-        </div>
-      </section>
+      <div className="qxt-sec">这些都不需要 AI<small>现在就能做</small></div>
+      <div className="qxt-exit-col rrp-exits resume-report-fail-exits" data-testid="resume-report-fail-exits">
+        {canPrintOriginal ? (
+          <ExitRow icon="printer" title="打印我上传的原件" desc="不需要 AI，先检查个人信息再打印" take="去核对" route="/print/material-check" index={0} onClick={printOriginal} />
+        ) : (
+          <div>
+            {/*
+              真 <button> + aria-disabled，不加原生 disabled：
+              置灰的按钮也必须能被 Tab 到、被读屏读到，并且读得到「为什么点不动」。
+              这里刻意不绑 onClick，按下去不会有任何副作用。
+            */}
+            <ExitRow icon="printer" title="打印我上传的原件" desc="本次不可用" disabled describedBy="resume-fail-print-reason" index={0} />
+            <p id="resume-fail-print-reason" className="qxt-reason-note">{NO_PRINT_URL_REASON}</p>
+          </div>
+        )}
+        <ExitRow icon="printer" title="去打印 / 扫描其他材料" desc="打印扫描不依赖 AI，照常可用" take="去打印扫描" route="/print-scan" index={1} onClick={() => navigate('/print-scan')} />
+        <ExitRow icon="book" title="查政策" desc="查看本机构发布的政策与办理说明" take="去看政策" route="/policy-service" index={2} onClick={() => navigate('/policy-service')} />
+        <ExitRow icon="qr" title="本机构官方渠道" desc="扫码查看本机构官网或官方账号" take="去扫码" route="/official-channels" index={3} onClick={() => navigate('/official-channels')} />
+      </div>
+      <ManualChecks delay={5} />
     </>
   )
 }

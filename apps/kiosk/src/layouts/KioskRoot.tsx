@@ -246,6 +246,12 @@ const QX_TOUCH_ROUTES = new Set<string>([
   '/print/done',
   '/print/pickup-claim',
   // 第四包 简历三条主路
+  '/resume-service',
+  '/resume/source',
+  '/resume/parse',
+  '/resume/report',
+  '/resume/optimize',
+  '/resume/optimize/compare',
   // 第五包 公共与系统
   // 第六包 我的与权益
   // 第七包 简历其余页

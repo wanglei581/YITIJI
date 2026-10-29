@@ -193,20 +193,22 @@ async function registerOptimizeSource(page: Page, api: ApiRouter): Promise<void>
 async function exportOptimized(page: Page) {
   await page.goto(`/resume/optimize?taskId=${OPT_TASK}`)
   await expect(page.locator('[data-kiosk-screen="resume-optimize"]')).toBeVisible()
-  await page.getByRole('button', { name: '导出 PDF', exact: true }).first().click()
+  // 触屏版：编辑页「去导出」→ 核对事实 → 导出页（PDF 默认）→「导出」才出文件。
+  await page.getByRole('button', { name: '去导出', exact: true }).click()
   await page.getByRole('checkbox', { name: /交接验收大学/ }).click()
   await page.getByRole('button', { name: '确认导出' }).click()
+  await page.getByRole('button', { name: '导出', exact: true }).click()
   // 导出成功后预览层自动弹出（预览 = 导出 = 打印同一份）。
   const dialog = page.getByRole('dialog', { name: OPT_FILE.filename })
   await expect(dialog).toBeVisible({ timeout: 10_000 })
   return dialog
 }
 
-/** 关掉预览层，点「去打印优化版」进报价确认页。 */
+/** 关掉预览层，点导出页底栏的「去打印这一份」进报价确认页。 */
 async function printOptimizedFromPanel(page: Page): Promise<void> {
   await page.getByRole('button', { name: '关闭文件预览' }).click()
   await expect(page.getByRole('dialog', { name: OPT_FILE.filename })).toHaveCount(0)
-  await page.getByRole('button', { name: '去打印优化版' }).click()
+  await page.getByRole('button', { name: '去打印这一份', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/print/confirm')
   await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
   await expect(page.locator('.print-file-name')).toHaveText(OPT_FILE.filename)

@@ -238,7 +238,8 @@ const NOTE_FILES = [
   'src/pages/job-fairs/FairVisitPlanPage.tsx',
   'src/pages/jobs/components/JobsQxChrome.tsx',
   'src/pages/jobs/components/JobDetailSections.tsx',
-  'src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx',
+  // 2026-10-28 触屏版：优化页的「AI 精简 / AI 调整排版」按钮与它下面的使用声明说明在编辑视图里（原 OptimizeReadyBody 已由它取代并删除）。
+  'src/pages/resume/touch/OptimizeEditView.tsx',
 ]
 
 const RETHROW_FILES = [
@@ -249,6 +250,25 @@ const RETHROW_FILES = [
   'src/services/api/jobFit.ts',
   'src/services/api/fairVisitPlan.ts',
 ]
+
+/**
+ * 文件里有没有真的把 <AiDeclarationNote /> 画出来（JSX 用法），而不是只留着 import 或一句注释。
+ * 此前判据是「文件里出现 AiDeclarationNote 这个标识符」：把 JSX 整个删掉、只留 import，门禁照样绿。
+ */
+function rendersAiDeclarationNote(file) {
+  const source = ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let found = false
+  const visit = (node) => {
+    if (found) return
+    if ((ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && node.tagName.getText(source) === 'AiDeclarationNote') {
+      found = true
+      return
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  return found
+}
 
 function sourceChecks() {
   const main = read('src/main.tsx')
@@ -297,7 +317,7 @@ function sourceChecks() {
     fail('确认弹层必须用现有弹层，拒绝先说明再结束')
   }
   for (const file of NOTE_FILES) {
-    if (!read(file).includes('AiDeclarationNote')) fail(`${file} 缺少主按钮下的声明说明`)
+    if (!rendersAiDeclarationNote(file)) fail(`${file} 缺少主按钮下的声明说明（要有 <AiDeclarationNote /> 的 JSX 用法，只留 import 不算）`)
   }
   const note = read('src/ai/AiDeclarationNote.tsx')
   if (!note.includes('AI_DECLARATION_NOTE') || !note.includes('qx-ai-declaration-note')) {

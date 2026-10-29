@@ -201,6 +201,8 @@ test('USB files render as named buttons and retain size, MIME, purpose and busy 
     },
     // W-125：面板先过后台能力闸门；这份单测只管文件列表与导入契约，闸门按已放行处理。
     '../../../hooks/useUsbImportGate': { useUsbImportGate: () => ({ state: 'allowed', note: null, retry: () => {} }) },
+    '../touch/unattendedResumeCopy': { unattendedResumeCopy: (text) => String(text ?? '') },
+    '../../../components/qingxu/touch/QxTouchIcon': { QxTouchIcon: 'svg' },
   }, { window: { setTimeout: () => 1, clearTimeout: () => {} } })
   const props = { onUploaded: (file) => imported.push(file), onBusyChange: (value) => busy.push(value) }
   const nodes = (node) => Array.isArray(node) ? node.flatMap(nodes) : node && typeof node === 'object' ? [node, ...nodes(node.props?.children)] : []
@@ -221,6 +223,44 @@ test('USB files render as named buttons and retain size, MIME, purpose and busy 
   upload.resolve({ filename: 'my_pdf_resume.jpg', sizeBytes: 2048, mimeType: 'image/jpeg', fileId: 'file-image', fileUrl: '/fixture.jpg' }); await h.flush()
   assert.deepEqual(plain(imported), [{ name: 'my_pdf_resume.jpg', size: '2 KB', format: 'jpg', fileId: 'file-image', fileUrl: '/fixture.jpg', mimeType: 'image/jpeg', channel: 'usb' }])
   assert.equal(busy.at(-1), false); h.unmount()
+})
+
+test('unattended USB panel: a row click only selects, the page-level import button runs the import', async () => {
+  const h = hooks(), upload = deferred(), imported = [], requests = [], picks = []
+  const files = [
+    { safeId: 'pdf', filename: 'U盘简历.pdf', extension: '.pdf', sizeBytes: 2048 },
+    { safeId: 'image', filename: 'my_pdf_resume.jpg', extension: '.jpg', sizeBytes: 2048 },
+  ]
+  const { ResumeUsbImportPanel } = load('src/pages/resume/components/ResumeUsbImportPanel.tsx', {
+    react: h.react,
+    '../../../services/api/userErrorMessage': { userMessageOf: (_err, fallback) => fallback },
+    '../../../auth/useAuth': { useAuth: () => ({ getToken: () => 'test-member-token' }) },
+    '@ai-job-print/ui': { Button: 'button', KioskStatePanel: 'aside' },
+    'lucide-react': { FileTextIcon: 'svg', LoaderIcon: 'svg', RefreshCwIcon: 'svg', UsbIcon: 'svg' },
+    '../../../services/files/usbImportApi': {
+      isUsbImportConfigured: () => true,
+      getUsbStatus: async () => ({ present: true, driveLabel: 'TEST-USB' }),
+      listUsbFiles: async () => ({ files }),
+      uploadUsbFile: (...args) => { requests.push(args); return upload.promise },
+    },
+    '../../../hooks/useUsbImportGate': { useUsbImportGate: () => ({ state: 'allowed', note: null, retry: () => {} }) },
+    '../touch/unattendedResumeCopy': { unattendedResumeCopy: (text) => String(text ?? '') },
+    '../../../components/qingxu/touch/QxTouchIcon': { QxTouchIcon: 'svg' },
+  }, { window: { setTimeout: () => 1, clearTimeout: () => {} } })
+  const props = { unattended: true, onUploaded: (file) => imported.push(file), onPickChange: (pick) => picks.push(pick) }
+  const nodes = (node) => Array.isArray(node) ? node.flatMap(nodes) : node && typeof node === 'object' ? [node, ...nodes(node.props?.children)] : []
+  const rows = () => nodes(h.value).filter((node) => node.type === 'button' && node.props.className?.includes('resume-usb-panel__row'))
+  h.render(() => ResumeUsbImportPanel(props)); await h.flush()
+  assert.equal(rows().length, 2)
+  assert.equal(picks.at(-1).selected, false)
+  rows()[1].props.onClick(); await h.flush()
+  assert.deepEqual(requests, [], 'selecting a row must not import')
+  assert.equal(picks.at(-1).selected, true)
+  picks.at(-1).run(); await h.flush()
+  assert.deepEqual(requests, [['image', 'resume_upload', 'test-member-token']])
+  assert.equal(picks.at(-1).importing, true)
+  upload.resolve({ filename: 'my_pdf_resume.jpg', sizeBytes: 2048, mimeType: 'image/jpeg', fileId: 'file-image', fileUrl: '/fixture.jpg' }); await h.flush()
+  assert.equal(imported.length, 1); assert.equal(imported[0].channel, 'usb'); h.unmount()
 })
 
 test('optimize holds a lock through 95s, succeeds before 100s, releases on failure and unmount', async (t) => {

@@ -91,11 +91,13 @@ expectNotIncludes(kioskShell, "startsWith('/resume')", 'Kiosk shell never broad-
 
 for (const [page, sourceCode, rootClass, cssPath] of [
   // 稿 21-resume-triage 迁入青序流光（2026-09-23）：两页共用本工作台的 Qx 根类与样式。
-  ['source', source, 'qx-resume-triage', './resume-triage-qx.css'],
-  ['parse', parse, 'qx-resume-triage', './resume-triage-qx.css'],
+  // 2026-10-28 触屏版（稿 resume-src / reading / optimize）：来源、解析、优化三页换成触屏壳，各自的根类与样式如下；
+  // 解析页的版面在 touch/ResumeReadingView.tsx（样式 reading.css 在那里引入）。
+  ['source', source, 'qxt-source-page', './touch/direction.css'],
+  ['parse', `${parse}\n${read('src/pages/resume/touch/ResumeReadingView.tsx')}`, 'qxt-parse-page', './reading.css'],
   ['generate', generate, 'qx-resume-generate', './resume-generate-qx.css'],
   ['generate preview', preview, 'qx-resume-generate', './resume-generate-qx.css'],
-  ['optimize', optimize, 'qx-resume-optimize', './resume-optimize-qx.css'],
+  ['optimize', optimize, 'qxt-optimize', './touch/optimize.css'],
   // 2026-09-23 版式参考迁入青序流光（稿 46 ?screen=templates），根作用域换成宿主 46 的 .rdq- 样式。
   ['templates', templates, 'rdq-tpl-grid', './resume-decision-qx.css'],
   // 2026-09-23 求职材料库迁入青序流光（稿 25-material-workshop），根作用域换成本页的 Qx 根类与样式。
@@ -103,19 +105,19 @@ for (const [page, sourceCode, rootClass, cssPath] of [
 ]) {
   expectIncludes(sourceCode, `import '${cssPath}'`, `${page} imports its local LightFlow CSS`)
   expectIncludes(sourceCode, rootClass, `${page} uses its route-specific LightFlow root`)
-  if (!rootClass.startsWith('qx-') && !rootClass.startsWith('rdq-')) {
+  if (!/^(qx-|qxt-|rdq-)/.test(rootClass)) {
     expectIncludes(sourceCode, 'resume-lightflow', `${page} uses shared local LightFlow namespace`)
   }
 }
 
 for (const [page, sourceCode, route] of [['source', source, '/resume/source'], ['parse', parse, '/resume/parse']]) {
-  expectIncludes(sourceCode, 'QxPageFrame', `${page} uses Qingxu page frame (21-resume-triage migration)`)
+  expectIncludes(sourceCode, 'ResumeTouchPage', `${page} uses the touch page frame (21-resume-triage migration)`)
   expectIncludes(kioskShell, `'${route}'`, `${page} is registered in QX_MIGRATED_ROUTES`)
   expectNotIncludes(sourceCode, 'KioskPageFrame', `${page} no longer mounts the old LightFlow page frame`)
   expectNotIncludes(sourceCode, 'resume-lightflow', `${page} no longer mixes the LightFlow namespace into the Qingxu frame`)
 }
 expectIncludes(report, "import './resume-report-qx.css'", 'report imports Qingxu page CSS')
-expectIncludes(report, 'QxPageFrame', 'report uses Qingxu page frame (22-resume-report migration)')
+expectIncludes(report, 'ResumeTouchPage', 'report uses the touch page frame (22-resume-report migration)')
 expectIncludes(kioskShell, "'/resume/report'", 'report is registered in QX_MIGRATED_ROUTES')
 expectIncludes(templates, 'QxPageFrame', 'templates uses Qingxu page frame (46-resume-decision-workspace migration)')
 expectIncludes(kioskShell, "'/resume/templates'", 'templates is registered in QX_MIGRATED_ROUTES')

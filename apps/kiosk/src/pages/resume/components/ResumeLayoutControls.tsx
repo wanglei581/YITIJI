@@ -14,6 +14,8 @@ type ResumeLayoutControlsProps = {
   /** 只渲染这些组。不传则字号、行距、页边距、主色、栏数都在。 */
   only?: LayoutKey[]
   className?: string
+  /** 'touch'：触屏稿的一行一组（标签 + 一排点选，主色带色块），不画外框。默认写法不变。 */
+  variant?: 'default' | 'touch'
 }
 
 const groups: Array<{
@@ -47,6 +49,8 @@ const groups: Array<{
   ] },
 ]
 
+const ACCENT_SWATCH: Record<string, string> = { blue: 'blue', green: 'green', slate: 'gray' }
+
 /**
  * 排版分段控件。**每组一行**，不再把 5 组并排塞进侧栏。
  *
@@ -59,8 +63,33 @@ const groups: Array<{
  * `min-w-[48px]` / `min-h-[48px]` 是兜底：将来这块被放进更窄的容器时，
  * 按钮会换行而不是再被压成竖条。
  */
-export function ResumeLayoutControls({ layout, onChange, disabled = false, only, className }: ResumeLayoutControlsProps) {
+export function ResumeLayoutControls({ layout, onChange, disabled = false, only, className, variant = 'default' }: ResumeLayoutControlsProps) {
   const shown = only ? groups.filter((group) => only.includes(group.key)) : groups
+  if (variant === 'touch') {
+    return (
+      <>
+        {shown.map((group) => (
+          <div className="qxt-line" key={group.key}>
+            <span>{group.label}</span>
+            <div className="qxt-chips" role="group" aria-label={group.label}>
+              {group.choices.map((choice) => (
+                <button
+                  key={`${group.key}-${choice.value}`}
+                  type="button"
+                  disabled={disabled}
+                  aria-pressed={layout[group.key] === choice.value}
+                  onClick={() => onChange({ ...layout, [group.key]: choice.value })}
+                >
+                  {group.key === 'accent' ? <i className="qxt-swatch" data-swatch={ACCENT_SWATCH[String(choice.value)]} aria-hidden="true" /> : null}
+                  {choice.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </>
+    )
+  }
   return (
     <div className={className ?? 'rounded-2xl border border-gray-200 bg-white p-4'}>
       <div className="flex flex-col gap-3">

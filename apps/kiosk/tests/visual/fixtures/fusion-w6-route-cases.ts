@@ -162,7 +162,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   // 五个服务台迁入青序流光（稿 16）后，栏目名「AI简历服务」等降为 eyebrow，h1 换成稿里的主标题。
   // featureText 顺势从栏目名改钉那五句**合规诚实性声明**——钉合规边界比钉栏目名有判别力：
   // 迁移里最容易丢的就是这几句，钉住它们，漏抄当场变红。
-  { pattern: '/resume-service', url: '/resume-service', marker: 'h1:text-is("把简历这件事，做得更清楚")', featureText: '系统不代投、不替企业筛选或邀约。' },
+  { pattern: '/resume-service', url: '/resume-service', marker: 'h1:text-is("你手上有简历吗？")', featureText: '系统不代投、不替企业筛选或邀约。' },
   { pattern: '/scan', url: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
   { pattern: '/scan/start', url: '/scan/start', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
   { pattern: '/scan/settings', url: '/scan/settings', expectedPath: '/scan', marker: w2('scan-settings'), featureText: '未创建扫描任务' },

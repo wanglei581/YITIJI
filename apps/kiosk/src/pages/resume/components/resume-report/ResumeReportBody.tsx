@@ -1,212 +1,147 @@
-import type { ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ResumeReportStates } from './ResumeReportStates'
-import type { ResumeContentBlockKey, ResumeIssue, ResumePriority, ResumeReport, ResumeScoringDimensionKey } from '@ai-job-print/shared'
+import type { ResumeContentBlock, ResumeIssue, ResumePriority, ResumeReport } from '@ai-job-print/shared'
 import {
-  conclusionCount,
-  defaultSeg,
+  blockLabel,
   derivedPriorities,
-  quantHits,
-  type ReportSeg,
+  DIM_ABOUT,
+  dimLabel,
+  displayResumeExcerpt,
+  evidenceCountOfBlock,
+  evidenceLineSet,
+  issuesOfBlock,
+  tierOf,
 } from '../../resume-report-model'
-import { IssuesZone, StructureZone } from './ResumeReportIssues'
-import { DimensionTalk, ScoresZone } from './ResumeReportScores'
+import { ResumeReportStates } from './ResumeReportStates'
 
+/** 一条问题卡：编号 + 问题 + 在哪一块 · 哪个维度 + 依据 / 影响 / 可以怎么改。 */
+function IssueCard({ issue, index, blocks }: { issue: ResumeIssue; index: number; blocks: ResumeContentBlock[] }) {
+  const quote = issue.evidence[0]?.quote
+  const blockKey = issue.evidence[0]?.blockKey
+  const where = blockKey ? blocks.find((block) => block.key === blockKey)?.label ?? blockLabel(blockKey) : null
+  return (
+    <article className="qxt-issue" data-testid="resume-report-issue">
+      <b>{index} {issue.title}</b>
+      <small>{where ? `${where} · ` : ''}{dimLabel(issue.dim)}</small>
+      {quote ? <p><u>依据</u>「{displayResumeExcerpt(quote)}」</p> : null}
+      <p><u>影响</u>{issue.impact}</p>
+      <p><u>可以怎么改</u>{issue.fixIt}</p>
+    </article>
+  )
+}
+
+/** 报告里没有问题条目时，用「先改这几处」的优先项顶上（报告自带或按低分维度列出）。 */
+function PriorityCard({ item, index }: { item: ResumePriority; index: number }) {
+  return (
+    <article className="qxt-issue" data-testid="resume-report-priority">
+      <b>{index} {item.focus}</b>
+      {item.reason ? <p>{item.reason}</p> : null}
+    </article>
+  )
+}
+
+/**
+ * 诊断报告正文（稿 diagnosis）：左边六个维度，右边先改这几处（最多 3 条），
+ * 下面是全部问题、报告结论、内容结构（收起），带走与去向由页面另放。
+ * 数字、依据、影响、可以怎么改都从本次报告读；没有的栏不画，不拿通用建议顶替。
+ */
 export function ResumeReportBody({
   report,
   issues,
-  fixture,
-  seg,
-  dim,
-  blk,
-  onSeg,
-  onDim,
-  onJobFit,
 }: {
   report: ResumeReport
   issues: ResumeIssue[]
-  fixture: boolean
-  seg: ReportSeg | null
-  dim: ResumeScoringDimensionKey | null
-  blk: ResumeContentBlockKey | null
-  onSeg: (seg: ReportSeg) => void
-  onDim: (dim: ResumeScoringDimensionKey) => void
-  onJobFit: () => void
 }) {
   const blocks = report.contentBlocks ?? []
-  const activeSeg = defaultSeg({ ...report, issues, contentBlocks: blocks }, seg)
-  const hasStructure = blocks.length > 0
-  const hasIssues = issues.length > 0
-  const hasScores = report.sections.length > 0
-  const conclN = conclusionCount(report)
   const priorities = (report.priorities?.length ? report.priorities : derivedPriorities(report.sections)).slice(0, 3)
-  const prioritiesFromReport = (report.priorities?.length ?? 0) > 0
-  const evidenceN = issues.reduce((n, issue) => n + issue.evidence.length, 0)
+  const top = issues.slice(0, 3)
+  const rest = issues.slice(3)
+  const riskNotes = report.riskNotes ?? []
+  const hasConclusions = report.suggestions.length > 0 || riskNotes.length > 0 || (report.priorities?.length ?? 0) > 0
 
   return (
     <>
-      <section className="rrp-cbar" data-testid="resume-report-counts">
-        <div className="rrp-cgrid">
-          {[
-            ['内容块', blocks.length],
-            ['问题', issues.length],
-            ['原文证据', evidenceN],
-            ['量化命中', quantHits(blocks)],
-            ['评分维度', report.sections.length],
-            ['结论条目', conclN],
-          ].map(([label, count]) => (
-            <span key={String(label)} className="rrp-cc" data-zero={count ? '0' : '1'}>
-              <u>{label}</u>
-              <b>{count as number}</b>
-            </span>
-          ))}
-        </div>
-      </section>
-
-      <div className="rrp-segs" role="tablist" aria-label="报告主内容分区" data-testid="resume-report-segs">
-        {([
-          ['structure', '内容结构', blocks.length, hasStructure],
-          ['issues', '问题证据', issues.length, hasIssues],
-          ['scores', '六维分数', report.sections.length, hasScores],
-          ['conclusions', '报告结论', conclN, conclN > 0],
-        ] as const).map(([key, label, count, enabled]) => (
-          <button
-            key={key}
-            type="button"
-            className="rrp-seg"
-            role="tab"
-            aria-selected={activeSeg === key}
-            aria-disabled={!enabled}
-            data-testid={`resume-report-seg-${key}`}
-            onClick={() => { if (enabled) onSeg(key) }}
-          >
-            {label}<em>{enabled ? count : '无'}</em>
-          </button>
-        ))}
-      </div>
-
-      {activeSeg === 'structure' && hasStructure ? (
-        <StructureZone blocks={blocks} issues={issues} activeBlk={blk} fixture={fixture} />
-      ) : null}
-      {activeSeg === 'issues' && hasIssues ? (
-        <IssuesZone issues={issues} sections={report.sections} fixture={fixture} onDim={onDim} />
-      ) : null}
-      {activeSeg === 'scores' && hasScores ? (
-        <ScoresZone sections={report.sections} issues={issues} activeDim={dim} onDim={onDim} />
-      ) : null}
-      {activeSeg === 'conclusions' && conclN > 0 ? (
-        <ConclusionsZone
-          report={report}
-          reading={<ReportReading priorities={priorities} prioritiesFromReport={prioritiesFromReport} sections={report.sections} onJobFit={onJobFit} />}
-        />
-      ) : null}
-      {conclN === 0 ? (
-        <ReportReading priorities={priorities} prioritiesFromReport={prioritiesFromReport} sections={report.sections} onJobFit={onJobFit} />
-      ) : null}
-    </>
-  )
-}
-
-function ReportReading({
-  priorities,
-  prioritiesFromReport,
-  sections,
-  onJobFit,
-}: {
-  priorities: ResumePriority[]
-  prioritiesFromReport: boolean
-  sections: ResumeReport['sections']
-  onJobFit: () => void
-}) {
-  const navigate = useNavigate()
-  return (
-    <>
-      <details className="rrp-explanation">
-        <summary>先改这几处 · 六维解读</summary>
-        <section className="rrp-score-note" data-testid="resume-report-not-admission">
-          这不是录取分
-          <span>六项各自打分，本页不求和、不换算百分比，也不代表录用、面试或投递结果。</span>
-        </section>
-        {priorities.length > 0 ? (
-          <section className="rrp-pri" data-testid="resume-report-priorities">
-            <div className="rrp-zh">先改这几处<span>{prioritiesFromReport ? '报告自带' : '按低分分项机械列出'}</span></div>
-            <ol>
-              {priorities.map((item, i) => (
-                <li key={`${item.focus}-${i}`}>
-                  <span className="no">{i + 1}</span>
-                  <span><b>{item.focus}</b>{item.reason ? ` ${item.reason}` : ''}</span>
-                </li>
-              ))}
-            </ol>
+      <div className="qxt-rep">
+        {report.sections.length > 0 ? (
+          <section className="qxt-dims" aria-label="六个维度" data-testid="resume-report-dims">
+            <div className="qxt-h">六个维度<small>这不是录取分 · 不求和</small></div>
+            {report.sections.map((section) => {
+              const tier = tierOf(section.score, section.maxScore)
+              const ratio = section.maxScore > 0 ? section.score / section.maxScore : 0
+              const about = section.key in DIM_ABOUT ? DIM_ABOUT[section.key as keyof typeof DIM_ABOUT] : ''
+              return (
+                <div key={section.key} className="qxt-dim" data-tone={tier.tone} data-testid={`resume-report-dim-${section.key}`}>
+                  <span><b>{section.label || dimLabel(section.key)}</b><small>{about}</small></span>
+                  <em>{section.score} · {tier.word}</em>
+                  <i
+                    role="progressbar"
+                    aria-label={`${section.label || dimLabel(section.key)}得分`}
+                    aria-valuemin={0}
+                    aria-valuemax={section.maxScore}
+                    aria-valuenow={section.score}
+                    style={{ ['--p' as string]: String(ratio) }}
+                  />
+                </div>
+              )
+            })}
           </section>
         ) : null}
-        <DimensionTalk sections={sections} />
-      </details>
-      <button type="button" className="rrp-jobfit" onClick={onJobFit} data-route="/resume/job-fit">
-        目标岗位匹配参考（仅供参考）
-      </button>
-      <p className="rrp-self">
-        想了解自己的倾向？
-        <button type="button" className="rrp-self" onClick={() => navigate('/resume/self-assessment/intro')}>
-          做一次自我探索
-        </button>
-      </p>
-    </>
-  )
-}
+        <section className="qxt-prios" aria-label="先改这几处" data-testid="resume-report-priorities">
+          <div className="qxt-h">先改这几处<small>最多 3 条{issues.length === 0 && (report.priorities?.length ?? 0) === 0 ? ' · 按低分维度列出' : ''}</small></div>
+          {top.length > 0
+            ? top.map((issue, i) => <IssueCard key={issue.id} issue={issue} index={i + 1} blocks={blocks} />)
+            : priorities.map((item, i) => <PriorityCard key={`${item.focus}-${i}`} item={item} index={i + 1} />)}
+          {top.length === 0 && priorities.length === 0 ? <p className="qxt-none">这份报告没有给出需要先改的条目。</p> : null}
+        </section>
+      </div>
 
-function ConclusionsZone({ report, reading }: { report: ResumeReport; reading: ReactNode }) {
-  const hasP = (report.priorities?.length ?? 0) > 0
-  const hasR = (report.riskNotes?.length ?? 0) > 0
-  return (
-    <section className="rrp-zone" data-testid="resume-report-zone" data-zone="conclusions">
-      <div className="rrp-zh">
-        报告自己给的三栏结论
-        <span>先改 {report.priorities?.length ?? 0} · 建议 {report.suggestions.length} · 风险 {report.riskNotes?.length ?? 0}</span>
-      </div>
-      <div className="rrp-scroll" data-testid="resume-report-list">
-        {hasP ? (
-          <>
-            <div className="rrp-subh">先改这几处</div>
-            {report.priorities!.map((item, i) => (
-              <div key={i} className="rrp-it" data-kind="pri"><span className="no">{i + 1}</span><span className="tx"><b>{item.focus}</b><p>{item.reason}</p></span></div>
-            ))}
-          </>
-        ) : null}
-        <div className="rrp-subh">可执行建议</div>
-        {report.suggestions.map((tip, i) => (
-          <div key={i} className="rrp-it" data-kind="sug"><span className="no">{i + 1}</span><span className="tx"><b>{tip}</b></span></div>
-        ))}
-        {hasR ? (
-          <>
-            <div className="rrp-subh">表达风险提醒</div>
-            {report.riskNotes!.map((note, i) => (
-              <div key={i} className="rrp-it" data-kind="risk"><span className="no">{i + 1}</span><span className="tx"><b>{note}</b></span></div>
-            ))}
-          </>
-        ) : null}
-      </div>
-      <p className="rrp-zfoot">
-        {hasP && hasR
-          ? '三栏都按报告给出的顺序原样排列。建议只针对简历表达，不涉及录用、面试或投递结果，也不会发给任何企业。'
-          : '这是一份早期报告：只有分数和建议，没有「先改这几处」「表达风险」两项内容 —— 这不是读取失败。'}
-      </p>
-      {reading}
-    </section>
+      {issues.length > 0 ? (
+        <details className="qxt-all" open={rest.length > 0} data-testid="resume-report-all-issues">
+          <summary>全部问题（{issues.length}）</summary>
+          <p>{top.map((issue, i) => `${i + 1} ${issue.title}`).join(' · ')}{rest.length > 0 ? ' · 上面三张' : ''}</p>
+          {rest.map((issue, i) => <IssueCard key={issue.id} issue={issue} index={i + 4} blocks={blocks} />)}
+        </details>
+      ) : null}
+
+      {hasConclusions ? (
+        <details className="qxt-all" data-testid="resume-report-conclusions">
+          <summary>报告结论（建议 {report.suggestions.length} · 风险提醒 {riskNotes.length}）</summary>
+          {report.suggestions.length > 0 ? (
+            <>
+              <p><u>可执行建议</u></p>
+              <ol className="qxt-list">{report.suggestions.map((tip) => <li key={tip}>{tip}</li>)}</ol>
+            </>
+          ) : null}
+          {riskNotes.length > 0 ? (
+            <>
+              <p><u>表达风险提醒</u></p>
+              <ol className="qxt-list">{riskNotes.map((note) => <li key={note}>{note}</li>)}</ol>
+            </>
+          ) : null}
+          <p>建议只针对简历表达，不涉及录用、面试或投递结果，也不会发给任何企业。</p>
+        </details>
+      ) : null}
+
+      {blocks.length > 0 ? (
+        <details className="qxt-all" data-testid="resume-report-structure">
+          <summary>简历内容结构（{blocks.length} 块）</summary>
+          {blocks.map((block) => {
+            const hits = issuesOfBlock(issues, block.key)
+            const evidence = evidenceCountOfBlock(issues, block.key)
+            const marks = evidenceLineSet(issues, block.key)
+            return (
+              <section key={block.key} className="qxt-block-row" data-testid={`resume-report-block-${block.key}`}>
+                <b>{block.label}<small>{hits.length > 0 ? `命中 ${hits.length} 条问题 · ${evidence} 条证据` : '本块没有命中问题'}</small></b>
+                {block.lines.length > 0
+                  ? block.lines.map((line, i) => <p key={i} data-ev={marks.has(i) ? '1' : '0'}><i>{i + 1}</i> {displayResumeExcerpt(line)}</p>)
+                  : <p>这一块在原文里是空的。</p>}
+              </section>
+            )
+          })}
+        </details>
+      ) : null}
+    </>
   )
 }
 
 export function EmptyReportBody() {
-  return (
-    <>
-      <section className="rrp-cbar" data-testid="resume-report-counts">
-        <div className="rrp-cgrid">
-          {['内容块', '问题', '原文证据', '量化命中', '评分维度', '结论条目'].map((label) => (
-            <span key={label} className="rrp-cc" data-zero="1"><u>{label}</u><b>0</b></span>
-          ))}
-        </div>
-      </section>
-      <ResumeReportStates viewState="report-empty" />
-    </>
-  )
+  return <ResumeReportStates viewState="report-empty" />
 }
