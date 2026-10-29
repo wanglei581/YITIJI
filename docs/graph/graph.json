@@ -13178,7 +13178,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 253,
+      "reachableFileCount": 266,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -13564,7 +13564,10 @@
         },
         {
           "component": "LegalDocsPage",
-          "endpoints": [],
+          "endpoints": [
+            "POST /admin/branding/logo",
+            "PUT /admin/branding"
+          ],
           "file": "apps/admin/src/routes/legal-docs/index.tsx",
           "layout": [
             "AdminLayoutWrapper"
@@ -13677,6 +13680,7 @@
             "PATCH /admin/orgs/:param/accounts/:param/status",
             "PATCH /admin/orgs/:param/content-trust",
             "PATCH /admin/orgs/:param/status",
+            "POST /admin/branding/logo",
             "POST /admin/orgs",
             "POST /admin/orgs/:param/accounts",
             "POST /admin/orgs/:param/accounts/:param/action-challenges",
@@ -13686,6 +13690,7 @@
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/verify",
             "POST /admin/recruitment-emergency/circuit-break",
             "POST /admin/recruitment-emergency/takedown",
+            "PUT /admin/branding",
             "PUT /admin/orgs/:param/accounts/:param/email",
             "PUT /admin/orgs/:param/verified-official-domains"
           ],
@@ -13949,7 +13954,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 279
+      "sourceFileCount": 293
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -16979,7 +16984,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 93,
+      "reachableFileCount": 97,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -17494,7 +17499,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 94
+      "sourceFileCount": 98
     }
   },
   "dataModel": {
@@ -22976,6 +22981,7 @@
       "apps/admin/scripts/verify-console-privacy-copy.mjs"
     ],
     "apps/partner/src/routes/profile/index.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/admin/scripts/verify-console-privacy-copy.mjs",
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
     ],
@@ -29307,6 +29313,7 @@
           "apps/admin/src/routes/terminals/index.tsx",
           "apps/partner/src/routes/Page.tsx",
           "apps/partner/src/routes/policy/PolicyEmergencyNote.tsx",
+          "apps/partner/src/routes/profile/index.tsx",
           "apps/partner/src/routes/smart-campus/index.tsx",
           "apps/partner/src/routes/terminals/index.tsx",
           "packages/shared/src/aiDisplayLabels.ts",
@@ -44715,6 +44722,17 @@
         "risk": "medium",
         "scope": "admin",
         "why": "仍被其它文件提及：apps/admin/src/routes/offline-agencies/AgencyForm.tsx、apps/admin/src/routes/offline-agencies/GovernanceDrawer.tsx、apps/admin/src/routes/offline-agencies/JobsDrawer.tsx"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/partners/licenseValidation.test.ts",
+        "kind": "test",
+        "mentions": [
+          "apps/admin/package.json"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
