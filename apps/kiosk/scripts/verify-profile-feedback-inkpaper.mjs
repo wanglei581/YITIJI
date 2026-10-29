@@ -49,7 +49,7 @@ const ci = readFileSync(join(repoRoot, '.github/workflows/ci.yml'), 'utf8')
 const homeVerify = read('scripts/verify-profile-inkpaper-home.mjs')
 
 expectIncludes(page, "import './styles/feedback-qx.css'", 'MyFeedbackPage 引入青序局部 CSS')
-expectIncludes(page, 'QxPageFrame', 'MyFeedbackPage 使用青序页框')
+expectIncludes(page, 'MeTouchShell', 'MyFeedbackPage 使用触屏页壳')
 expectAbsent(page, /KioskPageFrame/, 'MyFeedbackPage has left the V6 frame')
 expectIncludes(page, 'loginFrom="/me/feedback"', '意见反馈保留登录回跳来源')
 
@@ -74,7 +74,9 @@ expectIncludes(formPanel, 'maxLength={11}', '反馈表单保留联系电话长�
 expectIncludes(formPanel, 'maxLength={80}', '反馈表单保留标题长度限制')
 expectIncludes(formPanel, 'maxLength={500}', '反馈表单保留反馈内容长度限制')
 expectIncludes(formPanel, '提交反馈', '反馈表单保留提交按钮')
-expectIncludes(formPanel, 'KIcon name="send"', '反馈表单使用 KIcon 发送图标')
+// 触屏稿 pageFeedback：提交键在底栏，不在表单里。锚点随稿换到页面，判据不变（用 KIcon 发送图标、键名仍是「提交反馈」）。
+expectIncludes(page, 'KIcon name="send"', '反馈提交键使用 KIcon 发送图标')
+expectIncludes(page, '提交反馈', '反馈页底栏保留提交按钮')
 
 expectIncludes(listPanel, 'formatTime(item.updatedAt)', '反馈列表保留更新时间展示')
 expectIncludes(listPanel, 'selected?.id === item.id || selectedId === item.id', '反馈列表保留当前详情高亮逻辑')
@@ -174,6 +176,14 @@ const forbiddenChanged = changedFiles.filter((file) =>
     'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
     'apps/kiosk/src/pages/assistant/AssistantPage.tsx',
     'apps/kiosk/src/pages/assistant/assistant-qingxu.css',
+    // 2026-10-27 触屏版第 6 包把反馈、浏览记录、账号设置、消息通知同一批换壳。
+    // 仍留在下面的禁止名单里；这里只加例外。各自的行为断言仍由专属守卫负责。
+    'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
+    'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
+    'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx',
+    // 2026-10-27 审查：眉题改到稿上的「我的 · …」。行为断言仍由各自的专属守卫负责。
+    'apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx',
+    'apps/kiosk/src/pages/profile/me/MyResumesPage.tsx',
   ].includes(file) &&
   ([
     'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',

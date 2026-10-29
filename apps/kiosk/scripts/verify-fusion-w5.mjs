@@ -212,7 +212,8 @@ assert.match(activityDetail, /screen="activity-detail"/, 'activity detail still 
 assert.match(activityDetail, /<section className="me-detail-scroll">/, 'activity detail keeps its neutral scroll wrapper')
 assert.doesNotMatch(activityDetail, /<\/?main\b/, 'activity detail leaves the main landmark to the shell')
 assert.doesNotMatch(activityDetail, /<\/?main\b/, 'activity detail leaves the main landmark to KioskLayout')
-assertSharedPageShell(benefitActivityDetail, 'BenefitActivityDetailPage')
+assert.match(benefitActivityDetail, /<MeTouchShell\b/, 'BenefitActivityDetailPage uses the touch screen shell')
+assert.doesNotMatch(benefitActivityDetail, /<KioskPageFrame\b|<KioskPageHeader\b/, 'BenefitActivityDetailPage has left the V6 frame')
 assert.match(
   benefitActivityDetail,
   /<section\b(?=[^>]*\bdata-kiosk-domain="profile")(?=[^>]*\bdata-kiosk-screen="activity-detail")(?=[^>]*\bclassName="k8-act-scroll")[^>]*>/,
@@ -348,14 +349,15 @@ const qxMePages = [
 ]
 for (const path of qxMePages) {
   const source = read(path)
-  assert.match(source, path.endsWith('/MySettingsPage.tsx') ? /<QxPageFrame/ : /QxMePage/, `${path} uses its Qingxu page frame`)
+  assert.match(source, path.endsWith('/MySettingsPage.tsx') ? /<MeTouchShell/ : /QxMePage/, `${path} uses its touch or member page frame`)
   assert.doesNotMatch(source, /KioskPageFrame/, `${path} has left the V6 frame`)
   assert.doesNotMatch(source, /className="qx-nav-item"/, `${path} does not inline navbar items`)
 }
 const qxMeChrome = read('src/pages/profile/me/qx/QxMeChrome.tsx')
-assert.match(qxMeChrome, /QxPageFrame/, 'member chrome uses Qingxu page frame')
-assert.match(qxMeChrome, /QxAppNavbar/, 'member chrome uses shared QxAppNavbar')
-assert.match(qxMeChrome, /current="profile"/, 'member chrome marks 我的 as the current nav item')
+assert.match(qxMeChrome, /MeTouchShell/, 'member chrome uses the touch screen shell')
+const touchShell = read('src/pages/profile/touch/MeTouchShell.tsx')
+assert.match(touchShell, /QxTouchNav/, 'touch shell uses QxTouchNav')
+assert.match(touchShell, /current="profile"/, 'touch shell marks 我的 as the current nav item')
 assert.doesNotMatch(qxMeChrome, /KioskPageFrame/, 'member chrome has left the V6 frame')
 const qxNavbar = read('src/components/qingxu/QxAppNavbar.tsx')
 assert.match(qxNavbar, /aria-current=\{current === 'profile' \? 'page' : undefined\}/, 'shared navbar can mark 我的 as current')
@@ -395,13 +397,13 @@ const profilePageQx = read('src/pages/profile/ProfilePage.tsx')
 const benefitsPageQx = read('src/pages/profile/me/MyBenefitsPage.tsx')
 const feedbackPageQx = read('src/pages/profile/me/MyFeedbackPage.tsx')
 const privacyPageQx = read('src/pages/profile/me/MyPrivacyRequestsPage.tsx')
-assert.match(profilePageQx, /QxPageFrame/, 'ProfilePage uses Qingxu page frame')
+assert.match(profilePageQx, /MeTouchShell/, 'ProfilePage uses the touch screen shell')
 assert.doesNotMatch(profilePageQx, /KioskPageFrame/, 'ProfilePage has left the V6 frame')
-assert.match(benefitsPageQx, /QxPageFrame/, 'MyBenefitsPage uses Qingxu page frame')
+assert.match(benefitsPageQx, /MeTouchShell/, 'MyBenefitsPage uses the touch screen shell')
 assert.doesNotMatch(benefitsPageQx, /KioskPageFrame/, 'MyBenefitsPage has left the V6 frame')
-assert.match(feedbackPageQx, /QxPageFrame/, 'MyFeedbackPage uses Qingxu page frame')
+assert.match(feedbackPageQx, /MeTouchShell/, 'MyFeedbackPage uses the touch screen shell')
 assert.doesNotMatch(feedbackPageQx, /KioskPageFrame/, 'MyFeedbackPage has left the V6 frame')
-assert.match(privacyPageQx, /QxPageFrame/, 'MyPrivacyRequestsPage uses Qingxu page frame')
+assert.match(privacyPageQx, /MeTouchShell/, 'MyPrivacyRequestsPage uses the touch screen shell')
 assert.doesNotMatch(privacyPageQx, /KioskPageFrame/, 'MyPrivacyRequestsPage has left the V6 frame')
 assert.match(profilePageQx, /getPendingTasks/, 'ProfilePage reads /me/pending-tasks instead of inventing continue-todo')
 assert.doesNotMatch(profilePageQx, /一键投递|立即投递|平台投递|投递简历/, 'ProfilePage stays inside the recruitment copy whitelist')
@@ -417,15 +419,17 @@ const A_BATCH_EYEBROWS = [
   ['src/pages/print-scan/ConvertImagesView.tsx', ['>图片转 PDF<']],
   ['src/pages/print-scan/sign-stamp/SignStampPickView.tsx', ['>签名<']],
   ['src/pages/resume/SelfAssessmentFlow.tsx', ["SA_EYEBROW = '自我探索'"]],
-  ['src/pages/profile/me/MyNotificationsPage.tsx', ['eyebrow="消息通知"']],
-  ['src/pages/profile/me/MyDocumentsPage.tsx', ['eyebrow="我的文档和订单"']],
-  ['src/pages/profile/me/MyPrintOrdersPage.tsx', ['eyebrow="我的文档和订单"']],
-  ['src/pages/profile/me/MyResumesPage.tsx', ['eyebrow="我的简历"']],
-  ['src/pages/profile/me/MyFavoritesPage.tsx', ['eyebrow="我的收藏"']],
-  ['src/pages/profile/me/MyAiRecordsPage.tsx', ['eyebrow="AI 服务记录"']],
-  ['src/pages/profile/me/MyActivityPage.tsx', ['eyebrow="我的足迹"']],
+  // 证据锚点随稿换字，判据不变：眉题仍是中文、照稿，屏上不出现英文眉题。
+  ['src/pages/profile/me/MyNotificationsPage.tsx', ['eyebrow="我的 · 消息"']],
+  ['src/pages/profile/me/MyDocumentsPage.tsx', ['eyebrow="我的 · 文档"']],
+  ['src/pages/profile/me/MyPrintOrdersPage.tsx', ['eyebrow="我的 · 打印订单"']],
+  ['src/pages/profile/me/MyResumesPage.tsx', ['eyebrow="我的 · 简历"']],
+  ['src/pages/profile/me/MyFavoritesPage.tsx', ['eyebrow="我的 · 收藏"']],
+  ['src/pages/profile/me/MyAiRecordsPage.tsx', ['eyebrow="我的 · AI 服务记录"']],
+  ['src/pages/profile/me/MyActivityPage.tsx', ['eyebrow="我的 · 浏览记录"']],
   ['src/pages/placeholders/MeActivityDetailPage.tsx', ['eyebrow="记录详情"']],
-  ['src/pages/profile/me/MyFeedbackPage.tsx', ['>意见反馈<']],
+  // 证据锚点随稿换字，判据不变：眉题仍是中文、照稿，屏上不出现英文眉题。
+  ['src/pages/profile/me/MyFeedbackPage.tsx', ['eyebrow="我的 · 意见反馈"']],
 ]
 for (const [path, expected] of A_BATCH_EYEBROWS) {
   const source = read(path)

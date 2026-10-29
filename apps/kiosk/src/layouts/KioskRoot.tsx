@@ -262,6 +262,20 @@ const QX_TOUCH_ROUTES = new Set<string>([
   '/session-resume',
   '/error-offline',
   // 第六包 我的与权益
+  '/profile',
+  '/me/notifications',
+  '/notifications',
+  '/me/resumes',
+  '/me/print-orders',
+  '/me/documents',
+  '/me/ai-records',
+  '/me/activity',
+  '/me/favorites',
+  '/me/benefits',
+  '/activities',
+  '/me/feedback',
+  '/me/settings',
+  '/me/privacy-requests',
   // 第七包 简历其余页
   // 第八包 练面试
   // 第九包 扫描复印
@@ -288,6 +302,8 @@ const QX_TOUCH_PATTERNS: readonly RegExp[] = [
   // 第四包 简历三条主路
   // 第五包 公共与系统
   // 第六包 我的与权益
+  /^\/activities\/[^/]+$/,
+  /^\/me\/activity\/[^/]+$/,
   // 第七包 简历其余页
   // 第八包 练面试
   // 第九包 扫描复印

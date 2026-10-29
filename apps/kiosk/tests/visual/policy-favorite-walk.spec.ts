@@ -219,7 +219,9 @@ test('收藏的政策打开那一条，发布日期用确认发布时间 @kiosk'
   await routePolicies(page, state)
   await loginThroughVisibleUi(page, '/me/favorites')
   await expect(page.getByText('对应政策页待建设')).toHaveCount(0)
-  await expect(page.getByText('再打开这则说明，办理仍以官方入口为准。')).toBeVisible()
+  // 证据锚点随稿换字，判据不变：我的收藏改按触屏稿后，列表下面写「点一条打开政策」，不再写旧的「再打开这则说明…」；
+  // 要证明的仍是「收藏的政策是点开那一条，不是平台代办」。
+  await expect(page.getByText('点一条打开政策', { exact: false })).toBeVisible()
   await shot(page, 'W-49-favorites.png')
   await page.getByTestId('member-records-fav-fav-row').click()
   await page.waitForURL((url) => url.pathname === '/renshi' && url.searchParams.get('policy') === 'policy-fav')
@@ -274,7 +276,8 @@ test('政策找不到时说明打不开，并能去看其他政策或回到收�
   await expect(page.getByText('这条政策现在打不开', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: /返回我的收藏/ }).click()
   await page.waitForURL((url) => url.pathname === '/me/favorites')
-  await expect(page.getByText('登录后查看我的收藏')).toBeVisible()
+  // 登录门的标题现在同时出现在意图带和登录卡里（稿如此），按标题角色取意图带那一个。
+  await expect(page.getByRole('heading', { name: '登录后看你的收藏' })).toBeVisible()
 })
 
 test('这次没读到可以再试一次，成功后打开那一条 @kiosk', async ({ page }) => {

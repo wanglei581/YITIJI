@@ -1,194 +1,31 @@
 import type { ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
-import type { LucideIcon } from 'lucide-react'
-import { BriefcaseIcon, LandmarkIcon, PrinterIcon } from 'lucide-react'
-import { useRecruitmentHosting, type RecruitmentHostingState } from '../../../../hooks/useRecruitmentHosting'
-import { QxMeBanner, QxMeGuide, QX_ME_GUIDE } from './QxMeChrome'
+import { MeErrorPack, MeLoadingPack, MeLoginGate } from '../../touch/MeStatePacks'
+import { gatePageFromTitle } from '../../touch/meGatePage'
 
-export function QxMeSkeletonList({ count = 4, foot }: { count?: number; foot: string }) {
-  return (
-    <section className="qx-me-list qx-me-grow" aria-label="正在加载的记录占位">
-      {Array.from({ length: count }, (_, i) => (
-        <div className="qx-me-row" aria-hidden="true" key={i}>
-          <span className="qx-me-row-ico" data-tone="off" />
-          <span className="qx-me-row-main"><span className="qx-me-skel" /><span className="qx-me-skel qx-me-skel-s" /></span>
-          <span className="qx-me-acts"><span className="qx-me-skel" style={{ width: 110, height: 50, borderRadius: 16 }} /></span>
-        </div>
-      ))}
-      <div className="qx-me-legal">{foot}</div>
-    </section>
-  )
-}
-
-export function QxMeStructRow({
-  icon: Icon,
-  title,
-  desc,
-  mode,
-  testid,
-}: {
-  icon: LucideIcon
-  title: string
-  desc: string
-  mode: 'lock' | 'error'
-  testid: string
-}) {
-  return (
-    <div className="qx-me-row" data-dead="true" data-slot-mode={mode} data-testid={testid}>
-      <span className="qx-me-row-ico" data-tone="off" aria-hidden="true"><Icon size={28} /></span>
-      <span className="qx-me-row-main">
-        <span className="qx-me-row-title">{title}</span>
-        <span className="qx-me-row-sub">{desc}</span>
-        <span className="qx-me-row-foot" style={{ marginTop: 9, display: 'flex', gap: 9, flexWrap: 'wrap' }}>
-          <span className="qx-me-slot">{mode === 'lock' ? '标题登录后显示' : '标题本次未取到'}</span>
-          <span className="qx-me-slot">{mode === 'lock' ? '时间登录后显示' : '时间本次未取到'}</span>
-        </span>
-      </span>
-      <span className="qx-me-acts">
-        <span className="qx-me-small" aria-disabled="true">{mode === 'lock' ? '登录后显示' : '本次未取到'}</span>
-      </span>
-    </div>
-  )
-}
-
-export function QxMeStartRow({
-  icon: Icon,
-  tone,
-  title,
-  desc,
-  label,
-  onClick,
-  testid,
-  route,
-}: {
-  icon: LucideIcon
-  tone?: 'slate' | 'plum' | 'wheat'
-  title: string
-  desc: string
-  label: string
-  onClick: () => void
-  testid: string
-  route: string
-}) {
-  return (
-    <button type="button" className="qx-me-row" data-route={route} data-testid={testid} onClick={onClick}>
-      <span className="qx-me-row-ico" data-tone={tone} aria-hidden="true"><Icon size={28} /></span>
-      <span className="qx-me-row-main">
-        <span className="qx-me-row-title">{title}</span>
-        <span className="qx-me-row-sub">{desc}</span>
-      </span>
-      <span className="qx-me-acts"><span className="qx-me-small" data-variant="primary">{label}</span></span>
-    </button>
-  )
-}
-
-export function QxMePendingRow({
-  route,
-  testid,
-  title,
-  sub,
-  icon: Icon,
-  tone,
-}: {
-  route: string
-  testid: string
-  title: string
-  sub: string
-  icon: LucideIcon
-  tone?: 'slate' | 'plum' | 'wheat'
-}) {
-  return (
-    <div
-      className="qx-me-row"
-      data-dead="true"
-      aria-disabled="true"
-      data-pending-route-host="true"
-      data-route={route}
-      data-testid={testid}
-      aria-label={`${title}（对应页面待建设，暂不可进入）`}
-    >
-      <span className="qx-me-row-ico" data-tone={tone} aria-hidden="true"><Icon size={28} /></span>
-      <span className="qx-me-row-main">
-        <span className="qx-me-row-title">{title}</span>
-        <span className="qx-me-row-sub">{sub}</span>
-        <span className="qx-me-reason">对应页面待建设，暂不可进入</span>
-      </span>
-      <span className="qx-me-pending">待建设</span>
-    </div>
-  )
-}
-
-/** `hostingOpen`：招聘内容托管（3.13）关闭时没有岗位与招聘会可看，这一行换成同样不用登录的政策服务。 */
-export function QxMeGuestRows({ onJobs, onPrint, hostingOpen }: { onJobs: () => void; onPrint: () => void; hostingOpen: boolean }) {
-  const navigate = useNavigate()
-  return (
-    <>
-      <div className="qx-me-legal">不用登录也能办 · 这两项在这台机器上不需要账号</div>
-      {hostingOpen ? (
-        <QxMeStartRow icon={BriefcaseIcon} title="看第三方岗位与招聘会" desc="来源机构、更新时间与外部入口都在详情页里" label="查看岗位" route="/jobs" testid="member-records-guest-jobs" onClick={onJobs} />
-      ) : (
-        <QxMeStartRow icon={LandmarkIcon} tone="slate" title="查看就业政策" desc="政策、社保与登记指引，资格以官方核验为准" label="查看政策" route="/policy-service" testid="member-records-guest-policy" onClick={() => navigate('/policy-service')} />
-      )}
-      <QxMeStartRow icon={PrinterIcon} tone="wheat" title="打印或扫描材料" desc="当场办完的打印、扫描不需要登录，也不会绑定到账号" label="去打印扫描" route="/print-scan" testid="member-records-guest-print" onClick={onPrint} />
-    </>
-  )
-}
-
-/** 未登录指引第三条。托管读到「关闭」才说未开放；还没读到时只说本机不代收简历，不提岗位与招聘会。 */
-function guestBoundary(status: RecruitmentHostingState['status']): [string, string, string] {
-  return status === 'ready'
-    ? ['边界', '本机不代收简历', '本终端未开放岗位与招聘会信息']
-    : ['边界', '本机不代收简历', '也不把你的资料转交给任何企业']
-}
-
+/**
+ * 记录页的登录门、读取中、读不到三种状态，都落到触屏版的状态屏（稿 gate / loading / err）。
+ * 这里只剩薄薄一层，保留各页原来的调用形状：title 只用来认出是哪一页。
+ * 用它的七个记录页在 2.0 里登录门带说明格，其中「边界」一格随招聘托管状态改口，所以这里要画边界句。
+ */
 export function QxMeLoginBlock({
   title,
-  desc,
-  struct,
-  onJobs,
-  onPrint,
+  printPick = false,
 }: {
   title: string
-  desc: string
-  struct: ReactNode
-  onJobs: () => void
-  onPrint: () => void
+  desc?: string
+  struct?: ReactNode
+  onJobs?: () => void
+  onPrint?: () => void
+  printPick?: boolean
 }) {
-  const hosting = useRecruitmentHosting()
-  const hostingOpen = hosting.enabled
-  return (
-    <>
-      <QxMeBanner tone="lock" title={title} desc={<>{desc}<b>下面是登录后会出现的内容结构，以及现在就能办的事。</b></>} minis={['共 —', '登录后回填']} />
-      <section className="qx-me-list qx-me-grow" aria-label="登录后会出现的内容结构，以及不用登录也能办的事">
-        <div className="qx-me-legal">登录后会出现的内容结构 · 现在不显示任何明细</div>
-        {struct}
-        <QxMeGuestRows onJobs={onJobs} onPrint={onPrint} hostingOpen={hostingOpen} />
-        <div className="qx-me-legal">登录只用来确认「是你本人」。<b>结束这次使用，只清除这台机器上的登录状态和临时使用记录</b>；系统里的记录按各自保存期限管理。</div>
-      </section>
-      <QxMeGuide items={hostingOpen ? [...QX_ME_GUIDE.login] : [...QX_ME_GUIDE.login.slice(0, 2), guestBoundary(hosting.status)]} />
-    </>
-  )
+  return <MeLoginGate page={gatePageFromTitle(title)} printPick={printPick} boundary />
 }
 
-export function QxMeLoadingBlock({ title }: { title: string }) {
-  return (
-    <>
-      <QxMeBanner tone="calm" title={title} desc={<>正在读取当前登录账号的记录。<b>返回前先显示「—」</b>。上一位若没点结束使用，读出来的仍是那个账号。</>} minis={['共 —', '正在安全读取']} />
-      <QxMeSkeletonList foot="这次读取失败不会删除任何记录，也不会改动任何已保存的内容。" />
-      <QxMeGuide items={[...QX_ME_GUIDE.loading]} />
-    </>
-  )
+export function QxMeLoadingBlock(props: { title?: string }) {
+  void props.title
+  return <MeLoadingPack />
 }
 
-export function QxMeErrorBlock({ title, desc, struct }: { title: string; desc: string; struct: React.ReactNode }) {
-  return (
-    <>
-      <QxMeBanner tone="warn" title={title} desc={<>{desc}<b>本页不会拿上一次的内容冒充当前账号</b>，所以每一项都显示「—」。</>} minis={['共 —', '本次未取到']} />
-      <section className="qx-me-list qx-me-grow" aria-label="本次未取到的内容结构">
-        {struct}
-        <div className="qx-me-legal">重试不会重复创建记录，也不会改动已保存的内容。多次重试仍失败时，可以让现场工作人员协助查询。</div>
-      </section>
-      <QxMeGuide items={[...QX_ME_GUIDE.error]} />
-    </>
-  )
+export function QxMeErrorBlock({ onRetry }: { title?: string; desc?: string; struct?: ReactNode; onRetry?: () => void }) {
+  return <MeErrorPack onRetry={onRetry} />
 }

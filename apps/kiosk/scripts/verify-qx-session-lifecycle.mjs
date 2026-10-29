@@ -14,6 +14,7 @@ const files = {
   loginPage: read('src/pages/auth/LoginPage.tsx'),
   profilePage: read('src/pages/profile/ProfilePage.tsx'),
   settingsPage: read('src/pages/profile/me/MySettingsPage.tsx'),
+  meTouchShell: read('src/pages/profile/touch/MeTouchShell.tsx'),
   loginModel: read('src/pages/auth/loginGateModel.ts'),
   loginFields: read('src/pages/auth/components/LoginGatePhoneFields.tsx'),
   sessionPage: read('src/pages/placeholders/SessionTimeoutPage.tsx'),
@@ -69,10 +70,16 @@ check('login gate has a leave-without-login exit and no 已登录 overlay', () =
   // 规则 1：顶栏返回键保留，底部也要有回退。触屏稿顶栏与底栏都回首页。
   assert.match(files.loginPage, /data-testid="login-gate-back"[\s\S]{0,40}onClick=\{goHome\}>返回首页/)
   assert.match(files.loginPage, /back=\{\{\s*label:\s*'返回首页',\s*onBack:\s*goHome\s*\}\}/)
-  assert.match(files.profilePage, /back=\{\{\s*label:\s*'返回首页'/)
-  assert.match(files.profilePage, /<QxStepActions onPrev=/)
-  assert.match(files.settingsPage, /back=\{\{\s*label:\s*'返回我的'/)
-  assert.match(files.settingsPage, /<QxStepActions onPrev=/)
+  // 证据锚点随触屏壳换字，判据不变：返回仍在，且同一个 back 同时进意图带和底栏。
+  assert.match(files.meTouchShell, /back = true/)
+  assert.match(files.meTouchShell, /<QxTouchBand[\s\S]*?back=\{back\}/)
+  assert.match(files.meTouchShell, /<QxTouchDock[\s\S]*?back=\{back\}/)
+  assert.match(files.profilePage, /backLabel="返回首页"/)
+  assert.match(files.profilePage, /<MeTouchShell/)
+  assert.doesNotMatch(files.profilePage, /<MeTouchShell[\s\S]*?back=\{false\}/)
+  assert.match(files.settingsPage, /backLabel="返回我的"/)
+  assert.match(files.settingsPage, /<MeTouchShell/)
+  assert.doesNotMatch(files.settingsPage, /<MeTouchShell[\s\S]*?back=\{false\}/)
   assert.match(files.loginPage, /不登录，继续使用/)
   assert.match(files.loginPage, /useMemberPhoneLogin\(/)
   assert.match(files.loginPage, /phoneLogin\.paneProps/)

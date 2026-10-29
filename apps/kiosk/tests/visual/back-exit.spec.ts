@@ -29,6 +29,7 @@ import { sweepCases } from './route-sweep-cases'
 /** 顶栏返回键 / CTA 次级出口。刻意不含底部主导航。 */
 const EXIT_SELECTOR = [
   '.qx-topbar-back',
+  '.qxt-back',
   '[data-qx-back]',
   'button[aria-label*="返回"]',
   'button[aria-label*="上一步"]',
@@ -153,7 +154,7 @@ test.describe('每一页都要能回上一步 @kiosk', () => {
       // 而「迁进青序流光却忘了填 back 槽」正是 2026-09 那批缺陷的形态 ——
       // QxPageFrame 的 back 是可选 prop，不传就没有返回键，且不会有任何报错。
       // 所以判据钉在这里：**用了这个壳，就必须填 back 槽**。
-      const framed = await page.locator('[data-qx-frame="true"]').count()
+      const framed = await page.locator('[data-qx-frame="true"], [data-qxt-screen]').count()
       if (framed === 0 && !why) {
         console.log(`[back-exit] SKIP ${route.pattern} — 冷开未渲染青序流光壳`)
         test.skip(true, `${route.pattern} 冷开未渲染青序流光壳（多为 fail-closed 守卫态），不在本条判据范围内`)

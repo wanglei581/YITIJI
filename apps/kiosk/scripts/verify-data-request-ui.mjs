@@ -117,7 +117,7 @@ expectIncludes(kioskPage, '隐私与数据请求', 'Kiosk 页标题不再伪称�
 expectIncludes(kioskPage, 'MyPrivacyRequestsPage', 'Kiosk 隐私请求页存在')
 expectIncludes(kioskPage, 'revoke_consent', 'Kiosk 仅开放撤回授权操作')
 expectAbsent(kioskPage, /岗位 AI 授权|元数据|step-up/, 'Kiosk 隐私请求页不写「岗位 AI 授权」旧名与工程词')
-expectIncludes(kioskPage, 'QxPageFrame', 'Kiosk 隐私请求页使用青序页框')
+expectIncludes(kioskPage, 'MeTouchShell', 'Kiosk 隐私请求页使用触屏页壳')
 expectAbsent(kioskPage, /KioskPageFrame/, 'Kiosk 隐私请求页 has left the V6 frame')
 expectIncludes(kioskApi, '/me/data-requests', 'Kiosk API 走 me/data-requests')
 expectIncludes(kioskApi, 'idempotency-key', 'Kiosk 创建请求携带幂等键')
