@@ -5,7 +5,7 @@ import { AuthContext, deriveDisplayName, type AuthContextValue, type AuthUser } 
 import { clearKioskSensitiveSession, clearKioskSharedDeviceResidue } from './kioskSensitiveSession'
 import { clearGuestScanBeforeMemberLogin } from './kioskClearScope'
 import { getMemberSessionExpiryExit } from './memberSessionExpiryExit'
-import { markKioskPresenceConfirmed } from './kioskPresence'
+import { clearHandoverPending, markKioskPresenceConfirmed } from './kioskPresence'
 
 /**
  * Kiosk C 端会话 Provider（纯内存）。
@@ -83,6 +83,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearKioskSensitiveSession(token)
     // 游客本机收藏不能跟 login() 一起清，否则没机会合并到账号。
     clearKioskSharedDeviceResidue()
+    // 这一位走了（结束使用、「不是我」、闲置到点、401 过期都走这里）：没回答的「还是你吗？」一并作废，
+    // 待确认标记不跟着留给下一位（它只在内存里，这里是让它随清场当场消失，不等整页重载）。
+    clearHandoverPending()
     // 先清本地状态，后端失败也不影响。
     userRef.current = null
     setUser(null)

@@ -1,0 +1,279 @@
+/* 练面试服务台（稿 interview / interview-more）。只挂在 [data-qx-page="interview"] 下。
+   一屏放下正常、在线服务不可用、检查中三态，不滚动、互不遮挡：正常态主卡那一行吃余高，
+   停用与检查中态每一行只按内容高，余高匀进行距。 */
+
+[data-qx-page="interview"] .qxt-body.qxt-body-hub {
+  padding: 0;
+  gap: 0;
+}
+
+[data-qx-page="interview"] .qxt-ivhub {
+  gap: 10px;
+  padding: 14px 40px 12px;
+  background: var(--qx-paper);
+}
+
+/* 四张入口加主卡放在同一个网格里：主卡通栏，入口两列。主卡那一行吃余高，其余按内容高。 */
+[data-qx-page="interview"] .qxt-ivhub > .qx-hub-grid {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: minmax(min-content, 1fr) auto auto;
+  grid-auto-rows: auto;
+  gap: 10px 8px;
+  min-height: min-content;
+}
+
+/* 主卡停用时每一行只按内容高，余高匀进行与行之间的间距，不拉成空盒。
+   不用 fr 行：不同比例的 fr 行会把整块网格的最小高度算大，一屏就放不下了。 */
+[data-qx-page="interview"] .qxt-ivhub > .qx-hub-grid.is-off {
+  flex: 1 0 auto;
+  grid-template-rows: auto auto auto auto;
+  align-content: space-evenly;
+  min-height: 0;
+}
+
+[data-qx-page="interview"] .qxt-ivhub > .qx-hub-grid.is-more {
+  flex: none;
+  grid-template-rows: auto auto;
+  min-height: 0;
+}
+
+/* 入口磁贴：标题 28px，说明 22px，停用时再多一行原因 */
+[data-qx-page="interview"] .qxt-ivhub .qxt-tile {
+  min-height: 156px;
+  height: auto;
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-tile h3 {
+  display: block;
+  margin: 0;
+  font-size: var(--qxt-fs-tile);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-tile.qxt-off h3 {
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-tile-why {
+  display: block;
+  margin-top: 4px;
+  color: var(--qxt-clay-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+/* 主卡：深色一整块，左上是标题，下面三步 */
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-main {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: 8px;
+  min-height: 0;
+  padding: 18px 20px;
+  border: 0;
+  border-radius: 28px;
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+  text-align: left;
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-lead {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--qxt-cream) 14%, transparent);
+  color: var(--qxt-cream);
+  font-size: var(--qxt-fs-aux);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-chip::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.8;
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-main b,
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-dead h3 {
+  margin: 0;
+  font-family: var(--qx-serif);
+  font-size: var(--qxt-fs-task);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-main small {
+  color: var(--qxt-mint);
+  font-size: var(--qxt-fs-body);
+  font-style: normal;
+  line-height: 1.35;
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-steps i {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--qxt-cream) 8%, transparent);
+  font-style: normal;
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-steps b {
+  margin: 0;
+  color: var(--qxt-cream);
+  font-family: var(--qx-sans);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-steps em {
+  color: var(--qxt-mint);
+  font-size: var(--qxt-fs-sub);
+  font-style: normal;
+  line-height: 1.35;
+}
+
+/* 主卡停用：左边是标题、说明和原因，右边是三步。出路不在卡里，卡后面单独一颗。 */
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-dead {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  min-height: 0;
+  padding: 16px 18px;
+  border: 1.5px dashed var(--qxt-edge);
+  border-radius: 28px;
+  background: var(--qxt-well);
+  color: var(--qxt-ink);
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-dead h3 {
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-slab);
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-dead .qxt-iv-chip {
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-dead p {
+  margin: 0;
+  color: var(--qxt-ink-2);
+  font-size: var(--qxt-fs-sub);
+  line-height: 1.4;
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-dead .qx-hub-why {
+  color: var(--qxt-clay-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-dead .qxt-iv-steps i {
+  background: var(--qxt-card);
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-dead .qxt-iv-steps b {
+  color: var(--qxt-ink);
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-dead .qxt-iv-steps em {
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-out {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  min-height: var(--qxt-tap);
+  padding: 0 18px;
+  border-radius: 20px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  text-align: left;
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qxt-iv-more {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: var(--qxt-tap);
+  padding: 0 18px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 20px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  text-align: left;
+}
+
+/* 分流提示和边界声明合成一张说明卡。第一句左对齐，不靠服务台通用样式居中。 */
+[data-qx-page="interview"] .qxt-ivhub .qx-hub-notice.qxt-iv-note {
+  align-items: stretch;
+  gap: 4px;
+  min-height: 0;
+  padding: 12px 16px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 20px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink-2);
+  text-align: left;
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qx-hub-notice-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-size: var(--qxt-fs-sub);
+  line-height: 1.4;
+}
+
+[data-qx-page="interview"] .qxt-ivhub .qx-hub-notice-copy b {
+  margin: 0;
+  font-size: var(--qxt-fs-body);
+}
+
+/* 其余四项：两列入口，下面宽按钮和插画说明，插画吃余高 */
+[data-qx-page="interview"] .qxt-ivhub.is-more .qxt-tile {
+  min-height: 148px;
+}

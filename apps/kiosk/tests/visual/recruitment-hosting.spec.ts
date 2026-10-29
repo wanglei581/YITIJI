@@ -16,6 +16,7 @@ import { expect, test } from '../fixtures/kiosk-test'
 import { createRecruitmentHostingLoader, type RecruitmentHostingState } from '../../src/hooks/recruitmentHostingModel'
 import { RECRUITMENT_HOSTING_OFF, RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { assertNoHorizontalOverflow } from './assert-layout'
+import { registerW6Api } from './fixtures/fusion-w6-api'
 
 const CONFIG = '/api/v1/terminals/KSK-001/config'
 
@@ -111,10 +112,12 @@ async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void
   await page.waitForURL((url) => url.pathname === returnTo)
 }
 
-/** 首页服务区的几何：每一行都铺满两列宽度，行与行之间只有网格间距，最后一行贴住网格底边。 */
-async function homeTileGeometry(page: Page) {
-  return page.locator('.qx-home-tiles').evaluate((grid) => {
+/** 一块首页网格的几何：每一行都铺满网格宽度，行距等于该网格的 row-gap，最后一行贴住网格底边。 */
+async function gridGeometry(page: Page, selector: string) {
+  return page.locator(selector).evaluate((grid) => {
     const box = grid.getBoundingClientRect()
+    const style = getComputedStyle(grid)
+    const rowGap = Math.round(Number.parseFloat(style.rowGap) || Number.parseFloat(style.gap) || 0)
     const tiles = [...grid.children].map((el) => {
       const rect = el.getBoundingClientRect()
       return { action: el.getAttribute('data-action'), top: Math.round(rect.top), bottom: Math.round(rect.bottom), left: Math.round(rect.left), right: Math.round(rect.right), height: Math.round(rect.height) }
@@ -122,6 +125,7 @@ async function homeTileGeometry(page: Page) {
     const rows = new Map<number, typeof tiles>()
     for (const tile of tiles) rows.set(tile.top, [...(rows.get(tile.top) ?? []), tile])
     return {
+      rowGap,
       grid: { top: Math.round(box.top), bottom: Math.round(box.bottom), left: Math.round(box.left), right: Math.round(box.right) },
       rows: [...rows.values()].map((row) => ({
         actions: row.map((tile) => tile.action),
@@ -135,6 +139,19 @@ async function homeTileGeometry(page: Page) {
   })
 }
 
+function expectGridFilled(geometry: Awaited<ReturnType<typeof gridGeometry>>): void {
+  for (const row of geometry.rows) {
+    expect(row.left, `${row.actions.join('+')} 贴住左边`).toBeLessThanOrEqual(geometry.grid.left + 1)
+    expect(row.right, `${row.actions.join('+')} 贴住右边`).toBeGreaterThanOrEqual(geometry.grid.right - 1)
+    expect(row.minHeight, `${row.actions.join('+')} 触控高度`).toBeGreaterThanOrEqual(104)
+  }
+  for (let index = 1; index < geometry.rows.length; index += 1) {
+    const gap = geometry.rows[index]!.top - geometry.rows[index - 1]!.bottom
+    expect(Math.abs(gap - geometry.rowGap), '行间只有网格间距').toBeLessThanOrEqual(2)
+  }
+  expect(geometry.grid.bottom - geometry.rows.at(-1)!.bottom, '网格底部不留空白').toBeLessThanOrEqual(2)
+}
+
 // ── 关闭：首页 ─────────────────────────────────────────────────────────────
 
 test('hosting off: home shows no recruitment entry and the grid reflows without holes @w1-kiosk', async ({ page, api }) => {
@@ -146,35 +163,35 @@ test('hosting off: home shows no recruitment entry and the grid reflows without 
   const home = page.getByTestId('qx-home')
   await expect(home).toHaveAttribute('data-recruitment', 'closed')
   await expect(home.locator('[data-action="print-hub"]')).toBeVisible()
-  for (const action of ['jobs-hub', 'fairs-hub', 'jobs-retry', 'fairs-retry']) {
+  for (const action of ['jobs-hub', 'fairs-hub', 'jobs-retry', 'fairs-retry', 'campus-zone']) {
     await expect(home.locator(`[data-action="${action}"]`), `托管关闭时首页不摆 ${action}`).toHaveCount(0)
   }
   await expect(home.getByRole('button', { name: '找工作', exact: true })).toHaveCount(0)
-  await expect(home.getByRole('button', { name: '改简历', exact: true })).toBeVisible()
-  await expect(home.getByRole('button', { name: '查政策', exact: true })).toBeVisible()
+  await expect(home.getByRole('button', { name: '社会招聘' })).toHaveCount(0)
+  await expect(home.getByRole('button', { name: '校园招聘' })).toHaveCount(0)
+  await expect(home.getByRole('button', { name: '改简历' })).toBeVisible()
+  await expect(home.getByRole('button', { name: '查政策' })).toBeVisible()
   // 底栏合规句随之改说真话：这台终端不提供岗位与招聘会，也不代收简历。
   await expect(home.getByText('本终端未开放岗位与招聘会信息，也不代收简历。', { exact: false })).toBeVisible()
   await expectNoRecruitmentCopy(page, '首页')
 
-  // 稿 01：改简历 + 练面试 / 打印主卡 / 查政策。未开通的百宝箱与智慧校园不占行。每行铺满、不留空格、底部不留空白。
-  const geometry = await homeTileGeometry(page)
-  expect(geometry.rows.map((row) => row.actions)).toEqual([
+  // 四张大卡 2×2，打印卡不再独占一行。第三行只有到机取件和帮助。
+  const tasks = await gridGeometry(page, '.qxt-home-tasks')
+  expect(tasks.rows.map((row) => row.actions)).toEqual([
     ['resume-hub', 'interview-hub'],
-    ['print-hub'],
-    ['policy-hub'],
+    ['print-hub', 'policy-hub'],
   ])
-  for (const row of geometry.rows) {
-    expect(row.left, `${row.actions.join('+')} 贴住左边`).toBeLessThanOrEqual(geometry.grid.left + 1)
-    expect(row.right, `${row.actions.join('+')} 贴住右边`).toBeGreaterThanOrEqual(geometry.grid.right - 1)
-    expect(row.minHeight, `${row.actions.join('+')} 触控高度`).toBeGreaterThanOrEqual(104)
-  }
-  for (let index = 1; index < geometry.rows.length; index += 1) {
-    expect(geometry.rows[index]!.top - geometry.rows[index - 1]!.bottom, '行间只有网格间距').toBeLessThanOrEqual(16)
-  }
-  // 底边只留一个行距（与托管打开时的底边留白相当），不是少掉一行后剩下的一大截空白。
-  expect(geometry.grid.bottom - geometry.rows.at(-1)!.bottom, '服务区底部不留空白').toBeLessThanOrEqual(16)
-  const board = await page.locator('.qx-home-board').boundingBox()
-  expect(geometry.grid.bottom, '磁贴区铺到服务区底边').toBeGreaterThanOrEqual(Math.round(board!.y + board!.height) - 2)
+  expectGridFilled(tasks)
+  const tiles = await gridGeometry(page, '.qxt-home-tiles')
+  expect(tiles.rows.map((row) => row.actions)).toEqual([['pickup-claim', 'help']])
+  expectGridFilled(tiles)
+  const tileToIdentity = await page.evaluate(() => {
+    const tiles = document.querySelector('.qxt-home-tiles')?.getBoundingClientRect()
+    const identity = document.querySelector('.qxt-home-id')?.getBoundingClientRect()
+    if (!tiles || !identity) return Number.POSITIVE_INFINITY
+    return identity.top - tiles.bottom
+  })
+  expect(tileToIdentity, '磁贴区铺到身份行，中间不留大块空白').toBeLessThanOrEqual(24)
 
   await assertNoHorizontalOverflow(page)
   await page.screenshot({ path: test.info().outputPath('home-hosting-off-1080x1920.png') })
@@ -189,8 +206,8 @@ test('hosting off: the phone home keeps the quick row whole @w1-mobile', async (
   await expect(home).toHaveAttribute('data-recruitment', 'closed')
   // 稿 01 去掉头图里的快捷行。改简历 / 查政策在服务卡上，登录仍是独立按钮。触控高度下限仍是 48。
   const phoneButtons = [
-    home.getByRole('button', { name: '改简历', exact: true }),
-    home.getByRole('button', { name: '查政策', exact: true }),
+    home.getByRole('button', { name: '改简历' }),
+    home.getByRole('button', { name: '查政策' }),
     home.getByRole('button', { name: '登录后查看本人记录', exact: true }),
   ]
   for (const button of phoneButtons) {
@@ -213,17 +230,25 @@ test('hosting on: home keeps the job and fair entries exactly as today @w1-kiosk
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   const home = page.getByTestId('qx-home')
   await expect(home).toHaveAttribute('data-recruitment', 'open')
-  await expect(home.locator('[data-action="jobs-hub"]')).toContainText('12 个在招')
-  await expect(home.locator('[data-action="fairs-hub"]')).toContainText('暂无进行中或即将开始的场次')
-  await expect(home.getByRole('button', { name: '岗位信息', exact: true })).toBeVisible()
+  await expect(home.locator('[data-action="jobs-hub"]')).toContainText('全职、兼职岗位和社会招聘会')
+  await expect(home.locator('[data-action="jobs-hub"]')).not.toContainText('个在招')
+  await expect(home.locator('[data-action="jobs-hub"]')).not.toContainText('12')
+  await expect(home.locator('[data-action="campus-zone"]')).toContainText('校园招聘会、校招和实习岗位')
+  await expect(home.locator('[data-action="fairs-hub"]')).toHaveCount(0)
+  await expect(home.getByRole('button', { name: '社会招聘' })).toBeVisible()
+  await expect(home.getByRole('button', { name: '校园招聘' })).toBeVisible()
+  await expect(home.getByRole('button', { name: '岗位信息', exact: true })).toHaveCount(0)
   await expect(home.getByRole('button', { name: '找工作', exact: true })).toHaveCount(0)
   await expect(home.getByText('本终端仅展示与跳转，不代收简历', { exact: false })).toBeVisible()
-  const geometry = await homeTileGeometry(page)
-  expect(geometry.rows.map((row) => row.actions)).toEqual([
+  const tasks = await gridGeometry(page, '.qxt-home-tasks')
+  expect(tasks.rows.map((row) => row.actions)).toEqual([
     ['resume-hub', 'interview-hub'],
-    ['print-hub'],
-    ['jobs-hub', 'fairs-hub'],
-    ['policy-hub'],
+    ['print-hub', 'policy-hub'],
+  ])
+  const tiles = await gridGeometry(page, '.qxt-home-tiles')
+  expect(tiles.rows.map((row) => row.actions)).toEqual([
+    ['pickup-claim', 'jobs-hub'],
+    ['campus-zone', 'help'],
   ])
   await page.screenshot({ path: test.info().outputPath('home-hosting-on-1080x1920.png') })
 })
@@ -238,7 +263,9 @@ test('an older server without recruitmentHosting falls back to jobBoard, and to 
   api.respond('GET', '/api/v1/job-fairs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } } })
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   await expect(page.getByTestId('qx-home')).toHaveAttribute('data-recruitment', 'open')
-  await expect(page.locator('[data-action="jobs-hub"]')).toContainText('3 个在招')
+  await expect(page.locator('[data-action="jobs-hub"]')).toContainText('全职、兼职岗位和社会招聘会')
+  await expect(page.locator('[data-action="jobs-hub"]')).not.toContainText('个在招')
+  await expect(page.locator('[data-action="jobs-hub"]')).not.toContainText('3')
 
   // 两个字段都没有（比 3.13 更早的服务端）：按关闭处理，不因为「没说关」就放行。
   const { recruitmentHosting: _hosting, jobBoard: _board, ...neither } = terminalConfigWithHosting(RECRUITMENT_HOSTING_ON)
@@ -327,6 +354,8 @@ test('hosting off: every direct recruitment URL lands on the honest state, never
     await expect(page.locator('[data-kiosk-screen="route-error"]'), `${url} 不是报错页`).toHaveCount(0)
     await expect(page.locator('.qx-pagehead h1'), `${url} 说清楚哪一类没开放`).toHaveText(`本终端未开放${topic}`)
     await expect(page.getByRole('button', { name: '返回首页' }).last()).toBeVisible()
+    // 私有化版标识条只挂在招聘页上；托管关闭时招聘页根本不挂载，说明页上不能有它。
+    await expect(page.getByTestId('recruit-private-ribbon'), `${url} 托管关闭时没有私有化版标识条`).toHaveCount(0)
     await expectNoRecruitmentCopy(page, url)
   }
 
@@ -348,6 +377,21 @@ test('hosting off: every direct recruitment URL lands on the honest state, never
   expect(errors).toEqual([])
 })
 
+// 与上面「托管关闭没有标识条」配对的阳性对照：托管打开（客户私有化部署）时，招聘页顶上逐字带这条标识条，
+// 首页不带。没有这条对照，「关闭时没有」可能只是因为这条标识条根本没人渲染。
+test('hosting on: the recruitment pages wear the private-deployment ribbon word for word, the home does not @w1-kiosk', async ({ page, api }) => {
+  registerW6Api(api)
+  for (const url of ['/jobs-service', '/fairs-service', '/jobs', '/job-fairs', '/campus/welcome']) {
+    await page.goto(url)
+    const ribbon = page.getByTestId('recruit-private-ribbon')
+    await expect(ribbon, `${url} 顶上有私有化版标识条`).toHaveCount(1)
+    await expect(ribbon).toHaveText('私有化部署版 · 仅供持有人力资源服务许可证的客户自行运营 · 我方云上不出现 · 不得用于对外宣传')
+  }
+  await page.goto('/')
+  await expect(page.getByTestId('qx-home')).toBeVisible()
+  await expect(page.getByTestId('recruit-private-ribbon')).toHaveCount(0)
+})
+
 test('hosting unknown: a direct URL says it is checking and does not claim anything yet @w1-kiosk', async ({ page, api }) => {
   registerShell(api, RECRUITMENT_HOSTING_OFF)
   let release!: () => void
@@ -367,6 +411,29 @@ test('hosting unknown: a direct URL says it is checking and does not claim anyth
   await expect(page.locator('.qx-pagehead h1')).toHaveText('本终端未开放招聘会信息')
 })
 
+test('hosting unknown: campus child routes keep a way home, then land on the campus notice @w1-kiosk', async ({ page, api }) => {
+  for (const url of ['/campus/welcome', '/campus/freshman-insights']) {
+    registerShell(api, RECRUITMENT_HOSTING_OFF)
+    let release!: () => void
+    const held = new Promise<void>((resolve) => { release = resolve })
+    api.respondWith('GET', CONFIG, async () => {
+      await held
+      return { status: 200, json: terminalConfigWithHosting(RECRUITMENT_HOSTING_OFF) }
+    })
+
+    await page.goto(url, { waitUntil: 'domcontentloaded' })
+    const honest = page.locator('[data-kiosk-screen="recruitment-hosting"]')
+    await expect(honest, `${url} 确认中走说明页`).toHaveAttribute('data-state', 'checking')
+    await expect(page, `${url} 确认中不先跳走`).toHaveURL((current) => current.pathname === url)
+    await expect(page.getByRole('button', { name: '返回首页' }).last()).toBeVisible()
+    await expect(page.locator('.qx-pagehead h1')).toHaveText('正在确认本机开通的服务')
+    release()
+    await page.waitForURL((current) => current.pathname === '/campus')
+    await expect(page.locator('[data-kiosk-screen="recruitment-hosting"]')).toHaveAttribute('data-state', 'off')
+    await expect(page.locator('.qx-pagehead h1')).toHaveText('本终端未开放校园招聘信息')
+  }
+})
+
 test('hosting unknown: the home footer and the member guide stay neutral until the answer arrives @w1-kiosk', async ({ page, api }) => {
   registerShell(api, RECRUITMENT_HOSTING_OFF)
   let gate = deferred()
@@ -378,9 +445,10 @@ test('hosting unknown: the home footer and the member guide stay neutral until t
 
   // 首页底栏：没读到之前只说不代收简历，不提岗位与招聘会开没开。
   await page.goto('/', { waitUntil: 'domcontentloaded' })
-  const footer = page.locator('.qx-home-truth')
-  // 整句钉死：读到配置之前只有这一句，也不带「接口」这类工程词。
-  await expect(footer.locator('p').first()).toHaveText('本终端不代收简历。')
+  const footer = page.locator('.qxt-home-foot')
+  // 读到配置之前必须说出「不代收简历」，并带上 AI 说明；不许提前说「未开放」。
+  await expect(footer.getByTestId('home-recruitment-boundary')).toHaveText('本终端不代收简历。')
+  await expect(footer.locator('p').first()).toContainText('AI 生成的内容都会标明，仅供参考')
   await page.waitForTimeout(600)
   await expect(footer).not.toContainText('未开放')
   await markConfigReleased(page)
@@ -391,9 +459,11 @@ test('hosting unknown: the home footer and the member guide stay neutral until t
   expect(claims.every(Boolean), '首页在配置答复之前没有说过未开放').toBe(true)
 
   // 「我的」未登录页的指引：整页重新载入，配置缓存随之清空，再扣住一次。
+  // 触屏版登录门不再有 2.0 的三格说明（.qx-me-guide），其中随托管改口的「边界」那一格收成登录门底部的一行小字，
+  // 锚点是 member-records-guest-boundary；要盯的判据不变：没读到之前不说未开放，读到「关闭」才说。
   gate = deferred()
   await page.goto('/me/favorites', { waitUntil: 'domcontentloaded' })
-  const guide = page.locator('.qx-me-guide')
+  const guide = page.getByTestId('member-records-guest-boundary')
   await expect(guide).toContainText('也不把你的资料转交给任何企业')
   await page.waitForTimeout(600)
   await expect(guide).not.toContainText('未开放')
@@ -410,12 +480,24 @@ test('hosting unknown: the home footer and the member guide stay neutral until t
 const POLICY_FAVORITE = { id: 'fav-policy', targetType: 'policy', targetId: 'policy-001', title: '高校毕业生就业服务指引', createdAt: '2026-09-20T08:00:00.000Z' }
 // 服务端托管关闭时不会再返回岗位收藏；这一条模拟旧数据漏过来，证明页面自己也不摆。
 const STALE_JOB_FAVORITE = { id: 'fav-job', targetType: 'job', targetId: 'job-001', title: '漏过来的岗位收藏', createdAt: '2026-09-19T08:00:00.000Z' }
+/**
+ * 后台开了「求职进度页签」的联系方式应答：只多一个布尔，其余照 ApiRouter 的默认。
+ * 触屏版足迹页的第三个页签默认不显示（读不到开关、没配开关都当关），本用例要走到它的空态，所以把开关打开。
+ */
+const SUPPORT_CONTACT_WITH_PROGRESS_TAB = {
+  status: 200,
+  json: {
+    success: true,
+    data: { servicePhone: '18369161921', serviceHours: '工作日 9:00–18:00', otherOnlineTerminalNearby: false, miniappPublished: false, selfNoteTab: true },
+  },
+}
 
 test('hosting off: favorites and footprints show no job or fair section @w1-kiosk', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   const recruitmentHits = trackRecruitmentRequests(page)
   registerShell(api, RECRUITMENT_HOSTING_OFF)
   registerMemberLogin(api)
+  api.respond('GET', '/api/v1/public/support-contact', SUPPORT_CONTACT_WITH_PROGRESS_TAB)
   api.respond('GET', '/api/v1/me/favorites', { status: 200, json: { success: true, data: { items: [POLICY_FAVORITE, STALE_JOB_FAVORITE], nextCursor: null, total: 2 } } })
   api.respond('GET', '/api/v1/me/browse-logs', {
     status: 200,
@@ -441,7 +523,12 @@ test('hosting off: favorites and footprints show no job or fair section @w1-kios
   await expect(page.locator('[data-testid^="member-records-fav-tab-"]'), '只剩政策一类时不摆分类条').toHaveCount(0)
   await expect(page.getByText('岗位收藏', { exact: true })).toHaveCount(0)
   await expect(page.getByText('招聘会收藏', { exact: true })).toHaveCount(0)
-  await expect(page.getByTestId('member-records-view-favorites')).toContainText('政策')
+  // 触屏稿的分类条只写「收藏」，不再带「岗位·招聘会·政策」那行副标题；托管关闭时「收藏里只有政策」改由意图带来说
+  // （标题「你收藏的 N 条政策」、副题「只收藏政策」）。判据不变：说的是政策，条上和标题里都不出现「岗位」。
+  const favoritesTitle = page.getByRole('heading', { level: 1 })
+  await expect(favoritesTitle).toContainText('政策')
+  await expect(favoritesTitle).not.toContainText('岗位')
+  await expect(page.getByText('只收藏政策', { exact: true })).toBeVisible()
   await expect(page.getByTestId('member-records-view-favorites')).not.toContainText('岗位')
   await expect(page.getByTestId('member-records-primary')).toHaveText('查看政策')
   await expectNoRecruitmentCopy(page, '我的收藏')
@@ -513,8 +600,9 @@ test('hosting off: AI records never ask for job AI sessions and do not list fair
   await expect(page.getByText('2026 青岛高校毕业生招聘会')).toHaveCount(0)
   await expect(list.locator('[data-record-kind="job-ai-session"]')).toHaveCount(0)
   await expect(page.getByText('岗位 AI 参考记录')).toHaveCount(0)
-  // W3-a 起计数写成「已加载 N 条」（另有一格「小青作业共 N 条」）；数还是这张列表的行数。
-  await expect(page.getByText('已加载 2 条', { exact: true })).toBeVisible()
+  // 触屏稿的 AI 服务记录不再画「已加载 N 条」的汇总格；那个数本来就是这张列表的行数，现在直接数列表里的行。
+  // 夹具里没有小青作业和模拟面试，列表里每一行都带 data-record-kind，数出来的就是整张列表：简历诊断 + 简历对照两行。
+  await expect(list.locator('[data-record-kind]')).toHaveCount(2)
   expect(api.requestCount('GET', '/api/v1/me/job-ai-sessions'), '托管关闭时不请求岗位 AI 会话').toBe(0)
   await expectNoRecruitmentCopy(page, 'AI 服务记录')
   expect(recruitmentHits).toEqual([])
@@ -541,7 +629,8 @@ test('hosting on: AI records wait for the hosting answer, then list job AI sessi
   await expect(list.locator('[data-record-kind="fair_visit_plan"]')).toContainText('2026 青岛高校毕业生招聘会')
   await expect(list.locator('[data-record-kind="job-ai-session"]')).toContainText('前端工程师')
   await expect(list.locator('[data-record-kind="job_fit"]')).toHaveCount(1)
-  await expect(page.getByText('已加载 4 条', { exact: true })).toBeVisible()
+  // 同上：不再有「已加载 N 条」汇总格，直接数行。简历诊断、简历对照、招聘会准备单、岗位 AI 参考记录各一行。
+  await expect(list.locator('[data-record-kind]')).toHaveCount(4)
   expect(api.requestCount('GET', '/api/v1/me/ai-records')).toBe(1)
   expect(api.requestCount('GET', '/api/v1/me/job-ai-sessions')).toBe(1)
 })
@@ -654,4 +743,36 @@ test('hosting on: switching job fit to manual entry drops the picked job from th
   await page.getByRole('textbox', { name: '目标岗位名称' }).fill('行政专员')
   await expect(targetSlot).toHaveText('行政专员')
   await expect(targetCheck).toHaveAttribute('data-tone', 'ok')
+})
+
+test('job fit actions: the source-platform delivery sentence only exists when hosting is on @w1-kiosk', async ({ page, api }) => {
+  const ACTIONS_TASK = 't-rh-actions'
+  api.respond('GET', `/api/v1/resume/job-fit/${ACTIONS_TASK}`, {
+    status: 200,
+    json: {
+      taskId: ACTIONS_TASK,
+      status: 'completed',
+      summary: '简历里写到了活动组织与表格整理，还没有写到数据分析工具。',
+      job: { id: 'job-rh', title: '行政专员', company: '示例来源企业', sourceName: '来源平台', externalId: 'X-RH' },
+      matchPoints: [{ requirement: '活动组织', point: '组织过校园招聘宣讲', evidence: '负责 3 场宣讲会现场协调' }],
+      gapPoints: [{ requirement: '数据工具', gap: '没有写到 Excel 数据整理', suggestion: '补一条用表格汇总报名数据的经历' }],
+      targetedSuggestions: ['把「协助行政」改写成具体做过的三件事'],
+    },
+  })
+  const open = async (hosting: typeof RECRUITMENT_HOSTING_ON | typeof RECRUITMENT_HOSTING_OFF) => {
+    registerShell(api, hosting)
+    await page.goto(`/resume/job-fit/actions?taskId=${ACTIONS_TASK}`, { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('[data-kiosk-screen="resume-job-fit-actions"]')).toHaveAttribute('data-state', 'ready')
+    return page.locator('body').innerText()
+  }
+
+  // 托管关（我们云上）：整屏没有「来源平台」，也没有「投递请前往…」；「本平台不提供投递功能」照写。
+  const off = await open(RECRUITMENT_HOSTING_OFF)
+  expect(off, '托管关闭时行动清单不写来源平台').not.toContain('来源平台')
+  expect(off, '托管关闭时行动清单不写投递去向').not.toContain('投递请前往')
+  expect(off).toContain('本平台不提供投递功能')
+
+  // 阳性对照：托管打开（私有化部署）时原句仍在，说明上面的「没有」是条件生效，不是句子整个丢了。
+  const on = await open(RECRUITMENT_HOSTING_ON)
+  expect(on, '托管打开时保留投递去向句').toContain('投递请前往岗位来源平台')
 })

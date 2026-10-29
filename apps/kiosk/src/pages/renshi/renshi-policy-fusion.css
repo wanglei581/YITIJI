@@ -25,6 +25,12 @@
 .rq-lead > .rq-steps + * { margin-top: auto; }
 .rq-lead > .rq-srcline + .rq-tabs { margin-top: 2px; }
 
+/* 触屏带已经占了页头高度，任务头不再预留 432px，否则说明和三步之间会空出一整段纸色。 */
+.qxt-screen .rq-lead { min-height: 0; }
+.qxt-screen .rq-lead > .rq-steps,
+.qxt-screen .rq-lead > .rq-steps + * { margin-top: 12px; }
+.qxt-screen .w4-policy-page { background: var(--qx-surface); border-radius: 28px; }
+
 .rq-more {
   margin: 0;
   font-size: var(--qx-fs-body);

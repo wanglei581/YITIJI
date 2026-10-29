@@ -278,6 +278,44 @@ if (!hasHonestUploadButton(miswiredUploadFixture)) {
   fail('I3. 注释或相邻文案不得掩盖错误的 /print/upload 按钮标签')
 }
 
+// ── L. 无人值守：政策紧急下架后页面自己撤掉；问小青的问句不承诺政策解读 ─────────────────────────
+// 现场没有人盯着屏：已打开的列表与详情不能一直挂着已下架的旧正文，也不能等用户点来源码才发现 404。
+// L1 刷新间隔是写了理由的常量，量级在 10–60 秒（太短打服务端，太长等于没刷）。
+// L2 本人点开的那一条被下架 → 整页换成「这条政策已下架」，出路是回政策列表；自动展开的第一条只从列表摘掉。
+// L3 问小青的问句：详情带这一条的标题，并写明小青不解释政策原文、不判断能否办理（没有这项能力就不承诺）。
+const refreshMs = Number(page.match(/const POLICY_REFRESH_MS = ([\d_]+)/)?.[1]?.replace(/_/g, '') ?? '0')
+if (
+  refreshMs >= 10_000 && refreshMs <= 60_000 &&
+  /\/\/[^\n]*无人值守[^\n]*\n\s*const POLICY_REFRESH_MS/.test(page) &&
+  /window\.setInterval\([\s\S]{0,60}refresh\(\)[\s\S]{0,12}POLICY_REFRESH_MS\)/.test(page)
+) {
+  pass('L1. 政策列表定时重读，间隔是带理由的常量')
+} else {
+  fail('L1. RenshiPage 必须有带「无人值守」理由说明的 POLICY_REFRESH_MS（10–60 秒），并用 setInterval 定时重读')
+}
+if (
+  page.includes("if (now.userOpened) setWithdrawnDetail(id)") &&
+  page.includes("POLICY_CHECK_TIMEOUT_MS") &&
+  page.includes('title="这条政策已下架"') &&
+  page.includes('backToPolicyList') &&
+  policyPanel.includes('const userOpened = openId !== null && (touched || openId === focusHit)')
+) {
+  pass('L2. 本人点开的政策被下架整页换成已下架并可回列表，自动展开的第一条只摘掉')
+} else {
+  fail('L2. 被下架的详情必须整页换成「这条政策已下架」+ 回政策列表；自动展开的第一条不能整页替换')
+}
+const boundary = '小青还不能解释政策原文，也不判断能否办理'
+if (
+  page.includes(`${boundary}。\``) &&
+  policyPanel.includes(boundary) &&
+  /policy: '[^']*不要解释政策原文，也不要判断能否办理。'/.test(page) &&
+  !/帮我看懂政策|替我判断|帮你查了/.test(page + policyPanel)
+) {
+  pass('L3. 政策问小青的问句守住「不解释原文、不判断能否办理」，不声称已有政策解读能力')
+} else {
+  fail('L3. 政策问小青的问句必须写明小青不解释政策原文、不判断能否办理，且不得声称已有解读能力')
+}
+
 console.log('')
 if (failed > 0) {
   console.error(`FAIL ${failed} 项失败：政策服务页真实性契约未通过\n`)

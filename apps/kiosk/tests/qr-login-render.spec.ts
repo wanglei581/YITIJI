@@ -229,6 +229,62 @@ test('W-15 二维码获取失败后可以重新生成 @kiosk', async ({ page, ap
   expect(createCalls.n).toBe(2)
 })
 
+/**
+ * 登录页扫码态底部「只管这一次」卡：卡里的字和插画都要整块落在卡内，卡本身也不许把滚动区撑出滚动条。
+ * 此前卡高被 min-height: 150 压住，而内容（标题 + 说明 + 插画）要 198，overflow:hidden 把插画切掉了一大半，
+ * 字体栈换成 Qingxu Sans（CI、真机 Windows）和 Mac 苹方都一样。
+ */
+async function expectLoginFactWhole(page: Page, where: string): Promise<void> {
+  const card = page.locator('.lg-absorb')
+  await expect(card, `${where}：「只管这一次」卡在页上`).toBeVisible()
+  const report = await card.evaluate((el) => {
+    const box = el.getBoundingClientRect()
+    const inside = (child: Element | null) => {
+      if (!child) return null
+      const r = child.getBoundingClientRect()
+      return { top: Math.round((r.top - box.top) * 10) / 10, bottom: Math.round((box.bottom - r.bottom) * 10) / 10, left: Math.round((r.left - box.left) * 10) / 10, right: Math.round((box.right - r.right) * 10) / 10 }
+    }
+    const scroller = el.closest('.qx-scroll') as HTMLElement | null
+    return {
+      cardHeight: Math.round(box.height),
+      overflow: el.scrollHeight - el.clientHeight,
+      title: inside(el.querySelector('h2')),
+      note: inside(el.querySelector('.qxp-note')),
+      art: inside(el.querySelector('svg')),
+      scrollerOverflow: scroller ? scroller.scrollHeight - scroller.clientHeight : null,
+    }
+  })
+  expect(report.overflow, `${where}：卡内内容不得比卡高（卡高 ${report.cardHeight}px）`).toBeLessThanOrEqual(1)
+  for (const part of ['title', 'note', 'art'] as const) {
+    const gap = report[part]
+    expect(gap, `${where}：卡里要有 ${part}`).not.toBeNull()
+    expect(Math.min(gap!.top, gap!.bottom, gap!.left, gap!.right), `${where}：${part} 要整块落在卡内（四边余量 ${JSON.stringify(gap)}）`).toBeGreaterThanOrEqual(-0.5)
+  }
+  expect(report.scrollerOverflow, `${where}：这一卡不该把页面撑出滚动条`).toBeLessThanOrEqual(1)
+}
+
+test('登录页扫码态「只管这一次」卡的字和插画整块落在卡内：等协议、取码失败、取到码三态 @kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  api.respond('GET', `/api/v1/member/auth/qr/${TICKET_ID}/status`, {
+    status: 200,
+    json: { success: true, data: { status: 'pending', deviceLabel: '就业大厅 3 号机', returnTo: '/', expiresInSeconds: 180 } },
+  })
+  const createCalls = { n: 0 }
+  await page.route(LOCAL_QR_CREATE_URL, (route) => fulfillQrCreate(route, createCalls, TICKET_ID, true))
+  await page.goto('/login')
+  await page.getByRole('button', { name: '手机扫码登录', exact: true }).click()
+  await expect(page.getByTestId('login-gate-state-qr-loading')).toBeVisible()
+  await expectLoginFactWhole(page, '还没勾协议（等二维码）')
+
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await expect(page.getByTestId('login-gate-state-qr-error')).toBeVisible()
+  await expectLoginFactWhole(page, '二维码没取到')
+
+  await page.getByTestId('login-gate-primary').click()
+  await expect(page.locator('.k-qrframe svg')).toBeVisible()
+  await expectLoginFactWhole(page, '取到二维码')
+})
+
 test('手机号验证码按钮交互态可读且通用错误使用场景提示 @kiosk', async ({ page, api }, testInfo) => {
   registerKioskShell(api)
   let smsRequestCount = 0
@@ -522,12 +578,15 @@ for (const scenario of [
     registerKioskShell(api)
     api.respond('POST', '/api/v1/member/auth/sms-code', { status: scenario.status, json: { success: false, error: { code: scenario.code, message: scenario.message } } })
     await page.goto('/login')
-    await expect(page.locator('.qx-topbar button')).toHaveCount(1)
-    await expect(page.locator('.qx-topbar button')).toHaveAccessibleName('返回首页')
-    await expect(page.locator('.qx-step-prev')).toHaveText('返回首页')
+    await expect(page.locator('.qxt-back')).toHaveCount(1)
+    await expect(page.locator('.qxt-back')).toHaveAccessibleName('返回首页')
+    await expect(page.getByTestId('login-gate-back')).toHaveText('返回首页')
     await expect(page.getByTestId('login-gate-keypad')).toHaveCount(0)
     if (scenario.code === 'SMS_SEND_FAILED') {
-      expect((await page.getByTestId('login-gate-tab-phone').boundingBox())!.y).toBeGreaterThanOrEqual(500)
+      const phoneTab = (await page.getByTestId('login-gate-tab-phone').boundingBox())!
+      const loginBand = (await page.locator('.qxt-band').boundingBox())!
+      expect(phoneTab.y, '手机号入口在意图带下面').toBeGreaterThan(loginBand.y + loginBand.height - 1)
+      expect(phoneTab.y, '手机号入口仍在首屏').toBeLessThan(720)
       expect(await page.locator('.k1-login .qx-scroll').evaluate((el) => el.scrollHeight - el.clientHeight), '登录默认态首屏放得下').toBeLessThanOrEqual(1)
       await expect(page.getByRole('checkbox', { name: /我已阅读并同意/ })).toBeInViewport()
     }
@@ -574,7 +633,7 @@ for (const scenario of [
     await expect(page.getByTestId('login-gate-send')).toHaveText('暂时不能发')
     await expect(page.getByTestId('login-gate-send')).toBeDisabled()
     await expect(page.getByText('获取验证码', { exact: true })).toHaveCount(0)
-    const head = page.locator('.qx-pagehead')
+    const head = page.locator('.qxt-ask h1')
     if (scenario.code === 'SMS_TERMINAL_DAILY_LIMIT') await expect(head).toContainText('这台机器今天的短信已经发完')
     if (scenario.code === 'SMS_DAILY_TOTAL_LIMIT') {
       await expect(head).toContainText('今天的短信验证码已经发完')
@@ -599,7 +658,7 @@ test('W-19 这个号码今天用完后不再写成重新获取验证码 @kiosk',
   await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByTestId('login-gate-send').click()
   await expect(page.getByTestId('login-gate-state-phone-send-limited')).toBeVisible()
-  await expect(page.locator('.qx-pagehead')).toContainText('这个号码今天不能再收验证码')
+  await expect(page.locator('.qxt-ask h1')).toContainText('这个号码今天不能再收验证码')
   await expect(page.getByRole('alert')).toContainText('这个号码今天的验证码次数已用完')
   await expect(page.getByTestId('login-gate-send')).toHaveText('今天不能再发')
   await expect(page.getByTestId('login-gate-send')).toBeDisabled()
@@ -662,5 +721,48 @@ for (const [code, state] of [['SMS_CODE_INVALID', 'phone-code-invalid'], ['SMS_C
     const input = page.getByRole('button', { name: '短信验证码', exact: true })
     if (code === 'SMS_CODE_INVALID') await expect(input).toBeEnabled()
     else await expect(input).toBeDisabled()
+  })
+}
+
+/*
+ * #1519 留给触屏版第五包的接线（ScanQrLoginPanel 第 2 步）：小程序已发布时这一步写「微信扫进小程序、别的扫法打开网页」，
+ * 句子来自 copy/miniappLinkCopy.ts 的 qrLoginScanHint；没发布保持原句。步骤清单不依赖二维码有没有出来。
+ */
+for (const published of [true, false]) {
+  test(`扫码登录第 2 步：小程序${published ? '已发布，写小程序那一句' : '未发布，保持原句'} @kiosk`, async ({ page, api }) => {
+    api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
+    api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
+    api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', { status: 200, json: { enabled: false, idleTimeoutSec: 180, items: [] } })
+    api.respond('GET', '/api/v1/public/support-contact', {
+      status: 200,
+      json: { success: true, data: { servicePhone: '18369161921', serviceHours: '工作日 9:00–18:00', otherOnlineTerminalNearby: false, miniappPublished: published } },
+    })
+    await page.route(LOCAL_QR_CREATE_URL, async (route) => {
+      if (await fulfillLocalQrPreflight(route)) return
+      const origin = route.request().headers().origin ?? 'http://127.0.0.1:4177'
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'Access-Control-Allow-Origin': origin },
+        body: JSON.stringify({ success: true, data: { ticketId: TICKET_ID, qrUrl: `/member/qr-login?ticketId=${TICKET_ID}`, expiresInSeconds: 180, returnTo: '/' } }),
+      })
+    })
+    api.respond('GET', `/api/v1/member/auth/qr/${TICKET_ID}/status`, {
+      status: 200,
+      json: { success: true, data: { status: 'pending', deviceLabel: 'KSK-001', returnTo: '/', expiresInSeconds: 180 } },
+    })
+
+    await page.goto('/login')
+    await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+    await page.getByRole('button', { name: '手机扫码登录', exact: true }).click()
+    const step2 = page.locator('.lg-steps li').nth(1)
+    if (published) {
+      await expect(step2).toContainText('用手机微信扫码：打开的是职易达小程序，已登录的直接确认；打开的是网页，用短信验证。')
+      await expect(step2).not.toContainText('用手机相机或微信扫左边的二维码')
+    } else {
+      await expect(step2).toContainText('用手机相机或微信扫左边的二维码，在手机上完成手机号验证并确认。')
+      await expect(step2).not.toContainText('小程序')
+    }
+    await expectNoHorizontalOverflow(page)
   })
 }

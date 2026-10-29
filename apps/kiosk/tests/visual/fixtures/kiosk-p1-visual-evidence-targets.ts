@@ -340,4 +340,13 @@ export const routeEvidenceDispositions: readonly RouteEvidenceDisposition[] = [
   productionOnly('/contract-review'),
   productionOnly('/contract-review/processing'),
   productionOnly('/contract-review/result'),
+  routeDisposition({
+    routePattern: '/dev/touch-gallery',
+    referenceKind: 'NO_INDEPENDENT_PROTOTYPE',
+    targetIds: [],
+    captureUrl: '/dev/touch-gallery',
+    precondition: '开发样板（非业务屏）。开发环境打开 /dev/touch-gallery；生产构建不挂载样板页。',
+    claimScope: '开发样板（非业务屏）。不认领业务屏截图对。',
+    knownLimits: '开发样板（非业务屏）。生产构建访问此地址回到首页，不生成原型截图对。',
+  }),
 ]

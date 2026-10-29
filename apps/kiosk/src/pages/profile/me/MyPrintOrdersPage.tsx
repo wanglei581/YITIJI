@@ -14,19 +14,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { MemberPrintOrderItem } from '@ai-job-print/shared'
-import { ChevronDownIcon, FilesIcon, Loader2Icon, MessageSquareIcon, PrinterIcon, ReceiptIcon, TicketIcon } from 'lucide-react'
 import { getMyPrintOrders } from '../../../services/api/memberPrintOrders'
 import { useAuth } from '../../../auth/useAuth'
 import { formatTime } from '../assets/format'
-import { QxMeGuide, QxMePage, QxMeSummary, recordsCtabar } from './qx/QxMeChrome'
-import { QxMeErrorBlock, QxMeLoadingBlock, QxMeLoginBlock, QxMeStartRow, QxMeStructRow } from './qx/QxMeStateBits'
+import { QxTouchCallout } from '../../../components/qingxu/touch/QxTouchCallout'
+import { whenMiniapp } from '../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../hooks/useSupportContact'
+import { QxMePage, recordsCtabar } from './qx/QxMeChrome'
+import { QxMeErrorBlock, QxMeLoadingBlock, QxMeLoginBlock } from './qx/QxMeStateBits'
+import { MeActs, MeBtn, MeP, MeRow, MeRows, MeSeg } from '../touch/MeKit'
+import { MeEmptyPack, MeExitCard } from '../touch/MeStatePacks'
 import { OrderPaymentSummary } from './printOrders/OrderPaymentSummary'
 import {
-  duplexShortLabel,
   formatAmountCents,
   isFreeMemberOrder,
   memberPayStatusLabel,
-  publicOrderNo,
   paymentSourceLabel,
   PENDING_REFUND_LABEL,
 } from './printOrders/paymentCopy'
@@ -44,14 +46,13 @@ const MAX_REFRESH_PAGE_SIZE = 50
 
 type LoadState = 'loading' | 'error' | 'ready'
 
-/** tone 对应 .qx-me-st 的 data-tone：wait 排队 / run 处理中 / bad 失败 / off 已结束；缺省为完成青。 */
-const STATUS_META: Record<MemberPrintOrderItem['status'], { label: string; tone?: 'wait' | 'run' | 'bad' | 'off' }> = {
-  pending: { label: '排队中', tone: 'wait' },
-  claimed: { label: '已领取', tone: 'run' },
-  printing: { label: '打印中', tone: 'run' },
-  completed: { label: '已完成' },
-  failed: { label: '失败', tone: 'bad' },
-  cancelled: { label: '已取消', tone: 'off' },
+const STATUS_LABEL: Record<MemberPrintOrderItem['status'], string> = {
+  pending: '排队中',
+  claimed: '已领取',
+  printing: '打印中',
+  completed: '已完成',
+  failed: '失败',
+  cancelled: '已取消',
 }
 
 /** 任务状态筛选（客户端过滤已加载数据；「进行中」= pending/claimed/printing）。 */
@@ -64,17 +65,6 @@ const STATUS_FILTERS = [
 ] as const
 
 type FilterKey = (typeof STATUS_FILTERS)[number]['key']
-
-function metaLine(item: MemberPrintOrderItem): string {
-  const parts: string[] = []
-  if (item.copies) parts.push(`${item.copies} 份`)
-  if (item.colorMode) parts.push(item.colorMode === 'color' ? '彩色' : '黑白')
-  const duplex = duplexShortLabel(item.duplex)
-  if (duplex) parts.push(duplex)
-  if (item.paperSize) parts.push(item.paperSize)
-  parts.push(formatTime(item.completedAt ?? item.createdAt))
-  return parts.join(' · ')
-}
 
 /** 卡片上的支付概要一行。历史无 Order 显示「暂无支付信息」。
  *  0 元或免费来源不写「已支付」：待退款仍优先，其余只写免费。收费单保持金额 · 支付状态（来源）。
@@ -237,186 +227,133 @@ export function MyPrintOrdersPage() {
     [navigate],
   )
 
-  const filterCounts = useMemo(() => {
-    const counts = {} as Record<FilterKey, number>
-    for (const f of STATUS_FILTERS) counts[f.key] = items.filter((i) => f.match(i.status)).length
-    return counts
-  }, [items])
-
   const filtered = useMemo(() => {
     const f = STATUS_FILTERS.find((x) => x.key === filterKey) ?? STATUS_FILTERS[0]
     return items.filter((i) => f.match(i.status))
   }, [items, filterKey])
 
   const uiState = !isLoggedIn ? 'login' : state === 'loading' ? 'loading' : state === 'error' ? 'error' : items.length === 0 ? 'empty' : 'ready'
+  const miniOn = whenMiniapp(useSupportContact(isLoggedIn), 'on') !== ''
   const allLoadedFree = items.length > 0 && items.every(isFreeMemberOrder)
-  const summary = (
-    <QxMeSummary
-      tone="clay"
-      icon={<PrinterIcon size={32} />}
-      label="打印记录"
-      big={total}
-      desc={allLoadedFree
-        ? '只展示本人打印任务与订单安全信息；状态以真实订单数据为准'
-        : '只展示本人打印任务与订单安全信息；支付状态和金额以真实订单数据为准'}
-      minis={[`已加载 ${items.length}`, `进行中 ${activeOrderCount}`, `筛选 ${filtered.length}`]}
-    />
-  )
-  const structMode = !isLoggedIn ? 'lock' : 'error'
-  const struct = (
-    <>
-      <QxMeStructRow icon={PrinterIcon} title="打印内容与参数" desc="文件名、份数、彩色/黑白、单双面与幅面" mode={structMode} testid="member-assets-struct-orders-0" />
-      <QxMeStructRow icon={ReceiptIcon} title="支付状态与金额" desc="只显示订单真实记录；历史订单没有支付记录时如实说明" mode={structMode} testid="member-assets-struct-orders-1" />
-      <QxMeStructRow icon={TicketIcon} title="处理进度与取件码" desc="取件码只在系统返回时显示" mode={structMode} testid="member-assets-struct-orders-2" />
-    </>
-  )
 
   let body: ReactNode
   if (!isLoggedIn) {
-    body = <QxMeLoginBlock title="登录后查看打印订单" desc="公共一体机不会在未登录时展示文件名、订单金额或取件码；游客打印不会自动归入你的账号。" struct={struct} onJobs={() => navigate('/jobs')} onPrint={() => navigate('/print-scan')} />
+    body = <QxMeLoginBlock title="登录后查看打印订单" />
   } else if (state === 'loading') {
     body = <QxMeLoadingBlock title="正在加载打印订单" />
   } else if (state === 'error') {
-    body = <QxMeErrorBlock title="打印订单这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已建立的订单不会因为这次失败而消失。" struct={struct} />
+    body = <QxMeErrorBlock onRetry={() => setReloadKey((k) => k + 1)} />
   } else if (items.length === 0) {
     body = (
-      <>
-        {summary}
-        <section className="qx-me-banner" data-testid="qx-me-fallback" data-kind="empty">
-          <span className="qx-me-banner-ico" aria-hidden="true"><PrinterIcon size={34} /></span>
-          <span className="qx-me-banner-main">
-            <h2 className="qx-me-banner-t">还没有打印订单</h2>
-            <span className="qx-me-banner-p">完成一次打印后，这里会显示你的打印记录。<b>空就是空</b>，本页不会造几条记录让页面好看。</span>
-          </span>
-          <span className="qx-me-banner-mini"><i>共 0</i></span>
-        </section>
-        <section className="qx-me-list qx-me-grow" aria-label="从这里开始打印">
-          <QxMeStartRow icon={PrinterIcon} tone="wheat" title="发起一次打印" desc="选文件、定参数、确认价格后建立订单" label="去打印" route="/print-scan" testid="member-assets-start-print" onClick={() => navigate('/print-scan')} />
-          <QxMeStartRow icon={FilesIcon} tone="slate" title="先从我的文档选文件" desc="已保存的文件可以直接拿来打印，会新建一笔订单" label="去文档" route="/me/documents" testid="member-assets-start-docs" onClick={() => navigate('/me/documents')} />
-          <div className="qx-me-legal">确认打印并建单后，可以回到这里查看处理进度与结果。</div>
-        </section>
-        <QxMeGuide items={[['怎么产生', '确认打印并建单后', '订单在确认打印后建立'], ['能看到什么', '处理进度与支付记录', '状态一律由系统返回'], ['再打印', '会新建订单', '重新核价后建立一笔新订单']]} />
-      </>
+      <div className="me-state" data-testid="qx-me-fallback">
+        <MeEmptyPack sentence="还没有打印订单。没登录时在这台机器上打的单不会进这个账号。">
+          <MeExitCard art="usb" artWidth={120} title="去打印" desc="U 盘、手机或扫描都可以" onClick={() => navigate('/print-scan')} />
+          {miniOn
+            ? <MeExitCard art="phone" artWidth={96} title="输到机码取件" desc="手机上下的到店单，到机器上输入到机码" onClick={() => navigate('/print/pickup-claim')} />
+            : <MeExitCard art="stack" artWidth={120} title="看看我的文档" desc="选一份已保存的文件再打" onClick={() => navigate('/me/documents')} />}
+        </MeEmptyPack>
+      </div>
     )
   } else {
+    const syncNote = autoRefreshChecking
+        ? '正在同步进行中的订单…'
+        : autoRefreshSyncedAt
+          ? `进行中的订单会自动刷新，上次同步 ${formatTime(autoRefreshSyncedAt)}。没登录时在这台机器上打的单不会进这个账号。`
+          : '进行中的订单会自动刷新。没登录时在这台机器上打的单不会进这个账号。'
     body = (
       <>
-        {summary}
-        {/* 任务状态筛选（对已加载数据过滤，计数为已加载条数） */}
-        <div className="qx-me-tabbar" data-n={STATUS_FILTERS.length} role="group" aria-label="按任务状态筛选">
-          {STATUS_FILTERS.map((f) => (
-            <button key={f.key} type="button" onClick={() => setFilterKey(f.key)} aria-pressed={filterKey === f.key} className="qx-me-tab">
-              {f.label}
-              {filterCounts[f.key] > 0 && <i>{filterCounts[f.key]}</i>}
-            </button>
-          ))}
-        </div>
+        {miniOn ? (
+          <button type="button" className="me-line" onClick={() => navigate('/print/pickup-claim')}>
+            <b>手机上下的到店单，到机器上输到机码取件</b>
+            <small>还没核销出打印任务的单，不在下面的列表里</small>
+          </button>
+        ) : null}
+        {/* 任务状态筛选（对已加载数据过滤） */}
+        <MeSeg
+          mode="pressed"
+          label="按任务状态筛选"
+          current={filterKey}
+          items={STATUS_FILTERS.map((f) => ({ id: f.key, label: f.label }))}
+          onPick={(id) => setFilterKey(id as FilterKey)}
+        />
 
-        {hasActivePrintOrders(items) && (
-          <div className="qx-me-legal qx-me-asset-refresh">
-            {autoRefreshChecking ? (
-              <Loader2Icon size={20} className="animate-spin" aria-hidden="true" />
-            ) : (
-              <span className="qx-me-asset-live" aria-hidden="true" />
+        {filtered.length === 0 ? (
+          <div className="me-state">
+            <MeP>{filterKey !== 'all' && nextCursor ? '已加载记录中暂无此类，点「加载更多」继续查找。' : '这个筛选下没有订单。'}</MeP>
+            <div className="me-stack">
+              <MeExitCard art="checklist" artWidth={120} title="查看全部" desc="全部订单都在「全部」里" onClick={() => setFilterKey('all')} />
+              <MeExitCard art="usb" artWidth={120} title="去打印" desc="打一份新的，会新建一张打印任务" onClick={() => navigate('/print-scan')} />
+            </div>
+          </div>
+        ) : (
+          <MeRows few={filtered.length < 7 && expandedId === null} testId="member-assets-list" label="我的打印订单">
+            {filtered.map((item) => {
+              const canCreateFeedback = item.status === 'completed' || item.status === 'failed'
+              const expanded = expandedId === item.id
+              const name = item.fileName ?? '未命名订单'
+              const pay = paymentLine(item)
+              const refund = item.refundRequired === true && !pay.includes(PENDING_REFUND_LABEL) ? ` · ${PENDING_REFUND_LABEL}` : ''
+              return (
+                <MeRow
+                  key={item.id}
+                  data-testid="member-assets-order"
+                  data-server-slot="print-order"
+                  data-order-status={item.status}
+                  open={expanded}
+                  onToggle={() => setExpandedId(expanded ? null : item.id)}
+                  toggleLabel={`${expanded ? '收起' : '查看'}订单详单 ${name}`}
+                  title={<span className="qx-me-asset-name">{item.fileName ?? '未命名文件'}</span>}
+                  lines={[<>{STATUS_LABEL[item.status]} · {formatTime(item.completedAt ?? item.createdAt)} · {pay}{refund}{item.pickupCode && ' · 到机码'}</>]}
+                  actions={(
+                    <>
+                      <OrderPaymentSummary item={item} />
+                      {canCreateFeedback ? (
+                        <MeActs>
+                          <MeBtn v="sec" onClick={() => openFeedback(item.id)} aria-label={`反馈打印订单 ${name}`}>反馈问题</MeBtn>
+                        </MeActs>
+                      ) : null}
+                    </>
+                  )}
+                />
+              )
+            })}
+          </MeRows>
+        )}
+
+        {nextCursor && (
+          <div className="me-more">
+            {loadMoreError && (
+              <p className="me-reason" role="alert">
+                加载失败，请点「加载更多」重试
+              </p>
             )}
-            {autoRefreshFailed ? (
-              <span role="status" aria-live="polite">
-                自动刷新失败，稍后自动重试；当前列表已保留
-              </span>
-            ) : (
-              <span>
-                {autoRefreshChecking
-                  ? '正在同步进行中任务…'
-                  : autoRefreshSyncedAt
-                    ? `进行中任务自动更新中，上次同步 ${formatTime(autoRefreshSyncedAt)}`
-                    : '进行中任务每 5 秒自动更新'}
-              </span>
-            )}
+            <MeBtn v="sec" className="me-wide" onClick={loadMore} disabled={loadingMore} aria-label={`加载更多（已加载 ${items.length} / 共 ${total} 条）`}>
+              {loadingMore ? '正在加载更多…' : '加载更多'}
+            </MeBtn>
           </div>
         )}
 
-        <section className="qx-me-list qx-me-grow" data-testid="member-assets-list" aria-label="我的打印订单">
-          {filtered.length === 0 && (
-            <div className="qx-me-legal">
-              {filterKey !== 'all' && nextCursor ? '已加载记录中暂无此类，点「加载更多」继续查找' : '当前筛选下暂无记录'}
-            </div>
-          )}
+        {hasActivePrintOrders(items) ? (
+          <QxTouchCallout kind="remind" icon="alert">
+            {autoRefreshFailed ? (
+              <span role="status" aria-live="polite">刚才这次刷新没成功，过一会儿会再试。没登录时在这台机器上打的单不会进这个账号。</span>
+            ) : (
+              <span>{syncNote}</span>
+            )}
+          </QxTouchCallout>
+        ) : null}
 
-          {filtered.map((item) => {
-            const status = STATUS_META[item.status]
-            const canCreateFeedback = item.status === 'completed' || item.status === 'failed'
-            const expanded = expandedId === item.id
-            return (
-              <article key={item.id} className="qx-me-asset-item" data-server-slot="print-order" data-order-status={item.status} data-testid="member-assets-order">
-                <div className="qx-me-asset-main">
-                  <span className="qx-me-row-ico" data-tone="clay" aria-hidden="true"><PrinterIcon size={28} /></span>
-                  <div className="qx-me-row-main">
-                    <div className="qx-me-row-head">
-                      <p className="qx-me-row-title qx-me-asset-name">{item.fileName ?? '未命名文件'}</p>
-                      <span className="qx-me-st" data-tone={status.tone}>{status.label}</span>
-                    </div>
-                    <p className="qx-me-row-sub">{metaLine(item)}</p>
-                    <div className="qx-me-row-foot">
-                      <span className="qx-me-chip">{paymentLine(item)}</span>
-                      {publicOrderNo(item.orderNo) ? <span className="qx-me-chip">订单 {publicOrderNo(item.orderNo)}</span> : null}
-                      {item.refundRequired === true && <span className="qx-me-chip" data-tone="warn">{PENDING_REFUND_LABEL}</span>}
-                      {item.pickupCode && (
-                        <span className="qx-me-chip" data-tone="ok">
-                          <TicketIcon size={16} aria-hidden="true" />
-                          取件码
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="qx-me-acts">
-                    {canCreateFeedback && (
-                      <button type="button" onClick={() => openFeedback(item.id)} className="qx-me-small" aria-label={`反馈打印订单 ${item.fileName ?? '未命名订单'}`}>
-                        <MessageSquareIcon size={19} aria-hidden="true" />
-                        反馈
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setExpandedId(expanded ? null : item.id)}
-                      aria-expanded={expanded}
-                      aria-label={`${expanded ? '收起' : '查看'}订单详单 ${item.fileName ?? '未命名订单'}`}
-                      className="qx-me-small"
-                    >
-                      详单
-                      <ChevronDownIcon size={19} className={expanded ? 'rotate-180' : undefined} aria-hidden="true" />
-                    </button>
-                  </div>
-                </div>
-                {expanded && <OrderPaymentSummary item={item} />}
-              </article>
-            )
-          })}
-
-          {nextCursor && (
-            <div className="qx-me-asset-more">
-              <button type="button" onClick={loadMore} disabled={loadingMore} className="qx-me-small">
-                {loadingMore && <Loader2Icon size={19} className="animate-spin" aria-hidden="true" />}
-                加载更多（已加载 {items.length} / 共 {total} 条）
-              </button>
-              {loadMoreError && (
-                <p className="qx-me-reason" data-tone="bad" role="alert">
-                  加载失败，请点「加载更多」重试
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="qx-me-legal">
-            {allLoadedFree
-              ? <>仅展示本人打印任务与订单的安全信息，不含文件内容。再次打印会重新选择文件、确认参数，并<b>建立一笔新订单</b>。</>
-              : <>仅展示本人打印任务与订单的安全信息，不含文件内容；金额与支付状态为真实订单数据。再次打印会重新选择文件、确认参数与价格，并<b>建立一笔新订单</b>。</>}
+        {filtered.length > 0 && filtered.length < 7 && expandedId === null ? (
+          <div className="me-stack">
+            <MeExitCard art="usb" artWidth={110} title="去打印" desc="打一份新的，会新建一张打印任务" onClick={() => navigate('/print-scan')} />
+            <MeExitCard art="stack" artWidth={110} title="去我的文档" desc="从已保存的文件里再选一份" onClick={() => navigate('/me/documents')} />
           </div>
-        </section>
+        ) : null}
       </>
     )
   }
 
-  const ctabar = recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/print-orders', uiState === 'empty' ? '发起打印' : '发起新打印', () => navigate('/print-scan'))
+  const ctabar = recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/print-orders', '去打印', () => navigate('/print-scan'))
 
   return (
     <QxMePage
@@ -424,25 +361,13 @@ export function MyPrintOrdersPage() {
       view="orders"
       screen="member-list"
       screenState={`orders-${uiState}`}
-      eyebrow="我的文档和订单"
-      ask={<>打印到哪一步，<em>一眼看清</em>。</>}
-      doing={DOING[uiState]}
-      truth={allLoadedFree
-        ? '这里只显示当前登录账号的打印订单；状态与取件码一律由系统返回。'
-        : '这里只显示当前登录账号的打印订单；状态、金额与取件码一律由系统返回。'}
-      ordersHint={allLoadedFree ? '进度·取件' : undefined}
+      eyebrow="我的 · 打印订单"
+      sub={items.length > 0 ? `共 ${total} 条已产生打印任务的单` : uiState === 'empty' ? '还没有归入账号的打印任务' : undefined}
+      fine={allLoadedFree ? '只显示当前登录账号的打印订单；状态与到机码一律由系统返回。' : undefined}
       ctabar={ctabar}
       live={false}
     >
       {body}
     </QxMePage>
   )
-}
-
-const DOING: Record<'login' | 'loading' | 'error' | 'empty' | 'ready', ReactNode> = {
-  login: <>登录后才会显示你的订单；<b>未登录不展示任何订单或取件码</b>。</>,
-  loading: <>正在读取最新记录，<b>返回前一律显示「—」</b>。</>,
-  error: <>列表这次没有更新，<b>重试不会重复创建订单</b>。</>,
-  empty: <>还没有打印订单。<b>确认打印并建单后</b>，可以从这里查看进度。</>,
-  ready: <>进行中的订单会自动同步，<b>完成后仍可查看详单</b>。</>,
 }

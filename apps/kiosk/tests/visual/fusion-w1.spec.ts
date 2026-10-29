@@ -95,11 +95,12 @@ test('production home exposes the fusion frame and touch-safe real controls @w1-
 
   const shell = page.locator('.ui-kiosk-shell[data-kiosk-presentation="fusion-youth"]')
   await expect(shell).toHaveAttribute('data-kiosk-viewport', 'kiosk')
-  // 首页退出旧视觉壳，QxPageFrame 自带青序顶栏与导航；旧 KioskLayout 只保留安全布局容器。
-  const frame = page.locator('[data-qx-frame="true"]')
+  // 首页用触屏屏，不再套 QxPageFrame。旧 KioskLayout 只保留安全布局容器。
+  const frame = page.locator('[data-qxt-screen][data-qx-page="home"]')
   await expect(frame).toBeVisible()
-  await expect(frame.locator('.qx-home[data-qx-page="home"]')).toBeVisible()
-  await expect(frame.getByRole('heading', { name: /^(夜深了|上午好|中午好|下午好|晚上好)，我是小青$/ })).toBeVisible()
+  await expect(page.locator('[data-qx-frame="true"]')).toHaveCount(0)
+  await expect(frame.getByRole('heading', { level: 1, name: '我是小青', exact: true })).toBeVisible()
+  await expect(frame.locator('.qxt-eyebrow')).toHaveText(/^(夜深了|上午好|中午好|下午好|晚上好)$/)
   await expect(frame.getByText('今天想办哪件事', { exact: false })).toBeVisible()
   await expect(frame.getByText('本终端仅展示与跳转，不代收简历', { exact: false })).toBeVisible()
   await expectMinimumTargets(frame.locator('button:not(:disabled)'), 48)

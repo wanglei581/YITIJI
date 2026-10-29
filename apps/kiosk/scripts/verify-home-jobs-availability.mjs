@@ -24,7 +24,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const SRC = join(ROOT, 'src')
 const read = (abs) => readFileSync(abs, 'utf8')
 
-const VIEW_PATH = join(SRC, 'pages/home/components/QxHomeView.tsx')
+const VIEW_PATH = join(SRC, 'pages/home/homeTouchCopy.ts')
+const RENDER_PATH = join(SRC, 'pages/home/components/HomeTouchView.tsx')
 const HOOK_PATH = join(SRC, 'pages/home/hooks/useHomeJobHighlight.ts')
 const HOME_PATH = join(SRC, 'pages/home/HomePage.tsx')
 const LIST_PATH = join(SRC, 'pages/jobs/JobsPage.tsx')
@@ -294,9 +295,9 @@ const listCode = stripComments(listSrc)
 
 const jobCopyFn = extractNamedFunction(viewCode, 'jobCopy')
 if (!jobCopyFn) {
-  fail('1. QxHomeView 缺少 jobCopy()')
+  fail('1. homeTouchCopy 缺少 jobCopy()')
 } else {
-  pass('1. QxHomeView 定义了 jobCopy()')
+  pass('1. homeTouchCopy 定义了 jobCopy()')
   const branches = parseJobCopyBranches(jobCopyFn)
   for (const status of ['loading', 'ready', 'empty', 'error']) {
     if (branches[status]?.descriptionRaw) pass(`1.${status} 有独立 description 分支`)
@@ -316,11 +317,16 @@ if (!jobCopyFn) {
     fail(`1.loading 文案必须不同于 empty（loading=${JSON.stringify(loadingDesc)} empty=${JSON.stringify(emptyDesc)}）`)
   }
   const readyBadge = branches.ready?.badgeRaw ?? ''
-  if (/\btotal\b/.test(readyBadge)) pass('1.ready 徽章引用接口 total，不写死数量')
-  else fail('1.ready 徽章必须引用 total（写死「12 个在招」或「第三方来源」会红）')
+  const readyDesc = quotedValue(branches.ready?.descriptionRaw) ?? ''
+  if (/\btotal\b/.test(readyBadge) || /个在招/.test(readyBadge) || /个在招/.test(readyDesc)) {
+    fail('1.ready 不得把全量 total 写成「N 个在招」')
+  } else {
+    pass('1.ready 不展示全量 total，也不写成「N 个在招」')
+  }
 }
 
-if (/jobCopy\s*\(\s*jobs\s*\)/.test(viewCode) && /\{job\.description\}/.test(viewSrc) && /\{job\.badge\}/.test(viewSrc)) {
+const renderSrc = read(RENDER_PATH)
+if (/jobCopy\s*\(\s*jobs\s*\)/.test(renderSrc) && /job\.description/.test(renderSrc) && /job\.badge/.test(renderSrc)) {
   pass('1.岗位卡实际渲染 jobCopy 的 description / badge')
 } else {
   fail('1.岗位卡必须渲染 jobCopy(jobs) 的 description 与 badge（只定义函数不接线会红）')
@@ -360,9 +366,9 @@ else pass('3. hook 通过对象参数调用 getJobs')
 // 因此 hook **不得**按 category 收窄 —— 只数其中一类，另一类有内容时
 // 卡片会写「暂无岗位」，用户就不点了，比不显示还糟。
 if (hookQuery && /category\s*:/.test(hookQuery)) {
-  fail(`3. hook 不得按 category 收窄（卡片代表整个岗位域，服务台下有全职/实习/兼职/全部四个入口）。实际: ${hookQuery}`)
+  fail(`3. hook 不得按 category 收窄（首页不展示这个数，但仍按全量判断成败）。实际: ${hookQuery}`)
 } else {
-  pass('3. hook 不按 category 收窄,与「全部岗位」同构')
+  pass('3. hook 不按 category 收窄，全量 total 只用于判断成败')
 }
 
 // pageSize 不参与 total 计算（服务端 count 独立于 skip/take），
@@ -378,7 +384,7 @@ if (/pagination\s*\.\s*total/.test(hookCode)) pass('3. hook 只按 pagination.to
 else fail('3. hook 必须读 pagination.total（改用 data.length 或自估数量会红）')
 
 if (homeSrc.includes('useHomeJobHighlight()') && homeSrc.includes('jobs={jobs}')) {
-  pass('3. HomePage 接入 useHomeJobHighlight 并传给 QxHomeView')
+  pass('3. HomePage 接入 useHomeJobHighlight 并传给首页')
 } else {
   fail('3. HomePage 必须调用 useHomeJobHighlight() 且 jobs={jobs}（写死 empty 会红）')
 }

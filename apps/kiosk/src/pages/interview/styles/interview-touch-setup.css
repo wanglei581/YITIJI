@@ -1,0 +1,481 @@
+/* 练面试设置三步（稿 iv-1 / iv-2 / iv-3）。只挂在 [data-qx-page="interview"] 下。
+   旧页的 .iv-field / .iv-choice 只作测试与读屏的分组钩子，这里把它们的旧盒子样式清掉。 */
+
+[data-qx-page="interview"] [data-qx-interview] .interview-setup__stack,
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-stack {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-group.is-grow {
+  flex: 1 0 auto;
+}
+
+/* 第 3 步内容少时，余高分到各块之间的间距里，不拉成空盒 */
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-stack.is-spread {
+  justify-content: space-between;
+}
+
+/* 大字段：小标签在上，输入或取值在下 */
+[data-qx-page="interview"] .qxt-iv-field {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 88px;
+  padding: 10px 16px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 24px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  text-align: left;
+}
+
+[data-qx-page="interview"] .qxt-iv-field small {
+  color: var(--qxt-ink-3);
+  font-size: var(--qxt-fs-aux);
+  line-height: 1.3;
+}
+
+[data-qx-page="interview"] .qxt-iv-field b {
+  display: block;
+  width: 100%;
+  margin: 0;
+  color: var(--qxt-ink);
+  font: 700 26px/1.3 var(--qx-sans);
+}
+
+/* 输入框铺满整个字段，可点区域就是整张 88px 的卡 */
+[data-qx-page="interview"] label.qxt-iv-field {
+  position: relative;
+  justify-content: flex-start;
+  padding-top: 8px;
+}
+
+[data-qx-page="interview"] label.qxt-iv-field small {
+  position: relative;
+  z-index: 1;
+}
+
+[data-qx-page="interview"] [data-qx-interview] label.qxt-iv-field input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 38px 16px 8px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--qxt-ink);
+  font: 700 26px/1.3 var(--qx-sans);
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-field input::placeholder {
+  color: var(--qxt-ink-3);
+  font-weight: 600;
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-field input:focus-visible {
+  outline: none;
+}
+
+[data-qx-page="interview"] .qxt-iv-field:focus-within {
+  border-color: var(--qx-teal);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--qx-teal) 18%, transparent);
+}
+
+/* 3×2 大选项：高 88，余高均分，选中是深色 */
+[data-qx-page="interview"] .qxt-iv-choices {
+  display: grid;
+  flex: 1 0 auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: minmax(88px, 1fr);
+  gap: 8px;
+}
+
+[data-qx-page="interview"] .qxt-iv-group > .qxt-iv-choices {
+  flex: 1 0 auto;
+}
+
+[data-qx-page="interview"] .qxt-iv-opt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88px;
+  padding: 8px 10px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 22px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  white-space: normal;
+}
+
+[data-qx-page="interview"] .qxt-iv-opt[aria-pressed="true"],
+[data-qx-page="interview"] .qxt-iv-seg > button[aria-pressed="true"],
+[data-qx-page="interview"] .qxt-iv-src > button[aria-pressed="true"] {
+  border-color: var(--qx-deep);
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+[data-qx-page="interview"] .qxt-iv-src > button[aria-pressed="true"] small {
+  color: var(--qxt-mint);
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-sec .iv-hint {
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+}
+
+/* 第 2 步：五位面试官整行，余高均分 */
+[data-qx-page="interview"] .qxt-iv-personas {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-qx-page="interview"] .qxt-iv-persona {
+  display: flex;
+  flex: 1 0 auto;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 88px;
+  padding: 8px 14px;
+  border: 2px solid var(--qxt-edge);
+  border-radius: 26px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  text-align: left;
+}
+
+[data-qx-page="interview"] .qxt-iv-persona[aria-pressed="true"] {
+  border-color: var(--qx-teal);
+  background: var(--qxt-teal-wash);
+}
+
+[data-qx-page="interview"] .qxt-iv-persona b {
+  display: block;
+  font-size: var(--qxt-fs-sub);
+  line-height: 1.3;
+}
+
+[data-qx-page="interview"] .qxt-iv-persona small {
+  display: block;
+  margin-top: 2px;
+  color: var(--qxt-ink-3);
+  font-size: var(--qxt-fs-aux);
+  line-height: 1.35;
+}
+
+[data-qx-page="interview"] .qxt-iv-av {
+  display: grid;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+}
+
+[data-qx-page="interview"] .qxt-iv-tick {
+  display: grid;
+  flex: none;
+  width: 32px;
+  margin-left: auto;
+  place-items: center;
+  color: var(--qx-teal);
+}
+
+[data-qx-page="interview"] .qxt-iv-seg {
+  display: flex;
+  gap: 8px;
+}
+
+[data-qx-page="interview"] .qxt-iv-seg > button {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 72px;
+  padding: 6px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 20px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+[data-qx-page="interview"] .qxt-iv-seg > button small {
+  font-size: var(--qxt-fs-aux);
+  font-weight: 600;
+}
+
+/* 第 3 步：三行核对，每行一个 64×64 的「改」 */
+[data-qx-page="interview"] .qxt-iv-sum {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  max-height: 396px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 30px;
+  background: var(--qxt-card);
+  overflow: hidden;
+}
+
+[data-qx-page="interview"] .qxt-iv-sum-r {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: 108px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  min-height: 88px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--qxt-line);
+  font-size: var(--qxt-fs-sub);
+}
+
+[data-qx-page="interview"] .qxt-iv-sum-r:first-child {
+  border-top: 0;
+}
+
+[data-qx-page="interview"] .qxt-iv-sum-r > span {
+  color: var(--qxt-ink-3);
+  font-size: var(--qxt-fs-sub);
+}
+
+[data-qx-page="interview"] .qxt-iv-sum-r b {
+  font-weight: 700;
+  line-height: 1.3;
+  word-break: break-all;
+}
+
+[data-qx-page="interview"] .qxt-iv-edit {
+  min-width: var(--qxt-tap);
+  min-height: var(--qxt-tap);
+  padding: 0 14px;
+  border-radius: 18px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+}
+
+/* 简历来源：两颗（本机浏览器多一颗），选中后面板放在下面 */
+[data-qx-page="interview"] .qxt-iv-src {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 8px;
+}
+
+[data-qx-page="interview"] .qxt-iv-src > button {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: 88px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 22px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  text-align: left;
+}
+
+[data-qx-page="interview"] .qxt-iv-src b {
+  font-size: var(--qxt-fs-body);
+  line-height: 1.3;
+}
+
+[data-qx-page="interview"] .qxt-iv-src small {
+  color: var(--qxt-ink-3);
+  font-size: var(--qxt-fs-aux);
+  font-weight: 600;
+}
+
+[data-qx-page="interview"] .qxt-iv-panel {
+  padding: 12px 14px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 22px;
+  background: var(--qxt-card);
+}
+
+/* 简历来源面板是共享件（手机扫码、U 盘导入），自带 Tailwind 的小字号和 48px 按钮，
+   触屏页的按钮重置又把它们的底色抹掉了。这里只从外面补：字号不低于 20px，按钮不小于 64×64、有边有底。
+   不改它们的文件（上传面板的文件是冻结的）。 */
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-panel :is(h1, h2, h3, h4, p, li, span, small, label, a) {
+  font-size: max(1em, var(--qxt-fs-aux));
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-panel button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: var(--qxt-tap);
+  min-height: var(--qxt-tap);
+  padding: 0 20px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 18px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-panel button[class~="bg-primary-600"] {
+  border-color: var(--qx-deep);
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-panel button:disabled {
+  opacity: 0.48;
+}
+
+/* 行业选择弹窗也是共享件（KioskFilterPickerModal，职位页、企业页、简历诊断同在用）：
+   进到触屏页里，页面的按钮重置把 20 个选项的边和底抹光了，选中态也看不出来，
+   「当前：」字号 18px、选项和底部按钮 58px 高、关闭键 56px。只从外面补，不改共享件的文件。
+   弹窗和页面内容是兄弟节点，所以这里挂在页面根上，不挂 [data-qx-interview]。 */
+[data-qx-page="interview"] .ui-kiosk-modal-dialog .ui-kiosk-modal-close {
+  min-width: var(--qxt-tap);
+  min-height: var(--qxt-tap);
+}
+
+[data-qx-page="interview"] .ui-kiosk-modal-content section span {
+  font-size: var(--qxt-fs-aux);
+}
+
+[data-qx-page="interview"] .ui-kiosk-modal-content section button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--qxt-tap);
+  padding: 8px 14px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 18px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+[data-qx-page="interview"] .ui-kiosk-modal-content section button[aria-pressed="true"] {
+  border-color: var(--qx-deep);
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+[data-qx-page="interview"] .ui-kiosk-modal-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: var(--qxt-tap);
+  min-height: var(--qxt-tap);
+  padding: 0 28px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 18px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+}
+
+[data-qx-page="interview"] .ui-kiosk-modal-actions button[class~="bg-primary-600"] {
+  border-color: var(--qx-deep);
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+/* 创建失败后的降级区：共享 AiTaskRegion 的字号和按钮在触屏里重排 */
+[data-qx-page="interview"] .interview-setup-fallback {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+[data-qx-page="interview"] .interview-setup-fallback .kiosk-ai-fallback {
+  align-items: stretch;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--qx-cinnabar);
+  border-radius: 22px;
+  background: var(--qxt-card);
+}
+
+[data-qx-page="interview"] .kiosk-ai-fallback__head {
+  gap: 10px;
+}
+
+[data-qx-page="interview"] .kiosk-ai-fallback__title {
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+}
+
+[data-qx-page="interview"] .kiosk-ai-fallback p.kiosk-ai-fallback__reason {
+  margin: 0;
+  color: var(--qxt-ink);
+  font-weight: 700;
+}
+
+[data-qx-page="interview"] .kiosk-ai-fallback p.kiosk-ai-fallback__path {
+  margin: 0;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page="interview"] .kiosk-ai-fallback button.kiosk-ai-fallback__action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: var(--qxt-tap);
+  padding: 8px 16px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 18px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  text-align: left;
+}
+
+[data-qx-page="interview"] .kiosk-ai-fallback button.kiosk-ai-fallback__action--blocked {
+  border-style: dashed;
+  background: var(--qxt-well);
+  color: var(--qxt-ink-2);
+}

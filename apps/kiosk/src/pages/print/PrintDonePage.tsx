@@ -1,19 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { QRCodeSVG } from 'qrcode.react'
-import {
-  AlertCircleIcon,
-  AlertTriangleIcon,
-  CheckIcon,
-  PrinterIcon,
-  ShieldIcon,
-  SmartphoneIcon,
-} from 'lucide-react'
 import type { PrintJobParams, PrintJobTakeawayUrl } from '@ai-job-print/shared'
 import { API_MODE } from '../../services/api/client'
 import { useAuth } from '../../auth/useAuth'
 import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
-import { formatRemainingSeconds, useRemainingSeconds } from '../../hooks/useCountdown'
+import { useRemainingSeconds } from '../../hooks/useCountdown'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import {
   getPrintJobStatus,
@@ -24,19 +16,19 @@ import {
 import { KioskFeedbackDialog } from '../../components/KioskFeedbackDialog'
 import { PRINT_DONE_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
 import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { PrintAiHelp } from './components/PrintAiHelp'
+import { helpNeededLine, peekSupportContact, preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
+import { PrintTouchFrame, printAsk } from './PrintTouchFrame'
+import { PrintArt } from './art/PrintArt'
+import { PrintIcon } from './art/PrintIcon'
+import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
+import { PrintDoneUnverified } from './components/PrintDoneUnverified'
+import { PrintDoneFailed, PrintDoneFeeInfo } from './components/PrintDoneFailed'
+import { failureCopy, failureSummaryRows, feeInfoCopy, paymentRow, type FailureVariant } from './components/printDoneFailedModel'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
-import {
-  PrintDoneRecordSection,
-  PrintDoneXq,
-  PrintFeeBoundaryBar,
-  PrintJamGuide,
-  PrintOutOfPaperPanel,
-} from './components/PrintDoneSections'
-import { doneTakeaway, failureStaffDoing, jamOrderKeptLine, outOfPaperDoing, outOfPaperMoneyOf, outOfPaperPill, paymentFactOf, publicOrderNo, reprintHint } from './printProgressModel'
-import { formatCents } from './cashierStatus'
+import { PrintDoneRecordSection } from './components/PrintDoneSections'
+import { doneTakeaway, jobSubline, outOfPaperMoneyOf, paymentFactOf, publicOrderNo, reprintHint, type OutOfPaperMoney } from './printProgressModel'
 import './styles/print-fulfill-qx.css'
+import './styles/print-done-touch.css'
 
 interface PrintFile {
   name:     string
@@ -131,9 +123,10 @@ export function PrintDonePage() {
   const idDocument = state.idDocument === true
 
   const canReportIssue = taskId !== null
+  const support = useSupportContact()
+  const problem = printProblemLine(support)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [feeInfoOpen, setFeeInfoOpen] = useState(false)
-  const [endArmed, setEndArmed] = useState(false)
   const [idleLeft, setIdleLeft] = useState(60)
 
   const [verification, setVerification] = useState<PrintVerification | null>(null)
@@ -143,8 +136,8 @@ export function PrintDonePage() {
       ? verification.result
       : 'loading'
   const failureReason = verification?.taskId === taskId
-    ? verification.failureReason ?? '打印任务未能完成，请联系现场工作人员'
-    : '打印任务未能完成，请联系现场工作人员'
+    ? preferUnattended(verification.failureReason ?? '', problem)
+    : problem
   const isUnconfirmed =
     verification?.taskId === taskId && verification.errorCode === PRINT_JOB_UNCONFIRMED
   const visual = resultState === 'failed' ? failVisual(verification?.errorCode) : resultState
@@ -155,7 +148,9 @@ export function PrintDonePage() {
   const [retryError, setRetryError] = useState<string | null>(null)
   const takeawayRemaining = useRemainingSeconds(takeaway?.expiresAt)
   const takeawayExpired = takeawayRemaining === 0
-  const takeawayQrUrl = takeaway && !takeawayExpired ? toPublicQrUrl(takeaway.signedUrl) : null
+  const takeawayQrUrl = typeof takeaway?.signedUrl === 'string' && takeaway.signedUrl.length > 0 && !takeawayExpired
+    ? toPublicQrUrl(takeaway.signedUrl)
+    : null
 
   /* W-43（产品负责人 9/29）：完成页到点 = 真的结束这次使用。
    * 以前到点只收起打印预览、账号还登录着，下一位走上来点「我的」就是上一位的文件和订单。
@@ -213,7 +208,7 @@ export function PrintDonePage() {
           setVerification({
             taskId,
             result: 'failed',
-            failureReason: result.failureReasonForUser ?? '打印任务未能完成，请联系现场工作人员',
+            failureReason: result.failureReasonForUser ?? '',
             errorCode: result.errorCode,
             ...fileRetentionFromStatus(result),
           })
@@ -254,7 +249,7 @@ export function PrintDonePage() {
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setTakeawayError(userMessageOf(err, '暂时无法签发带走链接，请联系工作人员'))
+          setTakeawayError(preferUnattended(userMessageOf(err, `带走链接没取到。${printProblemLine()}`), `带走链接没取到。${printProblemLine()}`))
         }
       })
     return () => { cancelled = true }
@@ -296,112 +291,47 @@ export function PrintDonePage() {
       })
     } catch (err: unknown) {
       setRetryError(errorCodeOf(err) === 'PRINT_RETRY_AGENT_VERSION'
-        ? '这台机器的打印程序需要升级后才能重新提交，请找现场工作人员'
-        : userMessageOf(err, '重新提交失败，请联系工作人员补打'))
+        ? `这台机器的打印程序需要升级后才能重新提交。${printProblemLine()}`
+        : preferUnattended(userMessageOf(err, `重新提交失败。${printProblemLine()}`), `重新提交失败。${printProblemLine()}`))
       setRetrying(false)
     }
   }
 
-  const paidLabel = amountCents === 0
-    ? '免费试运营，本单 0 元'
-    : amountCents != null
-      ? `已付 ${formatCents(amountCents)}`
-      : '订单保留'
-
   if (feeInfoOpen) {
+    const fee = feeInfoCopy({ free: amountCents === 0, orderNo: displayOrderNo })
     return (
-      <QxPageFrame
-        title={amountCents === 0 ? '订单记录' : '费用与订单边界'}
-        subtitle="本页只展示订单的真实状态，不替你承诺结果"
-        status={{ tone: 'warn', label: displayOrderNo ? `订单 ${displayOrderNo}` : '状态未知' }}
-        terminalLabel="就业服务大厅"
-        ctabar={
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeeInfoOpen(false)}>
-              返回上一页
-            </button>
-            <button type="button" className="qx-btn" data-variant="primary" data-testid="print-fulfill-primary" onClick={() => navigate('/help')}>
-              找工作人员登记
-            </button>
-          </>
-        }
-        navbar={navbar}
-      >
-        <div data-w2-page="print-done" data-print-flow-step={6} data-testid="print-fulfill-state-fee-info" className="qx-scroll pff-page">
-          <PrintDoneXq ask={amountCents === 0 ? <>订单记录，<em>一项一项核对</em>。</> : <>钱的事，<em>一笔一笔说清楚</em>。</>} doing="本页只展示订单的真实状态，不替你承诺结果。" />
-          <PrintFeeBoundaryBar
-            free={amountCents === 0}
-            sub={amountCents === 0 ? '订单记录保留，不会因为这次异常消失' : '订单和支付记录都在，不会因为这次异常消失'}
-            body={amountCents === 0 ? <>是否补打，以工作人员现场核查结果为准。</> : <>是否处理费用、处理多少、多久到账，<b>以工作人员核查结果为准</b>，本机不承诺自动处理，也不会替你把费用改成别的数。</>}
-            facts={
-              <>
-                {displayOrderNo ? <span>订单 <b>{displayOrderNo}</b></span> : null}
-                {amountCents != null ? <span>{amountCents === 0 ? '办理方式' : '支付状态'} <b>{paidLabel}</b></span> : <span>支付状态 <b>以订单为准</b></span>}
-              </>
-            }
-          />
-          <div className="qx-card">
-            <div className="pff-step"><span className="pff-step-no">1</span><span className="pff-step-txt">{displayOrderNo ? <>把<b>订单号 {displayOrderNo}</b> 和这台机器的位置告诉现场工作人员。</> : <>把这台机器的位置告诉现场工作人员，请他们核对这一单。</>}</span></div>
-            <div className="pff-step"><span className="pff-step-no">2</span><span className="pff-step-txt">说明实际拿到了几页、哪几页没出，<b>已出的纸请一并带上</b>。</span></div>
-            <div className="pff-step"><span className="pff-step-no">3</span><span className="pff-step-txt">由工作人员现场登记；<b>是否处理、处理多少，以核查结果为准</b>。</span></div>
-          </div>
-          <div className="pff-help" data-testid="print-fulfill-fallback">
-            <span className="txt">{amountCents === 0 ? <>是否补打，以工作人员现场核查结果为准。</> : <>本机<b>不会自动处理费用</b>，也不会把支付异常写成打印状态。</>}</span>
-            <button type="button" className="pff-help-btn" onClick={() => navigate('/help')}>联系工作人员</button>
-          </div>
-          <PrintAiHelp
-            label="问小青：取纸或异常怎么办 →"
-            draft="打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。"
-          />
-        </div>
-        {feedbackDialog}
-      </QxPageFrame>
+      <PrintDoneFeeInfo
+        title={fee.title}
+        subtitle={fee.subtitle}
+        pill={displayOrderNo ? `订单 ${displayOrderNo}` : '状态未知'}
+        steps={fee.steps}
+        stepsLabel={fee.stepsLabel}
+        rows={[
+          ...(displayOrderNo ? [{ key: 'order', label: '订单号', value: displayOrderNo }] : []),
+          paymentRow({ fact: paymentFactOf(amountCents), amountCents }),
+        ]}
+        fine={fee.fine}
+        onBack={() => setFeeInfoOpen(false)}
+        onHelp={() => navigate('/help')}
+      />
     )
   }
 
   if (resultState === 'loading' || resultState === 'unknown') {
     const isLoading = resultState === 'loading'
     return (
-      <QxPageFrame
+      <PrintDoneUnverified
+        loading={isLoading}
+        hasTask={taskId !== null}
         title={isLoading ? '正在核验打印结果' : '无法确认打印结果'}
         subtitle={isLoading ? '正在读取真实打印任务状态，请稍候' : '当前未取得可信的任务终态，请勿据此判断已经出纸'}
-        status={{ tone: 'unknown', label: '状态未知' }}
-        terminalLabel="就业服务大厅"
-        ctabar={
-          isLoading ? (
-            <span className="why">核验完成后将显示真实结果或返回任务进度页</span>
-          ) : (
-            <>
-              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/')}>返回首页</button>
-              {taskId ? (
-                <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/me/print-orders')}>查看打印订单</button>
-              ) : null}
-              {canReportIssue ? (
-                <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeedbackOpen(true)}>反馈问题</button>
-              ) : null}
-              <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/help')}>使用帮助</button>
-            </>
-          )
-        }
-        navbar={navbar}
-      >
-        <div data-w2-page="print-done" data-print-flow-step={6} data-testid={isLoading ? 'print-fulfill-state-loading' : 'print-fulfill-state-unknown'} className="qx-scroll pff-page">
-          <div className="qx-state" data-tone={isLoading ? 'info' : 'error'}>
-            <span className="qx-state-ic"><AlertCircleIcon aria-hidden="true" /></span>
-            <div>
-              <div className="qx-state-t">{isLoading ? '正在向打印服务核验' : '暂未取得可信状态'}</div>
-              <div className="qx-state-d">
-                {isLoading
-                  ? '核验完成后将显示真实结果或返回任务进度页'
-                  : taskId
-                    ? '暂时无法核验这一单，请在打印订单中查看或联系工作人员'
-                    : '未找到打印任务上下文，请从打印入口重新开始'}
-              </div>
-            </div>
-          </div>
-        </div>
-        {feedbackDialog}
-      </QxPageFrame>
+        onHome={() => navigate('/')}
+        onHelp={() => navigate('/help')}
+        onUpload={() => navigate(uploadPath)}
+        onOrders={() => navigate('/me/print-orders')}
+        onFeedback={() => setFeedbackOpen(true)}
+        dialog={feedbackDialog}
+      />
     )
   }
 
@@ -409,339 +339,242 @@ export function PrintDonePage() {
     const feedbackButton = canReportIssue ? (
       <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeedbackOpen(true)}>反馈问题</button>
     ) : null
-    const retryButton = takeaway?.canRetry && !isUnconfirmed ? (
-      <>
-        <button
-          type="button"
-          className="qx-btn"
-          data-variant="teal"
-          disabled={retrying}
-          onClick={() => { void handleResubmitPrint() }}
-        >
-          {retrying ? '正在重新提交…' : '重新提交打印'}
-        </button>
-        {retryError && (
-          <p role="alert" className="qx-state-d" style={{ flex: '1 1 100%', order: -1, margin: 0 }}>
-            {retryError}
-          </p>
-        )}
-      </>
-    ) : null
-    const takeawayNotices = (
-      <>
-        {takeawayQrUrl && (
-          <div className="print-done-takeaway" role="region" aria-label="文件带走">
-            <p className="print-done-takeaway-title">文件带走</p>
-            <div className="print-done-takeaway-qr">
-              <QRCodeSVG value={takeawayQrUrl} size={168} level="M" marginSize={0} />
-            </div>
-            {takeawayRemaining >= 0 && (
-              <p className="print-done-takeaway-note">
-                剩余 {formatRemainingSeconds(takeawayRemaining)}，请用本人手机扫码保存
-              </p>
-            )}
-          </div>
-        )}
-        {takeaway && takeawayExpired && (
-          <p role="status">带走链接已过期，请联系工作人员补打</p>
-        )}
-        {takeawayError && <p role="status">{takeawayError}</p>}
-      </>
-    )
 
-    if (visual === 'out-of-paper') {
-      // 稿 15 out-of-paper：小青区即页头 → 任务卡（单文件 + 缺纸说明 + 费用边界）→ 现场三步 → 底栏两出口。
-      // 稿里「加纸后继续」「已出 1 份」在真实合同里都不成立，改写理由见 PrintOutOfPaperPanel 头注。
-      const money = outOfPaperMoneyOf(takeaway, amountCents)
-      const faultOrderNo = publicOrderNo(takeaway?.orderNo) ?? displayOrderNo
+    if (isUnconfirmed) {
+      const paramLine = params ? jobSubline(file ? { pages: file.pages } : null, params) : null
       return (
-        <QxPageFrame
-          back={{ label: '返回首页', onBack: () => navigate('/') }}
-          title="打印机缺纸"
-          subtitle="已经登记缺纸，这次打印不会在加纸后自动续打"
-          status={{ tone: 'bad', label: outOfPaperPill(money) }}
+        <PrintTouchFrame
+          page="print-unconfirmed"
+          legacyBody={false}
+          eyebrow="打印结果"
+          kind="compact"
+          seal={null}
+          title="这次打印结果未确认。"
+          subtitle="系统已明确登记，等待人工核查"
+          status={{ tone: 'warn', label: '打印结果未确认' }}
           terminalLabel="就业服务大厅"
-          ctabar={
-            <>
-              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeeInfoOpen(true)}>{amountCents === 0 ? '查看订单说明' : '查看费用说明'}</button>
-              {feedbackButton}
-              {retryButton}
-              <button type="button" className="qx-btn" data-variant="primary" data-testid="print-fulfill-primary" onClick={() => navigate('/help')}>
-                联系工作人员处理
-              </button>
-            </>
-          }
+          back={{ label: '返回首页', onBack: () => navigate('/') }}
+          ask={printAsk('问小青：取纸或异常怎么办', '这次打印结果未确认。请说明取纸或遇到异常时怎么做。不要猜成功或失败，也不要让我重复打印。')}
+          primary={{
+            label: '使用帮助',
+            testId: 'print-fulfill-primary',
+            onClick: () => navigate('/help'),
+          }}
           navbar={navbar}
         >
           <div
-            data-w2-page="print-done" data-print-flow-step={6}
-            data-pff-head="xq"
-            data-screen="print-fulfill"
-            data-state="out-of-paper"
-            data-testid="print-fulfill-state-out-of-paper"
-            className="qx-scroll pff-page pfp-page pfd-page"
+            data-w2-page="print-done"
+            data-print-flow-step={6}
+            data-testid="print-fulfill-state-result-unconfirmed"
+            className="qx-scroll pff-page pft-unc"
           >
-            <PrintDoneXq mainClassName="pfp-xq-main" ask={<>机器里<em>没纸了</em>。</>} doing={outOfPaperDoing(money)} />
-            <PrintOutOfPaperPanel
-              file={file ?? null}
-              params={params ?? null}
-              taskId={taskId}
-              orderNo={faultOrderNo}
-              failureReason={failureReason}
-              money={money}
-              canRetry={Boolean(takeaway?.canRetry)}
-              takeaway={takeawayNotices}
-            />
-            <PrintAiHelp
-              label="问小青：取纸或异常怎么办 →"
-              draft="打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。"
-            />
+            <ol className="qxt-steps qxt-steps-big pft-unc-steps" style={{ gridTemplateColumns: '1fr' }}>
+              <li className="qxt-step">
+                <span className="qxt-step-n">1</span>
+                <b>先看出纸口是否已有纸张</b>
+                <small>设备在断电、失联或硬件异常后，无法确认这次打印的实际结果。</small>
+              </li>
+              <li className="qxt-step">
+                <span className="qxt-step-n">2</span>
+                <b>无论有没有，这笔订单都已保留，不要重复打印</b>
+                <small>不猜成功也不猜失败，已登记等待人工核查。</small>
+              </li>
+              <li className="qxt-step">
+                <span className="qxt-step-n">3</span>
+                <b>
+                  {helpNeededLine()}
+                  {displayOrderNo ? `，报订单号 ${displayOrderNo}` : '，请报这一单的订单号'}
+                </b>
+                <small>报这一单的订单号。本机不猜成功或失败。</small>
+              </li>
+            </ol>
+            <dl className="qxt-sum pft-unc-sum">
+              {displayOrderNo ? <div className="qxt-sum-r"><dt>订单号</dt><dd>{displayOrderNo}</dd><span /></div> : null}
+              {file?.name ? <div className="qxt-sum-r"><dt>文件</dt><dd>{file.name}</dd><span /></div> : null}
+              {paramLine ? <div className="qxt-sum-r"><dt>参数</dt><dd>{paramLine}</dd><span /></div> : null}
+            </dl>
+            <div className="qxt-exits pft-unc-exits">
+              <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={() => setFeeInfoOpen(true)}>查看订单说明</button>
+              {feedbackButton}
+            </div>
+            {isLoggedIn ? (
+              <button type="button" className="qxt-rowlink pft-unc-row" onClick={() => navigate('/me/print-orders')}>
+                <QxTouchIcon name="receipt" size={32} />
+                <span><b>查看打印订单</b></span>
+                <span className="qxt-chev"><QxTouchIcon name="chevR" size={28} strokeWidth={2.2} /></span>
+              </button>
+            ) : null}
+            <p className="pft-unc-fine qxt-fine" data-testid="print-fulfill-fallback">
+              这次结果已登记，等待人工核查；订单保留。
+            </p>
           </div>
           {feedbackDialog}
-        </QxPageFrame>
+        </PrintTouchFrame>
       )
     }
 
-    const jam = visual === 'paper-jam'
-    const payment = paymentFactOf(amountCents)
-    const issueTitle = isUnconfirmed ? '打印结果未确认' : jam ? '打印机卡纸' : '打印失败'
-    const ask = isUnconfirmed
-      ? <>这次打印<em>结果未确认</em>。</>
-      : jam
-        ? <>纸<em>卡住了</em>，别硬拉。</>
-        : <>打印失败，<em>请联系工作人员</em>。</>
-    const doing = isUnconfirmed
-      ? '系统已经正式登记，工作人员核查后给出结论，不会让你自认倒霉。'
-      : jam
-        ? '硬拉可能撕坏纸、伤到机器，交给我们来处理。'
-        : failureStaffDoing(payment)
-    const issueSub = isUnconfirmed
-      ? '系统已明确登记，等待人工核查'
-      : jam
-        ? jamOrderKeptLine(payment)
-        : '打印任务已经确认失败'
+    // 普通失败、卡纸、缺纸三态共用一块版式（PrintDoneFailed）。收款事实：缺纸页优先用服务端回执，其余按进页时带来的金额。
+    const variant: FailureVariant = visual === 'out-of-paper' ? 'out-of-paper' : visual === 'paper-jam' ? 'paper-jam' : 'failed'
+    const money: OutOfPaperMoney = variant === 'out-of-paper'
+      ? outOfPaperMoneyOf(takeaway, amountCents)
+      : { fact: paymentFactOf(amountCents), amountCents }
+    const faultOrderNo = publicOrderNo(takeaway?.orderNo) ?? displayOrderNo
+    const canRetry = Boolean(takeaway?.canRetry)
     return (
-      <QxPageFrame
-        title={issueTitle}
-        subtitle={isUnconfirmed ? '这次无法确认是否已经出纸' : '打印任务已经确认失败'}
-        status={{ tone: 'bad', label: `${paidLabel} · ${issueTitle}` }}
-        terminalLabel="就业服务大厅"
-        ctabar={
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/')}>返回首页</button>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeeInfoOpen(true)}>{amountCents === 0 ? '查看订单说明' : '查看费用说明'}</button>
-            {feedbackButton}
-            {retryButton}
-            <button type="button" className="qx-btn" data-variant="primary" data-testid="print-fulfill-primary" onClick={() => navigate('/help')}>
-              {isUnconfirmed ? '联系工作人员核查' : '使用帮助'}
-            </button>
-          </>
-        }
-        navbar={navbar}
-      >
-        <div
-          data-w2-page="print-done" data-print-flow-step={6}
-          data-pff-head="xq"
-          data-testid={
-            isUnconfirmed
-              ? 'print-fulfill-state-result-unconfirmed'
-              : jam
-                ? 'print-fulfill-state-paper-jam'
-                : 'print-fulfill-state-failed'
-          }
-          className={jam ? 'qx-scroll pff-page pff-jam' : 'qx-scroll pff-page'}
-        >
-          <PrintDoneXq ask={ask} doing={doing} />
-
-          <div
-            className="pff-issue"
-            data-tone={isUnconfirmed ? 'deep' : 'bad'}
-            data-testid="print-fulfill-fallback"
-          >
-            <div className="pff-issue-head">
-              <span className="pff-issue-ic">{isUnconfirmed ? <PrinterIcon aria-hidden="true" /> : <AlertTriangleIcon aria-hidden="true" />}</span>
-              <div>
-                <div className="pff-issue-t">{issueTitle}</div>
-                <small>{issueSub}</small>
-              </div>
-            </div>
-            <p className="pff-issue-body">
-              {isUnconfirmed
-                ? <>设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。不猜成功也不猜失败，已登记等待人工核查。请先查看出纸口是否已有纸张。无论有没有，这笔订单都已保留，请联系现场工作人员核查处理。</>
-                : jam
-                  ? <>请<b>不要自己打开机器或拽纸</b>。工作人员会取出卡纸并补打受影响的部分，已出的纸你先收好。</>
-                  : failureReason}
-            </p>
-            {jam && failureReason ? <p className="pff-issue-body">{failureReason}</p> : null}
-          </div>
-
-          {(publicOrderNo(takeaway?.orderNo) ?? displayOrderNo) ? (
-            <p className="pff-out-sub">订单号 {publicOrderNo(takeaway?.orderNo) ?? displayOrderNo}</p>
-          ) : null}
-          <p className="pff-out-sub">联系工作人员补打</p>
-          {takeawayNotices}
-          {jam ? <PrintJamGuide orderNo={publicOrderNo(takeaway?.orderNo) ?? displayOrderNo} /> : null}
-        </div>
-        {feedbackDialog}
-      </QxPageFrame>
+      <PrintDoneFailed
+        variant={variant}
+        copy={failureCopy({ variant, money, orderNo: faultOrderNo, canRetry })}
+        rows={failureSummaryRows({ orderNo: faultOrderNo, file: file ?? null, params: params ?? null, money, reason: failureReason })}
+        free={amountCents === 0}
+        retry={{ available: canRetry, busy: retrying, error: retryError, onRetry: () => { void handleResubmitPrint() } }}
+        takeaway={{
+          qrUrl: takeawayQrUrl,
+          remaining: takeawayRemaining,
+          expired: Boolean(takeaway && takeawayExpired),
+          error: takeawayError && takeawayError !== printProblemLine() ? takeawayError : null,
+        }}
+        expiredLine={`带走链接已过期。${printProblemLine()}`}
+        canReportIssue={canReportIssue}
+        isLoggedIn={isLoggedIn}
+        onFeeInfo={() => setFeeInfoOpen(true)}
+        onFeedback={() => setFeedbackOpen(true)}
+        onHome={() => navigate('/')}
+        onHelp={() => navigate('/help')}
+        onOrders={() => navigate('/me/print-orders')}
+        dialog={feedbackDialog}
+      />
     )
   }
 
   // 成功态才到这里：loading / unknown / failed / feeInfo 均已 return。
   // 以建单响应 hasEndUser 为准；本地 token 不能证明后端认了会话。事后登录也不会把这单追认回去。
   const hasEndUser = state.hasEndUser
+  const miniappPublished = peekSupportContact().miniappPublished
 
   return (
-    <QxPageFrame
-      title="打印完成"
+    <PrintTouchFrame
+      page="print-done"
+      legacyBody={false}
+      eyebrow="打印完成"
+      title="都打好了，拿走前核一下"
       subtitle="文件已从出纸口送出，请核对页数后取走"
-      status={{ tone: 'ok', label: amountCents != null ? `${paidLabel} · 打印完成` : '打印完成' }}
+      status={{ tone: 'ok', label: '已在本机出纸' }}
+      titleRole="status"
       terminalLabel="就业服务大厅"
-      ctabar={
-        <>
-          {state.pickupSource ? <p>要再打一份请在手机上重新下单</p> : <button
-            type="button"
-            className="qx-btn pff-again"
-            data-variant="ghost"
-            data-testid="print-fulfill-reprint"
-            onClick={() => navigate(uploadPath)}
-          >
-            再印一份
-            <small>{reprintHint(amountCents)}</small>
-          </button>}
-          <button
-            type="button"
-            className="qx-btn"
-            data-variant="danger"
-            data-testid="print-fulfill-primary"
-            onClick={() => {
-              if (endArmed) {
-                endKioskUse('end_use')
-                return
-              }
-              setEndArmed(true)
-            }}
-          >
-            {endArmed ? '再按一次，确认结束使用' : '我拿走了，结束使用'}
-          </button>
-        </>
+      seal={null}
+      sealNode={<DoneCheckMark />}
+      back={undefined}
+      ask={printAsk('问小青：怎么取纸', '怎么取纸？请告诉我核对页数和从出纸口取走时可以做的事。不要替我判断有没有打出来。')}
+      dockLeft={
+        <div className="pft-count" aria-hidden="true">
+          <PrintArt name="ring" size={96} stroke={8} pct={idleLeft / 60} />
+          <b>{idleLeft}</b>
+        </div>
       }
-      navbar={navbar}
+      primaryNode={
+        <button
+          type="button"
+          className="qxt-btn qxt-btn-danger qxt-wide"
+          data-testid="print-fulfill-primary"
+          onClick={() => {
+            endKioskUse('end_use')
+          }}
+        >
+          <PrintIcon name="erase" size={32} strokeWidth={2.2} />
+          我拿走了，结束使用
+        </button>
+      }
+      nav
     >
-      <div data-w2-page="print-done" data-print-flow-step={6} data-pff-head="xq" data-testid="print-fulfill-state-completed" className="qx-scroll pff-page">
-        <PrintDoneXq ask={<>都打好了，<em>从出纸口拿走</em>。</>} doing={idDocument ? '拿走前记得核一下页数，证件原件和复印件一起带走。' : '拿走前记得核一下页数，少页当场能处理。'} />
-
-        <div className="qx-card">
-          <div className="pff-done-layout">
-            <div>
-              <div className="pff-done-title" role="status">
-                <span className="pff-ok"><CheckIcon aria-hidden="true" /></span>
-                都打好了，拿走前核一下
-              </div>
-              <p className="pff-out-sub">
-                {takeawayCopy.facesLabel}
-              </p>
-              <div className="pff-step">
-                <span className="pff-step-no">1</span>
-                <span className="pff-step-txt">
-                  从出纸口取走 <b>{takeawayCopy.pagesLabel}</b>。
-                </span>
-              </div>
-              <div className="pff-step">
-                <span className="pff-step-no">2</span>
-                <span className="pff-step-txt">当场核对<b>页数和清晰度</b>，少页、卡纸、印花了都能当场处理。</span>
-              </div>
-              {idDocument ? (
-                <div className="pff-step">
-                  <span className="pff-step-no">3</span>
-                  <span className="pff-step-txt">证件<b>原件和复印件一起带走</b>，别留在机器旁；复印件只用于本人求职等正当用途。</span>
-                </div>
-              ) : null}
-            </div>
-            <aside className="pff-done-side" aria-label="取件核对">
-              <b>已在本机出纸</b>
-              <span>{displayOrderNo ? `订单号 ${displayOrderNo}` : '核对页数'}</span>
-              <span>少页当场能处理</span>
-            </aside>
+      <div data-w2-page="print-done" data-print-flow-step={6} data-pff-head="xq" data-testid="print-fulfill-state-completed" className="pft-done">
+        <div className="pft-take" role="status">
+          <PrintArt name="stack" size={340} count={2} />
+          <div className="pft-take-tx">
+            <b>从出纸口取走</b>
+            <span>
+              {idDocument ? '拿走前记得核一下页数，证件原件和复印件一起带走。' : '拿走前记得核一下页数。'}
+              {' '}
+              {takeawayCopy.pagesLabel}{takeawayCopy.facesLabel ? ` · ${takeawayCopy.facesLabel}` : ''}
+            </span>
           </div>
         </div>
+        {idDocument ? (
+          <p className="pft-note">证件原件和复印件一起带走，别留在机器旁。</p>
+        ) : null}
+        <p className="pft-tray"><PrintIcon name="arrowD" size={72} strokeWidth={2.4} /><span>出纸口在下面</span></p>
 
-        {typeof hasEndUser === 'boolean' && (
-          <div className="pff-inbar" role="status">
-            <div className="pff-inbar-h">
-              <span className="pff-inbar-ic"><SmartphoneIcon aria-hidden="true" /></span>
-              <span>
-                {hasEndUser
-                  ? <>这单已经在你的小程序里<small>打开「我的 → 打印订单」就能看到</small></>
-                  : <>本次打印未关联账号<small>如需在小程序留存订单记录，下次打印前可先登录</small></>}
-              </span>
-            </div>
-          </div>
+        {/* 「这一单的记录」只在建单响应确认这一单关联了账号时才成立；没关联（false）或不知道（未知）时只说登录后看你的订单，不多承诺一层。 */}
+        {hasEndUser === false ? <p className="pft-dest" role="status">本次打印未关联账号</p> : null}
+        {hasEndUser === true && miniappPublished ? <p className="pft-dest" role="status">这单在手机『我的 → 打印订单』里能看到</p> : null}
+
+        <div className="pft-tiles">
+          <button type="button" className="qxt-tile qxt-tile-stack" onClick={() => navigate('/me/print-orders')}>
+            <span className="qxt-ic"><QxTouchIcon name="receipt" size={34} /></span>
+            <span className="qxt-tx"><b>查看打印订单</b><small>{hasEndUser === true ? '这一单的记录' : '登录后看你的订单'}</small></span>
+          </button>
+          <button type="button" className="qxt-tile qxt-tile-stack" onClick={() => navigate('/help')}>
+            <span className="qxt-ic"><PrintIcon name="help" size={34} /></span>
+            <span className="qxt-tx"><b>使用帮助</b><small>常见问题、服务电话</small></span>
+          </button>
+          {canReportIssue ? (
+            <button type="button" className="qxt-tile qxt-tile-stack" onClick={() => setFeedbackOpen(true)}>
+              <span className="qxt-ic qxt-ic-slate"><PrintIcon name="message" size={34} /></span>
+              <span className="qxt-tx"><b>反馈问题</b><small>不用登录也能写</small></span>
+            </button>
+          ) : null}
+        </div>
+
+        {state.pickupSource ? <p className="pft-again-note">要再打一份请在手机上重新下单</p> : (
+          <>
+            <button
+              type="button"
+              className="qxt-btn qxt-btn-sec pft-again"
+              data-testid="print-fulfill-reprint"
+              onClick={() => navigate(uploadPath)}
+            >
+              再印一份
+            </button>
+            <p className="qxt-fine">{reprintHint(amountCents)}</p>
+          </>
         )}
 
-        {displayOrderNo ? (
-          <div className="pff-meta">
-            <span className="pff-chip"><b>订单号</b> {displayOrderNo}</span>
-            <span className="pff-chip"><b>完成</b></span>
-          </div>
-        ) : null}
-
-        <div className="pff-wipe" data-live="true">
-          <div>
-            <div className="pff-wipe-t"><ShieldIcon aria-hidden="true" />一会儿结束本次使用</div>
-            <p className="pff-wipe-s">
-              {isLoggedIn
-                ? '不再点屏幕，到点会结束本次使用并退出登录，本机这次的打印预览一并收起。也可以现在就结束。'
-                : '不再点屏幕，到点会结束本次使用，本机这次的打印预览一并收起。也可以现在就结束。'}
-            </p>
-          </div>
-          <div className="pff-wipe-n">
-            <div className="n">{idleLeft}</div>
-            <div className="u">秒后结束使用</div>
-          </div>
-        </div>
-
         <div className="pff-help" data-testid="print-fulfill-fallback">
-          <span className="txt">少了页、印花了、对内容有疑问？<b>现在处理最方便</b>。</span>
-          <button type="button" className="pff-help-btn" onClick={() => navigate('/help')}>联系工作人员</button>
-        </div>
-        <PrintAiHelp
-          label="问小青：取纸或异常怎么办 →"
-          draft="打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。"
-        />
-
-        <div className="qx-card">
-          <b className="pff-info-hd">打印遇到问题？</b>
-          <span className="print-done-card-sub">缺页、卡纸、质量不佳等问题可在此反馈</span>
-          <div className="print-done-fb-group">
-            {canReportIssue && (
-              <button type="button" className="print-done-fb-btn" aria-label="反馈问题" onClick={() => setFeedbackOpen(true)}>
-                反馈问题
-              </button>
-            )}
-            <button type="button" className="print-done-fb-btn" aria-label="使用帮助" onClick={() => navigate('/help')}>
-              使用帮助
-            </button>
-            <button type="button" className="print-done-fb-btn" onClick={() => navigate('/me/print-orders')}>
-              查看打印订单
-            </button>
-          </div>
+          <span className="txt">少了页、印花了、对内容有疑问？{helpNeededLine()} 不再点屏幕，60 秒后结束本次使用；点一下屏幕重新计时。{isLoggedIn ? '到点会结束本次使用并退出登录，本机这次的打印预览一并收起。' : '到点会结束本次使用，本机这次的打印预览一并收起。'}</span>
         </div>
 
-        <PrintDoneRecordSection
-          file={file}
-          params={params}
-          retention={{
-            fileRetentionAvailable: verification?.fileRetentionAvailable,
-            fileExpiresAt: verification?.fileExpiresAt,
-            fileRetentionPolicy: verification?.fileRetentionPolicy,
-            fileDeletedAt: verification?.fileDeletedAt,
-            fileDeleteReason: verification?.fileDeleteReason,
-            fileStorageDeletedAt: verification?.fileStorageDeletedAt,
-          }}
-        />
+        <details className="pft-record">
+          <summary>本次打印记录{displayOrderNo ? ` · 订单 ${displayOrderNo}` : ''}</summary>
+          {displayOrderNo ? (
+            <div className="pff-meta">
+              <span className="pff-chip"><b>订单号</b> {displayOrderNo}</span>
+              <span className="pff-chip"><b>完成</b></span>
+            </div>
+          ) : null}
+          <PrintDoneRecordSection
+            file={file}
+            params={params}
+            retention={{
+              fileRetentionAvailable: verification?.fileRetentionAvailable,
+              fileExpiresAt: verification?.fileExpiresAt,
+              fileRetentionPolicy: verification?.fileRetentionPolicy,
+              fileDeletedAt: verification?.fileDeletedAt,
+              fileDeleteReason: verification?.fileDeleteReason,
+              fileStorageDeletedAt: verification?.fileStorageDeletedAt,
+            }}
+          />
+        </details>
       </div>
       {feedbackDialog}
-    </QxPageFrame>
+    </PrintTouchFrame>
+  )
+}
+
+/** 稿 done 意图带右侧的对勾章：一笔画出。 */
+function DoneCheckMark() {
+  return (
+    <svg className="pft-check" viewBox="0 0 150 150" width="130" height="130" aria-hidden="true">
+      <circle className="pft-check-ring" cx="75" cy="75" r="68" fill="none" strokeWidth="7" />
+      <path className="pft-check-tick" d="M46 77l20 20 40-42" fill="none" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   )
 }

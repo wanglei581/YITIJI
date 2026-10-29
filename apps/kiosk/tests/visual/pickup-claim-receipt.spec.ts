@@ -74,7 +74,9 @@ for (const printerCode of ['PRINT_TERMINAL_QUEUE_HALTED', 'PRINTER_UNAVAILABLE']
     await page.goto('/print/pickup-claim')
     await page.getByLabel('到机码输入框').fill('28491703')
     await expect(page.getByTestId('arrival-code-state-failed')).toBeVisible()
-    await expect(page.getByRole('alert')).toContainText(message)
+    await expect(page.getByRole('alert')).toContainText(message.replace(/，或找现场工作人员$/, ''))
+    await expect(page.getByRole('alert')).toContainText('需要帮助？')
+    await expect(page.getByRole('alert')).not.toContainText('找现场工作人员')
     // 输入框清空：扫码枪再扫不会接在旧码后面拼出错码；「重试校验」用失败时记下的原码重发。
     await expect(page.getByLabel('到机码输入框')).toHaveValue('')
     // W-117：公共终端上被拒的码不得继续回显；重试仍应提交同一码。
@@ -112,6 +114,8 @@ test('pickup idle names two codes and the same-code resume @w2', async ({ page, 
   api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', { status: 200, json: { enabled: false, idleTimeoutSec: 180, items: [] } })
   api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', { status: 200, json: { printerStatus: 'ready', isOnline: true, paperLevel: 'sufficient' } })
   await page.goto('/print/pickup-claim')
+  // 2026-10-28 稿 pickup：键盘下面只留一行折叠「两种码的区别 · 码找不到了」，点开才是两种码的说明与续打说明。
+  await page.getByText('两种码的区别 · 码找不到了').click()
   await expect(page.getByRole('heading', { name: '两种码，别搞混' })).toBeVisible()
   await expect(page.getByText('没打完？回到出纸失败的那台机器上，再输一次同一个到机码就能接着打，每单最多 2 次。')).toBeVisible()
   await expect(page.getByText('取件凭证码')).toHaveCount(0)

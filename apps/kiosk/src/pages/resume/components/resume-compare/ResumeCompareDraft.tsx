@@ -9,12 +9,12 @@ export function ResumeCompareDraft(props: {
 }) {
   const stats = decisionStats(props.items, props.decisions)
   return (
-    <details className="qx-card qxc-draft">
+    <details className="qxt-all qxt-draftlist">
       <summary>选择草稿</summary>
       <p>
         这是阅读草稿，不是简历最终稿；只有优化页编辑区的内容会进入导出。
       </p>
-      <p className="qxc-draft-stats">
+      <p className="qxt-draft-stats">
         已决定 {stats.decided}/{stats.total}
         {' · '}已采纳 {stats.adopt}
         {' · '}保留原文 {stats.keep}

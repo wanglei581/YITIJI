@@ -193,7 +193,75 @@ function assertRefreshButtonLockedWhileUploaded(src, label) {
   console.log(`PASS ${label}（disabled 由 ${source} 参与判定）`)
 }
 
-const source = read('src/pages/resume/ResumeSourcePage.tsx')
+/**
+ * 2026-10-28 简历三条主路返工：手机确认只许发一次。
+ * 交给页面的确认函数可能是旧一帧的闭包，闭包里的 confirming 不可靠，所以 handleConfirm 必须靠一个不随渲染变的
+ * 在途标记（confirmingRef）：先看标记、再立标记、立完才开始 await；try 的 finally 里放掉标记。
+ * 面板另在 effect 里把确认函数交给页面：只有「有文件且不在确认中」才交，其余交 null，卸载时也交一次 null。
+ */
+function assertConfirmSentOnce(src, label) {
+  const sourceFile = parsePanel(src)
+  const body = collectNamedBodies(sourceFile).get('handleConfirm')
+  if (!body) throw new Error(`${label}: 找不到 handleConfirm（结构已变，断言必须同步更新而不是删除）`)
+  const isMark = (node) => ts.isPropertyAccessExpression(node)
+    && ts.isIdentifier(node.expression)
+    && node.expression.text === 'confirmingRef'
+    && node.name.text === 'current'
+  let firstAwait = Infinity
+  let guardPosition = Infinity
+  let setPosition = Infinity
+  let releasedInFinally = false
+  const visit = (node, inFinally) => {
+    if (ts.isAwaitExpression(node)) firstAwait = Math.min(firstAwait, node.getStart())
+    if (ts.isIfStatement(node)) {
+      let mentions = false
+      const scan = (child) => { if (isMark(child)) mentions = true; ts.forEachChild(child, scan) }
+      scan(node.expression)
+      const thenReturns = ts.isReturnStatement(node.thenStatement)
+        || (ts.isBlock(node.thenStatement) && node.thenStatement.statements.some((statement) => ts.isReturnStatement(statement)))
+      if (mentions && thenReturns) guardPosition = Math.min(guardPosition, node.getStart())
+    }
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken && isMark(node.left)) {
+      if (node.right.kind === ts.SyntaxKind.TrueKeyword) setPosition = Math.min(setPosition, node.getStart())
+      if (node.right.kind === ts.SyntaxKind.FalseKeyword && inFinally) releasedInFinally = true
+    }
+    if (ts.isTryStatement(node)) {
+      ts.forEachChild(node.tryBlock, (child) => visit(child, inFinally))
+      if (node.catchClause) ts.forEachChild(node.catchClause, (child) => visit(child, inFinally))
+      if (node.finallyBlock) ts.forEachChild(node.finallyBlock, (child) => visit(child, true))
+      return
+    }
+    ts.forEachChild(node, (child) => visit(child, inFinally))
+  }
+  visit(body, false)
+  if (!Number.isFinite(guardPosition)) throw new Error(`${label}: handleConfirm 没有先看在途标记（confirmingRef.current）就返回的守卫，旧闭包能把确认发两遍`)
+  if (!Number.isFinite(setPosition)) throw new Error(`${label}: handleConfirm 从未把在途标记立起来（confirmingRef.current = true）`)
+  if (setPosition > firstAwait) throw new Error(`${label}: handleConfirm 先 await 才立在途标记，两次点击之间仍有窗口`)
+  if (guardPosition > setPosition) throw new Error(`${label}: handleConfirm 先立标记、后看标记，守卫形同虚设`)
+  if (!releasedInFinally) throw new Error(`${label}: handleConfirm 的 finally 里没有放掉在途标记，确认失败后再也点不了`)
+
+  // 交给页面的确认函数：只在「有文件且不在确认中」时有值。
+  let handOver = null
+  const findHandOver = (node) => {
+    if (!handOver && ts.isCallExpression(node) && node.expression.getText() === 'onConfirmReady' && node.arguments.length === 1) {
+      const arg = node.arguments[0]
+      if (ts.isConditionalExpression(arg)) handOver = arg
+    }
+    ts.forEachChild(node, findHandOver)
+  }
+  findHandOver(sourceFile)
+  if (!handOver) throw new Error(`${label}: 找不到 onConfirmReady?.(条件 ? 确认函数 : null)（结构已变，断言必须同步更新而不是删除）`)
+  const condition = handOver.condition.getText()
+  if (!/\buploaded\b/.test(condition) || !/!\s*confirming\b/.test(condition)) {
+    throw new Error(`${label}: 交给页面的确认函数没有同时要求「有文件」和「不在确认中」：${condition}`)
+  }
+  if (handOver.whenFalse.kind !== ts.SyntaxKind.NullKeyword) throw new Error(`${label}: 不可确认时必须交 null`)
+  console.log(`PASS ${label}`)
+}
+
+// 2026-10-28 触屏版：来源页「在哪里」一步的版面（来源卡、手机 / U 盘面板、原件预览）在 touch/ResumeSourceWhere.tsx。
+// 判据对「页面 + 它的版面组件」整体成立（assertNotIncludes 因此只会更严）。
+const source = `${read('src/pages/resume/ResumeSourcePage.tsx')}\n${read('src/pages/resume/touch/ResumeSourceWhere.tsx')}`
 const panel = read('src/pages/upload/components/UploadSessionQrPanel.tsx')
 const phone = read('src/pages/upload/PhoneUploadPage.tsx')
 const phoneModel = read('src/pages/upload/phoneUploadModel.ts')
@@ -260,6 +328,12 @@ assertIncludes(panel, 'created.controlToken', 'Kiosk keeps control token outside
 assertIncludes(panel, 'UPLOAD_SESSION_NOT_FOUND', 'polling stops when session disappears')
 assertRefreshRevokesOldQrBeforeMinting(panel, 'refresh revokes the previous QR before minting a replacement')
 assertRefreshButtonLockedWhileUploaded(panel, 'an uploaded file cannot be discarded by refreshing the QR')
+assertConfirmSentOnce(panel, 'QR panel confirm is guarded by an in-flight ref and handed to the page only while a file waits and no confirm runs')
+assertMatches(panel, /return \(\) => \{\s*onConfirmReady\?\.\(null\)\s*\}/, 'QR panel hands the page a null confirm when it unmounts')
+assertNotIncludes(panel, 'confirmRef', 'QR panel no longer writes a ref during render for the page confirm')
+assertNotIncludes(source, 'phoneConfirmRef', 'resume source no longer reads a stale render-phase ref for the phone confirm')
+assertIncludes(source, 'const [phoneConfirm, setPhoneConfirm] = useState<(() => void) | null>(null)', 'resume source keeps the phone confirm in state so the dock redraws when it is taken away')
+assertIncludes(source, "label: phoneConfirmNow ? '确认使用这份文件' : '正在确认…', onClick: () => phoneConfirmNow?.(), disabled: !phoneConfirmNow", 'dock primary says 正在确认… and is disabled while the phone confirm is running')
 assertIncludes(panel, 'window.setInterval(() => setNow(Date.now()), 1_000)', 'QR countdown is driven by the server expiry timestamp')
 assertIncludes(panel, 'uploadSessionUserMessage', 'Kiosk QR errors use public-safe copy')
 assertIncludes(api, 'url.hash = fragment.toString()', 'phone upload token stays in URL fragment')

@@ -164,7 +164,8 @@ for (const [name, src] of all) {
 
 // 8) 加载更多 / 筛选为真实数据行为
 expectMatches(pageSrc, /\{nextCursor\s*&&/, '加载更多仅在后端返回 nextCursor 时出现')
-expectMatches(pageSrc, /aria-pressed=\{filterKey === f\.key\}/, '状态筛选 chips 带 aria-pressed')
+// 触屏版第 6 包：证据锚点随稿换字，判据不变。
+expectMatches(pageSrc, /<MeSeg[\s\S]{0,40}mode="pressed"[\s\S]{0,120}current=\{filterKey\}/, '状态筛选 chips 带 aria-pressed（MeSeg pressed 模式）')
 
 // 9) 客户端筛选空态不误导：筛选非 all 且仍有 nextCursor（未加载完）时提示继续加载，
 //    不把「已加载页无此类」表述成「全量无此类」。
@@ -193,7 +194,7 @@ expectMatches(summarySrc, /duplexDisplay\(item\.duplex\)/, '单双面走 helper�
 expectMatches(copySrc, /return duplexShortLabel\(duplex\) \?\? UNRECORDED/, 'duplex 缺失显示未记录')
 expectMatches(copySrc, /return UNRECORDED/, '打印参数 helper 以未记录为缺省')
 expectAbsent(summarySrc, /print_duplex_surcharge|双面附加/, '详单不把双面渲染成计价项')
-expectMatches(pageSrc, /duplexShortLabel\(item\.duplex\)/, '列表摘要在有记录时展示单双面')
+expectMatches(summarySrc, /duplexDisplay\(item\.duplex\)/, '详单在有记录时展示单双面（触屏稿：列表只留状态、时间、支付，打印参数进详单）')
 
 // 15) 优惠 / 已退款展示服务端字段；实付无独立字段标未记录；前端不推算。
 expectMatches(summarySrc, /label="下单金额"/, '详单展示下单金额（amountCents）')
@@ -211,7 +212,7 @@ expectMatches(copySrc, /NET_PAID_UNRECORDED = '未记录'/, '实付未记录文�
 expectMatches(copySrc, /pageRange\.trim\(\)\.length === 0\) return '全部页'/, '页范围没传显示全部页')
 expectMatches(copySrc, /toLowerCase\(\) === 'all' \? '全部页'/, '页范围 all 显示全部页')
 expectMatches(pageSrc, /0 元（免费试运营）/, '列表 0 元写免费试运营')
-expectMatches(pageSrc, /publicOrderNo\(item\.orderNo\)/, '列表只显示 ORD- 订单号')
+expectMatches(summarySrc, /const orderNo = publicOrderNo\(item\.orderNo\)/, '订单号只在详单里显示，且只认 ORD-（触屏稿列表不写订单号）')
 expectAbsent(summarySrc, /amountCents[\s\S]{0,40}-[\s\S]{0,40}discountCents/, '详单不按应付减优惠推算实付')
 expectAbsent(copySrc, /amountCents\s*-/, 'paymentCopy 不计算实付')
 expectMatches(
@@ -242,7 +243,7 @@ expectMatches(pageSrc, /document\.visibilityState\s*!==\s*'visible'/, '页面不
 expectMatches(pageSrc, /let\s+inFlight\s*=\s*false[\s\S]{0,300}cancelled\s*\|\|\s*inFlight[\s\S]{0,1000}inFlight\s*=\s*false/, '轮询有 in-flight 闸门，避免快速切换页面产生并发请求')
 expectMatches(pageSrc, /items\.slice\(0,\s*MAX_REFRESH_PAGE_SIZE\)\.filter/, 'active 统计限制在本轮可刷新的前 50 条，避免深分页 active 无限轮询')
 expectMatches(pageSrc, /setAutoRefreshFailed\(true\)/, '轮询失败只进入自动刷新提示态，不覆盖既有列表')
-expectMatches(pageSrc, /<span role="status" aria-live="polite">[\s\S]{0,80}自动刷新失败/, '自动刷新失败提示对读屏播报')
+expectMatches(pageSrc, /<span role="status" aria-live="polite">[\s\S]{0,80}刷新没成功/, '自动刷新失败提示对读屏播报（稿上的说法：刷新没成功，过一会儿会再试）')
 expectAbsent(pageSrc, /<div[\s\S]{0,180}aria-live="polite"[\s\S]{0,180}autoRefreshChecking/, '常规 5 秒刷新文案不使用 aria-live，避免读屏反复播报')
 expectAbsent(pageSrc + refreshSrc, /failureReasonForUser|errorCode|errorMessage/, '本轮不在我的打印订单页回显失败原因或内部错误字段')
 
@@ -250,8 +251,16 @@ expectAbsent(pageSrc + refreshSrc, /failureReasonForUser|errorCode|errorMessage/
 expectMatches(copySrc, /PENDING_REFUND_LABEL = '待退款'/, '待退款标签在 paymentCopy')
 expectMatches(
   copySrc,
-  /PENDING_REFUND_EXPLANATION =\s*'本单已确认未出纸，退款由工作人员处理，到账时间以支付渠道为准'/,
-  '待退款说明不写到账天数',
+  /PENDING_REFUND_EXPLANATION =\s*'本单已确认未出纸，退款会按支付渠道处理，到账时间以支付渠道为准'/,
+  '待退款说明不写到账天数（说法照触屏稿：退款会按支付渠道处理）',
+)
+// 现场无人值守：待退款说明不写「由工作人员处理」，详单在说明后面给标准句 1（服务电话）。
+expectAbsent(copySrc, /工作人员/, '待退款说明不写工作人员')
+expectAbsent(summarySrc, /工作人员/, '详单不写工作人员')
+expectMatches(
+  summarySrc,
+  /\{PENDING_REFUND_EXPLANATION\}。\{helpNeededLine\(contact\)\}。/,
+  '详单待退款说明后面跟标准句 1（服务电话），0 元单与付费单是同一句',
 )
 expectMatches(copySrc, /item\.refundRequired === true/, 'memberPayStatusLabel 以服务端 refundRequired 为准')
 expectMatches(copySrc, /refunding:\s*\{\s*label:\s*'退款中'/, '退款中单独展示，不伪装已退款')

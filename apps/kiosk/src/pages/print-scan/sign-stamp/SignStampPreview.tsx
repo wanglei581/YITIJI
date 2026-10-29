@@ -36,7 +36,6 @@ function stampBox(position: SignStampPosition, size: SignStampSize, aspect: numb
 export function SignStampPreview({
   compact,
   document,
-  pages,
   stamp,
   result,
   viewPage,
@@ -48,14 +47,10 @@ export function SignStampPreview({
   placePage,
   burned,
   outErr,
-  onViewPage,
-  onViewMode,
-  onZoom,
   onPreviewError,
 }: {
   compact?: boolean
   document: PickedFile | null
-  pages: number | null
   stamp: PickedFile | null
   result: ComposeResult | null
   viewPage: number
@@ -67,14 +62,10 @@ export function SignStampPreview({
   placePage?: number
   burned: boolean
   outErr: 'render' | 'expired' | null
-  onViewPage: (page: number) => void
-  onViewMode: (mode: ViewMode) => void
-  onZoom: (zoom: number) => void
   onPreviewError: () => void
 }) {
   const viewRef = useRef<HTMLDivElement>(null)
   const drag = useRef<{ id: number; x: number; y: number; sl: number; st: number } | null>(null)
-  const pageCount = pages ?? 1
   const previewUrl = (burned ? result?.printFileUrl : document?.fileAccessUrl) || ''
 
   useEffect(() => {
@@ -88,7 +79,7 @@ export function SignStampPreview({
     return (
       <section className="ss-pvcol" aria-label="文档完整页预览">
         <div className="ss-pv-empty" data-testid="sign-stamp-pv-unavailable">
-          <FileTextIcon size={44} />
+          <span className="ss-pv-badge" aria-hidden="true"><FileTextIcon size={48} /></span>
           <b>{outErr === 'expired' ? '预览链接已过期' : '这份预览暂时打不开'}</b>
           <span>
             {outErr === 'expired'
@@ -160,14 +151,14 @@ export function SignStampPreview({
             top: `${(box.y / PAGE_H) * 100}%`,
             width: `${(box.w / PAGE_W) * 100}%`,
             height: `${(box.h / PAGE_H) * 100}%`,
-            fontSize: 15,
+            fontSize: 20,
           }
         : {
             left: box.x * scale,
             top: box.y * scale,
             width: box.w * scale,
             height: box.h * scale,
-            fontSize: Math.max(15, box.h * 0.26 * scale),
+            fontSize: Math.max(20, box.h * 0.26 * scale),
           }}
     >
       签名图
@@ -176,79 +167,6 @@ export function SignStampPreview({
 
   return (
     <section className="ss-pvcol" aria-label="文档完整页预览">
-      {!compact && (
-        <div className="ss-pvbar" data-testid="sign-stamp-pv-toolbar">
-          <div className="ss-pvrow">
-            <button type="button" className="ss-pvbtn" data-testid="sign-stamp-pv-prev" aria-label="上一页" disabled={viewPage <= 1} onClick={() => onViewPage(viewPage - 1)}>
-              上一页
-            </button>
-            <span className="ss-pvlabel" data-testid="sign-stamp-pv-pagelabel">
-              第 {viewPage} 页 / 共 {pageCount} 页
-            </span>
-            <button type="button" className="ss-pvbtn" data-testid="sign-stamp-pv-next" aria-label="下一页" disabled={viewPage >= pageCount} onClick={() => onViewPage(viewPage + 1)}>
-              下一页
-            </button>
-            <button type="button" className="ss-pvbtn" data-testid="sign-stamp-pv-jump2" aria-label="跳到第 2 页" onClick={() => onViewPage(Math.min(2, pageCount))}>
-              第2页
-            </button>
-            <button type="button" className="ss-pvbtn" data-testid="sign-stamp-pv-last" aria-label="跳到末页" onClick={() => onViewPage(pageCount)}>
-              末页
-            </button>
-          </div>
-          <div className="ss-pvrow">
-            <button type="button" className="ss-pvbtn" data-testid="sign-stamp-pv-fit-page" aria-pressed={viewMode === 'page'} aria-label="适整页显示" onClick={() => onViewMode('page')}>
-              适整页
-            </button>
-            <button type="button" className="ss-pvbtn" data-testid="sign-stamp-pv-fit-width" aria-pressed={viewMode === 'width'} aria-label="适宽显示" onClick={() => onViewMode('width')}>
-              适宽
-            </button>
-            <button
-              type="button"
-              className="ss-pvbtn"
-              data-testid="sign-stamp-pv-zoom-out"
-              aria-label="缩小"
-              disabled={viewMode !== 'zoom' || zoom <= 0}
-              onClick={() => {
-                const next = Math.max(0, zoom - 1)
-                onZoom(next)
-                if (next === 0) onViewMode('page')
-              }}
-            >
-              −
-            </button>
-            <button
-              type="button"
-              className="ss-pvbtn"
-              data-testid="sign-stamp-pv-zoom-in"
-              aria-label="放大"
-              disabled={viewMode === 'zoom' && zoom >= ZOOMS.length - 1}
-              onClick={() => {
-                onViewMode('zoom')
-                onZoom(Math.min(ZOOMS.length - 1, viewMode === 'zoom' ? zoom + 1 : 2))
-              }}
-            >
-              ＋
-            </button>
-            <span className="ss-pvlabel" data-testid="sign-stamp-pv-zoomlabel">
-              {viewMode === 'width' ? '适宽' : viewMode === 'zoom' ? '放大' : '适整页'} · {Math.round((scale / fitPage) * 100)}%
-            </span>
-            <button
-              type="button"
-              className="ss-pvbtn"
-              data-testid="sign-stamp-pv-zoom"
-              aria-pressed={viewMode === 'zoom'}
-              aria-label="切到放大模式"
-              onClick={() => {
-                onViewMode('zoom')
-                if (zoom < 1) onZoom(2)
-              }}
-            >
-              放大
-            </button>
-          </div>
-        </div>
-      )}
-
       <div
         className="ss-pv-view"
         ref={viewRef}
@@ -280,7 +198,7 @@ export function SignStampPreview({
             data-preview-kind="no-file"
             style={{ position: 'relative', left: 20, top: 20, width: pw, height: ph }}
           >
-            <p style={{ margin: 24, fontSize: 18, lineHeight: 1.5 }}>没有可打开的文件内容，这里不画示意纸面。</p>
+            <p style={{ margin: 24, fontSize: 20, lineHeight: 1.5 }}>没有可打开的文件内容，这里不画示意纸面。</p>
             {marker}
           </div>
         )}
@@ -291,7 +209,7 @@ export function SignStampPreview({
           : burned
             ? '生成的新 PDF · 签名已印在纸上'
             : compact
-              ? `原 PDF 第 ${viewPage} 页 · 下一步可翻页放大`
+              ? `原 PDF 第 ${viewPage} 页`
               : '原 PDF · 框是标记，原件不改写'}
       </div>
     </section>

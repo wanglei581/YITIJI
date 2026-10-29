@@ -679,6 +679,18 @@ button.kproto-badge {
   gap: 20px;
 }
 
+.qxt-screen .kproto.kproto-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.qxt-screen .sc-mod-grid {
+  flex: 1;
+  grid-auto-rows: 1fr;
+}
+
 .sc-mod {
   display: flex;
   min-height: 220px;

@@ -107,14 +107,21 @@ if (/工作人员/.test(hookSrc)) fail('useTerminalDeviceStatus 不许出现「�
 else pass('useTerminalDeviceStatus 不把人引向现场工作人员')
 const hubPageSrc = read('src/pages/print-scan/PrintScanHomePage.tsx')
 expectMatches(hubPageSrc, /device\.printer\.errorCode === 'paperEmpty'/, 'W-117 缺纸单独识别，不归入离线文案')
-expectMatches(hubPageSrc, /打印机缺纸，请找现场工作人员加纸/, 'W-117 缺纸提示加纸出路')
-expectMatches(hubPageSrc, /打印机异常，请找现场工作人员检查/, 'W-117 真实异常不说成离线')
+// 2026-10-28 触屏版第 5 版（稿 print / st-device-off）：状态由顶栏胶囊和卡片角标各说一次，提醒条只留标准句。
+// 离线与异常的区别由真实设备状态词（device.printerLabel）承担，不再各写一句话；缺纸另有一版面（paperOff）。
+// 断言随之改指新结构，强度不变：状态词写死、缺纸说明被删、求助不走服务电话，仍然会红。
+expectMatches(
+  hubPageSrc,
+  /label:\s*device\.printerLabel,\s*notice:\s*machineCannotPrintLine\(contact\)/,
+  'W-117 离线与异常的状态词取自真实设备状态，求助走服务电话（不找现场工作人员）',
+)
+expectMatches(hubPageSrc, /paperOff\s*=\s*hubState === 'device-off' && device\.printer\.errorCode === 'paperEmpty'/, 'W-117 缺纸只在确定缺纸时单独成版面，异常与离线不冒充缺纸')
 const hubView = read('src/pages/print-scan/components/QxPrintHubView.tsx')
-expectMatches(hubView, /capabilities\.filter\(\(item\) => item\.actionable/, 'W-117 提示条只声明真可用的服务')
-expectMatches(hubView, /usableServices=.*usableServices/, 'W-117 可用服务进入设备异常提示条')
+expectMatches(hubView, /打印机缺纸，这次出不了纸/, 'W-117 缺纸单独说明（稿 st-device-off）')
+expectMatches(hubView, /transferCaps\.some\(\(item\) => item\.actionable\)/, 'W-117 「先传、稍后打印」只在传文件类入口真可用时才出现')
 const uploadSrc = read('src/pages/print/PrintUploadPage.tsx')
 const homeDomainSrc = read('src/pages/home/homeDomainStatus.ts')
-const homeViewSrc = read('src/pages/home/components/QxHomeView.tsx')
+const homeViewSrc = read('src/pages/home/components/HomeTouchView.tsx')
 for (const status of ['queue_cleanup_failed', 'queue_pause_failed']) {
   const marker = `case '${status}':`
   const idx = hookSrc.indexOf(marker)

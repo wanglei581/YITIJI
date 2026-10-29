@@ -1,404 +1,458 @@
-/* 图片转 PDF · 青序流光
- * 视觉真值：docs/design/kiosk-redesign-2026-08/19-img2pdf.html
- * 地基按钮/卡片/操作条不在这里重复。多图列表必须真实可滚，不照抄原型只露出 3 张的缺陷。
+/* 图片转 PDF · 触屏版第 5 版稿 18「照片合成 PDF」
+ * 页面专用样式，颜色一律走 --qxt-* / --qx-* 令牌，不改 .qxt-*。
+ * 说明格 / 整行按钮的基础样式在 tool-fs.css（.fs-fact / .fs-row / .fs-2 …），这里只补本页独有的件：
+ *   待合并列表（缩略图 + 名字 + 第几张）、更多设置、示意小样、完成页的状态卡、查看大图层。
+ * 版式规矩（审查意见 A1）：卡片按内容定高，多出来的高度只给 .i2p-sample（一块示意小样），不撑空卡；
+ * 列表在自己的滚动区里滚（.i2p-lrows），其余块都是 .i2p-scroll 的直接子块，上下相邻、互不压盖。
  */
 
-.qx-stage:has(.i2p-page) .qx-body {
-  padding-left: 0;
-  padding-right: 0;
-  min-height: 0;
-}
-
 .i2p-page {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
 .i2p-scroll {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 0 44px 16px;
-  touch-action: pan-y;
-  overscroll-behavior: contain;
-}
-
-.i2p-xq {
-  flex: none;
-  margin: 16px 44px 0;
-  border-radius: 30px;
-  padding: 20px 34px 18px;
-  background: linear-gradient(158deg, var(--qx-deep-2) 0%, var(--qx-deep) 68%);
-  color: var(--qx-paper);
-  position: relative;
-  overflow: hidden;
-}
-.i2p-xq::after {
-  content: '';
-  position: absolute;
-  right: -140px;
-  top: -140px;
-  width: 420px;
-  height: 420px;
-  border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--qx-emerald) 16%, transparent), transparent 65%);
-}
-.i2p-xq-row { display: flex; align-items: center; gap: 22px; position: relative; z-index: 1; }
-.i2p-xq-face {
-  flex: none;
-  width: 78px; height: 78px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--qx-emerald) 10%, transparent);
-  border: 1.5px solid color-mix(in srgb, var(--qx-emerald) 40%, transparent);
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--qx-serif);
-  font-size: 38px;
-  color: var(--qx-emerald);
-}
-/* 眉题 2026-09-30 换成中文「图片转 PDF」，字号、字距、颜色照稿 19 v2 覆盖块。 */
-.i2p-xq-eyebrow { font-size: var(--qx-fs-aux-lg); letter-spacing: 2px; color: color-mix(in srgb, var(--qx-paper) 90%, transparent); margin-bottom: 6px; }
-.i2p-xq-ask { font-family: var(--qx-serif); font-size: 34px; line-height: 1.28; font-weight: 700; }
-.i2p-xq-ask em { font-style: normal; color: var(--qx-emerald); }
-.i2p-xq-doing { margin-top: 8px; font-size: 20px; line-height: 1.5; color: color-mix(in srgb, var(--qx-paper) 74%, transparent); }
-.i2p-xq-doing b { color: var(--qx-on-solid); font-weight: 600; }
-
-.i2p-sec-label { display: flex; align-items: baseline; gap: 16px; }
-.i2p-sec-label .no { font-family: var(--qx-serif); font-size: 20px; color: var(--qx-teal-d); font-weight: 700; letter-spacing: 2px; }
-.i2p-sec-label .t { font-size: 28px; font-weight: 700; }
-.i2p-sec-label .hint { font-size: 19px; color: var(--qx-ink-3); margin-left: auto; font-variant-numeric: tabular-nums; }
-
-.i2p-addrow { display: flex; gap: 16px; }
-.i2p-add {
-  flex: 1;
-  min-height: 96px;
-  border-radius: 20px;
-  border: 2px dashed var(--qx-line-2);
-  background: var(--qx-surface);
-  display: flex; align-items: center; justify-content: center; gap: 14px;
-  font-size: 21px; font-weight: 600; color: var(--qx-ink-2);
-  cursor: pointer;
-}
-.i2p-add:disabled, .i2p-add[aria-disabled='true'] { opacity: .5; cursor: default; }
-.i2p-add:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
-
-.i2p-srcnote { display: flex; gap: 16px; }
-.i2p-srcnote > div { flex: 1; min-width: 0; font-size: 17px; line-height: 1.42; color: var(--qx-ink-3); }
-.i2p-srcnote b { color: var(--qx-ink-2); font-weight: 600; }
-.i2p-srcnote em { font-style: normal; color: var(--qx-wheat-d); font-weight: 600; }
-
-.i2p-epane {
-  background: var(--qx-surface);
-  border: 1px solid var(--qx-line);
-  border-radius: 32px;
-  padding: 18px 22px;
-  display: flex;
-  gap: 22px;
-  min-height: 0;
-}
-.i2p-epane > .ep-l, .i2p-epane > .ep-r { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
-.i2p-epane > .ep-l { flex: 1.06; }
-.i2p-epane > .ep-r { flex: 1; }
-.i2p-ep-h { display: flex; align-items: baseline; gap: 12px; font-size: 21px; font-weight: 700; }
-.i2p-ep-h .r { margin-left: auto; font-size: 17px; font-weight: 600; color: var(--qx-ink-3); }
-
-.i2p-ghostwrap {
-  flex: 1; min-height: 0;
-  border: 1px dashed var(--qx-line-2);
-  border-radius: 24px;
-  background: var(--qx-paper);
-  padding: 8px 14px;
-  display: flex; flex-direction: column; justify-content: space-between;
-}
-.i2p-grow-r {
-  min-height: 72px;
-  display: flex; align-items: center; gap: 12px;
-  border-bottom: 1px solid var(--qx-line);
-}
-.i2p-grow-r:last-child { border-bottom: 0; }
-.i2p-gi {
-  flex: none; width: 50px; height: 50px; border-radius: 15px;
-  border: 1px dashed var(--qx-line-2); background: var(--qx-surface);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 20px; font-weight: 700; color: var(--qx-ink-3);
-}
-.i2p-gt { flex: none; width: 56px; height: 70px; border-radius: 8px; border: 1px dashed var(--qx-line-2); background: var(--qx-surface); }
-.i2p-gm { flex: 1; min-width: 0; font-size: 17px; line-height: 1.3; color: var(--qx-ink-3); }
-.i2p-gm b { display: block; font-size: 19px; font-weight: 600; color: var(--qx-ink-2); }
-.i2p-ga { flex: none; display: flex; gap: 7px; color: var(--qx-ink-3); }
-.i2p-ga span {
-  width: 48px; height: 48px; border-radius: 12px;
-  border: 1px solid var(--qx-line-2); background: var(--qx-surface);
-  display: flex; align-items: center; justify-content: center;
-}
-.i2p-grow-r.on .i2p-gi { border-style: solid; border-color: var(--qx-teal); color: var(--qx-teal-d); background: var(--qx-teal-soft); }
-
-.i2p-ghostbar { display: flex; gap: 9px; }
-.i2p-ghostbar span {
-  flex: 1; min-height: 56px; border-radius: 16px;
-  border: 1px solid var(--qx-line-2); background: var(--qx-paper); color: var(--qx-ink-3);
-  display: flex; align-items: center; justify-content: center; gap: 7px;
-  font-size: 18px; font-weight: 600; opacity: .72;
-}
-.i2p-ghostbar span.off { flex: 1.3; color: var(--qx-wheat-d); border-color: var(--qx-wheat-soft); background: var(--qx-wheat-soft); opacity: 1; }
-
-.i2p-epsteps { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
-.i2p-epstep { display: flex; gap: 13px; align-items: center; border-bottom: 1px solid var(--qx-line); padding-bottom: 10px; }
-.i2p-epstep:last-child { border-bottom: 0; padding-bottom: 0; }
-.i2p-sn {
-  flex: none; width: 42px; height: 42px; border-radius: 14px;
-  background: var(--qx-teal-soft); color: var(--qx-teal-d);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 19px; font-weight: 700;
-}
-.i2p-sb { flex: 1; min-width: 0; font-size: 18px; line-height: 1.45; color: var(--qx-ink-2); }
-.i2p-sb b { display: block; font-size: 20px; font-weight: 700; color: var(--qx-ink); margin-bottom: 2px; }
-.i2p-sb em { font-style: normal; color: var(--qx-wheat-d); font-weight: 600; }
-.i2p-ep-cap { font-size: 17px; line-height: 1.45; color: var(--qx-ink-3); }
-.i2p-ep-cap b { color: var(--qx-ink-2); font-weight: 600; }
-
-.i2p-limitbar {
-  background: var(--qx-surface);
-  border: 1px solid var(--qx-line);
-  border-radius: 32px;
-  padding: 16px 22px;
-  display: flex; flex-direction: column; gap: 10px;
-}
-.i2p-lb-h { display: flex; align-items: baseline; gap: 12px; font-size: 21px; font-weight: 700; }
-.i2p-lb-h .r { margin-left: auto; font-size: 17px; font-weight: 600; color: var(--qx-ink-3); }
-.i2p-lb-c { display: flex; gap: 10px; flex-wrap: wrap; }
-.i2p-chip {
-  min-height: 48px; padding: 0 18px; border-radius: 14px;
-  background: var(--qx-paper); border: 1px solid var(--qx-line-2);
-  display: inline-flex; align-items: center; font-size: 18px; color: var(--qx-ink-2); font-weight: 600;
-}
-.i2p-chip.warn { background: var(--qx-wheat-soft); border-color: transparent; color: var(--qx-wheat-d); }
-.i2p-chip.bad { background: var(--qx-cinnabar-soft); border-color: transparent; color: var(--qx-cinnabar-d); }
-.i2p-chip.ok { background: var(--qx-teal-soft); border-color: transparent; color: var(--qx-teal-d); }
-.i2p-lb-n { font-size: 17px; line-height: 1.45; color: var(--qx-ink-3); }
-.i2p-lb-n b { color: var(--qx-wheat-d); font-weight: 600; }
-
-.i2p-lwrap {
-  background: var(--qx-surface);
-  border: 1px solid var(--qx-line);
-  border-radius: 32px;
-  padding: 16px 20px 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 0;
-}
-.i2p-lwrap.qx-grow { flex: 1 1 auto; }
-.i2p-lhead { display: flex; align-items: baseline; gap: 14px; font-size: 22px; font-weight: 700; }
-.i2p-lhead .sub { margin-left: auto; font-size: 18px; font-weight: 600; color: var(--qx-ink-3); font-variant-numeric: tabular-nums; }
-
-.i2p-lrows {
-  flex: 1 1 auto;
-  min-height: 232px;
-  max-height: none;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-gutter: stable;
-  padding-right: 4px;
   touch-action: pan-y;
   overscroll-behavior: contain;
 }
+
+/* 子块一律按内容定高，不被 flex 压扁（压扁会让里面的字溢出去盖住下一块）。
+ * 只有示意小样（.i2p-sample）吃余量，也只有它能缩。 */
+.i2p-scroll > * {
+  flex: none;
+}
+
+[data-qx-page='img2pdf'] .i2p-scroll .fs-facts,
+[data-qx-page='img2pdf'] .i2p-scroll .fs-pairgrid,
+[data-qx-page='img2pdf'] .i2p-scroll .fs-pair {
+  flex: none;
+}
+
+/* 空态的操作卡吃掉整屏余量（稿：手机扫码卡和停用的 U 盘卡各占半屏，里面是大示意图）。 */
+[data-qx-page='img2pdf'][data-state='empty'] .i2p-scroll .fs-pair {
+  flex: 1 1 auto;
+}
+
+/* 停用的 U 盘卡按内容定高（虚线卡、底和井同色，拉高了就是一大片空白）；余量给手机扫码那张卡。 */
+[data-qx-page='img2pdf'][data-state='empty'] .i2p-scroll .fs-act:disabled {
+  flex: 0 0 auto;
+}
+
+[data-qx-page='img2pdf'] .i2p-scroll .fs-fact {
+  min-height: 0;
+}
+
+/* ── 待合并列表：一张卡（表头 + 行 + 两句限制）。行多了在 .i2p-lrows 里滚。 ── */
+.i2p-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 26px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  min-height: 0;
+}
+
+.i2p-lhead {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--qxt-ink);
+}
+
+.i2p-lhead .sub {
+  margin-left: auto;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--qxt-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.i2p-lrows {
+  flex: none;
+  max-height: 540px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scrollbar-gutter: stable;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+}
+
 .i2p-lrows::-webkit-scrollbar { width: 10px; }
-.i2p-lrows::-webkit-scrollbar-track { background: var(--qx-paper); border-radius: 5px; }
-.i2p-lrows::-webkit-scrollbar-thumb { background: var(--qx-line-2); border-radius: 5px; }
+.i2p-lrows::-webkit-scrollbar-thumb { background: var(--qxt-line); border-radius: 5px; }
 
 .i2p-irow {
-  display: flex; align-items: center; gap: 12px;
-  min-height: 116px;
-  border-bottom: 1px solid var(--qx-line);
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  min-height: 104px;
 }
-.i2p-irow:last-child { border-bottom: 0; }
-.i2p-ipick {
-  flex: 1; min-width: 0;
-  display: flex; align-items: center; gap: 14px;
+
+[data-qx-page='img2pdf'] .i2p-ipick {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  background: var(--qxt-well);
+  border: 1.5px solid transparent;
   text-align: left;
-  min-height: 100px;
-  border-radius: 18px;
-  padding: 0 10px;
-  border: 2px solid transparent;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
+  color: var(--qxt-ink);
 }
-.i2p-ipick[aria-pressed='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
-.i2p-idx {
-  flex: none; width: 52px; height: 52px; border-radius: 16px;
-  border: 1px solid var(--qx-line-2); background: var(--qx-paper);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 21px; font-weight: 700; color: var(--qx-ink-3); font-variant-numeric: tabular-nums;
+
+[data-qx-page='img2pdf'] .i2p-ipick[aria-pressed='true'] {
+  background: var(--qx-deep, var(--qxt-deep-2));
+  border-color: var(--qx-deep, var(--qxt-deep-2));
+  color: var(--qxt-cream);
 }
-.i2p-ipick[aria-pressed='true'] .i2p-idx { background: var(--qx-surface); border-color: var(--qx-teal); color: var(--qx-teal-d); }
+
 .i2p-ithumb {
-  flex: none; width: 76px; height: 94px; border-radius: 8px;
-  border: 1px solid var(--qx-line-2); background: var(--qx-on-solid);
-  overflow: hidden; display: flex; align-items: center; justify-content: center;
+  flex: none;
+  width: 72px;
+  height: 88px;
+  border-radius: 8px;
+  border: 1px solid var(--qxt-line);
+  background: var(--qxt-card);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.i2p-ithumb img { display: block; width: 100%; height: 100%; object-fit: contain; }
-.i2p-imeta { flex: 1; min-width: 0; }
-.i2p-imeta b { display: block; font-size: 21px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.i2p-imeta span { display: block; margin-top: 3px; font-size: 17px; color: var(--qx-ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.i2p-ibtn {
-  flex: none; width: 60px; height: 60px; border-radius: 18px;
-  border: 1px solid var(--qx-line-2); background: var(--qx-paper);
-  display: flex; align-items: center; justify-content: center; color: var(--qx-ink-2);
-  cursor: pointer;
+
+.i2p-ithumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
-.i2p-ibtn:focus-visible, .i2p-ipick:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 2px; }
 
-.i2p-ordline { font-size: 17px; line-height: 1.4; color: var(--qx-ink-3); padding-top: 8px; border-top: 1px solid var(--qx-line); }
-.i2p-ordline b { color: var(--qx-ink-2); font-weight: 700; margin-right: 8px; }
-
-.i2p-selbar { display: flex; gap: 10px; }
-.i2p-selbtn {
-  flex: 1; min-height: 64px; border-radius: 18px;
-  border: 1px solid var(--qx-line-2); background: var(--qx-surface);
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  font-size: 20px; font-weight: 600; color: var(--qx-ink); cursor: pointer;
+.i2p-imeta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
-.i2p-selbtn.del { border-color: color-mix(in srgb, var(--qx-cinnabar) 40%, var(--qx-line)); color: var(--qx-cinnabar-d); }
-.i2p-selbtn:disabled { opacity: .42; cursor: default; }
-.i2p-selbtn:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
-.i2p-rotnote { font-size: 17px; line-height: 1.45; color: var(--qx-wheat-d); font-weight: 600; }
 
-.i2p-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.i2p-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.i2p-pgrp {
-  background: var(--qx-surface);
-  border: 1px solid var(--qx-line);
-  border-radius: 24px;
-  padding: 14px 20px;
-  display: flex; flex-direction: column; gap: 8px;
+/* 24px 标题行的行高不低于 1.45（原因见 tool-fs.css 顶部「行高底线」），下面 .i2p-sample .tx b、.i2p-band-h 同。 */
+.i2p-imeta b {
+  font-size: 24px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
-.i2p-pgrp h4 { margin: 0; font-size: 21px; font-weight: 700; }
-.i2p-plan { margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
-.i2p-plan li { list-style: none; display: flex; gap: 12px; align-items: flex-start; font-size: 19px; line-height: 1.45; color: var(--qx-ink-2); }
-.i2p-sq { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--qx-teal); margin-top: 8px; }
-.i2p-kv { display: flex; flex-direction: column; gap: 8px; }
-.i2p-kv > div { display: flex; gap: 12px; font-size: 19px; color: var(--qx-ink-2); line-height: 1.35; }
-.i2p-kv > div > span:first-child { flex: none; width: 132px; color: var(--qx-ink-3); }
-.i2p-kv b { font-weight: 600; color: var(--qx-ink); font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; }
 
+.i2p-imeta span {
+  font-size: 22px;
+  line-height: 1.35;
+  color: var(--qxt-ink-2);
+}
+
+.i2p-ipick[aria-pressed='true'] .i2p-imeta span {
+  color: var(--qxt-mint);
+}
+
+[data-qx-page='img2pdf'] .i2p-ibtn {
+  flex: none;
+  width: 72px;
+  min-height: 72px;
+  border-radius: 20px;
+  background: var(--qxt-well);
+  border: 1.5px solid var(--qxt-edge);
+  color: var(--qxt-ink-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.i2p-list .fs-p,
+.i2p-more .fs-p {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+}
+
+/* ── 更多设置：上移、下移、移除、查看、旋转收在里面（稿 18）。 ── */
+.i2p-more {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 26px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+.i2p-more-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.i2p-more-grid .fs-row {
+  min-height: 76px;
+}
+
+/* ── 示意小样：多出来的高度给它（带走什么的实物小样，不撑空卡）。有字的版本在右边讲这份文件。 ── */
+.i2p-sample {
+  flex: 1 1 0;
+  min-height: 160px;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 24px;
+  padding: 16px 20px;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  overflow: hidden;
+}
+
+/* 带字的小样（编辑页「合成之后的 PDF」）里字要完整放下，不靠 overflow 裁掉：给足最小高度。 */
+.i2p-sample:not(.is-art-only) {
+  min-height: 280px;
+}
+
+.i2p-sample .vis {
+  flex: 0 1 52%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.i2p-sample.is-art-only .vis {
+  flex: 0 1 auto;
+}
+
+/* 手机宽度（舞台不缩放）：一整行只有 300 多像素，插画占一半字就挤了，回到四成。 */
+@media (max-width: 760px) {
+  [data-kiosk-stage-fit='off'] .i2p-sample:not(.is-art-only) .vis {
+    flex-basis: 40%;
+  }
+}
+
+.i2p-sample .vis .sx-art {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.i2p-sample .tx {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.i2p-sample .tx b {
+  font-size: 24px;
+  line-height: 1.45;
+  color: var(--qxt-ink);
+  overflow-wrap: anywhere;
+}
+
+.i2p-sample .tx span {
+  font-size: 22px;
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
+}
+
+/* ── 状态卡（完成、出错……）：和说明格同一副样子，按种类换底色。 ── */
 .i2p-band {
-  border-radius: 32px;
-  padding: 22px 30px;
-  border: 1px solid var(--qx-line);
-  background: var(--qx-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--qxt-well);
 }
-.i2p-band[data-kind='error'] { background: var(--qx-cinnabar-soft); border-color: color-mix(in srgb, var(--qx-cinnabar) 35%, var(--qx-line)); }
-.i2p-band[data-kind='warn'] { background: var(--qx-wheat-soft); border-color: color-mix(in srgb, var(--qx-wheat) 35%, var(--qx-line)); }
-.i2p-band[data-kind='lock'] { background: var(--qx-slate-soft); }
-.i2p-band[data-kind='info'] { background: var(--qx-teal-soft); }
-.i2p-band-h { display: flex; align-items: center; gap: 14px; font-size: 27px; font-weight: 700; }
-.i2p-band-p { margin-top: 10px; font-size: 20px; line-height: 1.55; color: var(--qx-ink-2); }
-.i2p-band-p b { color: var(--qx-ink); font-weight: 600; }
-.i2p-meta { margin-top: 12px; display: flex; gap: 12px; flex-wrap: wrap; }
+
+.i2p-band[data-kind='info'] { background: var(--qxt-teal-wash); color: var(--qxt-teal-ink); }
+.i2p-band[data-kind='warn'],
+.i2p-band[data-kind='error'] { background: var(--qxt-clay-wash); color: var(--qxt-clay-ink); }
+.i2p-band[data-kind='lock'] { background: var(--qxt-slate-wash); color: var(--qxt-slate-ink); }
+
+.i2p-band-h {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.i2p-band-p {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.45;
+}
+
+.i2p-band-p b {
+  font-weight: 700;
+}
+
+.i2p-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.i2p-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 18px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink-2);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
 .i2p-dot {
-  width: 16px; height: 16px; border-radius: 50%; background: var(--qx-teal); display: inline-block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--qxt-teal-ink);
+  display: inline-block;
   animation: i2p-breathe 1600ms ease-in-out infinite;
 }
-@keyframes i2p-breathe { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+
+@keyframes i2p-breathe { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+
 @media (prefers-reduced-motion: reduce) {
   .i2p-dot { animation: none; }
 }
 
-.i2p-cta-reason {
-  flex: none;
-  padding: 0 44px 10px;
-  font-size: 19px;
-  font-weight: 600;
-  color: var(--qx-wheat-d);
-}
-
-.i2p-truth {
-  flex: none;
-  padding: 14px 44px 8px;
+/* 完成页「这份文件」：名字、页数、大小、打印链接，一行一格。 */
+.i2p-outcard {
   display: flex;
-  gap: 26px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 26px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
 }
-.i2p-truth div { flex: 1; font-size: 17px; line-height: 1.45; color: var(--qx-ink-3); }
-.i2p-truth b { color: var(--qx-ink-2); font-weight: 600; }
 
-.i2p-ub-src { justify-content: flex-start; gap: 0; padding: 22px 24px; }
-.i2p-ub-ic {
-  width: 62px; height: 62px; border-radius: 20px;
-  background: var(--qx-teal-soft); color: var(--qx-teal-d);
-  display: flex; align-items: center; justify-content: center;
+.i2p-kv {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
-.i2p-ub-src.off { border-style: dashed; background: var(--qx-paper); }
-.i2p-ub-src.off .i2p-ub-ic { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
-.i2p-ub-n { display: block; margin-top: 16px; font-size: 24px; font-weight: 700; }
-.i2p-ub-d { margin-top: 16px; font-size: 18px; line-height: 1.5; color: var(--qx-ink-2); }
-.i2p-ub-to { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--qx-line); display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 600; color: var(--qx-teal-d); }
-.i2p-ub-src.off .i2p-ub-to { color: var(--qx-wheat-d); }
 
-.i2p-ub-ways { padding: 0; overflow: hidden; }
-.i2p-ub-way { padding: 20px 26px; display: flex; flex-direction: column; gap: 16px; }
-.i2p-ub-way + .i2p-ub-way { border-top: 1px solid var(--qx-line); background: var(--qx-paper); }
-.i2p-ub-wh { display: flex; align-items: baseline; gap: 16px; }
-.i2p-ub-wh b { font-size: 23px; font-weight: 700; }
-.i2p-ub-wh span { margin-left: auto; font-size: 18px; font-weight: 600; color: var(--qx-ink-3); }
-.i2p-ub-flow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.i2p-ub-node {
-  min-height: 86px; padding: 10px 20px; border-radius: 16px;
-  background: var(--qx-surface); border: 1px solid var(--qx-line-2);
-  display: inline-flex; flex-direction: column; justify-content: center; gap: 3px;
+.i2p-kv > div {
+  display: flex;
+  gap: 12px;
+  font-size: 22px;
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
 }
-.i2p-ub-node b { font-size: 20px; font-weight: 700; color: var(--qx-ink-2); }
-.i2p-ub-node i { font-style: normal; font-size: 17px; font-weight: 600; color: var(--qx-ink-3); }
-.i2p-ub-node.on { background: var(--qx-teal-soft); border-color: transparent; }
-.i2p-ub-node.on b { color: var(--qx-teal-d); }
-.i2p-ub-cut {
-  min-height: 86px; padding: 0 20px; border-radius: 16px;
-  background: var(--qx-wheat-soft); color: var(--qx-wheat-d);
-  display: inline-flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 700;
-}
-.i2p-ub-note { font-size: 18px; line-height: 1.5; color: var(--qx-ink-3); }
-.i2p-ub-note b { color: var(--qx-wheat-d); }
 
+.i2p-kv > div > span:first-child {
+  flex: none;
+  width: 132px;
+  color: var(--qxt-ink-3);
+}
+
+.i2p-kv b {
+  min-width: 0;
+  font-weight: 700;
+  color: var(--qxt-ink);
+  overflow-wrap: anywhere;
+}
+
+/* ── 查看大图层（单张原图 / 合成后的某一页）：整屏盖在这一屏上。 ── */
 .i2p-pv {
-  position: absolute; inset: 0; z-index: 20;
+  position: absolute;
+  inset: 0;
+  z-index: 20;
   background: color-mix(in srgb, var(--qx-deep) 78%, transparent);
-  display: flex; padding: 14px;
+  display: flex;
+  padding: 14px;
 }
+
 .i2p-pv-box {
-  flex: 1; min-height: 0;
+  flex: 1;
+  min-height: 0;
   border-radius: 30px;
-  background: var(--qx-surface);
-  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--qxt-card);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
+
 .i2p-pv-head {
-  flex: none; min-height: 132px;
-  display: flex; align-items: center; gap: 18px;
-  padding: 0 24px; border-bottom: 1px solid var(--qx-line);
+  flex: none;
+  min-height: 132px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--qxt-line);
 }
-.i2p-pv-t { font-size: 30px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.i2p-pv-s { margin-top: 6px; font-size: 19px; color: var(--qx-ink-3); }
+
+.i2p-pv-t {
+  font-size: 30px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.i2p-pv-s {
+  margin-top: 6px;
+  font-size: 20px;
+  color: var(--qxt-ink-2);
+}
+
 .i2p-pv-view {
-  flex: 1; min-height: 0;
+  flex: 1;
+  min-height: 0;
   background: var(--qx-deep);
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: auto;
 }
+
 .i2p-pv-view img {
-  max-width: 100%; max-height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   background: var(--qx-on-solid);
 }
+
 .i2p-pv-view [data-pdf-preview-host] {
   width: 100%;
   height: 100%;
   min-height: 0;
   background: var(--qx-on-solid);
 }
+
 .i2p-pv-fail {
   color: var(--qx-paper);
   text-align: center;
@@ -406,11 +460,14 @@
   font-size: 22px;
   font-weight: 700;
 }
+
 .i2p-pv-bar {
   flex: none;
-  border-top: 1px solid var(--qx-line);
+  border-top: 1px solid var(--qxt-line);
   padding: 14px 22px;
-  display: flex; gap: 11px; align-items: center;
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
 
 /* 无障碍隐藏。不用传统的 margin:-1px —— 那会把元素推到 left=-1，
@@ -419,10 +476,43 @@
    读屏仍能读到。 */
 .sr-only {
   position: absolute;
-  width: 1px; height: 1px;
-  padding: 0; margin: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: 0;
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   clip-path: inset(50%);
-  white-space: nowrap; border: 0;
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 二维码层：层是 880px 宽的居中卡，里面的扫码面板（旧共享件）靠左按内容排。 */
+.i2p-qr-layer .qxt-dialog {
+  align-items: stretch;
+  text-align: left;
+}
+
+/* 面板自己的标题（层标题之外那个 h2）：回到面板的字阶，不跟着层标题一样大。 */
+.i2p-qr-layer .qxt-dialog > :not(h2) h2 {
+  font: 700 28px/1.3 var(--qx-sans);
+}
+
+/* 大二维码：远处也扫得到。扫码面板是冻结的共享件（门禁按哈希钉着它），不改它的源码，
+ * 只在层里把二维码那个 svg 放大到 280px，并把它左边的格子（原 180px）撑到放得下。
+ * 只在 768px 以上放大：面板自己的两列版式就是 md: 断点（768px）才出现，手机宽度仍是它原来的一列，
+ * 不然 390 宽上 310px 的一列加文字列会把层撑出视口。 */
+@media (min-width: 768px) {
+  .i2p-qr-layer .qxt-dialog [class*='md:grid-cols-[180px_1fr]'] {
+    grid-template-columns: 310px minmax(0, 1fr);
+  }
+
+  .i2p-qr-layer .qxt-dialog [class*='md:grid-cols-[180px_1fr]'] > :first-child {
+    min-height: 310px;
+  }
+
+  .i2p-qr-layer .qxt-dialog svg:not([class]) {
+    width: 280px;
+    height: 280px;
+  }
 }

@@ -365,7 +365,8 @@ test('member report hard-replaces a clean homepage after the privacy deadline @p
   // 少任何一条都有洞：登录态但 displayName 为空时只有第 1 条能抓；
   // 姓名残留在问候语以外时只有第 2 条能抓。
   await expect(page.getByRole('button', { name: /登录后查看本人记录/ })).toBeVisible()
-  await expect(page.getByRole('heading', { name: /^(夜深了|上午好|中午好|下午好|晚上好)，我是小青$/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '我是小青', exact: true })).toBeVisible()
+  await expect(page.locator('.qxt-eyebrow')).toHaveText(/^(夜深了|上午好|中午好|下午好|晚上好)$/)
 })
 
 test('member privacy clear sends the original bearer and blocks authenticated re-entry @privacy-kiosk', async ({ page, api }) => {
@@ -436,7 +437,8 @@ test('legal documents cannot suspend an authenticated kiosk privacy deadline @pr
   // 少任何一条都有洞：登录态但 displayName 为空时只有第 1 条能抓；
   // 姓名残留在问候语以外时只有第 2 条能抓。
   await expect(page.getByRole('button', { name: /登录后查看本人记录/ })).toBeVisible()
-  await expect(page.getByRole('heading', { name: /^(夜深了|上午好|中午好|下午好|晚上好)，我是小青$/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '我是小青', exact: true })).toBeVisible()
+  await expect(page.locator('.qxt-eyebrow')).toHaveText(/^(夜深了|上午好|中午好|下午好|晚上好)$/)
 })
 
 test('anonymous interview state is hard-cleared and browser back cannot restore it @privacy-kiosk', async ({ page, api }) => {
@@ -653,7 +655,8 @@ test('an unknown terminal route remains inside the privacy guard @privacy-kiosk'
   // 少任何一条都有洞：登录态但 displayName 为空时只有第 1 条能抓；
   // 姓名残留在问候语以外时只有第 2 条能抓。
   await expect(page.getByRole('button', { name: /登录后查看本人记录/ })).toBeVisible()
-  await expect(page.getByRole('heading', { name: /^(夜深了|上午好|中午好|下午好|晚上好)，我是小青$/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '我是小青', exact: true })).toBeVisible()
+  await expect(page.locator('.qxt-eyebrow')).toHaveText(/^(夜深了|上午好|中午好|下午好|晚上好)$/)
 })
 
 // 2026-09-13 口径反转：清场以前**不撤**服务端扫描任务，理由是「任务在服务端，离开这一屏
@@ -940,7 +943,9 @@ test('hard clear stops active print polling without cancelling the backend task 
     )
   }, PRINT_TASK_ID)
   await page.reload({ waitUntil: 'domcontentloaded' })
-  await expect(page.getByText('任务已进入队列，终端尚未领取，请留在机器旁', { exact: true })).toBeVisible()
+  // 触屏版出纸页：这句话既是意图带的副题，也写进只给读屏的实时状态区（.pfp-lead-doing，1px 隐藏、不可见）。
+  // 定位收窄到意图带，断言强度不变；读屏实时区保留（状态变化要读给视障用户）。
+  await expect(page.locator('.qxt-band').getByText('任务已进入队列，终端尚未领取，请留在机器旁', { exact: true })).toBeVisible()
   await expect.poll(() => pollRequests).toBeGreaterThan(0)
 
   await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)
@@ -1660,10 +1665,14 @@ test('hard clear will not hand the machine over until the server confirms the ca
   const overlayText = (await clearing.innerText()).replace(/\s+/g, '')
   expect(overlayText).not.toContain(SCAN_CONTROL_TOKEN)
   expect(overlayText).not.toContain(SCAN_TASK_ID)
-  // 5) 主行动按钮是真能按的尺寸（CLAUDE.md §9：不小于 56px）。
+  // 5) 主行动按钮是真能按的尺寸（CLAUDE.md §9：不小于 56px；触屏版第 5 包起可点区不小于 64×64）。
   const retry = page.getByTestId('session-guard-cleanup-retry')
   const box = await retry.boundingBox()
-  expect(box?.height ?? 0).toBeGreaterThanOrEqual(56)
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(64)
+  expect(box?.width ?? 0).toBeGreaterThanOrEqual(64)
+  // 6) 现场没有人可叫：清场遮罩里不许出现「工作人员」；需要帮助只给服务电话，号码读不到就不写这一行。
+  expect(overlayText).not.toContain('工作人员')
+  await expect(page.getByTestId('session-guard-cleanup-help')).toContainText('拨打服务电话 18369161921')
 
   // 第一次撤销失败：服务端没给结论 —— 不许据此放行。
   revoke.release(0, 'server-error')
@@ -1803,7 +1812,7 @@ test('a delivery ack that lands mid-clear still ends with a confirmed cancel @pr
   })
   await page.reload({ waitUntil: 'domcontentloaded' })
   // 会话建成了，投递授权还没到手 —— 这一屏刻意不给面板操作指引。
-  await expect(page.getByText('投递授权未确认', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('还没确认能收到扫描件', { exact: true }).first()).toBeVisible()
   await expect.poll(() => ackCount).toBe(1)
 
   // 隐私硬截止到点：清场开始，撤销挂在半路。

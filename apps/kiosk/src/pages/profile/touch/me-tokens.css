@@ -1,0 +1,14 @@
+/* 我的与权益插画用的浅灰深灰。整文件只有令牌声明，值取自触屏稿 ui.js 的插画。 */
+:root {
+  --me-art-mist: #b9c3bf;
+  --me-art-rule: #d9ded9;
+  --me-art-track: #eef1ee;
+  --me-art-edge: #c9d1cd;
+  --me-art-body: #c9cfcc;
+  --me-art-body-2: #9aa6a1;
+  --me-art-key: #dfe5e2;
+  --me-art-sheet: #f6f4ee;
+  --me-art-sheet-edge: rgba(11, 36, 30, 0.12);
+  --me-art-bezel: #33423d;
+  --me-art-shadow: drop-shadow(0 6px 12px rgba(11, 36, 30, 0.16));
+}

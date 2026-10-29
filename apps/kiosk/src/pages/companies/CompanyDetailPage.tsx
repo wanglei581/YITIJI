@@ -7,16 +7,16 @@ import {
   type CompanyDetailDTO,
   type CompanyJobItemDTO,
 } from '@ai-job-print/shared'
-import { BriefcaseIcon, BuildingIcon, MapPinIcon, PlayIcon } from 'lucide-react'
+import { BriefcaseIcon, LayersIcon, MapPinIcon, PlayIcon } from 'lucide-react'
 import { getCompanyById, getCompanyJobs } from '../../services/api/companies'
 import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
 import { isValidSourceUrl } from '../../lib/url'
 import { useAuth } from '../../auth/useAuth'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
+import { RtFill } from '../recruitment-touch/RtFill'
+import { RtHelpLine } from '../recruitment-touch/RtHelpLine'
 import {
-  DirAiAssist,
   DirExitList,
   DirKv,
   DirNote,
@@ -28,7 +28,6 @@ import {
 } from '../../components/qingxu/directory/DirectoryBits'
 import '../../components/qingxu/directory/directory-qx.css'
 import { evaluateJobSourceTrust, SOURCE_ELEMENT_MISSING_TEXT, sourceTrustReason } from '../jobs/utils/sourceTrust'
-import { getTerminalCode } from '../../services/api/terminalConfig'
 
 const BOUNDARY = '本机只做来源企业与岗位导览：不收简历、不做筛选、不安排面试，投递在来源平台完成。'
 const CATEGORY_LABEL: Record<string, string> = { fulltime: '全职', intern: '实习', campus: '校招', parttime: '兼职' }
@@ -116,42 +115,23 @@ export function CompanyDetailPage() {
 
   const firstJob = jobs[0]
   return (
-    <QxPageFrame
-      // 稿 43 的目录页返回「岗位服务」；本页是详情段，返回落到目录本身。
-      back={{ label: '返回找企业', onBack: () => navigate('/companies') }}
+    <RecruitTouchFrame
+      eyebrow="企业详情"
+      back={{ label: '返回企业目录', onBack: () => navigate('/companies') }}
+      ask={{ label: '问小青：这家企业怎么看？', draft: '这家企业怎么看？', voice: true }}
       title={company?.name ?? '企业详情'}
       subtitle="来源企业与岗位导览 · 资料、岗位与来源主页缺哪项就不显示哪项。"
       status={pill}
-      terminalLabel={getTerminalCode() || '设备未绑定'}
-      ctabar={
-        state === 'error' ? (
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs-service')}>返回岗位服务</button>
-            <button type="button" className="qx-btn" data-variant="primary" onClick={notFound ? () => navigate('/companies') : load}>
-              {notFound ? '回企业目录重选' : '重新加载'}
-            </button>
-          </>
-        ) : sparse ? (
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/companies')}>返回企业目录</button>
-            <span id="company-jobs-bar-reason" className="why">该企业当前没有在招岗位</span>
-            <button type="button" className="qx-btn" data-variant="primary" aria-disabled={true} aria-describedby="company-jobs-bar-reason" onClick={() => { if (jobs.length === 0) return }}>查看在招岗位</button>
-          </>
-        ) : (
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/companies')}>返回企业目录</button>
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="primary"
-              onClick={() => { if (firstJob) navigate(`/jobs/${firstJob.id}`) }}
-            >
-              查看在招岗位
-            </button>
-          </>
-        )
-      }
-      navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
+      boundary={sparse ? <span id="company-jobs-bar-reason">该企业当前没有在招岗位</span> : BOUNDARY}
+      primary={state === 'error'
+        ? (notFound
+          ? undefined
+          : { label: '重新加载', onClick: load, noArrow: true })
+        : {
+          label: '查看在招岗位',
+          onClick: () => { if (!sparse && firstJob) navigate(`/jobs/${firstJob.id}`) },
+          ariaDisabled: sparse || !firstJob,
+        }}
     >
       <div className="dw-page qx-grow" data-state={uiState} data-testid={`company-directory-state-${uiState}`}>
         {qr?.kind === 'source' && company?.sourceUrl ? (
@@ -175,16 +155,20 @@ export function CompanyDetailPage() {
         {qr ? (
           <button type="button" className="qx-btn" data-variant="primary" onClick={() => setQr(null)}>关闭二维码</button>
         ) : state === 'loading' ? (
-          <DirState tone="info" testId="company-directory-loading" title="正在读取企业资料">企业名称、在招岗位数取到之前不显示任何数字。</DirState>
+          <>
+            <DirState tone="info" testId="company-directory-loading" title="正在读取企业资料">企业名称、在招岗位数取到之前不显示任何数字。</DirState>
+            <RtFill preset="directory" />
+          </>
         ) : state === 'error' || !company ? (
           <>
             <DirState tone={notFound ? 'empty' : 'error'} testId={notFound ? 'company-directory-company-missing' : 'company-directory-company-error'} title={notFound ? '企业详情不可用' : '企业详情读取失败'}>
               {notFound ? '这家企业可能未发布、已下架，或这条链接已经失效。本机不会拿同名企业或相似企业顶上来。' : '企业资料和在招岗位这次没有取回，本机不会用缓存或相似企业顶替。'}
             </DirState>
             <DirExitList>
-              <DirStripItem icon={BuildingIcon} title="回企业目录" desc="按行业和地区重新筛" onClick={() => navigate('/companies')} />
               <DirStripItem icon={BriefcaseIcon} tone="wheat" title="看岗位信息" desc="直接按岗位找，不按企业找" onClick={() => navigate('/jobs')} />
+              <DirStripItem icon={LayersIcon} tone="slate" title="看招聘会" desc="先看场次，再决定要不要去" onClick={() => navigate('/job-fairs')} />
             </DirExitList>
+            <RtHelpLine />
             <DirNote>{BOUNDARY}</DirNote>
           </>
         ) : (
@@ -313,13 +297,12 @@ export function CompanyDetailPage() {
                 )}
               </div>
             </DirSec>
-            {sparse ? <DirNote>{BOUNDARY}</DirNote> : (
-              <DirAiAssist screen="company-directory" onProfile={() => navigate('/profile')} onAssistant={() => navigate('/assistant')} />
-            )}
+            <DirNote>{BOUNDARY}</DirNote>
             {companyTrust && !companyTrust.ok ? <div className="dw-reason">{sourceTrustReason(companyTrust, SOURCE_APPLY_UNAVAILABLE_REASON)}</div> : null}
+            {sparse ? <RtFill preset="directory" /> : null}
           </>
         )}
       </div>
-    </QxPageFrame>
+    </RecruitTouchFrame>
   )
 }

@@ -8,12 +8,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  Button,
-  KioskModal,
-  KioskPageFrame,
-  KioskPageHeader,
-} from '@ai-job-print/ui'
 import { COMPLIANCE_COPY, type ContractReviewTaskView, type ContractType } from '@ai-job-print/shared'
 import {
   BrainCircuitIcon,
@@ -22,14 +16,19 @@ import {
   FileSearchIcon,
   Loader2Icon,
   ShieldCheckIcon,
-  XCircleIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { isAiOutage } from '../../ai/aiOutage'
 import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
+import { P10BigCard } from '../../auth/CapabilityStayCards'
+import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
+import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
+import { QxTouchOverlay } from '../../components/qingxu/touch/QxTouchOverlay'
+import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
+import { ContractTouchFrame } from './ContractTouchFrame'
 import {
   confirmContractReview,
   deleteContractReview,
@@ -41,6 +40,7 @@ import {
   readContractReviewSession,
   updateContractReviewSession,
 } from './contractReviewSession'
+import '../../auth/capability-gate-touch.css'
 import './contract-review.css'
 
 const STAGES = [
@@ -101,8 +101,14 @@ export function ContractReviewProcessingPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  // 确认时撞上 AI 停用：失败页多给一个不用 AI 的出路（去打印扫描）。
+  const [aiDown, setAiDown] = useState(false)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mountedRef = useRef(true)
+  // 删除成功、本页自己清掉会话之后正在离开：下面「没有会话就回上传页」的兜底不许抢走去向。
+  const leavingRef = useRef(false)
+  // 这次删完要去哪：只用来让「正在删除」那句话说对去向。
+  const [leavingTo, setLeavingTo] = useState('/resume-service')
 
   useBusyLock(confirming || cancelling)
 
@@ -140,7 +146,7 @@ export function ContractReviewProcessingPage() {
 
   useEffect(() => {
     if (!taskId) {
-      navigate('/contract-review', { replace: true })
+      if (!leavingRef.current) navigate('/contract-review', { replace: true })
       return
     }
     mountedRef.current = true
@@ -169,6 +175,7 @@ export function ContractReviewProcessingPage() {
       pollRef.current = setTimeout(poll, 1500)
     } catch (err) {
       const declined = aiDeclarationDeclineMessage(err)
+      setAiDown(isAiOutage(err))
       setError(declined ?? (isAiOutage(err)
         ? 'AI 现在停用，这份合同暂时审不了。可以删除本次任务，合同原件到打印扫描里直接打印。'
         : '确认失败，请重试'))
@@ -177,17 +184,21 @@ export function ContractReviewProcessingPage() {
     }
   }
 
-  async function handleCancel() {
+  /** 先删本次任务，删成功才离开；`to` 默认回简历服务，AI 停用时失败页也可以直接去打印扫描。 */
+  async function handleCancel(to = '/resume-service') {
+    if (cancelling) return
+    setLeavingTo(to)
     setCancelling(true)
     setDeleteError(null)
     try {
       await deleteContractReview(taskId, { token: getToken(), accessToken })
+      leavingRef.current = true
       clearContractReviewSession()
-      navigate('/resume-service', { replace: true })
+      // 成功就一直停在「正在删除」，等路由换页；不先复位成可点状态，免得换页前一闪又能点删除。
+      navigate(to, { replace: true })
     } catch {
       setShowConfirmModal(false)
       setDeleteError('删除失败，合同仍可能处于短期保留状态，请重试。')
-    } finally {
       if (mountedRef.current) setCancelling(false)
     }
   }
@@ -201,49 +212,180 @@ export function ContractReviewProcessingPage() {
 
   if (error) {
     return (
-      <KioskFullscreenShell>
-        <main className="flex min-h-0 flex-1 flex-col">
-          <KioskPageFrame
-            className="fusion-w3 fusion-w3--resume"
-            header={
-              <KioskPageHeader
-                title="AI 签约风险提示"
-                description="分析中"
-                onBack={() => void handleCancel()}
-                backLabel="删除并返回"
-              />
-            }
-          >
-          <div className="cr-done-screen">
-            <div className="cr-done-screen__icon" style={{ background: 'var(--error-soft)', color: 'var(--error)' }}>
-              <XCircleIcon size={52} />
+      <ContractTouchFrame>
+      <QxTouchScreen
+        testId="contract-touch"
+        stateId="failed"
+        bodyClassName="qxt-body-scroll"
+        band={(
+          <QxTouchBand
+            seal={null}
+            eyebrow="签约风险提示"
+            title="审查未完成"
+            sub={deleteError ?? error}
+            back={false}
+            rail={{ labels: ['上传合同', 'AI 分析', '查看结果'], now: 1 }}
+            status={{ text: '审查未完成', tone: 'warn' }}
+          />
+        )}
+        dock={(
+          <QxTouchDock
+            back={false}
+            ask={{
+              label: '问小青：失败了还能打印吗？',
+              draft: '失败了还能打印吗？请只说明能不能去打印扫描，不要下结论。',
+            }}
+            primary={{
+              label: cancelling ? '正在删除' : '删除任务并返回简历服务',
+              disabled: cancelling,
+              kind: 'danger',
+              onClick: () => void handleCancel(),
+            }}
+          />
+        )}
+      >
+          <div className={aiDown ? 'cr-failed cr-failed--ai-down' : 'cr-failed'}>
+            <div className="cr-failed__warn" role="alert">{deleteError ?? error}</div>
+            <div className="cr-failed__file">
+              <div className="cr-failed__file-icon">
+                {cancelling
+                  ? <Loader2Icon size={96} className="animate-spin" aria-hidden="true" />
+                  : <QxTouchIcon name="file" size={96} strokeWidth={1.5} />}
+              </div>
+              {cancelling ? (
+                <div role="status">
+                  <strong>正在删除本次任务</strong>
+                  <p>{leavingTo === '/print-scan' ? '删完再去打印扫描。' : '删完再回简历服务。'}</p>
+                </div>
+              ) : (
+                <div>
+                  <strong>本次合同</strong>
+                  <p>这次未能取得审查结果。可以删除任务后重新上传，或到打印扫描里自己看合同。</p>
+                </div>
+              )}
             </div>
-            <p className="cr-done-screen__title">审查未完成</p>
-            <p className="cr-done-screen__sub">{deleteError ?? error}</p>
-            <Button size="lg" disabled={cancelling} onClick={handleCancel}>
-              {cancelling ? <Loader2Icon size={18} className="animate-spin mr-1" /> : null}
-              删除任务并返回简历服务
-            </Button>
+            <div className="cr-failed__steps">
+              {STAGES.map((stage, index) => (
+                <div className="cr-failed__step" key={stage.key}>
+                  <span className="cr-failed__number">{index + 1}</span>
+                  <div><strong>未完成 · {stage.label}</strong><p>{stage.desc}</p></div>
+                </div>
+              ))}
+            </div>
+            {aiDown && (
+              <P10BigCard
+                icon="printer"
+                title="去打印扫描"
+                desc="AI 现在停用。可以删掉这次任务，合同到打印扫描里直接打印。"
+                cta={cancelling ? '正在删除，请稍候' : '先删除任务，再进入'}
+                onClick={() => void handleCancel('/print-scan')}
+              />
+            )}
+            <p className="qxt-fine">删除之后才离开。这一页不会把失败显示成已有结果。</p>
           </div>
-          </KioskPageFrame>
-        </main>
-      </KioskFullscreenShell>
+      </QxTouchScreen>
+      </ContractTouchFrame>
     )
   }
 
   return (
-    <KioskFullscreenShell>
-      <main className="flex min-h-0 flex-1 flex-col">
-        <KioskPageFrame
-          className="fusion-w3 fusion-w3--resume"
-          header={
-            <KioskPageHeader
-              title="AI 签约风险提示"
-              description="正在分析，请稍候…"
-              onBack={undefined}
-            />
-          }
+    <ContractTouchFrame>
+    <QxTouchScreen
+      testId="contract-touch"
+      stateId="wait"
+      bodyClassName="qxt-body-scroll"
+      band={(
+        <QxTouchBand
+          seal={null}
+          eyebrow="签约风险提示"
+          title="AI 签约风险提示"
+          sub="正在分析，请稍候…"
+          back={false}
+          rail={{ labels: ['上传合同', 'AI 分析', '查看结果'], now: 1 }}
+          status={{ text: currentStageLabel, tone: 'reading' }}
+        />
+      )}
+      dock={(
+        <QxTouchDock
+          back={false}
+          ask={{
+            label: '问小青：这一步在等什么？',
+            draft: '这一步在等什么？请只说明流程，不要下结论。',
+          }}
+          primary={{
+            label: cancelling ? '正在取消…' : '取消审查',
+            disabled: cancelling,
+            onClick: () => void handleCancel(),
+          }}
+        />
+      )}
+      overlay={showConfirmModal && task ? (
+        <QxTouchOverlay
+          kind="dialog"
+          title="确认文件提取结果"
+          onClose={() => setShowConfirmModal(false)}
+          actions={(
+            <>
+              <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => void handleCancel()}>
+                取消审查
+              </button>
+              <button type="button" className="qxt-btn qxt-btn-pri" onClick={() => void handleConfirm()} disabled={confirming}>
+                {confirming ? <Loader2Icon size={18} className="animate-spin" aria-hidden="true" /> : null}
+                确认，开始分析
+              </button>
+            </>
+          )}
         >
+          <div className="cr-confirm-modal">
+            <div className="cr-confirm-modal__info">
+              文字提取完成，请确认以下信息后继续 AI 分析。
+              {task.ocrConfidence === 'low' && (
+                <p style={{ marginTop: 8, color: 'var(--error)', fontWeight: 700 }}>
+                  部分页面识别置信度偏低，建议确认原件图像清晰度。
+                </p>
+              )}
+            </div>
+            <div>
+              <div className="cr-confirm-modal__row">
+                <span>识别页数</span>
+                <span>
+                  {task.analyzedPages} / {task.totalPages ?? task.analyzedPages} 页
+                  {task.truncated && '（已截断）'}
+                </span>
+              </div>
+              <div className="cr-confirm-modal__row">
+                <span>识别质量</span>
+                <span>
+                  {task.ocrConfidence === 'high'
+                    ? '高'
+                    : task.ocrConfidence === 'medium'
+                      ? '中'
+                      : '低'}
+                </span>
+              </div>
+              <div className="cr-confirm-modal__row">
+                <span>合同类型</span>
+                <span>
+                  {contractType === 'labor_contract'
+                    ? '劳动合同'
+                    : contractType === 'internship_agreement'
+                      ? '实习协议'
+                      : contractType === 'non_compete'
+                        ? '竞业限制协议'
+                        : '录用通知书'}
+                </span>
+              </div>
+            </div>
+            <p style={{ fontSize: 20, color: 'var(--muted)', lineHeight: 1.55 }}>
+              {COMPLIANCE_COPY.KIOSK_CONTRACT_REVIEW_PROCESSING}。重大争议请咨询律师或官方窗口。
+            </p>
+            <div className="qx-ai-declaration-slot">
+              <AiDeclarationNote />
+            </div>
+          </div>
+        </QxTouchOverlay>
+      ) : undefined}
+    >
         {/* 步骤指示器 */}
         {session && <ContractReviewSessionNotice expiresAt={session.expiresAt} />}
         <div className="cr-steps">
@@ -305,100 +447,20 @@ export function ContractReviewProcessingPage() {
                   <div className="cr-stage-item__text">
                     <div className="cr-stage-item__name">{stage.label}</div>
                     <div className="cr-stage-item__desc">{stage.desc}</div>
+                    <div className="cr-stage-item__status">{isDone ? '完成' : isActive2 ? '进行中' : '等待'}</div>
                   </div>
-                  {isDone && <span className="cr-stage-item__status">完成</span>}
-                  {isActive2 && <span className="cr-stage-item__status">进行中</span>}
                 </div>
               )
             })}
           </div>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={cancelling}
-            onClick={handleCancel}
-            style={{ marginTop: 8, color: 'var(--muted)' }}
-          >
-            {cancelling ? <Loader2Icon size={18} className="animate-spin mr-1" /> : null}
-            取消审查
-          </Button>
           {deleteError && (
-            <p role="alert" style={{ marginTop: -24, color: 'var(--error)', fontSize: 18 }}>
+            <p role="alert" style={{ marginTop: 8, color: 'var(--error)', fontSize: 20 }}>
               {deleteError}
             </p>
           )}
         </div>
-        </KioskPageFrame>
-      </main>
-
-      {/* awaiting_confirmation 确认弹窗 */}
-      {showConfirmModal && task && (
-        <KioskModal
-          title="确认文件提取结果"
-          open={showConfirmModal}
-          onClose={() => setShowConfirmModal(false)}
-          actions={
-            <div className="qx-ai-declaration-slot" style={{ width: '100%' }}>
-              <div style={{ display: 'flex', gap: 16, width: '100%' }}>
-                <Button variant="ghost" onClick={handleCancel} style={{ flex: 1 }}>
-                  取消审查
-                </Button>
-                <Button onClick={handleConfirm} disabled={confirming} style={{ flex: 2 }}>
-                  {confirming ? <Loader2Icon size={18} className="animate-spin mr-1" /> : null}
-                  确认，开始分析
-                </Button>
-              </div>
-              <AiDeclarationNote />
-            </div>
-          }
-        >
-          <div className="cr-confirm-modal">
-            <div className="cr-confirm-modal__info">
-              文字提取完成，请确认以下信息后继续 AI 分析。
-              {task.ocrConfidence === 'low' && (
-                <p style={{ marginTop: 8, color: 'var(--error)', fontWeight: 700 }}>
-                  ⚠️ 部分页面识别置信度偏低，建议确认原件图像清晰度。
-                </p>
-              )}
-            </div>
-            <div>
-              <div className="cr-confirm-modal__row">
-                <span>识别页数</span>
-                <span>
-                  {task.analyzedPages} / {task.totalPages ?? task.analyzedPages} 页
-                  {task.truncated && '（已截断）'}
-                </span>
-              </div>
-              <div className="cr-confirm-modal__row">
-                <span>识别质量</span>
-                <span>
-                  {task.ocrConfidence === 'high'
-                    ? '高'
-                    : task.ocrConfidence === 'medium'
-                      ? '中'
-                      : '低'}
-                </span>
-              </div>
-              <div className="cr-confirm-modal__row">
-                <span>合同类型</span>
-                <span>
-                  {contractType === 'labor_contract'
-                    ? '劳动合同'
-                    : contractType === 'internship_agreement'
-                      ? '实习协议'
-                      : contractType === 'non_compete'
-                        ? '竞业限制协议'
-                        : '录用通知书'}
-                </span>
-              </div>
-            </div>
-            <p style={{ fontSize: 17, color: 'var(--muted)', lineHeight: 1.55 }}>
-              {COMPLIANCE_COPY.KIOSK_CONTRACT_REVIEW_PROCESSING}。重大争议请咨询律师或官方窗口。
-            </p>
-          </div>
-        </KioskModal>
-      )}
-    </KioskFullscreenShell>
+    </QxTouchScreen>
+    </ContractTouchFrame>
   )
 }

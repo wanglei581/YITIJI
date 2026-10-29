@@ -29,6 +29,7 @@ import { sweepCases } from './route-sweep-cases'
 /** 顶栏返回键 / CTA 次级出口。刻意不含底部主导航。 */
 const EXIT_SELECTOR = [
   '.qx-topbar-back',
+  '.qxt-back',
   '[data-qx-back]',
   'button[aria-label*="返回"]',
   'button[aria-label*="上一步"]',
@@ -46,8 +47,10 @@ const EXEMPT = new Map<string, string>([
   ['/', '首页本身就是所有返回的终点。'],
   // /assistant 于 2026-09-25 移出：稿 05-ai-cockpit 顶栏带「返回首页」，运行页已按稿渲染返回槽。
   // /profile 于 2026-09-28 移出：稿 30 顶栏有返回键，运行页按稿渲染。底部主导航仍在，顶栏返回回首页。
+  // /print/done 于 2026-10-29 移出：「正在核验」「无法确认」两态与各失败态换成触屏三槽底栏后都渲染了返回槽（返回首页），
+  // 冷开落到的「无法确认」态必须按「必须提供离开这一页的出口」判（收紧，不是放宽）。已完成态没有返回槽、出口是它自己的主行动
+  // 「我拿走了，结束使用」，冷开到不了它，由 print-fulfill-qx / kiosk-end-use 的用例覆盖。
   ['/screensaver', '待机宣传屏：全屏无壳，任意触摸即唤醒。'],
-  ['/print/done', '终态页：出口是它自己的主行动（返回首页）。再放返回键会让人以为能退回去改已完成的单。'],
   ['/session-timeout', '会话超时是 fail-closed 终态，唯一出口是回首页重来。'],
 ])
 
@@ -151,7 +154,9 @@ test.describe('每一页都要能回上一步 @kiosk', () => {
       // 而「迁进青序流光却忘了填 back 槽」正是 2026-09 那批缺陷的形态 ——
       // QxPageFrame 的 back 是可选 prop，不传就没有返回键，且不会有任何报错。
       // 所以判据钉在这里：**用了这个壳，就必须填 back 槽**。
-      const framed = await page.locator('[data-qx-frame="true"]').count()
+      // 触屏版（QxTouchScreen）用 data-qxt-screen 而不是 data-qx-frame：只认前者，触屏壳的页面会一律被跳过，
+      // 「必须提供离开这一页的出口」对它们等于没跑。两种壳任一即算渲染了青序流光壳。
+      const framed = await page.locator('[data-qx-frame="true"], [data-qxt-screen]').count()
       if (framed === 0 && !why) {
         console.log(`[back-exit] SKIP ${route.pattern} — 冷开未渲染青序流光壳`)
         test.skip(true, `${route.pattern} 冷开未渲染青序流光壳（多为 fail-closed 守卫态），不在本条判据范围内`)

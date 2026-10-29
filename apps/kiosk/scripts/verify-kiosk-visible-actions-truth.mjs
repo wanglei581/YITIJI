@@ -36,7 +36,7 @@ assert.match(agencies, /agencyStatusBadge\(agency\.status\)/)
 assert.match(agencies, /district: district \|\| undefined/)
 assert.doesNotMatch(agencies, /<span className="oa-st open">/)
 assert.doesNotMatch(agencies, /正常收录|已核验/)
-assert.match(agencies, /QxPageFrame/)
+assert.match(agencies, /RecruitTouchFrame/)
 assert.match(agencies, /service: service \|\| undefined/)
 
 assert.match(fairMap, /navigate\(`\/job-fairs\/\$\{fairId\}\/materials`\)/)

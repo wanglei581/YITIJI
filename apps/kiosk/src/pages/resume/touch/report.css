@@ -1,0 +1,208 @@
+/* 诊断报告与失败说明（稿 diagnosis / st-ai-down）。样式移植自稿 d4-rep / d4-dim / d4-card / d4-all / d4-take 与 st3-aidown。
+   带走区沿用原有的导出组件，只在本页范围内改成稿的样子。 */
+
+:is([data-qx-page='diagnosis'], [data-qx-page='st-ai-down']) {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  text-align: left;
+}
+
+/* ── 左：六个维度，右：先改这几处 ── */
+[data-qx-page='diagnosis'] .qxt-rep { display: grid; grid-template-columns: 1fr 1.08fr; gap: 12px; min-height: 0; align-items: stretch; }
+[data-qx-page='diagnosis'] .qxt-rep > section { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
+
+[data-qx-page='diagnosis'] .qxt-h { display: flex; align-items: baseline; gap: 8px; font-size: 22px; font-weight: 700; }
+[data-qx-page='diagnosis'] .qxt-h small { font-size: 20px; font-weight: 500; color: var(--qxt-ink-3); }
+
+[data-qx-page='diagnosis'] .qxt-dim {
+  flex: 1;
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  align-items: center;
+  padding: 6px 10px 8px;
+  border-radius: 18px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page='diagnosis'] .qxt-dim b { font-size: 20px; }
+[data-qx-page='diagnosis'] .qxt-dim small { display: inline; margin-left: 4px; font-size: 20px; line-height: 1.25; color: var(--qxt-ink-2); }
+[data-qx-page='diagnosis'] .qxt-dim em { font-style: normal; font-weight: 700; font-size: 20px; color: var(--qxt-teal-ink); }
+[data-qx-page='diagnosis'] .qxt-dim[data-tone='low'] em { color: var(--qxt-clay-ink); }
+
+[data-qx-page='diagnosis'] .qxt-dim i {
+  grid-column: 1 / -1;
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--qxt-well);
+  position: relative;
+}
+
+[data-qx-page='diagnosis'] .qxt-dim i::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  transform: scaleX(var(--p));
+  transform-origin: left;
+  background: var(--qx-teal);
+}
+
+[data-qx-page='diagnosis'] .qxt-dim[data-tone='low'] i::after { background: var(--qxt-clay); }
+
+/* 问题卡 */
+[data-qx-page='diagnosis'] .qxt-issue {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 8px 12px;
+  border-radius: 20px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page='diagnosis'] .qxt-issue b { display: block; font-size: 22px; line-height: 1.35; }
+[data-qx-page='diagnosis'] .qxt-issue small { display: block; font-size: 20px; color: var(--qxt-ink-3); }
+[data-qx-page='diagnosis'] .qxt-issue p { margin: 3px 0 0; font-size: 20px; line-height: 1.3; color: var(--qxt-ink-2); }
+[data-qx-page='diagnosis'] .qxt-issue u { margin-right: 4px; text-decoration: none; font-weight: 700; color: var(--qxt-ink); }
+[data-qx-page='diagnosis'] .qxt-none { margin: 0; font-size: 20px; color: var(--qxt-ink-3); }
+
+/* 全部问题 / 报告结论 / 内容结构（收起） */
+[data-qx-page='diagnosis'] .qxt-all { border-radius: 20px; background: var(--qxt-well); padding: 0 14px 8px; }
+[data-qx-page='diagnosis'] .qxt-all > summary { min-height: 64px; display: flex; align-items: center; font-size: 22px; font-weight: 700; cursor: pointer; list-style: none; }
+[data-qx-page='diagnosis'] .qxt-all > summary::-webkit-details-marker { display: none; }
+[data-qx-page='diagnosis'] .qxt-all > p { margin: 0 0 6px; font-size: 20px; line-height: 1.4; color: var(--qxt-ink-3); }
+[data-qx-page='diagnosis'] .qxt-all > p u { text-decoration: none; font-weight: 700; color: var(--qxt-ink); }
+[data-qx-page='diagnosis'] .qxt-all .qxt-issue { margin-bottom: 8px; }
+[data-qx-page='diagnosis'] .qxt-list { margin: 0 0 8px; padding-left: 28px; font-size: 20px; line-height: 1.45; color: var(--qxt-ink-2); }
+
+[data-qx-page='diagnosis'] .qxt-block-row { margin-bottom: 8px; padding: 8px 12px; border-radius: 16px; background: var(--qxt-card); border: 1.5px solid var(--qxt-edge); }
+[data-qx-page='diagnosis'] .qxt-block-row b { display: block; font-size: 22px; }
+[data-qx-page='diagnosis'] .qxt-block-row b small { margin-left: 8px; font-size: 20px; font-weight: 500; color: var(--qxt-ink-3); }
+[data-qx-page='diagnosis'] .qxt-block-row p { margin: 3px 0 0; font-size: 20px; line-height: 1.35; color: var(--qxt-ink-2); }
+[data-qx-page='diagnosis'] .qxt-block-row p i { margin-right: 6px; font-style: normal; font-weight: 700; color: var(--qxt-ink-3); }
+[data-qx-page='diagnosis'] .qxt-block-row p[data-ev='1'] { padding: 2px 8px; border-radius: 10px; background: var(--qxt-clay-wash); color: var(--qxt-clay-ink); }
+
+/* 提醒条：OCR 清晰度、只看了前若干字符、合成演示 */
+[data-qx-page='diagnosis'] .rrp-banner,
+[data-qx-page='diagnosis'] .rrp-idbar {
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 18px;
+  background: var(--qxt-clay-wash);
+  border: 0;
+  color: var(--qxt-clay-ink);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+[data-qx-page='diagnosis'] .rrp-ai-label,
+[data-qx-page='diagnosis'] .rrp-dir { margin: 0; font-size: 20px; line-height: 1.4; color: var(--qxt-ink-3); }
+
+[data-qx-page='diagnosis'] .rrp-notice { border-radius: 20px; background: var(--qxt-well); padding: 0 14px 8px; }
+[data-qx-page='diagnosis'] .rrp-notice summary { min-height: 64px; display: flex; align-items: center; font-size: 22px; font-weight: 700; cursor: pointer; }
+[data-qx-page='diagnosis'] .rrp-notice ul { margin: 0; padding-left: 28px; font-size: 20px; line-height: 1.45; color: var(--qxt-ink-2); }
+
+/* ── 带走这份报告 ── */
+[data-qx-page='diagnosis'] .rrp-export-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 24px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page='diagnosis'] .rrp-take-h { margin: 0; font-size: 22px; font-weight: 700; }
+
+[data-qx-page='diagnosis'] .rrp-export-panel .qx-rd-price {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page='diagnosis'] .rrp-export-panel .qx-rd-price[data-tone='bad'] { color: var(--qx-cinnabar); }
+[data-qx-page='diagnosis'] .rrp-export-panel .qx-rd-price[data-tone='warn'] { color: var(--qxt-clay-ink); }
+
+[data-qx-page='diagnosis'] .rrp-export { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+
+[data-qx-page='diagnosis'] .rrp-export button {
+  min-height: 72px;
+  min-width: 64px;
+  padding: 0 8px;
+  border-radius: 20px;
+  background: var(--qxt-well);
+  color: var(--qxt-ink);
+  border: 0;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+[data-qx-page='diagnosis'] .rrp-export button small { display: block; font-size: 20px; font-weight: 500; color: var(--qxt-ink-3); }
+[data-qx-page='diagnosis'] .rrp-export button.rrp-dead { opacity: 0.55; }
+
+[data-qx-page='diagnosis'] .rrp-export-reason,
+[data-qx-page='diagnosis'] .rrp-export-error { margin: 0; font-size: 20px; line-height: 1.4; color: var(--qxt-ink-2); }
+[data-qx-page='diagnosis'] .rrp-export-error { color: var(--qx-cinnabar); }
+
+[data-qx-page='diagnosis'] .rrp-result { padding: 10px 14px; border-radius: 18px; background: var(--qxt-teal-wash); color: var(--qxt-teal-ink); }
+[data-qx-page='diagnosis'] .rrp-result h3 { margin: 0 0 4px; font-size: 22px; }
+[data-qx-page='diagnosis'] .rrp-result p { margin: 0; font-size: 20px; line-height: 1.4; }
+
+/* 简历对照 / 自我探索 */
+[data-qx-page='diagnosis'] .qxt-links { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+[data-qx-page='diagnosis'] .qxt-links button {
+  min-height: 64px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  background: var(--qxt-well);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--qxt-teal-ink);
+}
+
+/* ── 失败说明与没有报告的各态（稿 st-ai-down 的版式） ── */
+[data-qx-page='st-ai-down'] { gap: 8px; }
+[data-qx-page='st-ai-down'] .qxt-howto { min-height: 0; padding: 12px 16px; font-size: 22px; }
+[data-qx-page='st-ai-down'] .qxt-howto b { display: block; margin-bottom: 2px; font-size: 24px; }
+[data-qx-page='st-ai-down'] .qxt-sec { font-size: 26px; }
+[data-qx-page='st-ai-down'] .qxt-exit-col { gap: 8px; }
+/* 出路行可点区：整行是一个按钮，不低于 64px（稿 st-ai-down 的 exit 实际约 92px）。 */
+[data-qx-page='st-ai-down'] .qxt-exit-col .qxt-slab { min-height: 88px; }
+[data-qx-page='st-ai-down'] .qxt-olist { padding: 12px 14px; gap: 4px; }
+[data-qx-page='st-ai-down'] .qxt-olist-t { font-size: 24px; }
+[data-qx-page='st-ai-down'] .qxt-check { min-height: 44px; align-items: center; padding: 0; font-size: 24px; }
+[data-qx-page='st-ai-down'] .qxt-reason-note { margin: 8px 0 0; font-size: 20px; line-height: 1.4; color: var(--qxt-clay-ink); }
+
+[data-qx-page='st-ai-down'] .qxt-dimchips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+[data-qx-page='st-ai-down'] .qxt-dimchips span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: var(--qxt-well);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+[data-qx-page='st-ai-down'] .qxt-dimchips i { font-style: normal; color: var(--qxt-ink-3); }
+
+@media (max-width: 640px) {
+  [data-kiosk-stage-fit='off'] [data-qx-page='diagnosis'] .qxt-rep { grid-template-columns: 1fr; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='diagnosis'] .rrp-export { grid-template-columns: 1fr 1fr; }
+}

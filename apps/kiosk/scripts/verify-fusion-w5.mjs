@@ -66,7 +66,12 @@ const FROZEN = new Map([
   // 没有支付状态的历史订单仍不算免费。原有导出、实付不推算、待退款常量都没改。
   // 冻结契约不放宽，仍逐字节校验，只是基线随有意改动前移。
   // 旧哈希 50f3278ee897efe7c10b90990d4aacab4e17e0e3a5758d0b2cafb7f3aab61a7b。
-  ['src/pages/profile/me/printOrders/paymentCopy.ts', 'e7737e8cc24952dc69e2d6a38aa46e556fa8accc5145da043a415e35dc9f2cc7'],
+  // 2026-10-29 触屏版集成后修复：PENDING_REFUND_EXPLANATION 的「退款由工作人员处理」改成稿里的说法「退款会按支付渠道处理」
+  // （docs/design/kiosk-touch-2026-10 的 fix-me.js 待退款说明；现场无人值守，屏上不写由工作人员处理）。
+  // 只改这一句，原有导出、实付不推算、不承诺到账天数都没动；求助句由详单在说明后面按标准句 1 加（服务电话）。
+  // 冻结契约不放宽，仍逐字节校验，只是基线随有意改动前移。
+  // 旧哈希 e7737e8cc24952dc69e2d6a38aa46e556fa8accc5145da043a415e35dc9f2cc7。
+  ['src/pages/profile/me/printOrders/paymentCopy.ts', '9b16f46cfdfd247e76963eb2ff2fb74571698499c76ab684d42bd12c03c714a9'],
   ['src/pages/profile/me/printOrders/statusRefresh.ts', '61c86d39d8a4c576ec9b9c2ca2b92d08ee463a6874737cc4a7df70e36103ad8f'],
   ['src/pages/home/components/ContinuePanel.tsx', 'd9fc437e98a25e9734494bbd6dece4d0c3649ea5fa616d57d4e97451c111eff3'],
   ['src/pages/home/components/kioskAppLaunch.ts', '5bb684513182d680b91c6f086d17d27e26caed8b6cf616eba79ea1fa3c0a3b6b'],
@@ -84,10 +89,32 @@ const FROZEN = new Map([
   // 2026-09-29 重新冻结（W-81）：简历来源页传入 busyWhen="received"，等人扫、还没收到文件时不报忙；
   // 手机已传上或正在确认才报忙。其它调用方不传该参数，仍按会话还在（含等人扫）报忙。卸载仍补报不忙。
   // 旧哈希 1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f。
+  // 2026-10-28 重新冻结（触屏版简历三条主路）：新增三个可选属性 onCancelled / onReceivedChange / confirmRef，
+  // 供简历来源页在自己的版面里画「已取消」说明、文件卡和底栏「确认使用这份文件」；
+  // 不传时行为与此前逐字节同一（取消、确认、报忙、刷新先撤销旧会话、已上传时刷新不可点都不变）。
+  // 冻结契约不放宽，仍逐字节校验；手机上传的既有行为由 verify:resume-phone-upload-ui 的 AST 断言继续钉住。
+  // 旧哈希 9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb。
+  // 2026-10-28 再次重新冻结（简历三条主路返工）：confirmRef 换成 onConfirmReady。原先把确认函数在渲染期写进 ref，
+  // 确认一开始父页不重渲染，页面读到的还是确认前的旧闭包，底栏仍写「确认使用这份文件」、没禁用，双击会把
+  // /confirm 发两遍。现在面板在 effect 里把确认函数交给页面（有文件且不在确认中才交，确认中与卸载交 null），
+  // 页面放进 state，底栏随之写「正在确认…」并禁用；面板里另加不随渲染变的在途标记，同一帧内的两次点击也只发一次。
+  // 仍是可选属性，不传时行为不变。冻结契约不放宽，仍逐字节校验；既有行为由 verify:resume-phone-upload-ui 继续钉住，
+  // 新行为由它新加的几条断言和 W3 的手机确认用例钉住。
+  // 旧哈希 97a46d6d5dc1ef8aaafdc1ff99de267d673bb992bac1de6a7ebfa64be8453c82。
   // 2026-10-29 重新冻结（一体机手机码改短链）：出码调用从 buildPhoneUploadUrl 换成 buildPhoneUploadQrUrl
   // （回执带合格场景码出 /k/u/<场景码>，否则照旧出带 fragment 的长链），import 同步换名；面板其余逐字未动。
   // 旧哈希 9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb。
-  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '1e0e0b9256304a822d4b075394ed3aa855f47689594a391be7fa6d057a3ff56f'],
+  // 2026-10-29 重新冻结（触屏版集成：并入第一包新头里 #1519 的出码调用换名）：触屏版简历三条主路（上面 10/28 两次）和 #1519
+  // （一体机手机码改短链，上一条）各自改了这个文件，改动互不相交——前者加可选属性与 onConfirmReady，后者只换 import 与一处出码调用；
+  // 合并后的文件就是两者之和，没有别的改动。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 cc895ab96ceea8b511bbbb638c669e38dd0414cb9e8a53636258229806a3b32a（第四包终稿）、1e0e0b9256304a822d4b075394ed3aa855f47689594a391be7fa6d057a3ff56f（#1519）。
+  // 2026-10-29 重新冻结（#1519 留给触屏版第四包的面板接线）：码旁说明、手机传来文件后的来源与提醒三处文案都从
+  // copy/miniappLinkCopy.ts 取（phoneUploadScanHint(contact) 非空串时换掉原句「请用手机微信或浏览器扫码」，空串＝小程序未发布或读不到联系方式，
+  // 保持原句；已收到文件后在文件名下加 uploadedFileSourceLine(文件来源)（读不到来源不写）与 notYourFileHint()）。联系方式用 useSupportContact()。
+  // 只多两行 import、一行 hook、三行取句子、两行 JSX，二维码、轮询、取消、确认、报忙、刷新先撤销旧会话、已上传时刷新不可点都逐字未动。
+  // 冻结契约不放宽，仍逐字节校验；新行为由 scripts/tests/miniapp-link-copy.test.mjs 的接线断言和 fusion-w3 / fusion-w2 的浏览器用例钉住。
+  // 旧哈希 98691610ccd48ff766ff7d28256ed8814afb024ad454305f9de6345c0639db14。
+  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '7f0cacce1e2b505548a4a141e2b63c71517c8ec5fe5d47fc827732a461f3e524'],
 ])
 
 function propertyName(node) {
@@ -205,7 +232,8 @@ assert.match(activityDetail, /screen="activity-detail"/, 'activity detail still 
 assert.match(activityDetail, /<section className="me-detail-scroll">/, 'activity detail keeps its neutral scroll wrapper')
 assert.doesNotMatch(activityDetail, /<\/?main\b/, 'activity detail leaves the main landmark to the shell')
 assert.doesNotMatch(activityDetail, /<\/?main\b/, 'activity detail leaves the main landmark to KioskLayout')
-assertSharedPageShell(benefitActivityDetail, 'BenefitActivityDetailPage')
+assert.match(benefitActivityDetail, /<MeTouchShell\b/, 'BenefitActivityDetailPage uses the touch screen shell')
+assert.doesNotMatch(benefitActivityDetail, /<KioskPageFrame\b|<KioskPageHeader\b/, 'BenefitActivityDetailPage has left the V6 frame')
 assert.match(
   benefitActivityDetail,
   /<section\b(?=[^>]*\bdata-kiosk-domain="profile")(?=[^>]*\bdata-kiosk-screen="activity-detail")(?=[^>]*\bclassName="k8-act-scroll")[^>]*>/,
@@ -221,7 +249,9 @@ for (const marker of [
 ]) {
   assert.match(benefitActivityDetail, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `benefit activity detail keeps real branch ${marker}`)
 }
-assertSharedPageShell(toolbox, 'ToolboxZonePage')
+assert.match(toolbox, /<QxTouchScreen\b/, 'ToolboxZonePage uses the touch screen')
+assert.match(toolbox, /<QxTouchBand\b/, 'ToolboxZonePage uses the touch band')
+assert.doesNotMatch(toolbox, /<KioskPageFrame\b|<KioskPageHeader\b/, 'ToolboxZonePage has left the shared Kiosk page frame')
 assert.match(
   toolbox,
   /<section\b(?=[^>]*\bdata-kiosk-screen="toolbox")(?=[^>]*\bclassName="tb-content")[^>]*>/,
@@ -232,11 +262,11 @@ for (const marker of ['config.enabled', 'items.length > 0', '<QrLaunchModal', '<
 }
 assert.doesNotMatch(toolbox, /<\/?main\b/, 'toolbox leaves the main landmark to KioskLayout')
 /* 2026-09-25 稿 08-legal 迁入青序流光，同强度替换三条：
- * ① 页壳 KioskPageFrame/KioskPageHeader → QxPageFrame（并断言已退出 V6 壳）；
+ * ① 页壳 KioskPageFrame/KioskPageHeader → 触屏 PublicTouchFrame（并断言已退出 V6 壳）；
  * ② 旧页用 `apiContent ? ( … )` / `!apiContent && ( … )` 两支表达「服务端正文 / 本机留存文本」，
  *    新页拆成显式视图：ready 只渲染服务端正文分出的章节，fallback 渲染本机留存文本且必须挂「不作为正式版本」标注；
- * ③ 内容区留白中和器从旧壳的 .ui-kiosk-page-content 换到青序壳的 .qx-body（稿自带 44px 页边）。 */
-assert.match(legalDoc, /<QxPageFrame\b/, 'LegalDocPage uses the Qingxu page frame')
+ * ③ 内容区留白中和器从旧壳的 .ui-kiosk-page-content 换到触屏壳的 .qxt-body（稿自带 40px 页边，由 .legal-doc-scroll 自己给）。 */
+assert.match(legalDoc, /<PublicTouchFrame\b/, 'LegalDocPage uses the Qingxu touch page frame')
 assert.doesNotMatch(legalDoc, /KioskPageFrame|KioskPageHeader/, 'LegalDocPage has left the V6 frame')
 assert.match(legalDoc, /data-kiosk-screen="legal-doc"/, 'legal document keeps its stable screen marker')
 assert.match(
@@ -259,9 +289,32 @@ assertSinglePaddingNeutralizer(
   'activities-detail-inkpaper.css',
   /\.k8-act-detail\b/,
 )
-assertSinglePaddingNeutralizer(legalDocCss, 'legal-service-desk.css', /\.k1-legal-doc\b/, '.qx-body')
+assertSinglePaddingNeutralizer(legalDocCss, 'legal-service-desk.css', /\.k1-legal-doc\b/, '.qxt-body')
 assert.doesNotMatch(legalDocCss, /\.ui-kiosk-page-content/, 'legal-service-desk.css carries no dead selector for the retired V6 content wrapper')
-assertSinglePaddingNeutralizer(toolboxCss, 'toolbox-zone.css', /\.kpv1\.ktoolbox\b/)
+assert.doesNotMatch(toolboxCss, /\.ui-kiosk-page-content/, 'toolbox-zone.css carries no dead selector for the shared page content wrapper (the toolbox page left KioskPageFrame and never renders it)')
+/* 触屏页不得再用「贴左边的整列色条」遮空白：绝对定位、贴左、上下拉满、定宽的 ::before。
+ * 空白检查从 x=80 取样，色条正好盖住那一列，卡里再空也量不到（10/27 审出的做法）。
+ * 稿的大卡是带图标的 210 宽图标列，不是空色条。 */
+for (const path of [
+  'src/pages/toolbox/toolbox-zone.css',
+  'src/pages/smart-campus/smart-campus-touch.css',
+  'src/auth/capability-gate-touch.css',
+  'src/pages/contract-review/contract-review-touch.css',
+  'src/pages/contract-review/contract-review.css',
+  'src/pages/service-hubs/policy-touch.css',
+  'src/pages/renshi/renshi-touch.css',
+]) {
+  for (const match of read(path).matchAll(/([^{}]+)::before\s*\{([^}]*)\}/g)) {
+    const body = match[2]
+    const edgeStrip =
+      /position:\s*absolute/.test(body) &&
+      /\btop:\s*0\b/.test(body) &&
+      /\bbottom:\s*0\b/.test(body) &&
+      /\bleft:\s*0\b/.test(body) &&
+      /\bwidth:\s*\d+px/.test(body)
+    assert.ok(!edgeStrip, `${path}: ${match[1].trim()}::before 是贴左边的整列色条，空白检查会被它遮住，请改成按稿的图标列或去掉`)
+  }
+}
 assert.match(
   profileCss,
   /\.fusion-w5--profile-entry\s*>\s*\.ui-kiosk-page-content\s*\{[^}]*padding:\s*0;/,
@@ -318,7 +371,6 @@ const concretePages = [
   'src/pages/help/HelpCenterPage.tsx',
   'src/pages/activities/BenefitActivitiesPage.tsx',
   'src/pages/activities/BenefitActivityDetailPage.tsx',
-  'src/pages/toolbox/ToolboxZonePage.tsx',
 ]
 for (const path of concretePages) {
   const source = read(path)
@@ -341,14 +393,15 @@ const qxMePages = [
 ]
 for (const path of qxMePages) {
   const source = read(path)
-  assert.match(source, path.endsWith('/MySettingsPage.tsx') ? /<QxPageFrame/ : /QxMePage/, `${path} uses its Qingxu page frame`)
+  assert.match(source, path.endsWith('/MySettingsPage.tsx') ? /<MeTouchShell/ : /QxMePage/, `${path} uses its touch or member page frame`)
   assert.doesNotMatch(source, /KioskPageFrame/, `${path} has left the V6 frame`)
   assert.doesNotMatch(source, /className="qx-nav-item"/, `${path} does not inline navbar items`)
 }
 const qxMeChrome = read('src/pages/profile/me/qx/QxMeChrome.tsx')
-assert.match(qxMeChrome, /QxPageFrame/, 'member chrome uses Qingxu page frame')
-assert.match(qxMeChrome, /QxAppNavbar/, 'member chrome uses shared QxAppNavbar')
-assert.match(qxMeChrome, /current="profile"/, 'member chrome marks 我的 as the current nav item')
+assert.match(qxMeChrome, /MeTouchShell/, 'member chrome uses the touch screen shell')
+const touchShell = read('src/pages/profile/touch/MeTouchShell.tsx')
+assert.match(touchShell, /QxTouchNav/, 'touch shell uses QxTouchNav')
+assert.match(touchShell, /current="profile"/, 'touch shell marks 我的 as the current nav item')
 assert.doesNotMatch(qxMeChrome, /KioskPageFrame/, 'member chrome has left the V6 frame')
 const qxNavbar = read('src/components/qingxu/QxAppNavbar.tsx')
 assert.match(qxNavbar, /aria-current=\{current === 'profile' \? 'page' : undefined\}/, 'shared navbar can mark 我的 as current')
@@ -388,13 +441,13 @@ const profilePageQx = read('src/pages/profile/ProfilePage.tsx')
 const benefitsPageQx = read('src/pages/profile/me/MyBenefitsPage.tsx')
 const feedbackPageQx = read('src/pages/profile/me/MyFeedbackPage.tsx')
 const privacyPageQx = read('src/pages/profile/me/MyPrivacyRequestsPage.tsx')
-assert.match(profilePageQx, /QxPageFrame/, 'ProfilePage uses Qingxu page frame')
+assert.match(profilePageQx, /MeTouchShell/, 'ProfilePage uses the touch screen shell')
 assert.doesNotMatch(profilePageQx, /KioskPageFrame/, 'ProfilePage has left the V6 frame')
-assert.match(benefitsPageQx, /QxPageFrame/, 'MyBenefitsPage uses Qingxu page frame')
+assert.match(benefitsPageQx, /MeTouchShell/, 'MyBenefitsPage uses the touch screen shell')
 assert.doesNotMatch(benefitsPageQx, /KioskPageFrame/, 'MyBenefitsPage has left the V6 frame')
-assert.match(feedbackPageQx, /QxPageFrame/, 'MyFeedbackPage uses Qingxu page frame')
+assert.match(feedbackPageQx, /MeTouchShell/, 'MyFeedbackPage uses the touch screen shell')
 assert.doesNotMatch(feedbackPageQx, /KioskPageFrame/, 'MyFeedbackPage has left the V6 frame')
-assert.match(privacyPageQx, /QxPageFrame/, 'MyPrivacyRequestsPage uses Qingxu page frame')
+assert.match(privacyPageQx, /MeTouchShell/, 'MyPrivacyRequestsPage uses the touch screen shell')
 assert.doesNotMatch(privacyPageQx, /KioskPageFrame/, 'MyPrivacyRequestsPage has left the V6 frame')
 assert.match(profilePageQx, /getPendingTasks/, 'ProfilePage reads /me/pending-tasks instead of inventing continue-todo')
 assert.doesNotMatch(profilePageQx, /一键投递|立即投递|平台投递|投递简历/, 'ProfilePage stays inside the recruitment copy whitelist')
@@ -407,18 +460,23 @@ assert.doesNotMatch(privacyPageQx, /全部个人数据已删除|账号注销成�
  * 机器状态第 8 项按托管 a 叫「机构官方渠道」。18（SCAN VIA PANEL）归 B 批，不在此列。 */
 const A_BATCH_EYEBROWS = [
   ['src/pages/legal/LegalDocPage.tsx', ["eyebrow: '你和这台机器'", "eyebrow: '你的信息'"]],
-  ['src/pages/print-scan/ConvertImagesView.tsx', ['>图片转 PDF<']],
-  ['src/pages/print-scan/sign-stamp/SignStampPickView.tsx', ['>签名<']],
-  ['src/pages/resume/SelfAssessmentFlow.tsx', ["SA_EYEBROW = '自我探索'"]],
-  ['src/pages/profile/me/MyNotificationsPage.tsx', ['eyebrow="消息通知"']],
-  ['src/pages/profile/me/MyDocumentsPage.tsx', ['eyebrow="我的文档和订单"']],
-  ['src/pages/profile/me/MyPrintOrdersPage.tsx', ['eyebrow="我的文档和订单"']],
-  ['src/pages/profile/me/MyResumesPage.tsx', ['eyebrow="我的简历"']],
-  ['src/pages/profile/me/MyFavoritesPage.tsx', ['eyebrow="我的收藏"']],
-  ['src/pages/profile/me/MyAiRecordsPage.tsx', ['eyebrow="AI 服务记录"']],
-  ['src/pages/profile/me/MyActivityPage.tsx', ['eyebrow="我的足迹"']],
+  /* 触屏版（稿 18）：眉题在意图带里，由页面传给 TouchToolScreen；空态标题仍是「图片转 PDF」（h1 锚点与路由巡检按这个名字找）。 */
+  ['src/pages/print-scan/ConvertImagesPage.tsx', ['eyebrow="照片合成 PDF"']],
+  ['src/pages/print-scan/convert-images-model.ts', ["title: '图片转 PDF'"]],
+  /* 触屏版（稿 20）：眉题在意图带里，由页面传给 TouchToolScreen，每一屏都是「签名」。 */
+  ['src/pages/print-scan/SignStampPage.tsx', ['eyebrow="签名"']],
+  ['src/pages/resume/SelfAssessmentFlow.tsx', ["SA_EYEBROW = '改简历 · 自我探索'"]],
+  // 证据锚点随稿换字，判据不变：眉题仍是中文、照稿，屏上不出现英文眉题。
+  ['src/pages/profile/me/MyNotificationsPage.tsx', ['eyebrow="我的 · 消息"']],
+  ['src/pages/profile/me/MyDocumentsPage.tsx', ['eyebrow="我的 · 文档"']],
+  ['src/pages/profile/me/MyPrintOrdersPage.tsx', ['eyebrow="我的 · 打印订单"']],
+  ['src/pages/profile/me/MyResumesPage.tsx', ['eyebrow="我的 · 简历"']],
+  ['src/pages/profile/me/MyFavoritesPage.tsx', ['eyebrow="我的 · 收藏"']],
+  ['src/pages/profile/me/MyAiRecordsPage.tsx', ['eyebrow="我的 · AI 服务记录"']],
+  ['src/pages/profile/me/MyActivityPage.tsx', ['eyebrow="我的 · 浏览记录"']],
   ['src/pages/placeholders/MeActivityDetailPage.tsx', ['eyebrow="记录详情"']],
-  ['src/pages/profile/me/MyFeedbackPage.tsx', ['>意见反馈<']],
+  // 证据锚点随稿换字，判据不变：眉题仍是中文、照稿，屏上不出现英文眉题。
+  ['src/pages/profile/me/MyFeedbackPage.tsx', ['eyebrow="我的 · 意见反馈"']],
 ]
 for (const [path, expected] of A_BATCH_EYEBROWS) {
   const source = read(path)
@@ -441,5 +499,60 @@ for (const path of ['src/pages/profile/me/MyResumesPage.tsx', 'src/pages/profile
 const errorOfflineSrc = read('src/pages/placeholders/ErrorOfflinePage.tsx')
 assert.match(errorOfflineSrc, /key: 'jobs'[^\n]*name: '机构官方渠道'/, 'system state item 8 is 机构官方渠道 (hosting a)')
 assert.doesNotMatch(errorOfflineSrc, /name: '岗位与招聘会信息'|AI、岗位信息没有/, 'system state no longer lists recruitment info')
+
+/* 触屏版第 5 包（2026-10-28）：稿上的小标题、问答标题在读屏里仍是标题层级，不是 <p> / <b>。
+ * 画面由 .qxp-k / .qxp-note 类名保持（1080 宽改前改后逐像素比对一致），所以这里只钉标签。
+ * 对照旧版页内标题数：帮助 7、机器状态 6、登录 2、协议 5、闲置提醒 4，改版曾把它们都压成了 0 或 1。 */
+const publicBlocksSrc = read('src/pages/public-touch/PublicBlocks.tsx')
+assert.match(publicBlocksSrc, /export function K\(\{ children, as: Tag = 'p', id \}/, 'K：小标题标签可选，默认仍是 p，老调用不变')
+assert.match(publicBlocksSrc, /export function SrHeading\(/, 'SrHeading：稿上没有字的那一组内容，给读屏一个标题')
+const helpSrc = read('src/pages/help/HelpCenterPage.tsx')
+assert.match(helpSrc, /<h2 className="qxp-note" id=\{`\$\{answerId\}-q`\}><b>\{item\.q\}<\/b><\/h2>/, '帮助页：每条问答的问题是 h2')
+assert.match(helpSrc, /<K as="h2">卡住了，先自己试这三步<\/K>/, '帮助页：自助三步的小标题是 h2')
+assert.match(helpSrc, /<K as="h2">直接去办<\/K>/, '帮助页：直接去办的小标题是 h2')
+assert.match(
+  errorOfflineSrc,
+  /<SrHeading id="of-list-title">这台机器的八项状态<\/SrHeading>\s*<ul className="of-list"[^>]*aria-labelledby="of-list-title"/,
+  '机器状态页：八项状态清单有 h2 标题，清单用它命名',
+)
+const loginSrc = read('src/pages/auth/LoginPage.tsx')
+assert.ok((loginSrc.match(/<K as="h3">/g) ?? []).length >= 4, '登录页：四张「记在哪」卡的标题是 h3')
+assert.match(loginSrc, /<h2 className="t">不登录也能办<\/h2>/, '登录页：「不登录也能办」是 h2')
+assert.match(loginSrc, /<SrHeading id="lg-facts-title">登录之后记在哪<\/SrHeading>/, '登录页：四张卡这一组有 h2 标题')
+const legalViewsSrc = read('src/pages/legal/LegalDocViews.tsx')
+assert.match(legalViewsSrc, /<h2 className="legal-doc-toc-title">章节目录<\/h2>/, '协议页：章节目录有 h2 标题')
+assert.match(legalViewsSrc, /<h3>\{section\.title\}<\/h3>/, '协议页：章节标题仍是 h3（用例按 .legal-doc-body h3 取）')
+const guardViewSrc = read('src/pages/session-guard/SessionGuardView.tsx')
+assert.match(guardViewSrc, /<K as="h3">\{card\.title\}<\/K>/, '闲置提醒：两张清单卡的标题是 h3')
+assert.match(guardViewSrc, /<h3>\{ask\.title\}<\/h3>/, '闲置提醒：三个常问的问题是 h3')
+
+/* 触屏版第 5 包（2026-10-28）：改版时被删掉的说明句，稿上没画，按「稿上没画的也保留」放回。
+ * 登录步骤、身份说明只给读屏（默认态一屏放不下可见的字）；帮助与机器状态的说明是小字，运行页没有它们就是少了一条交代。 */
+assert.match(
+  loginSrc,
+  /<ol className="qxp-sr-h" aria-label="登录步骤"><li>01 选择登录方式<\/li><li>02 核对本人身份<\/li><li>03 回到刚才的办理<\/li><\/ol>/,
+  '登录页：三步（选择登录方式、核对本人身份、回到刚才的办理）留给读屏的有序列表',
+)
+assert.match(loginSrc, /这台机器不生成、也不代填。这一步不用 AI 核对是不是你。/, '登录页：验证码来源与「不用 AI 核对」的说明还在')
+assert.match(helpSrc, /data-testid="help-truth"[\s\S]{0,120}?只写本机已经上线的做法；帮助内容随应用一起发布，不是实时服务状态。/, '帮助页：「这页写的是什么」还在')
+assert.ok((helpSrc.match(/<HelpTruth \/>/g) ?? []).length >= 4, '帮助页：弹层与三个分支的插画卡里都放着「这页写的是什么」')
+assert.match(
+  errorOfflineSrc,
+  /data-testid="system-state-truth"[\s\S]{0,200}?八项状态一项不少地列出来；只有能真检测的才给结果，其余照实写未检测或随请求确认，不会默认写成正常。/,
+  '机器状态页：「怎么判断」还在',
+)
+const resumeViewSrc = read('src/pages/session-resume/SessionResumeView.tsx')
+assert.match(resumeViewSrc, /const RESUME_BOUNDARY = '这一页不重新建单，也不删除系统里的订单或文件。'/, '继续打印页：边界那一句还在')
+assert.strictEqual((resumeViewSrc.match(/\{RESUME_BOUNDARY\}/g) ?? []).length, 3, '继续打印页：空、读不到、列表三种结论卡都带着边界那一句')
+
+/* 点击区与插画（同一包）：协议行那颗勾选框原来只有 48，登录页四张「记在哪」卡的插画原来被压成一条缝。 */
+const loginCss = read('src/pages/auth/login-touch.css')
+assert.match(
+  loginCss,
+  /\.k-agree \.k-agree-check,\s*\n[^\n]*\.k-agree \.doclink \{[^}]*min-height: 64px;[^}]*min-width: 64px;/,
+  '登录页：协议勾选框和两个协议链接的可点区不小于 64×64',
+)
+assert.match(loginCss, /\.lg-fact \.qxp-artbox \{ min-height: 96px; \}/, '登录页：四张「记在哪」卡的插画保底 96 高，放不下由页面滚动，不压插画')
+assert.match(loginCss, /\.lg-fact \{ min-height: 224px; overflow: hidden; \}/, '登录页：「记在哪」卡保底 224 高')
 
 console.log('ALL PASS fusion W5 route, boundary, and presentation contract')

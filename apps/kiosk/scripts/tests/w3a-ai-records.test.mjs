@@ -204,6 +204,10 @@ test('USB files render as named buttons and retain size, MIME, purpose and busy 
     },
     // W-125：面板先过后台能力闸门；这份单测只管文件列表与导入契约，闸门按已放行处理。
     '../../../hooks/useUsbImportGate': { useUsbImportGate: () => ({ state: 'allowed', note: null, retry: () => {} }) },
+    '../touch/unattendedResumeCopy': { unattendedResumeCopy: (text) => String(text ?? '') },
+    '../../../copy/unattendedCopy': load('src/copy/unattendedCopy.ts'),
+    '../../../hooks/useSupportContact': { useSupportContact: () => load('src/copy/unattendedCopy.ts').CONSERVATIVE_SUPPORT_CONTACT },
+    '../../../components/qingxu/touch/QxTouchIcon': { QxTouchIcon: 'svg' },
   }, { window: { setTimeout: () => 1, clearTimeout: () => {} } })
   const props = { onUploaded: (file) => imported.push(file), onBusyChange: (value) => busy.push(value) }
   const nodes = (node) => Array.isArray(node) ? node.flatMap(nodes) : node && typeof node === 'object' ? [node, ...nodes(node.props?.children)] : []
@@ -224,6 +228,83 @@ test('USB files render as named buttons and retain size, MIME, purpose and busy 
   upload.resolve({ filename: 'my_pdf_resume.jpg', sizeBytes: 2048, mimeType: 'image/jpeg', fileId: 'file-image', fileUrl: '/fixture.jpg' }); await h.flush()
   assert.deepEqual(plain(imported), [{ name: 'my_pdf_resume.jpg', size: '2 KB', format: 'jpg', fileId: 'file-image', fileUrl: '/fixture.jpg', mimeType: 'image/jpeg', channel: 'usb' }])
   assert.equal(busy.at(-1), false); h.unmount()
+})
+
+test('unattended USB panel: a row click only selects, the page-level import button runs the import', async () => {
+  const h = hooks(), upload = deferred(), imported = [], requests = [], picks = []
+  const files = [
+    { safeId: 'pdf', filename: 'U盘简历.pdf', extension: '.pdf', sizeBytes: 2048 },
+    { safeId: 'image', filename: 'my_pdf_resume.jpg', extension: '.jpg', sizeBytes: 2048 },
+  ]
+  const { ResumeUsbImportPanel } = load('src/pages/resume/components/ResumeUsbImportPanel.tsx', {
+    react: h.react,
+    '../../../services/api/userErrorMessage': { userMessageOf: (_err, fallback) => fallback },
+    '../../../auth/useAuth': { useAuth: () => ({ getToken: () => 'test-member-token' }) },
+    '@ai-job-print/ui': { Button: 'button', KioskStatePanel: 'aside' },
+    'lucide-react': { FileTextIcon: 'svg', LoaderIcon: 'svg', RefreshCwIcon: 'svg', UsbIcon: 'svg' },
+    '../../../services/files/usbImportApi': {
+      isUsbImportConfigured: () => true,
+      getUsbStatus: async () => ({ present: true, driveLabel: 'TEST-USB' }),
+      listUsbFiles: async () => ({ files }),
+      uploadUsbFile: (...args) => { requests.push(args); return upload.promise },
+    },
+    '../../../hooks/useUsbImportGate': { useUsbImportGate: () => ({ state: 'allowed', note: null, retry: () => {} }) },
+    '../touch/unattendedResumeCopy': { unattendedResumeCopy: (text) => String(text ?? '') },
+    '../../../copy/unattendedCopy': load('src/copy/unattendedCopy.ts'),
+    '../../../hooks/useSupportContact': { useSupportContact: () => load('src/copy/unattendedCopy.ts').CONSERVATIVE_SUPPORT_CONTACT },
+    '../../../components/qingxu/touch/QxTouchIcon': { QxTouchIcon: 'svg' },
+  }, { window: { setTimeout: () => 1, clearTimeout: () => {} } })
+  const props = { unattended: true, onUploaded: (file) => imported.push(file), onPickChange: (pick) => picks.push(pick) }
+  const nodes = (node) => Array.isArray(node) ? node.flatMap(nodes) : node && typeof node === 'object' ? [node, ...nodes(node.props?.children)] : []
+  const rows = () => nodes(h.value).filter((node) => node.type === 'button' && node.props.className?.includes('resume-usb-panel__row'))
+  h.render(() => ResumeUsbImportPanel(props)); await h.flush()
+  assert.equal(rows().length, 2)
+  assert.equal(picks.at(-1).selected, false)
+  rows()[1].props.onClick(); await h.flush()
+  assert.deepEqual(requests, [], 'selecting a row must not import')
+  assert.equal(picks.at(-1).selected, true)
+  picks.at(-1).run(); await h.flush()
+  assert.deepEqual(requests, [['image', 'resume_upload', 'test-member-token']])
+  assert.equal(picks.at(-1).importing, true)
+  upload.resolve({ filename: 'my_pdf_resume.jpg', sizeBytes: 2048, mimeType: 'image/jpeg', fileId: 'file-image', fileUrl: '/fixture.jpg' }); await h.flush()
+  assert.equal(imported.length, 1); assert.equal(imported[0].channel, 'usb'); h.unmount()
+})
+
+test('legacy USB panel (interview setup): unconfigured and read-failure sentences give the service phone, never a staff handoff', async () => {
+  const copy = load('src/copy/unattendedCopy.ts')
+  const contact = { ...copy.CONSERVATIVE_SUPPORT_CONTACT, servicePhone: '18300000000', serviceHours: '工作日 9:00–18:00' }
+  const nodes = (node) => Array.isArray(node) ? node.flatMap(nodes) : node && typeof node === 'object' ? [node, ...nodes(node.props?.children)] : []
+  const mocks = (usb) => ({
+    react: null,
+    '../../../services/api/userErrorMessage': { userMessageOf: (_err, fallback) => fallback },
+    '../../../auth/useAuth': { useAuth: () => ({ getToken: () => 'test-member-token' }) },
+    '@ai-job-print/ui': { Button: 'button', KioskStatePanel: 'aside' },
+    'lucide-react': { FileTextIcon: 'svg', LoaderIcon: 'svg', RefreshCwIcon: 'svg', UsbIcon: 'svg' },
+    '../../../services/files/usbImportApi': usb,
+    '../../../hooks/useUsbImportGate': { useUsbImportGate: () => ({ state: 'allowed', note: null, retry: () => {} }) },
+    '../touch/unattendedResumeCopy': { unattendedResumeCopy: (text) => String(text ?? '') },
+    '../../../copy/unattendedCopy': copy,
+    '../../../hooks/useSupportContact': { useSupportContact: () => contact },
+    '../../../components/qingxu/touch/QxTouchIcon': { QxTouchIcon: 'svg' },
+  })
+  // 没开通 U 盘导入：整块说明里的 description 是「请改用手机扫码上传。」加标准句 1（带号码）。
+  const h1 = hooks()
+  const unconfigured = load('src/pages/resume/components/ResumeUsbImportPanel.tsx', { ...mocks({ isUsbImportConfigured: () => false }), react: h1.react }, { window: { setTimeout: () => 1, clearTimeout: () => {} } })
+  h1.render(() => unconfigured.ResumeUsbImportPanel({ onUploaded: () => {} })); await h1.flush()
+  const panel1 = nodes(h1.value).find((node) => node.type === 'aside')
+  assert.equal(panel1.props.description, '请改用手机扫码上传。需要帮助？拨打服务电话 18300000000（工作日 9:00–18:00）。')
+  assert.equal(copy.containsStaffHandoff(panel1.props.description), false); h1.unmount()
+  // 读盘失败：兜底句是「请重新插入。」加标准句 1（取会话缓存；这份单测里缓存读不到号码，写查看《隐私政策》里的联系方式）。
+  const h2 = hooks()
+  const failing = load('src/pages/resume/components/ResumeUsbImportPanel.tsx', {
+    ...mocks({ isUsbImportConfigured: () => true, getUsbStatus: async () => { throw new Error('读盘失败') }, listUsbFiles: async () => ({ files: [] }), uploadUsbFile: async () => ({}) }),
+    react: h2.react,
+  }, { window: { setTimeout: () => 1, clearTimeout: () => {} } })
+  h2.render(() => failing.ResumeUsbImportPanel({ onUploaded: () => {} })); await h2.flush()
+  const panel2 = nodes(h2.value).find((node) => node.type === 'aside' && node.props.title === 'U盘读取失败')
+  assert.ok(panel2, '读盘失败时画 U盘读取失败 说明')
+  assert.equal(panel2.props.description, 'U盘读取失败，请重新插入。需要帮助？查看《隐私政策》里的联系方式。')
+  assert.equal(copy.containsStaffHandoff(panel2.props.description), false); h2.unmount()
 })
 
 test('optimize holds a lock through 95s, succeeds before 100s, releases on failure and unmount', async (t) => {

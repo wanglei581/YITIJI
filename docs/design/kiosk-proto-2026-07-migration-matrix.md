@@ -120,6 +120,7 @@
 | `/contract-review` | ContractReviewHomePage | src/pages/contract-review/ContractReviewHomePage.tsx | 合同审查入口；生产路由无独立迁移矩阵屏 |
 | `/contract-review/processing` | ContractReviewProcessingPage | src/pages/contract-review/ContractReviewProcessingPage.tsx | 合同审查处理中状态；生产路由无独立迁移矩阵屏 |
 | `/contract-review/result` | ContractReviewResultPage | src/pages/contract-review/ContractReviewResultPage.tsx | 合同审查结果状态；生产路由无独立迁移矩阵屏 |
+| `/dev/touch-gallery` | QxTouchGalleryPage | src/pages/dev/QxTouchGalleryPage.tsx | 开发样板（非业务屏）。只在开发环境挂载；生产构建访问此地址回到首页 |
 | `/k/u/:scene` | UploadSceneEntry | src/pages/upload/KioskCodeEntryPage.tsx | 2026-10-29：一体机手机上传码的短链网页中转（微信规则没生效或用别的软件扫时打开），兑换场景码后 replace 到 `/upload/phone`；顶级全屏、手机尺寸；无原型屏 |
 | `/k/l/:ticketId` | LoginTicketEntry | src/pages/upload/KioskCodeEntryPage.tsx | 2026-10-29：一体机扫码登录码的短链网页中转，票据格式对就 replace 到 `/member/qr-login?ticketId=…`；顶级全屏、手机尺寸；无原型屏 |
 

@@ -1,0 +1,281 @@
+/* 首页专用。只挂在 [data-qx-page='home'] 下，不改共享类的默认。 */
+/* 下面 9 行原在共享 touch.css 末尾（10/28 共享层统一时挪来），选择器原样保留。 */
+.qxt-screen .qxt-body.qxt-home { justify-content: flex-start; }
+.qxt-screen .qxt-home-tasks { display: grid; grid-template-columns: 1fr 1fr; }
+.qxt-screen .qxt-home-foot { text-align: center; }
+.qxt-screen .qxt-home-id .qx-home-identity { min-height: 64px; }
+.qxt-screen .qxt-home-id[data-member='true'] .qx-home-identity[data-kind='status'] {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 页眉品牌名下的点位小字是本机绑定的机构名，长度由后台定：放不下就收成省略号，不把页眉撑歪、不越出屏幕。 */
+[data-qx-page='home'] .qxt-band .qxt-brand > div:last-child { min-width: 0; }
+[data-qx-page='home'] .qxt-band .qxt-brand small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-qx-page='home'] .qxt-body.qxt-home {
+  justify-content: flex-start;
+  gap: 16px;
+  padding-top: 20px;
+}
+[data-qx-page='home'] .qxt-body.qxt-home > * { flex: none; }
+[data-qx-page='home'] .qxt-home-tasks { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+[data-qx-page='home'] .qxt-home-tasks .qxt-task { min-height: 340px; padding: 14px 16px 12px; gap: 4px; }
+[data-qx-page='home'] .qxt-home-tasks .qxt-ic { width: 64px; height: 64px; border-radius: 18px; }
+[data-qx-page='home'] .qxt-home-tasks .qxt-task h3 { font-size: 34px; margin: 0; }
+[data-qx-page='home'] .qxt-home-tasks .qxt-task p { line-height: 1.3; max-width: none; padding-right: 158px; }
+[data-qx-page='home'] .qxt-body.qxt-home-on .qxt-home-tasks .qxt-task { min-height: 300px; }
+[data-qx-page='home'] .qxt-body.qxt-home-squeeze .qxt-home-tasks .qxt-task { min-height: 250px; }
+/* 已登录、但「继续办理」那一块没有东西可摆（名下没有可继续的办理，或交接保护把它收起了）：
+   上面把大卡压低（300px，压紧版 228px）是给那一块让位的，不摆它就没人补，底部导航上会空出 130–190px。
+   稿（docs/design/kiosk-touch-2026-10 的首页）里「已登录」一态永远画着那一条，没有这一态；照同屏的未登录态排：
+   四张大卡吃掉剩下的高度，但不比未登录态的大卡（340px）更高；磁贴多、进压紧版式的配置，剩下的高度本来就
+   不到 340px，直接填满。有「继续办理」时这条不生效，版面与原来逐像素一致。 */
+[data-qx-page='home'] .qxt-body.qxt-home-on:has(> .qxt-home-go:empty) > .qxt-home-tasks {
+  flex: 1 1 auto;
+  max-height: calc(340px * 2 + 16px);
+}
+[data-qx-page='home'] .qxt-body.qxt-home-on.qxt-home-squeeze .qxt-home-tasks .qxt-task { min-height: 228px; }
+[data-qx-page='home'] .qxt-task-note {
+  display: block;
+  max-width: none;
+  font-size: var(--qxt-fs-aux);
+  line-height: 1.3;
+  color: var(--qxt-ink-3);
+}
+[data-qx-page='home'] .qxt-task-dark .qxt-task-note { color: var(--qxt-mint); }
+[data-qx-page='home'] [data-action='print-hub'] .qxt-task-note {
+  align-self: flex-start;
+  box-sizing: border-box;
+  width: calc(100% - 200px);
+  max-width: calc(100% - 200px);
+  padding-right: 0;
+}
+[data-qx-page='home'] .qxt-home-tasks .qxt-chip {
+  white-space: normal;
+  height: auto;
+  min-height: 40px;
+  max-width: 58%;
+  text-align: right;
+}
+[data-qx-page='home'] .qxt-home-squeeze .qxt-mini { transform: scale(0.82); transform-origin: bottom right; }
+[data-qx-page='home'] .qxt-home-go:empty { display: none; }
+[data-qx-page='home'] .qxt-home-go .continue {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 96px;
+  padding: 14px 18px;
+  border-radius: 28px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+[data-qx-page='home'] .qxt-home-go .c-icon { flex: none; width: 72px; height: 72px; display: grid; place-items: center; }
+[data-qx-page='home'] .qxt-home-go .c-icon svg { width: 48px; height: 48px; }
+[data-qx-page='home'] .qxt-home-go .c-copy { flex: 1; min-width: 0; }
+[data-qx-page='home'] .qxt-home-go .c-copy strong { display: block; font-size: var(--qxt-fs-tile); line-height: 1.3; }
+[data-qx-page='home'] .qxt-home-go .c-copy p { margin: 4px 0 0; font-size: var(--qxt-fs-sub); line-height: 1.35; color: var(--qxt-ink-3); }
+[data-qx-page='home'] .qxt-home-go .btn {
+  flex: none;
+  min-height: 64px;
+  padding: 0 22px;
+  border-radius: 22px;
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+[data-qx-page='home'] .qxt-home-go .btn svg { width: 28px; height: 28px; flex: none; }
+[data-qx-page='home'] .qxt-home-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+[data-qx-page='home'] .qxt-home-tiles[data-count='3'] { grid-template-columns: repeat(3, 1fr); }
+[data-qx-page='home'] .qxt-home-tiles[data-count='4'],
+[data-qx-page='home'] .qxt-home-tiles[data-count='5'],
+[data-qx-page='home'] .qxt-home-tiles[data-count='6'] { grid-template-columns: repeat(6, 1fr); }
+[data-qx-page='home'] .qxt-home-tiles[data-count='4'] > .qxt-tile { grid-column: span 3; }
+[data-qx-page='home'] .qxt-home-tiles[data-count='5'] > .qxt-tile:nth-child(-n + 3) { grid-column: span 2; }
+[data-qx-page='home'] .qxt-home-tiles[data-count='5'] > .qxt-tile:nth-child(n + 4) { grid-column: span 3; }
+[data-qx-page='home'] .qxt-home-tiles[data-count='6'] > .qxt-tile { grid-column: span 2; }
+[data-qx-page='home'] .qxt-home-tiles .qxt-chev { display: none; }
+[data-qx-page='home'] .qxt-tile-mark {
+  display: block;
+  margin-top: 4px;
+  font-style: normal;
+  font-size: var(--qxt-fs-aux);
+  font-weight: 700;
+  color: var(--qxt-clay-ink);
+}
+[data-qx-page='home'] .qxt-tile-cue {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--qxt-teal-ink);
+}
+[data-qx-page='home'] .qxt-home-tiles .qxt-tx small {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+[data-qx-page='home'] .qxt-home-id {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 72px;
+}
+[data-qx-page='home'] .qxt-home-id-note {
+  flex: 1 1 280px;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--qxt-fs-sub);
+  color: var(--qxt-ink-2);
+}
+[data-qx-page='home'] .qxt-home-id .qx-home-identity,
+[data-qx-page='home'] .qxt-home-mini {
+  min-width: 64px;
+  min-height: 64px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+}
+[data-qx-page='home'] [data-testid='home-device-status'] {
+  min-width: 64px;
+  min-height: 64px;
+}
+[data-qx-page='home'] .qxt-home-id .qx-home-identity[data-kind='status'] {
+  flex: 0 0 auto;
+  justify-content: flex-start;
+  background: transparent;
+  border-color: transparent;
+}
+[data-qx-page='home'] .qxt-home-id button[data-testid='home-end-previous'] {
+  background: transparent;
+  color: var(--qx-cinnabar);
+  border: 2px solid var(--qx-cinnabar);
+}
+[data-qx-page='home'] .qxt-home-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+[data-qx-page='home'] .qxt-home-foot p {
+  margin: 0;
+  font-size: var(--qxt-fs-aux);
+  color: var(--qxt-ink-3);
+  line-height: 1.35;
+}
+[data-qx-page='home'] .qxt-home-icp { font-size: 20px; }
+[data-qx-page='home'] .qxt-home-icp a {
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  min-height: 64px;
+  padding: 0 8px;
+}
+[data-qx-page='home'][data-qx-intro='done'] .qxt-rise { animation: none; }
+[data-qx-page='home'] .qxt-home-tasks .qxt-task:focus-visible,
+[data-qx-page='home'] .qxt-home-tiles .qxt-tile:focus-visible,
+[data-qx-page='home'] .qxt-askbar:focus-visible {
+  outline: 3px solid var(--qx-teal);
+  outline-offset: 3px;
+  transform: translateY(-4px);
+}
+
+@media (max-width: 760px) {
+  [data-qx-page='home'] .qxt-home-tasks,
+  [data-qx-page='home'] .qxt-home-tiles,
+  [data-qx-page='home'] .qxt-home-tiles[data-count='3'],
+  [data-qx-page='home'] .qxt-home-tiles[data-count='4'],
+  [data-qx-page='home'] .qxt-home-tiles[data-count='5'],
+  [data-qx-page='home'] .qxt-home-tiles[data-count='6'] { grid-template-columns: 1fr; }
+  [data-qx-page='home'] .qxt-home-tiles > .qxt-tile { grid-column: auto; }
+  [data-qx-page='home'] .qxt-home-tasks .qxt-task { min-height: 0; padding: 14px 14px 12px; gap: 6px; }
+  [data-qx-page='home'] .qxt-home-tasks .qxt-ic { width: 44px; height: 44px; border-radius: 14px; }
+  [data-qx-page='home'] .qxt-home-tasks .qxt-task h3 { font-size: 26px; margin: 0; }
+  [data-qx-page='home'] .qxt-home-tasks .qxt-task p { font-size: 20px; line-height: 1.35; padding-right: 76px; }
+  [data-qx-page='home'] [data-action='print-hub'] .qxt-task-note {
+    width: calc(100% - 96px);
+    max-width: calc(100% - 96px);
+    font-size: 20px;
+  }
+  [data-qx-page='home'] .qxt-home-tasks .qxt-chip { max-width: 68%; font-size: 20px; min-height: 40px; }
+  [data-qx-page='home'] .qxt-home-tasks .qxt-take { font-size: 20px; }
+  /* 共享窄屏把问小青条上提，字号提到 20 以后会盖住第一张卡的点按区。首页改回正常流。 */
+  [data-qx-page='home'] .qxt-band-hero,
+  [data-qx-page='home'] .qxt-band-hero.qxt-band-dense { padding-bottom: 12px; }
+  [data-qx-page='home'] .qxt-askbar {
+    height: auto;
+    min-height: 88px;
+    margin: 8px 0 0;
+    border-radius: 28px;
+  }
+  [data-qx-page='home'] .qxt-askbar b { font-size: 22px; }
+  [data-qx-page='home'] .qxt-askbar small { font-size: 20px; }
+  [data-qx-page='home'] .qxt-greet p,
+  [data-qx-page='home'] .qxt-band-hero .qxt-eyebrow,
+  [data-qx-page='home'] .qxt-brand b,
+  [data-qx-page='home'] .qxt-brand small,
+  [data-qx-page='home'] .qxt-clock small { font-size: 20px; }
+  [data-qx-page='home'] .qxt-status { height: auto; min-height: 44px; font-size: 20px; }
+  [data-qx-page='home'] .qxt-home-tasks .qxt-mini { transform: scale(0.48); transform-origin: bottom right; }
+  [data-qx-page='home'] .qxt-home-id {
+    flex-direction: column;
+    align-items: stretch;
+    height: auto;
+    min-height: 72px;
+    gap: 8px;
+  }
+  [data-qx-page='home'] .qxt-home-id-note { flex: none; width: auto; }
+  [data-qx-page='home'] .qxt-home-id .qx-home-identity,
+  [data-qx-page='home'] .qxt-home-mini { width: 100%; min-height: 64px; }
+  [data-qx-page='home'] [data-testid='home-device-status'] { min-width: 64px; min-height: 64px; }
+  [data-qx-page='home'] .qxt-body.qxt-home { padding: 12px 16px 16px; overflow: auto; }
+}
+
+@media (min-width: 761px) {
+  [data-qx-page='home'] .qxt-body.qxt-home { justify-content: flex-start; gap: 16px; padding: 12px 56px 6px; }
+  [data-qx-page='home'] .qxt-body.qxt-home-on { gap: 12px; }
+  /* 同上：没有「继续办理」时，段与段之间的间隔回到未登录态的 16px。 */
+  [data-qx-page='home'] .qxt-body.qxt-home-on:not(.qxt-home-squeeze):has(> .qxt-home-go:empty) { gap: 16px; }
+  [data-qx-page='home'] .qxt-body.qxt-home-squeeze { gap: 12px; padding-top: 8px; padding-bottom: 4px; }
+  [data-qx-page='home'] .qxt-body.qxt-home-squeeze .qxt-home-tasks { gap: 14px; }
+  [data-qx-page='home'] .qxt-home-tasks { gap: 16px; }
+  [data-qx-page='home'] .qxt-home-tiles .qxt-tile { padding: 12px 16px; gap: 6px; }
+  [data-qx-page='home'] .qxt-home-tiles .qxt-ic { width: 52px; height: 52px; border-radius: 16px; }
+  [data-qx-page='home'] .qxt-home-tiles .qxt-tile b { font-size: var(--qxt-fs-tile); line-height: 1.25; }
+  /* 说明行用 line-clamp 的 overflow:hidden 裁行数，行高不低于 1.45：字体栈落到 Qingxu Sans（CI、真机 Windows 没有苹方，思源黑体子集，内容区 1.448em）时，
+     22px 字的内容区 31.9px，行高 1.35 的行盒只有 29.7px，字形上下各被贴着削约 1px（Mac 苹方量不出来）。盒子按内容撑开，不缩字、不藏字，同第九包 24px 标题行的做法。 */
+  [data-qx-page='home'] .qxt-home-tiles .qxt-tx small { font-size: var(--qxt-fs-sub); line-height: 1.45; margin-top: 4px; }
+  [data-qx-page='home'] .qxt-home-tiles .qxt-tile-mark { margin-top: 4px; font-size: var(--qxt-fs-aux); line-height: 1.3; }
+  /* 失败态的「点这里重新读取」和状态短句排同一行，磁贴和读取中一样高，状态切换时首页不跳（fusion-w5 守着） */
+  [data-qx-page='home'] .qxt-home-tiles .qxt-tx { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; align-items: start; }
+  [data-qx-page='home'] .qxt-home-tiles .qxt-tx > b { grid-column: 1 / -1; grid-row: 1; }
+  [data-qx-page='home'] .qxt-home-tiles .qxt-tile-mark { grid-column: 1; grid-row: 2; }
+  [data-qx-page='home'] .qxt-home-tiles .qxt-tile-cue { grid-column: 2; grid-row: 2; margin-top: 4px; font-size: var(--qxt-fs-aux); line-height: 1.3; }
+  [data-qx-page='home'] .qxt-home-tiles .qxt-tx > small { grid-column: 1 / -1; grid-row: 3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-qx-page='home'] .qxt-home-tasks .qxt-task:focus-visible,
+  [data-qx-page='home'] .qxt-home-tiles .qxt-tile:focus-visible,
+  [data-qx-page='home'] .qxt-askbar:focus-visible { transform: none; }
+}

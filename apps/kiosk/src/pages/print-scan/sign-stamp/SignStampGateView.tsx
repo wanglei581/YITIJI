@@ -1,47 +1,62 @@
 import { useNavigate } from 'react-router-dom'
-import { FileTextIcon, FolderIcon, ImageIcon, InfoIcon } from 'lucide-react'
+import { FileTextIcon, InfoIcon } from 'lucide-react'
+import { FsRow } from '../FsRow'
+import { PhoneHelpLine } from '../phoneHelp'
 import type { StatusCopy } from './signStampModel'
 import { SignStampStatus } from './SignStampStatus'
+import { Fact, Sample } from './SignStampBits'
 
 const ALTS = [
-  {
-    key: 'hub',
-    title: '文档打印',
-    d: '传文件、选参数、去打印。',
-    f: '要打印机就绪',
-    to: '/print/upload',
-    tone: 'teal' as const,
-    Icon: FileTextIcon,
-  },
-  {
-    key: 'scan',
-    title: '材料扫描',
-    d: '把纸质材料扫成电子件。',
-    f: '要扫描仪就绪',
-    to: '/scan',
-    tone: 'clay' as const,
-    Icon: ImageIcon,
-  },
-  {
-    key: 'convert',
-    title: '图片转 PDF',
-    d: '几张照片拼成一份 PDF。',
-    f: '不经过打印机',
-    to: '/print-scan/convert',
-    tone: 'muted' as const,
-    Icon: FolderIcon,
-  },
-  {
-    key: 'ask',
-    title: 'AI 顾问',
-    d: '说不清就直接问她。',
-    f: '随时可以问',
-    to: '/assistant',
-    tone: 'slate' as const,
-    Icon: InfoIcon,
-  },
-]
+  { key: 'hub', title: '文档打印', desc: '传文件、选参数、去打印。要打印机就绪', to: '/print/upload' },
+  { key: 'scan', title: '材料扫描', desc: '把纸质材料扫成电子件。要扫描仪就绪', to: '/scan' },
+  { key: 'convert', title: '图片转 PDF', desc: '几张照片拼成一份 PDF。不经过打印机', to: '/print-scan/convert' },
+  { key: 'ask', title: 'AI 顾问', desc: '说不清就直接问她。随时可以问', to: '/assistant' },
+] as const
 
+/** 默认关闭：三步都停用，出口只有打印扫描和查政策。卡片文案不含「上传」，避免被当成上传入口。 */
+export function SignClosedBody({ copy }: { copy: StatusCopy }) {
+  const navigate = useNavigate()
+  const hold = (title: string, detail: string) => (
+    <div className="fs-hold" role="group" aria-disabled="true" aria-label={`${title}，本机暂未开通`}>
+      <b>{title}</b>
+      <span>{detail}</span>
+      <span className="sx-chip">本机暂未开通</span>
+    </div>
+  )
+  return (
+    <>
+      <SignStampStatus copy={copy} />
+      <p className="fs-h">签名的三步</p>
+      <div className="fs-lock">
+        {hold('选 PDF', '选一份要签名的 PDF')}
+        {hold('传签名图', '上传本人手写签名')}
+        {hold('放置', '把签名放到某一页')}
+      </div>
+      <p className="fs-h">这些还能办</p>
+      <div className="fs-pair">
+        <button type="button" className="fs-act" onClick={() => navigate('/print-scan')}>
+          <span className="vis" aria-hidden="true"><FileTextIcon size={48} /></span>
+          <span className="tx">
+            <h3>打印扫描</h3>
+            <p>打印文件、扫描纸质材料、看复印步骤，都不靠签名。</p>
+          </span>
+          <span className="go" aria-hidden="true">›</span>
+        </button>
+        <button type="button" className="fs-act" onClick={() => navigate('/policy-service')}>
+          <span className="vis" aria-hidden="true"><InfoIcon size={48} /></span>
+          <span className="tx">
+            <h3>查政策</h3>
+            <p>看本机构发布的政策和要带的材料。</p>
+          </span>
+          <span className="go" aria-hidden="true">›</span>
+        </button>
+      </div>
+      <PhoneHelpLine />
+    </>
+  )
+}
+
+/** 还没放行（读取中、没登录、登录过期、没登记、维护、读取失败……）：状态卡 + 为什么 + 这一步过不去时还能去哪。 */
 export function SignStampGateView({
   copy,
   why,
@@ -52,66 +67,26 @@ export function SignStampGateView({
   const navigate = useNavigate()
   return (
     <>
-      <div className="ss-status">
-        <SignStampStatus copy={copy} />
-      </div>
-      <div className="ss-work">
-        <div className="ss-gatecol">
-          <h3>
-            这一步过不去，这些还能用
-            <span className="r">每个入口自己再检查一次</span>
-          </h3>
-          <div className="ss-gaterow">
-            {ALTS.map((alt) => (
-              <button
-                key={alt.key}
-                type="button"
-                className="ss-pickcard"
-                data-testid={`sign-stamp-alt-${alt.key}`}
-                onClick={() => navigate(alt.to)}
-              >
-                <span className="pi" data-tone={alt.tone}>
-                  <alt.Icon size={26} />
-                </span>
-                <span className="pt">
-                  <b>{alt.title}</b>
-                  <span className="d">{alt.d}</span>
-                  <span className="f">{alt.f}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-          <p className="note" style={{ margin: 0, fontSize: 17, color: 'var(--qx-ink-3)' }}>
-            这里只是导航；能不能用由那一页自己判断。
-          </p>
+      <SignStampStatus copy={copy} />
+      <div className="fs-facts">
+        <div className="fs-pairgrid">
+          <Fact title="为什么这么处理">{why.join('')}</Fact>
+          <Fact title="这一页现在不做什么">不显示任何文件名或页数。不上传、不合成、不保存。</Fact>
         </div>
       </div>
-      <div className="ss-aside">
-        <div className="ss-acol">
-          <h4>为什么这么处理</h4>
-          <ul className="ss-plan">
-            {why.map((item) => (
-              <li key={item}>
-                <span className="sq" aria-hidden />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="ss-acol" data-disclaimer="true">
-          <h4>这一页现在不做什么</h4>
-          <ul className="ss-plan">
-            <li>
-              <span className="sq" aria-hidden />
-              <span>不显示任何文件名或页数。</span>
-            </li>
-            <li>
-              <span className="sq" aria-hidden />
-              <span>不上传、不合成、不保存。</span>
-            </li>
-          </ul>
-        </div>
-      </div>
+      <PhoneHelpLine />
+      <p className="fs-h">这一步过不去，这些还能用<small>每个入口自己再检查一次</small></p>
+      {ALTS.map((alt) => (
+        <FsRow
+          key={alt.key}
+          title={alt.title}
+          desc={alt.desc}
+          testId={`sign-stamp-alt-${alt.key}`}
+          onClick={() => navigate(alt.to)}
+        />
+      ))}
+      <p className="fs-p">这里只是导航；能不能用由那一页自己判断。</p>
+      <Sample />
     </>
   )
 }
@@ -124,7 +99,7 @@ export function gateWhy(state: string): string[] {
     return ['签名图不留到下一次使用，过期即不可复用。', '这一步不会替你自动重传，也不会替你自动合成。']
   }
   if (state === 'terminal-missing') {
-    return ['不假设「读不到就是可用」。', '请联系现场工作人员登记这台机器。']
+    return ['不假设「读不到就是可用」。', '这台机器还没登记，签名不能开始。请安全返回打印扫描。']
   }
   if (state.startsWith('capability-')) {
     return ['读取中不等于可用，也不等于不可用。', '读不到就不放行，不把失败当成已关闭。']
