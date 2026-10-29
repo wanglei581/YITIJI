@@ -13,7 +13,7 @@
  *
  * 运行：pnpm --filter @ai-job-print/kiosk verify:renshi-policy-ui
  */
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
@@ -51,6 +51,39 @@ if (!/同步时间：\d/.test(allRenshi)) {
   pass('A2. 无硬编码「同步时间：YYYY-MM-DD」假时效')
 } else {
   fail('A2. 不得硬编码假同步时间')
+}
+
+// A3–A4. 政策与公告的审核、发布文案必须与机构自行操作的事实一致（托管 a：政策由机构在我们云上自己审核并发布，
+// 管理员审核或发布会被后端拒绝，只剩紧急下架；见 policies.service.ts 的 reviewPolicy、publishPolicy）。
+// 这一条曾在第七次冻结（#1366）改对，触屏版集成线从旧底稿切出时又带回「管理员审核」旧话（10/29 本机走查 I-04）：
+// 所以这里按目录整体扫，任何 renshi 源码里再出现「管理员审核」都红，四句定稿各在其位。
+function readRenshiSources(rel) {
+  return readdirSync(join(ROOT, rel), { withFileTypes: true }).flatMap((entry) => {
+    const sourcePath = join(rel, entry.name)
+    if (entry.isDirectory()) return readRenshiSources(sourcePath)
+    return entry.isFile() && /\.tsx?$/.test(entry.name)
+      ? [{ path: sourcePath, source: read(sourcePath) }]
+      : []
+  })
+}
+const adminReviewSources = readRenshiSources('src/pages/renshi').filter(({ source }) => source.includes('管理员审核'))
+if (adminReviewSources.length === 0) {
+  pass('A3. renshi 全部 .ts/.tsx 源码无「管理员审核」')
+} else {
+  fail(`A3. 政策由机构自己审核并发布，源码不得出现「管理员审核」：${adminReviewSources.map(({ path }) => path).join('、')}`)
+}
+const institutionReviewCopies = [
+  ['RenshiPage.tsx', page, '公告由发布机构自己审核并发布，正文与来源链接原样呈现。'],
+  ['NoticePanel.tsx', noticePanel, '公告由发布机构自己审核并发布，目前一条都没有。这是内容进度，不是读取失败；读取失败会另有一屏说明。'],
+  ['NoticePanel.tsx', noticePanel, '机构发布 · 机构自己审核'],
+  ['PolicyPanel.tsx', policyPanel, '这里只展示发布机构自己审核并发布的政策。下方「通用办事指引」是本机整理的参考，不属于政策库。'],
+]
+for (const [index, [file, source, copy]] of institutionReviewCopies.entries()) {
+  if (source.includes(copy)) {
+    pass(`A4.${index + 1}. ${file} 保留机构自己审核并发布的定稿`)
+  } else {
+    fail(`A4.${index + 1}. ${file} 缺少定稿：「${copy}」`)
+  }
 }
 
 // B. 内置指引数据诚实性
