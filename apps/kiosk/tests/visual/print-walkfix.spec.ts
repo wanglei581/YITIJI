@@ -8,7 +8,7 @@ import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { assertNoHorizontalOverflow } from './assert-layout'
-import { seedPrintHandoff, W2_FILE, W2_MATERIAL_CHECK } from './fixtures/fusion-w2-state'
+import { seedPrintHandoff, setReactRouterState, W2_FILE, W2_MATERIAL_CHECK, W2_ORDER, W2_PRINT_PARAMS } from './fixtures/fusion-w2-state'
 
 const NOW = '2026-07-24T00:00:00.000Z'
 
@@ -188,4 +188,96 @@ test('I-36 preview params: the "I checked the masked file" checkbox is at least 
   await expect(page.getByRole('button', { name: '下一步：核对价格' })).toBeEnabled()
   await assertNoHorizontalOverflow(page)
   await shot(page, 'i36-privacy-confirm')
+})
+
+// ── 完成屏 / 失败屏共用的路由状态与接口 ────────────────────────────────────────
+const flowState = { file: W2_FILE, params: W2_PRINT_PARAMS, source: 'document', ...W2_ORDER }
+const JOB_PATH = `/api/v1/print/jobs/${W2_ORDER.taskId}`
+
+function registerCompletedJob(api: ApiRouter): void {
+  api.respond('GET', JOB_PATH, {
+    status: 200,
+    json: { taskId: W2_ORDER.taskId, status: 'completed', completedAt: '2026-07-26T00:00:00.000Z' },
+  })
+}
+
+// ── I-12 打印完成屏页底两句话分开 ─────────────────────────────────────────────
+// 走查：「少了页、印花了、对内容有疑问？需要帮助？查看《隐私政策》里的联系方式 不再点屏幕，60 秒后结束本次使用……」
+// 连成一段，读起来像一句话。求助句和「不再点屏幕就结束」是两件事，各占一行。
+test('I-12 done screen: the help sentence and the auto-end sentence are two separate lines @w2', async ({ page, api }) => {
+  registerShell(api)
+  registerCompletedJob(api)
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', flowState)
+  const block = page.getByTestId('print-fulfill-fallback')
+  await expect(block).toBeVisible()
+  const lines = block.locator('p')
+  expect(await lines.count(), '页底说明至少分成两段').toBeGreaterThanOrEqual(2)
+  await expect(lines.nth(0)).toContainText('少了页、印花了、对内容有疑问？')
+  await expect(lines.nth(0)).not.toContainText('不再点屏幕')
+  await expect(lines.nth(1)).toContainText('不再点屏幕，60 秒后结束本次使用')
+  const text = await block.innerText()
+  expect(text, '求助句和自动结束句之间不能只隔一个空格').not.toMatch(/(?:联系方式|）|[0-9])\s+不再点屏幕/)
+  const [first, second] = await Promise.all([lines.nth(0).boundingBox(), lines.nth(1).boundingBox()])
+  expect((second?.y ?? 0) + 1, '第二句在第一句下面另起一行').toBeGreaterThanOrEqual((first?.y ?? 0) + (first?.height ?? 0))
+  await shot(page, 'i12-done')
+})
+
+// ── I-13 大厅「打印文件」进来源选择屏 ──────────────────────────────────────────
+// 走查：大厅「打印文件」的链接带 tab=file，一体机上 tab=file 直接走手机二维码，跳过了稿 print-src 的「文件在哪」选择屏，
+// 想用 U 盘的人（没手机或手机不方便）在正常状态下找不到入口。
+const HUB_READY = { document_print: 'available', phone_upload: 'available', usb_import: 'available', scan: 'available', copy: 'available', format_convert: 'available' }
+
+test('I-13 hub: 打印文件 opens the file-source chooser (phone, USB, my documents), not the phone QR page @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api, HUB_READY)
+  await page.goto('/print-scan')
+  await page.getByTestId('print-hub-cap-doc-print').click()
+  await expect(page).toHaveURL(/\/print\/upload\?/)
+  expect(new URL(page.url()).searchParams.get('tab'), '链接不带 tab，才会进来源选择屏').toBeNull()
+  const channels = page.getByTestId('file-source-channels')
+  await expect(channels).toBeVisible()
+  await expect(page.getByTestId('file-source-ch-qr').locator('button')).toBeEnabled()
+  await expect(page.getByTestId('file-source-ch-usb').locator('button')).toBeEnabled()
+  await expect(page.getByTestId('file-source-member-source')).toBeVisible()
+  await expect(channels).toContainText('U 盘导入')
+  await shot(page, 'i13-chooser')
+  // 选 U 盘就进 U 盘通道（而不是只在二维码过期后才露面）。
+  await page.route('http://127.0.0.1:9527/local/usb/**', (route) => route.fulfill({
+    status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' },
+    body: JSON.stringify({ success: true, data: { present: false } }),
+  }))
+  await page.getByTestId('file-source-ch-usb').locator('button').click()
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('U 盘')
+  await expect(page.getByTestId('file-source-member-source')).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
+test('I-13 hub: 照片打印 also lands on the chooser and keeps the photo category @w2', async ({ page, api }) => {
+  registerShell(api, HUB_READY)
+  await page.goto('/print-scan')
+  await page.getByRole('button', { name: /照片打印/ }).click()
+  await expect(page).toHaveURL(/\/print\/upload\?/)
+  const url = new URL(page.url())
+  expect(url.searchParams.get('tab')).toBeNull()
+  expect(url.searchParams.get('category')).toBe('photo')
+  await expect(page.getByTestId('file-source-channels')).toBeVisible()
+})
+
+test('I-13 chooser: the USB card is greyed out with the reason when the backend has not opened it on this machine @w2', async ({ page, api }) => {
+  registerShell(api, { ...HUB_READY, usb_import: 'maintenance' })
+  await page.goto('/print/upload?source=document')
+  const usb = page.getByTestId('file-source-ch-usb')
+  await expect(usb).toBeVisible()
+  await expect(usb.locator('button')).toBeDisabled()
+  await expect(usb).toContainText('维护中')
+  await expect(usb).toContainText('请改用手机上传')
+  await expect(page.getByTestId('file-source-ch-qr').locator('button')).toBeEnabled()
+  await shot(page, 'i13-chooser-usb-off')
+})
+
+test('I-13 chooser: with the capability not configured for this machine, USB stays available (没接管就放行) @w2', async ({ page, api }) => {
+  registerShell(api)
+  await page.goto('/print/upload?source=document')
+  await expect(page.getByTestId('file-source-ch-usb').locator('button')).toBeEnabled()
 })

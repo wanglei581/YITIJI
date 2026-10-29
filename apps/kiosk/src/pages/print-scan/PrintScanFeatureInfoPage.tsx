@@ -41,10 +41,10 @@ import { DocStackArt, IdCardArt } from './ToolArt'
 import { TouchToolScreen } from './TouchToolScreen'
 import './styles/print-hub-qx.css'
 
-const PHOTO_FALLBACK = '/print/upload?source=document&tab=file&category=photo'
+const PHOTO_FALLBACK = '/print/upload?source=document&category=photo'
 const SCAN_FALLBACK = '/scan'
 /** 复印说明页的主按钮：有电子版要打，走「文档打印」同一个入口。 */
-const DOC_PRINT_ENTRY = '/print/upload?source=document&tab=file'
+const DOC_PRINT_ENTRY = '/print/upload?source=document'
 
 const RECORD_LINKS: readonly (QxPrintQuickLinkView & { to: string })[] = [
   { key: 'documents', icon: FilesIcon, title: '我的文档', description: '已上传 / 生成的文件', to: '/me/documents' },

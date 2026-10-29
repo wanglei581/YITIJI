@@ -538,8 +538,10 @@ export function PrintDonePage() {
           </>
         )}
 
+        {/* 两件事各占一行：①出了问题怎么办 ②不再点屏幕就会结束使用。以前连成一段，中间只隔一个空格（走查 I-12）。 */}
         <div className="pff-help" data-testid="print-fulfill-fallback">
-          <span className="txt">少了页、印花了、对内容有疑问？{helpNeededLine()} 不再点屏幕，60 秒后结束本次使用；点一下屏幕重新计时。{isLoggedIn ? '到点会结束本次使用并退出登录，本机这次的打印预览一并收起。' : '到点会结束本次使用，本机这次的打印预览一并收起。'}</span>
+          <p className="txt">少了页、印花了、对内容有疑问？{helpNeededLine(support)}。</p>
+          <p className="txt">不再点屏幕，60 秒后结束本次使用；点一下屏幕重新计时。{isLoggedIn ? '到点会结束本次使用并退出登录，本机这次的打印预览一并收起。' : '到点会结束本次使用，本机这次的打印预览一并收起。'}</p>
         </div>
 
         <details className="pft-record">

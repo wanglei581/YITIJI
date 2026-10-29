@@ -352,6 +352,7 @@ export function SourceEntry({
   showFileChannel,
   showScan,
   usbMode,
+  usbHold = null,
   wordText,
   miniappLine,
   onSelectChannel,
@@ -362,18 +363,26 @@ export function SourceEntry({
   showFileChannel: boolean
   showScan: boolean
   usbMode: 'ok' | 'unavailable' | 'offline'
+  /** 令牌在、后台没放行时的说明（useUsbImportGate）。只有 blocked 才把这一项置灰：读不到或还在读，留着可点，进去由 U 盘页说明。 */
+  usbHold?: UsbImportHold | null
   wordText: string
   miniappLine: string
   onSelectChannel: (key: UploadTab) => void
   onScan: () => void
   onDocuments: () => void
 }) {
+  // 后台把 U 盘导入配成维护中、测试中、不支持、未验收时，这一项和「本机暂未开通」一样先置灰、写清原因，
+  // 不等人点进去才被挡回来（走查 I-13）。
+  const usbBlocked = usbMode === 'ok' && usbHold?.state === 'blocked'
+  const usbOff = usbMode !== 'ok' || usbBlocked
   const usbDesc =
     usbMode === 'unavailable'
       ? '本机暂未开通 U 盘导入，请改用手机上传。'
-      : usbMode === 'offline'
-        ? '暂时无法读取 U 盘，可以重新连接或改用手机上传。'
-        : CHANNEL_COPY.usb.desc
+      : usbBlocked
+        ? `${(usbHold?.note ?? '本机暂未开通').replace(/[。.]$/, '')}，请改用手机上传。`
+        : usbMode === 'offline'
+          ? '暂时无法读取 U 盘，可以重新连接或改用手机上传。'
+          : CHANNEL_COPY.usb.desc
   const count = 2 + (showScan ? 1 : 0) + (showFileChannel ? 1 : 0)
   return (
     <>
@@ -398,7 +407,7 @@ export function SourceEntry({
           desc={usbDesc}
           icon="usb"
           art="usb"
-          disabled={usbMode !== 'ok'}
+          disabled={usbOff}
           onClick={() => onSelectChannel('usb')}
         />
         {showScan ? (
