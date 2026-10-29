@@ -11,17 +11,36 @@
 
   <view class="content">
 
-    <!-- 空闲：可以选文件 -->
+    <!-- 空闲：可以选文件。两个来源，一张码只收一份 -->
     <block wx:if="{{phase === 'idle'}}">
       <view class="guide-card">
         <text class="guide-icon ficon i-printer"></text>
         <view class="guide-title">已连上终端</view>
-        <view class="guide-desc">选一份文件传过去，终端屏幕上会自己出现。单个文件不超过 10MB。</view>
-        <button class="btn-primary" bindtap="chooseAndSend">选择文件</button>
+        <view class="guide-desc">选一份文件传过去，终端屏幕上会自己出现。一张码只收一份，单个文件不超过 10MB。</view>
+        <button class="btn-primary" bindtap="chooseAndSend">从微信聊天选文件</button>
+      </view>
+
+      <!-- 从我的文档选：要登录。去登录再回来，这一单的令牌还在页面内存里 -->
+      <view class="state-card doc-card">
+        <view class="sc-title">从我的文档选</view>
+        <view wx:if="{{docNote}}" class="sc-desc">{{docNote}}</view>
+        <view wx:if="{{docState === 'login' && !docNote}}" class="sc-desc">登录后可以直接选「我的文档」里已有的文件，不用再从手机传一遍。</view>
+        <button wx:if="{{docState === 'login'}}" class="btn-secondary" bindtap="goLogin">登录后从我的文档选</button>
+        <view wx:elif="{{docState === 'loading'}}" class="sc-desc">正在读取我的文档…</view>
+        <button wx:elif="{{docState === 'error'}}" class="btn-secondary" bindtap="reloadDocs">重新读取</button>
+        <view wx:elif="{{docState === 'empty'}}" class="sc-desc">我的文档里还没有能传的文件</view>
+        <view wx:elif="{{docState === 'list'}}" class="sent-list doc-list">
+          <view wx:for="{{docs}}" wx:key="id" class="sent-item doc-item tap" hover-class="{{item.tooLarge ? 'none' : 'tap-press'}}" data-id="{{item.id}}" bindtap="pickDoc" aria-role="button" aria-disabled="{{item.tooLarge}}">
+            <view>{{item.name}}</view>
+            <view class="doc-meta">{{item.meta}}</view>
+            <view wx:if="{{item.tooLarge}}" class="doc-meta">超过 10MB，这一单收不了</view>
+          </view>
+        </view>
+        <view wx:if="{{docState === 'list' && docTruncated}}" class="sc-desc">这里只列了最近 50 份文件。</view>
       </view>
     </block>
 
-    <!-- 兑换扫码凭据中（微信扫小程序码进来的那条入口）-->
+    <!-- 兑换扫码凭据中（微信扫码直接进来的那几条入口）-->
     <block wx:elif="{{phase === 'resolving'}}">
       <view class="state-card">
         <view class="sc-title">正在连接终端…</view>
@@ -37,15 +56,12 @@
       </view>
     </block>
 
-    <!-- 完成：一张码只收一份，回到一体机继续，不再发送 -->
+    <!-- 完成：一张码只收一份，回到一体机继续，不再发送。说法与一体机同一句 -->
     <block wx:elif="{{phase === 'done'}}">
       <view class="state-card">
         <text class="sc-icon ficon i-check"></text>
-        <view class="sc-title">已传给终端</view>
-        <view class="sc-desc">请回到一体机屏幕继续操作</view>
-        <view class="sent-list">
-          <view class="sent-item" wx:for="{{sent}}" wx:key="index">{{item.name}}</view>
-        </view>
+        <view class="sc-title sent-title">已传给这台一体机：《{{sent[0].name}}》</view>
+        <view class="sc-desc">请回到一体机屏幕确认后继续。</view>
         <button class="btn-secondary" bindtap="goBack">回一体机继续</button>
       </view>
     </block>
@@ -59,14 +75,12 @@
       </view>
     </block>
 
-    <!-- 失败：只有服务端明确拒收才给重试 -->
+    <!-- 失败：服务端明确拒收（可以重选）、或兑换没回应（可以再兑换）才给重试；码失效不给 -->
     <block wx:elif="{{phase === 'error'}}">
       <view class="state-card">
         <view class="sc-title">没能传过去</view>
         <view class="sc-desc">{{errorMsg}}</view>
-        <button wx:if="{{canRetry}}" class="btn-primary" bindtap="retry">重试</button>
-        <!-- scene 码是一次性的，兑换失败给重试只会再失败一次 -->
-        <view wx:elif="{{sceneFailed}}" class="sc-desc">请回到一体机屏幕重新生成二维码</view>
+        <button wx:if="{{canRetry || resolveRetry}}" class="btn-primary" bindtap="retry">重试</button>
       </view>
     </block>
 
