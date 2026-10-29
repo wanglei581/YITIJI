@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { FileTextIcon, LockIcon } from 'lucide-react'
 import { PrintIcon } from '../art/PrintIcon'
+import { PrintFillArt } from '../art/PrintFillArt'
 import type { PrintParamAdjustment } from '@ai-job-print/shared'
 import { helpNeededLine, machineCannotPrintLine, machineUnusableLine, preferUnattended, printProblemLine } from '../../../copy/unattendedCopy'
 import type { PrintBenefitView } from '../../../services/api/benefits'
@@ -139,6 +140,8 @@ export function PrintConfirmView(props: Props) {
           <Sec no="03" title="现在可以去哪">
             <ConfirmCard hideHelp={hideHelp} note={<>先回上一步把文件和参数选好，<b>回到这一页才会有正式报价</b>。</>} alert={submitError} actions={actions} />
           </Sec>
+          {/* 三段说明只有 1100 上下高，下面剩的三百多用一块「纸」的实物小样吃掉（同打印进度、结果未确认等状态屏的做法），不留整块空白；内容够长时它自己缩到 0。 */}
+          <PrintFillArt name="stack" />
         </>
       ) : null}
 
@@ -178,6 +181,7 @@ export function PrintConfirmView(props: Props) {
               actions={actions}
             />
           </Sec>
+          <PrintFillArt name="stack" />
         </>
       ) : null}
 
