@@ -46,8 +46,10 @@ import { buildThrottlerConfig } from '../src/common/throttler/terminal-throttle'
 import {
   KIOSK_PROFILE_MINUTE_LIMIT,
   KIOSK_PROFILE_PRE_VERIFY_IP_LIMIT,
+  KIOSK_PROFILE_PRE_VERIFY_MAX_IPS,
   KIOSK_PROFILE_WINDOW_MS,
   kioskProfileGetTracker,
+  kioskProfilePreVerifySizeForTests,
   KioskProfileThrottleBinder,
   resetKioskProfilePreVerifyForTests,
 } from '../src/branding/kiosk-profile-throttle'
@@ -850,6 +852,15 @@ async function main(): Promise<void> {
       Date.now = realNow
       await flooded.close()
     }
+    // 计数表有内存上限：IPv6 能换出海量来源，表不能无限长，也不能让每个新来源都扫一遍整张表
+    resetKioskProfilePreVerifyForTests()
+    const sprayStart = realNow()
+    for (let i = 0; i < 120_000; i += 1) {
+      await kioskProfileGetTracker({ ip: `2001:db8::${i.toString(16)}`, headers: {} }, {} as never)
+    }
+    const sprayMs = realNow() - sprayStart
+    c.check(`  12 万个不同来源 IP 的请求：计数表不超过上限（${KIOSK_PROFILE_PRE_VERIFY_MAX_IPS} 个）`, kioskProfilePreVerifySizeForTests() <= KIOSK_PROFILE_PRE_VERIFY_MAX_IPS, `${kioskProfilePreVerifySizeForTests()} 个`)
+    c.check('  且没有逐请求扫整张表（12 万次请求 < 5 秒）', sprayMs < 5_000, `${sprayMs} ms`)
 
     // ── 9c. Redis 故障 ─────────────────────────────────────────────────────────
     console.log('\n[9c] Redis 故障：验签出错一律当作没验过（按 IP 计数），限流照样生效，恢复后验签终端马上用自己的额度')

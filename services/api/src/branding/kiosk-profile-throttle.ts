@@ -24,13 +24,27 @@ export const KIOSK_PROFILE_WINDOW_MS = 60_000
  * 额度要容得下同一出口 IP 下一个大厅里所有终端各自 30 次的验签请求（600 ≈ 20 台），再多的只可能是刷。
  */
 export const KIOSK_PROFILE_PRE_VERIFY_IP_LIMIT = 600
+/**
+ * 计数表的内存上限：来源 IP 只认 Express 在 trust proxy 配置后填的 req.ip（不信 X-Forwarded-For），所以不同 IP 的数量受真实来源限制；
+ * 但 IPv6 能一个人换出海量地址，表不能因此无限长。条数到 PURGE_AT 才扫一次过期项（且至少隔 5 秒一次，不是每个新来源都扫整张表），
+ * 到 MAX_IPS 直接清空——这一层放宽一阵子，后面还有按 IP 的 30 次/分钟桶和全局 ip-wide 桶，不会因此无设防。
+ */
+export const KIOSK_PROFILE_PRE_VERIFY_MAX_IPS = 50_000
+const PRE_VERIFY_PURGE_AT = 10_000
+const PRE_VERIFY_PURGE_EVERY_MS = 5_000
 const preVerifyHits = new Map<string, { windowStart: number; count: number }>()
+let preVerifyLastPurge = 0
 
 function preVerifyExceeded(ip: string, now: number): boolean {
   let entry = preVerifyHits.get(ip)
   if (!entry || now - entry.windowStart >= KIOSK_PROFILE_WINDOW_MS) {
-    if (preVerifyHits.size >= 10_000) {
-      for (const [key, value] of preVerifyHits) if (now - value.windowStart >= KIOSK_PROFILE_WINDOW_MS) preVerifyHits.delete(key)
+    if (!entry) {
+      if (preVerifyHits.size >= KIOSK_PROFILE_PRE_VERIFY_MAX_IPS) {
+        preVerifyHits.clear()
+      } else if (preVerifyHits.size >= PRE_VERIFY_PURGE_AT && now - preVerifyLastPurge >= PRE_VERIFY_PURGE_EVERY_MS) {
+        preVerifyLastPurge = now
+        for (const [key, value] of preVerifyHits) if (now - value.windowStart >= KIOSK_PROFILE_WINDOW_MS) preVerifyHits.delete(key)
+      }
     }
     entry = { windowStart: now, count: 0 }
     preVerifyHits.set(ip, entry)
@@ -42,6 +56,12 @@ function preVerifyExceeded(ip: string, now: number): boolean {
 /** 门禁里清空验签前的计数，免得前一个场景的请求算进后一个场景。 */
 export function resetKioskProfilePreVerifyForTests(): void {
   preVerifyHits.clear()
+  preVerifyLastPurge = 0
+}
+
+/** 门禁里看计数表现在有多少个来源（测内存上限）。 */
+export function kioskProfilePreVerifySizeForTests(): number {
+  return preVerifyHits.size
 }
 const PREP = Symbol('kioskProfileThrottlePrep')
 
