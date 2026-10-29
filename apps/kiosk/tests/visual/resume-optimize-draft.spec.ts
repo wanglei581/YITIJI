@@ -350,7 +350,9 @@ test('AI provider outage shows an honest unavailable state without removing the 
   await expect(page.locator('.qx-pill')).toHaveText('AI 暂时用不了')
   await expect(page.locator('.qx-pill')).not.toContainText('等待优化建议')
   await expect(page.getByText('简历优化当前不可用', { exact: true })).toBeVisible()
-  await expect(page.getByText('AI 能力尚未启用，请联系现场工作人员', { exact: true })).toBeVisible()
+  // 现场不安排人：如实说这项 AI 服务没开，出路是不用 AI 的手动方式（下面的 fallback 区就是），不叫人联系现场。
+  await expect(page.getByText('这项 AI 服务暂时没开，你可以先按这一页的手动方式继续', { exact: true })).toBeVisible()
+  await expect(page.getByText('请联系现场工作人员')).toHaveCount(0)
   await expect(page.getByTestId('resume-optimize-empty-fallback')).toBeVisible()
   await expect(page.getByTestId('resume-optimize-empty-paths').getByRole('button')).toHaveCount(3)
   await expect(page.getByTestId('resume-optimize-empty-steps').locator('li')).toHaveCount(8)
