@@ -229,6 +229,62 @@ test('W-15 二维码获取失败后可以重新生成 @kiosk', async ({ page, ap
   expect(createCalls.n).toBe(2)
 })
 
+/**
+ * 登录页扫码态底部「只管这一次」卡：卡里的字和插画都要整块落在卡内，卡本身也不许把滚动区撑出滚动条。
+ * 此前卡高被 min-height: 150 压住，而内容（标题 + 说明 + 插画）要 198，overflow:hidden 把插画切掉了一大半，
+ * 字体栈换成 Qingxu Sans（CI、真机 Windows）和 Mac 苹方都一样。
+ */
+async function expectLoginFactWhole(page: Page, where: string): Promise<void> {
+  const card = page.locator('.lg-absorb')
+  await expect(card, `${where}：「只管这一次」卡在页上`).toBeVisible()
+  const report = await card.evaluate((el) => {
+    const box = el.getBoundingClientRect()
+    const inside = (child: Element | null) => {
+      if (!child) return null
+      const r = child.getBoundingClientRect()
+      return { top: Math.round((r.top - box.top) * 10) / 10, bottom: Math.round((box.bottom - r.bottom) * 10) / 10, left: Math.round((r.left - box.left) * 10) / 10, right: Math.round((box.right - r.right) * 10) / 10 }
+    }
+    const scroller = el.closest('.qx-scroll') as HTMLElement | null
+    return {
+      cardHeight: Math.round(box.height),
+      overflow: el.scrollHeight - el.clientHeight,
+      title: inside(el.querySelector('h2')),
+      note: inside(el.querySelector('.qxp-note')),
+      art: inside(el.querySelector('svg')),
+      scrollerOverflow: scroller ? scroller.scrollHeight - scroller.clientHeight : null,
+    }
+  })
+  expect(report.overflow, `${where}：卡内内容不得比卡高（卡高 ${report.cardHeight}px）`).toBeLessThanOrEqual(1)
+  for (const part of ['title', 'note', 'art'] as const) {
+    const gap = report[part]
+    expect(gap, `${where}：卡里要有 ${part}`).not.toBeNull()
+    expect(Math.min(gap!.top, gap!.bottom, gap!.left, gap!.right), `${where}：${part} 要整块落在卡内（四边余量 ${JSON.stringify(gap)}）`).toBeGreaterThanOrEqual(-0.5)
+  }
+  expect(report.scrollerOverflow, `${where}：这一卡不该把页面撑出滚动条`).toBeLessThanOrEqual(1)
+}
+
+test('登录页扫码态「只管这一次」卡的字和插画整块落在卡内：等协议、取码失败、取到码三态 @kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  api.respond('GET', `/api/v1/member/auth/qr/${TICKET_ID}/status`, {
+    status: 200,
+    json: { success: true, data: { status: 'pending', deviceLabel: '就业大厅 3 号机', returnTo: '/', expiresInSeconds: 180 } },
+  })
+  const createCalls = { n: 0 }
+  await page.route(LOCAL_QR_CREATE_URL, (route) => fulfillQrCreate(route, createCalls, TICKET_ID, true))
+  await page.goto('/login')
+  await page.getByRole('button', { name: '手机扫码登录', exact: true }).click()
+  await expect(page.getByTestId('login-gate-state-qr-loading')).toBeVisible()
+  await expectLoginFactWhole(page, '还没勾协议（等二维码）')
+
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await expect(page.getByTestId('login-gate-state-qr-error')).toBeVisible()
+  await expectLoginFactWhole(page, '二维码没取到')
+
+  await page.getByTestId('login-gate-primary').click()
+  await expect(page.locator('.k-qrframe svg')).toBeVisible()
+  await expectLoginFactWhole(page, '取到二维码')
+})
+
 test('手机号验证码按钮交互态可读且通用错误使用场景提示 @kiosk', async ({ page, api }, testInfo) => {
   registerKioskShell(api)
   let smsRequestCount = 0
