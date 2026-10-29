@@ -1,5 +1,7 @@
 export const productionRoutePatterns = [
   '/', '/login', '/member/qr-login', '/upload/phone', '/legal/:doc',
+  // 2026-10-29 一体机手机码短链的网页中转（上传 / 登录），兑换或校验后 replace 到上面两个手机页。
+  '/k/u/:scene', '/k/l/:ticketId',
   '/resume/job-fit', '/resume/job-fit/actions', '/resume/career-plan', '/interview',
   '/interview/setup',
   '/interview/session', '/interview/report', '/interview/tips',
@@ -46,7 +48,7 @@ export const productionRoutePatterns = [
   '/policy-service',
   // 触屏版第一包：开发样板（非业务屏）。生产构建不挂载，直接访问回到首页。
   '/dev/touch-gallery',
-] as const // 110 routes (109 + 2026-10-27 开发样板 /dev/touch-gallery)
+] as const // 112 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan；2026-09-27 + /official-channels；2026-09-30 停放 smart-campus/freshman-insights；2026-10-29 + /k/u/:scene、/k/l/:ticketId；2026-10-27 + 触屏版开发样板 /dev/touch-gallery)
 
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',

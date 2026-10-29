@@ -19,6 +19,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
 import type {
   UploadSessionChannel,
+  UploadSessionFileSource,
   UploadSessionMode,
   UploadSessionStatus,
 } from './upload-sessions.dto'
@@ -31,6 +32,7 @@ export interface UploadSessionFileView {
   sha256: string
   fileExpiresAt: string | null
   fileUrl?: string | null
+  source?: UploadSessionFileSource | null
 }
 
 export interface UploadSessionConfirmResponse {

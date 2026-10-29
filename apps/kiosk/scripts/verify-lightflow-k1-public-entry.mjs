@@ -412,6 +412,7 @@ const memberAgreement = read('src/pages/auth/components/MemberAgreement.tsx')
 const mobileQrPage = read('src/pages/auth/MobileQrLoginPage.tsx')
 const scanQrPanel = read('src/pages/auth/ScanQrLoginPanel.tsx')
 const phoneUploadPage = read('src/pages/upload/PhoneUploadPage.tsx')
+const kioskCodeEntryPage = read('src/pages/upload/KioskCodeEntryPage.tsx')
 const legalDocPage = read('src/pages/legal/LegalDocPage.tsx')
 const legalDocCss = read('src/pages/legal/legal-service-desk.css')
 const screensaverPage = read('src/pages/screensaver/ScreensaverPage.tsx')
@@ -427,6 +428,9 @@ for (const [path, component] of [
   ['/login', 'LoginPage'],
   ['/member/qr-login', 'MobileQrLoginPage'],
   ['/upload/phone', 'PhoneUploadPage'],
+  // 2026-10-29 一体机手机码短链的网页中转。
+  ['/k/u/:scene', 'UploadSceneEntry'],
+  ['/k/l/:ticketId', 'LoginTicketEntry'],
   ['/legal/:doc', 'LegalDocPage'],
   ['/screensaver', 'ScreensaverPage'],
 ]) {
@@ -560,6 +564,7 @@ for (const forbiddenCopy of ['一键投递', '立即投递', '平台投递']) {
     [mobileQrPage, 'MobileQrLoginPage'],
     [scanQrPanel, 'ScanQrLoginPanel'],
     [phoneUploadPage, 'PhoneUploadPage'],
+    [kioskCodeEntryPage, 'KioskCodeEntryPage'],
     [legalDocPage, 'LegalDocPage'],
     [screensaverPage, 'ScreensaverPage'],
     [helpCenterPage, 'HelpCenterPage'],
@@ -588,6 +593,8 @@ for (const [source, componentName, rootClass, label] of [
   [mobileQrPage, 'MobileQrLoginPage', 'k1-mobile-qr-login', 'MobileQrLoginPage'],
   [scanQrPanel, 'ScanQrLoginPanel', 'k1-scan-qr-login', 'ScanQrLoginPanel'],
   [phoneUploadPage, 'PhoneUploadPage', 'k1-phone-upload', 'PhoneUploadPage'],
+  [kioskCodeEntryPage, 'UploadSceneEntry', 'k1-phone-upload', 'UploadSceneEntry'],
+  [kioskCodeEntryPage, 'LoginTicketEntry', 'k1-phone-upload', 'LoginTicketEntry'],
   [legalDocPage, 'LegalDocPage', 'k1-legal-doc', 'LegalDocPage'],
   [screensaverPage, 'ScreensaverPage', 'k1-screensaver', 'ScreensaverPage'],
   [helpCenterPage, 'HelpCenterPage', 'k1-help-center', 'HelpCenterPage'],
@@ -599,6 +606,8 @@ for (const [componentName, label] of [
   ['LoginPage', 'LoginPage'],
   ['MobileQrLoginPage', 'MobileQrLoginPage'],
   ['PhoneUploadPage', 'PhoneUploadPage'],
+  ['UploadSceneEntry', 'UploadSceneEntry'],
+  ['LoginTicketEntry', 'LoginTicketEntry'],
   ['LegalDocPage', 'LegalDocPage'],
   ['ScreensaverPage', 'ScreensaverPage'],
 ]) {
@@ -689,6 +698,19 @@ for (const { page, cssPath, rootClass, label } of [
     cssPath: 'src/pages/upload/phone-upload-service-desk.css',
     rootClass: 'k1-phone-upload',
     label: 'PhoneUploadPage',
+  },
+  // 中转页照用上传页样式，自己只补一份「重试」按钮样式；两份都要导入、都要守住 k1-phone-upload 作用域。
+  {
+    page: kioskCodeEntryPage,
+    cssPath: 'src/pages/upload/phone-upload-service-desk.css',
+    rootClass: 'k1-phone-upload',
+    label: 'KioskCodeEntryPage',
+  },
+  {
+    page: kioskCodeEntryPage,
+    cssPath: 'src/pages/upload/kiosk-code-entry.css',
+    rootClass: 'k1-phone-upload',
+    label: 'KioskCodeEntryPage',
   },
   {
     page: legalDocPage,

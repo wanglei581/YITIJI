@@ -124,7 +124,13 @@ const frozen = {
   // 仍是可选属性，不传时行为不变。冻结契约不放宽，仍逐字节校验；既有行为由 verify:resume-phone-upload-ui 继续钉住，
   // 新行为由它新加的几条断言和 W3 的手机确认用例钉住。
   // 旧哈希 97a46d6d5dc1ef8aaafdc1ff99de267d673bb992bac1de6a7ebfa64be8453c82。
-  'src/pages/upload/components/UploadSessionQrPanel.tsx': 'cc895ab96ceea8b511bbbb638c669e38dd0414cb9e8a53636258229806a3b32a',
+  // 2026-10-29 重新冻结（一体机手机码改短链）：出码调用换成 buildPhoneUploadQrUrl，import 同步换名；面板其余逐字未动。
+  // 旧哈希 9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb。
+  // 2026-10-29 重新冻结（触屏版集成：并入第一包新头里 #1519 的出码调用换名）：触屏版简历三条主路（上面 10/28 两次）和 #1519
+  // （一体机手机码改短链，上一条）各自改了这个文件，改动互不相交——前者加可选属性与 onConfirmReady，后者只换 import 与一处出码调用；
+  // 合并后的文件就是两者之和，没有别的改动。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 cc895ab96ceea8b511bbbb638c669e38dd0414cb9e8a53636258229806a3b32a（第四包终稿）、1e0e0b9256304a822d4b075394ed3aa855f47689594a391be7fa6d057a3ff56f（#1519）。
+  'src/pages/upload/components/UploadSessionQrPanel.tsx': '98691610ccd48ff766ff7d28256ed8814afb024ad454305f9de6345c0639db14',
   'src/pages/resume/aiResumeSession.ts': '5d023ee2388ecb12a3ba84a6b2b28c21e54ad65dece16eccc019f9dc43b5b164',
   'src/pages/resume/jobMaterialDraft.ts': '4a2404627c392c55cd39a6f525c522ce27cfec669f91d3b6ad5bb79f0de358ce',
   'src/pages/resume/hooks/useResumeLayout.ts': '2ef1c554e949344ce9d66430c521b986f5419db8627c4fcde1ef78d5927555e7',

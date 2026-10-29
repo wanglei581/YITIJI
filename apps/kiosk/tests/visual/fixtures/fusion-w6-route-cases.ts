@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { compatibilityRedirects, productionRoutePatterns } from '../route-manifest'
-import { W6_LONG_LEGAL_TEXT } from './fusion-w6-api'
+import { W6_LOGIN_TICKET, W6_LONG_LEGAL_TEXT, W6_UPLOAD_SCENE } from './fusion-w6-api'
 
 export type ProductionRoutePattern = (typeof productionRoutePatterns)[number]
 
@@ -21,7 +21,7 @@ export interface W6RouteCase {
 
 type W6RouteDefinition = Omit<W6RouteCase, 'viewport' | 'landmark' | 'requiresFusionRoot' | 'requiresTouchTargets'> & Partial<Pick<W6RouteCase, 'landmark' | 'requiresFusionRoot' | 'requiresTouchTargets'>>
 
-const MOBILE_ROUTE_PATTERNS = new Set<ProductionRoutePattern>(['/member/qr-login', '/upload/phone'])
+const MOBILE_ROUTE_PATTERNS = new Set<ProductionRoutePattern>(['/member/qr-login', '/upload/phone', '/k/u/:scene', '/k/l/:ticketId'])
 const TOUCH_TARGET_EXEMPTIONS = ['/screensaver', '/upload/phone'] as const satisfies readonly ProductionRoutePattern[]
 const touchTargetExemptions = new Set<ProductionRoutePattern>(TOUCH_TARGET_EXEMPTIONS)
 
@@ -76,6 +76,10 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/login', url: '/login', marker: screen('login'), featureText: '登录后继续办理', landmark: 'none' },
   { pattern: '/member/qr-login', url: '/member/qr-login?ticketId=w6-ticket', marker: screen('member-qr-login'), featureText: '手机确认登录' },
   { pattern: '/upload/phone', url: '/upload/phone', marker: screen('phone-upload'), featureText: '这个链接不能用来上传' },
+  // 一体机手机码短链的网页中转（2026-10-29）。/k/u 夹具兑换回 503，停在「网络失败 + 重试」（有可点的重试）；
+  // /k/l 票据格式对，转到手机确认登录页。兑换成功、失效、格式不对各态由 kiosk-code-entry-fusion-w5.spec.ts 钉。
+  { pattern: '/k/u/:scene', url: `/k/u/${W6_UPLOAD_SCENE}`, marker: screen('upload-scene-entry'), featureText: '网络连接失败，请稍后重试' },
+  { pattern: '/k/l/:ticketId', url: `/k/l/${W6_LOGIN_TICKET}`, expectedPath: '/member/qr-login', marker: screen('member-qr-login'), featureText: '手机确认登录' },
   { pattern: '/legal/:doc', url: '/legal/privacy', marker: screen('legal-doc'), featureText: '隐私政策', longText: W6_LONG_LEGAL_TEXT, landmark: 'none' },
   { pattern: '/resume/job-fit', url: '/resume/job-fit', marker: screen('resume-job-fit'), featureText: '岗位匹配', requiresFusionRoot: false },
   // S2-2 拆页。无 taskId 直达时停在前置缺失态，文案即断言锚点。
@@ -253,9 +257,9 @@ const unexpected = actualPatterns.filter((pattern) => !productionRoutePatterns.i
 if (duplicates.length || missing.length || unexpected.length) {
   throw new Error(`W6 route ownership mismatch: count=${actualPatterns.length}; duplicates=${duplicates.join(',')}; missing=${missing.join(',')}; unexpected=${unexpected.join(',')}`)
 }
-// mobile 这条**故意**写死：它是一个有名有姓的小集合（扫码登录、手机上传），
-// 增减都该是深思熟虑的动作，撞红正是想要的效果。
-if (w6MobileCases.length !== 2) throw new Error(`W6 mobile ownership mismatch: ${w6MobileCases.length}`)
+// mobile 这条**故意**写死：它是一个有名有姓的小集合（扫码登录、手机上传，及两者的短链网页中转），
+// 增减都该是深思熟虑的动作，撞红正是想要的效果。2026-10-29 加两条短链中转：2 → 4。
+if (w6MobileCases.length !== 4) throw new Error(`W6 mobile ownership mismatch: ${w6MobileCases.length}`)
 // kiosk 这条**不写死**：它 = 总数 − mobile。改成分区完整性判据，比原来的 `!== 106` 强——
 // 既堵住 viewport 写错值（那种情况两个子集都收不到它，和会一直对不上），
 // 又不必每加一条路由就人工重算。原来那个 106 就是这么过期的：
