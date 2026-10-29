@@ -15507,6 +15507,8 @@
           ],
           "path": "/print/confirm",
           "styles": [
+            "apps/kiosk/src/pages/print/art/print-art-tokens.css",
+            "apps/kiosk/src/pages/print/art/print-art.css",
             "apps/kiosk/src/pages/print/styles/print-confirm-qx.css",
             "apps/kiosk/src/pages/print/styles/print-confirm-touch.css",
             "apps/kiosk/src/pages/print/styles/print-desk-qx.css",
@@ -20308,7 +20310,8 @@
       "apps/kiosk/scripts/verify-kiosk-feedback-entry.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-kiosk-unattended-copy.mjs",
-      "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs"
+      "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
+      "apps/kiosk/scripts/verify-resume-decisions.mjs"
     ],
     "apps/kiosk/src/favorites/localFavorites.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
@@ -32863,6 +32866,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/src/copy/unattendedCopy.ts",
           "apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/optimizeStateCopy.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/resumeDecisions.ts",
