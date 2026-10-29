@@ -380,6 +380,24 @@ test('Kiosk 扫码登录通用 500 使用本机场景恢复提示 @kiosk', async
   await attachViewportScreenshot(page, testInfo, 'login-kiosk-qr-generic-500-1080x1920')
 })
 
+// 10/29 本机走查 I-32：本机程序（127.0.0.1:9527）没起时，扫码页曾写「网络连接失败，请稍后重试」——
+// 原因其实是这台机器自己的本机程序没连上，不是网络，人去查网络没用。如实说是本机程序没连上，并给不用扫码的出路。
+// 云上接口断开的「网络连接失败」说法不动（见下一条）。
+test('本机程序没连上时，扫码页说是本机程序没连上、不说成网络问题，并指向手机号登录 @kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  await page.route(LOCAL_QR_CREATE_URL, (route) => route.abort('connectionrefused'))
+
+  await page.goto('/login')
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机扫码登录', exact: true }).click()
+  const alert = page.getByRole('alert')
+  await expect(alert).toContainText('这台机器的本机程序没连上')
+  await expect(alert).toContainText('请改用手机号登录')
+  await expect(page.getByText('网络连接失败', { exact: false })).toHaveCount(0)
+  await expect(page.getByTestId('login-gate-state-qr-error')).toBeVisible()
+  await expect(page.getByRole('button', { name: /改用手机号登录/ })).toBeVisible()
+})
+
 test('Mobile QR 通用 500 使用恢复提示且明确业务消息原样保留 @mobile', async ({ page }, testInfo) => {
   let statusRequestCount = 0
   await page.route('**/api/v1/member/auth/qr/mobile-error-ticket/status', async (route) => {
