@@ -50,7 +50,8 @@ async function startAs(page: Page, api: ApiRouter, member: Member): Promise<MeCa
   const calls = await routeMembers(page, api)
   await allowLocalBootTicket(page)
   await loginThroughVisibleUi(page, '/', member.phone)
-  await expect(page.getByTestId('home-identity')).toHaveText('有人登录着')
+  // 刚登录、人还在屏前：首页对本人说「你已登录」（10/29 走查 I-05）；空档满 30 秒后才改回「有人登录着」。
+  await expect(page.getByTestId('home-identity')).toHaveText('你已登录')
   return calls
 }
 

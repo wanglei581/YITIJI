@@ -129,9 +129,11 @@ test('W-75 back home, idle 31s, open 我的 → 还是你吗？→ 不是我 cle
   await allowLocalBootTicket(page)
   await loginThroughVisibleUi(page, '/', WANG.phone)
 
-  // 首页登录态：只说有人登录着，手机号（含打码）不上首页。
-  await expect(page.getByTestId('home-identity')).toHaveText('有人登录着')
-  await expect(page.getByTestId('home-end-previous')).toHaveText('结束上一位的使用')
+  // 首页登录态，手机号（含打码）不上首页。
+  // 10/29 走查 I-05：刚登录、人还在屏前（一直在点、空档没到 30 秒）时对本人说本人的话——「你已登录」+「结束使用」，
+  // 与左边那句「离开前请点结束使用」对得上；红色按钮不再叫「结束上一位的使用」让本人犹豫「这是要退我自己吗」。
+  await expect(page.getByTestId('home-identity')).toHaveText('你已登录')
+  await expect(page.getByTestId('home-end-previous')).toHaveText('结束使用')
   await expectNoTraceOf(page, WANG)
   await shot(page, '01-home-member-no-phone.png')
 
@@ -148,6 +150,10 @@ test('W-75 back home, idle 31s, open 我的 → 还是你吗？→ 不是我 cle
 
   // 离开了 31 秒，一下都没点。
   await page.clock.runFor(31_000)
+  // 空档到了 30 秒，站在屏前的可能已经不是登录的那个人：首页改回对下一位说话（W-75 原句），仍不露名字和手机号。
+  await expect(page.getByTestId('home-identity')).toHaveText('有人登录着')
+  await expect(page.getByTestId('home-end-previous')).toHaveText('结束上一位的使用')
+  await expectNoTraceOf(page, WANG)
   const beforeAsk = calls.length
   await nav(page, '我的').click()
   const dialog = page.getByTestId('handover-confirm')

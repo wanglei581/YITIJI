@@ -145,7 +145,16 @@ check(
 )
 check(
   /<span>有人登录着<\/span>/.test(identity) && /data-testid="home-end-previous"[\s\S]{0,80}结束上一位的使用/.test(identity),
-  '登录态只写「有人登录着」，并给「结束上一位的使用」',
+  '空档到点后的登录态仍只写「有人登录着」，并给「结束上一位的使用」（给站到屏前的下一位看，W-75 原句不改）',
+)
+// 10/29 本机走查 I-05：刚登录、人还在屏前时对本人说本人的话，不再让本人看「结束上一位的使用」。
+// 说给谁只看一个信号：和「我的」前的「还是你吗？」同一个判据（needsHandoverConfirm，空档满 30 秒、没人点过屏就是下一位可能在场）。
+check(
+  /import \{ needsHandoverConfirm \} from '\.\.\/\.\.\/\.\.\/auth\/kioskPresence'/.test(identity) &&
+    /voice === 'self'[\s\S]{0,400}<span>你已登录<\/span>[\s\S]{0,260}data-testid="home-end-previous"[\s\S]{0,80}结束使用\s*<\/button>/.test(identity) &&
+    /useState<IdentityVoice>\(\(\) => \(needsHandoverConfirm\(\) \? 'next' : 'self'\)\)/.test(identity) &&
+    /setVoice\(needsHandoverConfirm\(\) \? 'next' : 'self'\)/.test(identity),
+  '刚登录、人还在屏前写「你已登录」+「结束使用」；是不是下一位只看 needsHandoverConfirm（和「还是你吗？」「继续办理」收起同一个判据），初值与计时都读它',
 )
 check(!/进入我的/.test(homeView + identity), '首页不放「进入我的」直达入口（进个人区走底部「我的」）')
 check(
