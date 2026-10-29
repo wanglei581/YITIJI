@@ -755,6 +755,8 @@ test('signature step 2: the phone QR opens a signature_image upload session and 
   await expect(layer.getByText('用手机上传签名图', { exact: true })).toBeVisible()
   await expect(layer.locator('svg').first()).toBeVisible()
   await expect(layer.getByText('二维码生成失败')).toHaveCount(0)
+  // 签名图只留系统短期、不进「我的文档」：面板里不能说「会员文件确认后归档」
+  await expect(layer.getByText('会员文件确认后归档')).toHaveCount(0)
   expect(createBodies).toHaveLength(1)
   expect(JSON.parse(createBodies[0])).toMatchObject({ purpose: 'signature_image', mode: 'member', channel: 'phone_h5' })
   // 手机传上来之后，一体机上确认，这张图就成了签名

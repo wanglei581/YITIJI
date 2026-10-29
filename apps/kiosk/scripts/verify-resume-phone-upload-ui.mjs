@@ -322,6 +322,9 @@ assertIncludes(selfAssessment, 'useSelfAssessmentIdleExit', 'self-assessment pag
   console.log('PASS self-assessment idle exit covers all four public-screen pages')
 }
 assertIncludes(panel, 'QRCodeSVG', 'QR panel renders real QR')
+// 走查 I-14：签名图确认后只留系统短期、不进「我的文档」，「会员文件确认后归档」对它不成立；别的用途的会员会话仍说这句。
+assertIncludes(panel, "status?.mode === 'member' && purpose !== 'signature_image' &&", 'archive badge is not shown for a signature image')
+assertIncludes(panel, '会员文件确认后归档', 'archive badge still shown for member sessions of other purposes')
 assertIncludes(panel, 'confirmUploadSession', 'Kiosk confirmation is explicit')
 assertIncludes(panel, 'requiresKioskConfirmation', 'panel understands confirmation state')
 assertIncludes(panel, 'created.controlToken', 'Kiosk keeps control token outside QR URL')
