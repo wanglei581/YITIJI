@@ -31,6 +31,15 @@
 [data-qx-page='home'] .qxt-home-tasks .qxt-task p { line-height: 1.3; max-width: none; padding-right: 158px; }
 [data-qx-page='home'] .qxt-body.qxt-home-on .qxt-home-tasks .qxt-task { min-height: 300px; }
 [data-qx-page='home'] .qxt-body.qxt-home-squeeze .qxt-home-tasks .qxt-task { min-height: 250px; }
+/* 已登录、但「继续办理」那一块没有东西可摆（名下没有可继续的办理，或交接保护把它收起了）：
+   上面把大卡压低（300px，压紧版 228px）是给那一块让位的，不摆它就没人补，底部导航上会空出 130–190px。
+   稿（docs/design/kiosk-touch-2026-10 的首页）里「已登录」一态永远画着那一条，没有这一态；照同屏的未登录态排：
+   四张大卡吃掉剩下的高度，但不比未登录态的大卡（340px）更高；磁贴多、进压紧版式的配置，剩下的高度本来就
+   不到 340px，直接填满。有「继续办理」时这条不生效，版面与原来逐像素一致。 */
+[data-qx-page='home'] .qxt-body.qxt-home-on:has(> .qxt-home-go:empty) > .qxt-home-tasks {
+  flex: 1 1 auto;
+  max-height: calc(340px * 2 + 16px);
+}
 [data-qx-page='home'] .qxt-body.qxt-home-on.qxt-home-squeeze .qxt-home-tasks .qxt-task { min-height: 228px; }
 [data-qx-page='home'] .qxt-task-note {
   display: block;
@@ -245,6 +254,8 @@
 @media (min-width: 761px) {
   [data-qx-page='home'] .qxt-body.qxt-home { justify-content: flex-start; gap: 16px; padding: 12px 56px 6px; }
   [data-qx-page='home'] .qxt-body.qxt-home-on { gap: 12px; }
+  /* 同上：没有「继续办理」时，段与段之间的间隔回到未登录态的 16px。 */
+  [data-qx-page='home'] .qxt-body.qxt-home-on:not(.qxt-home-squeeze):has(> .qxt-home-go:empty) { gap: 16px; }
   [data-qx-page='home'] .qxt-body.qxt-home-squeeze { gap: 12px; padding-top: 8px; padding-bottom: 4px; }
   [data-qx-page='home'] .qxt-body.qxt-home-squeeze .qxt-home-tasks { gap: 14px; }
   [data-qx-page='home'] .qxt-home-tasks { gap: 16px; }

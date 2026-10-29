@@ -8,7 +8,8 @@
  *
  * 正式构建 1080×1920，量「最后一块内容的底边到底部导航顶边」的距离，首页五种配置（第三行磁贴 2 / 3 / 4 / 5 / 6 块，
  * ≥ 4 块进压紧版式）：
- *   · 已登录、名下没有可继续的办理：留白 ≤ 105px，且内容不压到导航、不溢出；
+ *   · 已登录、名下没有可继续的办理：留白 ≤ 105px，且内容不压到导航、不溢出；照同屏未登录态排——大卡不比未登录态（340px）
+ *     更高，磁贴少的配置段间距回到 16px；
  *   · 带面板的人，空档过 30 秒面板收起之后：同上；收起前（带面板）也在 0–105px 内，是对照；
  *   · 未登录态（默认配置）仍在 0–105px 内，也是对照：不为了填满这一态把别的态弄乱。
  *
@@ -23,25 +24,64 @@ import { configureHomeVariant, MEI, routeMembers, WANG, type HomeVariant } from 
 const MAX_BLANK_PX = 105
 const VARIANTS: HomeVariant[] = ['default', 'channels', 'hosting', 'gov', 'full']
 
-/** 最后一块内容的底边到底部导航顶边的距离（按 1080 宽的版心折算），以及内容区有没有溢出。 */
-async function bottomGap(page: Page): Promise<{ gap: number; overflow: number }> {
-  await expect(page.locator('[data-qx-page="home"]')).toHaveAttribute('data-qx-intro', 'done')
-  return page.evaluate(() => {
-    const body = document.querySelector('.qxt-body.qxt-home') as HTMLElement
-    const nav = document.querySelector('.qxt-nav') as HTMLElement
-    const stage = document.querySelector('.kiosk-stage') as HTMLElement | null
-    const scale = stage ? stage.getBoundingClientRect().width / 1080 || 1 : 1
-    const shown = [...body.children].filter((el) => getComputedStyle(el).display !== 'none') as HTMLElement[]
-    const lastBottom = Math.max(...shown.map((el) => el.getBoundingClientRect().bottom))
-    return { gap: (nav.getBoundingClientRect().top - lastBottom) / scale, overflow: body.scrollHeight - body.clientHeight }
-  })
+/** 一体机设计稿里的版心宽度；页面缩放时按它折算。 */
+const DESIGN_WIDTH = 1080
+/** 未登录态一张大卡的高度：没有「继续办理」时，大卡可以长高来填屏，但不比它更高。 */
+const SIGNED_OUT_CARD_PX = 340
+/** 未登录态段与段之间的间隔（≥761px 宽）。 */
+const SIGNED_OUT_SECTION_GAP_PX = 16
+
+interface HomeLayout {
+  /** 最后一块内容的底边到底部导航顶边的距离。 */
+  gap: number
+  /** 内容区有没有溢出。 */
+  overflow: number
+  /** 第一张大卡的高度。 */
+  cardHeight: number
+  /** 内容区各段之间的间隔。 */
+  sectionGap: number
 }
 
-async function expectFilled(page: Page, label: string): Promise<void> {
-  const { gap, overflow } = await bottomGap(page)
-  expect(overflow, `${label}：内容不得溢出屏幕`).toBe(0)
-  expect(gap, `${label}：最后一块内容不得压到底部导航（留白 ${gap.toFixed(1)}px）`).toBeGreaterThanOrEqual(0)
-  expect(gap, `${label}：底部留白 ${gap.toFixed(1)}px，不得超过 ${MAX_BLANK_PX}px`).toBeLessThanOrEqual(MAX_BLANK_PX)
+/** 首页版面读数（都按 1080 宽的版心折算）。 */
+async function readLayout(page: Page): Promise<HomeLayout> {
+  await expect(page.locator('[data-qx-page="home"]')).toHaveAttribute('data-qx-intro', 'done')
+  return page.evaluate((designWidth) => {
+    const body = document.querySelector('.qxt-body.qxt-home') as HTMLElement
+    const nav = document.querySelector('.qxt-nav') as HTMLElement
+    const card = document.querySelector('.qxt-home-tasks .qxt-task') as HTMLElement
+    const stage = document.querySelector('.kiosk-stage') as HTMLElement | null
+    const scale = stage ? stage.getBoundingClientRect().width / designWidth || 1 : 1
+    const shown = [...body.children].filter((el) => getComputedStyle(el).display !== 'none') as HTMLElement[]
+    const lastBottom = Math.max(...shown.map((el) => el.getBoundingClientRect().bottom))
+    return {
+      gap: (nav.getBoundingClientRect().top - lastBottom) / scale,
+      overflow: body.scrollHeight - body.clientHeight,
+      cardHeight: card.getBoundingClientRect().height / scale,
+      sectionGap: parseFloat(getComputedStyle(body).rowGap) / scale,
+    }
+  }, DESIGN_WIDTH)
+}
+
+/** 留白在门槛内、内容不压到导航也不溢出。 */
+async function expectFilled(page: Page, label: string): Promise<HomeLayout> {
+  const layout = await readLayout(page)
+  expect(layout.overflow, `${label}：内容不得溢出屏幕`).toBe(0)
+  expect(layout.gap, `${label}：最后一块内容不得压到底部导航（留白 ${layout.gap.toFixed(1)}px）`).toBeGreaterThanOrEqual(0)
+  expect(layout.gap, `${label}：底部留白 ${layout.gap.toFixed(1)}px，不得超过 ${MAX_BLANK_PX}px`).toBeLessThanOrEqual(MAX_BLANK_PX)
+  return layout
+}
+
+/**
+ * 没有「继续办理」可摆的已登录态：填满之外，照同屏未登录态排——大卡不比未登录态高；
+ * 磁贴少（不进压紧版式）的配置，段间距也和未登录态一样（压紧版式本来就是 12px，不动）。
+ */
+async function expectFilledLikeSignedOut(page: Page, label: string, variant: HomeVariant): Promise<HomeLayout> {
+  const layout = await expectFilled(page, label)
+  expect(layout.cardHeight, `${label}：大卡 ${layout.cardHeight.toFixed(1)}px，不得比未登录态（${SIGNED_OUT_CARD_PX}px）更高`).toBeLessThanOrEqual(SIGNED_OUT_CARD_PX + 0.5)
+  if (variant === 'default' || variant === 'channels') {
+    expect(layout.sectionGap, `${label}：段间距要回到未登录态的 ${SIGNED_OUT_SECTION_GAP_PX}px`).toBeCloseTo(SIGNED_OUT_SECTION_GAP_PX, 0)
+  }
+  return layout
 }
 
 async function prepare(page: Page, api: Parameters<typeof routeMembers>[1], variant: HomeVariant): Promise<void> {
@@ -57,18 +97,20 @@ for (const variant of VARIANTS) {
     await loginThroughVisibleUi(page, '/', MEI.phone)
     await expect(page.getByTestId('home-identity')).toHaveText('有人登录着')
     await expect(page.locator('section.continue')).toHaveCount(0)
-    await expectFilled(page, `已登录、没有可继续的办理（${variant}）`)
+    await expectFilledLikeSignedOut(page, `已登录、没有可继续的办理（${variant}）`, variant)
   })
 
   test(`home page stays filled before and after the continue block collapses (${variant}) @home-fill`, async ({ page, api }) => {
     await prepare(page, api, variant)
     await loginThroughVisibleUi(page, '/', WANG.phone)
     await expect(page.locator('section.continue')).toBeVisible()
-    await expectFilled(page, `带「继续办理」面板（${variant}）`)
+    const withPanel = await expectFilled(page, `带「继续办理」面板（${variant}）`)
 
     await page.clock.runFor(31_000)
     await expect(page.locator('section.continue')).toHaveCount(0)
-    await expectFilled(page, `面板收起之后（${variant}）`)
+    const collapsed = await expectFilledLikeSignedOut(page, `面板收起之后（${variant}）`, variant)
+    // 大卡是给面板让位才矮的：面板没了，大卡把让出来的高度拿回去。
+    expect(collapsed.cardHeight, `面板收起之后大卡应比带面板时高（${withPanel.cardHeight.toFixed(1)} → ${collapsed.cardHeight.toFixed(1)}px）`).toBeGreaterThan(withPanel.cardHeight + 20)
   })
 }
 
