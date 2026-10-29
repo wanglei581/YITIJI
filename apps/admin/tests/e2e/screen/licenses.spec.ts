@@ -85,6 +85,7 @@ test('授权方式停用确认使用同一理由重发', async ({ page }) => {
   const area = await licensePage(page, { ...licenseOrg, licenseMode: 'none', managed: false })
   await area.getByRole('button', { name: '切换授权方式' }).click()
   const dialog = area.getByRole('dialog', { name: '切换授权方式' })
+  await expect(dialog.getByText('将切换为：需要授权')).toBeVisible()
   await dialog.getByLabel('理由').fill('合同到期')
   await dialog.getByRole('button', { name: '提交' }).click()
   await expect(dialog.getByText('将停用 2 台一体机')).toBeVisible()
@@ -122,4 +123,38 @@ test('更正提交版本理由和原样日期', async ({ page }) => {
   expect(body).toMatchObject({ version: 7, reason: '更正日期', startsOn: '2026-02-03', endsOn: '2028-02-04' })
   expect(body).not.toHaveProperty('startsAt')
   expect(body).not.toHaveProperty('endsAt')
+})
+
+
+test('暂停服务端拒绝后保留填写内容，可以修改并成功提交', async ({ page }) => {
+  let attempts = 0
+  await page.route('**/api/v1/admin/licenses/license-a/suspend', route => {
+    attempts++
+    if (attempts === 1) return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: { code: 'LICENSE_TICKET_INVALID', message: '审批工单号格式不对' } }) })
+    const suspended = { ...licenseRow, status: 'suspended', phase: 'suspended', statusReason: '合同核查', statusTicketNo: 'SP-456' }
+    return route.fulfill(json({ licenseId: 'license-a', org: { ...licenseOrg, state: 'suspended', usable: false, current: suspended, items: [suspended] } }))
+  })
+  const area = await licensePage(page)
+  await area.getByRole('button', { name: '暂停', exact: true }).click()
+  const dialog = area.getByRole('dialog', { name: '暂停授权' })
+  await dialog.getByLabel('理由').fill('合同核查')
+  await dialog.getByLabel('审批工单号').fill('SP-123')
+  await dialog.getByRole('button', { name: '提交' }).click()
+  await expect(dialog.getByText('理由：合同核查')).toBeVisible()
+  await expect(dialog.getByText('审批工单号：SP-123')).toBeVisible()
+  await dialog.getByRole('button', { name: '返回修改' }).click()
+  await expect(dialog.getByLabel('理由')).toHaveValue('合同核查')
+  await expect(dialog.getByLabel('审批工单号')).toHaveValue('SP-123')
+  await dialog.getByRole('button', { name: '提交' }).click()
+  await dialog.getByRole('button', { name: '确认暂停' }).click()
+  await expect(dialog.getByRole('alert')).toHaveText('审批工单号格式不对')
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByLabel('理由')).toHaveValue('合同核查')
+  await expect(dialog.getByLabel('审批工单号')).toHaveValue('SP-123')
+  await dialog.getByLabel('审批工单号').fill('SP-456')
+  await dialog.getByRole('button', { name: '提交' }).click()
+  await dialog.getByRole('button', { name: '确认暂停' }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(area).toContainText('当前状态：已暂停')
+  expect(attempts).toBe(2)
 })

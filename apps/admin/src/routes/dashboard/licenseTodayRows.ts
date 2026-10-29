@@ -7,13 +7,15 @@ function describe(item: OrgLicenseOverview): string {
   if (item.state === 'expired') return '已停用（已到期）'
   if (item.state === 'unlicensed') return '已停用（没有可用授权）'
   if (item.state === 'grace') return item.daysLeft === null ? '宽限期（剩余天数未读到）' : `宽限期还剩 ${formatCount(item.daysLeft)} 天`
+  if (item.current && item.coveredUntilOn && item.coveredUntilOn > item.current.endsOn) return `${item.daysLeft === null ? '当前授权剩余天数未读到' : `当前授权还剩 ${formatCount(item.daysLeft)} 天`}，已接续至 ${item.coveredUntilOn}（含当天）`
   const end = item.coveredUntilOn ? `，有效至 ${item.coveredUntilOn}（含当天）` : '，有效期这次没读到'
   return `${item.daysLeft === null ? '剩余天数未读到' : `还剩 ${formatCount(item.daysLeft)} 天`}${end}`
 }
 
 export function licenseTodayRows(state: QueueState<LicenseAttention>, retry: () => void): TodayRow[] {
   if (state.status === 'loading') return [{ key: 'license-loading', title: '软件使用授权', detail: '正在读取', action: '' }]
-  if (state.status === 'error' || state.status === 'preview') return [{ key: 'license-error', title: '软件使用授权情况这次没读到', detail: '', action: '重试', onRetry: retry }]
+  if (state.status === 'preview') return []
+  if (state.status === 'error') return [{ key: 'license-error', title: '软件使用授权情况这次没读到', detail: '', action: '重试', onRetry: retry }]
   const { data } = state
   const categories = [
     { key: 'inactive', items: data.inactive, count: data.counts.inactive, title: '机构的软件使用授权已停用', detail: '名下一体机不能开始新的服务，机构后台不能发布或修改内容' },

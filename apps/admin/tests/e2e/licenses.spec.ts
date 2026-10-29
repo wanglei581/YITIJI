@@ -36,7 +36,7 @@ test('新建授权校验信用代码并保存', async ({ page }) => {
   await expect(area.getByRole('article', { name: '授权 NEW-2028' })).toHaveCount(0)
   await form.getByLabel('统一社会信用代码').fill('91370212MA3T8K2P4T')
   await form.getByRole('button', { name: '提交' }).click()
-  await expect(area.getByRole('article', { name: '授权 NEW-2028' })).toContainText(/待生效|生效中/)
+  await expect(area.getByRole('article', { name: '授权 NEW-2028' }).locator('strong')).toHaveText('待生效')
 })
 
 test('续期默认接续并带出企业信息', async ({ page }) => {
@@ -88,7 +88,7 @@ async function revoke(page: Page) {
   await dialog.getByRole('button', { name: '提交' }).click()
   await dialog.getByRole('button', { name: '确认吊销' }).click()
   await expect(row).toContainText('已吊销')
-  for (const name of ['更正信息', '续期', '恢复']) await expect(row.getByRole('button', { name })).toHaveCount(0)
+  for (const name of ['更正信息', '续期', '暂停', '恢复']) await expect(row.getByRole('button', { name })).toHaveCount(0)
 }
 test('吊销后不能恢复、续期或更正', async ({ page }) => { await section(page); await revoke(page) })
 

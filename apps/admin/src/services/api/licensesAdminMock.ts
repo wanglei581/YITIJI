@@ -111,7 +111,7 @@ function result(org: MockOrg, id: string): LicenseMutationResult { return { lice
 export function mockGetOrg(id: string): OrgLicenseDetail { return deriveOrg(orgById(id)) }
 export function mockAttention(): LicenseAttention {
   const all = orgs.map(x => deriveOrg(x)).filter(x => x.managed).map(detail => { const { items, ...overview } = detail; void items; return overview })
-  const expiringSoon = all.filter(x => x.state === 'ok' && x.coveredUntil !== null && Date.parse(x.coveredUntil) - Date.now() <= 30 * DAY).sort ( (a, b) => a.coveredUntil!.localeCompare(b.coveredUntil!))
+  const expiringSoon = all.filter(x => x.state === 'ok' && x.coveredUntilOn !== null && diff(x.coveredUntilOn, todayBeijing()) + 1 <= 30).sort ( (a, b) => a.coveredUntil!.localeCompare(b.coveredUntil!))
   const grace = all.filter(x => x.state === 'grace').sort((a, b) => (a.daysLeft ?? 0) - (b.daysLeft ?? 0)), inactive = all.filter(x => ['expired', 'suspended', 'unlicensed'].includes(x.state))
   return { expiringSoon, grace, inactive, counts: { expiringSoon: expiringSoon.length, grace: grace.length, inactive: inactive.length } }
 }
