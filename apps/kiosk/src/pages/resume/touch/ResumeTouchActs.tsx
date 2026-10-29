@@ -9,7 +9,8 @@ import { ResumeDocArt, type ResumeDocArtKind } from './ResumeDocArt'
 export type ResumeTouchActItem = {
   title: string
   desc: string
-  take: string
+  /** 卡片下面带箭头的一行去向说明。稿上没画就不传（卡本身的名字已经说清去哪）。 */
+  take?: string
   onClick: () => void
   /** 左侧小样。不传时用 icon。 */
   art?: ResumeDocArtKind

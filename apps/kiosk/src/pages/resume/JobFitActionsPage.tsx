@@ -22,7 +22,7 @@
 import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { JobFitResponse } from '@ai-job-print/shared'
-import { BriefcaseIcon, ListIcon, PenLineIcon, PrinterIcon } from 'lucide-react'
+import { BriefcaseIcon, ListIcon, PrinterIcon } from 'lucide-react'
 import {
   AiDisclaimerLine,
   AigcMark,
@@ -51,9 +51,7 @@ import { useRouteIdentityGuard } from './hooks/useRouteIdentityGuard'
 import {
   CtaNote,
   Guardline,
-  KitRows,
   Sec,
-  Verdict,
 } from './jobFit/jobFitQxKit'
 import './job-fit-qx.css'
 import './resume-decision-qx.css'
@@ -356,36 +354,25 @@ export function JobFitActionsPage() {
     }
 
     if (screen === 'ai-down') {
+      // 稿 jobfit-actions 这一态：一句实话加三张大行动卡 —— 改简历、备材料、打印现有简历，三件都不经过 AI，去向都是本机已有的路由。
+      // 差距与准备建议由 AI 生成，这次读不到；没有清单就说没有，不拿别的内容顶替。
       return {
-        title: '差距清单这次读不到',
-        subtitle: `${unattendedReason(aiOutage, 'AI 服务当前不可用')} —— 差距与准备建议由 AI 生成，这次生成不了。`,
-        pill: { tone: 'bad', label: 'AI 差距清单当前不可用' },
+        title: '这次没有行动清单',
+        subtitle: 'AI 暂时不可用，这次没有行动清单。',
+        pill: { tone: 'bad', label: 'AI 暂时不可用' },
         body: (
-          <>
-            <Sec title="当前判定" hint="只写已经确认的事实">
-              <Verdict items={[
-                { tone: 'bad', label: 'AI 差距与准备建议', value: '当前不可用' },
-                hostingOpen ? { tone: 'ok', label: '岗位原文与来源信息', value: '照常可看' } : { tone: 'ok', label: '简历优化编辑区', value: '照常能改' },
-                { tone: 'ok', label: '简历原文与打印', value: '不经过这条 AI' },
-              ]} />
-              <p className="jfq-sec-copy">
-                {hostingOpen
-                  ? '岗位原文与来源信息照常可看；你的简历原文照常可打印；简历优化编辑区也照常能改。想投递请回岗位详情页，从来源平台入口走。'
-                  : '你的简历原文照常可打印；简历优化编辑区也照常能改。'}
-              </p>
-            </Sec>
-            <Sec title="现在能用的非 AI 入口" hint="都是既有流程" grow>
-              <KitRows items={[
-                { icon: <PenLineIcon size={22} />, title: '自己改简历', desc: '简历优化编辑区照常能改', onClick: goResumeOptimize },
-                ...(hostingOpen ? [{ icon: <ListIcon size={22} />, title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息', onClick: goJobs }] : []),
-                { icon: <PrinterIcon size={22} />, title: '打印现有简历', desc: '走既有打印流程，不依赖 AI', onClick: goPrintHub },
-              ]} />
-            </Sec>
-          </>
+          <ResumeErrorState
+            note="AI 暂时不可用，这次没有行动清单。"
+            acts={[
+              { title: '去简历优化', desc: '按你自己的判断改', art: 'resume', onClick: goResumeOptimize },
+              { title: '去材料工坊', desc: '准备求职信或材料清单', art: 'checklist', onClick: goMaterials },
+              { title: '打印现有简历', desc: '手上有文件就直接去打印', art: 'report', onClick: goPrintHub },
+            ]}
+            fine="仅供参考，不代表招聘结果。"
+          />
         ),
         cta: (
           <>
-            <CtaNote>AI 暂时不可用，这次没有行动清单。</CtaNote>
             <QxAction label="返回简历服务" variant="ghost" onClick={goResumeHub} />
             <QxAction label="返回比对结果" variant="primary" onClick={backToCompare} />
           </>

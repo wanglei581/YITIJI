@@ -8,7 +8,9 @@ import {
   assistantReply, diagnosis, interviewAnswered, interviewCreated,
   interviewReport, interviewStarted, uploadedResume,
 } from './fixtures/fusion-w3-states'
+import { longestBlankRun } from './fixtures/blank-run'
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
+import { registerW6Api } from './fixtures/fusion-w6-api'
 import { changeStoredResumeFileId, clearResumeParseIntents, readResumeParseIntents } from './fixtures/resume-parse-intent-state'
 import { mockAssistantVoice } from './fixtures/assistant-voice'
 import { chooseGenericResumeDirection, chooseTargetedResumeDirection, expectResumeDirectionUnselected, expectInterviewDirectionUnselected, chooseInterviewExperience } from './fixtures/direction-selection'
@@ -2468,19 +2470,53 @@ test('job fit actions lists only returned items and keeps print honest @w3-kiosk
   expect(page.url()).not.toContain('/print/confirm')
 })
 
-test('job fit actions: an AI stop says in plain words there is no list, and keeps the non-AI exits @w3-kiosk', async ({ page, api }) => {
-  terminalBaseline(api)
+// 差距行动清单 AI 停（稿 jobfit-actions 这一态）：一句对本人说的实话，加三张大行动卡 —— 去简历优化、去材料工坊、打印现有简历，三件都不经过 AI。
+// 三张卡把整屏吃满：最长连续空白不超过 105px（改前托管开 442px、托管关 574px）。卡与去向不随托管口径变，所以两种口径各量一遍。
+for (const hosting of [
+  { name: 'hosting on', config: RECRUITMENT_HOSTING_ON },
+  { name: 'hosting off', config: RECRUITMENT_HOSTING_OFF },
+] as const) {
+  test(`job fit actions: an AI stop is one plain sentence and three big action cards with no empty block (${hosting.name}) @w3-kiosk`, async ({ page, api }) => {
+    terminalBaseline(api)
+    api.respond('GET', '/api/v1/terminals/KSK-001/config', { status: 200, json: terminalConfigWithHosting(hosting.config, 'actions-ai-down') })
+    api.respond('GET', '/api/v1/resume/job-fit/t-act', { status: 503, json: { error: { code: 'AI_NOT_CONFIGURED', message: 'AI 能力未配置' } } })
+    await page.goto('/resume/job-fit/actions?taskId=t-act')
+    const screen = page.locator('[data-kiosk-screen="resume-job-fit-actions"]')
+    await expect(screen).toHaveAttribute('data-state', 'ai-down')
+    // 一句实话（稿 jobfit-actions 这一态的原句）：不写「不承诺恢复时间」这类写给审稿人看的批注，也不预告恢复。
+    await expect(screen.locator('.qxt-howto').getByText('AI 暂时不可用，这次没有行动清单。', { exact: true })).toBeVisible()
+    await expect(page.locator('body')).not.toContainText(/不承诺恢复时间|稍后自动恢复|服务不可用时不显示任何清单内容/)
+    // 没有清单，也不拿别的内容顶替；三张大行动卡照稿：名字、一句说明、顺序都对，AI 停了照常可点。
+    await expect(page.getByText('缺少 Excel 数据整理经历')).toHaveCount(0)
+    await expect(screen.locator('.rtp-acts .qxt-slab h3')).toHaveText(['去简历优化', '去材料工坊', '打印现有简历'])
+    await expect(screen.locator('.rtp-acts .qxt-slab p')).toHaveText(['按你自己的判断改', '准备求职信或材料清单', '手上有文件就直接去打印'])
+    for (const name of [/去简历优化/, /去材料工坊/, /打印现有简历/]) await expect(screen.getByRole('button', { name })).toBeEnabled()
+    // 整屏没有大片空白：卡片吃满正文区，不是留一块空底。
+    const blank = longestBlankRun(await page.screenshot())
+    expect(blank.px, `最长连续空白 ${blank.px}px（起点 y=${blank.atY}）`).toBeLessThanOrEqual(105)
+  })
+}
+
+test('job fit actions: each card of an AI stop leads to a real route that works without AI @w3-kiosk', async ({ page, api }) => {
+  registerW6Api(api)
   api.respond('GET', '/api/v1/resume/job-fit/t-act', { status: 503, json: { error: { code: 'AI_NOT_CONFIGURED', message: 'AI 能力未配置' } } })
-  await page.goto('/resume/job-fit/actions?taskId=t-act')
+  // 简历优化页带着这次的任务号读已有的优化结果（读取不经过 AI 停掉的那条链路）。
+  api.respond('GET', '/api/v1/resume/records/t-act/optimize', {
+    status: 200,
+    json: { taskId: 't-act', status: 'completed', providerName: 'deepseek', modules: [{ title: '项目成果', before: '参与数据整理工作。', after: '主导数据整理，完成 5000 条记录校验。' }] },
+  })
   const screen = page.locator('[data-kiosk-screen="resume-job-fit-actions"]')
-  await expect(screen).toHaveAttribute('data-state', 'ai-down')
-  // 底栏小字是对本人说的一句实话（稿 jobfit-actions 这一态的原句）：不写「不承诺恢复时间」这类写给审稿人看的批注，也不预告恢复。
-  await expect(page.locator('.qxt-dock').getByText('AI 暂时不可用，这次没有行动清单。', { exact: true })).toBeVisible()
-  await expect(page.locator('body')).not.toContainText(/不承诺恢复时间|稍后自动恢复|服务不可用时不显示任何清单内容/)
-  // 没有清单，也不拿别的内容顶替；AI 停了，不经过 AI 的出路照常可点。
-  await expect(page.getByText('缺少 Excel 数据整理经历')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: /自己改简历/ })).toBeEnabled()
-  await expect(page.getByRole('button', { name: /打印现有简历/ })).toBeEnabled()
+  for (const card of [
+    { name: /去简历优化/, url: /\/resume\/optimize$/, marker: '[data-kiosk-screen="resume-optimize"]' },
+    { name: /去材料工坊/, url: /\/resume\/materials$/, marker: '[data-kiosk-screen="resume-materials"]' },
+    { name: /打印现有简历/, url: /\/print-scan$/, marker: '[data-w2-page="print-scan-home"]' },
+  ]) {
+    await page.goto('/resume/job-fit/actions?taskId=t-act')
+    await expect(screen).toHaveAttribute('data-state', 'ai-down')
+    await screen.getByRole('button', { name: card.name }).click()
+    await expect(page).toHaveURL(card.url)
+    await expect(page.locator(card.marker)).toBeVisible()
+  }
 })
 
 test('job fit actions: a print result arriving after leaving does not hijack navigation @w3-kiosk', async ({ page, api }) => {

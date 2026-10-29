@@ -31,7 +31,7 @@ export function ResumeWaitState({ icon, title, desc, tag, fine, take }: {
   )
 }
 
-export function ResumeErrorState({ reasonTitle, reason, rows, region, alert = false, acts, fine, onHelp }: {
+export function ResumeErrorState({ reasonTitle, reason, rows, region, alert = false, note, acts, fine, onHelp }: {
   /** 原因卡的小标题。不传就不画原因卡（原因已经由 region 自己说清时）。 */
   reasonTitle?: string
   /** 一段原因（可以带节点）。 */
@@ -42,6 +42,8 @@ export function ResumeErrorState({ reasonTitle, reason, rows, region, alert = fa
   region?: ReactNode
   /** 原因是这次请求刚刚返回的真实失败说明时，用 alert 让读屏立刻读出。 */
   alert?: boolean
+  /** 不用原因卡、一句话就能说清时用：放在大卡上面的一句说明（如「AI 暂时不可用，这次没有行动清单。」）。 */
+  note?: string
   acts: ReadonlyArray<ResumeTouchActItem>
   fine?: string
   /** 传了就在求助句后面补一个「帮助中心」按钮（站内自助常见问题页，不是人工入口）。 */
@@ -69,7 +71,7 @@ export function ResumeErrorState({ reasonTitle, reason, rows, region, alert = fa
       {onHelp ? <button type="button" className="rtp-help-link" data-route="/help" onClick={onHelp}>帮助中心</button> : null}
     </QxTouchCallout>
   )
-  return <ResumeTouchActs before={<>{reasonBox}{region}</>} items={acts} after={help} fine={fine} />
+  return <ResumeTouchActs before={<>{reasonBox}{region}</>} note={note} items={acts} after={help} fine={fine} />
 }
 
 export function ResumeStepsState({ steps, summary, fine, take }: {
