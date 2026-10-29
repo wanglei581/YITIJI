@@ -348,7 +348,7 @@ test('free paper jam keeps the order without mentioning payment @w2', async ({ p
   await expect(jam).toBeVisible()
   // 意图带的副题和正文都不能提已付金额：整屏断言。
   const jamScreen = page.locator('[data-qx-page="print-done"]')
-  await expect(jamScreen).toContainText('你的订单还在，处理好后可以继续打印')
+  await expect(jamScreen).toContainText('你的订单还在。机器卡纸，我们已经收到提醒，会尽快处理')
   await expect(jamScreen).not.toContainText('已付金额')
   await expect(jamScreen).not.toContainText('已支付')
   await expect(page.getByRole('region', { name: '处理之前先做这三件' })).toBeVisible()
@@ -459,10 +459,12 @@ test('done with a real taskId whose status cannot be verified never claims there
 
   const unknown = page.locator('[data-testid="print-fulfill-state-unknown"]')
   await expect(unknown).toBeVisible()
-  await expect(unknown).toContainText('暂时无法核验这一单')
-  await expect(unknown).toContainText('说不准有没有下过单、扣没扣费')
-  await expect(unknown).toContainText('我的 → 打印订单')
-  await expect(unknown).toContainText('打印有问题？')
+  // 有任务号：订单号在屏上（走查 I-30），说「读不到结果不代表没出纸」，不下「没有订单、没有扣费」的结论。
+  await expect(unknown).toContainText(W2_ORDER.orderNo)
+  await expect(unknown).toContainText('不代表没出纸')
+  await expect(unknown).toContainText('请不要重新下单')
+  await expect(unknown).toContainText('需要帮助？')
+  await expect(unknown).not.toContainText('请勿据此判断已经出纸')
   await expect(unknown).not.toContainText(NO_ORDER_CLAIM)
   await expect(page.locator('body')).not.toContainText(NO_ORDER_CLAIM)
   expect(errors).toEqual([])
@@ -525,7 +527,9 @@ test('unknown done (status cannot be verified): touch dock with its own 问小�
 
   const unknown = page.locator('[data-testid="print-fulfill-state-unknown"]')
   await expect(unknown).toBeVisible()
-  await expectTouchDock(page, UNKNOWN_ASK_LABEL, '使用帮助')
+  // 有任务号读不到结果：主键是「重新查看这一单」（走查 I-30），「使用帮助」挪进正文出口。
+  await expectTouchDock(page, UNKNOWN_ASK_LABEL, '重新查看这一单')
+  await expect(unknown.getByRole('button', { name: '使用帮助', exact: true })).toBeVisible()
   // 旧 ctabar 里的另外两个出口挪进正文，一个不丢。
   await expect(unknown.getByRole('button', { name: '反馈问题', exact: true })).toBeVisible()
   await expect(unknown.getByRole('button', { name: '查看打印订单', exact: true })).toBeVisible()

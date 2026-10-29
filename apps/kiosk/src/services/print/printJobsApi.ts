@@ -274,7 +274,10 @@ export async function retryPrintJob(input: {
   return res.json() as Promise<PrintJobRetryResult>
 }
 
-export async function getPrintJobStatus(taskId: string): Promise<PrintJobStatusResult> {
+export async function getPrintJobStatus(
+  taskId: string,
+  options: { signal?: AbortSignal } = {},
+): Promise<PrintJobStatusResult> {
   // 限流按台计数用（后端 @TerminalScopedThrottle）。PrintProgressPage 每 3 秒轮询、
   // 最长 10 分钟；不带这个头时同一大厅第 3 台机器就会把 IP 桶打满，前端会把 429
   // 显示成「无法连接打印服务」。
@@ -286,6 +289,7 @@ export async function getPrintJobStatus(taskId: string): Promise<PrintJobStatusR
   try {
     res = await fetch(`${API_BASE_URL}/print/jobs/${taskId}`, {
       headers: terminalId ? { 'X-Terminal-Id': terminalId } : {},
+      ...(options.signal ? { signal: options.signal } : {}),
     })
   } catch (err) {
     throw networkError(err)

@@ -10,7 +10,8 @@
  */
 
 import type { PrintJobParams } from '@ai-job-print/shared'
-import { printProblemLine } from '../../../copy/unattendedCopy'
+import { helpNeededLine, machineCannotPrintLine, printProblemLine } from '../../../copy/unattendedCopy'
+import { MINIAPP_DISPLAY_NAME } from '../../../copy/miniappLinkCopy'
 import { truncateFileNameMiddle, FILE_NAME_BUDGET_CARD } from '../../../lib/fileName'
 import { formatCents } from '../cashierStatus'
 import { jamOrderKeptLine, jobSubline, outOfPaperPill, type OutOfPaperMoney } from '../printProgressModel'
@@ -62,10 +63,13 @@ const LOOK_AT_TRAY: FailureStep = {
   detail: '本机不知道出了几页，以你手里的实物为准。',
 }
 
-/** 同一订单整份重打（takeaway-url 给出 canRetry 才有这个出口）。 */
+/**
+ * 同一订单整份重打（takeaway-url 给出 canRetry 才有这个出口）。
+ * 现场没人加纸、没人处理（走查 I-11），所以不写「加完纸」：按钮只在打印机恢复后才亮，没亮就是机器还没好。
+ */
 function retryStep(money: OutOfPaperMoney): FailureStep {
   return {
-    title: '加完纸可点下方「重新提交打印」',
+    title: '机器恢复后可点下方「重新提交打印」',
     detail: money.fact === 'free'
       ? '同一订单整份重打，请不要重新下单。'
       : '同一订单整份重打、不再收费；不要重新下单，那会变成两笔费用。',
@@ -93,30 +97,32 @@ export function failureCopy(input: {
       steps: [
         { title: '把出纸口里已经出来的纸取走收好', detail: '别留在机器上。' },
         { title: '不要自己开机盖、不要拽纸', detail: '撕在里面更难取，也可能弄坏机器。' },
-        { title: `记下${orderRef}`, detail: help },
+        // 卡纸要机器恢复才能再打，现场没人处理：用「机器暂时打不了」的标准句，说清我们已收到提醒、请稍后再来、怎么找到我们。
+        { title: `记下${orderRef}`, detail: machineCannotPrintLine(undefined, { orderKept: true }) },
       ],
       fine: PAPER_HELP_FINE,
     }
   }
 
   if (variant === 'out-of-paper') {
+    const machine = machineCannotPrintLine(undefined, { orderKept: true })
     const third: FailureStep = canRetry
       ? retryStep(money)
       : free
-        ? { title: `记下${orderRef}，请不要重新下单`, detail: help }
-        : { title: `记下${orderRef}，不要重新下单再打一次`, detail: `那会变成两笔费用。${help}` }
+        ? { title: `记下${orderRef}，请不要重新下单`, detail: machine }
+        : { title: `记下${orderRef}，不要重新下单再打一次`, detail: `那会变成两笔费用。${machine}` }
     const kept = paid ? '订单和已付金额都保留着' : '订单记录保留着'
     const money2 = free
       ? '是否补打，以订单记录为准。'
       : '是否处理费用、处理多少，以订单记录为准，本机不承诺自动处理。'
     return {
       title: '打印机缺纸',
-      subtitle: '已经登记缺纸，这次打印不会在加纸后自动续打',
+      subtitle: '订单还在。机器缺纸，这次打印不会在加纸后自动续打',
       pill: outOfPaperPill(money),
       stepsLabel: STEPS_LABEL,
       steps: [
         LOOK_AT_TRAY,
-        { title: '纸匣空了，这次打印也不会自己接着打', detail: '加纸之后，只有本页出现「重新提交打印」才能整份重打。' },
+        { title: '纸匣空了，这次打印也不会自己接着打', detail: '机器恢复后，只有本页的「重新提交打印」能整份重打。' },
         third,
       ],
       fine: `纸匣已空，这次打印不会在加纸后自动继续。${kept}；只有本页出现「重新提交打印」按钮时，才能自己重打一次${free ? '。' : '，且不会重复收费。'}${money2}${canRetry ? help : ''}`,
@@ -229,4 +235,66 @@ export function paymentRow(money: OutOfPaperMoney): SummaryRow {
     return { key: 'pay', label: '支付状态', value: `已付 ${formatCents(money.amountCents)}` }
   }
   return { key: 'pay', label: '支付状态', value: '以订单为准' }
+}
+
+/**
+ * 重新提交打印要打印机现在能出纸才有意义：缺纸、卡纸、离线、读不到状态时，按钮置灰，并写清为什么。
+ * 打印机恢复后状态刷新（每分钟一次）按钮自己亮起。读不到就按不能算（和打印预览、核价页一个口径：状态没读到不放行）。
+ * 返回 null = 现在能提交；返回一句话 = 不能提交的原因，放在按钮下面。
+ */
+export function retryBlockedReason(device: {
+  loading: boolean
+  printerReady: boolean
+  kind: 'ready' | 'offline' | 'error' | 'low_paper' | 'unknown'
+  printer: { errorCode?: string }
+  printerNotice?: string
+}): string | null {
+  if (device.printerReady) return null
+  if (device.loading) return '正在确认这台机器的打印机状态…'
+  if (device.printerNotice) return device.printerNotice
+  const tail = '机器恢复后，这个按钮会自己亮起；订单还在，请不要重新下单。'
+  if (device.kind === 'offline') return `这台机器的打印机现在离线，暂时不能重新提交。${tail}`
+  if (device.kind === 'error') {
+    return device.printer.errorCode === 'paperEmpty'
+      ? `打印机现在还缺纸，暂时不能重新提交。${tail}`
+      : `打印机现在还有故障，暂时不能重新提交。${tail}`
+  }
+  return `暂时读不到打印机状态，先不能重新提交。${tail}`
+}
+
+/**
+ * 完成页「无法确认打印结果」（有任务号）的三步与小字：状态读不到不等于没出纸，也不等于失败（走查 I-30）。
+ *   ① 先看出纸口——读不到结果不代表没出纸，别因此重新下单；
+ *   ② 这一单已登记，这一页在自动重查（窗口内）或可以手动再查一次；
+ *   ③ 订单号的出口：这一单关联了账号才有「在手机上 / 在这台机器上查看」；没关联就记下订单号、需要时报给我们。
+ * `viewable` 只在建单响应确认这一单关联了账号（hasEndUser === true）时为真；手机这一句再受小程序是否已发布限制。
+ * 钱的事实只在金额大于 0 时提：免费单不提钱。
+ */
+export function unverifiedTaskCopy(input: {
+  money: OutOfPaperMoney
+  orderNo: string | null
+  viewable: boolean
+  miniappPublished: boolean
+  autoRechecking: boolean
+}): { stepsLabel: string; steps: FailureStep[]; fine: string } {
+  const { money, orderNo, viewable, miniappPublished, autoRechecking } = input
+  const orderRef = orderNo ? `订单号 ${orderNo}` : '这一单'
+  const paid = money.fact === 'paid'
+  const third: FailureStep = viewable
+    ? miniappPublished
+      ? { title: '在手机上查看这一单', detail: `打开${MINIAPP_DISPLAY_NAME}小程序「我的 → 打印订单」，找到${orderRef}。` }
+      : { title: '在这台机器上查看这一单', detail: `点下方「查看打印订单」，找到${orderRef}。` }
+    : { title: `记下${orderRef}，需要时报给我们`, detail: helpNeededLine() }
+  return {
+    stepsLabel: '这一刻你可以做的三件',
+    steps: [
+      { title: '先看出纸口，已出的纸取走收好', detail: '这一页读不到结果，不代表没出纸，以你手里的实物为准。' },
+      {
+        title: '这一单已登记，请不要重新下单',
+        detail: `${paid ? '重新下单会变成两笔费用。' : ''}${autoRechecking ? '这一页在自动重新查，查到会自己更新。' : '点下方「重新查看这一单」可以再查一次。'}`,
+      },
+      third,
+    ],
+    fine: '这只是这一页暂时读不到结果：不代表没出纸，也不代表打印失败。订单记录保留。',
+  }
 }

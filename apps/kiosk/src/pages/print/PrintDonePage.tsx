@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import type { PrintJobParams, PrintJobTakeawayUrl } from '@ai-job-print/shared'
 import { API_MODE } from '../../services/api/client'
@@ -6,6 +6,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
 import { useRemainingSeconds } from '../../hooks/useCountdown'
 import { useSupportContact } from '../../hooks/useSupportContact'
+import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import {
   getPrintJobStatus,
@@ -13,6 +14,8 @@ import {
   retryPrintJob,
   type PrintJobStatusResult,
 } from '../../services/print/printJobsApi'
+import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { STATUS_RECHECK_REQUEST_TIMEOUT_MS, STATUS_RECHECK_WINDOW_MS, statusRetryDelayMs } from './printProgressStatus'
 import { KioskFeedbackDialog } from '../../components/KioskFeedbackDialog'
 import { PRINT_DONE_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
 import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
@@ -22,8 +25,10 @@ import { PrintArt } from './art/PrintArt'
 import { PrintIcon } from './art/PrintIcon'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { PrintDoneUnverified } from './components/PrintDoneUnverified'
+import { UNKNOWN_NO_TASK_SUBTITLE, UNKNOWN_TASK_SUBTITLE } from './components/printDoneUnverifiedCopy'
 import { PrintDoneFailed, PrintDoneFeeInfo } from './components/PrintDoneFailed'
-import { failureCopy, failureSummaryRows, feeInfoCopy, paymentRow, type FailureVariant } from './components/printDoneFailedModel'
+import { failureCopy, failureSummaryRows, feeInfoCopy, paymentRow, retryBlockedReason, unverifiedTaskCopy, type FailureVariant } from './components/printDoneFailedModel'
+import { CONTACT_ENTRY_LABEL, PRIVACY_CONTACT_ROUTE, needsContactEntry } from './components/printContactEntry'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { PrintDoneRecordSection } from './components/PrintDoneSections'
 import { doneTakeaway, jobSubline, outOfPaperMoneyOf, paymentFactOf, publicOrderNo, reprintHint, type OutOfPaperMoney } from './printProgressModel'
@@ -101,6 +106,31 @@ function toPublicQrUrl(signedUrl: string): string {
 
 const ACTIVE_PRINT_STATUSES = ['pending', 'claimed', 'printing'] as const
 
+/**
+ * 把一次状态读数翻译成页面要的结论：已完成 / 已失败 / 还在排队打印（回进度页）/ 认不出来。
+ * 首次核验和「无法确认」态的重查共用这一处，两条路径对同一份读数说同一件事。
+ */
+function interpretStatus(taskId: string, result: PrintJobStatusResult): { kind: 'settled'; value: PrintVerification } | { kind: 'active' } {
+  if (result.taskId !== taskId) return { kind: 'settled', value: { taskId, result: 'unknown' } }
+  if (result.status === 'completed') {
+    return { kind: 'settled', value: { taskId, result: 'completed', ...fileRetentionFromStatus(result) } }
+  }
+  if (result.status === 'failed') {
+    return {
+      kind: 'settled',
+      value: {
+        taskId,
+        result: 'failed',
+        failureReason: result.failureReasonForUser ?? '',
+        errorCode: result.errorCode,
+        ...fileRetentionFromStatus(result),
+      },
+    }
+  }
+  if (ACTIVE_PRINT_STATUSES.some((status) => status === result.status)) return { kind: 'active' }
+  return { kind: 'settled', value: { taskId, result: 'unknown' } }
+}
+
 function failVisual(errorCode?: string): 'paper-jam' | 'out-of-paper' | 'result-unconfirmed' | 'failed' {
   if (errorCode === PRINT_JOB_UNCONFIRMED) return 'result-unconfirmed'
   if (errorCode === 'PAPER_EMPTY') return 'out-of-paper'
@@ -141,6 +171,10 @@ export function PrintDonePage() {
   const isUnconfirmed =
     verification?.taskId === taskId && verification.errorCode === PRINT_JOB_UNCONFIRMED
   const visual = resultState === 'failed' ? failVisual(verification?.errorCode) : resultState
+  // 重新提交打印要打印机现在能出纸才有意义；只在失败态读状态（成功态、核验中不发这条请求）。
+  const device = useTerminalDeviceStatus(resultState === 'failed')
+  // 没配服务电话时，「查看《隐私政策》里的联系方式」要有个真能点开的入口。
+  const openContact = needsContactEntry(support) ? () => navigate(PRIVACY_CONTACT_ROUTE) : undefined
 
   const [takeaway, setTakeaway] = useState<PrintJobTakeawayUrl | null>(null)
   const [takeawayError, setTakeawayError] = useState<string | null>(null)
@@ -196,32 +230,15 @@ export function PrintDonePage() {
     void getPrintJobStatus(taskId)
       .then((result) => {
         if (cancelled) return
-        if (result.taskId !== taskId) {
-          setVerification({ taskId, result: 'unknown' })
-          return
-        }
-        if (result.status === 'completed') {
-          setVerification({ taskId, result: 'completed', ...fileRetentionFromStatus(result) })
-          return
-        }
-        if (result.status === 'failed') {
-          setVerification({
-            taskId,
-            result: 'failed',
-            failureReason: result.failureReasonForUser ?? '',
-            errorCode: result.errorCode,
-            ...fileRetentionFromStatus(result),
-          })
-          return
-        }
-        if (ACTIVE_PRINT_STATUSES.some((status) => status === result.status)) {
+        const outcome = interpretStatus(taskId, result)
+        if (outcome.kind === 'active') {
           navigate('/print/progress', {
             replace: true,
             state: { ...((location.state ?? {}) as object), taskId },
           })
           return
         }
-        setVerification({ taskId, result: 'unknown' })
+        setVerification(outcome.value)
       })
       .catch(() => {
         if (!cancelled) setVerification({ taskId, result: 'unknown' })
@@ -229,6 +246,64 @@ export function PrintDonePage() {
 
     return () => { cancelled = true }
   }, [location.state, navigate, taskId])
+
+  // 「无法确认」且有任务号：状态读不到不等于没出纸，也不等于失败。按退避继续查，后端恢复后换成真实结果；
+  // 窗口（10 分钟）内这一屏不被闲置清场，窗口到点放开、留下手动的「重新查看这一单」（走查 I-30）。
+  const [recheckTick, setRecheckTick] = useState(0)
+  const [rechecking, setRechecking] = useState(false)
+  const [recheckWindowOpen, setRecheckWindowOpen] = useState(true)
+  const manualRecheckRef = useRef(false)
+  const awaitingRecheck = resultState === 'unknown' && taskId !== null
+  useBusyLock(awaitingRecheck && recheckWindowOpen)
+  useEffect(() => {
+    if (!awaitingRecheck || !taskId) return undefined
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let attempts = 0
+    const startedAt = Date.now()
+    setRecheckWindowOpen(true)
+
+    const run = async () => {
+      if (cancelled) return
+      setRechecking(true)
+      const abort = new AbortController()
+      const guard = setTimeout(() => abort.abort(), STATUS_RECHECK_REQUEST_TIMEOUT_MS)
+      try {
+        const result = await getPrintJobStatus(taskId, { signal: abort.signal })
+        if (cancelled) return
+        const outcome = interpretStatus(taskId, result)
+        if (outcome.kind === 'active') {
+          navigate('/print/progress', { replace: true, state: { ...((location.state ?? {}) as object), taskId } })
+          return
+        }
+        if (outcome.value.result !== 'unknown') {
+          setVerification(outcome.value)
+          return
+        }
+      } catch {
+        if (cancelled) return
+      } finally {
+        clearTimeout(guard)
+        if (!cancelled) setRechecking(false)
+      }
+      attempts += 1
+      if (Date.now() - startedAt >= STATUS_RECHECK_WINDOW_MS) {
+        setRecheckWindowOpen(false)
+        return
+      }
+      timer = setTimeout(() => { void run() }, statusRetryDelayMs(attempts))
+    }
+
+    const first = manualRecheckRef.current ? 0 : statusRetryDelayMs(0)
+    manualRecheckRef.current = false
+    timer = setTimeout(() => { void run() }, first)
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+    }
+    // location.state 随路由变，重查循环不跟着重开；recheckTick 是手动「重新查看这一单」的触发。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [awaitingRecheck, taskId, recheckTick, navigate])
 
   useEffect(() => {
     if (resultState !== 'failed' || API_MODE !== 'http' || !taskId) {
@@ -276,7 +351,7 @@ export function PrintDonePage() {
   ) : null
 
   const handleResubmitPrint = async () => {
-    if (!taskId || retrying || isUnconfirmed) return
+    if (!taskId || retrying || isUnconfirmed || retryBlockedReason(device)) return
     setRetrying(true)
     setRetryError(null)
     try {
@@ -319,12 +394,33 @@ export function PrintDonePage() {
 
   if (resultState === 'loading' || resultState === 'unknown') {
     const isLoading = resultState === 'loading'
+    // 有任务号、读不到结果：订单号、三步、手动再查一次的按钮都在屏上，页面另按退避自动重查（走查 I-30）。
+    const money: OutOfPaperMoney = { fact: paymentFactOf(amountCents), amountCents }
+    const recheck = !isLoading && taskId !== null
+      ? {
+          ...unverifiedTaskCopy({
+            money,
+            orderNo: displayOrderNo,
+            viewable: state.hasEndUser === true,
+            miniappPublished: support.miniappPublished,
+            autoRechecking: recheckWindowOpen,
+          }),
+          rows: failureSummaryRows({ orderNo: displayOrderNo, file: file ?? null, params: params ?? null, money, reason: '' }),
+          busy: rechecking,
+          onRecheck: () => {
+            manualRecheckRef.current = true
+            setRecheckTick((tick) => tick + 1)
+          },
+          onContact: openContact,
+        }
+      : undefined
     return (
       <PrintDoneUnverified
         loading={isLoading}
         hasTask={taskId !== null}
         title={isLoading ? '正在核验打印结果' : '无法确认打印结果'}
-        subtitle={isLoading ? '正在读取真实打印任务状态，请稍候' : '当前未取得可信的任务终态，请勿据此判断已经出纸'}
+        subtitle={isLoading ? '正在读取真实打印任务状态，请稍候' : taskId !== null ? UNKNOWN_TASK_SUBTITLE : UNKNOWN_NO_TASK_SUBTITLE}
+        recheck={recheck}
         onHome={() => navigate('/')}
         onHelp={() => navigate('/help')}
         onUpload={() => navigate(uploadPath)}
@@ -396,6 +492,9 @@ export function PrintDonePage() {
             <div className="qxt-exits pft-unc-exits">
               <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={() => setFeeInfoOpen(true)}>查看订单说明</button>
               {feedbackButton}
+              {openContact ? (
+                <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit pft-contact-entry" data-testid="print-contact-entry" onClick={openContact}>{CONTACT_ENTRY_LABEL}</button>
+              ) : null}
             </div>
             {isLoggedIn ? (
               <button type="button" className="qxt-rowlink pft-unc-row" onClick={() => navigate('/me/print-orders')}>
@@ -426,7 +525,7 @@ export function PrintDonePage() {
         copy={failureCopy({ variant, money, orderNo: faultOrderNo, canRetry })}
         rows={failureSummaryRows({ orderNo: faultOrderNo, file: file ?? null, params: params ?? null, money, reason: failureReason })}
         free={amountCents === 0}
-        retry={{ available: canRetry, busy: retrying, error: retryError, onRetry: () => { void handleResubmitPrint() } }}
+        retry={{ available: canRetry, blockedReason: retryBlockedReason(device), busy: retrying, error: retryError, onRetry: () => { void handleResubmitPrint() } }}
         takeaway={{
           qrUrl: takeawayQrUrl,
           remaining: takeawayRemaining,
@@ -441,6 +540,7 @@ export function PrintDonePage() {
         onHome={() => navigate('/')}
         onHelp={() => navigate('/help')}
         onOrders={() => navigate('/me/print-orders')}
+        onContact={openContact}
         dialog={feedbackDialog}
       />
     )

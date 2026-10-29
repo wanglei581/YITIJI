@@ -15,22 +15,41 @@ import { AlertCircleIcon } from 'lucide-react'
 import { PrintTouchFrame, printAsk } from '../PrintTouchFrame'
 import { PrintFillArt } from '../art/PrintFillArt'
 import { PrintMissResume } from './PrintMissResume'
+import { FailSteps, FailSummary } from './PrintFailParts'
+import { CONTACT_ENTRY_LABEL } from './printContactEntry'
+import type { FailureStep, SummaryRow } from './printDoneFailedModel'
 import {
   LOADING_ASK_DRAFT,
   LOADING_ASK_LABEL,
   LOADING_PRIMARY_LABEL,
   LOADING_PRIMARY_WHY,
+  RECHECK_BUSY_LABEL,
+  RECHECK_PRIMARY_LABEL,
   UNKNOWN_ASK_DRAFT,
   UNKNOWN_ASK_LABEL,
 } from './printDoneUnverifiedCopy'
 
 const LOADING_WHY_ID = 'print-done-loading-why'
 
+/** 有任务号、读不到结果时的内容（走查 I-30）：三步 + 订单摘要 + 出口；主按钮手动再查一次，页面另按退避自动重查。 */
+export interface UnverifiedRecheck {
+  steps: FailureStep[]
+  stepsLabel: string
+  rows: SummaryRow[]
+  fine: string
+  /** 正在查（自动或手动）：主按钮写「正在重新查看…」、不可点。 */
+  busy: boolean
+  onRecheck: () => void
+  /** 没配服务电话时才传：打开隐私政策里的联系方式。 */
+  onContact?: () => void
+}
+
 export function PrintDoneUnverified({
   loading,
   hasTask,
   title,
   subtitle,
+  recheck,
   onHome,
   onHelp,
   onUpload,
@@ -43,6 +62,8 @@ export function PrintDoneUnverified({
   hasTask: boolean
   title: string
   subtitle: string
+  /** 有任务号且不在核验中才传；传了就用「三步 + 订单摘要」的版式，并把主按钮换成「重新查看这一单」。 */
+  recheck?: UnverifiedRecheck
   onHome: () => void
   onHelp: () => void
   onUpload: () => void
@@ -65,7 +86,11 @@ export function PrintDoneUnverified({
       back={{ label: '返回首页', onBack: onHome }}
       ask={loading ? printAsk(LOADING_ASK_LABEL, LOADING_ASK_DRAFT) : printAsk(UNKNOWN_ASK_LABEL, UNKNOWN_ASK_DRAFT)}
       /* 核验期间没有可做的下一步：主按钮写状态、不可点，原因写在它上面那行小字里（aria-describedby 连着）。 */
-      primary={loading ? undefined : { label: '使用帮助', testId: 'print-fulfill-primary', onClick: onHelp }}
+      primary={loading
+        ? undefined
+        : recheck
+          ? { label: recheck.busy ? RECHECK_BUSY_LABEL : RECHECK_PRIMARY_LABEL, testId: 'print-fulfill-primary', disabled: recheck.busy, onClick: recheck.onRecheck }
+          : { label: '使用帮助', testId: 'print-fulfill-primary', onClick: onHelp }}
       primaryNode={loading ? (
         <button
           type="button"
@@ -79,6 +104,28 @@ export function PrintDoneUnverified({
       ) : undefined}
       nav
     >
+      {!loading && recheck ? (
+        <div
+          data-w2-page="print-done"
+          data-print-flow-step={6}
+          data-testid="print-fulfill-state-unknown"
+          className="qx-scroll pff-page pft-unc pft-fail pft-unk"
+        >
+          <FailSteps steps={recheck.steps} label={recheck.stepsLabel} />
+          <FailSummary rows={recheck.rows} testId="print-fulfill-list" />
+          <div className="qxt-exits pft-unc-exits pft-fail-exits">
+            <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={onOrders}>查看打印订单</button>
+            <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={onFeedback}>反馈问题</button>
+            <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit pft-exit-wide" onClick={onHelp}>使用帮助</button>
+            {recheck.onContact ? (
+              <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit pft-contact-entry" data-testid="print-contact-entry" onClick={recheck.onContact}>
+                {CONTACT_ENTRY_LABEL}
+              </button>
+            ) : null}
+          </div>
+          <p className="pft-unc-fine qxt-fine" data-testid="print-fulfill-fallback">{recheck.fine}</p>
+        </div>
+      ) : (
       <div
         data-w2-page="print-done"
         data-print-flow-step={6}
@@ -114,6 +161,7 @@ export function PrintDoneUnverified({
         <PrintFillArt name="stack" />
         {loading ? <p id={LOADING_WHY_ID} className="pft-wait-why">{LOADING_PRIMARY_WHY}</p> : null}
       </div>
+      )}
       {dialog}
     </PrintTouchFrame>
   )

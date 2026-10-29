@@ -10,6 +10,21 @@ export const POLL_FAIL_LIMIT = 5
 export const REAL_POLL_TIMEOUT_MS = 10 * 60 * 1000
 export const STATUS_READ_ERROR_TEXT = '暂时无法读取状态'
 
+// ── 读不到状态时的退避重查（走查 I-30）──────────────────────────────────────────
+// 进度页连续读不到状态后转到完成页的「无法确认」态；那一屏以前只查一次，后端恢复后也不更新。
+// 现在按 3、6、12、24 秒、之后每 30 秒一次继续查，恢复后换成真实结果；一次请求最多等 8 秒，不让挂住的请求卡死重查循环。
+// 自动重查的窗口与进度页的查询超时同一个 10 分钟：窗口内这一屏不被闲置清场，到点放开，留下手动的「重新查看这一单」。
+export const STATUS_RETRY_BASE_MS = 3000
+export const STATUS_RETRY_MAX_MS = 30_000
+export const STATUS_RECHECK_REQUEST_TIMEOUT_MS = 8000
+export const STATUS_RECHECK_WINDOW_MS = REAL_POLL_TIMEOUT_MS
+
+/** 第 n 次重查前等多久（n 从 0 数起）：3、6、12、24 秒，封顶 30 秒。 */
+export function statusRetryDelayMs(failedAttempts: number): number {
+  const n = Number.isFinite(failedAttempts) ? Math.max(0, Math.floor(failedAttempts)) : 0
+  return Math.min(STATUS_RETRY_MAX_MS, STATUS_RETRY_BASE_MS * 2 ** Math.min(n, 16))
+}
+
 export function realStatusPresentation(status: BackendJobStatus | null) {
   switch (status) {
     case 'pending':

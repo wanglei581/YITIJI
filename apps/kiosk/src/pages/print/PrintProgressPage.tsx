@@ -46,6 +46,7 @@ import { printUploadPathForSource } from './printMaterialSession'
 import { formatCents } from './cashierStatus'
 import { PrintJobRow, PrintProgressFailureActions, PrintProgressFailureNote, PrintStatusTimeoutPanel, type PrintJobState } from './components/PrintProgressSections'
 import { failureSummaryRows, timeoutCopy } from './components/printDoneFailedModel'
+import { PRIVACY_CONTACT_ROUTE, needsContactEntry } from './components/printContactEntry'
 import './styles/print-fulfill-qx.css'
 import './styles/print-progress-touch.css'
 import {
@@ -254,8 +255,10 @@ export function PrintProgressPage() {
         pollFailsRef.current += 1
         setStatusReadError(true)
         if (pollFailsRef.current >= POLL_FAIL_LIMIT) {
+          // 连续读不到状态 ≠ 打印失败：纸可能已经出来了。不再判失败、不闪「打印没有完成」，
+          // 直接去完成页的「无法确认」态：它带着订单号继续按退避重查，后端恢复后更新成真实结果（走查 I-30）。
           stopped = true
-          navigateFail(`${STATUS_READ_ERROR_TEXT}。${printProblemLine()}`)
+          navigate('/print/done', { replace: true, state: { ...(state ?? {}), taskId } })
         }
       }
     }
@@ -277,7 +280,7 @@ export function PrintProgressPage() {
       clearInterval(timer)
       if (timeoutTimer) clearTimeout(timeoutTimer)
     }
-  }, [useRealApi, taskId, navigateFail, navigateSuccess, pollEpoch])
+  }, [useRealApi, taskId, navigate, navigateFail, navigateSuccess, pollEpoch, state])
 
   const currentIdx = stepIndex(current)
   const realStatus = realStatusPresentation(backendStatus)
@@ -493,6 +496,7 @@ export function PrintProgressPage() {
           rows={failureSummaryRows({ orderNo, file, params, money: { fact: payment, amountCents }, reason: '' })}
           fine={timeout.fine}
           onHelp={() => navigate('/help')}
+          onContact={needsContactEntry(support) ? () => navigate(PRIVACY_CONTACT_ROUTE) : undefined}
         />
       ) : (
         <section className="pff-sec" aria-label="打印进度">

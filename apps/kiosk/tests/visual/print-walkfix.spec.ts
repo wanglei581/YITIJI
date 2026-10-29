@@ -281,3 +281,251 @@ test('I-13 chooser: with the capability not configured for this machine, USB sta
   await page.goto('/print/upload?source=document')
   await expect(page.getByTestId('file-source-ch-usb').locator('button')).toBeEnabled()
 })
+
+// ── I-11 缺纸 / 卡纸 / 结果未确认三屏 ──────────────────────────────────────────
+// 走查：三屏的「下一步」落在「加完纸」「处理好后」「查看《隐私政策》里的联系方式」上；现场没人加纸、没人处理，
+// 那句联系方式是纯文字点不开（没配服务电话时全站「出错有路」就只剩它）；打印机仍故障时「重新提交打印」还亮着。
+type FailKind = 'PAPER_EMPTY' | 'PRINTER_ERROR' | 'PRINT_JOB_UNCONFIRMED'
+
+function registerFailedJob(api: ApiRouter, errorCode: FailKind, canRetry: boolean): void {
+  api.respond('GET', JOB_PATH, {
+    status: 200,
+    json: { taskId: W2_ORDER.taskId, status: 'failed', errorCode, failureReasonForUser: '' },
+  })
+  api.respond('POST', `${JOB_PATH}/takeaway-url`, {
+    status: 200,
+    json: {
+      signedUrl: '/api/v1/files/signed/takeaway-demo', expiresAt: '2099-01-01T00:00:00.000Z',
+      filename: W2_FILE.name, mimeType: 'application/pdf', sizeBytes: 128,
+      orderId: W2_ORDER.orderId, orderNo: W2_ORDER.orderNo, payStatus: 'paid', amountCents: 0, canRetry,
+    },
+  })
+}
+
+function registerSupportContact(api: ApiRouter, servicePhone: string | null): void {
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        servicePhone, serviceHours: servicePhone ? '工作日 9:00–18:00' : null,
+        otherOnlineTerminalNearby: false, miniappPublished: false,
+      },
+    },
+  })
+}
+
+/** 隐私政策页的两份正文（页面一进来就各取一次，不接会被判成没接的请求）。 */
+function registerLegalDocs(api: ApiRouter): void {
+  const doc = (title: string) => ({
+    status: 200,
+    json: { success: true, data: { content: `一、说明\n这是${title}。\n\n五、联系我们\n请通过终端公示的联系方式联系我们。`, publishedAt: NOW, version: 'v-fixture' } },
+  })
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', doc('隐私政策'))
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', doc('用户服务协议'))
+}
+
+const FAIL_SCREENS: ReadonlyArray<{ kind: FailKind; testId: string; label: string }> = [
+  { kind: 'PAPER_EMPTY', testId: 'print-fulfill-state-out-of-paper', label: '缺纸' },
+  { kind: 'PRINTER_ERROR', testId: 'print-fulfill-state-paper-jam', label: '卡纸' },
+  { kind: 'PRINT_JOB_UNCONFIRMED', testId: 'print-fulfill-state-result-unconfirmed', label: '结果未确认' },
+]
+
+for (const { kind, testId, label } of FAIL_SCREENS) {
+  test(`I-11 ${label} screen: no step waits for someone to add paper or fix it, and without a service phone the contact is a tappable entry @w2`, async ({ page, api }) => {
+    registerShell(api)
+    registerSupportContact(api, null)
+    registerLegalDocs(api)
+    registerFailedJob(api, kind, kind !== 'PRINT_JOB_UNCONFIRMED')
+    await page.goto('/print/done')
+    await setReactRouterState(page, '/print/done', flowState)
+    const screen = page.getByTestId(testId)
+    await expect(screen).toBeVisible()
+    const whole = page.locator('[data-qx-page]').first()
+    await expect(whole).not.toContainText('加完纸')
+    await expect(whole).not.toContainText('处理好后')
+    // 没配服务电话：「查看《隐私政策》里的联系方式」那句话旁边有能点开的入口。
+    await expect(whole).toContainText('查看《隐私政策》里的联系方式')
+    const entry = page.getByRole('button', { name: '查看联系方式' })
+    await expect(entry).toBeVisible()
+    const box = await entry.boundingBox()
+    expect(box?.height ?? 0, '联系方式入口可点区 ≥64').toBeGreaterThanOrEqual(64)
+    await shot(page, `i11-${kind}-nophone`)
+    await entry.click()
+    await expect(page).toHaveURL(/\/legal\/privacy\?/)
+    expect(new URL(page.url()).searchParams.get('section')).toBe('联系')
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('隐私政策')
+  })
+
+  test(`I-11 ${label} screen: with a service phone the phone is on screen and there is no extra contact entry @w2`, async ({ page, api }) => {
+    registerShell(api)
+    registerSupportContact(api, '0532-82870136')
+    registerFailedJob(api, kind, kind !== 'PRINT_JOB_UNCONFIRMED')
+    await page.goto('/print/done')
+    await setReactRouterState(page, '/print/done', flowState)
+    await expect(page.getByTestId(testId)).toBeVisible()
+    await expect(page.locator('[data-qx-page]').first()).toContainText('拨打服务电话 0532-82870136')
+    await expect(page.getByRole('button', { name: '查看联系方式' })).toHaveCount(0)
+  })
+}
+
+// 打印机仍故障：「重新提交打印」置灰并写原因（缺纸、卡纸各一条），机器好了才亮。
+for (const [kind, testId, printerStatus, reason] of [
+  ['PAPER_EMPTY', 'print-fulfill-state-out-of-paper', 'paper_empty', '缺纸'],
+  ['PRINTER_ERROR', 'print-fulfill-state-paper-jam', 'error', '故障'],
+] as const) {
+  test(`I-11 ${kind}: 重新提交打印 is greyed out with the reason while the printer is still faulty, and works once it is ready @w2`, async ({ page, api }) => {
+    registerShell(api)
+    registerFailedJob(api, kind, true)
+    let printer: string = printerStatus
+    api.respondWith('GET', '/api/v1/terminals/KSK-001/printer-status', () => ({
+      status: 200, json: { printerStatus: printer, paperLevel: 'sufficient', isOnline: true },
+    }))
+    const retries: string[] = []
+    api.respondWith('POST', `${JOB_PATH}/retry`, () => {
+      retries.push('retry')
+      return { status: 200, json: { taskId: W2_ORDER.taskId, orderId: W2_ORDER.orderId, orderNo: W2_ORDER.orderNo, amountCents: 0, payStatus: 'paid', status: 'pending' } }
+    })
+    await page.goto('/print/done')
+    await setReactRouterState(page, '/print/done', flowState)
+    const retry = page.getByRole('button', { name: '重新提交打印' })
+    await expect(page.getByTestId(testId)).toBeVisible()
+    await expect(retry).toBeVisible()
+    await expect(retry).toHaveAttribute('aria-disabled', 'true')
+    const why = page.getByTestId('print-retry-blocked-reason')
+    await expect(why).toContainText(reason)
+    await expect(retry).toHaveAttribute('aria-describedby', await why.getAttribute('id') ?? 'missing')
+    await shot(page, `i11-${kind}-retry-blocked`)
+    await retry.click({ force: true })
+    expect(retries, '打印机还坏着，点了也不能把重提发出去').toEqual([])
+    // 机器好了（状态每分钟刷新一次；这里直接换页面重进，读到新状态）：按钮亮起、原因消失。
+    printer = 'ready'
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await expect(page.getByRole('button', { name: '重新提交打印' })).not.toHaveAttribute('aria-disabled', 'true')
+    await expect(page.getByTestId('print-retry-blocked-reason')).toHaveCount(0)
+    await page.getByRole('button', { name: '重新提交打印' }).click()
+    await page.waitForURL('**/print/progress')
+    expect(retries).toEqual(['retry'])
+  })
+}
+
+// ── I-30 打印途中后端断开 ─────────────────────────────────────────────────────
+// 走查：纸已出来，后端不可达，屏停在「无法确认打印结果」，后端恢复后这一屏仍不更新，没有订单号、没有「重新查看」，
+// 游客拿着已出的纸，屏上却说「请勿据此判断已经出纸」，容易重打一次。
+// 修：读不到状态不判失败，转到完成页「无法确认」态，带订单号；按退避（3、6、12、24、30 秒）继续查，
+// 恢复后换成真实结果；也有手动的「重新查看这一单」。
+const recoveryState = { ...flowState, hasEndUser: true }
+
+/** 后端开关：down 时状态接口回 503，up 时回 completed。 */
+function registerFlakyJob(api: ApiRouter): { up: () => void; calls: () => number } {
+  let up = false
+  let calls = 0
+  api.respondWith('GET', JOB_PATH, () => {
+    calls += 1
+    return up
+      ? { status: 200, json: { taskId: W2_ORDER.taskId, status: 'completed', completedAt: '2026-07-26T00:00:00.000Z' } }
+      : { status: 503, json: { error: { code: 'PRINT_STATUS_UNAVAILABLE', message: 'fixture status down' } } }
+  })
+  return { up: () => { up = true }, calls: () => calls }
+}
+
+/**
+ * 假时钟快进：一小步一小步走，每步之后让真实的网络响应落地，再走下一步
+ * （一次 runFor 走完全程的话，定时器触发的请求还没回来，后面的定时器是排不上的）。
+ */
+async function advance(page: Page, totalMs: number, until?: () => Promise<boolean>): Promise<void> {
+  const step = 3_000
+  for (let spent = 0; spent < totalMs; spent += step) {
+    if (until && await until()) return
+    await page.clock.runFor(step)
+    await page.waitForTimeout(60)
+  }
+}
+
+/** 进度页轮询连着失败、转到完成页「无法确认」态。时钟用假的，直接快进，不真等 15 秒。 */
+async function reachUnknownAfterOutage(page: Page, state: Record<string, unknown>): Promise<void> {
+  await page.clock.install()
+  await page.goto('/print/progress')
+  await setReactRouterState(page, '/print/progress', state)
+  await advance(page, 30_000, async () => page.url().includes('/print/done'))
+  await page.waitForURL('**/print/done')
+  await expect(page.getByTestId('print-fulfill-state-unknown')).toBeVisible()
+}
+
+test('I-30 backend drops during printing: the unknown screen shows the order number and a way to look again, and never tells people to doubt the paper @w2', async ({ page, api }) => {
+  registerShell(api)
+  registerFlakyJob(api)
+  await page.addInitScript(() => {
+    // 记下「打印没有完成」是否在任何时刻上过屏：读不到状态不是失败，不能闪这一句。
+    const seen = () => { if (document.body?.innerText.includes('打印没有完成')) (window as unknown as { __sawFailure?: boolean }).__sawFailure = true }
+    new MutationObserver(seen).observe(document, { childList: true, subtree: true, characterData: true })
+  })
+  await reachUnknownAfterOutage(page, recoveryState)
+  const unknown = page.getByTestId('print-fulfill-state-unknown')
+  await expect(unknown).toContainText(W2_ORDER.orderNo)
+  await expect(page.getByRole('button', { name: '重新查看这一单' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '重新查看这一单' })).toBeEnabled()
+  const whole = page.locator('[data-qx-page]').first()
+  await expect(whole).not.toContainText('请勿据此判断已经出纸')
+  await expect(whole).toContainText('先看出纸口')
+  await expect(whole).toContainText('请不要重新下单')
+  // 关联了账号：给出「在这台机器上查看这一单」的出口（小程序未发布，不说手机）。
+  await expect(whole).toContainText('点下方「查看打印订单」')
+  await expect(unknown.getByRole('button', { name: '查看打印订单', exact: true })).toBeVisible()
+  await expect(page.locator('body')).not.toContainText(/没有订单|没有扣费|没有收款/)
+  expect(await page.evaluate(() => (window as unknown as { __sawFailure?: boolean }).__sawFailure === true), '读不到状态时不能闪「打印没有完成」').toBe(false)
+  await shot(page, 'i30-unknown-with-order')
+})
+
+test('I-30 backend comes back: the unknown screen updates itself to the real result, no tap needed @w2', async ({ page, api }) => {
+  registerShell(api)
+  const job = registerFlakyJob(api)
+  await reachUnknownAfterOutage(page, recoveryState)
+  const before = job.calls()
+  // 还没恢复：自动重查仍在继续，次数在涨，屏不变。
+  await advance(page, 40_000)
+  expect(job.calls(), '后端没好时也按退避继续查').toBeGreaterThan(before)
+  await expect(page.getByTestId('print-fulfill-state-unknown')).toBeVisible()
+  // 恢复：下一次重查读到真实结果，屏自己换成「都打好了」。
+  job.up()
+  await advance(page, 40_000, async () => (await page.getByTestId('print-fulfill-state-completed').count()) > 0)
+  await expect(page.getByTestId('print-fulfill-state-completed')).toBeVisible()
+  await expect(page.getByTestId('print-fulfill-state-unknown')).toHaveCount(0)
+  await shot(page, 'i30-recovered')
+})
+
+test('I-30 the manual 重新查看这一单 asks again right away and shows the real result @w2', async ({ page, api }) => {
+  registerShell(api)
+  const job = registerFlakyJob(api)
+  await reachUnknownAfterOutage(page, recoveryState)
+  const before = job.calls()
+  job.up()
+  await page.getByRole('button', { name: '重新查看这一单' }).click()
+  await expect(page.getByTestId('print-fulfill-state-completed')).toBeVisible()
+  expect(job.calls()).toBeGreaterThan(before)
+})
+
+test('I-30 a guest (order not tied to an account) is told to note the order number, not to look it up on the phone @w2', async ({ page, api }) => {
+  registerShell(api)
+  registerFlakyJob(api)
+  await reachUnknownAfterOutage(page, { ...flowState, hasEndUser: false })
+  const whole = page.locator('[data-qx-page]').first()
+  await expect(whole).toContainText(`记下订单号 ${W2_ORDER.orderNo}，需要时报给我们`)
+  await expect(whole).toContainText('需要帮助？')
+  await expect(whole).not.toContainText('在手机上查看这一单')
+  await expect(whole).not.toContainText('点下方「查看打印订单」')
+})
+
+test('I-30 with the miniapp published, a signed-in person is pointed at 我的 → 打印订单 on the phone @w2', async ({ page, api }) => {
+  registerShell(api)
+  registerFlakyJob(api)
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 200,
+    json: { success: true, data: { servicePhone: '18369161921', serviceHours: '工作日 9:00–18:00', otherOnlineTerminalNearby: false, miniappPublished: true } },
+  })
+  await reachUnknownAfterOutage(page, recoveryState)
+  const whole = page.locator('[data-qx-page]').first()
+  await expect(whole).toContainText('在手机上查看这一单')
+  await expect(whole).toContainText('「我的 → 打印订单」')
+  await expect(whole).toContainText(W2_ORDER.orderNo)
+})

@@ -24,3 +24,13 @@ export const LOADING_ASK_DRAFT =
 /** 核验期间主按钮不可点：按钮上写状态，旁边的小字写原因。小字是对办事的人说的话，不写「主按钮」「真实状态」这类写给开发看的字眼。 */
 export const LOADING_PRIMARY_LABEL = '正在核验…'
 export const LOADING_PRIMARY_WHY = '正在核对这一单的打印结果，核对完才能继续。'
+
+/** 有任务号、读不到结果时的副标题：不叫人「勿据此判断已出纸」（那会让拿着纸的人以为没出纸、去重打），先看出纸口、别重新下单。 */
+export const UNKNOWN_TASK_SUBTITLE = '暂时读不到这一单的结果，先看出纸口，别重新下单'
+
+/** 没有任务号时的副标题（页面不知道有没有这一单）。 */
+export const UNKNOWN_NO_TASK_SUBTITLE = '当前未取得可信的任务终态，请勿据此判断已经出纸'
+
+/** 手动再查一次（有任务号的「无法确认」态的主按钮）。 */
+export const RECHECK_PRIMARY_LABEL = '重新查看这一单'
+export const RECHECK_BUSY_LABEL = '正在重新查看…'
