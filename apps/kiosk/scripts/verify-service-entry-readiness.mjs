@@ -308,9 +308,11 @@ check(
   const guardAt = hook.indexOf('if (!enabled) return')
   const fetchAt = hook.indexOf('await fetch(')
   const timerAt = hook.indexOf('window.setInterval')
+  // 10/29 走查 I-31：首页挂上时会递「马上重读」信号（requestDeviceStatusRefresh），停用档不许响应它，否则停用档也会发请求。
+  const refreshAt = hook.indexOf('refreshRequests.add(')
   check(
-    guardAt > 0 && fetchAt > guardAt && timerAt > guardAt,
-    'useTerminalDeviceStatus(false) 在发请求与挂 60s 轮询之前就 return（停用即不占用后端与定时器）'
+    guardAt > 0 && fetchAt > guardAt && timerAt > guardAt && refreshAt > guardAt,
+    'useTerminalDeviceStatus(false) 在发请求、挂轮询、接「马上重读」信号之前就 return（停用即不占用后端与定时器）'
   )
 }
 

@@ -314,6 +314,103 @@ test('home device offline state does not invent paper toner or scanner telemetry
   await expectFusionAcceptance(page, errors)
 })
 
+// 10/29 走查 I-31：首页对「打印机离线」「后端断了」不预告。机器状态每 60 秒才读一次，人在首页看着的时候，
+// 打印机掉线或服务断了，页头还写「打印机在线」要等最长一分钟；服务断了时打印磁贴还写「上传与文件加工仍可用」，那也是假的。
+// 现在：状态读得更勤（20 秒）、进首页那一刻立即读一次、请求 8 秒不回就算连不上，连不上时如实写「服务暂时连不上」。
+const HOME_STATUS_POLL_MS = 20_000
+type StatusReply = { status: number; json: unknown } | { abort: 'connectionrefused' } | 'hang'
+
+function registerSwitchableStatus(api: ApiRouter): { set: (next: StatusReply) => void } {
+  let reply: StatusReply = { status: 200, json: { printerStatus: 'ready', isOnline: true } }
+  api.respondWith('GET', '/api/v1/terminals/KSK-001/printer-status', () => (
+    reply === 'hang' ? new Promise(() => {}) : reply
+  ))
+  return { set: (next) => { reply = next } }
+}
+
+const homePill = (page: Page): Locator => page.locator('.qxt-band .qxt-status')
+
+test('home foretells a printer that drops offline while the page is open, within one short poll @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  const status = registerSwitchableStatus(api)
+  registerHomeApi(api, [])
+  await page.clock.install()
+  await page.goto('/')
+  await expect(homePill(page)).toHaveText('打印机在线')
+  await freezeClock(page)
+
+  status.set({ status: 200, json: { printerStatus: 'offline', isOnline: false } })
+  await page.clock.runFor(HOME_STATUS_POLL_MS + 1_000)
+  await expect(homePill(page)).toHaveText('打印机离线')
+  await expect(page.locator('[data-home-device-panel]')).toHaveAttribute('data-panel-state', 'offline')
+  await expect(page.locator('[data-home-device-panel]').getByText('打印机离线', { exact: true })).toBeVisible()
+  expect(errors).toEqual([])
+})
+
+test('home says the service cannot be reached when the status request fails, and recovers on the next poll @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  const status = registerSwitchableStatus(api)
+  registerHomeApi(api, [])
+  await page.clock.install()
+  await page.goto('/')
+  await expect(homePill(page)).toHaveText('打印机在线')
+  await freezeClock(page)
+
+  status.set({ abort: 'connectionrefused' })
+  await page.clock.runFor(HOME_STATUS_POLL_MS + 1_000)
+  const panel = page.locator('[data-home-device-panel]')
+  await expect(homePill(page)).toHaveText('服务暂时连不上')
+  await expect(panel).toHaveAttribute('data-panel-state', 'unreachable')
+  await expect(panel.getByText('服务暂时连不上', { exact: true })).toBeVisible()
+  await expect(panel).toContainText('打印、扫描和传文件暂不开放')
+  // 服务连不上时，上传和文件加工一样用不了：不得再说「仍可用」。
+  await expect(panel).not.toContainText('仍可用')
+
+  status.set({ status: 200, json: { printerStatus: 'ready', isOnline: true } })
+  await page.clock.runFor(HOME_STATUS_POLL_MS + 1_000)
+  await expect(homePill(page)).toHaveText('打印机在线')
+  await expect(panel).not.toContainText('服务暂时连不上')
+  expect(errors).toEqual([])
+})
+
+test('a hung status request is cut off after 8 seconds instead of leaving the home on a stale answer @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  const status = registerSwitchableStatus(api)
+  registerHomeApi(api, [])
+  await page.clock.install()
+  await page.goto('/')
+  await expect(homePill(page)).toHaveText('打印机在线')
+  await freezeClock(page)
+
+  status.set('hang')
+  await page.clock.runFor(HOME_STATUS_POLL_MS + 9_000)
+  await expect(homePill(page)).toHaveText('服务暂时连不上')
+  expect(errors).toEqual([])
+})
+
+test('entering the home re-reads the device status at once, not at the next poll @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  const status = registerSwitchableStatus(api)
+  registerHomeApi(api, [])
+  await page.goto('/help')
+  await expect(page.locator('[data-kiosk-screen="help"]')).toBeVisible()
+
+  // 人在帮助页的时候，打印机掉线了；下一次轮询还早。回首页那一刻就该读到。
+  status.set({ status: 200, json: { printerStatus: 'offline', isOnline: false } })
+  await page.evaluate(() => {
+    const state = { ...(window.history.state ?? {}), key: 'i31-home-reenter', usr: null }
+    window.history.pushState(state, '', '/')
+    window.dispatchEvent(new PopStateEvent('popstate', { state }))
+  })
+  await expect(page).toHaveURL(/\/$/)
+  await expect(homePill(page)).toHaveText('打印机离线')
+  expect(errors).toEqual([])
+})
+
 test('profile permission state uses the canonical fusion shell @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerKioskShell(api)

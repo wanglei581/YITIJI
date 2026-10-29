@@ -44,6 +44,11 @@ export interface TerminalDeviceStatusView {
    */
   printerNotice?: string
   networkLabel: string
+  /**
+   * 这一次读状态的请求本身失败了（网络不通、请求超时、服务 5xx）：此刻什么都读不到，不是「打印机离线」。
+   * 没配终端身份时不发请求，不算（那是本机程序没连上，不是服务断了）。缺省 = 没有失败。
+   */
+  requestFailed?: boolean
   /** 兼容旧 DeviceStatus 联合；展示请用 printerLabel。 */
   deviceStatus: DeviceStatus
 }
@@ -59,7 +64,22 @@ interface PrinterStatusApiBody {
   }
 }
 
-const REFRESH_MS = 60_000
+/**
+ * 轮询间隔。无人值守：打印机掉线、服务断了，屏上要尽快知道，不能让一分钟前的「打印机在线」留在首页上
+ * （10/29 本机走查 I-31）。一次只是一条公开只读的小请求，20 秒一次的负载可以忽略。
+ */
+const REFRESH_MS = 20_000
+/** 一次读状态最长等多久。不回就当连不上：否则服务挂着不回的时候，首页会一直停在上一次的答案（或一直「设备检查中」）。 */
+const REQUEST_TIMEOUT_MS = 8_000
+
+/**
+ * 「马上重读一次」：首页一挂上就调它（人从别的页回来，不等下一次轮询）。
+ * 调用方不需要拿到状态，也不需要自己启动轮询——状态仍只由壳层那一个 hook 读，页面只递一个信号。
+ */
+const refreshRequests = new Set<() => void>()
+export function requestDeviceStatusRefresh(): void {
+  for (const refresh of [...refreshRequests]) refresh()
+}
 
 function printerNameFromEnv(): string {
   return (import.meta.env['VITE_PRINTER_NAME'] ?? '').trim() || '已配置打印机'
@@ -206,10 +226,29 @@ function unknownView(partial: Partial<TerminalDeviceStatusView> = {}): TerminalD
   }
 }
 
+/** 两次读到的是不是同一个答案：是就保留旧对象，不让每次轮询都把壳层和首页白白重绘一遍。 */
+function sameView(a: TerminalDeviceStatusView, b: TerminalDeviceStatusView): boolean {
+  return a.loading === b.loading
+    && a.apiReachable === b.apiReachable
+    && a.heartbeatOnline === b.heartbeatOnline
+    && a.printerReady === b.printerReady
+    && a.kind === b.kind
+    && a.tonerKnown === b.tonerKnown
+    && a.printerName === b.printerName
+    && a.printerLabel === b.printerLabel
+    && a.printerNotice === b.printerNotice
+    && a.networkLabel === b.networkLabel
+    && a.requestFailed === b.requestFailed
+    && a.deviceStatus === b.deviceStatus
+    && a.printer.isOnline === b.printer.isOnline
+    && a.printer.hasPaper === b.printer.hasPaper
+    && a.printer.errorCode === b.printer.errorCode
+}
+
 /**
  * 暂停接单说明在取状态时就算好存进了 state，而服务联系方式是运行时根另外读的，可能比状态晚到，
  * 也可能之后被后台改掉。所以这里不用 state 里存的那句：渲染时按当前联系方式重算，
- * 号码到了说明立刻换成带号码的那句，不等下一次轮询（60 秒）碰运气。
+ * 号码到了说明立刻换成带号码的那句，不等下一次轮询（20 秒）碰运气。
  * 只动有说明的视图（打印闸门合上）；其余、以及说明没变时，原样返回同一个对象。
  */
 function withLiveNotice(
@@ -283,19 +322,31 @@ export function useTerminalDeviceStatus(enabled = true): TerminalDeviceStatusVie
 
     let cancelled = false
     const ac = new AbortController()
+    // 同时可能有两次在路上（轮询 + 「马上重读」）：只认最后发出的那一次，早发的晚到也不许盖掉新的。
+    let latest = 0
 
     const load = async (): Promise<void> => {
+      const mine = ++latest
+      // 本次请求自己的中断器：页面卸载时跟着中断；REQUEST_TIMEOUT_MS 内没回也中断，并算「连不上」。
+      const request = new AbortController()
+      const abortWithEffect = (): void => request.abort()
+      ac.signal.addEventListener('abort', abortWithEffect)
+      const timeout = window.setTimeout(() => request.abort(), REQUEST_TIMEOUT_MS)
+      const settle = (next: TerminalDeviceStatusView): void => {
+        if (cancelled || mine !== latest) return
+        setView((previous) => (sameView(previous, next) ? previous : next))
+      }
       try {
         const res = await fetch(
           `${API_BASE_URL}/terminals/${encodeURIComponent(terminalId)}/printer-status`,
-          { signal: ac.signal },
+          { signal: request.signal },
         )
-        if (cancelled) return
         if (!res.ok) {
-          setView(
+          settle(
             unknownView({
               loading: false,
               apiReachable: res.status < 500,
+              requestFailed: res.status >= 500,
               printerLabel: '状态未知',
               networkLabel: res.status >= 500 ? '网络异常' : '状态未知',
             }),
@@ -308,8 +359,7 @@ export function useTerminalDeviceStatus(enabled = true): TerminalDeviceStatusVie
           heartbeatOnline: Boolean(payload.isOnline),
           printerStatus: payload.printerStatus,
         })
-        if (cancelled) return
-        setView({
+        settle({
           loading: false,
           apiReachable: true,
           heartbeatOnline: Boolean(payload.isOnline),
@@ -318,17 +368,20 @@ export function useTerminalDeviceStatus(enabled = true): TerminalDeviceStatusVie
           networkLabel: '网络正常',
           ...mapped,
         })
-      } catch (err: unknown) {
-        if (err instanceof Error && err.name === 'AbortError') return
-        if (cancelled) return
-        setView(
+      } catch {
+        // 卸载引起的中断 settle 里已经丢掉；剩下的（网络不通、超时）都是「这次什么都没读到」，不是「打印机离线」。
+        settle(
           unknownView({
             loading: false,
             apiReachable: false,
+            requestFailed: true,
             printerLabel: '状态未知',
             networkLabel: '网络异常',
           }),
         )
+      } finally {
+        window.clearTimeout(timeout)
+        ac.signal.removeEventListener('abort', abortWithEffect)
       }
     }
 
@@ -336,11 +389,17 @@ export function useTerminalDeviceStatus(enabled = true): TerminalDeviceStatusVie
     const timer = window.setInterval(() => {
       void load()
     }, REFRESH_MS)
+    // 首页一挂上就马上重读，不等下一次轮询。
+    const refreshNow = (): void => {
+      void load()
+    }
+    refreshRequests.add(refreshNow)
 
     return () => {
       cancelled = true
       ac.abort()
       window.clearInterval(timer)
+      refreshRequests.delete(refreshNow)
     }
   }, [enabled, terminalId])
 

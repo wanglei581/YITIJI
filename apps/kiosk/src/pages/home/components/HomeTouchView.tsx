@@ -118,11 +118,14 @@ export function HomeTouchView({
     }
   }, [])
 
+  // 读状态的请求本身没回来（服务断了、超时）：和「打印机离线」不是一回事，磁贴上单独写（10/29 本机走查 I-31）。
+  const serviceDown = !device.loading && device.requestFailed === true
   const printStatus = printDomainStatus({
     deviceLoading: device.loading,
     deviceReady: device.printerReady,
     deviceLabel: device.printerLabel,
     deviceNotice: device.printerNotice,
+    serviceDown,
   })
   const job = jobCopy(jobs)
   const fair = campusCopy(jobFair)
@@ -132,7 +135,7 @@ export function HomeTouchView({
   const channelsTile = !recruitmentOpen && officialChannelCount > 0
   const greeting = greetingWord(now)
   const standbyNote = homeStandbyNote({ isLoggedIn, guestMode, hasSensitiveSession: hasKioskSensitiveSession() }, publicIdleLogoutLabel())
-  const printChip = device.loading ? printStatus.note : device.printerReady ? '先选材料再出纸 · 带走：打印件' : device.printerLabel
+  const printChip = device.loading ? printStatus.note : device.printerReady ? '先选材料再出纸 · 带走：打印件' : serviceDown ? '服务暂时连不上' : device.printerLabel
   const printNote = device.loading || device.printerReady ? undefined : printStatus.note
   const tileCount = 2 + (recruitmentOpen ? 2 : channelsTile ? 1 : 0) + (toolboxReady ? 1 : 0) + (campusReady ? 1 : 0)
   const dense = tileCount >= 4
@@ -213,7 +216,7 @@ export function HomeTouchView({
           dark
           visual={<QxTouchArtStack />}
           index={3}
-          dataAttrs={{ 'home-device-panel': '', 'panel-state': device.loading ? 'loading' : device.kind }}
+          dataAttrs={{ 'home-device-panel': '', 'panel-state': device.loading ? 'loading' : serviceDown ? 'unreachable' : device.kind }}
           onClick={() => onAction('print-hub')}
         />
         <QxTouchTask actionId="policy-hub" icon="landmark" title="查政策" desc="补贴、社保怎么办，要带哪些材料，以官方发布为准" chip="官方发布" chipTone="slate" take="查看政策说明" takeIcon="check" visual={<QxTouchArtChecklist />} index={4} onClick={() => onAction('policy-hub')} />

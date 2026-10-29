@@ -236,6 +236,42 @@ expectNotMatches(
   'HomePage 不得再次启动独立设备状态轮询',
 )
 expectNotMatches(homeSrc, /function KioskTopBar/, 'HomePage 不再自绘顶栏（设备态由共享壳展示）')
+// 10/29 本机走查 I-31：首页对「打印机离线」「服务断了」不预告。壳层那一个 hook 读得更勤、请求有超时、
+// 读不到就如实标 requestFailed；首页只递「马上重读」的信号（不自己起轮询），页头与打印磁贴在读不到时写「服务暂时连不上」，
+// 并且不再说「上传与文件加工仍可用」（服务断了它们一样走不通）。
+expectMatches(hookSrc, /const REFRESH_MS = 20_000/, 'hook 轮询 20 秒一次（原 60 秒：打印机掉线要等一分钟首页才知道）')
+expectMatches(hookSrc, /const REQUEST_TIMEOUT_MS = 8_000/, 'hook 一次读状态最长等 8 秒，不回就当连不上')
+expectMatches(
+  hookSrc,
+  /window\.setTimeout\(\(\) => request\.abort\(\), REQUEST_TIMEOUT_MS\)/,
+  'hook 的超时真的会中断这次请求（不是只定义了常量）',
+)
+expectMatches(
+  hookSrc,
+  /catch \{[\s\S]{0,400}requestFailed: true/,
+  '请求失败（网络不通、超时）标 requestFailed:true，不冒充「打印机离线」',
+)
+expectMatches(hookSrc, /export function requestDeviceStatusRefresh\(\): void/, 'hook 导出「马上重读」信号')
+expectMatches(
+  homeSrc,
+  /import \{ requestDeviceStatusRefresh, type TerminalDeviceStatusView \} from '\.\.\/\.\.\/hooks\/useTerminalDeviceStatus'[\s\S]*useEffect\(\(\) => \{\s*requestDeviceStatusRefresh\(\)\s*\}, \[\]\)/,
+  'HomePage 一挂上就递「马上重读」信号（人从别的页回来不等下一次轮询）',
+)
+expectMatches(
+  homeSrc,
+  /device\.requestFailed\s*\? \{ tone: 'warn' as const, label: '服务暂时连不上' \}/,
+  'HomePage 读状态的请求没回来时页头写「服务暂时连不上」',
+)
+expectMatches(
+  homeViewSrc,
+  /const serviceDown = !device\.loading && device\.requestFailed === true/,
+  '打印磁贴按 requestFailed 判服务连不上',
+)
+expectMatches(
+  homeDomainSrc,
+  /if \(input\.serviceDown\) \{\s*return \{\s*note: '服务暂时连不上 · 打印、扫描和传文件暂不开放'/,
+  '服务连不上时打印磁贴说「打印、扫描和传文件暂不开放」（不沿用「上传与文件加工仍可用」）',
+)
 expectMatches(
   warmOverrideSrc,
   /\.dc-dot\[data-state='ready'\]/,
