@@ -120,7 +120,7 @@
     "verify:scan-session-truth": "node scripts/verify-scan-session-truth.mjs",
     "verify:visible-actions-truth": "node scripts/verify-kiosk-visible-actions-truth.mjs",
     "verify:deploy-vite-env-coverage": "node scripts/verify-deploy-vite-env-coverage.mjs",
-    "verify:contract-review-session": "node scripts/verify-contract-review-session.mjs",
+    "verify:contract-review-session": "node scripts/verify-contract-review-session.mjs && node --test scripts/tests/contract-review-failure-copy.test.mjs",
     "verify:contract-review-report-print": "node scripts/verify-contract-review-report-print.mjs",
     "verify:qingxu-v2-frozen": "node scripts/verify-qingxu-v2-frozen.mjs",
     "verify:visual-evidence-manifest": "node scripts/verify-visual-evidence-manifest.mjs",
