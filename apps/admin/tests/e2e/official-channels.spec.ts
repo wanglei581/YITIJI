@@ -153,14 +153,17 @@ test.describe('机构详情：官方渠道（只读 + 紧急下架）', () => {
     const live = channelItem(channels, '人才交流中心官网')
     await expect(live.getByRole('status', { name: '机构已启用' })).toBeVisible()
     await expect(live).toContainText('https://www.rencai-demo.gov.cn/')
+    await expect(live).toContainText('面向对象：面向高校毕业生')
     await expect(live.getByRole('button', { name: '紧急下架', exact: true })).toBeVisible()
 
     const held = channelItem(channels, '线上业务大厅（旧入口）')
     await expect(held.getByRole('status', { name: '平台已紧急下架' })).toBeVisible()
+    await expect(held).toContainText('面向对象：面向社会求职者')
     await expect(held).toContainText('事由：权利人投诉')
     await expect(held).toContainText('页面冒用第三方机构标识，权利人投诉编号 TS-2026-0921')
     await expect(held.getByRole('button'), '已下架的一行不再有任何操作').toHaveCount(0)
 
+    await expect(channels.getByRole('radio')).toHaveCount(0)
     await expect(channels.getByRole('button', { name: /新增|添加|编辑|恢复/ })).toHaveCount(0)
     await shot(page, 'channels', channels)
   })

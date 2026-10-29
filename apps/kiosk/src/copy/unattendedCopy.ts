@@ -7,7 +7,9 @@
  * 没服务时间、单点位、小程序未发布。
  *
  * 省略 contact 时读会话缓存，不发请求。显式传 null 表示当前没有联系方式。
- * 运行时根在进页时拉取一次，子页面重绘时就能读到。
+ * 运行时根（KioskRuntimeRoot）挂载时拉取一次，并在缓存过期前续上、终端号变了重读；
+ * 省略写法只读调用那一刻的缓存，自己不会重绘——号码晚到时要跟着更新，页面用
+ * `useSupportContact()` / `useSupportContactSnapshot()` 订阅，把拿到的联系方式显式传进来。
  * 本文件不发请求，也不 import 接口模块，避免和 supportContact 循环引用。
  *
  * `UNATTENDED_FORBIDDEN_PHRASES` 与 `apps/kiosk/scripts/verify-kiosk-unattended-copy.mjs` 共用。

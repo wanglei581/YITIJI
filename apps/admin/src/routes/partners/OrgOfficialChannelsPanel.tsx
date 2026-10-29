@@ -8,7 +8,11 @@
 // ============================================================
 
 import { useCallback, useEffect, useState } from 'react'
-import { RECRUITMENT_EMERGENCY_REASON_LABELS, type RecruitmentEmergencyReasonCode } from '@ai-job-print/shared'
+import {
+  OFFICIAL_CHANNEL_AUDIENCE_LABELS,
+  RECRUITMENT_EMERGENCY_REASON_LABELS,
+  type RecruitmentEmergencyReasonCode,
+} from '@ai-job-print/shared'
 import { StatusBadge } from '@ai-job-print/ui'
 import { AlertTriangleIcon, ExternalLinkIcon, QrCodeIcon } from 'lucide-react'
 import { getUser } from '../../services/auth'
@@ -52,6 +56,7 @@ function ChannelItem({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-neutral-800">{channel.name}</span>
+          <span className="text-xs text-neutral-500">面向对象：{OFFICIAL_CHANNEL_AUDIENCE_LABELS[channel.audience]}</span>
           {held ? (
             <StatusBadge dot status="error" label="平台已紧急下架" />
           ) : (

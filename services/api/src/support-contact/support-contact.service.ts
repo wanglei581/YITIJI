@@ -7,8 +7,12 @@ import { terminalHeartbeatOnline } from './support-contact.online'
 /** 没配服务时间时，公开接口返回这句。合规要求电话后面跟着服务时间。 */
 export const DEFAULT_SERVICE_HOURS = '工作日 9:00–18:00'
 
-/** 按 terminalId 缓存整份公开响应。后台改配置不主动清，最迟一个周期后生效。 */
-export const SUPPORT_CONTACT_CACHE_TTL_MS = 5 * 60 * 1000
+/**
+ * 按 terminalId 缓存整份公开响应 90 秒。后台改配置不主动清，最迟一个周期后生效。
+ * 一体机每 3 分钟续读（apps/kiosk/src/services/api/supportContact.ts 的 SUPPORT_CONTACT_RENEW_MS），
+ * 两者相加，后台改了号码最迟约 4 分半到屏——管理员卡片写的是「最迟 5 分钟内」，这两个数不能再调大。
+ */
+export const SUPPORT_CONTACT_CACHE_TTL_MS = 90 * 1000
 
 const KEY_PHONE = 'support.servicePhone'
 const KEY_HOURS = 'support.serviceHours'
