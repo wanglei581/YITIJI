@@ -30,6 +30,8 @@ const DESIGN_WIDTH = 1080
 const SIGNED_OUT_CARD_PX = 340
 /** 未登录态段与段之间的间隔（≥761px 宽）。 */
 const SIGNED_OUT_SECTION_GAP_PX = 16
+/** 压紧版式（第三行磁贴 ≥ 4 块）段与段之间的间隔，本来就是 12px。 */
+const COMPACT_SECTION_GAP_PX = 12
 
 interface HomeLayout {
   /** 最后一块内容的底边到底部导航顶边的距离。 */
@@ -80,6 +82,8 @@ async function expectFilledLikeSignedOut(page: Page, label: string, variant: Hom
   expect(layout.cardHeight, `${label}：大卡 ${layout.cardHeight.toFixed(1)}px，不得比未登录态（${SIGNED_OUT_CARD_PX}px）更高`).toBeLessThanOrEqual(SIGNED_OUT_CARD_PX + 0.5)
   if (variant === 'default' || variant === 'channels') {
     expect(layout.sectionGap, `${label}：段间距要回到未登录态的 ${SIGNED_OUT_SECTION_GAP_PX}px`).toBeCloseTo(SIGNED_OUT_SECTION_GAP_PX, 0)
+  } else {
+    expect(layout.sectionGap, `${label}：压紧版式的段间距不动，仍是 ${COMPACT_SECTION_GAP_PX}px`).toBeCloseTo(COMPACT_SECTION_GAP_PX, 0)
   }
   return layout
 }
