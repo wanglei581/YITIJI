@@ -2945,3 +2945,67 @@ test('expired phone upload offers the usb switch when usb import is available @w
   await expect(page.getByRole('button', { name: '改用 U 盘导入' })).toBeVisible()
   await expectHealthy(page, errors, 'print-upload')
 })
+
+/*
+ * #1519 留给触屏版第三包的接线：选文件页「手机扫码上传」收到文件后，文件行写这份文件从哪来（来自小程序 / 来自手机网页），
+ * 待确认屏另有一句「不是你传的文件就取消」。句子都来自 copy/miniappLinkCopy.ts，页面不手写。
+ * 来源读不到（旧会话没有这个字段）时文件行保持原字「手机扫码上传」，提醒仍在。
+ */
+const NOT_YOUR_FILE_HINT = '不是你传的文件？请点「取消」，再重新扫码。'
+
+function installReceivedPhoneUpload(api: ApiRouter, source: string | null | undefined): void {
+  const sessionId = 'w3-received-upload'
+  const expiresAt = '2099-01-01T00:00:00.000Z'
+  api.respond('POST', '/api/v1/upload-sessions', {
+    status: 200,
+    json: { success: true, data: { sessionId, uploadUrl: '/upload/phone', uploadToken: 'w3-received-token', controlToken: 'w3-received-control', expiresAt } },
+  })
+  api.respond('GET', `/api/v1/upload-sessions/${sessionId}`, {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        sessionId,
+        status: 'uploaded',
+        purpose: 'print_doc',
+        mode: 'temporary',
+        file: {
+          fileId: 'w3-received-file',
+          filename: '手机传来的材料.pdf',
+          sizeBytes: 2048,
+          mimeType: 'application/pdf',
+          sha256: 'd'.repeat(64),
+          fileExpiresAt: null,
+          ...(source === undefined ? {} : { source }),
+        },
+        requiresKioskConfirmation: true,
+        expiresAt,
+      },
+    },
+  })
+}
+
+for (const c of [
+  { source: 'miniapp_documents', row: '来自职易达小程序「我的文档」' },
+  { source: 'miniapp', row: '来自职易达小程序' },
+  { source: 'web', row: '来自手机网页' },
+  { source: undefined, row: '手机扫码上传' },
+  { source: 'something-new', row: '手机扫码上传' },
+] as const) {
+  test(`print upload phone-received row names where the file came from and reminds to cancel a file that is not yours: ${String(c.source)} @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    installReceivedPhoneUpload(api, c.source)
+
+    await page.goto('/print/upload?source=document&tab=qr')
+    const row = page.getByTestId('file-source-phone-file')
+    await expect(row).toContainText('手机传来的材料.pdf')
+    await expect(row).toContainText(c.row)
+    // 认不得的来源不当成「来自小程序」，也不凭空编一句来源。
+    if (c.row === '手机扫码上传') await expect(row).not.toContainText('来自')
+    await expect(page.getByText(NOT_YOUR_FILE_HINT, { exact: true })).toBeVisible()
+    // 提醒说的是「取消」，本屏要真有一个叫「取消」的出口。
+    await expect(page.getByTestId('file-source-cancel')).toHaveText('取消这次上传')
+    await expectHealthy(page, errors, 'print-upload')
+  })
+}

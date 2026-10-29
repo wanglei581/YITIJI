@@ -3387,3 +3387,75 @@ test('resume source phone confirm sends one request per tap, shows 正在确认�
   expect(runtimeErrors).toEqual([])
 })
 
+/*
+ * #1519 留给触屏版第四包的面板接线（UploadSessionQrPanel，简历来源页「在手机里」）：
+ * 二维码旁的说明、手机传来文件后文件名下面的来源与「不是你传的文件就取消」提醒，句子都来自 copy/miniappLinkCopy.ts，面板不手写。
+ * 小程序已发布才换掉码旁原句；没发布保持「请用手机微信或浏览器扫码」。来源读不到（旧会话没有这个字段）就不写那一行，
+ * 提醒只在已收到文件后出现。
+ */
+const MINIAPP_UPLOAD_HINT = '用手机微信扫码：打开的是职易达小程序，就在里面选文件；打开的是网页，也能照常上传。'
+const NOT_YOUR_FILE_HINT = '不是你传的文件？请点「取消」，再重新扫码。'
+
+function supportContactMiniapp(published: boolean) {
+  return {
+    status: 200,
+    json: { success: true, data: { servicePhone: '18369161921', serviceHours: '工作日 9:00–18:00', otherOnlineTerminalNearby: false, miniappPublished: published } },
+  }
+}
+
+function mockResumePhoneSession(api: ApiRouter, status: 'pending' | 'uploaded', source?: string | null): void {
+  const SESSION = 'w3-miniapp-hint'
+  const file = status === 'uploaded'
+    ? { fileId: 'w3-miniapp-file', filename: '手机传来的简历.pdf', sizeBytes: 253952, mimeType: 'application/pdf', sha256: 'c'.repeat(64), fileExpiresAt: null, fileUrl: '/w3-fixtures/resume.pdf', ...(source === undefined ? {} : { source }) }
+    : null
+  api.respond('POST', '/api/v1/upload-sessions', { status: 201, json: { success: true, data: { sessionId: SESSION, uploadUrl: '/upload/phone', uploadToken: 'w3-mini-up', controlToken: 'w3-mini-ctl', expiresAt: '2099-01-01T00:00:00.000Z' } } })
+  api.respond('GET', `/api/v1/upload-sessions/${SESSION}`, { status: 200, json: { success: true, data: { sessionId: SESSION, status, purpose: 'resume_upload', mode: 'temporary', file, requiresKioskConfirmation: false, expiresAt: '2099-01-01T00:00:00.000Z' } } })
+}
+
+for (const published of [true, false]) {
+  test(`resume source phone QR: miniapp ${published ? 'published swaps the sentence beside the code' : 'unpublished keeps the original sentence'} @w3-kiosk`, async ({ page, api }) => {
+    terminalBaseline(api)
+    api.respond('GET', '/api/v1/public/support-contact', supportContactMiniapp(published))
+    mockResumePhoneSession(api, 'pending')
+    await page.goto('/resume/source')
+    await page.getByRole('button', { name: /在手机里/ }).click()
+    const panel = page.locator('.resume-source-phone-session')
+    await expect(panel.locator('svg[width="150"]')).toBeVisible()
+    if (published) {
+      await expect(panel.getByText(MINIAPP_UPLOAD_HINT, { exact: true })).toBeVisible()
+      await expect(panel.getByText('请用手机微信或浏览器扫码', { exact: true })).toHaveCount(0)
+    } else {
+      await expect(panel.getByText('请用手机微信或浏览器扫码', { exact: true })).toBeVisible()
+      await expect(panel).not.toContainText('小程序')
+    }
+    // 还没收到文件：不写来源，也没有「不是你传的」提醒。
+    await expect(panel).not.toContainText('不是你传的文件')
+    await assertNoHorizontalOverflow(page)
+  })
+}
+
+for (const c of [
+  { source: 'miniapp_documents', line: '来自职易达小程序「我的文档」' },
+  { source: 'miniapp', line: '来自职易达小程序' },
+  { source: 'web', line: '来自手机网页' },
+  { source: undefined, line: null },
+  { source: 'something-new', line: null },
+] as const) {
+  test(`resume source phone received: file source ${String(c.source)} shows ${c.line ?? 'no source line'} and the not-yours reminder @w3-kiosk`, async ({ page, api }) => {
+    terminalBaseline(api)
+    api.respond('GET', '/api/v1/public/support-contact', supportContactMiniapp(true))
+    mockResumePhoneSession(api, 'uploaded', c.source)
+    await page.route('**/w3-fixtures/resume.pdf', (route) => route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }))
+    await page.goto('/resume/source')
+    await page.getByRole('button', { name: /在手机里/ }).click()
+    const panel = page.locator('.resume-source-phone-session')
+    await expect(panel.getByText('手机传来的简历.pdf', { exact: false }).first()).toBeVisible()
+    if (c.line) await expect(panel.getByText(c.line, { exact: true })).toBeVisible()
+    else await expect(panel).not.toContainText('来自')
+    // 提醒是事实陈述，不管小程序发没发布、来源认不认得，只要已收到文件就在文件名下面。
+    await expect(panel.getByText(NOT_YOUR_FILE_HINT, { exact: true })).toBeVisible()
+    // 提醒说的是「取消」，面板里要真有一个叫「取消」的按钮。
+    await expect(panel.getByRole('button', { name: '取消', exact: true })).toBeVisible()
+    await assertNoHorizontalOverflow(page)
+  })
+}

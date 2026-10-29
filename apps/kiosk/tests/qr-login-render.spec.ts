@@ -667,3 +667,46 @@ for (const [code, state] of [['SMS_CODE_INVALID', 'phone-code-invalid'], ['SMS_C
     else await expect(input).toBeDisabled()
   })
 }
+
+/*
+ * #1519 留给触屏版第五包的接线（ScanQrLoginPanel 第 2 步）：小程序已发布时这一步写「微信扫进小程序、别的扫法打开网页」，
+ * 句子来自 copy/miniappLinkCopy.ts 的 qrLoginScanHint；没发布保持原句。步骤清单不依赖二维码有没有出来。
+ */
+for (const published of [true, false]) {
+  test(`扫码登录第 2 步：小程序${published ? '已发布，写小程序那一句' : '未发布，保持原句'} @kiosk`, async ({ page, api }) => {
+    api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
+    api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
+    api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', { status: 200, json: { enabled: false, idleTimeoutSec: 180, items: [] } })
+    api.respond('GET', '/api/v1/public/support-contact', {
+      status: 200,
+      json: { success: true, data: { servicePhone: '18369161921', serviceHours: '工作日 9:00–18:00', otherOnlineTerminalNearby: false, miniappPublished: published } },
+    })
+    await page.route(LOCAL_QR_CREATE_URL, async (route) => {
+      if (await fulfillLocalQrPreflight(route)) return
+      const origin = route.request().headers().origin ?? 'http://127.0.0.1:4177'
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'Access-Control-Allow-Origin': origin },
+        body: JSON.stringify({ success: true, data: { ticketId: TICKET_ID, qrUrl: `/member/qr-login?ticketId=${TICKET_ID}`, expiresInSeconds: 180, returnTo: '/' } }),
+      })
+    })
+    api.respond('GET', `/api/v1/member/auth/qr/${TICKET_ID}/status`, {
+      status: 200,
+      json: { success: true, data: { status: 'pending', deviceLabel: 'KSK-001', returnTo: '/', expiresInSeconds: 180 } },
+    })
+
+    await page.goto('/login')
+    await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+    await page.getByRole('button', { name: '手机扫码登录', exact: true }).click()
+    const step2 = page.locator('.lg-steps li').nth(1)
+    if (published) {
+      await expect(step2).toContainText('用手机微信扫码：打开的是职易达小程序，已登录的直接确认；打开的是网页，用短信验证。')
+      await expect(step2).not.toContainText('用手机相机或微信扫左边的二维码')
+    } else {
+      await expect(step2).toContainText('用手机相机或微信扫左边的二维码，在手机上完成手机号验证并确认。')
+      await expect(step2).not.toContainText('小程序')
+    }
+    await expectNoHorizontalOverflow(page)
+  })
+}

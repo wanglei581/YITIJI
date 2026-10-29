@@ -6,6 +6,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { InfoIcon, Loader2Icon } from 'lucide-react'
 import { QxTouchCallout } from '../../../components/qingxu/touch/QxTouchCallout'
 import { QxTouchIcon } from '../../../components/qingxu/touch/QxTouchIcon'
+import { notYourFileHint, uploadedFileSourceLine } from '../../../copy/miniappLinkCopy'
 import type { FileSourceScreen, PhoneSessionView, UploadTab } from './fileSourceModel'
 import { ChannelGrid, FileRow } from './FileSourceBits'
 
@@ -119,7 +120,7 @@ export function PhoneBoard({
           {phone.pendingName ? (
             <FileRow
               name={phone.pendingName}
-              meta={`${phone.pendingSize ?? ''} · 手机扫码上传`}
+              meta={`${phone.pendingSize ?? ''} · ${uploadedFileSourceLine(phone.pendingSource) || '手机扫码上传'}`}
               tag=""
               tagTone="doing"
               mark="PDF"
@@ -135,6 +136,9 @@ export function PhoneBoard({
       ) : null}
       {screen === 'phone-uploaded' ? (
         <QxTouchCallout kind="fine">请核对文件名和大小。在这台机器上确认后，才能继续材料检查。确认前它还不是当前文件。</QxTouchCallout>
+      ) : null}
+      {screen === 'phone-uploaded' ? (
+        <QxTouchCallout kind="remind" icon="alert">{notYourFileHint()}</QxTouchCallout>
       ) : null}
       {screen === 'phone-cancel-failed' ? (
         <QxTouchCallout kind="remind" icon="alert">取消未成功，旧二维码可能仍有效。可以重试取消，或确认使用这份文件。</QxTouchCallout>

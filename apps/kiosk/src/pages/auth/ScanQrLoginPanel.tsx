@@ -9,6 +9,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { QrCodeIcon } from 'lucide-react'
 import { cancelQrFetch, deriveQrGateState, type LoginQrState } from './loginGateModel'
 import { QRCodeSVG } from 'qrcode.react'
+import { qrLoginScanHint } from '../../copy/miniappLinkCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import {
   type LoginResult,
   MemberApiError,
@@ -44,6 +46,7 @@ export function ScanQrLoginPanel({
   onPhaseChange?: (phase: LoginQrState) => void
   onRegisterRefresh?: (refresh: () => void) => void
 }) {
+  const supportContact = useSupportContact()
   const [qr, setQr] = useState<QrLoginState | null>(null)
   const [loading, setLoading] = useState(false)
   const [claiming, setClaiming] = useState(false)
@@ -243,7 +246,7 @@ export function ScanQrLoginPanel({
       <div className="qrside">
         <ol className="lg-steps">
           <li><span className="sn">1</span><span>勾选上方协议后，左边会显示登录二维码。</span></li>
-          <li><span className="sn">2</span><span>用手机相机或微信扫左边的二维码，在手机上完成手机号验证并确认。</span></li>
+          <li><span className="sn">2</span><span>{qrLoginScanHint(supportContact) || '用手机相机或微信扫左边的二维码，在手机上完成手机号验证并确认。'}</span></li>
           <li><span className="sn">3</span><span>手机上确认后，回到这台机器等待页面跳转。</span></li>
         </ol>
         <p className="lg-qr-note">手机上的确认不等于你已经登录；短信验证码验证的是这个号码能收到短信。请回到这台机器等待登录结果。</p>

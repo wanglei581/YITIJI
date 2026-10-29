@@ -1,4 +1,5 @@
 import type { ReactNode, Ref } from 'react'
+import { uploadedFileSourceLine } from '../../../copy/miniappLinkCopy'
 import { helpNeededLine, printProblemLine, whenMiniapp } from '../../../copy/unattendedCopy'
 import { useSupportContact } from '../../../hooks/useSupportContact'
 import { SparklesIcon } from 'lucide-react'
@@ -327,7 +328,7 @@ export function FileSourceView(props: FileSourceViewProps) {
     'phone-confirm-failed': {
       retry: onPhoneConfirm,
       alt: onPhoneRefresh,
-      file: phone.pendingName ? { name: phone.pendingName, meta: `${phone.pendingSize ?? ''} · 手机扫码上传`, testId: 'file-source-phone-file' } : null,
+      file: phone.pendingName ? { name: phone.pendingName, meta: `${phone.pendingSize ?? ''} · ${uploadedFileSourceLine(phone.pendingSource) || '手机扫码上传'}`, testId: 'file-source-phone-file' } : null,
     },
     'usb-import-failed': {
       retry: onUsbRescan,

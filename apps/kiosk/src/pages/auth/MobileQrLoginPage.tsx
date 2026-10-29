@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ShieldCheckIcon } from 'lucide-react'
+import { PLATFORM_BRAND_NAME } from '../../copy/miniappLinkCopy'
 import { sendSmsCode } from '../../services/auth/memberAuthApi'
 import { confirmQrLogin, fetchQrLoginStatus } from '../../services/auth/memberQrLoginApi'
 import {
@@ -225,9 +226,9 @@ export function MobileQrLoginPage() {
     <main className="fusion-w5 fusion-w5--auth service-desk k1-mobile-qr-login" data-qx-page="phone-login" data-kiosk-screen="member-qr-login" data-visual-theme="service-desk" data-ux-density="touch" data-kiosk-presentation="fusion-youth" data-kiosk-viewport="mobile" data-mobile-qr-state={s.state}>
       <section className="k1-mobile-qr-content">
         <header className="k1-mobile-qr-relaybar">
-          <span className="k1-mobile-qr-seal" aria-hidden="true">职</span>
+          <span className="k1-mobile-qr-seal" aria-hidden="true">{PLATFORM_BRAND_NAME.slice(0, 1)}</span>
           <div className="k1-mobile-qr-brand">
-            <strong>职易达</strong>
+            <strong>{PLATFORM_BRAND_NAME}</strong>
             <small><span>手机确认登录</span><span> · {chrome.suffix}</span></small>
           </div>
           <span className="k1-mobile-qr-tag">{chrome.tag}</span>

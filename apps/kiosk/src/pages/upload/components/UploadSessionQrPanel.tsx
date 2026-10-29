@@ -4,6 +4,8 @@ import { CheckCircleIcon, Loader2Icon, RefreshCwIcon, SmartphoneIcon, XCircleIco
 import type { FilePurpose, UploadSessionStatusResponse } from '@ai-job-print/shared'
 import { Button, Card } from '@ai-job-print/ui'
 import { useAuth } from '../../../auth/useAuth'
+import { notYourFileHint, phoneUploadScanHint, uploadedFileSourceLine } from '../../../copy/miniappLinkCopy'
+import { useSupportContact } from '../../../hooks/useSupportContact'
 import { getTerminalId } from '../../../services/api/screensaver'
 import {
   buildPhoneUploadQrUrl,
@@ -133,6 +135,7 @@ export function UploadSessionQrPanel({
   busyWhen = 'session',
 }: UploadSessionQrPanelProps) {
   const { getToken, isLoggedIn } = useAuth()
+  const supportContact = useSupportContact()
   const pollFailuresRef = useRef(0)
   const qrRef = useRef<QrState | null>(null)
   const statusRef = useRef<UploadSessionStatusResponse | null>(null)
@@ -333,6 +336,11 @@ export function UploadSessionQrPanel({
   const uploadedFile = status?.status === 'uploaded' ? status.file : null
   const uploaded = Boolean(uploadedFile)
   const expired = status?.status === 'expired'
+  // 小程序已发布时，码旁说明讲清「微信扫进小程序、别的扫法打开网页」；空串（未发布或读不到联系方式）就保持原句。
+  const scanHint = phoneUploadScanHint(supportContact)
+  // 手机传来文件后，文件名下面那一行来源（读不到来源就不写）和「不是你传的就取消」的提醒：旁人拍到屏上的码也可能抢在本人之前传，
+  // 现场没有人，只能靠本人认出来、点取消。句子都来自 copy/miniappLinkCopy.ts，这里不手写。
+  const sourceLine = uploadedFileSourceLine(uploadedFile?.source)
   // 最新的确认函数放进 ref（在 effect 里写，不在渲染期写）；交给页面的 confirmNow 稳定不变，点下去读到的总是最新的那个。
   useEffect(() => {
     handleConfirmRef.current = handleConfirm
@@ -376,7 +384,7 @@ export function UploadSessionQrPanel({
         <div className="flex min-w-0 flex-col justify-between rounded-2xl bg-neutral-50 p-4">
           <div>
             <p className="text-sm font-bold text-neutral-900">
-              {uploaded ? '手机端已上传文件' : expired ? '二维码已过期' : '请用手机微信或浏览器扫码'}
+              {uploaded ? '手机端已上传文件' : expired ? '二维码已过期' : (scanHint || '请用手机微信或浏览器扫码')}
             </p>
             <p className="mt-2 text-sm leading-relaxed text-neutral-600">
               {uploaded
@@ -385,6 +393,8 @@ export function UploadSessionQrPanel({
                   ? '请刷新二维码后重新上传，旧二维码不再接收文件。'
                   : `二维码有效期 ${expiresLabel || '10:00'}，文件最大 10MB。`}
             </p>
+            {uploaded && sourceLine ? <p className="mt-1 text-sm leading-relaxed text-neutral-600">{sourceLine}</p> : null}
+            {uploaded ? <p className="mt-1 text-sm font-semibold leading-relaxed text-neutral-700">{notYourFileHint()}</p> : null}
             {error && (
               <div className="mt-3 flex items-start gap-2 rounded-xl bg-error-bg px-3 py-2 text-sm font-semibold text-error-fg">
                 <XCircleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />

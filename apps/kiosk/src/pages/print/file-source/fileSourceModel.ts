@@ -69,6 +69,8 @@ export interface PhoneSessionView {
   hasQr: boolean
   pendingName: string | null
   pendingSize: string | null
+  /** 手机传来的这份文件从哪来（服务端判定、只作提示）；读不到为 null，文件行就保持「手机扫码上传」。 */
+  pendingSource: string | null
 }
 
 export interface FileSourceDeriveInput {

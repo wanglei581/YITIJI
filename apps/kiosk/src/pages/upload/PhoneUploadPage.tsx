@@ -18,6 +18,7 @@ import {
   UploadIcon,
   type LucideIcon,
 } from 'lucide-react'
+import { PLATFORM_BRAND_NAME } from '../../copy/miniappLinkCopy'
 import { uploadPhoneSessionFile, uploadSessionUserMessage } from '../../services/api/uploadSessions'
 import {
   useDocumentConversionCapabilities,
@@ -268,9 +269,9 @@ export function PhoneUploadPage() {
     <main className="fusion-w5 fusion-w5--auth k1-phone-upload service-desk" data-qx-page="phone-upload" data-kiosk-screen="phone-upload" data-visual-theme="service-desk" data-ux-density="touch" data-kiosk-presentation="fusion-youth" data-kiosk-viewport="mobile" data-phone-upload-state={issue ?? s.state} data-purpose={s.confirmed ?? 'unconfirmed'} data-purpose-confirmed={s.confirmed ? '1' : '0'}>
       <section className="k1-phone-upload-content">
         <header className="ph-up-relaybar">
-          <span className="ph-up-seal" aria-hidden="true">职</span>
+          <span className="ph-up-seal" aria-hidden="true">{PLATFORM_BRAND_NAME.slice(0, 1)}</span>
           <div className="ph-up-brand">
-            <strong>职易达</strong>
+            <strong>{PLATFORM_BRAND_NAME}</strong>
             <small>{chrome.sub}</small>
           </div>
           <span className="ph-up-tag">{chrome.tag}</span>
