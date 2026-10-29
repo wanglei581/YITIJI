@@ -57,6 +57,7 @@ export interface PublicKioskProfile extends PublicBrand {
   licenseState: KioskLicenseState | null
   acceptsNewSessions: boolean
   currentSessionMayContinue: boolean
+  currentSessionEndsAt: string | null
   noticeLine: string | null
 }
 

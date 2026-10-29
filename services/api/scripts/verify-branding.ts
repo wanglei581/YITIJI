@@ -62,7 +62,7 @@ const c = new Checker()
 
 const SETTING_KEYS = Object.values(local.BRAND_SETTING_KEYS)
 /** 公开响应里绝不能出现的东西：机构名、机构号、终端号、点位名（验签通过的响应里点位名是预期内容，单独核）。 */
-const KIOSK_PROFILE_KEYS = ['acceptsNewSessions', 'brandName', 'brandMark', 'currentSessionMayContinue', 'filing', 'licenseState', 'location', 'logoUrl', 'noticeLine']
+const KIOSK_PROFILE_KEYS = ['acceptsNewSessions', 'brandName', 'brandMark', 'currentSessionEndsAt', 'currentSessionMayContinue', 'filing', 'licenseState', 'location', 'logoUrl', 'noticeLine']
 const PUBLIC_BRAND_KEYS = ['brandName', 'brandMark', 'logoUrl']
 
 function read(path: string): string {
@@ -224,7 +224,7 @@ async function main(): Promise<void> {
     const anonymous = await profileOf()
     c.equal('未验签的 kiosk-profile = 平台默认 + 默认备案 + 没有点位 + 没有授权状态', anonymous.json.data, {
       brandName: '职易达', brandMark: '职', logoUrl: null, filing: local.DEFAULT_BRANDING_FILING, location: null, licenseState: null,
-      acceptsNewSessions: true, currentSessionMayContinue: false, noticeLine: null,
+      acceptsNewSessions: true, currentSessionMayContinue: false, currentSessionEndsAt: null, noticeLine: null,
     })
     c.check('kiosk-profile 不许被共享缓存', anonymous.headers.get('cache-control') === 'private, no-store')
     const adminDefault = await call('GET', '/api/v1/admin/branding', { token: adminToken() })
@@ -234,7 +234,8 @@ async function main(): Promise<void> {
     const verifiedDefault = await profileOf(termB, tokenB)
     c.check('机构没覆盖时已验签终端也拿到平台默认品牌，点位取 locationLabel/displayName，授权状态 ok',
       verifiedDefault.json.data.brandName === '职易达' && verifiedDefault.json.data.location === LOC_B && verifiedDefault.json.data.licenseState === 'ok' &&
-      verifiedDefault.json.data.acceptsNewSessions === true && verifiedDefault.json.data.currentSessionMayContinue === true && verifiedDefault.json.data.noticeLine === null)
+      verifiedDefault.json.data.acceptsNewSessions === true && verifiedDefault.json.data.currentSessionMayContinue === true && verifiedDefault.json.data.noticeLine === null &&
+      typeof verifiedDefault.json.data.currentSessionEndsAt === 'string' && Date.parse(verifiedDefault.json.data.currentSessionEndsAt) > Date.now() - 60_000)
 
     // ── 3. 平台修改生效、审计、清空 ──────────────────────────────────────────
     console.log('\n[3] 平台修改')
@@ -264,7 +265,7 @@ async function main(): Promise<void> {
     const afterClear = await profileOf()
     c.equal('清空后公开接口回到默认', afterClear.json.data, {
       brandName: '职易达', brandMark: '职', logoUrl: null, filing: local.DEFAULT_BRANDING_FILING, location: null, licenseState: null,
-      acceptsNewSessions: true, currentSessionMayContinue: false, noticeLine: null,
+      acceptsNewSessions: true, currentSessionMayContinue: false, currentSessionEndsAt: null, noticeLine: null,
     })
     c.check('非管理员 PUT → 403', (await put({ brandName: '偷改' }, partnerToken())).status === 403)
     c.check('非管理员 GET → 403', (await call('GET', '/api/v1/admin/branding', { token: partnerToken() })).status === 403)
@@ -511,11 +512,43 @@ async function main(): Promise<void> {
     c.equal('跨场景 ④：续期被拒 403 TERMINAL_LICENSE_INACTIVE', await codeOf(() => sessions.refresh(termL, tokenL)), '403:TERMINAL_LICENSE_INACTIVE')
     const gone = (await profileOf(termL, 'expired-or-ended-' + 'x'.repeat(27))).json.data
     c.equal('跨场景 ⑤：会话结束后再问（令牌已无效）：没有可继续的会话，也不知道授权状态', [gone.licenseState, gone.currentSessionMayContinue, gone.acceptsNewSessions, gone.noticeLine], [null, false, true, null])
-    c.check('profile 里只有状态，没有到期日 / 台数 / 合同等商务细节', !/endsAt|expire|quota|startsAt|contract|credit|licensee/i.test(JSON.stringify((await profileOf(termL, tokenL)).json.data)))
+    c.equal('跨场景 ⑤（续）：未验签时没有凭证到期时刻', gone.currentSessionEndsAt, null)
+    const { currentSessionEndsAt: credentialEndsAt, ...commercialView } = (await profileOf(termL, tokenL)).json.data
+    c.check('profile 里只有状态，没有授权到期日 / 台数 / 合同等商务细节（currentSessionEndsAt 是会话凭证的到期时刻，不是授权的）',
+      !/endsAt|expire|quota|startsAt|contract|credit|licensee/i.test(JSON.stringify(commercialView)) && typeof credentialEndsAt === 'string')
     c.equal('未验签的请求拿不到授权状态', (await profileOf(termL, 'x'.repeat(40))).json.data.licenseState, null)
+
+    // ── 6c. 办理中授权失效：凭证到期前照常、续期被拒、到期后下一位被拦 ─────────────
+    console.log('\n[6c] 办理中授权失效的跨端路径（凭证 30 分钟，到期后不再续期）')
+    const MIN = 60_000
+    const termL2 = `t_br_l2_${suffix}`
+    await prisma.terminal.create({ data: mk(termL2, orgL, `授权点位二${suffix}`, null) })
+    let simNow = T0 + 55 * DAY - 10 * MIN // 授权已到期、宽限还剩 10 分钟：此刻还能签发
+    setLicenseClock(() => new Date(simNow))
+    redis.ttlClock = () => simNow
+    const issuedMs = simNow
+    const tokenS = await sessionOf(termL) // 群众开始办理：签发一张 30 分钟的凭证
+    const endsIso = new Date(issuedMs + 30 * MIN).toISOString()
+    const sBefore = (await profileOf(termL, tokenS)).json.data
+    c.equal('① 办理开始（授权仍在宽限内）：能开新会话，凭证到期时刻 = 签发后 30 分钟', [sBefore.acceptsNewSessions, sBefore.currentSessionMayContinue, sBefore.currentSessionEndsAt], [true, true, endsIso])
+    simNow = T0 + 55 * DAY // 宽限结束，授权失效——办理还在进行
+    const sMid = (await profileOf(termL, tokenS)).json.data
+    c.equal('② 办理中授权失效：当前请求照常（validate 通过），profile 不许新业务、允许当前凭证继续，到期时刻不变',
+      [await codeOf(() => sessions.validate(termL, tokenS)), sMid.licenseState, sMid.acceptsNewSessions, sMid.currentSessionMayContinue, sMid.currentSessionEndsAt], ['ok', 'inactive', false, true, endsIso])
+    simNow = issuedMs + 29 * MIN // 凭证还剩 1 分钟
+    c.equal('③ 凭证将到期：续期被拒 403 TERMINAL_LICENSE_INACTIVE，当前凭证在到期前仍可用',
+      [await codeOf(() => sessions.refresh(termL, tokenS)), await codeOf(() => sessions.validate(termL, tokenS))], ['403:TERMINAL_LICENSE_INACTIVE', 'ok'])
+    simNow = issuedMs + 31 * MIN // 凭证已到期
+    const sAfter = (await profileOf(termL, tokenS)).json.data
+    c.equal('④ 凭证到期后：请求 401，profile 当作未验签（没有可继续的凭证、没有到期时刻）',
+      [await codeOf(() => sessions.validate(termL, tokenS)), sAfter.licenseState, sAfter.currentSessionMayContinue, sAfter.currentSessionEndsAt], ['401:TERMINAL_SESSION_INVALID', null, false, null])
+    c.equal('⑤ 到期后新会话被拒（同一台，换票）', await codeOf(async () => sessions.exchangeBootTicket((await sessions.createBootTicket(termL, 'Bearer fixture')).bootTicket)), '403:TERMINAL_LICENSE_INACTIVE')
+    c.equal('⑥ 下一位用户被拦（同机构的另一台终端换票）', await codeOf(() => sessionOf(termL2)), '403:TERMINAL_LICENSE_INACTIVE')
+    c.equal('⑦ 正向对照：没有授权管控的机构的终端不受影响', await codeOf(() => sessionOf(termA)), 'ok')
+    redis.ttlClock = null
     setLicenseClock(null)
     await prisma.license.deleteMany({ where: { orgId: orgL } })
-    await prisma.terminal.deleteMany({ where: { id: termL } })
+    await prisma.terminal.deleteMany({ where: { id: { in: [termL, termL2] } } })
     await prisma.organization.deleteMany({ where: { id: orgL } })
 
     // ── 7. 未验签 / 伪造 / 不泄露 ───────────────────────────────────────────
@@ -530,7 +563,7 @@ async function main(): Promise<void> {
       const body = JSON.stringify(r.json.data)
       c.check(`${label}：只拿平台默认，没有点位 / 授权状态，且不含任何机构或终端信息`,
         r.status === 200 && r.json.data.location === null && r.json.data.licenseState === null && r.json.data.brandName === '平台通用名' &&
-        r.json.data.acceptsNewSessions === true && r.json.data.currentSessionMayContinue === false && r.json.data.noticeLine === null &&
+        r.json.data.acceptsNewSessions === true && r.json.data.currentSessionMayContinue === false && r.json.data.noticeLine === null && r.json.data.currentSessionEndsAt === null &&
         hiddenWords.every((word) => !body.includes(word)), body)
     }
     for (const [label, r, keys] of [['kiosk-profile（未验签）', anonymous, KIOSK_PROFILE_KEYS], ['kiosk-profile（已验签）', await profileOf(termA, tokenA), KIOSK_PROFILE_KEYS], ['public/brand', await call('GET', '/api/v1/public/brand'), PUBLIC_BRAND_KEYS]] as const) {

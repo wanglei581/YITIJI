@@ -76,15 +76,19 @@ export const KIOSK_PAUSED_NOTICE_LINE = '这台机器暂时不能用。'
  * 按「机构覆盖 → 平台默认」解析，location 取该终端的点位名（locationLabel，其次 displayName），并带授权块。
  * 没带或验不过：只给平台默认品牌，location 与 licenseState 一律 null（防止枚举终端拿到点位与机构）。
  *
- * 授权块把「不让开始新业务」和「让在办的人办完」拆成两个信号：
+ * 授权块把「不让开始新业务」和「当前凭证不被打断」拆成信号（口径要说准：**不是不限时地办完**）：
  *   acceptsNewSessions         此刻能否开始新会话（换票 / 续期）。ok / grace / 不管控 = true；inactive = false。
  *                              未验签时恒为 true——表示「不知道、不拦」，真正的闸门在签发新会话那一步（403 TERMINAL_LICENSE_INACTIVE）。
- *   currentSessionMayContinue  本请求带的会话是否仍可用到自然结束。验签通过（会话有效）= true，授权已不可用时也是 true；未验签 = false。
+ *   currentSessionMayContinue  本请求带的**当前凭证**有效期内不打断。验签通过（凭证有效）= true，授权已不可用时也是 true；未验签 = false。
+ *                              凭证到期后不再续期（续期也是「签发新会话」，会被拒）——它不等于群众的一次业务能办到结束。
+ *   currentSessionEndsAt       当前凭证的到期时刻（ISO 8601，签发后最长 30 分钟）；未验签 = null。授权失效后它就是「还能用到什么时候」的上限。
  *   noticeLine                 屏上用的如实说法（KIOSK_PAUSED_NOTICE_LINE）；acceptsNewSessions 为 false 时有值，其余 null。
  *
- * 前端规则（授权不可用时）：**不打断当前会话**——acceptsNewSessions 为 false 而 currentSessionMayContinue 为 true 时，
- * 在办的人照常办完；等当前会话结束（主动退出、超时、交接）之后，才进静态「暂停服务」屏，显示 noticeLine，待机屏停播宣传。
- * 换新会话（换票 / 续期）会被服务端拒绝，不要在前端自己重试。
+ * 前端规则（acceptsNewSessions 为 false 时）：
+ *   1. 不打断当前凭证下正在进行的办理，但**不再开始新的办理**（入口置灰）；
+ *   2. 进行中的办理要在 currentSessionEndsAt 之前收尾——临近到期（例如剩 5 分钟）时提示用户尽快完成 / 保存，到点后续期会被拒、请求会 401；
+ *   3. 当前凭证到期（或主动退出、超时、交接）之后，才进静态「暂停服务」屏，显示 noticeLine，待机屏停播宣传；
+ *   4. 换新会话（换票 / 续期）一律被服务端拒绝，不要在前端自己重试。
  */
 export interface PublicKioskProfile extends PublicBrand {
   filing: BrandingFiling
@@ -92,6 +96,7 @@ export interface PublicKioskProfile extends PublicBrand {
   licenseState: KioskLicenseState | null
   acceptsNewSessions: boolean
   currentSessionMayContinue: boolean
+  currentSessionEndsAt: string | null
   noticeLine: string | null
 }
 

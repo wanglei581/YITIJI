@@ -13,6 +13,22 @@ export class FakeRedis {
   readonly store = new Map<string, string>()
   /** 置 true 模拟 Redis 暂不可用：读写都抛错。 */
   down = false
+  /**
+   * 设成一个毫秒时钟函数，setEx 写进去的键就按它到期（默认 null = 不到期）。
+   * 门禁里用来模拟「30 分钟的会话凭证到点失效」；只对设置之后写入的键生效。
+   */
+  ttlClock: (() => number) | null = null
+  private readonly expireAt = new Map<string, number>()
+  /** 到过期点的键当作不存在。 */
+  private alive(key: string): boolean {
+    const at = this.expireAt.get(key)
+    if (this.ttlClock && at !== undefined && this.ttlClock() >= at) {
+      this.store.delete(key)
+      this.expireAt.delete(key)
+      return false
+    }
+    return true
+  }
 
   private check(): void {
     if (this.down) throw new Error('redis unavailable (fixture)')
@@ -24,18 +40,21 @@ export class FakeRedis {
 
   async get(key: string): Promise<string | null> {
     this.check()
-    return this.store.get(key) ?? null
+    return this.alive(key) ? (this.store.get(key) ?? null) : null
   }
 
-  async setEx(key: string, _ttl: number, value: string): Promise<void> {
+  async setEx(key: string, ttl: number, value: string): Promise<void> {
     this.check()
     this.store.set(key, value)
+    if (this.ttlClock) this.expireAt.set(key, this.ttlClock() + ttl * 1000)
+    else this.expireAt.delete(key)
   }
 
   async getDel(key: string): Promise<string | null> {
     this.check()
-    const value = this.store.get(key) ?? null
+    const value = this.alive(key) ? (this.store.get(key) ?? null) : null
     this.store.delete(key)
+    this.expireAt.delete(key)
     return value
   }
 
