@@ -49,7 +49,22 @@ function hooks() {
   }
 }
 
-const nav = load('src/pages/profile/me/aiRecordNavigation.ts')
+const nav = load('src/pages/profile/me/aiRecordNavigation.ts', { '../assets/format': load('src/pages/profile/assets/format.ts') })
+
+// 10/29 本机走查 I-27：「我的简历」一行标题曾带诊断记录编号的尾 8 位（d84c8295），普通人看不懂，多份时又只靠它区分。
+// 现在靠做出来的时间区分；编号是内部工程信息，不上屏，时间读不出来也只写类型、不退回编号。
+test('resume row label tells copies apart by time and never shows the internal task id', () => {
+  const first = { kind: 'parse', taskId: 'cmoj9x2k0001abcd84c8295', createdAt: '2026-10-29T10:27:00.000Z' }
+  const second = { kind: 'parse', taskId: 'cmoj9x2k0002zz51f0e7ab', createdAt: '2026-10-29T11:05:00.000Z' }
+  const label = nav.resumeLabel(first)
+  assert.doesNotMatch(label, /d84c8295/)
+  assert.doesNotMatch(label, /[0-9a-f]{8}/i)
+  assert.match(label, /^上传诊断简历 · \d{1,2}月\d{1,2}日 \d{2}:\d{2}$/)
+  assert.notEqual(label, nav.resumeLabel(second), '同一天的两份要靠时刻区分，不靠编号')
+  assert.match(nav.resumeLabel({ ...first, kind: 'generate' }), /^AI 生成简历 · \d{1,2}月\d{1,2}日 \d{2}:\d{2}$/)
+  assert.equal(nav.resumeLabel({ ...first, createdAt: 'bad' }), '上传诊断简历')
+})
+
 test('six result types carry the selected task; expired/failed/processing cannot open', () => {
   for (const kind of ['parse', 'optimize', 'generate', 'job_fit', 'career_plan', 'self_assessment']) {
     const item = { kind, taskId: 'A/&?', status: 'completed', expiresAt: '2099-01-01' }
