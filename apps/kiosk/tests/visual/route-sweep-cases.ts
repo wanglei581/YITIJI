@@ -15,6 +15,9 @@ export interface SweepCase {
  */
 const PARAM_SAMPLES = {
   '/legal/:doc': '/legal/privacy',
+  // 一体机手机码短链中转：/k/u 夹具兑换回 503，停在本页「网络失败 + 重试」；/k/l 用格式不对的票据，停在本页说明句。
+  '/k/u/:scene': '/k/u/sweepSceneToken_0123456',
+  '/k/l/:ticketId': '/k/l/sweep-not-a-kiosk-ticket',
   '/me/activity/:id': '/me/activity/sweep-record',
   '/activities/:id': '/activities/activity-001',
   '/smart-campus/service/:key': '/smart-campus/service/campus-card',
