@@ -29,3 +29,12 @@
 }
 .btn-primary { background: #1677ff; color: #fff; }
 .btn-secondary { background: #eef2ff; color: #1677ff; }
+
+/* 从我的文档选（2026-10-29）：第二张卡与上一张隔开；行沿用 .sent-item 的底色与圆角，
+   左对齐、可点高度不低于 96rpx（CLAUDE.md §9）。只用本页已有的间距与 app.wxss 现有变量。 */
+.doc-card { margin-top: 24rpx; }
+.doc-list { text-align: left; }
+.doc-item { min-height: 96rpx; }
+.doc-meta { font-size: var(--fs-sm); color: var(--muted); }
+/* 收据标题里带文件名：没有空格的长文件名也要能折行 */
+.sent-title { word-break: break-all; }

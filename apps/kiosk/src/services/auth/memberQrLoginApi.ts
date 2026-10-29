@@ -135,10 +135,25 @@ export function confirmQrLogin(
   )
 }
 
+/** 一体机登录票据格式：服务端 randomBytes(24) 的 base64url 为 32 位，这里留出余量；手机码路径只认这个字符集。 */
+const QR_LOGIN_TICKET_PATTERN = /^[A-Za-z0-9_-]{32,96}$/
+
+export function isQrLoginTicketId(value: unknown): value is string {
+  return typeof value === 'string' && QR_LOGIN_TICKET_PATTERN.test(value)
+}
+
+/**
+ * 一体机屏上扫码登录码的地址。
+ * qrUrl 里取得到合格票据：`<公网基址>/k/l/<票据>`。微信「扫普通链接二维码打开小程序」规则生效时扫码直接进小程序；
+ * 没生效或用别的软件扫，打开网页中转页 /k/l/:ticketId，再转到 /member/qr-login?ticketId=…。
+ * 取不到合格票据：照旧把 qrUrl 落到公网基址上。
+ */
 export function buildQrLoginUrl(qrUrl: string): string {
   const configured = (import.meta.env['VITE_QR_LOGIN_PUBLIC_BASE_URL'] ?? '').trim()
   const base = parseQrLoginPublicBase(configured)
   const candidate = new URL(qrUrl, base)
+  const ticketId = candidate.searchParams.get('ticketId')
+  if (isQrLoginTicketId(ticketId)) return new URL(`/k/l/${ticketId}`, base).toString()
   if (candidate.origin === base.origin) return candidate.toString()
   return new URL(`${candidate.pathname}${candidate.search}${candidate.hash}`, base).toString()
 }

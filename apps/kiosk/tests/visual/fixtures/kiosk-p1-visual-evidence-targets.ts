@@ -198,6 +198,25 @@ export const routeEvidenceDispositions: readonly RouteEvidenceDisposition[] = [
   route('/login', ['15', '15A'], '/login'),
   route('/member/qr-login', ['63'], '/member/qr-login?ticketId=evidence-ticket'),
   route('/upload/phone', ['62']),
+  // 2026-10-29 一体机手机码短链的两个网页中转页：2026-07 原型集里没有对应稿，只登记生产侧证据与原型缺口，不认领截图对。
+  routeDisposition({
+    routePattern: '/k/u/:scene',
+    referenceKind: 'NO_INDEPENDENT_PROTOTYPE',
+    targetIds: [],
+    captureUrl: '/k/u/evidenceSceneToken_012345',
+    precondition: 'Intercept POST /api/v1/upload-sessions/scene/resolve; a resolved scene replaces itself with /upload/phone, an unusable one stays on this transit page.',
+    claimScope: 'Production-only transit route evidence and explicit prototype-gap record.',
+    knownLimits: 'No independent prototype exists; no screenshot pair may be claimed.',
+  }),
+  routeDisposition({
+    routePattern: '/k/l/:ticketId',
+    referenceKind: 'NO_INDEPENDENT_PROTOTYPE',
+    targetIds: [],
+    captureUrl: '/k/l/evidence-not-a-kiosk-ticket',
+    precondition: 'A well-formed ticket replaces itself with /member/qr-login?ticketId=…; a malformed one stays on this transit page.',
+    claimScope: 'Production-only transit route evidence and explicit prototype-gap record.',
+    knownLimits: 'No independent prototype exists; no screenshot pair may be claimed.',
+  }),
   route('/legal/:doc', ['59'], '/legal/privacy'),
   route('/resume/job-fit', ['55']),
   // S2-2 拆页，2026-07 原型冻结之后新增：本合同的原型集内没有对应文件，只登记生产侧证据与原型缺口，不认领截图对。

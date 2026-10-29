@@ -6,7 +6,7 @@ import { Button, Card } from '@ai-job-print/ui'
 import { useAuth } from '../../../auth/useAuth'
 import { getTerminalId } from '../../../services/api/screensaver'
 import {
-  buildPhoneUploadUrl,
+  buildPhoneUploadQrUrl,
   cancelUploadSession,
   confirmUploadSession,
   createUploadSession,
@@ -218,7 +218,7 @@ export function UploadSessionQrPanel({
         sessionId: created.sessionId,
         uploadToken: created.uploadToken,
         controlToken: created.controlToken,
-        qrUrl: buildPhoneUploadUrl(created.uploadUrl, created.sessionId, created.uploadToken, purpose),
+        qrUrl: buildPhoneUploadQrUrl(created, purpose),
         expiresAt: created.expiresAt,
       })
       setStatus({

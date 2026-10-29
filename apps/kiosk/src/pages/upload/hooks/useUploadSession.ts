@@ -3,7 +3,7 @@ import type { FilePurpose, UploadSessionStatusResponse } from '@ai-job-print/sha
 import { useAuth } from '../../../auth/useAuth'
 import { getTerminalId } from '../../../services/api/screensaver'
 import {
-  buildPhoneUploadUrl,
+  buildPhoneUploadQrUrl,
   cancelUploadSession,
   confirmUploadSession,
   createUploadSession,
@@ -243,7 +243,7 @@ export function useUploadSession({
         sessionId: created.sessionId,
         uploadToken: created.uploadToken,
         controlToken: created.controlToken,
-        qrUrl: buildPhoneUploadUrl(created.uploadUrl, created.sessionId, created.uploadToken, purpose),
+        qrUrl: buildPhoneUploadQrUrl(created, purpose),
         expiresAt: created.expiresAt,
       })
       setStatus({

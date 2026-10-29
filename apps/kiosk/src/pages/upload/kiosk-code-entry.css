@@ -1,0 +1,15 @@
+/* KioskCodeEntryPage —— 一体机手机码的网页中转（/k/u/:scene、/k/l/:ticketId）。
+ * 版面照用 phone-upload-service-desk.css 的类与令牌，这里只补那份样式里没有的「重试」按钮：
+ * 尺寸与配色照扫码登录页的「重新检查二维码」（mobile-qr-service-desk.css 的 .k1-mobile-qr-retry），
+ * 只用 .k1-phone-upload 上已有的令牌，不新增颜色值。触控高 52px（≥48）。 */
+
+.k1-phone-upload .ph-entry-retry {
+  display: flex; width: 100%; min-height: 52px; align-items: center; justify-content: center; margin-top: 16px;
+  border: 1px solid var(--m-line2); border-radius: 16px; color: var(--m-ink); background: var(--m-surface);
+  font-size: 16px; font-weight: 800; letter-spacing: 1px; transition: transform 120ms var(--m-ease);
+}
+.k1-phone-upload .ph-entry-retry:active { transform: scale(.975); }
+
+@media (prefers-reduced-motion: reduce) {
+  .k1-phone-upload .ph-entry-retry { transition: none; }
+}
