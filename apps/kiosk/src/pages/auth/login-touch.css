@@ -47,8 +47,24 @@
    放不下时由 .qx-scroll 滚动，不压插画。默认态的空间靠上面的字段一行排、小标题只给读屏换出来。 */
 .qxt-screen[data-qx-page='login'] .lg-fact { min-height: 224px; overflow: hidden; }
 .qxt-screen[data-qx-page='login'] .lg-fact .qxp-artbox { min-height: 96px; }
-/* 非空闲态：这一张吸收余高，插画随卡高 */
-.qxt-screen[data-qx-page='login'] .qx-scroll > .lg-absorb { flex: 1 1 0; min-height: 150px; }
+/* 非空闲态：这一张吸收余高，卡高不低于内容（放不下由 .qx-scroll 滚动，不压插画，同上面四张「记在哪」卡）。 */
+.qxt-screen[data-qx-page='login'] .qx-scroll > .lg-absorb { flex: 1 0 auto; min-height: 150px; }
+/* 扫码态（等二维码、取码失败、取到码）：二维码区占去大半屏，余高只有 90–160，竖着排「标题 + 说明 + 插画」要 198，
+   插画被 .lg-fact 的 overflow:hidden 切掉一大半（Mac 苹方与 Qingxu Sans 都一样）。这里横排：插画在左、标题与说明在右，
+   插画随卡高（取到码、取码失败时约 110 高；还没勾协议时多一条提示，余高只剩约 90，插画跟着缩到约 58），整卡放得下，
+   不把页面撑出滚动条。卡高下限 86 = 上下内边距 28 + 小标题 + 一行说明。手机号态余高有 400 以上，仍然竖排。 */
+.qxt-screen[data-qx-page='login'] .qx-scroll[data-mode='qr'] > .lg-absorb {
+  flex: 1 1 auto;
+  min-height: 86px;
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  grid-template-rows: 1fr 1fr;
+  column-gap: 24px;
+  row-gap: 2px;
+}
+.qxt-screen[data-qx-page='login'] .qx-scroll[data-mode='qr'] > .lg-absorb > .qxp-artbox { grid-column: 1; grid-row: 1 / span 2; min-height: 0; }
+.qxt-screen[data-qx-page='login'] .qx-scroll[data-mode='qr'] > .lg-absorb > h2 { grid-column: 2; grid-row: 1; align-self: end; }
+.qxt-screen[data-qx-page='login'] .qx-scroll[data-mode='qr'] > .lg-absorb > .qxp-note { grid-column: 2; grid-row: 2; align-self: start; }
 .qxt-screen[data-qx-page='login'] .lg-fact .qxp-note { font-size: var(--qxt-fs-aux); line-height: 1.4; }
 
 /* 不登录也能办：三行入口，箭头靠右 */
@@ -79,6 +95,8 @@
   .qxt-screen[data-qx-page='login'] .lg-field > .lg-row { grid-column: 1; }
   .qxt-screen[data-qx-page='login'] .lg-facts { flex: none; grid-template-columns: 1fr; grid-template-rows: none; }
   .qxt-screen[data-qx-page='login'] .lg-fact { min-height: 200px; }
+  /* 扫码态横排卡：手机宽度下文字列窄、说明会折成两三行，卡高跟内容走，不收缩到内容以下。 */
+  .qxt-screen[data-qx-page='login'] .qx-scroll[data-mode='qr'] > .lg-absorb { flex: 1 0 auto; grid-template-columns: 96px minmax(0, 1fr); column-gap: 16px; }
   .qxt-screen[data-qx-page='login'] .lg-entries { flex-direction: column; }
   .qxt-screen[data-qx-page='login'] .lg-side { min-width: 132px; }
 }

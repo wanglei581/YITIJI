@@ -66,7 +66,12 @@ const FROZEN = new Map([
   // 没有支付状态的历史订单仍不算免费。原有导出、实付不推算、待退款常量都没改。
   // 冻结契约不放宽，仍逐字节校验，只是基线随有意改动前移。
   // 旧哈希 50f3278ee897efe7c10b90990d4aacab4e17e0e3a5758d0b2cafb7f3aab61a7b。
-  ['src/pages/profile/me/printOrders/paymentCopy.ts', 'e7737e8cc24952dc69e2d6a38aa46e556fa8accc5145da043a415e35dc9f2cc7'],
+  // 2026-10-29 触屏版集成后修复：PENDING_REFUND_EXPLANATION 的「退款由工作人员处理」改成稿里的说法「退款会按支付渠道处理」
+  // （docs/design/kiosk-touch-2026-10 的 fix-me.js 待退款说明；现场无人值守，屏上不写由工作人员处理）。
+  // 只改这一句，原有导出、实付不推算、不承诺到账天数都没动；求助句由详单在说明后面按标准句 1 加（服务电话）。
+  // 冻结契约不放宽，仍逐字节校验，只是基线随有意改动前移。
+  // 旧哈希 e7737e8cc24952dc69e2d6a38aa46e556fa8accc5145da043a415e35dc9f2cc7。
+  ['src/pages/profile/me/printOrders/paymentCopy.ts', '9b16f46cfdfd247e76963eb2ff2fb74571698499c76ab684d42bd12c03c714a9'],
   ['src/pages/profile/me/printOrders/statusRefresh.ts', '61c86d39d8a4c576ec9b9c2ca2b92d08ee463a6874737cc4a7df70e36103ad8f'],
   ['src/pages/home/components/ContinuePanel.tsx', 'd9fc437e98a25e9734494bbd6dece4d0c3649ea5fa616d57d4e97451c111eff3'],
   ['src/pages/home/components/kioskAppLaunch.ts', '5bb684513182d680b91c6f086d17d27e26caed8b6cf616eba79ea1fa3c0a3b6b'],

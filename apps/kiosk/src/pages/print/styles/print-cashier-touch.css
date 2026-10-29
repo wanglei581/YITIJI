@@ -154,6 +154,18 @@
   gap: 12px;
 }
 
+/* 付款区在触屏版是单列、按内容撑开。旧样式 cashier-qx.css 为两列版写的「没有支付工具的状态：付款区 flex:1 1 auto + max-height:620px，
+   金额卡 flex:1（基线 0）」，到单列里就把金额卡压到 75–110 高：说明句与价目明细被卡的 overflow:hidden 切掉（Mac 字体也一样）。
+   这里不夹高、不压：付款区按内容排，金额卡不收缩到内容以下；页面剩下的高度仍由页底的实物小样（PrintFillArt）吃掉。 */
+[data-qx-page='print-cashier'] .cashier-qx-paywrap:not(:has(.cashier-qx-instrument)) {
+  flex: none;
+  max-height: none;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-paywrap:not(:has(.cashier-qx-instrument)) .cashier-qx-amount {
+  flex: none;
+}
+
 /* 摘要卡：行自己带 22px 内边距，卡本身不再留边（.cashier-qx-group 的 12px 20px 写在后面，同权重会盖掉，所以加一层类名） */
 [data-qx-page='print-cashier'] .cashier-qx-group.pct-sum {
   padding: 0;
@@ -385,9 +397,12 @@
   text-align: left;
 }
 
+/* 金额卡在触屏版是浅底（--qxt-teal-wash）。旧样式 cashier-qx.css 的标签字色是按深底写的「纸色 58%」，叠在浅底上只有 1.02:1，几乎看不见；
+   这里取和下面说明句同一个 --qxt-ink-2（叠在浅底上 6.94:1）。 */
 [data-qx-page='print-cashier'] .cashier-qx-amount-lb {
   font-size: 22px;
   font-weight: 700;
+  color: var(--qxt-ink-2);
 }
 
 [data-qx-page='print-cashier'] .cashier-qx-amount-num {
@@ -407,9 +422,15 @@
   font-size: 20px;
 }
 
+/* 价目明细同样是浅底上的字：旧样式按深底写成「纸色 76%」与纸色，叠在浅底上是 1.03:1。名目取 --qxt-ink-2，小计取 --qxt-ink。 */
 [data-qx-page='print-cashier'] .cashier-qx-ledger > div {
   display: flex;
   justify-content: space-between;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-ledger > div > b {
+  color: var(--qxt-ink);
 }
 
 /* 侧注与折叠说明 */
@@ -436,6 +457,12 @@
   border-radius: 22px;
   background: var(--qxt-well);
   text-align: left;
+}
+
+/* 关着的折叠不排版。Chromium 对关着的 <details> 内容只跳过绘制，仍给它一份几何；本页页底的「更多订单信息」「付款说明」关着时，
+   里面的行（如「支付通道」）会在屏幕下沿冒出看不见的盒子，去掉苹方的字体栈下正好骑在 1920 线上，版式体检把它报成被裁。展开才排版。 */
+[data-qx-page='print-cashier'] .cashier-qx-more:not([open]) > :not(summary) {
+  display: none;
 }
 
 [data-qx-page='print-cashier'] .cashier-qx-more > summary {

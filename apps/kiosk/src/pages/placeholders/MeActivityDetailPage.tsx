@@ -130,9 +130,13 @@ export default function MeActivityDetailPage() {
       fine="投递 / 预约结果以来源平台为准，本系统不记录也不参与。离开 3 分钟没操作会自动退出。"
       ctabar={ctabar}
     >
-      <section className="me-detail-scroll">
-        <div className="me-page">{inner}</div>
-      </section>
+      {/* 登录门、读取中、读不到、没找到四态和别的记录页一样直接放在页面容器里，出口卡才能撑满余高；
+          只有真有这条记录时才进字段清单的滚动容器。 */}
+      {uiState === 'detail' ? (
+        <section className="me-detail-scroll">
+          <div className="me-page">{inner}</div>
+        </section>
+      ) : inner}
     </QxMePage>
   )
 }

@@ -37,20 +37,15 @@ import { useSupportContact } from '../../hooks/useSupportContact'
 function shownIssue(error: unknown, fallback: string): string {
   const raw = userMessageOf(error, fallback)
   // 这一码的固定句里有「请勿重复支付」。整句换成「请稍后重试」会在可能已扣款时教人再付一次。
-  // 只拿掉工作人员交接，核实路径留「支付账单」，求助改走服务电话。
+  // 码表里这一码的句子是标准句（说清未确认、请勿重复支付、核实路径在「支付账单」）：照用。
+  // 万一哪天表里的句子又带上叫人去找现场的人的话（词表 UNATTENDED_FORBIDDEN_PHRASES 判），退回下面不带的那一句，求助改走服务电话。
   if (errorCodeOf(error) === 'PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED') {
-    const kept = raw
-      .replace(/[，,]并联系现场工作人员核实该笔订单/g, '')
-      .replace(/请联系现场工作人员/g, '')
-      .replace(/联系现场工作人员/g, '')
-      .replace(/联系工作人员/g, '')
-      .replace(/[。．\s]+$/g, '')
-    const base = containsStaffHandoff(kept)
+    const base = containsStaffHandoff(raw)
       ? '支付结果尚未确认，可能已扣款。请勿重复支付，可在手机支付账单中核对'
-      : kept
+      : raw.replace(/[。．\s]+$/g, '')
     return `${base}。${printProblemLine()}`
   }
-  // 固定句末尾的「请联系现场工作人员」是找人口径：只拿掉这一截，留下说明原因的前半句，求助改走服务电话。
+  // 固定句末尾若带着叫人去找现场的人的那一截：只拿掉这一截，留下说明原因的前半句，求助改走服务电话。
   // 这样「这台机器的安全校验没通过」这类安全失败不会被泛化成「创建任务失败」，也不会被说成网络问题。
   const cause = raw.replace(/[，,]?(?:并|或)?(?:请)?联系(?:现场)?工作人员[^。]*$/, '').replace(/[。．\s]+$/g, '')
   if (cause && cause !== raw && !containsStaffHandoff(cause)) return `${cause}。${printProblemLine()}`
@@ -517,7 +512,7 @@ export function PrintCashierPage() {
 
   /** 订单已建、钱还没付成的那些状态。用户在这里最容易被困住：
    *  扫了码没付、付款码读不出、在等服务端确认——这几个分支下 secondaryAction
-   *  会落到「联系工作人员」，等于没有出口。青序流光迁移时（PR #933）把
+   *  会落到一个叫用户去找人的出口，等于没有站内出路。青序流光迁移时（PR #933）把
    *  main 上一直存在的「退出支付」整个丢了，privacy 用例
    *  kiosk-privacy-timeout.spec.ts:355 因此红。退出必须是**无条件**可达的：
    *  订单超时未支付会自动关闭、不扣款，用户有权直接走人。 */

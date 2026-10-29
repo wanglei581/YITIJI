@@ -473,7 +473,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/components/qingxu/touch/QxTouchOverlay.tsx` | `verify-profile-documents-inkpaper.mjs` |
 | `apps/kiosk/src/components/qingxu/touch/QxTouchTask.tsx` | `verify-fusion-home.mjs` |
 | `apps/kiosk/src/components/qingxu/touch/QxTouchTile.tsx` | `verify-kiosk-frontend-debt.mjs`<br/>`verify-service-entry-readiness.mjs` |
-| `apps/kiosk/src/copy/unattendedCopy.ts` | `verify-kiosk-feedback-entry.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-kiosk-unattended-copy.mjs`<br/>`verify-pickup-claim-error-coverage.mjs` |
+| `apps/kiosk/src/copy/unattendedCopy.ts` | `verify-kiosk-feedback-entry.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-kiosk-unattended-copy.mjs`<br/>`verify-pickup-claim-error-coverage.mjs`<br/>`verify-resume-decisions.mjs` |
 | `apps/kiosk/src/favorites/localFavorites.ts` | `verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/hooks/useAiAdvisorCallSession.ts` | `verify-ai-requests-terminal-session.mjs`<br/>`verify-assistant-trtc-guard.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-prod-build-config.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
 | `apps/kiosk/src/hooks/useApiReadiness.ts` | `verify-service-entry-readiness.mjs` |

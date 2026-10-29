@@ -100,7 +100,7 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
         <p className="me-note" role="status">
           <strong>{PENDING_REFUND_LABEL}</strong>
           {' '}
-          {isFreeMemberOrder(item) ? '本单已确认未出纸，退款由工作人员处理。' : PENDING_REFUND_EXPLANATION}
+          {PENDING_REFUND_EXPLANATION}。{helpNeededLine(contact)}。
         </p>
       )}
 

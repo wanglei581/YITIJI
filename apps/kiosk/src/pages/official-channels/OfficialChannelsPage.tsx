@@ -248,12 +248,12 @@ export function OfficialChannelsPage() {
           </>
         ) : null}
         {view === 'items' ? (
-          <section className="oc-sec" data-testid="official-channels-org" aria-label="本机构官方渠道">
+          <section className="oc-sec" data-testid="official-channels-org" aria-label="本机构官方渠道" style={{ flexGrow: items.length }}>
             <ChannelList items={items} kind="org" busyKey={busyKey} onRecheck={recheckCard} />
           </section>
         ) : null}
         {legacy.length > 0 ? (
-          <section className="oc-sec" data-testid="official-channels-legacy" aria-label="其他来源平台">
+          <section className="oc-sec" data-testid="official-channels-legacy" aria-label="其他来源平台" style={{ flexGrow: legacy.length }}>
             <K as="h2">其他来源平台 · 扫码后在该平台自行浏览</K>
             <ChannelList items={legacy} kind="legacy" busyKey={busyKey} onRecheck={recheckCard} />
           </section>

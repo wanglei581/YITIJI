@@ -2,6 +2,7 @@ import type { Locator, Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
+import { HELP_NEEDED_LINE, containsStaffHandoff } from '../fixtures/unattended-lines'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 import { FusionW5PaginationRoute } from './fixtures/fusion-w5-pagination-route'
 import { registerPrintConfirm } from './fixtures/fair-workbench-api'
@@ -1896,6 +1897,12 @@ test('orders: payment truth, pickup code, filters, detail, load-more and feedbac
 
   const feedbackLoaded = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/v1/me/feedback')
   await openRow(rows.filter({ hasText: '成绩单.pdf' }))
+  // 待退款（服务端 refundRequired）的说明：现场无人值守，不写「由工作人员处理」；说法照稿「退款会按支付渠道处理」，后面给标准句 1（服务电话）。
+  const refundNote = rows.filter({ hasText: '成绩单.pdf' }).locator('.me-note')
+  await expect(refundNote).toContainText('待退款')
+  await expect(refundNote).toContainText('本单已确认未出纸，退款会按支付渠道处理，到账时间以支付渠道为准')
+  expect((await refundNote.innerText()).replace(/\s+/g, ' ')).toMatch(HELP_NEEDED_LINE)
+  expect(containsStaffHandoff(await refundNote.innerText()), '待退款说明不得叫用户去找现场的人').toBe(false)
   await rows.filter({ hasText: '成绩单.pdf' }).getByRole('button', { name: '反馈打印订单 成绩单.pdf' }).click()
   await expect(page).toHaveURL(/\/me\/feedback\?category=print&relatedPrintTaskId=order-failed$/)
   await feedbackLoaded

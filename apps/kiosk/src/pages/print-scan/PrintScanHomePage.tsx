@@ -377,7 +377,7 @@ export function PrintScanHomePage() {
         const capabilityKey = CARD_CAPABILITY_KEY[capability.key]
 
         // ① 探测轴优先：读不到能力配置 → 八项一律不开（含证件照说明页）。
-        //    理由只写在徽标上一次；「重新检测 / 联系工作人员」在页顶状态块里，不在八张卡上各抄一遍。
+        //    理由只写在徽标上一次；「重新检测」与服务电话在页顶状态块里，不在八张卡上各抄一遍。
         if (!confirmed && capabilityKey) {
           return {
             ...capability,
