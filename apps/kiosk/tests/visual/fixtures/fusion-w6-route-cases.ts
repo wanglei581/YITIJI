@@ -42,7 +42,7 @@ function createRouteCase(definition: W6RouteDefinition): W6RouteCase {
 const screen = (name: string) => `[data-kiosk-screen="${name}"]`
 const w2 = (name: string) => `[data-w2-page="${name}"]`
 const w4 = '.w4-page-frame'
-const qx = '[data-qx-frame="true"]'
+const touch = '[data-qxt-screen]'
 const member = screen('member-list')
 
 async function seedScreensaver(page: Page): Promise<void> {
@@ -112,9 +112,9 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/activities', url: '/activities', marker: screen('activities'), featureText: '权益活动' },
   { pattern: '/activities/:id', url: '/activities/activity-001', marker: screen('activity-detail'), featureText: '返回活动' },
   { pattern: '/renshi', url: '/renshi', marker: '.w4-policy-page', featureText: '仅信息指引 · 不代办' },
-  { pattern: '/campus', url: '/campus', marker: '[data-kiosk-component="page-frame"] .campus-proto', featureText: '2026 青岛高校毕业生招聘会' },
-  { pattern: '/campus/welcome', url: '/campus/welcome', marker: '[data-kiosk-component="page-frame"]', featureText: '校园招聘迎新指引' },
-  { pattern: '/campus/freshman-insights', url: '/campus/freshman-insights', marker: '[data-kiosk-component="page-frame"]:has-text("暂无经核验的校园招聘统计")', featureText: '不会展示示例数据' },
+  { pattern: '/campus', url: '/campus', marker: touch, featureText: '2026 青岛高校毕业生招聘会' },
+  { pattern: '/campus/welcome', url: '/campus/welcome', marker: touch, featureText: '校园招聘迎新指引' },
+  { pattern: '/campus/freshman-insights', url: '/campus/freshman-insights', marker: '[data-qxt-screen]:has-text("暂无经核验的校园招聘统计")', featureText: '不会展示示例数据' },
   { pattern: '/toolbox', url: '/toolbox', marker: screen('toolbox'), featureText: '百宝箱' },
   { pattern: '/smart-campus', url: '/smart-campus', marker: w4, featureText: '智慧校园' },
   { pattern: '/smart-campus/welcome', url: '/smart-campus/welcome', marker: w4, featureText: '迎新指引' },
@@ -172,29 +172,29 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/scan/progress', url: '/scan/progress', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
   { pattern: '/scan/result', url: '/scan/result', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
 
-  { pattern: '/jobs', url: '/jobs', marker: qx, featureText: '岗位信息' },
-  { pattern: '/jobs-service', url: '/jobs-service', marker: 'h1:text-is("看清来源，再决定去哪里投")', featureText: '投递在来源平台完成。' },
-  { pattern: '/jobs/:id', url: '/jobs/job-001', marker: qx, featureText: '前端工程师' },
-  { pattern: '/jobs/:id/offline', url: '/jobs/offline-job-001/offline', marker: qx, featureText: '线下机构岗位' },
-  { pattern: '/offline-agencies', url: '/offline-agencies', marker: qx, featureText: '线下招聘机构' },
-  { pattern: '/offline-agencies/:id', url: '/offline-agencies/agency-001', marker: qx, featureText: '到店咨询办理' },
+  { pattern: '/jobs', url: '/jobs', marker: touch, featureText: '岗位信息' },
+  { pattern: '/jobs-service', url: '/jobs-service', marker: 'h1:text-is("想找哪种工作？")', featureText: '投递在来源平台完成。' },
+  { pattern: '/jobs/:id', url: '/jobs/job-001', marker: touch, featureText: '前端工程师' },
+  { pattern: '/jobs/:id/offline', url: '/jobs/offline-job-001/offline', marker: touch, featureText: '线下机构岗位' },
+  { pattern: '/offline-agencies', url: '/offline-agencies', marker: touch, featureText: '线下招聘机构' },
+  { pattern: '/offline-agencies/:id', url: '/offline-agencies/agency-001', marker: touch, featureText: '到店咨询办理' },
   // 证据锚点随稿换字，判据不变：/notifications 与 /me/notifications 是同一张会员消息页，屏上看得见的是登录引导标题。
   { pattern: '/notifications', url: '/notifications', marker: member, featureText: '登录后看你的消息' },
-  { pattern: '/companies', url: '/companies', marker: qx, featureText: '找企业' },
-  { pattern: '/companies/:id', url: '/companies/company-001', marker: qx, featureText: '青岛示例制造有限公司' },
+  { pattern: '/companies', url: '/companies', marker: touch, featureText: '找企业' },
+  { pattern: '/companies/:id', url: '/companies/company-001', marker: touch, featureText: '青岛示例制造有限公司' },
   // 2026-09-20：招聘会八条路由迁入青序流光共享工作台（稿 28），marker 从 W4 框换成 Qx 框。
   // featureText 按服务台那一轮定下的口径钉**合规诚实性声明**而不是栏目名——
   // 栏目名改两个字就得改夹具，而这几句是迁移里最容易整段丢掉的东西。
-  { pattern: '/job-fairs', url: '/job-fairs', marker: qx, featureText: '预约在来源平台完成。' },
-  { pattern: '/fairs-service', url: '/fairs-service', marker: 'h1:text-is("先看场次，再准备到场")', featureText: '本机不代收简历，也不承诺外部活动结果。' },
-  { pattern: '/job-fairs/checkin', url: '/job-fairs/checkin', marker: qx, featureText: '本机不做签到，也拿不到签到结果。' },
-  { pattern: '/job-fairs/:id', url: '/job-fairs/fair-001', marker: qx, featureText: '2026 青岛高校毕业生招聘会' },
-  { pattern: '/job-fairs/:id/companies', url: '/job-fairs/fair-001/companies', marker: qx, featureText: '本机不代收简历' },
-  { pattern: '/job-fairs/:id/companies/:companyId', url: '/job-fairs/fair-001/companies/fair-company-001', marker: qx, featureText: '青岛示例制造有限公司' },
-  { pattern: '/job-fairs/:id/map', url: '/job-fairs/fair-001/map', marker: qx, featureText: '本机不画推荐路线' },
-  { pattern: '/job-fairs/:id/materials', url: '/job-fairs/fair-001/materials', marker: qx, featureText: '下载链接临时有效' },
-  { pattern: '/job-fairs/:id/visit-plan', url: '/job-fairs/fair-001/visit-plan', marker: qx, featureText: 'AI参会准备单' },
-  { pattern: '/job-fairs/:id/stats', url: '/job-fairs/fair-001/stats', marker: qx, featureText: '真实数据正在接入' },
+  { pattern: '/job-fairs', url: '/job-fairs', marker: touch, featureText: '预约在来源平台完成。' },
+  { pattern: '/fairs-service', url: '/fairs-service', marker: 'h1:text-is("先看哪一场？")', featureText: '本机不代收简历，也不承诺外部活动结果。' },
+  { pattern: '/job-fairs/checkin', url: '/job-fairs/checkin', marker: touch, featureText: '本机不做签到，也拿不到签到结果。' },
+  { pattern: '/job-fairs/:id', url: '/job-fairs/fair-001', marker: touch, featureText: '2026 青岛高校毕业生招聘会' },
+  { pattern: '/job-fairs/:id/companies', url: '/job-fairs/fair-001/companies', marker: touch, featureText: '本机不代收简历' },
+  { pattern: '/job-fairs/:id/companies/:companyId', url: '/job-fairs/fair-001/companies/fair-company-001', marker: touch, featureText: '青岛示例制造有限公司' },
+  { pattern: '/job-fairs/:id/map', url: '/job-fairs/fair-001/map', marker: touch, featureText: '本机不画推荐路线' },
+  { pattern: '/job-fairs/:id/materials', url: '/job-fairs/fair-001/materials', marker: touch, featureText: '下载链接临时有效' },
+  { pattern: '/job-fairs/:id/visit-plan', url: '/job-fairs/fair-001/visit-plan', marker: touch, featureText: 'AI参会准备单' },
+  { pattern: '/job-fairs/:id/stats', url: '/job-fairs/fair-001/stats', marker: touch, featureText: '真实数据正在接入' },
   { pattern: '/resume/self-assessment/intro', url: '/resume/self-assessment/intro', marker: screen('resume-self-assessment-intro'), featureText: '自我探索', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/questions', url: '/resume/self-assessment/questions', marker: screen('resume-self-assessment-quiz'), featureText: '作答', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/result', url: '/resume/self-assessment/result', marker: screen('resume-self-assessment-result'), featureText: '倾向参考', requiresFusionRoot: false },

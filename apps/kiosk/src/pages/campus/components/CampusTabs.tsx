@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, EmptyState } from '@ai-job-print/ui'
-import { formatDateTime, parseInstant, shanghaiParts, type ExternalJobFairDTO, type FairCompanyDTO, type FairZoneDTO } from '@ai-job-print/shared'
+import { AI_LABEL_COPY, formatDateTime, parseInstant, shanghaiParts, type ExternalJobFairDTO, type FairCompanyDTO, type FairZoneDTO } from '@ai-job-print/shared'
 import {
   AwardIcon,
   BriefcaseIcon,
@@ -93,6 +93,7 @@ export function OverviewTab({
   jobCount,
   onGoTab,
   onBook,
+  bookBlockedReason = '',
 }: {
   fair: ExternalJobFairDTO
   companies: FairCompanyDTO[]
@@ -100,6 +101,8 @@ export function OverviewTab({
   jobCount: number
   onGoTab: (t: TabKey) => void
   onBook: () => void
+  /** 来源四要素缺项时的常显原因（空串＝放行）。有值时「扫码预约」aria-disabled，原因写在按钮下面。 */
+  bookBlockedReason?: string
 }) {
   const navigate = useNavigate()
 
@@ -138,13 +141,18 @@ export function OverviewTab({
             <button
               type="button"
               onClick={onBook}
+              aria-disabled={bookBlockedReason ? true : undefined}
+              aria-describedby={bookBlockedReason ? 'campus-book-blocked' : undefined}
               className="kproto-btn sm primary ml-auto"
               style={{ '--kp-accent': 'var(--kp-wheat)', '--kp-accent-deep': 'var(--kp-wheat-deep)', '--kp-accent-soft': 'var(--kp-wheat-soft)' } as React.CSSProperties}
             >
-              <QrCodeIcon aria-hidden="true" />扫码预约 · 去来源平台办理
+              <QrCodeIcon aria-hidden="true" />扫码预约
             </button>
           )}
         </div>
+        {fair.status !== 'ended' && bookBlockedReason ? (
+          <p id="campus-book-blocked" data-testid="campus-book-blocked" className="mb-4 text-[20px] font-semibold leading-snug text-[var(--kp-wheat-deep)]">{bookBlockedReason}</p>
+        ) : null}
         <div className="flex flex-col gap-3 text-[20px]">
           <div className="flex gap-4"><span className="w-[112px] shrink-0 text-[var(--kp-muted)]">举办时间</span><span className="flex-1 font-semibold">{fmtHeldTime(fair.startTime, fair.endTime)}</span></div>
           <div className="flex gap-4"><span className="w-[112px] shrink-0 text-[var(--kp-muted)]">举办地点</span><span className="flex-1 font-semibold">{fair.address || fair.venue}</span></div>
@@ -463,14 +471,38 @@ function AiFeatureCard({
   )
 }
 
-export function AiJobTab() {
+// 稿 b-campus-fair 的「AI 求职」页签：标题带 AI 底句，先列这场的参展企业再决定练什么。
+// kiosk 里没有单独的 AI 就绪探测（见 ai/aiOutage.ts），这一页不自己判「AI 不可用」；
+// 四个入口去的简历、面试页各自带不用 AI 的手动路径，名单、展位和资料打印本来就不经过 AI。
+const AI_TAB_NOTE = '诊断、模拟面试和优化都走已经有的能力，这一页不另调岗位模型。名单、展位和资料打印不经过 AI。'
+
+export function AiJobTab({ companies }: { companies: FairCompanyDTO[] }) {
   const navigate = useNavigate()
   return (
-    <div className="campus-tab-pane space-y-4">
+    <div className="campus-tab-pane space-y-4" data-testid="campus-ai-tab">
       <div className="rounded-2xl bg-gradient-to-br from-plum to-plum p-5 text-white">
-        <p className="text-lg font-bold">AI智能求职助手</p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-lg font-bold">AI智能求职助手</p>
+          <span className="rounded-full bg-white/15 px-3 py-1 text-sm font-semibold" data-testid="campus-ai-label">{AI_LABEL_COPY.BASE}</span>
+        </div>
         <p className="mt-1 text-sm text-white/80">四大 AI 功能，全方位助力你的求职之路</p>
+        <p className="mt-2 text-sm text-white/90">{AI_TAB_NOTE}</p>
       </div>
+      {companies.length > 0 ? (
+        <Card className="p-5" data-testid="campus-ai-companies">
+          <p className="text-base font-semibold text-neutral-900">先看这几家再决定练什么</p>
+          <div className="mt-3 flex flex-col gap-2">
+            {companies.slice(0, 6).map((company) => (
+              <div key={company.id} className="rounded-xl bg-neutral-50 px-4 py-3">
+                <p className="text-sm font-semibold text-neutral-900">{[company.boothNumber, company.companyName].filter(Boolean).join(' ')}</p>
+                <p className="mt-0.5 text-xs text-neutral-500">
+                  {[industryLabel(company.industry), `${company.positions.length} 个岗位`, company.positions.slice(0, 3).map((p) => p.title).join('、')].filter(Boolean).join(' · ')}
+                </p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
       <div className="grid grid-cols-1 gap-3">
         <AiFeatureCard icon={FileTextIcon} iconBg="bg-primary-50" iconColor="text-primary-600" title="AI简历诊断" desc="简历分析与诊断，提供专业修改建议（仅供本人参考）。" cta="开始诊断" onClick={() => navigate('/resume/source?intent=diagnose')} />
         <AiFeatureCard icon={MicIcon} iconBg="bg-plum-soft" iconColor="text-plum" title="AI模拟面试" desc="仿真面试场景与点评，迅速提升面试实战能力。" cta="开始模拟" onClick={() => navigate('/interview/setup')} />

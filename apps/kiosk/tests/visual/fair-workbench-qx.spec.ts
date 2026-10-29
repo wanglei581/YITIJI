@@ -33,45 +33,49 @@ import {
 
 const TRUTH_LEAD = '本机不代收简历、不代预约，也不做签到。'
 
-/** 八屏共用的形态断言：青序壳在、旧 W4 框不在、truth 条在、胶囊与稿一致。 */
+/** 稿里的 bad 在触屏状态点上并进提醒色；只有 ok 亮绿，其余保持未知。 */
+function fairStatusClass(tone: string): string {
+  if (tone === 'ok') return 'ok'
+  if (tone === 'warn' || tone === 'bad') return 'warn'
+  return 'unknown'
+}
+
+/** 八屏共用的形态断言：触屏壳在、旧 W4 框不在、truth 条在、状态与稿一致。 */
 async function expectQxWorkbench(
   page: import('@playwright/test').Page,
   screen: FairScreen,
   state: string,
 ): Promise<void> {
-  await expect(page.locator('[data-qx-frame="true"]')).toHaveCount(1)
+  await expect(page.locator('[data-qxt-screen]')).toHaveCount(1)
   // 「真迁移」的硬判据：旧 W4 框一个都不许留在 DOM 里。
   await expect(page.locator('.w4-page-frame')).toHaveCount(0)
   await expect(page.locator(`[data-testid="fair-${screen}-state-${state}"]`)).toHaveCount(1)
 
   const pill = fairPillOf(screen, state)
-  const pillEl = page.locator('.qx-pill')
+  const pillEl = page.locator('.qxt-status')
+  await expect(pillEl).toHaveCount(1)
   await expect(pillEl).toHaveText(pill.label)
-  await expect(pillEl).toHaveAttribute('data-tone', pill.tone)
+  await expect(pillEl).toHaveClass(new RegExp(`\\bqxt-status-${fairStatusClass(pill.tone)}\\b`))
 
   // 合规底线声明八屏共用，写在壳里，业务页删不掉。
   await expect(page.getByText(TRUTH_LEAD)).toBeVisible()
 
-  // 返回键：一体机上唯一的「上一步」（公共终端没有浏览器后退键）。
-  // 无障碍名逐字取稿 BACK 表 —— 稿改了壳没跟，这里会红。
-  //
-  // 精确锁 topbar，不按可及名全局找：稿在若干状态下**刻意**让底栏也放一个同名大键
-  // （例如 list:loading 的「返回招聘会服务」、detail:loading 的「返回场次列表」）——
-  // 图标返回键小、底栏键大，两者对一体机都是必要的。按名全局 count(1) 会把稿的
-  // 这个设计判成缺陷，所以判据落到「顶栏那一个存在且叫对名字」。
+  // 意图带上的返回是「返回上一步」。底栏那一颗才用稿 BACK 表的名字。
+  // 两者都要在，而且各自只有一颗：带上的 chevron 和底栏的文字返回不是同一个控件。
   const [, backLabel] = FAIR_BACK[screen]
-  const topbarBack = page.locator('.qx-topbar .qx-topbar-back')
-  await expect(topbarBack).toHaveCount(1)
-  await expect(topbarBack).toHaveAttribute('aria-label', backLabel)
+  const bandBack = page.locator('.qxt-band .qxt-back')
+  await expect(bandBack).toHaveCount(1)
+  await expect(bandBack).toHaveAttribute('aria-label', '返回上一步')
+  await expect(page.locator('.qxt-dock').getByRole('button', { name: backLabel, exact: true })).toHaveCount(1)
 
-  // 固定底栏：主操作必须和合规声明同在那条不随正文滚动的带里，且顺序是操作在上。
-  const bottom = page.locator('.qx-ctabar .qxfw-bottom')
+  // 固定底栏：主操作在不随正文滚动的 .qxt-dock 里。声明条在它上方，不进这一排。
+  const bottom = page.locator('.qxt-dock')
   await expect(bottom).toHaveCount(1)
 }
 
 /** 固定底栏里那一排主操作键（不含合规 truth 条里的「遇到问题」）。 */
 function ctaButtons(page: import('@playwright/test').Page) {
-  return page.locator('.qx-ctabar .qxfw-ctabar button')
+  return page.locator('.qxt-dock .qxt-btn')
 }
 
 /**
@@ -83,10 +87,10 @@ function ctaButtons(page: import('@playwright/test').Page) {
  */
 async function expectKioskLayout(page: import('@playwright/test').Page): Promise<void> {
   const report = await page.evaluate(() => {
-    const stage = document.querySelector('.qx-stage') as HTMLElement | null
-    const ctabar = document.querySelector('.qx-ctabar') as HTMLElement | null
-    const navbar = document.querySelector('.qx-navbar') as HTMLElement | null
-    const body = document.querySelector('.qx-body') as HTMLElement | null
+    const stage = document.querySelector('.kiosk-stage') as HTMLElement | null
+    const ctabar = document.querySelector('.qxt-dock') as HTMLElement | null
+    const navbar = document.querySelector('.qxt-nav') as HTMLElement | null
+    const body = document.querySelector('.qxt-body') as HTMLElement | null
     // 舞台是 1080×1920 等比缩放上去的：屏幕上量到的 px = CSS px × scale，
     // 所有尺寸断言都要除回去，否则窗口一变就误判（见 kiosk-stage-fit 笔记）。
     const scale = stage ? stage.getBoundingClientRect().width / 1080 : 1
@@ -185,7 +189,7 @@ test('列表 ready：服务端总数与本屏渲染数分开说，筛选口径�
   // 两个数不许合并成一个——服务端查到的和这一屏显示的不是一回事。
   await expect(page.getByText(/查到的结果 \d+ 场/)).toBeVisible()
   await expect(page.getByText(/当前展示 \d+ 场/)).toBeVisible()
-  await expect(page.getByText('关键字和状态会按全部场次来查；地区、日期和收藏只在这次已经加载出来的场次里筛选，不代表全部结果。')).toBeVisible()
+  await expect(page.getByText('关键字和状态会按全部场次来查；地区、日期、收藏和场次范围只在这次已经加载出来的场次里筛选，不代表全部结果。')).toBeVisible()
   await expect(page.getByRole('button', { name: '扫码预约' })).toHaveCount(1)
   await expect(page.getByText(/一键投递|立即投递|平台投递|报名成功/)).toHaveCount(0)
   await expectKioskLayout(page)
@@ -336,7 +340,7 @@ test('关键事务：详情 subnav 五条各自落到自己的路由 @kiosk', as
     await page.goto(`/job-fairs/${FAIR_ID}`)
     await page.getByTestId(testId).click()
     await expect(page).toHaveURL(expected)
-    await expect(page.locator('[data-qx-frame="true"]')).toHaveCount(1)
+    await expect(page.locator('[data-qxt-screen]')).toHaveCount(1)
   }
 })
 
@@ -635,8 +639,28 @@ test('来源要素缺项：详情「扫码预约」同样 fail-closed @kiosk', a
   // 所以这一条覆盖的是 FAIR_BOOKING_LINK_UNAVAILABLE_REASON 而非 'job_fair' 参数。
   await expectFairWordedBlockReason(page, 'p.why')
   await book.click({ force: true })
+  // 底栏主按钮是 ariaDisabled：只写 aria-disabled、不写原生 disabled，点击照常交给页面的 onClick。
+  // 一体机是 1080×1920 舞台等比缩放，force 点击的坐标不一定落在按钮上，所以再直接派发一次 click，
+  // 保证处理函数确实被调到，「点了不出码」才不是空断言。
+  await book.dispatchEvent('click')
   await expect(page.getByRole('dialog', { name: '扫码前往来源平台预约' })).toHaveCount(0)
+  await expect(page.getByTestId('fair-qr-slot')).toHaveCount(0)
   await shot(page, 'qx-fair-detail-source-blocked')
+})
+
+// 阳性对照：与上一条配对。来源四要素齐全时，详情底栏同一颗「扫码预约」点了要真的出码；
+// 否则上一条里「点了没出码」可能只是按钮根本接不到点击。
+test('来源要素齐全：详情「扫码预约」点了出码，窗口不代预约 @kiosk', async ({ page, api }) => {
+  registerFairApi(api)
+  await page.goto(`/job-fairs/${FAIR_ID}`)
+  await expectQxWorkbench(page, 'detail', 'detail')
+  const book = page.getByRole('button', { name: '扫码预约' })
+  await expect(book).not.toHaveAttribute('aria-disabled', 'true')
+  await book.dispatchEvent('click')
+  const overlay = page.getByRole('dialog', { name: '扫码前往来源平台预约' })
+  await expect(overlay).toBeVisible()
+  await expect(overlay).toContainText('本系统不参与活动报名流程、不接收简历')
+  await expect(page.getByTestId('fair-qr-slot')).toBeVisible()
 })
 
 test('来源要素缺项：到场指引「扫码签到」不出码 @kiosk', async ({ page, api }) => {
@@ -724,7 +748,8 @@ test('稿面 HEAD / PILL 表真的被壳消费，不是摆设 @kiosk', async ({ 
   registerFairApi(api)
   await page.goto('/job-fairs')
   // h1 与副标题直接取稿 HEAD；改了稿不改壳，这里会红。
-  await expect(page.locator('.qx-pagehead h1')).toHaveText(FAIR_HEAD.list[0])
-  await expect(page.locator('.qx-pagehead p')).toHaveText(FAIR_HEAD.list[1])
-  await expect(page.locator('.qx-pill')).toHaveText(FAIR_PILL['list:ready'].label)
+  await expect(page.locator('.qxt-band h1')).toHaveCount(1)
+  await expect(page.locator('.qxt-band h1')).toHaveText(FAIR_HEAD.list[0])
+  await expect(page.locator('.qxt-ask p')).toHaveText(FAIR_HEAD.list[1])
+  await expect(page.locator('.qxt-status')).toHaveText(FAIR_PILL['list:ready'].label)
 })

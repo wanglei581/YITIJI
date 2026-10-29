@@ -304,6 +304,16 @@ const QX_TOUCH_ROUTES = new Set<string>([
   '/contract-review/processing',
   '/contract-review/result',
   // 第十一包 私有化版招聘
+  '/jobs-service',
+  '/fairs-service',
+  '/offline-agencies',
+  '/companies',
+  '/jobs',
+  '/job-fairs',
+  '/job-fairs/checkin',
+  '/campus',
+  '/campus/welcome',
+  '/campus/freshman-insights',
 ])
 
 const QX_TOUCH_PREFIXES: readonly string[] = [
@@ -319,6 +329,8 @@ const QX_TOUCH_PREFIXES: readonly string[] = [
   // 第十包 政策与受控扩展
   '/smart-campus/service/', // 只放窄前缀，不写 /smart-campus（welcome 已在精确集合）
   // 第十一包 私有化版招聘
+  '/offline-agencies/',
+  '/companies/',
 ]
 
 const QX_TOUCH_PATTERNS: readonly RegExp[] = [
@@ -334,6 +346,15 @@ const QX_TOUCH_PATTERNS: readonly RegExp[] = [
   // 第九包 扫描复印
   // 第十包 政策与受控扩展
   // 第十一包 私有化版招聘
+  /^\/jobs\/[^/]+$/,
+  /^\/jobs\/[^/]+\/offline$/,
+  /^\/job-fairs\/[^/]+$/,
+  /^\/job-fairs\/[^/]+\/companies$/,
+  /^\/job-fairs\/[^/]+\/companies\/[^/]+$/,
+  /^\/job-fairs\/[^/]+\/map$/,
+  /^\/job-fairs\/[^/]+\/materials$/,
+  /^\/job-fairs\/[^/]+\/visit-plan$/,
+  /^\/job-fairs\/[^/]+\/stats$/,
 ]
 
 function isTouchRoute(pathname: string): boolean {

@@ -159,9 +159,9 @@ check('jobs preserve source-only application contract', () => {
   assert.throws(() => {
   assert.match(jobsPage, /KioskPageFrame/)
   }, 'jobs page must reject the frozen V6 frame contract')
-  assert.match(jobsPage, /QxPageFrame/)
+  assert.match(jobsPage, /RecruitTouchFrame/)
   assert.doesNotMatch(jobsPage, /\bKioskPageFrame\b/)
-  assert.match(jobDetail, /QxPageFrame/)
+  assert.match(jobDetail, /RecruitTouchFrame/)
   assert.doesNotMatch(jobDetail, /\bKioskPageFrame\b/)
   assert.match(jobDetail, /recordBrowse[\s\S]*'job'/)
   assert.match(jobDetail, /recordExternalJump[\s\S]*'external_apply'/)
@@ -199,21 +199,21 @@ check('offline agency presentation does not invent unavailable metrics or live s
   assert.match(offlineAgencies, /service: service \|\| undefined/)
   assert.match(offlineAgencies, /orgType: orgType \|\| undefined/)
 })
-check('directory pages have left the V6 frame for QxPageFrame', () => {
-  assert.match(offlineAgencies, /QxPageFrame/)
+check('directory pages have left the V6 frame for the touch shell', () => {
+  assert.match(offlineAgencies, /RecruitTouchFrame/)
   assert.doesNotMatch(offlineAgencies, /KioskPageFrame/, 'offline agencies list has left the V6 frame')
-  assert.match(offlineAgencyDetail, /QxPageFrame/)
+  assert.match(offlineAgencyDetail, /RecruitTouchFrame/)
   assert.doesNotMatch(offlineAgencyDetail, /KioskPageFrame/, 'offline agency detail has left the V6 frame')
-  assert.match(offlineJobDetail, /QxPageFrame/)
+  assert.match(offlineJobDetail, /RecruitTouchFrame/)
   assert.doesNotMatch(offlineJobDetail, /KioskPageFrame/, 'offline job detail has left the V6 frame')
-  assert.match(companiesPage, /QxPageFrame/)
+  assert.match(companiesPage, /RecruitTouchFrame/)
   assert.doesNotMatch(companiesPage, /KioskPageFrame/, 'companies list has left the V6 frame')
-  assert.match(companyDetail, /QxPageFrame/)
+  assert.match(companyDetail, /RecruitTouchFrame/)
   assert.doesNotMatch(companyDetail, /KioskPageFrame/, 'company detail has left the V6 frame')
   assert.match(officialChannels, /PublicTouchFrame/)
   assert.doesNotMatch(officialChannels, /KioskPageFrame/, 'official channels (稿 45 宿主) stays off the V6 frame')
   assert.doesNotMatch(officialChannels, /招聘/, 'official channels screen source has no 招聘')
-  assert.match(fairCompanyDetail, /QxPageFrame/)
+  assert.match(fairCompanyDetail, /RecruitTouchFrame/)
   assert.doesNotMatch(fairCompanyDetail, /KioskPageFrame/, 'fair company detail has left the V6 frame')
   assert.match(kioskRoot, /['"]\/offline-agencies['"]/)
   assert.match(kioskRoot, /['"]\/companies['"]/)
@@ -225,6 +225,132 @@ check('directory pages have left the V6 frame for QxPageFrame', () => {
   assert.match(kioskRoot, /\/job-fairs\\\/\[\^\/\]\+\\\/companies\\\/\[\^\/\]\+/)
   assert.doesNotMatch(kioskRoot, /QX_MIGRATED_PREFIXES = \[[^\]]*['"]\/jobs\//)
   assert.doesNotMatch(kioskRoot, /QX_MIGRATED_PREFIXES = \[[^\]]*['"]\/job-fairs\//)
+})
+check('company directory does not rank companies by the user resume', () => {
+  assert.doesNotMatch(companiesPage, /screen="company-directory"/)
+  assert.doesNotMatch(companyDetail, /screen="company-directory"/)
+  assert.doesNotMatch(companiesPage, /按本人简历排出/)
+  assert.doesNotMatch(companyDetail, /按本人简历排出/)
+  assert.match(companiesPage, /问小青：怎么挑企业？/)
+  assert.match(companyDetail, /问小青：这家企业怎么看？/)
+  assert.match(companiesPage, /RecruitTouchFrame/)
+  assert.match(companyDetail, /RecruitTouchFrame/)
+})
+// 第 11 包页面只在托管打开（客户私有化部署）时挂载；两个壳（RtFrame 与招聘会八屏的 QxFairWorkbench）
+// 一律在最上面挂私有化版标识条，文字逐字照稿，防止被当成我方云上的页面拿去演示或宣传。
+check('recruitment touch frames wear the private-deployment ribbon word for word', () => {
+  const ribbon = read('src/pages/recruitment-touch/RtRibbon.tsx')
+  assert.ok(
+    ribbon.includes('私有化部署版 · 仅供持有人力资源服务许可证的客户自行运营 · 我方云上不出现 · 不得用于对外宣传'),
+    'ribbon text must stay verbatim',
+  )
+  assert.match(read('src/pages/recruitment-touch/RtFrame.tsx'), /<RtRibbon\s*\/>/)
+  assert.match(read('src/pages/job-fairs/QxFairWorkbench.tsx'), /<RtRibbon\s*\/>/)
+})
+// 现场无人值守：5xx 的通用说法带「联系现场工作人员」。招聘页的接口错误一律经 recruitErrorText，
+// 命中无人值守禁用说法就换成当前操作的那句；状态屏求助只给服务电话（RtHelpLine 读后台号码）。
+check('recruitment pages never print the generic 5xx staff handoff and carry a service-phone help line', () => {
+  const guarded = [
+    'src/pages/jobs/JobsPage.tsx',
+    'src/pages/jobs/JobDetailPage.tsx',
+    'src/pages/job-fairs/FairCompanyDetailPage.tsx',
+    'src/pages/job-fairs/FairVisitPlanPage.tsx',
+    'src/pages/job-fairs/FairMaterialsPage.tsx',
+  ]
+  for (const rel of guarded) {
+    const source = read(rel)
+    assert.doesNotMatch(source, /\buserMessageOf\b/, `${rel} must route API errors through recruitErrorText`)
+    assert.match(source, /recruitErrorText\(/, `${rel} must call recruitErrorText`)
+  }
+  assert.match(read('src/pages/recruitment-touch/recruitErrorText.ts'), /containsStaffHandoff\(text\) \? fallback : text/)
+  assert.match(read('src/pages/job-fairs/QxFairWorkbench.tsx'), /fairIsCentered\(screen, state\) \? <RtHelpLine \/> : null/)
+  const help = read('src/pages/recruitment-touch/RtHelpLine.tsx')
+  assert.match(help, /useSupportContact\(\)/)
+  assert.match(help, /helpNeededLine\(contact\)/)
+})
+// 第 11 包文案照稿：机构电话缺省、企业查询说法、意图带小标题、预约按钮白名单原句、筛选说明、
+// 「去帮助中心」卡的说明（帮助中心实际给的是常见问题和服务电话）、校招数据页去招聘会的去向。
+check('recruitment copy follows the draft', () => {
+  for (const [name, source] of [['offline agency detail', offlineAgencyDetail], ['offline job detail', offlineJobDetail]]) {
+    assert.ok(source.includes('来源未提供电话'), `${name}: 机构电话缺省写「来源未提供电话」`)
+    assert.ok(!source.includes('请到帮助中心查看服务电话'), `${name}: 不把本机的服务电话说成机构电话`)
+  }
+  assert.ok(companiesPage.includes('行业、地区、招聘类型、来源种类都对应真实查询'), 'companies filter hint stays in user words')
+  assert.ok(!companiesPage.includes('CompanyQuery 的') && !/所有条件均对应真实 CompanyQuery/.test(companiesPage), 'no code type name on the screen')
+  for (const rel of ['src/pages/recruitment-touch/RecruitTouchFrame.tsx', 'src/pages/job-fairs/QxFairWorkbench.tsx']) {
+    assert.ok(!read(rel).includes('私有化版 ·'), `${rel}: 意图带小标题不统一加「私有化版 ·」，逐屏照稿`)
+  }
+  const campusTabs = read('src/pages/campus/components/CampusTabs.tsx')
+  assert.ok(!campusTabs.includes('扫码预约 · 去来源平台办理'), '预约按钮只用白名单原句「扫码预约」')
+  assert.ok(read('src/pages/job-fairs/JobFairsPage.tsx').includes('地区、日期、收藏和场次范围'), 'fair list filter note wording')
+  for (const rel of ['FairMapPage', 'JobFairCheckinPage', 'FairCompanyDetailPage']) {
+    const source = read(`src/pages/job-fairs/${rel}.tsx`)
+    assert.ok(source.includes('title="去帮助中心" desc="常见问题和服务电话"'), `${rel}: 帮助中心卡说帮助中心实际给的东西`)
+    assert.ok(!source.includes('入口一般有纸质导览和指示牌') && !source.includes('手上有主办方纸质名单时，以现场公示为准'), `${rel}: 帮助中心卡不讲现场纸质物`)
+  }
+  assert.match(campusInsights, /navigate\('\/job-fairs\?audience=campus'\)/, '校招数据页的「查看招聘会」去校园场次')
+})
+// 产品负责人 10/28：「AI 和这些功能结合在一起」。稿上本包每屏的 AI 元素一个不许少：
+// 底栏问小青（逐屏文字由 recruit-touch-metrics.spec.ts 钉）、岗位 AI 入口与登录提示、AI 底句、
+// 校园 AI 求职页签、AI 参会准备 / 回顾、AI 参会准备单；AI 整条不可用时结果区写「AI 暂时无法使用」且不再给重试。
+check('recruitment screens keep the draft AI elements and handle AI-down honestly', () => {
+  const social = read('src/pages/recruitment-touch/SocialHubPage.tsx')
+  assert.ok(social.includes("title: '岗位匹配参考'") && social.includes("title: '问 AI 顾问'"), '社会招聘台两扇 AI 门')
+  const jobsChrome = read('src/pages/jobs/components/JobsQxChrome.tsx')
+  assert.ok(jobsChrome.includes('用我的简历智能推荐') && jobsChrome.includes('开始推荐') && jobsChrome.includes('要先登录'), '岗位列表 AI 推荐入口与登录提示')
+  const jobSections = read('src/pages/jobs/components/JobDetailSections.tsx')
+  assert.ok(jobSections.includes('AI岗位解读') && jobSections.includes('岗位匹配参考'), '岗位详情两个 AI 入口')
+  assert.ok(jobSections.includes("hint={needLogin ? '要先登录' : '看懂职责与准备点'}"), '岗位详情「AI岗位解读」登录前写「要先登录」')
+  assert.ok(jobSections.includes("hint={needLogin ? '要先登录' : '用本人简历做准备'}"), '岗位详情「岗位匹配参考」登录前写「要先登录」')
+  assert.ok(jobSections.includes('AI_LABEL_COPY.BASE'), '岗位详情 AI 段用标准底句')
+  const campusTabs = read('src/pages/campus/components/CampusTabs.tsx')
+  assert.ok(campusTabs.includes('AI_LABEL_COPY.BASE') && campusTabs.includes('先看这几家再决定练什么'), '校园 AI 求职页签：AI 底句与先看参展企业')
+  for (const title of ['AI简历诊断', 'AI模拟面试', 'AI简历优化', '岗位信息参考']) {
+    assert.ok(campusTabs.includes(`title="${title}"`), `校园 AI 求职页签入口：${title}`)
+  }
+  const detailSections = read('src/pages/job-fairs/components/FairDetailSections.tsx')
+  assert.ok(detailSections.includes("'AI参会回顾'") && detailSections.includes("'AI 参会准备清单'"), '招聘会详情：AI 参会准备 / 回顾入口')
+  const visitPlan = read('src/pages/job-fairs/FairVisitPlanPage.tsx')
+  assert.ok(visitPlan.includes("title: 'AI参会准备单'") && visitPlan.includes('isAiOutage('), 'AI 参会准备单与能力级不可用判定')
+  for (const [rel, constant] of [['src/pages/jobs/JobsPage.tsx', 'JOBS_AI_OUTAGE_TEXT'], ['src/pages/jobs/JobDetailPage.tsx', 'JOB_AI_OUTAGE_TEXT']]) {
+    const source = read(rel)
+    assert.ok(source.includes('isAiOutage(err)') && source.includes(`'AI 暂时无法使用。`), `${rel}: AI 整条不可用写「AI 暂时无法使用」`)
+    assert.ok(source.includes(`onRetry={aiError === ${constant} ? undefined :`), `${rel}: AI 整条不可用时不再给重试`)
+  }
+})
+// 第二轮审查 A2：校园专区「扫码预约」缺项照样出码。二维码一旦出屏，用户就已经离开本机了，事后没有补救手段，
+// 所以来源四要素守卫必须在 setQr 之前；原来自带的 QrModal 没有 dialog 语义、二维码只有 180px，换成招聘会工作台的共享弹层。
+check('campus booking QR is guarded by the source four elements and uses the shared overlay', () => {
+  const campusPage = read('src/pages/campus/CampusPage.tsx')
+  assert.doesNotMatch(campusPage, /function QrModal/, '校园页不再自带 QrModal')
+  assert.match(campusPage, /<FairQrOverlay/, '预约码与导航码都用共享弹层')
+  const open = campusPage.match(/const openBookingQr = \(\) => \{([\s\S]*?)\n  \}\n/)
+  assert.ok(open, '找不到 openBookingQr')
+  const guard = open[1].indexOf('if (!fair || !evaluateJobSourceTrust(fair).ok) return')
+  assert.ok(guard >= 0, 'openBookingQr 必须先过来源四要素守卫')
+  assert.ok(open[1].indexOf('setQr(') > guard, '守卫必须在 setQr 之前：缺项时不出码')
+  assert.ok(open[1].indexOf('recordExternalJump(') > guard, '记外部跳转也在守卫之后')
+  const campusTabs = read('src/pages/campus/components/CampusTabs.tsx')
+  assert.ok(campusTabs.includes("aria-disabled={bookBlockedReason ? true : undefined}") && campusTabs.includes("aria-describedby={bookBlockedReason ? 'campus-book-blocked' : undefined}"), '「扫码预约」缺项时 aria-disabled 并指向常显的原因')
+})
+// 第二轮审查 A3：线下机构三页与参展企业详情上的 AI 入口原来是 DirAiAssist 桩：一次接口都不调，「整理」键永远写
+// 「没连上 AI」、「用本人简历」键永远写「没读到简历」，都是没有探测就下的结论。换成直达小青的真入口 RtAskCard。
+check('recruitment ask cards are real entries to the advisor, not the always-failing stub', () => {
+  for (const rel of [
+    'src/pages/offline-agencies/OfflineAgenciesPage.tsx',
+    'src/pages/offline-agencies/OfflineAgencyDetailPage.tsx',
+    'src/pages/offline-agencies/OfflineJobDetailPage.tsx',
+    'src/pages/job-fairs/FairCompanyDetailPage.tsx',
+  ]) {
+    const source = read(rel)
+    assert.doesNotMatch(source, /DirAiAssist/, `${rel}: 不再引用 DirAiAssist`)
+    assert.match(source, /<RtAskCard /, `${rel}: 用直达小青的 RtAskCard`)
+  }
+  const card = read('src/pages/recruitment-touch/RtAskCard.tsx')
+  assert.doesNotMatch(card, /setStep|没连上/, 'RtAskCard 不写没有探测的失败结论')
+  assert.match(card, /rememberAssistantDraft\(draft\)/, '点了把话放进顾问页输入框')
+  assert.match(card, /navigate\('\/assistant'\)/, '点了去顾问页')
+  assert.ok(card.includes('AI_LABEL_COPY.BASE'), 'AI 内容标「AI 生成，仅供参考」')
 })
 // 旧页的正向锚点是按钮文案「扫码打开来源平台」；新页不再有「先点再出码」这一步，出口就是二维码本身，
 // 正向锚点换成：二维码由 SourceUrlQr 按渠道网址生成 + 二维码下的来源说明逐字固定。反向判据一条不少，
