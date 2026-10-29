@@ -190,7 +190,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
   if (state === 'ai-down') {
     return {
       title: 'AI 匹配当前不可用',
-      // 能力级故障一律用固定人话：共享错误码表里的原句可能写着「联系现场工作人员」，现场无人值守，屏上不出现。
+      // 能力级故障一律用固定人话：共享错误码表里的原句若是叫人去现场找人的说法，现场无人值守，屏上不出现。
       subtitle: '这项分析暂时调不通。系统不显示对照要点或建议，也不会用旧结果冒充这次的结论。',
       pill: { tone: 'bad', label: 'AI 匹配服务当前不可用' },
       body: (

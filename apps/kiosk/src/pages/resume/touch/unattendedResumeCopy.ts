@@ -2,7 +2,7 @@ import type { PublicSupportContact } from '../../../copy/unattendedCopy'
 
 const STAFF = /(?:请|或)?(?:联系|找)(?:现场)?工作人员/g
 
-/** 本包屏上不出现「联系 / 找工作人员」。号码读不到就不加电话句。 */
+/** 本包屏上不出现叫用户去找人的话。号码读不到就不加电话句。 */
 export function unattendedResumeCopy(text: string, contact?: PublicSupportContact | null): string {
   const base = text
     .replace(STAFF, '')

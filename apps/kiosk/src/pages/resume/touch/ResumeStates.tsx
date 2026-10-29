@@ -2,7 +2,7 @@
 //   st-loading      读取中 / 生成中 / 分析中 → ResumeWaitState：一张等待卡 + 一句边界声明 + 「带走什么」的纸张小样（只吃余量）
 //   st-error        失败 / 读不出 / 打印失败 → ResumeErrorState：一张原因卡 + 两张大行动卡 + 求助句
 //   st-unconfirmed  打印文件还在等生成       → ResumeStepsState：三步大步骤 + 摘要行 + 一句边界声明
-// 只组合共享的触屏件和样式类，不改共享件。文案由各页传入；这里不写路由，也不写「找 / 联系工作人员」。
+// 只组合共享的触屏件和样式类，不改共享件。文案由各页传入；这里不写路由，也不写叫用户去找人的话。
 import type { ReactNode } from 'react'
 import { QxTouchCallout } from '../../../components/qingxu/touch/QxTouchCallout'
 import { QxTouchIcon } from '../../../components/qingxu/touch/QxTouchIcon'
