@@ -21,6 +21,8 @@ import {
   type UpdateBrandingInput,
 } from './branding.types'
 
+/** 平台品牌设置的咨询锁号（任意固定的 bigint，只要别处不用）。 */
+const BRANDING_SETTINGS_LOCK = 7_305_261_029
 const AUDIT_ACTION = 'branding.update'
 
 type SettingStore = PrismaService | PrismaTransactionClient
@@ -165,6 +167,11 @@ export class BrandingService {
     if (writes.length === 0) return this.getAdmin()
 
     const after = await this.prisma.$transaction(async (tx) => {
+      // 平台品牌设置整体一把锁：读「改前」、写入、写审计都在锁内，并发的两个管理员修改，后做的审计「改前」才带上先做的结果。
+      // PostgreSQL 用事务级咨询锁（事务结束自动放）；SQLite 单写者，事务本身就是串行的。
+      if (this.prisma.dbKind === 'postgres') {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(${BRANDING_SETTINGS_LOCK})::text AS locked`
+      }
       const before = await this.readStored(tx)
       for (const [key, value] of writes) {
         await tx.platformSetting.upsert({

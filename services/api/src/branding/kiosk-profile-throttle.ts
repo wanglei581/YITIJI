@@ -1,5 +1,6 @@
 import { Injectable, type ExecutionContext, type OnModuleInit } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
+import { resolveClientIpOrUnknown } from '../common/client-ip'
 import { resolveVerifiedTerminalOrIpTracker } from '../common/throttler/terminal-throttle'
 import { TerminalSessionService } from '../terminals/terminal-session.service'
 
@@ -16,6 +17,32 @@ import { TerminalSessionService } from '../terminals/terminal-session.service'
 export const KIOSK_PROFILE_MINUTE_LIMIT = 30
 export const KIOSK_PROFILE_WINDOW_MS = 60_000
 
+/**
+ * 验签**之前**的廉价总量限流：按 IP、进程内计数、不碰 Redis。
+ * 为什么要有：验签要查一次 Redis，伪造请求即使最后被 429，也会先把 Redis 查询花掉；一个 IP 狂发就能放大成对 Redis 的压力。
+ * 这一层按 IP 每分钟总量卡住：超过后不再验签（当作未验签，落进 IP 桶），一次 Redis 都不查。
+ * 额度要容得下同一出口 IP 下一个大厅里所有终端各自 30 次的验签请求（600 ≈ 20 台），再多的只可能是刷。
+ */
+export const KIOSK_PROFILE_PRE_VERIFY_IP_LIMIT = 600
+const preVerifyHits = new Map<string, { windowStart: number; count: number }>()
+
+function preVerifyExceeded(ip: string, now: number): boolean {
+  let entry = preVerifyHits.get(ip)
+  if (!entry || now - entry.windowStart >= KIOSK_PROFILE_WINDOW_MS) {
+    if (preVerifyHits.size >= 10_000) {
+      for (const [key, value] of preVerifyHits) if (now - value.windowStart >= KIOSK_PROFILE_WINDOW_MS) preVerifyHits.delete(key)
+    }
+    entry = { windowStart: now, count: 0 }
+    preVerifyHits.set(ip, entry)
+  }
+  entry.count += 1
+  return entry.count > KIOSK_PROFILE_PRE_VERIFY_IP_LIMIT
+}
+
+/** 门禁里清空验签前的计数，免得前一个场景的请求算进后一个场景。 */
+export function resetKioskProfilePreVerifyForTests(): void {
+  preVerifyHits.clear()
+}
 const PREP = Symbol('kioskProfileThrottlePrep')
 
 type Proof = (terminalId: string, sessionToken: string | undefined) => Promise<boolean>
@@ -47,7 +74,9 @@ async function verifiedTerminalId(req: Req): Promise<string | null> {
   if (cached) return cached.id
   const terminalId = headerOf(req, 'x-terminal-id')
   let id: string | null = null
-  if (terminalId && proof) {
+  // 先过廉价的 IP 总量闸：超了就不验签（不查 Redis），按未验签处理 → 落进 IP 桶 → 很快 429。
+  const overBudget = preVerifyExceeded(resolveClientIpOrUnknown(req), Date.now())
+  if (terminalId && proof && !overBudget) {
     try {
       if (await proof(terminalId, headerOf(req, 'x-terminal-session-token'))) id = terminalId
     } catch {

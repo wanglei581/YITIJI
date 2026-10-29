@@ -320,7 +320,8 @@ function inspectPng(buffer: Buffer): BrandLogoInspection {
   parts.push(chunk('IDAT', deflateSync(raw, { level: RECOMPRESS_LEVEL })), chunk('IEND', Buffer.alloc(0)))
   const sanitized = Buffer.concat(parts)
   if (sanitized.length > BRAND_LOGO_MAX_BYTES) {
-    return fail('BRAND_LOGO_TOO_LARGE', `Logo 不能超过 ${Math.round(BRAND_LOGO_MAX_BYTES / 1024)}KB`)
+    // 原文件在上限以内，是我们重编码（level 4）后变大了：说清楚是规整后超限，别让人对着 400KB 的文件看「不能超过 512KB」发懵。
+    return fail('BRAND_LOGO_TOO_LARGE', `Logo 规整后超过 ${Math.round(BRAND_LOGO_MAX_BYTES / 1024)}KB，请换一张更小或颜色更简单的图`)
   }
   return { ok: true, mimeType: 'image/png', ext: 'png', width, height, sanitized }
 }

@@ -13,6 +13,8 @@ export class FakeRedis {
   readonly store = new Map<string, string>()
   /** 置 true 模拟 Redis 暂不可用：读写都抛错。 */
   down = false
+  /** 收到过多少次调用（含不可用时抛错的那几次）。门禁用它证明「某条路径一次 Redis 都没碰」。 */
+  calls = 0
   /**
    * 设成一个毫秒时钟函数，setEx 写进去的键就按它到期（默认 null = 不到期）。
    * 门禁里用来模拟「30 分钟的会话凭证到点失效」；只对设置之后写入的键生效。
@@ -31,6 +33,7 @@ export class FakeRedis {
   }
 
   private check(): void {
+    this.calls += 1
     if (this.down) throw new Error('redis unavailable (fixture)')
   }
 

@@ -245,7 +245,7 @@ function paeth(a: number, b: number, c: number): number {
  */
 export function filterRows(rows: Uint8Array[], filters: number[], bytesPerPixel = 1): Buffer {
   const out: Buffer[] = []
-  let prior = new Uint8Array(rows[0]?.length ?? 0)
+  let prior: Uint8Array = new Uint8Array(rows[0]?.length ?? 0)
   rows.forEach((row, y) => {
     const filter = filters[y % filters.length]!
     const line = Buffer.alloc(1 + row.length)

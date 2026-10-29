@@ -5,14 +5,18 @@
  *   1. 静态契约：shared 与 API 本地副本一致；默认值与现状一致；控制器守卫 / 限流 / 注册；Logo 与待机素材分表。
  *   2. 默认：没配置时和今天一模一样（职易达 / 职 / 现有备案号与查询链接），两个公开接口都是。
  *   3. 平台修改生效、写审计；省略不改、清空回默认；非管理员 403。
+ *   3b. 并发的平台修改：六个管理员同时改不同的项，审计「改前」连成一条链（PostgreSQL 靠咨询锁；SQLite 靠事务串行，源码里也钉了锁的位置）。
  *   4. 校验：品牌名 1–12 字、字标恰好 1 字、控制字符 / 零宽字符拒绝；备案链接只许 https + 官方备案域名（含 beian.mps.gov.cn）。
  *   5. Logo：只收 PNG（按文件头判，不信扩展名与 Content-Type）；WebP / SVG / JPEG / GIF / 动图 / 损坏 /
  *      超 512KB / 超 1024 / 非 1:1 一律拒；落盘的是解压校验后重新编码的文件（只剩 IHDR / PLTE / tRNS / IDAT / IEND）；
  *      公开读取只认 Logo 表。文件内容检查的细节（压缩流、夹带、解压炸弹、扫描行布局）在 verify-brand-logo-image.ts。
+ *   5c. Logo 落盘后记账失败：对象要收回；收不回来 → 日志 BRAND_LOGO_ORPHAN_OBJECT + 待清理清单，下次上传补收；清单也写不进去 → 仍有日志。
  *   6. 机构覆盖只影响该机构的终端；逐项独立回退；终端 → 机构 → 平台；org.update 审计记品牌三项的改前改后（并发时 before 是真正的改前）。
  *   6b. kiosk-profile 的授权块：licenseState（ok / grace / inactive）+ acceptsNewSessions / currentSessionMayContinue / noticeLine，
  *      只给状态不给到期日等商务细节；跨场景：会话有效 + 授权到期 → 会话内照常、profile 不许新业务但允许当前继续、换新会话被拒。
  *   9.  限流：验签通过按终端号计数，未验签一律按 IP——伪造终端号拆不了桶（真实 429）。
+ *   9b. 验签之前先按 IP 总量限流：超额后不再验签（Redis 调用数不再增加），仍是真实 429；一分钟窗口过去后恢复。
+ *   9c. Redis 故障时限流照样生效（前 30 次 503、之后 429），恢复后验签终端马上用自己的额度。
  *   7. 未验签 / 未知终端 / 伪造终端头：只拿平台默认，没有点位、没有机构、没有授权状态；公开响应不含任何非公开字段。
  *   8. Redis 暂不可用时已验签请求回 503（一体机据此保持上次状态），不带验签头的请求不受影响。
  *
@@ -39,8 +43,15 @@ import { resetRedisCooldownForTests } from '../src/common/redis/redis-degradatio
 import { RedisService } from '../src/common/redis/redis.service'
 import { setLicenseClock } from '../src/licenses/license-clock'
 import { buildThrottlerConfig } from '../src/common/throttler/terminal-throttle'
-import { kioskProfileGetTracker, KioskProfileThrottleBinder } from '../src/branding/kiosk-profile-throttle'
-import { BrandLogoService } from '../src/branding/brand-logo.service'
+import {
+  KIOSK_PROFILE_MINUTE_LIMIT,
+  KIOSK_PROFILE_PRE_VERIFY_IP_LIMIT,
+  KIOSK_PROFILE_WINDOW_MS,
+  kioskProfileGetTracker,
+  KioskProfileThrottleBinder,
+  resetKioskProfilePreVerifyForTests,
+} from '../src/branding/kiosk-profile-throttle'
+import { BRAND_LOGO_PENDING_CLEANUP_KEY, BrandLogoService } from '../src/branding/brand-logo.service'
 import { BrandingAdminController } from '../src/branding/branding.admin.controller'
 import { BrandingPublicController } from '../src/branding/branding.public.controller'
 import { BrandingService } from '../src/branding/branding.service'
@@ -118,6 +129,12 @@ function assertStatic(): void {
     Reflect.getMetadata('THROTTLER:TRACKERdefault', handler) === kioskProfileGetTracker)
   const publicController = read(join(API_ROOT, 'src/branding/branding.public.controller.ts'))
   c.check('公开控制器不再引用 TerminalScopedThrottle', !/TerminalScopedThrottle/.test(publicController))
+  c.check(`验签前的 IP 总量额度（${KIOSK_PROFILE_PRE_VERIFY_IP_LIMIT} 次/分钟）容得下同一出口 IP 下 20 台终端各自的满额请求`,
+    KIOSK_PROFILE_PRE_VERIFY_IP_LIMIT >= 20 * KIOSK_PROFILE_MINUTE_LIMIT)
+  const brandingService = read(join(API_ROOT, 'src/branding/branding.service.ts'))
+  const updateAdminBody = brandingService.slice(brandingService.indexOf('async updateAdmin('), brandingService.indexOf('private async toAdmin('))
+  c.check('平台品牌设置的写入事务：先拿咨询锁（PostgreSQL），再读「改前」（SQLite 的事务本身串行，所以这条并发行为只能在 PostgreSQL 上测出来，源码里钉住锁的位置）',
+    /dbKind === 'postgres'[\s\S]{0,120}pg_advisory_xact_lock[\s\S]*?const before = await this\.readStored\(tx\)/.test(updateAdminBody))
   c.check('BrandingModule 注册限流的验签绑定器', /KioskProfileThrottleBinder/.test(read(join(API_ROOT, 'src/branding/branding.module.ts'))))
   c.equal('屏上暂停说明在 shared 与 API 副本一致', local.KIOSK_PAUSED_NOTICE_LINE, shared.KIOSK_PAUSED_NOTICE_LINE)
   const appModule = read(join(API_ROOT, 'src/app.module.ts'))
@@ -272,6 +289,47 @@ async function main(): Promise<void> {
     c.check('不带令牌 → 401', (await call('PUT', '/api/v1/admin/branding', { body: { brandName: 'x' } })).status === 401)
     c.check('多余字段 → 400', (await put({ brandName: '甲', extra: 1 })).status === 400)
 
+    // ── 3b. 并发的平台修改：审计「改前」连成一条链 ─────────────────────────────
+    console.log('\n[3b] 并发的平台修改：六个管理员同时改不同的项')
+    const brandingProto = BrandingService.prototype as unknown as { readStored: (this: unknown, store?: unknown) => Promise<unknown> }
+    const realReadStored = brandingProto.readStored
+    // 读完「改前」后故意停一会儿，把读与写之间的空窗拉宽：没有锁，几个事务必然都读到同一个旧值；有锁，后面的事务根本进不了这一步。
+    brandingProto.readStored = async function (this: unknown, store?: unknown) {
+      const value = await realReadStored.call(this, store)
+      await new Promise((resolve) => setTimeout(resolve, 60))
+      return value
+    }
+    try {
+      const knownAuditIds = new Set((await prisma.auditLog.findMany({ where: { action: 'branding.update' }, select: { id: true } })).map((row) => row.id))
+      const raceBodies = [
+        { brandName: '并发品牌名' },
+        { brandMark: '并' },
+        { filing: { icp: '并发ICP备案号' } },
+        { filing: { icpUrl: 'https://beian.miit.gov.cn/' } },
+        { filing: { police: '并发公安备案号' } },
+        { filing: { policeUrl: 'https://www.beian.gov.cn/portal/index' } },
+      ]
+      const raced = await Promise.all(raceBodies.map((body) => put(body)))
+      c.equal('六个同时提交的修改全部成功', raced.map((r) => r.status), raceBodies.map(() => 200))
+      const chainRows = (await prisma.auditLog.findMany({ where: { action: 'branding.update' } }))
+        .filter((row) => !knownAuditIds.has(row.id))
+        .map((row) => JSON.parse(row.payloadJson) as { before: unknown; after: unknown })
+      c.equal('每个修改各一条审计', chainRows.length, raceBodies.length)
+      const byBefore = new Map(chainRows.map((row) => [JSON.stringify(row.before), row]))
+      c.check('六条审计的「改前」各不相同（没有两个事务读到同一个旧值）', byBefore.size === chainRows.length, `不同的改前 ${byBefore.size} 个 / ${chainRows.length} 条`)
+      const afters = new Set(chainRows.map((row) => JSON.stringify(row.after)))
+      const head = chainRows.find((row) => !afters.has(JSON.stringify(row.before)))
+      let walked = 0
+      for (let cursor = head; cursor && walked <= chainRows.length; cursor = byBefore.get(JSON.stringify(cursor.after))) walked += 1
+      c.equal('审计连成一条链：每条的「改前」= 上一条的「改后」，从头走到尾共六条', walked, raceBodies.length)
+      const finalState = (await call('GET', '/api/v1/admin/branding', { token: adminToken() })).json.data
+      c.check('六项修改都生效了（没有互相覆盖）', finalState.brandName === '并发品牌名' && finalState.brandMark === '并' && finalState.filing.icp === '并发ICP备案号' &&
+        finalState.filing.icpUrl === 'https://beian.miit.gov.cn/' && finalState.filing.police === '并发公安备案号' && finalState.filing.policeUrl === 'https://www.beian.gov.cn/portal/index')
+    } finally {
+      brandingProto.readStored = realReadStored
+    }
+    await put({ brandName: null, brandMark: null, filing: { icp: null, icpUrl: null, police: null, policeUrl: null } })
+
     // ── 4. 校验 ─────────────────────────────────────────────────────────────
     console.log('\n[4] 校验')
     const code = async (body: unknown) => {
@@ -389,6 +447,117 @@ async function main(): Promise<void> {
     }
     await prisma.adAsset.delete({ where: { id: adId } })
     await storage.deleteObject(adKey)
+
+    // ── 5c. Logo 落盘后记账失败：对象要收回，收不回来要留痕、留清单、下次补收 ─────
+    console.log('\n[5c] Logo 的对象存储和数据库不在一个事务里：记账失败的补偿')
+    const logoService = app.get(BrandLogoService)
+    const auditService = app.get(AuditService)
+    const hooks = { logo: logoService, audit: auditService, storage } as unknown as Record<string, Record<string, unknown>>
+    const logoLogger = (logoService as unknown as { logger: { error: unknown; warn: unknown } }).logger
+    const logLines: string[] = []
+    logoLogger.error = (message: string) => { logLines.push(`ERROR ${message}`) }
+    logoLogger.warn = (message: string) => { logLines.push(`WARN ${message}`) }
+    const realPut = storage.putObject.bind(storage)
+    const realDelete = storage.deleteObject.bind(storage)
+    const putKeys: string[] = []
+    const orphanKeys: string[] = [] // 门禁自己造的孤儿对象，结束时一个不留
+    let failAllDeletes = false
+    const failingDeleteKeys = new Set<string>()
+    hooks['storage']!['putObject'] = (key: string, body: Buffer, type: string) => { putKeys.push(key); return realPut(key, body, type) }
+    hooks['storage']!['deleteObject'] = async (key: string) => {
+      if (failAllDeletes || failingDeleteKeys.has(key)) throw new Error('storage down (fixture)')
+      return realDelete(key)
+    }
+    const failAudit = () => { hooks['audit']!['writeRequired'] = async () => { throw new Error('audit down (fixture)') } }
+    const healAudit = () => { delete hooks['audit']!['writeRequired'] }
+    const pendingList = async (): Promise<string[]> => {
+      const row = await prisma.platformSetting.findUnique({ where: { key: BRAND_LOGO_PENDING_CLEANUP_KEY } })
+      return row?.value ? (JSON.parse(row.value) as string[]) : []
+    }
+    const uploadError = (buffer: Buffer) => logoService.upload(buffer, { actorId: adminId, actorRole: 'admin' }).then(() => 'resolved', (error: Error) => error.message)
+    const lastKey = () => putKeys[putKeys.length - 1]!
+    const pendingBefore = await prisma.platformSetting.findUnique({ where: { key: BRAND_LOGO_PENDING_CLEANUP_KEY } })
+    try {
+      const logoRowsBefore = await prisma.brandLogo.count()
+      // ① 记账失败、对象收得回：整体失败，对象删掉，不留痕（没有孤儿）
+      failAudit()
+      c.equal('① 记账失败：上传整体失败，抛出的是记账的错误', await uploadError(realPng), 'audit down (fixture)')
+      const key1 = lastKey()
+      orphanKeys.push(key1)
+      c.check('  落盘的对象已收回，也没留下 Logo 记录（事务整体回滚）', (await storage.headObject(key1)) === null && (await prisma.brandLogo.count()) === logoRowsBefore)
+      c.check('  收得回来就不留孤儿痕迹：没有孤儿日志、清单是空的', !logLines.some((line) => line.includes('BRAND_LOGO_ORPHAN')) && (await pendingList()).length === 0)
+      // ② 记账失败、对象也收不回：日志留痕 + 进清单；抛出的仍是记账的错误
+      failAllDeletes = true
+      c.equal('② 记账失败且对象收不回：抛出的仍是记账的错误（不被清理错误盖掉）', await uploadError(realPng), 'audit down (fixture)')
+      const key2 = lastKey()
+      orphanKeys.push(key2)
+      c.check('  对象确实留在存储里（孤儿）', (await storage.headObject(key2)) !== null)
+      c.check('  日志留痕：BRAND_LOGO_ORPHAN_OBJECT 带存储键、记账错误、清理错误',
+        logLines.some((line) => line.startsWith('ERROR BRAND_LOGO_ORPHAN_OBJECT') && line.includes(`key=${key2}`) && line.includes('audit down (fixture)') && line.includes('storage down (fixture)')), logLines.join(' | '))
+      c.equal('  待清理清单记下了这个存储键', await pendingList(), [key2])
+      await uploadError(realPng)
+      const key3 = lastKey()
+      orphanKeys.push(key3)
+      c.equal('  第二个孤儿追加进清单，已有的不重复', await pendingList(), [key2, key3])
+      // ③ 下一次正常上传顺手补收：删得掉的移出清单，删不掉的留着并记重试失败；不挡这次上传
+      healAudit()
+      failAllDeletes = false
+      failingDeleteKeys.add(key2)
+      logLines.length = 0
+      const good1 = await logoService.upload(canvasImage(64, 64, 'image/png'), { actorId: adminId, actorRole: 'admin' })
+      createdLogoIds.push(good1.assetId)
+      c.check('③ 清单里有删不掉的对象，不挡正常上传', /^[0-9a-f]{32}$/.test(good1.assetId))
+      c.equal('  删得掉的移出清单，删不掉的留着', await pendingList(), [key2])
+      c.check('  被补收的对象真的从存储里没了，删不掉的还在', (await storage.headObject(key3)) === null && (await storage.headObject(key2)) !== null)
+      c.check('  删不掉的有重试失败日志', logLines.some((line) => line.startsWith('WARN BRAND_LOGO_ORPHAN_RETRY_FAILED') && line.includes(`key=${key2}`)), logLines.join(' | '))
+      // ④ 存储恢复后下一次上传把剩下的补收掉，清单清空
+      failingDeleteKeys.clear()
+      const good2 = await logoService.upload(canvasImage(64, 64, 'image/png'), { actorId: adminId, actorRole: 'admin' })
+      createdLogoIds.push(good2.assetId)
+      c.equal('④ 存储恢复后下一次上传补收剩下的，清单清空', [await pendingList(), (await storage.headObject(key2)) === null], [[], true])
+      // ⑤ 清单也写不进去：最后一道留痕是日志
+      failAudit()
+      failAllDeletes = true
+      hooks['logo']!['writePending'] = async () => { throw new Error('db down (fixture)') }
+      logLines.length = 0
+      c.equal('⑤ 清单写不进去：抛出的仍是记账的错误', await uploadError(realPng), 'audit down (fixture)')
+      const key5 = lastKey()
+      orphanKeys.push(key5)
+      c.check('  日志里有 BRAND_LOGO_ORPHAN_OBJECT 与 BRAND_LOGO_ORPHAN_UNRECORDED，都带存储键',
+        logLines.some((line) => line.startsWith('ERROR BRAND_LOGO_ORPHAN_OBJECT') && line.includes(`key=${key5}`)) &&
+        logLines.some((line) => line.startsWith('ERROR BRAND_LOGO_ORPHAN_UNRECORDED') && line.includes(`key=${key5}`) && line.includes('db down (fixture)')), logLines.join(' | '))
+      delete hooks['logo']!['writePending']
+      failAllDeletes = false
+      healAudit()
+      // ⑥ 读清单本身失败：不挡这次上传，留一条日志
+      hooks['logo']!['readPending'] = async () => { throw new Error('db read down (fixture)') }
+      logLines.length = 0
+      const good3 = await logoService.upload(canvasImage(64, 64, 'image/png'), { actorId: adminId, actorRole: 'admin' })
+      createdLogoIds.push(good3.assetId)
+      c.check('⑥ 补收时读清单失败：不挡这次上传，留一条 BRAND_LOGO_ORPHAN_DRAIN_FAILED 日志',
+        /^[0-9a-f]{32}$/.test(good3.assetId) && logLines.some((line) => line.startsWith('WARN BRAND_LOGO_ORPHAN_DRAIN_FAILED') && line.includes('db read down (fixture)')), logLines.join(' | '))
+      delete hooks['logo']!['readPending']
+      // ⑦ 被拒的上传（文件不合格）不碰清单：不查库
+      let pendingReads = 0
+      hooks['logo']!['readPending'] = async () => { pendingReads += 1; return [] }
+      await uploadError(Buffer.from('not an image at all'))
+      c.equal('⑦ 文件不合格的上传被拒时不去补收（不额外查库）', pendingReads, 0)
+      delete hooks['logo']!['readPending']
+    } finally {
+      delete hooks['logo']!['writePending']
+      delete hooks['logo']!['readPending']
+      delete hooks['audit']!['writeRequired']
+      delete hooks['storage']!['putObject']
+      delete hooks['storage']!['deleteObject']
+      delete (logoLogger as Record<string, unknown>)['error']
+      delete (logoLogger as Record<string, unknown>)['warn']
+      for (const key of orphanKeys) await realDelete(key).catch(() => undefined)
+      if (pendingBefore) {
+        await prisma.platformSetting.upsert({ where: { key: BRAND_LOGO_PENDING_CLEANUP_KEY }, create: { key: BRAND_LOGO_PENDING_CLEANUP_KEY, value: pendingBefore.value, updatedBy: pendingBefore.updatedBy }, update: { value: pendingBefore.value } })
+      } else {
+        await prisma.platformSetting.deleteMany({ where: { key: BRAND_LOGO_PENDING_CLEANUP_KEY } })
+      }
+    }
 
     // ── 6. 机构覆盖与终端解析 ───────────────────────────────────────────────
     console.log('\n[6] 机构覆盖只影响该机构的终端')
@@ -597,9 +766,15 @@ async function main(): Promise<void> {
       ],
     })
     class ThrottleFixtureModule {}
-    const throttled = await NestFactory.create(ThrottleFixtureModule, { logger: false, abortOnError: false })
-    installGlobals(throttled)
-    await throttled.listen(0, '127.0.0.1')
+    // 每个场景一个全新的应用（限流桶在应用里，不串场景）；验签前的 IP 计数是进程级的，场景之间显式清空。
+    const makeThrottledApp = async () => {
+      const created = await NestFactory.create(ThrottleFixtureModule, { logger: false, abortOnError: false })
+      installGlobals(created)
+      await created.listen(0, '127.0.0.1')
+      return created
+    }
+    resetKioskProfilePreVerifyForTests()
+    const throttled = await makeThrottledApp()
     try {
       const callT = makeCaller(throttled)
       const profileT = (terminalId: string, token: string) =>
@@ -623,9 +798,65 @@ async function main(): Promise<void> {
     } finally {
       await throttled.close()
     }
+
+    // ── 9b. 验签之前先按 IP 总量限流 ───────────────────────────────────────────
+    console.log('\n[9b] 验签之前的廉价 IP 总量限流：超额后不再验签（一次 Redis 都不查），仍是真实 429')
+    resetKioskProfilePreVerifyForTests()
+    const flooded = await makeThrottledApp()
+    const realNow = Date.now
+    try {
+      const callF = makeCaller(flooded)
+      const profileF = (terminalId: string, token: string) =>
+        callF('GET', '/api/v1/public/kiosk-profile', { headers: { 'x-terminal-id': terminalId, 'x-terminal-session-token': token } })
+      const budget = KIOSK_PROFILE_PRE_VERIFY_IP_LIMIT
+      const readsBefore = redis.calls
+      const floodStatuses: number[] = []
+      let readsAtBudget = 0
+      for (let i = 1; i <= budget + 50; i += 1) {
+        floodStatuses.push((await profileF(`flood_${i}_${suffix}`, 'z'.repeat(43))).status)
+        if (i === budget) readsAtBudget = redis.calls
+      }
+      const readsAtEnd = redis.calls
+      c.equal(`同一出口 IP 连发 ${budget + 50} 次伪造请求：前 30 次放行，其余全是真实 429`,
+        [floodStatuses.slice(0, 30).every((status) => status === 200), floodStatuses.slice(30).every((status) => status === 429)], [true, true])
+      c.check(`  额度之内（前 ${budget} 次）的请求照常验签、都查了 Redis（对照：证明下面「一次都没查」不是因为根本没走验签）`, readsAtBudget - readsBefore >= budget, `${readsAtBudget - readsBefore} 次`)
+      c.equal(`  超过 ${budget} 次之后的 50 次请求：Redis 调用数不再增加（验签被跳过，直接落进 IP 桶）`, readsAtEnd - readsAtBudget, 0)
+      // 一分钟窗口过去：计数清零，验签通过的终端又拿到自己的点位（限流桶与验签前计数都用当前时间，一起往后拨）
+      Date.now = () => realNow() + KIOSK_PROFILE_WINDOW_MS + 1_000
+      const recovered = await profileF(termA, tokenA)
+      c.check('  一分钟窗口过去后恢复验签：验签通过的终端又拿到自己的点位', recovered.status === 200 && recovered.json.data.location === LOC_A, `${recovered.status} ${JSON.stringify(recovered.json.data?.location)}`)
+    } finally {
+      Date.now = realNow
+      await flooded.close()
+    }
+
+    // ── 9c. Redis 故障 ─────────────────────────────────────────────────────────
+    console.log('\n[9c] Redis 故障时限流照样生效，恢复后验签终端马上用自己的额度')
+    resetKioskProfilePreVerifyForTests()
+    const outageApp = await makeThrottledApp()
+    try {
+      const callO = makeCaller(outageApp)
+      const profileO = () => callO('GET', '/api/v1/public/kiosk-profile', { headers: { 'x-terminal-id': termA, 'x-terminal-session-token': tokenA } })
+      redis.down = true
+      resetRedisCooldownForTests()
+      const outageStatuses: number[] = []
+      for (let i = 0; i < 40; i += 1) outageStatuses.push((await profileO()).status)
+      c.equal('Redis 不可用时已验签的终端连发 40 次：前 30 次 503（一体机据此保持上次状态），之后 429（限流不依赖 Redis，故障不会变成不设防）',
+        [outageStatuses.slice(0, 30).every((status) => status === 503), outageStatuses.slice(30).every((status) => status === 429)], [true, true])
+      redis.down = false
+      resetRedisCooldownForTests()
+      const back = await profileO()
+      c.check('Redis 恢复后：验签通过的终端用自己的额度，马上 200 且拿到点位（故障期间攒下的 IP 桶 429 不连累它）',
+        back.status === 200 && back.json.data.location === LOC_A, `${back.status} ${JSON.stringify(back.json.data?.location)}`)
+    } finally {
+      redis.down = false
+      resetRedisCooldownForTests()
+      await outageApp.close()
+    }
   } finally {
     redis.down = false
     resetRedisCooldownForTests()
+    resetKioskProfilePreVerifyForTests()
     await prisma.platformSetting.deleteMany({ where: { key: { in: SETTING_KEYS } } }).catch(() => undefined)
     if (settingsBefore.length > 0) {
       await prisma.platformSetting.createMany({ data: settingsBefore.map(({ key, value, updatedBy }) => ({ key, value, updatedBy })) }).catch(() => undefined)
