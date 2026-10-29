@@ -453,6 +453,46 @@ test('cancel-completed race rechecks status and recovers the real scan file @w2'
   await expectHealthy(page, errors)
 })
 
+/*
+ * 确认一落地，等授权屏（[再确认一次 | 取消扫描]）换成等回传屏（[取消扫描 | 立即检查]）。
+ * 右格那个「取消扫描」要是被 React 按位置复用成「立即检查」，正好在这一瞬间按下去的人
+ * （或慢机器上的自动点击）按到的就是另一个按钮：取消没武装。上面那条竞态用例在慢 CI 上就是这样红的
+ * （第二下等不到「再点一次确认取消」），本机确认回得快，永远撞不上。
+ * 这里把确认的回话扣住，先按住「取消扫描」那个节点，再放行确认：节点还得是它、名字还得是「取消扫描」。
+ */
+test('cancel row stays the cancel row when the delivery ack lands under the finger @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  let releaseAck: () => void = () => undefined
+  const ackHeld = new Promise<void>((resolve) => { releaseAck = resolve })
+  await routeExact(page, 'POST', ACK_PATH, async (route) => {
+    await ackHeld
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true, data: { scanTaskId: SCAN_TASK_ID, deliveryAckedAt: DELIVERY_ACKED_AT } }),
+    })
+  })
+  await routeExact(page, 'GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(scanStatus('waiting')) })
+  })
+
+  await seedScanLive(page)
+  await page.goto('/scan?stage=progress')
+  // 确认还没回话：这一屏是等授权屏，右格是「取消扫描」。
+  await expect(page.getByRole('heading', { name: '正在确认能收到扫描件' })).toBeVisible()
+  const cancelRow = await page.getByRole('button', { name: '取消扫描' }).elementHandle()
+  expect(cancelRow, '确认没回话时这一屏就有「取消扫描」').not.toBeNull()
+
+  releaseAck()
+  await expect(page.getByRole('heading', { name: '等待打印机端扫描完成' })).toBeVisible()
+  // 还是刚才那个节点（被挪去了左格），名字还是「取消扫描」，不是「立即检查」。
+  expect(await cancelRow!.getAttribute('aria-label'), '确认落地之后，那个节点不许改叫别的').toBe('取消扫描')
+  await cancelRow!.click()
+  await expect(page.getByRole('button', { name: '再点一次确认取消' })).toBeVisible()
+  await expectHealthy(page, errors)
+})
+
 const resultState = {
   scanType: 'resume',
   success: true,

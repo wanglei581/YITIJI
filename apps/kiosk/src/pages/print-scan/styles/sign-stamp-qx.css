@@ -126,13 +126,14 @@
 .ss-card[data-kind='error'] { background: var(--qxt-cin-wash); color: var(--qxt-clay-ink); }
 .ss-card[data-kind='lock'] { background: var(--qxt-slate-wash); color: var(--qxt-slate-ink); }
 
+/* 24px 标题行的行高不低于 1.45（原因见 tool-fs.css 顶部「行高底线」），下面 .ss-outcard h3 同。 */
 .ss-card-h {
   display: flex;
   align-items: center;
   gap: 12px;
   font-size: 24px;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.45;
 }
 
 .ss-card-p {
@@ -415,7 +416,7 @@
 .ss-outcard h3 {
   margin: 0;
   font-size: 24px;
-  line-height: 1.3;
+  line-height: 1.45;
   color: var(--qxt-ink);
 }
 
