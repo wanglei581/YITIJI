@@ -1,3 +1,4 @@
+import type { VoiceUsage } from '../../ai/voice-usage'
 import { Injectable, Logger } from '@nestjs/common'
 import { randomUUID } from 'crypto'
 import { tc3Sign } from '../../common/tencent/tc3'
@@ -27,6 +28,7 @@ export interface TtsResult {
   /** base64 mp3 */
   audio?: string
   errorMessage?: string
+  voiceUsage?: VoiceUsage
 }
 
 function intEnv(name: string, fallback: number): number {
@@ -115,28 +117,33 @@ export class TtsService {
   /** 合成一段播报音频（mp3 base64）。失败诚实返回，前端降级本地 TTS。 */
   async synthesize(text: string): Promise<TtsResult> {
     if (!this.enabled) {
-      return { ok: false, errorMessage: '语音播报未启用' }
+      return { ok: false, errorMessage: '语音播报未启用', voiceUsage: { textChars: 0, succeededChars: 0, segments: 0, succeededSegments: 0, complete: false, rule: 'v1' } }
     }
     const clean = text.trim().slice(0, 600)
-    if (!clean) return { ok: false, errorMessage: '播报内容为空' }
+    if (!clean) return { ok: false, errorMessage: '播报内容为空', voiceUsage: { textChars: 0, succeededChars: 0, segments: 0, succeededSegments: 0, complete: false, rule: 'v1' } }
     // 出站白名单：地址不在单内就一段都不合成（前端照常降级本地播报）。
     if (!isAiEndpointAllowed(this.endpoint, 'tts') || !isTencentRegionAllowed(process.env['TENCENT_TTS_REGION'] ?? 'ap-guangzhou', 'tts')) {
-      return { ok: false, errorMessage: '语音播报服务地址未通过核准，本次没有发出请求' }
+      return { ok: false, errorMessage: '语音播报服务地址未通过核准，本次没有发出请求', voiceUsage: { textChars: 0, succeededChars: 0, segments: 0, succeededSegments: 0, complete: false, rule: 'v1' } }
     }
     const t0 = Date.now()
     const segments = splitForTts(clean)
     const parts: Buffer[] = []
+    const voiceUsage: VoiceUsage = { textChars: 0, succeededChars: 0, segments: segments.length, succeededSegments: 0, complete: false, rule: 'v1' }
     for (const seg of segments) {
+      voiceUsage.textChars! += Array.from(seg).length
       const part = await this.synthesizeSegment(seg)
       if (!part) {
         this.logMeta('tts.fail', { ms: Date.now() - t0, segs: segments.length })
-        return { ok: false, errorMessage: '语音合成失败' }
+        return { ok: false, errorMessage: '语音合成失败', voiceUsage }
       }
       parts.push(part)
+      voiceUsage.succeededChars! += Array.from(seg).length
+      voiceUsage.succeededSegments!++
     }
+    voiceUsage.complete = true
     const audio = Buffer.concat(parts)
     this.logMeta('tts.ok', { ms: Date.now() - t0, segs: segments.length, bytes: audio.length })
-    return { ok: true, audio: audio.toString('base64') }
+    return { ok: true, audio: audio.toString('base64'), voiceUsage }
   }
 
   private async synthesizeSegment(text: string): Promise<Buffer | null> {

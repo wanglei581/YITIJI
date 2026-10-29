@@ -22,8 +22,8 @@ export { AI_OPERATION_LABELS as OPERATION_LABELS } from '@ai-job-print/shared'
 export const NON_TOKEN_BILLED_OPS: readonly AiOperation[] = ['voiceTranscribe', 'voiceSynthesize']
 
 export const NON_TOKEN_BILLED_NOTE: Record<string, string> = {
-  voiceTranscribe: '按音频时长计费',
-  voiceSynthesize: '按字符数计费',
+  voiceTranscribe: '音频时长',
+  voiceSynthesize: '合成文字',
   // 注：selfAssessment 曾被误列在此。它是**按 token 计费**的付费 LLM 调用，
   // 本表只在 !row.tokenBilled 时才会被读到，所以那条目永远读不到，
   // 却会误导后来人以为它按量计费。已移除。

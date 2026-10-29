@@ -1,3 +1,4 @@
+import { wavDuration } from '../asr/wav-duration'
 import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
 import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { FileInterceptor } from '@nestjs/platform-express'
@@ -185,6 +186,7 @@ export class MockInterviewController {
     this.aiLog.record({
       taskId: id,
       operation: 'voiceTranscribe',
+      voiceUsage: wavDuration(audio.buffer),
       provider: this.asr.activeProviderName,
       status: result.ok ? 'success' : 'failed',
       latencyMs: Math.max(0, Date.now() - asrStartedAt),
@@ -223,6 +225,7 @@ export class MockInterviewController {
     this.aiLog.record({
       taskId: id,
       operation: 'voiceSynthesize',
+      voiceUsage: result.voiceUsage,
       provider: 'tts:tencent',
       status: result.ok ? 'success' : 'failed',
       latencyMs: Math.max(0, Date.now() - ttsStartedAt),

@@ -24464,6 +24464,7 @@
     ],
     "services/api/src/ai/ai.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-cost-runtime.ts",
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
       "services/api/scripts/verify-ai-public-quota.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
@@ -25049,6 +25050,9 @@
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-voice-generate.ts"
+    ],
+    "services/api/src/asr/wav-duration.ts": [
+      "services/api/scripts/verify-ai-cost-runtime.ts"
     ],
     "services/api/src/assistant/daily-brief.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
@@ -26824,6 +26828,7 @@
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/asr/tts.service.ts": [
+      "services/api/scripts/verify-ai-cost-runtime.ts",
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-mock-interview.ts"
@@ -26861,6 +26866,7 @@
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-cost-runtime.ts",
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-mock-interview.ts",
@@ -35603,12 +35609,16 @@
         "dirs": [],
         "files": [
           "services/api/src/ai/ai-log.service.ts",
+          "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/providers/claude.provider.stub.ts",
           "services/api/src/ai/providers/local.provider.stub.ts",
           "services/api/src/ai/providers/mock.provider.ts",
           "services/api/src/ai/providers/openai.provider.stub.ts",
           "services/api/src/ai/providers/qwen.provider.stub.ts",
-          "services/api/src/ai/providers/zhipu.provider.stub.ts"
+          "services/api/src/ai/providers/zhipu.provider.stub.ts",
+          "services/api/src/asr/wav-duration.ts",
+          "services/api/src/mock-interview/asr/tts.service.ts",
+          "services/api/src/mock-interview/mock-interview.controller.ts"
         ],
         "missing": []
       },

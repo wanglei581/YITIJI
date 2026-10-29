@@ -163,3 +163,76 @@ export async function costTriStateRuntimeChecks(
   })
 }
 
+
+/** 物理用量测试：只记录可证明的成功段，金额始终留空。 */
+export async function voiceUsageRuntimeChecks(pass: Check, fail: Check, aiLog: import('../src/ai/ai-log.service').AiLogService): Promise<void> {
+  const { wavDuration } = await import('../src/asr/wav-duration')
+  const wav = Buffer.alloc(48)
+  wav.write('RIFF', 0); wav.writeUInt32LE(40, 4); wav.write('WAVEfmt ', 8)
+  wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22)
+  wav.writeUInt32LE(2, 24); wav.writeUInt32LE(4, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34)
+  wav.write('data', 36); wav.writeUInt32LE(4, 40)
+  const valid = wavDuration(wav)
+  if (valid.complete && valid.audioSeconds === 1 && !wavDuration(wav.subarray(0, 47)).complete && !wavDuration(Buffer.from('not wav')).complete) pass('语音用量: 合法 WAV 及截断、非 WAV')
+  else fail('语音用量: WAV 合法及损坏判断错误')
+  const { AiController } = await import('../src/ai/ai.controller')
+  const { MockInterviewController } = await import('../src/mock-interview/mock-interview.controller')
+  const recorded: Array<{ voiceUsage?: { audioSeconds?: number | null; complete: boolean } }> = []
+  const fakeAsr = { activeProviderName: 'test', recognizeWav: async () => ({ ok: true, text: 'ok' }) }
+  const log = { record: (entry: { voiceUsage?: { audioSeconds?: number | null; complete: boolean } }) => recorded.push(entry) }
+  const controller = new AiController(...(Array.from({ length: AiController.length }, () => ({})) as never[]))
+  Object.assign(controller, { asr: fakeAsr, logService: log, audit: { write: async () => undefined }, publicQuota: { consume: async () => ({ keys: ['k'] }), rollback: async () => undefined }, jwt: {}, redis: {}, prisma: {} })
+  const interview = new MockInterviewController({ getSession: async () => ({}) } as never, fakeAsr as never, {} as never, {} as never, {} as never, {} as never, log as never)
+  const file = (buffer: Buffer) => ({ buffer }) as Express.Multer.File
+  const req = { headers: {} } as never
+  const entrances = [
+    (buffer: Buffer) => controller.transcribeResumeVoice(file(buffer), req),
+    (buffer: Buffer) => controller.transcribeAssistantVoice(file(buffer), req),
+    (buffer: Buffer) => interview.transcribe('test', file(buffer), req),
+  ]
+  for (const [index, run] of entrances.entries()) {
+    const start = recorded.length
+    try {
+      await run(wav)
+      await run(wav.subarray(0, 47))
+      await run(Buffer.from('not wav')).catch(() => undefined)
+      const rows = recorded.slice(start)
+      if (rows[0]?.voiceUsage?.audioSeconds === 1 && rows[0].voiceUsage.complete && rows[1]?.voiceUsage?.audioSeconds === null && !rows[1].voiceUsage.complete && (index < 2 ? rows.length === 2 : rows[2]?.voiceUsage?.audioSeconds === null && !rows[2].voiceUsage.complete)) pass(`语音用量: ASR 入口 ${index + 1} 合法、损坏、非 WAV`)
+      else fail(`语音用量: ASR 入口 ${index + 1} 用量错误`)
+    } catch (error) { fail(`语音用量: ASR 入口 ${index + 1} 异常 ${String(error)}`) }
+  }
+  const { TtsService, splitForTts } = await import('../src/mock-interview/asr/tts.service')
+  const oldId = process.env['TENCENT_TTS_SECRET_ID'], oldKey = process.env['TENCENT_TTS_SECRET_KEY'], oldProvider = process.env['TTS_PROVIDER']
+  process.env['TENCENT_TTS_SECRET_ID'] = 'test'; process.env['TENCENT_TTS_SECRET_KEY'] = 'test'; process.env['TTS_PROVIDER'] = 'tencent'
+  try {
+    const service = new TtsService()
+    const sent: string[] = []
+    ;(service as unknown as { synthesizeSegment: (text: string) => Promise<Buffer | null> }).synthesizeSegment = async (text) => {
+      sent.push(text)
+      return sent.length === 2 ? null : Buffer.from('audio')
+    }
+    const input = '中文 & 特殊字符。' + '测'.repeat(100)
+    const result = await service.synthesize(input)
+    const expected = splitForTts(input)
+    if (!result.ok && sent.length === 2 && result.voiceUsage?.segments === expected.length && result.voiceUsage.succeededSegments === 1 && result.voiceUsage.succeededChars === Array.from(sent[0]!).length && result.voiceUsage.textChars === sent.reduce((n, part) => n + Array.from(part).length, 0) && !result.voiceUsage.complete) pass('语音用量: 中文特殊字符、分段与部分失败')
+    else fail('语音用量: TTS 分段或部分失败计数错误')
+    ;(service as unknown as { synthesizeSegment: (text: string) => Promise<Buffer | null> }).synthesizeSegment = async () => Buffer.from('audio')
+    const success = await service.synthesize(input)
+    if (success.ok && success.voiceUsage?.complete && success.voiceUsage.succeededSegments === expected.length && success.voiceUsage.succeededChars === expected.reduce((n, part) => n + Array.from(part).length, 0)) pass('语音用量: 全部合成成功的字符和段数')
+    else fail('语音用量: 全部成功的字符或段数错误')
+
+  } finally {
+    if (oldId === undefined) delete process.env['TENCENT_TTS_SECRET_ID']; else process.env['TENCENT_TTS_SECRET_ID'] = oldId
+    if (oldKey === undefined) delete process.env['TENCENT_TTS_SECRET_KEY']; else process.env['TENCENT_TTS_SECRET_KEY'] = oldKey
+    if (oldProvider === undefined) delete process.env['TTS_PROVIDER']; else process.env['TTS_PROVIDER'] = oldProvider
+  }
+  const before = await aiLog.getUsage('test')
+  aiLog.record({ taskId: null, operation: 'voiceTranscribe', provider: 'asr:test', latencyMs: 1, status: 'success', voiceUsage: valid })
+  // 失败的识别即使带完整时长也不计入：供应方是否计费不明，宁可少算不多算
+  aiLog.record({ taskId: null, operation: 'voiceTranscribe', provider: 'asr:test', latencyMs: 1, status: 'failed', voiceUsage: valid })
+  aiLog.record({ taskId: null, operation: 'voiceSynthesize', provider: 'tts:test', latencyMs: 1, status: 'failed', voiceUsage: { textChars: 8, succeededChars: 3, segments: 2, succeededSegments: 1, complete: false, rule: 'v1' } })
+  await aiLog.flush()
+  const after = await aiLog.getUsage('test')
+  if (after.voiceUsageTotals.asrSeconds - before.voiceUsageTotals.asrSeconds === 1 && after.voiceUsageTotals.asrCallsWithUsage - before.voiceUsageTotals.asrCallsWithUsage === 1 && after.voiceUsageTotals.ttsChars - before.voiceUsageTotals.ttsChars === 3 && after.unmeasuredCalls - before.unmeasuredCalls === 3 && after.tokenUsageTotals.totalTokens === before.tokenUsageTotals.totalTokens) pass('语音用量: 落库回读、部分成功聚合、token 与费用未受影响')
+  else fail('语音用量: 落库聚合或 token / 费用不符合预期')
+}
