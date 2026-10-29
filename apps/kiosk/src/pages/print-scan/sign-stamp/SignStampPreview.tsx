@@ -151,14 +151,14 @@ export function SignStampPreview({
             top: `${(box.y / PAGE_H) * 100}%`,
             width: `${(box.w / PAGE_W) * 100}%`,
             height: `${(box.h / PAGE_H) * 100}%`,
-            fontSize: 15,
+            fontSize: 20,
           }
         : {
             left: box.x * scale,
             top: box.y * scale,
             width: box.w * scale,
             height: box.h * scale,
-            fontSize: Math.max(15, box.h * 0.26 * scale),
+            fontSize: Math.max(20, box.h * 0.26 * scale),
           }}
     >
       签名图
