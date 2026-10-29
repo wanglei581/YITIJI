@@ -169,6 +169,12 @@ test('W-75 back home, idle 31s, open 我的 → 还是你吗？→ 不是我 cle
   await expect(page.getByRole('alertdialog', { name: '还是你吗？' })).toHaveCount(1)
   await expect(dialog).toHaveAttribute('aria-modal', 'true')
   await expect(dialog).toHaveAccessibleDescription('确认之前不会显示上一位的文件和订单。')
+  // 10/29 走查 I-06：「不是我」卡曾配「手机 + 上传按钮」的插画，与「结束上一位的使用」的意思不搭。
+  // 现在配一叠纸（「清掉这台机器上这一次的临时信息」，同触屏稿「本机会清除」那张卡的用图），「是我」仍配简历。
+  const notMeArt = dialog.getByRole('button', { name: '不是我，结束上一位的使用' }).locator('.me-answer-art')
+  await expect(notMeArt).toHaveAttribute('data-art', 'stack')
+  await expect(notMeArt).not.toContainText('上传')
+  await expect(dialog.getByRole('button', { name: '是我，继续' }).locator('.me-answer-art')).toHaveAttribute('data-art', 'resume')
   // 两张答案卡的可点区域不小于 64×64（现在靠 .me-answers 里 160px 起的卡高撑着，改版后不能丢）。
   for (const name of ['是我，继续', '不是我，结束上一位的使用']) {
     const box = await dialog.getByRole('button', { name }).boundingBox()
