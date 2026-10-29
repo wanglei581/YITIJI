@@ -264,8 +264,10 @@ test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {
 
     await jobsEntry.click()
     await page.waitForURL((u) => u.pathname === '/jobs-service', { timeout: 10000 })
-    const fairEntry = page.locator('button.qx-hub-quick-item').filter({ hasText: '招聘会' })
-    await expect(fairEntry, '社会招聘服务台要有招聘会入口').toBeEnabled({ timeout: 15000 })
+    // 首页不再单列招聘会磁贴（第二包），社会招聘台换成触屏版后（第十一包）旧台的「招聘会」快捷入口
+    // （button.qx-hub-quick-item）一并退出，进招聘会台（/fairs-service）的路是台里「实习、校招岗位在『校园招聘』里」那句话里的按钮。
+    const fairEntry = page.getByRole('button', { name: '校园招聘', exact: true })
+    await expect(fairEntry, '社会招聘服务台要有进招聘会台的入口').toBeEnabled({ timeout: 15000 })
     await step(page, s, 'jobs-to-fairs')
     await fairEntry.click()
     await page.waitForURL((u) => u.pathname === '/fairs-service', { timeout: 10000 })
