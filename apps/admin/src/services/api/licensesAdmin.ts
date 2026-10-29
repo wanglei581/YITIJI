@@ -13,18 +13,21 @@ function mockAttention(): LicenseAttention {
   const now = Date.now()
   const day = 86_400_000
   const iso = (offset: number) => new Date(now + offset * day).toISOString()
+  const date = (offset: number) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(now + offset * day))
+  const midnight = (offset: number) => new Date(`${date(offset)}T00:00:00+08:00`).toISOString()
   const overview = (item: (typeof MOCK_LICENSES)[number], index: number): OrgLicenseOverview => {
     const current: LicenseView = {
-      id: `license-demo-${index + 1}`, orgId: item.orgId, licenseeName: item.licenseeName, creditCode: item.creditCode,
-      contractNo: item.contractNo, startsAt: iso(item.endsInDays - 365), endsAt: iso(item.endsInDays),
-      graceDays: 7, graceEndsAt: iso(item.endsInDays + 7), terminalQuota: 3, status: 'active',
+      id: `license-demo-${index + 1}`, orgId: item.orgId, version: 1, licenseeName: item.licenseeName, creditCode: item.creditCode,
+      contractNo: item.contractNo, startsAt: midnight(item.endsInDays - 365), endsAt: midnight(item.endsInDays + 1),
+      startsOn: date(item.endsInDays - 365), endsOn: date(item.endsInDays), periodText: `${date(item.endsInDays - 365)} 至 ${date(item.endsInDays)}（北京时间，含当天）`, graceEndsOn: date(item.endsInDays + 7),
+      graceDays: 7, graceEndsAt: midnight(item.endsInDays + 8), terminalQuota: 3, status: 'active',
       phase: item.state === 'ok' ? 'active' : 'grace', note: null, statusReason: null, statusTicketNo: null,
       statusChangedAt: null, statusChangedBy: null, createdBy: 'demo-admin', updatedBy: null,
       createdAt: iso(item.endsInDays - 372 - index), updatedAt: iso(-20 - index),
     }
     return { orgId: item.orgId, orgName: item.orgName, licenseMode: 'required', managed: true, state: item.state, usable: true,
       daysLeft: item.state === 'ok' ? item.endsInDays : item.endsInDays + 7, coveredUntil: item.state === 'ok' ? current.endsAt : null,
-      current, upcoming: null, terminalQuota: 3, terminalsBound: 2, overQuota: false }
+      coveredUntilOn: item.state === 'ok' ? current.endsOn : null, current, upcoming: null, terminalQuota: 3, terminalsBound: 2, overQuota: false }
   }
   const all = MOCK_LICENSES.map(overview)
   const expiringSoon = all.filter((item) => item.state === 'ok')

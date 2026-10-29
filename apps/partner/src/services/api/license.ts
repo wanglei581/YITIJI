@@ -12,8 +12,3 @@ export async function getPartnerLicense(): Promise<PartnerLicenseView> {
   }
   return ((await res.json()) as { data: PartnerLicenseView }).data
 }
-
-export function beijingDate(value: string, exclusiveEnd = false): string {
-  const date = new Date(new Date(value).getTime() - (exclusiveEnd ? 1 : 0))
-  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
-}

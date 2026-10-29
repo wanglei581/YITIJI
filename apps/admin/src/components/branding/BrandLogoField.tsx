@@ -2,12 +2,11 @@ import { useState } from 'react'
 import { BRAND_LOGO_MAX_BYTES, BRAND_LOGO_MIME_TYPES, BRAND_LOGO_MAX_PIXELS, formatCount } from '@ai-job-print/shared'
 import { brandingAdmin, brandingError, logoPreviewUrl } from '../../services/api/brandingAdmin'
 
-const names: Record<string, string> = { 'image/png': 'PNG', 'image/webp': 'WebP' }
+const names: Record<string, string> = { 'image/png': 'PNG' }
 const types = BRAND_LOGO_MIME_TYPES.map((type) => names[type] ?? type).join(' 或 ')
 function matchesHeader(bytes: Uint8Array): boolean {
   return BRAND_LOGO_MIME_TYPES.some((type: string) => {
     if (type === 'image/png') return [137, 80, 78, 71, 13, 10, 26, 10].every((v, i) => bytes[i] === v)
-    if (type === 'image/webp') return [82, 73, 70, 70].every((v, i) => bytes[i] === v) && [87, 69, 66, 80].every((v, i) => bytes[i + 8] === v)
     return false
   })
 }

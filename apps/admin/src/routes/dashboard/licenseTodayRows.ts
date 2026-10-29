@@ -2,16 +2,12 @@ import { formatCount, type LicenseAttention, type OrgLicenseOverview } from '@ai
 import type { QueueState } from '../../components/first-order/useServiceQueues'
 import type { TodayRow } from './todayServiceRows'
 
-function lastDate(value: string): string {
-  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(new Date(value).getTime() - 1))
-}
-
 function describe(item: OrgLicenseOverview): string {
   if (item.state === 'suspended') return '已停用（已暂停）'
   if (item.state === 'expired') return '已停用（已到期）'
   if (item.state === 'unlicensed') return '已停用（没有可用授权）'
   if (item.state === 'grace') return item.daysLeft === null ? '宽限期（剩余天数未读到）' : `宽限期还剩 ${formatCount(item.daysLeft)} 天`
-  const end = item.coveredUntil ? `，最后有效日 ${lastDate(item.coveredUntil)} 到期` : '，最后有效日未读到'
+  const end = item.coveredUntilOn ? `，有效至 ${item.coveredUntilOn}（含当天）` : '，有效期这次没读到'
   return `${item.daysLeft === null ? '剩余天数未读到' : `还剩 ${formatCount(item.daysLeft)} 天`}${end}`
 }
 
