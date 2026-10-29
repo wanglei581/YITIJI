@@ -831,21 +831,22 @@ async function main(): Promise<void> {
     }
 
     // ── 9c. Redis 故障 ─────────────────────────────────────────────────────────
-    console.log('\n[9c] Redis 故障时限流照样生效，恢复后验签终端马上用自己的额度')
+    console.log('\n[9c] Redis 故障：验签出错一律当作没验过（按 IP 计数），限流照样生效，恢复后验签终端马上用自己的额度')
     resetKioskProfilePreVerifyForTests()
     const outageApp = await makeThrottledApp()
     try {
       const callO = makeCaller(outageApp)
-      const profileO = () => callO('GET', '/api/v1/public/kiosk-profile', { headers: { 'x-terminal-id': termA, 'x-terminal-session-token': tokenA } })
+      const profileO = (terminalId: string) => callO('GET', '/api/v1/public/kiosk-profile', { headers: { 'x-terminal-id': terminalId, 'x-terminal-session-token': tokenA } })
       redis.down = true
       resetRedisCooldownForTests()
       const outageStatuses: number[] = []
-      for (let i = 0; i < 40; i += 1) outageStatuses.push((await profileO()).status)
-      c.equal('Redis 不可用时已验签的终端连发 40 次：前 30 次 503（一体机据此保持上次状态），之后 429（限流不依赖 Redis，故障不会变成不设防）',
+      // 每次换一个终端号：验签出错若被当成「验过了」，每个伪造号就有自己的桶，永远不会 429
+      for (let i = 0; i < 40; i += 1) outageStatuses.push((await profileO(`outage_${i}_${suffix}`)).status)
+      c.equal('Redis 不可用时换着终端号连发 40 次：前 30 次 503（一体机据此保持上次状态），之后 429（验签出错当作没验过、按 IP 计数，故障不会变成不设防）',
         [outageStatuses.slice(0, 30).every((status) => status === 503), outageStatuses.slice(30).every((status) => status === 429)], [true, true])
       redis.down = false
       resetRedisCooldownForTests()
-      const back = await profileO()
+      const back = await profileO(termA)
       c.check('Redis 恢复后：验签通过的终端用自己的额度，马上 200 且拿到点位（故障期间攒下的 IP 桶 429 不连累它）',
         back.status === 200 && back.json.data.location === LOC_A, `${back.status} ${JSON.stringify(back.json.data?.location)}`)
     } finally {
