@@ -7,23 +7,8 @@
     "不要往这里加条目。共享模块（src/pages/ 以外）不能进名单，零容忍。",
     "包号是触屏版页面包的编号：3 打印、4 简历三条主路、5 公共与系统、6 我的与权益、7 简历其余页、9 扫描复印、10 政策与受控扩展、11 私有化版招聘；第 2 包首页与第 8 包练面试没有存量命中。",
     "2026-10-29 词表补了 8 条短说法（现场工作人员、叫 / 请 / 问 / 向工作人员、工作人员现场 / 会、由工作人员），名单随之重算：72 个文件 216 处 → 78 个文件 263 处。",
-    "2026-10-29 触屏版集成（十个页面包并成一条线）：各包整页重写后清掉了大部分说法，名单按集成后的实际命中只减不增：78 个文件 263 处 → 7 个文件 17 处；清零的条目已删，减少的已改小。"
+    "2026-10-29 触屏版集成（十个页面包并成一条线）：各包整页重写后清掉了大部分说法，名单按集成后的实际命中只减不增：78 个文件 263 处 → 7 个文件 17 处；清零的条目已删，减少的已改小。",
+    "2026-10-29 触屏版集成后修复（对第一包的小 PR）：剩下的 7 个文件 17 处全部清掉——屏上句子（第 4 包简历 U 盘面板 3 处、导出校验提示 4 处，第 6 包待退款说明 2 处）换成标准句，注释与正则类的 8 处（第 3 包 7 处、第 9 包 1 处）改注释措辞、把正则换成读词表；名单从 7 个文件 17 处降到 0。名单仍然只许减不许增，下面是空对象。"
   ],
-  "packages": {
-    "触屏版第 3 包 · 打印": {
-      "src/pages/print-scan/PrintScanHomePage.tsx": 1,
-      "src/pages/print/PrintCashierPage.tsx": 6
-    },
-    "触屏版第 4 包 · 简历三条主路": {
-      "src/pages/resume/components/ResumeUsbImportPanel.tsx": 3,
-      "src/pages/resume/components/resume-deliver/optimizeStateCopy.ts": 4
-    },
-    "触屏版第 6 包 · 我的与权益": {
-      "src/pages/profile/me/printOrders/OrderPaymentSummary.tsx": 1,
-      "src/pages/profile/me/printOrders/paymentCopy.ts": 1
-    },
-    "触屏版第 9 包 · 扫描复印": {
-      "src/pages/scan/scanDeliveryAck.ts": 1
-    }
-  }
+  "packages": {}
 }

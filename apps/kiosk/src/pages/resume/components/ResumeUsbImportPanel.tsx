@@ -4,6 +4,8 @@ import { FileTextIcon, LoaderIcon, RefreshCwIcon, UsbIcon } from 'lucide-react'
 import { Button, KioskStatePanel } from '@ai-job-print/ui'
 import { useUsbImportGate, type UsbImportGate } from '../../../hooks/useUsbImportGate'
 import { unattendedResumeCopy } from '../touch/unattendedResumeCopy'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../hooks/useSupportContact'
 import { QxTouchIcon } from '../../../components/qingxu/touch/QxTouchIcon'
 import { useAuth } from '../../../auth/useAuth'
 import {
@@ -65,7 +67,7 @@ function inferFormat(mimeType: string, filename: string): string {
   return 'unknown'
 }
 
-const PANEL_USB_UNCONFIGURED_NOTE = '这台机器暂未开通 U 盘导入。请改用手机扫码上传，或联系现场工作人员。'
+const PANEL_USB_UNCONFIGURED_NOTE = '这台机器暂未开通 U 盘导入。请改用手机扫码上传。'
 
 function formatBadge(filename: string, extension: string): string {
   const fromName = inferFormat('', filename)
@@ -87,6 +89,8 @@ function UsbNote({ title, description, actions, tone }: { title: string; descrip
 }
 
 export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyChange, unattended = false, onListed, onPickChange }: ResumeUsbImportPanelProps) {
+  // 读后台的服务电话并在读到后重绘；求助句取同一份缓存（读不到号码时不写死号码）。
+  const contact = useSupportContact()
   const ownGate = useUsbImportGate(PANEL_USB_UNCONFIGURED_NOTE)
   const gate = gateFromParent ?? ownGate
   const { getToken } = useAuth()
@@ -132,7 +136,7 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
         setFiles(null)
         setError(unattended
           ? unattendedResumeCopy(userMessageOf(err, 'U盘读取失败，请重新插入。'))
-          : userMessageOf(err, 'U盘读取失败，请重新插入或联系现场工作人员'))
+          : userMessageOf(err, `U盘读取失败，请重新插入。${helpNeededLine()}。`))
       } finally {
         if (!cancelled) {
           setLoading(false)
@@ -203,7 +207,7 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
         compact
         tone="empty"
         title="这台机器暂未开通 U 盘导入"
-        description="请改用手机扫码上传，或联系现场工作人员。"
+        description={`请改用手机扫码上传。${helpNeededLine(contact)}。`}
       />
     )
   }

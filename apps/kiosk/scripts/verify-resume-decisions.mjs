@@ -57,10 +57,16 @@ const { outputText: copyJs } = ts.transpileModule(copySrc, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 })
 const fallback = '原有非校验错误文案'
-new Function('exports', 'module', 'require', copyJs)(copyModule.exports, copyModule, () => ({
-  errorCodeOf: (error) => error.code,
-  userMessageOf: () => fallback,
-}))
+// 导出被拒的提示要带标准句 1（服务电话）、不叫用户找现场的人：把 copy/unattendedCopy.ts 真转译进来用，句子与词表都不另抄。
+const unattended = { exports: {} }
+new Function('exports', 'module', ts.transpileModule(readFileSync(new URL('../src/copy/unattendedCopy.ts', import.meta.url), 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText)(unattended.exports, unattended)
+new Function('exports', 'module', 'require', copyJs)(copyModule.exports, copyModule, (id) => (
+  id.endsWith('copy/unattendedCopy')
+    ? unattended.exports
+    : { errorCodeOf: (error) => error.code, userMessageOf: () => fallback }
+))
 const validation = (message) => Object.assign(new Error(message), { code: 'VALIDATION_FAILED' })
 const { optimizeExportErrorMessage } = copyModule.exports
 assert.match(optimizeExportErrorMessage(validation('basic.name should not be empty')), /姓名还没填写.*不能在本页修改.*重新上传并诊断/)
@@ -75,7 +81,13 @@ assert.match(optimizeExportErrorMessage(validation('education.0.school should no
 assert.match(optimizeExportErrorMessage(validation('projects.0.role should not be empty')), /项目经历第 1 条的职务.*不能在本页修改.*重新上传并诊断/)
 assert.match(optimizeExportErrorMessage(validation('education.0.degree should not be empty')), /教育经历第 1 条的学历.*不能在本页修改.*重新上传并诊断/)
 assert.match(optimizeExportErrorMessage(validation('experience[0].description: description must be shorter than or equal to 1000 characters')), /工作经历第 1 条的描述.*编辑区.*1000 字以内/)
-assert.match(optimizeExportErrorMessage(validation('intention.position should not be empty')), /求职意向可以留空.*现场工作人员.*修改清单/)
+assert.match(optimizeExportErrorMessage(validation('intention.position should not be empty')), /求职意向可以留空.*修改清单.*需要帮助？/)
+// 现场无人值守：四种导出被拒的提示（求职意向 / 说不清哪一项 / 本页不能改的项 / 能改但格式不对）都不叫用户去找现场的人，求助只给标准句 1（服务电话）。
+for (const message of ['intention.position should not be empty', 'unknown.field secret technical payload', 'basic.name should not be empty', 'summary is invalid']) {
+  const shown = optimizeExportErrorMessage(validation(message))
+  assert.ok(shown.includes('需要帮助？'), `导出被拒的提示要带标准句 1（${message}）：${shown}`)
+  assert.equal(unattended.exports.containsStaffHandoff(shown), false, `导出被拒的提示不得叫用户找现场的人（${message}）：${shown}`)
+}
 assert.doesNotMatch(optimizeExportErrorMessage(validation('unknown.field secret technical payload')), /unknown|secret|technical/)
 assert.equal(optimizeExportErrorMessage({ code: 'NETWORK_ERROR' }), fallback)
 assert.match(page, /setExportError\(optimizeExportErrorMessage\(err\)\)/, '优化稿导出接入专用错误文案')

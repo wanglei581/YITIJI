@@ -251,8 +251,16 @@ expectAbsent(pageSrc + refreshSrc, /failureReasonForUser|errorCode|errorMessage/
 expectMatches(copySrc, /PENDING_REFUND_LABEL = '待退款'/, '待退款标签在 paymentCopy')
 expectMatches(
   copySrc,
-  /PENDING_REFUND_EXPLANATION =\s*'本单已确认未出纸，退款由工作人员处理，到账时间以支付渠道为准'/,
-  '待退款说明不写到账天数',
+  /PENDING_REFUND_EXPLANATION =\s*'本单已确认未出纸，退款会按支付渠道处理，到账时间以支付渠道为准'/,
+  '待退款说明不写到账天数（说法照触屏稿：退款会按支付渠道处理）',
+)
+// 现场无人值守：待退款说明不写「由工作人员处理」，详单在说明后面给标准句 1（服务电话）。
+expectAbsent(copySrc, /工作人员/, '待退款说明不写工作人员')
+expectAbsent(summarySrc, /工作人员/, '详单不写工作人员')
+expectMatches(
+  summarySrc,
+  /\{PENDING_REFUND_EXPLANATION\}。\{helpNeededLine\(contact\)\}。/,
+  '详单待退款说明后面跟标准句 1（服务电话），0 元单与付费单是同一句',
 )
 expectMatches(copySrc, /item\.refundRequired === true/, 'memberPayStatusLabel 以服务端 refundRequired 为准')
 expectMatches(copySrc, /refunding:\s*\{\s*label:\s*'退款中'/, '退款中单独展示，不伪装已退款')
