@@ -238,7 +238,7 @@ for (const route of w6KioskCases) {
 // 整屏没有大片空白：下面六条路由在夹具态下曾各有 122–340px 的整行空带。原因都是「卡被撑高，里面的画和字却没跟着变大」或「两段平分余高」：
 //   /activities（没有活动）、/activities/:id、/print/confirm（缺文件）、/me/activity/:id（未登录）、
 //   /official-channels 与它的旧地址 /jobs/online-platforms（本机构一张码独占一半、其他来源平台两张码挤另一半）。
-// 判据同第三包「行动卡吃满正文区」用例：任意颜色的整行空带（白卡片里的也算）不超过 105px。
+// 判据同 fusion-w3.spec.ts 里 job fit actions「行动卡吃满正文区」那条用例：任意颜色的整行空带（白卡片里的也算）不超过 105px。
 const BLANK_BAND_GUARDED = ['/activities', '/activities/:id', '/me/activity/:id', '/official-channels', '/jobs/online-platforms', '/print/confirm']
 for (const route of w6KioskCases.filter((item) => BLANK_BAND_GUARDED.includes(item.pattern))) {
   test(`${route.pattern} keeps no long blank band @w6-kiosk`, async ({ page, api }) => {

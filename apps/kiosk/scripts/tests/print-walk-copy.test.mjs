@@ -295,10 +295,14 @@ const queryUrl = toDataUrl('export const isRegisteredScreen = () => true')
 const confirmModelUrl = transpile(join(kioskRoot, 'src/pages/print/printConfirmModel.ts'), { './printConfirmQuery': queryUrl })
 // 2026-10-28 触屏版第 5 版：核对价格页的线条图标改用页面本地的 PrintIcon（纯 SVG 常量，无外部依赖）。
 const printIconUrl = transpile(join(kioskRoot, 'src/pages/print/art/PrintIcon.tsx'), { 'react/jsx-runtime': jsxUrl })
+// 缺文件 / 交接没通过核对两态底下放一块「纸」的实物小样吃掉剩下的高度（PrintFillArt）：纯装饰、读屏跳过、没有文字，
+// 文案断言用不着它的 SVG 与样式依赖，和别的纯装饰件一样在这里换成空件。
+const fillArtUrl = toDataUrl('export function PrintFillArt() { return null }')
 const viewUrl = transpile(join(kioskRoot, 'src/pages/print/components/PrintConfirmView.tsx'), {
   'react/jsx-runtime': jsxUrl,
   'lucide-react': iconUrl,
   '../art/PrintIcon': printIconUrl,
+  '../art/PrintFillArt': fillArtUrl,
   '../../../copy/unattendedCopy': unattendedUrl,
   '../printConfirmModel': confirmModelUrl,
   './PrintConfirmParts': partsUrl,
