@@ -223,7 +223,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
         </>
       ),
       cta: (
-        <Cta note="服务不可用时不显示任何匹配结论，也不保留半截结果。">
+        <Cta note="AI 暂时不可用，这次没能对照。">
           <Ghost label="返回目标选择" onClick={exits.backToPick} />
           <Primary label="重新提交分析" onClick={exits.retryAnalyze} />
         </Cta>

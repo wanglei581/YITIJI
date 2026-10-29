@@ -2259,6 +2259,9 @@ test('job fit outage and failure screens claim only what is provable @w3-kiosk',
   // 恢复时间没有任何依据：屏上只如实写「还不确定」，不写「稍后自动恢复」这类预告，也不写给审稿人看的「不承诺…」「本页也不写…」。
   await expect(page.getByText('还不确定什么时候能用')).toBeVisible()
   await expect(page.locator('body')).not.toContainText(/不承诺恢复时间|本页也不写|稍后自动恢复/)
+  // 底栏小字是对本人说的一句实话（稿 jobfit 这一态的原句）：说清这次没能对照，不写「服务不可用时不显示任何…也不保留半截结果」这类说页面规矩的话。
+  await expect(page.locator('.qxt-dock').getByText('AI 暂时不可用，这次没能对照。', { exact: true })).toBeVisible()
+  await expect(page.locator('body')).not.toContainText(/服务不可用时不显示任何匹配结论|也不保留半截结果/)
 
   api.respond('POST', '/api/v1/resume/job-fit', { status: 500, json: { error: { code: 'SERVER_ERROR', message: '分析失败' } } })
   await page.goto('/resume/job-fit?taskId=t-w3')
