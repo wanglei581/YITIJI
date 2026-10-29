@@ -31,4 +31,9 @@ export class UpdateSupportContactDto {
   @IsOptional()
   @IsBoolean()
   miniappPublished?: boolean
+
+  /** 省略表示不改。只有 true 打开一体机页签。 */
+  @IsOptional()
+  @IsBoolean()
+  selfNoteTab?: boolean
 }

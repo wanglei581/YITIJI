@@ -12834,7 +12834,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 253,
+      "reachableFileCount": 254,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -13605,7 +13605,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 279
+      "sourceFileCount": 280
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -19215,12 +19215,16 @@
     "apps/admin/src/routes/legal-docs/LegalDocPreview.tsx": [
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
+    "apps/admin/src/routes/legal-docs/SelfNoteTabCard.tsx": [
+      "services/api/scripts/verify-support-contact.ts"
+    ],
     "apps/admin/src/routes/legal-docs/SupportContactCard.tsx": [
       "services/api/scripts/verify-support-contact.ts"
     ],
     "apps/admin/src/routes/legal-docs/index.tsx": [
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
-      "services/api/scripts/verify-legal-doc-version.ts"
+      "services/api/scripts/verify-legal-doc-version.ts",
+      "services/api/scripts/verify-support-contact.ts"
     ],
     "apps/admin/src/routes/legal-docs/legalDocRender.ts": [
       "services/api/scripts/verify-legal-doc-version.ts"
@@ -25121,6 +25125,7 @@
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
+      "services/api/scripts/verify-job-application-track.ts",
       "services/api/scripts/verify-job-fit.ts",
       "services/api/scripts/verify-job-materials.ts",
       "services/api/scripts/verify-job-review.ts",
@@ -27847,6 +27852,7 @@
       "services/api/scripts/verify-support-contact.ts"
     ],
     "services/api/src/support-contact/support-contact.service.ts": [
+      "services/api/scripts/verify-job-application-track.ts",
       "services/api/scripts/verify-support-contact.ts"
     ],
     "services/api/src/sync/dto/webhook-payload.dto.ts": [
@@ -38183,6 +38189,7 @@
           "services/api/prisma/postgres/schema.prisma",
           "services/api/prisma/schema.prisma",
           "services/api/src/app.module.ts",
+          "services/api/src/audit/audit.service.ts",
           "services/api/src/job-applications/dto/create-job-application.dto.ts",
           "services/api/src/job-applications/dto/update-job-application.dto.ts",
           "services/api/src/job-applications/job-application.types.ts",
@@ -38191,7 +38198,8 @@
           "services/api/src/job-applications/job-applications.service.ts",
           "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
-          "services/api/src/prisma/prisma.service.ts"
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/support-contact/support-contact.service.ts"
         ],
         "missing": []
       },
@@ -42982,7 +42990,9 @@
           "services"
         ],
         "files": [
+          "apps/admin/src/routes/legal-docs/SelfNoteTabCard.tsx",
           "apps/admin/src/routes/legal-docs/SupportContactCard.tsx",
+          "apps/admin/src/routes/legal-docs/index.tsx",
           "docs/progress/current-progress.md",
           "services/api/prisma/schema.prisma",
           "services/api/src/audit/audit.service.ts",

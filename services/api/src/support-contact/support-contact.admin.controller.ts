@@ -31,6 +31,7 @@ export class SupportContactAdminController {
       if (Object.prototype.hasOwnProperty.call(body, 'servicePhone')) patch.servicePhone = dto.servicePhone ?? null
       if (Object.prototype.hasOwnProperty.call(body, 'serviceHours')) patch.serviceHours = dto.serviceHours ?? null
       if (Object.prototype.hasOwnProperty.call(body, 'miniappPublished')) patch.miniappPublished = dto.miniappPublished
+      if (Object.prototype.hasOwnProperty.call(body, 'selfNoteTab')) patch.selfNoteTab = dto.selfNoteTab
     }
     return {
       success: true as const,
