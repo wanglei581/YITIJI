@@ -16,6 +16,9 @@
  *      确认层出现时不挂载资产页（先确认、后读取）。弹出了没回答就一直是「待确认」（粘性标记，
  *      只在内存里）：确认层一弹出就记下，判断时先看它，本人答「是我」、清场退出登录、新的一位登录成功才解除；
  *      否则交接页一旦有出口（问小青、浏览器后退），下一位隔几秒再点「我的」就直接进了上一位的资料。
+ *      空档一到判据时长就**当时**记待确认（不等进页、不等确认层）：定时器到点就记，下一下触碰发现空档早已超时
+ *      也在这一下之前补记，之后任何触碰都解除不了；否则下一位先碰屏上别处、隔几秒再点「我的」，进页前只空了几秒，
+ *      确认层从没弹过，也就从没记过标记，照样直接进了上一位的资料。
  *
  * 全部读源码文本（先剥注释），不 import、不连网。
  */
@@ -168,9 +171,28 @@ check(
   /export function markKioskPresenceConfirmed\(at: number = Date\.now\(\)\): void \{\s*handoverPending = false/.test(presence) &&
     /export function clearHandoverPending\(\): void \{\s*handoverPending = false/.test(presence) &&
     /export function markHandoverPending\(\): void \{\s*handoverPending = true/.test(presence) &&
-    (presence.match(/handoverPending = /g) ?? []).length === 5,
-  '待确认只在三处读写：确认层弹出时记下、答「是我」/ 新的一位登录成功时解除、清场退出登录时解除（再加初值与测试复位）',
+    (presence.match(/handoverPending = true/g) ?? []).length === 3 &&
+    (presence.match(/handoverPending = false/g) ?? []).length === 4,
+  '待确认只在这几处写：记下三处（确认层弹出、空档到点的定时器、下一下触碰发现空档早已超时）；解除只有答「是我」/ 新的一位登录成功、清场退出登录两处（再加初值与测试复位）',
 )
+// 空档一到判据时长就当时记（不等进页、不等确认层）：定时器时长就是判据时长，每一次触碰与本人刚确认都让它重新计，
+// 触碰本身绝不解除标记；下一下触碰发现空档早已超时（定时器被挂起或晚到）就在这一下之前补记。行为由单测（mock 计时器）与浏览器用例真跑。
+check(
+  /idleMarkTimer = setTimeout\(\(\) => \{\s*idleMarkTimer = null\s*handoverPending = true\s*\}, KIOSK_HANDOVER_CONFIRM_MS\)/.test(presence),
+  '空档计时的时长就是判据时长（KIOSK_HANDOVER_CONFIRM_MS），到点就记待确认',
+)
+{
+  const touchBody = presence.match(/export function recordKioskTouch\(at: number = Date\.now\(\)\): void \{[\s\S]*?\n\}/)?.[0] ?? ''
+  const confirmedBody = presence.match(/export function markKioskPresenceConfirmed\(at: number = Date\.now\(\)\): void \{[\s\S]*?\n\}/)?.[0] ?? ''
+  check(
+    /armIdleMark\(\)/.test(touchBody) && /armIdleMark\(\)/.test(confirmedBody),
+    '每一次触碰、本人刚确认过（登录成功、答「是我」）都让空档重新计：在场一直有操作不误弹，旧定时器不会把刚确认的人又记成待确认',
+  )
+  check(
+    /if \(lastTouchAt !== null && at - lastTouchAt > KIOSK_HANDOVER_CONFIRM_MS\) handoverPending = true/.test(touchBody) && !/handoverPending = false/.test(touchBody),
+    '下一下触碰发现空档早已超过判据时长就在这一下之前补记待确认；触碰本身绝不解除它',
+  )
+}
 check(
   !/localStorage|sessionStorage|indexedDB|\bcookie\b|\bhistory\b|\blocation\b/.test(presence),
   '待确认标记只在内存里：kioskPresence 不碰 localStorage / sessionStorage / cookie / history / 地址（清场与重载让它当场消失）',

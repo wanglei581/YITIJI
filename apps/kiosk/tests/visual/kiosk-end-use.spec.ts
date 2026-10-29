@@ -551,3 +551,95 @@ test('W-75 sticky: 待确认标记只在内存里，不写进任何浏览器存�
   await page.waitForTimeout(400)
   expect(calls.slice(mark)).toEqual([])
 })
+
+// ── W-75 空档就记：上一位走开 30 秒以上，下一位先碰别处、隔几秒再点「我的」，也要先问 ─────────────────
+// 取证（10/29，首页包实测）：「还是你吗？」原来只看「点进来那一下之前空了多久」。上一位走开 31 秒，下一位先点首页上别的卡、
+// 隔几秒再点底部「我的」或直达 /me/*，进页前只空了几秒，旧判据不问，直接进了上一位的「我的」。
+// 现在：空档一到 30 秒就当时记为「待确认」（定时判，不等进页），之后任何触碰都解除不了它；
+// 只有本人答「是我，继续」、登录成功、退出登录或清场才解除。
+
+/** 上一位走开 31 秒一下没点；下一位先点首页上别的卡（打印 · 扫描），再隔几秒。返回此刻已发出的 /me 请求数：之后新增的都算在「确认之前」。 */
+async function nextPersonTouchesElsewhere(page: Page, calls: MeCall[]): Promise<number> {
+  await page.clock.runFor(31_000)
+  await page.getByRole('button', { name: /打印 · 扫描/ }).first().click()
+  await expect(page).toHaveURL(/\/print-scan$/)
+  await pace(page)
+  await page.waitForTimeout(500)
+  return calls.length
+}
+
+test('W-75 idle mark: 走开 31 秒后下一位先点别的卡，隔几秒再点底部「我的」，仍先问，不发 /me 请求 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const calls = await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+
+  const before = await nextPersonTouchesElsewhere(page, calls)
+  await nav(page, '我的').click()
+  await expectStillAsked(page, calls, before, '先点别的卡、隔几秒再点「我的」')
+})
+
+test('W-75 idle mark: 走开 31 秒后下一位先点别的卡，隔几秒站内直达 /me/*，仍先问，不发 /me 请求 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const calls = await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+
+  const mark = await nextPersonTouchesElsewhere(page, calls)
+  for (const path of ['/me/documents', '/profile', '/me/print-orders']) {
+    await pace(page)
+    await deepLink(page, path)
+    await expect(page).toHaveURL(new RegExp(`${path}$`))
+    await expectStillAsked(page, calls, mark, `直达 ${path}`)
+  }
+})
+
+test('W-75 idle mark: 答「是我，继续」后解除，之后照常进「我的」并读取，带的是本人的令牌 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const calls = await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+
+  const before = await nextPersonTouchesElsewhere(page, calls)
+  await nav(page, '我的').click()
+  await expectStillAsked(page, calls, before, '先点别的卡、隔几秒再点「我的」')
+  await pace(page)
+  await page.getByTestId('handover-confirm').getByRole('button', { name: '是我，继续' }).click()
+  await expect(page.getByTestId('handover-confirm')).toHaveCount(0)
+  await expect(page.getByTestId('profile-asset-documents')).toBeVisible()
+
+  // 本人确认过了：离开几秒再回来不再问，资产页照常读取。
+  await pace(page)
+  await nav(page, '首页').click()
+  await pace(page)
+  const after = calls.length
+  await nav(page, '我的').click()
+  await expect(page.getByTestId('profile-asset-documents'), '本人确认过了，不再问').toBeVisible()
+  await expect(page.getByTestId('handover-confirm')).toHaveCount(0)
+  await page.getByTestId('profile-asset-documents').click()
+  await expect(page.getByText(WANG.doc)).toBeVisible()
+  expect(calls.length, '确认之后资产页照常发 /me 请求').toBeGreaterThan(after)
+  expect(calls.slice(after).every((c) => c.auth === `Bearer ${WANG.token}`)).toBe(true)
+})
+
+test('W-75 idle mark: 在场一直有操作（每两下之间都不到 30 秒）不误弹，点「我的」直接进 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const calls = await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+
+  // 累计 100 秒，任意两下之间只隔 20 秒：每一次触碰都重新计空档，不该有任何一刻被记成待确认。
+  for (const name of ['AI 顾问', '首页', 'AI 顾问', '首页']) {
+    await page.clock.runFor(20_000)
+    await nav(page, name).click()
+  }
+  await page.clock.runFor(20_000)
+  const before = calls.length
+  await nav(page, '我的').click()
+  await expect(page).toHaveURL(/\/profile$/)
+  await expect(page.getByTestId('profile-asset-documents'), '一直在场，不该被问').toBeVisible()
+  await expect(page.getByTestId('handover-confirm')).toHaveCount(0)
+  await page.getByTestId('profile-asset-documents').click()
+  await expect(page.getByText(WANG.doc)).toBeVisible()
+  expect(calls.slice(before).every((c) => c.auth === `Bearer ${WANG.token}`)).toBe(true)
+})
