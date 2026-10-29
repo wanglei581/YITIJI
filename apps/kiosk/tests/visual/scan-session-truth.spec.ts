@@ -467,10 +467,10 @@ test('a revoked terminal session fails the creation closed and is not retried @k
   // 换票失败后还会向本机 Agent 要一张新引导票（默认配置里配了桥接令牌），
   // 连不上要等一次 4 秒超时才落到 fail-closed —— 这条断言要能等过那一段。
   await expect(page.getByText('这台机器的安全校验没通过', { exact: true }).first()).toBeVisible({ timeout: 20_000 })
-  await expect(page.getByText('这台机器的安全校验没通过。请安全返回扫描首页后再试。', { exact: false }).first()).toBeVisible()
-  await expect(page.getByText('联系现场工作人员')).toHaveCount(0)
   // 现场不安排人：说明是无人值守标准句 3（整台机器暂时不能用），不再叫用户联系现场的人。
+  // 标题那一句「这台机器的安全校验没通过」上一行已经钉了；说明句从共享错误码表来，main #1517 换成标准句 3。
   await expect(page.getByText(MACHINE_UNUSABLE_LINE).first()).toBeVisible()
+  await expect(page.getByText('联系现场工作人员')).toHaveCount(0)
   await expect(page.getByText('请联系现场工作人员')).toHaveCount(0)
   await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
   await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toHaveCount(0)
