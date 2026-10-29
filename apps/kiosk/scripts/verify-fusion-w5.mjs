@@ -229,7 +229,9 @@ for (const marker of [
 ]) {
   assert.match(benefitActivityDetail, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `benefit activity detail keeps real branch ${marker}`)
 }
-assertSharedPageShell(toolbox, 'ToolboxZonePage')
+assert.match(toolbox, /<QxTouchScreen\b/, 'ToolboxZonePage uses the touch screen')
+assert.match(toolbox, /<QxTouchBand\b/, 'ToolboxZonePage uses the touch band')
+assert.doesNotMatch(toolbox, /<KioskPageFrame\b|<KioskPageHeader\b/, 'ToolboxZonePage has left the shared Kiosk page frame')
 assert.match(
   toolbox,
   /<section\b(?=[^>]*\bdata-kiosk-screen="toolbox")(?=[^>]*\bclassName="tb-content")[^>]*>/,
@@ -269,7 +271,30 @@ assertSinglePaddingNeutralizer(
 )
 assertSinglePaddingNeutralizer(legalDocCss, 'legal-service-desk.css', /\.k1-legal-doc\b/, '.qxt-body')
 assert.doesNotMatch(legalDocCss, /\.ui-kiosk-page-content/, 'legal-service-desk.css carries no dead selector for the retired V6 content wrapper')
-assertSinglePaddingNeutralizer(toolboxCss, 'toolbox-zone.css', /\.kpv1\.ktoolbox\b/)
+assert.doesNotMatch(toolboxCss, /\.ui-kiosk-page-content/, 'toolbox-zone.css carries no dead selector for the shared page content wrapper (the toolbox page left KioskPageFrame and never renders it)')
+/* 触屏页不得再用「贴左边的整列色条」遮空白：绝对定位、贴左、上下拉满、定宽的 ::before。
+ * 空白检查从 x=80 取样，色条正好盖住那一列，卡里再空也量不到（10/27 审出的做法）。
+ * 稿的大卡是带图标的 210 宽图标列，不是空色条。 */
+for (const path of [
+  'src/pages/toolbox/toolbox-zone.css',
+  'src/pages/smart-campus/smart-campus-touch.css',
+  'src/auth/capability-gate-touch.css',
+  'src/pages/contract-review/contract-review-touch.css',
+  'src/pages/contract-review/contract-review.css',
+  'src/pages/service-hubs/policy-touch.css',
+  'src/pages/renshi/renshi-touch.css',
+]) {
+  for (const match of read(path).matchAll(/([^{}]+)::before\s*\{([^}]*)\}/g)) {
+    const body = match[2]
+    const edgeStrip =
+      /position:\s*absolute/.test(body) &&
+      /\btop:\s*0\b/.test(body) &&
+      /\bbottom:\s*0\b/.test(body) &&
+      /\bleft:\s*0\b/.test(body) &&
+      /\bwidth:\s*\d+px/.test(body)
+    assert.ok(!edgeStrip, `${path}: ${match[1].trim()}::before 是贴左边的整列色条，空白检查会被它遮住，请改成按稿的图标列或去掉`)
+  }
+}
 assert.match(
   profileCss,
   /\.fusion-w5--profile-entry\s*>\s*\.ui-kiosk-page-content\s*\{[^}]*padding:\s*0;/,
@@ -326,7 +351,6 @@ const concretePages = [
   'src/pages/help/HelpCenterPage.tsx',
   'src/pages/activities/BenefitActivitiesPage.tsx',
   'src/pages/activities/BenefitActivityDetailPage.tsx',
-  'src/pages/toolbox/ToolboxZonePage.tsx',
 ]
 for (const path of concretePages) {
   const source = read(path)

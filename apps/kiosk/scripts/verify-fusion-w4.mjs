@@ -425,9 +425,9 @@ check('policy builtin records remain server-safe', () => {
   assert.match(renshi, /if \(isBuiltin\(item\.id\)\) return/)
   assert.match(renshi, /if \(!isBuiltin\(item\.id\)\) recordExternalJump/)
 })
-check('renshi policy workspace uses the Qingxu frame', () => {
-  assert.match(renshi, /QxPageFrame/)
-  assert.doesNotMatch(renshi, /KioskPageFrame|KioskPageHeader/)
+check('renshi policy workspace uses the touch screen', () => {
+  assert.match(renshi, /QxTouchScreen/)
+  assert.doesNotMatch(renshi, /QxPageFrame|KioskPageFrame|KioskPageHeader/)
   assert.match(kioskRoot, /['"]\/renshi['"]/)
 })
 check('legacy CSS entry remains a compatibility aggregator', () => {

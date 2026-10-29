@@ -87,6 +87,33 @@ interface HubSnapshot {
  * 用单次 evaluate 而不是多条 await expect：'checking' 档只有 4 秒寿命，
  * 逐条等待会在中途翻成 'unavailable'，把一个真实缺陷测成随机失败。
  */
+/** 政策服务台改触屏后的读法。标题、原因、放行判据与旧卡一致，选择器换成触屏入口。 */
+async function readPolicyHub(page: Page): Promise<HubSnapshot> {
+  await page.waitForSelector('[data-qx-page="service-hub"]')
+  return page.evaluate(() => {
+    const hub = document.querySelector('[data-qx-page="service-hub"]')!
+    const entry = (el: Element) => {
+      const button = el.querySelector('button')
+      const clickable = Boolean(button) && !button!.hasAttribute('aria-disabled') && !button!.hasAttribute('disabled')
+      const title = el.querySelector('b')?.textContent?.trim() ?? ''
+      // 原因只在卡内写一次：停用的卡把说明换成原因，所以从卡里的 small 读
+      const reason = el.querySelector('button small')?.textContent?.trim() ?? null
+      return { title, clickable, reason: clickable ? null : reason }
+    }
+    const notice = hub.querySelector('[data-hub-notice]')
+    return {
+      probe: hub.getAttribute('data-hub-device-probe'),
+      readiness: hub.querySelector('[data-readiness]')?.getAttribute('data-readiness') ?? null,
+      pill: document.querySelector('.qxt-status')?.textContent?.trim() ?? '',
+      noticeTitle: notice?.querySelector('b')?.textContent?.trim() ?? '',
+      noticeDetail: notice?.querySelector('b + span')?.textContent?.trim() ?? '',
+      cards: [...hub.querySelectorAll('[data-hub-entry]')].map(entry),
+      goals: [...hub.querySelectorAll('[data-hub-goal]')].map(entry),
+      quick: [...hub.querySelectorAll('[data-hub-quick]')].map(entry),
+    }
+  })
+}
+
 async function readHub(page: Page): Promise<HubSnapshot> {
   await page.waitForSelector('[data-qx-page="service-hub"], [data-qx-page="resume"]')
   // 触屏版简历服务台只直接画四块，其余入口收在「其余 N 项」弹层里：先把弹层打开，再把整页（含弹层）的入口一次读全。
@@ -146,6 +173,38 @@ async function readHubDom(page: Page): Promise<HubSnapshot> {
       quick: (quickItems.length ? quickItems : marked('data-hub-quick')).map((el) => entry(el, 'b', 'span span')),
     }
   })
+}
+
+/**
+ * 政策服务台「检查中」「不可用」两态各块不能互相压住：
+ * 「常用入口」标题顶 ≥ 上一组（四个目标）里所有元素的最低底边，
+ * 页脚第一句顶 ≥ 常用入口那一组里所有元素的最低底边。
+ * 底边取整组所有后代的最大值，卡外多渲染的字、溢出卡片的字都算进去。
+ */
+async function expectPolicyHubStacksCleanly(page: Page): Promise<void> {
+  const geometry = await page.evaluate(() => {
+    const hub = document.querySelector('[data-qx-page="service-hub"]')!
+    const lowest = (root: Element | null) =>
+      root ? Math.max(...[root, ...root.querySelectorAll('*')].map((el) => el.getBoundingClientRect().bottom)) : null
+    const goals = hub.querySelector('section[aria-label="四个目标"]')
+    const quick = hub.querySelector('section[aria-label="常用入口"]')
+    const note = hub.querySelector('.p10-note')
+    return {
+      goalsBottom: lowest(goals),
+      headingTop: quick?.querySelector('h2')?.getBoundingClientRect().top ?? null,
+      quickBottom: lowest(quick),
+      noteTop: note?.getBoundingClientRect().top ?? null,
+      tileOverflow: [...hub.querySelectorAll('.qxt-tile')]
+        .filter((el) => el.scrollHeight > el.clientHeight + 1)
+        .map((el) => el.querySelector('b')?.textContent?.trim() ?? ''),
+    }
+  })
+  expect(geometry.goalsBottom, '四个目标那一组必须存在').not.toBeNull()
+  expect(geometry.headingTop, '「常用入口」标题必须存在').not.toBeNull()
+  expect(geometry.headingTop!, '「常用入口」标题不能压在上一组卡上').toBeGreaterThanOrEqual(geometry.goalsBottom!)
+  expect(geometry.noteTop, '页脚第一句必须存在').not.toBeNull()
+  expect(geometry.noteTop!, '页脚第一句不能压在最后一张卡上').toBeGreaterThanOrEqual(geometry.quickBottom!)
+  expect(geometry.tileOverflow, '卡里的字不能溢出卡片').toEqual([])
 }
 
 const byTitle = (entries: HubEntry[], title: string): HubEntry => {
@@ -246,23 +305,64 @@ test('在线服务「正在确认」同样不放行，白名单不受影响 @kio
   registerShell(api, { api: 'checking', printer: { isOnline: true, printerStatus: 'ready' } })
 
   await page.goto('/policy-service')
-  const hub = await readHub(page)
+  const hub = await readPolicyHub(page)
 
   expect(hub.readiness).toBe('checking')
   expect(hub.pill).toBe('正在确认在线服务')
-  // 「还不知道」不构成放行理由：checking 与 unavailable 一样 fail-closed。
-  expect(byTitle(hub.cards, '就业政策')).toEqual({
-    title: '就业政策',
+  expect(hub.probe).toBe('off')
+  expect(byTitle(hub.cards, '查政策与公告')).toEqual({
+    title: '查政策与公告',
     clickable: false,
     reason: '正在确认在线服务',
   })
-  expect(byTitle(hub.cards, '打开AI顾问').reason).toBe('正在确认AI能力状态')
-  // 白名单的两条静态指引不依赖后端，checking 期间照样可进。
-  expect(hub.cards.filter((card) => card.clickable).map((card) => card.title).sort()).toEqual(
-    ['社保指南', '档案与登记'].sort(),
-  )
-  // 政策服务台没有设备能力：即使在线服务还没确认，也不该顺带播报本机设备。
+  expect(byTitle(hub.goals, '找就业政策')).toEqual({
+    title: '找就业政策',
+    clickable: false,
+    reason: '正在确认在线服务',
+  })
+  expect(byTitle(hub.goals, '核对申领条件')).toEqual({
+    title: '核对申领条件',
+    clickable: false,
+    reason: '正在确认在线服务',
+  })
+  for (const title of ['浏览记录', 'AI 服务记录', '政策收藏']) {
+    expect(byTitle(hub.quick, title)).toEqual({
+      title,
+      clickable: false,
+      reason: '正在确认在线服务',
+    })
+  }
+  const clickable = [...hub.cards, ...hub.goals, ...hub.quick]
+    .filter((entry) => entry.clickable)
+    .map((entry) => entry.title)
+    .sort()
+  expect(clickable).toEqual(['全部服务', '查社保材料', '看登记档案'].sort())
+  await expect(page.getByRole('button', { name: '打开AI顾问' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '问小青' })).toBeVisible()
+  await expectPolicyHubStacksCleanly(page)
+})
+
+test('在线服务不可用时只放行社保、登记、全部服务和重新检测 @kiosk', async ({ page, api }) => {
+  registerShell(api, { api: 'down', printer: { isOnline: true, printerStatus: 'ready' } })
+
+  await page.goto('/policy-service')
+  const hub = await readPolicyHub(page)
+
+  expect(hub.readiness).toBe('unavailable')
   expect(hub.probe).toBe('off')
+  expect(byTitle(hub.cards, '查政策与公告').reason).toBe('在线服务当前不可用')
+  expect(byTitle(hub.goals, '找就业政策').reason).toBe('在线服务当前不可用')
+  expect(byTitle(hub.goals, '核对申领条件').reason).toBe('在线服务当前不可用')
+  for (const title of ['浏览记录', 'AI 服务记录', '政策收藏']) {
+    expect(byTitle(hub.quick, title).reason).toBe('在线服务当前不可用')
+  }
+  const clickable = [...hub.cards, ...hub.goals, ...hub.quick]
+    .filter((entry) => entry.clickable)
+    .map((entry) => entry.title)
+    .sort()
+  expect(clickable).toEqual(['全部服务', '查社保材料', '看登记档案'].sort())
+  await expect(page.getByRole('button', { name: '重新检测' })).toBeEnabled()
+  await expectPolicyHubStacksCleanly(page)
 })
 
 test('本机设备「正在确认」时提示条不说就绪态的话 @kiosk', async ({ page, api }) => {
@@ -540,4 +640,152 @@ test('阳性对照：能力都可用时，服务台主卡真的会进入 setup�
   await expect(page.locator('[data-qxt-ask="on"]')).toHaveText('问小青：先练哪一项？')
   await page.getByRole('button', { name: /马上练一场/ }).click()
   await page.waitForURL((url) => url.searchParams.get('stage') === 'setup')
+})
+
+test('条件核对未选中的选项有边框且高度不少于 64 @kiosk', async ({ page, api }) => {
+  registerShell(api, { api: 'ready', printer: { isOnline: true, printerStatus: 'ready' } })
+  api.respond('GET', '/api/v1/policies', {
+    status: 200,
+    json: { data: [], pagination: { total: 0 } },
+  })
+  api.respond('GET', '/api/v1/policies/eligibility-questions', {
+    status: 200,
+    json: {
+      questionSetVersion: 'policy-eligibility-questions-v1',
+      privacyNotice: '作答只留在本页，不写进网址。',
+      disclaimer: '本结果不是资格认定。',
+      questions: [{
+        key: 'household_social',
+        label: '户籍',
+        sensitive: true,
+        options: [
+          { value: 'local_household', label: '本地户籍' },
+          { value: 'other', label: '非本地户籍' },
+        ],
+      }],
+    },
+  })
+  api.respond('POST', '/api/v1/policies/eligibility-check', {
+    status: 200,
+    json: {
+      questionSetVersion: 'policy-eligibility-questions-v1',
+      checkedAt: '2026-10-27T00:00:00.000Z',
+      answeredCount: 0,
+      ignoredQuestionKeys: [],
+      disclaimer: '本结果不是资格认定。',
+      method: 'deterministic_comparison',
+      items: [{
+        policyId: 'p1',
+        title: '示例政策',
+        conditionsRecorded: true,
+        overall: 'some_conditions_unknown',
+        overallLabel: '有无法判定的条件',
+        conditions: [],
+        source: { sourceName: '来源机构', syncTime: '2026-10-27T00:00:00.000Z', externalId: null },
+      }],
+    },
+  })
+
+  await page.goto('/renshi?tab=eligibility')
+  const opt = page.locator('.k8-elig-opt[aria-pressed="false"]').first()
+  await expect(opt).toBeVisible()
+  const box = await opt.boundingBox()
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(64)
+  const border = await opt.evaluate((el) => Number.parseFloat(getComputedStyle(el).borderTopWidth))
+  expect(border).toBeGreaterThan(0)
+})
+
+/** 条件核对的问项与比对结果。`down` 时问项 503，页面落到「做不了」的重新检查。 */
+function registerEligibilityApi(api: ApiRouter, mode: 'ok' | 'down'): void {
+  api.respond('GET', '/api/v1/policies', { status: 200, json: { data: [], pagination: { total: 0 } } })
+  if (mode === 'down') {
+    api.respond('GET', '/api/v1/policies/eligibility-questions', { status: 503, json: { error: 'unavailable' } })
+    api.respond('POST', '/api/v1/policies/eligibility-check', { status: 503, json: { error: 'unavailable' } })
+    return
+  }
+  api.respond('GET', '/api/v1/policies/eligibility-questions', {
+    status: 200,
+    json: {
+      questionSetVersion: 'policy-eligibility-questions-v1',
+      privacyNotice: '作答只留在本页，不写进网址。',
+      disclaimer: '本结果不是资格认定。',
+      questions: [{
+        key: 'household_social',
+        label: '户籍',
+        sensitive: true,
+        options: [
+          { value: 'local_household', label: '本地户籍' },
+          { value: 'other', label: '非本地户籍' },
+        ],
+      }],
+    },
+  })
+  api.respond('POST', '/api/v1/policies/eligibility-check', {
+    status: 200,
+    json: {
+      questionSetVersion: 'policy-eligibility-questions-v1',
+      checkedAt: '2026-10-27T00:00:00.000Z',
+      answeredCount: 1,
+      ignoredQuestionKeys: [],
+      disclaimer: '本结果不是资格认定。',
+      method: 'deterministic_comparison',
+      items: [{
+        policyId: 'p1',
+        title: '示例政策',
+        conditionsRecorded: true,
+        overall: 'some_conditions_unknown',
+        overallLabel: '有无法判定的条件',
+        conditions: [],
+        source: { sourceName: '来源机构', syncTime: '2026-10-27T00:00:00.000Z', externalId: null },
+      }],
+    },
+  })
+}
+
+/** 底栏三个按钮（返回、问小青、主按钮）的高度。主按钮是 portal 进 .rq-cta-host 的那一颗。 */
+async function readEligibilityDockHeights(page: Page): Promise<{ back: number; ask: number; primary: number; primaryText: string }> {
+  return page.evaluate(() => {
+    const height = (el: Element | null) => Math.round(el?.getBoundingClientRect().height ?? 0)
+    const primary = document.querySelector('.rq-cta-host > button')
+    return {
+      back: height(document.querySelector('.rq-touch-dock .qxt-btn-sec')),
+      ask: height(document.querySelector('.rq-touch-dock .qxt-askq')),
+      primary: height(primary),
+      primaryText: primary?.textContent?.trim() ?? '',
+    }
+  })
+}
+
+test('条件核对表单、结果、连不上三态：底栏主按钮高 88，和同排按钮一样高 @kiosk', async ({ page, api }) => {
+  registerShell(api, { api: 'ready', printer: { isOnline: true, printerStatus: 'ready' } })
+  registerEligibilityApi(api, 'ok')
+
+  // 表单：按政策原文逐条比对
+  await page.goto('/renshi?tab=eligibility')
+  await expect(page.locator('.k8-elig-opt').first()).toBeVisible()
+  const form = await readEligibilityDockHeights(page)
+  expect(form.primaryText).toContain('按政策原文逐条比对')
+  expect(form.primary, '表单态主按钮高度').toBe(88)
+  expect(form.back).toBe(88)
+  expect(form.ask).toBe(88)
+
+  // 结果：重新填写并再比对一次
+  await page.locator('.k8-elig-opt', { hasText: '本地户籍' }).first().click()
+  await page.locator('.rq-cta-host > button').click()
+  await expect(page.locator('.k8-elig-restart')).toBeVisible()
+  const result = await readEligibilityDockHeights(page)
+  expect(result.primaryText).toContain('重新填写并再比对一次')
+  expect(result.primary, '结果态主按钮高度').toBe(88)
+})
+
+test('条件核对连不上时：底栏「重新检查」高 88 @kiosk', async ({ page, api }) => {
+  registerShell(api, { api: 'ready', printer: { isOnline: true, printerStatus: 'ready' } })
+  registerEligibilityApi(api, 'down')
+
+  await page.goto('/renshi?tab=eligibility')
+  await expect(page.locator('.k8-elig-notice-retry')).toBeVisible()
+  const offline = await readEligibilityDockHeights(page)
+  expect(offline.primaryText).toContain('重新检查')
+  expect(offline.primary, '连不上态主按钮高度').toBe(88)
+  expect(offline.back).toBe(88)
 })

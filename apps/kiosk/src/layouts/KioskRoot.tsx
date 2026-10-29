@@ -295,6 +295,14 @@ const QX_TOUCH_ROUTES = new Set<string>([
   '/print-scan/feature/copy', // 复印
   '/print-scan/feature/id-photo', // 证件照说明
   // 第十包 政策与受控扩展
+  '/policy-service',
+  '/renshi',
+  '/toolbox',
+  '/smart-campus',
+  '/smart-campus/welcome',
+  '/contract-review', // 合同审查三条在 KioskRoot 之外，登记在这里只为以后套进本壳时不再露出旧顶栏
+  '/contract-review/processing',
+  '/contract-review/result',
   // 第十一包 私有化版招聘
 ])
 
@@ -309,6 +317,7 @@ const QX_TOUCH_PREFIXES: readonly string[] = [
   // 第九包 扫描复印
   '/print-scan/feature/', // 复印、证件照和不认识的能力名是同一页的 :key，精确名单盖不住未知名字
   // 第十包 政策与受控扩展
+  '/smart-campus/service/', // 只放窄前缀，不写 /smart-campus（welcome 已在精确集合）
   // 第十一包 私有化版招聘
 ]
 
