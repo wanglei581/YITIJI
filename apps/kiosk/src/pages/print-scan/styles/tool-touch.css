@@ -1,15 +1,19 @@
-/* 第 9 包触屏壳里的旧按钮。`.qxt-screen button` 会清掉背景，这里按令牌补回来。 */
+/* 第 9 包触屏壳里的旧按钮。`.qxt-screen button` 会清掉背景，这里按令牌补回来。
+ * 只挂在第 9 包自己的屏上（TouchToolScreen 与 ScanWorkbenchChrome 都给 QxTouchScreen 挂 scan-touch）：
+ * 这组规则原先写成 `.qxt-screen .qx-btn`，所有触屏屏里用 .qx-btn 的旧按钮（打印收银台、简历、我的……）都被改了高度与内边距，
+ * 集成后第三包收银台首屏的「退出支付」被挤出底栏 6px。用 :where() 限定，权重与原来的 `.qxt-screen .X` 一样（0,2,0），
+ * 第 9 包自己的页面里这几条与别的规则谁赢谁输不变。 */
 
-.qxt-screen .qxt-scan-scroll,
-.qxt-screen .ph-page,
-.qxt-screen .i2p-page,
-.qxt-screen .ss-page {
+.qxt-screen:where(.scan-touch) .qxt-scan-scroll,
+.qxt-screen:where(.scan-touch) .ph-page,
+.qxt-screen:where(.scan-touch) .i2p-page,
+.qxt-screen:where(.scan-touch) .ss-page {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
 }
 
-.qxt-screen .qx-btn {
+.qxt-screen:where(.scan-touch) .qx-btn {
   min-width: var(--qxt-tap);
   min-height: var(--qxt-tap);
   height: var(--qxt-btn-h);
@@ -22,22 +26,22 @@
   gap: 10px;
 }
 
-.qxt-screen .qx-btn[data-variant='primary'] {
+.qxt-screen:where(.scan-touch) .qx-btn[data-variant='primary'] {
   background: var(--qx-deep);
   color: var(--qxt-cream);
 }
 
-.qxt-screen .qx-btn[data-variant='ghost'] {
+.qxt-screen:where(.scan-touch) .qx-btn[data-variant='ghost'] {
   background: var(--qxt-card);
   color: var(--qxt-ink);
   border: 1.5px solid var(--qxt-edge);
 }
 
-.qxt-screen .qx-btn:disabled {
+.qxt-screen:where(.scan-touch) .qx-btn:disabled {
   opacity: 0.42;
 }
 
-.qxt-screen .sw-page {
+.qxt-screen:where(.scan-touch) .sw-page {
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -46,58 +50,58 @@
 
 /* 短页把最后一块说明卡撑满剩余纸面。卡片底是 --qx-surface，不是奶油纸色。 */
 
-.qxt-screen .ph-page {
+.qxt-screen:where(.scan-touch) .ph-page {
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-height: 100%;
 }
 
-.qxt-screen .ph-page > .ph-sec.ph-sec--fill {
+.qxt-screen:where(.scan-touch) .ph-page > .ph-sec.ph-sec--fill {
   flex: 1 1 auto;
 }
 
-.qxt-screen .ph-page > .ph-sec.ph-sec--fill > .ph-pgrp {
+.qxt-screen:where(.scan-touch) .ph-page > .ph-sec.ph-sec--fill > .ph-pgrp {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
 }
 
 /* 1080 复印说明要在正文区一屏放下。意图带高度不动，只收这一页的横幅和步骤。 */
-.qxt-screen .ph-page[data-state='feature-copy'] {
+.qxt-screen:where(.scan-touch) .ph-page[data-state='feature-copy'] {
   gap: 8px;
   padding-top: 4px;
   padding-bottom: 4px;
 }
-.qxt-screen .ph-page[data-state='feature-copy'] .ph-xq {
+.qxt-screen:where(.scan-touch) .ph-page[data-state='feature-copy'] .ph-xq {
   min-height: 0;
   padding: 12px 24px;
   border-radius: 24px;
 }
-.qxt-screen .ph-page[data-state='feature-copy'] .ph-xq-row { gap: 16px; }
-.qxt-screen .ph-page[data-state='feature-copy'] .ph-xq-ask {
+.qxt-screen:where(.scan-touch) .ph-page[data-state='feature-copy'] .ph-xq-row { gap: 16px; }
+.qxt-screen:where(.scan-touch) .ph-page[data-state='feature-copy'] .ph-xq-ask {
   font-size: 32px;
   line-height: 1.25;
 }
-.qxt-screen .ph-page[data-state='feature-copy'] .ph-xq-doing { margin-top: 4px; }
-.qxt-screen .ph-page[data-state='feature-copy'] .ph-sec-h { min-height: 0; margin-bottom: 6px; }
-.qxt-screen .ph-page[data-state='feature-copy'] .ph-steps { gap: 6px; }
-.qxt-screen .ph-page[data-state='feature-copy'] .ph-step {
+.qxt-screen:where(.scan-touch) .ph-page[data-state='feature-copy'] .ph-xq-doing { margin-top: 4px; }
+.qxt-screen:where(.scan-touch) .ph-page[data-state='feature-copy'] .ph-sec-h { min-height: 0; margin-bottom: 6px; }
+.qxt-screen:where(.scan-touch) .ph-page[data-state='feature-copy'] .ph-steps { gap: 6px; }
+.qxt-screen:where(.scan-touch) .ph-page[data-state='feature-copy'] .ph-step {
   min-height: 0;
   gap: 12px;
   padding: 8px 16px;
 }
-.qxt-screen .ph-page[data-state='feature-copy'] .ph-step-no {
+.qxt-screen:where(.scan-touch) .ph-page[data-state='feature-copy'] .ph-step-no {
   width: 44px;
   height: 44px;
 }
-.qxt-screen .ph-page[data-state='feature-copy'] .ph-notes { gap: 8px; margin-top: 0; }
-.qxt-screen .ph-page[data-state='feature-copy'] .ph-note {
+.qxt-screen:where(.scan-touch) .ph-page[data-state='feature-copy'] .ph-notes { gap: 8px; margin-top: 0; }
+.qxt-screen:where(.scan-touch) .ph-page[data-state='feature-copy'] .ph-note {
   min-height: 0;
   padding: 10px 14px;
 }
-.qxt-screen .ph-page[data-state='feature-copy'] .ph-state { padding: 12px 18px; }
-.qxt-screen .ph-page[data-state='feature-copy'] > .ph-foot { margin-top: auto; }
+.qxt-screen:where(.scan-touch) .ph-page[data-state='feature-copy'] .ph-state { padding: 12px 18px; }
+.qxt-screen:where(.scan-touch) .ph-page[data-state='feature-copy'] > .ph-foot { margin-top: auto; }
 
 /* 手机不缩放时，410px 意图带把扫描正文挤到比底注还矮，底注滚不进可视区。
    只在舞台关闭时收这一壳，1080 舞台不吃。 */
