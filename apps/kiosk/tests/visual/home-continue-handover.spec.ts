@@ -16,115 +16,25 @@
  *
  * 用 playwright.privacy-clear.config.ts 跑（隐私硬截止保持默认 300 秒，不会抢在被测空档之前清场）。
  */
-import type { Locator, Page, Request, Route } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
-import { allowLocalBootTicket, fillPhoneLogin, loginThroughVisibleUi, registerPrivacyShell, shotTo } from './fixtures/privacy-clear-shell'
+import { allowLocalBootTicket, fillPhoneLogin, loginThroughVisibleUi, shotTo } from './fixtures/privacy-clear-shell'
+import {
+  CHEN,
+  CHEN_FILE,
+  LIN,
+  PRINT_TITLE,
+  RESUME_TITLE,
+  WANG,
+  WANG_FILE,
+  routeMembers,
+  type Member,
+  type MeCall,
+} from './fixtures/home-members'
 
 /** 设了环境变量才存证据截图；不设就不写任何目录（CI 上不落盘）。 */
 const EVIDENCE_DIR = process.env.HOME_CONTINUE_EVIDENCE_DIR ?? ''
-
-interface Member {
-  phone: string
-  masked: string
-  id: string
-  nickname: string
-  token: string
-}
-
-const WANG: Member = { phone: '13912345678', masked: '139****5678', id: 'member-wang-xiaoyu', nickname: '王晓雨', token: 'member-token-wang-xiaoyu' }
-const CHEN: Member = { phone: '13687654321', masked: '136****4321', id: 'member-chen-lixing', nickname: '陈立行', token: 'member-token-chen-lixing' }
-const LIN: Member = { phone: '13755556666', masked: '137****6666', id: 'member-lin-yue', nickname: '林悦', token: 'member-token-lin-yue' }
-const MEMBERS = [WANG, CHEN, LIN]
-
-const WANG_FILE = '王晓雨-个人简历-2026秋招.pdf'
-const CHEN_FILE = '陈立行-求职信-物流专员.pdf'
-const PRINT_TITLE = '打印任务进行中'
-const RESUME_TITLE = '上次诊断的简历，可继续优化'
-
-function printOrder(id: string, fileName: string, status: 'pending' | 'claimed' | 'printing', createdAt: string) {
-  return {
-    id,
-    orderNo: `ORD-20261029-${id.slice(-6).toUpperCase()}`,
-    status,
-    fileName,
-    createdAt,
-    completedAt: null,
-    copies: 1,
-    colorMode: 'black_white',
-    duplex: 'simplex',
-    paperSize: 'A4',
-    pageRange: 'all',
-  }
-}
-
-function diagnosedResume(id: string, taskId: string) {
-  return {
-    id,
-    taskId,
-    kind: 'parse',
-    status: 'completed',
-    provider: 'deepseek',
-    optimized: false,
-    hasDraft: false,
-    latestVersion: null,
-    createdAt: '2026-10-29T01:03:11.000Z',
-    updatedAt: '2026-10-29T01:04:52.000Z',
-    expiresAt: null,
-  }
-}
-
-/** 每个人名下的打印订单与简历，按令牌给；没带令牌或令牌不认识给 401。 */
-const ORDERS: Record<string, unknown[]> = {
-  [WANG.token]: [printOrder('task-wang-20261029-a3f7c2', WANG_FILE, 'printing', '2026-10-29T01:12:40.000Z')],
-  [CHEN.token]: [printOrder('task-chen-20261029-9be041', CHEN_FILE, 'pending', '2026-10-29T02:31:05.000Z')],
-  [LIN.token]: [],
-}
-const RESUMES: Record<string, unknown[]> = {
-  [WANG.token]: [diagnosedResume('resume-row-wang-01', 'ai-task-wang-5d21e8')],
-  [CHEN.token]: [],
-  [LIN.token]: [diagnosedResume('resume-row-lin-01', 'ai-task-lin-77c0b4')],
-}
-
-interface MeCall {
-  path: string
-  auth: string | null
-}
-
-/** 登录按手机号认人；打印订单、简历按令牌给各自的；记下每一条 /me 请求带的是谁的令牌。 */
-async function routeMembers(page: Page, api: ApiRouter): Promise<MeCall[]> {
-  registerPrivacyShell(api)
-  const calls: MeCall[] = []
-  page.on('request', (request: Request) => {
-    const url = new URL(request.url())
-    if (url.pathname.startsWith('/api/v1/me/')) calls.push({ path: url.pathname, auth: request.headers()['authorization'] ?? null })
-  })
-  await page.route('**/api/v1/member/auth/login', async (route) => {
-    const body = route.request().postDataJSON() as { phone?: string }
-    const member = MEMBERS.find((m) => m.phone === body.phone)
-    await route.fulfill({
-      status: member ? 200 : 400,
-      contentType: 'application/json',
-      body: JSON.stringify(member
-        ? { success: true, data: { token: member.token, user: { id: member.id, phoneMasked: member.masked, nickname: member.nickname } } }
-        : { success: false, error: { code: 'MEMBER_LOGIN_FAILED', message: '登录失败' } }),
-    })
-  })
-  const byToken = (table: Record<string, unknown[]>) => async (route: Route) => {
-    const auth = route.request().headers()['authorization'] ?? ''
-    const member = MEMBERS.find((m) => auth === `Bearer ${m.token}`)
-    await route.fulfill({
-      status: member ? 200 : 401,
-      contentType: 'application/json',
-      body: JSON.stringify(member
-        ? { success: true, data: { items: table[member.token] ?? [], nextCursor: null, total: (table[member.token] ?? []).length } }
-        : { success: false, error: { code: 'MEMBER_UNAUTHORIZED', message: '请先登录' } }),
-    })
-  }
-  await page.route('**/api/v1/me/print-orders**', byToken(ORDERS))
-  await page.route('**/api/v1/me/resumes**', byToken(RESUMES))
-  return calls
-}
 
 const nav = (page: Page, name: string) => page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name, exact: true })
 const region = (page: Page): Locator => page.getByTestId('home-context-region')

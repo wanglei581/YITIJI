@@ -17,7 +17,8 @@ export default defineConfig({
   // kiosk-end-use：统一清场正式构建走查（W-75 / W-43 / W-64），要 30 秒以上的本页时钟，
   // 不能放进把隐私硬截止压到 3 秒的 playwright.privacy.config.ts。
   // home-continue-handover：首页「继续办理」在交接判据（空档 >30 秒）之后收起、不再读 /me，同样要 30 秒以上的本页时钟。
-  testMatch: /(kiosk-privacy-clear-copy|kiosk-end-use|home-continue-handover)\.spec\.ts$/,
+  // home-fill-when-empty：首页「继续办理」收起（要 30 秒以上的本页时钟）或没有东西可摆时，版面照样填满。
+  testMatch: /(kiosk-privacy-clear-copy|kiosk-end-use|home-continue-handover|home-fill-when-empty)\.spec\.ts$/,
   outputDir: '../../test-results/kiosk-privacy-clear',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
