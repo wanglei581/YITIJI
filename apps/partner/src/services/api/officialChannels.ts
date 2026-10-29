@@ -3,8 +3,8 @@
 //
 // http（成功套 { success, data }；失败 { success:false, error:{ code, message } }）：
 //   GET    /partner/official-channels       → { items, verifiedDomains }
-//   POST   /partner/official-channels       body { name, url, displayOrder?, enabled? } → item
-//   PATCH  /partner/official-channels/:id   body 上面四项的任意子集 → item
+//   POST   /partner/official-channels       body { name, url, displayOrder?, enabled?, audience? } → item
+//   PATCH  /partner/official-channels/:id   body 上面几项的任意子集 → item
 //   DELETE /partner/official-channels/:id   → { archived: true }（归档后从列表消失，机构端没有恢复入口）
 //   服务端拒绝时 message 是中文原因（https、域名范围、跳转参数、商业招聘网站、已紧急下架……），页面原样展示。
 //
@@ -17,7 +17,11 @@
 //   mock 复刻服务端的校验与中文原因，否则演示会出现「什么链接都能保存」的假能力。
 // ============================================================
 
-import type { OfficialChannelPartnerItem } from '@ai-job-print/shared'
+import {
+  OFFICIAL_CHANNEL_AUDIENCES,
+  type OfficialChannelAudience,
+  type OfficialChannelPartnerItem,
+} from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 import {
@@ -39,6 +43,7 @@ export interface CreateOfficialChannelInput {
   url: string
   displayOrder?: number
   enabled?: boolean
+  audience?: OfficialChannelAudience
 }
 
 export type UpdateOfficialChannelInput = Partial<CreateOfficialChannelInput>
@@ -119,6 +124,18 @@ function unexpected(): never {
   throw new ApiHttpError('UNEXPECTED_RESPONSE', CODE_MESSAGES.UNEXPECTED_RESPONSE, 200)
 }
 
+function asAudience(value: unknown): OfficialChannelAudience {
+  return typeof value === 'string' && (OFFICIAL_CHANNEL_AUDIENCES as readonly string[]).includes(value)
+    ? value as OfficialChannelAudience
+    : 'general'
+}
+
+function audienceForWrite(value: OfficialChannelAudience | undefined, fallback: OfficialChannelAudience): OfficialChannelAudience {
+  if (value === undefined) return fallback
+  if ((OFFICIAL_CHANNEL_AUDIENCES as readonly string[]).includes(value)) return value
+  throw new ApiHttpError('VALIDATION_FAILED', '面向对象只能选择面向高校毕业生、面向社会求职者或通用', 400)
+}
+
 function asItem(raw: unknown): OfficialChannelPartnerItem {
   if (!raw || typeof raw !== 'object') unexpected()
   const row = raw as Record<string, unknown>
@@ -133,6 +150,7 @@ function asItem(raw: unknown): OfficialChannelPartnerItem {
     url: row.url,
     displayOrder: row.displayOrder,
     enabled: row.enabled,
+    audience: asAudience(row.audience),
     emergencyTakedown: row.emergencyTakedown,
     emergencyReasonCode: typeof row.emergencyReasonCode === 'string' ? row.emergencyReasonCode : null,
     emergencyReasonText: typeof row.emergencyReasonText === 'string' ? row.emergencyReasonText : null,
@@ -172,12 +190,12 @@ let mockSeq = 10
 let mockRows: OfficialChannelPartnerItem[] = [
   {
     id: 'oc-mock-1', name: '学校就业信息网', url: 'https://career.demo-university.edu.cn/',
-    displayOrder: 1, enabled: true, emergencyTakedown: false,
+    displayOrder: 1, enabled: true, audience: 'graduate', emergencyTakedown: false,
     emergencyReasonCode: null, emergencyReasonText: null, organizationName: MOCK_ORG_NAME,
   },
   {
     id: 'oc-mock-2', name: '就业指导中心旧版网站', url: 'https://jyzx.demo-university.edu.cn/notice',
-    displayOrder: 2, enabled: false, emergencyTakedown: true,
+    displayOrder: 2, enabled: false, audience: 'general', emergencyTakedown: true,
     emergencyReasonCode: 'false_information',
     emergencyReasonText: '页面上的招聘会时间与主办方公告不一致，投诉编号 TS-2026-0927',
     organizationName: MOCK_ORG_NAME,
@@ -242,6 +260,7 @@ const mockAdapter: PartnerOfficialChannelsService = {
       url: clean.url!,
       displayOrder: input.displayOrder ?? 0,
       enabled: input.enabled ?? true,
+      audience: audienceForWrite(input.audience, 'general'),
       emergencyTakedown: false,
       emergencyReasonCode: null,
       emergencyReasonText: null,
@@ -273,6 +292,7 @@ const mockAdapter: PartnerOfficialChannelsService = {
       url: clean.url ?? row.url,
       displayOrder: input.displayOrder ?? row.displayOrder,
       enabled,
+      audience: audienceForWrite(input.audience, row.audience),
     }
     mockRows = mockRows.map((item) => (item.id === id ? next : item)).sort((a, b) => a.displayOrder - b.displayOrder)
     return { ...next }

@@ -13609,7 +13609,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 645,
+      "reachableFileCount": 647,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -18129,7 +18129,7 @@
         ]
       },
       {
-        "fieldCount": 33,
+        "fieldCount": 34,
         "name": "OnlinePlatformDirectory",
         "relations": [
           "FileObject",
@@ -20028,6 +20028,7 @@
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
     "apps/kiosk/src/layouts/KioskRuntimeRoot.tsx": [
+      "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-fusion-shell.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-scan-input-safety.mjs"
@@ -23315,6 +23316,9 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
+    ],
+    "packages/shared/src/types/officialChannel.ts": [
+      "services/api/scripts/verify-official-channels.ts"
     ],
     "packages/shared/src/types/partner.ts": [
       "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
@@ -26891,6 +26895,9 @@
     "services/api/src/official-channels/dto/official-channel.dto.ts": [
       "services/api/scripts/verify-official-channels.ts"
     ],
+    "services/api/src/official-channels/official-channel.constants.ts": [
+      "services/api/scripts/verify-official-channels.ts"
+    ],
     "services/api/src/official-channels/official-channels.controller.ts": [
       "services/api/scripts/verify-official-channels.ts"
     ],
@@ -29635,6 +29642,7 @@
           "apps/kiosk/src/components/KioskDeviceStatusPills.tsx",
           "apps/kiosk/src/hooks/useTerminalDeviceStatus.ts",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
+          "apps/kiosk/src/layouts/KioskRuntimeRoot.tsx",
           "apps/kiosk/src/pages/home/HomePage.tsx",
           "apps/kiosk/src/pages/home/components/QxHomeView.tsx",
           "apps/kiosk/src/pages/home/homeDomainStatus.ts",
@@ -40055,12 +40063,14 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "packages/shared/src/types/officialChannel.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/ai/resume/career-plan.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/decorators/current-user.decorator.ts",
           "services/api/src/common/guards/roles.guard.ts",
           "services/api/src/official-channels/dto/official-channel.dto.ts",
+          "services/api/src/official-channels/official-channel.constants.ts",
           "services/api/src/official-channels/official-channels.controller.ts",
           "services/api/src/official-channels/official-channels.service.ts",
           "services/api/src/official-channels/registrable-domain.ts",
@@ -44144,17 +44154,6 @@
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/hooks/useSupportContact.ts",
-        "kind": "component",
-        "mentions": [
-          "docs/progress/current-progress.md"
-        ],
-        "risk": "medium",
-        "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/assistant/assistant-advisor.css",
         "kind": "style",
         "mentions": [
@@ -45382,18 +45381,6 @@
         "risk": "low",
         "scope": "kiosk",
         "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/services/api/supportContact.ts",
-        "kind": "component",
-        "mentions": [
-          "apps/kiosk/scripts/tests/unattended-copy.test.mjs",
-          "docs/progress/current-progress.md"
-        ],
-        "risk": "high",
-        "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/unattended-copy.test.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
