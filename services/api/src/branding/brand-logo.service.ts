@@ -36,7 +36,7 @@ export class BrandLogoService {
     private readonly audit: AuditService,
   ) {}
 
-  /** 检查 → 清洗 → 落盘 → 记一行。上传不会自动启用，调用方拿 assetId 再去保存。 */
+  /** 检查 → 重编码（去掉辅助块、规整压缩流；像素原样保留）→ 落盘 → 记一行。上传不会自动启用，调用方拿 assetId 再去保存。 */
   async upload(buffer: Buffer, context: BrandLogoAuditContext): Promise<BrandLogoUploadResult> {
     const inspected = inspectBrandLogo(buffer)
     if (!inspected.ok) {

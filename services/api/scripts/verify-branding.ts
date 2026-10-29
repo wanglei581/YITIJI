@@ -127,7 +127,7 @@ function assertStatic(): void {
     .map((file) => read(join(API_ROOT, 'src/branding', file))).join('\n')
   c.check('品牌模块不读写待机宣传屏素材（不碰 adAsset 表，也不依赖 ContentService）', !/\.adAsset\b|ContentService|content\.service/.test(brandingSources))
   const stored = read(join(API_ROOT, 'src/branding/brand-logo.service.ts'))
-  c.check('Logo 清洗后的内容落盘，不是原始上传', stored.includes('inspected.sanitized'))
+  c.check('Logo 重编码后的内容落盘，不是原始上传', stored.includes('inspected.sanitized'))
 }
 
 async function main(): Promise<void> {
@@ -367,17 +367,17 @@ async function main(): Promise<void> {
       c.check(`放行：${label}`, r.status === 201, `${r.status} ${r.json.error?.code}`)
       if (r.status === 201) createdLogoIds.push(r.json.data.assetId)
     }
-    // 元数据清洗：文字块、EXIF 被剥掉，画面必需块保留，清洗后仍能解码
+    // 辅助块（文字、EXIF、时间）被去掉，画面必需块保留，重编码后仍能解码；像素本身原样保留
     const dirty = buildPng(128, 128, { beforeIend: [pngChunk('tEXt', Buffer.from('Comment\0SECRET-GPS-1234')), pngChunk('eXIf', Buffer.from('Exif\0\0SECRET-EXIF')), pngChunk('tIME', Buffer.alloc(7))] })
     const dirtyUp = await upload(dirty)
     c.check('带文字块 / EXIF 的 PNG 可以上传', dirtyUp.status === 201)
     createdLogoIds.push(dirtyUp.json.data.assetId)
     const dirtyRow = await prisma.brandLogo.findUniqueOrThrow({ where: { id: dirtyUp.json.data.assetId } })
     const dirtyStored = await storage.getObject(dirtyRow.storageKey)
-    c.check('落盘的是重编码后的：只剩 IHDR / IDAT / IEND（文字块、EXIF、时间块都没了），也不含秘密字符串',
+    c.check('落盘的是重编码后的：只剩 IHDR / IDAT / IEND（文字块、EXIF、时间块都没了），也不含辅助块里的秘密字符串',
       pngChunks(dirtyStored).map((ch) => ch.type).join() === 'IHDR,IDAT,IEND' && !dirtyStored.includes('SECRET'))
     c.check('公开读取到的字节就是落盘的重编码文件', (await call('GET', `/api/v1/public/brand-logo/${dirtyUp.json.data.assetId}`)).buffer.equals(dirtyStored))
-    c.check('清洗后的 PNG 仍能解码为 128×128', (await decodeSize(dirtyStored)).width === 128)
+    c.check('重编码后的 PNG 仍能解码为 128×128', (await decodeSize(dirtyStored)).width === 128)
     // 公开读取只认 Logo 表
     const adId = randomUUID().replace(/-/g, '')
     const adKey = `screensaver/materials/${adId}.png`

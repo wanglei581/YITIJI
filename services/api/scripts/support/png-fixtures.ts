@@ -76,16 +76,32 @@ export function plainRows(width: number, height: number, bpp: number, filterByte
  * 归类规则来自 PNG 规范的 Adam7 图（趟号 / 列起点 / 行起点 / 列间隔 / 行间隔：
  * 1: 0,0,8,8  2: 4,0,8,8  3: 0,4,4,8  4: 2,0,4,4  5: 0,2,2,4  6: 1,0,2,2  7: 0,1,1,2）。
  */
-export function adam7RowLengths(width: number, height: number, bpp: number): number[] {
-  const passOf = (x: number, y: number): number => {
-    if (y % 8 === 0 && x % 8 === 0) return 0
-    if (y % 8 === 0 && x % 8 === 4) return 1
-    if (y % 8 === 4 && x % 4 === 0) return 2
-    if (y % 4 === 0 && x % 4 === 2) return 3
-    if (y % 4 === 2 && x % 2 === 0) return 4
-    if (y % 2 === 0 && x % 2 === 1) return 5
-    return 6
+export function adam7PassOf(x: number, y: number): number {
+  if (y % 8 === 0 && x % 8 === 0) return 0
+  if (y % 8 === 4 && x % 4 === 0) return 2
+  if (y % 8 === 0 && x % 8 === 4) return 1
+  if (y % 4 === 0 && x % 4 === 2) return 3
+  if (y % 4 === 2 && x % 2 === 0) return 4
+  if (y % 2 === 0 && x % 2 === 1) return 5
+  return 6
+}
+
+/** Adam7 每一趟里各行包含哪些像素（按文件里的顺序：趟序、行序、行内从左到右）。 */
+export function adam7Positions(width: number, height: number): Array<Array<Array<[number, number]>>> {
+  const passes: Array<Map<number, Array<[number, number]>>> = Array.from({ length: 7 }, () => new Map())
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const rows = passes[adam7PassOf(x, y)]!
+      const row = rows.get(y) ?? []
+      row.push([x, y])
+      rows.set(y, row)
+    }
   }
+  return passes.map((rows) => [...rows.keys()].sort((a, b) => a - b).map((y) => rows.get(y)!))
+}
+
+export function adam7RowLengths(width: number, height: number, bpp: number): number[] {
+  const passOf = adam7PassOf
   const counts: Array<Map<number, number>> = Array.from({ length: 7 }, () => new Map<number, number>())
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -211,4 +227,83 @@ export async function pixelsOf(buffer: Buffer): Promise<Buffer> {
   const context = canvas.getContext('2d')
   context.drawImage(image, 0, 0)
   return Buffer.from(context.getImageData(0, 0, image.width, image.height).data.buffer)
+}
+
+// ── 滤波编码与索引色图像（独立于被测代码的反滤波）──────────────────────────────
+
+function paeth(a: number, b: number, c: number): number {
+  const p = a + b - c
+  const pa = Math.abs(p - a)
+  const pb = Math.abs(p - b)
+  const pc = Math.abs(p - c)
+  return pa <= pb && pa <= pc ? a : pb <= pc ? b : c
+}
+
+/**
+ * 把「还原后的各行」（不含滤波字节）按每行指定的滤波类型编码，拼成带滤波字节的扫描行。
+ * filters 循环取用（filters[y % filters.length]）。隔行图像每趟各调一次（每趟的「上一行」从零行起）。
+ */
+export function filterRows(rows: Uint8Array[], filters: number[], bytesPerPixel = 1): Buffer {
+  const out: Buffer[] = []
+  let prior = new Uint8Array(rows[0]?.length ?? 0)
+  rows.forEach((row, y) => {
+    const filter = filters[y % filters.length]!
+    const line = Buffer.alloc(1 + row.length)
+    line[0] = filter
+    for (let i = 0; i < row.length; i += 1) {
+      const a = i >= bytesPerPixel ? row[i - bytesPerPixel]! : 0
+      const b = prior[i]!
+      const c = i >= bytesPerPixel ? prior[i - bytesPerPixel]! : 0
+      const predicted = filter === 0 ? 0 : filter === 1 ? a : filter === 2 ? b : filter === 3 ? (a + b) >> 1 : paeth(a, b, c)
+      line[1 + i] = (row[i]! - predicted) & 0xff
+    }
+    out.push(line)
+    prior = row
+  })
+  return Buffer.concat(out)
+}
+
+/** 调色板索引按位深打包成一行：高位在前，行尾补 0。 */
+export function packIndices(indices: number[], bitDepth: number): Uint8Array {
+  const row = new Uint8Array(Math.ceil((indices.length * bitDepth) / 8))
+  indices.forEach((value, x) => {
+    const bit = x * bitDepth
+    row[bit >> 3]! |= (value & ((1 << bitDepth) - 1)) << (8 - bitDepth - (bit & 7))
+  })
+  return row
+}
+
+export interface PaletteImageSpec {
+  width: number
+  height: number
+  bitDepth: 1 | 2 | 4 | 8
+  /** PLTE 的项数。 */
+  entries: number
+  interlace?: 0 | 1
+  /** 每行的滤波类型，循环使用；默认全部 0。 */
+  filters?: number[]
+  /** 像素 (x, y) 的调色板索引。 */
+  index: (x: number, y: number) => number
+  /** tRNS 的项数（不给 = 没有 tRNS）。 */
+  trnsEntries?: number
+}
+
+/** 索引色 PNG：PLTE 有 entries 项，像素索引由 spec.index 给，按指定滤波编码。 */
+export function paletteImage(spec: PaletteImageSpec): Buffer {
+  const interlace = spec.interlace ?? 0
+  const filters = spec.filters ?? [0]
+  const rowsOf = (positions: Array<[number, number]>): Uint8Array => packIndices(positions.map(([x, y]) => spec.index(x, y)), spec.bitDepth)
+  let raw: Buffer
+  if (interlace === 0) {
+    const rows = Array.from({ length: spec.height }, (_, y) => rowsOf(Array.from({ length: spec.width }, (_, x) => [x, y] as [number, number])))
+    raw = filterRows(rows, filters)
+  } else {
+    raw = Buffer.concat(adam7Positions(spec.width, spec.height).map((pass) => filterRows(pass.map(rowsOf), filters)))
+  }
+  const palette = Buffer.alloc(spec.entries * 3)
+  for (let i = 0; i < spec.entries; i += 1) palette.writeUIntBE(((i * 53) % 256) * 65536 + ((i * 97) % 256) * 256 + ((i * 29) % 256), i * 3, 3)
+  return pngFromSpec({
+    width: spec.width, height: spec.height, bitDepth: spec.bitDepth, colorType: 3, interlace, raw,
+    beforeIdat: [pngChunk('PLTE', palette), ...(spec.trnsEntries ? [pngChunk('tRNS', Buffer.alloc(spec.trnsEntries, 0x80))] : [])],
+  })
 }

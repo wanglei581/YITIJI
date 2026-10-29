@@ -14,8 +14,19 @@
  *   4. 按 IHDR 算出「应有的解压后字节数」，用 inflateSync(maxOutputLength = 该值) 解开全部 IDAT：
  *      压缩流损坏、解压后超长或不足、压缩流结束后 IDAT 里还有夹带的字节，一律拒；
  *      每一行的滤波类型字节必须是 0–4；
- *   5. **重新编码**：只写 IHDR、PLTE、tRNS + 一个重新压缩的 IDAT + IEND，落盘的是重编码后的文件。
- *      文字块、EXIF、时间、内嵌色彩配置、未知块一概不留；像素数据（滤波后的扫描行）原样保留，画面不变。
+ *   5. **索引色（颜色类型 3）逐像素核对**：反滤波（五种滤波、隔行每趟各自从零行起）后，每个像素的调色板索引必须小于 PLTE 项数
+ *      （位深 1 / 2 / 4 / 8 都核，行尾的填充位不算）；PLTE 项数 ≥ 2^位深 时索引不可能越界，直接跳过这一步。tRNS 长度也核。
+ *      只做索引色：别的颜色类型的像素值没有「越界」一说，不需要反滤波。
+ *   6. **重新编码**：只写 IHDR、PLTE、tRNS + 一个重新压缩的 IDAT + IEND，落盘的是重编码后的文件。
+ *      去掉的是辅助块（文字、EXIF、时间、内嵌色彩配置、私有块）并规整压缩流；
+ *      **像素数据本身原样保留**——所以这不是「清除隐藏内容」：藏在像素里的信息（隐写）不在处理范围，不要对外这样宣称。
+ *
+ * 资源预算（同步执行，会占事件循环；只有管理员能上传）：
+ *   - 输入 ≤ 512KB、宽高 ≤ 1024、解压输出被 maxOutputLength 卡死，最坏的扫描数据约 8 MiB（1024×1024 RGBA16）；
+ *   - 重压缩用 level 4，**不用 level 9**：实测 8 MiB 稀疏噪声数据 level 9 要 3.4 秒、level 6 要 0.2 秒、level 4 不超过 0.05 秒
+ *     （level 4 起用惰性匹配但搜索链只有 16，耗时有界，压缩率接近 level 6）；
+ *   - 实测（本机 Apple 芯片，Node 22）：最坏规格（1024×1024 RGBA16 非隔行 / 隔行、8 位与 4 位索引色逐行 Paeth）单次 inspectBrandLogo 约 50 ms；
+ *     verify-brand-logo-image 的第 7 节断言重压缩级别在 1–5、单次 < 2000 ms（只拦数量级的退化，例如改回 level 9），超了会红。
  */
 import { deflateSync, inflateSync } from 'node:zlib'
 import {
@@ -55,6 +66,8 @@ const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0
 /** 动图相关块。出现任何一个都拒绝，Logo 只收静态单帧。 */
 const PNG_ANIMATION = new Set(['acTL', 'fcTL', 'fdAT'])
 const PNG_CRITICAL = new Set(['IHDR', 'PLTE', 'IDAT', 'IEND'])
+/** 重压缩级别。不用 9：见文件头「资源预算」。 */
+const RECOMPRESS_LEVEL = 4
 /** colorType → 允许的位深，以及每个像素的通道数。 */
 const PNG_COLOR: Record<number, { depths: readonly number[]; channels: number }> = {
   0: { depths: [1, 2, 4, 8, 16], channels: 1 },
@@ -117,25 +130,87 @@ function checkDimensions(width: number, height: number): BrandLogoInspection | n
 interface Layout {
   /** 解压后应有的总字节数（含每行开头的滤波类型字节）。 */
   expectedBytes: number
-  /** 每一行（含滤波字节）的长度，按文件里出现的顺序；用来逐行核对滤波类型字节。 */
-  rowLengths: number[]
+  /** 扫描行分趟：非隔行只有一趟；Adam7 是非空的各趟。每趟 width 个像素、rows 行，「上一行」在每趟开头重新从零行算起。 */
+  passes: Array<{ width: number; rows: number }>
+  /** 一行（含滤波字节）的长度，pixels 为这一行的像素数。 */
+  rowLength: (pixels: number) => number
 }
 
 /** 按 IHDR 算出解压后的数据布局：非隔行是 height 行，隔行（Adam7）是七趟里非空的各行。 */
 function layoutOf(width: number, height: number, bitsPerPixel: number, interlace: number): Layout {
-  const rowBytes = (pixels: number) => 1 + Math.ceil((pixels * bitsPerPixel) / 8)
-  const rowLengths: number[] = []
+  const rowLength = (pixels: number) => 1 + Math.ceil((pixels * bitsPerPixel) / 8)
+  const passes: Layout['passes'] = []
   if (interlace === 0) {
-    for (let y = 0; y < height; y += 1) rowLengths.push(rowBytes(width))
+    passes.push({ width, rows: height })
   } else {
     for (const [xStart, yStart, xStep, yStep] of ADAM7) {
       if (width <= xStart || height <= yStart) continue
-      const passWidth = Math.ceil((width - xStart) / xStep)
-      const passHeight = Math.ceil((height - yStart) / yStep)
-      for (let y = 0; y < passHeight; y += 1) rowLengths.push(rowBytes(passWidth))
+      passes.push({ width: Math.ceil((width - xStart) / xStep), rows: Math.ceil((height - yStart) / yStep) })
     }
   }
-  return { expectedBytes: rowLengths.reduce((sum, n) => sum + n, 0), rowLengths }
+  return { expectedBytes: passes.reduce((sum, pass) => sum + pass.rows * rowLength(pass.width), 0), passes, rowLength }
+}
+
+/** PNG 反滤波（索引色每像素 1 字节以内，滤波用的「每像素字节数」就是 1）。line 原地改写，prior 是上一行已还原的数据。 */
+function unfilterRow(filter: number, line: Uint8Array, prior: Uint8Array): void {
+  const n = line.length
+  if (filter === 1) {
+    for (let i = 1; i < n; i += 1) line[i] = (line[i]! + line[i - 1]!) & 0xff
+  } else if (filter === 2) {
+    for (let i = 0; i < n; i += 1) line[i] = (line[i]! + prior[i]!) & 0xff
+  } else if (filter === 3) {
+    for (let i = 0; i < n; i += 1) line[i] = (line[i]! + (((i > 0 ? line[i - 1]! : 0) + prior[i]!) >> 1)) & 0xff
+  } else if (filter === 4) {
+    for (let i = 0; i < n; i += 1) {
+      const a = i > 0 ? line[i - 1]! : 0
+      const b = prior[i]!
+      const c = i > 0 ? prior[i - 1]! : 0
+      const p = a + b - c
+      const pa = Math.abs(p - a)
+      const pb = Math.abs(p - b)
+      const pc = Math.abs(p - c)
+      line[i] = (line[i]! + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c)) & 0xff
+    }
+  }
+}
+
+/** 一行里的 width 个调色板索引是否都小于 entries（位深 1 / 2 / 4 / 8；高位在前，行尾填充位不看）。 */
+function indicesWithin(line: Uint8Array, width: number, bitDepth: number, entries: number): boolean {
+  if (bitDepth === 8) {
+    for (let x = 0; x < width; x += 1) if (line[x]! >= entries) return false
+    return true
+  }
+  const mask = (1 << bitDepth) - 1
+  for (let x = 0; x < width; x += 1) {
+    const bit = x * bitDepth
+    if (((line[bit >> 3]! >> (8 - bitDepth - (bit & 7))) & mask) >= entries) return false
+  }
+  return true
+}
+
+/**
+ * 逐行核对：滤波类型字节 0–4；索引色且调色板不满时，反滤波后核对每个像素的索引没有越过 PLTE。
+ * 返回 false = 文件有问题。
+ */
+function scanRows(raw: Buffer, layout: Layout, colorType: number, bitDepth: number, paletteEntries: number): boolean {
+  const checkIndices = colorType === 3 && paletteEntries < 2 ** bitDepth
+  let offset = 0
+  for (const pass of layout.passes) {
+    const length = layout.rowLength(pass.width)
+    let prior = new Uint8Array(length - 1)
+    for (let y = 0; y < pass.rows; y += 1) {
+      const filter = raw[offset]!
+      if (filter > 4) return false
+      if (checkIndices) {
+        const line = Uint8Array.from(raw.subarray(offset + 1, offset + length))
+        unfilterRow(filter, line, prior)
+        if (!indicesWithin(line, pass.width, bitDepth, paletteEntries)) return false
+        prior = line
+      }
+      offset += length
+    }
+  }
+  return true
 }
 
 function inspectPng(buffer: Buffer): BrandLogoInspection {
@@ -236,17 +311,13 @@ function inspectPng(buffer: Buffer): BrandLogoInspection {
     return CORRUPT
   }
   if (raw.length !== layout.expectedBytes) return CORRUPT
-  let offset = 0
-  for (const rowLength of layout.rowLengths) {
-    if (raw[offset]! > 4) return CORRUPT
-    offset += rowLength
-  }
+  if (!scanRows(raw, layout, colorType, bitDepth, plte ? plte.length / 3 : 0)) return CORRUPT
 
   // ── 重新编码：只写 IHDR、PLTE、tRNS + 一个 IDAT + IEND ─────────────────────
   const parts = [PNG_SIGNATURE, chunk('IHDR', ihdr)]
   if (plte) parts.push(chunk('PLTE', plte))
   if (trns) parts.push(chunk('tRNS', trns))
-  parts.push(chunk('IDAT', deflateSync(raw, { level: 9 })), chunk('IEND', Buffer.alloc(0)))
+  parts.push(chunk('IDAT', deflateSync(raw, { level: RECOMPRESS_LEVEL })), chunk('IEND', Buffer.alloc(0)))
   const sanitized = Buffer.concat(parts)
   if (sanitized.length > BRAND_LOGO_MAX_BYTES) {
     return fail('BRAND_LOGO_TOO_LARGE', `Logo 不能超过 ${Math.round(BRAND_LOGO_MAX_BYTES / 1024)}KB`)

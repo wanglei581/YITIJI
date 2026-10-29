@@ -25,7 +25,9 @@ export const BRAND_FILING_URL_HOSTS = ['beian.miit.gov.cn', 'www.beian.gov.cn', 
 /**
  * Logo：**只收 PNG**（按文件头判，不信扩展名与 Content-Type）。SVG / JPEG / GIF / WebP 一律拒绝。
  * 静态单帧；宽高都 ≤1024；宽高比 1:1（±10%）；≤512KB。
- * 服务端会完整解压校验像素数据并**重新编码**后落盘（只留 IHDR / PLTE / tRNS + 一个 IDAT + IEND），所以上传后的文件字节与原文件不同，画面一个像素不变。
+ * 服务端会完整解压校验像素数据（索引色还会逐像素核对调色板索引）并**重新编码**后落盘（只留 IHDR / PLTE / tRNS + 一个 IDAT + IEND），
+ * 所以上传后的文件字节与原文件不同，画面一个像素不变。重编码去掉的是辅助块、规整的是压缩流；像素本身原样保留，
+ * **不是**「清除隐藏内容」——藏在像素里的信息不在处理范围，界面与对外材料都不要这样宣称。
  */
 export const BRAND_LOGO_MIME_TYPES = ['image/png'] as const
 export type BrandLogoMimeType = (typeof BRAND_LOGO_MIME_TYPES)[number]
