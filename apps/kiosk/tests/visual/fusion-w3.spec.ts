@@ -2546,6 +2546,27 @@ test('job fit actions: a print result arriving after leaving does not hijack nav
   await expect(page).toHaveURL(/\/resume\/job-fit$/)
 })
 
+// 生成中（稿 career 的 gen 屏）：边界声明只有稿的那一句「不承诺录用或收入。」。不写「不显示进度百分比或阶段名称」「也不生成打印文件、不发起支付」这类讲页面自己怎么做的话。
+test('career plan: while generating, the one boundary line is the draft sentence, not review notes @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('GET', CAREER_PLAN_PATH, { status: 404, json: { error: { code: 'CAREER_PLAN_NOT_FOUND', message: '尚未生成' } } })
+  let releaseGenerate: (() => void) | null = null
+  const generateHeld = new Promise<void>((resolve) => { releaseGenerate = resolve })
+  api.respondWith('POST', CAREER_PLAN_PATH, async () => {
+    await generateHeld
+    return { status: 200, json: CAREER_PLAN_READY }
+  })
+  await openWithRouteState(page, '/resume/career-plan', { taskId: 't-cp' })
+  const screen = page.locator('[data-kiosk-screen="resume-career-plan"]')
+  await expect(screen).toHaveAttribute('data-state', 'guide')
+  await page.locator('.qxt-dock').locator('[data-career-plan-generate]').click()
+  await expect(screen).toHaveAttribute('data-state', 'generating')
+  await expect(screen.locator('.qxt-fine').getByText('不承诺录用或收入。', { exact: true })).toBeVisible()
+  await expect(page.locator('body')).not.toContainText(/不显示进度百分比|阶段名称|不发起支付|不生成打印文件/)
+  releaseGenerate!()
+  await expect(screen).toHaveAttribute('data-state', 'ready')
+})
+
 test('career plan guide, ai-down and generated result keep print available @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)
   await page.goto('/resume/career-plan')

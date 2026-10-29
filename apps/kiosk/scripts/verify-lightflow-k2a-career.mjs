@@ -147,6 +147,9 @@ check(
   'ai-down 自查三条必须如实说明它不是针对本人简历的结论',
 )
 check(/aiOutage \? 'ai-down'/.test(page) && page.includes('<CareerPlanSelfCheck />'), 'ai-down 自查三条只在真的 ai-down 屏出现')
+// 生成中屏的边界声明是稿 career 的原句，不写讲页面自己怎么做的话（进度百分比、阶段名称、不生成打印文件、不发起支付）。
+check(page.includes('<QxTouchCallout kind="fine">不承诺录用或收入。</QxTouchCallout>'), '求职方案生成中屏的边界声明是稿原句「不承诺录用或收入。」')
+check(!/不显示进度百分比或阶段名称|也不生成打印文件、不发起支付/.test(page), '求职方案生成中屏不写讲页面自己怎么做的批注')
 
 check(css.length > 0, '宿主 46 四栏样式不得为空')
 check(lineCount(css) < 300, `宿主 46 四栏样式必须少于 300 行（当前 ${lineCount(css)}）`)

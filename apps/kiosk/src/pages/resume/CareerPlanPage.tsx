@@ -656,9 +656,7 @@ export function CareerPlanPage() {
       body: (
         <div className="rtp-state">
           {generationRegion}
-          <QxTouchCallout kind="fine">
-            生成期间不显示进度百分比或阶段名称，不承诺薪资、录用或跳槽结果，不把简历或规划内容提供给企业，也不生成打印文件、不发起支付；结果只给你本人看。
-          </QxTouchCallout>
+          <QxTouchCallout kind="fine">不承诺录用或收入。</QxTouchCallout>
           <ResumeStepPreview
             art="report"
             kicker="返回之后，你可以带走 · 示例版式"
