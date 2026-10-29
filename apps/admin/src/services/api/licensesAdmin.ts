@@ -1,48 +1,60 @@
-import type { LicenseAttention, LicenseView, OrgLicenseOverview } from '@ai-job-print/shared'
+import type { CreateLicenseInput, LicenseAttention, LicenseMutationResult, LicenseResumeInput, LicenseStatusChangeInput, OrgLicenseDetail, RenewLicenseInput, SetLicenseModeInput, UpdateLicenseInput } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
+import * as mock from './licensesAdminMock'
 
-// 演示数据用合作机构管理页现有的两家演示机构（id 与名称一致，点「去处理」能打开对应机构）；
-// 已停用一类不放演示数据，由 http 包用例喂快照覆盖。时间按现在推算，过几天状态不会变。
-const MOCK_LICENSES = [
-  { orgId: 'org-mock-2', orgName: '某大学就业指导中心(演示)', state: 'ok', endsInDays: 12, licenseeName: '青岛蓝谷数字科技有限公司', creditCode: '91370212MA3T8K2P4T', contractNo: 'ZYD-SQ-2026-0315' },
-  { orgId: 'org-mock-1', orgName: '市人才交流中心(演示)', state: 'grace', endsInDays: -4, licenseeName: '青岛海纳就业服务有限公司', creditCode: '91370203MA3RQ5WX71', contractNo: 'ZYD-SQ-2026-0316' },
-] as const
-
-function mockAttention(): LicenseAttention {
-  const now = Date.now()
-  const day = 86_400_000
-  const iso = (offset: number) => new Date(now + offset * day).toISOString()
-  const date = (offset: number) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(now + offset * day))
-  const midnight = (offset: number) => new Date(`${date(offset)}T00:00:00+08:00`).toISOString()
-  const overview = (item: (typeof MOCK_LICENSES)[number], index: number): OrgLicenseOverview => {
-    const current: LicenseView = {
-      id: `license-demo-${index + 1}`, orgId: item.orgId, version: 1, licenseeName: item.licenseeName, creditCode: item.creditCode,
-      contractNo: item.contractNo, startsAt: midnight(item.endsInDays - 365), endsAt: midnight(item.endsInDays + 1),
-      startsOn: date(item.endsInDays - 365), endsOn: date(item.endsInDays), periodText: `${date(item.endsInDays - 365)} 至 ${date(item.endsInDays)}（北京时间，含当天）`, graceEndsOn: date(item.endsInDays + 7),
-      graceDays: 7, graceEndsAt: midnight(item.endsInDays + 8), terminalQuota: 3, status: 'active',
-      phase: item.state === 'ok' ? 'active' : 'grace', note: null, statusReason: null, statusTicketNo: null,
-      statusChangedAt: null, statusChangedBy: null, createdBy: 'demo-admin', updatedBy: null,
-      createdAt: iso(item.endsInDays - 372 - index), updatedAt: iso(-20 - index),
-    }
-    return { orgId: item.orgId, orgName: item.orgName, licenseMode: 'required', managed: true, state: item.state, usable: true,
-      daysLeft: item.state === 'ok' ? item.endsInDays : item.endsInDays + 7, coveredUntil: item.state === 'ok' ? current.endsAt : null,
-      coveredUntilOn: item.state === 'ok' ? current.endsOn : null, current, upcoming: null, terminalQuota: 3, terminalsBound: 2, overQuota: false }
-  }
-  const all = MOCK_LICENSES.map(overview)
-  const expiringSoon = all.filter((item) => item.state === 'ok')
-  const grace = all.filter((item) => item.state === 'grace')
-  return { expiringSoon, grace, inactive: [], counts: { expiringSoon: expiringSoon.length, grace: grace.length, inactive: 0 } }
-}
-
-export async function getLicenseAttention(): Promise<LicenseAttention> {
-  if (API_MODE === 'mock') return mockAttention()
-  const res = await fetch(`${API_BASE_URL}/admin/licenses/attention`, { headers: authHeader() })
-  if (res.status === 401 || res.status === 403) redirectToLogin()
+async function request<T>(path: string, method = 'GET', body?: object): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`, { method, headers: { ...authHeader(), ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) })
+  if (res.status === 401) redirectToLogin()
   if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as { error?: { code?: string; message?: string }; message?: unknown }
-    const message = body.error?.message ?? (typeof body.message === 'string' ? body.message : undefined)
-    throw new ApiHttpError(body.error?.code ?? 'LICENSE_ATTENTION_ERROR', message ?? '软件使用授权情况这次没读到', res.status)
+    const data = await res.json().catch(() => ({})) as { error?: { code?: string; message?: string }; message?: unknown }
+    throw new ApiHttpError(data.error?.code ?? 'LICENSE_REQUEST_ERROR', data.error?.message ?? (typeof data.message === 'string' ? data.message : '软件使用授权操作失败'), res.status)
   }
-  return ((await res.json()) as { data: LicenseAttention }).data
+  return ((await res.json()) as { success: true; data: T }).data
+}
+function demo<T>(fn: () => T): T {
+  try { return fn() } catch (error) {
+    if (error instanceof mock.MockLicenseError) throw new ApiHttpError(error.code, error.message, error.status)
+    throw error
+  }
+}
+const orgPath = (id: string) => `/admin/orgs/${encodeURIComponent(id)}`
+const licensePath = (id: string) => `/admin/licenses/${encodeURIComponent(id)}`
+// 白名单避免额外字段进入后端的严格 DTO。
+function createBody(x: CreateLicenseInput | RenewLicenseInput) {
+  return { licenseeName: x.licenseeName, creditCode: x.creditCode, contractNo: x.contractNo, startsOn: x.startsOn, endsOn: x.endsOn, terminalQuota: x.terminalQuota, graceDays: x.graceDays, note: x.note }
+}
+export async function getLicenseAttention(): Promise<LicenseAttention> {
+  return API_MODE === 'mock' ? demo(mock.mockAttention) : request('/admin/licenses/attention')
+}
+export async function getOrgLicenses(orgId: string): Promise<OrgLicenseDetail> {
+  return API_MODE === 'mock' ? demo(() => mock.mockGetOrg(orgId)) : request(`${orgPath(orgId)}/licenses`)
+}
+export async function createLicense(orgId: string, input: CreateLicenseInput): Promise<LicenseMutationResult> {
+  const body = createBody(input)
+  return API_MODE === 'mock' ? demo(() => mock.mockCreate(orgId, input)) : request(`${orgPath(orgId)}/licenses`, 'POST', body)
+}
+export async function updateLicense(id: string, input: UpdateLicenseInput): Promise<LicenseMutationResult> {
+  const { version, reason, licenseeName, creditCode, contractNo, startsOn, endsOn, terminalQuota, graceDays, note } = input
+  const body = { version, reason, licenseeName, creditCode, contractNo, startsOn, endsOn, terminalQuota, graceDays, note }
+  return API_MODE === 'mock' ? demo(() => mock.mockUpdate(id, body)) : request(licensePath(id), 'PATCH', body)
+}
+export async function renewLicense(id: string, input: RenewLicenseInput): Promise<LicenseMutationResult> {
+  return API_MODE === 'mock' ? demo(() => mock.mockRenew(id, input)) : request(`${licensePath(id)}/renew`, 'POST', createBody(input))
+}
+export async function suspendLicense(id: string, input: LicenseStatusChangeInput): Promise<LicenseMutationResult> {
+  const { version, reason, approvalTicketNo } = input
+  return API_MODE === 'mock' ? demo(() => mock.mockStatus(id, { version, reason, approvalTicketNo }, 'suspended')) : request(`${licensePath(id)}/suspend`, 'POST', { version, reason, approvalTicketNo })
+}
+export async function resumeLicense(id: string, input: LicenseResumeInput): Promise<LicenseMutationResult> {
+  const { version, reason } = input
+  return API_MODE === 'mock' ? demo(() => mock.mockStatus(id, { version, reason }, 'active')) : request(`${licensePath(id)}/resume`, 'POST', { version, reason })
+}
+export async function revokeLicense(id: string, input: LicenseStatusChangeInput): Promise<LicenseMutationResult> {
+  const { version, reason, approvalTicketNo } = input
+  return API_MODE === 'mock' ? demo(() => mock.mockStatus(id, { version, reason, approvalTicketNo }, 'revoked')) : request(`${licensePath(id)}/revoke`, 'POST', { version, reason, approvalTicketNo })
+}
+export async function setLicenseMode(orgId: string, input: SetLicenseModeInput): Promise<OrgLicenseDetail> {
+  const { licenseMode, reason, confirmLockout } = input
+  return API_MODE === 'mock' ? demo(() => mock.mockSetMode(orgId, { licenseMode, reason, confirmLockout })) : request(`${orgPath(orgId)}/license-mode`, 'PUT', { licenseMode, reason, confirmLockout })
 }
