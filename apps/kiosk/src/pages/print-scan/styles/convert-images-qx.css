@@ -498,16 +498,20 @@
 }
 
 /* 大二维码：远处也扫得到。扫码面板是冻结的共享件（门禁按哈希钉着它），不改它的源码，
- * 只在层里把二维码那个 svg 放大到 280px，并把它左边的格子（原 180px）撑到放得下。 */
-.i2p-qr-layer .qxt-dialog [class*='md:grid-cols-[180px_1fr]'] {
-  grid-template-columns: 310px minmax(0, 1fr);
-}
+ * 只在层里把二维码那个 svg 放大到 280px，并把它左边的格子（原 180px）撑到放得下。
+ * 只在 768px 以上放大：面板自己的两列版式就是 md: 断点（768px）才出现，手机宽度仍是它原来的一列，
+ * 不然 390 宽上 310px 的一列加文字列会把层撑出视口。 */
+@media (min-width: 768px) {
+  .i2p-qr-layer .qxt-dialog [class*='md:grid-cols-[180px_1fr]'] {
+    grid-template-columns: 310px minmax(0, 1fr);
+  }
 
-.i2p-qr-layer .qxt-dialog [class*='md:grid-cols-[180px_1fr]'] > :first-child {
-  min-height: 310px;
-}
+  .i2p-qr-layer .qxt-dialog [class*='md:grid-cols-[180px_1fr]'] > :first-child {
+    min-height: 310px;
+  }
 
-.i2p-qr-layer .qxt-dialog svg:not([class]) {
-  width: 280px;
-  height: 280px;
+  .i2p-qr-layer .qxt-dialog svg:not([class]) {
+    width: 280px;
+    height: 280px;
+  }
 }
