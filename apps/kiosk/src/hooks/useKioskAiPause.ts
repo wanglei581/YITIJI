@@ -1,4 +1,5 @@
-// 后台「AI 暂停」开关在一体机侧的读数（我的 → AI 服务记录用，稿 my-ai 的「小青这次不可用」）。
+// 后台「AI 暂停」开关在一体机侧的读数（我的 → AI 服务记录用，稿 my-ai 的「小青这次不可用」；
+// 简历服务台也用它，把要 AI 的入口先置灰写原因，稿 resume 的 ?ai=down，走查 I-35）。
 //
 // 数据源：终端配置 GET /terminals/:id/config 里的 ai.paused。服务端对每一条 AI 请求回 503 AI_PAUSED
 // 用的就是同一个开关（ai-access.service.ts），所以读到 true 就是「小青此刻一定答不了」的真值。

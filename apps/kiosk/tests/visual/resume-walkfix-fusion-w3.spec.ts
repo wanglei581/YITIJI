@@ -76,3 +76,54 @@ test('小青：用屏上键盘发送后键盘收起，回答与底部导航露�
   await expect(page.getByRole('group', { name: '虚拟键盘' })).toBeVisible()
 })
 
+// ── I-35 ───────────────────────────────────────────────────────────────────
+// 走查实录：后台把「AI 暂停」打开后，简历服务台四个要 AI 的入口照常可点，要点进去才在诊断失败屏知道「AI 服务暂停中」。
+// 判据（稿 resume 的 ?ai=down）：写明哪些要 AI、现在不可用；两张大卡置灰并给不用 AI 的出路
+// （有简历 → 先打印原件；没有 → 先看简历素材库）；职业规划、简历对照同样置灰；求职材料、自我探索不要 AI，照常能点。
+// 没读到暂停状态（配置里没有 ai 字段）时一概不变，不把「没读到」说成「不可用」。
+test('AI 暂停时简历服务台预告：要 AI 的置灰写原因，给出不用 AI 的出路 @w3-kiosk', async ({ page, api }) => {
+  shell(api, { ai: { paused: true } })
+  await page.goto('/resume-service')
+  await expect(page.locator('[data-qx-page="resume"]')).toBeVisible()
+
+  // 两张大卡置灰，并写明原因
+  const dead = page.locator('.qxt-slab.qxt-slab-off')
+  await expect(dead).toHaveCount(2)
+  for (const card of await dead.all()) {
+    await expect(card).toHaveAttribute('aria-disabled', 'true')
+    await expect(card).toContainText('AI能力当前不可用')
+  }
+  // 要 AI 的两块磁贴置灰；不要 AI 的两块照常能点
+  for (const title of ['职业规划', '简历对照']) {
+    await expect(page.locator(`[data-hub-title="${title}"]`)).toHaveAttribute('data-hub-reason', 'AI能力当前不可用')
+  }
+  for (const title of ['求职材料', '自我探索']) {
+    await expect(page.locator(`[data-hub-title="${title}"]`)).not.toHaveAttribute('data-hub-reason', /.+/)
+  }
+  // 两条出路真的能走
+  const printOriginal = page.getByRole('button', { name: '可以先打印原件' })
+  const seeTemplates = page.getByRole('button', { name: '可以先看简历素材库' })
+  await expect(printOriginal).toBeVisible()
+  await expect(seeTemplates).toBeVisible()
+  await seeTemplates.click()
+  await expect(page).toHaveURL(/\/resume\/templates$/)
+  await page.goBack()
+  await page.getByRole('button', { name: '可以先打印原件' }).click()
+  await expect(page).toHaveURL(/\/print\/upload\?source=resume$/)
+})
+
+test('AI 没暂停或没读到暂停状态时简历服务台照常，不多出出路条 @w3-kiosk', async ({ page, api }) => {
+  shell(api, { ai: { paused: false } })
+  await page.goto('/resume-service')
+  await expect(page.locator('[data-qx-page="resume"]')).toBeVisible()
+  await expect(page.locator('.qxt-slab-off')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '可以先打印原件' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '可以先看简历素材库' })).toHaveCount(0)
+
+  // 配置里压根没有 ai 字段：读不到不等于暂停（重新加载，终端配置的内存缓存随之重来）
+  shell(api, {})
+  await page.reload()
+  await expect(page.locator('[data-qx-page="resume"]')).toBeVisible()
+  await expect(page.locator('.qxt-slab-off')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '可以先打印原件' })).toHaveCount(0)
+})
