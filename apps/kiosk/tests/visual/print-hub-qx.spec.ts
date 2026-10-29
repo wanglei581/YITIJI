@@ -494,6 +494,10 @@ const PAUSE_NOTICE = '这台机器暂时不能用，请稍后再来，或拨打�
 // 读不到服务联系方式（接口 404 / 超时 / 字段缺失）时的最保守一套：没号码，指向隐私政策。
 const PAUSE_NOTICE_CONSERVATIVE = '这台机器暂时不能用，请稍后再来，或查看《隐私政策》里的联系方式。'
 const CONTACT_PATH = '/api/v1/public/support-contact'
+// 触屏版任务卡（第三包）停用时卡面只写短标题「暂停接单」，整句原因是读屏名「标题（原因）」；整句说明在卡面下面的 print-hub-fallback 里看得见。
+// 旧的暂停说明指向现场工作人员，不许再回来。
+const PAUSE_NOTICE_STAFF = '打印机暂时不可用，请联系现场工作人员'
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 function registerQueueGate(api: ApiRouter, printerStatus: string): void {
   registerShell(api, { isOnline: true, printerStatus })
@@ -536,12 +540,13 @@ for (const status of ['queue_cleanup_failed', 'queue_pause_failed'] as const) {
     const docPrint = page.getByTestId('print-hub-cap-doc-print')
     await expect(docPrint).toBeDisabled()
     await expect(docPrint).toContainText(PAUSE_LABEL)
+    await expect(docPrint).toHaveAttribute('aria-label', new RegExp(escapeRegExp(PAUSE_NOTICE)))
     await expect(docPrint).not.toContainText('工作人员')
     await expect(page.getByTestId('print-hub-cap-photo-print')).toBeDisabled()
     await expect(page.getByTestId('print-hub-cap-scan')).toBeDisabled()
     await expect(page.getByTestId('print-hub-cap-convert')).toBeEnabled()
     await expect(page.getByTestId('print-hub-fallback')).toContainText(PAUSE_LABEL)
-    await expect(page.getByTestId('print-hub-fallback')).toContainText('这台机器暂时打不了')
+    await expect(page.getByTestId('print-hub-fallback')).toContainText(PAUSE_NOTICE)
     await expect(page.getByTestId('print-hub-fallback')).not.toContainText('工作人员')
     // 这两种心跳表示打印队列闸门失败，不是连接中断；新旧离线文案都必须被拦住。
     await expect(page.getByText(/离线|无法连接/)).toHaveCount(0)
@@ -551,8 +556,8 @@ for (const status of ['queue_cleanup_failed', 'queue_pause_failed'] as const) {
 
     await page.goto('/print/upload?source=document&tab=file')
     await expect(page.getByText(PAUSE_LABEL, { exact: true }).first()).toBeVisible()
-    await expect(page.getByText('这台机器暂时打不了').first()).toBeVisible()
-    await expect(page.getByText(PAUSE_NOTICE, { exact: true })).toHaveCount(0)
+    await expect(page.getByText(PAUSE_NOTICE, { exact: true }).first()).toBeVisible()
+    await expect(page.getByText(PAUSE_NOTICE_STAFF, { exact: true })).toHaveCount(0)
     await shot(page, `G8-${status}-upload`)
 
     await expectNoForgedReady(page)
@@ -582,7 +587,7 @@ test('pause notice keeps the conservative sentence when support-contact answers 
 
   await page.goto('/print-scan')
   await expect(page.locator('[data-testid="print-hub-state-device-off"]')).toBeVisible()
-  await expect(page.getByTestId('print-hub-cap-doc-print')).toContainText(PAUSE_NOTICE_CONSERVATIVE)
+  await expect(page.getByTestId('print-hub-cap-doc-print')).toHaveAttribute('aria-label', new RegExp(escapeRegExp(PAUSE_NOTICE_CONSERVATIVE)))
   await expect(page.getByTestId('print-hub-fallback')).toContainText(PAUSE_NOTICE_CONSERVATIVE)
 
   await page.goto('/print/upload?source=document&tab=file')
