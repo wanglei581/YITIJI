@@ -722,6 +722,12 @@ async function main(): Promise<void> {
     c.equal('⑤ 到期后新会话被拒（同一台，换票）', await codeOf(async () => sessions.exchangeBootTicket((await sessions.createBootTicket(termL, 'Bearer fixture')).bootTicket)), '403:TERMINAL_LICENSE_INACTIVE')
     c.equal('⑥ 下一位用户被拦（同机构的另一台终端换票）', await codeOf(() => sessionOf(termL2)), '403:TERMINAL_LICENSE_INACTIVE')
     c.equal('⑦ 正向对照：没有授权管控的机构的终端不受影响', await codeOf(() => sessionOf(termA)), 'ok')
+    // ⑧ 兼容：升级前签发的会话（凭证里没有 expiresAt）按「签发时刻 + 30 分钟」给出到期时刻
+    const legacyToken = `legacy-${'k'.repeat(36)}`
+    const legacyIssuedAt = new Date(simNow - 5 * MIN)
+    const { credentialGeneration } = await prisma.terminal.findUniqueOrThrow({ where: { id: termA }, select: { credentialGeneration: true } })
+    await redis.setEx(`term:session:${legacyToken}`, 1800, JSON.stringify({ terminalId: termA, generation: credentialGeneration, issuedAt: legacyIssuedAt.toISOString() }))
+    c.equal('⑧ 升级前签发的会话（凭证里没有到期时刻）：按签发后 30 分钟给出', (await profileOf(termA, legacyToken)).json.data.currentSessionEndsAt, new Date(legacyIssuedAt.getTime() + 30 * MIN).toISOString())
     redis.ttlClock = null
     setLicenseClock(null)
     await prisma.license.deleteMany({ where: { orgId: orgL } })
