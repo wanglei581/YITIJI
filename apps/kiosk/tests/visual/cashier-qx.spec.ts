@@ -469,3 +469,46 @@ test('cashier amount card: label, amount, note and ledger are readable on the ca
     expect(row.ratio, `金额卡「${row.text}」（${row.selector}）字色对底色的对比度`).toBeGreaterThanOrEqual(4.5)
   }
 })
+
+/** 金额卡里的标签、金额、说明句、价目明细的每一行，上下沿都要落在卡内（卡是 overflow:hidden，落在外面的就是被切掉的）。 */
+async function amountCardOverflow(page: Page) {
+  return page.locator('.cashier-qx-amount').evaluate((card) => {
+    const box = card.getBoundingClientRect()
+    const parts: Array<[string, string]> = [
+      ['标签', '.cashier-qx-amount-lb'], ['金额', '.cashier-qx-amount-num'], ['说明句', '.cashier-qx-amount-src'], ['价目明细', '.cashier-qx-ledger > div'],
+    ]
+    return {
+      cardHeight: Math.round(box.height),
+      rows: parts.flatMap(([name, selector]) => Array.from(card.querySelectorAll(selector)).map((el, index) => {
+        const rect = el.getBoundingClientRect()
+        return { name: `${name}${index > 0 ? ` 第 ${index + 1} 行` : ''}`, out: Math.round(Math.max(rect.bottom - box.bottom, box.top - rect.top) * 10) / 10 }
+      })),
+    }
+  })
+}
+
+for (const scene of [
+  { name: 'pending', channels: ['wechat', 'alipay'], payStatus: 'unpaid' as const },
+  { name: 'channel-selected', channels: ['wechat'], payStatus: 'unpaid' as const },
+  { name: 'closed', channels: ['wechat'], payStatus: 'closed' as const },
+]) {
+  test(`cashier amount card keeps its note and price ledger whole in the ${scene.name} state @w2`, async ({ page, api }) => {
+    // 旧样式 cashier-qx.css 为两列版写的「没有支付工具的状态：付款区 max-height: 620px、金额卡 flex: 1（基线 0）」，在触屏版的单列里
+    // 把金额卡压到 75–110 高：说明句与价目明细被卡的 overflow:hidden 切掉，Mac 字体也一样。这里量金额卡里每一行的上下沿都在卡内。
+    registerShell(api)
+    api.respond('GET', '/api/v1/payment/channels', { status: 200, json: { channels: scene.channels } })
+    api.respond('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, { status: 200, json: payStatus(scene.payStatus) })
+
+    await page.goto('/print/cashier')
+    await setReactRouterState(page, '/print/cashier', CASHIER_STATE)
+    await expect(page.locator(`[data-qx-state="${scene.name}"]`)).toBeVisible()
+
+    const report = await amountCardOverflow(page)
+    expect(report.rows.map((row) => row.name), '标签、金额、说明句、价目明细都要在卡里量到').toEqual(
+      expect.arrayContaining(['标签', '金额', '说明句', '价目明细']),
+    )
+    for (const row of report.rows) {
+      expect(row.out, `${scene.name} 态金额卡（卡高 ${report.cardHeight}px）的「${row.name}」不得落在卡外`).toBeLessThanOrEqual(0.5)
+    }
+  })
+}

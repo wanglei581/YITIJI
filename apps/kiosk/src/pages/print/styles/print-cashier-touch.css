@@ -154,6 +154,18 @@
   gap: 12px;
 }
 
+/* 付款区在触屏版是单列、按内容撑开。旧样式 cashier-qx.css 为两列版写的「没有支付工具的状态：付款区 flex:1 1 auto + max-height:620px，
+   金额卡 flex:1（基线 0）」，到单列里就把金额卡压到 75–110 高：说明句与价目明细被卡的 overflow:hidden 切掉（Mac 字体也一样）。
+   这里不夹高、不压：付款区按内容排，金额卡不收缩到内容以下；页面剩下的高度仍由页底的实物小样（PrintFillArt）吃掉。 */
+[data-qx-page='print-cashier'] .cashier-qx-paywrap:not(:has(.cashier-qx-instrument)) {
+  flex: none;
+  max-height: none;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-paywrap:not(:has(.cashier-qx-instrument)) .cashier-qx-amount {
+  flex: none;
+}
+
 /* 摘要卡：行自己带 22px 内边距，卡本身不再留边（.cashier-qx-group 的 12px 20px 写在后面，同权重会盖掉，所以加一层类名） */
 [data-qx-page='print-cashier'] .cashier-qx-group.pct-sum {
   padding: 0;
