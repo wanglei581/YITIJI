@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`604` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`621` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -253,6 +253,22 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | POST | `/api/v1/orders/:id/redeem` | OrderRedeemController.redeem | — | BenefitRedemptionService | AuditLog<br/>BenefitGrant<br/>Order<br/>RedemptionRecord |
+
+## `services/api/src/branding/branding.admin.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/branding` | BrandingAdminController.get | admin | BrandingService | AuditLog<br/>BrandLogo<br/>PlatformSetting |
+| PUT | `/api/v1/admin/branding` | BrandingAdminController.update | admin | BrandingService | AuditLog<br/>BrandLogo<br/>PlatformSetting |
+| POST | `/api/v1/admin/branding/logo` | BrandingAdminController.uploadLogo | admin | BrandLogoService | AuditLog<br/>BrandLogo<br/>PlatformSetting |
+
+## `services/api/src/branding/branding.public.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/public/brand` | BrandingPublicController.brand | — | BrandingService | AuditLog<br/>BrandLogo<br/>PlatformSetting |
+| GET | `/api/v1/public/brand-logo/:assetId` | BrandingPublicController.logo | — | BrandLogoService | AuditLog<br/>BrandLogo<br/>PlatformSetting |
+| GET | `/api/v1/public/kiosk-profile` | BrandingPublicController.kioskProfile | — | KioskProfileService | PlatformSetting<br/>Terminal |
 
 ## `services/api/src/bulk-publish/bulk-publish.controller.ts`
 
@@ -599,6 +615,27 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/kiosk/legal/:type` | LegalController.getActive | — | LegalService | AuditLog<br/>LegalDocVersion |
+
+## `services/api/src/licenses/license.admin.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/licenses/:id` | LicenseAdminController.getOne | admin | LicenseService | AuditLog<br/>License<br/>Organization<br/>Terminal |
+| PATCH | `/api/v1/admin/licenses/:id` | LicenseAdminController.update | admin | LicenseService | AuditLog<br/>License<br/>Organization<br/>Terminal |
+| POST | `/api/v1/admin/licenses/:id/renew` | LicenseAdminController.renew | admin | LicenseService | AuditLog<br/>License<br/>Organization<br/>Terminal |
+| POST | `/api/v1/admin/licenses/:id/resume` | LicenseAdminController.resume | admin | LicenseService | AuditLog<br/>License<br/>Organization<br/>Terminal |
+| POST | `/api/v1/admin/licenses/:id/revoke` | LicenseAdminController.revoke | admin | LicenseService | AuditLog<br/>License<br/>Organization<br/>Terminal |
+| POST | `/api/v1/admin/licenses/:id/suspend` | LicenseAdminController.suspend | admin | LicenseService | AuditLog<br/>License<br/>Organization<br/>Terminal |
+| GET | `/api/v1/admin/licenses/attention` | LicenseAdminController.attention | admin | LicenseService | AuditLog<br/>License<br/>Organization<br/>Terminal |
+| PUT | `/api/v1/admin/orgs/:orgId/license-mode` | LicenseAdminController.setMode | admin | LicenseService | AuditLog<br/>License<br/>Organization<br/>Terminal |
+| GET | `/api/v1/admin/orgs/:orgId/licenses` | LicenseAdminController.orgDetail | admin | LicenseService | AuditLog<br/>License<br/>Organization<br/>Terminal |
+| POST | `/api/v1/admin/orgs/:orgId/licenses` | LicenseAdminController.create | admin | LicenseService | AuditLog<br/>License<br/>Organization<br/>Terminal |
+
+## `services/api/src/licenses/license.partner.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/partner/license` | LicensePartnerController.get | partner | LicenseService | AuditLog<br/>License<br/>Organization<br/>Terminal |
 
 ## `services/api/src/materials/materials.controller.ts`
 

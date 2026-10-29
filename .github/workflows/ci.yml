@@ -746,6 +746,12 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-auth
           pnpm --filter @ai-job-print/api verify:legal-doc-version
           pnpm --filter @ai-job-print/api verify:support-contact
+          # 贴牌第一步：品牌与备案默认值 = 现状、机构覆盖只影响该机构终端、Logo 只收 PNG / WebP（按文件头判、禁 SVG、
+          # 清洗元数据）、一体机 kiosk-profile 只认已验签终端（防枚举）。写隔离库，结束恢复平台设置。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:branding
+          # 授权管理：状态推导（ok / grace / expired / suspended / unlicensed）逐边界、红线（不与岗位 / 投递挂钩）、
+          # 会话签发只拦新会话、绑定台数只管新增、机构后台写操作默认拒（真实路由表派生扫描）、到期告警。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:license
           pnpm --filter @ai-job-print/api verify:member-qr-login
           pnpm --filter @ai-job-print/api verify:member-auth-races
           pnpm --filter @ai-job-print/api verify:member-restore
@@ -1029,6 +1035,8 @@ jobs:
         run: |
           export PATH="$(pg_config --bindir):$PATH"
           pnpm verify:first-order-migrations
+          # 贴牌与授权两份迁移：SQLite 与临时 PostgreSQL 上升级保数据、CHECK 兜底、外键、零漂移
+          pnpm verify:branding-license-migrations
           pnpm verify:first-order-http:postgres
       - name: Migrate deploy on fresh PG
         working-directory: services/api
@@ -1125,6 +1133,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:console-screen-usage
           pnpm --filter @ai-job-print/api verify:ai-user-text-retention
           pnpm --filter @ai-job-print/api verify:policies
+          # 贴牌与授权管理（PostgreSQL 上同样真跑一遍：机构行锁抢最后一个名额、CHECK 与外键、日期比较）。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:branding
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:license
           pnpm --filter @ai-job-print/api verify:kiosk-session
           pnpm --filter @ai-job-print/api verify:policy-eligibility
           # 招聘会列表结构性门禁两个 job 都要跑：筛选下推靠 Prisma where 生成 SQL，

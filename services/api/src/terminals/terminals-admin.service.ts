@@ -25,6 +25,7 @@ import { adminPaperStatus, describePrinterFault, normalizeDiskFreeGb, toAdminPri
 import { PARKED_TERMINAL_ORG_TYPES, isParkedTerminalOrgType, orgTypeParkedError } from './terminal-org-parking'
 import { terminalOrgBindingOnCreate } from './terminal-org-binding'
 import { assignTerminalOrganization, type TerminalOrgAssignmentAudit } from './terminal-org-assignment'
+import { withOrgTerminalQuota } from '../licenses/license-gate'
 import { TERMINAL_ONLINE_WINDOW_MS } from './printer-availability'
 import type { KioskTerminalConfigView } from './terminal-config.types'
 import {
@@ -221,20 +222,22 @@ export class TerminalAdminService {
 
     const placeholder = `${PLANNED_CREDENTIAL_PREFIX}${crypto.randomBytes(32).toString('hex')}`
     try {
-      const terminal = await this.prisma.terminal.create({
-        data: {
-          id: `t_${crypto.randomBytes(8).toString('hex')}`,
-          terminalCode,
-          agentToken: placeholder,
-          credentialGeneration: 0,
-          lifecycleStatus: 'planned',
-          deviceFingerprint: `planned:${crypto.randomBytes(16).toString('hex')}`,
-          displayName: cleanNullable(dto.displayName),
-          locationLabel: cleanNullable(dto.locationLabel),
-          orgId,
-          orgBoundAt: terminalOrgBindingOnCreate(orgId, new Date()),
-        },
-      })
+      const data = {
+        id: `t_${crypto.randomBytes(8).toString('hex')}`,
+        terminalCode,
+        agentToken: placeholder,
+        credentialGeneration: 0,
+        lifecycleStatus: 'planned',
+        deviceFingerprint: `planned:${crypto.randomBytes(16).toString('hex')}`,
+        displayName: cleanNullable(dto.displayName),
+        locationLabel: cleanNullable(dto.locationLabel),
+        orgId,
+        orgBoundAt: terminalOrgBindingOnCreate(orgId, new Date()),
+      }
+      // 预创建时就绑了机构：同样过软件使用授权的台数关（在事务里锁机构、检查、再建）。
+      const terminal = orgId
+        ? await withOrgTerminalQuota(this.prisma, orgId, (tx) => tx.terminal.create({ data }))
+        : await this.prisma.terminal.create({ data })
       return {
         terminalId: terminal.id,
         terminalCode: terminal.terminalCode,
