@@ -1,5 +1,7 @@
 export const productionRoutePatterns = [
   '/', '/login', '/member/qr-login', '/upload/phone', '/legal/:doc',
+  // 2026-10-29 一体机手机码短链的网页中转（上传 / 登录），兑换或校验后 replace 到上面两个手机页。
+  '/k/u/:scene', '/k/l/:ticketId',
   '/resume/job-fit', '/resume/job-fit/actions', '/resume/career-plan', '/interview',
   '/interview/setup',
   '/interview/session', '/interview/report', '/interview/tips',
@@ -44,7 +46,7 @@ export const productionRoutePatterns = [
   '/contract-review/processing',
   '/contract-review/result',
   '/policy-service',
-] as const // 109 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan；2026-09-27 + /official-channels；2026-09-30 停放 smart-campus/freshman-insights)
+] as const // 111 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan；2026-09-27 + /official-channels；2026-09-30 停放 smart-campus/freshman-insights；2026-10-29 + /k/u/:scene、/k/l/:ticketId)
 
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',

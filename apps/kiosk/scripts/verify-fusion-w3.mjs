@@ -112,7 +112,9 @@ const frozen = {
   // 2026-09-29 重新冻结（W-81）：简历来源页传入 busyWhen="received"，等人扫、还没收到文件时不报忙；
   // 手机已传上或正在确认才报忙。其它调用方不传该参数，仍按会话还在（含等人扫）报忙。卸载仍补报不忙。
   // 旧哈希 1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f。
-  'src/pages/upload/components/UploadSessionQrPanel.tsx': '9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb',
+  // 2026-10-29 重新冻结（一体机手机码改短链）：出码调用换成 buildPhoneUploadQrUrl，import 同步换名；面板其余逐字未动。
+  // 旧哈希 9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb。
+  'src/pages/upload/components/UploadSessionQrPanel.tsx': '1e0e0b9256304a822d4b075394ed3aa855f47689594a391be7fa6d057a3ff56f',
   'src/pages/resume/aiResumeSession.ts': '5d023ee2388ecb12a3ba84a6b2b28c21e54ad65dece16eccc019f9dc43b5b164',
   'src/pages/resume/jobMaterialDraft.ts': '4a2404627c392c55cd39a6f525c522ce27cfec669f91d3b6ad5bb79f0de358ce',
   'src/pages/resume/hooks/useResumeLayout.ts': '2ef1c554e949344ce9d66430c521b986f5419db8627c4fcde1ef78d5927555e7',
