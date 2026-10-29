@@ -84,8 +84,8 @@ export async function assertTapTargetPointerHit(locator: Locator): Promise<void>
  * 带「 · 」分隔的标签只许在分隔处折行，不把短语拆开（「扫描件已交接 · 待确 / 认」那种）。
  * 行按每个字的纵向中心归并：同一行里混排的字体上沿可能差一两像素，按 top 取整会把一行误拆成两行。
  */
-export async function assertQxPillReadable(page: Page, where: string): Promise<void> {
-  const pill = page.locator('.qx-pill')
+export async function assertQxPillReadable(page: Page, where: string, selector = '.qx-pill'): Promise<void> {
+  const pill = page.locator(selector)
   await expect(pill).toBeVisible()
   const { text, lines, clipped } = await pill.evaluate((el) => {
     const node = Array.from(el.childNodes).reverse().find((child) => child.nodeType === Node.TEXT_NODE && child.textContent?.trim())

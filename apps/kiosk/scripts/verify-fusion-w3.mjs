@@ -242,17 +242,27 @@ const touchResume = new Set([
   'src/pages/resume/ResumeReportPage.tsx',
   'src/pages/resume/ResumeOptimizePage.tsx',
 ])
+const touchResumeScreens = new Set([
+  'src/pages/resume/JobMaterialLibraryPage.tsx',
+  'src/pages/resume/JobFitPage.tsx',
+  'src/pages/resume/CareerPlanPage.tsx',
+  'src/pages/resume/ResumeTemplateLibraryPage.tsx',
+  'src/pages/resume/ResumeGeneratePage.tsx',
+  'src/pages/resume/ResumeGeneratePreviewPage.tsx',
+])
 for (const [path, screen] of screens) {
   const isInterview = path.includes('/interview/')
   const frame = touchResume.has(path)
     ? 'ResumeTouchPage'
-    : path.endsWith('/AssistantPage.tsx')
-      ? 'PublicTouchFrame'
-      : qxScreens.has(path)
-        ? 'QxPageFrame'
-        : isInterview
-          ? 'InterviewShell'
-          : 'KioskPageFrame'
+    : touchResumeScreens.has(path)
+      ? 'ResumeTouchFrame'
+      : path.endsWith('/AssistantPage.tsx')
+        ? 'PublicTouchFrame'
+        : qxScreens.has(path)
+          ? 'QxPageFrame'
+          : isInterview
+            ? 'InterviewShell'
+            : 'KioskPageFrame'
   includes(path, frame, `${screen} consumes the frozen W1 frame`)
   includes(path, `data-kiosk-screen="${screen}"`, `${screen} exposes its stable landmark`)
 }
@@ -280,7 +290,7 @@ check(!read('src/pages/resume/JobFitPage.tsx').includes('KioskFullscreenShell'),
 // /resume/templates 在 KioskRoot 之内，舞台由 KioskRoot 负责，页面不得再挂第二层缩放。
 for (const path of ['src/pages/resume/CareerPlanPage.tsx', 'src/pages/resume/JobFitActionsPage.tsx']) {
   includes(path, '<JobFitStage>', `${path} keeps the fixed 1080x1920 host stage after the Qingxu migration`)
-  includes(path, 'QxPageFrame', `${path} uses the Qingxu page frame`)
+  includes(path, 'ResumeTouchFrame', `${path} uses the touch page frame`)
   check(!/KioskFullscreenShell|KioskPageFrame|job-fit-inkpaper|service-desk/.test(read(path)), `${path} has left the V6/LightFlow chrome`)
 }
 includes('src/pages/resume/JobFitActionsPage.tsx', 'data-kiosk-screen="resume-job-fit-actions"', 'resume-job-fit-actions exposes its stable landmark')

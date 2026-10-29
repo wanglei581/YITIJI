@@ -8,7 +8,9 @@ import {
   assistantReply, diagnosis, interviewAnswered, interviewCreated,
   interviewReport, interviewStarted, uploadedResume,
 } from './fixtures/fusion-w3-states'
+import { longestBlankRun } from './fixtures/blank-run'
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
+import { registerW6Api } from './fixtures/fusion-w6-api'
 import { changeStoredResumeFileId, clearResumeParseIntents, readResumeParseIntents } from './fixtures/resume-parse-intent-state'
 import { mockAssistantVoice } from './fixtures/assistant-voice'
 import { chooseGenericResumeDirection, chooseTargetedResumeDirection, expectResumeDirectionUnselected, expectInterviewDirectionUnselected, chooseInterviewExperience, openResumeDirection, startResumeDiagnosis, startResumeOptimize } from './fixtures/direction-selection'
@@ -2342,7 +2344,7 @@ test('job fit keeps touch targets usable on a narrow screen @w3-kiosk', async ({
   // 手机上必须关掉 1080 舞台缩放，否则整张稿被缩到 0.36，按钮量出来只有 35px。
   await expect(page.locator('.jfq-root')).toHaveAttribute('data-jfq-layout', 'phone')
   await expect(page.locator('[data-kiosk-stage-fit]')).toHaveAttribute('data-kiosk-stage-fit', 'off')
-  for (const target of [page.locator('.qx-topbar-back'), page.getByRole('button', { name: '继续并确认授权' })]) {
+  for (const target of [page.locator('.qxt-back'), page.getByRole('button', { name: '继续并确认授权' })]) {
     const box = await target.boundingBox()
     expect(box, '可点区域必须可见').not.toBeNull()
     expect(box!.width).toBeGreaterThanOrEqual(48)
@@ -2381,6 +2383,12 @@ test('job fit outage and failure screens claim only what is provable @w3-kiosk',
   // 本页确实没有任何支付调用；但配额回滚是 best-effort，「未产生任何扣费」没有服务端证明。
   await expect(page.getByText('本页没有发起支付')).toBeVisible()
   await expect(page.getByText('未产生任何扣费')).toHaveCount(0)
+  // 恢复时间没有任何依据：屏上只如实写「还不确定」，不写「稍后自动恢复」这类预告，也不写给审稿人看的「不承诺…」「本页也不写…」。
+  await expect(page.getByText('还不确定什么时候能用')).toBeVisible()
+  await expect(page.locator('body')).not.toContainText(/不承诺恢复时间|本页也不写|稍后自动恢复/)
+  // 底栏小字是对本人说的一句实话（稿 jobfit 这一态的原句）：说清这次没能对照，不写「服务不可用时不显示任何…也不保留半截结果」这类说页面规矩的话。
+  await expect(page.locator('.qxt-dock').getByText('AI 暂时不可用，这次没能对照。', { exact: true })).toBeVisible()
+  await expect(page.locator('body')).not.toContainText(/服务不可用时不显示任何匹配结论|也不保留半截结果/)
 
   api.respond('POST', '/api/v1/resume/job-fit', { status: 500, json: { error: { code: 'SERVER_ERROR', message: '分析失败' } } })
   await page.goto('/resume/job-fit?taskId=t-w3')
@@ -2444,7 +2452,7 @@ async function captureDecisionViewports(page: Parameters<typeof assertNoHorizont
     // 换视口后舞台缩放开关要等一次 resize 渲染，几何量用轮询等它落定，不用固定等待。
     await expect.poll(async () => {
       const scroll = await page.locator('.qx-scroll').boundingBox()
-      const ctabar = await page.locator('.qx-ctabar').boundingBox()
+      const ctabar = await page.locator('.qxt-dock').boundingBox()
       if (!scroll || !ctabar) return 'missing'
       if (scroll.y + scroll.height > ctabar.y + 0.5) return `scroll overlaps ctabar ${scroll.y + scroll.height} > ${ctabar.y}`
       if (ctabar.y + ctabar.height > size.height + 0.5) return `ctabar leaves viewport ${ctabar.y + ctabar.height}`
@@ -2453,7 +2461,7 @@ async function captureDecisionViewports(page: Parameters<typeof assertNoHorizont
     await assertNoHorizontalOverflow(page)
     // 横屏电脑改为舞台缩放后，屏上像素要除回 scale；舞台关闭（手机）时 scale 取 1，门槛仍是 48。
     const scale = await readEnabledStageScale(page)
-    for (const target of [page.locator('.qx-topbar-back'), page.locator('.qx-ctabar .qx-btn').last()]) {
+    for (const target of [page.locator('.qxt-back'), page.locator('.qxt-dock .qx-btn').last()]) {
       const box = await target.boundingBox()
       expect(box, '可点区域必须可见').not.toBeNull()
       expect(box!.height / scale, `${name} ${size.width}x${size.height} 触控高度`).toBeGreaterThanOrEqual(48)
@@ -2471,6 +2479,96 @@ async function openWithRouteState(page: Parameters<typeof assertNoHorizontalOver
     window.history.replaceState({ usr, key: 'w3-decision', idx: 0 }, '', target)
   }, [path, state] as const)
   await page.reload()
+}
+
+// ── 求职方案页底栏生成钮（稿 career）：已知 AI 停用 → 置灰、写明原因、点了不发请求；临时性错误 → 仍可点、字是「重试…」 ──
+const CAREER_AI_DOWN_WHY = 'AI 暂时不可用。可以先打印求职参考单。'
+const CAREER_AI_DOWN_WHY_WITH_PLAN = 'AI 暂时不可用。这份方案还在，重新生成先停着。'
+const CAREER_PLAN_PATH = '/api/v1/resume/career-plan/t-cp'
+
+/** 底栏的生成钮：aria-disabled=true、字照稿、原因（底栏小字）可见且读屏连着；点它（含强点）不发任何请求、屏不变。 */
+async function expectCareerGenerateKeyGreyed(page: Page, api: ApiRouter, label: string, why: string): Promise<void> {
+  const dock = page.locator('.qxt-dock')
+  const key = dock.locator('[data-career-plan-generate]')
+  await expect(key).toHaveText(label)
+  await expect(key).toHaveAttribute('data-career-plan-generate', 'blocked')
+  await expect(key).toHaveAttribute('aria-disabled', 'true')
+  await expect(dock.getByText(why, { exact: true })).toBeVisible()
+  await expect(key).toHaveAccessibleDescription(why)
+  // 原因是对本人说的一句话（稿原句）：不带「不承诺恢复时间」这类写给审稿人看的批注，也不预告恢复。
+  await expect(page.locator('body')).not.toContainText(/不承诺恢复时间|生成求职方案先停着|稍后自动恢复/)
+  await expect(dock.getByRole('button', { name: /^重试生成/ })).toHaveCount(0)
+  const posts = api.requestCount('POST', CAREER_PLAN_PATH)
+  // Playwright 不肯点 aria-disabled 的按钮；强点一下真实指针、再直接触发 DOM click，确保页面的点击处理真的跑过、并自己短路。
+  await key.click({ force: true })
+  await key.evaluate((el) => (el as HTMLElement).click())
+  // 不用定时等待（本文件的门禁禁了它）：先冲两帧让点击引起的重渲染落地，再等网络静默，之后请求数还没涨才算「没发」。
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+  await page.waitForLoadState('networkidle')
+  expect(api.requestCount('POST', CAREER_PLAN_PATH), '已知停用时点生成钮不得发请求').toBe(posts)
+  await expect(key).toHaveText(label)
+  await expect(key).toHaveAttribute('aria-disabled', 'true')
+}
+
+for (const code of ['AI_PAUSED', 'AI_BUDGET_EXHAUSTED'] as const) {
+  test(`career plan: a known AI stop (${code}) greys the generate key, says why, sends no request and keeps print @w3-kiosk`, async ({ page, api }) => {
+    terminalBaseline(api)
+    // 首屏读取就撞上能力级停用码：没有发生任何生成请求，页面直接落到 ai-down。
+    api.respond('GET', CAREER_PLAN_PATH, { status: 503, json: { error: { code, message: 'fixture ai stop' } } })
+    await openWithRouteState(page, '/resume/career-plan', { taskId: 't-cp' })
+    const screen = page.locator('[data-kiosk-screen="resume-career-plan"]')
+    await expect(screen).toHaveAttribute('data-state', 'ai-down')
+    await expect(page.getByRole('button', { name: '打印求职参考单（未含 AI 规划）' })).toBeEnabled()
+    await expectCareerGenerateKeyGreyed(page, api, '生成求职方案', CAREER_AI_DOWN_WHY)
+    expect(api.requestCount('POST', CAREER_PLAN_PATH)).toBe(0)
+  })
+}
+
+test('career plan: a known AI stop after a plan exists greys 重新生成, keeps the plan and the print key @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('GET', CAREER_PLAN_PATH, { status: 200, json: CAREER_PLAN_READY })
+  api.respond('POST', CAREER_PLAN_PATH, { status: 503, json: { error: { code: 'AI_PAUSED', message: 'fixture ai paused' } } })
+  await openWithRouteState(page, '/resume/career-plan', { taskId: 't-cp' })
+  const screen = page.locator('[data-kiosk-screen="resume-career-plan"]')
+  await expect(screen).toHaveAttribute('data-state', 'ready')
+  await expect(page.locator('.qxt-dock').locator('[data-career-plan-generate]')).toHaveAttribute('data-career-plan-generate', 'open')
+  await page.locator('.qxt-dock').getByRole('button', { name: '重新生成' }).click()
+  await expect.poll(() => api.requestCount('POST', CAREER_PLAN_PATH)).toBe(1)
+  // 方案还在、仍是 ready 屏；重新生成置灰，打印建议单照常可点。
+  await expect(screen).toHaveAttribute('data-state', 'ready')
+  await expect(page.locator('.rdq-direction h3')).toContainText('运营助理')
+  await expectCareerGenerateKeyGreyed(page, api, '重新生成', CAREER_AI_DOWN_WHY_WITH_PLAN)
+  await expect(page.locator('.qxt-dock').getByRole('button', { name: '打印建议单' })).toBeEnabled()
+})
+
+for (const temporary of [
+  { name: 'network drop', register: (api: ApiRouter) => api.abort('POST', CAREER_PLAN_PATH, 'internetdisconnected') },
+  { name: 'timeout (504 AI_CAREER_PLAN_TIMEOUT)', register: (api: ApiRouter) => api.respond('POST', CAREER_PLAN_PATH, { status: 504, json: { error: { code: 'AI_CAREER_PLAN_TIMEOUT', message: 'fixture timeout' } } }) },
+] as const) {
+  test(`career plan: a temporary error (${temporary.name}) keeps the generate key live as 重试, and the retry really sends @w3-kiosk`, async ({ page, api }) => {
+    terminalBaseline(api)
+    api.respond('GET', CAREER_PLAN_PATH, { status: 404, json: { error: { code: 'CAREER_PLAN_NOT_FOUND', message: '尚未生成' } } })
+    temporary.register(api)
+    await openWithRouteState(page, '/resume/career-plan', { taskId: 't-cp' })
+    const screen = page.locator('[data-kiosk-screen="resume-career-plan"]')
+    await expect(screen).toHaveAttribute('data-state', 'guide')
+    const key = page.locator('.qxt-dock').locator('[data-career-plan-generate]')
+    await expect(key).toHaveText('生成求职方案')
+    await key.click()
+    await expect.poll(() => api.requestCount('POST', CAREER_PLAN_PATH)).toBe(1)
+    // 临时性错误不是「AI 停了」：不落 ai-down，生成钮不置灰，字改成重试。
+    await expect(screen).toHaveAttribute('data-state', 'guide')
+    await expect(page.getByRole('alert')).toBeVisible()
+    await expect(key).toHaveText('重试生成求职方案')
+    await expect(key).toHaveAttribute('data-career-plan-generate', 'open')
+    await expect(key).not.toHaveAttribute('aria-disabled', 'true')
+    await expect(page.getByText('AI 暂时不可用。', { exact: false })).toHaveCount(0)
+    // 重试真的再发一次请求，这回成功就拿到方案。
+    api.respond('POST', CAREER_PLAN_PATH, { status: 200, json: CAREER_PLAN_READY })
+    await key.click()
+    await expect.poll(() => api.requestCount('POST', CAREER_PLAN_PATH)).toBe(2)
+    await expect(screen).toHaveAttribute('data-state', 'ready')
+  })
 }
 
 test('job fit actions lists only returned items and keeps print honest @w3-kiosk', async ({ page, api }) => {
@@ -2492,7 +2590,7 @@ test('job fit actions lists only returned items and keeps print honest @w3-kiosk
   await captureDecisionViewports(page, 'actions-ready')
 
   api.respond('POST', '/api/v1/resume/job-fit/t-act/print', { status: 500, json: { error: { code: 'SERVER_ERROR', message: '生成失败' } } })
-  await page.locator('.qx-ctabar').getByRole('button', { name: '生成打印版' }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '生成打印版' }).click()
   await expect(screen).toHaveAttribute('data-state', 'print-failed')
   await expect(page.getByRole('alert')).toBeVisible()
   await expect(page.getByText('已打印')).toHaveCount(0)
@@ -2500,6 +2598,55 @@ test('job fit actions lists only returned items and keeps print honest @w3-kiosk
   await page.getByRole('button', { name: '返回行动清单' }).click()
   await expect(screen).toHaveAttribute('data-state', 'ready')
   expect(page.url()).not.toContain('/print/confirm')
+})
+
+// 差距行动清单 AI 停（稿 jobfit-actions 这一态）：一句对本人说的实话，加三张大行动卡 —— 去简历优化、去材料工坊、打印现有简历，三件都不经过 AI。
+// 三张卡把整屏吃满：最长连续空白不超过 105px（改前托管开 442px、托管关 574px）。卡与去向不随托管口径变，所以两种口径各量一遍。
+for (const hosting of [
+  { name: 'hosting on', config: RECRUITMENT_HOSTING_ON },
+  { name: 'hosting off', config: RECRUITMENT_HOSTING_OFF },
+] as const) {
+  test(`job fit actions: an AI stop is one plain sentence and three big action cards with no empty block (${hosting.name}) @w3-kiosk`, async ({ page, api }) => {
+    terminalBaseline(api)
+    api.respond('GET', '/api/v1/terminals/KSK-001/config', { status: 200, json: terminalConfigWithHosting(hosting.config, 'actions-ai-down') })
+    api.respond('GET', '/api/v1/resume/job-fit/t-act', { status: 503, json: { error: { code: 'AI_NOT_CONFIGURED', message: 'AI 能力未配置' } } })
+    await page.goto('/resume/job-fit/actions?taskId=t-act')
+    const screen = page.locator('[data-kiosk-screen="resume-job-fit-actions"]')
+    await expect(screen).toHaveAttribute('data-state', 'ai-down')
+    // 一句实话（稿 jobfit-actions 这一态的原句）：不写「不承诺恢复时间」这类写给审稿人看的批注，也不预告恢复。
+    await expect(screen.locator('.qxt-howto').getByText('AI 暂时不可用，这次没有行动清单。', { exact: true })).toBeVisible()
+    await expect(page.locator('body')).not.toContainText(/不承诺恢复时间|稍后自动恢复|服务不可用时不显示任何清单内容/)
+    // 没有清单，也不拿别的内容顶替；三张大行动卡照稿：名字、一句说明、顺序都对，AI 停了照常可点。
+    await expect(page.getByText('缺少 Excel 数据整理经历')).toHaveCount(0)
+    await expect(screen.locator('.rtp-acts .qxt-slab h3')).toHaveText(['去简历优化', '去材料工坊', '打印现有简历'])
+    await expect(screen.locator('.rtp-acts .qxt-slab p')).toHaveText(['按你自己的判断改', '准备求职信或材料清单', '手上有文件就直接去打印'])
+    for (const name of [/去简历优化/, /去材料工坊/, /打印现有简历/]) await expect(screen.getByRole('button', { name })).toBeEnabled()
+    // 整屏没有大片空白：卡片吃满正文区，不是留一块空底。
+    const blank = longestBlankRun(await page.screenshot())
+    expect(blank.px, `最长连续空白 ${blank.px}px（起点 y=${blank.atY}）`).toBeLessThanOrEqual(105)
+  })
+}
+
+test('job fit actions: each card of an AI stop leads to a real route that works without AI @w3-kiosk', async ({ page, api }) => {
+  registerW6Api(api)
+  api.respond('GET', '/api/v1/resume/job-fit/t-act', { status: 503, json: { error: { code: 'AI_NOT_CONFIGURED', message: 'AI 能力未配置' } } })
+  // 简历优化页带着这次的任务号读已有的优化结果（读取不经过 AI 停掉的那条链路）。
+  api.respond('GET', '/api/v1/resume/records/t-act/optimize', {
+    status: 200,
+    json: { taskId: 't-act', status: 'completed', providerName: 'deepseek', modules: [{ title: '项目成果', before: '参与数据整理工作。', after: '主导数据整理，完成 5000 条记录校验。' }] },
+  })
+  const screen = page.locator('[data-kiosk-screen="resume-job-fit-actions"]')
+  for (const card of [
+    { name: /去简历优化/, url: /\/resume\/optimize$/, marker: '[data-kiosk-screen="resume-optimize"]' },
+    { name: /去材料工坊/, url: /\/resume\/materials$/, marker: '[data-kiosk-screen="resume-materials"]' },
+    { name: /打印现有简历/, url: /\/print-scan$/, marker: '[data-w2-page="print-scan-home"]' },
+  ]) {
+    await page.goto('/resume/job-fit/actions?taskId=t-act')
+    await expect(screen).toHaveAttribute('data-state', 'ai-down')
+    await screen.getByRole('button', { name: card.name }).click()
+    await expect(page).toHaveURL(card.url)
+    await expect(page.locator(card.marker)).toBeVisible()
+  }
 })
 
 test('job fit actions: a print result arriving after leaving does not hijack navigation @w3-kiosk', async ({ page, api }) => {
@@ -2514,16 +2661,37 @@ test('job fit actions: a print result arriving after leaving does not hijack nav
   await page.goto('/resume/job-fit/actions?taskId=t-act')
   const screen = page.locator('[data-kiosk-screen="resume-job-fit-actions"]')
   await expect(screen).toHaveAttribute('data-state', 'ready')
-  await page.locator('.qx-ctabar').getByRole('button', { name: '生成打印版' }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '生成打印版' }).click()
   await expect(screen).toHaveAttribute('data-state', 'print-pending')
   await expect(page.getByText('本页没有发起支付')).toBeVisible()
   await captureDecisionViewports(page, 'actions-print-pending')
-  await page.locator('.qx-ctabar').getByRole('button', { name: '返回比对结果' }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '返回比对结果' }).click()
   await expect(page).toHaveURL(/\/resume\/job-fit$/)
   releasePrint!()
   await expect.poll(() => api.requestCount('POST', '/api/v1/resume/job-fit/t-act/print')).toBe(1)
   await expect(page.locator('[data-kiosk-screen="resume-job-fit"]').first()).toBeVisible()
   await expect(page).toHaveURL(/\/resume\/job-fit$/)
+})
+
+// 生成中（稿 career 的 gen 屏）：边界声明只有稿的那一句「不承诺录用或收入。」。不写「不显示进度百分比或阶段名称」「也不生成打印文件、不发起支付」这类讲页面自己怎么做的话。
+test('career plan: while generating, the one boundary line is the draft sentence, not review notes @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('GET', CAREER_PLAN_PATH, { status: 404, json: { error: { code: 'CAREER_PLAN_NOT_FOUND', message: '尚未生成' } } })
+  let releaseGenerate: (() => void) | null = null
+  const generateHeld = new Promise<void>((resolve) => { releaseGenerate = resolve })
+  api.respondWith('POST', CAREER_PLAN_PATH, async () => {
+    await generateHeld
+    return { status: 200, json: CAREER_PLAN_READY }
+  })
+  await openWithRouteState(page, '/resume/career-plan', { taskId: 't-cp' })
+  const screen = page.locator('[data-kiosk-screen="resume-career-plan"]')
+  await expect(screen).toHaveAttribute('data-state', 'guide')
+  await page.locator('.qxt-dock').locator('[data-career-plan-generate]').click()
+  await expect(screen).toHaveAttribute('data-state', 'generating')
+  await expect(screen.locator('.qxt-fine').getByText('不承诺录用或收入。', { exact: true })).toBeVisible()
+  await expect(page.locator('body')).not.toContainText(/不显示进度百分比|阶段名称|不发起支付|不生成打印文件/)
+  releaseGenerate!()
+  await expect(screen).toHaveAttribute('data-state', 'ready')
 })
 
 test('career plan guide, ai-down and generated result keep print available @w3-kiosk', async ({ page, api }) => {
@@ -2546,12 +2714,16 @@ test('career plan guide, ai-down and generated result keep print available @w3-k
   // AI 能力级不可用时页面给固定人话和手动出路，不再透出服务端原文（#1241）。
   await expect(page.getByText('AI 暂时不可用，你可以先打印求职参考单（未含 AI 规划）')).toBeVisible()
   await expect(page.getByText('AI 能力未配置')).toHaveCount(0)
-  // 出纸不依赖 AI：ai-down 时打印按钮仍在，生成钮也仍可重试（不被 canStart 藏掉）。
+  // 出纸不依赖 AI：ai-down 时打印按钮仍在；生成钮也仍在（不被 canStart 藏掉），但已知停用 → 置灰、不发请求、原因写在旁边（稿 career 的 AI 停）。
   await expect(page.getByRole('button', { name: '打印求职参考单（未含 AI 规划）' })).toBeVisible()
+  await expectCareerGenerateKeyGreyed(page, api, '生成求职方案', CAREER_AI_DOWN_WHY)
   await captureDecisionViewports(page, 'career-ai-down')
 
+  // 离开再进来才会重新探测：这次服务好了，生成钮可点，点了拿到方案。
   api.respond('POST', '/api/v1/resume/career-plan/t-cp', { status: 200, json: CAREER_PLAN_READY })
-  await page.getByRole('button', { name: '重试生成求职方案' }).click()
+  await openWithRouteState(page, '/resume/career-plan', { taskId: 't-cp' })
+  await expect(screen).toHaveAttribute('data-state', 'guide')
+  await page.getByRole('button', { name: '生成求职方案' }).click()
   await expect(screen).toHaveAttribute('data-state', 'ready')
   await expect(page.getByRole('heading', { name: '目标与方向' })).toBeVisible()
   await expect(page.locator('.rdq-direction h3')).toContainText('运营助理')
@@ -2605,7 +2777,7 @@ test('resume templates: empty, error with real retry, and selection that saves n
   await captureDecisionViewports(page, 'templates-error')
 
   api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [RESUME_TEMPLATE] } })
-  await page.locator('.qx-ctabar').getByRole('button', { name: '重新读取模板' }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '重新读取模板' }).click()
   await expect(screen).toHaveAttribute('data-state', 'list')
   const card = page.getByTestId('resume-templates-template-tpl-clean')
   await expect(card).toHaveAttribute('aria-pressed', 'false')

@@ -154,6 +154,8 @@ test.describe('每一页都要能回上一步 @kiosk', () => {
       // 而「迁进青序流光却忘了填 back 槽」正是 2026-09 那批缺陷的形态 ——
       // QxPageFrame 的 back 是可选 prop，不传就没有返回键，且不会有任何报错。
       // 所以判据钉在这里：**用了这个壳，就必须填 back 槽**。
+      // 触屏版（QxTouchScreen）用 data-qxt-screen 而不是 data-qx-frame：只认前者，触屏壳的页面会一律被跳过，
+      // 「必须提供离开这一页的出口」对它们等于没跑。两种壳任一即算渲染了青序流光壳。
       const framed = await page.locator('[data-qx-frame="true"], [data-qxt-screen]').count()
       if (framed === 0 && !why) {
         console.log(`[back-exit] SKIP ${route.pattern} — 冷开未渲染青序流光壳`)

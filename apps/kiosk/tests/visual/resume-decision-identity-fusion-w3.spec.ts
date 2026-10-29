@@ -150,11 +150,11 @@ async function captureEnded(page: Page, name: string): Promise<void> {
   for (const size of ENDED_VIEWPORTS) {
     await page.setViewportSize(size)
     await expect.poll(async () => {
-      const ctabar = await page.locator('.qx-ctabar').boundingBox()
+      const ctabar = await page.locator('.qxt-dock').boundingBox()
       return ctabar && ctabar.y + ctabar.height <= size.height + 0.5 ? 'ok' : 'ctabar outside viewport'
     }).toBe('ok')
     await assertNoHorizontalOverflow(page)
-    for (const target of [page.locator('.qx-topbar-back'), page.locator('.qx-ctabar .qx-btn').last()]) {
+    for (const target of [page.locator('.qxt-back'), page.locator('.qxt-dock .qx-btn').last()]) {
       const box = await target.boundingBox()
       expect(box, '可点区域必须可见').not.toBeNull()
       expect(Math.min(box!.width, box!.height), `${name} ${size.width}x${size.height} 触控尺寸`).toBeGreaterThanOrEqual(48)
@@ -267,7 +267,7 @@ async function openActionsWithPendingExpiry(page: Page, api: ApiRouter, third: '
   await loginThenOpen(page, '/resume/job-fit/actions?taskId=t-act')
   const screen = page.locator('[data-kiosk-screen="resume-job-fit-actions"]')
   await expect(screen).toHaveAttribute('data-state', 'ready')
-  await page.locator('.qx-ctabar').getByRole('button', { name: '返回比对结果' }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '返回比对结果' }).click()
   await expect(page).toHaveURL(/\/resume\/job-fit$/)
   await expiry.arrived
   await page.goBack()
@@ -283,7 +283,7 @@ test('job fit actions: a 401 from the previous page ends the session and the lat
   const { expiry, screen } = await openActionsWithPendingExpiry(page, api, 'ready')
   await expect(screen).toHaveAttribute('data-state', 'ready')
   await seedLiveScan(page)
-  await page.locator('.qx-ctabar').getByRole('button', { name: '生成打印版' }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '生成打印版' }).click()
   await expect(screen).toHaveAttribute('data-state', 'print-pending')
   await print.arrived
 
@@ -333,7 +333,7 @@ async function openActionsWithAnonState(page: Page, api: ApiRouter) {
   await expect(page.getByText('缺少 Excel 数据整理经历')).toBeVisible()
   // 阳性对照：这条记录此刻确实带着上一位的任务号与匿名令牌。
   expect(await page.evaluate(() => (window.history.state as { usr?: unknown } | null)?.usr)).toEqual({ taskId: 't-act', accessToken: ANON_TOKEN })
-  await page.locator('.qx-ctabar').getByRole('button', { name: '生成打印版' }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '生成打印版' }).click()
   await expect(screen).toHaveAttribute('data-state', 'print-pending')
   await print.arrived
   return { print, screen }

@@ -277,6 +277,10 @@ const QX_TOUCH_ROUTES = new Set<string>([
   '/me/settings',
   '/me/privacy-requests',
   // 第七包 简历其余页
+  '/resume/generate',
+  '/resume/generate/preview',
+  '/resume/templates',
+  '/resume/materials',
   // 第八包 练面试
   // 第九包 扫描复印
   // 第十包 政策与受控扩展

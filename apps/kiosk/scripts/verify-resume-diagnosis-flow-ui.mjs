@@ -468,8 +468,10 @@ assertIncludes(wavRecorder, 'timedOut', 'wav recorder tracks late microphone per
 assertIncludes(wavRecorder, 'lateStream.getTracks().forEach((track) => track.stop())', 'wav recorder releases late microphone streams after timeout')
 
 assertIncludes(optimize, 'ResumeTouchPage', 'optimize page uses the touch page frame')
-assertIncludes(generatePreview, 'QxPageFrame', 'generate preview uses the Qingxu frame')
-assertIncludes(generatePreview, 'navbar={<GeneratePreviewNavbar', 'generate preview uses the QxPageFrame navbar slot instead of a page-local bar')
+assertIncludes(generatePreview, 'ResumeTouchFrame', 'generate preview uses the touch frame')
+assertIncludes(generatePreview, "home: 'resume-generate-preview-nav-home'", 'generate preview keeps the shared navbar home destination instead of a page-local bar')
+assertIncludes(generatePreview, "advisor: 'resume-generate-preview-nav-advisor'", 'generate preview keeps the shared navbar advisor destination instead of a page-local bar')
+assertIncludes(generatePreview, "profile: 'resume-generate-preview-nav-profile'", 'generate preview keeps the shared navbar profile destination instead of a page-local bar')
 assertIncludes(generatePreview, '返回服务大厅', 'session-lost CTA matches prototype 返回服务大厅 → /')
 assertIncludes(generatePreview, '重新填一份', 'session-lost / failed CTA keeps the refill action under the prototype name')
 assertIncludes(generatePreview, '回去改资料', 'ready CTA refill is named 回去改资料')

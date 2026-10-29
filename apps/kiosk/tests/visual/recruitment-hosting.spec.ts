@@ -703,3 +703,35 @@ test('hosting on: switching job fit to manual entry drops the picked job from th
   await expect(targetSlot).toHaveText('行政专员')
   await expect(targetCheck).toHaveAttribute('data-tone', 'ok')
 })
+
+test('job fit actions: the source-platform delivery sentence only exists when hosting is on @w1-kiosk', async ({ page, api }) => {
+  const ACTIONS_TASK = 't-rh-actions'
+  api.respond('GET', `/api/v1/resume/job-fit/${ACTIONS_TASK}`, {
+    status: 200,
+    json: {
+      taskId: ACTIONS_TASK,
+      status: 'completed',
+      summary: '简历里写到了活动组织与表格整理，还没有写到数据分析工具。',
+      job: { id: 'job-rh', title: '行政专员', company: '示例来源企业', sourceName: '来源平台', externalId: 'X-RH' },
+      matchPoints: [{ requirement: '活动组织', point: '组织过校园招聘宣讲', evidence: '负责 3 场宣讲会现场协调' }],
+      gapPoints: [{ requirement: '数据工具', gap: '没有写到 Excel 数据整理', suggestion: '补一条用表格汇总报名数据的经历' }],
+      targetedSuggestions: ['把「协助行政」改写成具体做过的三件事'],
+    },
+  })
+  const open = async (hosting: typeof RECRUITMENT_HOSTING_ON | typeof RECRUITMENT_HOSTING_OFF) => {
+    registerShell(api, hosting)
+    await page.goto(`/resume/job-fit/actions?taskId=${ACTIONS_TASK}`, { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('[data-kiosk-screen="resume-job-fit-actions"]')).toHaveAttribute('data-state', 'ready')
+    return page.locator('body').innerText()
+  }
+
+  // 托管关（我们云上）：整屏没有「来源平台」，也没有「投递请前往…」；「本平台不提供投递功能」照写。
+  const off = await open(RECRUITMENT_HOSTING_OFF)
+  expect(off, '托管关闭时行动清单不写来源平台').not.toContain('来源平台')
+  expect(off, '托管关闭时行动清单不写投递去向').not.toContain('投递请前往')
+  expect(off).toContain('本平台不提供投递功能')
+
+  // 阳性对照：托管打开（私有化部署）时原句仍在，说明上面的「没有」是条件生效，不是句子整个丢了。
+  const on = await open(RECRUITMENT_HOSTING_ON)
+  expect(on, '托管打开时保留投递去向句').toContain('投递请前往岗位来源平台')
+})

@@ -1,4 +1,4 @@
-// 简历素材库 · 版式参考（/resume/templates）。
+// 简历模板 · 版式参考（/resume/templates）。
 //
 // 视觉真值（2026-09-23 迁入青序流光）：
 //   docs/design/kiosk-redesign-2026-08/46-resume-decision-workspace.html?screen=templates
@@ -11,13 +11,19 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { ResumeTemplate, ResumeTemplateSectionKey } from '@ai-job-print/shared'
-import { CheckCircle2Icon, FileTextIcon, LayoutTemplateIcon, LockIcon, PenLineIcon, PrinterIcon, TargetIcon, UserIcon } from 'lucide-react'
+import { CheckCircle2Icon, FileTextIcon, LayoutTemplateIcon, LockIcon, PenLineIcon, PrinterIcon, TargetIcon } from 'lucide-react'
 import { getResumeTemplates } from '../../services/api/jobMaterials'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { Checks, CtaNote, Ghosts, KitRows, ListRows, Nots, RouteCards, Sec, Verdict, Waiting } from './jobFit/jobFitQxKit'
+
+import type { QxTouchRail } from '../../components/qingxu/touch/QxTouchBand'
+import { ResumeWaitState } from './touch/ResumeStates'
+import { ResumeDocArt } from './touch/ResumeDocArt'
+import './touch/resume-templates.css'
+import { ResumeTouchActs } from './touch/ResumeTouchActs'
+import { ASKS } from './touch/resumeAsks'
+import { unattendedReason } from './touch/unattendedReason'
+import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
+import { CtaNote, KitRows, Sec } from './jobFit/jobFitQxKit'
 import './job-fit-qx.css'
 import './resume-decision-qx.css'
 import './resume-templates-qx.css'
@@ -91,7 +97,7 @@ export function ResumeTemplateLibraryPage() {
         setSelectedId((prev) => (prev && items.some((item) => item.id === prev) ? prev : null))
       })
       .catch((err) => {
-        if (!cancelled) setError(userMessageOf(err, '简历素材加载失败，请稍后重试'))
+        if (!cancelled) setError(unattendedReason(userMessageOf(err, '简历素材加载失败，请稍后重试'), '简历素材加载失败，请稍后重试'))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -114,16 +120,6 @@ export function ResumeTemplateLibraryPage() {
   }
   const reload = () => setReloadKey((key) => key + 1)
   const goResumeHub = () => navigate('/resume-service')
-  const aiRow = (
-    <QxStepActions onPrev={goResumeHub}>
-      <QxAiHelp
-        label="让小青帮我选版式 →"
-        draft="我想挑一份简历版式，请根据经历长短告诉我更适合单栏还是双栏。"
-        testId="resume-templates-ai-help"
-      />
-    </QxStepActions>
-  )
-
   const screen: TemplatesScreen = loading
     ? 'loading'
     : error
@@ -142,38 +138,27 @@ export function ResumeTemplateLibraryPage() {
     ]} />
   )
 
-  function buildView(): { title: string; subtitle: string; pill: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }; body: ReactNode; cta: ReactNode } {
+  function buildView(): { title: string; subtitle: string; pill: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }; rail?: QxTouchRail; body: ReactNode; cta: ReactNode } {
     if (screen === 'loading') return {
       title: '正在读取版式，还没有列表',
-      subtitle: '简历素材库的模板由已发布的列表决定。读取完成前不显示任何模板名称、数量或已选状态。',
+      subtitle: '模板由已发布的列表决定。读取完成前不显示任何模板名称、数量或已选状态。',
       pill: { tone: 'unknown', label: '正在读取简历模板列表' },
+      rail: { labels: ['读取模板', '选一个版式', '去简历优化'], now: 0 },
       body: (
-        <>
-          <Sec title="正在读取可用的简历模板" hint="无进度条 · 无预计时间">
-            <Waiting icon={<LayoutTemplateIcon size={34} />} title="读取请求已提交，等待列表返回" desc="只显示已经发布的模板。读取失败或没有模板时会直接说明，不用内置默认模板顶替。" tag="整体等待中，没有百分比" />
-          </Sec>
-          <Sec title="这一步会做什么、不会做什么" hint="读取范围写在前面" grow>
-            <Checks items={[
-              { tone: 'ok', icon: <UserIcon size={24} />, title: '只读列表', desc: '这一步只读取模板列表，不读取你的简历内容。', chip: '已确认' },
-              { tone: 'wait', icon: <LayoutTemplateIcon size={24} />, title: '模板数量', desc: '有几个模板由已发布的列表决定，本页不预设。', chip: '等待返回' },
-              { tone: 'ok', icon: <LockIcon size={24} />, title: '不自动应用', desc: '读到列表也不会自动套用到你的简历上。', chip: '已固定' },
-            ]} />
-          </Sec>
-          <Sec title="还没有返回的内容" hint="返回前一律留空">
-            <Ghosts items={[
-              { title: '模板名称', desc: '标题与适用场景随列表一起返回。', tag: '等待返回' },
-              { title: '版式结构', desc: '栏数与分区顺序随模板返回。', tag: '等待返回' },
-              { title: '适用说明', desc: '适合哪类经历由发布方说明。', tag: '等待返回' },
-            ]} />
-          </Sec>
-        </>
+        <ResumeWaitState
+          icon={<LayoutTemplateIcon size={34} />}
+          title="读取请求已提交，等待列表返回"
+          desc="只显示已经发布的模板。读取失败或没有模板时会直接说明，不用内置默认模板顶替。"
+          tag="整体等待中，没有百分比"
+          fine="这一步只读取模板列表，不读取你的简历内容；读到列表也不会自动套用到你的简历上。"
+          take={{ art: 'resume', kicker: '读到之后，你可以挑一个版式', title: '版式只影响排版', lines: ['栏数与分区顺序随模板返回', '不会改写你的经历、技能或成果'] }}
+        />
       ),
       cta: (
         <>
           <CtaNote>读取期间不显示任何模板，也不保存任何选择。</CtaNote>
           <QxAction label="返回简历服务" variant="ghost" onClick={goResumeHub} />
           <QxAction label="不等模板，直接去简历优化" variant="primary" onClick={handleUseResumeTemplate} />
-          {aiRow}
         </>
       ),
     }
@@ -184,27 +169,15 @@ export function ResumeTemplateLibraryPage() {
       pill: { tone: 'bad', label: '简历模板列表读取失败' },
       body: (
         <>
-          <Sec title="这次的结果" hint="只写已确认的事实">
-            <Verdict items={[
-              { tone: 'bad', label: '模板列表', value: '未读取到' },
-              { tone: 'ok', label: '简历优化', value: '不依赖模板' },
-            ]} />
-            <p className="jfq-alert" role="alert">{error}</p>
-          </Sec>
-          <Sec title="这次没有发生的事" hint="失败不影响你已有的内容" grow>
-            <Nots items={[
-              '没有显示任何模板名称或版式',
-              '没有用内置默认模板冒充已发布列表',
-              '没有把任何版式套用到你的简历上',
-              '没有修改或保存你的简历内容',
-            ]} />
-          </Sec>
-          <Sec title="接下来" hint="版式不是前提，内容才是">
-            <RouteCards items={[
-              { title: '重新读取模板', desc: '网络或服务恢复之后可以再试一次。', action: '重新读取', onClick: reload },
-              { title: '不用模板，直接优化', desc: '先按目标岗位调整内容重点，版式随后再说。', action: '去简历优化', onClick: handleUseResumeTemplate },
-            ]} />
-          </Sec>
+          <p className="jfq-alert" role="alert">{error}</p>
+          <ResumeTouchActs
+            items={[
+              { title: '重新读取模板', desc: '网络或服务恢复之后可以再试一次。', take: '重新读取', art: 'checklist', onClick: reload },
+              { title: '不用模板，直接优化', desc: '先按目标岗位调整内容重点，版式随后再说。', take: '去简历优化', art: 'resume', onClick: handleUseResumeTemplate },
+              { title: '打印现有简历', desc: '手上已有可用文件就直接打印。', take: '去打印', art: 'report', onClick: () => navigate('/print-scan') },
+            ]}
+            fine="这次没有显示任何模板，也没有用内置默认模板冒充已发布列表；你已有的简历内容没有被改动或保存。"
+          />
         </>
       ),
       cta: (
@@ -212,7 +185,6 @@ export function ResumeTemplateLibraryPage() {
           <CtaNote>模板只影响排版，不影响你已有的简历内容。</CtaNote>
           <QxAction label="返回简历服务" variant="ghost" onClick={goResumeHub} />
           <QxAction label="重新读取模板" variant="primary" onClick={reload} />
-          {aiRow}
         </>
       ),
     }
@@ -222,32 +194,20 @@ export function ResumeTemplateLibraryPage() {
       subtitle: '这次没有已发布的模板。这不影响你继续准备简历 —— 内容比版式更重要。',
       pill: { tone: 'warn', label: '当前没有可用的简历模板' },
       body: (
-        <>
-          <Sec title="当前状态" hint="读取成功，只是内容为空">
-            <Verdict items={[
-              { tone: 'warn', label: '已发布模板', value: '数量为 0' },
-              { tone: 'ok', label: '本次读取', value: '已成功完成' },
-              { tone: 'ok', label: '简历优化', value: '可以直接进行' },
-            ]} />
-          </Sec>
-          <Sec title="没有模板时，这样准备一样有效" hint="一页 A4 就够" grow>
-            <ListRows items={[
-              '用一页 A4 说清楚：目标岗位、核心能力、可验证的成果',
-              '把与目标岗位最相关的经历放在最前面，其余往后压',
-              '每段经历写清楚：做了什么、怎么做的、结果是什么',
-              '只写你本人能解释清楚的事实，不写无法印证的内容',
-              '打印前先看一遍分页，避免关键内容被切到第二页',
-            ]} />
-          </Sec>
-          <Sec title="不用等版式也能推进" hint="都是既有入口">{fallbackKit}</Sec>
-        </>
+        <ResumeTouchActs
+          note="读取成功，只是已发布的模板数量为 0。没有模板时，一页 A4 说清目标岗位、核心能力和可验证的成果就够。"
+          items={[
+            { title: '直接去简历优化', desc: '按目标岗位重排已有内容，不依赖模板。', take: '去简历优化', art: 'resume', onClick: handleUseResumeTemplate },
+            { title: '生成一份新简历', desc: '还没有简历时从结构化填写开始。', take: '去生成', art: 'checklist', onClick: () => navigate('/resume/generate') },
+            { title: '打印现有简历', desc: '手上已有可用文件就直接打印。', take: '去打印', art: 'report', onClick: () => navigate('/print-scan') },
+          ]}
+        />
       ),
       cta: (
         <>
           <CtaNote>模板列表为空不代表服务异常；发布后会出现在这一页。</CtaNote>
           <QxAction label="重新读取模板" variant="ghost" onClick={reload} />
           <QxAction label="去简历优化" variant="primary" onClick={handleUseResumeTemplate} />
-          {aiRow}
         </>
       ),
     }
@@ -268,7 +228,7 @@ export function ResumeTemplateLibraryPage() {
       title: selected ? '版式选好了，再核对内容' : '先挑一个版式，内容仍由你决定',
       subtitle: selected
         ? '选中只是这次的版式参考。正式简历在后续流程结合你的真实内容生成，这里不冒充已生成。'
-        : '简历素材库：模板来自已发布的列表。选中后可以看版式结构，不会自动应用，也不会直接生成简历。',
+        : '模板来自已发布的列表。选中后可以看版式结构，不会自动应用，也不会直接生成简历。',
       pill: selected
         ? { tone: 'ok', label: '已选中一个版式 · 未保存' }
         : { tone: 'ok', label: '以实际发布的模板为准' },
@@ -296,8 +256,9 @@ export function ResumeTemplateLibraryPage() {
                     data-testid={`resume-templates-template-${template.id}`}
                   >
                     <span className="rdq-tpl-art" data-columns={template.resumeLayoutPreset.defaultLayout.columns === 2 ? '2' : '1'} aria-hidden="true">
-                      <i /><i /><i />
+                      <ResumeDocArt kind="resume" columns={template.resumeLayoutPreset.defaultLayout.columns === 2 ? 2 : 1} />
                     </span>
+                    <span className="rdq-tpl-sample">示例</span>
                     <h3>{template.title}</h3>
                     <p>{template.description}</p>
                     <small>{template.recommendedFor}</small>
@@ -346,7 +307,6 @@ export function ResumeTemplateLibraryPage() {
       cta: (
         <>
           <CtaNote>{selected ? '此页不会保存模板选择，也不会直接生成简历。' : '模板来自已发布的列表；此页不会保存模板选择，也不会直接生成简历。'}</CtaNote>
-          {aiRow}
           {selected
             ? <QxAction label="换一个版式" variant="ghost" onClick={() => setSelectedId(null)} />
             : <QxAction label="重新读取模板" variant="ghost" onClick={reload} />}
@@ -360,19 +320,15 @@ export function ResumeTemplateLibraryPage() {
 
   return (
     <div className="jfq-root">
-      <QxPageFrame
+      <ResumeTouchFrame
+        eyebrow="改简历 · 模板"
         title={view.title}
         subtitle={view.subtitle}
         status={view.pill}
+        rail={view.rail}
         back={{ label: '返回简历服务', onBack: goResumeHub }}
         ctabar={view.cta}
-        navbar={(
-          <QxAppNavbar
-            onHome={() => navigate('/')}
-            onAdvisor={() => navigate('/assistant')}
-            onProfile={() => navigate('/profile')}
-          />
-        )}
+        ask={{ ...ASKS.templates, testId: 'resume-templates-ai-help' }}
       >
         <section
           className="qx-scroll"
@@ -380,11 +336,11 @@ export function ResumeTemplateLibraryPage() {
           data-kiosk-screen="resume-templates"
           data-state={screen}
           data-testid={`resume-templates-state-${screen}`}
-          aria-label="简历素材库"
+          aria-label="简历模板"
         >
           {view.body}
         </section>
-      </QxPageFrame>
+      </ResumeTouchFrame>
     </div>
   )
 }
