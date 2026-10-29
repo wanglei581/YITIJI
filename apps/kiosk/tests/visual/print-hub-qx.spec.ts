@@ -425,7 +425,12 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
 })
 
 const PAUSE_LABEL = '暂停接单'
-const PAUSE_NOTICE = '打印机暂时不可用，请联系现场工作人员'
+// 无人值守标准句 3（machineUnusableLine）。运行时根会读服务联系方式；ApiRouter 对这个接口的默认应答是
+// 服务电话 18369161921、服务时间「工作日 9:00–18:00」、两个布尔为假（单点位，写「请稍后再来」）。
+const PAUSE_NOTICE = '这台机器暂时不能用，请稍后再来，或拨打服务电话 18369161921（工作日 9:00–18:00）。'
+// 读不到服务联系方式（接口 404 / 超时 / 字段缺失）时的最保守一套：没号码，指向隐私政策。
+const PAUSE_NOTICE_CONSERVATIVE = '这台机器暂时不能用，请稍后再来，或查看《隐私政策》里的联系方式。'
+const CONTACT_PATH = '/api/v1/public/support-contact'
 
 function registerQueueGate(api: ApiRouter, printerStatus: string): void {
   registerShell(api, { isOnline: true, printerStatus })
@@ -449,7 +454,7 @@ async function shot(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: `${dir}/${name}.png` })
 }
 
-// 打印闸门合上：要出纸的入口停用，短标题「暂停接单」，说明给现场工作人员。
+// 打印闸门合上：要出纸的入口停用，短标题「暂停接单」，说明用无人值守标准句（不把人引向现场）。
 // 不经过打印机的入口（格式转换）照旧可点。删掉 map 里的 case 会掉进「状态未知」，这两条变红。
 for (const status of ['queue_cleanup_failed', 'queue_pause_failed'] as const) {
   test(`print entry pauses new orders when heartbeat is ${status} @w2`, async ({ page, api }) => {
@@ -489,6 +494,80 @@ for (const status of ['queue_cleanup_failed', 'queue_pause_failed'] as const) {
     expect(errors).toEqual([])
   })
 }
+
+// 服务联系方式读不到（后台没发布这个接口、超时、字段缺失）：说明回到保守句，页面上一个号码都不能有。
+test('pause notice keeps the conservative sentence when support-contact answers 404 @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerQueueGate(api, 'queue_pause_failed')
+  api.respond('GET', CONTACT_PATH, {
+    status: 404,
+    json: { error: { code: 'NOT_FOUND', message: 'Cannot GET /api/v1/public/support-contact' } },
+  })
+
+  // 先等接口真的答过 404，再断言：不然保守句可能只是「还没读到」。
+  const answered = page.waitForResponse((response) => new URL(response.url()).pathname === CONTACT_PATH)
+  await page.goto('/')
+  expect((await answered).status()).toBe(404)
+  const printTile = page.locator('[data-action="print-hub"]')
+  await expect(printTile).toHaveAttribute('data-panel-state', 'error')
+  await expect(printTile.getByText(PAUSE_LABEL, { exact: true })).toBeVisible()
+  await expect(printTile.getByText(PAUSE_NOTICE_CONSERVATIVE, { exact: true })).toBeVisible()
+  await expect(page.getByText('18369161921')).toHaveCount(0)
+  await shot(page, 'G8-contact-404-home')
+
+  await page.goto('/print-scan')
+  await expect(page.locator('[data-testid="print-hub-state-device-off"]')).toBeVisible()
+  await expect(page.getByTestId('print-hub-cap-doc-print')).toContainText(PAUSE_NOTICE_CONSERVATIVE)
+  await expect(page.getByTestId('print-hub-fallback')).toContainText(PAUSE_NOTICE_CONSERVATIVE)
+
+  await page.goto('/print/upload?source=document&tab=file')
+  await expect(page.getByText(PAUSE_NOTICE_CONSERVATIVE, { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('18369161921')).toHaveCount(0)
+
+  await expectNoForgedReady(page)
+  expect(errors).toEqual([])
+})
+
+// 号码比打印机状态晚到：状态里存的说明是取状态那一刻算好的，必须随联系方式重算。
+// 打印机状态一分钟才再取一次，这里的断言窗口只有几秒，所以换句只能是「号码到了就重算」，不是下一次轮询碰巧换的。
+test('pause notice switches to the phone sentence when the number arrives after the printer status @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerQueueGate(api, 'queue_pause_failed')
+  let release: () => void = () => undefined
+  const held = new Promise<void>((resolve) => { release = resolve })
+  api.respondWith('GET', CONTACT_PATH, async () => {
+    await held
+    return {
+      status: 200,
+      json: {
+        success: true,
+        data: { servicePhone: '13800138000', serviceHours: '每天 8:00–20:00', otherOnlineTerminalNearby: false, miniappPublished: false },
+      },
+    }
+  })
+
+  await page.goto('/')
+  const printTile = page.locator('[data-action="print-hub"]')
+  await expect(printTile).toHaveAttribute('data-panel-state', 'error')
+  await expect(printTile.getByText(PAUSE_NOTICE_CONSERVATIVE, { exact: true })).toBeVisible()
+  await expect.poll(() => api.requestCount('GET', CONTACT_PATH), '号码还没回来，但已经问过一次').toBe(1)
+  const statusRequestsBefore = api.requestCount('GET', '/api/v1/terminals/KSK-001/printer-status')
+  await shot(page, 'G8-contact-late-before')
+
+  release()
+  const withNumber = '这台机器暂时不能用，请稍后再来，或拨打服务电话 13800138000（每天 8:00–20:00）。'
+  await expect(printTile.getByText(withNumber, { exact: true })).toBeVisible()
+  await expect(printTile.getByText(PAUSE_NOTICE_CONSERVATIVE, { exact: true })).toHaveCount(0)
+  expect(
+    api.requestCount('GET', '/api/v1/terminals/KSK-001/printer-status'),
+    '说明换了，但打印机状态没有再取一次：靠的是号码到了就重算',
+  ).toBe(statusRequestsBefore)
+  expect(api.requestCount('GET', CONTACT_PATH), '运行时根读一次，设备状态只订阅不再各自去读').toBe(1)
+  await shot(page, 'G8-contact-late-after')
+
+  await expectNoForgedReady(page)
+  expect(errors).toEqual([])
+})
 
 test('unknown feature page lists the copy guide as the second known explanation @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)

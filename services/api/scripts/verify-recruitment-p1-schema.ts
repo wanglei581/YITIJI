@@ -6,9 +6,15 @@ import { join, resolve } from 'node:path'
 
 const API_ROOT = resolve(__dirname, '..')
 const MIGRATION = '20260810100000_recruitment_p1_expand'
-// This migration indexes OnlinePlatformDirectory, which is created by MIGRATION.
-// The old-schema fixture must defer it until after the P1 expansion.
-const P1_DEPENDENT_MIGRATION = '20260927100000_official_channel_org_index'
+// These migrations touch OnlinePlatformDirectory, which is created by MIGRATION.
+// The old-schema fixture must defer them until after the P1 expansion.
+// 20261027233510 adds the official-channel audience column. It is not a new
+// assertion and does not change the upgrade row-count checks; without deferral
+// the ALTER runs before CREATE.
+const P1_DEPENDENT_MIGRATIONS = [
+  '20260927100000_official_channel_org_index',
+  '20261027233510_official_channel_audience',
+]
 const SQLITE_SCHEMA = join(API_ROOT, 'prisma/schema.prisma')
 const PG_SCHEMA = join(API_ROOT, 'prisma/postgres/schema.prisma')
 const SQLITE_MIGRATIONS = join(API_ROOT, 'prisma/migrations')
@@ -30,7 +36,7 @@ function requireTokens(haystack: string, label: string, tokens: string[]): void 
 
 function migrationFiles(dir: string, includeLatest: boolean): string[] {
   return readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && (includeLatest || (entry.name !== MIGRATION && entry.name !== P1_DEPENDENT_MIGRATION)))
+    .filter((entry) => entry.isDirectory() && (includeLatest || (entry.name !== MIGRATION && !P1_DEPENDENT_MIGRATIONS.includes(entry.name))))
     .map((entry) => join(dir, entry.name, 'migration.sql'))
     .sort()
 }
@@ -379,7 +385,9 @@ function verifySqliteFreshAndUpgrade(): void {
   const legacyTables = ['Organization', 'JobSource', 'Job', 'OfflineAgency', 'OfflineJob']
   const before = legacyTables.map((table) => sqlite(upgradeDb, `SELECT COUNT(*) FROM "${table}";`))
   sqlite(upgradeDb, read(join(SQLITE_MIGRATIONS, MIGRATION, 'migration.sql')))
-  sqlite(upgradeDb, read(join(SQLITE_MIGRATIONS, P1_DEPENDENT_MIGRATION, 'migration.sql')))
+  for (const name of P1_DEPENDENT_MIGRATIONS) {
+    sqlite(upgradeDb, read(join(SQLITE_MIGRATIONS, name, 'migration.sql')))
+  }
   const after = legacyTables.map((table) => sqlite(upgradeDb, `SELECT COUNT(*) FROM "${table}";`))
   assert.deepEqual(after, before, 'SQLite upgrade changed legacy row counts')
   assert.equal(
@@ -456,7 +464,9 @@ async function verifyPostgresUpgrade(): Promise<void> {
       )
     )
     await pool.query(read(join(PG_MIGRATIONS, MIGRATION, 'migration.sql')))
-    await pool.query(read(join(PG_MIGRATIONS, P1_DEPENDENT_MIGRATION, 'migration.sql')))
+    for (const name of P1_DEPENDENT_MIGRATIONS) {
+      await pool.query(read(join(PG_MIGRATIONS, name, 'migration.sql')))
+    }
     const after = await Promise.all(
       legacyTables.map(async (table) =>
         Number((await pool.query(`SELECT COUNT(*)::int AS count FROM "${table}"`)).rows[0]?.count)
