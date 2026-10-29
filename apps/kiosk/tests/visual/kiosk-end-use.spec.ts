@@ -331,6 +331,60 @@ test('idle timeout exit: 3 minutes untouched → logged out, deep link reads not
   await expectNextPersonSeesNothing(page, calls, WANG, '13-after-idle')
 })
 
+// 10/29 走查 I-07：「还在用吗？」只给人 30 秒决定「继续还是结束」。此前正文有五段说明、两张清单、三张常问卡和一行给开发看的话，
+// 大半屏的字，而要点（还在用就点「我还在，继续使用」）埋在第二屏中间的常问卡里。现在：要点放在说明卡的第一句，
+// 同一件事不说第二遍，只留影响这一趟的说明、两张清单（各 3 条）和一条「纸还在机器上」。
+const IDLE_WARNING_VISIBLE_CHARS_MAX = 360
+
+test('还在用吗？ 要点在最前面、字少到 30 秒读得完、同一件事不说两遍 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+
+  // 150 秒进「还在用吗？」，再过 2 秒；冻住倒计时，下面慢慢量。
+  await page.clock.runFor(152_000)
+  const screen = page.locator('[data-kiosk-screen="session-timeout"]')
+  const guard = page.locator('[data-screen="session-guard"]')
+  await expect(guard).toBeVisible()
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 500)
+
+  // 全屏可见的字（含两个按钮）不超过预算：30 秒按平均读速读得完，不靠「扫一眼」猜。
+  const visibleChars = (await screen.innerText()).replace(/\s+/g, '').length
+  expect(visibleChars, `这一屏可见字数 ${visibleChars}，预算 ${IDLE_WARNING_VISIBLE_CHARS_MAX}`).toBeLessThanOrEqual(IDLE_WARNING_VISIBLE_CHARS_MAX)
+
+  // 要点是说明卡的第一句：还在用就点哪个键、刚填的会不会丢。
+  const firstNote = guard.locator('.cg-copy .qxp-note').first()
+  await expect(firstNote).toContainText('还在用，就点下面的「我还在，继续使用」')
+  await expect(firstNote).toContainText('刚才填到一半的内容不会因此丢掉')
+  const noteBox = await firstNote.boundingBox()
+  expect(noteBox!.y, '要点要在上半屏，不是埋在第二屏').toBeLessThan(800)
+
+  // 同一件事不说两遍：这些句子的意思，两张清单、按钮名或要点里已经有了。
+  for (const dropped of [
+    '这是公用设备的隐私保护',
+    '现在结束使用，会结束并清除这台机器上的这次使用记录',
+    '我只是在看屏幕上的字',
+    '我的打印订单会不会没了',
+    '倒计时由本机时钟执行',
+    '这次读不到可用的来源页',
+  ]) {
+    await expect(screen, `不该再出现：${dropped}`).not.toContainText(dropped)
+  }
+
+  // 该留的还在：影响这一趟的说明、当前登录、回到哪一页、两张清单、纸的提醒；两个按钮在底栏。
+  await expect(guard.getByTestId('session-guard-impact')).toHaveText('登录状态和这台机器上的这次使用记录将清除')
+  await expect(guard.getByTestId('session-guard-identity')).toContainText('当前登录：')
+  await expect(guard.locator('.sg-from')).toContainText('继续后回到')
+  await expect(guard.getByRole('heading', { name: '本机会清除', exact: true })).toBeVisible()
+  await expect(guard.getByRole('heading', { name: '不因此清除', exact: true })).toBeVisible()
+  await expect(guard.locator('.cg-clear')).toHaveCount(2)
+  for (const list of await guard.locator('.cg-list').all()) expect(await list.locator('li').count(), '每张清单 3 条').toBe(3)
+  await expect(guard.getByRole('heading', { name: '纸还在机器上', exact: true })).toBeVisible()
+  await expect(screen.getByTestId('session-guard-primary')).toHaveText('我还在，继续使用')
+  await expect(screen.getByTestId('session-guard-clear')).toHaveText('现在结束使用')
+})
+
 // ── W-75 粘性：「还是你吗？」弹出了没答，就一直是「待确认」 ─────────────────────────────
 // 取证（10/28）：交接页只要有一个出口（问小青、浏览器后退……），下一位走到别处再点底部「我的」，
 // 进页前的空闲只有几秒，旧判据不会再问，直接进了上一位的「我的」，并带着上一位的令牌发出 7 条 /me 请求。
