@@ -313,14 +313,16 @@ for (const c of CASES) {
   })
 }
 
-// 5xx：通用错误文案里带「联系现场工作人员」，现场无人值守，招聘页的失败态必须换成当前操作的那句，求助只给服务电话。
+// 5xx：现场无人值守，招聘页的失败态不许叫人去找现场的人，求助只给服务电话。
+// 原先共享错误码表的 5xx 句子带着「联系现场工作人员」，页面要换成当前操作的那句；main #1517 把共享句换成了
+// 「服务暂时不可用，请稍后重试。」+ 标准句 1（服务电话），不带那种话，页面就原样显示共享句。
 test('岗位列表 5xx：失败态不写联系工作人员，求助句是服务电话 @w4', async ({ page, api }) => {
   registerW6Api(api)
   api.respond('GET', '/api/v1/jobs', boom)
   await page.goto('/jobs')
   await expect(page.getByTestId('jobs-state-error')).toBeVisible()
   // 阳性对照：页面确实把失败原因说了，并给出服务电话（夹具里的公示号码）。
-  await expect(page.getByText('岗位信息暂时无法加载，请稍后重试')).toBeVisible()
+  await expect(page.getByText(/服务暂时不可用，请稍后重试/).first()).toBeVisible()
   await expect(page.getByText(/拨打服务电话 18369161921/)).toBeVisible()
   const text = await page.locator('[data-qxt-screen]').innerText()
   expect(text).not.toMatch(FORBIDDEN_STAFF)
@@ -331,7 +333,8 @@ test('活动物料 5xx：失败态不写联系工作人员 @w4', async ({ page, 
   await page.goto(F('/materials'))
   await expect(page.getByTestId('fair-materials-state-error')).toBeVisible()
   const text = await page.locator('[data-qxt-screen]').innerText()
-  expect(text).toContain('活动物料列表这次没取到')
+  expect(text).toContain('活动物料这次没取到')
+  expect(text).toContain('服务暂时不可用，请稍后重试')
   expect(text).not.toMatch(FORBIDDEN_STAFF)
 })
 
