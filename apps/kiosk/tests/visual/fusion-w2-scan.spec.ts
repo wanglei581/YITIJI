@@ -293,6 +293,8 @@ test('scan start creates only after explicit continuation @w2', async ({ page, a
   await page.goto('/scan/start')
   await expect(page.getByText(/下一步会真实建立这次扫描/).first()).toBeVisible()
   await expect(page.getByText('可创建扫描任务 · 需面板操作', { exact: true })).toBeVisible()
+  // 走查 I-16：进来不替人选类型，选了才能下一步（原来这里不点类型直接下一步，会被悄悄建成简历扫描）
+  await page.getByTestId('scan-workbench-type-resume').click()
   const next = page.getByRole('button', { name: /下一步 · 建立这次扫描/ })
   await expect(next).toBeEnabled()
   // 稿 18：底部三列口径是一次性说明，只在选类型这一屏出现，后面各屏不复读。
@@ -313,6 +315,55 @@ test('scan start creates only after explicit continuation @w2', async ({ page, a
   // 互相喂招（ackRequestedForRef 守的就是它）。
   await ack.expectAcked(1)
   await expectHealthy(page, errors)
+})
+
+// 走查 I-16（回归，#1326 改过）：扫描类型一进来不预选。想扫证件的人不点类型直接「下一步」，原来会被建成简历扫描。
+// 走查 I-18：这一页的字不写死打印机品牌（CLAUDE.md §3，型号走 printerName 配置）。
+test('scan start pre-selects nothing, blocks next until a type is chosen, and never names a printer brand @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerScanCapability(api, 'available')
+  registerCreatedScan(api)
+  registerScanAck(page, api)
+  let createdBody: { scanType?: string } | null = null
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/scan/sessions') {
+      createdBody = request.postDataJSON() as { scanType?: string }
+    }
+  })
+
+  await page.goto('/scan/start')
+  await expect(page.getByTestId('scan-workbench-type-resume')).toBeVisible()
+  for (const type of ['resume', 'id', 'document']) {
+    await expect(page.getByTestId(`scan-workbench-type-${type}`), `${type} 进来不该是选中态`).toHaveAttribute('aria-checked', 'false')
+  }
+  // 没选类型：主按钮禁用并写原因，点不出去
+  const blocked = page.getByRole('button', { name: '先选一种材料', exact: true })
+  await expect(blocked).toBeDisabled()
+  await expect(page.getByRole('button', { name: /下一步 · 建立这次扫描/ })).toHaveCount(0)
+  await expect(page.getByText('已选「简历扫描」')).toHaveCount(0)
+  expect(createdBody).toBeNull()
+  // I-18：「奔图」「面板」之外的品牌词都不该出现在这一页（只说「打印机屏幕」「打印机面板」）
+  await expect(page.locator('main, [data-w2-page="scan-start"]').first()).not.toContainText(/奔图|Pantum|CM28\d0/)
+  // 点「证件扫描」才可以往下走，建出来的就是证件扫描
+  await page.getByTestId('scan-workbench-type-id').click()
+  await expect(page.getByTestId('scan-workbench-type-id')).toHaveAttribute('aria-checked', 'true')
+  await expect(page.getByTestId('scan-workbench-type-resume')).toHaveAttribute('aria-checked', 'false')
+  const next = page.getByRole('button', { name: /下一步 · 建立这次扫描/ })
+  await expect(next).toBeEnabled()
+  await next.click()
+  await page.waitForURL(/\/scan\?stage=settings/)
+  expect(createdBody).toMatchObject({ scanType: 'id' })
+  await expectHealthy(page, errors)
+})
+
+// 走查 I-18：扫描到 U 盘那一页同样不写死品牌。
+test('scan to USB panel page says the printer screen, not a brand @w2', async ({ page, api }) => {
+  registerShell(api)
+  registerScanCapability(api, 'available')
+  await page.goto('/scan?stage=start&mode=usb-panel')
+  await expect(page.getByText('在打印机屏幕上选', { exact: true })).toBeVisible()
+  await expect(page.locator('body')).not.toContainText(/奔图|Pantum|CM28\d0/)
 })
 
 test('scan start blocks continuation while scan capability is unavailable @w2', async ({ page, api }) => {
@@ -347,6 +398,7 @@ test('when 小青 is down every scan and tool screen says so and the manual path
   await expect(page.getByTestId('ai-down-note')).toHaveText('小青暂时接不上。这一步不用它也能做完，照下面的按钮继续。')
   // 手动路径照旧：问小青还在（点过去由顾问页自己降级）、「下一步」照样能按。
   await expect(page.locator('[data-qxt-ask="on"]')).toBeVisible()
+  await page.getByTestId('scan-workbench-type-document').click()
   await expect(page.getByRole('button', { name: /下一步 · 建立这次扫描/ })).toBeEnabled()
 
   for (const [path, primary] of [

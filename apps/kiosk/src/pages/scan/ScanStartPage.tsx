@@ -38,7 +38,10 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
   const [params, setSearchParams] = useSearchParams()
   const usbPanel = params.get('mode') === 'usb-panel'
   const storedType = readScanWorkbenchSession()?.scanType
-  const [selected, setSelected] = useState<ScanType>(storedType ?? 'resume')
+  /* 进来不替人选类型（走查 I-16，回归：#1326 改成不默认选，触屏集成又改回 'resume'）。
+   * 想扫证件、普通文档的人不点类型直接「下一步」，会被悄悄建成简历扫描。
+   * 只有本机登记里已经有类型（同一场里回到这一屏）时才恢复；verify-fusion-w2-print-scan 钉住这句初值。 */
+  const [selected, setSelected] = useState<ScanType | null>(storedType ?? null)
   const [gate, setGate] = useState<ScanGate>('loading')
   const [blockedNote, setBlockedNote] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
@@ -110,24 +113,29 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
           left: { label: '返回打印扫描', onClick: () => navigate('/print-scan') },
           primary: { label: '改用上传文件打印', onClick: () => navigate('/print/upload') },
         }
-      : {
-          primary: {
-            label: '下一步 · 建立这次扫描',
-            onClick: () => {
-              patchScanWorkbenchSession({
-                stage: 'settings',
-                scanType: selected,
-                live: undefined,
-                result: undefined,
-              })
-              if (onGoStage) {
-                onGoStage('settings')
-                return
-              }
-              navigate('/scan?stage=settings', { state: { scanType: selected } })
+      : selected === null
+        ? {
+            // 没选类型：说明为什么按不了，而不是一颗说「下一步」却不动的灰按钮。
+            primary: { label: '先选一种材料', onClick: () => undefined, disabled: true, noArrow: true },
+          }
+        : {
+            primary: {
+              label: '下一步 · 建立这次扫描',
+              onClick: () => {
+                patchScanWorkbenchSession({
+                  stage: 'settings',
+                  scanType: selected,
+                  live: undefined,
+                  result: undefined,
+                })
+                if (onGoStage) {
+                  onGoStage('settings')
+                  return
+                }
+                navigate('/scan?stage=settings', { state: { scanType: selected } })
+              },
             },
-          },
-        }
+          }
 
   return (
     <ScanWorkbenchShell
@@ -156,7 +164,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
             <div className="fs-facts">
               <div className="fs-pairgrid">
                 <div className="fs-fact"><b>把 U 盘插上</b><span>插到打印机支持的 USB 接口。</span></div>
-                <div className="fs-fact"><b>在奔图面板上选</b><span>打开「扫描」，选择「扫描到 U 盘」。</span></div>
+                <div className="fs-fact"><b>在打印机屏幕上选</b><span>打开「扫描」，选择「扫描到 U 盘」。</span></div>
                 <div className="fs-fact"><b>按面板提示</b><span>选文件格式和保存位置，再开始扫描。</span></div>
                 <div className="fs-fact"><b>拔出之前</b><span>先按面板提示安全结束，再拔出 U 盘。</span></div>
               </div>
@@ -227,7 +235,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
           <div className="fs-facts">
             <div className="fs-fact wide">
               <b>屏幕上没有「开始扫描」</b>
-              <span>只能在奔图面板启动。网页不能远程驱动扫描仪，也没有扫到第几张的进度。</span>
+              <span>只能在打印机屏幕上启动。网页不能远程驱动扫描仪，也没有扫到第几张的进度。</span>
             </div>
             <div className="fs-pairgrid">
               <div className="fs-fact"><b>放好纸</b><span>把原稿放进扫描区。你在打印机上操作。</span></div>
@@ -235,8 +243,17 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
             </div>
             <div className="fs-fact wide"><b>回到这台机器</b><span>文件回来后在这里确认。未登录扫描件不会进入「我的文档」。</span></div>
             <div className="fs-fact wide">
-              <b>已选「{SCAN_TYPE_LABELS[selected]}」</b>
-              <span>点类型只是选中。下一步建立这次扫描，并确认这台机器能收到扫描件。</span>
+              {selected === null ? (
+                <>
+                  <b>还没选材料类型</b>
+                  <span>点上面的一种材料，再点下一步。点类型只是选中，下一步才建立这次扫描。</span>
+                </>
+              ) : (
+                <>
+                  <b>已选「{SCAN_TYPE_LABELS[selected]}」</b>
+                  <span>点类型只是选中。下一步建立这次扫描，并确认这台机器能收到扫描件。</span>
+                </>
+              )}
             </div>
           </div>
           <div className="sw-truth" data-disclaimer="true" data-testid="scan-workbench-truth">
