@@ -378,9 +378,16 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           ? { tone: 'warn' as const, label: '查状态失败 · 不改判' }
           : { tone: 'ok' as const, label: '等待文件回传' }
 
-  /* 取消扫描：确认没回话的时候也照样可按（取消回执就是服务端报的终态），所以两种屏都放它。 */
+  /* 取消扫描：确认没回话的时候也照样可按（取消回执就是服务端报的终态），所以两种屏都放它。
+   *
+   * 三个整行按钮都带稳定的 key（cancel / ack / poll）。确认一落地，下面两屏的 `.fs-2` 会互换：
+   * 等授权屏是 [再确认一次 | 取消扫描]，等回传屏是 [取消扫描 | 立即检查]。不带 key 的话 React 按位置
+   * 复用节点，右格那个「取消扫描」会原地改叫「立即检查」、换掉点击处理：手指（或慢机器上的自动点击）
+   * 正好在这一瞬间按下去，按到的是「立即检查」，取消根本没武装。带 key 之后「取消扫描」永远是同一个
+   * 节点，只是被挪到左格，按下去的就是它。 */
   const cancelRow = (
     <FsRow
+      key="cancel"
       title={cancelling ? '正在发送取消请求' : cancelArmed ? '再点一次确认取消' : '取消扫描'}
       desc={cancelArmed && !cancelling ? '再按一次才会发出取消' : '取消这次还没完成的扫描'}
       disabled={cancelling}
@@ -425,6 +432,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           </div>
           <div className="fs-2">
             <FsRow
+              key="ack"
               title={ackRetryable ? '再确认一次' : '正在确认能收到扫描件'}
               desc="系统没回之前，不说已经确认"
               disabled={cancelling || !ackRetryable}
@@ -465,6 +473,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           <div className="fs-2">
             {cancelRow}
             <FsRow
+              key="poll"
               title="立即检查"
               desc="只增加一次查询，不自己判成功"
               disabled={cancelling || pollInFlight}
