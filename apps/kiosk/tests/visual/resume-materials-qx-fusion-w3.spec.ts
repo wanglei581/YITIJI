@@ -2,6 +2,7 @@ import type { Locator, Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 import type { ApiRouter } from '../fixtures/api-router'
+import { HELP_NEEDED_LINE } from '../fixtures/unattended-lines'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointerHit } from './assert-layout'
 
 // ── 稿 25 求职材料库（/resume/materials）迁入青序流光后的浏览器回归 ───────────────
@@ -69,7 +70,8 @@ function registerShell(api: ApiRouter): void {
 
 /** 原文一律不透传：5xx 走统一的「服务暂时不可用」，未登记错误码的 4xx 回落到页面自己的兜底句。 */
 const failure = (status: number, message: string) => ({ status, json: { success: false, error: { code: 'FIXTURE_UNREGISTERED', message } } })
-const SERVICE_DOWN = '服务暂时不可用，请稍后重试或联系现场工作人员'
+// 现场不安排人：5xx 通用句 = 「请稍后重试」+ 无人值守标准句 1（服务电话，或没读到时的隐私政策联系方式）。
+const SERVICE_DOWN = new RegExp(`^服务暂时不可用，请稍后重试。${HELP_NEEDED_LINE.source}。$`)
 
 /** 已停在登录页时完成短信登录，并等回到材料库。 */
 async function loginBackToMaterials(page: Page): Promise<void> {
