@@ -14,6 +14,7 @@ import { API_BASE_URL } from '../api/client'
 import { ApiHttpError } from '../api/httpAdapter'
 import { getTerminalId } from '../api/screensaver'
 import { networkError, throwHttpError } from '../api/throwHttpError'
+import { machineUnusableLine } from '../../copy/unattendedCopy'
 import { terminalProtectedFetch } from '../terminalAuth'
 import type {
   BillingPageSource,
@@ -191,7 +192,7 @@ export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJ
   const { token, ...body } = input
   const terminalId = getTerminalId()
   if (!terminalId) {
-    throw new ApiHttpError('TERMINAL_NOT_READY', '本机设备未就绪，请联系现场工作人员后再试', 0)
+    throw new ApiHttpError('TERMINAL_NOT_READY', machineUnusableLine(), 0)
   }
   let res: Response
   try {
@@ -258,7 +259,7 @@ export async function retryPrintJob(input: {
 }): Promise<PrintJobRetryResult> {
   const terminalId = getTerminalId()
   if (!terminalId) {
-    throw new ApiHttpError('TERMINAL_NOT_READY', '本机设备未就绪，请联系现场工作人员后再试', 0)
+    throw new ApiHttpError('TERMINAL_NOT_READY', machineUnusableLine(), 0)
   }
   let res: Response
   try {

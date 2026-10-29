@@ -98,9 +98,12 @@ export function scanDeliveryAckBlocked() {
   return globalThis.__ackCalls.get(${JSON.stringify(key)}).blocked
 }
 `)
+  // userErrorMessage 从 copy/unattendedCopy 取无人值守标准句（该文件自身无依赖），原样转译后接上。
+  const unattendedCopy = toDataUrl(transpile(join(root, 'src/copy/unattendedCopy.ts'), 'unattendedCopy.ts'))
   const userErrors = toDataUrl(
     transpile(join(root, 'src/services/api/userErrorMessage.ts'), 'userErrorMessage.ts')
-      .replaceAll("'./httpAdapter'", `'${HTTP_ADAPTER_STUB}'`),
+      .replaceAll("'./httpAdapter'", `'${HTTP_ADAPTER_STUB}'`)
+      .replaceAll("'../../copy/unattendedCopy'", `'${unattendedCopy}'`),
   )
   const code = transpile(join(root, 'src/pages/scan/scanDeliveryAck.ts'), 'scanDeliveryAck.ts')
     .replaceAll("'@ai-job-print/shared'", `'${SHARED_STUB}'`)

@@ -194,6 +194,9 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:kiosk-end-use
           # 无人值守标准句与公开服务联系方式（10/6）：读不到接口时按最保守的一套，号码 / 服务时间 / 附近终端 / 小程序发布从接口读，单测真跑源码。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-support-contact
+          # 现场无人值守（10/29）：一体机源码里不许教用户去找 / 联系现场工作人员。词表读自 unattendedCopy.ts；
+          # 共享模块零容忍，页面目录的存量按待清名单只减不增（触屏版各页面包重写后逐个删条目）。纯读 apps/kiosk/src，不连库、不连网。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-unattended-copy
           pnpm --filter @ai-job-print/kiosk verify:runtime-terminal-identity
           pnpm --filter @ai-job-print/kiosk verify:kiosk-field-safety
           pnpm --filter @ai-job-print/kiosk verify:terminal-session-self-heal

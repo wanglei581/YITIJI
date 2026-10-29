@@ -22,6 +22,7 @@ import { ApiHttpError } from '../api/httpAdapter'
 import { networkError, throwHttpError } from '../api/throwHttpError'
 import type { CodePayAttemptView, PayAttemptView, PayStatusView, PaymentChannelsView } from '@ai-job-print/shared'
 import { getTerminalId } from '../api/screensaver'
+import { machineUnusableLine } from '../../copy/unattendedCopy'
 import { terminalProtectedFetch } from '../terminalAuth'
 
 export interface PaymentSessionInput {
@@ -142,7 +143,7 @@ export async function releasePickupOrder(
 ): Promise<PickupReleaseView> {
   const terminalId = getTerminalId()
   if (!terminalId) {
-    throw new ApiHttpError('TERMINAL_NOT_READY', '本机设备未就绪，请联系现场工作人员后再试', 0)
+    throw new ApiHttpError('TERMINAL_NOT_READY', machineUnusableLine(), 0)
   }
   let res: Response
   try {

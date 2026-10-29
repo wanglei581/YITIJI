@@ -46,6 +46,8 @@ const progress = await import(progressUrl)
 const payment = await import(paymentUrl)
 const previewKind = await import(previewKindUrl)
 const phone = await import(phoneUrl)
+// 无人值守标准句（打印闸门合上的说明就是标准句 3）：读真源码，不在测试里另抄一句。
+const unattended = await import(transpile(join(kioskRoot, 'src/copy/unattendedCopy.ts')))
 const progressPage = readFileSync(join(kioskRoot, 'src/pages/print/PrintProgressPage.tsx'), 'utf8')
 const progressSections = readFileSync(join(kioskRoot, 'src/pages/print/components/PrintProgressSections.tsx'), 'utf8')
 const materialPage = readFileSync(join(kioskRoot, 'src/pages/print/PrintMaterialCheckPage.tsx'), 'utf8')
@@ -319,12 +321,13 @@ test('B 补：零元加载、失败、确认与参数收口的真实 JSX 不说�
 })
 test('W-117：收费闸门拒单原因只上屏一次，单卡占满现有栅格', () => {
   const reason = '这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端'
-  const props = { ...confirmProps, freePricing: false, screen: 'quote-failed', quote: { status: 'unavailable', code: 'PRINT_TERMINAL_QUEUE_HALTED', reason }, costCalcLabel: reason, printerBlocked: true, printerBlockedReason: '打印机暂时不可用，请联系现场工作人员' }
+  const gateNotice = unattended.machineUnusableLine()
+  const props = { ...confirmProps, freePricing: false, screen: 'quote-failed', quote: { status: 'unavailable', code: 'PRINT_TERMINAL_QUEUE_HALTED', reason }, costCalcLabel: reason, printerBlocked: true, printerBlockedReason: gateNotice }
   const html = renderToStaticMarkup(createElement(PrintConfirmView, props))
   assert.equal(html.split(reason).length - 1, 1)
   assert.match(html, /data-single="true"/)
   assert.doesNotMatch(html, /可能的原因/)
-  assert.doesNotMatch(html, /打印机暂时不可用，请联系现场工作人员/)
+  assert.equal(html.includes(gateNotice), false, '闸门说明（标准句 3）不得和拒单原因一起重复上屏')
 })
 
 const hubIconUrl = toDataUrl('export const ArrowRightIcon = () => null; export const CopyIcon = () => null; export const InfoIcon = () => null; export const LockIcon = () => null;')

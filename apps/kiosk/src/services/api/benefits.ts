@@ -26,6 +26,7 @@
 // ============================================================
 
 import type { MemberBenefitItem } from '@ai-job-print/shared'
+import { helpNeededLine } from '../../copy/unattendedCopy'
 import { getMyBenefits } from './memberFavorites'
 
 /**
@@ -144,7 +145,7 @@ export function resolvePrintBenefitState(input: PrintBenefitInput): PrintBenefit
       title: '本机没能取到现行价目',
       detail:
         '价目与权益都来自机构配置。取不到就不显示金额、不试算抵扣，也不会拿上一次的价格当现价。'
-        + '请稍后重试，或联系现场工作人员。',
+        + `请稍后重试。${helpNeededLine()}。`,
     }
   }
 
