@@ -2936,6 +2936,7 @@ model OnlinePlatformDirectory {
   evidenceFileId       String?
   evidenceFile         FileObject? @relation("OnlinePlatformEvidence", fields: [evidenceFileId], references: [id], onDelete: Restrict)
   displayOrder         Int      @default(0)
+  audience             String   @default("general")
   status               String   @default("inactive")
   reviewStatus         String   @default("pending")
   publishStatus        String   @default("draft")
