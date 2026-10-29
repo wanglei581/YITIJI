@@ -13567,7 +13567,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 678,
+      "reachableFileCount": 681,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -16566,7 +16566,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 772
+      "sourceFileCount": 775
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -20568,6 +20568,7 @@
     ],
     "apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
       "scripts/verify-no-raw-error-render.mjs"
@@ -20578,7 +20579,6 @@
     ],
     "apps/kiosk/src/pages/print-scan/ConvertImagesView.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-      "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
@@ -20607,19 +20607,20 @@
     "apps/kiosk/src/pages/print-scan/TouchToolScreen.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
+    "apps/kiosk/src/pages/print-scan/askDraft.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
     "apps/kiosk/src/pages/print-scan/components/QxPrintHubView.tsx": [
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs"
     ],
     "apps/kiosk/src/pages/print-scan/convert-images-model.ts": [
-      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
     "apps/kiosk/src/pages/print-scan/printHubContent.ts": [
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs"
-    ],
-    "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPickView.tsx": [
-      "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
     "apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
@@ -29734,6 +29735,7 @@
           "apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx",
           "apps/kiosk/src/pages/print-scan/SignStampPage.tsx",
           "apps/kiosk/src/pages/print-scan/TouchToolScreen.tsx",
+          "apps/kiosk/src/pages/print-scan/askDraft.ts",
           "apps/kiosk/src/pages/print-scan/components/QxPrintHubView.tsx",
           "apps/kiosk/src/pages/print-scan/convert-images-model.ts",
           "apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts",
@@ -29947,9 +29949,9 @@
           "apps/kiosk/src/pages/placeholders/MeActivityDetailPage.tsx",
           "apps/kiosk/src/pages/placeholders/NotificationsPage.tsx",
           "apps/kiosk/src/pages/placeholders/SessionTimeoutPage.tsx",
-          "apps/kiosk/src/pages/print-scan/ConvertImagesView.tsx",
+          "apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx",
           "apps/kiosk/src/pages/print-scan/SignStampPage.tsx",
-          "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPickView.tsx",
+          "apps/kiosk/src/pages/print-scan/convert-images-model.ts",
           "apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts",
           "apps/kiosk/src/pages/profile/ProfilePage.tsx",
           "apps/kiosk/src/pages/profile/assets/format.ts",

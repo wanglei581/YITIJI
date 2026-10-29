@@ -1,5 +1,29 @@
 # 当前开发进度
 
+## 2026-10-29：触屏版第 9 包「扫描复印」审查返工——照片合成与签名各步骤重排、状态屏空白、结果页预览改单列、死代码清理（未部署，生产与真机未验）
+
+- 范围（`claude/kiosk-touch-p9`，同一分支同一个 PR，接着下面 10/28 那一节做）：只改 `apps/kiosk` 里扫描、复印、照片合成、签名这几页的页面与样式、门禁真值、浏览器用例和本文档。共享件（`components/qingxu/touch`、`touch.css`、`touch-hero.css`、`tokens-touch.css`、`KioskRoot` 触屏三张表）零改动；`UploadSessionQrPanel.tsx` 被 `verify:fusion-w2` 按哈希冻结，一字未动（手机扫码二维码放大改走层样式）；不碰 `apps/miniapp`、`services/api`、两个后台。
+- 起因：审查把 10/28 自报的几条量实了——照片合成非空阶段与签名各步骤版面崩坏（说明格被压扁、字被截、可点区 56–60px），状态屏空白不是 3 个而是 11 个，结果页预览卡只占预览井的四分之一，失败态屏上留着设计批注（「这句只出现在失败说明里」），会话到期用例靠墙钟、取舍之间会竞态。下面 10/28 那一节里「十七个态里十四个达标」那句已按实情改正。
+- A1 照片合成各阶段重排：`ConvertImagesView.tsx` 按阶段分支（空、上传中、列表、合成中、完成、失败、冲突、未知、已关闭、U 盘），新增 `ConvertImagesStates.tsx`，`ConvertImagesPanels.tsx`、`convert-images-qx.css` 重写：卡片按内容定高，余量只给「合成之后的 PDF」示意小样、小样才允许缩；`TouchToolScreen` 加可选 `overlay`（手机扫码层）。只有一张图时小样的插画列放宽到 52%（手机宽度仍 40%），空白 143 → 92px。手机扫码层（照片合成与签名各一个）里放大二维码的三条规则只在 768px 以上生效——冻结的扫码面板自己的两列版式就是 md: 断点才出现，390 宽不再被撑出视口。
+- A2 签名各步骤重排：`SignStampPage.tsx`、`sign-stamp/*`（新增 `SignStampBits.tsx`）、`sign-stamp-qx.css` 重写，选 PDF、传签名图、放置、授权、合成中、完成、被拒、限流、维护、未登录各步按稿；页码、九宫格、大小、适宽放大收进「更多设置」；授权勾选是 `role="checkbox"`；`tool-touch.css` 去掉 `.ss-page{min-height:100%}`（被舞台的 `overflow:hidden` 裁掉的根因）。预览取不到时的提示框放进 96px 圆章、标题放大一档（空白 116 → 87px）；预览页上朱砂虚线框里的「签名图」从 15px 抬到 20px。
+- A3 结果页预览改单列：`ScanResultPage.tsx` 成功分支按「预览井 → 文件名行 → 整屏查看」一列排，`scan-fs.css` 的 `.sw-pvstage` 改单列，预览整页入框（`pdfFit="page"`）；预览卡不再被挤成两列里窄的那一边。
+- A4 状态屏空白与去重：`.fs-grow.is-status`（说明格内容定高、`grid-auto-rows:auto`）加 `ScanSample` 示意小样吃余量，涉及 `ScanSettingsStatusView`、`ScanStartPage`、`ScanProgressPage`、`ScanResultPage` 失败分支。同一件事只说一遍：等授权屏副标题改稿的短句、第一格标题改「卡在最后一步」、去掉重复的「下一步」格、警示条只留「先别在面板上按开始」（「面板上扫出来的东西不会交到这一场」「也不会被别人收走」在说明格里一次说完）；结果页失败态把标题、状态条、原因合成一处。状态条在这一屏一直写「还没确认能收到扫描件」（稿如此；隐私清场用例也按这一句找屏）。
+- A5 屏上开发用语：「失败原因原文」「页面上的说明：」「这句只出现在失败说明里」三处改成给用户看的话；「同一张纸原样再扫，系统可能按重复件拒收（两小时内）。」保留。
+- A6 会话到期用例：`scan-session-truth.spec.ts` 改用 `page.clock`（固定 NOW、到期时间 NOW+90s、快进 95s），不再依赖墙钟。
+- B1 问小青草稿：新增 `print-scan/askDraft.ts`（`askDraftOf`），草稿去掉「问小青：」前缀，非空、不以「问小青」开头、与按钮名不同、不含「工作人员」「联系」；按钮名 29 句与签名那一句原句不动。`verify-fusion-w2-print-scan` 的真值改成真把 `askDraftOf` 取出来对每个按钮名跑。
+- B2 类型卡读屏语义：类型卡去掉 `aria-pressed` 与 `aria-label`，标题 `aria-labelledby`、说明与角标 `aria-describedby`，选中态样式认 `aria-checked`。
+- A7 删除记录（CLAUDE.md §8，逐个举证；删后 `tsc`、`lint`、全部 verify、浏览器套件都过）：
+  - `ScanWorkbenchChrome.tsx` 的 `ScanHero`、`ScanChain`、`ScanTruth`、`ScanNoteCard`、`ScanPlan`、`ScanKvCard`、`ScanSec` 七个导出，及 `ScanWorkbenchShell` 的 `facts` 属性与 `.sw-xq-facts`：`src`、`tests`、`scripts`、`docs`、`docs/graph` 里除定义处零引用，没有任何页面传过 `facts`（`ScanStartPage` 里的 `scan-workbench-truth` 是它自己写的，不是 `ScanTruth`；`ScanPanelMock`、`ScanStatusPanel`、`ScanTypeCards`、`SCAN_TRUTH` 仍在用，保留）。
+  - `scanWorkbench.ts` 的 `SCAN_CHAIN`（只被 `ScanChain` 用）、`SCAN_ASK` 与 `ScanAsk`（没人渲染，只剩键名被当 `ScanWorkbenchState` 类型用，改成同键名的字符串联合）。
+  - `scan-workbench-qx.css`（769 → 522 行）、`scan-workbench-compact-qx.css`、`tool-touch.css` 里 `.sw-xq*`、`.sw-chain*`、`.sw-link*`、`.sw-pgrp`、`.sw-kv`、`.sw-plan`、`.sw-sec*`、`.sw-no`、`.sw-sq`、`.sw-note-body`、`.sw-foot` 及对它们的规则，共 112 个选择器，删后非 css 文件里零引用。
+  - `useSignStampFlow.ts` 的 `goHelp` 与 action 联合里的 `'help'`（CTA 已不给 help，页面也不再处理）；`tool-fs.css` 里签名页旧的 `.ss-gatecol`、`.ss-why`（对应的类已不存在）。
+  - 举证有误而**没删**的：`PrintScanFeatureInfoPage.tsx` 里 `COPY_GUIDE_KEY` 分支。一度以为 `RECORD_LINKS` 只有两个键所以走不到，漏看了 `PrintHubRecordNotes` 自己会补一张「复印」卡（`print-hub-copy-note`）并以 `COPY_GUIDE_KEY` 回调；整套 w2 在构建版上跑出 `print-hub-qx.spec.ts`「unknown feature page lists the copy guide」红，已原样还原。
+- 门禁与用例：新增 `fusion-w2-tools.spec.ts` 的 `auditToolLayout`（块与块不重叠、左右留白 ≥32、字不被截、可点 ≥64×64，照片合成各阶段与签名各步骤各一条）与 `fusion-w2-scan.spec.ts` 的结果页预览单列用例；B1、B2 的断言在 `verify-fusion-w2-print-scan`。新增和改过的每条都做了反向检查（先提交、故意改坏、确认变红、再改回）：照片合成旧版红「列表里的字被截（内容 366px > 盒子 221px）」「完整查看可点区只有 60×60」，签名旧版红「左右留白不足（左 0、右 0，要 ≥32）」「放在第 1 页可点区只有 56×56」，结果页旧版红「预览卡只有 263px 宽」，到期用例把取消去掉后红「Expected 1 Received 0」，B1/B2 八处改坏全红。
+- 量测（1080×1920，全部 72 个态重拍，含非默认态与非空阶段）：空白扫描阈值 105，改前 11 个态超（246、245、236、230、216、213、205、193、119、119、119），改后全部不超（最长 102，那 11 个态 66–100）；字号 <20px 与可点 <64×64 含非空阶段共 0 处（隐藏文件输入、sr-only 除外）；390 宽无横向溢出，`.sw-pvh-t` 那条仍绿。
+- 验证（构建版，私有端口 7022–7029，一次只跑一个套件）：kiosk `tsc` 0、`lint` 0 error（26 警告，比基线少 1）、`build`（`VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true`）与 `verify:prod-build-config`（同一组环境加合成网桥令牌，闸门读的是进程环境）、字体子集通过；kiosk 101 条 `verify:*` 全过（CI 那批去掉两条：要先有构建产物的 `prod-build-config`，已单独跑过；只量 `docs/design` 原稿的 `qingxu-proto-geometry`，本包不碰，未等它跑完）；根目录 `verify:compliance-copy`（含无裸错误渲染）、`ci-gate-coverage`、`repository-integrity` 通过；浏览器：w2 全套 172、truth + route-sweep + fusion-smoke + back-exit 合跑 242（另 31 条跳过，是 back-exit 里冷开被送去别处的路由，本来就跳）、scan-safety 38、privacy-clear 10（首跑 `W-75` 一条在机器上另有会话同时跑浏览器时超时，单跑 4/4、整套重跑 10/10）、privacy 42、session-warning 35；写死官方端口的 privacy（4187）与 session-warning（4188）两份用例在草稿区改端口的副本里跑。图谱已重新生成并 `--check` 通过。
+- 已知没做到：手机宽度（390）下工具几屏已收成可读尺寸但未逐屏对稿（稿没有手机版）；照片合成空态标题仍是「图片转 PDF」（稿写「把图片合成一个 PDF」；这个 h1 是 session-warning 与 w6 路由用例的就绪锚点，没动）；复印说明页卡标题与正文第一句同一句话、不认识能力名页两处同一句、扫描选类型页「未登录不进我的文档」出现两处——都是 10/28 按稿原样带来的、被既有用例钉着的原句，本轮没动；生产与真机未验。
+- 未部署，生产与真机未验。
+
 ## 2026-10-28：触屏版第 9 包「扫描复印」按第 5 版稿改完（未部署，生产与真机未验）
 
 - 范围（`claude/kiosk-touch-p9`）：`/scan` 扫描四阶段（选类型、扫描指引、等回传、扫描完成与失败）及兼容跳转、`/print-scan/feature/copy` 复印、`/print-scan/convert` 照片合成 PDF、`/print-scan/feature/id-photo` 证件照说明（含不认识的能力名）、`/print-scan/sign` 签名。共享件零改动（`components/qingxu/touch`、`touch.css` 706 行、`tokens-touch.css`、`touch-hero.css` 与第一包一致）；`KioskRoot` 只在本包锚点下加路由行（精确 9 条＋前缀 `/print-scan/feature/` 1 条）。已并入第一包两次（统一版 4de32255c、手机宽底栏版 5869549be）。
