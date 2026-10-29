@@ -1047,6 +1047,66 @@ test('phone upload does not call an uploaded status without a file receipt succe
   await expect(root.getByRole('heading', { name: '已收到', exact: true })).toHaveCount(0)
 })
 
+// 走查 I-14：一体机「签名」第 2 步的二维码现在能开出 signature_image 会话（后端 DTO 放行了），
+// 手机页因此要真的收签名图：只放行 JPG / PNG、被拒时不叫人转 PDF、回执认 signature_image，不再有「手机端不可用」的死胡同。
+test('phone upload takes a handwritten-signature image: JPG/PNG only, honest refusals, receipt purpose is signature_image @w5-mobile', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  api.respond('GET', '/api/v1/document-conversion/capabilities', {
+    status: 200, json: { data: { wordToPdf: true, engine: 'libreoffice', cjkFonts: true } },
+  })
+  api.respond('POST', '/api/v1/upload-sessions/w5-sign-session/files', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        sessionId: 'w5-sign-session', status: 'uploaded', purpose: 'signature_image', mode: 'member',
+        file: { fileId: 'w5-sign-file', filename: '手写签名.png', sizeBytes: 120, mimeType: 'image/png', sha256: 'c'.repeat(64), fileExpiresAt: '2026-10-29T13:00:00.000Z' },
+        requiresKioskConfirmation: true, expiresAt: '2026-10-29T12:10:00.000Z',
+      },
+    },
+  })
+  await page.goto('/upload/phone#sessionId=w5-sign-session&token=w5-sign-upload-token&purpose=signature_image')
+  const root = page.locator('main[data-kiosk-screen="phone-upload"]')
+  await expect(root).toHaveAttribute('data-phone-upload-state', 'idle')
+  await expect(root.getByText('本人手写签名暂不支持手机上传')).toHaveCount(0)
+  await expect(root.getByRole('heading', { name: '这个链接不能用来上传', exact: true })).toHaveCount(0)
+  // 链接写着是签名图：只收紧到 JPG / PNG（Word 转换开着也不放行 Word、PDF、WebP）
+  const input = root.getByLabel('选择要上传的文件')
+  await expect(input).toHaveAttribute('accept', '.jpg,.jpeg,.png,image/jpeg,image/png')
+  const chips = root.locator('.ph-up-hint')
+  await expect(chips).toContainText('支持 JPG / PNG')
+  await expect(root.getByText('链接里写着这次可能是「本人手写签名图片」', { exact: false })).toBeVisible()
+  // 选了 PDF：手机上就拦下，说的是签名图只收 JPG / PNG，不叫人把签名图转成 PDF
+  await input.setInputFiles({ name: '合同.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w5-sign-fixture') })
+  await expect(root).toHaveAttribute('data-phone-upload-state', 'type-error')
+  await expect(root.getByText('签名图片只收', { exact: false })).toBeVisible()
+  await expect(root.getByText('转成 PDF', { exact: false })).toHaveCount(0)
+  expect(api.requestCount('POST', '/api/v1/upload-sessions/w5-sign-session/files')).toBe(0)
+  // 换一张 PNG：发出去，回执用途 signature_image 才算已收到
+  await input.setInputFiles({ name: '手写签名.png', mimeType: 'image/png', buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) })
+  await expect(root).toHaveAttribute('data-phone-upload-state', 'success')
+  await expect(root).toHaveAttribute('data-purpose', 'signature_image')
+  await expect(root.getByRole('heading', { name: '已收到', exact: true })).toBeVisible()
+  await expect(root.getByText('这次上传用于', { exact: false })).toContainText('本人手写签名图片')
+  await expect(root.getByText('1 小时', { exact: false }).first()).toBeVisible()
+  await expect(root.getByText('w5-sign-upload-token')).toHaveCount(0)
+  await expectFusionAcceptance(page, errors, { allowNoTouchTargets: true })
+})
+
+// 链接里的用途提示只能收紧、不能放宽：没写签名的链接上 PDF 照常能传，签名提示不会拖累简历 / 打印。
+test('phone upload keeps PDF selectable on document links; only a signature hint narrows to images @w5-mobile', async ({ page, api }) => {
+  api.respond('GET', '/api/v1/document-conversion/capabilities', {
+    status: 200, json: { data: { wordToPdf: false, engine: 'none', cjkFonts: false } },
+  })
+  await page.goto('/upload/phone#sessionId=w5-doc-session&token=w5-doc-token&purpose=print_doc')
+  const root = page.locator('main[data-kiosk-screen="phone-upload"]')
+  const accept = await root.getByLabel('选择要上传的文件').getAttribute('accept')
+  expect(accept).toContain('.pdf')
+  expect(accept).toContain('.png')
+  await page.goto('/upload/phone#sessionId=w5-doc-session&token=w5-doc-token')
+  expect(await root.getByLabel('选择要上传的文件').getAttribute('accept')).toContain('.pdf')
+})
+
 const CTA_WHITELIST = ['查看岗位', '去来源平台投递', '扫码投递', '查看招聘会', '去来源平台预约', '扫码预约', '复制来源链接']
 const BANNED_COPY = ['一键投递', '立即投递', '平台投递', '企业收简历', '候选人管理', '我要应聘', '递交简历', '直投', '立即报名']
 

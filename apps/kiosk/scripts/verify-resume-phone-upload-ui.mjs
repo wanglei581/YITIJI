@@ -339,13 +339,34 @@ assertIncludes(panel, 'uploadSessionUserMessage', 'Kiosk QR errors use public-sa
 assertIncludes(api, 'url.hash = fragment.toString()', 'phone upload token stays in URL fragment')
 assertIncludes(phone, '一体机上确认', 'phone page explains kiosk confirmation')
 assertIncludes(phone, 'PHONE_UPLOAD_PURPOSES', 'phone page maps each supported purpose explicitly')
-// 稿 51 ⑥：CreateUploadSessionDto 的 @IsIn 不含 signature_image，一体机开不出这种会话。
-// 手机端不给它任何「看起来能走通」的上传配置，只给诚实不可用态，并指回现场已验证的「本机上传」。
-assertIncludes(phoneModel, "if (purpose === 'signature_image') return 'signature-blocked'", 'signature links are an honest dead end, not an upload flow')
-assertIncludes(phoneModel, '本人手写签名暂不支持手机上传', 'signature dead end tells the user it is unavailable on the phone')
-assertNotIncludes(phone, 'signature_image', 'phone page offers no signature_image purpose config or file filter')
-// 稿 51 ⑧：fragment 里的 purpose 可被随手改掉，上传前只按受支持用途 accept 的交集放行。
-assertIncludes(phone, 'genericPolicy(SESSION_PURPOSES.map((purpose) => purposes[purpose].accept))', 'phone pre-upload filter is the intersection of all supported purposes')
+// 走查 I-14：CreateUploadSessionDto 现在放行 signature_image（与 service 共用 UPLOAD_SESSION_PURPOSES），
+// 一体机「签名」第 2 步能开出这种会话。手机页因此不能再给「手机端不可用」的死胡同，而要真的收签名图：
+// 只收 JPG / PNG，回执认 signature_image；缺了会话号或令牌才算坏链接。
+assertNotIncludes(phoneModel, 'signature-blocked', 'phone model has no signature dead end any more')
+assertNotIncludes(phoneModel, '本人手写签名暂不支持手机上传', 'phone model no longer tells the user signature upload is unsupported')
+assertIncludes(phone, 'signature_image: {', 'phone page maps signature_image explicitly')
+assertIncludes(phone, "const SIGNATURE_ACCEPT = '.jpg,.jpeg,.png,image/jpeg,image/png'", 'signature image accepts only JPG / PNG on the phone page')
+{
+  // 一体机认的会话用途必须与后端 DTO 放行的是同一份清单：谁漏一边，这里或后端门禁就红。
+  const dto = readFileSync(new URL('../../../services/api/src/upload-sessions/upload-sessions.dto.ts', import.meta.url), 'utf8')
+  const listOf = (src, name) => {
+    const match = src.match(new RegExp(`${name}\\s*=\\s*\\[([^\\]]*)\\]`))
+    if (!match) throw new Error(`cannot find the ${name} list`)
+    return [...match[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort()
+  }
+  const apiPurposes = listOf(dto, 'UPLOAD_SESSION_PURPOSES')
+  const kioskPurposes = listOf(phoneModel, 'SESSION_PURPOSES')
+  if (JSON.stringify(apiPurposes) !== JSON.stringify(kioskPurposes)) {
+    throw new Error(`phone SESSION_PURPOSES ${kioskPurposes} must equal upload-sessions.dto UPLOAD_SESSION_PURPOSES ${apiPurposes}`)
+  }
+  console.log('PASS phone SESSION_PURPOSES equals the API upload-session purposes')
+}
+// 稿 51 ⑧：fragment 里的 purpose 可被随手改掉，上传前只按文档类用途 accept 的交集放行；
+// 链接写着是签名图时只能再收紧（并上签名图的 accept），永不放宽。签名图不能算进通用档，否则简历 / 打印连 PDF 都选不了。
+assertIncludes(phoneModel, "purposeHint === 'signature_image' ? SESSION_PURPOSES : DOCUMENT_PURPOSES", 'a signature hint can only tighten the pre-upload filter')
+assertIncludes(phoneModel, "export const DOCUMENT_PURPOSES = ['resume_upload', 'print_doc', 'contract_upload'] as const", 'the generic pre-upload filter is the intersection of document purposes only')
+assertIncludes(phone, 'preUploadPolicy({', 'phone pre-upload filter comes from preUploadPolicy')
+assertNotIncludes(phone, 'genericPolicy(', 'phone page does not hand-roll the pre-upload filter')
 assertNotIncludes(phone, '就业服务大厅 · 01号机', 'phone page does not invent a terminal name')
 assertIncludes(phone, 'uploadSessionUserMessage', 'phone upload errors use public-safe copy')
 assertIncludes(phone, "state !== 'success'", 'successful uploads cannot be reset into a false re-upload state')
