@@ -285,6 +285,15 @@ const QX_TOUCH_ROUTES = new Set<string>([
   '/interview',
   '/interview-service',
   // 第九包 扫描复印
+  '/scan', // 扫描四阶段（选类型、指引、等回传、结果）
+  '/scan/start', // 兼容跳转
+  '/scan/settings', // 兼容跳转
+  '/scan/progress', // 兼容跳转
+  '/scan/result', // 兼容跳转
+  '/print-scan/convert', // 照片合成 PDF
+  '/print-scan/sign', // 签名（默认关闭）
+  '/print-scan/feature/copy', // 复印
+  '/print-scan/feature/id-photo', // 证件照说明
   // 第十包 政策与受控扩展
   // 第十一包 私有化版招聘
 ])
@@ -298,6 +307,7 @@ const QX_TOUCH_PREFIXES: readonly string[] = [
   // 第七包 简历其余页
   // 第八包 练面试
   // 第九包 扫描复印
+  '/print-scan/feature/', // 复印、证件照和不认识的能力名是同一页的 :key，精确名单盖不住未知名字
   // 第十包 政策与受控扩展
   // 第十一包 私有化版招聘
 ]

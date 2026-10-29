@@ -1812,7 +1812,7 @@ test('a delivery ack that lands mid-clear still ends with a confirmed cancel @pr
   })
   await page.reload({ waitUntil: 'domcontentloaded' })
   // 会话建成了，投递授权还没到手 —— 这一屏刻意不给面板操作指引。
-  await expect(page.getByText('投递授权未确认', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('还没确认能收到扫描件', { exact: true }).first()).toBeVisible()
   await expect.poll(() => ackCount).toBe(1)
 
   // 隐私硬截止到点：清场开始，撤销挂在半路。

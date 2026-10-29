@@ -1,0 +1,239 @@
+/* 第 9 包触屏壳里的旧按钮。`.qxt-screen button` 会清掉背景，这里按令牌补回来。 */
+
+.qxt-screen .qxt-scan-scroll,
+.qxt-screen .ph-page,
+.qxt-screen .i2p-page,
+.qxt-screen .ss-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.qxt-screen .qx-btn {
+  min-width: var(--qxt-tap);
+  min-height: var(--qxt-tap);
+  height: var(--qxt-btn-h);
+  border-radius: var(--qxt-r-btn);
+  padding: 0 28px;
+  font: 700 var(--qxt-fs-body)/1.2 var(--qx-sans);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.qxt-screen .qx-btn[data-variant='primary'] {
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+.qxt-screen .qx-btn[data-variant='ghost'] {
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+.qxt-screen .qx-btn:disabled {
+  opacity: 0.42;
+}
+
+.qxt-screen .sw-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 100%;
+}
+
+/* 短页把最后一块说明卡撑满剩余纸面。卡片底是 --qx-surface，不是奶油纸色。 */
+
+.qxt-screen .ph-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 100%;
+}
+
+.qxt-screen .ph-page > .ph-sec.ph-sec--fill {
+  flex: 1 1 auto;
+}
+
+.qxt-screen .ph-page > .ph-sec.ph-sec--fill > .ph-pgrp {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 1080 复印说明要在正文区一屏放下。意图带高度不动，只收这一页的横幅和步骤。 */
+.qxt-screen .ph-page[data-state='feature-copy'] {
+  gap: 8px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-xq {
+  min-height: 0;
+  padding: 12px 24px;
+  border-radius: 24px;
+}
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-xq-row { gap: 16px; }
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-xq-ask {
+  font-size: 32px;
+  line-height: 1.25;
+}
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-xq-doing { margin-top: 4px; }
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-sec-h { min-height: 0; margin-bottom: 6px; }
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-steps { gap: 6px; }
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-step {
+  min-height: 0;
+  gap: 12px;
+  padding: 8px 16px;
+}
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-step-no {
+  width: 44px;
+  height: 44px;
+}
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-notes { gap: 8px; margin-top: 0; }
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-note {
+  min-height: 0;
+  padding: 10px 14px;
+}
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-state { padding: 12px 18px; }
+.qxt-screen .ph-page[data-state='feature-copy'] > .ph-foot { margin-top: auto; }
+
+/* 手机不缩放时，410px 意图带把扫描正文挤到比底注还矮，底注滚不进可视区。
+   只在舞台关闭时收这一壳，1080 舞台不吃。 */
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-band-compact {
+  min-height: 0;
+  padding: 10px 12px 0;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-hdr {
+  height: auto;
+  min-height: 48px;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-hdr-right {
+  flex: 1 1 100%;
+  margin-left: 0;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-status {
+  height: auto;
+  min-height: 36px;
+  max-width: 100%;
+  white-space: normal;
+  padding: 6px 12px;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-clock b { font-size: 20px; }
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-band-compact .qxt-ask { padding: 8px 0 10px; }
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-band-compact .qxt-ask h1 { font-size: 28px; }
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-band-compact .qxt-ask p {
+  margin-top: 4px;
+  font-size: 16px;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-rail {
+  gap: 8px;
+  padding-bottom: 10px;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-body {
+  padding: 8px 12px;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .sw-page,
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .ph-page,
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .i2p-page,
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .ss-page {
+  min-height: 0;
+  overflow: auto;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-nav { height: 64px; }
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-nav button {
+  min-height: 64px;
+  font-size: 13px;
+  gap: 2px;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-nav svg {
+  width: 22px;
+  height: 22px;
+}
+@media (max-width: 760px) {
+  [data-kiosk-stage-fit='off'] .qxt-screen .sw-pvh-t {
+    flex: 1 1 100%;
+    min-width: 12em;
+  }
+}
+
+/* 扫描与打印工具这几屏的底栏、正文间距：稿 18 把内容排得更紧（底栏 121px，正文左右 40px）。
+ * 只挂在本包的屏上，不动共享件的默认。 */
+.qxt-screen.scan-touch .qxt-dock {
+  padding: 16px 28px;
+  gap: 12px;
+}
+
+.qxt-screen.scan-touch .qxt-dock .qxt-btn {
+  padding: 0 16px;
+}
+
+.qxt-screen.scan-touch .qxt-dock .qxt-btn-pri {
+  min-width: 0;
+}
+
+.qxt-screen.scan-touch .qxt-body {
+  padding: 12px 40px 10px;
+  gap: 10px;
+}
+
+/* 示意图配色：稿 18 / 稿 20 那组灰、深青、浅蓝，全部取自 --qxt-* 令牌（页面 CSS 不写裸色值）。 */
+.qxt-screen.scan-touch {
+  --sx-art-base: color-mix(in srgb, var(--qxt-art-mist) 70%, var(--qxt-card));
+  --sx-art-top: var(--qxt-unknown-dot);
+  --sx-art-sheet: var(--qxt-card);
+  --sx-art-edge: var(--sx-art-base);
+  --sx-art-line: var(--qxt-art-rule);
+  --sx-art-ink: var(--qxt-ink);
+  --sx-art-deep: var(--qx-deep);
+  --sx-art-speaker: var(--qxt-ink-2);
+  --sx-art-teal: var(--qxt-mark-b);
+  --sx-art-plug: var(--qxt-art-track);
+  --sx-art-id-a: color-mix(in srgb, var(--qxt-art-slate) 50%, var(--qxt-card));
+  --sx-art-id-b: color-mix(in srgb, var(--qxt-art-slate) 25%, var(--qxt-card));
+}
+
+.qxt-screen.scan-touch .sx-art {
+  display: block;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* 手机宽度的底栏由共享件自己收进一行（touch-hero.css），这里不再另写。正文内边距照旧收紧。 */
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-body {
+  padding: 8px 12px;
+}
+
+/* 求助句照稿画成一张泥色提示卡：「需要帮助？拨打服务电话……」。号码读不到时组件不渲染，这里没有占位。 */
+.qxt-screen.scan-touch [data-testid='service-phone-line'] {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: left;
+}
+
+/* AI 状态：小青确实接不上时写在正文最上面（稿的 aiNote）。 */
+.qxt-screen.scan-touch .sx-ai-note {
+  flex: none;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.45;
+}

@@ -271,7 +271,7 @@ for (const path of presentationFiles) {
 // 两页的 QX 断言在下方各自的段落里（含 doesNotMatch(/KioskPageFrame/) 防回退），
 // 断言强度只增不减，故这张表连同它的循环一并移除。
 const printScanFeature = read('src/pages/print-scan/PrintScanFeatureInfoPage.tsx')
-assert.match(printScanFeature, /QxPageFrame/, 'feature info page uses Qingxu page frame')
+assert.match(printScanFeature, /TouchToolScreen/, 'feature info page uses the touch screen')
 assert.match(
   printScanFeature,
   /data-w2-page=["']print-scan-feature["']/,
@@ -414,7 +414,7 @@ const convertImages =
   read('src/pages/print-scan/ConvertImagesView.tsx') +
   read('src/pages/print-scan/ConvertImagesPanels.tsx') +
   read('src/pages/print-scan/convert-images-model.ts')
-for (const marker of ['kioskUploadFile', 'convertImagesToPdf', 'UploadSessionQrPanel', 'QxPageFrame']) {
+for (const marker of ['kioskUploadFile', 'convertImagesToPdf', 'UploadSessionQrPanel', 'TouchToolScreen']) {
   assert.match(convertImages, new RegExp(marker), `convert-images retains ${marker}`)
 }
 assert.match(
@@ -488,7 +488,7 @@ assert.doesNotMatch(
   /<img[\s\S]{0,200}stamp\.(fileAccessUrl|fileUrl)/,
   'sign-stamp does not echo the signature/stamp image on the public screen',
 )
-assert.match(signStamp, /QxPageFrame/, 'SignStampPage uses the qingxu page frame')
+assert.match(signStamp, /TouchToolScreen/, 'SignStampPage uses the touch screen')
 assert.doesNotMatch(signStamp, /KioskPageFrame/, 'SignStampPage has left the V6 frame')
 assert.match(
   signStamp,
@@ -997,13 +997,13 @@ assert.match(
 )
 assert.match(
   read('src/pages/scan/ScanWorkbenchChrome.tsx'),
-  /QxPageFrame/,
-  'scan chrome wraps QxPageFrame so the four scan routes leave the V6 shell',
+  /QxTouchScreen/,
+  'scan chrome wraps QxTouchScreen so the four scan routes leave the V6 shell',
 )
 assert.match(
   read('src/pages/scan/ScanWorkbenchChrome.tsx'),
-  /QxAppNavbar/,
-  'scan chrome uses the shared Qingxu navbar instead of an inlined copy',
+  /QxTouchNav/,
+  'scan chrome uses the shared touch navbar instead of an inlined copy',
 )
 assert.match(
   read('src/pages/scan/ScanWorkbenchChrome.tsx'),
@@ -1236,9 +1236,11 @@ assert.match(
   /terminalId,/,
   'convert request body must include terminalId',
 )
+/* 签名页的终端身份读取在 useSignStampFlow 里（页面本身不再展示终端号，稿 20 的顶栏没有它），
+ * 所以这里读 hook：它仍是 convert 要照抄的参考，发请求前先读本机终端号。 */
 assert.match(
-  signStamp,
-  /getTerminalId\(\)/,
+  read('src/pages/print-scan/sign-stamp/useSignStampFlow.ts'),
+  /const tid = getTerminalId\(\)/,
   'sign-stamp remains the reference deep-link gate that convert must copy',
 )
 
@@ -1339,5 +1341,82 @@ for (const path of [
   }
   checkVisibleIdentity(ast)
 }
+
+/* ── AI 是驱动层：稿上每屏的 AI 元素一个不许少（产品负责人 8/16、10/28） ────────────────
+ *
+ * 触屏版稿 18（扫描四阶段）、稿 20（复印、照片合成、证件照、签名）每一屏底栏都有「问小青」，
+ * 问句是**本屏专属**的（label 与带去顾问页的 draft 是同一句），逐态不同；每屏正文最上面还有一条 AI 状态
+ * （小青接不上时写实话，说明这一步不靠它也能做完）。这些是 AI 与打印扫描功能结合的接口，
+ * 改版时最容易被当成「文案」顺手删掉或合并成一句通用话，所以逐句钉在源码里。
+ * 缺哪一句，门禁就指名哪一句。 */
+const ASK_LABELS = [
+  ['src/pages/scan/ScanWorkbenchChrome.tsx', [
+    '问小青：扫描和复印有什么不同', '问小青：U 盘扫描怎么走', '问小青：扫描没开放怎么办', '问小青：任务还没建好',
+    '问小青：扫描任务没建好', '问小青：扫描过期了怎么办', '问小青：为什么还不能扫', '问小青：面板上怎么扫',
+    '问小青：授权还没好', '问小青：一直等不到怎么办', '问小青：扫描件接下来呢', '问小青：扫描失败怎么办',
+  ]],
+  ['src/pages/print-scan/ConvertImagesPage.tsx', [
+    '问小青：不能转 PDF 怎么办', '问小青：U 盘图片怎么加', '问小青：上传停住了', '问小青：合成要多久',
+    '问小青：合成的 PDF 怎么打印', '问小青：结果还没回来', '问小青：顺序冲突了', '问小青：照片怎么合成 PDF',
+  ]],
+  ['src/pages/print-scan/PrintScanFeatureInfoPage.tsx', [
+    '问小青：复印要注意什么', '问小青：这个功能是什么', '问小青：证件照怎么办',
+  ]],
+  ['src/pages/print-scan/SignStampPage.tsx', [
+    '问小青：签名没开怎么办', '问小青：签名用哪份 PDF', '问小青：签名图是什么', '问小青：签名放在哪一页',
+    '问小青：合成完怎么打印', '问小青：签名结果没回来',
+  ]],
+]
+for (const [path, labels] of ASK_LABELS) {
+  const code = read(path)
+  for (const label of labels) {
+    assert.ok(code.includes(label), `${path} 缺稿上的底栏问句「${label}」：AI 元素一个不许少，也不许并成一句通用话`)
+  }
+}
+// 问小青按钮本身：带麦克风（voice）；带去顾问页的草稿取自 askDraftOf(label)；扫描壳里还要先撤销会话再走（见 scan-session-truth）。
+for (const path of ['src/pages/scan/ScanWorkbenchChrome.tsx', 'src/pages/print-scan/TouchToolScreen.tsx']) {
+  const code = read(path)
+  assert.match(code, /draft: askDraft,[\s\S]{0,120}?voice: true|draft: askDraftOf\(askLabel\), voice: true/, `${path} 的问小青必须带麦克风，draft 取自 askDraftOf(label)，不再与 label 同一句`)
+  assert.match(code, /<AiDownNote \/>/, `${path} 正文最上面必须有 AI 状态（小青接不上时写实话）`)
+}
+/* 带去顾问页的草稿（审查意见 B1）：每句一个 draft。此前 draft 与 label 同一句，用户点过去，顾问页输入框里是
+ * 「问小青：扫描件接下来呢」——把按钮名带进了对话框。其余各包都是 label「问小青：…」+ 一句不带前缀的自然问句。
+ * 真把 askDraftOf 取出来跑一遍：每个 label 的草稿必须非空、不以「问小青」开头、与 label 不同；现场无人值守，草稿里不许出现「工作人员」「联系」。 */
+const askDraftJs = ts.transpileModule(read('src/pages/print-scan/askDraft.ts'), {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+}).outputText
+const { askDraftOf } = await import(`data:text/javascript;base64,${Buffer.from(askDraftJs).toString('base64')}`)
+for (const [path, labels] of ASK_LABELS) {
+  for (const label of labels) {
+    const draft = askDraftOf(label)
+    assert.ok(typeof draft === 'string' && draft.trim().length > 0, `${path}「${label}」的草稿不能为空`)
+    assert.ok(!/^问小青/.test(draft), `${path}「${label}」的草稿不能以「问小青」开头：那是按钮名，不是问句`)
+    assert.notEqual(draft, label, `${path}「${label}」的草稿不能与按钮上的字同一句`)
+    assert.doesNotMatch(draft, /工作人员|联系/, `${path}「${label}」的草稿里不许出现「工作人员」「联系」（现场无人值守）`)
+  }
+}
+/* 类型卡的读屏语义（审查意见 B2）：单选卡 role="radio" 上不许同时写 aria-pressed（非法组合，读屏会把状态混报成
+ * 「已选中并已按下」），也不许用盖住整张卡的 aria-label（读屏只念「选择扫描类型：简历扫描」，听不到说明和
+ * 「支持 AI 简历识别」「敏感文件 · 自动清理」角标）：标题走 aria-labelledby，说明与角标走 aria-describedby。 */
+const scanChromeSource = read('src/pages/scan/ScanWorkbenchChrome.tsx')
+const typeCardsStart = scanChromeSource.indexOf('export function ScanTypeCards')
+assert.ok(typeCardsStart >= 0, 'ScanTypeCards 还在')
+const typeCardsEnd = scanChromeSource.indexOf('\nexport function ', typeCardsStart + 10)
+const typeCardsBlock = scanChromeSource.slice(typeCardsStart, typeCardsEnd < 0 ? undefined : typeCardsEnd)
+assert.match(typeCardsBlock, /role="radio"/, '类型卡是单选')
+assert.doesNotMatch(typeCardsBlock, /aria-pressed=/, '类型卡 role="radio" 上不许同时写 aria-pressed')
+assert.doesNotMatch(typeCardsBlock, /aria-label=\{/, '类型卡不许用 aria-label 盖住整张卡的读屏内容')
+assert.match(typeCardsBlock, /aria-labelledby=/, '类型卡的读屏名取标题（aria-labelledby）')
+assert.match(typeCardsBlock, /aria-describedby=/, '类型卡的说明与角标走 aria-describedby')
+const aiDownProbe = read('src/pages/print-scan/useXiaoqingAvailability.ts')
+const aiDownNote = aiDownProbe + read('src/pages/print-scan/AiDownNote.tsx')
+assert.match(aiDownNote, /\/advisor\/availability/, 'AI 状态只认服务端那个真探测，不靠猜')
+assert.match(aiDownNote, /row\.available === false\) return 'unavailable'/, '只有服务端明说 available:false 才写「接不上」')
+assert.match(aiDownNote, /小青暂时接不上。这一步不用它也能做完，照下面的按钮继续。/, 'AI 状态那一句要说清这一步不靠小青也能做完')
+// 扫描完成后的 AI 简历识别入口与结果页不降级：入口还在、只对简历扫描放行、去的是简历解析页。
+const scanResultPage = read('src/pages/scan/ScanResultPage.tsx')
+assert.match(scanResultPage, /AI 简历识别/, '扫描结果页的「AI 简历识别」入口不许删')
+assert.match(scanResultPage, /const aiEnabled = scanType === 'resume' && Boolean\(file\)/, 'AI 简历识别只对简历扫描且有文件时放行')
+assert.match(scanResultPage, /leaveScanFlow\('\/resume\/parse'/, 'AI 简历识别去的是简历解析页，由那一屏自己按 AI 能力降级')
 
 console.log('ALL PASS fusion W2 print/scan contract')

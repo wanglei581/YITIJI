@@ -327,6 +327,58 @@ test('scan start blocks continuation while scan capability is unavailable @w2', 
   await expectHealthy(page, errors)
 })
 
+// ── AI 是驱动层：小青接不上时这一步也要做得完 ───────────────────────────────────
+//
+// 稿 18 / 20 每一屏正文最上面都有一条 AI 状态：小青确实接不上时写一句实话，并说明这一步不靠它也能做完；
+// 底栏「问小青」不动，扫描、复印、照片合成这些手动路径照旧。判「接不上」只认服务端那个真探测
+// （GET /advisor/availability 回 200 + available:false）；探不到、超时都不下结论，更不写「接不上」。
+const AI_DOWN_BODY = {
+  status: 200,
+  json: { available: false, providerLabel: null, reason: 'AI 顾问暂不可用：管理员尚未配置或已停用该功能位', degradedCapabilities: [], disclaimer: '' },
+}
+
+test('when 小青 is down every scan and tool screen says so and the manual path stays @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerScanCapability(api, 'available')
+  api.respond('GET', '/api/v1/advisor/availability', AI_DOWN_BODY)
+
+  await page.goto('/scan/start')
+  await expect(page.getByTestId('ai-down-note')).toHaveText('小青暂时接不上。这一步不用它也能做完，照下面的按钮继续。')
+  // 手动路径照旧：问小青还在（点过去由顾问页自己降级）、「下一步」照样能按。
+  await expect(page.locator('[data-qxt-ask="on"]')).toBeVisible()
+  await expect(page.getByRole('button', { name: /下一步 · 建立这次扫描/ })).toBeEnabled()
+
+  for (const [path, primary] of [
+    ['/print-scan/feature/copy', '去打印文件'],
+    ['/print-scan/feature/id-photo', '先用照片打印'],
+  ] as const) {
+    await page.goto(path)
+    await expect(page.getByTestId('ai-down-note'), `${path} 要写小青接不上`).toBeVisible()
+    await expect(page.locator('[data-qxt-ask="on"]'), `${path} 底栏问小青还在`).toBeVisible()
+    await expect(page.getByRole('button', { name: primary, exact: true }), `${path} 主按钮照常能按`).toBeEnabled()
+  }
+  await page.goto('/print-scan/convert')
+  await expect(page.getByTestId('ai-down-note')).toBeVisible()
+  await expect(page.locator('[data-qxt-ask="on"]')).toBeVisible()
+  expect(errors).toEqual([])
+})
+
+test('小青 reachable or unprobed never gets the 接不上 note @w2', async ({ page, api }) => {
+  registerShell(api)
+  registerScanCapability(api, 'available')
+  // 可用：不写。
+  await page.goto('/scan/start')
+  await expect(page.getByText('可创建扫描任务 · 需面板操作', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('ai-down-note')).toHaveCount(0)
+  // 探不到（断网）：不下结论，不写「接不上」，也不写「正常」。
+  api.abort('GET', '/api/v1/advisor/availability', 'internetdisconnected')
+  await page.reload()
+  await expect(page.getByText('可创建扫描任务 · 需面板操作', { exact: true })).toBeVisible()
+  await page.waitForTimeout(600)
+  await expect(page.getByTestId('ai-down-note')).toHaveCount(0)
+})
+
 test('direct scan settings access does not create a session @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
@@ -393,6 +445,7 @@ test('cancel-completed race rechecks status and recovers the real scan file @w2'
   await seedScanLive(page)
   await page.goto('/scan?stage=progress')
   await page.getByRole('button', { name: '取消扫描' }).click()
+  await page.getByRole('button', { name: '再点一次确认取消' }).click()
   await page.waitForURL(/\/scan\?stage=result/)
   await expect(page.getByText('w2-scan.pdf', { exact: true })).toBeVisible()
   // 等待页挂载那一次。走到结果页之后不许再确认。
@@ -455,7 +508,7 @@ test('successful scan result takes this scanned original to the print desk mater
 
   // 按操作条主按钮点（不按文字找）：这一条钉的是落点，文案另有一句软断言。
   // 它先去材料检查，就不能再叫「直接打印」；名字照稿 18 的出口名「拿去打印」。
-  const printAction = page.locator('.sw-cta-row .qx-btn[data-variant="primary"]')
+  const printAction = page.locator('.qxt-dock .qxt-btn-pri')
   await expect.soft(printAction, '打印出口先去材料检查，按钮不能再说「直接」').toHaveText('拿去打印')
   const inspectionCreated = page.waitForRequest((request) =>
     request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/materials/tasks',
@@ -551,7 +604,7 @@ test.describe('scan result at 390x844', () => {
 
     const viewport = { x: 0, y: 0, width: 390, height: 844 }
     const scroller = page.locator('[data-qx-page="scan-workbench"]')
-    const hero = page.locator('.sw-xq')
+    const ask = page.locator('[data-qxt-ask="on"]')
     const truth = page.getByTestId('scan-workbench-truth')
 
     // 底注按稿 18 只在选类型那一屏出现：在那一屏上它必须随正文整块滚得到，不被操作条 / 底栏盖住。
@@ -562,14 +615,14 @@ test.describe('scan result at 390x844', () => {
     const truthBox = await boxOf(truth, '底注')
     expectInside(truthBox, await boxOf(scroller, '扫描工作台滚动区'), '底注必须能整块滚进可视区')
     // 操作条在底栏之上：底注下沿不越过操作条上沿（与 expectInside 同一个 0.5px 容差），也就压不到底栏。
-    const ctabarTop = (await boxOf(page.locator('.qx-ctabar'), '操作条')).y
+    const ctabarTop = (await boxOf(page.locator('.qxt-dock'), '操作条')).y
     expect(truthBox.y + truthBox.height, '底注滚到底时不得压到操作条下面').toBeLessThanOrEqual(ctabarTop + 0.5)
 
     await seedScanResult(page, resultState)
     await page.goto('/scan?stage=result')
     await expectPdfCompleted(binary)
     await expect(page.locator('[data-kiosk-stage-fit]')).toHaveAttribute('data-kiosk-stage-fit', 'off')
-    const ctabar = page.locator('.qx-ctabar')
+    const ctabar = page.locator('.qxt-dock')
     const navbar = page.getByRole('navigation', { name: '主导航' })
     const aiButton = page.getByRole('button', { name: /AI 简历识别/ })
     await expect(aiButton).toBeEnabled()
@@ -580,18 +633,16 @@ test.describe('scan result at 390x844', () => {
     await assertTapTargetPointerHit(ctabar.getByRole('button', { name: '拿去打印' }))
     for (const item of await navbar.getByRole('button').all()) await assertTapTargetPointerHit(item)
 
-    // 横幅一字不删，只是随正文一起滚，整块露得出来；结果页不再复读底注。
-    await expect(hero).toBeVisible()
+    // 问小青在底栏，始终露出来；结果页不再复读底注。
+    await expect(ask).toBeVisible()
     await expect(truth).toHaveCount(0)
-    await revealByUserScroll(hero, 'start')
-    expectInside(await boxOf(hero, '横幅'), await boxOf(scroller, '扫描工作台滚动区'), '横幅必须能整块滚进可视区')
 
     await revealByUserScroll(aiButton)
     const view = await boxOf(scroller, '扫描工作台滚动区')
     const button = await boxOf(aiButton, '「AI 简历识别」')
     expectInside(button, view, '「AI 简历识别」必须能整块滚进可视区，不靠滚动 overflow:hidden 的舞台')
     expectInside(button, viewport, '「AI 简历识别」必须整块在视口内')
-    for (const [what, layer] of [['横幅', hero], ['操作条', ctabar], ['底栏', navbar]] as const) {
+    for (const [what, layer] of [['问小青', ask], ['操作条', ctabar], ['底栏', navbar]] as const) {
       expect(boxesOverlap(button, await boxOf(layer, what)), `「AI 简历识别」不得与${what}重叠`).toBe(false)
     }
     await assertTapTargetPointerHit(aiButton)
@@ -1038,7 +1089,7 @@ test('sensitive session clear returns the workbench to start without the previou
 
   await seedScanLive(page)
   await page.goto('/scan?stage=progress')
-  await expect(page.getByText('任务信息', { exact: true })).toBeVisible()
+  await expect(page.getByText('你在面板上', { exact: true })).toBeVisible()
   await expect(page.getByText('任务编号', { exact: true })).toHaveCount(0)
   await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toHaveCount(0)
   expect(await page.evaluate(() => JSON.parse(window.sessionStorage.getItem('ai-job-print:current-scan-workbench') ?? '{}').live?.scanTaskId)).toBe(SCAN_TASK_ID)
@@ -1169,7 +1220,7 @@ test('scan result full-screen preview drives real PDF page and fit controls with
   const stage = await boxOf(page.locator('.kiosk-stage'), '舞台')
   expect(Math.abs(scrim.x - stage.x) + Math.abs(scrim.y - stage.y), '预览层从舞台左上角铺起').toBeLessThanOrEqual(1)
   expect(Math.abs(scrim.width - stage.width) + Math.abs(scrim.height - stage.height), '预览层与舞台同大').toBeLessThanOrEqual(1)
-  for (const layer of ['.qx-topbar', '.qx-ctabar', '.qx-navbar', '[data-testid="scan-workbench-exits"]']) {
+  for (const layer of ['.qxt-band', '.qxt-dock', '.qxt-nav', '[data-testid="scan-workbench-exits"]']) {
     await expect(page.locator(layer), `${layer} 在预览打开时不可达`).toHaveAttribute('inert', '')
   }
   await expect(dialog.getByTestId('rs-pv-close')).toBeFocused()
@@ -1245,6 +1296,66 @@ test('scan result full-screen preview drives real PDF page and fit controls with
   await page.keyboard.press('Escape')
   await expect(again).toHaveCount(0)
   expect(page.url()).toBe(urlBefore)
+  await expectHealthy(page, errors)
+})
+
+/** 一个元素里的文字排成了几行（按字形矩形的纵向中心去重；折行的字会落在不同的纵向位置）。 */
+async function textLineCount(target: Locator): Promise<number> {
+  return target.evaluate((el) => {
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    const centers = Array.from(range.getClientRects())
+      .filter((rect) => rect.width > 0 && rect.height > 0)
+      .map((rect) => rect.top + rect.height / 2)
+      .sort((a, b) => a - b)
+    const tolerance = parseFloat(getComputedStyle(el).fontSize) * 0.6
+    return centers.filter((center, index) => index === 0 || center - centers[index - 1] > tolerance).length
+  })
+}
+
+/*
+ * 结果页的页内预览曾落进两列网格的第一列（minmax(140px, 28%)），只有 263px 宽，右边 700×620 的空米色，
+ * 翻页键被挤成「上一 / 页」「下一 / 页」竖排。示意图拿掉以后那条两列网格没跟着改。
+ * 空白扫描量不到它（左边那条白纸让每一行都不「纯色」），所以要用量出来的几何钉住。
+ */
+test('scan result inline preview takes the full well, keeps the pager on one line and the open row tappable @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page, TWO_PAGE_PDF_PATH)
+  await installPreviewFixtures(page)
+  registerShell(api)
+  await seedScanResult(page, previewResult({
+    fileUrl: TWO_PAGE_PDF_PATH,
+    name: 'w2-scan-two-page.pdf',
+    pages: 2,
+    mimeType: 'application/pdf',
+    format: 'PDF',
+  }))
+  await page.goto('/scan?stage=result')
+  const inline = page.locator('.sw-pvstage [data-file-preview-kind="pdf"] [data-pdf-preview-host]')
+  await expect(inline).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
+
+  const stage = await boxOf(page.locator('.sw-pvstage'), '预览井')
+  const doc = await boxOf(page.locator('.sw-pvdoc'), '预览卡')
+  expect(
+    doc.width,
+    `预览卡只有 ${Math.round(doc.width)}px 宽，要占预览井 ${Math.round(stage.width)}px 的六成以上`,
+  ).toBeGreaterThanOrEqual(stage.width * 0.6)
+
+  // 翻页键：单行，且可点区不小于 64×64。
+  for (const name of ['上一页', '下一页']) {
+    const key = page.locator('.sw-pvdoc').getByRole('button', { name, exact: true })
+    expect(await textLineCount(key), `「${name}」的字不许折成两行`).toBe(1)
+    const box = await boxOf(key, name)
+    expect(box.width, `${name} 宽`).toBeGreaterThanOrEqual(64)
+    expect(box.height, `${name} 高`).toBeGreaterThanOrEqual(64)
+  }
+
+  // 稿的排法：预览在上，文件信息在下，「整屏查看」是文件信息下面的一整行。
+  const brief = await boxOf(page.getByTestId('scan-workbench-file-brief'), '文件信息条')
+  expect(brief.y, '文件信息在预览下面').toBeGreaterThanOrEqual(stage.y + stage.height - 1)
+  const open = await boxOf(page.getByTestId('scan-result-preview-open'), '整屏查看')
+  expect(open.y, '整屏查看在文件信息下面').toBeGreaterThanOrEqual(brief.y + brief.height - 1)
+  expect(open.width, '整屏查看宽').toBeGreaterThanOrEqual(64)
+  expect(open.height, '整屏查看高').toBeGreaterThanOrEqual(64)
   await expectHealthy(page, errors)
 })
 

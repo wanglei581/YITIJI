@@ -381,7 +381,7 @@ test('id-photo feature page is honest and offers real fallbacks @w2', async ({ p
   await page.goto('/print-scan/feature/id-photo')
   await expect(page.locator('[data-testid="print-hub-state-feature-id-photo"]')).toBeVisible()
   await expect(page.getByText('证件照：本机尚未开放')).toBeVisible()
-  await expect(page.getByText('没有可用流程')).toBeVisible()
+  await expect(page.getByText('现在不能裁切、换底色或排版，也不会生成证件照成品')).toBeVisible()
   await page.locator('[data-testid="print-hub-idphoto-fallback"]').click()
   await expect(page).toHaveURL(/\/print\/upload\?.*category=photo/)
   expect(errors).toEqual([])
@@ -397,11 +397,11 @@ test('unknown feature key fails closed with recovery actions @w2', async ({ page
 
   await page.goto('/print-scan/feature/not-a-real-feature')
   await expect(page.locator('[data-testid="print-hub-state-feature-not-found"]')).toBeVisible()
-  await expect(page.getByRole('heading', { name: '未找到该功能' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '这个能力名我不认识' })).toBeVisible()
   await expect(page.getByText('没有这项能力说明')).toBeVisible()
-  await expect(page.getByRole('button', { name: '返回打印扫描服务' })).toBeVisible()
-  await expect(page.getByRole('button', { name: '联系工作人员' })).toBeVisible()
-  await page.getByRole('button', { name: '返回打印扫描服务' }).click()
+  await expect(page.getByTestId('print-hub-primary')).toHaveText('返回打印扫描')
+  await expect(page.getByRole('button', { name: '联系工作人员' })).toHaveCount(0)
+  await page.getByTestId('print-hub-primary').click()
   await expect(page).toHaveURL(/\/print-scan$/)
   expect(errors).toEqual([])
 })
@@ -431,8 +431,10 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
   const guide = page.getByTestId('print-hub-state-feature-copy')
   await expect(guide).toBeVisible()
   await expect(page.getByRole('heading', { level: 1, name: '怎么在打印机上复印' })).toHaveCount(1)
-  await expect(guide.getByText('不用在这台屏幕上下单', { exact: false })).toBeVisible()
-  await expect(guide.getByText('也不会出现在「我的打印订单」里', { exact: false })).toBeVisible()
+  // 稿 18：这句话在意图带的副标题里，不再在正文里重复一遍。
+  const band = page.locator('.qxt-band')
+  await expect(band.getByText('不用在这台屏幕上下单', { exact: false })).toBeVisible()
+  await expect(band.getByText('也不会出现在「我的打印订单」里', { exact: false })).toBeVisible()
   await expect(page.getByTestId('print-hub-copy-steps').locator('li')).toHaveCount(5)
   // 按钮名按面板屏幕实际字样：主屏的「复印」「身份证复印」「票据复印」。手册里前后不一的叫法不得出现。
   for (const panelWord of ['「复印」', '「身份证复印」', '「票据复印」']) {
@@ -444,7 +446,7 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
   // 身份证放置位置待现场核实：只给指路句，不编造位置。
   await expect(page.getByTestId('print-hub-copy-case-id-card')).toHaveAttribute('data-pending', 'true')
   await expect(page.getByTestId('print-hub-copy-case-id-card')).toContainText('身份证怎么放、怎么翻面，请看打印机屏幕上的图示。')
-  await expect(page.getByTestId('print-hub-copy-take-original')).toContainText('别忘了取走玻璃上或进纸口里的原件（身份证等）')
+  await expect(page.getByTestId('print-hub-copy-take-original')).toContainText('复印件和原件一起带走。原件还在玻璃上或进纸口里，请务必取回。')
   await expect(page.getByTestId('print-hub-copy-legal')).toContainText('不得复印伪造的证件、印章、票据。')
   // 不伪造结果、不写收费、不写工程词。
   for (const word of ['已复印', '复印成功', '复印完成', '免费', '元/页', '服务端', 'Agent', '能力配置']) {
@@ -461,7 +463,7 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
       const texts = [...scroller.querySelectorAll('b, .d, .ph-state-p, .ph-state-t, .ph-truth div, .ph-xq-doing, .ph-sec-h .t, .hint')]
         .filter((el) => (el.textContent ?? '').trim().length > 0)
         .map((el) => parseFloat(getComputedStyle(el).fontSize))
-      const ctas = [...document.querySelectorAll('.qx-ctabar .qx-btn')].map((el) => el.getBoundingClientRect().height)
+      const ctas = [...document.querySelectorAll('.qxt-dock .qxt-btn')].map((el) => el.getBoundingClientRect().height)
       return {
         overflow: scroller.scrollHeight - scroller.clientHeight,
         trailingBlank: box.bottom - lastBottom,
@@ -478,7 +480,7 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
   await page.screenshot({ path: test.info().outputPath('02-copy-guide.png') })
 
   // 点底部操作条里的「返回打印扫描」（顶栏返回键同名，这里点的是操作条那一个）。
-  await page.locator('.qx-ctabar').getByRole('button', { name: '返回打印扫描', exact: true }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '返回打印扫描', exact: true }).click()
   await expect(page).toHaveURL(/\/print-scan$/)
   await expect(page.locator('[data-testid="print-hub-state-default"]')).toBeVisible()
   await page.screenshot({ path: test.info().outputPath('03-back-to-hub.png') })
