@@ -28,6 +28,8 @@ const VARIANTS: HomeVariant[] = ['default', 'channels', 'hosting', 'gov', 'full'
 const DESIGN_WIDTH = 1080
 /** 未登录态一张大卡的高度：没有「继续办理」时，大卡可以长高来填屏，但不比它更高。 */
 const SIGNED_OUT_CARD_PX = 340
+/** 带「继续办理」面板时一张大卡的高度（不压紧版式）：大卡给面板让了位，这一态的版面不动。 */
+const WITH_PANEL_CARD_PX = 300
 /** 未登录态段与段之间的间隔（≥761px 宽）。 */
 const SIGNED_OUT_SECTION_GAP_PX = 16
 /** 压紧版式（第三行磁贴 ≥ 4 块）段与段之间的间隔，本来就是 12px。 */
@@ -109,12 +111,15 @@ for (const variant of VARIANTS) {
     await loginThroughVisibleUi(page, '/', WANG.phone)
     await expect(page.locator('section.continue')).toBeVisible()
     const withPanel = await expectFilled(page, `带「继续办理」面板（${variant}）`)
+    if (variant === 'default' || variant === 'channels') {
+      expect(withPanel.cardHeight, `带面板时大卡仍给面板让位，不超过 ${WITH_PANEL_CARD_PX}px（${variant}）`).toBeLessThanOrEqual(WITH_PANEL_CARD_PX + 0.5)
+    }
 
     await page.clock.runFor(31_000)
     await expect(page.locator('section.continue')).toHaveCount(0)
     const collapsed = await expectFilledLikeSignedOut(page, `面板收起之后（${variant}）`, variant)
     // 大卡是给面板让位才矮的：面板没了，大卡把让出来的高度拿回去。
-    expect(collapsed.cardHeight, `面板收起之后大卡应比带面板时高（${withPanel.cardHeight.toFixed(1)} → ${collapsed.cardHeight.toFixed(1)}px）`).toBeGreaterThan(withPanel.cardHeight + 20)
+    expect(collapsed.cardHeight, `面板收起之后大卡应比带面板时高（${withPanel.cardHeight.toFixed(1)} → ${collapsed.cardHeight.toFixed(1)}px）`).toBeGreaterThan(withPanel.cardHeight + 30)
   })
 }
 
