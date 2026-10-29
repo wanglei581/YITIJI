@@ -11,6 +11,7 @@ import { getPartnerStats, type PartnerStatsResponse } from '../../services/api/s
 import { getPartnerTerminalOperations, type PartnerTerminalOpsView } from '../../services/api/terminalOps'
 import { OrgNoticesSection, type OrgNoticeOutcome } from './OrgNoticesSection'
 import { RecruitmentOverview } from './RecruitmentOverview'
+import { LicenseNotice } from './LicenseNotice'
 
 type Load<T> = { status: 'loading' | 'error' | 'ready'; data: T | null }
 type OverviewLoad =
@@ -67,6 +68,7 @@ export default function DashboardPage() {
   const [dashKey, setDashKey] = useState(0)
   const [opsKey, setOpsKey] = useState(0)
   const [noticeOutcome, setNoticeOutcome] = useState<OrgNoticeOutcome>('loading')
+  const [licenseAttention, setLicenseAttention] = useState(true)
   const onNoticeOutcome = useCallback((next: OrgNoticeOutcome) => {
     setNoticeOutcome((prev) => (prev === next ? prev : next))
   }, [])
@@ -112,6 +114,7 @@ export default function DashboardPage() {
     && stats.status === 'ready'
     && policies.status === 'ready'
     && noticeOutcome === 'empty'
+    && !licenseAttention
     && actionable === 0
 
   return (
@@ -124,6 +127,7 @@ export default function DashboardPage() {
               <h2 className="text-[13px] font-bold text-neutral-700">今天要处理</h2>
             </div>
             <ProjectBar overview={overview} />
+            <LicenseNotice onAttention={setLicenseAttention} />
             {overview.kind === 'error' && <BlockMiss onRetry={() => setOverviewKey((k) => k + 1)} />}
             {overview.kind === 'ready' && <OverviewRows data={overview.data} month={month} />}
             {stats.status === 'error' && <BlockMiss onRetry={() => setStatsKey((k) => k + 1)} />}

@@ -1151,7 +1151,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/routes/policy/PolicyEmergencyNote.tsx` | `verify-console-plain-copy.mjs` |
 | `apps/partner/src/routes/policy/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/profile/ComplianceRestrictions.tsx` | `verify-console-privacy-copy.mjs` |
-| `apps/partner/src/routes/profile/index.tsx` | `verify-console-privacy-copy.mjs`<br/>`verify-partner-refresh-safe.mjs` |
+| `apps/partner/src/routes/profile/index.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-console-privacy-copy.mjs`<br/>`verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/screen/PartnerGrid.tsx` | `verify-console-screen-details.mjs`<br/>`verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/PartnerTerminalView.tsx` | `verify-console-batch5-copy.mjs` |
 | `apps/partner/src/routes/screen/PartnerUsageHostingOff.tsx` | `verify-console-screen-details.mjs` |

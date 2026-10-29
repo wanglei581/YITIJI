@@ -1,4 +1,5 @@
 import { ComplianceRestrictions } from './ComplianceRestrictions'
+import { LicenseSection } from './LicenseSection'
 import { PARTNER_TYPE_LABELS, type PartnerType } from '@ai-job-print/shared'
 import { useEffect, useState } from 'react'
 import {
@@ -147,6 +148,7 @@ export default function ProfilePage() {
     >
       {/* 本机构官方渠道（3.14）：二维码只在本机构终端显示；与内容信任无关，单独成块 */}
       <OfficialChannelsSection />
+      <LicenseSection />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* 基本信息（真实数据） */}
