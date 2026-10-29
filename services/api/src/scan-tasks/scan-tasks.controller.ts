@@ -23,6 +23,7 @@ import { ApiResponse } from '../common/dto/api-response.dto'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { restoreMultipartUtf8Filename } from '../files/file-validation'
 import { TerminalIdentityGuard } from '../terminals/terminal-identity.guard'
 import { TerminalsService } from '../terminals/terminals.service'
 import { CreateScanTaskDto } from './dto/create-scan-task.dto'
@@ -155,7 +156,9 @@ export class ScanTasksController {
       scanTaskId: typeof scanTaskId === 'string' ? scanTaskId : '',
       deliveryLease: typeof deliveryLease === 'string' ? deliveryLease : '',
       buffer: file.buffer,
-      filename: file.originalname,
+      // multer 把 multipart 里的 UTF-8 文件名按 latin1 读，中文会成乱码（走查 I-17）；手机上传、本机上传
+      // 早就这样还原，扫描回传是漏掉的那一条。
+      filename: restoreMultipartUtf8Filename(file.originalname),
       mimeType: file.mimetype,
       candidateSnapshotAt,
       observedAt,
