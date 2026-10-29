@@ -61,6 +61,7 @@ async function compileKiosk() {
         "export * as account from './src/pages/auth/accountUserMessage.ts';",
         "export * as auth from './src/services/auth/memberAuthApi.ts';",
         "export * as shared from './src/services/api/userErrorMessage.ts';",
+        "export * as http from './src/services/api/httpAdapter.ts';",
       ].join('\n'),
       resolveDir: kioskRoot,
     },
@@ -124,7 +125,9 @@ try {
 
   // ── B. AI 类 ───────────────────────────────────────────────────────
   const aiCodes = ['AI_ENDPOINT_NOT_ALLOWED', 'AI_BUDGET_EXHAUSTED', 'AI_BUDGET_UNAVAILABLE', 'AI_PROVIDER_NOT_CONFIGURED']
-  const GENERIC_5XX = '服务暂时不可用，请稍后重试或联系现场工作人员'
+  // 通用 5xx 兜底句是哨兵：命中它说明这个码没登记。句子由真模块现算（重试 + 标准句 1），不另抄一整句。
+  const GENERIC_5XX = mod.shared.userMessageOf(new mod.http.ApiHttpError('SENTINEL_UNREGISTERED_CODE', 'x', 503), SENTINEL)
+  if (GENERIC_5XX === SENTINEL || !GENERIC_5XX.includes('服务暂时不可用')) fail(`通用 5xx 兜底句没读到（实际「${GENERIC_5XX}」）：哨兵是空的，下面的「是否登记」判断会空转`)
   let checked = 0
   for (const code of aiCodes) {
     if (!serverSourceHasCode(code)) { console.log(`  · ${code} 尚未出现在服务端源码（对应 PR 未合入），跳过`); continue }
