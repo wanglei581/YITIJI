@@ -4,6 +4,12 @@
  * 接口可能尚未合入。404、超时、字段缺失都记成最保守的一套：
  * 没号码、没服务时间、附近没有别的在线终端、小程序未发布。
  * 不在模块加载时发请求。整个会话共用一次在途请求，结果 5 分钟内复用。
+ *
+ * 谁来读：运行时根（KioskRuntimeRoot）挂载时调 startSupportContactKeeper()——
+ * 立刻读一次，之后每 4 分钟续一次（赶在 5 分钟缓存过期前换新），终端号变了就丢缓存按新号重读。
+ * 后台改了服务电话，一体机最迟一个周期（加服务端自己的 5 分钟缓存）后上屏。
+ * 页面只读：useSupportContact / useSupportContactSnapshot 订阅这里的变化，号码到了、
+ * 续上换了值、终端号换了，用到标准句的地方都会跟着重绘，不靠各自的轮询碰运气。
  */
 
 import {
@@ -12,28 +18,64 @@ import {
   type PublicSupportContact,
 } from '../../copy/unattendedCopy'
 import { API_BASE_URL } from './client'
-import { getTerminalId } from './screensaver'
+import { getTerminalId, subscribeTerminalIdentity } from './screensaver'
 
 const TTL_MS = 5 * 60 * 1000
+/**
+ * 缓存 5 分钟，每 3 分钟续一次（慢网和超时有足够余量，单次请求最长 8 秒）。
+ * 后端缓存 90 秒（SUPPORT_CONTACT_CACHE_TTL_MS），后台改了号码最迟约 4 分半到屏，兑现管理员卡片上的「最迟 5 分钟内」。
+ */
+export const SUPPORT_CONTACT_RENEW_MS = 3 * 60 * 1000
 const TIMEOUT_MS = 8000
 
-type CacheEntry = { contact: PublicSupportContact; at: number }
+/** 缓存记着是为哪台终端读的：终端号换了，旧号的结果一律不认。 */
+type CacheEntry = { contact: PublicSupportContact; at: number; terminalId: string }
+type Inflight = { terminalId: string; promise: Promise<PublicSupportContact> }
 
 let cache: CacheEntry | null = null
-let inflight: Promise<PublicSupportContact> | null = null
+let inflight: Inflight | null = null
+const listeners = new Set<() => void>()
 
 export type { PublicSupportContact }
 
+function usable(entry: CacheEntry | null): entry is CacheEntry {
+  return entry !== null && entry.terminalId === getTerminalId() && Date.now() - entry.at <= TTL_MS
+}
+
 export function peekSupportContact(): PublicSupportContact {
-  if (!cache) return CONSERVATIVE_SUPPORT_CONTACT
-  if (Date.now() - cache.at > TTL_MS) return CONSERVATIVE_SUPPORT_CONTACT
-  return cache.contact
+  return usable(cache) ? cache.contact : CONSERVATIVE_SUPPORT_CONTACT
 }
 
 bindSupportContactPeek(peekSupportContact)
 
-function remember(contact: PublicSupportContact): PublicSupportContact {
-  cache = { contact, at: Date.now() }
+/** 订阅 peekSupportContact() 的变化（给 useSyncExternalStore 用）。值没变的续期不会通知。 */
+export function subscribeSupportContact(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+function notifyListeners(): void {
+  for (const listener of [...listeners]) listener()
+}
+
+/** 逐字段比，字段以后再加也不用回来改。 */
+function sameContact(a: PublicSupportContact, b: PublicSupportContact): boolean {
+  const keys = Object.keys(b) as Array<keyof PublicSupportContact>
+  return keys.length === Object.keys(a).length && keys.every((key) => a[key] === b[key])
+}
+
+/**
+ * 记下结果。值没变就沿用旧对象，订阅者不会白白重绘；
+ * 读到的值和订阅者手里的不一样（号码到了、被后台改了、被清空了）才通知。
+ * 请求发出后终端号又换了：这份是旧号的结果，只还给当时的调用方，不进缓存（否则会盖掉新号刚读到的）。
+ */
+function remember(contact: PublicSupportContact, terminalId: string): PublicSupportContact {
+  if (terminalId !== getTerminalId()) return contact
+  const before = peekSupportContact()
+  cache = { contact: sameContact(before, contact) ? before : contact, at: Date.now(), terminalId }
+  if (peekSupportContact() !== before) notifyListeners()
   return contact
 }
 
@@ -62,38 +104,78 @@ export function supportContactFromPayload(body: unknown): PublicSupportContact {
   }
 }
 
-async function requestSupportContact(): Promise<PublicSupportContact> {
+async function requestSupportContact(terminalId: string): Promise<PublicSupportContact> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
-    const terminalId = getTerminalId()
     const query = terminalId ? `?terminalId=${encodeURIComponent(terminalId)}` : ''
+    const headers: Record<string, string> = { Accept: 'application/json' }
+    // 服务端按「出口 IP + 终端号」给这条公开接口分限流桶（@TerminalScopedThrottle）：带上终端号，
+    // 同一个大厅里的几十台机器各用各的额度；不带就退化成整个大厅共用一个桶，周期性续期会互相挤掉。
+    if (terminalId) headers['x-terminal-id'] = terminalId
     const response = await fetch(`${API_BASE_URL}/public/support-contact${query}`, {
       signal: controller.signal,
-      headers: { Accept: 'application/json' },
+      headers,
     })
-    if (!response.ok) return remember(CONSERVATIVE_SUPPORT_CONTACT)
+    if (!response.ok) return remember(CONSERVATIVE_SUPPORT_CONTACT, terminalId)
     const body: unknown = await response.json()
-    return remember(supportContactFromPayload(body))
+    return remember(supportContactFromPayload(body), terminalId)
   } catch {
-    return remember(CONSERVATIVE_SUPPORT_CONTACT)
+    return remember(CONSERVATIVE_SUPPORT_CONTACT, terminalId)
   } finally {
     clearTimeout(timer)
   }
 }
 
-/** 5 分钟内直接复用；并发调用共用同一次请求。失败也缓存，避免每屏重打。 */
-export function loadSupportContact(): Promise<PublicSupportContact> {
-  if (cache && Date.now() - cache.at <= TTL_MS) return Promise.resolve(cache.contact)
-  if (!inflight) {
-    inflight = requestSupportContact().finally(() => {
-      inflight = null
-    })
-  }
-  return inflight
+/** 同一台终端的并发调用共用一次请求；终端号换了就另起一次，旧号的在途结果落不进新号的缓存。 */
+function request(): Promise<PublicSupportContact> {
+  const terminalId = getTerminalId()
+  if (inflight && inflight.terminalId === terminalId) return inflight.promise
+  const promise: Promise<PublicSupportContact> = requestSupportContact(terminalId).finally(() => {
+    if (inflight?.promise === promise) inflight = null
+  })
+  inflight = { terminalId, promise }
+  return promise
 }
 
-/** 测试或终端号切换时丢掉缓存。页面不要调用。 */
+/** 5 分钟内直接复用（只认当前终端号的结果）；并发调用共用同一次请求。失败也缓存，避免每屏重打。 */
+export function loadSupportContact(): Promise<PublicSupportContact> {
+  if (usable(cache)) return Promise.resolve(cache.contact)
+  return request()
+}
+
+/** 不看缓存，重新读一次。运行时根用它在缓存过期前续上。 */
+export function refreshSupportContact(): Promise<PublicSupportContact> {
+  return request()
+}
+
+/**
+ * 运行时根挂载时调用，返回停止函数（卸载时调）。
+ * - 立刻读一次（缓存还新就不发请求）；
+ * - 之后每 SUPPORT_CONTACT_RENEW_MS 强制续一次，后台改了号码最迟一个周期后上屏；
+ * - 终端号变了（Agent 晚于浏览器启动、改绑）：丢缓存，订阅者先回到保守值，再按新号重读。
+ */
+export function startSupportContactKeeper(): () => void {
+  let lastTerminalId = getTerminalId()
+  void loadSupportContact()
+  const timer = setInterval(() => {
+    void refreshSupportContact()
+  }, SUPPORT_CONTACT_RENEW_MS)
+  const unsubscribe = subscribeTerminalIdentity(() => {
+    const next = getTerminalId()
+    if (next === lastTerminalId) return
+    lastTerminalId = next
+    cache = null
+    notifyListeners()
+    void refreshSupportContact()
+  })
+  return () => {
+    clearInterval(timer)
+    unsubscribe()
+  }
+}
+
+/** 测试用：丢掉缓存和在途请求。页面不要调用；终端号换了由 startSupportContactKeeper 处理。 */
 export function resetSupportContactCacheForTests(): void {
   cache = null
   inflight = null
