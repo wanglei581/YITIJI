@@ -17,6 +17,7 @@
 | 当日开发摘要与协作收尾 | [progress/today-claude.md](progress/today-claude.md) |
 | 定位、托管方式、AI 求职操作系统分层、功能边界（能做 / 不能做）、已知缺口 | [product/feature-scope.md](product/feature-scope.md)（§零 定位与分层，§七 缺口） |
 | 谁是运营主体、我们做什么、管理员能做什么 | [product/role-boundary.md](product/role-boundary.md) |
+| 私有化部署（托管 b）怎么设计：四层管控、授权文件、各处显示、签约后的工程 | [product/private-deployment-design.md](product/private-deployment-design.md) |
 | 按谁排序、12 个月长什么 / 不长什么（从属于功能边界与合规） | [product/audience-growth-space.md](product/audience-growth-space.md) |
 | 合规红线、法规与资质总表 | [compliance/](compliance/) 全部；总表在 [compliance-boundary.md](compliance/compliance-boundary.md) §1.2 |
 | 目录职责 | [project-structure.md](project-structure.md) |
