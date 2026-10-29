@@ -306,6 +306,9 @@ test('ai-records complaint entry preselects AI 内容投诉 and posts category a
   await loginThroughVisibleUi(page, '/me/ai-records')
   const entry = page.getByTestId('member-records-ai-complaint').getByRole('button', { name: '投诉 AI 内容', exact: true })
   await expect(entry).toBeVisible()
+  // 投诉入口在列表还读着（骨架行）时就已经在页上，读完版面会整体上移约 100px。
+  // 量包围盒与逐点命中探测之间版面一动就会误报「点不到」，所以等读完再量；点得到这一条断言本身一字没动。
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0)
   await assertTapTargetPointerHit(entry)
   await entry.click()
   await expect(page).toHaveURL(/\/me\/feedback\?category=ai_content$/)
