@@ -5,8 +5,8 @@ import { continueHeldFor, holdContinueFor, isContinueHeld, subscribeContinueHold
 
 /** 与 kioskPresence 的触碰监听同一组事件：记的是「有人碰过屏幕」，不记坐标、不记按了什么。 */
 const TOUCH_EVENTS = ['pointerdown', 'touchstart', 'keydown'] as const
-/** 空档到点的检查间隔：到点后最迟 1 秒收起。 */
-const CHECK_EVERY_MS = 1_000
+/** 空档到点的检查间隔：到点后最迟 0.25 秒收起。 */
+const CHECK_EVERY_MS = 250
 
 /**
  * 首页「继续办理」的交接保护。
@@ -16,7 +16,7 @@ const CHECK_EVERY_MS = 1_000
  * （kioskPresence.needsHandoverConfirm），就先不画、也不读，等本人在「我的」的「还是你吗？」里确认。
  *
  *   · 挂载那一刻就判：要确认的话，面板根本不挂载，一条 /me 请求都不发；
- *   · 挂着的时候盯两件事：空档到点（每秒看一眼），和之后的每一下触碰（下一位碰屏）——一判成要确认就收起，
+ *   · 挂着的时候盯两件事：空档到点（每 0.25 秒看一眼），和之后的每一下触碰（下一位碰屏）——一判成要确认就收起，
  *     已经画出来的文件名立刻没有，面板的状态与读取一并卸掉；
  *   · 判成要确认之后是粘性的（见 continueHandover）：下一位碰几下、等多久、去别的页再回首页，都还是收着。
  *

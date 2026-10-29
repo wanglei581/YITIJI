@@ -198,13 +198,13 @@ for (const scene of [
     await expect(region(page)).toContainText(scene.title)
     if (scene.file) await expect(region(page)).toContainText(scene.file)
 
-    // 29 秒：还没到判据（>30 秒），面板在。
-    await page.clock.runFor(29_000)
+    // 27 秒：还没到判据（>30 秒），面板在（留 3 秒余量，登录后到这里真实耗时不会把它推过去）。
+    await page.clock.runFor(27_000)
     await expect(region(page)).toContainText(scene.title)
     const before = calls.length
 
     // 过了 30 秒还没人点：立刻收起，屏上没有任何这一位的东西，那一块不占位。
-    await page.clock.runFor(2_500)
+    await page.clock.runFor(4_500)
     await expectNoTraceOf(page, scene.member, scene.file)
     await expect(region(page)).toBeHidden()
     await shot(page, `02-home-collapsed-${scene.member.id}.png`)
@@ -265,12 +265,12 @@ test('home continue block is already collapsed when the next person taps the hom
   expect(homePanelCalls(calls.slice(before)), '空了 31 秒后进首页，面板不该读上一位的订单').toEqual([])
 })
 
-test('home continue block collapses on the very first touch after the gap even before the one-second check ran @home-continue', async ({ page, api }) => {
+test('home continue block collapses on the very first touch after the gap even before the periodic check ran @home-continue', async ({ page, api }) => {
   const calls = await startAs(page, api, WANG)
   await expect(region(page)).toContainText(WANG_FILE)
   const before = calls.length
 
-  // 先把页面时钟停住：之后一个定时器都不会跑，每秒一次的检查也就没有机会收起面板。
+  // 先把页面时钟停住：之后一个定时器都不会跑，定时检查也就没有机会收起面板。
   // 再把系统时间一下拨过 40 秒（setSystemTime 不触发定时器）；下一位这时碰屏——只有「碰屏即判」这条路能收起。
   const now = await page.evaluate(() => Date.now())
   await page.clock.pauseAt(now + 200)
