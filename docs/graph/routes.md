@@ -18,7 +18,7 @@
 flowchart LR
   app["kiosk"]
   app --> _root_["/<br/>1 页 · 33 端点"]
-  app --> _["/*<br/>1 页 · 0 端点"]
+  app --> _["/*<br/>1 页 · 10 端点"]
   app --> activities["/activities<br/>2 页 · 11 端点"]
   app --> assistant["/assistant<br/>1 页 · 38 端点"]
   app --> campus["/campus<br/>1 页 · 33 端点"]
@@ -27,6 +27,7 @@ flowchart LR
   app --> interview["/interview<br/>6 页 · 15 端点"]
   app --> job_fairs["/job-fairs<br/>9 页 · 33 端点"]
   app --> jobs["/jobs<br/>3 页 · 33 端点"]
+  app --> k["/k<br/>2 页 · 10 端点"]
   app --> legal["/legal<br/>1 页 · 33 端点"]
   app --> login["/login<br/>1 页 · 10 端点"]
   app --> me["/me<br/>11 页 · 26 端点"]
@@ -45,14 +46,14 @@ flowchart LR
 | 路由 | 页面组件 | 页面文件 | 端点数 | 样式 |
 | --- | --- | --- | --- | --- |
 | `/` | HomePage | `apps/kiosk/src/pages/home/HomePage.tsx` | 33 | 6 |
-| `/*` | KioskRouteErrorPage | `apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx` | 0 | — |
-| `/activities` | BenefitActivitiesPage | `apps/kiosk/src/pages/activities/BenefitActivitiesPage.tsx` | 1 | 1 |
-| `/activities/:id` | BenefitActivityDetailPage | `apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx` | 11 | 1 |
-| `/assistant` | AssistantPage | `apps/kiosk/src/pages/assistant/AssistantPage.tsx` | 38 | 10 |
+| `/*` | KioskRouteErrorPage | `apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx` | 10 | 7 |
+| `/activities` | BenefitActivitiesPage | `apps/kiosk/src/pages/activities/BenefitActivitiesPage.tsx` | 11 | 10 |
+| `/activities/:id` | BenefitActivityDetailPage | `apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx` | 11 | 10 |
+| `/assistant` | AssistantPage | `apps/kiosk/src/pages/assistant/AssistantPage.tsx` | 38 | 13 |
 | `/campus` | CampusPage | `apps/kiosk/src/pages/campus/CampusPage.tsx` | 33 | 8 |
 | `/companies` | CompaniesPage | `apps/kiosk/src/pages/companies/CompaniesPage.tsx` | 5 | 7 |
 | `/companies/:id` | CompanyDetailPage | `apps/kiosk/src/pages/companies/CompanyDetailPage.tsx` | 15 | 7 |
-| `/help` | HelpCenterPage | `apps/kiosk/src/pages/help/HelpCenterPage.tsx` | 10 | 5 |
+| `/help` | HelpCenterPage | `apps/kiosk/src/pages/help/HelpCenterPage.tsx` | 10 | 8 |
 | `/interview` | InterviewWorkbenchPage | `apps/kiosk/src/pages/interview/InterviewWorkbenchPage.tsx` | 15 | 20 |
 | `/interview/report` | Navigate | — _(重定向)_ | 0 | — |
 | `/interview/reports` | Navigate | — _(重定向)_ | 0 | — |
@@ -71,24 +72,26 @@ flowchart LR
 | `/jobs` | JobsPage | `apps/kiosk/src/pages/jobs/JobsPage.tsx` | 33 | 7 |
 | `/jobs/:id` | JobDetailPage | `apps/kiosk/src/pages/jobs/JobDetailPage.tsx` | 33 | 7 |
 | `/jobs/online-platforms` | Navigate | — _(重定向)_ | 0 | — |
-| `/legal/:doc` | LegalDocPage | `apps/kiosk/src/pages/legal/LegalDocPage.tsx` | 33 | 5 |
-| `/login` | LoginPage | `apps/kiosk/src/pages/auth/LoginPage.tsx` | 10 | 5 |
-| `/me/activity` | MyActivityPage | `apps/kiosk/src/pages/profile/me/MyActivityPage.tsx` | 10 | 6 |
-| `/me/ai-records` | MyAiRecordsPage | `apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx` | 23 | 6 |
-| `/me/benefits` | MyBenefitsPage | `apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx` | 11 | 5 |
-| `/me/documents` | MyDocumentsPage | `apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx` | 10 | 6 |
-| `/me/favorites` | MyFavoritesPage | `apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx` | 11 | 6 |
-| `/me/feedback` | MyFeedbackPage | `apps/kiosk/src/pages/profile/me/MyFeedbackPage.tsx` | 11 | 5 |
-| `/me/notifications` | MyNotificationsPage | `apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx` | 11 | 6 |
-| `/me/print-orders` | MyPrintOrdersPage | `apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx` | 10 | 6 |
-| `/me/privacy-requests` | MyPrivacyRequestsPage | `apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx` | 10 | 5 |
-| `/me/resumes` | MyResumesPage | `apps/kiosk/src/pages/profile/me/MyResumesPage.tsx` | 10 | 6 |
-| `/me/settings` | MySettingsPage | `apps/kiosk/src/pages/profile/me/MySettingsPage.tsx` | 18 | 5 |
-| `/member/qr-login` | MobileQrLoginPage | `apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx` | 10 | 1 |
+| `/k/l/:ticketId` | LoginTicketEntry | `apps/kiosk/src/pages/upload/KioskCodeEntryPage.tsx` | 10 | 2 |
+| `/k/u/:scene` | UploadSceneEntry | `apps/kiosk/src/pages/upload/KioskCodeEntryPage.tsx` | 10 | 2 |
+| `/legal/:doc` | LegalDocPage | `apps/kiosk/src/pages/legal/LegalDocPage.tsx` | 33 | 7 |
+| `/login` | LoginPage | `apps/kiosk/src/pages/auth/LoginPage.tsx` | 10 | 8 |
+| `/me/activity` | MyActivityPage | `apps/kiosk/src/pages/profile/me/MyActivityPage.tsx` | 10 | 11 |
+| `/me/ai-records` | MyAiRecordsPage | `apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx` | 23 | 11 |
+| `/me/benefits` | MyBenefitsPage | `apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx` | 11 | 10 |
+| `/me/documents` | MyDocumentsPage | `apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx` | 10 | 11 |
+| `/me/favorites` | MyFavoritesPage | `apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx` | 11 | 11 |
+| `/me/feedback` | MyFeedbackPage | `apps/kiosk/src/pages/profile/me/MyFeedbackPage.tsx` | 11 | 10 |
+| `/me/notifications` | MyNotificationsPage | `apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx` | 11 | 11 |
+| `/me/print-orders` | MyPrintOrdersPage | `apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx` | 10 | 11 |
+| `/me/privacy-requests` | MyPrivacyRequestsPage | `apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx` | 10 | 10 |
+| `/me/resumes` | MyResumesPage | `apps/kiosk/src/pages/profile/me/MyResumesPage.tsx` | 10 | 11 |
+| `/me/settings` | MySettingsPage | `apps/kiosk/src/pages/profile/me/MySettingsPage.tsx` | 18 | 10 |
+| `/member/qr-login` | MobileQrLoginPage | `apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx` | 10 | 2 |
 | `/print-scan` | PrintScanHomePage | `apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx` | 10 | 14 |
-| `/print-scan/convert` | ConvertImagesPage | `apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx` | 10 | 5 |
-| `/print-scan/feature/:key` | PrintScanFeatureInfoPage | `apps/kiosk/src/pages/print-scan/PrintScanFeatureInfoPage.tsx` | 0 | 7 |
-| `/print-scan/sign` | SignStampPage | `apps/kiosk/src/pages/print-scan/SignStampPage.tsx` | 12 | 5 |
+| `/print-scan/convert` | ConvertImagesPage | `apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx` | 10 | 8 |
+| `/print-scan/feature/:key` | PrintScanFeatureInfoPage | `apps/kiosk/src/pages/print-scan/PrintScanFeatureInfoPage.tsx` | 10 | 10 |
+| `/print-scan/sign` | SignStampPage | `apps/kiosk/src/pages/print-scan/SignStampPage.tsx` | 12 | 8 |
 | `/print/cashier` | PrintCashierPage | `apps/kiosk/src/pages/print/PrintCashierPage.tsx` | 10 | 13 |
 | `/print/confirm` | PrintConfirmPage | `apps/kiosk/src/pages/print/PrintConfirmPage.tsx` | 15 | 12 |
 | `/print/desk` | PrintDeskPage | `apps/kiosk/src/pages/print/PrintDeskPage.tsx` | 10 | 13 |
@@ -102,44 +105,46 @@ flowchart LR
 | `/print/scan-feature` | Navigate | — _(重定向)_ | 0 | — |
 | `/print/scan-sign` | Navigate | — _(重定向)_ | 0 | — |
 | `/print/upload` | PrintUploadPage | `apps/kiosk/src/pages/print/PrintUploadPage.tsx` | 10 | 14 |
-| `/profile` | ProfilePage | `apps/kiosk/src/pages/profile/ProfilePage.tsx` | 11 | 5 |
+| `/profile` | ProfilePage | `apps/kiosk/src/pages/profile/ProfilePage.tsx` | 11 | 10 |
 | `/renshi` | RenshiPage | `apps/kiosk/src/pages/renshi/RenshiPage.tsx` | 10 | 9 |
 | `/resume` | Navigate | — _(重定向)_ | 0 | — |
-| `/resume/career-plan` | CareerPlanPage | `apps/kiosk/src/pages/resume/CareerPlanPage.tsx` | 39 | 7 |
+| `/resume/career-plan` | CareerPlanPage | `apps/kiosk/src/pages/resume/CareerPlanPage.tsx` | 39 | 11 |
 | `/resume/export` | Navigate | — _(重定向)_ | 0 | — |
-| `/resume/generate` | ResumeGeneratePage | `apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx` | 33 | 8 |
-| `/resume/generate/preview` | ResumeGeneratePreviewPage | `apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx` | 34 | 7 |
-| `/resume/job-fit` | JobFitPage | `apps/kiosk/src/pages/resume/JobFitPage.tsx` | 37 | 6 |
-| `/resume/job-fit/actions` | JobFitActionsPage | `apps/kiosk/src/pages/resume/JobFitActionsPage.tsx` | 37 | 7 |
-| `/resume/materials` | JobMaterialLibraryPage | `apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx` | 10 | 5 |
+| `/resume/generate` | ResumeGeneratePage | `apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx` | 33 | 10 |
+| `/resume/generate/preview` | ResumeGeneratePreviewPage | `apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx` | 34 | 9 |
+| `/resume/job-fit` | JobFitPage | `apps/kiosk/src/pages/resume/JobFitPage.tsx` | 37 | 10 |
+| `/resume/job-fit/actions` | JobFitActionsPage | `apps/kiosk/src/pages/resume/JobFitActionsPage.tsx` | 37 | 11 |
+| `/resume/materials` | JobMaterialLibraryPage | `apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx` | 10 | 8 |
 | `/resume/optimize` | ResumeOptimizePage | `apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx` | 34 | 10 |
 | `/resume/optimize/compare` | ResumeOptimizeComparePage | `apps/kiosk/src/pages/resume/ResumeOptimizeComparePage.tsx` | 33 | 8 |
 | `/resume/parse` | ResumeParsePage | `apps/kiosk/src/pages/resume/ResumeParsePage.tsx` | 33 | 11 |
 | `/resume/report` | ResumeReportPage | `apps/kiosk/src/pages/resume/ResumeReportPage.tsx` | 34 | 10 |
-| `/resume/self-assessment/history` | SelfAssessmentHistoryPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 6 |
-| `/resume/self-assessment/intro` | SelfAssessmentIntroPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 6 |
-| `/resume/self-assessment/questions` | SelfAssessmentQuizPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 6 |
-| `/resume/self-assessment/result` | SelfAssessmentResultPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 6 |
+| `/resume/self-assessment/history` | SelfAssessmentHistoryPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 9 |
+| `/resume/self-assessment/intro` | SelfAssessmentIntroPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 9 |
+| `/resume/self-assessment/questions` | SelfAssessmentQuizPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 9 |
+| `/resume/self-assessment/result` | SelfAssessmentResultPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 9 |
 | `/resume/source` | ResumeSourcePage | `apps/kiosk/src/pages/resume/ResumeSourcePage.tsx` | 33 | 8 |
-| `/resume/templates` | ResumeTemplateLibraryPage | `apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx` | 10 | 7 |
+| `/resume/templates` | ResumeTemplateLibraryPage | `apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx` | 10 | 11 |
 | `/resume/upload` | Navigate | — _(重定向)_ | 0 | — |
-| `/scan` | ScanWorkbenchPage | `apps/kiosk/src/pages/scan/ScanWorkbenchPage.tsx` | 10 | 7 |
+| `/scan` | ScanWorkbenchPage | `apps/kiosk/src/pages/scan/ScanWorkbenchPage.tsx` | 10 | 10 |
 | `/scan/progress` | Navigate | — _(重定向)_ | 0 | — |
 | `/scan/result` | Navigate | — _(重定向)_ | 0 | — |
 | `/scan/settings` | Navigate | — _(重定向)_ | 0 | — |
 | `/scan/start` | Navigate | — _(重定向)_ | 0 | — |
-| `/screensaver` | ScreensaverPage | `apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx` | 10 | 5 |
+| `/screensaver` | ScreensaverPage | `apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx` | 10 | 10 |
 | `/smart-campus` | SmartCampusHomePage | `apps/kiosk/src/pages/smart-campus/SmartCampusHomePage.tsx` | 10 | 7 |
 | `/smart-campus/service/:key` | SmartCampusGuard | `apps/kiosk/src/pages/smart-campus/SmartCampusGuard.tsx` | 10 | 6 |
 | `/smart-campus/welcome` | SmartCampusGuard | `apps/kiosk/src/pages/smart-campus/SmartCampusGuard.tsx` | 10 | 6 |
-| `/upload/phone` | PhoneUploadPage | `apps/kiosk/src/pages/upload/PhoneUploadPage.tsx` | 10 | 1 |
+| `/upload/phone` | PhoneUploadPage | `apps/kiosk/src/pages/upload/PhoneUploadPage.tsx` | 10 | 2 |
 
 <details>
-<summary>展开：每个路由触达的端点（68 个路由）</summary>
+<summary>展开：每个路由触达的端点（72 个路由）</summary>
 
 **`/`** → `DELETE /me/job-ai-sessions/:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/parse`
 
-**`/activities`** → `POST /activities/:param/claim`
+**`/*`** → `GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
+
+**`/activities`** → `GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /activities/:param/claim`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 
 **`/activities/:id`** → `GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /activities/:param/claim`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 
@@ -177,6 +182,10 @@ flowchart LR
 
 **`/jobs/:id`** → `DELETE /me/job-ai-sessions/:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/parse`
 
+**`/k/l/:ticketId`** → `GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
+
+**`/k/u/:scene`** → `GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
+
 **`/legal/:doc`** → `DELETE /me/job-ai-sessions/:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/parse`
 
 **`/login`** → `GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
@@ -208,6 +217,8 @@ flowchart LR
 **`/print-scan`** → `GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 
 **`/print-scan/convert`** → `GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
+
+**`/print-scan/feature/:key`** → `GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 
 **`/print-scan/sign`** → `GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /print/sign/compose`、`POST /print/sign/inspect`
 
