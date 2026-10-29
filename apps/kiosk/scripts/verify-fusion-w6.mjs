@@ -217,6 +217,8 @@ const WAVE_ROUTES = new Map([
   ]],
   ['W5', [
     '/login', '/member/qr-login', '/upload/phone', '/legal/:doc', '/screensaver',
+    // 2026-10-29 一体机手机码短链的网页中转，与上面两个手机辅助页同一口径（顶层、手机视口）。
+    '/k/u/:scene', '/k/l/:ticketId',
     '/session-timeout', '/error-offline', '/profile', '/me/resumes', '/me/print-orders',
     '/me/documents', '/me/favorites', '/me/ai-records', '/me/benefits', '/me/activity',
     '/me/activity/:id', '/me/notifications', '/me/feedback', '/me/settings',
@@ -301,7 +303,14 @@ check('single main landmark', () => {
 })
 
 check('mobile routes', () => {
-  const mobile = ['/member/qr-login', '/upload/phone']
+  // 后两条是一体机手机码短链的网页中转（2026-10-29），兑换或校验后 replace 到前两条。
+  const mobilePages = {
+    '/member/qr-login': 'src/pages/auth/MobileQrLoginPage.tsx',
+    '/upload/phone': 'src/pages/upload/PhoneUploadPage.tsx',
+    '/k/u/:scene': 'src/pages/upload/KioskCodeEntryPage.tsx',
+    '/k/l/:ticketId': 'src/pages/upload/KioskCodeEntryPage.tsx',
+  }
+  const mobile = Object.keys(mobilePages)
   for (const path of mobile) {
     const route = routeInventory.find((candidate) => candidate.path === path)
     assert.ok(route, `missing mobile helper ${path}`)
@@ -309,12 +318,12 @@ check('mobile routes', () => {
   }
   assert.ok(!manifest.paths.includes('/login/mobile'), 'obsolete /login/mobile alias must not be introduced')
   const expectedFullScreen = [
-    '/login', '/member/qr-login', '/upload/phone', '/legal/:doc', '/resume/job-fit',
+    '/login', '/member/qr-login', '/upload/phone', '/k/u/:scene', '/k/l/:ticketId', '/legal/:doc', '/resume/job-fit',
     '/resume/career-plan', '/interview/setup', '/interview/session', '/interview/report',
     '/interview/tips', '/interview/reports', '/screensaver', '/session-timeout', '/error-offline',
   ]
   for (const path of expectedFullScreen) {
-    const expectedDepth = ['/member/qr-login', '/upload/phone'].includes(path) ? 0 : 2
+    const expectedDepth = mobile.includes(path) ? 0 : 2
     assert.equal(
       routeInventory.find((route) => route.path === path)?.depth,
       expectedDepth,
@@ -324,7 +333,7 @@ check('mobile routes', () => {
   const routesSource = readKiosk('src/routes/index.tsx')
   assert.match(routesSource, /element:\s*<KioskRuntimeRoot\s*\/>/, 'terminal full-screen routes retain the non-visual security root')
   for (const path of mobile) {
-    const page = path === '/member/qr-login' ? 'src/pages/auth/MobileQrLoginPage.tsx' : 'src/pages/upload/PhoneUploadPage.tsx'
+    const page = mobilePages[path]
     const source = readKiosk(page)
     assert.match(source, /data-kiosk-presentation=["']fusion-youth["']/, `${path} retains fusion presentation`)
     assert.match(source, /data-kiosk-viewport=["']mobile["']/, `${path} retains mobile viewport`)
@@ -522,7 +531,7 @@ check('W6 route acceptance contract', () => {
     const object = element
     const pattern = directString(object, 'pattern')
     assert.ok(pattern, 'W6 route pattern must be a direct string')
-    const viewport = ['/member/qr-login', '/upload/phone'].includes(pattern) ? 'mobile' : 'kiosk'
+    const viewport = ['/member/qr-login', '/upload/phone', '/k/u/:scene', '/k/l/:ticketId'].includes(pattern) ? 'mobile' : 'kiosk'
     const landmark = directString(object, 'landmark') ?? 'main'
     const requiresFusionRoot = directBoolean(object, 'requiresFusionRoot') ?? true
     const explicitTouchTargets = directBoolean(object, 'requiresTouchTargets')
@@ -539,7 +548,8 @@ check('W6 route acceptance contract', () => {
   assert.equal(new Set(routes.map(({ pattern }) => pattern)).size, routes.length, 'W6 route cases must be unique')
   assert.deepEqual(routes.map(({ pattern }) => pattern).sort(), [...manifest.paths].sort(), 'W6 cases and manifest differ')
   const mobileCount = routes.filter(({ viewport }) => viewport === 'mobile').length
-  assert.equal(mobileCount, 2, 'W6 mobile allocation')
+  // 2 → 4（2026-10-29）：扫码登录、手机上传，加两者的短链网页中转。
+  assert.equal(mobileCount, 4, 'W6 mobile allocation')
 })
 
 check('W6 browser collection contract', () => {

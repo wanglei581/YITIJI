@@ -1,3 +1,4 @@
+import { loadPartnerAiServices } from './console-screen.partner-ai'
 import { Injectable, Logger } from '@nestjs/common'
 import { SCREEN_CACHE_TTL_SECONDS } from './console-screen.types'
 import type {
@@ -206,9 +207,10 @@ export class ConsoleScreenUsageService {
     rowCap: number,
   ): Promise<CachedUsage> {
     const span = usageWindow(range, now)
-    const [facts, visits] = await Promise.all([
+    const [facts, visits, aiServices] = await Promise.all([
       this.settle('partnerUsage', () => loadPartnerUsageFacts(this.prisma, orgId, span.from, span.to, rowCap)),
       this.settle('partnerVisits', () => countOrgVisits(this.prisma, orgId, span.from, span.to)),
+      this.settle('partnerAiServices', () => loadPartnerAiServices(this.prisma, orgId, span.from, span.to)),
     ])
     const metrics: ScreenUsageMetrics = {
       partnerContent: this.fromFacts(facts, 'BrowseLog/Favorite/ExternalJumpLog join sourceOrgId', range, (value) => ({
@@ -230,10 +232,11 @@ export class ConsoleScreenUsageService {
           .slice(0, 5),
       })),
       visits: visitMetric(visits, range, true),
+      partnerAiServices: this.fromFacts(aiServices, 'AiServiceFact', range, (value) => value),
     }
-    const status = snapshotLoadStatus([facts, visits].filter((part) => part.ok).length, 2)
+    const status = snapshotLoadStatus([facts, visits, aiServices].filter((part) => part.ok).length, 3)
     return {
-      failed: !facts.ok || !visits.ok,
+      failed: !facts.ok || !visits.ok || !aiServices.ok,
       snapshot: this.envelope('partner', range, span, status, metrics),
     }
   }
