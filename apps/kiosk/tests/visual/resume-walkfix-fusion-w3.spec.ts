@@ -31,6 +31,57 @@ function shell(api: ApiRouter, configExtras: Record<string, unknown> = {}): void
   api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
 }
 
+/** 从零生成：模型回的一份简历。经历描述里新写进了「1500 件」「0.5%」两个数，「负责」是用户自己写过的词。 */
+const GENERATED = {
+  taskId: 'gen-task-walkfix-1',
+  status: 'completed',
+  providerName: 'llm:deepseek',
+  resume: {
+    basic: { name: '周敏', phone: '13800000614', email: 'zhoumin@example.com', city: '青岛' },
+    intention: { position: '仓储分拣员', city: '青岛' },
+    summary: '求职方向为仓储分拣员。熟悉岗位日常工作，做事细致，能适应夜班。',
+    education: [{ school: '青岛西海岸职业中等专业学校', major: '物流服务与管理', period: '2022.09 - 2025.06' }],
+    experience: [{ company: '青岛崂山某配送服务有限公司', role: '夜班分拣员', period: '2024.07 - 至今', description: '负责夜班包裹分拣与装车，日均分拣约 1500 件，错分率控制在 0.5% 以内。' }],
+    projects: [],
+    skills: ['叉车操作', 'Excel 表格'],
+    certificates: ['机动车驾驶证 C1'],
+  },
+  missingHints: [],
+}
+const GEN_EXPORTED = {
+  fileId: 'gen-file-walkfix-1',
+  filename: 'AI简历_周敏.pdf',
+  sizeBytes: 105472,
+  pageCount: 1,
+  signedUrl: '/w3-fixtures/gen-walkfix.pdf',
+  expiresAt: '2099-01-01T00:30:00.000Z',
+  printFileUrl: '/api/v1/files/gen-file-walkfix-1/content?expires=1&sig=walkfix',
+}
+
+/** 从首页进「从零生成」之前先把壳层、能力读数备好。 */
+function generateShell(api: ApiRouter, configExtras: Record<string, unknown> = {}): void {
+  shell(api, configExtras)
+  api.respond('POST', '/api/v1/resume/generate', { status: 200, json: GENERATED })
+  api.respond('POST', '/api/v1/resume/generate/export', { status: 200, json: GEN_EXPORTED })
+}
+
+/** 六步填到「核对」。没填的项不碰；经历描述写的是用户自己的话。 */
+async function fillGenerateFormToReview(page: Page): Promise<void> {
+  await page.goto('/resume/generate')
+  await page.getByRole('textbox', { name: /^姓名/ }).fill('周敏')
+  await page.getByRole('button', { name: /^下一步：求职意向/ }).click()
+  await page.getByRole('textbox', { name: /^目标岗位/ }).fill('仓储分拣员')
+  await page.getByRole('button', { name: /^下一步：教育经历/ }).click()
+  await page.getByRole('textbox', { name: /^学校/ }).fill('青岛西海岸职业中等专业学校')
+  await page.getByRole('button', { name: /^下一步：工作经历/ }).click()
+  await page.getByRole('textbox', { name: /^公司/ }).fill('青岛崂山某配送服务有限公司')
+  await page.getByRole('textbox', { name: /^职位/ }).fill('夜班分拣员')
+  await page.getByRole('textbox', { name: /^做了什么/ }).fill('负责夜班包裹分拣与装车。')
+  await page.getByRole('button', { name: /^下一步：项目经历/ }).click()
+  await page.getByRole('button', { name: /^下一步：技能证书/ }).click()
+  await page.getByRole('button', { name: '去核对' }).click()
+}
+
 /** 在小青页用屏上键盘问一句，等回答出来。 */
 async function askXiaoqing(page: Page, api: ApiRouter): Promise<void> {
   shell(api)
@@ -126,4 +177,34 @@ test('AI 没暂停或没读到暂停状态时简历服务台照常，不多出�
   await expect(page.locator('[data-qx-page="resume"]')).toBeVisible()
   await expect(page.locator('.qxt-slab-off')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '可以先打印原件' })).toHaveCount(0)
+})
+
+// ── I-21 ───────────────────────────────────────────────────────────────────
+// 走查实录：预览页橙条写「待本人确认：负责、1500、0.5%」，导出前的核对弹层里也有这一行，普通人读不懂。
+// 判据：①「待本人确认」下面写清为什么要本人确认——这几处是 AI 整理时新写进去的、你原来的内容里没有；
+//      ② 只列真正新写进去的：用户自己写过的词（这里的「负责」）不算，来源是把本次填的内容带到预览页做对照。
+test('预览页与核对弹层把「待本人确认」讲明白，并且只列 AI 新写进去的 @w3-kiosk', async ({ page, api }) => {
+  generateShell(api)
+  await page.route('**/w3-fixtures/gen-walkfix.pdf', (route) => route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n%%EOF' }))
+  await fillGenerateFormToReview(page)
+  await page.getByRole('button', { name: /让 AI 整理成新简历/ }).click()
+  await expect(page).toHaveURL(/\/resume\/generate\/preview/)
+
+  const banner = page.locator('.qx-rd-pending')
+  await expect(banner).toBeVisible()
+  // 只列新写进去的两个数；用户自己写的「负责」不算
+  await expect(banner).toContainText('待本人确认：1500、0.5%')
+  await expect(banner).not.toContainText('负责')
+  await expect(banner).toContainText('AI 整理时新写进了这几处，你原来的内容里没有')
+  await expect(banner).toContainText('不是，就改掉或删掉再导出')
+
+  // 去导出 → 选格式 → 导出这一份：核对弹层里同样讲明白
+  await page.getByRole('button', { name: '内容没问题，去导出' }).click()
+  await page.getByRole('button', { name: '导出这一份' }).click()
+  const dialog = page.getByRole('dialog', { name: '导出前核对事实' })
+  await expect(dialog).toBeVisible()
+  const note = dialog.locator('.qx-rd-pending')
+  await expect(note).toContainText('待本人确认：1500、0.5%')
+  await expect(note).not.toContainText('负责')
+  await expect(note).toContainText('AI 整理时新写进了这几处，你原来的内容里没有')
 })

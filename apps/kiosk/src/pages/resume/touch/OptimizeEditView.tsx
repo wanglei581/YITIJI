@@ -8,6 +8,7 @@ import type { ResumeLayoutAdjustAction } from '../../../services/api/ai'
 import { OptimizedResumeEditor } from '../components/OptimizedResumeEditor'
 import { ResumeLayoutControls } from '../components/ResumeLayoutControls'
 import { AIGC_SCREEN_MARK, COMPRESS_ONE_PAGE, HTML_PREVIEW_NOTE } from '../components/resume-deliver/constants'
+import { UNCONFIRMED_WHY } from '../components/resume-deliver/facts'
 import { ResumeVersionsPanel } from '../components/resume-deliver/ResumeVersionsPanel'
 import './edit.css'
 
@@ -74,7 +75,7 @@ export function OptimizeEditView(props: {
           <div><b>页数</b><span>{props.estimatedPagesLabel}</span></div>
           <div className="qxt-wide"><b>模板</b><span>{selected ? `当前选中「${selected.title}」。想换别的，去右边素材库。` : '没有选中模板，导出用默认版式。想换，去右边素材库。'}</span></div>
           <div><b>状态</b><span>{props.saveText}。选择和版式要在编辑区里才进导出。</span></div>
-          <div className="qxt-wide"><b>事实</b><span>{pending > 0 ? `还有 ${pending} 处待确认：${props.unconfirmed.join('、')}。未全勾不能出文件。` : '改写里没有原文之外的新增事实；导出前仍要逐项核对。'}</span></div>
+          <div className="qxt-wide"><b>事实</b><span>{pending > 0 ? `还有 ${pending} 处待确认：${props.unconfirmed.join('、')}。${UNCONFIRMED_WHY}未全勾不能出文件。` : '改写里没有原文之外的新增事实；导出前仍要逐项核对。'}</span></div>
           <div><b>主色</b><span>现在是{ACCENT_NAME[layout.accent] ?? layout.accent}。要改就点右边的色块，绿和灰同样能选。</span></div>
           <div><b>栏数</b><span>现在是{layout.columns === 2 ? '双栏' : '单栏'}。字号、行距、页边距在「更多版式」里。</span></div>
         </div>

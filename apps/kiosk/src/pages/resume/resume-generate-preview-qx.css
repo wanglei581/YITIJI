@@ -8,6 +8,8 @@
   font-size: var(--qx-fs-aux);
 }
 
+.qx-resume-generate .qx-rd-pending .qx-rd-pending-why { display: block; margin-top: 4px; font-weight: 500; }
+
 .qx-sec-h h2.t { margin: 0; }
 
 .qx-rg-no {

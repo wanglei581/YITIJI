@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { QxTouchOverlay } from '../../../../components/qingxu/touch/QxTouchOverlay'
 import { maskPii } from '../../../../utils/maskPii'
-import type { ConfirmableFact } from './facts'
+import { UNCONFIRMED_WHY, type ConfirmableFact } from './facts'
 
 /**
  * 导出前核对事实：逐项勾「已核对」，未全勾不能出文件。系统不替本人确认学校、公司、时间段、证书或电话。
@@ -48,6 +48,7 @@ export function ResumeFactConfirmDialog(props: {
           {props.unconfirmed.length > 0 && (
             <p className="qxt-pending" role="note">
               待本人确认：{props.unconfirmed.map((item) => maskPii(item)).join('、')}
+              <span className="qxt-pending-why">{UNCONFIRMED_WHY}</span>
             </p>
           )}
           {props.facts.length === 0 ? (
@@ -88,6 +89,7 @@ export function ResumeFactConfirmDialog(props: {
         {props.unconfirmed.length > 0 && (
           <p className="qx-rd-pending" role="note">
             待本人确认：{props.unconfirmed.map((item) => maskPii(item)).join('、')}
+            <span className="qx-rd-pending-why">{UNCONFIRMED_WHY}</span>
           </p>
         )}
         {props.facts.length === 0 ? (

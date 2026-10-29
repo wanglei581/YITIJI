@@ -330,6 +330,7 @@
 .qxt-screen .qxt-dialog:has([data-qx-page='resume-fact']) h2 { align-self: flex-start; text-align: left; }
 [data-qx-page='resume-fact'] p { margin: 0; font-size: 22px; line-height: 1.45; color: var(--qxt-ink-2); }
 [data-qx-page='resume-fact'] .qxt-pending { font-size: 24px; font-weight: 700; color: var(--qxt-clay-ink); }
+[data-qx-page='resume-fact'] .qxt-pending .qxt-pending-why { display: block; margin-top: 4px; font-size: 22px; font-weight: 500; line-height: 1.45; }
 [data-qx-page='resume-fact'] .qxt-factlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 
 [data-qx-page='resume-fact'] .qxt-factrow {

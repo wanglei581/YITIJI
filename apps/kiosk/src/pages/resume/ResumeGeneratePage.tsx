@@ -224,8 +224,9 @@ export function ResumeGeneratePage() {
         setError(unattendedReason(result.failReason, 'AI 简历生成失败，请稍后重试'))
         return
       }
-      // 只传 result：预览页的 LocationState 虽然声明了 input，但从未解引用过。
-      navigate('/resume/generate/preview', { state: { result } })
+      // 连同本次填的内容一起交给预览页：它要拿填写的原话和模型的输出对照，找出「AI 新写进去的数和职责词」让本人确认；
+      // 不带 input，用户自己写过的词（如「负责」）也会被当成新写进去的（走查 I-21）。
+      navigate('/resume/generate/preview', { state: { result, input } })
     } catch (err) {
       const declined = aiDeclarationDeclineMessage(err)
       if (declined) {
