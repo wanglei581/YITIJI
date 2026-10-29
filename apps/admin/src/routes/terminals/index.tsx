@@ -165,6 +165,7 @@ export default function TerminalsPage() {
     if (statusSavingId !== null) return
     setEditingId(terminal.id)
     setEditValue(terminal.orgId ?? '')
+    setOrgLicenseError(null)
     setProfileEditingId(null)
     setNotice(null)
   }

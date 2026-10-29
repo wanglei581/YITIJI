@@ -77,7 +77,7 @@ export function CreatePlannedTerminalDialog({ organizations, onClose, onCreated,
               {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
             </select>
           </label>
-          {licenseError && <p role="alert" className="text-sm text-error-fg">{licenseError} <a className="underline" href={`/partners?org=${encodeURIComponent(orgId)}`}>查看该机构的授权</a></p>}
+          {licenseError && <p role="alert" className="text-sm text-error-fg">{licenseError} <a className="underline" href={`/partners?org=${encodeURIComponent(orgId)}`} target="_blank" rel="noopener noreferrer">查看该机构的授权</a></p>}
         </div>
 
         {errorMessage ? (

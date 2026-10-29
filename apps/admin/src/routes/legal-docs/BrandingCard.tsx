@@ -69,7 +69,7 @@ export function BrandingCard() {
         </div>)}
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
         {notice && <p role="status" className="text-sm text-neutral-700">{notice}</p>}
-        <div><button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-primary-600 px-4 py-2 text-sm text-white disabled:opacity-60">{saving ? '保存中…' : '保存'}</button></div>
+        <div><button type="button" disabled={saving} onClick={() => void save()} className="min-h-11 rounded-lg bg-primary-600 px-4 text-sm text-white disabled:opacity-60">{saving ? '保存中…' : '保存'}</button></div>
       </div>}
   </Card>
 }

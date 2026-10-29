@@ -179,7 +179,7 @@ export function TerminalDetailDrawer({
                 <Button size="sm" onClick={() => onSaveOrg(terminal)} disabled={savingOrg} aria-label="保存归属"><CheckIcon className="h-4 w-4" /></Button>
                 <Button size="sm" variant="outline" onClick={onCancelOrgEdit} disabled={savingOrg} aria-label="取消"><XIcon className="h-4 w-4" /></Button>
               </div>
-              {orgLicenseError && <p role="alert" className="text-xs text-error-fg">{orgLicenseError} <a className="underline" href={`/partners?org=${encodeURIComponent(editOrgValue)}`}>查看该机构的授权</a></p>}
+              {orgLicenseError && <p role="alert" className="text-xs text-error-fg">{orgLicenseError} <a className="underline" href={`/partners?org=${encodeURIComponent(editOrgValue)}`} target="_blank" rel="noopener noreferrer">查看该机构的授权</a></p>}
             </>
           ) : (
             <>

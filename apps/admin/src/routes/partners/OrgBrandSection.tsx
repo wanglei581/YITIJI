@@ -47,10 +47,10 @@ export function OrgBrandSection({ detail, onChanged }: { detail: AdminOrgDetail;
         <input id={`${uid}-${key}`} aria-describedby={`${uid}-${key}-hint`} className="mt-1 w-full rounded-lg border px-3 py-2" value={draft[key] ?? ''} placeholder={platform[key] || platform.defaults[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} />
         <span id={`${uid}-${key}-hint`} className="block text-xs text-neutral-500">留空用平台品牌：{platform[key] || platform.defaults[key]}</span>
       </div>)}
-      <BrandLogoField url={draft.brandLogoUrl} onChange={(id, url) => setDraft({ ...draft, brandLogoAssetId: id, brandLogoUrl: url })} />
+      <BrandLogoField url={draft.brandLogoUrl} clearLabel="改用平台 Logo" onChange={(id, url) => setDraft({ ...draft, brandLogoAssetId: id, brandLogoUrl: url })} />
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       {notice && <p role="status" className="text-sm text-neutral-700">{notice}</p>}
-      <button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-primary-600 px-4 py-2 text-sm text-white disabled:opacity-60">{saving ? '保存中…' : '保存机构品牌'}</button>
+      <button type="button" disabled={saving} onClick={() => void save()} className="min-h-11 rounded-lg bg-primary-600 px-4 text-sm text-white disabled:opacity-60">{saving ? '保存中…' : '保存机构品牌'}</button>
     </>}
   </section>
 }
