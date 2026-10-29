@@ -25,7 +25,7 @@ export const DOCUMENT_PURPOSES = ['resume_upload', 'print_doc', 'contract_upload
 
 /** 链接本身的问题：invalid 只表示缺 sessionId / token（与过期无关）；用途读不懂不算链接坏。 */
 export type LinkIssue = 'invalid' | null
-export function linkIssueOf(sessionId: string, uploadToken: string, _purpose?: string): LinkIssue {
+export function linkIssueOf(sessionId: string, uploadToken: string): LinkIssue {
   return sessionId && uploadToken ? null : 'invalid'
 }
 
@@ -177,7 +177,7 @@ export function chromeCopy(issue: LinkIssue, state: UploadState, confirmedLabel:
   }
 }
 
-export function takeoverCopy(_issue: Exclude<LinkIssue, null>) {
+export function takeoverCopy() {
   return {
     kind: 'warn' as const, icon: 'alert' as IconKey, head: '这个链接不能用来上传',
     body: '链接里缺少必要信息，本页不知道该把文件发到哪一次上传。请回到一体机，在屏幕上重新生成上传二维码。',

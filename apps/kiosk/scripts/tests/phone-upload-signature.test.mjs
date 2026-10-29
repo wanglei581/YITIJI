@@ -64,10 +64,9 @@ test('回执用途是 signature_image 算「已收到」，确认后的用途就
 })
 
 test('链接不再有「签名不可用」这一态：带 signature_image 的链接缺了会话号才算坏', () => {
-  assert.equal(model.linkIssueOf('sess', 'token', 'signature_image'), null)
-  assert.equal(model.linkIssueOf('sess', 'token', 'print_doc'), null)
-  assert.equal(model.linkIssueOf('', 'token', 'signature_image'), 'invalid')
-  assert.equal(model.linkIssueOf('sess', '', 'signature_image'), 'invalid')
+  assert.equal(model.linkIssueOf('sess', 'token'), null)
+    assert.equal(model.linkIssueOf('', 'token'), 'invalid')
+  assert.equal(model.linkIssueOf('sess', ''), 'invalid')
 })
 
 test('上传前的通用档：文档类用途取交集，PDF 仍可选；签名链接只收紧到 JPG / PNG，不放宽', () => {

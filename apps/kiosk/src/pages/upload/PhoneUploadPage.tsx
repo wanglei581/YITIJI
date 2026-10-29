@@ -178,7 +178,7 @@ export function PhoneUploadPage() {
   const sessionId = hashParams.get('sessionId')?.trim() ?? ''
   const uploadToken = hashParams.get('token')?.trim() ?? ''
   const purposeHint = hashParams.get('purpose')?.trim() ?? ''
-  const issue = linkIssueOf(sessionId, uploadToken, purposeHint)
+  const issue = linkIssueOf(sessionId, uploadToken)
   const ready = issue === null
   const hinted = isSessionPurpose(purposeHint) ? purposes[purposeHint] : null
   // 上传前的通用档：文档类用途 accept 的交集；链接写着是签名图时只收紧到 JPG / PNG，永不放宽。
@@ -208,7 +208,7 @@ export function PhoneUploadPage() {
     : null
   const canPick = !kiosk && ready && view?.picker === 'ready'
   const chrome = chromeCopy(issue, s.state, confirmed?.label ?? null)
-  const takeover = issue ? takeoverCopy(issue) : null
+  const takeover = issue ? takeoverCopy() : null
   const chipsText = policy.chips.join(' / ')
   const formatsNote = signatureLink
     ? `在系统核对用途之前，本页只放行 **${chipsText}**。要传其他格式，请回一体机按那一步屏幕上的说明操作。`
