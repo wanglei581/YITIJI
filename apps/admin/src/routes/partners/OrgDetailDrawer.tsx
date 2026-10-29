@@ -6,6 +6,7 @@ import { orgsAdminService, type AdminOrgDetail, type UpdateOrgInput } from '../.
 import { inputCls, Field, InlineError, ModulesPicker, SceneTemplateReadonly } from './orgFormParts'
 import { PartnerAccountManager } from './PartnerAccountManager'
 import { OrgBrandSection } from './OrgBrandSection'
+import { OrgLicenseSection } from './OrgLicenseSection'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { OrgContentTrustPanel } from './OrgContentTrustPanel'
 import { OrgCircuitBreakPanel } from './OrgCircuitBreakPanel'
@@ -177,6 +178,7 @@ export function OrgDetailDrawer({
 
           {/* 内容可信:发布闸门的人工入口。放在档案之后、账号之前 ——
               它决定这家机构的内容能不能对公众可见,比账号管理更靠前。 */}
+          <OrgLicenseSection key={orgId} orgId={orgId ?? detail.id} onChanged={onChanged} />
           <FirstOrderPanel key={orgId ?? detail.id} orgId={orgId ?? detail.id} section={section} projectId={projectId} onSectionChange={onSectionChange} onProjectChange={onProjectChange} />
 
           <OrgContentTrustPanel
