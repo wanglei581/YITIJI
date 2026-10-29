@@ -260,14 +260,14 @@
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/branding` | BrandingAdminController.get | admin | BrandingService | AuditLog<br/>BrandLogo<br/>PlatformSetting |
 | PUT | `/api/v1/admin/branding` | BrandingAdminController.update | admin | BrandingService | AuditLog<br/>BrandLogo<br/>PlatformSetting |
-| POST | `/api/v1/admin/branding/logo` | BrandingAdminController.uploadLogo | admin | BrandLogoService | AuditLog<br/>BrandLogo |
+| POST | `/api/v1/admin/branding/logo` | BrandingAdminController.uploadLogo | admin | BrandLogoService | AuditLog<br/>BrandLogo<br/>PlatformSetting |
 
 ## `services/api/src/branding/branding.public.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/public/brand` | BrandingPublicController.brand | — | BrandingService | AuditLog<br/>BrandLogo<br/>PlatformSetting |
-| GET | `/api/v1/public/brand-logo/:assetId` | BrandingPublicController.logo | — | BrandLogoService | AuditLog<br/>BrandLogo |
+| GET | `/api/v1/public/brand-logo/:assetId` | BrandingPublicController.logo | — | BrandLogoService | AuditLog<br/>BrandLogo<br/>PlatformSetting |
 | GET | `/api/v1/public/kiosk-profile` | BrandingPublicController.kioskProfile | — | KioskProfileService | PlatformSetting<br/>Terminal |
 
 ## `services/api/src/bulk-publish/bulk-publish.controller.ts`

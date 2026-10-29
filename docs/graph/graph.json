@@ -920,7 +920,8 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "BrandLogo"
+          "BrandLogo",
+          "PlatformSetting"
         ],
         "path": "/api/v1/admin/branding/logo",
         "roles": [
@@ -11705,7 +11706,8 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "BrandLogo"
+          "BrandLogo",
+          "PlatformSetting"
         ],
         "path": "/api/v1/public/brand-logo/:assetId",
         "roles": [],
@@ -18671,6 +18673,7 @@
         "name": "PlatformSetting",
         "relations": [],
         "usedBy": [
+          "services/api/src/branding/brand-logo.service.ts",
           "services/api/src/branding/branding.service.ts",
           "services/api/src/support-contact/support-contact.service.ts"
         ]
