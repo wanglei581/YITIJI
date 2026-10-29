@@ -1,4 +1,5 @@
 import type { CreateLicenseInput, LicenseAttention, LicenseMode, LicenseMutationResult, LicenseResumeInput, LicenseStatusChangeInput, LicenseView, OrgLicenseDetail, RenewLicenseInput, SetLicenseModeInput, UpdateLicenseInput } from '@ai-job-print/shared'
+import { LICENSE_PERIOD_TOO_LONG_MESSAGE, maxEndsOn } from '../../lib/licensePeriod'
 
 const DAY = 86_400_000
 export class MockLicenseError extends Error {
@@ -40,8 +41,9 @@ function day(value: unknown): string {
   return s
 }
 export function validatePeriod(start: unknown, end: unknown): [string, string] {
-  const a = day(start), b = day(end), length = diff(b, a) + 1
-  if (length < 1 || length > 10 * 366) return fail('LICENSE_PERIOD_INVALID', length < 1 ? '到期日不能早于生效日' : '一条授权的期限不能超过 10 年')
+  const a = day(start), b = day(end)
+  if (b < a) return fail('LICENSE_PERIOD_INVALID', '到期日不能早于生效日')
+  if (b > (maxEndsOn(a) ?? '')) return fail('LICENSE_PERIOD_INVALID', LICENSE_PERIOD_TOO_LONG_MESSAGE)
   return [a, b]
 }
 function numberIn(value: unknown, max: number, code: string, label: string, min: number): number {
