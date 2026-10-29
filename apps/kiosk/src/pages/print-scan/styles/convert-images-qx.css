@@ -152,9 +152,10 @@
   gap: 4px;
 }
 
+/* 24px 标题行的行高不低于 1.45（原因见 tool-fs.css 顶部「行高底线」），下面 .i2p-sample .tx b、.i2p-band-h 同。 */
 .i2p-imeta b {
   font-size: 24px;
-  line-height: 1.3;
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
@@ -267,7 +268,7 @@
 
 .i2p-sample .tx b {
   font-size: 24px;
-  line-height: 1.3;
+  line-height: 1.45;
   color: var(--qxt-ink);
   overflow-wrap: anywhere;
 }
@@ -299,7 +300,7 @@
   gap: 12px;
   font-size: 24px;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.45;
 }
 
 .i2p-band-p {
