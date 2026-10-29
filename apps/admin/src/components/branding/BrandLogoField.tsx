@@ -26,11 +26,13 @@ export function BrandLogoField({ url, onChange }: { url: string | null; onChange
     } catch (e) { setError(brandingError(e, '图片上传失败，请稍后重试')) } finally { setBusy(false) }
   }
   return <div className="space-y-2 text-sm">
-    <label className="block">Logo
-      <input aria-label="选择 Logo" type="file" accept={BRAND_LOGO_MIME_TYPES.join(',')} disabled={busy} className="mt-1 block w-full" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void choose(file) }} />
+    <p className="font-medium text-neutral-800">Logo</p>
+    {/* 浏览器自带的选择文件控件会显示英文「Choose File」，藏起来换成中文按钮 */}
+    <label className={`inline-flex min-h-11 items-center rounded-lg border border-neutral-300 px-3 ${busy ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-neutral-50'}`}>
+      {busy ? '正在上传…' : '选择图片'}
+      <input aria-label="选择 Logo" type="file" accept={BRAND_LOGO_MIME_TYPES.join(',')} disabled={busy} className="sr-only" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void choose(file) }} />
     </label>
     <p className="text-xs text-neutral-500">支持 {types}，不超过 {formatCount(BRAND_LOGO_MAX_BYTES / 1024)}KB，宽高不超过 {formatCount(BRAND_LOGO_MAX_PIXELS)}，接近正方形；只支持静态图片。</p>
-    {busy && <p>正在上传…</p>}
     {url && <div><img src={logoPreviewUrl(url) ?? undefined} alt="Logo 预览" className="h-20 w-20 object-contain" onLoad={(e) => { if (!size) setSize(`${formatCount(e.currentTarget.naturalWidth)} × ${formatCount(e.currentTarget.naturalHeight)}`) }} />{size && <p>尺寸：{size}</p>}</div>}
     <button type="button" className="rounded border px-3 py-2" onClick={() => { onChange(null, null); setSize(null); setError(null) }}>不用 Logo</button>
     {error && <p role="alert" className="text-red-600">{error}</p>}
