@@ -476,6 +476,16 @@ async function main(): Promise<void> {
     }
     const uploadError = (buffer: Buffer) => logoService.upload(buffer, { actorId: adminId, actorRole: 'admin' }).then(() => 'resolved', (error: Error) => error.message)
     const lastKey = () => putKeys[putKeys.length - 1]!
+    // 正常上传：失败时给出干净的 FAIL 行，而不是让门禁崩溃
+    const goodUpload = async (): Promise<{ ok: boolean; error: string }> => {
+      try {
+        const done = await logoService.upload(canvasImage(64, 64, 'image/png'), { actorId: adminId, actorRole: 'admin' })
+        createdLogoIds.push(done.assetId)
+        return { ok: /^[0-9a-f]{32}$/.test(done.assetId), error: '' }
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) }
+      }
+    }
     const pendingBefore = await prisma.platformSetting.findUnique({ where: { key: BRAND_LOGO_PENDING_CLEANUP_KEY } })
     try {
       const logoRowsBefore = await prisma.brandLogo.count()
@@ -504,17 +514,16 @@ async function main(): Promise<void> {
       failAllDeletes = false
       failingDeleteKeys.add(key2)
       logLines.length = 0
-      const good1 = await logoService.upload(canvasImage(64, 64, 'image/png'), { actorId: adminId, actorRole: 'admin' })
-      createdLogoIds.push(good1.assetId)
-      c.check('③ 清单里有删不掉的对象，不挡正常上传', /^[0-9a-f]{32}$/.test(good1.assetId))
+      const good1 = await goodUpload()
+      c.check('③ 清单里有删不掉的对象，不挡正常上传', good1.ok, good1.error)
       c.equal('  删得掉的移出清单，删不掉的留着', await pendingList(), [key2])
       c.check('  被补收的对象真的从存储里没了，删不掉的还在', (await storage.headObject(key3)) === null && (await storage.headObject(key2)) !== null)
       c.check('  删不掉的有重试失败日志', logLines.some((line) => line.startsWith('WARN BRAND_LOGO_ORPHAN_RETRY_FAILED') && line.includes(`key=${key2}`)), logLines.join(' | '))
       // ④ 存储恢复后下一次上传把剩下的补收掉，清单清空
       failingDeleteKeys.clear()
-      const good2 = await logoService.upload(canvasImage(64, 64, 'image/png'), { actorId: adminId, actorRole: 'admin' })
-      createdLogoIds.push(good2.assetId)
-      c.equal('④ 存储恢复后下一次上传补收剩下的，清单清空', [await pendingList(), (await storage.headObject(key2)) === null], [[], true])
+      const good2 = await goodUpload()
+      c.check('④ 存储恢复后的上传成功', good2.ok, good2.error)
+      c.equal('  下一次上传把剩下的补收掉，清单清空', [await pendingList(), (await storage.headObject(key2)) === null], [[], true])
       // ⑤ 清单也写不进去：最后一道留痕是日志
       failAudit()
       failAllDeletes = true
@@ -532,10 +541,9 @@ async function main(): Promise<void> {
       // ⑥ 读清单本身失败：不挡这次上传，留一条日志
       hooks['logo']!['readPending'] = async () => { throw new Error('db read down (fixture)') }
       logLines.length = 0
-      const good3 = await logoService.upload(canvasImage(64, 64, 'image/png'), { actorId: adminId, actorRole: 'admin' })
-      createdLogoIds.push(good3.assetId)
+      const good3 = await goodUpload()
       c.check('⑥ 补收时读清单失败：不挡这次上传，留一条 BRAND_LOGO_ORPHAN_DRAIN_FAILED 日志',
-        /^[0-9a-f]{32}$/.test(good3.assetId) && logLines.some((line) => line.startsWith('WARN BRAND_LOGO_ORPHAN_DRAIN_FAILED') && line.includes('db read down (fixture)')), logLines.join(' | '))
+        good3.ok && logLines.some((line) => line.startsWith('WARN BRAND_LOGO_ORPHAN_DRAIN_FAILED') && line.includes('db read down (fixture)')), good3.error || logLines.join(' | '))
       delete hooks['logo']!['readPending']
       // ⑦ 被拒的上传（文件不合格）不碰清单：不查库
       let pendingReads = 0
@@ -809,6 +817,10 @@ async function main(): Promise<void> {
       const profileF = (terminalId: string, token: string) =>
         callF('GET', '/api/v1/public/kiosk-profile', { headers: { 'x-terminal-id': terminalId, 'x-terminal-session-token': token } })
       const budget = KIOSK_PROFILE_PRE_VERIFY_IP_LIMIT
+      const readsBeforeProbe = redis.calls
+      await sessions.inspect(termA, tokenA)
+      const readsPerVerification = redis.calls - readsBeforeProbe // 验一次签要读几次 Redis（测出来，不写死）
+      c.check('（对照）验一次签至少读一次 Redis，下面数 Redis 调用才有意义', readsPerVerification >= 1, String(readsPerVerification))
       const readsBefore = redis.calls
       const floodStatuses: number[] = []
       let readsAtBudget = 0
@@ -823,8 +835,11 @@ async function main(): Promise<void> {
       c.equal(`  超过 ${budget} 次之后的 50 次请求：Redis 调用数不再增加（验签被跳过，直接落进 IP 桶）`, readsAtEnd - readsAtBudget, 0)
       // 一分钟窗口过去：计数清零，验签通过的终端又拿到自己的点位（限流桶与验签前计数都用当前时间，一起往后拨）
       Date.now = () => realNow() + KIOSK_PROFILE_WINDOW_MS + 1_000
+      const readsBeforeRecovery = redis.calls
       const recovered = await profileF(termA, tokenA)
-      c.check('  一分钟窗口过去后恢复验签：验签通过的终端又拿到自己的点位', recovered.status === 200 && recovered.json.data.location === LOC_A, `${recovered.status} ${JSON.stringify(recovered.json.data?.location)}`)
+      c.check('  一分钟窗口过去后恢复：验签通过的终端又拿到自己的点位', recovered.status === 200 && recovered.json.data.location === LOC_A, `${recovered.status} ${JSON.stringify(recovered.json.data?.location)}`)
+      // 控制器自己也会验一次签，所以光看返回值分不出限流这一层有没有恢复验签；数 Redis 读取：限流层一次 + 控制器一次
+      c.equal('  限流这一层也恢复了验签（该请求读了两次验签的 Redis：限流层一次、控制器一次；窗口不清零则限流层仍在跳过）', redis.calls - readsBeforeRecovery, 2 * readsPerVerification)
     } finally {
       Date.now = realNow
       await flooded.close()
