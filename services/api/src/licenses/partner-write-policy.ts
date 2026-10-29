@@ -9,7 +9,8 @@
  *
  * 放行的有三类（kind）：
  *   maintain  续约联络与现场求助要用的：机构资料、报障、交付报告生成与确认；
- *   withdraw  撤回自己已发布内容的：下架、删除、归档（让机构随时能把内容拿下来，不被授权状态卡住）；
+ *   withdraw  撤回自己已发布内容 / 停止自己已开的数据通路的：下架、删除、归档、取消未确认的导入（让机构随时能把内容拿下来，不被授权状态卡住）；
+ *             只收「只会减少、不会新增或重新上架」的路由——取消归档、启停数据源这类可能重新打开的不在其中；
  *   compute   只算不存的：资格试算、导入预检（不落库、不进审计）。
  * 一体机上本机构终端在授权不可用时本来就不再签发新会话，所以已发布内容不会继续在本机构终端上展示。
  */
@@ -61,6 +62,26 @@ export const PARTNER_WRITE_EXEMPTIONS: readonly PartnerWriteExemption[] = [
   {
     method: 'DELETE', path: '/partner/official-channels/:p', handler: 'OfficialChannelsController.archive', kind: 'withdraw',
     reason: '官方渠道归档：撤回自己的内容',
+  },
+  {
+    method: 'PATCH', path: '/partner/jobs/:p/publish', handler: 'JobsController.unpublishPartnerJob', kind: 'withdraw',
+    reason: '岗位下架（私有化部署版）：服务只会把状态写成 unpublished；撤回必须始终可做',
+  },
+  {
+    method: 'PATCH', path: '/partner/fairs/:p/publish', handler: 'JobsController.unpublishPartnerFair', kind: 'withdraw',
+    reason: '招聘会下架（私有化部署版）：服务只会把状态写成 unpublished；撤回必须始终可做',
+  },
+  {
+    method: 'PATCH', path: '/partner/companies/:p/publish', handler: 'CompaniesController.partnerUnpublish', kind: 'withdraw',
+    reason: '企业资料下架（私有化部署版）：只下架，DTO 直接拒掉 action:publish；撤回必须始终可做',
+  },
+  {
+    method: 'PATCH', path: '/partner/data-sources/:p/archive', handler: 'JobsController.archivePartnerDataSource', kind: 'withdraw',
+    reason: '数据源归档（私有化部署版）：只置 archivedAt 并停用，停止接收与拉取；取消归档（unarchive）与启停（toggle）不放行',
+  },
+  {
+    method: 'DELETE', path: '/partner/excel/:p', handler: 'JobsController.cancelExcelImport', kind: 'withdraw',
+    reason: '取消还没确认的导入批次（私有化部署版）：只把 pending 批次置为 cancelled，不导入任何数据',
   },
   {
     method: 'POST', path: '/partner/policies/:p/eligibility-preview', handler: 'PoliciesController.previewPartnerEligibility', kind: 'compute',

@@ -87,8 +87,20 @@ export function licenseDay(value: unknown, code: string, label: string): string 
   return day
 }
 
-const MAX_PERIOD_MS = 10 * 366 * 24 * 60 * 60 * 1000
 const DAY_MS = 24 * 60 * 60 * 1000
+const BEIJING_OFFSET_MS = 8 * 60 * 60 * 1000
+/** 一条授权最长 10 个日历年。 */
+export const LICENSE_MAX_PERIOD_YEARS = 10
+
+/**
+ * 生效日起算满 10 个日历年的那一天北京 0 点（排他的上限）：2026-11-01 → 2036-11-01 0 点，
+ * 所以到期日最晚 2036-10-31。2 月 29 日起算的，十年后没有 2 月 29 日，顺延到 3 月 1 日（到期日最晚 2 月 28 日）。
+ * 不用「10 × 366 天」近似——那样会放过超过十周年的期限。
+ */
+export function maxEndExclusive(startsAt: Date): Date {
+  const local = new Date(startsAt.getTime() + BEIJING_OFFSET_MS)
+  return new Date(Date.UTC(local.getUTCFullYear() + LICENSE_MAX_PERIOD_YEARS, local.getUTCMonth(), local.getUTCDate()) - BEIJING_OFFSET_MS)
+}
 
 /** 生效日 → 当天北京 0 点（含）。day 必须先经过 licenseDay 校验。 */
 export function dayStart(day: string): Date {
@@ -100,13 +112,13 @@ export function dayEnd(day: string): Date {
   return new Date(beijingDayStart(day)!.getTime() + DAY_MS)
 }
 
-/** 起止时刻的合理性：到期日不得早于生效日（同一天 = 一天），最长 10 年。 */
+/** 起止时刻的合理性：到期日不得早于生效日（同一天 = 一天），最长 10 个日历年。 */
 export function checkPeriod(startsAt: Date, endsAt: Date): void {
   if (endsAt.getTime() <= startsAt.getTime()) {
     throw invalid('LICENSE_PERIOD_INVALID', '到期日不能早于生效日')
   }
-  if (endsAt.getTime() - startsAt.getTime() > MAX_PERIOD_MS) {
-    throw invalid('LICENSE_PERIOD_INVALID', '一条授权的期限不能超过 10 年')
+  if (endsAt.getTime() > maxEndExclusive(startsAt).getTime()) {
+    throw invalid('LICENSE_PERIOD_INVALID', `一条授权的期限不能超过 ${LICENSE_MAX_PERIOD_YEARS} 年（按日历年算，从生效日起满 ${LICENSE_MAX_PERIOD_YEARS} 年的前一天为止）`)
   }
 }
 

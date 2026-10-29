@@ -20,7 +20,7 @@ import { join, resolve } from 'node:path'
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants'
 import { ROLES_KEY } from '../src/common/decorators/roles.decorator'
 import { normalizeCreditCode } from '../src/licenses/credit-code'
-import { checkPeriod, dayEnd, dayStart, licenseDay, period } from '../src/licenses/license-input'
+import { checkPeriod, dayEnd, dayStart, licenseDay, maxEndExclusive, period } from '../src/licenses/license-input'
 import {
   DAY_MS,
   bindingQuota,
@@ -281,10 +281,24 @@ function assertBeijingDays(): void {
   c.equal('inclusiveDayText', inclusiveDayText('2027-10-31'), '2027-10-31（北京时间，含当天）')
   const sameDay = period('2026-11-01', '2026-11-01')
   c.equal('生效日 = 到期日：正好一天', sameDay.endsAt.getTime() - sameDay.startsAt.getTime(), DAY_MS)
-  for (const [label, a, b] of [['到期日早于生效日', '2026-11-02', '2026-11-01'], ['超过 10 年', '2026-11-01', '2037-01-01']] as const) {
+  for (const [label, a, b] of [
+    ['到期日早于生效日', '2026-11-02', '2026-11-01'],
+    ['超过 10 年（2026-11-01 起算，到期日不能晚于 2036-10-31）', '2026-11-01', '2036-11-01'],
+    ['按 10×366 天近似会放过的：2026-11-01 起算 3660 天后（2036-11-09）', '2026-11-01', '2036-11-09'],
+    ['闰日起算（2028-02-29），十年后顺延到 3 月 1 日，到期日最晚 2038-02-28', '2028-02-29', '2038-03-01'],
+  ] as const) {
     c.check(`期限被拒：${label}`, (() => { try { period(a, b); return false } catch (e) { return (e as { getResponse?: () => { error?: { code?: string } } }).getResponse?.().error?.code === 'LICENSE_PERIOD_INVALID' } })())
   }
-  c.check('恰好 10 年（含闰年天数上限内）通过', (() => { try { period('2026-11-01', '2036-10-31'); return true } catch { return false } })())
+  for (const [label, a, b] of [
+    ['2026-11-01 至 2036-10-31（恰好满 10 个日历年）', '2026-11-01', '2036-10-31'],
+    ['2028-02-29 至 2038-02-28（闰日起算）', '2028-02-29', '2038-02-28'],
+    ['2024-02-29 至 2034-02-28', '2024-02-29', '2034-02-28'],
+    ['2026-01-01 至 2035-12-31', '2026-01-01', '2035-12-31'],
+  ] as const) {
+    c.check(`期限通过：${label}`, (() => { try { period(a, b); return true } catch { return false } })())
+  }
+  c.equal('maxEndExclusive：2026-11-01 起算的上限 = 2036-11-01 北京 0 点', maxEndExclusive(dayStart('2026-11-01')).toISOString(), '2036-10-31T16:00:00.000Z')
+  c.equal('maxEndExclusive：闰日 2028-02-29 起算的上限 = 2038-03-01 北京 0 点', maxEndExclusive(dayStart('2028-02-29')).toISOString(), '2038-02-28T16:00:00.000Z')
   c.check('checkPeriod：起止同一时刻被拒', (() => { try { checkPeriod(dayStart('2026-11-01'), dayStart('2026-11-01')); return false } catch { return true } })())
   c.equal('dayEnd = 次日北京 0 点', dayEnd('2027-10-31').toISOString(), '2027-10-31T16:00:00.000Z')
   // 边界毫秒：合同写「到 11 月 30 日」，30 日整天都在期内，12 月 1 日 0 点才进宽限
@@ -395,7 +409,7 @@ function assertRouteTable(): void {
     c.equal(`登记 ${e.method} ${e.path} → 真实路由恰好一条，处理函数是 ${e.handler}`, hits.map((r) => r.handler), [e.handler])
     c.check(`  登记的是 partner 角色的路由、理由写明：${e.handler}`, hits.every((r) => r.roles.includes('partner')) && e.reason.length >= 6)
     if (e.kind === 'withdraw') {
-      c.check(`  撤回类（${e.handler}）：只用 DELETE / PATCH，处理函数名是下架 / 删除 / 归档`, ['DELETE', 'PATCH'].includes(e.method) && /\.(unpublish|delete|archive)/i.test(e.handler))
+      c.check(`  撤回类（${e.handler}）：只用 DELETE / PATCH，处理函数名是下架 / 删除 / 归档 / 取消`, ['DELETE', 'PATCH'].includes(e.method) && /\.\w*(unpublish|delete|archive|cancel)/i.test(e.handler))
     }
     if (e.kind === 'compute') {
       c.check(`  只算不存类（${e.handler}）：POST，处理函数名是预览 / 预检`, e.method === 'POST' && /\.(preview|preflight)/i.test(e.handler))
@@ -421,6 +435,53 @@ function assertRouteTable(): void {
   const unpublishBody = policiesService.slice(policiesService.indexOf('async unpublishPartnerPolicy'), policiesService.indexOf('async deletePartnerPolicy'))
   c.check('下架服务函数只把状态写成 unpublished，从不写 published', /publishStatus: 'unpublished'/.test(unpublishBody) && !/publishStatus: 'published'/.test(unpublishBody))
   c.check('发布走 /release（授权不可用时被拦），不在 /publish 路由上', blocked.some((r) => r.method === 'PATCH' && normalizeRoutePath(r.path) === '/partner/policies/:p/release'))
+  // ── 独立的业务清单：授权失效时必须仍能做的撤回操作。按语义列，不从登记表派生——
+  // 登记表只能证明「登记过的」没错，证明不了「该登记的都登记了」（审查二轮发现岗位 / 招聘会 / 企业 / 数据源的撤回被漏登记）。
+  interface Withdrawal { what: string; method: string; path: string; handler: string; file: string; fn: string; only: RegExp; never: RegExp }
+  const WITHDRAWALS: Withdrawal[] = [
+    { what: '政策下架', method: 'PATCH', path: '/partner/policies/:id/publish', handler: 'PoliciesController.unpublishPartnerPolicy',
+      file: 'policies/policies.service.ts', fn: 'async unpublishPartnerPolicy', only: /publishStatus: 'unpublished'/, never: /publishStatus: 'published'|\.create\(/ },
+    { what: '政策删除', method: 'DELETE', path: '/partner/policies/:id', handler: 'PoliciesController.deletePartnerPolicy',
+      file: 'policies/policies.service.ts', fn: 'async deletePartnerPolicy', only: /policyPost\.delete\(/, never: /publishStatus: 'published'|\.create\(/ },
+    { what: '官方渠道归档', method: 'DELETE', path: '/partner/official-channels/:id', handler: 'OfficialChannelsController.archive',
+      file: 'official-channels/official-channels.service.ts', fn: 'async archiveForPartner', only: /archivedAt: new Date\(\), status: 'inactive'/, never: /status: 'active'|\.create\(/ },
+    { what: '岗位下架（私有化部署）', method: 'PATCH', path: '/partner/jobs/:id/publish', handler: 'JobsController.unpublishPartnerJob',
+      file: 'jobs/jobs-partner.service.ts', fn: 'async unpublishPartnerJob', only: /publishStatus: 'unpublished'/, never: /publishStatus: 'published'|\.create\(/ },
+    { what: '招聘会下架（私有化部署）', method: 'PATCH', path: '/partner/fairs/:id/publish', handler: 'JobsController.unpublishPartnerFair',
+      file: 'jobs/jobs-partner.service.ts', fn: 'async unpublishPartnerFair', only: /publishStatus: 'unpublished'/, never: /publishStatus: 'published'|\.create\(/ },
+    { what: '企业资料下架（私有化部署）', method: 'PATCH', path: '/partner/companies/:id/publish', handler: 'CompaniesController.partnerUnpublish',
+      file: 'companies/companies.service.ts', fn: 'async partnerUnpublish', only: /publishStatus: 'unpublished'/, never: /publishStatus: 'published'|\.create\(/ },
+    { what: '数据源归档（私有化部署）', method: 'PATCH', path: '/partner/data-sources/:id/archive', handler: 'JobsController.archivePartnerDataSource',
+      file: 'jobs/jobs-partner.service.ts', fn: 'async archivePartnerDataSource', only: /archivedAt: new Date\(\), enabled: false/, never: /publishStatus: 'published'|\.create\(/ },
+    { what: '取消未确认的导入批次（私有化部署）', method: 'DELETE', path: '/partner/excel/:batchId', handler: 'JobsController.cancelExcelImport',
+      file: 'jobs/jobs-admin.service.ts', fn: 'async cancelExcelImport', only: /status: 'cancelled'/, never: /status: 'approved'|status: 'confirmed'|status: 'imported'|\.create\(/ },
+  ]
+  const functionBody = (source: string, fn: string): string => {
+    const start = source.indexOf(fn)
+    if (start < 0) return ''
+    const rest = source.slice(start + fn.length)
+    const next = rest.search(/\n  (async |private |public |get |set |[a-zA-Z]+\()/)
+    return next < 0 ? rest : rest.slice(0, next)
+  }
+  for (const w of WITHDRAWALS) {
+    const real = writes.filter((r) => r.method === w.method && normalizeRoutePath(r.path) === normalizeRoutePath(w.path))
+    c.equal(`撤回清单「${w.what}」：真实路由恰好一条，处理函数是 ${w.handler}`, real.map((r) => r.handler), [w.handler])
+    c.check(`  授权失效时放行（在放行集合里）`, real.length === 1 && !partnerWriteIsBlocked(real[0]!.method, real[0]!.path, real[0]!.handler))
+    const body = functionBody(read(join(API_ROOT, 'src', w.file)), w.fn)
+    c.check(`  实际语义只撤回 / 归档 / 取消：${w.fn.replace('async ', '')} 里有「${w.only.source.slice(0, 40)}」，没有重新上架或新建`, body.length > 0 && w.only.test(body) && !w.never.test(body), `${body.length} 字`)
+  }
+  const registryWithdrawals = PARTNER_WRITE_EXEMPTIONS.filter((e) => e.kind === 'withdraw').map((e) => `${e.method} ${e.path} ${e.handler}`).sort()
+  c.equal('登记表里的撤回类恰好就是业务清单（两本账互相核：不漏登，也不多放）', registryWithdrawals, WITHDRAWALS.map((w) => `${w.method} ${normalizeRoutePath(w.path)} ${w.handler}`).sort())
+  // 同在这些控制器里、但可能重新打开 / 重新上架的写路由必须继续被拦
+  for (const [label, method, path, handler] of [
+    ['取消归档数据源', 'PATCH', '/partner/data-sources/:id/unarchive', 'JobsController.unarchivePartnerDataSource'],
+    ['启停数据源', 'PATCH', '/partner/data-sources/:id/toggle', 'JobsController.togglePartnerDataSource'],
+    ['更新岗位', 'PATCH', '/partner/jobs/:id', 'JobsController.updatePartnerJob'],
+    ['导入岗位', 'POST', '/partner/jobs/import', 'JobsController.importJobs'],
+    ['更新企业资料', 'PATCH', '/partner/companies/:id', 'CompaniesController.partnerUpdate'],
+  ] as const) {
+    c.check(`授权失效时仍被拦：${label}`, writes.some((r) => r.method === method && normalizeRoutePath(r.path) === normalizeRoutePath(path) && r.handler === handler) && partnerWriteIsBlocked(method, path, handler))
+  }
   const interceptor = read(join(API_ROOT, 'src/licenses/partner-license-write.interceptor.ts'))
   c.check('拦截器把「控制器类名.处理函数名」交给登记表核对', /getClass\(\)\.name/.test(interceptor) && /getHandler\(\)\.name/.test(interceptor) && /partnerWriteIsBlocked\(req\.method, template, handler\)/.test(interceptor))
   c.check('查看与导出（GET）永远不拦', !partnerWriteIsBlocked('GET', '/api/v1/partner/policies') && !partnerWriteIsBlocked('GET', '/partner/stats') && !partnerWriteIsBlocked('HEAD', '/partner/x'))

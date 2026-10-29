@@ -47,6 +47,7 @@ async function main(): Promise<void> {
       ['到期日格式不对（斜杠）', { endsOn: '2027/10/31' }, 'LICENSE_PERIOD_INVALID'],
       ['到期日早于生效日', { endsOn: dateOf(-1) }, 'LICENSE_PERIOD_INVALID'],
       ['期限超过 10 年', { endsOn: '2037-12-31' }, 'LICENSE_PERIOD_INVALID'],
+      ['期限满 10 个日历年之后一天（生效日 2026-11-01，到期日 2036-11-01）', { endsOn: '2036-11-01' }, 'LICENSE_PERIOD_INVALID'],
       ['宽限 31 天', { graceDays: 31 }, 'LICENSE_GRACE_INVALID'],
       ['宽限 -1 天', { graceDays: -1 }, 'LICENSE_GRACE_INVALID'],
       ['台数 0', { terminalQuota: 0 }, 'LICENSE_QUOTA_INVALID'],
@@ -66,6 +67,8 @@ async function main(): Promise<void> {
       const r = await api('POST', `/admin/orgs/${orgA}/licenses`, body)
       c.equal(`新建被拒：${label}`, `${r.status}:${r.json.error?.code}`, '400:VALIDATION_FAILED')
     }
+    const tenYears = await api('POST', `/admin/orgs/${await newOrg('ten')}/licenses`, { ...valid, contractNo: 'HT-TEN', endsOn: '2036-10-31' })
+    c.equal('恰好满 10 个日历年（2026-11-01 至 2036-10-31）可以录入', tenYears.status, 201)
     c.equal('机构不存在时新建 → 404', (await api('POST', '/admin/orgs/no-such-org/licenses', valid)).status, 404)
     c.check('被拒的新建没有写库', (await detail(orgA)).items.length === 0)
 

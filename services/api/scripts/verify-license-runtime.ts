@@ -195,6 +195,10 @@ async function main(): Promise<void> {
       ['PUT', '/partner/profile', false], ['POST', '/partner/first-order/incidents', false], ['PATCH', '/partner/first-order/incidents/i1', false],
       ['POST', '/partner/first-order/projects/p1/reports', false], ['POST', '/partner/first-order/reports/r1/acknowledge', false],
       ['POST', '/partner/policies/p1/eligibility-preview', false], ['POST', '/partner/data-sources/preflight/jobs', false], ['POST', '/partner/data-sources/preflight/fairs', false],
+      ['PATCH', '/partner/jobs/j1/publish', false], ['PATCH', '/partner/fairs/f1/publish', false], ['PATCH', '/partner/companies/c1/publish', false],
+      ['PATCH', '/partner/data-sources/d1/archive', false], ['DELETE', '/partner/excel/b1', false],
+      ['PATCH', '/partner/data-sources/d1/unarchive', true], ['PATCH', '/partner/data-sources/d1/toggle', true], ['PATCH', '/partner/jobs/j1', true],
+      ['POST', '/partner/jobs/import', true], ['PATCH', '/partner/companies/c1', true],
       ['GET', '/partner/policies', false], ['GET', '/partner/policies/export.csv', false],
     ]
     const statusOf = async (method: string, path: string, token: string) => {

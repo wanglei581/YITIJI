@@ -93,6 +93,27 @@ class RecruitmentIntegrationController {
   @Post('data-sources/preflight/fairs') @Roles('partner') preflightFairs() { return { ok: 'preflight-fairs' } }
 }
 
+/** 私有化部署版的招聘内容路由：撤回类放行，会重新打开 / 新增的照样被拦。 */
+@Controller('partner')
+@UseGuards(JwtAuthGuard, RolesGuard)
+class JobsController {
+  @Patch('jobs/:id/publish') @Roles('partner') unpublishPartnerJob() { return { ok: 'unpublish-job' } }
+  @Patch('fairs/:id/publish') @Roles('partner') unpublishPartnerFair() { return { ok: 'unpublish-fair' } }
+  @Patch('data-sources/:id/archive') @Roles('partner') archivePartnerDataSource() { return { ok: 'archive-source' } }
+  @Delete('excel/:batchId') @Roles('partner') cancelExcelImport() { return { ok: 'cancel-import' } }
+  @Patch('data-sources/:id/unarchive') @Roles('partner') unarchivePartnerDataSource() { return { ok: 'unarchive-source' } }
+  @Patch('data-sources/:id/toggle') @Roles('partner') togglePartnerDataSource() { return { ok: 'toggle-source' } }
+  @Patch('jobs/:id') @Roles('partner') updatePartnerJob() { return { ok: 'update-job' } }
+  @Post('jobs/import') @Roles('partner') importJobs() { return { ok: 'import-jobs' } }
+}
+
+@Controller('partner')
+@UseGuards(JwtAuthGuard, RolesGuard)
+class CompaniesController {
+  @Patch('companies/:id/publish') @Roles('partner') partnerUnpublish() { return { ok: 'unpublish-company' } }
+  @Patch('companies/:id') @Roles('partner') partnerUpdate() { return { ok: 'update-company' } }
+}
+
 @Controller('partner')
 @UseGuards(JwtAuthGuard, RolesGuard)
 class FixtureMixedController {
@@ -166,7 +187,7 @@ export async function createLicenseHarness(): Promise<Harness> {
     controllers: [
       LicenseAdminController, LicensePartnerController,
       PoliciesController, OfficialChannelsController, PartnerOrgController, PartnerFirstOrderIncidentsController,
-      PartnerFirstOrderController, RecruitmentIntegrationController, FixtureMixedController,
+      PartnerFirstOrderController, RecruitmentIntegrationController, JobsController, CompaniesController, FixtureMixedController,
     ],
     providers: [
       LicenseService, AuditService, JwtAuthGuard, RolesGuard, PrismaService, TerminalSessionService,
