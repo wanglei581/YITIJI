@@ -76,18 +76,21 @@ function duplexLabel(mode: DuplexMode): string {
   return DUPLEX_OPTIONS.find((option) => option.value === mode)?.label ?? mode
 }
 
+/**
+ * 分段选项。「不可用」按**选项**算：只有本机真没开通的那几项划线置灰，已选且可用的（黑白、单面）照常显示。
+ * 以前按整组停用，试点终端（彩色、双面都没开通）上五个按钮全被划线，连能用的「黑白」「单面」也像不能选
+ * （2026-10-29 走查 I-08）。不可用项仍是可聚焦的 aria-disabled，不是原生 disabled，读屏读得到 aria-describedby 里的原因。
+ */
 function ToggleGroup({
   options,
   value,
   onChange,
-  disabled = false,
   disabledReason,
   describedById,
 }: {
-  options: Array<{ label: string; value: string }>
+  options: Array<{ label: string; value: string; disabled?: boolean }>
   value: string
   onChange: (value: string) => void
-  disabled?: boolean
   disabledReason?: string | null
   describedById?: string
 }) {
@@ -99,11 +102,11 @@ function ToggleGroup({
           type="button"
           data-selected={value === option.value ? 'true' : undefined}
           aria-pressed={value === option.value}
-          aria-disabled={disabled || undefined}
-          aria-describedby={disabled && describedById ? describedById : undefined}
-          title={disabled ? (disabledReason ?? undefined) : undefined}
+          aria-disabled={option.disabled || undefined}
+          aria-describedby={option.disabled && describedById ? describedById : undefined}
+          title={option.disabled ? (disabledReason ?? undefined) : undefined}
           onClick={() => {
-            if (!disabled) onChange(option.value)
+            if (!option.disabled) onChange(option.value)
           }}
         >
           {option.label}
@@ -412,9 +415,7 @@ export function PrintPreviewPage({
               ? '本机能力还在确认'
               : capabilityUnknown
                 ? '本机能力读不到'
-                : !capability.color.allowed || !capability.duplex.allowed
-                  ? '部分打印能力暂未开通'
-                  : '纸上会长这样'
+                : '纸上会长这样'
   const backToCheck = () => onBackToCheck ? onBackToCheck() : navigate('/print/desk?step=check')
   const blockingLine = printerLoading
     ? null
@@ -512,14 +513,14 @@ export function PrintPreviewPage({
           <div className="pdk-prow qpd-param-card">
             <span>颜色</span>
             <div>
-              <ToggleGroup options={COLOR_MODE_OPTIONS} value={colorMode} onChange={(value) => setColorMode(value as ColorMode)} disabled={!capability.color.allowed} disabledReason={colorReason} describedById="print-color-capability-note" />
+              <ToggleGroup options={COLOR_MODE_OPTIONS.map((item) => ({ ...item, disabled: item.value !== 'black_white' && !capability.color.allowed }))} value={colorMode} onChange={(value) => setColorMode(value as ColorMode)} disabledReason={colorReason} describedById="print-color-capability-note" />
               <p id="print-color-capability-note" className="pdk-why">{capability.color.allowed ? '彩色价格在下一步核对' : `彩色：${colorReason}`}{capabilityNote ? `；${capabilityNote}` : ''}</p>
             </div>
           </div>
           <div className="pdk-prow qpd-param-card">
             <span>单双面</span>
             <div>
-              <ToggleGroup options={DUPLEX_OPTIONS} value={duplex} onChange={(value) => setDuplex(value as DuplexMode)} disabled={!capability.duplex.allowed} disabledReason={duplexReason} describedById="print-duplex-capability-note" />
+              <ToggleGroup options={DUPLEX_OPTIONS.map((item) => ({ ...item, disabled: item.value !== 'simplex' && !capability.duplex.allowed }))} value={duplex} onChange={(value) => setDuplex(value as DuplexMode)} disabledReason={duplexReason} describedById="print-duplex-capability-note" />
               <p id="print-duplex-capability-note" className="pdk-why">{capability.duplex.allowed ? (duplex === 'simplex' ? '当前是单面。' : `翻页边：${duplex === 'duplex_long_edge' ? '长边' : '短边'}`) : `双面：${duplexReason}`}</p>
             </div>
           </div>

@@ -473,10 +473,11 @@
   text-align: left;
 }
 
+/* 方框本身也要够得着（≥48）：勾选框和后面那句话是同一个 <label>，点哪里都能勾，但方框是眼睛找的靶子（走查 I-36）。 */
 [data-qx-page='print-preview'] .pdk-privacy-confirm input {
   flex: none;
-  width: 40px;
-  height: 40px;
+  width: 56px;
+  height: 56px;
 }
 
 [data-qx-page='print-preview'] .pdk-sug {
