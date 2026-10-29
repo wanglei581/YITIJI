@@ -11,6 +11,7 @@ import {
   detectMicCapability,
   subscribeMicDeviceChange,
   MIC_FAILURE_REASON,
+  MIC_DETECTED_LABEL,
   MIC_REASON,
   MIC_STATUS_LABEL,
   type MicCapabilityState,
@@ -341,10 +342,13 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const busyTurn = phase === 'thinking' || phase === 'finishing'
   const voiceLocked = voice.kind === 'requesting_permission' || voice.kind === 'transcribing'
   const ttsLabel = ttsOfficial ? '官方语音播报' : '本机语音播报'
-  // 状态胶囊直述硬件事实：探测中不下结论，只有确实探到设备才敢说「可用」。
-  const micStatusLabel = micCapability === null ? '正在检测麦克风…' : MIC_STATUS_LABEL[micCapability]
+  // 状态胶囊直述硬件事实：探测中不下结论，只有探到设备、转写服务也开着才敢说「语音回答可用」；
+  // 转写没开时只说检测到了麦克风，「转写服务未启用」交给下面的常显原因讲一次，不自相矛盾（走查 I-24）。
+  const micNoTranscribe = micCapability === 'available' && !asrEnabled
+  const micStatusLabel =
+    micCapability === null ? '正在检测麦克风…' : micNoTranscribe ? MIC_DETECTED_LABEL : MIC_STATUS_LABEL[micCapability]
   const micStatusTone =
-    micCapability === null ? 'blue' : micCapability === 'available' ? 'green' : 'red'
+    micCapability === null || micNoTranscribe ? 'blue' : micCapability === 'available' ? 'green' : 'red'
   // 语音入口是否放行 = 服务端 ASR 已启用 且 本机确实有可用麦克风。
   const voiceAvailable = asrEnabled && micCapability === 'available'
   // 门禁置灰就必须有常显原因，一个都不能漏：硬件原因优先，其次是服务端未启用。
