@@ -385,9 +385,12 @@
   text-align: left;
 }
 
+/* 金额卡在触屏版是浅底（--qxt-teal-wash）。旧样式 cashier-qx.css 的标签字色是按深底写的「纸色 58%」，叠在浅底上只有 1.02:1，几乎看不见；
+   这里取和下面说明句同一个 --qxt-ink-2（叠在浅底上 6.94:1）。 */
 [data-qx-page='print-cashier'] .cashier-qx-amount-lb {
   font-size: 22px;
   font-weight: 700;
+  color: var(--qxt-ink-2);
 }
 
 [data-qx-page='print-cashier'] .cashier-qx-amount-num {
@@ -407,9 +410,15 @@
   font-size: 20px;
 }
 
+/* 价目明细同样是浅底上的字：旧样式按深底写成「纸色 76%」与纸色，叠在浅底上是 1.03:1。名目取 --qxt-ink-2，小计取 --qxt-ink。 */
 [data-qx-page='print-cashier'] .cashier-qx-ledger > div {
   display: flex;
   justify-content: space-between;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-ledger > div > b {
+  color: var(--qxt-ink);
 }
 
 /* 侧注与折叠说明 */

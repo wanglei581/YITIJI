@@ -401,3 +401,64 @@ test('cashier keeps channel, scan method and exit reachable at 390x844 @w2', asy
   expect(await page.locator('.cashier-qx-route').evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
   await page.screenshot({ path: '../../test-results/cashier-qx/runtime-channel-selected-390x844.png', fullPage: true })
 })
+
+/** 金额卡里每个带字的元素：字色叠在它实际落在的底色上的对比度（字色带透明度时先按底色合成）。 */
+async function amountCardContrast(page: Page) {
+  return page.locator('.cashier-qx-amount').evaluate((card) => {
+    const channels = (css: string): [number, number, number, number] => {
+      const body = css.slice(css.indexOf('(') + 1, css.lastIndexOf(')')).replace('/', ' ')
+      const nums = body.split(/[\s,]+/).filter((token) => /^[-+.\d]/.test(token)).map(Number)
+      // color(srgb 0.9 0.9 0.9 / 0.58) 的分量是 0-1；rgb(…) / rgba(…) 的分量是 0-255。
+      const unit = css.startsWith('color(') ? 255 : 1
+      return [nums[0] * unit, nums[1] * unit, nums[2] * unit, nums.length > 3 ? nums[3] : 1]
+    }
+    const over = (fg: number[], bg: number[]): [number, number, number] => {
+      const a = fg[3]
+      return [fg[0] * a + bg[0] * (1 - a), fg[1] * a + bg[1] * (1 - a), fg[2] * a + bg[2] * (1 - a)]
+    }
+    const lum = ([r, g, b]: number[]) => {
+      const f = (v: number) => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4 }
+      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+    }
+    const backdrop = (el: Element): number[] => {
+      for (let node: Element | null = el; node; node = node.parentElement) {
+        const bg = channels(getComputedStyle(node).backgroundColor)
+        if (bg[3] > 0) return [bg[0], bg[1], bg[2], 1]
+      }
+      return [255, 255, 255, 1]
+    }
+    const rows: Array<{ text: string; selector: string; ratio: number }> = []
+    for (const el of [card, ...Array.from(card.querySelectorAll<HTMLElement>('*'))]) {
+      const own = Array.from(el.childNodes).some((n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? '').trim())
+      if (!own) continue
+      const fg = channels(getComputedStyle(el).color)
+      const bg = backdrop(el)
+      const mixed = over(fg, bg)
+      const hi = Math.max(lum(mixed), lum(bg))
+      const lo = Math.min(lum(mixed), lum(bg))
+      rows.push({ text: (el.textContent ?? '').trim().slice(0, 16), selector: `${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]}`, ratio: Math.round(((hi + 0.05) / (lo + 0.05)) * 100) / 100 })
+    }
+    return rows
+  })
+}
+
+test('cashier amount card: label, amount, note and ledger are readable on the card background @w2', async ({ page, api }) => {
+  // 触屏版把金额卡改成浅底（--qxt-teal-wash），可「本次应付」标签沿用旧样式里按深底写的浅字色（纸色 58%），
+  // 叠在浅底上对比度只有 1.02:1，肉眼几乎看不见。这里逐个量金额卡里每个带字元素的字色对底色。
+  registerShell(api)
+  api.respond('GET', '/api/v1/payment/channels', { status: 200, json: { channels: ['wechat'] } })
+  api.respond('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, { status: 200, json: payStatus('unpaid') })
+
+  await page.goto('/print/cashier')
+  await setReactRouterState(page, '/print/cashier', CASHIER_STATE)
+  await expect(page.locator('[data-qx-state="channel-selected"]')).toBeVisible()
+  await expect(page.locator('.cashier-qx-amount-lb')).toHaveText('本次应付')
+
+  const rows = await amountCardContrast(page)
+  expect(rows.map((row) => row.selector), '金额卡里的标签、金额、说明都要量到').toEqual(
+    expect.arrayContaining(['div.cashier-qx-amount-lb', 'strong.cashier-qx-amount-num', 'p.cashier-qx-amount-src']),
+  )
+  for (const row of rows) {
+    expect(row.ratio, `金额卡「${row.text}」（${row.selector}）字色对底色的对比度`).toBeGreaterThanOrEqual(4.5)
+  }
+})
