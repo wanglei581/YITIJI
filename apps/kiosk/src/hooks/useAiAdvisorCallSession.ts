@@ -16,9 +16,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useBusyLock } from '../contexts/KioskBusyContext'
-import { machineUnusableLine } from '../copy/unattendedCopy'
 import { API_BASE_URL } from '../services/api/client'
 import { getTerminalId } from '../services/api/screensaver'
+import { machineUnusableLine } from '../copy/unattendedCopy'
 import { terminalProtectedFetch } from '../services/terminalAuth'
 import { prepareAiDeclaration } from '../ai/aiDeclarationGate'
 import { aiDeclarationDeclineMessage } from '../ai/aiDeclarationErrors'
@@ -223,7 +223,6 @@ export function useAiAdvisorCallSession() {
     if (startedRef.current || preparingRef.current) return
     const terminalId = getTerminalId()
     if (!terminalId) {
-      // 机器没有登记终端编号：用无人值守标准句（标准句 3），不叫人去找现场的人。
       setErrMsg(machineUnusableLine())
       setPhase('error')
       return

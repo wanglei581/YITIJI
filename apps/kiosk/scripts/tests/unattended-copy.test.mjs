@@ -120,6 +120,31 @@ test('服务端原话叫人找现场工作人员时换成登记句，干净原�
   assert.equal(copy.containsStaffHandoff('缺纸时一体机会自动停止接单'), true)
 })
 
+test('词表补的短说法：找 / 叫 / 请 / 问 / 向、现场……、会……、由……处理 的变体，服务端原话都换成登记句；隐私说明和普通提示不误伤', () => {
+  for (const handoff of [
+    '多次重试仍失败，请现场工作人员协助',
+    '可以叫现场工作人员来看看',
+    '上传一直不结束，可以叫工作人员来看一眼',
+    '打印作业未确认完成，请工作人员检查出纸状态',
+    '不会操作可以问工作人员',
+    '有问题可以向工作人员反馈',
+    '是否补打，以工作人员现场核查结果为准',
+    '工作人员会取出卡纸并补打',
+    '补打由工作人员凭订单号处理',
+  ]) {
+    assert.equal(copy.containsStaffHandoff(handoff), true, `应命中词表：${handoff}`)
+    assert.equal(copy.preferUnattended(handoff, '标准句'), '标准句', `应换成登记句：${handoff}`)
+  }
+  for (const clean of [
+    '企业、合作机构与工作人员都看不到，也不参与岗位排序',
+    '系统不保存答案原文，只留一串校验码',
+    '本机暂停接单，请稍后再来',
+  ]) {
+    assert.equal(copy.containsStaffHandoff(clean), false, `不该命中词表：${clean}`)
+    assert.equal(copy.preferUnattended(clean, '标准句'), clean, `应原样留下：${clean}`)
+  }
+})
+
 const clientStub = toDataUrl('export const API_BASE_URL = "/api/v1"')
 // 终端身份桩：号由 globalThis.__kioskTerminalId 给，改完调 globalThis.__fireTerminalIdentity() 通知订阅者（对应 screensaver.ts 的 subscribeTerminalIdentity）。
 const screenStub = toDataUrl(`
@@ -133,6 +158,61 @@ const contactMod = await import(transpile(join(kioskRoot, 'src/services/api/supp
   './client': clientStub,
   './screensaver': screenStub,
 }))
+
+// 错误码表（userErrorMessage）：带号码的句子必须在取文案时现算，不能在模块加载时算死。
+const httpStub = toDataUrl('export class ApiHttpError extends Error { constructor(code, message, status) { super(message); this.code = code; this.status = status } }')
+const { ApiHttpError } = await import(httpStub)
+const userErrors = await import(transpile(join(kioskRoot, 'src/services/api/userErrorMessage.ts'), {
+  './httpAdapter': httpStub,
+  '../../copy/unattendedCopy': transpile(join(kioskRoot, 'src/copy/unattendedCopy.ts')),
+}))
+
+test('错误码表里带号码的句子在取文案时才现算：服务联系方式变了，同一个码立刻读到新的', () => {
+  // 同一个 data URL = 同一个模块实例，所以 userErrors 里的标准句读的就是这里绑的缓存。
+  try {
+    copy.bindSupportContactPeek(() => ({ ...none, servicePhone: '010-60000001', serviceHours: '工作日 9:00–17:00' }))
+    assert.equal(
+      userErrors.userMessageOf({ code: 'TERMINAL_NOT_READY' }, '兜底'),
+      '这台机器暂时不能用，请稍后再来，或拨打服务电话 010-60000001（工作日 9:00–17:00）。',
+    )
+    assert.equal(
+      userErrors.userMessageOf({ code: 'SCAN_TERMINAL_DISABLED' }, '兜底'),
+      '本机扫描功能已停用。需要帮助？拨打服务电话 010-60000001（工作日 9:00–17:00）。',
+    )
+    copy.bindSupportContactPeek(() => ({ ...none, servicePhone: '010-60000002', otherOnlineTerminalNearby: true }))
+    const second = userErrors.userMessageOf({ code: 'TERMINAL_NOT_READY' }, '兜底')
+    assert.equal(second, '这台机器暂时不能用，请换一台机器，或拨打服务电话 010-60000002。')
+    assert.doesNotMatch(second, /60000001/, '号码不能停在第一次读到的值上')
+    // 还没读到服务联系方式（或缓存过期）：保守句，没有号码，不编一个。
+    copy.bindSupportContactPeek(() => none)
+    assert.equal(
+      userErrors.userMessageOf({ code: 'TERMINAL_NOT_READY' }, '兜底'),
+      '这台机器暂时不能用，请稍后再来，或查看《隐私政策》里的联系方式。',
+    )
+  } finally {
+    copy.bindSupportContactPeek(contactMod.peekSupportContact)
+  }
+})
+
+test('错误码表整表与 5xx 通用句：任何一句都不叫用户去找现场的人，且码表没有被清空', () => {
+  const codes = userErrors.SHARED_USER_MESSAGE_CODES
+  assert.ok(codes.length > 40, '码表被清空或没读到，整表检查是空转')
+  for (const phone of [null, '010-60000001']) {
+    copy.bindSupportContactPeek(() => ({ ...none, servicePhone: phone }))
+    try {
+      for (const code of codes) {
+        const text = userErrors.userMessageOf({ code }, '兜底')
+        assert.equal(copy.containsStaffHandoff(text), false, `${code} 叫用户去找现场的人：${text}`)
+        assert.doesNotMatch(text, /工作人员/, `${code} 里还有「工作人员」：${text}`)
+      }
+      const generic = userErrors.userMessageOf(new ApiHttpError('SOMETHING_NEW', 'x', 503), '兜底')
+      assert.equal(generic, `服务暂时不可用，请稍后重试。${copy.helpNeededLine()}。`)
+      assert.equal(copy.containsStaffHandoff(generic), false)
+    } finally {
+      copy.bindSupportContactPeek(contactMod.peekSupportContact)
+    }
+  }
+})
 
 test('文案层 resolveSupportContact：缺字段或非布尔一律按保守值，不把缺省当成已发布 / 附近有终端', () => {
   const partial = copy.resolveSupportContact({ servicePhone: ' 18369161921 ', serviceHours: '', otherOnlineTerminalNearby: true })

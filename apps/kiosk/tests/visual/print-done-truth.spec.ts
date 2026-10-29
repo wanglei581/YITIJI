@@ -3,6 +3,7 @@ import type { PrintJobTakeawayUrl } from '@ai-job-print/shared'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { setReactRouterState, W2_FILE, W2_PRINT_PARAMS } from './fixtures/fusion-w2-state'
+import { HELP_NEEDED_LINE, containsStaffHandoff } from '../fixtures/unattended-lines'
 
 const TASK_ID = 'truth-task-001'
 const taskState = {
@@ -387,13 +388,43 @@ test('a rejected submission is shown honestly and never fakes success @kiosk', a
   await page.getByRole('button', { name: '卡住没出完' }).click()
   await page.getByRole('button', { name: '提交反馈' }).click()
 
-  // 服务端的真实原因原样展示。
-  await expect(page.getByRole('alert')).toContainText('该设备反馈提交过于频繁')
+  // 真实原因如实展示。服务端这句原话末尾叫用户「联系现场工作人员」，现场不安排人，
+  // 所以换成一体机登记过的同一原因（KIOSK_FEEDBACK_RATE_LIMITED），不照抄那半句。
+  const alert = page.getByRole('alert')
+  await expect(alert).toContainText('反馈提交过于频繁，请稍后再试')
+  expect(containsStaffHandoff(await alert.innerText()), '反馈失败提示不得叫用户去找现场的人').toBe(false)
   // 绝不出现回执 / 成功态。
   await expect(page.getByText('已收到你的反馈')).toHaveCount(0)
   await expect(page.locator('[data-kiosk-feedback-result="submitted"]')).toHaveCount(0)
   // 表单仍在，用户可以重试。
   await expect(page.getByRole('button', { name: '提交反馈' })).toBeVisible()
+})
+
+test('a clean server reason is shown verbatim, and an unregistered one that sends users to staff falls back to the phone line @kiosk', async ({ page, api }) => {
+  let nextBody: { code: string; message: string } = {
+    code: 'KIOSK_FEEDBACK_PRINT_TASK_INVALID',
+    message: '关联打印任务不属于本终端',
+  }
+  await page.route('**/api/v1/kiosk/feedback', async (route) => {
+    await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: nextBody }) })
+  })
+
+  await openFailedDone(page, api)
+  await page.getByRole('button', { name: '反馈问题' }).click()
+  await page.getByRole('button', { name: '卡住没出完' }).click()
+  await page.getByRole('button', { name: '提交反馈' }).click()
+
+  // 阳性对照：不含「找现场的人」的服务端原话原样展示（没有被统一改写成兜底句）。
+  await expect(page.getByRole('alert')).toContainText('关联打印任务不属于本终端')
+
+  // 码没有登记、原话又叫人找现场的人：退回兜底句 = 提交失败 + 标准句 1。
+  nextBody = { code: 'KIOSK_FEEDBACK_SOMETHING_NEW', message: '提交失败，请联系现场工作人员处理' }
+  await page.getByRole('button', { name: '提交反馈' }).click()
+  const alert = page.getByRole('alert')
+  await expect(alert).toContainText('提交失败，反馈未送出。')
+  await expect(alert).toContainText(HELP_NEEDED_LINE)
+  expect(containsStaffHandoff(await alert.innerText()), '兜底提示不得叫用户去找现场的人').toBe(false)
+  await expect(page.getByText('已收到你的反馈')).toHaveCount(0)
 })
 
 test('network failure does not fabricate a receipt @kiosk', async ({ page, api }) => {

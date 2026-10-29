@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { helpNeededLine } from '../copy/unattendedCopy'
+import { helpNeededLine, networkDisconnectLine } from '../copy/unattendedCopy'
 import { useSupportContact } from '../hooks/useSupportContact'
 import {
   retryScanCleanupNow,
@@ -71,6 +71,7 @@ function CleanupHoldPanel({ status }: { status: ScanCleanupStatus }) {
       >
         立即重试
       </button>
+      <p className="qx-clearing-note">一直不成。{networkDisconnectLine()}。</p>
       {helpLine ? <p className="qx-clearing-note" data-testid="session-guard-cleanup-help">{helpLine}</p> : null}
     </div>
   )

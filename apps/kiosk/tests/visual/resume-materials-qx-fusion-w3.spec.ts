@@ -2,6 +2,7 @@ import type { Locator, Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 import type { ApiRouter } from '../fixtures/api-router'
+import { HELP_NEEDED_LINE } from '../fixtures/unattended-lines'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointerHit } from './assert-layout'
 
 // ── 稿 25 求职材料库（/resume/materials）迁入青序流光后的浏览器回归 ───────────────
@@ -69,8 +70,10 @@ function registerShell(api: ApiRouter): void {
 
 /** 原文一律不透传：5xx 走统一的「服务暂时不可用」，未登记错误码的 4xx 回落到页面自己的兜底句。 */
 const failure = (status: number, message: string) => ({ status, json: { success: false, error: { code: 'FIXTURE_UNREGISTERED', message } } })
-// 现场无人值守：目录读不到时屏上不许写「联系现场工作人员」。共享错误码表对 5xx 的句子带着这句话，页面先过 unattendedReason，换成固定句。
-const CATALOG_DOWN = '求职材料加载失败，请稍后重试'
+// 现场无人值守：目录读不到时屏上不许写「联系现场工作人员」。页面把共享错误码表的句子先过 unattendedReason：
+// 句子里带叫人找现场的话就换成页面固定句，不带就原样显示。5xx 通用句已换成「请稍后重试」+ 无人值守标准句 1
+// （服务电话，或没读到时的隐私政策联系方式），不带那种话，所以屏上是这一整句。
+const SERVICE_DOWN = new RegExp(`^服务暂时不可用，请稍后重试。${HELP_NEEDED_LINE.source}。$`)
 
 /** 已停在登录页时完成短信登录，并等回到材料库。 */
 async function loginBackToMaterials(page: Page): Promise<void> {
@@ -241,7 +244,7 @@ test('material workshop: empty list and read failure are separate honest states 
   api.respond('GET', TEMPLATES, failure(503, 'fixture template failure'))
   await catalogRetry(screen, '重新读取一次').click()
   await expect(screen).toHaveAttribute('data-state', 'error')
-  await expect(page.getByRole('alert')).toHaveText(CATALOG_DOWN)
+  await expect(page.getByRole('alert')).toHaveText(SERVICE_DOWN)
   await expect(page.getByText('联系现场工作人员')).toHaveCount(0)
   await expect(page.getByText('fixture template failure')).toHaveCount(0)
   await expect(page.locator('.qx-rm-template')).toHaveCount(0)

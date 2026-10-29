@@ -2,6 +2,7 @@ import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { setReactRouterState, W2_FILE, W2_ORDER, W2_PRINT_PARAMS } from './fixtures/fusion-w2-state'
+import { HELP_NEEDED_LINE, containsStaffHandoff } from '../fixtures/unattended-lines'
 
 const LATER = '2099-07-24T00:10:00.000Z'
 const CASHIER_STATE = {
@@ -202,7 +203,10 @@ test('channel outcome unconfirmed must say do-not-repay, never claim acceptance 
   const alertText = (await alert.innerText()).replace(/\s+/g, '')
   // ① 说出请勿重复/重新支付并指向核实路径 —— 资金安全的全部要点
   expect(alertText, '结果未确认时必须明说不要再付一次').toMatch(/请勿(重复|重新)支付/)
-  expect(alertText, '必须给出核实路径（现场工作人员 / 自查支付账单）').toMatch(/工作人员|支付账单/)
+  // 现场不安排人：核实路径 = 自查支付账单 + 标准句 1（服务电话），不叫人找现场的人。
+  expect(alertText, '必须给出核实路径（自查支付账单）').toContain('支付账单')
+  expect(alertText, '必须给出求助出路（标准句 1）').toMatch(new RegExp(HELP_NEEDED_LINE.source.replace(/\s/g, '')))
+  expect(containsStaffHandoff(alertText), '不得叫用户去找现场的人').toBe(false)
   // ② 不得出现「请稍后重试」类措辞
   expect(alertText, '结果未确认时不得出现通用重试话术').not.toContain('请稍后重试')
   // ③ 不得断言「已受理」：本例 503 body 里正写着这句，页面照抄即红（固定文案不得漂移成透传）
@@ -225,13 +229,14 @@ test('cashier exposes a failed channel request and retries the real endpoint @w2
   await setReactRouterState(page, '/print/cashier', CASHIER_STATE)
   await expect(page.locator('[data-qx-state="channel-failed"]')).toBeVisible()
   // 原先逐字钉「支付通道服务暂不可用」。文案已改成
-  // 「服务暂时不可用，请稍后重试或联系现场工作人员」—— 更好（多给了下一步动作）。
+  // 「服务暂时不可用，请稍后重试。」+ 标准句 1（服务电话）—— 更好（多给了下一步动作）。
   // 改成钉**不变量**而不是句子：必须说了不可用，且必须给出可执行的下一步。
   // 逐字钉整句会让每次文案打磨都变成一次假红，作者就会去改断言而不是看页面。
   {
     const alertText = (await page.getByRole('alert').innerText()).replace(/\s+/g, '')
     expect(alertText, '通道拉取失败时必须明说不可用').toMatch(/不可用|失败/)
-    expect(alertText, '必须给出可执行的下一步，而不是只报故障').toMatch(/重试|稍后|工作人员/)
+    expect(alertText, '必须给出可执行的下一步，而不是只报故障').toMatch(/重试|稍后|服务电话|隐私政策/)
+    expect(containsStaffHandoff(alertText), '不得叫用户去找现场的人').toBe(false)
   }
   await page.getByRole('button', { name: '重新读取支付通道' }).click()
   await expect(page.locator('[data-qx-state="channel-selected"]')).toBeVisible()

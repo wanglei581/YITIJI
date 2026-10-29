@@ -155,7 +155,10 @@ test('resume failure reasons preserve user messages and shared rate-limit copy v
   // 不再落到 RATE_LIMITED 的「当前使用的人较多」。resumeUserReason 必须原样放过这句。
   // 上面循环里的「当前使用的人较多，请稍后再试」仍覆盖普通限流，不能被这句替换。
   class ApiHttpError extends Error {}
-  const { userMessageOf } = load('src/services/api/userErrorMessage.ts', { './httpAdapter': { ApiHttpError } })
+  const { userMessageOf } = load('src/services/api/userErrorMessage.ts', {
+    './httpAdapter': { ApiHttpError },
+    '../../copy/unattendedCopy': load('src/copy/unattendedCopy.ts'),
+  })
   const error = Object.assign(new ApiHttpError('今日次数已用完'), { code: 'AI_PUBLIC_QUOTA_EXCEEDED', status: 429 })
   assert.equal(resumeUserReason(userMessageOf(error, fallback), fallback), '今天的 AI 次数用完了，明天恢复；可以先打印原件。')
 })

@@ -239,19 +239,27 @@ assert.deepEqual(
 // 做法沿用 verify-ai-down-fallbacks.mjs ⑤-A：纯本地编译 + 内存 import，不连网络/数据库。
 {
   const source = read('src/services/api/userErrorMessage.ts')
-  // 唯一的值导入是 ApiHttpError，用等价的本地类替掉即可独立加载（其余是纯逻辑）。
+  // 值导入只有两个：ApiHttpError 用等价的本地类替掉；无人值守标准句（copy/unattendedCopy，自身无依赖）
+  // 原样转译后以 data URL 接上，这样断言的就是真标准句，不是另抄的一份。其余是纯逻辑。
+  const COPY_IMPORT = /^import \{[^}]*\} from '\.\.\/\.\.\/copy\/unattendedCopy'$/m
   const standalone = source.replace(
     /^import \{ ApiHttpError \} from '\.\/httpAdapter'$/m,
     'export class ApiHttpError extends Error {\n'
       + '  constructor(code, message, status) { super(message); this.code = code; this.status = status }\n'
       + '}',
   )
-  assert.doesNotMatch(standalone, /^\s*import\s/m, 'userErrorMessage.ts 新增了运行时依赖，本判据需同步调整')
+  assert.match(standalone, COPY_IMPORT, 'userErrorMessage.ts 必须从 copy/unattendedCopy 取无人值守标准句')
+  assert.doesNotMatch(standalone.replace(COPY_IMPORT, ''), /^\s*import\s/m, 'userErrorMessage.ts 新增了运行时依赖，本判据需同步调整')
 
-  const js = ts.transpileModule(standalone, {
+  const transpileEsm = (code) => ts.transpileModule(code, {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
   }).outputText
-  const mod = await import(`data:text/javascript;base64,${Buffer.from(js, 'utf8').toString('base64')}`)
+  const toDataUrl = (code) => `data:text/javascript;base64,${Buffer.from(code, 'utf8').toString('base64')}`
+  const copyUrl = toDataUrl(transpileEsm(read('src/copy/unattendedCopy.ts')))
+  const copy = await import(copyUrl)
+  const js = transpileEsm(standalone).replace("'../../copy/unattendedCopy'", `'${copyUrl}'`)
+  assert.ok(js.includes(copyUrl), '标准句导入没有接上真实的 unattendedCopy')
+  const mod = await import(toDataUrl(js))
   const { userMessageOf, ApiHttpError } = mod
   assert.equal(typeof userMessageOf, 'function', 'userMessageOf 必须被导出')
   assert.equal(typeof ApiHttpError, 'function', '测试桩必须导出 ApiHttpError，否则无法构造带服务端原文的错误')
@@ -280,10 +288,10 @@ assert.deepEqual(
   assert.notEqual(userMessageOf({ code: 'MOCK_MODE' }, FALLBACK), FALLBACK, 'MOCK_MODE 必须有自己的文案')
   for (const [code, hint] of [
     ['NETWORK_ERROR', /网络|重试/],
-    ['TERMINAL_NOT_READY', /设备未就绪|现场/],
-    ['ONLINE_PAYMENT_DISABLED', /支付|现场/],
+    ['TERMINAL_NOT_READY', /暂时不能用.*(稍后再来|换一台机器)/],
+    ['ONLINE_PAYMENT_DISABLED', /线上支付.*(其他支付方式|服务电话|联系方式)/],
     ['SCAN_TERMINAL_BUSY', /扫描|等待/],
-    ['PRINTER_UNAVAILABLE', /打印机|重试|现场/],
+    ['PRINTER_UNAVAILABLE', /暂时不能用.*(稍后再来|换一台机器)/],
   ]) {
     const text = userMessageOf({ code }, FALLBACK)
     assert.notEqual(text, FALLBACK, `${code} 必须有自己的文案`)
@@ -309,7 +317,9 @@ assert.deepEqual(
   // 所以再钉一条不同的合格中文（#1150 现文「本机…」），证明不是固定覆盖。
   // 英文堆栈或路径、以及空原话，回退一体机自己的那句，不落到调用方兜底。
   // PRINTER_UNAVAILABLE 不放行：带「本机暂停接打印单…」时仍是原来的固定文案。
-  const PRINTER_FIXED = '打印机当前不可用（离线、缺纸或故障），请稍后再试或联系现场工作人员'
+  // 现场不安排人：打印机不可用是整台机器暂时打不了，用标准句 3（读自真实 unattendedCopy，不另抄）。
+  const PRINTER_FIXED = copy.machineUnusableLine()
+  assert.match(PRINTER_FIXED, /^这台机器暂时不能用，请(稍后再来|换一台机器)，或/, '标准句 3 的形状变了，本门禁的固定句要跟着看')
   const QUEUE_HALTED_FALLBACK = '这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端'
   const QUEUE_HALTED_SERVER = '本机暂停接打印单，暂不能下单，请稍后再试或换一台终端'
   assert.equal(
@@ -334,6 +344,36 @@ assert.deepEqual(
   assert.equal(printerShown, PRINTER_FIXED, 'PRINTER_UNAVAILABLE 不得透传「本机暂停接打印单」')
   assert.notEqual(printerShown, QUEUE_HALTED_SERVER)
   assert.notEqual(printerShown, QUEUE_HALTED_FALLBACK)
+  // 现场不安排人：透传码的服务端原话若仍叫用户去找现场的人，换成这个码登记过的那句；
+  // 没登记的透传码（CONVERT_FAILED）退回调用方兜底句。干净原话照旧原样显示（上面已钉）。
+  const HANDOFF_SERVER = '本机暂停接打印单，请联系现场工作人员'
+  assert.equal(copy.containsStaffHandoff(HANDOFF_SERVER), true, '阳性对照：夹具原话本身必须命中词表')
+  assert.equal(
+    userMessageOf(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', HANDOFF_SERVER, 400), FALLBACK),
+    QUEUE_HALTED_FALLBACK,
+    '服务端原话叫人找现场的人时，必须换成登记过的固定句',
+  )
+  assert.equal(
+    userMessageOf(new ApiHttpError('CONVERT_FAILED', '转换失败，请找现场工作人员', 400), FALLBACK),
+    FALLBACK,
+    '没有登记句的透传码，原话叫人找现场的人时退回调用方兜底句',
+  )
+  assert.equal(
+    userMessageOf(new ApiHttpError('CONVERT_FAILED', '合成图片尺寸不受支持，请换一张图', 400), FALLBACK),
+    '合成图片尺寸不受支持，请换一张图',
+    '干净的透传原话照旧原样显示',
+  )
+  // 码表整表真跑一遍：没有一句叫用户去找现场的人（静态扫描扫不到函数拼出来的句子，这里补上）。
+  const handoffs = []
+  for (const code of mod.SHARED_USER_MESSAGE_CODES) {
+    const text = userMessageOf({ code }, FALLBACK)
+    if (copy.containsStaffHandoff(text) || text.includes('工作人员')) handoffs.push(`${code}：${text}`)
+  }
+  assert.deepEqual(handoffs, [], `码表里有句子叫用户去找现场的人：\n${handoffs.join('\n')}`)
+  assert.ok(mod.SHARED_USER_MESSAGE_CODES.length > 40, '码表被清空或没读到，整表检查是空转')
+  const generic5xx = userMessageOf(new ApiHttpError('SOMETHING_NEW', 'x', 503), FALLBACK)
+  assert.equal(generic5xx, `服务暂时不可用，请稍后重试。${copy.helpNeededLine()}。`, '5xx 通用句要给重试加标准句 1，不叫人找人')
+  assert.equal(copy.containsStaffHandoff(generic5xx), false)
   const otherCode = userMessageOf(new ApiHttpError('RATE_LIMITED', QUEUE_HALTED_SERVER, 429), FALLBACK)
   assert.equal(otherCode, '当前使用的人较多，请稍后再试', '非透传码不得显示服务端原话')
   assert.notEqual(otherCode, QUEUE_HALTED_SERVER)
