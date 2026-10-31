@@ -25,3 +25,15 @@ export function isPrinterFaultStatus(printerStatus: string | null | undefined): 
     && !isHealthyPrinterStatus(printerStatus)
     && !isLowPaperWarning(printerStatus)
 }
+
+/** 对外（公开只读的 printer-status）只给扫描输入是否可用这一档，不带原因码、恢复动作和路径。 */
+export type PublicScanInputHealth = 'healthy' | 'locked_out' | 'unknown'
+
+/**
+ * Agent 心跳里的扫描输入状态 → 一体机公开接口里的那一档。
+ * 老版本 Agent 不上报（null）原样给 null，让一体机写「读不到」；库里出现不认识的值一律当 unknown，不冒充 healthy。
+ */
+export function publicScanInputHealth(value: string | null | undefined): PublicScanInputHealth | null {
+  if (value === null || value === undefined) return null
+  return value === 'healthy' || value === 'locked_out' ? value : 'unknown'
+}

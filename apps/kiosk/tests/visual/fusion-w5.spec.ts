@@ -895,7 +895,7 @@ test('direct visit to /session-timeout without a pending warning fails closed to
 
   await page.goto('/session-timeout')
 
-  await expect(page).toHaveURL('http://127.0.0.1:4185/', { timeout: 5_000 })
+  await expect(page).toHaveURL((url) => url.pathname === '/', { timeout: 5_000 })
   await expect(page.locator('[data-kiosk-screen="session-timeout"]')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /我还在，继续使用/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '结束并清除这台机器上的这次使用记录', exact: true })).toHaveCount(0)
@@ -961,32 +961,75 @@ test('offline page retains the 8177 state after an aborted health request @w5-ki
   registerKioskShell(api)
   api.abort('GET', '/api/v1/health', 'internetdisconnected')
   await page.goto('/error-offline')
+  await expect(page.getByTestId('system-state-state-offline')).toBeVisible()
   await page.getByRole('button', { name: '重新检测', exact: true }).click()
   await expect(page).toHaveURL(/\/error-offline$/)
   // 触屏稿 09：屏上只说各项读到没读到，不写重测次数和秒数；次数只留给读屏（.qxp-sr），状态没丢。
-  await expect(page.getByTestId('system-state-auto')).toContainText('已重试 1 次')
+  await expect(page.getByTestId('system-state-auto')).toContainText('已重试 2 次')
   await expectFusionAcceptance(page, errors)
 })
 
-test('offline page follows a recovered health response in a fresh page @w5-kiosk', async ({ page, api }) => {
+test('device status checks immediately and keeps healthy readings on this page @w5-kiosk', async ({ page, api }, testInfo) => {
   const errors = runtimeErrors(page)
   registerKioskShell(api)
-  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
-    status: 200,
-    json: terminalConfig({ enabled: false, items: [] }),
+  api.respond('GET', '/api/v1/health', { status: 200, json: { data: { status: 'ok' } } })
+  api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
+    status: 200, json: { data: { isOnline: true, printerStatus: 'ready', scanInputHealth: 'healthy' } },
   })
-  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
-  api.respond('GET', '/api/v1/job-fairs', {
-    status: 200,
-    json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
-  })
-  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
   await page.goto('/error-offline')
-  await expect(page.locator('[data-kiosk-screen="error-offline"]')).toBeVisible()
-  await expectFusionAcceptance(page, errors)
+  await expect(page.locator('[data-cap="printer"]')).toContainText('这次读到可用')
+  await expect(page.locator('[data-cap="scan"]')).toContainText('这次读到可接收')
+  await expect(page).toHaveURL(/\/error-offline$/)
   await page.getByRole('button', { name: '重新检测', exact: true }).click()
-  await page.waitForURL((url) => url.pathname === '/')
+  await expect(page.locator('[data-cap="printer"]')).toContainText('这次读到可用')
+  await expect(page).toHaveURL(/\/error-offline$/)
   await expectFusionAcceptance(page, errors)
+  await page.screenshot({ path: testInfo.outputPath('device-status.png'), fullPage: true })
+})
+
+for (const reading of [
+  { online: true, health: 'locked_out', expected: '暂停接收' },
+  { online: true, health: null, expected: '暂时读不到' },
+  { online: true, health: 'unrecognised', expected: '暂时读不到' },
+  { online: false, health: 'healthy', expected: '暂时读不到' },
+]) {
+  test(`device status scan verdict uses fresh explicit health ${reading.online}-${reading.health} @w5-kiosk`, async ({ page, api }) => {
+    registerKioskShell(api)
+    api.respond('GET', '/api/v1/health', { status: 200, json: { data: { status: 'ok' } } })
+    api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
+      status: 200, json: { data: { isOnline: reading.online, printerStatus: 'ready', scanInputHealth: reading.health } },
+    })
+    await page.goto('/error-offline')
+    await expect(page.getByTestId('system-state-state-partial')).toBeVisible()
+    await expect(page.locator('[data-cap="scan"]')).toContainText(reading.expected)
+    if (!reading.online) await expect(page.locator('[data-cap="agent"]')).toContainText('暂时读不到')
+    await expect(page).toHaveURL(/\/error-offline$/)
+  })
+}
+
+test('device status preserves an explicit fault return destination after recovery @w5-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  api.abort('GET', '/api/v1/health', 'internetdisconnected')
+  await page.goto('/error-offline')
+  await expect(page.getByTestId('system-state-state-offline')).toBeVisible()
+  await page.evaluate(() => window.history.replaceState({ usr: { from: '/help' }, key: 'fault-return' }, '', '/error-offline'))
+  api.respond('GET', '/api/v1/health', { status: 200, json: { data: { status: 'ok' } } })
+  await page.reload()
+  await expect(page).toHaveURL(/\/help$/)
+})
+
+test('device status times out an unresponsive probe and allows manual recovery @w5-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  api.respondWith('GET', '/api/v1/health', () => new Promise(() => {}))
+  await page.clock.install()
+  await page.goto('/error-offline')
+  await expect(page.getByTestId('system-state-state-checking')).toBeVisible()
+  await page.clock.runFor(5_100)
+  await expect(page.getByTestId('system-state-state-offline')).toBeVisible()
+  api.respond('GET', '/api/v1/health', { status: 200, json: { data: { status: 'ok' } } })
+  await page.getByRole('button', { name: '重新检测', exact: true }).click()
+  await expect(page.locator('[data-cap="network"]')).toContainText('这次连得上')
+  await expect(page).toHaveURL(/\/error-offline$/)
 })
 
 test('offline page backs off its automatic re-checks and resets on the online event @w5-kiosk', async ({ page, api }) => {
@@ -996,12 +1039,11 @@ test('offline page backs off its automatic re-checks and resets on the online ev
   registerKioskShell(api)
   api.abort('GET', '/api/v1/health', 'internetdisconnected')
   await page.clock.install()
-  await page.goto('/error-offline')
-  await expect(page.getByTestId('system-state-state-unknown')).toBeVisible()
+  // 进页立即发起探测；先冻结时钟，避免页面加载耗时吃掉首次20秒退避窗口。
   await freezeClock(page)
-  expect(api.requestCount('GET', '/api/v1/health')).toBe(0)
-
-  await page.clock.runFor(10_000)
+  await page.goto('/error-offline')
+  await expect(page.getByTestId('system-state-state-offline')).toBeVisible()
+  expect(api.requestCount('GET', '/api/v1/health')).toBe(1)
   await expect(page.locator('.qxp-sr', { hasText: '已重试 1 次，约 20 秒后自动再试' })).toBeAttached()
   await expect(page.getByText('约 20 秒后自动再试')).toBeHidden()
   await page.clock.runFor(19_000)
@@ -1029,10 +1071,8 @@ test('offline page aborts its in-flight probe when the user leaves the page @w5-
   api.respondWith('GET', '/api/v1/health', () => new Promise(() => {}))
   await page.clock.install()
   await page.goto('/error-offline')
-  await expect(page.getByTestId('system-state-state-unknown')).toBeVisible()
-  await freezeClock(page)
-  await page.getByRole('button', { name: '重新检测', exact: true }).click()
   await expect(page.getByTestId('system-state-state-checking')).toBeVisible()
+  await freezeClock(page)
   const aborted = page.waitForEvent('requestfailed', {
     predicate: (request) => new URL(request.url()).pathname === '/api/v1/health',
     timeout: 3_000,
