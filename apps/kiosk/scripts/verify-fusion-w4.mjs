@@ -237,13 +237,14 @@ check('company directory does not rank companies by the user resume', () => {
   assert.match(companyDetail, /RecruitTouchFrame/)
 })
 // 第 11 包页面只在托管打开（客户私有化部署）时挂载；两个壳（RtFrame 与招聘会八屏的 QxFairWorkbench）
-// 一律在最上面挂私有化版标识条，文字逐字照稿，防止被当成我方云上的页面拿去演示或宣传。
-check('recruitment touch frames wear the private-deployment ribbon word for word', () => {
+// 保留面向使用者的来源说明；部署与运营限制留在正式文档，不显示内部交付口径。
+check('recruitment touch frames retain public source guidance without internal delivery notes', () => {
   const ribbon = read('src/pages/recruitment-touch/RtRibbon.tsx')
   assert.ok(
-    ribbon.includes('私有化部署版 · 仅供持有人力资源服务许可证的客户自行运营 · 我方云上不出现 · 不得用于对外宣传'),
-    'ribbon text must stay verbatim',
+    ribbon.includes('信息以标注的来源为准；投递、预约请前往来源平台办理。'),
+    'public ribbon must retain source-platform guidance',
   )
+  assert.doesNotMatch(ribbon, /仅供持有人力资源服务许可证|我方云上不出现|不得用于对外宣传/, 'internal delivery notes must not be public copy')
   assert.match(read('src/pages/recruitment-touch/RtFrame.tsx'), /<RtRibbon\s*\/>/)
   assert.match(read('src/pages/job-fairs/QxFairWorkbench.tsx'), /<RtRibbon\s*\/>/)
 })

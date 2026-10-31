@@ -1,5 +1,14 @@
 # 当前开发进度
 
+## 2026-10-31：I-33 招聘页提示条改为群众来源说明（本地修复，未改托管开关）
+
+- 审查依据：`docs/compliance/compliance-boundary.md` §1/§1.1 与 `docs/product/feature-scope.md` 的托管 a/b 边界。云端招聘关闭、客户私有部署自行运营及资质/宣传限制继续有效；本轮只移除群众页面中的内部交付口径，没有删改正式运营限制或招聘隔离。
+- 基于集成 `39688b5eec3f8dbef5bbdcedbade477594cbe089`，独立分支 `codex/recruit-ribbon-20261031`；6 文件预算：RtRibbon、W4 门禁、托管浏览器用例、触屏几何用例、两份正式进度文档。未新增入口/依赖/数据模型；不改托管配置、路由/接口闸门、来源四要素、投递预约白名单、后端、生产或硬件。
+- 公共条保留原挂载与 note 语义，改为「信息以标注的来源为准；投递、预约请前往来源平台办理。」没有声称信息一定由本机构提供；两种招聘壳均保留说明，原页面的来源/不代收简历/不代替投递提示仍在。
+- 先以新 W4 断言运行旧 RtRibbon 源码，只有本条明确失败；修后 W4 全过。kiosk typecheck、生产模式 build、字体子集门禁（7168 字覆盖）、根合规及日期/截断/原始错误文案门禁通过。相关 lint 唯有 recruitment-hosting 既存三个 unused（_dropped/_hosting/_board）非零，已对基线 39688b5ee 原文复现，不计为本轮引入。
+- 本机 1080×1920 浏览器：托管关闭全部直达招聘 URL 无条、无招聘请求；托管打开五页覆盖两壳显示来源说明且无内部文案，两项通过。岗位/招聘会几何及关联指标四项通过；另重跑一项正例留存五页截图并目视核对。只切测试 API fixture，未打开真实托管开关。
+- 证据 `/Users/wanglei/.codex/evidence/recruit-ribbon-20261031/`（before-w4、after-w4、font、compliance、browser、metrics、typecheck、lint-baseline 与 public-copy-screenshots）。图谱交总集成统一处理。本轮不代表私有部署资质审核、真实机构数据、Windows 真机或上线完成；无生产写入、AI调用、出纸。
+
 ## 2026-10-31：接续四路候选的前后端、迁移与 CI 验证（发布准备线，实施中）
 
 - 用户本轮授权接续原聊天四路集成、修复实际问题、验证前后端/迁移/CI并准备备份回滚；生产上线另待用户确认，Windows 不出纸。沿用独立 `codex/touch-release-readiness-20261031`，保留原工作树与 Claude 改动。当前已并入原集成 `3e51537f6`；原聊天仍收齐简历与最终图谱，不抢写其文件。
