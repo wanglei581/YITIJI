@@ -208,3 +208,105 @@ test('预览页与核对弹层把「待本人确认」讲明白，并且只列 A
   await expect(note).not.toContainText('负责')
   await expect(note).toContainText('AI 整理时新写进了这几处，你原来的内容里没有')
 })
+
+// ── I-19 ───────────────────────────────────────────────────────────────────
+// 走查实录：诊断出 1 个问题时，左栏六个维度约 660px，右栏「先改这几处」只放一条问题卡，卡被拉到和左栏一样高，
+// 卡内下半截约 400px 是空的，空卡在首屏正中占近两成屏高。
+// 判据：问题卡按内容定高，不拉长凑高度；问题不足三条时右栏用报告里本来就有的「报告结论」（建议与风险提醒）补满，
+// 不留一片空白；三条都有时仍是稿里的样子。
+const REPORT_ID = 'rep-walkfix-1'
+const SECTIONS = [
+  { key: 'basic', label: '基础信息完整度', score: 8, maxScore: 10 },
+  { key: 'objective', label: '求职目标清晰度', score: 4, maxScore: 10 },
+  { key: 'experience', label: '经历表达清晰度', score: 7, maxScore: 10 },
+  { key: 'quantification', label: '成果量化程度', score: 4, maxScore: 10 },
+  { key: 'keyword', label: '岗位关键词覆盖', score: 6, maxScore: 10 },
+  { key: 'readability', label: '版式与可读性', score: 6, maxScore: 10 },
+]
+const ISSUE_QUANT = {
+  id: 'I1', dim: 'quantification', title: '这段经历没有写出规模或结果',
+  evidence: [{ blockKey: 'experience', lineIndex: 0, quote: '现居青岛市，本文件为虚构示例。' }],
+  impact: '读简历的人只看到做了什么，看不到做到什么程度。',
+  fixIt: '在这一行后面补上你实际负责的人数、数量或周期；没有准确数字就写清具体做了哪些环节。',
+}
+const ISSUE_GOAL = {
+  id: 'I2', dim: 'objective', title: '求职目标没有写成具体岗位',
+  evidence: [{ blockKey: 'basic', lineIndex: 0, quote: '希望找一份稳定的工作。' }],
+  impact: '全篇没有岗位名，后面的经历对不上具体职位。',
+  fixIt: '写成目标岗位，并让经历围着它写。',
+}
+const ISSUE_PROJ = {
+  id: 'I3', dim: 'experience', title: '项目只有活动名，没写你做了什么',
+  evidence: [{ blockKey: 'project', lineIndex: 0, quote: '参与迎新志愿服务。' }],
+  impact: '只有活动名，看不出你具体做了哪一段。',
+  fixIt: '补上你负责的那一段，不新加没做过的项目。',
+}
+function reportRecord(issues: unknown[]) {
+  return {
+    taskId: REPORT_ID, status: 'completed', providerName: 'llm',
+    report: {
+      sections: SECTIONS,
+      suggestions: ['把目标岗位写在简历第一行。', '每段经历后面补一个可核实的结果。', '技能栏只留你真用过的工具。', '联系方式放在第一屏。'],
+      riskNotes: ['「熟悉」「了解」这类词没有事例支撑，读的人容易当作空话。'],
+      contentBlocks: [
+        { key: 'basic', label: '基本信息', lines: ['希望找一份稳定的工作。'] },
+        { key: 'experience', label: '工作经历', lines: ['现居青岛市，本文件为虚构示例。'] },
+        { key: 'project', label: '项目经历', lines: ['参与迎新志愿服务。'] },
+      ],
+      issues,
+    },
+  }
+}
+async function openReport(page: Page, api: ApiRouter, issues: unknown[]): Promise<void> {
+  shell(api)
+  api.respond('GET', `/api/v1/resume/records/${REPORT_ID}`, { status: 200, json: reportRecord(issues) })
+  await page.goto(`/resume/report?taskId=${REPORT_ID}`)
+  await expect(page.getByTestId('resume-report-priorities')).toBeVisible()
+}
+/** 右栏有没有「拉长的空卡」：每张问题卡里最后一行字到卡下沿的空白，以及右栏末尾内容到栏下沿的空白，都不许超过 105px。 */
+async function rightColumnSlack(page: Page): Promise<{ cards: number[]; columnTail: number; cardTops: number[] }> {
+  return page.getByTestId('resume-report-priorities').evaluate((section) => {
+    const sectionBox = section.getBoundingClientRect()
+    const cards = Array.from(section.querySelectorAll<HTMLElement>('.qxt-issue'))
+    const slack = cards.map((card) => {
+      const box = card.getBoundingClientRect()
+      const last = Array.from(card.children).map((child) => child.getBoundingClientRect().bottom).reduce((max, value) => Math.max(max, value), box.top)
+      return Math.round(box.bottom - last)
+    })
+    const tail = Array.from(section.children).map((child) => child.getBoundingClientRect().bottom).reduce((max, value) => Math.max(max, value), sectionBox.top)
+    return { cards: slack, columnTail: Math.round(sectionBox.bottom - tail), cardTops: cards.map((card) => Math.round(card.getBoundingClientRect().top)) }
+  })
+}
+
+test('诊断报告只有 1 条问题时右栏不留拉长的空卡，用报告结论补满 @w3-kiosk', async ({ page, api }) => {
+  await openReport(page, api, [ISSUE_QUANT])
+  const slack = await rightColumnSlack(page)
+  expect(slack.cards, '问题卡数').toHaveLength(1)
+  for (const blank of slack.cards) expect(blank, '问题卡里最后一行字到卡下沿的空白').toBeLessThanOrEqual(105)
+  expect(slack.columnTail, '右栏末尾内容到栏下沿的空白').toBeLessThanOrEqual(105)
+  // 报告结论补进了右栏（不再只收在下面的折叠里），默认展开，建议与风险提醒都看得见
+  const conclusions = page.getByTestId('resume-report-priorities').getByTestId('resume-report-conclusions')
+  await expect(conclusions).toBeVisible()
+  await expect(conclusions).toHaveAttribute('open', '')
+  await expect(conclusions).toContainText('把目标岗位写在简历第一行。')
+  await expect(conclusions).toContainText('熟悉')
+  // 同一份结论只出现一处，不在下面的折叠里再来一遍
+  await expect(page.getByTestId('resume-report-conclusions')).toHaveCount(1)
+  await assertReportNoOverflow(page)
+})
+
+test('诊断报告有 3 条问题时仍是稿里的样子：三张卡并排左栏，报告结论收在下面 @w3-kiosk', async ({ page, api }) => {
+  await openReport(page, api, [ISSUE_QUANT, ISSUE_GOAL, ISSUE_PROJ])
+  const slack = await rightColumnSlack(page)
+  expect(slack.cards).toHaveLength(3)
+  expect(slack.columnTail).toBeLessThanOrEqual(105)
+  // 结论仍在右栏之外（下面那条折叠，默认收起）
+  await expect(page.getByTestId('resume-report-priorities').getByTestId('resume-report-conclusions')).toHaveCount(0)
+  await expect(page.getByTestId('resume-report-conclusions')).not.toHaveAttribute('open', '')
+  await assertReportNoOverflow(page)
+})
+
+async function assertReportNoOverflow(page: Page): Promise<void> {
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  expect(over, '横向溢出').toBeLessThanOrEqual(0)
+}

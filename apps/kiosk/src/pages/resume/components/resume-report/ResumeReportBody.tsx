@@ -56,6 +56,28 @@ export function ResumeReportBody({
   const rest = issues.slice(3)
   const riskNotes = report.riskNotes ?? []
   const hasConclusions = report.suggestions.length > 0 || riskNotes.length > 0 || (report.priorities?.length ?? 0) > 0
+  // 右栏摆不满三张卡时，用报告里本来就有的「报告结论」补进右栏并默认展开，不让问题卡被拉长去凑左栏的高度（走查 I-19）。
+  // 三张摆满时仍是稿里的样子：结论收在下面。
+  const shownCards = top.length > 0 ? top.length : priorities.length
+  const conclusionsInColumn = hasConclusions && shownCards < 3
+  const conclusions = hasConclusions ? (
+    <details className="qxt-all" open={conclusionsInColumn || undefined} data-testid="resume-report-conclusions">
+      <summary>报告结论（建议 {report.suggestions.length} · 风险提醒 {riskNotes.length}）</summary>
+      {report.suggestions.length > 0 ? (
+        <>
+          <p><u>可执行建议</u></p>
+          <ol className="qxt-list">{report.suggestions.map((tip) => <li key={tip}>{tip}</li>)}</ol>
+        </>
+      ) : null}
+      {riskNotes.length > 0 ? (
+        <>
+          <p><u>表达风险提醒</u></p>
+          <ol className="qxt-list">{riskNotes.map((note) => <li key={note}>{note}</li>)}</ol>
+        </>
+      ) : null}
+      <p>建议只针对简历表达，不涉及录用、面试或投递结果，也不会发给任何企业。</p>
+    </details>
+  ) : null
 
   return (
     <>
@@ -84,12 +106,13 @@ export function ResumeReportBody({
             })}
           </section>
         ) : null}
-        <section className="qxt-prios" aria-label="先改这几处" data-testid="resume-report-priorities">
+        <section className="qxt-prios" aria-label="先改这几处" data-testid="resume-report-priorities" data-roomy={conclusionsInColumn || undefined}>
           <div className="qxt-h">先改这几处<small>最多 3 条{issues.length === 0 && (report.priorities?.length ?? 0) === 0 ? ' · 按低分维度列出' : ''}</small></div>
           {top.length > 0
             ? top.map((issue, i) => <IssueCard key={issue.id} issue={issue} index={i + 1} blocks={blocks} />)
             : priorities.map((item, i) => <PriorityCard key={`${item.focus}-${i}`} item={item} index={i + 1} />)}
           {top.length === 0 && priorities.length === 0 ? <p className="qxt-none">这份报告没有给出需要先改的条目。</p> : null}
+          {conclusionsInColumn ? conclusions : null}
         </section>
       </div>
 
@@ -101,24 +124,7 @@ export function ResumeReportBody({
         </details>
       ) : null}
 
-      {hasConclusions ? (
-        <details className="qxt-all" data-testid="resume-report-conclusions">
-          <summary>报告结论（建议 {report.suggestions.length} · 风险提醒 {riskNotes.length}）</summary>
-          {report.suggestions.length > 0 ? (
-            <>
-              <p><u>可执行建议</u></p>
-              <ol className="qxt-list">{report.suggestions.map((tip) => <li key={tip}>{tip}</li>)}</ol>
-            </>
-          ) : null}
-          {riskNotes.length > 0 ? (
-            <>
-              <p><u>表达风险提醒</u></p>
-              <ol className="qxt-list">{riskNotes.map((note) => <li key={note}>{note}</li>)}</ol>
-            </>
-          ) : null}
-          <p>建议只针对简历表达，不涉及录用、面试或投递结果，也不会发给任何企业。</p>
-        </details>
-      ) : null}
+      {conclusionsInColumn ? null : conclusions}
 
       {blocks.length > 0 ? (
         <details className="qxt-all" data-testid="resume-report-structure">
