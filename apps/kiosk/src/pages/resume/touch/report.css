@@ -72,8 +72,9 @@
 [data-qx-page='diagnosis'] .qxt-none { margin: 0; font-size: 20px; color: var(--qxt-ink-3); }
 
 /* 右栏摆不满三张卡（走查 I-19）：问题卡按内容定高，不拉长去凑左栏的高度；补进来的报告结论接着往下排。 */
+[data-qx-page='diagnosis'] .qxt-prios[data-roomy] { align-self: start; }
 [data-qx-page='diagnosis'] .qxt-prios[data-roomy] .qxt-issue { flex: 0 0 auto; }
-[data-qx-page='diagnosis'] .qxt-prios[data-roomy] .qxt-all { flex: 1 1 auto; min-height: 0; margin: 0; }
+[data-qx-page='diagnosis'] .qxt-prios[data-roomy] .qxt-all { flex: 0 0 auto; min-height: 0; margin: 0; }
 
 /* 全部问题 / 报告结论 / 内容结构（收起） */
 [data-qx-page='diagnosis'] .qxt-all { border-radius: 20px; background: var(--qxt-well); padding: 0 14px 8px; }

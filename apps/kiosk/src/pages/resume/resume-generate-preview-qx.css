@@ -348,3 +348,9 @@
   color: var(--qx-ink-3);
   cursor: not-allowed;
 }
+
+/* I-22：结果的带走操作先出现；补充说明保留在可展开区，正文可继续滚动。 */
+.qx-resume-generate .qx-rg-next > summary {
+  display: flex; align-items: center; min-height: 64px;
+  font-size: var(--qxt-fs-body); font-weight: 700; cursor: pointer;
+}

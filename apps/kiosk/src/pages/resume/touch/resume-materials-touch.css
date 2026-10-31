@@ -112,3 +112,7 @@
     height: 140px;
   }
 }
+
+/* 生成结果属于当前办理，直接放在内容区开头，长信息仍允许随内容区滚动。 */
+.qx-resume-materials .qxt-screen .qx-rm-result { display: flex; flex-direction: column; gap: 14px; }
+.qx-resume-materials .qxt-screen .qx-rm-result > .qx-btn { align-self: flex-start; }

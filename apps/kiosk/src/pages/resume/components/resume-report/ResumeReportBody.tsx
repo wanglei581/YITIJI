@@ -106,7 +106,7 @@ export function ResumeReportBody({
             })}
           </section>
         ) : null}
-        <section className="qxt-prios" aria-label="先改这几处" data-testid="resume-report-priorities" data-roomy={conclusionsInColumn || undefined}>
+        <section className="qxt-prios" aria-label="先改这几处" data-testid="resume-report-priorities" data-roomy={shownCards < 3 || undefined}>
           <div className="qxt-h">先改这几处<small>最多 3 条{issues.length === 0 && (report.priorities?.length ?? 0) === 0 ? ' · 按低分维度列出' : ''}</small></div>
           {top.length > 0
             ? top.map((issue, i) => <IssueCard key={issue.id} issue={issue} index={i + 1} blocks={blocks} />)

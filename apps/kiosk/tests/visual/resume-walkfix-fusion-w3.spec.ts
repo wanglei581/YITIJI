@@ -3,6 +3,8 @@ import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
 import { assistantReply } from './fixtures/fusion-w3-states'
+import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
+import { registerPrivacyShell, loginThroughVisibleUi, fillPhoneLogin } from './fixtures/privacy-clear-shell'
 
 // ── 本机全链路走查（2026-10-29）C2 路：简历、练面试、AI 相关问题的回归用例 ─────────────
 // 每条用例自带夹具：ApiRouter 未登记的 /api/v1 请求一律中断，并在收尾时判红（fail-closed）。
@@ -185,7 +187,7 @@ test('AI 没暂停或没读到暂停状态时简历服务台照常，不多出�
 //      ② 只列真正新写进去的：用户自己写过的词（这里的「负责」）不算，来源是把本次填的内容带到预览页做对照。
 test('预览页与核对弹层把「待本人确认」讲明白，并且只列 AI 新写进去的 @w3-kiosk', async ({ page, api }) => {
   generateShell(api)
-  await page.route('**/w3-fixtures/gen-walkfix.pdf', (route) => route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n%%EOF' }))
+  await page.route('**/w3-fixtures/gen-walkfix.pdf', (route) => route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }))
   await fillGenerateFormToReview(page)
   await page.getByRole('button', { name: /让 AI 整理成新简历/ }).click()
   await expect(page).toHaveURL(/\/resume\/generate\/preview/)
@@ -310,3 +312,117 @@ async function assertReportNoOverflow(page: Page): Promise<void> {
   const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   expect(over, '横向溢出').toBeLessThanOrEqual(0)
 }
+
+// I-19：报告本来就没有建议时，不能把一条问题卡撑满六个维度的高度。
+test('诊断报告没有补充结论时问题卡仍按真实内容定高 @w3-kiosk', async ({ page, api }) => {
+  shell(api)
+  const record = reportRecord([ISSUE_QUANT])
+  record.report.suggestions = []
+  record.report.riskNotes = []
+  api.respond('GET', `/api/v1/resume/records/${REPORT_ID}`, { status: 200, json: record })
+  await page.goto(`/resume/report?taskId=${REPORT_ID}`)
+  await expect(page.getByTestId('resume-report-priorities')).toBeVisible()
+  const slack = await rightColumnSlack(page)
+  expect(slack.cards[0]).toBeLessThanOrEqual(105)
+  await expect(page.getByTestId('resume-report-conclusions')).toHaveCount(0)
+})
+
+// I-22：不靠缩字/裁切；四种格式与主操作在竖屏内，窄屏可滚动到全部选项。
+test('导出格式主操作可达且不靠四张大空卡撑长页面 @w3-kiosk', async ({ page, api }, testInfo) => {
+  generateShell(api)
+  await fillGenerateFormToReview(page)
+  await page.getByRole('button', { name: '让 AI 整理成新简历' }).click()
+  await page.getByRole('button', { name: '内容没问题，去导出' }).click()
+  for (const size of [{ width: 1080, height: 1920 }, { width: 1366, height: 768 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size)
+    const formats = page.getByRole('radiogroup', { name: '导出格式' })
+    await expect(formats.getByRole('radio')).toHaveCount(4)
+    const last = formats.getByRole('radio').last()
+    if (size.width === 1080) {
+      const box = await last.boundingBox()
+      const body = await page.locator('.rtp-fill').boundingBox()
+      expect(box!.y + box!.height).toBeLessThanOrEqual(body!.y + body!.height)
+    }
+    await last.click()
+    await expect(last).toHaveAttribute('aria-checked', 'true')
+    const exportButton = page.getByRole('button', { name: '导出这一份', exact: true })
+    await exportButton.scrollIntoViewIfNeeded()
+    await expect(exportButton).toBeInViewport()
+    await expect(exportButton).toBeEnabled()
+    await exportButton.click({ trial: true })
+    if (size.width === 1080) expect((await exportButton.boundingBox())!.height).toBeGreaterThanOrEqual(64)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0)
+    await page.screenshot({ path: testInfo.outputPath(`export-${size.width}.png`) })
+    await formats.getByRole('radio').first().click()
+  }
+})
+
+test('导出结果的文件与带走操作在首屏，说明可展开 @w3-kiosk', async ({ page, api }, testInfo) => {
+  generateShell(api)
+  await page.route('**/w3-fixtures/gen-walkfix.pdf', (route) => route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }))
+  await fillGenerateFormToReview(page)
+  await page.getByRole('button', { name: '让 AI 整理成新简历' }).click()
+  await page.getByRole('button', { name: '内容没问题，去导出' }).click()
+  await page.getByRole('button', { name: '导出这一份', exact: true }).click()
+  const confirm = page.getByRole('dialog', { name: '导出前核对事实' })
+  for (const checkbox of await confirm.getByRole('checkbox').all()) await checkbox.check()
+  await confirm.getByRole('button', { name: '确认导出', exact: true }).click()
+  await page.getByRole('button', { name: '关闭文件预览', exact: true }).click()
+  const actions = page.locator('.qx-rg-result-actions')
+  await expect(actions).toBeInViewport({ ratio: 1 })
+  await actions.getByRole('button', { name: '去打印确认', exact: true }).click({ trial: true })
+  await page.getByText('更多格式与帮助', { exact: true }).click()
+  await expect(page.getByRole('button', { name: /帮助中心/ }).first()).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('export-result-1080.png') })
+})
+
+
+test('从零简历会员换号后不继承上一位填写 @w3-kiosk', async ({ page, api }, testInfo) => {
+  registerPrivacyShell(api)
+  let logins = 0
+  await page.route('**/api/v1/member/auth/login', async (route) => {
+    logins += 1
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: {
+      token: `resume-member-${logins}`, user: { id: `resume-owner-${logins}`, phoneMasked: '138****8000', nickname: `验证会员${logins}` },
+    } }) })
+  })
+  await loginThroughVisibleUi(page, '/resume/generate', '13800138000')
+  await page.getByLabel('姓名', { exact: false }).fill('上一位会员的简历')
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '我的', exact: true }).click()
+  await page.getByTestId('profile-account').click()
+  await page.getByRole('button', { name: /换一个账号登录/ }).click()
+  await page.getByRole('dialog', { name: '换一个账号登录' }).getByRole('button', { name: '结束并去登录', exact: true }).click()
+  await expect(page).toHaveURL(/\/login$/)
+  await fillPhoneLogin(page, '13800138001')
+  await expect(page).toHaveURL(/\/profile$/)
+  await expect(page.locator('body')).toContainText('验证会员2')
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '首页', exact: true }).click()
+  await page.getByRole('button').filter({ has: page.getByRole('heading', { name: '改简历', exact: true }) }).click()
+  await page.getByRole('button', { name: /没有，帮我写一份/ }).click()
+  await expect(page.getByLabel('姓名', { exact: false })).toHaveValue('')
+  expect(logins).toBe(2)
+  expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain('上一位会员的简历')
+  await page.screenshot({ path: testInfo.outputPath('member-switch-cleared.png') })
+})
+
+test('诊断报告真实空态不补假问题，短结论不撑成空框 @w3-kiosk', async ({ page, api }) => {
+  shell(api)
+  const record = reportRecord([])
+  record.report.sections = []
+  record.report.suggestions = []
+  record.report.riskNotes = []
+  api.respond('GET', `/api/v1/resume/records/${REPORT_ID}`, { status: 200, json: record })
+  await page.goto(`/resume/report?taskId=${REPORT_ID}`)
+  await expect(page.getByText('报告回来了，但里面是空的', { exact: true })).toBeVisible()
+  await expect(page.locator('.qxt-issue')).toHaveCount(0)
+  await expect(page.getByTestId('resume-report-conclusions')).toHaveCount(0)
+  const brief = reportRecord([ISSUE_QUANT])
+  brief.report.suggestions = ['补上真实职责。']
+  brief.report.riskNotes = []
+  api.respond('GET', `/api/v1/resume/records/${REPORT_ID}`, { status: 200, json: brief })
+  await page.reload()
+  const conclusions = page.getByTestId('resume-report-conclusions')
+  await expect(conclusions).toHaveAttribute('open', '')
+  const slack = await conclusions.evaluate((box) => box.getBoundingClientRect().bottom - box.lastElementChild!.getBoundingClientRect().bottom)
+  expect(slack).toBeLessThanOrEqual(105)
+})
