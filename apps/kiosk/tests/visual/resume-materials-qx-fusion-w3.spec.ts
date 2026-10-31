@@ -223,6 +223,7 @@ test('material workshop: catalog, signed-out draft handoff, inline validation an
   await expect(dialog).toHaveCount(0)
   expect(api.requestCount('GET', PREVIEW_URL)).toBe(1)
 
+  await page.getByRole('button', { name: '返回填写', exact: true }).click()
   // 改字段就收起文件卡：屏幕上不留一张与当前草稿对不上的「已生成」。
   await page.locator('#material-field-notes').fill('希望语气稳重')
   await expect(screen).toHaveAttribute('data-state', 'select')
@@ -322,4 +323,35 @@ test('material workshop: failed generation keeps the form; a file without print 
   await expect(page.getByTestId('material-workshop-file').getByRole('button', { name: '预览文件' })).toHaveCount(0)
   await expect(page.getByRole('alert')).toHaveCount(0)
   expect(api.requestCount('GET', PREVIEW_URL)).toBe(1)
+})
+
+test('材料生成结果直接可见，返回填写保留全部模板与输入 @w3-kiosk', async ({ page, api }, testInfo) => {
+  registerShell(api)
+  api.respond('GET', TEMPLATES, templatesOf(...Array.from({ length: 5 }, (_, i) => ({ ...COVER, id: `cover-${i}`, title: `求职材料${i + 1}` }))))
+  api.respond('POST', GENERATE, { status: 200, json: { success: true, data: FILE } })
+  await page.goto('/login?from=%2Fresume%2Fmaterials')
+  await loginBackToMaterials(page)
+  await page.getByTestId('material-workshop-template-cover-0').click()
+  await page.locator('#material-field-applicantName').fill('结果验证者')
+  await page.locator('#material-field-targetRole').fill('仓储专员')
+  await cta(page, '生成可打印版').click()
+  const card = page.getByTestId('material-workshop-file')
+  await expect(card).toBeInViewport()
+  await expect(page.locator('.qx-rm-catalog')).toHaveCount(0)
+  for (const size of [{ width: 1080, height: 1920 }, { width: 1366, height: 768 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size)
+    const action = cta(page, '打印材料')
+    await action.scrollIntoViewIfNeeded()
+    await expect(action).toBeInViewport()
+    await expect(action).not.toHaveAttribute('aria-disabled', 'true')
+    await action.click({ trial: true })
+    if (size.width === 390) expect((await card.locator('.tx').boundingBox())!.width, '手机结果标题应有正常阅读宽度').toBeGreaterThanOrEqual(180)
+    if (size.width === 1080) expect((await action.boundingBox())!.height).toBeGreaterThanOrEqual(64)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0)
+    await page.screenshot({ path: testInfo.outputPath(`material-result-${size.width}.png`) })
+  }
+  await page.getByRole('button', { name: '返回填写', exact: true }).click()
+  await expect(page.locator('.qx-rm-template')).toHaveCount(5)
+  await expect(page.locator('#material-field-applicantName')).toHaveValue('结果验证者')
+  await expect(page.locator('#material-field-targetRole')).toHaveValue('仓储专员')
 })

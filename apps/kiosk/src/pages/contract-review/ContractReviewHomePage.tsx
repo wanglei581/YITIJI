@@ -44,6 +44,11 @@ import {
   type ConsentScope,
 } from '../../services/api/contractReview'
 import { UploadSessionQrPanel } from '../upload/components/UploadSessionQrPanel'
+import {
+  CONTRACT_SERVICE_DOWN_NOTICE,
+  contractReviewCreateFailureText,
+  isContractReviewServiceFailure,
+} from './contractReviewFailure'
 
 type ContractChannel = 'phone' | 'desktop'
 type PhoneSource = { fileId: string; name: string; sizeLabel: string; signedUrl?: string }
@@ -85,6 +90,8 @@ export function ContractReviewHomePage() {
   const [qrBusy, setQrBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [aiDown, setAiDown] = useState(false)
+  // 提交时服务这一头没接住（排队不可用、服务端出错、够不着服务）：不是文件的问题，也不是 AI 停用，过一会儿还能再试。
+  const [serviceDown, setServiceDown] = useState(false)
   const [checkingAi, setCheckingAi] = useState(Boolean(getTerminalId()))
   const [drag, setDrag] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -97,8 +104,8 @@ export function ContractReviewHomePage() {
 
   // 提交失败后才判成停用时，用户多半在页面下方：把说明和「去打印扫描」带回视野。
   useEffect(() => {
-    if (aiDown) aiStatusRef.current?.scrollIntoView({ block: 'nearest' })
-  }, [aiDown])
+    if (aiDown || serviceDown) aiStatusRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [aiDown, serviceDown])
 
   useEffect(() => {
     // 上传页不恢复上一份合同；浏览器返回到这里也立即丢弃易失凭证与结果。
@@ -150,6 +157,7 @@ export function ContractReviewHomePage() {
       return
     }
     setError(null)
+    setServiceDown(false)
     setSubmitting(true)
     try {
       const consent = {
@@ -181,9 +189,11 @@ export function ContractReviewHomePage() {
         setError(declined)
         return
       }
-      // AI 停用（暂停 / 当日额度已到 / 未配置）不是文件的问题，换文件重试也不会变好。
+      // AI 停用（暂停 / 当日额度已到 / 未配置）不是文件的问题，换文件重试也不会变好；
+      // 服务这一头没接住（排队不可用等）同样不是文件的问题，如实说服务暂时用不了（走查 I-28）。
       setAiDown(isAiOutage(err))
-      setError(isAiOutage(err) ? AI_DOWN_NOTICE : '创建审查任务失败，请检查文件格式后重试')
+      setServiceDown(!isAiOutage(err) && isContractReviewServiceFailure(err))
+      setError(isAiOutage(err) ? AI_DOWN_NOTICE : contractReviewCreateFailureText(err))
     } finally {
       setSubmitting(false)
     }
@@ -222,10 +232,10 @@ export function ContractReviewHomePage() {
         />
       )}
     >
-        <div ref={aiStatusRef} {...aiTask.containerProps} role="status" className={aiDown ? 'cr-failed' : undefined}>
-          {aiDown ? (
+        <div ref={aiStatusRef} {...aiTask.containerProps} role="status" className={aiDown || serviceDown ? 'cr-failed' : undefined}>
+          {aiDown || serviceDown ? (
             <>
-              <p className="cr-failed__warn">{AI_DOWN_NOTICE}</p>
+              <p className="cr-failed__warn">{aiDown ? AI_DOWN_NOTICE : CONTRACT_SERVICE_DOWN_NOTICE}</p>
               <P10BigCard
                 icon="printer"
                 title="去打印扫描"
@@ -433,7 +443,7 @@ export function ContractReviewHomePage() {
         </div>
 
         {/* 错误提示 */}
-        {error && !aiDown && (
+        {error && !aiDown && !serviceDown && (
           <div
             style={{
               display: 'flex',

@@ -168,3 +168,35 @@ test('有可用麦克风时进入语音模式 @mic-kiosk', async ({ page, api })
   await expect(page.locator('[data-mic-reason]')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /开始回答（语音）/ })).toBeVisible()
 })
+
+// ── ⑤ 转写服务没开、麦克风本身正常：只说一种话（走查 I-24）────────────────
+// 走查实录：作答屏顶部状态格写「麦克风 语音回答可用」，同屏「改用语音回答」灰着，下面红字又写
+// 「语音转写服务未启用，请用文字作答」。第一次来的人不知道到底能不能用语音。
+// 判据：能不能语音回答以真实能力为准（麦克风在，且转写服务开着，才说「可用」）；转写没开时状态格不许说「可用」，
+// 「语音转写服务未启用」这件事只在常显原因里说一次，也不自动进语音模式。
+test('转写服务没开、麦克风正常时不说「语音回答可用」，只写一种说法 @mic-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  interviewBaseline(api)
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
+    status: 200,
+    json: { data: { asrEnabled: false, ttsEnabled: false } },
+  })
+  await stubMic(page, 'available')
+  await gotoSession(page)
+
+  // 先等探测落定（常显原因出现），再量「没有说可用」：探测中状态格是「正在检测麦克风…」，那时数 0 不算证据。
+  const reason = page.locator('[data-mic-reason]')
+  await expect(reason).toContainText('语音转写服务未启用，请用文字作答')
+  // 状态格改说硬件事实（只说检测到了麦克风），不说「可用」
+  await expect(page.locator('[data-qx-interview]').getByText('已检测到麦克风', { exact: true })).toBeVisible()
+  await expect(page.getByText('语音回答可用')).toHaveCount(0)
+  // 转写服务没开这件事整页只说一次
+  await expect(page.getByText(/转写服务/)).toHaveCount(1)
+  // 语音入口置灰而不是消失；保持文字模式，不自动进语音模式
+  const voiceEntry = page.getByRole('button', { name: '改用语音回答' })
+  await expect(voiceEntry).toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByRole('textbox')).toBeVisible()
+  await expect(page.getByRole('button', { name: /开始回答（语音）/ })).toHaveCount(0)
+  expect(runtimeErrors).toEqual([])
+})

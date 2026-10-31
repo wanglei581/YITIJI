@@ -424,10 +424,6 @@ export function JobMaterialLibraryPage() {
           <b>这次没能生成出来：{submitError}</b> 你填的内容还在，改一改再试一次；本机不会用示例文件冒充结果。
         </Banner>
       ) : null}
-      {generated && !submitting ? (
-        <FileCard file={generated} demo={demoMode} previewBusy={previewBusy} previewError={currentPreview?.error}
-          onPreview={previewPathOf(generated, demoMode) && isLoggedIn ? () => void openPreview(generated) : undefined} />
-      ) : null}
     </>
   )
 
@@ -493,7 +489,14 @@ export function JobMaterialLibraryPage() {
       {waiting ? <button type="button" className="qx-btn" data-variant="primary" disabled>正在生成 PDF…</button> : btn('primary', '改一改再试一次', () => setSubmitError(null))}
     </>
   } else {
-    body = (
+    // 已生成时直接呈现本次文件；返回填写保留原目录、所选模板和所有输入。
+    body = generated ? (
+      <div className="qx-rm-result" aria-label="本次生成的求职材料">
+        <FileCard file={generated} demo={demoMode} previewBusy={previewBusy} previewError={currentPreview?.error}
+          onPreview={previewPathOf(generated, demoMode) && isLoggedIn ? () => void openPreview(generated) : undefined} />
+        {btn('ghost', '返回填写', () => setGenerated(null))}
+      </div>
+    ) : (
       <>
         {signedOutSelect ? (
           <ResumeStepPreview

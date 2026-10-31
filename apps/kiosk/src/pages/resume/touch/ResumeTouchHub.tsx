@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QxTouchCallout } from '../../../components/qingxu/touch/QxTouchCallout'
 import { QxTouchChip } from '../../../components/qingxu/touch/QxTouchChip'
@@ -9,6 +9,7 @@ import { QxTouchStateUnavailable } from '../../../components/qingxu/touch/QxTouc
 import { QxTouchTile } from '../../../components/qingxu/touch/QxTouchTile'
 import type { QxTouchStatus } from '../../../components/qingxu/touch/QxTouchBand'
 import { helpNeededLine } from '../../../copy/unattendedCopy'
+import { useKioskAiPause } from '../../../hooks/useKioskAiPause'
 import { useSupportContact } from '../../../hooks/useSupportContact'
 import {
   unavailableReason,
@@ -49,6 +50,9 @@ const TEMPLATES = '/resume/templates'
 const PRINT = '/print/upload?source=resume'
 const MINE = '/me/resumes'
 const RECORDS = '/me/ai-records'
+
+/** 后台把 AI 暂停时，要 AI 的入口写这一句（稿 resume 的 ?ai=down）。 */
+const AI_PAUSED_REASON = 'AI能力当前不可用'
 
 /** 草稿只放问法，不替用户选，也不替用户生成或投递。 */
 const ASK_DRAFT = '我手头有没有简历还没定。请先问我现在最想完成什么，再告诉我该进哪一条。不要替我生成简历，也不要替我投递。'
@@ -101,12 +105,15 @@ export function ResumeTouchHub({
   const contact = useSupportContact()
   const help = contact.servicePhone ? helpNeededLine(contact) : ''
   const [moreOpen, setMoreOpen] = useState(false)
+  // 后台「AI 暂停」打开时，要 AI 的入口先在服务台置灰并写原因，不等人点进去才在失败屏知道（走查 I-35）。
+  // 只认明确读到 paused === true：没读到、读失败都当没暂停，不把「没读到」说成「不可用」。
+  const aiPaused = useKioskAiPause() === 'paused'
   const readiness = readinessOf(availability)
   const caps = new Map(spec.capabilities.map((item) => [item.route, item]))
   const quick = new Map(spec.quickLinks.map((item) => [item.route, item]))
   const cap = (route: string) => caps.get(route)
   const reasonFor = (item: { kind: HubCapability['kind']; route: string }) =>
-    unavailableReason(item.kind, item.route, availability)
+    unavailableReason(item.kind, item.route, availability) ?? (aiPaused && item.kind === 'ai' ? AI_PAUSED_REASON : null)
   const open = (route: string, reason: string | null) => {
     if (!reason) navigate(route)
   }
@@ -196,6 +203,15 @@ export function ResumeTouchHub({
   const generate = cap(GENERATE)
   const diagnoseReason = diagnose ? reasonFor(diagnose) : null
   const generateReason = generate ? reasonFor(generate) : null
+  // 因 AI 暂停置灰的大卡改成稿里 ?ai=down 的行式小卡（不画「带走」和箭头），腾出高度给卡下的出路条。
+  const diagnosePaused = diagnoseReason === AI_PAUSED_REASON
+  const generatePaused = generateReason === AI_PAUSED_REASON
+  /** 大卡因 AI 暂停置灰时，卡下给一条不用 AI 的出路（稿：有简历先打印原件，没有先看素材库）。 */
+  const exitLink = (label: string, route: string) => (
+    <button type="button" className="qxt-hub-out" onClick={() => navigate(route)}>{label}</button>
+  )
+  /** 有出路条就把它和大卡并成一组；没有就原样，正常态的版面一点不动。 */
+  const withExit = (slab: ReactNode, exit: ReactNode) => (exit ? <div className="qxt-hub-pair">{slab}{exit}</div> : slab)
   const materials = cap(MATERIALS)
   const career = cap(CAREER)
   const fit = cap(FIT)
@@ -219,34 +235,40 @@ export function ResumeTouchHub({
           </span>
         </div>
       ) : null}
-      {diagnose ? (
+      {diagnose ? withExit(
         <QxTouchSlab
           title="有，帮我改一改"
           desc="上传后做诊断或优化，改不改你定"
           chip="AI 诊断改写"
           chipAi
-          take="问题清单和改法"
+          take={diagnosePaused ? undefined : '问题清单和改法'}
+          takeStyle={diagnosePaused ? 'plain' : 'object'}
+          row={diagnosePaused}
           visual={<ResumePaperArt width={150} state="annot" />}
           off={Boolean(diagnoseReason)}
           lock={diagnoseReason ?? undefined}
           onClick={() => open(DIAGNOSE, diagnoseReason)}
           index={0}
-        />
+        />,
+        diagnosePaused ? exitLink('可以先打印原件', PRINT) : null,
       ) : null}
-      {generate ? (
+      {generate ? withExit(
         <QxTouchSlab
           title="没有，帮我写一份"
           desc="从零生成一份可核对的草稿"
           chip="AI 起草"
           chipAi
-          take="一份新简历"
+          take={generatePaused ? undefined : '一份新简历'}
+          takeStyle={generatePaused ? 'plain' : 'object'}
+          row={generatePaused}
           visual={<ResumePaperArt width={150} state="blank" />}
           off={Boolean(generateReason)}
           lock={generateReason ?? undefined}
           onClick={() => open(GENERATE, generateReason)}
           hub={{ kind: 'card', title: generate.title, reason: generateReason }}
           index={1}
-        />
+        />,
+        generatePaused ? exitLink('可以先看简历素材库', TEMPLATES) : null,
       ) : null}
       <div className="qxt-hub-group">
         <div className="qxt-sec qxt-rise" style={{ ['--i' as string]: 3 }}>
