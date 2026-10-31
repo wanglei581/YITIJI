@@ -85,6 +85,7 @@ Page({
   },
 
   onLoad(options) {
+    this._disposed = false
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
     const opts = options || {}
     // 令牌和 scene 只留在内存，不进 data —— data 会随页面栈快照走，没必要让它们多待一层。
@@ -129,7 +130,11 @@ Page({
   },
 
   onUnload() {
-    // 晚到的兑换和列表不再落到已经关掉的页面上
+    // 退出后作废兑换、列表和上传回调；已发送请求的服务端结果仍由一体机核对。
+    this._disposed = true
+    this._sendAttempt = (this._sendAttempt || 0) + 1
+    this._uploadToken = ''
+    if (this.data.phase === 'uploading') wx.hideLoading()
     this._resolveAttempt = (this._resolveAttempt || 0) + 1
     this._docsFlow = (this._docsFlow || 0) + 1
     this._scene = ''
@@ -316,6 +321,7 @@ Page({
   },
 
   _sendBlocked() {
+    if (this._disposed) return true
     const phase = this.data.phase
     if (phase === 'uploading' || phase === 'done' || phase === 'unknown' || phase === 'resolving') return true
     if (phase === 'error' && !this.data.canRetry) return true

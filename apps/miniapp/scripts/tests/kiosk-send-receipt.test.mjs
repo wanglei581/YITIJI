@@ -475,3 +475,38 @@ test('返回键：扫码直达时本页在栈底，回首页', () => {
   assert.equal(env.wx.calls.tab, 1)
   assert.equal(env.wx.calls.tabUrl, '/pages/home/home')
 })
+
+
+test('退出上传页后晚到回执不得更新页面或关闭下一页的 loading，并清掉内存凭据', async () => {
+  for (const rejected of [false, true]) {
+    const pending = deferred()
+    const env = harness(() => pending.promise)
+    env.openDirect()
+    await flush()
+    env.wx.setChosen(FILE)
+    env.page.chooseAndSend()
+    assert.equal(env.uploads.length, 1)
+    env.page.onUnload()
+    const snapshot = JSON.stringify(env.page.data)
+    const hides = env.wx.calls.hide
+    if (rejected) pending.reject(httpError(503, 'SERVICE_UNAVAILABLE'))
+    else pending.resolve(receipt())
+    await flush()
+    assert.equal(JSON.stringify(env.page.data), snapshot, '卸载后不写页面')
+    assert.equal(env.wx.calls.hide, hides, '晚回执不得干扰其他页面的 loading')
+    assert.equal(env.page._uploadToken, '')
+  }
+})
+
+test('退出后系统选文件回调不再发上传请求', async () => {
+  const env = harness(() => Promise.resolve(receipt()))
+  env.openDirect()
+  await flush()
+  let picker
+  env.wx.chooseMessageFile = (opts) => { picker = opts }
+  env.page.chooseAndSend()
+  env.page.onUnload()
+  picker.success({ tempFiles: [FILE] })
+  await flush()
+  assert.equal(env.uploads.length, 0)
+})

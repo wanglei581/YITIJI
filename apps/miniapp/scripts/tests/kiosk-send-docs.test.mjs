@@ -506,3 +506,35 @@ test('我的文档：本人数据导出包、合同审查报告递不进一体�
   await flush()
   assert.equal(empty.page.data.docState, 'empty')
 })
+
+
+test('退出后我的文档确认弹窗不再发送，已发送的晚回执不落屏', async () => {
+  const pending = deferred()
+  const env = harness(() => Promise.resolve(receipt()), {
+    loggedIn: true, docs: () => Promise.resolve(DOCS), member: () => pending.promise,
+  })
+  env.openDirect()
+  await flush()
+  env.page.pickDoc(tap(DOCS[0].id))
+  assert.equal(env.memberCalls.length, 1)
+  env.page.onUnload()
+  const snapshot = JSON.stringify(env.page.data)
+  const hides = env.wx.calls.hide
+  pending.resolve(receipt())
+  await flush()
+  assert.equal(JSON.stringify(env.page.data), snapshot)
+  assert.equal(env.wx.calls.hide, hides)
+
+  const second = harness(() => Promise.resolve(receipt()), {
+    loggedIn: true, docs: () => Promise.resolve(DOCS),
+  })
+  second.openDirect()
+  await flush()
+  let modal
+  second.wx.showModal = (opts) => { modal = opts }
+  second.page.pickDoc(tap(DOCS[0].id))
+  second.page.onUnload()
+  modal.success({ confirm: true })
+  await flush()
+  assert.equal(second.memberCalls.length, 0)
+})
