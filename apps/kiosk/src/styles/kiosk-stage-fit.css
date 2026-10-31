@@ -40,3 +40,10 @@
     transition: none;
   }
 }
+
+/* 浏览器明确报告输入遮挡时：保留触控尺度，内容区域滚动，底栏随可用高度排布。 */
+.kiosk-stage-host[data-kiosk-input-occluded='true'] {
+  position: fixed;
+  left: 0;
+  align-items: flex-start;
+}
