@@ -505,6 +505,30 @@ test('I-30 the manual 重新查看这一单 asks again right away and shows the 
   expect(job.calls()).toBeGreaterThan(before)
 })
 
+test('I-30 a hanging initial result read times out, exposes recovery, and later shows only the confirmed result @w2', async ({ page, api }) => {
+  registerShell(api)
+  let calls = 0
+  api.respondWith('GET', JOB_PATH, () => {
+    calls += 1
+    // A connection can stay open without returning even an error response.
+    if (calls === 1) return new Promise(() => {})
+    return { status: 200, json: { taskId: W2_ORDER.taskId, status: 'completed', completedAt: '2026-07-26T00:00:00.000Z' } }
+  })
+  await page.clock.install()
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', recoveryState)
+  await expect.poll(() => calls).toBe(1)
+  await expect(page.getByTestId('print-fulfill-state-loading')).toBeVisible()
+  await page.clock.runFor(8_001)
+  await expect(page.getByTestId('print-fulfill-state-unknown')).toBeVisible()
+  await expect(page.getByTestId('print-fulfill-state-completed')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '重新查看这一单' })).toBeEnabled()
+  await expect(page.getByTestId('print-fulfill-state-unknown')).toContainText(W2_ORDER.orderNo)
+  await page.clock.runFor(3_001)
+  await expect(page.getByTestId('print-fulfill-state-completed')).toBeVisible()
+  expect(calls).toBe(2)
+})
+
 test('I-30 a guest (order not tied to an account) is told to note the order number, not to look it up on the phone @w2', async ({ page, api }) => {
   registerShell(api)
   registerFlakyJob(api)

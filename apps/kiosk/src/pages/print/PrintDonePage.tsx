@@ -226,8 +226,10 @@ export function PrintDonePage() {
     }
 
     let cancelled = false
+    const abort = new AbortController()
+    const guard = setTimeout(() => abort.abort(), STATUS_RECHECK_REQUEST_TIMEOUT_MS)
     setVerification(null)
-    void getPrintJobStatus(taskId)
+    void getPrintJobStatus(taskId, { signal: abort.signal })
       .then((result) => {
         if (cancelled) return
         const outcome = interpretStatus(taskId, result)
@@ -243,8 +245,13 @@ export function PrintDonePage() {
       .catch(() => {
         if (!cancelled) setVerification({ taskId, result: 'unknown' })
       })
+      .finally(() => clearTimeout(guard))
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      clearTimeout(guard)
+      abort.abort()
+    }
   }, [location.state, navigate, taskId])
 
   // 「无法确认」且有任务号：状态读不到不等于没出纸，也不等于失败。按退避继续查，后端恢复后换成真实结果；
