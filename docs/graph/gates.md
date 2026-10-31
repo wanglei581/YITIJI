@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1940 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1941 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1030,7 +1030,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/tests/</code> — 14 个文件</summary>
+<summary><code>apps/kiosk/tests/</code> — 15 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1045,6 +1045,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/tests/visual/fusion-w4.spec.ts` | `verify-fusion-w4.mjs` |
 | `apps/kiosk/tests/visual/fusion-w5.spec.ts` | `verify-fusion-w6.mjs` |
 | `apps/kiosk/tests/visual/fusion-w6-routes.spec.ts` | `verify-fusion-w6.mjs` |
+| `apps/kiosk/tests/visual/kiosk-desktop-stage-fit.spec.ts` | `verify-fusion-shell.mjs` |
 | `apps/kiosk/tests/visual/print-done-truth.spec.ts` | `verify-print-done-truth.mjs` |
 | `apps/kiosk/tests/visual/route-manifest.ts` | `verify-fusion-baseline.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-visual-evidence-manifest.mjs` |
 | `apps/kiosk/tests/w1-a-build-mode.test.mjs` | `verify-runtime-terminal-identity.mjs` |

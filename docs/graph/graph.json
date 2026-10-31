@@ -22854,6 +22854,9 @@
     "apps/kiosk/tests/visual/fusion-w6-routes.spec.ts": [
       "apps/kiosk/scripts/verify-fusion-w6.mjs"
     ],
+    "apps/kiosk/tests/visual/kiosk-desktop-stage-fit.spec.ts": [
+      "apps/kiosk/scripts/verify-fusion-shell.mjs"
+    ],
     "apps/kiosk/tests/visual/print-done-truth.spec.ts": [
       "apps/kiosk/scripts/verify-print-done-truth.mjs"
     ],
@@ -30358,6 +30361,7 @@
           "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/tests/visual/fixtures/fusion-w6-route-cases.ts",
+          "apps/kiosk/tests/visual/kiosk-desktop-stage-fit.spec.ts",
           "packages/ui/src/layouts/KioskLayout.tsx"
         ],
         "missing": []
