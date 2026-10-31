@@ -524,7 +524,7 @@ assert.match(legalViewsSrc, /<h2 className="legal-doc-toc-title">章节目录<\/
 assert.match(legalViewsSrc, /<h3>\{section\.title\}<\/h3>/, '协议页：章节标题仍是 h3（用例按 .legal-doc-body h3 取）')
 const guardViewSrc = read('src/pages/session-guard/SessionGuardView.tsx')
 assert.match(guardViewSrc, /<K as="h3">\{card\.title\}<\/K>/, '闲置提醒：两张清单卡的标题是 h3')
-assert.match(guardViewSrc, /<h3>\{ask\.title\}<\/h3>/, '闲置提醒：三个常问的问题是 h3')
+assert.match(guardViewSrc, /<h3>\{ask\.title\}<\/h3>/, '闲置提醒：常问的问题（10/29 走查 I-07 起只留「纸还在机器上」一条）标题是 h3')
 
 /* 触屏版第 5 包（2026-10-28）：改版时被删掉的说明句，稿上没画，按「稿上没画的也保留」放回。
  * 登录步骤、身份说明只给读屏（默认态一屏放不下可见的字）；帮助与机器状态的说明是小字，运行页没有它们就是少了一条交代。 */

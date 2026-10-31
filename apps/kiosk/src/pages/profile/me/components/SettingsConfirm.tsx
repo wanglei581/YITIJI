@@ -58,14 +58,16 @@ export function SettingsConfirm({ title, description, confirmLabel, cancelLabel 
         {error ? <p role="alert" className="settings-error">{error}</p> : null}
         <div className="me-answers">
           <button type="button" data-variant="primary" disabled={busy} onClick={onConfirm}>
-            <span className="me-answer-art"><MeArt name="resume" width={380} /></span>
+            <span className="me-answer-art" data-art="resume"><MeArt name="resume" width={380} /></span>
             <span>
               <b>{busy ? '处理中…' : confirmLabel}</b>
               {confirmDetail ? <small>{confirmDetail}</small> : null}
             </span>
           </button>
           <button type="button" ref={cancelRef} autoFocus disabled={busy} onClick={onCancel}>
-            <span className="me-answer-art"><MeArt name="phone" width={230} /></span>
+            {/* 「不是我」配一叠纸：清掉这台机器上这一次的临时信息，同触屏稿「本机会清除」那张卡的用图。
+                不用手机 + 「上传」的插画（10/29 本机走查 I-06：与「结束上一位的使用」的意思不搭）。 */}
+            <span className="me-answer-art" data-art="stack"><MeArt name="stack" width={300} /></span>
             <span>
               <b>{cancelLabel}</b>
               {cancelDetail ? <small>{cancelDetail}</small> : null}

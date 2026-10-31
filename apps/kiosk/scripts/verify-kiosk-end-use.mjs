@@ -145,7 +145,16 @@ check(
 )
 check(
   /<span>有人登录着<\/span>/.test(identity) && /data-testid="home-end-previous"[\s\S]{0,80}结束上一位的使用/.test(identity),
-  '登录态只写「有人登录着」，并给「结束上一位的使用」',
+  '空档到点后的登录态仍只写「有人登录着」，并给「结束上一位的使用」（给站到屏前的下一位看，W-75 原句不改）',
+)
+// 10/29 本机走查 I-05：刚登录、人还在屏前时对本人说本人的话，不再让本人看「结束上一位的使用」。
+// 说给谁只看一个信号：和「我的」前的「还是你吗？」同一个判据（needsHandoverConfirm，空档满 30 秒、没人点过屏就是下一位可能在场）。
+check(
+  /import \{ needsHandoverConfirm \} from '\.\.\/\.\.\/\.\.\/auth\/kioskPresence'/.test(identity) &&
+    /voice === 'self'[\s\S]{0,400}<span>你已登录<\/span>[\s\S]{0,260}data-testid="home-end-previous"[\s\S]{0,80}结束使用\s*<\/button>/.test(identity) &&
+    /useState<IdentityVoice>\(\(\) => \(needsHandoverConfirm\(\) \? 'next' : 'self'\)\)/.test(identity) &&
+    /setVoice\(needsHandoverConfirm\(\) \? 'next' : 'self'\)/.test(identity),
+  '刚登录、人还在屏前写「你已登录」+「结束使用」；是不是下一位只看 needsHandoverConfirm（和「还是你吗？」「继续办理」收起同一个判据），初值与计时都读它',
 )
 check(!/进入我的/.test(homeView + identity), '首页不放「进入我的」直达入口（进个人区走底部「我的」）')
 check(
@@ -222,6 +231,13 @@ check(
 check(
   /ask=\{\{ label: '问小青：这一页是什么意思？', draft: '这一页是什么意思？' \}\}/.test(gate) && /markHandoverPending\(\)/.test(gate),
   '确认层底栏有稿上的「问小青：这一页是什么意思？」，并和「待确认」粘性标记同在（出口不会绕过确认）',
+)
+// 「不是我」那张卡配一叠纸（清掉这台机器上这一次的临时信息，同触屏稿「本机会清除」那张卡的用图），
+// 不是手机 + 「上传」按钮的插画（10/29 本机走查 I-06：与「结束上一位的使用」的意思不搭）。「是我」仍配简历。
+const settingsConfirm = code('src/pages/profile/me/components/SettingsConfirm.tsx')
+check(
+  /data-art="resume"><MeArt name="resume"/.test(settingsConfirm) && /data-art="stack"><MeArt name="stack"/.test(settingsConfirm) && !/MeArt name="phone"/.test(settingsConfirm),
+  '确认层两张答案卡：「是我」配简历、「不是我」配一叠纸，不再用手机 + 上传的插画',
 )
 const authContext = code('src/auth/AuthContext.tsx')
 check(/markKioskPresenceConfirmed\(\)/.test(authContext), '登录成功算本人刚确认过（扫码登录后直接进「我的」不再多问）')

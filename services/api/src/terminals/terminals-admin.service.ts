@@ -26,6 +26,7 @@ import { PARKED_TERMINAL_ORG_TYPES, isParkedTerminalOrgType, orgTypeParkedError 
 import { terminalOrgBindingOnCreate } from './terminal-org-binding'
 import { assignTerminalOrganization, type TerminalOrgAssignmentAudit } from './terminal-org-assignment'
 import { TERMINAL_ONLINE_WINDOW_MS } from './printer-availability'
+import { publicScanInputHealth, type PublicScanInputHealth } from './printer-status'
 import type { KioskTerminalConfigView } from './terminal-config.types'
 import {
   cleanNullable,
@@ -775,6 +776,8 @@ export class TerminalAdminService {
     printerStatus: string | null
     lastSeenAt: string | null
     isOnline: boolean
+    /** 最近一次心跳里扫描输入是否可用（一体机「机器状态」页读）。老 Agent 不上报时为 null。 */
+    scanInputHealth: PublicScanInputHealth | null
   }> {
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: terminalId }, { terminalCode: terminalId }] },
@@ -782,12 +785,12 @@ export class TerminalAdminService {
         heartbeats: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          select: { printerStatus: true, createdAt: true },
+          select: { printerStatus: true, scanInputHealth: true, createdAt: true },
         },
       },
     })
     if (!terminal) {
-      return { found: false, printerStatus: null, lastSeenAt: null, isOnline: false }
+      return { found: false, printerStatus: null, lastSeenAt: null, isOnline: false, scanInputHealth: null }
     }
     const latest = terminal.heartbeats[0]
     const lastSeenAt = latest?.createdAt?.toISOString() ?? null
@@ -797,6 +800,7 @@ export class TerminalAdminService {
       printerStatus: latest?.printerStatus ?? null,
       lastSeenAt,
       isOnline,
+      scanInputHealth: publicScanInputHealth(latest?.scanInputHealth),
     }
   }
 

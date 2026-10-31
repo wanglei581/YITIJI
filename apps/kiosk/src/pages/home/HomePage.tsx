@@ -1,12 +1,13 @@
 // HomePage — 触屏版首页。本页只读取真实状态并执行封闭 action；展示交给 HomeTouchView。
 
+import { useEffect } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
 import { useOfficialChannels } from '../../hooks/useOfficialChannels'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useSmartCampusCapabilityState } from '../../hooks/useSmartCampusConfig'
-import type { TerminalDeviceStatusView } from '../../hooks/useTerminalDeviceStatus'
+import { requestDeviceStatusRefresh, type TerminalDeviceStatusView } from '../../hooks/useTerminalDeviceStatus'
 import { useToolboxCapabilityState } from '../../hooks/useToolboxConfig'
 import { ContinueHandoverGuard } from './components/ContinueHandoverGuard'
 import { ContinuePanel } from './components/ContinuePanel'
@@ -26,6 +27,11 @@ export function HomePage() {
   const auth = useAuth()
   const { endKioskUse } = useKioskSessionControl()
   const device = useOutletContext<TerminalDeviceStatusView>()
+  // 人从别的页回到首页：这段时间里打印机或服务可能变了，不等下一次轮询，挂上就让壳层重读一次（10/29 本机走查 I-31）。
+  // 状态仍只由壳层那一个 hook 读，首页只递一个信号，不自己再起轮询。
+  useEffect(() => {
+    requestDeviceStatusRefresh()
+  }, [])
   const toolbox = useToolboxCapabilityState()
   const campus = useSmartCampusCapabilityState()
   // 招聘内容托管（3.13）：没打开时首页不摆岗位、招聘会入口；两个 hook 自己也不发请求。
@@ -52,15 +58,18 @@ export function HomePage() {
     navigate(HOME_V6_ROUTES[actionId], topic ? { state: { topic } } : undefined)
   }
 
+  // 读状态的请求本身没回来（服务断了、超时）：什么都读不到，不写「打印机在线」，也不写成「打印机离线」。
   const deviceStatus = device.loading
     ? { tone: 'unknown' as const, label: '设备检查中' }
-    : device.printerReady
-      ? { tone: 'ok' as const, label: device.printerLabel }
-      : device.kind === 'error'
-        ? { tone: 'bad' as const, label: device.printerLabel }
-        : device.kind === 'offline'
-          ? { tone: 'warn' as const, label: device.printerLabel }
-          : { tone: 'unknown' as const, label: '状态未知' }
+    : device.requestFailed
+      ? { tone: 'warn' as const, label: '服务暂时连不上' }
+      : device.printerReady
+        ? { tone: 'ok' as const, label: device.printerLabel }
+        : device.kind === 'error'
+          ? { tone: 'bad' as const, label: device.printerLabel }
+          : device.kind === 'offline'
+            ? { tone: 'warn' as const, label: device.printerLabel }
+            : { tone: 'unknown' as const, label: '状态未知' }
 
   return (
     <HomeTouchView
