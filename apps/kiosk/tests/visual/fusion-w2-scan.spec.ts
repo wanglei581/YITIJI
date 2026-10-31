@@ -198,7 +198,8 @@ function scanFile() {
 }
 
 async function seedScanLive(page: Page, extras: Record<string, unknown> = {}): Promise<void> {
-  await page.goto('/scan')
+  // 种数据前停在 start，避免延迟挂载读取刚写入的 live 并提前发起 ACK。
+  await page.goto('/scan?stage=start')
   await writeScanWorkbenchSession(page, {
     stage: 'progress',
     scanType: 'resume',
@@ -293,6 +294,8 @@ test('scan start creates only after explicit continuation @w2', async ({ page, a
   await page.goto('/scan/start')
   await expect(page.getByText(/下一步会真实建立这次扫描/).first()).toBeVisible()
   await expect(page.getByText('可创建扫描任务 · 需面板操作', { exact: true })).toBeVisible()
+  // 走查 I-16：进来不替人选类型，选了才能下一步（原来这里不点类型直接下一步，会被悄悄建成简历扫描）
+  await page.getByTestId('scan-workbench-type-resume').click()
   const next = page.getByRole('button', { name: /下一步 · 建立这次扫描/ })
   await expect(next).toBeEnabled()
   // 稿 18：底部三列口径是一次性说明，只在选类型这一屏出现，后面各屏不复读。
@@ -313,6 +316,58 @@ test('scan start creates only after explicit continuation @w2', async ({ page, a
   // 互相喂招（ackRequestedForRef 守的就是它）。
   await ack.expectAcked(1)
   await expectHealthy(page, errors)
+})
+
+// 走查 I-16（回归，#1326 改过）：扫描类型一进来不预选。想扫证件的人不点类型直接「下一步」，原来会被建成简历扫描。
+// 走查 I-18：这一页的字不写死打印机品牌（CLAUDE.md §3，型号走 printerName 配置）。
+test('scan start pre-selects nothing, blocks next until a type is chosen, and never names a printer brand @w2', async ({ page, api }, testInfo) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerScanCapability(api, 'available')
+  registerCreatedScan(api)
+  registerScanAck(page, api)
+  let createdBody: { scanType?: string } | null = null
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/scan/sessions') {
+      createdBody = request.postDataJSON() as { scanType?: string }
+    }
+  })
+
+  await page.goto('/scan/start')
+  await expect(page.getByTestId('scan-workbench-type-resume')).toBeVisible()
+  for (const type of ['resume', 'id', 'document']) {
+    await expect(page.getByTestId(`scan-workbench-type-${type}`), `${type} 进来不该是选中态`).toHaveAttribute('aria-checked', 'false')
+  }
+  // 没选类型：主按钮禁用并写原因，点不出去
+  const blocked = page.getByRole('button', { name: '先选一种材料', exact: true })
+  await expect(blocked).toBeDisabled()
+  await expect(page.getByRole('button', { name: /下一步 · 建立这次扫描/ })).toHaveCount(0)
+  await expect(page.getByText('已选「简历扫描」')).toHaveCount(0)
+  expect(createdBody).toBeNull()
+  await page.screenshot({ path: testInfo.outputPath('qx-scan-start-unselected.png'), fullPage: false })
+  // I-18：「奔图」「面板」之外的品牌词都不该出现在这一页（只说「打印机屏幕」「打印机面板」）
+  await expect(page.locator('main, [data-w2-page="scan-start"]').first()).not.toContainText(/奔图|Pantum|CM28\d0/)
+  // 点「证件扫描」才可以往下走，建出来的就是证件扫描
+  await page.getByTestId('scan-workbench-type-id').click()
+  await expect(page.getByTestId('scan-workbench-type-id')).toHaveAttribute('aria-checked', 'true')
+  await expect(page.getByTestId('scan-workbench-type-resume')).toHaveAttribute('aria-checked', 'false')
+  const next = page.getByRole('button', { name: /下一步 · 建立这次扫描/ })
+  await expect(next).toBeEnabled()
+  await next.click()
+  await page.waitForURL(/\/scan\?stage=settings/)
+  // 建会话的请求在设置页挂载后才发，等它出现再看建的是哪一种
+  await expect.poll(() => createdBody, { timeout: 8_000 }).not.toBeNull()
+  expect(createdBody).toMatchObject({ scanType: 'id' })
+  await expectHealthy(page, errors)
+})
+
+// 走查 I-18：扫描到 U 盘那一页同样不写死品牌。
+test('scan to USB panel page says the printer screen, not a brand @w2', async ({ page, api }) => {
+  registerShell(api)
+  registerScanCapability(api, 'available')
+  await page.goto('/scan?stage=start&mode=usb-panel')
+  await expect(page.getByText('在打印机屏幕上选', { exact: true })).toBeVisible()
+  await expect(page.locator('body')).not.toContainText(/奔图|Pantum|CM28\d0/)
 })
 
 test('scan start blocks continuation while scan capability is unavailable @w2', async ({ page, api }) => {
@@ -347,6 +402,7 @@ test('when 小青 is down every scan and tool screen says so and the manual path
   await expect(page.getByTestId('ai-down-note')).toHaveText('小青暂时接不上。这一步不用它也能做完，照下面的按钮继续。')
   // 手动路径照旧：问小青还在（点过去由顾问页自己降级）、「下一步」照样能按。
   await expect(page.locator('[data-qxt-ask="on"]')).toBeVisible()
+  await page.getByTestId('scan-workbench-type-document').click()
   await expect(page.getByRole('button', { name: /下一步 · 建立这次扫描/ })).toBeEnabled()
 
   for (const [path, primary] of [
@@ -880,10 +936,115 @@ test('successful scan tells a guest the file will not reach 我的文档 @w2', a
   const destination = page.getByRole('button', { name: /本次不进入我的文档/ })
   await expect(destination).toBeVisible()
   await expect(destination).toBeDisabled()
-  await expect(page.getByText('未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别')).toBeVisible()
+  // 走查 I-15：不再只说「请在本次操作内完成打印或识别」——补上两条真能走的路：当场扫码带走，或登录后重新扫（补不进账号，所以说「重新扫一次」）。
+  await expect(page.getByText('未登录扫描件不会进入「我的文档」。要留在账号里：先登录，再重新扫一次。')).toBeVisible()
+  await expect(page.getByTestId('scan-takeaway-open')).toBeEnabled()
 
   // 旧的不实承诺不得再出现在页面上。
   await expect(page.getByText(/登录后管理文件|登录后可在「我的文档」管理/)).toHaveCount(0)
+  // 不能把游客送去登录、好像登录后这份会出现在「我的文档」里：这一屏没有任何去 /login 的出口
+  await expect(page.locator('a[href^="/login"]')).toHaveCount(0)
+  await expectHealthy(page, errors)
+})
+
+// 走查 I-15：游客扫完纸质材料原来只能「拿去打印」，拿不到电子版。扫描件事后补不进账号，所以当场给「扫码带走」。
+for (const scanType of ['resume', 'document'] as const) {
+test(`guest ${scanType} scan result lets the phone take the e-copy away by QR @w2`, async ({ page, api }, testInfo) => {
+  const errors = collectRuntimeErrors(page, TWO_PAGE_PDF_PATH)
+  await installPreviewFixtures(page)
+  registerShell(api)
+  const contentPath = '/api/v1/files/w2-scan-takeaway/content'
+  await page.route(`**${contentPath}?*`, route => route.fulfill({ status: 200, contentType: 'application/pdf', body: TWO_PAGE_PDF }))
+  const expiresMs = Date.now() + 20 * 60 * 1000
+  await seedScanResult(page, { ...previewResult({
+    fileUrl: `${contentPath}?expires=${expiresMs}&sig=${'a'.repeat(64)}`,
+    name: 'w2-scan-two-page.pdf',
+    pages: 2,
+    mimeType: 'application/pdf',
+    format: 'PDF',
+  }), scanType })
+  await page.goto('/scan?stage=result')
+  // 等预览真渲染出来再看版面、再截图（否则预览井是一块空白）
+  await expect(page.locator('.sw-pvstage [data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
+
+  const take = page.getByTestId('scan-takeaway-open')
+  await expect(take).toBeEnabled()
+  await expect(take).toContainText('扫码带走电子版')
+  const takeBox = await boxOf(take, '扫码带走电子版')
+  expect(takeBox.height, '扫码带走电子版 高').toBeGreaterThanOrEqual(64)
+  expect(takeBox.width, '扫码带走电子版 宽').toBeGreaterThanOrEqual(64)
+  await expect(page.getByTestId('scan-takeaway-layer')).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath('qx-scan-result-guest.png'), fullPage: false })
+  await take.click()
+  const layer = page.getByTestId('scan-takeaway-layer')
+  await expect(layer.getByText('扫码带走这份扫描件', { exact: true })).toBeVisible()
+  const qr = layer.getByTestId('scan-takeaway-qr')
+  await expect(qr.locator('svg')).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('qx-scan-takeaway-layer.png'), fullPage: false })
+  // 码里是完整地址（手机要打开得有域名），指向本系统的内容端点；签名不进 DOM 属性
+  await expect(qr).toHaveAttribute('data-qr-origin', /^http:\/\/127\.0\.0\.1:\d+$/)
+  await expect(qr).toHaveAttribute('data-qr-path', contentPath)
+  await expect(layer).toContainText('w2-scan-two-page.pdf')
+  await expect(layer).toContainText(/剩余 \d+ 分 \d{2} 秒/)
+  await expect(layer.getByText(/只在你自己的手机上打开/).first()).toBeVisible()
+  await expect(layer.locator('a[href]')).toHaveCount(0)
+  // 关掉就收起来，页面回到原样；关闭键够大
+  const close = page.getByTestId('scan-takeaway-close')
+  const closeBox = await boxOf(close, '关闭')
+  expect(closeBox.height, '关闭 高').toBeGreaterThanOrEqual(64)
+  await close.click()
+  await expect(page.getByTestId('scan-takeaway-layer')).toHaveCount(0)
+  await expect(take).toBeEnabled()
+  // 过期之后不再出码，说明手机打不开了
+  await page.clock.install({ time: expiresMs - 3_000 })
+  await take.click()
+  await expect(page.getByTestId('scan-takeaway-qr')).toBeVisible()
+  await page.clock.runFor(5_000)
+  await expect(page.getByTestId('scan-takeaway-expired')).toBeVisible()
+  await expect(page.getByTestId('scan-takeaway-qr')).toHaveCount(0)
+  await expectHealthy(page, errors)
+})
+
+}
+
+test('malformed scan download expiry is unavailable, never a permanent QR @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  const contentPath = '/api/v1/files/w2-invalid-expiry/content'
+  await page.route(`**${contentPath}?*`, route => route.fulfill({ status: 200, contentType: 'application/pdf', body: TWO_PAGE_PDF }))
+  await seedScanResult(page, previewResult({
+    fileUrl: `${contentPath}?expires=1e100&sig=${'a'.repeat(64)}`,
+    name: '扫描.pdf', pages: 2, mimeType: 'application/pdf', format: 'PDF',
+  }))
+  await page.goto('/scan?stage=result')
+  await page.getByTestId('scan-takeaway-open').click()
+  await expect(page.getByTestId('scan-takeaway-unavailable')).toBeVisible()
+  await expect(page.getByTestId('scan-takeaway-qr')).toHaveCount(0)
+  await page.getByTestId('scan-takeaway-close').click()
+  await expect(page.getByTestId('scan-takeaway-layer')).toHaveCount(0)
+  await expectHealthy(page, errors)
+})
+
+// 证件是高敏感材料：公共屏幕上不放它的下载码（链接有效期内谁拍到谁就能下）。
+test('guest ID scan result never shows a download QR and says how to get the e-copy @w2', async ({ page, api }, testInfo) => {
+  const errors = collectRuntimeErrors(page, TWO_PAGE_PDF_PATH)
+  await installPreviewFixtures(page)
+  registerShell(api)
+  await seedScanResult(page, {
+    ...previewResult({ fileUrl: TWO_PAGE_PDF_PATH, name: 'w2-scan-two-page.pdf', pages: 2, mimeType: 'application/pdf', format: 'PDF' }),
+    scanType: 'id',
+  })
+  await page.goto('/scan?stage=result')
+  await expect(page.locator('.sw-pvstage [data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
+
+  const take = page.getByTestId('scan-takeaway-open')
+  await expect(take).toBeDisabled()
+  await page.screenshot({ path: testInfo.outputPath('qx-scan-result-guest-id.png'), fullPage: false })
+  await expect(take).toContainText('证件扫描不提供扫码带走')
+  await expect(take).toContainText('要电子版：先登录，再重新扫一次')
+  await take.click({ force: true })
+  await expect(page.getByTestId('scan-takeaway-layer')).toHaveCount(0)
+  await expect(page.locator('[data-testid="scan-takeaway-qr"]')).toHaveCount(0)
   await expectHealthy(page, errors)
 })
 
@@ -1000,14 +1161,14 @@ test('poll requests send the in-memory control token header @w2', async ({ page,
  * 这一条取证用例横跨四屏，投递确认发生的次数不是一目了然的，所以把它拆开写清楚：
  *
  *   ① `/scan?stage=settings` + 路由态 scanType → 建成 → 设置页确认；
- *   ② `seedScanLive` 里那次裸 `/scan` → 登记里还是 settings + live，设置页**复水**
- *      挂载一次（复水进来的会话一律重新确认，本机不知道当初确认过没有）；
- *   ③ `/scan?stage=progress` → 等待页挂载确认。
+ *   ② `/scan?stage=progress` → 等待页挂载确认。
+ *
+ * `seedScanLive` 先显式停在 start 再写会话，不把准备夹具的导航算作一次业务确认。
  *
  * 结果屏与两次 start 屏都不确认。数字变了就说明这条取证路径本身的挂载次序变了 ——
  * 那时要回来重新数一遍，而不是把它调大。
  */
-const ACK_COUNT_EVIDENCE_WALKTHROUGH = 3
+const ACK_COUNT_EVIDENCE_WALKTHROUGH = 2
 
 test('qingxu scan workbench captures 1080x1920 evidence @w2', async ({ page, api }, testInfo) => {
   const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
@@ -1036,6 +1197,7 @@ test('qingxu scan workbench captures 1080x1920 evidence @w2', async ({ page, api
   await page.goto('/scan?stage=settings')
   await setReactRouterState(page, '/scan?stage=settings', { scanType: 'resume' })
   await expect(page.getByText('在打印机面板开始扫描', { exact: true })).toBeVisible()
+  await ack.expectAcked(1)
   await shot('qx-scan-settings.png')
 
   await routeExact(page, 'GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
@@ -1043,6 +1205,7 @@ test('qingxu scan workbench captures 1080x1920 evidence @w2', async ({ page, api
   })
   await seedScanLive(page)
   await page.goto('/scan?stage=progress')
+  await ack.expectAcked(2)
   await expect(page.getByRole('button', { name: '立即检查' })).toBeVisible()
   await shot('qx-scan-progress.png')
 

@@ -11,19 +11,26 @@ export const SESSION_TTL_MINUTES = 10
 /** upload-sessions.service.ts MAX_SESSION_UPLOAD_BYTES：比按用途的 20MB 更紧，先生效的是它。 */
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
-/** 一体机能开出会话的用途（CreateUploadSessionDto @IsIn）。signature_image 不在其中，会话在 DTO 就被拒。 */
-export const SESSION_PURPOSES = ['resume_upload', 'print_doc', 'contract_upload'] as const
+/**
+ * 一体机能开出会话的用途（与 services/api upload-sessions.dto.ts 的 UPLOAD_SESSION_PURPOSES 同表）。
+ * 走查 I-14 之前后端 DTO 漏了 signature_image，手机页只好给「手机端不可用」的死胡同；现在它是正式用途。
+ */
+export const SESSION_PURPOSES = ['resume_upload', 'print_doc', 'contract_upload', 'signature_image'] as const
 export type SessionPurpose = (typeof SESSION_PURPOSES)[number]
 export function isSessionPurpose(value: unknown): value is SessionPurpose {
   return typeof value === 'string' && (SESSION_PURPOSES as readonly string[]).includes(value)
 }
+/** 文档类用途：上传前的通用档只在这几种里取交集。签名图只收图片，算进来会让简历 / 打印连 PDF 都选不了。 */
+export const DOCUMENT_PURPOSES = ['resume_upload', 'print_doc', 'contract_upload'] as const
 
 /** 链接本身的问题：invalid 只表示缺 sessionId / token（与过期无关）；用途读不懂不算链接坏。 */
-export type LinkIssue = 'invalid' | 'signature-blocked' | null
-export function linkIssueOf(sessionId: string, uploadToken: string, purpose: string): LinkIssue {
-  if (purpose === 'signature_image') return 'signature-blocked'
+export type LinkIssue = 'invalid' | null
+export function linkIssueOf(sessionId: string, uploadToken: string): LinkIssue {
   return sessionId && uploadToken ? null : 'invalid'
 }
+
+/** 这次上传的是文档还是本人手写签名图：只影响被拒时怎么说（签名图只收 JPG / PNG，不能叫人转 PDF）。 */
+export type UploadTarget = 'document' | 'signature'
 
 export type PrecheckState = 'empty-error' | 'too-large' | 'type-error' | 'content-type-error'
 export type UploadFailure = 'service-error' | 'session-expired' | 'upload-in-progress' | 'outcome-unknown'
@@ -71,7 +78,11 @@ const PRINT_FORMAT_REFUSAL: Readonly<Record<string, { what: string; why: string 
   docx: { what: 'Word 文档（.docx）', why: '这是 Word 文档，这台机器现在打不了' },
 }
 
-export function refusedFormatCopy(file: PickedFile | null): string {
+export function refusedFormatCopy(file: PickedFile | null, target: UploadTarget = 'document'): string {
+  if (target === 'signature') {
+    const what = file ? extLabel(file.ext) : '这个格式'
+    return `这一份是 **${what}**。签名图片只收 **JPG** 或 **PNG**（手机拍一张手写签名、或截图保存成图片都行）。这一份没有发出去。`
+  }
   const byExt = file ? PRINT_FORMAT_REFUSAL[file.ext] : undefined
   const byMime = file?.type === 'image/heic' || file?.type === 'image/heif'
     ? PRINT_FORMAT_REFUSAL.heic
@@ -101,6 +112,15 @@ export function genericPolicy(accepts: readonly string[]): UploadPolicy {
   const mimes = tokens.filter((token) => token.includes('/'))
   const chips = [...new Set(exts.map((ext) => CHIP_BY_EXT[ext === 'jpeg' ? 'jpg' : ext === 'docx' ? 'doc' : ext]).filter(Boolean))]
   return { accept: tokens.join(','), exts, mimes, chips }
+}
+
+/**
+ * 上传前的通用档：文档类用途 accept 的交集。链接里的用途提示只能收紧、不能放宽 ——
+ * 写着是签名图时再并上签名图的 accept（只剩 JPG / PNG）；别的提示、读不懂的提示都不改通用档。
+ */
+export function preUploadPolicy(accepts: Readonly<Record<SessionPurpose, string>>, purposeHint: string): UploadPolicy {
+  const scope: readonly SessionPurpose[] = purposeHint === 'signature_image' ? SESSION_PURPOSES : DOCUMENT_PURPOSES
+  return genericPolicy(scope.map((purpose) => accepts[purpose]))
 }
 
 /** 手机端预检：拦下的文件一个字节都不发出去。浏览器不给类型时按后缀继续（服务端还会拿真实字节重查）。 */
@@ -143,9 +163,6 @@ export type FactRow = readonly [string, string]
 export const UPLOAD_STEPS = ['选手机里的文件', '系统接收', '回一体机确认'] as const
 
 export function chromeCopy(issue: LinkIssue, state: UploadState, confirmedLabel: string | null) {
-  if (issue === 'signature-blocked') {
-    return { sub: '本人手写签名 · 手机端不可用', tag: '需回一体机', icon: 'ban' as IconKey, foot: '本页当前没有可用的上传入口，也不会发送任何文件；本人手写签名图片请回一体机在原步骤上传。' }
-  }
   if (issue === 'invalid' || state === 'session-expired') {
     return { sub: issue === 'invalid' ? '上传链接不可用' : '手机上传 · 需回一体机重新生成', tag: '需回一体机', icon: 'ban' as IconKey, foot: '本页当前不能再发送文件；请回一体机重新生成上传二维码后再扫一次。' }
   }
@@ -160,19 +177,7 @@ export function chromeCopy(issue: LinkIssue, state: UploadState, confirmedLabel:
   }
 }
 
-export function takeoverCopy(issue: Exclude<LinkIssue, null>) {
-  if (issue === 'signature-blocked') {
-    return {
-      kind: 'warn' as const, icon: 'ban' as IconKey, head: '本人手写签名暂不支持手机上传',
-      body: '请回到「签名」的原步骤查看可用方式；没有可用方式时，这一页不能代传。',
-      facts: [
-        ['为什么不可用', '手机上传当前只接受 **简历 / 打印文件 / 合同**，签名图片不在其中，系统不会为它开出上传链接。'],
-        ['不是你的问题', '不是文件格式不对，也不是网络问题，换张图或换台手机都不会变。'],
-        ['这一页怎么办', '回到原步骤查看可用方式；只接受本人手写签名图片，没有可用方式时这一页不能代传。'],
-        ['还是不行', '返回上一步；本页没有别的上传方式可试。'],
-      ] as FactRow[],
-    }
-  }
+export function takeoverCopy() {
   return {
     kind: 'warn' as const, icon: 'alert' as IconKey, head: '这个链接不能用来上传',
     body: '链接里缺少必要信息，本页不知道该把文件发到哪一次上传。请回到一体机，在屏幕上重新生成上传二维码。',
@@ -213,8 +218,10 @@ const TTL_FACT: FactRow = ['链接时限', `二维码自**一体机生成起 ${S
 const PHONE_FILE_FACT: FactRow = ['你手机里的文件', '没有任何变化，本页也没有删除它。']
 
 /** 除 success 外每一态的选择区、文件行、进度与事实。拆分依据只有一条：用户能做的下一步不同，就必须是不同状态。 */
-export function uploadView(state: Exclude<UploadState, 'success'>, ctx: { file: PickedFile | null; typeIssue: TypeIssue; unknownType: boolean; chips: readonly string[] }): UploadView {
+export function uploadView(state: Exclude<UploadState, 'success'>, ctx: { file: PickedFile | null; typeIssue: TypeIssue; unknownType: boolean; chips: readonly string[]; target?: UploadTarget }): UploadView {
   const { file, chips } = ctx
+  const target: UploadTarget = ctx.target ?? 'document'
+  const signature = target === 'signature'
   const failed = (head: string, note: string, text: string, withChips = false): UploadView => ({
     picker: 'ready', removable: true, fileNote: { tone: 'error', text }, chips: withChips,
     progress: { head, right: '未发送', fill: 'error', tone: 'error', note }, facts: null,
@@ -231,14 +238,20 @@ export function uploadView(state: Exclude<UploadState, 'success'>, ctx: { file: 
     case 'too-large':
       return failed('文件太大，未上传', '体积是在手机上就拦下的，系统没有收到这份文件。', `这个文件 **${file ? formatSize(file.size) : ''}**，超过单个 **10MB** 的上限，没有发出去。请压缩后再选一次。`)
     case 'type-error':
-      return failed('格式不支持，未上传', `这一份没有发出去。请在手机或电脑上转成 PDF 或 JPG 后再传。本页现在只放行 ${chips.join(' / ')}。`,
-        refusedFormatCopy(file), true)
+      return failed('格式不支持，未上传',
+        signature
+          ? `这一份没有发出去。请换一张 JPG 或 PNG 的签名图片再传。本页现在只放行 ${chips.join(' / ')}。`
+          : `这一份没有发出去。请在手机或电脑上转成 PDF 或 JPG 后再传。本页现在只放行 ${chips.join(' / ')}。`,
+        refusedFormatCopy(file, target), true)
     case 'content-type-error': {
       const label = file?.type ? MIME_LABEL[file.type] ?? '另一种格式' : '另一种格式'
-      return failed('文件类型不匹配，未上传', '这是手机端的预检，不能代替系统检查；请换一个文件，或转成 PDF、JPG 后再传。',
+      return failed('文件类型不匹配，未上传',
+        signature
+          ? '这是手机端的预检，不能代替系统检查；请换一张 JPG 或 PNG 的签名图片再传。'
+          : '这是手机端的预检，不能代替系统检查；请换一个文件，或转成 PDF、JPG 后再传。',
         ctx.typeIssue === 'mismatch'
           ? `这个文件的后缀是 **.${file?.ext ?? ''}**，手机却把它认成了**${label}**。两者对不上，本页先拦下了，没有发出去。`
-          : refusedFormatCopy(file), true)
+          : refusedFormatCopy(file, target), true)
     }
     case 'service-error':
       return {

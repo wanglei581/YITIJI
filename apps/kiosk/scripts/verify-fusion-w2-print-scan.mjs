@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
@@ -74,9 +74,12 @@ const frozenHashes = new Map([
   // 只多两行 import、一行 hook、三行取句子、两行 JSX，二维码、轮询、取消、确认、报忙、刷新先撤销旧会话、已上传时刷新不可点都逐字未动。
   // 冻结契约不放宽，仍逐字节校验；新行为由 scripts/tests/miniapp-link-copy.test.mjs 的接线断言和 fusion-w3 / fusion-w2 的浏览器用例钉住。
   // 旧哈希 98691610ccd48ff766ff7d28256ed8814afb024ad454305f9de6345c0639db14。
+  // 2026-10-29 重新冻结（触屏版走查 I-14，B 路）：签名图（signature_image）确认后只留系统短期、不进「我的文档」，面板里「会员文件确认后归档」对它不成立；
+  // 只在那一处条件上加 purpose !== 'signature_image'，二维码、轮询、取消、确认、刷新先撤销旧会话等都逐字未动。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 7f0cacce1e2b505548a4a141e2b63c71517c8ec5fe5d47fc827732a461f3e524。
   [
     'src/pages/upload/components/UploadSessionQrPanel.tsx',
-    '7f0cacce1e2b505548a4a141e2b63c71517c8ec5fe5d47fc827732a461f3e524',
+    '412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357',
   ],
   [
     'src/pages/print/DevSandboxControls.tsx',
@@ -1067,6 +1070,60 @@ assert.match(
   /navigate\(["']\/scan\?stage=settings["'][\s\S]*state:\s*\{\s*scanType:\s*selected\s*\}/,
   'scan start carries a validated scan type into settings'
 )
+// 走查 I-16（回归，#1326 改过「不默认选类型」，触屏集成又改回 storedType ?? 'resume'）：
+// 扫描类型一进来不预选。想扫证件或普通文档的人不点类型直接「下一步」，会被悄悄建成简历扫描。
+// 用 AST 钉语义，不钉字面量：`selected` 的初值只能是「本机登记里已有的类型，否则 null」，
+// 主按钮在没选类型时必须是禁用态并说明原因。
+{
+  const startFile = ts.createSourceFile('ScanStartPage.tsx', scanStart, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let selectedInit = null
+  const findSelected = (node) => {
+    if (
+      ts.isVariableDeclaration(node) && ts.isArrayBindingPattern(node.name) && node.initializer &&
+      ts.isCallExpression(node.initializer) && ts.isIdentifier(node.initializer.expression) &&
+      node.initializer.expression.text === 'useState'
+    ) {
+      const first = node.name.elements[0]
+      if (first && ts.isBindingElement(first) && ts.isIdentifier(first.name) && first.name.text === 'selected') {
+        selectedInit = node.initializer.arguments[0] ?? null
+      }
+    }
+    ts.forEachChild(node, findSelected)
+  }
+  findSelected(startFile)
+  assert.ok(selectedInit, 'scan start keeps a `const [selected, ...] = useState(...)` for the scan type')
+  assert.ok(
+    ts.isBinaryExpression(selectedInit) &&
+      selectedInit.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken &&
+      selectedInit.right.kind === ts.SyntaxKind.NullKeyword,
+    'scan start must not pre-select a scan type: the initial value is `storedType ?? null` (走查 I-16 / #1326)',
+  )
+  assert.match(scanStart, /selected === null\s*\?\s*\{[\s\S]{0,400}?disabled:\s*true/, 'scan start disables the primary button until a scan type is chosen')
+  assert.match(scanStart, /先选一种材料/, 'scan start tells the user why the primary button is disabled')
+}
+// 走查 I-18：屏上的字不写死品牌或型号（CLAUDE.md §3：型号走 printerName 配置；换牌子或换型号后那句就错了）。
+// 只看会上屏的字（字符串、模板字符串、JSX 文本），注释不算。
+{
+  const walk = (dir) => readdirSync(join(kioskRoot, dir), { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory() ? walk(join(dir, entry.name)) : /\.(ts|tsx)$/.test(entry.name) ? [join(dir, entry.name)] : [])
+  const hits = []
+  for (const path of walk('src')) {
+    const source = ts.createSourceFile(path, read(path), ts.ScriptTarget.Latest, true, path.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+    const visitBrand = (node) => {
+      const text =
+        ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) ||
+        ts.isTemplateMiddle(node) || ts.isTemplateTail(node) || ts.isJsxText(node)
+          ? node.text
+          : ''
+      if (/奔图|CM28\d0|Pantum/i.test(text)) {
+        hits.push(`${path}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1} ${text.trim().slice(0, 40)}`)
+      }
+      ts.forEachChild(node, visitBrand)
+    }
+    visitBrand(source)
+  }
+  assert.deepEqual(hits, [], `kiosk on-screen text must not hard-code the printer brand or model (走查 I-18):\n${hits.join('\n')}`)
+}
 const scanSettings = read('src/pages/scan/ScanSettingsPage.tsx')
 assert.match(scanSettings, /function isScanType\(/, 'scan settings validates direct route state')
 assert.match(
