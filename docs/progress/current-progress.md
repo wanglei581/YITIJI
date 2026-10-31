@@ -1,5 +1,16 @@
 # 当前开发进度
 
+## 2026-10-31：接续四路候选的前后端、迁移与 CI 验证（发布准备线，实施中）
+
+- 用户本轮授权接续原聊天四路集成、修复实际问题、验证前后端/迁移/CI并准备备份回滚；生产上线另待用户确认，Windows 不出纸。沿用独立 `codex/touch-release-readiness-20261031`，保留原工作树与 Claude 改动。当前已并入原集成 `3e51537f6`；原聊天仍收齐简历与最终图谱，不抢写其文件。
+- 初始文件预算仅两份进度文档；若验证发现源码或门禁问题，先记录复现、最小修改范围与验证，再修复。无新增页面、服务、模型、依赖；不更改生产配置/数据/密钥/硬件。允许本分支合入原线完整保留的提交；精确最终 CI 独立核验，不借用中间版绿标。
+- 方案复核：API/双后台先构建，既有双库迁移与 PostgreSQL HTTP、完整 AppModule 双后台浏览器验收；额外从当前生产 SHA 重建隔离数据库，验证两条增量迁移与备份恢复。四路冻结后补 kiosk/全仓 lint/typecheck/图谱和 CI，生产发布保持关闭。
+- 已验证 `8e9b3a9d7`：API 构建、shared typecheck、Admin/Partner 真实 HTTP 模式构建通过；既有 first-order 双库升级与 fresh PostgreSQL 全迁移/schema diff 通过。共享包直接导出 TS 无 build 脚本，最初误调用立即失败，改按其正式 typecheck 验证，没有更改包脚本。
+- 完整 AppModule + 独立数据库/Redis 的双后台浏览器通过：真实首次登录/机构归属、工单受理与恢复确认/重开、月报留存与相同 CSV、失败刷新后的已提交状态保留、390px/桌面布局和退出撤销。API lint 与 kiosk lint/typecheck 通过（现有告警未冒充零告警）。前端为实际源码 HTTP 模式，AI/短信/硬件未作生产验收。
+- 生产备份只读补核：10/28 provenance 对应的 custom dump 存在，约 4.96MB，`pg_restore -l` 可读取目录；与 runtime backup 均有实物。仅证明文件存在与目录可解析，不等于真实生产数据恢复已验。正式上线前仍必须生成本次新备份并核验，不能只使用三天前备份。
+- 精确生产基线升级演练通过：隔离 PostgreSQL 从 `9a9563c37` schema 建库，插入官方渠道哨兵，执行 audience 与 AiServiceFact 两条 SQL；哨兵保留且默认 general、新事实表可写、候选 schema diff 为空；旧字段读写仍可用。pg_dump custom 备份恢复到另一隔离库后哨兵恢复且与旧 schema diff 为空。未声称旧 API 全接口兼容，也未操作生产库。证据 `~/.codex/evidence/touch-release-20261031/upgrade-result.json`；测试集群已停止，保留夹具与日志。
+
+
 ## 2026-10-31：触屏目标版发布准备——独立生产只读核查
 
 - 范围与预算：本分支 `codex/touch-release-readiness-20261031` 从干净 `origin/main@55f46065b08b90dfb358f51cd65d7343e735bd18` 建立，仅修改本文件与 next-tasks（2 文件）。对应阻塞为线上版本落后与同版发布证据缺失；不新增入口、模型、服务、依赖，不改四路集成工作树、根目录冲突、业务源码、生产配置、数据库或硬件。服务器仅只读检查，不出纸。方案审查：复用现有 full 发布、备份与回滚流程，先冻结集成目标再跑该 SHA 的门禁，不能用旧候选绿标代替。
