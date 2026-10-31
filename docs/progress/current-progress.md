@@ -2,6 +2,8 @@
 
 ## 2026-10-31：集成候选继续收口与无实体键盘验收
 
+- 补充范围预算：仅在既有 `docs/device/windows-golden-image-and-install-checklist.md` 增加 D.1 无实体键盘验收，复用正式装机清单；不新增标准或测试服务。明确实体触摸、完整中文/编辑、数字、避让、弹窗、扫码共存与清场标准，不将配置建议写成现场已完成。
+
 - 本轮在既有 `codex/touch-four-lane-integration-20261031` 保留原四路，快进纳入发布准备线 `7487a0de3`：服务器来源/升级回退证据、签名正式契约同步及 follow-redirects 1.16.2 最小补丁。再纳入 I-33 群众文案与签名图片无扩展显示名兼容修复；各专项预算/负例/回归见下文。没有改原 Claude 工作树、生产配置或硬件。
 - PR #1526 原 `39688b5ee` CI 41176414657 的 build-and-verify 确认失败于 follow-redirects 高危公告；不是页面回归失败。接入发布线修复后本集成实际 dependency-security 复验通过，全树/生产 high/critical 均 0，仍有 2 low 与 13/10 moderate，未放宽门禁。第一次独立 frozen 安装因 registry playwright-core 请求重试停滞；另一正式 pnpm 调用已完成供应链验证及 frozen 安装并跑完安全门禁，随后只停止本轮重复挂起进程。
 - 用户明确无实体键盘使用要求。源码核实：页内 KioskNumpad 已用于取件，KioskKeyboard 仅接小青且 pinyinDict 明确为精简词库；简历/材料/反馈等普通输入尚依赖系统 IME。不能把精简词库全局接入冒充完整中文，也不能把脚本填表算触摸可用。正式验收须覆盖中文姓名/生僻字/经历、手机号/验证码/邮箱、光标插改/选字/删除、键盘避让、切页/换人清场及扫码器并存。
