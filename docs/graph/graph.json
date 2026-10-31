@@ -13609,7 +13609,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 804,
+      "reachableFileCount": 808,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -16959,7 +16959,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 906
+      "sourceFileCount": 910
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -21553,6 +21553,7 @@
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/components/SettingsConfirm.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
@@ -22188,6 +22189,9 @@
     ],
     "apps/kiosk/src/pages/resume/resume-triage-qx.css": [
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/resumeGenerateDraft.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
     "apps/kiosk/src/pages/resume/self-assessment-lightflow.css": [
       "services/api/scripts/verify-compliance.ts"
@@ -31106,6 +31110,7 @@
           "apps/kiosk/src/pages/resume/aiResumeSession.ts",
           "apps/kiosk/src/pages/resume/components/ResumeVoiceInputButton.tsx",
           "apps/kiosk/src/pages/resume/jobMaterialDraft.ts",
+          "apps/kiosk/src/pages/resume/resumeGenerateDraft.ts",
           "apps/kiosk/src/pages/resume/selfAssessmentSession.ts",
           "apps/kiosk/src/pages/resume/touch/OptimizeEditView.tsx",
           "apps/kiosk/src/pages/scan/scanWorkbenchModel.ts",
@@ -31222,6 +31227,7 @@
           "apps/kiosk/src/pages/print/PrintDonePage.tsx",
           "apps/kiosk/src/pages/profile/ProfilePage.tsx",
           "apps/kiosk/src/pages/profile/me/MySettingsPage.tsx",
+          "apps/kiosk/src/pages/profile/me/components/SettingsConfirm.tsx",
           "apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/src/services/terminalAuth.ts",
@@ -32848,7 +32854,9 @@
     {
       "asserts": {
         "absent": [],
-        "dirs": [],
+        "dirs": [
+          "apps/kiosk/src/pages/renshi"
+        ],
         "files": [
           "apps/kiosk/src/pages/home/serviceGroups.ts",
           "apps/kiosk/src/pages/renshi/NoticePanel.tsx",
