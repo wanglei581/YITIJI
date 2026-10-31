@@ -16,6 +16,7 @@ import { RedisService } from '../common/redis/redis.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import { signFileUrl, verifyFileSignature } from '../files/signing'
 import { countPdfPages } from '../files/file-page-count.util'
+import { formatBeijingMinute } from '../common/beijing-display-time'
 import { readImageDimensions } from './image-dimensions.util'
 
 const MAX_IMAGES = 20
@@ -261,7 +262,7 @@ export class PrintConversionService {
 
     const uploaded = await this.files.upload({
       buffer: outputBuffer,
-      filename: `format-convert-${Date.now()}.pdf`,
+      filename: convertedFileName(new Date()),
       mimeType: 'application/pdf',
       purpose: 'print_doc',
       uploaderId: null,
@@ -307,6 +308,17 @@ export class PrintConversionService {
       doc.end()
     })
   }
+}
+
+/**
+ * 合成件在「我的文档」里的名字：照片合成 + 北京时间的日期和分钟（例：照片合成-20261029-1754.pdf）。
+ * 这是用户自己会在文档列表里认的名字（一体机和小程序都读它），不能是内部名字 format-convert-<毫秒时间戳>；
+ * 带上分钟是为了同一天合成的几份分得开。时间取北京时间墙钟（common/beijing-display-time），与服务器时区无关；
+ * 名字里不留冒号和空格，Windows 与各类下载场景都能直接存。
+ */
+function convertedFileName(now: Date): string {
+  const [date = '', time = ''] = formatBeijingMinute(now).split(' ')
+  return `照片合成-${date.replace(/-/g, '')}-${time.replace(':', '')}.pdf`
 }
 
 function fingerprintSources(sources: ConvertImageSource[]): string {

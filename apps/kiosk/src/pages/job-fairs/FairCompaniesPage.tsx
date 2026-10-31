@@ -9,6 +9,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import type { FairCompanyDTO, FairZoneDTO, ExternalJobFairDTO } from '@ai-job-print/shared'
 import { BriefcaseIcon, BuildingIcon, FileTextIcon, SearchIcon, UsersIcon } from 'lucide-react'
 import { getFairCompanies, getFairZones, getJobFairById } from '../../services/api'
+import { RtFill } from '../recruitment-touch/RtFill'
 import { QxFairWorkbench } from './QxFairWorkbench'
 import { FairSkeletonList } from './components/FairWorkbenchBits'
 import { fmtFairSyncDate } from './fairFormat'
@@ -73,37 +74,23 @@ export function FairCompaniesPage() {
 
   const uiState = loading ? 'loading' : error ? 'error' : companies.length === 0 ? 'empty' : 'list'
 
-  const ctabar = uiState === 'error'
-    ? (
-      <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>找工作人员</button>
-        <button type="button" className="qx-btn" data-variant="primary" onClick={() => setRetryKey((k) => k + 1)}>重新加载</button>
-      </>
-    )
-    : uiState === 'empty'
-      ? (
-        <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}/materials`)}>看看活动物料</button>
-          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(`/job-fairs/${fairId}`)}>返回招聘会</button>
-        </>
-      )
-      : uiState === 'loading'
-        ? <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}`)}>返回招聘会</button>
-        : (
-          <>
-            <p className="why">{BOUNDARY}</p>
-            <button type="button" className="qx-btn narrow" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}/map`)}>展位分布</button>
-            <button type="button" className="qx-btn narrow" data-variant="primary" onClick={() => navigate(`/job-fairs/${fairId}`)}>返回招聘会</button>
-          </>
-        )
-
   return (
     <QxFairWorkbench
       screen="companies"
       state={uiState}
       fairId={fairId}
       subtitle={fair ? `${fair.name} · ${BOUNDARY}` : undefined}
-      ctabar={ctabar}
+      boundary={uiState === 'list' ? BOUNDARY : undefined}
+      secondary={uiState === 'error'
+        ? <button type="button" className="qxt-btn qxt-btn-ghost" onClick={() => navigate('/help')}>去帮助中心</button>
+        : uiState === 'empty'
+          ? <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate(`/job-fairs/${fairId}/materials`)}>看看活动物料</button>
+          : uiState === 'list'
+            ? <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate(`/job-fairs/${fairId}/map`)}>展位分布</button>
+            : undefined}
+      primary={uiState === 'error'
+        ? { label: '重新加载', onClick: () => setRetryKey((k) => k + 1), noArrow: true }
+        : undefined}
     >
       {uiState === 'loading' ? (
         <>
@@ -117,7 +104,6 @@ export function FairCompaniesPage() {
           </DirState>
           <DirStrip>
             <DirStripItem icon={FileTextIcon} title="活动物料" desc="物料里通常也有一份纸质名单可以打印" onClick={() => navigate(`/job-fairs/${fairId}/materials`)} />
-            <DirStripItem icon={BuildingIcon} tone="wheat" title="返回招聘会" desc="时间地点仍然可以查看" onClick={() => navigate(`/job-fairs/${fairId}`)} />
           </DirStrip>
         </>
       ) : uiState === 'empty' ? (
@@ -214,6 +200,7 @@ export function FairCompaniesPage() {
           <DirNote>{BOUNDARY}</DirNote>
         </>
       )}
+      <RtFill preset="fair" />
     </QxFairWorkbench>
   )
 }

@@ -25,7 +25,7 @@ import {
 } from './kiosk-send-harness.mjs'
 
 test('完整回执才算已收到，令牌只留在内存', async () => {
-  for (const purpose of ['resume_upload', 'print_doc', 'contract_upload']) {
+  for (const purpose of ['resume_upload', 'print_doc', 'contract_upload', 'signature_image']) {
     const env = await send(null, receipt({ purpose }))
     assert.equal(env.page.data.phase, 'done', purpose)
     assert.equal(env.page.data.canRetry, false)
@@ -49,7 +49,6 @@ test('空回执、缺字段、非上传成功态都不能说已收到', async ()
     receipt({ file: { fileId: '' } }),
     receipt({ file: { fileId: '   ' } }),
     receipt({ file: { fileId: 1 } }),
-    receipt({ purpose: 'signature_image' }),
     receipt({ purpose: 'not_a_purpose' }),
     receipt({ purpose: '' }),
     receipt({ status: 'pending' }),
@@ -474,4 +473,110 @@ test('返回键：扫码直达时本页在栈底，回首页', () => {
   assert.equal(env.wx.calls.back, 1)
   assert.equal(env.wx.calls.tab, 1)
   assert.equal(env.wx.calls.tabUrl, '/pages/home/home')
+})
+
+
+test('退出上传页后晚到回执不得更新页面或关闭下一页的 loading，并清掉内存凭据', async () => {
+  for (const rejected of [false, true]) {
+    const pending = deferred()
+    const env = harness(() => pending.promise)
+    env.openDirect()
+    await flush()
+    env.wx.setChosen(FILE)
+    env.page.chooseAndSend()
+    assert.equal(env.uploads.length, 1)
+    env.page.onUnload()
+    const snapshot = JSON.stringify(env.page.data)
+    const hides = env.wx.calls.hide
+    if (rejected) pending.reject(httpError(503, 'SERVICE_UNAVAILABLE'))
+    else pending.resolve(receipt())
+    await flush()
+    assert.equal(JSON.stringify(env.page.data), snapshot, '卸载后不写页面')
+    assert.equal(env.wx.calls.hide, hides, '晚回执不得干扰其他页面的 loading')
+    assert.equal(env.page._uploadToken, '')
+  }
+})
+
+test('退出后系统选文件回调不再发上传请求', async () => {
+  const env = harness(() => Promise.resolve(receipt()))
+  env.openDirect()
+  await flush()
+  let picker
+  env.wx.chooseMessageFile = (opts) => { picker = opts }
+  env.page.chooseAndSend()
+  env.page.onUnload()
+  picker.success({ tempFiles: [FILE] })
+  await flush()
+  assert.equal(env.uploads.length, 0)
+})
+
+async function openSignature(upload) {
+  const env = harness(upload)
+  env.setScene(() => Promise.resolve({ sessionId: SESSION, uploadToken: TOKEN, purpose: 'signature_image' }))
+  env.openLink(UPLOAD_LINK)
+  await flush()
+  return env
+}
+
+test('签名短链兑换驱动聊天图片选择，JPG/PNG上传回执不再是未知', async () => {
+  for (const ext of ['jpg', 'jpeg', 'png']) {
+    const env = await openSignature(() => Promise.resolve(receipt({ purpose: 'signature_image' })))
+    assert.equal(env.page.data.purpose, 'signature_image')
+    assert.equal(env.page.data.phase, 'idle')
+    let picker
+    env.wx.chooseMessageFile = (options) => { picker = options }
+    env.page.chooseAndSend()
+    assert.equal(picker.type, 'image')
+    assert.equal(picker.extension, undefined, 'image 不依赖只在 type=file 生效的 extension')
+    picker.success({ tempFiles: [{ name: `本人签名.${ext}`, path: `wxfile://tmp/s.${ext}`, size: 10 * 1024 * 1024 }] })
+    await flush()
+    assert.equal(env.uploads.length, 1)
+    assert.equal(env.page.data.phase, 'done')
+    assertTokenStaysInMemory(env.page)
+  }
+})
+
+test('签名选择拒绝GIF/PDF/未知扩展和超过10MB，允许重选', async () => {
+  for (const file of [
+    { name: '签名.gif', path: 'wxfile://tmp/s.gif', size: 100 },
+    { name: '签名.pdf', path: 'wxfile://tmp/s.pdf', size: 100 },
+    { name: '签名', path: 'wxfile://tmp/unknown', size: 100 },
+    { name: '签名.png', path: 'wxfile://tmp/s.png', size: 10 * 1024 * 1024 + 1 },
+  ]) {
+    const env = await openSignature(() => Promise.reject(new Error('不得上传')))
+    env.wx.setChosen(file)
+    env.page.chooseAndSend()
+    assert.equal(env.uploads.length, 0)
+    assert.equal(env.page.data.phase, 'error')
+    assert.equal(env.page.data.canRetry, true)
+    assert.match(env.page.data.errorMsg, /JPG|PNG|10MB/)
+  }
+})
+
+test('签名图片伪装由后端明确拒绝，前端不伪造成功或引导转PDF', async () => {
+  const env = await openSignature(() => Promise.reject(httpError(400, 'FILE_CONTENT_MISMATCH', '文件内容与图片格式不符，请重新选择本人签名图片')))
+  env.wx.setChosen({ name: '签名.png', path: 'wxfile://tmp/s.png', size: 100 })
+  env.page.chooseAndSend()
+  await flush()
+  assert.equal(env.uploads.length, 1)
+  assert.equal(env.page.data.phase, 'error')
+  assert.equal(env.page.data.canRetry, true)
+  assert.doesNotMatch(env.page.data.errorMsg, /转.*PDF/)
+})
+
+test('原三用途保持聊天文件选择器与我的文档入口', async () => {
+  for (const purpose of ['resume_upload', 'print_doc', 'contract_upload']) {
+    const env = harness(() => Promise.resolve(receipt({ purpose })), { loggedIn: true })
+    env.setScene(() => Promise.resolve({ sessionId: SESSION, uploadToken: TOKEN, purpose }))
+    env.openLink(UPLOAD_LINK)
+    await flush()
+    assert.equal(env.docCalls.length, 1)
+    let picker
+    env.wx.chooseMessageFile = (options) => { picker = options }
+    env.page.chooseAndSend()
+    assert.equal(picker.type, 'file')
+    picker.success({ tempFiles: [FILE] })
+    await flush()
+    assert.equal(env.page.data.phase, 'done')
+  }
 })

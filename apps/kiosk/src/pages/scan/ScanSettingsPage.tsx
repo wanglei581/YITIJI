@@ -22,6 +22,7 @@ import { scanCleanupInProgress, trackScanSessionCreation } from './scanCleanupGa
 import { useScanSettingsFlags } from './scanSettingsFlags'
 import { createScanSessionTeardown } from './scanSettingsTeardown'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
+import { SCAN_TERMINAL_FAIL_COPY, scanShownText } from './scanShownText'
 import {
   classifyCreateFailure,
   isRescanRefusedByServer,
@@ -29,13 +30,10 @@ import {
   type SessionFailure,
 } from './scanRescanRecovery'
 import {
-  ScanChain,
-  ScanCta,
   ScanPanelMock,
-  ScanSec,
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
-import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
+import { type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
 import {
   beginPlainScanRestart,
@@ -107,7 +105,7 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   const [starting, setStarting] = useState(false)
   const [scanTaskId, setScanTaskId] = useState<string | null>(restoredLive?.scanTaskId ?? null)
   const [expiresAt, setExpiresAt] = useState<string | null>(restoredLive?.expiresAt ?? null)
-  const [countdown, setCountdown] = useState('--:--')
+  const [countdown, setCountdown] = useState('剩余 -- 分 -- 秒')
   const [quietPeriodRemaining, setQuietPeriodRemaining] = useState(0)
   const [quietPeriodBlocked, setQuietPeriodBlocked] = useState(false)
   const [controlToken, setControlToken] = useState<string | null>(restoredLive?.controlToken ?? null)
@@ -297,9 +295,9 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         terminalFailClosedRef.current = true
         setFailure({
           title: '这台机器的安全校验没通过',
-          description: userMessageOf(
-            { code: 'TERMINAL_SESSION_INVALID' },
-            '这台机器的安全校验没通过，请联系现场工作人员',
+          description: scanShownText(
+            userMessageOf({ code: 'TERMINAL_SESSION_INVALID' }, SCAN_TERMINAL_FAIL_COPY),
+            SCAN_TERMINAL_FAIL_COPY,
           ),
         })
         setPhase('error')
@@ -762,35 +760,24 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       page="scan-settings"
       state="panel-instruction"
       title="扫描指引"
-      subtitle={<><b>扫描任务已创建</b>，请只按系统给出的这一次操作说明来做。</>}
+      /* 「扫描任务已创建」单独包一层：门禁与用例按这一整句精确匹配它来判断「会话真的建成了」。 */
+      subtitle={<><span>扫描任务已创建</span>，请只按系统给出的这一次操作说明来做。</>}
       status={{ tone: 'ok', label: '第 2 步 · 去面板操作' }}
-      ctabar={
-        <ScanCta>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={handleSafeReturn}>
-            返回（取消任务）
-          </button>
-          <button type="button" className="qx-btn" data-variant="primary" disabled={starting} onClick={handleConfirm}>
-            {starting ? '正在进入等待…' : '我已操作，开始等待'}
-          </button>
-        </ScanCta>
-      }
+      dock={{
+        left: { label: '返回（取消任务）', onClick: handleSafeReturn },
+        primary: {
+          label: starting ? '正在进入等待…' : '我已操作，开始等待',
+          onClick: handleConfirm,
+          disabled: starting,
+        },
+      }}
     >
-      <ScanSec no="01" title="照着做：全在机器面板上" hint="以下是系统给的原文，本机不改写" grow>
-        <ScanPanelMock
-          instructions={instructions.map((instruction) => instruction)}
-          scanLabel={SCAN_TYPE_LABELS[scanType]}
-        />
-      </ScanSec>
-      <ScanSec no="02" title="现在能做什么" hint="按系统结果继续">
-        <ScanChain active={0} />
-      </ScanSec>
-      {/* 「这次会话」整张卡是纯展示，已搬去 ScanSettingsStatusView。restoredFromStorage 必须喂
-          **挂载那一刻**那个 ref：每帧重算会把一个刚在本页建成的会话说成「本页重载过」。 */}
       <ScanSettingsSessionFacts
         scanType={scanType} countdown={countdown}
         rescanRequested={rescanRequested} plainRestartChosen={plainRestartChosen}
         restoredFromStorage={restoredFromStorageRef.current}
       />
+      <ScanPanelMock instructions={instructions.map((instruction) => instruction)} />
     </ScanWorkbenchShell>
   )
 }

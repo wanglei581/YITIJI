@@ -2,8 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeftIcon, LoaderIcon, PrinterIcon } from 'lucide-react'
 import { PRINT_MAX_SIDES_PER_ORDER, type MemberBenefitItem, type PrintJobParams } from '@ai-job-print/shared'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { PrintTouchFrame, printAsk } from './PrintTouchFrame'
 import { useAuth } from '../../auth/useAuth'
 import { loginPathForPrintStep } from '../../auth/returnPath'
 import { API_MODE } from '../../services/api/client'
@@ -22,6 +21,8 @@ import {
   type PrintPriceChangedQuote,
 } from '../../services/print/printJobsApi'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
+import { machineCannotPrintLine, preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { appendSelfAssessmentToResume } from '../../services/api/selfAssessment'
 import { abandonContractReviewReport } from '../../services/api/contractReview'
 import { formatCents } from './cashierStatus'
@@ -32,6 +33,9 @@ import { usePrintConfirmHandoff } from './usePrintConfirmHandoff'
 import { printPrivacyDecisionSummary } from './printDeskModel'
 import { materialRedactionBadge } from './piiRedaction'
 import { subscribeTerminalSession, terminalSessionState, type TerminalSessionState } from '../../services/terminalAuth'
+
+import { previewKindForFile } from './components/printPreviewKind'
+import { computePrintUsageEstimate } from './printUsageEstimate'
 import { PrintConfirmView } from './components/PrintConfirmView'
 import {
   COLOR_MODE_LABEL,
@@ -44,6 +48,8 @@ import {
 } from './printConfirmModel'
 import { usePrintConfirmQueryGuard } from './printConfirmQuery'
 import './styles/print-confirm-qx.css'
+import { FilePageThumb } from './components/FileThumbCard'
+import './styles/print-confirm-touch.css'
 
 type PrintFile = PrintFileState
 
@@ -106,6 +112,7 @@ function quoteKeyOf(fileUrl: string | null | undefined, params: PrintJobParams):
 export function PrintConfirmPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const support = useSupportContact()
   const { getToken, isLoggedIn } = useAuth()
   const { scan, queryInvalid, invalidReason } = usePrintConfirmQueryGuard()
   const invalidReasonRef = useRef(invalidReason)
@@ -130,10 +137,10 @@ export function PrintConfirmPage() {
     : printerNotice
       ? printerNotice
       : printer.errorCode === 'paperEmpty'
-        ? '打印机缺纸，当前不能下单，不会扣费。请联系工作人员补纸后再试。'
+        ? `打印机缺纸，当前不能下单，不会扣费。${machineCannotPrintLine()}`
         : printerKind === 'offline'
-          ? `${printerLabel}。当前不能下单，不会扣费。请联系工作人员检查设备后再试。`
-          : `${printerLabel}。当前不能下单，不会扣费。请联系工作人员。`
+          ? `${printerLabel}。当前不能下单，不会扣费。${machineCannotPrintLine()}`
+          : `${printerLabel}。当前不能下单，不会扣费。${machineCannotPrintLine()}`
   const adjusted = adjustments.length > 0
   const materialCheck = handoff?.materialCheck
   const source = handoff?.source
@@ -208,7 +215,7 @@ export function PrintConfirmPage() {
         const code = errorCodeOf(err)
         const reason =
           code === 'PRINTER_UNAVAILABLE' || code === 'PRINT_JOB_TOO_LARGE' || code === 'PRINT_TERMINAL_QUEUE_HALTED'
-            ? userMessageOf(err, '请稍后重试或联系现场工作人员')
+            ? preferUnattended(userMessageOf(err, `请稍后重试。${printProblemLine()}`), `请稍后重试。${printProblemLine()}`)
             : '页数以实际结果为准，确认前不显示金额'
         setQuoteState({ key: quoteKey, view: { status: 'unavailable', reason, code } })
       })
@@ -345,9 +352,12 @@ export function PrintConfirmPage() {
   const handleConfirm = async () => {
     if (terminalSession === 'checking') return
     if (terminalSession === 'failed') {
-      setSubmitError(userMessageOf(
-        { code: 'TERMINAL_SESSION_INVALID' },
-        '这台机器的安全校验没通过，请联系现场工作人员',
+      setSubmitError(preferUnattended(
+        userMessageOf(
+          { code: 'TERMINAL_SESSION_INVALID' },
+          `这台机器的安全校验没通过。${printProblemLine()}`,
+        ),
+        `这台机器的安全校验没通过。${printProblemLine()}`,
       ))
       return
     }
@@ -459,7 +469,7 @@ export function PrintConfirmPage() {
           setPiiCheckRequired(true)
           setSubmitError('这份文件的隐私检查还没有确认完，需要回到材料检查再确认一次。你的文件还在，不用重新上传。')
         } else {
-          setSubmitError(userMessageOf(err, '提交失败，请稍后重试或联系现场工作人员'))
+          setSubmitError(preferUnattended(userMessageOf(err, `提交失败，请稍后重试。${printProblemLine()}`), `提交失败，请稍后重试。${printProblemLine()}`))
         }
       } finally {
         if (!leaving) {
@@ -497,8 +507,15 @@ export function PrintConfirmPage() {
     : [decisionSummary, redactionBadge?.text].filter(Boolean).join(' ') || null
   const amountText = quote.status === 'ready' ? formatCents(quote.amountCents).replace(/^¥/, '') : ''
   const pill = PILL[screen]
-  const pricingPill = freePricing && screen === 'quoting' ? { tone: 'unknown' as const, label: '正在核定页数' }
-    : freePricing && screen === 'quote-failed' ? { tone: 'bad' as const, label: '页数核定未完成 · 未建单' } : pill
+  const pricingPill = !freePricing
+    ? pill
+    : screen === 'quoting'
+      ? { tone: 'unknown' as const, label: '正在核定页数' }
+      : screen === 'quote-failed'
+        ? { tone: 'bad' as const, label: '页数核定未完成 · 未建单' }
+        : screen === 'capability-invalid-params'
+          ? { tone: 'warn' as const, label: '已改回目前能打的参数' }
+          : pill
   const status = printerLoading && (screen === 'quoted' || screen === 'zero-amount')
     ? { tone: 'unknown' as const, label: '状态未知' }
     : pricingPill
@@ -526,7 +543,7 @@ export function PrintConfirmPage() {
                 ? '打印合并版（简历+自我探索）'
                 : quote.status === 'ready' && quote.amountCents === 0
                   ? '确认并打印'
-                  : '确认并去付款'
+                  : '去付款'
 
   // 稿 14 .cfm-act：动作收在 03 卡里（返回在左、主操作在右），不再挂在底部操作条上。
   const backLabel = isContractReport ? (abandoning ? '正在删除…' : '放弃打印') : '返回修改'
@@ -642,22 +659,64 @@ export function PrintConfirmPage() {
           </>
         )}
         <li>{freePricing ? '提交后请留在机器旁，任务确认后自动开始打印。' : '提交后请留在机器旁，任务确认后自动开始打印（免费任务直接进入打印队列，付费任务完成支付后开始）。'}</li>
-        <li>打印完成请从出纸口取件；如有质量问题请联系现场工作人员。</li>
+        <li>打印完成请从出纸口取件。如有质量问题，{printProblemLine(support)}</li>
       </ol>
     </section>
   )
 
+  const usesDockPrimary = !piiCheckRequired
+    && screen !== 'missing-context'
+    && screen !== 'invalid-context'
+    && screen !== 'ordered'
+    && screen !== 'benefit-unverified'
+  const dockLabel = sidesOverLimit
+    ? '确认打印'
+    : screen === 'quoting'
+      ? (freePricing ? '页数核定后可继续' : '获取报价后可继续')
+      : screen === 'quote-failed'
+        ? (freePricing ? '重新核定页数' : '重新报价')
+        : primaryLabel
+  const dockDisabled = sidesOverLimit || screen === 'quoting' || (screen !== 'quote-failed' && confirmBlocked)
+  const previewKind = hasFileContext ? previewKindForFile(file) : 'unavailable'
+  const previewNode = hasFileContext && (previewKind === 'pdf' || previewKind === 'image') ? <FilePageThumb file={file} /> : null
+  const sheetPages = quote.status === 'ready' ? quote.billablePages : rangedPages
+  const sheetUsage = computePrintUsageEstimate({
+    pages: sheetPages,
+    copies: params.copies,
+    pagesPerSheet: params.pagesPerSheet,
+    duplex: params.duplex,
+  })
+  const sheetsLabel = sheetUsage.sheetsUsed === null ? null : `${sheetUsage.sheetsUsed} 张`
+  const settingsLabel = `${COLOR_MODE_LABEL[params.colorMode] ?? params.colorMode} · ${DUPLEX_LABEL[params.duplex] ?? params.duplex} · ${params.paperSize}`
+
   return (
-    <QxPageFrame
-      // 直达打印台参数页（不经旧地址重定向）；是哪一份文件由交接上下文决定。
-      back={{ label: '返回预览与参数', onBack: () => navigate('/print/desk?step=preview') }}
-      // 稿 14 没有独立页头：小青区就是页头。标题留给读屏，视觉上由小青区承担。
-      title={freePricing ? '确认打印' : '报价确认'}
+    <PrintTouchFrame
+      page="print-confirm"
+      legacyBody={false}
+      kind="compact"
+      seal={null}
+      railNow={3}
+      eyebrow="核对价格"
+      title="确认打印"
+      back={{
+        label: backLabel,
+        onBack: () => {
+          if (isContractReport) void handleBack()
+          else navigate('/print/desk?step=preview')
+        },
+      }}
+      nav
+      ask={printAsk('问小青：核对这单', '请帮我核对这一单要印的文件、页数和设置。')}
+      primary={usesDockPrimary ? {
+        label: dockLabel,
+        disabled: dockDisabled,
+        onClick: () => {
+          if (!sidesOverLimit && screen === 'quote-failed') setQuoteNonce((n) => n + 1)
+          else void handleConfirm()
+        },
+      } : undefined}
       status={status}
       terminalLabel="就业服务大厅"
-      navbar={
-        <QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />
-      }
     >
       <PrintConfirmView
         step={4}
@@ -683,14 +742,19 @@ export function PrintConfirmPage() {
         printerBlocked={printerBlocked}
         printerBlockedReason={freePricing ? printerBlockedReason.replace('不会扣费。', '') : printerBlockedReason}
         terminalFailed={terminalSession === 'failed'}
-        terminalFailedText={userMessageOf({ code: 'TERMINAL_SESSION_INVALID' }, '这台机器的安全校验没通过，请联系现场工作人员')}
+        terminalFailedText={preferUnattended(userMessageOf({ code: 'TERMINAL_SESSION_INVALID' }, `这台机器的安全校验没通过。${printProblemLine(support)}`), `这台机器的安全校验没通过。${printProblemLine(support)}`)}
         selfAssessment={selfAssessment}
         printNotes={printNotes}
-        actions={actions}
+        actions={usesDockPrimary ? null : actions}
+        preview={previewNode}
+        sheetsLabel={sheetsLabel}
+        settingsLabel={settingsLabel}
+        copiesLabel={`${params.copies} 份`}
+        docked
         submitError={submitError ?? activeNotice ?? (sidesOverLimit ? sidesNotice : null)}
         // 回跳地址只放路由路径：不带文件编号、打印链接、交接编号，也不带当前查询串。
         onLogin={() => navigate(loginPathForPrintStep('confirm'))}
       />
-    </QxPageFrame>
+    </PrintTouchFrame>
   )
 }

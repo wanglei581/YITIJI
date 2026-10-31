@@ -482,13 +482,13 @@ for (const [source, marker, label] of [
 ]) {
   expectIncludes(source, marker, label)
 }
-// 2026-09-25 稿 08-legal 迁入青序流光：共享页壳 KioskPageFrame + KioskPageHeader 换成 QxPageFrame，
-// 三条同强度替换 —— 用青序共享壳、已退出 V6 壳、顶栏返回槽接到「回上一页」（来路不明才回受控来源 / 首页）。
-expectIncludes(legalDocPage, '<QxPageFrame', 'LegalDocPage 必须使用青序共享页壳 QxPageFrame')
+// 2026-10-27 触屏版：共享页壳换成 PublicTouchFrame。
+// 三条同强度替换 —— 用触屏共享壳、已退出 V6 壳、顶栏返回槽接到「回上一页」（来路不明才回受控来源 / 首页）。
+expectIncludes(legalDocPage, '<PublicTouchFrame', 'LegalDocPage 必须使用触屏共享页壳 PublicTouchFrame')
 expectNotIncludes(legalDocPage, 'KioskPageFrame', 'LegalDocPage 已退出 V6 KioskPageFrame')
 expectPattern(
   legalDocPage,
-  /<QxPageFrame\b[\s\S]{0,400}?back=\{\{\s*label:\s*backLabel,\s*onBack:\s*goBack\s*\}\}/,
+  /<PublicTouchFrame\b[\s\S]{0,400}?back=\{\{\s*label:\s*backLabel,\s*onBack:\s*goBack\s*\}\}/,
   'LegalDocPage 顶栏返回槽必须接到 goBack',
 )
 expectPattern(

@@ -1,0 +1,155 @@
+/* 简历对照结果页（DecisionSummaryBar / FitSkillMap）按稿 jobfit-result 的摆法：头部一张纸加「写到 N 条」，其下每条一行。
+   颜色只走 var(--qxt-*)；挂在 .qxt-screen 下，不动 job-fit-qx.css 的原规则。 */
+
+.qxt-screen .rtp-fit-hero {
+  /* 头部吃这一屏的余量：条目少时纸张放大，条目多时收到最小高度，整屏滚动。 */
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  border-radius: var(--qxt-r-card);
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  overflow: hidden;
+}
+
+.qxt-screen .rtp-fit-art {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 190px;
+  background: var(--qxt-well);
+  overflow: hidden;
+}
+
+.qxt-screen .rtp-fit-art .rtp-paper {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  height: 92%;
+  width: auto;
+  max-width: 86%;
+}
+
+.qxt-screen .rtp-fit-tx {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 26px 20px;
+}
+
+.qxt-screen .rtp-fit-tx .jfq-summary-eyebrow,
+.qxt-screen .rtp-fit-tx .jfq-summary-disclaimer {
+  margin: 0;
+  font-size: var(--qxt-fs-aux);
+  color: var(--qxt-ink-3);
+}
+
+.qxt-screen .rtp-fit-tx .jfq-summary-title {
+  margin: 0;
+  font: 700 40px/1.25 var(--qx-serif);
+  color: var(--qxt-ink);
+}
+
+.qxt-screen .rtp-fit-job {
+  margin: 0;
+  font-size: var(--qxt-fs-body);
+  font-weight: 700;
+  color: var(--qxt-teal-ink);
+}
+
+.qxt-screen .rtp-fit-tx .jfq-summary-body {
+  margin: 0;
+  font-size: var(--qxt-fs-aux);
+  line-height: 1.5;
+  color: var(--qxt-ink-2);
+}
+
+/* 每条一行：已经写到（带原文依据）/ 还没体现。 */
+.qxt-screen .rtp-fit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.qxt-screen .rtp-fit-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.qxt-screen .rtp-fit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 22px;
+  border-radius: 24px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+.qxt-screen .rtp-fit-row b {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: var(--qxt-fs-step);
+  line-height: 1.3;
+  color: var(--qxt-ink);
+  overflow-wrap: anywhere;
+}
+
+.qxt-screen .rtp-fit-row b i {
+  font-style: normal;
+  color: var(--qxt-teal-ink);
+}
+
+.qxt-screen .rtp-fit-row[data-tone='warn'] b i {
+  color: var(--qxt-clay-ink);
+}
+
+.qxt-screen .rtp-fit-row[data-tone='warn'] {
+  background: var(--qxt-clay-wash);
+  border-color: transparent;
+}
+
+.qxt-screen .rtp-fit-row span,
+.qxt-screen .rtp-fit-row small {
+  font-size: var(--qxt-fs-aux);
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.qxt-screen .rtp-fit-kw {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  font-size: var(--qxt-fs-aux);
+  color: var(--qxt-ink-3);
+}
+
+.qxt-screen .rtp-fit-chip {
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-weight: 700;
+}
+
+.qxt-screen .rtp-fit-chip[data-tone='warn'] {
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+}
+
+/* 手机宽度：标题缩小，纸张区矮一点。 */
+@media (max-width: 390px) {
+  .qxt-screen .rtp-fit-art {
+    min-height: 140px;
+  }
+  .qxt-screen .rtp-fit-tx .jfq-summary-title {
+    font-size: 28px;
+  }
+}

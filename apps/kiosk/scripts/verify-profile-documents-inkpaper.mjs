@@ -163,19 +163,27 @@ expectIncludes(page, 'documentForConvertedPdf', '结果卡预览/打印复用本
 expectIncludes(page, 'reprintable={isDocumentReprintable(doc)}', '结果卡打印按转换前记录的 reprintable 判定')
 expectIncludes(page, 'disabled={deleteDisabled}', '删除按钮保留禁用态')
 
-expectIncludes(retentionOverlay, 'role="dialog"', '保存期限确认弹层保留 dialog 语义')
+// 触屏版第 6 包：确认层换成共享弹层 QxTouchOverlay（自带 role=dialog、aria-modal、焦点圈住），判据不变。
+expectIncludes(retentionOverlay, '<QxTouchOverlay', '保存期限确认弹层使用触屏共享弹层')
+expectIncludes(retentionOverlay, 'kind="dialog"', '保存期限确认弹层保留 dialog 语义')
+expectIncludes(read('src/components/qingxu/touch/QxTouchOverlay.tsx'), 'role="dialog"', '共享弹层带 role=dialog')
 expectIncludes(page, 'aria-modal="true"', '保存期限确认弹层保留 aria-modal')
 expectIncludes(page, '还没有文档', '我的文档保留空态标题')
-expectIncludes(page, '保存简历 / 打印材料等文档后，这里会显示你的文档记录', '我的文档保留空态说明')
+// 证据锚点随稿换字，判据不变：空态仍说明登录后上传才出现，游客文件不归入账号。
+expectIncludes(page, '登录后上传的文档才会出现在这里。游客上传的文件不会自动归入你的账号。', '我的文档保留空态说明')
 expectIncludes(page, '访问链接短期有效', '我的文档保留短期访问链接合规说明')
 expectIncludes(page, '原始简历/求职材料默认 90 天', '我的文档保留默认保存期限说明')
 expectIncludes(page, 'documentsLoggedInTruth(resultIdleLogoutLabel())', '已登录的文档说明引用结果页空闲时长')
 expectAbsent(page, /不会显示上一位/, '已登录的文档页不承诺看不到上一位的资料')
 const loadingBlock = read('src/pages/profile/me/qx/QxMeStateBits.tsx')
 const meGuide = read('src/pages/profile/me/qx/QxMeChrome.tsx')
-expectIncludes(loadingBlock, '上一位若没点结束使用，读出来的仍是那个账号。', '文档加载说明承认没结束使用时仍是那个账号')
+// 证据锚点随稿换字，判据不变：读列表之前不把上一位的资料画出来。交接屏先挡住，加载只留骨架。
+expectIncludes(read('src/auth/KioskHandoverGate.tsx'), '确认之前不会显示上一位的文件和订单。', '确认之前不会显示上一位的文件和订单')
+expectIncludes(loadingBlock, '<MeLoadingPack', '文档加载态按稿使用骨架')
 expectAbsent(loadingBlock, /不会闪回上一位用户的内容/, '文档加载不再写「不会闪回上一位」')
-expectIncludes(meGuide, '离开前请点结束使用，否则一段时间无操作后才会自动退出', '共用加载说明改为离开前结束使用')
+// 证据锚点随稿换字，判据不变：触屏稿的读取中只有骨架，不再有说明卡；「离开前请点结束使用」这句留在登录后的文档页底部小字（kioskIdleTiming）。
+expectIncludes(read('src/auth/kioskIdleTiming.ts'), '离开前请点结束使用，否则', '离开前结束使用的说明仍有出处')
+expectIncludes(page, 'documentsLoggedInTruth', '我的文档底部小字用登录后的结束使用说明')
 expectAbsent(meGuide, /上一位用户的内容不会残留在屏幕上/, '共用加载说明不再写上一位的内容不会残留')
 
 for (const [label, source] of [

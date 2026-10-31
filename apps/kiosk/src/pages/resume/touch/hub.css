@@ -1,0 +1,71 @@
+/* 简历服务台（稿 resume / resume-more / st-unavailable）。只挂在本页 data-qx-page 下，不改 .qxt-* 默认。 */
+
+[data-qx-page='resume'] {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* 内容不满一屏时把余量摊到各块之间，不留成底部一大片空白 */
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 后端整站不可用时两组磁贴之间按状态样式板排，间距 18 */
+[data-qx-page='resume'][data-readiness='unavailable'] { gap: 18px; }
+[data-qx-page='resume'][data-readiness='unavailable'] .qxt-tile { min-height: 112px; }
+
+[data-qx-page='resume'] .qxt-hub-group { display: flex; flex-direction: column; gap: 16px; }
+
+[data-qx-page='resume'] .qxt-hub-more {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 64px;
+  min-width: 64px;
+  padding: 0 6px;
+  font-size: 23px;
+  font-weight: 700;
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page='resume'] .qxt-fine { line-height: 1.45; }
+
+/* AI 暂停时大卡置灰，卡下并一条不用 AI 的出路（稿 resume 的 ?ai=down，d4-dead / d4-outlink）。 */
+[data-qx-page='resume'] .qxt-hub-pair { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+[data-qx-page='resume'] .qxt-hub-pair .qxt-slab-row { padding-block: 20px; min-height: 0; }
+
+[data-qx-page='resume'] .qxt-hub-out {
+  display: flex;
+  align-items: center;
+  min-height: var(--qxt-tap);
+  padding: 0 22px;
+  border-radius: 20px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  text-align: left;
+}
+
+[data-qx-page='resume'] [data-hub-notice] { min-height: 0; padding: 14px 20px; font-size: 22px; }
+[data-qx-page='resume'] [data-hub-notice] b { display: block; font-size: 24px; }
+[data-qx-page='resume'] [data-hub-notice] span span { display: block; font-weight: 500; }
+
+/* 其余简历服务（面板里的行） */
+[data-qx-page='resume-more'] {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+[data-qx-page='resume-more'] .qxt-hub-row { min-height: 104px; }
+
+[data-qx-page='resume-more'] .qxt-hub-row .qxt-chip {
+  height: 34px;
+  margin-left: 8px;
+  font-size: 20px;
+  vertical-align: 4px;
+}
+
+/* 收起键是面板里 data-qx-page 容器的后一个兄弟 */
+[data-qx-page='resume-more'] ~ .qxt-hub-close { width: 100%; }

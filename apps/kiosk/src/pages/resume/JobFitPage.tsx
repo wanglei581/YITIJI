@@ -34,8 +34,10 @@ import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
 import { isKioskCompactViewport, useKioskStageFit, usesKioskFluidViewport } from '../../hooks/useKioskStageFit'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
+import { ASKS, type ResumeAsk } from './touch/resumeAsks'
+import { unattendedReason } from './touch/unattendedReason'
+import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { readAiResumeSession } from './aiResumeSession'
 import { DecisionSummaryBar } from './jobFit/DecisionSummaryBar'
 import { FitSkillMap } from './jobFit/FitSkillMap'
@@ -43,9 +45,8 @@ import { AnonymousJobFitConsentCard } from './jobFit/AnonymousJobFitConsentCard'
 import { AnonymousJobFitConsentDialog } from './jobFit/AnonymousJobFitConsentDialog'
 import { MemberJobFitConsentCard } from './jobFit/MemberJobFitConsentCard'
 import { buildJobFitStateView, type JobFitExits, type JobFitStaticState } from './jobFit/JobFitQxStates'
-import { CtaNote, Guardline, KitRows, ManualTargetFields, NextSteps, PreflightChecklist, Sec } from './jobFit/jobFitQxKit'
+import { CtaNote, KitRows, ManualTargetFields, PreflightChecklist, Sec } from './jobFit/jobFitQxKit'
 import { JOB_FIT_NEXT_STEPS, type JobFitStepTarget } from './jobFit/jobFitResultSpec'
-import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { JobAiConsentModal } from '../jobs/components/JobAiConsentModal'
 import { grantJobAiConsent } from '../../services/api/jobAi'
 import './job-fit-qx.css'
@@ -97,6 +98,16 @@ interface PageState {
   accessToken?: string
 }
 
+/** 六个静态屏各自的底栏「问小青」（稿 jobfit 各状态）。 */
+const STATIC_ASKS: Record<JobFitStaticState, ResumeAsk> = {
+  'missing-task': ASKS.fitMissing,
+  'rejected-task': ASKS.fitMissing,
+  loading: ASKS.fitWait,
+  analyzing: ASKS.fitWait,
+  'ai-down': ASKS.fitDown,
+  failed: ASKS.fitFailed,
+}
+
 /**
  * 只判「有没有 taskId」不够：sessionStorage 里的 taskId 会比后端那行解析结果活得久。
  * 后端 AI_TASK_NOT_FOUND（不存在 / 已过期 / 不属于当前身份）必须挡在选岗表单之前，
@@ -125,13 +136,13 @@ export function JobFitPage() {
   const isAnonymous = !currentToken && Boolean(accessToken)
 
   const [tab, setTab] = useState<'pick' | 'manual'>('pick')
-  // 招聘内容托管（3.13）关闭时没有系统内岗位可选：只留手填这一条路，也不请求岗位列表。
+  // 招聘内容托管关闭时没有系统内岗位可选：只留手填，也不请求岗位列表。
   const hosting = useRecruitmentHosting()
   const mode = hosting.enabled ? tab : 'manual'
   const [keyword, setKeyword] = useState('')
   const [jobs, setJobs] = useState<ExternalJobDTO[]>([])
   const [jobsLoading, setJobsLoading] = useState(true)
-  /** 岗位列表**读取失败**；与「关键词没搜到」必须分开呈现。 */
+  /** 岗位列表读取失败；与「关键词没搜到」必须分开呈现。 */
   const [jobsError, setJobsError] = useState(false)
   const [selectedJob, setSelectedJob] = useState<ExternalJobDTO | null>(null)
   const [manualTitle, setManualTitle] = useState('')
@@ -178,8 +189,6 @@ export function JobFitPage() {
       })
       .catch(() => {
         if (cancelled) return
-        // 「没搜到岗位」和「岗位列表没取回来」对用户是两件事，
-        // 原实现一律渲染成空列表，等于把故障说成没有结果（章程门槛①）。
         setJobsError(true)
         setJobs([])
       })
@@ -258,14 +267,6 @@ export function JobFitPage() {
     retryAnalyze: () => { setAnalysisFail(null); void handleAnalyze() },
   }
 
-  const navbar = (
-    <QxAppNavbar
-      onHome={() => navigate('/')}
-      onAdvisor={() => navigate('/assistant')}
-      onProfile={() => navigate('/profile')}
-    />
-  )
-
   /**
    * 六个静态屏共用一层壳。写成函数而不是嵌套组件：嵌套组件每次渲染都是新的
    * 组件类型，React 会整棵卸载重建，输入焦点与滚动位置都会丢。
@@ -274,13 +275,15 @@ export function JobFitPage() {
     const view = buildJobFitStateView(screenState, exits, failMessage)
     return (
       <JobFitStage>
-        <QxPageFrame
+        <ResumeTouchFrame
+          eyebrow="改简历 · 简历对照"
           title={view.title}
           subtitle={view.subtitle}
           status={view.pill}
+          rail={view.rail}
           back={{ label: '返回简历服务', onBack: exits.resumeHub }}
           ctabar={view.cta}
-          navbar={navbar}
+          ask={{ ...STATIC_ASKS[screenState], testId: 'job-fit-ai-ask' }}
         >
           <main
             className="qx-scroll"
@@ -291,7 +294,7 @@ export function JobFitPage() {
           >
             {view.body}
           </main>
-        </QxPageFrame>
+        </ResumeTouchFrame>
       </JobFitStage>
     )
   }
@@ -328,7 +331,7 @@ export function JobFitPage() {
       const res = await analyzeJobFit(input, { token, accessToken })
       if (analysisRunRef.current !== run) return
       if (res.status === 'failed') {
-        setAnalysisFail({ kind: 'failed', message: res.failReason ?? '请求中断，没有可确认的结果。系统不展示对照要点或建议，也不保留半截结论。' })
+        setAnalysisFail({ kind: 'failed', message: unattendedReason(res.failReason, '请求中断，没有可确认的结果。系统不展示对照要点或建议，也不保留半截结论。') })
       } else {
         setResult(res)
       }
@@ -359,7 +362,7 @@ export function JobFitPage() {
           return
         }
       }
-      setAnalysisFail({ kind: isAiOutage(err) ? 'ai-down' : 'failed', message: userMessageOf(err, '分析失败，请稍后重试') })
+      setAnalysisFail({ kind: isAiOutage(err) ? 'ai-down' : 'failed', message: unattendedReason(userMessageOf(err, '分析失败，请稍后重试'), '分析失败，请稍后重试') })
     } finally {
       setAnalyzing(false)
     }
@@ -382,7 +385,7 @@ export function JobFitPage() {
       const res = await analyzeJobFit(input, { accessToken })
       if (analysisRunRef.current !== run) return
       if (res.status === 'failed') {
-        setAnalysisFail({ kind: 'failed', message: res.failReason ?? '请求中断，没有可确认的结果。' })
+        setAnalysisFail({ kind: 'failed', message: unattendedReason(res.failReason, '请求中断，没有可确认的结果。') })
       } else {
         setResult(res)
       }
@@ -398,7 +401,7 @@ export function JobFitPage() {
         setRejectedTask(true)
         return
       }
-      const message = userMessageOf(err, '授权失败，请稍后重试')
+      const message = unattendedReason(userMessageOf(err, '授权失败，请稍后重试'), '授权失败，请稍后重试')
       if (granted) setAnalysisFail({ kind: isAiOutage(err) ? 'ai-down' : 'failed', message })
       else setConsentError(message)
     } finally {
@@ -431,7 +434,7 @@ export function JobFitPage() {
       const res = await analyzeJobFit(input, { token, accessToken })
       if (analysisRunRef.current !== run) return
       if (res.status === 'failed') {
-        setAnalysisFail({ kind: 'failed', message: res.failReason ?? '请求中断，没有可确认的结果。' })
+        setAnalysisFail({ kind: 'failed', message: unattendedReason(res.failReason, '请求中断，没有可确认的结果。') })
       } else {
         setResult(res)
       }
@@ -447,7 +450,7 @@ export function JobFitPage() {
         setRejectedTask(true)
         return
       }
-      const message = userMessageOf(err, '授权失败，请稍后重试')
+      const message = unattendedReason(userMessageOf(err, '授权失败，请稍后重试'), '授权失败，请稍后重试')
       // 已授权后失败的是分析本身，属页面级错误；授权本身失败才留在弹窗里。
       if (granted) setAnalysisFail({ kind: isAiOutage(err) ? 'ai-down' : 'failed', message })
       else setConsentError(message)
@@ -486,7 +489,7 @@ export function JobFitPage() {
         setRejectedTask(true)
         return
       }
-      setError(userMessageOf(err, '撤回失败，请稍后重试'))
+      setError(unattendedReason(userMessageOf(err, '撤回失败，请稍后重试'), '撤回失败，请稍后重试'))
     } finally {
       setRevokingConsent(false)
     }
@@ -512,7 +515,7 @@ export function JobFitPage() {
         },
       })
     } catch (err) {
-      setError(userMessageOf(err, '打印版生成失败，请稍后重试'))
+      setError(unattendedReason(userMessageOf(err, '打印版生成失败，请稍后重试'), '打印版生成失败，请稍后重试'))
     } finally {
       setPrinting(false)
     }
@@ -531,7 +534,6 @@ export function JobFitPage() {
      */
     const gapActionCount =
       (result.gapPoints ?? []).length + (result.targetedSuggestions ?? []).length
-    // 系统内岗位的来源与「查看岗位」只在招聘内容托管打开时出现；关着时岗位页本来就进不去。
     const showSource = hosting.enabled && Boolean(result.job?.sourceName)
     const goStep = (target: JobFitStepTarget) => {
       if (target === 'actions') { navigate('/resume/job-fit/actions', { state: { taskId, accessToken } }); return }
@@ -540,12 +542,13 @@ export function JobFitPage() {
     }
     return (
       <JobFitStage>
-        <QxPageFrame
+        <ResumeTouchFrame
+          eyebrow="简历对照 · 结果"
           title="简历对照"
           subtitle="按你给的岗位要求，逐条列出简历里已经写到的和还没体现的；不分档、不打分，也不判断能否录用。"
           status={{ tone: 'ok', label: '对照结果已返回' }}
           back={{ label: '返回简历服务', onBack: exits.resumeHub }}
-          navbar={navbar}
+          ask={{ ...(printing ? ASKS.fitPrint : ASKS.fitResult), testId: 'job-fit-ai-ask' }}
           ctabar={
             <>
               <CtaNote>对照只说明简历里写到了什么，不代表企业的真实评价。</CtaNote>
@@ -577,17 +580,13 @@ export function JobFitPage() {
             data-testid="resume-job-fit-state-result"
           >
             <p className="jfq-sec-copy" data-testid="job-fit-resume-name">正在用：{resumeName}</p>
-            <Sec title="对照概要" hint="仅供本人准备使用">
-              <DecisionSummaryBar
-                jobTitle={result.job?.title ?? '目标岗位'}
-                company={result.job?.company}
-                summary={result.summary}
-              />
-              <Guardline
-                head="只对照，不打分"
-                body="不分档、不给分数或通过率，也不等于录用结论；结果只供本人准备，不提供给企业。"
-              />
-            </Sec>
+            <DecisionSummaryBar
+              jobTitle={result.job?.title ?? '目标岗位'}
+              company={result.job?.company}
+              summary={result.summary}
+              matched={(result.matchPoints ?? []).length}
+              missing={(result.gapPoints ?? []).length}
+            />
 
             <FitSkillMap
               matchPoints={result.matchPoints ?? []}
@@ -597,21 +596,24 @@ export function JobFitPage() {
 
             {/*
               「怎么办」已拆到 `/resume/job-fit/actions`（S2-2，矩阵 §3.5）：
-              本页专心做「差在哪」（已写到 / 还没体现两栏 + 关键词命中），
+              本页专心做「差在哪」（每条一行：已经写到 / 还没体现 + 关键词命中），
               行动页专心做「怎么补」（差距项 + 定向改写 + 打印/改简历/备材料）。
               原先两块同屏，27 寸竖屏上要一边读比对一边找按钮，两件事互相打断。
+              「去简历优化」是底栏主按钮，这里只放另外两个去处。
             */}
             {gapActionCount > 0 && (
-              <Sec title="下一步建议" hint="都是本机既有流程">
+              <>
                 <p className="jfq-sec-copy">
-                  这次一共列出 {gapActionCount} 条可以着手补的地方。补什么、怎么补、本机能不能补，单独放在一屏里。
+                  这次一共列出 {gapActionCount} 条可以着手补的地方；补什么、怎么补，单独放在行动清单一屏里。
                 </p>
-                <NextSteps items={JOB_FIT_NEXT_STEPS.map((step) => ({
-                  title: step.title,
-                  desc: step.desc,
-                  onClick: () => goStep(step.target),
-                }))} />
-              </Sec>
+                <div className="qxt-exits">
+                  {JOB_FIT_NEXT_STEPS.filter((step) => step.target !== 'optimize').map((step) => (
+                    <button key={step.target} type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={() => goStep(step.target)}>
+                      {step.title}
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
 
             {showSource && (
@@ -629,10 +631,10 @@ export function JobFitPage() {
             {isAnonymous && anonymousConsentActive && (
               <AnonymousJobFitConsentCard busy={revokingConsent} onRevoke={() => void handleRevokeConsent()} />
             )}
-            {notice && <p className="jfq-notice" aria-live="polite">{notice}</p>}
+            {notice && <p className="jfq-notice" role="status" aria-live="polite">{notice}</p>}
             {error && !showSource && <p className="jfq-alert" role="alert">{error}</p>}
           </main>
-        </QxPageFrame>
+        </ResumeTouchFrame>
       </JobFitStage>
     )
   }
@@ -644,12 +646,13 @@ export function JobFitPage() {
   const target = mode === 'pick' ? pickedJob?.title : manualTitle.trim()
   return (
     <JobFitStage>
-      <QxPageFrame
+      <ResumeTouchFrame
+        eyebrow="改简历 · 简历对照"
         title="简历对照"
         subtitle="对照结果只给本人看，不分档、不打分。请核对简历和岗位要求后再开始。"
         status={{ tone: 'unknown', label: '对照前请选好简历并确认授权' }}
         back={{ label: '返回简历服务', onBack: exits.resumeHub }}
-        navbar={navbar}
+        ask={{ ...ASKS.fitForm, testId: 'job-fit-ai-ask' }}
         ctabar={
           <>
             <CtaNote>对照结果不代表录用判断，也不会提供给企业；本平台不提供投递功能。</CtaNote>
@@ -781,7 +784,7 @@ export function JobFitPage() {
               manualOnly={!hosting.enabled}
             />
             {error && <p className="jfq-alert" role="alert">{error}</p>}
-            {notice && <p className="jfq-notice" aria-live="polite">{notice}</p>}
+            {notice && <p className="jfq-notice" role="status" aria-live="polite">{notice}</p>}
             {memberConsentRequired && (
               <MemberJobFitConsentCard
                 busy={memberConsentBusy}
@@ -801,7 +804,7 @@ export function JobFitPage() {
             ]} />
           </Sec>
         </main>
-      </QxPageFrame>
+      </ResumeTouchFrame>
     </JobFitStage>
   )
 }

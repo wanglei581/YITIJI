@@ -224,6 +224,145 @@ function isQxMigratedPath(pathname: string): boolean {
   return QX_MIGRATED_EXACT_PATTERNS.some((pattern) => pattern.test(pathname))
 }
 
+/**
+ * 触屏版路由，三张表：精确路径、前缀、带参屏的正则。只登记已按触屏稿改好的屏。
+ * 各页面包只在自己那行注释下面加，不动别包那一段：段与段之间隔着注释行，合并时互不冲突。
+ * 改好的屏不从 QX_MIGRATED_ROUTES 拿掉（避免旧壳漏出）。
+ */
+const QX_TOUCH_ROUTES = new Set<string>([
+  // 第一包 开发样板
+  '/dev/touch-gallery',
+  // 第二包 首页
+  '/', // 首页仍留在 QX_MIGRATED_ROUTES，避免旧壳漏出
+  // 第三包 打印
+  '/print-scan',
+  '/print/upload',
+  '/print/desk',
+  '/print/material-check',
+  '/print/preview',
+  '/print/confirm',
+  '/print/cashier',
+  '/print/progress',
+  '/print/done',
+  '/print/pickup-claim',
+  // 第四包 简历三条主路
+  '/resume-service',
+  '/resume/source',
+  '/resume/parse',
+  '/resume/report',
+  '/resume/optimize',
+  '/resume/optimize/compare',
+  // 第五包 公共与系统
+  '/assistant',
+  '/help',
+  '/official-channels',
+  '/login',
+  '/screensaver',
+  '/session-timeout',
+  '/session-resume',
+  '/error-offline',
+  // 第六包 我的与权益
+  '/profile',
+  '/me/notifications',
+  '/notifications',
+  '/me/resumes',
+  '/me/print-orders',
+  '/me/documents',
+  '/me/ai-records',
+  '/me/activity',
+  '/me/favorites',
+  '/me/benefits',
+  '/activities',
+  '/me/feedback',
+  '/me/settings',
+  '/me/privacy-requests',
+  // 第七包 简历其余页
+  '/resume/generate',
+  '/resume/generate/preview',
+  '/resume/templates',
+  '/resume/materials',
+  // 第八包 练面试
+  '/interview',
+  '/interview-service',
+  // 第九包 扫描复印
+  '/scan', // 扫描四阶段（选类型、指引、等回传、结果）
+  '/scan/start', // 兼容跳转
+  '/scan/settings', // 兼容跳转
+  '/scan/progress', // 兼容跳转
+  '/scan/result', // 兼容跳转
+  '/print-scan/convert', // 照片合成 PDF
+  '/print-scan/sign', // 签名（默认关闭）
+  '/print-scan/feature/copy', // 复印
+  '/print-scan/feature/id-photo', // 证件照说明
+  // 第十包 政策与受控扩展
+  '/policy-service',
+  '/renshi',
+  '/toolbox',
+  '/smart-campus',
+  '/smart-campus/welcome',
+  '/contract-review', // 合同审查三条在 KioskRoot 之外，登记在这里只为以后套进本壳时不再露出旧顶栏
+  '/contract-review/processing',
+  '/contract-review/result',
+  // 第十一包 私有化版招聘
+  '/jobs-service',
+  '/fairs-service',
+  '/offline-agencies',
+  '/companies',
+  '/jobs',
+  '/job-fairs',
+  '/job-fairs/checkin',
+  '/campus',
+  '/campus/welcome',
+  '/campus/freshman-insights',
+])
+
+const QX_TOUCH_PREFIXES: readonly string[] = [
+  // 第二包 首页
+  // 第三包 打印
+  // 第四包 简历三条主路
+  // 第五包 公共与系统
+  // 第六包 我的与权益
+  // 第七包 简历其余页
+  // 第八包 练面试
+  // 第九包 扫描复印
+  '/print-scan/feature/', // 复印、证件照和不认识的能力名是同一页的 :key，精确名单盖不住未知名字
+  // 第十包 政策与受控扩展
+  '/smart-campus/service/', // 只放窄前缀，不写 /smart-campus（welcome 已在精确集合）
+  // 第十一包 私有化版招聘
+  '/offline-agencies/',
+  '/companies/',
+]
+
+const QX_TOUCH_PATTERNS: readonly RegExp[] = [
+  // 第二包 首页
+  // 第三包 打印
+  // 第四包 简历三条主路
+  // 第五包 公共与系统
+  // 第六包 我的与权益
+  /^\/activities\/[^/]+$/,
+  /^\/me\/activity\/[^/]+$/,
+  // 第七包 简历其余页
+  // 第八包 练面试
+  // 第九包 扫描复印
+  // 第十包 政策与受控扩展
+  // 第十一包 私有化版招聘
+  /^\/jobs\/[^/]+$/,
+  /^\/jobs\/[^/]+\/offline$/,
+  /^\/job-fairs\/[^/]+$/,
+  /^\/job-fairs\/[^/]+\/companies$/,
+  /^\/job-fairs\/[^/]+\/companies\/[^/]+$/,
+  /^\/job-fairs\/[^/]+\/map$/,
+  /^\/job-fairs\/[^/]+\/materials$/,
+  /^\/job-fairs\/[^/]+\/visit-plan$/,
+  /^\/job-fairs\/[^/]+\/stats$/,
+]
+
+function isTouchRoute(pathname: string): boolean {
+  if (QX_TOUCH_ROUTES.has(pathname)) return true
+  if (QX_TOUCH_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true
+  return QX_TOUCH_PATTERNS.some((pattern) => pattern.test(pathname))
+}
+
 function v6ShellSubtitle(entry: V6ShellRoute, terminalCode: string): string {
   // 域名已经在顶栏主标题上时，副标题回落到品牌名，避免「职易达 / 职易达 · 机号」自我重复。
   const base = entry.domainTitle === null ? 'AI 求职操作系统' : '职易达'
@@ -287,6 +426,7 @@ function KioskShell() {
   // 由页面自带顶栏 + 返回箭头承载导航。
   // 青序流光已迁移路由退出旧壳：判定见模块级 isQxMigratedPath（精确集合 + 带参前缀）。
   const isQxRoute = isQxMigratedPath(pathname)
+  const touchRoute = isTouchRoute(pathname)
 
   const isCampusZone = pathname === '/campus'
   const v6Shell = V6_SHELL_ROUTES.get(pathname) ?? null
@@ -307,8 +447,8 @@ function KioskShell() {
       density="touch"
       presentation="fusion-youth"
       viewport={isCompactViewport ? 'mobile' : 'kiosk'}
-      hideHeader={isCampusZone || isQxRoute}
-      hideBottomNav={isCampusZone || isQxRoute || usesPageActionbar}
+      hideHeader={isCampusZone || isQxRoute || touchRoute}
+      hideBottomNav={isCampusZone || isQxRoute || usesPageActionbar || touchRoute}
       brandMark={isV6Route ? '职' : undefined}
       brandTitle={v6DomainTitle ?? (isV6Route ? '职易达' : `就业服务大厅 · ${terminalCode}`)}
       brandSubtitle={

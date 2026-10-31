@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../../auth/useAuth'
 import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { SessionGuardView } from '../session-guard/SessionGuardView'
+import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
 import {
   deriveSessionGuardState,
   remainingSeconds,
@@ -11,6 +11,7 @@ import {
   sessionGuardSourceName,
 } from '../session-guard/sessionGuardModel'
 import '../session-guard/styles/session-guard-qx.css'
+import './cleared-touch.css'
 
 export default function SessionTimeoutPage() {
   const { warning, continueSession, hardClear, clearToScreensaver } = useKioskSessionControl()
@@ -80,35 +81,38 @@ export default function SessionTimeoutPage() {
       data-kiosk-viewport="kiosk"
     >
       <KioskStageFit>
-        <QxPageFrame
-          title="使用时限"
-          subtitle="这台机器闲置后会清掉这次使用。倒计时由本机时钟执行。"
-          status={pill}
-          ctabar={
-            <>
-              <button
-                type="button"
-                className="qx-btn"
-                data-variant="danger"
-                data-testid="session-guard-clear"
-                onClick={hardClear}
-              >
-                结束并清除这台机器上的这次使用记录
-              </button>
+        <PublicTouchFrame
+          page="cleared"
+          title="还在用吗？"
+          sub={`${seconds} 秒后自动结束这次使用`}
+          eyebrow="使用时限"
+          status={{ label: pill.label, tone: pill.tone === 'bad' ? 'warn' : pill.tone }}
+          back={false}
+          nav={false}
+          dock={(
+            <footer className="qxt-dock">
               {canContinue ? (
                 <button
                   type="button"
-                  className="qx-btn"
-                  data-variant="primary"
+                  className="qxt-btn qxt-btn-sec qxt-fill"
                   data-testid="session-guard-primary"
                   onClick={continueSession}
                   aria-label={sourceKnown ? `我还在，继续使用，回到${sessionGuardSourceName(sourcePath)}` : '我还在，继续使用；来源页不可用，只能回首页重新进入'}
                 >
-                  {sourceKnown ? '我还在，继续使用' : '我还在，继续使用（回首页）'}
+                  我还在，继续使用
                 </button>
               ) : null}
-            </>
-          }
+              <button
+                type="button"
+                className="qxt-btn qxt-btn-pri qxt-fill"
+                data-testid="session-guard-clear"
+                onClick={hardClear}
+                aria-label="结束并清除这台机器上的这次使用记录"
+              >
+                现在结束使用
+              </button>
+            </footer>
+          )}
         >
           <SessionGuardView
             state={state}
@@ -119,7 +123,7 @@ export default function SessionTimeoutPage() {
             isAnonymous={isAnonymous}
             accountLabel={accountLabel}
           />
-        </QxPageFrame>
+        </PublicTouchFrame>
       </KioskStageFit>
     </div>
   )

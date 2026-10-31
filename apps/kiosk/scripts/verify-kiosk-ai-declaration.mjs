@@ -238,7 +238,8 @@ const NOTE_FILES = [
   'src/pages/job-fairs/FairVisitPlanPage.tsx',
   'src/pages/jobs/components/JobsQxChrome.tsx',
   'src/pages/jobs/components/JobDetailSections.tsx',
-  'src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx',
+  // 2026-10-28 触屏版：优化页的「AI 精简 / AI 调整排版」按钮与它下面的使用声明说明在编辑视图里（原 OptimizeReadyBody 已由它取代并删除）。
+  'src/pages/resume/touch/OptimizeEditView.tsx',
 ]
 
 const RETHROW_FILES = [
@@ -249,6 +250,25 @@ const RETHROW_FILES = [
   'src/services/api/jobFit.ts',
   'src/services/api/fairVisitPlan.ts',
 ]
+
+/**
+ * 文件里有没有真的把 <AiDeclarationNote /> 画出来（JSX 用法），而不是只留着 import 或一句注释。
+ * 此前判据是「文件里出现 AiDeclarationNote 这个标识符」：把 JSX 整个删掉、只留 import，门禁照样绿。
+ */
+function rendersAiDeclarationNote(file) {
+  const source = ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let found = false
+  const visit = (node) => {
+    if (found) return
+    if ((ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && node.tagName.getText(source) === 'AiDeclarationNote') {
+      found = true
+      return
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  return found
+}
 
 function sourceChecks() {
   const main = read('src/main.tsx')
@@ -297,7 +317,7 @@ function sourceChecks() {
     fail('确认弹层必须用现有弹层，拒绝先说明再结束')
   }
   for (const file of NOTE_FILES) {
-    if (!read(file).includes('AiDeclarationNote')) fail(`${file} 缺少主按钮下的声明说明`)
+    if (!rendersAiDeclarationNote(file)) fail(`${file} 缺少主按钮下的声明说明（要有 <AiDeclarationNote /> 的 JSX 用法，只留 import 不算）`)
   }
   const note = read('src/ai/AiDeclarationNote.tsx')
   if (!note.includes('AI_DECLARATION_NOTE') || !note.includes('qx-ai-declaration-note')) {
@@ -773,10 +793,14 @@ async function loadClearance() {
   const interviewCode = `${transpile('src/pages/interview/interviewWorkbenchSession.ts')}${tag}`
     .replaceAll("from './interviewWorkbenchModel'", `from '${interviewModelUrl}'`)
   const assistantDraftCode = transpile('src/services/assistantDraft.ts').replaceAll("from 'react'", `from '${import.meta.resolve('react')}'`)
+  const draftHooksUrl = toDataUrl(`export const effects = []; export function useEffect(effect) { effects.push(effect) }; export function useState(initial) { return [typeof initial === 'function' ? initial() : initial, () => {}] }${tag}`)
+  const resumeDraftCode = `${transpile('src/pages/resume/resumeGenerateDraft.ts')}${tag}`.replaceAll("from 'react'", `from '${draftHooksUrl}'`)
+  const resumeDraftUrl = toDataUrl(resumeDraftCode)
   const versionsUrl = toDataUrl(`${transpile('src/ai/aiDeclarationVersions.ts')}${tag}`)
   const sessionCode = `${transpile('src/ai/aiDeclarationSession.ts')}${tag}`.replaceAll("from './aiDeclarationVersions'", `from '${versionsUrl}'`)
   const sessionUrl = toDataUrl(sessionCode)
   const sensitiveCode = `${transpile('src/auth/kioskSensitiveSession.ts')}${tag}`
+    .replaceAll("from '../pages/resume/resumeGenerateDraft'", `from '${resumeDraftUrl}'`)
     .replaceAll("from '../ai/aiDeclarationSession'", `from '${sessionUrl}'`)
     .replaceAll("from '../ai/aiDeclarationVersions'", `from '${versionsUrl}'`)
     .replaceAll("from '../pages/print/printMaterialSession'", `from '${leaf('src/pages/print/printMaterialSession.ts')}'`)
@@ -792,10 +816,24 @@ async function loadClearance() {
     .replaceAll("from '../pages/contract-review/contractReviewSession'", `from '${leaf('src/pages/contract-review/contractReviewSession.ts')}'`)
   const sensitive = await import(toDataUrl(sensitiveCode))
   const declaration = await import(sessionUrl)
-  return { sensitive, declaration, session }
+  return { sensitive, declaration, session, resumeDraft: await import(resumeDraftUrl), draftHooks: await import(draftHooksUrl) }
 }
 
 async function clearanceChecks() {
+  await check('简历生成草稿参与残留判断，统一清场清除且旧 effect 不能写回', async () => {
+    const { sensitive, resumeDraft, draftHooks } = await loadClearance()
+    assert.equal(sensitive.hasKioskSensitiveSession(), false)
+    const filled = { name: '合成清场用户', phone: '', email: '', city: '' }
+    resumeDraft.useResumeGenerateDraftField('basic', filled)
+    draftHooks.effects.forEach((effect) => effect())
+    assert.equal(sensitive.hasKioskSensitiveSession(), true)
+    assert.deepEqual(resumeDraft.useResumeGenerateDraftField('basic', {})[0], filled)
+    sensitive.clearKioskSensitiveSession()
+    assert.equal(sensitive.hasKioskSensitiveSession(), false)
+    draftHooks.effects.forEach((effect) => effect())
+    assert.equal(sensitive.hasKioskSensitiveSession(), false)
+    assert.deepEqual(resumeDraft.useResumeGenerateDraftField('basic', {})[0], {})
+  })
   await check('clearKioskSensitiveSession 让这一次的声明失效，开着的确认也作废', async () => {
     const { sensitive, declaration, session } = await loadClearance()
     declaration.markScopeDeclared('age_14_plus')

@@ -1,0 +1,202 @@
+/* 改动清单（稿 optimize）与优化页的状态说明。样式移植自稿 d4-stats / d4-batch / d4-rows / d4-seg / d4-exits。 */
+
+[data-qx-page='optimize'] {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  text-align: left;
+}
+
+[data-qx-page='optimize'] .qxt-overview { flex: 1 0 auto; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+/* 四格统计 */
+[data-qx-page='optimize'] .qxt-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+
+[data-qx-page='optimize'] .qxt-stats span {
+  min-height: 112px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 18px;
+  background: var(--qxt-well);
+}
+
+[data-qx-page='optimize'] .qxt-stats u { font-size: 20px; text-decoration: none; color: var(--qxt-ink-3); }
+[data-qx-page='optimize'] .qxt-stats b { font-size: 40px; font-variant-numeric: tabular-nums; }
+[data-qx-page='optimize'] .qxt-stats i { font-style: italic; }
+[data-qx-page='optimize'] .qxt-stats small { font-size: 20px; font-weight: 500; color: var(--qxt-ink-3); }
+
+/* 批量 */
+[data-qx-page='optimize'] .qxt-batch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+
+[data-qx-page='optimize'] .qxt-batch button {
+  min-height: 112px;
+  padding: 8px 10px;
+  border-radius: 20px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  text-align: left;
+}
+
+[data-qx-page='optimize'] .qxt-batch button:disabled { opacity: 0.55; }
+[data-qx-page='optimize'] .qxt-batch b { display: block; font-size: 22px; }
+[data-qx-page='optimize'] .qxt-batch small { display: block; font-size: 20px; line-height: 1.3; color: var(--qxt-ink-3); font-weight: 500; }
+
+/* 一句提示 */
+[data-qx-page='optimize'] .qxt-draft {
+  margin: 0;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 18px;
+  background: var(--qxt-well);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+/* 每一条 */
+[data-qx-page='optimize'] .qxt-rows { flex: 1 0 auto; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+[data-qx-page='optimize'] .qxt-row {
+  flex: 1 0 auto;
+  min-height: 140px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(240px, 0.9fr) 104px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page='optimize'] .qxt-rowtx { min-width: 0; text-align: left; }
+[data-qx-page='optimize'] .qxt-rowtx b { display: block; font-size: 24px; }
+[data-qx-page='optimize'] .qxt-rowtx small { display: block; font-size: 24px; line-height: 1.35; color: var(--qxt-ink-2); }
+[data-qx-page='optimize'] .qxt-rowtx span { display: block; margin-top: 2px; font-size: 20px; line-height: 1.3; color: var(--qxt-ink-3); }
+[data-qx-page='optimize'] .qxt-rowtx span.warn { color: var(--qxt-clay-ink); }
+
+[data-qx-page='optimize'] .qxt-segsel { display: flex; gap: 8px; }
+
+[data-qx-page='optimize'] .qxt-segsel button {
+  flex: 1;
+  min-height: 64px;
+  min-width: 64px;
+  padding: 0 10px;
+  border-radius: 18px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+[data-qx-page='optimize'] .qxt-segsel button[aria-pressed='true'] { background: var(--qx-deep); color: var(--qxt-cream); border-color: var(--qx-deep); }
+[data-qx-page='optimize'] .qxt-segsel button:disabled { opacity: 0.42; }
+
+[data-qx-page='optimize'] .qxt-open {
+  min-height: 64px;
+  min-width: 96px;
+  border-radius: 18px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+[data-qx-page='optimize'] .qxt-hand {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border-radius: 18px;
+  background: var(--qxt-well);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='optimize'] .qxt-rowstatus { grid-column: 1 / -1; margin: 0; padding: 8px 12px; border-radius: 14px; background: var(--qxt-clay-wash); color: var(--qxt-clay-ink); font-size: 20px; line-height: 1.4; }
+
+/* 编辑简历 / 自己动手改 / 回诊断报告 */
+[data-qx-page='optimize'] .qxt-ovx { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+
+[data-qx-page='optimize'] .qxt-ovx button {
+  min-height: 88px;
+  padding: 0 12px;
+  border-radius: 24px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  font-size: 26px;
+  font-weight: 700;
+}
+
+[data-qx-page='optimize'] .qxt-ovx button:first-child { background: var(--qxt-teal-wash); color: var(--qxt-teal-ink); border-color: transparent; }
+
+[data-qx-page='optimize'] .qxt-fine { margin: 0; font-size: 20px; line-height: 1.5; color: var(--qxt-ink-3); text-align: center; }
+
+/* 页面上方的提示：AI 标识、游客草稿、草稿保存状态 */
+:is([data-qx-page='optimize'], [data-qx-page='resume-edit'], [data-qx-page='resume-export']) .qxt-note {
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 18px;
+  background: var(--qxt-well);
+  font-size: 20px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+}
+
+:is([data-qx-page='optimize'], [data-qx-page='resume-edit'], [data-qx-page='resume-export']) .qxt-note b { margin-right: 8px; color: var(--qxt-teal-ink); }
+:is([data-qx-page='optimize'], [data-qx-page='resume-edit'], [data-qx-page='resume-export']) .qxt-note[data-tone='bad'] { background: var(--qxt-cin-wash); color: var(--qx-cinnabar); }
+:is([data-qx-page='optimize'], [data-qx-page='resume-edit'], [data-qx-page='resume-export']) .qxt-note-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+
+:is([data-qx-page='optimize'], [data-qx-page='resume-edit'], [data-qx-page='resume-export']) .qxt-btn-line {
+  min-height: 64px;
+  min-width: 64px;
+  padding: 0 18px;
+  border-radius: 20px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+:is([data-qx-page='optimize'], [data-qx-page='resume-edit'], [data-qx-page='resume-export']) .qxt-btn-line[data-kind='pri'] { background: var(--qx-deep); color: var(--qxt-cream); border-color: var(--qx-deep); }
+:is([data-qx-page='optimize'], [data-qx-page='resume-edit'], [data-qx-page='resume-export']) .qxt-btn-line:disabled { opacity: 0.42; }
+
+/* 读取中 / 没有建议 / 失败 / AI 暂时用不了 */
+[data-qx-page='optimize'] .qxt-state { display: flex; align-items: flex-start; gap: 18px; padding: 22px 26px; border-radius: 26px; background: var(--qxt-well); }
+[data-qx-page='optimize'] .qxt-state b { display: block; font-size: 28px; }
+[data-qx-page='optimize'] .qxt-state p { margin: 6px 0 0; font-size: 22px; line-height: 1.45; color: var(--qxt-ink-2); }
+[data-qx-page='optimize'] .qxt-state .qxt-note-actions { margin-top: 14px; }
+[data-qx-page='optimize'] .qxt-state-spin { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 4px solid var(--qxt-teal-wash); border-top-color: var(--qx-teal); animation: qxt-optimize-spin 1s linear infinite; }
+@keyframes qxt-optimize-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { [data-qx-page='optimize'] .qxt-state-spin { animation: none; } }
+
+/* 出路与自己改的 8 步 */
+[data-qx-page='optimize'] .qxt-fallback { flex: 1 0 auto; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+[data-qx-page='optimize'] .qxt-sec { font-size: 26px; }
+[data-qx-page='optimize'] .qxt-exit-col { gap: 8px; }
+[data-qx-page='optimize'] .qxt-exit-col .qxt-slab { min-height: 88px; }
+[data-qx-page='optimize'] .qxt-olist { flex: 1 0 auto; padding: 12px 14px; gap: 4px; }
+[data-qx-page='optimize'] .qxt-olist-t { font-size: 24px; }
+[data-qx-page='optimize'] .qxt-steps { flex: 1 0 auto; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 2px; }
+[data-qx-page='optimize'] .qxt-check { min-height: 44px; align-items: center; padding: 0; font-size: 24px; }
+
+/* 发现上次的草稿：先选怎么继续，选之前不打开编辑区 */
+[data-qx-page='optimize'] .qxt-choice { display: flex; flex-direction: column; gap: 18px; padding: 26px 30px; border-radius: 28px; background: var(--qxt-well); }
+[data-qx-page='optimize'] .qxt-choice p { margin: 0; font-size: 26px; line-height: 1.5; font-weight: 600; }
+[data-qx-page='optimize'] .qxt-choice-acts { display: flex; flex-direction: column; gap: 12px; }
+[data-qx-page='optimize'] .qxt-choice-acts .qxt-btn { width: 100%; }
+
+@media (max-width: 640px) {
+  [data-kiosk-stage-fit='off'] [data-qx-page='optimize'] .qxt-stats { grid-template-columns: repeat(2, 1fr); }
+  [data-kiosk-stage-fit='off'] [data-qx-page='optimize'] .qxt-batch,
+  [data-kiosk-stage-fit='off'] [data-qx-page='optimize'] .qxt-ovx { grid-template-columns: 1fr; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='optimize'] .qxt-row { grid-template-columns: 1fr; }
+}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ResumeReportExportKind, ResumeReportExportResponse } from '@ai-job-print/shared'
 import { FilePreviewDialog } from '../../../../components/FilePreviewDialog'
 import { useCountdown } from '../../../../hooks/useCountdown'
@@ -88,6 +88,8 @@ export function ResumeReportTakeaway(props: {
   taskId?: string
   accessToken?: string
   capture?: ExportCaptureState | null
+  /** 可选。导出成功 / 清掉时通知页面（页面顶栏胶囊据此写「导出已生成」）。 */
+  onExportedChange?: (exported: boolean) => void
 }) {
   const startPrint = useStartPrintHandoff()
   const { getToken } = useAuth()
@@ -123,6 +125,10 @@ export function ResumeReportTakeaway(props: {
   const [exportError, setExportError] = useState<string | null>(
     capture === 'export-failed' ? FIXTURE_EXPORT_ERROR : null,
   )
+
+  const { onExportedChange } = props
+  const hasExport = Boolean(exported)
+  useEffect(() => { onExportedChange?.(hasExport) }, [onExportedChange, hasExport])
 
   if (!props.show) return null
 

@@ -1,10 +1,11 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BuildingIcon, ClockIcon, FileTextIcon, MapPinIcon, SearchIcon } from 'lucide-react'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
+import { RtFill } from '../recruitment-touch/RtFill'
+import { RtAskCard } from '../recruitment-touch/RtAskCard'
+import { OFFLINE_AGENCY_ASK } from '../recruitment-touch/askCopy'
 import {
-  DirAiAssist,
   DirNote,
   DirSec,
   DirState,
@@ -168,9 +169,18 @@ export function OfflineAgenciesPage() {
   const exception = uiState === 'list-loading' || uiState === 'list-empty' || uiState === 'list-error'
 
   return (
-    <QxPageFrame
-      back={{ label: '返回岗位服务', onBack: () => navigate('/jobs-service') }}
-      title="线下招聘机构"
+    <RecruitTouchFrame
+      eyebrow="线下招聘机构"
+      back={{ label: '返回社会招聘', onBack: () => navigate('/jobs-service') }}
+      ask={{ label: '问小青：到店要带什么？', draft: '到店要带什么？', voice: true }}
+      title="想去哪家门店问？"
+      primary={{
+        label: '查询机构目录',
+        onClick: () => {
+          const form = document.getElementById('offline-agency-search')
+          if (form instanceof HTMLFormElement) form.requestSubmit()
+        },
+      }}
       subtitle={
         uiState === 'list-loading' ? '正在读取名单，取到之前不显示机构名称或数量。'
           : uiState === 'list-empty' ? '这些条件没有匹配的门店，换个条件再试。'
@@ -179,13 +189,6 @@ export function OfflineAgenciesPage() {
       }
       status={pill}
       terminalLabel={getTerminalCode() || '设备未绑定'}
-      ctabar={
-        <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs-service')}>返回岗位服务</button>
-          <button type="submit" form="offline-agency-search" className="qx-btn" data-variant="primary">查询机构目录</button>
-        </>
-      }
-      navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
     >
       <div className="dw-page qx-grow" data-screen="offline-agency" data-state={uiState} data-testid={`offline-agency-state-${uiState}`}>
         <DirSec no="01" title="先缩小范围" hint="四项都会真正用来筛选，可单选也可组合">
@@ -244,21 +247,21 @@ export function OfflineAgenciesPage() {
             ) : error ? (
               <>
                 <DirState tone="error" testId="offline-agency-result-error" title="机构名单没取到">
-                  这次请求失败了。本机不会用示例机构顶替真实结果，所以目录先空着。可以重试；重试仍失败时，请找现场工作人员。
+                  这次请求失败了。本机不会用示例机构顶替真实结果，所以目录先空着。可以重试；重试仍失败时，请到帮助中心查看服务电话。
                 </DirState>
                 <div className="dw-filter-actions">
                   <button type="button" className="dw-chip" onClick={() => setRetryKey((k) => k + 1)}>重试</button>
-                  <button type="button" className="dw-chip" onClick={() => navigate('/help')}>联系工作人员</button>
+                  <button type="button" className="dw-chip" onClick={() => navigate('/help')}>去帮助中心</button>
                 </div>
               </>
             ) : !data ? null : data.items.length === 0 ? (
               <>
                 <DirState tone="empty" testId="offline-agency-result-empty" title="当前条件没有匹配的机构">
-                  换个关键词或检索方式再试一次。机构信息需要管理员审核发布后才会出现在目录里。也可以找现场工作人员，按纸质名单帮你找。
+                  换个关键词或检索方式再试一次。机构信息需要管理员审核发布后才会出现在目录里。纸质名单以机构现场公示为准。
                 </DirState>
                 <div className="dw-filter-actions">
                   <button type="button" className="dw-chip" onClick={clearSearch}>清除条件重新查询</button>
-                  <button type="button" className="dw-chip" onClick={() => navigate('/help')}>联系工作人员</button>
+                  <button type="button" className="dw-chip" onClick={() => navigate('/help')}>去帮助中心</button>
                 </div>
               </>
             ) : (
@@ -293,11 +296,12 @@ export function OfflineAgenciesPage() {
             <DirStripItem icon={FileTextIcon} tone="wheat" title="简历先过一遍" desc="上传或扫描后做一次诊断" onClick={() => navigate('/resume/source')} />
           </DirStrip>
           {exception ? <DirNote>{BOUNDARY}</DirNote> : (
-            <DirAiAssist screen="offline-agency" onProfile={() => navigate('/profile')} onAssistant={() => navigate('/assistant')} />
+            <RtAskCard {...OFFLINE_AGENCY_ASK} />
           )}
         </DirSec>
+        {uiState === 'list-empty' || uiState === 'list-error' ? <RtFill preset="directory" /> : null}
       </div>
-    </QxPageFrame>
+    </RecruitTouchFrame>
   )
 }
 

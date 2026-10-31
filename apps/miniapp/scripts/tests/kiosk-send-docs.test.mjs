@@ -76,7 +76,7 @@ test('已登录：列「我的文档」，过期的不列，超过 10MB 的列�
   assert.match(wxml, /超过 10MB，这一单收不了/)
   assert.match(wxml, /只列了最近 50 份/)
   assert.match(wxml, /我的文档里还没有能传的文件/)
-  assert.match(wxml, /bindtap="chooseAndSend">从微信聊天选文件</)
+  assert.ok(wxml.includes("{{purpose === 'signature_image' ? '从微信聊天选签名图片' : '从微信聊天选文件'}}"))
   assert.match(wxml, /bindtap="goLogin">登录后从我的文档选</)
 })
 
@@ -505,4 +505,53 @@ test('我的文档：本人数据导出包、合同审查报告递不进一体�
   empty.openDirect()
   await flush()
   assert.equal(empty.page.data.docState, 'empty')
+})
+
+
+test('退出后我的文档确认弹窗不再发送，已发送的晚回执不落屏', async () => {
+  const pending = deferred()
+  const env = harness(() => Promise.resolve(receipt()), {
+    loggedIn: true, docs: () => Promise.resolve(DOCS), member: () => pending.promise,
+  })
+  env.openDirect()
+  await flush()
+  env.page.pickDoc(tap(DOCS[0].id))
+  assert.equal(env.memberCalls.length, 1)
+  env.page.onUnload()
+  const snapshot = JSON.stringify(env.page.data)
+  const hides = env.wx.calls.hide
+  pending.resolve(receipt())
+  await flush()
+  assert.equal(JSON.stringify(env.page.data), snapshot)
+  assert.equal(env.wx.calls.hide, hides)
+
+  const second = harness(() => Promise.resolve(receipt()), {
+    loggedIn: true, docs: () => Promise.resolve(DOCS),
+  })
+  second.openDirect()
+  await flush()
+  let modal
+  second.wx.showModal = (opts) => { modal = opts }
+  second.page.pickDoc(tap(DOCS[0].id))
+  second.page.onUnload()
+  modal.success({ confirm: true })
+  await flush()
+  assert.equal(second.memberCalls.length, 0)
+})
+
+test('签名会话不列我的文档、不发送既有文档且不承诺归档', async () => {
+  const env = harness(() => Promise.resolve(receipt({ purpose: 'signature_image' })), { loggedIn: true })
+  env.setScene(() => Promise.resolve({ sessionId: SESSION, uploadToken: TOKEN, purpose: 'signature_image' }))
+  env.page.onLoad({ scene: 'signature-scene' })
+  await flush()
+  assert.equal(env.docCalls.length, 0)
+  env.page.data.docs = [{ id: 'file-existing', name: '旧文档.pdf' }]
+  env.page.data.docState = 'list'
+  env.page.pickDoc(tap('file-existing'))
+  env.page._sendMemberFile({ id: 'file-existing', name: '旧文档.pdf' })
+  await flush()
+  assert.equal(env.memberCalls.length, 0)
+  const markup = fs.readFileSync(path.join(MINIAPP, 'pages/kiosk-send/kiosk-send.wxml'), 'utf8')
+  assert.match(markup, /wx:if="{{purpose !== 'signature_image'}}" class="state-card doc-card"/)
+  assert.match(markup, /不会存入.*我的文档/)
 })

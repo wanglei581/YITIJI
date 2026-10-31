@@ -1,22 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { canCreateFormalPrintScanTask } from '@ai-job-print/shared'
-import { HeadphonesIcon, RefreshCwIcon, UploadIcon } from 'lucide-react'
+import { FsRow } from '../print-scan/FsRow'
+import { PhoneHelpLine } from '../print-scan/phoneHelp'
 import {
   loadConfiguredCapabilities,
   type ConfiguredCapability,
 } from '../../services/api/printScanCapabilities'
 import {
-  ScanChain,
-  ScanCta,
-  ScanNoteCard,
-  ScanPlan,
-  ScanSec,
-  ScanStatusPanel,
+  ScanSample,
   ScanTypeCards,
   ScanWorkbenchShell,
+  type ScanDock,
 } from './ScanWorkbenchChrome'
-import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
+import { SCAN_TRUTH, SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
 import { patchScanWorkbenchSession, readScanWorkbenchSession } from './scanWorkbenchSession'
 
@@ -41,7 +38,10 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
   const [params, setSearchParams] = useSearchParams()
   const usbPanel = params.get('mode') === 'usb-panel'
   const storedType = readScanWorkbenchSession()?.scanType
-  const [selected, setSelected] = useState<ScanType>(storedType ?? 'resume')
+  /* 进来不替人选类型（走查 I-16，回归：#1326 改成不默认选，触屏集成又改回 'resume'）。
+   * 想扫证件、普通文档的人不点类型直接「下一步」，会被悄悄建成简历扫描。
+   * 只有本机登记里已经有类型（同一场里回到这一屏）时才恢复；verify-fusion-w2-print-scan 钉住这句初值。 */
+  const [selected, setSelected] = useState<ScanType | null>(storedType ?? null)
   const [gate, setGate] = useState<ScanGate>('loading')
   const [blockedNote, setBlockedNote] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
@@ -96,63 +96,32 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
       ? '当前无法创建扫描任务，请查看说明或改用其他方式'
       : '请先选择扫描类型；本页尚未创建任务。下一步会真实建立这次扫描'
 
-  return (
-    <ScanWorkbenchShell
-      page="scan-start"
-      state={workbenchState}
-      title="材料扫描"
-      subtitle={subtitle}
-      status={status}
-      layout={blocked ? 'spread' : 'stack'}
-      facts={
-        usbPanel
-          ? ['不创建平台任务', '文件只在你的 U 盘', '暂未开通']
-          : blocked
-            ? undefined
-            : ['面板上的扫描入口已准备好，直接按提示操作，不用你填写地址。']
+  const goStart = () => {
+    if (onGoStage) {
+      setSearchParams({ stage: 'start' }, { replace: true })
+      return
+    }
+    navigate('/scan?stage=start')
+  }
+  const dock: ScanDock = usbPanel
+    ? {
+        left: { label: '返回材料扫描', onClick: goStart },
+        primary: { label: '完成后回打印扫描', onClick: () => navigate('/print-scan') },
       }
-      ctabar={
-        usbPanel ? (
-          <ScanCta>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>
-              <HeadphonesIcon aria-hidden="true" />
-              联系工作人员
-            </button>
-            <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print-scan')}>
-              完成后回打印扫描
-            </button>
-          </ScanCta>
-        ) : blocked ? (
-          <ScanCta reason="能力确认前不会创建扫描任务">
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print-scan')}>
-              返回打印扫描
-            </button>
-            <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print/upload')}>
-              <UploadIcon aria-hidden="true" />
-              改用上传文件打印
-            </button>
-          </ScanCta>
-        ) : (
-          <ScanCta>
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="ghost"
-              onClick={() => {
-                if (onGoStage) {
-                  setSearchParams({ stage: 'start', mode: 'usb-panel' }, { replace: true })
-                  return
-                }
-                navigate('/scan?stage=start&mode=usb-panel')
-              }}
-            >
-              改用面板扫描到 U 盘
-            </button>
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="primary"
-              onClick={() => {
+    : blocked
+      ? {
+          left: { label: '返回打印扫描', onClick: () => navigate('/print-scan') },
+          primary: { label: '改用上传文件打印', onClick: () => navigate('/print/upload') },
+        }
+      : selected === null
+        ? {
+            // 没选类型：说明为什么按不了，而不是一颗说「下一步」却不动的灰按钮。
+            primary: { label: '先选一种材料', onClick: () => undefined, disabled: true, noArrow: true },
+          }
+        : {
+            primary: {
+              label: '下一步 · 建立这次扫描',
+              onClick: () => {
                 patchScanWorkbenchSession({
                   stage: 'settings',
                   scanType: selected,
@@ -164,132 +133,138 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                   return
                 }
                 navigate('/scan?stage=settings', { state: { scanType: selected } })
-              }}
-            >
-              下一步 · 建立这次扫描
-            </button>
-          </ScanCta>
-        )
+              },
+            },
+          }
+
+  return (
+    <ScanWorkbenchShell
+      page="scan-start"
+      state={workbenchState}
+      title={
+        usbPanel
+          ? '扫描到 U 盘'
+          : gate === 'loading'
+            ? '正在确认扫描能力'
+            : gate === 'blocked'
+              ? '扫描能力暂未开放'
+              : gate === 'unknown'
+                ? '能力状态暂不可用'
+                : '材料扫描'
       }
+      subtitle={subtitle}
+      status={status}
+      layout="stack"
+      dock={dock}
     >
       {usbPanel ? (
         <>
-          <ScanSec no="01" title="在奔图面板选择「扫描到 U 盘」" hint="这是打印机自己的独立能力，不经过屏幕上的扫描流程">
-            <div className="sw-grid2">
-              <ScanNoteCard
-                title="面板上怎么做"
-                foot="具体菜单名称、可选格式和 USB 接口位置以现场奔图面板为准。"
-              >
-                <ScanPlan items={[
-                  '把 U 盘插到打印机支持的 USB 接口。',
-                  '在奔图操作面板打开「扫描」，选择「扫描到 U 盘」。',
-                  '按面板提示选择文件格式与保存位置，再开始扫描。',
-                  '完成后先按面板提示安全结束，再拔出 U 盘。',
-                ]} />
-              </ScanNoteCard>
-              <ScanNoteCard
-                title="这条路与平台扫描的区别"
-                foot="平台不会读取、上传或保留这次扫描产生的文件。"
-              >
-                <ScanPlan items={[
-                  '不创建平台扫描任务，所以本页没有任务编号。',
-                  '不显示扫描进度或结果，成功失败只看打印机面板。',
-                  '不进入「我的文档」，文件只保存在你的 U 盘。',
-                  '这条能力暂未开通，不能把这条说明当成已经可以用。',
-                ]} />
-              </ScanNoteCard>
+          <p className="fs-warn">这条能力暂未开通，不能把这条说明当成已经可以用。</p>
+          <div className="fs-grow is-status">
+            <div className="fs-facts">
+              <div className="fs-pairgrid">
+                <div className="fs-fact"><b>把 U 盘插上</b><span>插到打印机支持的 USB 接口。</span></div>
+                <div className="fs-fact"><b>在打印机屏幕上选</b><span>打开「扫描」，选择「扫描到 U 盘」。</span></div>
+                <div className="fs-fact"><b>按面板提示</b><span>选文件格式和保存位置，再开始扫描。</span></div>
+                <div className="fs-fact"><b>拔出之前</b><span>先按面板提示安全结束，再拔出 U 盘。</span></div>
+              </div>
+              <div className="fs-fact wide"><b>和平台扫描不同</b><span>文件只进你的 U 盘。不创建平台任务，没有任务编号，不显示进度，不进「我的文档」。扫描服务不接收这次文件。</span></div>
+              <div className="fs-fact wide"><b>面板没有这一项</b><span>不要反复点。菜单名称和接口位置以打印机屏幕为准。</span></div>
             </div>
-          </ScanSec>
-          <ScanSec no="02" title="完成之后怎么继续" hint="U 盘里的文件要重新导入才能在本机办理">
-            <div className="sw-grid2">
-              <ScanNoteCard title="要打印或继续加工" foot="能不能从 U 盘导入，以这台机器屏幕上的提示为准。">
-                <p>回到打印扫描，选择<b>U 盘导入</b>。本机只读取你再次选中的文件，不会自动扫描整个 U 盘。</p>
-              </ScanNoteCard>
-              <ScanNoteCard title="面板没有这个选项" foot="本页不假设所有奔图固件都提供相同菜单。">
-                <p>不要在本页反复点击。请联系工作人员确认机型、固件和现场 USB 配置。</p>
-              </ScanNoteCard>
-            </div>
-          </ScanSec>
+            <PhoneHelpLine />
+            <ScanSample art="usb" />
+          </div>
         </>
       ) : blocked ? (
         <>
-          <ScanStatusPanel
-            tone={gate === 'loading' ? 'info' : 'error'}
-            title={gate === 'loading' ? '正在确认扫描能力' : gate === 'unknown' ? '能力状态暂不可用' : '扫描能力暂未开放'}
-            breathe={gate === 'loading'}
-            chips={[
-              { label: gate === 'loading' ? '正在读取配置' : gate === 'unknown' ? '状态未知' : '暂未开放', tone: 'warn' },
-              { label: '不会创建扫描任务' },
-            ]}
-          >
-            <p>
-              {gate === 'loading'
-                ? '正在读取这台机器的扫描配置。'
-                : gate === 'unknown'
-                  ? '本机未能读取扫描能力配置。恢复后可继续；扫描仍需在打印机面板操作。'
-                  : (blockedNote ?? '工作人员还没有给这台机器开通扫描，或这项能力正在维护、暂未开通。')}
-            </p>
-          </ScanStatusPanel>
-          <ScanSec no="01" title="下一步" hint="扫描之外的路照常可用">
-            <div className="sw-grid2">
-              <ScanNoteCard title="你现在还能做什么">
-                <ScanPlan items={[
-                  '上传文件打印：手机 / U 盘里的现成文件仍可打印。',
-                  '本机扫描：这台机器的扫描还没开通，或状态还不知道。',
-                  '改用面板扫描到 U 盘：不经过屏幕上的扫描流程，文件只进你的 U 盘。',
-                ]} />
-              </ScanNoteCard>
-              <ScanNoteCard title="确认能力" foot="若长时间未恢复，请到服务台联系现场工作人员检查这台机器是否开通了扫描。">
-                <p>本页不会假装扫描仪已经就绪，也不会在能力未知时创建任务。</p>
-                <div className="sw-cta-row sw-note-actions">
-                  <button
-                    type="button"
-                    className="qx-btn"
-                    data-variant="ghost"
-                    disabled={checking || gate === 'loading'}
-                    onClick={() => void refreshGate()}
-                  >
-                    <RefreshCwIcon aria-hidden="true" />
-                    {checking || gate === 'loading' ? '正在确认…' : '重新确认能力'}
-                  </button>
-                  <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>
-                    <HeadphonesIcon aria-hidden="true" />
-                    联系工作人员
-                  </button>
-                </div>
-              </ScanNoteCard>
+          <div className="fs-grow is-status">
+            <div className="fs-facts">
+              <div className="fs-fact wide">
+                <b>{gate === 'loading' ? '正在读取配置' : gate === 'unknown' ? '状态未知' : '暂未开放'}</b>
+                <span>
+                  {gate === 'loading'
+                    ? '正在读取这台机器的扫描配置。扫描服务还没确认。'
+                    : gate === 'unknown'
+                      ? '本机未能读取扫描能力配置。恢复后可继续；扫描仍需在打印机面板操作。'
+                      : (blockedNote ?? '扫描还没对这台机器开放，或正在维护。恢复之后可以再试。')}
+                </span>
+              </div>
+              <div className="fs-pairgrid">
+                <div className="fs-fact"><b>测试中，暂未对用户开放</b><span>还在测试，或正在维护，现在都不能扫描。</span></div>
+                <div className="fs-fact"><b>维护中，暂时不可用</b><span>这台机器暂时不支持扫描。恢复之后可以再试。</span></div>
+                <div className="fs-fact"><b>现在不能开始</b><span>确认完成之前，不能建立扫描，也不能在面板上开始。</span></div>
+              </div>
+              <div className="fs-fact wide"><b>你现在还能做什么</b><span>上传现成文件仍可打印。也可以看扫描到 U 盘的说明，那条仍写暂未开通。</span></div>
             </div>
-          </ScanSec>
+            <PhoneHelpLine />
+            <ScanSample />
+          </div>
+          <FsRow
+            title={checking || gate === 'loading' ? '正在确认…' : '重新确认能力'}
+            desc="再读一次这台机器的扫描配置"
+            disabled={checking || gate === 'loading'}
+            onClick={() => void refreshGate()}
+          />
+          <FsRow
+            title="改用面板扫描到 U 盘"
+            desc="文件只进你的 U 盘，平台不接收"
+            onClick={() => {
+              if (onGoStage) {
+                setSearchParams({ stage: 'start', mode: 'usb-panel' }, { replace: true })
+                return
+              }
+              navigate('/scan?stage=start&mode=usb-panel')
+            }}
+          />
         </>
       ) : (
         <>
-          <ScanSec no="01" title="这个流程是这样" hint="四段都走完，文件才到你手上">
-            <ScanChain active={-1} />
-          </ScanSec>
-          <ScanSec no="02" title="要扫什么" hint={`扫描服务 · 已选「${SCAN_TYPE_LABELS[selected]}」`}>
-            <ScanTypeCards selected={selected} onPick={setSelected} />
-          </ScanSec>
-          <ScanSec no="03" title="动手之前先看两件事" grow>
-            <div className="sw-grid2">
-              <ScanNoteCard
-                title="为什么屏幕上没有「开始扫描」"
-                foot="合同类材料的扫描从「合同审阅」工作台发起，本屏不重复开口子。"
-              >
-                <p>这台一体机的扫描<b>只能在奔图自己的操作面板上启动</b>，网页不能远程驱动扫描仪。本机负责建立这次扫描、转达系统给出的操作说明、等文件回来。</p>
-                <p>所以这一屏不会有「一键扫描」，也不会有扫到第几张的进度。</p>
-              </ScanNoteCard>
-              <ScanNoteCard
-                title="扫完之后这份文件能干什么"
-                foot="费用以办理时系统报价与现场规则为准。未登录扫描件不会进入「我的文档」。"
-              >
-                <ScanPlan items={[
-                  '简历扫描件可以进 AI 识别，做诊断与优化。',
-                  '拿去打印：到打印流程重新选定，由系统报价后出纸。',
-                  '留存按文件类型与系统的规则；本屏无登录步骤，匿名件不进「我的文档」。',
-                ]} />
-              </ScanNoteCard>
+          <ScanTypeCards selected={selected} onPick={setSelected} />
+          <FsRow
+            title="改用面板扫描到 U 盘"
+            desc="不创建平台任务，文件只在你的 U 盘"
+            onClick={() => {
+              if (onGoStage) {
+                setSearchParams({ stage: 'start', mode: 'usb-panel' }, { replace: true })
+                return
+              }
+              navigate('/scan?stage=start&mode=usb-panel')
+            }}
+          />
+          <div className="fs-grow">
+          <div className="fs-facts">
+            <div className="fs-fact wide">
+              <b>屏幕上没有「开始扫描」</b>
+              <span>只能在打印机屏幕上启动。网页不能远程驱动扫描仪，也没有扫到第几张的进度。</span>
             </div>
-          </ScanSec>
+            <div className="fs-pairgrid">
+              <div className="fs-fact"><b>放好纸</b><span>把原稿放进扫描区。你在打印机上操作。</span></div>
+              <div className="fs-fact"><b>面板上按扫描</b><span>按屏幕上给出的这次说明操作。</span></div>
+            </div>
+            <div className="fs-fact wide"><b>回到这台机器</b><span>文件回来后在这里确认。未登录扫描件不会进入「我的文档」。</span></div>
+            <div className="fs-fact wide">
+              {selected === null ? (
+                <>
+                  <b>还没选材料类型</b>
+                  <span>点上面的一种材料，再点下一步。点类型只是选中，下一步才建立这次扫描。</span>
+                </>
+              ) : (
+                <>
+                  <b>已选「{SCAN_TYPE_LABELS[selected]}」</b>
+                  <span>点类型只是选中。下一步建立这次扫描，并确认这台机器能收到扫描件。</span>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="sw-truth" data-disclaimer="true" data-testid="scan-workbench-truth">
+            {SCAN_TRUTH.map((item) => (
+              <div key={item.title}>
+                <b>{item.title}</b>
+                {item.body}
+              </div>
+            ))}
+          </div>
+          </div>
         </>
       )}
     </ScanWorkbenchShell>

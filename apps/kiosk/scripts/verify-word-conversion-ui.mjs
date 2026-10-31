@@ -7,7 +7,8 @@ const kioskRoot = fileURLToPath(new URL('..', import.meta.url))
 const repoRoot = join(kioskRoot, '../..')
 const paths = {
   service: join(kioskRoot, 'src/services/api/documentConversion.ts'),
-  resume: join(kioskRoot, 'src/pages/resume/ResumeSourcePage.tsx'),
+  // 2026-10-28 触屏版：来源页「在哪里」一步的版面在 touch/ResumeSourceWhere.tsx（Word 未开放原因、复杂版式提示在那里），两份一起看。
+  resume: [join(kioskRoot, 'src/pages/resume/ResumeSourcePage.tsx'), join(kioskRoot, 'src/pages/resume/touch/ResumeSourceWhere.tsx')],
   phone: join(kioskRoot, 'src/pages/upload/PhoneUploadPage.tsx'),
   printUpload: join(kioskRoot, 'src/pages/print/PrintUploadPage.tsx'),
   preview: join(kioskRoot, 'src/components/FileContentPreview.tsx'),
@@ -23,7 +24,10 @@ const paths = {
 }
 
 function sources() {
-  return Object.fromEntries(Object.entries(paths).map(([key, path]) => [key, readFileSync(path, 'utf8')]))
+  return Object.fromEntries(Object.entries(paths).map(([key, path]) => [
+    key,
+    Array.isArray(path) ? path.map((item) => readFileSync(item, 'utf8')).join('\n') : readFileSync(path, 'utf8'),
+  ]))
 }
 
 function collectFailures(files) {

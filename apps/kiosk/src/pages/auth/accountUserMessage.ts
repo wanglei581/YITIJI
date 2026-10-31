@@ -26,7 +26,7 @@ const CODE_COPY: Readonly<Record<string, string>> = {
   PHONE_CONFLICT: '该手机号已绑定其他账号，无法换绑。',
   // 2026-09-29 后端排雷新增（谁新增的码谁补文案；覆盖门禁 verify:backend-error-copy-coverage）
   REBIND_UNAVAILABLE: '暂时无法换绑，手机号没有改动。请稍后从验证旧手机号重新开始。',
-  ACCOUNT_UNAVAILABLE: '账号当前不可用，请联系现场工作人员。',
+  ACCOUNT_UNAVAILABLE: '账号当前不可用，请稍后再试。',
   SMS_DAILY_TOTAL_LIMIT: '今天的短信验证码已发满，请明天再试，或用手机扫码登录。',
   SMS_TERMINAL_DAILY_LIMIT: '这台机器今天的短信验证码已发满，请用手机扫码登录，或明天再试。',
   SMS_BUDGET_UNAVAILABLE: '验证码服务暂时不可用，请稍后再试，或用手机扫码登录。',

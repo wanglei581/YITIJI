@@ -116,7 +116,7 @@ test.describe('真人走查（模拟数据）', () => {
     await step(page, s, 'print-hub')
 
     // Hub 上「文档打印」卡：点了必须真的走到选择文件来源
-    const docCard = page.getByRole('button', { name: /文档打印/ }).first()
+    const docCard = page.getByRole('button', { name: /打印文件/ }).first()
     await expect(docCard).toBeVisible()
     await docCard.click()
     await page.waitForURL((u) => u.pathname !== '/print-scan', { timeout: 10000 })
@@ -236,15 +236,16 @@ test.describe('真人走查（模拟数据）', () => {
     await page.waitForTimeout(2500)
     await step(page, s, 'home')
 
-    const entry = page.getByRole('button', { name: /岗位信息/ }).first()
+    // 触屏版首页的岗位入口是「社会招聘」磁贴（托管打开时才有），点它进服务目录。
+    const entry = page.getByRole('button', { name: /^社会招聘/ }).first()
     await expect(entry).toBeVisible({ timeout: 10000 })
     await entry.click()
     await page.waitForTimeout(2500)
     await step(page, s, 'jobs-list')
 
-    // 「岗位信息」进的是服务目录页 /jobs-service（含校招在内的分类卡），列表还要再点一层。
+    // 「社会招聘」进的是服务目录页 /jobs-service（含校招在内的分类卡），列表还要再点一层。
     // 这一层是走查发现的：直达 /jobs 会跳过目录，真人不会那样走。
-    const fullTime = page.getByRole('button', { name: /全职岗位/ }).first()
+    const fullTime = page.getByRole('button', { name: /找全职/ }).first()
     if (await fullTime.count()) {
       await fullTime.click()
       await page.waitForTimeout(3000)
@@ -349,7 +350,7 @@ test.describe('真人走查（模拟数据）', () => {
     await page.waitForURL((u) => u.pathname === '/print-scan')
     await step(page, s, 'D-hub')
 
-    await page.getByRole('button', { name: /文档打印/ }).first().click()
+    await page.getByRole('button', { name: /打印文件/ }).first().click()
     await page.waitForURL((u) => u.pathname === '/print/upload', { timeout: 10000 })
     await step(page, s, 'D-file-source')
 
@@ -635,10 +636,10 @@ test.describe('真人走查（模拟数据）', () => {
     page.on('console', (m) => { if (m.type() === 'error') pageErrors.push(`console: ${m.text().slice(0, 200)}`) })
 
     await page.goto('/print-scan')
-    await expect(page.getByRole('button', { name: /材料扫描/ })).toBeVisible({ timeout: 15000 })
+    await expect(page.getByRole('button', { name: /扫描纸质材料/ })).toBeVisible({ timeout: 15000 })
     await step(page, s, 'F-hub')
 
-    await page.getByRole('button', { name: /材料扫描/ }).first().click()
+    await page.getByRole('button', { name: /扫描纸质材料/ }).first().click()
     await page.waitForTimeout(3000)
     await step(page, s, 'F-scan-entry')
 

@@ -22,6 +22,8 @@ export interface PublicSupportContact {
   serviceHours: string | null
   otherOnlineTerminalNearby: boolean
   miniappPublished: boolean
+  /** 一体机「我的足迹」第三个页签（本人自填记事本）的开关，后台可配。只有 true 才开，缺省和读取失败都是关。 */
+  selfNoteTab: boolean
 }
 
 /** 404、超时、字段缺失，以及还没请求到之前，都用这一套。 */
@@ -30,6 +32,7 @@ export const CONSERVATIVE_SUPPORT_CONTACT: PublicSupportContact = {
   serviceHours: null,
   otherOnlineTerminalNearby: false,
   miniappPublished: false,
+  selfNoteTab: false,
 }
 
 let readCachedContact: () => PublicSupportContact = () => CONSERVATIVE_SUPPORT_CONTACT
@@ -58,6 +61,7 @@ export function resolveSupportContact(contact?: PublicSupportContact | null): Pu
     serviceHours: trimmedOrNull(contact.serviceHours),
     otherOnlineTerminalNearby: contact.otherOnlineTerminalNearby === true,
     miniappPublished: contact.miniappPublished === true,
+    selfNoteTab: contact.selfNoteTab === true,
   }
 }
 

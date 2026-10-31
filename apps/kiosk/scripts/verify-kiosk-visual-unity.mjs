@@ -114,15 +114,16 @@ expect(
   !/function KioskTopBar/.test(home) && !/function HomeNavbar/.test(home),
   '首页不混入旧版顶栏/底栏组件'
 )
+const homeView = read(join(kioskRoot, 'src/pages/home/components/HomeTouchView.tsx'))
 expect(
-  home.includes('className="qx-home-host"') && !home.includes('kpv1--content-only'),
-  '首页内容区只声明青序页面作用域'
+  home.includes('<HomeTouchView') && !home.includes('kpv1--content-only'),
+  '首页内容区只声明触屏视图'
 )
 expect(
-  home.includes('className="qx-stage"') &&
-    home.includes('data-qx-frame="true"') &&
-    home.includes('className="qx-navbar"'),
-  '首页按原稿使用 Hero 内顶行与独立主导航'
+  homeView.includes('<QxTouchScreen') &&
+    homeView.includes('kind="hero"') &&
+    homeView.includes('<QxTouchNav'),
+  '首页按触屏稿使用 hero 意图带与独立主导航'
 )
 expect(!home.includes('KioskPageFrame'), '首页已退出 V6 KioskPageFrame')
 

@@ -962,7 +962,7 @@ test('leaving the scan flow drops the rescan authority @scan-safety', async ({ p
 
   // 顶栏返回和隐私清场、退出、屏保走同一条 leaveScanFlow → clearScanWorkbenchSession，
   // 代次在抹掉登记之前同步推进 —— 授权必须跟着那一步消失，不能被下一位用户继承。
-  await page.locator('.qx-topbar-back').click()
+  await page.locator('.qxt-band .qxt-back').click()
   await page.waitForURL(/\/print-scan$/)
 
   // 这里**必须**用页内回退，不能 page.goto：整页加载会把模块内存连同授权一起抹掉，
@@ -971,6 +971,7 @@ test('leaving the scan flow drops the rescan authority @scan-safety', async ({ p
   await page.goBack()
   await page.waitForURL(/\/scan/)
   await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
+  await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
   await page.getByRole('button', { name: /下一步/ }).click()
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
 
@@ -1000,13 +1001,14 @@ test('the result page own exit drops the rescan authority too @scan-safety', asy
   // 「返回打印扫描」是**另一套按钮**，此前只是裸 navigate —— 同一屏两个出口两种命运：
   // 从顶栏走的人登记被清干净，从这里走的人把 live 登记（含刚结束那一场的 controlToken
   // 明文）和这枚一次性授权一起留在原地，下一位用户接着用这台机器就继承了。
-  await page.locator('.qx-ctabar').getByRole('button', { name: '返回打印扫描', exact: true }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '返回打印扫描', exact: true }).click()
   await page.waitForURL(/\/print-scan$/)
 
   // 必须页内回退：整页加载会把模块内存连授权一起抹掉，那样这条用例无论代码对不对都绿。
   await page.goBack()
   await page.waitForURL(/\/scan/)
   await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
+  await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
   await page.getByRole('button', { name: /下一步/ }).click()
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
 
@@ -1269,7 +1271,7 @@ test('leaving during the recovery window revokes the recovered child @scan-safet
    * 真正要证明的是：随后领回来的那条 child 不许被写进任何状态，而且必须被撤掉。
    * 这一步刻意用页内跳转，不用 page.goto：整页加载会把还在飞的重放一起干掉，
    * 那样这条用例无论代码对不对都是绿的。 */
-  await page.locator('.qx-topbar-back').click()
+  await page.locator('.qxt-band .qxt-back').click()
   await page.waitForURL(/\/print-scan$/)
 
   // ① 领回来的 child 必须被撤掉。不撤它就停在 waiting 收下一位的面板扫描 ——
@@ -1505,7 +1507,7 @@ test('leaving while the delivery ack is in flight revokes the session @scan-safe
 
   // 顶栏返回 = leaveScanFlow（撤服务端 + 清本机登记 + 推进代次）。用页内跳转，
   // 不用 page.goto：整页加载会把还在飞的那次确认一起干掉，那样用例怎么写都是绿的。
-  await page.locator('.qx-topbar-back').click()
+  await page.locator('.qxt-band .qxt-back').click()
   await page.waitForURL(/\/print-scan$/)
 
   // ① 这一场必须被撤掉 —— 否则它就是一条没人看着的会话。
@@ -1570,7 +1572,7 @@ test('an ack that succeeds after the user left forces a second revoke when the f
   // 离开时那一次撤销在路上丢了。页内跳转，不用 page.goto：整页加载会把还在飞的
   // 那次确认一起干掉，那样这条用例无论代码对不对都是绿的。
   server.dropNextDelete()
-  await page.locator('.qx-topbar-back').click()
+  await page.locator('.qxt-band .qxt-back').click()
   await page.waitForURL(/\/print-scan$/)
 
   // ① 本机确实按登记发了那一次，而它确实没生效 —— 前提成立，这条用例才测得到东西。
@@ -1758,7 +1760,8 @@ for (const exit of COMPLETED_EXITS) {
     await page.goto('/scan')
     await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
     await expect(page.getByText(SAME_SHEET_FILE.filename, { exact: false })).toHaveCount(0)
-    await expect(page.getByText('扫描完成', { exact: true })).toHaveCount(0)
+    // 稿的四段进度在每一屏都写着「扫描完成」。这里要钉的是结果页标题不在，不是进度名。
+    await expect(page.getByRole('heading', { name: '扫描完成', exact: true })).toHaveCount(0)
     const residue = await page.evaluate((token) => ({
       session: JSON.stringify(Object.fromEntries(
         Array.from({ length: window.sessionStorage.length }, (_, i) => window.sessionStorage.key(i))
@@ -1774,6 +1777,7 @@ for (const exit of COMPLETED_EXITS) {
     expect(residue).toEqual({ session: false, local: false })
 
     // ③ 下一次创建不许带上一位的重扫血缘。
+    await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
     await page.getByRole('button', { name: /下一步/ }).click()
     await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
     expect(server.creates).toHaveLength(1)
@@ -1941,7 +1945,8 @@ test('a later member cannot reopen the previous guest scan @scan-safety', async 
   // ② 落在选类型那一屏，看不到上一位的结果与文件。
   await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
   await expect(page.getByText(SAME_SHEET_FILE.filename, { exact: false })).toHaveCount(0)
-  await expect(page.getByText('扫描完成', { exact: true })).toHaveCount(0)
+  // 稿的四段进度在选类型屏也写着「扫描完成」。钉结果页标题，进度名可以留着。
+  await expect(page.getByRole('heading', { name: '扫描完成', exact: true })).toHaveCount(0)
   // ③ 任何存储里都不许再有那枚控制凭证。
   const residue = await page.evaluate((token) => ({
     session: JSON.stringify(Object.fromEntries(
@@ -1966,6 +1971,7 @@ test('a later member cannot reopen the previous guest scan @scan-safety', async 
   expect(printMaterial, '闸门范围只到扫描：游客的打印材料不许被这次登录清掉').toContain('guest-print-material')
 
   // ⑥ 这位会员自己开的那一场不许继承上一位的重扫血缘。
+  await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
   await page.getByRole('button', { name: /下一步/ }).click()
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
   expect(server.creates).toHaveLength(1)
@@ -2206,7 +2212,8 @@ for (const attempt of INTERRUPTED_CREATES) {
 
     // ⑧ 而且这一次真的能把同一张纸扫回来（桩只对配对创建回 completed）。
     await page.getByRole('button', { name: '我已操作，开始等待' }).click()
-    await expect(page.getByText('扫描完成', { exact: true })).toBeVisible({ timeout: 15_000 })
+    // 眉题、标题、进度名都是「扫描完成」。钉标题，避免同一句命中三处。
+    await expect(page.getByRole('heading', { name: '扫描完成', exact: true })).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText(SAME_SHEET_FILE.filename, { exact: false }).first()).toBeVisible()
 
     expect(errors).toEqual([])
@@ -2332,6 +2339,7 @@ test('leaving after an interrupted create never resurrects the rescan authority 
   await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
 
   // 下一位在这台机器上从头选类型开一场：必须是干净的普通创建，一个字节的血缘都不许带。
+  await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
   await page.getByRole('button', { name: /下一步/ }).click()
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
   expect(server.creates).toHaveLength(2)

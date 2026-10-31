@@ -210,6 +210,7 @@ export function ConfirmCard({
   reason,
   alert,
   actions,
+  hideHelp = false,
 }: {
   freePricing?: boolean
   tone?: 'warn' | 'error'
@@ -218,6 +219,8 @@ export function ConfirmCard({
   reason?: string
   alert: string | null
   actions: ReactNode
+  /** 底栏已经有问小青时，卡内不再放第二颗。 */
+  hideHelp?: boolean
 }) {
   return (
     <div className="pcf-cfm" data-tone={tone}>
@@ -239,12 +242,14 @@ export function ConfirmCard({
         </div>
       ) : null}
       <div className="pcf-act">{actions}</div>
-      <div className="pcf-airow">
-        <PrintAiHelp
-          label={freePricing ? '问小青：帮我核对打印内容 →' : '问小青：帮我看费用明细 →'}
-          draft={freePricing ? '请帮我核对打印的页数、份数和参数。' : '请告诉我打印报价应该核对哪些项目，怎样确认页数、份数和费用是否一致？'}
-        />
-      </div>
+      {hideHelp ? null : (
+        <div className="pcf-airow">
+          <PrintAiHelp
+            label={freePricing ? '问小青：帮我核对打印内容 →' : '问小青：帮我看费用明细 →'}
+            draft={freePricing ? '请帮我核对打印的页数、份数和参数。' : '请告诉我打印报价应该核对哪些项目，怎样确认页数、份数和费用是否一致？'}
+          />
+        </div>
+      )}
     </div>
   )
 }

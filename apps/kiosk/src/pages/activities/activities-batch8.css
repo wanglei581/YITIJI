@@ -57,3 +57,8 @@
 @media (max-width: 760px) {
   .k8-activities-grid { grid-template-columns: 1fr; }
 }
+
+/* 没有活动时的两张高出口卡（稿 activities 空态）：卡被撑到约 560 高，插画原来封顶 380、只占 84%，上下各留约 95 的白，
+   两张卡之间连成 150 上下的空白带。插画放大到卡高的 96%、取消封顶，让两张卡的画都顶满（最长空白 149 → 65，blankscan 阈值 105）。
+   做法同 me-states.css 里 data-ai-down 那一条；只作用于权益活动页，别的「高卡」（还是你吗）不动。 */
+.k8-activities .me-exit.me-tall .me-exit-art .me-art { height: 96%; max-height: none; }

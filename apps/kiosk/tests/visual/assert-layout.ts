@@ -84,8 +84,8 @@ export async function assertTapTargetPointerHit(locator: Locator): Promise<void>
  * 带「 · 」分隔的标签只许在分隔处折行，不把短语拆开（「扫描件已交接 · 待确 / 认」那种）。
  * 行按每个字的纵向中心归并：同一行里混排的字体上沿可能差一两像素，按 top 取整会把一行误拆成两行。
  */
-export async function assertQxPillReadable(page: Page, where: string): Promise<void> {
-  const pill = page.locator('.qx-pill')
+export async function assertQxPillReadable(page: Page, where: string, selector = '.qx-pill'): Promise<void> {
+  const pill = page.locator(selector)
   await expect(pill).toBeVisible()
   const { text, lines, clipped } = await pill.evaluate((el) => {
     const node = Array.from(el.childNodes).reverse().find((child) => child.nodeType === Node.TEXT_NODE && child.textContent?.trim())
@@ -118,6 +118,54 @@ export async function assertQxPillReadable(page: Page, where: string): Promise<v
       expect(lines.some((line) => line.includes(phrase)), `${detail}：「${phrase}」被拆到两行`).toBe(true)
     }
   }
+}
+
+/**
+ * 屏上的字不被裁，量真实排版：每个带字的文本节点，它的字体内容区（Range 矩形）不得越出最近那个 overflow:hidden / clip 祖先的
+ * 内边距盒上下沿 1px 以上。
+ * 为什么要量：字体栈换成 Qingxu Sans（CI 的 Ubuntu、真机 Windows 都没有苹方）后，字的内容区是 1.448em；行高写 1.3、1.35 的行盒比它矮 1–3px，
+ * 被 line-clamp 之类的 overflow:hidden 贴着裁，字形上下各削掉一道。Mac 上落到苹方，内容区矮，本机量不出来，所以这条要在 CI 的字体栈上才红。
+ * 不算：关着的 <details> 里的字（不渲染）、aria-hidden / 读屏专用的、display:none 的。
+ * 返回越界项的清单（空数组 = 没有），调用方 expect(...).toEqual([])。
+ */
+export async function findClippedText(page: Page, rootSelector = '[data-qxt-screen]'): Promise<string[]> {
+  return page.evaluate((rootSel) => {
+    const root = document.querySelector(rootSel)
+    if (!root) return [`找不到版式根 ${rootSel}`]
+    const issues: string[] = []
+    const clipAncestor = (el: Element): Element | null => {
+      for (let node: Element | null = el; node && node !== document.documentElement; node = node.parentElement) {
+        const cs = getComputedStyle(node)
+        if (cs.overflowY === 'hidden' || cs.overflowY === 'clip') return node
+      }
+      return null
+    }
+    const hidden = (el: Element) => !!el.closest('[aria-hidden="true"], [inert], script, style, svg, .sr-only, .qxp-sr-h, .qxp-sr')
+      || !!el.closest('details:not([open]) > :not(summary)')
+    const label = (el: Element) => `${el.tagName.toLowerCase()}${String((el as HTMLElement).className || '').trim() ? '.' + String((el as HTMLElement).className).trim().split(/\s+/).slice(0, 2).join('.') : ''}`
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    while (walker.nextNode()) {
+      const node = walker.currentNode as Text
+      const text = (node.textContent ?? '').trim()
+      const parent = node.parentElement
+      if (!text || !parent || hidden(parent)) continue
+      const style = getComputedStyle(parent)
+      if (style.display === 'none' || style.visibility === 'hidden') continue
+      const range = document.createRange()
+      range.selectNodeContents(node)
+      const rects = Array.from(range.getClientRects()).filter((rect) => rect.width > 1 && rect.height > 1)
+      if (rects.length === 0) continue
+      const clipper = clipAncestor(parent)
+      if (!clipper) continue
+      const box = clipper.getBoundingClientRect()
+      const top = box.top + (clipper as HTMLElement).clientTop
+      const bottom = top + (clipper as HTMLElement).clientHeight
+      let over = 0
+      for (const rect of rects) over = Math.max(over, top - rect.top, rect.bottom - bottom)
+      if (over > 1) issues.push(`${label(parent)} 里的「${text.slice(0, 14)}」字体内容区越出 ${label(clipper)} 上下沿 ${Math.round(over * 10) / 10}px（字号 ${style.fontSize}，行高 ${style.lineHeight}）`)
+    }
+    return issues
+  }, rootSelector)
 }
 
 export async function assertKioskShellFillsViewport(page: Page): Promise<void> {

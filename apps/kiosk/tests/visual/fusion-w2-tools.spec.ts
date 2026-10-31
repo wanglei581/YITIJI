@@ -3,6 +3,7 @@ import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { assertNoHorizontalOverflow } from './assert-layout'
 import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
+import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 
 function collectRuntimeErrors(page: Page): string[] {
   const errors: string[] = []
@@ -54,9 +55,9 @@ test('tool center honors terminal capability configuration @w2', async ({ page, 
   })
 
   await page.goto('/print-scan')
-  await expect(page.getByRole('button', { name: /材料扫描/ })).toBeDisabled()
+  await expect(page.getByRole('button', { name: /扫描纸质材料/ })).toBeDisabled()
   await expect(page.getByText('扫描仪正在保养', { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: /格式转换/ })).toBeEnabled()
+  await expect(page.getByRole('button', { name: /照片合成 PDF/ })).toBeEnabled()
   await expectHealthy(page, errors, 'print-scan-home')
 })
 
@@ -78,7 +79,7 @@ test('tool center exposes the miniapp arrival-code claim entry @w2', async ({ pa
   // 2.0 卡面用徽标「不是取件码」区分（稿 10），不再重复长句。
   await expect(entry).toContainText('不是取件码')
   // 它不占「七件事」栅格的格子 —— 标题写着七件事，就必须只有七张能力卡。
-  await expect(page.locator('[data-testid^="print-hub-cap-"]')).toHaveCount(8)
+  await expect(page.locator('[data-testid^="print-hub-cap-"]')).toHaveCount(6)
   await entry.click()
 
   await expect(page).toHaveURL(/\/print\/pickup-claim$/)
@@ -91,8 +92,8 @@ test('unknown tool feature key fails closed with a real recovery action @w2', as
   registerShell(api)
 
   await page.goto('/print-scan/feature/not-a-real-feature')
-  await expect(page.getByRole('heading', { name: '未找到该功能' })).toBeVisible()
-  await expect(page.getByRole('button', { name: '返回打印扫描服务' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '这个能力名我不认识' })).toBeVisible()
+  await expect(page.getByTestId('print-hub-primary')).toHaveText('返回打印扫描')
   await expectHealthy(page, errors, 'print-scan-feature')
 })
 
@@ -197,6 +198,8 @@ test('conversion payload order matches the visible list after reorder @w2', asyn
   await upload.setInputFiles({ name: 'w2-image-2.png', mimeType: 'image/png', buffer: Buffer.from('synthetic-w2-image-2') })
   await expect(page.getByText('w2-image-2.png', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '选中第 1 张：w2-image-1.png' }).click()
+  // 上移 / 下移 / 移除 / 查看 / 旋转收在「更多设置」里（稿 18），先点开再排序。
+  await page.getByRole('button', { name: '更多设置', exact: true }).click()
   await page.getByRole('button', { name: '下移' }).click()
   await expect(page.locator('[data-testid="img2pdf-order"]')).toHaveAttribute(
     'data-sent-payload',
@@ -321,6 +324,156 @@ test('guest login from a finished conversion comes back to convert again, not to
   await expect(page.getByTestId('img2pdf-band').getByText('PDF 已生成')).toHaveCount(0)
   await expect(page.getByTestId('img2pdf-primary')).toBeDisabled()
   expect(api.requestCount('POST', '/api/v1/print/convert/images-to-pdf')).toBe(1)
+  await expectHealthy(page, errors, 'print-scan-convert')
+})
+
+
+/*
+ * 版式体检（审查意见 A1 / A2）。一体机竖屏 1080×1920 上，工具页的内容块必须：
+ *   · 左右各留 ≥32px（贴到屏边就是没排好）；
+ *   · 上下相邻、互不压盖（后一块的上沿 ≥ 前一块的下沿 − 1）；
+ *   · 带字的块没有被截（scrollHeight ≤ clientHeight + 1；自己能滚的列表不算）；
+ *   · 屏上所有可点的件 ≥64×64（隐藏的文件输入、读屏专用的除外）。
+ * 此前加 3 张图后「待合并图片」卡只露出前 2 行、上移 / 下移那条和下面两句说明叠成一团，
+ * 签名页内容从 x=0 铺到 x=1080：这些靠空白扫描量不到，要用量出来的几何钉住。
+ */
+async function auditToolLayout(page: Page, rootSelector: string, gutter = 32): Promise<string[]> {
+  return page.evaluate(
+    ({ rootSelector: rootSel, gutter: g }) => {
+      const issues: string[] = []
+      const root = document.querySelector(rootSel) as HTMLElement | null
+      if (!root) return [`找不到版式根 ${rootSel}`]
+      const vw = window.innerWidth
+      const vis = (el: Element) => {
+        const rect = el.getBoundingClientRect()
+        const cs = getComputedStyle(el)
+        return rect.width > 0 && rect.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'
+      }
+      const label = (el: Element) => {
+        const h = el as HTMLElement
+        const id = h.dataset?.testid
+        return `${el.tagName.toLowerCase()}${id ? `[${id}]` : `.${String(h.className).split(' ')[0] ?? ''}`}`
+      }
+      const blocks = Array.from(root.children).filter((c) => {
+        const pos = getComputedStyle(c).position
+        return vis(c) && pos !== 'absolute' && pos !== 'fixed'
+      }) as HTMLElement[]
+      const placed = blocks
+        .map((block) => ({ block, rect: block.getBoundingClientRect() }))
+        .sort((a, b) => a.rect.top - b.rect.top)
+      for (const { block, rect } of placed) {
+        if (rect.left < g - 0.5 || vw - rect.right < g - 0.5) {
+          issues.push(`${label(block)} 左右留白不足（左 ${Math.round(rect.left)}、右 ${Math.round(vw - rect.right)}，要 ≥${g}）`)
+        }
+      }
+      for (let i = 1; i < placed.length; i += 1) {
+        const prev = placed[i - 1]!
+        const next = placed[i]!
+        if (next.rect.top < prev.rect.bottom - 1) {
+          issues.push(`${label(next.block)} 压在 ${label(prev.block)} 上（${Math.round(next.rect.top)} < ${Math.round(prev.rect.bottom)}）`)
+        }
+      }
+      const scrolls = (el: Element) => ['auto', 'scroll'].includes(getComputedStyle(el).overflowY)
+      for (const block of blocks) {
+        for (const el of [block, ...Array.from(block.querySelectorAll<HTMLElement>('*'))]) {
+          if (!vis(el) || scrolls(el) || el instanceof SVGElement || el.closest('[aria-hidden="true"]')) continue
+          if (el.clientHeight === 0 || !(el.textContent ?? '').trim()) continue
+          if (el.scrollHeight > el.clientHeight + 1) {
+            issues.push(`${label(el)} 里的字被截（内容 ${el.scrollHeight}px > 盒子 ${el.clientHeight}px）`)
+          }
+        }
+      }
+      const screen = document.querySelector('[data-qxt-screen]')
+      for (const el of Array.from(screen?.querySelectorAll<HTMLElement>('button, a[href], [role="button"], [role="radio"], [role="checkbox"], input:not([type="hidden"])') ?? [])) {
+        if (!vis(el) || el.closest('[inert]') || el.closest('[aria-hidden="true"]')) continue
+        if (el.matches('.sr-only, .ss-hidden-file, input[type="file"]')) continue
+        const rect = el.getBoundingClientRect()
+        if (rect.width < 64 - 0.5 || rect.height < 64 - 0.5) {
+          issues.push(`${label(el)}「${(el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 14)}」可点区只有 ${Math.round(rect.width)}×${Math.round(rect.height)}，要 ≥64×64`)
+        }
+      }
+      return issues
+    },
+    { rootSelector, gutter },
+  )
+}
+
+function registerNumberedImageUploads(api: ApiRouter): void {
+  api.respondWith('POST', '/api/v1/files/kiosk-upload', (n) => ({
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        fileId: `w2-image-${String(n).padStart(3, '0')}`,
+        filename: `成绩单-扫描-${n}.png`,
+        sizeBytes: 1024,
+        mimeType: 'image/png',
+        sha256: 'c'.repeat(64),
+        signedUrl: '/w2-fixtures/image.png',
+        signedUrlExpiresAt: '2026-07-24T00:10:00.000Z',
+        fileExpiresAt: '2026-07-25T00:00:00.000Z',
+      },
+    },
+  }))
+}
+
+async function addNumberedImages(page: Page, count: number): Promise<void> {
+  for (let i = 1; i <= count; i += 1) {
+    await page.locator('input[type="file"]').setInputFiles({
+      name: `成绩单-扫描-${i}.png`,
+      mimeType: 'image/png',
+      buffer: Buffer.from(`synthetic-w2-image-${i}`),
+    })
+    await expect(page.getByText(`成绩单-扫描-${i}.png`, { exact: true })).toBeVisible()
+  }
+}
+
+const CONVERT_LAYOUT_ROOT = '[data-qx-page="img2pdf"] .i2p-scroll'
+
+for (const count of [1, 3, 20]) {
+  test(`conversion list with ${count} image(s) keeps blocks apart, uncut and tappable @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    await fulfillFixtureImage(page)
+    registerShell(api)
+    registerNumberedImageUploads(api)
+
+    await page.goto('/print-scan/convert')
+    await addNumberedImages(page, count)
+    expect(await auditToolLayout(page, CONVERT_LAYOUT_ROOT), `${count} 张图的列表版式`).toEqual([])
+    // 选中一张、点开「更多设置」之后也一样：设置条不许压在下面的说明上。
+    await page.getByRole('button', { name: `选中第 ${count} 张：成绩单-扫描-${count}.png` }).click()
+    await page.getByRole('button', { name: '更多设置', exact: true }).click()
+    expect(await auditToolLayout(page, CONVERT_LAYOUT_ROOT), `${count} 张图、选中并展开更多设置的版式`).toEqual([])
+    await expectHealthy(page, errors, 'print-scan-convert')
+  })
+}
+
+test('conversion finished and failed states keep blocks apart, uncut and tappable @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await fulfillFixtureImage(page)
+  registerShell(api)
+  registerNumberedImageUploads(api)
+  api.respond('POST', '/api/v1/print/convert/images-to-pdf', {
+    status: 422,
+    json: { success: false, error: { code: 'CONVERT_FAILED', message: '合成图片尺寸不受支持' } },
+  })
+
+  await page.goto('/print-scan/convert')
+  await addNumberedImages(page, 3)
+  await page.getByRole('button', { name: /合成 3 张为一份 PDF/ }).click()
+  await expect(page.getByText('合成图片尺寸不受支持', { exact: true })).toBeVisible()
+  expect(await auditToolLayout(page, CONVERT_LAYOUT_ROOT), '明确失败态的版式').toEqual([])
+
+  api.respond('POST', '/api/v1/print/convert/images-to-pdf', {
+    status: 200,
+    json: {
+      success: true,
+      data: { fileId: 'w2-pdf-layout', printFileUrl: '/w2-fixtures/image.png', fileMd5: 'd'.repeat(32), sizeBytes: 4096, pages: 3, hasEndUser: false },
+    },
+  })
+  await page.getByRole('button', { name: '改完之后重试合成' }).click()
+  await expect(page.getByTestId('img2pdf-band').getByText('PDF 已生成')).toBeVisible()
+  expect(await auditToolLayout(page, CONVERT_LAYOUT_ROOT), '完成态的版式').toEqual([])
   await expectHealthy(page, errors, 'print-scan-convert')
 })
 
@@ -563,6 +716,59 @@ test('signature inspect renders server pages and compose sends placement payload
   await expectHealthy(page, errors, 'print-scan-sign')
 })
 
+// 走查 I-14：「签名」第 2 步点「手机扫码上传图片」，二维码此前必败（POST /upload-sessions 带 signature_image 回 400，
+// 弹层写「二维码生成失败」、确认键灰着）。后端放行后，这一步要真的走通：开会话 → 手机传 → 一体机确认 → 这张图成为签名。
+test('signature step 2: the phone QR opens a signature_image upload session and the confirmed picture becomes the stamp @w2', async ({ page, api }, testInfo) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerSignCapabilities(api)
+  registerMemberLogin(api)
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+  const stampFile = { fileId: 'w2-sign-phone-stamp', filename: '手写签名.png', sizeBytes: 240, mimeType: 'image/png', sha256: 'e'.repeat(64), fileExpiresAt: new Date(Date.now() + 3_600_000).toISOString() }
+  api.respond('POST', '/api/v1/files/kiosk-upload', {
+    status: 200,
+    json: { success: true, data: { fileId: 'w2-sign-doc-phone', filename: '就业协议.pdf', sizeBytes: 1800, mimeType: 'application/pdf', sha256: 'a'.repeat(64), signedUrl: '/w2-fixtures/doc.pdf', signedUrlExpiresAt: '2026-07-24T00:10:00.000Z', fileExpiresAt: '2026-07-25T00:00:00.000Z' } },
+  })
+  api.respond('POST', '/api/v1/print/sign/inspect', { status: 200, json: { success: true, data: { pages: 3 } } })
+  api.respond('POST', '/api/v1/upload-sessions', {
+    status: 201,
+    json: { success: true, data: { sessionId: 'w2-sign-session', uploadUrl: 'http://127.0.0.1:4182/upload/phone', uploadToken: 'w2-sign-upload-token', controlToken: 'w2-sign-control-token', expiresAt, sceneToken: 'SNtynYMXmy7P4MSNE8uMi-yL' } },
+  })
+  api.respond('GET', '/api/v1/upload-sessions/w2-sign-session', {
+    status: 200,
+    json: { success: true, data: { sessionId: 'w2-sign-session', status: 'uploaded', purpose: 'signature_image', mode: 'member', file: stampFile, requiresKioskConfirmation: true, expiresAt } },
+  })
+  api.respond('POST', '/api/v1/upload-sessions/w2-sign-session/confirm', {
+    status: 201,
+    json: { success: true, data: { sessionId: 'w2-sign-session', status: 'confirmed', file: { ...stampFile, fileUrl: '/w2-fixtures/stamp.png' } } },
+  })
+  const createBodies: string[] = []
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/upload-sessions') createBodies.push(request.postData() ?? '')
+  })
+
+  await loginThroughVisibleUi(page, '/print-scan/sign')
+  await page.locator('input[accept="application/pdf"]').setInputFiles({ name: '就业协议.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') })
+  await expect(page.getByTestId('sign-stamp-doc-tag')).toContainText('就业协议.pdf')
+  await page.getByTestId('sign-stamp-pick-stamp-phone').click()
+  const layer = page.getByTestId('sign-stamp-qr-layer')
+  await expect(layer.getByText('用手机上传签名图', { exact: true })).toBeVisible()
+  await expect(layer.locator('svg').first()).toBeVisible()
+  await expect(layer.getByText('二维码生成失败')).toHaveCount(0)
+  // 签名图只留系统短期、不进「我的文档」：面板里不能说「会员文件确认后归档」
+  await expect(layer.getByText('会员文件确认后归档')).toHaveCount(0)
+  expect(createBodies).toHaveLength(1)
+  expect(JSON.parse(createBodies[0])).toMatchObject({ purpose: 'signature_image', mode: 'member', channel: 'phone_h5' })
+  // 手机传上来之后，一体机上确认，这张图就成了签名
+  const confirm = layer.getByRole('button', { name: '确认使用该图片', exact: true })
+  await expect(confirm).toBeEnabled({ timeout: 8_000 })
+  await page.screenshot({ path: testInfo.outputPath('sign-step2-phone-qr-uploaded.png'), fullPage: false })
+  await confirm.click()
+  await expect(layer).toHaveCount(0)
+  await expect(page.getByTestId('sign-stamp-stamp-tag')).toContainText('手写签名.png')
+  await expectHealthy(page, errors, 'print-scan-sign')
+})
+
 test('signature compose 429 shows rate-limited and does not silently retry @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
@@ -647,3 +853,96 @@ for (const alias of [
     await expectHealthy(page, errors, alias.marker)
   })
 }
+
+/*
+ * 签名页的版式体检（审查意见 A2）。此前选 PDF、放置、完成各态：内容从 x=0 铺到 x=1080（卡片、标题、说明句全部没有左右留白）、
+ * 「再加一处」整行按钮和授权说明没有样式、放置步右栏第三张卡被裁掉、选 PDF 底部一句和下面的卡叠在一起、
+ * 页码键 56×56、九宫格 108×62、预览工具条 52 高。空白扫描量不到这些，要用量出来的几何钉住。
+ */
+const SIGN_LAYOUT_ROOT = '[data-qx-page="sign"].ss-page'
+const SIGN_DOC_PATH = '/w2-sign-fixtures/doc.pdf'
+
+async function signFixtures(page: Page, api: ApiRouter, pages: number): Promise<void> {
+  registerShell(api)
+  registerSignCapabilities(api)
+  registerMemberLogin(api)
+  await page.route(`**${SIGN_DOC_PATH}`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+  )
+  await page.route('**/w2-sign-fixtures/stamp.png', (route) =>
+    route.fulfill({ status: 200, contentType: 'image/png', body: PNG_BYTES }),
+  )
+  api.respondWith('POST', '/api/v1/files/kiosk-upload', (n) =>
+    n === 1
+      ? { status: 200, json: { success: true, data: { fileId: 'w2-sign-doc', filename: '就业协议.pdf', sizeBytes: 1800, mimeType: 'application/pdf', sha256: 'a'.repeat(64), signedUrl: SIGN_DOC_PATH, signedUrlExpiresAt: '2026-07-24T00:10:00.000Z', fileExpiresAt: '2026-07-25T00:00:00.000Z' } } }
+      : { status: 200, json: { success: true, data: { fileId: 'w2-sign-stamp', filename: '签名.png', sizeBytes: 240, mimeType: 'image/png', sha256: 'b'.repeat(64), signedUrl: '/w2-sign-fixtures/stamp.png', signedUrlExpiresAt: '2026-07-24T00:10:00.000Z', fileExpiresAt: '2026-07-24T01:00:00.000Z' } } },
+  )
+  api.respond('POST', '/api/v1/print/sign/inspect', { status: 200, json: { success: true, data: { pages } } })
+  api.respond('POST', '/api/v1/print/sign/compose', {
+    status: 200,
+    json: { success: true, data: { fileId: 'w2-sign-out', printFileUrl: SIGN_DOC_PATH, fileMd5: 'c'.repeat(32), sizeBytes: 2100, pages } },
+  })
+}
+
+async function pickSignDocument(page: Page): Promise<void> {
+  await page.locator('input[accept="application/pdf"]').setInputFiles({ name: '就业协议.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') })
+  await expect(page.getByTestId('sign-stamp-doc-tag')).toContainText('就业协议.pdf')
+}
+
+async function pickSignStamp(page: Page): Promise<void> {
+  await page.locator('input[accept="image/jpeg,image/png"]').setInputFiles({ name: '签名.png', mimeType: 'image/png', buffer: Buffer.from('png') })
+  await expect(page.getByTestId('sign-stamp-stamp-tag')).toContainText('签名.png')
+}
+
+for (const [label, steps] of [
+  ['picking the PDF', async () => undefined],
+  ['picking the signature image', async (page: Page) => pickSignDocument(page)],
+] as const) {
+  test(`signature page while ${label} keeps blocks apart, uncut, inset and tappable @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    await signFixtures(page, api, 6)
+    await loginThroughVisibleUi(page, '/print-scan/sign')
+    await expect(page.getByTestId('sign-stamp-pick-doc-phone').or(page.getByTestId('sign-stamp-pick-stamp-phone'))).toBeVisible()
+    await steps(page)
+    await expect(page.locator('[data-testid^="sign-stamp-pick-"]').first()).toBeVisible()
+    expect(await auditToolLayout(page, SIGN_LAYOUT_ROOT), `签名页「${label}」的版式`).toEqual([])
+    await expectHealthy(page, errors, 'print-scan-sign')
+  })
+}
+
+test('signature placement and finished steps keep blocks apart, uncut, inset and tappable @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await signFixtures(page, api, 6)
+  await loginThroughVisibleUi(page, '/print-scan/sign')
+  await pickSignDocument(page)
+  await pickSignStamp(page)
+  await expect(page.getByTestId('sign-stamp-authorize')).toBeVisible()
+  expect(await auditToolLayout(page, SIGN_LAYOUT_ROOT), '放置步的版式').toEqual([])
+
+  // 更多设置展开后：页码、九宫格、大小、怎么看的按钮都 ≥64×64，设置面板不压别的块。
+  await page.getByTestId('sign-stamp-more').click()
+  await expect(page.getByTestId('sign-stamp-settings')).toBeVisible()
+  expect(await auditToolLayout(page, SIGN_LAYOUT_ROOT), '放置步展开更多设置的版式').toEqual([])
+  await page.getByTestId('sign-stamp-more').click()
+
+  await page.getByRole('checkbox', { name: /我确认本人拥有该签名\/印章图片的使用授权/ }).click()
+  await page.getByRole('button', { name: '生成合成 PDF', exact: true }).click()
+  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('新的 PDF 已生成')
+  await expect(page.getByTestId('sign-stamp-add-another')).toBeVisible()
+  expect(await auditToolLayout(page, SIGN_LAYOUT_ROOT), '完成态的版式').toEqual([])
+  await expectHealthy(page, errors, 'print-scan-sign')
+})
+
+test('signature closed and login-required gates keep blocks apart, uncut, inset and tappable @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: { capabilities: [capabilityRow('document_print', 'available', true)] },
+  })
+  await loginThroughVisibleUi(page, '/print-scan/sign')
+  await expectSignatureNotOpen(page, api)
+  expect(await auditToolLayout(page, SIGN_LAYOUT_ROOT), '能力未开的整页说明版式').toEqual([])
+  await expectHealthy(page, errors, 'print-scan-sign')
+})

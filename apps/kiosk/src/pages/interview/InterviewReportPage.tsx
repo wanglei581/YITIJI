@@ -4,12 +4,13 @@
 // 数据：路由 state（刚结束）或凭 sessionId+凭证从服务端读回（会员历史/刷新）。
 // 操作：打印报告（服务端真实 PDF → 既有打印链路）、重新练习。
 // 合规：不显示等级、不写岗位匹配；固定免责说明，只给本人复盘。
+// 版式（稿 iv-report / iv-report-more）：主视图是概览、五个维度、风险点；预测题、STAR、清单、摘录在「更多」视图。
+// 整页只有一个滚动容器，说明卡和维度行都不收缩，条目多就往下滑，不压扁、不裁字。
 // ============================================================
 
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Card, ComplianceBanner } from '@ai-job-print/ui'
 import type { InterviewReportResponse } from '@ai-job-print/shared'
 
 type InterviewQaExcerpt = {
@@ -23,22 +24,17 @@ type InterviewReportView = InterviewReportResponse & {
   includeAnswersInPrint?: boolean
 }
 import { AI_LABEL_COPY, COMPLIANCE_COPY } from '@ai-job-print/shared'
-import {
-  AlertTriangleIcon,
-  CheckCircle2Icon,
-  ClipboardListIcon,
-  HelpCircleIcon,
-  LightbulbIcon,
-  MessageSquareTextIcon,
-  TargetIcon,
-} from 'lucide-react'
 import { getInterviewReport, printInterviewReport } from '../../services/api/interview'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
+import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { InterviewShell } from './InterviewShell'
-import { InterviewNotice, InterviewRail, InterviewStatus } from './interviewQxParts'
-import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
+import { InterviewArt } from './InterviewArt'
+import { InterviewStatus } from './interviewQxParts'
+import { scrollInterviewToTop } from './interviewScroll'
+import { interviewUserLine } from './interviewMicCopy'
+import { type InterviewStage } from './interviewWorkbenchModel'
 import {
   patchInterviewWorkbenchSession,
   readInterviewWorkbenchSession,
@@ -47,6 +43,7 @@ import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
 import './styles/interview-qx2.css'
+import './styles/interview-touch-report.css'
 
 const REPORT_AI_DRAFT = '我刚完成一场模拟面试，想看懂练习报告。请先问我想看的部分，再说明这只供我自己复盘，不要预测录用。'
 
@@ -56,28 +53,26 @@ interface ReportState {
   report?: InterviewReportView
 }
 
-function Section({ icon: Icon, title, children, className = '' }: { icon: React.ElementType; title: string; children: React.ReactNode; className?: string }) {
+/** 一个维度：标题是真正的标题，下面是这一维的几条观察。 */
+function Dimension({ title, items }: { title: string; items: string[] }) {
   return (
-    <Card className={['interview-card interview-report__section p-5', className].filter(Boolean).join(' ')}>
-      <div className="mb-3 flex items-center gap-2">
-        <Icon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-        <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
-      </div>
-      {children}
-    </Card>
+    <section className="qxt-iv-ab">
+      <h2>{title}</h2>
+      <ul>
+        {items.map((t) => (
+          <li key={t.slice(0, 24)}>{t}</li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
-function Bullets({ items }: { items: string[] }) {
+/** 报告顶部的 AI 标识与边界。主视图和「更多」都带，只用于本人复盘，不发给任何企业。 */
+function AiBanner() {
   return (
-    <ul className="flex flex-col gap-2">
-      {items.map((t) => (
-        <li key={t.slice(0, 24)} className="flex items-start gap-2 text-sm leading-relaxed text-neutral-700">
-          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-400" aria-hidden="true" />
-          {t}
-        </li>
-      ))}
-    </ul>
+    <div role="note" aria-label="合规提示" className="qxt-iv-banner">
+      <b>{AI_LABEL_COPY.INTERVIEW_REPORT}。</b>不代表任何招聘结果，不参与企业筛选、面试邀约或录用决策，也不会发送给任何企业。
+    </div>
   )
 }
 
@@ -99,6 +94,11 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
   const [loadError, setLoadError] = useState(false)
   const [printing, setPrinting] = useState(false)
   const [printError, setPrintError] = useState<string | null>(null)
+  const [more, setMore] = useState(false)
+  const moreTitleRef = useRef<HTMLHeadingElement>(null)
+  const overviewRef = useRef<HTMLHeadingElement>(null)
+  const contact = useSupportContact()
+  const shownPrintError = interviewUserLine(printError, contact)
 
   useBusyLock(printing)
 
@@ -148,25 +148,33 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
 
   const goSetup = () => onGoStage ? onGoStage('setup') : navigate('/interview/setup')
   const goReports = () => onGoStage ? onGoStage('reports') : navigate('/interview/reports')
+  const leave = () => navigate('/interview-service')
+
+  // 切到「更多」或回主视图：回到顶，焦点放到新视图的第一个标题（点下去的按钮已被卸载）。
+  useLayoutEffect(() => {
+    const target = more ? moreTitleRef.current : overviewRef.current
+    target?.focus({ preventScroll: true })
+    scrollInterviewToTop()
+  }, [more])
 
   if (loading) {
     return (
       <InterviewShell
-        title={<>正在核对<em>报告状态</em>。</>}
+        eyebrow="练面试 · 报告"
+        title="正在核对报告状态。"
         subtitle="报告只按这场练习读取。读取完成前不展示上一次内容，也不提前放开打印。"
         status={{ tone: 'unknown', label: '正在读取' }}
         ctabar={
-          <div className="interview-qx-cta">
-            <QxStepActions>
-              <QxAiHelp label="问小青：报告还在读取怎么办" draft="练习报告还在读取。请说明我可以先做什么，不要假装报告已经生成。" />
-            </QxStepActions>
-          </div>
+          <QxTouchDock
+            onBack={leave}
+            ask={{ label: '问小青：报告还在读取怎么办', draft: '练习报告还在读取。请说明我可以先做什么，不要假装报告已经生成。' }}
+          />
         }
       >
-        <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
+        <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
           <div className="interview-flow__scroll">
             <InterviewStatus label="报告读取状态" items={[{ k: '报告内容', v: '读取中' }, { k: '打印版', v: '未生成' }, { k: '录用预测', v: '不提供' }]} />
-            <section className="iv-card iv-empty"><div><h2>正在读取本场练习报告</h2><p>读取完成前，这里不展示上一次的内容。</p></div></section>
+            <InterviewArt title="正在读取本场练习报告">读取完成前，这里不展示上一次的内容，也不显示评分、打印成功或可下载文件。读取没有完成之前，不能生成打印版。</InterviewArt>
           </div>
         </div>
       </InterviewShell>
@@ -175,164 +183,152 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
   if (loadError || !data) {
     return (
       <InterviewShell
-        title={<>这份报告暂时<em>不能查看</em>。</>}
+        eyebrow="练面试 · 报告"
+        title="这份报告暂时不能查看。"
         subtitle="报告可能还没生成、已经过期，或当前账号不能查看；不能用固定内容替代实际结果。"
         status={{ tone: 'bad', label: '报告不可用' }}
         ctabar={
-          <div className="interview-qx-cta">
-            <div className="iv-cta-row">
-              <button type="button" className="qx-btn" data-variant="ghost" onClick={goReports}>查看报告历史</button>
-              <button type="button" className="qx-btn" data-variant="primary" onClick={goSetup}>重新开始练习<em aria-hidden="true">→</em></button>
-            </div>
-          </div>
+          <QxTouchDock
+            onBack={leave}
+            ask={{ label: '问小青：这份练习报告怎么看', draft: REPORT_AI_DRAFT }}
+            primary={{ label: '重新开始练习', onClick: goSetup }}
+          />
         }
       >
-      <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
-        <div className="interview-flow__scroll">
-          <section className="iv-card iv-empty is-bad">
-            <div>
-              <h2>报告不存在或已过期</h2>
-              <p>没有真实报告时，不显示评分、打印成功或可下载文件。</p>
-            </div>
-          </section>
+        <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
+          <div className="interview-flow__scroll">
+            <button type="button" className="qxt-iv-wide" onClick={goReports}>
+              <b>查看报告历史</b>
+              <small>回到本人的练习记录</small>
+            </button>
+            <InterviewArt title="报告不存在或已过期">没有真实报告时，不显示评分、打印成功或可下载文件。可以重新开始一场练习，或先看历史里别的记录。</InterviewArt>
+          </div>
         </div>
-      </div>
       </InterviewShell>
     )
   }
 
-  const copy = INTERVIEW_STAGE_COPY.report
-  const titleParts = emphasizedTitle(copy)
+  const printNote = data.includeAnswersInPrint === false
+    ? '你选择了不把回答印进打印件'
+    : '打印件会收录每题回答的前 200 字'
+  const excerpts = Array.isArray(data.qaExcerpts) ? data.qaExcerpts : []
 
   return (
     <InterviewShell
-      title={<>{titleParts.before}<em>{titleParts.em}</em>{titleParts.after}</>}
-      subtitle={`${data.position} · ${data.industry} · ${data.interviewerLabel}。只用于本人复盘，不代表通过率或录用结果。`}
+      eyebrow="练面试 · 报告"
+      title="报告用来复盘练习。"
+      subtitle={more
+        ? '预测题、STAR、准备清单和问答摘录。'
+        : `${data.position} · ${data.industry} · ${data.interviewerLabel}。只用于本人复盘，不代表通过率或录用结果。`}
+      onBack={more ? () => setMore(false) : undefined}
+      status={printing
+        ? { tone: 'warn', label: '正在生成打印版' }
+        : printError
+          ? { tone: 'bad', label: '打印版没有生成' }
+          : { tone: 'ok', label: '报告可以查看' }}
       ctabar={
-        <div className="interview-qx-cta">
-          <QxStepActions onPrev={goReports} prevLabel="查看历史报告">
-            <QxAiHelp label="问小青：这份练习报告怎么看" draft={REPORT_AI_DRAFT} />
-          </QxStepActions>
-          <div className="iv-history-actions">
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={goSetup}>重新练习</button>
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="primary"
-              data-testid="interview-primary"
-              disabled={printing}
-              onClick={() => void handlePrint()}
-            >
-              {printing ? '正在生成打印版…' : '生成打印版'}
-            </button>
-          </div>
-        </div>
+        <QxTouchDock
+          onBack={more ? () => setMore(false) : leave}
+          ask={{ label: '问小青：这份练习报告怎么看', draft: REPORT_AI_DRAFT }}
+          primary={more
+            ? { label: '回到这份报告', onClick: () => setMore(false), testId: 'interview-primary' }
+            : {
+                label: printing ? '正在生成打印版…' : '生成打印版',
+                onClick: () => void handlePrint(),
+                disabled: printing,
+                testId: 'interview-primary',
+              }}
+        />
       }
     >
-    <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
-
-      <div className="interview-flow__scroll">
-        <p className="text-xs text-neutral-400">{COMPLIANCE_COPY.INTERVIEW_PRACTICE_RESULT_DISCLAIMER}</p>
-        <InterviewStatus
-          label="报告与打印状态"
-          items={[
-            { k: '报告内容', v: '可以查看', tone: 'ok' },
-            { k: '打印版', v: printing ? '生成中' : printError ? '没有生成' : '还没有', tone: printError ? 'off' : undefined },
-            { k: '录用预测', v: '不提供' },
-          ]}
-        />
-        {/* 横幅以 AI 可见标识开头（审计表一「模拟面试报告（一体机）」，next-tasks 3.5c）。 */}
-        <ComplianceBanner tone="info">
-          <b>{AI_LABEL_COPY.INTERVIEW_REPORT}。</b>不代表任何招聘结果，不参与企业筛选、面试邀约或录用决策，也不会发送给任何企业。
-        </ComplianceBanner>
-
-        {/* 综合表现 */}
-        <Card className="interview-card interview-report__hero p-5">
-          <h2 className="text-base font-semibold text-neutral-900">综合表现概览</h2>
-          <p className="mt-3 text-sm leading-relaxed text-neutral-700">{data.report.overall.summary}</p>
-        </Card>
-
-        <div className="interview-report__abilities">
-          <Section icon={MessageSquareTextIcon} title="表达清晰度"><Bullets items={data.report.expression} /></Section>
-          <Section icon={TargetIcon} title="和目标岗位要求的对照"><Bullets items={data.report.positionFit} /></Section>
-          <Section icon={CheckCircle2Icon} title="经历可信度与细节"><Bullets items={data.report.credibility} /></Section>
-          <Section icon={LightbulbIcon} title="专业能力表现"><Bullets items={data.report.professional} /></Section>
-          <Section icon={MessageSquareTextIcon} title="沟通与应变能力"><Bullets items={data.report.adaptability} /></Section>
-        </div>
-
-        <div className="interview-report__two-col">
-        <Section icon={AlertTriangleIcon} title="风险点与改进建议" className="interview-report__risk">
-          <ul className="flex flex-col gap-2">
-            {data.report.risks.map((t) => (
-              <li key={t.slice(0, 24)} className="flex items-start gap-2 rounded-lg bg-warning-bg px-3 py-2 text-sm leading-relaxed text-warning-fg">
-                <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                {t}
-              </li>
-            ))}
-          </ul>
-        </Section>
-
-        <Section icon={HelpCircleIcon} title="高频问题预测" className="interview-report__questions">
-          <div className="flex flex-col gap-3">
-            {data.report.predictedQuestions.map((q, i) => (
-              <div key={q.question.slice(0, 24)} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-3.5">
-                <p className="text-sm font-semibold text-neutral-900">{i + 1}. {q.question}</p>
-                <p className="mt-1.5 text-xs text-neutral-500">考察点：{q.why}</p>
-                <p className="mt-1 text-xs leading-relaxed text-neutral-600">回答思路:{q.approach}</p>
+      <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
+        <div className="interview-flow__scroll">
+          <AiBanner />
+          {more ? (
+            <>
+              <section className="qxt-iv-note">
+                <h2 ref={moreTitleRef} tabIndex={-1}>高频问题预测</h2>
+                {data.report.predictedQuestions.map((q, i) => (
+                  <div key={q.question.slice(0, 24)} className="qxt-iv-q-row">
+                    <span><b>{i + 1}. {q.question}</b></span>
+                    <span>考察点：{q.why}</span>
+                    <span>回答思路：{q.approach}</span>
+                  </div>
+                ))}
+              </section>
+              <section className="qxt-iv-note">
+                <h2>面试前准备清单</h2>
+                {data.report.checklist.map((c) => (
+                  <span key={c.slice(0, 24)}>{c}</span>
+                ))}
+              </section>
+              {excerpts.length > 0 && (
+                <section className="qxt-iv-note">
+                  <h2>问答摘录</h2>
+                  <span>{data.includeAnswersInPrint === false ? '你选择了不把回答印进打印件。下面仍可在屏幕上回看摘录。' : `${printNote}。`}</span>
+                  {excerpts.map((item, i) => (
+                    <div key={`${i}-${item.question.slice(0, 24)}`} className="qxt-iv-q-row">
+                      <span><b>{i + 1}. {item.question}</b></span>
+                      <span>{item.skipped ? '回答：（跳过）' : `回答：${item.answerExcerpt?.trim() || '（未作答）'}`}</span>
+                    </div>
+                  ))}
+                </section>
+              )}
+              <section className="qxt-iv-note qxt-iv-rest">
+                <h2>STAR 回答建议</h2>
+                <span><b>S 情境：</b>{data.report.starAdvice.s}</span>
+                <span><b>T 任务：</b>{data.report.starAdvice.t}</span>
+                <span><b>A 行动：</b>{data.report.starAdvice.a}</span>
+                <span><b>R 结果：</b>{data.report.starAdvice.r}</span>
+                <span>{data.report.starAdvice.reminder}</span>
+              </section>
+            </>
+          ) : (
+            <>
+              <InterviewStatus
+                label="报告与打印状态"
+                items={[
+                  { k: '报告内容', v: '可以查看', tone: 'ok' },
+                  { k: '打印版', v: printing ? '生成中' : printError ? '没有生成' : '还没有', tone: printError ? 'off' : undefined },
+                  { k: '录用预测', v: '不提供' },
+                ]}
+              />
+              <section className="qxt-iv-note">
+                <h2 ref={overviewRef} tabIndex={-1}>综合表现概览</h2>
+                <span>{data.report.overall.summary}</span>
+              </section>
+              <div className="qxt-iv-abs">
+                <Dimension title="表达清晰度" items={data.report.expression} />
+                <Dimension title="和目标岗位要求的对照" items={data.report.positionFit} />
+                <Dimension title="经历可信度与细节" items={data.report.credibility} />
+                <Dimension title="专业能力表现" items={data.report.professional} />
+                <Dimension title="沟通与应变能力" items={data.report.adaptability} />
               </div>
-            ))}
-          </div>
-        </Section>
+              <section className="qxt-iv-note">
+                <h2>风险点与改进建议</h2>
+                <ul>
+                  {data.report.risks.map((t) => (
+                    <li key={t.slice(0, 24)}>{t}</li>
+                  ))}
+                </ul>
+              </section>
+              {shownPrintError ? <p className="qxt-iv-err" role="alert">{shownPrintError}</p> : null}
+              <button type="button" className="qxt-iv-wide" onClick={() => setMore(true)}>
+                <b>预测题、STAR、清单、摘录</b>
+                <small>{printNote}</small>
+              </button>
+              <div className="qxt-iv-acts">
+                <button type="button" onClick={goReports}>查看历史报告</button>
+                <button type="button" onClick={goSetup}>重新练习</button>
+              </div>
+              <div className="qxt-iv-note">
+                <span>{COMPLIANCE_COPY.INTERVIEW_PRACTICE_RESULT_DISCLAIMER}</span>
+                <span><b>打印不会先假装成功。</b>只有真正生成文件之后，才会进入打印确认；失败时仍停在报告页并写明原因。</span>
+              </div>
+            </>
+          )}
         </div>
-
-        <Section icon={LightbulbIcon} title="STAR 回答建议">
-          <div className="flex flex-col gap-2 text-sm leading-relaxed text-neutral-700">
-            <p><span className="font-semibold text-primary-700">S 情境：</span>{data.report.starAdvice.s}</p>
-            <p><span className="font-semibold text-primary-700">T 任务：</span>{data.report.starAdvice.t}</p>
-            <p><span className="font-semibold text-primary-700">A 行动：</span>{data.report.starAdvice.a}</p>
-            <p><span className="font-semibold text-primary-700">R 结果：</span>{data.report.starAdvice.r}</p>
-            <p className="mt-1 rounded-lg bg-warning-bg px-3 py-2 text-xs text-warning-fg">{data.report.starAdvice.reminder}</p>
-          </div>
-        </Section>
-
-        {Array.isArray(data.qaExcerpts) && data.qaExcerpts.length > 0 && (
-          <Section icon={MessageSquareTextIcon} title="问答摘录">
-            <p className="mb-3 text-xs text-neutral-500">
-              {data.includeAnswersInPrint === false
-                ? '你选择了不把回答印进打印件。下面仍可在屏幕上回看摘录。'
-                : '打印件会收录每题回答的前 200 字。'}
-            </p>
-            <div className="flex flex-col gap-3">
-              {data.qaExcerpts.map((item, i) => (
-                <div key={`${i}-${item.question.slice(0, 24)}`} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-3.5">
-                  <p className="text-sm font-semibold text-neutral-900">{i + 1}. {item.question}</p>
-                  <p className="mt-1.5 text-sm leading-relaxed text-neutral-700">
-                    {item.skipped ? '回答：（跳过）' : `回答：${item.answerExcerpt?.trim() || '（未作答）'}`}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </Section>
-        )}
-
-        <Section icon={ClipboardListIcon} title="面试前准备清单">
-          <ul className="flex flex-col gap-2">
-            {data.report.checklist.map((c) => (
-              <li key={c.slice(0, 24)} className="flex items-start gap-2.5 text-sm leading-relaxed text-neutral-700">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border border-neutral-300 text-[10px] text-transparent" aria-hidden="true">✓</span>
-                {c}
-              </li>
-            ))}
-          </ul>
-        </Section>
-
-        {printError && <p className="iv-alert" role="alert">{printError}</p>}
-        <InterviewNotice>
-          <b>打印不会先假装成功。</b>只有真正生成文件之后，才会进入打印确认；失败时仍停在报告页并写明原因。
-        </InterviewNotice>
-        <InterviewRail />
       </div>
-    </div>
     </InterviewShell>
   )
 }

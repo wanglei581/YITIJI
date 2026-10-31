@@ -233,6 +233,8 @@ const WAVE_ROUTES = new Map([
     '/contract-review',
     '/contract-review/processing',
     '/contract-review/result', '/policy-service',
+    // 开发样板（非业务屏）：触屏公共件，不占业务波次。
+    '/dev/touch-gallery',
   ]],
 ])
 
@@ -462,21 +464,23 @@ check('W2-W5 state coverage', () => {
     "registerMemberLogin(api)",
     "loginThroughVisibleUi(page, '/me/resumes')",
     "status: 503",
-    "page.getByRole('heading', { name: '简历记录这次没有加载出来' })",
+    "page.getByRole('heading', { name: '这次没读到', exact: true })",
     "json: { success: true, data: { items: [], nextCursor: null, total: 0 } }",
-    "page.getByText('还没有登录后保存的简历', { exact: true })",
+    "page.getByText('这个账号还没有简历记录', { exact: true })",
   ])
   // 稿 09-system-state（2026-09-25 迁入）：主操作按稿叫「重新检测」（旧页叫「重试连接」），证据锚点随稿换字，判据不变。
+  // 2026-10-28 触屏稿：屏上不写重测次数和秒数，次数只留给读屏（.qxp-sr），证据锚点换成读屏文字节点；进页自动检测后手动重试，判据仍是失败后状态还在且计数累加。
   assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'offline page retains the 8177 state after an aborted health request @w5-kiosk'", [
     "api.abort('GET', '/api/v1/health', 'internetdisconnected')",
     "page.getByRole('button', { name: '重新检测', exact: true }).click()",
-    "page.getByText(/已重试 1 次/)",
+    "page.getByTestId('system-state-auto')).toContainText('已重试 2 次')",
   ])
+  // 证据锚点随稿换字，判据不变：未登录仍有去登录，仍不预渲染资产，仍有不登录出口。
   assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'profile permission state uses the canonical fusion shell @w5-kiosk'", [
     "page.goto('/profile')",
     "page.getByRole('button', { name: '去登录', exact: true })",
     "page.getByRole('region', { name: '我的资产' })",
-    "page.getByRole('region', { name: '登录与不登录的分界' })",
+    "page.getByRole('region', { name: '不登录也能办' })",
   ])
   assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'mobile QR login renders a real API error and touch-safe retry @w5-mobile'", [
     "status: 410",
