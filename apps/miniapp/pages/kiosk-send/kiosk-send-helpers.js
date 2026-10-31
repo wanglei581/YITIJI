@@ -2,6 +2,8 @@
 // 传文件到一体机：回执判定、错误归类、「我的文档」行。纯函数，顶层不碰 wx。
 // （kiosk-send.js 加了「从我的文档选」后超过 500 行，按 CLAUDE.md §8 把纯函数拆到这里。）
 
+const { pickedFileName } = require('../../utils/upload-name')
+
 const MAX_BYTES = 10 * 1024 * 1024
 // 与一体机 phoneUploadModel.receiptOf 的 SESSION_PURPOSES 相同。
 // 与后端上传会话 DTO/service 的用途集合保持一致；签名图仍由后端验证并短期留存。
@@ -39,6 +41,13 @@ function receiptAccepted(body, sessionId, expectedPurpose) {
   if (!isSessionPurpose(body.purpose)) return false
   if (isSessionPurpose(expectedPurpose) && body.purpose !== expectedPurpose) return false
   return true
+}
+
+/** 只补无扩展的显示名：路径明确为 JPG/PNG 才沿用它，不用 image 类别猜 MIME。 */
+function normalizeSignatureFile(file) {
+  if (!file || typeof file.name !== 'string' || !file.name.trim() || file.name.indexOf('.') !== -1
+    || typeof file.path !== 'string' || !/\.(?:jpe?g|png)$/i.test(file.path)) return file
+  return Object.assign({}, file, { name: pickedFileName(file.name, file.path) })
 }
 
 /** 图片选择器只限制媒体类别；扩展名/大小先给明确提示，实际字节仍由后端校验。 */
@@ -125,6 +134,7 @@ function docRowsOf(items, nowMs) {
 module.exports = {
   MAX_BYTES,
   isSessionPurpose,
+  normalizeSignatureFile,
   signatureFileIssue,
   receiptAccepted,
   statusOf,

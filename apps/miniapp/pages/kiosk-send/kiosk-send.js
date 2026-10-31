@@ -30,6 +30,7 @@ const { userMessageOf } = require('../../utils/user-error')
 const {
   MAX_BYTES,
   isSessionPurpose,
+  normalizeSignatureFile,
   signatureFileIssue,
   receiptAccepted,
   statusOf,
@@ -355,6 +356,7 @@ Page({
 
   _send(file) {
     if (this._sendBlocked()) return
+    if (this.data.purpose === 'signature_image') file = normalizeSignatureFile(file)
     const issue = this.data.purpose === 'signature_image' ? signatureFileIssue(file) : ''
     if (issue) {
       this.setData({ phase: 'error', canRetry: true, errorMsg: issue })

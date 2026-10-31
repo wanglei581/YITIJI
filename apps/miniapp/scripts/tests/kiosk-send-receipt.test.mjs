@@ -580,3 +580,58 @@ test('原三用途保持聊天文件选择器与我的文档入口', async () =>
     assert.equal(env.page.data.phase, 'done')
   }
 })
+
+// 条件输入回归，不代表已在某个微信客户端观察到该返回形状。
+test('签名图片名称没有扩展但路径明确时补齐上传名并保持显示一致', async () => {
+  for (const ext of ['jpg', 'jpeg', 'png']) {
+    const env = await openSignature(() => Promise.resolve(receipt({ purpose: 'signature_image' })))
+    const file = { name: '本人手写签名', path: `wxfile://tmp/actual.${ext}`, size: 100, type: 'image' }
+    env.wx.setChosen(file)
+    env.page.chooseAndSend()
+    await flush()
+    assert.equal(env.uploads.length, 1, `${ext} 路径有明确扩展时不应被无扩展显示名遮蔽`)
+    assert.deepEqual(env.uploads[0], [SESSION, TOKEN, file.path, `本人手写签名.${ext}`])
+    assert.equal(env.page.data.phase, 'done')
+    assert.equal(env.page.data.sent[0].name, `本人手写签名.${ext}`)
+    assert.equal(file.name, '本人手写签名', '不能改写选择器原对象')
+    assertTokenStaysInMemory(env.page)
+  }
+})
+
+test('签名图片补名不替换已有扩展、不从image类别猜类型', async () => {
+  for (const file of [
+    { name: '签名.gif', path: 'wxfile://tmp/a.png', size: 100, type: 'image' },
+    { name: '签名.pdf', path: 'wxfile://tmp/a.jpg', size: 100, type: 'image' },
+    { name: '签名.unknown', path: 'wxfile://tmp/a.jpg', size: 100, type: 'image' },
+    { name: '签名', path: 'wxfile://tmp/a', size: 100, type: 'image' },
+    { name: '签名', path: 'wxfile://tmp/a.gif', size: 100, type: 'image' },
+    { name: '签名', path: 'wxfile://tmp/a.jpg', size: 0, type: 'image' },
+    { name: '签名', path: 'wxfile://tmp/a.jpg', size: 10 * 1024 * 1024 + 1, type: 'image' },
+  ]) {
+    const env = await openSignature(() => Promise.reject(new Error('不得上传')))
+    env.wx.setChosen(file)
+    env.page.chooseAndSend()
+    assert.equal(env.uploads.length, 0)
+    assert.equal(env.page.data.phase, 'error')
+    assert.equal(env.page.data.canRetry, true)
+  }
+  const env = await openSignature(() => Promise.resolve(receipt({ purpose: 'signature_image' })))
+  env.wx.setChosen({ name: '原名.JPG', path: 'wxfile://tmp/a.png', size: 100, type: 'image' })
+  env.page.chooseAndSend()
+  await flush()
+  assert.equal(env.uploads[0][3], '原名.JPG', '已有扩展仍走原策略，由后端校验MIME与真实字节')
+})
+
+test('签名补名逻辑不改变简历打印合同的上传文件名', async () => {
+  for (const purpose of ['resume_upload', 'print_doc', 'contract_upload']) {
+    const env = harness(() => Promise.resolve(receipt({ purpose })))
+    env.setScene(() => Promise.resolve({ sessionId: SESSION, uploadToken: TOKEN, purpose }))
+    env.openLink(UPLOAD_LINK)
+    await flush()
+    env.wx.setChosen({ name: '原文件名', path: 'wxfile://tmp/a.jpg', size: 100 })
+    env.page.chooseAndSend()
+    await flush()
+    assert.equal(env.uploads[0][3], '原文件名')
+    assert.equal(env.page.data.sent[0].name, '原文件名')
+  }
+})

@@ -1,5 +1,14 @@
 # 当前开发进度
 
+## 2026-10-31：签名图片无扩展显示名的窄兼容修复（独立本地候选）
+
+- 从集成 `39688b5eec3f8dbef5bbdcedbade477594cbe089` 建 `codex/signature-picker-compat-20261031`；只改既有小程序页面/helper/回执测试 3 文件及两份进度文档。未写主集成/原 Claude 工作区，未改后端、发布配置、依赖、开关或其他用途。
+- 已确认的是条件输入代码缺口：`name=本人手写签名` 非空无扩展、`path=wxfile://tmp/actual.jpg` 时，原预检只看 name 而拒绝；同路径 name 为空反而可过。旧代码新增正例实际得到 0 次上传（预期 1）而失败。官方 api-typings 的 ChooseFile 仅规定 name/path 为 string、type=image 为媒体类别，未约定 name 一定含扩展；这不是已在真实微信客户端复现的故障。来源：https://github.com/wechat-miniprogram/api-typings/blob/master/types/wx/lib.wx.api.d.ts
+- 仅非空且不含点的显示名、临时路径明确以 JPG/JPEG/PNG 结尾时，复用现有命名工具补同类扩展、保留中文名；不修改选择器原对象，规范化名字一致用于原预检、上传和成功显示。有任何点/已有扩展的名称按原策略，不用 image 类别猜 MIME，不为未知路径猜后缀。简历/打印/合同三用途不变。
+- 后端仍只准 signature_image 的 image/jpeg、image/png 且 ≤10MB，并校验扩展与声明 MIME 一致、字节魔数一致；客户端路径/后缀均不当内容真值。既有短期留存、不进我的文档、会话/成员隔离与卸载晚回调保护不变。
+- 验证：先红后绿；JPG/JPEG/PNG 条件正例、中文上传名/显示一致、原对象不变、GIF/PDF/未知/零大小/超限拒绝、已有扩展保持及原三用途回归覆盖。回执/文档 45 项通过；完整 miniapp verify:static 通过（含 418 项生命周期），JS 语法与 diff 检查通过。仓库外日志：`~/.codex/evidence/signature-picker-compat-20261031/`。没有真实 AI、生产请求、出纸或重新构建一体机。
+- 真机边界：尚未验证实际 iOS/Android 微信是否产生这一返回形状、wx.uploadFile 实际 multipart MIME、普通链接规则与一体机确认。手机验收按下一步清单执行，使用合成签名，不以页面沙箱替代平台/硬件验收。
+
 ## 2026-10-31：I-33 招聘页提示条改为群众来源说明（本地修复，未改托管开关）
 
 - 审查依据：`docs/compliance/compliance-boundary.md` §1/§1.1 与 `docs/product/feature-scope.md` 的托管 a/b 边界。云端招聘关闭、客户私有部署自行运营及资质/宣传限制继续有效；本轮只移除群众页面中的内部交付口径，没有删改正式运营限制或招聘隔离。
