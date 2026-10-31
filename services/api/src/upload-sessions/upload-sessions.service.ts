@@ -34,11 +34,12 @@ import {
 import { deleteAnonymousObjectThenTombstone } from './upload-session-object-delete'
 import { hashToken, mintSceneToken, redeemScene, safeEquals, sceneIndexKey } from './upload-scene'
 import { clientDeclarationJson, type ClientDeclaration } from '../common/privacy/client-declaration'
-import type {
-  UploadSessionChannel,
-  UploadSessionFileSource,
-  UploadSessionMode,
-  UploadSessionStatus,
+import {
+  UPLOAD_SESSION_PURPOSES,
+  type UploadSessionChannel,
+  type UploadSessionFileSource,
+  type UploadSessionMode,
+  type UploadSessionStatus,
 } from './upload-sessions.dto'
 
 export interface CreateUploadSessionInput {
@@ -114,12 +115,8 @@ const SESSION_PREFIX = 'upload_session:'
 const UPLOAD_LOCK_PREFIX = 'upload_session_upload_lock:'
 const UPLOAD_EXPIRY_INDEX_KEY = 'upload_session_expiry_index'
 const UPLOAD_CLEANUP_PREFIX = 'upload_session_cleanup:'
-const SUPPORTED_UPLOAD_SESSION_PURPOSES: ReadonlySet<FilePurpose> = new Set([
-  'resume_upload',
-  'print_doc',
-  'signature_image',
-  'contract_upload',
-])
+// 与 CreateUploadSessionDto 的 @IsIn 同一份清单（见 UPLOAD_SESSION_PURPOSES），不再各写一遍。
+const SUPPORTED_UPLOAD_SESSION_PURPOSES: ReadonlySet<FilePurpose> = new Set(UPLOAD_SESSION_PURPOSES)
 const SIGNED_URL_PURPOSES: ReadonlySet<FilePurpose> = new Set([
   'resume_upload',
   'print_doc',
@@ -722,6 +719,8 @@ function memberMismatchException(): ForbiddenException {
 function defaultUploadFilename(purpose: FilePurpose): string {
   if (purpose === 'print_doc') return 'document.pdf'
   if (purpose === 'contract_upload') return 'contract.pdf'
+  // 签名图只收 JPG / PNG：手机没给文件名时按图片起，别落成 resume.pdf 再被扩展名校验挡下。
+  if (purpose === 'signature_image') return 'signature.png'
   return 'resume.pdf'
 }
 

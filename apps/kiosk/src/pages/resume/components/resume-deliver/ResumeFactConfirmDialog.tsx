@@ -1,14 +1,20 @@
 import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { QxTouchOverlay } from '../../../../components/qingxu/touch/QxTouchOverlay'
 import { maskPii } from '../../../../utils/maskPii'
 import type { ConfirmableFact } from './facts'
 
+/**
+ * 导出前核对事实：逐项勾「已核对」，未全勾不能出文件。系统不替本人确认学校、公司、时间段、证书或电话。
+ * variant="touch" 是触屏弹层（优化页用）；默认写法不变（生成预览页用）。两种写法同一份勾选逻辑与同一套脱敏。
+ */
 export function ResumeFactConfirmDialog(props: {
   facts: ConfirmableFact[]
   unconfirmed: string[]
   busy: boolean
   onCancel: () => void
   onConfirm: (factsConfirmedAt: string) => void
+  variant?: 'default' | 'touch'
 }) {
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const allChecked = useMemo(
@@ -16,6 +22,61 @@ export function ResumeFactConfirmDialog(props: {
     [checked, props.facts],
   )
   const canExport = props.facts.length === 0 || allChecked
+  const touch = props.variant === 'touch'
+  const confirm = () => {
+    if (!canExport || props.busy) return
+    props.onConfirm(new Date().toISOString())
+  }
+
+  if (touch) {
+    return (
+      <QxTouchOverlay
+        kind="dialog"
+        title="导出前核对事实"
+        onClose={props.onCancel}
+        actions={(
+          <>
+            <button type="button" className="qxt-btn qxt-btn-pri" aria-disabled={!canExport || props.busy || undefined} onClick={confirm}>
+              {props.busy ? '正在生成文件…' : '确认导出'}
+            </button>
+            <button type="button" className="qxt-btn qxt-btn-sec" onClick={props.onCancel}>返回修改</button>
+          </>
+        )}
+      >
+        <div data-qx-page="resume-fact">
+          <p>请逐项勾选「已核对」。未全勾不能出文件。系统不会替你确认学校、公司、时间段、证书或电话。</p>
+          {props.unconfirmed.length > 0 && (
+            <p className="qxt-pending" role="note">
+              待本人确认：{props.unconfirmed.map((item) => maskPii(item)).join('、')}
+            </p>
+          )}
+          {props.facts.length === 0 ? (
+            <p>这份稿里没有可勾选的学校 / 公司 / 时间段 / 证书 / 电话。</p>
+          ) : (
+            <ul className="qxt-factlist">
+              {props.facts.map((fact) => (
+                <li key={fact.id}>
+                  <label className="qxt-factrow">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(checked[fact.id])}
+                      onChange={(event) => setChecked((prev) => ({ ...prev, [fact.id]: event.target.checked }))}
+                    />
+                    <span>
+                      <b>{fact.label}</b>
+                      {maskPii(fact.value)}
+                    </span>
+                    <em>已核对</em>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+          {!canExport && <p className="qxt-why-not">还有未勾选的事实，不能出文件。</p>}
+        </div>
+      </QxTouchOverlay>
+    )
+  }
 
   return (
     <div className="qx-rd-overlay" role="dialog" aria-modal="true" aria-labelledby="resume-fact-title">
@@ -60,10 +121,7 @@ export function ResumeFactConfirmDialog(props: {
             className="qx-btn"
             data-variant="primary"
             aria-disabled={!canExport || props.busy || undefined}
-            onClick={() => {
-              if (!canExport || props.busy) return
-              props.onConfirm(new Date().toISOString())
-            }}
+            onClick={confirm}
           >
             {props.busy ? '正在生成文件…' : '确认导出'}
           </button>

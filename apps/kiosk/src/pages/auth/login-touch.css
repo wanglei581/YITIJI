@@ -1,0 +1,106 @@
+/* 登录页触屏版：分段切换、协议行、手机号与验证码两行、四张「记在哪」卡、不登录也能办、问小青。
+   只挂在本页；块的通用样式在 public-touch.css；旧版 .k1-login 规则（login-gate-qx.css）在这里按稿覆盖。 */
+.qxt-screen[data-qx-page='login'] .qxp-fill { overflow: hidden; }
+.qxt-screen[data-qx-page='login'] .qx-scroll { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; gap: 10px; padding-top: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.qxt-screen[data-qx-page='login'] .qx-scroll > * { flex-shrink: 0; margin: 0; }
+
+/* 分段：手机号 / 扫码 */
+.qxt-screen[data-qx-page='login'] .lg-tabs { display: flex; gap: 8px; padding: 8px; border-radius: 30px; background: var(--qxt-well); }
+.qxt-screen[data-qx-page='login'] .lg-tab { flex: 1; min-height: 84px; padding: 0 22px; gap: 14px; border: 0; border-radius: 22px; background: transparent; color: var(--qxt-ink-2); }
+.qxt-screen[data-qx-page='login'] .lg-tab .ti { width: 56px; height: 56px; border-radius: 16px; background: var(--qxt-card); color: var(--qxt-ink-2); }
+.qxt-screen[data-qx-page='login'] .lg-tab .tn { font-size: 28px; line-height: 1.3; }
+.qxt-screen[data-qx-page='login'] .lg-tab .td { margin-top: 0; font-size: var(--qxt-fs-aux); color: var(--qxt-ink-3); }
+.qxt-screen[data-qx-page='login'] .lg-tab[aria-current='page'] { background: var(--qx-deep); color: var(--qxt-cream); }
+.qxt-screen[data-qx-page='login'] .lg-tab[aria-current='page'] .ti { background: var(--qxt-band-a); color: var(--qx-emerald); }
+.qxt-screen[data-qx-page='login'] .lg-tab[aria-current='page'] .td { color: var(--qxt-mint); }
+
+/* 协议：一行卡 + 一句提示 */
+.qxt-screen[data-qx-page='login'] .k-agree { min-height: 72px; padding: 8px 16px; gap: 14px; border-radius: 22px; background: var(--qxt-card); border: 1.5px solid var(--qxt-edge); font-size: var(--qxt-fs-body); }
+/* 勾选框那颗按钮（.k-agree-check）旧版只给了 48，和两个协议链接一样抬到 64×64 以上；字号不动。 */
+.qxt-screen[data-qx-page='login'] .k-agree .k-agree-check,
+.qxt-screen[data-qx-page='login'] .k-agree .doclink { display: inline-flex; align-items: center; min-height: 64px; min-width: 64px; }
+.qxt-screen[data-qx-page='login'] .k-agree-hint,
+.qxt-screen[data-qx-page='login'] .lg-hint,
+.qxt-screen[data-qx-page='login'] .lg-from { padding: 12px 18px; border-radius: 22px; background: var(--qxt-well); color: var(--qxt-clay-ink); font-size: var(--qxt-fs-sub); line-height: 1.45; font-weight: 600; }
+
+/* 手机号 / 验证码两行：名称 + 取值区 + 旁边的按钮 */
+.qxt-screen[data-qx-page='login'] section.qx-card { padding: 0; }
+.qxt-screen[data-qx-page='login'] .qx-sec-h .t { font: 700 26px/1.3 var(--qx-sans); color: var(--qxt-ink); }
+.qxt-screen[data-qx-page='login'] .lg-fields { display: flex; flex-direction: column; gap: 10px; }
+/* 名称在左、取值区在右，一行 72 高：省下的高度留给下面四张「记在哪」卡的插画（名称那一格仍是 ≥64 的可点区，点它等于点输入框）。 */
+.qxt-screen[data-qx-page='login'] .lg-field { display: grid; grid-template-columns: 172px minmax(0, 1fr); column-gap: 12px; align-items: center; padding: 8px 16px; border-radius: 22px; background: var(--qxt-card); border: 1.5px solid var(--qxt-edge); }
+.qxt-screen[data-qx-page='login'] .lg-field + .lg-field { margin-top: 0; }
+.qxt-screen[data-qx-page='login'] .lg-field label { grid-column: 1; display: flex; align-items: center; min-height: 64px; margin-bottom: 0; font-size: var(--qxt-fs-sub); font-weight: 700; color: var(--qxt-ink); }
+.qxt-screen[data-qx-page='login'] .lg-field > .lg-row { grid-column: 2; }
+.qxt-screen[data-qx-page='login'] .lg-field > .lg-reason { grid-column: 1 / -1; }
+.qxt-screen[data-qx-page='login'] .lg-input { min-height: 72px; border-radius: 18px; border: 1.5px solid var(--qxt-edge); background: var(--qxt-card); font-size: var(--qxt-fs-body); }
+.qxt-screen[data-qx-page='login'] .lg-input .ph { font-size: var(--qxt-fs-body); color: var(--qxt-ink-3); }
+.qxt-screen[data-qx-page='login'] .lg-side { min-height: 72px; min-width: 212px; border-radius: 18px; border: 1.5px solid var(--qxt-edge); background: var(--qxt-well); color: var(--qxt-ink); font-size: var(--qxt-fs-body); }
+.qxt-screen[data-qx-page='login'] .lg-reason { margin-top: 6px; font-size: var(--qxt-fs-aux); line-height: 1.4; color: var(--qxt-clay-ink); }
+.qxt-screen[data-qx-page='login'] .lg-sent { padding: 12px 18px; border-radius: 22px; background: var(--qxt-teal-wash); color: var(--qxt-teal-ink); font-size: var(--qxt-fs-sub); }
+.qxt-screen[data-qx-page='login'] .lg-sent-h { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+.qxt-screen[data-qx-page='login'] .lg-sent p { margin: 4px 0 0; }
+
+/* 四张「记在哪」卡：2×2，吸收余高，插画随卡高 */
+.qxt-screen[data-qx-page='login'] .lg-facts { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(2, minmax(224px, 1fr)); gap: 10px; }
+/* 保底：卡高不低于 224（上下内边距 28 + 小标题 + 两行说明 + 插画 96），插画不会再被压成一条缝；
+   放不下时由 .qx-scroll 滚动，不压插画。默认态的空间靠上面的字段一行排、小标题只给读屏换出来。 */
+.qxt-screen[data-qx-page='login'] .lg-fact { min-height: 224px; overflow: hidden; }
+.qxt-screen[data-qx-page='login'] .lg-fact .qxp-artbox { min-height: 96px; }
+/* 非空闲态：这一张吸收余高，卡高不低于内容（放不下由 .qx-scroll 滚动，不压插画，同上面四张「记在哪」卡）。 */
+.qxt-screen[data-qx-page='login'] .qx-scroll > .lg-absorb { flex: 1 0 auto; min-height: 150px; }
+/* 扫码态（等二维码、取码失败、取到码）：二维码区占去大半屏，余高只有 90–160，竖着排「标题 + 说明 + 插画」要 198，
+   插画被 .lg-fact 的 overflow:hidden 切掉一大半（Mac 苹方与 Qingxu Sans 都一样）。这里横排：插画在左、标题与说明在右，
+   插画随卡高（取到码、取码失败时约 110 高；还没勾协议时多一条提示，余高只剩约 90，插画跟着缩到约 58），整卡放得下，
+   不把页面撑出滚动条。卡高下限 86 = 上下内边距 28 + 小标题 + 一行说明。手机号态余高有 400 以上，仍然竖排。 */
+.qxt-screen[data-qx-page='login'] .qx-scroll[data-mode='qr'] > .lg-absorb {
+  flex: 1 1 auto;
+  min-height: 86px;
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  grid-template-rows: 1fr 1fr;
+  column-gap: 24px;
+  row-gap: 2px;
+}
+.qxt-screen[data-qx-page='login'] .qx-scroll[data-mode='qr'] > .lg-absorb > .qxp-artbox { grid-column: 1; grid-row: 1 / span 2; min-height: 0; }
+.qxt-screen[data-qx-page='login'] .qx-scroll[data-mode='qr'] > .lg-absorb > h2 { grid-column: 2; grid-row: 1; align-self: end; }
+.qxt-screen[data-qx-page='login'] .qx-scroll[data-mode='qr'] > .lg-absorb > .qxp-note { grid-column: 2; grid-row: 2; align-self: start; }
+.qxt-screen[data-qx-page='login'] .lg-fact .qxp-note { font-size: var(--qxt-fs-aux); line-height: 1.4; }
+
+/* 不登录也能办：三行入口，箭头靠右 */
+.qxt-screen[data-qx-page='login'] .lg-anon { display: flex; flex-direction: column; gap: 8px; }
+.qxt-screen[data-qx-page='login'] .lg-entries { display: flex; flex-direction: row; gap: 10px; }
+.qxt-screen[data-qx-page='login'] .lg-entry { flex: 1 1 0; min-width: 0; min-height: 96px; padding: 10px 14px; gap: 12px; align-items: flex-start; border-radius: 22px; background: var(--qxt-card); border: 1.5px solid var(--qxt-edge); text-align: left; }
+.qxt-screen[data-qx-page='login'] .lg-entry .ei { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; flex: none; background: var(--qxt-teal-wash); color: var(--qxt-teal-ink); }
+.qxt-screen[data-qx-page='login'] .lg-entry .eb { flex: 1; min-width: 0; display: block; }
+.qxt-screen[data-qx-page='login'] .lg-entry .en { display: block; font-size: 24px; line-height: 1.3; font-weight: 700; }
+.qxt-screen[data-qx-page='login'] .lg-entry .ed { display: block; font-size: var(--qxt-fs-aux); line-height: 1.35; color: var(--qxt-ink-2); font-weight: 500; }
+.qxt-screen[data-qx-page='login'] .lg-entry .ego { display: none; }
+
+/* 求助句、边界句、问小青 */
+.qxt-screen[data-qx-page='login'] .qxp-fill > .qxp-note,
+.qxt-screen[data-qx-page='login'] .lg-truth { margin: 4px 0 0; font-size: var(--qxt-fs-aux); line-height: 1.4; color: var(--qxt-ink-2); }
+.qxt-screen[data-qx-page='login'] .lg-ask { flex: none; margin-top: 6px; }
+/* 问小青：共享底栏的 askq 样子（话筒圆钮 + 青色长钮），这里通宽排在底栏上面 */
+.qxt-screen[data-qx-page='login'] .lg-ask .qxt-askq { width: 100%; flex: none; }
+
+/* 数字键盘盖住底部时仍用原来的遮罩与键帽，只把字号放到不小于 20 */
+.qxt-screen[data-qx-page='login'] .lg-kb { font-size: 36px; }
+.qxt-screen[data-qx-page='login'] .lg-keyboard-head { font-size: var(--qxt-fs-sub); }
+
+@media (max-width: 600px) {
+  /* 手机宽度：名称叠在取值区上面，不并排 */
+  .qxt-screen[data-qx-page='login'] .lg-field { grid-template-columns: minmax(0, 1fr); }
+  .qxt-screen[data-qx-page='login'] .lg-field label,
+  .qxt-screen[data-qx-page='login'] .lg-field > .lg-row { grid-column: 1; }
+  .qxt-screen[data-qx-page='login'] .lg-facts { flex: none; grid-template-columns: 1fr; grid-template-rows: none; }
+  .qxt-screen[data-qx-page='login'] .lg-fact { min-height: 200px; }
+  /* 扫码态横排卡：手机宽度下文字列窄、说明会折成两三行，卡高跟内容走，不收缩到内容以下。 */
+  .qxt-screen[data-qx-page='login'] .qx-scroll[data-mode='qr'] > .lg-absorb { flex: 1 0 auto; grid-template-columns: 96px minmax(0, 1fr); column-gap: 16px; }
+  .qxt-screen[data-qx-page='login'] .lg-entries { flex-direction: column; }
+  .qxt-screen[data-qx-page='login'] .lg-side { min-width: 132px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qxt-screen[data-qx-page='login'] * { transition: none; }
+}

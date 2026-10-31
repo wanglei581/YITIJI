@@ -70,7 +70,9 @@ function registerShell(api: ApiRouter): void {
 
 /** 原文一律不透传：5xx 走统一的「服务暂时不可用」，未登记错误码的 4xx 回落到页面自己的兜底句。 */
 const failure = (status: number, message: string) => ({ status, json: { success: false, error: { code: 'FIXTURE_UNREGISTERED', message } } })
-// 现场不安排人：5xx 通用句 = 「请稍后重试」+ 无人值守标准句 1（服务电话，或没读到时的隐私政策联系方式）。
+// 现场无人值守：目录读不到时屏上不许写「联系现场工作人员」。页面把共享错误码表的句子先过 unattendedReason：
+// 句子里带叫人找现场的话就换成页面固定句，不带就原样显示。5xx 通用句已换成「请稍后重试」+ 无人值守标准句 1
+// （服务电话，或没读到时的隐私政策联系方式），不带那种话，所以屏上是这一整句。
 const SERVICE_DOWN = new RegExp(`^服务暂时不可用，请稍后重试。${HELP_NEEDED_LINE.source}。$`)
 
 /** 已停在登录页时完成短信登录，并等回到材料库。 */
@@ -88,15 +90,33 @@ async function loginBackToMaterials(page: Page): Promise<void> {
 }
 
 /**
- * 1080×1920 一体机舞台与 390×844 手机（关缩放走流式）各量一遍：操作条不压滚动区、不掉出视口，
- * 无横向溢出与越界元素，状态胶囊可读，返回键与主操作真能被 ≥48px 的指针命中，再落一张截图。
+ * 详情栏的信息条（材料类型 / 字段数 / 页数 / 文件名）：条本身和里面每个元素的内容都不许比盒子宽，
+ * 否则右边的字被 overflow:hidden 切掉（触屏壳里详情栏只有约 500px 宽，实测「材料类型」「5 项 · 2 必填」被切）。
+ * 这一页没有信息条（空态、读取失败）时不判。
  */
-async function captureViewports(page: Page, name: string, primary = page.locator('.qx-ctabar .qx-btn').last()): Promise<void> {
+async function assertTemplateMetaNotClipped(page: Page, label: string): Promise<void> {
+  const clipped = await page.evaluate(() => {
+    const bad: string[] = []
+    for (const bar of document.querySelectorAll<HTMLElement>('.qx-rm-tmeta')) {
+      for (const el of [bar, ...bar.querySelectorAll<HTMLElement>('*')]) {
+        if (el.scrollWidth > el.clientWidth + 0.5) bad.push(`${el.tagName.toLowerCase()}「${(el.textContent ?? '').trim().slice(0, 16)}」${el.scrollWidth}>${el.clientWidth}`)
+      }
+    }
+    return bad
+  })
+  expect(clipped, `${label} 材料信息条文字被切`).toEqual([])
+}
+
+/**
+ * 1080×1920 一体机舞台与 390×844 手机（关缩放走流式）各量一遍：操作条不压滚动区、不掉出视口，
+ * 无横向溢出与越界元素，状态胶囊可读，信息条文字不被切，返回键与主操作真能被 ≥48px 的指针命中，再落一张截图。
+ */
+async function captureViewports(page: Page, name: string, primary = page.locator('.qxt-dock .qx-btn').last()): Promise<void> {
   for (const size of VIEWPORTS) {
     await page.setViewportSize(size)
     await expect.poll(async () => {
       const scroll = await page.locator('.qx-scroll').boundingBox()
-      const ctabar = await page.locator('.qx-ctabar').boundingBox()
+      const ctabar = await page.locator('.qxt-dock').boundingBox()
       if (!scroll || !ctabar) return 'missing'
       if (scroll.y + scroll.height > ctabar.y + 0.5) return `scroll overlaps ctabar ${scroll.y + scroll.height} > ${ctabar.y}`
       if (ctabar.y + ctabar.height > size.height + 0.5) return `ctabar leaves viewport ${ctabar.y + ctabar.height}`
@@ -104,16 +124,17 @@ async function captureViewports(page: Page, name: string, primary = page.locator
     }, { message: `${name} ${size.width}x${size.height} 操作条与滚动区` }).toBe('ok')
     await assertNoHorizontalOverflow(page)
     await assertNoElementCrossesViewport(page)
-    await assertQxPillReadable(page, `${name} ${size.width}x${size.height}`)
+    await assertQxPillReadable(page, `${name} ${size.width}x${size.height}`, '.qxt-status')
+    await assertTemplateMetaNotClipped(page, `${name} ${size.width}x${size.height}`)
     await primary.scrollIntoViewIfNeeded()
-    for (const target of [page.locator('.qx-topbar-back'), primary]) await assertTapTargetPointerHit(target)
+    for (const target of [page.locator('.qxt-back'), primary]) await assertTapTargetPointerHit(target)
     await page.screenshot({ path: test.info().outputPath(`${name}-${size.width}x${size.height}.png`) })
   }
   await page.setViewportSize({ width: 1080, height: 1920 })
 }
 
 const screenOf = (page: Page) => page.locator('[data-kiosk-screen="resume-materials"]')
-const cta = (page: Page, name: string) => page.locator('.qx-ctabar').getByRole('button', { name, exact: true })
+const cta = (page: Page, name: string) => page.locator('.qxt-dock').getByRole('button', { name, exact: true })
 /** 最终稿的目录重试在正文状态卡；点哪一个、量哪一个，不回落到其它按钮。 */
 const catalogRetry = (screen: Locator, name: string) => screen.getByRole('button', { name, exact: true })
 
@@ -123,10 +144,10 @@ test('material workshop: catalog, signed-out draft handoff, inline validation an
   await page.goto('/resume/materials')
   const screen = screenOf(page)
   await expect(screen).toHaveAttribute('data-state', 'select')
-  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.locator('[data-qxt-screen]')).toBeVisible()
   await expect(page.locator('.qx-rm-template')).toHaveCount(2)
   await expect(page.getByTestId('material-workshop-template-campus-cover-letter')).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.locator('.qx-pill')).toHaveText('未登录 · 生成前先存草稿')
+  await expect(page.locator('.qxt-status')).toHaveText('未登录 · 生成前先存草稿')
   await expect(page.getByText('系统不收取求职者简历给企业', { exact: false })).toBeVisible()
   await captureViewports(page, 'materials-select-signed-out')
 
@@ -217,13 +238,14 @@ test('material workshop: empty list and read failure are separate honest states 
   await expect(screen).toHaveAttribute('data-state', 'empty')
   await expect(page.getByRole('heading', { name: '当前没有已发布的求职材料模板' })).toBeVisible()
   await expect(page.locator('.qx-rm-template')).toHaveCount(0)
-  await expect(page.locator('.qx-pill')).toHaveText('当前没有已发布模板')
+  await expect(page.locator('.qxt-status')).toHaveText('当前没有已发布模板')
   await captureViewports(page, 'materials-empty', catalogRetry(screen, '重新读取一次'))
 
   api.respond('GET', TEMPLATES, failure(503, 'fixture template failure'))
   await catalogRetry(screen, '重新读取一次').click()
   await expect(screen).toHaveAttribute('data-state', 'error')
   await expect(page.getByRole('alert')).toHaveText(SERVICE_DOWN)
+  await expect(page.getByText('联系现场工作人员')).toHaveCount(0)
   await expect(page.getByText('fixture template failure')).toHaveCount(0)
   await expect(page.locator('.qx-rm-template')).toHaveCount(0)
   await captureViewports(page, 'materials-error', catalogRetry(screen, '重新读取'))
@@ -246,7 +268,7 @@ test('material workshop: failed generation keeps the form; a file without print 
   await loginBackToMaterials(page)
   const screen = screenOf(page)
   await expect(screen).toHaveAttribute('data-state', 'select')
-  await expect(page.locator('.qx-pill')).toHaveText('固定模板生成 · 内容由你填写')
+  await expect(page.locator('.qxt-status')).toHaveText('固定模板生成 · 内容由你填写')
   await page.locator('#material-field-applicantName').fill('王同学')
   await page.locator('#material-field-targetRole').fill('用户运营专员')
 

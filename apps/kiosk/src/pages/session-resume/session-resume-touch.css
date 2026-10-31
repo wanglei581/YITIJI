@@ -1,0 +1,34 @@
+/* 继续打印任务触屏版：任务卡、说明卡、去处卡。块的通用样式在 public-touch.css；只挂在本页。 */
+.qxt-screen[data-qx-page='session-resume'] .qxp-grow { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.qxt-screen[data-qx-page='session-resume'] .qxp-grow > * { flex-shrink: 0; }
+.qxt-screen[data-qx-page='session-resume'] .qxp-pair-grow { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+
+/* 任务卡 */
+.qxt-screen[data-qx-page='session-resume'] .sr-list { margin: 0; padding: 0; list-style: none; }
+.qxt-screen[data-qx-page='session-resume'] .sr-row { gap: 4px; padding: 14px 16px; }
+.qxt-screen[data-qx-page='session-resume'] .sr-name { font-size: 28px; line-height: 1.3; word-break: break-all; }
+.qxt-screen[data-qx-page='session-resume'] .sr-meta { font-size: var(--qxt-fs-aux); line-height: 1.4; color: var(--qxt-ink-2); }
+.qxt-screen[data-qx-page='session-resume'] .sr-sub { font-size: var(--qxt-fs-aux); line-height: 1.4; color: var(--qxt-ink-3); }
+.qxt-screen[data-qx-page='session-resume'] .sr-go { margin-top: 6px; min-height: 72px; }
+.qxt-screen[data-qx-page='session-resume'] .sr-go b { font-size: 28px; }
+.qxt-screen[data-qx-page='session-resume'] .sr-why { font-size: var(--qxt-fs-aux); line-height: 1.4; color: var(--qxt-clay-ink); font-weight: 600; }
+
+/* 吸收余高的插画卡 */
+.qxt-screen[data-qx-page='session-resume'] .sr-sink { flex: 1 1 0; min-height: 200px; overflow: hidden; }
+.qxt-screen[data-qx-page='session-resume'] .sr-sink .qxp-artbox > svg { height: 92%; width: auto; max-width: 100%; }
+.qxt-screen[data-qx-page='session-resume'] .sr-exits { flex-shrink: 0; }
+
+/* 底栏三颗等宽（返回、去打印扫描、重新读取） */
+.qxt-screen[data-qx-page='session-resume'] .qxt-dock .qxt-fill { flex: 1; min-width: 0; }
+.qxt-screen[data-qx-page='session-resume'] .qxt-dock .qxt-btn { padding: 0 22px; }
+.qxt-screen[data-qx-page='session-resume'] .qxt-dock .qxt-btn-pri { min-width: 0; flex: 1; }
+
+@media (max-width: 600px) {
+  .qxt-screen[data-qx-page='session-resume'] .qxp-grow { overflow: auto; }
+  .qxt-screen[data-qx-page='session-resume'] .qxp-pair-grow { grid-template-columns: 1fr; flex: none; }
+  .qxt-screen[data-qx-page='session-resume'] .sr-sink { flex: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qxt-screen[data-qx-page='session-resume'] * { transition: none; }
+}

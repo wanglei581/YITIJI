@@ -2,7 +2,6 @@ import type { LucideIcon } from 'lucide-react'
 import {
   CreditCardIcon,
   FileTextIcon,
-  MonitorIcon,
   ScanLineIcon,
 } from 'lucide-react'
 
@@ -51,128 +50,34 @@ export const SCAN_TYPE_OPTIONS: ScanTypeOption[] = [
   },
 ]
 
-export const SCAN_CHAIN = [
-  { title: '放好纸', copy: '把原稿放进扫描区', who: '你在打印机上操作', icon: FileTextIcon },
-  { title: '面板上按扫描', copy: '按屏幕上的开始键', who: '你在打印机上操作', icon: ScanLineIcon },
-  { title: '回到这台机器', copy: '文件回来后在这里确认', who: '这台屏幕自动等待', icon: MonitorIcon },
-] as const
-
 export const SCAN_TRUTH = [
   { title: '怎么做', body: '放好纸 → 面板上按扫描 → 回到这台机器等文件。' },
   { title: '不显示什么', body: '没有页级扫描进度与逐张计数，也不猜具体硬件故障原因。' },
   { title: '文件和费用', body: '文件按类型与保存规则管理；价格只在打印流程里由系统报价给出。' },
 ] as const
 
-export interface ScanAsk {
-  text: string
-  em: string
-  doing: string
-}
-
-export const SCAN_ASK = {
-  setup: {
-    text: '扫描这一步，在机器面板上做。',
-    em: '在机器面板上做',
-    doing: '屏幕上没有「开始扫描」这个按钮 —— 本机不能远程驱动扫描仪。你在奔图面板上扫，文件回传到这里。',
-  },
-  blocked: {
-    text: '这一台现在不能建立这次扫描。',
-    em: '不能建立这次扫描',
-    doing: '能力还没确认或尚未开放。本页不会创建扫描任务，也不会假装扫描仪已经就绪。',
-  },
-  unknown: {
-    text: '扫描能力此刻读不到。',
-    em: '读不到',
-    doing: '拿不到配置就不创建任务。恢复后再试；扫描仍要在奔图面板上做。',
-  },
-  loading: {
-    text: '正在确认这台机器的扫描能力。',
-    em: '确认',
-    doing: '确认之前不建立这次扫描，也不显示任务编号。',
-  },
-  'usb-panel': {
-    text: '文件只进你的 U 盘。',
-    em: '只进你的 U 盘',
-    doing: '这条路不创建平台任务、不显示进度，也不进入「我的文档」。以奔图面板提示为准。',
-  },
-  'create-loading': {
-    text: '正在建立这次扫描。',
-    em: '建立这次扫描',
-    doing: '建成之前不给你任务编号 —— 免得你照着一个不存在的号去面板上操作。',
-  },
-  'create-failed': {
-    text: '这次扫描没建好。',
-    em: '没建好',
-    doing: '现在去面板扫也没用：文件回来了也没有这次扫描来接收它。',
-  },
-  'cleanup-holding': {
-    text: '上一场扫描还没收完尾。',
-    em: '还没收完尾',
-    doing: '本机正在向系统确认上一位那条任务确实已经取消。确认之前不建立新的一次扫描 —— 系统会把面板上扫出来的文件交给这台机器上最早那条还在等文件的任务。',
-  },
-  invalid: {
-    text: '这一页没有可创建的扫描类型。',
-    em: '没有可创建的扫描类型',
-    doing: '请从扫描首页选类型再进来。本页不会凭空发创建请求。',
-  },
-  expired: {
-    text: '这次扫描过期了。',
-    em: '过期了',
-    doing: '有效期内没等到文件。重新开始就行。',
-  },
-  'awaiting-ack': {
-    text: '这次扫描已经建好，还没拿到投递授权。',
-    em: '还没拿到投递授权',
-    doing: '系统确认之前，面板上扫出来的文件不会交到这一场，所以先别按开始。它也不会被别人收走 —— 没确认的任务不会接收任何文件。',
-  },
-  'panel-instruction': {
-    text: '接下来去机器面板上。',
-    em: '去机器面板上',
-    doing: '下面几步都在那台奔图上按；扫完回这台屏幕，等待页会自动查。',
-  },
-  'waiting-delivery': {
-    text: '正在等文件回来。',
-    em: '等文件回来',
-    doing: '我每隔几秒自动问一次系统。面板上的扫描结果回来前，这里只转达系统给出的结果。',
-  },
-  polling: {
-    text: '正在问系统。',
-    em: '问系统',
-    doing: '结果没到之前，我不改任何判断。',
-  },
-  'poll-failed': {
-    text: '状态没查到。',
-    em: '没查到',
-    doing: '查不到不等于扫失败。我不改判，过几秒自动再查。别重复扫。',
-  },
-  cancelling: {
-    text: '正在发取消请求。',
-    em: '发取消请求',
-    doing: '成不成由系统定，我不提前说已取消。',
-  },
-  completed: {
-    text: '文件到了。',
-    em: '到了',
-    doing: '系统回了完成、也带齐了文件信息，我才画出来。',
-  },
-  'completed-no-file': {
-    text: '完成了，可结果里没有文件。',
-    em: '可结果里没有文件',
-    doing: '结果里没有文件。我不猜它还在不在系统里，这一屏也就到此为止。',
-  },
-  /* 结果页的 failed / wait-timeout 两态也接本机自己放弃的路（轮询到点、连续查不动），
-   * 那时服务端并没有说过「失败」或「过期」—— 所以这两句只说对所有成因都成立的话，
-   * 具体成因由结果页那一行原因转达。 */
-  failed: {
-    text: '这次没扫成。',
-    em: '没扫成',
-    doing: '这次没有拿到可用文件，原因见下方说明。页面不猜具体纸张或机器故障原因。',
-  },
-  'wait-timeout': {
-    text: '这次没等到文件。',
-    em: '没等到文件',
-    doing: '等待超过了时限，这次没有拿到可用文件。重新开始一次就行。',
-  },
-} as const satisfies Record<string, ScanAsk>
-
-export type ScanWorkbenchState = keyof typeof SCAN_ASK
+/**
+ * 扫描工作台的屏幕状态。键名不能改：页面用它写 data-state、问小青的本屏问句按它选、用例与门禁按这些名字找屏。
+ * （原来这里还有一整段给旧横幅用的 ScanAsk 文案，没有任何地方渲染它，只剩键名被当成类型用，已删。）
+ */
+export type ScanWorkbenchState =
+  | 'setup'
+  | 'blocked'
+  | 'unknown'
+  | 'loading'
+  | 'usb-panel'
+  | 'create-loading'
+  | 'create-failed'
+  | 'cleanup-holding'
+  | 'invalid'
+  | 'expired'
+  | 'awaiting-ack'
+  | 'panel-instruction'
+  | 'waiting-delivery'
+  | 'polling'
+  | 'poll-failed'
+  | 'cancelling'
+  | 'completed'
+  | 'completed-no-file'
+  | 'failed'
+  | 'wait-timeout'

@@ -15,6 +15,12 @@
 | 传文件 | `https://<公网域名>/k/u/<sceneToken>` | `https://zyidai.cn/k/u/` → `pages/kiosk-send/kiosk-send` | `/k/u/:scene` 兑换后 replace 到 `/upload/phone#sessionId=…&token=…&purpose=…` |
 | 扫码登录 | `https://<公网域名>/k/l/<ticketId>` | `https://zyidai.cn/k/l/` → `pages/kiosk-login/kiosk-login` | `/k/l/:ticketId` replace 到 `/member/qr-login?ticketId=…` |
 
+- **例外：本人手写签名图（`purpose=signature_image`，一体机「签名」第 2 步）的码不出短链**，出网页长链
+  `/upload/phone#sessionId=…&token=…&purpose=signature_image`（`buildPhoneUploadQrUrl` 按用途分支）。原因：小程序
+  「传文件」页的回执判定 `kiosk-send-helpers.js` 的 `SESSION_PURPOSES` 只认 `resume_upload / print_doc / contract_upload`，
+  收到 `signature_image` 的回执会判成「没收到」；长链的路径 `/upload/phone` 不在微信规则（`/k/u/`、`/k/l/`）里，
+  微信里扫也只会打开网页。小程序以后要接这个用途，须先在 `SESSION_PURPOSES` 加上它、再把 `buildPhoneUploadQrUrl`
+  的这个分支拿掉（走查 I-14）。
 - 为什么放路径不放 `#` 后面：官方规则只写了路径前缀匹配（规则以 `/` 结尾才匹配子路径）和 `?` 参数前缀匹配，
   没提 `#`；官方例子本身就是「业务参数放路径里」。码也从约 130 字符缩到约 45 字符，屏上更好扫。
 - 进小程序后整条码在 `options.q`，`decodeURIComponent` 一次后交给 `apps/miniapp/utils/kiosk-qr.js` 认码型

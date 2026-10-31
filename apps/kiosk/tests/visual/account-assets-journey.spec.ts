@@ -17,10 +17,10 @@ const SHOTS = process.env.JOURNEY_SHOTS_DIR ?? 'test-results/account-assets-jour
 // 所以这里也逐页给期望值，而不是拿一句去套所有页（那样迁移一页就红一次，
 // 且红的是「文案变了」不是「登录门没了」）。
 const ASSET_ROUTES = [
-  { path: '/me/resumes', gate: '登录后查看我的简历' },
-  // 2026-09-23 稿 38 迁入青序流光：文档与打印订单的登录门也改成逐页标题。
-  { path: '/me/documents', gate: '登录后查看我的文档' },
-  { path: '/me/print-orders', gate: '登录后查看打印订单' },
+  { path: '/me/resumes', gate: '登录后看你的简历' },
+  // 证据锚点随稿换字，判据不变：文档与打印订单的登录门仍是逐页标题。
+  { path: '/me/documents', gate: '登录后看你的文档' },
+  { path: '/me/print-orders', gate: '登录后看你的打印订单' },
 ] as const
 
 type Step = { n: number }
@@ -88,7 +88,7 @@ test.describe('账号资产页（未登录）', () => {
           page.getByRole('heading', { name: gate }),
           `${path} 未出现登录门（期望标题「${gate}」）`,
         ).toBeVisible({ timeout: 15_000 })
-        await expect(page.getByRole('button', { name: '手机号登录' })).toBeVisible()
+        await expect(page.getByRole('button', { name: '去登录', exact: true })).toBeVisible()
         await step(page, s, path.slice(1).replaceAll('/', '-'))
         // 给壳层/页内延迟请求一个窗口，避免「门先出来、请求后发」漏计。
         await page.waitForTimeout(1500)

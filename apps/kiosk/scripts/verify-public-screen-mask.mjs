@@ -79,7 +79,8 @@ check(plan.includes('const READ_LIMIT = 3'), '读取失败最多试有限次')
 check(plan.includes('attempt < READ_LIMIT'), '超过次数就停止重发')
 check(plan.includes('重新读取'), '失败后给出重新读取')
 
-const source = read('src/pages/resume/ResumeSourcePage.tsx')
+// 2026-10-28 触屏版：来源页的「在哪里」一步在 touch/ResumeSourceWhere.tsx（手机面板的 busyWhen 在那里传）。
+const source = `${read('src/pages/resume/ResumeSourcePage.tsx')}\n${read('src/pages/resume/touch/ResumeSourceWhere.tsx')}`
 const panel = read('src/pages/upload/components/UploadSessionQrPanel.tsx')
 check(source.includes('busyWhen="received"'), '简历来源页等人扫时不把整页标成忙')
 check(source.includes('const sourceBusy = uploading || phoneBusy || usbBusy'), '三条来源仍共用一把忙锁')

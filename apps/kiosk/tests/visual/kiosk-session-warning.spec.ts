@@ -214,6 +214,8 @@ test('ordinary idle warns before clearing and can resume the previous route', as
   await expect(from).toContainText('继续后回到 练面试')
   await expect(from).not.toContainText('/')
   await expect(page.getByRole('button', { name: '我还在，继续使用，回到练面试', exact: true })).toBeVisible()
+  await expect(page.getByTestId('session-guard-primary')).toHaveText('我还在，继续使用')
+  await expect(page.getByTestId('session-guard-clear')).toHaveText('现在结束使用')
   await page.getByRole('button', { name: /我还在，继续使用/ }).click()
 
   await expect(page).toHaveURL(/\/interview\?stage=tips/)
@@ -440,10 +442,12 @@ test('orphan /session-timeout shows the clearing overlay on first frame and neve
       const heading = document.querySelector('#session-timeout-title')
       const buttons = Array.from(document.querySelectorAll('button'))
       const exitButton = buttons.find((button) =>
-        /结束并清除这台机器上的这次使用记录/.test(button.textContent ?? '')
+        /现在结束使用/.test(button.textContent ?? '')
+        && /结束并清除这台机器上的这次使用记录/.test(button.getAttribute('aria-label') ?? '')
       )
       const continueButton = buttons.find((button) =>
-        /我还在，继续使用|结束并清除这台机器上的这次使用记录/.test(button.textContent ?? '')
+        /我还在，继续使用/.test(button.textContent ?? '')
+        && /我还在，继续使用/.test(button.getAttribute('aria-label') ?? '')
       )
       const accountLabel = Array.from(document.querySelectorAll('p, span, b')).find((el) =>
         /当前登录：|当前会话：/.test(el.textContent ?? '')
@@ -1062,6 +1066,7 @@ test('user cancel while the delivery ack is still in flight sends exactly one DE
   await expect.poll(() => counts.statusRequests()).toBeGreaterThanOrEqual(1)
 
   await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+  await page.getByRole('button', { name: '再点一次确认取消', exact: true }).click()
   await expect(page).toHaveURL(/\/scan\?stage=start/, { timeout: 6_000 })
   ack.release()
 
@@ -1102,6 +1107,7 @@ test('user cancel that finds the scan already completed sends no second DELETE w
   await expect.poll(() => counts.statusRequests()).toBeGreaterThanOrEqual(1)
 
   await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+  await page.getByRole('button', { name: '再点一次确认取消', exact: true }).click()
   await expect(page).toHaveURL(/\/scan\?stage=result/, { timeout: 6_000 })
   await page.getByRole('button', { name: '首页', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/')
@@ -1140,6 +1146,7 @@ test('user cancel that hits already-completed with an unanswered recheck sends n
   const pollsBeforeCancel = counts.statusRequests()
 
   await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+  await page.getByRole('button', { name: '再点一次确认取消', exact: true }).click()
   // 补查确实发出去了、也确实没拿到回话：页面落回 start，而不是结果屏。
   await expect(page).toHaveURL(/\/scan\?stage=start/, { timeout: 6_000 })
   expect(counts.statusRequests()).toBeGreaterThan(pollsBeforeCancel)
@@ -1181,6 +1188,7 @@ test('a cancel answered with SCAN_TASK_CANCEL_CONFLICT keeps the late-ack compen
   await expect.poll(() => counts.statusRequests()).toBeGreaterThanOrEqual(1)
 
   await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+  await page.getByRole('button', { name: '再点一次确认取消', exact: true }).click()
   await expect(page).toHaveURL(/\/scan\?stage=start/, { timeout: 6_000 })
   await expect.poll(async () => (await readProbe())?.deletes ?? 0, { message: '用户按的那一次已经发出' }).toBe(1)
   ack.release()
@@ -1209,6 +1217,7 @@ test('explicit user cancel sends exactly one DELETE before navigating away @scan
 
   const deleteBefore = cancelCounts.deleteRequests()
   await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+  await page.getByRole('button', { name: '再点一次确认取消', exact: true }).click()
 
   await expect(page).toHaveURL(/\/scan\?stage=start/, { timeout: 6_000 })
   await expectWarningWithinThreeSeconds(page)
@@ -1240,6 +1249,7 @@ test('user cancel with a failing DELETE sends exactly one attempt and falls back
 
   const deleteBefore = cancelCounts.deleteRequests()
   await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+  await page.getByRole('button', { name: '再点一次确认取消', exact: true }).click()
 
   // DELETE 抛错 → catch 走默认 fallback,busy 在 effect 渲染后释放,
   // 落地到 /scan/start。/scan/start 上 idle 计时器重新开始,3s 内

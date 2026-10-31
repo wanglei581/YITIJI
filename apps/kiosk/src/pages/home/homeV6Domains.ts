@@ -23,6 +23,9 @@ export type HomeV6ActionId =
   | 'policy-hub'
   | 'toolbox'
   | 'smart-campus'
+  | 'pickup-claim'
+  | 'help'
+  | 'campus-zone'
 
 export interface HomeV6QuickAction {
   id: HomeV6ActionId
@@ -74,6 +77,9 @@ export const HOME_V6_ROUTES: Readonly<Record<HomeV6ActionId, string>> = {
   'policy-hub': '/policy-service',
   toolbox: '/toolbox',
   'smart-campus': '/smart-campus',
+  'pickup-claim': '/print/pickup-claim',
+  help: '/help',
+  'campus-zone': '/campus',
 }
 
 export const HOME_V6_DOMAINS: readonly HomeV6Domain[] = [

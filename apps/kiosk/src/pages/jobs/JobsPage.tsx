@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { formatDateTime, parseInstant, type ExternalJobDTO, type JobAiRecommendationDTO, type MemberResumeItem } from '@ai-job-print/shared'
 import { Building2Icon, FilterIcon, SearchIcon, SparklesIcon, StoreIcon } from 'lucide-react'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
+import { RtFill } from '../recruitment-touch/RtFill'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
 import { getJobs } from '../../services/api'
 import {
@@ -12,6 +12,7 @@ import {
   grantJobAiConsent,
 } from '../../services/api/jobAi'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
+import { isAiOutage } from '../../ai/aiOutage'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { useAuth } from '../../auth/useAuth'
 import { useFavorites } from '../../favorites/useFavorites'
@@ -21,7 +22,8 @@ import { ResumeSelectModal } from './components/ResumeSelectModal'
 import { JobResultsSection } from './components/JobResultsSection'
 import { JobsQxAiEntry, JobsQxSourceNotice, JobsQxState } from './components/JobsQxChrome'
 import { buildSourceCards, buildTopTags, uniqueSorted } from './utils/jobDisplay'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { recruitErrorText } from '../recruitment-touch/recruitErrorText'
+import { helpNeededLine } from '../../copy/unattendedCopy'
 import './styles/jobs-list-qx.css'
 
 const VALID_CATEGORIES = new Set(['fulltime', 'intern', 'campus', 'parttime'])
@@ -46,6 +48,7 @@ export function JobsPage() {
   const [facetLoading, setFacetLoading] = useState(true)
   const [listLoading, setListLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [boardOff, setBoardOff] = useState<string | null>(null)
   const [retryKey, setRetryKey] = useState(0)
 
   const [keyword, setKeyword] = useState('')
@@ -92,16 +95,25 @@ export function JobsPage() {
     let cancelled = false
     setFacetLoading(true)
     setError(null)
+    setBoardOff(null)
     getJobs({ pageSize: 100 })
       .then((res) => {
         if (cancelled) return
         setFacetJobs(res.data)
         setFacetTotal(res.pagination.total)
+        setBoardOff(null)
         setFacetLoading(false)
       })
       .catch((err) => {
         if (cancelled) return
-        setError(userMessageOf(err, '岗位信息暂时无法加载，请稍后重试'))
+        if (err instanceof ApiHttpError && err.code === 'KIOSK_JOB_BOARD_DISABLED') {
+          setFacetJobs([])
+          setListJobs([])
+          setBoardOff(err.message || '本终端岗位板块已关闭')
+          setError(null)
+        } else {
+          setError(recruitErrorText(err, '岗位信息暂时无法加载，请稍后重试'))
+        }
         setFacetLoading(false)
       })
     return () => {
@@ -143,7 +155,13 @@ export function JobsPage() {
       })
       .catch((err) => {
         if (cancelled) return
-        setError(userMessageOf(err, '岗位信息暂时无法加载，请稍后重试'))
+        if (err instanceof ApiHttpError && err.code === 'KIOSK_JOB_BOARD_DISABLED') {
+          setListJobs([])
+          setBoardOff(err.message || '本终端岗位板块已关闭')
+          setError(null)
+        } else {
+          setError(recruitErrorText(err, '岗位信息暂时无法加载，请稍后重试'))
+        }
         setListLoading(false)
       })
     return () => {
@@ -271,32 +289,25 @@ export function JobsPage() {
     setAiError(null)
   }
 
-  const screenState = facetLoading ? 'loading' : error ? 'error' : displayedJobs.length === 0 ? 'empty' : hasAnyFilter ? 'filtered' : 'default'
+  const screenState = facetLoading ? 'loading' : boardOff ? 'board-off' : error ? 'error' : displayedJobs.length === 0 ? 'empty' : hasAnyFilter ? 'filtered' : 'default'
   return (
-    <QxPageFrame
+    <RecruitTouchFrame
       /* 稿 26-browse-list 原文：data-route="/jobs-service" aria-label="返回岗位服务"。 */
-      back={{ label: '返回岗位服务', onBack: () => navigate('/jobs-service') }}
-      title="岗位信息"
+      eyebrow="岗位信息"
+      back={{ label: '返回', onBack: () => navigate('/jobs-service') }}
+      ask={{ label: '问小青：这些岗位怎么看？', draft: '这些岗位怎么看？', voice: true }}
+      title="想看哪些岗位？"
       subtitle="只展示已审核发布且在有效期内的第三方与官方岗位；来源要素不完整时仅保留只读详情。"
       status={facetLoading
         ? { tone: 'unknown', label: '正在读取岗位名单' }
-        : error
-          ? { tone: 'bad', label: '岗位名单这次没读到' }
-          : { tone: 'ok', label: '岗位与来源信息已读到' }}
+        : boardOff
+          ? { tone: 'warn', label: '岗位板块已关闭' }
+          : error
+            ? { tone: 'bad', label: '岗位名单这次没读到' }
+            : { tone: 'ok', label: '岗位与来源信息已读到' }}
       terminalLabel="就业服务大厅"
-      navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
-      ctabar={
-        <>
-          <p className="why">本机不代收简历、不代替投递。岗位由来源平台发布，投递在来源平台完成。</p>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/offline-agencies')}>
-            <StoreIcon aria-hidden="true" />线下招聘机构
-          </button>
-          {/* 3.14：原线上平台目录并入本机构官方渠道（b 版本在同一页另列「其他来源平台」）。 */}
-          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/official-channels')}>
-            官方与合作平台目录
-          </button>
-        </>
-      }
+      boundary="本机不代收简历、不代替投递。岗位由来源平台发布，投递在来源平台完成。"
+      primary={{ label: '线下招聘机构', onClick: () => navigate('/offline-agencies') }}
     >
       <JobAiConsentModal
         open={showConsent}
@@ -343,8 +354,17 @@ export function JobsPage() {
         onClose={() => setShowFilterPicker(false)}
       />
       <div className="qx-scroll qx-jobs-page" data-screen="jobs" data-state={screenState} data-testid={`jobs-state-${screenState}`}>
-        <JobsQxAiEntry onStart={() => void startAiRecommend()} />
-      {facetLoading || error ? (
+        <JobsQxAiEntry onStart={() => void startAiRecommend()} needLogin={!getToken()} />
+      {boardOff ? (
+        <section className="qx-state qx-grow" data-tone="info" role="status">
+          <span>
+            <span className="qx-state-t">岗位板块已关闭</span>
+            <span className="qx-state-d">{boardOff}。这一页不展示岗位名单。企业目录和招聘会不受这一项影响。</span>
+          </span>
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/companies')}>找企业</button>
+          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/job-fairs')}>查看招聘会</button>
+        </section>
+      ) : facetLoading || error ? (
         <JobsQxState error={error} onRetry={() => setRetryKey((key) => key + 1)} />
       ) : (
         <>
@@ -360,6 +380,7 @@ export function JobsPage() {
                 key={item.label}
                 type="button"
                 className={`jf-f-chip${category === item.value ? ' on' : ''}`}
+                aria-pressed={category === item.value}
                 onClick={() => setCategory(item.value)}
               >
                 {item.label}
@@ -377,7 +398,7 @@ export function JobsPage() {
 
           <div className="jf-filter-bar">
             <span className="jf-filter-label">来源</span>
-            <button type="button" className={`jf-f-chip${sourceOrgId ? '' : ' on'}`} onClick={() => setSourceOrgId('')}>
+            <button type="button" className={`jf-f-chip${sourceOrgId ? '' : ' on'}`} aria-pressed={!sourceOrgId} onClick={() => setSourceOrgId('')}>
               全部
             </button>
             {sourceCards.slice(0, 3).map((source) => (
@@ -385,6 +406,7 @@ export function JobsPage() {
                 key={source.orgId}
                 type="button"
                 className={`jf-f-chip${sourceOrgId === source.orgId ? ' on' : ''}`}
+                aria-pressed={sourceOrgId === source.orgId}
                 onClick={() => setSourceOrgId(sourceOrgId === source.orgId ? '' : source.orgId)}
               >
                 {source.name}
@@ -427,14 +449,14 @@ export function JobsPage() {
                   </button>
                 </>
               )}
-              <button type="button" className={`jf-f-chip sm${favoritesOnly ? ' on' : ''}`} onClick={() => setFavoritesOnly((value) => !value)}>
+              <button type="button" className={`jf-f-chip sm${favoritesOnly ? ' on' : ''}`} aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly((value) => !value)}>
                 仅看收藏 {favoriteSet.size}
               </button>
               排序
-              <button type="button" className={`jf-f-chip sm${sortMode === 'latest' ? ' on' : ''}`} onClick={() => setSortMode('latest')}>
+              <button type="button" className={`jf-f-chip sm${sortMode === 'latest' ? ' on' : ''}`} aria-pressed={sortMode === 'latest'} onClick={() => setSortMode('latest')}>
                 最新同步
               </button>
-              <button type="button" className={`jf-f-chip sm${sortMode === 'salary_first' ? ' on' : ''}`} onClick={() => setSortMode('salary_first')}>
+              <button type="button" className={`jf-f-chip sm${sortMode === 'salary_first' ? ' on' : ''}`} aria-pressed={sortMode === 'salary_first'} onClick={() => setSortMode('salary_first')}>
                 薪资标注优先
               </button>
             </span>
@@ -447,7 +469,7 @@ export function JobsPage() {
               error={aiError}
               recommendations={aiRecommendations ?? undefined}
               clearLabel="退出 AI 推荐"
-              onRetry={() => void startAiRecommend()}
+              onRetry={aiError === JOBS_AI_OUTAGE_TEXT ? undefined : () => void startAiRecommend()}
               onClear={clearAiRecommendations}
               onOpenRecommendation={(jobId) => navigate(`/jobs/${jobId}`)}
             />
@@ -480,27 +502,37 @@ export function JobsPage() {
               <span className="jf-tile-icon"><Building2Icon aria-hidden="true" /></span>
               <span><b>找企业</b><span>来源企业与岗位导览</span></span>
             </button>
+            <button type="button" className="jf-tile" onClick={() => navigate('/official-channels')}>
+              <span className="jf-tile-icon"><StoreIcon aria-hidden="true" /></span>
+              <span><b>官方与合作平台目录</b><span>手机扫码打开，本机不打开外链</span></span>
+            </button>
           </div>
 
           <JobsQxSourceNotice activeSourceName={hasAnyFilter ? activeSourceName : undefined} />
         </>
       )}
+      <RtFill preset="jobs" />
       </div>
-    </QxPageFrame>
+    </RecruitTouchFrame>
   )
 }
+
+const JOBS_AI_OUTAGE_TEXT = 'AI 暂时无法使用。岗位原文、筛选和扫码投递不受影响，推荐要等恢复后再做。'
+const JOBS_AI_RETRY_TEXT = 'AI 这次没有算出推荐。岗位原文、筛选和扫码投递不受影响，可以再试一次。'
 
 function formatJobAiError(err: unknown): string {
   const declined = aiDeclarationDeclineMessage(err)
   if (declined) return declined
+  // 整条 AI 能力不可用（未配置、连不上、后台暂停等，重试不会变好）：照稿说清哪些不受影响，不再引导重试。
+  if (isAiOutage(err)) return JOBS_AI_OUTAGE_TEXT
   if (err instanceof ApiHttpError) {
     if (err.code === 'JOB_AI_QUOTA_EXCEEDED') return '今日 AI 辅助额度已用完，请明天再试。'
-    if (err.code === 'JOB_AI_QUOTA_UNAVAILABLE') return '岗位 AI 配额服务暂不可用，请联系现场工作人员确认服务状态。'
+    if (err.code === 'JOB_AI_QUOTA_UNAVAILABLE') return `岗位 AI 配额服务暂不可用。${helpNeededLine()}`
     if (err.code === 'USER_AI_CONSENT_REQUIRED') return '请先确认岗位 AI 辅助授权。'
     if (err.code === 'JOB_AI_MOCK_DISABLED') return '岗位 AI 需要连上真实服务后才能使用。'
-    return err.message
   }
-  return userMessageOf(err, 'AI 辅助暂时不可用，请稍后重试。')
+  // 其余是「这一次没成」：保留重试入口，不拿服务端原话上屏。
+  return recruitErrorText(err, JOBS_AI_RETRY_TEXT)
 }
 // Component markers for verify:job-info-ui contract
 // JobOverviewPanel — 岗位总览面板 (显示来源统计、岗位数量、最近同步时间)

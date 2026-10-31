@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
+import { RECRUITMENT_HOSTING_OFF, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import {
   assertNoElementCrossesViewport,
   assertNoHorizontalOverflow,
@@ -39,10 +40,13 @@ const flowState = {
   ...W2_ORDER,
 }
 
+// 订单可能已建、已付的页面（出纸页、完成页）拿不到任务信息时，不得说「没有订单、没有扣费、没有收款」：这些话只在付款之前才是事实。
+const NO_ORDER_CLAIM = /没有订单|没有扣费|没有收款/
+
 async function expectTouchAndBounds(page: Page): Promise<void> {
   await assertNoHorizontalOverflow(page)
   await assertNoElementCrossesViewport(page)
-  const buttons = page.locator('.qx-ctabar .qx-btn:not([disabled]):not([aria-disabled="true"]), .qx-nav-item')
+  const buttons = page.locator('.qx-ctabar .qx-btn:not([disabled]):not([aria-disabled="true"]), .qx-nav-item, .qxt-nav button, .qxt-dock .qxt-btn:not([disabled]):not([aria-disabled="true"]), .qxt-dock .qxt-askq:not([disabled]):not([aria-disabled="true"])')
   const count = await buttons.count()
   expect(count, '交付页必须有可点出口').toBeGreaterThan(0)
   for (let i = 0; i < count; i += 1) {
@@ -106,7 +110,9 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
 
   await expect(page.locator('[data-testid="print-fulfill-state-out-of-paper"]')).toBeVisible()
   await expect(page.getByText('打印机缺纸', { exact: true }).first()).toBeVisible()
-  await expect(page.getByText('打印机缺纸，当前无法打印，请联系工作人员补纸后重试', { exact: true })).toBeVisible()
+  await expect(page.getByText('打印机缺纸，当前无法打印，请联系工作人员补纸后重试', { exact: true })).toHaveCount(0)
+  // 订单边界说明在小字行（print-fulfill-fallback）；标准求助句在第三步，下面对整页断言。
+  await expect(page.getByTestId('print-fulfill-fallback')).toContainText('不会在加纸后自动继续')
   await expect(page.getByText('agent stack must stay hidden')).toHaveCount(0)
   await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
 
@@ -117,7 +123,8 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
   // 正是"页面没给出重试出口"的那一态：此时更不能让用户以为补个纸就能等到结果。
   const outOfPaper = page.locator('[data-testid="print-fulfill-state-out-of-paper"]')
   await expect(outOfPaper).toContainText('不会在加纸后自动继续')
-  await expect(outOfPaper).toContainText('联系现场工作人员')
+  await expect(outOfPaper).toContainText('打印有问题？')
+  await expect(outOfPaper).not.toContainText('联系现场工作人员')
   await expect(outOfPaper).toContainText('订单和已付金额都保留着')
   // 「只有出现按钮时才能自己重打」——重试必须被说成有条件的，不是无条件可用。
   await expect(outOfPaper).toContainText('只有本页出现「重新提交打印」按钮时')
@@ -133,20 +140,18 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
     await expect(outOfPaper, `缺纸页不得再出现「${banned}」`).not.toContainText(banned)
   }
 
-  // 稿 15 out-of-paper 的结构：小青区即页头 → 任务卡（真实单文件 + 缺纸说明 + 费用边界）→ 现场三步 → 底栏两出口。
-  await expect(outOfPaper.locator('.pff-xq-ask')).toHaveText('机器里没纸了。')
+  // 照稿 st-unconfirmed 的骨架：意图带（标题 + 状态胶囊）→ 三步 → 订单摘要（真实单文件 + 订单号 + 支付事实）→ 出口 → 小字；底栏触屏三槽。
+  await expect(page.getByRole('heading', { name: '打印机缺纸', exact: true })).toBeVisible()
   const taskCard = outOfPaper.getByTestId('print-fulfill-list')
   await expect(taskCard).toContainText(W2_FILE.name)
-  await expect(taskCard).toContainText('缺纸中断')
   await expect(taskCard).not.toContainText(W2_ORDER.taskId)
   await expect(taskCard).not.toContainText('任务号')
-  await expect(taskCard.getByTestId('print-fulfill-fallback')).toContainText('打印机缺纸')
-  await expect(taskCard).toContainText('费用与订单边界')
+  await expect(outOfPaper.getByTestId('print-fulfill-fallback')).toContainText('以订单记录为准')
   // takeaway-url 404：订单号与金额退回进页时带来的真值，不编退款状态。
-  await expect(taskCard.locator('.pff-inbar-kv')).toContainText(`订单 ${W2_ORDER.orderNo}`)
-  await expect(taskCard.locator('.pff-inbar-kv')).toContainText('支付状态 已付 ¥2.00')
+  await expect(taskCard.locator('.qxt-sum-r').filter({ hasText: '订单号' })).toContainText(W2_ORDER.orderNo)
+  await expect(taskCard.locator('.qxt-sum-r').filter({ hasText: '支付状态' })).toContainText('已付 ¥2.00')
   await expect(page.locator('.qx-pill')).toHaveText('已付 ¥2.00 · 缺纸')
-  const steps = outOfPaper.locator('.pff-step')
+  const steps = outOfPaper.locator('.qxt-step')
   await expect(steps).toHaveCount(3)
   await expect(steps.nth(0)).toContainText('本机不知道出了几页')
   await expect(steps.nth(2)).toContainText(`订单号 ${W2_ORDER.orderNo}`)
@@ -155,8 +160,9 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
     await expect(outOfPaper, `缺纸页不得出现「${banned}」`).not.toContainText(banned)
   }
   await expect(page.getByRole('button', { name: '查看费用说明' })).toBeVisible()
-  await expect(page.getByTestId('print-fulfill-primary')).toHaveText('联系工作人员处理')
-  await expect(outOfPaper.getByRole('status')).toContainText('暂时无法签发带走链接，请联系工作人员')
+  await expect(page.getByTestId('print-fulfill-primary')).toHaveText('使用帮助')
+  await expect(outOfPaper.getByRole('status')).toContainText('打印有问题？')
+  await expect(outOfPaper.getByRole('status')).not.toContainText('联系工作人员')
 
   await expectTouchAndBounds(page)
   await page.screenshot({ path: test.info().outputPath('fulfill-out-of-paper.png'), fullPage: true })
@@ -198,12 +204,13 @@ test('PAPER_EMPTY with server canRetry offers whole-file resubmit and server ord
   await expect(outOfPaper).toBeVisible()
   // 带走接口回了订单：订单号与金额以服务端为准，不用进页时带来的值。
   await expect(page.locator('.qx-pill')).toHaveText('已付 ¥3.50 · 缺纸')
-  await expect(outOfPaper.locator('.pff-inbar-kv')).toContainText('订单 ORD-20260929-SRV777')
-  await expect(outOfPaper.locator('.pff-inbar-kv')).toContainText('支付状态 已付 ¥3.50')
+  const summary = outOfPaper.getByTestId('print-fulfill-list')
+  await expect(summary.locator('.qxt-sum-r').filter({ hasText: '订单号' })).toContainText('ORD-20260929-SRV777')
+  await expect(summary.locator('.qxt-sum-r').filter({ hasText: '支付状态' })).toContainText('已付 ¥3.50')
   await expect(outOfPaper).not.toContainText(W2_ORDER.orderNo)
   // canRetry 为真才出现重打出口，且说清是整份重打、不再收费，不是「续打剩下的」。
   await expect(page.getByRole('button', { name: '重新提交打印' })).toBeVisible()
-  await expect(outOfPaper.locator('.pff-step').nth(2)).toContainText('整份重打')
+  await expect(outOfPaper.locator('.qxt-step').nth(2)).toContainText('整份重打')
   await expect(outOfPaper).toContainText('不会在加纸后自动继续')
   await expect(outOfPaper.getByRole('region', { name: '文件带走' })).toBeVisible()
 
@@ -275,8 +282,9 @@ test('failed done retry posts the real taskId and payment session @w2', async ({
   await setReactRouterState(page, '/print/done', flowState)
 
   await expect(page.locator('[data-testid="print-fulfill-state-paper-jam"]')).toBeVisible()
-  await expect(page.locator('[data-testid="print-fulfill-state-paper-jam"]')).toContainText('你的订单和已付金额都保留着')
-  await expect(page.getByRole('region', { name: '找工作人员之前先做这三件' })).toBeVisible()
+  // 副题在意图带里（稿骨架），不在正文容器里。
+  await expect(page.locator('.qxt-band')).toContainText('你的订单和已付金额都保留着')
+  await expect(page.getByRole('region', { name: '处理之前先做这三件' })).toBeVisible()
   await expect(page.getByRole('button', { name: '重新提交打印' })).toBeVisible()
   await expectTouchAndBounds(page)
   if (page.viewportSize()?.width === 1080) {
@@ -338,10 +346,12 @@ test('free paper jam keeps the order without mentioning payment @w2', async ({ p
 
   const jam = page.locator('[data-testid="print-fulfill-state-paper-jam"]')
   await expect(jam).toBeVisible()
-  await expect(jam).toContainText('你的订单还在，处理好后可以继续打印')
-  await expect(jam).not.toContainText('已付金额')
-  await expect(jam).not.toContainText('已支付')
-  await expect(page.getByRole('region', { name: '找工作人员之前先做这三件' })).toBeVisible()
+  // 意图带的副题和正文都不能提已付金额：整屏断言。
+  const jamScreen = page.locator('[data-qx-page="print-done"]')
+  await expect(jamScreen).toContainText('你的订单还在。机器卡纸，我们已经收到提醒，会尽快处理')
+  await expect(jamScreen).not.toContainText('已付金额')
+  await expect(jamScreen).not.toContainText('已支付')
+  await expect(page.getByRole('region', { name: '处理之前先做这三件' })).toBeVisible()
   expect(errors).toEqual([])
 })
 
@@ -377,7 +387,7 @@ test('completed done says the paper is already out and never renders a pickup co
   await expect(page.getByText('请取走纸张', { exact: true })).toHaveCount(0)
   await expect(page.getByText('请取走文件', { exact: true })).toHaveCount(0)
   await expect(page.getByText('少了页、印花了、对内容有疑问？')).toBeInViewport()
-  await expect(page.getByRole('button', { name: '问小青：取纸或异常怎么办 →' })).toBeInViewport()
+  await expect(page.getByRole('button', { name: '问小青：怎么取纸' })).toBeInViewport()
   await expect(page.getByText('已在本机出纸', { exact: true })).toBeVisible()
   await expect(page.getByText('W2-PICKUP-7391', { exact: true })).toHaveCount(0)
   await expect(page.getByText('取件码', { exact: true })).toHaveCount(0)
@@ -387,6 +397,40 @@ test('completed done says the paper is already out and never renders a pickup co
   expect(errors).toEqual([])
 })
 
+// 完成页「查看打印订单」磁贴的副题：「这一单的记录」只在建单响应确认这一单关联了账号（hasEndUser === true）时才成立；
+// 没关联（false）或不知道（缺省）时，这一单进不了「我的打印订单」，只能说「登录后看你的订单」，不多承诺一层。
+for (const [label, hasEndUser, expected, forbidden] of [
+  ['hasEndUser true', true, '这一单的记录', '登录后看你的订单'],
+  ['hasEndUser false', false, '登录后看你的订单', '这一单的记录'],
+  ['hasEndUser unknown', undefined, '登录后看你的订单', '这一单的记录'],
+] as const) {
+  test(`completed done order tile only promises this order's record when it is tied to an account: ${label} @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+      status: 200,
+      json: { taskId: W2_ORDER.taskId, status: 'completed', completedAt: '2026-07-26T00:00:00.000Z' },
+    })
+    api.respond('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, {
+      status: 200,
+      json: {
+        orderId: W2_ORDER.orderId, orderNo: W2_ORDER.orderNo, payStatus: 'paid', paymentSource: 'wechat', payChannel: 'wechat',
+        amountCents: W2_ORDER.amountCents, paidAt: '2026-07-26T00:00:00.000Z', pickupCode: null, attempt: null,
+      },
+    })
+
+    await page.goto('/print/done')
+    await setReactRouterState(page, '/print/done', hasEndUser === undefined ? flowState : { ...flowState, hasEndUser })
+
+    await expect(page.locator('[data-testid="print-fulfill-state-completed"]')).toBeVisible()
+    const tile = page.locator('.pft-tiles').getByRole('button', { name: /查看打印订单/ })
+    await expect(tile).toBeVisible()
+    await expect(tile).toContainText(expected)
+    await expect(tile).not.toContainText(forbidden)
+    expect(errors).toEqual([])
+  })
+}
+
 test('direct done visit without task context stays unknown @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
@@ -394,7 +438,247 @@ test('direct done visit without task context stays unknown @w2', async ({ page, 
   await expect(page.getByText('无法确认打印结果', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
   await expect(page.locator('[data-testid="print-fulfill-state-unknown"]')).toBeVisible()
+  // 没拿到任务信息不等于没有订单：不下「没有订单、没有扣费」的结论，只说说不准，并给出可以自己查的出路。
+  await expect(page.locator('[data-testid="print-fulfill-state-unknown"]')).toContainText('说不准有没有下过单、扣没扣费')
+  await expect(page.locator('[data-testid="print-fulfill-state-unknown"]')).not.toContainText(NO_ORDER_CLAIM)
   await expectTouchAndBounds(page)
   await page.screenshot({ path: test.info().outputPath('fulfill-unknown.png'), fullPage: true })
+  expect(errors).toEqual([])
+})
+
+test('done with a real taskId whose status cannot be verified never claims there is no order or charge @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 503,
+    json: { error: { code: 'PRINT_STATUS_UNAVAILABLE', message: 'fixture status down' } },
+  })
+
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', flowState)
+
+  const unknown = page.locator('[data-testid="print-fulfill-state-unknown"]')
+  await expect(unknown).toBeVisible()
+  // 有任务号：订单号在屏上（走查 I-30），说「读不到结果不代表没出纸」，不下「没有订单、没有扣费」的结论。
+  await expect(unknown).toContainText(W2_ORDER.orderNo)
+  await expect(unknown).toContainText('不代表没出纸')
+  await expect(unknown).toContainText('请不要重新下单')
+  await expect(unknown).toContainText('需要帮助？')
+  await expect(unknown).not.toContainText('请勿据此判断已经出纸')
+  await expect(unknown).not.toContainText(NO_ORDER_CLAIM)
+  await expect(page.locator('body')).not.toContainText(NO_ORDER_CLAIM)
+  expect(errors).toEqual([])
+})
+
+// ── 完成页「无法确认打印结果」「正在核验打印结果」两态 ──
+// 稿里没有这两态；照同页失败各态与稿 st-unconfirmed 的做法：底栏用触屏三槽（返回首页 / 问小青 / 主按钮），不再是旧的小号 ctabar。
+// 「查看打印订单」「反馈问题」原先挤在旧 ctabar 里，现在放进正文出口，一个不丢。
+// 问小青只把本屏专属的一句话带到顾问页、由本人自己按发送；句子里写明：不要假装查过订单、不要替我判断有没有扣款。
+const UNKNOWN_ASK_LABEL = '问小青：结果没确认怎么办'
+const UNKNOWN_ASK_DRAFT = '这一页没能确认这次打印的结果，订单可能已经建立，我也说不准有没有下过单、扣没扣费。请告诉我接下来怎么核对：先看出纸口，再到「我的 → 打印订单」里看。不要假装已经查过我的订单，不要替我判断有没有扣款，不要猜成功或失败，也不要让我重复打印。'
+const LOADING_ASK_LABEL = '问小青：结果怎么还没出来'
+const LOADING_ASK_DRAFT = '这一页正在向打印服务核验这次打印的结果，还没有显示。请告诉我等的时候可以做什么、一直没有结果该怎么办。不要假装已经查到结果，也不要替我判断有没有出纸或扣款。'
+
+function registerAssistantShell(api: ApiRouter): void {
+  // 顾问页挂载时读终端配置与语音能力；形状同 W3 基线，招聘托管按云上默认关闭。
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
+    status: 200,
+    json: terminalConfigWithHosting(RECRUITMENT_HOSTING_OFF, 'w2-done-unverified-assistant'),
+  })
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
+    status: 200,
+    json: { data: { asrEnabled: false, ttsEnabled: false } },
+  })
+}
+
+/** 底栏必须是触屏三槽：整页没有旧的小号 ctabar，三个键都在。 */
+async function expectTouchDock(page: Page, ask: string, primary: string): Promise<void> {
+  const dock = page.locator('.qxt-dock')
+  await expect(dock).toBeVisible()
+  await expect(page.locator('.qx-ctabar')).toHaveCount(0)
+  await expect(dock.getByRole('button', { name: '返回首页' })).toBeVisible()
+  await expect(dock.getByRole('button', { name: ask, exact: true })).toBeVisible()
+  await expect(dock.getByTestId('print-fulfill-primary')).toHaveText(primary)
+}
+
+/** 点问小青：到顾问页，输入框里就是这一句、没有自动发送；读过一次就没有了。 */
+async function expectAskHandsOffOnce(page: Page, api: ApiRouter, ask: string, draft: string): Promise<void> {
+  await page.locator('.qxt-dock').getByRole('button', { name: ask, exact: true }).click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  const input = page.getByLabel('输入咨询问题')
+  await expect(input).toHaveValue(draft)
+  expect(api.requestCount('POST', '/api/v1/assistant/chat'), '问小青只填进输入框，不自动发送').toBe(0)
+  await page.goBack()
+  await page.locator('.qxt-nav button', { hasText: 'AI 顾问' }).first().click()
+  await expect(page.getByLabel('输入咨询问题')).toHaveValue('')
+}
+
+test('unknown done (status cannot be verified): touch dock with its own 问小青 question, feedback and orders stay in the body @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerAssistantShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 503,
+    json: { error: { code: 'PRINT_STATUS_UNAVAILABLE', message: 'fixture status down' } },
+  })
+
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', flowState)
+
+  const unknown = page.locator('[data-testid="print-fulfill-state-unknown"]')
+  await expect(unknown).toBeVisible()
+  // 有任务号读不到结果：主键是「重新查看这一单」（走查 I-30），「使用帮助」挪进正文出口。
+  await expectTouchDock(page, UNKNOWN_ASK_LABEL, '重新查看这一单')
+  await expect(unknown.getByRole('button', { name: '使用帮助', exact: true })).toBeVisible()
+  // 旧 ctabar 里的另外两个出口挪进正文，一个不丢。
+  await expect(unknown.getByRole('button', { name: '反馈问题', exact: true })).toBeVisible()
+  await expect(unknown.getByRole('button', { name: '查看打印订单', exact: true })).toBeVisible()
+  // 不下结论、不找人、不说成已出纸。
+  await expect(page.locator('body')).not.toContainText(NO_ORDER_CLAIM)
+  await expect(page.locator('body')).not.toContainText(/联系现场|联系工作人员|找现场|找工作人员/)
+  await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
+  await expectTouchAndBounds(page)
+  // 整屏落在底栏之上：正文最后一块不压到底栏（旧版这一屏要靠把底栏顶出屏幕才放得下出口）。
+  await expect(unknown.getByRole('button', { name: '查看打印订单', exact: true })).toBeInViewport({ ratio: 1 })
+  expect(await page.evaluate(() => {
+    const dockTop = document.querySelector('.qxt-dock')?.getBoundingClientRect().top ?? 0
+    const exits = document.querySelector('[data-testid="print-fulfill-state-unknown"] .qxt-exits')?.getBoundingClientRect().bottom ?? 9999
+    return exits <= dockTop
+  }), '出口一排整个在底栏之上').toBe(true)
+  await page.screenshot({ path: test.info().outputPath('fulfill-unknown-dock.png'), fullPage: true })
+
+  // 问小青：本屏专属的一句话。草稿里要如实说「没能确认、订单可能已经建立」，并拦住假装查过订单、替人判断扣款、猜结果、重复打印。
+  for (const must of ['没能确认这次打印的结果', '订单可能已经建立', '不要假装已经查过我的订单', '不要替我判断有没有扣款', '不要猜成功或失败', '不要让我重复打印']) {
+    expect(UNKNOWN_ASK_DRAFT).toContain(must)
+  }
+  await expectAskHandsOffOnce(page, api, UNKNOWN_ASK_LABEL, UNKNOWN_ASK_DRAFT)
+  expect(errors).toEqual([])
+})
+
+test('unknown done without task context: touch dock, help key, and no feedback or orders to attach to @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerAssistantShell(api)
+
+  await page.goto('/print/done')
+
+  const unknown = page.locator('[data-testid="print-fulfill-state-unknown"]')
+  await expect(unknown).toBeVisible()
+  await expectTouchDock(page, UNKNOWN_ASK_LABEL, '使用帮助')
+  // 没有任务号：没有可关联的任务，也就没有「反馈问题」和「查看打印订单」（旧 ctabar 也是这样）。
+  await expect(page.getByRole('button', { name: '反馈问题', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '查看打印订单', exact: true })).toHaveCount(0)
+  await expect(page.locator('body')).not.toContainText(NO_ORDER_CLAIM)
+  await expectTouchAndBounds(page)
+  await expectAskHandsOffOnce(page, api, UNKNOWN_ASK_LABEL, UNKNOWN_ASK_DRAFT)
+  await page.goto('/print/done')
+  await page.getByTestId('print-fulfill-primary').click()
+  await expect(page).toHaveURL(/\/help$/)
+  expect(errors).toEqual([])
+})
+
+test('loading done: touch dock, the primary key is off while verifying and says why @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerAssistantShell(api)
+  // 状态请求发出去、一直不回：页面就停在「正在核验」。
+  api.respondWith('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, () => new Promise(() => undefined))
+
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', flowState)
+
+  const loading = page.locator('[data-testid="print-fulfill-state-loading"]')
+  await expect(loading).toBeVisible()
+  await expect.poll(() => api.requestCount('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`), '真的在核验：状态请求已发出').toBeGreaterThan(0)
+  await expectTouchDock(page, LOADING_ASK_LABEL, '正在核验…')
+
+  // 主按钮：核验期间不可点，并且旁边写明原因（读屏用 aria-describedby 连着）。
+  const primary = page.getByTestId('print-fulfill-primary')
+  await expect(primary).toBeDisabled()
+  const why = '正在核对这一单的打印结果，核对完才能继续。'
+  await expect(loading.getByText(why, { exact: true })).toBeVisible()
+  await expect(primary).toHaveAccessibleDescription(why)
+  // 原因是对办事的人说的话：不带「主按钮」「真实状态」这类写给开发看的字眼。
+  await expect(page.locator('body')).not.toContainText(/主按钮|真实状态|不知道下一步/)
+  // 强行点也点不动：没有任何去处、页面还在核验。
+  await primary.click({ force: true })
+  await expect(page).toHaveURL(/\/print\/done$/)
+  await expect(loading).toBeVisible()
+  // 核验期间不挡路：返回首页、问小青仍可点。
+  await expect(page.locator('.qxt-dock').getByRole('button', { name: '返回首页' })).toBeEnabled()
+  await expect(page.locator('.qxt-dock').getByRole('button', { name: LOADING_ASK_LABEL, exact: true })).toBeEnabled()
+  // 不说成已出纸、不下「没有订单」的结论。
+  await expect(page.locator('body')).not.toContainText(NO_ORDER_CLAIM)
+  await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
+  await expectTouchAndBounds(page)
+  await page.screenshot({ path: test.info().outputPath('fulfill-loading-dock.png'), fullPage: true })
+
+  for (const must of ['不要假装已经查到结果', '不要替我判断有没有出纸或扣款']) {
+    expect(LOADING_ASK_DRAFT).toContain(must)
+  }
+  await expectAskHandsOffOnce(page, api, LOADING_ASK_LABEL, LOADING_ASK_DRAFT)
+  expect(errors).toEqual([])
+})
+
+test('progress without task context never claims there is no order or charge either @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  await page.goto('/print/progress')
+
+  const missing = page.locator('[data-testid="print-fulfill-state-missing-context"]')
+  await expect(missing).toBeVisible()
+  await expect(missing).toContainText('说不准有没有下过单、扣没扣费')
+  await expect(missing).not.toContainText(NO_ORDER_CLAIM)
+  expect(errors).toEqual([])
+})
+
+// 出纸页「暂时查不到打印结果」（连续 10 分钟没拿到终态才翻到这一屏）：照稿 st-unconfirmed 的骨架——数字三步 + 订单摘要 + 小字，
+// 底栏触屏三槽（返回首页 / 问小青 / 重新查询状态）。这一屏此前没有任何浏览器用例：它要等满 10 分钟，这里用页面时钟快进，
+// 期间每分钟点一下屏，整机闲置清场不会插进来。只是查询超时，既不猜成功也不猜失败，也不让用户去找人。
+test('progress status timeout: three steps, order summary and a re-query key, never guesses a result @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  let polls = 0
+  api.respondWith('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, async () => {
+    polls += 1
+    return { status: 200, json: { taskId: W2_ORDER.taskId, status: 'pending' } }
+  })
+  await page.clock.install({ time: new Date('2026-10-28T10:00:00+08:00') })
+  await page.goto('/print/progress')
+  await setReactRouterState(page, '/print/progress', flowState)
+  await expect(page.locator('[data-testid="print-fulfill-state-printing"]')).toBeVisible()
+  for (let minute = 0; minute < 11; minute += 1) {
+    await page.clock.runFor(60 * 1000)
+    await page.evaluate(() => window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })))
+  }
+  await page.clock.runFor(3000)
+
+  const timedOut = page.locator('[data-testid="print-fulfill-state-client-status-timeout"]')
+  await expect(timedOut).toBeVisible()
+  await expect(page.locator('.qxt-band')).toContainText('暂时查不到打印结果')
+  await expect(page.locator('.qxt-band')).toContainText('这不代表成功或失败')
+  // 骨架：三步、订单摘要、小字。
+  await expect(page.getByRole('region', { name: '这一刻你可以做的三件' }).locator('li')).toHaveCount(3)
+  await expect(timedOut.locator('.qxt-sum dt', { hasText: '订单号' })).toHaveCount(1)
+  await expect(timedOut).toContainText('这只是查询超时')
+  await expect(timedOut).toContainText('我们不会猜它成功或失败')
+  // 不下结论、不找人。
+  await expect(page.locator('body')).not.toContainText(NO_ORDER_CLAIM)
+  await expect(page.locator('body')).not.toContainText(/联系现场|联系工作人员|找现场|找工作人员/)
+  await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
+  // 底栏：返回首页 / 问小青（本屏专属问句）/ 重新查询状态；整页没有旧的小号 ctabar。
+  await expect(page.getByRole('button', { name: '返回首页' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '问小青：取纸或异常怎么办', exact: true })).toBeVisible()
+  await expect(page.locator('.qx-ctabar')).toHaveCount(0)
+  const recheck = page.getByTestId('print-fulfill-primary')
+  await expect(recheck).toHaveText('重新查询状态')
+  await expectTouchAndBounds(page)
+
+  // 「重新查询状态」只是让轮询从头再来：回到进行中的那一屏，再次向 GET /print/jobs/:taskId 发请求，不重新下单。
+  const pollsBefore = polls
+  await recheck.click()
+  await expect(page.locator('[data-testid="print-fulfill-state-printing"]')).toBeVisible()
+  await page.clock.runFor(3000)
+  await expect.poll(() => polls).toBeGreaterThan(pollsBefore)
   expect(errors).toEqual([])
 })

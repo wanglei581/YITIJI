@@ -13,7 +13,12 @@
  *      并给「结束上一位的使用」；不放「进入我的」直达入口。
  *   C. 进个人资产页先问「还是你吗？」：距上次触屏超过 30 秒（KIOSK_HANDOVER_CONFIRM_MS），
  *      我的、我的文档、打印订单、AI 服务记录、我的简历……全部路由都包在 KioskHandoverGate 下，
- *      确认层出现时不挂载资产页（先确认、后读取）。
+ *      确认层出现时不挂载资产页（先确认、后读取）。弹出了没回答就一直是「待确认」（粘性标记，
+ *      只在内存里）：确认层一弹出就记下，判断时先看它，本人答「是我」、清场退出登录、新的一位登录成功才解除；
+ *      否则交接页一旦有出口（问小青、浏览器后退），下一位隔几秒再点「我的」就直接进了上一位的资料。
+ *      空档一到判据时长就**当时**记待确认（不等进页、不等确认层）：定时器到点就记，下一下触碰发现空档早已超时
+ *      也在这一下之前补记，之后任何触碰都解除不了；否则下一位先碰屏上别处、隔几秒再点「我的」，进页前只空了几秒，
+ *      确认层从没弹过，也就从没记过标记，照样直接进了上一位的资料。
  *
  * 全部读源码文本（先剥注释），不 import、不连网。
  */
@@ -80,12 +85,12 @@ check(
 
 // 每个离场出口都经 endKioskUse。
 const exits = [
-  ['src/pages/profile/ProfilePage.tsx', /onEnd=\{\(\) => endKioskUse\('end_use'\)\}/, '「我的」结束使用'],
+  ['src/pages/profile/ProfilePage.tsx', /const onEnd = \(\) => endKioskUse\('end_use'\)/, '「我的」结束使用'],
   ['src/pages/profile/me/MySettingsPage.tsx', /const handleLogout = [\s\S]{0,200}endKioskUse\('end_use'\)/, '账号设置「结束使用并退出登录」'],
   ['src/pages/profile/me/MySettingsPage.tsx', /const handleSwitch = [\s\S]{0,200}endKioskUse\('switch_account'\)/, '换号登录（W-64：先完整清场再进登录）'],
   ['src/pages/profile/me/MySettingsPage.tsx', /const handleRebindDone = [\s\S]{0,120}endKioskUse\('switch_account', \{ loginHint:/, '换绑成功重新登录'],
   ['src/pages/print/PrintDonePage.tsx', /const endOnTimeout = useCallback\(\(\) => \{\s*endKioskUse\('print_done_timeout'\)/, '打印完成页 60 秒到点（W-43）'],
-  ['src/pages/print/PrintDonePage.tsx', /if \(endArmed\) \{\s*endKioskUse\('end_use'\)/, '打印完成页「我拿走了，结束使用」'],
+  ['src/pages/print/PrintDonePage.tsx', /onClick=\{\(\) => \{\s*endKioskUse\('end_use'\)/, '打印完成页「我拿走了，结束使用」按一下就结束'],
   ['src/pages/home/HomePage.tsx', /onEndPrevious=\{\(\) => endKioskUse\('handover'\)\}/, '首页「结束上一位的使用」'],
   ['src/auth/KioskHandoverGate.tsx', /onCancel=\{\(\) => endKioskUse\('handover'\)\}/, '「还是你吗？」答「不是我」'],
   ['src/pages/placeholders/SessionTimeoutPage.tsx', /onClick=\{hardClear\}/, '超时提醒页结束按钮（hardClearFromWarning → endKioskUse）'],
@@ -124,21 +129,36 @@ check(offenders.length === 0, `页面不自己 logout / 清本机数据（另起
 check(!/clearPrintMaterialSession\s*\(/.test(code('src/pages/print/PrintDonePage.tsx')), '打印完成页不再自己只清打印材料（半清）')
 
 // ── B. 首页登录态 ───────────────────────────────────────────
-const homeView = code('src/pages/home/components/QxHomeView.tsx')
+const homeView = code('src/pages/home/components/HomeTouchView.tsx')
 const identity = code('src/pages/home/components/HomeIdentityActions.tsx')
 const homePage = code('src/pages/home/HomePage.tsx')
 check(
   !/displayName|phoneMasked|nickname|maskPhone|\buser\b/.test(homeView + identity) && !/displayName=/.test(homePage),
   '首页不读、不传登录人的名字或手机号（打码的也不显示）',
 )
-check(/const hello = greeting\b/.test(homeView), '首页问候不带名字')
+check(
+  /const greeting = greetingWord\(/.test(homeView) &&
+    /eyebrow=\{greeting\}/.test(homeView) &&
+    /title="我是小青"/.test(homeView) &&
+    !/title=\{`\$\{greeting\}/.test(homeView),
+  '眉题等于 greetingWord，标题只有「我是小青」',
+)
 check(
   /<span>有人登录着<\/span>/.test(identity) && /data-testid="home-end-previous"[\s\S]{0,80}结束上一位的使用/.test(identity),
-  '登录态只写「有人登录着」，并给「结束上一位的使用」',
+  '空档到点后的登录态仍只写「有人登录着」，并给「结束上一位的使用」（给站到屏前的下一位看，W-75 原句不改）',
+)
+// 10/29 本机走查 I-05：刚登录、人还在屏前时对本人说本人的话，不再让本人看「结束上一位的使用」。
+// 说给谁只看一个信号：和「我的」前的「还是你吗？」同一个判据（needsHandoverConfirm，空档满 30 秒、没人点过屏就是下一位可能在场）。
+check(
+  /import \{ needsHandoverConfirm \} from '\.\.\/\.\.\/\.\.\/auth\/kioskPresence'/.test(identity) &&
+    /voice === 'self'[\s\S]{0,400}<span>你已登录<\/span>[\s\S]{0,260}data-testid="home-end-previous"[\s\S]{0,80}结束使用\s*<\/button>/.test(identity) &&
+    /useState<IdentityVoice>\(\(\) => \(needsHandoverConfirm\(\) \? 'next' : 'self'\)\)/.test(identity) &&
+    /setVoice\(needsHandoverConfirm\(\) \? 'next' : 'self'\)/.test(identity),
+  '刚登录、人还在屏前写「你已登录」+「结束使用」；是不是下一位只看 needsHandoverConfirm（和「还是你吗？」「继续办理」收起同一个判据），初值与计时都读它',
 )
 check(!/进入我的/.test(homeView + identity), '首页不放「进入我的」直达入口（进个人区走底部「我的」）')
 check(
-  /isLoggedIn \? 'true' : undefined/.test(homeView) && /data-member='true'/.test(read('src/pages/home/styles/home-qx.css')),
+  /isLoggedIn \? 'true' : undefined/.test(homeView) && /data-member='true'/.test(read('src/pages/home/styles/home-touch.css')),
   '登录态那一行按稿 01 ?state=member 收起副标题、不折行',
 )
 const draft = readFileSync(join(repoRoot, 'docs/design/kiosk-redesign-2026-08-v2/01-home.html'), 'utf8')
@@ -157,17 +177,74 @@ check(
   /return idleBeforeEntryMs\(now\) > KIOSK_HANDOVER_CONFIRM_MS/.test(presence),
   '判据：进来之前空了超过 30 秒（行为由单测真跑）',
 )
+// 弹出了没回答就是「待确认」：判断先看这个标记，空多久、从哪条路进来都先问（行为由单测与浏览器用例真跑）。
+check(
+  /export function needsHandoverConfirm\(now: number = Date\.now\(\)\): boolean \{\s*if \(handoverPending\) return true\s*return idleBeforeEntryMs\(now\) > KIOSK_HANDOVER_CONFIRM_MS/.test(presence),
+  '判据先看「待确认」标记（弹出了没回答就一直要问），再看进来之前空了多久',
+)
+check(
+  /export function markKioskPresenceConfirmed\(at: number = Date\.now\(\)\): void \{\s*handoverPending = false/.test(presence) &&
+    /export function clearHandoverPending\(\): void \{\s*handoverPending = false/.test(presence) &&
+    /export function markHandoverPending\(\): void \{\s*handoverPending = true/.test(presence) &&
+    (presence.match(/handoverPending = true/g) ?? []).length === 3 &&
+    (presence.match(/handoverPending = false/g) ?? []).length === 4,
+  '待确认只在这几处写：记下三处（确认层弹出、空档到点的定时器、下一下触碰发现空档早已超时）；解除只有答「是我」/ 新的一位登录成功、清场退出登录两处（再加初值与测试复位）',
+)
+// 空档一到判据时长就当时记（不等进页、不等确认层）：定时器时长就是判据时长，每一次触碰与本人刚确认都让它重新计，
+// 触碰本身绝不解除标记；下一下触碰发现空档早已超时（定时器被挂起或晚到）就在这一下之前补记。行为由单测（mock 计时器）与浏览器用例真跑。
+check(
+  /idleMarkTimer = setTimeout\(\(\) => \{\s*idleMarkTimer = null\s*handoverPending = true\s*\}, KIOSK_HANDOVER_CONFIRM_MS\)/.test(presence),
+  '空档计时的时长就是判据时长（KIOSK_HANDOVER_CONFIRM_MS），到点就记待确认',
+)
+{
+  const touchBody = presence.match(/export function recordKioskTouch\(at: number = Date\.now\(\)\): void \{[\s\S]*?\n\}/)?.[0] ?? ''
+  const confirmedBody = presence.match(/export function markKioskPresenceConfirmed\(at: number = Date\.now\(\)\): void \{[\s\S]*?\n\}/)?.[0] ?? ''
+  check(
+    /armIdleMark\(\)/.test(touchBody) && /armIdleMark\(\)/.test(confirmedBody),
+    '每一次触碰、本人刚确认过（登录成功、答「是我」）都让空档重新计：在场一直有操作不误弹，旧定时器不会把刚确认的人又记成待确认',
+  )
+  check(
+    /if \(lastTouchAt !== null && at - lastTouchAt > KIOSK_HANDOVER_CONFIRM_MS\) handoverPending = true/.test(touchBody) && !/handoverPending = false/.test(touchBody),
+    '下一下触碰发现空档早已超过判据时长就在这一下之前补记待确认；触碰本身绝不解除它',
+  )
+}
+check(
+  !/localStorage|sessionStorage|indexedDB|\bcookie\b|\bhistory\b|\blocation\b/.test(presence),
+  '待确认标记只在内存里：kioskPresence 不碰 localStorage / sessionStorage / cookie / history / 地址（清场与重载让它当场消失）',
+)
 const gate = code('src/auth/KioskHandoverGate.tsx')
 check(
-  /if \(!isLoggedIn \|\| !current\.ask\) return <Outlet \/>/.test(gate) && (gate.match(/<Outlet/g) ?? []).length === 1,
+  /const showConfirm = isLoggedIn && current\.ask/.test(gate) && /if \(!showConfirm\) return <Outlet \/>/.test(gate) && (gate.match(/<Outlet/g) ?? []).length === 1,
   '确认层出现时不挂载资产页（先确认、后读取）',
+)
+check(
+  /useLayoutEffect\(\(\) => \{\s*if \(showConfirm\) markHandoverPending\(\)\s*\}, \[showConfirm\]\)/.test(gate),
+  '确认层一弹出就记「待确认」（和确认层同一次提交，没有「画出来了、标记还没记」的间隙）',
 )
 check(/ask: needsHandoverConfirm\(\)/.test(gate) && /decision\.key !== location\.key/.test(gate), '每换一次地址（含后退、深链）重新判一次')
 check(
-  /title="还是你吗？"/.test(gate) && /confirmLabel="是我，继续"/.test(gate) && /cancelLabel="不是我"/.test(gate) && /<SettingsConfirm/.test(gate),
-  '确认层复用 2.0 确认弹层：「还是你吗？」「是我，继续」「不是我」',
+  /title="还是你吗？"/.test(gate) && /confirmLabel="是我，继续"/.test(gate) && /cancelLabel="不是我，结束上一位的使用"/.test(gate) && /<SettingsConfirm/.test(gate) && /back=\{false\}/.test(gate) && /nav=\{false\}/.test(gate),
+  '确认层复用卡片确认：「还是你吗？」「是我，继续」「不是我，结束上一位的使用」，且没有返回和底导航',
 )
-check(/markKioskPresenceConfirmed\(\)/.test(code('src/auth/AuthContext.tsx')), '登录成功算本人刚确认过（扫码登录后直接进「我的」不再多问）')
+// 稿上这一屏的底栏「问小青」（AI 是驱动层，label 与 draft 照稿）。它是能离开这一屏的出口，
+// 所以必须和上面的「待确认」粘性标记同在：离开再回来仍先问（浏览器用例 W-75 sticky 真跑）。
+check(
+  /ask=\{\{ label: '问小青：这一页是什么意思？', draft: '这一页是什么意思？' \}\}/.test(gate) && /markHandoverPending\(\)/.test(gate),
+  '确认层底栏有稿上的「问小青：这一页是什么意思？」，并和「待确认」粘性标记同在（出口不会绕过确认）',
+)
+// 「不是我」那张卡配一叠纸（清掉这台机器上这一次的临时信息，同触屏稿「本机会清除」那张卡的用图），
+// 不是手机 + 「上传」按钮的插画（10/29 本机走查 I-06：与「结束上一位的使用」的意思不搭）。「是我」仍配简历。
+const settingsConfirm = code('src/pages/profile/me/components/SettingsConfirm.tsx')
+check(
+  /data-art="resume"><MeArt name="resume"/.test(settingsConfirm) && /data-art="stack"><MeArt name="stack"/.test(settingsConfirm) && !/MeArt name="phone"/.test(settingsConfirm),
+  '确认层两张答案卡：「是我」配简历、「不是我」配一叠纸，不再用手机 + 上传的插画',
+)
+const authContext = code('src/auth/AuthContext.tsx')
+check(/markKioskPresenceConfirmed\(\)/.test(authContext), '登录成功算本人刚确认过（扫码登录后直接进「我的」不再多问）')
+check(
+  /const logout = useCallback\(\(\) => \{[\s\S]*?clearHandoverPending\(\)[\s\S]*?\}, \[\]\)/.test(authContext),
+  '退出登录（结束使用、「不是我」、闲置到点、401 过期都走这里）一并解除待确认，不留给下一位',
+)
 
 const routes = code('src/routes/index.tsx')
 const gateBlock = routes.match(/element: <KioskHandoverGate \/>,\s*children: \[([\s\S]*?)\n\s{8}\],/)

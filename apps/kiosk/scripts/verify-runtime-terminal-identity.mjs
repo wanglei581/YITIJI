@@ -143,7 +143,7 @@ for (const [file, guard] of filePickers) {
 }
 assert.match(read('src/pages/resume/ResumeSourcePage.tsx'), /isTerminalKiosk\(\) \? 'phone' : 'cloud'/, 'terminal resume source defaults to an allowed channel')
 assert.match(read('src/pages/print/PrintUploadPage.tsx'), /if \(!isTerminalKiosk\(\)\) inputRef\.current\?\.click\(\)/, 'delayed replace-file callback rechecks terminal identity')
-for (const file of ['src/pages/home/components/QxHomeView.tsx', 'src/pages/help/HelpCenterPage.tsx']) {
+for (const file of ['src/pages/home/components/HomeTouchView.tsx', 'src/pages/help/HelpCenterPage.tsx']) {
   const source = read(file)
   assert.match(source, /kiosk \? <span>鲁ICP备[^<]+<\/span> : \(<a href="https:\/\/beian\.miit\.gov\.cn\//)
   assert.match(source, /kiosk \? <span>鲁公网安备[^<]+<\/span> : \(<a href="https:\/\/beian\.mps\.gov\.cn\//)

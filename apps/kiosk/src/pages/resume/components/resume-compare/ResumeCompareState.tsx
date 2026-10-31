@@ -1,5 +1,6 @@
-import { AlertCircleIcon, Loader2Icon } from 'lucide-react'
+import { QxTouchIcon } from '../../../../components/qingxu/touch/QxTouchIcon'
 
+/** 没有可对照的内容时的说明：缺简历 / 读取中 / AI 不可用 / 没有候选。 */
 export function ResumeCompareState(props: {
   title: string
   description: string
@@ -7,14 +8,13 @@ export function ResumeCompareState(props: {
   actionLabel?: string
   onAction?: () => void
 }) {
-  const Icon = props.busy ? Loader2Icon : AlertCircleIcon
   return (
-    <div className="qx-state qxc-state" data-tone={props.busy ? 'info' : 'empty'} role={props.busy ? 'status' : 'alert'}>
-      <span className="qx-state-ic"><Icon size={32} className={props.busy ? 'qxc-spin' : undefined} aria-hidden="true" /></span>
+    <div className="qxt-state" data-tone={props.busy ? 'info' : 'empty'} role={props.busy ? 'status' : 'alert'}>
+      {props.busy ? <span className="qxt-state-spin" aria-hidden="true" /> : <QxTouchIcon name="alert" size={40} strokeWidth={2} />}
       <div>
-        <p className="qx-state-t">{props.title}</p>
-        <p className="qx-state-d">{props.description}</p>
-        {props.actionLabel && props.onAction ? <button type="button" className="qx-btn qxc-state-action" data-variant="ghost" onClick={props.onAction}>{props.actionLabel}</button> : null}
+        <b>{props.title}</b>
+        <p>{props.description}</p>
+        {props.actionLabel && props.onAction ? <button type="button" className="qxt-use qxt-use-pri" onClick={props.onAction}>{props.actionLabel}</button> : null}
       </div>
     </div>
   )

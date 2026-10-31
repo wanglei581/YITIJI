@@ -4,24 +4,22 @@ import {
   ExpandIcon,
   FileTextIcon,
   FolderIcon,
-  HeadphonesIcon,
   PrinterIcon,
-  RotateCcwIcon,
   SparklesIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { PhoneHelpLine } from '../print-scan/phoneHelp'
 import { FileContentPreview } from '../../components/FileContentPreview'
 import { formatLabelFromMime } from './scanOutputFormat'
 import { ScanResultPreviewViewer } from './ScanResultPreviewViewer'
 import {
-  ScanChain,
-  ScanCta,
-  ScanNoteCard,
-  ScanPlan,
-  ScanSec,
+  ScanSample,
   ScanStatusPanel,
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
+import { FsRow } from '../print-scan/FsRow'
+import { ScanTakeawayExit, ScanTakeawayLayer, TAKEAWAY_ALLOWED } from './ScanTakeaway'
+import { scanShownText } from './scanShownText'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
 import { revokeLiveScanSession } from './scanSessionRevoke'
@@ -102,6 +100,7 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
   const scanType = state.scanType ?? 'document'
   const success = state.success === true
   const reason = state.reason
+  const shownReason = reason ? scanShownText(reason, '扫描任务未能完成。请返回重试。') : null
   const file = state.file
   const outcome = deriveOutcome(state)
   // 刚结束那一场的凭证还留在本机登记里（finishWithResult 刻意不抹 live）。
@@ -115,6 +114,9 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
   // 整屏预览只是这一屏的视图状态：不进地址、不进历史、不落存储。
   const [previewOpen, setPreviewOpen] = useState(false)
   const closePreview = useCallback(() => setPreviewOpen(false), [])
+  // 游客扫码带走电子版（走查 I-15）：同样只是这一屏的视图状态，不进地址、不进历史、不落存储。
+  const [takeawayOpen, setTakeawayOpen] = useState(false)
+  const closeTakeaway = useCallback(() => setTakeawayOpen(false), [])
 
   /**
    * 登记这一场可能存在的重扫授权。幂等（同一场不会重新计时），所以可以被调用两次：
@@ -315,109 +317,65 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
         title={isNoFile ? '已完成 · 结果里没有文件' : isExpired ? '等待超时' : '扫描未完成'}
         subtitle="本次没有生成可用的扫描文件"
         status={{ tone: isNoFile || isExpired ? 'warn' : 'bad', label: isNoFile ? '已完成 · 结果里没有文件' : isExpired ? '等待超时 · 没有文件' : '扫描未完成' }}
-        ctabar={
-          <ScanCta>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => leaveScanFlow('/print-scan')}>
-              返回打印扫描
-            </button>
-            {isNoFile ? (
-              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => leaveScanFlow('/help')}>
-                <HeadphonesIcon aria-hidden />
-                联系工作人员
-              </button>
-            ) : (
-              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => leaveScanFlow('/')}>
-                返回首页
-              </button>
-            )}
-            {/* 两个按钮，不是一个按钮两种文案：拿到凭据时它是「同一份材料」的安全重扫，
-                拿不到时它是一次普通新会话 —— 后者会让同一张纸撞上服务端两小时的重复件
-                拒收，代价完全不同，所以文案必须分开，并且由用户自己按下那一个。 */}
-            {rescanAuthorized ? (
-              <button type="button" className="qx-btn" data-variant="primary" onClick={handleRetry}>
-                重试扫描（同一份材料）
-              </button>
-            ) : (
-              <button type="button" className="qx-btn" data-variant="primary" onClick={handlePlainRestart}>
-                重新开始一次扫描
-              </button>
-            )}
-          </ScanCta>
-        }
+        /* 两个按钮，不是一个按钮两种文案：拿到凭据时它是「同一份材料」的安全重扫，
+           拿不到时它是一次普通新会话 —— 后者会让同一张纸撞上服务端两小时的重复件
+           拒收，代价完全不同，所以文案必须分开，并且由用户自己按下那一个。 */
+        dock={{
+          left: { label: '返回打印扫描', leaveTo: '/print-scan' },
+          primary: rescanAuthorized
+            ? { label: '重试扫描（同一份材料）', onClick: handleRetry }
+            : { label: '重新开始一次扫描', onClick: handlePlainRestart },
+        }}
       >
-        {/* 标题与第一枚标签只说**所有成因都成立**的那句话：这一屏也接本机自己放弃的两条路
-            （轮询到点、连续查不动），那两条服务端并没有说过「失败」或「过期」，
-            真实成因由下面那行 reason 原样转达。 */}
-        <ScanStatusPanel
-          tone={isNoFile ? 'warn' : 'error'}
-          title={isNoFile ? '系统说已完成，但这次结果里没有可用文件' : isExpired ? '等待超时，这次没有拿到文件' : '扫描未完成'}
-          /* 不写「编号已作废」：本机放弃那两条路上的撤销没有回执，本机不知道服务端作没作废。 */
-          chips={isNoFile
-            ? [{ label: '状态：已完成', tone: 'ok' }, { label: '这次扫描没有文件', tone: 'warn' }, { label: '这次扫描到此结束' }]
-            : [
-                ...(isExpired ? [{ label: '等待已超时', tone: 'warn' as const }] : []),
-                { label: '这次扫描没有文件', tone: isExpired ? undefined : 'warn' as const },
-                { label: '不自动重扫' },
-              ]}
-        >
-          {isNoFile ? (
-            <>
-              <p>系统确认<b>这次扫描已经完成</b>，可是同一份结果里<b>没有带可用的文件信息</b>（结果里允许不带文件，这不是出错）。</p>
-              <p>这份文件此刻还在不在系统里，<b>本机没有依据判断</b>。页面不替系统说它还在，不说它已被删掉，也不承诺能找回来。</p>
-            </>
-          ) : (
-            <p>{reason ?? '扫描任务未能完成，请重试或联系工作人员'}</p>
-          )}
+        {/* 失败态：原因只写一处。此前意图带标题、状态条、面板标题三处都是「扫描未完成」，面板里的原因
+            和下面「失败原因原文」说明格又是同一句。现在第一格就是原因（标题 + 原因本身）。
+            这一屏也接本机自己放弃的两条路（轮询到点、连续查不动），那两条服务端并没有说过「失败」或「过期」，
+            所以第一格的标题只说所有成因都成立的那句话，真实成因由 reason 原样转达。 */}
+        <div className="fs-grow is-status">
+          <div className="fs-facts">
+            <div className="fs-fact wide">
+              <b>{isNoFile ? '系统说已完成，但这次结果里没有可用文件' : isExpired ? '等待超时，这次没有拿到文件' : '这次没扫成的原因'}</b>
+              {isNoFile ? (
+                <>
+                  <span>系统确认<b>这次扫描已经完成</b>，可是同一份结果里<b>没有带可用的文件信息</b>（结果里允许不带文件，这不是出错）。</span>
+                  <span>这份文件此刻还在不在系统里，<b>本机没有依据判断</b>。页面不替系统说它还在，不说它已被删掉，也不承诺能找回来。这次扫描到此结束。</span>
+                </>
+              ) : (
+                <span>{shownReason ?? '扫描任务未能完成，请重试。'}</span>
+              )}
+            </div>
+            <div className="fs-fact wide">
+              <b>同一张纸</b>
+              <span>同一张纸原样再扫，系统可能按重复件拒收（两小时内）。</span>
+            </div>
+            <div className="fs-pairgrid">
+              <div className="fs-fact">
+                <b>重试扫描（同一份材料）</b>
+                <span>{rescanAuthorized ? '这一次会带上上一场的凭据去申请安全重扫放行：系统认了，同一份材料照原样再扫一遍就行；不认会在下一页当场说明，不会悄悄按普通重扫处理。' : '本机没有可用的安全重扫凭据。这里不写成已经放行。'}</span>
+              </div>
+              <div className="fs-fact">
+                <b>重新开始一次扫描</b>
+                <span>这是一次普通新会话，不是免查重的重扫。不自动重扫。</span>
+              </div>
+            </div>
+          </div>
           {safeRescanLost ? (
-            <p data-testid="scan-safe-rescan-lost">
+            <p className="fs-warn" data-testid="scan-safe-rescan-lost">
               <b>刚才那份安全重扫凭据已经用不了了</b>（超过 15 分钟，或者中间清过场 / 换过人）。
               本页<b>没有</b>替你改成普通重扫 —— 同一张纸如果走普通扫描，系统会按重复件拒收，
               你会在机器前白等到这次扫描过期。要继续，请自己按右下角<b>「重新开始一次扫描」</b>，
-              并且换一份材料或找工作人员。
+              并且换一份材料。
             </p>
           ) : null}
-        </ScanStatusPanel>
-        <ScanSec no="01" title={isNoFile ? '现在能做什么' : '现在怎么办'} hint={isNoFile ? '这是终态，不用再等' : '右下角重扫，左下角回打印扫描'}>
-          <div className="sw-grid2">
-            <ScanNoteCard title="现在能做什么" foot="重扫是另建一次扫描，不是接着这一次。">
-              <ScanPlan items={[
-                /* 按钮文案是两条分支（见 ctabar），这句指路也必须跟着分支走。
-                 * 写死「点右下角重试扫描」时，没有凭据的那一屏上根本没有叫这个名字的按钮
-                 * —— 同一屏两个名字，用户会以为自己少看见了一个控件。 */
-                rescanAuthorized
-                  ? '点右下角「重试扫描（同一份材料）」：那是另一次任务。'
-                  : '点右下角「重新开始一次扫描」：那是另一次任务，也不是免查重的重扫。',
-                '重扫之前把纸取回来抚平、订书钉取掉。',
-                /* 服务端对「取过件但没建档成功」的同一份字节有两小时去重（它挡的是把上一位的
-                 * 扫描件误挂到下一位头上）。所以这句必须按手里有没有那份凭据分开说。
-                 *
-                 * 措辞上有一条不能越过：**本机不知道服务端到底铸没铸过那枚授权**。服务端只在
-                 * 任务已经取到文件（matched + 内容 hash 已落 lastAttemptHash）之后落到
-                 * failed / cancelled / expired 时才铸；而本机在一个还停在 waiting 的任务上
-                 * 放弃轮询，也会走到这一屏 —— 那种情况根本没有授权，凭据照样在手里。
-                 * 所以这里只能说「会带着凭据去申请」，不能说「服务端已经放行」。
-                 * 真正有资格说「已放行」的是设置页：那一行只在创建成功之后才出现，
-                 * 而带着重扫两半的创建能成功，等于服务端已经把授权消费掉了。 */
-                rescanAuthorized
-                  ? '这一次会带上上一场的凭据去申请安全重扫放行：系统认了，同一份材料照原样再扫一遍就行；不认会在下一页当场说明，不会悄悄按普通重扫处理。'
-                  : '本机没有可用的安全重扫凭据：同一张纸原样再扫，系统可能按重复件拒收（两小时内），换一次扫描或找工作人员。',
-                isNoFile ? '这个编号问不出文件，反复点也是同一句结果。' : '同一份材料连续失败两次，就找工作人员。',
-              ]} />
-            </ScanNoteCard>
-            <ScanNoteCard title="本机不会替系统补话">
-              <ScanPlan items={[
-                '不猜纸张或机器故障原因，本机收不到这些事件。',
-                '不自动重扫，避免同一份材料出两份。',
-                '不说「稍后会好」，也不按等待时长改判结果。',
-              ]} />
-            </ScanNoteCard>
-          </div>
-        </ScanSec>
+          <PhoneHelpLine />
+          <ScanSample />
+        </div>
         {isNoFile ? null : (
-          <ScanSec no="02" title={isExpired ? '流程停在哪' : '流程没走完'} hint="没有可用文件挂到这次扫描">
-            <ScanChain active={-1} />
-          </ScanSec>
+          <FsRow title="返回首页" desc="结束这次等待" onClick={() => leaveScanFlow('/')} />
         )}
+        {rescanAuthorized ? (
+          <FsRow title="重新开始一次扫描" desc="回选类型，不带安全重扫凭据" onClick={handlePlainRestart} />
+        ) : null}
       </ScanWorkbenchShell>
     )
   }
@@ -432,70 +390,69 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
       title="扫描完成"
       subtitle="请核对文件信息，选择下一步操作"
       status={{ tone: 'ok', label: '系统已返回完成，并带回文件' }}
-      ctabar={
-        <ScanCta reason="未选择去向的临时文件会按系统的保存规则清理；本页不会伪造“已保存”">
-          {/* 成功页上的「重新扫描」本来就没有安全重扫可言：上一场已经建档，服务端那条
-              两小时去重只管「取过件但没建档成功」的字节。所以它是一次普通新会话，
-              走显式的那一条，不碰重扫授权。 */}
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={handlePlainRestart}>
-            <RotateCcwIcon aria-hidden />
-            重新扫描
-          </button>
-          {/* 名字照稿 18 的出口名：它先去材料检查（原件要先过隐私检查），不能再叫「直接打印」。 */}
-          <button type="button" className="qx-btn" data-variant="primary" disabled={!printEnabled} onClick={handlePrint}>
-            拿去打印
-          </button>
-        </ScanCta>
-      }
+      /* 成功页上的「重新扫描」本来就没有安全重扫可言：上一场已经建档，服务端那条
+         两小时去重只管「取过件但没建档成功」的字节。所以它是一次普通新会话，
+         走显式的那一条，不碰重扫授权。名字照稿 18 的出口名：「拿去打印」先去材料检查
+         （原件要先过隐私检查），不能再叫「直接打印」。 */
+      dock={{
+        left: { label: '重新扫描', onClick: handlePlainRestart, icon: 'refresh' },
+        primary: { label: '拿去打印', onClick: handlePrint, disabled: !printEnabled },
+      }}
     >
       <div className="sw-result qx-grow">
+        {/* 稿 18「扫描完成」：预览在上，文件名、格式大小页数、类型在下，再是预览说明，最后是「整屏查看」。
+            这块原来是「文件头在上、预览在下」，预览落进了左边 28% 的窄列（两列网格是给「左示意图 + 右预览」写的）。 */}
         <div className="sw-preview">
+          <div className="sw-pvstage">
+            <div className="sw-pvdoc">
+              {file ? (
+                <FileContentPreview
+                  fileUrl={file.fileUrl}
+                  fileName={file.name}
+                  mimeType={file.mimeType}
+                  format={displayFormat}
+                  pdfFit="page"
+                />
+              ) : (
+                <ScanStatusPanel tone="error" title="缺少扫描结果文件">
+                  <p>本页未收到真实扫描结果，不会生成占位文件。请重新开始扫描。</p>
+                </ScanStatusPanel>
+              )}
+            </div>
+          </div>
           <div className="sw-pvhead" data-testid="scan-workbench-file-brief">
+            {file ? (
+              <div className="sw-pvh-2">
+                <b>{file.name}</b>
+                <span className="sw-pvh-meta">
+                  {displayFormat}
+                  <span className="sep">·</span>
+                  {file.size}
+                  <span className="sep">·</span>
+                  {file.pages != null ? `${file.pages} 页` : '页数以文件为准'}
+                </span>
+              </div>
+            ) : null}
             <div className="sw-pvh-1">
               <span className="sw-pvh-ic"><FileTextIcon size={24} aria-hidden /></span>
               <span className="sw-pvh-t">系统结果：已完成，并带回文件</span>
               <span className="sw-chip is-ok">{SCAN_TYPE_LABELS[scanType]}</span>
-              {file ? (
-                <button
-                  type="button"
-                  className="sw-pvh-open"
-                  data-testid="scan-result-preview-open"
-                  onClick={() => setPreviewOpen(true)}
-                >
-                  <ExpandIcon size={20} aria-hidden />
-                  整屏查看
-                </button>
-              ) : null}
             </div>
-            {file ? (
-              <div className="sw-pvh-2">
-                <b>{file.name}</b>
-                <span className="sep">·</span>
-                <span>{displayFormat}</span>
-                <span className="sep">·</span>
-                <span>{file.size}</span>
-                <span className="sep">·</span>
-                <span>{file.pages != null ? `${file.pages} 页` : '页数以文件为准'}</span>
-              </div>
-            ) : null}
-          </div>
-          <div className="sw-pvstage">
-            {file ? (
-              <FileContentPreview
-                fileUrl={file.fileUrl}
-                fileName={file.name}
-                mimeType={file.mimeType}
-                format={displayFormat}
-              />
-            ) : (
-              <ScanStatusPanel tone="error" title="缺少扫描结果文件">
-                <p>本页未收到真实扫描结果，不会生成占位文件。请重新开始扫描。</p>
-              </ScanStatusPanel>
-            )}
           </div>
           <p className="sw-preview-cap">
             预览用的是结果里那条临时内容链接，不是另外再申请一条要登录的链接。打不开只证明这一次没打开，不改判扫描已完成，也不能据此判断文件是否仍可用。
           </p>
+          {file ? (
+            <button
+              type="button"
+              className="sw-pvh-open"
+              data-testid="scan-result-preview-open"
+              onClick={() => setPreviewOpen(true)}
+            >
+              <ExpandIcon size={24} aria-hidden />
+              整屏查看
+            </button>
+          ) : null}
         </div>
       <div className="sw-actrow" data-testid="scan-workbench-exits">
         <button
@@ -524,6 +481,8 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
             <small>先检查文件和个人信息，再选打印参数。金额由系统报价决定，本页不给价格。</small>
           </span>
         </button>
+        {/* 游客的扫描件事后补不进账号，要电子版只有当场扫码带走（走查 I-15）；登录用户的在「我的文档」里。 */}
+        {isLoggedIn || !file ? null : <ScanTakeawayExit scanType={scanType} onOpen={() => setTakeawayOpen(true)} />}
         <button
           type="button"
           className={`sw-exit${file && isLoggedIn ? '' : ' is-off'}`}
@@ -539,13 +498,17 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
             <small>
               {isLoggedIn
                 ? '在「我的文档」查看与管理本次扫描件'
-                : '未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别'}
+                : '未登录扫描件不会进入「我的文档」。要留在账号里：先登录，再重新扫一次。'}
             </small>
           </span>
         </button>
       </div>
+      <p className="fs-p fs-foot">还没选下一步的临时文件，会按保存规则清理。扫完请取回原件。</p>
       {previewOpen && file ? (
         <ScanResultPreviewViewer file={file} formatLabel={displayFormat} onClose={closePreview} />
+      ) : null}
+      {takeawayOpen && file && !isLoggedIn && TAKEAWAY_ALLOWED[scanType] ? (
+        <ScanTakeawayLayer fileName={file.name} fileUrl={file.fileUrl} onClose={closeTakeaway} />
       ) : null}
       </div>
     </ScanWorkbenchShell>

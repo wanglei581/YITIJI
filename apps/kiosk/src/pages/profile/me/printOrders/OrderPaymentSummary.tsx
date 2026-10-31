@@ -17,6 +17,8 @@
 
 import { useNavigate } from 'react-router-dom'
 import type { MemberPrintOrderItem } from '@ai-job-print/shared'
+import { helpNeededLine } from '../../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../../hooks/useSupportContact'
 import { KIcon } from '../../../../components/kiosk-icon'
 import {
   BILLING_PAGE_SOURCE_LABEL,
@@ -50,6 +52,7 @@ function DetailRow({ label, value, hint }: { label: string; value: string; hint?
 
 export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
   const navigate = useNavigate()
+  const contact = useSupportContact()
   const payStatus = item.payStatus ?? null
   const orderNo = publicOrderNo(item.orderNo)
   const paid = netPaidDisplay(item)
@@ -67,7 +70,7 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
       {payStatus === null ? (
         <p className="me-payment-empty">
           暂无支付信息
-          <span>（该订单未关联支付记录，如有疑问请联系现场工作人员）</span>
+          <span>（该订单未关联支付记录。{helpNeededLine(contact)}）</span>
         </p>
       ) : isFreeMemberOrder(item) ? null : (
         <div className="me-payment-grid">
@@ -97,7 +100,7 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
         <p className="me-note" role="status">
           <strong>{PENDING_REFUND_LABEL}</strong>
           {' '}
-          {isFreeMemberOrder(item) ? '本单已确认未出纸，退款由工作人员处理。' : PENDING_REFUND_EXPLANATION}
+          {PENDING_REFUND_EXPLANATION}。{helpNeededLine(contact)}。
         </p>
       )}
 

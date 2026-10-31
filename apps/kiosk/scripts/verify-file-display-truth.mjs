@@ -104,6 +104,12 @@ const uploadModule = [
   uploadSrc,
   read('src/pages/print/file-source/FileSourceView.tsx'),
   read('src/pages/print/file-source/FileSourceBits.tsx'),
+  // displayFileName 挪到纯 TS 的 fileSourceModel.ts（组件文件不再混出非组件导出），文件名同样只走这一个函数。
+  read('src/pages/print/file-source/fileSourceModel.ts'),
+  // 手机、U 盘两态正文与出错板件从 FileSourceBits 拆出（拆分只搬不改行为），文件名同样只走 displayFileName。
+  read('src/pages/print/file-source/FileSourcePhone.tsx'),
+  read('src/pages/print/file-source/FileSourceUsb.tsx'),
+  read('src/pages/print/file-source/FileSourceError.tsx'),
   read('src/pages/print/components/PrintPreviewPanel.tsx'),
 ].join('\n')
 const fmtMatch = uploadSrc.match(/function formatBytes\(bytes: number\): string \{([\s\S]*?)\n\}/)

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertCircleIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { PrintEmptyDesk } from './components/PrintEmptyDesk'
+import { PrintTouchFrame, printAsk } from './PrintTouchFrame'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import {
@@ -38,9 +38,35 @@ import {
   MaterialCheckPresentation,
   type MaterialCheckStage,
 } from './components/MaterialCheckPresentation'
-import { PrintDeskGuide, PrintDeskFooter, PrintDeskNavbar } from './components/PrintDeskChrome'
 import { manualOriginalPrintCheck, shareMaterialChecks } from './printDeskModel'
 import './styles/print-desk-qx.css'
+import './styles/print-desk-touch.css'
+
+const CHECK_ASK = {
+  label: '问小青：怎么遮挡',
+  draft: '材料检查发现了个人信息片段，保留和遮挡有什么区别？',
+} as const
+
+const EMPTY_ASK = {
+  label: '问小青：文件要从哪传？',
+  draft: '这一页没有待处理的文件。请说明文件可以从哪里传上来。不要假装已经收到文件。',
+} as const
+
+const IMAGE_CLARITY_CODES = ['IMAGE_RESOLUTION_OK_FOR_A4', 'IMAGE_RESOLUTION_LOW_FOR_A4']
+const INCOMPLETE_INSPECTION_CODES = [
+  'PRINT_MIME_UNSUPPORTED',
+  'SOURCE_FILE_BYTES_UNAVAILABLE',
+  'PDF_PAGE_COUNT_NOT_DETECTED',
+  'IMAGE_BYTES_UNAVAILABLE',
+  'IMAGE_DIMENSIONS_NOT_DETECTED',
+]
+
+function imageClarityAlreadyChecked(summary: InspectionSummaryView | null): boolean {
+  if (!summary || summary.pageCount === null || summary.canPrint === false) return false
+  const codes = summary.messages.map((message) => message.code)
+  if (codes.some((code) => INCOMPLETE_INSPECTION_CODES.includes(code))) return false
+  return codes.some((code) => IMAGE_CLARITY_CODES.includes(code))
+}
 
 /** 检查途中这一份交接已被替换或失效：迟到的结果一律不写，当场停下。 */
 class PrintHandoffGoneError extends Error {
@@ -567,72 +593,27 @@ export function PrintMaterialCheckPage({
 
   if (!file) {
     return (
-      <QxPageFrame
-        navbar={<PrintDeskNavbar />}
-        back={{ label: '返回选文件', onBack: () => navigate(uploadPath) }}
-        title="材料检查"
-        subtitle="先完成文件体检和隐私预检，再进入打印参数"
+      <PrintTouchFrame
+        nav
+        page="print-check"
+        legacyBody={false}
+        kind="compact"
+        seal={null}
+        eyebrow="材料检查与预览"
+        title="这一页没有待处理的文件"
+        titleTag="h2"
+        subtitle="先选好要打印的材料，再检查、再设参数。"
         status={{ tone: 'warn', label: '没有待处理的文件' }}
-        ctabar={(
-          <PrintDeskFooter step="check" onBack={() => navigate(uploadPath)}>
-            <button className="qx-btn" data-variant="ghost" type="button" onClick={() => navigate('/print-scan')}>返回打印扫描</button>
-            <p className="why">没有文件时不显示文件名、页数或检查结论，也不会产生订单。</p>
-            <button className="qx-btn" data-variant="primary" type="button" onClick={() => navigate(uploadPath)}>去选文件</button>
-          </PrintDeskFooter>
-        )}
+        back={{ label: '上一步', onBack: () => navigate(uploadPath) }}
+        ask={printAsk(EMPTY_ASK.label, EMPTY_ASK.draft)}
+        primary={{ label: '去选文件', onClick: () => navigate(uploadPath) }}
       >
-        <PrintDeskGuide step={1} title={<>这一页<em>没有文件</em>。</>} detail="先选好要打印的材料，再检查文件与个人信息。" />
-        <div className="qpd-context-empty" data-w2-page="print-material-check" data-qx-state="missing-context">
-          <div className="qx-state" data-tone="empty">
-            <span className="qx-state-ic"><AlertCircleIcon aria-hidden="true" /></span>
-            <div>
-              <h2 className="qx-state-t">这一页没有待处理的文件</h2>
-              <p className="qx-state-d" data-print-handoff-problem={problem ? 'true' : undefined}>{problem ?? '材料检查和打印参数必须基于已经进入本次办理的真实文件。请回选文件步骤重新选择。'}</p>
-            </div>
-          </div>
-          <div className="qpd-empty-work qx-grow">
-            <div className="qpd-empty-left">
-              <section className="qpd-empty-sheet" aria-label="当前没有文件">
-                <AlertCircleIcon aria-hidden="true" />
-                <strong>当前文件：无</strong>
-                <span>没有文件名、没有页数、没有大小</span>
-              </section>
-              <section className="qx-card qpd-empty-proof">
-                <h3>这一屏不会显示什么</h3>
-                <ul>
-                  <li>文件名、文件大小</li>
-                  <li>页数、打印份数</li>
-                  <li>检查结论、隐私片段</li>
-                </ul>
-                <p>没有文件时以上内容一律不显示，也不会放示例文件。</p>
-              </section>
-            </div>
-            <section className="qx-card">
-              <div className="qx-sec-h"><span className="t">为什么会看到这一屏</span></div>
-              <ul>
-                <li>从旧链接直接进入，没有完成选文件步骤。</li>
-                <li>上一次办理已经结束，临时文件信息已清除。</li>
-                <li>本页不会用示例文件冒充真实待打印文件。</li>
-              </ul>
-              <section className="qpd-empty-next">
-                <h3>下一步</h3>
-                <ul>
-                  <li>去选文件，把真实文件带入本次办理。</li>
-                  <li>返回材料检查，逐项完成文件体检和隐私检查。</li>
-                  <li>检查通过后进入预览参数，下一步核对价格。</li>
-                </ul>
-              </section>
-              <section className="qpd-empty-facts">
-                <h3>两条事实</h3>
-                <ul>
-                  <li>到这里为止<b>没有产生订单，也没有扣任何费用</b>。</li>
-                  <li>之前存过的文件在<b>「我的文档」</b>里；这一页本身不保存文件。</li>
-                </ul>
-              </section>
-            </section>
-          </div>
-        </div>
-      </QxPageFrame>
+        <PrintEmptyDesk
+          marker="print-material-check"
+          problem={problem}
+          onPickFile={() => navigate(uploadPath)}
+        />
+      </PrintTouchFrame>
     )
   }
 
@@ -654,73 +635,67 @@ export function PrintMaterialCheckPage({
           ? { tone: 'warn' as const, label: `还有 ${findings.filter((finding) => decisions[finding.id] !== 'keep' && decisions[finding.id] !== 'redact').length} 处待确认` }
           : { tone: 'ok' as const, label: '材料检查完成' }
 
+  const hitCountTitle = findings.length > 0 ? `有 ${findings.length} 处要你拿主意` : null
+  let frameTitle = '没有待决定的片段'
+  let frameSub = '检查格式、页数和个人信息，逐项确认后再设打印参数。'
+  if (encryptedPdf) {
+    frameTitle = '这份 PDF 打不开'
+    frameSub = ENCRYPTED_PDF_BLOCK_COPY
+  } else if (stage === 'error') {
+    frameTitle = '检查没做成'
+    frameSub = '请重试检查，或返回选择其他文件。'
+  } else if (isWorking) {
+    frameTitle = stage === 'submitting' ? '正在保存选择并生成遮挡文件' : '正在读这份文件'
+    frameSub = '结果返回前不能进入预览，也不会自动放行。'
+  } else if (piiScanIncomplete) {
+    frameTitle = '检查没有覆盖完整'
+    frameSub = '文字识别这次没覆盖这份文件。确认后按原件继续，本机不会生成遮挡文件。'
+  } else if (hitCountTitle) {
+    frameTitle = hitCountTitle
+    frameSub = '第 2 步 / 共 4 步 · 逐处选择遮挡或保留'
+  }
+  const clarityChecked = imageClarityAlreadyChecked(inspectionSummary)
+  const precheckLine = clarityChecked
+    ? '格式、大小、页数、图片清晰度已检查 · 不做 AI 判断'
+    : '检查格式、大小、页数与图片质量；不做 AI 判断，也不承诺检查边距。'
+  const primaryLabel = encryptedPdf
+    ? '重新选择文件'
+    : stage === 'submitting'
+      ? (piiScanIncomplete ? '正在继续…' : '保存选择中…')
+      : requiresFormatReview
+        ? '请重新上传文件'
+        : piiScanIncomplete
+          ? '我已确认，继续打印'
+          : '下一步：预览与参数'
+
   // Legacy gate markers: PrintPageFrame, KioskActionBar, step={2}.
   // The route now renders QxPageFrame and its qx-ctabar; these names only document the replaced contract.
   return (
-    <QxPageFrame
-      navbar={<PrintDeskNavbar />}
-      back={{ label: '返回选文件', onBack: () => navigate(uploadPath) }}
-      title="材料检查"
-      subtitle="第 2 步 / 共 4 步 · 检查格式、大小、页数与图片质量，并完成隐私选择"
+    <PrintTouchFrame
+      nav
+      page="print-check"
+      legacyBody={false}
+      kind="compact"
+      seal={null}
+      railNow={1}
+      eyebrow="材料检查"
+      title={frameTitle}
+      subtitle={frameSub}
       status={status}
-      ctabar={(
-        <PrintDeskFooter step="check" onBack={() => navigate(uploadPath)}>
-          <button className="qx-btn" data-variant="ghost" type="button" disabled={isWorking} onClick={() => navigate(uploadPath)}>返回选文件</button>
-          <p className="why">
-            {encryptedPdf
-              ? ENCRYPTED_PDF_BLOCK_COPY
-              : stage === 'error'
-              ? '检查结果未知，隐私预检不可跳过。请重试或返回重新选择文件。'
-              : isWorking
-                ? stage === 'submitting'
-                  ? '正在保存选择并生成遮挡文件，完成前不能进入预览。'
-                  : '正在检查材料，结果返回前不能进入预览，也不会自动放行。'
-              : submitFailed
-                ? '上次保存选择或遮挡处理没有完成，打印文件未更新。请再次点击继续重试。'
-              : requiresFormatReview
-                ? '文件体检判定当前文件不能直接打印，请返回重新上传。'
-                : piiScanIncomplete
-                  ? (allFindingsDecided
-                    ? '文字识别这次没覆盖这份文件。确认后按原件继续，本机不会生成遮挡文件。'
-                    : '每一处已经标出的内容都要先选择保留或遮挡，然后再确认按原件继续。')
-                  : !allFindingsDecided
-                  ? '每一处隐私片段都必须由你选择保留或遮挡。'
-                  : '继续后会保存选择，并按处理结果准备打印文件。'}
-          </p>
-          <button
-            className="qx-btn"
-            data-variant="primary"
-            type="button"
-            disabled={encryptedPdf ? isWorking : !(canContinue || canManualAck)}
-            onClick={() => { if (encryptedPdf) { navigate(uploadPath); return } void handleContinue() }}
-          >
-            {encryptedPdf
-              ? '重新选择文件'
-              : stage === 'submitting'
-              ? (piiScanIncomplete ? '正在继续…' : '保存选择中…')
-              : requiresFormatReview
-                ? '请重新上传文件'
-                : piiScanIncomplete
-                  ? '我已确认，继续打印'
-                  : '下一步：预览与参数'}
-          </button>
-        </PrintDeskFooter>
-      )}
+      back={{ label: '上一步', onBack: () => navigate(uploadPath) }}
+      ask={printAsk(CHECK_ASK.label, CHECK_ASK.draft)}
+      primary={{
+        label: primaryLabel,
+        disabled: encryptedPdf ? isWorking : !(canContinue || canManualAck),
+        onClick: () => { if (encryptedPdf) { navigate(uploadPath); return } void handleContinue() },
+      }}
     >
-      <PrintDeskGuide step={2}
-        title={encryptedPdf ? <>这份 PDF <em>打不开</em>。</> : stage === 'error' ? <>检查<em>没做成</em>。</> : isWorking ? <>正在<em>读这份文件</em>。</> : piiScanIncomplete ? <>检查没有<em>覆盖完整</em>。</> : findings.length > 0 && allFindingsDecided ? <>每一处都<em>决定完了</em>。</> : findings.length > 0 && presentationFindings.some((finding) => finding.selected !== 'pending') ? <>还剩 {presentationFindings.filter((finding) => finding.selected === 'pending').length} 处<em>没决定</em>。</> : findings.length > 0 ? <>有 {findings.length} 处<em>要你拿主意</em>。</> : <>没有<em>待决定的片段</em>。</>}
-        detail={encryptedPdf ? ENCRYPTED_PDF_BLOCK_COPY : stage === 'error' ? '请重试检查，或返回选择其他文件。' : '检查格式、页数和个人信息，逐项确认后再设打印参数。'}
-      />
-      <div className="qpd-check-page">
-        <div className="qpd-check-intro" data-feature="文件预检">
-          <strong>文件预检</strong>
-          <span>检查格式、大小、页数与图片质量；不做 AI 判断，也不承诺检查边距。</span>
-        </div>
-        <MaterialCheckPresentation
+      <MaterialCheckPresentation
           stage={stage}
           file={file}
           token={getToken()}
           error={error}
+          precheckLine={precheckLine}
           inspection={inspectionSummary ? {
             pageLabel: inspectionSummary.pageCount ? `${inspectionSummary.pageCount} 页` : '页数以实际打印为准',
             canPrint: inspectionSummary.canPrint,
@@ -745,7 +720,6 @@ export function PrintMaterialCheckPage({
           onKeepAll={keepAll}
           onDecision={setDecision}
         />
-      </div>
-    </QxPageFrame>
+    </PrintTouchFrame>
   )
 }

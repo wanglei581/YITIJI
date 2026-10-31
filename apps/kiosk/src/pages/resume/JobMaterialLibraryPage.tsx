@@ -18,9 +18,14 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
-import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+
+import { QxTouchSection, QxTouchTile } from './touch/ResumeMaterialsTouch'
+import { ASKS } from './touch/resumeAsks'
+import { ResumeStepPreview } from './touch/ResumeStepPreview'
+import { ResumeDocArt, type ResumeDocArtKind } from './touch/ResumeDocArt'
+import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
+import { unattendedReason } from './touch/unattendedReason'
+import './touch/resume-materials-touch.css'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { DEMO_MODE_NO_REAL_FILE_REASON } from '../../lib/capabilityReasons'
 import { generateJobMaterial, getJobMaterialTemplates } from '../../services/api/jobMaterials'
@@ -107,6 +112,11 @@ function formatTime(iso: string | null): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+/** 目录卡上的纸张小样：只表示这一类材料的版式形状，不是任何人的内容。 */
+const ART_OF: Record<JobMaterialTemplateType, ResumeDocArtKind> = {
+  cover_letter: 'resume', thank_you: 'resume', resume_template: 'resume', portfolio_cover: 'report', materials_checklist: 'checklist',
+}
+
 function typeFilterLabel(type: JobMaterialDocumentTemplate['type']): Filter {
   if (type === 'cover_letter') return '求职信'
   if (type === 'thank_you') return '感谢信'
@@ -145,7 +155,7 @@ function FileCard({ file, demo, onPreview, previewBusy, previewError }: {
   return (
     <div className="qx-rm-file" data-tone={demo ? 'demo' : canPrint ? 'ok' : 'warn'} data-print-ready={canPrint ? '1' : '0'} data-testid="material-workshop-file">
       <div className="qx-rm-file-h">
-        <FileTextIcon size={28} aria-hidden="true" />
+        <span className="qx-rm-file-art" aria-hidden="true"><ResumeDocArt kind={ART_OF[file.documentType]} /></span>
         <span className="tx">
           <b>{head}</b>
           <span>{demo ? `已生成 ${file.filename} 的演示结果；演示模式未保存真实文件，暂不可打印。` : `已生成 ${file.filename}，文件已进入我的文档。`}</span>
@@ -222,7 +232,7 @@ export function JobMaterialLibraryPage() {
         })
         setError(null)
       })
-      .catch((err) => { if (!cancelled) setError(userMessageOf(err, '求职材料加载失败，请稍后重试')) })
+      .catch((err) => { if (!cancelled) setError(unattendedReason(userMessageOf(err, '求职材料加载失败，请稍后重试'), '求职材料加载失败，请稍后重试')) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [reloadKey])
@@ -280,7 +290,7 @@ export function JobMaterialLibraryPage() {
       setGenerated(result)
       clearJobMaterialDraft()
     } catch (err) {
-      setSubmitError(userMessageOf(err, '生成失败，请稍后重试'))
+      setSubmitError(unattendedReason(userMessageOf(err, '生成失败，请稍后重试'), '生成失败，请稍后重试'))
     } finally {
       setSubmitting(false)
     }
@@ -317,7 +327,7 @@ export function JobMaterialLibraryPage() {
       if (!res?.url) throw new Error('preview url missing')
       setPreview({ file, url: res.url })
     } catch (err) {
-      setPreview({ file, error: userMessageOf(err, '预览链接没能生成，可能已到期或被清理') })
+      setPreview({ file, error: unattendedReason(userMessageOf(err, '预览链接没能生成，可能已到期或被清理'), '预览链接没能生成，可能已到期或被清理') })
     } finally {
       setPreviewBusy(false)
     }
@@ -457,8 +467,7 @@ export function JobMaterialLibraryPage() {
         {fallbackRows}
       </>
     )
-    cta = <><p className="why">{status.why}</p>{screen === 'loading' ? btn('ghost', '返回简历服务', goResumeHub) : null}
-      <QxStepActions onPrev={goResumeHub}><QxAiHelp label="让小青帮我整理材料亮点 →" draft="我正在准备求职材料，请先问材料用途和真实经历，帮我整理可填写的亮点。" testId="material-workshop-ai-help" /></QxStepActions></>
+    cta = <><p className="why">{status.why}</p>{screen === 'loading' ? btn('ghost', '返回简历服务', goResumeHub) : null}</>
   } else if ((screen === 'submitting' || screen === 'failed') && selected) {
     const waiting = screen === 'submitting'
     const statusRows = waiting
@@ -482,12 +491,19 @@ export function JobMaterialLibraryPage() {
     cta = <>
       <p className="why">{waiting ? '正在等待结果，内容已提交；此时不再重复生成。' : '回表单核对内容后，再由你点击生成。'}</p>
       {waiting ? <button type="button" className="qx-btn" data-variant="primary" disabled>正在生成 PDF…</button> : btn('primary', '改一改再试一次', () => setSubmitError(null))}
-      <QxStepActions onPrev={goResumeHub}><QxAiHelp label="让小青帮我整理材料亮点 →" draft="请先问我的材料用途和真实经历，帮我整理可以填写的亮点。" testId="material-workshop-ai-help" /></QxStepActions>
     </>
   } else {
     body = (
       <>
-        {generated ? null : afterFlow}
+        {signedOutSelect ? (
+          <ResumeStepPreview
+            className="rtp-hero-min"
+            art="checklist"
+            kicker="登录后继续"
+            title="填过的内容会留在这台机器上"
+            lines={['点「登录后生成」时才需要登录，草稿不会丢。', '模板目录随便看，不登录也能选、能填。']}
+          />
+        ) : generated ? null : afterFlow}
         <nav className="qx-rm-filters" aria-label="求职材料分类">
           {FILTERS.map((item) => (
             <button key={item} type="button" aria-pressed={filter === item} onClick={() => setFilter(item)}>{item}</button>
@@ -495,7 +511,6 @@ export function JobMaterialLibraryPage() {
         </nav>
         <div className="qx-rm-workspace">
           <section className="qx-rm-catalog" aria-label="可选求职材料" tabIndex={0}>
-            <p className="qx-rm-catalog-hint">上下滑动，查看全部模板</p>
             {visible.length === 0 ? (
               <StateBlock kind="warn" size="sm" icon={<InfoIcon size={24} aria-hidden="true" />} title="该分类暂无求职材料">
                 请切换其他分类查看；空列表不使用内置假模板填充。
@@ -503,6 +518,8 @@ export function JobMaterialLibraryPage() {
             ) : visible.map((template) => (
               <button key={template.id} type="button" className="qx-rm-template" aria-pressed={selected?.id === template.id} disabled={submitting}
                 onClick={() => selectTemplate(template)} data-testid={`material-workshop-template-${template.id}`}>
+                <span className="qx-rm-art" aria-hidden="true"><ResumeDocArt kind={ART_OF[template.type]} /></span>
+                <span className="qx-rm-sample">示例</span>
                 <b>{template.title}</b>
                 <span className="qx-rm-desc">{template.description}</span>
                 <span className="qx-rm-use">带走：{template.outputFilename}</span>
@@ -531,6 +548,16 @@ export function JobMaterialLibraryPage() {
             )}
           </aside>
         </div>
+        {signedOutSelect ? (
+          <>
+            <QxTouchSection title="不登录也能办" />
+            <div className="qxt-tools">
+              <QxTouchTile layout="stack" icon="printer" title="打印" desc="打印现有简历" onClick={() => navigate('/print-scan')} />
+              <QxTouchTile layout="stack" icon="scan" title="扫描" desc="扫描纸质简历" onClick={() => navigate('/scan/start')} />
+              <QxTouchTile layout="stack" icon="landmark" title="查政策" desc="查看公开的政策" onClick={() => navigate('/policy-service')} />
+            </div>
+          </>
+        ) : null}
       </>
     )
     cta = generated && !submitting && !submitError ? (
@@ -540,13 +567,6 @@ export function JobMaterialLibraryPage() {
           {demoMode ? '演示模式不保存真实文件，我的文档与打印都停用。' : generated.printFileUrl ? '' : '本次没有打印凭证，只有打印被禁用，我的文档不受影响。'}
         </p>
         {btn('ghost', '重新生成一份', () => void handleGenerate())}
-        <QxStepActions onPrev={goResumeHub}>
-          <QxAiHelp
-            label="让小青帮我整理材料亮点 →"
-            draft="我正在准备求职材料，请先问材料用途和真实经历，帮我整理可填写的亮点。"
-            testId="material-workshop-ai-help"
-          />
-        </QxStepActions>
         {/* 两个都是能力门禁：aria-disabled + 文件卡里那句常显原因（触屏没有 hover，title 永远显示不出来）。 */}
         <button type="button" className="qx-btn" data-variant="ghost" aria-disabled={demoMode || undefined}
           aria-describedby={demoMode ? 'material-docs-blocked' : undefined} onClick={() => { if (!demoMode) navigate('/me/documents') }}>
@@ -564,26 +584,31 @@ export function JobMaterialLibraryPage() {
         <button type="button" className="qx-btn" data-variant="primary" disabled={submitting || !selected} onClick={() => void handleGenerate()}>
           {submitting ? '生成中…' : isLoggedIn ? '生成可打印版' : '登录后生成'}
         </button>
-        <QxStepActions onPrev={goResumeHub}>
-          <QxAiHelp
-            label="让小青帮我整理材料亮点 →"
-            draft="我正在准备求职材料，请先问材料用途和真实经历，帮我整理可填写的亮点。"
-            testId="material-workshop-ai-help"
-          />
-        </QxStepActions>
       </>
     )
   }
 
+  // 底栏「问小青」：每个状态一句自己的问题（稿 materials / materials-result 各状态）。
+  const askSpec = screen === 'loading' ? ASKS.materialsLoad
+    : screen === 'error' ? ASKS.materialsError
+      : screen === 'empty' ? ASKS.materialsNone
+        : screen === 'submitting' ? ASKS.materialsBusy
+          : screen === 'failed' ? ASKS.materialsFailed
+            : screen === 'generated' || screen === 'generated-no-print' || screen === 'demo-result' ? ASKS.materialsResult
+              : signedOutSelect ? ASKS.materialsOut
+                : Object.values(form).some((value) => value.trim()) ? ASKS.materialsForm
+                  : ASKS.materialsPick
+
   return (
     <div className="qx-resume-materials">
-      <QxPageFrame
-        title="求职材料库"
+      <ResumeTouchFrame
+        eyebrow="改简历 · 求职材料"
+        title="求职材料"
         subtitle={subtitle}
         status={{ tone, label: pillLabel }}
         back={{ label: '返回简历服务', onBack: goResumeHub }}
         ctabar={cta}
-        navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
+        ask={{ ...askSpec, testId: 'material-workshop-ai-help' }}
       >
         <section className="qx-scroll qx-rm-scroll" data-kiosk-domain="resume" data-kiosk-screen="resume-materials"
           data-state={screen} data-testid={`material-workshop-state-${screen}`} aria-label="求职材料库">
@@ -592,7 +617,7 @@ export function JobMaterialLibraryPage() {
             模板按你填的内容排版，不调用 AI；不代投递。系统不收取求职者简历给企业。生成后请先核对文件内容和页数。
           </p>
         </section>
-      </QxPageFrame>
+      </ResumeTouchFrame>
       {generated && currentPreview?.url ? (
         <FilePreviewDialog fileUrl={currentPreview.url} fileName={generated.filename} mimeType={generated.mimeType} onClose={() => setPreview(null)} />
       ) : null}

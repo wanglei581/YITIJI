@@ -34,8 +34,19 @@ export function printDomainStatus(input: {
   deviceLabel: string
   /** 暂停接单时的一句说明；没有则沿用缺纸/离线的范围说明。 */
   deviceNotice?: string
+  /**
+   * 读状态的请求本身没回来（服务断了、超时）。这时上传、文件加工、纸质扫描一样走不通（都要连服务），
+   * 所以不能沿用下面「上传与文件加工仍可用」那一句——那是只有打印机掉线才成立的话（10/29 本机走查 I-31）。
+   */
+  serviceDown?: boolean
 }): HomeDomainStatus {
   if (input.deviceLoading) return { note: '正在确认打印机状态' }
+  if (input.serviceDown) {
+    return {
+      note: '服务暂时连不上 · 打印、扫描和传文件暂不开放',
+      unavailableActions: new Set<HomeV6ActionId>(['scan-paper']),
+    }
+  }
   if (input.deviceReady) return {}
   return {
     note: input.deviceNotice ?? `${input.deviceLabel} · 上传与文件加工仍可用，出纸与扫描暂停`,

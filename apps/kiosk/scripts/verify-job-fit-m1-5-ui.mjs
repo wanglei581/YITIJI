@@ -116,6 +116,7 @@ expectIncludes(jobFitActionsPage, 'finally {\n      setPrinting(false)', '行动
 expectIncludes(jobFitPage, 'result.job?.id', '恢复结果以持久化岗位 id 决定查看入口')
 expectIncludes(jobFitPage, '查看岗位', '岗位 CTA 为查看岗位')
 expectMatches(jobFitPage, /navigate\(`\/jobs\/\$\{result\.job\.id\}`\)/, '查看岗位进入既有岗位详情')
+expectIncludes(jobFitPage, 'hosting.enabled && Boolean(result.job?.sourceName)', '岗位来源只在招聘内容托管打开时展示')
 expectAbsent(jobFitPage, /\/jobs\/master|JobMaster|window\.open|去来源平台投递/, '岗位匹配页不复活独立入口或直接外跳')
 expectAbsent(jobFitActionsPage, /\/jobs\/master|JobMaster|window\.open|去来源平台投递/, '差距行动页不复活独立入口或直接外跳')
 // 合规红线随页面一起搬：行动页同样不得出现平台内投递文案（CLAUDE.md §2）。
@@ -132,7 +133,8 @@ expectIncludes(fitMap, 'keywordCoverage', '关键词组件只读取可选 decisi
 expectIncludes(jobFitPage, 'result.decisionSupport?.keywordCoverage', '旧缓存无 decisionSupport 时页面自然降级')
 expectAbsent(`${jobFitPage}\n${jobFitActionsPage}\n${summary}\n${fitMap}\n${gaps}\n${rewrite}`, /面试预判|晋升路径|风险与建议/, '无真实契约字段时不展示面试、晋升或风险结论')
 expectIncludes(jobFitPage, "import './job-fit-qx.css'", '岗位匹配页引入青序流光局部样式')
-expectIncludes(jobFitPage, 'QxPageFrame', '岗位匹配页使用青序流光页面壳')
+expectIncludes(jobFitPage, 'ResumeTouchFrame', '岗位匹配页使用触屏版页面壳')
+expectIncludes(expectFile('src/pages/resume/touch/ResumeTouchFrame.tsx', '简历触屏壳存在'), '<QxTouchScreen', '触屏壳必须包在 QxTouchScreen 里')
 expectIncludes(jobFitPage, 'KioskStageFit', '岗位匹配页保留 1080×1920 定高舞台')
 expectIncludes(jobFitPage, 'data-kiosk-screen="resume-job-fit"', '岗位匹配页保留稳定 landmark')
 // 两套色系（墨青纸感 / 青序流光）不能在同一页相遇 —— V6 那次「只迁了一半」就是这么坏的。
@@ -142,6 +144,13 @@ expectIncludes(jobFitPage, 'role="alert"', '岗位匹配错误态声明告警语
 expectIncludes(jobFitPage, "aria-pressed={tab === 'pick'}", '岗位选择标签声明当前选择态')
 expectIncludes(jobFitPage, "aria-pressed={tab === 'manual'}", '手填岗位标签声明当前选择态')
 expectIncludes(jobFitPage, 'aria-pressed={active}', '岗位列表声明当前选择态')
+expectIncludes(jobFitPage, '<ManualTargetFields', '对照仍收集用户自己填写的岗位要求')
+expectIncludes(jobFitPage, '从已发布岗位中选择', '托管打开时仍可从已发布岗位中选择')
+expectIncludes(jobFitPage, 'getJobs(', '托管打开时仍读取已发布岗位')
+expectIncludes(jobFitPage, "const mode = hosting.enabled ? tab : 'manual'", '托管关闭时对照只走手填')
+expectIncludes(jobFitPage, 'if (!hosting.enabled) return', '托管关闭时不请求岗位列表')
+expectIncludes(jobFitPage, "hosting.status === 'loading'", '托管开关读取中先停在读取屏')
+expectIncludes(jobFitPage, 'jobs: hosting.enabled', '看来源岗位要求只在托管打开时出现')
 expectIncludes(jobFitPage, 'const accessToken = state.accessToken', '岗位匹配保留匿名访问凭证恢复链路')
 expectIncludes(jobFitPage, 'getLatestJobFit(taskId, { token: currentToken, accessToken })', '岗位匹配保留历史结果恢复链路')
 expectIncludes(jobFitPage, 'getJobFitConsentStatus(taskId, { accessToken })', '岗位匹配保留匿名授权状态恢复链路')
@@ -190,7 +199,20 @@ expectAbsent(jobFitQxCss, /#[0-9a-f]{3,8}\b/i, '岗位匹配青序流光样式�
 expectIncludes(jobFitStates, '不显示匹配百分比、评分或通过率预测', '等待态不预告分数或通过率')
 expectIncludes(jobFitStates, '不把简历内容提供给企业或第三方', '等待态保留不提供给企业的边界')
 expectIncludes(jobFitStates, '不替你在来源渠道完成任何投递或预约动作', '等待态不伪称代办投递或预约')
-expectIncludes(jobFitStates, '不承诺恢复时间', 'AI 不可用时不伪造恢复时间')
+// AI 不可用时恢复时间没有任何依据：屏上只如实写「还不确定」，不预告恢复（「稍后自动恢复」「很快恢复」…），
+// 也不写给审稿人看的批注（「不承诺恢复时间」「本页也不写…」）—— 屏上的字是对办事的人说的话。
+expectIncludes(jobFitStates, '还不确定什么时候能用', 'AI 不可用时如实说恢复时间还不确定')
+expectAbsent(jobFitStates, /稍后自动恢复|很快(?:就)?恢复|马上恢复|预计[^。]{0,8}恢复/, 'AI 不可用时不预告恢复时间')
+expectAbsent(jobFitStates, /不承诺恢复时间|本页也不写/, 'AI 不可用屏上不写给审稿人看的批注')
+// 底栏小字同理：稿 jobfit 这一态的原句，说清这次没能对照；不写「服务不可用时不显示任何…」这类说页面规矩的话。
+expectIncludes(jobFitStates, '<Cta note="AI 暂时不可用，这次没能对照。">', 'AI 不可用时底栏如实说这次没能对照')
+expectAbsent(jobFitStates, /服务不可用时不显示任何匹配结论|也不保留半截结果/, 'AI 不可用屏底栏不写说页面规矩的话')
+// 差距行动页 AI 停：稿 jobfit-actions 这一态是「一句实话 + 三张大行动卡」（去简历优化 / 去材料工坊 / 打印现有简历），
+// 三件都不经过 AI；一句实话就是稿的原句，同样不写批注、不预告恢复。不回到清单式长页（当前判定 / 非 AI 入口）。
+expectIncludes(jobFitActionsPage, 'AI 暂时不可用，这次没有行动清单。', '行动页 AI 不可用时如实说这次没有行动清单')
+expectMatches(jobFitActionsPage, /note="AI 暂时不可用，这次没有行动清单。"[\s\S]{0,400}title: '去简历优化'[\s\S]{0,260}goResumeOptimize[\s\S]{0,260}title: '去材料工坊'[\s\S]{0,260}goMaterials[\s\S]{0,260}title: '打印现有简历'[\s\S]{0,260}goPrintHub/, '行动页 AI 不可用屏：一句实话加三张大行动卡，名字、顺序与去向照稿')
+expectAbsent(jobFitActionsPage, /不承诺恢复时间|稍后自动恢复|服务不可用时不显示任何清单内容/, '行动页 AI 不可用屏上不写批注、不预告恢复')
+expectAbsent(jobFitActionsPage, /差距清单这次读不到|现在能用的非 AI 入口|当前判定/, '行动页 AI 不可用屏不回到清单式长页')
 expectAbsent(jobFitRoute, /一键投递|立即投递|平台投递|投递简历/, '岗位匹配整条路由不出现平台内投递文案')
 
 expectIncludes(recordsPage, 'completedJobFitTaskIds', '我的 AI 记录识别已完成岗位匹配结果')

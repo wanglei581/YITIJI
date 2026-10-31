@@ -1,0 +1,108 @@
+/* 政策服务台页内样式。只挂在 .p10-hub 下，不改共享 .qxt-sec。
+   各区按内容高度排（不用 flex 增长、不用定行高的网格），整页由 qxt-body-scroll 滚动，
+   所以「检查中」「不可用」两态里文字不会互相压住。 */
+
+.qxt-screen .qxt-body:has(> .p10-hub) {
+  justify-content: flex-start;
+}
+
+.qxt-screen:has(.p10-hub) .qxt-flow svg {
+  left: 4%;
+  width: 92%;
+}
+
+.qxt-screen:has(.p10-hub) .qxt-halo {
+  right: 24px;
+  width: 640px;
+}
+
+.p10-hub {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.p10-hub .p10-notice {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 18px 20px;
+  border-radius: 18px;
+  background: var(--qxt-clay-wash, var(--qxt-well));
+  color: var(--qxt-ink);
+}
+
+.p10-hub .p10-notice b,
+.p10-hub .p10-note,
+.p10-hub .p10-sec h2 {
+  font-size: 22px;
+  line-height: 1.45;
+}
+
+.p10-hub .p10-notice-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  min-width: 0;
+}
+
+.p10-hub .p10-notice span {
+  font-size: 20px;
+  line-height: 1.45;
+}
+
+.p10-hub .p10-retry,
+.qxt-screen .p10-retry {
+  flex: none;
+  min-width: 64px;
+  min-height: 64px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--qx-ink);
+  color: var(--qx-paper);
+  font-size: 20px;
+}
+
+.p10-hub .p10-sec {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.p10-hub .p10-sec h2 {
+  margin: 0;
+  font-weight: 700;
+}
+
+.p10-hub .p10-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* 每格外面包了一层 div（带 data-hub-* 标记），同一行两张卡取同高。 */
+.p10-hub .p10-grid > div > .qxt-tile {
+  height: 100%;
+  min-height: 148px;
+}
+
+.p10-hub .p10-entry > .qxt-tile {
+  min-height: 148px;
+}
+
+.p10-hub .p10-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.p10-hub .p10-note {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+}

@@ -1,0 +1,57 @@
+/* 自我探索结果页（SaResultParts）：头部一张纸，其下五个方向各一行（强度 n/5 加一条细线，依据题号）。
+   颜色只走 var(--qxt-*) / var(--qx-*)。 */
+
+.qxt-screen .rtp-sa-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.qxt-screen .rtp-sa-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 22px;
+  border-radius: 24px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+.qxt-screen .rtp-sa-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.qxt-screen .rtp-sa-top b {
+  font-size: var(--qxt-fs-step);
+  color: var(--qxt-ink);
+}
+
+.qxt-screen .rtp-sa-top span {
+  font-size: var(--qxt-fs-step);
+  font-weight: 700;
+  color: var(--qxt-teal-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.qxt-screen .rtp-sa-bar {
+  height: 12px;
+  border-radius: 6px;
+  background: var(--qxt-well);
+  overflow: hidden;
+}
+
+.qxt-screen .rtp-sa-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+  background: var(--qx-teal);
+}
+
+.qxt-screen .rtp-sa-row small {
+  font-size: var(--qxt-fs-aux);
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+}

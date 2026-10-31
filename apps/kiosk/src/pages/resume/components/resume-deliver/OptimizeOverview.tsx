@@ -1,5 +1,4 @@
-import type { ResumeOptimizeModule } from '@ai-job-print/shared'
-import { ChevronRightIcon, FileTextIcon, PencilLineIcon } from 'lucide-react'
+import { COMPLIANCE_COPY, type ResumeOptimizeModule } from '@ai-job-print/shared'
 import { detectUnconfirmedTextAdditions } from './facts'
 import { moduleKeyOf, type ResumeDecisionMap, type ResumeModuleDecision, type ResumeSwitchBlock } from './resumeDecisions'
 
@@ -10,16 +9,11 @@ const MANUAL_NOTE: Record<ResumeSwitchBlock, string> = {
   'original-empty': '这条是新加的一句，原文里没有对应的句子，这里没法切换；不要的话，请在编辑区里删掉。',
 }
 
-function charCount(text: string): number {
-  return text.replace(/\s/g, '').length
-}
-
 /**
- * 稿 23（2.0）总览：计数与批量、全部建议、编辑与导出三张卡。
+ * 稿 optimize 总览（改动清单）：四格统计、批量、每条「用改写 / 保留原文 / 打开」、编辑与回报告。
  *
- * 运行时每条只有两种选择（用改写 / 保留原文），选了就写进优化稿、随草稿保存；
- * 稿里的「自己写」「待定」「清空裁决」在逐条对照页（/resume/optimize/compare）里，
- * 这里不画没有的状态。「待确认事实」是本页的文字比对：只比对数字和职责词，不是通用事实校验。
+ * 清空选择只清除本屏选择标记，不撤销已写进编辑区的内容。
+ * 「待确认事实」只比对数字和职责词，不是通用事实校验。
  *
  * 切换靠在优化稿里找改写的原句；找不到（或原文为空）的条目记为「只能手改」：不画开关、不进用改写 / 保留原文的计数和批量。
  * 一条可切换的都没有时（例如演示模式的建议句），计数只剩「只能手改」和「待确认事实」，批量按钮不画。
@@ -32,6 +26,8 @@ export function OptimizeOverview(props: {
   disabled: boolean
   onDecisionChange: (key: string, next: ResumeModuleDecision) => void
   onBatch: (next: ResumeModuleDecision) => void
+  clearedChoices: ReadonlySet<string>
+  onClear: () => void
   decisionIssues: Record<string, string>
   onCompare: (focusIndex?: number) => void
   onEditor: () => void
@@ -46,141 +42,76 @@ export function OptimizeOverview(props: {
   })
   const total = rows.length
   const switchableRows = rows.filter((row) => row.switchable)
-  const optimizedCount = switchableRows.filter((row) => row.decision === 'optimized').length
-  const originalCount = switchableRows.length - optimizedCount
+  const optimizedCount = switchableRows.filter((row) => !props.clearedChoices.has(row.key) && row.decision === 'optimized').length
+  const originalCount = switchableRows.filter((row) => !props.clearedChoices.has(row.key) && row.decision === 'original').length
   const manualCount = total - switchableRows.length
   const factCount = rows.filter((row) => row.additions.length > 0).length
   const canSwitch = switchableRows.length > 0
 
   return (
-    <div className="qx-opt-overview" data-testid="resume-optimize-overview">
-      <section className="qx-opt-sec" aria-labelledby="qx-opt-count-title">
-        <div className="qx-opt-sec-h">
-          <h2 id="qx-opt-count-title">这份简历有 {total} 处可以改</h2>
-          {props.synthetic ? <small>合成样本</small> : null}
-        </div>
-        <p className="qx-opt-lead">
-          建议<b>只改表达</b>：正常情况下只会重排、删减你原文里已经写过的内容，不新增学校、公司、证书、时间、薪资、获奖。
-          改写里若出现原文没有的数字或职责词，那一条会标出来，导出前要你<b>逐项确认</b>。
-        </p>
-        <div className="qx-opt-stat" aria-label="当前选择" data-testid="resume-optimize-counts">
-          {canSwitch && <span data-d="optimized"><u>用改写</u><b>{optimizedCount}<small> / {switchableRows.length}</small></b></span>}
-          {canSwitch && <span data-d="original"><u>保留原文</u><b>{originalCount}</b></span>}
-          {manualCount > 0 && <span data-d="manual"><u>只能手改</u><b>{manualCount}</b></span>}
-          <span data-d="facts"><u>待确认事实</u><b>{factCount}</b></span>
-        </div>
-        <div className="qx-opt-seg" aria-hidden="true">
-          {rows.map((row) => <u key={row.key} data-d={row.switchable ? row.decision : 'manual'} />)}
-        </div>
-        {canSwitch && <div className="qx-opt-batch" data-testid="resume-optimize-batch">
-          <button
-            type="button"
-            className="qx-opt-bx"
-            disabled={props.disabled || optimizedCount === switchableRows.length}
-            onClick={() => props.onBatch('optimized')}
-          >
-            全部用改写<small>有待确认事实的，导出前仍要逐项确认</small>
+    <div className="qxt-overview" data-testid="resume-optimize-overview">
+      {props.synthetic ? <p className="qxt-fine">合成样本</p> : null}
+      <div className="qxt-stats" aria-label="当前选择" data-testid="resume-optimize-counts">
+        {canSwitch && <span data-d="optimized"><u>用改写</u><b><i>{optimizedCount}</i><small> / {switchableRows.length}</small></b></span>}
+        {canSwitch && <span data-d="original"><u>保留原文</u><b>{originalCount}</b></span>}
+        {manualCount > 0 && <span data-d="manual"><u>只能手改</u><b>{manualCount}</b></span>}
+        <span data-d="facts"><u>待确认事实</u><b>{factCount}</b></span>
+      </div>
+      {canSwitch ? (
+        <div className="qxt-batch" aria-label="批量处理" data-testid="resume-optimize-batch">
+          <button type="button" disabled={props.disabled || optimizedCount === switchableRows.length} onClick={() => props.onBatch('optimized')}>
+            <b>全部用改写</b><small>有待确认事实的，导出前仍要逐项确认</small>
           </button>
-          <button
-            type="button"
-            className="qx-opt-bx"
-            disabled={props.disabled || originalCount === switchableRows.length}
-            onClick={() => props.onBatch('original')}
-          >
-            全部保留原文<small>这几条都换回你原来的句子</small>
+          <button type="button" disabled={props.disabled || originalCount === switchableRows.length} onClick={() => props.onBatch('original')}>
+            <b>全部保留原文</b><small>这几条都换回你原来的句子</small>
           </button>
-          <button type="button" className="qx-opt-bx" disabled={props.disabled} onClick={() => props.onCompare()}>
-            逐条确认或自己写<small>打开对照页，再决定每一条用哪一版</small>
-          </button>
-        </div>}
-      </section>
-
-      <section className="qx-opt-sec qx-opt-sec--list" aria-labelledby="qx-opt-list-title">
-        <div className="qx-opt-sec-h">
-          <h2 id="qx-opt-list-title">全部建议</h2>
-          <small>点一条去逐条对照</small>
-        </div>
-        <ul className="qx-opt-mods" data-testid="resume-optimize-list">
-          {rows.map((row) => {
-            const title = row.module.title || `第 ${row.index + 1} 条`
-            const factLine = row.additions.length > 0
-              ? `改写里有原文没有的：${row.additions.join('、')}`
-              : '文字比对未发现新增事实'
-            return (
-              <li key={row.key} className="qx-opt-mod" data-decision={row.switchable ? row.decision : 'manual'} data-pending={row.additions.length}>
-                <button
-                  type="button"
-                  className="qx-opt-mod-open"
-                  onClick={() => props.onCompare(row.index)}
-                  aria-label={`第 ${row.index + 1} 条 ${title}，${row.switchable ? `当前${DECISION_LABEL[row.decision]}` : '这一条只能在编辑区里改'}，去逐条对照`}
-                >
-                  <i className="no" aria-hidden="true">{row.index + 1}</i>
-                  <span className="tx">
-                    <b>{title}</b>
-                    <span className={row.additions.length > 0 ? 'warn' : undefined}>
-                      原文 {charCount(row.module.before)} 字 → 建议 {charCount(row.module.after)} 字 · {factLine}
-                    </span>
-                  </span>
-                  <ChevronRightIcon className="go" aria-hidden="true" />
-                </button>
-                {row.switchable ? <div className="qx-opt-toggle" role="group" aria-label={`第 ${row.index + 1} 条用哪一版`}>
-                  <button
-                    type="button"
-                    aria-pressed={row.decision === 'optimized'}
-                    disabled={props.disabled}
-                    onClick={() => props.onDecisionChange(row.key, 'optimized')}
-                  >
-                    用改写
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={row.decision === 'original'}
-                    disabled={props.disabled}
-                    onClick={() => props.onDecisionChange(row.key, 'original')}
-                  >
-                    保留原文
-                  </button>
-                </div> : null}
-                {row.block
-                  ? <p className="qx-opt-decision-row-status" data-testid="resume-optimize-row-manual" role="status">{MANUAL_NOTE[row.block]}</p>
-                  : props.decisionIssues[row.key] && <p className="qx-opt-decision-row-status" role="status">{props.decisionIssues[row.key]}</p>}
-              </li>
-            )
-          })}
-        </ul>
-      </section>
-
-      <section className="qx-opt-sec" aria-labelledby="qx-opt-save-title">
-        <div className="qx-opt-sec-h">
-          <h2 id="qx-opt-save-title">优化版简历编辑与导出</h2>
-          <small>唯一可导出的工作区</small>
-        </div>
-        <div className="qx-opt-save">
-          <button type="button" className="qx-opt-sbtn" data-testid="resume-optimize-open-editor" onClick={props.onEditor}>
-            <span>编辑优化版简历</span>
-            <small>排版 · 模板 · 导出</small>
-          </button>
-          <div className="qx-opt-need">
-            <span>· {canSwitch
-              ? '上面的选择已经写进编辑区里的这一份：选了「保留原文」的几条，用你原来的句子'
-              : '上面这几条都没法在这里切换，要用哪一版，请在编辑区里对照着改'}</span>
-            <span>· 导出的就是编辑区里的这一份，你还可以再改；导出前要逐项确认事实</span>
-            <span>· PDF 可以进打印确认；Word、TXT、Markdown 先保存到手机</span>
-          </div>
-        </div>
-        <div className="qx-opt-exits">
-          <button type="button" className="qx-opt-row" onClick={props.onManual}>
-            <i aria-hidden="true"><PencilLineIcon /></i>
-            <span className="tx"><b>自己动手改</b><span>自己填写并原样导出草稿，不经过模型</span></span>
-            <ChevronRightIcon className="go" aria-hidden="true" />
-          </button>
-          <button type="button" className="qx-opt-row" onClick={props.onReport}>
-            <i aria-hidden="true"><FileTextIcon /></i>
-            <span className="tx"><b>回看诊断报告</b><span>确认哪几条最该改</span></span>
-            <ChevronRightIcon className="go" aria-hidden="true" />
+          <button type="button" disabled={props.disabled || switchableRows.every((row) => props.clearedChoices.has(row.key))} onClick={props.onClear}>
+            <b>清空选择</b><small>清除选择标记，编辑区内容保留</small>
           </button>
         </div>
-      </section>
+      ) : null}
+      <p className="qxt-draft" role="note">
+        {props.clearedChoices.size > 0 ? '选择标记已清空，编辑区已有内容保留；可以重新选择。' : canSwitch
+          ? '上面的选择已经写进编辑区里的这一份：选了「保留原文」的几条，用你原来的句子'
+          : '上面这几条都没法在这里切换，要用哪一版，请在编辑区里对照着改'}
+      </p>
+      <ul className="qxt-rows" data-testid="resume-optimize-list">
+        {rows.map((row) => {
+          const title = row.module.title || `第 ${row.index + 1} 条`
+          const snippet = row.module.before.replace(/\s+/g, ' ').trim()
+          return (
+            <li key={row.key} className="qxt-row" data-decision={row.switchable ? row.decision : 'manual'} data-pending={row.additions.length}>
+              <div className="qxt-rowtx">
+                <b>{title}</b>
+                <small>原文：{snippet || '这一条没有留下原句。'}{row.block ? ' 这一条只能在编辑区里改。' : ''}{row.additions.length > 0 ? ` 待确认：${row.additions.join('、')}` : ''}</small>
+              </div>
+              {row.switchable ? (
+                <div className="qxt-segsel" role="group" aria-label={`第 ${row.index + 1} 条用哪一版`}>
+                  <button type="button" aria-pressed={!props.clearedChoices.has(row.key) && row.decision === 'optimized'} disabled={props.disabled} onClick={() => props.onDecisionChange(row.key, 'optimized')}>用改写</button>
+                  <button type="button" aria-pressed={!props.clearedChoices.has(row.key) && row.decision === 'original'} disabled={props.disabled} onClick={() => props.onDecisionChange(row.key, 'original')}>保留原文</button>
+                </div>
+              ) : <span className="qxt-hand">只能手改</span>}
+              <button
+                type="button"
+                className="qxt-open"
+                onClick={() => props.onCompare(row.index)}
+                aria-label={`第 ${row.index + 1} 条 ${title}，${row.switchable ? `当前${DECISION_LABEL[row.decision]}` : '这一条只能在编辑区里改'}，去逐条对照`}
+              >
+                打开
+              </button>
+              {row.block
+                ? <p className="qxt-rowstatus" data-testid="resume-optimize-row-manual" role="status">{MANUAL_NOTE[row.block]}</p>
+                : props.decisionIssues[row.key] && <p className="qxt-rowstatus" role="status">{props.decisionIssues[row.key]}</p>}
+            </li>
+          )
+        })}
+      </ul>
+      <div className="qxt-ovx">
+        <button type="button" data-testid="resume-optimize-open-editor" aria-label="编辑简历" onClick={props.onEditor}>编辑简历</button>
+        <button type="button" onClick={props.onManual}>自己动手改</button>
+        <button type="button" onClick={props.onReport}>回诊断报告</button>
+      </div>
+      <p className="qxt-fine">导出的就是编辑区里的这一份，你还可以再改；导出前要逐项确认事实。PDF 可以进打印确认；Word、TXT、Markdown 先保存到手机。{COMPLIANCE_COPY.KIOSK_RESUME_OPTIMIZE_DISCLAIMER}页面只展示表达调整参考，不承诺提分或招聘结果。</p>
     </div>
   )
 }

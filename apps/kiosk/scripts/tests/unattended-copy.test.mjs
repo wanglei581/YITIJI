@@ -223,6 +223,11 @@ test('文案层 resolveSupportContact：缺字段或非布尔一律按保守值�
   const truthy = copy.resolveSupportContact({ servicePhone: null, serviceHours: null, otherOnlineTerminalNearby: 'yes', miniappPublished: 1 })
   assert.equal(truthy.otherOnlineTerminalNearby, false)
   assert.equal(truthy.miniappPublished, false)
+  assert.equal(truthy.selfNoteTab, false, '求职进度页签开关缺字段或非布尔不能当成已开')
+  assert.equal(partial.selfNoteTab, false)
+  assert.equal(copy.resolveSupportContact({ ...partial, selfNoteTab: true }).selfNoteTab, true)
+  assert.equal(copy.resolveSupportContact({ ...partial, selfNoteTab: 'true' }).selfNoteTab, false)
+  assert.equal(copy.CONSERVATIVE_SUPPORT_CONTACT.selfNoteTab, false, '读不到联系方式时求职进度页签是关的')
   assert.deepEqual(copy.resolveSupportContact(null), copy.CONSERVATIVE_SUPPORT_CONTACT)
 })
 
@@ -232,8 +237,15 @@ test('联系方式缺字段按保守值，布尔只有 true 才当真', () => {
     serviceHours: null,
     otherOnlineTerminalNearby: false,
     miniappPublished: false,
+    selfNoteTab: false,
   })
   assert.equal(contactMod.supportContactFromPayload({ success: true, data: { otherOnlineTerminalNearby: 'yes' } }).otherOnlineTerminalNearby, false)
+  // 求职进度页签开关：只有 true 才开，缺省、字符串、数字、空对象都是关。
+  assert.equal(contactMod.supportContactFromPayload({ success: true, data: { selfNoteTab: true } }).selfNoteTab, true)
+  for (const value of ['true', 1, 'yes', null, undefined, false]) {
+    assert.equal(contactMod.supportContactFromPayload({ success: true, data: { selfNoteTab: value } }).selfNoteTab, false, `selfNoteTab=${String(value)} 不能当成已开`)
+  }
+  assert.equal(contactMod.supportContactFromPayload({ success: true, data: {} }).selfNoteTab, false)
   assert.deepEqual(contactMod.supportContactFromPayload({ success: true }), copy.CONSERVATIVE_SUPPORT_CONTACT)
 })
 

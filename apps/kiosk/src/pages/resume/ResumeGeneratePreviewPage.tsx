@@ -8,7 +8,11 @@ import type {
   ResumeGenerateResponse,
   ResumeTemplate,
 } from '@ai-job-print/shared'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { maskEmail, maskPhone } from '../../utils/maskPii'
+import { ResumeHelpLine } from './touch/ResumeHelpLine'
+import { ResumeStepPreview } from './touch/ResumeStepPreview'
+import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
+import { unattendedReason } from './touch/unattendedReason'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -27,8 +31,9 @@ import { detectUnconfirmedAdditions, extractConfirmableFacts } from './component
 import { SYNTHETIC_GENERATE } from './components/resume-deliver/fixtures'
 import { parseGeneratePreviewQuery, resolveGeneratePreviewView } from './components/resume-deliver/generatePreviewQuery'
 import type { GeneratePreviewViewState } from './components/resume-deliver/constants'
-import { GeneratePreviewCta, GeneratePreviewEmptyExits, GeneratePreviewNavbar } from './GeneratePreviewChrome'
-import { ResumeGenerateAdvisor, ResumeGenerateAiRow } from './components/ResumeGenerateQxChrome'
+import { GeneratePreviewCta, GeneratePreviewEmptyExits } from './GeneratePreviewChrome'
+import { ResumeGenerateAdvisor } from './components/ResumeGenerateQxChrome'
+import { ASKS, type ResumeAsk } from './touch/resumeAsks'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-generate-qx.css'
 import './resume-generate-preview-qx.css'
@@ -196,7 +201,7 @@ export function ResumeGeneratePreviewPage() {
       setExportVersion((n) => n + 1)
       if (file.signedUrl && exportFormat === 'pdf') setPreviewOpen(true)
     } catch (err) {
-      setExportError(userMessageOf(err, '导出失败，请稍后重试'))
+      setExportError(unattendedReason(userMessageOf(err, '导出失败，请稍后重试'), '导出失败，请稍后重试'))
     } finally { setExporting(false); setFactOpen(false) }
   }
 
@@ -318,10 +323,25 @@ export function ResumeGeneratePreviewPage() {
       ? { eyebrow: '预览', ask: '生成好了，你核一遍', doing: '事实和你填的逐字一致。被润色过的段落会标明供参考。' }
       : { eyebrow: '预览', ask: emptyNext.ask, doing: emptyNext.doing }
 
+  // 底栏「问小青」：每个状态一句自己的问题（稿 gen-preview 各状态）；稿里 ask 为 false 的「认不出」状态不画。
+  const previewAsk: ResumeAsk | null = onExportScreen
+    ? (exportScreen === 'export-exporting' ? ASKS.exportBusy
+      : exportScreen === 'export-failed' ? ASKS.exportFailed
+        : exportScreen === 'export-ready' ? ASKS.exportReady
+          : exportScreen === 'export-url-expired' ? ASKS.exportExpired
+            : exportScreen === 'export-print-unavailable' ? ASKS.exportNoPrint
+              : ASKS.exportChooser)
+    : view === 'illegal' ? null
+      : view === 'preview-failed' ? ASKS.previewFailed
+        : view === 'preview-no-result' ? ASKS.previewNone
+          : view === 'session-lost' ? ASKS.previewLost
+            : ASKS.previewReady
+
   return (
-    <QxPageFrame
-      title="简历预览"
-      subtitle="核对内容后带走"
+    <ResumeTouchFrame
+      eyebrow="从零生成 · 核对"
+      title={onExportScreen ? '简历预览' : advisor.ask}
+      subtitle={onExportScreen ? '核对内容后带走' : advisor.doing}
       status={{
         tone: view === 'preview-failed' || view === 'illegal' || view === 'export-failed' ? 'bad' : view === 'preview-loading' || view === 'export-exporting' ? 'warn' : view === 'preview-ready' || view === 'export-ready' ? 'ok' : 'unknown',
         label: statusLabel,
@@ -330,8 +350,13 @@ export function ResumeGeneratePreviewPage() {
         label: onExportScreen ? '返回预览' : '返回填写',
         onBack: () => { if (onExportScreen) backToPreview(); else go('/resume/generate') },
       }}
-      navbar={<GeneratePreviewNavbar onNavigate={go} />}
-      ctabar={<>{ctabar}<ResumeGenerateAiRow /></>}
+      navTestIds={{
+        home: 'resume-generate-preview-nav-home',
+        advisor: 'resume-generate-preview-nav-advisor',
+        profile: 'resume-generate-preview-nav-profile',
+      }}
+      ctabar={ctabar}
+      ask={previewAsk ? { ...previewAsk, testId: 'resume-generate-ai-help' } : false}
     >
       <section
         data-kiosk-domain="resume"
@@ -342,7 +367,8 @@ export function ResumeGeneratePreviewPage() {
         data-fallback={resolved.fallback ? '1' : undefined}
         data-synthetic={resolved.synthetic ? '1' : undefined}
       >
-        <ResumeGenerateAdvisor eyebrow={advisor.eyebrow} ask={advisor.ask} doing={advisor.doing} />
+        {/* 核对屏与空状态的问句已经在意图带上；选格式 / 出文件那几屏的正文靠这张横幅撑起高度，仍然画。 */}
+        {onExportScreen ? <ResumeGenerateAdvisor eyebrow={advisor.eyebrow} ask={advisor.ask} doing={advisor.doing} /> : null}
         <ResumeAigcBadge synthetic={resolved.synthetic} />
         {!showWorkspace && (
           <>
@@ -360,6 +386,24 @@ export function ResumeGeneratePreviewPage() {
         )}
         {showWorkspace && resume && result && !onExportScreen && (
           <div className="qx-rg-review">
+            <ResumeStepPreview
+              className="rtp-hero-min"
+              kicker="核对这一份"
+              title={resume.basic.name.trim() ? `${resume.basic.name.trim()}的简历` : '姓名未填'}
+              lines={[
+                [resume.intention.position, resume.intention.city].filter(Boolean).join(' · ') || '求职意向未填',
+                [resume.basic.phone ? maskPhone(resume.basic.phone) : '', resume.basic.email ? maskEmail(resume.basic.email) : ''].filter(Boolean).join(' · ') || '联系方式未填',
+                `教育 ${resume.education.length} 段 · 经历 ${resume.experience.length} 段 · 项目 ${resume.projects.length} 个 · 技能 ${resume.skills.length} 项`,
+              ]}
+              note="公共屏上手机号、邮箱打码显示，导出的简历里是完整的"
+            />
+            {unconfirmed.length > 0 && <p className="qx-rd-pending">待本人确认：{unconfirmed.join('、')}</p>}
+            <div className="qxt-exits">
+              <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={focusSummary}>改一段描述</button>
+              <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={() => document.getElementById('resume-generate-preview-hints')?.scrollIntoView({ block: 'center' })}>
+                {hints.length > 0 ? `看这 ${hints.length} 处` : '看缺失提示'}
+              </button>
+            </div>
             <div className="qx-card">
               <div className="qx-sec-h">
                 <span className="qx-rg-no">01</span>
@@ -375,23 +419,18 @@ export function ResumeGeneratePreviewPage() {
                 onEditingChange={setEditing}
               />
             </div>
-            {unconfirmed.length > 0 && <p className="qx-rd-pending">待本人确认：{unconfirmed.join('、')}</p>}
             <div className="qx-rg-help">
               <p>
                 润色只动个人简介和各段描述。学校、专业、公司和职务可以在这一页改；学历、时间段、项目名和证书仍按你填的保留。
                 {hints.length > 0 ? `另外还有 ${hints.length} 处建议补充。` : ''}
               </p>
-              <button type="button" className="qx-rg-hbtn" onClick={focusSummary}>改一段描述</button>
-              <button type="button" className="qx-rg-hbtn" onClick={() => document.getElementById('resume-generate-preview-hints')?.scrollIntoView({ block: 'center' })}>
-                {hints.length > 0 ? `看这 ${hints.length} 处` : '看缺失提示'}
-              </button>
             </div>
             <div id="resume-generate-preview-hints" className="qx-rg-hints">
               {hints.length > 0 ? hints.map((hint) => <p key={hint}>{hint}</p>) : <p>按当前内容，没有要补充的项。不补也能导出。</p>}
             </div>
             <div className="qx-rg-help">
               <p>{token ? '这一页先在屏幕上核对。导出之后可以扫码带走，登录状态下按保存期限留在账号里。' : '这一页只在屏幕上。没登录时导出的文件不会进账号，事后登录也不补绑。要留底就先登录，再生成、再导出。'}</p>
-              <button type="button" className="qx-rg-hbtn" data-route="/help" onClick={() => go('/help')}>找工作人员</button>
+              <ResumeHelpLine onHelp={() => go('/help')} />
             </div>
             <p className="qx-rg-reason">学校、专业、公司和职务改完就留在这一份上。学历、时间段、项目名和证书要改，得回填写页。</p>
           </div>
@@ -433,6 +472,6 @@ export function ResumeGeneratePreviewPage() {
           <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportFormat} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} primaryAction={exported.printFileUrl && exportFormat === 'pdf' ? { label: '去打印这一份', onClick: handlePrint, disabled: printNavigating || titleBlocked } : undefined} onClose={() => setPreviewOpen(false)} />
         )}
       </section>
-    </QxPageFrame>
+    </ResumeTouchFrame>
   )
 }

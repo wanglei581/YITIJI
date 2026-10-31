@@ -91,6 +91,19 @@ test('上传码：回执没带场景码（旧后端）或格式不对，照旧�
   assert.equal(uploads.isUploadSceneToken(null), false)
 })
 
+test('上传码：签名图 signature_image 永远出网页长链，不出 /k/u 短链（小程序传文件页暂不认这个用途，走查 I-14）', () => {
+  const url = uploads.buildPhoneUploadQrUrl(created(SCENE), 'signature_image')
+  assert.ok(!url.includes('/k/u/'), `签名图的码不能指向 /k/u 短链（微信会转进小程序）：${url}`)
+  assert.match(url, /^https:\/\/zhiyida\.example\.cn\/upload\/phone#/)
+  const fragment = new URLSearchParams(new URL(url).hash.slice(1))
+  assert.equal(fragment.get('sessionId'), SESSION_ID)
+  assert.equal(fragment.get('token'), UPLOAD_TOKEN)
+  assert.equal(fragment.get('purpose'), 'signature_image')
+  assert.ok(!url.includes('control-token-never-in-qr'), '控制令牌永远不进码')
+  // 其他用途不受影响：仍然出短链
+  assert.equal(uploads.buildPhoneUploadQrUrl(created(SCENE), 'print_doc'), `https://zhiyida.example.cn/k/u/${SCENE}`)
+})
+
 test('登录码：qrUrl 里取得到合格票据出 <公网基址>/k/l/<票据>，取不到照旧', () => {
   globalThis[ENV] = { VITE_QR_LOGIN_PUBLIC_BASE_URL: 'https://zhiyida.example.cn' }
   try {
