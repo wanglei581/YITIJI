@@ -5,6 +5,7 @@ import { QxTouchOverlay } from '../../components/qingxu/touch/QxTouchOverlay'
 import { formatRemainingSeconds, useRemainingSeconds } from '../../hooks/useCountdown'
 import { PhoneHelpLine } from '../print-scan/phoneHelp'
 import type { ScanType } from './scanWorkbench'
+import { takeawayUrlOf } from './scanTakeawayUrl'
 import './styles/scan-takeaway-qx.css'
 
 /**
@@ -16,16 +17,6 @@ import './styles/scan-takeaway-qx.css'
  * 扫出来直接在「我的文档」里。要放开只改这一张表。
  */
 export const TAKEAWAY_ALLOWED: Readonly<Record<ScanType, boolean>> = { resume: true, id: false, document: true }
-
-/** QR 里放的地址：签名内容链接是相对路径，补上当前页面的域名（手机要打开得是完整地址）。 */
-export function takeawayUrlOf(fileUrl: string): { url: string; expiresAt: string | null } {
-  const absolute = new URL(fileUrl, window.location.origin)
-  const expiresMs = Number(absolute.searchParams.get('expires'))
-  return {
-    url: absolute.toString(),
-    expiresAt: Number.isFinite(expiresMs) && expiresMs > 0 ? new Date(expiresMs).toISOString() : null,
-  }
-}
 
 /** 结果页「去向」里的一行：扫码带走电子版（证件扫描时是停用态并说明原因）。 */
 export function ScanTakeawayExit({ scanType, onOpen }: { scanType: ScanType; onOpen: () => void }) {
@@ -56,7 +47,8 @@ export function ScanTakeawayExit({ scanType, onOpen }: { scanType: ScanType; onO
 
 /** 扫码带走的层。看的是回执里那条临时链接；本层不另取文件、不存任何东西，关掉就没了。 */
 export function ScanTakeawayLayer({ fileName, fileUrl, onClose }: { fileName: string; fileUrl: string; onClose: () => void }) {
-  const { url, expiresAt } = useMemo(() => takeawayUrlOf(fileUrl), [fileUrl])
+  const link = useMemo(() => takeawayUrlOf(fileUrl, window.location.origin), [fileUrl])
+  const expiresAt = link?.expiresAt ?? null
   const remaining = useRemainingSeconds(expiresAt)
   const expired = expiresAt !== null && remaining === 0
   return (
@@ -68,25 +60,31 @@ export function ScanTakeawayLayer({ fileName, fileUrl, onClose }: { fileName: st
         actions={<button type="button" className="qxt-btn qxt-btn-sec" data-testid="scan-takeaway-close" onClick={onClose}>关闭</button>}
       >
         <div className="sw-take-body">
-          {expired ? (
+          {!link ? (
+            <p className="sw-take-expired" role="status" data-testid="scan-takeaway-unavailable">
+              下载链接不可用。请重新扫描这一份，或先登录再扫，存进「我的文档」。
+            </p>
+          ) : expired ? (
             <p className="sw-take-expired" role="status" data-testid="scan-takeaway-expired">
               这个二维码已过期。请重新扫描这一份，或先登录再扫，存进「我的文档」。
             </p>
           ) : (
             // data-qr-origin / data-qr-path 只给用例核「码里是完整地址、指向内容端点」，不带查询串（签名不进 DOM 属性）。
-            <div className="sw-take-qr" data-testid="scan-takeaway-qr" data-qr-origin={new URL(url).origin} data-qr-path={new URL(url).pathname}>
-              <QRCodeSVG value={url} size={300} level="M" marginSize={1} />
+            <div className="sw-take-qr" data-testid="scan-takeaway-qr" data-qr-origin={new URL(link.url).origin} data-qr-path={new URL(link.url).pathname}>
+              <QRCodeSVG value={link.url} size={300} level="M" marginSize={1} />
             </div>
           )}
           <p className="sw-take-name">{fileName}</p>
           <p className="sw-take-note">
-            {expired
+            {!link
+              ? '没有有效的短时下载链接，不能生成二维码。'
+              : expired
               ? '过期之后手机打不开这份文件。'
               : expiresAt !== null && remaining >= 0
                 ? `用手机扫码保存。剩余 ${formatRemainingSeconds(remaining)}，只在你自己的手机上打开。`
                 : '用手机扫码保存。链接短时有效，只在你自己的手机上打开。'}
           </p>
-          <p className="sw-take-note">保存好之后点「关闭」，这个码就收起来了。</p>
+          {!link || expired ? null : <p className="sw-take-note">保存好之后点「关闭」，这个码就收起来了。</p>}
           <PhoneHelpLine />
         </div>
       </QxTouchOverlay>
