@@ -793,10 +793,14 @@ async function loadClearance() {
   const interviewCode = `${transpile('src/pages/interview/interviewWorkbenchSession.ts')}${tag}`
     .replaceAll("from './interviewWorkbenchModel'", `from '${interviewModelUrl}'`)
   const assistantDraftCode = transpile('src/services/assistantDraft.ts').replaceAll("from 'react'", `from '${import.meta.resolve('react')}'`)
+  const draftHooksUrl = toDataUrl(`export const effects = []; export function useEffect(effect) { effects.push(effect) }; export function useState(initial) { return [typeof initial === 'function' ? initial() : initial, () => {}] }${tag}`)
+  const resumeDraftCode = `${transpile('src/pages/resume/resumeGenerateDraft.ts')}${tag}`.replaceAll("from 'react'", `from '${draftHooksUrl}'`)
+  const resumeDraftUrl = toDataUrl(resumeDraftCode)
   const versionsUrl = toDataUrl(`${transpile('src/ai/aiDeclarationVersions.ts')}${tag}`)
   const sessionCode = `${transpile('src/ai/aiDeclarationSession.ts')}${tag}`.replaceAll("from './aiDeclarationVersions'", `from '${versionsUrl}'`)
   const sessionUrl = toDataUrl(sessionCode)
   const sensitiveCode = `${transpile('src/auth/kioskSensitiveSession.ts')}${tag}`
+    .replaceAll("from '../pages/resume/resumeGenerateDraft'", `from '${resumeDraftUrl}'`)
     .replaceAll("from '../ai/aiDeclarationSession'", `from '${sessionUrl}'`)
     .replaceAll("from '../ai/aiDeclarationVersions'", `from '${versionsUrl}'`)
     .replaceAll("from '../pages/print/printMaterialSession'", `from '${leaf('src/pages/print/printMaterialSession.ts')}'`)
@@ -812,10 +816,24 @@ async function loadClearance() {
     .replaceAll("from '../pages/contract-review/contractReviewSession'", `from '${leaf('src/pages/contract-review/contractReviewSession.ts')}'`)
   const sensitive = await import(toDataUrl(sensitiveCode))
   const declaration = await import(sessionUrl)
-  return { sensitive, declaration, session }
+  return { sensitive, declaration, session, resumeDraft: await import(resumeDraftUrl), draftHooks: await import(draftHooksUrl) }
 }
 
 async function clearanceChecks() {
+  await check('简历生成草稿参与残留判断，统一清场清除且旧 effect 不能写回', async () => {
+    const { sensitive, resumeDraft, draftHooks } = await loadClearance()
+    assert.equal(sensitive.hasKioskSensitiveSession(), false)
+    const filled = { name: '合成清场用户', phone: '', email: '', city: '' }
+    resumeDraft.useResumeGenerateDraftField('basic', filled)
+    draftHooks.effects.forEach((effect) => effect())
+    assert.equal(sensitive.hasKioskSensitiveSession(), true)
+    assert.deepEqual(resumeDraft.useResumeGenerateDraftField('basic', {})[0], filled)
+    sensitive.clearKioskSensitiveSession()
+    assert.equal(sensitive.hasKioskSensitiveSession(), false)
+    draftHooks.effects.forEach((effect) => effect())
+    assert.equal(sensitive.hasKioskSensitiveSession(), false)
+    assert.deepEqual(resumeDraft.useResumeGenerateDraftField('basic', {})[0], {})
+  })
   await check('clearKioskSensitiveSession 让这一次的声明失效，开着的确认也作废', async () => {
     const { sensitive, declaration, session } = await loadClearance()
     declaration.markScopeDeclared('age_14_plus')

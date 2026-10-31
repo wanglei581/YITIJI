@@ -1,5 +1,15 @@
 # 当前开发进度
 
+## 2026-10-31：I-29 从零生成简历故障恢复（本地候选，未合并、未部署、真机未验）
+
+- 基线 `a035b6d8d`，独立分支 `codex/resume-retry-20261031`。范围：4 个业务文件、2 个既有测试/门禁文件及本进度/下一步文档。只修 AI 故障后不能重试和本次填写离页丢失；不引入入口、依赖、模型、后端变更或其他旧分支修复。
+- AI 暂停后可在原核对页主动点「重新检查并整理」，服务端仍判定是否可用；生成/导出过程中按钮互斥。表单字段和当前步骤仅留当前 JS 会话内存，离页可续填；刷新即失去，不写 localStorage/sessionStorage/history/服务端。
+- 草稿接入统一敏感清场和残留检测：首页仍有草稿时不能误判为干净可自动更新。退出、闲置、换会员走原清场；匿名首次登录也清草稿。清场递增代次，旧组件延迟 effect 不得把清掉的资料写回；不改变原闲置 deadline。
+- 本地生产构建浏览器 1 项通过：两次合成 503、首页往返保留姓名/岗位及核对步骤、同页点击重试成功预览、三次 payload 相同且浏览器存储没有填写原文；首页闲置 151 秒后结束使用，再进入姓名为空。所有请求由 fixture 拦截，没有真实 AI/生产/硬件调用。AI 声明门禁新增真实草稿残留→清场→旧 effect 不回写测试通过。
+- 已通过 typecheck、业务改动 ESLint、build、verify:ai-down-fallbacks、verify:kiosk-ai-declaration、verify:member-session-closure（内容更新浏览器子项按原脚本跳过）、verify:kiosk-end-use、verify:scan-session-truth、verify:contract-review-session。首次 AI 声明门禁因 data URL 测试加载器未映射新模块失败，补齐真实模块映射后通过；浏览器初次缺 health fixture 和时钟安装太晚均已修正后重跑通过。
+- 红测：临时恢复旧 `disabled={generating || Boolean(aiOutage)}` 后同一浏览器用例在重试按钮 enabled 断言失败；已还原修复。
+- 边界：无真实服务恢复/会员换号浏览器/Windows 触摸验证，不证明整个简历链路或商业上线达标；刷新后续填不在本次范围。原 Claude `wt-wf-resume` 的未提交内容保持不动。
+
 ## 2026-10-29：触屏版集成后查出的页面问题修复——六条（对第一包的小 PR，分支 `claude/kiosk-touch-pkg1-fixes`，未合并、未部署、真机未验）
 
 - 来源：集成报告（`claude/kiosk-touch-integration`，已快进成第一包头 `18c669c00`）列出的、两种字体栈下都存在或只在去掉苹方后出现的页面问题。本 PR 只改页面与它们的用例 / 断言，不碰共享触屏件（`components/qingxu/touch`、`touch*.css`、`tokens-touch.css`）、`apps/miniapp`、`services/api/src/ai`。每条都是先写会红的断言或量测、再改；改完提交后又把改动改回去确认变红、再复原（红行见 PR 说明）。浏览器用例在 Mac 字体与「去掉苹方」两种构建上各跑一遍；「去掉苹方」= 构建产物 CSS 里 PingFang SC / Hiragino Sans GB 改名、去掉 -apple-system / BlinkMacSystemFont，字体落到打包的 Qingxu Sans，模拟 CI 与真机 Windows。

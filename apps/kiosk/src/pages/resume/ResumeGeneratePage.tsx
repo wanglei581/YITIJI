@@ -3,11 +3,12 @@
 //
 // 合规红线:
 //   - AI 只润色用户提供的信息,不编造学历/证书/公司/项目;缺失内容提示补充,不代填。
-//   - 公共一体机:表单数据只在组件内存,离开页面/进入待机即丢失;
+//   - 公共一体机:表单仅存本次会话内存，离页可续填，清场或刷新即丢失;
 //     生成结果走后端 AiResumeResult TTL 清理,不长期保留。
 // ============================================================
 
 import { useMemo, useState } from 'react'
+import { useResumeGenerateDraftField } from './resumeGenerateDraft'
 import { useNavigate } from 'react-router-dom'
 import { maskEmail, maskPhone } from '../../utils/maskPii'
 import { ResumeHelpLine } from './touch/ResumeHelpLine'
@@ -137,8 +138,8 @@ export function ResumeGeneratePage() {
   const { getToken } = useAuth()
   const consent = useResumeAiConsent()
   const [showConsent, setShowConsent] = useState(false)
-  const [step, setStep] = useState(0)
-  const [reviewing, setReviewing] = useState(false)
+  const [step, setStep] = useResumeGenerateDraftField('step', 0)
+  const [reviewing, setReviewing] = useResumeGenerateDraftField('reviewing', false)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   /** AI 能力级不可用的**真实原因**（原样透出后端 message）；null 表示未观测到不可用。 */
@@ -148,15 +149,15 @@ export function ResumeGeneratePage() {
   /** 原样草稿导出中（不经过 AI，只是服务端排版 + 上传）。 */
   const [exportingDraft, setExportingDraft] = useState(false)
 
-  // 表单数据只在组件内存(公共设备隐私):刷新/待机即丢失,不写任何本地存储。
-  const [basic, setBasic] = useState({ name: '', phone: '', email: '', city: '' })
-  const [intention, setIntention] = useState({ position: '', city: '', jobType: '', salary: '' })
-  const [education, setEducation] = useState<ResumeGenEducation[]>([{ ...EMPTY_EDU }])
-  const [experience, setExperience] = useState<ResumeGenExperience[]>([{ ...EMPTY_EXP }])
-  const [projects, setProjects] = useState<ResumeGenProject[]>([])
-  const [skillsText, setSkillsText] = useState('')
-  const [certsText, setCertsText] = useState('')
-  const [selfIntro, setSelfIntro] = useState('')
+  // 只保留本次会话内存，退出/换人/待机统一清场；不落浏览器存储或 history。
+  const [basic, setBasic] = useResumeGenerateDraftField('basic', { name: '', phone: '', email: '', city: '' })
+  const [intention, setIntention] = useResumeGenerateDraftField('intention', { position: '', city: '', jobType: '', salary: '' })
+  const [education, setEducation] = useResumeGenerateDraftField('education', [{ ...EMPTY_EDU }])
+  const [experience, setExperience] = useResumeGenerateDraftField('experience', [{ ...EMPTY_EXP }])
+  const [projects, setProjects] = useResumeGenerateDraftField('projects', [])
+  const [skillsText, setSkillsText] = useResumeGenerateDraftField('skillsText', '')
+  const [certsText, setCertsText] = useResumeGenerateDraftField('certsText', '')
+  const [selfIntro, setSelfIntro] = useResumeGenerateDraftField('selfIntro', '')
 
   // 生成期间豁免待机宣传屏(打断会丢表单)。导出草稿同样豁免：那一步正在把用户
   // 填的内容变成一张能带走的纸，被待机屏打断等于把它又弄丢一次。
@@ -333,7 +334,7 @@ export function ResumeGeneratePage() {
       }
     : aiOutage
     ? {
-        // 能力级不可用：底部「让 AI 整理成新简历」这次按了也没用，置灰它并写清原因。
+        // 上次请求确认不可用；主动再检查仍由服务端判定，不自动调用或承诺恢复。
         mode: 'blocked',
         reason: aiOutage,
         blockedActionLabel: 'AI 润色成文',
@@ -381,11 +382,11 @@ export function ResumeGeneratePage() {
             type="button"
             className="qx-btn"
             data-variant="primary"
-            disabled={generating || Boolean(aiOutage)}
-            onClick={() => { if (!aiOutage) void handleGenerate() }}
+            disabled={generating || exportingDraft}
+            onClick={() => { void handleGenerate() }}
           >
             <SparklesIcon className="h-5 w-5" aria-hidden="true" />
-            {generating ? '正在整理…' : '让 AI 整理成新简历'}
+            {generating ? '正在整理…' : aiOutage ? '重新检查并整理' : '让 AI 整理成新简历'}
           </button>
           <AiDeclarationNote />
         </span>

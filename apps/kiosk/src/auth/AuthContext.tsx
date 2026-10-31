@@ -1,3 +1,4 @@
+import { clearResumeGenerateDraft } from '../pages/resume/resumeGenerateDraft'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { memberLogout } from '../services/auth/memberAuthApi'
 import { onMemberSessionExpired } from '../services/auth/memberSessionEvents'
@@ -57,8 +58,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // 他一登录就会继承那份扫描件和登记里那枚 controlToken 明文。
       // 扫描流程自己从不把人送去登录（结果页未登录时那颗按钮是禁用的，任何出口都会先
       // leaveScanFlow 清干净），所以这里没有可信的延续标记，按 fail-closed 收掉扫描。
-      // 范围只到扫描，其余敏感会话不动；判据与理由见 kioskClearScope。
+      // 扫描清理判据与理由见 kioskClearScope；下面另清不支持登录续办的简历填写。
       clearGuestScanBeforeMemberLogin()
+      // 简历填写页没有发起登录续办；新登录不能继承上一位游客的输入。
+      clearResumeGenerateDraft()
     }
     // 这一位已经换了一张有效令牌：还在等收尾闸放行的那次「回登录页」就此作废。
     sessionExpiryExit.cancel()
