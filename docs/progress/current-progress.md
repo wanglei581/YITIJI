@@ -1,5 +1,14 @@
 # 当前开发进度
 
+## 2026-10-31：集成候选继续收口与无实体键盘验收
+
+- 本轮在既有 `codex/touch-four-lane-integration-20261031` 保留原四路，快进纳入发布准备线 `7487a0de3`：服务器来源/升级回退证据、签名正式契约同步及 follow-redirects 1.16.2 最小补丁。再纳入 I-33 群众文案与签名图片无扩展显示名兼容修复；各专项预算/负例/回归见下文。没有改原 Claude 工作树、生产配置或硬件。
+- PR #1526 原 `39688b5ee` CI 41176414657 的 build-and-verify 确认失败于 follow-redirects 高危公告；不是页面回归失败。接入发布线修复后本集成实际 dependency-security 复验通过，全树/生产 high/critical 均 0，仍有 2 low 与 13/10 moderate，未放宽门禁。第一次独立 frozen 安装因 registry playwright-core 请求重试停滞；另一正式 pnpm 调用已完成供应链验证及 frozen 安装并跑完安全门禁，随后只停止本轮重复挂起进程。
+- 用户明确无实体键盘使用要求。源码核实：页内 KioskNumpad 已用于取件，KioskKeyboard 仅接小青且 pinyinDict 明确为精简词库；简历/材料/反馈等普通输入尚依赖系统 IME。不能把精简词库全局接入冒充完整中文，也不能把脚本填表算触摸可用。正式验收须覆盖中文姓名/生僻字/经历、手机号/验证码/邮箱、光标插改/选字/删除、键盘避让、切页/换人清场及扫码器并存。
+- 系统输入方案按既有装机边界评估 Assigned Access + 中文触摸键盘，数字流程复用页内键盘，长文本保留手机已有入口；不新增无验证 IME 或由网页任意启动系统程序。微软说明仅保证触屏、无物理键盘等条件下的自动唤起，HID 扫码器和现场 Windows 配置必须实测：https://learn.microsoft.com/en-us/windows/configuration/assigned-access/configure-single-app-kiosk 。本机正在检查键盘弹出后的视口/表单避让，尚未记为完成。
+- UU 再核：当前 DESKTOP-DDD6FCO 仅“虚拟屏1”，切换显示器明确提示仅有 1 个屏幕；坐标点击再次报 noWindowsAvailable，远程输入还出现丢标点。已请用户接通实际 27 寸触摸屏；这些远程结果不能判为产品键盘失败或通过。未触发打印、扫描或收费。
+
+
 ## 2026-10-31：签名图片无扩展显示名的窄兼容修复（独立本地候选）
 
 - 从集成 `39688b5eec3f8dbef5bbdcedbade477594cbe089` 建 `codex/signature-picker-compat-20261031`；只改既有小程序页面/helper/回执测试 3 文件及两份进度文档。未写主集成/原 Claude 工作区，未改后端、发布配置、依赖、开关或其他用途。
