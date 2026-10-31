@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
-import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
+import { RECRUITMENT_HOSTING_ON, RECRUITMENT_HOSTING_OFF, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { assistantReply } from './fixtures/fusion-w3-states'
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 import { registerPrivacyShell, loginThroughVisibleUi, fillPhoneLogin } from './fixtures/privacy-clear-shell'
@@ -376,6 +376,61 @@ test('导出结果的文件与带走操作在首屏，说明可展开 @w3-kiosk'
   await page.screenshot({ path: testInfo.outputPath('export-result-1080.png') })
 })
 
+
+// I-29：一次能力故障不能把这位用户锁死在已填完的表单里。
+test('resume generation retries after outage without losing this session draft @w3-kiosk', async ({ page, api }) => {
+  await page.clock.install()
+  shell(api)
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', { status: 200, json: terminalConfigWithHosting(RECRUITMENT_HOSTING_OFF) })
+  let attempts = 0
+  const payloads: unknown[] = []
+  await page.route('**/api/v1/resume/generate', async (route) => {
+    attempts += 1
+    payloads.push(route.request().postDataJSON())
+    await route.fulfill({ status: attempts <= 2 ? 503 : 200, contentType: 'application/json', body: JSON.stringify(
+      attempts <= 2
+        ? { error: { code: 'AI_PAUSED', message: 'AI 服务暂停中' } }
+        : { taskId: 'retry-result', status: 'completed', providerName: 'fixture', resume: {
+          basic: { name: '恢复验证者', city: '青岛' }, intention: { position: '维修工程师' },
+          summary: '', education: [], experience: [], projects: [], skills: [], certificates: [],
+        }, missingHints: [] },
+    ) })
+  })
+  await page.goto('/resume/generate')
+  await page.getByLabel('姓名', { exact: false }).fill('恢复验证者')
+  await page.getByRole('button', { name: '下一步：求职意向', exact: true }).click()
+  await page.getByLabel('目标岗位', { exact: false }).fill('维修工程师')
+  for (const title of ['教育经历', '工作经历', '项目经历', '技能证书']) {
+    await page.getByRole('button', { name: `下一步：${title}`, exact: true }).click()
+  }
+  await page.getByRole('button', { name: '去核对', exact: true }).click()
+  await page.getByRole('button', { name: '让 AI 整理成新简历', exact: true }).click()
+  await expect(page.getByRole('button', { name: '重新检查并整理', exact: true })).toBeEnabled()
+  expect(attempts).toBe(1)
+  // 同一标签页离开再回来，应恢复核对页和填写内容；没有把原文放进浏览器持久存储。
+  await page.getByRole('button', { name: '首页', exact: true }).click()
+  await page.getByRole('button').filter({ has: page.getByRole('heading', { name: '改简历', exact: true }) }).click()
+  await page.getByRole('button', { name: /没有，帮我写一份/ }).click()
+  await expect(page.getByText('恢复验证者', { exact: true })).toBeVisible()
+  await expect(page.getByText('维修工程师', { exact: true })).toBeVisible()
+  expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain('恢复验证者')
+  await page.getByRole('button', { name: '让 AI 整理成新简历', exact: true }).click()
+  await expect(page.getByRole('button', { name: '重新检查并整理', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: '重新检查并整理', exact: true }).click()
+  await expect(page).toHaveURL(/\/resume\/generate\/preview$/)
+  expect(attempts).toBe(3)
+  expect(payloads[1]).toEqual(payloads[0])
+  expect(payloads[2]).toEqual(payloads[0])
+  await page.getByRole('button', { name: '首页', exact: true }).click()
+  await page.clock.fastForward(151_000)
+  await page.getByTestId('session-guard-clear').click()
+  await page.clock.runFor(1000)
+  await expect(page).toHaveURL(/\/$/)
+  await page.getByRole('button').filter({ has: page.getByRole('heading', { name: '改简历', exact: true }) }).click()
+  await page.getByRole('button', { name: /没有，帮我写一份/ }).click()
+  await expect(page.getByLabel('姓名', { exact: false })).toHaveValue('')
+})
 
 test('从零简历会员换号后不继承上一位填写 @w3-kiosk', async ({ page, api }, testInfo) => {
   registerPrivacyShell(api)
