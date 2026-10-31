@@ -82,21 +82,23 @@ type EvidenceBadgeProps =
 
 /**
  * 证据分级徽章。E3 恒带「仅供参考」，不可省略。
+ *
+ * 屏上只写用户读得懂的名字：「你的材料」「来源信息」「AI 判断 · 仅供参考」。E1 / E2 / E3 是内部证据等级编号，
+ * 求职者看不懂，不上屏（走查 I-02：小青回答上方露着「E3 AI 判断 · 仅供参考」）；编号只留在 data-evidence 属性里，
+ * 给样式与测试用。编号撤掉以后 compact 与否都只显示名字（名字本身已经很短），保留这个属性是为了旧调用点不用改。
  */
 export function EvidenceBadge(props: EvidenceBadgeProps) {
   const { level, className } = props
-  const compact = props.level === 'E3' ? false : props.compact === true
-  const full =
-    level === 'E3' ? `${level} ${AI_JUDGEMENT_TEXT}` : `${level} ${EVIDENCE_LABEL[level]}`
+  const text = level === 'E3' ? AI_JUDGEMENT_TEXT : EVIDENCE_LABEL[level]
 
   return (
     <span
       className={['kiosk-ev', `kiosk-ev--${level.toLowerCase()}`, className].filter(Boolean).join(' ')}
       data-evidence={level}
-      aria-label={full}
-      title={full}
+      aria-label={text}
+      title={text}
     >
-      {compact ? level : full}
+      {text}
     </span>
   )
 }

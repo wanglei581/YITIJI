@@ -27,7 +27,7 @@ import { GenerateResumeEditor } from './components/resume-deliver/GenerateResume
 import { focusResumeTitleIssue, resumeTitleIssues } from './components/resume-deliver/resumeEntryTitles'
 import { ResumeFormatChooser } from './components/resume-deliver/ResumeFormatChooser'
 import { useResumeExportPricing } from './components/resume-deliver/useResumeExportPricing'
-import { detectUnconfirmedAdditions, extractConfirmableFacts } from './components/resume-deliver/facts'
+import { detectUnconfirmedAdditions, extractConfirmableFacts, UNCONFIRMED_WHY } from './components/resume-deliver/facts'
 import { SYNTHETIC_GENERATE } from './components/resume-deliver/fixtures'
 import { parseGeneratePreviewQuery, resolveGeneratePreviewView } from './components/resume-deliver/generatePreviewQuery'
 import type { GeneratePreviewViewState } from './components/resume-deliver/constants'
@@ -397,7 +397,12 @@ export function ResumeGeneratePreviewPage() {
               ]}
               note="公共屏上手机号、邮箱打码显示，导出的简历里是完整的"
             />
-            {unconfirmed.length > 0 && <p className="qx-rd-pending">待本人确认：{unconfirmed.join('、')}</p>}
+            {unconfirmed.length > 0 && (
+              <p className="qx-rd-pending" role="note">
+                待本人确认：{unconfirmed.join('、')}
+                <span className="qx-rd-pending-why">{UNCONFIRMED_WHY}</span>
+              </p>
+            )}
             <div className="qxt-exits">
               <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={focusSummary}>改一段描述</button>
               <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={() => document.getElementById('resume-generate-preview-hints')?.scrollIntoView({ block: 'center' })}>

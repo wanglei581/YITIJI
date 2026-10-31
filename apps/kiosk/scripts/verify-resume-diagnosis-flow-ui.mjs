@@ -436,6 +436,24 @@ assertIncludes(httpAdapter, '...(templateId ? { templateId } : {})', 'http adapt
 assertIncludes(mockAdapter, '_templateId?: string', 'mock adapter accepts templateId without fabricating files')
 assertNotIncludes(optimize, '一键投递', 'optimize page keeps compliance wording')
 
+// ── 走查 I-21：「待本人确认」要讲明白，并且只列 AI 新写进去的 ─────────────────
+// 「待本人确认：负责、1500、0.5%」普通人读不懂：下面必须写清这几处是 AI 整理时新写进去的、为什么要本人核对；
+// 四处显示（预览页橙条、两种核对弹层、优化页编辑屏）共用 facts.ts 的 UNCONFIRMED_WHY。
+// 生成页要把本次填的内容交给预览页，预览页才有「原话」可对照；不交，用户自己写过的词也会被当成新写进去的。
+{
+  const factsSrc = read('src/pages/resume/components/resume-deliver/facts.ts')
+  assertIncludes(factsSrc, 'export const UNCONFIRMED_WHY', 'facts.ts exports the shared explanation for 待本人确认')
+  for (const [name, path] of [
+    ['generate preview banner', 'src/pages/resume/ResumeGeneratePreviewPage.tsx'],
+    ['fact confirm dialog', 'src/pages/resume/components/resume-deliver/ResumeFactConfirmDialog.tsx'],
+    ['optimize edit sheet facts row', 'src/pages/resume/touch/OptimizeEditView.tsx'],
+  ]) assertIncludes(read(path), 'UNCONFIRMED_WHY', `${name} explains why the listed items need the person's confirmation`)
+  assertIncludes(read('src/pages/resume/components/resume-deliver/ResumeFactConfirmDialog.tsx'), 'qxt-pending-why', 'touch fact dialog renders the explanation line')
+  assertIncludes(read('src/pages/resume/components/resume-deliver/ResumeFactConfirmDialog.tsx'), 'qx-rd-pending-why', 'default fact dialog renders the explanation line')
+  assertIncludes(generate, "state: { result, input }", 'generate page hands the filled input to the preview so only AI-added items are flagged')
+  assertNotIncludes(generate, "state: { result } }", 'generate page no longer drops the input on the way to the preview')
+}
+
 // ── Wave4:语音生成简历文本(字段级转写 + 人工确认) ─────────────────────
 assertIncludes(generate, 'ResumeVoiceInputButton', 'generate page renders resume voice input buttons')
 assertIncludes(generate, 'appendVoiceText', 'generate page appends confirmed voice transcripts into existing text')
