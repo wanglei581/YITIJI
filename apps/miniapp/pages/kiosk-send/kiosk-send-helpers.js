@@ -4,8 +4,8 @@
 
 const MAX_BYTES = 10 * 1024 * 1024
 // 与一体机 phoneUploadModel.receiptOf 的 SESSION_PURPOSES 相同。
-// signature_image 能出现在文件用途里，但创建上传会话的 DTO 不接受它。
-const SESSION_PURPOSES = ['resume_upload', 'print_doc', 'contract_upload']
+// 与后端上传会话 DTO/service 的用途集合保持一致；签名图仍由后端验证并短期留存。
+const SESSION_PURPOSES = ['resume_upload', 'print_doc', 'contract_upload', 'signature_image']
 const DEAD_CODES = {
   UPLOAD_SESSION_EXPIRED: true,
   UPLOAD_SESSION_NOT_PENDING: true,
@@ -26,10 +26,10 @@ function isSessionPurpose(value) {
 
 /**
  * 请求兑现不等于已收到：utils/request.js 会把 2xx 的 {} 和 data:null 解包后兑现。
- * 只有 status=uploaded、file.fileId，且 purpose 是会话真实支持的三种用途，
+ * 只有 status=uploaded、file.fileId，且 purpose 是会话真实支持的用途，
  * 并且 sessionId 就是这一次，才算收到。两条路（聊天文件、我的文档）回执同形。
  */
-function receiptAccepted(body, sessionId) {
+function receiptAccepted(body, sessionId, expectedPurpose) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return false
   if (!sessionId || body.sessionId !== sessionId) return false
   if (body.status !== 'uploaded') return false
@@ -37,7 +37,19 @@ function receiptAccepted(body, sessionId) {
   if (!file || typeof file !== 'object' || Array.isArray(file)) return false
   if (typeof file.fileId !== 'string' || file.fileId.trim() === '') return false
   if (!isSessionPurpose(body.purpose)) return false
+  if (isSessionPurpose(expectedPurpose) && body.purpose !== expectedPurpose) return false
   return true
+}
+
+/** 图片选择器只限制媒体类别；扩展名/大小先给明确提示，实际字节仍由后端校验。 */
+function signatureFileIssue(file) {
+  if (!file || !/\.(?:jpe?g|png)$/i.test(String(file.name || file.path || ''))) {
+    return '本人签名图片只支持 JPG / PNG，请重新选择'
+  }
+  if (!Number.isFinite(file.size) || file.size <= 0 || file.size > MAX_BYTES) {
+    return '请选择有效的签名图片，单个文件不能超过 10MB'
+  }
+  return ''
 }
 
 function statusOf(err) {
@@ -112,6 +124,8 @@ function docRowsOf(items, nowMs) {
 
 module.exports = {
   MAX_BYTES,
+  isSessionPurpose,
+  signatureFileIssue,
   receiptAccepted,
   statusOf,
   isAuthError,

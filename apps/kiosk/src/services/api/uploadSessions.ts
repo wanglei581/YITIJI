@@ -153,16 +153,12 @@ export function isUploadSceneToken(value: unknown): value is string {
  * 微信「扫普通链接二维码打开小程序」规则生效时，扫码直接进小程序；没生效或用别的软件扫，打开网页中转页 /k/u/:scene，
  * 兑换后转到 /upload/phone。码里不再放会话号与上传令牌。
  * 回执没带场景码（旧后端）或格式不对：照旧出 buildPhoneUploadUrl 的长链，purpose 只在长链里作文案提示。
- *
- * 例外：本人手写签名图（signature_image）永远出网页长链。小程序「传文件」页只认简历 / 打印 / 合同三种用途，
- * 收到 signature_image 的回执会判成「没收到」（apps/miniapp/pages/kiosk-send/kiosk-send-helpers.js），而 /k/u/ 短链
- * 在微信里会被规则转进小程序；长链的路径 /upload/phone 不在微信规则里，永远打开网页中转（走查 I-14）。
  */
 export function buildPhoneUploadQrUrl(
   created: Pick<UploadSessionCreateResponse, 'uploadUrl' | 'sessionId' | 'uploadToken' | 'sceneToken'>,
   purpose?: string,
 ): string {
-  if (purpose !== 'signature_image' && isUploadSceneToken(created.sceneToken)) {
+  if (isUploadSceneToken(created.sceneToken)) {
     const origin = new URL(created.uploadUrl, window.location.origin).origin
     return new URL(`/k/u/${created.sceneToken}`, origin).toString()
   }

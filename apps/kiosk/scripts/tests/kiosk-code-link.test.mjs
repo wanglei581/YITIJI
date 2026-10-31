@@ -91,17 +91,17 @@ test('上传码：回执没带场景码（旧后端）或格式不对，照旧�
   assert.equal(uploads.isUploadSceneToken(null), false)
 })
 
-test('上传码：签名图 signature_image 永远出网页长链，不出 /k/u 短链（小程序传文件页暂不认这个用途，走查 I-14）', () => {
-  const url = uploads.buildPhoneUploadQrUrl(created(SCENE), 'signature_image')
-  assert.ok(!url.includes('/k/u/'), `签名图的码不能指向 /k/u 短链（微信会转进小程序）：${url}`)
+test('上传码：签名图与原三用途都走短链，缺场景码仍保留网页兜底', () => {
+  for (const purpose of ['signature_image', 'resume_upload', 'print_doc', 'contract_upload']) {
+    assert.equal(uploads.buildPhoneUploadQrUrl(created(SCENE), purpose), `https://zhiyida.example.cn/k/u/${SCENE}`)
+  }
+  const url = uploads.buildPhoneUploadQrUrl(created(undefined), 'signature_image')
   assert.match(url, /^https:\/\/zhiyida\.example\.cn\/upload\/phone#/)
   const fragment = new URLSearchParams(new URL(url).hash.slice(1))
   assert.equal(fragment.get('sessionId'), SESSION_ID)
   assert.equal(fragment.get('token'), UPLOAD_TOKEN)
   assert.equal(fragment.get('purpose'), 'signature_image')
-  assert.ok(!url.includes('control-token-never-in-qr'), '控制令牌永远不进码')
-  // 其他用途不受影响：仍然出短链
-  assert.equal(uploads.buildPhoneUploadQrUrl(created(SCENE), 'print_doc'), `https://zhiyida.example.cn/k/u/${SCENE}`)
+  assert.ok(!url.includes('control-token-never-in-qr'))
 })
 
 test('登录码：qrUrl 里取得到合格票据出 <公网基址>/k/l/<票据>，取不到照旧', () => {
