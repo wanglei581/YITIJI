@@ -746,8 +746,20 @@ expectMatches(
 expectMatches(
   progressCode,
   /POLL_FAIL_LIMIT\s*=\s*5/,
-  '进度页轮询连续失败 ≥5 次才判失败',
+  '进度页轮询连续失败 ≥5 次才离开进度页',
 )
+// 2026-10-29（走查 I-30）：连续读不到状态不是打印失败（纸可能已经出来），不再判失败、不闪「打印没有完成」，
+// 而是去完成页的「无法确认」态：那里带订单号，按退避继续查，后端恢复后换成真实结果。
+expectMatches(
+  progressCode,
+  /pollFailsRef\.current\s*>=\s*POLL_FAIL_LIMIT\)\s*\{[^}]*navigate\('\/print\/done'/,
+  '进度页轮询连续失败 ≥5 次转去完成页「无法确认」态',
+)
+if (/pollFailsRef\.current\s*>=\s*POLL_FAIL_LIMIT\)\s*\{[^}]*navigateFail/.test(progressCode)) {
+  fail('进度页读不到状态不得 navigateFail：那会把「读不到」说成「打印没有完成」，让拿着纸的人去重打')
+} else {
+  pass('进度页读不到状态不判失败')
+}
 expectMatches(
   progressCode,
   /暂时无法读取状态/,

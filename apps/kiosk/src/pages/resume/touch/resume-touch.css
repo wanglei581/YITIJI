@@ -501,6 +501,13 @@
   font-weight: 700;
   line-height: 1.4;
 }
+.qxt-screen .qx-rg-review .qx-rd-pending .qx-rd-pending-why {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--qxt-fs-aux);
+  font-weight: 500;
+  line-height: 1.4;
+}
 
 /* 放不下整张时收成一行（只留眉题和标题），一行也放不下就不画：滚动区下沿不再切出半张卡。 */
 .qxt-screen .rtp-hero[data-fit='row'] .rtp-hero-art,

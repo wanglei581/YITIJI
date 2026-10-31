@@ -716,6 +716,59 @@ test('signature inspect renders server pages and compose sends placement payload
   await expectHealthy(page, errors, 'print-scan-sign')
 })
 
+// 走查 I-14：「签名」第 2 步点「手机扫码上传图片」，二维码此前必败（POST /upload-sessions 带 signature_image 回 400，
+// 弹层写「二维码生成失败」、确认键灰着）。后端放行后，这一步要真的走通：开会话 → 手机传 → 一体机确认 → 这张图成为签名。
+test('signature step 2: the phone QR opens a signature_image upload session and the confirmed picture becomes the stamp @w2', async ({ page, api }, testInfo) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerSignCapabilities(api)
+  registerMemberLogin(api)
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+  const stampFile = { fileId: 'w2-sign-phone-stamp', filename: '手写签名.png', sizeBytes: 240, mimeType: 'image/png', sha256: 'e'.repeat(64), fileExpiresAt: new Date(Date.now() + 3_600_000).toISOString() }
+  api.respond('POST', '/api/v1/files/kiosk-upload', {
+    status: 200,
+    json: { success: true, data: { fileId: 'w2-sign-doc-phone', filename: '就业协议.pdf', sizeBytes: 1800, mimeType: 'application/pdf', sha256: 'a'.repeat(64), signedUrl: '/w2-fixtures/doc.pdf', signedUrlExpiresAt: '2026-07-24T00:10:00.000Z', fileExpiresAt: '2026-07-25T00:00:00.000Z' } },
+  })
+  api.respond('POST', '/api/v1/print/sign/inspect', { status: 200, json: { success: true, data: { pages: 3 } } })
+  api.respond('POST', '/api/v1/upload-sessions', {
+    status: 201,
+    json: { success: true, data: { sessionId: 'w2-sign-session', uploadUrl: 'http://127.0.0.1:4182/upload/phone', uploadToken: 'w2-sign-upload-token', controlToken: 'w2-sign-control-token', expiresAt, sceneToken: 'SNtynYMXmy7P4MSNE8uMi-yL' } },
+  })
+  api.respond('GET', '/api/v1/upload-sessions/w2-sign-session', {
+    status: 200,
+    json: { success: true, data: { sessionId: 'w2-sign-session', status: 'uploaded', purpose: 'signature_image', mode: 'member', file: stampFile, requiresKioskConfirmation: true, expiresAt } },
+  })
+  api.respond('POST', '/api/v1/upload-sessions/w2-sign-session/confirm', {
+    status: 201,
+    json: { success: true, data: { sessionId: 'w2-sign-session', status: 'confirmed', file: { ...stampFile, fileUrl: '/w2-fixtures/stamp.png' } } },
+  })
+  const createBodies: string[] = []
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/upload-sessions') createBodies.push(request.postData() ?? '')
+  })
+
+  await loginThroughVisibleUi(page, '/print-scan/sign')
+  await page.locator('input[accept="application/pdf"]').setInputFiles({ name: '就业协议.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') })
+  await expect(page.getByTestId('sign-stamp-doc-tag')).toContainText('就业协议.pdf')
+  await page.getByTestId('sign-stamp-pick-stamp-phone').click()
+  const layer = page.getByTestId('sign-stamp-qr-layer')
+  await expect(layer.getByText('用手机上传签名图', { exact: true })).toBeVisible()
+  await expect(layer.locator('svg').first()).toBeVisible()
+  await expect(layer.getByText('二维码生成失败')).toHaveCount(0)
+  // 签名图只留系统短期、不进「我的文档」：面板里不能说「会员文件确认后归档」
+  await expect(layer.getByText('会员文件确认后归档')).toHaveCount(0)
+  expect(createBodies).toHaveLength(1)
+  expect(JSON.parse(createBodies[0])).toMatchObject({ purpose: 'signature_image', mode: 'member', channel: 'phone_h5' })
+  // 手机传上来之后，一体机上确认，这张图就成了签名
+  const confirm = layer.getByRole('button', { name: '确认使用该图片', exact: true })
+  await expect(confirm).toBeEnabled({ timeout: 8_000 })
+  await page.screenshot({ path: testInfo.outputPath('sign-step2-phone-qr-uploaded.png'), fullPage: false })
+  await confirm.click()
+  await expect(layer).toHaveCount(0)
+  await expect(page.getByTestId('sign-stamp-stamp-tag')).toContainText('手写签名.png')
+  await expectHealthy(page, errors, 'print-scan-sign')
+})
+
 test('signature compose 429 shows rate-limited and does not silently retry @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)

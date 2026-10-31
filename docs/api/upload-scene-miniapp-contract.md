@@ -15,6 +15,11 @@
 | 传文件 | `https://<公网域名>/k/u/<sceneToken>` | `https://zyidai.cn/k/u/` → `pages/kiosk-send/kiosk-send` | `/k/u/:scene` 兑换后 replace 到 `/upload/phone#sessionId=…&token=…&purpose=…` |
 | 扫码登录 | `https://<公网域名>/k/l/<ticketId>` | `https://zyidai.cn/k/l/` → `pages/kiosk-login/kiosk-login` | `/k/l/:ticketId` replace 到 `/member/qr-login?ticketId=…` |
 
+- **本人手写签名图（`purpose=signature_image`）已接入同一普通短链**（2026-10-31 候选，尚未发布）：
+  `/k/u/<sceneToken>` 兑换后，小程序按真实会话用途使用聊天图片选择器，只接受 JPG/PNG、有效大小且不超过 10MB；
+  回执必须属于同一会话和已知用途，签名用途不显示「我的文档」也不能从文档库发送。后端继续校验实际字节，
+  签名图确认后系统短期留存，不归档进会员文档。没有有效场景码时仍回落网页长链，H5 上传仍可用。
+  发布时必须包含支持该用途的小程序版本，再启用对应微信规则并实机验证；旧小程序版本不能据此称为支持签名图。
 - 为什么放路径不放 `#` 后面：官方规则只写了路径前缀匹配（规则以 `/` 结尾才匹配子路径）和 `?` 参数前缀匹配，
   没提 `#`；官方例子本身就是「业务参数放路径里」。码也从约 130 字符缩到约 45 字符，屏上更好扫。
 - 进小程序后整条码在 `options.q`，`decodeURIComponent` 一次后交给 `apps/miniapp/utils/kiosk-qr.js` 认码型

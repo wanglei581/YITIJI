@@ -2105,6 +2105,7 @@ test('a member login cannot start a scan while the previous one is still being c
   await loginThroughVisibleUi(page, '/scan/start')
   await revoke.received(0)
 
+  await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
   await page.getByRole('button', { name: /下一步/ }).click()
   await page.waitForURL(/\/scan\?stage=settings/)
 

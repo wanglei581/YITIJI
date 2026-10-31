@@ -338,6 +338,15 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   }, [aiAvailability, getToken, loading, selectedTask, toolboxSkill])
 
   const handleSend = useCallback(() => { void sendMessage(input) }, [input, sendMessage])
+  // 用屏上键盘的「发送」把话真的发出去之后收起键盘：回答和底部导航要露出来，不能被键盘和它外面的遮罩压着（走查 I-03）。
+  // 条件与 sendMessage 的放行条件一致：没发出去（空输入、正在回答、AI 已停用）时键盘留着，人还要接着打。
+  const handleKeyboardSend = useCallback(() => {
+    if (input.trim() && !loading && !declaringRef.current && aiAvailability !== 'unavailable') {
+      setKeyboardOpen(false)
+      inputRef.current?.blur()
+    }
+    handleSend()
+  }, [aiAvailability, handleSend, input, loading])
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
@@ -783,7 +792,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
         open={keyboardOpen}
         value={input}
         onChange={(value) => setInput(value.slice(0, ASSISTANT_USER_MESSAGE_MAX_LENGTH))}
-        onEnter={handleSend}
+        onEnter={handleKeyboardSend}
         onClose={() => {
           setKeyboardOpen(false)
           inputRef.current?.blur()

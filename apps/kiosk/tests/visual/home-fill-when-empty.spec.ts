@@ -101,7 +101,7 @@ for (const variant of VARIANTS) {
   test(`home page stays filled for a signed-in person with nothing to continue (${variant}) @home-fill`, async ({ page, api }) => {
     await prepare(page, api, variant)
     await loginThroughVisibleUi(page, '/', MEI.phone)
-    await expect(page.getByTestId('home-identity')).toHaveText('有人登录着')
+    await expect(page.getByTestId('home-identity')).toHaveText('你已登录')
     await expect(page.locator('section.continue')).toHaveCount(0)
     await expectFilledLikeSignedOut(page, `已登录、没有可继续的办理（${variant}）`, variant)
   })

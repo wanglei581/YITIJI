@@ -1,0 +1,37 @@
+/* 扫描结果 · 扫码带走层（走查 I-15）。只放层里正文的版式；弹层本身用共享的 QxTouchOverlay，不在这里改它。
+ * 颜色只用 qx 令牌。二维码底必须是实色浅底（--qx-surface），否则手机扫不出来。 */
+.sw-take-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  text-align: center;
+}
+.sw-take-qr {
+  padding: 18px;
+  border-radius: 24px;
+  background: var(--qx-surface);
+  border: 1.5px solid var(--qx-line-2);
+}
+.sw-take-qr svg {
+  display: block;
+  width: 300px;
+  height: 300px;
+}
+.sw-take-name {
+  max-width: 100%;
+  margin: 0;
+  font-weight: 700;
+  word-break: break-all;
+}
+.sw-take-note,
+.sw-take-expired {
+  margin: 0;
+}
+.sw-take-expired {
+  padding: 22px 20px;
+  border-radius: 20px;
+  background: var(--qx-paper);
+  border: 1.5px dashed var(--qx-line-2);
+}

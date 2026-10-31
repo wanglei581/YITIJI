@@ -219,6 +219,8 @@ class FakeAudit {
 
 class FakeFiles {
   private next = 1
+  /** 每次 upload 收到的文件名，用来核对「我的文档」里会看到什么名字。 */
+  readonly uploadedFilenames: string[] = []
   constructor(private readonly prisma: FakePrisma) {}
   async upload(args: {
     buffer: Buffer
@@ -241,6 +243,7 @@ class FakeFiles {
     fileExpiresAt: string | null
   }> {
     const id = `out_${this.next++}`
+    this.uploadedFilenames.push(args.filename)
     const record: StoredFile = {
       id,
       storageKey: `key_${id}`,
@@ -358,7 +361,7 @@ function makeService() {
     redis as never,
     capabilities as never,
   )
-  return { service, prisma, storage, audit, redis, capabilities }
+  return { service, prisma, storage, audit, files, redis, capabilities }
 }
 
 function seedImage(prisma: FakePrisma, storage: FakeStorage, id: string, overrides: Partial<StoredFile> = {}): StoredFile {
@@ -474,13 +477,18 @@ async function main() {
 
   // 7) 成功合并 3 张图片 → 输出 3 页，返回内部 HMAC URL，audit 记录正确
   {
-    const { service, prisma, storage, audit } = makeService()
+    const { service, prisma, storage, audit, files } = makeService()
     const sources = ['a1', 'a2', 'a3'].map((id) => {
       seedImage(prisma, storage, id)
       return { fileId: id, fileAccessUrl: guestAccessUrl(id) }
     })
     const result = await runConvert(service, { sources, endUserId: null })
     assert.equal(result.pages, 3, 'output should have 3 pages')
+    // 合成件在「我的文档」里的名字（10/29 本机走查 I-26）：人能认的中文 + 北京时间日期时刻，
+    // 不是 format-convert-<毫秒时间戳>.pdf 这种内部名字。
+    assert.equal(files.uploadedFilenames.length, 1, 'exactly one derived file is stored')
+    assert.match(files.uploadedFilenames[0]!, /^照片合成-\d{8}-\d{4}\.pdf$/, 'derived file name must be human readable')
+    assert.ok(!/format-convert|\d{10,}/.test(files.uploadedFilenames[0]!), 'no internal prefix or epoch millis in the name')
     assert.match(result.printFileUrl, /^\/api\/v1\/files\//, 'must return internal HMAC url, not COS url')
     assert.equal(audit.entries.length, 1)
     assert.equal(audit.entries[0]!.action, 'print_conversion.images_to_pdf')

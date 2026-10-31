@@ -114,7 +114,10 @@ const FROZEN = new Map([
   // 只多两行 import、一行 hook、三行取句子、两行 JSX，二维码、轮询、取消、确认、报忙、刷新先撤销旧会话、已上传时刷新不可点都逐字未动。
   // 冻结契约不放宽，仍逐字节校验；新行为由 scripts/tests/miniapp-link-copy.test.mjs 的接线断言和 fusion-w3 / fusion-w2 的浏览器用例钉住。
   // 旧哈希 98691610ccd48ff766ff7d28256ed8814afb024ad454305f9de6345c0639db14。
-  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '7f0cacce1e2b505548a4a141e2b63c71517c8ec5fe5d47fc827732a461f3e524'],
+  // 2026-10-29 重新冻结（触屏版走查 I-14，B 路）：签名图（signature_image）确认后只留系统短期、不进「我的文档」，面板里「会员文件确认后归档」对它不成立；
+  // 只在那一处条件上加 purpose !== 'signature_image'，二维码、轮询、取消、确认、刷新先撤销旧会话等都逐字未动。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 7f0cacce1e2b505548a4a141e2b63c71517c8ec5fe5d47fc827732a461f3e524。
+  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357'],
 ])
 
 function propertyName(node) {
@@ -524,7 +527,7 @@ assert.match(legalViewsSrc, /<h2 className="legal-doc-toc-title">章节目录<\/
 assert.match(legalViewsSrc, /<h3>\{section\.title\}<\/h3>/, '协议页：章节标题仍是 h3（用例按 .legal-doc-body h3 取）')
 const guardViewSrc = read('src/pages/session-guard/SessionGuardView.tsx')
 assert.match(guardViewSrc, /<K as="h3">\{card\.title\}<\/K>/, '闲置提醒：两张清单卡的标题是 h3')
-assert.match(guardViewSrc, /<h3>\{ask\.title\}<\/h3>/, '闲置提醒：三个常问的问题是 h3')
+assert.match(guardViewSrc, /<h3>\{ask\.title\}<\/h3>/, '闲置提醒：常问的问题（10/29 走查 I-07 起只留「纸还在机器上」一条）标题是 h3')
 
 /* 触屏版第 5 包（2026-10-28）：改版时被删掉的说明句，稿上没画，按「稿上没画的也保留」放回。
  * 登录步骤、身份说明只给读屏（默认态一屏放不下可见的字）；帮助与机器状态的说明是小字，运行页没有它们就是少了一条交代。 */

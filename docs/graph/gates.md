@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1938 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1941 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -426,7 +426,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 595 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 596 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -727,7 +727,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx` | `verify-lightflow-profile-entry.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-word-conversion-ui.mjs` |
 | `apps/kiosk/src/pages/profile/me/components/PhoneRebindPanel.tsx` | `verify-lightflow-profile-entry.mjs`<br/>`verify-member-session-closure.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-w4-login-profile-l1.mjs` |
 | `apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx` | `verify-file-retention-ui.mjs`<br/>`verify-lightflow-profile-entry.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-profile-inkpaper-home.mjs` |
-| `apps/kiosk/src/pages/profile/me/components/SettingsConfirm.tsx` | `verify-lightflow-profile-entry.mjs`<br/>`verify-profile-inkpaper-home.mjs` |
+| `apps/kiosk/src/pages/profile/me/components/SettingsConfirm.tsx` | `verify-kiosk-end-use.mjs`<br/>`verify-lightflow-profile-entry.mjs`<br/>`verify-profile-inkpaper-home.mjs` |
 | `apps/kiosk/src/pages/profile/me/components/documentReprint.ts` | `verify-lightflow-profile-entry.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-profile-inkpaper-home.mjs` |
 | `apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx` | `verify-lightflow-profile-entry.mjs`<br/>`verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-inkpaper-home.mjs` |
 | `apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx` | `verify-lightflow-profile-entry.mjs`<br/>`verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-inkpaper-home.mjs` |
@@ -876,6 +876,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/resume-report-qx.css` | `verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/resume-triage-panels-qx.css` | `verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/resume-triage-qx.css` | `verify-lightflow-k2b-ai-resume.mjs` |
+| `apps/kiosk/src/pages/resume/resumeGenerateDraft.ts` | `verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/pages/resume/self-assessment-lightflow.css` | `verify-compliance.ts` |
 | `apps/kiosk/src/pages/resume/selfAssessmentConsent.ts` | `verify-self-assessment-consent-source.mjs` |
 | `apps/kiosk/src/pages/resume/selfAssessmentSession.ts` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-self-assessment-consent-source.mjs` |
@@ -1029,7 +1030,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/tests/</code> — 14 个文件</summary>
+<summary><code>apps/kiosk/tests/</code> — 15 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1044,6 +1045,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/tests/visual/fusion-w4.spec.ts` | `verify-fusion-w4.mjs` |
 | `apps/kiosk/tests/visual/fusion-w5.spec.ts` | `verify-fusion-w6.mjs` |
 | `apps/kiosk/tests/visual/fusion-w6-routes.spec.ts` | `verify-fusion-w6.mjs` |
+| `apps/kiosk/tests/visual/kiosk-desktop-stage-fit.spec.ts` | `verify-fusion-shell.mjs` |
 | `apps/kiosk/tests/visual/print-done-truth.spec.ts` | `verify-print-done-truth.mjs` |
 | `apps/kiosk/tests/visual/route-manifest.ts` | `verify-fusion-baseline.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-visual-evidence-manifest.mjs` |
 | `apps/kiosk/tests/w1-a-build-mode.test.mjs` | `verify-runtime-terminal-identity.mjs` |
@@ -2251,7 +2253,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/scan-panel-wording.ts` | `verify-scan-tasks.ts` |
 | `services/api/scripts/support/serializable-race-barrier.ts` | `verify-first-admin-bootstrap-postgres.ts`<br/>`verify-pg-serialization-conflict-postgres.ts`<br/>`verify-print-retry-lock-postgres.ts` |
 | `services/api/scripts/support/sqlite-cli.ts` | `verify-scan-tasks.ts` |
-| `services/api/scripts/support/upload-session-verifier.ts` | `verify-upload-sessions-bind.ts`<br/>`verify-upload-sessions-faults.ts`<br/>`verify-upload-sessions-member-file.ts`<br/>`verify-upload-sessions.ts` |
+| `services/api/scripts/support/upload-session-verifier.ts` | `verify-upload-sessions-bind.ts`<br/>`verify-upload-sessions-faults.ts`<br/>`verify-upload-sessions-member-file.ts`<br/>`verify-upload-sessions-signature.ts`<br/>`verify-upload-sessions.ts` |
 | `services/api/scripts/unpublish-demo-companies.ts` | `verify-demo-company-unpublish.ts` |
 | `services/api/scripts/verify-admin-fairs.ts` | `verify-profile-commercial-first-batch.mjs` |
 | `services/api/scripts/verify-ai-access.ts` | `verify-recruitment-hosting-gate-declares.ts` |
@@ -2325,7 +2327,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 603 个文件</summary>
+<summary><code>services/api/src/</code> — 604 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2583,16 +2585,16 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/files/dto/kiosk-upload-options.dto.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-print-sign.ts` |
 | `services/api/src/files/file-content-integrity.ts` | `verify-pickup-claim-error-coverage.mjs` |
 | `services/api/src/files/file-page-count.util.ts` | `verify-document-page-count.ts`<br/>`verify-file-display-truth.ts`<br/>`verify-pdfjs-engine.ts`<br/>`verify-print-sign.ts` |
-| `services/api/src/files/file-validation.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-cos-storage.ts`<br/>`verify-document-conversion.ts`<br/>`verify-file-display-truth.ts`<br/>`verify-file-internal-auth.ts`<br/>`verify-member-data-export-files.ts` |
-| `services/api/src/files/file.types.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-file-retention-ui.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-kiosk-upload-print-contract.ts`<br/>`verify-member-data-export-files.ts`<br/>`verify-member-data-retention.ts`<br/>`verify-upload-sessions-member-file.ts` |
+| `services/api/src/files/file-validation.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-cos-storage.ts`<br/>`verify-document-conversion.ts`<br/>`verify-file-display-truth.ts`<br/>`verify-file-internal-auth.ts`<br/>`verify-member-data-export-files.ts`<br/>`verify-upload-sessions-signature.ts` |
+| `services/api/src/files/file.types.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-file-retention-ui.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-kiosk-upload-print-contract.ts`<br/>`verify-member-data-export-files.ts`<br/>`verify-member-data-retention.ts`<br/>`verify-upload-sessions-member-file.ts`<br/>`verify-upload-sessions-signature.ts` |
 | `services/api/src/files/files.cleanup.task.ts` | `verify-file-assets-trial-acceptance.ts`<br/>`verify-upload-sessions.ts` |
 | `services/api/src/files/files.controller.ts` | `verify-file-assets-trial-acceptance.ts`<br/>`verify-file-internal-auth.ts`<br/>`verify-kiosk-upload-print-contract.ts`<br/>`verify-member-data-export-files.ts`<br/>`verify-multipart-field-nesting.ts`<br/>`verify-print-jobs.ts` |
 | `services/api/src/files/files.module.ts` | `verify-file-assets-trial-acceptance.ts` |
 | `services/api/src/files/files.service.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-admin-fairs.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-cos-files.ts`<br/>`verify-derivation-kind.ts`<br/>`verify-document-page-count.ts`<br/>`verify-fair-company-positions.ts`<br/>`verify-fair-info-fields.ts`<br/>`verify-fair-visit-review.ts`<br/>`verify-file-assets-trial-acceptance.ts`<br/>`verify-file-cleanup-cas-ledger.ts`<br/>`verify-file-delete-consistency.ts`<br/>`verify-file-internal-auth.ts`<br/>`verify-file-lifecycle-summary.ts`<br/>`verify-file-retention.ts`<br/>`verify-job-materials.ts`<br/>`verify-jobfair-venue-guide.ts`<br/>`verify-kiosk-upload-print-contract.ts`<br/>`verify-materials-processing.ts`<br/>`verify-member-assets-c2d.ts`<br/>`verify-member-closure.ts`<br/>`verify-member-data-export-files.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-pii-redaction.ts`<br/>`verify-print-jobs.ts`<br/>`verify-public-fair-demo-guard.ts`<br/>`verify-recruitment-content-http.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-draft-source.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-resume-generate.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-optimize.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-report-export.ts`<br/>`verify-resume-template-fill.ts`<br/>`verify-scan-tasks.ts`<br/>`verify-upload-sessions-faults.ts`<br/>`verify-upload-sessions-member-file.ts`<br/>`verify-upload-sessions.ts` |
 | `services/api/src/files/lifecycle-summary.ts` | `verify-file-lifecycle-summary.ts` |
 | `services/api/src/files/member-data-export-file.service.ts` | `verify-member-data-export-files.ts` |
-| `services/api/src/files/retention-policy.ts` | `verify-file-retention-ui.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-file-retention.ts`<br/>`verify-member-data-retention.ts`<br/>`verify-resume-generate.ts`<br/>`verify-upload-sessions.ts` |
-| `services/api/src/files/signing.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-admin-fairs.ts`<br/>`verify-admin-print-scan.ts`<br/>`verify-derivation-kind.ts`<br/>`verify-document-conversion.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-kiosk-upload-print-contract.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pii-redaction.ts`<br/>`verify-print-conversion.ts`<br/>`verify-print-jobs.ts`<br/>`verify-print-retry-lock-postgres.ts`<br/>`verify-print-sign.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
+| `services/api/src/files/retention-policy.ts` | `verify-file-retention-ui.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-file-retention.ts`<br/>`verify-member-data-retention.ts`<br/>`verify-resume-generate.ts`<br/>`verify-upload-sessions-signature.ts`<br/>`verify-upload-sessions.ts` |
+| `services/api/src/files/signing.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-admin-fairs.ts`<br/>`verify-admin-print-scan.ts`<br/>`verify-derivation-kind.ts`<br/>`verify-document-conversion.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-kiosk-upload-print-contract.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pii-redaction.ts`<br/>`verify-print-conversion.ts`<br/>`verify-print-jobs.ts`<br/>`verify-print-retry-lock-postgres.ts`<br/>`verify-print-sign.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-upload-sessions-signature.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/src/first-order/first-order-report-metrics.ts` | `verify-first-order-http.ts` |
 | `services/api/src/job-ai/governed-job-fit.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-governed-job-fit.ts`<br/>`verify-job-ai-backend.ts`<br/>`verify-job-ai-privacy.ts` |
 | `services/api/src/job-ai/job-ai-llm.service.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-feature-keys.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-job-ai-backend.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-llm-thinking-off.ts` |
@@ -2870,7 +2872,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/release-provenance/release-runtime-contract.ts` | `verify-release-genesis.ts`<br/>`verify-release-provenance.ts` |
 | `services/api/src/scan-tasks/dto/create-scan-task.dto.ts` | `verify-scan-session-truth.mjs`<br/>`verify-scan-tasks.ts` |
 | `services/api/src/scan-tasks/scan-task-reaper.task.ts` | `verify-scan-tasks.ts` |
-| `services/api/src/scan-tasks/scan-tasks.controller.ts` | `verify-scan-session-truth.mjs`<br/>`verify-ai-access.ts`<br/>`verify-multipart-field-nesting.ts`<br/>`verify-scan-tasks.ts`<br/>`verify-throttle-dimension.ts` |
+| `services/api/src/scan-tasks/scan-tasks.controller.ts` | `verify-scan-session-truth.mjs`<br/>`verify-ai-access.ts`<br/>`verify-multipart-field-nesting.ts`<br/>`verify-scan-deliver-filename.ts`<br/>`verify-scan-tasks.ts`<br/>`verify-throttle-dimension.ts` |
 | `services/api/src/scan-tasks/scan-tasks.service.ts` | `verify-scan-session-truth.mjs`<br/>`verify-admin-print-scan.ts`<br/>`verify-pg-serialization-conflict.ts`<br/>`verify-scan-quiet-period.ts`<br/>`verify-scan-tasks.ts` |
 | `services/api/src/smart-campus/dto/save-smart-campus-config.dto.ts` | `verify-partner-smart-campus.ts` |
 | `services/api/src/smart-campus/smart-campus.module.ts` | `verify-terminal-device-config.ts` |
@@ -2931,6 +2933,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/upload-sessions/upload-scene.ts` | `verify-upload-scene.ts` |
 | `services/api/src/upload-sessions/upload-session-object-delete.ts` | `verify-upload-sessions.ts` |
 | `services/api/src/upload-sessions/upload-sessions.controller.ts` | `verify-ai-access.ts`<br/>`verify-multipart-field-nesting.ts`<br/>`verify-upload-sessions-member-file.ts`<br/>`verify-upload-sessions.ts` |
+| `services/api/src/upload-sessions/upload-sessions.dto.ts` | `verify-resume-phone-upload-ui.mjs`<br/>`verify-upload-sessions-signature.ts` |
 | `services/api/src/upload-sessions/upload-sessions.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-upload-scene.ts`<br/>`verify-upload-sessions-faults.ts`<br/>`verify-upload-sessions-member-file.ts`<br/>`verify-upload-sessions.ts` |
 
 </details>

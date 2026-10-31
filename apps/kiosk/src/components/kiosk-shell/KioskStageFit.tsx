@@ -1,4 +1,4 @@
-import { createContext, useContext, type CSSProperties, type ReactNode } from 'react'
+import { createContext, useContext, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import { useKioskStageFit } from '../../hooks/useKioskStageFit'
 
 /**
@@ -20,7 +20,43 @@ export function KioskRootStageScope({ children }: { children: ReactNode }) {
 
 export function KioskStageFit({ children, enabled = true }: KioskStageFitProps) {
   const insideRootStage = useContext(KioskRootStageContext)
-  const { stageW, stageH, scale } = useKioskStageFit()
+  const { stageW, stageH, scale, inputOccluded, visibleHeight, visibleTop } = useKioskStageFit()
+  const hostRef = useRef<HTMLDivElement>(null)
+  const avoidInputOcclusion = enabled && !insideRootStage && Boolean(inputOccluded)
+  useLayoutEffect(() => {
+    if (!avoidInputOcclusion) return
+    let frame = 0
+    const revealInput = () => {
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(() => {
+        const active = document.activeElement
+        const host = hostRef.current
+        if (!(active instanceof HTMLElement) || !host?.contains(active)) return
+        const hostBox = host.getBoundingClientRect()
+        let top = hostBox.top
+        let bottom = hostBox.bottom
+        for (let parent = active.parentElement; parent && parent !== host; parent = parent.parentElement) {
+          if (!/(auto|scroll|hidden|clip)/.test(getComputedStyle(parent).overflowY)) continue
+          const box = parent.getBoundingClientRect()
+          top = Math.max(top, box.top + parent.clientTop)
+          bottom = Math.min(bottom, box.bottom - parent.clientTop)
+        }
+        // 标签能一起放下时一起滚入，避免只看见输入框却不知道在填什么。
+        const label = active.closest('label')
+        const target = label && label.getBoundingClientRect().height <= bottom - top ? label : active
+        const box = target.getBoundingClientRect()
+        if (box.top < top || box.bottom > bottom) {
+          target.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' })
+        }
+      })
+    }
+    revealInput()
+    document.addEventListener('focusin', revealInput)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      document.removeEventListener('focusin', revealInput)
+    }
+  }, [avoidInputOcclusion, stageH])
   if (insideRootStage) return children
 
   const scalerStyle: CSSProperties = {
@@ -36,7 +72,9 @@ export function KioskStageFit({ children, enabled = true }: KioskStageFitProps) 
   }
 
   return (
-    <div className="kiosk-stage-host" data-kiosk-stage-fit={enabled ? 'on' : 'off'}>
+    <div ref={hostRef} className="kiosk-stage-host" data-kiosk-stage-fit={enabled ? 'on' : 'off'}
+      data-kiosk-input-occluded={avoidInputOcclusion ? 'true' : undefined}
+      style={avoidInputOcclusion ? { height: visibleHeight, top: visibleTop } : undefined}>
       <div className="kiosk-stage-scaler" style={scalerStyle}>
         <div className="kiosk-stage" style={stageStyle}>
           {children}

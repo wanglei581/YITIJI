@@ -5,14 +5,13 @@
 // 四个真实态照做：unknown（进页默认，没检测过就不写结论）/ checking / partial / offline。
 // 稿里没有「正常」「在线」这类保证词，本页也不伪造任何读数；没探到的写「暂时读不到」，不写成好或坏。
 //
-// 能真检测的只有两条（其余六轴照实写未检测 / 未验收 / 随请求确认，不默认写成正常）：
+// 联网、本机程序、打印机与扫描接收可读；其余照实写未检测 / 未验收 / 随请求确认。
 //   1) 联网 = GET {API_BASE_URL}/health（5s 超时）+ navigator.onLine —— 与其它接口同一个基址，
 //      VITE_API_BASE_URL 指向别的源时也探得到（写死 /api/v1 会永远探测失败、卡在本页）；
 //   2) 机器后台程序 / 打印机 = 公开只读 printer-status（后端按 5 分钟心跳窗算 isOnline），
 //      映射沿用 useTerminalDeviceStatus 的纯函数，default 分支不返回在线。
-// 行为沿用旧页：自动重试 + 监听 online 事件；连得上时 replace 回安全的
-// location.state.from（没有来源时回 /）——来源页之外，只有打印机也读到可用才离开，
-// 否则停在 partial 把「连得上但几项取不到」照实摆出来。
+// 进页立即检测 + 自动重试 + 监听 online 事件。只对带明确安全 from 的故障回退恢复来源页；
+// 主动打开设备状态时始终留在本页，展示本次检测结果。扫描存放读新鲜心跳的枚举，不暴露本机路径。
 // 自动重试退避：每多一次「检测完仍留在本页」（offline / partial），间隔翻倍 10 → 20 → 40 秒，封顶 60 秒；
 // online 事件归零并立即重测；「重新检测」按钮始终立即执行。页面卸载时中断在途的探测与它的 5 秒计时器。
 // ============================================================
@@ -84,11 +83,12 @@ interface PrinterReading {
   heartbeatOnline: boolean
   ready: boolean
   verdict: Verdict
+  scanVerdict: Verdict
 }
 
 /** 读不到就写「暂时读不到」：不当成好，也不当成坏。 */
 const UNREAD_LABEL = '暂时读不到'
-const UNREAD: PrinterReading = { heartbeatOnline: false, ready: false, verdict: [UNREAD_LABEL, 'warn'] }
+const UNREAD: PrinterReading = { heartbeatOnline: false, ready: false, verdict: [UNREAD_LABEL, 'warn'], scanVerdict: [UNREAD_LABEL, 'warn'] }
 
 interface CheckResult {
   at: Date
@@ -132,20 +132,23 @@ async function readPrinterStatus(signal: AbortSignal): Promise<PrinterReading> {
       signal,
     })
     if (!response.ok) return UNREAD
-    const body = (await response.json()) as { isOnline?: boolean; printerStatus?: string | null; data?: { isOnline?: boolean; printerStatus?: string | null } }
+    type StatusPayload = { isOnline?: boolean; printerStatus?: string | null; scanInputHealth?: string | null }
+    const body = (await response.json()) as StatusPayload & { data?: StatusPayload }
     const payload = body.data ?? body
-    const heartbeatOnline = Boolean(payload.isOnline)
+    const heartbeatOnline = payload.isOnline === true
     // 心跳过期时后端读数不代表现在：写「没读到」，不写「离线」（稿：两者不合并）。
     if (!heartbeatOnline) return UNREAD
+    const scanVerdict: Verdict = payload.scanInputHealth === 'healthy' ? ['这次读到可接收', 'ok']
+      : payload.scanInputHealth === 'locked_out' ? ['暂停接收', 'bad'] : [UNREAD_LABEL, 'warn']
     const mapped = mapTerminalPrinterStatus({ heartbeatOnline, printerStatus: payload.printerStatus })
-    if (mapped.printerReady) return { heartbeatOnline, ready: true, verdict: ['这次读到可用', 'ok'] }
+    if (mapped.printerReady) return { heartbeatOnline, ready: true, verdict: ['这次读到可用', 'ok'], scanVerdict }
     const raw = normalizePrinterStatusRaw(payload.printerStatus)
     const verdict: Verdict = raw === 'offline' ? ['离线', 'bad']
       : raw === 'paper_empty' ? ['缺纸', 'bad']
         : raw === 'error' ? ['异常', 'bad']
           : (raw === 'queue_cleanup_failed' || raw === 'queue_pause_failed') ? ['暂停接单', 'bad']
             : [UNREAD_LABEL, 'warn']
-    return { heartbeatOnline, ready: false, verdict }
+    return { heartbeatOnline, ready: false, verdict, scanVerdict }
   } catch {
     return UNREAD
   }
@@ -164,7 +167,7 @@ function rowsFor(view: View, result: CheckResult | null): Row[] {
       { dep: '正在向服务器探', verdict: q('检测中') },
       { dep: '正在检测', verdict: q('检测中') },
       { dep: '正在检测', verdict: q('检测中') },
-      { dep: '还没有检测', verdict: q('未检测') },
+      { dep: '正在读取接收状态', verdict: q('检测中') },
       usb,
       { dep: asked, verdict: q('随请求确认') },
       { dep: asked, verdict: q('随请求确认') },
@@ -194,7 +197,7 @@ function rowsFor(view: View, result: CheckResult | null): Row[] {
       printer.verdict[0] === UNREAD_LABEL
         ? { dep: '这次没有读到', verdict: printer.verdict }
         : { dep: '读机器上报的状态', verdict: printer.verdict },
-      { dep: '还没有检测', verdict: q('未检测') },
+      { dep: '只说明本次接收状态', verdict: printer.scanVerdict },
       usb,
       { dep: asked, verdict: q('随请求确认') },
       { dep: asked, verdict: q('随请求确认') },
@@ -235,7 +238,6 @@ export default function ErrorOfflinePage() {
       ? candidate
       : null
   }, [location.state])
-  const returnTo = safeFrom ?? '/'
 
   const view: View = checking ? 'checking' : !result ? 'unknown' : result.reachable ? 'partial' : 'offline'
 
@@ -268,15 +270,15 @@ export default function ErrorOfflinePage() {
     }
     checkingRef.current = false
     if (!mountedRef.current) return
-    // 连得上：有来源页就回去（稿：一连上就把你送回刚才那一页）；没有来源页时，打印机也读到可用才回首页。
-    if (reachable && (safeFrom !== null || printer?.ready)) {
-      navigate(returnTo, { replace: true })
+    // 故障回退可恢复原页；主动查看设备状态必须留在这里读到结果。
+    if (reachable && safeFrom !== null) {
+      navigate(safeFrom, { replace: true })
       return
     }
     setStayStreak((value) => value + 1)
     setResult({ at: new Date(), reachable, printer })
     setChecking(false)
-  }, [navigate, returnTo, safeFrom])
+  }, [navigate, safeFrom])
 
   useEffect(() => {
     mountedRef.current = true
@@ -285,6 +287,10 @@ export default function ErrorOfflinePage() {
       closeProbe(probeRef, true)
     }
   }, [])
+
+  useEffect(() => {
+    void retry()
+  }, [retry])
 
   useEffect(() => {
     // 网络恢复：退避归零，立刻重测。
@@ -317,7 +323,7 @@ export default function ErrorOfflinePage() {
   const sub = view === 'unknown'
     ? '还没向服务器和打印机问过。'
     : view === 'checking'
-      ? '先问联网、本机程序和打印机；其余没有单独的检测口。'
+      ? '先问联网、本机程序、打印机和扫描接收；其余随办理确认。'
       : view === 'partial'
         ? '取不到的标成暂时读不到。'
         : '这次连不上。其余没问到的项标成暂时读不到。'

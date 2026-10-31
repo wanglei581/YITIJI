@@ -128,7 +128,9 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     icon: FileTextIcon,
     title: '文档打印',
     description: '选文件，检查后设参数',
-    to: '/print/upload?source=document&tab=file',
+    // 不带 tab：进「文件在哪」来源选择屏（手机、U 盘、纸质、我的文档）。以前带 tab=file，一体机上直接落到手机二维码，
+    // 想用 U 盘的人找不到入口（走查 I-13）。
+    to: '/print/upload?source=document',
     aiRole: 'ai',
     needsMfp: true,
     available: true,
@@ -172,7 +174,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     icon: ImageIcon,
     title: '照片打印',
     description: '选照片，检查后设参数',
-    to: '/print/upload?source=document&tab=file&category=photo',
+    to: '/print/upload?source=document&category=photo',
     state: { category: 'photo' },
     aiRole: 'ai',
     needsMfp: true,

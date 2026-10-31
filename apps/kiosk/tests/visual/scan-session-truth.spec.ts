@@ -62,6 +62,7 @@ async function fulfillCreatedSession(route: Route): Promise<void> {
 
 async function enterSettingsFromVisibleStart(page: Page): Promise<void> {
   await page.goto('/scan/start')
+  await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
   await page.getByRole('button', { name: /\u4e0b\u4e00\u6b65/ }).click()
   await page.waitForURL(/\/scan\?stage=settings/)
 }
@@ -151,6 +152,7 @@ test('scan start does not probe a nonexistent device endpoint and carries explic
 
   await page.goto('/scan/start')
   await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
+  await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
   const next = page.getByRole('button', { name: /\u4e0b\u4e00\u6b65/ })
   await expect(next).toBeEnabled()
   expect(deviceRequests()).toBe(0)
@@ -362,6 +364,7 @@ test('leaving while creation is in flight cancels the late-created session once 
   })
 
   await page.goto('/scan/start')
+  await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
   await page.getByRole('button', { name: /\u4e0b\u4e00\u6b65/ }).click()
   await createReceived
   await page.getByRole('button', { name: '\u5b89\u5168\u8fd4\u56de\u626b\u63cf\u9996\u9875' }).first().click()
@@ -695,6 +698,7 @@ test('a scan session that arrives after the user left is revoked and never writt
   })
 
   await page.goto('/scan/start')
+  await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
   await page.getByRole('button', { name: /下一步/ }).click()
   await createReceived
   await expect(page.getByText('正在创建扫描任务', { exact: false }).first()).toBeVisible()
@@ -880,6 +884,7 @@ test('a terminal session that recovers after the abandoned task was revoked neve
   })
 
   await page.goto('/scan/start')
+  await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
   await page.getByRole('button', { name: /下一步/ }).click()
   await createReceived
   await expect(page.getByText('正在创建扫描任务', { exact: false }).first()).toBeVisible()
@@ -951,6 +956,7 @@ test('a create deferred by a terminal refresh still goes out once the new ticket
   await refreshArrived
   expect(await terminalSessionStateOf(page), '续期在飞时会话状态必须真的是 checking').toBe('checking')
 
+  await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
   await page.getByRole('button', { name: /下一步/ }).click()
   await page.waitForURL(/\/scan\?stage=settings/)
   // 换票没出结果之前：不抢跑创建请求（抢跑只会拿回 401），也不谎称正在建扫描会话。

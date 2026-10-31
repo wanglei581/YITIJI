@@ -22,14 +22,18 @@ const browserSpecSource = read('tests/visual/print-done-truth.spec.ts')
 const checks = [
   ['完成页读取真实打印任务接口', () => {
     assert.match(doneSource, /import\s*\{[^}]*getPrintJobStatus[^}]*\}\s*from\s*'\.\.\/\.\.\/services\/print\/printJobsApi'/)
-    assert.match(doneSource, /getPrintJobStatus\(taskId\)/)
+    assert.equal((doneRuntime.match(/getPrintJobStatus\(taskId,\s*\{\s*signal:\s*abort\.signal\s*\}\)/g) ?? []).length, 2, '首次核验与重查都必须传入有界取消信号')
+    assert.equal((doneRuntime.match(/setTimeout\(\(\) => abort\.abort\(\), STATUS_RECHECK_REQUEST_TIMEOUT_MS\)/g) ?? []).length, 2, '首次核验与重查共用状态请求超时')
     assert.match(doneSource, /result\.taskId\s*!==\s*taskId/)
     assert.match(doneSource, /verification\?\.taskId\s*===\s*taskId/)
     assert.match(browserSpecSource, /a response for a different task cannot confirm the current task/)
   }],
   ['只有 completed 状态进入成功视图', () => {
     assert.match(doneSource, /result\.status\s*===\s*'completed'/)
-    assert.match(doneSource, /setVerification\(\{\s*taskId,\s*result:\s*'completed'/)
+    // 2026-10-29（走查 I-30）：首次核验和「无法确认」态的重查共用同一个读数翻译 interpretStatus，
+    // 只有它把 completed 翻成成功结论，两条路径都经 setVerification(outcome.value) 落到页面。
+    assert.match(doneSource, /kind:\s*'settled',\s*value:\s*\{\s*taskId,\s*result:\s*'completed'/)
+    assert.equal((doneSource.match(/setVerification\(outcome\.value\)/g) ?? []).length, 2, '首次核验与重查都只经翻译结果落页')
   }],
   ['pending、claimed、printing 返回真实进度页', () => {
     assert.match(doneSource, /\['pending',\s*'claimed',\s*'printing'\]/)
@@ -180,7 +184,8 @@ const checks = [
     const takeawayCard = failedViewRuntime.slice(failedViewRuntime.indexOf('function TakeawayCard'), failedViewRuntime.indexOf('function OrdersRowLink'))
     assert.doesNotMatch(takeawayCard, /retry/)
     // 页面把 retryError 原样传给版式；普通失败、卡纸、缺纸共用同一块按钮栏，所以三态的提示位置一致。
-    assert.match(doneRuntime, /retry=\{\{ available: canRetry, busy: retrying, error: retryError, onRetry:/)
+    // 走查 I-11：打印机仍故障时重新提交置灰，原因由页面按设备状态算好传给版式。
+    assert.match(doneRuntime, /retry=\{\{ available: canRetry, blockedReason: retryBlockedReason\(device\), busy: retrying, error: retryError, onRetry:/)
     assert.equal((doneRuntime.match(/<PrintDoneFailed\b/g) ?? []).length, 1, '三种失败态共用同一块版式')
     assert.match(failedViewRuntime, /TESTID_BY_VARIANT[\s\S]*'print-fulfill-state-failed'[\s\S]*'print-fulfill-state-paper-jam'[\s\S]*'print-fulfill-state-out-of-paper'/)
     assert.match(browserSpecSource, /old agent retry rejection stays beside the actions in the first viewport/)

@@ -6,8 +6,13 @@ import { SESSION_GUARD_ASKS, sessionGuardClears, sessionGuardSourceName, type Se
 
 /**
  * 闲置提醒的正文（触屏稿 cleared）。顶栏标题是「还在用吗？」，所以这里不再写第二个同名标题，只用 h2 写本页状态。
- * 版式：左边倒计时、右边说明；下面「本机会清除 / 不因此清除」两张清单；再是三个现场常问的事和求助句。
+ * 版式：左边倒计时、右边说明；下面「本机会清除 / 不因此清除」两张清单；再是「纸还在机器上」和求助句。
  * 倒计时由本机时钟执行；清除结果要等清除做完才算数，本页不提前写成已完成。
+ *
+ * 这一屏只给人 30 秒决定「继续还是结束」（10/29 本机走查 I-07：原来大半屏的字，要点埋在第二屏中间）。
+ * 所以：要点（还在用就点哪个键、刚填的会不会丢）是说明卡的第一句；同一件事只说一遍——
+ * 「现在结束使用……」是按钮自己的名字，「隐私保护……会被清掉」是两张清单，「订单会不会没了」是清单第二张，
+ * 「倒计时由本机时钟执行……」是写给开发看的，都不再重复。
  */
 export function SessionGuardView({
   state,
@@ -40,7 +45,7 @@ export function SessionGuardView({
       ? (isAnonymous
         ? '清的是这台机器上这次的临时使用记录。结果要等清除做完才算数，本页不提前写成已完成。'
         : '清的是这台机器上的登录状态和这次的临时使用记录。结果要等清除做完才算数，本页不提前写成已完成。')
-      : '这是公用设备的隐私保护。时间一到，本机上这趟留下的东西会被清掉；已经交给系统的任务和账号数据不受影响。'
+      : '还在用，就点下面的「我还在，继续使用」。刚才填到一半的内容不会因此丢掉。'
   const heading = state === 'warning-no-continue'
     ? '这次不能就地继续'
     : state === 'clearing'
@@ -60,23 +65,26 @@ export function SessionGuardView({
         <Card className="cg-copy">
           {/* 页面名由顶栏承担；这里的 h2 只给读屏说明本页状态，视觉上收起。 */}
           <h2 className="cg-sr" id="session-timeout-title">{heading}</h2>
-          <p className="qxp-note">{copy}</p>
+          <p className="qxp-note cg-lead" data-testid="session-guard-lead">{copy}</p>
           <p className="qxp-note" data-testid="session-guard-impact">{sessionImpact}</p>
           <p className="qxp-note" data-testid="session-guard-identity">
             <span>{isAnonymous ? '这次使用：' : '当前登录：'}<b>{accountLabel}</b></span>
-            {' · '}
-            {/* 独立 span：用例按 exact 匹配这一句，混在同一个元素里会匹配不到，
-                而这句是匿名用户唯一能看到的「退出就没了」的提示，不能被稀释。 */}
-            <span>{isAnonymous ? '匿名任务退出后无法恢复' : '账号中已保存的数据不受本次终端清场影响'}</span>
+            {isAnonymous ? (
+              <>
+                {' · '}
+                {/* 独立 span：用例按 exact 匹配这一句，混在同一个元素里会匹配不到，
+                    而这句是匿名用户唯一能看到的「退出就没了」的提示，不能被稀释。
+                    登录用户「账号里的数据不受影响」在右下「不因此清除」清单里已经有了，这里不再说第二遍。 */}
+                <span>匿名任务退出后无法恢复</span>
+              </>
+            ) : null}
           </p>
           {state === 'warning' ? (
             <p className="qxp-note sg-from">
-              {/* 屏上只写页面名，不写路径；名字统一由 sessionGuardSourceName 给。 */}
+              {/* 屏上只写页面名，不写路径；名字统一由 sessionGuardSourceName 给。读不到来源页时回首页，不多解释。 */}
               继续后回到 {sourceKnown ? <b>{sessionGuardSourceName(sourcePath)}</b> : <b>首页</b>}
-              {sourceKnown ? null : '（这次读不到可用的来源页，所以回到首页）'}
             </p>
           ) : null}
-          <p className="qxp-note">现在结束使用，会结束并清除这台机器上的这次使用记录。</p>
         </Card>
       </div>
 
@@ -103,9 +111,6 @@ export function SessionGuardView({
         </div>
       ) : null}
 
-      <p className="qxp-note cg-truth" data-disclaimer="true" data-testid="session-guard-truth">
-        倒计时由本机时钟执行，不依赖网络与 AI；这台机器没有离人传感器，也不做人脸判断。
-      </p>
       {helpLine ? <QxTouchCallout kind="remind">{helpLine}</QxTouchCallout> : null}
     </div>
   )

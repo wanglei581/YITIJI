@@ -18,6 +18,7 @@ import { PrintTouchFrame, printAsk } from '../PrintTouchFrame'
 import { PrintFillArt } from '../art/PrintFillArt'
 import type { FailureCopy, FailureStep, SummaryRow, FailureVariant } from './printDoneFailedModel'
 import { FailSteps, FailSummary } from './PrintFailParts'
+import { CONTACT_ENTRY_LABEL } from './printContactEntry'
 
 const ASK_LABEL = '问小青：取纸或异常怎么办'
 const ASK_DRAFT = '打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。'
@@ -44,6 +45,8 @@ export interface PrintDoneFailedProps {
   retry: {
     /** takeaway-url 给出 canRetry 且不是「结果未确认」才有这个出口。 */
     available: boolean
+    /** 打印机现在还不能出纸（缺纸、卡纸、离线、没读到状态）时的原因；null = 能提交。有原因时按钮置灰，原因写在它下面。 */
+    blockedReason: string | null
     busy: boolean
     /** 重提被拒时的一句话（含版本门槛提示）；放在按钮栏第一行，不滚动就能看到。 */
     error: string | null
@@ -57,6 +60,8 @@ export interface PrintDoneFailedProps {
   onHome: () => void
   onHelp: () => void
   onOrders: () => void
+  /** 没配服务电话时才传：打开隐私政策里的联系方式。配了电话号码就在屏上，不给这个入口。 */
+  onContact?: () => void
   /** 反馈弹层：挂在触屏壳里面（与其余各态一致），由页面持有开关。 */
   dialog?: ReactNode
 }
@@ -92,6 +97,8 @@ function OrdersRowLink({ onOrders }: { onOrders: () => void }) {
     </button>
   )
 }
+
+const RETRY_WHY_ID = 'print-retry-blocked-why'
 
 const TESTID_BY_VARIANT: Record<FailureVariant, string> = {
   failed: 'print-fulfill-state-failed',
@@ -138,13 +145,26 @@ export function PrintDoneFailed(props: PrintDoneFailedProps & { expiredLine: str
             <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={props.onFeedback}>反馈问题</button>
           ) : null}
           {retry.available ? (
-            <button
-              type="button"
-              className="qxt-btn qxt-btn-sec qxt-btn-exit pft-fail-retry"
-              disabled={retry.busy}
-              onClick={retry.onRetry}
-            >
-              {retry.busy ? '正在重新提交…' : '重新提交打印'}
+            <>
+              {/* 打印机还没好时置灰：用可聚焦的 aria-disabled（不是原生 disabled），读屏读得到 aria-describedby 里的原因。 */}
+              <button
+                type="button"
+                className="qxt-btn qxt-btn-sec qxt-btn-exit pft-fail-retry"
+                disabled={retry.busy}
+                aria-disabled={retry.blockedReason ? true : undefined}
+                aria-describedby={retry.blockedReason ? RETRY_WHY_ID : undefined}
+                onClick={retry.blockedReason ? undefined : retry.onRetry}
+              >
+                {retry.busy ? '正在重新提交…' : '重新提交打印'}
+              </button>
+              {retry.blockedReason ? (
+                <p id={RETRY_WHY_ID} className="pft-fail-why" data-testid="print-retry-blocked-reason" role="status">{retry.blockedReason}</p>
+              ) : null}
+            </>
+          ) : null}
+          {props.onContact ? (
+            <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit pft-contact-entry" data-testid="print-contact-entry" onClick={props.onContact}>
+              {CONTACT_ENTRY_LABEL}
             </button>
           ) : null}
         </div>

@@ -30,6 +30,23 @@
 
 [data-qx-page='resume'] .qxt-fine { line-height: 1.45; }
 
+/* AI 暂停时大卡置灰，卡下并一条不用 AI 的出路（稿 resume 的 ?ai=down，d4-dead / d4-outlink）。 */
+[data-qx-page='resume'] .qxt-hub-pair { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+[data-qx-page='resume'] .qxt-hub-pair .qxt-slab-row { padding-block: 20px; min-height: 0; }
+
+[data-qx-page='resume'] .qxt-hub-out {
+  display: flex;
+  align-items: center;
+  min-height: var(--qxt-tap);
+  padding: 0 22px;
+  border-radius: 20px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  text-align: left;
+}
+
 [data-qx-page='resume'] [data-hub-notice] { min-height: 0; padding: 14px 20px; font-size: 22px; }
 [data-qx-page='resume'] [data-hub-notice] b { display: block; font-size: 24px; }
 [data-qx-page='resume'] [data-hub-notice] span span { display: block; font-weight: 500; }

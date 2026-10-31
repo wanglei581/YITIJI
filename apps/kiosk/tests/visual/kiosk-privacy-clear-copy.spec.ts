@@ -43,10 +43,11 @@ async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void
   await loginWithPhone(page, returnTo, MEMBER_PHONE)
 }
 
-// W-75（9/29）：首页登录态只说「有人登录着」，手机号（含打码）不上首页。
+// W-75（9/29）：首页登录态不露名字，手机号（含打码）不上首页。
+// 10/29 走查 I-05：刚登录、人还在屏前时对本人说「你已登录」+「结束使用」；空档满 30 秒后才改回「有人登录着」（见 kiosk-end-use）。
 async function expectThisMember(page: Page): Promise<void> {
-  await expect(page.getByTestId('home-identity')).toHaveText('有人登录着')
-  await expect(page.getByTestId('home-end-previous')).toBeVisible()
+  await expect(page.getByTestId('home-identity')).toHaveText('你已登录')
+  await expect(page.getByTestId('home-end-previous')).toHaveText('结束使用')
   await expect(page.locator('body')).not.toContainText('138****8000')
 }
 

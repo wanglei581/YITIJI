@@ -398,6 +398,17 @@ assert.match(stageFit, /enabled\s*=\s*true/, 'KioskStageFit enabled must default
 assert.match(stageFit, /data-kiosk-stage-fit=\{enabled\s*\?\s*['"]on['"]\s*:\s*['"]off['"]\}/, 'KioskStageFit must expose on/off state')
 assert.match(stageFit, /transform:\s*enabled\s*\?\s*`scale\(\$\{scale\}\)`\s*:\s*['"]none['"]/, 'KioskStageFit off state must disable transforms')
 
+// 触控输入遮挡：网页只响应浏览器几何，不调用系统键盘或改浏览器覆盖策略。
+assert.match(stageFitHook, /keyboard\?\.boundingRect\?\.height/, '同步布局收缩必须有明确键盘几何，不能猜普通窗口resize')
+assert.match(stageFitHook, /Math\.abs\(vv\.scale - 1\)/, 'pinch缩放不能当作键盘')
+assert.match(stageFitHook, /keyboard\?\.removeEventListener\('geometrychange', update\)/, '键盘几何监听须卸载清理')
+assert.doesNotMatch(stageFitHook + stageFit, /overlaysContent\s*=|TabTip|osk\.exe|virtualKeyboard\??\.show\(/, '布局修复不得启动系统程序或改变键盘策略')
+assert.match(stageFit, /data-kiosk-input-occluded/, '输入遮挡只作用于启用的共享舞台')
+const stageFitBrowser = await read('tests/visual/kiosk-desktop-stage-fit.spec.ts')
+for (const scenario of ['触屏输入时只缩可用内容高', '明确键盘几何下布局视口一起缩小', '普通窗口resize和pinch', '手机原生输入保持流式布局', '键盘连续小步展开', '可见区有上偏移', '横屏电脑输入遮挡时仍水平居中']) {
+  assert.ok(stageFitBrowser.includes(scenario), `输入视口回归缺失：${scenario}`)
+}
+
 const activeTabBody = functionBody(root, 'getActiveTab')
 for (const [pathContract, pattern] of [
   ['/assistant -> assistant', /pathname\.startsWith\(\s*['"]\/assistant['"]\s*\)[\s\S]*?return\s+['"]assistant['"]/],

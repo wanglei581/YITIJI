@@ -109,6 +109,43 @@
   text-align: left;
 }
 
+/* 「无法确认」（有任务号）比失败态少一张「文件带走」卡：摘要行放大到 88，吃掉多出来的高度，
+   三步、摘要、出口之间的空带都落在 105 以内（不靠拉长空卡凑高度） */
+[data-qx-page='print-done'] .pft-unk .pft-fail-sum .qxt-sum-r {
+  min-height: 88px;
+  padding: 12px 22px;
+}
+
+/* 打印机还没好时，重新提交打印置灰，原因写在它下面（走查 I-11）：可聚焦的 aria-disabled，不是原生 disabled */
+:is([data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-fail-exits .pft-fail-retry[aria-disabled='true'] {
+  background: var(--qxt-well);
+  color: var(--qxt-ink-3);
+  border-color: var(--qxt-edge);
+  cursor: default;
+}
+
+:is([data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-fail-exits .pft-fail-why {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 12px 20px;
+  border-radius: 20px;
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+  font-size: 22px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+/* 「查看联系方式」（没配服务电话时才有）和「无法确认」态里的「使用帮助」：独占一行，不和另外两颗挤一排 */
+:is([data-qx-page='print-unconfirmed'], [data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-exit-wide,
+:is([data-qx-page='print-unconfirmed'], [data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-contact-entry {
+  grid-column: 1 / -1;
+  min-height: 88px;
+  height: 88px;
+  font-size: 28px;
+  font-weight: 700;
+}
+
 /* 「文件带走」触屏卡：标题 + 二维码（不小于 168）+ 剩余时间 + 说明 */
 :is([data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-take-card {
   display: flex;

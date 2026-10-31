@@ -126,7 +126,7 @@ flowchart LR
 | `/resume/source` | ResumeSourcePage | `apps/kiosk/src/pages/resume/ResumeSourcePage.tsx` | 33 | 8 |
 | `/resume/templates` | ResumeTemplateLibraryPage | `apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx` | 10 | 11 |
 | `/resume/upload` | Navigate | — _(重定向)_ | 0 | — |
-| `/scan` | ScanWorkbenchPage | `apps/kiosk/src/pages/scan/ScanWorkbenchPage.tsx` | 10 | 10 |
+| `/scan` | ScanWorkbenchPage | `apps/kiosk/src/pages/scan/ScanWorkbenchPage.tsx` | 10 | 11 |
 | `/scan/progress` | Navigate | — _(重定向)_ | 0 | — |
 | `/scan/result` | Navigate | — _(重定向)_ | 0 | — |
 | `/scan/settings` | Navigate | — _(重定向)_ | 0 | — |

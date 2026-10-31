@@ -134,10 +134,17 @@
   padding: 0;
   border: 0;
   background: none;
+  /* 页底两句话（求助句、自动结束句）上下各占一行；底层 .pff-help 是横排，不压成一排两栏（走查 I-12）。 */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
 }
 
 [data-qx-page='print-done'] .pff-help .txt {
   display: block;
+  flex: none;
+  margin: 0;
   font-size: 20px;
   line-height: 1.5;
   color: var(--qxt-ink-3);

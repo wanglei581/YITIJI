@@ -354,8 +354,8 @@ test('hosting off: every direct recruitment URL lands on the honest state, never
     await expect(page.locator('[data-kiosk-screen="route-error"]'), `${url} 不是报错页`).toHaveCount(0)
     await expect(page.locator('.qx-pagehead h1'), `${url} 说清楚哪一类没开放`).toHaveText(`本终端未开放${topic}`)
     await expect(page.getByRole('button', { name: '返回首页' }).last()).toBeVisible()
-    // 私有化版标识条只挂在招聘页上；托管关闭时招聘页根本不挂载，说明页上不能有它。
-    await expect(page.getByTestId('recruit-private-ribbon'), `${url} 托管关闭时没有私有化版标识条`).toHaveCount(0)
+    // 来源说明条只挂在招聘页上；托管关闭时招聘页根本不挂载，说明页上不能有它。
+    await expect(page.getByTestId('recruit-private-ribbon'), `${url} 托管关闭时没有来源说明条`).toHaveCount(0)
     await expectNoRecruitmentCopy(page, url)
   }
 
@@ -379,13 +379,16 @@ test('hosting off: every direct recruitment URL lands on the honest state, never
 
 // 与上面「托管关闭没有标识条」配对的阳性对照：托管打开（客户私有化部署）时，招聘页顶上逐字带这条标识条，
 // 首页不带。没有这条对照，「关闭时没有」可能只是因为这条标识条根本没人渲染。
-test('hosting on: the recruitment pages wear the private-deployment ribbon word for word, the home does not @w1-kiosk', async ({ page, api }) => {
+test('hosting on: recruitment frames show public source guidance without internal delivery notes, the home does not @w1-kiosk', async ({ page, api }, testInfo) => {
   registerW6Api(api)
   for (const url of ['/jobs-service', '/fairs-service', '/jobs', '/job-fairs', '/campus/welcome']) {
     await page.goto(url)
     const ribbon = page.getByTestId('recruit-private-ribbon')
-    await expect(ribbon, `${url} 顶上有私有化版标识条`).toHaveCount(1)
-    await expect(ribbon).toHaveText('私有化部署版 · 仅供持有人力资源服务许可证的客户自行运营 · 我方云上不出现 · 不得用于对外宣传')
+    await expect(ribbon, `${url} 顶上有来源说明条`).toHaveCount(1)
+    await expect(ribbon).toHaveText('信息以标注的来源为准；投递、预约请前往来源平台办理。')
+    await expect(ribbon).toHaveAttribute('role', 'note')
+    await page.screenshot({ path: testInfo.outputPath(`source-guidance${url.replaceAll('/', '-')}.png`), fullPage: false })
+    await expect(page.locator('body')).not.toContainText(/私有化部署版|我方云上不出现|不得用于对外宣传/)
   }
   await page.goto('/')
   await expect(page.getByTestId('qx-home')).toBeVisible()

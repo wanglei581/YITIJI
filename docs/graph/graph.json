@@ -13609,7 +13609,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 802,
+      "reachableFileCount": 808,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -16737,6 +16737,7 @@
             "apps/kiosk/src/pages/print-scan/styles/tool-touch.css",
             "apps/kiosk/src/pages/scan/styles/scan-fs.css",
             "apps/kiosk/src/pages/scan/styles/scan-result-viewer-qx.css",
+            "apps/kiosk/src/pages/scan/styles/scan-takeaway-qx.css",
             "apps/kiosk/src/pages/scan/styles/scan-workbench-compact-qx.css",
             "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
@@ -16958,7 +16959,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 904
+      "sourceFileCount": 910
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -21552,6 +21553,7 @@
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/components/SettingsConfirm.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
@@ -22187,6 +22189,9 @@
     ],
     "apps/kiosk/src/pages/resume/resume-triage-qx.css": [
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/resumeGenerateDraft.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
     "apps/kiosk/src/pages/resume/self-assessment-lightflow.css": [
       "services/api/scripts/verify-compliance.ts"
@@ -22848,6 +22853,9 @@
     ],
     "apps/kiosk/tests/visual/fusion-w6-routes.spec.ts": [
       "apps/kiosk/scripts/verify-fusion-w6.mjs"
+    ],
+    "apps/kiosk/tests/visual/kiosk-desktop-stage-fit.spec.ts": [
+      "apps/kiosk/scripts/verify-fusion-shell.mjs"
     ],
     "apps/kiosk/tests/visual/print-done-truth.spec.ts": [
       "apps/kiosk/scripts/verify-print-done-truth.mjs"
@@ -24573,6 +24581,7 @@
       "services/api/scripts/verify-upload-sessions-bind.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions-member-file.ts",
+      "services/api/scripts/verify-upload-sessions-signature.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ],
     "services/api/scripts/unpublish-demo-companies.ts": [
@@ -26399,7 +26408,8 @@
       "services/api/scripts/verify-document-conversion.ts",
       "services/api/scripts/verify-file-display-truth.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
-      "services/api/scripts/verify-member-data-export-files.ts"
+      "services/api/scripts/verify-member-data-export-files.ts",
+      "services/api/scripts/verify-upload-sessions-signature.ts"
     ],
     "services/api/src/files/file.types.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
@@ -26408,7 +26418,8 @@
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-member-data-export-files.ts",
       "services/api/scripts/verify-member-data-retention.ts",
-      "services/api/scripts/verify-upload-sessions-member-file.ts"
+      "services/api/scripts/verify-upload-sessions-member-file.ts",
+      "services/api/scripts/verify-upload-sessions-signature.ts"
     ],
     "services/api/src/files/files.cleanup.task.ts": [
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
@@ -26484,6 +26495,7 @@
       "services/api/scripts/verify-file-retention.ts",
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-resume-generate.ts",
+      "services/api/scripts/verify-upload-sessions-signature.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ],
     "services/api/src/files/signing.ts": [
@@ -26508,6 +26520,7 @@
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
       "services/api/scripts/verify-resume-export-label.ts",
+      "services/api/scripts/verify-upload-sessions-signature.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
@@ -28241,6 +28254,7 @@
       "apps/kiosk/scripts/verify-scan-session-truth.mjs",
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts",
+      "services/api/scripts/verify-scan-deliver-filename.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-throttle-dimension.ts"
     ],
@@ -28653,6 +28667,10 @@
       "services/api/scripts/verify-multipart-field-nesting.ts",
       "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions.ts"
+    ],
+    "services/api/src/upload-sessions/upload-sessions.dto.ts": [
+      "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
+      "services/api/scripts/verify-upload-sessions-signature.ts"
     ],
     "services/api/src/upload-sessions/upload-sessions.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -30343,6 +30361,7 @@
           "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/tests/visual/fixtures/fusion-w6-route-cases.ts",
+          "apps/kiosk/tests/visual/kiosk-desktop-stage-fit.spec.ts",
           "packages/ui/src/layouts/KioskLayout.tsx"
         ],
         "missing": []
@@ -31095,6 +31114,7 @@
           "apps/kiosk/src/pages/resume/aiResumeSession.ts",
           "apps/kiosk/src/pages/resume/components/ResumeVoiceInputButton.tsx",
           "apps/kiosk/src/pages/resume/jobMaterialDraft.ts",
+          "apps/kiosk/src/pages/resume/resumeGenerateDraft.ts",
           "apps/kiosk/src/pages/resume/selfAssessmentSession.ts",
           "apps/kiosk/src/pages/resume/touch/OptimizeEditView.tsx",
           "apps/kiosk/src/pages/scan/scanWorkbenchModel.ts",
@@ -31211,6 +31231,7 @@
           "apps/kiosk/src/pages/print/PrintDonePage.tsx",
           "apps/kiosk/src/pages/profile/ProfilePage.tsx",
           "apps/kiosk/src/pages/profile/me/MySettingsPage.tsx",
+          "apps/kiosk/src/pages/profile/me/components/SettingsConfirm.tsx",
           "apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/src/services/terminalAuth.ts",
@@ -32837,7 +32858,9 @@
     {
       "asserts": {
         "absent": [],
-        "dirs": [],
+        "dirs": [
+          "apps/kiosk/src/pages/renshi"
+        ],
         "files": [
           "apps/kiosk/src/pages/home/serviceGroups.ts",
           "apps/kiosk/src/pages/renshi/NoticePanel.tsx",
@@ -32992,7 +33015,8 @@
           "apps/kiosk/src/pages/upload/phoneUploadModel.ts",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/src/services/api/uploadSessions.ts",
-          "apps/kiosk/src/services/files/usbImportApi.ts"
+          "apps/kiosk/src/services/files/usbImportApi.ts",
+          "services/api/src/upload-sessions/upload-sessions.dto.ts"
         ],
         "missing": []
       },
@@ -43350,6 +43374,24 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/scan-tasks/scan-tasks.controller.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-scan-deliver-filename.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:scan-tasks"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [
           "services/api/src/terminals"
         ],
@@ -44228,6 +44270,29 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-upload-sessions-member-file.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:upload-sessions"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/upload-session-verifier.ts",
+          "services/api/src/files/file-validation.ts",
+          "services/api/src/files/file.types.ts",
+          "services/api/src/files/retention-policy.ts",
+          "services/api/src/files/signing.ts",
+          "services/api/src/upload-sessions/upload-sessions.dto.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-upload-sessions-signature.ts",
       "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",

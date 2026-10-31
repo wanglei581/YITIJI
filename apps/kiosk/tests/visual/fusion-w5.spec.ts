@@ -314,6 +314,103 @@ test('home device offline state does not invent paper toner or scanner telemetry
   await expectFusionAcceptance(page, errors)
 })
 
+// 10/29 走查 I-31：首页对「打印机离线」「后端断了」不预告。机器状态每 60 秒才读一次，人在首页看着的时候，
+// 打印机掉线或服务断了，页头还写「打印机在线」要等最长一分钟；服务断了时打印磁贴还写「上传与文件加工仍可用」，那也是假的。
+// 现在：状态读得更勤（20 秒）、进首页那一刻立即读一次、请求 8 秒不回就算连不上，连不上时如实写「服务暂时连不上」。
+const HOME_STATUS_POLL_MS = 20_000
+type StatusReply = { status: number; json: unknown } | { abort: 'connectionrefused' } | 'hang'
+
+function registerSwitchableStatus(api: ApiRouter): { set: (next: StatusReply) => void } {
+  let reply: StatusReply = { status: 200, json: { printerStatus: 'ready', isOnline: true } }
+  api.respondWith('GET', '/api/v1/terminals/KSK-001/printer-status', () => (
+    reply === 'hang' ? new Promise(() => {}) : reply
+  ))
+  return { set: (next) => { reply = next } }
+}
+
+const homePill = (page: Page): Locator => page.locator('.qxt-band .qxt-status')
+
+test('home foretells a printer that drops offline while the page is open, within one short poll @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  const status = registerSwitchableStatus(api)
+  registerHomeApi(api, [])
+  await page.clock.install()
+  await page.goto('/')
+  await expect(homePill(page)).toHaveText('打印机在线')
+  await freezeClock(page)
+
+  status.set({ status: 200, json: { printerStatus: 'offline', isOnline: false } })
+  await page.clock.runFor(HOME_STATUS_POLL_MS + 1_000)
+  await expect(homePill(page)).toHaveText('打印机离线')
+  await expect(page.locator('[data-home-device-panel]')).toHaveAttribute('data-panel-state', 'offline')
+  await expect(page.locator('[data-home-device-panel]').getByText('打印机离线', { exact: true })).toBeVisible()
+  expect(errors).toEqual([])
+})
+
+test('home says the service cannot be reached when the status request fails, and recovers on the next poll @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  const status = registerSwitchableStatus(api)
+  registerHomeApi(api, [])
+  await page.clock.install()
+  await page.goto('/')
+  await expect(homePill(page)).toHaveText('打印机在线')
+  await freezeClock(page)
+
+  status.set({ abort: 'connectionrefused' })
+  await page.clock.runFor(HOME_STATUS_POLL_MS + 1_000)
+  const panel = page.locator('[data-home-device-panel]')
+  await expect(homePill(page)).toHaveText('服务暂时连不上')
+  await expect(panel).toHaveAttribute('data-panel-state', 'unreachable')
+  await expect(panel.getByText('服务暂时连不上', { exact: true })).toBeVisible()
+  await expect(panel).toContainText('打印、扫描和传文件暂不开放')
+  // 服务连不上时，上传和文件加工一样用不了：不得再说「仍可用」。
+  await expect(panel).not.toContainText('仍可用')
+
+  status.set({ status: 200, json: { printerStatus: 'ready', isOnline: true } })
+  await page.clock.runFor(HOME_STATUS_POLL_MS + 1_000)
+  await expect(homePill(page)).toHaveText('打印机在线')
+  await expect(panel).not.toContainText('服务暂时连不上')
+  expect(errors).toEqual([])
+})
+
+test('a hung status request is cut off after 8 seconds instead of leaving the home on a stale answer @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  const status = registerSwitchableStatus(api)
+  registerHomeApi(api, [])
+  await page.clock.install()
+  await page.goto('/')
+  await expect(homePill(page)).toHaveText('打印机在线')
+  await freezeClock(page)
+
+  status.set('hang')
+  await page.clock.runFor(HOME_STATUS_POLL_MS + 9_000)
+  await expect(homePill(page)).toHaveText('服务暂时连不上')
+  expect(errors).toEqual([])
+})
+
+test('entering the home re-reads the device status at once, not at the next poll @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  const status = registerSwitchableStatus(api)
+  registerHomeApi(api, [])
+  await page.goto('/help')
+  await expect(page.locator('[data-kiosk-screen="help"]')).toBeVisible()
+
+  // 人在帮助页的时候，打印机掉线了；下一次轮询还早。回首页那一刻就该读到。
+  status.set({ status: 200, json: { printerStatus: 'offline', isOnline: false } })
+  await page.evaluate(() => {
+    const state = { ...(window.history.state ?? {}), key: 'i31-home-reenter', usr: null }
+    window.history.pushState(state, '', '/')
+    window.dispatchEvent(new PopStateEvent('popstate', { state }))
+  })
+  await expect(page).toHaveURL(/\/$/)
+  await expect(homePill(page)).toHaveText('打印机离线')
+  expect(errors).toEqual([])
+})
+
 test('profile permission state uses the canonical fusion shell @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerKioskShell(api)
@@ -798,7 +895,7 @@ test('direct visit to /session-timeout without a pending warning fails closed to
 
   await page.goto('/session-timeout')
 
-  await expect(page).toHaveURL('http://127.0.0.1:4185/', { timeout: 5_000 })
+  await expect(page).toHaveURL((url) => url.pathname === '/', { timeout: 5_000 })
   await expect(page.locator('[data-kiosk-screen="session-timeout"]')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /我还在，继续使用/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '结束并清除这台机器上的这次使用记录', exact: true })).toHaveCount(0)
@@ -864,32 +961,75 @@ test('offline page retains the 8177 state after an aborted health request @w5-ki
   registerKioskShell(api)
   api.abort('GET', '/api/v1/health', 'internetdisconnected')
   await page.goto('/error-offline')
+  await expect(page.getByTestId('system-state-state-offline')).toBeVisible()
   await page.getByRole('button', { name: '重新检测', exact: true }).click()
   await expect(page).toHaveURL(/\/error-offline$/)
   // 触屏稿 09：屏上只说各项读到没读到，不写重测次数和秒数；次数只留给读屏（.qxp-sr），状态没丢。
-  await expect(page.getByTestId('system-state-auto')).toContainText('已重试 1 次')
+  await expect(page.getByTestId('system-state-auto')).toContainText('已重试 2 次')
   await expectFusionAcceptance(page, errors)
 })
 
-test('offline page follows a recovered health response in a fresh page @w5-kiosk', async ({ page, api }) => {
+test('device status checks immediately and keeps healthy readings on this page @w5-kiosk', async ({ page, api }, testInfo) => {
   const errors = runtimeErrors(page)
   registerKioskShell(api)
-  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
-    status: 200,
-    json: terminalConfig({ enabled: false, items: [] }),
+  api.respond('GET', '/api/v1/health', { status: 200, json: { data: { status: 'ok' } } })
+  api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
+    status: 200, json: { data: { isOnline: true, printerStatus: 'ready', scanInputHealth: 'healthy' } },
   })
-  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
-  api.respond('GET', '/api/v1/job-fairs', {
-    status: 200,
-    json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
-  })
-  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
   await page.goto('/error-offline')
-  await expect(page.locator('[data-kiosk-screen="error-offline"]')).toBeVisible()
-  await expectFusionAcceptance(page, errors)
+  await expect(page.locator('[data-cap="printer"]')).toContainText('这次读到可用')
+  await expect(page.locator('[data-cap="scan"]')).toContainText('这次读到可接收')
+  await expect(page).toHaveURL(/\/error-offline$/)
   await page.getByRole('button', { name: '重新检测', exact: true }).click()
-  await page.waitForURL((url) => url.pathname === '/')
+  await expect(page.locator('[data-cap="printer"]')).toContainText('这次读到可用')
+  await expect(page).toHaveURL(/\/error-offline$/)
   await expectFusionAcceptance(page, errors)
+  await page.screenshot({ path: testInfo.outputPath('device-status.png'), fullPage: true })
+})
+
+for (const reading of [
+  { online: true, health: 'locked_out', expected: '暂停接收' },
+  { online: true, health: null, expected: '暂时读不到' },
+  { online: true, health: 'unrecognised', expected: '暂时读不到' },
+  { online: false, health: 'healthy', expected: '暂时读不到' },
+]) {
+  test(`device status scan verdict uses fresh explicit health ${reading.online}-${reading.health} @w5-kiosk`, async ({ page, api }) => {
+    registerKioskShell(api)
+    api.respond('GET', '/api/v1/health', { status: 200, json: { data: { status: 'ok' } } })
+    api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
+      status: 200, json: { data: { isOnline: reading.online, printerStatus: 'ready', scanInputHealth: reading.health } },
+    })
+    await page.goto('/error-offline')
+    await expect(page.getByTestId('system-state-state-partial')).toBeVisible()
+    await expect(page.locator('[data-cap="scan"]')).toContainText(reading.expected)
+    if (!reading.online) await expect(page.locator('[data-cap="agent"]')).toContainText('暂时读不到')
+    await expect(page).toHaveURL(/\/error-offline$/)
+  })
+}
+
+test('device status preserves an explicit fault return destination after recovery @w5-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  api.abort('GET', '/api/v1/health', 'internetdisconnected')
+  await page.goto('/error-offline')
+  await expect(page.getByTestId('system-state-state-offline')).toBeVisible()
+  await page.evaluate(() => window.history.replaceState({ usr: { from: '/help' }, key: 'fault-return' }, '', '/error-offline'))
+  api.respond('GET', '/api/v1/health', { status: 200, json: { data: { status: 'ok' } } })
+  await page.reload()
+  await expect(page).toHaveURL(/\/help$/)
+})
+
+test('device status times out an unresponsive probe and allows manual recovery @w5-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  api.respondWith('GET', '/api/v1/health', () => new Promise(() => {}))
+  await page.clock.install()
+  await page.goto('/error-offline')
+  await expect(page.getByTestId('system-state-state-checking')).toBeVisible()
+  await page.clock.runFor(5_100)
+  await expect(page.getByTestId('system-state-state-offline')).toBeVisible()
+  api.respond('GET', '/api/v1/health', { status: 200, json: { data: { status: 'ok' } } })
+  await page.getByRole('button', { name: '重新检测', exact: true }).click()
+  await expect(page.locator('[data-cap="network"]')).toContainText('这次连得上')
+  await expect(page).toHaveURL(/\/error-offline$/)
 })
 
 test('offline page backs off its automatic re-checks and resets on the online event @w5-kiosk', async ({ page, api }) => {
@@ -899,12 +1039,11 @@ test('offline page backs off its automatic re-checks and resets on the online ev
   registerKioskShell(api)
   api.abort('GET', '/api/v1/health', 'internetdisconnected')
   await page.clock.install()
-  await page.goto('/error-offline')
-  await expect(page.getByTestId('system-state-state-unknown')).toBeVisible()
+  // 进页立即发起探测；先冻结时钟，避免页面加载耗时吃掉首次20秒退避窗口。
   await freezeClock(page)
-  expect(api.requestCount('GET', '/api/v1/health')).toBe(0)
-
-  await page.clock.runFor(10_000)
+  await page.goto('/error-offline')
+  await expect(page.getByTestId('system-state-state-offline')).toBeVisible()
+  expect(api.requestCount('GET', '/api/v1/health')).toBe(1)
   await expect(page.locator('.qxp-sr', { hasText: '已重试 1 次，约 20 秒后自动再试' })).toBeAttached()
   await expect(page.getByText('约 20 秒后自动再试')).toBeHidden()
   await page.clock.runFor(19_000)
@@ -932,10 +1071,8 @@ test('offline page aborts its in-flight probe when the user leaves the page @w5-
   api.respondWith('GET', '/api/v1/health', () => new Promise(() => {}))
   await page.clock.install()
   await page.goto('/error-offline')
-  await expect(page.getByTestId('system-state-state-unknown')).toBeVisible()
-  await freezeClock(page)
-  await page.getByRole('button', { name: '重新检测', exact: true }).click()
   await expect(page.getByTestId('system-state-state-checking')).toBeVisible()
+  await freezeClock(page)
   const aborted = page.waitForEvent('requestfailed', {
     predicate: (request) => new URL(request.url()).pathname === '/api/v1/health',
     timeout: 3_000,
@@ -1045,6 +1182,68 @@ test('phone upload does not call an uploaded status without a file receipt succe
   })
   await expect(root).toHaveAttribute('data-phone-upload-state', 'outcome-unknown')
   await expect(root.getByRole('heading', { name: '已收到', exact: true })).toHaveCount(0)
+})
+
+// 走查 I-14：一体机「签名」第 2 步的二维码现在能开出 signature_image 会话（后端 DTO 放行了），
+// 手机页因此要真的收签名图：只放行 JPG / PNG、被拒时不叫人转 PDF、回执认 signature_image，不再有「手机端不可用」的死胡同。
+test('phone upload takes a handwritten-signature image: JPG/PNG only, honest refusals, receipt purpose is signature_image @w5-mobile', async ({ page, api }, testInfo) => {
+  const errors = runtimeErrors(page)
+  api.respond('GET', '/api/v1/document-conversion/capabilities', {
+    status: 200, json: { data: { wordToPdf: true, engine: 'libreoffice', cjkFonts: true } },
+  })
+  api.respond('POST', '/api/v1/upload-sessions/w5-sign-session/files', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        sessionId: 'w5-sign-session', status: 'uploaded', purpose: 'signature_image', mode: 'member',
+        file: { fileId: 'w5-sign-file', filename: '手写签名.png', sizeBytes: 120, mimeType: 'image/png', sha256: 'c'.repeat(64), fileExpiresAt: '2026-10-29T13:00:00.000Z' },
+        requiresKioskConfirmation: true, expiresAt: '2026-10-29T12:10:00.000Z',
+      },
+    },
+  })
+  await page.goto('/upload/phone#sessionId=w5-sign-session&token=w5-sign-upload-token&purpose=signature_image')
+  const root = page.locator('main[data-kiosk-screen="phone-upload"]')
+  await expect(root).toHaveAttribute('data-phone-upload-state', 'idle')
+  await expect(root.getByText('本人手写签名暂不支持手机上传')).toHaveCount(0)
+  await expect(root.getByRole('heading', { name: '这个链接不能用来上传', exact: true })).toHaveCount(0)
+  // 链接写着是签名图：只收紧到 JPG / PNG（Word 转换开着也不放行 Word、PDF、WebP）
+  const input = root.getByLabel('选择要上传的文件')
+  await expect(input).toHaveAttribute('accept', '.jpg,.jpeg,.png,image/jpeg,image/png')
+  const chips = root.locator('.ph-up-hint')
+  await expect(chips).toContainText('支持 JPG / PNG')
+  await expect(root.getByText('链接里写着这次可能是「本人手写签名图片」', { exact: false })).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('phone-upload-signature-ready-390.png'), animations: 'disabled' })
+  // 选了 PDF：手机上就拦下，说的是签名图只收 JPG / PNG，不叫人把签名图转成 PDF
+  await input.setInputFiles({ name: '合同.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w5-sign-fixture') })
+  await expect(root).toHaveAttribute('data-phone-upload-state', 'type-error')
+  await page.screenshot({ path: testInfo.outputPath('phone-upload-signature-refused-390.png'), animations: 'disabled' })
+  await expect(root.getByText('签名图片只收', { exact: false })).toBeVisible()
+  await expect(root.getByText('转成 PDF', { exact: false })).toHaveCount(0)
+  expect(api.requestCount('POST', '/api/v1/upload-sessions/w5-sign-session/files')).toBe(0)
+  // 换一张 PNG：发出去，回执用途 signature_image 才算已收到
+  await input.setInputFiles({ name: '手写签名.png', mimeType: 'image/png', buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) })
+  await expect(root).toHaveAttribute('data-phone-upload-state', 'success')
+  await expect(root).toHaveAttribute('data-purpose', 'signature_image')
+  await expect(root.getByRole('heading', { name: '已收到', exact: true })).toBeVisible()
+  await expect(root.getByText('这次上传用于', { exact: false })).toContainText('本人手写签名图片')
+  await expect(root.getByText('1 小时', { exact: false }).first()).toBeVisible()
+  await expect(root.getByText('w5-sign-upload-token')).toHaveCount(0)
+  await expectFusionAcceptance(page, errors, { allowNoTouchTargets: true })
+})
+
+// 链接里的用途提示只能收紧、不能放宽：没写签名的链接上 PDF 照常能传，签名提示不会拖累简历 / 打印。
+test('phone upload keeps PDF selectable on document links; only a signature hint narrows to images @w5-mobile', async ({ page, api }) => {
+  api.respond('GET', '/api/v1/document-conversion/capabilities', {
+    status: 200, json: { data: { wordToPdf: false, engine: 'none', cjkFonts: false } },
+  })
+  await page.goto('/upload/phone#sessionId=w5-doc-session&token=w5-doc-token&purpose=print_doc')
+  const root = page.locator('main[data-kiosk-screen="phone-upload"]')
+  const accept = await root.getByLabel('选择要上传的文件').getAttribute('accept')
+  expect(accept).toContain('.pdf')
+  expect(accept).toContain('.png')
+  await page.goto('/upload/phone#sessionId=w5-doc-session&token=w5-doc-token')
+  expect(await root.getByLabel('选择要上传的文件').getAttribute('accept')).toContain('.pdf')
 })
 
 const CTA_WHITELIST = ['查看岗位', '去来源平台投递', '扫码投递', '查看招聘会', '去来源平台预约', '扫码预约', '复制来源链接']

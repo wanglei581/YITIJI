@@ -377,6 +377,7 @@ export function FileSourceView(props: FileSourceViewProps) {
             showFileChannel={showFileChannel}
             showScan={showScan}
             usbMode={usbMode}
+            usbHold={usbHold}
             wordText={conversionReason ?? wordHint}
             miniappLine={miniappLine}
             onSelectChannel={onSelectChannel}

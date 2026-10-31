@@ -14,6 +14,7 @@
 import { AlertCircleIcon, FileTextIcon } from 'lucide-react'
 import { PrintFillArt } from '../art/PrintFillArt'
 import { FailSteps, FailSummary } from './PrintFailParts'
+import { CONTACT_ENTRY_LABEL } from './printContactEntry'
 import type { FailureStep, SummaryRow } from './printDoneFailedModel'
 
 export interface PrintJobState {
@@ -75,12 +76,14 @@ export function PrintJobRow({ fileName, subline, idLine, state }: {
 }
 
 /** 查询超时：三步 + 摘要 + 使用帮助 + 小字。「重新查询状态」是触屏底栏的主键。 */
-export function PrintStatusTimeoutPanel({ steps, stepsLabel, rows, fine, onHelp }: {
+export function PrintStatusTimeoutPanel({ steps, stepsLabel, rows, fine, onHelp, onContact }: {
   steps: FailureStep[]
   stepsLabel: string
   rows: SummaryRow[]
   fine: string
   onHelp: () => void
+  /** 没配服务电话时才传：打开隐私政策里的联系方式（走查 I-11）。 */
+  onContact?: () => void
 }) {
   return (
     <>
@@ -89,6 +92,9 @@ export function PrintStatusTimeoutPanel({ steps, stepsLabel, rows, fine, onHelp 
       <FailSummary rows={rows} testId="print-fulfill-list" compact={false} />
       <div className="qxt-exits pft-unc-exits pft-fail-exits">
         <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={onHelp}>使用帮助</button>
+        {onContact ? (
+          <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit pft-contact-entry" data-testid="print-contact-entry" onClick={onContact}>{CONTACT_ENTRY_LABEL}</button>
+        ) : null}
       </div>
       <p className="pft-unc-fine qxt-fine" data-testid="print-fulfill-fallback">{fine}</p>
       <PrintFillArt name="stack" />

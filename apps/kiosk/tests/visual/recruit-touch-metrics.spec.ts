@@ -2,7 +2,7 @@
 //
 // 招聘页只在托管打开（客户私有化部署）时才挂载；ApiRouter 默认按「托管打开」应答，所以这里直接进页。
 // 对每个页面和主要状态量同一组指标，防止回到「只换外框、正文原样」或者悄悄退回旧壳：
-//   · 顶上有私有化版标识条，文字逐字照稿；
+//   · 顶上有面向使用者的来源说明，不显示内部部署口径；
 //   · 底导航三项（首页 / AI 顾问 / 我的）始终在，底栏里恰好一个问小青、文字逐屏照稿；
 //   · 底栏所有按钮同在一行、都在屏内，主按钮高 88，问小青不被挤得只剩话筒；
 //   · 屏上没有小于 20px 的字，没有小于 64×64 的可点区；
@@ -19,7 +19,7 @@ import { registerW6Api } from './fixtures/fusion-w6-api'
 import { registerFairApi, makeFair, FAIR_ID } from './fixtures/fair-workbench-api'
 import { manyCompanies, manyAgencies, agencyWithJobs, manyJobs, companyJobs, fairCompanies, fairCompanyWithPositions, manyFairs } from './fixtures/recruit-many-rows'
 
-const RIBBON = '私有化部署版 · 仅供持有人力资源服务许可证的客户自行运营 · 我方云上不出现 · 不得用于对外宣传'
+const RIBBON = '信息以标注的来源为准；投递、预约请前往来源平台办理。'
 const FORBIDDEN_STAFF = /联系现场|联系工作人员|找现场|找工作人员|交给.{0,2}工作人员|去服务台|工作人员核查/
 const boom = { status: 500, json: { success: false, error: { code: 'INTERNAL_ERROR', message: 'boom' } } }
 const notFound = { status: 404, json: { success: false, error: { code: 'NOT_FOUND', message: 'not found' } } }
@@ -274,6 +274,7 @@ for (const c of CASES) {
     await page.goto(c.url)
     await expect(page.locator('[data-qxt-screen]')).toHaveCount(1)
     await expect(page.getByTestId('recruit-private-ribbon')).toHaveText(RIBBON)
+    await expect(page.locator('body')).not.toContainText(/私有化部署版|我方云上不出现|不得用于对外宣传/)
     await expect(page.locator('.qxt-nav button')).toHaveCount(3)
     await expect(page.locator('.qxt-dock .qxt-askq')).toHaveCount(1)
     await page.waitForLoadState('networkidle')

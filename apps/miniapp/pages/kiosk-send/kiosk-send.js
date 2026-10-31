@@ -29,6 +29,9 @@ const { userMessageOf } = require('../../utils/user-error')
 
 const {
   MAX_BYTES,
+  isSessionPurpose,
+  normalizeSignatureFile,
+  signatureFileIssue,
   receiptAccepted,
   statusOf,
   isAuthError,
@@ -67,6 +70,7 @@ Page({
   data: {
     statusBarHeight: 20,
     sessionId: '',
+    purpose: '',
     // 'idle' | 'resolving' | 'uploading' | 'done' | 'unknown' | 'error'
     phase: 'idle',
     // 码失效（兑换说 UNUSABLE）：不提供重试
@@ -85,6 +89,7 @@ Page({
   },
 
   onLoad(options) {
+    this._disposed = false
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
     const opts = options || {}
     // 令牌和 scene 只留在内存，不进 data —— data 会随页面栈快照走，没必要让它们多待一层。
@@ -129,7 +134,11 @@ Page({
   },
 
   onUnload() {
-    // 晚到的兑换和列表不再落到已经关掉的页面上
+    // 退出后作废兑换、列表和上传回调；已发送请求的服务端结果仍由一体机核对。
+    this._disposed = true
+    this._sendAttempt = (this._sendAttempt || 0) + 1
+    this._uploadToken = ''
+    if (this.data.phase === 'uploading') wx.hideLoading()
     this._resolveAttempt = (this._resolveAttempt || 0) + 1
     this._docsFlow = (this._docsFlow || 0) + 1
     this._scene = ''
@@ -160,10 +169,11 @@ Page({
   },
 
   /** 连上这一单：令牌进内存，列「我的文档」。 */
-  _connect(sessionId, uploadToken) {
+  _connect(sessionId, uploadToken, purpose) {
     this._uploadToken = uploadToken
     this.setData({
       sessionId,
+      purpose: isSessionPurpose(purpose) ? purpose : '',
       phase: 'idle',
       sceneFailed: false,
       resolveRetry: false,
@@ -190,7 +200,7 @@ Page({
         const uploadToken = res && typeof res.uploadToken === 'string' ? res.uploadToken : ''
         // 回执不完整：码可能还好好的（同一张码可以再兑换），给重试
         if (!sessionId || !uploadToken) this._resolveFailed(true, null)
-        else this._connect(sessionId, uploadToken)
+        else this._connect(sessionId, uploadToken, res.purpose)
       },
       (err) => {
         if (attempt !== this._resolveAttempt) return
@@ -238,6 +248,10 @@ Page({
     this._gen = gen
     this._docsLoggedIn = auth.isLoggedIn()
     const base = { docs: [], docTruncated: false, docNote: note || '' }
+    if (this.data.purpose === 'signature_image') {
+      this.setData(Object.assign(base, { docState: 'empty' }))
+      return
+    }
     if (this._memberBlocked) {
       this.setData(Object.assign(base, { docState: 'blocked', docNote: MEMBER_MISMATCH_COPY }))
       return
@@ -292,7 +306,7 @@ Page({
     if (this._sendBlocked()) return
     wx.chooseMessageFile({
       count: 1,
-      type: 'file',
+      type: this.data.purpose === 'signature_image' ? 'image' : 'file',
       success: (res) => {
         const file = (res.tempFiles || [])[0]
         if (!file) return
@@ -316,6 +330,7 @@ Page({
   },
 
   _sendBlocked() {
+    if (this._disposed) return true
     const phase = this.data.phase
     if (phase === 'uploading' || phase === 'done' || phase === 'unknown' || phase === 'resolving') return true
     if (phase === 'error' && !this.data.canRetry) return true
@@ -325,7 +340,7 @@ Page({
 
   /** 从「我的文档」递：只在连上、空闲、列表可选、账号没变时可以。 */
   _memberSendBlocked() {
-    if (this._sendBlocked() || this.data.phase !== 'idle') return true
+    if (this._sendBlocked() || this.data.phase !== 'idle' || this.data.purpose === 'signature_image') return true
     if (this._memberBlocked || this.data.docState !== 'list') return true
     return !auth.isLoggedIn() || !auth.isSameSession(this._gen)
   },
@@ -341,6 +356,12 @@ Page({
 
   _send(file) {
     if (this._sendBlocked()) return
+    if (this.data.purpose === 'signature_image') file = normalizeSignatureFile(file)
+    const issue = this.data.purpose === 'signature_image' ? signatureFileIssue(file) : ''
+    if (issue) {
+      this.setData({ phase: 'error', canRetry: true, errorMsg: issue })
+      return
+    }
     const attempt = (this._sendAttempt || 0) + 1
     this._sendAttempt = attempt
     const sessionId = this.data.sessionId
@@ -350,7 +371,7 @@ Page({
       .then((body) => {
         if (attempt !== this._sendAttempt) return
         wx.hideLoading()
-        if (!receiptAccepted(body, sessionId)) {
+        if (!receiptAccepted(body, sessionId, this.data.purpose)) {
           this.setData({ phase: 'unknown', canRetry: false, errorMsg: UNKNOWN_COPY })
           return
         }
@@ -392,7 +413,7 @@ Page({
       (body) => {
         if (attempt !== this._sendAttempt) return
         wx.hideLoading()
-        if (!receiptAccepted(body, sessionId)) {
+        if ((body && body.purpose === 'signature_image') || !receiptAccepted(body, sessionId, this.data.purpose)) {
           this.setData({ phase: 'unknown', canRetry: false, errorMsg: UNKNOWN_COPY })
           return
         }

@@ -18,6 +18,7 @@ import {
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
 import { FsRow } from '../print-scan/FsRow'
+import { ScanTakeawayExit, ScanTakeawayLayer, TAKEAWAY_ALLOWED } from './ScanTakeaway'
 import { scanShownText } from './scanShownText'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
@@ -113,6 +114,9 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
   // 整屏预览只是这一屏的视图状态：不进地址、不进历史、不落存储。
   const [previewOpen, setPreviewOpen] = useState(false)
   const closePreview = useCallback(() => setPreviewOpen(false), [])
+  // 游客扫码带走电子版（走查 I-15）：同样只是这一屏的视图状态，不进地址、不进历史、不落存储。
+  const [takeawayOpen, setTakeawayOpen] = useState(false)
+  const closeTakeaway = useCallback(() => setTakeawayOpen(false), [])
 
   /**
    * 登记这一场可能存在的重扫授权。幂等（同一场不会重新计时），所以可以被调用两次：
@@ -477,6 +481,8 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
             <small>先检查文件和个人信息，再选打印参数。金额由系统报价决定，本页不给价格。</small>
           </span>
         </button>
+        {/* 游客的扫描件事后补不进账号，要电子版只有当场扫码带走（走查 I-15）；登录用户的在「我的文档」里。 */}
+        {isLoggedIn || !file ? null : <ScanTakeawayExit scanType={scanType} onOpen={() => setTakeawayOpen(true)} />}
         <button
           type="button"
           className={`sw-exit${file && isLoggedIn ? '' : ' is-off'}`}
@@ -492,7 +498,7 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
             <small>
               {isLoggedIn
                 ? '在「我的文档」查看与管理本次扫描件'
-                : '未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别'}
+                : '未登录扫描件不会进入「我的文档」。要留在账号里：先登录，再重新扫一次。'}
             </small>
           </span>
         </button>
@@ -500,6 +506,9 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
       <p className="fs-p fs-foot">还没选下一步的临时文件，会按保存规则清理。扫完请取回原件。</p>
       {previewOpen && file ? (
         <ScanResultPreviewViewer file={file} formatLabel={displayFormat} onClose={closePreview} />
+      ) : null}
+      {takeawayOpen && file && !isLoggedIn && TAKEAWAY_ALLOWED[scanType] ? (
+        <ScanTakeawayLayer fileName={file.name} fileUrl={file.fileUrl} onClose={closeTakeaway} />
       ) : null}
       </div>
     </ScanWorkbenchShell>

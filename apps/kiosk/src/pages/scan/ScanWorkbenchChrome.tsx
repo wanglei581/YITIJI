@@ -218,7 +218,8 @@ export function ScanTypeCards({
   selected,
   onPick,
 }: {
-  selected: ScanType
+  /** null = 还没选（扫描类型进来不预选，走查 I-16）。 */
+  selected: ScanType | null
   onPick: (type: ScanType) => void
 }) {
   return (

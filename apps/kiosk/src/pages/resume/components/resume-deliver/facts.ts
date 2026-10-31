@@ -28,6 +28,13 @@ export function extractConfirmableFacts(resume: GeneratedResume): ConfirmableFac
   return facts
 }
 
+/**
+ * 「待本人确认」那一行下面对人说的话（走查 I-21：「待本人确认：负责、1500、0.5%」普通人读不懂）。
+ * 这几处是 AI 整理时新写进去的数和职责词，本机无从判断真假，只有本人知道，所以要本人核对。预览页、导出前核对弹层、
+ * 优化页编辑屏三处共用这一句。
+ */
+export const UNCONFIRMED_WHY = 'AI 整理时新写进了这几处，你原来的内容里没有。请核对是不是你的实际情况；不是，就改掉或删掉再导出。'
+
 const DIGIT_RE = /\d+(?:\.\d+)?%?/g
 const DUTY_WORDS = ['主导', '负责', '带领', '季度之星'] as const
 
