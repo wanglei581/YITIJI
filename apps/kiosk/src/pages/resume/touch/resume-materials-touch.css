@@ -116,3 +116,13 @@
 /* 生成结果属于当前办理，直接放在内容区开头，长信息仍允许随内容区滚动。 */
 .qx-resume-materials .qxt-screen .qx-rm-result { display: flex; flex-direction: column; gap: 14px; }
 .qx-resume-materials .qxt-screen .qx-rm-result > .qx-btn { align-self: flex-start; }
+
+@media (max-width: 600px) {
+  .qx-resume-materials .qxt-screen .qx-rm-result .qx-rm-file-h {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    align-items: start;
+  }
+  .qx-resume-materials .qxt-screen .qx-rm-result .qx-rm-file-art { width: 64px; padding: 6px; }
+  .qx-resume-materials .qxt-screen .qx-rm-result .qx-rm-file-h .badge { grid-column: 2; justify-self: start; }
+}

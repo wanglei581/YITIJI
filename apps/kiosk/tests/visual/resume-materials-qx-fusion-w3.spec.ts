@@ -345,6 +345,7 @@ test('材料生成结果直接可见，返回填写保留全部模板与输入 @
     await expect(action).toBeInViewport()
     await expect(action).not.toHaveAttribute('aria-disabled', 'true')
     await action.click({ trial: true })
+    if (size.width === 390) expect((await card.locator('.tx').boundingBox())!.width, '手机结果标题应有正常阅读宽度').toBeGreaterThanOrEqual(180)
     if (size.width === 1080) expect((await action.boundingBox())!.height).toBeGreaterThanOrEqual(64)
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0)
     await page.screenshot({ path: testInfo.outputPath(`material-result-${size.width}.png`) })
