@@ -492,12 +492,7 @@ if (existsSync(join(ROOT, 'playwright.w3.config.ts'))) {
   for (const env of ['VITE_API_MODE=http', 'VITE_API_BASE_URL=/api/v1', 'VITE_USE_TRTC_CALL=true', 'VITE_ALLOW_TEXT_ONLY_ASSISTANT=false', 'VITE_TERMINAL_ID=KSK-001', 'VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token']) check(config.includes(env), `W3 browser build pins ${env}`)
   for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report', 'advisor artifact eight proto states fit the kiosk stage', 'advisor artifact renders covered evidence as a quotation', 'advisor artifact print-unavailable state has no print button', 'advisor artifact print waits for the server receipt', 'advisor artifact no-artifact shows the three jobs and opens AI records', 'advisor artifact expired offers only a redo', 'advisor artifact content state opens my documents']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
   check(selfAssessmentSpec.includes('自评 PDF 在隐私根内预览且不打开新标签页 @w3-kiosk'), 'W3 browser scenario exists: self-assessment PDF stays inside the privacy root')
-  // I-29 reads both stores only to prove the user's draft was never persisted.
-  // Exempt this exact assertion, not arbitrary storage access; any mutation or
-  // changed callback remains subject to the original no-storage/no-injection gate.
-  const draftPrivacyAssertion = "expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain('恢复验证者')"
-  const interactionSpec = spec.replace(draftPrivacyAssertion, '')
-  for (const forbidden of ['addInitScript', 'localStorage', 'sessionStorage', 'waitForTimeout']) check(!interactionSpec.includes(forbidden), `W3 browser spec avoids ${forbidden}`)
+  for (const forbidden of ['addInitScript', 'localStorage', 'sessionStorage', 'waitForTimeout']) check(!spec.includes(forbidden), `W3 browser spec avoids ${forbidden}`)
 }
 
 if (failures) process.exit(1)

@@ -16,12 +16,13 @@
       <view class="guide-card">
         <text class="guide-icon ficon i-printer"></text>
         <view class="guide-title">已连上终端</view>
-        <view class="guide-desc">选一份文件传过去，终端屏幕上会自己出现。一张码只收一份，单个文件不超过 10MB。</view>
-        <button class="btn-primary" bindtap="chooseAndSend">从微信聊天选文件</button>
+        <view wx:if="{{purpose === 'signature_image'}}" class="guide-desc">选择本人手写签名图片，仅支持 JPG / PNG，单张不超过 10MB。仅供本次签名使用，不会存入「我的文档」。</view>
+        <view wx:else class="guide-desc">选一份文件传过去，终端屏幕上会自己出现。一张码只收一份，单个文件不超过 10MB。</view>
+        <button class="btn-primary" bindtap="chooseAndSend">{{purpose === 'signature_image' ? '从微信聊天选签名图片' : '从微信聊天选文件'}}</button>
       </view>
 
       <!-- 从我的文档选：要登录。去登录再回来，这一单的令牌还在页面内存里 -->
-      <view class="state-card doc-card">
+      <view wx:if="{{purpose !== 'signature_image'}}" class="state-card doc-card">
         <view class="sc-title">从我的文档选</view>
         <view wx:if="{{docNote}}" class="sc-desc">{{docNote}}</view>
         <view wx:if="{{docState === 'login' && !docNote}}" class="sc-desc">登录后可以直接选「我的文档」里已有的文件，不用再从手机传一遍。</view>
