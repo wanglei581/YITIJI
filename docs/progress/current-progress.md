@@ -1,5 +1,18 @@
 # 当前开发进度
 
+## 2026-10-31：触屏目标版发布准备——独立生产只读核查
+
+- 范围与预算：本分支 `codex/touch-release-readiness-20261031` 从干净 `origin/main@55f46065b08b90dfb358f51cd65d7343e735bd18` 建立，仅修改本文件与 next-tasks（2 文件）。对应阻塞为线上版本落后与同版发布证据缺失；不新增入口、模型、服务、依赖，不改四路集成工作树、根目录冲突、业务源码、生产配置、数据库或硬件。服务器仅只读检查，不出纸。方案审查：复用现有 full 发布、备份与回滚流程，先冻结集成目标再跑该 SHA 的门禁，不能用旧候选绿标代替。
+- 2026-10-31 13:57（北京时间）直接 SSH 核验：`/srv/ai-job-print/DEPLOY_SOURCE.txt` 为 `origin/main@9a9563c3759ee35dff3fe9fbb475af15c4f942b8`，部署时间 `2026-10-28T20:28:14+08:00`，CI `40678015681`；GitHub deploy `40687292951` success 与其一致。未取得独立 API_DEPLOY_SOURCE 记录，不据此推断额外 API 发布。
+- PM2 `ai-job-print-api` online，cwd `/srv/ai-job-print/services/api`，入口该目录 `dist/main.js`；nginx 三域名分别指向 `/srv/ai-job-print/apps/{kiosk,admin,partner}/dist`，API 反代 3010。公网 ready 成功，PostgreSQL/Redis/AI 配置/隐私导出调度健康；健康不等于真实 AI 输出或全链路验收。PM2 累计重启 45 次，未核时间原因，不报告为当前故障。
+- 三端 index.html SHA256：kiosk `22000601f8af7528225551dd05eff8082eca6d6326113299907677b885678a4d`；admin `b93cf497587064360858d5984e7d527facbcbba48f95b8b1e300dcab61e14e80`；partner `26c8da6610970a3c6a2681a6090df4bf5d6276873a26ebf19f4d1b20aa70ed3f`。公网三个域名首页的 SHA256 与服务器各自 index.html 完全一致；未声称已与候选构建相同。
+- 当前远程 main 仍为 `55f46065b`。相对线上新增：#1513 机构 AI 成功次数、#1519 小程序扫码/文件库/扫码登录、#1502 官方渠道 audience、#1507 服务联系方式根加载与暂停接单说明、#1517 无人值守共享文案。上述已合并但未部署；旧文档的 #1519 未合并说法是历史状态。
+- 触屏 PR #1497 OPEN、MERGEABLE，head `a035b6d8d92f88be8407d911f4bcad1b0ee63527`。相对 main 未改 API 运行时、后台、小程序或共享包（只有 API verify 脚本小改）；因此发布应同时带上 main 已有跨端能力，不可仅替换触屏静态文件。四路集成还含未提交小程序生命周期修复，不接管、不替其提交。
+- 发布预检：`DEPLOY_API_ENABLED=false`；服务器根分区余 17G（只表示当前空间，发布前重核）；当前 provenance 指向的 runtime backup 目录存在，但数据库备份完整性与恢复演练尚未证明。线上到 main 有两条 PostgreSQL additive migration：官方渠道新增 `audience DEFAULT general`；新增 `AiServiceFact` 表及索引。未执行生产迁移，回滚不可假设恢复静态文件便完成。
+- 本地验证：`node scripts/verify-deploy-gates-in-sync.mjs`、`node scripts/verify-deploy-rollback.mjs`、`node scripts/verify-deploy-authorization-gate.mjs` 全部通过；覆盖 API/迁移失败、三端静态切换与 nginx 失败、信号中断、备份组保留及授权闸门。均为隔离夹具演练，无生产写入，不证明生产备份可恢复。文档 `git diff --check` 通过。
+- 验收边界：本轮关闭服务器来源/进程/三端目录只读证据项；完整触屏与四路本地验证、最终精确 SHA CI、合并、同版部署、Windows 触控/键盘/清场、微信真扫码、独立买方验收各自仍待完成。用户当前明确不出纸，纸张结果不纳入本轮执行。
+
+
 ## 2026-10-29：一体机共享模块的「找 / 联系现场工作人员」说法换成无人值守标准句，加只减不增门禁（分支 `claude/kiosk-unattended-shared-copy`）
 
 - 依据：产品负责人定「一体机在政府就业服务大厅等场所无人值守，现场没有工作人员；任何错误分支都不许出现联系 / 找（现场）工作人员，需要求助时只给服务电话或站内出路」。标准句与禁用说法在 `apps/kiosk/src/copy/unattendedCopy.ts`（10/6 先行合入），本包只换页面目录（`src/pages/`）以外的共享模块；页面目录正被触屏版各页面包整页重写，不在这里改，免得和它们冲突。
