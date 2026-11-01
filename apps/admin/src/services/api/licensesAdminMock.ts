@@ -1,12 +1,12 @@
 import type { CreateLicenseInput, LicenseAttention, LicenseMode, LicenseMutationResult, LicenseResumeInput, LicenseStatusChangeInput, LicenseView, OrgLicenseDetail, RenewLicenseInput, SetLicenseModeInput, UpdateLicenseInput } from '@ai-job-print/shared'
-import { LICENSE_PERIOD_TOO_LONG_MESSAGE, maxEndsOn } from '../../lib/licensePeriod'
+import { LICENSE_PERIOD_TOO_LONG_MESSAGE, isRealDay, maxEndsOn, shiftDay } from '../../lib/licensePeriod'
 
 const DAY = 86_400_000
 export class MockLicenseError extends Error {
   constructor(public code: string, message: string, public status: number) { super(message) }
 }
 function fail(code: string, message: string, status = 400): never { throw new MockLicenseError(code, message, status) }
-export function addDays(day: string, n: number): string { return new Date(Date.parse(`${day}T12:00:00Z`) + n * DAY).toISOString().slice(0, 10) }
+export function addDays(day: string, n: number): string { return shiftDay(day, n) ?? day }
 export function todayBeijing(now = new Date()): string { return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now) }
 const midnight = (day: string) => new Date(`${day}T00:00:00+08:00`).toISOString()
 const diff = (a: string, b: string) => (Date.parse(`${a}T12:00:00Z`) - Date.parse(`${b}T12:00:00Z`)) / DAY
@@ -37,7 +37,7 @@ function credit(value: unknown): string {
 }
 function day(value: unknown): string {
   const s = typeof value === 'string' ? value.trim() : ''
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || +s.slice(0, 4) < 2000 || +s.slice(0, 4) > 2100 || !Number.isFinite(Date.parse(`${s}T12:00:00Z`)) || new Date(`${s}T12:00:00Z`).toISOString().slice(0, 10) !== s) return fail('LICENSE_PERIOD_INVALID', '日期需为 YYYY-MM-DD 格式的真实日期（北京时间）')
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || +s.slice(0, 4) < 2000 || +s.slice(0, 4) > 2100 || !isRealDay(s)) return fail('LICENSE_PERIOD_INVALID', '日期需为 YYYY-MM-DD 格式的真实日期（北京时间）')
   return s
 }
 export function validatePeriod(start: unknown, end: unknown): [string, string] {

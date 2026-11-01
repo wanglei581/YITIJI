@@ -2,11 +2,11 @@ import { useState, type FormEvent } from 'react'
 import type { CreateLicenseInput, LicenseView, RenewLicenseInput, UpdateLicenseInput } from '@ai-job-print/shared'
 import { reasonLength, validGraceDays, validQuota, validReason } from './licenseValidation'
 import { validCreditChecksum } from './licensePresentation'
-import { LICENSE_PERIOD_TOO_LONG_MESSAGE, maxEndsOn, nextDay } from '../../lib/licensePeriod'
+import { LICENSE_PERIOD_TOO_LONG_MESSAGE, isRealDay, maxEndsOn, nextDay } from '../../lib/licensePeriod'
 
 type FormValues = { licenseeName: string; creditCode: string; contractNo: string; startsOn: string; endsOn: string; terminalQuota: string; graceDays: string; note: string; reason: string }
 type Props = { kind: 'create' | 'edit' | 'renew'; item?: LicenseView; saving: boolean; error: string; onCancel: () => void; onSubmit: (input: CreateLicenseInput | UpdateLicenseInput | RenewLicenseInput) => void }
-const validDay = (day: string) => /^\d{4}-\d{2}-\d{2}$/.test(day) && Number.isFinite(Date.parse(`${day}T12:00:00Z`)) && new Date(`${day}T12:00:00Z`).toISOString().slice(0, 10) === day && Number(day.slice(0, 4)) >= 2000 && Number(day.slice(0, 4)) <= 2100
+const validDay = (day: string) => isRealDay(day) && Number(day.slice(0, 4)) >= 2000 && Number(day.slice(0, 4)) <= 2100
 const inputClass = 'w-full rounded border border-neutral-300 px-2 py-1.5 text-sm'
 export function LicenseForm({ kind, item, saving, error, onCancel, onSubmit }: Props) {
   const [values, setValues] = useState<FormValues>({ licenseeName: item?.licenseeName ?? '', creditCode: item?.creditCode ?? '', contractNo: kind === 'edit' ? item?.contractNo ?? '' : '', startsOn: kind === 'edit' ? item?.startsOn ?? '' : '', endsOn: kind === 'edit' ? item?.endsOn ?? '' : '', terminalQuota: String(item?.terminalQuota ?? 1), graceDays: String(item?.graceDays ?? 7), note: kind === 'edit' ? item?.note ?? '' : '', reason: '' })
