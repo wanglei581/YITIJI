@@ -26,22 +26,34 @@ test('工作台 AI 服务：加载、小样本、零与正常计数', async ({ p
 })
 
 test('工作台 AI 服务：切片不可用可重试；请求失败也可重试', async ({ page }) => {
-  let attempt = 0
+  // 回话按用例所处阶段给，不按第几次请求给：开发版构建在 StrictMode 下挂载时会请求两次，
+  // 页面上其它块的请求时序也会变，按计数回话会让「第几次」错位（CI 上慢机器尤其明显）。
+  let phase: 'unavailable' | 'error' | 'ok' = 'unavailable'
+  const served = { unavailable: 0, error: 0, ok: 0 }
   await serve(page, () => {
-    attempt += 1
-    if (attempt === 1) return bare(snapshot({ available: false, reason: 'source_query_failed' }))
-    if (attempt === 2) return { status: 500, body: {} }
+    served[phase] += 1
+    if (phase === 'unavailable') return bare(snapshot({ available: false, reason: 'source_query_failed' }))
+    if (phase === 'error') return { status: 500, body: {} }
     return bare(snapshot(value(0, 5)))
   })
   await page.goto('/')
   const section = page.getByRole('region', { name: '近 7 天终端运营（截至昨天）' })
-  await expect(section.getByText('AI 服务情况这次没读到')).toBeVisible()
-  const retry = section.getByRole('button', { name: '重试' }).last()
-  const size = await retry.boundingBox()
+  // 重试按钮只在 AI 服务那一块的提示里找：同一区域里终端运营、首单概况读失败时也各有「重试」
+  const aiAlert = section.getByRole('alert').filter({ hasText: 'AI 服务情况这次没读到' })
+  const loading = section.getByText('正在读取 AI 服务情况')
+  await expect(aiAlert).toBeVisible()
+  const size = await aiAlert.getByRole('button', { name: '重试' }).boundingBox()
   expect(size && size.width >= 44 && size.height >= 44).toBeTruthy()
-  await retry.click()
-  await expect(section.getByText('AI 服务情况这次没读到')).toBeVisible()
-  await retry.click()
+
+  phase = 'error'
+  await aiAlert.getByRole('button', { name: '重试' }).click()
+  await expect.poll(() => served.error).toBeGreaterThan(0)
+  await expect(loading).toHaveCount(0)
+  await expect(aiAlert).toBeVisible()
+
+  phase = 'ok'
+  await aiAlert.getByRole('button', { name: '重试' }).click()
+  await expect.poll(() => served.ok).toBeGreaterThan(0)
   await expect(section.getByText('AI 模拟面试：5 场')).toBeVisible()
   await expect(section.getByText(/只统计本机构终端上成功完成/)).toBeVisible()
 })
