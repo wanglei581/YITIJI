@@ -259,7 +259,7 @@ Page({
     this._fetch()
   },
 
-  tapReupload() { wx.navigateTo({ url: '/pages/resume-parse/resume-parse', fail: () => wx.showToast({ title: '页面跳转失败', icon: 'none' }) }) },
+  tapReupload() { wx.navigateTo({ url: ways.UPLOAD_URL, fail: () => wx.showToast({ title: '页面跳转失败', icon: 'none' }) }) },
 
   pickFormat(e) {
     if (this.data.exporting) return

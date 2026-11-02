@@ -15,11 +15,16 @@ function optimizeUrl(taskId) {
   return `${OPTIMIZE_URL}?taskId=${encodeURIComponent(taskId)}`
 }
 
-/** 列表按创建时间从新到旧。第一份已完成的诊断就是最近可优化的那份。 */
+// 只看最近 50 条。列表按创建时间从新到旧，接口一页就是这 50 条。
+// 前 50 条都不可优化时，不读 nextCursor，也不再请求更早的记录。
+const RECENT_LIMIT = 50
+
+/** 只看最近 50 条里的第一份已完成诊断。更早的记录不在这次入口里找。 */
 function continuable(list) {
   const items = Array.isArray(list) ? list : []
-  for (let i = 0; i < items.length; i += 1) {
-    const item = items[i]
+  const recent = items.slice(0, RECENT_LIMIT)
+  for (let i = 0; i < recent.length; i += 1) {
+    const item = recent[i]
     if (!item || item.kind !== CONTINUABLE_KIND || item.status !== CONTINUABLE_STATUS) continue
     const taskId = typeof item.taskId === 'string' ? item.taskId.trim() : ''
     if (!taskId) continue
@@ -72,8 +77,9 @@ function readSaved(storage) {
 
 function readList(deps) {
   if (!deps.api || typeof deps.api.getMyResumes !== 'function') return Promise.resolve(null)
+  // 只看最近 50 条：只请求这一页。有下一页也不翻，避免把更早的诊断带进来。
   return Promise.resolve()
-    .then(() => deps.api.getMyResumes({ pageSize: 50 }))
+    .then(() => deps.api.getMyResumes({ pageSize: RECENT_LIMIT }))
     .then((list) => continuable(list), () => null)
 }
 
@@ -144,13 +150,15 @@ function openEntry(page, deps) {
   const wxApi = deps.wx
   wxApi.showLoading({ title: '正在打开…', mask: true })
   const finish = (url) => {
-    const stale = page._optimizeGen !== gen
+    // 先看代次。切走再回来又点了一次之后，旧请求立刻返回，
+    // 不得清掉新请求的打开状态，也不得藏起新的加载提示。
+    if (page._optimizeGen !== gen) return
     page._optimizeOpening = false
     if (!page._optimizeLoadingHidden) {
       page._optimizeLoadingHidden = true
       wxApi.hideLoading()
     }
-    if (!stale) wxApi.navigateTo({ url: url || OPTIMIZE_URL })
+    wxApi.navigateTo({ url: url || OPTIMIZE_URL })
   }
   resolveEntryUrl(deps).then(finish, () => finish(OPTIMIZE_URL))
 }
