@@ -22,6 +22,9 @@
 import 'reflect-metadata'
 // 要验「改用面板扫描不吃静默期」，必须用生产默认的 90 秒静默期（verify-scan-tasks 为了老用例把它关成 0，这里不能）。
 delete process.env['SCAN_TERMINAL_QUIET_PERIOD_SECONDS']
+// 本门禁不验证招聘托管内容；按生产配置（托管关闭）显式声明，免得被运行环境里的同名变量悄悄带偏
+// （verify-recruitment-hosting-gate-declares 要求引用了终端管理服务的门禁显式赋值）。
+process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-scan-device-secret-0123456789-abcdef'
 process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-scan-device-admin-secret-0123456789'
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-scan-device-action-secret-0123456789'
