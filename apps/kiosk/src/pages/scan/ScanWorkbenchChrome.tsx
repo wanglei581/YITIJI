@@ -13,6 +13,7 @@ import { useAuth } from '../../auth/useAuth'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { revokeLiveScanSession } from './scanSessionRevoke'
 import { clearScanWorkbenchSession } from './scanWorkbenchSession'
+import { MaterialThumb } from './ScanGuideArt'
 import { SCAN_MATERIALS, type ScanMaterial } from './scanMaterials'
 import {
   type ScanWorkbenchState,
@@ -274,12 +275,16 @@ export function ScanTypeCards({
             data-testid={`scan-workbench-type-${option.material}`}
             onClick={() => onPick(option.material)}
           >
-            <b id={`${base}-title`}>{option.label}</b>
-            <span id={`${base}-desc`} className="fs-sub">{option.desc}</span>
-            <span id={`${base}-more`} className="fs-sub">
-              {option.more}
-              {option.chip ? <span className="sx-chips"><span className="sx-chip is-warn">{option.chip}</span></span> : null}
+            <span className="vis" aria-hidden="true"><MaterialThumb material={option.material} /></span>
+            <span className="tx">
+              <b id={`${base}-title`}>{option.label}</b>
+              <span id={`${base}-desc`} className="fs-sub">{option.desc}</span>
+              <span id={`${base}-more`} className="fs-sub">
+                {option.more}
+                {option.chip ? <span className="sx-chips"><span className="sx-chip is-warn">{option.chip}</span></span> : null}
+              </span>
             </span>
+            <span className="cs-mark" aria-hidden="true"><QxTouchIcon name="check" size={30} strokeWidth={3} /></span>
           </button>
         )
       })}
