@@ -284,7 +284,7 @@ export function unverifiedTaskCopy(input: {
     ? miniappPublished
       ? { title: '在手机上查看这一单', detail: `打开${MINIAPP_DISPLAY_NAME}小程序「我的 → 打印订单」，找到${orderRef}。` }
       : { title: '在这台机器上查看这一单', detail: `点下方「查看打印订单」，找到${orderRef}。` }
-    : { title: `记下${orderRef}，需要时报给我们`, detail: helpNeededLine() }
+    : { title: orderNo ? `订单号是 ${orderNo}` : '记下这一单的订单号', detail: orderNo ? `需要时打服务电话，报这个订单号查询。${helpNeededLine()}` : helpNeededLine() }
   return {
     stepsLabel: '这一刻你可以做的三件',
     steps: [

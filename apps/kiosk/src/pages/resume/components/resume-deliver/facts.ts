@@ -56,12 +56,7 @@ function collectBeforeText(
 ): string {
   if (modules && modules.length > 0) return modules.map((m) => m.before).join('\n')
   if (!originalInput) return ''
-  return [
-    originalInput.selfIntro ?? '',
-    ...originalInput.education.map((item) => item.description ?? ''),
-    ...originalInput.experience.map((item) => item.description),
-    ...originalInput.projects.map((item) => item.description),
-  ].join('\n')
+  return JSON.stringify(originalInput)
 }
 
 /** 机械对照：after 里有、before/原文里没有的数字与职责词。不是「已校验」。 */
@@ -84,4 +79,25 @@ export function detectUnconfirmedAdditions(
     }
   }
   return hits
+}
+
+/** 保留仍存在于生成稿的候选词；预览时本人后来加入的词不属于 AI 新增。 */
+export function detectGeneratedUnconfirmedAdditions(
+  resume: GeneratedResume,
+  generated: GeneratedResume,
+  input?: ResumeGenerateInput,
+  userAdditions: string[] = [],
+): string[] {
+  const generatedAdditions = detectUnconfirmedAdditions(generated, undefined, input)
+  return detectUnconfirmedAdditions(resume, undefined, input).filter((word) => generatedAdditions.includes(word) && !userAdditions.includes(word))
+}
+
+/** 记录预览中每个描述字段由本人新增的候选词。 */
+export function detectUserResumeEdits(before: GeneratedResume, after: GeneratedResume): string[] {
+  const texts = (resume: GeneratedResume) => [resume.summary,
+    ...resume.education.map((item) => item.description ?? ''),
+    ...resume.experience.map((item) => item.description),
+    ...resume.projects.map((item) => item.description)]
+  const oldTexts = texts(before)
+  return texts(after).flatMap((text, index) => detectUnconfirmedTextAdditions(text, oldTexts[index] ?? ''))
 }

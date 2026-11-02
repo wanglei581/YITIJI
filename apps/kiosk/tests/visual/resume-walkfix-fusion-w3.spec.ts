@@ -211,6 +211,18 @@ test('预览页与核对弹层把「待本人确认」讲明白，并且只列 A
   await expect(note).toContainText('AI 整理时新写进了这几处，你原来的内容里没有')
 })
 
+test('本人预览时填写的数字和职责词不归给 AI @w3-kiosk', async ({ page, api }) => {
+  generateShell(api)
+  await fillGenerateFormToReview(page)
+  await page.getByRole('button', { name: /让 AI 整理成新简历/ }).click()
+  const description = page.getByRole('textbox', { name: '工作经历描述 1' })
+  await description.fill('本人主导 2800 件，差错率 0.8%')
+  const banner = page.locator('.qx-rd-pending')
+  await expect(banner).not.toContainText('2800')
+  await expect(banner).not.toContainText('0.8%')
+  await expect(banner).not.toContainText('主导')
+})
+
 // ── I-19 ───────────────────────────────────────────────────────────────────
 // 走查实录：诊断出 1 个问题时，左栏六个维度约 660px，右栏「先改这几处」只放一条问题卡，卡被拉到和左栏一样高，
 // 卡内下半截约 400px 是空的，空卡在首屏正中占近两成屏高。
