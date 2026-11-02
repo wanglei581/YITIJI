@@ -136,6 +136,16 @@ async function reachPaused(world: LicenseWorld, page: Page, options: { active?: 
   await expect(paused(page)).toBeVisible()
 }
 
+/** 进暂停前给旧文档打记号；进暂停时的结束使用清场会整页重载，记号没了就说明新文档已经起来。 */
+const markDocument = (page: Page) => page.evaluate(() => { (window as unknown as { __beforePause?: boolean }).__beforePause = true })
+/** 等旧文档被换掉再等暂停屏回来。requireReload 为真时，等不到重载就算失败（用例要看的是重载之后的样子）。 */
+async function settleAfterPause(page: Page, options: { requireReload?: boolean } = {}): Promise<void> {
+  const reloaded = page.waitForFunction(() => !(window as unknown as { __beforePause?: boolean }).__beforePause, undefined, { timeout: 5_000 })
+  if (options.requireReload) await reloaded
+  else await reloaded.catch(() => undefined)
+  await expect(paused(page)).toBeVisible()
+}
+
 // ───────────────────────── a) 授权失效：收尾中 ─────────────────────────
 
 test('授权失效、当前凭证还剩 10 分钟：首页入口停用并写明原因与服务电话，AI 顾问停用 @license-gate', async ({ page, api }) => {
@@ -278,22 +288,27 @@ test('凭证剩不到 5 分钟弹「请尽快办完」，点「知道了」关�
 
 // ───────────────────────── c) 凭证到期：暂停服务屏 ─────────────────────────
 
-test('凭证到期后整机换成「暂停服务」屏：写明原因与服务电话，没有任何能点的入口 @license-gate', async ({ page, api }) => {
+test('凭证到期后整机换成「暂停服务」屏：到期前不是、到期后 1 秒内是，写明原因与服务电话，没有任何能点的入口 @license-gate', async ({ page, api }) => {
   const world = await boot(page, api)
   world.lapse(10 * MINUTE)
   await world.advance(3.5 * MINUTE)
   await expectHomeWindingDown(page)
-  // 阴性对照：到期之前（还剩半分钟）不是暂停屏。
-  await world.advance(6 * MINUTE)
+  // 阴性对照：到期之前不是暂停屏。再冻结页面时钟，精确地走到到期前 300 毫秒（仍不是）和到期后 1 秒（必须是）。
+  await world.advance(5 * MINUTE)
   await expect(paused(page)).toHaveCount(0)
-
   const deadline = Date.parse(world.currentEndsAt()!)
-  await world.advance(Math.max(0, deadline + 1000 - world.now()), { step: 1000 })
-  expect(await paused(page).isVisible(), '凭证截止后 1 秒内必须进入暂停屏').toBe(true)
+  await world.freeze()
+  await world.advance(deadline - 300 - world.now())
+  await expect(paused(page), '凭证到期前不能是暂停屏').toHaveCount(0)
+  await markDocument(page)
+  await world.advance(1300, { step: 100 })
+  await expect(paused(page), '凭证截止后 1 秒内必须进入暂停屏').toBeVisible()
+  await world.thaw()
+  await settleAfterPause(page)
+
   const screen = paused(page)
   await expect(screen.getByRole('heading', { name: '暂停服务' })).toBeVisible()
-  // 副标题写「现在不能开始新的办理」，正文是标准句 3（原因 + 服务电话）；「这台机器暂时不能用」整屏只出现一次。
-  await expect(screen).toContainText('现在不能开始新的办理')
+  // 正文是标准句 3（原因 + 服务电话）；「这台机器暂时不能用」整屏只出现一次。
   await expect(screen).toContainText(MACHINE_UNUSABLE_LINE)
   await expect(screen).toContainText(PHONE_SENTENCE)
   expect(((await screen.innerText()).match(/这台机器暂时不能用/g) ?? []).length).toBe(1)
@@ -301,6 +316,20 @@ test('凭证到期后整机换成「暂停服务」屏：写明原因与服务�
   await expect(page.locator('button:visible, a[href]:visible')).toHaveCount(0)
   await expect(page.locator('[data-qx-page="home"]')).toHaveCount(0)
   await expect(mainNav(page)).toHaveCount(0)
+})
+
+// 暂停屏的副标题「现在不能开始新的办理」。进暂停时的结束使用清场会整页重载，重载后凭证已过期，profile 的答复是「没验过」、没有 noticeLine；
+// 原先页面只在有 noticeLine 时才画副标题，noticeLine 也没有跟着暂停标记一起存下来——于是这句只在重载前的一瞬间出现，之后一直没有。
+// 已改成暂停就一定写这句（KioskPausedScreen 不再看 notice）；这条守住重载之后副标题仍在。
+test('进暂停并清场重载之后，暂停屏仍写「现在不能开始新的办理」 @license-gate', async ({ page, api }) => {
+  const world = await boot(page, api)
+  world.lapse(10 * MINUTE)
+  await world.advance(3.5 * MINUTE)
+  await world.advance(5 * MINUTE)
+  await markDocument(page)
+  await reachPaused(world, page)
+  await settleAfterPause(page, { requireReload: true })
+  await expect(paused(page)).toContainText('现在不能开始新的办理')
 })
 
 test('到期那一刻正在播宣传的待机屏停播：换成「暂停服务」屏，宣传素材不再出现 @license-gate', async ({ page, api }) => {
@@ -333,6 +362,12 @@ test('暂停之后没人碰屏幕，空闲到点也不会再冒出待机宣传 @
   await standby.getByTestId('standby-primary').click()
   await page.waitForURL((url) => url.pathname === '/')
   await expect(page.locator('[data-qx-page="home"]')).toBeVisible()
+  // 待机清场算「这一位用完了」，这时授权失效会直接进暂停屏（见下一条）。要走收尾中，得有人正在办：
+  // 让下一位进一个办理页再回首页（登录、选游客、进办理页都算下一位开始用了）。
+  await tap(page, homeEntry(page, 'help'))
+  await page.waitForURL((url) => url.pathname === '/help')
+  await page.getByRole('button', { name: '返回首页' }).first().click()
+  await page.waitForURL((url) => url.pathname === '/')
 
   world.lapse(6 * MINUTE)
   await world.advance(3.5 * MINUTE)
@@ -346,6 +381,24 @@ test('暂停之后没人碰屏幕，空闲到点也不会再冒出待机宣传 @
   await expect(paused(page)).toBeVisible()
   await expect(standby).toHaveCount(0)
   await expect(page.locator('img')).toHaveCount(0)
+})
+
+test('没人在用时授权失效，下一次读到后直接进暂停屏，不用等凭证到期 @license-gate', async ({ page, api }) => {
+  const world = await boot(page, api, { screensaver: true })
+  const standby = page.locator('[data-kiosk-screen="screensaver"]')
+
+  // 没人碰屏幕，空闲到点进待机（这一位用完了）；有人轻触唤醒后停在首页，还没开始办任何事。
+  await world.advance(3.5 * MINUTE, { active: false })
+  await expect(standby).toBeVisible()
+  await standby.getByTestId('standby-primary').click()
+  await page.waitForURL((url) => url.pathname === '/')
+  await expect(page.locator('[data-qx-page="home"]')).toBeVisible()
+
+  // 授权失效、当前凭证还有 10 分钟。没人在办，不必等到凭证到期：页面下一次读到授权失效就进暂停屏。
+  world.lapse(10 * MINUTE)
+  const deadline = Date.parse(world.currentEndsAt()!)
+  await reachPaused(world, page)
+  expect(world.now(), '没人在办时不必等到凭证到期才暂停').toBeLessThan(deadline)
 })
 
 test('收尾中刷新页面，仍是收尾中（入口仍停用、到期仍进暂停屏） @license-gate', async ({ page, api }) => {
@@ -434,6 +487,10 @@ test('收尾中我的可进入并结束使用，待办和重新打印锁住并�
   await expectHomeWindingDown(page)
   await tap(page, mainNav(page).getByRole('button', { name: '我的' }))
   await page.waitForURL((url) => url.pathname === '/profile')
+  // 离开屏幕超过 30 秒再进「我的」，照旧先问一句「还是你吗？」，收尾中也一样；答「是我，继续」才看到本人的待办。
+  const handover = page.getByTestId('handover-confirm')
+  await expect(handover).toBeVisible()
+  await handover.getByRole('button', { name: '是我，继续' }).click()
   await expect(page.getByTestId('profile-resume')).toBeVisible()
   await expect(page.locator('[data-license-locked] [data-testid="profile-resume"]')).toHaveCount(1)
   await expectTapStays(page, page.getByTestId('profile-resume'), '继续付款')
@@ -508,8 +565,10 @@ test('授权恢复后，暂停屏在下一次 5 分钟复查时自动回首页�
   const attempts = [...world.log.exchange.slice(exchangeBefore), ...world.log.refresh.slice(refreshBefore)].sort((left, right) => left - right)
   expect(attempts.length, '暂停期间应有复查').toBeGreaterThanOrEqual(2)
   expect(attempts.length, '12 分钟内复查最多 3 次（每 5 分钟一次）').toBeLessThanOrEqual(3)
+  // 页面按自己的钟保证两次尝试至少隔 5 分钟；这里量的是请求发出时的页面读数，假时钟的读数偶尔倒退数百毫秒（实测量到过 299.0 秒），
+  // 所以留 2 秒余量——还是远大于「每分钟一次」那种过密（见反向检查）。
   for (let i = 1; i < attempts.length; i += 1) {
-    expect(attempts[i]! - attempts[i - 1]!, `第 ${i} 次与第 ${i + 1} 次复查的间隔`).toBeGreaterThanOrEqual(5 * MINUTE)
+    expect(attempts[i]! - attempts[i - 1]!, `第 ${i} 次与第 ${i + 1} 次复查的间隔`).toBeGreaterThanOrEqual(5 * MINUTE - 2_000)
   }
   await expect(paused(page)).toBeVisible()
 

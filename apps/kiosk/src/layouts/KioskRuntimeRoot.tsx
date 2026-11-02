@@ -42,7 +42,7 @@ function SupportContactGuard() {
 }
 
 function LicensedOutlet() {
-  const { mode, notice } = useKioskLicense()
+  const { mode } = useKioskLicense()
   const navigate = useNavigate()
   const { endKioskUse } = useKioskSessionControl()
   const previousMode = useRef(mode)
@@ -51,7 +51,7 @@ function LicensedOutlet() {
     if (previousMode.current === 'paused' && mode === 'normal') navigate('/', { replace: true })
     previousMode.current = mode
   }, [mode, navigate, endKioskUse])
-  return mode === 'paused' ? <KioskPausedScreen notice={notice} /> : <Outlet />
+  return mode === 'paused' ? <KioskPausedScreen /> : <Outlet />
 }
 
 /**
