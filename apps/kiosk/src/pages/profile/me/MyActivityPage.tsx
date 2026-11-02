@@ -1,3 +1,4 @@
+import { LicenseLock } from '../../../layouts/LicenseLock'
 import { useMemberCursorPage } from './useMemberCursorPage'
 import { MemberLoadMore } from './MemberLoadMore'
 // 我的浏览 / 外部跳转记录 / 本人自填求职进度。
@@ -105,7 +106,7 @@ export function MyActivityPage() {
         <div className="me-state" data-testid="member-records-application-list">
           <MeP>{hostingOpen ? '在岗位详情页投完之后，从那里把这次投递记进来。' : '求职进度只由你本人填写。'}{pagination.nextCursor ? '已加载的记录中没有这一类，可继续加载较早记录。' : '当前没有这一类记录。'}本页不会替你造进度。</MeP>
           <div className="me-stack">
-            <MeExitCard art="checklist" artWidth={120} title="查看政策" desc="进度不能填的时候，可以先看政策" onClick={() => navigate('/policy-service')} />
+            <LicenseLock><MeExitCard art="checklist" artWidth={120} title="查看政策" desc="进度不能填的时候，可以先看政策" onClick={() => navigate('/policy-service')} /></LicenseLock>
           </div>
         </div>
       </>
@@ -135,13 +136,13 @@ export function MyActivityPage() {
           <MeEmptyPack sentence={browseTab ? '这里还没有记录。只记你在这台机器上浏览和打开的来源。' : '打开来源平台或官方入口之后，这里会出现记录。是否投递、是否预约得成由来源平台决定，本系统不记录也不参与。'}>
             {hostingOpen ? (
               <>
-                <MeExitCard art="checklist" artWidth={120} title="查看岗位" desc="在岗位详情里点「去来源平台投递」或「扫码投递」" testId="member-records-start-jobs" onClick={() => navigate('/jobs')} />
-                <MeExitCard art="stack" artWidth={110} title="查看招聘会" desc="在招聘会详情里点「去来源平台预约」或「扫码预约」" testId="member-records-start-fairs" onClick={() => navigate('/job-fairs')} />
+                <LicenseLock><MeExitCard art="checklist" artWidth={120} title="查看岗位" desc="在岗位详情里点「去来源平台投递」或「扫码投递」" testId="member-records-start-jobs" onClick={() => navigate('/jobs')} /></LicenseLock>
+                <LicenseLock><MeExitCard art="stack" artWidth={110} title="查看招聘会" desc="在招聘会详情里点「去来源平台预约」或「扫码预约」" testId="member-records-start-fairs" onClick={() => navigate('/job-fairs')} /></LicenseLock>
               </>
             ) : (
               <>
-                <MeExitCard art="checklist" artWidth={120} title="查看政策" desc="看本机构发布的就业政策" testId="member-records-start-policy" onClick={() => navigate('/policy-service')} />
-                <MeExitCard art="usb" artWidth={120} title="去打印" desc="打印和扫描现在就能办" onClick={() => navigate('/print-scan')} />
+                <LicenseLock><MeExitCard art="checklist" artWidth={120} title="查看政策" desc="看本机构发布的就业政策" testId="member-records-start-policy" onClick={() => navigate('/policy-service')} /></LicenseLock>
+                <LicenseLock><MeExitCard art="usb" artWidth={120} title="去打印" desc="打印和扫描现在就能办" onClick={() => navigate('/print-scan')} /></LicenseLock>
               </>
             )}
           </MeEmptyPack>
@@ -183,8 +184,8 @@ export function MyActivityPage() {
         </MeRows>
         {(tab === 'browse' ? browse : jumps).length < 7 ? (
           <div className="me-stack">
-            <MeExitCard art="checklist" artWidth={110} title={hostingOpen ? '查看岗位' : '查看政策'} desc={hostingOpen ? '在岗位详情里点「去来源平台投递」或「扫码投递」' : '看本机构发布的就业政策'} onClick={() => navigate(hostingOpen ? '/jobs' : '/policy-service')} />
-            <MeExitCard art="usb" artWidth={110} title="去打印" desc="打印和扫描现在就能办" onClick={() => navigate('/print-scan')} />
+            <LicenseLock><MeExitCard art="checklist" artWidth={110} title={hostingOpen ? '查看岗位' : '查看政策'} desc={hostingOpen ? '在岗位详情里点「去来源平台投递」或「扫码投递」' : '看本机构发布的就业政策'} onClick={() => navigate(hostingOpen ? '/jobs' : '/policy-service')} /></LicenseLock>
+            <LicenseLock><MeExitCard art="usb" artWidth={110} title="去打印" desc="打印和扫描现在就能办" onClick={() => navigate('/print-scan')} /></LicenseLock>
           </div>
         ) : null}
       </>
@@ -207,7 +208,7 @@ export function MyActivityPage() {
       fine={showJobProgressTab
         ? '仅记录本人浏览与打开来源入口的行为；投递 / 预约结果以来源平台为准，本系统不记录。本终端不参与投递，也不掌握来源平台的处理结果；求职进度仅你可见，不会提供给企业或来源机构。离开 3 分钟没操作会自动退出。'
         : '只记录你在这台机器上看过的政策。投递 / 预约结果以来源平台为准，本系统不记录。离开 3 分钟没操作会自动退出。'}
-      ctabar={recordsCtabar(uiState === 'login' || uiState === 'loading' || uiState === 'error' ? uiState : 'ready', navigate, () => setReloadKey((k) => k + 1), loginFrom, primaryLabel, primaryGo)}
+      ctabar={uiState === 'login' || uiState === 'loading' || uiState === 'error' ? recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), loginFrom, primaryLabel, primaryGo) : <LicenseLock>{recordsCtabar('ready', navigate, () => setReloadKey((k) => k + 1), loginFrom, primaryLabel, primaryGo)}</LicenseLock>}
     >
       {body}
       {isLoggedIn && state === 'ready' ? <MemberLoadMore {...pagination} /> : null}

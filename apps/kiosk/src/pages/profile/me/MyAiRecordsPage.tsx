@@ -1,3 +1,4 @@
+import { LicenseLock } from '../../../layouts/LicenseLock'
 import { useMemberCursorPage } from './useMemberCursorPage'
 import { MemberLoadMore } from './MemberLoadMore'
 import { QaRecords } from './QaRecords'
@@ -82,11 +83,11 @@ function RecordExitCards({ aiPaused, artWidths }: { aiPaused: boolean; artWidths
   return (
     <>
       {aiPaused ? (
-        <MeExitCard art="usb" artWidth={artWidths[0]} title="去打印" desc="打印不需要小青" testId="member-records-ai-down-print" onClick={() => navigate('/print-scan')} />
+        <LicenseLock><MeExitCard art="usb" artWidth={artWidths[0]} title="去打印" desc="打印不需要小青" testId="member-records-ai-down-print" onClick={() => navigate('/print-scan')} /></LicenseLock>
       ) : (
-        <MeExitCard art="resume" artWidth={artWidths[0]} title="去做简历诊断" desc="上传一份简历，先做诊断" onClick={() => navigate('/resume/source?intent=diagnose')} />
+        <LicenseLock><MeExitCard art="resume" artWidth={artWidths[0]} title="去做简历诊断" desc="上传一份简历，先做诊断" onClick={() => navigate('/resume/source?intent=diagnose')} /></LicenseLock>
       )}
-      <MeExitCard art="checklist" artWidth={artWidths[1]} title="查政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} />
+      <LicenseLock><MeExitCard art="checklist" artWidth={artWidths[1]} title="查政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} /></LicenseLock>
     </>
   )
 }
@@ -406,14 +407,14 @@ export function MyAiRecordsPage() {
       sub="列表不显示原文、提示词和输出全文"
       fine={`仅展示本人 AI 服务记录，不展示简历原文、诊断正文或模型原始输出。诊断、优化、生成、对照、规划、自我探索和模拟面试都在这里。${confirmingLine(confirmId)}`}
       toast={toast}
-      ctabar={recordsCtabar(
-        uiState === 'login' || uiState === 'loading' || uiState === 'error' ? uiState : 'ready',
+      ctabar={uiState === 'login' || uiState === 'loading' || uiState === 'error' ? recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/ai-records', '去做简历诊断', () => navigate('/resume/source?intent=diagnose')) : <LicenseLock>{recordsCtabar(
+        'ready',
         navigate,
         () => setReloadKey((k) => k + 1),
         '/me/ai-records',
         '去做简历诊断',
         () => navigate('/resume/source?intent=diagnose'),
-      )}
+      )}</LicenseLock>}
     >
       {body}
       {isLoggedIn && state === 'ready' ? <MemberLoadMore {...recordsPage} label="加载更多简历与规划记录" /> : null}

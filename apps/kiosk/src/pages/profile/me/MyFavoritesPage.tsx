@@ -1,3 +1,4 @@
+import { LicenseLock } from '../../../layouts/LicenseLock'
 // 我的收藏 — /me/favorites（本人）。收藏只记录本人收藏行为，不含投递 / 预约结果。
 // 招聘内容托管（next-tasks 3.13）关闭时只剩政策收藏：不摆岗位、招聘会分类，也不给「去看岗位」的出口。
 
@@ -95,13 +96,13 @@ export function MyFavoritesPage() {
         <MeEmptyPack sentence="还没有收藏。收藏只是方便下次再找，不含投递结果。">
           {hostingOpen ? (
             <>
-              <MeExitCard art="checklist" artWidth={160} tall title="查看岗位" desc="来源、更新时间与外部投递入口都在详情页" onClick={() => navigate('/jobs')} />
-              <MeExitCard art="stack" artWidth={140} tall title="查看招聘会" desc="时间、地点与官方预约入口以详情页为准" onClick={() => navigate('/job-fairs')} />
+              <LicenseLock><MeExitCard art="checklist" artWidth={160} tall title="查看岗位" desc="来源、更新时间与外部投递入口都在详情页" onClick={() => navigate('/jobs')} /></LicenseLock>
+              <LicenseLock><MeExitCard art="stack" artWidth={140} tall title="查看招聘会" desc="时间、地点与官方预约入口以详情页为准" onClick={() => navigate('/job-fairs')} /></LicenseLock>
             </>
           ) : (
             <>
-              <MeExitCard art="checklist" artWidth={160} tall title="查看政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} />
-              <MeExitCard art="phone" artWidth={140} tall title="去打印" desc="打印和扫描现在就能办" onClick={() => navigate('/print-scan')} />
+              <LicenseLock><MeExitCard art="checklist" artWidth={160} tall title="查看政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} /></LicenseLock>
+              <LicenseLock><MeExitCard art="phone" artWidth={140} tall title="去打印" desc="打印和扫描现在就能办" onClick={() => navigate('/print-scan')} /></LicenseLock>
             </>
           )}
         </MeEmptyPack>
@@ -132,8 +133,8 @@ export function MyFavoritesPage() {
         )}
         {visible.length > 0 && visible.length < 7 ? (
           <div className="me-stack">
-            <MeExitCard art="checklist" artWidth={110} title={hostingOpen ? '查看岗位' : '查看政策'} desc={hostingOpen ? '看看第三方来源的岗位' : '看本机构发布的就业政策'} onClick={() => navigate(hostingOpen ? '/jobs' : '/policy-service')} />
-            <MeExitCard art="usb" artWidth={110} title="去打印" desc="打印和扫描现在就能办" onClick={() => navigate('/print-scan')} />
+            <LicenseLock><MeExitCard art="checklist" artWidth={110} title={hostingOpen ? '查看岗位' : '查看政策'} desc={hostingOpen ? '看看第三方来源的岗位' : '看本机构发布的就业政策'} onClick={() => navigate(hostingOpen ? '/jobs' : '/policy-service')} /></LicenseLock>
+            <LicenseLock><MeExitCard art="usb" artWidth={110} title="去打印" desc="打印和扫描现在就能办" onClick={() => navigate('/print-scan')} /></LicenseLock>
           </div>
         ) : null}
       </>
@@ -151,9 +152,9 @@ export function MyFavoritesPage() {
       fine={hostingOpen
         ? '点一条打开详情。投递与预约都在来源平台完成，本机不代收简历，也不记录结果。取消收藏在详情页里。离开 3 分钟没操作会自动退出。'
         : '点一条打开政策。取消收藏在政策页里。办理仍以官方入口为准，本机不代收简历，也不记录办理结果。离开 3 分钟没操作会自动退出。'}
-      ctabar={hostingOpen
+      ctabar={uiState === 'login' || uiState === 'loading' || uiState === 'error' ? recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/favorites', '查看政策', () => navigate('/policy-service')) : <LicenseLock>{hostingOpen
         ? recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/favorites', '查看岗位', () => navigate('/jobs'))
-        : recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/favorites', '查看政策', () => navigate('/policy-service'))}
+        : recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/favorites', '查看政策', () => navigate('/policy-service'))}</LicenseLock>}
     >
       {body}
     </QxMePage>
