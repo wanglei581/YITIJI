@@ -28,11 +28,16 @@ test('工作台 AI 服务：加载、小样本、零与正常计数', async ({ p
 test('工作台 AI 服务：切片不可用可重试；请求失败也可重试', async ({ page }) => {
   // 回话按用例所处阶段给，不按第几次请求给：开发版构建在 StrictMode 下挂载时会请求两次，
   // 页面上其它块的请求时序也会变，按计数回话会让「第几次」错位（CI 上慢机器尤其明显）。
+  // 每次重试的回话先扣住，等看见「正在读取」再放行，再等放行后的新状态——这样断言看到的一定是这一次的结果，
+  // 不会拿重试前残留的旧提示当成重试后的结果。
   let phase: 'unavailable' | 'error' | 'ok' = 'unavailable'
-  const served = { unavailable: 0, error: 0, ok: 0 }
-  await serve(page, () => {
-    served[phase] += 1
+  let gate: Promise<void> = Promise.resolve()
+  let release = () => {}
+  const hold = () => { gate = new Promise<void>((resolve) => { release = resolve }) }
+  await serve(page, async (url) => {
+    if (!url.pathname.endsWith('/partner/screen/usage')) return bare(snapshot(value(0, 0)))
     if (phase === 'unavailable') return bare(snapshot({ available: false, reason: 'source_query_failed' }))
+    await gate
     if (phase === 'error') return { status: 500, body: {} }
     return bare(snapshot(value(0, 5)))
   })
@@ -46,14 +51,20 @@ test('工作台 AI 服务：切片不可用可重试；请求失败也可重试'
   expect(size && size.width >= 44 && size.height >= 44).toBeTruthy()
 
   phase = 'error'
+  hold()
   await aiAlert.getByRole('button', { name: '重试' }).click()
-  await expect.poll(() => served.error).toBeGreaterThan(0)
+  await expect(loading).toBeVisible()
+  await expect(aiAlert).toHaveCount(0)
+  release()
   await expect(loading).toHaveCount(0)
   await expect(aiAlert).toBeVisible()
 
   phase = 'ok'
+  hold()
   await aiAlert.getByRole('button', { name: '重试' }).click()
-  await expect.poll(() => served.ok).toBeGreaterThan(0)
+  await expect(loading).toBeVisible()
+  release()
   await expect(section.getByText('AI 模拟面试：5 场')).toBeVisible()
+  await expect(aiAlert).toHaveCount(0)
   await expect(section.getByText(/只统计本机构终端上成功完成/)).toBeVisible()
 })
