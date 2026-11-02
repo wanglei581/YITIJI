@@ -642,14 +642,18 @@ async function httpContract(h: Harness, K: string, M: string): Promise<void> {
 // ── h. 自我探索追加：用只用于这一单的简历追加，合出来的 PDF（含整份原简历）跟着锁，「我的文档」和导出都不列 ──
 async function selfAssessmentAppendFollowsLock(h: Harness, K: string): Promise<void> {
   const taskId = `verify-sa-${randomUUID()}`
+  const aiTaskId = `verify-sa-ai-${randomUUID()}`
   const dims = ['interest', 'style', 'team', 'value', 'motivation'].map((key) => ({ key, label: key, strength: 3, note: null }))
-  await h.prisma.aiResumeResult.create({
+  const record = (id: string, summary: string | null) => h.prisma.aiResumeResult.create({
     data: {
-      taskId, kind: 'self_assessment', status: 'completed', provider: 'rules', endUserId: K,
+      taskId: id, kind: 'self_assessment', status: 'completed', provider: 'rules', endUserId: K,
       expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-      payloadJson: JSON.stringify({ dimensions: dims, summary: null, completedAt: new Date().toISOString() }),
+      payloadJson: JSON.stringify({ dimensions: dims, summary, completedAt: new Date().toISOString() }),
     },
   })
+  await record(taskId, null)
+  // 含 AI 解读的一路（有 summary）：前面多一道闸门、合并时写 AIGC 标识，最后仍是同一次上传。
+  await record(aiTaskId, '倾向在稳定团队里做细致的执行与协调工作。')
   try {
     // 只测合并与落库：报告页用一页真 PDF 代替渲染（渲染另有门禁），审计不落库。
     const selfAssessment = { renderReportForAppend: async () => ({ buffer: buildRealPdf(1), pageCount: 1 }) }
@@ -664,15 +668,19 @@ async function selfAssessmentAppendFollowsLock(h: Harness, K: string): Promise<v
     h.fileIds.add(ownMerged)
     const lockedRow = await h.prisma.fileObject.findUniqueOrThrow({ where: { id: lockedMerged } })
     assert.equal(lockedRow.retentionLockedReason, UPLOAD_SESSION_ORDER_ONLY_REASON, 'appended PDF built from an order-only resume must inherit the lock')
+    const aiMerged = (await append.appendToResume({ taskId: aiTaskId, requester: { endUserId: K, accessToken: null }, resumeFileId: lockedResume })).fileId
+    h.fileIds.add(aiMerged)
+    const aiRow = await h.prisma.fileObject.findUniqueOrThrow({ where: { id: aiMerged } })
+    assert.equal(aiRow.retentionLockedReason, UPLOAD_SESSION_ORDER_ONLY_REASON, 'AI-interpreted appended PDF of an order-only resume must inherit the lock too')
     const docIds = (await new MemberAssetsService(h.prisma).listDocuments(K, { cursor: null, pageSize: 50 })).items.map((item) => item.id)
     assert.equal(docIds.includes(lockedMerged), false, 'appended PDF of an order-only resume must not be in K documents')
     assert.ok(docIds.includes(ownMerged), 'positive control: appended PDF of K own resume is in K documents')
     const exported = JSON.stringify(await new MemberDataExportMapper(h.prisma).build({ endUserId: K, requestId: 'verify-sa-append' }))
     assert.equal(exported.includes(lockedMerged), false, 'appended PDF of an order-only resume must not be in K data export')
     assert.ok(exported.includes(ownMerged), 'positive control: appended PDF of K own resume is in K data export')
-    pass('h 自我探索追加：用只用于这一单的简历合出来的 PDF 跟着锁，「我的文档」和本人数据导出都不列；用本人自己的简历照常列（对照）')
+    pass('h 自我探索追加（只有打分 / 含 AI 解读两路）：用只用于这一单的简历合出来的 PDF 跟着锁，「我的文档」和本人数据导出都不列；用本人自己的简历照常列（对照）')
   } finally {
-    await h.prisma.aiResumeResult.deleteMany({ where: { taskId } })
+    await h.prisma.aiResumeResult.deleteMany({ where: { taskId: { in: [taskId, aiTaskId] } } })
   }
 }
 
