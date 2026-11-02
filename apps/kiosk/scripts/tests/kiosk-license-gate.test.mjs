@@ -94,3 +94,45 @@ test('授权复查清除被拒标记并实际再走续期', async () => {
   assert.equal(store.get('terminal_session_token_v1'), 'new')
   assert.equal(requests, 2)
 })
+
+test('换票被授权拒绝时通知闸门，复查可恢复', async () => {
+  for (const scenario of ['expired', 'no-token', 'url-ticket']) {
+    globalThis.__gateEnv = { VITE_TERMINAL_AGENT_LOCAL_URL: '', VITE_TERMINAL_AGENT_BRIDGE_TOKEN: 'bridge', VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN: '' }
+    const store = new Map(scenario === 'expired' ? [['terminal_session_token_v1', 'old']] : [])
+    const bootTicket = 'a'.repeat(32)
+    globalThis.window = {
+      sessionStorage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v), removeItem: (k) => store.delete(k) },
+      location: { href: `http://localhost/${scenario === 'url-ticket' ? `?boot_ticket=${bootTicket}` : ''}`, origin: 'http://localhost' },
+      history: { state: null, replaceState: () => {} },
+      setTimeout: (fn, ms) => { const id = setTimeout(fn, ms); id.unref(); return id }, clearTimeout,
+    }
+    let allow = false, notifications = 0
+    globalThis.fetch = async (input) => {
+      const address = String(input)
+      if (address.includes('/local/terminal-boot-ticket')) return { ok: true, json: async () => ({ data: { bootTicket } }) }
+      if (address.includes('/refresh')) return { ok: false, status: 401, json: async () => ({ code: 'TERMINAL_SESSION_INVALID' }) }
+      return allow ? { ok: true, json: async () => ({ sessionToken: 'new' }) }
+        : { ok: false, status: 403, json: async () => ({ code: 'TERMINAL_LICENSE_INACTIVE' }) }
+    }
+    const stub = (s) => url(s)
+    const auth = await import(url(transpile('src/services/terminalAuth.ts')
+      .replaceAll('import.meta.env', 'globalThis.__gateEnv')
+      .replaceAll("from '../auth/kioskSensitiveSession'", `from '${stub('export function clearKioskSensitiveSession() {}\nexport function clearKioskSharedDeviceResidue() {}')}'`)
+      .replaceAll("from './api/client'", `from '${stub("export const API_BASE_URL='/api/v1'; export const API_MODE='http'")}'`)
+      .replaceAll("from './api/httpAdapter'", `from '${stub('export class ApiHttpError extends Error { constructor(code,message,status) { super(message); this.code=code; this.status=status } }')}'`)
+      .replaceAll("from './api/screensaver'", `from '${stub("export function getTerminalId() { return 'terminal' }")}'`)
+      .replaceAll("from './api/throwHttpError'", `from '${stub('export async function readHttpError(response) { return response.json() }')}'`) + `\n// ${scenario}`))
+    auth.subscribeTerminalLicenseRenewalRejected(() => { notifications++; assert.equal(auth.wasTerminalLicenseRenewalRejected(), true) })
+    await auth.initializeTerminalSession()
+    assert.equal(auth.wasTerminalLicenseRenewalRejected(), true, scenario)
+    assert.equal(notifications, 1, scenario)
+    assert.equal(auth.terminalSessionState(), 'failed', scenario)
+    assert.equal(decide(gate.INITIAL_KIOSK_LICENSE_GATE, input(null, { rejected: true, sessionState: 'failed' })).mode, 'paused')
+    allow = true
+    window.location.href = 'http://localhost/'
+    await auth.recheckTerminalSessionAfterLicensePause({ credentialExpired: true })
+    assert.equal(auth.wasTerminalLicenseRenewalRejected(), false, scenario)
+    assert.equal(auth.terminalSessionState(), 'ready', scenario)
+    assert.equal(store.get('terminal_session_token_v1'), 'new', scenario)
+  }
+})

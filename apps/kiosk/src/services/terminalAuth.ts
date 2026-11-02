@@ -32,6 +32,14 @@ export function subscribeTerminalLicenseRenewalRejected(listener: () => void): (
   return () => { licenseRejectionListeners.delete(listener) }
 }
 
+function recordLicenseRejection(error: unknown, keepSessionReady = false): boolean {
+  if (!(error instanceof ApiHttpError && error.status === 403 && error.code === 'TERMINAL_LICENSE_INACTIVE')) return false
+  licenseRenewalRejected = true
+  if (keepSessionReady) setState('ready')
+  licenseRejectionListeners.forEach((listener) => listener())
+  return true
+}
+
 function setState(next: TerminalSessionState): void {
   state = next
   listeners.forEach((listener) => listener(next))
@@ -105,7 +113,11 @@ async function exchangeBootTicket(bootTicket: string, timeoutMs: number): Promis
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ bootTicket }),
   }, timeoutMs)
-  if (!response.ok) throw await asHttpError(response)
+  if (!response.ok) {
+    const error = await asHttpError(response)
+    recordLicenseRejection(error)
+    throw error
+  }
   const payload = (await response.json()) as { sessionToken?: string }
   if (!payload.sessionToken) throw new ApiHttpError('TERMINAL_SESSION_INVALID', '这台机器的安全校验没通过', 401)
   const sessionToken = payload.sessionToken
@@ -200,10 +212,7 @@ async function retryRefreshOnce(): Promise<void> {
       return
     } catch (error) {
       lastError = error
-      if (error instanceof ApiHttpError && error.status === 403 && error.code === 'TERMINAL_LICENSE_INACTIVE') {
-        licenseRenewalRejected = true
-        setState('ready')
-        licenseRejectionListeners.forEach((listener) => listener())
+      if (recordLicenseRejection(error, true)) {
         throw error
       }
       if (!transient(error)) break

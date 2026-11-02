@@ -77,7 +77,7 @@ export function HomeTouchView({
   onOpenDevice,
   onEndPrevious,
 }: HomeTouchViewProps) {
-  const { mode, notice } = useKioskLicense()
+  const { mode } = useKioskLicense()
   const contact = useSupportContactSnapshot()
   const winding = mode === 'winding-down'
   const kiosk = useTerminalKiosk()
@@ -208,7 +208,7 @@ export function HomeTouchView({
         />
       )}
     >
-      {winding ? <p className="qxt-remind" role="status">{notice} {machineUnusableLine(contact)}</p> : null}
+      {winding ? <p className="qxt-remind" role="status">{machineUnusableLine(contact)}</p> : null}
       <div className="qxt-home-go" data-testid="home-context-region">{continueSlot}</div>
       <div className="qxt-home-tasks">
         <QxTouchTask held={winding} note={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} actionId="resume-hub" icon="file" title="改简历" desc="上传或扫描，诊断、优化或生成新简历，改不改你定" chip="AI 诊断改写" chipAi take="带走：新简历" takeIcon="check" visual={<QxTouchArtResume />} index={1} onClick={() => onAction('resume-hub')} />
