@@ -24,6 +24,7 @@ const checks = [
     assert.match(doneSource, /import\s*\{[^}]*getPrintJobStatus[^}]*\}\s*from\s*'\.\.\/\.\.\/services\/print\/printJobsApi'/)
     assert.equal((doneRuntime.match(/getPrintJobStatus\(taskId,\s*\{\s*signal:\s*abort\.signal\s*\}\)/g) ?? []).length, 2, '首次核验与重查都必须传入有界取消信号')
     assert.equal((doneRuntime.match(/setTimeout\(\(\) => abort\.abort\(\), STATUS_RECHECK_REQUEST_TIMEOUT_MS\)/g) ?? []).length, 2, '首次核验与重查共用状态请求超时')
+    assert.match(doneRuntime, /cancelled = true\s+if \(timer\) clearTimeout\(timer\)\s+if \(inFlight\) \{\s+clearTimeout\(inFlight\.guard\)\s+inFlight\.abort\.abort\(\)/, '离页清除在途超时并中止重查')
     assert.match(doneSource, /result\.taskId\s*!==\s*taskId/)
     assert.match(doneSource, /verification\?\.taskId\s*===\s*taskId/)
     assert.match(browserSpecSource, /a response for a different task cannot confirm the current task/)

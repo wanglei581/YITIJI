@@ -553,3 +553,36 @@ test('I-30 with the miniapp published, a signed-in person is pointed at 我的 �
   await expect(whole).toContainText('「我的 → 打印订单」')
   await expect(whole).toContainText(W2_ORDER.orderNo)
 })
+
+test('I-30 leaving during an automatic recheck aborts it and ignores a late result @w2', async ({ page, api }) => {
+  registerShell(api)
+  let calls = 0
+  let release: (() => void) | undefined
+  await page.route(`**${JOB_PATH}`, async (route) => {
+    calls += 1
+    if (calls === 1) {
+      await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' })
+      return
+    }
+    await new Promise<void>((resolve) => { release = resolve })
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ taskId: W2_ORDER.taskId, status: 'completed' }) }).catch(() => {})
+  })
+  await page.clock.install()
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', recoveryState)
+  await expect(page.getByTestId('print-fulfill-state-unknown')).toBeVisible()
+  await page.clock.runFor(3_001)
+  await expect.poll(() => calls).toBe(2)
+  const aborted = page.waitForEvent('requestfailed', {
+    predicate: (request) => new URL(request.url()).pathname === JOB_PATH,
+    timeout: 3_000,
+  })
+  await page.getByRole('button', { name: '返回首页', exact: true }).click()
+  await expect(page).toHaveURL(/\/$/)
+  expect((await aborted).failure()?.errorText).toMatch(/ABORTED/i)
+  release?.()
+  await page.clock.runFor(10_000)
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByTestId('print-fulfill-state-completed')).toHaveCount(0)
+  expect(calls).toBe(2)
+})

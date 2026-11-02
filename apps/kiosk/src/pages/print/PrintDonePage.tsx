@@ -267,6 +267,7 @@ export function PrintDonePage() {
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | null = null
     let attempts = 0
+    let inFlight: { abort: AbortController; guard: ReturnType<typeof setTimeout> } | null = null
     const startedAt = Date.now()
     setRecheckWindowOpen(true)
 
@@ -275,6 +276,7 @@ export function PrintDonePage() {
       setRechecking(true)
       const abort = new AbortController()
       const guard = setTimeout(() => abort.abort(), STATUS_RECHECK_REQUEST_TIMEOUT_MS)
+      inFlight = { abort, guard }
       try {
         const result = await getPrintJobStatus(taskId, { signal: abort.signal })
         if (cancelled) return
@@ -291,6 +293,7 @@ export function PrintDonePage() {
         if (cancelled) return
       } finally {
         clearTimeout(guard)
+        inFlight = null
         if (!cancelled) setRechecking(false)
       }
       attempts += 1
@@ -307,6 +310,10 @@ export function PrintDonePage() {
     return () => {
       cancelled = true
       if (timer) clearTimeout(timer)
+      if (inFlight) {
+        clearTimeout(inFlight.guard)
+        inFlight.abort.abort()
+      }
     }
     // location.state 随路由变，重查循环不跟着重开；recheckTick 是手动「重新查看这一单」的触发。
     // eslint-disable-next-line react-hooks/exhaustive-deps

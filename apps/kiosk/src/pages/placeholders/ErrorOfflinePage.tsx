@@ -257,11 +257,12 @@ export default function ErrorOfflinePage() {
 
   const view: View = checking ? 'checking' : !result ? 'unknown' : result.reachable ? 'partial' : 'offline'
 
-  const retry = useCallback(async () => {
+  // counted=false 只给进页那一次自动检测用：它不算「重试」；之后的自动退避、online 重测和手动重新检测都算。
+  const retry = useCallback(async (counted = true) => {
     if (checkingRef.current) return
     checkingRef.current = true
     setChecking(true)
-    setAttempts((value) => value + 1)
+    if (counted) setAttempts((value) => value + 1)
     let reachable = false
     try {
       if (!navigator.onLine) throw new Error('offline')
@@ -305,7 +306,7 @@ export default function ErrorOfflinePage() {
   }, [])
 
   useEffect(() => {
-    void retry()
+    void retry(false)
   }, [retry])
 
   useEffect(() => {
