@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1893 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1896 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1197,7 +1197,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/terminal-agent/scripts/</code> — 5 个文件</summary>
+<summary><code>apps/terminal-agent/scripts/</code> — 6 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1205,17 +1205,18 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/scripts/diagnose-production-agent.ps1` | `verify-agent-unauthorized.mjs` |
 | `apps/terminal-agent/scripts/install-production-agent.ps1` | `verify-agent-unauthorized.mjs`<br/>`verify-terminal-bind-code.ts` |
 | `apps/terminal-agent/scripts/scan-lease-barrier.helper.ts` | `verify-scan-watcher.ts` |
+| `apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts` | `verify-scan-device-engine.ts` |
 | `apps/terminal-agent/scripts/verify-windows-service-recovery.mjs` | `verify-agent-unauthorized.mjs` |
 
 </details>
 
 <details>
-<summary><code>apps/terminal-agent/src/</code> — 47 个文件</summary>
+<summary><code>apps/terminal-agent/src/</code> — 49 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `apps/terminal-agent/src/agent/api-client.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-direct-http-agents.ts` |
-| `apps/terminal-agent/src/agent/auth-state.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-print-retry-attempt.ts`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-scan-device-engine.ts`<br/>`verify-task-reliability.ts` |
+| `apps/terminal-agent/src/agent/auth-state.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-print-retry-attempt.ts`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-scan-device-engine.helper.ts`<br/>`verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/boot-print-queue-order.ts` | `verify-print-queue-residue.ts` |
 | `apps/terminal-agent/src/agent/claim-rate-limit.ts` | `verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/config-manager.ts` | `verify-agent-config-resilience.mjs`<br/>`verify-agent-unauthorized.mjs`<br/>`verify-print-queue-residue.ts`<br/>`verify-printer-config.mjs` |
@@ -1238,9 +1239,11 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/src/agent/scan-candidate-barrier.ts` | `verify-scan-input-lockout-telemetry.ts`<br/>`verify-scan-watcher.ts` |
 | `apps/terminal-agent/src/agent/scan-deletion-audit-reporter.ts` | `verify-scan-deletion-audit.ts` |
 | `apps/terminal-agent/src/agent/scan-delivery.ts` | `verify-scan-device-engine.ts` |
-| `apps/terminal-agent/src/agent/scan-device/scan-temp-dir.ts` | `verify-scan-device-engine.ts` |
-| `apps/terminal-agent/src/agent/scan-device/wia-runner.ts` | `verify-scan-device-engine.ts` |
-| `apps/terminal-agent/src/agent/scan-device/wia-script.ts` | `verify-scan-device-engine.ts` |
+| `apps/terminal-agent/src/agent/scan-device/scan-pdf-compose.ts` | `verify-scan-device-engine.ts` |
+| `apps/terminal-agent/src/agent/scan-device/scan-temp-dir.ts` | `verify-scan-device-engine.helper.ts`<br/>`verify-scan-device-engine.ts` |
+| `apps/terminal-agent/src/agent/scan-device/wia-probe.ts` | `verify-scan-device-engine.helper.ts` |
+| `apps/terminal-agent/src/agent/scan-device/wia-runner.ts` | `verify-scan-device-engine.helper.ts` |
+| `apps/terminal-agent/src/agent/scan-device/wia-script.ts` | `verify-scan-device-engine.helper.ts`<br/>`verify-scan-device-engine.ts` |
 | `apps/terminal-agent/src/agent/scan-input/verified-folder.ts` | `verify-scan-input-health.ts` |
 | `apps/terminal-agent/src/agent/scan-input/windows-secure-reader.ts` | `verify-scan-input-health.ts` |
 | `apps/terminal-agent/src/agent/scan-watcher.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-print-truth-hardening.ts`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-scan-device-engine.ts`<br/>`verify-scan-watcher.ts` |

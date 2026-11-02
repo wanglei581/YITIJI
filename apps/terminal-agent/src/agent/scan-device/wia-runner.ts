@@ -5,8 +5,7 @@
  *   runJob()         通用：起进程 → 逐行喂给 onLine → 空闲 / 总超时 → 软停（写取消标记）→
  *                    宽限期后 taskkill /T /F → 进程结束或强杀后兜底放行。
  *   startWiaScan()   扫描：脚本参数、逐页核实、HRESULT → 对外错误码、预热重试、卡纸删页。
- *   runWiaProbe()    探测：只连一次扫描仪，回 ready / busy / not_found / error。
- *   composeScanPdf() 合 PDF：A4 等比适配，按页数与字节数上限，不二次压缩。
+ * 同目录另有两块建在它之上：wia-probe.ts（健康探测）、scan-pdf-compose.ts（合 PDF）。
  *
  * 本批（A1）只提供底座和单测：不拿设备锁（A2 在外层拿）、不碰心跳 / 本机 HTTP / task-runner，
  * 没有任何调用方。所有外部依赖（起进程、时钟、强杀、文件）都可注入，Mac 上用假执行器测。
@@ -18,14 +17,12 @@ import { execFile, spawn, type ChildProcess, type SpawnOptions } from 'child_pro
 import fs from 'fs'
 import path from 'path'
 import { log, warn } from '../../logger'
-import { ImagesToPdfError, imagesToPdf } from '../../printer/image-to-pdf'
 import {
   LineBuffer,
   SCAN_MAX_PAGES_DEFAULT,
   WIA_HRESULT,
   WiaParamError,
   buildWiaPowerShellArgs,
-  buildWiaProbeScript,
   buildWiaScanScript,
   encodeWiaCommand,
   mapWiaHresult,
@@ -36,22 +33,13 @@ import {
   type WiaLine,
   type WiaSource,
 } from './wia-script'
-import {
-  SCAN_PAGE_FILE_PATTERN,
-  assertScanTaskDir,
-  getScanDeviceRoot,
-  scanCancelFlagPath,
-  scanResultPdfPath,
-} from './scan-temp-dir'
+import { getScanDeviceRoot, scanCancelFlagPath } from './scan-temp-dir'
 
 export const WIA_ABORT_GRACE_MS = 45_000
 export const WIA_FORCE_KILL_WAIT_MS = 10_000
 export const WIA_WARMING_UP_RETRY_DELAY_MS = 10_000
 export const WIA_IDLE_TIMEOUT_MS = 120_000
 export const WIA_TOTAL_TIMEOUT_MS = 12 * 60_000
-export const WIA_PROBE_TIMEOUT_MS = 20_000
-/** 后端 deliver 单文件上限 20 MiB，留出 multipart 开销，合成后超过 18 MiB 直接报 too_large。 */
-export const SCAN_PDF_MAX_BYTES = 18 * 1024 * 1024
 
 // ── 可注入的外部依赖 ──────────────────────────────────────────────────────
 
@@ -122,7 +110,7 @@ export function createDefaultWiaRunnerDeps(): WiaRunnerDeps {
 
 // ── 通用：起进程并盯住它 ───────────────────────────────────────────────────
 
-interface JobSpec {
+export interface JobSpec {
   args: string[]
   idleTimeoutMs: number
   totalTimeoutMs: number
@@ -132,7 +120,7 @@ interface JobSpec {
   onLine(line: string): void
 }
 
-interface JobExit {
+export interface JobExit {
   timedOut: boolean
   stopRequested: boolean
   forceKilled: boolean
@@ -140,12 +128,12 @@ interface JobExit {
   exitCode: number | null
 }
 
-interface JobHandle {
+export interface JobHandle {
   stop(): void
   done: Promise<JobExit>
 }
 
-function runJob(spec: JobSpec, deps: WiaRunnerDeps): JobHandle {
+export function runJob(spec: JobSpec, deps: WiaRunnerDeps): JobHandle {
   let closed = false
   let stopRequested = false
   let timedOut = false
@@ -480,95 +468,5 @@ export function startWiaScan(request: WiaScanRequest, overrides: Partial<WiaRunn
       wakeSleeper?.()
     },
     result,
-  }
-}
-
-// ── 探测 ─────────────────────────────────────────────────────────────────
-
-export interface WiaProbeResult {
-  state: 'ready' | 'busy' | 'not_found' | 'error'
-  hresult?: string
-  forceKilled: boolean
-  elapsedMs: number
-}
-
-/** 即时连一次扫描仪：不设属性、不扫描、不写文件。调用方负责先拿设备锁。 */
-export async function runWiaProbe(
-  options: { deviceName?: string; timeoutMs?: number } = {},
-  overrides: Partial<WiaRunnerDeps> = {},
-): Promise<WiaProbeResult> {
-  const deps: WiaRunnerDeps = { ...createDefaultWiaRunnerDeps(), ...overrides }
-  const args = buildWiaPowerShellArgs(encodeWiaCommand(buildWiaProbeScript(options.deviceName ?? '')))
-  const startedAt = deps.clock.now()
-  let final: Extract<WiaLine, { kind: 'done' | 'failed' }> | undefined
-  const timeoutMs = options.timeoutMs ?? WIA_PROBE_TIMEOUT_MS
-  const job = runJob(
-    {
-      args,
-      idleTimeoutMs: timeoutMs,
-      totalTimeoutMs: timeoutMs,
-      graceMs: 0,
-      onLine: (line) => {
-        const parsed = parseWiaLine(line)
-        if (parsed && parsed.kind !== 'page') final ??= parsed
-      },
-    },
-    deps,
-  )
-  const exit = await job.done
-  const base = { forceKilled: exit.forceKilled, elapsedMs: deps.clock.now() - startedAt }
-  let probe: WiaProbeResult
-  if (exit.timedOut || exit.spawnFailed || !final) {
-    probe = { state: 'error', ...base }
-  } else if (final.kind === 'done') {
-    probe = { state: final.probe ? 'ready' : 'error', ...base }
-  } else if (final.stage === 'device_not_found') {
-    probe = { state: 'not_found', ...base }
-  } else {
-    probe = { state: final.hresult === WIA_HRESULT.BUSY ? 'busy' : 'error', hresult: final.hresult, ...base }
-  }
-  log(`wia-runner: probe state=${probe.state}${probe.hresult ? ` hresult=${probe.hresult}` : ''} forceKilled=${probe.forceKilled} elapsedMs=${probe.elapsedMs}`)
-  return probe
-}
-
-// ── 合 PDF ───────────────────────────────────────────────────────────────
-
-export type ComposeScanPdfResult =
-  | { ok: true; path: string; pageCount: number; bytes: number }
-  | { ok: false; errorCode: Extract<ScanDeviceErrorCode, 'too_large' | 'unknown'>; reason: string }
-
-/**
- * 把一个任务目录里的扫描页合成 <taskDir>\scan.pdf：A4、等比适配、页序同输入。
- * 页数超过上限（默认 20）或合成后超过 18 MiB 都报 too_large，不做二次压缩，不留半成品。
- * 输入必须恰好是该任务目录下的 page-NNN.jpg，其它文件一律拒绝，免得把别处的文件塞进 PDF。
- */
-export async function composeScanPdf(
-  taskDir: string,
-  pageFiles: readonly string[],
-  options: { maxPages?: number; maxBytes?: number; root?: string } = {},
-): Promise<ComposeScanPdfResult> {
-  try {
-    const dir = path.resolve(taskDir)
-    assertScanTaskDir(dir, options.root ?? getScanDeviceRoot())
-    for (const file of pageFiles) {
-      const resolved = path.resolve(file)
-      if (path.dirname(resolved) !== dir || !SCAN_PAGE_FILE_PATTERN.test(path.basename(resolved))) {
-        return { ok: false, errorCode: 'unknown', reason: 'page_outside_task_dir' }
-      }
-    }
-    const output = await imagesToPdf(pageFiles, {
-      outputPath: scanResultPdfPath(dir),
-      scale: 'fit',
-      maxPages: options.maxPages ?? SCAN_MAX_PAGES_DEFAULT,
-      maxBytes: options.maxBytes ?? SCAN_PDF_MAX_BYTES,
-    })
-    return { ok: true, ...output }
-  } catch (error) {
-    if (error instanceof ImagesToPdfError) {
-      // 页数太多与体积太大，屏上都是同一句「页数太多，请分两次扫」。
-      const tooLarge = error.code === 'too_large' || error.code === 'too_many_pages'
-      return { ok: false, errorCode: tooLarge ? 'too_large' : 'unknown', reason: error.code }
-    }
-    return { ok: false, errorCode: 'unknown', reason: 'unexpected' }
   }
 }
