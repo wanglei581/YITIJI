@@ -30,8 +30,10 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
   try {
     await client.$connect()
     await client.organization.create({ data: { id: 'first-order-migration-sentinel', name: 'Migration sentinel', type: 'public_employment_service' } })
+    // 基线之后的每条迁移都要在这里按顺序补一行；漏一条，下面用当前客户端写库就会报缺列。
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', migration)])
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261028120000_ai_service_fact/migration.sql')])
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261102090000_add_terminal_daily_free_print_sides/migration.sql')])
     await client.aiServiceFact.create({ data: { serviceType: 'resume_optimize', serviceKey: 'migration-test', orgId: 'org-snapshot', terminalId: 'terminal-snapshot' } })
     if (await client.aiServiceFact.count() !== 1) throw new Error(`${kind}: fact table unavailable`)
     const sentinel = await client.organization.findUnique({ where: { id: 'first-order-migration-sentinel' } })

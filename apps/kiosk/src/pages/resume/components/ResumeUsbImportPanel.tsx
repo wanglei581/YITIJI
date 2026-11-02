@@ -101,6 +101,7 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
   const [importingId, setImportingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const selectedRef = useRef<UsbFileListItem | null>(null)
   const [scanNonce, setScanNonce] = useState(0)
   const [redetectNote, setRedetectNote] = useState<string | null>(null)
   const configured = isUsbImportConfigured()
@@ -128,7 +129,17 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
         const nextStatus = await getUsbStatus()
         if (cancelled) return
         setStatus(nextStatus)
-        setFiles(nextStatus.present ? (await listUsbFiles()).files.filter((item) => item.sizeBytes <= MAX_RESUME_BYTES) : null)
+        const nextFiles = nextStatus.present ? (await listUsbFiles()).files.filter((item) => item.sizeBytes <= MAX_RESUME_BYTES) : null
+        if (cancelled) return
+        const selected = selectedRef.current
+        if (selected) {
+          const matches = nextFiles?.filter((item) => item.filename === selected.filename && item.extension === selected.extension && item.sizeBytes === selected.sizeBytes) ?? []
+          const match = matches.length === 1 ? matches[0] : null
+          selectedRef.current = match
+          setSelectedId(match?.safeId ?? null)
+          if (!match) setRedetectNote('U 盘里的文件变了，请重新选一份')
+        }
+        setFiles(nextFiles)
         setError(null)
       } catch (err) {
         if (cancelled) return
@@ -190,9 +201,9 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
   const selectedItem = unattended && selectedId ? files?.find((item) => item.safeId === selectedId) : undefined
   const runImportRef = useRef<() => void>(() => {})
   runImportRef.current = () => {
-    if (selectedItem && importingId === null) void importFile(selectedItem)
+    if (selectedItem && importingId === null && !loading) void importFile(selectedItem)
   }
-  const importing = importingId !== null
+  const importing = importingId !== null || (loading && Boolean(selectedId))
   const hasSelection = Boolean(selectedItem)
   useEffect(() => {
     onPickChange?.({ selected: hasSelection, importing, run: () => runImportRef.current() })
@@ -255,6 +266,7 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
     const picking = Boolean(files && files.length > 0)
     const redetect = () => {
       setRedetectNote(!status?.present ? '刚刚重新检测过，还是没有插入 U 盘' : `刚刚重新读过这块 U 盘，根目录里还是这 ${files?.length ?? 0} 个文件`)
+      selectedRef.current = null
       setSelectedId(null)
       setError(null)
       setScanNonce((value) => value + 1)
@@ -285,9 +297,9 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
                 <button
                   key={item.safeId}
                   type="button"
-                  disabled={importingId !== null}
+                  disabled={loading || importingId !== null}
                   aria-pressed={selectedId === item.safeId}
-                  onClick={() => setSelectedId(item.safeId)}
+                  onClick={() => { selectedRef.current = item; setSelectedId(item.safeId); setRedetectNote(null) }}
                   className="resume-usb-panel__row qxt-usb-row"
                 >
                   <span className="resume-usb-panel__fmt qxt-usb-fmt" data-kind={badge === 'PDF' ? 'pdf' : 'img'}>
@@ -322,7 +334,7 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
           </button>
         )}
         {!onPickChange && selectedItem ? (
-          <button type="button" className="resume-usb-import qxt-usb-pri" disabled={importingId !== null} onClick={() => void importFile(selectedItem)}>
+          <button type="button" className="resume-usb-import qxt-usb-pri" disabled={loading || importingId !== null} onClick={() => void importFile(selectedItem)}>
             {importingId ? '正在导入' : '导入这份文件'}
           </button>
         ) : null}

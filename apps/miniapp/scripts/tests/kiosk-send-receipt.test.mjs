@@ -22,6 +22,7 @@ import {
   MINIAPP, PAGE, SESSION, TOKEN, FILE, BUSY_COPY, DEAD_COPY, OCCUPIED_COPY, REJECT_FALLBACK, OFFLINE_COPY,
   NOT_KIOSK_COPY, SCENE, UPLOAD_LINK, LOGIN_LINK,
   receipt, httpError, harness, assertTokenStaysInMemory, assertUnknown, send, deferred, flush,
+  AGE_DECLINED_COPY, ageDeclinedError,
 } from './kiosk-send-harness.mjs'
 
 test('完整回执才算已收到，令牌只留在内存', async () => {
@@ -198,6 +199,88 @@ test('上传进行中不会叠第二次，迟到的失败也不会改写', async
   await flush()
   assertUnknown(env.page)
   assert.equal(env.wx.calls.hide, 1)
+})
+
+test('年龄确认点了「未满」：文件没发出去，照实说原因，不说结果未知，可以重选（#1409）', async () => {
+  const declined = await ageDeclinedError()
+  assert.equal(declined.code, 'AI_AGE_NOT_DECLARED')
+  assert.equal(typeof declined.statusCode, 'undefined', '没发出去，没有状态码')
+  let next = Promise.reject(declined)
+  const env = harness(() => next)
+  env.openDirect()
+  env.page._send(FILE)
+  await flush()
+  assert.equal(env.page.data.phase, 'error', '不是「结果不确定」')
+  assert.equal(env.page.data.canRetry, true)
+  assert.equal(env.page.data.errorMsg, AGE_DECLINED_COPY)
+  env.page.retry()
+  assert.equal(env.page.data.phase, 'idle')
+  next = Promise.resolve(receipt())
+  env.wx.setChosen({ path: 'wxfile://tmp/b.pdf', name: 'b.pdf', size: 10 })
+  env.page.chooseAndSend()
+  await flush()
+  assert.equal(env.uploads.length, 2)
+  assert.equal(env.page.data.phase, 'done', '点错「未满」后重选，照常能传')
+})
+
+test('拍照或从相册选：只选图片、不压缩，按「拍照文档 时间」起名、沿用真实扩展名，令牌只在内存（#1363）', async () => {
+  const env = harness(() => Promise.resolve(receipt({ purpose: 'print_doc' })))
+  env.openDirect()
+  env.wx.setMedia({ tempFilePath: 'wxfile://tmp_8a3f2c.png', size: 2048 })
+  env.page.chooseFromAlbum()
+  await flush()
+  // 页面在沙箱里跑，数组来自另一个运行域：比内容不比原型
+  assert.deepEqual(JSON.parse(JSON.stringify(env.wx.calls.media)), [{ count: 1, mediaType: ['image'], sourceType: ['camera', 'album'], sizeType: ['original'] }])
+  assert.equal(env.uploads.length, 1)
+  const [sid, token, filePath, name] = env.uploads[0]
+  assert.equal(sid, SESSION)
+  assert.equal(token, TOKEN)
+  assert.equal(filePath, 'wxfile://tmp_8a3f2c.png')
+  assert.match(name, /^拍照文档 .+\.png$/, '照片临时名没意义，起可读名、扩展名照真实的')
+  assertTokenStaysInMemory(env.page)
+  assert.equal(env.page.data.phase, 'done')
+})
+
+test('拍照或从相册选：取消不报错；超过 10MB、认不出格式都不发出去，可以重选（#1363）', async () => {
+  const cancelled = harness(() => Promise.resolve(receipt()))
+  cancelled.openDirect()
+  cancelled.page.chooseFromAlbum()
+  await flush()
+  assert.equal(cancelled.page.data.phase, 'idle')
+  assert.equal(cancelled.page.data.errorMsg, '')
+  assert.equal(cancelled.uploads.length, 0)
+
+  const big = harness(() => Promise.resolve(receipt()))
+  big.openDirect()
+  big.wx.setMedia({ tempFilePath: 'wxfile://tmp_big.jpg', size: 10 * 1024 * 1024 + 1 })
+  big.page.chooseFromAlbum()
+  await flush()
+  assert.equal(big.page.data.phase, 'error')
+  assert.equal(big.page.data.canRetry, true)
+  assert.equal(big.page.data.errorMsg, '单个文件不能超过 10MB，请压缩后重试')
+  assert.equal(big.uploads.length, 0)
+
+  const noExt = harness(() => Promise.resolve(receipt()))
+  noExt.openDirect()
+  noExt.wx.setMedia({ tempFilePath: 'wxfile://tmp_noext', size: 100 })
+  noExt.page.chooseFromAlbum()
+  await flush()
+  assert.equal(noExt.page.data.phase, 'error')
+  assert.equal(noExt.page.data.errorMsg, '无法识别照片格式，请重新选择')
+  assert.equal(noExt.uploads.length, 0)
+})
+
+test('拍照或从相册选：已经收到一份后不再选、不再传（一张码只收一份）', async () => {
+  const env = harness(() => Promise.resolve(receipt()))
+  env.openDirect()
+  env.page._send(FILE)
+  await flush()
+  assert.equal(env.page.data.phase, 'done')
+  env.wx.setMedia({ tempFilePath: 'wxfile://tmp_later.jpg', size: 100 })
+  env.page.chooseFromAlbum()
+  await flush()
+  assert.equal(env.wx.calls.media.length, 0, '收到之后不再打开相册')
+  assert.equal(env.uploads.length, 1)
 })
 
 test('本地就拦住的大文件没有发出去，仍可以重选', async () => {

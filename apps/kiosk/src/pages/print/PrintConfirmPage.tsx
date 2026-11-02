@@ -695,7 +695,7 @@ export function PrintConfirmPage() {
       legacyBody={false}
       kind="compact"
       seal={null}
-      railNow={3}
+      railNow={handoff?.origin === 'my_documents' ? undefined : 3}
       eyebrow="核对价格"
       title="确认打印"
       back={{

@@ -18,6 +18,7 @@ import {
   DOCS,
   myDoc, listOf, tap, receipt, httpError, harness, assertTokenStaysInMemory, assertUnknown,
   deferred, flush,
+  AGE_DECLINED_COPY, ageDeclinedError,
 } from './kiosk-send-harness.mjs'
 
 // kiosk-send-receipt.test.mjs「成功按钮是回一体机继续，页面不再提供再传一份」那条注释里说的「下面的用例」就是这条。
@@ -361,6 +362,26 @@ test('我的文档那份没递成：找不到 / 超 10MB / 类型不收都回到
     assert.equal(env.memberCalls.length, 2, err.code)
     assert.equal(env.page.data.phase, 'done')
   }
+})
+
+test('我的文档那份：年龄确认点了「未满」，没递出去，回到能重选并照实说原因（#1409）', async () => {
+  const declined = await ageDeclinedError()
+  let m = 0
+  const env = harness(() => Promise.resolve(receipt()), {
+    loggedIn: true,
+    docs: () => Promise.resolve(DOCS),
+    member: () => { m += 1; return m === 1 ? Promise.reject(declined) : Promise.resolve(receipt()) },
+  })
+  env.openDirect()
+  await flush()
+  env.page.pickDoc(tap('file-degree'))
+  await flush()
+  assert.equal(env.page.data.phase, 'idle', '不是「结果不确定」')
+  assert.equal(env.page.data.docNote, AGE_DECLINED_COPY)
+  env.page.pickDoc(tap('file-degree'))
+  await flush()
+  assert.equal(env.memberCalls.length, 2)
+  assert.equal(env.page.data.phase, 'done', '点错「未满」后再选，照常能递')
 })
 
 test('一体机登录的是另一个账号：这张码不能再从我的文档递，换账号也不解开；聊天文件照旧', async () => {

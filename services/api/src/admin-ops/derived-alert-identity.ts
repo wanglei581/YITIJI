@@ -14,7 +14,7 @@
  *   3. 退款消警必须读 Order.payStatus；禁止为了让红条消失去写 printOutcome。
  */
 
-export const ALERT_TYPES = ['terminal_offline', 'printer_issue', 'print_failed', 'paid_pending_file_unavailable', 'feedback_pending'] as const
+export const ALERT_TYPES = ['terminal_offline', 'printer_issue', 'print_failed', 'paid_pending_file_unavailable', 'feedback_pending', 'print_terminal_quota_high'] as const
 export type DerivedAlertType = (typeof ALERT_TYPES)[number]
 
 export const ALERT_ACTIONS = ['acknowledge', 'silence', 'close', 'reopen'] as const

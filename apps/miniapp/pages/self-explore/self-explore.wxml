@@ -79,10 +79,10 @@
         <!-- 敏感题同意单独一条，且不勾也能提交。题数按服务端下发的题目真值算，
              不写死数字——v1 题库实测 0 题，写死「N 题」在题库改版时就成了假话。 -->
         <view class="cbox tap" hover-class="tap-press" bindtap="toggleSensitive"
-              role="button" aria-label="{{agreeSensitive ? '已同意作答敏感话题题目，可选，点击取消' : '同意作答敏感话题题目，可选'}}">
+              role="button" aria-label="{{agreeSensitive ? '已同意作答涉及偏好 / 风格的敏感题，可选，点击取消' : '同意作答涉及偏好 / 风格的敏感题，可选'}}">
           <view class="cb {{agreeSensitive ? 'on' : ''}}"><text wx:if="{{agreeSensitive}}" class="ficon i-check"></text></view>
           <view class="cb-body">
-            <view class="cb-title">我同意作答涉及敏感话题的题目（可选）</view>
+            <view class="cb-title">同意作答涉及偏好 / 风格的敏感题（可选）</view>
             <view class="cb-desc" wx:if="{{sensitiveCount > 0}}">本次题目中有 {{sensitiveCount}} 题被标为敏感；不勾选也能提交，这些题可以留空。</view>
             <view class="cb-desc" wx:else>本次题目中没有被标为敏感的题，勾不勾都不会改变题目，此项只记录你的意愿。</view>
           </view>

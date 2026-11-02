@@ -8,6 +8,7 @@ import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { assertNoHorizontalOverflow } from './assert-layout'
+import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 import { seedPrintHandoff, setReactRouterState, W2_FILE, W2_MATERIAL_CHECK, W2_ORDER, W2_PRINT_PARAMS } from './fixtures/fusion-w2-state'
 
 const NOW = '2026-07-24T00:00:00.000Z'
@@ -588,4 +589,87 @@ test('I-30 leaving during an automatic recheck aborts it and ignores a late resu
   await expect(page).toHaveURL(/\/$/)
   await expect(page.getByTestId('print-fulfill-state-completed')).toHaveCount(0)
   expect(calls).toBe(2)
+})
+
+// ── R-08 登录后用 U 盘打印：导入的文件是匿名归属，材料任务要凭令牌读（发布候选走查 11/2）──────────────
+// 走查：登录会员从 U 盘导入文件后点「下一步：材料检查」被拒（403），屏上却写「没有待处理的文件」。
+// 服务端现在对「无归属的源文件」不论游客还是会员都发任务令牌、读任务时凭 x-material-task-token 放行；这条钉住前端把令牌带上了。
+// 放在本文件（w2 配置）而不是 fusion-w5：U 盘入口要构建期注入本机网桥令牌（VITE_TERMINAL_AGENT_BRIDGE_TOKEN），
+// w2 配置的构建带它，w5 配置不带，放在 w5 里 U 盘入口只会显示「本机暂未开通」，这条在官方配置下必红。
+const R08_MEMBER_TOKEN = 'r08-member-token'
+
+/** 会员短信登录 + 登录后外壳会读的几条会员接口（与 fusion-w2-tools、print-handoff 的同名夹具同口径）。 */
+function registerMemberLogin(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
+  api.respond('POST', '/api/v1/member/auth/sms-code', {
+    status: 200,
+    json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } },
+  })
+  api.respond('POST', '/api/v1/member/auth/login', {
+    status: 200,
+    json: { success: true, data: { token: R08_MEMBER_TOKEN, user: { id: 'member-r08', phoneMasked: '138****8000', nickname: '走查会员' } } },
+  })
+  api.respond('GET', '/api/v1/me/pending-tasks', { status: 200, json: { success: true, data: [] } })
+  api.respond('GET', '/api/v1/me/favorites', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+}
+
+/** 用屏幕键盘走可见的手机号 + 验证码登录，再等回跳。 */
+async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
+  await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
+  for (const digit of '13800138000') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+  await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+  for (const digit of '123456') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
+  await page.waitForURL((url) => `${url.pathname}${url.search}` === returnTo)
+}
+
+test('R-08 member USB import carries anonymous task token into material check @w2', async ({ page, api }) => {
+  registerShell(api, { usb_import: 'available' })
+  registerMemberLogin(api)
+  const usbFile = {
+    fileId: 'usb-anon', filename: '材料.pdf', sizeBytes: 100, mimeType: 'application/pdf', sha256: 'a'.repeat(64),
+    fileUrl: '/api/v1/files/usb-anon/content', fileUrlExpiresAt: '2099-03-01T00:00:00.000Z',
+  }
+  await page.route('http://127.0.0.1:9527/local/usb/**', (route) => {
+    const path = new URL(route.request().url()).pathname
+    const data = path.endsWith('/status') ? { present: true, driveLabel: 'USB' }
+      : path.endsWith('/files')
+        ? { present: true, driveLabel: 'USB', files: [{ safeId: 'usb-1', filename: '材料.pdf', extension: 'pdf', sizeBytes: 100 }] }
+        : usbFile
+    return route.fulfill({
+      status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({ success: true, data }),
+    })
+  })
+  // 导入完成后材料检查页会取这一份文件自己的第一页做小样：接到一份可见 PDF 让请求有人应答，
+  // 否则夹具收尾报 Unhandled API requests；「未处理请求即失败」的夹具本身不放宽。
+  await page.route((url) => url.pathname === '/api/v1/files/usb-anon/content', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }))
+  // 会员请求、源文件无归属：任务不属于任何人（endUserId 空），建任务的回包里带一次性令牌，之后读任务不再回带。
+  const task = {
+    id: 'r08-inspection', kind: 'inspection', status: 'processing', requesterMode: 'member',
+    sourceFileId: 'usb-anon', resultFileId: null, endUserId: null, accessToken: 'usb-task-token',
+    params: {}, result: null, errorCode: null, errorMessage: null,
+    expiresAt: '2099-03-01T00:00:00.000Z', createdAt: NOW, updatedAt: NOW,
+  }
+  api.respond('POST', '/api/v1/materials/tasks', { status: 200, json: { success: true, data: task } })
+  api.respond('GET', `/api/v1/materials/tasks/${task.id}`, {
+    status: 200, json: { success: true, data: { ...task, accessToken: undefined } },
+  })
+  await loginThroughVisibleUi(page, '/print/upload?tab=usb')
+  await page.getByTestId('file-source-usb-file-usb-1').click()
+  await page.getByRole('button', { name: '导入这份文件' }).click()
+  const readRequest = page.waitForRequest((request) => (
+    request.method() === 'GET' && new URL(request.url()).pathname === `/api/v1/materials/tasks/${task.id}`
+  ))
+  await page.getByRole('button', { name: '下一步：材料检查' }).click()
+  const read = await readRequest
+  expect(read.headers()['x-material-task-token']).toBe('usb-task-token')
+  await expect(page.locator('[data-w2-page="print-material-check"]')).toBeVisible()
 })
