@@ -98,12 +98,12 @@ test('清场实际调用通知订阅者', async () => {
 })
 
 test('清场通知驱动 provider 的 useEnded', async () => {
-  globalThis.__licenseTest = { ended: false, listener: null, seen: null, ref: null }
+  globalThis.__licenseTest = { ended: false, listener: null, seen: null, refs: [], index: 0 }
   const fakeReact = url(`
     export const createContext = () => ({ Provider: 'provider' });
     export const useContext = () => null;
     export const useState = () => [globalThis.__licenseTest.ended, (value) => { globalThis.__licenseTest.ended = value }];
-    export const useRef = (value) => globalThis.__licenseTest.ref ??= { current: value };
+    export const useRef = (value) => { const i = globalThis.__licenseTest.index++; return globalThis.__licenseTest.refs[i] ??= { current: value } };
     export const useEffect = (fn) => { fn() };
   `)
   globalThis.React = { createElement: () => null }
@@ -114,11 +114,13 @@ test('清场通知驱动 provider 的 useEnded', async () => {
     .replaceAll("from 'react-router-dom'", `from '${url("export const useLocation=()=>({pathname:'/'})")}'`)
     .replaceAll("from '../auth/kioskSensitiveSession'", `from '${url('export const subscribeKioskSensitiveSessionClear=(fn)=>{ globalThis.__licenseTest.listener=fn; return ()=>{} }')}'`)
     .replaceAll("from '../auth/useAuth'", `from '${url('export const useAuth=()=>({user:null,guestMode:false})')}'`)
-    .replaceAll("from '../services/kioskLicenseGate'", `from '${url('export const INITIAL_KIOSK_LICENSE_GATE={}; export const useKioskLicenseGate=(ended)=>{globalThis.__licenseTest.seen=ended; return {}}')}'`)
+    .replaceAll("from '../services/kioskLicenseGate'", `from '${url('export const INITIAL_KIOSK_LICENSE_GATE={}; export const loadStoredWindDown=()=>null; export const saveStoredWindDown=()=>{}; export const useKioskLicenseGate=(ended)=>{globalThis.__licenseTest.seen=ended; return {}}')}'`)
+    .replaceAll("from './licenseWindDownRoutes'", `from '${url('export const windDownRoute=()=>null; export const isWindDownViewOnly=()=>false')}'`)
   const provider = await import(url(code))
   provider.KioskLicenseProvider({ children: null })
   assert.equal(globalThis.__licenseTest.seen, false)
   globalThis.__licenseTest.listener()
+  globalThis.__licenseTest.index = 0
   provider.KioskLicenseProvider({ children: null })
   assert.equal(globalThis.__licenseTest.seen, true)
 })
@@ -345,7 +347,7 @@ test('换票被授权拒绝时通知闸门，复查可恢复', async () => {
   }
 })
 
-test('收尾缺少截止时间时固定十分钟兜底，到点暂停', () => {
+test('收尾缺少截止时间时固定三十分钟兜底，到点暂停', () => {
   const noDeadline = { ...inactive, currentSessionEndsAt: null }
   const first = decide(gate.INITIAL_KIOSK_LICENSE_GATE, input(noDeadline))
   assert.equal(first.endsAt, new Date(time + gate.LICENSE_UNKNOWN_DEADLINE_GRACE_MS).toISOString())
@@ -391,4 +393,94 @@ test('路由登记覆盖路由表且收尾判定保持服务边界', async () =>
   assert.equal(routes.nextWindDownService('winding-down', 'normal', service, '/'), null)
   assert.equal(routes.nextWindDownService('normal', 'winding-down', null, '/me/resumes'), 'mine')
   assert.equal(routes.nextWindDownService('normal', 'winding-down', null, '/unknown'), null)
+})
+
+test('收尾记录刷新恢复、真实截止覆盖兜底、可信恢复清除', () => {
+  const store = new Map()
+  window.localStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v), removeItem: (k) => store.delete(k) }
+  const first = decide(gate.INITIAL_KIOSK_LICENSE_GATE, input(null, { rejected: true }))
+  assert.equal(first.endsAt, new Date(time + 30 * 60_000).toISOString())
+  gate.saveStoredWindDown({ service: 'convert', endsAt: first.endsAt })
+  const restored = gate.loadInitialLicenseGate()
+  assert.equal(restored.mode, 'winding-down')
+  assert.equal(gate.loadStoredWindDown().service, 'convert')
+  const repeated = decide(restored, input(null, { rejected: true, now: time + 60_000 }))
+  assert.equal(repeated.endsAt, first.endsAt)
+  const real = decide(repeated, input({ ...inactive, currentSessionEndsAt: '2026-01-01T00:45:00Z' }))
+  gate.persistLicenseGate(real, inactive)
+  assert.equal(gate.loadStoredWindDown().endsAt, real.endsAt)
+  gate.persistLicenseGate(decide(real, input(unknown)), unknown)
+  assert.equal(gate.loadStoredWindDown().service, 'convert')
+  gate.persistLicenseGate(decide(real, input(ok)), ok)
+  assert.equal(gate.loadStoredWindDown(), null)
+  assert.equal(gate.loadInitialLicenseGate().mode, 'normal')
+})
+
+test('Provider 收尾时记服务，刷新后不按新地址重认', async () => {
+  const map = new Map()
+  globalThis.window = { localStorage: { getItem: (k) => map.get(k) ?? null, setItem: (k, v) => map.set(k, v), removeItem: (k) => map.delete(k) } }
+  globalThis.__providerTest = { refs: [], index: 0, mode: 'normal', path: '/print-scan/convert', value: null }
+  const fakeReact = url(`export const createContext=()=>({Provider:'provider'}); export const useContext=()=>globalThis.__providerTest.value;
+    export const useState=()=>[false,()=>{}]; export const useEffect=(fn)=>fn();
+    export const useRef=(v)=>{const t=globalThis.__providerTest; const i=t.index++; return t.refs[i] ??= {current:v}};`)
+  globalThis.React = { createElement: (_component, props) => { globalThis.__providerTest.value = props.value; return null } }
+  const code = ts.transpileModule(readFileSync(join(root, 'src/layouts/KioskLicenseContext.tsx'), 'utf8'), {
+    fileName: 'KioskLicenseContext.tsx', compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React },
+  }).outputText
+    .replaceAll("from 'react'", `from '${fakeReact}'`)
+    .replaceAll("from 'react-router-dom'", `from '${url('export const useLocation=()=>({pathname:globalThis.__providerTest.path})')}'`)
+    .replaceAll("from '../auth/kioskSensitiveSession'", `from '${url('export const subscribeKioskSensitiveSessionClear=()=>()=>{}')}'`)
+    .replaceAll("from '../auth/useAuth'", `from '${url('export const useAuth=()=>({user:null,guestMode:false})')}'`)
+    .replaceAll("from '../services/kioskLicenseGate'", `from '${url('export const INITIAL_KIOSK_LICENSE_GATE={mode:"normal",endsAt:null,notice:null}; export const loadStoredWindDown=()=>JSON.parse(window.localStorage.getItem("test") || "null"); export const saveStoredWindDown=(v)=>window.localStorage.setItem("test",JSON.stringify(v)); export const useKioskLicenseGate=()=>({mode:globalThis.__providerTest.mode,endsAt:"2026-01-01T00:30:00Z",notice:null})')}'`)
+    .replaceAll("from './licenseWindDownRoutes'", `from '${url(transpile('src/layouts/licenseWindDownRoutes.ts'))}'`)
+  const provider = await import(url(code))
+  const render = () => { globalThis.__providerTest.index = 0; provider.KioskLicenseProvider({ children: null }) }
+  render()
+  globalThis.__providerTest.mode = 'winding-down'; render()
+  assert.equal(globalThis.__providerTest.value.windDownService, 'convert')
+  globalThis.__providerTest.refs = []; globalThis.__providerTest.path = '/resume/source'; render()
+  assert.equal(globalThis.__providerTest.value.windDownService, 'convert')
+  assert.equal(provider.useWindDownViewOnly('resume'), true)
+  assert.equal(provider.useWindDownViewOnly('convert'), false)
+})
+
+test('按服务只读、交接来源及重定向分类', async () => {
+  const routes = await import(url(transpile('src/layouts/licenseWindDownRoutes.ts')))
+  assert.equal(routes.isWindDownViewOnly('winding-down', 'convert', 'resume'), true)
+  assert.equal(routes.isWindDownViewOnly('winding-down', 'convert', 'convert'), false)
+  assert.equal(routes.isWindDownViewOnly('normal', null, 'convert'), false)
+  assert.equal(routes.windDownAllows('/print/confirm', 'convert', '', 'convert'), true)
+  assert.equal(routes.windDownAllows('/print/confirm', 'convert', '', 'mine'), false)
+  assert.equal(routes.windDownAllows('/print/confirm', 'mine', '', 'mine'), false)
+  assert.equal(routes.windDownAllows('/resume/source', 'convert', '', 'convert'), false)
+  for (const path of ['/interview/report', '/interview/reports']) assert.equal(routes.windDownAllows(path, 'mine'), true)
+  for (const path of ['/interview/setup', '/interview/session', '/interview/tips']) assert.equal(routes.windDownAllows(path, 'mine'), false)
+  for (const [path, service] of [['/print/scan-convert', 'convert'], ['/print/scan-sign', 'sign'], ['/print/material-check', 'print'], ['/print/preview', 'print'], ['/print/params', 'print'], ['/resume', 'resume'], ['/resume/upload', 'resume'], ['/resume/export', 'resume'], ['/scan/start', 'scan'], ['/scan/settings', 'scan'], ['/scan/progress', 'scan'], ['/scan/result', 'scan']]) {
+    assert.equal(routes.windDownRoute(path).service, service, path)
+    assert.equal(routes.windDownRoute(path).kind, 'work', path)
+  }
+  for (const path of ['/print/scan-feature', '/jobs/online-platforms']) assert.equal(routes.windDownRoute(path).kind, 'always', path)
+})
+
+test('交接来源只认当前有效编号，不带文件或用户资料', async () => {
+  const map = new Map()
+  window.sessionStorage = { getItem: (k) => map.get(k) ?? null, setItem: (k, v) => map.set(k, v), removeItem: (k) => map.delete(k) }
+  const session = url(transpile('src/pages/print/printMaterialSession.ts'))
+  const policy = url(transpile('src/pages/print/printHandoffPolicy.ts'))
+  const copy = url(transpile('src/copy/unattendedCopy.ts'))
+  const handoff = await import(url(transpile('src/pages/print/printHandoff.ts')
+    .replaceAll("from './printMaterialSession'", `from '${session}'`)
+    .replaceAll("from './printHandoffPolicy'", `from '${policy}'`)
+    .replaceAll("from '../../copy/unattendedCopy'", `from '${copy}'`)))
+  const owner = { kind: 'guest' }
+  const result = handoff.beginPrintHandoff({ origin: 'upload', file: { name: 'private.pdf', fileId: 'private-id', fileUrl: '/api/v1/files/private-id/content', size: '1 KB' } }, owner)
+  assert.equal(result.ok, true)
+  handoff.recordPrintHandoffService(result, 'convert')
+  assert.deepEqual(JSON.parse(map.get('kiosk_print_handoff_service_v1')), { contextId: result.context.contextId, service: 'convert' })
+  assert.equal(handoff.readPrintHandoffService(owner), 'convert')
+  const next = handoff.beginPrintHandoff({ origin: 'upload', file: { name: 'other.pdf', fileId: 'other', fileUrl: '/api/v1/files/other/content', size: '1 KB' } }, owner)
+  assert.equal(next.ok, true)
+  assert.equal(handoff.readPrintHandoffService(owner), null)
+  handoff.recordPrintHandoffService(next, 'mine')
+  assert.equal(handoff.readPrintHandoffService(owner), 'mine')
 })

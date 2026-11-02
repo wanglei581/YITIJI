@@ -17,18 +17,42 @@ export interface KioskLicenseGateInput {
   useEnded: boolean
 }
 export const INITIAL_KIOSK_LICENSE_GATE: KioskLicenseGate = { mode: 'normal', endsAt: null, notice: null }
-export const LICENSE_UNKNOWN_DEADLINE_GRACE_MS = 10 * 60_000
+// 与服务端 terminal-session 的 SESSION_TTL_SECONDS（30 分钟）对齐。
+export const LICENSE_UNKNOWN_DEADLINE_GRACE_MS = 30 * 60_000
 const PAUSED_STORAGE_KEY = 'kiosk_license_paused_v1'
+const WIND_DOWN_STORAGE_KEY = 'kiosk_license_winddown_v1'
+export interface StoredWindDown { service: string | null; endsAt: string | null }
+
+export function loadStoredWindDown(): StoredWindDown | null {
+  try {
+    const raw = window.localStorage.getItem(WIND_DOWN_STORAGE_KEY)
+    if (!raw) return null
+    const value = JSON.parse(raw)
+    if ((typeof value.service !== 'string' && value.service !== null) ||
+        (value.endsAt !== null && (typeof value.endsAt !== 'string' || !Number.isFinite(Date.parse(value.endsAt))))) return null
+    return { service: value.service, endsAt: value.endsAt }
+  } catch { return null }
+}
+export function saveStoredWindDown(value: StoredWindDown): void {
+  try { window.localStorage.setItem(WIND_DOWN_STORAGE_KEY, JSON.stringify(value)) } catch { /* storage unavailable */ }
+}
 
 export function loadInitialLicenseGate(): KioskLicenseGate {
   try { if (window.localStorage.getItem(PAUSED_STORAGE_KEY) === '1') return { ...INITIAL_KIOSK_LICENSE_GATE, mode: 'paused' } } catch { /* storage unavailable */ }
-  return INITIAL_KIOSK_LICENSE_GATE
+  const stored = loadStoredWindDown()
+  return stored ? { ...INITIAL_KIOSK_LICENSE_GATE, mode: 'winding-down', endsAt: stored.endsAt } : INITIAL_KIOSK_LICENSE_GATE
 }
 
 export function persistLicenseGate(gate: KioskLicenseGate, profile: PublicKioskProfile | null): void {
   try {
     if (gate.mode === 'paused') window.localStorage.setItem(PAUSED_STORAGE_KEY, '1')
-    else if (profile && profile.licenseState !== null && profile.acceptsNewSessions) window.localStorage.removeItem(PAUSED_STORAGE_KEY)
+    else if (profile && profile.licenseState !== null && profile.acceptsNewSessions) {
+      window.localStorage.removeItem(PAUSED_STORAGE_KEY)
+      window.localStorage.removeItem(WIND_DOWN_STORAGE_KEY)
+    } else if (gate.mode === 'winding-down') {
+      const stored = loadStoredWindDown()
+      if (stored) saveStoredWindDown({ ...stored, endsAt: gate.endsAt })
+    }
   } catch { /* storage unavailable */ }
 }
 
@@ -43,9 +67,8 @@ export function decideKioskLicenseGate(previous: KioskLicenseGate, input: KioskL
   if ((verified && !profile.acceptsNewSessions) || rejected) {
     next = {
       mode: previous.mode === 'paused' ? 'paused' : 'winding-down',
-      endsAt: verified && profile.currentSessionEndsAt === null
-        ? (previous.mode === 'winding-down' && previous.endsAt !== null ? previous.endsAt : new Date(now + LICENSE_UNKNOWN_DEADLINE_GRACE_MS).toISOString())
-        : verified ? profile.currentSessionEndsAt : previous.endsAt,
+      endsAt: (verified ? profile.currentSessionEndsAt : null) ??
+        (verified && previous.mode !== 'winding-down' ? null : previous.endsAt) ?? new Date(now + LICENSE_UNKNOWN_DEADLINE_GRACE_MS).toISOString(),
       notice: verified ? profile.noticeLine : previous.notice,
     }
   }

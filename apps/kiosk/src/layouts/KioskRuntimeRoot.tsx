@@ -13,7 +13,9 @@ import { KioskLicenseProvider, useKioskLicense } from './KioskLicenseContext'
 import { LicenseWindDownPrompt } from './LicenseWindDownPrompt'
 import { KioskPausedScreen } from '../components/KioskPausedScreen'
 import { WindDownBlockedScreen } from './WindDownBlockedScreen'
-import { nextWindDownService, windDownAllows } from './licenseWindDownRoutes'
+import { windDownAllows, windDownRoute } from './licenseWindDownRoutes'
+import { usePrintHandoffOwner } from '../pages/print/usePrintHandoff'
+import { readPrintHandoffService } from '../pages/print/printHandoff'
 
 function ContentUpdateGuard() {
   useContentUpdate()
@@ -44,10 +46,9 @@ function SupportContactGuard() {
 }
 
 function LicensedOutlet() {
-  const { mode } = useKioskLicense()
+  const { mode, windDownService } = useKioskLicense()
   const { pathname, search } = useLocation()
-  const windDown = useRef<{ mode: string; service: string | null }>({ mode: 'normal', service: null })
-  windDown.current = { mode, service: nextWindDownService(windDown.current.mode, mode, windDown.current.service, pathname) }
+  const owner = usePrintHandoffOwner()
   const navigate = useNavigate()
   const { endKioskUse } = useKioskSessionControl()
   const previousMode = useRef(mode)
@@ -57,7 +58,8 @@ function LicensedOutlet() {
     previousMode.current = mode
   }, [mode, navigate, endKioskUse])
   if (mode === 'paused') return <KioskPausedScreen />
-  if (mode === 'winding-down' && !windDownAllows(pathname, windDown.current.service, search)) return <WindDownBlockedScreen />
+  const handoffService = mode === 'winding-down' && windDownRoute(pathname)?.service === 'print' ? readPrintHandoffService(owner) : null
+  if (mode === 'winding-down' && !windDownAllows(pathname, windDownService, search, handoffService)) return <WindDownBlockedScreen />
   return <Outlet />
 }
 

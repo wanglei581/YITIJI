@@ -21,7 +21,8 @@ const groups: Array<[string, WindDownRouteKind, string[]]> = [
   ['career-plan', 'work', ['/resume/career-plan']],
   ['self-assessment', 'work', ['/resume/self-assessment/intro', '/resume/self-assessment/questions']],
   ['self-assessment', 'result', ['/resume/self-assessment/result', '/resume/self-assessment/history']],
-  ['interview', 'work', ['/interview-service', '/interview', '/interview/setup', '/interview/session', '/interview/report', '/interview/tips', '/interview/reports']],
+  ['interview', 'work', ['/interview-service', '/interview', '/interview/setup', '/interview/session', '/interview/tips']],
+  ['interview', 'result', ['/interview/report', '/interview/reports']],
   ['assistant', 'work', ['/assistant']],
   ['ai-plan', 'work', ['/ai/plan', '/session-resume']],
   ['policy', 'work', ['/policy-service']],
@@ -49,12 +50,17 @@ export function windDownRoute(pathname: string): WindDownRoute | undefined {
  */
 const RESULT_STAGES: Record<string, readonly string[]> = { '/interview': ['report', 'reports'] }
 
-export function windDownAllows(pathname: string, currentService: string | null, search = ''): boolean {
+export function windDownAllows(pathname: string, currentService: string | null, search = '', handoffService: string | null = null): boolean {
   const route = windDownRoute(pathname)
   if (!route) return false
   const stage = new URLSearchParams(search).get('stage')
   const kind = route.kind === 'work' && stage !== null && RESULT_STAGES[route.path]?.includes(stage) ? 'result' : route.kind
-  return kind !== 'work' || (currentService !== null && route.service === currentService)
+  return kind !== 'work' || (currentService !== null && route.service === currentService) ||
+    (route.service === 'print' && currentService !== null && !['public', 'mine', 'information'].includes(currentService) && handoffService === currentService)
+}
+
+export function isWindDownViewOnly(mode: string, currentService: string | null, service: string): boolean {
+  return mode === 'winding-down' && currentService !== service
 }
 
 export function nextWindDownService(previousMode: string, mode: string, currentService: string | null, pathname: string): string | null {
