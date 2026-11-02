@@ -405,6 +405,8 @@ jobs:
           pnpm run verify:scan-deletion-audit
           # 屏上扫描引擎底座：假 PowerShell 执行器 + 假时钟 + 临时目录（另有少量真实 node 子进程验证管道与强杀），不起 PowerShell、不碰扫描仪或打印机。
           pnpm run verify:scan-device-engine
+          # 屏上扫描接线：假执行器、假后端、假时钟。不起 PowerShell，不碰扫描仪或打印机。
+          pnpm run verify:scan-device-runner
           # Linux-safe fault injection only: temp SQLite + loopback HTTP fixture; no Windows printer or external network.
           pnpm run verify:task-reliability
           # 同一任务号按 attempt 重打：临时 SQLite + loopback HTTP + 打印桩，不碰 Windows 打印机。

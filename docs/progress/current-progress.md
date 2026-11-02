@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-11-02：屏上扫描 ③ 终端程序第二批 A2——接线（分支 `claude/scan-device-a2-1102`，未合并、未部署）
+
+- 做了：在 A1 底座上接配置开关（默认关）、current-lease 核对、调度、本机 HTTP、健康探测、心跳两个字段、删除审计原因码。开关不是 true 时不注册扫描路由、不探测、不清理残留、心跳不带新字段，删除审计仍只上报原来的原因码白名单之外会进死信。
+- 本机接口：`GET /local/scan/probe`，`POST /local/scan/start`、`/next-page`、`/finish`、`/abort`。不加 `GET /local/scan/status`：一体机每 3 秒看云端会话，每条本机命令的响应已经带 state、pageCount、errorCode。
+- 新门禁 `verify:scan-device-runner`（16 组，假执行器、假后端、假时钟），已进 ci.yml。
+- 没做：打印领取持锁（任务第 10 项）还没提交。没碰真机，没打安装包，没部署。B1 上生产前不得打开 `scanDeviceEnabled`。#1465 去留定下来之前，不往真机发新的终端程序安装包。
+
 ## 2026-11-02：屏上扫描 ③ 终端程序第一批 A1——底座，不接线（分支 `claude/scan-device-a1-1102`，未合并、未部署）
 
 - 做了：终端程序加屏上扫描引擎底座——设备锁（进程内互斥、先到先得、30 秒超时；打印侧接锁在 A2）、私有临时目录（`%ProgramData%\AIJobPrintAgent\scan-device\<任务号>\`，提供立即删除与启动清残留，删除写本地审计、只存 HMAC）、WIA 脚本与运行器（参数只走白名单、逐页一行 JSON、取消标记、45 秒后强杀、卡纸删页、预热重试、探测）、按 20 页 / 18 MiB 上限合 PDF；`imagesToPdf` 新增，`imageToPdf` 不变。
