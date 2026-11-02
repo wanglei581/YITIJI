@@ -184,6 +184,12 @@ const USER_FACING_ERROR_PAGES = [
   'src/pages/print-scan/SignStampPage.tsx',
   'src/pages/print-scan/ConvertImagesPage.tsx',
   'src/pages/scan/ScanProgressPage.tsx',
+  // 2026-11-02 K1a：设置页按职责拆开，创建失败 / 投递确认的错误处置在几个 hook 里，一并查。
+  'src/pages/scan/useScanSettingsState.ts',
+  'src/pages/scan/useScanSessionCreate.ts',
+  'src/pages/scan/useScanSettingsDeliveryAck.ts',
+  'src/pages/scan/useScanSettingsExpiry.ts',
+  'src/pages/scan/useScanSettingsActions.ts',
   'src/pages/scan/ScanSettingsPage.tsx',
   'src/pages/profile/me/MySettingsPage.tsx',
   'src/pages/profile/me/MyPrivacyRequestsPage.tsx',

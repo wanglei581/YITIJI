@@ -125,7 +125,8 @@ const checks = [
     assert.match(doneRuntime, /: '拿走前记得核一下页数。'/)
     const handoff = read('src/pages/print/printHandoff.ts')
     const confirm = read('src/pages/print/PrintConfirmPage.tsx')
-    const scan = read('src/pages/scan/ScanResultPage.tsx')
+    // 2026-11-02 K1a：结果页按职责拆开，「拿去打印」的交接（idDocument）在 useScanResultExits.ts。
+    const scan = read('src/pages/scan/useScanResultExits.ts')
     const documents = read('src/pages/profile/me/MyDocumentsPage.tsx')
     assert.match(handoff, /input\.idDocument === true/)
     assert.match(confirm, /idDocument:\s*handoff\.idDocument === true/)
