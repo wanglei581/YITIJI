@@ -1,5 +1,20 @@
 # 当前开发进度
 
+## 2026-11-02：删除 11 个全仓零引用的一体机旧文件（逐个举证；2 个保留）
+
+- 范围：图谱 `docs/graph/orphans.md` low 档里点名的 13 个一体机文件。只 `git rm` 通过全部证据的。不改 CI / verify 门禁、合规闸门、硬件适配，也不动 `docs/design` 冻结稿。动态引用：全仓没有 `import.meta.glob` / `require.context`；kiosk 仅有的 `lazy(() => import(` 是打印页的 `DevSandboxControls`，匹配不到这 13 个。开着的 PR：`gh pr list` 128 个，逐个 `git fetch origin pull/<编号>/head` 后看 `git diff --name-only origin/main...<提交>`。图谱对这 13 个都报「没有任何门禁断言」。最后一次提交都早于 14 天（最近的是 `home-v6-footer.css` 的 `5d800c3020`，2026-10-06）。
+- 删除 11 个：
+  - `apps/kiosk/src/pages/home/components/V6HomeFooterPanels.tsx`：`git grep V6HomeFooterPanels` 只命中自身；128 个 PR 都没改它。最后提交 `5cb74bc6c1`（2026-08-16）。
+  - `apps/kiosk/src/pages/home/prototypeIcons.tsx`：文件名零命中。导出的 `ProtoIcon` 只出现在 2026-07-24 计划稿的示例 JSX 里，没有 import。最后提交 `5883c8c4ea`（2026-07-21）。
+  - `apps/kiosk/src/pages/profile/assets/ui.tsx`：`profile/assets/ui`、`assets/ui`、`from './ui'` 零命中；`RowIconButton` 无调用。同目录 `format.ts` 等其它文件仍在用，没动。最后提交 `6824100759`（2026-07-03）。
+  - `apps/kiosk/src/pages/scan/ScanFlowSteps.tsx`：没有 import。本文件 2026-07-25 的更新记录里有一句历史叙述提到组件名，不是路径也不是 import；现行扫描页不引用它。最后提交 `5843cafa8f`（2026-07-25）。
+  - `apps/kiosk/src/services/api/smartCampus.ts`、`smartCampusHttpAdapter.ts`、`smartCampusMockAdapter.ts`：三者只互相引用，kiosk 里没有人 import 这个模块。现行智慧校园走 `useSmartCampusConfig` → `getKioskTerminalConfig`；`verify-terminal-device-config.ts` 禁止钩子回退 `getSmartCampusConfig(`。不是停放件：停放清单里的智慧校园页是迎新洞察页，不是这三个旧的按功能客户端；也没有文档把它们列为校园招聘或私有化部署 b 要保留的源码。最后提交 `bcb24062a9`（2026-07-29）、`6f0d38397c`（2026-08-19）、`109c7c7cb8`（2026-07-01）。
+  - `apps/kiosk/src/pages/home/styles/home-v6-footer.css`、`apps/kiosk/src/pages/resume/job-fit-actions.css`、`jobFit-inkpaper-ext.css`、`resume-library-ext.css`：路径零命中，没有 `@import`。岗位行动页实际引入的是 `job-fit-qx.css` 与 `resume-decision-qx.css`。
+- 保留 2 个：
+  - `apps/kiosk/src/pages/home/components/HomeHeroHeader.tsx`：`QxHomeView.tsx` 第 35 行 import 并渲染，删了类型检查会断。开着的 PR #1528、#1521、#1511 都在改它（同一提交 `1cc7937f28`）。图谱把它标成 low 是漏报：import 没写 `.tsx`，提及索引对不上。
+  - `apps/kiosk/src/pages/assistant/assistant-cockpit-body.css`：开着的 PR #1383 仍在改它（`afe050b0f3` 删了 9 行）。现行顾问页 import 的是 `assistant-qingxu.css` 与 `assistant-touch.css`，没有引入这份样式；按「开着的 PR 改过就保留」。
+- 校验：`CI=true pnpm install --frozen-lockfile --prefer-offline` 通过（812 包，锁文件未改）。`pnpm --filter kiosk typecheck` 通过。`pnpm --filter kiosk lint` 通过（0 error，27 条原有 warning，都不在被删文件上）。不带环境变量的 `pnpm --filter kiosk build` 被生产闸门拒绝（`VITE_API_MODE` 未设置）；按 `ci.yml` 同一组变量（`VITE_API_MODE=http`、`VITE_API_BASE_URL=/api/v1`、`VITE_USE_TRTC_CALL=true`、`VITE_TERMINAL_ID=KSK-001`、桥接令牌）再跑，`tsc -b && vite build` 通过（3150 个模块）。图谱重新生成后 `--check` 通过。low 从 96 变为 83：11 个是删掉的，另外 2 个是上面保留的文件被本条点名后从 low 升到 medium。
+
 ## 2026-11-02：本人数据导出不再把编号当手机号打码（顺带消除上传会话门禁约 1% 的偶发红）
 
 - 问题：本人数据导出对所有字符串套手机号打码（「1[3-9]」开头的 11 位数字串，留前 3 位和后 4 位），编号也被打。文件编号是 32 位十六进制，本机模拟 40 万次约 0.93% 碰巧含这种数字串，导出里变成 `139****5678` 的样子，跟「我的文档」对不上；自我探索任务编号（sa- 加 24 位十六进制）约 0.52%，带横杠的标准编号约 0.08%。上传会话门禁 h 用例的正向对照因此约 1% 偶发红（#1524 只改文档，CI 第一次就撞上），同一处的反向断言也可能因编号被打坏而误放行。
