@@ -196,11 +196,6 @@ export class LicenseWorld {
   /**
    * 一段一段推进页面时钟，直到 reached() 为真；推进满 limitMs 还没到就报错。返回实际推进的毫秒数。
    *
-   * 用在「到期」这类由页面里单个定时器触发的转换上。页面到点的做法是 setTimeout(…, 到期时刻 - Date.now()) 触发一次重新判定，
-   * Playwright 假时钟在 runFor 里让定时器与 React 渲染交错执行，Date.now() 不保证单调：实测定时器触发时读到 600.002 秒，
-   * 紧接着 effect 里再读却是 599.680 秒（到期时刻 600.000 秒），这一次判定落空，要等下一次 profile（每 3 分钟）才补上。约每 10 次出现 1 次。
-   * 真浏览器的 Date.now() 不倒退，没有这个问题。所以不断言「恰好在到期那一刻」，而是断言「到期后不晚于下一次 profile 读取」
-   * （调用方传 limitMs），并另用「到期之前不是」把下界钉住。
    */
   async advanceUntil(reached: () => Promise<boolean>, limitMs: number, options: { step?: number; active?: boolean } = {}): Promise<number> {
     const step = options.step ?? 30_000
