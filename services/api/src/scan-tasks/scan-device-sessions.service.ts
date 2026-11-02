@@ -144,7 +144,9 @@ export class ScanDeviceSessionsService {
           startMode: 'device',
           status: 'waiting',
           deliveryAckedAt: { not: null },
-          expiresAt: { gt: now },
+          // 读到的 expiresAt 一并钉死（B1 复审修复）：两条同状态回报交错时，较晚算出的截止时间不会被较早算出的值覆盖回去；
+          // 对不上就重读重判。仍要求没过期。
+          expiresAt: { equals: task.expiresAt, gt: now },
           deviceState: task.deviceState,
           devicePageCount: task.devicePageCount,
         },
@@ -226,7 +228,8 @@ export class ScanDeviceSessionsService {
           startMode: 'device',
           status: 'waiting',
           fileId: null,
-          expiresAt: { gt: now },
+          // 读到的 expiresAt 一并钉死（B1 复审修复）：读写之间别的请求续过截止时间，就重读重判，不把较晚的值覆盖回较早的。
+          expiresAt: { equals: task.expiresAt, gt: now },
         },
         data: {
           startMode: 'panel',
@@ -333,7 +336,8 @@ export class ScanDeviceSessionsService {
           startMode: 'device',
           status: 'waiting',
           fileId: null,
-          expiresAt: { gt: now },
+          // 读到的 expiresAt 也钉死：读写之间别的请求续过截止时间，就重读重判，不把较晚的值覆盖回较早的。
+          expiresAt: { equals: task.expiresAt, gt: now },
           // 读到的 ready / error 与来源、颜色一并钉死：这几个值是响应的依据，读写之间被改了就重读重判。
           deviceState: task.deviceState,
           deviceSource: task.deviceSource,

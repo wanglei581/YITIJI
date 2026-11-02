@@ -292,6 +292,88 @@ async function main(): Promise<void> {
       pass('面板路线不受影响：设备列被翻也照常投递；已改用面板的会话 watcher 投递照常；抢占前被取消仍是原来的 409')
     }
 
+    // ── B. 截止时间只增不减 ────────────────────────────────────────────────────
+    console.log('\n-- B. 并发时截止时间只增不减（条件更新钉住读到的 expiresAt）--')
+    {
+      // 在服务读到行之后、写之前插入别人的操作，来模拟并发（每次 findUnique 返回后调一次钩子，read 从 1 数起）
+      const racing = (hook: (read: number, id: string) => Promise<void>) => {
+        let reads = 0
+        const wrapped = {
+          scanTask: {
+            findUnique: async (args: { where: { id: string } }) => {
+              const row = await prisma.scanTask.findUnique(args as never)
+              reads += 1
+              await hook(reads, args.where.id)
+              return row
+            },
+            updateMany: (args: never) => prisma.scanTask.updateMany(args),
+          },
+        }
+        return { svc: new ScanDeviceSessionsService(wrapped as never, capabilities), reads: () => reads }
+      }
+      const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+      // B1. 两条同状态回报交错：先读的那条（A）在写之前，后读的那条（B）已经写完，A 的 now 比 B 的早，
+      //     A 算出的截止时间比 B 的小。A 的条件更新钉住读到的 expiresAt，写不进去 → 重读 → 按最新值重新续，最终不小于 B 写下的值
+      {
+        const s = await deviceSession('monoreport')
+        await deviceSvc.report(s.t.id, s.id, { state: 'scanning', pageCount: 1 })
+        // 把截止时间压到 now+30 秒，两条回报才都真的要续（续到各自的 now+3 分钟）
+        await prisma.scanTask.update({ where: { id: s.id }, data: { expiresAt: new Date(Date.now() + 30_000) } })
+        let laterValue = 0
+        const racer = racing(async (read, id) => {
+          if (read !== 1) return
+          await sleep(40) // 保证 B 的 now 比 A 的 now 至少晚 40ms，两条续出来的截止时间可区分
+          await deviceSvc.report(s.t.id, id, { state: 'scanning', pageCount: 1 })
+          laterValue = (await rowOf(id)).expiresAt.getTime()
+        })
+        const result = await racer.svc.report(s.t.id, s.id, { state: 'scanning', pageCount: 1 })
+        const finalAt = (await rowOf(s.id)).expiresAt.getTime()
+        assert.ok(laterValue > 0, '钩子必须执行过（较晚那条回报已写下截止时间）')
+        assert.ok(finalAt >= laterValue, `两条同状态回报交错：截止时间只增不减。较晚那条写下 ${laterValue}，最终却是 ${finalAt}（被较早算出的值覆盖回去了）`)
+        assert.equal(result.expiresAt, new Date(finalAt).toISOString(), '响应里的 expiresAt 与库一致')
+        assert.equal(racer.reads(), 2, '条件更新对不上后重读重判了一次')
+        assert.equal((await rowOf(s.id)).deviceState, 'scanning')
+      }
+
+      // B2. 改用面板与别人的续期交错：别人刚把截止时间续到 25 分钟后（比 now+10 分钟更晚，仍在 hardExpiresAt 之内），
+      //     改用面板不得把它写回 now+10 分钟
+      {
+        const s = await deviceSession('monoswitch')
+        await deviceSvc.report(s.t.id, s.id, { state: 'error', errorCode: 'feeder_empty' })
+        await prisma.scanTask.update({ where: { id: s.id }, data: { expiresAt: new Date(Date.now() + 30_000) } })
+        const extended = new Date(Date.now() + 25 * 60_000)
+        const racer = racing(async (read, id) => {
+          if (read === 1) await prisma.scanTask.update({ where: { id }, data: { expiresAt: extended } })
+        })
+        const result = await racer.svc.switchToPanel(s.id, null, s.token)
+        const row = await rowOf(s.id)
+        assert.equal(row.startMode, 'panel')
+        assert.ok(row.expiresAt.getTime() >= extended.getTime(), `改用面板与别人的续期交错：截止时间只增不减。别人续到 ${extended.getTime()}，最终却是 ${row.expiresAt.getTime()}`)
+        assert.equal(result.expiresAt, row.expiresAt.toISOString(), '响应里的 expiresAt 与库一致')
+        assert.equal(racer.reads(), 2, '条件更新对不上后重读重判了一次')
+      }
+
+      // B3. 改扫描设置与别人的续期交错：同上
+      {
+        const s = await deviceSession('monosettings')
+        await deviceSvc.report(s.t.id, s.id, { state: 'error', errorCode: 'feeder_empty' })
+        await prisma.scanTask.update({ where: { id: s.id }, data: { expiresAt: new Date(Date.now() + 30_000) } })
+        const extended = new Date(Date.now() + 25 * 60_000)
+        const racer = racing(async (read, id) => {
+          if (read === 1) await prisma.scanTask.update({ where: { id }, data: { expiresAt: extended } })
+        })
+        const result = await racer.svc.updateDeviceSettings(s.id, null, s.token, { source: 'flatbed' })
+        const row = await rowOf(s.id)
+        assert.equal(row.deviceSource, 'flatbed')
+        assert.equal(row.deviceState, 'ready')
+        assert.ok(row.expiresAt.getTime() >= extended.getTime(), `改设置与别人的续期交错：截止时间只增不减。别人续到 ${extended.getTime()}，最终却是 ${row.expiresAt.getTime()}`)
+        assert.equal(result.expiresAt, row.expiresAt.toISOString(), '响应里的 expiresAt 与库一致')
+        assert.equal(racer.reads(), 2, '条件更新对不上后重读重判了一次')
+      }
+      pass('截止时间只增不减：两条同状态回报交错、改用面板与别人的续期交错、改设置与别人的续期交错——条件更新钉住读到的 expiresAt，对不上就重读重判')
+    }
+
     // @@NEXT-SECTION@@
 
     console.log('\nPASS verify-scan-device-lifecycle')
