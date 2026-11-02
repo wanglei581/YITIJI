@@ -725,6 +725,22 @@ function verifyKnownLegacyResidueCleanup(): void {
   runKnownLegacyResidueCleanupTests()
 }
 
+function verifyPostDispatchFailureStaysUnconfirmed(): void {
+  const runner = readFileSync(join(__dirname, '../src/agent/task-runner.ts'), 'utf8')
+  const monitor = readFileSync(join(__dirname, '../src/agent/print-job-monitor.ts'), 'utf8')
+  assert.match(runner, /export function reportedPrintCommandFailure/)
+  assert.match(runner, /errorCode: 'PAPER_EMPTY'/)
+  assert.match(runner, /errorCode: 'PRINTER_ERROR'/)
+  assert.doesNotMatch(monitor, /errorCode: 'PAPER_EMPTY'/)
+  assert.doesNotMatch(monitor, /errorCode: 'PRINTER_ERROR'/)
+  assert.match(monitor, /COMPLETION_GRACE_POLLS = 4/)
+  assert.doesNotMatch(runner, /queue removal may reach the server as completed/)
+  assert.doesNotMatch(monitor, /inferred/)
+  const printAt = runner.indexOf('const result = await print(')
+  const reportedAt = runner.indexOf('reportedPrintCommandFailure(result.errorCode, result.errorMessage)')
+  assert.ok(printAt >= 0 && reportedAt > printAt, 'command-failure reporting must stay after print()')
+}
+
 async function main(): Promise<void> {
   const cases: Array<[string, () => void | Promise<void>]> = [
     ['claim rate-limit pause computation', verifyClaimPauseComputation],
@@ -734,6 +750,7 @@ async function main(): Promise<void> {
     ['retry-limit dead-letter durability', verifyRetryLimitBecomesDurableDeadLetter],
     ['known terminal task replay', verifyKnownTerminalTasksAreReplayed],
     ['pre-print dispatch durability', verifyDispatchIntentIsDurableBeforePrinterInvocation],
+    ['post-dispatch failure stays unconfirmed', verifyPostDispatchFailureStaysUnconfirmed],
     ['real DB migration and terminal replay', verifyRealDatabaseMigrationAndTerminalReplay],
     ['dead-letter operator workflow', verifyDeadLetterOperatorWorkflow],
     ['instance-lock exclusive create and successor-safe release', runInstanceLockHardeningTests],

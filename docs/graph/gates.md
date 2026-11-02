@@ -26,7 +26,7 @@ _（空）_
 
 ──────────────────────────────────────────────────────────────────────
 
-## 有脚本名但不在 CI 执行闭包里（14）
+## 有脚本名但不在 CI 执行闭包里（15）
 
 这一栏是**尽力而为的推断**，权威是 `verify:ci-gate-coverage` 加
 `scripts/ci-gate-exemptions.json`。已在豁免清单里登记的（需要真实凭证 / 真机 /
@@ -41,6 +41,7 @@ _（空）_
 | `apps/kiosk/scripts/probe-ai-resume-closure-42.mjs` | `@ai-job-print/kiosk::verify:probe-ai-resume-closure-42` |
 | `apps/kiosk/scripts/probe-file-closure-43.mjs` | `@ai-job-print/kiosk::verify:probe-file-closure-43` |
 | `apps/kiosk/scripts/probe-member-session-41.mjs` | `@ai-job-print/kiosk::verify:probe-member-session-41` |
+| `apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts` | `terminal-agent::verify:boot-spool-guard-windows` |
 | `apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts` | `terminal-agent::verify:print-queue-residue-windows` |
 | `scripts/generate-project-graph.mjs` | `ai-job-print-terminal::graph`<br/>`ai-job-print-terminal::graph:check` |
 | `scripts/project-graph-query.mjs` | `ai-job-print-terminal::graph:query` |
@@ -69,7 +70,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1959 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1965 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -98,7 +99,7 @@ node scripts/project-graph-query.mjs file <路径>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `.github/workflows/ci.yml` | `verify-browser-spec-coverage.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-job-ai-history-privacy-ui.mjs`<br/>`verify-job-ai-ui.mjs`<br/>`verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-end-use.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-member-login-dialog.mjs`<br/>`verify-mic-capability-truth.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-profile-print-orders-inkpaper.mjs`<br/>`verify-profile-print-orders-login-smoke.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-service-desk-foundation.mjs`<br/>`gates.mjs`<br/>`verify-ci-gate-coverage.mjs`<br/>`verify-ci-main-runs-complete.mjs`<br/>`verify-release-bundle.mjs`<br/>`verify-contract-review-preprod-readiness.ts`<br/>`verify-free-print-quota.ts`<br/>`verify-job-ai-backend.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-job-ai-privacy.ts`<br/>`verify-job-customer-sample-readiness.ts`<br/>`verify-job-data-quality.ts`<br/>`verify-job-info-ai-real-acceptance.ts`<br/>`verify-partner-excel-template.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-profile-commercial-first-batch-acceptance.ts` |
+| `.github/workflows/ci.yml` | `verify-browser-spec-coverage.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-job-ai-history-privacy-ui.mjs`<br/>`verify-job-ai-ui.mjs`<br/>`verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-end-use.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-member-login-dialog.mjs`<br/>`verify-mic-capability-truth.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-profile-print-orders-inkpaper.mjs`<br/>`verify-profile-print-orders-login-smoke.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-boot-spool-guard.mjs`<br/>`verify-service-desk-foundation.mjs`<br/>`gates.mjs`<br/>`verify-ci-gate-coverage.mjs`<br/>`verify-ci-main-runs-complete.mjs`<br/>`verify-release-bundle.mjs`<br/>`verify-contract-review-preprod-readiness.ts`<br/>`verify-free-print-quota.ts`<br/>`verify-job-ai-backend.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-job-ai-privacy.ts`<br/>`verify-job-customer-sample-readiness.ts`<br/>`verify-job-data-quality.ts`<br/>`verify-job-info-ai-real-acceptance.ts`<br/>`verify-partner-excel-template.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-profile-commercial-first-batch-acceptance.ts` |
 
 </details>
 
@@ -143,7 +144,7 @@ node scripts/project-graph-query.mjs file <路径>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `.github/workflows/windows-agent-installer.yml` | `verify-ci-gate-coverage.mjs` |
+| `.github/workflows/windows-agent-installer.yml` | `verify-boot-spool-guard.mjs`<br/>`verify-ci-gate-coverage.mjs` |
 
 </details>
 
@@ -1249,13 +1250,25 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/terminal-agent/scripts/</code> — 6 个文件</summary>
+<summary><code>apps/terminal-agent/installer/</code> — 3 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `apps/terminal-agent/installer/provision/boot-spool-guard-task.ps1` | `verify-boot-spool-guard-windows.ts` |
+| `apps/terminal-agent/installer/provision/boot-spool-guard.ps1` | `verify-boot-spool-guard-windows.ts` |
+| `apps/terminal-agent/installer/provision/daily-reboot.ps1` | `verify-boot-spool-guard-windows.ts` |
+
+</details>
+
+<details>
+<summary><code>apps/terminal-agent/scripts/</code> — 7 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `apps/terminal-agent/scripts/agent-crash-privacy.helper.ts` | `verify-task-reliability.ts` |
+| `apps/terminal-agent/scripts/collect-field-evidence.ps1` | `verify-boot-spool-guard.mjs` |
 | `apps/terminal-agent/scripts/diagnose-production-agent.ps1` | `verify-agent-unauthorized.mjs` |
-| `apps/terminal-agent/scripts/install-production-agent.ps1` | `verify-agent-unauthorized.mjs`<br/>`verify-terminal-bind-code.ts` |
+| `apps/terminal-agent/scripts/install-production-agent.ps1` | `verify-agent-unauthorized.mjs`<br/>`verify-boot-spool-guard.mjs`<br/>`verify-terminal-bind-code.ts` |
 | `apps/terminal-agent/scripts/scan-lease-barrier.helper.ts` | `verify-scan-watcher.ts` |
 | `apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts` | `verify-scan-device-engine.ts` |
 | `apps/terminal-agent/scripts/verify-windows-service-recovery.mjs` | `verify-agent-unauthorized.mjs` |
@@ -1263,7 +1276,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/terminal-agent/src/</code> — 49 个文件</summary>
+<summary><code>apps/terminal-agent/src/</code> — 50 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1282,6 +1295,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/src/agent/offline-queue.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-print-retry-attempt.ts`<br/>`verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/print-correlation.ts` | `verify-print-retry-attempt.ts` |
 | `apps/terminal-agent/src/agent/print-dispatch-gate.ts` | `verify-print-queue-residue-windows.ts`<br/>`verify-print-queue-residue.ts` |
+| `apps/terminal-agent/src/agent/print-job-monitor.ts` | `verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/print-monitor-timeout.ts` | `verify-print-truth-hardening.ts` |
 | `apps/terminal-agent/src/agent/print-queue-hold.ts` | `verify-print-queue-residue-windows.ts`<br/>`verify-print-queue-residue.ts` |
 | `apps/terminal-agent/src/agent/print-task-temp-cleanup.ts` | `verify-print-scan-agent.mjs` |
@@ -2339,7 +2353,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 610 个文件</summary>
+<summary><code>services/api/src/</code> — 611 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2386,7 +2400,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/ai-public-quota.service.ts` | `verify-ai-public-quota.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-member-assets-c2d.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-parse-intent-runner.ts`<br/>`verify-resume-parse-quota-once.ts` |
 | `services/api/src/ai/ai-request-guard.ts` | `verify-ai-public-quota.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-timeout-concurrency.ts` |
 | `services/api/src/ai/ai-result.cleanup.task.ts` | `verify-ai-quota.ts`<br/>`verify-ai-usage-retention.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-job-ai-backend.ts` |
-| `services/api/src/ai/ai.controller.ts` | `verify-ai-access.ts`<br/>`verify-ai-cost-ui-coverage.ts`<br/>`verify-ai-public-quota.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-assistant-provider-label.ts`<br/>`verify-assistant-voice.ts`<br/>`verify-file-assets-trial-acceptance.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-multipart-field-nesting.ts`<br/>`verify-resume-diagnosis-context.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-template-fill.ts`<br/>`verify-resume-voice-generate.ts`<br/>`verify-throttle-dimension.ts` |
+| `services/api/src/ai/ai.controller.ts` | `verify-ai-access.ts`<br/>`verify-ai-cost-runtime.ts`<br/>`verify-ai-cost-ui-coverage.ts`<br/>`verify-ai-public-quota.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-assistant-provider-label.ts`<br/>`verify-assistant-voice.ts`<br/>`verify-file-assets-trial-acceptance.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-multipart-field-nesting.ts`<br/>`verify-resume-diagnosis-context.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-template-fill.ts`<br/>`verify-resume-voice-generate.ts`<br/>`verify-throttle-dimension.ts` |
 | `services/api/src/ai/ai.module.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-assess-isolation.ts`<br/>`verify-fair-visit-plan.ts`<br/>`verify-governed-job-fit.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai/ai.service.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-ai-persistence-consistency.ts`<br/>`verify-ai-result-ownership.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-assistant-provider-label.ts`<br/>`verify-file-assets-trial-acceptance.ts`<br/>`verify-member-assets-c2d.ts`<br/>`verify-member-data-retention.ts`<br/>`verify-real-resume-diagnosis.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-resume-generate.ts`<br/>`verify-resume-layout-adjust.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-optimize.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-report-export.ts`<br/>`verify-resume-template-fill.ts` |
 | `services/api/src/ai/career-plan.controller.ts` | `verify-ai-access.ts`<br/>`verify-career-plan.ts`<br/>`verify-kiosk-job-board-switch.ts` |
@@ -2476,6 +2490,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/usage/ai-usage.module.ts` | `verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
 | `services/api/src/app.module.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-access.ts`<br/>`verify-ai-platform-degradation.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-contract-review-http.ts`<br/>`verify-file-assets-trial-acceptance.ts`<br/>`verify-job-ai-backend.ts`<br/>`verify-job-ai-privacy.ts`<br/>`verify-job-application-track.ts`<br/>`verify-job-favorites-http.ts`<br/>`verify-job-materials.ts`<br/>`verify-member-assets-c2d.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-qr-login.ts`<br/>`verify-member-restore.ts`<br/>`verify-member-step-up.ts`<br/>`verify-resume-export-draft-source.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-upload-sessions-http.ts` |
 | `services/api/src/asr/asr.service.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-throttle-dimension.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-voice-generate.ts` |
+| `services/api/src/asr/wav-duration.ts` | `verify-ai-cost-runtime.ts` |
 | `services/api/src/assistant/daily-brief.controller.ts` | `verify-ai-access.ts`<br/>`verify-community-daily-brief.ts` |
 | `services/api/src/assistant/daily-brief.service.ts` | `verify-beijing-display-time.ts`<br/>`verify-community-daily-brief.ts`<br/>`verify-recruitment-hosting-default-off.ts` |
 | `services/api/src/audit/audit.module.ts` | `verify-contract-review-http.ts`<br/>`verify-internal-accounts.ts` |
@@ -2761,14 +2776,14 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/member-privacy/member-privacy.service.ts` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-job-ai-backend.ts`<br/>`verify-job-ai-privacy.ts`<br/>`verify-member-data-request-state-machine.ts`<br/>`verify-member-data-request-truth.ts`<br/>`verify-miniapp-review-backend.ts`<br/>`verify-pg-serialization-conflict.ts`<br/>`verify-resume-export-draft-source.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-report-export.ts` |
 | `services/api/src/member-privacy/member-privacy.types.ts` | `verify-job-ai-privacy.ts` |
 | `services/api/src/mock-interview/asr/asr.service.ts` | `verify-mock-interview.ts` |
-| `services/api/src/mock-interview/asr/tts.service.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-throttle-dimension.ts`<br/>`verify-mock-interview.ts` |
+| `services/api/src/mock-interview/asr/tts.service.ts` | `verify-ai-cost-runtime.ts`<br/>`verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-throttle-dimension.ts`<br/>`verify-mock-interview.ts` |
 | `services/api/src/mock-interview/interview-practice-sheet-pdf.service.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-mock-interview.ts` |
 | `services/api/src/mock-interview/interview-practice-sheet.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-mock-interview.ts` |
 | `services/api/src/mock-interview/interview-report-pdf.service.ts` | `verify-ai-safety-aigc.ts`<br/>`verify-aigc-pdf-metadata.ts`<br/>`verify-cjk-font.ts`<br/>`verify-mock-interview.ts` |
 | `services/api/src/mock-interview/interview-transcript-pdf.service.ts` | `verify-mock-interview.ts` |
 | `services/api/src/mock-interview/interview-transcript-print.service.ts` | `verify-mock-interview.ts` |
 | `services/api/src/mock-interview/mock-interview-llm.service.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-mock-interview.ts` |
-| `services/api/src/mock-interview/mock-interview.controller.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-ai-access.ts`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-ai-cost-ui-coverage.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-mock-interview.ts`<br/>`verify-multipart-field-nesting.ts` |
+| `services/api/src/mock-interview/mock-interview.controller.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-ai-access.ts`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-ai-cost-runtime.ts`<br/>`verify-ai-cost-ui-coverage.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-mock-interview.ts`<br/>`verify-multipart-field-nesting.ts` |
 | `services/api/src/mock-interview/mock-interview.module.ts` | `verify-ai-down-fallbacks.mjs` |
 | `services/api/src/mock-interview/mock-interview.service.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-cost-ui-coverage.ts`<br/>`verify-ai-user-text-retention.ts`<br/>`verify-beijing-display-time.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-member-data-retention.ts`<br/>`verify-mock-interview.ts` |
 | `services/api/src/notifications/notifications.controller.ts` | `verify-backend-p0-contracts.mjs` |
