@@ -535,9 +535,9 @@ test('I-30 a guest (order not tied to an account) is told to note the order numb
   registerFlakyJob(api)
   await reachUnknownAfterOutage(page, { ...flowState, hasEndUser: false })
   const whole = page.locator('[data-qx-page]').first()
-  // R-10 把第三步改成「订单号是 X」+「需要时打服务电话，报这个订单号查询」，旧句「记下订单号 X，需要时报给我们」不再出现。
+  // R-10 把第三步改成「订单号是 X」+「需要时报这个订单号查询」加服务电话那句，旧句「记下订单号 X，需要时报给我们」不再出现。
   await expect(whole).toContainText(`订单号是 ${W2_ORDER.orderNo}`)
-  await expect(whole).toContainText('需要时打服务电话，报这个订单号查询')
+  await expect(whole).toContainText('需要时报这个订单号查询')
   await expect(whole).toContainText('需要帮助？')
   await expect(whole).not.toContainText('在手机上查看这一单')
   await expect(whole).not.toContainText('点下方「查看打印订单」')

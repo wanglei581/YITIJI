@@ -487,5 +487,5 @@ test('游客状态未知时保留订单号和查询提示 @kiosk', async ({ page
   api.abort('GET', `/api/v1/print/jobs/${TASK_ID}`, 'internetdisconnected')
   await openDoneWithState(page, { ...taskState, orderNo: 'ORD-20261102-A7A1F567E5', hasEndUser: false })
   await expect(page.getByText('订单号是 ORD-20261102-A7A1F567E5')).toBeVisible()
-  await expect(page.getByText('需要时打服务电话，报这个订单号查询', { exact: false })).toBeVisible()
+  await expect(page.getByText('需要时报这个订单号查询', { exact: false })).toBeVisible()
 })
