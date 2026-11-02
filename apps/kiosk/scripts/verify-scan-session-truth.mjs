@@ -268,6 +268,20 @@ assert.match(
   /未登录扫描件不会进入「我的文档」/,
   'guest scan result must say the file will not enter My Documents',
 )
+/* 产品负责人 2026-11-02 拍板的游客说明（照触屏版补稿 cs-scan-done 的原话，再补一句 U 盘）：
+ * 说清「请在本次操作内完成打印或识别」，带走电子版是「下次先扫码登录再扫」或「用 U 盘」，
+ * U 盘那条这台机器暂未开通所以如实写出来。上面那条只钉开头，这里钉全句 —— 句子被改回走查 I-15 的旧版
+ * （「要留在账号里：先登录，再重新扫一次」，会让人以为现在登录就能存进去），或者悄悄丢掉 U 盘那一句，都要红。 */
+assert.match(
+  scanResult,
+  /未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。要带走电子版，下次先扫码登录再扫。用 U 盘带走：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。/,
+  'guest scan result must carry the 11/02 approved wording incl. the USB line',
+)
+assert.doesNotMatch(
+  scanResult,
+  /要留在账号里|先登录，再重新扫一次/,
+  'guest scan result must not go back to the pre-11/02 sentence that implies logging in now keeps the file',
+)
 assert.match(
   scanResult,
   /disabled=\{!file \|\| !isLoggedIn\}/,
