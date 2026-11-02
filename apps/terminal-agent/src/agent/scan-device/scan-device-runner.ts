@@ -1,7 +1,8 @@
 /**
  * agent/scan-device/scan-device-runner.ts — 屏上扫描调度
  *
- * 一个进程同时只一场。云端只收状态回报；开始 / 下一页 / 完成 / 中止由本机路由进来。
+ * 一个进程同时只一场。开始 / 下一页 / 完成进同一条串行队列。中止不进队列，只置本场取消标记。
+ * 清理重试、空闲截止、回报补发都绑在场次上。进程是否退出只交给健康管理器。
  * 开关关着时 scanDeviceRuntimeForConfig 直接返回 undefined，不创建、不扫残留、不探测。
  * 页文件只进 A1 的私有目录。日志只有任务号、状态、错误码，没有路径和文件名。
  */
@@ -21,7 +22,7 @@ import {
   type ScanDeviceReportState,
 } from './scan-device-backend'
 import { createScanDeviceHealth, defaultScanProcessAlive, type ScanDeviceClock, type ScanDeviceHealth } from './scan-device-health'
-import { createScanDeviceHousekeeping } from './scan-device-housekeeping'
+import { createScanDeviceHousekeeping, type CleanupMeta } from './scan-device-housekeeping'
 import { scanDeviceReportBridge } from './scan-device-sync'
 import { composeScanPdf } from './scan-pdf-compose'
 import {
@@ -132,6 +133,8 @@ export function createScanDeviceRuntime(
   let gate: Promise<void> = Promise.resolve()
   let reportChain: Promise<void> = Promise.resolve()
   let armed = false
+  let commandRunning = false
+  const abortWaiters: Array<{ resolve: (view: ScanDeviceView) => void; reject: (error: unknown) => void }> = []
 
   const health: ScanDeviceHealth = createScanDeviceHealth({
     clock: deps.clock,
@@ -140,6 +143,7 @@ export function createScanDeviceRuntime(
     deviceName: () => config.scanDeviceName ?? '',
     getPhase: () => state.session?.phase ?? 'idle',
     isProcessAlive: (pid) => (deps.isProcessAlive ?? defaultScanProcessAlive)(pid),
+    ...(deps.listResiduals ? { listResiduals: deps.listResiduals } : {}),
   })
 
   let ackedState: ScanDeviceReportState = 'ready'
@@ -157,16 +161,38 @@ export function createScanDeviceRuntime(
     })
   }
 
-  const exclusive = async <T>(fn: () => Promise<T>): Promise<T> => {
+  const releaseAbort = (view: ScanDeviceView): ScanDeviceView => {
+    const waiters = abortWaiters.splice(0, abortWaiters.length)
+    for (const waiter of waiters) waiter.resolve(view)
+    return view
+  }
+
+  const rejectAbort = (error: unknown): void => {
+    const waiters = abortWaiters.splice(0, abortWaiters.length)
+    for (const waiter of waiters) waiter.reject(error)
+  }
+
+  const isDeviceView = (value: unknown): value is ScanDeviceView =>
+    !!value && typeof value === 'object' && 'state' in value && 'pageCount' in value && !('kind' in value)
+
+  /** 开始 / 下一页 / 完成共用这一条队列。中止不进来。 */
+  const enqueue = async <T>(fn: () => Promise<T>): Promise<T> => {
     const previous = gate
     let release: () => void = () => undefined
     gate = new Promise((resolve) => {
       release = resolve
     })
     await previous
+    commandRunning = true
     try {
-      return await fn()
+      const value = await fn()
+      if (abortWaiters.length > 0 && isDeviceView(value)) releaseAbort(value)
+      return value
+    } catch (error) {
+      rejectAbort(error)
+      throw error
     } finally {
+      commandRunning = false
       release()
     }
   }
@@ -201,6 +227,12 @@ export function createScanDeviceRuntime(
     clock: deps.clock,
     purge,
     isProcessAlive: alive,
+    unidentifiedStop: () => health.unidentifiedSuspect(),
+    activeEpoch: (taskId) => {
+      const current = state.session
+      if (!current || current.taskId !== taskId || !LIVE.has(current.phase)) return undefined
+      return current.generation
+    },
     fetchLease: (now) => deps.fetchLease(now),
     session: () => {
       const current = state.session
@@ -208,16 +240,16 @@ export function createScanDeviceRuntime(
       return { generation: current.generation, phase: current.phase, taskId: current.taskId, stopCode: current.stopCode }
     },
     onIdleTimeout: async (generation) => {
-      await exclusive(async () => {
+      await enqueue(async () => {
         const current = state.session
-        if (!current || current.generation !== generation || current.phase !== 'page_ready' || current.awaitingLock) return
+        if (!current || current.generation !== generation || current.phase !== 'page_ready') return
         await round().finishAbort()
       })
     },
     onLeaseLost: (generation, code) => {
-      void exclusive(async () => {
+      void enqueue(async () => {
         const current = state.session
-        if (!current || current.generation !== generation || current.phase !== 'page_ready' || current.awaitingLock) return
+        if (!current || current.generation !== generation || current.phase !== 'page_ready') return
         current.stopCode = code
         round().finishStop()
       })
@@ -225,13 +257,23 @@ export function createScanDeviceRuntime(
     log,
   })
 
+  const cleanupMeta = (taskId: string): CleanupMeta => {
+    const current = state.session
+    const same = current?.taskId === taskId ? current : undefined
+    return {
+      epoch: same?.generation ?? 0,
+      stopUnconfirmed: same?.stopUnconfirmed === true,
+      ...(same?.suspectPid !== undefined ? { pid: same.suspectPid } : {}),
+    }
+  }
+
   const commitPurge = (taskId: string, reason: ScanDeviceDeletionReason): boolean => {
     const session = state.session
     const same = session?.taskId === taskId ? session : undefined
     if (same?.stopUnconfirmed) {
       same.purgeSettled = true
       same.purged = false
-      housekeeping.scheduleCleanup(taskId, reason, same.suspectPid)
+      housekeeping.scheduleCleanup(taskId, reason, cleanupMeta(taskId))
       return false
     }
     const result = purge(taskId, reason)
@@ -240,7 +282,7 @@ export function createScanDeviceRuntime(
       same.purged = result.status !== 'failed'
     }
     if (result.status === 'failed') {
-      housekeeping.scheduleCleanup(taskId, reason, same?.suspectPid)
+      housekeeping.scheduleCleanup(taskId, reason, cleanupMeta(taskId))
       return false
     }
     return true
@@ -312,12 +354,20 @@ export function createScanDeviceRuntime(
     if (unsynced && decorated.state !== ackedState) {
       const bridge = scanDeviceReportBridge(ackedState, decorated.state)
       if (!bridge) return markUnsyncable()
-      for (const hop of bridge) {
-        const hopBody = decorate({ state: hop, ...(decorated.pageCount !== undefined ? { pageCount: decorated.pageCount } : {}) })
-        const hopResult = await postAttempts(taskId, hopBody)
-        if (hopResult.kind === 'stop' || hopResult.kind === 'unauthorized') return applyReport(hopResult)
-        if (hopResult.kind !== 'ok') return markUnsyncable()
-        ackedState = hop
+      if (bridge.length > 0) {
+        const confirmBody = ackedState === 'ready'
+          ? decorate({ state: 'ready' })
+          : decorate({ state: ackedState, ...(decorated.pageCount !== undefined ? { pageCount: decorated.pageCount } : {}) })
+        const confirmed = await postAttempts(taskId, confirmBody)
+        if (confirmed.kind === 'stop' || confirmed.kind === 'unauthorized') return applyReport(confirmed)
+        if (confirmed.kind !== 'ok') return markUnsyncable()
+        for (const hop of bridge) {
+          const hopBody = decorate({ state: hop, ...(decorated.pageCount !== undefined ? { pageCount: decorated.pageCount } : {}) })
+          const hopResult = await postAttempts(taskId, hopBody)
+          if (hopResult.kind === 'stop' || hopResult.kind === 'unauthorized') return applyReport(hopResult)
+          if (hopResult.kind !== 'ok') return markUnsyncable()
+          ackedState = hop
+        }
       }
     }
     const result = await postAttempts(taskId, decorated)
@@ -327,6 +377,7 @@ export function createScanDeviceRuntime(
       return applyReport(result)
     }
     if (result.kind === 'unavailable') unsynced = true
+    if (unsynced && result.kind === 'rejected' && result.code === 'SCAN_DEVICE_TRANSITION_INVALID') return markUnsyncable()
     return applyReport(result)
   }
 
@@ -353,7 +404,9 @@ export function createScanDeviceRuntime(
     health,
     purge,
     commitPurge,
-    scheduleCleanup: (taskId, reason, pid) => housekeeping.scheduleCleanup(taskId, reason, pid),
+    scheduleCleanup: (taskId, reason, meta) => housekeeping.scheduleCleanup(taskId, reason, meta),
+    revokeCleanup: (taskId) => housekeeping.revoke(taskId),
+    releaseAbort,
     note,
     sendReport,
     enqueueReport,
@@ -384,7 +437,7 @@ export function createScanDeviceRuntime(
 
   return {
     async start(taskId) {
-      const plan = await exclusive(async () => {
+      const plan = await enqueue(async () => {
         const session = state.session
         if (session && session.taskId !== taskId && LIVE.has(session.phase)) {
           throw new LocalScanError(409, 'LOCAL_SCAN_BUSY', viewOf(session), '本机正在进行另一场扫描')
@@ -398,8 +451,6 @@ export function createScanDeviceRuntime(
                 session.stopCode = session.stopCode ?? 'LOCAL_RESTART'
                 session.handle?.abort()
                 await tail
-              } else {
-                purge(session.taskId, 'SCAN_DEVICE_SESSION_CLEARED')
               }
               const prepared = await round().prepare(fetched.lease)
               if (!prepared.ok) return { kind: 'view' as const, view: prepared.view }
@@ -414,47 +465,92 @@ export function createScanDeviceRuntime(
         return { kind: 'launch' as const, taskId: lease.scanTaskId, generation: prepared.generation }
       })
       if (plan.kind === 'view') return plan.view
+      if (state.session?.abortRequested || state.session?.phase === 'aborted') return viewOf(state.session)
       const lock = await round().acquire(plan.taskId)
-      return exclusive(() => round().launch(plan.generation, lock))
+      return enqueue(() => round().launch(plan.generation, lock))
     },
     async nextPage(taskId) {
-      const prepared = await exclusive(async () => {
-        const session = state.session
-        if (!session || session.taskId !== taskId || session.phase !== 'page_ready' || session.pageCount < 1) {
-          throw new LocalScanError(409, 'LOCAL_SCAN_STATE_CONFLICT', viewOf(session), '现在不能扫描下一页')
+      const session = state.session
+      if (session && session.taskId === taskId && (session.phase === 'scanning' || session.awaitingLock || session.nextAccepted)) {
+        return viewOf(session)
+      }
+      if (!session || session.taskId !== taskId || session.phase !== 'page_ready' || session.pageCount < 1) {
+        throw new LocalScanError(409, 'LOCAL_SCAN_STATE_CONFLICT', viewOf(session), '现在不能扫描下一页')
+      }
+      if (session.pageCount >= session.pageCap) {
+        throw new LocalScanError(409, 'LOCAL_SCAN_PAGE_LIMIT', viewOf(session), '已达到本机页数上限，请完成或中止')
+      }
+      if (housekeeping.idleDue()) return enqueue(() => round().finishAbort())
+      session.nextAccepted = true
+      session.reservedIndex = session.pageCount + 1
+      session.awaitingLock = true
+      const generation = session.generation
+      const reservedIndex = session.reservedIndex
+      const lock = await round().acquire(taskId).catch((error: unknown) => {
+        const current = state.session
+        if (current?.generation === generation) {
+          current.nextAccepted = false
+          current.awaitingLock = false
         }
-        if (session.pageCount >= session.pageCap) {
-          throw new LocalScanError(409, 'LOCAL_SCAN_PAGE_LIMIT', viewOf(session), '已达到本机页数上限，请完成或中止')
-        }
-        session.awaitingLock = true
-        housekeeping.disarmIdle()
-        return { generation: session.generation, startIndex: session.pageCount + 1 }
+        throw error
       })
-      const lock = await round().acquire(taskId)
-      return exclusive(async () => {
-        const session = state.session
-        if (!session || session.generation !== prepared.generation) {
+      return enqueue(async () => {
+        const current = state.session
+        if (!current || current.generation !== generation) {
           lock?.release()
-          return viewOf(session)
+          return viewOf(current)
         }
-        session.awaitingLock = false
-        if (session.abortRequested || session.phase !== 'page_ready') {
+        current.awaitingLock = false
+        if (current.abortRequested || current.phase === 'aborted') {
           lock?.release()
-          if (session.abortRequested && session.phase === 'page_ready') return round().finishAbort()
-          return viewOf(session)
+          current.nextAccepted = false
+          if (current.abortRequested && current.phase === 'page_ready') return round().finishAbort()
+          return viewOf(current)
+        }
+        if (housekeeping.idleDue()) {
+          lock?.release()
+          current.nextAccepted = false
+          if (current.phase === 'page_ready') return round().finishAbort()
+          return viewOf(current)
+        }
+        if (current.phase !== 'page_ready' || current.pageCount + 1 !== reservedIndex) {
+          lock?.release()
+          current.nextAccepted = false
+          return viewOf(current)
+        }
+        const fetched = await deps.fetchLease(deps.clock.now())
+        const latest = state.session
+        if (!latest || latest.generation !== generation) {
+          lock?.release()
+          return viewOf(latest)
+        }
+        if (latest.abortRequested) {
+          lock?.release()
+          latest.nextAccepted = false
+          return round().finishAbort()
+        }
+        if (fetched.kind === 'none' || (fetched.kind === 'lease' && fetched.lease.scanTaskId !== taskId)) {
+          lock?.release()
+          latest.nextAccepted = false
+          latest.stopCode = fetched.kind === 'none' ? fetched.stopCode ?? 'SCAN_DEVICE_SESSION_CLEARED' : 'SCAN_DEVICE_SESSION_CLEARED'
+          return round().finishStop()
         }
         if (!lock) {
-          housekeeping.armIdle(session.generation)
-          throw new LocalScanError(409, 'LOCAL_SCAN_BUSY', viewOf(session), '扫描仪正忙，已扫的页还在。可以再试、点扫完了，或中止')
+          latest.nextAccepted = false
+          throw new LocalScanError(409, 'LOCAL_SCAN_BUSY', viewOf(latest), '扫描仪正忙，已扫的页还在。可以再试、点扫完了，或中止')
         }
-        session.phase = 'scanning'
-        track(round().runBatch(lock, 1, prepared.startIndex, session.generation))
+        latest.phase = 'scanning'
+        latest.nextAccepted = false
+        housekeeping.disarmIdle()
+        track(round().runBatch(lock, 1, reservedIndex, generation))
         note('scanning')
-        return viewOf(session)
+        return viewOf(latest)
       })
     },
     async finish(taskId) {
-      const current = await exclusive(async () => {
+      // 只把改状态放进队列。合成和投递在队列外跑，否则进行中的完成会挡住
+      // 同一次开始（它只该看到当前状态就返回），两边互相等待，进程会直接退出。
+      const generation = await enqueue(async () => {
         const session = state.session
         if (!session || session.taskId !== taskId || session.phase !== 'page_ready' || session.pageCount < 1) {
           throw new LocalScanError(409, 'LOCAL_SCAN_STATE_CONFLICT', viewOf(session), '现在不能完成扫描')
@@ -463,8 +559,8 @@ export function createScanDeviceRuntime(
         session.phase = 'composing'
         return session.generation
       })
-      const job = round().composeAndDeliver(current)
-      track(job.then(() => undefined))
+      const job = round().composeAndDeliver(generation)
+      track(job.then(() => undefined, () => undefined))
       try {
         return await job
       } finally {
@@ -472,27 +568,12 @@ export function createScanDeviceRuntime(
       }
     },
     async abort(taskId) {
-      const decision = await exclusive(async () => {
-        const session = state.session
-        if (session && session.taskId !== taskId && LIVE.has(session.phase)) {
-          const purged = commitPurge(taskId, 'SCAN_DEVICE_ABORTED')
-          return { kind: 'done' as const, view: { state: 'aborted' as const, pageCount: 0, errorCode: null, purged } }
-        }
-        if (!session || session.taskId !== taskId || !LIVE.has(session.phase)) {
-          const purged = commitPurge(taskId, 'SCAN_DEVICE_ABORTED')
-          if (session?.taskId === taskId) state.session = undefined
-          return { kind: 'done' as const, view: { state: 'aborted' as const, pageCount: 0, errorCode: null, purged } }
-        }
-        session.abortRequested = true
-        session.handle?.abort()
-        if (session.awaitingLock || inflight === 0) return { kind: 'finish' as const }
-        return { kind: 'wait' as const }
-      })
-      if (decision.kind === 'done') return decision.view
-      if (decision.kind === 'wait') await tail
-      else await round().finishAbort()
       const session = state.session
-      if (session?.taskId === taskId && session.delivered) {
+      if (session && session.taskId !== taskId && LIVE.has(session.phase)) {
+        const purged = commitPurge(taskId, 'SCAN_DEVICE_ABORTED')
+        return { state: 'aborted' as const, pageCount: 0, errorCode: null, purged }
+      }
+      if (session?.taskId === taskId && (session.delivered || session.deliveryOutcome === 'received')) {
         return {
           state: 'delivering' as const,
           pageCount: session.pageCount,
@@ -500,8 +581,47 @@ export function createScanDeviceRuntime(
           ...(session.purgeSettled ? { purged: session.purged } : {}),
         }
       }
-      if (session?.taskId === taskId) return viewOf(session)
-      return { state: 'aborted' as const, pageCount: 0, errorCode: null }
+      if (session?.taskId === taskId && session.deliveryOutcome === 'uncertain') {
+        throw new LocalScanError(
+          409,
+          'LOCAL_SCAN_DELIVERY_UNCONFIRMED',
+          { state: 'delivering', pageCount: session.pageCount, errorCode: null },
+          '投递结果还没确认',
+        )
+      }
+      if (!session || session.taskId !== taskId || !LIVE.has(session.phase)) {
+        const purged = commitPurge(taskId, 'SCAN_DEVICE_ABORTED')
+        if (session?.taskId === taskId) state.session = undefined
+        return { state: 'aborted' as const, pageCount: 0, errorCode: null, purged }
+      }
+      session.abortRequested = true
+      session.handle?.abort()
+      if (!commandRunning && (session.awaitingLock || inflight === 0)) return round().finishAbort()
+      if (!commandRunning) {
+        await tail
+        const current = state.session
+        if (current?.taskId === taskId && (current.delivered || current.deliveryOutcome === 'received')) {
+          return {
+            state: 'delivering' as const,
+            pageCount: current.pageCount,
+            errorCode: null,
+            ...(current.purgeSettled ? { purged: current.purged } : {}),
+          }
+        }
+        if (current?.taskId === taskId && current.deliveryOutcome === 'uncertain') {
+          throw new LocalScanError(
+            409,
+            'LOCAL_SCAN_DELIVERY_UNCONFIRMED',
+            { state: 'delivering', pageCount: current.pageCount, errorCode: null },
+            '投递结果还没确认',
+          )
+        }
+        if (current?.taskId === taskId) return viewOf(current)
+        return { state: 'aborted' as const, pageCount: 0, errorCode: null }
+      }
+      return new Promise((resolve, reject) => {
+        abortWaiters.push({ resolve, reject })
+      })
     },
     probe: () => health.probe(),
     health: () => health.snapshot(),

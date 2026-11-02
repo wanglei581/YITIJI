@@ -413,6 +413,25 @@ export function buildWiaPowerShellArgs(encodedCommand: string): string[] {
   return ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encodedCommand]
 }
 
+/**
+ * 命令行是不是本程序拉起的 WIA PowerShell。
+ * 只认 powershell + -EncodedCommand，并且解码后的脚本里同时有本脚本的两处固定标记。
+ * 普通 -Command 列举进程不会被算进来。
+ */
+export function commandLineIsOurWiaProcess(commandLine: string): boolean {
+  if (!/powershell(\.exe)?/i.test(commandLine)) return false
+  const match = /-EncodedCommand\s+([A-Za-z0-9+/=]+)/i.exec(commandLine)
+  const encoded = match?.[1]
+  if (!encoded) return false
+  let script: string
+  try {
+    script = Buffer.from(encoded, 'base64').toString('utf16le')
+  } catch {
+    return false
+  }
+  return script.includes("$script:via = 'none'") && script.includes('WIA.DeviceManager')
+}
+
 /** 优先用系统目录下的绝对路径，不依赖服务进程的 PATH；取不到才退回 powershell。 */
 export function resolvePowerShellPath(
   env: NodeJS.ProcessEnv = process.env,

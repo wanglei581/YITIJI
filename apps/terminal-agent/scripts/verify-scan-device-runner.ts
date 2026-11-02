@@ -44,6 +44,7 @@ import {
   type Harness,
 } from './verify-scan-device-runner.helper'
 import { verifyRound2 } from './verify-scan-device-runner-r2'
+import { verifyRound3 } from './verify-scan-device-runner-r3'
 
 const ALLOWED = 'https://kiosk.example.test'
 const BRIDGE = 'bridge-token-scan-device-verify'
@@ -758,6 +759,8 @@ async function verifyDeliveryWire(): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  // 挂起的 Promise 留不住事件循环。没有这个句柄时，命令互相等待会让进程以 0 退出，后面的组不再跑。
+  const keepAlive = setInterval(() => undefined, 1_000_000)
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'scan-device-runner-'))
   const previous = process.env['PROGRAMDATA']
   process.env['PROGRAMDATA'] = root
@@ -784,8 +787,10 @@ async function main(): Promise<void> {
     await check('投递带 origin', () => verifyDeliveryWire())
     await check('打印领取持锁', () => verifyPrintClaimLock(db))
     await check('第二轮', () => verifyRound2(path.join(root, 'r2'), db))
+    await check('第三轮', () => verifyRound3(path.join(root, 'r3'), db))
     console.log(`verify-scan-device-runner: ok（${passed.length} 组）`)
   } finally {
+    clearInterval(keepAlive)
     __resetUnauthorizedForTests(true)
     if (previous === undefined) delete process.env['PROGRAMDATA']
     else process.env['PROGRAMDATA'] = previous

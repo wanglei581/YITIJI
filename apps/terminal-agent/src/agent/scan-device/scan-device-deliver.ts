@@ -9,9 +9,67 @@ import { warn } from '../../logger'
 import { isUnauthorizedHttpError } from '../api-client'
 import { markUnauthorized } from '../auth-state'
 import { classifyScanDeliveryFailure } from '../scan-delivery'
+import type { DeviceReportResult, FetchDeviceLeaseResult } from './scan-device-backend'
 import type { RoundHost, RoundSession } from './scan-device-round'
-import { SCAN_PDF_COMPOSE_MARGIN_BYTES, scanPagesAligned, type ScanDeviceDeliveryInput, type ScanDeviceView } from './scan-device-types'
+import { LocalScanError, SCAN_PDF_COMPOSE_MARGIN_BYTES, scanPagesAligned, type ScanDeviceDeliveryInput, type ScanDeviceView } from './scan-device-types'
 import type { ScanDeviceErrorCode } from './wia-script'
+
+export type DeliveryVerdict = 'received' | 'rejected' | 'uncertain'
+
+/** 上传抛错时先看服务端有没有把结果说死。网络错误和没有响应体都算不确定。 */
+export function verdictFromUploadError(error: unknown): DeliveryVerdict {
+  const failure = classifyScanDeliveryFailure(error)
+  if (failure.kind === 'refused') {
+    return failure.refusal === 'file_already_delivered' ? 'received' : 'rejected'
+  }
+  return 'uncertain'
+}
+
+/**
+ * 上传结果不确定时，用租约和回报的 409 原因把三态定下来。
+ * 还在等这一场 = 文件没被收下。任务已经 matched（SCAN_DEVICE_TASK_DELIVERING）或租约没了且同状态回报被原样收下 = 已经收下。
+ * 两边都说不清就保持不确定，调用方不能报已中止或已投递。
+ */
+export async function confirmUncertainDelivery(input: {
+  taskId: string
+  pageCount: number
+  now: number
+  fetchLease: (now: number) => Promise<FetchDeviceLeaseResult>
+  report: (taskId: string, body: { state: 'delivering'; pageCount: number }) => Promise<DeviceReportResult>
+}): Promise<DeliveryVerdict> {
+  let fetched: FetchDeviceLeaseResult
+  try {
+    fetched = await input.fetchLease(input.now)
+  } catch {
+    fetched = { kind: 'unavailable' }
+  }
+  if (fetched.kind === 'lease' && fetched.lease.scanTaskId === input.taskId) return 'rejected'
+  if (fetched.kind === 'none' && fetched.stopCode) return 'rejected'
+  if (fetched.kind === 'unauthorized') return 'uncertain'
+  const leaseGone = fetched.kind === 'none'
+  let reported: DeviceReportResult
+  try {
+    reported = await input.report(input.taskId, { state: 'delivering', pageCount: input.pageCount })
+  } catch {
+    reported = { kind: 'unavailable' }
+  }
+  if (reported.kind === 'rejected' && reported.code === 'SCAN_DEVICE_TASK_DELIVERING') return 'received'
+  if (reported.kind === 'ok' && leaseGone) return 'received'
+  if (reported.kind === 'stop') {
+    if (reported.code === 'SCAN_DEVICE_TASK_ENDED' || reported.code === 'TASK_ENDED') return 'uncertain'
+    return 'rejected'
+  }
+  return 'uncertain'
+}
+
+function unconfirmedError(session: RoundSession): LocalScanError {
+  return new LocalScanError(
+    409,
+    'LOCAL_SCAN_DELIVERY_UNCONFIRMED',
+    { state: 'delivering', pageCount: session.pageCount, errorCode: null },
+    '投递结果还没确认',
+  )
+}
 
 export async function deliverComposedRound(
   host: RoundHost,
@@ -120,9 +178,20 @@ export async function deliverComposedRound(
   if (!beforeUpload) return show(host.state.session)
   const uploadStop = stopOrAbort(beforeUpload)
   if (uploadStop) return uploadStop
+  const acceptDelivery = (session: RoundSession): ScanDeviceView => {
+    session.delivered = true
+    session.deliveryOutcome = 'received'
+    const purged = host.commitPurge(session.taskId, 'SCAN_DEVICE_DELIVERED')
+    session.phase = 'idle'
+    session.errorCode = null
+    host.note('delivering')
+    return { state: 'delivering', pageCount: session.pageCount, errorCode: null, purged }
+  }
+
   try {
     await host.deps.deliver(delivery)
     beforeUpload.delivered = true
+    beforeUpload.deliveryOutcome = 'received'
   } catch (error) {
     const failed = sameRound() ?? beforeUpload
     if (failed.generation !== currentGen) return show(host.state.session)
@@ -131,18 +200,34 @@ export async function deliverComposedRound(
       failed.unauthorized = true
       return markDead(failed)
     }
+    let verdict = verdictFromUploadError(error)
     const failure = classifyScanDeliveryFailure(error)
     const code = failure.kind === 'refused' ? failure.code : failure.code ?? 'NETWORK'
-    warn(`scan-device: deliver failed task=${failed.taskId} code=${code}`)
-    return hooks.fail('unknown')
+    warn(`scan-device: deliver failed task=${failed.taskId} code=${code} verdict=${verdict}`)
+    if (verdict === 'uncertain') {
+      verdict = await confirmUncertainDelivery({
+        taskId: failed.taskId,
+        pageCount: failed.pageCount,
+        now: host.deps.clock.now(),
+        fetchLease: (now) => host.deps.fetchLease(now),
+        report: (taskId, body) => host.deps.report(taskId, body),
+      })
+    }
+    const confirmed = sameRound() ?? failed
+    if (confirmed.generation !== currentGen) return show(host.state.session)
+    if (verdict === 'received') return acceptDelivery(confirmed)
+    if (verdict === 'rejected') {
+      confirmed.deliveryOutcome = 'rejected'
+      if (confirmed.abortRequested) return hooks.finishAbort()
+      return hooks.fail('unknown')
+    }
+    confirmed.deliveryOutcome = 'uncertain'
+    confirmed.phase = 'delivering'
+    throw unconfirmedError(confirmed)
   }
   const uploaded = host.state.session
   if (!uploaded || uploaded.generation !== currentGen) {
     return { state: 'delivering', pageCount: beforeUpload.pageCount, errorCode: null, purged: false }
   }
-  const purged = host.commitPurge(uploaded.taskId, 'SCAN_DEVICE_DELIVERED')
-  uploaded.phase = 'idle'
-  uploaded.errorCode = null
-  host.note('delivering')
-  return { state: 'delivering', pageCount: uploaded.pageCount, errorCode: null, purged }
+  return acceptDelivery(uploaded)
 }

@@ -25,7 +25,7 @@ import type { WiaProbeResult } from '../src/agent/scan-device/wia-probe'
 import type { ScanDeviceErrorCode } from '../src/agent/scan-device/wia-script'
 
 export function probeResult(state: WiaProbeResult['state']): WiaProbeResult {
-  return { state, forceKilled: false, elapsedMs: 1 }
+  return { state, forceKilled: false, stopUnconfirmed: false, elapsedMs: 1 }
 }
 
 export interface ManualClock extends DeviceLockClock {
@@ -213,6 +213,7 @@ export function createHarness(input: {
   now?: number
   reportDelaysMs?: readonly number[]
   isProcessAlive?: (pid: number) => boolean
+  listResiduals?: ScanDeviceRuntimeDeps['listResiduals']
   beforeUpload?: () => Promise<void>
   purge?: ScanDeviceRuntimeDeps['purge']
 }): Harness {
@@ -248,6 +249,7 @@ export function createHarness(input: {
     readFile: async () => Buffer.from('%PDF-test'),
     ...(input.beforeUpload ? { beforeUpload: input.beforeUpload } : {}),
     ...(input.isProcessAlive ? { isProcessAlive: input.isProcessAlive } : {}),
+    ...(input.listResiduals ? { listResiduals: input.listResiduals } : {}),
     ...(input.purge ? { purge: input.purge } : {}),
     clock,
     lock,

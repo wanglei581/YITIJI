@@ -6,7 +6,7 @@
 
 import type { DeviceLock } from '../device-lock'
 import type { DeviceReportBody, FetchDeviceLeaseResult, DeviceReportResult } from './scan-device-backend'
-import type { ScanDeviceClock, ScanDeviceHealthSnapshot } from './scan-device-health'
+import type { ResidualSurvey, ScanDeviceClock, ScanDeviceHealthSnapshot } from './scan-device-health'
 import type { ScanDeviceDeletionReason, ScanTempPurgeResult } from './scan-temp-dir'
 import { SCAN_PDF_MAX_BYTES, type composeScanPdf } from './scan-pdf-compose'
 import type { createScanTaskDir, sweepScanDeviceResidue } from './scan-temp-dir'
@@ -99,6 +99,8 @@ export interface ScanDeviceRuntimeDeps {
   beforeUpload?: () => Promise<void>
   /** 强杀后的进程还在不在。探测与下一场开始靠它确认旧进程已经退出。 */
   isProcessAlive?: (pid: number) => boolean
+  /** 没有 PID 时列出本机进程，核对是不是本程序留下的 PowerShell。 */
+  listResiduals?: () => ResidualSurvey
   clock: ScanDeviceClock
   lock: DeviceLock
   root?: string

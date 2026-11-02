@@ -12,9 +12,11 @@ import {
 import type { DeviceLease, DeviceReportBody } from './scan-device-backend'
 import { isSwitchedToPanelCode } from './scan-device-backend'
 import type { ScanDeviceHealth } from './scan-device-health'
+import type { CleanupMeta } from './scan-device-housekeeping'
 import type { ScanDeviceDeletionReason, ScanTempPurgeResult } from './scan-temp-dir'
 import { deliverComposedRound } from './scan-device-deliver'
 import {
+  LocalScanError,
   resolveScanDeviceLimits,
   type ScanDeviceRuntimeDeps,
   type ScanDeviceView,
@@ -44,9 +46,15 @@ export interface RoundSession {
   purged: boolean
   delivered: boolean
   awaitingLock: boolean
+  /** 已经接过一次下一页，还没开扫或还在等锁。再点一次直接回当前状态。 */
+  nextAccepted: boolean
+  /** 这一次下一页预定的页号。拿到锁之后对不上就不开扫。 */
+  reservedIndex: number
   stopUnconfirmed: boolean
   suspectPid?: number
   reportUnsyncable: boolean
+  /** 上传已经分清，或还悬着。不确定时不能报已中止或已投递。 */
+  deliveryOutcome?: 'received' | 'rejected' | 'uncertain'
   lastResult?: import('./wia-runner').WiaScanResult
 }
 
@@ -65,8 +73,11 @@ export interface RoundHost {
   health: ScanDeviceHealth
   purge(taskId: string, reason: ScanDeviceDeletionReason): ScanTempPurgeResult
   commitPurge(taskId: string, reason: ScanDeviceDeletionReason): boolean
-  scheduleCleanup(taskId: string, reason: ScanDeviceDeletionReason, pid?: number): void
+  scheduleCleanup(taskId: string, reason: ScanDeviceDeletionReason, meta?: CleanupMeta): void
+  revokeCleanup(taskId: string): void
   note(state: string, code?: string | null): void
+  /** 正在等这场中止收尾的请求，在这里拿到最终视图。 */
+  releaseAbort(view: ScanDeviceView): ScanDeviceView
   sendReport(body: DeviceReportBody): Promise<ReportOutcome>
   enqueueReport(body: DeviceReportBody): Promise<ReportOutcome>
   flushReports(): Promise<void>
@@ -117,6 +128,8 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
     purged: false,
     delivered: false,
     awaitingLock: false,
+    nextAccepted: false,
+    reservedIndex: 0,
     stopUnconfirmed: false,
     reportUnsyncable: false,
     ...fields,
@@ -125,48 +138,70 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
   const fail = async (code: ScanDeviceErrorCode): Promise<ScanDeviceView> => {
     host.disarmIdle()
     const current = session()
-    if (!current) return { state: 'error', pageCount: 0, errorCode: code }
+    if (!current) return host.releaseAbort({ state: 'error', pageCount: 0, errorCode: code })
     current.phase = 'error'
     current.errorCode = code
+    current.nextAccepted = false
+    current.awaitingLock = false
     host.note('error', code)
     host.commitPurge(current.taskId, 'SCAN_DEVICE_FAILED')
     if (!current.stopCode && !current.unauthorized) {
       await host.sendReport({ state: 'error', pageCount: current.pageCount, errorCode: code })
     }
-    return viewOf(current)
+    return host.releaseAbort(viewOf(current))
   }
 
   const finishStop = (): ScanDeviceView => {
     host.disarmIdle()
     const current = session()
-    if (!current) return { state: 'aborted', pageCount: 0, errorCode: null, purged: false }
-    if (current.phase === 'aborted' && current.purgeSettled) return viewOf(current)
+    if (!current) return host.releaseAbort({ state: 'aborted', pageCount: 0, errorCode: null, purged: false })
+    if (current.delivered) {
+      return host.releaseAbort({ state: 'delivering', pageCount: current.pageCount, errorCode: null, purged: current.purged })
+    }
+    if (current.phase === 'aborted' && current.purgeSettled) return host.releaseAbort(viewOf(current))
     const reason: ScanDeviceDeletionReason = isSwitchedToPanelCode(current.stopCode ?? '')
       ? 'SCAN_DEVICE_SWITCHED_TO_PANEL'
       : 'SCAN_DEVICE_SESSION_CLEARED'
     host.commitPurge(current.taskId, reason)
     current.phase = 'aborted'
     current.errorCode = null
+    current.nextAccepted = false
+    current.awaitingLock = false
     host.note('aborted', current.stopCode)
-    return viewOf(current)
+    return host.releaseAbort(viewOf(current))
   }
 
   const finishAbort = async (): Promise<ScanDeviceView> => {
     host.disarmIdle()
     const current = session()
-    if (!current) return { state: 'aborted', pageCount: 0, errorCode: null, purged: false }
-    if (current.delivered) {
-      return { state: 'delivering', pageCount: current.pageCount, errorCode: null, purged: current.purged }
+    if (!current) return host.releaseAbort({ state: 'aborted', pageCount: 0, errorCode: null, purged: false })
+    if (current.delivered || current.deliveryOutcome === 'received') {
+      return host.releaseAbort({
+        state: 'delivering',
+        pageCount: current.pageCount,
+        errorCode: null,
+        ...(current.purgeSettled ? { purged: current.purged } : {}),
+      })
     }
-    if (current.phase === 'aborted' && current.purgeSettled) return viewOf(current)
+    if (current.deliveryOutcome === 'uncertain') {
+      throw new LocalScanError(
+        409,
+        'LOCAL_SCAN_DELIVERY_UNCONFIRMED',
+        { state: 'delivering', pageCount: current.pageCount, errorCode: null },
+        '投递结果还没确认',
+      )
+    }
+    if (current.phase === 'aborted' && current.purgeSettled) return host.releaseAbort(viewOf(current))
     host.commitPurge(current.taskId, 'SCAN_DEVICE_ABORTED')
     current.phase = 'aborted'
     current.errorCode = null
+    current.nextAccepted = false
+    current.awaitingLock = false
     host.note('aborted')
     if (!current.stopCode && !current.unauthorized) {
       await host.sendReport({ state: 'aborted', pageCount: current.pageCount })
     }
-    return viewOf(current)
+    return host.releaseAbort(viewOf(current))
   }
 
   const mergePages = (current: RoundSession, batch: readonly WiaScannedPage[]): void => {
@@ -287,8 +322,13 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
       if (current.lastResult.forceKilled) host.health.noteForceKilled()
       if (current.lastResult.stopUnconfirmed) {
         current.stopUnconfirmed = true
-        current.suspectPid = current.lastResult.processId
-        host.health.noteSuspect(current.lastResult.processId)
+        const processId = current.lastResult.processId
+        if (processId !== undefined) current.suspectPid = processId
+        else current.suspectPid = undefined
+        host.health.noteProcessStop({
+          stopUnconfirmed: true,
+          ...(processId !== undefined ? { processId } : {}),
+        })
       }
     } catch {
       const current = session()
@@ -347,9 +387,10 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
   const prepare = async (
     lease: DeviceLease,
   ): Promise<{ ok: true; generation: number } | { ok: false; view: ScanDeviceView }> => {
-    if (host.health.suspectProcessAlive()) return errorView(lease, 'busy')
-    if (host.health.hasForceKilled() || host.health.hasSuspect()) {
+    if (host.health.knownProcessAlive()) return errorView(lease, 'busy')
+    if (host.health.unidentifiedSuspect() || host.health.hasForceKilled() || host.health.hasSuspect()) {
       const probed = await host.health.probe()
+      if (host.health.knownProcessAlive() || host.health.unidentifiedSuspect()) return errorView(lease, 'busy')
       if (probed.health !== 'ready') {
         const code: ScanDeviceErrorCode = probed.health === 'busy' ? 'busy' : 'not_ready'
         return errorView(lease, code)
@@ -358,9 +399,23 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
       host.health.clearSuspect()
     }
     const taskId = lease.scanTaskId
+    host.revokeCleanup(taskId)
+    host.disarmIdle()
     const cleared = host.purge(taskId, 'SCAN_DEVICE_SESSION_CLEARED')
     if (cleared.status === 'failed') {
-      host.scheduleCleanup?.(taskId, 'SCAN_DEVICE_SESSION_CLEARED')
+      host.scheduleCleanup(taskId, 'SCAN_DEVICE_SESSION_CLEARED', {
+        epoch: host.getGeneration(),
+        stopUnconfirmed: false,
+      })
+      const current = session()
+      if (current?.taskId === taskId) {
+        current.phase = 'error'
+        current.errorCode = 'unknown'
+        current.purgeSettled = true
+        current.purged = false
+        current.nextAccepted = false
+        current.awaitingLock = false
+      }
       return { ok: false, view: { state: 'error', pageCount: 0, errorCode: 'unknown', purged: false } }
     }
     const outDir = host.deps.createDir(taskId, host.root ? { root: host.root } : {})

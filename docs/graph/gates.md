@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1968 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1969 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1249,7 +1249,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/terminal-agent/scripts/</code> — 9 个文件</summary>
+<summary><code>apps/terminal-agent/scripts/</code> — 10 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1260,7 +1260,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/scripts/verify-scan-device-engine-r2.helper.ts` | `verify-scan-device-engine.ts` |
 | `apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts` | `verify-scan-device-engine-r2.helper.ts`<br/>`verify-scan-device-engine.ts` |
 | `apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts` | `verify-scan-device-runner.ts` |
-| `apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts` | `verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner.ts` |
+| `apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts` | `verify-scan-device-runner.ts` |
+| `apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts` | `verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner.ts` |
 | `apps/terminal-agent/scripts/verify-windows-service-recovery.mjs` | `verify-agent-unauthorized.mjs` |
 
 </details>
@@ -1275,7 +1276,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/src/agent/boot-print-queue-order.ts` | `verify-print-queue-residue.ts` |
 | `apps/terminal-agent/src/agent/claim-rate-limit.ts` | `verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/config-manager.ts` | `verify-agent-config-resilience.mjs`<br/>`verify-agent-unauthorized.mjs`<br/>`verify-print-queue-residue.ts`<br/>`verify-printer-config.mjs` |
-| `apps/terminal-agent/src/agent/db.ts` | `verify-print-retry-attempt.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-scan-device-engine.ts`<br/>`verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-device-runner.ts`<br/>`verify-task-reliability.ts` |
+| `apps/terminal-agent/src/agent/db.ts` | `verify-print-retry-attempt.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-scan-device-engine.ts`<br/>`verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-device-runner.ts`<br/>`verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/dead-letter-operator.ts` | `verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/device-lock.ts` | `verify-scan-device-engine.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-device-runner.ts` |
 | `apps/terminal-agent/src/agent/heartbeat.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-local-qr-proxy.ts`<br/>`verify-print-queue-residue.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-scan-device-runner.ts`<br/>`verify-scan-input-lockout-telemetry.ts` |
@@ -1294,17 +1295,17 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/src/agent/scan-candidate-barrier.ts` | `verify-scan-input-lockout-telemetry.ts`<br/>`verify-scan-watcher.ts` |
 | `apps/terminal-agent/src/agent/scan-deletion-audit-reporter.ts` | `verify-scan-deletion-audit.ts`<br/>`verify-scan-device-runner.ts` |
 | `apps/terminal-agent/src/agent/scan-delivery.ts` | `verify-scan-device-engine.ts` |
-| `apps/terminal-agent/src/agent/scan-device/scan-device-backend.ts` | `verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-device-runner.ts` |
-| `apps/terminal-agent/src/agent/scan-device/scan-device-health.ts` | `verify-scan-device-runner.ts` |
-| `apps/terminal-agent/src/agent/scan-device/scan-device-housekeeping.ts` | `verify-scan-device-runner-r2.ts` |
-| `apps/terminal-agent/src/agent/scan-device/scan-device-runner.ts` | `verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-device-runner.ts` |
+| `apps/terminal-agent/src/agent/scan-device/scan-device-backend.ts` | `verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-device-runner.ts` |
+| `apps/terminal-agent/src/agent/scan-device/scan-device-health.ts` | `verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner.ts` |
+| `apps/terminal-agent/src/agent/scan-device/scan-device-housekeeping.ts` | `verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts` |
+| `apps/terminal-agent/src/agent/scan-device/scan-device-runner.ts` | `verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-device-runner.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-device-sync.ts` | `verify-scan-device-runner-r2.ts` |
-| `apps/terminal-agent/src/agent/scan-device/scan-device-types.ts` | `verify-scan-device-runner-r2.ts` |
+| `apps/terminal-agent/src/agent/scan-device/scan-device-types.ts` | `verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-pdf-compose.ts` | `verify-scan-device-engine.ts`<br/>`verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner.ts` |
-| `apps/terminal-agent/src/agent/scan-device/scan-temp-dir.ts` | `verify-scan-device-engine.helper.ts`<br/>`verify-scan-device-engine.ts`<br/>`verify-scan-device-runner.ts` |
+| `apps/terminal-agent/src/agent/scan-device/scan-temp-dir.ts` | `verify-scan-device-engine.helper.ts`<br/>`verify-scan-device-engine.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner.ts` |
 | `apps/terminal-agent/src/agent/scan-device/wia-probe.ts` | `verify-scan-device-engine.helper.ts`<br/>`verify-scan-device-runner.helper.ts` |
 | `apps/terminal-agent/src/agent/scan-device/wia-runner.ts` | `verify-scan-device-engine-r2.helper.ts`<br/>`verify-scan-device-engine.helper.ts`<br/>`verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner.helper.ts` |
-| `apps/terminal-agent/src/agent/scan-device/wia-script.ts` | `verify-scan-device-engine-r2.helper.ts`<br/>`verify-scan-device-engine.helper.ts`<br/>`verify-scan-device-engine.ts`<br/>`verify-scan-device-runner.helper.ts` |
+| `apps/terminal-agent/src/agent/scan-device/wia-script.ts` | `verify-scan-device-engine-r2.helper.ts`<br/>`verify-scan-device-engine.helper.ts`<br/>`verify-scan-device-engine.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner.helper.ts` |
 | `apps/terminal-agent/src/agent/scan-input/verified-folder.ts` | `verify-scan-input-health.ts` |
 | `apps/terminal-agent/src/agent/scan-input/windows-secure-reader.ts` | `verify-scan-input-health.ts` |
 | `apps/terminal-agent/src/agent/scan-watcher.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-print-truth-hardening.ts`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-scan-device-engine.ts`<br/>`verify-scan-watcher.ts` |
