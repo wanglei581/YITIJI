@@ -285,6 +285,7 @@ export function isScanDeviceSettingsEditableState(state: ScanDeviceState): boole
 
 type DeviceFieldsRow = {
   startMode?: string | null
+  scanType?: string | null
   deviceSource?: string | null
   deviceColorMode?: string | null
   deviceState?: string | null
@@ -303,10 +304,11 @@ export function isSwitchedToPanel(task: Pick<DeviceFieldsRow, 'startMode' | 'dev
 }
 
 /**
- * GET /scan/sessions/:id 多返回的七项（B1 加前四项，B2 加后三项）。
- * 面板任务（含已改用面板的）一律 startMode:'panel'、其余 null / 0——哪怕库里还留着 device 时期的列值。
+ * GET /scan/sessions/:id 多返回的字段（B1 加前四项，B2 加来源 / 颜色 / deviceUpdatedAt，B4 加 deviceMaxPages）。
+ * 面板任务（含已改用面板的）一律 startMode:'panel'、deviceMaxPages:null、其余 null / 0——哪怕库里还留着 device 时期的列值。
  * deviceSource / deviceColorMode 是用户当前选的来源与颜色（改设置之后读到的就是新值）；
  * deviceUpdatedAt 是最近一次状态变化（ISO 字符串）：终端程序回报，或用户改设置 / 改用面板。
+ * deviceMaxPages 与租约 device.maxPages 同源（证件 4，其余 20）。一体机用它写「最多 N 页」。
  */
 export function scanDeviceStatusFields(task: DeviceFieldsRow): {
   startMode: ScanStartMode
@@ -316,6 +318,7 @@ export function scanDeviceStatusFields(task: DeviceFieldsRow): {
   deviceSource: ScanDeviceSource | null
   deviceColorMode: ScanDeviceColorMode | null
   deviceUpdatedAt: string | null
+  deviceMaxPages: number | null
 } {
   if (!isScanDeviceTask(task)) {
     return {
@@ -326,6 +329,7 @@ export function scanDeviceStatusFields(task: DeviceFieldsRow): {
       deviceSource: null,
       deviceColorMode: null,
       deviceUpdatedAt: null,
+      deviceMaxPages: null,
     }
   }
   return {
@@ -340,6 +344,7 @@ export function scanDeviceStatusFields(task: DeviceFieldsRow): {
       ? (task.deviceColorMode as ScanDeviceColorMode)
       : null,
     deviceUpdatedAt: task.deviceUpdatedAt instanceof Date ? task.deviceUpdatedAt.toISOString() : null,
+    deviceMaxPages: scanDeviceLeaseLimits(task.scanType).maxPages,
   }
 }
 

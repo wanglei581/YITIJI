@@ -255,7 +255,8 @@ export interface ScanTaskStatusResult {
   expiresAt: string
   /**
    * 屏上扫描（2026-11-02）：面板任务恒为 startMode:'panel'、deviceState / deviceErrorCode / deviceSource /
-   * deviceColorMode / deviceUpdatedAt:null、devicePageCount:0。字段由 scanDeviceStatusFields 产出。
+   * deviceColorMode / deviceUpdatedAt:null、devicePageCount:0、deviceMaxPages:null。字段由 scanDeviceStatusFields 产出。
+   * device 任务的 deviceMaxPages 与租约同源：证件 4，其余 20。
    */
   startMode: 'panel' | 'device'
   deviceState: string | null
@@ -264,6 +265,7 @@ export interface ScanTaskStatusResult {
   deviceSource: string | null
   deviceColorMode: string | null
   deviceUpdatedAt: string | null
+  deviceMaxPages: number | null
 }
 
 /**

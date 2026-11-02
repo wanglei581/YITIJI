@@ -197,7 +197,7 @@ async function main(): Promise<void> {
     assert.doesNotMatch(createBody, /[Cc]ontrolToken/, '凭证不得进 body 类型（与一体机真实性门禁同一条）')
     const statusBody = interfaceBody('ScanSessionStatusResponse')
     assert.ok(statusBody, '共享契约缺 ScanSessionStatusResponse')
-    for (const key of ['startMode', 'deviceState', 'devicePageCount', 'deviceErrorCode', 'deviceSource', 'deviceColorMode', 'deviceUpdatedAt']) {
+    for (const key of ['startMode', 'deviceState', 'devicePageCount', 'deviceErrorCode', 'deviceSource', 'deviceColorMode', 'deviceUpdatedAt', 'deviceMaxPages']) {
       assert.match(statusBody, new RegExp(`\\b${key}\\?:`), `ScanSessionStatusResponse.${key} 必须是可选字段：老服务端不带，一体机缺省按面板处理`)
     }
     const settingsRequest = interfaceBody('ScanDeviceSettingsRequest')
@@ -206,7 +206,7 @@ async function main(): Promise<void> {
     assert.ok(settingsResponse, '共享契约缺 ScanDeviceSettingsResponse')
     for (const key of SPEC_RESPONSE_KEYS) assert.match(settingsResponse, new RegExp(`\\b${key}:`), `ScanDeviceSettingsResponse 缺 ${key}`)
     assert.ok(interfaceBody('ScanSwitchToPanelResponse'), '共享契约缺 ScanSwitchToPanelResponse')
-    pass('共享契约：创建请求的 startMode / source / colorMode、状态响应七项新字段（全部可选）、三个新类型都在')
+    pass('共享契约：创建请求的 startMode / source / colorMode、状态响应八项新字段（全部可选）、三个新类型都在')
 
     const handler = ScanDeviceController.prototype.deviceSettings
     assert.equal(Reflect.getMetadata(PATH_METADATA, handler), 'scan/sessions/:id/device-settings')

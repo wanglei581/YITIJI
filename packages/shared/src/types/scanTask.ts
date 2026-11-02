@@ -228,6 +228,11 @@ export interface ScanSessionStatusResponse {
   deviceColorMode?: ScanDeviceColorMode | null
   /** 最近一次状态变化（ISO 8601）：终端程序回报，或用户改设置 / 改用面板。 */
   deviceUpdatedAt?: string | null
+  /**
+   * 这一场最多扫几页。证件 4，其余 20，与租约 device.maxPages 同源。
+   * 面板任务（含已改用面板的）为 null。可选：老服务端不带，一体机就沿用自己的默认上限。
+   */
+  deviceMaxPages?: number | null
 }
 
 export interface ScanSessionCancelResponse {

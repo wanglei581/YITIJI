@@ -24,6 +24,7 @@ import { AuditService } from '../src/audit/audit.service'
 import { FilesService } from '../src/files/files.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { StorageService } from '../src/storage/storage.service'
+import { ScanDeviceSessionsService } from '../src/scan-tasks/scan-device-sessions.service'
 import { ScanTasksService } from '../src/scan-tasks/scan-tasks.service'
 import { TerminalCapabilitiesService, setPrintScanCapabilityModeForTest } from '../src/terminals/terminal-capabilities.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
@@ -73,6 +74,7 @@ async function main(): Promise<void> {
   const capabilities = new TerminalCapabilitiesService(prisma)
   const files = new FilesService(prisma, new AuditService(prisma), new StorageService())
   const scanSvc = new ScanTasksService(prisma, files, capabilities)
+  const deviceSvc = new ScanDeviceSessionsService(prisma, capabilities)
   const terminalIds: string[] = []
 
   async function makeTerminal(tag: string, scanDevice: 'available' | null = null) {
@@ -146,6 +148,54 @@ async function main(): Promise<void> {
       assert.equal(typeof next.scanTaskId, 'string', '静默期关着时取消之后立刻可以再建会话')
       process.env['SCAN_TERMINAL_QUIET_PERIOD_SECONDS'] = '90'
       pass('静默期关着：仍给两个时间，结束时刻等于 serverNow，不挡下一场')
+    }
+
+    console.log('\n-- GET 会话给页数上限（与租约同源）--')
+    {
+      const documentTerminal = await makeTerminal('pagesdoc', 'available')
+      const document = await scanSvc.create(
+        { scanType: 'document', terminalId: documentTerminal.id, startMode: 'device', source: 'feeder', colorMode: 'gray' },
+        null,
+      )
+      await scanSvc.ack(document.scanTaskId, null, document.controlToken, documentTerminal.id)
+      const documentStatus = await scanSvc.getStatus(document.scanTaskId, null, document.controlToken)
+      const documentLease = await scanSvc.getScanDeliveryLease(documentTerminal.id)
+      assert.equal(documentStatus.deviceMaxPages, 20, '非证件屏上扫描最多 20 页')
+      assert.equal(documentStatus.deviceMaxPages, documentLease.device?.maxPages, 'GET 的页数上限与租约 device.maxPages 是同一个数')
+
+      const idTerminal = await makeTerminal('pagesid', 'available')
+      const idScan = await scanSvc.create(
+        { scanType: 'id', terminalId: idTerminal.id, startMode: 'device', source: 'flatbed', colorMode: 'color' },
+        null,
+      )
+      await scanSvc.ack(idScan.scanTaskId, null, idScan.controlToken, idTerminal.id)
+      const idStatus = await scanSvc.getStatus(idScan.scanTaskId, null, idScan.controlToken)
+      const idLease = await scanSvc.getScanDeliveryLease(idTerminal.id)
+      assert.equal(idStatus.deviceMaxPages, 4, '证件屏上扫描最多 4 页')
+      assert.equal(idStatus.deviceMaxPages, idLease.device?.maxPages)
+
+      const panelTerminal = await makeTerminal('pagespanel')
+      const panel = await scanSvc.create({ scanType: 'id', terminalId: panelTerminal.id }, null)
+      const panelStatus = await scanSvc.getStatus(panel.scanTaskId, null, panel.controlToken)
+      assert.equal(panelStatus.deviceMaxPages, null, '面板任务给 null，哪怕扫描类型是证件')
+      assert.equal(panelStatus.startMode, 'panel')
+
+      // 上一场 document 还在 waiting，同一终端不能再开。先取消再开。静默期 90 秒会挡住，临时关掉。
+      process.env['SCAN_TERMINAL_QUIET_PERIOD_SECONDS'] = '0'
+      await scanSvc.cancel(document.scanTaskId, null, document.controlToken)
+      const switchedSession = await scanSvc.create(
+        { scanType: 'id', terminalId: documentTerminal.id, startMode: 'device', source: 'flatbed', colorMode: 'gray' },
+        null,
+      )
+      await deviceSvc.switchToPanel(switchedSession.scanTaskId, null, switchedSession.controlToken)
+      const switchedStatus = await scanSvc.getStatus(switchedSession.scanTaskId, null, switchedSession.controlToken)
+      const switchedRow = await prisma.scanTask.findUniqueOrThrow({ where: { id: switchedSession.scanTaskId } })
+      assert.equal(switchedRow.startMode, 'panel')
+      assert.equal(switchedRow.scanType, 'id', '库里仍是证件类型')
+      assert.equal(switchedStatus.deviceMaxPages, null, '已改用面板的会话按面板给 null')
+      assert.equal(switchedStatus.startMode, 'panel')
+      process.env['SCAN_TERMINAL_QUIET_PERIOD_SECONDS'] = '90'
+      pass('GET deviceMaxPages：证件 4、其余 20，与租约同源；面板与已改用面板为 null')
     }
 
     console.log('\nPASS verify-scan-device-b4')
