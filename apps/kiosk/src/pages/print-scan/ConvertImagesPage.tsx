@@ -71,6 +71,10 @@ export function ConvertImagesPage() {
   const loggedIn = Boolean(getToken())
   const hasEndUser =
     result != null && typeof result.hasEndUser === 'boolean' ? result.hasEndUser : undefined
+  // 「已进我的文档」只认响应里的 savedToDocuments：登录了也可能不进（用了手机传来的图片，只用于这一单，
+  // 11/02 拍板）。没有这个字段的旧后端照旧按 hasEndUser。
+  const savedToDocuments =
+    result != null && typeof result.savedToDocuments === 'boolean' ? result.savedToDocuments : hasEndUser
   const phase = derivePhase({
     usbOpen,
     uploading,
@@ -299,6 +303,7 @@ export function ConvertImagesPage() {
           rechecking={rechecking}
           uploading={uploading}
           hasEndUser={hasEndUser}
+          savedToDocuments={savedToDocuments}
           onBack={() => navigate('/print-scan')}
           onConvert={() => void runConvert('convert')}
           onRecheck={() => void runConvert('recheck')}
@@ -339,6 +344,7 @@ export function ConvertImagesPage() {
       <ConvertImagesView
         loggedIn={loggedIn}
         hasEndUser={hasEndUser}
+        savedToDocuments={savedToDocuments}
         kiosk={kiosk}
         phase={phase}
         images={images}
