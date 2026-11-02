@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { loginPathForCurrentLocation } from '../../auth/returnPath'
 import { useAuth } from '../../auth/useAuth'
 import { useLocalScanProbe } from '../../hooks/useTerminalDeviceStatus'
+import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
+import { PrintArt } from '../print/art/PrintArt'
 import { PhoneHelpLine } from '../print-scan/phoneHelp'
+import { ScanPaperArt } from './ScanPaperArt'
 import { armScanHowContinue, clearScanHowContinue, consumeScanHowContinue, peekScanHowContinue } from './scanHowContinue'
 import { SCAN_MATERIALS, panelScanType, type ScanMaterial } from './scanMaterials'
 import { scanReadyChipText, screenScanBlockReason } from './scanProbeCopy'
@@ -16,6 +19,30 @@ import './styles/scan-device-qx.css'
 
 function labelOf(material: ScanMaterial): string {
   return SCAN_MATERIALS.find((item) => item.material === material)?.label ?? ''
+}
+
+function WayArt({ kind }: { kind: 'scan' | 'mfp' }) {
+  return (
+    <span className="vis" aria-hidden="true">
+      {kind === 'scan' ? <ScanPaperArt /> : <PrintArt name="mfp" />}
+    </span>
+  )
+}
+
+function WayTail({ kind }: { kind: 'mark' | 'arrow' | 'none' }) {
+  if (kind === 'none') return <span />
+  if (kind === 'arrow') {
+    return (
+      <span className="arrow" aria-hidden="true">
+        <QxTouchIcon name="arrowR" size={30} strokeWidth={2.4} />
+      </span>
+    )
+  }
+  return (
+    <span className="mark" aria-hidden="true">
+      <QxTouchIcon name="check" size={30} strokeWidth={3} />
+    </span>
+  )
 }
 
 export function ScanHowPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => void } = {}) {
@@ -133,21 +160,26 @@ export function ScanHowPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => v
       onBandBack={showOff ? undefined : goWhat}
       bandBackLabel={showOff ? '返回打印扫描' : '返回'}
     >
+      <div className="cs-stack">
       {showOff ? (
         <div className="cs-ways">
           <button type="button" className="cs-way" disabled data-testid="scan-way-screen">
+            <WayArt kind="scan" />
             <span className="tx">
               <span className="sx-chip is-warn">这台机器还没开通</span>
               <h3>在这块屏上开始扫描</h3>
               <p>放好纸，在屏上点开始，扫描仪自己动。这台机器暂时做不到。</p>
             </span>
+            <WayTail kind="none" />
           </button>
           <button type="button" className="cs-way" data-testid="scan-way-panel" onClick={goPanel}>
+            <WayArt kind="mfp" />
             <span className="tx">
               <span className="sx-chip">现在可以用</span>
               <h3>到打印机面板上扫</h3>
               <p>在打印机屏幕上按扫描，文件传回这台机器。</p>
             </span>
+            <WayTail kind="arrow" />
           </button>
         </div>
       ) : (
@@ -164,11 +196,13 @@ export function ScanHowPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => v
               setWay('screen')
             }}
           >
+            <WayArt kind="scan" />
             <span className="tx">
               {screenAllowed ? <span className="sx-chip">推荐</span> : null}
               <h3>在这块屏上开始扫描</h3>
               <p>{screenAllowed ? '放好纸，在屏上点开始，扫描仪自己动' : blockReason}</p>
             </span>
+            <WayTail kind="mark" />
           </button>
           <button
             type="button"
@@ -180,10 +214,12 @@ export function ScanHowPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => v
               setWay('panel')
             }}
           >
+            <WayArt kind="mfp" />
             <span className="tx">
               <h3>到打印机面板上扫</h3>
               <p>在打印机屏幕上按扫描，文件传回这台机器</p>
             </span>
+            <WayTail kind="mark" />
           </button>
         </div>
       )}
@@ -194,11 +230,18 @@ export function ScanHowPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => v
         </div>
       ) : null}
       {!showOff ? (
-        <div className="cs-hold" role="note">用 U 盘：在打印机面板上选「扫描到 U 盘」——这台机器暂未开通</div>
+        <div className="cs-hold" role="note">
+          <QxTouchIcon name="usb" size={32} strokeWidth={2} />
+          <span>用 U 盘：在打印机面板上选「扫描到 U 盘」——这台机器暂未开通</span>
+        </div>
       ) : (
-        <PhoneHelpLine />
+        <div className="cs-remind">
+          <QxTouchIcon name="call" size={34} strokeWidth={2} />
+          <PhoneHelpLine />
+        </div>
       )}
       {createsOnNext ? <p className="cs-create" role="status">下一步会真实建立这次扫描</p> : null}
+      </div>
     </ScanWorkbenchShell>
   )
 }
