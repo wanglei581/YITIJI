@@ -9,7 +9,7 @@ const TYPES = api.LEGAL_DOC_TITLES
 const UNPUBLISHED_DESC = {
   terms_of_service: '正式版本发布之前，小程序暂时不能登录。不登录也可以看使用帮助和打印指引。',
   privacy_policy: '正式版本发布之前，小程序暂时不能登录。不登录也可以看使用帮助和打印指引。',
-  ai_disclaimer: '发布后，这里会写明本服务用到的大模型名称与备案号，以及 AI 能做什么、不能做什么。',
+  ai_disclaimer: '发布后，这里会写明本服务用到的大模型名称与备案情况，以及 AI 能做什么、不能做什么。',
   operator_info: '发布后，这里会写明经营者名称、证照信息和联系方式。',
 }
 

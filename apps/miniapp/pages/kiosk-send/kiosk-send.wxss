@@ -30,6 +30,9 @@
 .btn-primary { background: #1677ff; color: #fff; }
 .btn-secondary { background: #eef2ff; color: #1677ff; }
 
+/* 拍照或从相册选（2026-11-02，#1363）：和上面的按钮隔开，用本页已有的 24rpx 间距，不新增颜色与字号。 */
+.album-btn { margin-top: 24rpx; }
+
 /* 从我的文档选（2026-10-29）：第二张卡与上一张隔开；行沿用 .sent-item 的底色与圆角，
    左对齐、可点高度不低于 96rpx（CLAUDE.md §9）。只用本页已有的间距与 app.wxss 现有变量。 */
 .doc-card { margin-top: 24rpx; }
