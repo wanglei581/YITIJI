@@ -1,5 +1,16 @@
 # 当前开发进度
 
+## 2026-11-03：屏上扫描 ③ 后端 B3（只对屏上扫描放行证件 PDF；分支 `claude/scan-device-b2-1102`，叠在 B2 头 `fafcfdb0d` 上，未推送、未部署）
+
+- 放行只认服务端核实过的会话：`assertScanDeliverOriginAllowed` 在 `startMode=device`、`origin=device`、`deviceState` 为 composing / delivering、`devicePageCount≥1`、文件是 PDF 时签发模块内 Symbol 凭据；面板返回 null。`FilesService.uploadVerifiedDeviceScan` 只认这份凭据，伪造对象退回普通 `upload`。`upload()` 与控制器、DTO 都不接受「跳过校验」或「允许证件 PDF」参数。
+- 上限：证件 4 页 / 10 MiB（10 MiB 即 `PURPOSE_POLICY.id_scan.maxBytes`）；其余屏上扫描 20 页 / 18 MiB（18 MiB 与终端程序 `SCAN_PDF_MAX_BYTES` 一致，见 `apps/terminal-agent/src/agent/scan-device/scan-pdf-compose.ts`）。device-report 的 `pageCount` 超过该类型上限 → 409 `SCAN_DEVICE_TOO_MANY_PAGES`（超过 200 仍是 400 `SCAN_DEVICE_REPORT_INVALID`）。投递时文件服务再按认出的页数和字节数查一遍。超大小落 `SCAN_FILE_TOO_LARGE`（屏上与面板都是；面板其余行为不变），不再落成 `SCAN_UPLOAD_FAILED`。
+- 个人信息检查与留存按用途 `id_scan`，不按 MIME 分叉；证件 PDF 每一页走同一套检查。页数上限 4 ≤ OCR 默认 5 页（`PII_SCAN_OCR_PAGE_LIMIT_DEFAULT`）。留存仍是 `system_short`。
+- current-lease 的 device 段多带 `maxPages`、`maxBytes`。面板租约不多任何字段。`packages/shared` 只在注释里说明（一体机不读租约）。
+- 两处旧门禁对 `lease.device` 的整对象精确相等补上了这两个字段（document 会话为 20 页 / 18 MiB），没有改成子集，也没有动 W3b。
+- 合规：`docs/compliance/compliance-boundary.md` §5.2。新门禁 `verify:scan-device-idscan`，进 `package.json` 与 `ci.yml` 的 SQLite、postgres-readiness 两处。建档对象字面量仍留在 `FilesService.upload`（派生种类门禁只认这一处透传建档点）；屏上扫描已经核实过的校验结果用模块内 WeakMap 交进去，`upload()` 没有外部可传的跳过校验参数。
+- 验证（本机隔离库，`RECRUITMENT_CONTENT_HOSTING_ENABLED=false`）：api typecheck 与 `eslint src/` 都是 0。`verify:scan-device-idscan` 在 SQLite 和临时 PostgreSQL 16（127.0.0.1:55441，时区 UTC）上都过。`verify:scan-tasks` 带 `POSTGRES_URL` 跑完，日志里没有「SKIPPED real DB」，末尾是 `PASS scan tasks verification`。`verify:repository-integrity` 三项 OK；`pnpm graph:check` 通过。反向检查 6 处（不核实 startMode、面板也放行证件 PDF、不查 4 页上限、超大小落回 `SCAN_UPLOAD_FAILED`、证件 PDF 不进个人信息检查、面板租约多字段）都让新门禁变红，`git checkout --` 恢复后干净。`verify:member-closure` 的 HTTP 断言 503≠401（`MEMBER_SESSION_STORE_UNAVAILABLE`）在起点 `fafcfdb0d` 的 `files.service.ts` 上用同一环境复跑同样红，不是这次改动引入的。
+- 没做：一体机、终端程序、小程序、两个后台都没动；没有新迁移。未推送、未部署。
+
 ## 2026-11-03：屏上扫描 ③ 后端第二批 B2（删除审计认屏上扫描原因码、原地改扫描设置、GET 补三项与共享契约类型；另含两处 B1 复审修复和 page_ready 续期 10 分钟；分支 `claude/scan-device-b2-1102`，叠在 B1 头 1c72b8f80 上，未推送、未部署）
 
 - 删除审计认屏上扫描的六个原因码：新常量文件 `services/api/src/terminals/scan-deletion-reason-codes.ts` 列出 `UNCLAIMED_TTL_EXPIRED` 加 `SCAN_DEVICE_DELIVERED / FAILED / ABORTED / SWITCHED_TO_PANEL / SESSION_CLEARED / STARTUP_RESIDUE`（逐字对齐终端程序 A1 的 `ScanDeviceDeletionReason`），上报 DTO 的 `@IsIn` 与类型都从它来。`terminal-scan-deletion-audit.service.ts` 不用改（`reasonCode` 本来就是 String 列，同一 eventId 换原因码本来就判 `SCAN_DELETION_AUDIT_EVENT_CONFLICT`）；两套 schema 的注释同步（`pnpm db:pg:sync` 重出），**没加迁移**。终端程序没动：A2 要改的是 `apps/terminal-agent/src/agent/scan-deletion-audit-reporter.ts` 的 `buildPayload`（第 59 行写死 `reasonCode: 'UNCLAIMED_TTL_EXPIRED'`，改成 `event.reasonCode`）和 `apps/terminal-agent/src/agent/types.ts` 的 `ScanDeletionAuditReportPayload.reasonCode`（现在只写 `'UNCLAIMED_TTL_EXPIRED'`，放宽到七个码）；后端先上线，终端程序才能放开上报，否则 400 进死信。
