@@ -2929,6 +2929,17 @@ for (const code of ['AI_PAUSED', 'AI_BUDGET_EXHAUSTED'] as const) {
     await expect(page.getByRole('button', { name: '打印求职参考单（未含 AI 规划）' })).toBeEnabled()
     await expectCareerGenerateKeyGreyed(page, api, '生成求职方案', CAREER_AI_DOWN_WHY)
     expect(api.requestCount('POST', CAREER_PLAN_PATH)).toBe(0)
+    // 「AI 不可用时的出路」要看得出是按钮：触屏壳按钮重置曾清掉 .kiosk-ai-fallback__action 的内边距、边框、底色，
+    // 出路和置灰的那颗都成了纯文字（走查 I-29 同根因，简历各页共用，样式在 resume-touch.css 的 .rtp 下）。
+    for (const kind of ['alternative', 'blocked']) {
+      const style = await page.locator(`[data-ai-fallback-action="${kind}"]`).first().evaluate((el) => {
+        const computed = getComputedStyle(el)
+        return { padLeft: parseFloat(computed.paddingLeft), border: parseFloat(computed.borderTopWidth), background: computed.backgroundColor }
+      })
+      expect(style.padLeft, `${kind} 出路按钮内边距`).toBeGreaterThanOrEqual(12)
+      expect(style.border, `${kind} 出路按钮要有边框`).toBeGreaterThanOrEqual(1)
+      expect(style.background, `${kind} 出路按钮要有底色，不是透明`).not.toBe('rgba(0, 0, 0, 0)')
+    }
   })
 }
 
