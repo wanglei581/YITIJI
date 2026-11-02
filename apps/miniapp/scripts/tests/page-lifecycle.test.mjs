@@ -6951,6 +6951,19 @@ test('privacy 注销：模板里开放时有说明块、待处理状态行、「
   assert.match(wxml, /accountClosureAvailable \? '[^']*注销账号在本页下方申请/)
 })
 
+test('privacy 注销：「办不了的」那行分三种——没登录说登录后申请，登录且开放说本页下方申请，其余照旧找我们', () => {
+  const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/privacy/privacy.wxml'), 'utf8')
+  const line = (/<text class="pr-k">办不了的<\/text><text class="pr-v">\{\{([\s\S]*?)\}\}<\/text>/.exec(wxml) || [])[1]
+  assert.ok(line, '找不到「办不了的」那一行')
+  // 能力位只有登录后读得到。合规十一 10/12：没登录这一支的条件用 !isLoggedIn，不能用「能力位为假」——
+  // 登录了但能力位还在读、读失败、服务端说不能注销时它也是假，那时说「登录后申请」不对。
+  const m = /^!isLoggedIn \? '([^']*)' : \(accountClosureAvailable \? '([^']*)' : '([^']*)'\)$/.exec(line.trim())
+  assert.ok(m, `「办不了的」那行三种情况的结构变了：${line}`)
+  assert.equal(m[1], '例如更正：在「意见反馈」里写清楚，或按「经营者信息」里的联系方式联系我们。注销账号登录后在本页下方申请；手机号用不了或由监护人代办的，也按联系方式找我们。')
+  assert.equal(m[2], '例如更正：在「意见反馈」里写清楚，或按「经营者信息」里的联系方式联系我们。注销账号在本页下方申请；手机号用不了或由监护人代办的，也按联系方式找我们。')
+  assert.equal(m[3], '例如更正、注销账号：在「意见反馈」里写清楚，或按「经营者信息」里的联系方式联系我们。')
+})
+
 test('privacy 注销：提交失败时如实说，幂等键留着给下一次重试用', async () => {
   let n = 0
   const { page, modals, calls } = makePrivacy({
@@ -7005,4 +7018,40 @@ test('U 盘指引：只列一体机真能读的格式，Word 说另存为 PDF，
   const usbFaq = help.data.faqs.find((f) => f.id === 'usb')
   assert.doesNotMatch(usbFaq.a, /OTG|读卡器|传输到终端/, '小程序读不了 U 盘，也没有手机直传终端')
   assert.match(usbFaq.a, /U盘打印指引/)
+})
+
+// AI 简历导出默认印「含人工智能辅助生成内容」（产品负责人 2026-10-06 晚拍板，服务端开关 10/9 打开）。
+// 导出之前就要让用户知道：生成页「导出设置」卡、优化页「导出优化稿」格式格下方各一句。
+test('AI 简历导出：生成页与优化页在导出处说明每页底部会印 AI 标注', () => {
+  const m = requireMiniapp('../utils/resume-build-model.js')
+  assert.match(m.RESUME_AI_LABEL_NOTE, /每页底部有一行小字：含人工智能辅助生成内容/)
+  for (const rel of ['pages/resume-build/resume-build.js', 'pages/resume-optimize/resume-optimize.js']) {
+    const page = makePage(rel, { auth: createAuth('A'), api: {}, wx: createWx() })
+    assert.equal(page.data.aiLabelNote, m.RESUME_AI_LABEL_NOTE, `${rel} data.aiLabelNote`)
+  }
+  const build = fs.readFileSync(path.join(MINIAPP, 'pages/resume-build/resume-build.wxml'), 'utf8')
+  const card = build.slice(build.indexOf('<view class="section-t">导出设置</view>'))
+  assert.ok(card.indexOf('{{aiLabelNote}}') > 0 && card.indexOf('{{aiLabelNote}}') < card.indexOf('</view></view>'), '在「导出设置」卡内')
+  const opt = fs.readFileSync(path.join(MINIAPP, 'pages/resume-optimize/resume-optimize.wxml'), 'utf8')
+  const grid = opt.indexOf('<view class="format-grid">')
+  const note = opt.indexOf('{{aiLabelNote}}')
+  assert.ok(grid > 0 && note > grid && note < opt.indexOf('pricing-line', grid), '在「导出优化稿」格式格下方、价格说明之前')
+})
+
+// 还没有真实的大模型备案号时，不对用户（含读屏标签）说「备案号」，只说「备案情况」——
+// 读屏用户听到「备案号」会以为点进去能查到号码（合规窗口反方审查 10/6）。
+// 拿到深度求索备案号、写进后台「AI 服务说明」以后，这条断言连同文案一起改回带号码的写法。
+test('AI 服务说明入口：没有真号码之前只说「备案情况」，不说「备案号」', () => {
+  const stripComments = (src, ext) => ext === 'wxml'
+    ? src.replace(/<!--[\s\S]*?-->/g, '')
+    : src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  const files = [
+    'pages/home/home.wxml', 'pages/assistant/assistant.wxml', 'pages/ai/ai.wxml',
+    'pages/about/about.js', 'pages/legal/legal.js', 'pages/help/help.js',
+  ]
+  for (const rel of files) {
+    const src = stripComments(fs.readFileSync(path.join(MINIAPP, rel), 'utf8'), rel.split('.').pop())
+    assert.doesNotMatch(src, /备案号/, `${rel} 用户看得到的文字里不该有「备案号」`)
+    assert.match(src, /备案情况/, `${rel} 应改成「备案情况」`)
+  }
 })

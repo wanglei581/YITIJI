@@ -17,7 +17,7 @@ Page({
       { id: 'privacy', title: '隐私政策' },
     ],
     links2: [
-      { id: 'ai',       title: 'AI 服务说明', sub: '所用模型与备案号' },
+      { id: 'ai',       title: 'AI 服务说明', sub: '所用模型与备案情况' },
       { id: 'operator', title: '经营者信息', sub: '名称、证照与联系方式' },
     ],
   },
