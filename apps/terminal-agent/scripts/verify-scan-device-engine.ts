@@ -1498,7 +1498,7 @@ async function deliveryChecks(): Promise<void> {
     assert.doesNotMatch(watcher, /'origin'|"origin"|origin:/, 'watcher 里没有任何 origin 字段')
   })
 
-  await step('watcher 线上字节：字段恰为五个、顺序固定、没有 origin、成功后删除源文件', async () => {
+  await step('watcher 线上字节：字段恰为五个、顺序固定、值对得上、没有 origin、成功后删除源文件', async () => {
     let captured = ''
     const server = http.createServer((req, res) => {
       const chunks: Buffer[] = []
@@ -1521,6 +1521,9 @@ async function deliveryChecks(): Promise<void> {
     try {
       const file = path.join(folder, 'wire.pdf')
       fs.writeFileSync(file, '%PDF-1.4 engine wire check')
+      const mtime = new Date(Date.now() - 5_000)
+      fs.utimesSync(file, mtime, mtime)
+      const expectedSnapshotAt = new Date(fs.statSync(file).mtimeMs).toISOString()
       const originalWrite = process.stdout.write.bind(process.stdout)
       process.stdout.write = (() => true) as typeof process.stdout.write
       try {
@@ -1533,6 +1536,12 @@ async function deliveryChecks(): Promise<void> {
       }
       const names = [...captured.matchAll(/; name="([^"]+)"/g)].map((m) => m[1])
       assert.deepEqual(names, ['file', 'scanTaskId', 'deliveryLease', 'candidateSnapshotAt', 'observedAt'], 'watcher 上传的字段必须恰为这五个且顺序固定')
+      const values = new Map([...captured.matchAll(/; name="([^"]+)"\r\n\r\n([^\r]*)\r\n/g)].map((m) => [m[1], m[2]] as const))
+      assert.equal(values.get('scanTaskId'), 'scan-task-engine-1', 'scanTaskId 取租约里的任务号')
+      assert.equal(values.get('deliveryLease'), 'engine-lease', 'deliveryLease 取租约里的投递令牌（不能和任务号接反）')
+      assert.equal(values.get('candidateSnapshotAt'), expectedSnapshotAt, '可信快照时间 = 文件原始 mtime 转 ISO，不夹值')
+      assert.equal(values.get('observedAt'), expectedSnapshotAt, 'observedAt 与 candidateSnapshotAt 同值')
+      assert.match(captured, /name="file"; filename="wire\.pdf"\r\nContent-Type: application\/pdf\r\n\r\n%PDF-1\.4 engine wire check\r\n/)
       assert.doesNotMatch(captured, /origin/)
       assert.equal(fs.existsSync(file), false, '投递成功后删除源文件')
     } finally {
