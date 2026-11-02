@@ -63,7 +63,7 @@ export function MyResumesPage() {
   const { items, state, total } = pagination
 
   const openReport = (taskId: string) => navigate(taskPath('/resume/report', taskId), { state: { taskId, licenseViewOnly: winding } })
-  const openOptimize = (taskId: string, saved: boolean) => navigate(`${taskPath('/resume/optimize', taskId)}${saved ? '&saved=1' : ''}`, { state: { taskId } })
+  const openOptimize = (taskId: string, saved: boolean) => navigate(`${taskPath('/resume/optimize', taskId)}${saved ? '&saved=1' : ''}`, { state: { taskId, licenseViewOnly: winding } })
   const openJobFit = (item: MemberResumeItem) => {
     if (item.kind !== 'parse' || !isActionable(item)) return
     navigate(`/resume/job-fit?${new URLSearchParams({ taskId: item.taskId, resumeName: resumeLabel(item) })}`)

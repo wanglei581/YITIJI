@@ -347,7 +347,7 @@ export function ResumeReportPage() {
       railNow={REPORT_HEAD[viewState].rail}
       seal={hasBody ? 'idle' : null}
       ask={(viewOnly || state.aiDown || outage) ? { label: '小青暂时不可用，先自己核一遍', disabled: true } : { label: '问小青：先改哪几处', draft: '请帮我理解这份简历诊断报告，先让我提供想问的内容，再解释修改顺序，不添加我没有提供的事实。' }}
-      primary={viewOnly && viewState !== 'read-error' ? { ...dockPrimary, disabled: true } : dockPrimary}
+      primary={viewOnly && viewState !== 'read-error' ? { ...dockPrimary, disabled: true, title: LICENSE_NO_NEW_TASK_REASON } : dockPrimary}
       bodyClassName="qxt-body-scroll"
     >
       <section

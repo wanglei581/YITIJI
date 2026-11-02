@@ -1,7 +1,6 @@
 import { useKioskLicense } from '../../layouts/KioskLicenseContext'
-import { LicenseLock } from '../../layouts/LicenseLock'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { cloneElement, isValidElement, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useClearGuestDraftOnFlowExit } from './resumeGenerateDraft'
 import type {
@@ -64,6 +63,31 @@ const FORMAT_NAME: Record<ResumeExportFormat, string> = {
   docx: 'DOCX',
   txt: 'TXT',
   md: 'MD',
+}
+
+const NEW_TASK_CTA = new Set([
+  'resume-generate-preview-cta-export',
+  'resume-generate-preview-cta-print',
+  'resume-generate-preview-cta-confirm-export',
+])
+
+/** 底栏里只停用打印、导出。返回、离开、再读一次保持可点。 */
+function holdExportPrint(node: ReactNode): ReactNode {
+  if (Array.isArray(node)) return node.map((child) => holdExportPrint(child))
+  if (!isValidElement(node)) return node
+  const props = node.props as { 'data-testid'?: unknown; children?: ReactNode }
+  const testId = props['data-testid']
+  if (typeof testId === 'string' && NEW_TASK_CTA.has(testId)) {
+    return cloneElement(node, {
+      disabled: true,
+      title: LICENSE_NO_NEW_TASK_REASON,
+      'aria-disabled': undefined,
+      onClick: () => undefined,
+    })
+  }
+  const children = props.children
+  if (children == null || typeof children === 'string' || typeof children === 'number') return node
+  return cloneElement(node, undefined, holdExportPrint(children))
 }
 
 function readPhase(state: unknown): 'preview' | 'export' | null {
@@ -199,7 +223,7 @@ export function ResumeGeneratePreviewPage() {
     : '导出后显示真实页数。若担心第二页只剩两三行，可先点「压到一页」。'
 
   const handleExport = async (factsConfirmedAt: string) => {
-    if (!resume || !result || resumeTitleIssues(resume).length > 0) return
+    if (viewOnly || !resume || !result || resumeTitleIssues(resume).length > 0) return
     setExporting(true)
     setExportError(null)
     try {
@@ -213,6 +237,7 @@ export function ResumeGeneratePreviewPage() {
   }
 
   const handlePrint = () => {
+    if (viewOnly) return
     if (titleBlocked) { focusTitleIssue(); return }
     if (!exported?.printFileUrl) return
     if (exportFormat !== 'pdf') return
@@ -232,6 +257,7 @@ export function ResumeGeneratePreviewPage() {
   }
 
   const openExport = () => {
+    if (viewOnly) return
     if (titleBlocked) { focusTitleIssue(); return }
     const base = state && typeof state === 'object' ? state : {}
     navigate(
@@ -362,7 +388,7 @@ export function ResumeGeneratePreviewPage() {
         advisor: 'resume-generate-preview-nav-advisor',
         profile: 'resume-generate-preview-nav-profile',
       }}
-      ctabar={viewOnly ? <LicenseLock>{ctabar}</LicenseLock> : ctabar}
+      ctabar={viewOnly ? holdExportPrint(ctabar) : ctabar}
       ask={viewOnly ? false : previewAsk ? { ...previewAsk, testId: 'resume-generate-ai-help' } : false}
     >
       <section
@@ -468,8 +494,8 @@ export function ResumeGeneratePreviewPage() {
             guest={!token}
             synthetic={resolved.synthetic}
             printNavigating={printNavigating}
-            titleBlocked={titleBlocked}
-            onTitleBlocked={focusTitleIssue}
+            titleBlocked={viewOnly || titleBlocked}
+            onTitleBlocked={viewOnly ? () => undefined : focusTitleIssue}
             onPrint={handlePrint}
             onOpenPreview={() => setPreviewOpen(true)}
             onClearExport={() => { setExported(null); setExportError(null) }}
@@ -482,7 +508,7 @@ export function ResumeGeneratePreviewPage() {
           <ResumeFactConfirmDialog facts={facts} unconfirmed={unconfirmed} busy={exporting} onCancel={() => setFactOpen(false)} onConfirm={(at) => { void handleExport(at) }} />
         )}
         {previewOpen && exported?.signedUrl && (
-          <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportFormat} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} primaryAction={exported.printFileUrl && exportFormat === 'pdf' ? { label: '去打印这一份', onClick: handlePrint, disabled: printNavigating || titleBlocked } : undefined} onClose={() => setPreviewOpen(false)} />
+          <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportFormat} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} primaryAction={exported.printFileUrl && exportFormat === 'pdf' ? { label: '去打印这一份', onClick: handlePrint, disabled: viewOnly || printNavigating || titleBlocked } : undefined} onClose={() => setPreviewOpen(false)} />
         )}
       </section>
     </ResumeTouchFrame>
