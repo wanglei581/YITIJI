@@ -45,7 +45,7 @@ flowchart LR
 
 | 路由 | 页面组件 | 页面文件 | 端点数 | 样式 |
 | --- | --- | --- | --- | --- |
-| `/` | HomePage | `apps/kiosk/src/pages/home/HomePage.tsx` | 33 | 6 |
+| `/` | HomePage | `apps/kiosk/src/pages/home/HomePage.tsx` | 33 | 7 |
 | `/*` | KioskRouteErrorPage | `apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx` | 10 | 7 |
 | `/activities` | BenefitActivitiesPage | `apps/kiosk/src/pages/activities/BenefitActivitiesPage.tsx` | 11 | 10 |
 | `/activities/:id` | BenefitActivityDetailPage | `apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx` | 11 | 10 |
@@ -88,7 +88,7 @@ flowchart LR
 | `/me/resumes` | MyResumesPage | `apps/kiosk/src/pages/profile/me/MyResumesPage.tsx` | 10 | 11 |
 | `/me/settings` | MySettingsPage | `apps/kiosk/src/pages/profile/me/MySettingsPage.tsx` | 18 | 10 |
 | `/member/qr-login` | MobileQrLoginPage | `apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx` | 10 | 2 |
-| `/print-scan` | PrintScanHomePage | `apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx` | 10 | 14 |
+| `/print-scan` | PrintScanHomePage | `apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx` | 10 | 15 |
 | `/print-scan/convert` | ConvertImagesPage | `apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx` | 10 | 8 |
 | `/print-scan/feature/:key` | PrintScanFeatureInfoPage | `apps/kiosk/src/pages/print-scan/PrintScanFeatureInfoPage.tsx` | 10 | 10 |
 | `/print-scan/sign` | SignStampPage | `apps/kiosk/src/pages/print-scan/SignStampPage.tsx` | 12 | 8 |
@@ -105,7 +105,7 @@ flowchart LR
 | `/print/scan-feature` | Navigate | — _(重定向)_ | 0 | — |
 | `/print/scan-sign` | Navigate | — _(重定向)_ | 0 | — |
 | `/print/upload` | PrintUploadPage | `apps/kiosk/src/pages/print/PrintUploadPage.tsx` | 10 | 14 |
-| `/profile` | ProfilePage | `apps/kiosk/src/pages/profile/ProfilePage.tsx` | 11 | 10 |
+| `/profile` | ProfilePage | `apps/kiosk/src/pages/profile/ProfilePage.tsx` | 11 | 11 |
 | `/renshi` | RenshiPage | `apps/kiosk/src/pages/renshi/RenshiPage.tsx` | 10 | 9 |
 | `/resume` | Navigate | — _(重定向)_ | 0 | — |
 | `/resume/career-plan` | CareerPlanPage | `apps/kiosk/src/pages/resume/CareerPlanPage.tsx` | 39 | 11 |

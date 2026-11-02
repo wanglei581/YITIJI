@@ -13953,7 +13953,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 809,
+      "reachableFileCount": 812,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -14002,6 +14002,7 @@
           ],
           "path": "/",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/home/styles/home-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
@@ -15677,6 +15678,7 @@
           "path": "/print-scan",
           "styles": [
             "apps/kiosk/src/components/styles/kiosk-feedback-dialog.css",
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/print-scan/styles/print-hub-qx.css",
             "apps/kiosk/src/pages/print-scan/styles/print-hub-touch.css",
             "apps/kiosk/src/pages/print/art/print-art-tokens.css",
@@ -16175,6 +16177,7 @@
           ],
           "path": "/profile",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/styles/profile-qx.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
             "apps/kiosk/src/pages/profile/touch/me-states.css",
@@ -17312,7 +17315,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 911
+      "sourceFileCount": 914
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
