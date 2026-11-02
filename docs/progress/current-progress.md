@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-11-02：依赖安全——follow-redirects 1.16.1 → 1.16.2（单独先进 main，解开全仓 CI）
+
+- 原因：10/30 收录的高危公告 GHSA-mrwp-f3q8-3g9p（跨 realm 的敏感请求头数组被丢弃、自定义凭据可随重定向带出）打中仓库钉住的 follow-redirects 1.16.1，修复版 1.16.2；main 上所有 PR 的 build-and-verify 都红在「Dependency security gate」。
+- 改动：只拣触屏线的修复提交 8d0b2f9e9（在 #1525 发布准备线上）里的 `pnpm-workspace.yaml` 钉子与 `pnpm-lock.yaml`；不带该线的其它内容。#1525 以后合进来是同一份改动。
+- 验证：`pnpm install --frozen-lockfile` 通过；`node scripts/verify-dependency-security.mjs` 全部 OK（full tree 与 --prod 的未接受高危 / 严重均为 0）。
+
 ## 2026-10-29：产品负责人定「只卖机器和软件，不办证不备案」（合规口径落文）
 
 - 产品负责人原话：「可以，不需要备案，你们继续做好，做完，我们卖机器和软件」。合规边界文档第一节一点一补一条拍板：岗位信息只由运营机构发布、放在机构自己的平台或服务器上；我方云上只放机构官方招聘平台的二维码，想直接展示岗位的客户走私有化部署；收费只有设备款与维保费；AI 求职指导类服务的人社备案定为不办，对外不说已获人社确认。
