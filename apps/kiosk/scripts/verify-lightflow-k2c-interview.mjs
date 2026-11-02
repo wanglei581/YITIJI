@@ -128,10 +128,13 @@ try {
   new Function('setIndustry', 'DEFAULT_EMPLOYMENT_INDUSTRY', executable(`return (${clearIndustry})();`))((value) => { clearedIndustry = value }, '信息传输、软件和信息技术服务业')
   assert.equal(clearedIndustry, '', '清空行业不能回填 IT')
   assert.ok(setup.includes("{industry || '尚未选择'}"), '未选行业如实显示')
-  assert.ok(setup.includes('请本人填写目标岗位、选择行业和经验后再开始'), '必须选的方向在开始前说明')
+  // 触屏版第 1 步按稿 iv-1：必选项直接写在各自字段的标签上，不再有一句总括。三个标签缺一不可，「尚未选择」的提示也要在。
+  for (const label of ['目标岗位（必填，最多 50 字）', '行业（必填，从就业行业清单选择）', '你的经验（必选）', '尚未选择，请按自己的实际情况选择。']) {
+    assert.ok(setup.includes(label), `必须选的方向在开始前说明：${label}`)
+  }
   const start = new Function('context', executable(`const {
     position, industry, experience, interviewerType, difficulty, duration, resumeFile,
-    setError, setCreating, setAiOutage, setStartFailed, getToken, createInterview,
+    setError, setCreating, setAiOutage, setAssistantDown, setStartFailed, getToken, createInterview,
     setPendingSession, startInterview, setProbed, patchInterviewWorkbenchSession, onGoStage,
   } = context; return ${sourceNode(setupAst, 'handleStart')};`))
   const noop = () => {}
@@ -140,7 +143,7 @@ try {
     const errors = []
     const context = {
       ...draft, duration: 5, resumeFile: null,
-      setError: (value) => errors.push(value), setCreating: noop, setAiOutage: noop,
+      setError: (value) => errors.push(value), setCreating: noop, setAiOutage: noop, setAssistantDown: noop,
       setStartFailed: noop, getToken: noop, setPendingSession: noop, setProbed: noop,
       patchInterviewWorkbenchSession: noop, onGoStage: noop,
       createInterview: async (input) => { requests.push(input); return { sessionId: 'real-handle', questionTarget: 6 } },
@@ -167,12 +170,15 @@ try {
   check(false, `模拟面试不预选与本人选择校验：${error.message}`)
 }
 check(setup.indexOf('createInterview(') < setup.indexOf('startInterview('), '创建与启动面试顺序被改变')
+// 简历来源面板随设置页 700 行预算拆到 InterviewSetupExtras，仍由设置页挂上。
+// 移除钮从 48px 图标（className="flex h-12 w-12"）改成整行「移除，不用简历」。
+const setupExtrasPath = 'src/pages/interview/InterviewSetupExtras.tsx'
+const setupExtras = read(setupExtrasPath)
+const setupSurface = `${setup}\n${setupExtras}`
+check(setup.includes('<InterviewSetupResume'), `${pages[0]} — 设置页未挂上拆出的简历来源`)
 for (const token of [
   'kioskUploadFile',
   'useBusyLock(creating || uploading || printingSheet || qrBusy || usbBusy)',
-  'UploadSessionQrPanel',
-  'ResumeUsbImportPanel',
-  "purpose=\"resume_upload\"",
   'durationMin: duration',
   'interviewerType,',
   'position: pos',
@@ -183,9 +189,17 @@ for (const token of [
   // InterviewSessionPage 只读 state.firstQuestion，`firstQType` 全仓无 reader。
   // 「传了没人消费」正是 verify:kiosk-frontend-debt ② 要清的形态，
   // 由那条门禁反向钉死「不得再传」，本合同不再要求它存在。
-  'className="flex h-12 w-12',
 ]) {
   check(setup.includes(token), `${pages[0]} — Setup 真实链路合同缺失：${token}`)
+}
+for (const token of [
+  'UploadSessionQrPanel',
+  'ResumeUsbImportPanel',
+  'purpose="resume_upload"',
+  '<button type="button" className="qxt-iv-wide" onClick={onClearResume}>',
+  '<b>移除，不用简历</b>',
+]) {
+  check(setupSurface.includes(token), `${setupExtrasPath} — Setup 真实链路合同缺失：${token}`)
 }
 
 for (const token of [
@@ -256,8 +270,8 @@ check(
   fullscreenShell.includes('h-screen') || fullscreenShell.includes('100vh') || fullscreenShell.includes('100dvh'),
   'KioskFullscreenShell 未锁定完整视口高度',
 )
-check(interviewShell.includes('QxPageFrame'), 'InterviewShell 未接入青序流光页壳')
-check(interviewShell.includes('QxAppNavbar'), 'InterviewShell 未接入共享底栏')
+check(interviewShell.includes('QxTouchScreen'), 'InterviewShell 未接入青序流光触屏页壳')
+check(interviewShell.includes('QxTouchNav'), 'InterviewShell 未接入共享触屏底栏')
 check(read('src/pages/interview/InterviewWorkbenchPage.tsx').includes('readInterviewWorkbenchSession'), '工作台未从 sessionStorage 复水')
 check(read('src/pages/interview/InterviewWorkbenchPage.tsx').includes('replace: true'), '阶段切换必须 replace 历史')
 check(read('src/pages/interview/InterviewWorkbenchPage.tsx').includes('parseInterviewStage'), '工作台必须解析 ?stage=')

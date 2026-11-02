@@ -3,14 +3,18 @@
 //
 // 合规红线:
 //   - AI 只润色用户提供的信息,不编造学历/证书/公司/项目;缺失内容提示补充,不代填。
-//   - 公共一体机:表单数据只在组件内存,离开页面/进入待机即丢失;
+//   - 公共一体机:表单仅存本次会话内存，离页可续填，清场或刷新即丢失;
 //     生成结果走后端 AiResumeResult TTL 清理,不长期保留。
 // ============================================================
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { resumeGenerateGeneration, useClearGuestDraftOnFlowExit, useResumeGenerateDraftField } from './resumeGenerateDraft'
 import { useNavigate } from 'react-router-dom'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { maskEmail, maskPhone } from '../../utils/maskPii'
+import { ResumeHelpLine } from './touch/ResumeHelpLine'
+import { ResumeStepPreview } from './touch/ResumeStepPreview'
+import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
+import { unattendedReason } from './touch/unattendedReason'
 import type {
   GeneratedResume,
   ResumeGenEducation,
@@ -18,6 +22,7 @@ import type {
   ResumeGenProject,
   ResumeGenerateInput,
   ResumeGenerateResponse,
+  ResumeGenerateExportResponse,
 } from '@ai-job-print/shared'
 import { EDUCATION_LEVEL_OPTIONS } from '@ai-job-print/shared'
 import { AiTaskRegion, useAiTask, isAiOutage, type AiAvailability, type AiTaskFallback } from '../../ai'
@@ -39,7 +44,8 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { useResumeAiConsent } from './resumeAiConsent'
 import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
-import { ResumeGenerateAdvisor, ResumeGenerateAiRow } from './components/ResumeGenerateQxChrome'
+import { ResumeGenerateAdvisor } from './components/ResumeGenerateQxChrome'
+import { ASKS } from './touch/resumeAsks'
 import { ResumeGenerateReview } from './components/ResumeGenerateReview'
 import { ResumeVoiceInputButton } from './components/ResumeVoiceInputButton'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
@@ -131,10 +137,23 @@ export function ResumeGeneratePage() {
   const navigate = useNavigate()
   const startPrint = useStartPrintHandoff()
   const { getToken } = useAuth()
+  const mounted = useRef(false)
+  useClearGuestDraftOnFlowExit(!getToken())
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+  // 回包作不作数：组件还挂着、清场代次没变，而且人还在发起请求的那个地址上。最后一条补的是「点了首页、页面还没卸载」
+  // 那几毫秒：路由跳转先改地址、组件晚一拍才卸载，只看 mounted 会把迟到的结果接住，带进预览或打印（CI 慢机器上复现过）。
+  const beginRequest = () => {
+    const owner = resumeGenerateGeneration()
+    const path = window.location.pathname
+    return { valid: () => mounted.current && owner === resumeGenerateGeneration() && window.location.pathname === path }
+  }
   const consent = useResumeAiConsent()
   const [showConsent, setShowConsent] = useState(false)
-  const [step, setStep] = useState(0)
-  const [reviewing, setReviewing] = useState(false)
+  const [step, setStep] = useResumeGenerateDraftField('step', 0)
+  const [reviewing, setReviewing] = useResumeGenerateDraftField('reviewing', false)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   /** AI 能力级不可用的**真实原因**（原样透出后端 message）；null 表示未观测到不可用。 */
@@ -144,15 +163,15 @@ export function ResumeGeneratePage() {
   /** 原样草稿导出中（不经过 AI，只是服务端排版 + 上传）。 */
   const [exportingDraft, setExportingDraft] = useState(false)
 
-  // 表单数据只在组件内存(公共设备隐私):刷新/待机即丢失,不写任何本地存储。
-  const [basic, setBasic] = useState({ name: '', phone: '', email: '', city: '' })
-  const [intention, setIntention] = useState({ position: '', city: '', jobType: '', salary: '' })
-  const [education, setEducation] = useState<ResumeGenEducation[]>([{ ...EMPTY_EDU }])
-  const [experience, setExperience] = useState<ResumeGenExperience[]>([{ ...EMPTY_EXP }])
-  const [projects, setProjects] = useState<ResumeGenProject[]>([])
-  const [skillsText, setSkillsText] = useState('')
-  const [certsText, setCertsText] = useState('')
-  const [selfIntro, setSelfIntro] = useState('')
+  // 只保留本次会话内存，退出/换人/待机统一清场；不落浏览器存储或 history。
+  const [basic, setBasic] = useResumeGenerateDraftField('basic', { name: '', phone: '', email: '', city: '' })
+  const [intention, setIntention] = useResumeGenerateDraftField('intention', { position: '', city: '', jobType: '', salary: '' })
+  const [education, setEducation] = useResumeGenerateDraftField('education', [{ ...EMPTY_EDU }])
+  const [experience, setExperience] = useResumeGenerateDraftField('experience', [{ ...EMPTY_EXP }])
+  const [projects, setProjects] = useResumeGenerateDraftField('projects', [])
+  const [skillsText, setSkillsText] = useResumeGenerateDraftField('skillsText', '')
+  const [certsText, setCertsText] = useResumeGenerateDraftField('certsText', '')
+  const [selfIntro, setSelfIntro] = useResumeGenerateDraftField('selfIntro', '')
 
   // 生成期间豁免待机宣传屏(打断会丢表单)。导出草稿同样豁免：那一步正在把用户
   // 填的内容变成一张能带走的纸，被待机屏打断等于把它又弄丢一次。
@@ -206,10 +225,11 @@ export function ResumeGeneratePage() {
   const runGenerate = async () => {
     setGenerating(true)
     setError(null)
-    setAiOutage(null)
     const input = buildInput()
+    const request = beginRequest()
     try {
       const result: ResumeGenerateResponse = await submitResumeGenerate(input, getToken())
+      if (!request.valid()) return
       if (result.failCode && isAiOutage({ code: result.failCode })) {
         setAiOutage('AI 暂时不可用，你可以先导出并打印已填的内容')
         return
@@ -217,25 +237,28 @@ export function ResumeGeneratePage() {
       // 拿到结构化响应就算一次真实往返 —— 账户级 / 模型名问题除外，那种每次都会失败。
       setProbed(true)
       if (result.status !== 'completed' || !result.resume) {
-        setError(result.failReason ?? 'AI 简历生成失败，请稍后重试')
+        setError(unattendedReason(result.failReason, 'AI 简历生成失败，请稍后重试'))
         return
       }
-      // 只传 result：预览页的 LocationState 虽然声明了 input，但从未解引用过。
-      navigate('/resume/generate/preview', { state: { result } })
+      setAiOutage(null)
+      // 连同本次填的内容一起交给预览页：它要拿填写的原话和模型的输出对照，找出「AI 新写进去的数和职责词」让本人确认；
+      // 不带 input，用户自己写过的词（如「负责」）也会被当成新写进去的（走查 I-21）。
+      navigate('/resume/generate/preview', { state: { result, input } })
     } catch (err) {
+      if (!request.valid()) return
       const declined = aiDeclarationDeclineMessage(err)
       if (declined) {
         setError(declined)
         return
       }
-      const message = userMessageOf(err, 'AI 简历生成失败，请稍后重试')
+      const message = unattendedReason(userMessageOf(err, 'AI 简历生成失败，请稍后重试'), 'AI 简历生成失败，请稍后重试')
       setError(message)
       // 只有能力级故障才判成「AI 不可用」；限流 / 参数错误等只是本次失败，
       // 那些必须保留重试入口，不许拿去把能力说成挂了（aiOutage.ts 口径）。
       if (isAiOutage(err)) setAiOutage(message)
       else setProbed(true)
     } finally {
-      setGenerating(false)
+      if (request.valid()) setGenerating(false)
     }
   }
 
@@ -263,6 +286,7 @@ export function ResumeGeneratePage() {
     setExportingDraft(true)
     setError(null)
     const input = buildInput()
+    const request = beginRequest()
     const draft: GeneratedResume = {
       basic: input.basic,
       intention: input.intention,
@@ -275,7 +299,8 @@ export function ResumeGeneratePage() {
       certificates: input.certificates,
     }
     try {
-      const file = await exportResumeDraft(draft, getToken())
+      const file: ResumeGenerateExportResponse = await exportResumeDraft(draft, getToken())
+      if (!request.valid()) return
       if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
       startPrint({
         origin: 'resume_generate',
@@ -292,9 +317,10 @@ export function ResumeGeneratePage() {
         },
       })
     } catch (err) {
-      setError(userMessageOf(err, '草稿导出失败，请稍后重试'))
+      if (!request.valid()) return
+      setError(unattendedReason(userMessageOf(err, '草稿导出失败，请稍后重试'), '草稿导出失败，请稍后重试'))
     } finally {
-      setExportingDraft(false)
+      if (request.valid()) setExportingDraft(false)
     }
   }
 
@@ -311,6 +337,14 @@ export function ResumeGeneratePage() {
     failed: Boolean(error) || Boolean(aiOutage),
     hasResult: false,
   })
+  // 失败的说明和「不用 AI 也能带走」的出路在滚动区最下面（核对页内容比一屏高）。失败那一刻把它们带到眼前：
+  // 现场没人，以前人只看到底栏按钮上的字变了，要往下滑才找得到出路（走查 I-29）。再按一次又失败同样处理。
+  const scrollRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (!reviewing || generating || exportingDraft || (!aiOutage && !error)) return
+    const scroller = scrollRef.current
+    if (scroller) scroller.scrollTo({ top: scroller.scrollHeight })
+  }, [aiOutage, error, generating, exportingDraft, reviewing])
   const draftAction = {
     label: exportingDraft ? '正在导出草稿…' : '导出并打印我填的内容（未经 AI 润色）',
     onClick: () => void handleExportDraft(),
@@ -328,7 +362,7 @@ export function ResumeGeneratePage() {
       }
     : aiOutage
     ? {
-        // 能力级不可用：底部「让 AI 整理成新简历」这次按了也没用，置灰它并写清原因。
+        // 上次请求确认不可用；主动再检查仍由服务端判定，不自动调用或承诺恢复。
         mode: 'blocked',
         reason: aiOutage,
         blockedActionLabel: 'AI 润色成文',
@@ -376,11 +410,11 @@ export function ResumeGeneratePage() {
             type="button"
             className="qx-btn"
             data-variant="primary"
-            disabled={generating || Boolean(aiOutage)}
-            onClick={() => { if (!aiOutage) void handleGenerate() }}
+            disabled={generating || exportingDraft}
+            onClick={() => { void handleGenerate() }}
           >
             <SparklesIcon className="h-5 w-5" aria-hidden="true" />
-            {generating ? '正在整理…' : '让 AI 整理成新简历'}
+            {generating ? '正在整理…' : aiOutage ? '重新检查并整理' : '让 AI 整理成新简历'}
           </button>
           <AiDeclarationNote />
         </span>
@@ -406,12 +440,16 @@ export function ResumeGeneratePage() {
           去核对
         </button>
       )}
-      <ResumeGenerateAiRow />
     </>
   )
+  // 底栏「问小青」：每一步一句自己的问题（稿 scratch / scratch-1，第 3–6 步按同一写法补）；整理中、AI 停了、失败各有各的。
+  const stepAsks = [ASKS.genBasic, ASKS.genIntention, ASKS.genEducation, ASKS.genExperience, ASKS.genProjects, ASKS.genSkills]
+  const askSpec = generating || exportingDraft ? ASKS.genBusy : aiOutage ? ASKS.genDown : error ? ASKS.genFailed : reviewing ? ASKS.genReview : stepAsks[step]
 
   return (
-    <QxPageFrame
+    <ResumeTouchFrame
+      eyebrow="改简历"
+      rail={reviewing ? undefined : { labels: STEPS.map((item) => item.title), now: step }}
       title="从零生成简历"
       subtitle="分步问完，一次整理。只整理你说的，不替你编。"
       status={{
@@ -429,28 +467,15 @@ export function ResumeGeneratePage() {
                   : `第 ${step + 1} 步 / 共 ${STEPS.length} 步 · ${STEPS[step].title}`,
       }}
       back={{ label: '返回简历服务', onBack: () => navigate('/resume/source') }}
-      navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
       ctabar={ctabar}
+      ask={{ ...askSpec, testId: 'resume-generate-ai-help' }}
     >
-    <section data-kiosk-domain="resume" data-kiosk-screen="resume-generate" className="qx-resume-generate qx-scroll">
+    <section ref={scrollRef} data-kiosk-domain="resume" data-kiosk-screen="resume-generate" className="qx-resume-generate qx-scroll">
       <ResumeGenerateAdvisor
         eyebrow="AI 简历生成"
         ask={reviewing ? <>提交前<em>你先核一遍</em></> : STEPS[step].ask}
         doing={reviewing ? '先核对资料，再让小青整理成新简历。信息不完整的经历可点开补充。' : STEPS[step].doing}
       />
-      {!reviewing && (
-        <ol className="qx-rg-prog" aria-label={`填写进度：第 ${step + 1} 步，共 ${STEPS.length} 步`}>
-          {STEPS.map((item, index) => {
-            const mark = index < step ? 'done' : index === step ? 'now' : undefined
-            return (
-              <li key={item.title} data-on={mark} aria-current={mark === 'now' ? 'step' : undefined}>
-                <u aria-hidden="true" />
-                {index + 1} {item.title}
-              </li>
-            )
-          })}
-        </ol>
-      )}
       {reviewing ? (
         <ResumeGenerateReview
           basic={basic}
@@ -476,12 +501,6 @@ export function ResumeGeneratePage() {
 
           {step === 0 && (
             <>
-            {/*
-              这一步在说什么（2026-09-09 第 5 条并排比对补齐）：
-              设计稿 24-resume-generate 的 input-basic 态，正文之外还有一张说明卡、
-              两张「为什么要填」卡和一条底部自查行；正是它们把 1080×1920 竖屏填满。
-              删掉稿里没有的右侧「填写进度」面板之后，这些必须补上，否则下半屏是空的。
-            */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="姓名" required>
                 <input className={inputCls} value={basic.name} onChange={(e) => setBasic((b) => ({ ...b, name: e.target.value }))} />
@@ -496,20 +515,21 @@ export function ResumeGeneratePage() {
                 <input className={inputCls} inputMode="email" value={basic.email} onChange={(e) => setBasic((b) => ({ ...b, email: e.target.value }))} />
               </Field>
             </div>
-            <div className="qx-rd-notes">
-              <div className="qx-card">
-                <b>这几项印在最上面</b>
-                <p>姓名和联系方式是对方找到你的唯一入口。写错一个数字，后面全白做 —— 这一栏值得你自己核一遍。</p>
-              </div>
-              <div className="qx-card">
-                <b>除了姓名都能空着</b>
-                <p>城市、手机号、邮箱空着也能往下走。空着的话，生成之后会算一条提示让你回来补，AI 不会替你编一个。</p>
-              </div>
-            </div>
+            <ResumeStepPreview
+              kicker="简历顶部会这样显示"
+              title={basic.name.trim() || '必填'}
+              need={!basic.name.trim()}
+              lines={[
+                [basic.city.trim() || '城市未填', basic.phone.trim() ? maskPhone(basic.phone) : '电话未填'].join(' · '),
+                basic.email.trim() ? maskEmail(basic.email) : '邮箱未填',
+              ]}
+              note="公共屏上打码显示，导出的简历里是完整的"
+            />
             </>
           )}
 
           {step === 1 && (
+            <>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="目标岗位" required>
                 <input className={inputCls} placeholder="如 前端开发工程师" value={intention.position} onChange={(e) => setIntention((v) => ({ ...v, position: e.target.value }))} />
@@ -529,9 +549,20 @@ export function ResumeGeneratePage() {
                 <input className={inputCls} placeholder="如 8k-12k(可不填)" value={intention.salary} onChange={(e) => setIntention((v) => ({ ...v, salary: e.target.value }))} />
               </Field>
             </div>
+            <ResumeStepPreview
+              kicker="简历顶部会这样显示"
+              title={intention.position.trim() || '必填'}
+              need={!intention.position.trim()}
+              lines={[
+                [intention.city.trim() || '意向城市未填', intention.salary.trim() || '期望薪资未填'].join(' · '),
+                `工作类型：${intention.jobType.trim() || '不填写'}`,
+              ]}
+            />
+            </>
           )}
 
           {step === 2 && (
+            <>
             <EntryList
               items={education}
               maxItems={6}
@@ -572,9 +603,19 @@ export function ResumeGeneratePage() {
                 </div>
               )}
             />
+            <ResumeStepPreview
+              kicker="这一步已经填上的"
+              title={education.find((item) => item.school.trim())?.school.trim() || '教育经历还没填'}
+              need={!education.some((item) => item.school.trim())}
+              lines={education.some((item) => item.school.trim() || (item.major ?? '').trim())
+                ? education.map((item) => [item.school.trim(), (item.major ?? '').trim(), (item.degree ?? '').trim()].filter(Boolean).join(' · ') || '这一段还空着')
+                : ['可以先跳过，生成后会提示补充']}
+            />
+            </>
           )}
 
           {step === 3 && (
+            <>
             <EntryList
               items={experience}
               maxItems={8}
@@ -611,9 +652,19 @@ export function ResumeGeneratePage() {
                 </div>
               )}
             />
+            <ResumeStepPreview
+              kicker="这一步已经填上的"
+              title={experience.find((item) => item.company.trim())?.company.trim() || '工作经历还没填'}
+              need={!experience.some((item) => item.company.trim())}
+              lines={experience.some((item) => item.company.trim() || item.role.trim())
+                ? experience.map((item) => [item.company.trim(), item.role.trim(), (item.period ?? '').trim()].filter(Boolean).join(' · ') || '这一段还空着')
+                : ['可以先跳过，生成后会提示补充']}
+            />
+            </>
           )}
 
           {step === 4 && (
+            <>
             <EntryList
               items={projects}
               maxItems={6}
@@ -645,9 +696,19 @@ export function ResumeGeneratePage() {
                 </div>
               )}
             />
+            <ResumeStepPreview
+              kicker="这一步已经填上的"
+              title={projects.find((item) => item.name.trim())?.name.trim() || '项目经历还没填'}
+              need={!projects.some((item) => item.name.trim())}
+              lines={projects.some((item) => item.name.trim() || (item.role ?? '').trim())
+                ? projects.map((item) => [item.name.trim(), (item.role ?? '').trim()].filter(Boolean).join(' · ') || '这一段还空着')
+                : ['项目经历可以不填，没有就直接下一步']}
+            />
+            </>
           )}
 
           {step === 5 && (
+            <>
             <div className="space-y-4">
               <Field label="技能(用逗号或换行分隔)">
                 <textarea className={`${inputCls} h-20 resize-none`} placeholder="如 JavaScript, Excel, 英语六级" value={skillsText} onChange={(e) => setSkillsText(e.target.value)} />
@@ -668,20 +729,26 @@ export function ResumeGeneratePage() {
                 </div>
               </Field>
             </div>
+            <ResumeStepPreview
+              kicker="这一步已经填上的"
+              title="技能与证书"
+              lines={[
+                `技能：${skillsText.trim() || '未填'}`,
+                `证书：${certsText.trim() || '未填'}`,
+                `自我评价：${selfIntro.trim() || '未填'}`,
+              ]}
+            />
+            </>
           )}
             </div>
         </div>
       </div>
       )}
       {(reviewing || step === 0) && (
-        <div className="qx-rg-helper">
-          <span>
-            {reviewing
-              ? '可以慢慢核对，准备好后再点生成。'
-              : '姓名、手机号这两项建议自己核对一遍，简历印出来就是这个。'}
-          </span>
-          <button type="button" onClick={() => navigate('/help')}>找工作人员</button>
-        </div>
+        <ResumeHelpLine
+          lead={reviewing ? '可以慢慢核对，准备好后再点生成。' : '姓名、手机号这两项建议自己核对一遍。'}
+          onHelp={() => navigate('/help')}
+        />
       )}
       {!reviewing && step === 0 && !basic.name.trim() && (
         <p className="qx-rg-reason" id="resume-generate-name-reason">
@@ -711,14 +778,16 @@ export function ResumeGeneratePage() {
         guest={!getToken()}
         onCancel={() => setShowConsent(false)}
         onConfirm={() => {
+          const owner = resumeGenerateGeneration()
+          const path = window.location.pathname
           void consent.confirm().then((ok) => {
-            if (!ok) return
+            if (!ok || !mounted.current || owner !== resumeGenerateGeneration() || window.location.pathname !== path) return
             setShowConsent(false)
             void runGenerate()
           })
         }}
       />
     )}
-    </QxPageFrame>
+    </ResumeTouchFrame>
   )
 }

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common'
-import { CONTRACT_REVIEW_TTL_MS } from '../src/files/retention-policy'
+import { CONTRACT_REVIEW_TTL_MS, UPLOAD_SESSION_ORDER_ONLY_REASON } from '../src/files/retention-policy'
 import { sniffDeclaredMimeMismatch } from '../src/files/content-sniff'
 import { FilesCleanupTask } from '../src/files/files.cleanup.task'
 import { FilesService } from '../src/files/files.service'
@@ -377,13 +377,25 @@ async function main(): Promise<void> {
       file: file(),
     })
     assert.equal(prisma.files.get(uploaded.file!.fileId)?.endUserId, null)
+    assert.ok(prisma.files.get(uploaded.file!.fileId)?.expiresAt, '匿名上传就带系统短期到期时间')
+    // 内存假库里上传和确认常在同一毫秒内：把上传时的到期时间挪成一个可区分的值，断言确认后原样保留，
+    // 否则「确认时按当下重算」和「沿用上传时」算出来一样，断言抓不住续期。
+    const uploadExpiry = new Date(Date.now() + 7 * 60 * 1000)
+    prisma.files.get(uploaded.file!.fileId)!.expiresAt = uploadExpiry
     const confirmed = await service.confirm(session.sessionId, session.controlToken, 'member_1')
     assert.equal(confirmed.status, 'confirmed')
     assert.equal('signedUrl' in confirmed.file, false)
     const bound = prisma.files.get(uploaded.file!.fileId)
     assert.equal(bound?.endUserId, 'member_1')
     assert.equal(bound?.ownerType, 'user')
-    assert.equal(bound?.retentionPolicy, 'months_3')
+    // 只用于这一单（11/02 拍板）：会员这一单里从手机传来的简历不再按 90 天存进「我的文档」。
+    assert.equal(bound?.retentionPolicy, 'system_short', '只用于这一单：不走会员简历 90 天默认')
+    assert.equal(bound?.retentionLockedReason, UPLOAD_SESSION_ORDER_ONLY_REASON, '只用于这一单：确认后锁住')
+    assert.equal(
+      new Date(bound!.expiresAt as Date).getTime(),
+      new Date(uploadExpiry as Date).getTime(),
+      '只用于这一单：到期沿用上传那一刻起算的短期，确认不续期',
+    )
     assert.match(
       bound?.storageKey ?? '',
       /^users\/member_1\//,
@@ -899,6 +911,7 @@ async function main(): Promise<void> {
       'system_short',
       'print_doc must not get the 90-day resume retention default even when bound to a member'
     )
+    assert.equal(bound?.retentionLockedReason, UPLOAD_SESSION_ORDER_ONLY_REASON, '打印文件同样只用于这一单')
   }
 
   {

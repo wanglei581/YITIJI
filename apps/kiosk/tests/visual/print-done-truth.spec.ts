@@ -68,7 +68,8 @@ test('forged success cannot override pending or failed backend status @kiosk', a
   })
   await openDoneWithState(page, { ...taskState, success: true, reason: '伪造成功' })
   await expect(page.getByText('打印失败', { exact: true }).first()).toBeVisible()
-  await expect(page.getByText('打印机暂时离线，请联系现场工作人员', { exact: true })).toBeVisible()
+  await expect(page.getByText('打印有问题？拨打服务电话 18369161921（工作日 9:00–18:00），或问小青', { exact: true })).toBeVisible()
+  await expect(page.getByText('请联系现场工作人员')).toHaveCount(0)
   await expect(page.getByText('private agent stack must remain hidden')).toHaveCount(0)
 })
 
@@ -100,7 +101,7 @@ test('an unconfirmed print is never presented as a confirmed failure @kiosk', as
   await expect(page.getByText('打印结果未确认', { exact: true }).first()).toBeVisible()
   const body = await page.locator('body').innerText()
   expect(body).toContain('出纸口')
-  expect(body).toContain('联系现场工作人员')
+  expect(body).toContain('系统已明确登记，等待人工核查')
   // 不承诺退款、也不替现场断言纸没出来。
   expect(body).not.toContain('已为你退款')
 })
@@ -301,8 +302,10 @@ for (const errorCode of ['PRINTER_ERROR', 'PAPER_EMPTY']) {
     await expect(retryButton).toBeInViewport({ ratio: 1 })
     await retryButton.click()
 
-    const alert = page.locator('.qx-ctabar').getByRole('alert')
-    await expect(alert).toHaveText('这台机器的打印程序需要升级后才能重新提交，请找现场工作人员')
+    // 重提被拒的提示放在出口按钮的第一行（失败态照稿骨架，没有旧的 ctabar 条）。
+    const alert = page.locator('.pft-fail-exits').getByRole('alert')
+    await expect(alert).toHaveText(/这台机器的打印程序需要升级后才能重新提交。打印有问题？/)
+    await expect(alert).not.toContainText('找现场工作人员')
     // 不滚动找提示：toBeVisible 不能证明没有落在二维码下面的滚动区。
     await expect(alert).toBeInViewport({ ratio: 1 })
     const box = await alert.boundingBox()
@@ -453,6 +456,8 @@ test('pickup completed receipt shows real summary and directs reorders to phone 
   registerShell(api)
   api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, { status: 200, json: { taskId: TASK_ID, status: 'completed' } })
   await openDoneWithState(page, { taskId: TASK_ID, pickupSource: true, file: { name: '取件文件.pdf', size: '', pages: 3 }, params: { copies: 2, colorMode: 'color', duplex: 'duplex_long_edge' } })
+  // 2026-10-28 稿 done：完成页只留取走、入口和结束使用，打印记录收在「本次打印记录」折叠里，点开才是真实摘要。
+  await page.locator('summary', { hasText: '本次打印记录' }).click()
   await expect(page.getByText('本次任务摘要', { exact: true })).toBeVisible()
   await expect(page.getByText('3 页 × 2 份', { exact: true })).toBeVisible()
   await expect(page.getByText('双面（长边）', { exact: true })).toBeVisible()

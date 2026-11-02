@@ -77,7 +77,8 @@ export function AssistantSessionSummaryBar({
         aria-disabled={Boolean(blockedReason) || busy || undefined}
         onClick={() => { if (blockedReason || busy) return; void onSave() }}
       >
-        {busy ? '正在保存…' : '保存本次要点'}
+        <strong>{busy ? '正在保存…' : '保存这次回答的要点'}</strong>
+        <small>{loggedIn ? '存进我的文档，可打印' : '登录后才能保存'}</small>
       </button>
       {blockedReason && <p className="assistant-summary-reason" role="status">{blockedReason}</p>}
       {error && <p className="assistant-summary-reason" role="status">{error}</p>}

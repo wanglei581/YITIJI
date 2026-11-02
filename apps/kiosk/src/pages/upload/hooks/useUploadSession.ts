@@ -34,6 +34,8 @@ export interface UploadSessionSnapshot {
   hasQr: boolean
   pendingName: string | null
   pendingSize: string | null
+  /** 这份文件从哪来（服务端判定，只作确认屏提示）：miniapp_documents / miniapp / web；旧会话与读不到时为 null。 */
+  pendingSource: string | null
 }
 
 interface QrState {
@@ -383,6 +385,7 @@ export function useUploadSession({
     hasQr: Boolean(qr),
     pendingName: status?.file?.filename ?? null,
     pendingSize: status?.file ? formatSize(status.file.sizeBytes) : null,
+    pendingSource: status?.file?.source ?? null,
   }
 
   return {

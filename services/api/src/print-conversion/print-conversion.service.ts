@@ -15,7 +15,9 @@ import { FilesService } from '../files/files.service'
 import { RedisService } from '../common/redis/redis.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import { signFileUrl, verifyFileSignature } from '../files/signing'
+import { isOrderOnlyFile } from '../files/retention-policy'
 import { countPdfPages } from '../files/file-page-count.util'
+import { formatBeijingMinute } from '../common/beijing-display-time'
 import { readImageDimensions } from './image-dimensions.util'
 
 const MAX_IMAGES = 20
@@ -144,8 +146,9 @@ export class PrintConversionService {
     // completed：命中缓存前必须重新校验"这次请求"确实有权访问这些图片——
     // 否则只要拿到同样的 idempotencyKey + fileId 列表就能白嫖别人那次转换结果的签名 URL，
     // 绕开本文件其余地方一直坚持的 capability 校验模型。校验不通过按 doConvert 同样方式抛错。
+    let orderOnly = false
     for (const source of sources) {
-      await this.verifySourceOwnership(source, endUserId)
+      if (isOrderOnlyFile(await this.verifySourceOwnership(source, endUserId))) orderOnly = true
     }
 
     // completed：重新签发 URL，不重复生成。
@@ -157,6 +160,7 @@ export class PrintConversionService {
       sizeBytes: state.sizeBytes!,
       pages: state.pages!,
       hasEndUser: Boolean(endUserId),
+      savedToDocuments: Boolean(endUserId) && !orderOnly,
     }
   }
 
@@ -215,10 +219,13 @@ export class PrintConversionService {
     const validated: ValidatedSource[] = []
     let totalBytes = 0
     let totalPixels = 0
+    // 任一张图只用于这一单（一体机这一单里从手机传来的）：拼出来的 PDF 跟着锁，不进「我的文档」。
+    let orderOnly = false
 
     // 顺序逐个校验 + 读取（禁止 Promise.all，避免瞬时内存峰值）。
     for (const source of sources) {
       const record = await this.verifySourceOwnership(source, endUserId)
+      if (isOrderOnlyFile(record)) orderOnly = true
 
       if (!ALLOWED_MIME_TYPES.has(record.mimeType)) {
         throw new BadRequestException({ error: { code: 'CONVERT_SOURCE_TYPE_UNSUPPORTED', message: '仅支持 JPG / PNG 图片' } })
@@ -261,7 +268,7 @@ export class PrintConversionService {
 
     const uploaded = await this.files.upload({
       buffer: outputBuffer,
-      filename: `format-convert-${Date.now()}.pdf`,
+      filename: convertedFileName(new Date()),
       mimeType: 'application/pdf',
       purpose: 'print_doc',
       uploaderId: null,
@@ -270,6 +277,7 @@ export class PrintConversionService {
       derivationKind: 'format_conversion',
       sourceFileId: null,
       createdBy: endUserId,
+      orderOnly,
     })
 
     const printSigned = signFileUrl(uploaded.fileId, OUTPUT_URL_TTL_MS)
@@ -290,6 +298,7 @@ export class PrintConversionService {
       sizeBytes: uploaded.sizeBytes,
       pages: pageCount,
       hasEndUser: Boolean(endUserId),
+      savedToDocuments: Boolean(endUserId) && !orderOnly,
     }
   }
 
@@ -307,6 +316,17 @@ export class PrintConversionService {
       doc.end()
     })
   }
+}
+
+/**
+ * 合成件在「我的文档」里的名字：照片合成 + 北京时间的日期和分钟（例：照片合成-20261029-1754.pdf）。
+ * 这是用户自己会在文档列表里认的名字（一体机和小程序都读它），不能是内部名字 format-convert-<毫秒时间戳>；
+ * 带上分钟是为了同一天合成的几份分得开。时间取北京时间墙钟（common/beijing-display-time），与服务器时区无关；
+ * 名字里不留冒号和空格，Windows 与各类下载场景都能直接存。
+ */
+function convertedFileName(now: Date): string {
+  const [date = '', time = ''] = formatBeijingMinute(now).split(' ')
+  return `照片合成-${date.replace(/-/g, '')}-${time.replace(':', '')}.pdf`
 }
 
 function fingerprintSources(sources: ConvertImageSource[]): string {

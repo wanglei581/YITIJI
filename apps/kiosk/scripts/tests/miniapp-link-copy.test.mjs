@@ -140,3 +140,54 @@ test('是否已发布只经 whenMiniapp 判断，本文件不发请求', () => {
   assert.deepEqual(imports, ['./unattendedCopy'])
   assert.equal((code.match(/职易达/g) ?? []).length, 1, '小程序名只在常量里写一次')
 })
+
+/*
+ * 触屏版接线（#1519 留给第三、四、五包）：面板只调用文案函数，不手写小程序的话；页头品牌三页都从常量取。
+ * 转译不了页面，所以读真源码（去掉注释）逐处钉调用点。
+ */
+const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+const readCode = (rel) => stripComments(readFileSync(join(kioskRoot, rel), 'utf8'))
+
+test('接线：手机上传面板（第四包）码旁说明、来源与提醒都取自文案函数，联系方式用 useSupportContact', () => {
+  const panel = readCode('src/pages/upload/components/UploadSessionQrPanel.tsx')
+  assert.match(panel, /from '\.\.\/\.\.\/\.\.\/copy\/miniappLinkCopy'/)
+  assert.match(panel, /const supportContact = useSupportContact\(\)/)
+  assert.match(panel, /const scanHint = phoneUploadScanHint\(supportContact\)/)
+  assert.match(panel, /\(scanHint \|\| '请用手机微信或浏览器扫码'\)/, '空串要保持原句')
+  assert.match(panel, /const sourceLine = uploadedFileSourceLine\(uploadedFile\?\.source\)/)
+  assert.match(panel, /\{uploaded && sourceLine \? <p[^>]*>\{sourceLine\}<\/p> : null\}/, '读不到来源就不写那一行')
+  assert.match(panel, /\{uploaded \? <p[^>]*>\{notYourFileHint\(\)\}<\/p> : null\}/)
+  assert.doesNotMatch(panel, /小程序|不是你传的|来自/, '面板里不手写小程序、来源与提醒的句子')
+})
+
+test('接线：选文件页手机上传（第三包）文件行取来源句、读不到保持原字，待确认屏加提醒', () => {
+  const hook = readCode('src/pages/upload/hooks/useUploadSession.ts')
+  assert.match(hook, /pendingSource: string \| null/)
+  assert.match(hook, /pendingSource: status\?\.file\?\.source \?\? null/)
+  const model = readCode('src/pages/print/file-source/fileSourceModel.ts')
+  assert.match(model, /pendingSource: string \| null/)
+  const phone = readCode('src/pages/print/file-source/FileSourcePhone.tsx')
+  assert.match(phone, /uploadedFileSourceLine\(phone\.pendingSource\) \|\| '手机扫码上传'/)
+  assert.match(phone, /screen === 'phone-uploaded' \? \(\s*<QxTouchCallout kind="remind" icon="alert">\{notYourFileHint\(\)\}<\/QxTouchCallout>/)
+  assert.doesNotMatch(phone, /来自|小程序|不是你传的/, '文件行与待确认屏不手写来源和提醒的句子')
+  const view = readCode('src/pages/print/file-source/FileSourceView.tsx')
+  assert.match(view, /uploadedFileSourceLine\(phone\.pendingSource\) \|\| '手机扫码上传'/, '确认失败屏里的文件行同样取来源句')
+})
+
+test('接线：扫码登录面板（第五包）第 2 步取 qrLoginScanHint、空串保持原句', () => {
+  const login = readCode('src/pages/auth/ScanQrLoginPanel.tsx')
+  assert.match(login, /const supportContact = useSupportContact\(\)/)
+  assert.match(login, /\{qrLoginScanHint\(supportContact\) \|\| '用手机相机或微信扫左边的二维码，在手机上完成手机号验证并确认。'\}/)
+  assert.doesNotMatch(login, /职易达小程序/, '面板不手写小程序名')
+})
+
+test('接线：手机上传页、手机确认登录页页头品牌从 PLATFORM_BRAND_NAME 取，不写字面量', () => {
+  for (const rel of ['src/pages/upload/PhoneUploadPage.tsx', 'src/pages/auth/MobileQrLoginPage.tsx']) {
+    const code = readCode(rel)
+    assert.match(code, /import \{ PLATFORM_BRAND_NAME \} from '\.\.\/\.\.\/copy\/miniappLinkCopy'/, rel)
+    assert.match(code, /<strong>\{PLATFORM_BRAND_NAME\}<\/strong>/, `${rel} 页头品牌取常量`)
+    assert.match(code, /aria-hidden="true">\{PLATFORM_BRAND_NAME\.slice\(0, 1\)\}<\/span>/, `${rel} 印章字取常量的首字`)
+    assert.doesNotMatch(code, /职易达/, `${rel} 不写品牌字面量`)
+    assert.doesNotMatch(code, /aria-hidden="true">职<\/span>/, `${rel} 印章字不写字面量`)
+  }
+})

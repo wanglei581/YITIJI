@@ -43,10 +43,11 @@ async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void
   await loginWithPhone(page, returnTo, MEMBER_PHONE)
 }
 
-// W-75（9/29）：首页登录态只说「有人登录着」，手机号（含打码）不上首页。
+// W-75（9/29）：首页登录态不露名字，手机号（含打码）不上首页。
+// 10/29 走查 I-05：刚登录、人还在屏前时对本人说「你已登录」+「结束使用」；空档满 30 秒后才改回「有人登录着」（见 kiosk-end-use）。
 async function expectThisMember(page: Page): Promise<void> {
-  await expect(page.getByTestId('home-identity')).toHaveText('有人登录着')
-  await expect(page.getByTestId('home-end-previous')).toBeVisible()
+  await expect(page.getByTestId('home-identity')).toHaveText('你已登录')
+  await expect(page.getByTestId('home-end-previous')).toHaveText('结束使用')
   await expect(page.locator('body')).not.toContainText('138****8000')
 }
 
@@ -118,9 +119,10 @@ test('W-43 print done "我拿走了，结束使用" really ends the use and logs
     { taskId: TASK_ID, file: W2_FILE, params: W2_PRINT_PARAMS },
   )
 
-  await expect(page.getByText('一会儿结束本次使用')).toBeVisible()
+  // 2026-10-28 稿 done：原「走完就清」那一节没有了，倒计时说法并进帮助行：「不再点屏幕，60 秒后结束本次使用」。
+  await expect(page.getByText(/不再点屏幕，60 秒后结束本次使用/)).toBeVisible()
   await expect(page.getByText(/到点会结束本次使用并退出登录/)).toBeVisible()
-  await expect(page.getByText('秒后结束使用')).toBeVisible()
+  await expect(page.getByText('秒后结束本次使用')).toBeVisible()
   await expect(page.getByText('已清除')).toHaveCount(0)
   await expect(page.getByText('下一个人看不到')).toHaveCount(0)
   await expect(page.getByText('结束并清空')).toHaveCount(0)
@@ -128,8 +130,6 @@ test('W-43 print done "我拿走了，结束使用" really ends the use and logs
 
   const end = page.getByTestId('print-fulfill-primary')
   await expect(end).toHaveText('我拿走了，结束使用')
-  await end.click()
-  await expect(end).toHaveText('再按一次，确认结束使用')
   await end.click()
 
   // 真的结束：回首页、已退出登录，首页不再说有人登录着。
@@ -150,7 +150,8 @@ test('W-43 direct completed state still uses the honest wipe copy @privacy-clear
     params: W2_PRINT_PARAMS,
     source: 'document',
   })
-  await expect(page.getByText('一会儿结束本次使用')).toBeVisible()
+  // 2026-10-28 稿 done：原「走完就清」那一节没有了，倒计时说法并进帮助行：「不再点屏幕，60 秒后结束本次使用」。
+  await expect(page.getByText(/不再点屏幕，60 秒后结束本次使用/)).toBeVisible()
   // 没登录：如实只说结束本次使用，不说退出登录。
   await expect(page.getByText(/到点会结束本次使用，本机这次的打印预览一并收起/)).toBeVisible()
   await expect(page.getByText('已清除')).toHaveCount(0)

@@ -10,24 +10,31 @@
 // 实际办理一律引导至现场服务窗口 / 学校官方自助平台。无任何招聘闭环语义。
 // ============================================================
 
-import { Button } from '@ai-job-print/ui'
+import type { CSSProperties } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import '../../auth/capability-gate-touch.css'
 import {
   CheckCircle2Icon,
-  ChevronRightIcon,
   ClipboardListIcon,
   CreditCardIcon,
   KeyRoundIcon,
   MapPinIcon,
   PackageIcon,
-  PartyPopperIcon,
   PrinterIcon,
   ScanFaceIcon,
   ShieldCheckIcon,
   WifiIcon,
   type LucideIcon,
 } from 'lucide-react'
-import { FusionBadge, KioskPageFrame } from '../jobs/components/W4Presentation'
+import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
+import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
+import { QxTouchTile } from '../../components/qingxu/touch/QxTouchTile'
+import { P10BigCard, P10HelpRemind } from '../../auth/CapabilityStayCards'
+import { useSmartCampusCapabilitySnapshot } from '../../auth/KioskCapabilityGuard'
+import './smart-campus-touch.css'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 
 type ServiceKey = 'campus-card' | 'all-in-one' | 'campus-network' | 'luggage' | 'panorama'
 
@@ -57,7 +64,7 @@ const SERVICES: Record<ServiceKey, ServiceInfo> = {
     items: ['新生首次办卡', '卡片遗失补办', '挂失与解挂', '信息变更换卡'],
     materials: ['录取通知书 / 学生证', '本人身份证原件', '近期一寸免冠照片'],
     location: '校园卡服务中心 / 一卡通中心（具体位置以学校迎新指引为准）',
-    note: '校园卡线上办理后续开放，目前请携带上述材料前往校园卡服务中心办理；办理中遇到问题，可联系现场工作人员协助。',
+    note: '校园卡线上办理后续开放，目前请携带上述材料前往校园卡服务中心办理。',
   },
   'all-in-one': {
     icon: KeyRoundIcon,
@@ -68,7 +75,7 @@ const SERVICES: Record<ServiceKey, ServiceInfo> = {
     items: ['食堂与校内消费', '宿舍 / 教学楼门禁', '图书馆借阅', '自助圈存与充值'],
     materials: ['已办理的校园卡', '本人学号'],
     location: '一卡通服务中心 / 校内自助圈存机（具体位置以学校迎新指引为准）',
-    note: '一卡通权限开通暂未接入本终端线上办理，请前往一卡通服务中心或自助圈存机激活；如有疑问，可联系现场工作人员。',
+    note: '本机不办理一卡通权限开通，请前往一卡通服务中心或自助圈存机激活。',
   },
   'campus-network': {
     icon: WifiIcon,
@@ -79,7 +86,7 @@ const SERVICES: Record<ServiceKey, ServiceInfo> = {
     items: ['校园 Wi-Fi 上网账号', '宿舍有线网络', '上网认证账号激活', '流量 / 套餐选择'],
     materials: ['本人学号', '初始密码（随录取材料发放）'],
     location: '网络服务中心 / 校园网自助服务平台（具体位置以学校迎新指引为准）',
-    note: '校园网开通暂未接入本终端线上办理，请通过校园网自助服务平台或网络服务中心激活；如有疑问，可联系现场工作人员。',
+    note: '本机不办理校园网开通，请通过校园网自助服务平台或网络服务中心激活。',
   },
   luggage: {
     icon: PackageIcon,
@@ -101,8 +108,17 @@ const SERVICES: Record<ServiceKey, ServiceInfo> = {
     items: ['校园主干路线', '教学楼与实验楼', '图书馆 / 食堂 / 体育馆', '宿舍区与服务中心'],
     materials: ['无需材料'],
     location: '本终端 · 智慧校园服务专区',
-    note: 'VR校园为信息展示与导览服务；如需实地咨询，请以现场志愿者或学校官方导览信息为准。',
+    note: 'VR校园为信息展示与导览服务。实地路线以学校公布的导览信息为准。',
   },
+}
+
+/** 说明卡的最小高度（稿 campus-svc 按服务各有一档，让正文把屏填满）。 */
+const HERO_MIN_HEIGHT: Record<ServiceKey, number> = {
+  'campus-card': 300,
+  'all-in-one': 360,
+  'campus-network': 380,
+  luggage: 380,
+  panorama: 380,
 }
 
 function isServiceKey(k: string | undefined): k is ServiceKey {
@@ -112,19 +128,73 @@ function isServiceKey(k: string | undefined): k is ServiceKey {
 export function SmartCampusServicePage() {
   const navigate = useNavigate()
   const { key } = useParams<{ key: string }>()
+  const supportContact = useSupportContact()
+  const { config } = useSmartCampusCapabilitySnapshot()
 
-  // 未知 key 直达容错：不白屏，引导回智慧校园。
+  // 未知 key 直达容错：不白屏，引导回智慧校园，并列出本机已开通的服务让人直接再选一次。
   if (!isServiceKey(key)) {
+    const openServices = (Object.keys(SERVICES) as ServiceKey[]).filter(
+      (serviceKey) => (serviceKey !== 'luggage' && serviceKey !== 'panorama') || config.modules[serviceKey],
+    )
     return (
-      <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-neutral-100">
-          <PartyPopperIcon className="h-8 w-8 text-neutral-400" aria-hidden="true" />
+      <div data-qx-page="campus-service" className="sc-touch-fill w4-page-frame">
+      <QxTouchScreen
+        testId="campus-svc-missing"
+        stateId="missing"
+        bodyClassName="qxt-body-scroll"
+        band={(
+          <QxTouchBand
+            seal={null}
+            eyebrow="智慧校园"
+            title="未找到该服务"
+            sub="请返回智慧校园选择可用服务"
+            back={false}
+            status={{ text: '未找到', tone: 'unknown' }}
+          />
+        )}
+        dock={(
+          <QxTouchDock
+            onBack={() => navigate('/smart-campus')}
+            backLabel="返回智慧校园"
+            ask={{ label: '问小青：有哪些校园服务？', draft: '有哪些校园服务？请只做说明，具体以学校官方通知为准。' }}
+          />
+        )}
+      >
+        <div className="p10-gate-wrap">
+          <div className="p10-gate" data-kiosk-screen="campus-service-missing">
+            <p>请返回智慧校园选择可用服务</p>
+          </div>
+          <P10BigCard
+            icon="map"
+            title="返回智慧校园"
+            desc="校园卡、行李帮运、校园网等已开通的项目，从这里再选一次。"
+            cta="返回"
+            onClick={() => navigate('/smart-campus')}
+          />
+          <div className="qxt-sec">本机已开通的校园服务</div>
+          <div className="qxt-grid2">
+            {openServices.map((serviceKey, index) => (
+              <QxTouchTile
+                key={serviceKey}
+                icon="idcard"
+                title={SERVICES[serviceKey].title}
+                desc={SERVICES[serviceKey].subtitle}
+                tone="slate"
+                index={index}
+                onClick={() => navigate(`/smart-campus/service/${serviceKey}`)}
+              />
+            ))}
+          </div>
+          <P10BigCard
+            icon="home"
+            title="回首页"
+            desc="打印、扫描和政策查询不受这项影响，可以先回首页接着办。"
+            cta="回首页"
+            onClick={() => navigate('/')}
+          />
+          <P10HelpRemind />
         </div>
-        <h1 className="mt-5 text-lg font-semibold text-neutral-900">未找到该服务</h1>
-        <p className="mt-1.5 text-sm text-neutral-500">请返回智慧校园选择可用服务</p>
-        <Button size="lg" className="mt-7" onClick={() => navigate('/smart-campus')}>
-          返回智慧校园
-        </Button>
+      </QxTouchScreen>
       </div>
     )
   }
@@ -132,14 +202,34 @@ export function SmartCampusServicePage() {
   const info = SERVICES[key]
   const Icon = info.icon
 
+  const help = (key === 'campus-card' || key === 'all-in-one' || key === 'campus-network') && supportContact.servicePhone
+    ? `${helpNeededLine(supportContact)}。`
+    : ''
+
   return (
-    <KioskPageFrame
-      tone="wheat"
-      title={info.title}
-      subtitle={`${info.subtitle} · 智慧校园自助服务指引`}
-      backLabel="返回智慧校园"
-      onBack={() => navigate('/smart-campus')}
-      badge={<FusionBadge>办理指引 · 未接线上办理</FusionBadge>}
+    <div data-qx-page="campus-service" className="sc-touch-fill w4-page-frame">
+    <QxTouchScreen
+      testId="campus-svc-touch"
+      stateId={key}
+      bodyClassName="qxt-body-scroll"
+      band={(
+        <QxTouchBand
+          seal={null}
+          eyebrow="智慧校园"
+          title={info.title}
+          sub={`${info.subtitle} · 智慧校园自助服务指引`}
+          back={false}
+          status={{ text: '到窗口办理', tone: 'unknown' }}
+        />
+      )}
+      dock={(
+        <QxTouchDock
+          onBack={() => navigate('/smart-campus')}
+          backLabel="返回智慧校园"
+          ask={{ label: '问小青：这一项要带什么？', draft: `${info.title}要带什么？请只做说明，以学校官方通知为准，不要代替学校办理。` }}
+          primary={{ label: '查看迎新报到指引', onClick: () => navigate('/smart-campus/welcome') }}
+        />
+      )}
     >
         <div className="kproto kproto-teal kproto-content">
           <div className="kproto-auth">
@@ -147,15 +237,16 @@ export function SmartCampusServicePage() {
             <p>本页为通用办理指引，<b>不代表任何具体学校的安排</b>；所需材料、办理地点与流程请以学校官方通知为准。本终端不采集任何个人信息，实际办理请前往现场服务窗口或学校官方自助平台。</p>
           </div>
 
-          <section className="kproto-card accented">
-            <div className="flex items-center gap-6">
-              <span className="grid h-24 w-24 shrink-0 place-items-center rounded-[20px] bg-[var(--kp-accent-soft)] text-[var(--kp-accent-deep)]">
-                <Icon className="h-12 w-12" aria-hidden="true" />
-              </span>
-              <div>
-                <h2 className="font-serif text-4xl font-black tracking-[2px]">{info.title}</h2>
-                <p className="mt-2 text-[21px] leading-normal text-[var(--kp-muted)]">{info.summary}</p>
-              </div>
+          <section
+            className="sc-hero"
+            style={{ '--sc-hero-h': `${HERO_MIN_HEIGHT[key]}px` } as CSSProperties}
+          >
+            <span className="sc-hero-v" aria-hidden="true">
+              <Icon size={96} strokeWidth={1.5} />
+            </span>
+            <div className="sc-hero-t">
+              <h2>{info.title}</h2>
+              <p>{info.summary}</p>
             </div>
           </section>
 
@@ -201,7 +292,7 @@ export function SmartCampusServicePage() {
 
           <div className="kproto-notice warn">
             <ShieldCheckIcon aria-hidden="true" />
-            <p>{info.note}</p>
+            <p>{info.note}{help}</p>
           </div>
 
           {/* 本机可办（仅校园卡页展示：证件照打印即将上线 + 入学材料打印可用） */}
@@ -216,9 +307,9 @@ export function SmartCampusServicePage() {
                 <span className="kproto-icon shrink-0"><ScanFaceIcon aria-hidden="true" /></span>
                 <span className="flex-1 text-left">
                   <b className="block text-[23px] font-semibold">证件照排版打印</b>
-                  <span className="mt-1 block text-[17px] text-[var(--kp-muted)]">功能即将上线；当前可用手机照片在打印扫描页打印</span>
+                  <span className="sc-sub">功能即将上线；当前可用手机照片在打印扫描页打印</span>
                 </span>
-                <span className="shrink-0 rounded-full border border-[var(--kp-line)] bg-[var(--kp-paper)] px-3 py-1 text-[14px] text-[var(--kp-muted)]">即将上线</span>
+                <span className="sc-soon">即将上线</span>
               </button>
               <button
                 type="button"
@@ -229,20 +320,14 @@ export function SmartCampusServicePage() {
                 <span className="kproto-icon shrink-0" style={{ background: 'var(--kp-teal)', color: '#fffdf8' }}><PrinterIcon aria-hidden="true" /></span>
                 <span className="flex-1 text-left">
                   <b className="block text-[23px] font-semibold">入学材料 / 表格打印</b>
-                  <span className="mt-1 block text-[17px] text-[var(--kp-muted)]">报到表、申请表等自助打印</span>
+                  <span className="sc-sub">报到表、申请表等自助打印</span>
                 </span>
               </button>
             </div>
           )}
 
-          <div className="kproto-actionbar">
-            <button type="button" className="kproto-btn" onClick={() => navigate('/smart-campus')}>返回智慧校园</button>
-            <div className="kproto-spacer" />
-            <button type="button" className="kproto-btn dark" onClick={() => navigate('/smart-campus/welcome')}>
-              查看迎新报到指引<ChevronRightIcon aria-hidden="true" />
-            </button>
-          </div>
         </div>
-    </KioskPageFrame>
+    </QxTouchScreen>
+    </div>
   )
 }
