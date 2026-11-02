@@ -17312,7 +17312,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 908
+      "sourceFileCount": 909
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -46881,6 +46881,17 @@
         "risk": "low",
         "scope": "kiosk",
         "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/services/kioskLicenseGate.ts",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/tests/kiosk-license-gate.test.mjs"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/kiosk-license-gate.test.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
