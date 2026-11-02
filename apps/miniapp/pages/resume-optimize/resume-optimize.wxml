@@ -173,7 +173,14 @@
         <view class="btn ghost tap" bindtap="openPdf">打开真实 PDF</view>
         <view class="btn ghost tap" bindtap="viewDocuments">我的文档</view>
         <view class="btn primary tap" bindtap="printExport">去打印</view>
+        <view
+          class="btn ghost tap {{exportShare.busy ? 'disabled' : ''}}"
+          hover-class="tap-press"
+          bindtap="shareToFriend"
+          aria-disabled="{{exportShare.busy}}"
+        >{{exportShare.phase === 'ready' ? '发送给微信好友' : '发给微信好友'}}</view>
       </view>
+      <view wx:if="{{exportShare.message}}" class="export-note">{{exportShare.message}}</view>
     </view>
   </view>
 

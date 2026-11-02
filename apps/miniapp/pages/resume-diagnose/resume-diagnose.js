@@ -4,6 +4,7 @@ const storage = require('../../utils/storage')
 const N = require('../../utils/normalize')
 const auth = require('../../utils/auth')
 const fileUrls = require('../../utils/file-url')
+const shareFriend = require('../../utils/share-friend')
 
 // 结果未就绪时的轮询节奏(与解析页一致口径)
 const POLL_INTERVAL = 3000
@@ -30,6 +31,7 @@ Page({
     exportingKind: '',
     openingPdf: false,
     exportResult: null,
+    exportShare: { phase: 'idle', busy: false, message: '' },
     exportCountdown: '',
     exportExpired: false,
   },
@@ -63,6 +65,7 @@ Page({
     this._stopped = true
     if (this._pollTimer) clearTimeout(this._pollTimer)
     this._stopExportCountdown()
+    shareFriend.abandon(this)
   },
 
   /** 读取真实报告。匿名场景必须带 accessToken,否则后端一律 404。 */
@@ -262,6 +265,10 @@ Page({
     wx.navigateTo({
       url: `/pages/print-upload/print-upload?fileId=${encodeURIComponent(result.fileId)}&name=${encodeURIComponent(result.filename)}&pages=${encodeURIComponent(result.pageCount || '')}&printFileUrl=${encodeURIComponent(result.printFileUrl)}`,
     })
+  },
+
+  shareToFriend(e) {
+    shareFriend.onTap(this, e, wx, (fileId) => api.getFilePreviewUrl(fileId))
   },
 
   goBack() { wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } }) },

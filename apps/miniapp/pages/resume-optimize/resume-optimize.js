@@ -5,6 +5,7 @@ const normalize = require('../../utils/normalize.js')
 const auth = require('../../utils/auth.js')
 const buildModel = require('../../utils/resume-build-model.js')
 const fileUrls = require('../../utils/file-url.js')
+const shareFriend = require('../../utils/share-friend')
 const draft = require('./draft')
 const factCheck = require('./fact-check')
 
@@ -14,8 +15,6 @@ const FORMATS = [
   { key: 'txt', label: 'TXT', mimeType: 'text/plain' },
   { key: 'md', label: 'Markdown', mimeType: 'text/markdown' },
 ]
-
-/** 优化页接线：导出 / 草稿 / 事实核对。对照只读，编辑区才进草稿与导出。 */
 Page({
   data: {
     statusBarHeight: 20,
@@ -33,6 +32,7 @@ Page({
     exporting: false,
     opening: false,
     exportResult: null,
+    exportShare: { phase: 'idle', busy: false, message: '' },
     exportDisabledReason: '',
     pricingStatus: 'loading',
     pricing: { mode: 'unavailable', text: '正在确认能否导出…', disabledReason: '正在确认能否导出，请稍候。' },
@@ -74,6 +74,7 @@ Page({
     this._gone = true
     this._stopExportCountdown()
     if (this._saver) this._saver.flush()
+    shareFriend.abandon(this) // 迟到的下载回调不再写本页
   },
 
   async _fetch() {
@@ -490,10 +491,9 @@ Page({
     this._exportCountdownTimer = setInterval(tick, 1000)
   },
 
-  _stopExportCountdown() {
-    if (this._exportCountdownTimer) clearInterval(this._exportCountdownTimer)
-    this._exportCountdownTimer = null
-  },
+  _stopExportCountdown() { if (this._exportCountdownTimer) clearInterval(this._exportCountdownTimer); this._exportCountdownTimer = null },
+
+  shareToFriend(e) { shareFriend.onTap(this, e, wx, (fileId) => api.getFilePreviewUrl(fileId)) },
 
   viewDocuments() { wx.navigateTo({ url: '/pages/documents/documents' }) },
 })

@@ -209,7 +209,16 @@
         <view wx:else class="export-result-actions">
           <button class="btn ghost" bindtap="openExportPdf" loading="{{openingPdf}}" disabled="{{openingPdf}}" aria-disabled="{{openingPdf}}">打开真实 PDF</button>
           <button class="btn primary" bindtap="printExportPdf">去打印</button>
+          <button
+            wx:if="{{exportResult.savedToDocuments}}"
+            class="btn ghost"
+            bindtap="shareToFriend"
+            loading="{{exportShare.busy}}"
+            disabled="{{exportShare.busy}}"
+            aria-disabled="{{exportShare.busy}}"
+          >{{exportShare.phase === 'ready' ? '发送给微信好友' : '发给微信好友'}}</button>
         </view>
+        <view wx:if="{{exportResult.savedToDocuments && exportShare.message}}" class="export-meta">{{exportShare.message}}</view>
       </view>
     </view>
 
