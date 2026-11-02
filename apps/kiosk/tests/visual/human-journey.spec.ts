@@ -643,7 +643,22 @@ test.describe('真人走查（模拟数据）', () => {
     await page.waitForTimeout(3000)
     await step(page, s, 'F-scan-entry')
 
-    const BACK = /^(首页|AI ?顾问|我的)$|^问小青|返回|退出|上一步|更换|删除|重试|取消|问工作人员|再扫/
+    // 走查 I-16：扫描类型进来不替人选。真人要先点一种材料，「下一步 · 建立这次扫描」才亮。
+    // 此前这趟走查靠「预选了简历扫描」才能一路点到底；预选取消后，下面「最后一个可点的前进按钮」
+    // 的循环落到「改用面板扫描到 U 盘」，绕回打印扫描，永远走不到建会话与投递确认
+    // （CI kiosk-browser-smoke 在这条用例上红的根因）。
+    for (const type of ['resume', 'id', 'document']) {
+      await expect(page.getByTestId(`scan-workbench-type-${type}`), `${type} 进来不该是选中态`).toHaveAttribute('aria-checked', 'false')
+    }
+    await expect(page.getByRole('button', { name: '先选一种材料', exact: true })).toBeDisabled()
+    await expect(page.getByRole('button', { name: /下一步 · 建立这次扫描/ })).toHaveCount(0)
+    // 点「普通文档扫描」：上面注册的建会话回包就是 document 类型。
+    await page.getByTestId('scan-workbench-type-document').click()
+    await expect(page.getByTestId('scan-workbench-type-document')).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByRole('button', { name: /下一步 · 建立这次扫描/ })).toBeEnabled()
+    await step(page, s, 'F-scan-type-picked')
+
+    const BACK =/^(首页|AI ?顾问|我的)$|^问小青|返回|退出|上一步|更换|删除|重试|取消|问工作人员|再扫/
     for (let hop = 0; hop < 5; hop += 1) {
       const before = page.url()
       const cands = await page.locator('button:visible').evaluateAll((els) =>
