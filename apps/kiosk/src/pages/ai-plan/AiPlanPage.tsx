@@ -1,3 +1,5 @@
+import { useKioskLicense } from '../../layouts/KioskLicenseContext'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 // 小青的作业面。只呈现顾问会话刚产出的三种产物，不编目标/材料/计划。
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -51,7 +53,8 @@ export function AiPlanPage() {
   const location = useLocation()
   const [search] = useSearchParams()
   const { getToken } = useAuth()
-  const navState = (location.state ?? {}) as AdvisorArtifactLocationState
+  const navState = (location.state ?? {}) as AdvisorArtifactLocationState & { licenseViewOnly?: boolean }
+  const viewOnly = useKioskLicense().mode === 'winding-down' && navState.licenseViewOnly === true
 
   const sessionId = parseId(search.get('sessionId')) ?? parseId(navState.sessionId)
   const artifactId = parseId(search.get('artifactId')) ?? parseId(navState.artifactId)
@@ -226,7 +229,7 @@ export function AiPlanPage() {
   return (
     <QxPageFrame
       /* 稿 52-advisor-artifact 原文：data-route="/assistant" aria-label="返回问小青"。 */
-      back={{ label: '返回问小青', onBack: () => navigate('/assistant') }}
+      back={{ label: '返回问小青', onBack: () => navigate(viewOnly ? '/me/ai-records' : '/assistant') }}
       title="小青的作业面"
       status={{ tone: copy.statusTone, label: copy.statusLabel }}
       terminalLabel="就业服务大厅"
@@ -235,7 +238,7 @@ export function AiPlanPage() {
           <button type="button" className="qx-nav-item" onClick={() => navigate('/')} data-testid="advisor-artifact-nav-home">
             <HomeIcon size={28} aria-hidden />首页
           </button>
-          <button type="button" className="qx-nav-item" onClick={() => navigate('/assistant')} aria-current="page" data-testid="advisor-artifact-nav-advisor">
+          <button type="button" className="qx-nav-item" disabled={viewOnly} title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={() => navigate('/assistant')} aria-current="page" data-testid="advisor-artifact-nav-advisor">
             <SparklesIcon size={28} aria-hidden />AI 顾问
           </button>
           <button type="button" className="qx-nav-item" onClick={() => navigate('/profile')} data-testid="advisor-artifact-nav-profile">
@@ -251,6 +254,8 @@ export function AiPlanPage() {
               className="qx-btn"
               data-variant="ghost"
               data-testid="advisor-artifact-cta-back"
+              disabled={viewOnly}
+              title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined}
               onClick={() => navigate('/assistant')}
             >
               {backLabel}
@@ -262,6 +267,8 @@ export function AiPlanPage() {
               className="qx-btn aa-cta-print"
               data-variant="primary"
               data-testid="advisor-artifact-cta-redo"
+              disabled={viewOnly}
+              title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined}
               onClick={() => navigate('/assistant')}
             >
               回去重做一次
@@ -273,7 +280,8 @@ export function AiPlanPage() {
               className="qx-btn aa-cta-print"
               data-variant="primary"
               data-testid="advisor-artifact-cta-print"
-              disabled={printBusy || !activeIds}
+              disabled={viewOnly || printBusy || !activeIds}
+              title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined}
               aria-busy={printBusy || undefined}
               onClick={() => { void onPrint() }}
             >
@@ -305,6 +313,7 @@ export function AiPlanPage() {
         data-state={derivedState}
         data-testid="advisor-artifact-main"
       >
+        {viewOnly ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : null}
         <AdvisorHero
           heroBefore={copy.heroBefore}
           heroEm={copy.heroEm}

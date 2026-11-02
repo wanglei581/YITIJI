@@ -1,3 +1,4 @@
+import { useKioskLicense } from '../../../layouts/KioskLicenseContext'
 import { LicenseLock } from '../../../layouts/LicenseLock'
 import { useMemberCursorPage } from './useMemberCursorPage'
 import { MemberLoadMore } from './MemberLoadMore'
@@ -93,6 +94,7 @@ function RecordExitCards({ aiPaused, artWidths }: { aiPaused: boolean; artWidths
 }
 
 export function MyAiRecordsPage() {
+  const winding = useKioskLicense().mode === 'winding-down'
   const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
   // 招聘内容托管（3.13）关闭时：不读、不列岗位 AI 会话与招聘会准备单，也不摆岗位 AI 类入口与说明（那些页不开放）。
@@ -352,7 +354,7 @@ export function MyAiRecordsPage() {
                 chips={<MeAiChip />}
                 actions={(
                   <MeActs>
-                    {openPath ? <MeBtn v="pri" disabled={busy} onClick={() => navigate(openPath)}>打开</MeBtn> : null}
+                    {openPath ? <MeBtn v="pri" disabled={busy} onClick={() => navigate(openPath, { state: { taskId: item.taskId, licenseViewOnly: winding } })}>打开</MeBtn> : null}
                     {hostingOpen && item.kind === 'fair_visit_plan' && item.ref?.type === 'job_fair' && item.ref.id && item.status === 'completed' ? (
                       <MeBtn v="sec" onClick={() => openFairPlan(item)}>打开这场招聘会规划</MeBtn>
                     ) : null}

@@ -62,7 +62,7 @@ export function MyResumesPage() {
   const pagination = useMemberCursorPage<MemberResumeItem>({ enabled: isLoggedIn, identityKey: token, reloadKey, fetchPage })
   const { items, state, total } = pagination
 
-  const openReport = (taskId: string) => navigate(taskPath('/resume/report', taskId), { state: { taskId } })
+  const openReport = (taskId: string) => navigate(taskPath('/resume/report', taskId), { state: { taskId, licenseViewOnly: winding } })
   const openOptimize = (taskId: string, saved: boolean) => navigate(`${taskPath('/resume/optimize', taskId)}${saved ? '&saved=1' : ''}`, { state: { taskId } })
   const openJobFit = (item: MemberResumeItem) => {
     if (item.kind !== 'parse' || !isActionable(item)) return
@@ -80,7 +80,7 @@ export function MyResumesPage() {
     } catch { setDeleteError('删除没有完成，记录可能已被删除，或网络暂时不可用。请刷新后重试。') }
     finally { setDeleting(false) }
   }
-  const openGenerate = (taskId: string) => navigate(taskPath('/resume/generate/preview', taskId), { state: { taskId } })
+  const openGenerate = (taskId: string) => navigate(taskPath('/resume/generate/preview', taskId), { state: { taskId, licenseViewOnly: winding } })
 
   const uiState = !isLoggedIn ? 'login' : state === 'loading' ? 'loading' : state === 'error' ? 'error' : items.length === 0 ? 'empty' : 'ready'
   const [openId, setOpenId] = useState<string | null>(null)

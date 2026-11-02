@@ -128,7 +128,7 @@ function ProfileContent() {
   // 待办里的「继续付款 / 看出纸进度 / 去首页开始」在待办卡上。
   const dock = uiState === 'signed-out'
     ? (
-      <button type="button" className="qx-btn" data-variant="primary" data-grow="1" data-testid="profile-primary" disabled={winding} onClick={goLogin}>
+      <button type="button" className="qx-btn" data-variant="primary" data-grow="1" data-testid="profile-primary" disabled={winding} title={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={goLogin}>
         <span data-testid="profile-login">去登录</span>
       </button>
     )
@@ -167,7 +167,7 @@ function ProfileContent() {
       >
         <div className="qx-scroll qx-grow me-page">
           {winding ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : null}
-          {uiState === 'signed-out' ? <LicenseLock><MeProfileGuest contact={support} /></LicenseLock> : null}
+          {uiState === 'signed-out' ? <MeProfileGuest contact={support} /> : null}
 
           {uiState === 'loading' ? <MeProfileLoading /> : null}
 
@@ -188,7 +188,7 @@ function ProfileContent() {
                 onOpenSettings={() => navigate('/me/settings')}
               />
               {miniappLine ? <p className="me-sync">{miniappLine}</p> : null}
-              <LicenseLock><ProfileAssetGrid counts={assetOverview.counts} loading={assetOverview.loading} /></LicenseLock>
+              <ProfileAssetGrid counts={assetOverview.counts} loading={assetOverview.loading} />
               <LicenseLock><ProfileContinueCard task={pendingTask} tasksError={tasksError} empty={uiState === 'empty'} /></LicenseLock>
               {uiState === 'empty' ? <LicenseLock><EmptyStartRows /></LicenseLock> : null}
               {resumes.length + scans.length + aiRecords.length > 0 ? (
@@ -203,7 +203,7 @@ function ProfileContent() {
                   onDeleteAiRecord={(id) => setAiRecords((prev) => prev.filter((item) => item.id !== id))}
                 />
               ) : null}
-              <LicenseLock><AccountRows few={uiState === 'empty'} /></LicenseLock>
+              <AccountRows few={uiState === 'empty'} />
               <p className="me-fine">
                 结束使用会退出本机并清除临时信息。已提交的订单与文件按保存期限管理。离开 3 分钟没操作会自动退出。
               </p>

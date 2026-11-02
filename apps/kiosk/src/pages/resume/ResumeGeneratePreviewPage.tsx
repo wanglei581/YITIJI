@@ -1,3 +1,6 @@
+import { useKioskLicense } from '../../layouts/KioskLicenseContext'
+import { LicenseLock } from '../../layouts/LicenseLock'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useClearGuestDraftOnFlowExit } from './resumeGenerateDraft'
@@ -43,6 +46,7 @@ interface LocationState {
   result?: ResumeGenerateResponse
   input?: ResumeGenerateInput
   taskId?: string
+  licenseViewOnly?: boolean
   deliverPhase?: 'preview' | 'export'
 }
 
@@ -72,6 +76,7 @@ export function ResumeGeneratePreviewPage() {
   const navigate = useNavigate()
   const startPrint = useStartPrintHandoff()
   const location = useLocation()
+  const viewOnly = useKioskLicense().mode === 'winding-down' && (location.state as LocationState | null)?.licenseViewOnly === true
   const { getToken } = useAuth()
   useClearGuestDraftOnFlowExit(!getToken())
   const query = useMemo(() => parseGeneratePreviewQuery(location.search), [location.search])
@@ -357,8 +362,8 @@ export function ResumeGeneratePreviewPage() {
         advisor: 'resume-generate-preview-nav-advisor',
         profile: 'resume-generate-preview-nav-profile',
       }}
-      ctabar={ctabar}
-      ask={previewAsk ? { ...previewAsk, testId: 'resume-generate-ai-help' } : false}
+      ctabar={viewOnly ? <LicenseLock>{ctabar}</LicenseLock> : ctabar}
+      ask={viewOnly ? false : previewAsk ? { ...previewAsk, testId: 'resume-generate-ai-help' } : false}
     >
       <section
         data-kiosk-domain="resume"
@@ -472,6 +477,7 @@ export function ResumeGeneratePreviewPage() {
             estimatedPagesLabel={estimatedPagesLabel}
           />
         )}
+        {viewOnly ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : null}
         {factOpen && resume && (
           <ResumeFactConfirmDialog facts={facts} unconfirmed={unconfirmed} busy={exporting} onCancel={() => setFactOpen(false)} onConfirm={(at) => { void handleExport(at) }} />
         )}

@@ -362,7 +362,7 @@ export function MyDocumentsPage() {
             const printable = doc.mimeType === 'application/pdf' || doc.mimeType === 'image/jpeg' || doc.mimeType === 'image/png'
             const reprintBlocked = !isDocumentReprintable(doc)
             const viewDisabled = expired || isAnyPending
-            const printDisabled = winding || expired || !printable || isAnyPending || reprintBlocked
+            const printDisabled = (winding && !pickPrint) || expired || !printable || isAnyPending || reprintBlocked
             const deleteDisabled = isAnyPending
             const policies = selectablePolicies(doc)
             const canChangeRetention = !expired && policies.length > 1
@@ -391,7 +391,7 @@ export function MyDocumentsPage() {
                       mimeType={doc.mimeType}
                       token={getToken()}
                       busy={isAnyPending}
-                      winding={winding}
+                      winding={winding && !pickPrint}
                       reprintable={isDocumentReprintable(doc)}
                       onConverted={() => setReloadKey((key) => key + 1)}
                       onError={(text) => setHint({ tone: 'bad', text })}
@@ -406,7 +406,7 @@ export function MyDocumentsPage() {
                     <MeBtn
                       v={printDisabled ? 'sec' : 'pri'}
                       disabled={printDisabled}
-                      title={winding ? LICENSE_NO_NEW_TASK_REASON : undefined}
+                      title={winding && !pickPrint ? LICENSE_NO_NEW_TASK_REASON : undefined}
                       aria-disabled={reprintBlocked || undefined}
                       aria-describedby={printReasonId}
                       onClick={() => { if (reprintBlocked) return; void print(doc) }}
