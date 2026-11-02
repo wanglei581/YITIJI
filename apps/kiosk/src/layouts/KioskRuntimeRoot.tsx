@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { refreshKioskProfile, startKioskProfileKeeper } from '../services/api/kioskProfile'
 import { AiDeclarationHost } from '../ai/AiDeclarationHost'
@@ -8,6 +8,8 @@ import { KioskBusyProvider } from '../contexts/KioskBusyContext'
 import { KioskHidScanGuard } from '../components/hid-guard/KioskHidScanGuard'
 import { useContentUpdate } from '../hooks/useContentUpdate'
 import { startSupportContactKeeper } from '../services/api/supportContact'
+import { KioskLicenseProvider, useKioskLicense } from './KioskLicenseContext'
+import { KioskPausedScreen } from '../components/KioskPausedScreen'
 
 function ContentUpdateGuard() {
   useContentUpdate()
@@ -37,6 +39,17 @@ function SupportContactGuard() {
   return null
 }
 
+function LicensedOutlet() {
+  const { mode, notice } = useKioskLicense()
+  const navigate = useNavigate()
+  const previousMode = useRef(mode)
+  useEffect(() => {
+    if (previousMode.current === 'paused' && mode === 'normal') navigate('/', { replace: true })
+    previousMode.current = mode
+  }, [mode, navigate])
+  return mode === 'paused' ? <KioskPausedScreen notice={notice} /> : <Outlet />
+}
+
 /**
  * Kiosk 终端业务路由的非视觉运行时根。
  *
@@ -51,11 +64,13 @@ export function KioskRuntimeRoot() {
       <AiDeclarationHost />
       <SupportContactGuard />
       <ProfileGuard />
-      <KioskPrivacyGuard>
-        <ContentUpdateGuard />
-        <KioskHidScanGuard />
-        <Outlet />
-      </KioskPrivacyGuard>
+      <KioskLicenseProvider>
+        <KioskPrivacyGuard>
+          <ContentUpdateGuard />
+          <KioskHidScanGuard />
+          <LicensedOutlet />
+        </KioskPrivacyGuard>
+      </KioskLicenseProvider>
     </KioskBusyProvider>
   )
 }
