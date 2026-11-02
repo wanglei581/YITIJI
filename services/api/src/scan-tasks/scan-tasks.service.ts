@@ -222,11 +222,17 @@ export interface ScanTaskStatusResult {
   errorCode: string | null
   errorMessage: string | null
   expiresAt: string
-  /** 屏上扫描（2026-11-02）：面板任务恒为 startMode:'panel'、deviceState/deviceErrorCode:null、devicePageCount:0。 */
+  /**
+   * 屏上扫描（2026-11-02）：面板任务恒为 startMode:'panel'、deviceState / deviceErrorCode / deviceSource /
+   * deviceColorMode / deviceUpdatedAt:null、devicePageCount:0。字段由 scanDeviceStatusFields 产出。
+   */
   startMode: 'panel' | 'device'
   deviceState: string | null
   devicePageCount: number
   deviceErrorCode: string | null
+  deviceSource: string | null
+  deviceColorMode: string | null
+  deviceUpdatedAt: string | null
 }
 
 /** current-lease 的响应：面板任务就是 ScanDeliveryLeaseResult 本身；device 任务多带 startMode 与 device 参数。 */

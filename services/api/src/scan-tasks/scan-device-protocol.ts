@@ -74,6 +74,16 @@ export const SCAN_DEVICE_MAX_PAGE_COUNT = 200
  *   重试    error → scanning（同一会话「放好再试」；页数从 0 重新数，见 planScanDeviceReport）
  *   中止    任何未结束状态 → aborted（终态；之后只能新建会话或改用面板扫描）
  * 同状态重复回报（网络重试）一律允许，只刷新续期与页数。除此之外的组合一律 409。
+ *
+ * 这张表只管「终端程序回报」。还有一条状态变化不经过它，也不进它：
+ *   error → ready   只发生在用户在屏上点「改用玻璃台 / 改颜色」之后（POST /scan/sessions/:id/device-settings，
+ *                   见 scan-device-sessions.service.ts 的 updateDeviceSettings），由云端在同一次条件更新里把
+ *                   deviceState 写回 ready、清掉 deviceErrorCode、把 devicePageCount 归 0。
+ * 终端程序不会也不许回报 error → ready（表里没有这一格，回报它一律 409 SCAN_DEVICE_TRANSITION_INVALID）。
+ * 用户改完设置之后，终端程序下一次回报 scanning，走的是表里已有的 ready → scanning，不需要任何新转移。
+ * 所以回报表保持原样不动；改设置只在 ready / error 两个状态允许（SCAN_DEVICE_SETTABLE_STATES），
+ * 正在扫或已经收到页（scanning / page_ready / composing / delivering）时 409 SCAN_DEVICE_SETTINGS_LOCKED，
+ * 要换设置先停下（改用面板或取消重来）。
  */
 export const SCAN_DEVICE_STATE_TRANSITIONS: Readonly<Record<ScanDeviceState, readonly ScanDeviceState[]>> = {
   ready: ['ready', 'scanning', 'error', 'aborted'],
@@ -90,6 +100,13 @@ const STATES_REQUIRING_PAGES: readonly ScanDeviceState[] = ['page_ready', 'compo
 
 /** deliver 只在这两个 state 下收 device 投递。 */
 export const SCAN_DEVICE_DELIVERABLE_STATES: readonly ScanDeviceState[] = ['composing', 'delivering']
+
+/**
+ * 用户改扫描设置（来源 / 颜色）只在这两个 state 下允许：ready（还没开始）、error（出错了，放好纸再来）。
+ * 其余（含 aborted）一律 SCAN_DEVICE_SETTINGS_LOCKED：正在扫、已经收到页、正在合成或投递时换设置，
+ * 会让已经扫下来的页和新设置对不上。
+ */
+export const SCAN_DEVICE_SETTABLE_STATES: readonly ScanDeviceState[] = ['ready', 'error']
 
 export function isScanDeviceState(value: unknown): value is ScanDeviceState {
   return typeof value === 'string' && (SCAN_DEVICE_STATES as readonly string[]).includes(value)
@@ -197,6 +214,45 @@ export function buildScanDeviceCreateData(
   }
 }
 
+// ── 改扫描设置（来源 / 颜色）──────────────────────────────────────────────────
+
+/** 用户在放纸与设置屏换来源 / 颜色：两个至少给一个，没给的保持原值。 */
+export interface ScanDeviceSettingsInput {
+  source?: ScanDeviceSource
+  colorMode?: ScanDeviceColorMode
+}
+
+/**
+ * 校验改设置的请求体：取值范围在 DTO 里已用 @IsIn 校验；这里再判一次，是因为「至少给一个」只能在这里判，
+ * 且门禁和别的调用方可能绕过 ValidationPipe 直接调 service。null 与不传同样算没给。
+ * 400 SCAN_DEVICE_SETTINGS_INVALID：两个都没给，或给了不认识的取值。先于任何数据库访问。
+ */
+export function resolveScanDeviceSettingsInput(input: { source?: unknown; colorMode?: unknown }): ScanDeviceSettingsInput {
+  const hasSource = !isAbsent(input.source)
+  const hasColorMode = !isAbsent(input.colorMode)
+  if (!hasSource && !hasColorMode) {
+    badSettings('请至少给出 source（flatbed / feeder）或 colorMode（gray / color）之一')
+  }
+  if (hasSource && !(SCAN_DEVICE_SOURCES as readonly unknown[]).includes(input.source)) {
+    badSettings('source 只能是 flatbed 或 feeder')
+  }
+  if (hasColorMode && !(SCAN_DEVICE_COLOR_MODES as readonly unknown[]).includes(input.colorMode)) {
+    badSettings('colorMode 只能是 gray 或 color')
+  }
+  return {
+    ...(hasSource ? { source: input.source as ScanDeviceSource } : {}),
+    ...(hasColorMode ? { colorMode: input.colorMode as ScanDeviceColorMode } : {}),
+  }
+}
+
+function badSettings(message: string): never {
+  throw new BadRequestException({ error: { code: 'SCAN_DEVICE_SETTINGS_INVALID', message } })
+}
+
+export function isScanDeviceSettingsEditableState(state: ScanDeviceState): boolean {
+  return (SCAN_DEVICE_SETTABLE_STATES as readonly string[]).includes(state)
+}
+
 // ── 对外视图 ──────────────────────────────────────────────────────────────────
 
 type DeviceFieldsRow = {
@@ -206,6 +262,7 @@ type DeviceFieldsRow = {
   deviceState?: string | null
   devicePageCount?: number | null
   deviceErrorCode?: string | null
+  deviceUpdatedAt?: Date | null
 }
 
 export function isScanDeviceTask(task: Pick<DeviceFieldsRow, 'startMode'>): boolean {
@@ -218,22 +275,43 @@ export function isSwitchedToPanel(task: Pick<DeviceFieldsRow, 'startMode' | 'dev
 }
 
 /**
- * GET /scan/sessions/:id 多返回的四项。面板任务（含已改用面板的）一律 startMode:'panel'、其余 null / 0。
+ * GET /scan/sessions/:id 多返回的七项（B1 加前四项，B2 加后三项）。
+ * 面板任务（含已改用面板的）一律 startMode:'panel'、其余 null / 0——哪怕库里还留着 device 时期的列值。
+ * deviceSource / deviceColorMode 是用户当前选的来源与颜色（改设置之后读到的就是新值）；
+ * deviceUpdatedAt 是最近一次状态变化（ISO 字符串）：终端程序回报，或用户改设置 / 改用面板。
  */
 export function scanDeviceStatusFields(task: DeviceFieldsRow): {
   startMode: ScanStartMode
   deviceState: ScanDeviceState | null
   devicePageCount: number
   deviceErrorCode: ScanDeviceErrorCode | null
+  deviceSource: ScanDeviceSource | null
+  deviceColorMode: ScanDeviceColorMode | null
+  deviceUpdatedAt: string | null
 } {
   if (!isScanDeviceTask(task)) {
-    return { startMode: 'panel', deviceState: null, devicePageCount: 0, deviceErrorCode: null }
+    return {
+      startMode: 'panel',
+      deviceState: null,
+      devicePageCount: 0,
+      deviceErrorCode: null,
+      deviceSource: null,
+      deviceColorMode: null,
+      deviceUpdatedAt: null,
+    }
   }
   return {
     startMode: 'device',
     deviceState: isScanDeviceState(task.deviceState) ? task.deviceState : null,
     devicePageCount: typeof task.devicePageCount === 'number' ? task.devicePageCount : 0,
     deviceErrorCode: isScanDeviceErrorCode(task.deviceErrorCode) ? task.deviceErrorCode : null,
+    deviceSource: (SCAN_DEVICE_SOURCES as readonly unknown[]).includes(task.deviceSource)
+      ? (task.deviceSource as ScanDeviceSource)
+      : null,
+    deviceColorMode: (SCAN_DEVICE_COLOR_MODES as readonly unknown[]).includes(task.deviceColorMode)
+      ? (task.deviceColorMode as ScanDeviceColorMode)
+      : null,
+    deviceUpdatedAt: task.deviceUpdatedAt instanceof Date ? task.deviceUpdatedAt.toISOString() : null,
   }
 }
 
