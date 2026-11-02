@@ -16863,6 +16863,8 @@
           "path": "/scan",
           "styles": [
             "apps/kiosk/src/pages/print-scan/styles/tool-touch.css",
+            "apps/kiosk/src/pages/print/art/print-art-tokens.css",
+            "apps/kiosk/src/pages/print/art/print-art.css",
             "apps/kiosk/src/pages/scan/styles/scan-device-qx.css",
             "apps/kiosk/src/pages/scan/styles/scan-fs.css",
             "apps/kiosk/src/pages/scan/styles/scan-result-viewer-qx.css",

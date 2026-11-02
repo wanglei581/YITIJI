@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
 
-const SHOT_DIR = '/Users/wanglei/.cache/claude-lanes/copyscan-1102/code-shots/k1b1'
+const SHOT_DIR = '/Users/wanglei/.cache/claude-lanes/copyscan-1102/code-shots/k1b1v'
 const SCAN_TASK_ID = 'k1b-scan-001'
 const CONTROL_TOKEN = 'k1b-scan-control'
 
@@ -94,6 +94,7 @@ test('screen scan stays off when scan_device is not opened @w2', async ({ page, 
   await page.goto('/scan?stage=start')
   await expect(page.getByRole('heading', { name: '扫什么？' })).toBeVisible()
   await expect(page.getByText('扫描仪就绪')).toHaveCount(0)
+  await page.getByTestId('scan-workbench-type-document').click()
   await shot(page, 'cs-scan-what')
   await page.getByTestId('scan-workbench-type-resume').click()
   await page.getByRole('button', { name: '下一步', exact: true }).click()
