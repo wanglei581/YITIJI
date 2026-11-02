@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`604` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`607` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -951,15 +951,23 @@
 | POST | `/api/v1/admin/print-jobs/:id/abandon` | AdminPrintJobsController.abandonPending | admin | AdminPrintJobsAbandonService | AuditLog<br/>Order<br/>PrintTask<br/>PrintTaskStatusLog<br/>User |
 | POST | `/api/v1/admin/print-jobs/:id/verify-outcome` | AdminPrintJobsController.verifyOutcome | admin | — | — |
 
+## `services/api/src/print-jobs/free-print-quota.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/kiosk/print-quota` | KioskPrintQuotaController.get | — | FreePrintQuotaService | AuditLog<br/>PlatformSetting<br/>Terminal |
+| GET | `/api/v1/kiosk/print-quota` | KioskPrintQuotaController.get | — | FreePrintQuotaService | AuditLog<br/>PlatformSetting<br/>Terminal |
+| PUT | `/api/v1/kiosk/print-quota` | KioskPrintQuotaController.update | — | FreePrintQuotaService | AuditLog<br/>PlatformSetting<br/>Terminal |
+
 ## `services/api/src/print-jobs/print-jobs.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/print/jobs` | PrintJobsController.create | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| POST | `/api/v1/print/jobs` | PrintJobsController.create | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
 | POST | `/api/v1/print/jobs/:orderId/release` | PrintJobsController.releasePickup | — | PickupOrderService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability |
-| GET | `/api/v1/print/jobs/:taskId` | PrintJobsController.getStatus | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
-| POST | `/api/v1/print/jobs/:taskId/retry` | PrintJobsController.retryPaidFailedJob | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
-| POST | `/api/v1/print/jobs/:taskId/takeaway-url` | PrintJobsController.issueTakeawayUrl | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| GET | `/api/v1/print/jobs/:taskId` | PrintJobsController.getStatus | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| POST | `/api/v1/print/jobs/:taskId/retry` | PrintJobsController.retryPaidFailedJob | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| POST | `/api/v1/print/jobs/:taskId/takeaway-url` | PrintJobsController.issueTakeawayUrl | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
 | POST | `/api/v1/print/jobs/claim-pickup` | PrintJobsController.claimPickup | — | PickupOrderService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability |
 
 ## `services/api/src/print-sign/print-sign.controller.ts`

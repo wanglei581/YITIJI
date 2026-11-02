@@ -57,6 +57,7 @@ const ALERT_ROW_ICON: Record<AdminAlertItem['type'], ElementType> = {
   print_failed: PrinterIcon,
   paid_pending_file_unavailable: FileWarningIcon,
   feedback_pending: MessageSquareWarningIcon,
+  print_terminal_quota_high: PrinterIcon,
 }
 
 /**
