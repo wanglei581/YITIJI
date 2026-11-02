@@ -1,6 +1,7 @@
 // kiosk-send 两份测试（kiosk-send-receipt.test.mjs / kiosk-send-docs.test.mjs）共用的页面沙箱与替身：常量、夹具、wx 与 api/auth 替身、断言助手。
 import assert from 'node:assert/strict'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { deferred, flush, instantiate, loadPageDefinition } from './page-sandbox.mjs'
 
@@ -20,6 +21,33 @@ export const DEAD_COPY = '二维码已失效或已使用，请回到一体机刷
 export const OCCUPIED_COPY = '这一单已经不能再收文件了。如果一体机屏上有不是你传的文件，请在一体机上点「取消」，再重新扫码。'
 export const REJECT_FALLBACK = '系统没有收下这份文件，可以重新选择后再试'
 export const OFFLINE_COPY = '没连上终端，可以重试。'
+
+/** 小程序共享文案里「未满 14 周岁」那一句（utils/user-error.js SHARED_USER_MESSAGES.AI_AGE_NOT_DECLARED）。 */
+export const AGE_DECLINED_COPY = '未满 14 周岁需要监护人同意后才能使用，小程序暂时办不了'
+
+/**
+ * 年龄确认点「未满」时上传接口拿到的那个错误，用真代码造（#1409）：utils/ai-access.js 的 promptScope
+ * 在提示框选「未满」时抛出它；runAi 先问声明、再发请求，所以这时文件根本没发出去。
+ * 页面引用的是同一份 ai-access 模块，判断用的 isDeclined 也是真的。
+ */
+export async function ageDeclinedError() {
+  const aiAccess = createRequire(path.join(MINIAPP, 'utils', 'entry.js'))('./ai-access.js')
+  const saved = globalThis.wx
+  globalThis.wx = {
+    getStorageSync: () => '',
+    setStorageSync() {},
+    showModal(opts) { opts.success({ confirm: false, cancel: true }) },
+  }
+  try {
+    return await aiAccess.promptScope(aiAccess.AGE_SCOPE).then(
+      () => { throw new Error('选「未满」应当被拒绝') },
+      (err) => err,
+    )
+  } finally {
+    if (saved === undefined) delete globalThis.wx
+    else globalThis.wx = saved
+  }
+}
 export const NOT_KIOSK_COPY = '这不是一体机上的二维码，请扫一体机屏幕上显示的二维码。'
 export const DOC_NOT_FOUND_COPY = '这份文件现在用不了，可能已删除或已过期，请换一份。'
 export const DOC_TOO_LARGE_COPY = '这份文件超过 10MB，这台一体机这一单收不了，请换一份。'
@@ -83,13 +111,16 @@ export function httpError(statusCode, code, message) {
 }
 
 export function makeWx() {
-  const calls = { choose: 0, back: 0, tab: 0, loading: 0, hide: 0, modal: [], navigate: [], redirect: [] }
+  const calls = { choose: 0, media: [], back: 0, tab: 0, loading: 0, hide: 0, modal: [], navigate: [], redirect: [] }
   let chosen = null
+  let media = null
   let modalConfirm = true
   let redirectFails = false
   return {
     calls,
     setChosen(file) { chosen = file },
+    /** 拍照或相册选回来的那张（#1363）：{ tempFilePath, size }；null 表示用户取消。 */
+    setMedia(file) { media = file },
     setModalConfirm(value) { modalConfirm = value },
     setRedirectFails(value) { redirectFails = value },
     showLoading() { calls.loading += 1 },
@@ -101,6 +132,14 @@ export function makeWx() {
         return
       }
       opts.success({ tempFiles: [chosen] })
+    },
+    chooseMedia(opts) {
+      calls.media.push({ count: opts.count, mediaType: opts.mediaType, sourceType: opts.sourceType, sizeType: opts.sizeType })
+      if (!media) {
+        opts.fail({ errMsg: 'chooseMedia:fail cancel' })
+        return
+      }
+      opts.success({ tempFiles: [media] })
     },
     navigateBack(opts) {
       calls.back += 1
