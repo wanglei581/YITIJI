@@ -22,6 +22,15 @@ export type TerminalSessionState = 'checking' | 'ready' | 'failed'
 let state: TerminalSessionState = API_MODE === 'http' && !HAS_E2E_MOCK_TOKEN ? 'checking' : 'ready'
 let refreshTimer: number | null = null
 const listeners = new Set<(next: TerminalSessionState) => void>()
+let licenseRenewalRejected = false
+const licenseRejectionListeners = new Set<() => void>()
+
+export function wasTerminalLicenseRenewalRejected(): boolean { return licenseRenewalRejected }
+export function clearTerminalLicenseRenewalRejection(): void { licenseRenewalRejected = false }
+export function subscribeTerminalLicenseRenewalRejected(listener: () => void): () => void {
+  licenseRejectionListeners.add(listener)
+  return () => { licenseRejectionListeners.delete(listener) }
+}
 
 function setState(next: TerminalSessionState): void {
   state = next
@@ -105,6 +114,7 @@ async function exchangeBootTicket(bootTicket: string, timeoutMs: number): Promis
   } finally {
     saveToken(sessionToken)
   }
+  licenseRenewalRejected = false
 }
 
 /**
@@ -167,6 +177,7 @@ let refreshInflight: Promise<void> | null = null
 // 并发业务请求同时遇到 401 时共享同一次刷新，避免向 /session-token/refresh 涌入多次请求。
 function retryRefresh(): Promise<void> {
   if (refreshInflight) return refreshInflight
+  if (licenseRenewalRejected) return Promise.reject(new ApiHttpError('TERMINAL_LICENSE_INACTIVE', '', 403))
   refreshInflight = retryRefreshOnce().finally(() => { refreshInflight = null })
   return refreshInflight
 }
@@ -189,6 +200,12 @@ async function retryRefreshOnce(): Promise<void> {
       return
     } catch (error) {
       lastError = error
+      if (error instanceof ApiHttpError && error.status === 403 && error.code === 'TERMINAL_LICENSE_INACTIVE') {
+        licenseRenewalRejected = true
+        setState('ready')
+        licenseRejectionListeners.forEach((listener) => listener())
+        throw error
+      }
       if (!transient(error)) break
     }
   }
@@ -229,6 +246,12 @@ export function initializeTerminalSession(): Promise<void> {
   if (initInflight) return initInflight
   initInflight = initializeTerminalSessionOnce().finally(() => { initInflight = null })
   return initInflight
+}
+
+/** 授权暂停后的低频复查；由授权闸门负责限频。 */
+export function recheckTerminalSessionAfterLicensePause(): Promise<void> {
+  clearTerminalLicenseRenewalRejection()
+  return initializeTerminalSession()
 }
 
 async function initializeTerminalSessionOnce(): Promise<void> {

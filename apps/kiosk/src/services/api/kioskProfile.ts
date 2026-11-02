@@ -1,6 +1,6 @@
 import { createElement, useSyncExternalStore } from 'react'
 import { DEFAULT_BRANDING_FILING, DEFAULT_BRAND_MARK, DEFAULT_BRAND_NAME, type PublicKioskProfile } from '@ai-job-print/shared'
-import { subscribeTerminalSession } from '../terminalAuth'
+import { clearTerminalLicenseRenewalRejection, subscribeTerminalLicenseRenewalRejected, subscribeTerminalSession } from '../terminalAuth'
 import { API_BASE_URL } from './client'
 import { getTerminalId, subscribeTerminalIdentity } from './screensaver'
 
@@ -22,7 +22,7 @@ export function useKioskProfile(): PublicKioskProfile {
   return useSyncExternalStore(subscribeKioskProfile, getKioskProfile, getKioskProfile)
 }
 function publish(next: PublicKioskProfile): void {
-  if (JSON.stringify(profile) === JSON.stringify(next)) return
+  if (next.licenseState !== null && next.acceptsNewSessions) clearTerminalLicenseRenewalRejection()
   profile = next
   listeners.forEach((listener) => listener())
 }
@@ -91,7 +91,8 @@ export function startKioskProfileKeeper(): () => void {
   const unsubscribeSession = subscribeTerminalSession((state) => {
     if (state === 'ready' || state === 'failed') void refreshKioskProfile()
   })
-  return () => { window.clearInterval(timer); unsubscribeIdentity(); unsubscribeSession(); generation++ }
+  const unsubscribeRejection = subscribeTerminalLicenseRenewalRejected(() => { void refreshKioskProfile() })
+  return () => { window.clearInterval(timer); unsubscribeIdentity(); unsubscribeSession(); unsubscribeRejection(); generation++ }
 }
 
 /** 图标加载失败时保留字标。 */
