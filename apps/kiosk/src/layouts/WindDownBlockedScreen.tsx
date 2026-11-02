@@ -1,8 +1,11 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { QxTouchIcon, type QxTouchIconName } from '../components/qingxu/touch/QxTouchIcon'
 import { KioskStageFit } from '../components/kiosk-shell/KioskStageFit'
-import { LICENSE_NO_NEW_TASK_REASON, licenseWindDownLine } from '../copy/unattendedCopy'
-import { Hit } from '../pages/public-touch/PublicBlocks'
+import { MINIAPP_DISPLAY_NAME } from '../copy/miniappLinkCopy'
+import { LICENSE_NO_NEW_TASK_REASON, licenseWindDownLine, machineUnusableLine, whenMiniapp, type PublicSupportContact } from '../copy/unattendedCopy'
+import { useSupportContactSnapshot } from '../hooks/useSupportContact'
+import { ArtBox, Card, Hit } from '../pages/public-touch/PublicBlocks'
+import { IllusMachine } from '../pages/public-touch/PublicIllus'
 import { PublicTouchFrame } from '../pages/public-touch/PublicTouchFrame'
 import { useKioskLicense } from './KioskLicenseContext'
 import '../pages/placeholders/system-state-qx.css'
@@ -15,11 +18,43 @@ const EXITS: { title: string; sub: string; to: string; icon: QxTouchIconName }[]
   { title: '回首页', sub: '不开始新的办理', to: '/', icon: 'home' },
 ]
 
+/** 机器状态稿上的状态卡（k9s-cap）。整句放在名称上，不退成 of-truth 那种一行小字。 */
+function FactCard({
+  tone,
+  icon,
+  title,
+  detail,
+  status = false,
+}: {
+  tone: 'wheat' | 'clay' | 'slate'
+  icon: QxTouchIconName
+  title: string
+  detail?: string
+  status?: boolean
+}) {
+  return (
+    <div className="k9s-cap" role={status ? 'status' : undefined}>
+      <span className="k9s-ic" data-tone={tone} aria-hidden="true"><QxTouchIcon name={icon} size={32} /></span>
+      <span className="k9s-cap-main">
+        <span className="k9s-cap-name">{title}</span>
+        {detail ? <span className="k9s-cap-dep">{detail}</span> : null}
+      </span>
+    </div>
+  )
+}
+
+/** 小程序未发布时为空串，调用方不画这一块。 */
+function recordsOnPhone(contact: PublicSupportContact): string {
+  return whenMiniapp(contact, `打开${MINIAPP_DISPLAY_NAME}小程序「我的」，记录都在。`)
+}
+
 export function WindDownBlockedScreen() {
   const navigate = useNavigate()
   const location = useLocation()
+  const contact = useSupportContactSnapshot()
   const { endsAt } = useKioskLicense()
   const remaining = endsAt ? Date.parse(endsAt) - Date.now() : NaN
+  const onPhone = recordsOnPhone(contact)
   const goBack = () => {
     if (window.history.length <= 1 || location.key === 'default') navigate('/', { replace: true })
     else navigate(-1)
@@ -43,7 +78,9 @@ export function WindDownBlockedScreen() {
           )}
         >
           <div className="of-page">
-            {Number.isFinite(remaining) && <p className="qxp-note of-truth">{licenseWindDownLine(Math.max(1, Math.ceil(remaining / 60_000)))}</p>}
+            {Number.isFinite(remaining) ? (
+              <FactCard tone="wheat" icon="clock" status title={licenseWindDownLine(Math.max(1, Math.ceil(remaining / 60_000)))} />
+            ) : null}
             <h2 className="qxt-sec" id="wind-down-exits">现在可以做的<small>都不开始新的办理</small></h2>
             <ul className="of-list of-actions" aria-labelledby="wind-down-exits">
               {EXITS.map((item) => (
@@ -59,6 +96,11 @@ export function WindDownBlockedScreen() {
                 </li>
               ))}
             </ul>
+            {onPhone ? <FactCard tone="slate" icon="phone" title="在手机上也能看" detail={onPhone} /> : null}
+            <FactCard tone="clay" icon="call" status title={machineUnusableLine(contact)} />
+            <Card className="of-machine">
+              <ArtBox><IllusMachine /></ArtBox>
+            </Card>
           </div>
         </PublicTouchFrame>
       </KioskStageFit>
