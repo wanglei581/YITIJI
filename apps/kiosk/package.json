@@ -48,6 +48,7 @@
     "verify:kiosk-session-reporting": "node scripts/verify-kiosk-session-reporting.mjs && node --test scripts/tests/kiosk-session-reporting.test.mjs",
     "verify:kiosk-support-contact": "node --test scripts/tests/unattended-copy.test.mjs scripts/tests/interview-unattended-copy.test.mjs scripts/tests/miniapp-link-copy.test.mjs scripts/tests/kiosk-code-link.test.mjs",
     "verify:kiosk-brand-display": "node scripts/verify-kiosk-brand-display.mjs",
+    "verify:kiosk-license-gate": "node --test scripts/tests/kiosk-license-gate.test.mjs",
     "verify:kiosk-unattended-copy": "node scripts/verify-kiosk-unattended-copy.mjs",
     "verify:kiosk-end-use": "node scripts/verify-kiosk-end-use.mjs && node --test scripts/tests/kiosk-end-use.test.mjs",
     "verify:p39-print-hub-fidelity": "node scripts/verify-p39-print-hub-fidelity.mjs",
