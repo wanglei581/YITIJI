@@ -21,11 +21,15 @@ import {
   type ScanDeletionAudit,
 } from './db'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
+import { SCAN_DEVICE_DELETION_REASONS } from './scan-device/scan-temp-dir'
 import type {
   AgentConfig,
   ScanDeletionAuditReportPayload,
   ScanDeletionAuditReportResponse,
 } from './types'
+
+/** 与 scan-temp-dir 的原因码列表同源，再加面板路线原有的未领取过期。不要另抄六个数。 */
+const REPORTABLE_REASON_CODES = new Set<string>(['UNCLAIMED_TTL_EXPIRED', ...SCAN_DEVICE_DELETION_REASONS])
 
 const REPORT_INTERVAL_MS = 60_000
 const BASE_DELAY_MS = 30_000
@@ -56,7 +60,7 @@ function safeEventLabel(eventId: string): string {
 function buildPayload(event: ScanDeletionAudit): ScanDeletionAuditReportPayload {
   return {
     eventId: event.eventId,
-    reasonCode: 'UNCLAIMED_TTL_EXPIRED',
+    reasonCode: event.reasonCode as ScanDeletionAuditReportPayload['reasonCode'],
     identifierHash: event.identifierHash,
     createdAt: event.createdAt,
     deletedAt: event.deletedAt,
@@ -80,6 +84,10 @@ export async function processScanDeletionAuditReport(
   const { terminalId, agentToken, apiBaseUrl } = config
   if (!terminalId || !agentToken) return 'skipped'
   if (isUnauthorized()) return 'paused_unauthorized'
+  if (!REPORTABLE_REASON_CODES.has(event.reasonCode)) {
+    deadLetterScanDeletionAuditReport(db, event.eventId, 'REASON_CODE_UNSUPPORTED')
+    return 'processed'
+  }
 
   const payload = buildPayload(event)
   try {
