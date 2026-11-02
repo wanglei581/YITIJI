@@ -1,3 +1,4 @@
+import { kioskBrandMark, useKioskProfile } from '../../../services/api/kioskProfile'
 // HomeHeroHeader — 首页 Hero 顶行（稿 01-home `.hero-top`）：品牌 · 终端号 · 设备状态 · 时钟。
 // 首页不走 QxPageFrame 的独立顶栏，品牌在 Hero 内，并承担全页唯一的 h1。
 // 仍挂 qx-topbar / qx-pill：设备状态胶囊的测试锚点是 `.qx-topbar .qx-pill`。
@@ -32,11 +33,12 @@ function QxHomeClock() {
 
 // 2.0 首页头：品牌 + 「就业服务大厅」+ 状态胶囊与时钟（v2 01-home）。终端编号不上屏，报修时在帮助页找。
 export function HomeHeroHeader({ deviceStatus }: HomeHeroHeaderProps) {
+  const brand = useKioskProfile()
   return (
     <header className="qx-topbar qx-home-hero-top">
-      <span className="qx-topbar-mark" aria-hidden="true">职</span>
+      <span className="qx-topbar-mark" aria-hidden="true">{kioskBrandMark(brand)}</span>
       <div className="qx-home-brand">
-        <h1 className="qx-topbar-brand">职易达</h1>
+        <h1 className="qx-topbar-brand">{brand.brandName}</h1>
         <span className="qx-topbar-sub">就业服务大厅</span>
       </div>
       <span className="qx-topbar-spacer" />

@@ -1,5 +1,6 @@
 import type { Page, Route } from '@playwright/test'
 import { KIOSK_AI_CAPABILITIES_PATH, kioskAiCapabilitiesResponse } from './ai-capabilities'
+import { kioskProfileBody, UNVERIFIED_KIOSK_PROFILE } from './kiosk-profile'
 import { RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from './recruitment-hosting'
 import { SELF_ASSESSMENT_QUESTIONS_PATH, selfAssessmentQuestionsResponse } from './self-assessment-questions'
 
@@ -106,6 +107,14 @@ export class ApiRouter {
           miniappPublished: false,
         },
       },
+    })
+    // 一体机贴牌与授权信号：运行时根在每个终端业务页挂载时读一次（之后每 3 分钟续读）。
+    // 默认按「没验过签」应答——接口对没带有效会话票的请求就是这个答案：平台默认品牌，没有授权状态，
+    // acceptsNewSessions 为 true（不知道、不拦）。授权闸门只认 licenseState 非空的答复，所以既有用例的品牌、
+    // 入口与流程一概不变。要看贴牌或授权三态的用例自行 respond / route 覆盖（见 kiosk-license-gate.spec.ts）。
+    this.respond('GET', '/api/v1/public/kiosk-profile', {
+      status: 200,
+      json: kioskProfileBody(UNVERIFIED_KIOSK_PROFILE),
     })
     // 包 N2：/campus/freshman-insights 挂载时读校招聚合。默认空集合，避免冒烟撞 Unhandled API。
     this.respond('GET', '/api/v1/kiosk/campus/recruitment-stats', {

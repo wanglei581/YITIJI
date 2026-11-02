@@ -22,6 +22,23 @@ export type TerminalSessionState = 'checking' | 'ready' | 'failed'
 let state: TerminalSessionState = API_MODE === 'http' && !HAS_E2E_MOCK_TOKEN ? 'checking' : 'ready'
 let refreshTimer: number | null = null
 const listeners = new Set<(next: TerminalSessionState) => void>()
+let licenseRenewalRejected = false
+const licenseRejectionListeners = new Set<() => void>()
+
+export function wasTerminalLicenseRenewalRejected(): boolean { return licenseRenewalRejected }
+export function clearTerminalLicenseRenewalRejection(): void { licenseRenewalRejected = false }
+export function subscribeTerminalLicenseRenewalRejected(listener: () => void): () => void {
+  licenseRejectionListeners.add(listener)
+  return () => { licenseRejectionListeners.delete(listener) }
+}
+
+function recordLicenseRejection(error: unknown, keepSessionReady = false): boolean {
+  if (!(error instanceof ApiHttpError && error.status === 403 && error.code === 'TERMINAL_LICENSE_INACTIVE')) return false
+  licenseRenewalRejected = true
+  if (keepSessionReady) setState('ready')
+  licenseRejectionListeners.forEach((listener) => listener())
+  return true
+}
 
 function setState(next: TerminalSessionState): void {
   state = next
@@ -96,7 +113,11 @@ async function exchangeBootTicket(bootTicket: string, timeoutMs: number): Promis
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ bootTicket }),
   }, timeoutMs)
-  if (!response.ok) throw await asHttpError(response)
+  if (!response.ok) {
+    const error = await asHttpError(response)
+    recordLicenseRejection(error)
+    throw error
+  }
   const payload = (await response.json()) as { sessionToken?: string }
   if (!payload.sessionToken) throw new ApiHttpError('TERMINAL_SESSION_INVALID', '这台机器的安全校验没通过', 401)
   const sessionToken = payload.sessionToken
@@ -105,6 +126,7 @@ async function exchangeBootTicket(bootTicket: string, timeoutMs: number): Promis
   } finally {
     saveToken(sessionToken)
   }
+  licenseRenewalRejected = false
 }
 
 /**
@@ -167,6 +189,7 @@ let refreshInflight: Promise<void> | null = null
 // 并发业务请求同时遇到 401 时共享同一次刷新，避免向 /session-token/refresh 涌入多次请求。
 function retryRefresh(): Promise<void> {
   if (refreshInflight) return refreshInflight
+  if (licenseRenewalRejected) return Promise.reject(new ApiHttpError('TERMINAL_LICENSE_INACTIVE', '', 403))
   refreshInflight = retryRefreshOnce().finally(() => { refreshInflight = null })
   return refreshInflight
 }
@@ -189,6 +212,9 @@ async function retryRefreshOnce(): Promise<void> {
       return
     } catch (error) {
       lastError = error
+      if (recordLicenseRejection(error, true)) {
+        throw error
+      }
       if (!transient(error)) break
     }
   }
@@ -229,6 +255,14 @@ export function initializeTerminalSession(): Promise<void> {
   if (initInflight) return initInflight
   initInflight = initializeTerminalSessionOnce().finally(() => { initInflight = null })
   return initInflight
+}
+
+/** 授权暂停后的低频复查；由授权闸门负责限频。 */
+export function recheckTerminalSessionAfterLicensePause({ credentialExpired }: { credentialExpired: boolean } = { credentialExpired: false }): Promise<void> {
+  clearTerminalLicenseRenewalRejection()
+  // 凭证已过期：清掉过期票，初始化就会走「没有存量票 → 向本机 Agent 重新取票」，而不是拿过期票去续期。
+  if (credentialExpired) { try { window.sessionStorage.removeItem(STORAGE_KEY) } catch { /* storage unavailable */ } }
+  return initializeTerminalSession()
 }
 
 async function initializeTerminalSessionOnce(): Promise<void> {

@@ -1,3 +1,6 @@
+import { LicenseLock } from '../../layouts/LicenseLock'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
+import { useKioskLicense } from '../../layouts/KioskLicenseContext'
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
@@ -25,6 +28,7 @@ export function ProfilePage() {
 }
 
 function ProfileContent() {
+  const winding = useKioskLicense().mode === 'winding-down'
   const navigate = useNavigate()
   const location = useLocation()
   const { user, isLoggedIn, displayName, getToken } = useAuth()
@@ -124,7 +128,7 @@ function ProfileContent() {
   // 待办里的「继续付款 / 看出纸进度 / 去首页开始」在待办卡上。
   const dock = uiState === 'signed-out'
     ? (
-      <button type="button" className="qx-btn" data-variant="primary" data-grow="1" data-testid="profile-primary" onClick={goLogin}>
+      <button type="button" className="qx-btn" data-variant="primary" data-grow="1" data-testid="profile-primary" disabled={winding} onClick={goLogin}>
         <span data-testid="profile-login">去登录</span>
       </button>
     )
@@ -156,13 +160,14 @@ function ProfileContent() {
         status={status}
         backLabel="返回首页"
         onBack={() => navigate('/')}
-        ask={signedIn
+        ask={winding ? { label: '问小青', disabled: true } : signedIn
           ? { label: '问小青：我的记录在哪里找？', draft: '我的简历、文档和打印订单在哪里找？离开前应该怎样结束使用？' }
           : { label: '问小青：不登录能办什么？', draft: '不登录能办什么？' }}
         primaryNode={dock}
       >
         <div className="qx-scroll qx-grow me-page">
-          {uiState === 'signed-out' ? <MeProfileGuest contact={support} /> : null}
+          {winding ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : null}
+          {uiState === 'signed-out' ? <LicenseLock><MeProfileGuest contact={support} /></LicenseLock> : null}
 
           {uiState === 'loading' ? <MeProfileLoading /> : null}
 
@@ -183,9 +188,9 @@ function ProfileContent() {
                 onOpenSettings={() => navigate('/me/settings')}
               />
               {miniappLine ? <p className="me-sync">{miniappLine}</p> : null}
-              <ProfileAssetGrid counts={assetOverview.counts} loading={assetOverview.loading} />
+              <LicenseLock><ProfileAssetGrid counts={assetOverview.counts} loading={assetOverview.loading} /></LicenseLock>
               <ProfileContinueCard task={pendingTask} tasksError={tasksError} empty={uiState === 'empty'} />
-              {uiState === 'empty' ? <EmptyStartRows /> : null}
+              {uiState === 'empty' ? <LicenseLock><EmptyStartRows /></LicenseLock> : null}
               {resumes.length + scans.length + aiRecords.length > 0 ? (
                 <ProfileSessionRecords
                   resumes={resumes}
@@ -197,7 +202,7 @@ function ProfileContent() {
                   onDeleteAiRecord={(id) => setAiRecords((prev) => prev.filter((item) => item.id !== id))}
                 />
               ) : null}
-              <AccountRows few={uiState === 'empty'} />
+              <LicenseLock><AccountRows few={uiState === 'empty'} /></LicenseLock>
               <p className="me-fine">
                 结束使用会退出本机并清除临时信息。已提交的订单与文件按保存期限管理。离开 3 分钟没操作会自动退出。
               </p>
