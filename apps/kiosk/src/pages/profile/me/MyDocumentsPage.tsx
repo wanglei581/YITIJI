@@ -9,7 +9,8 @@ import { MemberLoadMore } from './MemberLoadMore'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { userMessageOf } from '../../../services/api/userErrorMessage'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { FILE_DEFAULT_TTL_HOURS, type FileRetentionPolicy, type FileRetentionUpdateRequest, type MemberDocumentItem } from '@ai-job-print/shared'
+import { FILE_DEFAULT_TTL_HOURS, canCreateFormalPrintScanTask, type FileRetentionPolicy, type FileRetentionUpdateRequest, type MemberDocumentItem } from '@ai-job-print/shared'
+import { loadConfiguredCapabilities, resolveCapabilityOverride } from '../../../services/api/printScanCapabilities'
 import {
   deleteMyDocument,
   fetchAccessUrl,
@@ -111,6 +112,7 @@ function documentForConvertedPdf(
 ): MemberDocumentItem {
   return items.find((item) => item.id === fileId) ?? {
     ...source,
+    materialCheckRequired: true,
     id: fileId,
     mimeType: 'application/pdf',
     downloadUrlPath: `/files/${fileId}/download-url`,
@@ -142,6 +144,17 @@ export function MyDocumentsPage() {
   const [retentionConfirm, setRetentionConfirm] = useState<{ fileId: string; policy: SelectableRetentionPolicy } | null>(null)
   const [convertingId, setConvertingId] = useState<string | null>(null)
   const [openDocId, setOpenDocId] = useState<string | null>(null)
+  const [signCapability, setSignCapability] = useState<'loading' | 'ready' | 'closed' | 'error'>('loading')
+  useEffect(() => {
+    let active = true
+    void loadConfiguredCapabilities().then((result) => {
+      if (!active) return
+      if (result.status === 'error') { setSignCapability('error'); return }
+      const override = resolveCapabilityOverride(result, 'signature_stamp')
+      setSignCapability(!override || canCreateFormalPrintScanTask(override.status) ? 'ready' : 'closed')
+    })
+    return () => { active = false }
+  }, [])
   const miniappLine = whenMiniapp(useSupportContact(isLoggedIn), '在手机小程序登录后传的文件也会出现在这里。')
 
   const token = getToken()
@@ -210,8 +223,7 @@ export function MyDocumentsPage() {
         fileUrl: res.printFileUrl,
         mimeType: doc.mimeType,
       }
-      // 本人原件：生产隐私闸门要求先做完隐私检查才建单，检查只在打印台材料检查里做；
-      // 派生产物（AI 报告、优化稿……）免检查，直达报价确认页。入口由 printHandoffPolicy 按 requiresCheck 定。
+      // 接口给出的检查策略决定入口；旧接口缺字段时保守检查。
       // 写法与打印上传页相同：先整份写打印交接上下文（旧检查结论、旧参数一并作废），跳转只带交接编号。
       const requiresCheck = documentNeedsPrintMaterialCheck(doc, convertedFrom)
       startPrint({
@@ -404,8 +416,8 @@ export function MyDocumentsPage() {
                       </MeBtn>
                     ) : null}
                     {doc.mimeType === 'application/pdf' && SIGNABLE_PURPOSES.has(doc.purpose) ? (
-                      <MeBtn v="sec" disabled={isAnyPending} onClick={() => void signStamp(doc)}>
-                        {signingId === doc.id ? '准备中' : '签名'}
+                      <MeBtn v="sec" disabled={isAnyPending || signCapability !== 'ready'} onClick={() => void signStamp(doc)}>
+                        {signCapability === 'loading' ? '签名 · 检查中' : signCapability === 'error' ? '签名 · 服务状态无法确认' : signCapability === 'closed' ? '签名 · 本机暂未开通' : signingId === doc.id ? '准备中' : '签名'}
                       </MeBtn>
                     ) : null}
                     <MeBtn

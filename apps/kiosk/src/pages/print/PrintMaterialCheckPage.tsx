@@ -438,7 +438,15 @@ export function PrintMaterialCheckPage({
         setStage('error')
         return
       }
-      if (err instanceof ApiHttpError && [403, 404, 410].includes(err.status)) {
+      if (err instanceof ApiHttpError && err.status === 403) {
+        // 403 不清本地材料会话：清了屏上就会变成「没有待处理的文件」，把被拒说成没文件（走查 R-08）。
+        setError(getToken()
+          ? '这份文件现在不能做材料检查。请重新导入一次，或结束使用后以游客身份再试。'
+          : '这份文件现在不能做材料检查。请重新导入一次再试。')
+        setStage('error')
+        return
+      }
+      if (err instanceof ApiHttpError && [404, 410].includes(err.status)) {
         clearStaleSession()
       }
       setError(userMessageOf(err, '材料检查失败，请重试'))

@@ -129,6 +129,8 @@ expectMatches(
     fail(`我的文档的原件分流判据与服务端建单闸门不一致 — 服务端 ${JSON.stringify(server)}，一体机 ${JSON.stringify(kiosk)}`)
   }
 }
+// 走查 R-04（11/02）：接口给出的 materialCheckRequired 优先于按用途猜（照片合成 PDF 是派生件但要查）；上面用途清单与服务端一致的核对照旧。
+expectMatches(read('src/pages/profile/me/components/documentReprint.ts'), /if \(typeof doc\.materialCheckRequired === 'boolean'\) return doc\.materialCheckRequired/, '我的文档重印：接口 materialCheckRequired 为布尔值时优先采用')
 expectIncludes(page, "doc.mimeType === 'application/pdf' || doc.mimeType === 'image/jpeg' || doc.mimeType === 'image/png'", '我的文档保留可打印 MIME 白名单')
 expectIncludes(page, '该文件格式暂不支持打印', '我的文档保留不可打印格式说明')
 

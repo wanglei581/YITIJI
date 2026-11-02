@@ -17,6 +17,7 @@ export type PiiFindingAction = 'pending' | 'keep' | 'redact'
 export interface MaterialsRequester {
   kind: 'anonymous' | 'member'
   endUserId?: string
+  /** 无归属任务的访问令牌，游客与会员均可携带。 */
   accessToken?: string
 }
 
