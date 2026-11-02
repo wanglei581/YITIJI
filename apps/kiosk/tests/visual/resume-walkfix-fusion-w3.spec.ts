@@ -216,11 +216,29 @@ test('本人预览时填写的数字和职责词不归给 AI @w3-kiosk', async (
   await fillGenerateFormToReview(page)
   await page.getByRole('button', { name: /让 AI 整理成新简历/ }).click()
   const description = page.getByRole('textbox', { name: '工作经历描述 1' })
+  // 先确认橙条确实在（AI 写的 1500、0.5%），否则后面「整条不出现」会在橙条压根没渲染时空过。
+  await expect(page.locator('.qx-rd-pending')).toContainText('待本人确认：1500、0.5%')
   await description.fill('本人主导 2800 件，差错率 0.8%')
+  // 本人把描述整段换掉后：AI 写的 1500、0.5% 已不在稿里，本人的 2800、0.8%、主导又不归给 AI，橙条整条不该渲染。
+  // 不能写成 expect(banner).not.toContainText(...)：Playwright 对「找不到元素」的否定文本断言判失败（Received: <element(s) not found>）。
+  await expect(page.locator('.qx-rd-pending')).toHaveCount(0)
+})
+
+// 撞词：本人先把描述清空，再把 AI 写过的 1500、0.5% 自己敲回去。这两个数此刻是本人敲的，不能再算成 AI 新加的。
+// 上一条里本人写的是 AI 没写过的词，只看「生成稿里有没有这个词」就挡得住；这一条的词生成稿里本来就有，
+// 只有「预览中本人新加的词」这一支（userAdditions）能把它们排除，所以单独成一条。
+test('本人把 AI 写过的数字敲回去，不再算 AI 新加的 @w3-kiosk', async ({ page, api }) => {
+  generateShell(api)
+  await fillGenerateFormToReview(page)
+  await page.getByRole('button', { name: /让 AI 整理成新简历/ }).click()
   const banner = page.locator('.qx-rd-pending')
-  await expect(banner).not.toContainText('2800')
-  await expect(banner).not.toContainText('0.8%')
-  await expect(banner).not.toContainText('主导')
+  await expect(banner).toContainText('待本人确认：1500、0.5%')
+  const description = page.getByRole('textbox', { name: '工作经历描述 1' })
+  await description.fill('')
+  await expect(banner).toHaveCount(0)
+  await description.fill('日均分拣约 1500 件，错分率 0.5%')
+  await expect(description).toHaveValue('日均分拣约 1500 件，错分率 0.5%')
+  await expect(banner).toHaveCount(0)
 })
 
 // ── I-19 ───────────────────────────────────────────────────────────────────
