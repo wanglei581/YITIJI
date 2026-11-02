@@ -27,7 +27,10 @@ import { resolveJwtSecret } from '../src/common/jwt-verifier.module'
 import { RedisService } from '../src/common/redis/redis.service'
 import type { FilePurpose } from '../src/files/file.types'
 import { FilesService } from '../src/files/files.service'
+import { UPLOAD_SESSION_ORDER_ONLY_REASON } from '../src/files/retention-policy'
 import { MemberAssetsService } from '../src/member-assets/member-assets.service'
+import { MemberDataExportMapper } from '../src/member-privacy/member-data-export.mapper'
+import { AppendedSelfAssessmentService } from '../src/ai/resume/appended-self-assessment.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { StorageService } from '../src/storage/storage.service'
 import { UploadSessionsController } from '../src/upload-sessions/upload-sessions.controller'
@@ -314,14 +317,48 @@ async function onlyListedDocumentsAreAccepted(h: Harness, K: string): Promise<vo
   await h.prisma.fileObject.update({ where: { id: expiredBig }, data: { expiresAt: new Date(Date.now() - 60_000) } })
   const dataExport = await document(h, K, '王晓雯-个人数据导出.txt', Buffer.from('{"profile":{}}'), 'text/plain')
   await h.prisma.fileObject.update({ where: { id: dataExport }, data: { purpose: 'member_data_export', mimeType: 'application/json' } })
+  const orderOnly = await document(h, K, '王晓雯-身份证正反面.pdf', buildRealPdf(1), 'application/pdf', 'print_doc')
+  await h.prisma.fileObject.update({ where: { id: orderOnly }, data: { retentionLockedReason: UPLOAD_SESSION_ORDER_ONLY_REASON } })
+  // 真 FilesService.upload(orderOnly)：派生件（打印前 Word 转 PDF、图片拼 PDF）落的就是这把锁，会员简历也不走 90 天。
+  h.filenames.add('王晓雯-简历-转换稿.pdf')
+  const orderOnlyDerived = (await h.files.upload({
+    buffer: buildRealPdf(1), filename: '王晓雯-简历-转换稿.pdf', mimeType: 'application/pdf', purpose: 'resume_upload',
+    uploaderId: null, endUserId: K, assetCategory: 'derived', derivationKind: 'format_conversion', orderOnly: true,
+  })).fileId
+  h.fileIds.add(orderOnlyDerived)
+  const derivedRow = await h.prisma.fileObject.findUniqueOrThrow({ where: { id: orderOnlyDerived } })
+  assert.equal(derivedRow.retentionLockedReason, UPLOAD_SESSION_ORDER_ONLY_REASON)
+  assert.equal(derivedRow.retentionPolicy, 'system_short', 'order-only member resume must not get the 90-day default')
+  assert.equal(derivedRow.endUserId, K, 'order-only file still belongs to the member')
+  // 打印副本（格式转换 / 签章 / 隐私遮挡）不传 orderOnly 也按 sourceFileId 跟锁；原件没锁时副本不锁（对照）。
+  const copyOf = async (sourceFileId: string, derivationKind: 'format_conversion' | 'signature' | 'pii_redaction', name: string) => {
+    h.filenames.add(name)
+    const id = (await h.files.upload({
+      buffer: buildRealPdf(1), filename: name, mimeType: 'application/pdf', purpose: 'print_doc',
+      uploaderId: null, endUserId: K, assetCategory: 'derived', derivationKind, sourceFileId,
+    })).fileId
+    h.fileIds.add(id)
+    return { id, lock: (await h.prisma.fileObject.findUniqueOrThrow({ where: { id } })).retentionLockedReason }
+  }
+  const printCopies: string[] = []
+  for (const kind of ['format_conversion', 'signature', 'pii_redaction'] as const) {
+    const copy = await copyOf(orderOnly, kind, `王晓雯-身份证-${kind}.pdf`)
+    assert.equal(copy.lock, UPLOAD_SESSION_ORDER_ONLY_REASON, `${kind} copy of an order-only file must inherit the lock`)
+    printCopies.push(copy.id)
+  }
+  const normalSource = await document(h, K, '王晓雯-求职信-定稿.pdf', buildRealPdf(1))
+  const normalCopy = await copyOf(normalSource, 'signature', '王晓雯-求职信-签章合成.pdf')
+  assert.equal(normalCopy.lock, null, 'copy of a normal file stays unlocked')
   const listedPdf = await document(h, K, '王晓雯-个人简历-投递版.pdf', buildRealPdf(1))
-  const notListed = { contract, sessionOnly, signature, jobFit, expiredBig }
+  const notListed = { contract, sessionOnly, orderOnly, orderOnlyDerived, signature, jobFit, expiredBig }
 
   const listed = await new MemberAssetsService(h.prisma).listDocuments(K, { cursor: null, pageSize: 50 })
   const listedIds = new Set(listed.items.map((item) => item.id))
   assert.ok(listedIds.has(listedPdf), 'positive control: a normal document is listed')
   for (const [name, id] of Object.entries(notListed)) assert.equal(listedIds.has(id), false, `${name} must not be listed`)
-  pass('A 对照真 listDocuments：合同原件 / 会话专用 / 签名图 / 系统岗位匹配 / 已过期都不在「我的文档」，普通简历在')
+  for (const id of printCopies) assert.equal(listedIds.has(id), false, 'print copies of an order-only file must not be listed')
+  assert.ok(listedIds.has(normalCopy.id), 'positive control: a print copy of a normal file is listed')
+  pass('A 对照真 listDocuments：合同原件 / 会话专用 / 只用于这一单（含不传参数自动跟锁的三种打印副本）/ 签名图 / 系统岗位匹配 / 已过期都不在「我的文档」，普通简历在')
 
   const { service, redis } = freshService(h)
   const session = await kioskSession(service)
@@ -337,7 +374,7 @@ async function onlyListedDocumentsAreAccepted(h: Harness, K: string): Promise<vo
       assert.equal(await redis.get(`upload_session:${session.sessionId}`), before, `${name}: session must not be written`)
     }
     assert.equal(reads.count, 0, 'not-listed files must be refused before reading bytes')
-    pass('A 本人合同原件 / 会话专用 / 签名图 / 系统岗位匹配 / 已过期且登记 >10MB：同一个 404、没读字节、会话一字不动')
+    pass('A 本人合同原件 / 会话专用 / 只用于这一单 / 签名图 / 系统岗位匹配 / 已过期且登记 >10MB：同一个 404、没读字节、会话一字不动')
     const exported = await rejectionOf(() => push(service, session, dataExport, K))
     expectError(exported, 404, 'FILE_NOT_FOUND', 'member_data_export')
     assert.deepEqual(exported.body, { error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' } })
@@ -399,7 +436,28 @@ async function memberSessionSamePersonAndArchive(h: Harness, K: string, M: strin
   const kAfter = await h.prisma.fileObject.findUniqueOrThrow({ where: { id: kFile } })
   assert.equal(kAfter.deletedAt, null)
   assert.equal(kAfter.storageKey, kOriginal.storageKey)
-  pass('f member 会话确认后走现有归档：K 的文件库多一份、匿名对象被释放、原件不动')
+  // 只用于这一单（11/02 拍板）：副本挂 K 名下（后面按本人校验），但锁住、系统短期、「我的文档」不列。
+  assert.equal(archived.retentionLockedReason, UPLOAD_SESSION_ORDER_ONLY_REASON)
+  assert.equal(archived.retentionPolicy, 'system_short')
+  assert.equal(archived.expiresAt?.getTime(), anonymous.expiresAt?.getTime(), '到期沿用匿名副本的短期，确认不续期')
+  const kDocs = await new MemberAssetsService(h.prisma).listDocuments(K, { cursor: null, pageSize: 50 })
+  const kDocIds = kDocs.items.map((item) => item.id)
+  assert.equal(kDocIds.includes(copyId), false, 'the order-only copy must not show up in K documents')
+  assert.equal(kDocIds.filter((id) => id === kFile).length, 1, 'the original stays listed exactly once')
+  // 本人数据导出（真库跑 mapper）：只用于这一单的副本不进清单（可能是旁人的文件），原件照常在。
+  const exported = await new MemberDataExportMapper(h.prisma).build({ endUserId: K, requestId: 'verify-order-only' })
+  const exportedIds = JSON.stringify(exported)
+  assert.equal(exportedIds.includes(copyId), false, 'the order-only copy must not be in K data export')
+  assert.equal(exportedIds.includes(kFile), true, 'positive control: the original is in K data export')
+  // 到期清理后的删除记录：只用于这一单的副本不列（文件名可能是旁人的），普通文件照常列（对照）。
+  const deletedNormal = await document(h, K, '王晓雯-旧版简历-作废.pdf', buildRealPdf(1))
+  const tombstone = { status: 'deleted', deletedAt: new Date(), deleteReason: 'expired' }
+  await h.prisma.fileObject.update({ where: { id: copyId }, data: tombstone })
+  await h.prisma.fileObject.update({ where: { id: deletedNormal }, data: tombstone })
+  const deletedIds = (await new MemberAssetsService(h.prisma).listDeletedDocuments(K, { cursor: null, pageSize: 50 })).items.map((item) => item.id)
+  assert.equal(deletedIds.includes(copyId), false, 'a cleaned order-only copy must not show in K deleted records')
+  assert.equal(deletedIds.includes(deletedNormal), true, 'positive control: a cleaned normal file is in K deleted records')
+  pass('f member 会话确认后：副本挂 K 名下但只用于这一单（锁住、系统短期、「我的文档」、本人数据导出、清理后的删除记录都不列、不多一份重复的），匿名对象被释放、原件不动')
 
   const open = freshService(h)
   const temporary = await kioskSession(open.service)
@@ -581,6 +639,51 @@ async function httpContract(h: Harness, K: string, M: string): Promise<void> {
   }
 }
 
+// ── h. 自我探索追加：用只用于这一单的简历追加，合出来的 PDF（含整份原简历）跟着锁，「我的文档」和导出都不列 ──
+async function selfAssessmentAppendFollowsLock(h: Harness, K: string): Promise<void> {
+  const taskId = `verify-sa-${randomUUID()}`
+  const aiTaskId = `verify-sa-ai-${randomUUID()}`
+  const dims = ['interest', 'style', 'team', 'value', 'motivation'].map((key) => ({ key, label: key, strength: 3, note: null }))
+  const record = (id: string, summary: string | null) => h.prisma.aiResumeResult.create({
+    data: {
+      taskId: id, kind: 'self_assessment', status: 'completed', provider: 'rules', endUserId: K,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      payloadJson: JSON.stringify({ dimensions: dims, summary, completedAt: new Date().toISOString() }),
+    },
+  })
+  await record(taskId, null)
+  // 含 AI 解读的一路（有 summary）：前面多一道闸门、合并时写 AIGC 标识，最后仍是同一次上传。
+  await record(aiTaskId, '倾向在稳定团队里做细致的执行与协调工作。')
+  try {
+    // 只测合并与落库：报告页用一页真 PDF 代替渲染（渲染另有门禁），审计不落库。
+    const selfAssessment = { renderReportForAppend: async () => ({ buffer: buildRealPdf(1), pageCount: 1 }) }
+    const append = new AppendedSelfAssessmentService(h.prisma, selfAssessment as never, h.files, { write: async () => null } as never)
+    const run = (resumeFileId: string) => append.appendToResume({ taskId, requester: { endUserId: K, accessToken: null }, resumeFileId })
+    const lockedResume = await document(h, K, '李晨阳-简历-手机传来.pdf', buildRealPdf(2))
+    await h.prisma.fileObject.update({ where: { id: lockedResume }, data: { retentionLockedReason: UPLOAD_SESSION_ORDER_ONLY_REASON } })
+    const ownResume = await document(h, K, '王晓雯-简历-自己的.pdf', buildRealPdf(2))
+    const lockedMerged = (await run(lockedResume)).fileId
+    const ownMerged = (await run(ownResume)).fileId
+    h.fileIds.add(lockedMerged)
+    h.fileIds.add(ownMerged)
+    const lockedRow = await h.prisma.fileObject.findUniqueOrThrow({ where: { id: lockedMerged } })
+    assert.equal(lockedRow.retentionLockedReason, UPLOAD_SESSION_ORDER_ONLY_REASON, 'appended PDF built from an order-only resume must inherit the lock')
+    const aiMerged = (await append.appendToResume({ taskId: aiTaskId, requester: { endUserId: K, accessToken: null }, resumeFileId: lockedResume })).fileId
+    h.fileIds.add(aiMerged)
+    const aiRow = await h.prisma.fileObject.findUniqueOrThrow({ where: { id: aiMerged } })
+    assert.equal(aiRow.retentionLockedReason, UPLOAD_SESSION_ORDER_ONLY_REASON, 'AI-interpreted appended PDF of an order-only resume must inherit the lock too')
+    const docIds = (await new MemberAssetsService(h.prisma).listDocuments(K, { cursor: null, pageSize: 50 })).items.map((item) => item.id)
+    assert.equal(docIds.includes(lockedMerged), false, 'appended PDF of an order-only resume must not be in K documents')
+    assert.ok(docIds.includes(ownMerged), 'positive control: appended PDF of K own resume is in K documents')
+    const exported = JSON.stringify(await new MemberDataExportMapper(h.prisma).build({ endUserId: K, requestId: 'verify-sa-append' }))
+    assert.equal(exported.includes(lockedMerged), false, 'appended PDF of an order-only resume must not be in K data export')
+    assert.ok(exported.includes(ownMerged), 'positive control: appended PDF of K own resume is in K data export')
+    pass('h 自我探索追加（只有打分 / 含 AI 解读两路）：用只用于这一单的简历合出来的 PDF 跟着锁，「我的文档」和本人数据导出都不列；用本人自己的简历照常列（对照）')
+  } finally {
+    await h.prisma.aiResumeResult.deleteMany({ where: { taskId: { in: [taskId, aiTaskId] } } })
+  }
+}
+
 async function cleanup(h: Harness): Promise<void> {
   const owned = await h.prisma.fileObject.findMany({ where: { endUserId: { in: h.endUserIds } }, select: { id: true } })
   const strays = await h.prisma.fileObject.findMany({
@@ -625,6 +728,7 @@ async function main(): Promise<void> {
       ['同人校验/f', () => memberSessionSamePersonAndArchive(h, K, M)],
       ['g', () => abandonDeletesOnlyTheCopy(h, K)],
       ['HTTP', () => httpContract(h, K, M)],
+      ['h', () => selfAssessmentAppendFollowsLock(h, K)],
     ]
     for (const [name, run] of cases) {
       try {
