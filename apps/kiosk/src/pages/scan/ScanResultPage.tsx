@@ -99,6 +99,7 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
   const scanType = state.scanType ?? 'document'
   const success = state.success === true
   const reason = state.reason
+  const formatFailure = scanType === 'id' && Boolean(reason?.includes('文件格式不符合证件扫描要求'))
   const shownReason = reason ? scanShownText(reason, '扫描任务未能完成。请返回重试。') : null
   const file = state.file
   const outcome = deriveOutcome(state)
@@ -318,7 +319,11 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
            拒收，代价完全不同，所以文案必须分开，并且由用户自己按下那一个。 */
         dock={{
           left: { label: '返回打印扫描', leaveTo: '/print-scan' },
-          primary: rescanAuthorized
+          primary: formatFailure
+            ? (rescanAuthorized
+              ? { label: '选 JPG 格式重扫（同一份材料）', onClick: handleRetry }
+              : { label: '选 JPG 格式重新扫描', onClick: handlePlainRestart })
+            : rescanAuthorized
             ? { label: '重试扫描（同一份材料）', onClick: handleRetry }
             : { label: '重新开始一次扫描', onClick: handlePlainRestart },
         }}

@@ -436,7 +436,7 @@ export function PrintPreviewPage({
       legacyBody={false}
       kind="compact"
       seal={null}
-      railNow={2}
+      railNow={handoff?.origin === 'my_documents' ? undefined : 2}
       eyebrow="预览与参数"
       title={previewTitle}
       subtitle={PREVIEW_SUB}
@@ -464,7 +464,7 @@ export function PrintPreviewPage({
         <FileThumbCard file={file} token={getToken()} size="lg" pager>
           <span className="qpd-redaction-badge" data-tone={redactionBadge?.tone ?? 'warning'}>
             {exempt
-              ? '系统生成的文件，不需要材料检查 · 请自行核对预览'
+              ? '这份文件不需要材料检查 · 请自行核对预览'
               : <>{materialCheck?.mode === 'demo' ? '材料检查流程演示完成' : '材料检查已完成'}
                 {redactionBadge ? ` · ${redactionBadge.text}` : ' · 遮挡结果未知，请自行核对预览'}</>}
           </span>

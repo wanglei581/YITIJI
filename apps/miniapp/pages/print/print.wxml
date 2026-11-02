@@ -53,7 +53,7 @@
     </view>
 
     <view class="compliance-note">
-      打印状态、出纸完成均以一体机终端实时上报为准；如与实际不符，{{supportHint}}
+      打印状态、出纸完成均以一体机终端实时上报为准；如与实际不符，<text wx:if="{{canCallPhone}}">需要帮助可拨打服务电话 <text class="tap" hover-class="tap-press" bindtap="callSupport" role="button" aria-label="拨打服务电话">{{supportPhone}}</text>{{supportHoursText}}</text><text wx:else>{{supportHint}}</text>
     </view>
 
   </view>

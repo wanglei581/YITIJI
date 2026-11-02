@@ -2008,7 +2008,7 @@ test('documents: derived AI output skips the material check and goes straight to
   registerAuthenticatedShell(api)
   registerPrintConfirm(api)
   api.respond('GET', '/api/v1/me/documents', memberPage([
-    memberDocument({ id: 'doc-ai-report', filename: '简历对照.pdf', assetCategory: 'derived' }),
+    memberDocument({ id: 'doc-ai-report', filename: '简历对照.pdf', assetCategory: 'derived', materialCheckRequired: false }),
   ]))
   api.respond('GET', '/api/v1/files/doc-ai-report/preview-url', {
     status: 200,
@@ -2041,6 +2041,30 @@ test('documents: derived AI output skips the material check and goes straight to
   expect((await quoteRequest).postDataJSON()).toMatchObject({ fileUrl: '/api/v1/files/doc-ai-report/content?sig=print' })
   expect(api.requestCount('POST', '/api/v1/materials/tasks'), '派生产物不进材料检查').toBe(0)
   expect(errors).toEqual([])
+})
+
+test('R-04 documents: photo composite requiring check opens material check @w5-kiosk', async ({ page, api }) => {
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  api.respond('GET', '/api/v1/me/documents', memberPage([
+    memberDocument({ id: 'doc-photo-pdf', filename: '照片合成.pdf', assetCategory: 'derived', derivationKind: 'format_conversion', materialCheckRequired: true }),
+  ]))
+  api.respond('GET', '/api/v1/files/doc-photo-pdf/preview-url', {
+    status: 200, json: { success: true, data: { fileId: 'doc-photo-pdf', printFileUrl: '/api/v1/files/doc-photo-pdf/content?sig=print', expiresAt: FUTURE } },
+  })
+  // 材料检查页会取这一份文件自己的第一页做小样（上面 derived AI 那条用例同款写法）：接到一份可见 PDF 让请求有人应答，
+  // 否则夹具收尾报 Unhandled API requests；「未处理请求即失败」的夹具本身不放宽。
+  await page.route((url) => url.pathname === '/api/v1/files/doc-photo-pdf/content', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }))
+  api.respond('POST', '/api/v1/materials/tasks', { status: 200, json: { success: true, data: { ...W5_DOC_INSPECTION, sourceFileId: 'doc-photo-pdf' } } })
+  api.respond('GET', `/api/v1/materials/tasks/${W5_DOC_INSPECTION.id}`, { status: 200, json: { success: true, data: { ...W5_DOC_INSPECTION, sourceFileId: 'doc-photo-pdf' } } })
+  await loginThroughVisibleUi(page, '/me/documents')
+  const row = page.getByTestId('member-assets-document').filter({ hasText: '照片合成.pdf' })
+  await openRow(row)
+  const created = page.waitForRequest((request) => request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/materials/tasks')
+  await row.getByRole('button', { name: '打印', exact: true }).click()
+  await page.waitForURL(/\/print\/desk\?step=check$/)
+  expect((await created).postDataJSON()).toMatchObject({ sourceFileId: 'doc-photo-pdf', kind: 'inspection' })
 })
 
 test('documents and orders: error then empty come from the server, never a cached list @w5-kiosk', async ({ page, api }) => {

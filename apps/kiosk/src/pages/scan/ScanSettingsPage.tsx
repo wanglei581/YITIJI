@@ -777,6 +777,7 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         rescanRequested={rescanRequested} plainRestartChosen={plainRestartChosen}
         restoredFromStorage={restoredFromStorageRef.current}
       />
+      {scanType === 'id' ? <p role="note">在打印机屏幕上把文件格式选成 JPG（图片）再开始。</p> : null}
       <ScanPanelMock instructions={instructions.map((instruction) => instruction)} />
     </ScanWorkbenchShell>
   )

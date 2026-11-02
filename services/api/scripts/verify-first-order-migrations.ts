@@ -31,8 +31,16 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
   try {
     await client.$connect()
     await client.organization.create({ data: { id: 'first-order-migration-sentinel', name: 'Migration sentinel', type: 'public_employment_service' } })
+    // 基线之后的每条迁移都要在这里按顺序补一行；漏一条，下面用当前客户端写库就会报缺列。
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', migration)])
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261028120000_ai_service_fact/migration.sql')])
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261102090000_add_terminal_daily_free_print_sides/migration.sql')])
+    // 屏上扫描会话字段（20261102230000，排在上一条之后）。升级前已有的扫描任务升级后要取默认值：此时库里的 ScanTask 还是旧结构，
+    // 而当前客户端的模型已含新列，所以旧行只能用原生 SQL 写，且必须在执行这条迁移之前写；扫描任务要挂在终端下，先建一个专用终端。
+    const legacyScanId = 'legacy-scan-before-device-fields'
+    await client.terminal.create({ data: { id: 'scan-device-legacy-terminal', terminalCode: 'SCAN-DEVICE-LEGACY', agentToken: 'migration-only-no-device-legacy', deviceFingerprint: 'migration' } })
+    await client.$executeRawUnsafe(`INSERT INTO "ScanTask" ("id", "terminalId", "scanType", "status", "expiresAt", "updatedAt") VALUES ('${legacyScanId}', 'scan-device-legacy-terminal', 'document', 'completed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', scanDeviceMigration)])
     await client.aiServiceFact.create({ data: { serviceType: 'resume_optimize', serviceKey: 'migration-test', orgId: 'org-snapshot', terminalId: 'terminal-snapshot' } })
     if (await client.aiServiceFact.count() !== 1) throw new Error(`${kind}: fact table unavailable`)
     const sentinel = await client.organization.findUnique({ where: { id: 'first-order-migration-sentinel' } })
@@ -55,11 +63,7 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     await client.serviceDeployment.create({ data: { projectId: project.id, orgId: sentinel.id, terminalId: deployment.terminalId, activeTerminalId: deployment.terminalId, terminalCode: deployment.terminalCode, locationLabel: 'Next' } })
     console.log(`PASS ${kind}: upgrade preserves baseline data; five tables usable; active uniqueness and release verified`)
 
-    // 屏上扫描会话字段（20261102230000）：升级前已有的扫描任务升级后取默认值，新列可写；终端心跳新列可写。
-    // 此时库里的 ScanTask 还是旧结构，而当前客户端的模型已含新列，所以旧行只能用原生 SQL 写。
-    const legacyScanId = 'legacy-scan-before-device-fields'
-    await client.$executeRawUnsafe(`INSERT INTO "ScanTask" ("id", "terminalId", "scanType", "status", "expiresAt", "updatedAt") VALUES ('${legacyScanId}', 'migration-terminal', 'document', 'completed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
-    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', scanDeviceMigration)])
+    // 屏上扫描会话字段（20261102230000，已在上面的迁移清单里按顺序执行）：升级前的旧行取默认值，新列可写；终端心跳新列可写。
     const [legacy] = await client.$queryRawUnsafe<Array<Record<string, unknown>>>(`SELECT "startMode", "devicePageCount", "deviceSource", "deviceColorMode", "deviceState", "deviceErrorCode", "deviceUpdatedAt", "hardExpiresAt" FROM "ScanTask" WHERE "id" = '${legacyScanId}'`)
     if (!legacy || legacy['startMode'] !== 'panel' || Number(legacy['devicePageCount']) !== 0) throw new Error(`${kind}: legacy scan row must default to panel / 0 pages`)
     for (const column of ['deviceSource', 'deviceColorMode', 'deviceState', 'deviceErrorCode', 'deviceUpdatedAt', 'hardExpiresAt']) {

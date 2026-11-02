@@ -1663,3 +1663,22 @@ test.describe('scan result full-screen preview at 390x844', () => {
     await expectHealthy(page, errors)
   })
 })
+
+// 前端按扫描会话的类型错误码给出 JPG 重扫指引。
+test('ID scan explains an explicit MIME rejection and directs JPG rescan @w2', async ({ page, api }) => {
+  registerShell(api)
+  registerScanCapability(api, 'available')
+  registerCreatedScan(api)
+  registerScanAck(page, api)
+  api.respond('GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
+    status: 200,
+    json: { success: true, data: { scanTaskId: SCAN_TASK_ID, scanType: 'id', status: 'failed', file: null, errorCode: 'SCAN_FILE_TYPE_NOT_ALLOWED', errorMessage: '这次扫出来的文件格式不收：证件扫描请在打印机屏幕上选图片格式（JPG）后重扫。', expiresAt: LATER } },
+  })
+  await page.goto('/scan/start')
+  await page.getByTestId('scan-workbench-type-id').click()
+  await page.getByRole('button', { name: /下一步 · 建立这次扫描/ }).click()
+  await expect(page.getByText('在打印机屏幕上把文件格式选成 JPG（图片）再开始。')).toBeVisible()
+  await page.getByRole('button', { name: '我已操作，开始等待' }).click()
+  await expect(page.getByText('文件格式不符合证件扫描要求，请在打印机屏幕上选 JPG（图片）后重新扫描。')).toBeVisible()
+  await expect(page.getByRole('button', { name: /选 JPG 格式.*扫描|选 JPG 格式重扫/ })).toBeVisible()
+})

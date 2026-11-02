@@ -8,3 +8,11 @@ export const SCAN_CREATE_FAIL_COPY = '系统没能建立这次扫描。请返回
 export function scanShownText(text: string, replacement = SCAN_CREATE_FAIL_COPY): string {
   return preferUnattended(text, replacement)
 }
+
+/** 仅在服务端明确给出类型错误时使用；通用上传失败不能推断为 PDF。 */
+export function scanFailureReason(code: string | null | undefined, message: string | null | undefined, scanType: string): string {
+  if (scanType === 'id' && code === 'SCAN_FILE_TYPE_NOT_ALLOWED') {
+    return '文件格式不符合证件扫描要求，请在打印机屏幕上选 JPG（图片）后重新扫描。'
+  }
+  return message ?? '扫描处理失败，请重试'
+}

@@ -16,7 +16,7 @@ export function isDocumentReprintable(doc: { reprintable?: boolean; purpose?: st
  */
 const PRINT_PII_CHECK_PURPOSES = new Set(['resume_upload', 'resume_scan', 'print_doc', 'id_scan'])
 
-type DocumentPrintRoutingInput = { purpose?: string | null; assetCategory?: string | null }
+type DocumentPrintRoutingInput = { purpose?: string | null; assetCategory?: string | null; materialCheckRequired?: boolean | null }
 
 /** 这三种用途的文件只会是本人原件或由原件转出来的（AI 报告用 print_doc，不在此列）。 */
 const ORIGINAL_ONLY_PURPOSES = new Set(['resume_upload', 'resume_scan', 'id_scan'])
@@ -30,6 +30,9 @@ export function documentNeedsPrintMaterialCheck(
   doc: DocumentPrintRoutingInput,
   convertedFrom?: DocumentPrintRoutingInput,
 ): boolean {
+  // 接口（/me/documents 的 materialCheckRequired）已按服务端建单闸门算好：有就以它为准。走查 R-04：照片合成的 PDF
+  // 是派生件（format_conversion），内容却是本人照片，服务端要查，下面按用途猜的回落会放行。字段缺失（旧接口）才用下面的回落。
+  if (typeof doc.materialCheckRequired === 'boolean') return doc.materialCheckRequired
   // 本人原件转换出的 PDF（Word 转 PDF）：服务端记为派生，但内容就是原件 —— 按原件过材料检查（9/29 拍板）。
   if (convertedFrom && documentNeedsPrintMaterialCheck(convertedFrom)) return true
   // 简历上传 / 简历扫描 / 证件扫描这三种用途的派生件只可能来自本人原件（转换件、脱敏副本），同样先查。
