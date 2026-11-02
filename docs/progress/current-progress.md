@@ -1,5 +1,16 @@
 # 当前开发进度
 
+## 2026-11-03：屏上扫描 ③ 后端 B4（投递防 ABA、回报与设置交错、取消倒计时、页数上限、扫描仪告警、文件体积；分支 `claude/scan-device-b2-1102`，叠在 B3 头 `7935410c1` 上，未推送、未部署）
+
+- 投递防 ABA：device 任务的 `scanDeliverClaimPins` 再钉读到的 `deviceUpdatedAt`（不加列）。出错重扫后旧投递迟到、状态又回到 composing / delivering 时，抢占落空，409 `SCAN_TASK_STATE_CHANGED`，不建文件，任务仍 waiting。正常进纸器与玻璃台投递照常。面板仍只钉 `startMode`。
+- 改设置与回报交错：device-report 体可选 `source`、`colorMode`。给了且与库里 `deviceSource` / `deviceColorMode` 不一致 → 409 `SCAN_DEVICE_SETTINGS_CHANGED`（写进必须停扫清单）。不给照旧。截止时间不变的那种改设置，旧来源回报被拒且不写库。
+- 取消响应多给 `quietPeriodEndsAt`（本终端静默期结束时刻，ISO）和 `serverNow`（ISO）。共享类型 `ScanSessionCancelResponse` 这两个字段可选。取消的其余行为不变。静默期 ≤ 0 时不另查库，两个时刻相等。
+- `GET /scan/sessions/:id` 对 device 任务多给 `deviceMaxPages`（证件 4、其余 20，与租约同源）；面板任务以及已改用面板的任务给 null。共享类型可选。
+- 扫描仪告警：现成通道是心跳现算的派生告警（`derived-alerts.ts`，不写 Alert 行；打印机离线 / 缺纸就是这条）。终端 `scan_device` 为 available、最近心跳仍在 5 分钟在线窗口内、且 `scanDeviceHealth` 为 `not_found` 或 `error` 时，多一条 `scan_device_issue`。去重键 `scan_device_issue:终端 id`，可与 `printer_issue` 并存。心跳改报正常后下一次收集不再出现（没有单独的「已恢复」行）。实现在 `derived-scan-device-alerts.ts`。管理后台类型、筛选和图标是类型集合门禁和告警页 `TYPE_META[type].icon` 所迫的最小配套，文案「扫描仪异常」，没有「找工作人员」。
+- 文件体积：`files.service.ts` 从 1716 行回到 1543 行。屏上扫描放行和上传准备抽到 `files/verified-device-scan-upload.ts`（244 行）。`upload()` 里的 `fileObject.create` 仍留在原处；`uploadVerifiedDeviceScan` 仍是 FilesService 上紧挨 `upload` 的薄方法。`scan-tasks.service.ts` 现为 1335 行（B3 末约 1305；增加的是取消倒计时那个私有方法和注释，页数上限与静默期时刻在 `scan-device-protocol.ts`）。
+- 门禁：`verify:scan-device-b4` 进 `package.json` 与 `ci.yml` 的 SQLite、postgres-readiness 两处。本机隔离库（`RECRUITMENT_CONTENT_HOSTING_ENABLED=false`）SQLite 与临时 PostgreSQL 16（127.0.0.1:55451，时区 UTC，库名 `b4_verify`）上，typecheck、`eslint src/`、扫描相关门禁、`verify:admin-ops`（73/53/50 仍在）、`verify:file-retention`、`verify:derivation-kind`、`db:pg:sync:check` 都过。`verify:scan-tasks` 带 `POSTGRES_URL` 时日志没有「SKIPPED real DB」。`pnpm graph:check` 通过；`verify:repository-integrity` 三项 OK。反向检查五处（去掉 deviceUpdatedAt 钉、回报不比对来源、取消不给 quietPeriodEndsAt、GET 的 deviceMaxPages 改成 null、恢复后仍发告警）都让对应门禁变红，`git checkout --` 恢复后只剩图谱产物。
+- 没做：一体机、终端程序、小程序没动。没有新迁移、没有新列。未推送、未部署。哪台机器都不许因此把 `scan_device` 配成 available。
+
 ## 2026-11-03：屏上扫描 ③ 后端 B3（只对屏上扫描放行证件 PDF；分支 `claude/scan-device-b2-1102`，叠在 B2 头 `fafcfdb0d` 上，未推送、未部署）
 
 - 放行只认服务端核实过的会话：`assertScanDeliverOriginAllowed` 在 `startMode=device`、`origin=device`、`deviceState` 为 composing / delivering、`devicePageCount≥1`、文件是 PDF 时签发模块内 Symbol 凭据；面板返回 null。`FilesService.uploadVerifiedDeviceScan` 只认这份凭据，伪造对象退回普通 `upload`。`upload()` 与控制器、DTO 都不接受「跳过校验」或「允许证件 PDF」参数。
