@@ -9,8 +9,18 @@
 
   <view wx:if="{{phase === 'no-task'}}" class="no-task-state">
     <text class="ficon i-file-text nt-ic"></text>
-    <view class="nt-title">未指定优化任务</view>
-    <view class="nt-sub">请从简历诊断页发起 AI 优化</view>
+    <view class="nt-title">先准备一份简历</view>
+    <view class="nt-sub">优化要基于已经诊断过的简历。选一条路继续。</view>
+    <block wx:for="{{ways}}" wx:key="id">
+      <view class="nt-sub">{{item.hint}}</view>
+      <view
+        class="btn {{item.primary ? 'primary' : 'ghost'}} tap nt-btn"
+        bindtap="tapWay"
+        data-id="{{item.id}}"
+        role="button"
+        aria-label="{{item.title}}"
+      >{{item.title}}</view>
+    </block>
     <view class="btn ghost tap nt-btn" bindtap="goBack">返回</view>
   </view>
 

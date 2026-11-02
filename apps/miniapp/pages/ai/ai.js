@@ -1,5 +1,9 @@
 // pages/ai/ai.js
 const app = getApp()
+const api = require('../../utils/api')
+const auth = require('../../utils/auth')
+const storage = require('../../utils/storage')
+const entryWays = require('../../utils/resume-optimize-entry')
 
 Page({
   data: {
@@ -91,8 +95,14 @@ Page({
     }
   },
 
+  onHide() { entryWays.cancelEntry(this, wx) },
+
   tapEntry(e) {
     const { id } = e.currentTarget.dataset
+    if (id === 'optimize') {
+      entryWays.openEntry(this, { api, auth, storage, wx })
+      return
+    }
     const routes = {
       // 删掉这条会怎样：上面 groups.prepare 的「生成简历」磁贴点下去 url 取到
       // undefined，wx.navigateTo 不会被调用，卡片变成静默死按钮（用户会以为是

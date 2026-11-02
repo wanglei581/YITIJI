@@ -8,6 +8,7 @@ const fileUrls = require('../../utils/file-url.js')
 const shareFriend = require('../../utils/share-friend')
 const draft = require('./draft')
 const factCheck = require('./fact-check')
+const ways = require('../../utils/resume-optimize-entry')
 
 const FORMATS = [
   { key: 'pdf', label: 'PDF', mimeType: 'application/pdf' },
@@ -20,6 +21,7 @@ Page({
     statusBarHeight: 20,
     aiLabelNote: buildModel.RESUME_AI_LABEL_NOTE,
     phase: 'no-task',
+    ways: ways.staticWays(),
     taskId: '',
     needReupload: false,
     failMsg: '',
@@ -58,7 +60,7 @@ Page({
     this._loadPricing()
     const taskId = options.taskId || ''
     if (!taskId) {
-      this.setData({ phase: 'no-task' })
+      ways.showEntry(this, { api, auth, storage })
       return
     }
     this.setData({
@@ -247,9 +249,9 @@ Page({
     this.setData({ exportDisabled: Boolean(reason), exportDisabledReason: reason })
   },
 
-  goBack() {
-    wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } })
-  },
+  goBack() { ways.goBack(wx) },
+
+  tapWay(e) { ways.openWay(this, e, wx) },
 
   tapRetry() {
     if (this.data.phase !== 'failed' || this.data.needReupload) return
@@ -257,12 +259,7 @@ Page({
     this._fetch()
   },
 
-  tapReupload() {
-    wx.navigateTo({
-      url: '/pages/resume-parse/resume-parse',
-      fail: () => wx.showToast({ title: '页面跳转失败', icon: 'none' }),
-    })
-  },
+  tapReupload() { wx.navigateTo({ url: '/pages/resume-parse/resume-parse', fail: () => wx.showToast({ title: '页面跳转失败', icon: 'none' }) }) },
 
   pickFormat(e) {
     if (this.data.exporting) return
