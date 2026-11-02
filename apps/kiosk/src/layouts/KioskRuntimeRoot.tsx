@@ -1,5 +1,7 @@
-import { useEffect } from 'react'
-import { Outlet } from 'react-router-dom'
+import { useEffect, useRef } from 'react'
+import { Outlet, useLocation } from 'react-router-dom'
+import { useAuth } from '../auth/useAuth'
+import { refreshKioskProfile, startKioskProfileKeeper } from '../services/api/kioskProfile'
 import { AiDeclarationHost } from '../ai/AiDeclarationHost'
 import { KioskPrivacyGuard } from '../auth/KioskPrivacyGuard'
 import { KioskBusyProvider } from '../contexts/KioskBusyContext'
@@ -17,6 +19,19 @@ function ContentUpdateGuard() {
  * 终端号变了按新号重读（见 supportContact.ts）；页面和设备状态只订阅，不各自去读。
  * 挂在隐私清场叠层外面：清场只换掉子树，不应该让读取与续期的计时跟着重来一遍。
  */
+function ProfileGuard() {
+  const { user, guestMode } = useAuth()
+  const { pathname } = useLocation()
+  const previousPath = useRef(pathname)
+  useEffect(() => startKioskProfileKeeper(), [])
+  useEffect(() => { void refreshKioskProfile() }, [user, guestMode])
+  useEffect(() => {
+    if (previousPath.current === '/screensaver' && pathname !== '/screensaver') void refreshKioskProfile()
+    previousPath.current = pathname
+  }, [pathname])
+  return null
+}
+
 function SupportContactGuard() {
   useEffect(() => startSupportContactKeeper(), [])
   return null
@@ -35,6 +50,7 @@ export function KioskRuntimeRoot() {
     <KioskBusyProvider>
       <AiDeclarationHost />
       <SupportContactGuard />
+      <ProfileGuard />
       <KioskPrivacyGuard>
         <ContentUpdateGuard />
         <KioskHidScanGuard />
