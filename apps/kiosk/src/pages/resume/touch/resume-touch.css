@@ -221,6 +221,22 @@
 .qxt-screen .kiosk-ai-fallback__action {
   min-height: var(--qxt-tap);
   min-width: var(--qxt-tap);
+  /* 触屏壳的按钮重置（.qxt-screen button，0,1,1）盖掉了 ai-primitives.css 里这颗按钮自己的内边距、边框、底色（0,1,0），
+     「不用 AI 的出路」成了一行纯文字，看不出能点。这里补回，样子与问小青页的同一颗按钮一致（浅青底、深青字、青边）。 */
+  padding: 0 26px;
+  border: 1px solid var(--qx-teal-line);
+  border-radius: 16px;
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+  font-weight: 700;
+}
+
+/* 置灰的那颗（aria-disabled，不是原生 disabled，保持可聚焦读得到原因）：灰底灰字，一眼不是可点的。 */
+.qxt-screen .kiosk-ai-fallback__action--blocked {
+  border-color: var(--qx-line);
+  background: var(--qxt-well);
+  color: var(--qxt-ink-3);
+  cursor: not-allowed;
 }
 
 .qxt-screen .rtp .jfq-choice,

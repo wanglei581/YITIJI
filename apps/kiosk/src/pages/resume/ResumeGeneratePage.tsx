@@ -7,7 +7,7 @@
 //     生成结果走后端 AiResumeResult TTL 清理,不长期保留。
 // ============================================================
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useResumeGenerateDraftField } from './resumeGenerateDraft'
 import { useNavigate } from 'react-router-dom'
 import { maskEmail, maskPhone } from '../../utils/maskPii'
@@ -317,6 +317,14 @@ export function ResumeGeneratePage() {
     failed: Boolean(error) || Boolean(aiOutage),
     hasResult: false,
   })
+  // 失败的说明和「不用 AI 也能带走」的出路在滚动区最下面（核对页内容比一屏高）。失败那一刻把它们带到眼前：
+  // 现场没人，以前人只看到底栏按钮上的字变了，要往下滑才找得到出路（走查 I-29）。再按一次又失败同样处理。
+  const scrollRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (generating || exportingDraft || (!aiOutage && !error)) return
+    const scroller = scrollRef.current
+    if (scroller) scroller.scrollTo({ top: scroller.scrollHeight })
+  }, [aiOutage, error, generating, exportingDraft])
   const draftAction = {
     label: exportingDraft ? '正在导出草稿…' : '导出并打印我填的内容（未经 AI 润色）',
     onClick: () => void handleExportDraft(),
@@ -442,7 +450,7 @@ export function ResumeGeneratePage() {
       ctabar={ctabar}
       ask={{ ...askSpec, testId: 'resume-generate-ai-help' }}
     >
-    <section data-kiosk-domain="resume" data-kiosk-screen="resume-generate" className="qx-resume-generate qx-scroll">
+    <section ref={scrollRef} data-kiosk-domain="resume" data-kiosk-screen="resume-generate" className="qx-resume-generate qx-scroll">
       <ResumeGenerateAdvisor
         eyebrow="AI 简历生成"
         ask={reviewing ? <>提交前<em>你先核一遍</em></> : STEPS[step].ask}

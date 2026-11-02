@@ -425,6 +425,22 @@ test('resume generation retries after outage without losing this session draft @
   await page.getByRole('button', { name: '让 AI 整理成新简历', exact: true }).click()
   await expect(page.getByRole('button', { name: '重新检查并整理', exact: true })).toBeEnabled()
   expect(attempts).toBe(1)
+  // 失败的说明和「不用 AI 也能带走」的出路要落在眼前：现场没人，看不到就等于没有。
+  // 它们在滚动区最下面（核对页内容比一屏高），以前失败后人只看到底栏按钮上的字变了，要往下滑才找得到。
+  await expect(page.getByText('你填的内容还留在这一页上', { exact: false })).toBeInViewport({ ratio: 1 })
+  await expect(page.getByRole('button', { name: /导出并打印我填的内容/ })).toBeInViewport({ ratio: 1 })
+  // 出路要看得出是个按钮：触屏壳的按钮重置（0,1,1）会盖掉 .kiosk-ai-fallback__action（0,1,0）的内边距、边框和底色，
+  // 以前这一条「不用 AI 的出路」和旁边灰掉的「AI 润色成文」都像两行纯文字，没人看得出能点。
+  for (const kind of ['alternative', 'blocked']) {
+    const style = await page.locator(`[data-ai-fallback-action="${kind}"]`).evaluate((el) => {
+      const s = getComputedStyle(el)
+      return { padLeft: parseFloat(s.paddingLeft), border: parseFloat(s.borderTopWidth), background: s.backgroundColor, height: el.getBoundingClientRect().height }
+    })
+    expect(style.padLeft, `${kind} 按钮内边距`).toBeGreaterThanOrEqual(12)
+    expect(style.border, `${kind} 按钮要有边框`).toBeGreaterThanOrEqual(1)
+    expect(style.background, `${kind} 按钮要有底色，不是透明`).not.toBe('rgba(0, 0, 0, 0)')
+    expect(style.height, `${kind} 按钮可点高度`).toBeGreaterThanOrEqual(64)
+  }
   // 同一标签页离开再回来，应恢复核对页和填写内容；没有把原文放进浏览器持久存储。
   await page.getByRole('button', { name: '首页', exact: true }).click()
   await page.getByRole('button').filter({ has: page.getByRole('heading', { name: '改简历', exact: true }) }).click()
