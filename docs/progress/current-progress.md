@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-11-02：依赖安全——follow-redirects 1.16.1 → 1.16.2（单独先进 main，解开全仓 CI）
+
+- 原因：10/30 收录的高危公告 GHSA-mrwp-f3q8-3g9p（跨 realm 的敏感请求头数组被丢弃、自定义凭据可随重定向带出）打中仓库钉住的 follow-redirects 1.16.1，修复版 1.16.2；main 上所有 PR 的 build-and-verify 都红在「Dependency security gate」。
+- 改动：只拣触屏线的修复提交 8d0b2f9e9（在 #1525 发布准备线上）里的 `pnpm-workspace.yaml` 钉子与 `pnpm-lock.yaml`；不带该线的其它内容。#1525 以后合进来是同一份改动。
+- 验证：`pnpm install --frozen-lockfile` 通过；`node scripts/verify-dependency-security.mjs` 全部 OK（full tree 与 --prod 的未接受高危 / 严重均为 0）。
+
 ## 2026-11-02：一体机触屏版发布候选（接替 #1525；分支 `claude/kiosk-touch-rc-1102`，草稿 PR，未合并、未部署、真机未验）
 
 - 基线：#1525（GPT 合成的四路候选，含第一包 `a035b6d8d`、四路走查修复的头与 GPT 自己的修复、follow-redirects 补丁）的头 `7487a0de3`。本分支只在它上面加提交，不往 GPT 的分支推。
