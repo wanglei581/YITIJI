@@ -146,7 +146,11 @@ must('evidence', /E2: '来源信息'/, 'E2 的用户可读名必须是「来源�
 // E3 必须带「仅供参考」，且不得被 compact 掉。
 must('evidence', /AI_JUDGEMENT_DISCLAIMER = '仅供参考'/, 'E3 免责后缀必须是「仅供参考」')
 must('evidence', /level: 'E3'\n {6}compact\?: never/, 'E3 必须在类型层面禁用 compact')
-must('evidence', /props\.level === 'E3' \? false/, 'E3 运行时也不得走 compact 分支')
+// 走查 I-02：E1 / E2 / E3 是内部证据等级编号，不上屏。徽章的可见文字只取用户可读名，E3 恒是带「仅供参考」的整串；
+// 编号只留在 data-evidence 属性里。原来「E3 运行时不走 compact」那条随 compact 分支一起撤了——现在没有任何分支只显示编号。
+must('evidence', /level === 'E3' \? AI_JUDGEMENT_TEXT : EVIDENCE_LABEL\[level\]/, '徽章文字必须取用户可读名：E3 是 AI_JUDGEMENT_TEXT（带「仅供参考」），其余取 EVIDENCE_LABEL')
+mustNot('evidence', /\$\{level\}/, '徽章可见文字不得拼上 E1 / E2 / E3 编号（走查 I-02：小青回答上方露着「E3 AI 判断 · 仅供参考」）')
+must('evidence', /data-evidence=\{level\}/, '编号只留在 data-evidence 属性里，给样式与测试用')
 
 // E3 禁止百分比 / 录用概率 / 通过率。断在导出声明上，改名即失效。
 must(

@@ -996,9 +996,19 @@ console.log('\n⑬ 锁状态、草稿归属与协议同意')
     'orders 的取消链按身份判定（用 active 判定会把这一行锁死在「取消中…」）')
 
   assert(/agreedToTerms: false/.test(confirmCode),
-    '《打印服务协议》默认不勾选（本仓库同类口径：pages/launch/launch.js 的 agreed: false）')
+    '《用户服务协议》默认不勾选（本仓库同类口径：pages/launch/launch.js 的 agreed: false）')
   assert(confirmWxml.includes('我已阅读并同意') && confirmWxml.includes('viewTerms'),
     '模板确实是一份「已阅读并同意 + 可查看原文」的法律同意，不是普通确认')
+  // 同意的对象要和点开看到的文件同名（合规十 10/12）。法务文档只有四份（utils/api-legal-consent.js 的
+  // LEGAL_DOC_TITLES），没有叫《打印服务协议》的；此前勾选句写的就是它，点开看到的却是《用户服务协议》，
+  // 同意对象说不清。勾选句后面的协议名必须是 viewTerms 指明打开的那份文档的标题。
+  const termsType = (/viewTerms\(\) \{[\s\S]{0,300}?\/pages\/legal\/legal\?type=(\w+)/.exec(confirmCode) || [])[1]
+  const termsTitle = termsType && (new RegExp(`${termsType}: '([^']+)'`).exec(read('utils/api-legal-consent.js')) || [])[1]
+  const termsLink = (/bindtap="viewTerms">《([^》]+)》<\/text>/.exec(confirmWxml) || [])[1]
+  assert(!!termsTitle && termsLink === termsTitle,
+    `勾选句后面的协议名《${termsLink}》和点开看到的文件同名（viewTerms 打开 ${termsType || '没指明类型'}，标题《${termsTitle || '?'}》）`)
+  assert(!/打印服务协议/.test(confirmWxml + confirmJs),
+    '材料包确认页不再出现《打印服务协议》：法务文档里没有这一份')
 
   const codeCode = stripComments(codeJs)
   {
@@ -1146,12 +1156,12 @@ console.log('\n⑫ R4 身份 / 代次收口')
   assert(/setIdentity\(this\._identityKey\(\)\)\) \{[\s\S]{0,200}this\._resetForIdentity\(\)/.test(confirmCode),
     'onShow 发现身份变化时真的调用了 _resetForIdentity（写了不接线等于没写）')
 
-  // ③ 《打印服务协议》：链接不得靠 label 冒充勾选，按钮 disabled 与提交守卫一致。
+  // ③ 《用户服务协议》：链接不得靠 label 冒充勾选，按钮 disabled 与提交守卫一致。
   //    label 包住 checkbox 时，label 内任意点击都会切换它 —— "点开协议看一眼"
   //    会被同时记成"我已阅读并同意"，而这份同意用户从没做过。
   const labelBlock = /<label class="agreement-label">[\s\S]*?<\/label>/.exec(confirmWxml)
   assert(!!labelBlock && !labelBlock[0].includes('viewTerms'),
-    '《打印服务协议》链接在 <label> 之外（label 内点击会把同意一起勾上）')
+    '《用户服务协议》链接在 <label> 之外（label 内点击会把同意一起勾上）')
   assert(confirmWxml.includes('bindtap="viewTerms"'),
     '协议原文仍然可查看（不能因为挪出 label 就把入口弄丢）')
   assert(/disabled="\{\{quoteState !== 'ready' \|\| !agreedToTerms \|\| submitting\}\}"/.test(confirmWxml),

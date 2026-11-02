@@ -193,13 +193,13 @@ test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {
     const s: Step = { n: 0 }
 
     await page.goto('/')
-    const jobsEntry = page.getByRole('button', { name: /岗位信息/ }).first()
+    const jobsEntry = page.locator('[data-action="jobs-hub"]')
     await expect(jobsEntry).toBeVisible({ timeout: 15000 })
     await step(page, s, 'home')
 
     await jobsEntry.click()
     await page.waitForURL((u) => u.pathname === '/jobs-service', { timeout: 10000 })
-    const fullTime = page.getByRole('button', { name: /全职岗位/ }).first()
+    const fullTime = page.getByRole('button', { name: /找全职/ }).first()
     await expect(fullTime).toBeEnabled({ timeout: 15000 })
     await step(page, s, 'jobs-hub')
 
@@ -256,19 +256,28 @@ test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {
     const s: Step = { n: 0 }
 
     await page.goto('/')
-    // 无障碍名是「招聘会」+「场次、企业与现场导览」，中间可能有空格。
-    // V6 首页是 `[data-domain-id="fairs"] button.v6-home-domain__main`；青序流光首页
-    // 换成带 `data-action="fairs-hub"` 的磁贴（QxHomeView.tsx:226）。钉钩子不钉 class。
-    const fairsEntry = page.locator('[data-action="fairs-hub"]')
-    await expect(fairsEntry).toBeVisible({ timeout: 15000 })
+    const jobsEntry = page.locator('[data-action="jobs-hub"]')
+    await expect(jobsEntry, '托管打开时从首页社会招聘进入').toBeVisible({ timeout: 15000 })
+    await expect(page.locator('[data-action="fairs-hub"]')).toHaveCount(0)
+    await expect(page.getByTestId('qx-home')).toBeVisible()
     await step(page, s, 'home')
 
-    await fairsEntry.click()
+    await jobsEntry.click()
+    await page.waitForURL((u) => u.pathname === '/jobs-service', { timeout: 10000 })
+    // 首页不再单列招聘会磁贴（第二包），社会招聘台换成触屏版后（第十一包）旧台的「招聘会」快捷入口
+    // （button.qx-hub-quick-item）一并退出，进招聘会台（/fairs-service）的路是台里「实习、校招岗位在『校园招聘』里」那句话里的按钮。
+    const fairEntry = page.getByRole('button', { name: '校园招聘', exact: true })
+    await expect(fairEntry, '社会招聘服务台要有进招聘会台的入口').toBeEnabled({ timeout: 15000 })
+    await step(page, s, 'jobs-to-fairs')
+    await fairEntry.click()
     await page.waitForURL((u) => u.pathname === '/fairs-service', { timeout: 10000 })
-    // /fairs-service 迁入青序流光（稿 16）后，能力卡由「社会招聘会」改称「招聘会列表」，
-    // 落点仍是 /job-fairs。本旅程夹具把 /health 打成 200，所以这张 info 卡可点；
+    // 校园招聘台「更多去处」的「全部招聘会」落到 /job-fairs，不带 audience。
+    // 可用门不写 aria-label，读屏名是「标题 + 说明」，所以按门标题定位，不把说明从名字里裁掉。
+    // 本旅程夹具把 /health 打成 200，所以这扇门可点；
     // API checking/unavailable 时它仍 fail-closed，不得理解成「永远 enabled」。
-    const social = page.getByRole('button', { name: /招聘会列表/ }).first()
+    const socialDoor = page.locator('[data-door-title="全部招聘会"]')
+    await expect(socialDoor).toHaveCount(1)
+    const social = socialDoor.getByRole('button')
     await expect(social).toBeEnabled({ timeout: 15000 })
     await step(page, s, 'fairs-hub')
 

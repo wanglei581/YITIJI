@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { UPLOAD_SESSION_ORDER_ONLY_REASON } from '../files/retention-policy'
 import { PrismaService } from '../prisma/prisma.service'
 
 export const MEMBER_EXPORT_SCHEMA_VERSION = 'member-data-export-v1'
@@ -78,7 +79,11 @@ export class MemberDataExportMapper {
         select: { id: true, nickname: true, status: true, createdAt: true, lastLoginAt: true },
       }),
       this.prisma.fileObject.findMany({
-        where: { endUserId: input.endUserId },
+        // 只用于这一单的文件不算账号里的（11/02 拍板）：可能是旁人在一体机上扫码传的，不能进登录人的导出清单。
+        where: {
+          endUserId: input.endUserId,
+          OR: [{ retentionLockedReason: null }, { retentionLockedReason: { not: UPLOAD_SESSION_ORDER_ONLY_REASON } }],
+        },
         select: {
           id: true,
           filename: true,

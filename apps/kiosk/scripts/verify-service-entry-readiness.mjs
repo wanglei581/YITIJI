@@ -186,8 +186,10 @@ check(
   for (const local of ['面试前准备清单', '高频问题应对', 'STAR', '自我介绍结构建议']) {
     check(tips.includes(local), `在线服务不可用不影响本地技巧内容「${local}」仍然渲染`)
   }
+  // 触屏版按稿 iv-tips：「重新检测」是一颗宽按钮（qxt-iv-wide qxt-iv-recheck），不再是旧的 qx-btn。
+  // 要的事一样：它在、接着 retryApi、写着「重新检测」。
   check(
-    /className="qx-btn"[\s\S]{0,200}?onClick=\{retryApi\}/.test(tips),
+    /className="qxt-iv-wide qxt-iv-recheck"[\s\S]{0,200}?onClick=\{retryApi\}[\s\S]{0,60}?<b>重新检测<\/b>/.test(tips),
     '面试技巧页在线服务不可用时保留「重新检测」，不让用户只能退出去'
   )
 }
@@ -306,9 +308,11 @@ check(
   const guardAt = hook.indexOf('if (!enabled) return')
   const fetchAt = hook.indexOf('await fetch(')
   const timerAt = hook.indexOf('window.setInterval')
+  // 10/29 走查 I-31：首页挂上时会递「马上重读」信号（requestDeviceStatusRefresh），停用档不许响应它，否则停用档也会发请求。
+  const refreshAt = hook.indexOf('refreshRequests.add(')
   check(
-    guardAt > 0 && fetchAt > guardAt && timerAt > guardAt,
-    'useTerminalDeviceStatus(false) 在发请求与挂 60s 轮询之前就 return（停用即不占用后端与定时器）'
+    guardAt > 0 && fetchAt > guardAt && timerAt > guardAt && refreshAt > guardAt,
+    'useTerminalDeviceStatus(false) 在发请求、挂轮询、接「马上重读」信号之前就 return（停用即不占用后端与定时器）'
   )
 }
 
@@ -370,6 +374,74 @@ check(
   '目标分段用稿的固定说明，不再拼 sectionHint（那会让同一句话在一屏里出现两次）'
 )
 
+// 岗位 / 招聘会两条路由已经改渲染 SocialHubPage / CampusServicePage。
+// 上面钉在 QxServiceHubPage 上的不变量一条不撤；这里把同一组再钉到现在真正上屏的文件。
+{
+  const socialHub = read('src/pages/recruitment-touch/SocialHubPage.tsx')
+  const campusHub = read('src/pages/recruitment-touch/CampusServicePage.tsx')
+  const doors = read('src/pages/recruitment-touch/RecruitDoors.tsx')
+  const availabilityHook = read('src/pages/recruitment-touch/useRecruitmentAvailability.ts')
+  const tile = read('src/components/qingxu/touch/QxTouchTile.tsx')
+  check(
+    /apiDown: apiStatus === 'unavailable'/.test(availabilityHook) &&
+      /apiChecking: apiStatus === 'checking'/.test(availabilityHook) &&
+      /return unavailableReason\(kind, route, availability\)/.test(availabilityHook),
+    '招聘入口 checking 与 unavailable 都进同一套 fail-closed 原因'
+  )
+  check(
+    hubModel.includes('在线服务当前不可用') &&
+      hubModel.includes('正在确认在线服务') &&
+      hubModel.includes('AI能力当前不可用') &&
+      hubModel.includes('正在确认AI能力状态'),
+    '招聘入口不可用原因仍按在线服务 / AI 分开说'
+  )
+  check(
+    /off=\{Boolean\(reason\)\}/.test(doors) &&
+      /aria-disabled=\{off \? true : undefined\}/.test(tile) &&
+      /if \(off\) return/.test(tile),
+    '被拦的招聘门不是可点控件（off 时 aria-disabled，点击直接返回）'
+  )
+  check(
+    /label=\{reason \? `\$\{door\.title\}，\$\{reason\}。\$\{door\.desc\}` : undefined\}/.test(doors) &&
+      /data-disabled-reason=\{reason \? `capability:\$\{door\.kind\}` : undefined\}/.test(doors),
+    '被拦的招聘门读出「标题，原因。说明」，并带 capability 原因'
+  )
+  for (const [name, src] of [
+    ['SocialHubPage.tsx', socialHub],
+    ['CampusServicePage.tsx', campusHub],
+  ]) {
+    check(src.includes("label: '重新检测'") && src.includes('onClick: retryApi'), `${name} 保留重新检测入口`)
+    check(/data-hub-device-probe="off"/.test(src), `${name} 不探测本机设备`)
+    check(!/navigate\([^)]*,\s*\{\s*state:/.test(src), `${name} 跳转不带 location.state`)
+    check(src.includes("route: '/me/activity'") && src.includes("route: '/me/activity?tab=jump'"), `${name} 保留通往「我的」台账的入口`)
+    check(!src.includes("kind: 'device'"), `${name} 没有设备类入口`)
+  }
+  check(!/navigate\([^)]*,\s*\{\s*state:/.test(doors), 'RecruitDoors 跳转不带 location.state')
+  check(socialHub.includes("navigate('/fairs-service')"), '社会招聘台保留通往校园招聘的跨域入口')
+  check(campusHub.includes("navigate('/jobs-service')"), '校园招聘台保留通往社会招聘的跨域入口')
+  check(
+    /title: '打印扫描'[\s\S]{0,160}kind: 'info'/.test(campusHub) &&
+      /useRecruitmentAvailability\(false\)/.test(campusHub),
+    '校园招聘台的打印扫描是信息入口，不探测打印机'
+  )
+  for (const sentence of [
+    '投递在来源平台完成。',
+    '本机记录你的浏览与外部跳转；投递进度由你自己填写，本机不掌握来源平台的处理结果。',
+    '本机不代收简历',
+    '不做企业筛选、面试邀约或Offer管理。',
+  ]) {
+    check(socialHub.includes(sentence), `社会招聘台逐字保留「${sentence}」`)
+  }
+  for (const sentence of [
+    '预约和投递由来源平台负责。',
+    '本机不代收简历，也不承诺外部活动结果。',
+    '不显示虚构签到结果',
+    '场次、参会企业和地图均以真实数据为准。',
+  ]) {
+    check(campusHub.includes(sentence), `校园招聘台逐字保留「${sentence}」`)
+  }
+}
+
 // 规格表 ↔ 2.0 稿 16-service-hubs.html（v2 目录）的转录对账。
 // 这份 36 张卡 / 17 个目标 / 15 条常用入口的规格是机械抽取产物；2026-09-10 那版
 // 漏掉稿里的 quick，15 条通往「我的」台账的入口静默消失过一次。手改 specs、
@@ -405,7 +477,12 @@ for (const marker of ['AbortController', "cache: 'no-store'", 'CAPABILITY_TIMEOU
 }
 
 const home = read('src/pages/home/HomePage.tsx')
-check(home.includes('useTerminalDeviceStatus'), '首页本机卡使用真实打印机状态')
+check(
+  home.includes('useOutletContext<TerminalDeviceStatusView>()') &&
+    !/useTerminalDeviceStatus\s*\(/.test(home) &&
+    read('src/layouts/KioskRoot.tsx').includes('useTerminalDeviceStatus(true)'),
+  '首页从 Outlet 拿终端设备状态，轮询只在 KioskRoot',
+)
 for (const forbidden of ['文档打印就绪', '材料扫描就绪', '自动双面可用']) {
   check(!home.includes(forbidden), `首页不再硬编码「${forbidden}」`)
 }

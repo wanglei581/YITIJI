@@ -21,6 +21,7 @@ const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const { createLifecycleGuard, isMemberIdentity, resolveAccountState, sameAccount } = require('../../utils/page-guard')
+const { reprintNoteText } = require('../../utils/support-contact')
 
 const STATUS_MAP = {
   // 云打印单到机前的两个任务态（服务端 Order.taskStatus），与「我的打印订单」列表同一说法
@@ -109,6 +110,7 @@ function toDetail(raw) {
     statusLabel:  STATUS_MAP[status] || status || '未知',
     statusTone:   STATUS_TONE[status] || 'neutral',
     pickup:       fmtCode(pickupRaw),
+    reprintNote:  pickupRaw ? reprintNoteText(raw) : '',
     createdAt:    fmtTime(raw.createdAt),
     payStatus:    raw.payStatus || '',
     pickupStatus: raw.pickupStatus || '',

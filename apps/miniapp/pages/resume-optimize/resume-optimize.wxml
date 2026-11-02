@@ -156,6 +156,7 @@
       >{{item.label}}</view>
     </view>
     <view class="export-note">四种格式都来自同一份优化稿；打印和打开预览使用同内容 PDF 副本。导出前请核对姓名、学校、公司、时间和数字。</view>
+    <view class="export-note">{{aiLabelNote}}</view>
     <view class="pricing-line {{pricing.mode}}">
       <text class="ficon i-info pricing-icon"></text>
       <text>{{pricing.text}}</text>

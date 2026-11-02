@@ -6,6 +6,7 @@ import {
   type MemberPhoneLoginPaneProps,
 } from '../hooks/useMemberPhoneLogin'
 import { isPhoneDailySmsCode, phoneSendHeld, phoneSendSideLabel, type LoginPhoneState } from '../loginGateModel'
+import { SrHeading } from '../../public-touch/PublicBlocks'
 
 const CODE_OPEN_STATES: ReadonlySet<LoginPhoneState> = new Set([
   'phone-code-sent',
@@ -52,7 +53,8 @@ export function LoginGatePhoneFields({
 
   return (
     <section className="qx-card" style={{ padding: 0, border: 0, background: 'transparent' }}>
-      <div className="qx-sec-h"><span className="t">用手机号登录</span></div>
+      {/* 分段切换已经写了「手机号」，稿上这两行直接排在协议下面，不再有可见的小标题；给读屏留一个 h2，不占版面。 */}
+      <SrHeading>用手机号登录</SrHeading>
       <div className="lg-fields">
       <div className="lg-field lg-field-phone">
         <label htmlFor="login-gate-phone">手机号</label>

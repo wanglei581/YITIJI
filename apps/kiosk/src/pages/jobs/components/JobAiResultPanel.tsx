@@ -39,7 +39,7 @@ export function JobAiResultPanel({
           <SparklesIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
           <div>
             <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
-            <p className="mt-0.5 text-xs text-neutral-400">仅供参考，不代表录用结果。</p>
+            <p className="mt-0.5 text-xs text-neutral-400">AI 生成，仅供参考，不代表录用结果。</p>
           </div>
         </div>
         {onClear && (

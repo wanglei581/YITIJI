@@ -15,6 +15,11 @@
 | 传文件 | `https://<公网域名>/k/u/<sceneToken>` | `https://zyidai.cn/k/u/` → `pages/kiosk-send/kiosk-send` | `/k/u/:scene` 兑换后 replace 到 `/upload/phone#sessionId=…&token=…&purpose=…` |
 | 扫码登录 | `https://<公网域名>/k/l/<ticketId>` | `https://zyidai.cn/k/l/` → `pages/kiosk-login/kiosk-login` | `/k/l/:ticketId` replace 到 `/member/qr-login?ticketId=…` |
 
+- **本人手写签名图（`purpose=signature_image`）已接入同一普通短链**（2026-10-31 候选，尚未发布）：
+  `/k/u/<sceneToken>` 兑换后，小程序按真实会话用途使用聊天图片选择器，只接受 JPG/PNG、有效大小且不超过 10MB；
+  回执必须属于同一会话和已知用途，签名用途不显示「我的文档」也不能从文档库发送。后端继续校验实际字节，
+  签名图确认后系统短期留存，不归档进会员文档。没有有效场景码时仍回落网页长链，H5 上传仍可用。
+  发布时必须包含支持该用途的小程序版本，再启用对应微信规则并实机验证；旧小程序版本不能据此称为支持签名图。
 - 为什么放路径不放 `#` 后面：官方规则只写了路径前缀匹配（规则以 `/` 结尾才匹配子路径）和 `?` 参数前缀匹配，
   没提 `#`；官方例子本身就是「业务参数放路径里」。码也从约 130 字符缩到约 45 字符，屏上更好扫。
 - 进小程序后整条码在 `options.q`，`decodeURIComponent` 一次后交给 `apps/miniapp/utils/kiosk-qr.js` 认码型
@@ -97,6 +102,13 @@ POST /api/v1/upload-sessions/:sessionId/member-file    （小程序会员「我�
    签名图等不在列表里的一律同一个 404 `FILE_NOT_FOUND`，不回显 fileId）；落进这一单的是匿名副本，会话作废、过期只删副本。
    一体机登录着另一个会员（会话 mode=member 且会员不是本人）时读文件之前就拒：403 `UPLOAD_SESSION_MEMBER_MISMATCH`，
    免得别人的文件在一体机确认后归档进当前登录者的文件库。超过 10MB：400 `FILE_TOO_LARGE`。
+6. **只用于这一单（2026-11-02 产品负责人拍板）。** 一体机登录着会员（mode=member）时，手机传进这一单的文件
+   （三种来源一样，含从小程序「我的文档」递交的副本）确认后仍挂在登录人名下——后面的诊断、打印按本人校验——
+   但锁成 `upload_session_order_only`：按系统短期保存（到期从上传那一刻起算，和未登录一样，确认不续期；
+   简历约 1 小时、打印文件约 24 小时），`GET /me/documents` 和本人数据导出清单都不列，本人也改不了保存期限。由它自动转出来的 PDF
+   （打印前 Word 转 PDF、图片拼 PDF）跟着锁；图片拼 PDF 的响应多回 `savedToDocuments`，一体机说「已进我的文档」只认它。
+   起因：现场无人值守，上一位没退出时，下一位传的身份证、简历会在确认后存进上一位的账号。
+   从小程序「我的文档」递交的，原件本来就在「我的文档」里，这一单用的副本不再多存一份。合同文件仍按自己的会话专用锁。
 
 ### 旁人拍码抢传：风险与防线（触屏版总指挥 10/29 要求写明）
 
