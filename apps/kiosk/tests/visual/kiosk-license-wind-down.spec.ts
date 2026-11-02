@@ -20,14 +20,13 @@ import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
 import {
   boot, expectHomeLive, expectHomeWindingDown, expectTapStays, goInApp, mainNav, markDocument, MINUTE, NO_NEW_TASK, paused,
-  settleAfterPause, tap, windDownBlocked,
+  settleAfterPause, startWindDown, tap, windDownBlocked,
 } from './fixtures/license-gate-kit'
 import {
   INTERVIEW_REPORT, INTERVIEW_REPORT_2, INTERVIEW_ROW, INTERVIEW_ROW_2, INTERVIEW_SESSION_ID, INTERVIEW_SESSION_ID_2,
   RESUME_REPORT_RECORD, RESUME_ROW, RESUME_TASK_ID,
 } from './fixtures/license-records'
 import type { LicenseWorld } from './fixtures/license-world'
-import { longestBlankRun } from './fixtures/blank-run'
 import { loginThroughVisibleUi } from './fixtures/privacy-clear-shell'
 
 test.describe.configure({ timeout: 120_000 })
@@ -45,13 +44,6 @@ const PNG_1X1 = Buffer.from(
 
 const emptyPage = { success: true, data: { items: [], nextCursor: null, total: 0 } }
 const MEMBER = { token: 'privacy-member-token', user: { id: 'privacy-member', phoneMasked: '139****5678', nickname: '王晓雨' } }
-
-/** 收尾开始：授权失效、当前凭证还剩 10 分钟，推进到页面自己读到验过签的失效答复为止。 */
-async function startWindDown(world: LicenseWorld): Promise<void> {
-  world.lapse(10 * MINUTE)
-  await world.advance(3.5 * MINUTE)
-  expect(world.log.profile.some((entry) => entry.verified && entry.licenseState === 'inactive'), '页面应已读到授权失效').toBe(true)
-}
 
 /** 走屏上的手机号登录（本人），再把假服务端的时钟读数对齐。 */
 async function signIn(page: Page, api: ApiRouter, world: LicenseWorld): Promise<void> {
@@ -134,7 +126,8 @@ test('收尾中从首页进另一项服务的办理页：整屏换成「本机�
   await expect(paused(page)).toHaveCount(0)
 })
 
-test('收尾拦截屏：徽标写「即将暂停」，三张去处卡能点、只去查看类页面，卡片区与底栏之间没有大片空白 @license-gate', async ({ page, api }, testInfo) => {
+// 拦截屏的版面（1080×1920 排满一屏、插画不变形、文字不被裁、底栏不压内容）见 kiosk-license-screens.spec.ts。
+test('收尾拦截屏：徽标写「即将暂停」，三张去处卡能点、只去查看类页面 @license-gate', async ({ page, api }) => {
   const world = await boot(page, api)
   await startWindDown(world)
   await goInApp(page, '/resume/source')
@@ -156,39 +149,6 @@ test('收尾拦截屏：徽标写「即将暂停」，三张去处卡能点、�
   await expect(cards.nth(2)).toContainText('回首页')
   await expect(cards.nth(2)).toContainText('不开始新的办理')
   await expect(screen.locator('.qxt-dock').getByRole('button')).toHaveText(['返回', '回首页'])
-
-  // 1080×1920 下量版面：卡片区最后一张卡的底边到底栏顶边的距离，超过三分之一屏（640px）算大片空白；
-  // 再按项目量空白的老办法（fixtures/blank-run.ts：整屏截图里最长的连续空行）量一遍，并存下截图。
-  const shotPath = testInfo.outputPath('wind-down-blocked-1080x1920.png')
-  const shot = await page.screenshot({ path: shotPath })
-  const blank = longestBlankRun(shot)
-  const layout = await page.evaluate(() => {
-    const root = document.querySelector('[data-kiosk-screen="license-wind-down-blocked"]')!
-    const rects = (selector: string) => [...root.querySelectorAll(selector)].map((element) => element.getBoundingClientRect())
-    const cardRects = rects('.of-actions button')
-    const dockRect = root.querySelector('.qxt-dock')!.getBoundingClientRect()
-    const lastCardBottom = Math.max(...cardRects.map((rect) => rect.bottom))
-    return {
-      viewportH: window.innerHeight,
-      cardsTop: Math.min(...cardRects.map((rect) => rect.top)),
-      lastCardBottom,
-      dockTop: dockRect.top,
-      gapPx: dockRect.top - lastCardBottom,
-      cardHeights: cardRects.map((rect) => Math.round(rect.height)),
-      dockButtonHeights: rects('.qxt-dock button').map((rect) => Math.round(rect.height)),
-    }
-  })
-  const summary = `1080×1920：最后一张卡底边 y=${Math.round(layout.lastCardBottom)}，底栏顶边 y=${Math.round(layout.dockTop)}，间距 ${Math.round(layout.gapPx)}px`
-    + `（${(layout.gapPx / layout.viewportH * 100).toFixed(1)}% 屏高，三分之一屏=${Math.round(layout.viewportH / 3)}px）；整屏最长连续空白 ${blank.px}px（起点 y=${blank.atY}）；`
-    + `卡高 ${layout.cardHeights.join('/')}px，底栏按钮高 ${layout.dockButtonHeights.join('/')}px；截图 ${shotPath}`
-  console.log(`\n  [拦截屏版面] ${summary}`)
-  testInfo.annotations.push({ type: '拦截屏版面', description: summary })
-  expect(layout.viewportH, '按 1080×1920 量').toBe(1920)
-  expect(layout.gapPx, `卡片区与底栏之间的间距 ${Math.round(layout.gapPx)}px 超过三分之一屏`).toBeLessThanOrEqual(layout.viewportH / 3)
-  // 老办法量到的整屏最长连续空白同样不超过三分之一屏（卡被拉高后，空白在卡里，不在卡片区与底栏之间）。
-  expect(blank.px, `整屏最长连续空白 ${blank.px}px（起点 y=${blank.atY}）`).toBeLessThanOrEqual(layout.viewportH / 3)
-  for (const height of layout.cardHeights) expect(height, '每张去处卡都要够触摸高度').toBeGreaterThanOrEqual(56)
-  for (const height of layout.dockButtonHeights) expect(height, '底栏按钮高度不小于 56px').toBeGreaterThanOrEqual(56)
 
   // 三张卡都能点，而且只去查看类页面：我的记录、帮助与求助、收尾中的首页（入口仍全部停用）。
   const exits = [['我的记录', '/profile'], ['帮助与求助', '/help'], ['回首页', '/']] as const

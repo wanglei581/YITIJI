@@ -35,6 +35,8 @@ export interface BootOptions {
   path?: string
   /** 待机宣传：开着并带一条素材（默认关）。 */
   screensaver?: boolean
+  /** GET /public/support-contact 里的 miniappPublished（默认按 ApiRouter：未发布）。拦截屏、暂停屏有一块「在手机上也能看」，只在已发布时出现。 */
+  miniappPublished?: boolean
 }
 
 /** 起一台「授权正常」的机器：换到会话票、读到验过签的 profile、首页入口可用。 */
@@ -44,6 +46,16 @@ export async function boot(page: Page, api: ApiRouter, options: BootOptions = {}
   await allowLocalBootTicket(page)
   registerPrivacyShell(api)
   configureHomeVariant(api, 'gov')
+  if (options.miniappPublished !== undefined) {
+    // 号码与服务时间同 ApiRouter 默认（PHONE_SENTENCE 钉的就是它们），只切小程序发布标志。
+    api.respond('GET', '/api/v1/public/support-contact', {
+      status: 200,
+      json: {
+        success: true,
+        data: { servicePhone: '18369161921', serviceHours: '工作日 9:00–18:00', otherOnlineTerminalNearby: false, miniappPublished: options.miniappPublished },
+      },
+    })
+  }
   if (options.screensaver) {
     api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', {
       status: 200,
@@ -113,6 +125,13 @@ export async function expectHomeWindingDown(page: Page): Promise<void> {
     await expect(entry, `${action}：要停用`).toHaveAttribute('aria-disabled', 'true')
     await expect(entry, `${action}：要写原因`).toContainText(NO_NEW_TASK)
   }
+}
+
+/** 收尾开始：授权失效、当前凭证还剩 10 分钟，推进到页面自己读到验过签的失效答复为止。 */
+export async function startWindDown(world: LicenseWorld): Promise<void> {
+  world.lapse(10 * MINUTE)
+  await world.advance(3.5 * MINUTE)
+  expect(world.log.profile.some((entry) => entry.verified && entry.licenseState === 'inactive'), '页面应已读到授权失效').toBe(true)
 }
 
 /** 授权恢复后的首页：入口都可用、没有说明条。 */

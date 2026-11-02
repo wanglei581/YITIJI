@@ -21,7 +21,8 @@ export default defineConfig({
   // kiosk-license-gate：授权闸门（收尾中 / 暂停 / 恢复）与贴牌上屏走查，要没有 mock 会话票的正式构建（页面自己换票、续期、每 5 分钟复查）
   // 和 5 分钟以上的本页时钟，同样不能放进把隐私硬截止压到 3 秒的 playwright.privacy.config.ts。
   // kiosk-license-wind-down：收尾中的运行时根拦截、旧结果只读、到期时刻为空的兜底，与 kiosk-license-gate 共用同一套构建与假服务端。
-  testMatch: /(kiosk-privacy-clear-copy|kiosk-end-use|home-continue-handover|home-fill-when-empty|kiosk-license-gate|kiosk-license-wind-down)\.spec\.ts$/,
+  // kiosk-license-screens：收尾拦截屏与暂停服务屏在 1080×1920 下的版面（排满一屏、插画不变形、文字不被裁、底栏不压内容）。
+  testMatch: /(kiosk-privacy-clear-copy|kiosk-end-use|home-continue-handover|home-fill-when-empty|kiosk-license-gate|kiosk-license-wind-down|kiosk-license-screens)\.spec\.ts$/,
   outputDir: '../../test-results/kiosk-privacy-clear',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
