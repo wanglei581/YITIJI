@@ -31877,7 +31877,7 @@
       },
       "file": "apps/kiosk/scripts/verify-kiosk-brand-display.mjs",
       "helper": false,
-      "inCi": false,
+      "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
         "@ai-job-print/kiosk::verify:kiosk-brand-display"
