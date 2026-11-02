@@ -116,6 +116,7 @@ async function main() {
   const svc = new CareerPlanService(
     prisma, llm, stubExtraction as never, stubFiles as never, pdf, audit, aiLog,
     new CareerPlanDegradedPdfService(),
+    { requireActiveConsent: async () => undefined } as never,
   )
   const assets = new MemberAssetsService(prisma)
 
@@ -298,6 +299,7 @@ async function main() {
       const printRedacted = new CareerPlanService(
         prisma, llm, stubExtraction as never, stubFiles as never, capturePdf as never, audit, aiLog,
         new CareerPlanDegradedPdfService(),
+        { requireActiveConsent: async () => undefined } as never,
       )
       await printRedacted.printPlan(taskAnon, anonReq)
       if (!pdfPayload?.summary.includes('「目标岗位」') || pdfPayload.summary.includes('高级财务会计')) {
@@ -327,7 +329,8 @@ async function main() {
       if (!defensivePdf.buffer.toString('latin1', 0, 4).startsWith('%PDF')) fail('9b. PDF 渲染器未独立过滤空项')
       pass('9b. PDF 渲染器独立过滤空项')
       const closedController = new CareerPlanController(svc, {} as never, {} as never, prisma,
-        { resolve: async () => ({ enabled: false }) } as never)
+        { resolve: async () => ({ enabled: false }) } as never,
+        { requireActiveConsent: async () => undefined } as never)
       const manualHttp = await closedController.latest(taskAnon, { headers: { 'x-resume-access-token': accessToken } })
       if (manualHttp.basedOn.jobFit !== '高级财务会计') fail('9b. 手填来源被 controller 拒绝或清理')
       pass('9b. controller 在板块关闭时放行手填旧规划')
@@ -345,7 +348,8 @@ async function main() {
     }
     pass('9c. 系统来源规划在板块关闭时清理后可读')
     const closedController = new CareerPlanController(svc, {} as never, {} as never, prisma,
-      { resolve: async () => ({ enabled: false }) } as never)
+      { resolve: async () => ({ enabled: false }) } as never,
+      { requireActiveConsent: async () => undefined } as never)
     const systemHttp = await closedController.latest(taskAnon, { headers: { 'x-resume-access-token': accessToken } })
     const systemPrint = await closedController.print(taskAnon, { headers: { 'x-resume-access-token': accessToken } })
     if (systemHttp.basedOn.jobFit !== null || systemPrint.pageCount < 1) fail('9c. controller 查看或打印系统来源旧规划失败')
@@ -364,7 +368,6 @@ async function main() {
       const consentSvc = new CareerPlanService(
         prisma, llm, stubExtraction as never, stubFiles as never, pdf, audit, aiLog,
         new CareerPlanDegradedPdfService(),
-        undefined,
         privacy,
       )
       const taskConsent = `vcp_consent_${suffix}`

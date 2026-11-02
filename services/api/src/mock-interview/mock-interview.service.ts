@@ -1,5 +1,5 @@
 import { captureFactIdentity, recordAiServiceFact } from '../ai/usage/ai-service-fact'
-import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
@@ -102,9 +102,8 @@ export class MockInterviewService {
     private readonly extraction: ResumeExtractionService,
     private readonly audit: AuditService,
     private readonly aiLog: AiLogService,
+    private readonly privacy: MemberPrivacyService,
     redis?: RedisService,
-    /** 未注入时不拦（既有直接构造的门禁与脱敏探针）。生产由 MockInterviewModule 注入。 */
-    @Optional() private readonly privacy?: MemberPrivacyService,
   ) { this.endLock = new RedisInflightLock(redis) }
 
   // ── 创建 / 开始 ────────────────────────────────────────────────────────────
@@ -696,12 +695,12 @@ export class MockInterviewService {
 
   /**
    * 只有把简历摘要送进模型时才核 resume_ai。没有摘要不拦。
-   * 隐私服务未注入时不拦（既有直接构造）。游客 resume_ai 由服务本身放行。
+   * 游客 resume_ai 由授权服务放行。
    * 调用点都在 nextQuestion / buildReport 之前；开场失败的 catch 会把状态滚回去。
    */
   private async requireResumeConsent(session: { resumeDigest: string | null; endUserId: string | null }): Promise<void> {
     if (!session.resumeDigest?.trim()) return
-    if (this.privacy) await this.privacy.requireActiveConsent(session.endUserId, 'resume_ai')
+    await this.privacy.requireActiveConsent(session.endUserId, 'resume_ai')
   }
 
   private llmCtx(session: SessionRow) {

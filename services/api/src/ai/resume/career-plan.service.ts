@@ -76,6 +76,7 @@ export class CareerPlanService {
     private readonly audit: AuditService,
     private readonly aiLog: AiLogService,
     private readonly degradedPdf: CareerPlanDegradedPdfService,
+    private readonly privacy: MemberPrivacyService,
     /**
      * 岗位要求计数（E2）。PR #636 合入前本 token 不注册 —— 拿不到就在纸上如实写
      * 「本次未取到」，绝不留白或编一张空表。见 career-plan-degraded.ts 的接线说明。
@@ -83,9 +84,6 @@ export class CareerPlanService {
     @Optional()
     @Inject(CAREER_PLAN_JOB_REQUIREMENT_STATS)
     private readonly jobRequirementStats?: CareerPlanJobRequirementStatsPort,
-    /** 未注入时不拦（既有直接构造的门禁）。生产由 AiModule 注入。 */
-    @Optional()
-    private readonly privacy?: MemberPrivacyService,
   ) {}
 
   async generate(
@@ -96,7 +94,7 @@ export class CareerPlanService {
     const includeJobFitTitle = options?.includeJobFitTitle !== false
     const parse = await this.loadAuthorizedParse(taskId, requester)
     // 简历原文会送进模型。登录会员须先有未撤回的 resume_ai；游客由服务放行。检查在读文件和调模型之前。
-    if (this.privacy) await this.privacy.requireActiveConsent(parse.endUserId, 'resume_ai')
+    await this.privacy.requireActiveConsent(parse.endUserId, 'resume_ai')
 
     // 简历原文重提（2B 模式；清理后诚实失败不调 LLM）
     let resumeText: string | undefined

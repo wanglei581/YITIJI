@@ -1,4 +1,4 @@
-import { Body, Controller, Optional, Param, Post, Req } from '@nestjs/common'
+import { Body, Controller, Param, Post, Req } from '@nestjs/common'
 import { AiUse } from '../ai-access/ai-access.decorator'
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
 import { JwtService } from '@nestjs/jwt'
@@ -58,7 +58,7 @@ export class ResumeLayoutAdjustController {
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
-    @Optional() private readonly privacy?: MemberPrivacyService,
+    private readonly privacy: MemberPrivacyService,
   ) {}
 
   private async resolveAiResultRequester(req: ReqLike): Promise<AiResultRequester> {
@@ -76,7 +76,7 @@ export class ResumeLayoutAdjustController {
     @Req() req: ReqLike,
   ) {
     const requester = await this.resolveAiResultRequester(req)
-    if (this.privacy) await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
+    await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
     const result = await this.aiService.adjustResumeLayout(taskId, dto.resume, dto.action, dto.layout, requester)
     await this.audit.write({
       actorId: null,

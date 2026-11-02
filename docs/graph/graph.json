@@ -11533,10 +11533,12 @@
         "path": "/api/v1/resume/career-plan/:taskId",
         "roles": [],
         "serviceFiles": [
-          "services/api/src/ai/resume/career-plan.service.ts"
+          "services/api/src/ai/resume/career-plan.service.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts"
         ],
         "services": [
-          "CareerPlanService"
+          "CareerPlanService",
+          "MemberPrivacyService"
         ]
       },
       {
@@ -11968,22 +11970,26 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "UserAiConsent"
         ],
         "path": "/api/v1/resume/records/:taskId/layout-adjust",
         "roles": [],
         "serviceFiles": [
           "services/api/src/ai/ai.service.ts",
-          "services/api/src/audit/audit.service.ts"
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts"
         ],
         "services": [
           "AiService",
-          "AuditService"
+          "AuditService",
+          "MemberPrivacyService"
         ]
       },
       {
@@ -27505,7 +27511,6 @@
       "services/api/scripts/verify-member-data-request-state-machine.ts",
       "services/api/scripts/verify-member-data-request-truth.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
-      "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-pg-serialization-conflict.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
@@ -40876,7 +40881,6 @@
           "services/api/src/ai/ai-log.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/pdf/pdfjs-document.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts",
           "services/api/src/mock-interview/asr/asr.service.ts",
           "services/api/src/mock-interview/asr/tts.service.ts",
           "services/api/src/mock-interview/interview-practice-sheet-pdf.service.ts",

@@ -126,7 +126,7 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/resume/career-plan/:taskId` | CareerPlanController.latest | — | CareerPlanService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewSession<br/>PrintTask<br/>UserAiConsent |
-| POST | `/api/v1/resume/career-plan/:taskId` | CareerPlanController.generate | — | CareerPlanService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewSession<br/>PrintTask<br/>UserAiConsent |
+| POST | `/api/v1/resume/career-plan/:taskId` | CareerPlanController.generate | — | CareerPlanService<br/>MemberPrivacyService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewSession<br/>PrintTask<br/>UserAiConsent |
 | POST | `/api/v1/resume/career-plan/:taskId/print` | CareerPlanController.print | — | CareerPlanService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewSession<br/>PrintTask<br/>UserAiConsent |
 
 ## `services/api/src/ai/fair-visit-plan.controller.ts`
@@ -170,7 +170,7 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/resume/records/:taskId/layout-adjust` | ResumeLayoutAdjustController.adjustResumeLayout | — | AiService<br/>AuditService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/resume/records/:taskId/layout-adjust` | ResumeLayoutAdjustController.adjustResumeLayout | — | AiService<br/>AuditService<br/>MemberPrivacyService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
 
 ## `services/api/src/ai/resume-report-export.controller.ts`
 

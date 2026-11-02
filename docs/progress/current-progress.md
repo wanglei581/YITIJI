@@ -1,5 +1,13 @@
 # 当前开发进度
 
+## 2026-11-03：简历 AI 授权改为必需注入，并拆出模拟面试授权门禁（分支 `claude/resume-ai-consent-1103`，未合并、未部署）
+
+- 职业规划控制器、职业规划服务、版式调整控制器、模拟面试服务里的授权服务改为和现有简历 AI 控制器一样的必需注入。漏注册时应用启动失败，不再静默放行。岗位要求计数端口仍可选，排在授权服务之后。
+- 直接构造的既有测试显式传入放行替身；专门测授权的仍用真服务。新增 `verify:resume-ai-consent-wiring`，在真实模块装配下证明这四处拿到同一个 `MemberPrivacyService`，且该参数不是可选依赖。
+- `verify-mock-interview.ts` 回到拆出前的 1132 行，原有 25 条正向断言还在。授权用例挪到 `verify-mock-interview-consent.ts`。补上已开始的带简历会话：撤回 `resume_ai` 后，回答出下一题和结束生成报告都返回 403 `USER_AI_CONSENT_REQUIRED`，模型调用、AI 日志和计量不增加，会话仍在进行中；重新同意后能继续并结束。
+- 两条新门禁接进 `services/api/package.json`，并跟在 CI 里两处 `verify:mock-interview` 后面（SQLite 与 PostgreSQL）。
+- 验证：模拟面试 25 条、授权门禁 6 条、职业规划 22 条、版式调整通过、AI 访问通过、注入 4 处、降级出纸 13 条、送模型打码 136 条、自我探索同意 26 通过 / 1 跳过、会员资产与问答记录通过、岗位板块开关通过、API 类型检查通过、一体机声明门禁通过、仓库完整性与图谱检查通过。
+
 ## 2026-11-03：简历 AI 授权补到职业规划、版式调整和带简历的模拟面试（分支 `claude/resume-ai-consent-1103`，未合并、未部署）
 
 - 后端：把用户简历内容交给 AI 之前核 `resume_ai`。未同意时与现有简历 AI 端点相同：403，错误码 `USER_AI_CONSENT_REQUIRED`，文案「请先确认简历 AI 服务授权」。游客（`endUserId` 为空）由 `requireActiveConsent` 放行。检查都在调用模型之前。
