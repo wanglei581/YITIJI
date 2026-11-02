@@ -1,3 +1,6 @@
+import { useKioskLicense } from '../../../layouts/KioskLicenseContext'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../../copy/unattendedCopy'
+import { LicenseLock } from '../../../layouts/LicenseLock'
 import { clearResumeReferences } from '../../resume/clearResumeReferences'
 import { recordUnavailableReason, resumeLabel } from './aiRecordNavigation'
 import { useMemberCursorPage } from './useMemberCursorPage'
@@ -46,6 +49,7 @@ function taskPath(path: string, taskId: string): string {
 export function MyResumesPage() {
   // loginFrom="/me/resumes"
   const navigate = useNavigate()
+  const winding = useKioskLicense().mode === 'winding-down'
   const { isLoggedIn, getToken } = useAuth()
   const [reloadKey, setReloadKey] = useState(0)
   const [confirmDelete, setConfirmDelete] = useState<(MemberResumeItem & { ownerToken: string | null }) | null>(null)
@@ -95,9 +99,9 @@ export function MyResumesPage() {
           sentence="这个账号还没有简历记录。"
           note={<p className="me-p">公共一体机上的游客上传不会自动绑定到账号；登录后上传、诊断或生成的简历会显示在这里。</p>}
         >
-          <MeExitCard art="resume" artWidth={120} title="上传一份简历" desc="从手机或 U 盘选一份，接着做诊断" onClick={() => navigate('/resume/source')} />
-          <MeExitCard art="scan" artWidth={120} title="扫描纸质简历" desc="把纸质简历扫进来" onClick={() => navigate('/scan/start')} />
-          <MeExitCard art="checklist" artWidth={110} title="从零生成" desc="没有旧简历也可以做" onClick={() => navigate('/resume/generate')} />
+          <LicenseLock><MeExitCard art="resume" artWidth={120} title="上传一份简历" desc="从手机或 U 盘选一份，接着做诊断" onClick={() => navigate('/resume/source')} /></LicenseLock>
+          <LicenseLock><MeExitCard art="scan" artWidth={120} title="扫描纸质简历" desc="把纸质简历扫进来" onClick={() => navigate('/scan/start')} /></LicenseLock>
+          <LicenseLock><MeExitCard art="checklist" artWidth={110} title="从零生成" desc="没有旧简历也可以做" onClick={() => navigate('/resume/generate')} /></LicenseLock>
         </MeEmptyPack>
       </div>
     )
@@ -128,8 +132,8 @@ export function MyResumesPage() {
                   {isParse ? (
                     <>
                       <SmallAct label="查看报告" disabled={!actionable} reason={disabledReason} aria={`查看 ${taskLabel} 这份简历的诊断报告`} onClick={() => openReport(item.taskId)} primary />
-                      <SmallAct label={item.optimized ? '查看优化版' : '继续优化'} disabled={!actionable} reason={disabledReason} aria={`${item.optimized ? '查看' : '继续生成'} ${taskLabel} 这份简历的优化版`} onClick={() => openOptimize(item.taskId, item.optimized)} />
-                      <SmallAct label="简历对照" disabled={!actionable} reason={disabledReason} aria="用这份简历做简历对照" onClick={() => openJobFit(item)} />
+                      <SmallAct label={item.optimized ? '查看优化版' : '继续优化'} disabled={!actionable || (winding && !item.optimized)} reason={winding && !item.optimized ? LICENSE_NO_NEW_TASK_REASON : disabledReason} aria={`${item.optimized ? '查看' : '继续生成'} ${taskLabel} 这份简历的优化版`} onClick={() => openOptimize(item.taskId, item.optimized)} />
+                      <SmallAct label="简历对照" disabled={!actionable || winding} reason={winding ? LICENSE_NO_NEW_TASK_REASON : disabledReason} aria="用这份简历做简历对照" onClick={() => openJobFit(item)} />
                     </>
                   ) : (
                     <>
@@ -165,15 +169,15 @@ export function MyResumesPage() {
         </MeRows>
         {items.length < 7 && openId === null ? (
           <div className="me-stack">
-            <MeExitCard art="scan" artWidth={110} title="扫描纸质简历" desc="把纸质简历扫进来" onClick={() => navigate('/scan/start')} />
-            <MeExitCard art="checklist" artWidth={100} title="从零生成" desc="没有旧简历也可以做" onClick={() => navigate('/resume/generate')} />
+            <LicenseLock><MeExitCard art="scan" artWidth={110} title="扫描纸质简历" desc="把纸质简历扫进来" onClick={() => navigate('/scan/start')} /></LicenseLock>
+            <LicenseLock><MeExitCard art="checklist" artWidth={100} title="从零生成" desc="没有旧简历也可以做" onClick={() => navigate('/resume/generate')} /></LicenseLock>
           </div>
         ) : null}
       </>
     )
   }
 
-  const ctabar = recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/resumes', '去上传简历', () => navigate('/resume/source'))
+  const ctabar = uiState === 'login' || uiState === 'loading' || uiState === 'error' ? recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/resumes', '去上传简历', () => navigate('/resume/source')) : <LicenseLock>{recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/resumes', '去上传简历', () => navigate('/resume/source'))}</LicenseLock>
 
   return (
     <QxMePage
@@ -206,6 +210,7 @@ function SmallAct({
     <MeBtn
       v={primary ? 'pri' : 'sec'}
       disabled={disabled}
+      title={disabled && reason === LICENSE_NO_NEW_TASK_REASON ? reason : undefined}
       aria-disabled={disabled || undefined}
       onClick={disabled ? (event) => event.preventDefault() : onClick}
       aria-label={disabled ? `${aria}（${reason}）` : aria}
