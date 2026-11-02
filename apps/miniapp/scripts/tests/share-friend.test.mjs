@@ -47,8 +47,8 @@ function tap(id) {
   return { currentTarget: { dataset: { id } } }
 }
 
-function doc(id, filename) {
-  return { id, filename, mimeType: 'application/pdf', sizeBytes: 1200, createdAt: '2026-10-20T00:00:00.000Z' }
+function doc(id, filename, mimeType = 'application/pdf') {
+  return { id, filename, mimeType, sizeBytes: 1200, createdAt: '2026-10-20T00:00:00.000Z' }
 }
 
 function openDocuments(items, previewOf) {
@@ -112,6 +112,220 @@ function row(page, id) {
   return page.data.filtered.find((item) => item.id === id)
 }
 
+const FUTURE = '2099-01-01T00:00:00.000Z'
+
+function diagnoseBody(fileId, filename) {
+  return {
+    fileId,
+    filename,
+    mimeType: 'application/pdf',
+    sizeBytes: 1200,
+    pageCount: 1,
+    signedUrl: `/api/v1/files/${fileId}/content?sig=open`,
+    printFileUrl: `/api/v1/files/${fileId}/content?sig=print`,
+    expiresAt: FUTURE,
+    savedToDocuments: true,
+    aiGenerated: true,
+  }
+}
+
+function optimizeBody(fileId, filename) {
+  return {
+    fileId,
+    filename,
+    sizeBytes: 1200,
+    pageCount: 1,
+    signedUrl: `https://zyidai.cn/api/v1/files/${fileId}/content?sig=open`,
+    expiresAt: FUTURE,
+    printFileUrl: `/api/v1/files/${fileId}-print/content?sig=print`,
+  }
+}
+
+function openDiagnose() {
+  const wx = makeWx()
+  const exportQueue = []
+  const previewQueue = []
+  const api = {
+    exportResumeReport() {
+      const pending = deferred()
+      exportQueue.push(pending)
+      return pending.promise
+    },
+    getFilePreviewUrl(fileId) {
+      const pending = deferred()
+      previewQueue.push({ fileId, pending })
+      return pending.promise
+    },
+  }
+  const page = instantiate(loadPageDefinition('pages/resume-diagnose/resume-diagnose.js', {
+    wx: wx.api,
+    modules: { auth: { isLoggedIn: () => true }, api },
+  }))
+  page.setData({ exportDisabled: false, status: 'done', taskId: 'task-1' })
+  return { page, wx, exportQueue, previewQueue }
+}
+
+function openOptimize(format) {
+  const wx = makeWx()
+  const exportQueue = []
+  const previewQueue = []
+  const api = {
+    exportGeneratedResume() {
+      const pending = deferred()
+      exportQueue.push(pending)
+      return pending.promise
+    },
+    getFilePreviewUrl(fileId) {
+      const pending = deferred()
+      previewQueue.push({ fileId, pending })
+      return pending.promise
+    },
+    getResumeVersions() {
+      return Promise.resolve({ items: [], latestVersion: null })
+    },
+  }
+  const page = instantiate(loadPageDefinition('pages/resume-optimize/resume-optimize.js', {
+    wx: wx.api,
+    modules: { auth: { isLoggedIn: () => true }, api },
+  }))
+  const resume = { basic: { name: '王晓雯' } }
+  page.setData({
+    exportDisabled: false,
+    phase: 'done',
+    taskId: 'task-1',
+    format: format || 'pdf',
+    pricing: { mode: 'free', text: '当前免费', disabledReason: '' },
+    opt: { hasOptimizedResume: true, optimizedResume: resume },
+  })
+  page._resume = resume
+  page._factsConfirmedAt = '2026-11-03T00:00:00.000Z'
+  page._factsNeedRecheck = false
+  return { page, wx, exportQueue, previewQueue }
+}
+
+function beginExport(env) {
+  const index = env.exportQueue.length
+  if (typeof env.page.exportReport === 'function') {
+    env.page.exportReport({
+      currentTarget: { dataset: { kind: index === 0 ? 'diagnosis_report' : 'change_list' } },
+    })
+  } else {
+    env.page.exportResume()
+  }
+  assert.equal(env.exportQueue.length, index + 1, JSON.stringify(env.wx.modals))
+  assert.equal(env.page.data.exportResult, null)
+  assert.equal(env.page.data.exportShare.phase, 'idle')
+  assert.equal(env.page.data.exportShare.busy, false)
+  return index
+}
+
+async function finishExport(env, fileId, filename, body) {
+  const index = beginExport(env)
+  env.exportQueue[index].resolve(body(fileId, filename))
+  await flush()
+  assert.equal(env.page.data.exportResult.fileId, fileId)
+  assert.equal(env.page.data.exportResult.filename, filename)
+  assert.equal(env.wx.modals.length, 0, JSON.stringify(env.wx.modals))
+}
+
+async function beginShareDownload(env) {
+  const previewBefore = env.previewQueue.length
+  const downloadBefore = env.wx.downloads.length
+  env.page.shareToFriend({})
+  await flush()
+  assert.equal(env.previewQueue.length, previewBefore + 1)
+  const queued = env.previewQueue[previewBefore]
+  queued.pending.resolve({ url: `/api/v1/files/${queued.fileId}/content?sig=preview` })
+  await flush()
+  const added = env.wx.downloads.slice(downloadBefore).filter((item) => String(item.url).includes('sig=preview'))
+  assert.equal(added.length, 1)
+  return { download: added[0], fileId: queued.fileId }
+}
+
+function exportShareWrites(writes) {
+  return writes.filter((patch) => patch && patch.exportShare !== undefined)
+}
+
+async function sendListed(id, filename, mimeType) {
+  const env = openDocuments([doc(id, filename, mimeType)])
+  await flush()
+  const shown = row(env.page, id).name
+  env.page.shareToFriend(tap(id))
+  await flush()
+  env.pending().resolve({ url: PREVIEW_PATH })
+  await flush()
+  env.wx.downloads[0].success({ statusCode: 200, tempFilePath: `wxfile://tmp/${id}` })
+  env.page.shareToFriend(tap(id))
+  return { shown, fileName: env.wx.shares[0].fileName }
+}
+
+async function assertReexportFollowsCurrentFile(env, body) {
+  await finishExport(env, 'file-a', '文件A.pdf', body)
+  const downloadA = await beginShareDownload(env)
+  assert.equal(downloadA.fileId, 'file-a')
+  assert.equal(env.page.data.exportShare.phase, 'downloading')
+
+  const second = beginExport(env)
+  assert.equal(env.page.data.exportResult, null)
+  downloadA.download.success({ statusCode: 200, tempFilePath: 'wxfile://tmp/a.pdf' })
+  assert.equal(env.page.data.exportResult, null)
+  assert.equal(env.page.data.exportShare.phase, 'idle')
+  assert.equal(env.page.data.exportShare.busy, false)
+  assert.equal(env.wx.shares.length, 0)
+  env.exportQueue[second].resolve(body('file-b', '文件B.pdf'))
+  await flush()
+  assert.equal(env.page.data.exportResult.fileId, 'file-b')
+  assert.equal(env.page.data.exportResult.filename, '文件B.pdf')
+  assert.equal(env.page.data.exportShare.phase, 'idle', 'B 出来后应是初始态，不能接着显示下载中')
+  assert.equal(env.page.data.exportShare.busy, false)
+  const downloadB = await beginShareDownload(env)
+  assert.equal(downloadB.fileId, 'file-b')
+  assert.equal(env.wx.shares.length, 0, '第一次点是在下载 B')
+
+  const ready = env.page.exportReport ? openDiagnose() : openOptimize(env.page.data.format)
+  await finishExport(ready, 'file-a', '文件A.pdf', body)
+  const readyDownload = await beginShareDownload(ready)
+  readyDownload.download.success({ statusCode: 200, tempFilePath: 'wxfile://tmp/a-ready.pdf' })
+  assert.equal(ready.page.data.exportShare.phase, 'ready')
+  await finishExport(ready, 'file-b', '文件B.pdf', body)
+  assert.equal(ready.page.data.exportShare.phase, 'idle', 'A 已下载时，B 不能先显示成可发送')
+  assert.equal(ready.page.data.exportShare.busy, false)
+  const firstTap = await beginShareDownload(ready)
+  assert.equal(firstTap.fileId, 'file-b')
+  assert.equal(ready.wx.shares.length, 0)
+  firstTap.download.success({ statusCode: 200, tempFilePath: 'wxfile://tmp/b-ready.pdf' })
+  assert.equal(ready.page.data.exportShare.phase, 'ready')
+  ready.page.shareToFriend({})
+  assert.equal(ready.wx.shares.length, 1)
+  assert.equal(ready.wx.shares[0].filePath, 'wxfile://tmp/b-ready.pdf')
+  assert.notEqual(ready.wx.shares[0].filePath, 'wxfile://tmp/a-ready.pdf')
+  assert.equal(ready.wx.shares[0].fileName, '文件B.pdf')
+
+  const late = env.page.exportReport ? openDiagnose() : openOptimize(env.page.data.format)
+  await finishExport(late, 'file-a', '文件A.pdf', body)
+  const lateA = await beginShareDownload(late)
+  await finishExport(late, 'file-b', '文件B.pdf', body)
+  assert.equal(late.page.data.exportShare.phase, 'idle')
+  const lateB = await beginShareDownload(late)
+  assert.equal(late.page.data.exportShare.phase, 'downloading')
+  const writes = []
+  const orig = late.page.setData
+  late.page.setData = function setData(patch, callback) {
+    writes.push(patch)
+    return orig.call(this, patch, callback)
+  }
+  lateA.download.success({ statusCode: 200, tempFilePath: 'wxfile://tmp/a-late.pdf' })
+  assert.equal(exportShareWrites(writes).length, 0)
+  assert.equal(late.page.data.exportShare.phase, 'downloading')
+  assert.equal(late.page.data.exportShare.busy, true)
+  assert.equal(late.wx.shares.length, 0)
+  lateB.download.success({ statusCode: 200, tempFilePath: 'wxfile://tmp/b-late.pdf' })
+  assert.equal(late.page.data.exportShare.phase, 'ready')
+  late.page.shareToFriend({})
+  assert.equal(late.wx.shares[0].filePath, 'wxfile://tmp/b-late.pdf')
+  assert.notEqual(late.wx.shares[0].filePath, 'wxfile://tmp/a-late.pdf')
+}
+
 function noFakeSuccess(page, wx) {
   const dumped = JSON.stringify(page.data)
   assert.equal(dumped.includes('已发送'), false)
@@ -155,9 +369,11 @@ test('下载成功后按页面显示的文件名发送，不显示已发送', as
   noFakeSuccess(env.page, env.wx)
 
   const sameName = await readyFile('file-1')
+  assert.equal(row(sameName.page, 'file-1').name, 'file-1')
   sameName.page.shareToFriend(tap('file-1'))
-  assert.equal(sameName.wx.shares.length, 1, '显示名碰巧等于编号时仍然发送')
-  assert.equal(sameName.wx.shares[0].fileName, 'file-1')
+  assert.equal(sameName.wx.shares.length, 1, '显示名没有扩展名时仍按类型补上再发送')
+  assert.equal(sameName.wx.shares[0].fileName, 'file-1.pdf')
+  assert.equal(sameName.wx.shares[0].fileName, row(sameName.page, 'file-1').name + '.pdf')
 })
 
 test('下载中不能重复取链接', async () => {
@@ -380,6 +596,72 @@ test('诊断和优化的导出文件走同一套发送', async () => {
   optimize.wx.shares[0].fail({ errMsg: 'shareFileMessage:fail cancel' })
   assert.equal(optimize.page.data.exportShare.message, '')
   assert.equal(optimize.page.data.exportShare.phase, 'ready')
+})
+
+test('诊断页重新导出时发送按钮跟着当前文件', async () => {
+  await assertReexportFollowsCurrentFile(openDiagnose(), diagnoseBody)
+})
+
+test('优化页重新导出时发送按钮跟着当前文件', async () => {
+  await assertReexportFollowsCurrentFile(openOptimize('pdf'), optimizeBody)
+})
+
+test('发给微信的文件名保留已有扩展名，没有时按类型补上', async () => {
+  const pdf = await sendListed('file-pdf', '王晓雯-简历.pdf')
+  assert.equal(pdf.fileName, '王晓雯-简历.pdf')
+  assert.equal(pdf.fileName, pdf.shown)
+
+  const bare = await sendListed('file-1', 'file-1')
+  assert.equal(bare.shown, 'file-1')
+  assert.equal(bare.fileName, 'file-1.pdf')
+  assert.equal(bare.fileName, bare.shown + '.pdf')
+
+  const word = await sendListed('file-doc', '求职信', 'application/msword')
+  assert.equal(word.shown, '求职信')
+  assert.equal(word.fileName, '求职信.doc')
+  assert.equal(word.fileName, word.shown + '.doc')
+
+  const docx = await sendListed('file-docx', '求职信', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+  assert.equal(docx.fileName, docx.shown + '.docx')
+
+  const png = await sendListed('file-png', '证件照', 'image/png')
+  assert.equal(png.fileName, png.shown + '.png')
+
+  const jpeg = await sendListed('file-jpg', '证件照', 'image/jpeg')
+  assert.equal(jpeg.fileName, jpeg.shown + '.jpg')
+
+  const txt = await sendListed('file-txt', '备注', 'text/plain')
+  assert.equal(txt.fileName, txt.shown + '.txt')
+
+  const kept = await sendListed('file-kept', '简历.PDF', 'application/msword')
+  assert.equal(kept.fileName, '简历.PDF')
+  assert.equal(kept.fileName, kept.shown)
+
+  const webp = await sendListed('file-webp', '扫描件', 'image/webp')
+  assert.equal(webp.shown, '扫描件')
+  assert.equal(webp.fileName, '扫描件')
+
+  const markdown = await sendListed('file-md', '笔记', 'text/markdown')
+  assert.equal(markdown.fileName, '笔记')
+
+  const diagnose = openDiagnose()
+  await finishExport(diagnose, 'diag-plain', '诊断报告', diagnoseBody)
+  assert.equal(diagnose.page.data.exportResult.filename, '诊断报告')
+  const diagDownload = await beginShareDownload(diagnose)
+  diagDownload.download.success({ statusCode: 200, tempFilePath: 'wxfile://tmp/diag-plain.pdf' })
+  diagnose.page.shareToFriend({})
+  assert.equal(diagnose.wx.shares[0].fileName, '诊断报告.pdf')
+  assert.equal(diagnose.wx.shares[0].fileName, diagnose.page.data.exportResult.filename + '.pdf')
+
+  const optimize = openOptimize('docx')
+  await finishExport(optimize, 'opt-plain', '优化稿', optimizeBody)
+  assert.equal(optimize.page.data.exportResult.filename, '优化稿')
+  assert.equal(optimize.page.data.exportResult.formatLabel, 'DOCX')
+  const optDownload = await beginShareDownload(optimize)
+  optDownload.download.success({ statusCode: 200, tempFilePath: 'wxfile://tmp/opt-plain.docx' })
+  optimize.page.shareToFriend({})
+  assert.equal(optimize.wx.shares[0].fileName, '优化稿.docx')
+  assert.equal(optimize.wx.shares[0].fileName, optimize.page.data.exportResult.filename + '.docx')
 })
 
 test('按钮文案只有发给微信好友和发送给微信好友', () => {

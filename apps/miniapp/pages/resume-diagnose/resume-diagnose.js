@@ -181,7 +181,7 @@ Page({
     const accessToken = saved.taskId === this.data.taskId ? (saved.accessToken || '') : ''
     const label = kind === 'diagnosis_report' ? '诊断报告 PDF' : '修改清单 PDF'
     this._stopExportCountdown()
-    this.setData({ exportingKind: kind, exportResult: null, exportCountdown: '', exportExpired: false })
+    this.setData({ exportingKind: kind, exportResult: null, exportCountdown: '', exportExpired: false, exportShare: shareFriend.viewForFile(this, '') })
     wx.showLoading({ title: '正在生成 PDF…', mask: true })
     api.exportResumeReport(this.data.taskId, kind, accessToken, this.data.benefitGrantId)
       .then((raw) => {
@@ -191,7 +191,7 @@ Page({
         if (!result.fileId || !result.filename || result.mimeType !== 'application/pdf' || !result.signedUrl || !result.printFileUrl) {
           throw new Error('服务端未返回完整的 PDF 文件信息')
         }
-        this.setData({ exportingKind: '', exportResult: result }, () => this._startExportCountdown())
+        this.setData({ exportingKind: '', exportResult: result, exportShare: shareFriend.viewForFile(this, result.savedToDocuments ? result.fileId : '') }, () => this._startExportCountdown())
         if (this.data.pricing.mode === 'charged') this._loadPricing()
       })
       .catch((err) => {

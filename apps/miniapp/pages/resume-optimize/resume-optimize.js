@@ -268,7 +268,7 @@ Page({
     if (this.data.exporting) return
     const format = String(e.currentTarget.dataset.format || '')
     if (!FORMATS.some((item) => item.key === format)) return
-    this.setData({ format, exportResult: null })
+    this.setData({ format, exportResult: null, exportShare: shareFriend.viewForFile(this, '') })
   },
 
   exportResume() {
@@ -354,7 +354,7 @@ Page({
     if (this.data.benefitGrantId) payload.benefitGrantId = this.data.benefitGrantId
     payload.factsConfirmedAt = factsConfirmedAt
     this._stopExportCountdown()
-    this.setData({ exporting: true, exportResult: null })
+    this.setData({ exporting: true, exportResult: null, exportShare: shareFriend.viewForFile(this, '') })
     wx.showLoading({ title: '正在生成文件…', mask: true })
     const saved = storage.get(storage.KEYS.RESUME_TASK) || {}
     const accessToken = saved.taskId === this.data.taskId ? (saved.accessToken || '') : ''
@@ -368,7 +368,7 @@ Page({
         result.printFileId = draft.fileIdFromPrintUrl(res.printFileUrl)
         result.pdfUrl = fileUrls.absoluteUrl(res.printFileUrl)
         if (!result.pdfUrl || !result.printFileId) throw new Error('打印用 PDF 副本地址无效')
-        this.setData({ exporting: false, exportResult: result }, () => this._startExportCountdown())
+        this.setData({ exporting: false, exportResult: result, exportShare: shareFriend.viewForFile(this, result.fileId) }, () => this._startExportCountdown())
         if (this.data.pricing.mode === 'charged') this._loadPricing()
         this._loadVersions()
         this._openPdf(result)
