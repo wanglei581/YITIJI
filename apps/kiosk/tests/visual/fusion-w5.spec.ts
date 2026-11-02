@@ -2052,6 +2052,10 @@ test('R-04 documents: photo composite requiring check opens material check @w5-k
   api.respond('GET', '/api/v1/files/doc-photo-pdf/preview-url', {
     status: 200, json: { success: true, data: { fileId: 'doc-photo-pdf', printFileUrl: '/api/v1/files/doc-photo-pdf/content?sig=print', expiresAt: FUTURE } },
   })
+  // 材料检查页会取这一份文件自己的第一页做小样（上面 derived AI 那条用例同款写法）：接到一份可见 PDF 让请求有人应答，
+  // 否则夹具收尾报 Unhandled API requests；「未处理请求即失败」的夹具本身不放宽。
+  await page.route((url) => url.pathname === '/api/v1/files/doc-photo-pdf/content', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }))
   api.respond('POST', '/api/v1/materials/tasks', { status: 200, json: { success: true, data: { ...W5_DOC_INSPECTION, sourceFileId: 'doc-photo-pdf' } } })
   api.respond('GET', `/api/v1/materials/tasks/${W5_DOC_INSPECTION.id}`, { status: 200, json: { success: true, data: { ...W5_DOC_INSPECTION, sourceFileId: 'doc-photo-pdf' } } })
   await loginThroughVisibleUi(page, '/me/documents')
@@ -2076,6 +2080,10 @@ test('R-08 member USB import carries anonymous task token into material check @w
       : path.endsWith('/files') ? { present: true, driveLabel: 'USB', files: [{ safeId: 'usb-1', filename: '材料.pdf', extension: 'pdf', sizeBytes: 100 }] } : usbFile
     return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ success: true, data }) })
   })
+  // 导入完成后材料检查页会取这一份文件自己的第一页做小样（与上面 R-04 用例同因）：接到一份可见 PDF 让请求有人应答，
+  // 否则夹具收尾报 Unhandled API requests；「未处理请求即失败」的夹具本身不放宽。
+  await page.route((url) => url.pathname === '/api/v1/files/usb-anon/content', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }))
   const task = { ...W5_DOC_INSPECTION, sourceFileId: 'usb-anon', endUserId: null, accessToken: 'usb-task-token' }
   api.respond('POST', '/api/v1/materials/tasks', { status: 200, json: { success: true, data: task } })
   api.respond('GET', `/api/v1/materials/tasks/${task.id}`, { status: 200, json: { success: true, data: { ...task, accessToken: undefined } } })
