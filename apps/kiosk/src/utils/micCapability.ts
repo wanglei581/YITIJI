@@ -43,6 +43,12 @@ export const MIC_STATUS_LABEL: Record<MicCapabilityState, string> = {
 }
 
 /**
+ * 本机探到了麦克风，但语音转写服务没开时的状态格说法。
+ * 只陈述硬件事实，不说「可用」：能不能语音回答还要看转写服务，那件事由常显原因讲一次（走查 I-24）。
+ */
+export const MIC_DETECTED_LABEL = '已检测到麦克风'
+
+/**
  * 常显原因 + 可执行的下一步。
  * 一体机没有 hover，原因不能塞进 title，必须常驻在页面上（见 CLAUDE.md §9）。
  * 「无权限」文案不能把人指去地址栏：一体机是全屏模式、没有地址栏，所以写成两边都成立的说法。
@@ -52,7 +58,7 @@ export const MIC_REASON: Record<MicCapabilityState, string | null> = {
   'no-device':
     '本机没有麦克风，请用文字作答。如果刚插入 USB 麦克风，点「重新检测麦克风」即可启用语音。',
   'permission-denied':
-    '麦克风权限没有打开：可以直接用文字作答。需要语音时，请在浏览器设置里允许麦克风后点「重新检测麦克风」；在一体机上请联系现场工作人员。',
+    '麦克风权限没有打开：可以直接用文字作答。需要语音时，请在浏览器设置里允许麦克风后点「重新检测麦克风」；在一体机上请继续用文字作答。',
   unsupported:
     '当前浏览器环境不支持麦克风采集（需要 HTTPS 或 localhost），请用文字作答。',
 }
@@ -62,7 +68,7 @@ export const MIC_FAILURE_REASON: Record<MicFailureState, string> = {
   available: '麦克风调用失败，可重新录音或改用文字输入',
   'no-device': '本机没有麦克风，请用文字作答',
   'permission-denied':
-    '麦克风权限没有打开，请改用文字输入；需要语音时请在浏览器设置里允许麦克风，一体机上请联系现场工作人员',
+    '麦克风权限没有打开，请改用文字输入；需要语音时请在浏览器设置里允许麦克风，一体机上请继续用文字输入',
   unsupported: '当前浏览器环境不支持麦克风采集，请用文字作答',
   busy: '麦克风被其他程序占用，请关闭占用程序后重试，或改用文字输入',
   timeout: '麦克风权限请求超时，请重试或改用文字输入',

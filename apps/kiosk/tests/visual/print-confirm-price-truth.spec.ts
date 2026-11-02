@@ -171,7 +171,7 @@ test('print confirm falls back to black-and-white and never quotes unverified co
   await expect(page.locator('[data-cost-calc]')).toHaveText(`${yuan(UNIT_CENTS.black_white)}/页 × ${W2_FILE.pages} 页`)
   expect(seen.colorMode).toBe('black_white')
   await expect(page.getByText('金额暂不可用')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: /确认并去付款/ })).toBeEnabled()
+  await expect(page.getByRole('button', { name: /^去付款$/ })).toBeEnabled()
   expect(pageErrors).toEqual([])
 })
 
@@ -289,7 +289,7 @@ async function openConfirm(page: Page, selfAssessment = false): Promise<void> {
 }
 
 const amountCard = (page: Page) => page.getByTestId('print-confirm-amount')
-const originalConfirm = (page: Page) => page.getByRole('button', { name: /^(确认并去付款|确认并打印)$/ })
+const originalConfirm = (page: Page) => page.getByRole('button', { name: /^(去付款|确认并打印)$/ })
 const reconfirm = (page: Page, cents: number, merged = false) =>
   page.getByRole('button', { name: `按新金额 ${yuan(cents)} 确认${merged ? '（合并版）' : ''}` })
 

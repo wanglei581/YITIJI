@@ -31,7 +31,7 @@ const fail = (msg) => {
 
 const home = read('src/pages/home/HomePage.tsx')
 const homeDomains = read('src/pages/home/homeV6Domains.ts')
-const homeView = read('src/pages/home/components/QxHomeView.tsx')
+const homeView = read('src/pages/home/components/HomeTouchView.tsx')
 const toolboxPage = read('src/pages/toolbox/ToolboxZonePage.tsx')
 const launchHelpers = read('src/pages/home/components/kioskAppLaunch.ts')
 const toolboxHook = read('src/hooks/useToolboxConfig.ts')

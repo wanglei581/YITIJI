@@ -81,8 +81,8 @@ export function isDefinitiveAckRefusal(code: string | undefined): boolean {
  * （所以没有谁在等他那张纸）、现在别去面板按开始。
  */
 export const SCAN_ACK_REFUSED_FAILURE: SessionFailure = {
-  title: '这次扫描没能取得投递授权',
-  description: '这次扫描建出来了，但本机向系统确认投递授权时被明确拒绝：这一场已经过期、'
+  title: '这次扫描没能确认能收到扫描件',
+  description: '这次扫描建出来了，但本机向系统确认能收到扫描件时被明确拒绝：这一场已经过期、'
     + '被取消或已经结束，系统不会再把面板上扫出来的文件交给它。本页已经把它撤掉，'
     + '也清掉了本机这一份记录，所以系统里没有留下还在等文件的任务，'
     + '你手上的纸不会被谁悄悄收走。现在请先别在面板上按开始：没有这次扫描来接收那份文件。'
@@ -97,10 +97,10 @@ export const SCAN_ACK_REFUSED_FAILURE: SessionFailure = {
  */
 export const SCAN_ACK_PENDING_FAILURE: SessionFailure = {
   title: '还没确认这台机器能收这份文件',
-  description: '这次扫描已经建好，但本机还没能向系统确认投递授权。没确认之前，'
+  description: '这次扫描已经建好，但本机还没确认能收到扫描件。没确认之前，'
     + '打印机面板上扫出来的文件不会交到这一场，所以现在按开始只会白扫一张纸，'
     + '也不会被别人收走。这一步可以重来：点「再确认一次」让本机再问一遍系统。'
-    + '一直不成就安全返回扫描首页，或者叫工作人员看一眼这台机器到系统的网络。',
+    + '一直不成就安全返回扫描首页。',
 }
 
 /**
@@ -108,9 +108,9 @@ export const SCAN_ACK_PENDING_FAILURE: SessionFailure = {
  *
  * 和上面两条一样是**纯字符串**：它会被原样渲染进 `<p>`，写 markdown 会把星号
  * 打在 27 寸公共屏上。三句缺一不可 —— 会话确实建成了、这一刻扫也没用、
- * 但也不会被别人收走（否则用户会以为自己的纸有风险，转身去找工作人员）。
+ * 但也不会被别人收走（否则用户会以为自己的纸有风险，转身去找人）。
  */
-export const SCAN_ACK_PENDING_NOTICE = '这次扫描已经建好。本机正在向系统确认投递授权：'
+export const SCAN_ACK_PENDING_NOTICE = '这次扫描已经建好。本机正在确认能收到扫描件：'
   + '确认之前，打印机面板上扫出来的文件不会交到这一场，所以请先别在面板上按开始。'
   + '这一场也不会被别人收走 —— 没确认的任务不会接收任何文件。'
 
@@ -121,7 +121,7 @@ export const SCAN_ACK_PENDING_NOTICE = '这次扫描已经建好。本机正在�
  * 出路是设置页上的「重新开始一次扫描」，而等待页拒绝之后落的是结果屏，
  * 那里根本没有这颗按钮 —— 照抄过去就是指了一条按不到的路。
  */
-export const SCAN_ACK_REFUSED_PROGRESS_REASON = '系统没有给这一场投递授权（已过期、被取消'
+export const SCAN_ACK_REFUSED_PROGRESS_REASON = '系统没有确认这一场能收到扫描件（已过期、被取消'
   + '或已经结束），本机已经把它撤掉。面板上扫出来的文件不会交到这一场，'
   + '你手上的纸也不会被谁收走。要继续请重新开始一次扫描。'
 

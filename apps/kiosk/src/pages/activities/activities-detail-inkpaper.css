@@ -353,3 +353,7 @@
   .k8-act-steps { grid-template-columns: 1fr; }
   .k8-act-cta { grid-template-columns: 1fr; }
 }
+
+/* 活动详情的两张「画 + 一段话」卡（活动信息、领了之后）被撑到 500 多高，插画原来封顶 300（占不到 60%），上下各留约 120 的白，
+   最长空白 122。取消封顶、放大到卡高的 90%，上下各留约 45（blankscan 阈值 105，实测 37–70）；只作用于活动详情页。 */
+.k8-act-detail .me-hero > .me-art { height: 90%; max-height: none; }

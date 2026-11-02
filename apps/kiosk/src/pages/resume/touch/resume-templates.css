@@ -1,0 +1,65 @@
+/* 简历模板列表：每个版式一张大卡，上面是一张纸（栏数照服务端预设画，标「示例」），下面是名字、适用说明和标签。
+   小样只表示版式形状，不是任何人的内容。颜色只走 var(--qxt-*) / var(--qx-*)；挂在 .qxt-screen 下，不动 resume-decision-qx.css 的原规则。 */
+
+.qxt-screen .rdq-tpl-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.qxt-screen .rdq-tpl {
+  padding: 0 0 18px;
+  gap: 6px;
+  overflow: hidden;
+  border-radius: var(--qxt-r-card);
+  border: 1.5px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  text-align: left;
+}
+
+.qxt-screen .rdq-tpl[aria-pressed='true'] {
+  border-color: var(--qx-teal);
+  background: var(--qx-teal-soft);
+  box-shadow: inset 0 0 0 2px var(--qx-teal);
+}
+
+.qxt-screen .rdq-tpl-art {
+  display: grid;
+  place-items: center;
+  height: 300px;
+  padding: 14px;
+  border-radius: 0;
+  background: var(--qxt-well);
+}
+
+.qxt-screen .rdq-tpl-art .rtp-paper {
+  height: 100%;
+  width: auto;
+}
+
+.qxt-screen .rdq-tpl > :not(.rdq-tpl-art) {
+  margin-inline: 22px;
+}
+
+.qxt-screen .rdq-tpl-sample {
+  align-self: flex-start;
+  margin-top: 12px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: var(--qxt-fs-aux);
+  font-weight: 700;
+}
+
+.qxt-screen .rdq-tpl h3 {
+  font: 700 var(--qxt-fs-hub) / 1.2 var(--qx-serif);
+}
+
+@media (max-width: 390px) {
+  .qxt-screen .rdq-tpl-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .qxt-screen .rdq-tpl-art {
+    height: 200px;
+  }
+}

@@ -17,6 +17,7 @@
 // 仓库里已有若干返回 { ok: true } 的空壳端点，这里不再制造同类体验。
 // ============================================================
 
+import { machineUnusableLine } from '../../copy/unattendedCopy'
 import { API_BASE_URL, API_MODE } from './client'
 import { getTerminalId } from './screensaver'
 
@@ -131,7 +132,7 @@ export async function submitKioskFeedback(
     // 终端身份未解析 = 后端无法定位是哪台机器，也无法做按终端限流。失败关闭。
     throw new KioskFeedbackApiError(
       'NO_TERMINAL_IDENTITY',
-      '本机终端身份未确认，暂时无法提交反馈，请联系现场工作人员',
+      `本机终端身份未确认，暂时无法提交反馈。${machineUnusableLine()}`,
       0,
     )
   }

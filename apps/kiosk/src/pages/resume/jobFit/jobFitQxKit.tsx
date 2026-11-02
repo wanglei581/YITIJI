@@ -9,7 +9,7 @@
 // 等待返回」槽位，不是骨架假内容。不要给它们加默认值兜底 —— 那等于替服务端说话。
 
 import type { ReactNode } from 'react'
-import { AlertTriangleIcon, FileTextIcon, LockIcon, ShieldCheckIcon, TargetIcon, XIcon } from 'lucide-react'
+import { AlertTriangleIcon, FileTextIcon, LockIcon, ShieldCheckIcon, TargetIcon } from 'lucide-react'
 
 export function Sec({ no, title, hint, copy, grow, children }: {
   no?: string
@@ -104,21 +104,6 @@ export function Waiting({ icon, title, desc, tag }: { icon: ReactNode; title: st
   )
 }
 
-/** 未返回占位：虚线框写清「等待返回」，不拿上一次的值或默认值填。 */
-export function Ghosts({ items }: { items: Array<{ title: string; desc: string; tag: string }> }) {
-  return (
-    <div className="jfq-ghosts">
-      {items.map((item) => (
-        <div key={item.title} className="jfq-ghost">
-          <b>{item.title}</b>
-          <p>{item.desc}</p>
-          <span>{item.tag}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 export function Verdict({ items }: { items: Array<{ tone: 'ok' | 'warn' | 'bad'; label: string; value: string }> }) {
   return (
     <div className="jfq-verdict" data-cols={items.length === 2 ? '2' : undefined}>
@@ -142,64 +127,6 @@ export function Why({ items }: { items: Array<{ head: string; title: string; des
             <b>{item.title}</b>
           </div>
           <p>{item.desc}</p>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-export function Steps({ items }: { items: Array<{ title: string; desc: string }> }) {
-  return (
-    <div className="jfq-steps">
-      {items.map((item, index) => (
-        <div key={item.title} className="jfq-step">
-          <span className="jfq-step-no" aria-hidden="true">{index + 1}</span>
-          <span>
-            <b>{item.title}</b>
-            <p>{item.desc}</p>
-          </span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-/** 明确否定：这些事现在没有发生。合规边界不随状态放宽。 */
-export function Nots({ items }: { items: string[] }) {
-  return (
-    <div className="jfq-nots">
-      {items.map((item) => (
-        <div key={item} className="jfq-not">
-          <XIcon size={20} aria-hidden="true" />
-          <span>{item}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-export function ListRows({ items }: { items: string[] }) {
-  return (
-    <div className="jfq-list">
-      {items.map((item, index) => (
-        <div key={item} className="jfq-list-row">
-          <i aria-hidden="true">{index + 1}</i>
-          <span>{item}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-export function Trace({ items }: { items: Array<{ phase: string; title: string; desc: string; now?: boolean }> }) {
-  return (
-    <div className="jfq-trace">
-      {items.map((item) => (
-        <div key={item.title} data-now={item.now ? 'true' : undefined}>
-          <small>{item.phase}</small>
-          <b>{item.title}</b>
-          <p>{item.desc}</p>
-          {item.now ? <span className="jfq-now-tag">当前停在这里</span> : null}
         </div>
       ))}
     </div>
@@ -233,29 +160,10 @@ export function RouteCards({ items }: {
   )
 }
 
-export function NextSteps({ items }: {
-  items: Array<{ title: string; desc: string; onClick: () => void }>
-}) {
-  return (
-    <div className="jfq-next">
-      {items.map((item, index) => (
-        <button key={item.title} type="button" onClick={item.onClick}>
-          <span className="jfq-next-no" aria-hidden="true">{index + 1}</span>
-          <span className="jfq-next-t">
-            <b>{item.title}</b>
-            <p>{item.desc}</p>
-          </span>
-          <span className="jfq-next-go" aria-hidden="true">→</span>
-        </button>
-      ))}
-    </div>
-  )
-}
-
 /** 底部操作条注脚：稿里 dock 的第一行，说清这一屏的边界。 */
-export function CtaNote({ children }: { children: ReactNode }) {
+export function CtaNote({ children, id }: { children: ReactNode; id?: string }) {
   return (
-    <p className="jfq-cta-note">
+    <p className="jfq-cta-note" id={id}>
       <AlertTriangleIcon size={20} aria-hidden="true" />
       <span>{children}</span>
     </p>

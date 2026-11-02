@@ -1,0 +1,354 @@
+/* ============================================================
+   合同审查 — 触屏版页内样式（从 contract-review.css 拆出）
+   规则挂在 [data-qx-page='contract-review'] 下，优先级高于共享
+   .qxt-screen button 的重置（0,1,1）；不改共享 .qxt-*。
+   原则：卡片按内容高度，整页由 qxt-body-scroll 滚动；不靠色条、
+   底色或拉伸去遮空白。
+   ============================================================ */
+
+/* ── 壳：合同三页在 KioskRoot 之外，壳负责舞台高度，屏铺满后底栏贴底 ── */
+.kiosk-stage .ui-kiosk-shell.cr-touch-shell {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+}
+.cr-touch-fill {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+[data-qx-page='contract-review'] .qxt-screen {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ── 正文：旧步骤条由顶栏的三步进度取代 ── */
+[data-qx-page='contract-review'] .cr-steps {
+  display: none;
+}
+[data-qx-page='contract-review'] .cr-touch-result {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px 8px 12px;
+}
+[data-qx-page='contract-review'] .cr-body-btn {
+  width: 100%;
+  min-width: 0;
+  justify-content: center;
+}
+
+/* ── 结果页：三类计数 ── */
+[data-qx-page='contract-review'] .cr-summary-stat {
+  border: 1.5px solid var(--qxt-edge, var(--line));
+  border-radius: 22px;
+  background: var(--qxt-card, #fffdf7);
+}
+[data-qx-page='contract-review'] .cr-summary-stat--critical {
+  background: var(--qxt-cin-wash, #f6e2de);
+}
+[data-qx-page='contract-review'] .cr-summary-stat--attention {
+  background: var(--qxt-clay-wash, #f5e9de);
+}
+[data-qx-page='contract-review'] .cr-summary-stat--info {
+  background: var(--qxt-slate-wash, #e6ecf6);
+}
+[data-qx-page='contract-review'] .cr-summary-stat--critical .cr-summary-stat__num,
+[data-qx-page='contract-review'] .cr-summary-stat--critical .cr-summary-stat__label {
+  color: var(--qx-cinnabar, #b6472f);
+}
+[data-qx-page='contract-review'] .cr-summary-stat--attention .cr-summary-stat__num,
+[data-qx-page='contract-review'] .cr-summary-stat--attention .cr-summary-stat__label {
+  color: var(--qxt-clay-ink, #93512a);
+}
+[data-qx-page='contract-review'] .cr-summary-stat--info .cr-summary-stat__num,
+[data-qx-page='contract-review'] .cr-summary-stat--info .cr-summary-stat__label {
+  color: var(--qxt-slate-ink, #2f5291);
+}
+
+/* ── 结果页：风险条目。列表按内容高度，不裁切、不自带滚动，整页滚动；
+      每条是一张整行卡，展开头是整行按钮。 ── */
+[data-qx-page='contract-review'] .cr-results-list {
+  flex: none;
+  overflow: visible;
+  min-height: 0;
+  gap: 12px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+[data-qx-page='contract-review'] .cr-finding-card {
+  flex: none;
+  background: var(--qxt-card, #fffdf7);
+  border: 1.5px solid var(--qxt-edge, var(--line));
+  border-radius: 22px;
+  overflow: hidden;
+}
+[data-qx-page='contract-review'] .cr-finding-card__header {
+  width: 100%;
+  min-height: 88px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+[data-qx-page='contract-review'] .cr-finding-ai-label {
+  font-size: 20px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+[data-qx-page='contract-review'] .cr-finding-card__header--open {
+  background: var(--qxt-teal-wash, var(--teal-soft));
+}
+
+/* ── 处理页：五个阶段按内容高度排，进行中的一格用青底和青边标出 ── */
+[data-qx-page='contract-review'] .qxt-body:has(.cr-progress-shell) {
+  justify-content: flex-start;
+}
+[data-qx-page='contract-review'] .cr-progress-shell {
+  flex: none;
+  width: 100%;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 8px 0 12px;
+}
+[data-qx-page='contract-review'] .cr-progress-ring {
+  width: auto;
+  height: auto;
+}
+[data-qx-page='contract-review'] .cr-stage-list {
+  flex: none;
+  gap: 16px;
+}
+[data-qx-page='contract-review'] .cr-stage-item,
+[data-qx-page='contract-review'] .cr-stage-item--active,
+[data-qx-page='contract-review'] .cr-stage-item--done {
+  flex: none;
+  min-height: 164px;
+  align-items: center;
+  gap: 22px;
+  padding: 20px 24px;
+  background: var(--qxt-card, #fffdf7);
+  border: 1.5px solid var(--qxt-edge, var(--qxt-line));
+  border-radius: 22px;
+  opacity: 1;
+}
+[data-qx-page='contract-review'] .cr-stage-item--active {
+  background: var(--qxt-teal-wash, var(--teal-soft));
+  border-color: var(--qx-emerald, var(--teal));
+}
+[data-qx-page='contract-review'] .cr-stage-item__icon {
+  width: 72px;
+  height: 72px;
+  min-height: 72px;
+  border-radius: 22px;
+  color: var(--qxt-ink-3);
+  background: var(--qxt-well);
+}
+[data-qx-page='contract-review'] .cr-stage-item--done .cr-stage-item__icon {
+  color: var(--qxt-teal-ink);
+  background: var(--qxt-teal-wash);
+}
+[data-qx-page='contract-review'] .cr-stage-item--active .cr-stage-item__icon {
+  color: var(--qxt-cream);
+  background: var(--qx-deep);
+}
+[data-qx-page='contract-review'] .cr-stage-item__name {
+  font-size: 28px;
+  line-height: 1.5;
+}
+[data-qx-page='contract-review'] .cr-stage-item__desc {
+  font-size: 22px;
+  line-height: 1.5;
+}
+[data-qx-page='contract-review'] .cr-stage-item__status {
+  margin-top: 6px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--qxt-ink-3);
+}
+[data-qx-page='contract-review'] .cr-stage-item--done .cr-stage-item__status,
+[data-qx-page='contract-review'] .cr-stage-item--active .cr-stage-item__status {
+  color: var(--qxt-teal-ink);
+}
+
+/* ── 上传页：类型卡与展开头被共享重置抹掉的边框和底色补回，选中态一眼可见 ── */
+[data-qx-page='contract-review'] .cr-type-btn {
+  min-height: 88px;
+  min-width: 64px;
+  border-radius: 16px;
+  border: 2px solid var(--qxt-line, var(--line));
+  background: var(--qx-paper, var(--surface));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px 22px;
+  gap: 6px;
+  text-align: left;
+}
+[data-qx-page='contract-review'] .cr-type-btn--active {
+  border-color: var(--qx-emerald, var(--teal));
+  background: var(--qx-teal-soft, var(--teal-soft, #e7f6f2));
+}
+[data-qx-page='contract-review'] .cr-file-remove {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 64px;
+  min-width: 64px;
+  margin-top: 12px;
+  padding: 12px 18px;
+  font-size: 20px;
+  color: var(--qxt-ink-2, var(--muted));
+  background: var(--qx-paper, var(--surface));
+  border: 1px solid var(--qxt-line, var(--line));
+  border-radius: 16px;
+}
+/* 二维码面板里的共享 Button 被触屏重置抹掉边框，只在本页补回；
+   面板说明用的是 text-sm（14px），在本页提到 20px，不改共享组件。 */
+[data-qx-page='contract-review'] .qxt-body button:not(.cr-type-btn):not(.cr-file-remove):not(.qxt-btn):not(.cr-finding-card__header) {
+  min-height: 64px;
+  min-width: 64px;
+  padding: 12px 18px;
+  border-radius: 16px;
+  border: 1.5px solid var(--qxt-line, var(--qx-line));
+  background: var(--qx-paper, #fff);
+  font-size: 20px;
+}
+[data-qx-page='contract-review'] .qxt-body .text-sm,
+[data-qx-page='contract-review'] .qxt-body .text-xs {
+  font-size: 20px;
+  line-height: 1.5;
+}
+
+/* ── 处理失败（稿 failBody）：原因、合同卡、五格「未完成」；卡按内容高，整页由 qxt-body-scroll 滚 ──
+   正在删除时合同卡原位换成转圈和说明，页高不跳；AI 停用时多一张「去打印扫描」大卡（P10BigCard）。 */
+[data-qx-page='contract-review'] .cr-failed,
+[data-qx-page='contract-review'] .cr-failed__steps {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 12px;
+}
+[data-qx-page='contract-review'] .cr-failed__steps { gap: 10px; }
+[data-qx-page='contract-review'] .cr-failed__warn {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--qxt-cin-wash);
+  color: var(--qx-cinnabar);
+  font-size: 24px;
+  line-height: 1.45;
+}
+[data-qx-page='contract-review'] .cr-failed__file,
+[data-qx-page='contract-review'] .cr-failed__step {
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+[data-qx-page='contract-review'] .cr-failed__file {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 24px;
+}
+[data-qx-page='contract-review'] .cr-failed__file-icon {
+  display: grid;
+  place-items: center;
+  align-self: stretch;
+  min-height: 250px;
+  border-radius: 18px;
+  color: var(--qxt-teal-ink);
+  background: var(--qxt-well);
+}
+[data-qx-page='contract-review'] .cr-failed__file strong {
+  display: block;
+  font-size: 28px;
+  line-height: 1.3;
+}
+[data-qx-page='contract-review'] .cr-failed__file p {
+  margin: 8px 0 0;
+  font-size: 22px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+}
+[data-qx-page='contract-review'] .cr-failed__step {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 132px;
+  padding: 10px 16px;
+  border-radius: 18px;
+}
+/* AI 停用：合同卡压到 130（稿 failHero），五格回到稿的 122，让后面的「去打印扫描」大卡整张露在底栏之上 */
+[data-qx-page='contract-review'] .cr-failed--ai-down .cr-failed__file-icon { min-height: 130px; }
+[data-qx-page='contract-review'] .cr-failed--ai-down .cr-failed__step { min-height: 122px; }
+[data-qx-page='contract-review'] .cr-failed__number {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+  font-size: 22px;
+  font-weight: 700;
+}
+[data-qx-page='contract-review'] .cr-failed__step strong {
+  display: block;
+  font-size: 24px;
+}
+[data-qx-page='contract-review'] .cr-failed__step p {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.45;
+  color: var(--qxt-ink-3);
+}
+
+/* ── 未找到结果：两张大卡（带图标列），不撑满整屏 ── */
+[data-qx-page='contract-review'] .cr-missing {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 20px;
+  padding: 8px 0 12px;
+  text-align: left;
+}
+[data-qx-page='contract-review'] .cr-missing .cr-done-screen__sub {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.5;
+}
+
+/* ── 确认框：不带色条；标题、正文左对齐，按钮由共享 qxt-btn 提供 ── */
+[data-qx-page='contract-review'] .qxt-screen .qxt-dialog {
+  align-items: stretch;
+  text-align: left;
+}
+[data-qx-page='contract-review'] .qxt-dialog .cr-confirm-modal {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-size: 20px;
+}
+[data-qx-page='contract-review'] .qxt-dialog .cr-confirm-modal__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 48px;
+  font-size: 20px;
+}

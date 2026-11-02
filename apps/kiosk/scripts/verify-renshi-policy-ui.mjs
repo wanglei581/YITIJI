@@ -13,7 +13,7 @@
  *
  * 运行：pnpm --filter @ai-job-print/kiosk verify:renshi-policy-ui
  */
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
@@ -51,6 +51,39 @@ if (!/同步时间：\d/.test(allRenshi)) {
   pass('A2. 无硬编码「同步时间：YYYY-MM-DD」假时效')
 } else {
   fail('A2. 不得硬编码假同步时间')
+}
+
+// A3–A4. 政策与公告的审核、发布文案必须与机构自行操作的事实一致（托管 a：政策由机构在我们云上自己审核并发布，
+// 管理员审核或发布会被后端拒绝，只剩紧急下架；见 policies.service.ts 的 reviewPolicy、publishPolicy）。
+// 这一条曾在第七次冻结（#1366）改对，触屏版集成线从旧底稿切出时又带回「管理员审核」旧话（10/29 本机走查 I-04）：
+// 所以这里按目录整体扫，任何 renshi 源码里再出现「管理员审核」都红，四句定稿各在其位。
+function readRenshiSources(rel) {
+  return readdirSync(join(ROOT, rel), { withFileTypes: true }).flatMap((entry) => {
+    const sourcePath = join(rel, entry.name)
+    if (entry.isDirectory()) return readRenshiSources(sourcePath)
+    return entry.isFile() && /\.tsx?$/.test(entry.name)
+      ? [{ path: sourcePath, source: read(sourcePath) }]
+      : []
+  })
+}
+const adminReviewSources = readRenshiSources('src/pages/renshi').filter(({ source }) => source.includes('管理员审核'))
+if (adminReviewSources.length === 0) {
+  pass('A3. renshi 全部 .ts/.tsx 源码无「管理员审核」')
+} else {
+  fail(`A3. 政策由机构自己审核并发布，源码不得出现「管理员审核」：${adminReviewSources.map(({ path }) => path).join('、')}`)
+}
+const institutionReviewCopies = [
+  ['RenshiPage.tsx', page, '公告由发布机构自己审核并发布，正文与来源链接原样呈现。'],
+  ['NoticePanel.tsx', noticePanel, '公告由发布机构自己审核并发布，目前一条都没有。这是内容进度，不是读取失败；读取失败会另有一屏说明。'],
+  ['NoticePanel.tsx', noticePanel, '机构发布 · 机构自己审核'],
+  ['PolicyPanel.tsx', policyPanel, '这里只展示发布机构自己审核并发布的政策。下方「通用办事指引」是本机整理的参考，不属于政策库。'],
+]
+for (const [index, [file, source, copy]] of institutionReviewCopies.entries()) {
+  if (source.includes(copy)) {
+    pass(`A4.${index + 1}. ${file} 保留机构自己审核并发布的定稿`)
+  } else {
+    fail(`A4.${index + 1}. ${file} 缺少定稿：「${copy}」`)
+  }
 }
 
 // B. 内置指引数据诚实性
@@ -276,6 +309,44 @@ if (!hasHonestUploadButton(miswiredUploadFixture)) {
   pass('I3. 路由与诚实文案绑定在同一按钮内')
 } else {
   fail('I3. 注释或相邻文案不得掩盖错误的 /print/upload 按钮标签')
+}
+
+// ── L. 无人值守：政策紧急下架后页面自己撤掉；问小青的问句不承诺政策解读 ─────────────────────────
+// 现场没有人盯着屏：已打开的列表与详情不能一直挂着已下架的旧正文，也不能等用户点来源码才发现 404。
+// L1 刷新间隔是写了理由的常量，量级在 10–60 秒（太短打服务端，太长等于没刷）。
+// L2 本人点开的那一条被下架 → 整页换成「这条政策已下架」，出路是回政策列表；自动展开的第一条只从列表摘掉。
+// L3 问小青的问句：详情带这一条的标题，并写明小青不解释政策原文、不判断能否办理（没有这项能力就不承诺）。
+const refreshMs = Number(page.match(/const POLICY_REFRESH_MS = ([\d_]+)/)?.[1]?.replace(/_/g, '') ?? '0')
+if (
+  refreshMs >= 10_000 && refreshMs <= 60_000 &&
+  /\/\/[^\n]*无人值守[^\n]*\n\s*const POLICY_REFRESH_MS/.test(page) &&
+  /window\.setInterval\([\s\S]{0,60}refresh\(\)[\s\S]{0,12}POLICY_REFRESH_MS\)/.test(page)
+) {
+  pass('L1. 政策列表定时重读，间隔是带理由的常量')
+} else {
+  fail('L1. RenshiPage 必须有带「无人值守」理由说明的 POLICY_REFRESH_MS（10–60 秒），并用 setInterval 定时重读')
+}
+if (
+  page.includes("if (now.userOpened) setWithdrawnDetail(id)") &&
+  page.includes("POLICY_CHECK_TIMEOUT_MS") &&
+  page.includes('title="这条政策已下架"') &&
+  page.includes('backToPolicyList') &&
+  policyPanel.includes('const userOpened = openId !== null && (touched || openId === focusHit)')
+) {
+  pass('L2. 本人点开的政策被下架整页换成已下架并可回列表，自动展开的第一条只摘掉')
+} else {
+  fail('L2. 被下架的详情必须整页换成「这条政策已下架」+ 回政策列表；自动展开的第一条不能整页替换')
+}
+const boundary = '小青还不能解释政策原文，也不判断能否办理'
+if (
+  page.includes(`${boundary}。\``) &&
+  policyPanel.includes(boundary) &&
+  /policy: '[^']*不要解释政策原文，也不要判断能否办理。'/.test(page) &&
+  !/帮我看懂政策|替我判断|帮你查了/.test(page + policyPanel)
+) {
+  pass('L3. 政策问小青的问句守住「不解释原文、不判断能否办理」，不声称已有政策解读能力')
+} else {
+  fail('L3. 政策问小青的问句必须写明小青不解释政策原文、不判断能否办理，且不得声称已有解读能力')
 }
 
 console.log('')

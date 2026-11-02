@@ -1,0 +1,66 @@
+/* 打印流程页自己的覆盖。不改 .qxt-* 默认。
+   顶栏流光线的路径画出 viewBox，光晕 right 为负；本页收进视口，版面门禁才认。 */
+
+[data-qx-page^='print'] .qxt-flow svg {
+  left: 0;
+  width: 100%;
+  transform: scale(0.9);
+  transform-origin: center center;
+}
+
+[data-qx-page^='print'] .qxt-halo {
+  right: 0;
+  width: min(640px, 70%);
+}
+
+/* 旧正文的过渡样式。只在 .qxt-print-legacy 下生效。 */
+
+.qxt-screen .qxt-print-dock {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 56px;
+  border-top: 1px solid var(--qx-line);
+  background: var(--qx-surface);
+}
+
+.qxt-print-legacy .qx-btn {
+  min-height: var(--qxt-tap);
+  min-width: var(--qxt-tap);
+}
+
+.qxt-screen .qxt-print-legacy {
+  min-height: 0;
+}
+
+.qxt-print-legacy .fs-flow,
+.qxt-print-legacy .qpd-guide ol,
+.qxt-print-legacy .pcf-steps,
+.qxt-print-legacy .ph-axes {
+  display: none;
+}
+
+.qxt-print-legacy .fs-page,
+.qxt-print-legacy .pff-page,
+.qxt-print-legacy .qpd-page,
+.qxt-print-legacy .pickup-claim-page {
+  overflow: visible;
+  height: auto;
+  max-height: none;
+}
+
+.qxt-screen .qxt-body.qxt-print-legacy > .pff-page,
+.qxt-screen .qxt-body.qxt-print-legacy > .fs-page,
+.qxt-screen .qxt-body.qxt-print-legacy > .pickup-claim-page {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.qxt-print-legacy .pff-page > .pff-issue,
+.qxt-print-legacy .fs-page > .qx-card:last-of-type,
+.qxt-print-legacy .pickup-claim-page > .qx-card:last-of-type {
+  flex: 1 1 auto;
+}

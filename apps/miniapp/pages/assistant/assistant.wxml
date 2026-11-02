@@ -27,7 +27,7 @@
       <view class="as-disc">
         <view>{{disclaimer}}</view>
         <view class="as-disc-links">
-          <text class="as-disc-link" bindtap="openAiDisclaimer" role="link" aria-label="AI 服务说明，所用模型与备案号">AI 服务说明</text>
+          <text class="as-disc-link" bindtap="openAiDisclaimer" role="link" aria-label="AI 服务说明，所用模型与备案情况">AI 服务说明</text>
           <text aria-hidden="true">·</text>
           <text class="as-disc-link" bindtap="openAiComplaint" role="link" aria-label="投诉 AI 回答">投诉 AI 回答</text>
         </view>

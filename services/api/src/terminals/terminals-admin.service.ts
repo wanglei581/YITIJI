@@ -26,6 +26,7 @@ import { PARKED_TERMINAL_ORG_TYPES, isParkedTerminalOrgType, orgTypeParkedError 
 import { terminalOrgBindingOnCreate } from './terminal-org-binding'
 import { assignTerminalOrganization, type TerminalOrgAssignmentAudit } from './terminal-org-assignment'
 import { TERMINAL_ONLINE_WINDOW_MS } from './printer-availability'
+import { publicScanInputHealth, type PublicScanInputHealth } from './printer-status'
 import type { KioskTerminalConfigView } from './terminal-config.types'
 import {
   cleanNullable,
@@ -45,6 +46,7 @@ import { DEFAULT_SMART_CAMPUS_MODULES } from '../smart-campus/smart-campus.types
 import { ReleaseObservationService, type AdminReleaseObservationView } from './release-observation.service'
 import { KioskJobBoardService } from './kiosk-job-board.service'
 import { AiAccessService } from '../ai-access/ai-access.service'
+import { todayFreePrintSidesByTerminal } from '../print-jobs/free-print-quota.usage'
 
 // ── Admin view types ───────────────────────────────────────────────────────────
 
@@ -84,6 +86,8 @@ export interface AdminTerminalView {
   ipAddress: string | null
   diskFreeGb: number | null
   releaseObservation: AdminReleaseObservationView | null
+  /** 今天（北京日）已出纸成功的免费面数。不含在途。 */
+  todayFreePrintSides: number
 }
 
 export interface AdminOrganizationOption {
@@ -296,6 +300,8 @@ export class TerminalAdminService {
       },
     })
 
+    const todayFreePrintSides = await todayFreePrintSidesByTerminal(this.prisma, rows.map((row) => row.id))
+
     const terminals: AdminTerminalView[] = rows.map((t: (typeof rows)[number]) => {
       const hb = t.heartbeats[0]
       // W-04：终端上的心跳时间列（只在心跳时写，不受 90 天心跳表清理影响）与最新心跳行取较新者。
@@ -343,6 +349,7 @@ export class TerminalAdminService {
         releaseObservation: releaseTarget
           ? this.releases.toAdminObservation(releaseTarget)
           : null,
+        todayFreePrintSides: todayFreePrintSides.get(t.id) ?? 0,
       }
     })
 
@@ -775,6 +782,8 @@ export class TerminalAdminService {
     printerStatus: string | null
     lastSeenAt: string | null
     isOnline: boolean
+    /** 最近一次心跳里扫描输入是否可用（一体机「机器状态」页读）。老 Agent 不上报时为 null。 */
+    scanInputHealth: PublicScanInputHealth | null
   }> {
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: terminalId }, { terminalCode: terminalId }] },
@@ -782,12 +791,12 @@ export class TerminalAdminService {
         heartbeats: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          select: { printerStatus: true, createdAt: true },
+          select: { printerStatus: true, scanInputHealth: true, createdAt: true },
         },
       },
     })
     if (!terminal) {
-      return { found: false, printerStatus: null, lastSeenAt: null, isOnline: false }
+      return { found: false, printerStatus: null, lastSeenAt: null, isOnline: false, scanInputHealth: null }
     }
     const latest = terminal.heartbeats[0]
     const lastSeenAt = latest?.createdAt?.toISOString() ?? null
@@ -797,6 +806,7 @@ export class TerminalAdminService {
       printerStatus: latest?.printerStatus ?? null,
       lastSeenAt,
       isOnline,
+      scanInputHealth: publicScanInputHealth(latest?.scanInputHealth),
     }
   }
 

@@ -284,8 +284,8 @@ export function subscribeTerminalSession(listener: (next: TerminalSessionState) 
  * 防的是一个只有一两秒宽的窗口：健康的一体机每十分钟续一次会话票，续期期间 state
  * 被真实地置成 checking。此前只要用户恰好在这一两秒里按下「到机认领」，或者付款成功
  * 触发 Order-only 释放，请求就当场抛 TERMINAL_SESSION_INVALID，屏幕上写
- * 「终端安全校验失败，请联系现场工作人员」—— 票其实好好的，只是正在换。让用户去找
- * 工作人员、或者以为自己的到机码作废了，都是这一句话造成的。
+ * 「终端安全校验失败」并让用户去找现场的人 —— 票其实好好的，只是正在换。让用户去求助、
+ * 或者以为自己的到机码作废了，都是这一句话造成的。
  *
  * 边界三条，一条都不放宽：
  *   · 只等「checking 且确有在飞续期」。启动引导（checking 但没有 refreshInflight）

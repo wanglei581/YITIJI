@@ -205,8 +205,8 @@ check(
 )
 // 证据分级：确定性逻辑不得标 E3，也不得出现「AI 判断」。
 check(
-  /E2 · 按政策原文逐条比对/.test(resultsCode) && !/E3/.test(resultsCode) && !/AI\s*判断/.test(eligibilityCode),
-  'D5. 证据分级标 E2，不标 E3、不写「AI 判断」',
+  /按政策原文逐条比对/.test(resultsCode) && !/E2 ·/.test(resultsCode) && !/E3/.test(resultsCode) && !/AI\s*判断/.test(eligibilityCode),
+  'D5. 结果写「按政策原文逐条比对」，屏上不写 E2 编号，不标 E3、不写「AI 判断」',
 )
 
 // ── E. 打印诚实性 ─────────────────────────────────────────────────────────
