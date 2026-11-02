@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { PublicKioskProfile } from '@ai-job-print/shared'
 import { useKioskProfile } from './api/kioskProfile'
 import {
-  recheckTerminalSessionAfterLicensePause, setLicenseRenewalSuspended, subscribeTerminalLicenseRenewalRejected,
+  lastTerminalRenewalAttemptAt, recheckTerminalSessionAfterLicensePause, setLicenseRenewalSuspended, subscribeTerminalLicenseRenewalRejected,
   subscribeTerminalSession, terminalSessionState, wasTerminalLicenseRenewalRejected,
   type TerminalSessionState,
 } from './terminalAuth'
@@ -60,19 +60,25 @@ export const LICENSE_RECHECK_INTERVAL_MS = 5 * 60_000
 /** 停止计时不重置上次尝试时间；即使重新挂载也不会缩短两次间隔。 */
 export function createLicenseRecheckTimer(
   recheck: () => Promise<void>,
-  clock: { now: () => number; set: (fn: () => void, delay: number) => ReturnType<typeof setTimeout>; clear: (id: ReturnType<typeof setTimeout>) => void },
+  clock: { now: () => number; set: (fn: () => void, delay: number) => ReturnType<typeof setTimeout>; clear: (id: ReturnType<typeof setTimeout>) => void; lastExternalAttempt?: () => number | null },
 ) {
   let timer: ReturnType<typeof setTimeout> | null = null
   let lastAttempt: number | null = null
   let active = false
   let inFlight = false
+  function latestAttempt(): number | null {
+    const external = clock.lastExternalAttempt?.() ?? null
+    return lastAttempt === null ? external : external === null ? lastAttempt : Math.max(lastAttempt, external)
+  }
   function schedule(): void {
     if (!active || timer !== null || inFlight) return
-    const delay = lastAttempt === null ? LICENSE_RECHECK_INTERVAL_MS : Math.max(0, lastAttempt + LICENSE_RECHECK_INTERVAL_MS - clock.now())
+    const latest = latestAttempt()
+    const delay = latest === null ? LICENSE_RECHECK_INTERVAL_MS : Math.max(0, latest + LICENSE_RECHECK_INTERVAL_MS - clock.now())
     timer = clock.set(() => {
       timer = null
       if (!active) return
-      if (lastAttempt !== null && clock.now() < lastAttempt + LICENSE_RECHECK_INTERVAL_MS) { schedule(); return }
+      const latest = latestAttempt()
+      if (latest !== null && clock.now() < latest + LICENSE_RECHECK_INTERVAL_MS) { schedule(); return }
       lastAttempt = clock.now()
       inFlight = true
       void recheck().catch(() => undefined).finally(() => { inFlight = false; schedule() })
@@ -106,6 +112,7 @@ const recheckTimer = createLicenseRecheckTimer(() => {
   return recheckTerminalSessionAfterLicensePause({ credentialExpired: licenseCredentialExpired(recheckEndsAt, recheckSessionState, Date.now()) })
 }, {
   now: () => Date.now(), set: (fn, delay) => setTimeout(fn, delay), clear: (id) => clearTimeout(id),
+  lastExternalAttempt: lastTerminalRenewalAttemptAt,
 })
 
 /** useEnded 由统一的结束使用 / 清场链路提供。 */
@@ -116,7 +123,6 @@ export function useKioskLicenseGate(useEnded: boolean): KioskLicenseGate {
   const [gate, setGate] = useState(loadInitialLicenseGate)
   const [now, setNow] = useState(() => Date.now())
   const seenProfile = useRef<PublicKioskProfile | null>(null)
-  const needsRecheck = gate.mode !== 'normal'
 
   useEffect(() => { recheckEndsAt = gate.endsAt; recheckSessionState = sessionState }, [gate.endsAt, sessionState])
 
@@ -131,11 +137,12 @@ export function useKioskLicenseGate(useEnded: boolean): KioskLicenseGate {
   }, [profile, rejected, sessionState, useEnded, now])
 
   useEffect(() => {
-    setLicenseRenewalSuspended(needsRecheck)
-    if (!needsRecheck) return
+    setLicenseRenewalSuspended(gate.mode !== 'normal')
+    // 收尾中的凭证仍可用，profile 可发现恢复；复查换票会清场，打断正在办理的人。
+    if (gate.mode !== 'paused') return
     recheckTimer.start()
     return () => recheckTimer.stop()
-  }, [needsRecheck])
+  }, [gate.mode])
 
   useEffect(() => {
     if (gate.mode !== 'winding-down' || gate.endsAt === null) return

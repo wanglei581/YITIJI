@@ -11,7 +11,7 @@ const transpile = (path) => ts.transpileModule(readFileSync(join(root, path), 'u
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
 }).outputText
 const react = url('export function useEffect() {}\nexport function useRef() {}\nexport function useState() {}\nexport function useSyncExternalStore() {}')
-const authStub = url('export const setLicenseRenewalSuspended=()=>{}; export const recheckTerminalSessionAfterLicensePause=async()=>{}; export const subscribeTerminalLicenseRenewalRejected=()=>{}; export const subscribeTerminalSession=()=>{}; export const terminalSessionState=()=>"ready"; export const wasTerminalLicenseRenewalRejected=()=>false')
+const authStub = url('export const lastTerminalRenewalAttemptAt=()=>null; export const setLicenseRenewalSuspended=()=>{}; export const recheckTerminalSessionAfterLicensePause=async()=>{}; export const subscribeTerminalLicenseRenewalRejected=()=>{}; export const subscribeTerminalSession=()=>{}; export const terminalSessionState=()=>"ready"; export const wasTerminalLicenseRenewalRejected=()=>false')
 const profileStub = url('export const useKioskProfile=()=>null')
 const gate = await import(url(transpile('src/services/kioskLicenseGate.ts')
   .replaceAll("from 'react'", `from '${react}'`)
@@ -54,7 +54,7 @@ test('恢复的暂停状态复查时将空截止时间传成已过期', async ()
   try {
     const reactHook = url(`export const useEffect=(fn)=>{fn()}; export const useRef=(value)=>({current:value});
       export const useState=(value)=>[typeof value==='function'?value():value,()=>{}]; export const useSyncExternalStore=(_sub,get)=>get();`)
-    const authHook = url(`export const recheckTerminalSessionAfterLicensePause=async(options)=>{globalThis.__recheckTest.options=options};
+    const authHook = url(`export const lastTerminalRenewalAttemptAt=()=>null; export const recheckTerminalSessionAfterLicensePause=async(options)=>{globalThis.__recheckTest.options=options};
       export const setLicenseRenewalSuspended=()=>{}; export const subscribeTerminalLicenseRenewalRejected=()=>{};
       export const subscribeTerminalSession=()=>{}; export const terminalSessionState=()=>"failed"; export const wasTerminalLicenseRenewalRejected=()=>false;`)
     const module = await import(url(transpile('src/services/kioskLicenseGate.ts')
@@ -165,7 +165,7 @@ test('收尾中普通失败不暂停，授权拒绝的失败才暂停', () => {
   assert.equal(decide(winding, input(null, { sessionState: 'failed', rejected: true })).mode, 'paused')
 })
 
-test('复查在收尾和暂停期间排队，离开停止，两次不少于五分钟', async () => {
+test('复查计时启动后排队，离开停止，两次不少于五分钟', async () => {
   let now = 0, nextId = 0
   const jobs = new Map(), calls = []
   const clock = { now: () => now, set: (fn, delay) => { const id = ++nextId; jobs.set(id, { fn, at: now + delay }); return id }, clear: (id) => jobs.delete(id) }
@@ -190,8 +190,47 @@ test('复查在收尾和暂停期间排队，离开停止，两次不少于五�
   timer.stop(); await advance(600_000); assert.equal(calls.length, 2)
 })
 
+test('复查使用最近的外部或自身尝试，到点时重新检查外部尝试', async () => {
+  let now = 600_000, external = now - 120_000, job = null
+  const calls = []
+  const timer = gate.createLicenseRecheckTimer(async () => { calls.push(now) }, {
+    now: () => now, lastExternalAttempt: () => external,
+    set: (fn, delay) => { job = { fn, at: now + delay }; return 1 }, clear: () => { job = null },
+  })
+  timer.start(); assert.equal(job.at, 780_000)
+  external = 700_000; now = 780_000; job.fn(); assert.equal(calls.length, 0); assert.equal(job.at, 1_000_000)
+  now = 1_000_000; job.fn(); await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(calls, [1_000_000])
+  external = 900_000; timer.stop(); timer.start(); assert.equal(job.at, 1_300_000)
+  now = 1_299_999; job.fn(); assert.equal(calls.length, 1); assert.equal(job.at, 1_300_000)
+  now = 1_300_000; job.fn(); await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(calls, [1_000_000, 1_300_000]); timer.stop()
+})
+
+test('收尾不启动复查，暂停启动复查且两者均挂起例行续期', async () => {
+  for (const mode of ['winding-down', 'paused']) {
+    globalThis.__modeTest = { jobs: [], suspended: [] }
+    const reactHook = url(`export const useEffect=(fn)=>{fn()}; export const useRef=(value)=>({current:value});
+      export const useState=(value)=>[typeof value==='function'?{...value(),mode:'${mode}'}:value,()=>{}]; export const useSyncExternalStore=(_sub,get)=>get();`)
+    const authHook = url(`export const lastTerminalRenewalAttemptAt=()=>null; export const recheckTerminalSessionAfterLicensePause=async()=>{};
+      export const setLicenseRenewalSuspended=(v)=>globalThis.__modeTest.suspended.push(v); export const subscribeTerminalLicenseRenewalRejected=()=>{};
+      export const subscribeTerminalSession=()=>{}; export const terminalSessionState=()=>"ready"; export const wasTerminalLicenseRenewalRejected=()=>false;`)
+    const saved = globalThis.setTimeout
+    globalThis.setTimeout = (fn, delay) => { globalThis.__modeTest.jobs.push({ fn, delay }); return 1 }
+    try {
+      const module = await import(url(transpile('src/services/kioskLicenseGate.ts')
+        .replaceAll("from 'react'", `from '${reactHook}'`)
+        .replaceAll("from './api/kioskProfile'", `from '${profileStub}'`)
+        .replaceAll("from './terminalAuth'", `from '${authHook}'`) + `\n// ${mode}`))
+      module.useKioskLicenseGate(false)
+      assert.deepEqual(globalThis.__modeTest.suspended, [true])
+      assert.equal(globalThis.__modeTest.jobs.filter((item) => item.delay === 300_000).length, mode === 'paused' ? 1 : 0)
+    } finally { globalThis.setTimeout = saved }
+  }
+})
+
 test('收尾和暂停都挂起例行续期，恢复正常后重启', async () => {
-  globalThis.__gateEnv = { VITE_TERMINAL_AGENT_LOCAL_URL: '', VITE_TERMINAL_AGENT_BRIDGE_TOKEN: '', VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN: '' }
+  globalThis.__gateEnv = { VITE_TERMINAL_AGENT_LOCAL_URL: '', VITE_TERMINAL_AGENT_BRIDGE_TOKEN: 'bridge', VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN: '' }
   const store = new Map([['terminal_session_token_v1', 'old']]), timers = new Map()
   let nextId = 0, requests = 0
   globalThis.window = {
@@ -219,6 +258,22 @@ test('收尾和暂停都挂起例行续期，恢复正常后重启', async () =>
     assert.equal([...timers.values()].filter((timer) => timer.ms === 600_000).length, 1, mode)
   }
   assert.equal(requests, 3)
+  const paths = []
+  globalThis.fetch = async (input) => {
+    const address = String(input); paths.push(address)
+    if (address.includes('/refresh')) return { ok: false, status: 401, json: async () => ({ code: 'TERMINAL_SESSION_INVALID' }) }
+    if (address.includes('/local/terminal-boot-ticket')) return { ok: true, json: async () => ({ data: { bootTicket: 'a'.repeat(32) } }) }
+    return { ok: true, json: async () => ({ sessionToken: 'new' }) }
+  }
+  auth.setLicenseRenewalSuspended(true)
+  await auth.recheckTerminalSessionAfterLicensePause({ credentialExpired: false })
+  assert.equal(paths.length, 1)
+  assert.ok(paths[0].includes('/refresh'))
+  assert.equal(auth.terminalSessionState(), 'failed')
+  await auth.recheckTerminalSessionAfterLicensePause({ credentialExpired: true })
+  assert.equal(paths.length, 3)
+  assert.ok(paths[1].includes('/local/terminal-boot-ticket'))
+  assert.ok(paths[2].endsWith('/terminals/session-token'))
 })
 
 test('授权复查清除被拒标记并实际再走续期', async () => {

@@ -38,6 +38,8 @@ export class LicenseWorld {
   forceUnverified = false
   /** 机构品牌覆盖：只给验过签的请求（没验过只给平台默认）。 */
   brand: Partial<PublicKioskProfile> = {}
+  /** 在一次成功续期签票后、响应送达前模拟后台状态变化。 */
+  afterRefresh?: (at: number) => void
   /** 会话票 → 到期时刻（页面时钟毫秒）。 */
   readonly sessions = new Map<string, number>()
   readonly log = {
@@ -163,7 +165,9 @@ export class LicenseWorld {
           return route.fulfill(json(401, { error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } }))
         }
         if (!this.active) return route.fulfill(this.inactive())
-        return route.fulfill(json(200, { sessionToken: this.issue(at), expiresInSeconds: SESSION_TTL_MS / 1000 }))
+        const sessionToken = this.issue(at)
+        this.afterRefresh?.(at)
+        return route.fulfill(json(200, { sessionToken, expiresInSeconds: SESSION_TTL_MS / 1000 }))
       })
     })
 

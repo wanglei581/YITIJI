@@ -214,6 +214,46 @@ test('授权失效：已经在办理的页面不被打断，还能接着办 @lic
   expect(new URL(page.url()).searchParams.get('stage')).toBe('setup')
 })
 
+test('收尾中八分钟不续期或换票，正在办理的选择保留 @license-gate', async ({ page, api }) => {
+  const world = await boot(page, api, { path: '/interview/tips' })
+  await page.getByTestId('interview-primary').click()
+  await page.waitForURL((url) => url.searchParams.get('stage') === 'setup')
+  await chooseInterviewExperience(page)
+  const selected = page.locator('.iv-choice').filter({ hasText: '经验（必选）' }).getByRole('button', { name: '1-3 年', exact: true })
+  await expect(selected).toHaveAttribute('aria-pressed', 'true')
+  world.lapse(10 * MINUTE)
+  const refreshBefore = world.log.refresh.length
+  const exchangeBefore = world.log.exchange.length
+  await world.advance(8 * MINUTE)
+  expect(world.log.profile.some((entry) => entry.verified && entry.licenseState === 'inactive')).toBe(true)
+  expect(world.log.refresh.length).toBe(refreshBefore)
+  expect(world.log.exchange.length).toBe(exchangeBefore)
+  await expect(selected).toHaveAttribute('aria-pressed', 'true')
+  expect(new URL(page.url()).searchParams.get('stage')).toBe('setup')
+  await expect(paused(page)).toHaveCount(0)
+})
+
+test('例行续期后两分钟到期，暂停复查距续期至少五分钟 @license-gate', async ({ page, api }) => {
+  const world = await boot(page, api)
+  await world.freeze()
+  const before = world.log.refresh.length
+  world.afterRefresh = (at) => {
+    world.active = false
+    for (const [token, endsAt] of world.sessions) world.sessions.set(token, Math.min(endsAt, at + 2 * MINUTE))
+    delete world.afterRefresh
+  }
+  await world.advanceUntil(async () => world.log.refresh.length > before, 11 * MINUTE)
+  const t = world.log.refresh[world.log.refresh.length - 1]!
+  expect(world.log.profile.some((entry) => entry.verified && entry.licenseState === 'inactive')).toBe(true)
+  await reachPaused(world, page)
+  const refreshBefore = world.log.refresh.length
+  const exchangeBefore = world.log.exchange.length
+  await world.advanceUntil(async () => world.log.refresh.length > refreshBefore || world.log.exchange.length > exchangeBefore, 6 * MINUTE)
+  const attempts = [...world.log.refresh.slice(refreshBefore), ...world.log.exchange.slice(exchangeBefore)]
+  expect(Math.min(...attempts)).toBeGreaterThanOrEqual(t + 5 * MINUTE)
+  await world.thaw()
+})
+
 test('授权失效：简历台、练面试、查政策、打印台的入口停用并写明原因，问小青停用 @license-gate', async ({ page, api }) => {
   const world = await boot(page, api)
   const hubs = [
@@ -561,15 +601,15 @@ test('授权恢复后，暂停屏在下一次 5 分钟复查时自动回首页�
   // 授权仍失效时，暂停期间的复查（换票）一律被服务端拒绝；两次复查之间不少于 5 分钟。
   const exchangeBefore = world.log.exchange.length
   const refreshBefore = world.log.refresh.length
+  await world.freeze()
   await world.advance(12 * MINUTE)
   const attempts = [...world.log.exchange.slice(exchangeBefore), ...world.log.refresh.slice(refreshBefore)].sort((left, right) => left - right)
   expect(attempts.length, '暂停期间应有复查').toBeGreaterThanOrEqual(2)
   expect(attempts.length, '12 分钟内复查最多 3 次（每 5 分钟一次）').toBeLessThanOrEqual(3)
-  // 页面按自己的钟保证两次尝试至少隔 5 分钟；这里量的是请求发出时的页面读数，假时钟的读数偶尔倒退数百毫秒（实测量到过 299.0 秒），
-  // 所以留 2 秒余量——还是远大于「每分钟一次」那种过密（见反向检查）。
   for (let i = 1; i < attempts.length; i += 1) {
-    expect(attempts[i]! - attempts[i - 1]!, `第 ${i} 次与第 ${i + 1} 次复查的间隔`).toBeGreaterThanOrEqual(5 * MINUTE - 2_000)
+    expect(attempts[i]! - attempts[i - 1]!, `第 ${i} 次与第 ${i + 1} 次复查的间隔`).toBeGreaterThanOrEqual(5 * MINUTE)
   }
+  await world.thaw()
   await expect(paused(page)).toBeVisible()
 
   // 授权恢复（后台续期）。最迟再过一个复查周期，页面自己换到新票、读到验过签的 ok，自动回首页。
