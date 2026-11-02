@@ -473,7 +473,7 @@ check('W2-W5 state coverage', () => {
   assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'offline page retains the 8177 state after an aborted health request @w5-kiosk'", [
     "api.abort('GET', '/api/v1/health', 'internetdisconnected')",
     "page.getByRole('button', { name: '重新检测', exact: true }).click()",
-    "page.getByTestId('system-state-auto')).toContainText('已重试 2 次')",
+    "page.getByTestId('system-state-auto')).toContainText('已重试 1 次')",
   ])
   // 证据锚点随稿换字，判据不变：未登录仍有去登录，仍不预渲染资产，仍有不登录出口。
   assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'profile permission state uses the canonical fusion shell @w5-kiosk'", [

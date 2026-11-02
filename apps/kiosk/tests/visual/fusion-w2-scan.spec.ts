@@ -974,6 +974,11 @@ test(`guest ${scanType} scan result has no download QR and no takeaway entry, on
   await expect(page.locator('[data-testid^="scan-takeaway"]'), '游客结果页不得有扫码带走的任何元素').toHaveCount(0)
   await expect(page.locator('[data-qr-origin], [data-qr-path]'), '游客结果页不得有下载二维码').toHaveCount(0)
   await expect(page.locator('body')).not.toContainText(/扫码带走|带走这份扫描件|证件扫描不提供/)
+  const main = page.locator('[data-qx-page="scan-workbench"]')
+  // 扫描件本身的 PDF 预览用 canvas 画（data-pdf-preview-host 里），那不是码；它以外不许有任何 canvas。
+  await expect(main.locator('svg[shape-rendering="crispEdges"], canvas:not([data-pdf-preview-host] canvas), img[src^="data:image"]')).toHaveCount(0)
+  await expect(main.getByText(/扫码带走|下载码|二维码/)).toHaveCount(0)
+  await expect(main.locator('[aria-label*="扫码带走"], [aria-label*="下载码"], [aria-label*="二维码"], [aria-description*="扫码带走"], [aria-description*="下载码"], [aria-description*="二维码"]')).toHaveCount(0)
   // 只留一句实话，和灰着的「本次不进入我的文档」；这一屏没有任何去 /login 的出口。
   await expect(page.getByText('未登录扫描件不会进入「我的文档」。要留在账号里：先登录，再重新扫一次。')).toBeVisible()
   await expect(page.getByRole('button', { name: /本次不进入我的文档/ })).toBeDisabled()

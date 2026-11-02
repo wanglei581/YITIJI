@@ -86,7 +86,9 @@ export function ResumeFormatChooser(props: {
       {props.screen === 'export-failed' && (
         <div className="qx-card" role="alert">
           <div className="qx-sec-h"><span className="qx-rg-no">01</span><span className="t">文件没生成出来</span><span className="hint">简历内容还在</span></div>
-          <p className="qx-rg-lead">{props.exportError || '这次没有生成文件。核对过的内容还在，可以直接再导一次。'}</p>
+          <p className="qx-rg-lead">{props.exportError || '这次没有生成文件，核对过的内容还在。'}</p>
+          <p>点底部「重新导出」，核对后可按当前格式再导一次。</p>
+          <button type="button" className="qx-btn" data-variant="ghost" disabled={props.exporting} onClick={props.onClearExport}>换个格式</button>
         </div>
       )}
 
@@ -251,7 +253,7 @@ export function ResumeFormatChooser(props: {
         <details className="qx-card qx-rg-next" aria-label="接下来怎么带走">
           <summary>更多格式与帮助</summary>
           <div className="qx-rows">
-            <button type="button" className="qx-row" disabled={props.exporting} onClick={props.onClearExport}><span className="qx-row-tx"><b className="qx-row-t">{props.screen === 'export-failed' ? '换个格式再试一次' : '再导一份别的格式'}</b><span className="qx-row-d">内容仍在；PDF 用于打印，Word、TXT、Markdown 可带走编辑</span></span><span className="qx-row-go">›</span></button>
+            {props.screen !== 'export-failed' && <button type="button" className="qx-row" disabled={props.exporting} onClick={props.onClearExport}><span className="qx-row-tx"><b className="qx-row-t">再导一份别的格式</b><span className="qx-row-d">内容仍在；PDF 用于打印，Word、TXT、Markdown 可带走编辑</span></span><span className="qx-row-go">›</span></button>}
             <button type="button" className="qx-row" onClick={props.onHelp}><span className="qx-row-tx"><b className="qx-row-t">帮助中心</b><span className="qx-row-d">{helpNeededLine()}。不需要重新填写经历</span></span><span className="qx-row-go">›</span></button>
           </div>
           <div className="qx-rg-export-facts">
