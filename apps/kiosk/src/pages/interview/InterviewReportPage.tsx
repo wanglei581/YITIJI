@@ -154,7 +154,8 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
 
   const goSetup = () => {
     if (viewOnly) return
-    onGoStage ? onGoStage('setup') : navigate('/interview/setup')
+    if (onGoStage) onGoStage('setup')
+    else navigate('/interview/setup')
   }
   const goReports = () => onGoStage ? onGoStage('reports') : navigate('/interview/reports')
   const leave = () => navigate('/interview-service')
