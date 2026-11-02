@@ -504,8 +504,8 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
   await expect(entry).toContainText('这几种原件这样复印')
   await expect(entry).toContainText('身份证、发票、双面')
   for (const step of await page.getByTestId('print-hub-copy-steps').locator('li').all()) await expect(step).toBeVisible()
-  // 不伪造结果、不写收费、不写工程词。
-  for (const word of ['已复印', '复印成功', '复印完成', '免费', '元/页', '服务端', 'Agent', '能力配置']) {
+  // 不伪造结果、不写收费、不写工程词，也不写「找工作人员」一类说法（现场无人值守）。
+  for (const word of ['已复印', '复印成功', '复印完成', '免费', '元/页', '服务端', 'Agent', '能力配置', '工作人员']) {
     await expect(guide.getByText(word, { exact: false })).toHaveCount(0)
   }
   await expectNoForgedReady(page)

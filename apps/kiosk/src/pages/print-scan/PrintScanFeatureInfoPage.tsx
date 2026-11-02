@@ -3,10 +3,10 @@
 //
 // 视觉真值：docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html
 //   state: feature-id-photo | feature-not-found（稿里有）
-//          feature-copy（稿里没有：R4，2026-09-29 产品负责人拍板复印走打印机面板；
-//                        同日定合规新状态不画新稿，用 2.0 现有组件与字阶实现）
+//          feature-copy（2.0 稿里没有：R4，2026-09-29 产品负责人拍板复印走打印机面板；
+//                        11/02 起照补稿 docs/design/kiosk-touch-2026-11-copyscan 的 cs-copy-guide、cs-copy-guide-more）
 // 证件照当前只有说明 + 两条真实替代路径，不做排版 / 换底 / 成品生成。
-// 复印只有「怎么在打印机面板上复印」的说明，不经过本机下单，不宣称复印结果。
+// 复印只有「怎么在打印机面板上复印」的图文说明（两个视图），不经过本机下单，不宣称复印结果。
 // ============================================================
 
 import { Fragment, useId, type ReactNode } from 'react'
