@@ -23,7 +23,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { PDFDocument, StandardFonts } from 'pdf-lib'
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { AuditService } from '../src/audit/audit.service'
 import {
   PURPOSE_POLICY,
@@ -36,7 +36,17 @@ import { FilesService } from '../src/files/files.service'
 import { allowedPoliciesForFile, defaultRetentionForUpload } from '../src/files/retention-policy'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { StorageService } from '../src/storage/storage.service'
-import { extractTextForPiiScan, HIGH_RISK_PII_PURPOSES, PII_SCAN_OCR_PAGE_LIMIT_DEFAULT } from '../src/materials/pii-scan.util'
+import {
+  countPdfPages,
+  recognizeStoredPageCount,
+  setPdfPageCountParserUnavailableForTest,
+} from '../src/files/file-page-count.util'
+import {
+  extractTextForPiiScan,
+  HIGH_RISK_PII_PURPOSES,
+  PII_SCAN_OCR_PAGE_LIMIT_DEFAULT,
+  piiScanOcrPageLimit,
+} from '../src/materials/pii-scan.util'
 import { materialCheckRequired, PII_SCAN_REQUIRED_PURPOSES } from '../src/print-jobs/material-check-policy'
 import { ScanDeviceSessionsService } from '../src/scan-tasks/scan-device-sessions.service'
 import { ScanTasksService } from '../src/scan-tasks/scan-tasks.service'
@@ -49,6 +59,7 @@ import { assertIsolatedVerificationDatabase } from './support/isolated-verificat
 const MIB = 1024 * 1024
 const ID_TOO_LARGE = '这份扫描文件太大，收不了。请少扫几页，分成几次办理。'
 const ID_TOO_MANY = '页数超过这次扫描的上限。请少扫几页，分成几次办理。'
+const PAGE_COUNT_UNREADABLE = '这份扫描件的页数没能读出来，请重新扫描。'
 const PANEL_ID_PDF = '这次扫出来的文件格式不收：证件扫描请在打印机屏幕上选图片格式（JPG）后重扫。'
 const PANEL_LEASE_KEYS = ['deliveryLease', 'expiresAt', 'notBefore', 'scanTaskId', 'serverNow']
 
@@ -97,6 +108,31 @@ function padPdf(pdf: Buffer, bytes: number): Buffer {
   const out = Buffer.alloc(bytes)
   pdf.copy(out)
   return out
+}
+
+/** 只有整页色块、没有文字层。每页颜色不同，渲染结果不该是同一张图。 */
+async function imageOnlyPdf(pageCount: number): Promise<Buffer> {
+  const doc = await PDFDocument.create()
+  for (let i = 0; i < pageCount; i += 1) {
+    const page = doc.addPage([200, 200])
+    const channel = (i + 1) / (pageCount + 1)
+    page.drawRectangle({ x: 0, y: 0, width: 200, height: 200, color: rgb(channel, 0, 1 - channel) })
+  }
+  return Buffer.from(await doc.save())
+}
+
+function countingOcr() {
+  const calls: Array<{ mimeType: string; sha256: string }> = []
+  return {
+    calls,
+    recognize: async (input: { buffer: Buffer; mimeType: string }) => {
+      calls.push({
+        mimeType: input.mimeType,
+        sha256: createHash('sha256').update(input.buffer).digest('hex'),
+      })
+      return { ok: true as const, text: `ocr-page-${calls.length}` }
+    },
+  }
 }
 
 async function main(): Promise<void> {
@@ -203,7 +239,7 @@ async function main(): Promise<void> {
     const piiAt = materialsSrc.indexOf("if (kind === 'pii_scan')")
     assert.ok(piiAt >= 0)
     const piiWindow = materialsSrc.slice(piiAt, piiAt + 2500)
-    assert.match(piiWindow, /extractTextForPiiScan\(buffer, sourceFile\.mimeType, this\.ocr\)/)
+    assert.match(piiWindow, /extractTextForPiiScan\(buffer, sourceFile\.mimeType, this\.ocr, sourceFile\.purpose\)/)
     assert.doesNotMatch(piiWindow, /mimeType\s*===|mimeType\s*!==/)
     const retention = defaultRetentionForUpload({
       purpose: 'id_scan',
@@ -439,15 +475,34 @@ async function main(): Promise<void> {
       const message = await expectHttp(
         () => deliver(session, pdf, 'device', 'id.pdf'),
         409,
-        'SCAN_DEVICE_TOO_MANY_PAGES',
+        'SCAN_DEVICE_PAGE_COUNT_UNREADABLE',
         '证件 PDF 页数读不出来',
       )
-      assert.equal(message, '这份扫描件的页数没能读出来，请重新扫描。')
+      assert.equal(message, PAGE_COUNT_UNREADABLE)
       const status = await scanSvc.getStatus(session.scanTaskId, null, session.controlToken)
-      assert.equal(status.errorCode, 'SCAN_DEVICE_TOO_MANY_PAGES')
-      assert.equal(status.errorMessage, ID_TOO_MANY)
+      assert.equal(status.status, 'failed')
+      assert.equal(status.errorCode, 'SCAN_DEVICE_PAGE_COUNT_UNREADABLE')
+      assert.equal(status.errorMessage, PAGE_COUNT_UNREADABLE)
+      assert.notEqual(status.errorMessage, ID_TOO_MANY)
       await assertNotStored(pdf, '读不出页数的证件 PDF')
-      pass('证件 PDF 读不出页数也拒，不按 1 页放行')
+      pass('证件 PDF 读不出页数：投递与 getStatus 都是 SCAN_DEVICE_PAGE_COUNT_UNREADABLE，不说成超限')
+    }
+    {
+      const session = await readyToDeliver('docunread', 'document', 1)
+      const pdf = Buffer.from(`%PDF-1.4\n%${suffix}-doc\nnot a real pdf\n%%EOF\n`, 'latin1')
+      const message = await expectHttp(
+        () => deliver(session, pdf, 'device'),
+        409,
+        'SCAN_DEVICE_PAGE_COUNT_UNREADABLE',
+        '非证件 PDF 页数读不出来',
+      )
+      assert.equal(message, PAGE_COUNT_UNREADABLE)
+      const status = await scanSvc.getStatus(session.scanTaskId, null, session.controlToken)
+      assert.equal(status.status, 'failed')
+      assert.equal(status.errorCode, 'SCAN_DEVICE_PAGE_COUNT_UNREADABLE')
+      assert.equal(status.errorMessage, PAGE_COUNT_UNREADABLE)
+      await assertNotStored(pdf, '读不出页数的非证件 PDF')
+      pass('非证件屏上 PDF 读不出页数也拒，不再按未知页数落库')
     }
     {
       const session = await readyToDeliver('idbig', 'id', 1)
@@ -524,6 +579,57 @@ async function main(): Promise<void> {
       pass('非证件投递超过 20 页被拒')
     }
 
+    console.log('\n-- C2. 解析器不可用时不改信字节正则 --')
+    {
+      const buf = Buffer.from(
+        `%PDF-1.4\n% ${suffix} regex\n1 0 obj\n<< /Type /Page >>\nendobj\n2 0 obj\n<< /Type /Page >>\nendobj\n%%EOF\n`,
+        'latin1',
+      )
+      assert.equal(countPdfPages(buf), 2, '夹具必须能被字节正则数成 2 页，否则测不到「退回正则仍放行」')
+      setPdfPageCountParserUnavailableForTest(true)
+      let panelFileId: string | null = null
+      try {
+        assert.equal(await recognizeStoredPageCount(buf, 'application/pdf'), 2, '面板用的识别函数仍接受字节正则')
+
+        const idSession = await readyToDeliver('regexid', 'id', 1)
+        await expectHttp(
+          () => deliver(idSession, buf, 'device', 'id.pdf'),
+          409,
+          'SCAN_DEVICE_PAGE_COUNT_UNREADABLE',
+          '证件 PDF 只剩字节正则计数',
+        )
+        const idStatus = await scanSvc.getStatus(idSession.scanTaskId, null, idSession.controlToken)
+        assert.equal(idStatus.errorCode, 'SCAN_DEVICE_PAGE_COUNT_UNREADABLE')
+        assert.equal(idStatus.errorMessage, PAGE_COUNT_UNREADABLE)
+        await assertNotStored(buf, '字节正则能数的证件 PDF')
+
+        const docSession = await readyToDeliver('regexdoc', 'document', 1)
+        await expectHttp(
+          () => deliver(docSession, buf, 'device'),
+          409,
+          'SCAN_DEVICE_PAGE_COUNT_UNREADABLE',
+          '非证件 PDF 只剩字节正则计数',
+        )
+        await assertNotStored(buf, '字节正则能数的非证件 PDF')
+        pass('解析器不可用、字节正则能数到 2 页时，证件与非证件屏上扫描都拒')
+
+        const uploaded = await files.upload({
+          buffer: buf,
+          filename: 'panel-regex.pdf',
+          mimeType: 'application/pdf',
+          purpose: 'print_doc',
+          uploaderId: null,
+        })
+        panelFileId = uploaded.fileId
+        const panelRow = await prisma.fileObject.findUniqueOrThrow({ where: { id: uploaded.fileId } })
+        assert.equal(panelRow.pageCount, 2)
+        pass('解析器不可用时，普通上传仍按字节正则记下 2 页')
+      } finally {
+        setPdfPageCountParserUnavailableForTest(false)
+        if (panelFileId) await prisma.fileObject.delete({ where: { id: panelFileId } }).catch(() => undefined)
+      }
+    }
+
     console.log('\n-- D. 租约上限 --')
     {
       const idSession = await openSession('leaseid', 'id', 'device')
@@ -536,6 +642,81 @@ async function main(): Promise<void> {
       const panelLease = await scanSvc.getScanDeliveryLease(panel.terminalId)
       assert.deepEqual(Object.keys(panelLease).sort(), PANEL_LEASE_KEYS)
       pass('证件租约 4 页 / 10 MiB，其余 20 页 / 18 MiB，面板租约不多字段')
+    }
+
+    console.log('\n-- E. 证件 PDF 每一页都走 OCR --')
+    {
+      const imagePdf = await imageOnlyPdf(4)
+      const ocr = countingOcr()
+      const extracted = await extractTextForPiiScan(imagePdf, 'application/pdf', ocr, 'id_scan')
+      assert.equal(extracted.outcome, 'ok')
+      assert.equal(extracted.truncated, false)
+      assert.equal(extracted.pages.length, 4)
+      assert.deepEqual(extracted.pages.map((page) => page.pageNumber), [1, 2, 3, 4])
+      assert.equal(ocr.calls.length, 4)
+      assert.ok(ocr.calls.every((call) => call.mimeType === 'image/png'))
+      assert.equal(new Set(ocr.calls.map((call) => call.sha256)).size, 4, '四次识别的图片应当来自不同页')
+      assert.ok(extracted.pages.every((page) => page.text.startsWith('ocr-page-')))
+      pass('id_scan 四页纯图片 PDF：四页各识别一次')
+    }
+    {
+      const textPdf = await pdfWithPages(4, `layer ${suffix}`)
+      const ocr = countingOcr()
+      const extracted = await extractTextForPiiScan(textPdf, 'application/pdf', ocr, 'id_scan')
+      assert.equal(ocr.calls.length, 4)
+      assert.equal(extracted.outcome, 'ok')
+      assert.equal(extracted.truncated, false)
+      assert.equal(extracted.pages.length, 4)
+      assert.ok(extracted.pages.every((page) => !page.text.includes('ABCDEFG')), '有文字层也不许把文字层当检查结果')
+      assert.ok(extracted.pages.every((page) => page.items === undefined), 'OCR 路径不带文字层坐标')
+      pass('id_scan 四页文字层 PDF：四页仍都走 OCR')
+    }
+    {
+      let failedCalls = 0
+      const failed = await extractTextForPiiScan(await imageOnlyPdf(4), 'application/pdf', {
+        recognize: async () => {
+          failedCalls += 1
+          return { ok: false, errorCode: 'OCR_FAILED' as const }
+        },
+      }, 'id_scan')
+      assert.equal(failedCalls, 1)
+      assert.equal(failed.outcome, 'degraded')
+      assert.equal(failed.pages.length, 0)
+      pass('id_scan 证件 PDF 某一页 OCR 失败：整份降级，不把已识别页当成查完')
+    }
+    {
+      const previous = process.env['PII_SCAN_MAX_OCR_PAGES']
+      process.env['PII_SCAN_MAX_OCR_PAGES'] = '1'
+      try {
+        assert.equal(piiScanOcrPageLimit('id_scan'), SCAN_DEVICE_ID_MAX_PAGES)
+        assert.equal(piiScanOcrPageLimit('print_doc'), 1)
+        const four = await imageOnlyPdf(4)
+        const idOcr = countingOcr()
+        const idExtracted = await extractTextForPiiScan(four, 'application/pdf', idOcr, 'id_scan')
+        assert.equal(idOcr.calls.length, 4)
+        assert.equal(idExtracted.truncated, false)
+        assert.equal(idExtracted.pages.length, 4)
+        pass('PII_SCAN_MAX_OCR_PAGES=1 时，id_scan 四页仍各识别一次')
+
+        const fiveOcr = countingOcr()
+        const five = await extractTextForPiiScan(await imageOnlyPdf(5), 'application/pdf', fiveOcr, 'id_scan')
+        assert.equal(fiveOcr.calls.length, 4)
+        assert.equal(five.truncated, true)
+        assert.equal(five.scannedPages, 4)
+        assert.equal(five.totalPages, 5)
+        pass('PII_SCAN_MAX_OCR_PAGES=1 时，超过 4 页的证件 PDF 只识别 4 页并标截断')
+
+        const otherOcr = countingOcr()
+        const other = await extractTextForPiiScan(four, 'application/pdf', otherOcr, 'print_doc')
+        assert.equal(otherOcr.calls.length, 1)
+        assert.equal(other.truncated, true)
+        assert.equal(other.scannedPages, 1)
+        assert.equal(other.totalPages, 4)
+        pass('PII_SCAN_MAX_OCR_PAGES=1 时，非证件图片 PDF 仍只识别 1 页')
+      } finally {
+        if (previous === undefined) delete process.env['PII_SCAN_MAX_OCR_PAGES']
+        else process.env['PII_SCAN_MAX_OCR_PAGES'] = previous
+      }
     }
 
     console.log('\nPASS verify-scan-device-idscan')

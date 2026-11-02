@@ -38,6 +38,7 @@ process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-scan-device-settings-admin-secr
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-scan-device-settings-action-secret-0123456789'
 
 import assert from 'node:assert/strict'
+import { PDFDocument } from 'pdf-lib'
 import { randomBytes } from 'node:crypto'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -111,8 +112,12 @@ async function expectHttp(run: () => Promise<unknown>, status: number, code: str
   return assert.fail(`${label}：应当被拒绝（${status} ${code}），实际放行了`)
 }
 
-function uniquePdf(): Buffer {
-  return Buffer.from(`%PDF-1.4\n%${randomBytes(8).toString('hex')}\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n`, 'latin1')
+/** 屏上扫描投递只认解析器读出的页数。占位的 %PDF 头读不出页数，会被拒。每次标题不同，避免按哈希去重撞车。 */
+async function uniquePdf(): Promise<Buffer> {
+  const doc = await PDFDocument.create()
+  doc.addPage([200, 200])
+  doc.setTitle(randomBytes(8).toString('hex'))
+  return Buffer.from(await doc.save())
 }
 
 async function main(): Promise<void> {
@@ -302,7 +307,7 @@ async function main(): Promise<void> {
         '终端程序下一次取租约拿到的是改过的来源，并带上该类型的页数与大小上限',
       )
       await scanSvc.deliverScanFile({
-        terminalId: s.t.id, scanTaskId: s.id, deliveryLease: lease.deliveryLease, buffer: uniquePdf(), filename: 'scan.pdf',
+        terminalId: s.t.id, scanTaskId: s.id, deliveryLease: lease.deliveryLease, buffer: await uniquePdf(), filename: 'scan.pdf',
         mimeType: 'application/pdf', observedAt: new Date().toISOString(), origin: 'device',
       })
       const done = await scanSvc.getStatus(s.id, null, s.token)

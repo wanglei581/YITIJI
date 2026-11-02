@@ -12,7 +12,7 @@ import type { UserRole } from '../common/decorators/roles.decorator'
 import { generateObjectKey, type FileOwnerType as ObjKeyOwnerType } from '../storage/object-key'
 import { isVerifiedDeviceScanDelivery } from '../scan-tasks/scan-device-protocol'
 import { sniffDeclaredMimeMismatch } from './content-sniff'
-import { recognizeStoredPageCount } from './file-page-count.util'
+import { recognizeStoredPageCount, resolvePdfPageCountDetailed } from './file-page-count.util'
 import {
   RESUME_EXPORT_STAGING_MAX_MS,
   type FileOwnerType,
@@ -22,6 +22,7 @@ import {
   type FileAssetCategory,
 } from './file.types'
 import {
+  SCAN_DEVICE_PAGE_COUNT_UNREADABLE_MESSAGE,
   scanDeviceDeliveryLimits,
   scanDeviceTooManyPagesMessage,
   validateVerifiedDeviceScanUpload,
@@ -122,26 +123,43 @@ export interface UploadStageDeps {
   region: string
 }
 
-/** 屏上扫描投递在落库前按类型再核页数。普通上传不设页数上限。证件读不出页数也拒。 */
+function declaredMime(mimeType: string): string {
+  return mimeType.split(';')[0]?.trim().toLowerCase() ?? ''
+}
+
+/**
+ * 屏上扫描投递在落库前按类型再核页数。普通上传（capPages 为 false）不设页数上限，
+ * 解析器不可用时仍可退回字节正则，和面板路线一样。
+ *
+ * 屏上扫描的 PDF（证件与非证件）只认解析器读出的页数。解析器不可用、退回字节正则、
+ * 读不出、小于 1，一律拒，错误码不是「超过上限」。超过上限仍是 SCAN_DEVICE_TOO_MANY_PAGES。
+ */
 async function resolveStoredPageCount(
   args: { buffer: Buffer; mimeType: string; purpose: FilePurpose },
   capPages: boolean,
 ): Promise<number | null> {
-  const pageCount = await recognizeStoredPageCount(args.buffer, args.mimeType)
-  if (!capPages) return pageCount
-  const limits = scanDeviceDeliveryLimits(args.purpose)
-  const tooMany = args.purpose === 'id_scan'
-    ? pageCount === null || pageCount < 1 || pageCount > limits.maxPages
-    : pageCount !== null && pageCount > limits.maxPages
-  if (tooMany) {
+  if (!capPages || declaredMime(args.mimeType) !== 'application/pdf') {
+    return recognizeStoredPageCount(args.buffer, args.mimeType)
+  }
+  const resolved = await resolvePdfPageCountDetailed(args.buffer)
+  if (resolved.status !== 'pages' || resolved.source !== 'parser' || resolved.pages < 1) {
     throw new ConflictException({
       error: {
-        code: 'SCAN_DEVICE_TOO_MANY_PAGES',
-        message: scanDeviceTooManyPagesMessage(limits.maxPages, pageCount),
+        code: 'SCAN_DEVICE_PAGE_COUNT_UNREADABLE',
+        message: SCAN_DEVICE_PAGE_COUNT_UNREADABLE_MESSAGE,
       },
     })
   }
-  return pageCount
+  const limits = scanDeviceDeliveryLimits(args.purpose)
+  if (resolved.pages > limits.maxPages) {
+    throw new ConflictException({
+      error: {
+        code: 'SCAN_DEVICE_TOO_MANY_PAGES',
+        message: scanDeviceTooManyPagesMessage(limits.maxPages, resolved.pages),
+      },
+    })
+  }
+  return resolved.pages
 }
 
 export async function stagePreparedUpload(

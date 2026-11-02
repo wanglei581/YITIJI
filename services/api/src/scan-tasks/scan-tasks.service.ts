@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { isSerializationConflict } from '../common/prisma/serialization-conflict'
 import { FilesService } from '../files/files.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
+import { SCAN_DEVICE_PAGE_COUNT_UNREADABLE_MESSAGE } from '../files/file-validation'
 import { signFileUrl } from '../files/signing'
 import type { FilePurpose } from '../files/file.types'
 import type { CreateScanTaskDto } from './dto/create-scan-task.dto'
@@ -175,9 +176,11 @@ const USER_FACING_SCAN_ERROR: Record<string, string> = {
   SCAN_FILE_TYPE_NOT_ALLOWED: '这次扫出来的文件格式不收：证件扫描请在打印机屏幕上选图片格式（JPG）后重扫。',
   // 屏上扫描与面板扫描超大小都落这个码。无人值守口径，不出现「找工作人员」。
   SCAN_FILE_TOO_LARGE: '这份扫描文件太大，收不了。请少扫几页，分成几次办理。',
-  // 屏上扫描页数超过该类型上限，或证件 PDF 的页数读不出来。device-report 直接抛这个码；
+  // 屏上扫描页数超过该类型上限。device-report 直接抛这个码；
   // 投递时文件服务再核一遍，catch 里原样保留，不落成 SCAN_UPLOAD_FAILED。
   SCAN_DEVICE_TOO_MANY_PAGES: '页数超过这次扫描的上限。请少扫几页，分成几次办理。',
+  // 屏上扫描投递的 PDF 页数不是可靠解析结果。不要说成「页数超过上限」。
+  SCAN_DEVICE_PAGE_COUNT_UNREADABLE: SCAN_DEVICE_PAGE_COUNT_UNREADABLE_MESSAGE,
   // B1-5：ScanTaskReaperTask 收敛卡在 'matched' 状态太久的任务时写入的 errorCode，
   // 必须在这里登记白名单文案，否则 getStatus() 会把它 fallback 成通用的
   // '扫描处理失败，请重试'，用户看不到"超时未完成"这个更准确的原因。
@@ -185,14 +188,16 @@ const USER_FACING_SCAN_ERROR: Record<string, string> = {
 }
 
 /**
- * 投递 catch 只认这三种文件服务错误码。其余（含 SCAN_TASK_STATE_CHANGED、普通 Error）
+ * 投递 catch 只认这四种文件服务错误码。其余（含 SCAN_TASK_STATE_CHANGED、普通 Error）
  * 仍落 SCAN_UPLOAD_FAILED。按 getResponse() 取码，这样 ConflictException 也看得见。
+ * 页数读不出必须单独保留，不能并进 SCAN_DEVICE_TOO_MANY_PAGES。
  */
 function scanDeliveredUploadErrorCode(error: unknown): string {
   const code = nestedExceptionErrorCode(error)
   if (code === 'FILE_MIME_NOT_ALLOWED') return 'SCAN_FILE_TYPE_NOT_ALLOWED'
   if (code === 'FILE_TOO_LARGE') return 'SCAN_FILE_TOO_LARGE'
   if (code === 'SCAN_DEVICE_TOO_MANY_PAGES') return 'SCAN_DEVICE_TOO_MANY_PAGES'
+  if (code === 'SCAN_DEVICE_PAGE_COUNT_UNREADABLE') return 'SCAN_DEVICE_PAGE_COUNT_UNREADABLE'
   return 'SCAN_UPLOAD_FAILED'
 }
 

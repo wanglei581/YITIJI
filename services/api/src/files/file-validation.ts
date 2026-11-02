@@ -199,8 +199,9 @@ export function isPurpose(value: string): value is FilePurpose {
  * 屏上扫描（device 投递）的页数与字节上限。租约下发和投递时再拦，用的是同一组数。
  *
  * 证件：4 页 / 10 MiB。10 MiB 就是 PURPOSE_POLICY.id_scan.maxBytes，不另写一个数。
- * 4 页必须 ≤ 个人信息检查的默认识别页数（pii-scan.util 的 PII_SCAN_OCR_PAGE_LIMIT_DEFAULT，默认 5），
- * 这样每一页都会进和图片证件同一套检查。
+ * 4 页必须 ≤ 个人信息检查的默认识别页数（pii-scan.util 的 PII_SCAN_OCR_PAGE_LIMIT_DEFAULT，默认 5）。
+ * 证件 PDF 的实际 OCR 上限是 max(PII_SCAN_MAX_OCR_PAGES, 本常量 4)：配置被调到 1 时，
+ * 4 页仍然每一页都识别。
  *
  * 其余：20 页 / 18 MiB。20 页来自任务包 ③ §2.4 和补稿 cs-scan-more。
  * 18 MiB 与终端程序 `SCAN_PDF_MAX_BYTES` 相同：
@@ -233,9 +234,12 @@ export function scanDeviceLeaseLimits(scanType: string | null | undefined): { ma
   return { maxPages: SCAN_DEVICE_OTHER_MAX_PAGES, maxBytes: SCAN_DEVICE_OTHER_MAX_BYTES }
 }
 
-/** 页数超限或读不出页数。无人值守口径，不出现「找工作人员」。 */
+/** 屏上扫描投递的 PDF 页数不是可靠解析结果。无人值守口径，不出现「找工作人员」。 */
+export const SCAN_DEVICE_PAGE_COUNT_UNREADABLE_MESSAGE = '这份扫描件的页数没能读出来，请重新扫描。'
+
+/** 页数超过该类型上限。读不出页数用 {@link SCAN_DEVICE_PAGE_COUNT_UNREADABLE_MESSAGE}，不要说成超限。 */
 export function scanDeviceTooManyPagesMessage(maxPages: number, recognized: number | null): string {
-  if (recognized === null) return '这份扫描件的页数没能读出来，请重新扫描。'
+  if (recognized === null) return SCAN_DEVICE_PAGE_COUNT_UNREADABLE_MESSAGE
   return `这次最多扫 ${maxPages} 页。请少扫几页，分成几次办理。`
 }
 

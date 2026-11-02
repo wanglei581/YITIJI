@@ -29,6 +29,7 @@ process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-scan-device-lifecycle-admin-sec
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-scan-device-lifecycle-action-secret-0123456789'
 
 import assert from 'node:assert/strict'
+import { PDFDocument } from 'pdf-lib'
 import { createHash, randomBytes } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -72,8 +73,12 @@ async function expectHttp(run: () => Promise<unknown>, status: number, code: str
   return assert.fail(`${label}：应当被拒绝（${status} ${code}），实际放行了`)
 }
 
-function uniquePdf(): Buffer {
-  return Buffer.from(`%PDF-1.4\n%${randomBytes(8).toString('hex')}\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n`, 'latin1')
+/** 屏上扫描投递只认解析器读出的页数。占位的 %PDF 头读不出页数，会被拒。每次标题不同，避免按哈希去重撞车。 */
+async function uniquePdf(): Promise<Buffer> {
+  const doc = await PDFDocument.create()
+  doc.addPage([200, 200])
+  doc.setTitle(randomBytes(8).toString('hex'))
+  return Buffer.from(await doc.save())
 }
 const sha256Of = (buffer: Buffer) => createHash('sha256').update(buffer).digest('hex')
 
@@ -186,7 +191,7 @@ async function main(): Promise<void> {
 
       /** 钩子先赢：投递被 409 拒、任务仍 waiting、没挂文件、没留去重痕迹。返回这次用的 PDF，供之后验证同一份内容还能投。 */
       async function expectClaimLost(label: string, s: Session, hook: () => Promise<void>): Promise<Buffer> {
-        const pdf = uniquePdf()
+        const pdf = await uniquePdf()
         const raced = claimRace(hook)
         await expectHttp(() => deliver(raced.svc, s, pdf, 'device'), 409, STATE_CHANGED, label)
         assert.equal(raced.ran(), 1, `${label}：钩子必须在抢占那次 updateMany 之前执行过一次，否则这个用例什么都没证明`)
@@ -271,7 +276,7 @@ async function main(): Promise<void> {
       for (const state of ['composing', 'delivering'] as const) {
         const s = await readyToDeliver(`claimok_${state}`, state)
         const raced = claimRace(async () => undefined)
-        const result = await deliver(raced.svc, s, uniquePdf(), 'device')
+        const result = await deliver(raced.svc, s, await uniquePdf(), 'device')
         assert.equal(raced.ran(), 1)
         assert.equal(result.scanTaskId, s.id)
         const row = await rowOf(s.id)
@@ -289,7 +294,7 @@ async function main(): Promise<void> {
         await deviceSvc.report(s.t.id, s.id, { state: 'composing' })
         await deviceSvc.report(s.t.id, s.id, { state: 'delivering' })
         const raced = claimRace(async () => undefined)
-        const result = await deliver(raced.svc, s, uniquePdf(), 'device')
+        const result = await deliver(raced.svc, s, await uniquePdf(), 'device')
         assert.equal(raced.ran(), 1)
         assert.equal(result.scanTaskId, s.id)
         const row = await rowOf(s.id)
@@ -305,7 +310,7 @@ async function main(): Promise<void> {
         const raced = claimRace(async () => {
           await prisma.scanTask.update({ where: { id: s.id }, data: { deviceState: 'error', devicePageCount: 0, deviceErrorCode: 'paper_jam' } })
         })
-        const result = await deliver(raced.svc, s, uniquePdf())
+        const result = await deliver(raced.svc, s, await uniquePdf())
         assert.equal(raced.ran(), 1, '钩子确实在抢占前执行过')
         assert.equal(result.scanTaskId, s.id)
         assert.equal((await rowOf(s.id)).status, 'completed', '面板任务的抢占不看设备列')
@@ -316,7 +321,7 @@ async function main(): Promise<void> {
         const raced2 = claimRace(async () => {
           await prisma.scanTask.update({ where: { id: sw.id }, data: { deviceState: 'error', devicePageCount: 0 } })
         })
-        await deliver(raced2.svc, sw, uniquePdf())
+        await deliver(raced2.svc, sw, await uniquePdf())
         assert.equal(raced2.ran(), 1)
         assert.equal((await rowOf(sw.id)).status, 'completed')
 
@@ -325,7 +330,7 @@ async function main(): Promise<void> {
         const raced3 = claimRace(async () => {
           await scanSvc.cancel(c.id, null, c.token)
         })
-        await expectHttp(() => deliver(raced3.svc, c, uniquePdf()), 409, STATE_CHANGED, '面板会话：抢占前被取消，现有行为照旧 409')
+        await expectHttp(async () => deliver(raced3.svc, c, await uniquePdf()), 409, STATE_CHANGED, '面板会话：抢占前被取消，现有行为照旧 409')
         assert.equal(raced3.ran(), 1)
         assert.equal((await rowOf(c.id)).status, 'cancelled')
       }
