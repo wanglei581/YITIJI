@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+// useRef 用命名空间取：node 门禁（verify-kiosk-ai-declaration、boot-ticket 用例）把 react 换成只导出 useEffect / useState 的桩，
+// 命名导入 useRef 会在加载时直接报错。
+import * as React from 'react'
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import type { ResumeGenEducation, ResumeGenExperience, ResumeGenProject } from '@ai-job-print/shared'
 
 interface ResumeGenerateDraft {
@@ -23,7 +26,7 @@ export const RESUME_GENERATE_FLOW_PATHS = ['/resume/generate', '/resume/generate
 export function resumeGenerateGeneration(): number { return generation }
 
 export function useClearGuestDraftOnFlowExit(isGuest: boolean): void {
-  const isGuestRef = useRef(isGuest)
+  const isGuestRef = React.useRef(isGuest)
   isGuestRef.current = isGuest
   useEffect(() => () => {
     if (isGuestRef.current && !RESUME_GENERATE_FLOW_PATHS.includes(window.location.pathname)) {
