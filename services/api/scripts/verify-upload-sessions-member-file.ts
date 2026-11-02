@@ -329,6 +329,25 @@ async function onlyListedDocumentsAreAccepted(h: Harness, K: string): Promise<vo
   assert.equal(derivedRow.retentionLockedReason, UPLOAD_SESSION_ORDER_ONLY_REASON)
   assert.equal(derivedRow.retentionPolicy, 'system_short', 'order-only member resume must not get the 90-day default')
   assert.equal(derivedRow.endUserId, K, 'order-only file still belongs to the member')
+  // 打印副本（格式转换 / 签章 / 隐私遮挡）不传 orderOnly 也按 sourceFileId 跟锁；原件没锁时副本不锁（对照）。
+  const copyOf = async (sourceFileId: string, derivationKind: 'format_conversion' | 'signature' | 'pii_redaction', name: string) => {
+    h.filenames.add(name)
+    const id = (await h.files.upload({
+      buffer: buildRealPdf(1), filename: name, mimeType: 'application/pdf', purpose: 'print_doc',
+      uploaderId: null, endUserId: K, assetCategory: 'derived', derivationKind, sourceFileId,
+    })).fileId
+    h.fileIds.add(id)
+    return { id, lock: (await h.prisma.fileObject.findUniqueOrThrow({ where: { id } })).retentionLockedReason }
+  }
+  const printCopies: string[] = []
+  for (const kind of ['format_conversion', 'signature', 'pii_redaction'] as const) {
+    const copy = await copyOf(orderOnly, kind, `王晓雯-身份证-${kind}.pdf`)
+    assert.equal(copy.lock, UPLOAD_SESSION_ORDER_ONLY_REASON, `${kind} copy of an order-only file must inherit the lock`)
+    printCopies.push(copy.id)
+  }
+  const normalSource = await document(h, K, '王晓雯-求职信-定稿.pdf', buildRealPdf(1))
+  const normalCopy = await copyOf(normalSource, 'signature', '王晓雯-求职信-签章合成.pdf')
+  assert.equal(normalCopy.lock, null, 'copy of a normal file stays unlocked')
   const listedPdf = await document(h, K, '王晓雯-个人简历-投递版.pdf', buildRealPdf(1))
   const notListed = { contract, sessionOnly, orderOnly, orderOnlyDerived, signature, jobFit, expiredBig }
 
@@ -336,7 +355,9 @@ async function onlyListedDocumentsAreAccepted(h: Harness, K: string): Promise<vo
   const listedIds = new Set(listed.items.map((item) => item.id))
   assert.ok(listedIds.has(listedPdf), 'positive control: a normal document is listed')
   for (const [name, id] of Object.entries(notListed)) assert.equal(listedIds.has(id), false, `${name} must not be listed`)
-  pass('A 对照真 listDocuments：合同原件 / 会话专用 / 只用于这一单 / 签名图 / 系统岗位匹配 / 已过期都不在「我的文档」，普通简历在')
+  for (const id of printCopies) assert.equal(listedIds.has(id), false, 'print copies of an order-only file must not be listed')
+  assert.ok(listedIds.has(normalCopy.id), 'positive control: a print copy of a normal file is listed')
+  pass('A 对照真 listDocuments：合同原件 / 会话专用 / 只用于这一单（含不传参数自动跟锁的三种打印副本）/ 签名图 / 系统岗位匹配 / 已过期都不在「我的文档」，普通简历在')
 
   const { service, redis } = freshService(h)
   const session = await kioskSession(service)
@@ -427,7 +448,15 @@ async function memberSessionSamePersonAndArchive(h: Harness, K: string, M: strin
   const exportedIds = JSON.stringify(exported)
   assert.equal(exportedIds.includes(copyId), false, 'the order-only copy must not be in K data export')
   assert.equal(exportedIds.includes(kFile), true, 'positive control: the original is in K data export')
-  pass('f member 会话确认后：副本挂 K 名下但只用于这一单（锁住、系统短期、「我的文档」和本人数据导出都不列、不多一份重复的），匿名对象被释放、原件不动')
+  // 到期清理后的删除记录：只用于这一单的副本不列（文件名可能是旁人的），普通文件照常列（对照）。
+  const deletedNormal = await document(h, K, '王晓雯-旧版简历-作废.pdf', buildRealPdf(1))
+  const tombstone = { status: 'deleted', deletedAt: new Date(), deleteReason: 'expired' }
+  await h.prisma.fileObject.update({ where: { id: copyId }, data: tombstone })
+  await h.prisma.fileObject.update({ where: { id: deletedNormal }, data: tombstone })
+  const deletedIds = (await new MemberAssetsService(h.prisma).listDeletedDocuments(K, { cursor: null, pageSize: 50 })).items.map((item) => item.id)
+  assert.equal(deletedIds.includes(copyId), false, 'a cleaned order-only copy must not show in K deleted records')
+  assert.equal(deletedIds.includes(deletedNormal), true, 'positive control: a cleaned normal file is in K deleted records')
+  pass('f member 会话确认后：副本挂 K 名下但只用于这一单（锁住、系统短期、「我的文档」、本人数据导出、清理后的删除记录都不列、不多一份重复的），匿名对象被释放、原件不动')
 
   const open = freshService(h)
   const temporary = await kioskSession(open.service)

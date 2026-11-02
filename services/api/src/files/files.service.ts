@@ -53,6 +53,8 @@ import {
   allowedPoliciesForFile,
   computeRetentionDecision,
   defaultRetentionForUpload,
+  isOrderOnlyFile,
+  ORDER_ONLY_INHERITING_DERIVATIONS,
   UPLOAD_SESSION_ORDER_ONLY_REASON,
 } from './retention-policy'
 import { summarizeFileLifecycleRows } from './lifecycle-summary'
@@ -211,7 +213,8 @@ export class FilesService {
       uploaderId: args.uploaderId,
       orgId: args.actorOrgId ?? null,
     })
-    const orderOnly = Boolean(args.orderOnly) && !staging && args.purpose !== 'contract_upload'
+    const orderOnly = !staging && args.purpose !== 'contract_upload'
+      && (Boolean(args.orderOnly) || await this.inheritsOrderOnly(args.sourceFileId, args.derivationKind))
     const retention = defaultRetentionForUpload({
       purpose: args.purpose,
       sensitiveLevel,
@@ -1377,6 +1380,13 @@ export class FilesService {
           : {}),
       },
     })
+  }
+
+  /** 这一单的打印副本（格式转换、签章、隐私遮挡）由只用于这一单的原件变出来时跟锁，调用方忘了传也不漏。 */
+  private async inheritsOrderOnly(sourceFileId?: string | null, derivationKind?: string | null): Promise<boolean> {
+    if (!sourceFileId || !derivationKind || !ORDER_ONLY_INHERITING_DERIVATIONS.has(derivationKind)) return false
+    const source = await this.prisma.fileObject.findUnique({ where: { id: sourceFileId }, select: { retentionLockedReason: true } })
+    return isOrderOnlyFile(source ?? {})
   }
 
   private resolveSensitiveLevel(

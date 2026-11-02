@@ -17,6 +17,7 @@ import {
   allowedPoliciesForFile,
   isVisibleMemberFileWhere,
   MEMBER_DOCUMENT_HIDDEN_LOCK_REASONS,
+  UPLOAD_SESSION_ORDER_ONLY_REASON,
 } from '../files/retention-policy'
 import { materialCheckRequired } from '../print-jobs/material-check-policy'
 import { listedDocumentPageCount } from '../files/file-page-count.util'
@@ -239,6 +240,8 @@ export class MemberAssetsService {
       status: 'deleted',
       deletedAt: { not: null },
       purpose: { notIn: ['signature_image', 'contract_upload', 'contract_review_report'] },
+      // 只用于这一单的文件到期清理后也不列：可能是旁人在一体机上扫码传的，文件名不能落进登录人的删除记录。
+      OR: [{ retentionLockedReason: null }, { retentionLockedReason: { not: UPLOAD_SESSION_ORDER_ONLY_REASON } }],
     }
     const total = await this.prisma.fileObject.count({ where })
     const rows = await this.prisma.fileObject.findMany({

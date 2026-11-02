@@ -55,6 +55,16 @@ export function isOrderOnlyFile(file: { retentionLockedReason?: string | null })
   return file.retentionLockedReason === UPLOAD_SESSION_ORDER_ONLY_REASON
 }
 
+/**
+ * 由只用于这一单的原件变出来时自动跟锁的派生类型：这一单的打印副本（格式转换、签章、隐私遮挡）。
+ * AI 生成的新成果（ai_generated）不在这里，要不要跟锁另行拍板。FilesService.upload 按 sourceFileId 判。
+ */
+export const ORDER_ONLY_INHERITING_DERIVATIONS: ReadonlySet<string> = new Set([
+  'format_conversion',
+  'signature',
+  'pii_redaction',
+])
+
 export interface RetentionUploadInput {
   purpose: FilePurpose
   sensitiveLevel: FileSensitiveLevel
