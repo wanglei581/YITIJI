@@ -44829,8 +44829,7 @@
           "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
           "apps/admin/src/routes/fairs/index.tsx",
           "docs/progress/current-progress.md",
-          "docs/reviews/engineering-scale-normalization-backlog.md",
-          "docs/reviews/partner-capability-inventory-2026-09-02.md"
+          "docs/reviews/engineering-scale-normalization-backlog.md"
         ],
         "risk": "high",
         "scope": "admin",
@@ -45033,12 +45032,10 @@
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/App.tsx",
         "kind": "component",
-        "mentions": [
-          "docs/reviews/legacy-capability-inventory-2026-08-16.md"
-        ],
-        "risk": "medium",
+        "mentions": [],
+        "risk": "low",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/reviews/legacy-capability-inventory-2026-08-16.md"
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -45106,12 +45103,11 @@
         "kind": "style",
         "mentions": [
           "apps/kiosk/src/pages/assistant/assistant-advisor.css",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md",
           "docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md"
         ],
         "risk": "medium",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md、docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md"
+        "why": "仅被文档提及：docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -45140,10 +45136,7 @@
         "mentions": [
           "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
           "docs/progress/next-tasks.md",
-          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-core-tabs-4188-layout.md",
-          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2-ai-resume-interview.md",
-          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2a-ai-career.md",
-          "docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md"
+          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2-ai-resume-interview.md"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45154,48 +45147,44 @@
         "file": "apps/kiosk/src/pages/assistant/assistant-lightflow-call-gate.css",
         "kind": "style",
         "mentions": [
-          "apps/kiosk/src/pages/assistant/assistant-lightflow-call.css",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+          "apps/kiosk/src/pages/assistant/assistant-lightflow-call.css"
         ],
         "risk": "medium",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+        "why": "仍被其它文件提及：apps/kiosk/src/pages/assistant/assistant-lightflow-call.css"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/assistant/assistant-lightflow-call-live.css",
         "kind": "style",
         "mentions": [
-          "apps/kiosk/src/pages/assistant/assistant-lightflow-call.css",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+          "apps/kiosk/src/pages/assistant/assistant-lightflow-call.css"
         ],
         "risk": "medium",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+        "why": "仍被其它文件提及：apps/kiosk/src/pages/assistant/assistant-lightflow-call.css"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/assistant/assistant-lightflow-call-responsive.css",
         "kind": "style",
         "mentions": [
-          "apps/kiosk/src/pages/assistant/assistant-lightflow-call.css",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+          "apps/kiosk/src/pages/assistant/assistant-lightflow-call.css"
         ],
         "risk": "medium",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+        "why": "仍被其它文件提及：apps/kiosk/src/pages/assistant/assistant-lightflow-call.css"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/assistant/assistant-lightflow-call-shell.css",
         "kind": "style",
         "mentions": [
-          "apps/kiosk/src/pages/assistant/assistant-lightflow-call.css",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+          "apps/kiosk/src/pages/assistant/assistant-lightflow-call.css"
         ],
         "risk": "medium",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+        "why": "仍被其它文件提及：apps/kiosk/src/pages/assistant/assistant-lightflow-call.css"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -45203,12 +45192,11 @@
         "kind": "style",
         "mentions": [
           ".ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md",
-          "apps/kiosk/src/pages/assistant/assistant-inkpaper.css",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+          "apps/kiosk/src/pages/assistant/assistant-inkpaper.css"
         ],
         "risk": "medium",
         "scope": "kiosk",
-        "why": "仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+        "why": "仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -45216,13 +45204,11 @@
         "kind": "style",
         "mentions": [
           ".ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md",
-          "apps/kiosk/src/pages/assistant/assistant-inkpaper.css",
-          "docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+          "apps/kiosk/src/pages/assistant/assistant-inkpaper.css"
         ],
         "risk": "medium",
         "scope": "kiosk",
-        "why": "仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md、docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+        "why": "仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -45230,13 +45216,11 @@
         "kind": "style",
         "mentions": [
           ".ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md",
-          "apps/kiosk/src/pages/assistant/assistant-inkpaper.css",
-          "docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+          "apps/kiosk/src/pages/assistant/assistant-inkpaper.css"
         ],
         "risk": "medium",
         "scope": "kiosk",
-        "why": "仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md、docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+        "why": "仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -45244,13 +45228,11 @@
         "kind": "style",
         "mentions": [
           ".ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md",
-          "apps/kiosk/src/pages/assistant/assistant-inkpaper.css",
-          "docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+          "apps/kiosk/src/pages/assistant/assistant-inkpaper.css"
         ],
         "risk": "medium",
         "scope": "kiosk",
-        "why": "仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md、docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+        "why": "仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -45259,9 +45241,7 @@
         "mentions": [
           "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
           "apps/kiosk/scripts/verify-member-login-dialog.mjs",
-          "docs/reviews/legacy-capability-inventory-2026-08-16.md",
-          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-home-login.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-home-login.md"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45274,8 +45254,7 @@
         "mentions": [
           "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
           "apps/kiosk/scripts/verify-member-login-dialog.mjs",
-          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-home-login.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-home-login.md"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45286,12 +45265,11 @@
         "file": "apps/kiosk/src/pages/auth/login-batch8.css",
         "kind": "style",
         "mentions": [
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md",
           "docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md"
         ],
         "risk": "medium",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md、docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md"
+        "why": "仅被文档提及：docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -45333,7 +45311,6 @@
           "apps/kiosk/src/pages/auth/login.css",
           "docs/superpowers/plans/2026-07-13-qingxu-lightflow-k1-public-entry.md",
           "docs/superpowers/plans/2026-07-16-user-center-wave0-truth-baseline.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md",
           "docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md"
         ],
         "risk": "high",
@@ -45373,8 +45350,7 @@
         "mentions": [
           "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
           "apps/kiosk/src/pages/auth/login.css",
-          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-k1-public-entry.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-k1-public-entry.md"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45448,7 +45424,6 @@
           "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
           "docs/device/onsite-acceptance-runsheet-2026-09.md",
           "docs/reviews/launch-audit-2026-09-05.md",
-          "docs/reviews/legacy-capability-inventory-2026-08-16.md",
           "docs/superpowers/plans/2026-07-13-qingxu-lightflow-home-login.md",
           "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md"
         ],
@@ -45480,7 +45455,6 @@
           "docs/progress/current-progress.md",
           "docs/reviews/2026-08-01-self-assessment-design-proposal.md",
           "docs/reviews/kiosk-control-integrity-audit-2026-08-16.md",
-          "docs/reviews/legacy-capability-inventory-2026-08-16.md",
           "docs/reviews/v6-missing-pages-plan-2026-08-16.md",
           "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md",
           "docs/superpowers/specs/2026-07-27-kiosk-scan-ux-honesty-design.md"
@@ -45538,12 +45512,10 @@
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/interview/InterviewTopbar.tsx",
         "kind": "component",
-        "mentions": [
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
-        ],
-        "risk": "medium",
+        "mentions": [],
+        "risk": "low",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -45624,12 +45596,11 @@
         "kind": "style",
         "mentions": [
           "apps/kiosk/src/pages/placeholders/system-state-qx.css",
-          "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+          "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md"
         ],
         "risk": "medium",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+        "why": "仅被文档提及：docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -45637,8 +45608,7 @@
         "kind": "style",
         "mentions": [
           ".ccg/tasks/archive/2026-07/kiosk87-runtime-visual-defect-audit/plan.md",
-          "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w2.md"
+          "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45675,8 +45645,7 @@
           "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
           "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
           "docs/reviews/kiosk-control-integrity-audit-2026-08-16.md",
-          "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w2.md"
+          "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45694,10 +45663,8 @@
           "apps/kiosk/src/pages/print/PrintPrototypeLayout.tsx",
           "apps/kiosk/src/styles/qingxu/index.css",
           "apps/kiosk/src/styles/qingxu/tokens.css",
-          "docs/reviews/branch-split-plan-2026-09-02.md",
           "docs/reviews/page-migration-inventory-2026-09-02.md",
           "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w2.md",
           "docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md"
         ],
         "risk": "high",
@@ -45712,8 +45679,7 @@
           "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
           "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs",
           "apps/kiosk/scripts/verify-print-cta-contrast.mjs",
-          "apps/kiosk/src/pages/print/print-prototype.css",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w2.md"
+          "apps/kiosk/src/pages/print/print-prototype.css"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45725,8 +45691,7 @@
         "kind": "style",
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-          "apps/kiosk/src/pages/print/print-prototype.css",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w2.md"
+          "apps/kiosk/src/pages/print/print-prototype.css"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45752,8 +45717,7 @@
           "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
           "apps/kiosk/src/pages/print/print-prototype.css",
           "docs/design/kiosk-proto-2026-07-migration-matrix.md",
-          "docs/progress/current-progress.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w2.md"
+          "docs/progress/current-progress.md"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45766,8 +45730,7 @@
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
           "apps/kiosk/src/pages/print/print-prototype.css",
-          "docs/progress/current-progress.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w2.md"
+          "docs/progress/current-progress.md"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45779,8 +45742,7 @@
         "kind": "style",
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-          "apps/kiosk/src/pages/print/print-prototype.css",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w2.md"
+          "apps/kiosk/src/pages/print/print-prototype.css"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45803,8 +45765,7 @@
           "apps/kiosk/scripts/verify-fusion-w5.mjs",
           "docs/progress/project-full-audit-and-august-launch-plan-2026-06-14.md",
           "docs/reviews/delivery-readiness-audit-2026-09-05.md",
-          "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+          "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45818,9 +45779,7 @@
           ".ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md",
           "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
           "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-          "docs/superpowers/plans/2026-06-21-profile-commercial-closure.md",
-          "docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+          "docs/superpowers/plans/2026-06-21-profile-commercial-closure.md"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45846,10 +45805,7 @@
           "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
           "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
           "docs/progress/current-progress.md",
-          "docs/reviews/branch-split-plan-2026-09-02.md",
-          "docs/reviews/launch-audit-2026-09-05.md",
-          "docs/reviews/page-audit-resume-profile-2026-09-02.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+          "docs/reviews/launch-audit-2026-09-05.md"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45868,13 +45824,8 @@
           "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
           "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
           "docs/progress/current-progress.md",
-          "docs/reviews/branch-split-plan-2026-09-02.md",
-          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-core-tabs-4188-layout.md",
-          "docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md",
           "docs/superpowers/plans/2026-07-16-user-center-wave1-ops-ui.md",
-          "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md",
-          "docs/superpowers/specs/2026-07-14-qingxu-lightflow-4188-layout-parity-design.md"
+          "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45891,8 +45842,7 @@
           "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
           "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
           "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
-          "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+          "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45912,8 +45862,7 @@
           "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
           "apps/kiosk/src/pages/profile/me/styles/me-assets.css",
           "apps/kiosk/src/pages/profile/me/styles/me-orders.css",
-          "docs/reviews/kiosk-control-integrity-audit-2026-08-16.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+          "docs/reviews/kiosk-control-integrity-audit-2026-08-16.md"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45930,8 +45879,7 @@
           "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
           "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
           "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
-          "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+          "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45948,8 +45896,7 @@
           "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
           "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
           "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
-          "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+          "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45966,8 +45913,7 @@
           "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
           "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
           "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
-          "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+          "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45980,10 +45926,7 @@
         "mentions": [
           "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
           "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-          "apps/kiosk/src/pages/profile/profileTypes.ts",
-          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-core-tabs-4188-layout.md",
-          "docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md",
-          "docs/superpowers/specs/2026-07-14-qingxu-lightflow-4188-layout-parity-design.md"
+          "apps/kiosk/src/pages/profile/profileTypes.ts"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -45999,10 +45942,7 @@
           "apps/kiosk/scripts/verify-fusion-w5.mjs",
           "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
           "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-          "apps/kiosk/src/pages/profile/profile-inkpaper.css",
-          "docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md",
-          "docs/superpowers/specs/2026-07-14-qingxu-lightflow-4188-layout-parity-design.md"
+          "apps/kiosk/src/pages/profile/profile-inkpaper.css"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -46019,10 +45959,7 @@
           "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
           "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
           "apps/kiosk/src/pages/profile/profile-inkpaper.css",
-          "docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md",
-          "docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md",
-          "docs/superpowers/specs/2026-07-14-qingxu-lightflow-4188-layout-parity-design.md"
+          "docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -46038,10 +45975,7 @@
           "apps/kiosk/scripts/verify-fusion-w5.mjs",
           "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
           "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
-          "apps/kiosk/src/pages/profile/profile-inkpaper.css",
-          "docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md",
-          "docs/superpowers/specs/2026-07-14-qingxu-lightflow-4188-layout-parity-design.md"
+          "apps/kiosk/src/pages/profile/profile-inkpaper.css"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -46063,15 +45997,12 @@
           "docs/design/kiosk-ai-os-v3-2026-08/23b-account-privacy.html",
           "docs/progress/current-progress.md",
           "docs/progress/next-tasks.md",
-          "docs/reviews/page-audit-resume-profile-2026-09-02.md",
           "docs/reviews/result-layer-2026-09-06-packets.md",
           "docs/reviews/v6-missing-pages-plan-2026-08-16.md",
           "docs/superpowers/plans/2026-06-21-ai-resume-assets-closure.md",
           "docs/superpowers/plans/2026-06-21-profile-commercial-closure.md",
-          "docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md",
           "docs/superpowers/plans/2026-07-16-user-center-wave0-truth-baseline.md",
           "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md",
           "docs/superpowers/specs/2026-07-23-kiosk-8177-5299-fusion-design.md"
         ],
         "risk": "high",
@@ -46096,8 +46027,7 @@
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w3.mjs",
           "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
-          "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+          "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -46109,8 +46039,7 @@
         "kind": "component",
         "mentions": [
           "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
-          "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+          "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -46122,8 +46051,7 @@
         "kind": "component",
         "mentions": [
           "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
-          "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+          "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -46134,8 +46062,7 @@
         "file": "apps/kiosk/src/pages/resume/resume-authoring-lightflow.css",
         "kind": "style",
         "mentions": [
-          "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
-          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2b-ai-resume.md"
+          "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -46160,8 +46087,7 @@
         "mentions": [
           "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
           "docs/progress/current-progress.md",
-          "docs/progress/next-tasks.md",
-          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2b-ai-resume.md"
+          "docs/progress/next-tasks.md"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -46175,8 +46101,7 @@
           ".ccg/tasks/archive/2026-07/kiosk87-runtime-visual-defect-audit/plan.md",
           "apps/kiosk/scripts/verify-fusion-w3.mjs",
           "docs/design/kiosk-v6-migration-matrix.md",
-          "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+          "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -46187,8 +46112,7 @@
         "file": "apps/kiosk/src/pages/resume/resume-library-lightflow.css",
         "kind": "style",
         "mentions": [
-          "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
-          "docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2b-ai-resume.md"
+          "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -46212,8 +46136,7 @@
         "kind": "style",
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w3.mjs",
-          "apps/kiosk/src/pages/resume/resume-fusion-youth.css",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+          "apps/kiosk/src/pages/resume/resume-fusion-youth.css"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -46225,8 +46148,7 @@
         "kind": "style",
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w3.mjs",
-          "apps/kiosk/src/pages/resume/resume-fusion-youth.css",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+          "apps/kiosk/src/pages/resume/resume-fusion-youth.css"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -46238,8 +46160,7 @@
         "kind": "style",
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w3.mjs",
-          "apps/kiosk/src/pages/resume/resume-fusion-youth.css",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+          "apps/kiosk/src/pages/resume/resume-fusion-youth.css"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -46253,8 +46174,7 @@
           "apps/kiosk/scripts/verify-fusion-w3.mjs",
           "apps/kiosk/src/pages/resume/JobFitPage.tsx",
           "apps/kiosk/src/pages/resume/job-fit-qx.css",
-          "apps/kiosk/src/pages/resume/jobFit-inkpaper.css",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+          "apps/kiosk/src/pages/resume/jobFit-inkpaper.css"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -46266,8 +46186,7 @@
         "kind": "style",
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w3.mjs",
-          "apps/kiosk/src/pages/resume/resume-fusion-youth.css",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
+          "apps/kiosk/src/pages/resume/resume-fusion-youth.css"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -46278,8 +46197,7 @@
         "file": "apps/kiosk/src/pages/scan/styles/scan-fusion.css",
         "kind": "style",
         "mentions": [
-          "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w2.md"
+          "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -46337,7 +46255,6 @@
           "docs/progress/current-progress.md",
           "docs/reviews/kiosk-control-integrity-audit-2026-08-16.md",
           "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w1.md",
           "docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md",
           "docs/superpowers/specs/2026-07-23-kiosk-8177-5299-fusion-design.md"
         ],
@@ -46527,7 +46444,7 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/design/kiosk-ai-orchestration-2026-08/README.md",
+        "file": "docs/design/campus-fair-visibility-structure.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -46536,7 +46453,7 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/design/kiosk-ai-orchestration-2026-08/_RESUME-NOTE.md",
+        "file": "docs/design/kiosk-ai-orchestration-2026-08/README.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -46587,15 +46504,6 @@
         "risk": "protected",
         "scope": "docs",
         "why": "当前 V6 目标设计，是「将要实现」而不是「已被引用」"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/design/kiosk-migration-capability-contracts.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
@@ -46680,7 +46588,7 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/branch-split-plan-2026-09-02.md",
+        "file": "docs/reviews/admin-capability-inventory-2026-09-02.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -46689,7 +46597,7 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/kiosk-management-requirements-2026-09-02.md",
+        "file": "docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2-ai-resume-interview.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -46698,7 +46606,7 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/kiosk-route-vs-design-page-audit-2026-09-08.md",
+        "file": "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -46707,7 +46615,7 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/legacy-capability-inventory-2026-08-16.md",
+        "file": "docs/superpowers/specs/2026-07-10-real-scan-design.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -46716,7 +46624,7 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/page-audit-print-2026-09-02.md",
+        "file": "docs/superpowers/specs/2026-07-11-material-check-real-design.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -46725,403 +46633,7 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/page-audit-resume-profile-2026-09-02.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/partner-capability-inventory-2026-09-02.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/project-normalization-ignore-proposal.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/project-normalization-local-tools-landing.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/project-normalization-task-evidence-triage.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/qx-b1-arrival-hid-2026-09-07/README.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/real-file-print-2026-08-17/README.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/repo-size-and-structure-2026-09-06.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-03-deploy-data-safety-gate.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-04-profile-commercial-first-batch-execution.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-10-real-scan-implementation-plan.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-11-material-check-real-implementation-plan.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-12-c5-4-redemption-settlement-consistency.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-12-isolated-production-p0-launch.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-12-preprod-test-print-seed-guard-implementation.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-13-payment-qr-auto-reconcile.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-13-preprod-payment-timeout-acceptance.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-13-print-unpaid-task-controlled-cancellation.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-13-qingxu-lightflow-core-tabs-4188-layout.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2a-ai-career.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2b-ai-resume.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-14-alipay-f2f-codepay.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-14-windows-agent-reliability-p0.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-15-production-deployment-integrated.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-15-terminal-fleet-f0-overview.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w1.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w2.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w6.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-26-kiosk82-visual-evidence-and-truth-batch2.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-26-qingxu-lightflow-kiosk87-shell-closure.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-29-p0-1b-kiosk-session-warning.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-30-f1-d3-single-owner-governance.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-08-01-f1-d2-integration-reconcile.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-08-01-f1-d2-invocation-uniqueness.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-08-09-contract-review-report-printing.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-07-12-preprod-test-print-seed-guard-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-07-13-payment-qr-auto-reconcile-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-07-13-qingxu-lightflow-core-tabs-4188-layout-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-07-14-qingxu-lightflow-4188-layout-parity-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-07-15-production-deployment-integrated-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-07-16-f1-release-provenance-manifest-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-07-29-p0-1b-kiosk-session-warning-design.md",
+        "file": "docs/superpowers/specs/2026-07-30-f1-d3-single-owner-governance-design.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",

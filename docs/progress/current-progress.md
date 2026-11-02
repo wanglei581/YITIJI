@@ -1,5 +1,22 @@
 # 当前开发进度
 
+## 2026-11-03：删除 52 份零引用旧文档（产品负责人按推荐拍板；另删 2 个旧评审目录里的 15 张截图）
+
+- 范围：图谱 low 档（全仓零提及）里的旧文档。产品负责人 11/03 按推荐拍板删除三类：7–8 月的实施计划与规格、8–9 月的旧评审、废弃设计方向的续接笔记。交付验收记录（`docs/delivery/`）、专利文档和其余零散旧文档保留。
+- 删除 52 份：
+  - `docs/design/`（1）：`kiosk-migration-capability-contracts.md`
+  - `docs/design/kiosk-ai-orchestration-2026-08/`（1）：`_RESUME-NOTE.md`
+  - `docs/reviews/`（11）：`branch-split-plan-2026-09-02.md`、`kiosk-management-requirements-2026-09-02.md`、`kiosk-route-vs-design-page-audit-2026-09-08.md`、`legacy-capability-inventory-2026-08-16.md`、`page-audit-print-2026-09-02.md`、`page-audit-resume-profile-2026-09-02.md`、`partner-capability-inventory-2026-09-02.md`、`project-normalization-ignore-proposal.md`、`project-normalization-local-tools-landing.md`、`project-normalization-task-evidence-triage.md`、`repo-size-and-structure-2026-09-06.md`
+  - `docs/reviews/qx-b1-arrival-hid-2026-09-07/`（1）：`README.md`
+  - `docs/reviews/real-file-print-2026-08-17/`（1）：`README.md`
+  - `docs/superpowers/plans/`（30）：`2026-07-03-deploy-data-safety-gate.md`、`2026-07-04-profile-commercial-first-batch-execution.md`、`2026-07-10-real-scan-implementation-plan.md`、`2026-07-11-material-check-real-implementation-plan.md`、`2026-07-12-c5-4-redemption-settlement-consistency.md`、`2026-07-12-isolated-production-p0-launch.md`、`2026-07-12-preprod-test-print-seed-guard-implementation.md`、`2026-07-13-payment-qr-auto-reconcile.md`、`2026-07-13-preprod-payment-timeout-acceptance.md`、`2026-07-13-print-unpaid-task-controlled-cancellation.md`、`2026-07-13-qingxu-lightflow-core-tabs-4188-layout.md`、`2026-07-13-qingxu-lightflow-k2a-ai-career.md`、`2026-07-13-qingxu-lightflow-k2b-ai-resume.md`、`2026-07-14-alipay-f2f-codepay.md`、`2026-07-14-qingxu-lightflow-4188-layout-parity.md`、`2026-07-14-windows-agent-reliability-p0.md`、`2026-07-15-production-deployment-integrated.md`、`2026-07-15-terminal-fleet-f0-overview.md`、`2026-07-24-kiosk-8177-5299-fusion-w1.md`、`2026-07-24-kiosk-8177-5299-fusion-w2.md`、`2026-07-24-kiosk-8177-5299-fusion-w3.md`、`2026-07-24-kiosk-8177-5299-fusion-w5.md`、`2026-07-24-kiosk-8177-5299-fusion-w6.md`、`2026-07-26-kiosk82-visual-evidence-and-truth-batch2.md`、`2026-07-26-qingxu-lightflow-kiosk87-shell-closure.md`、`2026-07-29-p0-1b-kiosk-session-warning.md`、`2026-07-30-f1-d3-single-owner-governance.md`、`2026-08-01-f1-d2-integration-reconcile.md`、`2026-08-01-f1-d2-invocation-uniqueness.md`、`2026-08-09-contract-review-report-printing.md`
+  - `docs/superpowers/specs/`（7）：`2026-07-12-preprod-test-print-seed-guard-design.md`、`2026-07-13-payment-qr-auto-reconcile-design.md`、`2026-07-13-qingxu-lightflow-core-tabs-4188-layout-design.md`、`2026-07-14-qingxu-lightflow-4188-layout-parity-design.md`、`2026-07-15-production-deployment-integrated-design.md`、`2026-07-16-f1-release-provenance-manifest-design.md`、`2026-07-29-p0-1b-kiosk-session-warning-design.md`
+  - `docs/reviews/qx-b1-arrival-hid-2026-09-07/`、`docs/reviews/real-file-print-2026-08-17/` 两个目录连同里面的 15 张截图整目录删除：截图全仓无引用，只删说明会留下没人看得懂的图。
+- 原推荐 56 份里另有 4 份保留（不写文件名，免得进度文档的点名改变图谱分级）：一份在 `docs/README.md` 写明「禁止清理」的青序流光原型目录里；两份是仍有原型页面的目录说明，删了页面就没人看得懂；一份被两份历史设计文档点名为「历史候选残留（仅 README）」，删了会让那两处说法落空。
+- 证据：每份都在图谱 low 档；最后一次改动都早于 14 天（最近的是 2026-09-29）；`gh pr list --json files` 核 131 个开着的 PR，文件超过 100 个的 #1511、#1490、#1487、#1485 另用 `gh pr diff --name-only` 补查，都没有改动这些文件；被门禁点名检查存在性的 `docs/superpowers/` 文件都在图谱 high 档，不在清单里。
+- 连带变化：删除后有 9 个文件因为原来只被这批旧文档提到，从「被文档提及」落进 low（其中 2 个是一体机代码文件）。不在这次拍板范围内，本次不动，记入 next-tasks。
+- 校验：见本 PR 说明（图谱 `--check`、`verify:repository-integrity`、读进度文档的门禁、按目录比对主线的范围门禁）。
+
 ## 2026-11-02：本机清理——旧工作副本被成批挪走后的备份与恢复办法
 
 - 起因：22:43 另一个清理工具（WorkBuddy）把本机五处工作副本根目录（`~/.cache/claude-lanes`、本仓库 `.claude/worktrees`、`~/.codex/worktrees`、`~/.grok/worktrees`、另一项目的 `.claude/worktrees`）整个挪进废纸篓，随后对仓库执行了 `git worktree prune`。各窗口旧副本的 git 登记因此丢失（在里面跑 git 会报「不是仓库」）；`claude-lanes` 后来被放回原处，登记仍是断的。正在干活的窗口已各自重建并重新登记了自己的副本。

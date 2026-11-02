@@ -49,8 +49,8 @@ node scripts/project-graph-query.mjs model PrintTask
 | 被至少一条门禁断言的文件 | 1952 |
 | 孤儿候选 · protected（不得删） | 4 |
 | 孤儿候选 · high（仍被 CI/门禁引用） | 83 |
-| 孤儿候选 · medium（仅文档提及） | 30 |
-| 孤儿候选 · low（全仓零提及） | 86 |
+| 孤儿候选 · medium（仅文档提及） | 28 |
+| 孤儿候选 · low（全仓零提及） | 43 |
 
 ## 分册
 
