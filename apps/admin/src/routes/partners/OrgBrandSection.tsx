@@ -33,7 +33,7 @@ export function OrgBrandSection({ detail, onChanged }: { detail: AdminOrgDetail;
     try {
       await orgsAdminService.updateOrg(detail.id, input)
       if (API_MODE === 'mock') brandingAdmin.saveMockOrg(detail.id, input)
-      setNotice('已保存。一体机更新到支持贴牌的版本后，本机构名下的终端最迟 5 分钟内按这里显示。')
+      setNotice('已保存。本机构名下的一体机最迟约 3 分钟内按这里显示；登录、换人或从待机唤醒时会立即更新。')
       onChanged()
     } catch (e) { setError(brandingError(e, '保存失败，请稍后重试')) } finally { setSaving(false) }
   }

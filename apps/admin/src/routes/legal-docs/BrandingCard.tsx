@@ -46,7 +46,7 @@ export function BrandingCard() {
     setSaving(true); setError(null)
     try {
       const data = await brandingAdmin.save(input); setOriginal(data); setDraft(structuredClone(data))
-      setNotice('已保存。一体机更新到支持贴牌的版本后，最迟 5 分钟内按这里显示。')
+      setNotice('已保存。一体机最迟约 3 分钟内按这里显示；登录、换人或从待机唤醒时会立即更新。')
     } catch (e) { setError(brandingError(e, '保存失败，请稍后重试')) } finally { setSaving(false) }
   }
   return <Card className="mb-4 p-4">
