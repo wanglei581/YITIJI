@@ -460,13 +460,17 @@ export function normalizeScanDeliverOrigin(raw: unknown): ScanDeliverOrigin {
  * deviceState→aborted），终端程序也可能回报 error / aborted。条件更新里没有这几条，已切面板 / 已中止的会话
  * 仍会被挂上设备扫描件。所以：
  *   - 所有任务都钉读到的 startMode（面板任务恒为 'panel'，是一条恒真条件，行为不变）；
- *   - device 任务再钉 deviceState ∈ composing / delivering 且 devicePageCount ≥ 1（与 assertScanDeliverOriginAllowed 同一组条件）。
- * 面板任务不加后两条：面板路线行为一字不变。条件失效按现有写法回 409 SCAN_TASK_STATE_CHANGED。
+ *   - device 任务再钉 deviceState ∈ composing / delivering 且 devicePageCount ≥ 1（与 assertScanDeliverOriginAllowed 同一组条件）；
+ *   - device 任务再钉读到的 deviceUpdatedAt（B4 防 ABA，不加列）。出错重扫会把状态和页数重新走回 composing / delivering，
+ *     只钉那两列时，上一轮还没抢占成功的旧投递会把旧 PDF 挂到新一轮。正常流程里 delivering 回报在投递之前，
+ *     投递期间只有用户动作或新一轮回报会改 deviceUpdatedAt。没读到（一直是 null）就钉 null。
+ * 面板任务不加后三条：面板路线行为一字不变。条件失效按现有写法回 409 SCAN_TASK_STATE_CHANGED。
  */
-export function scanDeliverClaimPins(task: Pick<DeviceFieldsRow, 'startMode'>): {
+export function scanDeliverClaimPins(task: Pick<DeviceFieldsRow, 'startMode' | 'deviceUpdatedAt'>): {
   startMode: string
   deviceState?: { in: string[] }
   devicePageCount?: { gte: number }
+  deviceUpdatedAt?: Date | null
 } {
   const startMode = task.startMode ?? 'panel'
   if (!isScanDeviceTask(task)) return { startMode }
@@ -474,6 +478,7 @@ export function scanDeliverClaimPins(task: Pick<DeviceFieldsRow, 'startMode'>): 
     startMode,
     deviceState: { in: [...SCAN_DEVICE_DELIVERABLE_STATES] },
     devicePageCount: { gte: 1 },
+    deviceUpdatedAt: task.deviceUpdatedAt ?? null,
   }
 }
 
