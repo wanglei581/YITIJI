@@ -1,5 +1,5 @@
 /**
- * 屏上扫描后端 B6：用扫描轮次替换 B4 的 deviceUpdatedAt 钉。
+ * 屏上扫描后端 B6：用扫描轮次替换 B4 的 deviceUpdatedAt 钉；取消倒计时不再另查库。
  *
  * 覆盖：
  *   1. 旧一轮拿到的租约，要等新一轮已经到 delivering 才投递 → 409 SCAN_TASK_STATE_CHANGED，不建文件
@@ -8,6 +8,7 @@
  *   4. deviceRound 只在 ready / error → scanning 加一（同状态、翻页、改设置都不加）
  *   5. 轮次在签名负载里；改了签名就无效；改了轮次再签，投递要比对
  *   6. 面板任务的租约不多 deviceRound，投递不比轮次
+ *   7. 取消已经落库之后，再查静默期依据的 findFirst 失败，取消仍然成功，倒计时照这次取消的时间给
  *
  * 写库：本脚本在库里造终端 / 会话 / 文件，结束时清理，所以必须在隔离库上跑
  * （VERIFICATION_DATABASE_TARGET=isolated，库名带 ci/dev/test/verify）。
@@ -394,6 +395,60 @@ async function main(): Promise<void> {
       assert.equal(flatbedRow.deviceSource, 'flatbed')
       assert.ok(flatbedRow.fileId)
       pass('进纸器 3 页、玻璃台 2 页都投递成功，轮次都只加了一次')
+    }
+
+    console.log('\n-- 取消落库后倒计时查询失败，取消仍然成功 --')
+    {
+      process.env['SCAN_TERMINAL_QUIET_PERIOD_SECONDS'] = '90'
+      let failFindFirst = false
+      let findFirstCalls = 0
+      const bind = (target: object, prop: string | symbol) => {
+        const value = Reflect.get(target, prop, target)
+        return typeof value === 'function' ? value.bind(target) : value
+      }
+      const scanTask = new Proxy(prisma.scanTask, {
+        get(target, prop) {
+          if (prop === 'findFirst') {
+            return async (args: unknown) => {
+              findFirstCalls += 1
+              if (failFindFirst) throw new Error('simulated quiet-period lookup failure')
+              return prisma.scanTask.findFirst(args as never)
+            }
+          }
+          return bind(target, prop)
+        },
+      })
+      const wrapped = new Proxy(prisma, {
+        get: (target, prop) => (prop === 'scanTask' ? scanTask : bind(target, prop)),
+      }) as PrismaService
+      const wrappedSvc = new ScanTasksService(wrapped, files, capabilities)
+      const t = await makeTerminal('cancel', null)
+      findFirstCalls = 0
+      const created = await wrappedSvc.create({ scanType: 'document', terminalId: t.id }, null)
+      assert.ok(findFirstCalls >= 1, '建会话仍会查静默期；失败开关还没打开')
+      failFindFirst = true
+      findFirstCalls = 0
+      const before = Date.now()
+      const cancelled = await wrappedSvc.cancel(created.scanTaskId, null, created.controlToken)
+      const after = Date.now()
+      assert.equal(findFirstCalls, 0, '取消成功路径不得再查静默期依据')
+      assert.equal(cancelled.status, 'cancelled')
+      assert.equal(cancelled.scanTaskId, created.scanTaskId)
+      const serverNowMs = Date.parse(cancelled.serverNow)
+      assert.ok(serverNowMs >= before - 1000 && serverNowMs <= after + 1000, 'serverNow 仍是这次取消的时间')
+      const row = await rowOf(created.scanTaskId)
+      assert.equal(row.status, 'cancelled')
+      assert.equal(cancelled.quietPeriodEndsAt, new Date(row.updatedAt.getTime() + 90_000).toISOString(), '倒计时从这次取消写入的 updatedAt 起算')
+      assert.equal(cancelled.serverNow, row.updatedAt.toISOString(), 'serverNow 与这次写入的 updatedAt 是同一个时刻')
+      failFindFirst = false
+      await expectHttp(
+        () => wrappedSvc.cancel(created.scanTaskId, null, created.controlToken),
+        409,
+        'SCAN_TASK_CANCEL_CONFLICT',
+        '已经取消的会话再取消仍是原来的冲突',
+      )
+      process.env['SCAN_TERMINAL_QUIET_PERIOD_SECONDS'] = '0'
+      pass('倒计时查询失败不影响取消；倒计时仍按这次取消的时间给出')
     }
 
     console.log('\nPASS verify-scan-device-b6')

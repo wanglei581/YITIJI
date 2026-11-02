@@ -876,13 +876,16 @@ export class ScanTasksService {
       task.status === 'matched' && task.lastAttemptHash
         ? new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS)
         : null
+    // 倒计时用这次取消自己写入的时间，不再落库后再查最近一条结束记录。
+    // 那次查询失败会让已经取消成功的请求变成服务端错误，重试又得到 SCAN_TASK_CANCEL_CONFLICT。
+    const cancelledAt = new Date()
     const cancelled = await this.prisma.scanTask.updateMany({
       where: {
         id: scanTaskId,
         status: task.status,
         lastAttemptHash: task.lastAttemptHash,
       },
-      data: { status: 'cancelled', retryAuthorityExpiresAt },
+      data: { status: 'cancelled', retryAuthorityExpiresAt, updatedAt: cancelledAt },
     })
     if (cancelled.count === 0) {
       // 状态在读取之后、CAS 之前发生了变化（多半是并发投递刚好完成），
@@ -900,33 +903,14 @@ export class ScanTasksService {
         },
       })
     }
-    const serverNow = new Date()
+    const quietPeriodMs = scanTerminalQuietPeriodMs()
     return {
       scanTaskId,
       status: 'cancelled',
-      quietPeriodEndsAt: await this.quietPeriodEndsAtForTerminal(task.terminalId, serverNow),
-      serverNow: serverNow.toISOString(),
+      // 静默期从这次写入的 updatedAt 起算。关着时两个时刻相同，不查库。
+      quietPeriodEndsAt: quietPeriodEndsAtIso(quietPeriodMs > 0 ? cancelledAt : null, cancelledAt, quietPeriodMs),
+      serverNow: cancelledAt.toISOString(),
     }
-  }
-
-  /**
-   * 取消成功之后告诉一体机本终端静默期何时结束。算法与 assertTerminalQuietPeriod 相同。
-   * 静默期关着（≤0）时不查库，结束时刻等于 serverNow——verify-scan-tasks 把静默期设成 0，
-   * 它的假 Prisma 不必实现这次查询。
-   */
-  private async quietPeriodEndsAtForTerminal(terminalId: string, now: Date): Promise<string> {
-    const quietPeriodMs = scanTerminalQuietPeriodMs()
-    if (quietPeriodMs <= 0) return quietPeriodEndsAtIso(null, now, quietPeriodMs)
-    const recent = await this.prisma.scanTask.findFirst({
-      where: {
-        terminalId,
-        status: { in: ['cancelled', 'expired'] },
-        updatedAt: { gt: new Date(now.getTime() - quietPeriodMs) },
-      },
-      orderBy: { updatedAt: 'desc' },
-      select: { updatedAt: true },
-    })
-    return quietPeriodEndsAtIso(recent?.updatedAt ?? null, now, quietPeriodMs)
   }
 
   /**
