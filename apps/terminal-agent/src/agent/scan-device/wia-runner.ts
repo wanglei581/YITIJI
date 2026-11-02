@@ -243,6 +243,11 @@ export interface WiaScanRequest {
   totalTimeoutMs?: number
   /** 软停后等进程自己退出的时长，默认 45 秒。只有单测会改它。 */
   abortGraceMs?: number
+  /**
+   * 一页已被核实并计入 pages 之后调用。不传则行为与以前相同。
+   * 调用方可以返回 Promise；本运行器不等待它（不能让网络回报堵住 stdout）。
+   */
+  onPage?: (page: WiaScannedPage) => void | Promise<void>
 }
 
 export interface WiaScannedPage {
@@ -351,6 +356,12 @@ export function startWiaScan(request: WiaScanRequest, overrides: Partial<WiaRunn
             return
           }
           pages.push({ index: parsed.page, file, bytes: stat.size })
+          const notified = request.onPage?.(pages[pages.length - 1]!)
+          if (notified) {
+            void Promise.resolve(notified).catch(() => {
+              warn('wia-runner: onPage callback failed')
+            })
+          }
         },
       },
       deps,
