@@ -556,6 +556,9 @@ test('I-30 with the miniapp published, a signed-in person is pointed at 我的 �
 
 test('I-30 leaving during an automatic recheck aborts it and ignores a late result @w2', async ({ page, api }) => {
   registerShell(api)
+  // 点「返回首页」后首页会读这两个接口（同配置的 print-handoff 用例也这样桩），给空答复，免得夹具收尾报未处理的请求。
+  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
+  api.respond('GET', '/api/v1/job-fairs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 } } })
   let calls = 0
   let release: (() => void) | undefined
   await page.route(`**${JOB_PATH}`, async (route) => {
