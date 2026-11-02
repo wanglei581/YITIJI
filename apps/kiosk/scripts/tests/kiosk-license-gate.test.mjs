@@ -344,3 +344,51 @@ test('换票被授权拒绝时通知闸门，复查可恢复', async () => {
     assert.equal(store.get('terminal_session_token_v1'), 'new', scenario)
   }
 })
+
+test('收尾缺少截止时间时固定十分钟兜底，到点暂停', () => {
+  const noDeadline = { ...inactive, currentSessionEndsAt: null }
+  const first = decide(gate.INITIAL_KIOSK_LICENSE_GATE, input(noDeadline))
+  assert.equal(first.endsAt, new Date(time + gate.LICENSE_UNKNOWN_DEADLINE_GRACE_MS).toISOString())
+  const repeated = decide(first, input(noDeadline, { now: time + 100_000 }))
+  assert.equal(repeated.endsAt, first.endsAt)
+  assert.equal(decide(repeated, input(null, { now: Date.parse(first.endsAt) - 1 })).mode, 'winding-down')
+  assert.equal(decide(repeated, input(noDeadline, { now: Date.parse(first.endsAt) })).mode, 'paused')
+  const recovered = decide(first, input(ok))
+  assert.equal(decide(recovered, input(noDeadline, { now: time + 200_000 })).endsAt, new Date(time + 200_000 + gate.LICENSE_UNKNOWN_DEADLINE_GRACE_MS).toISOString())
+})
+
+test('路由登记覆盖路由表且收尾判定保持服务边界', async () => {
+  const routes = await import(url(transpile('src/layouts/licenseWindDownRoutes.ts')))
+  const source = ts.createSourceFile('routes.tsx', readFileSync(join(root, 'src/routes/index.tsx'), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const declared = new Set()
+  function visit(node) {
+    if (ts.isPropertyAssignment(node) && node.name.getText(source) === 'path' && ts.isStringLiteral(node.initializer)) {
+      const path = node.initializer.text
+      declared.add(path === '*' || path.startsWith('/') ? path : `/${path}`)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  const registered = routes.WIND_DOWN_ROUTES.map((route) => route.path)
+  assert.equal(new Set(registered).size, registered.length)
+  assert.deepEqual([...declared].sort(), registered.sort())
+  assert.equal(routes.windDownAllows('/login', 'mine'), true)
+  assert.equal(routes.windDownAllows('/resume/report', 'mine'), true)
+  assert.equal(routes.windDownAllows('/resume/source', 'resume'), true)
+  assert.equal(routes.windDownAllows('/resume/source', 'mine'), false)
+  assert.equal(routes.windDownAllows('/unknown', 'unknown'), false)
+  assert.equal(routes.windDownAllows('/job-fairs/checkin', 'mine'), false)
+  // 面试工作台：查看报告与历史报告按结果页放行，设置与作答仍按办理页拦。
+  assert.equal(routes.windDownAllows('/interview', 'mine', '?stage=report&sessionId=s1'), true)
+  assert.equal(routes.windDownAllows('/interview', 'mine', '?stage=reports'), true)
+  assert.equal(routes.windDownAllows('/interview', 'mine', '?stage=setup'), false)
+  assert.equal(routes.windDownAllows('/interview', 'mine', ''), false)
+  assert.equal(routes.windDownAllows('/interview', 'interview', '?stage=setup'), true)
+  let service = routes.nextWindDownService('normal', 'winding-down', null, '/resume/report')
+  assert.equal(service, 'resume')
+  service = routes.nextWindDownService('winding-down', 'winding-down', service, '/me/resumes')
+  assert.equal(service, 'resume')
+  assert.equal(routes.nextWindDownService('winding-down', 'normal', service, '/'), null)
+  assert.equal(routes.nextWindDownService('normal', 'winding-down', null, '/me/resumes'), 'mine')
+  assert.equal(routes.nextWindDownService('normal', 'winding-down', null, '/unknown'), null)
+})

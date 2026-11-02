@@ -17,6 +17,7 @@ export interface KioskLicenseGateInput {
   useEnded: boolean
 }
 export const INITIAL_KIOSK_LICENSE_GATE: KioskLicenseGate = { mode: 'normal', endsAt: null, notice: null }
+export const LICENSE_UNKNOWN_DEADLINE_GRACE_MS = 10 * 60_000
 const PAUSED_STORAGE_KEY = 'kiosk_license_paused_v1'
 
 export function loadInitialLicenseGate(): KioskLicenseGate {
@@ -42,7 +43,9 @@ export function decideKioskLicenseGate(previous: KioskLicenseGate, input: KioskL
   if ((verified && !profile.acceptsNewSessions) || rejected) {
     next = {
       mode: previous.mode === 'paused' ? 'paused' : 'winding-down',
-      endsAt: verified ? profile.currentSessionEndsAt : previous.endsAt,
+      endsAt: verified && profile.currentSessionEndsAt === null
+        ? (previous.mode === 'winding-down' && previous.endsAt !== null ? previous.endsAt : new Date(now + LICENSE_UNKNOWN_DEADLINE_GRACE_MS).toISOString())
+        : verified ? profile.currentSessionEndsAt : previous.endsAt,
       notice: verified ? profile.noticeLine : previous.notice,
     }
   }

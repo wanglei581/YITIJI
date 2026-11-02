@@ -12,6 +12,8 @@ import { startSupportContactKeeper } from '../services/api/supportContact'
 import { KioskLicenseProvider, useKioskLicense } from './KioskLicenseContext'
 import { LicenseWindDownPrompt } from './LicenseWindDownPrompt'
 import { KioskPausedScreen } from '../components/KioskPausedScreen'
+import { WindDownBlockedScreen } from './WindDownBlockedScreen'
+import { nextWindDownService, windDownAllows } from './licenseWindDownRoutes'
 
 function ContentUpdateGuard() {
   useContentUpdate()
@@ -43,6 +45,9 @@ function SupportContactGuard() {
 
 function LicensedOutlet() {
   const { mode } = useKioskLicense()
+  const { pathname, search } = useLocation()
+  const windDown = useRef<{ mode: string; service: string | null }>({ mode: 'normal', service: null })
+  windDown.current = { mode, service: nextWindDownService(windDown.current.mode, mode, windDown.current.service, pathname) }
   const navigate = useNavigate()
   const { endKioskUse } = useKioskSessionControl()
   const previousMode = useRef(mode)
@@ -51,7 +56,9 @@ function LicensedOutlet() {
     if (previousMode.current === 'paused' && mode === 'normal') navigate('/', { replace: true })
     previousMode.current = mode
   }, [mode, navigate, endKioskUse])
-  return mode === 'paused' ? <KioskPausedScreen /> : <Outlet />
+  if (mode === 'paused') return <KioskPausedScreen />
+  if (mode === 'winding-down' && !windDownAllows(pathname, windDown.current.service, search)) return <WindDownBlockedScreen />
+  return <Outlet />
 }
 
 /**
