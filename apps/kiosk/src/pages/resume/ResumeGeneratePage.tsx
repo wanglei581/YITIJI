@@ -143,9 +143,12 @@ export function ResumeGeneratePage() {
     mounted.current = true
     return () => { mounted.current = false }
   }, [])
+  // 回包作不作数：组件还挂着、清场代次没变，而且人还在发起请求的那个地址上。最后一条补的是「点了首页、页面还没卸载」
+  // 那几毫秒：路由跳转先改地址、组件晚一拍才卸载，只看 mounted 会把迟到的结果接住，带进预览或打印（CI 慢机器上复现过）。
   const beginRequest = () => {
     const owner = resumeGenerateGeneration()
-    return { valid: () => mounted.current && owner === resumeGenerateGeneration() }
+    const path = window.location.pathname
+    return { valid: () => mounted.current && owner === resumeGenerateGeneration() && window.location.pathname === path }
   }
   const consent = useResumeAiConsent()
   const [showConsent, setShowConsent] = useState(false)
@@ -776,8 +779,9 @@ export function ResumeGeneratePage() {
         onCancel={() => setShowConsent(false)}
         onConfirm={() => {
           const owner = resumeGenerateGeneration()
+          const path = window.location.pathname
           void consent.confirm().then((ok) => {
-            if (!ok || !mounted.current || owner !== resumeGenerateGeneration()) return
+            if (!ok || !mounted.current || owner !== resumeGenerateGeneration() || window.location.pathname !== path) return
             setShowConsent(false)
             void runGenerate()
           })
