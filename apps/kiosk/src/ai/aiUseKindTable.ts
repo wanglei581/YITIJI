@@ -22,7 +22,7 @@ export const AI_USE_ROUTES: readonly AiUseRoute[] = [
   { method: 'PATCH', path: '/advisor/sessions/:sessionId/skill', kind: 'generate' },
   { method: 'POST', path: '/advisor/sessions/:sessionId/slots', kind: 'exempt' },
   { method: 'POST', path: '/assistant/chat', kind: 'generate' },
-  { method: 'POST', path: '/assistant/daily-report', kind: 'generate' },
+  { method: 'POST', path: '/assistant/daily-report', kind: 'exempt' },
   { method: 'POST', path: '/assistant/sessions/:sessionId/summary', kind: 'generate' },
   { method: 'POST', path: '/assistant/voice', kind: 'voice' },
   { method: 'POST', path: '/contract-reviews', kind: 'generate' },
