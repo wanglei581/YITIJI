@@ -342,6 +342,23 @@ test('导出格式主操作可达且不靠四张大空卡撑长页面 @w3-kiosk'
       const box = await last.boundingBox()
       const body = await page.locator('.rtp-fill').boundingBox()
       expect(box!.y + box!.height).toBeLessThanOrEqual(body!.y + body!.height)
+      // 格式卡是整张可点的按钮：要有自己的内边距和边框，选中的外框不能贴着字。
+      // 触屏壳的按钮重置（.qxt-screen button，0,1,1）会盖过 .qx-rg-fmt（0,1,0）的内边距、边框与底色，
+      // 以前四张卡的字直接顶到卡边，选中的描边紧贴字（走查截图 c5-resume/032 就是这样，当时没人登记）。
+      for (const radio of await formats.getByRole('radio').all()) {
+        const style = await radio.evaluate((el) => {
+          const s = getComputedStyle(el)
+          return {
+            left: parseFloat(s.paddingLeft), right: parseFloat(s.paddingRight), top: parseFloat(s.paddingTop),
+            border: parseFloat(s.borderTopWidth), background: s.backgroundColor,
+          }
+        })
+        expect(style.left, '格式卡左内边距').toBeGreaterThanOrEqual(12)
+        expect(style.right, '格式卡右内边距').toBeGreaterThanOrEqual(12)
+        expect(style.top, '格式卡上内边距').toBeGreaterThanOrEqual(12)
+        expect(style.border, '格式卡要有边框').toBeGreaterThanOrEqual(1)
+        expect(style.background, '格式卡要有底色，不是透明').not.toBe('rgba(0, 0, 0, 0)')
+      }
     }
     await last.click()
     await expect(last).toHaveAttribute('aria-checked', 'true')
