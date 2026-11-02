@@ -16877,6 +16877,7 @@
           ],
           "path": "/resume/report",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/resume/resume-r1-qx2.css",
             "apps/kiosk/src/pages/resume/resume-report-qx.css",
             "apps/kiosk/src/pages/resume/touch/frame.css",
