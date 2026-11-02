@@ -20,6 +20,14 @@ import {
   verifyScanDeliveryLease,
   type ScanDeliveryLeaseResult,
 } from './scan-lease'
+import {
+  assertScanDeliverOriginAllowed,
+  buildScanDeviceCreateData,
+  normalizeScanDeliverOrigin,
+  resolveScanStartParams,
+  scanDeviceLeaseFields,
+  scanDeviceStatusFields,
+} from './scan-device-protocol'
 
 /**
  * 契约本地副本。
@@ -213,6 +221,17 @@ export interface ScanTaskStatusResult {
   errorCode: string | null
   errorMessage: string | null
   expiresAt: string
+  /** 屏上扫描（2026-11-02）：面板任务恒为 startMode:'panel'、deviceState/deviceErrorCode:null、devicePageCount:0。 */
+  startMode: 'panel' | 'device'
+  deviceState: string | null
+  devicePageCount: number
+  deviceErrorCode: string | null
+}
+
+/** current-lease 的响应：面板任务就是 ScanDeliveryLeaseResult 本身；device 任务多带 startMode 与 device 参数。 */
+export type ScanDeliveryLeaseView = ScanDeliveryLeaseResult & {
+  startMode?: 'device'
+  device?: { source: string | null; colorMode: string | null }
 }
 
 /** ScanTask has distinct active-session and retry-lineage unique constraints. */
@@ -257,7 +276,7 @@ function isScanRetryTransactionConflict(e: unknown): boolean {
  * Buffer 长度不同而抛异常（那样反而会把"长度不同"这个信息通过异常/耗时差异暴露出去，
  * 且会变成未处理异常而不是可控的 403）。
  */
-function timingSafeEqualHex(
+export function timingSafeEqualHex(
   token: string | undefined,
   expectedHash: string | null | undefined
 ): boolean {
@@ -282,6 +301,9 @@ export class ScanTasksService {
     endUserId: string | null,
     retryControlToken?: string
   ): Promise<ScanRetryCreateResult> {
+    // 屏上扫描（device）：字段组合不合法一律 400，先于任何数据库访问。
+    // 不传新字段 = 面板扫描，下面所有 device 分支一行都不执行。
+    const startParams = resolveScanStartParams(dto)
     const terminalRef = dto.terminalId.trim()
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: terminalRef }, { terminalCode: terminalRef }] },
@@ -309,6 +331,10 @@ export class ScanTasksService {
     // Task 10 服务端能力门禁：管理员把该终端 scan 配为非 available 时拒绝创建
     // （未配置行放行，见 TerminalCapabilitiesService.assertUserTaskAllowed）。
     await this.capabilities.assertUserTaskAllowed(terminal.id, 'scan')
+    // 屏上扫描另要 scan_device available（DEFAULT_DENY：未登记 = 拒绝）→ 403 SCAN_DEVICE_NOT_VERIFIED_ON_TERMINAL。
+    if (startParams.startMode === 'device') {
+      await this.capabilities.assertScanDeviceAllowed(terminal.id)
+    }
 
     const retryOfScanTaskId = dto.retryOfScanTaskId?.trim() || undefined
     if (!retryOfScanTaskId && retryControlToken) {
@@ -348,6 +374,9 @@ export class ScanTasksService {
         : randomBytes(24).toString('hex')
     const controlTokenHash = createHash('sha256').update(controlToken).digest('hex')
     const expiresAt = new Date(Date.now() + SCAN_TASK_TTL_MS)
+    // device 会话额外写入的列（含显式 createdAt，保证 hardExpiresAt = createdAt + 30 分钟）；面板会话为空对象。
+    const deviceCreateData =
+      startParams.startMode === 'device' ? buildScanDeviceCreateData(startParams, new Date()) : {}
 
     let task: { id: string }
     try {
@@ -427,6 +456,7 @@ export class ScanTasksService {
             retryOfScanTaskId: retryOfScanTaskId ?? null,
             retryContentHash,
             deliveryAckedAt: null,
+            ...deviceCreateData,
           },
           select: { id: true },
         })
@@ -744,6 +774,7 @@ export class ScanTasksService {
         ? (USER_FACING_SCAN_ERROR[task.errorCode] ?? '扫描处理失败，请重试')
         : null,
       expiresAt: task.expiresAt.toISOString(),
+      ...scanDeviceStatusFields(task),
     }
   }
 
@@ -866,7 +897,7 @@ export class ScanTasksService {
    * Agent 专用扫描租约签发：校验目标终端当前 waiting 任务，签发短期 deliveryLease。
    * Unacked waiting rows are invisible here until Kiosk POSTs /ack.
    */
-  async getScanDeliveryLease(terminalId: string): Promise<ScanDeliveryLeaseResult> {
+  async getScanDeliveryLease(terminalId: string): Promise<ScanDeliveryLeaseView> {
     const now = new Date()
     const task = await this.prisma.scanTask.findFirst({
       where: {
@@ -881,13 +912,17 @@ export class ScanTasksService {
         error: { code: 'NO_WAITING_SCAN_TASK', message: '没有匹配的等待中扫描任务' },
       })
     }
-    return buildScanDeliveryLease({
-      terminalId,
-      scanTaskId: task.id,
-      taskCreatedAt: task.createdAt,
-      taskExpiresAt: task.expiresAt,
-      now,
-    })
+    return {
+      ...buildScanDeliveryLease({
+        terminalId,
+        scanTaskId: task.id,
+        taskCreatedAt: task.createdAt,
+        taskExpiresAt: task.expiresAt,
+        now,
+      }),
+      // device 任务多带 startMode 与 device 参数；面板任务这里是空对象，响应里不多出任何键。
+      ...scanDeviceLeaseFields(task),
+    }
   }
 
   /**
@@ -904,6 +939,8 @@ export class ScanTasksService {
     mimeType: string
     candidateSnapshotAt?: unknown
     observedAt?: unknown
+    /** 投递来源：watcher（面板扫描，缺省）/ device（屏上扫描）。原样来自 multipart 字段，未校验。 */
+    origin?: unknown
   }): Promise<{ scanTaskId: string; fileId: string }> {
     const now = new Date()
 
@@ -973,6 +1010,13 @@ export class ScanTasksService {
         error: { code: 'SCAN_LEASE_INVALID', message: '扫描租约绑定的任务版本不一致' },
       })
     }
+
+    // 3b. 投递来源必须与会话一致：device 会话只收终端程序自己扫的 PDF（origin=device，且已整理好文件），
+    // 面板会话只收 watcher；没带 origin 一律按 watcher（兼容现有终端程序）。
+    assertScanDeliverOriginAllowed(task, normalizeScanDeliverOrigin(args.origin), {
+      buffer: args.buffer,
+      mimeType: args.mimeType,
+    })
 
     // 4. 内容级去重防跨用户误挂载。只有创建事务绑定到本任务的精确内容 hash
     // 可以绕过一次；其它内容、其它任务和普通创建都继续执行完整的终端级去重。
