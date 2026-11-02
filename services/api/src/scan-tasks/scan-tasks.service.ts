@@ -24,6 +24,7 @@ import {
   assertScanDeliverOriginAllowed,
   buildScanDeviceCreateData,
   normalizeScanDeliverOrigin,
+  quietPeriodEndsAtIso,
   resolveScanStartParams,
   scanDeliverClaimPins,
   scanDeviceLeaseFields,
@@ -823,7 +824,7 @@ export class ScanTasksService {
     scanTaskId: string,
     endUserId: string | null,
     controlToken: string | undefined
-  ): Promise<{ scanTaskId: string; status: 'cancelled' }> {
+  ): Promise<{ scanTaskId: string; status: 'cancelled'; quietPeriodEndsAt: string; serverNow: string }> {
     const task = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
     if (!task) {
       throw new NotFoundException({
@@ -889,7 +890,33 @@ export class ScanTasksService {
         },
       })
     }
-    return { scanTaskId, status: 'cancelled' }
+    const serverNow = new Date()
+    return {
+      scanTaskId,
+      status: 'cancelled',
+      quietPeriodEndsAt: await this.quietPeriodEndsAtForTerminal(task.terminalId, serverNow),
+      serverNow: serverNow.toISOString(),
+    }
+  }
+
+  /**
+   * 取消成功之后告诉一体机本终端静默期何时结束。算法与 assertTerminalQuietPeriod 相同。
+   * 静默期关着（≤0）时不查库，结束时刻等于 serverNow——verify-scan-tasks 把静默期设成 0，
+   * 它的假 Prisma 不必实现这次查询。
+   */
+  private async quietPeriodEndsAtForTerminal(terminalId: string, now: Date): Promise<string> {
+    const quietPeriodMs = scanTerminalQuietPeriodMs()
+    if (quietPeriodMs <= 0) return quietPeriodEndsAtIso(null, now, quietPeriodMs)
+    const recent = await this.prisma.scanTask.findFirst({
+      where: {
+        terminalId,
+        status: { in: ['cancelled', 'expired'] },
+        updatedAt: { gt: new Date(now.getTime() - quietPeriodMs) },
+      },
+      orderBy: { updatedAt: 'desc' },
+      select: { updatedAt: true },
+    })
+    return quietPeriodEndsAtIso(recent?.updatedAt ?? null, now, quietPeriodMs)
   }
 
   /**

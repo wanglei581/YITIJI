@@ -139,6 +139,16 @@ export function scanDeviceReportRenewWindowMs(state: ScanDeviceState): number {
 }
 
 /**
+ * 取消响应里的静默期结束时刻。与 assertTerminalQuietPeriod 同一条规则：
+ * 从最近一条 cancelled / expired 的 updatedAt 起算 quietPeriodMs。
+ * 静默期关着，或窗口内没有已结束的会话时，结束时刻就是 serverNow，一体机倒计时为 0。
+ */
+export function quietPeriodEndsAtIso(endedAt: Date | null, now: Date, quietPeriodMs: number): string {
+  if (quietPeriodMs <= 0 || !endedAt) return now.toISOString()
+  return new Date(endedAt.getTime() + quietPeriodMs).toISOString()
+}
+
+/**
  * 续期：min(max(expiresAt, now + 窗口), hardExpiresAt)。窗口缺省 3 分钟（终端程序每次回报，见 scanDeviceReportRenewWindowMs）；
  * 改用面板扫描、改扫描设置时传 SCAN_DEVICE_SWITCH_RENEW_WINDOW_MS（10 分钟）。
  * 只会把截止时间往后推、且永远不超过 hardExpiresAt；已经过了上限的会话不会被续命。

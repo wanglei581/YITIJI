@@ -354,6 +354,7 @@
     "verify:scan-device-settings": "node -r @swc-node/register scripts/verify-scan-device-settings.ts",
     "verify:scan-device-idscan": "node -r @swc-node/register scripts/verify-scan-device-idscan.ts",
     "verify:scan-device-lifecycle": "node -r @swc-node/register scripts/verify-scan-device-lifecycle.ts",
+    "verify:scan-device-b4": "node -r @swc-node/register scripts/verify-scan-device-b4.ts",
     "verify:print-conversion": "node -r @swc-node/register scripts/verify-print-conversion.ts",
     "verify:print-sign": "node -r @swc-node/register scripts/verify-print-sign.ts",
     "verify:legal-doc-version": "node -r @swc-node/register scripts/verify-legal-doc-version.ts",

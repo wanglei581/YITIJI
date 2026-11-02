@@ -233,6 +233,13 @@ export interface ScanSessionStatusResponse {
 export interface ScanSessionCancelResponse {
   scanTaskId: string
   status: 'cancelled'
+  /**
+   * 本终端静默期结束时间（ISO 8601）。服务端按与下一次建会话同一条规则算。
+   * 静默期关着，或窗口内没有已结束的会话时，等于 serverNow。可选：老服务端不带。
+   */
+  quietPeriodEndsAt?: string
+  /** 服务端当前时间（ISO 8601）。一体机用它和 quietPeriodEndsAt 算倒计时。可选：老服务端不带。 */
+  serverNow?: string
 }
 
 /**
