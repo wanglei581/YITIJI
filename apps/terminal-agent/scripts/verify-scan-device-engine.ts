@@ -329,6 +329,24 @@ function makeJpeg(width: number, height: number, payloadBytes: number): Buffer {
   return Buffer.concat([Buffer.from([0xff, 0xd8]), app0, sof, sos, Buffer.alloc(payloadBytes, 0x5a), Buffer.from([0xff, 0xd9])])
 }
 const countPdfPages = (pdf: Buffer): number => (pdf.toString('latin1').match(/\/Type \/Page(?!s)/g) ?? []).length
+/** 按页序（/Kids 顺序）读出每页图片的摆放尺寸（pt）：page 对象 → /Contents → 内容流里的 cm 矩阵。 */
+function readPagePlacements(pdf: Buffer): Array<{ width: number; height: number }> {
+  const text = pdf.toString('latin1')
+  const kids = /\/Kids \[([^\]]*)\]/.exec(text)
+  assert.ok(kids, '找不到 /Kids')
+  const pageIds = [...kids[1].matchAll(/(\d+) 0 R/g)].map((m) => m[1])
+  return pageIds.map((pageId) => {
+    const page = new RegExp(`(?:^|\\n)${pageId} 0 obj\\n<<\\n/Type /Page\\n[\\s\\S]*?/Contents (\\d+) 0 R`).exec(text)
+    assert.ok(page, `找不到页对象 ${pageId}`)
+    const header = new RegExp(`(?:^|\\n)${page[1]} 0 obj\\n<<[\\s\\S]*?>>\\nstream\\n`).exec(text)
+    assert.ok(header, `找不到内容流 ${page[1]}`)
+    const from = header.index + header[0].length
+    const content = zlib.inflateSync(Buffer.from(text.slice(from, text.indexOf('\nendstream', from)), 'latin1')).toString('latin1')
+    const cm = /([\d.-]+) 0 0 ([\d.-]+) ([\d.-]+) ([\d.-]+) cm\s*\/\w+ Do/.exec(content)
+    assert.ok(cm, `页 ${pageId} 的内容流里没有图片摆放矩阵`)
+    return { width: Number(cm[1]), height: Math.abs(Number(cm[2])) }
+  })
+}
 const normalizePdf = (pdf: Buffer): string =>
   pdf.toString('latin1').replace(/\(D:\d{14}Z\)/g, '(D:<D>)').replace(/\/ID \[[^\]]*\]/g, '/ID [<ID>]')
 
@@ -1201,7 +1219,8 @@ async function pdfChecks(): Promise<void> {
     return file
   }
 
-  await step('imagesToPdf：PDF 页数恰等于输入张数，页序同输入，每页等比铺满 A4', async () => {
+  await step('imagesToPdf：PDF 页数恰等于输入张数，页序同输入，每页按像素比例等比适配 A4', async () => {
+    const sizes = [[640, 480], [480, 640], [2480, 3508], [100, 200]]
     const files = [jpg('a.jpg', 100, 640, 480), jpg('b.jpg', 100, 480, 640), jpg('c.jpg', 100, 2480, 3508)]
     const png = path.join(dir, 'd.png')
     fs.writeFileSync(png, makePng(100, 200, 300))
@@ -1212,6 +1231,16 @@ async function pdfChecks(): Promise<void> {
       const bytes = fs.readFileSync(out.path)
       assert.equal(countPdfPages(bytes), count, `输入 ${count} 张，PDF 必须恰好 ${count} 页`)
       assert.equal(out.bytes, bytes.length)
+      const placements = readPagePlacements(bytes)
+      assert.equal(placements.length, count)
+      placements.forEach((placed, index) => {
+        const [pixelWidth, pixelHeight] = sizes[index]
+        const factor = Math.min(595.28 / pixelWidth, 841.89 / pixelHeight)
+        assert.ok(
+          Math.abs(placed.width - pixelWidth * factor) < 0.5 && Math.abs(placed.height - pixelHeight * factor) < 0.5,
+          `第 ${index + 1} 页应为 ${(pixelWidth * factor).toFixed(1)}x${(pixelHeight * factor).toFixed(1)}pt（等比适配，页序同输入），实得 ${placed.width.toFixed(1)}x${placed.height.toFixed(1)}pt`,
+        )
+      })
     }
     const text = fs.readFileSync(path.join(dir, 'out-3.pdf')).toString('latin1')
     assert.equal((text.match(/\/MediaBox \[0 0 595\.28 841\.89\]/g) ?? []).length, 3, '每页都是 A4')
