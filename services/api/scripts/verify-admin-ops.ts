@@ -84,6 +84,8 @@ function mockOpsPrisma(
 ): PrismaService {
   return {
     terminal: { findMany: async () => terminalRows },
+    // 扫描仪告警先查已开通的 scan_device。这组夹具没有这项能力，返回空，条数不变。
+    terminalCapability: { findMany: async () => [] },
     platformSetting: { findMany: async () => [] },
     order: { findMany: async () => [] },
     orderItem: { findMany: async () => [] },

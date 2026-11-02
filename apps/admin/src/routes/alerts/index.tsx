@@ -4,7 +4,7 @@ import { formatCount, formatDateTime } from '@ai-job-print/shared'
 import { ConsoleTable, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
-import { AlertTriangleIcon, FileWarningIcon, MessageSquareWarningIcon, MonitorOffIcon, PrinterIcon, RefreshCwIcon } from 'lucide-react'
+import { AlertTriangleIcon, FileWarningIcon, MessageSquareWarningIcon, MonitorOffIcon, PrinterIcon, RefreshCwIcon, ScanLineIcon } from 'lucide-react'
 import {
   adminOpsService,
   type AdminAlertItem,
@@ -42,6 +42,11 @@ const TYPE_META: Record<
     icon: PrinterIcon,
     guidance: '这台终端今天的免费打印面数已接近或达到每日上限（数字见上一行），达到上限后本机当天不再接受免费单，明天 0 点恢复。每日上限的全站默认值和单台设置由管理员配置。确认 / 静默只记录处理。',
   },
+  scan_device_issue: {
+    label: '扫描仪异常',
+    icon: ScanLineIcon,
+    guidance: '这台终端已开通屏上扫描，最近一次心跳报扫描仪找不到或出错。心跳改报正常后这条告警会自行消失。确认 / 静默只记录处理。',
+  },
 }
 
 const SEVERITY_MAP: Record<string, { badge: 'error' | 'warning'; label: string }> = {
@@ -62,6 +67,7 @@ const TYPE_FILTERS = [
   { label: '已支付文件不可用', value: 'paid_pending_file_unavailable' },
   { label: 'AI 内容投诉', value: 'feedback_pending' },
   { label: '免费打印量', value: 'print_terminal_quota_high' },
+  { label: '扫描仪异常', value: 'scan_device_issue' },
 ] as const
 
 const VIEW_TABS: Array<{ label: string; value: AlertListView }> = [

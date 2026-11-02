@@ -4,6 +4,7 @@ import type { PrismaService } from '../prisma/prisma.service'
 import { HEALTHY_PRINTER_STATUS_VALUES, isHealthyPrinterStatus, isLowPaperWarning } from '../terminals/printer-status'
 import { TERMINAL_ONLINE_WINDOW_MS } from '../terminals/printer-availability'
 import { collectPrintQuotaAlerts, resolvePrintQuotaAlert } from './derived-print-quota-alerts'
+import { collectScanDeviceAlerts, resolveScanDeviceAlert } from './derived-scan-device-alerts'
 import {
   buildSubjectKey,
   offlineEpisodeToken,
@@ -460,8 +461,10 @@ export async function collectDerivedAlerts(
     const alert = buildTerminalAlert(t, lastHealthyAt.get(t.id) ?? null, nowMs)
     if (alert) alerts.push(alert)
   }
-  // 终端类告警一台终端最多一条,总数就是列表长度,不存在截断。
+  // 离线 / 打印机一台终端最多一条。扫描仪是另一类，可以和打印机异常同时存在，单独计。
   const terminalAlertCount = alerts.length
+  const scanDeviceAlerts = await collectScanDeviceAlerts(prisma, now)
+  alerts.push(...scanDeviceAlerts)
 
   const where = failedTaskWhere(nowMs)
   const [failedTasks, failedTotal] = await Promise.all([
@@ -502,7 +505,7 @@ export async function collectDerivedAlerts(
     alerts,
     firingTotal: terminalAlertCount + Math.max(failedTotal, failedTasks.length) + unavailableTasks.reduce((count, task) => (
       count + (buildPaidPendingFileUnavailableAlert(task, nowMs) ? 1 : 0)
-    ), 0) + (feedbackAlert ? 1 : 0) + alerts.filter((alert) => alert.type === 'print_terminal_quota_high').length,
+    ), 0) + (feedbackAlert ? 1 : 0) + alerts.filter((alert) => alert.type === 'print_terminal_quota_high').length + scanDeviceAlerts.length,
     omitted,
     cap: PRINT_FAILED_LIST_CAP,
   }
@@ -548,6 +551,10 @@ export async function resolveDerivedAlert(
 
   if (type === 'print_terminal_quota_high') {
     return resolvePrintQuotaAlert(prisma, subjectId, now)
+  }
+
+  if (type === 'scan_device_issue') {
+    return resolveScanDeviceAlert(prisma, subjectId, now)
   }
 
   const terminal = (await prisma.terminal.findUnique({
