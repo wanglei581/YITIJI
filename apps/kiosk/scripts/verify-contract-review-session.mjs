@@ -74,4 +74,28 @@ assert.match(home, /本机文件（桌面验证）/)
 assert.match(contractApi, /export async function createContractReviewFromSource/)
 assert.doesNotMatch(home, /不超过 20MB/)
 
+// ── AI 停用（稿 contract / contract-result）─────────────────────────────────
+// 首页在请求前就按终端配置的 ai.paused 停用分析并写原因；读不到只算没确认，不说停用也不说可用（有超时，不挂死）。
+// 停用时：开始分析不可用、问小青换停用态、出口是「去打印扫描」。结果页每条风险卡默认可见「AI 生成，仅供参考」。
+assert.match(home, /getKioskTerminalConfig\(terminalId\)/)
+assert.match(home, /config\.ai\?\.paused === true/)
+assert.match(home, /AI_STATUS_CHECK_TIMEOUT_MS/)
+assert.match(home, /const canSubmit = [^\n]*!aiDown && !checkingAi/)
+assert.match(home, /if \(aiDown \|\| checkingAi \|\|/)
+assert.match(home, /ask=\{aiDown \? \{ label: '小青暂时不可用，可先打印', disabled: true \}/)
+assert.match(home, /title="去打印扫描"[\s\S]{0,160}navigate\('\/print-scan'\)/)
+assert.match(home, /availability: aiDown \? 'unavailable' : submitting \? 'available' : 'unknown', pending: submitting/)
+const findingCard = result.match(/function FindingCard\([\s\S]*?\n\}\n/)?.[0] ?? ''
+assert.ok(findingCard, 'FindingCard 必须存在')
+assert.ok(
+  findingCard.indexOf('AI_LABEL_COPY.BASE') > -1 &&
+    findingCard.indexOf('AI_LABEL_COPY.BASE') < findingCard.indexOf('{expanded && ('),
+  '每条风险卡的「AI 生成，仅供参考」必须在折叠之外默认可见',
+)
+assert.ok(
+  findingCard.indexOf('cr-finding-excerpt') < findingCard.indexOf('{expanded && (') &&
+    findingCard.indexOf('cr-finding-question') < findingCard.indexOf('{expanded && ('),
+  '原文摘录与核对追问必须在折叠之外默认可见',
+)
+
 console.log('PASS contract review volatile session contract')

@@ -1,0 +1,553 @@
+/* 复印、证件照、照片合成 PDF、签名的正文。只挂在这三页，不改 .qxt-*。
+ *
+ * 行高底线：24px 以上的标题行（.fs-h、.fs-row b、.fs-act h3，以及 convert / sign 样式表里的同类标题）
+ * 行高不低于 1.45。一体机（Windows）和 CI（Linux）上字体栈落到 Qingxu Sans（思源黑体子集，内容区 1.448em），
+ * 行高 1.3 的行盒比字形矮 1–3px，scrollHeight 大过盒子 2px，版式体检（fusion-w2-tools 的 auditToolLayout）
+ * 报「字被截」；Mac 上落到苹方，本机量不出来。行高跟着内容区走，不靠定高、缩字号或 overflow:hidden 凑。 */
+
+[data-qx-page='print-hub'].sx-page,
+[data-qx-page='img2pdf'].i2p-page,
+[data-qx-page='sign'].ss-page,
+[data-qx-page='print-hub'] .sx-page,
+[data-qx-page='img2pdf'] .sx-page,
+[data-qx-page='sign'] .sx-page {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+[data-qx-page='print-hub'] .fs-h,
+[data-qx-page='img2pdf'] .fs-h,
+[data-qx-page='sign'] .fs-h {
+  margin: 8px 0 0;
+  font-size: 24px;
+  line-height: 1.45;
+  font-weight: 700;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='print-hub'] .fs-lead,
+[data-qx-page='img2pdf'] .fs-lead,
+[data-qx-page='sign'] .fs-lead {
+  margin: 0;
+  font-size: 32px;
+  line-height: 1.35;
+  font-weight: 700;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='print-hub'] .fs-ol,
+[data-qx-page='img2pdf'] .fs-ol,
+[data-qx-page='sign'] .fs-ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-qx-page='print-hub'] .fs-step,
+[data-qx-page='img2pdf'] .fs-step,
+[data-qx-page='sign'] .fs-step {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 4px 12px;
+  align-content: center;
+  background: var(--qxt-well);
+  border-radius: 20px;
+  padding: 12px 14px;
+  min-height: 76px;
+  flex: 1 1 auto;
+}
+
+[data-qx-page='print-hub'] .fs-step .n,
+[data-qx-page='img2pdf'] .fs-step .n,
+[data-qx-page='sign'] .fs-step .n {
+  grid-row: 1 / span 2;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--qx-deep, var(--qxt-deep-2));
+  color: var(--qxt-cream);
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+[data-qx-page='print-hub'] .fs-step b,
+[data-qx-page='img2pdf'] .fs-step b,
+[data-qx-page='sign'] .fs-step b {
+  font-size: 24px;
+  line-height: 1.3;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='print-hub'] .fs-step .d,
+[data-qx-page='img2pdf'] .fs-step .d,
+[data-qx-page='sign'] .fs-step .d {
+  font-size: 22px;
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-hub'] .fs-facts,
+[data-qx-page='img2pdf'] .fs-facts,
+[data-qx-page='sign'] .fs-facts {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-qx-page='print-hub'] .fs-pairgrid,
+[data-qx-page='img2pdf'] .fs-pairgrid,
+[data-qx-page='sign'] .fs-pairgrid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr;
+  gap: 8px;
+}
+
+[data-qx-page='print-hub'] .fs-fact,
+[data-qx-page='img2pdf'] .fs-fact,
+[data-qx-page='sign'] .fs-fact {
+  background: var(--qxt-well);
+  border-radius: 18px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 84px;
+}
+
+[data-qx-page='print-hub'] .fs-fact.wide,
+[data-qx-page='img2pdf'] .fs-fact.wide,
+[data-qx-page='sign'] .fs-fact.wide {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+[data-qx-page='print-hub'] .fs-fact b,
+[data-qx-page='img2pdf'] .fs-fact b,
+[data-qx-page='sign'] .fs-fact b {
+  font-size: 22px;
+  line-height: 1.3;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='print-hub'] .fs-fact span,
+[data-qx-page='img2pdf'] .fs-fact span,
+[data-qx-page='sign'] .fs-fact span,
+[data-qx-page='print-hub'] .fs-p,
+[data-qx-page='img2pdf'] .fine,
+[data-qx-page='sign'] .fs-p {
+  font-size: 22px;
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-hub'] .fs-warn,
+[data-qx-page='img2pdf'] .fs-warn,
+[data-qx-page='sign'] .fs-warn {
+  margin: 0;
+  border-radius: 18px;
+  padding: 12px 14px;
+  font-size: 22px;
+  line-height: 1.45;
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+}
+
+[data-qx-page='print-hub'] .fs-act,
+[data-qx-page='img2pdf'] .fs-act,
+[data-qx-page='sign'] .fs-act {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 64px;
+  gap: 16px;
+  align-items: center;
+  width: 100%;
+  min-height: 200px;
+  flex: 1 1 auto;
+  padding: 16px 18px;
+  border-radius: 28px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  text-align: left;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='print-hub'] .fs-act .vis,
+[data-qx-page='img2pdf'] .fs-act .vis,
+[data-qx-page='sign'] .fs-act .vis {
+  height: 100%;
+  min-height: 120px;
+  align-self: stretch;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  display: grid;
+  place-items: center;
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page='print-hub'] .fs-act h3,
+[data-qx-page='img2pdf'] .fs-act h3,
+[data-qx-page='sign'] .fs-act h3 {
+  margin: 0;
+  font-size: 36px;
+  line-height: 1.45;
+  font-weight: 700;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='print-hub'] .fs-act p,
+[data-qx-page='img2pdf'] .fs-act p,
+[data-qx-page='sign'] .fs-act p {
+  margin: 6px 0 0;
+  font-size: 22px;
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-hub'] .fs-act .go,
+[data-qx-page='img2pdf'] .fs-act .go,
+[data-qx-page='sign'] .fs-act .go {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--qx-deep, var(--qxt-deep-2));
+  color: var(--qxt-cream);
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+}
+
+[data-qx-page='print-hub'] .fs-act.off,
+[data-qx-page='img2pdf'] .fs-act.off,
+[data-qx-page='sign'] .fs-act.off,
+[data-qx-page='print-hub'] .fs-act:disabled,
+[data-qx-page='img2pdf'] .fs-act:disabled {
+  background: var(--qxt-well);
+  border-style: dashed;
+}
+
+[data-qx-page='print-hub'] .fs-act:disabled .go,
+[data-qx-page='img2pdf'] .fs-act:disabled .go {
+  visibility: hidden;
+}
+
+[data-qx-page='print-hub'] .fs-pair,
+[data-qx-page='img2pdf'] .fs-pair,
+[data-qx-page='sign'] .fs-pair {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+[data-qx-page='print-hub'] .fs-idhead,
+[data-qx-page='sign'] .fs-idhead {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 26px;
+  padding: 14px 18px;
+}
+
+[data-qx-page='print-hub'] .fs-idhead .vis,
+[data-qx-page='sign'] .fs-idhead .vis {
+  min-height: 140px;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  display: grid;
+  place-items: center;
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page='print-hub'] .fs-idhead h2,
+[data-qx-page='sign'] .fs-idhead h2 {
+  margin: 0;
+  font-size: 36px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='print-hub'] .fs-idhead p,
+[data-qx-page='sign'] .fs-idhead p {
+  margin: 8px 0 0;
+  font-size: 24px;
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-hub'] .fs-plan,
+[data-qx-page='sign'] .fs-plan {
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 22px;
+  padding: 12px 16px;
+}
+
+[data-qx-page='print-hub'] .fs-plan .hd,
+[data-qx-page='sign'] .fs-plan .hd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+[data-qx-page='print-hub'] .fs-plan ol,
+[data-qx-page='sign'] .fs-plan ol {
+  margin: 6px 0 0;
+  padding-left: 1.4em;
+  list-style: decimal;
+}
+
+[data-qx-page='print-hub'] .fs-plan li,
+[data-qx-page='sign'] .fs-plan li {
+  display: list-item;
+  font-size: 22px;
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-hub'] .sx-chip,
+[data-qx-page='img2pdf'] .sx-chip,
+[data-qx-page='sign'] .sx-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 18px;
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+[data-qx-page='sign'] .fs-lock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: none;
+}
+
+[data-qx-page='sign'] .fs-hold {
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 76px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  background: var(--qxt-well);
+  border: 1.5px dashed var(--qxt-edge);
+}
+
+[data-qx-page='sign'] .fs-hold b {
+  font-size: 26px;
+  line-height: 1.3;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='sign'] .fs-hold span {
+  font-size: 22px;
+  line-height: 1.35;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-hub'] .fs-row,
+[data-qx-page='img2pdf'] .fs-row,
+[data-qx-page='sign'] .fs-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 76px;
+  /* 标题行高从 1.3 抬到 1.45 比原来高 3.6px，上下内边距各让出 2px：整行高度、字的位置都和原稿排法一致。 */
+  padding: 8px 14px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  text-align: left;
+  color: var(--qxt-ink);
+  font-size: 24px;
+}
+
+[data-qx-page='print-hub'] .fs-row b,
+[data-qx-page='img2pdf'] .fs-row b,
+[data-qx-page='sign'] .fs-row b {
+  display: block;
+  font-size: 24px;
+  line-height: 1.45;
+}
+
+[data-qx-page='print-hub'] .fs-row:disabled,
+[data-qx-page='img2pdf'] .fs-row:disabled,
+[data-qx-page='sign'] .fs-row:disabled {
+  opacity: 0.45;
+}
+
+/* 选中态的整行按钮（稿 .fs-row.on / aria-pressed）：深底浅字，授权勾选、九宫格的当前格都用它。 */
+[data-qx-page='sign'] .fs-row[aria-pressed='true'],
+[data-qx-page='sign'] .fs-row[aria-checked='true'] {
+  background: var(--qx-deep, var(--qxt-deep-2));
+  border-color: var(--qx-deep, var(--qxt-deep-2));
+  color: var(--qxt-cream);
+}
+
+[data-qx-page='sign'] .fs-row[aria-pressed='true'] small,
+[data-qx-page='sign'] .fs-row[aria-checked='true'] small {
+  color: var(--qxt-mint);
+}
+
+/* 蓝绿提示条（稿 .fs-help）：一句帮助、一句提示。 */
+[data-qx-page='img2pdf'] .fs-help,
+[data-qx-page='sign'] .fs-help {
+  margin: 0;
+  border-radius: 18px;
+  padding: 12px 14px;
+  font-size: 22px;
+  line-height: 1.45;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+}
+
+/* 示意图在卡里的大小：操作卡里占 76% 高，证件卡抬头里固定 132px（稿）。 */
+[data-qx-page='print-hub'] .fs-act .vis .sx-art,
+[data-qx-page='img2pdf'] .fs-act .vis .sx-art,
+[data-qx-page='sign'] .fs-act .vis .sx-art {
+  height: 76%;
+  max-width: 90%;
+  max-height: 90%;
+}
+
+[data-qx-page='print-hub'] .fs-idhead .vis .sx-art,
+[data-qx-page='sign'] .fs-idhead .vis .sx-art {
+  height: 132px;
+}
+
+/* 两个整行按钮并排（冲突屏的「换一个新标识」与「恢复上一次的顺序」、上一页 / 下一页）。 */
+[data-qx-page='img2pdf'] .fs-2,
+[data-qx-page='sign'] .fs-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* 一体机尺寸底线：正文 ≥20px。旧页面样式里 17–18px 的小字在这里抬起来。 */
+[data-kiosk-stage-fit='on'] [data-qx-page='img2pdf'] .i2p-truth div,
+[data-kiosk-stage-fit='on'] [data-qx-page='img2pdf'] .i2p-truth b,
+[data-kiosk-stage-fit='on'] [data-qx-page='sign'] .ss-tag,
+[data-kiosk-stage-fit='on'] [data-qx-page='sign'] .ss-chip,
+[data-kiosk-stage-fit='on'] [data-qx-page='sign'] .ss-truth span {
+  font-size: 20px;
+}
+
+[data-qx-page='print-hub'] .fs-row small,
+[data-qx-page='img2pdf'] .fs-row small,
+[data-qx-page='sign'] .fs-row small {
+  display: block;
+  font-size: 22px;
+  line-height: 1.35;
+  color: var(--qxt-ink-2);
+  font-weight: 500;
+}
+
+/* 证件照说明一屏放下：操作卡的最小高度收到 150，让卡片自己让出余量（稿里它们也是挨着排满）。 */
+[data-qx-page='print-hub'][data-state='feature-id-photo'] .fs-act {
+  min-height: 150px;
+}
+
+/* 页脚：说明在上、求助卡在下，各占一整行（只在本包的屏里；打印扫描首页不受影响）。 */
+.qxt-screen.scan-touch [data-qx-page='print-hub'] .ph-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+/* 复印说明的法律提示：稿里是一张泥色提示卡，不是页脚小字。 */
+.qxt-screen.scan-touch [data-testid='print-hub-copy-legal'] {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+  font-size: 22px;
+  line-height: 1.45;
+}
+
+/* 手机宽度（舞台不缩放）：1080 舞台的字号、整行高度、三列网格在 390 宽上放不下，说明格互相叠在一起。
+ * 这一块把复印、证件照、照片合成、签名收成手机尺寸：行高按内容走、整页可滚，正文不小于 15px
+ * （一体机 20px / 64px 的底线只管 1080 舞台）。 */
+@media (max-width: 760px) {
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch :is(.ph-page, .i2p-page, .ss-page) {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow: auto;
+  }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch :is(.fs-ol, .fs-pair, .fs-lock, .fs-plist, .fs-facts) {
+    flex: none;
+    min-height: auto;
+  }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-facts { grid-auto-rows: auto; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-step {
+    flex: none;
+    min-height: 0;
+    grid-template-columns: 34px 1fr;
+    gap: 2px 10px;
+    padding: 8px 10px;
+  }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-step .n { width: 34px; height: 34px; font-size: 16px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-step b { font-size: 17px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-step .d { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-fact { min-height: 0; padding: 8px 10px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-fact b { font-size: 16px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-fact span { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-h { font-size: 17px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-lead { font-size: 18px; line-height: 1.4; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-row { min-height: 56px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-row b { font-size: 17px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-row small { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-act {
+    flex: none;
+    min-height: 0;
+    grid-template-columns: 84px minmax(0, 1fr) 40px;
+    gap: 10px;
+    padding: 10px;
+  }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-act .vis { min-height: 84px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-act h3 { font-size: 20px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-act p { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-act .go { width: 40px; height: 40px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-idhead { grid-template-columns: 96px minmax(0, 1fr); gap: 10px; padding: 10px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-idhead .vis { min-height: 70px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-idhead .vis .sx-art { height: 60px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-idhead h2 { font-size: 20px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-idhead p { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-plan .hd b { font-size: 17px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-plan li { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch :is(.fs-warn, .fs-help, [data-testid='service-phone-line'], [data-testid='print-hub-copy-legal']) { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .sx-chip { font-size: 14px; min-height: 28px; }
+  /* 底栏左键的字比扫描页长（「返回打印扫描」），限一下宽，别把主按钮挤成一条竖缝。 */
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-dock .qxt-btn-sec { flex: 0 1 auto; max-width: 42%; white-space: normal; line-height: 1.15; font-size: 15px; }
+  /* 主按钮的字比共享件的 18px 再小一档：「下一步 · 建立这次扫描」这类长字在 64px 高的钮里折三行放得下。 */
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-dock .qxt-btn-pri { font-size: 15px; padding: 0 8px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .i2p-truth { flex-direction: column; gap: 8px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .i2p-truth div { font-size: 14px; }
+}

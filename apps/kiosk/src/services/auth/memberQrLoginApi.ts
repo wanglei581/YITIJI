@@ -7,6 +7,9 @@ const LOCAL_AGENT_BASE_URL = configuredLocalAgentBaseUrl || 'http://127.0.0.1:95
 // localApiBridgeToken 配置一致,安装时一起下发。
 const BRIDGE_TOKEN = (import.meta.env['VITE_TERMINAL_AGENT_BRIDGE_TOKEN'] ?? '').trim()
 
+/** 本机程序没连上时扫码登录页上写的话：说清是哪一环，并指出不用扫码的路（手机号登录）。 */
+export const LOCAL_AGENT_UNREACHABLE_MESSAGE = '这台机器的本机程序没连上，扫码登录暂时用不了，请改用手机号登录。'
+
 function requireLocalAgentHeaders(): HeadersInit {
   if (!BRIDGE_TOKEN) {
     throw new MemberApiError(
@@ -60,6 +63,11 @@ async function callEnvelope<T>(
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {
+    // 连不上的是这台机器自己的本机程序（127.0.0.1）时，说法要和云上接口断开不同：那不是「网络」的事，
+    // 让人去查网络没用（10/29 本机走查 I-32）。如实说本机程序没连上，并给不用扫码的出路。
+    if (baseUrl === LOCAL_AGENT_BASE_URL) {
+      throw new MemberApiError('LOCAL_AGENT_UNREACHABLE', LOCAL_AGENT_UNREACHABLE_MESSAGE, 0)
+    }
     throw new MemberApiError('NETWORK_ERROR', '网络连接失败，请稍后重试', 0)
   }
 

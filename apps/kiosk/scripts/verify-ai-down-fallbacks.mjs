@@ -35,7 +35,9 @@ const files = {
   report: kiosk('src/pages/resume/ResumeReportPage.tsx'),
   reportExits: kiosk('src/pages/resume/components/ResumeDiagnosisFailExits.tsx'),
   handoffPolicy: kiosk('src/pages/print/printHandoffPolicy.ts'),
-  reportCss: kiosk('src/pages/resume/resume-report-qx.css'),
+  // 触屏版出路行（ExitRow）是报告页所有出路的唯一实现，样式在 touch/report.css。
+  reportExitRow: kiosk('src/pages/resume/components/resume-report/ResumeReportExits.tsx'),
+  reportTouchCss: kiosk('src/pages/resume/touch/report.css'),
   generate: kiosk('src/pages/resume/ResumeGeneratePage.tsx'),
   interviewSetup: kiosk('src/pages/interview/InterviewSetupPage.tsx'),
   careerPlan: kiosk('src/pages/resume/CareerPlanPage.tsx'),
@@ -148,22 +150,25 @@ for (const route of ['/print-scan', '/policy-service', '/official-channels']) {
 }
 
 // D：置灰可解释。原生 disabled 会退出 Tab 序列、读屏跳过，触屏没有 hover 读不到原因。
-must('reportExits', /aria-disabled="true"/, '打印链接不可用时必须用 aria-disabled 置灰')
-must('reportExits', /aria-describedby="resume-fail-print-reason"/, '置灰按钮必须用 aria-describedby 指向常驻原因')
+// 出路行统一由 ExitRow 画：置灰靠 aria-disabled + aria-describedby，不用原生 disabled。
+must('reportExitRow', /aria-disabled=\{disabled \|\| undefined\}/, '打印链接不可用时必须用 aria-disabled 置灰')
+must('reportExitRow', /aria-describedby=\{disabled \? describedBy : undefined\}/, '置灰按钮必须用 aria-describedby 指向常驻原因')
+must('reportExits', /disabled describedBy="resume-fail-print-reason"/, '置灰的打印原件出路必须把 describedBy 指向常驻原因')
 must('reportExits', /id="resume-fail-print-reason"/, '置灰原因必须是常驻可见元素，不能只放 title/tooltip')
 mustNot('reportExits', /<button[^>]*\sdisabled(\s|=|>)/, '禁止对置灰按钮使用原生 disabled')
+mustNot('reportExitRow', /<button[^>]*\sdisabled(\s|=|>)/, '出路行禁止使用原生 disabled')
 
 // E：触控。1080×1920 竖屏，主操作 ≥56px。
-// 2026-09-24 出路区并入稿 22 的青序 `.rrp-row`（高度写在 resume-report-qx.css），
-// 不再逐个挂 Tailwind `min-h-[56px]`；判据换成「四条出路都是 rrp-row」+「rrp-row 的 min-height ≥56px」。
+// 2026-09-24 出路区并入稿 22 的青序 `.rrp-row`；2026-10-28 改成触屏版出路行 ExitRow（稿 st-ai-down 的 exit），
+// 高度写在 touch/report.css。判据换成「四条出路都是 ExitRow」+「出路行的 min-height ≥64px」（触屏版可点区比原 56 更严）。
 assert(
-  (files.reportExits.match(/className="rrp-row"/g) ?? []).length >= 4,
-  'reportExits: 四条出路都必须用报告页的 rrp-row 行（可点高度由页面样式统一给）',
+  (files.reportExits.match(/<ExitRow/g) ?? []).length >= 4,
+  'reportExits: 四条出路都必须用 ExitRow 出路行（可点高度由页面样式统一给）',
 )
 {
-  const rowRule = /\.rrp-row\s*\{([^}]*)\}/.exec(files.reportCss)?.[1] ?? ''
+  const rowRule = /\.qxt-exit-col \.qxt-slab\s*\{([^}]*)\}/.exec(files.reportTouchCss)?.[1] ?? ''
   const minHeight = Number(/min-height:\s*(\d+)px/.exec(rowRule)?.[1] ?? 0)
-  assert(minHeight >= 56, `resume-report-qx.css: .rrp-row 的 min-height 必须 ≥56px（实测 ${minHeight}px）`)
+  assert(minHeight >= 64, `touch/report.css: 出路行 .qxt-exit-col .qxt-slab 的 min-height 必须 ≥64px（实测 ${minHeight}px）`)
 }
 
 // C：不伪造 —— 诊断没跑出来就不许给任何结论。
@@ -174,8 +179,8 @@ must(
   '拿不到原件时说人话：离开这一页再回来就拿不到了',
 )
 mustNot('reportExits', '文件凭证', '出路文案不再说文件凭证')
-must('reportExits', 'className="rrp-ic"', '出路行左边有图标')
-must('reportExits', 'className="rrp-go"', '能走的出路行右边有圆形箭头')
+must('reportExitRow', 'className="qxt-vis"', '出路行左边有图标')
+must('reportExitRow', /\{take && !disabled \? <div className="qxt-take"><QxTouchIcon name="arrowR"/, '能走的出路行右边有去向箭头（置灰的没有）')
 
 // ── ② 访谈式生成失败 → 已答内容能变成纸带走 ─────────────────────────────────
 // 原型口径：10-resume-interview.html:394「把已答的部分导出成草稿带走」/ :523「草稿 ≠ 成文简历」
@@ -631,7 +636,7 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
   assert(parseOutage > 0 && parseUnknown > 0 && parseOutage < parseUnknown,
     'parse: 能力级停用必须在「结果未知」判定之前处理 —— 否则 503 AI_PAUSED 会让页面叫人原样再试')
   must('parse', /navigateFail\(aiErrorMessageOf\(err, [^)]*\), undefined, true\)/, '能力级停用转失败屏时必须标 aiDown')
-  const reportAiDownCta = slice(files.report, 'const failCta = state.aiDown ? (', ') : (')
+  const reportAiDownCta = slice(files.report, 'state.aiDown\n          ? (printable', ": { label: '重新解析'")
   assert(reportAiDownCta.length > 0, 'report: 失败屏必须有 aiDown 分支')
   assert(!/handleRetry|重新解析/.test(reportAiDownCta), 'report: AI 停用的失败屏不得再给「重新解析」')
   // AI 顾问：能力级停用锁住输入、转不经过 AI 的入口，不走「重试这一轮」。

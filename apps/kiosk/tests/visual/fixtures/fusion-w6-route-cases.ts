@@ -42,7 +42,7 @@ function createRouteCase(definition: W6RouteDefinition): W6RouteCase {
 const screen = (name: string) => `[data-kiosk-screen="${name}"]`
 const w2 = (name: string) => `[data-w2-page="${name}"]`
 const w4 = '.w4-page-frame'
-const qx = '[data-qx-frame="true"]'
+const touch = '[data-qxt-screen]'
 const member = screen('member-list')
 
 async function seedScreensaver(page: Page): Promise<void> {
@@ -93,29 +93,32 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/interview/reports', url: '/interview/reports', expectedPath: '/interview', marker: screen('interview-reports'), featureText: '练习报告' },
   { pattern: '/screensaver', url: '/screensaver', marker: screen('screensaver'), featureText: '轻触屏幕，开始办事', landmark: 'presentation', seed: seedScreensaver },
   { pattern: '/session-timeout', url: '/session-timeout', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
-  // 2026-09-25 迁入稿 09-system-state：锚点换成稿里常驻的八项状态区块标题（旧页标题「网络连接中断」已随稿替换）。
-  { pattern: '/error-offline', url: '/error-offline', marker: screen('error-offline'), featureText: '这台机器的八项状态' },
+  // 2026-09-25 迁入稿 09-system-state；2026-10-28 触屏稿里每一态都在的是页眉小字「机器状态」，锚点换成它。
+  { pattern: '/error-offline', url: '/error-offline', marker: screen('error-offline'), featureText: '机器状态' },
   { pattern: '/assistant', url: '/assistant', marker: screen('assistant'), featureText: '小青' },
   { pattern: '/profile', url: '/profile', marker: screen('profile'), featureText: '我的' },
-  { pattern: '/me/resumes', url: '/me/resumes', marker: member, featureText: '我的简历' },
+  // 证据锚点随稿换字，判据不变：未登录意图带标题仍逐页点名这一页。
+  { pattern: '/me/resumes', url: '/me/resumes', marker: member, featureText: '登录后看你的简历' },
   { pattern: '/me/print-orders', url: '/me/print-orders', marker: member, featureText: '打印订单' },
-  { pattern: '/me/documents', url: '/me/documents', marker: member, featureText: '我的文档' },
-  { pattern: '/me/favorites', url: '/me/favorites', marker: member, featureText: '我的收藏' },
-  { pattern: '/me/ai-records', url: '/me/ai-records', marker: member, featureText: 'AI服务记录' },
+  // 证据锚点随稿换字，判据不变：未登录意图带标题仍逐页点名这一页（旧登录门标题带「我的文档」，稿上的登录门标题是「登录后看你的文档」）。
+  { pattern: '/me/documents', url: '/me/documents', marker: member, featureText: '登录后看你的文档' },
+  { pattern: '/me/favorites', url: '/me/favorites', marker: member, featureText: '登录后看你的收藏' },
+  { pattern: '/me/ai-records', url: '/me/ai-records', marker: member, featureText: 'AI 服务记录' },
   { pattern: '/me/benefits', url: '/me/benefits', marker: member, featureText: '我的权益' },
   { pattern: '/me/activity', url: '/me/activity', marker: member, featureText: '浏览与跳转记录' },
-  { pattern: '/me/activity/:id', url: '/me/activity/w6-record', marker: screen('activity-detail'), featureText: '登录后查看本人记录' },
-  { pattern: '/me/notifications', url: '/me/notifications', marker: member, featureText: '消息通知' },
+  { pattern: '/me/activity/:id', url: '/me/activity/w6-record', marker: screen('activity-detail'), featureText: '登录后看你的这条记录' },
+  // 证据锚点随稿换字，判据不变：未登录意图带标题仍逐页点名这一页。
+  { pattern: '/me/notifications', url: '/me/notifications', marker: member, featureText: '登录后看你的消息' },
   { pattern: '/me/feedback', url: '/me/feedback', marker: member, featureText: '意见反馈' },
   { pattern: '/me/settings', url: '/me/settings', marker: screen('member-settings'), featureText: '账号设置' },
   { pattern: '/me/privacy-requests', url: '/me/privacy-requests', marker: screen('member-privacy-requests'), featureText: '隐私与数据请求' },
   { pattern: '/help', url: '/help', marker: screen('help'), featureText: '你想解决' },
   { pattern: '/activities', url: '/activities', marker: screen('activities'), featureText: '权益活动' },
-  { pattern: '/activities/:id', url: '/activities/activity-001', marker: screen('activity-detail'), featureText: '权益活动详情' },
+  { pattern: '/activities/:id', url: '/activities/activity-001', marker: screen('activity-detail'), featureText: '返回活动' },
   { pattern: '/renshi', url: '/renshi', marker: '.w4-policy-page', featureText: '仅信息指引 · 不代办' },
-  { pattern: '/campus', url: '/campus', marker: '[data-kiosk-component="page-frame"] .campus-proto', featureText: '2026 青岛高校毕业生招聘会' },
-  { pattern: '/campus/welcome', url: '/campus/welcome', marker: '[data-kiosk-component="page-frame"]', featureText: '校园招聘迎新指引' },
-  { pattern: '/campus/freshman-insights', url: '/campus/freshman-insights', marker: '[data-kiosk-component="page-frame"]:has-text("暂无经核验的校园招聘统计")', featureText: '不会展示示例数据' },
+  { pattern: '/campus', url: '/campus', marker: touch, featureText: '2026 青岛高校毕业生招聘会' },
+  { pattern: '/campus/welcome', url: '/campus/welcome', marker: touch, featureText: '校园招聘迎新指引' },
+  { pattern: '/campus/freshman-insights', url: '/campus/freshman-insights', marker: '[data-qxt-screen]:has-text("暂无经核验的校园招聘统计")', featureText: '不会展示示例数据' },
   { pattern: '/toolbox', url: '/toolbox', marker: screen('toolbox'), featureText: '百宝箱' },
   { pattern: '/smart-campus', url: '/smart-campus', marker: w4, featureText: '智慧校园' },
   { pattern: '/smart-campus/welcome', url: '/smart-campus/welcome', marker: w4, featureText: '迎新指引' },
@@ -146,10 +149,10 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/print/pickup-claim', url: '/print/pickup-claim', marker: w2('pickup-claim'), featureText: '输入你的到机码' },
   // PR #496 新路由
   { pattern: '/ai/plan', url: '/ai/plan', marker: 'h1:text-is("小青的作业面")', featureText: '小青的作业面' },
-  { pattern: '/session-resume', url: '/session-resume', marker: 'h1:text-is("继续打印任务")', featureText: 'W6 待续打材料.pdf', requiresMemberSession: true },
+  { pattern: '/session-resume', url: '/session-resume', marker: '[data-testid="session-resume-state-list"]', featureText: 'W6 待续打材料.pdf', requiresMemberSession: true },
   // 3.14：线上平台目录并入本机构官方渠道，旧地址只做重定向。marker 仍是 h1 精确匹配、featureText 钉二维码下那句
   // 来源说明的固定部分（夹具是 b 版本：本机构一个渠道 + 其他来源平台两个），强度不降。
-  { pattern: '/jobs/online-platforms', url: '/jobs/online-platforms', expectedPath: compatibilityRedirects['/jobs/online-platforms'], marker: 'h1:text-is("本机构官方渠道")', featureText: '提供，信息以其官网为准' },
+  { pattern: '/jobs/online-platforms', url: '/jobs/online-platforms', expectedPath: compatibilityRedirects['/jobs/online-platforms'], marker: 'h1:text-is("扫码，在手机上看")', featureText: '提供，信息以其官网为准' },
   { pattern: '/official-channels', url: '/official-channels', marker: screen('official-channels'), featureText: '本渠道由示例大学就业指导中心提供，信息以其官网为准' },
   { pattern: '/resume', url: '/resume', expectedPath: compatibilityRedirects['/resume'], marker: screen('resume-source'), featureText: 'AI 简历诊断' },
   { pattern: '/resume/upload', url: '/resume/upload', expectedPath: compatibilityRedirects['/resume/upload'], marker: screen('resume-source'), featureText: 'AI 简历诊断' },
@@ -166,35 +169,37 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   // 五个服务台迁入青序流光（稿 16）后，栏目名「AI简历服务」等降为 eyebrow，h1 换成稿里的主标题。
   // featureText 顺势从栏目名改钉那五句**合规诚实性声明**——钉合规边界比钉栏目名有判别力：
   // 迁移里最容易丢的就是这几句，钉住它们，漏抄当场变红。
-  { pattern: '/resume-service', url: '/resume-service', marker: 'h1:text-is("把简历这件事，做得更清楚")', featureText: '系统不代投、不替企业筛选或邀约。' },
-  { pattern: '/scan', url: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
-  { pattern: '/scan/start', url: '/scan/start', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
+  { pattern: '/resume-service', url: '/resume-service', marker: 'h1:text-is("你手上有简历吗？")', featureText: '系统不代投、不替企业筛选或邀约。' },
+  // 扫描选类型屏（第 9 包按第 5 版稿重排）的屏上功能名是「材料扫描」，原来的「扫描服务」已不在屏上。
+  { pattern: '/scan', url: '/scan', marker: w2('scan-start'), featureText: '材料扫描' },
+  { pattern: '/scan/start', url: '/scan/start', expectedPath: '/scan', marker: w2('scan-start'), featureText: '材料扫描' },
   { pattern: '/scan/settings', url: '/scan/settings', expectedPath: '/scan', marker: w2('scan-settings'), featureText: '未创建扫描任务' },
-  { pattern: '/scan/progress', url: '/scan/progress', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
-  { pattern: '/scan/result', url: '/scan/result', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
+  { pattern: '/scan/progress', url: '/scan/progress', expectedPath: '/scan', marker: w2('scan-start'), featureText: '材料扫描' },
+  { pattern: '/scan/result', url: '/scan/result', expectedPath: '/scan', marker: w2('scan-start'), featureText: '材料扫描' },
 
-  { pattern: '/jobs', url: '/jobs', marker: qx, featureText: '岗位信息' },
-  { pattern: '/jobs-service', url: '/jobs-service', marker: 'h1:text-is("看清来源，再决定去哪里投")', featureText: '投递在来源平台完成。' },
-  { pattern: '/jobs/:id', url: '/jobs/job-001', marker: qx, featureText: '前端工程师' },
-  { pattern: '/jobs/:id/offline', url: '/jobs/offline-job-001/offline', marker: qx, featureText: '线下机构岗位' },
-  { pattern: '/offline-agencies', url: '/offline-agencies', marker: qx, featureText: '线下招聘机构' },
-  { pattern: '/offline-agencies/:id', url: '/offline-agencies/agency-001', marker: qx, featureText: '到店咨询办理' },
-  { pattern: '/notifications', url: '/notifications', marker: member, featureText: '消息通知' },
-  { pattern: '/companies', url: '/companies', marker: qx, featureText: '找企业' },
-  { pattern: '/companies/:id', url: '/companies/company-001', marker: qx, featureText: '青岛示例制造有限公司' },
+  { pattern: '/jobs', url: '/jobs', marker: touch, featureText: '岗位信息' },
+  { pattern: '/jobs-service', url: '/jobs-service', marker: 'h1:text-is("想找哪种工作？")', featureText: '投递在来源平台完成。' },
+  { pattern: '/jobs/:id', url: '/jobs/job-001', marker: touch, featureText: '前端工程师' },
+  { pattern: '/jobs/:id/offline', url: '/jobs/offline-job-001/offline', marker: touch, featureText: '线下机构岗位' },
+  { pattern: '/offline-agencies', url: '/offline-agencies', marker: touch, featureText: '线下招聘机构' },
+  { pattern: '/offline-agencies/:id', url: '/offline-agencies/agency-001', marker: touch, featureText: '到店咨询办理' },
+  // 证据锚点随稿换字，判据不变：/notifications 与 /me/notifications 是同一张会员消息页，屏上看得见的是登录引导标题。
+  { pattern: '/notifications', url: '/notifications', marker: member, featureText: '登录后看你的消息' },
+  { pattern: '/companies', url: '/companies', marker: touch, featureText: '找企业' },
+  { pattern: '/companies/:id', url: '/companies/company-001', marker: touch, featureText: '青岛示例制造有限公司' },
   // 2026-09-20：招聘会八条路由迁入青序流光共享工作台（稿 28），marker 从 W4 框换成 Qx 框。
   // featureText 按服务台那一轮定下的口径钉**合规诚实性声明**而不是栏目名——
   // 栏目名改两个字就得改夹具，而这几句是迁移里最容易整段丢掉的东西。
-  { pattern: '/job-fairs', url: '/job-fairs', marker: qx, featureText: '预约在来源平台完成。' },
-  { pattern: '/fairs-service', url: '/fairs-service', marker: 'h1:text-is("先看场次，再准备到场")', featureText: '本机不代收简历，也不承诺外部活动结果。' },
-  { pattern: '/job-fairs/checkin', url: '/job-fairs/checkin', marker: qx, featureText: '本机不做签到，也拿不到签到结果。' },
-  { pattern: '/job-fairs/:id', url: '/job-fairs/fair-001', marker: qx, featureText: '2026 青岛高校毕业生招聘会' },
-  { pattern: '/job-fairs/:id/companies', url: '/job-fairs/fair-001/companies', marker: qx, featureText: '本机不代收简历' },
-  { pattern: '/job-fairs/:id/companies/:companyId', url: '/job-fairs/fair-001/companies/fair-company-001', marker: qx, featureText: '青岛示例制造有限公司' },
-  { pattern: '/job-fairs/:id/map', url: '/job-fairs/fair-001/map', marker: qx, featureText: '本机不画推荐路线' },
-  { pattern: '/job-fairs/:id/materials', url: '/job-fairs/fair-001/materials', marker: qx, featureText: '下载链接临时有效' },
-  { pattern: '/job-fairs/:id/visit-plan', url: '/job-fairs/fair-001/visit-plan', marker: qx, featureText: 'AI参会准备单' },
-  { pattern: '/job-fairs/:id/stats', url: '/job-fairs/fair-001/stats', marker: qx, featureText: '真实数据正在接入' },
+  { pattern: '/job-fairs', url: '/job-fairs', marker: touch, featureText: '预约在来源平台完成。' },
+  { pattern: '/fairs-service', url: '/fairs-service', marker: 'h1:text-is("先看哪一场？")', featureText: '本机不代收简历，也不承诺外部活动结果。' },
+  { pattern: '/job-fairs/checkin', url: '/job-fairs/checkin', marker: touch, featureText: '本机不做签到，也拿不到签到结果。' },
+  { pattern: '/job-fairs/:id', url: '/job-fairs/fair-001', marker: touch, featureText: '2026 青岛高校毕业生招聘会' },
+  { pattern: '/job-fairs/:id/companies', url: '/job-fairs/fair-001/companies', marker: touch, featureText: '本机不代收简历' },
+  { pattern: '/job-fairs/:id/companies/:companyId', url: '/job-fairs/fair-001/companies/fair-company-001', marker: touch, featureText: '青岛示例制造有限公司' },
+  { pattern: '/job-fairs/:id/map', url: '/job-fairs/fair-001/map', marker: touch, featureText: '本机不画推荐路线' },
+  { pattern: '/job-fairs/:id/materials', url: '/job-fairs/fair-001/materials', marker: touch, featureText: '下载链接临时有效' },
+  { pattern: '/job-fairs/:id/visit-plan', url: '/job-fairs/fair-001/visit-plan', marker: touch, featureText: 'AI参会准备单' },
+  { pattern: '/job-fairs/:id/stats', url: '/job-fairs/fair-001/stats', marker: touch, featureText: '真实数据正在接入' },
   { pattern: '/resume/self-assessment/intro', url: '/resume/self-assessment/intro', marker: screen('resume-self-assessment-intro'), featureText: '自我探索', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/questions', url: '/resume/self-assessment/questions', marker: screen('resume-self-assessment-quiz'), featureText: '作答', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/result', url: '/resume/self-assessment/result', marker: screen('resume-self-assessment-result'), featureText: '倾向参考', requiresFusionRoot: false },
@@ -205,7 +210,9 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
   { pattern: '/contract-review/result', url: '/contract-review/result', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
   { pattern: '/policy-service', url: '/policy-service', marker: 'h1:text-is("看来源、查条件、备材料")', featureText: 'AI顾问不替主管部门作资格判断。' },
-] as const // 110 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan；2026-09-27 + /official-channels)
+  // 开发样板（非业务屏）。W6 浏览器跑的是生产构建，样板页不挂载，地址回到首页。
+  { pattern: '/dev/touch-gallery', url: '/dev/touch-gallery', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
+] as const // 110 routes (109 + 2026-10-27 开发样板 /dev/touch-gallery)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
 

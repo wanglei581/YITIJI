@@ -9,23 +9,17 @@ import { MemberLoadMore } from './MemberLoadMore'
 import { useCallback, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { JobApplicationItem, MemberBrowseLogItem, MemberJumpLogItem } from '@ai-job-print/shared'
-import {
-  BriefcaseIcon,
-  CalendarDaysIcon,
-  ChevronRightIcon,
-  ClockIcon,
-  EyeIcon,
-  ExternalLinkIcon,
-  FileTextIcon,
-} from 'lucide-react'
 import { getMyBrowseLogs, getMyJumpLogs } from '../../../services/api/activity'
 import { listMyJobApplications } from '../../../services/api/jobApplications'
 import { useAuth } from '../../../auth/useAuth'
 import { useRecruitmentHosting } from '../../../hooks/useRecruitmentHosting'
+import { useSupportContact } from '../../../hooks/useSupportContact'
 import { formatTime } from '../assets/format'
 import { actionLabel, APPLICATION_STATUS_LABEL, detailRoute, TYPE_LABEL } from './activityPresentation'
-import { QxMeGuide, QxMePage, QxMeSummary, recordsCtabar } from './qx/QxMeChrome'
-import { QxMeErrorBlock, QxMeLoadingBlock, QxMeLoginBlock, QxMePendingRow, QxMeStartRow, QxMeStructRow } from './qx/QxMeStateBits'
+import { QxMePage, recordsCtabar } from './qx/QxMeChrome'
+import { QxMeErrorBlock, QxMeLoadingBlock, QxMeLoginBlock } from './qx/QxMeStateBits'
+import { MeBtn, MeP, MeRows, MeSeg } from '../touch/MeKit'
+import { MeEmptyPack, MeExitCard } from '../touch/MeStatePacks'
 import './styles/member-records-qx.css'
 
 type ActivityTab = 'browse' | 'jump' | 'applications'
@@ -44,8 +38,11 @@ export function MyActivityPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { isLoggedIn, getToken } = useAuth()
   const hostingOpen = useRecruitmentHosting().enabled
+  // 求职进度页签由后台开关控制，默认不显示：读不到开关、没配开关都当关。
+  const showJobProgressTab = useSupportContact(isLoggedIn).selfNoteTab
   const [reloadKey, setReloadKey] = useState(0)
-  const tab = getTab(searchParams)
+  const requestedTab = getTab(searchParams)
+  const tab = showJobProgressTab || requestedTab !== 'applications' ? requestedTab : 'browse'
   const setTab = (next: ActivityTab) => {
     if (next === 'applications') setSearchParams({ tab: 'applications' }, { replace: true })
     else setSearchParams(next === 'jump' ? { tab: 'jump' } : {}, { replace: true })
@@ -78,159 +75,118 @@ export function MyActivityPage() {
           ? `${tab}-empty`
           : `${tab}-ready`
 
-  const struct = (
-    <>
-      <QxMeStructRow icon={EyeIcon} title="浏览记录" desc={hostingOpen ? '看过哪些岗位、招聘会与政策' : '看过哪些政策'} mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-0" />
-      <QxMeStructRow icon={ExternalLinkIcon} title="外部跳转记录" desc="打开过哪些来源平台或官方入口" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-1" />
-      <QxMeStructRow icon={ClockIcon} title="记录时间" desc="由系统返回，这台机器上不留存明细" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-2" />
-    </>
-  )
-
+  const tabItems = [
+    { id: 'browse', label: '浏览', testId: 'member-records-activity-tab-browse', aria: '浏览记录' },
+    { id: 'jump', label: '外部跳转', testId: 'member-records-activity-tab-jump', aria: '外部跳转记录' },
+    ...(showJobProgressTab ? [{ id: 'applications', label: '求职进度', testId: 'member-records-activity-tab-applications', aria: '求职进度' }] : []),
+  ]
   const tabs = (
-    <div className="qx-me-tabbar" data-n="3" role="group" aria-label="记录筛选">
-      <button type="button" className="qx-me-tab" aria-current={tab === 'browse' ? 'true' : undefined} data-testid="member-records-activity-tab-browse" onClick={() => setTab('browse')}>
-        浏览记录{tab === 'browse' ? <i>{browse.length}</i> : null}
-      </button>
-      <button type="button" className="qx-me-tab" aria-current={tab === 'jump' ? 'true' : undefined} data-testid="member-records-activity-tab-jump" onClick={() => setTab('jump')}>
-        外部跳转记录{tab === 'jump' ? <i>{jumps.length}</i> : null}
-      </button>
-      <button type="button" className="qx-me-tab" aria-current={tab === 'applications' ? 'true' : undefined} data-testid="member-records-activity-tab-applications" onClick={() => setTab('applications')}>
-        求职进度{tab === 'applications' ? <i>{applications.length}</i> : null}
-      </button>
-    </div>
+    <MeSeg
+      label="记录筛选"
+      current={tab}
+      items={tabItems}
+      onPick={(id) => setTab(id as ActivityTab)}
+    />
   )
 
   let body: ReactNode
   if (!isLoggedIn) {
-    body = <QxMeLoginBlock title="登录后查看本人记录" desc="游客模式不把浏览记录留到下一次使用，也不保存你自己填写的求职进度；这台机器不留存这些明细。" struct={struct} onJobs={() => navigate('/jobs')} onPrint={() => navigate('/print-scan')} />
+    body = <QxMeLoginBlock title="登录后查看本人记录" />
   } else if (state === 'loading') {
     body = <QxMeLoadingBlock title="正在加载本人记录" />
   } else if (state === 'error') {
-    body = <QxMeErrorBlock title="记录这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已有记录不会因为这次失败而消失。" struct={struct} />
+    body = <QxMeErrorBlock onRetry={() => setReloadKey((k) => k + 1)} />
   } else if (tab === 'applications') {
     body = applications.length === 0 ? (
       <>
-        <QxMeSummary tone="clay" icon={<ClockIcon size={32} />} label="求职进度" big={0} desc="由你自己填写；本终端不参与投递，也不掌握来源平台的结果" minis={['进度 0']} />
         {tabs}
-        <section className="qx-me-list qx-me-grow" data-testid="member-records-application-list" aria-label="从这里开始">
-          {hostingOpen ? (
-            <QxMeStartRow icon={BriefcaseIcon} title="先去看岗位" desc="在岗位详情点「去来源平台投递」，回来再记一笔" label="查看岗位" route="/jobs" testid="member-records-start-jobs" onClick={() => navigate('/jobs')} />
-          ) : null}
-          <QxMePendingRow route="/me/activity?tab=applications" testid="member-records-start-manual" title={hostingOpen ? '投了本站没有的岗位？' : '自己记一笔求职进度'} sub="也可以自己填公司与岗位名记一笔 · 手填入口待建设" icon={FileTextIcon} />
-          <div className="qx-me-legal">{hostingOpen ? '在岗位详情页投完之后，从那里把这次投递记进来。' : '求职进度只由你本人填写。'}{pagination.nextCursor ? '已加载的记录中没有这一类，可继续加载较早记录。' : '当前没有这一类记录。'}本页不会替你造进度。</div>
-        </section>
-        <QxMeGuide items={[['怎么产生', '你自己填写', '本终端不会替你自动记录'], ['这里显示什么', '你填的公司、岗位与进度', '来源平台的处理结果本终端不掌握'], ['谁能看到', '只有本人', '不会提供给企业或来源机构']]} />
+        <MeP>求职进度是本人自己填的。手填还在建设，现在不能填。</MeP>
+        <MeBtn v="sec" disabled data-testid="member-records-start-manual">手填入口待建设</MeBtn>
+        <div className="me-state" data-testid="member-records-application-list">
+          <MeP>{hostingOpen ? '在岗位详情页投完之后，从那里把这次投递记进来。' : '求职进度只由你本人填写。'}{pagination.nextCursor ? '已加载的记录中没有这一类，可继续加载较早记录。' : '当前没有这一类记录。'}本页不会替你造进度。</MeP>
+          <div className="me-stack">
+            <MeExitCard art="checklist" artWidth={120} title="查看政策" desc="进度不能填的时候，可以先看政策" onClick={() => navigate('/policy-service')} />
+          </div>
+        </div>
       </>
     ) : (
       <>
-        <QxMeSummary tone="clay" icon={<ClockIcon size={32} />} label="求职进度" big={applications.length} desc="全部由你自己填写；本终端不参与投递，也不掌握来源平台的结果" minis={[`进度 ${applications.length}`]} />
         {tabs}
-        <section className="qx-me-list qx-me-grow" data-testid="member-records-application-list" aria-label="求职进度">
+        <MeRows few={applications.length < 5} testId="member-records-application-list" label="求职进度">
           {applications.map((item) => (
-            <div key={item.id} className="qx-me-row" data-testid={`member-records-application-${item.id}`} data-status-source={item.statusSource}>
-              <span className="qx-me-row-ico" data-tone="clay" aria-hidden="true"><BriefcaseIcon size={28} /></span>
-              <span className="qx-me-row-main">
-                <span className="qx-me-row-head">
-                  <span className="qx-me-row-title">{item.positionTitle} · {item.companyName}</span>
-                  <span className="qx-me-chip qx-me-self">本人自填</span>
-                  <span className="qx-me-st">{APPLICATION_STATUS_LABEL[item.status]}</span>
-                </span>
-                <span className="qx-me-row-sub">
-                  {item.selfReportedAt ? `你填写的投递时间 ${formatTime(item.selfReportedAt)}` : '尚未填写投递时间'}
-                </span>
-              </span>
+            <div key={item.id} className="me-static" data-testid={`member-records-application-${item.id}`} data-status-source={item.statusSource}>
+              <b>{item.positionTitle} · {item.companyName}</b>
+              <small>
+                <span className="qx-me-chip qx-me-self">本人自填</span> {APPLICATION_STATUS_LABEL[item.status]}
+              </small>
+              <small>{item.selfReportedAt ? `你填写的投递时间 ${formatTime(item.selfReportedAt)}` : '尚未填写投递时间'}</small>
             </div>
           ))}
-          <div className="qx-me-legal">求职进度<b>由你本人填写，仅你可见</b>；本终端不参与投递，也不掌握来源平台的处理结果，更不会把这些记录提供给企业或来源机构。</div>
-        </section>
+        </MeRows>
+        <MeP>求职进度<b>由你本人填写，仅你可见</b>；本终端不参与投递，也不掌握来源平台的处理结果，更不会把这些记录提供给企业或来源机构。</MeP>
       </>
     )
   } else if (empty) {
     const browseTab = tab === 'browse'
     body = (
       <>
-        <QxMeSummary tone="slate" icon={<ClockIcon size={32} />} label="访问足迹" big={0} desc="只记录浏览与打开来源入口动作，不记录投递或预约结果" minis={[browseTab ? '浏览 0' : '跳转 0']} />
         {tabs}
-        <section className="qx-me-list qx-me-grow" aria-label={browseTab ? '从这里开始浏览' : '从这里打开来源入口'}>
-          {!hostingOpen ? (
-            <>
-              <QxMeStartRow icon={FileTextIcon} tone="slate" title={browseTab ? '看看就业政策' : '打开政策的官方入口'} desc={browseTab ? '政策、社保与登记指引，浏览动作会记在这里' : '在政策详情里打开发布方的官方入口'} label="查看政策" route="/policy-service" testid="member-records-start-policy" onClick={() => navigate('/policy-service')} />
-              {browseTab
-                ? <QxMeStartRow icon={FileTextIcon} tone="plum" title="先做一份简历" desc="诊断或生成一份简历，当场打印带走" label="去简历服务" route="/resume-service" testid="member-records-start-resume" onClick={() => navigate('/resume-service')} />
-                : <QxMeStartRow icon={EyeIcon} tone="slate" title="先看看浏览记录" desc="浏览与打开官方入口是两类记录，分开保存" label="切到浏览记录" route="/me/activity" testid="member-records-start-browse" onClick={() => setTab('browse')} />}
-            </>
-          ) : browseTab ? (
-            <>
-              <QxMeStartRow icon={BriefcaseIcon} title="看看第三方岗位" desc="浏览来源平台或机构发布的岗位，浏览动作会记在这里" label="查看岗位" route="/jobs" testid="member-records-start-jobs" onClick={() => navigate('/jobs')} />
-              <QxMeStartRow icon={CalendarDaysIcon} tone="wheat" title="看看招聘会" desc="查看官方或主办方发布的招聘会信息" label="查看招聘会" route="/job-fairs" testid="member-records-start-fairs" onClick={() => navigate('/job-fairs')} />
-              <QxMeStartRow icon={FileTextIcon} tone="plum" title="先做一份简历" desc="诊断或生成之后再去看岗位会更有针对性" label="去简历服务" route="/resume-service" testid="member-records-start-resume" onClick={() => navigate('/resume-service')} />
-            </>
-          ) : (
-            <>
-              <QxMeStartRow icon={BriefcaseIcon} title="打开岗位的来源入口" desc="在岗位详情里点「去来源平台投递」或「扫码投递」" label="查看岗位" route="/jobs" testid="member-records-start-jobs" onClick={() => navigate('/jobs')} />
-              <QxMeStartRow icon={CalendarDaysIcon} tone="wheat" title="打开招聘会的官方入口" desc="在招聘会详情里点「去来源平台预约」或「扫码预约」" label="查看招聘会" route="/job-fairs" testid="member-records-start-fairs" onClick={() => navigate('/job-fairs')} />
-              <QxMeStartRow icon={EyeIcon} tone="slate" title="先看看浏览记录" desc="浏览与打开来源入口是两类记录，分开保存" label="切到浏览记录" route="/me/activity" testid="member-records-start-browse" onClick={() => setTab('browse')} />
-            </>
-          )}
-          <div className="qx-me-legal">
-            {browseTab
-              ? <>{hostingOpen ? '浏览岗位 / 招聘会 / 政策 / 企业之后' : '浏览政策之后'}，这里会出现你的浏览记录。{pagination.nextCursor ? '已加载的记录中没有这一类，可继续加载较早记录。' : '当前没有这一类记录。'}本页不会造记录让页面好看。</>
-              : <>打开来源平台或官方入口之后，这里会出现记录。<b>是否投递、是否预约得成由来源平台决定，本系统不记录也不参与。</b></>}
-          </div>
-        </section>
-        <QxMeGuide items={[['怎么产生', '浏览或打开来源入口', '这两个动作分开记录'], ['这里显示什么', '动作本身', '不记录投递、预约或签到结果'], ['谁能看到', '只有本人', '退出后本机不留明细']]} />
+        <div className="me-state" data-testid="qx-me-fallback">
+          <MeEmptyPack sentence={browseTab ? '这里还没有记录。只记你在这台机器上浏览和打开的来源。' : '打开来源平台或官方入口之后，这里会出现记录。是否投递、是否预约得成由来源平台决定，本系统不记录也不参与。'}>
+            {hostingOpen ? (
+              <>
+                <MeExitCard art="checklist" artWidth={120} title="查看岗位" desc="在岗位详情里点「去来源平台投递」或「扫码投递」" testId="member-records-start-jobs" onClick={() => navigate('/jobs')} />
+                <MeExitCard art="stack" artWidth={110} title="查看招聘会" desc="在招聘会详情里点「去来源平台预约」或「扫码预约」" testId="member-records-start-fairs" onClick={() => navigate('/job-fairs')} />
+              </>
+            ) : (
+              <>
+                <MeExitCard art="checklist" artWidth={120} title="查看政策" desc="看本机构发布的就业政策" testId="member-records-start-policy" onClick={() => navigate('/policy-service')} />
+                <MeExitCard art="usb" artWidth={120} title="去打印" desc="打印和扫描现在就能办" onClick={() => navigate('/print-scan')} />
+              </>
+            )}
+          </MeEmptyPack>
+        </div>
       </>
     )
   } else {
     body = (
       <>
-        <QxMeSummary
-          tone="slate"
-          icon={<ClockIcon size={32} />}
-          label="已加载访问足迹"
-          big={browse.length + jumps.length}
-          desc="只记录浏览与打开来源入口动作，不记录投递或预约结果"
-          minis={[tab === 'browse' ? `浏览 ${browse.length}` : `跳转 ${jumps.length}`, pagination.nextCursor ? '可加载较早记录' : '已加载全部可见记录']}
-        />
         {tabs}
-        <section className="qx-me-list qx-me-grow" data-testid="member-records-list" aria-label="浏览与跳转记录">
+        <MeRows few={(tab === 'browse' ? browse : jumps).length < 7} testId="member-records-list" label="浏览与跳转记录">
           {tab === 'browse'
             ? browse.map((it) => (
               <button
                 key={it.id}
                 type="button"
-                className="qx-me-row"
+                className="me-line"
                 data-activity-kind="browse"
                 data-testid={`member-records-activity-${it.id}`}
                 onClick={() => navigate(detailRoute(it.targetType, it.targetId, it.externalId))}
               >
-                <span className="qx-me-row-ico" data-tone="slate" aria-hidden="true"><EyeIcon size={28} /></span>
-                <span className="qx-me-row-main">
-                  <span className="qx-me-row-title">{it.targetTitle ?? `${TYPE_LABEL[it.targetType]}详情`}</span>
-                  <span className="qx-me-row-sub">浏览 · {TYPE_LABEL[it.targetType]}{it.sourceName ? ` · ${it.sourceName}` : ''} · {formatTime(it.createdAt)}</span>
-                </span>
-                <span className="qx-me-row-go" aria-hidden="true"><ChevronRightIcon size={22} /></span>
+                <b>{it.targetTitle ?? `${TYPE_LABEL[it.targetType]}详情`}</b>
+                <small>浏览 · {TYPE_LABEL[it.targetType]}{it.sourceName ? ` · ${it.sourceName}` : ''} · {formatTime(it.createdAt)}</small>
               </button>
             ))
             : jumps.map((it) => (
               <button
                 key={it.id}
                 type="button"
-                className="qx-me-row"
+                className="me-line"
                 data-activity-kind="jump"
                 data-testid={`member-records-activity-${it.id}`}
                 onClick={() => navigate(detailRoute(it.targetType, it.targetId, it.externalId))}
               >
-                <span className="qx-me-row-ico" aria-hidden="true"><ExternalLinkIcon size={28} /></span>
-                <span className="qx-me-row-main">
-                  <span className="qx-me-row-title">{it.targetTitle ?? `${TYPE_LABEL[it.targetType]}详情`}</span>
-                  <span className="qx-me-row-sub">打开{actionLabel(it.action, it.targetType)} · {TYPE_LABEL[it.targetType]} · {formatTime(it.createdAt)}</span>
-                </span>
-                <span className="qx-me-row-go" aria-hidden="true"><ChevronRightIcon size={22} /></span>
+                <b>{it.targetTitle ?? `${TYPE_LABEL[it.targetType]}详情`}</b>
+                <small>打开{actionLabel(it.action, it.targetType)} · {TYPE_LABEL[it.targetType]} · {formatTime(it.createdAt)}</small>
               </button>
             ))}
-          <div className="qx-me-legal">仅记录本人浏览与打开来源入口的行为；投递 / 预约结果以来源平台为准，本系统不记录</div>
-        </section>
+        </MeRows>
+        {(tab === 'browse' ? browse : jumps).length < 7 ? (
+          <div className="me-stack">
+            <MeExitCard art="checklist" artWidth={110} title={hostingOpen ? '查看岗位' : '查看政策'} desc={hostingOpen ? '在岗位详情里点「去来源平台投递」或「扫码投递」' : '看本机构发布的就业政策'} onClick={() => navigate(hostingOpen ? '/jobs' : '/policy-service')} />
+            <MeExitCard art="usb" artWidth={110} title="去打印" desc="打印和扫描现在就能办" onClick={() => navigate('/print-scan')} />
+          </div>
+        ) : null}
       </>
     )
   }
@@ -244,12 +200,13 @@ export function MyActivityPage() {
       view="activity"
       screen="member-list"
       screenState={`activity-${uiState}`}
-      eyebrow="我的足迹"
-      ask={<>看过什么、去过哪个来源、自己记了哪些进度，<em>都能回看</em>。</>}
-      doing={<>浏览与跳转只记录<b>动作本身</b>；求职进度<b>由你自己填写</b>。</>}
-      truth={tab === 'applications'
-        ? '本终端不参与投递，也不掌握来源平台的处理结果；求职进度仅你可见，不会提供给企业或来源机构。'
-        : '本终端不参与投递，也不掌握来源平台的处理结果；求职进度仅你可见，不会提供给企业或来源机构。'}
+      eyebrow="我的 · 浏览记录"
+      sub={showJobProgressTab
+        ? '看过什么、去过哪个来源、自己记了哪些进度，都能回看'
+        : '只记录浏览和打开，不记录你在别的平台办了什么'}
+      fine={showJobProgressTab
+        ? '仅记录本人浏览与打开来源入口的行为；投递 / 预约结果以来源平台为准，本系统不记录。本终端不参与投递，也不掌握来源平台的处理结果；求职进度仅你可见，不会提供给企业或来源机构。离开 3 分钟没操作会自动退出。'
+        : '只记录你在这台机器上看过的政策。投递 / 预约结果以来源平台为准，本系统不记录。离开 3 分钟没操作会自动退出。'}
       ctabar={recordsCtabar(uiState === 'login' || uiState === 'loading' || uiState === 'error' ? uiState : 'ready', navigate, () => setReloadKey((k) => k + 1), loginFrom, primaryLabel, primaryGo)}
     >
       {body}

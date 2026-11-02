@@ -107,14 +107,21 @@ if (/工作人员/.test(hookSrc)) fail('useTerminalDeviceStatus 不许出现「�
 else pass('useTerminalDeviceStatus 不把人引向现场工作人员')
 const hubPageSrc = read('src/pages/print-scan/PrintScanHomePage.tsx')
 expectMatches(hubPageSrc, /device\.printer\.errorCode === 'paperEmpty'/, 'W-117 缺纸单独识别，不归入离线文案')
-expectMatches(hubPageSrc, /打印机缺纸，请找现场工作人员加纸/, 'W-117 缺纸提示加纸出路')
-expectMatches(hubPageSrc, /打印机异常，请找现场工作人员检查/, 'W-117 真实异常不说成离线')
+// 2026-10-28 触屏版第 5 版（稿 print / st-device-off）：状态由顶栏胶囊和卡片角标各说一次，提醒条只留标准句。
+// 离线与异常的区别由真实设备状态词（device.printerLabel）承担，不再各写一句话；缺纸另有一版面（paperOff）。
+// 断言随之改指新结构，强度不变：状态词写死、缺纸说明被删、求助不走服务电话，仍然会红。
+expectMatches(
+  hubPageSrc,
+  /label:\s*device\.printerLabel,\s*notice:\s*machineCannotPrintLine\(contact\)/,
+  'W-117 离线与异常的状态词取自真实设备状态，求助走服务电话（不找现场工作人员）',
+)
+expectMatches(hubPageSrc, /paperOff\s*=\s*hubState === 'device-off' && device\.printer\.errorCode === 'paperEmpty'/, 'W-117 缺纸只在确定缺纸时单独成版面，异常与离线不冒充缺纸')
 const hubView = read('src/pages/print-scan/components/QxPrintHubView.tsx')
-expectMatches(hubView, /capabilities\.filter\(\(item\) => item\.actionable/, 'W-117 提示条只声明真可用的服务')
-expectMatches(hubView, /usableServices=.*usableServices/, 'W-117 可用服务进入设备异常提示条')
+expectMatches(hubView, /打印机缺纸，这次出不了纸/, 'W-117 缺纸单独说明（稿 st-device-off）')
+expectMatches(hubView, /transferCaps\.some\(\(item\) => item\.actionable\)/, 'W-117 「先传、稍后打印」只在传文件类入口真可用时才出现')
 const uploadSrc = read('src/pages/print/PrintUploadPage.tsx')
 const homeDomainSrc = read('src/pages/home/homeDomainStatus.ts')
-const homeViewSrc = read('src/pages/home/components/QxHomeView.tsx')
+const homeViewSrc = read('src/pages/home/components/HomeTouchView.tsx')
 for (const status of ['queue_cleanup_failed', 'queue_pause_failed']) {
   const marker = `case '${status}':`
   const idx = hookSrc.indexOf(marker)
@@ -229,6 +236,42 @@ expectNotMatches(
   'HomePage 不得再次启动独立设备状态轮询',
 )
 expectNotMatches(homeSrc, /function KioskTopBar/, 'HomePage 不再自绘顶栏（设备态由共享壳展示）')
+// 10/29 本机走查 I-31：首页对「打印机离线」「服务断了」不预告。壳层那一个 hook 读得更勤、请求有超时、
+// 读不到就如实标 requestFailed；首页只递「马上重读」的信号（不自己起轮询），页头与打印磁贴在读不到时写「服务暂时连不上」，
+// 并且不再说「上传与文件加工仍可用」（服务断了它们一样走不通）。
+expectMatches(hookSrc, /const REFRESH_MS = 20_000/, 'hook 轮询 20 秒一次（原 60 秒：打印机掉线要等一分钟首页才知道）')
+expectMatches(hookSrc, /const REQUEST_TIMEOUT_MS = 8_000/, 'hook 一次读状态最长等 8 秒，不回就当连不上')
+expectMatches(
+  hookSrc,
+  /window\.setTimeout\(\(\) => request\.abort\(\), REQUEST_TIMEOUT_MS\)/,
+  'hook 的超时真的会中断这次请求（不是只定义了常量）',
+)
+expectMatches(
+  hookSrc,
+  /catch \{[\s\S]{0,400}requestFailed: true/,
+  '请求失败（网络不通、超时）标 requestFailed:true，不冒充「打印机离线」',
+)
+expectMatches(hookSrc, /export function requestDeviceStatusRefresh\(\): void/, 'hook 导出「马上重读」信号')
+expectMatches(
+  homeSrc,
+  /import \{ requestDeviceStatusRefresh, type TerminalDeviceStatusView \} from '\.\.\/\.\.\/hooks\/useTerminalDeviceStatus'[\s\S]*useEffect\(\(\) => \{\s*requestDeviceStatusRefresh\(\)\s*\}, \[\]\)/,
+  'HomePage 一挂上就递「马上重读」信号（人从别的页回来不等下一次轮询）',
+)
+expectMatches(
+  homeSrc,
+  /device\.requestFailed\s*\? \{ tone: 'warn' as const, label: '服务暂时连不上' \}/,
+  'HomePage 读状态的请求没回来时页头写「服务暂时连不上」',
+)
+expectMatches(
+  homeViewSrc,
+  /const serviceDown = !device\.loading && device\.requestFailed === true/,
+  '打印磁贴按 requestFailed 判服务连不上',
+)
+expectMatches(
+  homeDomainSrc,
+  /if \(input\.serviceDown\) \{\s*return \{\s*note: '服务暂时连不上 · 打印、扫描和传文件暂不开放'/,
+  '服务连不上时打印磁贴说「打印、扫描和传文件暂不开放」（不沿用「上传与文件加工仍可用」）',
+)
 expectMatches(
   warmOverrideSrc,
   /\.dc-dot\[data-state='ready'\]/,

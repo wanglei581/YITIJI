@@ -170,7 +170,7 @@ export class MaterialsService {
     const kind = dto.kind as MaterialTaskKind
     const now = new Date()
     const requesterMode = requester.kind === 'member' ? 'member' : 'anonymous'
-    const accessToken = requesterMode === 'anonymous' ? randomBytes(24).toString('hex') : undefined
+    const accessToken = !sourceFile.endUserId ? randomBytes(24).toString('hex') : undefined
     const params = sanitizeParams(dto.params ?? {}, kind)
     assertSupportedTaskParams(kind, params)
     const paramsJson = JSON.stringify(params)

@@ -17,6 +17,8 @@
 // ============================================================
 
 import { useEffect, useMemo, useState } from 'react'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useIdleTimer } from '../../hooks/useIdleTimer'
@@ -84,6 +86,7 @@ export function EligibilityPanel({
   ctaHost: HTMLElement | null
   onTab: (tab: TabKey) => void
 }) {
+  const supportContact = useSupportContact()
   const [phase, setPhase] = useState<Phase>({ s: 'loading' })
   /** 作答只放 React state：不写 localStorage / sessionStorage / URL query。 */
   const [answers, setAnswers] = useState<Record<string, string>>({})
@@ -131,7 +134,7 @@ export function EligibilityPanel({
     } else if (phase.s === 'error') {
       onChrome({ tone: 'bad', label: '核对未成功', subtitle: '这次没有拿到结果，本页不显示任何结论。' })
     } else if (phase.s === 'result') {
-      onChrome({ tone: 'ok', label: '逐条结果已返回', subtitle: '总体说明与逐条判定都按返回内容原样显示。' })
+      onChrome({ tone: 'ok', label: '仅供对照', subtitle: '不是资格认定。能不能办，以经办窗口审核为准。' })
     } else if (submitting) {
       onChrome({ tone: 'unknown', label: '正在等待比对结果', subtitle: '等结果返回；本机不猜结论。' })
     } else if (answeredCount > 0) {
@@ -174,8 +177,8 @@ export function EligibilityPanel({
             <ScaleIcon className="h-6 w-6" aria-hidden="true" />
             按政策原文逐条比对
           </button>
-          <span id="k8-elig-probe-why" className="why">{PROBE_WHY}</span>
         </CtaSlot>
+        <p id="k8-elig-probe-why" className="rq-touch-hint why">{PROBE_WHY}</p>
         <EligibilityStepBar step={1} />
         {/* 稿 48 eligibility-probing 的状态卡与两句说明；检查的这一会儿，和本页读取中一样给三条不用等的出口
             （稿 48 loading 的做法），余高分在各段之间，不放大字。 */}
@@ -217,7 +220,7 @@ export function EligibilityPanel({
         onTab={onTab}
         kind="backend-required"
         title="本机现在做不了条件核对"
-        body="本机暂时连不上政策服务。要问什么、怎么判定，都要由政策服务提供，本机不会自己编一套问项或结论。请联系现场工作人员后再试。"
+        body={`本机暂时连不上政策服务。要问什么、怎么判定，都要由政策服务提供，本机不会自己编一套问项或结论。${supportContact.servicePhone ? `${helpNeededLine(supportContact)}。` : ''}`}
       />
     )
   }
@@ -257,7 +260,6 @@ export function EligibilityPanel({
   return (
     <div className="k8-elig">
       <CtaSlot host={ctaHost}>
-        <span className="rq-cta-count">已填 <b>{answeredCount} / {total}</b> 项</span>
         {/*
           置灰用 aria-disabled + 点击短路 + 常显原因 + aria-describedby，
           **不用原生 disabled**：27 寸触摸屏没有 hover，title 永不显示；
@@ -280,11 +282,6 @@ export function EligibilityPanel({
           {submitting ? '正在比对…' : '按政策原文逐条比对'}
           <ArrowRightIcon className="h-6 w-6" aria-hidden="true" />
         </button>
-        {enough ? (
-          <span className="why">{PARTIAL_WHY}</span>
-        ) : (
-          <span id="k8-elig-submit-why" className="why">{SUBMIT_WHY}</span>
-        )}
       </CtaSlot>
       <EligibilityStepBar step={1} />
 
@@ -329,6 +326,12 @@ export function EligibilityPanel({
         ))}
       </div>
 
+      <p className="rq-cta-count">已填 <b>{answeredCount} / {total}</b> 项</p>
+      {enough ? (
+        <p className="rq-touch-hint why">{PARTIAL_WHY}</p>
+      ) : (
+        <p id="k8-elig-submit-why" className="rq-touch-hint why">{SUBMIT_WHY}</p>
+      )}
       <p className="k8-elig-disclaimer">{questions.disclaimer}</p>
     </div>
   )
@@ -367,8 +370,8 @@ function NoticeBlock({
           <RotateCcwIcon className="h-6 w-6" aria-hidden="true" />
           重新检查
         </button>
-        <span className="why">{RETRY_WHY}</span>
       </CtaSlot>
+      <p className="rq-touch-hint why">{RETRY_WHY}</p>
       <EligibilityStepBar step={1} />
       <RqDeadEnd
         tone={look.tone}

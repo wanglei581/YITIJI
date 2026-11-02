@@ -75,7 +75,7 @@ async function enterDiagnoseSource(page: Page, journey: string, collectors: Retu
     page, journey, step: 'hub-diagnose', control: 'AI简历诊断', selectorHint: 'button:AI简历诊断',
     kind: 'click', collectors,
     act: async () => {
-      await page.getByRole('button', { name: /AI简历诊断/ }).click()
+      await page.getByRole('button', { name: '有，帮我改一改' }).click()
       await page.waitForURL((url) => url.pathname === '/resume/source', { timeout: 15_000 })
     },
   })
@@ -88,7 +88,11 @@ async function startDiagnosis(page: Page, journey: string, collectors: ReturnTyp
     page, journey, step: 'start-diagnosis', control: '开始 AI 诊断', selectorHint: 'button:开始 AI 诊断',
     kind: 'click', collectors,
     act: async () => {
-      await page.getByRole('button', { name: /开始 AI 诊断/ }).click()
+      const start = page.getByRole('button', { name: '开始 AI 诊断', exact: true })
+      if (!(await start.isVisible().catch(() => false))) {
+        await page.getByRole('button', { name: '下一步：诊断方向', exact: true }).click()
+      }
+      await start.click()
       await page.waitForURL((url) => url.pathname === '/resume/parse' || url.pathname === '/resume/report', { timeout: 20_000 })
     },
   })
@@ -311,25 +315,31 @@ test('J2 匿名 · 诊断→对照→应用弹层两分支→四种导出 @inter
       })
     }
 
-    const formats = ['PDF', 'Word', 'TXT', 'Markdown'] as const
+    // 触屏版：编辑区「去导出」→ 核对事实 → 进导出页，再逐个选格式、点「导出」才出文件。
+    await recordStep({
+      page, journey, step: 'to-export', control: '去导出', selectorHint: 'button:去导出',
+      kind: 'click', collectors,
+      act: async () => {
+        await page.getByRole('button', { name: '去导出', exact: true }).click()
+        await confirmFactsIfOpen(page, journey, collectors)
+      },
+    })
+    const formats = ['PDF', 'DOCX', 'TXT', 'MD'] as const
     for (const format of formats) {
       await closePreviewIfOpen(page)
       await recordStep({
-        page, journey, step: `format-${format}`, control: format, selectorHint: `.qx-rd-fmt >> ${format}`,
+        page, journey, step: `format-${format}`, control: format, selectorHint: `[aria-label=导出格式] >> ${format}`,
         kind: 'click', collectors,
         act: async () => {
-          const btn = page.locator('.qx-rd-fmt button', { hasText: new RegExp(`^${format}$`) })
+          const btn = page.getByRole('group', { name: '导出格式' }).getByRole('button', { name: new RegExp(`^${format}`) })
           if (await btn.count()) await btn.first().click()
         },
       })
       await recordStep({
-        page, journey, step: `export-${format}`, control: `导出 ${format}`, selectorHint: `.qx-rd-export-actions >> 导出 ${format}`,
+        page, journey, step: `export-${format}`, control: `导出 ${format}`, selectorHint: 'button:导出',
         kind: 'click', collectors,
         act: async () => {
-          const exportBtn = page.locator('.qx-rd-export-actions .qx-btn').filter({ hasText: `导出 ${format}` })
-          if (await exportBtn.count()) await exportBtn.first().click()
-          else await page.getByRole('button', { name: `导出 ${format}` }).click()
-          await confirmFactsIfOpen(page, journey, collectors)
+          await page.getByRole('button', { name: '导出', exact: true }).click()
           await page.waitForTimeout(800)
           await closePreviewIfOpen(page)
         },
@@ -542,16 +552,18 @@ test('会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interacti
     }
     expect(page.url(), '会员未走到优化页').toContain('/resume/optimize')
     {
-      // 稿 23（2.0）：有可对照的条目时先落在建议总览（点「编辑并导出」进编辑区），没有条目时直接是编辑区。
+      // 触屏版（稿 optimize → resume-edit → resume-export）：有可对照的条目时先落在建议总览（点「编辑简历」进编辑区），
+      // 没有条目时直接是编辑区；编辑区点「去导出」→ 核对事实 → 导出页选格式 → 点「导出」才出文件。
       // 先等两者之一真的出现，再决定点不点，不靠一次不等待的 count()。
-      const toEditor = page.getByRole('button', { name: '编辑并导出', exact: true })
-      const exportBtn = page.getByRole('button', { name: /确认优化版，导出 PDF|导出 PDF/ })
-      await expect(toEditor.or(exportBtn).first()).toBeVisible({ timeout: 15_000 })
+      const toEditor = page.getByRole('button', { name: '编辑简历', exact: true })
+      const toExport = page.getByRole('button', { name: '去导出', exact: true })
+      await expect(toEditor.or(toExport).first()).toBeVisible({ timeout: 15_000 })
       if (await toEditor.isVisible()) await toEditor.click()
-      expect(await exportBtn.count(), '优化页没有导出按钮 —— 会员导出闭环无法验证').toBeGreaterThan(0)
+      expect(await toExport.count(), '优化页没有导出入口 —— 会员导出闭环无法验证').toBeGreaterThan(0)
       {
-        await exportBtn.first().click()
+        await toExport.first().click()
         await confirmFactsIfOpen(page, journey, collectors)
+        await page.getByRole('button', { name: '导出', exact: true }).click()
         await page.waitForTimeout(1200)
         await closePreviewIfOpen(page)
       }

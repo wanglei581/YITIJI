@@ -1852,7 +1852,8 @@ const api = {
   createContractReview(payload) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
     // 建任务要落库并校验同意快照，15 秒默认值偏紧。
-    return request('/contract-reviews', { method: 'POST', data: payload, needAuth: true, timeout: config.aiTimeout });
+    // ai: 'generate'：和别的 AI 功能一样，先过未满 14 周岁的声明（服务端这条是 @AiUse('generate')）。
+    return request('/contract-reviews', { method: 'POST', data: payload, needAuth: true, timeout: config.aiTimeout, ai: 'generate' });
   },
 
   /**
@@ -1876,7 +1877,7 @@ const api = {
   confirmContractReview(id, payload) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
     return request(`/contract-reviews/${encodeURIComponent(id)}/confirm`, {
-      method: 'POST', data: payload, needAuth: true,
+      method: 'POST', data: payload, needAuth: true, ai: 'generate',
       // 确认后服务端要做状态机切换与入队，实测会超过 15 秒默认值。
       timeout: config.aiTimeout,
     });
@@ -2072,5 +2073,19 @@ api.appendSelfAssessmentToResume = function appendSelfAssessmentToResume(taskId,
     needAuth: true,
     timeout: 60000,
     ai: 'generate',
+  });
+};
+
+/**
+ * 公开服务电话。不登录。terminalId 为空就不带查询参数。
+ * 后端: GET /api/v1/public/support-contact
+ */
+api.getSupportContact = function getSupportContact(terminalId) {
+  if (config.USE_MOCK) return Promise.reject(mockUnavailable('服务电话'));
+  const ref = typeof terminalId === 'string' ? terminalId.trim() : '';
+  // 路径必须是字面量：契约门禁只抽 request('…') / request(`…`)，变量拼出来的路径会被漏掉。
+  if (!ref) return request('/public/support-contact', { method: 'GET', needAuth: false });
+  return request(`/public/support-contact?terminalId=${encodeURIComponent(ref)}`, {
+    method: 'GET', needAuth: false,
   });
 };

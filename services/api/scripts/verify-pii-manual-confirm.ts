@@ -41,7 +41,7 @@ async function main(): Promise<void> {
   const { MaterialsService } = await import('../src/materials/materials.service')
   const { MaterialsManualConfirmationService, PII_MANUAL_CONFIRMABLE_MODES } = await import('../src/materials/materials-manual-confirmation.service')
   const { assertPiiScanned, PII_SCAN_INCOMPLETE_MODES } = await import('../src/print-jobs/pii-scan-gate')
-  const { hashAccessToken } = await import('../src/materials/materials.access')
+  const { hashAccessToken, assertCanAccessTask } = await import('../src/materials/materials.access')
 
   const prisma = new PrismaService()
   await prisma.onModuleInit()
@@ -103,6 +103,8 @@ async function main(): Promise<void> {
       check('审计写不进：确认失败，库里不留「已确认」（整体回滚）',
         !rejected.ok && !String(after.resultJson).includes('manualConfirmedAt'), `${describe(rejected)} ${after.resultJson}`)
     }
+    const memberTokenRead = await outcome(() => materials.getTask(t1.task.id, { kind: 'member', endUserId: `verify-pii-member-${suffix}`, accessToken: t1.token }))
+    check('会员凭有效令牌读取已有匿名任务', memberTokenRead.ok, describe(memberTokenRead))
     const intruder = await outcome(() => confirm.confirm(t1.task.id, { kind: 'anonymous', accessToken: 'someone-else' }))
     check('别人的任务令牌不能替本人确认（403）', !intruder.ok && intruder.status === 403, describe(intruder))
     for (const mode of ['partial', 'unsupported_format']) {
@@ -249,10 +251,25 @@ async function main(): Promise<void> {
     await confirm.confirm(firstScan.id, { kind: 'anonymous', accessToken: firstScan.accessToken })
     const secondScan = await dedupe.createTask(touchedDto, anon)
     check('窗口内但前一条已被本人确认过：新建一条，不复用', secondScan.id !== firstScan.id, `${firstScan.id}/${secondScan.id}`)
-    // 去重按请求方分开：会员请求不能拿到匿名任务（连同它的访问口令）。
-    const asMember = await outcome(() => dedupe.createTask(dto, { kind: 'member', endUserId: `verify-pii-member-${suffix}` }))
-    check('窗口内换一个请求方：不复用匿名任务，也拿不到它的访问口令',
-      !asMember.ok || ((asMember.value as { id: string; accessToken?: string }).id !== d1.id && (asMember.value as { accessToken?: string }).accessToken === undefined), describe(asMember))
+    // 会员与游客分别建任务；无归属任务只凭对应令牌访问。
+    const member = { kind: 'member' as const, endUserId: `verify-pii-member-${suffix}` }
+    const asMember = await outcome(() => dedupe.createTask(dto, member))
+    const memberTask = asMember.ok ? asMember.value as { id: string; accessToken?: string; endUserId: string | null } : null
+    check('会员对匿名源文件建任务：独立任务有令牌且无归属', !!memberTask?.accessToken && memberTask.id !== d1.id && memberTask.endUserId === null, describe(asMember))
+    if (memberTask?.accessToken) {
+      const authorized = { ...member, accessToken: memberTask.accessToken }
+      const read = await outcome(() => dedupe.getTask(memberTask.id, authorized))
+      const use = await outcome(() => confirm.confirm(memberTask.id, authorized))
+      check('会员凭令牌读并使用匿名任务', read.ok && use.ok, `${describe(read)} / ${describe(use)}`)
+      for (const accessToken of [undefined, 'wrong-token']) {
+        const denied = await outcome(() => dedupe.getTask(memberTask.id, { ...member, accessToken }))
+        check(`会员${accessToken ? '带错令牌' : '不带令牌'}访问匿名任务被拒`, !denied.ok && denied.status === 403, describe(denied))
+      }
+    } else {
+      check('会员凭令牌读并使用匿名任务', false, '建任务未返回令牌')
+    }
+    const ownedDenied = await outcome(async () => assertCanAccessTask({ endUserId: 'other-owner' }, { ...member, accessToken: 'wrong-token' }))
+    check('有归属任务拒绝其他会员', !ownedDenied.ok && ownedDenied.status === 403, describe(ownedDenied))
     const missing = { kind: 'pii_scan', sourceFileId: `no-such-file-${suffix}` } as never
     const m1 = await outcome(() => dedupe.createTask(missing, anon)); const m2 = await outcome(() => dedupe.createTask(missing, anon))
     check('建任务失败不留在去重表里（两次都如实报错）', !m1.ok && !m2.ok && ![...(dedupe as unknown as { recentPiiScans: Map<string, unknown> }).recentPiiScans.keys()].some((key) => key.includes('no-such-file')))

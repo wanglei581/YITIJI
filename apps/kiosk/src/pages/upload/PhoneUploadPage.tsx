@@ -1,5 +1,6 @@
 import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
 import './phone-upload-service-desk.css'
+import './phone-upload-touch.css'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import {
@@ -17,6 +18,7 @@ import {
   UploadIcon,
   type LucideIcon,
 } from 'lucide-react'
+import { PLATFORM_BRAND_NAME } from '../../copy/miniappLinkCopy'
 import { uploadPhoneSessionFile, uploadSessionUserMessage } from '../../services/api/uploadSessions'
 import {
   useDocumentConversionCapabilities,
@@ -32,17 +34,16 @@ import {
   type Tone,
   type TypeIssue,
   type UploadState,
-  SESSION_PURPOSES,
   UPLOAD_STEPS,
   chromeCopy,
   classifyUploadError,
   extLabel,
   extOf,
   formatSize,
-  genericPolicy,
   isSessionPurpose,
   linkIssueOf,
   pickerCopy,
+  preUploadPolicy,
   precheck,
   receiptOf,
   retainFacts,
@@ -57,6 +58,8 @@ import {
 const BASE_RESUME_ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp'
 const BASE_PRINT_DOC_ACCEPT = '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png'
 const WORD_ACCEPT = '.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+/** 本人手写签名图片：服务端 PURPOSE_POLICY.signature_image 只收 JPG / PNG（不收 WebP、不收 PDF）。 */
+const SIGNATURE_ACCEPT = '.jpg,.jpeg,.png,image/jpeg,image/png'
 
 interface PhoneUploadPurposeConfig {
   noun: string
@@ -85,6 +88,12 @@ const PHONE_UPLOAD_PURPOSES = (wordConversionAvailable: boolean): Readonly<Recor
     label: '合同上传',
     accept: wordConversionAvailable ? `${BASE_RESUME_ACCEPT},${WORD_ACCEPT}` : BASE_RESUME_ACCEPT,
     retain: '确认之后：固定保留 **2 小时**，从你上传的那一刻起算，确认动作不会重置也不会延长；这一档由系统锁定，本人也改不了。',
+  },
+  signature_image: {
+    noun: '签名图片',
+    label: '本人手写签名图片',
+    accept: SIGNATURE_ACCEPT,
+    retain: '确认之后：按系统短期留存（**1 小时**），只用来把它放到你选的那份 PDF 上；不会进「我的文档」，也不会长期留着。',
   },
 })
 
@@ -169,10 +178,17 @@ export function PhoneUploadPage() {
   const sessionId = hashParams.get('sessionId')?.trim() ?? ''
   const uploadToken = hashParams.get('token')?.trim() ?? ''
   const purposeHint = hashParams.get('purpose')?.trim() ?? ''
-  const issue = linkIssueOf(sessionId, uploadToken, purposeHint)
+  const issue = linkIssueOf(sessionId, uploadToken)
   const ready = issue === null
   const hinted = isSessionPurpose(purposeHint) ? purposes[purposeHint] : null
-  const policy = genericPolicy(SESSION_PURPOSES.map((purpose) => purposes[purpose].accept))
+  // 上传前的通用档：文档类用途 accept 的交集；链接写着是签名图时只收紧到 JPG / PNG，永不放宽。
+  const policy = preUploadPolicy({
+    resume_upload: purposes.resume_upload.accept,
+    print_doc: purposes.print_doc.accept,
+    contract_upload: purposes.contract_upload.accept,
+    signature_image: purposes.signature_image.accept,
+  }, purposeHint)
+  const signatureLink = purposeHint === 'signature_image'
 
   const linkKey = `${sessionId}\n${uploadToken}`
   const [s, setS] = useState<Session>(() => initialSession(linkKey))
@@ -188,13 +204,15 @@ export function PhoneUploadPage() {
 
   const confirmed = s.confirmed ? purposes[s.confirmed] : null
   const view = s.state !== 'success'
-    ? uploadView(s.state, { file: s.file, typeIssue: s.typeIssue, unknownType: Boolean(s.file && !s.file.type), chips: policy.chips })
+    ? uploadView(s.state, { file: s.file, typeIssue: s.typeIssue, unknownType: Boolean(s.file && !s.file.type), chips: policy.chips, target: signatureLink ? 'signature' : 'document' })
     : null
   const canPick = !kiosk && ready && view?.picker === 'ready'
   const chrome = chromeCopy(issue, s.state, confirmed?.label ?? null)
-  const takeover = issue ? takeoverCopy(issue) : null
+  const takeover = issue ? takeoverCopy() : null
   const chipsText = policy.chips.join(' / ')
-  const formatsNote = conversionCapabilities.wordToPdf
+  const formatsNote = signatureLink
+    ? `在系统核对用途之前，本页只放行 **${chipsText}**。要传其他格式，请回一体机按那一步屏幕上的说明操作。`
+    : conversionCapabilities.wordToPdf
     ? `在系统核对用途之前，本页只放行 **${chipsText}**；Word ${WORD_CONVERSION_DISCLOSURE}。要传其他格式，请回一体机按那一步屏幕上的说明操作。`
     : conversionLoading
       ? `在系统核对用途之前，本页只放行 **${chipsText}**；Word 能否转换还在确认，确认之前本页不发送 Word。`
@@ -264,12 +282,12 @@ export function PhoneUploadPage() {
   }
 
   return (
-    <main className="fusion-w5 fusion-w5--auth k1-phone-upload service-desk" data-kiosk-screen="phone-upload" data-visual-theme="service-desk" data-ux-density="touch" data-kiosk-presentation="fusion-youth" data-kiosk-viewport="mobile" data-phone-upload-state={issue ?? s.state} data-purpose={s.confirmed ?? 'unconfirmed'} data-purpose-confirmed={s.confirmed ? '1' : '0'}>
+    <main className="fusion-w5 fusion-w5--auth k1-phone-upload service-desk" data-qx-page="phone-upload" data-kiosk-screen="phone-upload" data-visual-theme="service-desk" data-ux-density="touch" data-kiosk-presentation="fusion-youth" data-kiosk-viewport="mobile" data-phone-upload-state={issue ?? s.state} data-purpose={s.confirmed ?? 'unconfirmed'} data-purpose-confirmed={s.confirmed ? '1' : '0'}>
       <section className="k1-phone-upload-content">
         <header className="ph-up-relaybar">
-          <span className="ph-up-seal" aria-hidden="true">职</span>
+          <span className="ph-up-seal" aria-hidden="true">{PLATFORM_BRAND_NAME.slice(0, 1)}</span>
           <div className="ph-up-brand">
-            <strong>职易达</strong>
+            <strong>{PLATFORM_BRAND_NAME}</strong>
             <small>{chrome.sub}</small>
           </div>
           <span className="ph-up-tag">{chrome.tag}</span>
@@ -299,7 +317,13 @@ export function PhoneUploadPage() {
                     <MonitorIcon aria-hidden="true" />
                     <span>
                       这份文件用于一体机发起的这一次上传。具体是哪一步、允许哪些格式、留多久，以系统对这次上传的核对结果为准。
-                      {hinted && <span className="ph-up-unsure">链接里写着这次可能是「{hinted.label}」。本页无法核对这句话，也不按它决定任何事。</span>}
+                      {hinted && (
+                        <span className="ph-up-unsure">
+                          {signatureLink
+                            ? `链接里写着这次可能是「${hinted.label}」。本页无法核对这句话；它只会让本页收得更严（只放行 ${policy.chips.join(' / ')}），不会收得更宽。`
+                            : `链接里写着这次可能是「${hinted.label}」。本页无法核对这句话，也不按它决定任何事。`}
+                        </span>
+                      )}
                     </span>
                   </p>
                   {!view.facts && (

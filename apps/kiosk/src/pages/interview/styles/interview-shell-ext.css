@@ -120,23 +120,3 @@
   box-shadow: 0 8px 24px rgba(16, 48, 43, .08);
   transform: translateY(-1px);
 }
-
-.interview-state-page,
-.interview-session-invalid {
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  padding: 32px;
-  text-align: center;
-}
-
-.interview-session-invalid > div:first-child {
-  display: flex;
-  width: 72px;
-  height: 72px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 24px;
-  background: var(--interview-error-soft);
-  color: var(--interview-error);
-}
