@@ -172,6 +172,11 @@ export const SCAN_DEVICE_ALREADY_DELIVERED = 'SCAN_DEVICE_ALREADY_DELIVERED'
 export const SCAN_TASK_NOT_DEVICE = 'SCAN_TASK_NOT_DEVICE'
 /** 409：读与写之间会话状态又变了（重读重判 3 轮仍对不上），刷新后再试。 */
 export const SCAN_DEVICE_STATE_CHANGED = 'SCAN_DEVICE_STATE_CHANGED'
+/**
+ * 409：终端程序回报的来源或颜色与会话上的设置不一致（用户在回报读到之后改了设置）。
+ * 必须停扫，按新的来源和颜色重新开始。没带 source / colorMode 的旧终端程序不会拿到这个码。
+ */
+export const SCAN_DEVICE_SETTINGS_CHANGED = 'SCAN_DEVICE_SETTINGS_CHANGED'
 /** 409：会话已取消 / 过期 / 结束，或已到续期上限，不能再改设置或改用面板扫描。 */
 export const SCAN_TASK_NOT_ACTIVE = 'SCAN_TASK_NOT_ACTIVE'
 

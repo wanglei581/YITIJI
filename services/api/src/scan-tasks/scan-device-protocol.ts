@@ -365,6 +365,61 @@ export interface ScanDeviceReportInput {
   state: ScanDeviceState
   pageCount?: number | null
   errorCode?: ScanDeviceErrorCode | null
+  /**
+   * 终端程序这一场实际在用的来源 / 颜色。不给（或缺省 null）= 旧终端程序，不比对、条件更新也不钉。
+   * 给了且与库里的 deviceSource / deviceColorMode 不一致 → 409 SCAN_DEVICE_SETTINGS_CHANGED（必须停扫）。
+   */
+  source?: ScanDeviceSource | null
+  colorMode?: ScanDeviceColorMode | null
+}
+
+/** 回报里带来源 / 颜色时，条件更新要钉住的列。没给的不钉，旧终端程序的 where 与以前一样。 */
+export function scanDeviceReportSettingsPins(reported: {
+  source?: ScanDeviceSource
+  colorMode?: ScanDeviceColorMode
+}): { deviceSource?: ScanDeviceSource; deviceColorMode?: ScanDeviceColorMode } {
+  return {
+    ...(reported.source !== undefined ? { deviceSource: reported.source } : {}),
+    ...(reported.colorMode !== undefined ? { deviceColorMode: reported.colorMode } : {}),
+  }
+}
+
+/**
+ * 从回报体里取出终端程序声明的来源 / 颜色。null / undefined = 没给。
+ * 给了空串或别的取值 → 400 SCAN_DEVICE_REPORT_INVALID，先于任何数据库访问。
+ */
+export function parseScanDeviceReportSettings(input: {
+  source?: unknown
+  colorMode?: unknown
+}): { source?: ScanDeviceSource; colorMode?: ScanDeviceColorMode } {
+  const sourceAbsent = input.source === undefined || input.source === null
+  const colorAbsent = input.colorMode === undefined || input.colorMode === null
+  if (!sourceAbsent && !(SCAN_DEVICE_SOURCES as readonly unknown[]).includes(input.source)) {
+    badReport('source 只能是 flatbed 或 feeder')
+  }
+  if (!colorAbsent && !(SCAN_DEVICE_COLOR_MODES as readonly unknown[]).includes(input.colorMode)) {
+    badReport('colorMode 只能是 gray 或 color')
+  }
+  return {
+    ...(sourceAbsent ? {} : { source: input.source as ScanDeviceSource }),
+    ...(colorAbsent ? {} : { colorMode: input.colorMode as ScanDeviceColorMode }),
+  }
+}
+
+/** 给了来源或颜色、且与这一行不一致：必须停扫，不能把旧一场的回报写进新设置。 */
+export function assertScanDeviceReportSettingsMatch(
+  task: { deviceSource?: string | null; deviceColorMode?: string | null },
+  reported: { source?: ScanDeviceSource; colorMode?: ScanDeviceColorMode },
+): void {
+  if (
+    (reported.source !== undefined && reported.source !== task.deviceSource) ||
+    (reported.colorMode !== undefined && reported.colorMode !== task.deviceColorMode)
+  ) {
+    conflict(
+      'SCAN_DEVICE_SETTINGS_CHANGED',
+      '扫描设置已更改，请停止屏上扫描，按新的来源和颜色重新开始',
+    )
+  }
 }
 
 export interface ScanDeviceReportPlan {

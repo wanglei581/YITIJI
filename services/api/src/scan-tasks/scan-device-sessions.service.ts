@@ -4,14 +4,17 @@ import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.
 import {
   SCAN_DEVICE_HARD_LIFETIME_MS,
   SCAN_DEVICE_SWITCH_RENEW_WINDOW_MS,
+  assertScanDeviceReportSettingsMatch,
   isScanDeviceSettingsEditableState,
   isScanDeviceState,
   isScanDeviceTask,
   isSwitchedToPanel,
+  parseScanDeviceReportSettings,
   planScanDeviceReport,
   renewScanDeviceExpiry,
   resolveScanDeviceSettingsInput,
   scanDeviceReportRenewWindowMs,
+  scanDeviceReportSettingsPins,
   type ScanDeviceColorMode,
   type ScanDeviceErrorCode,
   type ScanDeviceReportInput,
@@ -64,7 +67,8 @@ function conflict(code: string, message: string): never {
  * 云端只记状态、管能力、管投递；实时指令走一体机到终端程序的本机通道，不在这里。
  * 回报的 409 都带原因码，终端程序据此决定是否中止：
  *   必须停扫   SCAN_DEVICE_TASK_CANCELLED / SCAN_DEVICE_TASK_ENDED / SCAN_DEVICE_SWITCHED_TO_PANEL /
- *              SCAN_DEVICE_CAPABILITY_DISABLED / SCAN_TASK_NOT_DEVICE / SCAN_DEVICE_TASK_NOT_ACKED
+ *              SCAN_DEVICE_CAPABILITY_DISABLED / SCAN_TASK_NOT_DEVICE / SCAN_DEVICE_TASK_NOT_ACKED /
+ *              SCAN_DEVICE_SETTINGS_CHANGED
  *   仅此次回报被拒（会话还在）  SCAN_DEVICE_TRANSITION_INVALID / SCAN_DEVICE_PAGE_COUNT_DECREASED /
  *              SCAN_DEVICE_TASK_DELIVERING / SCAN_DEVICE_STATE_CHANGED
  */
@@ -86,6 +90,8 @@ export class ScanDeviceSessionsService {
     scanTaskId: string,
     input: ScanDeviceReportInput,
   ): Promise<ScanDeviceReportResult> {
+    // 取值非法 400，先于任何数据库访问。没给 source / colorMode 的旧终端程序走原来的路径。
+    const reportedSettings = parseScanDeviceReportSettings(input)
     for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt += 1) {
       const now = new Date()
       const task = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
@@ -119,6 +125,12 @@ export class ScanDeviceSessionsService {
       if (!capability.available) {
         conflict('SCAN_DEVICE_CAPABILITY_DISABLED', '本机屏上扫描已被关闭，请停止屏上扫描')
       }
+
+      // 终端程序报了这一场实际在用的来源 / 颜色，就和库里的设置对。对不上必须停扫，
+      // 包括文件已经在投递（matched）时的同状态重试——不能把旧一场的回报当成重复收下。
+      // 读到的是旧行时这里会对得上，所以下面的条件更新再把这两列钉进 where：
+      // 读写之间用户改了设置（截止时间可以不变），这次更新落空，重读后才走到上面的 409。
+      assertScanDeviceReportSettingsMatch(task, reportedSettings)
 
       if (task.status === 'matched') {
         // 文件正在投递（waiting → matched 之后）。网络重试迟到的同状态回报当作重复，原样应答，
@@ -156,6 +168,7 @@ export class ScanDeviceSessionsService {
           expiresAt: { equals: task.expiresAt, gt: now },
           deviceState: task.deviceState,
           devicePageCount: task.devicePageCount,
+          ...scanDeviceReportSettingsPins(reportedSettings),
         },
         data: {
           deviceState: plan.deviceState,

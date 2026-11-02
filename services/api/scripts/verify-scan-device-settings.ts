@@ -18,6 +18,8 @@
  *   I. 并发：条件更新（CAS），读写之间被改了重读重判；一直对不上 409 STATE_CHANGED；不覆盖别人刚改的另一项
  *   J. GET 会话多返回 deviceSource / deviceColorMode / deviceUpdatedAt（device 任务有值、面板任务 null）
  *   K. HTTP 真路由：全局 ValidationPipe 下的 400、控制令牌 403、200、409
+ *   L. 回报与改设置交错（B4）：回报读到旧行之后、写出之前改设置（截止时间不变），旧回报带着旧来源被 409
+ *      SCAN_DEVICE_SETTINGS_CHANGED 拒；带着新来源照常收；不带来源 / 颜色的旧回报照旧收
  *
  * 写库：本脚本在库里造终端 / 会话 / 文件，结束时清理，所以必须在隔离库上跑
  * （VERIFICATION_DATABASE_TARGET=isolated，库名带 ci/dev/test/verify）。
@@ -80,8 +82,9 @@ const SPEC_RESPONSE_KEYS = ['colorMode', 'deviceErrorCode', 'devicePageCount', '
 const SHARED_CODE_NAMES = [
   'SCAN_DEVICE_NOT_VERIFIED_ON_TERMINAL', 'SCAN_DEVICE_SETTINGS_LOCKED', 'SCAN_DEVICE_CAPABILITY_DISABLED',
   'SCAN_DEVICE_ALREADY_DELIVERED', 'SCAN_TASK_NOT_DEVICE', 'SCAN_DEVICE_STATE_CHANGED', 'SCAN_TASK_NOT_ACTIVE',
+  'SCAN_DEVICE_SETTINGS_CHANGED',
 ] as const
-const { SCAN_DEVICE_SETTINGS_LOCKED, SCAN_DEVICE_CAPABILITY_DISABLED, SCAN_DEVICE_ALREADY_DELIVERED, SCAN_TASK_NOT_DEVICE, SCAN_DEVICE_STATE_CHANGED, SCAN_TASK_NOT_ACTIVE } = sharedScan
+const { SCAN_DEVICE_SETTINGS_LOCKED, SCAN_DEVICE_CAPABILITY_DISABLED, SCAN_DEVICE_ALREADY_DELIVERED, SCAN_TASK_NOT_DEVICE, SCAN_DEVICE_STATE_CHANGED, SCAN_TASK_NOT_ACTIVE, SCAN_DEVICE_SETTINGS_CHANGED } = sharedScan
 const SETTINGS_INVALID = 'SCAN_DEVICE_SETTINGS_INVALID'
 
 function pass(label: string): void {
@@ -183,7 +186,7 @@ async function main(): Promise<void> {
     pass('共享契约的五个常量数组（startMode / 来源 / 颜色 / 状态 / 出错原因）与后端副本逐项一致，且等于任务包规格')
     assert.deepEqual([...protocol.SCAN_DEVICE_SETTABLE_STATES], [...SPEC_SETTABLE_STATES], '改设置只在 ready / error 两个状态允许')
     for (const name of SHARED_CODE_NAMES) assert.equal(sharedScan[name], name, `共享常量 ${name} 的值必须就是它的名字（= 后端 error.code）`)
-    pass('共享契约里一体机要判的 7 个原因码常量值 = 码名（下面全部用它们作期望值去打后端）')
+    pass('共享契约里一体机要判的 8 个原因码常量值 = 码名（下面全部用它们作期望值去打后端）')
 
     const repoRoot = join(__dirname, '../../..')
     const sharedSource = readFileSync(join(repoRoot, 'packages/shared/src/types/scanTask.ts'), 'utf8')
@@ -709,6 +712,13 @@ async function main(): Promise<void> {
       assert.equal(typeof got.json.data?.['deviceUpdatedAt'], 'string')
 
       await deviceSvc.report(s.t.id, s.id, { state: 'scanning', pageCount: 1 })
+      const reportPath = `/terminals/${s.t.id}/scan-tasks/${s.id}/device-report`
+      const agent = { authorization: `Bearer ${tokens.get(s.t.id)}` }
+      const mismatch = await post(reportPath, { state: 'scanning', pageCount: 1, source: 'feeder' }, agent)
+      assert.equal(mismatch.status, 409, 'HTTP 回报带着旧来源应 409')
+      assert.equal(mismatch.json.error?.code, SCAN_DEVICE_SETTINGS_CHANGED)
+      const matchedSource = await post(reportPath, { state: 'scanning', pageCount: 1, source: 'flatbed', colorMode: 'gray' }, agent)
+      assert.equal(matchedSource.status, 200, 'HTTP 回报带着一致的来源和颜色应 200')
       const locked = await post(path, { source: 'feeder' }, control)
       assert.equal(locked.status, 409)
       assert.equal(locked.json.error?.code, SCAN_DEVICE_SETTINGS_LOCKED)
@@ -722,7 +732,92 @@ async function main(): Promise<void> {
       assert.equal(gotPanel.json.data?.['deviceSource'], null)
       assert.equal(gotPanel.json.data?.['deviceColorMode'], null)
       assert.equal(gotPanel.json.data?.['deviceUpdatedAt'], null)
-      pass('device-settings 真路由：403 / 400（非法取值、多余字段、全 null）/ 200 / 重复 200 / 409 SETTINGS_LOCKED / 409 NOT_DEVICE；GET 多返回三项')
+      pass('device-settings 真路由：403 / 400（非法取值、多余字段、全 null）/ 200 / 重复 200 / 409 SETTINGS_LOCKED / 409 NOT_DEVICE；GET 多返回三项；回报来源不一致 409 SETTINGS_CHANGED、一致则 200')
+    }
+
+    // ── L. 回报与改设置交错（截止时间不变）──────────────────────────────────────
+    console.log('\n-- L. 回报读到旧行之后改设置（截止时间不变）--')
+    {
+      await expectHttp(
+        () => deviceSvc.report('t_absent', 'task_absent', { state: 'scanning', source: 'tray' }),
+        400,
+        'SCAN_DEVICE_REPORT_INVALID',
+        '回报 source 不是 flatbed / feeder：400，先于数据库访问',
+      )
+      await expectHttp(
+        () => deviceSvc.report('t_absent', 'task_absent', { state: 'scanning', colorMode: '' }),
+        400,
+        'SCAN_DEVICE_REPORT_INVALID',
+        '回报 colorMode 是空串：400',
+      )
+
+      const omitTerminal = await makeTerminal('reportomit')
+      const omitted = await deviceSession(omitTerminal.id, { source: 'feeder', colorMode: 'gray' })
+      const omittedRowBefore = await rowOf(omitted.scanTaskId)
+      const accepted = await deviceSvc.report(omitTerminal.id, omitted.scanTaskId, { state: 'scanning', pageCount: 1 })
+      assert.equal(accepted.deviceState, 'scanning')
+      assert.equal((await rowOf(omitted.scanTaskId)).deviceSource, 'feeder', '不带来源的回报不得改来源')
+      assert.equal((await rowOf(omitted.scanTaskId)).deviceColorMode, omittedRowBefore.deviceColorMode)
+
+      const racing = (hook: (read: number, id: string) => Promise<void>) => {
+        let reads = 0
+        const wrapped = {
+          scanTask: {
+            findUnique: async (args: { where: { id: string } }) => {
+              const row = await prisma.scanTask.findUnique(args as never)
+              reads += 1
+              await hook(reads, args.where.id)
+              return row
+            },
+            updateMany: (args: never) => prisma.scanTask.updateMany(args),
+          },
+        }
+        return { svc: new ScanDeviceSessionsService(wrapped as never, capabilities), reads: () => reads }
+      }
+
+      const t = await makeTerminal('reportrace')
+      const created = await deviceSession(t.id, { source: 'feeder', colorMode: 'gray' })
+      const session = { t, id: created.scanTaskId, token: created.controlToken }
+      const longExpiry = new Date(Date.now() + 20 * 60_000)
+      await prisma.scanTask.update({ where: { id: session.id }, data: { expiresAt: longExpiry } })
+      const before = await rowOf(session.id)
+      assert.equal(before.deviceState, 'ready')
+      assert.equal(before.devicePageCount, 0)
+      const raced = racing(async (read, id) => {
+        if (read !== 1) return
+        const changed = await deviceSvc.updateDeviceSettings(id, null, session.token, { source: 'flatbed' })
+        assert.equal(changed.source, 'flatbed')
+        assert.equal(changed.expiresAt, longExpiry.toISOString(), '这次改设置不得挪动截止时间，否则旧的 expiresAt 钉就会先把回报拒掉')
+      })
+      await expectHttp(
+        () => raced.svc.report(t.id, session.id, { state: 'scanning', pageCount: 1, source: 'feeder' }),
+        409,
+        SCAN_DEVICE_SETTINGS_CHANGED,
+        '回报读到旧行后改了来源：旧回报带着旧来源被拒',
+      )
+      assert.ok(raced.reads() >= 2, '旧行对得上，必须靠条件更新落空后再读到新来源')
+      const afterReject = await rowOf(session.id)
+      assert.equal(afterReject.deviceSource, 'flatbed', '被拒的旧回报不得把来源写回去')
+      assert.equal(afterReject.deviceState, 'ready', '被拒的旧回报不得把状态改成 scanning')
+      assert.equal(afterReject.devicePageCount, 0)
+      assert.equal(afterReject.expiresAt.getTime(), longExpiry.getTime())
+      assert.equal(afterReject.status, 'waiting')
+
+      const resumed = await deviceSvc.report(t.id, session.id, { state: 'scanning', pageCount: 1, source: 'flatbed' })
+      assert.equal(resumed.deviceState, 'scanning')
+      assert.equal(resumed.devicePageCount, 1)
+      assert.equal((await rowOf(session.id)).deviceSource, 'flatbed')
+
+      await expectHttp(
+        () => deviceSvc.report(t.id, session.id, { state: 'scanning', pageCount: 1, colorMode: 'color' }),
+        409,
+        SCAN_DEVICE_SETTINGS_CHANGED,
+        '颜色与库里不一致同样 409，且不写库',
+      )
+      assert.equal((await rowOf(session.id)).deviceColorMode, 'gray')
+      assert.equal((await rowOf(session.id)).devicePageCount, 1)
+
+      pass('改设置不挪截止时间时，旧来源的回报 409 SETTINGS_CHANGED 且不写库；一致来源照常收；不带 source / colorMode 的回报照旧收')
     }
 
     console.log('\nPASS verify-scan-device-settings')
