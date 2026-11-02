@@ -11,6 +11,9 @@
  * to keep agent code self-contained.
  */
 
+import type { ScanDeviceHealthState } from './scan-device/scan-device-health'
+import type { ScanDeviceDeletionReason } from './scan-device/scan-temp-dir'
+
 export type { PrintJobParams } from '../printer/types'
 
 // ── Scan input health ──────────────────────────────────────────────────────
@@ -200,6 +203,9 @@ export interface HeartbeatPayload {
   scanInputAction?: ScanInputRequiredAction
   scanInputReason?: ScanInputLockoutReason | null
   scanInputObservedAt?: string
+  /** 屏上扫描开关打开时才带。后端 B1 上生产前打开开关会因多余字段被拒。 */
+  scanDeviceHealth?: ScanDeviceHealthState
+  scanDeviceObservedAt?: string
 }
 
 export interface HeartbeatResponse {
@@ -278,7 +284,7 @@ export interface PatchStatusResponse {
 
 export interface ScanDeletionAuditReportPayload {
   eventId: string
-  reasonCode: 'UNCLAIMED_TTL_EXPIRED'
+  reasonCode: 'UNCLAIMED_TTL_EXPIRED' | ScanDeviceDeletionReason
   identifierHash: string
   createdAt: string
   deletedAt: string | null
