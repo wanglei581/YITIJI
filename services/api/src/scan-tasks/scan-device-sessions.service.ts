@@ -32,6 +32,11 @@ export interface ScanDeviceReportResult {
   deviceState: ScanDeviceState
   devicePageCount: number
   deviceErrorCode: ScanDeviceErrorCode | null
+  /**
+   * 这次回报收下之后的 deviceRound。scanning 被收下时就是这一轮的轮次
+   * （ready / error → scanning 已经加过一），终端程序记下它，投递时随 PDF 送回。
+   */
+  deviceRound: number
   /** 续期后的会话截止时间（不超过 hardExpiresAt）。 */
   expiresAt: string
 }
@@ -184,11 +189,16 @@ export class ScanDeviceSessionsService {
         },
       })
       if (updated.count === 1) {
+        // 与上面的 increment 同一条规则。where 钉着读到的 deviceState，这次转移只会被加一次。
+        const deviceRound =
+          (typeof task.deviceRound === 'number' ? task.deviceRound : 0) +
+          (scanDeviceRoundStarts(task.deviceState, plan.deviceState) ? 1 : 0)
         return {
           scanTaskId: task.id,
           deviceState: plan.deviceState,
           devicePageCount: plan.devicePageCount,
           deviceErrorCode: plan.deviceErrorCode,
+          deviceRound,
           expiresAt: expiresAt.toISOString(),
         }
       }
@@ -421,7 +431,13 @@ export class ScanDeviceSessionsService {
   }
 
   private toReportResult(
-    task: { id: string; deviceState: string | null; devicePageCount: number; deviceErrorCode: string | null },
+    task: {
+      id: string
+      deviceState: string | null
+      devicePageCount: number
+      deviceErrorCode: string | null
+      deviceRound: number | null
+    },
     expiresAt: Date,
   ): ScanDeviceReportResult {
     return {
@@ -429,6 +445,7 @@ export class ScanDeviceSessionsService {
       deviceState: task.deviceState as ScanDeviceState,
       devicePageCount: task.devicePageCount,
       deviceErrorCode: task.deviceErrorCode as ScanDeviceErrorCode | null,
+      deviceRound: typeof task.deviceRound === 'number' ? task.deviceRound : 0,
       expiresAt: expiresAt.toISOString(),
     }
   }

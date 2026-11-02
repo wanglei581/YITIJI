@@ -545,7 +545,8 @@ export function normalizeScanDeliverOrigin(raw: unknown): ScanDeliverOrigin {
  *   - device 任务再钉读到的 deviceRound（B6，替换 B4 的 deviceUpdatedAt 钉）。轮次只在 ready / error → scanning 时加一，
  *     同状态重发（例如网络重试再报一次 delivering）不改它，不会误拒正常投递。没读到时按列默认值钉 0。
  * 只钉读到的轮次挡不住「服务端第一次读到的已经是新一轮」——那一步用已验签租约里的 deviceRound 比对
- * （assertScanDeliverRoundMatches）。面板任务不加后三条：面板路线行为一字不变。
+ * （assertScanDeliverRoundMatches）。租约仍证明不了所附 PDF 产生于该轮次；终端程序若带上扫描时记下的
+ * 轮次，再由 assertScanDeliverAttachedRound 核。面板任务不加后三条：面板路线行为一字不变。
  * 条件失效按现有写法回 409 SCAN_TASK_STATE_CHANGED。
  */
 export function scanDeliverClaimPins(task: Pick<DeviceFieldsRow, 'startMode' | 'deviceRound'>): {
@@ -578,6 +579,39 @@ export function assertScanDeliverRoundMatches(
   if (typeof leasedRound !== 'number' || !Number.isInteger(leasedRound) || leasedRound !== current) {
     conflict('SCAN_TASK_STATE_CHANGED', '扫描任务状态已变化，请重新发起扫描')
   }
+}
+
+/**
+ * 屏上扫描投递附带的轮次。终端程序在 scanning 回报被收下时记下响应里的 deviceRound，
+ * 投递这份 PDF 时可以把它放进 multipart。签名租约只证明取租约时的轮次，证明不了 PDF 产生于该轮次；
+ * 旧一轮留下的文件配上新取的租约，所带轮次对不上。
+ *
+ * 没给（缺省、null、空串）照旧，只靠上面的租约比对，兼容还没带这个字段的终端程序。
+ * 给了就必须同时等于已验签租约里的轮次和库里当前轮次，否则 409 SCAN_TASK_STATE_CHANGED，且发生在建文件之前。
+ * 面板任务不比，传入的值一律忽略。
+ */
+export function assertScanDeliverAttachedRound(
+  task: Pick<DeviceFieldsRow, 'startMode' | 'deviceRound'>,
+  leasedRound: unknown,
+  attachedRound: unknown,
+): void {
+  if (!isScanDeviceTask(task)) return
+  if (attachedRound === undefined || attachedRound === null || attachedRound === '') return
+  const current = typeof task.deviceRound === 'number' ? task.deviceRound : 0
+  const parsed = parseAttachedDeviceRound(attachedRound)
+  if (parsed === null || parsed !== current || parsed !== leasedRound) {
+    conflict('SCAN_TASK_STATE_CHANGED', '扫描任务状态已变化，请重新发起扫描')
+  }
+}
+
+/** multipart 里的轮次是字符串；直接调 service 时也可能是整数。其余都算给了但对不上。 */
+function parseAttachedDeviceRound(raw: unknown): number | null {
+  if (typeof raw === 'number') return Number.isSafeInteger(raw) ? raw : null
+  if (typeof raw === 'string' && /^(0|[1-9]\d*)$/.test(raw)) {
+    const value = Number(raw)
+    return Number.isSafeInteger(value) ? value : null
+  }
+  return null
 }
 
 export function looksLikePdf(buffer: Buffer): boolean {

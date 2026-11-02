@@ -22,6 +22,7 @@ import {
   type ScanDeliveryLeaseResult,
 } from './scan-lease'
 import {
+  assertScanDeliverAttachedRound,
   assertScanDeliverOriginAllowed,
   assertScanDeliverRoundMatches,
   buildScanDeviceCreateData,
@@ -1005,6 +1006,11 @@ export class ScanTasksService {
     observedAt?: unknown
     /** 投递来源：watcher（面板扫描，缺省）/ device（屏上扫描）。原样来自 multipart 字段，未校验。 */
     origin?: unknown
+    /**
+     * 这份 PDF 产生时的扫描轮次。multipart 原样传入，未校验。
+     * 没给则只比对已验签租约；给了还必须同时等于租约轮次和库里当前轮次。
+     */
+    deviceRound?: unknown
   }): Promise<{ scanTaskId: string; fileId: string }> {
     const now = new Date()
 
@@ -1077,6 +1083,9 @@ export class ScanTasksService {
     // 旧一轮的租约在新一轮已经走到可投递时才到：服务端这次读到的就是新轮次。
     // 只钉读到的 deviceRound 会把旧 PDF 挂到新一轮，所以先拿已验签负载里的轮次比对。面板不比。
     assertScanDeliverRoundMatches(task, leasePayload.deviceRound)
+    // 租约对得上仍可能是「旧 PDF 配新取的租约」。终端程序若带上扫描时记下的轮次，
+    // 必须同时等于已验签轮次和库里当前轮次；没带则保持上面那一次比对。拒绝发生在建文件之前。
+    assertScanDeliverAttachedRound(task, leasePayload.deviceRound, args.deviceRound)
 
     // 3b. 投递来源必须与会话一致：device 会话只收终端程序自己扫的 PDF（origin=device，且已整理好文件），
     // 面板会话只收 watcher；没带 origin 一律按 watcher（兼容现有终端程序）。

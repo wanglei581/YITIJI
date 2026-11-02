@@ -7,8 +7,11 @@
  *   3. 正常进纸器、玻璃台多页投递成功
  *   4. deviceRound 只在 ready / error → scanning 加一（同状态、翻页、改设置都不加）
  *   5. 轮次在签名负载里；改了签名就无效；改了轮次再签，投递要比对
- *   6. 面板任务的租约不多 deviceRound，投递不比轮次
+ *   6. 面板任务的租约不多 deviceRound，投递不比轮次；multipart 带了别的轮次也不比
  *   7. 取消已经落库之后，再查静默期依据的 findFirst 失败，取消仍然成功，倒计时照这次取消的时间给
+ *   8. B7：scanning 回报被收下时响应带当前 deviceRound。旧一轮 PDF 带着旧轮次、配上新取的租约 → 409、不建文件；
+ *      带当前轮次成功；不带照旧成功。deliver 逐字段取 body，控制器把 deviceRound 交进 service
+ *   9. B7：进纸器 3 页、玻璃台 2 页是解析器能读的真多页 PDF，投递后核对保存文件的页数
  *
  * 写库：本脚本在库里造终端 / 会话 / 文件，结束时清理，所以必须在隔离库上跑
  * （VERIFICATION_DATABASE_TARGET=isolated，库名带 ci/dev/test/verify）。
@@ -24,9 +27,9 @@ process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-scan-device-b6-action-se
 
 import assert from 'node:assert/strict'
 import { createHash, randomBytes } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { PDFDocument } from 'pdf-lib'
 import { AuditService } from '../src/audit/audit.service'
 import { FilesService } from '../src/files/files.service'
@@ -66,11 +69,16 @@ async function expectHttp(run: () => Promise<unknown>, status: number, code: str
   assert.fail(`${label}：应当被拒绝（${status} ${code}），实际放行了`)
 }
 
-async function uniquePdf(): Promise<Buffer> {
+/** 与本文件原来的一页夹具同一写法（pdf-lib），页数由调用方指定。每份标题不同，避免内容去重撞车。 */
+async function pdfWithPages(pageCount: number): Promise<Buffer> {
   const doc = await PDFDocument.create()
-  doc.addPage([200, 200])
+  for (let index = 0; index < pageCount; index += 1) doc.addPage([200, 200])
   doc.setTitle(randomBytes(8).toString('hex'))
   return Buffer.from(await doc.save())
+}
+
+async function uniquePdf(): Promise<Buffer> {
+  return pdfWithPages(1)
 }
 
 const sha256Of = (buffer: Buffer) => createHash('sha256').update(buffer).digest('hex')
@@ -93,7 +101,8 @@ async function main(): Promise<void> {
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const capabilities = new TerminalCapabilitiesService(prisma)
-  const files = new FilesService(prisma, new AuditService(prisma), new StorageService())
+  const storage = new StorageService()
+  const files = new FilesService(prisma, new AuditService(prisma), storage)
   const scanSvc = new ScanTasksService(prisma, files, capabilities)
   const deviceSvc = new ScanDeviceSessionsService(prisma, capabilities)
   const terminalIds: string[] = []
@@ -138,6 +147,7 @@ async function main(): Promise<void> {
     pdf: Buffer,
     lease: string,
     origin?: 'device' | 'watcher',
+    deviceRound?: unknown,
   ) {
     return svc.deliverScanFile({
       terminalId: s.t.id,
@@ -148,6 +158,7 @@ async function main(): Promise<void> {
       mimeType: 'application/pdf',
       observedAt: new Date().toISOString(),
       ...(origin ? { origin } : {}),
+      ...(deviceRound !== undefined ? { deviceRound } : {}),
     })
   }
   const freshLease = async (s: Session) => (await scanSvc.getScanDeliveryLease(s.t.id)).deliveryLease
@@ -177,6 +188,18 @@ async function main(): Promise<void> {
       get: (target, prop) => (prop === 'scanTask' ? scanTask : bind(target, prop)),
     }) as PrismaService
     return { svc: new ScanTasksService(wrapped, files, capabilities), ran: () => ran }
+  }
+
+  async function assertSavedPdfPages(fileId: string, pages: number, label: string): Promise<void> {
+    const file = await prisma.fileObject.findUniqueOrThrow({
+      where: { id: fileId },
+      select: { pageCount: true, storageKey: true, bucket: true, sha256: true },
+    })
+    assert.equal(file.pageCount, pages, `${label}：库里记下的页数应为 ${pages}`)
+    const stored = await storage.getObject(file.storageKey, file.bucket)
+    assert.equal(sha256Of(stored), file.sha256, `${label}：读回的字节应是保存的那一份`)
+    const loaded = await PDFDocument.load(stored)
+    assert.equal(loaded.getPageCount(), pages, `${label}：保存的 PDF 实际页数应为 ${pages}`)
   }
 
   async function assertNoFile(label: string, s: Session, pdf: Buffer): Promise<void> {
@@ -211,10 +234,13 @@ async function main(): Promise<void> {
       assert.equal(await roundOf(), 0, '还没开始扫描时轮次是 0')
       await deviceSvc.report(s.t.id, s.id, { state: 'ready' })
       assert.equal(await roundOf(), 0, 'ready 重发不加')
-      await deviceSvc.report(s.t.id, s.id, { state: 'scanning', pageCount: 1 })
+      const started = await deviceSvc.report(s.t.id, s.id, { state: 'scanning', pageCount: 1 })
       assert.equal(await roundOf(), 1, 'ready → scanning 加一')
-      await deviceSvc.report(s.t.id, s.id, { state: 'scanning', pageCount: 2 })
+      assert.equal(started.deviceRound, 1, 'scanning 回报被收下时，响应带上这一轮的 deviceRound')
+      assert.equal(started.deviceRound, await roundOf(), '响应轮次与库里当前轮次相同')
+      const resent = await deviceSvc.report(s.t.id, s.id, { state: 'scanning', pageCount: 2 })
       assert.equal(await roundOf(), 1, 'scanning 同状态重发不加')
+      assert.equal(resent.deviceRound, 1, '同状态重发的响应仍是这一轮')
       await deviceSvc.report(s.t.id, s.id, { state: 'error', errorCode: 'paper_jam' })
       assert.equal(await roundOf(), 1, '转到 error 不加')
       await deviceSvc.report(s.t.id, s.id, { state: 'error', errorCode: 'paper_jam' })
@@ -224,13 +250,15 @@ async function main(): Promise<void> {
       assert.equal(reset.deviceState, 'ready')
       assert.equal(reset.devicePageCount, 0)
       assert.equal(reset.deviceRound, 1, '改设置回到 ready 不加')
-      await deviceSvc.report(s.t.id, s.id, { state: 'scanning', pageCount: 1 })
+      const restarted = await deviceSvc.report(s.t.id, s.id, { state: 'scanning', pageCount: 1 })
       assert.equal(await roundOf(), 2, '改设置之后下一次 ready → scanning 才加一')
+      assert.equal(restarted.deviceRound, 2, '新一轮 scanning 的响应轮次是加一之后的值')
       await deviceSvc.report(s.t.id, s.id, { state: 'page_ready' })
       await deviceSvc.report(s.t.id, s.id, { state: 'scanning', pageCount: 2 })
       await deviceSvc.report(s.t.id, s.id, { state: 'page_ready' })
       await deviceSvc.report(s.t.id, s.id, { state: 'composing' })
-      await deviceSvc.report(s.t.id, s.id, { state: 'delivering' })
+      const delivering = await deviceSvc.report(s.t.id, s.id, { state: 'delivering' })
+      assert.equal(delivering.deviceRound, 2, '之后的成功回报也带当前轮次')
       await deviceSvc.report(s.t.id, s.id, { state: 'delivering' })
       assert.equal(await roundOf(), 2, '翻页、合成、投递中、同状态 delivering 都不加')
       pass('deviceRound 只在 ready / error → scanning 加一')
@@ -258,9 +286,9 @@ async function main(): Promise<void> {
       const panelVerified = verifyScanDeliveryLease(panelView.deliveryLease, panel.t.id, panel.id)
       assert.equal(panelVerified.deviceRound, undefined, '面板签名负载没有 deviceRound')
       assert.equal('deviceRound' in decodeLease(panelView.deliveryLease), false)
-      const panelResult = await deliverWith(scanSvc, panel, await uniquePdf(), panelView.deliveryLease)
+      const panelResult = await deliverWith(scanSvc, panel, await uniquePdf(), panelView.deliveryLease, undefined, '1')
       assert.equal(panelResult.scanTaskId, panel.id)
-      assert.equal((await rowOf(panel.id)).status, 'completed', '库里轮次被改成 7，面板投递仍不比轮次')
+      assert.equal((await rowOf(panel.id)).status, 'completed', '库里轮次是 7，multipart 还带了别的轮次，面板投递仍不比')
       pass('device 轮次在签名负载里；面板租约不多字段、不比轮次')
     }
 
@@ -317,10 +345,40 @@ async function main(): Promise<void> {
       )
       await assertNoFile('篡改负载', s, tamperedPdf)
 
-      const ok = await deliverWith(scanSvc, s, await uniquePdf(), await freshLease(s), 'device')
-      assert.equal(ok.scanTaskId, s.id)
-      assert.equal((await rowOf(s.id)).status, 'completed', '新一轮用当时的租约仍能投递')
-      pass('旧轮次租约被拒且不建文件；当时的轮次仍能投递')
+      const stalePdf = await uniquePdf()
+      const staleLease = await freshLease(s)
+      await expectHttp(
+        () => deliverWith(scanSvc, s, stalePdf, staleLease, 'device', '1'),
+        409,
+        STATE_CHANGED,
+        '旧一轮 PDF 带着旧轮次、配上新取的租约',
+      )
+      await assertNoFile('旧 PDF 配新租约', s, stalePdf)
+      assert.equal((await rowOf(s.id)).deviceRound, 2, '旧 PDF 被拒后轮次仍是 2')
+      assert.equal((await rowOf(s.id)).deviceState, 'delivering', '新一轮仍停在 delivering')
+
+      const currentPdf = await uniquePdf()
+      const withRound = await deliverWith(scanSvc, s, currentPdf, await freshLease(s), 'device', '2')
+      assert.equal(withRound.scanTaskId, s.id)
+      assert.equal((await rowOf(s.id)).status, 'completed', '带上当前轮次照常投递')
+      pass('旧轮次租约被拒且不建文件；旧 PDF 配新租约被拒；当时的轮次仍能投递')
+    }
+
+    console.log('\n-- 不带 deviceRound 的屏上投递仍成功 --')
+    {
+      const controllerSource = readFileSync(join(dirname(__filename), '../src/scan-tasks/scan-tasks.controller.ts'), 'utf8')
+      assert.match(controllerSource, /@Body\('deviceRound'\) deviceRound\?: unknown/, 'deliver 逐字段取 deviceRound，不经 DTO')
+      assert.match(controllerSource, /origin,\s*deviceRound,/, '控制器把 deviceRound 交进 deliverScanFile')
+      const compat = await deviceSession('compat')
+      await deviceSvc.report(compat.t.id, compat.id, { state: 'scanning', pageCount: 1 })
+      await deviceSvc.report(compat.t.id, compat.id, { state: 'composing' })
+      await deviceSvc.report(compat.t.id, compat.id, { state: 'delivering' })
+      const compatPdf = await uniquePdf()
+      const compatResult = await deliverWith(scanSvc, compat, compatPdf, await freshLease(compat), 'device')
+      assert.equal(compatResult.scanTaskId, compat.id)
+      assert.equal((await rowOf(compat.id)).status, 'completed', '没带 deviceRound 照旧成功')
+      assert.ok((await rowOf(compat.id)).fileId)
+      pass('不带 deviceRound 的屏上投递仍成功')
     }
 
     console.log('\n-- 投递读行后、CAS 前的合法回报不挡正常投递 --')
@@ -371,13 +429,16 @@ async function main(): Promise<void> {
       await deviceSvc.report(feeder.t.id, feeder.id, { state: 'composing' })
       await deviceSvc.report(feeder.t.id, feeder.id, { state: 'delivering' })
       assert.equal((await rowOf(feeder.id)).deviceRound, 1)
-      const feederResult = await deliverWith(scanSvc, feeder, await uniquePdf(), await freshLease(feeder), 'device')
+      const feederPdf = await pdfWithPages(3)
+      const feederResult = await deliverWith(scanSvc, feeder, feederPdf, await freshLease(feeder), 'device')
       assert.equal(feederResult.scanTaskId, feeder.id)
       const feederRow = await rowOf(feeder.id)
       assert.equal(feederRow.status, 'completed')
       assert.equal(feederRow.devicePageCount, 3)
+      assert.equal(feederRow.deviceRound, 1)
       assert.equal(feederRow.deviceSource, 'feeder')
       assert.ok(feederRow.fileId)
+      await assertSavedPdfPages(feederRow.fileId, 3, '进纸器')
 
       const flatbed = await deviceSession('flatbed', 'flatbed')
       await deviceSvc.report(flatbed.t.id, flatbed.id, { state: 'scanning', pageCount: 1 })
@@ -387,14 +448,17 @@ async function main(): Promise<void> {
       await deviceSvc.report(flatbed.t.id, flatbed.id, { state: 'composing' })
       await deviceSvc.report(flatbed.t.id, flatbed.id, { state: 'delivering' })
       assert.equal((await rowOf(flatbed.id)).deviceRound, 1, '玻璃台翻页不加轮次')
-      const flatbedResult = await deliverWith(scanSvc, flatbed, await uniquePdf(), await freshLease(flatbed), 'device')
+      const flatbedPdf = await pdfWithPages(2)
+      const flatbedResult = await deliverWith(scanSvc, flatbed, flatbedPdf, await freshLease(flatbed), 'device')
       assert.equal(flatbedResult.scanTaskId, flatbed.id)
       const flatbedRow = await rowOf(flatbed.id)
       assert.equal(flatbedRow.status, 'completed')
       assert.equal(flatbedRow.devicePageCount, 2)
+      assert.equal(flatbedRow.deviceRound, 1)
       assert.equal(flatbedRow.deviceSource, 'flatbed')
       assert.ok(flatbedRow.fileId)
-      pass('进纸器 3 页、玻璃台 2 页都投递成功，轮次都只加了一次')
+      await assertSavedPdfPages(flatbedRow.fileId, 2, '玻璃台')
+      pass('进纸器 3 页、玻璃台 2 页都投递成功，保存的文件页数相符，轮次都只加了一次')
     }
 
     console.log('\n-- 取消落库后倒计时查询失败，取消仍然成功 --')
