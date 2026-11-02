@@ -659,6 +659,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-sessions
           # 屏上扫描(device 路线)原地改设置(出错屏「改用玻璃台」):只在 ready/error 允许、不吃静默期、CAS 并发、幂等、GET 多三项、共享契约五个数组与后端逐项一致。SQLite 与 PG 两侧各跑一遍。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-settings
+          # 屏上扫描证件 PDF:只在服务端核实过的 device 会话放行；页数/大小上限、个人信息检查与留存、租约 maxPages/maxBytes。面板与上传仍只收图片。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-idscan
           # 屏上扫描(device 路线)会话生命周期:投递抢占钉住 startMode/设备状态(B1 复审修复)、截止时间只增不减、page_ready 回报续 10 分钟(补稿 cs-scan-more)。SQLite 与 PG 两侧各跑一遍。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-lifecycle
           pnpm --filter @ai-job-print/api verify:print-conversion
@@ -1201,6 +1203,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-sessions
           # 屏上扫描(device 路线)原地改设置(出错屏「改用玻璃台」):只在 ready/error 允许、不吃静默期、CAS 并发、幂等、GET 多三项、共享契约五个数组与后端逐项一致。SQLite 与 PG 两侧各跑一遍。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-settings
+          # 屏上扫描证件 PDF:只在服务端核实过的 device 会话放行；页数/大小上限、个人信息检查与留存、租约 maxPages/maxBytes。面板与上传仍只收图片。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-idscan
           # 屏上扫描(device 路线)会话生命周期:投递抢占钉住 startMode/设备状态(B1 复审修复)、截止时间只增不减、page_ready 回报续 10 分钟(补稿 cs-scan-more)。SQLite 与 PG 两侧各跑一遍。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-lifecycle
           pnpm --filter @ai-job-print/api verify:print-conversion
