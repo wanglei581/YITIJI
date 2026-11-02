@@ -212,6 +212,19 @@ model ScanTask {
   // Null until Kiosk ACKs that it durably holds this task's control credentials.
   // Agent current-lease must not see waiting rows while this is null.
   deliveryAckedAt  DateTime?
+  // ── 屏上扫描（device 路线，2026-11-02）──────────────────────────────────────
+  // startMode='panel'（默认）= 现有面板扫描：用户在打印机面板扫描到 SMB，Agent watcher 投递。
+  // startMode='device' = 用户在一体机屏上点「开始扫描」，终端程序服务经 WIA 直接扫描、合成 PDF 后投递。
+  // device* 字段只由终端程序回报（device-report）、「改用面板扫描」（switch-to-panel）与用户改扫描设置（device-settings）写入；
+  // 面板路线这些字段恒为默认/空。status 仍是上面那套（waiting → matched → completed 等），device* 只是附加进度。
+  startMode        String    @default("panel") // 'panel' | 'device'
+  deviceSource     String?   // 'flatbed' | 'feeder'
+  deviceColorMode  String?   // 'gray' | 'color'
+  deviceState      String?   // ready | scanning | page_ready | composing | delivering | error | aborted
+  devicePageCount  Int       @default(0) // 只数整页收到的图
+  deviceErrorCode  String?   // feeder_empty | paper_jam | cover_open | busy | warming_up | not_ready | timeout | too_large | unknown
+  deviceUpdatedAt  DateTime? // 最近一次状态变化：终端程序回报，或用户改设置 / 改用面板
+  hardExpiresAt    DateTime? // 续期上限 = createdAt + 30 分钟（仅 device 会话）
   expiresAt        DateTime
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -234,7 +247,10 @@ model ScanTask {
 
 // ── TerminalHeartbeat ─────────────────────────────────────────────────────────
 
-// PII-safe cloud receipt of Terminal Agent `_unclaimed` TTL deletion evidence.
+// PII-safe cloud receipt of Terminal Agent local scan-file deletion evidence: the `_unclaimed` TTL
+// deletion of panel scans (UNCLAIMED_TTL_EXPIRED) and the temp-page deletions of on-screen (device)
+// scans (SCAN_DEVICE_*). reasonCode is a plain String column; the accepted values live in
+// src/terminals/scan-deletion-reason-codes.ts, so adding a code never needs a migration.
 // Paths, filenames, content, exception text, and the local HMAC key are absent.
 model TerminalScanDeletionAudit {
   terminalId          String
@@ -269,6 +285,10 @@ model TerminalHeartbeat {
   scanInputAction            String?
   scanInputReason            String?
   scanInputObservedAt        DateTime?
+  // 屏上扫描：终端程序最近一次探测扫描仪的结果（ready/busy/not_found/error/unknown）与探测时刻。
+  // 旧版终端程序不报这两项，库里就是 null。
+  scanDeviceHealth           String?
+  scanDeviceObservedAt       DateTime?
   agentVersion               String?
   ipAddress                  String?
   diskFreeGb                 Float?
