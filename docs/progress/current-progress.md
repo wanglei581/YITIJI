@@ -1,5 +1,22 @@
 # 当前开发进度
 
+## 2026-11-03：再删 11 个没有入口引用的一体机旧文件（逐个举证；6 个保留）
+
+- 范围：上一轮列出来、还没删的 17 个一体机文件。只 `git rm` 重新过完全部证据的。不改 CI / verify 门禁、合规闸门、硬件适配，也不动 `docs/design` 冻结稿。动态引用：全仓没有 `import.meta.glob` / `require.context`。开着的 PR：`gh pr list --json files` 核 132 个，文件数达到 100 的 #1511、#1490、#1487、#1485 另用 `gh pr diff --name-only` 补查。图谱对这 17 个都报「没有任何门禁断言」。最后一次提交都早于 14 天（最近的是 `home-v6.css` 的 `5d800c3020`，2026-10-06）。
+- 删除 11 个（代码侧 `git grep` 没有 import / `@import`；一组内互引除外。历史文档里的叙述不算入口引用）：
+  - `apps/kiosk/src/App.tsx`：一体机入口是 `main.tsx` 里的 `KioskApp`，没有人 import 这份文件。别的应用各自的 `./App.tsx` 是另一份文件。最后提交 `72de9ce5e2`（2026-05-24）。
+  - `apps/kiosk/src/pages/interview/InterviewTopbar.tsx`：文件名零代码引用。最后提交 `5843cafa8f`（2026-07-25）。
+  - `apps/kiosk/src/components/AiDriverBanner.tsx`、`KioskNumPad.tsx`：没有 import。最后提交 `20a80f9d41`（2026-08-04）、`dcc0b27ffc`（2026-06-04）。
+  - `apps/kiosk/src/pages/jobs/components/JobAiEntryPanel.tsx`、`apps/kiosk/src/pages/jobs-fairs-prototype.tsx`：没有 import。招聘会样式表 `jobs-fairs-prototype.css` 仍被 `index.css` 引入，这次只删同名的 tsx。最后提交 `6824100759`（2026-07-03）、`fb385d24dc`（2026-09-06）。
+  - `apps/kiosk/src/pages/auth/login-batch8.css`、`apps/kiosk/src/pages/resume/careerPlan-lightflow.css`、`resume-diagnosis-ext.css`：路径没有 `@import`。职业规划页实际引入的是 `job-fit-qx.css`。
+  - `apps/kiosk/src/pages/home/styles/home-v6.css`、`home-v6-motion-responsive.css`：整组删除（后者只被前者 `@import`）。现行首页不引入这两份。
+- 保留 6 个（这里故意不写文件名，免得进度文档的点名把它们在图谱里从 low 改判成 medium）：
+  - 顾问页两份旧驾驶舱样式整组留下：其中一份仍被开着的 PR #1383 修改。
+  - 三份旧样式：现行样式文件的注释还点着它们的路径，`git grep` 不是零引用。
+  - 首页上一版视图：现行首页状态模块的注释还点着组件名，没有 import，但不是零引用。
+- 不是停放件：这 11 个文件没有停放标记，停放清单也不含它们。
+- 校验：五条按目录比对主线的范围门禁（`verify:profile-inkpaper-home`、`verify:profile-feedback-inkpaper`、`verify:profile-resumes-notifications-inkpaper`、`verify:profile-commercial-first-batch`、`verify:lightflow-profile-entry`）都通过，没有因为删除报红。`pnpm --filter @ai-job-print/kiosk typecheck` 通过。`lint` 通过（0 error，25 条原有 warning，都不在被删文件上）。按 `ci.yml` 同一组变量的 `build` 通过（3150 个模块）。图谱重新生成后 `--check` 通过（low 41 / medium 19）。`verify:repository-integrity` 通过。
+
 ## 2026-11-03：删除 52 份零引用旧文档（产品负责人按推荐拍板；另删 2 个旧评审目录里的 15 张截图）
 
 - 范围：图谱 low 档（全仓零提及）里的旧文档。产品负责人 11/03 按推荐拍板删除三类：7–8 月的实施计划与规格、8–9 月的旧评审、废弃设计方向的续接笔记。交付验收记录（`docs/delivery/`）、专利文档和其余零散旧文档保留。
