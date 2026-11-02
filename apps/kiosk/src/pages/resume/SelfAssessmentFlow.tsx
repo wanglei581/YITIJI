@@ -30,7 +30,7 @@
 // ============================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useNavigate, useSearchParams, type NavigateFunction } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams, type NavigateFunction } from 'react-router-dom'
 import type {
   SelfAssessmentConsentLink,
   SelfAssessmentDimensionKey,
@@ -83,6 +83,8 @@ import { useSelfAssessmentConsentBundle } from './useSelfAssessmentConsentBundle
 import { interpretationGap } from './selfAssessmentInterpretation'
 import { useSelfAssessmentIdleExit } from './useSelfAssessmentIdleExit'
 import { useAuth } from '../../auth/useAuth'
+import { useKioskLicense } from '../../layouts/KioskLicenseContext'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import {
@@ -126,15 +128,20 @@ function GuardedButton({
   onClick,
   variant,
   testId,
+  title,
+  forceBlocked = false,
   children,
 }: {
   blockedReason: string | null
   onClick: () => void
   variant?: 'primary' | 'teal' | 'ghost' | 'danger'
   testId?: string
+  title?: string
+  /** 收尾中只读：停用，原因由页内 status 写一次，不写进常驻 blockedReason。 */
+  forceBlocked?: boolean
   children: ReactNode
 }) {
-  const blocked = Boolean(blockedReason)
+  const blocked = Boolean(blockedReason) || forceBlocked
   return (
     <span className="sa-guarded">
       <button
@@ -143,6 +150,7 @@ function GuardedButton({
         data-variant={variant}
         data-testid={testId}
         aria-disabled={blocked || undefined}
+        title={title}
         onClick={() => { if (!blocked) onClick() }}
       >
         {children}
@@ -160,9 +168,17 @@ function GhostButton({ label, route, onClick }: { label: string; route?: string;
   )
 }
 
-function PrimaryButton({ label, testId, onClick }: { label: string; testId?: string; onClick: () => void }) {
+function PrimaryButton({ label, testId, onClick, held = false, title }: { label: string; testId?: string; onClick: () => void; held?: boolean; title?: string }) {
   return (
-    <button type="button" className="qx-btn" data-variant="primary" data-testid={testId ?? 'self-assessment-primary'} onClick={onClick}>{label}</button>
+    <button
+      type="button"
+      className="qx-btn"
+      data-variant="primary"
+      data-testid={testId ?? 'self-assessment-primary'}
+      aria-disabled={held || undefined}
+      title={title}
+      onClick={() => { if (!held) onClick() }}
+    >{label}</button>
   )
 }
 
@@ -653,6 +669,8 @@ export function SelfAssessmentResultPage() {
 
 function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | null }) {
   const navigate = useNavigate()
+  const location = useLocation()
+  const viewOnly = useKioskLicense().mode === 'winding-down' && (location.state as { licenseViewOnly?: boolean } | null)?.licenseViewOnly === true
   const startPrint = useStartPrintHandoff()
   const { getToken } = useAuth()
   const [session, setSession] = useState<SelfAssessmentSession>(() => {
@@ -824,12 +842,18 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
             ) : (
               <>
                 <GhostButton label="返回简历服务" route={SA_BACK_ROUTE} onClick={() => navigate(SA_BACK_ROUTE)} />
-                <PrimaryButton label={failure ? '重新作答' : '去看说明并开始'} onClick={() => navigate('/resume/self-assessment/intro')} />
+                <PrimaryButton
+                  label={failure ? '重新作答' : '去看说明并开始'}
+                  held={viewOnly}
+                  title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined}
+                  onClick={() => navigate('/resume/self-assessment/intro')}
+                />
               </>
             )}
           </>
         }
       >
+        {viewOnly ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : null}
         <AiTaskRegion task={task} label="AI 陈述式解读" className="sa-ai-region"
           fallback={{
             mode: 'result-unavailable',
@@ -872,6 +896,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
   }
 
   const handlePrint = async () => {
+    if (viewOnly) return
     setPrinting(true)
     setError(null)
     try {
@@ -898,6 +923,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
    * 只有服务端签出的 `printFileUrl` 能被打印链路认；缺它就置灰并写清原因，不假装能打。
    */
   const handoffToPrint = () => {
+    if (viewOnly) return
     if (!printed?.printFileUrl) return
     startPrint({
       origin: 'self_assessment',
@@ -954,7 +980,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
           retryHint: '答案原文不留存，服务恢复后也补不回这一次；要拿到解读需要重新作答（约 5 分钟）。下面的维度强度与依据题号不依赖 AI，现在就能看、能打印。',
           action: gap === 'login'
             ? { label: '先登录账号', onClick: () => navigate('/login', { state: { from: '/resume/self-assessment/intro' } }) }
-            : { label: '重新作答（约 5 分钟）', onClick: () => { clearSession(); navigate('/resume/self-assessment/intro') } },
+            : { label: '重新作答（约 5 分钟）', onClick: () => { if (viewOnly) return; clearSession(); navigate('/resume/self-assessment/intro') } },
         }),
   }
 
@@ -976,12 +1002,14 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
         <>
           <GhostButton label="查看记录" route="/resume/self-assessment/history" onClick={() => navigate('/resume/self-assessment/history')} />
           <GuardedButton variant="teal" testId="self-assessment-print" onClick={() => void handlePrint()}
+            forceBlocked={viewOnly} title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined}
             blockedReason={printing ? '正在生成 PDF，请稍候' : accessReason}>{printing ? '生成 PDF 中…' : '生成 PDF 预览'}</GuardedButton>
           <GuardedButton variant="danger" testId="self-assessment-withdraw" onClick={handleWithdraw}
             blockedReason={withdrawing ? '正在撤回，请稍候' : accessReason}>{withdrawing ? '撤回中…' : '撤回本次探索'}</GuardedButton>
         </>
       }
     >
+      {viewOnly ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : null}
       <ResumeStepPreview
         className="rtp-hero-min"
         art="report"
@@ -1055,6 +1083,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
           <div className="sa-quickrow">
             <button type="button" className="sa-quick" onClick={() => setPreviewOpen(true)}>页内预览 PDF</button>
             <GuardedButton onClick={handoffToPrint}
+              forceBlocked={viewOnly} title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined}
               blockedReason={printed.printFileUrl ? null : '打印链接未就绪，这份文件暂时送不到打印工作台；页内预览与扫码带走不受影响。'}>去打印工作台核价</GuardedButton>
           </div>
         </SaCard>
@@ -1072,7 +1101,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
         <FilePreviewDialog
           fileUrl={printed.signedUrl} fileName={printed.filename} mimeType="application/pdf"
           phoneDownloadUrl={printed.signedUrl} expiresAt={printed.expiresAt} regenerating={printing}
-          onRegenerate={() => { void handlePrint() }} onClose={() => setPreviewOpen(false)}
+          onRegenerate={viewOnly ? undefined : () => { void handlePrint() }} onClose={() => setPreviewOpen(false)}
         />
       ) : null}
     </SaFrame>

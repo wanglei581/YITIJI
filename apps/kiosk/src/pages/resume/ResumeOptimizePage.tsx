@@ -320,7 +320,8 @@ export function ResumeOptimizePage() {
 
   const goToReport = () => {
     const search = taskId ? `?taskId=${encodeURIComponent(taskId)}` : ''
-    navigate(`/resume/report${search}`, { state: { ...state, taskId, accessToken, ...(aiDown ? { aiDown: true } : {}) } })
+    const licenseViewOnly = state?.licenseViewOnly === true
+    navigate(`/resume/report${search}`, { state: { ...state, taskId, accessToken, ...(aiDown ? { aiDown: true } : {}), ...(licenseViewOnly ? { licenseViewOnly: true } : {}) } })
   }
 
   // 稿：总览、编辑、导出是同一页的三屏，用按钮切换。没有可对照的条目时直接进编辑区。
@@ -466,7 +467,7 @@ export function ResumeOptimizePage() {
             onDecisionChange={handleDecisionChange}
             onBatch={handleBatch}
             onCompare={openCompare}
-            onEditor={() => setWorkView('editor')}
+            onEditor={() => { if (!viewOnly) setWorkView('editor') }}
             onManual={() => { if (!viewOnly) requestLeave(() => navigate('/resume/generate')) }}
             newTaskLocked={viewOnly}
             onReport={() => requestLeave(goToReport)}

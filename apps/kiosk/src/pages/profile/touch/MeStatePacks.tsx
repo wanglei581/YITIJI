@@ -185,15 +185,15 @@ export function MeProfileGuest({ contact }: { contact?: PublicSupportContact } =
   ]
   return (
     <div className="me-state">
-      <LicenseLock><LoginCard title="这台机器是公共终端" text="不登录不会显示任何人的记录。用手机号和验证码，或在手机上扫码确认。" /></LicenseLock>
+      <LoginCard title="这台机器是公共终端" text="不登录不会显示任何人的记录。用手机号和验证码，或在手机上扫码确认。" />
       <p className="me-k">登录后可以看</p>
-      <LicenseLock>{jumps.map(([to, Icon, title, desc]) => (
+      {jumps.map(([to, Icon, title, desc]) => (
         <button type="button" className="me-line me-jump" key={to} onClick={() => navigate('/login', { state: { from: to } })}>
           <span className="me-ic"><Icon size={32} strokeWidth={2} aria-hidden /></span>
           <span className="me-jump-tx"><b>{title}</b><small>{desc}</small></span>
           <ChevronRightIcon size={28} strokeWidth={2.2} aria-hidden />
         </button>
-      ))}</LicenseLock>
+      ))}
       <section className="me-stack" aria-label="不登录也能办">
         <p className="me-k">不登录也能办</p>
         <LicenseLock><MeExitCard art="usb" artWidth={120} title="打印扫描" desc="不登录也能打印、扫描" onClick={() => navigate('/print-scan')} /></LicenseLock>

@@ -1,4 +1,5 @@
 import { COMPLIANCE_COPY, type ResumeOptimizeModule } from '@ai-job-print/shared'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../../../copy/unattendedCopy'
 import { detectUnconfirmedTextAdditions } from './facts'
 import { moduleKeyOf, type ResumeDecisionMap, type ResumeModuleDecision, type ResumeSwitchBlock } from './resumeDecisions'
 
@@ -110,7 +111,7 @@ export function OptimizeOverview(props: {
         })}
       </ul>
       <div className="qxt-ovx">
-        <button type="button" data-testid="resume-optimize-open-editor" aria-label="编辑简历" onClick={props.onEditor}>编辑简历</button>
+        <button type="button" data-testid="resume-optimize-open-editor" aria-label="编辑简历" disabled={props.newTaskLocked === true} title={props.newTaskLocked ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={props.onEditor}>编辑简历</button>
         <button type="button" disabled={props.newTaskLocked === true} onClick={props.onManual}>自己动手改</button>
         <button type="button" onClick={props.onReport}>回诊断报告</button>
       </div>

@@ -249,7 +249,7 @@ export function MyAiRecordsPage() {
 
   const openFairPlan = (item: AiRecordView) => {
     if (item.kind !== 'fair_visit_plan' || item.ref?.type !== 'job_fair' || !item.ref.id) return
-    navigate(`/job-fairs/${encodeURIComponent(item.ref.id)}/visit-plan`, { state: { taskId: item.taskId } })
+    navigate(`/job-fairs/${encodeURIComponent(item.ref.id)}/visit-plan`, { state: { taskId: item.taskId, licenseViewOnly: winding } })
   }
 
   const totalCount = items.length + jobAiSessions.length + interviews.length + qaPage.items.length
@@ -316,7 +316,7 @@ export function MyAiRecordsPage() {
               // 五页合成一张工作台之后，/interview/report 是工作台的一个 stage 而不是独立路由。
               // 只 navigate 会落到工作台默认 stage（setup），看不到这条记录的报告。
               patchInterviewWorkbenchSession({ stage: 'report', report: { sessionId } })
-              navigate('/interview/report', { state: { sessionId } })
+              navigate('/interview/report', { state: { sessionId, licenseViewOnly: winding } })
             }}
             onDelete={(sessionId) => void removeInterview(sessionId)}
           />

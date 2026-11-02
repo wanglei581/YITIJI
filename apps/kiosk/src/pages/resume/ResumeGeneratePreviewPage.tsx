@@ -317,6 +317,11 @@ export function ResumeGeneratePreviewPage() {
   const showWorkspace = Boolean(resume && result) && !['session-lost', 'preview-no-result', 'preview-loading', 'preview-failed', 'illegal'].includes(view)
   const canRetry = Boolean(restoreTaskId) && !synthetic
   const go = (to: string) => navigate(to)
+  const leaveToCaller = () => {
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0
+    if (idx > 0) navigate(-1)
+    else navigate('/me/resumes')
+  }
   const onExportScreen = showWorkspace && phase === 'export'
   useEffect(() => {
     const id = pendingTitleFocus.current
@@ -338,7 +343,7 @@ export function ResumeGeneratePreviewPage() {
     canRetry,
     onHome: () => go('/'),
     onSource: () => go('/resume/source'),
-    onRefill: () => go('/resume/generate'),
+    onRefill: () => { if (viewOnly) leaveToCaller(); else go('/resume/generate') },
     onRetry: () => { setRestoreFailed(false); setRestoring(true); setRetryNonce((n) => n + 1) },
     onOpenExport: openExport,
     onBackToPreview: backToPreview,
@@ -381,7 +386,7 @@ export function ResumeGeneratePreviewPage() {
       }}
       back={{
         label: onExportScreen ? '返回预览' : '返回填写',
-        onBack: () => { if (onExportScreen) backToPreview(); else go('/resume/generate') },
+        onBack: () => { if (onExportScreen) backToPreview(); else if (viewOnly) leaveToCaller(); else go('/resume/generate') },
       }}
       navTestIds={{
         home: 'resume-generate-preview-nav-home',
