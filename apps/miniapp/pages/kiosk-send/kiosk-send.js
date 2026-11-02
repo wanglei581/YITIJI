@@ -26,6 +26,7 @@ const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const { parseKioskCode } = require('../../utils/kiosk-qr')
 const { userMessageOf } = require('../../utils/user-error')
+const aiAccess = require('../../utils/ai-access')
 
 const {
   MAX_BYTES,
@@ -36,6 +37,7 @@ const {
   resolveRetryable,
   safeDecode,
   docRowsOf,
+  albumFileOf,
 } = require('./kiosk-send-helpers')
 
 const DOC_PAGE_SIZE = 50
@@ -315,6 +317,32 @@ Page({
     })
   },
 
+  /** 拍照或从相册选一张照片（#1363）：访客传签名图、照片合成要用；只收图片、不压缩（打印件压过会糊）。 */
+  chooseFromAlbum() {
+    if (this._sendBlocked()) return
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['camera', 'album'],
+      sizeType: ['original'],
+      success: (res) => {
+        if (this._sendBlocked()) return
+        const picked = albumFileOf(res)
+        if (!picked) return
+        if (picked.error) {
+          this.setData({ phase: 'error', canRetry: true, errorMsg: picked.error })
+          return
+        }
+        this._send(picked.file)
+      },
+      fail: (err) => {
+        if (err && err.errMsg && err.errMsg.indexOf('cancel') >= 0) return
+        if (this._sendBlocked()) return
+        this.setData({ phase: 'error', canRetry: true, errorMsg: '选择照片失败，请重试' })
+      },
+    })
+  },
+
   _sendBlocked() {
     const phase = this.data.phase
     if (phase === 'uploading' || phase === 'done' || phase === 'unknown' || phase === 'resolving') return true
@@ -359,8 +387,10 @@ Page({
       .catch((err) => {
         if (attempt !== this._sendAttempt) return
         wx.hideLoading()
-        const kind = classifySendError(err)
-        if (kind === 'rejected') {
+        // 年龄确认点了「未满」：先问声明、再发请求，文件根本没发出去，码也没用掉（#1409）。
+        // 照实说原因、可以重选，不能落进「结果不确定」把人卡住。
+        const kind = aiAccess.isDeclined(err) ? 'declined' : classifySendError(err)
+        if (kind === 'rejected' || kind === 'declined') {
           this.setData({
             phase: 'error',
             canRetry: true,
@@ -448,7 +478,8 @@ Page({
       })
       return
     }
-    if (kind === 'rejected') {
+    // 年龄确认点了「未满」：没递出去，回到空闲照实说原因，可以再选（#1409）。
+    if (kind === 'rejected' || aiAccess.isDeclined(err)) {
       this.setData({ phase: 'idle', docNote: userMessageOf(err, REJECT_FALLBACK) })
       return
     }

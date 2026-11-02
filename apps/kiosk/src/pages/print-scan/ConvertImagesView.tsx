@@ -30,6 +30,8 @@ interface ConvertImagesViewProps {
   loggedIn: boolean
   /** 转换响应的真信号；缺省（尚未转换 / 旧响应）时完成态两句都不说。 */
   hasEndUser: boolean | undefined
+  /** 这份 PDF 进没进「我的文档」（响应的 savedToDocuments）；登录了、用了手机传来的图片时为 false。 */
+  savedToDocuments: boolean | undefined
   kiosk: boolean
   phase: ConvertPhase
   images: SelectedImage[]
@@ -74,7 +76,7 @@ interface ConvertImagesViewProps {
 
 export function ConvertImagesView(props: ConvertImagesViewProps) {
   const {
-    loggedIn, hasEndUser, kiosk, phase, images, selected, uploading, generating, rechecking,
+    loggedIn, hasEndUser, savedToDocuments, kiosk, phase, images, selected, uploading, generating, rechecking,
     showQr, error, result, recovered, requestKey, preview, previewFailed, inputRef, atLimit,
   } = props
   const advisor = advisorCopy(phase, images.length, error)
@@ -130,7 +132,9 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
               '系统已返回结果',
               '一张图一页 · A4',
               ...(typeof hasEndUser === 'boolean'
-                ? [hasEndUser ? '已进我的文档 · 约 24 小时' : '未登录 · 不进我的文档']
+                ? [hasEndUser
+                    ? (savedToDocuments ? '已进我的文档 · 约 24 小时' : '只用于这一单 · 不进我的文档')
+                    : '未登录 · 不进我的文档']
                 : []),
             ]}
           >
@@ -141,6 +145,9 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
                   <b>你现在没登录，这份 PDF 不会进「我的文档」，转好之后再登录也存不进去。</b>
                   不登录也能直接打印这份；想存进「我的文档」，要先登录，再回到这一页重新添加图片转换。
                 </>
+              ) : null}
+              {hasEndUser === true && savedToDocuments === false ? (
+                <b>用了手机传来的图片，这份 PDF 只用于这一单，不进「我的文档」；可以直接拿去打印。</b>
               ) : null}
               {recovered ? ' 没有生成第二份，只是重新签发了一条新的临时打印链接。' : null}
             </div>
@@ -237,7 +244,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
         <div>
           <b>留存</b>
           {loggedIn
-            ? '登录后 PDF 进「我的文档」，默认约 24 小时可延长。'
+            ? '登录后 PDF 进「我的文档」，默认约 24 小时可延长；用了手机传来的图片时，只用于这一单，不进「我的文档」。'
             : '未登录时 PDF 不会进入「我的文档」，也不下载到这台公用机器。'}
         </div>
       </div>

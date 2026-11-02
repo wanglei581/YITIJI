@@ -112,7 +112,7 @@ export const PRINT_HUB_AI_EXPLAINER: readonly PrintHubAiExplainerRow[] = [
     isAi: true,
     help: '材料体检：读一遍文件，给出页数、能不能按 A4 打，以及有没有身份证号一类隐私片段。打印参数不代你设。',
     aiDown: '没有体检结论，也没有隐私提示。页数、纸张、份数、双面照旧由你自己设，照常出纸。',
-    deviceOff: '停。出纸要这台机器；文件可以先传上来存着，换一台再打。',
+    deviceOff: '停。出纸要这台机器；「我的文档」里的文件换一台登录后照样能打，手机传来的要到那台重新扫码传。',
   },
   {
     cap: 'phone',
@@ -120,7 +120,7 @@ export const PRINT_HUB_AI_EXPLAINER: readonly PrintHubAiExplainerRow[] = [
     isAi: false,
     help: '不帮。传文件这一步纯粹是搬运，用不到模型；体检与隐私检查在「文档打印」那一步做。',
     aiDown: '不受影响。',
-    deviceOff: '照常可用。文件不经过打印机，先传上来存进「我的文档」，换机取回来打。',
+    deviceOff: '照常可用，文件不经过打印机；但手机传来的只用于这一单、不进「我的文档」，换一台要重新扫码传。',
   },
   {
     cap: 'scan',

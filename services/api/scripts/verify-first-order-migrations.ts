@@ -34,8 +34,12 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     // 只填没有库内默认值的必填列；读回时也只取 id。
     const stamp = kind === 'sqlite' ? `'2026-10-28T00:00:00.000+00:00'` : `TIMESTAMP '2026-10-28 00:00:00'`
     await client.$executeRawUnsafe(`INSERT INTO "Organization" ("id", "name", "type", "updatedAt") VALUES ('first-order-migration-sentinel', 'Migration sentinel', 'public_employment_service', ${stamp})`)
+    // 基线之后的每条迁移都要在这里按顺序补一行；漏一条，下面用当前客户端写库就会报缺列。
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', migration)])
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261028120000_ai_service_fact/migration.sql')])
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261028230000_organization_branding/migration.sql')])
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261028230100_license/migration.sql')])
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261102090000_add_terminal_daily_free_print_sides/migration.sql')])
     await client.aiServiceFact.create({ data: { serviceType: 'resume_optimize', serviceKey: 'migration-test', orgId: 'org-snapshot', terminalId: 'terminal-snapshot' } })
     if (await client.aiServiceFact.count() !== 1) throw new Error(`${kind}: fact table unavailable`)
     const sentinel = await client.organization.findUnique({ where: { id: 'first-order-migration-sentinel' }, select: { id: true } })

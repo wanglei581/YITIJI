@@ -501,6 +501,8 @@ export function ConvertImagesCta(props: {
   rechecking: boolean
   uploading: boolean
   hasEndUser: boolean | undefined
+  /** 这份 PDF 进没进「我的文档」；只用于这一单时不给「查看我的文档」。 */
+  savedToDocuments: boolean | undefined
   onBack: () => void
   onConvert: () => void
   onRecheck: () => void
@@ -514,7 +516,7 @@ export function ConvertImagesCta(props: {
   onCloseUsb: () => void
   onPickLocal: () => void
 }) {
-  const { phase, imageCount, error, generating, rechecking, uploading, hasEndUser } = props
+  const { phase, imageCount, error, generating, rechecking, uploading, hasEndUser, savedToDocuments } = props
   const convertLabel = `合成 ${imageCount} 张为一份 PDF`
   const ghostBack = (
     <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onBack}>返回打印扫描</button>
@@ -570,7 +572,9 @@ export function ConvertImagesCta(props: {
       <>
         {typeof hasEndUser === 'boolean'
           ? hasEndUser
-            ? <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onDocuments}>查看我的文档</button>
+            ? (savedToDocuments
+                ? <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onDocuments}>查看我的文档</button>
+                : null)
             : <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onLogin}>先登录再转换</button>
           : null}
         <button type="button" className="qx-btn" data-variant="primary" data-testid="img2pdf-primary" onClick={props.onPrint}>

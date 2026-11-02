@@ -31,4 +31,9 @@ export interface ConvertImagesResponse {
    * 对过期/无效 JWT 和 Redis 会话不匹配静默 return null，转换仍成功且 endUserId 落 null。
    */
   hasEndUser: boolean
+  /**
+   * 这份 PDF 进没进「我的文档」。绑定了会员也可能不进：用了一体机这一单里从手机传来的图片时，
+   * PDF 只用于这一单（2026-11-02 拍板）。前端说「已进我的文档」只认这个字段。
+   */
+  savedToDocuments: boolean
 }

@@ -2,6 +2,8 @@
 // 传文件到一体机：回执判定、错误归类、「我的文档」行。纯函数，顶层不碰 wx。
 // （kiosk-send.js 加了「从我的文档选」后超过 500 行，按 CLAUDE.md §8 把纯函数拆到这里。）
 
+const uploadName = require('../../utils/upload-name')
+
 const MAX_BYTES = 10 * 1024 * 1024
 // 与一体机 phoneUploadModel.receiptOf 的 SESSION_PURPOSES 相同。
 // signature_image 能出现在文件用途里，但创建上传会话的 DTO 不接受它。
@@ -110,7 +112,22 @@ function docRowsOf(items, nowMs) {
   return rows
 }
 
+/**
+ * 拍照或从相册选回来的那张照片（#1363）→ 要传的 { file } 或一句 { error }；什么都没选回来时为 null。
+ * 照片临时名没意义，按「我的文档」同一套办法起可读名；扩展名沿用临时文件的真实扩展名
+ * （改了会被后端魔数校验打回），认不出扩展名就不传。
+ */
+function albumFileOf(res) {
+  const file = ((res && res.tempFiles) || [])[0]
+  if (!file || !file.tempFilePath) return null
+  if (file.size > MAX_BYTES) return { error: '单个文件不能超过 10MB，请压缩后重试' }
+  const ext = uploadName.extOf(file.tempFilePath)
+  if (!ext) return { error: '无法识别照片格式，请重新选择' }
+  return { file: { path: file.tempFilePath, name: uploadName.cameraFileName(ext), size: file.size } }
+}
+
 module.exports = {
+  albumFileOf,
   MAX_BYTES,
   receiptAccepted,
   statusOf,
