@@ -1,5 +1,16 @@
 # 当前开发进度
 
+## 2026-11-03：屏上扫描 ③ 后端 B5（证件 PDF 每页 OCR、页数读不出就拒收；分支 `claude/scan-device-b2-1102`，叠在 B4 头 `dfd2ab8a0` 上，未推送、未部署）
+
+- Codex 复审 B3 第 1–6 条回源码后属实，按协调方定的做法修。第 7 条（本线门禁里 `lease.device` 的整对象精确比对、补 maxPages / maxBytes）没动。
+- 证件 PDF：用途 `id_scan` 时，不论有没有文字层，每一页都走和图片证件相同的 OCR。其它用途仍先试文字层。实际 OCR 页数上限是 max(配置 `PII_SCAN_MAX_OCR_PAGES`, 证件页数上限 4)。配置成 1 时，4 页证件 PDF 仍 4 页都识别；超过 4 页只识别 4 页并标截断。非证件仍按配置截断。
+- 屏上扫描投递的 PDF（证件与非证件）只认解析器读出的页数。解析器不可用、退回字节正则、读不出、小于 1 页，一律 409 `SCAN_DEVICE_PAGE_COUNT_UNREADABLE`，中文「这份扫描件的页数没能读出来，请重新扫描。」任务失败后的 `getStatus` 用同一个码和这一句，不再说成「页数超过上限」。超过上限仍是 `SCAN_DEVICE_TOO_MANY_PAGES`。面板上传和计费仍接受字节正则兜底。
+- 门禁加在现有 `verify:scan-device-idscan`（没有新文件，没改 `ci.yml` / `package.json`）。旧断言里把「读不出页数」说成超限的几条改成新错误码；W3b（面板仍拒证件 PDF）没动。会话、设置、生命周期三条门禁里用来成功投递的占位 `%PDF` 头换成解析器能读的一页 PDF，精确比对的断言没改。
+- 隐私遮挡仍按打印用途抽文字层，没有把 `id_scan` 传进去。证件 PDF 改走 OCR 后没有文字坐标，遮挡结果与图片证件一样是不支持，不把已识别文字当成遮完。
+- 合规：`docs/compliance/compliance-boundary.md` §5.2 同步了「只认解析器页数」和「证件 PDF 每页 OCR、上限至少 4」。
+- 验证（本机隔离库，`RECRUITMENT_CONTENT_HOSTING_ENABLED=false`，独立 Redis `127.0.0.1:56379`）：SQLite `file:./prisma/verify-b5.db` 上 api typecheck、`eslint src/`、扫描与材料 / 个人信息相关门禁、`db:pg:sync:check` 过。三条设备门禁第一次红，是占位 PDF 读不出页数，换夹具后过。临时 PostgreSQL 16（127.0.0.1:55461，时区 UTC，库名 `b5_verify`）上扫描相关门禁再跑过；`verify:scan-tasks` 带 `POSTGRES_URL` 时日志没有「SKIPPED real DB」，末尾 `PASS scan tasks verification`。没有新文件，没跑 `pnpm graph`。没改 workflow，没跑 `verify:repository-integrity`。反向检查四处（证件 PDF 有文字层就跳过 OCR、字节正则计数仍放行、配置 1 页时证件只识别 1 页、读不出页数在 `getStatus` 上说成超限）都让 `verify:scan-device-idscan` 变红，`git checkout --` 恢复后工作区干净。
+- 没做：一体机、终端程序、小程序、两个后台没动。没有新迁移。未推送、未部署。哪台机器都不许因此把 `scan_device` 配成 available。
+
 ## 2026-11-03：屏上扫描 ③ 后端 B4（投递防 ABA、回报与设置交错、取消倒计时、页数上限、扫描仪告警、文件体积；分支 `claude/scan-device-b2-1102`，叠在 B3 头 `7935410c1` 上，未推送、未部署）
 
 - 投递防 ABA：device 任务的 `scanDeliverClaimPins` 再钉读到的 `deviceUpdatedAt`（不加列）。出错重扫后旧投递迟到、状态又回到 composing / delivering 时，抢占落空，409 `SCAN_TASK_STATE_CHANGED`，不建文件，任务仍 waiting。正常进纸器与玻璃台投递照常。面板仍只钉 `startMode`。
