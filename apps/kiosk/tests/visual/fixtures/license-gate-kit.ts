@@ -55,9 +55,21 @@ export async function boot(page: Page, api: ApiRouter, options: BootOptions = {}
   return world
 }
 
-/** 像手指一样点一下：按元素中心的屏幕坐标发鼠标点击（停用的入口 Playwright 的 click 会拒绝点，那不是我们要测的）。 */
+/**
+ * 像手指一样点一下：按元素中心的屏幕坐标发鼠标点击（停用的入口 Playwright 的 click 会拒绝点，那不是我们要测的）。
+ * 先等元素在屏上、位置稳住再点：页面刚渲染、列表和数字刚读回来时版面还会挪（例如「我的」读回待办后，下面的行整体下移），
+ * 按挪动前量到的坐标点会点空，用例就在 waitForURL 上白等到超时。
+ */
 export async function tap(page: Page, target: Locator): Promise<void> {
-  const box = await target.boundingBox()
+  await target.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => undefined)
+  let box = await target.boundingBox()
+  for (let attempt = 0; attempt < 25; attempt += 1) {
+    await page.waitForTimeout(80)
+    const next = await target.boundingBox()
+    const settled = box !== null && next !== null && Math.abs(next.x - box.x) < 0.5 && Math.abs(next.y - box.y) < 0.5
+    box = next
+    if (settled) break
+  }
   expect(box, '要点的东西得在屏上').not.toBeNull()
   await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2)
 }

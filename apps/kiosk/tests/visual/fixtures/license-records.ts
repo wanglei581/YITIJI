@@ -76,3 +76,21 @@ export const INTERVIEW_ROW = {
 
 /** GET /api/v1/mock-interviews/:sessionId/report 的响应（沿用既有的练习报告夹具，换成这场的编号）。 */
 export const INTERVIEW_REPORT = { data: { ...interviewReport.data, sessionId: INTERVIEW_SESSION_ID } }
+
+/** 历史列表里的第二场练习（另一个岗位、另一份总评），用来看「从历史列表打开另一份旧报告」。 */
+export const INTERVIEW_SESSION_ID_2 = 'license-wind-down-interview-2'
+export const INTERVIEW_ROW_2 = {
+  ...INTERVIEW_ROW,
+  sessionId: INTERVIEW_SESSION_ID_2,
+  position: '产品运营',
+  createdAt: '2026-10-21T09:00:00.000Z',
+  endedAt: '2026-10-21T09:05:00.000Z',
+} as const
+export const INTERVIEW_REPORT_2 = {
+  data: {
+    ...interviewReport.data,
+    sessionId: INTERVIEW_SESSION_ID_2,
+    position: '产品运营',
+    report: { ...interviewReport.data.report, overall: { level: 'pass', summary: '第二场的总评：思路清楚，数据意识还要加强。' } },
+  },
+}
