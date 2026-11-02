@@ -32,6 +32,8 @@ export interface ScanDeviceHealthDeps {
   deviceName: () => string
   /** 周期探测在这些阶段跳过。 */
   getPhase: () => string
+  /** 强杀后确认旧进程是否还在。没注入时无法确认，按还在处理。 */
+  isProcessAlive?: (pid: number) => boolean
 }
 
 export interface ScanDeviceHealth {
@@ -42,6 +44,23 @@ export interface ScanDeviceHealth {
   noteForceKilled(): void
   hasForceKilled(): boolean
   clearForceKilled(): void
+  /** 强杀没有确认进程退出。健康态记为 error，扫描和探测在解除前不再连扫描仪。 */
+  noteSuspect(pid?: number): void
+  hasSuspect(): boolean
+  /** 旧进程还在，或根本没有进程号、无法确认已经退出。 */
+  suspectProcessAlive(): boolean
+  clearSuspect(): void
+}
+
+/** 进程不存在才算退出。权限不够（EPERM）仍当作还在。 */
+export function defaultScanProcessAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return true
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM'
+  }
 }
 
 function iso(ms: number): string {
@@ -52,8 +71,21 @@ export function createScanDeviceHealth(deps: ScanDeviceHealthDeps): ScanDeviceHe
   let health: ScanDeviceHealthState = 'unknown'
   let observedAt = iso(deps.clock.now())
   let forceKilled = false
+  let suspect = false
+  let suspectPid: number | undefined
   let timer: unknown
   let stopped = false
+
+  const processAlive = (pid: number): boolean => {
+    if (!deps.isProcessAlive) return true
+    return deps.isProcessAlive(pid)
+  }
+
+  const suspectAlive = (): boolean => {
+    if (!suspect) return false
+    if (suspectPid === undefined) return true
+    return processAlive(suspectPid)
+  }
 
   const record = (next: ScanDeviceHealthState): ScanDeviceHealthSnapshot => {
     health = next
@@ -69,6 +101,7 @@ export function createScanDeviceHealth(deps: ScanDeviceHealthDeps): ScanDeviceHe
     ) {
       return { health, observedAt }
     }
+    if (suspectAlive()) return record('error')
     let handle: DeviceLockHandle | undefined
     try {
       handle = deps.lock.tryAcquire('scan-probe')
@@ -78,6 +111,11 @@ export function createScanDeviceHealth(deps: ScanDeviceHealthDeps): ScanDeviceHe
     if (!handle) return record('busy')
     try {
       const result = await deps.runProbe({ deviceName: deps.deviceName() || undefined })
+      if (suspect && result.state === 'ready' && !suspectAlive()) {
+        suspect = false
+        suspectPid = undefined
+        forceKilled = false
+      }
       return record(result.state)
     } catch {
       return record('error')
@@ -112,6 +150,18 @@ export function createScanDeviceHealth(deps: ScanDeviceHealthDeps): ScanDeviceHe
     hasForceKilled: () => forceKilled,
     clearForceKilled: () => {
       forceKilled = false
+    },
+    noteSuspect: (pid?: number) => {
+      suspect = true
+      suspectPid = pid
+      forceKilled = true
+      record('error')
+    },
+    hasSuspect: () => suspect,
+    suspectProcessAlive: () => suspectAlive(),
+    clearSuspect: () => {
+      suspect = false
+      suspectPid = undefined
     },
   }
 }
