@@ -28524,6 +28524,7 @@
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts",
       "services/api/scripts/verify-scan-deliver-filename.ts",
+      "services/api/scripts/verify-scan-device-b6.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-scan-tasks.ts",
@@ -43824,6 +43825,7 @@
           "services/api/src/scan-tasks/scan-device-protocol.ts",
           "services/api/src/scan-tasks/scan-device-sessions.service.ts",
           "services/api/src/scan-tasks/scan-lease.ts",
+          "services/api/src/scan-tasks/scan-tasks.controller.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
           "services/api/src/storage/storage.service.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts"

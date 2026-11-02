@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-11-03：屏上扫描 ③ 后端 B7（投递核对所附扫描轮次；多页门禁用真多页 PDF；分支 `claude/scan-device-b2-1102`，叠在 B6 头 `ed0460bd9` 上，未推送、未部署）
+
+- Codex 复审 B5+B6 新问题 1、2。device-report 成功响应多带收下之后的 `deviceRound`（与加一轮次同一条规则，不另查库）。deliver 不走 DTO，multipart 逐字段增加可选 `deviceRound`。给了就必须同时等于已验签租约里的轮次和库里当前轮次，否则 409 `SCAN_TASK_STATE_CHANGED`，比对在建文件和抢占之前（`assertScanDeliverAttachedRound`）。没给、null、空串照旧。面板不比。
+- `verify:scan-device-b6` 的进纸器、玻璃台改为 pdf-lib 真的 3 页、2 页 PDF，投递后核对库里的页数和读回文件的页数。状态与轮次断言保留。没有新迁移，没改 workflow，没跑 `verify:repository-integrity`。`scan-tasks.service.ts` 1342 行，只多一次调用。
+- 验证（本机隔离库，`RECRUITMENT_CONTENT_HOSTING_ENABLED=false`，用完已停）：api typecheck、`eslint src/`、`db:pg:sync:check`（「postgres schema 同步校验通过」）过。SQLite 空库 `file:/tmp/verify-b7-sqlite.db`（Redis `127.0.0.1:57280`）`migrate deploy` 129 条全部应用。临时 PostgreSQL 16（127.0.0.1:57281，时区 UTC，库名 `b7_verify`，Redis `127.0.0.1:57282`）空库 `migrate deploy` 101 条全部应用，`migrate diff`「No difference detected.」。两套库上 B6 清单和图谱多列出的门禁都过；`verify:scan-tasks` 在 PostgreSQL 上单独重跑（与 SQLite 并行时反向突变写同一文件撞车），日志没有「SKIPPED real DB」，末尾 `PASS scan tasks verification`。`pnpm graph:check` 通过。反向检查三处（给了轮次但不比对、回报响应不带轮次、多页用例退回单页）都让 `verify:scan-device-b6` 变红，`git checkout --` 恢复后工作区干净。
+- 没做：一体机、终端程序、小程序、两个后台没动。未推送、未部署。哪台机器都不许因此把 `scan_device` 配成 available。终端程序下一轮才会开始带 `deviceRound`；没带的投递仍只核租约轮次。
+
 ## 2026-11-03：屏上扫描 ③ 后端 B6（扫描轮次替换 deviceUpdatedAt 钉；取消倒计时不再另查库；分支 `claude/scan-device-b2-1102`，叠在 B5 头 `dec1dfb2e` 上，未推送、未部署）
 
 - Codex 复审 B4 的三条都按协调方的判定改了。`ScanTask` 加 `deviceRound Int @default(0)`（两套 schema）。新迁移 `20261103030000_add_scan_device_round`，两套目录同名，排在 `20261102230000_add_scan_device_session_fields` 之后。`verify-first-order-migrations` 的升级清单补了这一行：升级前的旧行取 0，新行默认 0，可以加一。

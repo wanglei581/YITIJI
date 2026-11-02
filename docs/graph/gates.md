@@ -2888,7 +2888,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/scan-tasks/scan-device.controller.ts` | `verify-ai-access.ts`<br/>`verify-scan-device-sessions.ts`<br/>`verify-scan-device-settings.ts` |
 | `services/api/src/scan-tasks/scan-lease.ts` | `verify-scan-device-b6.ts` |
 | `services/api/src/scan-tasks/scan-task-reaper.task.ts` | `verify-scan-tasks.ts` |
-| `services/api/src/scan-tasks/scan-tasks.controller.ts` | `verify-scan-session-truth.mjs`<br/>`verify-ai-access.ts`<br/>`verify-multipart-field-nesting.ts`<br/>`verify-scan-deliver-filename.ts`<br/>`verify-scan-device-sessions.ts`<br/>`verify-scan-device-settings.ts`<br/>`verify-scan-tasks.ts`<br/>`verify-throttle-dimension.ts` |
+| `services/api/src/scan-tasks/scan-tasks.controller.ts` | `verify-scan-session-truth.mjs`<br/>`verify-ai-access.ts`<br/>`verify-multipart-field-nesting.ts`<br/>`verify-scan-deliver-filename.ts`<br/>`verify-scan-device-b6.ts`<br/>`verify-scan-device-sessions.ts`<br/>`verify-scan-device-settings.ts`<br/>`verify-scan-tasks.ts`<br/>`verify-throttle-dimension.ts` |
 | `services/api/src/scan-tasks/scan-tasks.module.ts` | `verify-scan-device-sessions.ts` |
 | `services/api/src/scan-tasks/scan-tasks.service.ts` | `verify-scan-session-truth.mjs`<br/>`verify-admin-print-scan.ts`<br/>`verify-pg-serialization-conflict.ts`<br/>`verify-scan-device-b4.ts`<br/>`verify-scan-device-b6.ts`<br/>`verify-scan-device-idscan.ts`<br/>`verify-scan-device-lifecycle.ts`<br/>`verify-scan-device-sessions.ts`<br/>`verify-scan-device-settings.ts`<br/>`verify-scan-quiet-period.ts`<br/>`verify-scan-tasks.ts` |
 | `services/api/src/smart-campus/dto/save-smart-campus-config.dto.ts` | `verify-partner-smart-campus.ts` |
