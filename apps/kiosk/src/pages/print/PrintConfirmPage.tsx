@@ -151,6 +151,7 @@ export function PrintConfirmPage() {
   const [terminalSession, setTerminalSession] = useState<TerminalSessionState>(() => terminalSessionState())
   const [abandoning, setAbandoning] = useState(false)
   const [piiCheckRequired, setPiiCheckRequired] = useState(false)
+  const [quotaCode, setQuotaCode] = useState<string | undefined>()
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [appendSelfAssessment, setAppendSelfAssessment] = useState(false)
   const [quoteNonce, setQuoteNonce] = useState(0)
@@ -389,6 +390,7 @@ export function PrintConfirmPage() {
       inFlightRef.current = true
       setSubmitting(true)
       setSubmitError(null)
+      setQuotaCode(undefined)
       let leaving = false
       try {
         let printFileUrl = file.fileUrl
@@ -465,6 +467,9 @@ export function PrintConfirmPage() {
               ? `价格已更新：你确认的是 ${formatCents(quote.amountCents)}，现在应付 ${formatCents(current.amountCents)}。本次没有建单，也没有扣款；请核对新金额后再点确认。`
               : '价格已更新，本次没有建单，也没有扣款。正在重新获取报价，请核对新金额后再确认。',
           })
+        } else if (['PRINT_TERMINAL_DAILY_QUOTA_REACHED', 'PRINT_MEMBER_DAILY_QUOTA_REACHED', 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED'].includes(errorCodeOf(err) ?? '')) {
+          setQuotaCode(errorCodeOf(err))
+          setSubmitError(`${userMessageOf(err, '')} 本次没有建单，也没有出纸。`)
         } else if (errorCodeOf(err) === 'PRINT_PII_SCAN_REQUIRED') {
           setPiiCheckRequired(true)
           setSubmitError('这份文件的隐私检查还没有确认完，需要回到材料检查再确认一次。你的文件还在，不用重新上传。')
@@ -582,7 +587,12 @@ export function PrintConfirmPage() {
     }
     navigate('/print/desk?step=check', { state: { printContextId: kept.contextId } })
   }
-  const actions = piiCheckRequired ? (
+  const actions = quotaCode === 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED' ? (
+    <>
+      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print/desk?step=preview')}>减少份数或页数再试</button>
+      <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(loginPathForPrintStep('confirm'))}>去登录</button>
+    </>
+  ) : piiCheckRequired ? (
     <button type="button" className="qx-btn" data-variant="primary" style={{ minHeight: 56 }} onClick={returnToMaterialCheck}>回到材料检查</button>
   ) : screen === 'missing-context' ? (
     <>
@@ -664,7 +674,7 @@ export function PrintConfirmPage() {
     </section>
   )
 
-  const usesDockPrimary = !piiCheckRequired
+  const usesDockPrimary = quotaCode !== 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED' && !piiCheckRequired
     && screen !== 'missing-context'
     && screen !== 'invalid-context'
     && screen !== 'ordered'

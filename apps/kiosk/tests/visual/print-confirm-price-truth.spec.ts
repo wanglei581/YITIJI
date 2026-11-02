@@ -518,3 +518,32 @@ for (const state of ['loading', 'failed'] as const) {
     }
   })
 }
+
+for (const scenario of [
+  { code: 'PRINT_TERMINAL_DAILY_QUOTA_REACHED', message: '这台机器今天的免费打印量已用完，明天 0 点恢复', limit: 300 },
+  { code: 'PRINT_MEMBER_DAILY_QUOTA_REACHED', message: '你今天已免费打印 50 面，达到每日上限，明天 0 点恢复', limit: 50 },
+  { code: 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED', message: '免登录每次最多打印 20 面', limit: 20 },
+] as const) {
+  test(`free print quota ${scenario.code} gives an exit @kiosk`, async ({ page, api }) => {
+    registerShell(api, [])
+    registerPriceConfig(api, [0])
+    await routeQuote(page, () => ({ unitCents: 0, pages: W2_FILE.pages }))
+    await page.route('**/api/v1/print/jobs', async (route) => {
+      await route.fulfill({ status: 429, json: { error: { code: scenario.code, message: 'server text', details: { limit: scenario.limit } } } })
+    })
+    await openConfirm(page)
+    await expect(originalConfirm(page)).toBeEnabled()
+    await originalConfirm(page).click()
+    await expect(page.getByRole('alert')).toContainText(scenario.message)
+    await expect(page.getByRole('alert')).toContainText('本次没有建单，也没有出纸')
+    if (scenario.code === 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED') {
+      await expect(page.getByRole('button', { name: '去登录', exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: '减少份数或页数再试' })).toBeVisible()
+      await page.getByRole('button', { name: '去登录', exact: true }).click()
+      await expect(page).toHaveURL(/\/login\?from=%2Fprint%2Fconfirm/)
+    } else {
+      await expect(page.getByRole('alert')).toContainText('需要帮助？')
+      await expect(page.getByRole('button', { name: '返回修改' })).toBeVisible()
+    }
+  })
+}
