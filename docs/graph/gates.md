@@ -26,7 +26,7 @@ _（空）_
 
 ──────────────────────────────────────────────────────────────────────
 
-## 有脚本名但不在 CI 执行闭包里（14）
+## 有脚本名但不在 CI 执行闭包里（15）
 
 这一栏是**尽力而为的推断**，权威是 `verify:ci-gate-coverage` 加
 `scripts/ci-gate-exemptions.json`。已在豁免清单里登记的（需要真实凭证 / 真机 /
@@ -41,6 +41,7 @@ _（空）_
 | `apps/kiosk/scripts/probe-ai-resume-closure-42.mjs` | `@ai-job-print/kiosk::verify:probe-ai-resume-closure-42` |
 | `apps/kiosk/scripts/probe-file-closure-43.mjs` | `@ai-job-print/kiosk::verify:probe-file-closure-43` |
 | `apps/kiosk/scripts/probe-member-session-41.mjs` | `@ai-job-print/kiosk::verify:probe-member-session-41` |
+| `apps/kiosk/scripts/verify-kiosk-brand-display.mjs` | `@ai-job-print/kiosk::verify:kiosk-brand-display` |
 | `apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts` | `terminal-agent::verify:print-queue-residue-windows` |
 | `scripts/generate-project-graph.mjs` | `ai-job-print-terminal::graph`<br/>`ai-job-print-terminal::graph:check` |
 | `scripts/project-graph-query.mjs` | `ai-job-print-terminal::graph:query` |
@@ -69,7 +70,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1975 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1979 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -426,7 +427,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 596 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 600 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -470,9 +471,12 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/components/kiosk-shell/KioskFullscreenShell.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/components/kiosk-shell/KioskStageFit.tsx` | `verify-fusion-shell.mjs` |
 | `apps/kiosk/src/components/qingxu/QxAppNavbar.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w5.mjs` |
+| `apps/kiosk/src/components/qingxu/QxPageFrame.tsx` | `verify-kiosk-brand-display.mjs` |
+| `apps/kiosk/src/components/qingxu/touch/QxTouchBand.tsx` | `verify-kiosk-brand-display.mjs` |
 | `apps/kiosk/src/components/qingxu/touch/QxTouchOverlay.tsx` | `verify-profile-documents-inkpaper.mjs` |
 | `apps/kiosk/src/components/qingxu/touch/QxTouchTask.tsx` | `verify-fusion-home.mjs` |
 | `apps/kiosk/src/components/qingxu/touch/QxTouchTile.tsx` | `verify-kiosk-frontend-debt.mjs`<br/>`verify-service-entry-readiness.mjs` |
+| `apps/kiosk/src/copy/miniappLinkCopy.ts` | `verify-kiosk-brand-display.mjs` |
 | `apps/kiosk/src/copy/unattendedCopy.ts` | `verify-kiosk-feedback-entry.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-kiosk-unattended-copy.mjs`<br/>`verify-pickup-claim-error-coverage.mjs`<br/>`verify-resume-decisions.mjs` |
 | `apps/kiosk/src/favorites/localFavorites.ts` | `verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/hooks/useAiAdvisorCallSession.ts` | `verify-ai-requests-terminal-session.mjs`<br/>`verify-assistant-trtc-guard.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-prod-build-config.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
@@ -482,7 +486,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/hooks/useTerminalDeviceStatus.ts` | `verify-device-status-honest.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-field-safety.mjs`<br/>`verify-kiosk-unattended-copy.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-service-entry-readiness.mjs`<br/>`verify-print-monitor-truth.ts`<br/>`verify-queue-dispatch-printer-status.ts` |
 | `apps/kiosk/src/hooks/useToolboxConfig.ts` | `verify-home-toolbox-ui.mjs`<br/>`verify-terminal-device-config.ts` |
 | `apps/kiosk/src/index.css` | `verify-fusion-shell.mjs`<br/>`verify-kiosk-ai-primitives.mjs`<br/>`verify-kiosk-visual-unity.mjs`<br/>`verify-service-desk-foundation.mjs`<br/>`verify-kiosk-font-subset.mjs` |
-| `apps/kiosk/src/layouts/KioskRoot.tsx` | `verify-device-status-honest.mjs`<br/>`verify-fusion-home.mjs`<br/>`verify-fusion-shell.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-fusion-w4.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-kiosk-shell-active-nav.mjs`<br/>`verify-kiosk-visual-unity.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-lightflow-profile-entry.mjs`<br/>`verify-p39-print-hub-fidelity.mjs`<br/>`verify-print-parameter-capability.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-qx-session-lifecycle.mjs`<br/>`verify-resume-report-qx.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-service-entry-readiness.mjs` |
+| `apps/kiosk/src/layouts/KioskRoot.tsx` | `verify-device-status-honest.mjs`<br/>`verify-fusion-home.mjs`<br/>`verify-fusion-shell.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-fusion-w4.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-kiosk-brand-display.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-kiosk-shell-active-nav.mjs`<br/>`verify-kiosk-visual-unity.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-lightflow-profile-entry.mjs`<br/>`verify-p39-print-hub-fidelity.mjs`<br/>`verify-print-parameter-capability.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-qx-session-lifecycle.mjs`<br/>`verify-resume-report-qx.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/layouts/KioskRuntimeRoot.tsx` | `verify-device-status-honest.mjs`<br/>`verify-fusion-shell.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-scan-input-safety.mjs` |
 | `apps/kiosk/src/lib/capabilityReasons.ts` | `verify-jobfair-ui.mjs`<br/>`verify-kiosk-frontend-debt.mjs` |
 | `apps/kiosk/src/lib/fileName.ts` | `verify-file-display-truth.mjs` |
@@ -551,6 +555,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/help/help-service-desk.css` | `verify-lightflow-k1-public-entry.mjs` |
 | `apps/kiosk/src/pages/home/HomePage.tsx` | `verify-device-status-honest.mjs`<br/>`verify-fusion-home.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-home-toolbox-ui.mjs`<br/>`verify-kiosk-end-use.mjs`<br/>`verify-kiosk-visual-unity.mjs`<br/>`verify-member-login-dialog.mjs`<br/>`verify-service-entry-readiness.mjs`<br/>`verify-smart-campus-ui.mjs`<br/>`verify-terminal-device-config.ts` |
 | `apps/kiosk/src/pages/home/components/ContinuePanel.tsx` | `verify-fusion-w5.mjs` |
+| `apps/kiosk/src/pages/home/components/HomeHeroHeader.tsx` | `verify-kiosk-brand-display.mjs` |
 | `apps/kiosk/src/pages/home/components/HomeIdentityActions.tsx` | `verify-kiosk-end-use.mjs` |
 | `apps/kiosk/src/pages/home/components/HomeTouchView.tsx` | `verify-device-status-honest.mjs`<br/>`verify-fusion-home.mjs`<br/>`verify-home-toolbox-ui.mjs`<br/>`verify-kiosk-end-use.mjs`<br/>`verify-kiosk-visual-unity.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
 | `apps/kiosk/src/pages/home/components/ToolboxLaunchModals.tsx` | `verify-fusion-w5.mjs`<br/>`verify-home-toolbox-ui.mjs`<br/>`verify-toolbox-launch-events.ts` |
@@ -917,7 +922,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/scan/styles/scan-fusion.css` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx` | `verify-fusion-w5.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-kiosk-end-use.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-qx-session-lifecycle.mjs`<br/>`verify-scan-session-truth.mjs`<br/>`verify-screensaver-empty-shell.mjs` |
-| `apps/kiosk/src/pages/screensaver/StandbyView.tsx` | `verify-qx-session-lifecycle.mjs`<br/>`verify-screensaver-empty-shell.mjs` |
+| `apps/kiosk/src/pages/screensaver/StandbyView.tsx` | `verify-kiosk-brand-display.mjs`<br/>`verify-qx-session-lifecycle.mjs`<br/>`verify-screensaver-empty-shell.mjs` |
 | `apps/kiosk/src/pages/screensaver/screensaver-service-desk.css` | `verify-lightflow-k1-public-entry.mjs` |
 | `apps/kiosk/src/pages/screensaver/standbyModel.ts` | `verify-qx-session-lifecycle.mjs` |
 | `apps/kiosk/src/pages/service-hubs/QxServiceHubPage.tsx` | `verify-kiosk-frontend-debt.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs`<br/>`verify-service-entry-readiness.mjs` |

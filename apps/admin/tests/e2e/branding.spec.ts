@@ -24,7 +24,7 @@ test('品牌与备案校验、默认值和保存', async ({ page }) => {
   await card.getByLabel('ICP 备案查询链接').fill('https://beian.miit.gov.cn/')
   await card.getByLabel('品牌名').fill('新品牌')
   await save.click()
-  await expect(card.getByRole('status')).toHaveText('已保存。一体机更新到支持贴牌的版本后，最迟 5 分钟内按这里显示。')
+  await expect(card.getByRole('status')).toHaveText('已保存。一体机最迟约 3 分钟内按这里显示；登录、换人或从待机唤醒时会立即更新。')
 })
 
 test('Logo 按文件头校验并预览', async ({ page }) => {
@@ -45,7 +45,7 @@ test('机构品牌保存后重新打开仍回显', async ({ page }) => {
   await section.getByLabel('品牌名').fill('机构品牌')
   await section.getByLabel('字标').fill('机')
   await section.getByRole('button', { name: '保存机构品牌' }).click()
-  await expect(section.getByRole('status')).toHaveText('已保存。一体机更新到支持贴牌的版本后，本机构名下的终端最迟 5 分钟内按这里显示。')
+  await expect(section.getByRole('status')).toHaveText('已保存。本机构名下的一体机最迟约 3 分钟内按这里显示；登录、换人或从待机唤醒时会立即更新。')
   await page.keyboard.press('Escape')
   await page.locator('tbody tr').first().getByRole('button', { name: '详情/账号' }).click()
   await expect(section.getByLabel('品牌名')).toHaveValue('机构品牌')

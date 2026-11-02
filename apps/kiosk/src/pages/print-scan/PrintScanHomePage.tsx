@@ -1,3 +1,6 @@
+import { LicenseLock } from '../../layouts/LicenseLock'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
+import { useKioskLicense } from '../../layouts/KioskLicenseContext'
 // ============================================================
 // PrintScanHomePage — 打印扫描 Hub（青序流光 10-print-hub）。
 //
@@ -317,6 +320,7 @@ function toProbeStatus(load: CapabilitiesLoadResult | { status: 'loading' }): Pr
 }
 
 export function PrintScanHomePage() {
+  const winding = useKioskLicense().mode === 'winding-down'
   const navigate = useNavigate()
   const device = useTerminalDeviceStatus()
   // Hub 只选办理入口，使用中性文案；价目由后续打印确认页读取，离开扫描不额外取价。
@@ -509,8 +513,10 @@ export function PrintScanHomePage() {
       railNow={paperOff ? undefined : -1}
       bodyClassName={paperOff ? 'qxt-body-hub' : 'qxt-body-print'}
       status={device.printerNotice ? { tone: 'warn', label: device.printerLabel } : hubState === 'device-off' ? { tone: 'warn', label: `${device.printerLabel} · 出纸类暂停` } : pill}
-      ask={printAsk(askLabel, '我想打印一份文件，应该选手机上传、U 盘还是扫描？请帮我选一种方式。')}
+      ask={winding ? { label: askLabel, disabled: true } : printAsk(askLabel, '我想打印一份文件，应该选手机上传、U 盘还是扫描？请帮我选一种方式。')}
     >
+      {winding ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : null}
+      <LicenseLock>
       <QxPrintHubView
         hubState={hubState}
         probe={probe}
@@ -556,6 +562,7 @@ export function PrintScanHomePage() {
         onArrivalCode={() => navigate(ARRIVAL_CODE_ENTRY.to)}
         onQuickLink={handleQuickLink}
       />
+      </LicenseLock>
       <KioskFeedbackDialog
         open={feedbackOpen}
         onClose={() => setFeedbackOpen(false)}
