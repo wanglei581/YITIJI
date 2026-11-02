@@ -38,17 +38,19 @@
 }
 
 [data-qx-page='print-done'] .pft-take {
-  flex: 1 0 auto;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 40px;
-  min-height: 300px;
-  padding: 24px;
+  min-height: 220px;
+  padding: 12px;
   border-radius: 30px;
   background: var(--qxt-card);
   border: 1.5px solid var(--qxt-edge);
 }
+
+[data-qx-page='print-done'] .pft-take .pa svg { width: 200px; height: 200px; }
 
 [data-qx-page='print-done'] .pft-take-tx {
   display: flex;
@@ -107,8 +109,8 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 12px;
-  min-height: 168px;
-  padding: 22px;
+  min-height: 128px;
+  padding: 14px;
   text-align: left;
 }
 

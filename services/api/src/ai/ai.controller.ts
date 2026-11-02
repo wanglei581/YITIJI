@@ -1,3 +1,4 @@
+import { wavDuration } from '../asr/wav-duration'
 import { BadRequestException, Controller, Optional, Post, Put, Get, Header, Param, Body, Query, Req, ServiceUnavailableException, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors, NotFoundException } from '@nestjs/common'
 import { AiManualPathWhen, AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { RESUME_DRAFT_EXPORT_MANUAL_PATH } from './resume-draft-export-manual-path'
@@ -515,6 +516,7 @@ export class AiController {
     this.logService.record({
       taskId: null,
       operation: 'voiceTranscribe',
+      voiceUsage: wavDuration(audio.buffer),
       provider: this.asr.activeProviderName,
       status: result.ok ? 'success' : 'failed',
       latencyMs: Math.max(0, Date.now() - asrStartedAt),
@@ -681,6 +683,7 @@ export class AiController {
       this.logService.record({
         taskId: null,
         operation: 'voiceTranscribe',
+      voiceUsage: wavDuration(audio.buffer),
         provider: this.asr.activeProviderName,
         status: result.ok ? 'success' : 'failed',
         latencyMs: Math.max(0, Date.now() - asrStartedAt),

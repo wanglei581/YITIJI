@@ -11,7 +11,7 @@
 //      所以没回应、超时、5xx 可以点「重试」再兑换；码失效（UPLOAD_SCENE_UNUSABLE）不给重试。
 //   ③ 小程序内扫码：pages/kiosk-login 扫到上传码后跳进来，新码带 q，旧码直接带 sessionId / token。
 //
-// 文件有两个来源，都是「一张码只收一份」：
+// 文件有三个来源（签名图那一单只用聊天图片和拍照 / 相册），都是「一张码只收一份」：
 //   a. 从「我的文档」选：要登录，POST /upload-sessions/:id/member-file（服务端只读本人的文件）。
 //   b. 从微信聊天选：不要求登录，POST /upload-sessions/:id/files，只认 body 里的 uploadToken，
 //      与一体机现有 H5 手机上传页口径一致 —— 人已经站在机器前，递一份文件不该先逼他注册。
@@ -30,6 +30,8 @@ const aiAccess = require('../../utils/ai-access')
 
 const {
   MAX_BYTES,
+  isSessionPurpose,
+  signatureFileIssue,
   receiptAccepted,
   statusOf,
   isAuthError,
@@ -41,34 +43,17 @@ const {
 } = require('./kiosk-send-helpers')
 
 const DOC_PAGE_SIZE = 50
-const UNKNOWN_COPY = '这次上传的结果还不确定。请回到一体机屏幕核对，不要在这里重复发送。'
-const BUSY_COPY = '这个二维码正在处理一次上传。请回到一体机屏幕查看，不要重复发送。'
-// 码失效 / 已用 / 过期：与一体机 uploadSessionUserMessage 同一句（一体机句子为准）
-const DEAD_COPY = '二维码已失效或已使用，请回到一体机刷新二维码。'
-// 这一单已经不收文件了（收到了一份、一体机已确认或已取消）。可能是旁人拍到屏上的码先传了：
-// 叫本人去一体机上看，不是自己的就取消再扫（无人值守，只能靠本人认）。
-const OCCUPIED_COPY = '这一单已经不能再收文件了。如果一体机屏上有不是你传的文件，请在一体机上点「取消」，再重新扫码。'
-const REJECT_FALLBACK = '系统没有收下这份文件，可以重新选择后再试'
-const OFFLINE_COPY = '没连上终端，可以重试。'
-const NOT_KIOSK_COPY = '这不是一体机上的二维码，请扫一体机屏幕上显示的二维码。'
-const INCOMPLETE_COPY = '扫码信息不完整，请回到一体机重新扫码'
-const LOGIN_PAGE_FAILED_COPY = '没能打开扫码登录页，请返回后重新扫码。'
-// 从「我的文档」选
-const DOC_NOT_FOUND_COPY = '这份文件现在用不了，可能已删除或已过期，请换一份。'
-const DOC_TOO_LARGE_COPY = '这份文件超过 10MB，这台一体机这一单收不了，请换一份。'
-const MEMBER_MISMATCH_COPY = '这台一体机现在登录的是另一个账号。请先在一体机上退出登录，再重新扫码。'
-const LOGIN_EXPIRED_COPY = '登录已失效，请重新登录后再选。'
-const DOCS_LOAD_FALLBACK = '我的文档这次没读到，可以重新读取。'
-
-/** 码已不能再传时说哪一句：这一单不再收文件（NOT_PENDING）单说，其余照一体机那句。 */
-function deadCopyOf(err) {
-  return err && err.code === 'UPLOAD_SESSION_NOT_PENDING' ? OCCUPIED_COPY : DEAD_COPY
-}
+const {
+  UNKNOWN_COPY, BUSY_COPY, DEAD_COPY, REJECT_FALLBACK, OFFLINE_COPY, NOT_KIOSK_COPY, INCOMPLETE_COPY,
+  LOGIN_PAGE_FAILED_COPY, DOC_NOT_FOUND_COPY, DOC_TOO_LARGE_COPY, MEMBER_MISMATCH_COPY, LOGIN_EXPIRED_COPY,
+  DOCS_LOAD_FALLBACK, deadCopyOf,
+} = require('./kiosk-send-copy')
 
 Page({
   data: {
     statusBarHeight: 20,
     sessionId: '',
+    purpose: '', // 这一单的用途（兑换回执带回）；签名图只收这次新传的 JPG / PNG
     // 'idle' | 'resolving' | 'uploading' | 'done' | 'unknown' | 'error'
     phase: 'idle',
     // 码失效（兑换说 UNUSABLE）：不提供重试
@@ -131,7 +116,11 @@ Page({
   },
 
   onUnload() {
-    // 晚到的兑换和列表不再落到已经关掉的页面上
+    // 退出后作废兑换、列表和上传回调；清掉令牌，晚到的选文件回调也发不出新上传（_sendBlocked 认令牌）。
+    // 已发出的请求结果由一体机核对。
+    this._sendAttempt = (this._sendAttempt || 0) + 1
+    this._uploadToken = ''
+    if (this.data.phase === 'uploading') wx.hideLoading()
     this._resolveAttempt = (this._resolveAttempt || 0) + 1
     this._docsFlow = (this._docsFlow || 0) + 1
     this._scene = ''
@@ -162,10 +151,11 @@ Page({
   },
 
   /** 连上这一单：令牌进内存，列「我的文档」。 */
-  _connect(sessionId, uploadToken) {
+  _connect(sessionId, uploadToken, purpose) {
     this._uploadToken = uploadToken
     this.setData({
       sessionId,
+      purpose: isSessionPurpose(purpose) ? purpose : '',
       phase: 'idle',
       sceneFailed: false,
       resolveRetry: false,
@@ -192,7 +182,7 @@ Page({
         const uploadToken = res && typeof res.uploadToken === 'string' ? res.uploadToken : ''
         // 回执不完整：码可能还好好的（同一张码可以再兑换），给重试
         if (!sessionId || !uploadToken) this._resolveFailed(true, null)
-        else this._connect(sessionId, uploadToken)
+        else this._connect(sessionId, uploadToken, res.purpose)
       },
       (err) => {
         if (attempt !== this._resolveAttempt) return
@@ -240,6 +230,11 @@ Page({
     this._gen = gen
     this._docsLoggedIn = auth.isLoggedIn()
     const base = { docs: [], docTruncated: false, docNote: note || '' }
+    // 签名图只能这次新传（与一体机同一口径），不从「我的文档」选；那张卡模板里也不显示。
+    if (this.data.purpose === 'signature_image') {
+      this.setData(Object.assign(base, { docState: 'empty' }))
+      return
+    }
     if (this._memberBlocked) {
       this.setData(Object.assign(base, { docState: 'blocked', docNote: MEMBER_MISMATCH_COPY }))
       return
@@ -294,7 +289,7 @@ Page({
     if (this._sendBlocked()) return
     wx.chooseMessageFile({
       count: 1,
-      type: 'file',
+      type: this.data.purpose === 'signature_image' ? 'image' : 'file',
       success: (res) => {
         const file = (res.tempFiles || [])[0]
         if (!file) return
@@ -353,7 +348,7 @@ Page({
 
   /** 从「我的文档」递：只在连上、空闲、列表可选、账号没变时可以。 */
   _memberSendBlocked() {
-    if (this._sendBlocked() || this.data.phase !== 'idle') return true
+    if (this._sendBlocked() || this.data.phase !== 'idle' || this.data.purpose === 'signature_image') return true
     if (this._memberBlocked || this.data.docState !== 'list') return true
     return !auth.isLoggedIn() || !auth.isSameSession(this._gen)
   },
@@ -369,6 +364,8 @@ Page({
 
   _send(file) {
     if (this._sendBlocked()) return
+    const issue = this.data.purpose === 'signature_image' ? signatureFileIssue(file) : ''
+    if (issue) return this.setData({ phase: 'error', canRetry: true, errorMsg: issue })
     const attempt = (this._sendAttempt || 0) + 1
     this._sendAttempt = attempt
     const sessionId = this.data.sessionId
@@ -378,7 +375,7 @@ Page({
       .then((body) => {
         if (attempt !== this._sendAttempt) return
         wx.hideLoading()
-        if (!receiptAccepted(body, sessionId)) {
+        if (!receiptAccepted(body, sessionId, this.data.purpose)) {
           this.setData({ phase: 'unknown', canRetry: false, errorMsg: UNKNOWN_COPY })
           return
         }
@@ -422,7 +419,7 @@ Page({
       (body) => {
         if (attempt !== this._sendAttempt) return
         wx.hideLoading()
-        if (!receiptAccepted(body, sessionId)) {
+        if ((body && body.purpose === 'signature_image') || !receiptAccepted(body, sessionId, this.data.purpose)) {
           this.setData({ phase: 'unknown', canRetry: false, errorMsg: UNKNOWN_COPY })
           return
         }

@@ -47,6 +47,12 @@ const SENSITIVE_SESSION_STORAGE_KEYS = [
   AI_DECLARATION_SESSION_KEY,
 ] as const
 
+const clearListeners = new Set<() => void>()
+export function subscribeKioskSensitiveSessionClear(listener: () => void): () => void {
+  clearListeners.add(listener)
+  return () => { clearListeners.delete(listener) }
+}
+
 /**
  * 清掉本机这一位用户留下的敏感会话。
  *
@@ -80,6 +86,7 @@ export function clearKioskSensitiveSession(outgoingMemberToken?: string | null):
   // clearScanWorkbenchSession() 一旦先跑，就再也找不到要撤谁。
   beginScanSessionCleanup(outgoingMemberToken ?? null)
   clearScanWorkbenchSession()
+  clearListeners.forEach((listener) => listener())
 }
 
 /**

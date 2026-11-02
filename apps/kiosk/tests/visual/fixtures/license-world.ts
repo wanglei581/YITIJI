@@ -38,6 +38,10 @@ export class LicenseWorld {
   forceUnverified = false
   /** 机构品牌覆盖：只给验过签的请求（没验过只给平台默认）。 */
   brand: Partial<PublicKioskProfile> = {}
+  /** 在一次成功续期签票后、响应送达前模拟后台状态变化。 */
+  afterRefresh?: (at: number) => void
+  /** 验过签的答复里不给 currentSessionEndsAt（后台算不出当前凭证何时到期）：页面只能自己兜一个到点时刻。 */
+  omitEndsAt = false
   /** 会话票 → 到期时刻（页面时钟毫秒）。 */
   readonly sessions = new Map<string, number>()
   readonly log = {
@@ -52,25 +56,58 @@ export class LicenseWorld {
   private runTarget: number | null = null
   private base = 0
   private bootedAt: number | null = null
+  private frozen = false
   private seq = 0
   private inFlight = 0
   private nudgeFlip = false
   /** 页面发出、还没收到结果的请求（含本机程序桥接那几条）：时钟往前跳之前必须等它们落地，否则页面里 4 秒、8 秒的请求超时计时器会先于应答到点。 */
-  private readonly pending = new Set<Request>()
+  private readonly pending = new Map<Request, number>()
 
   constructor(private readonly page: Page) {
     const settle = (request: Request) => { this.pending.delete(request) }
     page.on('request', (request) => {
-      if (!request.url().startsWith('data:')) this.pending.add(request)
+      if (!request.url().startsWith('data:')) this.pending.set(request, Date.now())
     })
     page.on('requestfinished', settle)
     page.on('requestfailed', settle)
+    // 整页刷新（清场、换票后重载）时旧文档里没收到结果的请求不会再有结果事件，别让它们一直算「在途」。
+    // 用 domcontentloaded 而不是 framenavigated：后者连 pushState 的站内跳转也算，会把正在途中的请求忘掉。
+    page.on('domcontentloaded', () => this.pending.clear())
   }
 
-  /** 页面时钟此刻的毫秒数。 */
+  /** 在途请求数。超过 4 秒还没结果的不再算（旧文档遗留、被页面自己放弃的），否则每一小步都要白等满上限。 */
+  private openRequests(): Request[] {
+    const now = Date.now()
+    const open: Request[] = []
+    for (const [request, startedAt] of this.pending) {
+      if (now - startedAt > 4_000) this.pending.delete(request)
+      else open.push(request)
+    }
+    return open
+  }
+
+  /** 页面时钟此刻的毫秒数。冻结时页面时钟不随真实时间走。 */
   now(): number {
     if (this.runTarget !== null) return this.runTarget
+    if (this.frozen) return this.syncedPage
     return this.syncedPage + (Date.now() - this.syncedAt)
+  }
+
+  /**
+   * 冻结页面时钟：之后页面时间只随 advance / runFor 走，真实时间不再往里加。要精确地断言「到期前 300 毫秒不是、到期后 1 秒内是」时用——
+   * 不冻结的话，每小步之间真实时间照走，推进 1 秒实际要多走好几秒，量不到「1 秒内」。用完 thaw()。
+   */
+  async freeze(): Promise<void> {
+    await this.page.clock.pauseAt((await this.page.evaluate(() => Date.now())) + 200)
+    this.frozen = true
+    await this.sync()
+  }
+
+  /** 解冻：页面时钟重新按真实时间走。 */
+  async thaw(): Promise<void> {
+    await this.page.clock.resume()
+    this.frozen = false
+    await this.sync()
   }
 
   /** 回页面读一遍时钟。页面正在跳转读不到时沿用上一次的读数。刷新页面之后要调用。 */
@@ -86,6 +123,25 @@ export class LicenseWorld {
   /** 装页面时钟和三条服务端路由。要在 page.goto 之前调用。 */
   async install(): Promise<void> {
     await this.page.clock.install()
+    // 同源 /api/v1 请求带上「发出那一刻的页面时钟」。假服务端处理请求时页面时钟已经往前走了一截，
+    // 用处理时刻记日志，两次复查的间隔会有最多一个小步（3.5 秒）的误差，量不准「不少于 5 分钟」；用请求头里的时刻就是页面自己的读数。
+    await this.page.addInitScript(() => {
+      const original = window.fetch.bind(window)
+      window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+        try {
+          const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+          if (url.includes('/api/v1/')) {
+            const source = init?.headers ?? (typeof input === 'object' && 'headers' in input ? input.headers : undefined)
+            const headers = new Headers(source)
+            headers.set('x-pw-page-now', String(Date.now()))
+            return original(input, { ...init, headers })
+          }
+        } catch {
+          /* 取不到就照原样发 */
+        }
+        return original(input, init)
+      }
+    })
     this.base = Date.now()
     this.syncedPage = this.base
     this.syncedAt = this.base
@@ -94,32 +150,37 @@ export class LicenseWorld {
     await page.route('**/api/v1/terminals/session-token', async (route) => {
       if (route.request().method() !== 'POST') return route.fallback()
       await this.guard(async () => {
-        this.log.exchange.push(this.now())
+        const at = this.stamp(route)
+        this.log.exchange.push(at)
         if (!this.active) return route.fulfill(this.inactive())
-        return route.fulfill(json(200, { sessionToken: this.issue(), expiresInSeconds: SESSION_TTL_MS / 1000 }))
+        return route.fulfill(json(200, { sessionToken: this.issue(at), expiresInSeconds: SESSION_TTL_MS / 1000 }))
       })
     })
 
     await page.route('**/api/v1/terminals/session-token/refresh', async (route) => {
       if (route.request().method() !== 'POST') return route.fallback()
       await this.guard(async () => {
-        this.log.refresh.push(this.now())
+        const at = this.stamp(route)
+        this.log.refresh.push(at)
         const presented = route.request().headers()['x-terminal-session-token'] ?? ''
-        if (!this.live(presented)) {
+        if (!this.live(presented, at)) {
           return route.fulfill(json(401, { error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } }))
         }
         if (!this.active) return route.fulfill(this.inactive())
-        return route.fulfill(json(200, { sessionToken: this.issue(), expiresInSeconds: SESSION_TTL_MS / 1000 }))
+        const sessionToken = this.issue(at)
+        this.afterRefresh?.(at)
+        return route.fulfill(json(200, { sessionToken, expiresInSeconds: SESSION_TTL_MS / 1000 }))
       })
     })
 
     await page.route('**/api/v1/public/kiosk-profile', async (route) => {
       if (route.request().method() !== 'GET') return route.fallback()
       await this.guard(async () => {
+        const at = this.stamp(route)
         const presented = route.request().headers()['x-terminal-session-token'] ?? ''
-        const verified = !this.forceUnverified && this.live(presented)
+        const verified = !this.forceUnverified && this.live(presented, at)
         const body = verified ? this.verifiedProfile(presented) : UNVERIFIED_KIOSK_PROFILE
-        this.log.profile.push({ at: this.now(), verified, licenseState: body.licenseState })
+        this.log.profile.push({ at, verified, licenseState: body.licenseState })
         return route.fulfill(json(200, kioskProfileBody(body)))
       })
     })
@@ -190,17 +251,12 @@ export class LicenseWorld {
   /** 等在途请求落地（轻量版，每小步之后用；上限 3 秒，机器再忙也不无限等）。 */
   private async landed(): Promise<void> {
     const giveUp = Date.now() + 3_000
-    while ((this.inFlight > 0 || this.pending.size > 0) && Date.now() < giveUp) await this.page.waitForTimeout(5)
+    while ((this.inFlight > 0 || this.openRequests().length > 0) && Date.now() < giveUp) await this.page.waitForTimeout(5)
   }
 
   /**
    * 一段一段推进页面时钟，直到 reached() 为真；推进满 limitMs 还没到就报错。返回实际推进的毫秒数。
    *
-   * 用在「到期」这类由页面里单个定时器触发的转换上。页面到点的做法是 setTimeout(…, 到期时刻 - Date.now()) 触发一次重新判定，
-   * Playwright 假时钟在 runFor 里让定时器与 React 渲染交错执行，Date.now() 不保证单调：实测定时器触发时读到 600.002 秒，
-   * 紧接着 effect 里再读却是 599.680 秒（到期时刻 600.000 秒），这一次判定落空，要等下一次 profile（每 3 分钟）才补上。约每 10 次出现 1 次。
-   * 真浏览器的 Date.now() 不倒退，没有这个问题。所以不断言「恰好在到期那一刻」，而是断言「到期后不晚于下一次 profile 读取」
-   * （调用方传 limitMs），并另用「到期之前不是」把下界钉住。
    */
   async advanceUntil(reached: () => Promise<boolean>, limitMs: number, options: { step?: number; active?: boolean } = {}): Promise<number> {
     const step = options.step ?? 30_000
@@ -217,7 +273,7 @@ export class LicenseWorld {
   async quiet(): Promise<void> {
     const giveUp = Date.now() + 10_000
     for (let stable = 0; stable < 2 && Date.now() < giveUp; ) {
-      stable = this.inFlight === 0 && this.pending.size === 0 ? stable + 1 : 0
+      stable = this.inFlight === 0 && this.openRequests().length === 0 ? stable + 1 : 0
       await this.page.waitForTimeout(60)
     }
     await this.page.evaluate(
@@ -239,7 +295,7 @@ export class LicenseWorld {
       `  换票 ${this.log.exchange.map(min).join(' ') || '无'}`,
       `  续期 ${this.log.refresh.map(min).join(' ') || '无'}`,
       `  最近 profile ${profiles.join(' ') || '无'}`,
-      `  在途请求 ${[...this.pending].map((request) => new URL(request.url()).pathname).join(' ') || '无'}`,
+      `  在途请求 ${this.openRequests().map((request) => new URL(request.url()).pathname).join(' ') || '无'}`,
     ].join('\n')
   }
 
@@ -249,15 +305,22 @@ export class LicenseWorld {
     await this.page.mouse.move(this.nudgeFlip ? 12 : 14, 12)
   }
 
-  private live(token: string): boolean {
-    const endsAt = this.sessions.get(token)
-    return endsAt !== undefined && endsAt > this.now()
+  /** 请求发出那一刻的页面时钟（页面自己写进请求头的）；没有就用处理请求时的读数。 */
+  private stamp(route: Route): number {
+    const raw = Number(route.request().headers()['x-pw-page-now'])
+    return Number.isFinite(raw) ? raw : this.now()
   }
 
-  private issue(): string {
+  /** 这张票在 at（请求发出那一刻的页面时钟）是否还有效：服务端的「现在」就是页面发请求时的读数，不是处理请求时的读数。 */
+  private live(token: string, at: number = this.now()): boolean {
+    const endsAt = this.sessions.get(token)
+    return endsAt !== undefined && endsAt > at
+  }
+
+  private issue(at: number = this.now()): string {
     this.seq += 1
     const token = `terminal-session-${this.base.toString(36)}-${this.seq}`
-    this.sessions.set(token, this.now() + SESSION_TTL_MS)
+    this.sessions.set(token, at + SESSION_TTL_MS)
     return token
   }
 
@@ -273,7 +336,7 @@ export class LicenseWorld {
       licenseState: this.active ? 'ok' : 'inactive',
       acceptsNewSessions: this.active,
       currentSessionMayContinue: true,
-      currentSessionEndsAt: new Date(endsAt).toISOString(),
+      currentSessionEndsAt: this.omitEndsAt ? null : new Date(endsAt).toISOString(),
       noticeLine: this.active ? null : PAUSED_NOTICE_LINE,
     })
   }

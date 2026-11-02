@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useKioskLicense, useWindDownViewOnly } from '../../layouts/KioskLicenseContext'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
+import { cloneElement, isValidElement, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useClearGuestDraftOnFlowExit } from './resumeGenerateDraft'
 import type {
@@ -28,7 +30,7 @@ import { GenerateResumeEditor } from './components/resume-deliver/GenerateResume
 import { focusResumeTitleIssue, resumeTitleIssues } from './components/resume-deliver/resumeEntryTitles'
 import { ResumeFormatChooser } from './components/resume-deliver/ResumeFormatChooser'
 import { useResumeExportPricing } from './components/resume-deliver/useResumeExportPricing'
-import { detectUnconfirmedAdditions, extractConfirmableFacts, UNCONFIRMED_WHY } from './components/resume-deliver/facts'
+import { detectGeneratedUnconfirmedAdditions, detectUserResumeEdits, extractConfirmableFacts, UNCONFIRMED_WHY } from './components/resume-deliver/facts'
 import { SYNTHETIC_GENERATE } from './components/resume-deliver/fixtures'
 import { parseGeneratePreviewQuery, resolveGeneratePreviewView } from './components/resume-deliver/generatePreviewQuery'
 import type { GeneratePreviewViewState } from './components/resume-deliver/constants'
@@ -43,6 +45,7 @@ interface LocationState {
   result?: ResumeGenerateResponse
   input?: ResumeGenerateInput
   taskId?: string
+  licenseViewOnly?: boolean
   deliverPhase?: 'preview' | 'export'
 }
 
@@ -62,6 +65,31 @@ const FORMAT_NAME: Record<ResumeExportFormat, string> = {
   md: 'MD',
 }
 
+const NEW_TASK_CTA = new Set([
+  'resume-generate-preview-cta-export',
+  'resume-generate-preview-cta-print',
+  'resume-generate-preview-cta-confirm-export',
+])
+
+/** 底栏里只停用打印、导出。返回、离开、再读一次保持可点。 */
+function holdExportPrint(node: ReactNode): ReactNode {
+  if (Array.isArray(node)) return node.map((child) => holdExportPrint(child))
+  if (!isValidElement(node)) return node
+  const props = node.props as { 'data-testid'?: unknown; children?: ReactNode }
+  const testId = props['data-testid']
+  if (typeof testId === 'string' && NEW_TASK_CTA.has(testId)) {
+    return cloneElement(node, {
+      disabled: true,
+      title: LICENSE_NO_NEW_TASK_REASON,
+      'aria-disabled': undefined,
+      onClick: () => undefined,
+    })
+  }
+  const children = props.children
+  if (children == null || typeof children === 'string' || typeof children === 'number') return node
+  return cloneElement(node, undefined, holdExportPrint(children))
+}
+
 function readPhase(state: unknown): 'preview' | 'export' | null {
   if (!state || typeof state !== 'object') return null
   const value = (state as LocationState).deliverPhase
@@ -72,6 +100,9 @@ export function ResumeGeneratePreviewPage() {
   const navigate = useNavigate()
   const startPrint = useStartPrintHandoff()
   const location = useLocation()
+  const windDownViewOnly = useWindDownViewOnly('resume')
+  const licenseFlagViewOnly = useKioskLicense().mode === 'winding-down' && (location.state as LocationState | null)?.licenseViewOnly === true
+  const viewOnly = windDownViewOnly || licenseFlagViewOnly
   const { getToken } = useAuth()
   useClearGuestDraftOnFlowExit(!getToken())
   const query = useMemo(() => parseGeneratePreviewQuery(location.search), [location.search])
@@ -101,6 +132,7 @@ export function ResumeGeneratePreviewPage() {
   const [templatesError, setTemplatesError] = useState(false)
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [editing, setEditing] = useState(false)
+  const [userAdditions, setUserAdditions] = useState<string[]>([])
   const [factOpen, setFactOpen] = useState(false)
   const [retryNonce, setRetryNonce] = useState(0)
 
@@ -182,7 +214,8 @@ export function ResumeGeneratePreviewPage() {
     ? (query.requested && EXPORT_VIEWS.has(query.requested) ? 'export' : 'preview')
     : (readPhase(location.state) === 'export' ? 'export' : 'preview')
   const exportScreen: GeneratePreviewViewState = view.startsWith('export-') ? view : 'export-chooser'
-  const unconfirmed = resume ? detectUnconfirmedAdditions(resume, undefined, input) : []
+  // 只追踪生成结果里已有的候选词；预览中后来由本人输入的词不归给 AI。
+  const unconfirmed = resume && result?.resume ? detectGeneratedUnconfirmedAdditions(resume, result.resume, input, userAdditions) : []
   const facts = resume ? extractConfirmableFacts(resume) : []
   const hints = result?.missingHints ?? []
   const exportBlocked = pricing.unavailable || pricing.chargedBlocked || !resume || exporting
@@ -194,7 +227,7 @@ export function ResumeGeneratePreviewPage() {
     : '导出后显示真实页数。若担心第二页只剩两三行，可先点「压到一页」。'
 
   const handleExport = async (factsConfirmedAt: string) => {
-    if (!resume || !result || resumeTitleIssues(resume).length > 0) return
+    if (viewOnly || !resume || !result || resumeTitleIssues(resume).length > 0) return
     setExporting(true)
     setExportError(null)
     try {
@@ -208,6 +241,7 @@ export function ResumeGeneratePreviewPage() {
   }
 
   const handlePrint = () => {
+    if (viewOnly) return
     if (titleBlocked) { focusTitleIssue(); return }
     if (!exported?.printFileUrl) return
     if (exportFormat !== 'pdf') return
@@ -227,6 +261,7 @@ export function ResumeGeneratePreviewPage() {
   }
 
   const openExport = () => {
+    if (viewOnly) return
     if (titleBlocked) { focusTitleIssue(); return }
     const base = state && typeof state === 'object' ? state : {}
     navigate(
@@ -286,6 +321,11 @@ export function ResumeGeneratePreviewPage() {
   const showWorkspace = Boolean(resume && result) && !['session-lost', 'preview-no-result', 'preview-loading', 'preview-failed', 'illegal'].includes(view)
   const canRetry = Boolean(restoreTaskId) && !synthetic
   const go = (to: string) => navigate(to)
+  const leaveToCaller = () => {
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0
+    if (idx > 0) navigate(-1)
+    else navigate('/me/resumes')
+  }
   const onExportScreen = showWorkspace && phase === 'export'
   useEffect(() => {
     const id = pendingTitleFocus.current
@@ -307,7 +347,7 @@ export function ResumeGeneratePreviewPage() {
     canRetry,
     onHome: () => go('/'),
     onSource: () => go('/resume/source'),
-    onRefill: () => go('/resume/generate'),
+    onRefill: () => { if (viewOnly) leaveToCaller(); else go('/resume/generate') },
     onRetry: () => { setRestoreFailed(false); setRestoring(true); setRetryNonce((n) => n + 1) },
     onOpenExport: openExport,
     onBackToPreview: backToPreview,
@@ -350,15 +390,15 @@ export function ResumeGeneratePreviewPage() {
       }}
       back={{
         label: onExportScreen ? '返回预览' : '返回填写',
-        onBack: () => { if (onExportScreen) backToPreview(); else go('/resume/generate') },
+        onBack: () => { if (onExportScreen) backToPreview(); else if (viewOnly) leaveToCaller(); else go('/resume/generate') },
       }}
       navTestIds={{
         home: 'resume-generate-preview-nav-home',
         advisor: 'resume-generate-preview-nav-advisor',
         profile: 'resume-generate-preview-nav-profile',
       }}
-      ctabar={ctabar}
-      ask={previewAsk ? { ...previewAsk, testId: 'resume-generate-ai-help' } : false}
+      ctabar={viewOnly ? holdExportPrint(ctabar) : ctabar}
+      ask={viewOnly ? false : previewAsk ? { ...previewAsk, testId: 'resume-generate-ai-help' } : false}
     >
       <section
         data-kiosk-domain="resume"
@@ -420,7 +460,10 @@ export function ResumeGeneratePreviewPage() {
               <GenerateResumeEditor
                 resume={resume}
                 summaryRef={summaryRef}
-                onChange={(next) => { setResume(next); setExported(null); setExportError(null) }}
+                onChange={(next) => {
+                  setUserAdditions((words) => [...new Set([...words, ...detectUserResumeEdits(resume, next)])])
+                  setResume(next); setExported(null); setExportError(null)
+                }}
                 previewClassName={previewClassName}
                 previewStyle={previewStyle}
                 onEditingChange={setEditing}
@@ -463,8 +506,8 @@ export function ResumeGeneratePreviewPage() {
             guest={!token}
             synthetic={resolved.synthetic}
             printNavigating={printNavigating}
-            titleBlocked={titleBlocked}
-            onTitleBlocked={focusTitleIssue}
+            titleBlocked={viewOnly || titleBlocked}
+            onTitleBlocked={viewOnly ? () => undefined : focusTitleIssue}
             onPrint={handlePrint}
             onOpenPreview={() => setPreviewOpen(true)}
             onClearExport={() => { setExported(null); setExportError(null) }}
@@ -472,11 +515,12 @@ export function ResumeGeneratePreviewPage() {
             estimatedPagesLabel={estimatedPagesLabel}
           />
         )}
+        {viewOnly ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : null}
         {factOpen && resume && (
           <ResumeFactConfirmDialog facts={facts} unconfirmed={unconfirmed} busy={exporting} onCancel={() => setFactOpen(false)} onConfirm={(at) => { void handleExport(at) }} />
         )}
         {previewOpen && exported?.signedUrl && (
-          <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportFormat} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} primaryAction={exported.printFileUrl && exportFormat === 'pdf' ? { label: '去打印这一份', onClick: handlePrint, disabled: printNavigating || titleBlocked } : undefined} onClose={() => setPreviewOpen(false)} />
+          <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportFormat} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} primaryAction={exported.printFileUrl && exportFormat === 'pdf' ? { label: '去打印这一份', onClick: handlePrint, disabled: viewOnly || printNavigating || titleBlocked } : undefined} onClose={() => setPreviewOpen(false)} />
         )}
       </section>
     </ResumeTouchFrame>

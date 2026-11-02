@@ -14019,7 +14019,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 812,
+      "reachableFileCount": 814,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -14132,6 +14132,7 @@
           ],
           "path": "/activities",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/activities/activities-batch8.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
             "apps/kiosk/src/pages/profile/touch/me-states.css",
@@ -14168,6 +14169,7 @@
           ],
           "path": "/activities/:id",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/activities/activities-detail-inkpaper.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
             "apps/kiosk/src/pages/profile/touch/me-states.css",
@@ -15293,6 +15295,7 @@
           ],
           "path": "/me/activity",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15343,6 +15346,7 @@
           ],
           "path": "/me/ai-records",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15381,6 +15385,7 @@
           ],
           "path": "/me/benefits",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/benefits-qx.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
             "apps/kiosk/src/pages/profile/touch/me-states.css",
@@ -15417,6 +15422,7 @@
           ],
           "path": "/me/documents",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15455,6 +15461,7 @@
           ],
           "path": "/me/favorites",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15493,6 +15500,7 @@
           ],
           "path": "/me/feedback",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/feedback-qx.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
             "apps/kiosk/src/pages/profile/touch/me-states.css",
@@ -15530,6 +15538,7 @@
           ],
           "path": "/me/notifications",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/notifications-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15567,6 +15576,7 @@
           ],
           "path": "/me/print-orders",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15604,6 +15614,7 @@
           ],
           "path": "/me/privacy-requests",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/privacy-qx.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
             "apps/kiosk/src/pages/profile/touch/me-states.css",
@@ -15640,6 +15651,7 @@
           ],
           "path": "/me/resumes",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -16873,6 +16885,7 @@
           ],
           "path": "/resume/report",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/resume/resume-r1-qx2.css",
             "apps/kiosk/src/pages/resume/resume-report-qx.css",
             "apps/kiosk/src/pages/resume/touch/frame.css",
@@ -17381,7 +17394,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 914
+      "sourceFileCount": 916
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -19735,6 +19748,7 @@
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-login-smoke.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
+      "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
       "packages/ui/scripts/verify-service-desk-foundation.mjs",
       "scripts/project-graph/gates.mjs",
       "scripts/verify-ci-gate-coverage.mjs",
@@ -19773,6 +19787,7 @@
       "scripts/verify-server-maintenance-workflows.mjs"
     ],
     ".github/workflows/windows-agent-installer.yml": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
       "scripts/verify-ci-gate-coverage.mjs"
     ],
     "apps/admin/index.html": [
@@ -23735,14 +23750,27 @@
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-printer-config.mjs"
     ],
+    "apps/terminal-agent/installer/provision/boot-spool-guard-task.ps1": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts"
+    ],
+    "apps/terminal-agent/installer/provision/boot-spool-guard.ps1": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts"
+    ],
+    "apps/terminal-agent/installer/provision/daily-reboot.ps1": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts"
+    ],
     "apps/terminal-agent/scripts/agent-crash-privacy.helper.ts": [
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
+    ],
+    "apps/terminal-agent/scripts/collect-field-evidence.ps1": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs"
     ],
     "apps/terminal-agent/scripts/diagnose-production-agent.ps1": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs"
     ],
     "apps/terminal-agent/scripts/install-production-agent.ps1": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
+      "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
       "services/api/scripts/verify-terminal-bind-code.ts"
     ],
     "apps/terminal-agent/scripts/scan-lease-barrier.helper.ts": [
@@ -23811,6 +23839,9 @@
     "apps/terminal-agent/src/agent/print-dispatch-gate.ts": [
       "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
+    ],
+    "apps/terminal-agent/src/agent/print-job-monitor.ts": [
+      "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
     "apps/terminal-agent/src/agent/print-monitor-timeout.ts": [
       "apps/terminal-agent/scripts/verify-print-truth-hardening.ts"
@@ -25538,6 +25569,7 @@
     ],
     "services/api/src/ai/ai.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-cost-runtime.ts",
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
       "services/api/scripts/verify-ai-public-quota.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
@@ -26128,6 +26160,9 @@
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-voice-generate.ts"
+    ],
+    "services/api/src/asr/wav-duration.ts": [
+      "services/api/scripts/verify-ai-cost-runtime.ts"
     ],
     "services/api/src/assistant/daily-brief.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
@@ -27991,6 +28026,7 @@
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/asr/tts.service.ts": [
+      "services/api/scripts/verify-ai-cost-runtime.ts",
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-mock-interview.ts"
@@ -28028,6 +28064,7 @@
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-cost-runtime.ts",
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-mock-interview.ts",
@@ -34605,6 +34642,49 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/terminal-agent/installer/provision/boot-spool-guard-task.ps1",
+          "apps/terminal-agent/installer/provision/boot-spool-guard.ps1",
+          "apps/terminal-agent/installer/provision/daily-reboot.ps1"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts",
+      "helper": false,
+      "inCi": false,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:boot-spool-guard-windows"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "apps"
+        ],
+        "files": [
+          ".github/workflows/ci.yml",
+          ".github/workflows/windows-agent-installer.yml",
+          "apps/terminal-agent/scripts/collect-field-evidence.ps1",
+          "apps/terminal-agent/scripts/install-production-agent.ps1"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:boot-spool-guard"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/terminal-agent/src/agent/api-client.ts"
         ],
         "missing": []
@@ -35050,6 +35130,7 @@
           "apps/terminal-agent/src/agent/dead-letter-operator.ts",
           "apps/terminal-agent/src/agent/legacy-residue-cleanup.ts",
           "apps/terminal-agent/src/agent/offline-queue.ts",
+          "apps/terminal-agent/src/agent/print-job-monitor.ts",
           "apps/terminal-agent/src/agent/task-runner.ts",
           "apps/terminal-agent/src/agent/types.ts",
           "apps/terminal-agent/src/index.ts"
@@ -36969,12 +37050,16 @@
         "dirs": [],
         "files": [
           "services/api/src/ai/ai-log.service.ts",
+          "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/providers/claude.provider.stub.ts",
           "services/api/src/ai/providers/local.provider.stub.ts",
           "services/api/src/ai/providers/mock.provider.ts",
           "services/api/src/ai/providers/openai.provider.stub.ts",
           "services/api/src/ai/providers/qwen.provider.stub.ts",
-          "services/api/src/ai/providers/zhipu.provider.stub.ts"
+          "services/api/src/ai/providers/zhipu.provider.stub.ts",
+          "services/api/src/asr/wav-duration.ts",
+          "services/api/src/mock-interview/asr/tts.service.ts",
+          "services/api/src/mock-interview/mock-interview.controller.ts"
         ],
         "missing": []
       },

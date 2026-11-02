@@ -444,4 +444,31 @@ await check('F3 旧日志概览：0 次调用不显示 0% 成功率，页面改�
   assert.doesNotMatch(index, /value=\{`\$\{usage\.avgLatencyMs\} ms`\}/)
 })
 
+await check('G1 语音行展示物理用量与未配置单价，费用不显示推算金额', () => {
+  const labels = load('src/routes/ai-services/aiOperationLabels.ts', {})
+  const table = load('src/routes/ai-services/AiOperationCostTable.tsx', {
+    'react/jsx-runtime': sharedJsx,
+    '@ai-job-print/ui': { Card: ({ children }) => children },
+    './aiUsageDisplay': displayModule,
+    './aiOperationLabels': labels,
+  })
+  const ops = ['voiceTranscribe', 'voiceSynthesize']
+  const usage = {
+    byOperation: { voiceTranscribe: 1, voiceSynthesize: 1 },
+    costByOperation: Object.fromEntries(ops.map((op) => [op, { calls: 1, measuredCalls: 0, cny: 0 }])),
+    voiceUsageTotals: { asrSeconds: 65, asrCallsWithUsage: 1, ttsChars: 9, ttsCallsWithUsage: 1 },
+    costCollectionSince: '2026-08-17',
+  }
+  const tree = createReactRuntime().mount(() => table.AiOperationCostTable({ usage })).render()
+  const rows = find(tree, (node) => node.type === 'tr')
+  const asr = rows.find((row) => textOf(row.children).includes('时长 1 分 5.0 秒'))
+  const tts = rows.find((row) => textOf(row.children).includes('9 字'))
+  assert.ok(asr && tts)
+  for (const row of [asr, tts]) {
+    assert.match(textOf(row.children), /未配置单价/)
+    assert.doesNotMatch(textOf(row.children), /¥/)
+  }
+  assert.match(textOf(tree), /合计只含大模型费用；语音费用待配置单价后计入/)
+})
+
 console.log(`\nALL PASS（${passed} 项）`)
