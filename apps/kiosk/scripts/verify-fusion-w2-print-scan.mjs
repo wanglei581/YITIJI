@@ -1295,6 +1295,9 @@ assert.match(
   /getTerminalId\(\)/,
   'convert must read the kiosk terminal id before calling the API',
 )
+assert.match(convertImages, /let filename: string \| null = converted\.filename \|\| null[\s\S]*?if \(!filename && converted\.savedToDocuments\)[\s\S]*?getMyDocuments/, 'convert prefers the API filename and queries documents only as fallback')
+assert.match(convertImages, /name: resultName \?\? outputFileName\(result\.pages\)/, 'printing uses the same resolved result name')
+assert.match(convertImages, /props\.resultName \?\? outputFileName\(result\.pages\)/, 'result screen uses the same resolved result name')
 assert.match(
   convertImages,
   /这台机器还没完成登记，无法使用格式转换/,
