@@ -17,134 +17,22 @@
  *
  * 到期前不是暂停屏，到期后 1 秒内必须进入暂停屏。
  */
-import type { Locator, Page } from '@playwright/test'
-import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
 import { MACHINE_UNUSABLE_LINE, whole } from '../fixtures/unattended-lines'
 import { chooseInterviewExperience } from './fixtures/direction-selection'
-import { configureHomeVariant } from './fixtures/home-members'
-import { LicenseWorld } from './fixtures/license-world'
-import { allowLocalBootTicket, loginThroughVisibleUi, registerPrivacyShell } from './fixtures/privacy-clear-shell'
+import {
+  boot, expectHomeLive, expectHomeWindingDown, expectTapStays, goInApp, homeEntry, HOME_TASKS, HOME_TILES, homeReminder, mainNav,
+  markDocument, MINUTE, NO_NEW_TASK, paused, PHONE_SENTENCE, reachPaused, settleAfterPause, tap, windDownBlocked, windDownDialog,
+} from './fixtures/license-gate-kit'
+import { loginThroughVisibleUi } from './fixtures/privacy-clear-shell'
 
 test.describe.configure({ timeout: 120_000 })
 
-const MINUTE = 60_000
-/** 收尾中每个停用入口下面写的原因（产品口径：只写「不开始新的办理」，不提授权、到期）。 */
-const NO_NEW_TASK = '本机暂不开始新的办理'
-/** support-contact 默认应答里的公示号码与服务时间（ApiRouter 默认）。 */
-const PHONE_SENTENCE = '拨打服务电话 18369161921（工作日 9:00–18:00）'
-/** 首页入口：四张大卡 + 'gov' 配置下的四块磁贴（到机取件、本机构官方渠道、帮助、智慧校园；百宝箱要有已上架的扩展服务才摆）。 */
-const HOME_TASKS = ['resume-hub', 'interview-hub', 'print-hub', 'policy-hub'] as const
-const HOME_TILES = ['pickup-claim', 'official-channels', 'help', 'smart-campus'] as const
-
-/** 一张宣传图（秋季招聘会海报）：能真正解码，作待机屏播放的阳性对照。 */
-const AD_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1280" viewBox="0 0 960 1280">'
-  + '<rect width="960" height="1280" fill="#e76f51"/>'
-  + '<text x="480" y="600" font-size="80" text-anchor="middle" fill="#ffffff">2026 秋季招聘会</text></svg>'
-const AD_ITEM = {
-  id: 'ad-autumn-career-fair',
-  type: 'image',
-  url: `data:image/svg+xml;utf8,${encodeURIComponent(AD_SVG)}`,
-  mimeType: 'image/png',
-  durationSec: 300,
-  sha256: 'sha-ad-autumn-career-fair',
-}
 /** 1×1 PNG：机构 Logo 的阳性对照。 */
 const PNG_1X1 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
   'base64',
 )
-
-interface BootOptions {
-  path?: string
-  /** 待机宣传：开着并带一条素材（默认关）。 */
-  screensaver?: boolean
-}
-
-/** 起一台「授权正常」的机器：换到会话票、读到验过签的 profile、首页入口可用。 */
-async function boot(page: Page, api: ApiRouter, options: BootOptions = {}): Promise<LicenseWorld> {
-  const world = new LicenseWorld(page)
-  await world.install()
-  await allowLocalBootTicket(page)
-  registerPrivacyShell(api)
-  configureHomeVariant(api, 'gov')
-  if (options.screensaver) {
-    api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', {
-      status: 200,
-      json: { enabled: true, idleTimeoutSec: 180, items: [AD_ITEM] },
-    })
-  }
-  await page.goto(options.path ?? '/')
-  await world.waitForVerifiedProfile()
-  return world
-}
-
-/** 像手指一样点一下：按元素中心的屏幕坐标发鼠标点击（停用的入口 Playwright 的 click 会拒绝点，那不是我们要测的）。 */
-async function tap(page: Page, target: Locator): Promise<void> {
-  const box = await target.boundingBox()
-  expect(box, '要点的东西得在屏上').not.toBeNull()
-  await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2)
-}
-
-/** 点了之后地址不变（停用的入口、被锁的区域真的点不动）。 */
-async function expectTapStays(page: Page, target: Locator, label: string): Promise<void> {
-  const before = page.url()
-  await tap(page, target)
-  await page.waitForTimeout(350)
-  expect(page.url(), `${label}：点了之后地址不该变`).toBe(before)
-}
-
-/** 站内跳转（不刷新页面，闸门状态与页面时钟都原样保留）：等同从别处的链接 / 按钮进去。 */
-async function goInApp(page: Page, path: string): Promise<void> {
-  await page.evaluate((target) => {
-    window.history.pushState({}, '', target)
-    window.dispatchEvent(new PopStateEvent('popstate'))
-  }, path)
-  await page.waitForURL((url) => `${url.pathname}${url.search}` === path)
-}
-
-const homeEntry = (page: Page, action: string) => page.locator(`[data-qx-page="home"] [data-action="${action}"]`)
-const mainNav = (page: Page) => page.getByRole('navigation', { name: '主导航' })
-const paused = (page: Page) => page.locator('[data-kiosk-screen="license-paused"]')
-const windDownDialog = (page: Page) => page.getByRole('dialog', { name: '请尽快办完' })
-const homeReminder = (page: Page) => page.locator('[data-qx-page="home"] .qxt-remind')
-
-/** 收尾中的首页：说明条在、入口全部停用并写明原因。 */
-async function expectHomeWindingDown(page: Page): Promise<void> {
-  await expect(homeReminder(page)).toBeVisible()
-  for (const action of [...HOME_TASKS, ...HOME_TILES]) {
-    const entry = homeEntry(page, action)
-    await expect(entry, `${action}：入口还在屏上`).toHaveCount(1)
-    await expect(entry, `${action}：要停用`).toHaveAttribute('aria-disabled', 'true')
-    await expect(entry, `${action}：要写原因`).toContainText(NO_NEW_TASK)
-  }
-}
-
-/** 授权恢复后的首页：入口都可用、没有说明条。 */
-async function expectHomeLive(page: Page): Promise<void> {
-  await expect(page.locator('[data-qx-page="home"]')).toBeVisible()
-  await expect(homeReminder(page)).toHaveCount(0)
-  for (const action of [...HOME_TASKS, ...HOME_TILES]) {
-    await expect(homeEntry(page, action), `${action}：要可用`).not.toHaveAttribute('aria-disabled', 'true')
-    await expect(homeEntry(page, action)).not.toContainText(NO_NEW_TASK)
-  }
-}
-
-/** 把时钟推进到页面进暂停屏为止（最多再走一个 profile 周期）；返回前确认页面真的是暂停屏。 */
-async function reachPaused(world: LicenseWorld, page: Page, options: { active?: boolean } = {}): Promise<void> {
-  await world.advanceUntil(async () => (await paused(page).count()) > 0, 4 * MINUTE, options)
-  await expect(paused(page)).toBeVisible()
-}
-
-/** 进暂停前给旧文档打记号；进暂停时的结束使用清场会整页重载，记号没了就说明新文档已经起来。 */
-const markDocument = (page: Page) => page.evaluate(() => { (window as unknown as { __beforePause?: boolean }).__beforePause = true })
-/** 等旧文档被换掉再等暂停屏回来。requireReload 为真时，等不到重载就算失败（用例要看的是重载之后的样子）。 */
-async function settleAfterPause(page: Page, options: { requireReload?: boolean } = {}): Promise<void> {
-  const reloaded = page.waitForFunction(() => !(window as unknown as { __beforePause?: boolean }).__beforePause, undefined, { timeout: 5_000 })
-  if (options.requireReload) await reloaded
-  else await reloaded.catch(() => undefined)
-  await expect(paused(page)).toBeVisible()
-}
 
 // ───────────────────────── a) 授权失效：收尾中 ─────────────────────────
 
@@ -254,48 +142,65 @@ test('例行续期后两分钟到期，暂停复查距续期至少五分钟 @lic
   await world.thaw()
 })
 
-test('授权失效：简历台、练面试、查政策、打印台的入口停用并写明原因，问小青停用 @license-gate', async ({ page, api }) => {
-  const world = await boot(page, api)
-  const hubs = [
-    { path: '/resume-service', root: '[data-qx-page="resume"]' },
-    { path: '/interview-service', root: '[data-qx-page="interview"]' },
-    { path: '/policy-service', root: '[data-qx-page="service-hub"]' },
-  ] as const
-  const entriesOf = (root: string) => page.locator(root).locator('.qxt-task, .qxt-tile')
-  const liveOf = (root: string) => page.locator(root).locator('.qxt-task:not([aria-disabled="true"]), .qxt-tile:not([aria-disabled="true"])')
+// 服务台与打印台的入口停用，要在「收尾开始那一刻就站在这一项服务里」的前提下测：
+// 运行时根只拦「收尾开始之后进入另一项服务的办理页」（licenseWindDownRoutes.ts），
+// 站在别处再进来看到的是拦截屏而不是服务台（见 kiosk-license-wind-down.spec.ts）。所以每个服务台各开一条，从它自己开机。
+const HUBS = [
+  { name: '简历台', path: '/resume-service', root: '[data-qx-page="resume"]' },
+  { name: '练面试', path: '/interview-service', root: '[data-qx-page="interview"]' },
+  { name: '查政策', path: '/policy-service', root: '[data-qx-page="service-hub"]' },
+] as const
 
-  // 阳性对照：授权正常时，这几个服务台里都有能点的入口，问小青也是亮的；打印台没有被锁住的区域。
-  for (const { path, root } of hubs) {
-    await goInApp(page, path)
+for (const { name, path, root } of HUBS) {
+  test(`授权失效：${name}服务台（收尾开始时就在这一页）的入口停用并写明原因，问小青停用 @license-gate`, async ({ page, api }) => {
+    const world = await boot(page, api, { path })
+    const entries = page.locator(root).locator('.qxt-task, .qxt-tile')
+    const live = page.locator(root).locator('.qxt-task:not([aria-disabled="true"]), .qxt-tile:not([aria-disabled="true"])')
+
+    // 阳性对照：授权正常时，这个服务台里有能点的入口，问小青也是亮的。
     await expect(page.locator(root), `${path}：服务台要在屏上`).toBeVisible()
-    await expect(liveOf(root).first(), `${path}：正常时要有能点的入口`).toBeVisible()
+    await expect(live.first(), `${path}：正常时要有能点的入口`).toBeVisible()
     await expect(page.locator('.qxt-askq[data-qxt-ask="on"]'), `${path}：正常时问小青是亮的`).toHaveCount(1)
-  }
-  await goInApp(page, '/print-scan')
+
+    world.lapse(12 * MINUTE)
+    await world.advance(3.5 * MINUTE)
+
+    // 收尾是在这个服务台里开始的：它还留在屏上（没被拦），入口全部停用。
+    await expect(windDownBlocked(page), `${path}：收尾开始时就站在这一页，不该被拦`).toHaveCount(0)
+    await expect(entries.first(), `${path}：入口要在屏上`).toBeVisible()
+    expect(await entries.count(), `${path}：入口个数`).toBeGreaterThanOrEqual(4)
+    await expect(live, `${path}：不能有还能点的入口`).toHaveCount(0)
+    await expect(page.locator(root).getByText(NO_NEW_TASK).first(), `${path}：要写原因`).toBeVisible()
+    await expect(page.locator('.qxt-askq[data-qxt-ask="off"]'), `${path}：问小青停用`).toHaveCount(1)
+    await expect(page.locator('.qxt-askq[data-qxt-ask="on"]')).toHaveCount(0)
+    await expectTapStays(page, entries.first(), `${path} 第一个入口`)
+
+    // 收尾中进另一个服务台：整屏换成拦截屏，目标服务台不渲染（只有收尾开始时所在的这一项服务还能留在里面）。
+    const other = HUBS.find((hub) => hub.path !== path)!
+    await goInApp(page, other.path)
+    await expect(windDownBlocked(page), `${path} 里进 ${other.path}：要出拦截屏`).toBeVisible()
+    await expect(page.locator(other.root), `${other.path}：被拦的服务台不该渲染`).toHaveCount(0)
+  })
+}
+
+test('授权失效：打印台（收尾开始时就在这一页）整块入口停用并写明原因，问小青停用 @license-gate', async ({ page, api }) => {
+  const world = await boot(page, api, { path: '/print-scan' })
+  // 阳性对照：授权正常时，打印台没有被锁住的区域。
   await expect(page.locator('[data-w2-page="print-scan-home"]')).toBeVisible()
   await expect(page.locator('[data-license-locked]')).toHaveCount(0)
 
   world.lapse(12 * MINUTE)
   await world.advance(3.5 * MINUTE)
 
-  for (const { path, root } of hubs) {
-    await goInApp(page, path)
-    await expect(entriesOf(root).first(), `${path}：入口要在屏上`).toBeVisible()
-    const total = await entriesOf(root).count()
-    expect(total, `${path}：入口个数`).toBeGreaterThanOrEqual(4)
-    await expect(liveOf(root), `${path}：不能有还能点的入口`).toHaveCount(0)
-    await expect(page.locator(root).getByText(NO_NEW_TASK).first(), `${path}：要写原因`).toBeVisible()
-    await expect(page.locator('.qxt-askq[data-qxt-ask="off"]'), `${path}：问小青停用`).toHaveCount(1)
-    await expect(page.locator('.qxt-askq[data-qxt-ask="on"]')).toHaveCount(0)
-    await expectTapStays(page, entriesOf(root).first(), `${path} 第一个入口`)
-  }
-
   // 打印台：整块入口被锁（点不动），台上写明原因，问小青停用。
-  await goInApp(page, '/print-scan')
   await expect(page.locator('[data-license-locked]')).toHaveCount(1)
   await expect(page.getByRole('status').filter({ hasText: NO_NEW_TASK })).toBeVisible()
   await expect(page.locator('.qxt-askq[data-qxt-ask="off"]')).toHaveCount(1)
   await expectTapStays(page, page.locator('[data-license-locked] button').first(), '打印台第一个入口')
+
+  // 从打印台进简历台（另一项服务的办理页）：整屏换成拦截屏。
+  await goInApp(page, '/resume-service')
+  await expect(windDownBlocked(page), '打印台里进 /resume-service：要出拦截屏').toBeVisible()
 })
 
 // ───────────────────────── b) 剩 5 分钟：请尽快办完 ─────────────────────────

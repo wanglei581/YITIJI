@@ -40,6 +40,8 @@ export class LicenseWorld {
   brand: Partial<PublicKioskProfile> = {}
   /** 在一次成功续期签票后、响应送达前模拟后台状态变化。 */
   afterRefresh?: (at: number) => void
+  /** 验过签的答复里不给 currentSessionEndsAt（后台算不出当前凭证何时到期）：页面只能自己兜一个到点时刻。 */
+  omitEndsAt = false
   /** 会话票 → 到期时刻（页面时钟毫秒）。 */
   readonly sessions = new Map<string, number>()
   readonly log = {
@@ -334,7 +336,7 @@ export class LicenseWorld {
       licenseState: this.active ? 'ok' : 'inactive',
       acceptsNewSessions: this.active,
       currentSessionMayContinue: true,
-      currentSessionEndsAt: new Date(endsAt).toISOString(),
+      currentSessionEndsAt: this.omitEndsAt ? null : new Date(endsAt).toISOString(),
       noticeLine: this.active ? null : PAUSED_NOTICE_LINE,
     })
   }
