@@ -13737,7 +13737,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 816,
+      "reachableFileCount": 825,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -16863,6 +16863,7 @@
           "path": "/scan",
           "styles": [
             "apps/kiosk/src/pages/print-scan/styles/tool-touch.css",
+            "apps/kiosk/src/pages/scan/styles/scan-device-qx.css",
             "apps/kiosk/src/pages/scan/styles/scan-fs.css",
             "apps/kiosk/src/pages/scan/styles/scan-result-viewer-qx.css",
             "apps/kiosk/src/pages/scan/styles/scan-workbench-compact-qx.css",
@@ -17086,7 +17087,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 918
+      "sourceFileCount": 927
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -22400,6 +22401,13 @@
     "apps/kiosk/src/pages/resume/useSelfAssessmentIdleExit.ts": [
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
     ],
+    "apps/kiosk/src/pages/scan/ScanDeviceSettingsPage.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
+    "apps/kiosk/src/pages/scan/ScanHowPage.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs"
+    ],
     "apps/kiosk/src/pages/scan/ScanProgressPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
@@ -22455,8 +22463,17 @@
     "apps/kiosk/src/pages/scan/scanDeliveryAck.ts": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
+    "apps/kiosk/src/pages/scan/scanHowContinue.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
+    "apps/kiosk/src/pages/scan/scanMaterials.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
     "apps/kiosk/src/pages/scan/scanOutputFormat.ts": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
+    ],
+    "apps/kiosk/src/pages/scan/scanProbeCopy.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
     "apps/kiosk/src/pages/scan/scanRescanRecovery.ts": [
       "apps/kiosk/scripts/verify-scan-quiet-period.mjs",
@@ -30778,6 +30795,8 @@
           "apps/kiosk/src/pages/print/styles/pickup-claim-qx.css",
           "apps/kiosk/src/pages/print/styles/print-pickup-claim.css",
           "apps/kiosk/src/pages/print/styles/print-upload.css",
+          "apps/kiosk/src/pages/scan/ScanDeviceSettingsPage.tsx",
+          "apps/kiosk/src/pages/scan/ScanHowPage.tsx",
           "apps/kiosk/src/pages/scan/ScanProgressPage.tsx",
           "apps/kiosk/src/pages/scan/ScanResultExitRow.tsx",
           "apps/kiosk/src/pages/scan/ScanResultFailedView.tsx",
@@ -30788,6 +30807,7 @@
           "apps/kiosk/src/pages/scan/ScanStartPage.tsx",
           "apps/kiosk/src/pages/scan/ScanWorkbenchChrome.tsx",
           "apps/kiosk/src/pages/scan/ScanWorkbenchPage.tsx",
+          "apps/kiosk/src/pages/scan/scanProbeCopy.ts",
           "apps/kiosk/src/pages/scan/scanResultModel.ts",
           "apps/kiosk/src/pages/scan/styles/scan-fusion.css",
           "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css",
@@ -31473,6 +31493,8 @@
           "apps/kiosk/src/pages/resume/resumeGenerateDraft.ts",
           "apps/kiosk/src/pages/resume/selfAssessmentSession.ts",
           "apps/kiosk/src/pages/resume/touch/OptimizeEditView.tsx",
+          "apps/kiosk/src/pages/scan/scanHowContinue.ts",
+          "apps/kiosk/src/pages/scan/scanMaterials.ts",
           "apps/kiosk/src/pages/scan/scanWorkbenchModel.ts",
           "apps/kiosk/src/pages/scan/scanWorkbenchSession.ts",
           "apps/kiosk/src/services/api/careerPlan.ts",
@@ -33524,6 +33546,7 @@
           "apps/kiosk/src/auth/kioskClearScope.ts",
           "apps/kiosk/src/auth/kioskSensitiveSession.ts",
           "apps/kiosk/src/pages/print/printHandoffPolicy.ts",
+          "apps/kiosk/src/pages/scan/ScanHowPage.tsx",
           "apps/kiosk/src/pages/scan/ScanProgressPage.tsx",
           "apps/kiosk/src/pages/scan/ScanResultExitRow.tsx",
           "apps/kiosk/src/pages/scan/ScanResultFailedView.tsx",
