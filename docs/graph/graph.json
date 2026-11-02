@@ -14124,6 +14124,7 @@
           ],
           "path": "/activities",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/activities/activities-batch8.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
             "apps/kiosk/src/pages/profile/touch/me-states.css",
@@ -14160,6 +14161,7 @@
           ],
           "path": "/activities/:id",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/activities/activities-detail-inkpaper.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
             "apps/kiosk/src/pages/profile/touch/me-states.css",
@@ -15285,6 +15287,7 @@
           ],
           "path": "/me/activity",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15335,6 +15338,7 @@
           ],
           "path": "/me/ai-records",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15373,6 +15377,7 @@
           ],
           "path": "/me/benefits",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/benefits-qx.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
             "apps/kiosk/src/pages/profile/touch/me-states.css",
@@ -15409,6 +15414,7 @@
           ],
           "path": "/me/documents",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15447,6 +15453,7 @@
           ],
           "path": "/me/favorites",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15485,6 +15492,7 @@
           ],
           "path": "/me/feedback",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/feedback-qx.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
             "apps/kiosk/src/pages/profile/touch/me-states.css",
@@ -15522,6 +15530,7 @@
           ],
           "path": "/me/notifications",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/notifications-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15559,6 +15568,7 @@
           ],
           "path": "/me/print-orders",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15596,6 +15606,7 @@
           ],
           "path": "/me/privacy-requests",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/privacy-qx.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
             "apps/kiosk/src/pages/profile/touch/me-states.css",
@@ -15632,6 +15643,7 @@
           ],
           "path": "/me/resumes",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
