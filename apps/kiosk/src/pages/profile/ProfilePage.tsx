@@ -189,13 +189,14 @@ function ProfileContent() {
               />
               {miniappLine ? <p className="me-sync">{miniappLine}</p> : null}
               <LicenseLock><ProfileAssetGrid counts={assetOverview.counts} loading={assetOverview.loading} /></LicenseLock>
-              <ProfileContinueCard task={pendingTask} tasksError={tasksError} empty={uiState === 'empty'} />
+              <LicenseLock><ProfileContinueCard task={pendingTask} tasksError={tasksError} empty={uiState === 'empty'} /></LicenseLock>
               {uiState === 'empty' ? <LicenseLock><EmptyStartRows /></LicenseLock> : null}
               {resumes.length + scans.length + aiRecords.length > 0 ? (
                 <ProfileSessionRecords
                   resumes={resumes}
                   scans={scans}
                   aiRecords={aiRecords}
+                  winding={winding}
                   onPrintFile={printFile}
                   onDeleteResume={(id) => setResumes((prev) => prev.filter((item) => item.id !== id))}
                   onDeleteScan={(id) => setScans((prev) => prev.filter((item) => item.id !== id))}

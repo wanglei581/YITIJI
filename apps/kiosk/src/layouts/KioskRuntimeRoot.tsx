@@ -4,6 +4,7 @@ import { useAuth } from '../auth/useAuth'
 import { refreshKioskProfile, startKioskProfileKeeper } from '../services/api/kioskProfile'
 import { AiDeclarationHost } from '../ai/AiDeclarationHost'
 import { KioskPrivacyGuard } from '../auth/KioskPrivacyGuard'
+import { useKioskSessionControl } from '../auth/KioskSessionControlContext'
 import { KioskBusyProvider } from '../contexts/KioskBusyContext'
 import { KioskHidScanGuard } from '../components/hid-guard/KioskHidScanGuard'
 import { useContentUpdate } from '../hooks/useContentUpdate'
@@ -43,11 +44,13 @@ function SupportContactGuard() {
 function LicensedOutlet() {
   const { mode, notice } = useKioskLicense()
   const navigate = useNavigate()
+  const { endKioskUse } = useKioskSessionControl()
   const previousMode = useRef(mode)
   useEffect(() => {
+    if (previousMode.current !== 'paused' && mode === 'paused') endKioskUse('end_use')
     if (previousMode.current === 'paused' && mode === 'normal') navigate('/', { replace: true })
     previousMode.current = mode
-  }, [mode, navigate])
+  }, [mode, navigate, endKioskUse])
   return mode === 'paused' ? <KioskPausedScreen notice={notice} /> : <Outlet />
 }
 
