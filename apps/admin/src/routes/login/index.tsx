@@ -1,3 +1,5 @@
+import { usePublicBrand } from '../../services/api/publicBrand'
+import { logoPreviewUrl } from '../../services/api/brandingAdmin'
 // Admin 登录页 — 密码 / 短信验证码双模式 + 找回密码 + 登录后手机号本人验证
 //
 // 接口接线（保持不变）：
@@ -83,6 +85,9 @@ function validateCommercialPassword(value: string): string | null {
 }
 
 export default function LoginPage() {
+  const brand = usePublicBrand()
+  const [failedLogo, setFailedLogo] = useState<string | null>(null)
+  const logo = logoPreviewUrl(brand.logoUrl)
   const nav = useNavigate()
   const smsCountdown = useCountdown()
   const resetCountdown = useCountdown()
@@ -290,10 +295,12 @@ export default function LoginPage() {
         <span className="vert">值守 · 运营 · 审计</span>
         <div className="c-brand">
           <div className="c-logo">
-            <ShieldCheckIcon size={25} aria-hidden="true" />
+            {logo && logo !== failedLogo
+              ? <img src={logo} alt="" onError={() => setFailedLogo(logo)} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              : <ShieldCheckIcon size={25} aria-hidden="true" />}
           </div>
           <div>
-            <strong>职易达</strong>
+            <strong>{brand.brandName}</strong>
             <span>管理员后台</span>
           </div>
         </div>
