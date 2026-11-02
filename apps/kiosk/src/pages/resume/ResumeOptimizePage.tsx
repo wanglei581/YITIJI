@@ -25,6 +25,7 @@ import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { DEFAULT_RESUME_LAYOUT, useResumeLayout } from './hooks/useResumeLayout'
 import { readAiResumeSession } from './aiResumeSession'
+import { useResumeAiConsent } from './resumeAiConsent'
 import { RESUME_AI_CONSENT_NEEDED_COPY } from './resumeAiConsentPrompt'
 import { useInlineResumeAiConsent } from './useInlineResumeAiConsent'
 import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
@@ -95,10 +96,10 @@ export function ResumeOptimizePage() {
     adjustError, setAdjustError, factOpen, setFactOpen, savedToDocuments, setSavedToDocuments,
     decisions, setDecisions, draftAccepted, setDraftAccepted,
   } = useOptimizeSession(query.format, Boolean(token))
+  const consent = useResumeAiConsent()
   const resumeAiConsent = useInlineResumeAiConsent(() => {
     setAdjustError(RESUME_AI_CONSENT_NEEDED_COPY)
   })
-  const consent = resumeAiConsent.consent
   const [adjustOutage, setAdjustOutage] = useState(false)
   const [clearedChoices, setClearedChoices] = useState<ReadonlySet<string>>(new Set())
   const [decisionIssues, setDecisionIssues] = useState<Record<string, string>>({})
