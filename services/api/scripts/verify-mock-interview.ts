@@ -46,6 +46,7 @@ import { openUnpdfDocument } from '../src/common/pdf/pdfjs-document'
 import { AsrService } from '../src/mock-interview/asr/asr.service'
 import { TtsService, splitForTts } from '../src/mock-interview/asr/tts.service'
 import { AiLogService } from '../src/ai/ai-log.service'
+import { MemberPrivacyService } from '../src/member-privacy/member-privacy.service'
 
 const SECRET_ANSWER = '我在某电商项目里把首屏加载从4秒优化到1.5秒_机密标记XYZQ'
 const SECRET_QUESTION = '请讲讲你最有代表性的项目经历_问题标记ABCD'
@@ -1114,6 +1115,106 @@ async function main() {
       if (dtoErrors.length === 0) fail('21g. DTO 应拒绝非布尔')
 
       pass('21. 本场作答记录：进行中无报告可出，跳过开关、越权、不调模型、审计与 PDF 口径正确')
+    }
+
+    // ── 22. 带简历才核 resume_ai：未同意拒绝且不调模型；同意后放行；撤回后再拒绝 ──
+    {
+      const privacy = new MemberPrivacyService(prisma)
+      const extraction = {
+        extractResumeText: async () => ({
+          ok: true,
+          text: '做过行政工作三年，熟悉档案整理与会议安排。',
+          textSource: 'docx',
+          confidence: 'high',
+          charCount: 24,
+        }),
+      }
+      let llmCalls = 0
+      const counting = {
+        nextQuestion: async (
+          ctx: Parameters<MockInterviewLlmService['nextQuestion']>[0],
+          sink?: Parameters<MockInterviewLlmService['nextQuestion']>[1],
+        ) => {
+          llmCalls += 1
+          return llm.nextQuestion(ctx, sink)
+        },
+        buildReport: async (
+          ctx: Parameters<MockInterviewLlmService['buildReport']>[0],
+          sink?: Parameters<MockInterviewLlmService['buildReport']>[1],
+        ) => {
+          llmCalls += 1
+          return llm.buildReport(ctx, sink)
+        },
+      }
+      const consentSvc = new MockInterviewService(
+        prisma, counting as never, pdf, practiceSheetPdf, {} as never, extraction as never, audit, aiLog, redis, privacy,
+      )
+      const member = { endUserId: endUserA, accessToken: null }
+      const consentError = (e: unknown) => {
+        const ex = e as { getStatus?: () => number; getResponse?: () => { error?: { code?: string; message?: string } } }
+        const body = ex.getResponse?.()
+        return { status: ex.getStatus?.() ?? 0, code: body?.error?.code, message: body?.error?.message }
+      }
+      const bare = await consentSvc.createSession(baseCfg, member)
+      cleanupSessionIds.push(bare.sessionId)
+      const beforeBare = llmCalls
+      responseQueue.push(q('请自我介绍', { qType: 'intro' }))
+      await consentSvc.start(bare.sessionId, member)
+      if (llmCalls !== beforeBare + 1) fail('22. 不带简历应照常出题')
+      pass('22. 不带简历的模拟面试不核授权，模型照常调用')
+
+      const withResume = await consentSvc.createSession({ ...baseCfg, resumeFileId: `resume_${suffix}` }, member)
+      cleanupSessionIds.push(withResume.sessionId)
+      const beforeDeny = llmCalls
+      const bodiesBefore = llmRequestBodies.length
+      try {
+        await consentSvc.start(withResume.sessionId, member)
+        fail('22a. 未同意不应出题')
+      } catch (e) {
+        const info = consentError(e)
+        if (info.status !== 403 || info.code !== 'USER_AI_CONSENT_REQUIRED' || info.message !== '请先确认简历 AI 服务授权') {
+          fail(`22a. 拒绝形态不符: ${JSON.stringify(info)}`)
+        }
+      }
+      if (llmCalls !== beforeDeny || llmRequestBodies.length !== bodiesBefore) fail('22a. 未同意时调用了模型')
+      const deniedRow = await prisma.mockInterviewSession.findUnique({ where: { id: withResume.sessionId } })
+      if (deniedRow?.status !== 'configured') fail(`22a. 拒绝后状态应回到 configured，实际 ${deniedRow?.status}`)
+      pass('22a. 带简历未同意 → 403，模型未调用，会话未停在进行中')
+
+      const guestCreated = await consentSvc.createSession(
+        { ...baseCfg, resumeFileId: `resume_guest_${suffix}` },
+        { endUserId: null, accessToken: null },
+      )
+      cleanupSessionIds.push(guestCreated.sessionId)
+      responseQueue.push(q('请自我介绍', { qType: 'intro' }))
+      const beforeGuest = llmCalls
+      await consentSvc.start(guestCreated.sessionId, { endUserId: null, accessToken: guestCreated.accessToken ?? null })
+      if (llmCalls !== beforeGuest + 1) fail('22g. 游客带简历应照常出题')
+      pass('22g. 游客带简历不拦截')
+
+      await privacy.grantConsent(endUserA, 'resume_ai', null)
+      responseQueue.push(q('请自我介绍', { qType: 'intro' }))
+      const beforeOk = llmCalls
+      const started = await consentSvc.start(withResume.sessionId, member)
+      if (!started.question || llmCalls !== beforeOk + 1) fail('22b. 已同意应出题')
+      pass('22b. 带简历已同意 → 照常出题')
+
+      await privacy.revokeConsent(endUserA, 'resume_ai')
+      const again = await consentSvc.createSession({ ...baseCfg, resumeFileId: `resume_revoked_${suffix}` }, member)
+      cleanupSessionIds.push(again.sessionId)
+      const beforeRevoke = llmCalls
+      const bodiesRevoke = llmRequestBodies.length
+      try {
+        await consentSvc.start(again.sessionId, member)
+        fail('22c. 撤回后不应出题')
+      } catch (e) {
+        const info = consentError(e)
+        if (info.status !== 403 || info.code !== 'USER_AI_CONSENT_REQUIRED' || info.message !== '请先确认简历 AI 服务授权') {
+          fail(`22c. 撤回后拒绝形态不符: ${JSON.stringify(info)}`)
+        }
+      }
+      if (llmCalls !== beforeRevoke || llmRequestBodies.length !== bodiesRevoke) fail('22c. 撤回后仍调用了模型')
+      pass('22c. 同意后撤回 → 带简历再次拒绝且未调模型')
     }
 
     console.log(`\n=== ALL PASS (${passCount} checks) ===`)

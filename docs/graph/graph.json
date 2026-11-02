@@ -8902,12 +8902,14 @@
         "models": [
           "AiServiceLog",
           "AuditLog",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews",
         "roles": [],
@@ -8925,12 +8927,14 @@
         "models": [
           "AiServiceLog",
           "AuditLog",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews",
         "roles": [],
@@ -8948,12 +8952,14 @@
         "models": [
           "AiServiceLog",
           "AuditLog",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id",
         "roles": [],
@@ -8971,12 +8977,14 @@
         "models": [
           "AiServiceLog",
           "AuditLog",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id",
         "roles": [],
@@ -8994,12 +9002,14 @@
         "models": [
           "AiServiceLog",
           "AuditLog",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/answer",
         "roles": [],
@@ -9017,12 +9027,14 @@
         "models": [
           "AiServiceLog",
           "AuditLog",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/end",
         "roles": [],
@@ -9040,12 +9052,14 @@
         "models": [
           "AiServiceLog",
           "AuditLog",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/practice-sheet",
         "roles": [],
@@ -9063,12 +9077,14 @@
         "models": [
           "AiServiceLog",
           "AuditLog",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/report",
         "roles": [],
@@ -9086,12 +9102,14 @@
         "models": [
           "AiServiceLog",
           "AuditLog",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/report/print",
         "roles": [],
@@ -9109,12 +9127,14 @@
         "models": [
           "AiServiceLog",
           "AuditLog",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/start",
         "roles": [],
@@ -9132,12 +9152,14 @@
         "models": [
           "AiServiceLog",
           "AuditLog",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/transcribe",
         "roles": [],
@@ -9181,12 +9203,14 @@
         "models": [
           "AiServiceLog",
           "AuditLog",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/turns/:idx/audio",
         "roles": [],
@@ -11475,10 +11499,12 @@
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewSession",
-          "PrintTask"
+          "PrintTask",
+          "UserAiConsent"
         ],
         "path": "/api/v1/resume/career-plan/:taskId",
         "roles": [],
@@ -11497,10 +11523,12 @@
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewSession",
-          "PrintTask"
+          "PrintTask",
+          "UserAiConsent"
         ],
         "path": "/api/v1/resume/career-plan/:taskId",
         "roles": [],
@@ -11519,10 +11547,12 @@
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewSession",
-          "PrintTask"
+          "PrintTask",
+          "UserAiConsent"
         ],
         "path": "/api/v1/resume/career-plan/:taskId/print",
         "roles": [],
@@ -11930,8 +11960,8 @@
         ]
       },
       {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.adjustResumeLayout",
+        "controller": "services/api/src/ai/resume-layout-adjust.controller.ts",
+        "handler": "ResumeLayoutAdjustController.adjustResumeLayout",
         "method": "POST",
         "models": [
           "AiResumeResult",
@@ -25316,6 +25346,10 @@
     "services/api/src/ai/redis-inflight-lock.ts": [
       "services/api/scripts/verify-resume-optimize.ts"
     ],
+    "services/api/src/ai/resume-layout-adjust.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-resume-layout-adjust.ts"
+    ],
     "services/api/src/ai/resume-parse-intent-runner.service.ts": [
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
@@ -27465,13 +27499,16 @@
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-ai-usage-coverage.ts",
+      "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
       "services/api/scripts/verify-member-data-request-state-machine.ts",
       "services/api/scripts/verify-member-data-request-truth.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
+      "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-pg-serialization-conflict.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
+      "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-report-export.ts"
     ],
@@ -36286,6 +36323,7 @@
           "services/api/src/ai/fair-visit-plan.controller.ts",
           "services/api/src/ai/job-fit.controller.ts",
           "services/api/src/ai/kiosk-ai-capabilities.controller.ts",
+          "services/api/src/ai/resume-layout-adjust.controller.ts",
           "services/api/src/ai/resume-report-export.controller.ts",
           "services/api/src/ai/self-assessment.controller.ts",
           "services/api/src/app.module.ts",
@@ -37384,6 +37422,7 @@
           "services/api/src/ai/resume/llm-career-plan.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/member-assets/member-assets.service.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
         "missing": []
@@ -40837,6 +40876,7 @@
           "services/api/src/ai/ai-log.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/pdf/pdfjs-document.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts",
           "services/api/src/mock-interview/asr/asr.service.ts",
           "services/api/src/mock-interview/asr/tts.service.ts",
           "services/api/src/mock-interview/interview-practice-sheet-pdf.service.ts",
@@ -43286,9 +43326,11 @@
           "services/api/src/ai/ai.service.ts",
           "services/api/src/ai/dto/resume-generate.dto.ts",
           "services/api/src/ai/interfaces/ai-provider.interface.ts",
+          "services/api/src/ai/resume-layout-adjust.controller.ts",
           "services/api/src/ai/resume/llm-resume-optimize.service.ts",
           "services/api/src/ai/resume/resume-pdf.service.ts",
-          "services/api/src/common/pdf/pdfjs-document.ts"
+          "services/api/src/common/pdf/pdfjs-document.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts"
         ],
         "missing": []
       },

@@ -28,7 +28,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import type { AdminAiUsage, AdminAiLogsResult, AiLogStatus, AiOperation } from './ai-log.service'
 import { ResumeParseRequestDto } from './dto/resume-parse.dto'
 import type { ResumeParseResponseDto } from './dto/resume-parse.dto'
-import { ResumeGenerateExportDto, ResumeGenerateRequestDto, ResumeLayoutAdjustDto } from './dto/resume-generate.dto'
+import { ResumeGenerateExportDto, ResumeGenerateRequestDto } from './dto/resume-generate.dto'
 import { ResumeDraftPutDto } from './dto/resume-draft.dto'
 import { RESUME_VOICE_AUDIO_FIELD, RESUME_VOICE_MAX_AUDIO_BYTES, type ResumeVoiceTranscribeResponseDto } from './dto/resume-voice.dto'
 import type { ResumeOptimizeResponseDto } from './dto/resume-optimize.dto'
@@ -402,36 +402,6 @@ export class AiController {
       await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
     }
     return this.aiService.factCheckResume(taskId, requester)
-  }
-
-  @Post('resume/records/:taskId/layout-adjust')
-  @PaidAiThrottle(6)
-  @AiUse('generate')
-
-  async adjustResumeLayout(
-    @Param('taskId') taskId: string,
-    @Body() dto: ResumeLayoutAdjustDto,
-    @Req() req: ReqLike,
-  ) {
-    const requester = await this.resolveAiResultRequester(req)
-    const result = await this.aiService.adjustResumeLayout(taskId, dto.resume, dto.action, dto.layout, requester)
-    await this.audit.write({
-      actorId: null,
-      actorRole: 'kiosk',
-      action: 'resume.layout_adjusted',
-      targetType: 'ai_task',
-      targetId: taskId,
-      payload: {
-        action: dto.action,
-        layout: dto.layout ? { columns: dto.layout.columns ?? 1, margin: dto.layout.margin ?? 'normal', fontScale: dto.layout.fontScale ?? 'standard', accent: dto.layout.accent ?? 'blue' } : null,
-        warningCount: result.warnings.length,
-        hasEndUser: requester.endUserId !== null,
-      },
-      ipAddress: ipOf(req),
-      userAgent: uaOf(req),
-      requestId: req.requestId ?? null,
-    })
-    return result
   }
 
   /**

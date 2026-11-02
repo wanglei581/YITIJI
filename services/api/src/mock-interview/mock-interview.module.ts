@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { AiModule } from '../ai/ai.module'
+import { MemberPrivacyModule } from '../member-privacy/member-privacy.module'
 import { FilesModule } from '../files/files.module'
 import { AsrModule } from '../asr/asr.module'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
@@ -23,6 +24,7 @@ import { TtsService } from './asr/tts.service'
 @Module({
   imports: [
     AiModule,
+    MemberPrivacyModule,
     AsrModule,
     FilesModule,
     JwtModule.registerAsync({

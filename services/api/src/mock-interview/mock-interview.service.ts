@@ -1,5 +1,5 @@
 import { captureFactIdentity, recordAiServiceFact } from '../ai/usage/ai-service-fact'
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
@@ -20,6 +20,7 @@ import {
   PRACTICE_SHEET_INTERVIEWER_LABEL,
   pickPracticeQuestions,
 } from './interview-practice-sheet'
+import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai/ai-log.service'
 import { InflightCoalescer } from '../ai/ai-inflight'
 import { RedisInflightLock } from '../ai/redis-inflight-lock'
@@ -102,6 +103,8 @@ export class MockInterviewService {
     private readonly audit: AuditService,
     private readonly aiLog: AiLogService,
     redis?: RedisService,
+    /** 未注入时不拦（既有直接构造的门禁与脱敏探针）。生产由 MockInterviewModule 注入。 */
+    @Optional() private readonly privacy?: MemberPrivacyService,
   ) { this.endLock = new RedisInflightLock(redis) }
 
   // ── 创建 / 开始 ────────────────────────────────────────────────────────────
@@ -188,6 +191,7 @@ export class MockInterviewService {
     const startedAt = Date.now()
     let q: NextQuestionOutput
     try {
+      await this.requireResumeConsent(session)
       q = await this.llm.nextQuestion({ ...this.llmCtx(session), askedCount: 0, transcript: [] }, usage.add)
       this.recordAiLog(session.id, 'interviewQuestion', usage, startedAt, 'success', session.endUserId)
       const content = q.greeting ? `${q.greeting}\n${q.question}` : q.question
@@ -279,6 +283,7 @@ export class MockInterviewService {
     const qStartedAt = Date.now()
     let q: NextQuestionOutput
     try {
+      await this.requireResumeConsent(session)
       q = await this.llm.nextQuestion({ ...this.llmCtx(session), askedCount: asked, transcript }, qUsage.add)
     } catch (error) {
       this.recordAiLog(session.id, 'interviewQuestion', qUsage, qStartedAt, 'failed', session.endUserId, aiErrorCodeOf(error, 'AI_INTERVIEW_QUESTION_FAILED'))
@@ -378,6 +383,7 @@ export class MockInterviewService {
     const rStartedAt = Date.now()
     let payload: InterviewReportPayload
     try {
+      await this.requireResumeConsent(session)
       payload = await this.llm.buildReport({
         ...this.llmCtx(session),
         transcript: turns.map((t) => ({
@@ -686,6 +692,16 @@ export class MockInterviewService {
       ? `u:${requester.endUserId}`
       : `t:${hashToken(requester.accessToken ?? '')}`
     return `${sessionId}:${owner}`
+  }
+
+  /**
+   * 只有把简历摘要送进模型时才核 resume_ai。没有摘要不拦。
+   * 隐私服务未注入时不拦（既有直接构造）。游客 resume_ai 由服务本身放行。
+   * 调用点都在 nextQuestion / buildReport 之前；开场失败的 catch 会把状态滚回去。
+   */
+  private async requireResumeConsent(session: { resumeDigest: string | null; endUserId: string | null }): Promise<void> {
+    if (!session.resumeDigest?.trim()) return
+    if (this.privacy) await this.privacy.requireActiveConsent(session.endUserId, 'resume_ai')
   }
 
   private llmCtx(session: SessionRow) {
