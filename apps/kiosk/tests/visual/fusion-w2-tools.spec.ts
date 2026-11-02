@@ -269,6 +269,60 @@ test('conversion success stays on the page until the print CTA and does not clai
   expect(errors).toEqual([])
 })
 
+// 只用于这一单（11/02 拍板）：登录了也可能不进「我的文档」——用了一体机这一单里从手机传来的图时，
+// 后端回 savedToDocuments=false。完成态只认这个字段：不说「已进我的文档」，也不给「查看我的文档」。
+async function convertOneImageWith(page: Page, api: ApiRouter, data: Record<string, unknown>): Promise<void> {
+  await fulfillFixtureImage(page)
+  registerShell(api)
+  registerConvertUpload(api)
+  api.respond('POST', '/api/v1/print/convert/images-to-pdf', { status: 200, json: { success: true, data } })
+  await page.goto('/print-scan/convert')
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'w2-image.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('synthetic-w2-image'),
+  })
+  await expect(page.getByText('w2-image.png', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: /合成 1 张为一份 PDF/ }).click()
+  await expect(page.getByTestId('img2pdf-band').getByText('PDF 已生成')).toBeVisible()
+}
+
+test('member PDF made from phone images is order-only, not claimed as saved @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await convertOneImageWith(page, api, {
+    fileId: 'w2-pdf-order-only',
+    printFileUrl: '/w2-fixtures/image.png',
+    fileMd5: 'a'.repeat(32),
+    sizeBytes: 2048,
+    pages: 1,
+    hasEndUser: true,
+    savedToDocuments: false,
+  })
+  await expect(page.getByText('只用于这一单 · 不进我的文档', { exact: true })).toBeVisible()
+  await expect(page.getByText(/用了手机传来的图片，这份 PDF 只用于这一单/)).toBeVisible()
+  await expect(page.getByText('已进我的文档', { exact: false })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '查看我的文档' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '拿这份 PDF 去打印' })).toBeVisible()
+  expect(errors).toEqual([])
+})
+
+test('member PDF that did go into my documents says so and links there @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await convertOneImageWith(page, api, {
+    fileId: 'w2-pdf-saved',
+    printFileUrl: '/w2-fixtures/image.png',
+    fileMd5: 'b'.repeat(32),
+    sizeBytes: 2048,
+    pages: 1,
+    hasEndUser: true,
+    savedToDocuments: true,
+  })
+  await expect(page.getByText('已进我的文档 · 约 24 小时', { exact: true })).toBeVisible()
+  await expect(page.getByText('只用于这一单', { exact: false })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '查看我的文档' })).toBeVisible()
+  expect(errors).toEqual([])
+})
+
 // 后端没有「游客转换件登录后认领」的接口：归属在转换那一刻按会员令牌定死（hasEndUser）。
 // 所以游客完成态的登录按钮只能叫「先登录再转换」，登录回来回到本页重新选图，由用户自己再点转换；
 // 不能把这份游客件带去打印台，让人以为登录就把它存下了。

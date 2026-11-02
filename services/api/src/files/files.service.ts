@@ -53,6 +53,7 @@ import {
   allowedPoliciesForFile,
   computeRetentionDecision,
   defaultRetentionForUpload,
+  UPLOAD_SESSION_ORDER_ONLY_REASON,
 } from './retention-policy'
 import { summarizeFileLifecycleRows } from './lifecycle-summary'
 import { parseContentFileId, PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from './signing'
@@ -128,6 +129,8 @@ export class FilesService {
     validationMode?: UploadValidationMode
     /** 仅服务端派生成果可收紧默认 system_short 到明确到期时间。 */
     expiresAtOverride?: Date
+    /** 只用于这一单的源文件转出来的派生件：系统短期保存并锁定，不进「我的文档」（retention-policy.ts）。 */
+    orderOnly?: boolean
     /**
      * 收费导出预写：对象先落库为 uploading + 短寿命，会员列表和访问 URL 看不到。
      * 核销事务提交时再激活并恢复正式保存期限。endUserId 在激活前不写入，
@@ -208,11 +211,13 @@ export class FilesService {
       uploaderId: args.uploaderId,
       orgId: args.actorOrgId ?? null,
     })
+    const orderOnly = Boolean(args.orderOnly) && !staging && args.purpose !== 'contract_upload'
     const retention = defaultRetentionForUpload({
       purpose: args.purpose,
       sensitiveLevel,
       ownerType: owner.ownerType,
       endUserId: ownerEndUserId,
+      orderOnly,
     })
     const expiresAtOverride =
       args.purpose === 'contract_upload' ? undefined : args.expiresAtOverride
@@ -269,7 +274,9 @@ export class FilesService {
           retentionConsentVersion: retention.retentionConsentVersion,
           retentionLockedReason: staging
             ? RESUME_EXPORT_STAGING_LOCK
-            : (args.purpose === 'contract_upload' ? 'contract_review_session_only' : null),
+            : (args.purpose === 'contract_upload'
+              ? 'contract_review_session_only'
+              : (orderOnly ? UPLOAD_SESSION_ORDER_ONLY_REASON : null)),
         },
       })
     } catch (createError) {

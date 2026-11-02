@@ -13,7 +13,11 @@ import type {
   MemberQaRecordItem,
   MemberResumeItem,
 } from './member-assets.types'
-import { allowedPoliciesForFile, isVisibleMemberFileWhere } from '../files/retention-policy'
+import {
+  allowedPoliciesForFile,
+  isVisibleMemberFileWhere,
+  MEMBER_DOCUMENT_HIDDEN_LOCK_REASONS,
+} from '../files/retention-policy'
 import { materialCheckRequired } from '../print-jobs/material-check-policy'
 import { listedDocumentPageCount } from '../files/file-page-count.util'
 import { RESUME_PARSE_INTENT_KIND } from '../ai/resume-parse-submission.service'
@@ -48,9 +52,10 @@ import { assertJobFitPrintFileReadable, storedJobFitUsesSystemJob } from '../ai/
 
 /**
  * 「我的文档」的列出条件：本人、active、未删、未过期（expiresAt=null 视为长期保存），
- * 不含签名图、合同审查原件，也不含锁成合同审查会话专用的文件。托管关闭时，系统岗位匹配
- * 报告另由 hiddenSystemJobFitIds 去掉。列表与「把文档递进一体机」（upload-sessions
- * member-file）共用这一套，两边不会一个列得出、一个收不进，也不会一个收、一个不列。
+ * 不含签名图、合同审查原件，也不含锁成合同审查会话专用、只用于这一单（一体机这一单里从手机
+ * 传来的，11/02 拍板）的文件。托管关闭时，系统岗位匹配报告另由 hiddenSystemJobFitIds 去掉。
+ * 列表与「把文档递进一体机」（upload-sessions member-file）共用这一套，两边不会一个列得出、
+ * 一个收不进，也不会一个收、一个不列。
  */
 export function memberDocumentWhere(endUserId: string, now: Date) {
   return {
@@ -60,7 +65,7 @@ export function memberDocumentWhere(endUserId: string, now: Date) {
       {
         OR: [
           { retentionLockedReason: null },
-          { retentionLockedReason: { not: 'contract_review_session_only' } },
+          { retentionLockedReason: { notIn: [...MEMBER_DOCUMENT_HIDDEN_LOCK_REASONS] } },
         ],
       },
     ],

@@ -27,7 +27,9 @@ import { resolveJwtSecret } from '../src/common/jwt-verifier.module'
 import { RedisService } from '../src/common/redis/redis.service'
 import type { FilePurpose } from '../src/files/file.types'
 import { FilesService } from '../src/files/files.service'
+import { UPLOAD_SESSION_ORDER_ONLY_REASON } from '../src/files/retention-policy'
 import { MemberAssetsService } from '../src/member-assets/member-assets.service'
+import { MemberDataExportMapper } from '../src/member-privacy/member-data-export.mapper'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { StorageService } from '../src/storage/storage.service'
 import { UploadSessionsController } from '../src/upload-sessions/upload-sessions.controller'
@@ -314,14 +316,27 @@ async function onlyListedDocumentsAreAccepted(h: Harness, K: string): Promise<vo
   await h.prisma.fileObject.update({ where: { id: expiredBig }, data: { expiresAt: new Date(Date.now() - 60_000) } })
   const dataExport = await document(h, K, '王晓雯-个人数据导出.txt', Buffer.from('{"profile":{}}'), 'text/plain')
   await h.prisma.fileObject.update({ where: { id: dataExport }, data: { purpose: 'member_data_export', mimeType: 'application/json' } })
+  const orderOnly = await document(h, K, '王晓雯-身份证正反面.pdf', buildRealPdf(1), 'application/pdf', 'print_doc')
+  await h.prisma.fileObject.update({ where: { id: orderOnly }, data: { retentionLockedReason: UPLOAD_SESSION_ORDER_ONLY_REASON } })
+  // 真 FilesService.upload(orderOnly)：派生件（打印前 Word 转 PDF、图片拼 PDF）落的就是这把锁，会员简历也不走 90 天。
+  h.filenames.add('王晓雯-简历-转换稿.pdf')
+  const orderOnlyDerived = (await h.files.upload({
+    buffer: buildRealPdf(1), filename: '王晓雯-简历-转换稿.pdf', mimeType: 'application/pdf', purpose: 'resume_upload',
+    uploaderId: null, endUserId: K, assetCategory: 'derived', derivationKind: 'format_conversion', orderOnly: true,
+  })).fileId
+  h.fileIds.add(orderOnlyDerived)
+  const derivedRow = await h.prisma.fileObject.findUniqueOrThrow({ where: { id: orderOnlyDerived } })
+  assert.equal(derivedRow.retentionLockedReason, UPLOAD_SESSION_ORDER_ONLY_REASON)
+  assert.equal(derivedRow.retentionPolicy, 'system_short', 'order-only member resume must not get the 90-day default')
+  assert.equal(derivedRow.endUserId, K, 'order-only file still belongs to the member')
   const listedPdf = await document(h, K, '王晓雯-个人简历-投递版.pdf', buildRealPdf(1))
-  const notListed = { contract, sessionOnly, signature, jobFit, expiredBig }
+  const notListed = { contract, sessionOnly, orderOnly, orderOnlyDerived, signature, jobFit, expiredBig }
 
   const listed = await new MemberAssetsService(h.prisma).listDocuments(K, { cursor: null, pageSize: 50 })
   const listedIds = new Set(listed.items.map((item) => item.id))
   assert.ok(listedIds.has(listedPdf), 'positive control: a normal document is listed')
   for (const [name, id] of Object.entries(notListed)) assert.equal(listedIds.has(id), false, `${name} must not be listed`)
-  pass('A 对照真 listDocuments：合同原件 / 会话专用 / 签名图 / 系统岗位匹配 / 已过期都不在「我的文档」，普通简历在')
+  pass('A 对照真 listDocuments：合同原件 / 会话专用 / 只用于这一单 / 签名图 / 系统岗位匹配 / 已过期都不在「我的文档」，普通简历在')
 
   const { service, redis } = freshService(h)
   const session = await kioskSession(service)
@@ -337,7 +352,7 @@ async function onlyListedDocumentsAreAccepted(h: Harness, K: string): Promise<vo
       assert.equal(await redis.get(`upload_session:${session.sessionId}`), before, `${name}: session must not be written`)
     }
     assert.equal(reads.count, 0, 'not-listed files must be refused before reading bytes')
-    pass('A 本人合同原件 / 会话专用 / 签名图 / 系统岗位匹配 / 已过期且登记 >10MB：同一个 404、没读字节、会话一字不动')
+    pass('A 本人合同原件 / 会话专用 / 只用于这一单 / 签名图 / 系统岗位匹配 / 已过期且登记 >10MB：同一个 404、没读字节、会话一字不动')
     const exported = await rejectionOf(() => push(service, session, dataExport, K))
     expectError(exported, 404, 'FILE_NOT_FOUND', 'member_data_export')
     assert.deepEqual(exported.body, { error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' } })
@@ -399,7 +414,20 @@ async function memberSessionSamePersonAndArchive(h: Harness, K: string, M: strin
   const kAfter = await h.prisma.fileObject.findUniqueOrThrow({ where: { id: kFile } })
   assert.equal(kAfter.deletedAt, null)
   assert.equal(kAfter.storageKey, kOriginal.storageKey)
-  pass('f member 会话确认后走现有归档：K 的文件库多一份、匿名对象被释放、原件不动')
+  // 只用于这一单（11/02 拍板）：副本挂 K 名下（后面按本人校验），但锁住、系统短期、「我的文档」不列。
+  assert.equal(archived.retentionLockedReason, UPLOAD_SESSION_ORDER_ONLY_REASON)
+  assert.equal(archived.retentionPolicy, 'system_short')
+  assert.equal(archived.expiresAt?.getTime(), anonymous.expiresAt?.getTime(), '到期沿用匿名副本的短期，确认不续期')
+  const kDocs = await new MemberAssetsService(h.prisma).listDocuments(K, { cursor: null, pageSize: 50 })
+  const kDocIds = kDocs.items.map((item) => item.id)
+  assert.equal(kDocIds.includes(copyId), false, 'the order-only copy must not show up in K documents')
+  assert.equal(kDocIds.filter((id) => id === kFile).length, 1, 'the original stays listed exactly once')
+  // 本人数据导出（真库跑 mapper）：只用于这一单的副本不进清单（可能是旁人的文件），原件照常在。
+  const exported = await new MemberDataExportMapper(h.prisma).build({ endUserId: K, requestId: 'verify-order-only' })
+  const exportedIds = JSON.stringify(exported)
+  assert.equal(exportedIds.includes(copyId), false, 'the order-only copy must not be in K data export')
+  assert.equal(exportedIds.includes(kFile), true, 'positive control: the original is in K data export')
+  pass('f member 会话确认后：副本挂 K 名下但只用于这一单（锁住、系统短期、「我的文档」和本人数据导出都不列、不多一份重复的），匿名对象被释放、原件不动')
 
   const open = freshService(h)
   const temporary = await kioskSession(open.service)
