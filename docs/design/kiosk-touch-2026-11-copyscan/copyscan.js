@@ -1,4 +1,4 @@
-/* copyscan.js：屏上扫描 13 屏、屏上复印 8 屏、设备状态细分 1 屏，共 22 屏。
+/* copyscan.js：屏上扫描 14 屏、屏上复印 8 屏、设备状态细分 1 屏，共 23 屏。
    待产品负责人审看的补稿：样式沿用青序流光触屏版（ui.js 部件、状态样式板的写法），定稿目录里的文件一个字节不改。
    怎么打开、屏清单、地址参数见 docs/design/kiosk-touch-2026-11-copyscan/README.md。
    类名一律 cs- 开头；状态放在 window.S.cs。地址参数可切换样子：
@@ -15,17 +15,23 @@
 .cs-fine{margin:0;font-size:20px;line-height:1.5;color:var(--ink-3);text-align:center}
 .cs-tick{display:none;width:44px;height:44px;border-radius:50%;background:var(--teal);color:#fff;place-items:center;flex:none}
 [aria-pressed="true"] .cs-tick{display:grid}
-/* 材料四选一 */
-.cs-mats{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.cs-mat{position:relative;display:flex;flex-direction:column;gap:4px;padding:18px 22px 20px;border-radius:28px;background:var(--card);border:2px solid var(--edge);text-align:left;color:var(--ink);transition:transform var(--t-press),border-color var(--t-press),background-color var(--t-press)}
-.cs-mat:active{transform:scale(.985)}
-.cs-mat .top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
-.cs-mat .ic{width:72px;height:72px;border-radius:22px;background:var(--teal-wash);color:var(--teal-ink);display:grid;place-items:center;flex:none}
-.cs-mat b{font:700 34px/1.25 var(--serif)}
-.cs-mat small{font-size:22px;line-height:1.4;color:var(--ink-2)}
-.cs-mat .top .chip{height:36px;padding:0 12px;font-size:20px}
-.cs-mat[aria-pressed="true"]{border-color:var(--teal);background:var(--teal-wash)}
-.cs-mat[aria-pressed="true"] .ic{background:var(--teal);color:#fff}
+/* 扫什么：四种材料，样子照定稿 scan-type 的类型卡，选中是深色；每张带一张「扫的是什么」的小样 */
+.cs-types{flex:1;min-height:0;display:flex;flex-direction:column;gap:14px}
+.cs-type{flex:1;min-height:0;display:grid;grid-template-columns:230px minmax(0,1fr) 56px;gap:26px;align-items:center;width:100%;padding:16px 28px 16px 16px;border-radius:30px;background:var(--card);border:2px solid var(--edge);text-align:left;color:var(--ink);transition:transform var(--t-press),border-color var(--t-press),background-color var(--t-press)}
+.cs-type:active{transform:scale(.985)}
+.cs-type .vis{align-self:stretch;border-radius:22px;background:var(--well);display:grid;place-items:center;overflow:hidden}
+.cs-type .vis svg{max-height:88%;max-width:86%;height:auto;width:auto}
+.cs-type .tx{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
+.cs-type b{font:700 40px/1.25 var(--serif)}
+.cs-type .sub{font-size:25px;line-height:1.45;color:var(--ink-2);text-wrap:pretty}
+.cs-type .sub2{font-size:22px;line-height:1.4;color:var(--ink-3)}
+.cs-type .mark{width:56px;height:56px;border-radius:50%;border:3px solid var(--edge);display:grid;place-items:center;color:transparent}
+.cs-type[aria-pressed="true"]{background:var(--deep);color:var(--cream);border-color:var(--deep)}
+.cs-type[aria-pressed="true"] .sub{color:var(--mint)}
+.cs-type[aria-pressed="true"] .sub2{color:var(--mint);opacity:.85}
+.cs-type[aria-pressed="true"] .vis{background:rgba(255,255,255,.1)}
+.cs-type[aria-pressed="true"] .chip{background:rgba(255,255,255,.14);color:var(--cream)}
+.cs-type[aria-pressed="true"] .mark{background:var(--glow);border-color:var(--glow);color:var(--deep)}
 /* 带插画的大选项：选中式（打勾）和直达式（箭头） */
 .cs-ways{flex:1;min-height:0;display:flex;flex-direction:column;gap:14px}
 .cs-ways>.cs-way{flex:1}
@@ -35,7 +41,7 @@
 .cs-way .vis svg{height:82%;width:auto;max-width:90%}
 .cs-way .tx{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
 .cs-way h3{margin:0;font:700 36px/1.25 var(--serif)}
-.cs-way p{margin:0;font-size:24px;line-height:1.45;color:var(--ink-2)}
+.cs-way p{margin:0;font-size:24px;line-height:1.45;color:var(--ink-2);word-break:keep-all;overflow-wrap:anywhere}
 .cs-way .arrow{width:64px;height:64px;border-radius:50%;background:var(--deep);color:var(--cream);display:grid;place-items:center}
 .cs-way .mark{width:56px;height:56px;border-radius:50%;border:3px solid var(--edge);display:grid;place-items:center;color:transparent;justify-self:center}
 .cs-way[aria-pressed="true"]{border-color:var(--teal);background:var(--teal-wash)}
@@ -56,15 +62,18 @@
 .cs-src{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:16px 20px 18px;border-radius:28px;background:var(--card);border:2px solid var(--edge);text-align:left;color:var(--ink);transition:transform var(--t-press),border-color var(--t-press),background-color var(--t-press)}
 .cs-src:active{transform:scale(.985)}
 .cs-src .vis{align-self:stretch;flex:1;min-height:190px;border-radius:20px;background:var(--well);display:grid;place-items:center;overflow:hidden;margin-bottom:6px}
-.cs-src .vis svg{height:84%;width:auto;max-width:90%}
-.cs-src b{font:700 36px/1.25 var(--serif)}
-.cs-src .d{font-size:24px;line-height:1.4;color:var(--ink)}
-.cs-src .d2{font-size:22px;line-height:1.4;color:var(--ink-2)}
+.cs-src .vis svg{height:auto;width:100%;max-width:100%}
+.cs-src b{font:700 42px/1.25 var(--serif)}
+.cs-src .d{font-size:28px;line-height:1.4;color:var(--ink)}
+.cs-src .d2{font-size:26px;line-height:1.4;color:var(--ink-2)}
 .cs-src .cs-tick{position:absolute;right:14px;top:14px}
 .cs-src[aria-pressed="true"]{border-color:var(--teal);background:var(--teal-wash)}
 .cs-src[aria-pressed="true"] .vis{background:var(--card)}
 /* 黑白 / 彩色、单面 / 双面 */
 .cs-seg button{min-height:104px}
+.cs-set .cs-seg button{min-height:140px;font-size:30px}
+.cs-set .cs-seg button small{font-size:22px}
+.cs-set .howto{min-height:128px;font-size:28px;padding:22px 30px}
 .cs-seg button small{font-size:20px;font-weight:400;opacity:.9}
 .cs-seg button[disabled]{text-decoration:none;opacity:1;background:transparent;border:2px dashed var(--line);color:var(--ink-3)}
 .cs-seg button[disabled] small{color:var(--clay-ink);font-weight:700;opacity:1}
@@ -266,14 +275,14 @@
   const PHONE = '183-6916-1921';
   const HELP = '需要帮助？拨打服务电话 ' + PHONE;
   const MACHINE = '这台机器暂时打不了，我们已经收到提醒，会尽快处理。你可以稍后再来；需要帮助请拨打服务电话 ' + PHONE + '。';
-  const SCAN_RAIL = ['选方式', '放纸设置', '扫描', '拿走文件'];
+  const SCAN_RAIL = ['扫什么', '怎么扫', '放纸设置', '扫描', '拿走文件'];
   const COPY_RAIL = ['扫原件', '核对', '打印', '取走'];
   const G_SCAN = '屏上扫描（新）', G_COPY = '屏上复印（新）', G_DEV = '设备状态（新）';
   const MATS = {
-    resume: { label: '简历', icon: 'file', desc: '纸质简历，扫成 PDF', fs: 'resume' },
-    id: { label: '证件', icon: 'idcard', desc: '身份证、学历证书等原件', chip: '敏感文件 · 自动清理', fs: 'id' },
-    doc: { label: '普通文档', icon: 'layers', desc: '证明、成绩单等多页材料', fs: 'document' },
-    contract: { label: '合同', icon: 'pen', desc: '多页合同、协议，扫成 PDF', fs: 'document' }
+    resume: { label: '简历', desc: '纸质简历，扫成 PDF', more: '扫完可以做 AI 简历识别，也可以打印', fs: 'resume' },
+    id: { label: '证件', desc: '身份证、学历证书等原件', more: '正反面要各扫一次', chip: '敏感文件 · 自动清理', fs: 'id' },
+    doc: { label: '普通文档', desc: '证明、成绩单等多页材料', more: '多页的放进纸器，一次扫完', fs: 'document' },
+    contract: { label: '合同', desc: '多页合同、协议，扫成 PDF', more: '扫完是一个 PDF，可以打印', fs: 'document' }
   };
 
   /* ───────── 状态：地址参数给初值，演示事件和点击改它；结束使用时随 doClear 一起清掉 ───────── */
@@ -392,9 +401,20 @@
   const armNote = () => (st().stopArm ? '<p class="cs-warn">再按一次才会停止，已扫的页会从这台机器删除。</p>' : '');
   const remind = (t, ic) => `<div class="remind">${icon(ic || 'call', 34, 2)}<span>${t}</span></div>`;
   const howto = (t, ic) => `<div class="howto">${icon(ic || 'help', 34, 2)}<span>${t}</span></div>`;
-  function matTile(k, on) {
+  /* 合同的小样：多页纸，底下一道签字线（只是示意要扫的是合同，不是签名功能） */
+  function contractSvg(w) {
+    const h = Math.round(w * 1.414);
+    return `<svg class="illus paper-shadow" width="${w}" height="${h}" viewBox="0 0 120 170" aria-hidden="true"><rect x="1" y="1" width="118" height="168" rx="6" fill="#fff" stroke="rgba(11,36,30,.14)" stroke-width="2"/>
+      <rect x="14" y="16" width="64" height="10" rx="3" fill="#13231e"/>
+      <rect x="14" y="40" width="92" height="5" rx="2" fill="#d9ded9"/><rect x="14" y="54" width="80" height="5" rx="2" fill="#d9ded9"/><rect x="14" y="68" width="92" height="5" rx="2" fill="#d9ded9"/>
+      <rect x="14" y="82" width="70" height="5" rx="2" fill="#d9ded9"/><rect x="14" y="96" width="88" height="5" rx="2" fill="#d9ded9"/><rect x="14" y="110" width="60" height="5" rx="2" fill="#d9ded9"/>
+      <path d="M16 142q8-18 14-5t14-1 16-8" fill="none" stroke="#3f68b0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><rect x="14" y="150" width="62" height="2.5" rx="1" fill="#9aa6a1"/></svg>`;
+  }
+  const MAT_ART = { resume: () => UI.resume(150, 'plain'), id: () => UI.idcard(180), doc: () => stack(124, 3, ''), contract: () => contractSvg(150) };
+  /* 一张材料卡：单选，选中变深色（跟定稿扫描类型卡一个样子） */
+  function typeCard(k, on) {
     const m = MATS[k];
-    return `<button class="cs-mat" data-cs="mat:${k}" aria-pressed="${on}"><span class="top"><span class="ic">${icon(m.icon, 44, 2)}</span>${m.chip ? `<span class="chip clay">${m.chip}</span>` : ''}<span class="cs-tick">${icon('check', 26, 3)}</span></span><b>${m.label}</b><small>${m.desc}</small></button>`;
+    return `<button class="cs-type" data-cs="mat:${k}" aria-pressed="${on}"><span class="vis">${MAT_ART[k]()}</span><span class="tx"><b>${m.label}</b><span class="sub">${m.desc}</span><span class="sub2">${m.more}</span>${m.chip ? `<span class="chip clay">${m.chip}</span>` : ''}</span><span class="mark">${icon('check', 30, 3)}</span></button>`;
   }
   /* 带插画的大选项：on 有值是选中式，没有是直达式（带箭头） */
   function wayCard(o) {
@@ -429,29 +449,36 @@
   const rowBtn = (attr, ic, t, d) => `<button class="cs-row" ${attr}><span class="ic">${icon(ic, 36, 2)}</span><span class="tx"><b>${t}</b><small>${d}</small></span>${chev()}</button>`;
 
   /* ═════════ 屏上扫描 ═════════ */
-  /* 1 扫什么、怎么扫 */
-  function scanHow() {
-    const c = st(), blocked = scanBlock(), w = blocked ? 'panel' : c.way;
+  /* 1 扫什么：只问材料，四选一 */
+  function scanWhat() {
+    const c = st();
     return shell({
-      band: { eyebrow: '屏上扫描', title: '扫什么？怎么扫？', status: scanChip(), rail: { labels: SCAN_RAIL, now: 0 } },
+      band: { eyebrow: '屏上扫描', title: '扫什么？', status: scanChip(), rail: { labels: SCAN_RAIL, now: 0 } },
+      cls: 'cs-what',
+      body: `<div class="cs-types" role="group" aria-label="扫什么">${Object.keys(MATS).map((k) => typeCard(k, c.mat === k)).join('')}</div>`,
+      dock: D({ back: { go: 'print' }, ask: '问小青：扫描和复印有什么不同', pri: pri('下一步', 'data-cs="what-next"') })
+    });
+  }
+  /* 2 怎么扫：只问方式，二选一 */
+  function scanHow() {
+    const c = st(), blocked = scanBlock(), w = blocked ? 'panel' : c.way, m = MATS[c.mat];
+    return shell({
+      band: { eyebrow: '屏上扫描 · ' + m.label, title: '怎么扫？', status: scanChip(), rail: { labels: SCAN_RAIL, now: 1 } },
       cls: 'cs-how',
-      body: `<div class="sec-t">扫什么？</div>
-        <div class="cs-mats">${Object.keys(MATS).map((k) => matTile(k, c.mat === k)).join('')}</div>
-        <div class="sec-t">怎么扫？</div>
-        <div class="cs-ways">
-          ${wayCard({ cs: 'way:screen', on: w === 'screen', dis: !!blocked, chip: blocked ? '' : '推荐', t: '在这块屏上开始扫描', d: blocked || '放好纸，在屏上点开始，扫描仪自己动', vis: scanPaper(150) })}
-          ${wayCard({ cs: 'way:panel', on: w === 'panel', t: '到打印机面板上扫', d: '在打印机屏幕上按扫描，文件传回这台机器', vis: mfp() })}
+      body: `<div class="cs-ways">
+          ${wayCard({ big: 1, cs: 'way:screen', on: w === 'screen', dis: !!blocked, chip: blocked ? '' : '推荐', t: '在这块屏上开始扫描', d: blocked || '放好纸，在屏上点开始，扫描仪自己动', vis: scanPaper(250) })}
+          ${wayCard({ big: 1, cs: 'way:panel', on: w === 'panel', t: '到打印机面板上扫', d: '在打印机屏幕上按扫描，文件传回这台机器', vis: mfp() })}
         </div>
         ${S().logged ? '' : `<div class="cs-login"><span>想带走电子版？先扫码登录（微信一扫，不用短信），扫完会存进<span style="white-space:nowrap">「我的文档」</span></span><button class="btn pri" data-go="login">先登录</button></div>`}
         <div class="cs-hold" role="note">${icon('usb', 32, 2)}<span>用 U 盘：在打印机面板上选「扫描到 U 盘」——这台机器暂未开通</span></div>`,
-      dock: D({ back: { go: 'print' }, ask: '问小青：扫描和复印有什么不同', pri: pri('下一步', 'data-cs="how-next"') })
+      dock: D({ back: { go: 'cs-scan-what' }, ask: '问小青：两种扫法怎么选', pri: pri('下一步', 'data-cs="how-next"') })
     });
   }
-  /* 2 放纸与设置 */
+  /* 3 放纸与设置（上一屏已经选过方式，要改就点「返回」，这里不再放「改用面板扫描」） */
   function scanSet() {
     const c = st(), blocked = scanBlock(), m = MATS[c.mat], src = srcOf(c), ink = inkOf(c);
     return shell({
-      band: { eyebrow: '屏上扫描 · ' + m.label, title: '纸放哪？扫成黑白还是彩色？', status: scanChip(), rail: { labels: SCAN_RAIL, now: 1 } },
+      band: { eyebrow: '屏上扫描 · ' + m.label, title: '纸放哪？扫成黑白还是彩色？', status: scanChip(), rail: { labels: SCAN_RAIL, now: 2 } },
       cls: 'cs-set',
       body: `<div class="sec-t">纸放哪？</div>
         <div class="cs-two">${srcCard('glass', src, 'src')}${srcCard('feeder', src, 'src')}</div>
@@ -461,8 +488,7 @@
           <button data-cs="ink:color" aria-pressed="${ink === 'color'}">彩色<small>带照片、带颜色的材料</small></button>
         </div>
         ${howto('多页单面材料用进纸器一次扫完；玻璃台适合证件、书本，一面一面扫')}
-        ${blocked ? `<p class="cs-warn">${blocked}。</p>` : ''}
-        <button class="cs-link" data-cs="panel"><span class="tx"><b>改用面板扫描</b><small>在打印机屏幕上按扫描，文件传回这台机器</small></span>${chev()}</button>`,
+        ${blocked ? `<p class="cs-warn">${blocked}。点「返回」改选「到打印机面板上扫」。</p>` : ''}`,
       dock: D({ back: { go: 'cs-scan-how' }, ask: '问小青：纸怎么放', pri: pri('开始扫描', 'data-cs="set-start"', { dis: !!blocked }) })
     });
   }
@@ -474,7 +500,7 @@
     return shell({
       band: copy
         ? { eyebrow: '屏上复印', title: '正在扫原件', sub: '先别动原件，扫描仪正在工作。', status: { text: '扫描中' }, rail: { labels: COPY_RAIL, now: 0 } }
-        : { eyebrow: '屏上扫描', title: '正在扫描', sub: '先别动原件，扫描仪正在工作。', status: { text: '扫描中' }, rail: { labels: SCAN_RAIL, now: 2 } },
+        : { eyebrow: '屏上扫描', title: '正在扫描', sub: '先别动原件，扫描仪正在工作。', status: { text: '扫描中' }, rail: { labels: SCAN_RAIL, now: 3 } },
       cls: 'cs-run',
       body: `${psteps([['已收到', '完成', '这台机器收到了扫描请求', 'on'], ['扫描仪已开始', '完成', '扫描仪回报已经开始扫', 'on'], [third[0], third[1], third[2], 'now'], [last[0], last[1], last[2], '']])}
         <div class="cs-hero${none ? ' none' : ''}"><div class="cs-hrow">
@@ -491,7 +517,7 @@
   function scanMore() {
     const c = st(), n = c.rec == null ? 2 : c.rec, full = n >= 20;
     return shell({
-      band: { eyebrow: '屏上扫描 · 玻璃台', title: '这一页扫好了，还有下一页吗？', status: { text: '已收到 ' + n + ' 页' }, rail: { labels: SCAN_RAIL, now: 2 } },
+      band: { eyebrow: '屏上扫描 · 玻璃台', title: '这一页扫好了，还有下一页吗？', status: { text: '已收到 ' + n + ' 页' }, rail: { labels: SCAN_RAIL, now: 3 } },
       cls: 'cs-more',
       body: `<div class="cs-strip">${thumbs(n, '下一页', true)}<p>已收到 ${n} 页<small>最多 20 页</small></p></div>
         <div class="cs-ways">
@@ -506,7 +532,7 @@
   function scanMake() {
     const c = st(), n = c.rec == null ? 3 : c.rec;
     return shell({
-      band: { eyebrow: '屏上扫描', title: '正在生成文件', sub: '扫描仪已经扫完，正在把页面合成一个文件。', status: { text: '正在生成文件' }, rail: { labels: SCAN_RAIL, now: 2 } },
+      band: { eyebrow: '屏上扫描', title: '正在生成文件', sub: '扫描仪已经扫完，正在把页面合成一个文件。', status: { text: '正在生成文件' }, rail: { labels: SCAN_RAIL, now: 3 } },
       cls: 'cs-make',
       body: `<div class="stagelist">
           <div class="it ok"><span class="ico">${icon('check', 24, 3)}</span>扫描仪已扫完 · 共收到 ${n} 页</div>
@@ -537,7 +563,7 @@
       ? `<div class="cs-saved">${icon('folder', 40, 2)}<span>这份扫描件已存进「我的文档」${c.mini ? '，手机上打开职易达小程序也能看到' : ''}</span></div>`
       : '<p class="cs-warn">未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。<br>要带走电子版，下次先扫码登录再扫。</p>';
     return shell({
-      band: { eyebrow: '扫描完成', title: '扫描完成，文件已传回', sub: '先核对文件，再选下一步。', status: { text: '文件已传回' }, rail: { labels: SCAN_RAIL, now: 3 } },
+      band: { eyebrow: '扫描完成', title: '扫描完成，文件已传回', sub: '先核对文件，再选下一步。', status: { text: '文件已传回' }, rail: { labels: SCAN_RAIL, now: 4 } },
       cls: 'cs-done',
       body: `<div class="cs-file"><div class="cs-fhead"><span class="ft">PDF</span><div class="tx"><b>${fileName(c)}</b><span class="meta">${n} 页 · ${fileSize(c)}</span></div><span class="chips"><span class="chip">${m.label}</span>${id ? '<span class="chip clay">敏感文件 · 自动清理</span>' : ''}</span></div>
           <div class="cs-fpages">${pgs}</div>
@@ -800,6 +826,7 @@
     switch (a) {
       case 'mat': c.mat = v; return refresh();
       case 'way': c.way = v; return refresh();
+      case 'what-next': return go('cs-scan-how');
       case 'how-next': { if (!scanBlock() && c.way === 'screen') { c.flow = 'scan'; return go('cs-scan-set'); } return toPanel(false); }
       case 'panel': return toPanel(false);
       case 'panel-copy': return toPanel(true);
@@ -812,9 +839,9 @@
       case 'retry-copy': return go('cs-copy-scan');
       case 'glass': c.src = 'glass'; return go('cs-scan-set');
       case 'glass-copy': c.orig = 'glass'; return go('cs-copy-set');
-      case 'restart': return go('cs-scan-how');
+      case 'restart': return go('cs-scan-what');
       case 'restart-copy': return go('cs-copy-set');
-      case 'again': c.rec = null; return go('cs-scan-how');
+      case 'again': c.rec = null; return go('cs-scan-what');
       case 'stop': {
         if (!c.stopArm) { c.stopArm = true; return refresh(); }
         c.rec = null; return go('cs-scan-stopped');
@@ -863,6 +890,7 @@
     { label: '演示：扫描仪没有响应', ev: 'noresp' }, { label: '演示：等太久没有结果', ev: 'timeout' }
   ];
   const demos = {
+    'cs-scan-what': [{ label: '演示：扫描仪状态过期', ev: 'stale' }, { label: '演示：没开通屏上扫描', ev: 'scandev-off' }, { label: '演示：恢复正常', ev: 'ok' }],
     'cs-scan-how': [{ label: '演示：扫描仪状态过期', ev: 'stale' }, { label: '演示：没开通屏上扫描', ev: 'scandev-off' }, { label: '演示：恢复正常', ev: 'ok' }],
     'cs-scan-set': [{ label: '演示：扫描仪状态过期', ev: 'stale' }, { label: '演示：没开通屏上扫描', ev: 'scandev-off' }, { label: '演示：恢复正常', ev: 'ok' }],
     'cs-scan-run': [{ label: '演示：扫描仪不回报页数', ev: 'nopages' }, { label: '演示：页数恢复', ev: 'pages' }, { label: '演示：这一页扫好了（玻璃台）', ev: 'pagedone' }, { label: '演示：整叠扫完了（进纸器）', ev: 'alldone' }].concat(demoErrs),
@@ -876,7 +904,7 @@
     'cs-device': [{ label: '演示：扫描仪状态过期', ev: 'stale' }, { label: '演示：恢复正常', ev: 'ok' }]
   };
   /* 打开某一屏时，记下它属于扫描还是复印，出错屏照这个换写法 */
-  const FLOW = (id) => (/^cs-copy-/.test(id) ? 'copy' : (/^cs-scan-(how|set|run|more|make|done|off)$/.test(id) ? 'scan' : ''));
+  const FLOW = (id) => (/^cs-copy-/.test(id) ? 'copy' : (/^cs-scan-(what|how|set|run|more|make|done|off)$/.test(id) ? 'scan' : ''));
   function mount(el) {
     const c = st(), id = el.dataset.id;
     if (FLOW(id)) c.flow = FLOW(id);
@@ -900,15 +928,20 @@
   const reg = (id, group, name, render, notes) => window.SCREENS.push({ id, group, name, render, mount, demo: demos[id], notes });
   const NK = '现场无人值守：屏上不写「找工作人员」一类说法，出错只给自助出路和「需要帮助？拨打服务电话」，号码照定稿写法，运行时与服务时间一起从后台读，读不到不显示。不写打印机品牌型号，不写开发用语。';
 
-  reg('cs-scan-how', G_SCAN, '扫什么、怎么扫', scanHow, {
-    does: '屏上扫描的第一问：扫什么（简历 / 证件 / 普通文档 / 合同）、怎么扫（在这块屏上开始 / 到打印机面板上扫）。选好点「下一步」。',
+  reg('cs-scan-what', G_SCAN, '扫什么', scanWhat, {
+    does: '屏上扫描的第一问，只问「扫什么？」：简历 / 证件 / 普通文档 / 合同，四选一，点「下一步」去「怎么扫」。',
+    motion: '无。选中只变深色并打勾。',
+    keep: '样子照定稿面板扫描的选类型屏（scan-type）：整行类型卡，选中是深色；每张多一张「扫的是什么」的小样，下面两行字都是已有说法（简历可做 AI 简历识别、证件正反面各扫一次、多页放进纸器、扫成一个 PDF）。证件带「敏感文件 · 自动清理」。状态是扫描仪状态，两个样子（?scanner=stale、?scandev=off）在下一屏「怎么扫」里体现。合同在面板扫描里按普通文档处理。每屏可点 7 个：4 个材料 + 底部 3 个。可用地址 #cs-scan-what 直接打开，?mat=resume|id|doc|contract 预选材料。' + NK
+  });
+  reg('cs-scan-how', G_SCAN, '怎么扫', scanHow, {
+    does: '屏上扫描的第二问，只问「怎么扫？」：在这块屏上开始 / 到打印机面板上扫。选好点「下一步」，返回回「扫什么」。',
     motion: '无。选中只改边框和打勾。',
-    keep: '状态「扫描仪就绪 · 20 秒前检查」。证件带「敏感文件 · 自动清理」。「在这块屏上开始扫描」标「推荐」。两个样子：地址 ?scanner=stale（或演示事件）时屏上方式灰掉，写「扫描仪状态 2 分钟没更新，先用面板扫描」；?scandev=off 时写「这台机器还没开通屏上扫描」。选面板扫描，「下一步」带着已选的材料去定稿现有的面板扫描选类型屏（scan-type）。合同在面板扫描里按普通文档处理。底部两行：没登录的人多一行「想带走电子版？先扫码登录（微信一扫，不用短信），扫完会存进「我的文档」」加「先登录」按钮，去定稿现有的登录屏（login），登录成功回到这一屏；跟说明栏「已登录」开关走，登录后这行不显示。另一行灰掉、不能点：用 U 盘（在打印机面板上选「扫描到 U 盘」）——这台机器暂未开通，真机试通之前照实写暂未开通。不做「扫码带走电子版」：屏上的码会被旁人拍走。每屏可点：4 个材料 + 2 个方式 + 底部 3 个共 9 个（没登录再加「先登录」共 10 个），超过 7 个是这一屏要一次问两件事造成的。' + NK
+    keep: '状态「扫描仪就绪 · 20 秒前检查」。「在这块屏上开始扫描」标「推荐」。两个样子：地址 ?scanner=stale（或演示事件）时屏上方式灰掉，写「扫描仪状态 2 分钟没更新，先用面板扫描」；?scandev=off 时写「这台机器还没开通屏上扫描」。选面板扫描，「下一步」带着上一屏选的材料去定稿现有的面板扫描选类型屏（scan-type）。底部两行：没登录的人多一行「想带走电子版？先扫码登录（微信一扫，不用短信），扫完会存进「我的文档」」加「先登录」按钮，去定稿现有的登录屏（login），登录成功回到这一屏；跟说明栏「已登录」开关走，登录后这行不显示。另一行灰掉、不能点：用 U 盘（在打印机面板上选「扫描到 U 盘」）——这台机器暂未开通，真机试通之前照实写暂未开通。不做「扫码带走电子版」：屏上的码会被旁人拍走。每屏可点 5 个：2 个方式 + 底部 3 个（没登录再加「先登录」共 6 个）。' + NK
   });
   reg('cs-scan-set', G_SCAN, '放纸与设置', scanSet, {
     does: '放纸与设置：纸放玻璃台还是进纸器、扫成黑白还是彩色，然后开始扫描。',
     motion: '无。',
-    keep: '玻璃台写「一次一页，适合证件、书本」「字朝下，对齐左上角」；进纸器写「一叠最多 50 页，只扫单面」「字朝上」。提示：多页单面材料用进纸器一次扫完；玻璃台适合证件、书本，一面一面扫。默认：证件用玻璃台和彩色，其余用进纸器和黑白，点了就记住。次要入口「改用面板扫描」去 scan-type。扫描仪状态过期或没开通时，「开始扫描」停用并写原因。' + NK
+    keep: '玻璃台写「一次一页，适合证件、书本」「字朝下，对齐左上角」；进纸器写「一叠最多 50 页，只扫单面」「字朝上」。提示：多页单面材料用进纸器一次扫完；玻璃台适合证件、书本，一面一面扫。默认：证件用玻璃台和彩色，其余用进纸器和黑白，点了就记住。方式上一屏已经选过，这里不再放「改用面板扫描」，要改就点「返回」。扫描仪状态过期或没开通时，「开始扫描」停用，写原因并提示点「返回」改选面板扫描。每屏可点 7 个：2 个放纸 + 2 个颜色 + 底部 3 个。' + NK
   });
   reg('cs-scan-run', G_SCAN, '正在扫描', () => runScreen(false), {
     does: '扫描进行中。四段进度：已收到 → 扫描仪已开始 → 已收到 N 页 → 生成文件并传回，第三段进行中。',
@@ -1016,7 +1049,7 @@
   /* 说明栏的分组和流程缩略图 */
   [G_SCAN, G_COPY, G_DEV].forEach((g) => { if (window.SCREEN_GROUPS.indexOf(g) < 0) window.SCREEN_GROUPS.push(g); });
   window.FLOWS.push(
-    { n: '屏上扫描（新）', ids: ['print', 'cs-scan-how', 'cs-scan-set', 'cs-scan-run', 'cs-scan-more', 'cs-scan-make', 'cs-scan-done', 'pii'] },
+    { n: '屏上扫描（新）', ids: ['print', 'cs-scan-what', 'cs-scan-how', 'cs-scan-set', 'cs-scan-run', 'cs-scan-more', 'cs-scan-make', 'cs-scan-done', 'pii'] },
     { n: '屏上扫描出错（新）', ids: ['cs-scan-run', 'cs-scan-err-nopaper', 'cs-scan-err-jam', 'cs-scan-err-busy', 'cs-scan-err-noresp', 'cs-scan-timeout', 'cs-scan-stopped', 'cs-scan-off'] },
     { n: '屏上复印（新）', ids: ['print', 'cs-copy-how', 'cs-copy-set', 'cs-copy-scan', 'cs-copy-check', 'cs-copy-print', 'cs-copy-done', 'cs-copy-unconfirmed', 'cs-copy-off'] },
     { n: '设备状态（新）', ids: ['offline', 'cs-device'] }
