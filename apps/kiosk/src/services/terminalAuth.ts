@@ -249,8 +249,10 @@ export function initializeTerminalSession(): Promise<void> {
 }
 
 /** 授权暂停后的低频复查；由授权闸门负责限频。 */
-export function recheckTerminalSessionAfterLicensePause(): Promise<void> {
+export function recheckTerminalSessionAfterLicensePause({ credentialExpired }: { credentialExpired: boolean } = { credentialExpired: false }): Promise<void> {
   clearTerminalLicenseRenewalRejection()
+  // 凭证已过期：清掉过期票，初始化就会走「没有存量票 → 向本机 Agent 重新取票」，而不是拿过期票去续期。
+  if (credentialExpired) { try { window.sessionStorage.removeItem(STORAGE_KEY) } catch { /* storage unavailable */ } }
   return initializeTerminalSession()
 }
 

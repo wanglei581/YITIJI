@@ -70,7 +70,11 @@ export function createLicenseRecheckTimer(
   }
 }
 
-const recheckTimer = createLicenseRecheckTimer(recheckTerminalSessionAfterLicensePause, {
+let recheckEndsAt: string | null = null
+const recheckTimer = createLicenseRecheckTimer(() => {
+  const deadline = recheckEndsAt === null ? NaN : Date.parse(recheckEndsAt)
+  return recheckTerminalSessionAfterLicensePause({ credentialExpired: Number.isFinite(deadline) && Date.now() >= deadline })
+}, {
   now: () => Date.now(), set: (fn, delay) => setTimeout(fn, delay), clear: (id) => clearTimeout(id),
 })
 
@@ -84,6 +88,8 @@ export function useKioskLicenseGate(useEnded: boolean): KioskLicenseGate {
   const seenProfile = useRef<PublicKioskProfile | null>(null)
   const seenRejection = useRef(false)
   const needsRecheck = gate.mode !== 'normal'
+
+  useEffect(() => { recheckEndsAt = gate.endsAt }, [gate.endsAt])
 
   useEffect(() => {
     const freshProfile = seenProfile.current === profile ? null : profile
