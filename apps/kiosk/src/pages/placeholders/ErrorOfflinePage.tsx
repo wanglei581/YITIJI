@@ -419,13 +419,16 @@ export default function ErrorOfflinePage() {
               ))}
             </ul>
             <ul className="of-list" data-testid="system-state-scanner" aria-label="扫描仪">
-              <li className="qxp-hit of-row" data-cap="scanner">
-                <span className="qxp-ic" data-tone="teal" aria-hidden="true"><Glyph name="scan" size={30} /></span>
+              <li className={`qxp-hit of-row of-scan${scanner.tone === 'ok' ? '' : ' is-stale'}`} data-cap="scanner">
+                <span className="qxp-ic" data-tone="teal" aria-hidden="true"><Glyph name="scan" size={36} /></span>
                 <span className="qxp-tx">
                   <b>扫描仪</b>
-                  <small>{scanner.ago ? `${scanner.dep} · ${scanner.ago}` : scanner.dep}</small>
+                  <small>{scanner.dep}</small>
                 </span>
-                <span className="of-verdict" data-tone={scanner.tone}>{scanner.label}</span>
+                <span className="of-st">
+                  <span className="of-chip" data-tone={scanner.tone}>{scanner.label}</span>
+                  {scanner.ago ? <span className="of-when">{scanner.ago}</span> : null}
+                </span>
               </li>
             </ul>
             <Card className="of-machine" testId={view === 'offline' ? 'system-state-fallback' : undefined}>
