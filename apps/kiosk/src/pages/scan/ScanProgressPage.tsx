@@ -16,7 +16,7 @@ import {
 } from './scanDeliveryAck'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import { scanShownText } from './scanShownText'
+import { scanFailureReason, scanShownText } from './scanShownText'
 import { SCAN_OUTPUT_FORMAT_PENDING, formatLabelFromMime } from './scanOutputFormat'
 import { ScanSample, ScanWorkbenchShell } from './ScanWorkbenchChrome'
 import { FsRow } from '../print-scan/FsRow'
@@ -250,7 +250,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           finishWithResult({
             outcome: 'failed',
             success: false,
-            reason: status.errorMessage ?? '扫描处理失败，请重试',
+            reason: scanFailureReason(status.errorCode, status.errorMessage, scanType),
           })
           return
         }

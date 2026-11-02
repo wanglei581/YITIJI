@@ -3470,3 +3470,63 @@ for (const c of [
     await assertNoHorizontalOverflow(page)
   })
 }
+
+test('USB resume keeps selection across changing safe IDs @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  let listings = 0
+  let uploadBody: { safeId?: string; purpose?: string } | null = null
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  await page.route('**/w3-fixtures/usb-resume.pdf', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+  )
+  await page.route('http://127.0.0.1:9527/local/usb/**', async (route) => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    const origin = new URL(page.url()).origin
+    expect(request.headers()['origin']).toBe(origin)
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Local-Bridge-Token',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Private-Network': 'true',
+    }
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers: corsHeaders })
+      return
+    }
+    if (path.endsWith('/status')) {
+      await route.fulfill({ status: 200, headers: corsHeaders, contentType: 'application/json', body: JSON.stringify({ success: true, data: { present: true, driveLabel: 'TEST-USB' } }) })
+      return
+    }
+    if (path.endsWith('/files')) {
+      listings += 1
+      await route.fulfill({ status: 200, headers: corsHeaders, contentType: 'application/json', body: JSON.stringify({ success: true, data: { present: true, driveLabel: 'TEST-USB', files: [{ safeId: `usb-safe-${listings}`, filename: 'U盘简历.pdf', extension: '.pdf', sizeBytes: 2048 }] } }) })
+      return
+    }
+    uploadBody = request.postDataJSON() as { safeId?: string; purpose?: string }
+    await route.fulfill({
+      status: 200,
+      headers: corsHeaders,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true, data: { fileId: 'file-usb-resume', filename: 'U盘简历.pdf', sizeBytes: 2048, mimeType: 'application/pdf', sha256: 'c'.repeat(64), fileUrl: '/w3-fixtures/usb-resume.pdf', fileUrlExpiresAt: new Date(Date.now() + 300_000).toISOString() } }),
+    })
+  })
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/resume/parse', { status: 200, json: diagnosis })
+
+  await page.goto('/resume/source')
+  await page.getByRole('button', { name: /在 U 盘里/ }).click()
+  await page.getByRole('button', { name: /U盘简历\.pdf/ }).click()
+  await expect.poll(() => listings, { timeout: 8000 }).toBeGreaterThanOrEqual(2)
+  await expect(page.getByRole('button', { name: /U盘简历\.pdf/ })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: '导入这份文件' }).click()
+  await chooseTargetedResumeDirection(page)
+  await page.locator('.qx-rt-preview > summary').click()
+  await expect(page.locator('[data-file-preview-kind="pdf"]')).toBeVisible()
+  expect(uploadBody).toEqual({ safeId: `usb-safe-${listings}`, purpose: 'resume_upload' })
+  await startResumeDiagnosis(page)
+  await page.waitForURL('/resume/report')
+  await expect(page.locator('[data-kiosk-screen="resume-report"]')).toBeVisible()
+  await assertNoHorizontalOverflow(page)
+  expect(runtimeErrors).toEqual([])
+})

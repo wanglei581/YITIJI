@@ -207,7 +207,8 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
           />
           <FsRow
             title="改用面板扫描到 U 盘"
-            desc="文件只进你的 U 盘，平台不接收"
+            disabled
+            desc="暂未开通 · 文件只进你的 U 盘，平台不接收"
             onClick={() => {
               if (onGoStage) {
                 setSearchParams({ stage: 'start', mode: 'usb-panel' }, { replace: true })
@@ -222,7 +223,8 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
           <ScanTypeCards selected={selected} onPick={setSelected} />
           <FsRow
             title="改用面板扫描到 U 盘"
-            desc="不创建平台任务，文件只在你的 U 盘"
+            disabled
+            desc="暂未开通 · 不创建平台任务，文件只在你的 U 盘"
             onClick={() => {
               if (onGoStage) {
                 setSearchParams({ stage: 'start', mode: 'usb-panel' }, { replace: true })
