@@ -694,10 +694,20 @@ model Organization {
   /// 入驻时核验过的官方注册域。JSON 数组，元素为 domain / verifiedAt / verifiedBy。
   /// 这是机构身份核验，不是渠道内容审核。渠道能否保存只跟这份名单比对。
   verifiedOfficialDomainsJson String @default("[]")
+  /// 贴牌：机构自己的品牌覆盖。三项都可空，空 = 用平台默认（src/branding）。
+  /// 解析顺序「终端 → 所属机构 → 平台默认」，逐项独立回退。备案号不随机构走，只按部署（平台）配。
+  brandName  String?
+  brandMark  String?
+  /// 指向 BrandLogo.id（不加外键：Logo 只增不删，找不到就当没设）。
+  brandLogoAssetId String?
+  /// 软件使用授权方式：none = 不管控（默认，现有点位一律照旧）；required = 须有生效授权，
+  /// 否则本机构一体机不再签发新会话、机构后台写操作被拒（src/licenses）。库里 CHECK 只允许这两个值。
+  licenseMode String @default("none")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   users      User[]
+  licenses   License[]
   serviceProjects ServiceProject[]
   terminals  Terminal[]
   jobs       Job[]      @relation("JobOrg")
@@ -3371,6 +3381,64 @@ model PlatformSetting {
   value     String?
   updatedBy String?
   updatedAt DateTime @updatedAt
+}
+
+// 贴牌 Logo（只收 PNG / WebP，按文件头魔数判断，剥掉元数据块后落盘，禁 SVG）。
+// 公开读取 GET /api/v1/public/brand-logo/:id 只认本表，所以别的素材（待机宣传屏等）读不到、本表的图也进不了播放方案。
+// 只增不删：被平台或机构引用着的 Logo 不能凭空消失；找不到就回退字标。
+model BrandLogo {
+  id         String   @id
+  storageKey String   @unique
+  mimeType   String
+  sizeBytes  Int
+  sha256     String
+  width      Int
+  height     Int
+  createdBy  String?
+  createdAt  DateTime @default(now())
+}
+
+// 软件使用授权（设备与软件供应方的许可，只按「期限 + 终端台数」授权）。
+// 红线：不设任何与岗位数、招聘会、浏览、投递、入职挂钩的字段或计费口径（CLAUDE.md §1）。
+// 一个机构可有多条历史授权；同一时刻只认覆盖当前时刻的那条（src/licenses/license-state.ts 统一推导）。
+// 未设授权的机构（Organization.licenseMode = none）一律不管控。
+// 库里另有 CHECK（见迁移）：status 三态、台数 1–10000、宽限 0–30 天、止期晚于起期。
+model License {
+  id              String   @id @default(cuid())
+  orgId           String
+  org             Organization @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  /// 被授权企业全称（可与机构名不同）。
+  licenseeName    String
+  /// 统一社会信用代码，18 位，格式与校验位都在服务端校验。
+  creditCode      String
+  /// 合同编号，必填。
+  contractNo      String
+  /// 生效起点（含）。在未来 = 待生效。
+  startsAt        DateTime
+  /// 到期时刻（不含）。到期后进入宽限期。
+  endsAt          DateTime
+  /// 可绑定终端台数上限；只管「新增绑定」，运行期不按台数裁决已绑终端。
+  terminalQuota   Int
+  /// 到期后的宽限天数，默认 7，可配 0–30。宽限期内照常服务。
+  graceDays       Int      @default(7)
+  /// active | suspended | revoked（revoked 不可恢复）。
+  status          String   @default("active")
+  note            String?
+  /// 最近一次暂停 / 吊销的理由与工单号（恢复时清空，历史在审计里）。
+  statusReason    String?
+  statusTicketNo  String?
+  statusChangedAt DateTime?
+  statusChangedBy String?
+  createdBy       String
+  updatedBy       String?
+  /// 乐观版本号：从 1 起，每次变更（更正 / 暂停 / 恢复 / 吊销）+1。
+  /// 写入必须带上界面读到的版本，更新条件带 where version，对不上回 409 LICENSE_VERSION_CONFLICT。
+  version         Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([orgId, startsAt])
+  @@index([status, endsAt])
 }
 
 
