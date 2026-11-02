@@ -13609,7 +13609,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 808,
+      "reachableFileCount": 805,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -16737,7 +16737,6 @@
             "apps/kiosk/src/pages/print-scan/styles/tool-touch.css",
             "apps/kiosk/src/pages/scan/styles/scan-fs.css",
             "apps/kiosk/src/pages/scan/styles/scan-result-viewer-qx.css",
-            "apps/kiosk/src/pages/scan/styles/scan-takeaway-qx.css",
             "apps/kiosk/src/pages/scan/styles/scan-workbench-compact-qx.css",
             "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
@@ -16959,7 +16958,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 910
+      "sourceFileCount": 907
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",

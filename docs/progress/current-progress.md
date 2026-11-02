@@ -1,5 +1,16 @@
 # 当前开发进度
 
+## 2026-11-02：一体机触屏版发布候选（接替 #1525；分支 `claude/kiosk-touch-rc-1102`，草稿 PR，未合并、未部署、真机未验）
+
+- 基线：#1525（GPT 合成的四路候选，含第一包 `a035b6d8d`、四路走查修复的头与 GPT 自己的修复、follow-redirects 补丁）的头 `7487a0de3`。本分支只在它上面加提交，不往 GPT 的分支推。
+- **冒烟红的根因**（#1525 的 `kiosk-browser-smoke` 唯一的红）：`human-journey` 旅程 F。走查 I-16 取消「简历扫描」预选后，旅程里「点最后一个可点的前进按钮」的循环落到「改用面板扫描到 U 盘」，绕回打印扫描，走不到建会话与投递确认（实得 0 次）。四路和 GPT 本机都没跑 `test:browser:journeys`。旅程 F 改成先点一种材料再往下走，原断言一条没动；改前红、改后绿、反向检查（预选改回）红。
+- 走查 35 条（问题单里没有 I-34）逐条核实：已修且核实 29；已修待核 2（I-14 真微信扫码、I-17 真终端中文文件名）；没修 4（I-20 真机项；I-33 待产品负责人定；I-23、I-25 本就是环境说明）。核实表在 PR 说明里。
+- 新发现并修（每处先写会红的断言，再改，再绿）：简历导出页四张格式卡被触屏壳按钮重置清掉内边距、边框和底色；设备状态页读完都可用时标题仍写「有几项取不到」（GPT 的 I-01 收尾带出，改成都可用 / 有项目不能用 / 有项没读到三档）；I-29 失败后的说明与「不用 AI 的出路」原来在滚动区最下面要往下滑才看到，补成失败那一刻滚到眼前，并把这条出路与灰掉的「AI 润色成文」补回按钮样子。
+- **撤掉游客「扫码带走电子版」**（I-15；`8ac655ae1` 及 GPT 只为它加的链接校验与单测）：产品负责人 10/12 认可的小程序方案把「游客扫码领扫描件」列在「明确不做」（屏上的码会被旁人拍走；没登录的人用 U 盘，登录的人进「我的文档」）。结果页只留一句实话「未登录扫描件不会进入「我的文档」。要留在账号里：先登录，再重新扫一次。」；三类扫描（简历、证件、普通文档）结果页都不出下载码的防回退用例先红后绿并做了反向检查。前面各节里提到扫码带走的几行已标成作废。
+- 检查：shared、api、kiosk、admin、partner、terminal-agent、refresh 七个 typecheck 0 错；api、kiosk、admin、partner、terminal-agent 五个 lint 0 error；api、kiosk（含 `verify:prod-build-config`）、admin、partner、terminal-agent 五个生产构建与 `verify:prod-react-build` 照 CI 的 Build 步骤与 env 过；kiosk 104 个 verify 门禁按 CI 顺序全过（`prod-build-config` 要带 CI 的 env 才过，带了过）；api 的 upload-sessions（含 http 端到端）、scan-tasks、print-conversion、scan-input-lockout-telemetry 过；miniapp `verify:static` 与 415 条页面生命周期用例过；根级文案、字体子集、仓库完整性、CI 门禁覆盖等门禁过；图谱 `--check` 过。
+- 浏览器：照 CI「Run Kiosk browser smoke」的全部配置，在 Mac 字体与去掉 PingFang 的两种构建上各跑一轮（私有端口）。本机偶发红且与本次改动无关的：`kiosk-privacy-timeout`「a BFCache pageshow restore is fail-closed before reuse」在第一包头上同样 3/3 红（macOS 无头 Chromium 的 BFCache 行为），CI 绿；`fusion-w2-print` 与 `scan-session-truth` 里「续期在飞时会话状态必须真的是 checking」两条（后者整文件跑必红，第一包头上同样）；`fusion-w3`「1440x900 触控高度」一组（换视口后舞台缩放过渡没落定就量，机器忙时红，基线构建上同样）。这几条靠 CI 的 retries=1 才不红，建议另开小包治。
+- 没验：真机（Windows 27 寸竖屏、触摸、字体、扫码枪、真打印机）、真服务（本轮只在隔离 SQLite 与私有 Redis 上跑后端门禁与 HTTP 端到端；前端用的是 mock 夹具）、真人试用、真微信扫码（签名短链依赖小程序新版，见 PR 风险 1）。GPT 在进度文档里自记的 PG 迁移演练、备份恢复、生产版本核对、预检等结果我没复核。
+
 ## 2026-10-31：接续四路候选的前后端、迁移与 CI 验证（发布准备线，实施中）
 
 - 用户本轮授权接续原聊天四路集成、修复实际问题、验证前后端/迁移/CI并准备备份回滚；生产上线另待用户确认，Windows 不出纸。沿用独立 `codex/touch-release-readiness-20261031`，保留原工作树与 Claude 改动。当前已并入原集成 `3e51537f6`；原聊天仍收齐简历与最终图谱，不抢写其文件。
