@@ -56,10 +56,17 @@ assert.doesNotMatch(
   /\/kiosk\/device\/status|fetchScannerStatus|setInterval\s*\(/,
   'scan start must not depend on the nonexistent device-status endpoint or auto retry it',
 )
-assert.match(
+// K1b-1（2026-11-03）：这句话跟着「真的会建会话」的那一下走，不留在选材料屏。
+// 选材料屏不得再出现这句；怎么扫 / 屏上未开通必须仍出现。判据没有删，也没有放宽。
+assert.doesNotMatch(
   scanStart,
   /\u4e0b\u4e00\u6b65\u4f1a\u771f\u5b9e\u5efa\u7acb\u8fd9\u6b21\u626b\u63cf/,
-  'scan start must explain that the next step really creates this scan',
+  'scan start must not claim the next click creates this scan',
+)
+assert.match(
+  read('src/pages/scan/ScanHowPage.tsx'),
+  /\u4e0b\u4e00\u6b65\u4f1a\u771f\u5b9e\u5efa\u7acb\u8fd9\u6b21\u626b\u63cf/,
+  'the screen whose next click creates this scan must still say so',
 )
 assert.match(
   scanStart,
@@ -592,7 +599,6 @@ assert.match(
   '离开 = 先撤服务端任务，再清本地登记，最后才走人；落点是参数，语义不随落点变',
 )
 for (const [prop, destination] of [
-  ['onBack', '/print-scan'],
   ['onHome', '/'],
   ['onAdvisor', '/assistant'],
   ['onProfile', '/profile'],
@@ -603,6 +609,19 @@ for (const [prop, destination] of [
     `${prop}（落点 ${destination}）必须走 leaveScanFlow，不能自己 navigate`,
   )
 }
+// K1b-1（2026-11-03）：顶栏返回的默认落点仍是离开整条流程。
+// 「怎么扫 / 放纸」可以显式传入 onBandBack，只在这条流程里退一步，不撤会话。
+// 不传 onBandBack 时必须还是 leaveScanFlow('/print-scan')。不许改成自己 navigate。这不是放宽。
+assert.match(
+  scanChrome,
+  /onBack=\{onBandBack \?\? \(\(\) => leaveScanFlow\('\/print-scan'\)\)\}/,
+  '顶栏返回不传 onBandBack 时必须 leaveScanFlow(\'/print-scan\')，不能自己 navigate',
+)
+assert.doesNotMatch(
+  scanChrome,
+  /onBack=\{[^}]*navigate\(/,
+  '顶栏返回不许自己 navigate',
+)
 assert.doesNotMatch(
   scanChrome,
   /on(Home|Advisor|Profile)=\{\(\) => navigate\(/,

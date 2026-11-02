@@ -170,9 +170,9 @@ test('hardware warning tells anonymous users that background work continues with
   await expect(page).toHaveURL(/\/scan\?stage=start$/)
 
   // Assert real page rendered (not a wildcard error page)
-  await expect(page.getByRole('heading', { name: '材料扫描' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '扫什么？' })).toBeVisible()
   await expect(
-    page.getByText('请先选择扫描类型；本页尚未创建任务。下一步会真实建立这次扫描')
+    page.getByText('请先选择一种材料。本页尚未创建任务。')
   ).toBeVisible()
 
   await expectWarningWithinThreeSeconds(page)

@@ -1,4 +1,5 @@
 import type { ScanRescanAuthorization } from '@ai-job-print/shared'
+import { isScanMaterial, parseDeviceChoice, type ScanDeviceChoice, type ScanMaterial } from './scanMaterials'
 import { isScanType, type ScanType } from './scanWorkbench'
 import { parseScanStage, type ScanStage } from './scanWorkbenchModel'
 
@@ -413,6 +414,10 @@ export interface ScanRetryExtras {
 export interface ScanWorkbenchSession {
   stage: ScanStage
   scanType?: ScanType
+  /** 屏上「扫什么」选中的材料。合同在这里保留；面板路线另用 scanType=document。 */
+  material?: ScanMaterial
+  /** 放纸与颜色。只在用户选过之后才有；没有就按材料用默认值。 */
+  deviceChoice?: ScanDeviceChoice
   extras?: ScanRetryExtras
   live?: ScanLiveState
   result?: ScanResultSnapshot
@@ -508,6 +513,8 @@ export function readScanWorkbenchSession(): ScanWorkbenchSession | null {
     return {
       stage,
       scanType: isScanType(parsed.scanType) ? parsed.scanType : undefined,
+      material: isScanMaterial(parsed.material) ? parsed.material : undefined,
+      deviceChoice: parseDeviceChoice(parsed.deviceChoice),
       extras: parseExtras(parsed.extras),
       live: parseLive(parsed.live),
       result: parseResult(parsed.result),
@@ -539,6 +546,8 @@ export function patchScanWorkbenchSession(
   const next: ScanWorkbenchSession = {
     stage: patch.stage ?? current.stage,
     scanType: 'scanType' in patch ? patch.scanType : current.scanType,
+    material: 'material' in patch ? patch.material : current.material,
+    deviceChoice: 'deviceChoice' in patch ? patch.deviceChoice : current.deviceChoice,
     extras: 'extras' in patch ? patch.extras : current.extras,
     live: 'live' in patch ? patch.live : current.live,
     result: 'result' in patch ? patch.result : current.result,

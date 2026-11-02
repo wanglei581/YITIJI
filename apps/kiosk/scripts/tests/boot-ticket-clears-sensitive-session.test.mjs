@@ -133,9 +133,15 @@ export function isScanType(value) {
   const leaf = (relativePath) => toDataUrl(`${transpile(relativePath)}\n// ${seed}\n`)
   const selfAssessmentCode = `${transpile('src/pages/resume/selfAssessmentSession.ts')}\n// ${seed}\n`
     .replaceAll("from '@ai-job-print/shared'", `from '${questionsStub}'`)
+  const scanMaterialsUrl = toDataUrl(`${transpile('src/pages/scan/scanMaterials.ts')}\n// ${seed}\n`)
   const scanSessionCode = `${transpile('src/pages/scan/scanWorkbenchSession.ts')}\n// ${seed}\n`
     .replaceAll("from './scanWorkbench'", `from '${scanTypeStub}'`)
     .replaceAll("from './scanWorkbenchModel'", `from '${scanModelUrl}'`)
+    .replaceAll("from './scanMaterials'", `from '${scanMaterialsUrl}'`)
+  const scanSessionUrl = toDataUrl(scanSessionCode)
+  const scanHowContinueCode = `${transpile('src/pages/scan/scanHowContinue.ts')}\n// ${seed}\n`
+    .replaceAll("from './scanMaterials'", `from '${scanMaterialsUrl}'`)
+    .replaceAll("from './scanWorkbenchSession'", `from '${scanSessionUrl}'`)
   const interviewCode = `${transpile('src/pages/interview/interviewWorkbenchSession.ts')}\n// ${seed}\n`
     .replaceAll("from './interviewWorkbenchModel'", `from '${interviewModelUrl}'`)
   const assistantDraftCode = transpile('src/services/assistantDraft.ts').replaceAll("from 'react'", `from '${import.meta.resolve('react')}'`)
@@ -163,7 +169,8 @@ export function useState(initial) { return [typeof initial === 'function' ? init
     .replaceAll("from '../pages/resume/jobMaterialDraft'", `from '${leaf('src/pages/resume/jobMaterialDraft.ts')}'`)
     .replaceAll("from '../pages/resume/selfAssessmentSession'", `from '${toDataUrl(selfAssessmentCode)}'`)
     .replaceAll("from '../pages/interview/interviewWorkbenchSession'", `from '${toDataUrl(interviewCode)}'`)
-    .replaceAll("from '../pages/scan/scanWorkbenchSession'", `from '${toDataUrl(scanSessionCode)}'`)
+    .replaceAll("from '../pages/scan/scanWorkbenchSession'", `from '${scanSessionUrl}'`)
+    .replaceAll("from '../pages/scan/scanHowContinue'", `from '${toDataUrl(scanHowContinueCode)}'`)
     .replaceAll("from '../pages/scan/scanCleanupGate'", `from '${cleanupStub}'`)
     .replaceAll("from '../favorites/localFavorites'", `from '${leaf('src/favorites/localFavorites.ts')}'`)
     .replaceAll("from '../pages/contract-review/contractReviewSession'", `from '${leaf('src/pages/contract-review/contractReviewSession.ts')}'`)

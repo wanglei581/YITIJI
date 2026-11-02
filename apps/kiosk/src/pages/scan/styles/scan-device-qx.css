@@ -1,0 +1,162 @@
+/* 屏上扫描：怎么扫、放纸。颜色只用 --qxt-* / --qx-*。 */
+
+[data-qx-page='scan-workbench'] .cs-ways {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+[data-qx-page='scan-workbench'] .cs-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+[data-qx-page='scan-workbench'] .cs-way,
+[data-qx-page='scan-workbench'] .cs-src {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 148px;
+  padding: 16px 18px;
+  border-radius: 28px;
+  border: 2px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  text-align: left;
+}
+
+[data-qx-page='scan-workbench'] .cs-way[aria-pressed],
+[data-qx-page='scan-workbench'] .cs-src {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px;
+}
+
+[data-qx-page='scan-workbench'] .cs-way[aria-pressed]::after,
+[data-qx-page='scan-workbench'] .cs-src::after {
+  content: "";
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 3px solid var(--qxt-edge);
+  justify-self: center;
+  box-sizing: border-box;
+}
+
+[data-qx-page='scan-workbench'] .cs-way[aria-pressed='true'],
+[data-qx-page='scan-workbench'] .cs-src[aria-pressed='true'] {
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-ink);
+  border-color: var(--qxt-teal, #1f9e86);
+}
+
+[data-qx-page='scan-workbench'] .cs-way[aria-pressed='true']::after,
+[data-qx-page='scan-workbench'] .cs-src[aria-pressed='true']::after {
+  background: var(--qxt-teal, #1f9e86);
+  border-color: var(--qxt-teal, #1f9e86);
+}
+
+[data-qx-page='scan-workbench'] .cs-way[aria-pressed='true'] .sx-chip {
+  background: var(--qxt-teal, #1f9e86);
+  color: var(--qxt-cream);
+}
+
+[data-qx-page='scan-workbench'] .cs-way:disabled {
+  background: var(--qxt-paper, var(--qxt-card));
+  color: var(--qxt-ink);
+  border-style: dashed;
+  opacity: 1;
+}
+
+[data-qx-page='scan-workbench'] .cs-way h3,
+[data-qx-page='scan-workbench'] .cs-src b {
+  display: block;
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+[data-qx-page='scan-workbench'] .cs-way p,
+[data-qx-page='scan-workbench'] .cs-src .d,
+[data-qx-page='scan-workbench'] .cs-src .d2,
+[data-qx-page='scan-workbench'] .cs-howto,
+[data-qx-page='scan-workbench'] .cs-hold,
+[data-qx-page='scan-workbench'] .cs-login span {
+  display: block;
+  margin: 4px 0 0;
+  font-size: 22px;
+  line-height: 1.35;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .cs-sec {
+  margin: 8px 0 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+[data-qx-page='scan-workbench'] .cs-seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+[data-qx-page='scan-workbench'] .cs-seg button {
+  min-height: 84px;
+  padding: 12px;
+  border-radius: 22px;
+  border: 1.5px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+[data-qx-page='scan-workbench'] .cs-seg button small {
+  display: block;
+  margin-top: 4px;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+[data-qx-page='scan-workbench'] .cs-seg button[aria-pressed='true'] {
+  background: var(--qx-deep, var(--qxt-deep-2));
+  color: var(--qxt-cream);
+  border-color: var(--qx-deep, var(--qxt-deep-2));
+}
+
+[data-qx-page='scan-workbench'] .cs-login {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 22px;
+  background: var(--qxt-teal-wash);
+}
+
+[data-qx-page='scan-workbench'] .cs-login span {
+  color: var(--qxt-teal-ink);
+  font-weight: 700;
+}
+
+[data-qx-page='scan-workbench'] .cs-login .qxt-btn {
+  min-height: 56px;
+  min-width: 120px;
+  flex: 0 0 auto;
+}
+
+[data-qx-page='scan-workbench'] .cs-hold {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1.5px dashed var(--qxt-edge);
+}
+
+[data-qx-page='scan-workbench'] .cs-create {
+  margin: 8px 0 0;
+  font-size: 22px;
+  line-height: 1.35;
+}

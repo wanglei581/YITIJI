@@ -1053,15 +1053,55 @@ assert.match(
 )
 assert.match(
   scanStart,
-  /下一步会真实建立这次扫描/,
-  'scan start explains when this scan is really created'
-)
-assert.match(
-  scanStart,
   /可创建扫描任务/,
   'scan start uses task-creation copy instead of hardware ready'
 )
-assert.doesNotMatch(scanStart, /扫描仪就绪/, 'scan start must not claim scanner hardware ready')
+// K1b-1（2026-11-03）：这句从选材料屏挪到「下一步真的会建会话」的那一屏（怎么扫 / 屏上未开通）。
+// 选材料屏的「下一步」只记住材料并进入怎么扫，并不建会话。判据没有放宽：
+// 建会话的那一屏必须仍把这句话写在屏上，选材料屏不得再写（写了会让人以为这一下就要建）。
+assert.doesNotMatch(
+  scanStart,
+  /下一步会真实建立这次扫描/,
+  'scan start must not claim the next click creates a session',
+)
+const scanHow = read('src/pages/scan/ScanHowPage.tsx')
+assert.match(
+  scanHow,
+  /下一步会真实建立这次扫描/,
+  'the screen whose next click creates the session must still say so',
+)
+assert.match(scanHow, /createsOnNext/, 'the create sentence stays tied to the click that really creates')
+assert.match(scanHow, /openPanelScanSettings/, 'panel route still creates through the existing settings handoff')
+assert.match(scanHow, /if \(!screenAllowed\) \{\s*setWay\('panel'\)/, 'screen method is forced back to the panel when it is not usable')
+// K1b-1：以前整页禁止「扫描仪就绪」，是因为当时没有真探测，写出来就是假话。
+// 现在这句只允许从 scanReadyChipText 出来，而且调用方必须同时带上这次探测新鲜成功和屏上扫描已开通。
+// 探测失败、能力没取到、超过 1 分钟，函数返回 null。无条件写这句、或失败时也写，都会红。这不是放宽。
+const probeCopy = read('src/pages/scan/scanProbeCopy.ts')
+assert.match(
+  probeCopy,
+  /export function scanReadyChipText\(ok: boolean\): string \| null \{[\s\S]*?if \(!ok\) return null[\s\S]*?return '扫描仪就绪 · 刚刚检查'/,
+  'the ready phrase is produced only when the caller proves this probe succeeded',
+)
+assert.doesNotMatch(scanStart, /扫描仪就绪/, 'scan start must not hard-code the ready phrase')
+assert.match(
+  scanStart,
+  /scanReadyChipText\(probe\.freshReady && deviceCap\.allowed\)/,
+  'scan start shows the ready phrase only for a fresh successful probe while screen scan is allowed',
+)
+assert.doesNotMatch(scanHow, /扫描仪就绪/, 'how page must not hard-code the ready phrase')
+assert.match(
+  scanHow,
+  /scanReadyChipText\(screenAllowed && probe\.freshReady && cap\.allowed\)/,
+  'how page shows the ready phrase only when the screen method is actually usable',
+)
+const scanSet = read('src/pages/scan/ScanDeviceSettingsPage.tsx')
+assert.doesNotMatch(scanSet, /开始扫描/, 'this batch must not render a start-scan control')
+assert.doesNotMatch(scanSet, /扫描仪就绪/, 'settings page must not hard-code the ready phrase')
+assert.match(
+  scanSet,
+  /scanReadyChipText\(probe\.freshReady && cap\.allowed\)/,
+  'paper settings show the ready phrase only for a fresh successful probe',
+)
 assert.doesNotMatch(scanStart, /盖板感知|盖板已关|免点击扫描/, 'scan start must not imply lid-sensing auto start')
 assert.match(scanStart, /改用面板扫描到 U 盘/, 'scan start keeps the USB-panel independent path')
 assert.match(scanStart, /mode=usb-panel/, 'USB-panel path is a real query mode, not a fake scan session')

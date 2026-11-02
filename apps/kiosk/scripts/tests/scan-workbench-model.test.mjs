@@ -14,12 +14,15 @@ const { outputText } = ts.transpileModule(source, {
 const dataUrl = `data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`
 const model = await import(dataUrl)
 
-test('parseScanStage only accepts the four workbench stages', () => {
+test('parseScanStage accepts the workbench stages and rejects anything else', () => {
   assert.equal(model.parseScanStage('start'), 'start')
+  assert.equal(model.parseScanStage('how'), 'how')
+  assert.equal(model.parseScanStage('device-settings'), 'device-settings')
   assert.equal(model.parseScanStage('settings'), 'settings')
   assert.equal(model.parseScanStage('progress'), 'progress')
   assert.equal(model.parseScanStage('result'), 'result')
   assert.equal(model.parseScanStage('preview'), null)
+  assert.equal(model.parseScanStage('off'), null)
   assert.equal(model.parseScanStage(null), null)
 })
 
@@ -71,4 +74,40 @@ test('progress and result still need a real handle to be authorized', () => {
   assert.equal(model.isScanStageAuthorized('progress', true, false), true)
   assert.equal(model.isScanStageAuthorized('result', false, false), false)
   assert.equal(model.isScanStageAuthorized('result', false, true), true)
+})
+
+test('how and device-settings need this visit’s material, and a login mark only opens how', () => {
+  assert.equal(model.isScanStageAuthorized('how', false, false, false), false)
+  assert.equal(model.isScanStageAuthorized('device-settings', false, false, false), false)
+  assert.equal(model.isScanStageAuthorized('how', false, false, true), true)
+  assert.equal(model.isScanStageAuthorized('device-settings', false, false, true), true)
+  assert.equal(model.isScanStageAuthorized('how', true, false, true), false)
+  assert.equal(model.isScanStageAuthorized('device-settings', false, true, true), false)
+  assert.equal(
+    model.resolveScanView({
+      requested: 'how', storedStage: null, hasLiveSession: false, hasResult: false,
+      hasMaterialContext: false, hasHowContinue: true,
+    }),
+    'how',
+  )
+  assert.equal(
+    model.resolveScanView({
+      requested: 'device-settings', storedStage: null, hasLiveSession: false, hasResult: false,
+      hasMaterialContext: false, hasHowContinue: true,
+    }),
+    'start',
+  )
+  assert.equal(
+    model.resolveScanView({
+      requested: 'device-settings', storedStage: null, hasLiveSession: false, hasResult: false,
+      hasMaterialContext: true,
+    }),
+    'device-settings',
+  )
+  assert.equal(
+    model.resolveScanView({
+      requested: 'how', storedStage: null, hasLiveSession: false, hasResult: false,
+    }),
+    'start',
+  )
 })

@@ -979,7 +979,7 @@ test('print intake keeps three upload sources and a separate scan CTA @w2', asyn
 
   await page.getByRole('button', { name: /扫描纸质原件|扫描原件/ }).click()
   await page.waitForURL((url) => url.pathname === '/scan')
-  await expect(page.getByRole('heading', { name: '材料扫描' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '扫什么？' })).toBeVisible()
   await expectHealthy(page, errors)
 })
 

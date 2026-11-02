@@ -82,17 +82,20 @@
   color: var(--qxt-clay-ink);
 }
 
-[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'] {
+[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'],
+[data-qx-page='scan-workbench'] .fs-type[aria-pressed='true'] {
   background: var(--qx-deep, var(--qxt-deep-2));
   color: var(--qxt-cream);
   border-color: var(--qx-deep, var(--qxt-deep-2));
 }
 
-[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'] .fs-sub {
+[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'] .fs-sub,
+[data-qx-page='scan-workbench'] .fs-type[aria-pressed='true'] .fs-sub {
   color: var(--qxt-mint);
 }
 
-[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'] .sx-chip {
+[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'] .sx-chip,
+[data-qx-page='scan-workbench'] .fs-type[aria-pressed='true'] .sx-chip {
   background: var(--qxt-chip-ghost);
   color: var(--qxt-cream);
 }
@@ -560,6 +563,8 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  /* 滚到整数 scrollTop 的尽头时，底注边框会比重叠的亚像素多出不到 1px。留出这 1px 才能整块进可视区。 */
+  padding-bottom: 1px;
 }
 
 [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-result,
@@ -593,6 +598,12 @@
 }
 
 [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-truth {
+  flex: none;
+}
+
+/* 不缩放时正文按自然高度排进 .sw-page 的滚动区。fs-grow 若保持 flex:1 且 min-height:0，
+ * 底注会被挤出滚动高度：390×844 上滚不到整块底注（fusion-w2-scan 的 expectInside）。 */
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .fs-grow {
   flex: none;
 }
 
