@@ -13953,7 +13953,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 805,
+      "reachableFileCount": 806,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -14244,7 +14244,17 @@
             "GET /companies/:param",
             "GET /companies/:param/jobs",
             "GET /companies/filters",
-            "GET /companies/stats"
+            "GET /companies/stats",
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
           ],
           "file": "apps/kiosk/src/pages/companies/CompaniesPage.tsx",
           "layout": [
@@ -17302,7 +17312,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 907
+      "sourceFileCount": 908
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -20674,6 +20684,12 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
+    "apps/kiosk/src/components/qingxu/QxPageFrame.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-brand-display.mjs"
+    ],
+    "apps/kiosk/src/components/qingxu/touch/QxTouchBand.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-brand-display.mjs"
+    ],
     "apps/kiosk/src/components/qingxu/touch/QxTouchOverlay.tsx": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
@@ -20683,6 +20699,9 @@
     "apps/kiosk/src/components/qingxu/touch/QxTouchTile.tsx": [
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
+    ],
+    "apps/kiosk/src/copy/miniappLinkCopy.ts": [
+      "apps/kiosk/scripts/verify-kiosk-brand-display.mjs"
     ],
     "apps/kiosk/src/copy/unattendedCopy.ts": [
       "apps/kiosk/scripts/verify-kiosk-feedback-entry.mjs",
@@ -20741,6 +20760,7 @@
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-fusion-w6.mjs",
+      "apps/kiosk/scripts/verify-kiosk-brand-display.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-kiosk-shell-active-nav.mjs",
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs",
@@ -21052,6 +21072,9 @@
     ],
     "apps/kiosk/src/pages/home/components/ContinuePanel.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
+    ],
+    "apps/kiosk/src/pages/home/components/HomeHeroHeader.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-brand-display.mjs"
     ],
     "apps/kiosk/src/pages/home/components/HomeIdentityActions.tsx": [
       "apps/kiosk/scripts/verify-kiosk-end-use.mjs"
@@ -22722,6 +22745,7 @@
       "apps/kiosk/scripts/verify-screensaver-empty-shell.mjs"
     ],
     "apps/kiosk/src/pages/screensaver/StandbyView.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-brand-display.mjs",
       "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs",
       "apps/kiosk/scripts/verify-screensaver-empty-shell.mjs"
     ],
@@ -31686,6 +31710,29 @@
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
         "@ai-job-print/kiosk::verify:kiosk-ai-primitives"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/src/components/qingxu/QxPageFrame.tsx",
+          "apps/kiosk/src/components/qingxu/touch/QxTouchBand.tsx",
+          "apps/kiosk/src/copy/miniappLinkCopy.ts",
+          "apps/kiosk/src/layouts/KioskRoot.tsx",
+          "apps/kiosk/src/pages/home/components/HomeHeroHeader.tsx",
+          "apps/kiosk/src/pages/screensaver/StandbyView.tsx"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-kiosk-brand-display.mjs",
+      "helper": false,
+      "inCi": false,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:kiosk-brand-display"
       ],
       "wired": true
     },
@@ -45836,10 +45883,12 @@
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/home/components/HomeHeroHeader.tsx",
         "kind": "component",
-        "mentions": [],
-        "risk": "low",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-brand-display.mjs"
+        ],
+        "risk": "high",
         "scope": "kiosk",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-brand-display.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
