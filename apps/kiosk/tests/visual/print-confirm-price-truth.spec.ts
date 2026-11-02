@@ -22,7 +22,7 @@
 //   - 连点只建一次单；报价没回来不能建单；合并版先按最终文件报价、且只生成一次。
 // ============================================================
 
-import type { Page, Route } from '@playwright/test'
+import type { Locator, Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { assertNoHorizontalOverflow } from './assert-layout'
@@ -33,6 +33,24 @@ async function openConfirmWith(page: Page, printParams: Record<string, unknown>)
   await page.goto('/print/confirm')
   await writePrintHandoff(page, { printParams, materialCheck: null })
   await page.reload({ waitUntil: 'domcontentloaded' })
+}
+
+async function expectExitInViewport(button: Locator): Promise<void> {
+  await expect(button).toBeVisible()
+  const box = await button.boundingBox()
+  expect(box).not.toBeNull()
+  expect(box!.x).toBeGreaterThanOrEqual(0)
+  expect(box!.y).toBeGreaterThanOrEqual(0)
+  expect(box!.x + box!.width).toBeLessThanOrEqual(1080)
+  expect(box!.y + box!.height).toBeLessThanOrEqual(1920)
+  const unobstructed = await button.evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    return [0.1, 0.5, 0.9].every((x) => [0.1, 0.5, 0.9].every((y) => {
+      const hit = document.elementFromPoint(rect.left + rect.width * x, rect.top + rect.height * y)
+      return hit !== null && element.contains(hit)
+    }))
+  })
+  expect(unobstructed, '出口按钮不能被其他元素遮挡').toBe(true)
 }
 
 const NOW = '2026-08-18T00:00:00.000Z'
@@ -525,6 +543,7 @@ for (const scenario of [
   { code: 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED', message: '免登录每次最多打印 20 面', limit: 20 },
 ] as const) {
   test(`free print quota ${scenario.code} gives an exit @kiosk`, async ({ page, api }) => {
+    await page.setViewportSize({ width: 1080, height: 1920 })
     registerShell(api, [])
     registerPriceConfig(api, [0])
     await routeQuote(page, () => ({ unitCents: 0, pages: W2_FILE.pages }))
@@ -537,8 +556,8 @@ for (const scenario of [
     await expect(page.getByRole('alert')).toContainText(scenario.message)
     await expect(page.getByRole('alert')).toContainText('本次没有建单，也没有出纸')
     if (scenario.code === 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED') {
-      await expect(page.getByRole('button', { name: '去登录', exact: true })).toBeVisible()
-      await expect(page.getByRole('button', { name: '减少份数或页数再试' })).toBeVisible()
+      await expectExitInViewport(page.getByRole('button', { name: '去登录', exact: true }))
+      await expectExitInViewport(page.getByRole('button', { name: '减少份数或页数再试' }))
       await page.getByRole('button', { name: '去登录', exact: true }).click()
       await expect(page).toHaveURL(/\/login\?from=%2Fprint%2Fconfirm/)
     } else {
@@ -547,3 +566,21 @@ for (const scenario of [
     }
   })
 }
+
+test('unfinished privacy check keeps the recovery exit on screen @kiosk', async ({ page, api }) => {
+  await page.setViewportSize({ width: 1080, height: 1920 })
+  registerShell(api, [])
+  registerPriceConfig(api, [0])
+  await routeQuote(page, () => ({ unitCents: 0, pages: W2_FILE.pages }))
+  await page.route('**/api/v1/print/jobs', async (route) => {
+    await route.fulfill({ status: 400, json: { error: { code: 'PRINT_PII_SCAN_REQUIRED', message: 'PRINT_PII_SCAN_REQUIRED' } } })
+  })
+  await openConfirm(page)
+  await expect(originalConfirm(page)).toBeEnabled()
+  await originalConfirm(page).click()
+  await expect(page.getByRole('alert')).toContainText('隐私检查还没有确认完')
+  const recovery = page.getByRole('button', { name: '回到材料检查', exact: true })
+  await expectExitInViewport(recovery)
+  await recovery.click()
+  await expect(page).toHaveURL(/\/print\/desk\?step=check/)
+})

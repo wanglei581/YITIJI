@@ -587,14 +587,7 @@ export function PrintConfirmPage() {
     }
     navigate('/print/desk?step=check', { state: { printContextId: kept.contextId } })
   }
-  const actions = quotaCode === 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED' ? (
-    <>
-      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print/desk?step=preview')}>减少份数或页数再试</button>
-      <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(loginPathForPrintStep('confirm'))}>去登录</button>
-    </>
-  ) : piiCheckRequired ? (
-    <button type="button" className="qx-btn" data-variant="primary" style={{ minHeight: 56 }} onClick={returnToMaterialCheck}>回到材料检查</button>
-  ) : screen === 'missing-context' ? (
+  const actions = screen === 'missing-context' ? (
     <>
       <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/me/print-orders')}>我的打印订单</button>
       <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(uploadPath)}>重新选文件</button>
@@ -674,19 +667,19 @@ export function PrintConfirmPage() {
     </section>
   )
 
-  const usesDockPrimary = quotaCode !== 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED' && !piiCheckRequired
-    && screen !== 'missing-context'
+  const guestQuotaExceeded = quotaCode === 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED'
+  const usesDockPrimary = guestQuotaExceeded || piiCheckRequired || (screen !== 'missing-context'
     && screen !== 'invalid-context'
     && screen !== 'ordered'
-    && screen !== 'benefit-unverified'
-  const dockLabel = sidesOverLimit
+    && screen !== 'benefit-unverified')
+  const dockLabel = guestQuotaExceeded ? '去登录' : piiCheckRequired ? '回到材料检查' : sidesOverLimit
     ? '确认打印'
     : screen === 'quoting'
       ? (freePricing ? '页数核定后可继续' : '获取报价后可继续')
       : screen === 'quote-failed'
         ? (freePricing ? '重新核定页数' : '重新报价')
         : primaryLabel
-  const dockDisabled = sidesOverLimit || screen === 'quoting' || (screen !== 'quote-failed' && confirmBlocked)
+  const dockDisabled = !guestQuotaExceeded && !piiCheckRequired && (sidesOverLimit || screen === 'quoting' || (screen !== 'quote-failed' && confirmBlocked))
   const previewKind = hasFileContext ? previewKindForFile(file) : 'unavailable'
   const previewNode = hasFileContext && (previewKind === 'pdf' || previewKind === 'image') ? <FilePageThumb file={file} /> : null
   const sheetPages = quote.status === 'ready' ? quote.billablePages : rangedPages
@@ -709,9 +702,10 @@ export function PrintConfirmPage() {
       eyebrow="核对价格"
       title="确认打印"
       back={{
-        label: backLabel,
+        label: guestQuotaExceeded ? '减少份数或页数再试' : backLabel,
         onBack: () => {
-          if (isContractReport) void handleBack()
+          if (guestQuotaExceeded) navigate('/print/desk?step=preview')
+          else if (isContractReport) void handleBack()
           else navigate('/print/desk?step=preview')
         },
       }}
@@ -721,7 +715,9 @@ export function PrintConfirmPage() {
         label: dockLabel,
         disabled: dockDisabled,
         onClick: () => {
-          if (!sidesOverLimit && screen === 'quote-failed') setQuoteNonce((n) => n + 1)
+          if (guestQuotaExceeded) navigate(loginPathForPrintStep('confirm'))
+          else if (piiCheckRequired) returnToMaterialCheck()
+          else if (!sidesOverLimit && screen === 'quote-failed') setQuoteNonce((n) => n + 1)
           else void handleConfirm()
         },
       } : undefined}
