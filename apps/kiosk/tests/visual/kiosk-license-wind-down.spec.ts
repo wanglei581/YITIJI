@@ -23,9 +23,11 @@ import {
   settleAfterPause, tap, windDownBlocked,
 } from './fixtures/license-gate-kit'
 import {
-  INTERVIEW_REPORT, INTERVIEW_ROW, INTERVIEW_SESSION_ID, RESUME_REPORT_RECORD, RESUME_ROW, RESUME_TASK_ID,
+  INTERVIEW_REPORT, INTERVIEW_REPORT_2, INTERVIEW_ROW, INTERVIEW_ROW_2, INTERVIEW_SESSION_ID, INTERVIEW_SESSION_ID_2,
+  RESUME_REPORT_RECORD, RESUME_ROW, RESUME_TASK_ID,
 } from './fixtures/license-records'
 import type { LicenseWorld } from './fixtures/license-world'
+import { longestBlankRun } from './fixtures/blank-run'
 import { loginThroughVisibleUi } from './fixtures/privacy-clear-shell'
 
 test.describe.configure({ timeout: 120_000 })
@@ -63,7 +65,10 @@ async function openMine(page: Page): Promise<void> {
   await tap(page, mainNav(page).getByRole('button', { name: '我的' }))
   await page.waitForURL((url) => url.pathname === '/profile')
   const handover = page.getByTestId('handover-confirm')
-  if (await handover.isVisible().catch(() => false)) await handover.getByRole('button', { name: '是我，继续' }).click()
+  // 离开屏幕超过 30 秒再进「我的」会先问一句；弹层比页面晚一拍出来，给它一点时间，没有就不等了。
+  const asked = await handover.waitFor({ state: 'visible', timeout: 1_500 }).then(() => true, () => false)
+  if (asked) await handover.getByRole('button', { name: '是我，继续' }).click()
+  await expect(page.getByTestId('profile-account')).toBeVisible()
 }
 
 /** 简历来源页挂载时会建一个手机上传会话并轮询它；给它应答，免得挂载了这一页的用例被当成有未处理的接口请求。 */
@@ -111,7 +116,7 @@ test('收尾中从首页进另一项服务的办理页：整屏换成「本机�
   await expect(screen).toContainText(NO_NEW_TASK)
   await expect(screen).toContainText('分钟后暂停使用')
   await expect(page.locator('[data-kiosk-screen="resume-source"]'), '被拦的页面不该渲染').toHaveCount(0)
-  await expect(screen.getByRole('button'), '拦截屏上只有「返回」「回首页」两个按钮').toHaveText(['返回', '回首页'])
+  await expect(screen.locator('.qxt-dock').getByRole('button'), '底栏是「返回」「回首页」两个标准按钮').toHaveText(['返回', '回首页'])
 
   // 「返回」：回到上一页（首页），拦截屏消失。
   await screen.getByRole('button', { name: '返回', exact: true }).click()
@@ -127,6 +132,76 @@ test('收尾中从首页进另一项服务的办理页：整屏换成「本机�
   await expect(windDownBlocked(page)).toHaveCount(0)
   await expectHomeWindingDown(page)
   await expect(paused(page)).toHaveCount(0)
+})
+
+test('收尾拦截屏：徽标写「即将暂停」，三张去处卡能点、只去查看类页面，卡片区与底栏之间没有大片空白 @license-gate', async ({ page, api }, testInfo) => {
+  const world = await boot(page, api)
+  await startWindDown(world)
+  await goInApp(page, '/resume/source')
+  const screen = windDownBlocked(page)
+  await expect(screen).toBeVisible()
+
+  // 顶栏徽标如实写「即将暂停」，不是「状态未知」。
+  await expect(screen.getByText('即将暂停', { exact: true })).toBeVisible()
+  await expect(screen.getByText('状态未知')).toHaveCount(0)
+
+  // 「现在可以做的」三张去处卡：名字、说明、顺序；底栏是「返回」「回首页」两个标准按钮。
+  await expect(screen.getByRole('heading', { name: /现在可以做的/ })).toBeVisible()
+  const cards = screen.locator('.of-actions button')
+  await expect(cards).toHaveCount(3)
+  await expect(cards.nth(0)).toContainText('我的记录')
+  await expect(cards.nth(0)).toContainText('简历、文档和打印订单')
+  await expect(cards.nth(1)).toContainText('帮助与求助')
+  await expect(cards.nth(1)).toContainText('常见问题与服务电话')
+  await expect(cards.nth(2)).toContainText('回首页')
+  await expect(cards.nth(2)).toContainText('不开始新的办理')
+  await expect(screen.locator('.qxt-dock').getByRole('button')).toHaveText(['返回', '回首页'])
+
+  // 1080×1920 下量版面：卡片区最后一张卡的底边到底栏顶边的距离，超过三分之一屏（640px）算大片空白；
+  // 再按项目量空白的老办法（fixtures/blank-run.ts：整屏截图里最长的连续空行）量一遍，并存下截图。
+  const shotPath = testInfo.outputPath('wind-down-blocked-1080x1920.png')
+  const shot = await page.screenshot({ path: shotPath })
+  const blank = longestBlankRun(shot)
+  const layout = await page.evaluate(() => {
+    const root = document.querySelector('[data-kiosk-screen="license-wind-down-blocked"]')!
+    const rects = (selector: string) => [...root.querySelectorAll(selector)].map((element) => element.getBoundingClientRect())
+    const cardRects = rects('.of-actions button')
+    const dockRect = root.querySelector('.qxt-dock')!.getBoundingClientRect()
+    const lastCardBottom = Math.max(...cardRects.map((rect) => rect.bottom))
+    return {
+      viewportH: window.innerHeight,
+      cardsTop: Math.min(...cardRects.map((rect) => rect.top)),
+      lastCardBottom,
+      dockTop: dockRect.top,
+      gapPx: dockRect.top - lastCardBottom,
+      cardHeights: cardRects.map((rect) => Math.round(rect.height)),
+      dockButtonHeights: rects('.qxt-dock button').map((rect) => Math.round(rect.height)),
+    }
+  })
+  const summary = `1080×1920：最后一张卡底边 y=${Math.round(layout.lastCardBottom)}，底栏顶边 y=${Math.round(layout.dockTop)}，间距 ${Math.round(layout.gapPx)}px`
+    + `（${(layout.gapPx / layout.viewportH * 100).toFixed(1)}% 屏高，三分之一屏=${Math.round(layout.viewportH / 3)}px）；整屏最长连续空白 ${blank.px}px（起点 y=${blank.atY}）；`
+    + `卡高 ${layout.cardHeights.join('/')}px，底栏按钮高 ${layout.dockButtonHeights.join('/')}px；截图 ${shotPath}`
+  console.log(`\n  [拦截屏版面] ${summary}`)
+  testInfo.annotations.push({ type: '拦截屏版面', description: summary })
+  expect(layout.viewportH, '按 1080×1920 量').toBe(1920)
+  expect(layout.gapPx, `卡片区与底栏之间的间距 ${Math.round(layout.gapPx)}px 超过三分之一屏`).toBeLessThanOrEqual(layout.viewportH / 3)
+  // 老办法量到的整屏最长连续空白同样不超过三分之一屏（卡被拉高后，空白在卡里，不在卡片区与底栏之间）。
+  expect(blank.px, `整屏最长连续空白 ${blank.px}px（起点 y=${blank.atY}）`).toBeLessThanOrEqual(layout.viewportH / 3)
+  for (const height of layout.cardHeights) expect(height, '每张去处卡都要够触摸高度').toBeGreaterThanOrEqual(56)
+  for (const height of layout.dockButtonHeights) expect(height, '底栏按钮高度不小于 56px').toBeGreaterThanOrEqual(56)
+
+  // 三张卡都能点，而且只去查看类页面：我的记录、帮助与求助、收尾中的首页（入口仍全部停用）。
+  const exits = [['我的记录', '/profile'], ['帮助与求助', '/help'], ['回首页', '/']] as const
+  for (const [index, [title, route]] of exits.entries()) {
+    if (index > 0) {
+      await goInApp(page, '/resume/source')
+      await expect(windDownBlocked(page)).toBeVisible()
+    }
+    await tap(page, windDownBlocked(page).locator('.of-actions button').nth(index))
+    await page.waitForURL((url) => url.pathname === route)
+    await expect(windDownBlocked(page), `「${title}」去的是查看类页面，不该再被拦`).toHaveCount(0)
+  }
+  await expectHomeWindingDown(page)
 })
 
 test('收尾开始时正在面试设置页：面试里切阶段照常，进打印台被拦，返回仍回到面试 @license-gate', async ({ page, api }) => {
@@ -342,18 +417,21 @@ test('收尾中从面试历史列表打开旧报告：没带只读标记也只�
   api.respond('GET', `/api/v1/mock-interviews/${INTERVIEW_SESSION_ID}/report`, { status: 200, json: INTERVIEW_REPORT })
   await signIn(page, api, world)
 
-  // 阳性对照：授权正常时，从同一个历史列表点「查看」打开的报告，重新练习、生成打印版都是亮的。
+  // 阳性对照：授权正常时，历史列表上的「开始新练习」是亮的；从同一个列表点「查看」打开的报告，重新练习、生成打印版也都是亮的。
   await goInApp(page, '/interview?stage=reports')
+  await expect(page.getByTestId('interview-primary')).toBeEnabled()
   await page.getByRole('button', { name: '查看', exact: true }).click()
   await expect(page.locator('[data-interview-stage="report"]')).toBeVisible()
   await expect(page.getByRole('button', { name: '重新练习', exact: true })).toBeEnabled()
   await expect(page.getByTestId('interview-primary')).toBeEnabled()
 
-  // 收尾在首页开始（不在面试服务里）：历史列表是结果页，进得去；点「查看」切到报告阶段，没有任何导航标记，也按服务只读。
+  // 收尾在首页开始（不在面试服务里）：历史列表是结果页，进得去，但「开始新练习」停用；
+  // 点「查看」切到报告阶段，报告按服务只读。
   await goInApp(page, '/')
   await startWindDown(world)
   await goInApp(page, '/interview?stage=reports')
   await expect(windDownBlocked(page)).toHaveCount(0)
+  await expect(page.getByTestId('interview-primary')).toBeDisabled()
   await page.getByRole('button', { name: '查看', exact: true }).click()
   await expect(page.locator('[data-interview-stage="report"]')).toBeVisible()
   await expect(page.getByText(INTERVIEW_REPORT.data.report.overall.summary)).toBeVisible()
@@ -365,6 +443,76 @@ test('收尾中从面试历史列表打开旧报告：没带只读标记也只�
   await expect(print).toBeDisabled()
   await expect(print).toHaveAttribute('title', NO_NEW_TASK)
 })
+
+// 收尾开始时正处在面试服务里：正在看的那份报告不受影响（同一项服务里接着办），
+// 但从历史列表打开的「另一份旧报告」带着只读标记，仍只读；历史列表上的「开始新练习」也停用。
+const IN_SERVICE_STARTS = [
+  {
+    name: '面试设置页',
+    begin: async (page: Page) => {
+      await goInApp(page, '/interview?stage=setup')
+      await expect(page.locator('[data-interview-stage="setup"]')).toBeVisible()
+    },
+    toHistory: (page: Page) => goInApp(page, '/interview?stage=reports'),
+  },
+  {
+    name: '面试报告页',
+    begin: async (page: Page) => {
+      await goInApp(page, '/interview?stage=reports')
+      await page.locator('.qxt-iv-rec').filter({ hasText: '前端开发工程师' }).getByRole('button', { name: '查看', exact: true }).click()
+      await expect(page.locator('[data-interview-stage="report"]')).toBeVisible()
+      await expect(page.getByText(INTERVIEW_REPORT.data.report.overall.summary)).toBeVisible()
+      await expect(page.getByRole('button', { name: '重新练习', exact: true })).toBeEnabled()
+    },
+    toHistory: async (page: Page) => { await page.getByRole('button', { name: '查看历史报告', exact: true }).click() },
+  },
+] as const
+
+for (const start of IN_SERVICE_STARTS) {
+  test(`收尾开始时正在${start.name}：切到历史列表打开另一份旧报告仍只读，历史列表「开始新练习」停用 @license-gate`, async ({ page, api }) => {
+    const world = await boot(page, api)
+    api.respond('GET', '/api/v1/me/mock-interviews', { status: 200, json: { success: true, data: { items: [INTERVIEW_ROW, INTERVIEW_ROW_2], nextCursor: null } } })
+    api.respond('GET', `/api/v1/mock-interviews/${INTERVIEW_SESSION_ID}/report`, { status: 200, json: INTERVIEW_REPORT })
+    api.respond('GET', `/api/v1/mock-interviews/${INTERVIEW_SESSION_ID_2}/report`, { status: 200, json: INTERVIEW_REPORT_2 })
+    await signIn(page, api, world)
+
+    // 阳性对照：授权正常时，历史列表上的「开始新练习」是亮的，列表里的第二份报告重新练习、生成打印版也是亮的。
+    await goInApp(page, '/interview?stage=reports')
+    await expect(page.getByTestId('interview-primary')).toBeEnabled()
+    await page.locator('.qxt-iv-rec').filter({ hasText: '产品运营' }).getByRole('button', { name: '查看', exact: true }).click()
+    await expect(page.getByText(INTERVIEW_REPORT_2.data.report.overall.summary)).toBeVisible()
+    await expect(page.getByRole('button', { name: '重新练习', exact: true })).toBeEnabled()
+    await expect(page.getByTestId('interview-primary')).toBeEnabled()
+
+    // 收尾在面试服务里开始。
+    await start.begin(page)
+    await startWindDown(world)
+    await expect(windDownBlocked(page), '收尾开始时就站在面试里，不该被拦').toHaveCount(0)
+
+    // 切到历史列表：是面试服务里的结果页，进得去；「开始新练习」停用并写明原因。
+    await start.toHistory(page)
+    await expect(page.locator('[data-interview-stage="reports"]')).toBeVisible()
+    await expect(windDownBlocked(page)).toHaveCount(0)
+    const startNew = page.getByTestId('interview-primary')
+    await expect(startNew).toBeDisabled()
+    await expect(startNew).toHaveAttribute('title', NO_NEW_TASK)
+    await expectTapStays(page, startNew, '开始新练习')
+
+    // 打开另一份旧报告：在面试服务里也只读（报告可看，重新练习、生成打印版停用）。
+    await page.locator('.qxt-iv-rec').filter({ hasText: '产品运营' }).getByRole('button', { name: '查看', exact: true }).click()
+    await expect(page.locator('[data-interview-stage="report"]')).toBeVisible()
+    await expect(page.getByText(INTERVIEW_REPORT_2.data.report.overall.summary)).toBeVisible()
+    await expect(page.getByRole('status').filter({ hasText: NO_NEW_TASK })).toBeVisible()
+    const again = page.getByRole('button', { name: '重新练习', exact: true })
+    await expect(again).toBeDisabled()
+    await expect(again).toHaveAttribute('title', NO_NEW_TASK)
+    await expectTapStays(page, again, '重新练习')
+    const print = page.getByTestId('interview-primary')
+    await expect(print).toBeDisabled()
+    await expect(print).toHaveAttribute('title', NO_NEW_TASK)
+    await expectTapStays(page, print, '生成打印版')
+  })
+}
 
 // ───────────────────────── 「我的」：查看类入口放开，开始新办理的入口仍锁 ─────────────────────────
 
@@ -402,7 +550,8 @@ test('收尾中本人的「我的」：资产格子、浏览记录、通知、�
     await expect(windDownBlocked(page), `${route}：收尾中能进，不该被拦`).toHaveCount(0)
     await expect(paused(page)).toHaveCount(0)
     await goInApp(page, '/profile')
-    await expect(page.getByTestId(testId)).toBeVisible()
+    // 回来之后「我的」要读回数量与待办，读完下面的行才摆出来、版面才定；等最后一行出现再点下一个。
+    await expect(page.getByTestId('profile-account')).toBeVisible()
   }
 })
 
