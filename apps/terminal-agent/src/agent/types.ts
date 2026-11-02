@@ -129,6 +129,11 @@ export interface AgentConfig {
    */
   scanDeviceMaxPages?: number
   /**
+   * 设备回报是否带上这一场实际的 source 与 colorMode。缺省 false。
+   * 后端 B4 上生产之前不得打开：B1 的 DTO 是 forbidNonWhitelisted，多带字段会 400。
+   */
+  scanDeviceReportSettings?: boolean
+  /**
    * 打印机"扫描到 SMB/FTP 共享目录"对应的本地可访问路径（映射盘符或 UNC 路径）。
    * 显式配置，不给默认值；未配置时扫描监听整体不启动，不影响其余 Agent 功能。
    */

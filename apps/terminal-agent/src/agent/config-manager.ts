@@ -171,6 +171,7 @@ function validateConfigShape(config: AgentConfig): AgentConfig {
     scanDeviceEnabled: requireOptionalBoolean(config.scanDeviceEnabled, 'scanDeviceEnabled'),
     scanDeviceName: requireOptionalString(config.scanDeviceName, 'scanDeviceName') ?? '',
     scanDeviceMaxPages: requireScanDeviceMaxPages(config.scanDeviceMaxPages),
+    scanDeviceReportSettings: requireOptionalBoolean(config.scanDeviceReportSettings, 'scanDeviceReportSettings'),
     agentVersion: requireNonEmpty(config.agentVersion, 'agentVersion'),
     heartbeatIntervalMs: requireOptionalPositiveInteger(config.heartbeatIntervalMs, 'heartbeatIntervalMs'),
     claimIntervalMs: requireOptionalPositiveInteger(config.claimIntervalMs, 'claimIntervalMs'),

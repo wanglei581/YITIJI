@@ -8,7 +8,7 @@ import type { DeviceLock } from '../device-lock'
 import type { DeviceReportBody, FetchDeviceLeaseResult, DeviceReportResult } from './scan-device-backend'
 import type { ScanDeviceClock, ScanDeviceHealthSnapshot } from './scan-device-health'
 import type { ScanDeviceDeletionReason, ScanTempPurgeResult } from './scan-temp-dir'
-import type { composeScanPdf } from './scan-pdf-compose'
+import { SCAN_PDF_MAX_BYTES, type composeScanPdf } from './scan-pdf-compose'
 import type { createScanTaskDir, sweepScanDeviceResidue } from './scan-temp-dir'
 import type { runWiaProbe } from './wia-probe'
 import type { startWiaScan } from './wia-runner'
@@ -24,6 +24,40 @@ export interface ScanDeviceView {
   state: ScanDeviceReportState
   pageCount: number
   errorCode: ScanDeviceErrorCode | null
+  /**
+   * 这次命令有没有把页目录删掉。
+   * 只有真的尝试过清理才带上：true 已删除或不存在，false 没删成（还会重试）。
+   */
+  purged?: boolean
+}
+
+function positiveLimit(value: number | undefined): number | undefined {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) return undefined
+  return value
+}
+
+/**
+ * 页数取本机配置和租约上限里更严的一个。字节取租约和 18 MiB 里更严的一个，再留出合成余量。
+ * 租约没给、或给的不是正整数时，该项沿用原来的默认。
+ */
+export function resolveScanDeviceLimits(
+  localMaxPages: number,
+  device: { maxPages?: number; maxBytes?: number } | undefined,
+): { pageCap: number; byteBudget: number } {
+  const leasePages = positiveLimit(device?.maxPages)
+  const pageCap = leasePages === undefined ? localMaxPages : Math.min(localMaxPages, leasePages)
+  const leaseBytes = positiveLimit(device?.maxBytes)
+  const byteCap = leaseBytes === undefined ? SCAN_PDF_MAX_BYTES : Math.min(SCAN_PDF_MAX_BYTES, leaseBytes)
+  return { pageCap, byteBudget: Math.max(0, byteCap - SCAN_PDF_COMPOSE_MARGIN_BYTES) }
+}
+
+/** 合成前核对：页列表长度等于已经回报的页数，且页序正好是 1..n。 */
+export function scanPagesAligned(pageCount: number, pages: readonly { index: number }[]): boolean {
+  if (pageCount < 1 || pages.length !== pageCount) return false
+  for (let i = 0; i < pages.length; i += 1) {
+    if (pages[i]?.index !== i + 1) return false
+  }
+  return true
 }
 
 export class LocalScanError extends Error {
@@ -61,6 +95,10 @@ export interface ScanDeviceRuntimeDeps {
   sweep: typeof sweepScanDeviceResidue
   createDir: typeof createScanTaskDir
   readFile: (file: string) => Promise<Buffer>
+  /** 发起上传之前再让出一次，让已经受理的中止赶在上传之前被看见。 */
+  beforeUpload?: () => Promise<void>
+  /** 强杀后的进程还在不在。探测与下一场开始靠它确认旧进程已经退出。 */
+  isProcessAlive?: (pid: number) => boolean
   clock: ScanDeviceClock
   lock: DeviceLock
   root?: string
@@ -77,4 +115,6 @@ export interface ScanDeviceRuntime {
   arm(): void
   stop(): void
   whenIdle(): Promise<void>
+  /** 还在排队重试的目录清理。0 表示没有未完成的清理。 */
+  cleanupPending(): number
 }

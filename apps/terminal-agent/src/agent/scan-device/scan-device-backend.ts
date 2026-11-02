@@ -32,18 +32,22 @@ export interface DeviceLease {
   expiresAt: string
   deliveryLease: string
   startMode: 'device'
-  device: { source: WiaSource; colorMode: WiaColor }
+  device: { source: WiaSource; colorMode: WiaColor; maxPages?: number; maxBytes?: number }
 }
 
 export interface DeviceReportBody {
   state: ScanDeviceReportState
   pageCount?: number
   errorCode?: ScanDeviceErrorCode
+  /** 这一场实际在扫的来源和颜色。只有 scanDeviceReportSettings 开着才放进请求体。 */
+  source?: WiaSource
+  colorMode?: WiaColor
 }
 
 export type FetchDeviceLeaseResult =
   | { kind: 'lease'; lease: DeviceLease }
-  | { kind: 'none' }
+  | { kind: 'none'; stopCode?: string }
+  | { kind: 'rejected'; code: string }
   | { kind: 'unauthorized' }
   | { kind: 'unavailable' }
 
@@ -67,6 +71,7 @@ const SCAN_DEVICE_STOP_CODES = new Set<string>([
   'SCAN_TASK_NOT_DEVICE',
   'SCAN_DEVICE_TASK_NOT_ACKED',
   'TASK_NOT_ACKED',
+  'SCAN_DEVICE_SETTINGS_CHANGED',
 ])
 
 const SWITCHED_TO_PANEL_CODES = new Set<string>([
@@ -118,6 +123,8 @@ export function readDeviceLease(body: unknown, now: number): DeviceLease | undef
   if (typeof deliveryLease !== 'string' || deliveryLease.length === 0) return undefined
   if (typeof notBefore !== 'string' || Number.isNaN(Date.parse(notBefore))) return undefined
   if (typeof expiresAt !== 'string' || !(Date.parse(expiresAt) > now)) return undefined
+  const maxPages = optionalDeviceLimit((device as { maxPages?: unknown }).maxPages)
+  const maxBytes = optionalDeviceLimit((device as { maxBytes?: unknown }).maxBytes)
   return {
     scanTaskId,
     serverNow: typeof serverNow === 'string' ? serverNow : new Date(now).toISOString(),
@@ -125,8 +132,19 @@ export function readDeviceLease(body: unknown, now: number): DeviceLease | undef
     expiresAt,
     deliveryLease,
     startMode: 'device',
-    device: { source, colorMode },
+    device: {
+      source,
+      colorMode,
+      ...(maxPages !== undefined ? { maxPages } : {}),
+      ...(maxBytes !== undefined ? { maxBytes } : {}),
+    },
   }
+}
+
+/** 不是正整数就当这个上限没给，整张租约仍然有效。 */
+function optionalDeviceLimit(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) return undefined
+  return value
 }
 
 export async function fetchDeviceLease(
@@ -148,7 +166,9 @@ export async function fetchDeviceLease(
       return { kind: 'unauthorized' }
     }
     const { status, code } = readErrorCode(error)
-    if (status === 409 || status === 404 || code === 'NO_WAITING_SCAN_TASK') return { kind: 'none' }
+    if (status === 409 && code && isScanDeviceStopCode(code)) return { kind: 'none', stopCode: code }
+    if (status === 404 || code === 'NO_WAITING_SCAN_TASK') return { kind: 'none' }
+    if (status === 409) return { kind: 'rejected', code: code ?? 'HTTP_409' }
     return { kind: 'unavailable' }
   }
 }
@@ -163,6 +183,10 @@ export async function postDeviceReport(
   const payload: DeviceReportBody = { state: body.state }
   if (body.pageCount !== undefined) payload.pageCount = body.pageCount
   if (body.state === 'error' && body.errorCode) payload.errorCode = body.errorCode
+  if (body.source && body.colorMode) {
+    payload.source = body.source
+    payload.colorMode = body.colorMode
+  }
   try {
     await client.post(
       `/terminals/${encodeURIComponent(terminalId)}/scan-tasks/${encodeURIComponent(taskId)}/device-report`,

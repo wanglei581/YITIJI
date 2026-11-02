@@ -10,6 +10,7 @@
   "scanDeviceEnabled": false,
   "scanDeviceName": "",
   "scanDeviceMaxPages": 20,
+  "scanDeviceReportSettings": false,
   "heartbeatIntervalMs": 30000,
   "claimIntervalMs": 5000,
   "localApiPort": 9527,
