@@ -13,14 +13,14 @@
 - 主目录：已从 `codex/governance-safety-20260822`（落后主线 3011 个提交，还卡着 9/13 没做完的拣选）切回 `main`，旧分支保留；专利草稿等未跟踪、被忽略的文件原地保留，没有进仓库。
 - 已移除：`.worktrees/` 下 13 个干净的旧副本（`git worktree remove`，不加 --force）；触屏版线确认不再用的 51 个已断开副本挪进废纸篓。仍保留：各窗口在用并已重新登记的副本；`.worktrees/` 下 8 个有改动的旧副本（快照已做，删不删等产品负责人确认）；`touch-impl-1025` 顶层 13 个旧副本（等「触屏稿补稿收稿与审图」窗口确认）。
 
-## 2026-11-02：删除 10 个全仓零引用的一体机旧文件（逐个举证；3 个保留）
+## 2026-11-02：删除 10 个没有入口引用的一体机旧文件（逐个举证；3 个保留）
 
 - 范围：图谱 `docs/graph/orphans.md` low 档里点名的 13 个一体机文件。只 `git rm` 通过全部证据的。不改 CI / verify 门禁、合规闸门、硬件适配，也不动 `docs/design` 冻结稿。动态引用：全仓没有 `import.meta.glob` / `require.context`；kiosk 仅有的 `lazy(() => import(` 是打印页的 `DevSandboxControls`，匹配不到这 13 个。开着的 PR：`gh pr list` 128 个，逐个 `git fetch origin pull/<编号>/head` 后看 `git diff --name-only origin/main...<提交>`。图谱对这 13 个都报「没有任何门禁断言」。最后一次提交都早于 14 天（最近的是 `home-v6-footer.css` 的 `5d800c3020`，2026-10-06）。
 - 删除 10 个：
   - `apps/kiosk/src/pages/home/components/V6HomeFooterPanels.tsx`：`git grep V6HomeFooterPanels` 只命中自身；128 个 PR 都没改它。最后提交 `5cb74bc6c1`（2026-08-16）。
   - `apps/kiosk/src/pages/home/prototypeIcons.tsx`：文件名零命中。导出的 `ProtoIcon` 只出现在 2026-07-24 计划稿的示例 JSX 里，没有 import。最后提交 `5883c8c4ea`（2026-07-21）。
   - `apps/kiosk/src/pages/scan/ScanFlowSteps.tsx`：没有 import。本文件 2026-07-25 的更新记录里有一句历史叙述提到组件名，不是路径也不是 import；现行扫描页不引用它。最后提交 `5843cafa8f`（2026-07-25）。
-  - `apps/kiosk/src/services/api/smartCampus.ts`、`smartCampusHttpAdapter.ts`、`smartCampusMockAdapter.ts`：三者只互相引用，kiosk 里没有人 import 这个模块。现行智慧校园走 `useSmartCampusConfig` → `getKioskTerminalConfig`；`verify-terminal-device-config.ts` 禁止钩子回退 `getSmartCampusConfig(`。不是停放件：停放清单里的智慧校园页是迎新洞察页，不是这三个旧的按功能客户端；也没有文档把它们列为校园招聘或私有化部署 b 要保留的源码。最后提交 `bcb24062a9`（2026-07-29）、`6f0d38397c`（2026-08-19）、`109c7c7cb8`（2026-07-01）。
+  - `apps/kiosk/src/services/api/smartCampus.ts`、`smartCampusHttpAdapter.ts`、`smartCampusMockAdapter.ts`：整组删除（两个适配器只被同组的 `smartCampus.ts` 引用，三者只互相引用，kiosk 里没有人 import 这个模块）。现行智慧校园走 `useSmartCampusConfig` → `getKioskTerminalConfig`；`verify-terminal-device-config.ts` 禁止钩子回退 `getSmartCampusConfig(`。不是停放件：停放清单里的智慧校园页是迎新洞察页，不是这三个旧的按功能客户端；也没有文档把它们列为校园招聘或私有化部署 b 要保留的源码。最后提交 `bcb24062a9`（2026-07-29）、`6f0d38397c`（2026-08-19）、`109c7c7cb8`（2026-07-01）。
   - `apps/kiosk/src/pages/home/styles/home-v6-footer.css`、`apps/kiosk/src/pages/resume/job-fit-actions.css`、`jobFit-inkpaper-ext.css`、`resume-library-ext.css`：路径零命中，没有 `@import`。岗位行动页实际引入的是 `job-fit-qx.css` 与 `resume-decision-qx.css`。
 - 保留 3 个（这里故意不写文件名，免得进度文档的点名把它们在图谱里从 low 改判成 medium）：
   - 首页头部组件：被 `QxHomeView.tsx` 第 35 行 import（`QxHomeView` 本身也已不在入口引用链里，图谱列在 medium），单删它会让类型检查断；开着的 PR #1528、#1521、#1511 也在改它，所以这次不动。图谱把它放进 low 而不是「被其它文件提及」，是因为提及索引不认不带扩展名的 import（属脚本问题，已记入 next-tasks）。
