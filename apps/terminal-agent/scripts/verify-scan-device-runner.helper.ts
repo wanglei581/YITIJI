@@ -2,11 +2,16 @@
  * verify-scan-device-runner 的夹具。
  * 不改环境变量、不打开数据库、不 import 屏上扫描引擎那份会在加载时改 PROGRAMDATA 的 helper。
  */
+import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
 import axios from 'axios'
-import { DeviceLock, type DeviceLockClock } from '../src/agent/device-lock'
+import type { AgentDatabase } from '../src/agent/db'
+import { DeviceLock, globalDeviceLock, type DeviceLockClock } from '../src/agent/device-lock'
+import { __resetPrintDispatchGateForTests } from '../src/agent/print-dispatch-gate'
+import { bindScanDevicePrintFinishedProbe } from '../src/agent/scan-device/scan-device-runner'
+import { __resetClaimRateLimitForTests, startTaskRunner } from '../src/agent/task-runner'
 import type { AgentConfig } from '../src/agent/types'
 import type { DeviceLease, DeviceReportBody, DeviceReportResult, FetchDeviceLeaseResult } from '../src/agent/scan-device/scan-device-backend'
 import {
@@ -253,6 +258,143 @@ export function agentConfig(patch: Partial<AgentConfig> = {}): AgentConfig {
     scanDeviceName: '',
     scanDeviceMaxPages: 20,
     ...patch,
+  }
+}
+
+async function waitUntil(predicate: () => boolean, timeoutMs = 3_000): Promise<void> {
+  const started = Date.now()
+  while (!predicate()) {
+    if (Date.now() - started > timeoutMs) throw new Error('timed out waiting for print claim')
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+}
+
+/** 开关关着不碰设备锁；开着时领取到执行结束一直持锁，空领取不探测。 */
+export async function verifyPrintClaimLock(db: AgentDatabase): Promise<void> {
+  __resetPrintDispatchGateForTests()
+  __resetClaimRateLimitForTests()
+  bindScanDevicePrintFinishedProbe(undefined)
+  const held = globalDeviceLock.tryAcquire('scan:taskA')
+  assert.ok(held, '测试要先占住设备锁')
+  let released = false
+  const releaseHeld = (): void => {
+    if (released) return
+    released = true
+    held.release()
+  }
+  let mode: 'empty' | 'file' = 'empty'
+  let claims = 0
+  let downloads = 0
+  let releaseDownload: () => void = () => undefined
+  const downloadGate = new Promise<void>((resolve) => {
+    releaseDownload = resolve
+  })
+  const server = http.createServer((request, response) => {
+    request.on('data', () => undefined)
+    request.on('end', () => {
+      const url = request.url ?? ''
+      if (request.method === 'POST' && url.includes('/tasks/claim')) {
+        claims += 1
+        response.writeHead(200, { 'content-type': 'application/json' })
+        if (mode === 'empty') {
+          response.end('[]')
+          return
+        }
+        response.end(JSON.stringify([{
+          taskId: 'print-scan-lock',
+          type: 'print',
+          fileUrl: `http://127.0.0.1:${(server.address() as { port: number }).port}/missing.pdf`,
+          fileMd5: '',
+          actionToken: 'token',
+          claimedBy: 'terminal-scan-device',
+          claimExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+          params: {
+            copies: 1,
+            colorMode: 'black_white',
+            duplex: 'simplex',
+            paperSize: 'A4',
+            orientation: 'portrait',
+            quality: 'standard',
+            scale: 'fit',
+            pagesPerSheet: 1,
+          },
+          createdAt: new Date().toISOString(),
+        }]))
+        return
+      }
+      if (url.includes('/missing.pdf')) {
+        downloads += 1
+        void downloadGate.then(() => {
+          if (!response.writableEnded) {
+            response.writeHead(404)
+            response.end()
+          }
+        })
+        return
+      }
+      response.writeHead(200, { 'content-type': 'application/json' })
+      response.end('{"acknowledged":true}')
+    })
+  })
+  const port = await listen(server)
+  const configFor = (enabled: boolean) => agentConfig({
+    apiBaseUrl: `http://127.0.0.1:${port}/api/v1`,
+    scanDeviceEnabled: enabled,
+    claimIntervalMs: 3_600_000,
+    holdPrinterQueueWhenIdle: false,
+  })
+  const runners: Array<{ stop(): void }> = []
+  try {
+    const off = startTaskRunner({ config: configFor(false), db })
+    runners.push(off)
+    off.wake()
+    await waitUntil(() => claims >= 1)
+    assert.equal(claims, 1, '开关关着时别人占着锁也要照常领取')
+    off.stop()
+
+    const blocked = startTaskRunner({ config: configFor(true), db })
+    runners.push(blocked)
+    const claimsAtBlock = claims
+    blocked.wake()
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    assert.equal(claims, claimsAtBlock, '开关开着且锁被扫描占着时不得领取')
+    blocked.stop()
+    releaseHeld()
+
+    let probes = 0
+    bindScanDevicePrintFinishedProbe(() => {
+      probes += 1
+    })
+    const empty = startTaskRunner({ config: configFor(true), db })
+    runners.push(empty)
+    const beforeEmpty = claims
+    empty.wake()
+    await waitUntil(() => claims > beforeEmpty)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    assert.equal(probes, 0, '没领到任务不得探测扫描仪')
+    empty.stop()
+
+    mode = 'file'
+    const printing = startTaskRunner({ config: configFor(true), db })
+    runners.push(printing)
+    printing.wake()
+    await waitUntil(() => downloads >= 1)
+    assert.equal(globalDeviceLock.tryAcquire('scan:during'), undefined, '下载未结束时打印仍持着设备锁')
+    assert.equal(probes, 0)
+    releaseDownload()
+    await waitUntil(() => probes === 1)
+    const after = globalDeviceLock.tryAcquire('scan:after')
+    assert.ok(after, '打印结束后要放锁再探测')
+    after.release()
+    printing.stop()
+  } finally {
+    releaseDownload()
+    releaseHeld()
+    for (const runner of runners) runner.stop()
+    bindScanDevicePrintFinishedProbe(undefined)
+    __resetClaimRateLimitForTests()
+    __resetPrintDispatchGateForTests()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
   }
 }
 

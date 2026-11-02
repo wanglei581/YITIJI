@@ -40,6 +40,7 @@ import {
   listen,
   probeResult,
   pushScript,
+  verifyPrintClaimLock,
   type Harness,
 } from './verify-scan-device-runner.helper'
 
@@ -780,6 +781,7 @@ async function main(): Promise<void> {
     await check('删除审计上报', () => verifyReporter())
     await check('开关与装配', () => verifySwitchAndIndex(path.join(root, 'switch')))
     await check('投递带 origin', () => verifyDeliveryWire())
+    await check('打印领取持锁', () => verifyPrintClaimLock(db))
     console.log(`verify-scan-device-runner: ok（${passed.length} 组）`)
   } finally {
     __resetUnauthorizedForTests(true)

@@ -4,8 +4,9 @@
 
 - 做了：在 A1 底座上接配置开关（默认关）、current-lease 核对、调度、本机 HTTP、健康探测、心跳两个字段、删除审计原因码。开关不是 true 时不注册扫描路由、不探测、不清理残留、心跳不带新字段，删除审计仍只上报原来的原因码白名单之外会进死信。
 - 本机接口：`GET /local/scan/probe`，`POST /local/scan/start`、`/next-page`、`/finish`、`/abort`。不加 `GET /local/scan/status`：一体机每 3 秒看云端会话，每条本机命令的响应已经带 state、pageCount、errorCode。
-- 新门禁 `verify:scan-device-runner`（16 组，假执行器、假后端、假时钟），已进 ci.yml。
-- 没做：打印领取持锁（任务第 10 项）还没提交。没碰真机，没打安装包，没部署。B1 上生产前不得打开 `scanDeviceEnabled`。#1465 去留定下来之前，不往真机发新的终端程序安装包。
+- 新门禁 `verify:scan-device-runner`（17 组，假执行器、假后端、假时钟），已进 ci.yml。
+- 打印领取：开关打开时，领任务前试拿设备锁（`print-claim`），拿不到就跳过这一轮（日志每分钟最多一条）；拿到后一直持有到本轮 `executeTask` 结束再放，放锁之后才探测扫描仪。没领到任务立即放锁、不探测。开关关着时领取路径不碰这把锁。没改续打、重打判定，也没改 `print-job-monitor.ts`。
+- 没做：没碰真机，没打安装包，没部署。B1 上生产前不得打开 `scanDeviceEnabled`。#1465 去留定下来之前，不往真机发新的终端程序安装包。
 
 ## 2026-11-02：屏上扫描 ③ 终端程序第一批 A1——底座，不接线（分支 `claude/scan-device-a1-1102`，未合并、未部署）
 

@@ -23370,6 +23370,7 @@
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-scan-deletion-audit.ts",
       "apps/terminal-agent/scripts/verify-scan-device-engine.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner.ts",
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
@@ -23410,7 +23411,8 @@
     ],
     "apps/terminal-agent/src/agent/print-dispatch-gate.ts": [
       "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
-      "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
+      "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts"
     ],
     "apps/terminal-agent/src/agent/print-monitor-timeout.ts": [
       "apps/terminal-agent/scripts/verify-print-truth-hardening.ts"
@@ -23503,6 +23505,7 @@
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-print-truth-hardening.ts",
       "apps/terminal-agent/scripts/verify-printer-config.mjs",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
     "apps/terminal-agent/src/agent/types.ts": [
@@ -34514,12 +34517,15 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/terminal-agent/src/agent/db.ts",
           "apps/terminal-agent/src/agent/device-lock.ts",
+          "apps/terminal-agent/src/agent/print-dispatch-gate.ts",
           "apps/terminal-agent/src/agent/scan-device/scan-device-backend.ts",
           "apps/terminal-agent/src/agent/scan-device/scan-device-runner.ts",
           "apps/terminal-agent/src/agent/scan-device/wia-probe.ts",
           "apps/terminal-agent/src/agent/scan-device/wia-runner.ts",
           "apps/terminal-agent/src/agent/scan-device/wia-script.ts",
+          "apps/terminal-agent/src/agent/task-runner.ts",
           "apps/terminal-agent/src/agent/types.ts"
         ],
         "missing": []

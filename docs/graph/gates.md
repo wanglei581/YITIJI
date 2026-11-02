@@ -1273,7 +1273,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/src/agent/boot-print-queue-order.ts` | `verify-print-queue-residue.ts` |
 | `apps/terminal-agent/src/agent/claim-rate-limit.ts` | `verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/config-manager.ts` | `verify-agent-config-resilience.mjs`<br/>`verify-agent-unauthorized.mjs`<br/>`verify-print-queue-residue.ts`<br/>`verify-printer-config.mjs` |
-| `apps/terminal-agent/src/agent/db.ts` | `verify-print-retry-attempt.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-scan-device-engine.ts`<br/>`verify-scan-device-runner.ts`<br/>`verify-task-reliability.ts` |
+| `apps/terminal-agent/src/agent/db.ts` | `verify-print-retry-attempt.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-scan-device-engine.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-device-runner.ts`<br/>`verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/dead-letter-operator.ts` | `verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/device-lock.ts` | `verify-scan-device-engine.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-device-runner.ts` |
 | `apps/terminal-agent/src/agent/heartbeat.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-local-qr-proxy.ts`<br/>`verify-print-queue-residue.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-scan-device-runner.ts`<br/>`verify-scan-input-lockout-telemetry.ts` |
@@ -1282,7 +1282,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/src/agent/network-diagnostics.ts` | `verify-network-diagnostics.ts`<br/>`verify-print-queue-residue.ts` |
 | `apps/terminal-agent/src/agent/offline-queue.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-print-retry-attempt.ts`<br/>`verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/print-correlation.ts` | `verify-print-retry-attempt.ts` |
-| `apps/terminal-agent/src/agent/print-dispatch-gate.ts` | `verify-print-queue-residue-windows.ts`<br/>`verify-print-queue-residue.ts` |
+| `apps/terminal-agent/src/agent/print-dispatch-gate.ts` | `verify-print-queue-residue-windows.ts`<br/>`verify-print-queue-residue.ts`<br/>`verify-scan-device-runner.helper.ts` |
 | `apps/terminal-agent/src/agent/print-monitor-timeout.ts` | `verify-print-truth-hardening.ts` |
 | `apps/terminal-agent/src/agent/print-queue-hold.ts` | `verify-print-queue-residue-windows.ts`<br/>`verify-print-queue-residue.ts` |
 | `apps/terminal-agent/src/agent/print-task-temp-cleanup.ts` | `verify-print-scan-agent.mjs` |
@@ -1305,7 +1305,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/src/agent/scan-watcher.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-print-truth-hardening.ts`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-scan-device-engine.ts`<br/>`verify-scan-watcher.ts` |
 | `apps/terminal-agent/src/agent/startup-diagnostics.ts` | `verify-agent-config-resilience.mjs` |
 | `apps/terminal-agent/src/agent/task-runner-control.ts` | `verify-print-queue-residue.ts`<br/>`verify-task-runner-wake.ts` |
-| `apps/terminal-agent/src/agent/task-runner.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-print-monitor-truth.ts`<br/>`verify-print-queue-residue.ts`<br/>`verify-print-retry-attempt.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-print-truth-hardening.ts`<br/>`verify-printer-config.mjs`<br/>`verify-task-reliability.ts` |
+| `apps/terminal-agent/src/agent/task-runner.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-print-monitor-truth.ts`<br/>`verify-print-queue-residue.ts`<br/>`verify-print-retry-attempt.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-print-truth-hardening.ts`<br/>`verify-printer-config.mjs`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/types.ts` | `verify-local-print-wake.ts`<br/>`verify-local-qr-proxy.ts`<br/>`verify-print-retry-attempt.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-input-health.ts`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-scan-watcher.ts`<br/>`verify-task-reliability.ts`<br/>`verify-usb-import-agent.ts` |
 | `apps/terminal-agent/src/agent/wmi.ts` | `verify-print-monitor-truth.ts`<br/>`verify-print-queue-residue-windows.ts`<br/>`verify-print-queue-residue.ts`<br/>`verify-print-retry-attempt.ts` |
 | `apps/terminal-agent/src/agent/wql-literal.ts` | `verify-print-monitor-truth.ts`<br/>`verify-print-queue-residue.ts` |
