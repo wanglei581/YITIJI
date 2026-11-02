@@ -17016,7 +17016,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 896
+      "sourceFileCount": 897
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -45117,12 +45117,10 @@
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/assistant/assistant-cockpit-body.css",
         "kind": "style",
-        "mentions": [
-          "docs/progress/current-progress.md"
-        ],
-        "risk": "medium",
+        "mentions": [],
+        "risk": "low",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -45399,12 +45397,10 @@
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/home/components/HomeHeroHeader.tsx",
         "kind": "component",
-        "mentions": [
-          "docs/progress/current-progress.md"
-        ],
-        "risk": "medium",
+        "mentions": [],
+        "risk": "low",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -45789,6 +45785,15 @@
         "risk": "high",
         "scope": "kiosk",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/profile/assets/ui.tsx",
+        "kind": "component",
+        "mentions": [],
+        "risk": "low",
+        "scope": "kiosk",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

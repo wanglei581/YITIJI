@@ -1,19 +1,33 @@
 # 当前开发进度
 
-## 2026-11-02：删除 11 个全仓零引用的一体机旧文件（逐个举证；2 个保留）
+## 2026-11-02：本机清理——旧工作副本被成批挪走后的备份与恢复办法
+
+- 起因：22:43 另一个清理工具（WorkBuddy）把本机五处工作副本根目录（`~/.cache/claude-lanes`、本仓库 `.claude/worktrees`、`~/.codex/worktrees`、`~/.grok/worktrees`、另一项目的 `.claude/worktrees`）整个挪进废纸篓，随后对仓库执行了 `git worktree prune`。各窗口旧副本的 git 登记因此丢失（在里面跑 git 会报「不是仓库」）；`claude-lanes` 后来被放回原处，登记仍是断的。正在干活的窗口已各自重建并重新登记了自己的副本。
+- 保护（都在本机仓库里，没有推送 GitHub：里面有专利草稿等不能公开的内容）：
+  - `refs/backup/wt-20261102/<副本路径>`：被挪走时各副本的 HEAD，共 270 条。
+  - `refs/backup/wt-20261102-dirty/<副本路径>`：有未提交改动的副本的快照，父提交是当时的分支尖端或 HEAD；被挪走前后都逐个比对过，触屏版线用自己存的补丁核对一致。
+  - `refs/backup/wt-20261102-orphan/...`：早就和 git 断开的旧副本的整树快照（没有父提交）。
+  - `refs/backup/wt-20261102-dotwt*/...`：`.worktrees/` 下 8 月旧副本的 HEAD 与改动快照。
+  - `refs/backup/main-checkout-wip-20261102`：主目录 8 月以来的全部在制品；`refs/backup/stash-20261102/NN`：43 个暂存（最早是 8 月的，免得被 git 按期限自动过期）。
+- 取回：`git for-each-ref refs/backup | grep <副本名>` 找到引用；`git worktree add <新目录> <分支>` 后，用 `git diff <快照>^ <快照> | git apply` 放回未提交改动（整树快照用 `git checkout <快照> -- <路径>`）。
+- 主目录：已从 `codex/governance-safety-20260822`（落后主线 3011 个提交，还卡着 9/13 没做完的拣选）切回 `main`，旧分支保留；专利草稿等未跟踪、被忽略的文件原地保留，没有进仓库。
+- 已移除：`.worktrees/` 下 13 个干净的旧副本（`git worktree remove`，不加 --force）；触屏版线确认不再用的 51 个已断开副本挪进废纸篓。仍保留：各窗口在用并已重新登记的副本；`.worktrees/` 下 8 个有改动的旧副本（快照已做，删不删等产品负责人确认）；`touch-impl-1025` 顶层 13 个旧副本（等「触屏稿补稿收稿与审图」窗口确认）。
+
+## 2026-11-02：删除 10 个全仓零引用的一体机旧文件（逐个举证；3 个保留）
 
 - 范围：图谱 `docs/graph/orphans.md` low 档里点名的 13 个一体机文件。只 `git rm` 通过全部证据的。不改 CI / verify 门禁、合规闸门、硬件适配，也不动 `docs/design` 冻结稿。动态引用：全仓没有 `import.meta.glob` / `require.context`；kiosk 仅有的 `lazy(() => import(` 是打印页的 `DevSandboxControls`，匹配不到这 13 个。开着的 PR：`gh pr list` 128 个，逐个 `git fetch origin pull/<编号>/head` 后看 `git diff --name-only origin/main...<提交>`。图谱对这 13 个都报「没有任何门禁断言」。最后一次提交都早于 14 天（最近的是 `home-v6-footer.css` 的 `5d800c3020`，2026-10-06）。
-- 删除 11 个：
+- 删除 10 个：
   - `apps/kiosk/src/pages/home/components/V6HomeFooterPanels.tsx`：`git grep V6HomeFooterPanels` 只命中自身；128 个 PR 都没改它。最后提交 `5cb74bc6c1`（2026-08-16）。
   - `apps/kiosk/src/pages/home/prototypeIcons.tsx`：文件名零命中。导出的 `ProtoIcon` 只出现在 2026-07-24 计划稿的示例 JSX 里，没有 import。最后提交 `5883c8c4ea`（2026-07-21）。
-  - `apps/kiosk/src/pages/profile/assets/ui.tsx`：`profile/assets/ui`、`assets/ui`、`from './ui'` 零命中；`RowIconButton` 无调用。同目录 `format.ts` 等其它文件仍在用，没动。最后提交 `6824100759`（2026-07-03）。
   - `apps/kiosk/src/pages/scan/ScanFlowSteps.tsx`：没有 import。本文件 2026-07-25 的更新记录里有一句历史叙述提到组件名，不是路径也不是 import；现行扫描页不引用它。最后提交 `5843cafa8f`（2026-07-25）。
   - `apps/kiosk/src/services/api/smartCampus.ts`、`smartCampusHttpAdapter.ts`、`smartCampusMockAdapter.ts`：三者只互相引用，kiosk 里没有人 import 这个模块。现行智慧校园走 `useSmartCampusConfig` → `getKioskTerminalConfig`；`verify-terminal-device-config.ts` 禁止钩子回退 `getSmartCampusConfig(`。不是停放件：停放清单里的智慧校园页是迎新洞察页，不是这三个旧的按功能客户端；也没有文档把它们列为校园招聘或私有化部署 b 要保留的源码。最后提交 `bcb24062a9`（2026-07-29）、`6f0d38397c`（2026-08-19）、`109c7c7cb8`（2026-07-01）。
   - `apps/kiosk/src/pages/home/styles/home-v6-footer.css`、`apps/kiosk/src/pages/resume/job-fit-actions.css`、`jobFit-inkpaper-ext.css`、`resume-library-ext.css`：路径零命中，没有 `@import`。岗位行动页实际引入的是 `job-fit-qx.css` 与 `resume-decision-qx.css`。
-- 保留 2 个：
-  - `apps/kiosk/src/pages/home/components/HomeHeroHeader.tsx`：`QxHomeView.tsx` 第 35 行 import 并渲染，删了类型检查会断。开着的 PR #1528、#1521、#1511 都在改它（同一提交 `1cc7937f28`）。图谱把它标成 low 是漏报：import 没写 `.tsx`，提及索引对不上。
-  - `apps/kiosk/src/pages/assistant/assistant-cockpit-body.css`：开着的 PR #1383 仍在改它（`afe050b0f3` 删了 9 行）。现行顾问页 import 的是 `assistant-qingxu.css` 与 `assistant-touch.css`，没有引入这份样式；按「开着的 PR 改过就保留」。
-- 校验：`CI=true pnpm install --frozen-lockfile --prefer-offline` 通过（812 包，锁文件未改）。`pnpm --filter kiosk typecheck` 通过。`pnpm --filter kiosk lint` 通过（0 error，27 条原有 warning，都不在被删文件上）。不带环境变量的 `pnpm --filter kiosk build` 被生产闸门拒绝（`VITE_API_MODE` 未设置）；按 `ci.yml` 同一组变量（`VITE_API_MODE=http`、`VITE_API_BASE_URL=/api/v1`、`VITE_USE_TRTC_CALL=true`、`VITE_TERMINAL_ID=KSK-001`、桥接令牌）再跑，`tsc -b && vite build` 通过（3150 个模块）。图谱重新生成后 `--check` 通过。low 从 96 变为 83：11 个是删掉的，另外 2 个是上面保留的文件被本条点名后从 low 升到 medium。
+- 保留 3 个（这里故意不写文件名，免得进度文档的点名把它们在图谱里从 low 改判成 medium）：
+  - 首页头部组件：被 `QxHomeView.tsx` 第 35 行 import（`QxHomeView` 本身也已不在入口引用链里，图谱列在 medium），单删它会让类型检查断；开着的 PR #1528、#1521、#1511 也在改它，所以这次不动。图谱把它放进 low 而不是「被其它文件提及」，是因为提及索引不认不带扩展名的 import（属脚本问题，已记入 next-tasks）。
+  - 「我的」页资源目录里一个只导出图标按钮、全仓无人调用的旧小组件：本可删，但「我的」页范围门禁 `verify-profile-inkpaper-home` 不允许本 PR 改动该目录（删除也算改动），按「不为迁就改动放宽门禁」留到下次动「我的」页时一起删。
+  - 顾问页一份旧的「驾驶舱正文」样式：现行顾问页没有引入它，但开着的 PR #1383 仍在改它，按「开着的 PR 改过就保留」。
+- 校验：`CI=true pnpm install --frozen-lockfile --prefer-offline` 通过（812 包，锁文件未改）。`pnpm --filter kiosk typecheck` 通过。`pnpm --filter kiosk lint` 通过（0 error，27 条原有 warning，都不在被删文件上）。不带环境变量的 `pnpm --filter kiosk build` 被生产闸门拒绝（`VITE_API_MODE` 未设置）；按 `ci.yml` 同一组变量（`VITE_API_MODE=http`、`VITE_API_BASE_URL=/api/v1`、`VITE_USE_TRTC_CALL=true`、`VITE_TERMINAL_ID=KSK-001`、桥接令牌）再跑，`tsc -b && vite build` 通过（3150 个模块）。图谱重新生成后 `--check` 通过，low 从 96 变为 86（正好是删掉的 10 个），medium 仍是 30。
+- 复核：Claude 收货时用 `gh pr list --json files` 核对 131 个开着的 PR（文件超过 100 个的 #1511、#1490、#1487、#1485 另用 `gh pr diff --name-only` 补查），都没有改动原定删除的 11 个文件；Codex 只读复核了同一提交。
 
 ## 2026-11-02：本人数据导出不再把编号当手机号打码（顺带消除上传会话门禁约 1% 的偶发红）
 
