@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { PublicKioskProfile } from '@ai-job-print/shared'
 import { useKioskProfile } from './api/kioskProfile'
 import {
-  recheckTerminalSessionAfterLicensePause, subscribeTerminalLicenseRenewalRejected,
+  recheckTerminalSessionAfterLicensePause, setLicenseRenewalSuspended, subscribeTerminalLicenseRenewalRejected,
   subscribeTerminalSession, terminalSessionState, wasTerminalLicenseRenewalRejected,
   type TerminalSessionState,
 } from './terminalAuth'
@@ -17,6 +17,19 @@ export interface KioskLicenseGateInput {
   useEnded: boolean
 }
 export const INITIAL_KIOSK_LICENSE_GATE: KioskLicenseGate = { mode: 'normal', endsAt: null, notice: null }
+const PAUSED_STORAGE_KEY = 'kiosk_license_paused_v1'
+
+export function loadInitialLicenseGate(): KioskLicenseGate {
+  try { if (window.localStorage.getItem(PAUSED_STORAGE_KEY) === '1') return { ...INITIAL_KIOSK_LICENSE_GATE, mode: 'paused' } } catch { /* storage unavailable */ }
+  return INITIAL_KIOSK_LICENSE_GATE
+}
+
+export function persistLicenseGate(gate: KioskLicenseGate, profile: PublicKioskProfile | null): void {
+  try {
+    if (gate.mode === 'paused') window.localStorage.setItem(PAUSED_STORAGE_KEY, '1')
+    else if (profile && profile.licenseState !== null && profile.acceptsNewSessions) window.localStorage.removeItem(PAUSED_STORAGE_KEY)
+  } catch { /* storage unavailable */ }
+}
 
 /** profile 只传新收到的响应；null 表示没有新证据。 */
 export function decideKioskLicenseGate(previous: KioskLicenseGate, input: KioskLicenseGateInput): KioskLicenseGate {
@@ -35,7 +48,7 @@ export function decideKioskLicenseGate(previous: KioskLicenseGate, input: KioskL
   }
   if (next.mode === 'winding-down') {
     const deadline = next.endsAt === null ? NaN : Date.parse(next.endsAt)
-    if (useEnded || sessionState === 'failed' || (Number.isFinite(deadline) && now >= deadline)) {
+    if (useEnded || (sessionState === 'failed' && rejected) || (Number.isFinite(deadline) && now >= deadline)) {
       next = { ...next, mode: 'paused' }
     }
   }
@@ -59,6 +72,7 @@ export function createLicenseRecheckTimer(
     timer = clock.set(() => {
       timer = null
       if (!active) return
+      if (lastAttempt !== null && clock.now() < lastAttempt + LICENSE_RECHECK_INTERVAL_MS) { schedule(); return }
       lastAttempt = clock.now()
       inFlight = true
       void recheck().catch(() => undefined).finally(() => { inFlight = false; schedule() })
@@ -71,9 +85,25 @@ export function createLicenseRecheckTimer(
 }
 
 let recheckEndsAt: string | null = null
+let recheckSessionState: TerminalSessionState = 'checking'
+export function licenseCredentialExpired(endsAt: string | null, sessionState: TerminalSessionState, now: number): boolean {
+  const deadline = endsAt === null ? NaN : Date.parse(endsAt)
+  return sessionState === 'failed' || !Number.isFinite(deadline) || now >= deadline
+}
+export function scheduleLicenseDeadline(deadline: number, onDeadline: () => void, clock: {
+  now: () => number; set: (fn: () => void, delay: number) => ReturnType<typeof setTimeout>; clear: (id: ReturnType<typeof setTimeout>) => void
+}): () => void {
+  let timer: ReturnType<typeof setTimeout>
+  const check = () => {
+    const remaining = deadline - clock.now()
+    if (remaining > 0) timer = clock.set(check, remaining + 50)
+    else onDeadline()
+  }
+  timer = clock.set(check, Math.max(0, deadline - clock.now()))
+  return () => clock.clear(timer)
+}
 const recheckTimer = createLicenseRecheckTimer(() => {
-  const deadline = recheckEndsAt === null ? NaN : Date.parse(recheckEndsAt)
-  return recheckTerminalSessionAfterLicensePause({ credentialExpired: Number.isFinite(deadline) && Date.now() >= deadline })
+  return recheckTerminalSessionAfterLicensePause({ credentialExpired: licenseCredentialExpired(recheckEndsAt, recheckSessionState, Date.now()) })
 }, {
   now: () => Date.now(), set: (fn, delay) => setTimeout(fn, delay), clear: (id) => clearTimeout(id),
 })
@@ -83,23 +113,25 @@ export function useKioskLicenseGate(useEnded: boolean): KioskLicenseGate {
   const profile = useKioskProfile()
   const sessionState = useSyncExternalStore(subscribeTerminalSession, terminalSessionState, terminalSessionState)
   const rejected = useSyncExternalStore(subscribeTerminalLicenseRenewalRejected, wasTerminalLicenseRenewalRejected, wasTerminalLicenseRenewalRejected)
-  const [gate, setGate] = useState(INITIAL_KIOSK_LICENSE_GATE)
+  const [gate, setGate] = useState(loadInitialLicenseGate)
   const [now, setNow] = useState(() => Date.now())
   const seenProfile = useRef<PublicKioskProfile | null>(null)
-  const seenRejection = useRef(false)
   const needsRecheck = gate.mode !== 'normal'
 
-  useEffect(() => { recheckEndsAt = gate.endsAt }, [gate.endsAt])
+  useEffect(() => { recheckEndsAt = gate.endsAt; recheckSessionState = sessionState }, [gate.endsAt, sessionState])
 
   useEffect(() => {
     const freshProfile = seenProfile.current === profile ? null : profile
     seenProfile.current = profile
-    const newRejection = rejected && !seenRejection.current
-    seenRejection.current = rejected
-    setGate((previous) => decideKioskLicenseGate(previous, { profile: freshProfile, rejected: newRejection, now: Date.now(), sessionState, useEnded }))
+    setGate((previous) => {
+      const next = decideKioskLicenseGate(previous, { profile: freshProfile, rejected, now: Date.now(), sessionState, useEnded })
+      persistLicenseGate(next, freshProfile)
+      return next
+    })
   }, [profile, rejected, sessionState, useEnded, now])
 
   useEffect(() => {
+    setLicenseRenewalSuspended(needsRecheck)
     if (!needsRecheck) return
     recheckTimer.start()
     return () => recheckTimer.stop()
@@ -109,8 +141,9 @@ export function useKioskLicenseGate(useEnded: boolean): KioskLicenseGate {
     if (gate.mode !== 'winding-down' || gate.endsAt === null) return
     const deadline = Date.parse(gate.endsAt)
     if (!Number.isFinite(deadline)) return
-    const timer = setTimeout(() => setNow(Date.now()), Math.max(0, deadline - Date.now()))
-    return () => clearTimeout(timer)
+    return scheduleLicenseDeadline(deadline, () => setNow(Date.now()), {
+      now: () => Date.now(), set: (fn, delay) => setTimeout(fn, delay), clear: (id) => clearTimeout(id),
+    })
   }, [gate.mode, gate.endsAt])
   return gate
 }

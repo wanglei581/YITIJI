@@ -11,6 +11,7 @@ const DEFAULT_PROFILE: PublicKioskProfile = {
 }
 let profile = DEFAULT_PROFILE
 let generation = 0
+let refreshInflight: Promise<PublicKioskProfile> | null = null
 const listeners = new Set<() => void>()
 
 export function getKioskProfile(): PublicKioskProfile { return profile }
@@ -56,7 +57,15 @@ function parseProfile(body: unknown): PublicKioskProfile | null {
 }
 
 /** 强制重新读取；失败保留当前终端上一次成功的结果。 */
-export async function refreshKioskProfile(): Promise<PublicKioskProfile> {
+export function refreshKioskProfile(): Promise<PublicKioskProfile> {
+  if (refreshInflight) return refreshInflight
+  const request = refreshKioskProfileOnce()
+  refreshInflight = request.finally(() => { if (refreshInflight === shared) refreshInflight = null })
+  const shared = refreshInflight
+  return shared
+}
+
+async function refreshKioskProfileOnce(): Promise<PublicKioskProfile> {
   const requestGeneration = ++generation
   const terminalId = getTerminalId()
   let token: string | null = null
@@ -85,6 +94,7 @@ export function startKioskProfileKeeper(): () => void {
     if (next === terminalId) return
     terminalId = next
     generation++
+    refreshInflight = null
     publish(DEFAULT_PROFILE)
     void refreshKioskProfile()
   })
