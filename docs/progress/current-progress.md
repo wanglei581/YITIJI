@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-11-02：依赖安全——follow-redirects 1.16.1 → 1.16.2（单独先进 main，解开全仓 CI）
+
+- 原因：10/30 收录的高危公告 GHSA-mrwp-f3q8-3g9p（跨 realm 的敏感请求头数组被丢弃、自定义凭据可随重定向带出）打中仓库钉住的 follow-redirects 1.16.1，修复版 1.16.2；main 上所有 PR 的 build-and-verify 都红在「Dependency security gate」。
+- 改动：只拣触屏线的修复提交 8d0b2f9e9（在 #1525 发布准备线上）里的 `pnpm-workspace.yaml` 钉子与 `pnpm-lock.yaml`；不带该线的其它内容。#1525 以后合进来是同一份改动。
+- 验证：`pnpm install --frozen-lockfile` 通过；`node scripts/verify-dependency-security.mjs` 全部 OK（full tree 与 --prod 的未接受高危 / 严重均为 0）。
+
 ## 2026-10-29（二轮）：贴牌与授权管理后端第一步——第二轮审查返工（#1511，未合并、未部署）
 
 - 背景：Codex 第二轮复核仍判「先别合」（四项必须改、四项建议改），逐条对着代码核实后全部属实，已改完；边界不变（贴牌只换展示；授权只按期限与台数；界面不在本 PR）。
@@ -21,6 +27,7 @@
 - 机构品牌覆盖的 org.update 审计记品牌名 / 字标 / Logo 的改前改后（事务内锁机构后读 before）。kiosk-profile 限流：验签通过才按终端号计数，未验签按 IP（伪造终端号拆不了桶）；共享的 TerminalScopedThrottle 在别的公开路由上有同样问题，只记后续、没改共享限流器。机构后台写拦截：豁免改成逐 (方法, 路由, 处理函数) 登记 11 条，去掉 /partner/first-order/* 前缀通配。
 - 门禁：verify:license 拆成四份（状态与契约 / 管理员接口 / 写操作语义 / 管控点与告警，共用 scripts/support/license-harness.ts）；迁移门禁按当前迁移链建旧库，不再钉死某个 main 提交；CI 红的四处一并修好——隔离库（internal-auth-verify-harness）改为应用真实迁移并加对表守卫、multipart 契约登记 Logo 上传（13 处）、首单迁移门禁与托管开关声明。每处改动都做过反向检查（先提交、故意改坏、看红行、复原）。
 - 未做：界面全部不做；一体机对新契约的处理在一体机线；小程序不动；未部署、真机未验。
+
 ## 2026-10-29：一体机共享模块的「找 / 联系现场工作人员」说法换成无人值守标准句，加只减不增门禁（分支 `claude/kiosk-unattended-shared-copy`）
 
 - 依据：产品负责人定「一体机在政府就业服务大厅等场所无人值守，现场没有工作人员；任何错误分支都不许出现联系 / 找（现场）工作人员，需要求助时只给服务电话或站内出路」。标准句与禁用说法在 `apps/kiosk/src/copy/unattendedCopy.ts`（10/6 先行合入），本包只换页面目录（`src/pages/`）以外的共享模块；页面目录正被触屏版各页面包整页重写，不在这里改，免得和它们冲突。
