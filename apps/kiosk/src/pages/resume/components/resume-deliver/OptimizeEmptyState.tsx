@@ -20,8 +20,10 @@ export function OptimizeEmptyState(props: {
   onReport: () => void
   onManualEdit: () => void
   onMyResumes: () => void
+  /** 授权收尾中、从记录页只读打开时，「手动逐项修改」会开始另一件事，停用。 */
+  manualLocked?: boolean
 }) {
-  const exits: Array<{ title: string; description: string; take: string; icon: QxTouchIconName; route: string; testId: string; action: () => void }> = [
+  const exits: Array<{ title: string; description: string; take: string; icon: QxTouchIconName; route: string; testId: string; action: () => void; locked?: boolean }> = [
     {
       title: '返回诊断报告',
       description: '看清楚要改哪几处，再决定怎么改',
@@ -42,6 +44,7 @@ export function OptimizeEmptyState(props: {
       route: '/resume/generate',
       testId: 'resume-optimize-empty-manual',
       action: props.onManualEdit,
+      locked: props.manualLocked,
     },
     {
       title: '打开我的简历',
@@ -72,6 +75,7 @@ export function OptimizeEmptyState(props: {
             route={exit.route}
             index={index}
             onClick={exit.action}
+            disabled={exit.locked === true}
           />
         ))}
       </div>

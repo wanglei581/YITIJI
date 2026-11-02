@@ -1,3 +1,6 @@
+import { useKioskLicense, useWindDownViewOnly } from '../../layouts/KioskLicenseContext'
+import { LicenseLock } from '../../layouts/LicenseLock'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { ResumeParseResponse, ResumeReport, ResumeTargetContext } from '@ai-job-print/shared'
@@ -35,6 +38,7 @@ import './resume-report-qx.css'
 import './resume-r1-qx2.css'
 
 interface ReportState {
+  licenseViewOnly?: boolean
   intent?: string
   source?: string
   file?: { name: string; size: string; format: string; fileUrl?: string; mimeType?: string }
@@ -107,6 +111,9 @@ export function ResumeReportPage() {
   const { getToken } = useAuth()
   const supportPhone = useSupportContact().servicePhone?.trim() ?? ''
   const routeState = (location.state ?? {}) as ReportState
+  const windDownViewOnly = useWindDownViewOnly('resume')
+  const licenseFlagViewOnly = useKioskLicense().mode === 'winding-down' && routeState.licenseViewOnly === true
+  const viewOnly = windDownViewOnly || licenseFlagViewOnly
   // 读回的失败记录带着「能力级停用」码（暂停 / 当日额度到了 / 未配置）：并进 state.aiDown，失败屏按小青停用那一屏画，
   // 不画「能力未接通」。失败屏只认 state.aiDown，所以从路由带来的和读回发现的是同一个口子。
   const [recoveredAiDown, setRecoveredAiDown] = useState(false)
@@ -341,8 +348,8 @@ export function ResumeReportPage() {
       status={statusState}
       railNow={REPORT_HEAD[viewState].rail}
       seal={hasBody ? 'idle' : null}
-      ask={(state.aiDown || outage) ? { label: '小青暂时不可用，先自己核一遍', disabled: true } : { label: '问小青：先改哪几处', draft: '请帮我理解这份简历诊断报告，先让我提供想问的内容，再解释修改顺序，不添加我没有提供的事实。' }}
-      primary={dockPrimary}
+      ask={(viewOnly || state.aiDown || outage) ? { label: '小青暂时不可用，先自己核一遍', disabled: true } : { label: '问小青：先改哪几处', draft: '请帮我理解这份简历诊断报告，先让我提供想问的内容，再解释修改顺序，不添加我没有提供的事实。' }}
+      primary={viewOnly && viewState !== 'read-error' ? { ...dockPrimary, disabled: true, title: LICENSE_NO_NEW_TASK_REASON } : dockPrimary}
       bodyClassName="qxt-body-scroll"
     >
       <section
@@ -355,6 +362,7 @@ export function ResumeReportPage() {
         data-fallback={parsed.fallback ? '1' : undefined}
         data-flat={parsed.flat ? '1' : undefined}
       >
+        {viewOnly ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : null}
         {isFixture ? (
           <div className="rrp-idbar" data-testid="resume-report-fixture">
             <span className="rrp-fx">合成演示</span>
@@ -366,17 +374,17 @@ export function ResumeReportPage() {
             <ReportNoticePanel isDemoReport={isDemoReport} extractionNotice={extractionNotice} truncated={displayReport?.truncatedInput} />
             {summary ? <p className="rrp-dir" data-testid="resume-report-target">目标方向 {summary}</p> : null}
             {displayReport ? <ResumeReportBody report={displayReport} issues={displayIssues} /> : null}
-            <ResumeReportTakeaway
+            {viewOnly ? <LicenseLock><ResumeReportTakeaway
               key={viewState}
               show
               taskId={taskId}
               accessToken={accessToken}
               capture={isExportCaptureState(viewState) ? viewState : null}
               onExportedChange={setExportedNow}
-            />
+            /></LicenseLock> : <ResumeReportTakeaway key={viewState} show taskId={taskId} accessToken={accessToken} capture={isExportCaptureState(viewState) ? viewState : null} onExportedChange={setExportedNow} />}
             <div className="qxt-links">
-              <button type="button" data-route="/resume/job-fit" onClick={() => navigate('/resume/job-fit', { state: { taskId, accessToken } })}>简历对照</button>
-              <button type="button" onClick={() => navigate('/resume/self-assessment/intro')}>自我探索</button>
+              <button type="button" disabled={viewOnly} title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined} data-route="/resume/job-fit" onClick={() => navigate('/resume/job-fit', { state: { taskId, accessToken } })}>简历对照</button>
+              <button type="button" disabled={viewOnly} title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={() => navigate('/resume/self-assessment/intro')}>自我探索</button>
             </div>
             <p className="qxt-fine" id="resume-report-why">{why}</p>
           </>

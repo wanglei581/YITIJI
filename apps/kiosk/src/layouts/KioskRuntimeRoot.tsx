@@ -4,6 +4,7 @@ import { useAuth } from '../auth/useAuth'
 import { refreshKioskProfile, startKioskProfileKeeper } from '../services/api/kioskProfile'
 import { AiDeclarationHost } from '../ai/AiDeclarationHost'
 import { KioskPrivacyGuard } from '../auth/KioskPrivacyGuard'
+import { useKioskSessionControl } from '../auth/KioskSessionControlContext'
 import { KioskBusyProvider } from '../contexts/KioskBusyContext'
 import { KioskHidScanGuard } from '../components/hid-guard/KioskHidScanGuard'
 import { useContentUpdate } from '../hooks/useContentUpdate'
@@ -11,6 +12,10 @@ import { startSupportContactKeeper } from '../services/api/supportContact'
 import { KioskLicenseProvider, useKioskLicense } from './KioskLicenseContext'
 import { LicenseWindDownPrompt } from './LicenseWindDownPrompt'
 import { KioskPausedScreen } from '../components/KioskPausedScreen'
+import { WindDownBlockedScreen } from './WindDownBlockedScreen'
+import { windDownAllows, windDownRoute } from './licenseWindDownRoutes'
+import { usePrintHandoffOwner } from '../pages/print/usePrintHandoff'
+import { readPrintHandoffService } from '../pages/print/printHandoff'
 
 function ContentUpdateGuard() {
   useContentUpdate()
@@ -41,14 +46,21 @@ function SupportContactGuard() {
 }
 
 function LicensedOutlet() {
-  const { mode, notice } = useKioskLicense()
+  const { mode, windDownService } = useKioskLicense()
+  const { pathname, search } = useLocation()
+  const owner = usePrintHandoffOwner()
   const navigate = useNavigate()
+  const { endKioskUse } = useKioskSessionControl()
   const previousMode = useRef(mode)
   useEffect(() => {
+    if (previousMode.current !== 'paused' && mode === 'paused') endKioskUse('end_use')
     if (previousMode.current === 'paused' && mode === 'normal') navigate('/', { replace: true })
     previousMode.current = mode
-  }, [mode, navigate])
-  return mode === 'paused' ? <KioskPausedScreen notice={notice} /> : <Outlet />
+  }, [mode, navigate, endKioskUse])
+  if (mode === 'paused') return <KioskPausedScreen />
+  const handoffService = mode === 'winding-down' && windDownRoute(pathname)?.service === 'print' ? readPrintHandoffService(owner) : null
+  if (mode === 'winding-down' && !windDownAllows(pathname, windDownService, search, handoffService)) return <WindDownBlockedScreen />
+  return <Outlet />
 }
 
 /**

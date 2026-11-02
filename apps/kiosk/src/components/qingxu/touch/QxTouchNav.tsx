@@ -29,7 +29,7 @@ export function QxTouchNav({
         <QxTouchIcon name="sparkle" size={36} strokeWidth={2} />
         <span>AI 顾问</span>
       </button>
-      <button type="button" className={current === 'profile' ? 'qxt-on' : undefined} data-route="/profile" aria-disabled={winding || undefined} onClick={() => { if (!winding) onProfile() }} aria-current={current === 'profile' ? 'page' : undefined} data-testid={testIds?.profile}>
+      <button type="button" className={current === 'profile' ? 'qxt-on' : undefined} data-route="/profile" onClick={onProfile} aria-current={current === 'profile' ? 'page' : undefined} data-testid={testIds?.profile}>
         <QxTouchIcon name="user" size={36} strokeWidth={2} />
         <span>我的</span>
       </button>

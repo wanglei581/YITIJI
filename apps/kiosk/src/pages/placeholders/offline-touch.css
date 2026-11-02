@@ -36,3 +36,21 @@
 @media (prefers-reduced-motion: reduce) {
   .qxt-screen[data-qx-page='offline'] * { transition: none; }
 }
+
+/* 收尾拦截屏没有八行状态，说明下只有三张去处卡。
+   of-row 按八行清单定高，三行撑不满 1080×1920；of-machine 是给机器插画吸收余高的，这里没有可读的机器读数，不拿插画填空。
+   三张卡分掉余高。只挂在本屏，机器状态页的行高不变。 */
+[data-kiosk-screen='license-wind-down-blocked'] .of-page > .of-actions {
+  flex-grow: 1;
+  flex-basis: 0;
+  min-height: 0;
+}
+[data-kiosk-screen='license-wind-down-blocked'] .of-actions > li {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+}
+[data-kiosk-screen='license-wind-down-blocked'] .of-actions > li > .qxp-hit {
+  flex: 1 1 auto;
+  min-height: 78px;
+}

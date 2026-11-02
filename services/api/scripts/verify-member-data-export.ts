@@ -20,6 +20,9 @@ import { MEMBER_EXPORT_JOB } from '../src/member-privacy/member-privacy.queue'
 
 const FORBIDDEN_KEYS = /phoneEnc|phoneHash|contactPhoneEnc|storageKey|objectKey|\bbucket\b|\bregion\b|sha256|accessToken|verificationCode|payloadJson|itemsJson|turnContent|transcript|auditRef|prompt|output/i
 const PHONE_LIKE = /1[3-9]\d{9}/
+// 编号类字段原样导出（编号不是手机号，打码会把它打坏），不做手机号扫描。按导出里实际有的编号字段逐个列：
+// 导出新加编号字段要在这里显式登记，没登记的字段一律按自由文本扫。
+const IDENTIFIER_KEYS = new Set(['id', 'taskId', 'targetId', 'jobId', 'externalId', 'orderNo', 'requestId'])
 
 type WalkVisitor = (key: string, value: unknown) => void
 
@@ -39,7 +42,9 @@ export function walkExport(value: unknown, visitor: WalkVisitor, key = '$'): voi
 export function assertNoSensitiveExportData(exported: unknown): void {
   walkExport(exported, (key, value) => {
     assert.doesNotMatch(key, FORBIDDEN_KEYS, `导出包包含禁止字段: ${key}`)
-    if (typeof value === 'string') assert.doesNotMatch(value, PHONE_LIKE, '导出包包含疑似明文手机号')
+    if (typeof value === 'string' && !IDENTIFIER_KEYS.has(key)) {
+      assert.doesNotMatch(value, PHONE_LIKE, `导出包字段 ${key} 包含疑似明文手机号`)
+    }
   })
 }
 
@@ -363,6 +368,41 @@ async function verifyWhitelistEnvelope(): Promise<void> {
   }
 }
 
+// 编号不是手机号。文件编号是 32 位十六进制，约 0.9% 碰巧含「1[3-9]」开头的 11 位数字串；修复前导出对所有字符串打码，
+// 这种编号会被打成 139****5678 的样子，导出里的编号对不上「我的文档」（上传会话门禁 h 用例因此约 1% 偶发红）。
+// 这里人为造出一定会命中的编号，确定地钉住：编号原样导出，自由文本里的手机号照旧打码（前 3 位 + **** + 后 4 位）。
+async function verifyIdentifiersExportedVerbatim(): Promise<void> {
+  const store = dualUserFixtures()
+  const patch = (model: string, id: string, fields: Record<string, unknown>): void => {
+    const row = store[model]?.find((candidate) => candidate.id === id)
+    assert.ok(row, `夹具缺 ${model} ${id}`)
+    Object.assign(row, fields)
+  }
+  patch('fileObject', 'file-one', { id: 'a1b2c13912345678d9e8f7a6b5c4d3e2', filename: '王晓雯-简历-13800138000.pdf' })
+  // 自我探索的任务编号：sa- 加 24 位十六进制。
+  patch('aiResumeResult', 'resume-one', { taskId: 'sa-7f3e15812345678c0d9b2a41', kind: 'self_assessment' })
+  // 订单号现行格式 ORD-年月日-10 位十六进制凑不出 11 位连续数字；这里用纯数字订单号钉住「订单号是编号」。
+  patch('order', 'order-one', { orderNo: '202611021391234567890' })
+  patch('jobApplication', 'application-one', { note: '面试官电话 13712345678，周三下午两点到' })
+  store['browseLog'] = [{
+    id: 'browse-one', endUserId: 'member-one', createdAt: date(6), expiresAt: date(20),
+    targetType: 'job', targetId: 'job-one', targetTitle: '行政专员（联系人电话 13912345678）',
+    sourceName: '市公共招聘网', externalId: '1856234567890123456',
+  }]
+  const { mapper } = mapperHarness(store)
+  const envelope = await mapper.build({ endUserId: 'member-one', requestId: 'request-one', generatedAt: date(17) })
+  const { files, aiRecords, printOrders, jobApplications, activity, notifications } = envelope.sections
+  assert.equal(files[0]?.['id'], 'a1b2c13912345678d9e8f7a6b5c4d3e2', '文件编号必须原样导出')
+  assert.equal(files[0]?.['filename'], '王晓雯-简历-138****8000.pdf', '文件名里的手机号照旧打码')
+  assert.equal(aiRecords.resumeResults[0]?.['taskId'], 'sa-7f3e15812345678c0d9b2a41', 'AI 任务编号必须原样导出')
+  assert.equal(printOrders[0]?.['orderNo'], '202611021391234567890', '订单号必须原样导出')
+  assert.equal(activity.browsing[0]?.['externalId'], '1856234567890123456', '来源平台编号必须原样导出')
+  assert.equal(activity.browsing[0]?.['targetTitle'], '行政专员（联系人电话 139****5678）', '标题里的手机号照旧打码')
+  assert.equal(jobApplications[0]?.['note'], '面试官电话 137****5678，周三下午两点到', '备注里的手机号照旧打码')
+  assert.equal(notifications[0]?.['content'], '导出已受理，旧联系方式 139****0000', '通知正文里的手机号照旧打码')
+  assertNoSensitiveExportData(envelope)
+}
+
 async function verifyLimits(): Promise<void> {
   const store = dualUserFixtures()
   store['fileObject'] = Array.from({ length: MEMBER_EXPORT_SECTION_ROW_LIMIT + 1 }, (_, index) => ({
@@ -471,6 +511,7 @@ async function verifyReadyCasOrphanCompensation(): Promise<void> {
 const RUNTIME_MATRIX = [
   ['双用户数据隔离', verifyDualUserIsolation],
   ['白名单 envelope 与递归敏感扫描', verifyWhitelistEnvelope],
+  ['编号原样导出、自由文本手机号照旧打码', verifyIdentifiersExportedVerbatim],
   ['分区行数与总字节上限', verifyLimits],
   ['processor 幂等、CAS 与 handling 租约', verifyProcessorCasAndLease],
   ['ready CAS 失败后的 orphan 补偿', verifyReadyCasOrphanCompensation],
@@ -480,6 +521,8 @@ async function main(): Promise<void> {
   assert.doesNotThrow(() => assertNoSensitiveExportData({ schemaVersion: MEMBER_EXPORT_SCHEMA_VERSION, sections: {} }))
   assert.throws(() => assertNoSensitiveExportData({ storageKey: 'forbidden' }))
   assert.throws(() => assertNoSensitiveExportData({ value: '13900000000' }))
+  assert.throws(() => assertNoSensitiveExportData({ filename: '王晓雯-简历-13800138000.pdf' }))
+  assert.doesNotThrow(() => assertNoSensitiveExportData({ id: 'a1b2c13912345678d9e8f7a6b5c4d3e2' }))
   console.log('PASS 递归敏感扫描器原语')
 
   let failures = 0

@@ -465,3 +465,27 @@ test('pickup completed receipt shows real summary and directs reorders to phone 
   await expect(page.getByTestId('print-fulfill-reprint')).toHaveCount(0)
   await expect(page.getByText('要再打一份请在手机上重新下单', { exact: true })).toBeVisible()
 })
+
+
+test('游客完成页首屏显示提示和订单记录，不被底栏遮住 @kiosk', async ({ page, api }) => {
+  await page.setViewportSize({ width: 1080, height: 1920 })
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, { status: 200, json: { taskId: TASK_ID, status: 'completed' } })
+  await openDoneWithState(page, { ...taskState, orderNo: 'ORD-20261102-A7A1F567E5', hasEndUser: false })
+  const record = page.locator('summary', { hasText: '本次打印记录' })
+  await expect(record).toBeVisible()
+  const dock = page.locator('.qxt-dock')
+  const recordBox = await record.boundingBox()
+  const hintBox = await page.getByText('不再点屏幕，60 秒后结束本次使用', { exact: false }).boundingBox()
+  const dockBox = await dock.boundingBox()
+  expect(recordBox!.y + recordBox!.height).toBeLessThanOrEqual(dockBox!.y)
+  expect(hintBox!.y + hintBox!.height).toBeLessThanOrEqual(dockBox!.y)
+})
+
+test('游客状态未知时保留订单号和查询提示 @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  api.abort('GET', `/api/v1/print/jobs/${TASK_ID}`, 'internetdisconnected')
+  await openDoneWithState(page, { ...taskState, orderNo: 'ORD-20261102-A7A1F567E5', hasEndUser: false })
+  await expect(page.getByText('订单号是 ORD-20261102-A7A1F567E5')).toBeVisible()
+  await expect(page.getByText('需要时报这个订单号查询', { exact: false })).toBeVisible()
+})

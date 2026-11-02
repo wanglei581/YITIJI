@@ -14,6 +14,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/files/filesApi'
 import { getTerminalId, isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
 import { convertImagesToPdf } from '../../services/api/printConversion'
+import { getMyDocuments } from '../../services/api/memberAssets'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import type { PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
@@ -69,6 +70,7 @@ export function ConvertImagesPage() {
   const [qrBusy, setQrBusy] = useState(false)
   const [usbOpen, setUsbOpen] = useState(false)
   const [result, setResult] = useState<Awaited<ReturnType<typeof convertImagesToPdf>> | null>(null)
+  const [resultName, setResultName] = useState<string | null>(null)
   const [recovered, setRecovered] = useState(false)
   const [idempotency, setIdempotency] = useState<ConvertIdempotency | null>(null)
   const [lastSubmitted, setLastSubmitted] = useState<SelectedImage[] | null>(null)
@@ -248,6 +250,14 @@ export function ConvertImagesPage() {
         },
         { token: getToken(), idempotencyKey: nextKey.key },
       )
+      let filename: string | null = null
+      if (converted.savedToDocuments) {
+        try {
+          const documents = await getMyDocuments(getToken(), { pageSize: 50 })
+          filename = documents.items.find((item) => item.id === converted.fileId)?.filename ?? null
+        } catch { /* 文件名不可用时沿用本机描述，不猜测服务端时间。 */ }
+      }
+      setResultName(filename)
       setRecovered(mode === 'recheck' || previousKind === 'result-unknown' || previousKind === 'in-progress')
       setResult(converted)
       setError(null)
@@ -266,7 +276,7 @@ export function ConvertImagesPage() {
     source: 'document' as const,
     returnPath: window.location.pathname,
     file: {
-      name: outputFileName(result.pages),
+      name: resultName ?? outputFileName(result.pages),
       size: formatBytes(result.sizeBytes),
       pages: result.pages,
       fileId: result.fileId,
@@ -359,6 +369,7 @@ export function ConvertImagesPage() {
         rechecking={rechecking}
         error={error}
         result={result}
+        resultName={resultName}
         recovered={recovered}
         previousOrder={lastSubmitted ? lastSubmitted.map((img) => img.name) : null}
         preview={preview}

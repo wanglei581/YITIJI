@@ -5,9 +5,9 @@
 const uploadName = require('../../utils/upload-name')
 
 const MAX_BYTES = 10 * 1024 * 1024
-// 与一体机 phoneUploadModel.receiptOf 的 SESSION_PURPOSES 相同。
-// signature_image 能出现在文件用途里，但创建上传会话的 DTO 不接受它。
-const SESSION_PURPOSES = ['resume_upload', 'print_doc', 'contract_upload']
+// 与后端上传会话支持的用途一致（upload-sessions.service.ts SUPPORTED_UPLOAD_SESSION_PURPOSES）。
+// 签名图那一单只收这次新传的 JPG / PNG，由后端验字节、短期留存，不进「我的文档」。
+const SESSION_PURPOSES = ['resume_upload', 'print_doc', 'contract_upload', 'signature_image']
 const DEAD_CODES = {
   UPLOAD_SESSION_EXPIRED: true,
   UPLOAD_SESSION_NOT_PENDING: true,
@@ -28,10 +28,10 @@ function isSessionPurpose(value) {
 
 /**
  * 请求兑现不等于已收到：utils/request.js 会把 2xx 的 {} 和 data:null 解包后兑现。
- * 只有 status=uploaded、file.fileId，且 purpose 是会话真实支持的三种用途，
+ * 只有 status=uploaded、file.fileId，且 purpose 是会话真实支持的用途（知道这一单用途时还得对得上），
  * 并且 sessionId 就是这一次，才算收到。两条路（聊天文件、我的文档）回执同形。
  */
-function receiptAccepted(body, sessionId) {
+function receiptAccepted(body, sessionId, expectedPurpose) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return false
   if (!sessionId || body.sessionId !== sessionId) return false
   if (body.status !== 'uploaded') return false
@@ -39,7 +39,19 @@ function receiptAccepted(body, sessionId) {
   if (!file || typeof file !== 'object' || Array.isArray(file)) return false
   if (typeof file.fileId !== 'string' || file.fileId.trim() === '') return false
   if (!isSessionPurpose(body.purpose)) return false
+  if (isSessionPurpose(expectedPurpose) && body.purpose !== expectedPurpose) return false
   return true
+}
+
+/** 签名图本机先挡：只认 JPG / PNG、单张不超过 10MB；挡不住的伪装由后端验字节拒收。返回要显示的一句，没问题回空串。 */
+function signatureFileIssue(file) {
+  if (!file || !/\.(?:jpe?g|png)$/i.test(String(file.name || file.path || ''))) {
+    return '本人签名图片只支持 JPG / PNG，请重新选择'
+  }
+  if (!Number.isFinite(file.size) || file.size <= 0 || file.size > MAX_BYTES) {
+    return '请选择有效的签名图片，单个文件不能超过 10MB'
+  }
+  return ''
 }
 
 function statusOf(err) {
@@ -127,6 +139,8 @@ function albumFileOf(res) {
 }
 
 module.exports = {
+  isSessionPurpose,
+  signatureFileIssue,
   albumFileOf,
   MAX_BYTES,
   receiptAccepted,

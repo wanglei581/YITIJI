@@ -591,8 +591,9 @@ test('I-30 有任务号的「无法确认」三步：先看出纸口、别重新
   const guest = copyWith({})
   assert.match(guest.steps[0].title, /先看出纸口/)
   assert.match(guest.steps[1].title, /请不要重新下单/)
-  assert.match(guest.steps[2].title, /记下订单号 ORD-20261029-OUT，需要时报给我们/)
-  assert.match(guest.steps[2].detail, /^需要帮助？/)
+  // 走查 R-10：游客没有手机查询入口，第三步写出订单号，并说凭它打服务电话查询（服务电话那句由 helpNeededLine 接在后面）。
+  assert.match(guest.steps[2].title, /订单号是 ORD-20261029-OUT/)
+  assert.match(guest.steps[2].detail, /^需要时报这个订单号查询。需要帮助？/)
   assert.doesNotMatch(all(guest), /手机|已付|费用|付款|收费|没出纸了|请勿据此判断/)
   const machine = copyWith({ viewable: true })
   assert.match(machine.steps[2].detail, /查看打印订单.*ORD-20261029-OUT/)
