@@ -68,8 +68,8 @@ function generateShell(api: ApiRouter, configExtras: Record<string, unknown> = {
 }
 
 /** 六步填到「核对」。没填的项不碰；经历描述写的是用户自己的话。 */
-async function fillGenerateFormToReview(page: Page): Promise<void> {
-  await page.goto('/resume/generate')
+async function fillGenerateFormToReview(page: Page, open = true): Promise<void> {
+  if (open) await page.goto('/resume/generate')
   await page.getByRole('textbox', { name: /^姓名/ }).fill('周敏')
   await page.getByRole('button', { name: /^下一步：求职意向/ }).click()
   await page.getByRole('textbox', { name: /^目标岗位/ }).fill('仓储分拣员')
@@ -397,7 +397,9 @@ test('导出结果的文件与带走操作在首屏，说明可展开 @w3-kiosk'
 // I-29：一次能力故障不能把这位用户锁死在已填完的表单里。
 test('resume generation retries after outage without losing this session draft @w3-kiosk', async ({ page, api }) => {
   await page.clock.install()
-  shell(api)
+  registerPrivacyShell(api)
+  api.respond('GET', '/api/v1/me/ai-consents/status', { status: 200, json: { success: true, data: [{ scope: 'resume_ai', granted: true }] } })
+  api.respond('POST', '/api/v1/member/auth/login', { status: 200, json: { success: true, data: { token: 'resume-retry-member', user: { id: 'resume-retry-owner', phoneMasked: '138****8000', nickname: '会员' } } } })
   api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
   api.respond('GET', '/api/v1/terminals/KSK-001/config', { status: 200, json: terminalConfigWithHosting(RECRUITMENT_HOSTING_OFF) })
   let attempts = 0
@@ -414,7 +416,7 @@ test('resume generation retries after outage without losing this session draft @
         }, missingHints: [] },
     ) })
   })
-  await page.goto('/resume/generate')
+  await loginThroughVisibleUi(page, '/resume/generate', '13800138000')
   await page.getByLabel('姓名', { exact: false }).fill('恢复验证者')
   await page.getByRole('button', { name: '下一步：求职意向', exact: true }).click()
   await page.getByLabel('目标岗位', { exact: false }).fill('维修工程师')
@@ -491,6 +493,143 @@ test('从零简历会员换号后不继承上一位填写 @w3-kiosk', async ({ p
   expect(logins).toBe(2)
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain('上一位会员的简历')
   await page.screenshot({ path: testInfo.outputPath('member-switch-cleared.png') })
+})
+
+for (const operation of ['generate', 'draft'] as const) {
+  for (const boundary of ['离页', '结束会话'] as const) {
+    test(`迟到的${operation}回包在${boundary}后不能交接上一位资料 @w3-kiosk`, async ({ page, api }) => {
+      await page.clock.install()
+      registerPrivacyShell(api)
+      generateShell(api)
+      if (boundary === '结束会话') {
+        api.respond('POST', '/api/v1/member/auth/login', { status: 200, json: { success: true, data: { token: 'late-member', user: { id: 'late-owner', phoneMasked: '138****8000', nickname: '会员' } } } })
+        api.respond('GET', '/api/v1/me/ai-consents/status', { status: 200, json: { success: true, data: [{ scope: 'resume_ai', granted: true }] } })
+        await loginThroughVisibleUi(page, '/resume/generate', '13800138000')
+      }
+      let release!: () => void
+      let received!: () => void
+      const arrived = new Promise<void>((resolve) => { received = resolve })
+      const gate = new Promise<void>((resolve) => { release = resolve })
+      if (operation === 'draft') {
+        await page.route('**/api/v1/resume/generate', (route) => route.fulfill({ status: 503, json: { error: { code: 'AI_PAUSED', message: 'AI 服务暂停中' } } }))
+      }
+      await page.route(`**/api/v1/resume/generate${operation === 'draft' ? '/export' : ''}`, async (route) => {
+        received()
+        await gate
+        await route.fulfill({ status: 200, json: operation === 'draft' ? GEN_EXPORTED : GENERATED }).catch(() => {})
+      })
+      await fillGenerateFormToReview(page, boundary !== '结束会话')
+      await page.getByRole('button', { name: '让 AI 整理成新简历' }).click()
+      if (operation === 'draft') await page.getByRole('button', { name: /导出并打印我填的内容/ }).click()
+      await arrived
+      if (boundary === '离页') {
+        await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '首页', exact: true }).click()
+      } else {
+        await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '我的', exact: true }).click()
+        await page.getByRole('button', { name: '结束使用', exact: true }).click()
+      }
+      release()
+      await page.clock.runFor(1000)
+      await expect(page).toHaveURL(/\/$/)
+      await page.goto('/resume/generate/preview')
+      await expect(page.locator('body')).not.toContainText('周敏')
+      await expect(page.locator('body')).not.toContainText('仓储分拣员')
+    })
+  }
+}
+
+for (const operation of ['generate', 'draft'] as const) {
+  test(`生成页在场时统一清场，迟到的${operation}成功回包不能交接 @w3-kiosk`, async ({ page, api }) => {
+    await page.clock.install()
+    registerPrivacyShell(api)
+    generateShell(api)
+    let release!: () => void
+    let received!: () => void
+    const arrived = new Promise<void>((resolve) => { received = resolve })
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    if (operation === 'draft') {
+      await page.route('**/api/v1/resume/generate', (route) => route.fulfill({ status: 503, json: { error: { code: 'AI_PAUSED', message: 'AI 服务暂停中' } } }))
+    }
+    await page.route(`**/api/v1/resume/generate${operation === 'draft' ? '/export' : ''}`, async (route) => {
+      received()
+      await gate
+      await route.fulfill({ status: 200, json: operation === 'draft' ? GEN_EXPORTED : GENERATED }).catch(() => {})
+    })
+    await fillGenerateFormToReview(page)
+    await page.getByRole('button', { name: '让 AI 整理成新简历' }).click()
+    if (operation === 'draft') await page.getByRole('button', { name: /导出并打印我填的内容/ }).click()
+    await arrived
+    await expect(page).toHaveURL(/\/resume\/generate$/)
+    // BFCache 恢复的清场钩子同步执行统一清场，此时仍在生成页。
+    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })))
+    release()
+    await page.clock.runFor(1000)
+    await expect(page).not.toHaveURL(/\/resume\/generate\/preview/)
+    await expect(page).not.toHaveURL(/\/print/)
+    await expect(page.locator('body')).not.toContainText('周敏')
+    await expect(page.locator('body')).not.toContainText('仓储分拣员')
+  })
+}
+
+test('游客离开流程清草稿，会员留到结束使用 @w3-kiosk', async ({ page, api }) => {
+  registerPrivacyShell(api)
+  api.respond('POST', '/api/v1/member/auth/login', { status: 200, json: { success: true, data: { token: 'draft-member', user: { id: 'draft-owner', phoneMasked: '138****8000', nickname: '会员' } } } })
+  await page.goto('/resume/generate')
+  await page.getByLabel('姓名', { exact: false }).fill('游客上一位')
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '首页', exact: true }).click()
+  await page.getByRole('button').filter({ has: page.getByRole('heading', { name: '改简历', exact: true }) }).click()
+  await page.getByRole('button', { name: /没有，帮我写一份/ }).click()
+  await expect(page.getByLabel('姓名', { exact: false })).toHaveValue('')
+  await loginThroughVisibleUi(page, '/resume/generate', '13800138000')
+  await page.getByLabel('姓名', { exact: false }).fill('会员本人')
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '首页', exact: true }).click()
+  await page.getByRole('button').filter({ has: page.getByRole('heading', { name: '改简历', exact: true }) }).click()
+  await page.getByRole('button', { name: /没有，帮我写一份/ }).click()
+  await expect(page.getByLabel('姓名', { exact: false })).toHaveValue('会员本人')
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '我的', exact: true }).click()
+  await page.getByTestId('profile-account').click()
+  await page.getByTestId('member-settings-primary').click()
+  await page.getByRole('button', { name: '确认结束使用' }).click()
+  await page.getByRole('button').filter({ has: page.getByRole('heading', { name: '改简历', exact: true }) }).click()
+  await page.getByRole('button', { name: /没有，帮我写一份/ }).click()
+  await expect(page.getByLabel('姓名', { exact: false })).toHaveValue('')
+})
+
+test('AI 重试挂起时原样导出仍可操作 @w3-kiosk', async ({ page, api }) => {
+  generateShell(api)
+  let attempts = 0
+  let release!: () => void
+  let received!: () => void
+  const arrived = new Promise<void>((resolve) => { received = resolve })
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  await page.route('**/api/v1/resume/generate', async (route) => {
+    if (++attempts === 1) return route.fulfill({ status: 503, json: { error: { code: 'AI_PAUSED', message: 'AI 服务暂停中' } } })
+    received()
+    await gate
+    await route.fulfill({ status: 200, json: GENERATED }).catch(() => {})
+  })
+  await fillGenerateFormToReview(page)
+  await page.getByRole('button', { name: '让 AI 整理成新简历' }).click()
+  await page.getByRole('button', { name: '重新检查并整理' }).click()
+  await arrived
+  const alternative = page.getByRole('button', { name: '导出并打印我填的内容（未经 AI 润色）' })
+  await expect(alternative).toBeVisible()
+  await expect(alternative).toBeEnabled()
+  await alternative.click()
+  await expect(page).toHaveURL(/\/print/)
+  release()
+})
+
+test('填写步字段校验不改变滚动位置 @w3-kiosk', async ({ page, api }) => {
+  generateShell(api)
+  await page.goto('/resume/generate')
+  const scroller = page.locator('[data-kiosk-screen="resume-generate"]')
+  await page.getByLabel('姓名', { exact: false }).fill('校验者')
+  await scroller.evaluate((el) => { el.scrollTop = 0 })
+  const before = await scroller.evaluate((el) => el.scrollTop)
+  await page.getByLabel('姓名', { exact: false }).fill('')
+  await expect(page.getByText('姓名还没填，填完才能进下一步。其余三项可以空着。')).toBeVisible()
+  expect(await scroller.evaluate((el) => el.scrollTop)).toBe(before)
 })
 
 test('诊断报告真实空态不补假问题，短结论不撑成空框 @w3-kiosk', async ({ page, api }) => {

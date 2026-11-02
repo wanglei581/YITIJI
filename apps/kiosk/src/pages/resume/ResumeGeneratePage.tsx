@@ -8,7 +8,7 @@
 // ============================================================
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useResumeGenerateDraftField } from './resumeGenerateDraft'
+import { resumeGenerateGeneration, useClearGuestDraftOnFlowExit, useResumeGenerateDraftField } from './resumeGenerateDraft'
 import { useNavigate } from 'react-router-dom'
 import { maskEmail, maskPhone } from '../../utils/maskPii'
 import { ResumeHelpLine } from './touch/ResumeHelpLine'
@@ -22,6 +22,7 @@ import type {
   ResumeGenProject,
   ResumeGenerateInput,
   ResumeGenerateResponse,
+  ResumeGenerateExportResponse,
 } from '@ai-job-print/shared'
 import { EDUCATION_LEVEL_OPTIONS } from '@ai-job-print/shared'
 import { AiTaskRegion, useAiTask, isAiOutage, type AiAvailability, type AiTaskFallback } from '../../ai'
@@ -136,6 +137,16 @@ export function ResumeGeneratePage() {
   const navigate = useNavigate()
   const startPrint = useStartPrintHandoff()
   const { getToken } = useAuth()
+  const mounted = useRef(false)
+  useClearGuestDraftOnFlowExit(!getToken())
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+  const beginRequest = () => {
+    const owner = resumeGenerateGeneration()
+    return { valid: () => mounted.current && owner === resumeGenerateGeneration() }
+  }
   const consent = useResumeAiConsent()
   const [showConsent, setShowConsent] = useState(false)
   const [step, setStep] = useResumeGenerateDraftField('step', 0)
@@ -211,10 +222,11 @@ export function ResumeGeneratePage() {
   const runGenerate = async () => {
     setGenerating(true)
     setError(null)
-    setAiOutage(null)
     const input = buildInput()
+    const request = beginRequest()
     try {
       const result: ResumeGenerateResponse = await submitResumeGenerate(input, getToken())
+      if (!request.valid()) return
       if (result.failCode && isAiOutage({ code: result.failCode })) {
         setAiOutage('AI 暂时不可用，你可以先导出并打印已填的内容')
         return
@@ -225,10 +237,12 @@ export function ResumeGeneratePage() {
         setError(unattendedReason(result.failReason, 'AI 简历生成失败，请稍后重试'))
         return
       }
+      setAiOutage(null)
       // 连同本次填的内容一起交给预览页：它要拿填写的原话和模型的输出对照，找出「AI 新写进去的数和职责词」让本人确认；
       // 不带 input，用户自己写过的词（如「负责」）也会被当成新写进去的（走查 I-21）。
       navigate('/resume/generate/preview', { state: { result, input } })
     } catch (err) {
+      if (!request.valid()) return
       const declined = aiDeclarationDeclineMessage(err)
       if (declined) {
         setError(declined)
@@ -241,7 +255,7 @@ export function ResumeGeneratePage() {
       if (isAiOutage(err)) setAiOutage(message)
       else setProbed(true)
     } finally {
-      setGenerating(false)
+      if (request.valid()) setGenerating(false)
     }
   }
 
@@ -269,6 +283,7 @@ export function ResumeGeneratePage() {
     setExportingDraft(true)
     setError(null)
     const input = buildInput()
+    const request = beginRequest()
     const draft: GeneratedResume = {
       basic: input.basic,
       intention: input.intention,
@@ -281,7 +296,8 @@ export function ResumeGeneratePage() {
       certificates: input.certificates,
     }
     try {
-      const file = await exportResumeDraft(draft, getToken())
+      const file: ResumeGenerateExportResponse = await exportResumeDraft(draft, getToken())
+      if (!request.valid()) return
       if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
       startPrint({
         origin: 'resume_generate',
@@ -298,9 +314,10 @@ export function ResumeGeneratePage() {
         },
       })
     } catch (err) {
+      if (!request.valid()) return
       setError(unattendedReason(userMessageOf(err, '草稿导出失败，请稍后重试'), '草稿导出失败，请稍后重试'))
     } finally {
-      setExportingDraft(false)
+      if (request.valid()) setExportingDraft(false)
     }
   }
 
@@ -321,10 +338,10 @@ export function ResumeGeneratePage() {
   // 现场没人，以前人只看到底栏按钮上的字变了，要往下滑才找得到出路（走查 I-29）。再按一次又失败同样处理。
   const scrollRef = useRef<HTMLElement>(null)
   useEffect(() => {
-    if (generating || exportingDraft || (!aiOutage && !error)) return
+    if (!reviewing || generating || exportingDraft || (!aiOutage && !error)) return
     const scroller = scrollRef.current
     if (scroller) scroller.scrollTo({ top: scroller.scrollHeight })
-  }, [aiOutage, error, generating, exportingDraft])
+  }, [aiOutage, error, generating, exportingDraft, reviewing])
   const draftAction = {
     label: exportingDraft ? '正在导出草稿…' : '导出并打印我填的内容（未经 AI 润色）',
     onClick: () => void handleExportDraft(),
@@ -758,8 +775,9 @@ export function ResumeGeneratePage() {
         guest={!getToken()}
         onCancel={() => setShowConsent(false)}
         onConfirm={() => {
+          const owner = resumeGenerateGeneration()
           void consent.confirm().then((ok) => {
-            if (!ok) return
+            if (!ok || !mounted.current || owner !== resumeGenerateGeneration()) return
             setShowConsent(false)
             void runGenerate()
           })

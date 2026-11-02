@@ -1,4 +1,4 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { ResumeGenEducation, ResumeGenExperience, ResumeGenProject } from '@ai-job-print/shared'
 
 interface ResumeGenerateDraft {
@@ -18,6 +18,26 @@ interface ResumeGenerateDraft {
 // 统一清场先递增代次，已卸载/正在卸载的旧组件不得把清掉的资料重新写回来。
 let draft: Partial<ResumeGenerateDraft> | null = null
 let generation = 0
+export const RESUME_GENERATE_FLOW_PATHS = ['/resume/generate', '/resume/generate/preview']
+
+export function resumeGenerateGeneration(): number { return generation }
+
+export function useClearGuestDraftOnFlowExit(isGuest: boolean): void {
+  const isGuestRef = useRef(isGuest)
+  isGuestRef.current = isGuest
+  useEffect(() => () => {
+    if (isGuestRef.current && !RESUME_GENERATE_FLOW_PATHS.includes(window.location.pathname)) {
+      clearResumeGenerateDraft()
+    }
+  }, [])
+}
+
+function hasContent(value: unknown): boolean {
+  if (typeof value === 'string') return value.trim().length > 0
+  if (Array.isArray(value)) return value.some(hasContent)
+  if (value && typeof value === 'object') return Object.values(value).some(hasContent)
+  return false
+}
 
 export function clearResumeGenerateDraft(): void {
   generation += 1
@@ -25,7 +45,7 @@ export function clearResumeGenerateDraft(): void {
 }
 
 export function hasResumeGenerateDraft(): boolean {
-  return draft !== null
+  return draft !== null && Object.entries(draft).some(([key, value]) => key !== 'step' && key !== 'reviewing' && hasContent(value))
 }
 
 export function useResumeGenerateDraftField<K extends keyof ResumeGenerateDraft>(
@@ -36,6 +56,7 @@ export function useResumeGenerateDraftField<K extends keyof ResumeGenerateDraft>
   const [value, setValue] = useState<ResumeGenerateDraft[K]>(() => draft?.[key] ?? initial)
   useEffect(() => {
     if (ownerGeneration !== generation) return
+    if (!draft && !hasContent(value)) return
     draft = { ...draft, [key]: value }
   }, [key, value, ownerGeneration])
   return [value, setValue]

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useClearGuestDraftOnFlowExit } from './resumeGenerateDraft'
 import type {
   GeneratedResume,
   ResumeExportFormat,
@@ -72,6 +73,7 @@ export function ResumeGeneratePreviewPage() {
   const startPrint = useStartPrintHandoff()
   const location = useLocation()
   const { getToken } = useAuth()
+  useClearGuestDraftOnFlowExit(!getToken())
   const query = useMemo(() => parseGeneratePreviewQuery(location.search), [location.search])
   const state = location.state as LocationState | null
   const token = getToken()
