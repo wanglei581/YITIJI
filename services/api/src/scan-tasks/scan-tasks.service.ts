@@ -25,6 +25,7 @@ import {
   buildScanDeviceCreateData,
   normalizeScanDeliverOrigin,
   resolveScanStartParams,
+  scanDeliverClaimPins,
   scanDeviceLeaseFields,
   scanDeviceStatusFields,
 } from './scan-device-protocol'
@@ -1113,6 +1114,10 @@ export class ScanTasksService {
     // ATOMIC_SCAN_DELIVER_CAS_ACK_EXPIRY: re-pin ACK + expiry (and signed
     // task identity already in where) so mixed/raced state cannot go
     // waiting → matched after ACK/expiry eligibility changed.
+    // 屏上扫描（B1 复审修复）：3b 的来源校验是在读到的快照上判的，这里再把读到的 startMode 钉进 where；
+    // device 任务另钉 deviceState ∈ composing / delivering 且 devicePageCount ≥ 1（scanDeliverClaimPins）。
+    // 否则读与这次抢占之间用户「改用面板」或终端程序回报 error / aborted，已切面板 / 已中止的会话仍会被挂上设备扫描件。
+    // 面板任务只多一条恒真的 startMode，其余不变。条件失效 → count 0 → 下面的 SCAN_TASK_STATE_CHANGED。
     const claimed = await this.prisma.scanTask.updateMany({
       where: {
         id: task.id,
@@ -1121,6 +1126,7 @@ export class ScanTasksService {
         deliveryAckedAt: { not: null },
         expiresAt: { gt: now },
         createdAt: task.createdAt,
+        ...scanDeliverClaimPins(task),
       },
       data: { status: 'matched', matchedFileMtime: observedDate, lastAttemptHash: contentHash },
     })

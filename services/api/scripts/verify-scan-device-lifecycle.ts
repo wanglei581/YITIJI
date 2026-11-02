@@ -1,0 +1,316 @@
+/**
+ * 屏上扫描（device 路线）会话生命周期守门（后端第二批 B2 追加）：投递怎么抢占、截止时间怎么续。
+ *
+ * 为什么单独一个门禁：verify-scan-device-sessions.ts（1000 多行）与 verify-scan-device-settings.ts（700 多行）
+ * 都已经够大（CLAUDE.md §8），这三处修复的用例不再往里堆。
+ *
+ * 覆盖：
+ *   A. 投递抢占（B1 复审修复）：deliverScanFile 第 6 步把任务从 waiting 抢占成 matched 的那次条件更新，必须钉住读到的 startMode；
+ *      device 任务另钉 deviceState ∈ composing / delivering 且 devicePageCount ≥ 1。用包一层 PrismaService 的办法，
+ *      在那次 updateMany 真正执行前先让别的请求赢（用户改用面板、终端程序回报 error / aborted……），断言投递被
+ *      409 SCAN_TASK_STATE_CHANGED 拒、任务仍是 waiting、没有挂上文件、没留下「已尝试」的去重痕迹；面板投递不受影响
+ *   B. 截止时间只增不减（B1 复审修复）：report / switch-to-panel / device-settings 的条件更新都钉住读到的 expiresAt，
+ *      并发的同状态回报（或别的续期）交错时，较晚算出的截止时间不会被较早算出的值覆盖回去
+ *   C. 续期窗口（补稿 cs-scan-more）：回报 state=page_ready 续到 now+10 分钟，其余 state 仍 3 分钟，都不超过 hardExpiresAt
+ *
+ * 写库：本脚本在库里造终端 / 会话 / 文件，结束时清理，所以必须在隔离库上跑
+ * （VERIFICATION_DATABASE_TARGET=isolated，库名带 ci/dev/test/verify）。
+ * SQLite 与 PostgreSQL 两个 CI 作业各跑一遍。
+ *
+ * 运行：VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-lifecycle
+ */
+import 'reflect-metadata'
+// 与生产默认一致：90 秒终端静默期（本门禁不依赖它，但不让运行环境里的同名变量悄悄改写行为）。
+delete process.env['SCAN_TERMINAL_QUIET_PERIOD_SECONDS']
+// 本门禁不验证招聘托管内容；按生产配置（托管关闭）显式声明（verify-recruitment-hosting-gate-declares 的要求）。
+process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
+process.env['FILE_SIGNING_SECRET'] ||= 'verify-scan-device-lifecycle-secret-0123456789-abcdef'
+process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-scan-device-lifecycle-admin-secret-0123456789'
+process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-scan-device-lifecycle-action-secret-0123456789'
+
+import assert from 'node:assert/strict'
+import { createHash, randomBytes } from 'node:crypto'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { AuditService } from '../src/audit/audit.service'
+import { FilesService } from '../src/files/files.service'
+import { PrismaService } from '../src/prisma/prisma.service'
+import { StorageService } from '../src/storage/storage.service'
+import * as protocol from '../src/scan-tasks/scan-device-protocol'
+import { ScanDeviceSessionsService } from '../src/scan-tasks/scan-device-sessions.service'
+import { ScanTasksService } from '../src/scan-tasks/scan-tasks.service'
+import { TerminalCapabilitiesService, setPrintScanCapabilityModeForTest } from '../src/terminals/terminal-capabilities.service'
+import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
+
+// ── 规格（照任务包与协调方的修复说明写死，不从被测代码里取）─────────────────────────
+/** 投递只收这两个设备状态（且至少 1 页）。 */
+const SPEC_DELIVERABLE_STATES = ['composing', 'delivering']
+const STATE_CHANGED = 'SCAN_TASK_STATE_CHANGED'
+
+function pass(label: string): void {
+  console.log(`  PASS ${label}`)
+}
+
+type HttpLike = { getStatus?: () => number; getResponse?: () => unknown }
+function httpErrorOf(error: unknown): { status: number | undefined; code: string | undefined; message: string } {
+  const e = error as HttpLike
+  const body = e.getResponse?.() as { error?: { code?: string; message?: string } } | undefined
+  return { status: e.getStatus?.(), code: body?.error?.code, message: String(body?.error?.message ?? '') }
+}
+
+async function expectHttp(run: () => Promise<unknown>, status: number, code: string, label: string): Promise<string> {
+  try {
+    await run()
+  } catch (error) {
+    const got = httpErrorOf(error)
+    assert.equal(got.status, status, `${label}：HTTP 状态应为 ${status}，实际 ${String(got.status)}（${got.code}）${String(error)}`)
+    assert.equal(got.code, code, `${label}：错误码应为 ${code}，实际 ${String(got.code)}`)
+    pass(`${label}（${status} ${code}）`)
+    return got.message
+  }
+  return assert.fail(`${label}：应当被拒绝（${status} ${code}），实际放行了`)
+}
+
+function uniquePdf(): Buffer {
+  return Buffer.from(`%PDF-1.4\n%${randomBytes(8).toString('hex')}\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n`, 'latin1')
+}
+const sha256Of = (buffer: Buffer) => createHash('sha256').update(buffer).digest('hex')
+
+async function main(): Promise<void> {
+  assertIsolatedVerificationDatabase()
+  setPrintScanCapabilityModeForTest('managed')
+
+  const suffix = randomBytes(5).toString('hex')
+  const storageDir = mkdtempSync(join(tmpdir(), 'verify-scan-device-lifecycle-storage-'))
+  const originalStorageDir = process.env['FILE_STORAGE_DIR']
+  process.env['FILE_STORAGE_DIR'] = storageDir
+
+  const prisma = new PrismaService()
+  await prisma.onModuleInit()
+  const capabilities = new TerminalCapabilitiesService(prisma)
+  const files = new FilesService(prisma, new AuditService(prisma), new StorageService())
+  const scanSvc = new ScanTasksService(prisma, files, capabilities)
+  const deviceSvc = new ScanDeviceSessionsService(prisma, capabilities)
+
+  const terminalIds: string[] = []
+
+  async function makeTerminal(tag: string, scanDevice: 'available' | null = 'available') {
+    const id = `t_slife_${tag}_${suffix}`
+    await prisma.terminal.create({
+      data: { id, terminalCode: `SLIFE-${tag}-${suffix}`.toUpperCase(), agentToken: `slife-token-${randomBytes(12).toString('hex')}`, deviceFingerprint: `verify-scan-device-lifecycle-${suffix}`, enabled: true },
+    })
+    terminalIds.push(id)
+    if (scanDevice) await capabilities.upsert(id, 'scan_device', scanDevice, undefined, 'verify-scan-device-lifecycle')
+    return { id }
+  }
+  const rowOf = (id: string) => prisma.scanTask.findUniqueOrThrow({ where: { id } })
+
+  type Session = { t: { id: string }; id: string; token: string }
+  async function deviceSession(tag: string, opts: { source?: 'flatbed' | 'feeder'; colorMode?: 'gray' | 'color' } = {}): Promise<Session> {
+    const t = await makeTerminal(tag)
+    const created = await scanSvc.create(
+      { scanType: 'document', terminalId: t.id, startMode: 'device', source: opts.source ?? 'feeder', colorMode: opts.colorMode ?? 'gray' },
+      null,
+    )
+    await scanSvc.ack(created.scanTaskId, null, created.controlToken, t.id)
+    return { t, id: created.scanTaskId, token: created.controlToken }
+  }
+  async function panelSession(tag: string): Promise<Session> {
+    const t = await makeTerminal(tag, null)
+    const created = await scanSvc.create({ scanType: 'document', terminalId: t.id }, null)
+    await scanSvc.ack(created.scanTaskId, null, created.controlToken, t.id)
+    return { t, id: created.scanTaskId, token: created.controlToken }
+  }
+  /** device 会话推进到可投递：scanning（pages 页）→ composing（→ delivering）。 */
+  async function readyToDeliver(tag: string, finalState: 'composing' | 'delivering' = 'composing'): Promise<Session> {
+    const s = await deviceSession(tag)
+    await deviceSvc.report(s.t.id, s.id, { state: 'scanning', pageCount: 2 })
+    await deviceSvc.report(s.t.id, s.id, { state: 'composing' })
+    if (finalState === 'delivering') await deviceSvc.report(s.t.id, s.id, { state: 'delivering' })
+    return s
+  }
+  const leaseOf = async (s: Session) => (await scanSvc.getScanDeliveryLease(s.t.id)).deliveryLease
+  async function deliver(svc: ScanTasksService, s: Session, pdf: Buffer, origin?: 'device' | 'watcher') {
+    return svc.deliverScanFile({
+      terminalId: s.t.id, scanTaskId: s.id, deliveryLease: await leaseOf(s), buffer: pdf, filename: 'scan.pdf',
+      mimeType: 'application/pdf', observedAt: new Date().toISOString(), ...(origin ? { origin } : {}),
+    })
+  }
+
+  try {
+    // ── A. 投递抢占 ────────────────────────────────────────────────────────────
+    console.log('\n-- A. 投递抢占（waiting → matched）要钉住扫描方式与设备状态 --')
+    {
+      // 包一层 PrismaService：只拦「waiting → matched」那次抢占（data.status === 'matched'）——先跑钩子再真正执行，
+      // 模拟「读完快照、通过来源校验之后，别的请求先到」。心跳、completed、failed 等别的 updateMany 照常。
+      const claimRace = (hook: () => Promise<void>) => {
+        let ran = 0
+        const bind = (target: object, prop: string | symbol) => {
+          const value = Reflect.get(target, prop, target)
+          return typeof value === 'function' ? value.bind(target) : value
+        }
+        const scanTask = new Proxy(prisma.scanTask, {
+          get(target, prop) {
+            if (prop === 'updateMany') {
+              return async (args: { data?: { status?: string } }) => {
+                if (args?.data?.status === 'matched') {
+                  ran += 1
+                  await hook()
+                }
+                return prisma.scanTask.updateMany(args as never)
+              }
+            }
+            return bind(target, prop)
+          },
+        })
+        const wrapped = new Proxy(prisma, { get: (target, prop) => (prop === 'scanTask' ? scanTask : bind(target, prop)) }) as PrismaService
+        return { svc: new ScanTasksService(wrapped, files, capabilities), ran: () => ran }
+      }
+
+      // A0. 钉住的列（纯函数）：面板任务只多一条恒真的 startMode，device 任务再多 deviceState / devicePageCount 两条
+      assert.deepEqual([...protocol.SCAN_DEVICE_DELIVERABLE_STATES], SPEC_DELIVERABLE_STATES, '可投递的设备状态 = composing / delivering')
+      assert.deepEqual(protocol.scanDeliverClaimPins({ startMode: 'panel' }), { startMode: 'panel' }, '面板任务只钉 startMode，不加设备条件')
+      assert.deepEqual(
+        protocol.scanDeliverClaimPins({ startMode: 'device' }),
+        { startMode: 'device', deviceState: { in: SPEC_DELIVERABLE_STATES }, devicePageCount: { gte: 1 } },
+        'device 任务另钉 deviceState ∈ composing / delivering 且 devicePageCount ≥ 1',
+      )
+      pass('抢占要钉的列：面板任务只有 startMode；device 任务另有 deviceState ∈ {composing, delivering}、devicePageCount ≥ 1')
+
+      /** 钩子先赢：投递被 409 拒、任务仍 waiting、没挂文件、没留去重痕迹。返回这次用的 PDF，供之后验证同一份内容还能投。 */
+      async function expectClaimLost(label: string, s: Session, hook: () => Promise<void>): Promise<Buffer> {
+        const pdf = uniquePdf()
+        const raced = claimRace(hook)
+        await expectHttp(() => deliver(raced.svc, s, pdf, 'device'), 409, STATE_CHANGED, label)
+        assert.equal(raced.ran(), 1, `${label}：钩子必须在抢占那次 updateMany 之前执行过一次，否则这个用例什么都没证明`)
+        const row = await rowOf(s.id)
+        assert.equal(row.status, 'waiting', `${label}：任务仍是 waiting（没被抢占成 matched）`)
+        assert.equal(row.fileId, null, `${label}：没有挂上文件`)
+        assert.equal(row.lastAttemptHash, null, `${label}：抢占没成功，不得留下「已尝试」的去重痕迹（否则同一份内容再也投不进去）`)
+        assert.equal(row.matchedFileMtime, null)
+        assert.equal(await prisma.fileObject.count({ where: { sha256: sha256Of(pdf) } }), 0, `${label}：库里不得出现这份内容的文件`)
+        return pdf
+      }
+
+      // A1. 抢占前用户「改用面板」：已切面板的会话不得收到设备扫描件；之后照面板流程能继续
+      {
+        const s = await readyToDeliver('claimswitch')
+        const pdf = await expectClaimLost('投递读完快照后、抢占前用户改用面板', s, async () => {
+          await deviceSvc.switchToPanel(s.id, null, s.token)
+        })
+        const row = await rowOf(s.id)
+        assert.equal(row.startMode, 'panel')
+        assert.equal(row.deviceState, 'aborted')
+        const watcher = await deliver(scanSvc, s, pdf)
+        assert.equal(watcher.scanTaskId, s.id)
+        assert.equal((await rowOf(s.id)).status, 'completed', '改用面板之后，面板（watcher）仍能把同一份内容投进这个会话')
+      }
+
+      // A2. 抢占前终端程序回报 error：不得挂上设备扫描件；终端程序重来（error → scanning → composing）后同一份内容能投
+      {
+        const s = await readyToDeliver('claimerror')
+        const pdf = await expectClaimLost('投递读完快照后、抢占前终端程序回报 error', s, async () => {
+          await deviceSvc.report(s.t.id, s.id, { state: 'error', errorCode: 'paper_jam' })
+        })
+        assert.equal((await rowOf(s.id)).deviceState, 'error', '终端程序的 error 回报没有被投递覆盖')
+        await deviceSvc.report(s.t.id, s.id, { state: 'scanning', pageCount: 1 })
+        await deviceSvc.report(s.t.id, s.id, { state: 'composing' })
+        await deliver(scanSvc, s, pdf, 'device')
+        assert.equal((await rowOf(s.id)).status, 'completed', '终端程序恢复后同一份内容能投进去')
+      }
+
+      // A3. 抢占前终端程序回报 aborted：不得挂上设备扫描件；用户还能改用面板
+      {
+        const s = await readyToDeliver('claimaborted')
+        const pdf = await expectClaimLost('投递读完快照后、抢占前终端程序回报 aborted', s, async () => {
+          await deviceSvc.report(s.t.id, s.id, { state: 'aborted' })
+        })
+        assert.equal((await rowOf(s.id)).deviceState, 'aborted')
+        await deviceSvc.switchToPanel(s.id, null, s.token)
+        await deliver(scanSvc, s, pdf)
+        assert.equal((await rowOf(s.id)).status, 'completed', '中止之后用户改用面板，同一份内容仍能走面板投递')
+      }
+
+      // A4 / A5. 只翻一列，证明每条新增的条件都各自有用
+      {
+        const s = await readyToDeliver('claimmode')
+        await expectClaimLost('只有 startMode 被改成 panel（设备状态与页数都没动）', s, async () => {
+          await prisma.scanTask.update({ where: { id: s.id }, data: { startMode: 'panel' } })
+        })
+        const p = await readyToDeliver('claimpages')
+        await expectClaimLost('只有 devicePageCount 被改成 0（设备状态没动）', p, async () => {
+          await prisma.scanTask.update({ where: { id: p.id }, data: { devicePageCount: 0 } })
+        })
+      }
+      pass('抢占前别的请求先赢（改用面板 / error / aborted / 只翻 startMode / 只翻页数）：全部 409 且不挂文件、不留去重痕迹；用户的后路（面板、终端重来）仍通')
+
+      // A6. 正向对照：可投递的设备会话（composing、delivering）经同一个包装服务照常投递成功
+      for (const state of ['composing', 'delivering'] as const) {
+        const s = await readyToDeliver(`claimok_${state}`, state)
+        const raced = claimRace(async () => undefined)
+        const result = await deliver(raced.svc, s, uniquePdf(), 'device')
+        assert.equal(raced.ran(), 1)
+        assert.equal(result.scanTaskId, s.id)
+        const row = await rowOf(s.id)
+        assert.equal(row.status, 'completed')
+        assert.ok(row.fileId)
+        assert.equal(row.devicePageCount, 2)
+      }
+      pass('正向对照：deviceState=composing / delivering 且已收 ≥ 1 页的 device 会话经抢占照常投递成功')
+
+      // A7. 面板路线不受影响：不加设备条件——即使设备列被翻到“不可投递”的样子，面板任务照常投递
+      {
+        const s = await panelSession('claimpanel')
+        const raced = claimRace(async () => {
+          await prisma.scanTask.update({ where: { id: s.id }, data: { deviceState: 'error', devicePageCount: 0, deviceErrorCode: 'paper_jam' } })
+        })
+        const result = await deliver(raced.svc, s, uniquePdf())
+        assert.equal(raced.ran(), 1, '钩子确实在抢占前执行过')
+        assert.equal(result.scanTaskId, s.id)
+        assert.equal((await rowOf(s.id)).status, 'completed', '面板任务的抢占不看设备列')
+
+        // 已改用面板的会话（startMode=panel、deviceState=aborted）走 watcher 投递同样不受影响
+        const sw = await readyToDeliver('claimswitched')
+        await deviceSvc.switchToPanel(sw.id, null, sw.token)
+        const raced2 = claimRace(async () => {
+          await prisma.scanTask.update({ where: { id: sw.id }, data: { deviceState: 'error', devicePageCount: 0 } })
+        })
+        await deliver(raced2.svc, sw, uniquePdf())
+        assert.equal(raced2.ran(), 1)
+        assert.equal((await rowOf(sw.id)).status, 'completed')
+
+        // 现有行为照旧：抢占前会话被取消 → 409（status 仍是钉住的）
+        const c = await panelSession('claimcancel')
+        const raced3 = claimRace(async () => {
+          await scanSvc.cancel(c.id, null, c.token)
+        })
+        await expectHttp(() => deliver(raced3.svc, c, uniquePdf()), 409, STATE_CHANGED, '面板会话：抢占前被取消，现有行为照旧 409')
+        assert.equal(raced3.ran(), 1)
+        assert.equal((await rowOf(c.id)).status, 'cancelled')
+      }
+      pass('面板路线不受影响：设备列被翻也照常投递；已改用面板的会话 watcher 投递照常；抢占前被取消仍是原来的 409')
+    }
+
+    // @@NEXT-SECTION@@
+
+    console.log('\nPASS verify-scan-device-lifecycle')
+  } finally {
+    setPrintScanCapabilityModeForTest(null)
+    if (originalStorageDir === undefined) delete process.env['FILE_STORAGE_DIR']
+    else process.env['FILE_STORAGE_DIR'] = originalStorageDir
+    const tasks = await prisma.scanTask.findMany({ where: { terminalId: { in: terminalIds } }, select: { fileId: true } }).catch(() => [])
+    const fileIds = tasks.map((task) => task.fileId).filter((id): id is string => Boolean(id))
+    await prisma.scanTask.deleteMany({ where: { terminalId: { in: terminalIds } } }).catch(() => undefined)
+    await prisma.fileObject.deleteMany({ where: { id: { in: fileIds } } }).catch(() => undefined)
+    await prisma.terminalCapability.deleteMany({ where: { terminalId: { in: terminalIds } } }).catch(() => undefined)
+    await prisma.terminal.deleteMany({ where: { id: { in: terminalIds } } }).catch(() => undefined)
+    await prisma.onModuleDestroy().catch(() => undefined)
+    rmSync(storageDir, { recursive: true, force: true })
+  }
+}
+
+main().catch((error) => {
+  console.error(error)
+  process.exit(1)
+})

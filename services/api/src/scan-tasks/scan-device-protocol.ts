@@ -417,6 +417,29 @@ export function normalizeScanDeliverOrigin(raw: unknown): ScanDeliverOrigin {
   })
 }
 
+/**
+ * 投递时把任务从 waiting 抢占成 matched 的那次条件更新（deliverScanFile 第 6 步）要钉住的扫描方式与设备状态。
+ * assertScanDeliverOriginAllowed 是在读到的快照上判的；读与这次抢占之间，用户可能「改用面板」（startMode→panel、
+ * deviceState→aborted），终端程序也可能回报 error / aborted。条件更新里没有这几条，已切面板 / 已中止的会话
+ * 仍会被挂上设备扫描件。所以：
+ *   - 所有任务都钉读到的 startMode（面板任务恒为 'panel'，是一条恒真条件，行为不变）；
+ *   - device 任务再钉 deviceState ∈ composing / delivering 且 devicePageCount ≥ 1（与 assertScanDeliverOriginAllowed 同一组条件）。
+ * 面板任务不加后两条：面板路线行为一字不变。条件失效按现有写法回 409 SCAN_TASK_STATE_CHANGED。
+ */
+export function scanDeliverClaimPins(task: Pick<DeviceFieldsRow, 'startMode'>): {
+  startMode: string
+  deviceState?: { in: string[] }
+  devicePageCount?: { gte: number }
+} {
+  const startMode = task.startMode ?? 'panel'
+  if (!isScanDeviceTask(task)) return { startMode }
+  return {
+    startMode,
+    deviceState: { in: [...SCAN_DEVICE_DELIVERABLE_STATES] },
+    devicePageCount: { gte: 1 },
+  }
+}
+
 export function looksLikePdf(buffer: Buffer): boolean {
   return buffer.length >= 5 && buffer.subarray(0, 5).toString('latin1') === '%PDF-'
 }
