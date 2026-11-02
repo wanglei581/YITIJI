@@ -675,9 +675,11 @@ async function selfAssessmentAppendFollowsLock(h: Harness, K: string): Promise<v
     const docIds = (await new MemberAssetsService(h.prisma).listDocuments(K, { cursor: null, pageSize: 50 })).items.map((item) => item.id)
     assert.equal(docIds.includes(lockedMerged), false, 'appended PDF of an order-only resume must not be in K documents')
     assert.ok(docIds.includes(ownMerged), 'positive control: appended PDF of K own resume is in K documents')
-    const exported = JSON.stringify(await new MemberDataExportMapper(h.prisma).build({ endUserId: K, requestId: 'verify-sa-append' }))
-    assert.equal(exported.includes(lockedMerged), false, 'appended PDF of an order-only resume must not be in K data export')
-    assert.ok(exported.includes(ownMerged), 'positive control: appended PDF of K own resume is in K data export')
+    // 编号原样导出、不打码（member-data-export.mapper），按编号查是确定的。修复前文件编号约 0.9% 碰巧含手机号样式的
+    // 11 位数字串、被导出打码打坏：正向对照随机失败，反向那条也可能因编号被打坏而误放行。
+    const envelope = await new MemberDataExportMapper(h.prisma).build({ endUserId: K, requestId: 'verify-sa-append' })
+    assert.equal(JSON.stringify(envelope).includes(lockedMerged), false, 'appended PDF of an order-only resume must not be in K data export')
+    assert.ok(envelope.sections.files.some((row) => row['id'] === ownMerged), 'positive control: appended PDF of K own resume is in K data export files')
     pass('h 自我探索追加（只有打分 / 含 AI 解读两路）：用只用于这一单的简历合出来的 PDF 跟着锁，「我的文档」和本人数据导出都不列；用本人自己的简历照常列（对照）')
   } finally {
     await h.prisma.aiResumeResult.deleteMany({ where: { taskId: { in: [taskId, aiTaskId] } } })
