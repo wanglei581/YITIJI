@@ -13178,7 +13178,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 267,
+      "reachableFileCount": 268,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -13578,7 +13578,10 @@
         },
         {
           "component": "LoginPage",
-          "endpoints": [],
+          "endpoints": [
+            "POST /admin/branding/logo",
+            "PUT /admin/branding"
+          ],
           "file": "apps/admin/src/routes/login/index.tsx",
           "layout": [],
           "path": "/login",
@@ -13954,7 +13957,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 294
+      "sourceFileCount": 295
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -16984,7 +16987,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 97,
+      "reachableFileCount": 98,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -17499,7 +17502,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 98
+      "sourceFileCount": 99
     }
   },
   "dataModel": {
@@ -19789,6 +19792,7 @@
     ],
     "apps/admin/src/routes/screen/GovGrid.tsx": [
       "apps/admin/scripts/verify-console-batch5-copy.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/admin/scripts/verify-console-screen-details.mjs",
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
@@ -19804,6 +19808,7 @@
     ],
     "apps/admin/src/routes/screen/UsageView.tsx": [
       "apps/admin/scripts/verify-console-batch6-copy.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/admin/scripts/verify-console-screen-details.mjs",
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
@@ -23625,6 +23630,7 @@
       "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "packages/shared/src/types/branding.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "services/api/scripts/verify-branding.ts"
     ],
     "packages/shared/src/types/campusRecruitmentStats.ts": [
@@ -29302,6 +29308,8 @@
           "apps/admin/src/routes/peripherals/peripheralViews.ts",
           "apps/admin/src/routes/print-scan/index.tsx",
           "apps/admin/src/routes/printers/index.tsx",
+          "apps/admin/src/routes/screen/GovGrid.tsx",
+          "apps/admin/src/routes/screen/UsageView.tsx",
           "apps/admin/src/routes/screensaver/AssetsTab.tsx",
           "apps/admin/src/routes/screensaver/PlaylistsTab.tsx",
           "apps/admin/src/routes/screensaver/TerminalsTab.tsx",
@@ -29320,6 +29328,7 @@
           "packages/shared/src/formatDateTime.ts",
           "packages/shared/src/formatNumber.ts",
           "packages/shared/src/types/admin.ts",
+          "packages/shared/src/types/branding.ts",
           "packages/ui/package.json",
           "scripts/audit-action-codes.mjs",
           "services/api/src/admin-ops/derived-alerts.ts",
