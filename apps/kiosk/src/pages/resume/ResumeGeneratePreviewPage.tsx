@@ -1,4 +1,4 @@
-import { useKioskLicense } from '../../layouts/KioskLicenseContext'
+import { useKioskLicense, useWindDownViewOnly } from '../../layouts/KioskLicenseContext'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { cloneElement, isValidElement, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -100,7 +100,9 @@ export function ResumeGeneratePreviewPage() {
   const navigate = useNavigate()
   const startPrint = useStartPrintHandoff()
   const location = useLocation()
-  const viewOnly = useKioskLicense().mode === 'winding-down' && (location.state as LocationState | null)?.licenseViewOnly === true
+  const windDownViewOnly = useWindDownViewOnly('resume')
+  const licenseFlagViewOnly = useKioskLicense().mode === 'winding-down' && (location.state as LocationState | null)?.licenseViewOnly === true
+  const viewOnly = windDownViewOnly || licenseFlagViewOnly
   const { getToken } = useAuth()
   useClearGuestDraftOnFlowExit(!getToken())
   const query = useMemo(() => parseGeneratePreviewQuery(location.search), [location.search])

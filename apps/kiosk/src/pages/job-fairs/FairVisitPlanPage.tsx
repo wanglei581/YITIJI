@@ -31,7 +31,7 @@ import { FileTextIcon, MapIcon, PrinterIcon, SparklesIcon, UsersIcon } from 'luc
 import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { useAuth } from '../../auth/useAuth'
-import { useKioskLicense } from '../../layouts/KioskLicenseContext'
+import { useKioskLicense, useWindDownViewOnly } from '../../layouts/KioskLicenseContext'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import {
@@ -107,7 +107,9 @@ export function FairVisitPlanPage() {
   const fairId = id ?? ''
   const { getToken } = useAuth()
   const state = (location.state ?? {}) as PageState
-  const viewOnly = useKioskLicense().mode === 'winding-down' && state.licenseViewOnly === true
+  const windDownViewOnly = useWindDownViewOnly('fair')
+  const licenseFlagViewOnly = useKioskLicense().mode === 'winding-down' && state.licenseViewOnly === true
+  const viewOnly = windDownViewOnly || licenseFlagViewOnly
   const newTaskTitle = viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined
   const session = useMemo(() => readAiResumeSession(), [])
   const taskId = state.taskId ?? session?.taskId

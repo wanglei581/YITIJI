@@ -83,7 +83,7 @@ import { useSelfAssessmentConsentBundle } from './useSelfAssessmentConsentBundle
 import { interpretationGap } from './selfAssessmentInterpretation'
 import { useSelfAssessmentIdleExit } from './useSelfAssessmentIdleExit'
 import { useAuth } from '../../auth/useAuth'
-import { useKioskLicense } from '../../layouts/KioskLicenseContext'
+import { useKioskLicense, useWindDownViewOnly } from '../../layouts/KioskLicenseContext'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
@@ -670,7 +670,9 @@ export function SelfAssessmentResultPage() {
 function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | null }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const viewOnly = useKioskLicense().mode === 'winding-down' && (location.state as { licenseViewOnly?: boolean } | null)?.licenseViewOnly === true
+  const windDownViewOnly = useWindDownViewOnly('self-assessment')
+  const licenseFlagViewOnly = useKioskLicense().mode === 'winding-down' && (location.state as { licenseViewOnly?: boolean } | null)?.licenseViewOnly === true
+  const viewOnly = windDownViewOnly || licenseFlagViewOnly
   const startPrint = useStartPrintHandoff()
   const { getToken } = useAuth()
   const [session, setSession] = useState<SelfAssessmentSession>(() => {

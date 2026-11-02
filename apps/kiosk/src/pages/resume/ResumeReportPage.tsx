@@ -1,4 +1,4 @@
-import { useKioskLicense } from '../../layouts/KioskLicenseContext'
+import { useKioskLicense, useWindDownViewOnly } from '../../layouts/KioskLicenseContext'
 import { LicenseLock } from '../../layouts/LicenseLock'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { useEffect, useMemo, useState } from 'react'
@@ -111,7 +111,9 @@ export function ResumeReportPage() {
   const { getToken } = useAuth()
   const supportPhone = useSupportContact().servicePhone?.trim() ?? ''
   const routeState = (location.state ?? {}) as ReportState
-  const viewOnly = useKioskLicense().mode === 'winding-down' && routeState.licenseViewOnly === true
+  const windDownViewOnly = useWindDownViewOnly('resume')
+  const licenseFlagViewOnly = useKioskLicense().mode === 'winding-down' && routeState.licenseViewOnly === true
+  const viewOnly = windDownViewOnly || licenseFlagViewOnly
   // 读回的失败记录带着「能力级停用」码（暂停 / 当日额度到了 / 未配置）：并进 state.aiDown，失败屏按小青停用那一屏画，
   // 不画「能力未接通」。失败屏只认 state.aiDown，所以从路由带来的和读回发现的是同一个口子。
   const [recoveredAiDown, setRecoveredAiDown] = useState(false)

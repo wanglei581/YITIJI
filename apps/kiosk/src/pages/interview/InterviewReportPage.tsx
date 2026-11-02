@@ -26,7 +26,7 @@ type InterviewReportView = InterviewReportResponse & {
 import { AI_LABEL_COPY, COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { getInterviewReport, printInterviewReport } from '../../services/api/interview'
 import { useAuth } from '../../auth/useAuth'
-import { useKioskLicense } from '../../layouts/KioskLicenseContext'
+import { useKioskLicense, useWindDownViewOnly } from '../../layouts/KioskLicenseContext'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
@@ -86,7 +86,9 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
   const { getToken } = useAuth()
   const storedReport = readInterviewWorkbenchSession()?.report
   const locationState = (location.state ?? {}) as ReportState
-  const viewOnly = useKioskLicense().mode === 'winding-down' && locationState.licenseViewOnly === true
+  const windDownViewOnly = useWindDownViewOnly('interview')
+  const licenseFlagViewOnly = useKioskLicense().mode === 'winding-down' && locationState.licenseViewOnly === true
+  const viewOnly = windDownViewOnly || licenseFlagViewOnly
   const state: ReportState = {
     sessionId: locationState.sessionId ?? storedReport?.sessionId,
     accessToken: locationState.accessToken ?? storedReport?.accessToken,

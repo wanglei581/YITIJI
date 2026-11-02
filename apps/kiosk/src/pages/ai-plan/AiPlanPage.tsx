@@ -1,4 +1,4 @@
-import { useKioskLicense } from '../../layouts/KioskLicenseContext'
+import { useKioskLicense, useWindDownViewOnly } from '../../layouts/KioskLicenseContext'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 // 小青的作业面。只呈现顾问会话刚产出的三种产物，不编目标/材料/计划。
 
@@ -54,7 +54,9 @@ export function AiPlanPage() {
   const [search] = useSearchParams()
   const { getToken } = useAuth()
   const navState = (location.state ?? {}) as AdvisorArtifactLocationState & { licenseViewOnly?: boolean }
-  const viewOnly = useKioskLicense().mode === 'winding-down' && navState.licenseViewOnly === true
+  const windDownViewOnly = useWindDownViewOnly('ai-plan')
+  const licenseFlagViewOnly = useKioskLicense().mode === 'winding-down' && navState.licenseViewOnly === true
+  const viewOnly = windDownViewOnly || licenseFlagViewOnly
 
   const sessionId = parseId(search.get('sessionId')) ?? parseId(navState.sessionId)
   const artifactId = parseId(search.get('artifactId')) ?? parseId(navState.artifactId)

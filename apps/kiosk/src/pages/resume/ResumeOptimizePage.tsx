@@ -1,4 +1,4 @@
-import { useKioskLicense } from '../../layouts/KioskLicenseContext'
+import { useKioskLicense, useWindDownViewOnly } from '../../layouts/KioskLicenseContext'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -72,7 +72,9 @@ export function ResumeOptimizePage() {
   const { getToken } = useAuth()
   const consent = useResumeAiConsent()
   const state = location.state as Record<string, unknown> | null
-  const viewOnly = useKioskLicense().mode === 'winding-down' && state?.licenseViewOnly === true
+  const windDownViewOnly = useWindDownViewOnly('resume')
+  const licenseFlagViewOnly = useKioskLicense().mode === 'winding-down' && state?.licenseViewOnly === true
+  const viewOnly = windDownViewOnly || licenseFlagViewOnly
   const query = useMemo(() => parseOptimizeQuery(location.search), [location.search])
   const [workView, setWorkView] = useState<OptimizePane>(() => new URLSearchParams(location.search).get('screen') === 'editor' || state?.decisions ? 'editor' : 'overview')
   const existingOnly = new URLSearchParams(location.search).get('saved') === '1' || new URLSearchParams(location.search).get('existingOnly') === '1' || state?.existingOnly === true
