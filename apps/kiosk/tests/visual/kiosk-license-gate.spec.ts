@@ -20,10 +20,10 @@
 import type { Locator, Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
-import { MACHINE_UNUSABLE_LINE } from '../fixtures/unattended-lines'
+import { MACHINE_UNUSABLE_LINE, whole } from '../fixtures/unattended-lines'
 import { chooseInterviewExperience } from './fixtures/direction-selection'
 import { configureHomeVariant } from './fixtures/home-members'
-import { LicenseWorld, PAUSED_NOTICE_LINE } from './fixtures/license-world'
+import { LicenseWorld } from './fixtures/license-world'
 import { allowLocalBootTicket, registerPrivacyShell } from './fixtures/privacy-clear-shell'
 
 test.describe.configure({ timeout: 120_000 })
@@ -154,10 +154,11 @@ test('授权失效、当前凭证还剩 10 分钟：首页入口停用并写明�
   // 页面每 3 分钟自己续读一次 profile，下一次读回来的就是「授权失效、凭证还剩约 6 分钟」。
   await world.advance(3.5 * MINUTE)
   await expectHomeWindingDown(page)
+  // 只说一遍：整条说明就是标准句 3（原因 + 请稍后再来 + 服务电话），「这台机器暂时不能用」只出现一次。
   const reminder = homeReminder(page)
-  await expect(reminder).toContainText(PAUSED_NOTICE_LINE)
-  await expect(reminder).toContainText(MACHINE_UNUSABLE_LINE)
+  await expect(reminder).toHaveText(whole(MACHINE_UNUSABLE_LINE))
   await expect(reminder).toContainText(PHONE_SENTENCE)
+  expect(((await reminder.innerText()).match(/这台机器暂时不能用/g) ?? []).length).toBe(1)
 
   // 每个停用的入口都点一遍：地址不变，还在首页。
   for (const action of [...HOME_TASKS, ...HOME_TILES]) {
@@ -289,9 +290,11 @@ test('凭证到期后整机换成「暂停服务」屏：写明原因与服务�
   await reachPaused(world, page)
   const screen = paused(page)
   await expect(screen.getByRole('heading', { name: '暂停服务' })).toBeVisible()
-  await expect(screen).toContainText(PAUSED_NOTICE_LINE)
+  // 副标题写「现在不能开始新的办理」，正文是标准句 3（原因 + 服务电话）；「这台机器暂时不能用」整屏只出现一次。
+  await expect(screen).toContainText('现在不能开始新的办理')
   await expect(screen).toContainText(MACHINE_UNUSABLE_LINE)
   await expect(screen).toContainText(PHONE_SENTENCE)
+  expect(((await screen.innerText()).match(/这台机器暂时不能用/g) ?? []).length).toBe(1)
   // 静态屏：整个页面上没有任何能点的按钮或链接，首页和底部导航都没了。
   await expect(page.locator('button:visible, a[href]:visible')).toHaveCount(0)
   await expect(page.locator('[data-qx-page="home"]')).toHaveCount(0)
@@ -361,12 +364,9 @@ test('收尾中刷新页面，仍是收尾中（入口仍停用、到期仍进�
   await reachPaused(world, page)
 })
 
-// 这条用例当前是红的，红的是页面的缺陷，不是用例（2026-11-02 走查，6b3312b41 上复现 100%）：
-// 暂停状态只在内存里。刷新后页面拿 sessionStorage 里已过期的票续期（401），再向本机程序要新引导票换会话，服务端因授权失效回
-// 403 TERMINAL_LICENSE_INACTIVE——但换票这条路上的 403 没有记成「续期被拒」（只有 retryRefreshOnce 记；
-// reBootstrapFromLocalAgent 把任何失败都吞成 false），会话落到 failed，而闸门在 normal 档不看 failed；此时 profile 没带有效票，
-// 答复是「没验过」，也不能让闸门进暂停。结果刷新（看门狗重启浏览器、前端发版自动刷新、断电重启都一样）之后，
-// 整机回到一个入口全亮、实际每一步都会因会话失效而失败的首页。页面修好后这条转绿。
+// 暂停状态只在内存里，刷新后要靠换票被拒的标记重新进暂停：刷新后页面拿 sessionStorage 里已过期的票续期（401），再向本机程序要新引导票换会话，
+// 服务端因授权失效回 403 TERMINAL_LICENSE_INACTIVE。这条路上的 403 曾经没有记成「续期被拒」，会话落到 failed 而闸门 normal 档不看 failed，
+// 整机刷新（看门狗重启浏览器、前端发版自动刷新、断电重启都一样）后回到入口全亮的首页（2026-11-02 走查在 6b3312b41 上抓到，B6 修复）。
 test('暂停之后刷新页面，仍是暂停屏 @license-gate', async ({ page, api }) => {
   const world = await boot(page, api)
   world.lapse(10 * MINUTE)
