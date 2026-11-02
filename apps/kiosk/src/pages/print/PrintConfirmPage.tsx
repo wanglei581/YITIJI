@@ -151,6 +151,7 @@ export function PrintConfirmPage() {
   const [terminalSession, setTerminalSession] = useState<TerminalSessionState>(() => terminalSessionState())
   const [abandoning, setAbandoning] = useState(false)
   const [piiCheckRequired, setPiiCheckRequired] = useState(false)
+  const [quotaCode, setQuotaCode] = useState<string | undefined>()
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [appendSelfAssessment, setAppendSelfAssessment] = useState(false)
   const [quoteNonce, setQuoteNonce] = useState(0)
@@ -389,6 +390,7 @@ export function PrintConfirmPage() {
       inFlightRef.current = true
       setSubmitting(true)
       setSubmitError(null)
+      setQuotaCode(undefined)
       let leaving = false
       try {
         let printFileUrl = file.fileUrl
@@ -465,6 +467,9 @@ export function PrintConfirmPage() {
               ? `价格已更新：你确认的是 ${formatCents(quote.amountCents)}，现在应付 ${formatCents(current.amountCents)}。本次没有建单，也没有扣款；请核对新金额后再点确认。`
               : '价格已更新，本次没有建单，也没有扣款。正在重新获取报价，请核对新金额后再确认。',
           })
+        } else if (['PRINT_TERMINAL_DAILY_QUOTA_REACHED', 'PRINT_MEMBER_DAILY_QUOTA_REACHED', 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED'].includes(errorCodeOf(err) ?? '')) {
+          setQuotaCode(errorCodeOf(err))
+          setSubmitError(`${userMessageOf(err, '')} 本次没有建单，也没有出纸。`)
         } else if (errorCodeOf(err) === 'PRINT_PII_SCAN_REQUIRED') {
           setPiiCheckRequired(true)
           setSubmitError('这份文件的隐私检查还没有确认完，需要回到材料检查再确认一次。你的文件还在，不用重新上传。')
@@ -582,9 +587,7 @@ export function PrintConfirmPage() {
     }
     navigate('/print/desk?step=check', { state: { printContextId: kept.contextId } })
   }
-  const actions = piiCheckRequired ? (
-    <button type="button" className="qx-btn" data-variant="primary" style={{ minHeight: 56 }} onClick={returnToMaterialCheck}>回到材料检查</button>
-  ) : screen === 'missing-context' ? (
+  const actions = screen === 'missing-context' ? (
     <>
       <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/me/print-orders')}>我的打印订单</button>
       <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(uploadPath)}>重新选文件</button>
@@ -664,19 +667,19 @@ export function PrintConfirmPage() {
     </section>
   )
 
-  const usesDockPrimary = !piiCheckRequired
-    && screen !== 'missing-context'
+  const guestQuotaExceeded = quotaCode === 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED'
+  const usesDockPrimary = guestQuotaExceeded || piiCheckRequired || (screen !== 'missing-context'
     && screen !== 'invalid-context'
     && screen !== 'ordered'
-    && screen !== 'benefit-unverified'
-  const dockLabel = sidesOverLimit
+    && screen !== 'benefit-unverified')
+  const dockLabel = guestQuotaExceeded ? '去登录' : piiCheckRequired ? '回到材料检查' : sidesOverLimit
     ? '确认打印'
     : screen === 'quoting'
       ? (freePricing ? '页数核定后可继续' : '获取报价后可继续')
       : screen === 'quote-failed'
         ? (freePricing ? '重新核定页数' : '重新报价')
         : primaryLabel
-  const dockDisabled = sidesOverLimit || screen === 'quoting' || (screen !== 'quote-failed' && confirmBlocked)
+  const dockDisabled = !guestQuotaExceeded && !piiCheckRequired && (sidesOverLimit || screen === 'quoting' || (screen !== 'quote-failed' && confirmBlocked))
   const previewKind = hasFileContext ? previewKindForFile(file) : 'unavailable'
   const previewNode = hasFileContext && (previewKind === 'pdf' || previewKind === 'image') ? <FilePageThumb file={file} /> : null
   const sheetPages = quote.status === 'ready' ? quote.billablePages : rangedPages
@@ -699,9 +702,10 @@ export function PrintConfirmPage() {
       eyebrow="核对价格"
       title="确认打印"
       back={{
-        label: backLabel,
+        label: guestQuotaExceeded ? '减少份数或页数再试' : backLabel,
         onBack: () => {
-          if (isContractReport) void handleBack()
+          if (guestQuotaExceeded) navigate('/print/desk?step=preview')
+          else if (isContractReport) void handleBack()
           else navigate('/print/desk?step=preview')
         },
       }}
@@ -711,7 +715,9 @@ export function PrintConfirmPage() {
         label: dockLabel,
         disabled: dockDisabled,
         onClick: () => {
-          if (!sidesOverLimit && screen === 'quote-failed') setQuoteNonce((n) => n + 1)
+          if (guestQuotaExceeded) navigate(loginPathForPrintStep('confirm'))
+          else if (piiCheckRequired) returnToMaterialCheck()
+          else if (!sidesOverLimit && screen === 'quote-failed') setQuoteNonce((n) => n + 1)
           else void handleConfirm()
         },
       } : undefined}
