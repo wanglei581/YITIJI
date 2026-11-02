@@ -30,6 +30,8 @@ export interface LocalApiError {
   state?: string
   pageCount?: number
   errorCode?: string | null
+  /** 屏上扫描：这次有没有把已扫页删掉。没尝试清理时不带。 */
+  purged?: boolean
 }
 
 /** Browser-safe identity exposed only through the loopback Origin allowlist. */

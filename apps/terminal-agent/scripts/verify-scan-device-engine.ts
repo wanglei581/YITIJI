@@ -95,6 +95,7 @@ import {
   tmpRoot,
   type Rig,
 } from './verify-scan-device-engine.helper'
+import { runnerChecksR2 } from './verify-scan-device-engine-r2.helper'
 
 // ═════════════════════════════════════════════════════════════════════════
 // 2. 脚本与参数白名单
@@ -847,6 +848,7 @@ async function main(): Promise<void> {
     await protocolChecks()
     await scriptChecks()
     await runnerChecks()
+    await runnerChecksR2()
     await realProcessChecks()
     await tempDirChecks()
     await pdfChecks()

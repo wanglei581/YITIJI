@@ -15,15 +15,12 @@ import type { ScanDeviceHealth } from './scan-device-health'
 import type { ScanDeviceDeletionReason, ScanTempPurgeResult } from './scan-temp-dir'
 import { deliverComposedRound } from './scan-device-deliver'
 import {
-  SCAN_PDF_COMPOSE_MARGIN_BYTES,
+  resolveScanDeviceLimits,
   type ScanDeviceRuntimeDeps,
   type ScanDeviceView,
 } from './scan-device-types'
-import { SCAN_PDF_MAX_BYTES } from './scan-pdf-compose'
 import type { WiaScanHandle, WiaScannedPage } from './wia-runner'
 import type { ScanDeviceErrorCode, WiaColor, WiaSource } from './wia-script'
-
-const PAGE_BUDGET_BYTES = SCAN_PDF_MAX_BYTES - SCAN_PDF_COMPOSE_MARGIN_BYTES
 
 export interface RoundSession {
   taskId: string
@@ -41,6 +38,15 @@ export interface RoundSession {
   tooLarge: boolean
   abortRequested: boolean
   generation: number
+  pageCap: number
+  byteBudget: number
+  purgeSettled: boolean
+  purged: boolean
+  delivered: boolean
+  awaitingLock: boolean
+  stopUnconfirmed: boolean
+  suspectPid?: number
+  reportUnsyncable: boolean
   lastResult?: import('./wia-runner').WiaScanResult
 }
 
@@ -58,6 +64,8 @@ export interface RoundHost {
   deviceName: string
   health: ScanDeviceHealth
   purge(taskId: string, reason: ScanDeviceDeletionReason): ScanTempPurgeResult
+  commitPurge(taskId: string, reason: ScanDeviceDeletionReason): boolean
+  scheduleCleanup(taskId: string, reason: ScanDeviceDeletionReason, pid?: number): void
   note(state: string, code?: string | null): void
   sendReport(body: DeviceReportBody): Promise<ReportOutcome>
   enqueueReport(body: DeviceReportBody): Promise<ReportOutcome>
@@ -65,11 +73,16 @@ export interface RoundHost {
   track(work: Promise<void>): void
   getGeneration(): number
   setGeneration(next: number): void
+  armIdle(generation: number): void
+  disarmIdle(): void
+  resetReportCursor(): void
 }
 
-function viewOf(session: RoundSession | undefined): ScanDeviceView {
+export function roundView(session: RoundSession | undefined): ScanDeviceView {
   if (!session || session.phase === 'idle') return { state: 'ready', pageCount: 0, errorCode: null }
-  return { state: session.phase, pageCount: session.pageCount, errorCode: session.errorCode }
+  const view: ScanDeviceView = { state: session.phase, pageCount: session.pageCount, errorCode: session.errorCode }
+  if (session.purgeSettled) view.purged = session.purged
+  return view
 }
 
 export interface RoundDriver {
@@ -79,19 +92,44 @@ export interface RoundDriver {
   runBatch(lock: DeviceLockHandle, batchPages: number, startIndex: number, current: number): Promise<void>
   composeAndDeliver(current: number): Promise<ScanDeviceView>
   acquire(taskId: string): Promise<DeviceLockHandle | undefined>
-  begin(lease: DeviceLease): Promise<ScanDeviceView>
+  prepare(lease: DeviceLease): Promise<{ ok: true; generation: number } | { ok: false; view: ScanDeviceView }>
+  launch(generation: number, lock: DeviceLockHandle | undefined): Promise<ScanDeviceView>
 }
 
 export function createRoundDriver(host: RoundHost): RoundDriver {
   const session = (): RoundSession | undefined => host.state.session
+  const viewOf = roundView
+
+  const fresh = (
+    fields: Pick<RoundSession, 'taskId' | 'phase' | 'source' | 'color' | 'generation'> & Partial<RoundSession>,
+  ): RoundSession => ({
+    pageCount: 0,
+    errorCode: fields.phase === 'error' ? fields.errorCode ?? 'unknown' : null,
+    pages: [],
+    bytes: 0,
+    outDir: '',
+    unauthorized: false,
+    tooLarge: false,
+    abortRequested: false,
+    pageCap: host.maxPages,
+    byteBudget: resolveScanDeviceLimits(host.maxPages, undefined).byteBudget,
+    purgeSettled: false,
+    purged: false,
+    delivered: false,
+    awaitingLock: false,
+    stopUnconfirmed: false,
+    reportUnsyncable: false,
+    ...fields,
+  })
 
   const fail = async (code: ScanDeviceErrorCode): Promise<ScanDeviceView> => {
+    host.disarmIdle()
     const current = session()
     if (!current) return { state: 'error', pageCount: 0, errorCode: code }
     current.phase = 'error'
     current.errorCode = code
     host.note('error', code)
-    host.purge(current.taskId, 'SCAN_DEVICE_FAILED')
+    host.commitPurge(current.taskId, 'SCAN_DEVICE_FAILED')
     if (!current.stopCode && !current.unauthorized) {
       await host.sendReport({ state: 'error', pageCount: current.pageCount, errorCode: code })
     }
@@ -99,12 +137,14 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
   }
 
   const finishStop = (): ScanDeviceView => {
+    host.disarmIdle()
     const current = session()
-    if (!current) return { state: 'aborted', pageCount: 0, errorCode: null }
+    if (!current) return { state: 'aborted', pageCount: 0, errorCode: null, purged: false }
+    if (current.phase === 'aborted' && current.purgeSettled) return viewOf(current)
     const reason: ScanDeviceDeletionReason = isSwitchedToPanelCode(current.stopCode ?? '')
       ? 'SCAN_DEVICE_SWITCHED_TO_PANEL'
       : 'SCAN_DEVICE_SESSION_CLEARED'
-    host.purge(current.taskId, reason)
+    host.commitPurge(current.taskId, reason)
     current.phase = 'aborted'
     current.errorCode = null
     host.note('aborted', current.stopCode)
@@ -112,9 +152,14 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
   }
 
   const finishAbort = async (): Promise<ScanDeviceView> => {
+    host.disarmIdle()
     const current = session()
-    if (!current) return { state: 'aborted', pageCount: 0, errorCode: null }
-    host.purge(current.taskId, 'SCAN_DEVICE_ABORTED')
+    if (!current) return { state: 'aborted', pageCount: 0, errorCode: null, purged: false }
+    if (current.delivered) {
+      return { state: 'delivering', pageCount: current.pageCount, errorCode: null, purged: current.purged }
+    }
+    if (current.phase === 'aborted' && current.purgeSettled) return viewOf(current)
+    host.commitPurge(current.taskId, 'SCAN_DEVICE_ABORTED')
     current.phase = 'aborted'
     current.errorCode = null
     host.note('aborted')
@@ -124,20 +169,28 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
     return viewOf(current)
   }
 
+  const mergePages = (current: RoundSession, batch: readonly WiaScannedPage[]): void => {
+    const byIndex = new Map(current.pages.map((page) => [page.index, page]))
+    for (const page of batch) byIndex.set(page.index, page)
+    current.pages = [...byIndex.values()].sort((left, right) => left.index - right.index)
+  }
+
   const onPage = (page: WiaScannedPage, box: { scan?: WiaScanHandle }): Promise<void> => {
     const current = session()
     if (!current || current.tooLarge || current.stopCode || current.abortRequested) return Promise.resolve()
     current.pageCount = Math.max(current.pageCount, page.index)
     current.bytes += page.bytes
     current.pages.push(page)
-    if (current.bytes > PAGE_BUDGET_BYTES) {
+    if (current.bytes > current.byteBudget) {
       current.tooLarge = true
       box.scan?.abort()
       current.handle?.abort()
       host.note('error', 'too_large')
       return Promise.resolve()
     }
-    return host.enqueueReport({ state: 'scanning', pageCount: current.pageCount }).then(() => undefined)
+    return host.enqueueReport({ state: 'scanning', pageCount: current.pageCount }).then((outcome) => {
+      if (outcome === 'dead') current.reportUnsyncable = true
+    })
   }
 
   const composeAndDeliver = (currentGen: number): Promise<ScanDeviceView> =>
@@ -147,8 +200,12 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
     await host.flushReports()
     const current = session()
     if (!current || current.generation !== currentGen) return
+    if (current.reportUnsyncable) {
+      await fail('unknown')
+      return
+    }
     if (current.unauthorized) {
-      host.purge(current.taskId, 'SCAN_DEVICE_FAILED')
+      host.commitPurge(current.taskId, 'SCAN_DEVICE_FAILED')
       current.phase = 'error'
       current.errorCode = 'unknown'
       return
@@ -183,17 +240,20 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
       await fail(code)
       return
     }
-    current.pages = result.pages.slice()
+    mergePages(current, result.pages)
     if (current.source === 'flatbed') {
       current.phase = 'page_ready'
       current.errorCode = null
       host.note('page_ready')
       const reported = await host.sendReport({ state: 'page_ready', pageCount: current.pageCount })
+      if (current.generation !== currentGen) return
       if (reported === 'stop') finishStop()
       else if (reported === 'dead') {
-        host.purge(current.taskId, 'SCAN_DEVICE_FAILED')
+        host.commitPurge(current.taskId, 'SCAN_DEVICE_FAILED')
         current.phase = 'error'
         current.errorCode = 'unknown'
+      } else if (current.phase === 'page_ready') {
+        host.armIdle(current.generation)
       }
       return
     }
@@ -225,6 +285,11 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
       if (current.tooLarge || current.abortRequested || current.stopCode) scan.abort()
       current.lastResult = await scan.result
       if (current.lastResult.forceKilled) host.health.noteForceKilled()
+      if (current.lastResult.stopUnconfirmed) {
+        current.stopUnconfirmed = true
+        current.suspectPid = current.lastResult.processId
+        host.health.noteSuspect(current.lastResult.processId)
+      }
     } catch {
       const current = session()
       if (current && current.generation === currentGen && !current.lastResult) {
@@ -235,6 +300,7 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
           errorCode: 'unknown',
           discardedPages: 0,
           forceKilled: false,
+          stopUnconfirmed: false,
           attempts: 1,
           setFailed: [],
           elapsedMs: 0,
@@ -261,75 +327,99 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
     }
   }
 
-  const begin = async (lease: DeviceLease): Promise<ScanDeviceView> => {
-    if (host.health.hasForceKilled()) {
+  const errorView = async (
+    lease: DeviceLease,
+    code: ScanDeviceErrorCode,
+  ): Promise<{ ok: false; view: ScanDeviceView }> => {
+    host.state.session = fresh({
+      taskId: lease.scanTaskId,
+      phase: 'error',
+      errorCode: code,
+      source: lease.device.source,
+      color: lease.device.colorMode,
+      generation: host.getGeneration(),
+    })
+    host.note('error', code)
+    await host.sendReport({ state: 'error', pageCount: 0, errorCode: code })
+    return { ok: false, view: viewOf(host.state.session) }
+  }
+
+  const prepare = async (
+    lease: DeviceLease,
+  ): Promise<{ ok: true; generation: number } | { ok: false; view: ScanDeviceView }> => {
+    if (host.health.suspectProcessAlive()) return errorView(lease, 'busy')
+    if (host.health.hasForceKilled() || host.health.hasSuspect()) {
       const probed = await host.health.probe()
       if (probed.health !== 'ready') {
         const code: ScanDeviceErrorCode = probed.health === 'busy' ? 'busy' : 'not_ready'
-        host.state.session = {
-          taskId: lease.scanTaskId,
-          phase: 'error',
-          pageCount: 0,
-          errorCode: code,
-          source: lease.device.source,
-          color: lease.device.colorMode,
-          pages: [],
-          bytes: 0,
-          outDir: '',
-          unauthorized: false,
-          tooLarge: false,
-          abortRequested: false,
-          generation: host.getGeneration(),
-        }
-        host.note('error', code)
-        await host.sendReport({ state: 'error', pageCount: 0, errorCode: code })
-        return viewOf(host.state.session)
+        return errorView(lease, code)
       }
       host.health.clearForceKilled()
+      host.health.clearSuspect()
     }
     const taskId = lease.scanTaskId
     const cleared = host.purge(taskId, 'SCAN_DEVICE_SESSION_CLEARED')
-    if (cleared.status === 'failed') return { state: 'error', pageCount: 0, errorCode: 'unknown' }
+    if (cleared.status === 'failed') {
+      host.scheduleCleanup?.(taskId, 'SCAN_DEVICE_SESSION_CLEARED')
+      return { ok: false, view: { state: 'error', pageCount: 0, errorCode: 'unknown', purged: false } }
+    }
     const outDir = host.deps.createDir(taskId, host.root ? { root: host.root } : {})
+    const limits = resolveScanDeviceLimits(host.maxPages, lease.device)
     const currentGen = host.getGeneration() + 1
     host.setGeneration(currentGen)
-    host.state.session = {
+    host.resetReportCursor()
+    host.state.session = fresh({
       taskId,
       phase: 'scanning',
-      pageCount: 0,
-      errorCode: null,
       source: lease.device.source,
       color: lease.device.colorMode,
-      pages: [],
-      bytes: 0,
       outDir,
-      unauthorized: false,
-      tooLarge: false,
-      abortRequested: false,
       generation: currentGen,
-    }
-    const lock = await acquire(taskId)
+      pageCap: limits.pageCap,
+      byteBudget: limits.byteBudget,
+      awaitingLock: true,
+    })
+    return { ok: true, generation: currentGen }
+  }
+
+  const launch = async (currentGen: number, lock: DeviceLockHandle | undefined): Promise<ScanDeviceView> => {
     const current = session()
-    if (!current) return { state: 'error', pageCount: 0, errorCode: 'unknown' }
-    if (!lock) return fail('busy')
-    if (current.generation !== currentGen) {
-      lock.release()
+    if (!current || current.generation !== currentGen) {
+      lock?.release()
       return viewOf(current)
     }
+    current.awaitingLock = false
+    if (current.phase === 'aborted') {
+      lock?.release()
+      return viewOf(current)
+    }
+    if (current.abortRequested) {
+      lock?.release()
+      return finishAbort()
+    }
+    if (!lock) return fail('busy')
     const reported = await host.sendReport({ state: 'scanning', pageCount: current.pageCount })
+    if (current.generation !== currentGen) {
+      lock.release()
+      return viewOf(session())
+    }
+    if (current.abortRequested) {
+      lock.release()
+      return finishAbort()
+    }
     if (reported !== 'go') {
       lock.release()
       if (reported === 'stop') return finishStop()
-      host.purge(current.taskId, 'SCAN_DEVICE_FAILED')
+      host.commitPurge(current.taskId, 'SCAN_DEVICE_FAILED')
       current.phase = 'error'
       current.errorCode = 'unknown'
       return viewOf(current)
     }
-    const batchPages = lease.device.source === 'feeder' ? host.maxPages : 1
+    const batchPages = current.source === 'feeder' ? current.pageCap : 1
     host.track(runBatch(lock, batchPages, current.pageCount + 1, currentGen))
     host.note('scanning')
     return viewOf(current)
   }
 
-  return { fail, finishStop, finishAbort, runBatch, composeAndDeliver, acquire, begin }
+  return { fail, finishStop, finishAbort, runBatch, composeAndDeliver, acquire, prepare, launch }
 }

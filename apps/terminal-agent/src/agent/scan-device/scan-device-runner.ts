@@ -18,8 +18,11 @@ import {
   type DeviceLease,
   type DeviceReportBody,
   type DeviceReportResult,
+  type ScanDeviceReportState,
 } from './scan-device-backend'
-import { createScanDeviceHealth, type ScanDeviceClock, type ScanDeviceHealth } from './scan-device-health'
+import { createScanDeviceHealth, defaultScanProcessAlive, type ScanDeviceClock, type ScanDeviceHealth } from './scan-device-health'
+import { createScanDeviceHousekeeping } from './scan-device-housekeeping'
+import { scanDeviceReportBridge } from './scan-device-sync'
 import { composeScanPdf } from './scan-pdf-compose'
 import {
   createScanTaskDir,
@@ -28,7 +31,7 @@ import {
   type ScanDeviceDeletionReason,
   type ScanTempPurgeResult,
 } from './scan-temp-dir'
-import { createRoundDriver, type RoundSession, type RoundState } from './scan-device-round'
+import { createRoundDriver, roundView, type RoundSession, type RoundState } from './scan-device-round'
 import {
   LocalScanError,
   SCAN_DEVICE_REPORT_ATTEMPTS,
@@ -52,8 +55,7 @@ export type { ScanDeviceDeliveryInput, ScanDeviceRuntime, ScanDeviceRuntimeDeps,
 const LIVE = new Set<RoundSession['phase']>(['scanning', 'page_ready', 'composing', 'delivering'])
 
 function viewOf(session: RoundSession | undefined): ScanDeviceView {
-  if (!session || session.phase === 'idle') return { state: 'ready', pageCount: 0, errorCode: null }
-  return { state: session.phase, pageCount: session.pageCount, errorCode: session.errorCode }
+  return roundView(session)
 }
 
 let printFinishedProbe: (() => void) | undefined
@@ -113,6 +115,10 @@ export function createScanDeviceRuntime(
     sweep: sweepScanDeviceResidue,
     createDir: createScanTaskDir,
     readFile: (file) => fs.promises.readFile(file),
+    beforeUpload: () => new Promise((resolve) => {
+      setImmediate(resolve)
+    }),
+    isProcessAlive: defaultScanProcessAlive,
     clock: systemClock(),
     lock: globalDeviceLock,
     reportDelaysMs: SCAN_DEVICE_REPORT_RETRY_DELAYS_MS,
@@ -133,7 +139,16 @@ export function createScanDeviceRuntime(
     runProbe: (options) => deps.runProbe(options),
     deviceName: () => config.scanDeviceName ?? '',
     getPhase: () => state.session?.phase ?? 'idle',
+    isProcessAlive: (pid) => (deps.isProcessAlive ?? defaultScanProcessAlive)(pid),
   })
+
+  let ackedState: ScanDeviceReportState = 'ready'
+  let unsynced = false
+  const resetReportCursor = (): void => {
+    ackedState = 'ready'
+    unsynced = false
+  }
+  const alive = (pid: number): boolean => (deps.isProcessAlive ?? defaultScanProcessAlive)(pid)
 
   const sleep = (ms: number): Promise<void> => {
     if (ms <= 0) return Promise.resolve()
@@ -176,6 +191,75 @@ export function createScanDeviceRuntime(
     }
   }
 
+  const roundSlot: { driver?: ReturnType<typeof createRoundDriver> } = {}
+  const round = (): ReturnType<typeof createRoundDriver> => {
+    const driver = roundSlot.driver
+    if (!driver) throw new Error('scan-device round is not ready')
+    return driver
+  }
+  const housekeeping = createScanDeviceHousekeeping({
+    clock: deps.clock,
+    purge,
+    isProcessAlive: alive,
+    fetchLease: (now) => deps.fetchLease(now),
+    session: () => {
+      const current = state.session
+      if (!current) return undefined
+      return { generation: current.generation, phase: current.phase, taskId: current.taskId, stopCode: current.stopCode }
+    },
+    onIdleTimeout: async (generation) => {
+      await exclusive(async () => {
+        const current = state.session
+        if (!current || current.generation !== generation || current.phase !== 'page_ready' || current.awaitingLock) return
+        await round().finishAbort()
+      })
+    },
+    onLeaseLost: (generation, code) => {
+      void exclusive(async () => {
+        const current = state.session
+        if (!current || current.generation !== generation || current.phase !== 'page_ready' || current.awaitingLock) return
+        current.stopCode = code
+        round().finishStop()
+      })
+    },
+    log,
+  })
+
+  const commitPurge = (taskId: string, reason: ScanDeviceDeletionReason): boolean => {
+    const session = state.session
+    const same = session?.taskId === taskId ? session : undefined
+    if (same?.stopUnconfirmed) {
+      same.purgeSettled = true
+      same.purged = false
+      housekeeping.scheduleCleanup(taskId, reason, same.suspectPid)
+      return false
+    }
+    const result = purge(taskId, reason)
+    if (same) {
+      same.purgeSettled = true
+      same.purged = result.status !== 'failed'
+    }
+    if (result.status === 'failed') {
+      housekeeping.scheduleCleanup(taskId, reason, same?.suspectPid)
+      return false
+    }
+    return true
+  }
+
+  const decorate = (body: DeviceReportBody): DeviceReportBody => {
+    const session = state.session
+    if (config.scanDeviceReportSettings !== true || !session) {
+      return { state: body.state, ...(body.pageCount !== undefined ? { pageCount: body.pageCount } : {}), ...(body.errorCode ? { errorCode: body.errorCode } : {}) }
+    }
+    return {
+      state: body.state,
+      ...(body.pageCount !== undefined ? { pageCount: body.pageCount } : {}),
+      ...(body.errorCode ? { errorCode: body.errorCode } : {}),
+      source: session.source,
+      colorMode: session.color,
+    }
+  }
+
   const applyReport = (result: DeviceReportResult): 'go' | 'stop' | 'dead' => {
     const session = state.session
     if (!session) return 'go'
@@ -195,9 +279,7 @@ export function createScanDeviceRuntime(
     return 'stop'
   }
 
-  const sendReport = async (body: DeviceReportBody): Promise<'go' | 'stop' | 'dead'> => {
-    const taskId = state.session?.taskId
-    if (!taskId) return 'go'
+  const postAttempts = async (taskId: string, body: DeviceReportBody): Promise<DeviceReportResult> => {
     let last: DeviceReportResult = { kind: 'unavailable' }
     for (let attempt = 0; attempt < SCAN_DEVICE_REPORT_ATTEMPTS; attempt += 1) {
       try {
@@ -205,13 +287,47 @@ export function createScanDeviceRuntime(
       } catch {
         last = { kind: 'unavailable' }
       }
-      if (last.kind !== 'unavailable') break
+      if (last.kind !== 'unavailable') return last
       if (attempt < SCAN_DEVICE_REPORT_ATTEMPTS - 1) {
         const delay = deps.reportDelaysMs[Math.min(attempt, deps.reportDelaysMs.length - 1)] ?? 0
         await sleep(delay)
       }
     }
-    return applyReport(last)
+    return last
+  }
+
+  const markUnsyncable = (): 'dead' => {
+    const session = state.session
+    if (session) {
+      session.reportUnsyncable = true
+      session.handle?.abort()
+    }
+    return 'dead'
+  }
+
+  const sendReport = async (body: DeviceReportBody): Promise<'go' | 'stop' | 'dead'> => {
+    const taskId = state.session?.taskId
+    if (!taskId) return 'go'
+    const decorated = decorate(body)
+    if (unsynced && decorated.state !== ackedState) {
+      const bridge = scanDeviceReportBridge(ackedState, decorated.state)
+      if (!bridge) return markUnsyncable()
+      for (const hop of bridge) {
+        const hopBody = decorate({ state: hop, ...(decorated.pageCount !== undefined ? { pageCount: decorated.pageCount } : {}) })
+        const hopResult = await postAttempts(taskId, hopBody)
+        if (hopResult.kind === 'stop' || hopResult.kind === 'unauthorized') return applyReport(hopResult)
+        if (hopResult.kind !== 'ok') return markUnsyncable()
+        ackedState = hop
+      }
+    }
+    const result = await postAttempts(taskId, decorated)
+    if (result.kind === 'ok') {
+      ackedState = decorated.state
+      unsynced = false
+      return applyReport(result)
+    }
+    if (result.kind === 'unavailable') unsynced = true
+    return applyReport(result)
   }
 
   const enqueueReport = (body: DeviceReportBody): Promise<'go' | 'stop' | 'dead'> => {
@@ -228,7 +344,7 @@ export function createScanDeviceRuntime(
     log(`scan-device: task=${session?.taskId ?? '-'} state=${stateName} pageCount=${session?.pageCount ?? 0} code=${code ?? '-'}`)
   }
 
-  const round = createRoundDriver({
+  roundSlot.driver = createRoundDriver({
     state,
     deps,
     maxPages,
@@ -236,6 +352,8 @@ export function createScanDeviceRuntime(
     deviceName: config.scanDeviceName ?? '',
     health,
     purge,
+    commitPurge,
+    scheduleCleanup: (taskId, reason, pid) => housekeeping.scheduleCleanup(taskId, reason, pid),
     note,
     sendReport,
     enqueueReport,
@@ -245,6 +363,9 @@ export function createScanDeviceRuntime(
     setGeneration: (next) => {
       generation = next
     },
+    armIdle: (current) => housekeeping.armIdle(current),
+    disarmIdle: () => housekeeping.disarmIdle(),
+    resetReportCursor,
   })
 
   const requireLease = async (taskId: string): Promise<DeviceLease> => {
@@ -256,18 +377,6 @@ export function createScanDeviceRuntime(
     throw new LocalScanError(409, 'LOCAL_SCAN_TASK_NOT_ACTIVE', viewOf(undefined), '当前没有可执行的屏上扫描任务')
   }
 
-  const restart = async (lease: DeviceLease): Promise<ScanDeviceView> => {
-    const session = state.session
-    if (session && inflight > 0) {
-      session.stopCode = session.stopCode ?? 'LOCAL_RESTART'
-      session.handle?.abort()
-      await tail
-    } else if (session) {
-      purge(session.taskId, 'SCAN_DEVICE_SESSION_CLEARED')
-    }
-    return round.begin(lease)
-  }
-
   const sameParams = (lease: DeviceLease): boolean => {
     const session = state.session
     return !!session && lease.device.source === session.source && lease.device.colorMode === session.color
@@ -275,7 +384,7 @@ export function createScanDeviceRuntime(
 
   return {
     async start(taskId) {
-      return exclusive(async () => {
+      const plan = await exclusive(async () => {
         const session = state.session
         if (session && session.taskId !== taskId && LIVE.has(session.phase)) {
           throw new LocalScanError(409, 'LOCAL_SCAN_BUSY', viewOf(session), '本机正在进行另一场扫描')
@@ -283,37 +392,65 @@ export function createScanDeviceRuntime(
         if (session && session.taskId === taskId && LIVE.has(session.phase)) {
           const fetched = await deps.fetchLease(deps.clock.now())
           if (fetched.kind === 'lease' && fetched.lease.scanTaskId === taskId) {
-            if (sameParams(fetched.lease)) return viewOf(session)
-            if (session.phase === 'scanning' || session.phase === 'page_ready') return restart(fetched.lease)
+            if (sameParams(fetched.lease)) return { kind: 'view' as const, view: viewOf(session) }
+            if (session.phase === 'scanning' || session.phase === 'page_ready') {
+              if (inflight > 0) {
+                session.stopCode = session.stopCode ?? 'LOCAL_RESTART'
+                session.handle?.abort()
+                await tail
+              } else {
+                purge(session.taskId, 'SCAN_DEVICE_SESSION_CLEARED')
+              }
+              const prepared = await round().prepare(fetched.lease)
+              if (!prepared.ok) return { kind: 'view' as const, view: prepared.view }
+              return { kind: 'launch' as const, taskId: fetched.lease.scanTaskId, generation: prepared.generation }
+            }
           }
-          return viewOf(session)
+          return { kind: 'view' as const, view: viewOf(session) }
         }
-        return round.begin(await requireLease(taskId))
+        const lease = await requireLease(taskId)
+        const prepared = await round().prepare(lease)
+        if (!prepared.ok) return { kind: 'view' as const, view: prepared.view }
+        return { kind: 'launch' as const, taskId: lease.scanTaskId, generation: prepared.generation }
       })
+      if (plan.kind === 'view') return plan.view
+      const lock = await round().acquire(plan.taskId)
+      return exclusive(() => round().launch(plan.generation, lock))
     },
     async nextPage(taskId) {
-      return exclusive(async () => {
+      const prepared = await exclusive(async () => {
         const session = state.session
         if (!session || session.taskId !== taskId || session.phase !== 'page_ready' || session.pageCount < 1) {
           throw new LocalScanError(409, 'LOCAL_SCAN_STATE_CONFLICT', viewOf(session), '现在不能扫描下一页')
         }
-        if (session.pageCount >= maxPages) {
+        if (session.pageCount >= session.pageCap) {
           throw new LocalScanError(409, 'LOCAL_SCAN_PAGE_LIMIT', viewOf(session), '已达到本机页数上限，请完成或中止')
         }
-        const startIndex = session.pageCount + 1
-        session.phase = 'scanning'
-        const lock = await round.acquire(taskId)
+        session.awaitingLock = true
+        housekeeping.disarmIdle()
+        return { generation: session.generation, startIndex: session.pageCount + 1 }
+      })
+      const lock = await round().acquire(taskId)
+      return exclusive(async () => {
+        const session = state.session
+        if (!session || session.generation !== prepared.generation) {
+          lock?.release()
+          return viewOf(session)
+        }
+        session.awaitingLock = false
+        if (session.abortRequested || session.phase !== 'page_ready') {
+          lock?.release()
+          if (session.abortRequested && session.phase === 'page_ready') return round().finishAbort()
+          return viewOf(session)
+        }
         if (!lock) {
-          await round.fail('busy')
-          return viewOf(state.session)
+          housekeeping.armIdle(session.generation)
+          throw new LocalScanError(409, 'LOCAL_SCAN_BUSY', viewOf(session), '扫描仪正忙，已扫的页还在。可以再试、点扫完了，或中止')
         }
-        if (state.session?.generation !== session.generation) {
-          lock.release()
-          return viewOf(state.session)
-        }
-        track(round.runBatch(lock, 1, startIndex, session.generation))
+        session.phase = 'scanning'
+        track(round().runBatch(lock, 1, prepared.startIndex, session.generation))
         note('scanning')
-        return viewOf(state.session)
+        return viewOf(session)
       })
     },
     async finish(taskId) {
@@ -322,9 +459,11 @@ export function createScanDeviceRuntime(
         if (!session || session.taskId !== taskId || session.phase !== 'page_ready' || session.pageCount < 1) {
           throw new LocalScanError(409, 'LOCAL_SCAN_STATE_CONFLICT', viewOf(session), '现在不能完成扫描')
         }
+        housekeeping.disarmIdle()
+        session.phase = 'composing'
         return session.generation
       })
-      const job = round.composeAndDeliver(current)
+      const job = round().composeAndDeliver(current)
       track(job.then(() => undefined))
       try {
         return await job
@@ -333,35 +472,36 @@ export function createScanDeviceRuntime(
       }
     },
     async abort(taskId) {
-      const wait = await exclusive(async () => {
+      const decision = await exclusive(async () => {
         const session = state.session
         if (session && session.taskId !== taskId && LIVE.has(session.phase)) {
-          purge(taskId, 'SCAN_DEVICE_ABORTED')
-          return false
+          const purged = commitPurge(taskId, 'SCAN_DEVICE_ABORTED')
+          return { kind: 'done' as const, view: { state: 'aborted' as const, pageCount: 0, errorCode: null, purged } }
         }
         if (!session || session.taskId !== taskId || !LIVE.has(session.phase)) {
-          purge(taskId, 'SCAN_DEVICE_ABORTED')
-          state.session = undefined
-          return false
+          const purged = commitPurge(taskId, 'SCAN_DEVICE_ABORTED')
+          if (session?.taskId === taskId) state.session = undefined
+          return { kind: 'done' as const, view: { state: 'aborted' as const, pageCount: 0, errorCode: null, purged } }
         }
         session.abortRequested = true
         session.handle?.abort()
-        return inflight > 0
+        if (session.awaitingLock || inflight === 0) return { kind: 'finish' as const }
+        return { kind: 'wait' as const }
       })
-      if (wait) await tail
-      else if (
-        state.session?.taskId === taskId &&
-        state.session.abortRequested &&
-        state.session.phase !== 'aborted'
-      ) {
-        await round.finishAbort()
+      if (decision.kind === 'done') return decision.view
+      if (decision.kind === 'wait') await tail
+      else await round().finishAbort()
+      const session = state.session
+      if (session?.taskId === taskId && session.delivered) {
+        return {
+          state: 'delivering' as const,
+          pageCount: session.pageCount,
+          errorCode: null,
+          ...(session.purgeSettled ? { purged: session.purged } : {}),
+        }
       }
-      if (state.session?.taskId === taskId && state.session.phase === 'aborted') return viewOf(state.session)
-      return {
-        state: 'aborted',
-        pageCount: state.session?.taskId === taskId ? state.session.pageCount : 0,
-        errorCode: null,
-      }
+      if (session?.taskId === taskId) return viewOf(session)
+      return { state: 'aborted' as const, pageCount: 0, errorCode: null }
     },
     probe: () => health.probe(),
     health: () => health.snapshot(),
@@ -380,9 +520,11 @@ export function createScanDeviceRuntime(
     },
     stop() {
       health.stop()
+      housekeeping.stop()
       armed = false
     },
     whenIdle: () => tail,
+    cleanupPending: () => housekeeping.pending(),
   }
 }
 

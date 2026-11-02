@@ -48,6 +48,20 @@ export const WIA_HRESULT = {
   COVER_OPEN: '0x80210016',
 } as const
 
+/**
+ * 设失败或属性不存在就必须当这次扫描没成功。
+ * 3088 来源，6146/4103 颜色，6147/6148 分辨率，6151/6152 扫描区域。
+ * 3096（进纸器）和 6149/6150（原点）失败只记日志，不在这张表里。
+ */
+export const WIA_REQUIRED_PROPERTY_IDS = [3088, 6146, 4103, 6147, 6148, 6151, 6152] as const
+
+const WIA_REQUIRED_PROPERTY_ID_SET = new Set<number>(WIA_REQUIRED_PROPERTY_IDS)
+
+/** 必需属性里设失败的那些。空数组表示可以按扫描结果本身判断成功与否。 */
+export function requiredWiaPropertiesFailed(setFailed: readonly number[]): number[] {
+  return setFailed.filter((id) => WIA_REQUIRED_PROPERTY_ID_SET.has(id))
+}
+
 /** 规范成 0x + 8 位大写十六进制；不是 HRESULT 形状返回 undefined。 */
 export function normalizeHresult(raw: unknown): string | undefined {
   if (typeof raw !== 'string') return undefined

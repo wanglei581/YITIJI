@@ -100,6 +100,9 @@ export interface ScanScript {
   errorCode?: ScanDeviceErrorCode
   /** abort() 时把结果标成强杀，用来验证下一轮开始前必须先探测。 */
   forceKillOnAbort?: boolean
+  /** 强杀后进程仍未确认退出。 */
+  stopUnconfirmed?: boolean
+  processId?: number
   /** 每一页回报之后停住，测试可以在这里中止。 */
   holdAfterPage?: boolean
 }
@@ -151,18 +154,19 @@ export function createScanner(): ScannerDouble {
           }
           if (aborted) break
         }
-        const produced = script.errorCode === 'paper_jam' ? [] : pages
-        const ok = script.ok ?? (!script.errorCode && produced.length > 0 && !aborted)
+        const ok = script.ok ?? (!script.errorCode && pages.length > 0 && !aborted)
         const endedBy = aborted
           ? 'canceled'
           : script.endedBy ?? (ok ? (request.source === 'flatbed' ? 'single_page' : 'feeder_emptied') : 'error')
         return {
           ok,
           endedBy,
-          pages: ok ? produced : produced,
+          pages,
           ...(script.errorCode ? { errorCode: script.errorCode } : {}),
-          discardedPages: script.errorCode === 'paper_jam' ? pages.length : 0,
+          discardedPages: 0,
           forceKilled,
+          stopUnconfirmed: script.stopUnconfirmed === true,
+          ...(script.processId !== undefined ? { processId: script.processId } : {}),
           attempts: 1,
           setFailed: [],
           elapsedMs: 1,
@@ -207,6 +211,10 @@ export function createHarness(input: {
   root: string
   config: AgentConfig
   now?: number
+  reportDelaysMs?: readonly number[]
+  isProcessAlive?: (pid: number) => boolean
+  beforeUpload?: () => Promise<void>
+  purge?: ScanDeviceRuntimeDeps['purge']
 }): Harness {
   const clock = createManualClock(input.now)
   const lock = new DeviceLock({ clock, logger: { log() {}, warn() {} } })
@@ -238,10 +246,13 @@ export function createHarness(input: {
       return reportResult.current(body, attempt)
     },
     readFile: async () => Buffer.from('%PDF-test'),
+    ...(input.beforeUpload ? { beforeUpload: input.beforeUpload } : {}),
+    ...(input.isProcessAlive ? { isProcessAlive: input.isProcessAlive } : {}),
+    ...(input.purge ? { purge: input.purge } : {}),
     clock,
     lock,
     root: input.root,
-    reportDelaysMs: [200, 400],
+    reportDelaysMs: input.reportDelaysMs ?? [200, 400],
   })
   return { runtime, clock, lock, scanner, reports, deliveries, probeCalls, lease, reportResult, root: input.root }
 }

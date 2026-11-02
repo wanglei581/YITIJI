@@ -81,7 +81,9 @@ function scanTaskIdFrom(body: Record<string, unknown>): string {
 }
 
 function dataOf(view: ScanDeviceView): ScanDeviceView {
-  return { state: view.state, pageCount: view.pageCount, errorCode: view.errorCode }
+  const data: ScanDeviceView = { state: view.state, pageCount: view.pageCount, errorCode: view.errorCode }
+  if (view.purged !== undefined) data.purged = view.purged
+  return data
 }
 
 function sendLocalScanError(
@@ -96,6 +98,7 @@ function sendLocalScanError(
     state: error.snapshot.state,
     pageCount: error.snapshot.pageCount,
     errorCode: error.snapshot.errorCode,
+    ...(error.snapshot.purged !== undefined ? { purged: error.snapshot.purged } : {}),
   }, origin)
 }
 

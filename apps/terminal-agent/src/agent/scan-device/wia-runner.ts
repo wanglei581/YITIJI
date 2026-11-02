@@ -4,7 +4,8 @@
  * 分层：
  *   runJob()         通用：起进程 → 逐行喂给 onLine → 空闲 / 总超时 → 软停（写取消标记）→
  *                    宽限期后 taskkill /T /F → 进程结束或强杀后兜底放行。
- *   startWiaScan()   扫描：脚本参数、逐页核实、HRESULT → 对外错误码、预热重试、卡纸删页。
+ *   startWiaScan()   扫描：脚本参数、逐页核实、HRESULT → 对外错误码、预热重试。
+ *                    卡纸保留页文件，由调用方整目录清理。强杀没确认退出时如实标出。
  * 同目录另有两块建在它之上：wia-probe.ts（健康探测）、scan-pdf-compose.ts（合 PDF）。
  *
  * 本批（A1）只提供底座和单测：不拿设备锁（A2 在外层拿）、不碰心跳 / 本机 HTTP / task-runner，
@@ -27,6 +28,7 @@ import {
   encodeWiaCommand,
   mapWiaHresult,
   parseWiaLine,
+  requiredWiaPropertiesFailed,
   resolvePowerShellPath,
   type ScanDeviceErrorCode,
   type WiaColor,
@@ -51,7 +53,11 @@ export interface RunnerClock {
 
 export interface WiaRunnerDeps {
   spawnProcess(command: string, args: string[], options: SpawnOptions): ChildProcess
-  killProcessTree(pid: number): Promise<void>
+  /**
+   * 强杀进程树。返回 false，或抛错，表示没确认杀成。
+   * 不返回值（void）视为已发出强杀，接着等进程自己退出。
+   */
+  killProcessTree(pid: number): Promise<unknown>
   clock: RunnerClock
   writeCancelFlag(filePath: string): void
   removeFile(filePath: string): void
@@ -126,6 +132,9 @@ export interface JobExit {
   forceKilled: boolean
   spawnFailed: boolean
   exitCode: number | null
+  /** 强杀没发出去，或发出去之后进程在等待窗口内仍没退出。 */
+  stopUnconfirmed: boolean
+  processId?: number
 }
 
 export interface JobHandle {
@@ -138,6 +147,8 @@ export function runJob(spec: JobSpec, deps: WiaRunnerDeps): JobHandle {
   let stopRequested = false
   let timedOut = false
   let forceKilled = false
+  let stopUnconfirmed = false
+  let processId: number | undefined
   let spawnFailed = false
   const timers: { idle?: unknown; total?: unknown; grace?: unknown; guard?: unknown } = {}
   const lineBuffer = new LineBuffer()
@@ -153,7 +164,7 @@ export function runJob(spec: JobSpec, deps: WiaRunnerDeps): JobHandle {
       if (timer !== undefined) deps.clock.clearTimeout(timer)
     }
     for (const line of lineBuffer.flush()) spec.onLine(line)
-    resolveDone({ timedOut, stopRequested, forceKilled, spawnFailed, exitCode })
+    resolveDone({ timedOut, stopRequested, forceKilled, spawnFailed, exitCode, stopUnconfirmed, processId })
   }
 
   let child: ChildProcess
@@ -182,13 +193,29 @@ export function runJob(spec: JobSpec, deps: WiaRunnerDeps): JobHandle {
     timers.grace = deps.clock.setTimeout(() => {
       if (closed) return
       forceKilled = true
+      processId = child.pid
       warn(`wia-runner: process still running ${spec.softStop ? `after ${spec.graceMs}ms grace` : 'after stop request'}; force-killing process tree`)
-      if (child.pid !== undefined) deps.killProcessTree(child.pid).catch(() => undefined)
-      timers.guard = deps.clock.setTimeout(() => {
+      const pid = child.pid
+      const kill = pid === undefined
+        ? Promise.resolve(false)
+        : Promise.resolve()
+            .then(() => deps.killProcessTree(pid))
+            .then((value) => value !== false, () => false)
+      void kill.then((confirmed) => {
         if (closed) return
-        warn('wia-runner: process did not exit after force kill; giving up waiting')
-        finish(null)
-      }, WIA_FORCE_KILL_WAIT_MS)
+        if (!confirmed) {
+          stopUnconfirmed = true
+          warn('wia-runner: force kill did not confirm the process stopped')
+          finish(null)
+          return
+        }
+        timers.guard = deps.clock.setTimeout(() => {
+          if (closed) return
+          stopUnconfirmed = true
+          warn('wia-runner: process did not exit after force kill; stop is unconfirmed')
+          finish(null)
+        }, WIA_FORCE_KILL_WAIT_MS)
+      })
     }, spec.softStop ? spec.graceMs : 0)
   }
 
@@ -269,14 +296,18 @@ export interface WiaScanResult {
   /** 至少拿到一页整页图，且没有任何需要丢弃结果的错误。 */
   ok: boolean
   endedBy: WiaScanEnd
-  /** 本次运行整页收到并核实过的图，按页序。卡纸时已删除并清空。 */
+  /** 本次运行整页收到并核实过的图，按页序。卡纸也留着，交给调用方整目录清理。 */
   pages: WiaScannedPage[]
   errorCode?: ScanDeviceErrorCode
   hresult?: string
-  /** 因卡纸而删除的页数。 */
+  /** 运行器自己删掉的页数。卡纸不再逐页删，这里是 0，页文件留给调用方。 */
   discardedPages: number
   /** 是否对 PowerShell 进程树用过 taskkill /T /F。A2 据此决定下次开始前先探测。 */
   forceKilled: boolean
+  /** 强杀没确认进程已经退出。调用方不得宣称清理完成。 */
+  stopUnconfirmed: boolean
+  /** 被强杀的进程号。只有强杀过才有。 */
+  processId?: number
   attempts: number
   setFailed: number[]
   elapsedMs: number
@@ -384,22 +415,14 @@ export function startWiaScan(request: WiaScanRequest, overrides: Partial<WiaRunn
       }
     })
 
-  const discard = (pages: WiaScannedPage[]): void => {
-    for (const page of pages) {
-      try {
-        deps.removeFile(page.file)
-      } catch {
-        warn('wia-runner: could not delete a discarded scan page; the task directory purge will retry')
-      }
-    }
-  }
-
   const finalize = (outcome: AttemptOutcome): WiaScanResult => {
     const { pages, final, exit } = outcome
     const result = (fields: Partial<WiaScanResult> & Pick<WiaScanResult, 'ok' | 'endedBy'>): WiaScanResult => ({
       pages,
       discardedPages: 0,
       forceKilled,
+      stopUnconfirmed: exit.stopUnconfirmed,
+      ...(exit.processId !== undefined ? { processId: exit.processId } : {}),
       attempts,
       setFailed: final?.setFailed ?? [],
       elapsedMs: deps.clock.now() - startedAt,
@@ -407,6 +430,16 @@ export function startWiaScan(request: WiaScanRequest, overrides: Partial<WiaRunn
     })
     const error = (errorCode: ScanDeviceErrorCode, hresult?: string): WiaScanResult =>
       result({ ok: false, endedBy: 'error', errorCode, hresult })
+    const blockedByProperty = (): WiaScanResult | undefined => {
+      const failed = requiredWiaPropertiesFailed(final?.setFailed ?? [])
+      if (failed.length === 0) {
+        const optional = (final?.setFailed ?? []).filter((id) => !failed.includes(id))
+        if (optional.length > 0) log(`wia-runner: optional WIA property failed ids=${optional.join(',')}`)
+        return undefined
+      }
+      warn(`wia-runner: required WIA property failed ids=${failed.join(',')}`)
+      return error('not_ready')
+    }
 
     if (abortRequested) return result({ ok: false, endedBy: 'aborted' })
     if (exit.timedOut) return error('timeout')
@@ -416,6 +449,8 @@ export function startWiaScan(request: WiaScanRequest, overrides: Partial<WiaRunn
       if (final.probe || final.pages !== pages.length) return error('unknown')
       if (final.canceled) return result({ ok: false, endedBy: 'canceled' })
       if (pages.length === 0) return error('unknown')
+      const blocked = blockedByProperty()
+      if (blocked) return blocked
       return result({ ok: true, endedBy: request.source === 'flatbed' ? 'single_page' : 'page_limit' })
     }
 
@@ -426,17 +461,13 @@ export function startWiaScan(request: WiaScanRequest, overrides: Partial<WiaRunn
       if (request.source !== 'feeder') return error('unknown', hresult)
       // 首页就无纸 = 没放纸；已有 ≥1 页后无纸 = 进纸器扫空了，正常结束。
       if (pages.length === 0) return error('feeder_empty', hresult)
+      const blocked = blockedByProperty()
+      if (blocked) return blocked
       return result({ ok: true, endedBy: 'feeder_emptied' })
     }
     if (hresult === WIA_HRESULT.PAPER_JAM) {
-      // 一期不做「只交已扫部分」：卡纸时已扫的页全部删除，用户重来。
-      const discarded = pages.length
-      discard(pages)
-      return {
-        ...error('paper_jam', hresult),
-        pages: [],
-        discardedPages: discarded,
-      }
+      // 页文件留在任务目录里。调用方用 SCAN_DEVICE_FAILED 整目录清理并写审计。
+      return error('paper_jam', hresult)
     }
     return error(mapWiaHresult(hresult), hresult)
   }
@@ -465,7 +496,7 @@ export function startWiaScan(request: WiaScanRequest, overrides: Partial<WiaRunn
     const finalResult = finalize(outcome)
     log(
       `wia-runner: scan finished ok=${finalResult.ok} ended=${finalResult.endedBy} pages=${finalResult.pages.length} ` +
-        `attempts=${finalResult.attempts} forceKilled=${finalResult.forceKilled} elapsedMs=${finalResult.elapsedMs}` +
+        `attempts=${finalResult.attempts} forceKilled=${finalResult.forceKilled} stopUnconfirmed=${finalResult.stopUnconfirmed} elapsedMs=${finalResult.elapsedMs}` +
         `${finalResult.errorCode ? ` code=${finalResult.errorCode}` : ''}${finalResult.hresult ? ` hresult=${finalResult.hresult}` : ''}`,
     )
     return finalResult

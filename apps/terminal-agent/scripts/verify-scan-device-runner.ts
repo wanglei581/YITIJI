@@ -43,6 +43,7 @@ import {
   verifyPrintClaimLock,
   type Harness,
 } from './verify-scan-device-runner.helper'
+import { verifyRound2 } from './verify-scan-device-runner-r2'
 
 const ALLOWED = 'https://kiosk.example.test'
 const BRIDGE = 'bridge-token-scan-device-verify'
@@ -782,6 +783,7 @@ async function main(): Promise<void> {
     await check('开关与装配', () => verifySwitchAndIndex(path.join(root, 'switch')))
     await check('投递带 origin', () => verifyDeliveryWire())
     await check('打印领取持锁', () => verifyPrintClaimLock(db))
+    await check('第二轮', () => verifyRound2(path.join(root, 'r2'), db))
     console.log(`verify-scan-device-runner: ok（${passed.length} 组）`)
   } finally {
     __resetUnauthorizedForTests(true)
