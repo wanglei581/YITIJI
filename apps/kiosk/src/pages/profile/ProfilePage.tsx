@@ -108,7 +108,7 @@ function ProfileContent() {
   // 打印台没有交接就落「这一页没有待处理的文件」，按钮带用户去选文件。
   const printFile = (file: { name: string; size: string; pages?: number }) => {
     void file
-    navigate('/print/preview')
+    navigate('/print/preview', { state: { licenseViewOnly: winding } })
   }
 
   const uiState = deriveProfileState({
@@ -128,7 +128,7 @@ function ProfileContent() {
   // 待办里的「继续付款 / 看出纸进度 / 去首页开始」在待办卡上。
   const dock = uiState === 'signed-out'
     ? (
-      <button type="button" className="qx-btn" data-variant="primary" data-grow="1" data-testid="profile-primary" disabled={winding} title={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={goLogin}>
+      <button type="button" className="qx-btn" data-variant="primary" data-grow="1" data-testid="profile-primary" onClick={goLogin}>
         <span data-testid="profile-login">去登录</span>
       </button>
     )
