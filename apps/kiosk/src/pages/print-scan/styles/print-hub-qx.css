@@ -935,6 +935,7 @@ button.ph-chip { cursor: pointer; }
   color: var(--qxt-ink);
 }
 .qx-copy-guide-kind .qx-copy-guide-p { font-size: var(--qxt-fs-body); line-height: 1.5; }
+.qx-copy-guide-nw { white-space: nowrap; }
 .qx-copy-guide-pill {
   display: flex;
   align-items: flex-start;
@@ -951,3 +952,55 @@ button.ph-chip { cursor: pointer; }
 }
 .qx-copy-guide-pill[data-tone='clay'] { background: var(--qxt-clay-wash); color: var(--qxt-clay-ink); }
 .qx-copy-guide-pill svg { flex: none; margin-top: 3px; }
+
+/* 手机宽度（舞台不缩放）：并排的收成单列，面板和图随宽度缩；正文不小于 15px（一体机 20px 的底线只管 1080 舞台）。 */
+@media (max-width: 760px) {
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-steps,
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-steps > li,
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-kinds { flex: none; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-card,
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-row { column-gap: 10px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-card { grid-template-columns: 34px minmax(0, 1fr); padding: 10px 12px 12px; border-radius: 20px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-row { grid-template-columns: 34px minmax(0, 1fr) auto; padding: 10px 12px 12px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-row[data-pos='first'] { border-radius: 20px 20px 0 0; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-row[data-pos='last'] { border-radius: 0 0 20px 20px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-row:not([data-pos='first']) { background-position: 12px 0; background-size: calc(100% - 24px) 1.5px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-n { width: 34px; height: 34px; font-size: 16px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-h { min-height: 34px; font-size: 20px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-p,
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-warn,
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-pill,
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-kind .qx-copy-guide-p,
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qx-copy-guide-notes .qxt-remind { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-two { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-pick { grid-template-columns: 84px minmax(0, 1fr); }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-vis { width: 84px; height: 84px; border-radius: 14px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-sp { flex-direction: column; align-items: stretch; gap: 12px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-panel,
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-panel[data-size='md'] { width: 100%; height: 150px; padding: 8px; gap: 8px; border-radius: 18px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-keys,
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-panel[data-size='md'] .qx-copy-guide-keys { width: 36px; gap: 6px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-key { border-radius: 10px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-key svg { width: 20px; height: 20px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-scr { gap: 6px; padding: 6px; border-radius: 12px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-btns { gap: 5px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-b { gap: 3px; padding: 8px 0 4px; border-radius: 9px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-b > svg:not(.qx-copy-guide-tap) { width: 26px; height: 26px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-lab,
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-bar { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-bar { height: 24px; padding: 0 8px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-tap { right: -6px; bottom: -14px; width: 28px; height: 28px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-more { min-height: 56px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-more b { font-size: 16px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-more small { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-well { width: 52px; height: 52px; border-radius: 14px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-well svg { width: 30px; height: 30px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-tray { width: 64px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-kind { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 10px; border-radius: 20px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-pic { padding: 12px 8px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-svg.qx-copy-guide-flip { width: 100%; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-kh { font-size: 20px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qx-copy-guide-notes .qxt-remind { padding: 10px 12px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qx-copy-guide-notes .qx-copy-guide-big { gap: 12px; padding: 12px 14px; font-size: 18px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-big svg { width: 34px; height: 34px; }
+}

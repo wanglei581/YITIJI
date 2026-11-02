@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
-import { assertNoHorizontalOverflow } from './assert-layout'
+import { assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 
 function collectRuntimeErrors(page: Page): string[] {
   const errors: string[] = []
@@ -406,9 +406,55 @@ test('unknown feature key fails closed with recovery actions @w2', async ({ page
   expect(errors).toEqual([])
 })
 
+/**
+ * 复印说明一屏的几何（1080×1920）：不滚动、没有大片留白、字 ≥20px（图里的字按渲染后的有效字号）、
+ * 可点区 ≥48px、底部主按钮 ≥64px。两个视图各量一次。
+ */
+async function expectCopyGuideGeometry(page: Page, label: string): Promise<void> {
+  const geo = await page.evaluate(() => {
+    const scroller = document.querySelector('.ph-page') as HTMLElement
+    const box = scroller.getBoundingClientRect()
+    const lastBottom = Math.max(...[...scroller.children].map((el) => el.getBoundingClientRect().bottom))
+    const ownText = (el: Element) => [...el.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && (node.textContent ?? '').trim().length > 0)
+    const fonts = [...scroller.querySelectorAll('*')]
+      .filter((el) => !el.closest('svg') && ownText(el))
+      .map((el) => parseFloat(getComputedStyle(el).fontSize))
+    // svg 里的字：写在 viewBox 里的字号 × 实际渲染宽 / viewBox 宽。
+    const svgFonts = [...scroller.querySelectorAll('svg text')].map((text) => {
+      const svg = (text as SVGTextElement).ownerSVGElement as SVGSVGElement
+      return parseFloat(getComputedStyle(text).fontSize) * (svg.getBoundingClientRect().width / svg.viewBox.baseVal.width)
+    })
+    const taps = [...document.querySelectorAll('.qxt-band button, .qxt-body button, .qxt-dock button')].map((el) => {
+      const rect = el.getBoundingClientRect()
+      return Math.min(rect.width, rect.height)
+    })
+    const ctas = [...document.querySelectorAll('.qxt-dock .qxt-btn')].map((el) => el.getBoundingClientRect().height)
+    const primary = (document.querySelector('[data-testid="print-hub-primary"]') as Element).getBoundingClientRect().height
+    return {
+      overflow: scroller.scrollHeight - scroller.clientHeight,
+      trailingBlank: box.bottom - lastBottom,
+      minFont: Math.min(...fonts),
+      minSvgFont: svgFonts.length > 0 ? Math.min(...svgFonts) : 9999,
+      minTap: Math.min(...taps),
+      minCta: Math.min(...ctas),
+      primary,
+    }
+  })
+  console.log(`copy-guide-geometry ${label} ${JSON.stringify(geo)}`)
+  expect(geo.overflow, `${label}：1080×1920 一屏放下，不需要滚动`).toBeLessThanOrEqual(1)
+  expect(geo.trailingBlank, `${label}：一屏内不许大片留白（整行 ≥160px 即算）`).toBeLessThan(160)
+  expect(geo.minFont, `${label}：主要文字 ≥20px`).toBeGreaterThanOrEqual(20)
+  expect(geo.minSvgFont, `${label}：图里的字按渲染后的有效字号 ≥20px`).toBeGreaterThanOrEqual(20)
+  expect(geo.minCta, `${label}：底部主按钮 ≥56px`).toBeGreaterThanOrEqual(56)
+  expect(geo.minTap, `${label}：可点区 ≥48px`).toBeGreaterThanOrEqual(48)
+  expect(geo.primary, `${label}：主按钮可点区 ≥64px`).toBeGreaterThanOrEqual(64)
+}
+
 // R4（2026-09-29 产品负责人拍板）：复印走打印机面板自带功能。打印扫描首页的「复印」卡原是 2.0 稿 10
 // 里不可点的静态说明（data-static / role=group），按拍板改为可点，进 /print-scan/feature/copy。
-// 这条用例从首页真实点击进入说明态，再点「返回打印扫描」回到首页。
+// 11/02 起复印说明是图文分步：第一视图五步配图，第 2 步旁的「这几种原件这样复印」进第二视图
+// （同一路由 ?view=cases：身份证、发票收据、正反两面都有字），第二视图的返回回到第一视图。
+// 这条用例从首页真实点击进入说明态，走完两个视图，再点「返回打印扫描」回到首页。
 test('copy card opens the panel copy guide and returns to the hub @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
@@ -430,6 +476,7 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
   await expect(page).toHaveURL(/\/print-scan\/feature\/copy$/)
   const guide = page.getByTestId('print-hub-state-feature-copy')
   await expect(guide).toBeVisible()
+  await expect(guide).toHaveAttribute('data-view', 'steps')
   await expect(page.getByRole('heading', { level: 1, name: '怎么在打印机上复印' })).toHaveCount(1)
   // 稿 18：这句话在意图带的副标题里，不再在正文里重复一遍。
   const band = page.locator('.qxt-band')
@@ -443,11 +490,20 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
   for (const manualWord of ['OK 键', 'OK键', '复印开始键']) {
     await expect(guide.getByText(manualWord, { exact: false })).toHaveCount(0)
   }
-  // 身份证放置位置待现场核实：只给指路句，不编造位置。
-  await expect(page.getByTestId('print-hub-copy-case-id-card')).toHaveAttribute('data-pending', 'true')
-  await expect(page.getByTestId('print-hub-copy-case-id-card')).toContainText('身份证怎么放、怎么翻面，请看打印机屏幕上的图示。')
+  // 第 1、2 步补的两句（出自厂家官方手册）。
+  await expect(guide.getByText('进纸器里有纸时先扫进纸器，玻璃上的不会被复印。')).toBeVisible()
+  await expect(guide.getByText('屏幕不在主屏时，先按触摸屏左边的主页键（小房子）。')).toBeVisible()
   await expect(page.getByTestId('print-hub-copy-take-original')).toContainText('复印件和原件一起带走。原件还在玻璃上或进纸口里，请务必取回。')
   await expect(page.getByTestId('print-hub-copy-legal')).toContainText('不得复印伪造的证件、印章、票据。')
+  // 三种原件不在第一视图里：它们在第二视图，从第 2 步旁的按钮进。
+  await expect(page.getByTestId('print-hub-copy-case-id-card')).toHaveCount(0)
+  // 第一视图：五步和进第二视图的按钮同屏可见、可点。
+  const entry = page.getByTestId('print-hub-copy-cases-entry')
+  await expect(entry).toBeVisible()
+  await expect(entry).toBeEnabled()
+  await expect(entry).toContainText('这几种原件这样复印')
+  await expect(entry).toContainText('身份证、发票、双面')
+  for (const step of await page.getByTestId('print-hub-copy-steps').locator('li').all()) await expect(step).toBeVisible()
   // 不伪造结果、不写收费、不写工程词。
   for (const word of ['已复印', '复印成功', '复印完成', '免费', '元/页', '服务端', 'Agent', '能力配置']) {
     await expect(guide.getByText(word, { exact: false })).toHaveCount(0)
@@ -456,28 +512,65 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
   await assertNoHorizontalOverflow(page)
 
   if (page.viewportSize()?.width === 1080) {
-    const geo = await page.evaluate(() => {
-      const scroller = document.querySelector('.ph-page') as HTMLElement
-      const box = scroller.getBoundingClientRect()
-      const lastBottom = Math.max(...[...scroller.children].map((el) => el.getBoundingClientRect().bottom))
-      const texts = [...scroller.querySelectorAll('b, .d, .ph-state-p, .ph-state-t, .ph-truth div, .ph-xq-doing, .ph-sec-h .t, .hint')]
-        .filter((el) => (el.textContent ?? '').trim().length > 0)
-        .map((el) => parseFloat(getComputedStyle(el).fontSize))
-      const ctas = [...document.querySelectorAll('.qxt-dock .qxt-btn')].map((el) => el.getBoundingClientRect().height)
+    const onScreen = await page.evaluate(() => {
+      const boxes = [
+        ...document.querySelectorAll('[data-testid="print-hub-copy-steps"] > li'),
+        document.querySelector('[data-testid="print-hub-copy-cases-entry"]') as Element,
+      ].map((el) => el.getBoundingClientRect())
       return {
-        overflow: scroller.scrollHeight - scroller.clientHeight,
-        trailingBlank: box.bottom - lastBottom,
-        minFont: Math.min(...texts),
-        minCta: Math.min(...ctas),
+        top: Math.min(...boxes.map((box) => box.top)),
+        bottom: Math.max(...boxes.map((box) => box.bottom)),
+        bandBottom: (document.querySelector('.qxt-band') as Element).getBoundingClientRect().bottom,
+        dockTop: (document.querySelector('.qxt-dock') as Element).getBoundingClientRect().top,
       }
     })
-    console.log(`copy-guide-geometry ${JSON.stringify(geo)}`)
-    expect(geo.overflow, '1080×1920 一屏放下，不需要滚动').toBeLessThanOrEqual(1)
-    expect(geo.trailingBlank, '一屏内不许大片留白（整行 ≥160px 即算）').toBeLessThan(160)
-    expect(geo.minFont, '主要文字 ≥20px').toBeGreaterThanOrEqual(20)
-    expect(geo.minCta, '底部主按钮 ≥56px').toBeGreaterThanOrEqual(56)
+    expect(onScreen.top, '五步和入口按钮都在意图带之下').toBeGreaterThanOrEqual(onScreen.bandBottom - 1)
+    expect(onScreen.bottom, '五步和入口按钮都在底栏之上，同一屏，不用滚').toBeLessThanOrEqual(onScreen.dockTop + 1)
+    await assertTapTargetPointerHit(entry)
+    await expectCopyGuideGeometry(page, '第一视图')
   }
   await page.screenshot({ path: test.info().outputPath('02-copy-guide.png') })
+
+  // 点第 2 步旁的「这几种原件这样复印」进第二视图（同一路由，查询串 view=cases）。
+  await entry.click()
+  await expect(page).toHaveURL(/\/print-scan\/feature\/copy\?view=cases$/)
+  await expect(guide).toHaveAttribute('data-view', 'cases')
+  await expect(page.getByRole('heading', { level: 1, name: '这几种原件这样复印' })).toHaveCount(1)
+  await expect(band.getByText('身份证、发票收据、正反两面都有字，各有一点不同。')).toBeVisible()
+  // 三种原件：身份证、发票收据、正反两面都有字。
+  for (const key of ['id-card', 'receipt', 'duplex']) {
+    await expect(page.getByTestId(`print-hub-copy-case-${key}`)).toBeVisible()
+  }
+  await expect(page.getByTestId('print-hub-copy-case-id-card')).toContainText('在打印机屏幕上点「身份证复印」，需要时改设置，再点「复印」开始。')
+  await expect(page.getByTestId('print-hub-copy-case-receipt')).toContainText('在打印机屏幕上点「票据复印」，原件字朝下放在玻璃上、合上盖，需要时改设置，再点「复印」开始。')
+  await expect(page.getByTestId('print-hub-copy-case-receipt')).toContainText('摆放位置以打印机屏幕提示为准。')
+  await expect(page.getByTestId('print-hub-copy-case-duplex')).toContainText('用进纸器放原件，选「双面复印」。第一面印完，原件会从进纸器出口出来。照原样放回进纸口，不翻面、不转方向，再按打印机屏幕提示印第二面。')
+  await expect(page.getByTestId('print-hub-copy-case-duplex')).toContainText('等太久没放，就只印单面。')
+  // 身份证放置位置待现场核实：只给指路句，不编造位置。
+  await expect(page.getByTestId('print-hub-copy-case-id-card')).toHaveAttribute('data-pending', 'true')
+  await expect(page.getByTestId('print-hub-copy-case-id-card')).toContainText('身份证怎么放、怎么翻面，请看打印机屏幕上的图示。')
+  // 两条提醒两个视图都在，原句不变。
+  await expect(page.getByTestId('print-hub-copy-take-original')).toContainText('复印件和原件一起带走。原件还在玻璃上或进纸口里，请务必取回。')
+  await expect(page.getByTestId('print-hub-copy-legal')).toContainText('不得复印伪造的证件、印章、票据。只能复印本人的真实证件和票据。')
+  // 第二视图同样不伪造结果、不写收费、不写工程词，也不写「找工作人员」一类说法（现场无人值守）。
+  for (const word of ['已复印', '复印成功', '复印完成', '免费', '元/页', '服务端', 'Agent', '能力配置', '工作人员']) {
+    await expect(guide.getByText(word, { exact: false })).toHaveCount(0)
+  }
+  await expectNoForgedReady(page)
+  await assertNoHorizontalOverflow(page)
+  if (page.viewportSize()?.width === 1080) await expectCopyGuideGeometry(page, '第二视图')
+  await page.screenshot({ path: test.info().outputPath('02b-copy-cases.png') })
+
+  // 第二视图的返回回到第一视图，不直接退出复印说明页：先点顶栏返回键，再进去，再点底栏的「返回」。
+  await band.getByRole('button', { name: '返回', exact: true }).click()
+  await expect(page).toHaveURL(/\/print-scan\/feature\/copy$/)
+  await expect(guide).toHaveAttribute('data-view', 'steps')
+  await expect(page.getByTestId('print-hub-copy-steps').locator('li')).toHaveCount(5)
+  await entry.click()
+  await expect(guide).toHaveAttribute('data-view', 'cases')
+  await page.locator('.qxt-dock').getByRole('button', { name: '返回', exact: true }).click()
+  await expect(page).toHaveURL(/\/print-scan\/feature\/copy$/)
+  await expect(guide).toHaveAttribute('data-view', 'steps')
 
   // 点底部操作条里的「返回打印扫描」（顶栏返回键同名，这里点的是操作条那一个）。
   await page.locator('.qxt-dock').getByRole('button', { name: '返回打印扫描', exact: true }).click()
