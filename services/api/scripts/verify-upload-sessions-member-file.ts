@@ -30,6 +30,7 @@ import { FilesService } from '../src/files/files.service'
 import { UPLOAD_SESSION_ORDER_ONLY_REASON } from '../src/files/retention-policy'
 import { MemberAssetsService } from '../src/member-assets/member-assets.service'
 import { MemberDataExportMapper } from '../src/member-privacy/member-data-export.mapper'
+import { AppendedSelfAssessmentService } from '../src/ai/resume/appended-self-assessment.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { StorageService } from '../src/storage/storage.service'
 import { UploadSessionsController } from '../src/upload-sessions/upload-sessions.controller'
@@ -638,6 +639,43 @@ async function httpContract(h: Harness, K: string, M: string): Promise<void> {
   }
 }
 
+// ── h. 自我探索追加：用只用于这一单的简历追加，合出来的 PDF（含整份原简历）跟着锁，「我的文档」和导出都不列 ──
+async function selfAssessmentAppendFollowsLock(h: Harness, K: string): Promise<void> {
+  const taskId = `verify-sa-${randomUUID()}`
+  const dims = ['interest', 'style', 'team', 'value', 'motivation'].map((key) => ({ key, label: key, strength: 3, note: null }))
+  await h.prisma.aiResumeResult.create({
+    data: {
+      taskId, kind: 'self_assessment', status: 'completed', provider: 'rules', endUserId: K,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      payloadJson: JSON.stringify({ dimensions: dims, summary: null, completedAt: new Date().toISOString() }),
+    },
+  })
+  try {
+    // 只测合并与落库：报告页用一页真 PDF 代替渲染（渲染另有门禁），审计不落库。
+    const selfAssessment = { renderReportForAppend: async () => ({ buffer: buildRealPdf(1), pageCount: 1 }) }
+    const append = new AppendedSelfAssessmentService(h.prisma, selfAssessment as never, h.files, { write: async () => null } as never)
+    const run = (resumeFileId: string) => append.appendToResume({ taskId, requester: { endUserId: K, accessToken: null }, resumeFileId })
+    const lockedResume = await document(h, K, '李晨阳-简历-手机传来.pdf', buildRealPdf(2))
+    await h.prisma.fileObject.update({ where: { id: lockedResume }, data: { retentionLockedReason: UPLOAD_SESSION_ORDER_ONLY_REASON } })
+    const ownResume = await document(h, K, '王晓雯-简历-自己的.pdf', buildRealPdf(2))
+    const lockedMerged = (await run(lockedResume)).fileId
+    const ownMerged = (await run(ownResume)).fileId
+    h.fileIds.add(lockedMerged)
+    h.fileIds.add(ownMerged)
+    const lockedRow = await h.prisma.fileObject.findUniqueOrThrow({ where: { id: lockedMerged } })
+    assert.equal(lockedRow.retentionLockedReason, UPLOAD_SESSION_ORDER_ONLY_REASON, 'appended PDF built from an order-only resume must inherit the lock')
+    const docIds = (await new MemberAssetsService(h.prisma).listDocuments(K, { cursor: null, pageSize: 50 })).items.map((item) => item.id)
+    assert.equal(docIds.includes(lockedMerged), false, 'appended PDF of an order-only resume must not be in K documents')
+    assert.ok(docIds.includes(ownMerged), 'positive control: appended PDF of K own resume is in K documents')
+    const exported = JSON.stringify(await new MemberDataExportMapper(h.prisma).build({ endUserId: K, requestId: 'verify-sa-append' }))
+    assert.equal(exported.includes(lockedMerged), false, 'appended PDF of an order-only resume must not be in K data export')
+    assert.ok(exported.includes(ownMerged), 'positive control: appended PDF of K own resume is in K data export')
+    pass('h 自我探索追加：用只用于这一单的简历合出来的 PDF 跟着锁，「我的文档」和本人数据导出都不列；用本人自己的简历照常列（对照）')
+  } finally {
+    await h.prisma.aiResumeResult.deleteMany({ where: { taskId } })
+  }
+}
+
 async function cleanup(h: Harness): Promise<void> {
   const owned = await h.prisma.fileObject.findMany({ where: { endUserId: { in: h.endUserIds } }, select: { id: true } })
   const strays = await h.prisma.fileObject.findMany({
@@ -682,6 +720,7 @@ async function main(): Promise<void> {
       ['同人校验/f', () => memberSessionSamePersonAndArchive(h, K, M)],
       ['g', () => abandonDeletesOnlyTheCopy(h, K)],
       ['HTTP', () => httpContract(h, K, M)],
+      ['h', () => selfAssessmentAppendFollowsLock(h, K)],
     ]
     for (const [name, run] of cases) {
       try {

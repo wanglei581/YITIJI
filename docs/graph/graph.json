@@ -24733,7 +24733,8 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts",
-      "services/api/scripts/verify-self-assessment-ai-gate.ts"
+      "services/api/scripts/verify-self-assessment-ai-gate.ts",
+      "services/api/scripts/verify-upload-sessions-member-file.ts"
     ],
     "services/api/src/ai/resume/career-plan-degraded-pdf.service.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -25966,6 +25967,7 @@
       "services/api/scripts/verify-file-retention.ts",
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-print-conversion.ts",
+      "services/api/scripts/verify-print-sign.ts",
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions.ts"
@@ -41494,6 +41496,7 @@
         "files": [
           "services/api/src/files/dto/kiosk-upload-options.dto.ts",
           "services/api/src/files/file-page-count.util.ts",
+          "services/api/src/files/retention-policy.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/print-sign/print-sign-geometry.ts",
           "services/api/src/print-sign/print-sign.service.ts",
@@ -43610,6 +43613,7 @@
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
           "services/api/scripts/support/upload-session-verifier.ts",
+          "services/api/src/ai/resume/appended-self-assessment.service.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/common/guards/end-user-auth.guard.ts",
           "services/api/src/common/jwt-verifier.module.ts",
