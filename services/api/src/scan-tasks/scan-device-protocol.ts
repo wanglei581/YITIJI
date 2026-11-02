@@ -56,6 +56,11 @@ export type ScanDeliverOrigin = (typeof SCAN_DELIVER_ORIGINS)[number]
 export const SCAN_DEVICE_HARD_LIFETIME_MS = 30 * 60 * 1000
 /** 每次收下终端程序回报，把 expiresAt 至少续到「现在 + 3 分钟」（不超过上限）。 */
 export const SCAN_DEVICE_RENEW_WINDOW_MS = 3 * 60 * 1000
+/**
+ * 用户「改用面板扫描」时，把 expiresAt 至少续到「现在 + 10 分钟」（= 面板会话的初始时长，不超过上限）。
+ * 用户在屏上试了很久（出错、重试）再切回面板，不能只剩一两分钟去面板上操作。
+ */
+export const SCAN_DEVICE_SWITCH_RENEW_WINDOW_MS = 10 * 60 * 1000
 /** 回报页数的合理上限（进纸器 50 页；终端程序默认页数上限 20，可配）。超过视为回报有误。 */
 export const SCAN_DEVICE_MAX_PAGE_COUNT = 200
 
@@ -99,11 +104,18 @@ export function canTransitionScanDeviceState(from: ScanDeviceState, to: ScanDevi
 }
 
 /**
- * 续期：min(max(expiresAt, now + 3 分钟), hardExpiresAt)。
+ * 续期：min(max(expiresAt, now + 窗口), hardExpiresAt)。窗口缺省 3 分钟（终端程序每次回报）；
+ * 改用面板扫描时传 SCAN_DEVICE_SWITCH_RENEW_WINDOW_MS（10 分钟）。
  * 只会把截止时间往后推、且永远不超过 hardExpiresAt；已经过了上限的会话不会被续命。
  */
-export function renewScanDeviceExpiry(args: { expiresAt: Date; hardExpiresAt: Date; now: Date }): Date {
-  const wanted = Math.max(args.expiresAt.getTime(), args.now.getTime() + SCAN_DEVICE_RENEW_WINDOW_MS)
+export function renewScanDeviceExpiry(args: {
+  expiresAt: Date
+  hardExpiresAt: Date
+  now: Date
+  windowMs?: number
+}): Date {
+  const windowMs = args.windowMs ?? SCAN_DEVICE_RENEW_WINDOW_MS
+  const wanted = Math.max(args.expiresAt.getTime(), args.now.getTime() + windowMs)
   return new Date(Math.min(wanted, args.hardExpiresAt.getTime()))
 }
 

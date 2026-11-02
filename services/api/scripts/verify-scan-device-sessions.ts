@@ -59,6 +59,7 @@ import {
   SCAN_DEVICE_RENEW_WINDOW_MS,
   SCAN_DEVICE_STATES,
   SCAN_DEVICE_STATE_TRANSITIONS,
+  SCAN_DEVICE_SWITCH_RENEW_WINDOW_MS,
   renewScanDeviceExpiry,
   type ScanDeviceState,
 } from '../src/scan-tasks/scan-device-protocol'
@@ -185,7 +186,8 @@ async function main(): Promise<void> {
     pass('状态转移表与规格表逐项一致（49 个组合：25 合法、24 非法）')
     assert.equal(SCAN_DEVICE_HARD_LIFETIME_MS, 30 * 60 * 1000, '续期上限 = createdAt + 30 分钟')
     assert.equal(SCAN_DEVICE_RENEW_WINDOW_MS, 3 * 60 * 1000, '每次回报续到 now + 3 分钟')
-    pass('续期上限 30 分钟、续期窗口 3 分钟')
+    assert.equal(SCAN_DEVICE_SWITCH_RENEW_WINDOW_MS, 10 * 60 * 1000, '改用面板扫描续到 now + 10 分钟')
+    pass('续期上限 30 分钟、回报续期窗口 3 分钟、改用面板扫描续期窗口 10 分钟')
 
     for (const [label, contract] of [['api 副本', apiContract], ['shared', sharedContract]] as const) {
       assert.ok((contract.PRINT_SCAN_CAPABILITY_KEYS as readonly string[]).includes('scan_device'), `${label}能力键表缺 scan_device`)
@@ -472,6 +474,10 @@ async function main(): Promise<void> {
       assert.equal(renewScanDeviceExpiry({ expiresAt: new Date(day.getTime() + 10 * 60_000), hardExpiresAt: hard, now: new Date(day.getTime() + 9 * 60_000) }).getTime(), day.getTime() + 12 * 60_000, '9 分钟时回报：续到 12 分钟')
       assert.equal(renewScanDeviceExpiry({ expiresAt: new Date(day.getTime() + 10 * 60_000), hardExpiresAt: hard, now: new Date(day.getTime() + 2 * 60_000) }).getTime(), day.getTime() + 10 * 60_000, '2 分钟时回报：已超过 now+3 分钟，不缩短')
       assert.equal(renewScanDeviceExpiry({ expiresAt: new Date(day.getTime() + 28 * 60_000), hardExpiresAt: hard, now: new Date(day.getTime() + 29 * 60_000) }).getTime(), hard.getTime(), '29 分钟时回报：封顶在 hardExpiresAt')
+      const tenMin = { windowMs: SCAN_DEVICE_SWITCH_RENEW_WINDOW_MS, hardExpiresAt: hard }
+      assert.equal(renewScanDeviceExpiry({ ...tenMin, expiresAt: new Date(day.getTime() + 10 * 60_000), now: new Date(day.getTime() + 9 * 60_000) }).getTime(), day.getTime() + 19 * 60_000, '9 分钟时改用面板：续到 19 分钟')
+      assert.equal(renewScanDeviceExpiry({ ...tenMin, expiresAt: new Date(day.getTime() + 25 * 60_000), now: new Date(day.getTime() + 5 * 60_000) }).getTime(), day.getTime() + 25 * 60_000, '已超过 now+10 分钟：不缩短')
+      assert.equal(renewScanDeviceExpiry({ ...tenMin, expiresAt: new Date(day.getTime() + 20 * 60_000), now: new Date(day.getTime() + 25 * 60_000) }).getTime(), hard.getTime(), '25 分钟时改用面板：封顶在 hardExpiresAt（只剩 5 分钟）')
 
       const t = await makeTerminal('renew')
       const created = await deviceSession(t.id)
@@ -576,6 +582,7 @@ async function main(): Promise<void> {
       assert.equal((await rowOf(id)).startMode, 'device', '被拒的切换不得改库')
 
       // 成功：会员登出后（调用方身份为 null）凭令牌仍可切，与 DELETE 一致
+      const switchedAt = Date.now()
       const result = await deviceSvc.switchToPanel(id, null, created.controlToken)
       assert.equal(result.scanTaskId, id)
       assert.equal(result.startMode, 'panel')
@@ -588,16 +595,25 @@ async function main(): Promise<void> {
       assert.equal(after.id, before.id)
       assert.equal(after.controlTokenHash, before.controlTokenHash, '控制令牌原样保留')
       assert.equal(after.deliveryAckedAt?.getTime(), before.deliveryAckedAt?.getTime(), 'ACK 原样保留')
-      assert.equal(after.expiresAt.getTime(), before.expiresAt.getTime())
       assert.equal(after.endUserId, owner.id)
-      pass('原地切换：startMode→panel、deviceState→aborted、清 errorCode；会话 / 令牌 / ACK / 归属 / 截止时间原样')
+      // 截止时间只会往后推：续到至少切换时刻 + 10 分钟，但不超过 hardExpiresAt；响应里的 expiresAt 与库一致
+      assert.ok(after.expiresAt.getTime() >= before.expiresAt.getTime(), '切换只会把截止时间往后推')
+      assert.ok(
+        after.expiresAt.getTime() >= switchedAt + 10 * 60_000 - 2000,
+        `切换后至少还剩约 10 分钟，实际只剩 ${Math.round((after.expiresAt.getTime() - switchedAt) / 1000)} 秒`,
+      )
+      assert.ok(after.expiresAt.getTime() <= (after.hardExpiresAt as Date).getTime(), '续期不超过 hardExpiresAt')
+      assert.equal(result.expiresAt, after.expiresAt.toISOString(), '响应里的 expiresAt 与库一致')
+      pass('原地切换：startMode→panel、deviceState→aborted、清 errorCode；会话 / 令牌 / ACK / 归属原样；截止时间续到至少 10 分钟且不超过 hardExpiresAt')
 
       // 幂等
       const again = await deviceSvc.switchToPanel(id, owner.id, created.controlToken)
       assert.equal(again.startMode, 'panel')
       const afterAgain = await rowOf(id)
       assert.equal(afterAgain.deviceUpdatedAt?.getTime(), after.deviceUpdatedAt?.getTime(), '重复调用不再写库')
-      pass('重复调用幂等')
+      assert.equal(afterAgain.expiresAt.getTime(), after.expiresAt.getTime(), '重复调用不再续期')
+      assert.equal(again.expiresAt, after.expiresAt.toISOString(), '重复调用返回的 expiresAt 就是第一次续出来的')
+      pass('重复调用幂等(不再写库、不再续期)')
 
       // 不触发静默期：没有任何取消 / 过期行；ACK 仍可立即重放；对照：取消会触发
       const quiet = (scanSvc as unknown as { assertTerminalQuietPeriod: (terminalId: string) => Promise<void> })
@@ -661,6 +677,46 @@ async function main(): Promise<void> {
         assert.equal((await rowOf(cc.scanTaskId)).deviceState, 'aborted')
       }
       pass('ready / scanning / page_ready / composing 状态下都能原地切换')
+
+      // 切换续期的边界
+      {
+        // 只剩几十秒：续到约 now + 10 分钟
+        const tr = await makeTerminal('switchrenew1')
+        const c1 = await deviceSession(tr.id)
+        const t0 = Date.now()
+        await prisma.scanTask.update({ where: { id: c1.scanTaskId }, data: { expiresAt: new Date(t0 + 30_000) } })
+        await deviceSvc.switchToPanel(c1.scanTaskId, null, c1.controlToken)
+        const r1 = await rowOf(c1.scanTaskId)
+        assert.ok(Math.abs(r1.expiresAt.getTime() - (t0 + 10 * 60_000)) < 10_000, `只剩 30 秒时切换，应续到约 10 分钟，实际差 ${r1.expiresAt.getTime() - t0 - 600_000}ms`)
+        assert.ok(r1.expiresAt.getTime() <= (r1.hardExpiresAt as Date).getTime())
+
+        // 已经比 now + 10 分钟更长：不缩短
+        const t2 = await makeTerminal('switchrenew2')
+        const c2 = await deviceSession(t2.id)
+        const longer = new Date(Date.now() + 20 * 60_000)
+        await prisma.scanTask.update({ where: { id: c2.scanTaskId }, data: { expiresAt: longer } })
+        await deviceSvc.switchToPanel(c2.scanTaskId, null, c2.controlToken)
+        assert.equal((await rowOf(c2.scanTaskId)).expiresAt.getTime(), longer.getTime(), '已超过 now+10 分钟的截止时间不被缩短')
+
+        // 封顶：hardExpiresAt 只剩 4 分钟 → 续到 hardExpiresAt，不能越过
+        const t3 = await makeTerminal('switchrenew3')
+        const c3 = await deviceSession(t3.id)
+        const hardAt = new Date(Date.now() + 4 * 60_000)
+        await prisma.scanTask.update({ where: { id: c3.scanTaskId }, data: { hardExpiresAt: hardAt, expiresAt: new Date(Date.now() + 60_000) } })
+        await deviceSvc.switchToPanel(c3.scanTaskId, null, c3.controlToken)
+        assert.equal((await rowOf(c3.scanTaskId)).expiresAt.getTime(), hardAt.getTime(), '切换续期必须封顶在 hardExpiresAt')
+
+        // 已经到了 hardExpiresAt：没有可续的，如实拒绝且不改库
+        const t4 = await makeTerminal('switchrenew4')
+        const c4 = await deviceSession(t4.id)
+        const beyond = new Date(Date.now() + 60_000)
+        await prisma.scanTask.update({ where: { id: c4.scanTaskId }, data: { hardExpiresAt: new Date(Date.now() - 1000), expiresAt: beyond } })
+        await expectHttp(() => deviceSvc.switchToPanel(c4.scanTaskId, null, c4.controlToken), 409, 'SCAN_TASK_NOT_ACTIVE', '已达 hardExpiresAt 不能再改用面板扫描')
+        const r4 = await rowOf(c4.scanTaskId)
+        assert.equal(r4.startMode, 'device', '被拒的切换不得改库')
+        assert.equal(r4.expiresAt.getTime(), beyond.getTime())
+        pass('切换续期：只剩 30 秒续到约 10 分钟；已更长不缩短；封顶 hardExpiresAt；已到上限拒绝且不改库')
+      }
     }
 
     // ── F. deliver 的 origin ───────────────────────────────────────────────────

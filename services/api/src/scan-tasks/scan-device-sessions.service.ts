@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import {
   SCAN_DEVICE_HARD_LIFETIME_MS,
+  SCAN_DEVICE_SWITCH_RENEW_WINDOW_MS,
   isScanDeviceTask,
   isSwitchedToPanel,
   planScanDeviceReport,
@@ -155,7 +156,9 @@ export class ScanDeviceSessionsService {
    *
    * 会话、控制令牌、ACK 原样保留；**不触发也不检查终端静默期**（走取消重建会吃 90 秒静默期，
    * 这是单独做这条接口的原因）。之后 current-lease 按面板任务给，watcher 照常能投。
-   * 只在 device 任务、还没投递文件时允许；重复调用幂等。
+   * 截止时间续到 min(max(expiresAt, now + 10 分钟), hardExpiresAt)：用户在屏上试了很久再切，
+   * 不至于只剩一两分钟去面板上操作（仍不超过 hardExpiresAt）。
+   * 只在 device 任务、还没投递文件时允许；重复调用幂等（第二次不再写库、不再续期）。
    * 权限照 DELETE：控制令牌必须正确；调用方带了会员身份时必须就是会话所有者。
    */
   async switchToPanel(
@@ -196,7 +199,20 @@ export class ScanDeviceSessionsService {
       if (task.status !== 'waiting' || task.expiresAt.getTime() <= now.getTime()) {
         conflict('SCAN_TASK_NOT_ACTIVE', '扫描任务已结束，不能再改用面板扫描')
       }
-      if (alreadySwitched) return this.toSwitchResult(task)
+      if (alreadySwitched) return this.toSwitchResult(task, task.expiresAt)
+
+      // 截止时间续到至少 now + 10 分钟（不超过 hardExpiresAt）。已经到了 hardExpiresAt 的会话没有可续的了，如实拒绝。
+      const hardExpiresAt =
+        task.hardExpiresAt ?? new Date(task.createdAt.getTime() + SCAN_DEVICE_HARD_LIFETIME_MS)
+      if (hardExpiresAt.getTime() <= now.getTime()) {
+        conflict('SCAN_TASK_NOT_ACTIVE', '屏上扫描会话已达最长时限，不能再改用面板扫描')
+      }
+      const expiresAt = renewScanDeviceExpiry({
+        expiresAt: task.expiresAt,
+        hardExpiresAt,
+        now,
+        windowMs: SCAN_DEVICE_SWITCH_RENEW_WINDOW_MS,
+      })
 
       const switched = await this.prisma.scanTask.updateMany({
         where: {
@@ -211,9 +227,10 @@ export class ScanDeviceSessionsService {
           deviceState: 'aborted',
           deviceErrorCode: null,
           deviceUpdatedAt: now,
+          expiresAt,
         },
       })
-      if (switched.count === 1) return this.toSwitchResult(task)
+      if (switched.count === 1) return this.toSwitchResult(task, expiresAt)
       // 读与写之间有人改了这一行（刚好投递、取消、过期）：重读重判。
     }
     conflict('SCAN_DEVICE_STATE_CHANGED', '扫描任务状态刚刚发生变化，请刷新后再试')
@@ -232,11 +249,11 @@ export class ScanDeviceSessionsService {
     }
   }
 
-  private toSwitchResult(task: { id: string; scanType: string; expiresAt: Date }): ScanSwitchToPanelResult {
+  private toSwitchResult(task: { id: string; scanType: string }, expiresAt: Date): ScanSwitchToPanelResult {
     return {
       scanTaskId: task.id,
       startMode: 'panel',
-      expiresAt: task.expiresAt.toISOString(),
+      expiresAt: expiresAt.toISOString(),
       instructions: SCAN_TYPE_INSTRUCTIONS[task.scanType as ScanType] ?? [],
     }
   }
