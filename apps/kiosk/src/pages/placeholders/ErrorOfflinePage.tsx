@@ -216,6 +216,22 @@ function rowsFor(view: View, result: CheckResult | null): Row[] {
   ]
 }
 
+/** 连得上之后，四项能读的（联网、本机程序、打印机、扫描件的存放）这次读到了什么。 */
+type Outcome = 'all-read' | 'has-bad' | 'has-unread'
+
+/**
+ * 标题与胶囊照读数说，不能一律写「有几项取不到」。页面现在读完不再回首页，留在本页的最常见一屏就是
+ * 「四项都读到了、都可用」——那时再写「取不到」是假话（走查 I-01 接续）。
+ *   has-bad    有项读到了、但读到的是不能用（缺纸、异常、离线、暂停接单、暂停接收）；
+ *   all-read   四项都读到、都可用；
+ *   has-unread 其余：至少有一项没读到。
+ */
+function outcomeOf(rows: Row[]): Outcome {
+  const tones = rows.slice(0, 4).map((row) => row.verdict[1])
+  if (tones.includes('bad')) return 'has-bad'
+  return tones.every((tone) => tone === 'ok') ? 'all-read' : 'has-unread'
+}
+
 const clock = (date: Date) => `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 
 export default function ErrorOfflinePage() {
@@ -313,26 +329,33 @@ export default function ErrorOfflinePage() {
   const rows = rowsFor(view, result)
   const lastCheck = result ? `最近一次检测：${clock(result.at)}` : ''
   const nextAuto = `约 ${autoDelayMs / 1000} 秒后自动再${view === 'offline' ? '试' : '检测'}`
+  const outcome = outcomeOf(rows)
   const title = view === 'unknown'
     ? '这台机器还没检测'
     : view === 'checking'
       ? '正在检测'
       : view === 'partial'
-        ? '连得上，但有几项取不到'
+        ? (outcome === 'all-read' ? '这次读到的都可用' : outcome === 'has-bad' ? '连得上，但有项目不能用' : '连得上，但有几项取不到')
         : '和服务器连不上'
   const sub = view === 'unknown'
     ? '还没向服务器和打印机问过。'
     : view === 'checking'
       ? '先问联网、本机程序、打印机和扫描接收；其余随办理确认。'
       : view === 'partial'
-        ? '取不到的标成暂时读不到。'
+        ? (outcome === 'all-read'
+          ? '只说明这一次读到的结果。付款、AI 服务和机构官方渠道，办理到那一步再确认。'
+          : outcome === 'has-bad'
+            ? '读到不能用的已经标出来；没读到的标成暂时读不到。'
+            : '取不到的标成暂时读不到。')
         : '这次连不上。其余没问到的项标成暂时读不到。'
-  const pill = {
+  const pill: Record<View, { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }> = {
     unknown: { tone: 'unknown', label: '还没检测' },
     checking: { tone: 'unknown', label: '正在检测' },
-    partial: { tone: 'warn', label: '部分取不到' },
+    partial: outcome === 'all-read'
+      ? { tone: 'ok', label: '这次读到可用' }
+      : { tone: 'warn', label: outcome === 'has-bad' ? '有项目不能用' : '部分取不到' },
     offline: { tone: 'bad', label: '连不上服务器' },
-  } as const
+  }
   const remind = view === 'offline' ? faultLine : helpLine
 
   return (
@@ -368,7 +391,7 @@ export default function ErrorOfflinePage() {
             />
           )}
         >
-          <div className="of-page" data-testid={`system-state-state-${view}`}>
+          <div className="of-page" data-testid={`system-state-state-${view}`} data-outcome={view === 'partial' ? outcome : undefined}>
             {/* 自动再测的间隔与已重试次数只留给读屏和门禁核对，屏上不写秒数，页面也不自己跳走。 */}
             <p className="qxp-sr" data-testid="system-state-auto">
               {view === 'offline' ? `已重试 ${attempts} 次，${nextAuto}` : nextAuto}

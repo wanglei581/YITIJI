@@ -980,18 +980,27 @@ test('device status checks immediately and keeps healthy readings on this page @
   await expect(page.locator('[data-cap="printer"]')).toContainText('这次读到可用')
   await expect(page.locator('[data-cap="scan"]')).toContainText('这次读到可接收')
   await expect(page).toHaveURL(/\/error-offline$/)
+  // 四项能读的都读到了：标题和胶囊要照读数说「都可用」，不能还停在「有几项取不到」。
+  // 页面读完不再回首页，留在本页的这一屏是最常见的一屏（走查 I-01 的接续：标题要对得上读数）。
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('这次读到的都可用')
+  await expect(page.locator('.qxt-status')).toHaveText('这次读到可用')
+  await expect(page.getByTestId('system-state-state-partial')).toHaveAttribute('data-outcome', 'all-read')
+  await expect(page.locator('body')).not.toContainText('取不到')
   await page.getByRole('button', { name: '重新检测', exact: true }).click()
   await expect(page.locator('[data-cap="printer"]')).toContainText('这次读到可用')
   await expect(page).toHaveURL(/\/error-offline$/)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('这次读到的都可用')
   await expectFusionAcceptance(page, errors)
   await page.screenshot({ path: testInfo.outputPath('device-status.png'), fullPage: true })
 })
 
+const NOT_USABLE_HEADING = '连得上，但有项目不能用'
+const UNREAD_HEADING = '连得上，但有几项取不到'
 for (const reading of [
-  { online: true, health: 'locked_out', expected: '暂停接收' },
-  { online: true, health: null, expected: '暂时读不到' },
-  { online: true, health: 'unrecognised', expected: '暂时读不到' },
-  { online: false, health: 'healthy', expected: '暂时读不到' },
+  { online: true, health: 'locked_out', expected: '暂停接收', heading: NOT_USABLE_HEADING, pill: '有项目不能用', outcome: 'has-bad' },
+  { online: true, health: null, expected: '暂时读不到', heading: UNREAD_HEADING, pill: '部分取不到', outcome: 'has-unread' },
+  { online: true, health: 'unrecognised', expected: '暂时读不到', heading: UNREAD_HEADING, pill: '部分取不到', outcome: 'has-unread' },
+  { online: false, health: 'healthy', expected: '暂时读不到', heading: UNREAD_HEADING, pill: '部分取不到', outcome: 'has-unread' },
 ]) {
   test(`device status scan verdict uses fresh explicit health ${reading.online}-${reading.health} @w5-kiosk`, async ({ page, api }) => {
     registerKioskShell(api)
@@ -1004,8 +1013,25 @@ for (const reading of [
     await expect(page.locator('[data-cap="scan"]')).toContainText(reading.expected)
     if (!reading.online) await expect(page.locator('[data-cap="agent"]')).toContainText('暂时读不到')
     await expect(page).toHaveURL(/\/error-offline$/)
+    // 标题与胶囊照读数说：读到不能用的写「不能用」，没读到的才写「取不到」，不混着说。
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(reading.heading)
+    await expect(page.locator('.qxt-status')).toHaveText(reading.pill)
+    await expect(page.getByTestId('system-state-state-partial')).toHaveAttribute('data-outcome', reading.outcome)
   })
 }
+
+test('device status headline says what was read when the printer itself reports a fault @w5-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/health', { status: 200, json: { data: { status: 'ok' } } })
+  api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
+    status: 200, json: { data: { isOnline: true, printerStatus: 'paper_empty', scanInputHealth: 'healthy' } },
+  })
+  await page.goto('/error-offline')
+  await expect(page.locator('[data-cap="printer"]')).toContainText('缺纸')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(NOT_USABLE_HEADING)
+  await expect(page.getByTestId('system-state-state-partial')).toHaveAttribute('data-outcome', 'has-bad')
+  await expect(page.locator('body')).not.toContainText('取不到')
+})
 
 test('device status preserves an explicit fault return destination after recovery @w5-kiosk', async ({ page, api }) => {
   registerKioskShell(api)
