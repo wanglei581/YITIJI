@@ -7,7 +7,7 @@ import {
 import type { Redis } from 'ioredis'
 import type { FilePurpose, FileSensitiveLevel } from '../files/file.types'
 import { FilesService } from '../files/files.service'
-import { defaultRetentionForUpload } from '../files/retention-policy'
+import { defaultRetentionForUpload, UPLOAD_SESSION_ORDER_ONLY_REASON } from '../files/retention-policy'
 import { signFileUrl } from '../files/signing'
 import { generateObjectKey } from '../storage/object-key'
 import {
@@ -346,11 +346,14 @@ export async function applyOwnership(
   file: BindFileRow,
   intent: MemberBindIntent,
 ): Promise<void> {
+  // 只用于这一单（11/02 拍板，见 UPLOAD_SESSION_ORDER_ONLY_REASON）：挂本人名下供后面按本人校验，但不进「我的文档」；
+  // 到期沿用上传那一刻起算的系统短期，和未登录一样，确认不续期。合同另有自己的锁。
   const retention = defaultRetentionForUpload({
     purpose: file.purpose as FilePurpose,
     sensitiveLevel: file.sensitiveLevel as FileSensitiveLevel,
     ownerType: 'user',
     endUserId: intent.endUserId,
+    orderOnly: true,
   })
   const isContract = file.purpose === 'contract_upload'
   const switched = await host.prisma.fileObject.updateMany({
@@ -367,18 +370,13 @@ export async function applyOwnership(
       storageKey: intent.userKey,
       pendingStorageKey: null,
       replacedStorageKey: intent.previousKey === intent.userKey ? null : intent.previousKey,
-      expiresAt: isContract ? file.expiresAt : retention.expiresAt,
+      expiresAt: file.expiresAt ?? retention.expiresAt,
       retentionPolicy: retention.retentionPolicy,
       retentionSetBy: retention.retentionSetBy,
       retentionConsentAt: retention.retentionConsentAt,
       retentionConsentVersion: retention.retentionConsentVersion,
-      ...(isContract
-        ? {
-            sensitiveLevel: 'highly_sensitive',
-            visibility: 'private',
-            retentionLockedReason: 'contract_review_session_only',
-          }
-        : {}),
+      retentionLockedReason: isContract ? 'contract_review_session_only' : UPLOAD_SESSION_ORDER_ONLY_REASON,
+      ...(isContract ? { sensitiveLevel: 'highly_sensitive', visibility: 'private' } : {}),
     },
   })
   if (switched.count === 1) return

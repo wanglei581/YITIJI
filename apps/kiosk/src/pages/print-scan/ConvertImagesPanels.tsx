@@ -382,6 +382,8 @@ export function convertDockSpec(props: {
   rechecking: boolean
   uploading: boolean
   hasEndUser: boolean | undefined
+  /** 这份 PDF 进没进「我的文档」；只用于这一单时不给「查看我的文档」。 */
+  savedToDocuments: boolean | undefined
   kiosk: boolean
   onConvert: () => void
   onRecheck: () => void
@@ -395,7 +397,7 @@ export function convertDockSpec(props: {
   onPickLocal: () => void
   onBack: () => void
 }): ConvertDockSpec {
-  const { phase, imageCount, error, generating, rechecking, uploading, hasEndUser, kiosk } = props
+  const { phase, imageCount, error, generating, rechecking, uploading, hasEndUser, savedToDocuments, kiosk } = props
   const primary = (p: Omit<QxTouchPrimary, 'testId'>): QxTouchPrimary => ({ ...p, testId: 'img2pdf-primary' })
 
   if (phase === 'empty') {
@@ -420,7 +422,9 @@ export function convertDockSpec(props: {
       primary: primary({ label: '拿这份 PDF 去打印', onClick: props.onPrint }),
       rows: typeof hasEndUser === 'boolean'
         ? hasEndUser
-          ? <ActionRow title="查看我的文档" desc="登录后可以去我的文档" onClick={props.onDocuments} />
+          ? (savedToDocuments
+              ? <ActionRow title="查看我的文档" desc="登录后可以去我的文档" onClick={props.onDocuments} />
+              : null)
           : <ActionRow title="先登录再转换" desc="这是完成之后的登录入口，合成本身不用先登录" onClick={props.onLogin} />
         : null,
     }

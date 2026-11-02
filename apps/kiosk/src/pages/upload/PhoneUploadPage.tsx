@@ -75,13 +75,13 @@ const PHONE_UPLOAD_PURPOSES = (wordConversionAvailable: boolean): Readonly<Recor
     noun: '简历文件',
     label: '简历上传',
     accept: wordConversionAvailable ? `${BASE_RESUME_ACCEPT},${WORD_ACCEPT}` : BASE_RESUME_ACCEPT,
-    retain: '确认之后：已登录会员按简历类默认保存 **90 天**，可在一体机「我的文档」里改；未登录的临时上传按系统短期留存（**1 小时**）。',
+    retain: '确认之后：这份文件只用于这一单，不存进「我的文档」；按系统短期留存（**1 小时**）。',
   },
   print_doc: {
     noun: '打印文件',
     label: '打印文件上传',
     accept: wordConversionAvailable ? `${BASE_PRINT_DOC_ACCEPT},${WORD_ACCEPT}` : BASE_PRINT_DOC_ACCEPT,
-    retain: '确认之后：按系统短期留存（**24 小时**）。打印完成不代表立刻删除，也不会长期留着。',
+    retain: '确认之后：这份文件只用于这一单，不存进「我的文档」；按系统短期留存（**24 小时**）。打印完成不代表立刻删除，也不会长期留着。',
   },
   contract_upload: {
     noun: '合同文件',

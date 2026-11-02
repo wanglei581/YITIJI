@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { BadRequestException, ServiceUnavailableException } from '@nestjs/common'
 import { PDFDocument } from 'pdf-lib'
 import { DocumentConversionService } from '../src/document-conversion/document-conversion.service'
+import { UPLOAD_SESSION_ORDER_ONLY_REASON } from '../src/files/retention-policy'
 import { DocumentConversionController } from '../src/document-conversion/document-conversion.controller'
 import { setWordToPdfUploadAvailable } from '../src/document-conversion/document-conversion-capability-state'
 import { validateUpload } from '../src/files/file-validation'
@@ -81,6 +82,7 @@ interface SourceRecord {
   status: string
   deletedAt: Date | null
   expiresAt: Date | null
+  retentionLockedReason?: string | null
 }
 
 class FakeFiles {
@@ -171,7 +173,18 @@ async function verifyRuntime(): Promise<void> {
   assert.equal(files.uploadedArgs?.sourceFileId, source.id)
   assert.equal(files.uploadedArgs?.createdBy, 'document_conversion')
   assert.equal(files.uploadedArgs?.purpose, 'print_doc')
+  assert.equal(files.uploadedArgs?.orderOnly, false, '源文件不锁时派生 PDF 也不锁')
   pass('假引擎生成真实可解析 PDF，响应与派生 FileObject 契约完整')
+
+  // 只用于这一单（11/02 拍板）：一体机这一单里从手机传来的 Word，打印前转出来的 PDF 跟着锁，不进「我的文档」。
+  const orderOnlySource: SourceRecord = { ...source, id: 'source-order-only', retentionLockedReason: UPLOAD_SESSION_ORDER_ONLY_REASON }
+  const orderOnlyFiles = new FakeFiles(orderOnlySource, Buffer.from('docx'))
+  const orderOnlyService = serviceWith(orderOnlyFiles, orderOnlySource, new FakeAdapter(pdf))
+  await orderOnlyService.onModuleInit()
+  await orderOnlyService.convertForPrint(orderOnlySource.id)
+  assert.equal(orderOnlyFiles.uploadedArgs?.orderOnly, true, '只用于这一单的源文件转出来的 PDF 必须带 orderOnly')
+  assert.equal(orderOnlyFiles.uploadedArgs?.endUserId, 'member-1', '派生 PDF 仍挂本人名下')
+  pass('只用于这一单的 Word 打印前转出来的 PDF 跟着锁（orderOnly），仍挂本人名下')
 
   files.accessAllowed = false
   await assert.rejects(() => service.convertOwnedFile(source.id, { kind: 'member', endUserId: 'other' }))
