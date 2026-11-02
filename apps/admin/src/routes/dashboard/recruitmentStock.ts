@@ -7,9 +7,9 @@ import { BriefcaseIcon, PrinterIcon } from 'lucide-react'
 //
 // 3.15 起管理员不审核、不发布岗位 / 招聘会（信息源页只留查看与紧急下架），工作台不再出现
 // 「待审核数据 / 待办审核 / 去审核」。按招聘内容托管开关分两种说法（读取中 / 读取失败按关闭处理）：
-//   - 托管关闭（我们云上默认）：有存量才出现，写「招聘类存量 N 条（托管关闭，不再审核）」，
-//     链到能紧急下架的信息源页；没有存量，指标卡换成打印机就绪数，待办里不出现这一行。
-//   - 托管打开（私有化部署 b）：写「招聘类内容 N 条」，说明由发布机构自审自发，不把管理员写成审核人。
+//   - 托管关闭（我们云上默认）：有存量才出现待办，写「存量 N 条，机构自审自发，违法违规才紧急下架」，
+//     按钮「去查看」，链到能紧急下架的信息源页；没有存量，指标卡换成打印机就绪数，待办里不出现这一行。
+//   - 托管打开（私有化部署 b）：待办用同一句；指标卡仍写「招聘类内容 N 条」，说明由发布机构自审自发。
 // 抽成独立文件是为了不再往 897 行的 dashboard/index.tsx 里加逻辑。
 // ============================================================
 
@@ -78,25 +78,16 @@ export function recruitmentStockKpi({ hostingOpen, jobs, fairs, printers }: Stoc
 }
 
 export function recruitmentStockTodo({ hostingOpen, jobs, fairs }: Omit<StockInput, 'printers'>): StockTodo | null {
-  const j = jobs ?? 0
-  const f = fairs ?? 0
-  const total = j + f
+  if (jobs === null || fairs === null) return null
+  const total = jobs + fairs
   if (total === 0) return null
-  return hostingOpen
-    ? {
-        key: 'recruitment-content',
-        icon: BriefcaseIcon,
-        title: `招聘类内容 ${formatCount(total)} 条（由发布机构自审自发）`,
-        sub: stockSub(j, f, '如有违法违规内容可紧急下架'),
-        href: takedownHref(j),
-        actionLabel: '去查看',
-      }
-    : {
-        key: 'recruitment-stock',
-        icon: BriefcaseIcon,
-        title: `招聘类存量 ${formatCount(total)} 条（托管关闭，不再审核）`,
-        sub: stockSub(j, f, '如有违法违规内容可紧急下架'),
-        href: takedownHref(j),
-        actionLabel: '去查看',
-      }
+  const phrase = '存量，机构自审自发，违法违规才紧急下架'
+  return {
+    key: hostingOpen ? 'recruitment-content' : 'recruitment-stock',
+    icon: BriefcaseIcon,
+    title: `存量 ${formatCount(total)} 条，机构自审自发，违法违规才紧急下架`,
+    sub: stockSub(jobs, fairs, phrase),
+    href: takedownHref(jobs),
+    actionLabel: '去查看',
+  }
 }

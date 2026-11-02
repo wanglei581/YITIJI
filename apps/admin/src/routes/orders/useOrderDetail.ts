@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { adminOrdersReadonlyService, type AdminOrderReadonlyDetail, type AdminOrderMarkPaidSource, type AdminOrderMarkPaidResult } from '../../services/api/adminOrdersReadonly'
 import { adminPrintJobsService } from '../../services/api/adminPrintJobs'
 import { ApiHttpError } from '../../services/api/client'
@@ -29,7 +29,9 @@ export function useOrderDetail(refresh: () => unknown) {
   const [verifyConfirm, setVerifyConfirm] = useState('')
   const [verifySubmitting, setVerifySubmitting] = useState(false)
   const [verifyError, setVerifyError] = useState<string | null>(null)
+  const detailIdRef = useRef<string | null>(null)
   const openDetail = async (id: string) => {
+    detailIdRef.current = id
     setDetailState('loading')
     setDetail(null)
     // 收款结论只属于刚操作过的那一单，换单必须清掉，避免把上一单的入账结果显示在这一单上。
@@ -46,7 +48,14 @@ export function useOrderDetail(refresh: () => unknown) {
     }
   }
 
+  const retryDetail = () => {
+    const id = detailIdRef.current
+    if (!id) return
+    void openDetail(id)
+  }
+
   const closeDetail = () => {
+    detailIdRef.current = null
     setDetail(null)
     setDetailState('idle')
     setRefundOpen(false)
@@ -154,7 +163,7 @@ export function useOrderDetail(refresh: () => unknown) {
     }
   }, [detail, refresh, verifyConfirm, verifyOpen])
 
-  return { detail, detailState, refundOpen, setRefundOpen, refundReason, setRefundReason, refundSubmitting, refundError, setRefundError, markPaidOpen, setMarkPaidOpen, markPaidSource, setMarkPaidSource, markPaidSubmitting, markPaidError, setMarkPaidError, markPaidResult, setMarkPaidResult, abandonConfirmOpen, setAbandonConfirmOpen, abandonSubmitting, abandonError, setAbandonError, verifyOpen, setVerifyOpen, verifyConfirm, setVerifyConfirm, verifySubmitting, verifyError, setVerifyError, openDetail, closeDetail, handleRefund, handleMarkPaid, handleAbandon, handleVerifyOutcome }
+  return { detail, detailState, refundOpen, setRefundOpen, refundReason, setRefundReason, refundSubmitting, refundError, setRefundError, markPaidOpen, setMarkPaidOpen, markPaidSource, setMarkPaidSource, markPaidSubmitting, markPaidError, setMarkPaidError, markPaidResult, setMarkPaidResult, abandonConfirmOpen, setAbandonConfirmOpen, abandonSubmitting, abandonError, setAbandonError, verifyOpen, setVerifyOpen, verifyConfirm, setVerifyConfirm, verifySubmitting, verifyError, setVerifyError, openDetail, retryDetail, closeDetail, handleRefund, handleMarkPaid, handleAbandon, handleVerifyOutcome }
 }
 
 export type OrderDetailControls = ReturnType<typeof useOrderDetail>

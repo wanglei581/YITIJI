@@ -3,7 +3,7 @@ import type { FilePurpose, UploadSessionStatusResponse } from '@ai-job-print/sha
 import { useAuth } from '../../../auth/useAuth'
 import { getTerminalId } from '../../../services/api/screensaver'
 import {
-  buildPhoneUploadUrl,
+  buildPhoneUploadQrUrl,
   cancelUploadSession,
   confirmUploadSession,
   createUploadSession,
@@ -34,6 +34,8 @@ export interface UploadSessionSnapshot {
   hasQr: boolean
   pendingName: string | null
   pendingSize: string | null
+  /** 这份文件从哪来（服务端判定，只作确认屏提示）：miniapp_documents / miniapp / web；旧会话与读不到时为 null。 */
+  pendingSource: string | null
 }
 
 interface QrState {
@@ -243,7 +245,7 @@ export function useUploadSession({
         sessionId: created.sessionId,
         uploadToken: created.uploadToken,
         controlToken: created.controlToken,
-        qrUrl: buildPhoneUploadUrl(created.uploadUrl, created.sessionId, created.uploadToken, purpose),
+        qrUrl: buildPhoneUploadQrUrl(created, purpose),
         expiresAt: created.expiresAt,
       })
       setStatus({
@@ -383,6 +385,7 @@ export function useUploadSession({
     hasQr: Boolean(qr),
     pendingName: status?.file?.filename ?? null,
     pendingSize: status?.file ? formatSize(status.file.sizeBytes) : null,
+    pendingSource: status?.file?.source ?? null,
   }
 
   return {

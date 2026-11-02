@@ -129,6 +129,7 @@ for (const phrase of [
 ]) {
   if (!adminSmartCampus.includes(phrase)) fail(`管理员智慧校园页缺少正向文案「${phrase}」`)
 }
+if (!adminSmartCampus.includes('重新加载') || !adminSmartCampus.includes('onClick={load}')) fail('智慧校园终端列表加载失败必须能重新加载')
 if (!failures.length) console.log('  PASS 智慧校园文案明确管理员按终端配置，并保留学校账号与未开放模块说明')
 
 console.log('\n=== 审计动作中文名 ===')

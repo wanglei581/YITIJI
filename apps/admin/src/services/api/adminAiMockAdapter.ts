@@ -61,6 +61,7 @@ function computeUsage(entries: AdminAiLogEntry[]): AdminAiUsage {
     byOperation,
     errorDistribution: Object.entries(errorCounts).map(([code, count]) => ({ code, count })),
     tokenUsageTotals: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+    voiceUsageTotals: { asrSeconds: 0, asrCallsWithUsage: 0, ttsChars: 0, ttsCallsWithUsage: 0 },
     costByOperation,
     alerts: [],
     estimatedCostCny: 0,
@@ -76,7 +77,12 @@ function delay(): Promise<void> {
 export const adminAiMockAdapter = {
   async getAiUsage(): Promise<AdminAiUsage> {
     await delay()
-    return computeUsage(MOCK_LOG_ENTRIES)
+    const usage = computeUsage(MOCK_LOG_ENTRIES)
+    const scenario = new URLSearchParams(window.location.search).get('mock:aiCost')
+    if (scenario === 'measured') return { ...usage, estimatedCostCny: 0.1234 }
+    if (scenario === 'partial') return { ...usage, estimatedCostCny: 0.1234, unmeasuredCalls: 2 }
+    if (scenario === 'unmeasured') return { ...usage, unmeasuredCalls: usage.totalCalls }
+    return usage
   },
 
   /**

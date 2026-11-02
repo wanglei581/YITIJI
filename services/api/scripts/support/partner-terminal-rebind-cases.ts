@@ -15,6 +15,7 @@ import { TerminalAgentService } from '../../src/terminals/terminals-agent.servic
 import { ReleaseObservationService } from '../../src/terminals/release-observation.service'
 import { TerminalCredentialSecurityService } from '../../src/terminals/terminal-credential-security.service'
 import { TerminalToolboxService } from '../../src/terminals/terminal-toolbox.service'
+import type { TerminalOrgAssignmentAudit } from '../../src/terminals/terminal-org-assignment'
 
 type Assert = (label: string, condition: boolean, detail?: string) => void
 
@@ -34,6 +35,9 @@ export async function verifyTerminalRebindIsolation(assert: Assert, prisma: Pris
   const unbindAt = ago(10)
 
   const audit = new AuditService(prisma)
+  const writeAudit: TerminalOrgAssignmentAudit = (tx, result) => audit.writeRequired(tx, {
+    actorId: null, actorRole: 'admin', action: 'terminal.org.update', targetType: 'terminal', targetId: terminalId, payload: { ...result },
+  })
   const toolbox = new TerminalToolboxService(prisma)
   const agent = new TerminalAgentService(prisma, audit)
   // 只调用 assignTerminalOrg，不跑 onModuleInit（避免播种打印任务、避免心跳定时器）。
@@ -41,6 +45,7 @@ export async function verifyTerminalRebindIsolation(assert: Assert, prisma: Pris
   const stats = new PartnerStatsService(prisma)
 
   async function cleanup(): Promise<void> {
+    await prisma.auditLog.deleteMany({ where: { action: 'terminal.org.update', targetId: terminalId } })
     await prisma.terminalHeartbeat.deleteMany({ where: { terminalId } })
     await prisma.printTask.deleteMany({ where: { terminalId } })
     await prisma.scanTask.deleteMany({ where: { terminalId } })
@@ -71,7 +76,7 @@ export async function verifyTerminalRebindIsolation(assert: Assert, prisma: Pris
       },
     })
 
-    await admin.assignTerminalOrg(terminalId, orgA, boundAAt)
+    await admin.assignTerminalOrg(terminalId, orgA, boundAAt, writeAudit)
     const afterA = await prisma.terminal.findUnique({
       where: { id: terminalId },
       select: { orgId: true, orgBoundAt: true },
@@ -104,7 +109,7 @@ export async function verifyTerminalRebindIsolation(assert: Assert, prisma: Pris
       ],
     })
 
-    await admin.assignTerminalOrg(terminalId, orgB, boundBAt)
+    await admin.assignTerminalOrg(terminalId, orgB, boundBAt, writeAudit)
     const afterB = await prisma.terminal.findUnique({
       where: { id: terminalId },
       select: { orgId: true, orgBoundAt: true },
@@ -170,7 +175,7 @@ export async function verifyTerminalRebindIsolation(assert: Assert, prisma: Pris
       JSON.stringify({ service: bRow?.serviceCount, faults: bRow?.faults, online: bRow?.online }),
     )
 
-    await admin.assignTerminalOrg(terminalId, orgB, sameOrgAt)
+    await admin.assignTerminalOrg(terminalId, orgB, sameOrgAt, writeAudit)
     const same = await prisma.terminal.findUnique({
       where: { id: terminalId },
       select: { orgId: true, orgBoundAt: true },
@@ -181,7 +186,7 @@ export async function verifyTerminalRebindIsolation(assert: Assert, prisma: Pris
       String(same?.orgBoundAt?.toISOString()),
     )
 
-    await admin.assignTerminalOrg(terminalId, null, unbindAt)
+    await admin.assignTerminalOrg(terminalId, null, unbindAt, writeAudit)
     const unbound = await prisma.terminal.findUnique({
       where: { id: terminalId },
       select: { orgId: true, orgBoundAt: true },

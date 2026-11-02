@@ -7,6 +7,7 @@ import { MemberAuthController } from './member-auth.controller'
 import { MemberAuthService } from './member-auth.service'
 import { MemberPhoneRebindService } from './member-phone-rebind.service'
 import { MemberQrLoginService } from './member-qr-login.service'
+import { MemberRestoreService } from './member-restore.service'
 import { MemberStepUpService } from './member-step-up.service'
 import { SMS_SENDER } from './sms/sms-sender'
 import { createMemberBudgetedSmsSender } from './sms/sms-budget'
@@ -44,6 +45,7 @@ import { RedisService } from '../common/redis/redis.service'
     MemberStepUpService,
     MemberQrLoginService,
     MemberPhoneRebindService,
+    MemberRestoreService,
     EndUserAuthGuard,
     MemberClosureReceiptGuard,
     // 发验证码的每分钟限流：启动时把「终端验签」接上，只对这一条路由按已验签终端计。

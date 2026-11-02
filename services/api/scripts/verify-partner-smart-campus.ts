@@ -44,6 +44,7 @@ import { TerminalAdminService } from '../src/terminals/terminals-admin.service'
 import { TerminalToolboxService } from '../src/terminals/terminal-toolbox.service'
 import { AdminOrgsService } from '../src/orgs/admin-orgs.service'
 import { AuditService } from '../src/audit/audit.service'
+import type { TerminalOrgAssignmentAudit } from '../src/terminals/terminal-org-assignment'
 import { SaveSmartCampusConfigDto } from '../src/smart-campus/dto/save-smart-campus-config.dto'
 import type { SaveSmartCampusConfigInput } from '../src/smart-campus/smart-campus.types'
 
@@ -134,6 +135,7 @@ function cleanupTempDatabase(prepared: { previousUrl: string | undefined; dbPath
 }
 
 async function cleanup(prisma: PrismaService): Promise<void> {
+  await prisma.auditLog.deleteMany({ where: { action: 'terminal.org.update', targetId: T_ADMIN } })
   await prisma.terminalSmartCampusConfig.deleteMany({ where: { terminalId: { in: [T_A, T_B, T_ADMIN, T_PRESET] } } })
   await prisma.terminal.deleteMany({ where: { id: { in: [T_A, T_B, T_ADMIN, T_UNRELATED] } } })
   await prisma.auditLog.deleteMany({ where: { actorId: ADMIN_USER_ID } })
@@ -148,6 +150,9 @@ async function main(): Promise<void> {
   await prisma.onModuleInit()
   const toolbox = new TerminalToolboxService(prisma)
   const audit = new AuditService(prisma)
+  const writeAudit: TerminalOrgAssignmentAudit = (tx, result) => audit.writeRequired(tx, {
+    actorId: null, actorRole: 'admin', action: 'terminal.org.update', targetType: 'terminal', targetId: T_ADMIN, payload: { ...result },
+  })
   const svc = new SmartCampusService(prisma, toolbox)
   const terminals = (() => { const _ag = new TerminalAgentService(prisma, audit); return new TerminalsService(_ag, new TerminalAdminService(prisma, _ag, toolbox)) })() // 仅用 assignTerminalOrg，不调 onModuleInit（避免播种打印任务）
   const adminOrgs = new AdminOrgsService(prisma, audit) // 高校版模板联动：smart_campus 白名单保存验证
@@ -238,34 +243,34 @@ async function main(): Promise<void> {
     // Case 8: 未绑定不可见；绑定到 A 校后 partner(A) 可见
     if (!(await seesAdminTerminal())) pass('Case8 未绑定终端 partner(A) 不可见')
     else fail('Case8 未绑定终端却对 partner(A) 可见')
-    const bindA = await terminals.assignTerminalOrg(T_ADMIN, SCHOOL_A)
+    const bindA = await terminals.assignTerminalOrg(T_ADMIN, SCHOOL_A, undefined, writeAudit)
     if (bindA.oldOrgId === null && bindA.newOrgId === SCHOOL_A) pass('Case8 admin 绑定返回 old=null new=A')
     else fail(`Case8 绑定返回异常: ${JSON.stringify(bindA)}`)
     if (await seesAdminTerminal()) pass('Case8 绑定到 A 校后 partner(A) 可见')
     else fail('Case8 绑定到 A 校后 partner(A) 仍不可见')
 
     // Case 9: 改绑到 B 校后 partner(A) 不可见
-    const bindB = await terminals.assignTerminalOrg(T_ADMIN, SCHOOL_B)
+    const bindB = await terminals.assignTerminalOrg(T_ADMIN, SCHOOL_B, undefined, writeAudit)
     if (bindB.oldOrgId === SCHOOL_A && bindB.newOrgId === SCHOOL_B) pass('Case9 admin 改绑返回 old=A new=B')
     else fail(`Case9 改绑返回异常: ${JSON.stringify(bindB)}`)
     if (!(await seesAdminTerminal())) pass('Case9 改绑到 B 校后 partner(A) 不可见')
     else fail('Case9 改绑到 B 校后 partner(A) 仍可见')
 
     // Case 10: 解绑后 partner(A) 不可见
-    const unbind = await terminals.assignTerminalOrg(T_ADMIN, null)
+    const unbind = await terminals.assignTerminalOrg(T_ADMIN, null, undefined, writeAudit)
     if (unbind.oldOrgId === SCHOOL_B && unbind.newOrgId === null) pass('Case10 admin 解绑返回 old=B new=null')
     else fail(`Case10 解绑返回异常: ${JSON.stringify(unbind)}`)
     if (!(await seesAdminTerminal())) pass('Case10 解绑后 partner(A) 不可见')
     else fail('Case10 解绑后 partner(A) 仍可见')
 
     // Case 11: admin 归属错误分支
-    await expectCode(() => terminals.assignTerminalOrg('TEST-SC-KSK-NOPE', SCHOOL_A), 'TERMINAL_NOT_FOUND', 'Case11 终端不存在')
-    await expectCode(() => terminals.assignTerminalOrg(T_ADMIN, 'test-sc-org-nope'), 'ORG_NOT_FOUND', 'Case11 机构不存在')
-    await expectCode(() => terminals.assignTerminalOrg(T_ADMIN, DISABLED_ORG), 'ORG_DISABLED', 'Case11 机构已停用')
+    await expectCode(() => terminals.assignTerminalOrg('TEST-SC-KSK-NOPE', SCHOOL_A, undefined, writeAudit), 'TERMINAL_NOT_FOUND', 'Case11 终端不存在')
+    await expectCode(() => terminals.assignTerminalOrg(T_ADMIN, 'test-sc-org-nope', undefined, writeAudit), 'ORG_NOT_FOUND', 'Case11 机构不存在')
+    await expectCode(() => terminals.assignTerminalOrg(T_ADMIN, DISABLED_ORG, undefined, writeAudit), 'ORG_DISABLED', 'Case11 机构已停用')
 
     // Case 11b: 托管 a 停放类型（企业来源 / 招聘会主办方）不在可选列表里，新绑定一律 ORG_TYPE_PARKED
-    await expectCode(() => terminals.assignTerminalOrg(T_ADMIN, PARKED_ENTERPRISE), 'ORG_TYPE_PARKED', 'Case11b 绑定企业来源类机构')
-    await expectCode(() => terminals.assignTerminalOrg(T_ADMIN, PARKED_FAIR), 'ORG_TYPE_PARKED', 'Case11b 绑定招聘会主办方类机构')
+    await expectCode(() => terminals.assignTerminalOrg(T_ADMIN, PARKED_ENTERPRISE, undefined, writeAudit), 'ORG_TYPE_PARKED', 'Case11b 绑定企业来源类机构')
+    await expectCode(() => terminals.assignTerminalOrg(T_ADMIN, PARKED_FAIR, undefined, writeAudit), 'ORG_TYPE_PARKED', 'Case11b 绑定招聘会主办方类机构')
     const afterParked = await prisma.terminal.findUnique({ where: { id: T_ADMIN }, select: { orgId: true } })
     if (afterParked?.orgId === null) pass('Case11b 被拒后终端归属保持不变（仍未绑定）')
     else fail(`Case11b 被拒后终端归属却变成 ${afterParked?.orgId}`)

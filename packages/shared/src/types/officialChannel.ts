@@ -1,9 +1,26 @@
+/** 一体机分组。服务端只存这三个英文值。 */
+export const OFFICIAL_CHANNEL_AUDIENCES = ['graduate', 'social', 'general'] as const
+
+export type OfficialChannelAudience = (typeof OFFICIAL_CHANNEL_AUDIENCES)[number]
+
+/** 屏上分组标题。全是「通用」时一体机不分组。 */
+export const OFFICIAL_CHANNEL_AUDIENCE_LABELS: Readonly<Record<OfficialChannelAudience, string>> = {
+  graduate: '面向高校毕业生',
+  social: '面向社会求职者',
+  general: '通用',
+}
+
 /** 一体机公开读取。只含展示字段，不含审核、证据、哈希或内部 id。 */
 export interface OfficialChannelPublicItem {
   name: string
   url: string
   displayOrder: number
   organizationName: string
+  /**
+   * 一体机分组。公开响应会带上；类型先保持可选，一体机解析器目前会丢掉未知字段，
+   * 缺这个字段时按「通用」、不分组。
+   */
+  audience?: OfficialChannelAudience
 }
 
 /**
@@ -22,6 +39,7 @@ export interface OfficialChannelPartnerItem {
   url: string
   displayOrder: number
   enabled: boolean
+  audience: OfficialChannelAudience
   emergencyTakedown: boolean
   emergencyReasonCode: string | null
   emergencyReasonText: string | null
@@ -40,6 +58,7 @@ export interface OfficialChannelAdminItem {
   url: string
   displayOrder: number
   enabled: boolean
+  audience: OfficialChannelAudience
   emergencyTakedown: boolean
   emergencyReasonCode: string | null
   emergencyReasonText: string | null

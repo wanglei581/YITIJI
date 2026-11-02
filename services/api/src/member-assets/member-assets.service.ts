@@ -13,7 +13,12 @@ import type {
   MemberQaRecordItem,
   MemberResumeItem,
 } from './member-assets.types'
-import { allowedPoliciesForFile, isVisibleMemberFileWhere } from '../files/retention-policy'
+import {
+  allowedPoliciesForFile,
+  isVisibleMemberFileWhere,
+  MEMBER_DOCUMENT_HIDDEN_LOCK_REASONS,
+  UPLOAD_SESSION_ORDER_ONLY_REASON,
+} from '../files/retention-policy'
 import { materialCheckRequired } from '../print-jobs/material-check-policy'
 import { listedDocumentPageCount } from '../files/file-page-count.util'
 import { RESUME_PARSE_INTENT_KIND } from '../ai/resume-parse-submission.service'
@@ -45,6 +50,65 @@ import { assertJobFitPrintFileReadable, storedJobFitUsesSystemJob } from '../ai/
 // 只回元数据：select 显式列出安全字段，绝不 select payloadJson / storageKey / sha256 /
 // accessTokenHash 等敏感列；文件不回内容，只给换取短期签名 URL 的端点路径。
 // ============================================================
+
+/**
+ * 「我的文档」的列出条件：本人、active、未删、未过期（expiresAt=null 视为长期保存），
+ * 不含签名图、合同审查原件，也不含锁成合同审查会话专用、只用于这一单（一体机这一单里从手机
+ * 传来的，11/02 拍板）的文件。托管关闭时，系统岗位匹配报告另由 hiddenSystemJobFitIds 去掉。
+ * 列表与「把文档递进一体机」（upload-sessions member-file）共用这一套，两边不会一个列得出、
+ * 一个收不进，也不会一个收、一个不列。
+ */
+export function memberDocumentWhere(endUserId: string, now: Date) {
+  return {
+    ...isVisibleMemberFileWhere(endUserId, now),
+    purpose: { notIn: ['signature_image', 'contract_upload'] },
+    AND: [
+      {
+        OR: [
+          { retentionLockedReason: null },
+          { retentionLockedReason: { notIn: [...MEMBER_DOCUMENT_HIDDEN_LOCK_REASONS] } },
+        ],
+      },
+    ],
+  }
+}
+
+/** 托管关闭时不列出的系统岗位匹配报告；判断时遇到托管关闭以外的错误照常抛出。 */
+export async function hiddenSystemJobFitIds(
+  prisma: PrismaService,
+  files: Array<{ id: string; createdBy: string | null }>,
+): Promise<Set<string>> {
+  const hidden = new Set<string>()
+  if (isRecruitmentContentHostingEnabled()) return hidden
+  for (const file of files) {
+    try {
+      await assertJobFitPrintFileReadable(prisma as never, file)
+    } catch (error) {
+      if (!isHostingDisabledError(error)) throw error
+      hidden.add(file.id)
+    }
+  }
+  return hidden
+}
+
+/**
+ * 这份文件此刻是否列在本人「我的文档」里：在就回它登记的大小，不在（别人的、不存在、已删除、
+ * 已过期、被排除的用途、系统岗位匹配报告）一律回 null，调用方按同一个 404 处理。
+ */
+export async function findListedMemberDocument(
+  prisma: PrismaService,
+  endUserId: string,
+  fileId: string,
+  now: Date,
+): Promise<{ id: string; sizeBytes: number } | null> {
+  const row = await prisma.fileObject.findFirst({
+    where: { ...memberDocumentWhere(endUserId, now), id: fileId },
+    select: { id: true, sizeBytes: true, createdBy: true },
+  })
+  if (!row) return null
+  if ((await hiddenSystemJobFitIds(prisma, [row])).has(row.id)) return null
+  return { id: row.id, sizeBytes: row.sizeBytes }
+}
 
 /** 简历资产包含的 AiResumeResult 种类：parse=上传诊断，generate=AI 生成。 */
 const RESUME_KINDS = ['parse', 'generate'] as const
@@ -113,18 +177,7 @@ export class MemberAssetsService {
     endUserId: string,
     page: MemberPageQuery
   ): Promise<MemberAssetPage<MemberDocumentItem>> {
-    const where = {
-      ...isVisibleMemberFileWhere(endUserId, new Date()),
-      purpose: { notIn: ['signature_image', 'contract_upload'] },
-      AND: [
-        {
-          OR: [
-            { retentionLockedReason: null },
-            { retentionLockedReason: { not: 'contract_review_session_only' } },
-          ],
-        },
-      ],
-    }
+    const where = memberDocumentWhere(endUserId, new Date())
     const total = await this.prisma.fileObject.count({ where })
     const rows = await this.prisma.fileObject.findMany({
       where,
@@ -187,6 +240,8 @@ export class MemberAssetsService {
       status: 'deleted',
       deletedAt: { not: null },
       purpose: { notIn: ['signature_image', 'contract_upload', 'contract_review_report'] },
+      // 只用于这一单的文件到期清理后也不列：可能是旁人在一体机上扫码传的，文件名不能落进登录人的删除记录。
+      OR: [{ retentionLockedReason: null }, { retentionLockedReason: { not: UPLOAD_SESSION_ORDER_ONLY_REASON } }],
     }
     const total = await this.prisma.fileObject.count({ where })
     const rows = await this.prisma.fileObject.findMany({
@@ -347,15 +402,7 @@ export class MemberAssetsService {
       where: { ...(where as Record<string, unknown>), createdBy: 'job_fit' } as never,
       select: { id: true, createdBy: true },
     })
-    const hiddenIds = new Set<string>()
-    for (const file of files) {
-      try {
-        await assertJobFitPrintFileReadable(this.prisma as never, file)
-      } catch (error) {
-        if (!isHostingDisabledError(error)) throw error
-        hiddenIds.add(file.id)
-      }
-    }
+    const hiddenIds = await hiddenSystemJobFitIds(this.prisma, files)
     if (hiddenIds.size === 0) return { rows, total }
     return {
       rows: rows.filter((row) => !hiddenIds.has(row.id)),

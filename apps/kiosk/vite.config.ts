@@ -1,5 +1,6 @@
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
+import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import { pdfjsPresetAssets } from './pdfjs-cmap-plugin'
@@ -81,7 +82,20 @@ export default defineConfig(({ command, mode }) => {
   assertProdAssistantTrtcMode(command, mode, env)
   warnAssistantTrtcDevMode(command, env)
   return {
-    plugins: [pdfjsPresetAssets(), react(), tailwindcss()],
+    plugins: [
+      pdfjsPresetAssets(),
+      react(),
+      tailwindcss(),
+      {
+        name: 'kiosk-content-version',
+        apply: 'build',
+        transformIndexHtml: () => [{
+          tag: 'meta',
+          attrs: { name: 'kiosk-content-version', content: randomUUID() },
+          injectTo: 'head',
+        }],
+      },
+    ],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

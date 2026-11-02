@@ -1,3 +1,4 @@
+import { captureFactIdentity, recordAiServiceFact } from './usage/ai-service-fact'
 import { BadRequestException, Injectable, Logger, NotFoundException, InternalServerErrorException, ServiceUnavailableException, Optional } from '@nestjs/common'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'crypto'
 import { isLlmProviderLabel, type AiProvider, type AiProviderName, type AssistantChatResult, type GeneratedResume, type GenerateResumeOutput, type ParseResumeInput, type ParseResumeOutput, type OptimizeResumeOutput, type ChatInput, type ResumeGenerateInput, type ResumeLayoutSettings } from './interfaces/ai-provider.interface'
@@ -423,10 +424,11 @@ export class AiService {
     requester: AiResultRequester = { endUserId: null, accessToken: null },
     existingOnly = false,
   ): Promise<OptimizeResumeOutput> {
+    const identity = captureFactIdentity()
     const cached = await this.loadAuthorizedResult<OptimizeResumeOutput>(taskId, 'optimize', requester)
     if (cached) return cached
     if (existingOnly) throw new NotFoundException({ error: { code: 'AI_TASK_NOT_FOUND', message: '这份优化稿已删除、已过期或不属于当前账号，无法打开' } })
-    return this.optimizeLock.run(`ai:resume-optimize:${taskId}`, 120_000, () => this.computeResumeOptimize(taskId, requester))
+    return this.optimizeLock.run(`ai:resume-optimize:${taskId}`, 120_000, () => this.computeResumeOptimize(taskId, requester, identity))
   }
 
   /** PUT /resume/records/:taskId/draft — 仅登录用户；匿名 404。 */
@@ -456,6 +458,7 @@ export class AiService {
   private async computeResumeOptimize(
     taskId: string,
     requester: AiResultRequester,
+    identity: ReturnType<typeof captureFactIdentity>,
   ): Promise<OptimizeResumeOutput> {
     const cached = await this.loadAuthorizedResult<OptimizeResumeOutput>(taskId, 'optimize', requester)
     if (cached) return cached
@@ -513,6 +516,7 @@ export class AiService {
           parseOwner?.endUserId ?? null,
           parseOwner?.accessTokenHash ?? null,
         )
+        recordAiServiceFact(this.prisma, this.logger, identity, 'resume_optimize', taskId)
       }
       this.logService.record({
         taskId,

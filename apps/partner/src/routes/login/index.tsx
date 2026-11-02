@@ -154,7 +154,7 @@ export default function LoginPage() {
     return false
   }
 
-  /** 登录成功统一收口：记住账号 → 手机号未验证先弹本人验证，否则播过场进工作台 */
+  /** 登录成功统一收口：记住账号 → 手机号未验证先说明可用方式，否则播过场进工作台 */
   function completeLogin(user: AuthedUser, usedLoginId: string) {
     persistRememberedLoginId(remember, usedLoginId)
     if (user.phoneMasked && !user.phoneVerifiedAt) {
@@ -252,7 +252,7 @@ export default function LoginPage() {
   }
 
   async function sendPhoneVerificationCode() {
-    if (!phoneVerifyUser || phoneVerifyCountdown.seconds > 0 || phoneVerifyBusy) return
+    if (!phoneVerifyUser?.phoneVerificationAvailable || phoneVerifyCountdown.seconds > 0 || phoneVerifyBusy) return
     setPhoneVerifyBusy(true)
     setPhoneVerifyError(null)
     const r = await sendOwnPhoneCode()
@@ -263,7 +263,7 @@ export default function LoginPage() {
 
   async function confirmPhoneVerification(e: FormEvent) {
     e.preventDefault()
-    if (!phoneVerifyUser || phoneVerifyBusy || phoneVerifyCode.length !== 6) return
+    if (!phoneVerifyUser?.phoneVerificationAvailable || phoneVerifyBusy || phoneVerifyCode.length !== 6) return
     setPhoneVerifyBusy(true)
     setPhoneVerifyError(null)
     const r = await verifyOwnPhone(phoneVerifyCode)
@@ -613,20 +613,21 @@ export default function LoginPage() {
       )}
 
       {phoneVerifyUser && (
-        <div className="c-modal" role="dialog" aria-modal="true" aria-label="手机号本人验证">
+        <div className="c-modal" role="dialog" aria-modal="true" aria-label={phoneVerifyUser.phoneVerificationAvailable ? '手机号本人验证' : '账号已登录'}>
           <form className="c-modal-card" onSubmit={confirmPhoneVerification}>
             <div className="c-modal-head">
               <div>
-                <h3>手机号本人验证</h3>
+                <h3>{phoneVerifyUser.phoneVerificationAvailable ? '手机号本人验证' : '账号已登录'}</h3>
                 <p>
-                  账号 {phoneVerifyUser.name} 已绑定 {phoneVerifyUser.phoneMasked}
-                  ，本人验证后才可使用手机号登录和找回密码。
+                  账号 {phoneVerifyUser.name} 预留手机号为 {phoneVerifyUser.phoneMasked}
+                  ，尚未完成本人验证。用户名和密码已登录成功，可以进入工作台。
                 </p>
               </div>
-              <button type="button" className="close-btn" onClick={() => nav('/', { replace: true })} aria-label="稍后验证">
+              <button type="button" className="close-btn" onClick={() => nav('/', { replace: true })} aria-label={phoneVerifyUser.phoneVerificationAvailable ? '稍后验证' : '关闭提示并进入工作台'}>
                 <XIcon size={18} aria-hidden="true" />
               </button>
             </div>
+            {phoneVerifyUser.phoneVerificationAvailable === true ? <>
             <div className="c-field">
               <label htmlFor="partner-phone-verify-code">
                 <b className="fno">01</b>短信验证码
@@ -664,6 +665,14 @@ export default function LoginPage() {
             <div className="c-modal-foot">
               也可以点右上角<b>稍后验证</b>直接进入工作台，下次登录时再完成本人验证。
             </div>
+            </> : <>
+              <div className="c-modal-foot">
+                新账号初始密码由管理员交付。预留手机号尚不能用于短信登录；如需手机登录或找回，请联系管理员核对账号，按确认函联系人登记及本人短信重置流程办理。
+              </div>
+              <button type="button" className="c-cta ripple-host" onClick={() => nav('/', { replace: true })}>
+                <span className="label">进入工作台</span>
+              </button>
+            </>}
           </form>
         </div>
       )}

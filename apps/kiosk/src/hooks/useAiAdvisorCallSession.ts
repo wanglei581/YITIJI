@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useBusyLock } from '../contexts/KioskBusyContext'
 import { API_BASE_URL } from '../services/api/client'
 import { getTerminalId } from '../services/api/screensaver'
+import { machineUnusableLine } from '../copy/unattendedCopy'
 import { terminalProtectedFetch } from '../services/terminalAuth'
 import { prepareAiDeclaration } from '../ai/aiDeclarationGate'
 import { aiDeclarationDeclineMessage } from '../ai/aiDeclarationErrors'
@@ -222,7 +223,7 @@ export function useAiAdvisorCallSession() {
     if (startedRef.current || preparingRef.current) return
     const terminalId = getTerminalId()
     if (!terminalId) {
-      setErrMsg('当前设备身份不可用，请联系现场工作人员')
+      setErrMsg(machineUnusableLine())
       setPhase('error')
       return
     }

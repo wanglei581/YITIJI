@@ -12,6 +12,8 @@ interface KpiCardProps {
   /** 该指标的某个数据源加载失败：整卡转错误态并给「重试」，不再显示猜测值。 */
   failed?: boolean
   onRetry: () => void
+  /** 数据已加载时整卡可点。失败态保留重试按钮，不再套链接。 */
+  href?: string
 }
 
 export interface TodoRow {
@@ -38,25 +40,23 @@ export function SectionLink({ href, children }: { href: string; children: ReactN
 }
 
 /** KPI 卡片；数据源失败时卡内给错误 + 重试，不让整页因单块失败而崩溃。 */
-export function KpiCard({ label, value, unit, sub, icon: Icon, warn, failed, onRetry }: KpiCardProps) {
-  return (
-    <div
-      className={
-        'rounded-lg border bg-surface px-5 py-[18px] shadow-sm ' +
-        (warn && !failed
-          ? 'border-warning/30'
-          : failed
-            ? 'border-error/30'
-            : 'border-neutral-900/[0.06]')
-      }
-    >
+export function KpiCard({ label, value, unit, sub, icon: Icon, warn, failed, onRetry, href }: KpiCardProps) {
+  const shellClass =
+    'rounded-lg border bg-surface px-5 py-[18px] shadow-sm ' +
+    (warn && !failed
+      ? 'border-warning/30'
+      : failed
+        ? 'border-error/30'
+        : 'border-neutral-900/[0.06]')
+  const body = (
+    <>
       <div className="flex items-center gap-1.5 text-[12px] font-semibold text-neutral-500">
         <Icon className="h-[14px] w-[14px] shrink-0" aria-hidden="true" />
         {label}
       </div>
       {failed ? (
         <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="text-[13px] text-error-fg">数据源加载失败</span>
+          <span className="text-[13px] text-error-fg">这类这次没读到</span>
           <button
             type="button"
             onClick={onRetry}
@@ -79,8 +79,19 @@ export function KpiCard({ label, value, unit, sub, icon: Icon, warn, failed, onR
           <p className="mt-2 text-[11.5px] text-neutral-500">{sub}</p>
         </>
       )}
-    </div>
+    </>
   )
+  if (!failed && href) {
+    return (
+      <a
+        href={href}
+        className={`${shellClass} block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600`}
+      >
+        {body}
+      </a>
+    )
+  }
+  return <div className={shellClass}>{body}</div>
 }
 
 /** 区块级错误：只影响所在卡片/区块，配独立重试。 */
@@ -91,7 +102,7 @@ export function BlockError({ message, onRetry }: { message: string; onRetry: () 
       <button
         type="button"
         onClick={onRetry}
-        className="rounded-lg border border-neutral-200 bg-surface px-4 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-50"
+        className="inline-flex min-h-11 items-center rounded-lg border border-neutral-200 bg-surface px-4 text-sm font-bold text-neutral-700 hover:bg-neutral-50"
       >
         重试
       </button>

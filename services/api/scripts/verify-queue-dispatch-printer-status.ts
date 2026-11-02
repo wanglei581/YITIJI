@@ -63,7 +63,7 @@ function assertKioskFailClosed(): void {
   const stripped = source
     .replace(
       /import \{[^}]+\} from 'react'\n/,
-      'const useEffect = () => undefined\nconst useState = () => undefined\nconst useSyncExternalStore = () => undefined\n',
+      'const useEffect = () => undefined\nconst useMemo = () => undefined\nconst useState = () => undefined\nconst useSyncExternalStore = () => undefined\n',
     )
     .replace(/import type \{[^}]+\} from '@ai-job-print\/shared'\n/, '')
     .replace(
@@ -73,6 +73,16 @@ function assertKioskFailClosed(): void {
     .replace(
       /import \{[^}]+\} from '\.\.\/services\/api\/screensaver'\n/,
       'const getTerminalId = () => ""\nconst subscribeTerminalIdentity = () => () => undefined\n',
+    )
+    // 暂停接单说明来自无人值守文案模块（一体机 hook 的标准句 3）；这里只验 printerReady，给个桩即可。
+    .replace(
+      /import \{[^}]+\} from '\.\.\/copy\/unattendedCopy'\n/,
+      'const machineUnusableLine = () => "这台机器暂时不能用"\n',
+    )
+    // 说明随服务联系方式晚到而更新：hook 里只读订阅服务联系方式（不发请求）。映射函数不用它，给个桩即可。
+    .replace(
+      /import \{[^}]+\} from '\.\/useSupportContact'\n/,
+      'const useSupportContactSnapshot = () => undefined\n',
     )
     .replace(/import\.meta\.env/g, '({} as { VITE_PRINTER_NAME?: string })')
   const dir = mkdtempSync(join(tmpdir(), 'kiosk-printer-map-'))

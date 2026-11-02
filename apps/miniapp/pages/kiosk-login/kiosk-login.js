@@ -5,20 +5,18 @@
 // 一体机要自己轮询到 confirmed 再 claim 才真正登录，而 claim 会失败（一体机会清掉二维码要求重扫）。
 // 所以本页最多只能说「已确认，请回一体机查看登录结果」，不说「登录成功 / 已在该机完成登录」。
 // 口径与状态拆分按 docs/design/kiosk-redesign-2026-08/51-phone-relay.html 的 qr-login 分屏。
+//
+// 进页三条路：首页「扫码连接一体机」（autoScan=1，进页就开扫码）；
+// 微信「扫一扫」直接扫一体机的登录码（`https://<域名>/k/l/<ticketId>`，整条码在 options.q）；
+// 传文件页把扫到的登录码转过来（同样带 q）。q 若是传文件码，转给 pages/kiosk-send。
+// 扫码时还没登录也照样读票据；去登录再回来，票据还是这一张，接着确认（见 _resumeAfterLogin）。
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+// 一体机屏幕上的码（登录码、传文件码，新旧两种格式）都由 utils/kiosk-qr.js 认。
+const { parseKioskCode } = require('../../utils/kiosk-qr')
 
-// 从扫码结果 URL 里提取 ticketId（容错：带或不带 domain 前缀）
-const TICKET_RE = /[?&]ticketId=([A-Za-z0-9_%-]{20,200})/
-
-/**
- * 一体机「手机扫码上传」的码：`<origin><path>#sessionId=xx&token=xx`。
- * 参数在 **fragment** 里而不是 query —— 一体机侧 buildPhoneUploadUrl 是这么拼的，
- * 用 `[?&]` 匹配不到，必须认 `#` 与 `&`。
- */
-const UPLOAD_SESSION_RE = /[#&]sessionId=([A-Za-z0-9_%-]{8,200})/
-const UPLOAD_TOKEN_RE = /[#&]token=([A-Za-z0-9_.%-]{8,400})/
+const NOT_KIOSK_COPY = '这不是一体机上的二维码，请确认扫的是终端屏幕上的登录码或上传码'
 
 /** 票据总寿命（member-qr-login.service.ts 的 QR_TICKET_TTL）。status 回的是**剩余**秒数，不是它。 */
 const QR_TICKET_TTL_SECONDS = 180
@@ -123,11 +121,18 @@ Page({
     this._flow = 0
     // 这一轮属于哪个会话。换号或退出之后，上一个人的票据与结果一律作废。
     this._gen = auth.sessionGeneration()
+    // 这一轮开始时有没有登录。没登录时扫到的票据，登录回来还能接着用。
+    this._genLoggedIn = auth.isLoggedIn()
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
       capsuleInsetRight: app.globalData.capsuleInsetRight || 94,
-      isLoggedIn: auth.isLoggedIn(),
+      isLoggedIn: this._genLoggedIn,
     })
+    // 微信扫一体机屏幕上的普通链接码进来：整条码在 q 里（微信编码过一次）。
+    if (options && options.q) {
+      this._openLink(options.q)
+      return
+    }
     // 首页「扫码连接一体机」进来：直接开扫码。取消扫码就停在本页说明上，不算出错。
     if (options && options.autoScan === '1') this.scanCode()
   },
@@ -135,7 +140,7 @@ Page({
   onShow() {
     // 从登录页返回、或在别处换了账号
     if (!auth.isSameSession(this._gen)) {
-      this._reset()
+      if (!this._resumeAfterLogin()) this._reset()
       return
     }
     const loggedIn = auth.isLoggedIn()
@@ -153,7 +158,51 @@ Page({
   },
 
   goBack() {
-    wx.navigateBack()
+    // 扫码直达时本页在栈底，navigateBack 会失败：回首页，不留一个点了没反应的返回键。
+    wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } })
+  },
+
+  /** q：解一次再认码型。登录码在本页读票据；传文件码转给 kiosk-send；别的码说清不是一体机的码。 */
+  _openLink(q) {
+    let raw = ''
+    try {
+      raw = decodeURIComponent(String(q))
+    } catch (_) {
+      raw = ''
+    }
+    const code = parseKioskCode(raw)
+    if (code && code.kind === 'login') {
+      this._ticketId = code.ticketId
+      this._readStatus('scan')
+      return
+    }
+    if (code) {
+      wx.redirectTo({
+        url: '/pages/kiosk-send/kiosk-send?q=' + encodeURIComponent(raw),
+        fail: () => this.setData({ phase: 'scan-error', errorMsg: '没能打开传文件页，请重新扫码。' }),
+      })
+      return
+    }
+    this.setData({ phase: 'scan-error', errorMsg: NOT_KIOSK_COPY })
+  },
+
+  /**
+   * 扫码时还没登录、这会儿登录上了：票据是本人刚扫的那一张，接着用。
+   * 换成新代号、作废没登录时发出的在途读取，再读一次状态（过期就进 ticket-dead，没过期进 ready）。
+   * 已登录换成另一个人、或退出登录，都不算 —— 照旧按换人清场。
+   * @returns {boolean} 接上了返回 true；调用方拿到 false 就清场。
+   */
+  _resumeAfterLogin() {
+    if (this._genLoggedIn || !auth.isLoggedIn()) return false
+    // 登录前就读到这张票据已经不能再确认了：照旧停在「回一体机」那一屏，不退回扫码引导
+    const dead = !this._ticketId && this.data.phase === 'ticket-dead'
+    if (!this._ticketId && !dead) return false
+    this._flow += 1
+    this._gen = auth.sessionGeneration()
+    this._genLoggedIn = true
+    this.setData({ isLoggedIn: true })
+    if (!dead) this._readStatus('scan')
+    return true
   },
 
   /** 丢掉当前这一轮，回到当前账号的起点。 */
@@ -161,6 +210,7 @@ Page({
     this._flow += 1
     this._ticketId = ''
     this._gen = auth.sessionGeneration()
+    this._genLoggedIn = auth.isLoggedIn()
     this.setData({
       phase: phase || 'idle',
       isLoggedIn: auth.isLoggedIn(),
@@ -172,11 +222,14 @@ Page({
     })
   },
 
-  /** 这一发响应还属于屏幕上这一轮、这个账号吗。换了账号就顺手清场。 */
+  /**
+   * 这一发响应还属于屏幕上这一轮、这个账号吗。换了账号就顺手清场；
+   * 没登录时扫的票据、读的途中登录上了，则接着用这张票据重读（这一发照样丢掉）。
+   */
   _owns(flow) {
     if (flow !== this._flow) return false
     if (auth.isSameSession(this._gen)) return true
-    this._reset()
+    if (!this._resumeAfterLogin()) this._reset()
     return false
   },
 
@@ -206,40 +259,32 @@ Page({
   },
 
   _handleScanResult(raw) {
-    const text = typeof raw === 'string' ? raw : ''
+    const text = typeof raw === 'string' ? raw.trim() : ''
     // 一体机屏幕上有两类码：登录票据、手机上传会话。先按码型分流，
     // 不能一律当登录码处理 —— 那会让扫上传码的人看到「这不是一体机登录码」，
     // 而他扫的恰恰就是终端屏幕上的码。
-    const session = text.match(UPLOAD_SESSION_RE)
-    const token = text.match(UPLOAD_TOKEN_RE)
-    if (session && token) {
-      try {
-        const url = '/pages/kiosk-send/kiosk-send'
-          + '?sessionId=' + encodeURIComponent(decodeURIComponent(session[1]))
-          + '&token=' + encodeURIComponent(decodeURIComponent(token[1]))
-        this.setData({ phase: 'idle' })
-        wx.navigateTo({ url })
-      } catch (_) {
-        this.setData({ phase: 'scan-error', errorMsg: '这张上传码读不出来，请回一体机重新生成后再扫' })
-      }
+    const code = parseKioskCode(text)
+    if (code && code.kind === 'upload-scene') {
+      // 新码：整条码带过去，由传文件页自己兑换
+      this.setData({ phase: 'idle' })
+      wx.navigateTo({ url: '/pages/kiosk-send/kiosk-send?q=' + encodeURIComponent(text) })
       return
     }
-
-    const match = text.match(TICKET_RE)
-    let ticketId = ''
-    try {
-      ticketId = match ? decodeURIComponent(match[1]) : ''
-    } catch (_) {
-      ticketId = ''
-    }
-    if (!ticketId) {
-      this.setData({
-        phase: 'scan-error',
-        errorMsg: '这不是一体机上的二维码，请确认扫的是终端屏幕上的登录码或上传码',
+    if (code && code.kind === 'upload-session') {
+      // 旧码：照旧直接带 sessionId / token
+      this.setData({ phase: 'idle' })
+      wx.navigateTo({
+        url: '/pages/kiosk-send/kiosk-send'
+          + '?sessionId=' + encodeURIComponent(code.sessionId)
+          + '&token=' + encodeURIComponent(code.token),
       })
       return
     }
-    this._ticketId = ticketId
+    if (!code) {
+      this.setData({ phase: 'scan-error', errorMsg: NOT_KIOSK_COPY })
+      return
+    }
+    this._ticketId = code.ticketId
     this._readStatus('scan')
   },
 
@@ -300,8 +345,13 @@ Page({
   /** 本人在页面上核对过机器之后确认。只在 ready 屏可用，一张票据一次只发一发。 */
   confirmLogin() {
     if (this.data.phase !== 'ready' || !this._ticketId) return
-    if (!auth.isLoggedIn() || !auth.isSameSession(this._gen)) {
-      this._reset()
+    if (!auth.isSameSession(this._gen)) {
+      if (!this._resumeAfterLogin()) this._reset()
+      return
+    }
+    if (!auth.isLoggedIn()) {
+      // 先登录再确认：票据留在内存里，页面落到「请先登录小程序」，登录回来接着用这一张
+      this.setData({ isLoggedIn: false })
       return
     }
     const flow = this._flow

@@ -61,6 +61,7 @@
     "GET /policies/:p",
     "GET /policies/eligibility-questions",
     "GET /print/price-config",
+    "GET /public/support-contact",
     "GET /resume/career-plan/:p",
     "GET /resume/export/pricing",
     "GET /resume/generate/:p",
@@ -139,6 +140,7 @@
     "POST /resume/self-assessment/:p/print",
     "POST /resume/voice/transcribe",
     "POST /upload-sessions/:p/files",
+    "POST /upload-sessions/:p/member-file",
     "POST /upload-sessions/scene/resolve",
     "PUT /resume/records/:p/draft"
   ],

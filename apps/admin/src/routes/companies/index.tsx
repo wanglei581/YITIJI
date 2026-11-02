@@ -7,6 +7,7 @@ import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentH
 import { RecruitmentHostingNotice } from '../components/recruitment/RecruitmentHostingNotice'
 import { EmergencyTakedownDialog } from '../components/recruitment/EmergencyTakedownDialog'
 import type { EmergencyTakedownTarget } from '../components/recruitment/emergencyReason'
+import { RECRUITMENT_AUDIT_ACTIONS, RecentEmergencyAuditCard } from '../components/RecentEmergencyAuditCard'
 import { CompanyDetailDrawer } from './components/CompanyDetailDrawer'
 import {
   PUBLISH_BADGE,
@@ -182,6 +183,8 @@ export default function CompaniesPage() {
       </p>
 
       <CompanyDetailDrawer companyId={selectedId} onClose={() => setSelectedId(null)} />
+
+      <RecentEmergencyAuditCard actions={RECRUITMENT_AUDIT_ACTIONS} />
 
       <EmergencyTakedownDialog target={takedown} onClose={() => setTakedown(null)} onDone={refreshList} />
     </Page>

@@ -139,10 +139,21 @@ export function isScanType(value) {
   const interviewCode = `${transpile('src/pages/interview/interviewWorkbenchSession.ts')}\n// ${seed}\n`
     .replaceAll("from './interviewWorkbenchModel'", `from '${interviewModelUrl}'`)
   const assistantDraftCode = transpile('src/services/assistantDraft.ts').replaceAll("from 'react'", `from '${import.meta.resolve('react')}'`)
+  // 与 AI 声明门禁相同：只驱动 hook 的状态初始化/提交时机，草稿和清场用真实模块。
+  const draftHooksUrl = toDataUrl(`
+export const effects = []
+export function useEffect(effect) { effects.push(effect) }
+export function useState(initial) { return [typeof initial === 'function' ? initial() : initial, () => {}] }
+// ${seed}
+`)
+  const resumeDraftCode = `${transpile('src/pages/resume/resumeGenerateDraft.ts')}\n// ${seed}\n`
+    .replaceAll("from 'react'", `from '${draftHooksUrl}'`)
+  const resumeDraftUrl = toDataUrl(resumeDraftCode)
   const declarationVersions = toDataUrl(`${transpile('src/ai/aiDeclarationVersions.ts')}\n// ${seed}\n`)
   const declarationSessionCode = `${transpile('src/ai/aiDeclarationSession.ts')}\n// ${seed}\n`
     .replaceAll("from './aiDeclarationVersions'", `from '${declarationVersions}'`)
   const sensitiveCode = `${transpile('src/auth/kioskSensitiveSession.ts')}\n// ${seed}\n`
+    .replaceAll("from '../pages/resume/resumeGenerateDraft'", `from '${resumeDraftUrl}'`)
     .replaceAll("from '../ai/aiDeclarationSession'", `from '${toDataUrl(declarationSessionCode)}'`)
     .replaceAll("from '../ai/aiDeclarationVersions'", `from '${declarationVersions}'`)
     .replaceAll("from '../pages/print/printMaterialSession'", `from '${leaf('src/pages/print/printMaterialSession.ts')}'`)
@@ -165,10 +176,13 @@ export function isScanType(value) {
     .replaceAll("from '../auth/kioskSensitiveSession'", `from '${toDataUrl(sensitiveCode)}'`)
 
   const mod = await import(toDataUrl(authCode))
-  return { mod, session, local, calls, location }
+  return { mod, session, local, calls, location, resumeDraft: await import(resumeDraftUrl), draftHooks: await import(draftHooksUrl) }
 }
 
-function seedPreviousOccupant(session, local) {
+function seedPreviousOccupant(session, local, resumeDraft, draftHooks) {
+  resumeDraft.useResumeGenerateDraftField('basic', { name: '上一位填写的姓名', phone: '', email: '', city: '' })
+  draftHooks.effects.forEach((effect) => effect())
+  assert.equal(resumeDraft.hasResumeGenerateDraft(), true)
   session.setItem(DRAFT_KEY, '上一位的打印问题')
   session.setItem(PRINT_KEY, PRINT_VALUE)
   session.setItem(TOKEN_KEY, OLD_TOKEN)
@@ -176,9 +190,12 @@ function seedPreviousOccupant(session, local) {
 }
 
 test('successful boot-ticket exchange clears the previous occupant and keeps the new token', async () => {
-  const { mod, session, local, calls, location } = await loadTerminalAuth({ exchangeOk: true })
-  seedPreviousOccupant(session, local)
+  const { mod, session, local, calls, location, resumeDraft, draftHooks } = await loadTerminalAuth({ exchangeOk: true })
+  seedPreviousOccupant(session, local, resumeDraft, draftHooks)
   await mod.initializeTerminalSession()
+  assert.equal(resumeDraft.hasResumeGenerateDraft(), false)
+  draftHooks.effects.forEach((effect) => effect())
+  assert.equal(resumeDraft.hasResumeGenerateDraft(), false, '旧组件延迟 effect 不得把已清场的草稿写回')
   assert.equal(session.getItem(PRINT_KEY), null)
   assert.equal(session.getItem(DRAFT_KEY), null)
   assert.equal(local.getItem(FAVORITE_KEY), null)
@@ -190,9 +207,11 @@ test('successful boot-ticket exchange clears the previous occupant and keeps the
 })
 
 test('failed boot-ticket exchange keeps the session still in use', async () => {
-  const { mod, session, local, calls } = await loadTerminalAuth({ exchangeOk: false })
-  seedPreviousOccupant(session, local)
+  const { mod, session, local, calls, resumeDraft, draftHooks } = await loadTerminalAuth({ exchangeOk: false })
+  seedPreviousOccupant(session, local, resumeDraft, draftHooks)
   await mod.initializeTerminalSession()
+  assert.equal(resumeDraft.hasResumeGenerateDraft(), true)
+  assert.equal(resumeDraft.useResumeGenerateDraftField('basic', {})[0].name, '上一位填写的姓名')
   assert.equal(session.getItem(PRINT_KEY), PRINT_VALUE)
   assert.equal(session.getItem(DRAFT_KEY), '上一位的打印问题')
   assert.equal(local.getItem(FAVORITE_KEY), FAVORITE_VALUE)

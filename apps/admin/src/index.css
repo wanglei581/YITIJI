@@ -22,3 +22,40 @@
     background-color: var(--color-canvas);
   }
 }
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  .ui-admin-sidebar,
+  .ui-admin-topbar,
+  .no-print {
+    display: none !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .first-order-report-print,
+  .first-order-report-print * {
+    visibility: visible;
+  }
+
+  .first-order-report-print {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    background: white;
+  }
+
+  .first-order-report-print .no-print,
+  .first-order-report-print button {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+}

@@ -554,13 +554,14 @@ const api = {
    * 凭据，那些历史日志会**追溯性地**变成凭据泄露。（契约见
    * docs/api/upload-scene-miniapp-contract.md）
    *
-   * 三条调用方必须知道的行为：
-   *   1. **一次性**：服务端用 Redis GETDEL 原子消费，第二次兑换必失败。
-   *      所以不要重试，也不要在 onShow 里重复兑换。
-   *   2. **兑换会轮换 uploadToken**：同一会话的旧网页二维码当场作废。
-   *   3. **失败一律 UPLOAD_SCENE_UNUSABLE**：格式错 / 查无此码 / 已过期 / 已用掉
+   * 调用方必须知道的行为（2026-10-29 起的契约）：
+   *   1. **会话有效期内可重复兑换**：同一张码多次兑换拿到同一把 uploadToken。
+   *      所以断网、超时、5xx 之后可以让用户点「重试」再兑换一次；但不要在 onShow 里自动兑换。
+   *   2. **失败一律 UPLOAD_SCENE_UNUSABLE**：格式错 / 查无此码 / 已过期 / 已收到文件 / 已作废
    *      都是同一个码。**不要按原因分支** —— 区分原因对用户没价值（补救动作都是
-   *      「回一体机重新生成」），对探测者却是一台预言机。
+   *      「回一体机刷新二维码」），对探测者却是一台预言机。这个码不给重试。
+   *   3. 一体机直接出的普通链接码（`https://<域名>/k/u/<scene>`）里的 scene 也走这里，
+   *      见 utils/kiosk-qr.js。
    *
    * 不返回 controlToken：那是一体机侧的凭据，手机端不该拿到。
    *
@@ -589,6 +590,30 @@ const api = {
         (err) => { prepared.cleanup(); throw err; }
       )
     );
+  },
+
+  /**
+   * 把本人「我的文档」里的一份文件递进**一体机的上传会话**（不用再从手机传一遍字节）。
+   *
+   * 与 uploadToKioskSession 同一把 uploadToken、同形回执（status=uploaded、file.fileId、
+   * sessionId、purpose）；区别是要会员登录（needAuth: true），服务端只读本人的文件，
+   * 落到会话里的是一份匿名副本。主要错误码：
+   *   FILE_NOT_FOUND（不是本人的 / 已删 / 已过期）· FILE_TOO_LARGE（超 10MB）·
+   *   UPLOAD_SESSION_MEMBER_MISMATCH（一体机登录的是另一个会员）·
+   *   UPLOAD_TOKEN_INVALID / UPLOAD_SESSION_NOT_PENDING / _EXPIRED / _NOT_FOUND（码已不能再传）·
+   *   UPLOAD_SESSION_UPLOAD_IN_PROGRESS（这张码正在收一份）· 401（会员登录失效）。
+   *
+   * @param {string} sessionId 扫码得到的会话 id
+   * @param {string} uploadToken 扫码得到的上传令牌（只进 body，不进 URL）
+   * @param {string} fileId 「我的文档」列表里的文件 id
+   */
+  sendMemberFileToKioskSession(sessionId, uploadToken, fileId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('传文件到一体机'));
+    return request(`/upload-sessions/${encodeURIComponent(sessionId)}/member-file`, {
+      method: 'POST',
+      data: { uploadToken, fileId },
+      needAuth: true,
+    });
   },
 
   uploadPrintFile(filePath, displayName) {
@@ -1526,18 +1551,18 @@ const api = {
     });
   },
 
-  /** 打印前隐私检查；会员 token 保证只能检查本人文件。 */
+  /** 打印前隐私检查；会员 token 保证只能检查本人文件。服务端已豁免 AI 闸门（materials.controller 的 AiUseExempt，AI 挂了原件照样能打），这里不挂 ai、不问年龄。 */
   createPrintPiiScan(fileId) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印隐私检查'));
     return request('/materials/tasks', {
-      method: 'POST', data: { kind: 'pii_scan', sourceFileId: fileId }, needAuth: true, timeout: config.aiTimeout, ai: 'generate',
+      method: 'POST', data: { kind: 'pii_scan', sourceFileId: fileId }, needAuth: true, timeout: config.aiTimeout,
     });
   },
 
   decidePrintPiiFindings(taskId, decisions) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印隐私检查'));
     return request(`/materials/tasks/${encodeURIComponent(taskId)}/pii-findings/decisions`, {
-      method: 'POST', data: { decisions }, needAuth: true, timeout: config.aiTimeout, ai: 'generate',
+      method: 'POST', data: { decisions }, needAuth: true, timeout: config.aiTimeout,
     });
   },
 
@@ -1827,7 +1852,8 @@ const api = {
   createContractReview(payload) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
     // 建任务要落库并校验同意快照，15 秒默认值偏紧。
-    return request('/contract-reviews', { method: 'POST', data: payload, needAuth: true, timeout: config.aiTimeout });
+    // ai: 'generate'：和别的 AI 功能一样，先过未满 14 周岁的声明（服务端这条是 @AiUse('generate')）。
+    return request('/contract-reviews', { method: 'POST', data: payload, needAuth: true, timeout: config.aiTimeout, ai: 'generate' });
   },
 
   /**
@@ -1851,7 +1877,7 @@ const api = {
   confirmContractReview(id, payload) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
     return request(`/contract-reviews/${encodeURIComponent(id)}/confirm`, {
-      method: 'POST', data: payload, needAuth: true,
+      method: 'POST', data: payload, needAuth: true, ai: 'generate',
       // 确认后服务端要做状态机切换与入队，实测会超过 15 秒默认值。
       timeout: config.aiTimeout,
     });
@@ -2047,5 +2073,19 @@ api.appendSelfAssessmentToResume = function appendSelfAssessmentToResume(taskId,
     needAuth: true,
     timeout: 60000,
     ai: 'generate',
+  });
+};
+
+/**
+ * 公开服务电话。不登录。terminalId 为空就不带查询参数。
+ * 后端: GET /api/v1/public/support-contact
+ */
+api.getSupportContact = function getSupportContact(terminalId) {
+  if (config.USE_MOCK) return Promise.reject(mockUnavailable('服务电话'));
+  const ref = typeof terminalId === 'string' ? terminalId.trim() : '';
+  // 路径必须是字面量：契约门禁只抽 request('…') / request(`…`)，变量拼出来的路径会被漏掉。
+  if (!ref) return request('/public/support-contact', { method: 'GET', needAuth: false });
+  return request(`/public/support-contact?terminalId=${encodeURIComponent(ref)}`, {
+    method: 'GET', needAuth: false,
   });
 };

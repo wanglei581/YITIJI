@@ -67,8 +67,11 @@ function registerKioskShell(api: ApiRouter, options: KioskShellOptions = {}): vo
 }
 
 async function expectWarningWithinThreeSeconds(page: Page): Promise<void> {
-  await expect(page).toHaveURL(/\/session-timeout$/, { timeout: 3_000 })
-  await expect(page.getByRole('heading', { name: /还在用吗/ })).toBeVisible()
+  // 3 秒只守「计时器触发导航」，等到地址变成 /session-timeout（commit）即可。
+  // 渲染另由下面的标题断言兜，上界 5 秒。
+  await page.waitForURL(/\/session-timeout$/, { timeout: 3_000, waitUntil: 'commit' })
+  // 标题可见兜白屏和懒加载失败。5 秒是渲染上界，不计入上面的 3 秒导航契约。
+  await expect(page.getByRole('heading', { name: /还在用吗/ })).toBeVisible({ timeout: 5_000 })
 }
 
 async function readSensitiveSession(page: Page): Promise<string | null | undefined> {
@@ -148,6 +151,9 @@ test('image-to-pdf editing warns that unsaved work is lost, not the generic clea
   // 「登录状态和这台机器上的这次使用记录将清除」——那句话没提用户会丢掉刚挑的图。
   registerKioskShell(api, { screensaverEnabled: false })
   await page.goto('/print-scan/convert')
+  // 就绪锚点：h1「图片转 PDF」（QxPageFrame，apps/kiosk/src/components/qingxu/QxPageFrame.tsx）。
+  // 标题出现说明这条路由已经挂载、空闲计时已开始；在这之前开始计 3 秒，会把挂载耗时算进去。
+  await expect(page.getByRole('heading', { name: '图片转 PDF', level: 1 })).toBeVisible({ timeout: 5_000 })
   await expectWarningWithinThreeSeconds(page)
   await expect(page.getByText('未保存的填写、编辑或练习内容会清除', { exact: true })).toBeVisible()
   await expect(page.getByText('登录状态和这台机器上的这次使用记录将清除', { exact: true })).toHaveCount(0)
@@ -208,6 +214,8 @@ test('ordinary idle warns before clearing and can resume the previous route', as
   await expect(from).toContainText('继续后回到 练面试')
   await expect(from).not.toContainText('/')
   await expect(page.getByRole('button', { name: '我还在，继续使用，回到练面试', exact: true })).toBeVisible()
+  await expect(page.getByTestId('session-guard-primary')).toHaveText('我还在，继续使用')
+  await expect(page.getByTestId('session-guard-clear')).toHaveText('现在结束使用')
   await page.getByRole('button', { name: /我还在，继续使用/ }).click()
 
   await expect(page).toHaveURL(/\/interview\?stage=tips/)
@@ -434,10 +442,12 @@ test('orphan /session-timeout shows the clearing overlay on first frame and neve
       const heading = document.querySelector('#session-timeout-title')
       const buttons = Array.from(document.querySelectorAll('button'))
       const exitButton = buttons.find((button) =>
-        /结束并清除这台机器上的这次使用记录/.test(button.textContent ?? '')
+        /现在结束使用/.test(button.textContent ?? '')
+        && /结束并清除这台机器上的这次使用记录/.test(button.getAttribute('aria-label') ?? '')
       )
       const continueButton = buttons.find((button) =>
-        /我还在，继续使用|结束并清除这台机器上的这次使用记录/.test(button.textContent ?? '')
+        /我还在，继续使用/.test(button.textContent ?? '')
+        && /我还在，继续使用/.test(button.getAttribute('aria-label') ?? '')
       )
       const accountLabel = Array.from(document.querySelectorAll('p, span, b')).find((el) =>
         /当前登录：|当前会话：/.test(el.textContent ?? '')
@@ -759,11 +769,11 @@ test('scan busy stays released when the scan task id is missing @scan-busy @warn
   registerKioskShell(api)
   await page.goto('/scan?stage=progress')
 
-  // 缺少扫描会话时，工作台把 ?stage=progress 按回 start；busy 的作用是
-  // 抑制空闲警告(suppresses idle warning),不会拦截路由跳转。E2E 这一组测试
-  // 要锁住的是用户可见的承诺:身份不完整时,idle 计时器继续工作,提示用户在
-  // 3s 内弹出 /session-timeout。不去对内部 active===false 这种实现细节
-  // 做断言——它属于 hook 单测的职责范围。
+  // 缺少扫描会话时，工作台把 ?stage=progress 纠偏回 ?stage=start。busy 抑制空闲警告，但不会拦截这次跳转。
+  // 要锁住的是可见承诺：身份不完整时空闲计时继续走，3 秒内弹出 /session-timeout。不对内部 active===false 做断言。
+  // 纠偏回 ?stage=start 并且 start 区块可见后再计 3 秒，不放宽 helper。
+  await expect(page).toHaveURL(/\/scan\?stage=start$/, { timeout: 5_000 })
+  await expect(page.locator('[data-scan-stage="start"]')).toBeVisible({ timeout: 5_000 })
   await expectWarningWithinThreeSeconds(page)
 })
 
@@ -785,6 +795,10 @@ test('scan busy stays released when the scan control token is missing @scan-busy
   )
   await page.goto('/scan?stage=progress')
 
+  // 控制令牌为空时，工作台同样把 ?stage=progress 纠偏回 start。
+  // 纠偏回 start 并且 start 区块可见后再计 3 秒，不放宽 helper。
+  await expect(page).toHaveURL(/\/scan\?stage=start$/, { timeout: 5_000 })
+  await expect(page.locator('[data-scan-stage="start"]')).toBeVisible({ timeout: 5_000 })
   await expectWarningWithinThreeSeconds(page)
 })
 
@@ -1052,6 +1066,7 @@ test('user cancel while the delivery ack is still in flight sends exactly one DE
   await expect.poll(() => counts.statusRequests()).toBeGreaterThanOrEqual(1)
 
   await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+  await page.getByRole('button', { name: '再点一次确认取消', exact: true }).click()
   await expect(page).toHaveURL(/\/scan\?stage=start/, { timeout: 6_000 })
   ack.release()
 
@@ -1092,6 +1107,7 @@ test('user cancel that finds the scan already completed sends no second DELETE w
   await expect.poll(() => counts.statusRequests()).toBeGreaterThanOrEqual(1)
 
   await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+  await page.getByRole('button', { name: '再点一次确认取消', exact: true }).click()
   await expect(page).toHaveURL(/\/scan\?stage=result/, { timeout: 6_000 })
   await page.getByRole('button', { name: '首页', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/')
@@ -1130,6 +1146,7 @@ test('user cancel that hits already-completed with an unanswered recheck sends n
   const pollsBeforeCancel = counts.statusRequests()
 
   await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+  await page.getByRole('button', { name: '再点一次确认取消', exact: true }).click()
   // 补查确实发出去了、也确实没拿到回话：页面落回 start，而不是结果屏。
   await expect(page).toHaveURL(/\/scan\?stage=start/, { timeout: 6_000 })
   expect(counts.statusRequests()).toBeGreaterThan(pollsBeforeCancel)
@@ -1171,6 +1188,7 @@ test('a cancel answered with SCAN_TASK_CANCEL_CONFLICT keeps the late-ack compen
   await expect.poll(() => counts.statusRequests()).toBeGreaterThanOrEqual(1)
 
   await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+  await page.getByRole('button', { name: '再点一次确认取消', exact: true }).click()
   await expect(page).toHaveURL(/\/scan\?stage=start/, { timeout: 6_000 })
   await expect.poll(async () => (await readProbe())?.deletes ?? 0, { message: '用户按的那一次已经发出' }).toBe(1)
   ack.release()
@@ -1199,6 +1217,7 @@ test('explicit user cancel sends exactly one DELETE before navigating away @scan
 
   const deleteBefore = cancelCounts.deleteRequests()
   await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+  await page.getByRole('button', { name: '再点一次确认取消', exact: true }).click()
 
   await expect(page).toHaveURL(/\/scan\?stage=start/, { timeout: 6_000 })
   await expectWarningWithinThreeSeconds(page)
@@ -1230,6 +1249,7 @@ test('user cancel with a failing DELETE sends exactly one attempt and falls back
 
   const deleteBefore = cancelCounts.deleteRequests()
   await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+  await page.getByRole('button', { name: '再点一次确认取消', exact: true }).click()
 
   // DELETE 抛错 → catch 走默认 fallback,busy 在 effect 渲染后释放,
   // 落地到 /scan/start。/scan/start 上 idle 计时器重新开始,3s 内

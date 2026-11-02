@@ -82,6 +82,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // ── Model delegates ────────────────────────────────────────────────────────
 
+  get aiServiceFact() {
+    return this.client.aiServiceFact
+  }
+
   get terminal() {
     return this.client.terminal
   }
@@ -561,6 +565,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ── Transaction ────────────────────────────────────────────────────────────
+
+  get serviceProject() { return this.client.serviceProject }
+  get serviceDeployment() { return this.client.serviceDeployment }
+  get serviceIncident() { return this.client.serviceIncident }
+  get serviceIncidentEvent() { return this.client.serviceIncidentEvent }
+  get serviceReport() { return this.client.serviceReport }
 
   $transaction<R>(
     fn: (prisma: PrismaTransactionClient) => Promise<R>,

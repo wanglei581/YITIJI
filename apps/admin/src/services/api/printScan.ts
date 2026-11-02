@@ -144,6 +144,8 @@ export interface ListPrintScanTasksParams {
   terminalId?: string
   page?: number
   pageSize?: number
+  /** 为真时只查询出纸未确认。演示模式不造这条数据。 */
+  unconfirmed?: boolean
 }
 
 export interface CancelUnpaidPrintTaskInput {
@@ -200,6 +202,7 @@ const httpAdapter: AdminPrintScanServiceInterface = {
     if (params.terminalId) q.set('terminalId', params.terminalId)
     if (params.page) q.set('page', String(params.page))
     if (params.pageSize) q.set('pageSize', String(params.pageSize))
+    if (params.unconfirmed) q.set('unconfirmed', '1')
     return request(`/admin/print-scan/tasks?${q.toString()}`)
   },
   getTaskDetail: (type, taskId) =>
@@ -259,6 +262,9 @@ const MOCK_PRINT_TASKS: AdminPrintScanTaskItem[] = [
 
 const mockAdapter: AdminPrintScanServiceInterface = {
   listTasks: async (params) => {
+    if (params.unconfirmed) {
+      throw new Error('项目交付与服务需要连接真实后端，当前预览模式不可操作。')
+    }
     const implemented = params.type === 'print' || params.type === 'scan' || params.type === 'document_process'
     const items = params.type === 'print' ? MOCK_PRINT_TASKS.filter((t) => !params.status || t.status === params.status) : []
     return {

@@ -5,6 +5,12 @@ packages:
 # pnpm 11 is the single supported package-manager line. Keep all project settings here.
 engineStrict: true
 overrides:
+  # CI 2026-10-22: redirect credential leaks in 1.16.0; first fix is 1.16.1.
+  # GHSA-q3jh-wrc6-jgq8 / GHSA-8r9p-f939-6h3c. Keep the existing 1.x API.
+  # GHSA-mrwp-f3q8-3g9p: preserve cross-realm sensitiveHeaders on redirect.
+  follow-redirects: 1.16.2
+  # GHSA-587h-7wmj-h5pm: Windows editor launch check bypass, fixed on Vite 6 in 6.4.4.
+  vite: 6.4.4
   # qs: GHSA-x5fp-wj9c-mxmx (6.14.2–6.15.3 array-limit bypass) and
   # GHSA-4mjr-xmp4-gh2g (<6.16.0 isBuffer DoS) both first-fix at 6.16.0.
   # The previous pin 6.15.2 sits inside both ranges. express@5.2.1 asks for
@@ -39,7 +45,8 @@ overrides:
   # 2026-09-29 更新：9/28 夜新发一条 moderate，打在 2.3.0 上、首修 2.4.0 ——
   #   GHSA-3pph-fpjx-jg34（上传中断后遗留的磁盘写入致 DoS，影响 >= 2.2.0 < 2.4.0）
   # 改钉 2.4.0（2026-09-14 发布，已过 minimumReleaseAge）。
-  multer: 2.4.0
+  # 2026-10-24: GHSA-q7qp-rjg7-q26m affects 2.x <2.5.0; pin the upstream fix.
+  multer: 2.5.0
   # js-yaml: GHSA-2883-xcg3-v3hh（HIGH，2026-09-08 发布）
   # maxTotalMergeKeys 不限制「空合并源」的 CPU 消耗；影响 >=4.0.0 <4.3.2，首修 4.3.2。
   # 原先钉的 4.3.1 当初也是安全修复，被新公告覆盖。取 4.3.2（2026-08-26）不跨大版本；
@@ -82,7 +89,8 @@ overrides:
   # line is 2.3.0. express@5.2.1 (services/api direct) asks for ^2.2.1, which
   # already allows 2.3.0, but the lock stayed on 2.2.2. Pin the minimum fix
   # so a later resolve cannot drop back under 2.3.0.
-  body-parser: 2.3.0
+  # 2026-10-24: GHSA-27r3-jxmh-p828 affects 2.x <2.4.0; pin the upstream fix.
+  body-parser: 2.4.0
   # @babel/core: GHSA-4x5r-pxfx-6jf8 affects <=7.29.0 on the 7.x line.
   # First fix is 7.29.6. @vitejs/plugin-react@4.7.0 asks for ^7.28.0, which
   # already allows 7.29.6, but the lock resolved 7.29.0. Pin the minimum fix.

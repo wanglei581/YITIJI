@@ -1,0 +1,390 @@
+/* 编辑与导出（稿 resume-edit / resume-export）。样式移植自稿 d4-edit / d4-side / d4-ai / d4-fmts / d4-out / d4-facts。
+   左边的简历页是运行页的真编辑区（Tailwind 控件），这里只在本页范围内把字抬到 20px 以上、点区放大。 */
+
+:is([data-qx-page='resume-edit'], [data-qx-page='resume-export']) {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  text-align: left;
+}
+
+/* ── 编辑 ── 左边是简历页（在框里滚动）加六条说明，右边是设置；整屏不滚，哪一边内容多哪一边自己滚。 */
+[data-qx-page='resume-edit'] { flex: 1; min-height: 0; }
+[data-qx-page='resume-edit'] .qxt-edit { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr); grid-template-rows: minmax(0, 1fr); gap: 12px; align-items: stretch; }
+
+[data-qx-page='resume-edit'] .qxt-paperbox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border-radius: 26px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page='resume-edit'] .qxt-paperbox { min-height: 0; }
+[data-qx-page='resume-edit'] .qxt-paperbox-note { margin: 0; font-size: 20px; line-height: 1.4; color: var(--qxt-ink-3); }
+[data-qx-page='resume-edit'] .qxt-paperbox-note b { display: block; font-size: 24px; color: var(--qxt-ink); }
+
+/* 真编辑区：把 Tailwind 的小字与小控件放大到触屏尺寸。框里滚动，下面的六条说明始终看得见。 */
+[data-qx-page='resume-edit'] .qxt-paperbox-in { flex: 1; min-height: 0; min-width: 0; overflow-y: auto; overscroll-behavior: contain; border-radius: 18px; }
+[data-qx-page='resume-edit'] .qxt-paperbox-in [class~='text-xs'],
+[data-qx-page='resume-edit'] .qxt-paperbox-in [class~='text-sm'] { font-size: 20px; line-height: 1.4; }
+[data-qx-page='resume-edit'] .qxt-paperbox-in [class~='text-base'] { font-size: 22px; }
+[data-qx-page='resume-edit'] .qxt-paperbox-in [class~='text-lg'] { font-size: 24px; }
+[data-qx-page='resume-edit'] .qxt-paperbox-in [class~='text-2xl'] { font-size: 30px; }
+[data-qx-page='resume-edit'] .qxt-paperbox-in :is(input, textarea) { font-size: 22px; line-height: 1.4; min-height: 64px; }
+[data-qx-page='resume-edit'] .qxt-paperbox-in button { min-height: 64px; min-width: 64px; font-size: 20px; }
+
+[data-qx-page='resume-edit'] .qxt-sheetfacts { display: grid; grid-template-columns: 1fr 1fr; grid-auto-flow: row dense; gap: 8px; }
+[data-qx-page='resume-edit'] .qxt-sheetfacts .qxt-wide { grid-column: 1 / -1; }
+
+[data-qx-page='resume-edit'] .qxt-sheetfacts div {
+  min-height: 0;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: var(--qxt-well);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+[data-qx-page='resume-edit'] .qxt-sheetfacts b { font-size: 22px; }
+[data-qx-page='resume-edit'] .qxt-sheetfacts span { font-size: 20px; line-height: 1.35; color: var(--qxt-ink-2); }
+
+[data-qx-page='resume-edit'] .qxt-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+[data-qx-page='resume-edit'] .qxt-side > * { flex: none; }
+[data-qx-page='resume-edit'] .qxt-now { margin-top: auto; }
+[data-qx-page='resume-edit'] .qxt-savestat { margin: 0; min-height: 40px; display: flex; align-items: center; font-size: 22px; font-weight: 700; }
+[data-qx-page='resume-edit'] .qxt-savestat[data-tone='bad'] { color: var(--qx-cinnabar); }
+
+[data-qx-page='resume-edit'] .qxt-warn {
+  margin: 0;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 18px;
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+[data-qx-page='resume-edit'] .qxt-block { display: flex; flex-direction: column; gap: 8px; }
+[data-qx-page='resume-edit'] .qxt-hint { margin: 0; font-size: 20px; line-height: 1.4; color: var(--qxt-ink-3); }
+[data-qx-page='resume-edit'] .qxt-lab { font-size: 22px; font-weight: 700; }
+
+[data-qx-page='resume-edit'] .qxt-tpl {
+  min-height: 88px;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  font-size: 26px;
+  font-weight: 700;
+  text-align: left;
+}
+
+[data-qx-page='resume-edit'] .qxt-tpl[aria-pressed='true'] { background: var(--qx-deep); color: var(--qxt-cream); border-color: var(--qx-deep); }
+
+[data-qx-page='resume-edit'] .qxt-outlink {
+  min-height: 64px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--qxt-teal-ink);
+  text-align: left;
+}
+
+[data-qx-page='resume-edit'] .qxt-outlink:disabled { opacity: 0.42; }
+[data-qx-page='resume-edit'] .qxt-morebtn { min-height: 72px; }
+
+[data-qx-page='resume-edit'] .qxt-line { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 8px; align-items: center; }
+[data-qx-page='resume-edit'] .qxt-line > span { font-size: 22px; font-weight: 700; }
+[data-qx-page='resume-edit'] .qxt-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+[data-qx-page='resume-edit'] .qxt-chips button {
+  min-height: 64px;
+  min-width: 64px;
+  padding: 0 10px;
+  border-radius: 20px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  font-size: 22px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+[data-qx-page='resume-edit'] .qxt-chips button[aria-pressed='true'] { background: var(--qx-deep); color: var(--qxt-cream); border-color: var(--qx-deep); }
+[data-qx-page='resume-edit'] .qxt-chips button:disabled { opacity: 0.42; }
+
+[data-qx-page='resume-edit'] .qxt-swatch { width: 22px; height: 22px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: -4px; }
+[data-qx-page='resume-edit'] .qxt-swatch[data-swatch='blue'] { background: var(--qx-slate); }
+[data-qx-page='resume-edit'] .qxt-swatch[data-swatch='green'] { background: var(--qx-teal); }
+[data-qx-page='resume-edit'] .qxt-swatch[data-swatch='gray'] { background: var(--qxt-ink-3); }
+
+[data-qx-page='resume-edit'] .qxt-layout { display: flex; flex-direction: column; gap: 8px; }
+
+[data-qx-page='resume-edit'] .qxt-now {
+  min-height: 112px;
+  padding: 14px 16px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+[data-qx-page='resume-edit'] .qxt-now b { font-size: 24px; }
+[data-qx-page='resume-edit'] .qxt-now span { font-size: 22px; line-height: 1.4; color: var(--qxt-ink-2); }
+
+[data-qx-page='resume-edit'] .qxt-ai {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page='resume-edit'] .qxt-ai h3 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 24px; }
+[data-qx-page='resume-edit'] .qxt-ai p { margin: 0; font-size: 20px; line-height: 1.4; color: var(--qxt-ink-2); }
+[data-qx-page='resume-edit'] .qxt-ai-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+[data-qx-page='resume-edit'] .qxt-ai-acts button {
+  min-height: 64px;
+  padding: 0 8px;
+  border-radius: 18px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+[data-qx-page='resume-edit'] .qxt-ai-acts button:disabled { opacity: 0.42; }
+[data-qx-page='resume-edit'] .qxt-ai .qx-ai-declaration-note { font-size: 20px; }
+
+[data-qx-page='resume-edit'] .qxt-all { border-radius: 20px; background: var(--qxt-well); padding: 0 14px 8px; }
+[data-qx-page='resume-edit'] .qxt-all > summary { min-height: 64px; display: flex; align-items: center; font-size: 22px; font-weight: 700; cursor: pointer; }
+[data-qx-page='resume-edit'] .qxt-versions :is(p, span, b, button) { font-size: 20px; }
+[data-qx-page='resume-edit'] .qxt-versions button { min-height: 64px; }
+
+/* ── 导出与打印 ── */
+[data-qx-page='resume-export'] { flex: 1 0 auto; }
+[data-qx-page='resume-export'] .qxt-export { flex: 1 0 auto; display: flex; flex-direction: column; gap: 12px; }
+
+[data-qx-page='resume-export'] .qxt-fmts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+[data-qx-page='resume-export'] .qxt-fmt {
+  min-height: 180px;
+  padding: 16px 18px;
+  border-radius: 26px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 6px;
+}
+
+[data-qx-page='resume-export'] .qxt-fmt b { font: 700 32px/1.3 var(--qx-serif); }
+[data-qx-page='resume-export'] .qxt-fmt small { font-size: 20px; line-height: 1.35; color: var(--qxt-ink-2); }
+[data-qx-page='resume-export'] .qxt-fmt[aria-pressed='true'] { background: var(--qx-deep); color: var(--qxt-cream); border-color: var(--qx-deep); }
+[data-qx-page='resume-export'] .qxt-fmt[aria-pressed='true'] small { color: var(--qxt-mint); }
+[data-qx-page='resume-export'] .qxt-fmt:disabled { opacity: 0.6; }
+
+[data-qx-page='resume-export'] .qxt-pricebar .qx-rd-price {
+  margin: 0;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: var(--qxt-teal-wash);
+  border: 0;
+  color: var(--qxt-teal-ink);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+[data-qx-page='resume-export'] .qxt-pricebar .qx-rd-price[data-tone='bad'] { background: var(--qxt-cin-wash); color: var(--qx-cinnabar); }
+[data-qx-page='resume-export'] .qxt-pricebar .qx-rd-price[data-tone='warn'] { background: var(--qxt-clay-wash); color: var(--qxt-clay-ink); }
+[data-qx-page='resume-export'] .qxt-pricebar .qx-rd-price p { margin: 0; font-size: 22px; }
+
+/* 回执 */
+[data-qx-page='resume-export'] .qxt-out {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 24px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page='resume-export'] .qxt-outfile b { display: block; font-size: 26px; word-break: break-all; }
+[data-qx-page='resume-export'] .qxt-outfile small { display: block; margin-top: 4px; font-size: 20px; color: var(--qxt-ink-3); }
+[data-qx-page='resume-export'] .qxt-price { display: block; margin-top: 4px; font-size: 20px; font-weight: 700; color: var(--qxt-teal-ink); }
+
+[data-qx-page='resume-export'] .qxt-out > button {
+  min-height: 80px;
+  min-width: 180px;
+  padding: 0 16px;
+  border-radius: 20px;
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+[data-qx-page='resume-export'] .qxt-out > button[aria-disabled='true'] { opacity: 0.42; }
+
+[data-qx-page='resume-export'] .qxt-qrcell { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+[data-qx-page='resume-export'] .qxt-qrcell svg { background: var(--qxt-card); padding: 6px; border-radius: 12px; }
+
+[data-qx-page='resume-export'] .qxt-qrcell button {
+  min-height: 64px;
+  min-width: 140px;
+  padding: 0 12px;
+  border-radius: 18px;
+  background: var(--qxt-well);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+[data-qx-page='resume-export'] .qxt-expired { margin: 0; font-size: 20px; color: var(--qxt-clay-ink); }
+
+[data-qx-page='resume-export'] .qxt-outlink {
+  min-height: 64px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--qxt-teal-ink);
+  text-align: left;
+}
+
+[data-qx-page='resume-export'] .qxt-outlink[aria-disabled='true'] { opacity: 0.42; }
+
+/* 四句说明 */
+[data-qx-page='resume-export'] .qxt-facts { flex: 1 0 auto; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(150px, 1fr); gap: 12px; }
+
+[data-qx-page='resume-export'] .qxt-facts div {
+  min-height: 150px;
+  padding: 16px 18px;
+  border-radius: 24px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+[data-qx-page='resume-export'] .qxt-facts b { font-size: 26px; }
+[data-qx-page='resume-export'] .qxt-facts span { font-size: 22px; line-height: 1.4; color: var(--qxt-ink-2); }
+
+[data-qx-page='resume-export'] .qxt-guest {
+  margin: 0;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border-radius: 18px;
+  background: var(--qxt-well);
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+}
+
+[data-qx-page='resume-export'] .qxt-fine { margin: 0; font-size: 20px; line-height: 1.5; color: var(--qxt-ink-3); text-align: center; }
+
+/* ── 导出前核对事实（弹层，在页面外层，自带范围标记） ── */
+[data-qx-page='resume-fact'] { display: flex; flex-direction: column; gap: 14px; text-align: left; min-width: 0; width: 100%; }
+.qxt-screen .qxt-dialog:has([data-qx-page='resume-fact']) h2 { align-self: flex-start; text-align: left; }
+[data-qx-page='resume-fact'] p { margin: 0; font-size: 22px; line-height: 1.45; color: var(--qxt-ink-2); }
+[data-qx-page='resume-fact'] .qxt-pending { font-size: 24px; font-weight: 700; color: var(--qxt-clay-ink); }
+[data-qx-page='resume-fact'] .qxt-pending .qxt-pending-why { display: block; margin-top: 4px; font-size: 22px; font-weight: 500; line-height: 1.45; }
+[data-qx-page='resume-fact'] .qxt-factlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+
+[data-qx-page='resume-fact'] .qxt-factrow {
+  position: relative;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 16px;
+  border-radius: 20px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  font-size: 24px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+[data-qx-page='resume-fact'] .qxt-factrow span { min-width: 0; flex: 1; word-break: break-all; }
+[data-qx-page='resume-fact'] .qxt-factrow b { margin-right: 10px; }
+[data-qx-page='resume-fact'] .qxt-factrow em { margin-left: auto; font-style: normal; font-size: 22px; font-weight: 700; color: var(--qxt-ink-3); }
+
+[data-qx-page='resume-fact'] .qxt-factrow input {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  margin: 0;
+  border: 2px solid var(--qxt-ink);
+  border-radius: 12px;
+  background: var(--qxt-card);
+  display: grid;
+  place-items: center;
+}
+
+[data-qx-page='resume-fact'] .qxt-factrow input:checked { background: var(--qx-deep); border-color: var(--qx-deep); }
+
+[data-qx-page='resume-fact'] .qxt-factrow input:checked::after {
+  content: '';
+  width: 14px;
+  height: 8px;
+  border-left: 3px solid var(--qxt-cream);
+  border-bottom: 3px solid var(--qxt-cream);
+  transform: rotate(-45deg) translate(1px, -2px);
+}
+
+[data-qx-page='resume-fact'] .qxt-why-not { color: var(--qx-cinnabar); font-weight: 700; }
+
+@media (max-width: 640px) {
+  [data-kiosk-stage-fit='off'] [data-qx-page='resume-edit'] { overflow-y: auto; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='resume-edit'] .qxt-edit { display: block; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='resume-edit'] .qxt-paperbox-in,
+  [data-kiosk-stage-fit='off'] [data-qx-page='resume-edit'] .qxt-side { overflow: visible; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='resume-export'] .qxt-out { grid-template-columns: 1fr; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='resume-export'] .qxt-fmts,
+  [data-kiosk-stage-fit='off'] [data-qx-page='resume-export'] .qxt-facts { grid-template-columns: 1fr; }
+}

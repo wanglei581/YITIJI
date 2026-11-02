@@ -212,6 +212,12 @@
    「这里没答上你的问题」紧跟在「直接去办」后面，不单独分一份：两块之间再拉开，右半边就空成一片。 */
 .k1-help-center .k1-help-scroll > .k1-help-sec-head,
 .k1-help-center .k1-help-scroll > .k1-help-filing { margin-top: auto; }
+/* 触屏卡片里滚动区已经撑满，auto 会把分类顶出首屏。只在触屏壳里取消。
+   旧壳把按钮条和说明写成 flex:1 1 100%，挂进触屏列之后会把正文挤成一条。 */
+.k1-help-center .qxt-screen .k1-help-scroll > .k1-help-sec-head,
+.k1-help-center .qxt-screen .k1-help-scroll > .k1-help-filing { margin-top: 0; }
+.k1-help-center .qxt-screen .k1-help-actions,
+.k1-help-center .qxt-screen .k1-help-truth { flex: none; width: 100%; }
 /* 分类照稿两列；七张（托管 a 多一张「我的记录」）时末张占满一行，不留空格子。 */
 .k1-help-center .k1-help-filters > button:nth-child(7):last-child { grid-column: 1 / -1; }
 .k1-help-center .k1-help-links { display: flex; flex-wrap: wrap; gap: 14px; }

@@ -63,7 +63,7 @@ test('六列中文列表、尾号与悬停原值；长字段与递归脱敏在�
   const width = await table.evaluate((el) => ({ scroll: el.parentElement!.scrollWidth, client: el.parentElement!.clientWidth }))
   expect(width.scroll).toBeLessThanOrEqual(width.client)
   await expect(page.locator('[lang="zh-CN"]').first()).toBeVisible()
-  await expect(page.getByText('起始时间（年/月/日 时:分）')).toBeVisible()
+  await expect(page.getByText('起始时间（年/月/日 时:分，北京时间）')).toBeVisible()
 })
 
 for (const payloadJson of ['{"password":"bad-secret"', '{"unknown":"unrecognized-secret"', '["private-raw"']) {

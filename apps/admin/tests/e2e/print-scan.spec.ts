@@ -6,6 +6,7 @@ test.describe('打印扫描运维（mock 口径）', () => {
     const guards = await openAuthed(page, '/print-scan')
     await settleAdminPage(page, guards)
     await expect(page.getByRole('heading', { name: '打印扫描运维' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '出纸未确认', exact: true })).toHaveAttribute('aria-pressed', 'false')
 
     await page.getByRole('button', { name: '设备能力' }).click()
     await expect(page.getByRole('heading', { name: '打印扫描运维' })).toBeVisible()
@@ -69,6 +70,21 @@ test.describe('打印扫描运维（mock 口径）', () => {
     await materialRow.getByRole('button', { name: '登记' }).click()
     await expect(materialRow.getByText('已开通')).toBeVisible()
     await expect(materialRow.getByRole('button', { name: '保存' })).toBeDisabled()
+    await settleAdminPage(page, guards)
+  })
+
+  test('地址带出纸未确认时选中该筛选，演示模式不造数据', async ({ page }) => {
+    const guards = await openAuthed(page, '/print-scan?unconfirmed=1')
+    await settleAdminPage(page, guards)
+    const chip = page.getByRole('button', { name: '出纸未确认', exact: true })
+    await expect(chip).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByText('演示模式不显示出纸未确认')).toBeVisible()
+    await expect(page.getByText('暂无任务')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /查看打印任务/ })).toHaveCount(0)
+    await chip.click()
+    await expect(page).not.toHaveURL(/unconfirmed=1/)
+    await expect(chip).toHaveAttribute('aria-pressed', 'false')
+    await expect(page.getByRole('button', { name: /查看打印任务/ }).first()).toBeVisible()
     await settleAdminPage(page, guards)
   })
 

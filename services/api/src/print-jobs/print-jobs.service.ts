@@ -20,6 +20,9 @@ import {
   paidReprintBlockReason,
   throwIfMemberReprintBlocked,
 } from './paid-reprint-eligibility'
+import { payableCents } from '../payment/pending-refund-signal'
+import { assertFreePrintQuota } from './free-print-quota.decide'
+import { reprintRequestedSides } from './free-print-quota.usage'
 import { lockPrintTaskRow } from '../terminals/print-status-attempt'
 import { assertSelfServiceReprintRemaining, KIOSK_RETRY_LOG_CODE } from './self-service-reprint'
 import type { CreatePrintJobDto } from './dto/create-print-job.dto'
@@ -486,6 +489,12 @@ export class PrintJobsService {
           error: { code: 'PRINT_TERMINAL_NOT_ACTIVE', message: '目标终端已进入维护状态，不再接收新打印任务' },
         })
       }
+      await assertFreePrintQuota(tx, {
+        terminalId: targetTerminalId,
+        endUserId: ctx.endUserId ?? null,
+        requestedSides: billablePages * copies,
+        payableCents: payableCents({ amountCents: quote.amountCents, discountCents: 0 }),
+      })
       const task = await tx.printTask.create({
         data: {
           id:         taskId,
@@ -778,6 +787,17 @@ export class PrintJobsService {
         })
       }
       await assertSelfServiceReprintRemaining(tx, task.id)
+      const quotaItem = await tx.orderItem.findFirst({
+        where: { printTaskId: task.id },
+        select: { billablePages: true, copies: true },
+      })
+      await assertFreePrintQuota(tx, {
+        terminalId: liveTask?.terminalId ?? task.terminalId ?? '',
+        endUserId: task.endUserId,
+        requestedSides: reprintRequestedSides(quotaItem, order, task.paramsJson),
+        // 付过款的单金额与优惠不再变；下面改单时还用 amountBefore 守卫一次。
+        payableCents: payableCents(order),
+      })
 
       const updatedOrder = await tx.order.updateMany({
         where: {

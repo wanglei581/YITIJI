@@ -13,6 +13,18 @@
  */
 
 export type AuditAction =
+  | 'first_order.project_created'
+  | 'first_order.project_updated'
+  | 'first_order.deployment_created'
+  | 'first_order.deployment_ended'
+  | 'first_order.incident_created'
+  | 'first_order.incident_start'
+  | 'first_order.incident_resolve'
+  | 'first_order.incident_confirm'
+  | 'first_order.incident_reopen'
+  | 'first_order.report_created'
+  | 'first_order.report_exported'
+  | 'first_order.report_acknowledged'
   | 'file.upload'
   | 'file.force_delete'
   | 'file.cleanup_expired'
@@ -87,6 +99,10 @@ export type AuditAction =
   | 'legal_doc.view'
 
 export type AuditTargetType =
+  | 'service_project'
+  | 'service_deployment'
+  | 'service_incident'
+  | 'service_report'
   | 'auth'
   | 'file'
   | 'job'

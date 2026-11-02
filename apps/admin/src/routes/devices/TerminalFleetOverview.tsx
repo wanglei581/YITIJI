@@ -124,6 +124,7 @@ export default function TerminalFleetOverview() {
           <p className="mt-1 text-xs text-neutral-500">
             健康判定窗口 {data?.onlineWindowSeconds ?? 180} 秒 · 每 30 秒自动刷新
           </p>
+          <p className="mt-1 text-xs text-neutral-500">机队总览按设备上报统计，条数可能与终端名册不同。</p>
         </div>
         <button
           type="button"

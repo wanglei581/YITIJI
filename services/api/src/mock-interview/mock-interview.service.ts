@@ -1,3 +1,4 @@
+import { captureFactIdentity, recordAiServiceFact } from '../ai/usage/ai-service-fact'
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
@@ -168,12 +169,13 @@ export class MockInterviewService {
   }
 
   async start(sessionId: string, requester: InterviewRequester) {
+    const identity = captureFactIdentity()
     // 鉴权必须在合并之前：否则无权请求会复用已授权 worker 的 Promise。
     await this.loadAuthorized(sessionId, requester)
-    return this.startInflight.run(this.coalesceKey(sessionId, requester), () => this.startOnce(sessionId, requester))
+    return this.startInflight.run(this.coalesceKey(sessionId, requester), () => this.startOnce(sessionId, requester, identity))
   }
 
-  private async startOnce(sessionId: string, requester: InterviewRequester) {
+  private async startOnce(sessionId: string, requester: InterviewRequester, identity: ReturnType<typeof captureFactIdentity>) {
     const session = await this.loadAuthorized(sessionId, requester)
     const claimed = await this.prisma.mockInterviewSession.updateMany({
       where: { id: session.id, status: 'configured' },
@@ -192,6 +194,7 @@ export class MockInterviewService {
       await this.prisma.mockInterviewTurn.create({
         data: { sessionId: session.id, idx: 0, role: 'interviewer', qType: q.qType, content },
       })
+      recordAiServiceFact(this.prisma, this.logger, identity, 'mock_interview', session.id)
       return { question: content, qType: q.qType, questionIndex: 1, questionTarget: session.questionTarget, done: false as const }
     } catch (error) {
       this.recordAiLog(session.id, 'interviewQuestion', usage, startedAt, 'failed', session.endUserId, aiErrorCodeOf(error, 'AI_INTERVIEW_QUESTION_FAILED'))

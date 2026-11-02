@@ -1,5 +1,5 @@
 import { sceneFieldsForType } from './orgFormState'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { PARTNER_TYPE_LABELS } from '@ai-job-print/shared'
 import { Drawer, LoadingState, ErrorState } from '@ai-job-print/ui'
 import { orgsAdminService, type AdminOrgDetail, type UpdateOrgInput } from '../../services/api/orgsAdmin'
@@ -11,17 +11,27 @@ import { OrgCircuitBreakPanel } from './OrgCircuitBreakPanel'
 import { OrgOfficialChannelSections } from './OrgOfficialChannelSections'
 import { OrgQualificationSection } from './OrgQualificationSection'
 import { editOrgTypeOptions, isParkedOrgType } from './orgTypeOptions'
+import { FirstOrderPanel } from '../../components/first-order/FirstOrderPanel'
+import type { PartnerSection } from '../../components/first-order/serviceQueueModel'
 
 export function OrgDetailDrawer({
   orgId,
   open,
   showRecruitment,
+  section = null,
+  projectId = null,
+  onSectionChange,
+  onProjectChange,
   onClose,
   onChanged,
 }: {
   orgId: string | null
   open: boolean
   showRecruitment: boolean
+  section?: PartnerSection | null
+  projectId?: string | null
+  onSectionChange?: (section: PartnerSection) => void
+  onProjectChange?: (id: string) => void
   onClose: () => void
   onChanged: () => void
 }) {
@@ -31,12 +41,19 @@ export function OrgDetailDrawer({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [profileSaved, setProfileSaved] = useState(false)
+  const mounted = useRef(false)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   const load = useCallback(async (showLoading = true) => {
     if (!orgId) return
     if (showLoading) setState('loading')
     try {
       const d = await orgsAdminService.getOrgDetail(orgId)
+      if (!mounted.current) return
       setDetail(d)
       setForm({
         name: d.name,
@@ -48,7 +65,7 @@ export function OrgDetailDrawer({
       })
       setState('ready')
     } catch {
-      setState('error')
+      if (mounted.current) setState('error')
     }
   }, [orgId])
 
@@ -72,13 +89,14 @@ export function OrgDetailDrawer({
         contact: form.contact?.trim() ?? '',
         contactPhone: form.contactPhone?.trim() ?? '',
       })
+      if (!mounted.current) return
       setProfileSaved(true)
       onChanged()
       await load()
     } catch (e) {
-      setError(userMessageOf(e, '保存失败，请稍后重试'))
+      if (mounted.current) setError(userMessageOf(e, '保存失败，请稍后重试'))
     } finally {
-      setSaving(false)
+      if (mounted.current) setSaving(false)
     }
   }
 
@@ -158,6 +176,8 @@ export function OrgDetailDrawer({
 
           {/* 内容可信:发布闸门的人工入口。放在档案之后、账号之前 ——
               它决定这家机构的内容能不能对公众可见,比账号管理更靠前。 */}
+          <FirstOrderPanel key={orgId ?? detail.id} orgId={orgId ?? detail.id} section={section} projectId={projectId} onSectionChange={onSectionChange} onProjectChange={onProjectChange} />
+
           <OrgContentTrustPanel
             orgId={orgId ?? detail.id}
             onChanged={() => {
@@ -196,4 +216,3 @@ export function OrgDetailDrawer({
     </Drawer>
   )
 }
-

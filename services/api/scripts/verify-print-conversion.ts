@@ -50,6 +50,7 @@ import zlib from 'node:zlib'
 import { ForbiddenException } from '@nestjs/common'
 import { PrintConversionService } from '../src/print-conversion/print-conversion.service'
 import { signFileUrl } from '../src/files/signing'
+import { UPLOAD_SESSION_ORDER_ONLY_REASON } from '../src/files/retention-policy'
 
 function pass(m: string) {
   console.log(`  PASS ${m}`)
@@ -191,6 +192,7 @@ interface StoredFile {
   endUserId: string | null
   ownerType: string
   ownerId: string | null
+  retentionLockedReason?: string | null
 }
 
 class FakePrisma {
@@ -219,6 +221,8 @@ class FakeAudit {
 
 class FakeFiles {
   private next = 1
+  /** 每次 upload 收到的文件名，用来核对「我的文档」里会看到什么名字。 */
+  readonly uploadedFilenames: string[] = []
   constructor(private readonly prisma: FakePrisma) {}
   async upload(args: {
     buffer: Buffer
@@ -230,6 +234,7 @@ class FakeFiles {
     assetCategory?: string
     sourceFileId?: string | null
     createdBy?: string | null
+    orderOnly?: boolean
   }): Promise<{
     fileId: string
     filename: string
@@ -241,6 +246,7 @@ class FakeFiles {
     fileExpiresAt: string | null
   }> {
     const id = `out_${this.next++}`
+    this.uploadedFilenames.push(args.filename)
     const record: StoredFile = {
       id,
       storageKey: `key_${id}`,
@@ -255,6 +261,8 @@ class FakeFiles {
       endUserId: args.endUserId ?? null,
       ownerType: args.endUserId ? 'user' : 'system',
       ownerId: args.endUserId ?? null,
+      // 照真 files.upload：orderOnly 落「只用于这一单」锁（retention-policy.ts）。
+      retentionLockedReason: args.orderOnly ? UPLOAD_SESSION_ORDER_ONLY_REASON : null,
     }
     this.prisma.files.set(id, record)
     return {
@@ -358,7 +366,7 @@ function makeService() {
     redis as never,
     capabilities as never,
   )
-  return { service, prisma, storage, audit, redis, capabilities }
+  return { service, prisma, storage, audit, files, redis, capabilities }
 }
 
 function seedImage(prisma: FakePrisma, storage: FakeStorage, id: string, overrides: Partial<StoredFile> = {}): StoredFile {
@@ -474,13 +482,18 @@ async function main() {
 
   // 7) 成功合并 3 张图片 → 输出 3 页，返回内部 HMAC URL，audit 记录正确
   {
-    const { service, prisma, storage, audit } = makeService()
+    const { service, prisma, storage, audit, files } = makeService()
     const sources = ['a1', 'a2', 'a3'].map((id) => {
       seedImage(prisma, storage, id)
       return { fileId: id, fileAccessUrl: guestAccessUrl(id) }
     })
     const result = await runConvert(service, { sources, endUserId: null })
     assert.equal(result.pages, 3, 'output should have 3 pages')
+    // 合成件在「我的文档」里的名字（10/29 本机走查 I-26）：人能认的中文 + 北京时间日期时刻，
+    // 不是 format-convert-<毫秒时间戳>.pdf 这种内部名字。
+    assert.equal(files.uploadedFilenames.length, 1, 'exactly one derived file is stored')
+    assert.match(files.uploadedFilenames[0]!, /^照片合成-\d{8}-\d{4}\.pdf$/, 'derived file name must be human readable')
+    assert.ok(!/format-convert|\d{10,}/.test(files.uploadedFilenames[0]!), 'no internal prefix or epoch millis in the name')
     assert.match(result.printFileUrl, /^\/api\/v1\/files\//, 'must return internal HMAC url, not COS url')
     assert.equal(audit.entries.length, 1)
     assert.equal(audit.entries[0]!.action, 'print_conversion.images_to_pdf')
@@ -670,6 +683,46 @@ async function main() {
     assert.equal(capabilities.calls[0]!.capabilityKey, 'format_convert')
     assert.equal(capabilities.calls[0]!.terminalId, TERMINAL_ID)
     pass('成功转换前必须 assertUserTaskAllowed(format_convert)')
+  }
+
+  // 18) 只用于这一单（11/02 拍板）：会员这一单里从手机传来的图（挂本人名下、锁 upload_session_order_only）
+  //     拼出来的 PDF 跟着锁，响应 savedToDocuments=false；同一请求重放走幂等缓存也一样。
+  {
+    const { service, prisma, storage } = makeService()
+    seedImage(prisma, storage, 'oo1', {
+      endUserId: 'me', ownerType: 'user', ownerId: 'me', retentionLockedReason: UPLOAD_SESSION_ORDER_ONLY_REASON,
+    })
+    seedImage(prisma, storage, 'oo2', { endUserId: 'me', ownerType: 'user', ownerId: 'me' })
+    const sources = [
+      { fileId: 'oo2', fileAccessUrl: '' },
+      { fileId: 'oo1', fileAccessUrl: '' },
+    ]
+    const first = await runConvert(service, { sources, endUserId: 'me', idempotencyKey: 'oo-k' })
+    assert.equal(first.hasEndUser, true, '只用于这一单的 PDF 仍挂本人名下')
+    assert.equal(first.savedToDocuments, false, '用了只用于这一单的图，PDF 不进我的文档')
+    assert.equal(
+      prisma.files.get(first.fileId)?.retentionLockedReason,
+      UPLOAD_SESSION_ORDER_ONLY_REASON,
+      '拼出来的 PDF 必须落只用于这一单的锁',
+    )
+    const replay = await runConvert(service, { sources, endUserId: 'me', idempotencyKey: 'oo-k' })
+    assert.equal(replay.fileId, first.fileId)
+    assert.equal(replay.savedToDocuments, false, '幂等缓存路径也得说不进我的文档')
+    pass('会员用了手机传来的图：PDF 只用于这一单、savedToDocuments=false（含幂等重放）')
+  }
+
+  // 19) 会员只用「我的文档」里的图：照旧进我的文档；游客：不进
+  {
+    const { service, prisma, storage } = makeService()
+    seedImage(prisma, storage, 'doc1', { endUserId: 'me', ownerType: 'user', ownerId: 'me' })
+    const member = await runConvert(service, { sources: [{ fileId: 'doc1', fileAccessUrl: '' }], endUserId: 'me' })
+    assert.equal(member.savedToDocuments, true)
+    assert.equal(prisma.files.get(member.fileId)?.retentionLockedReason ?? null, null, '源图都不锁时 PDF 也不锁')
+    seedImage(prisma, storage, 'gst1')
+    const guest = await runConvert(service, { sources: [{ fileId: 'gst1', fileAccessUrl: guestAccessUrl('gst1') }], endUserId: null })
+    assert.equal(guest.hasEndUser, false)
+    assert.equal(guest.savedToDocuments, false)
+    pass('会员只用我的文档里的图 savedToDocuments=true；游客 false')
   }
 
   console.log('PASS print-conversion verification')

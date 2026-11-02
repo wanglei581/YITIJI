@@ -194,6 +194,9 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:kiosk-end-use
           # 无人值守标准句与公开服务联系方式（10/6）：读不到接口时按最保守的一套，号码 / 服务时间 / 附近终端 / 小程序发布从接口读，单测真跑源码。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-support-contact
+          # 现场无人值守（10/29）：一体机源码里不许教用户去找 / 联系现场工作人员。词表读自 unattendedCopy.ts；
+          # 共享模块零容忍，页面目录的存量按待清名单只减不增（触屏版各页面包重写后逐个删条目）。纯读 apps/kiosk/src，不连库、不连网。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-unattended-copy
           pnpm --filter @ai-job-print/kiosk verify:runtime-terminal-identity
           pnpm --filter @ai-job-print/kiosk verify:kiosk-field-safety
           pnpm --filter @ai-job-print/kiosk verify:terminal-session-self-heal
@@ -615,8 +618,10 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-edit
           pnpm --filter @ai-job-print/api verify:partner-org-self
           pnpm --filter @ai-job-print/api verify:partner-stats-contract
+          pnpm --filter @ai-job-print/api verify:first-order-http
           INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:free-print-quota
           pnpm --filter @ai-job-print/api verify:print-parameter-capability
           # 彩色/双面按终端能力开放（fail-closed）：未登记的终端必须拒绝，
           # 且彩色订单必须按彩色价目计价 —— 误放的代价是用户按彩色付费拿到黑白纸。
@@ -746,6 +751,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:support-contact
           pnpm --filter @ai-job-print/api verify:member-qr-login
           pnpm --filter @ai-job-print/api verify:member-auth-races
+          pnpm --filter @ai-job-print/api verify:member-restore
           pnpm --filter @ai-job-print/api verify:member-step-up
           pnpm --filter @ai-job-print/api verify:member-assets-c2d
           pnpm --filter @ai-job-print/api verify:trtc-ownership
@@ -832,9 +838,9 @@ jobs:
           # 简历解析首答丢失：持久意图、Redis 原子配额、单次模型调用及 HTTP 双头兼容。
           pnpm --filter @ai-job-print/api verify:resume-parse-intent
           pnpm --filter @ai-job-print/api verify:upload-sessions
-          # 扫码上传的小程序场景码：明文不落库、兑换一次性、兑换即轮换上传令牌、
-          # 失败路径不当预言机。跑进程内 RESP 桩，不连库不连外部 Redis，
-          # 所以只挂在本 job（postgres-readiness 那边加一遍纯属重复耗时）。
+          # 扫码上传的场景码：明文不落库、会话等文件期间可重复兑换（同码同一把派生令牌，2026-10-29 起）、
+          # 首次兑换作废创建时的令牌、失败路径不当预言机。不连库；本 job 设了 REDIS_URL 就连真实 Redis，
+          # 没有时退到进程内 RESP 桩。只挂在本 job（postgres-readiness 那边加一遍纯属重复耗时）。
           pnpm --filter @ai-job-print/api verify:upload-scene
           # 进程内 NestFactory 起 AppModule、随机端口监听（无需外部 API 服务），
           # 覆盖扫码上传 HTTP 契约与手机端错误信封不泄露。会员会话需要真实 Redis。
@@ -987,6 +993,8 @@ jobs:
       RECRUITMENT_CONTENT_HOSTING_ENABLED: 'false'
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 11.2.2
@@ -1001,7 +1009,7 @@ jobs:
         run: |
           bash scripts/ci/drop-unused-apt-sources.sh
           sudo apt-get update -q
-          sudo apt-get install -y -q fonts-noto-cjk sqlite3 redis-server
+          sudo apt-get install -y -q fonts-noto-cjk sqlite3 redis-server postgresql
       - name: PG schema drift check
         working-directory: services/api
         run: pnpm db:pg:sync:check
@@ -1019,6 +1027,12 @@ jobs:
         run: |
           npx prisma generate
           pnpm db:pg:generate
+      - name: First-order isolated PostgreSQL and dual migration gates
+        working-directory: services/api
+        run: |
+          export PATH="$(pg_config --bindir):$PATH"
+          pnpm verify:first-order-migrations
+          pnpm verify:first-order-http:postgres
       - name: Migrate deploy on fresh PG
         working-directory: services/api
         run: pnpm db:pg:deploy
@@ -1147,6 +1161,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:member-account-status
           pnpm --filter @ai-job-print/api verify:member-auth
+          pnpm --filter @ai-job-print/api verify:member-restore
           pnpm --filter @ai-job-print/api verify:legal-doc-version
           pnpm --filter @ai-job-print/api verify:member-qr-login
           pnpm --filter @ai-job-print/api verify:member-step-up
@@ -1257,7 +1272,13 @@ jobs:
     # 下次它又开始撞线时：**先量一次再调，别直接加十分钟**。
     # 量法：gh api repos/<owner>/<repo>/actions/runs/<id>/jobs，
     # 用 started_at / completed_at 算时长；只看 conclusion=success 的那些定基线。
-    timeout-minutes: 70
+    #
+    # 2026-10-28 按上面的量法把 70 提到 90。main 上最近 8 次的本 job 时长（分钟）：
+    #   70.0 ← cancelled（撞上限，run 40563203054，路由巡检 67/110 时被停，前面步骤全过）
+    #   66  64  63  63  62  55  50  ← 全部 success；10/10 另有一次 68.5 success、一次撞 70
+    # 成功区间 50–68.5，上限 70，余量最少只剩 2%，两次撞线都挡住了发布。
+    # 90 让最差成功观测（68.5）留 31% 余量；真的挂死仍会被 90 分钟兜住。
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -1279,6 +1300,15 @@ jobs:
         run: |
           bash scripts/ci/drop-unused-apt-sources.sh
           pnpm --filter @ai-job-print/kiosk exec playwright install --with-deps chromium
+          sudo apt-get install -y -q redis-server
+
+      - name: First-order complete AppModule two-console password-login workflow
+        env:
+          FIRST_ORDER_BROWSER_OUTPUT: ${{ github.workspace }}/test-results/first-order
+        run: |
+          pnpm --filter @ai-job-print/api exec prisma generate
+          FIRST_ORDER_BROWSER_OUTPUT="${FIRST_ORDER_BROWSER_OUTPUT}/focused" pnpm --filter @ai-job-print/admin verify:first-order-live
+          pnpm --filter @ai-job-print/admin verify:first-order-full-app
 
       - name: Typecheck Kiosk workspace-source dependencies
         run: |
@@ -1397,6 +1427,7 @@ jobs:
             test-results/kiosk-scan-safety/**
             test-results/kiosk-mic-capability/**
             test-results/kiosk-mic-capability-report/**
+            test-results/first-order/**
             test-results/admin-e2e/**
             test-results/admin-e2e-report/**
             test-results/partner-e2e/**
@@ -1427,27 +1458,78 @@ jobs:
             echo 'latest-deployed.txt 不存在或 BOS 不可用'
           fi
 
-      - name: Create and upload incremental release bundle
+      - name: Create and upload release bundle
         continue-on-error: true
         env:
           BOS_RELEASE_ACCESS_KEY: ${{ secrets.BOS_RELEASE_ACCESS_KEY }}
           BOS_RELEASE_SECRET_KEY: ${{ secrets.BOS_RELEASE_SECRET_KEY }}
           BASE_SHA: ${{ steps.bos-baseline.outputs.base }}
         run: |
+          # release-bundle-pack:begin
+          set -euo pipefail
           RELEASE_SHA="$GITHUB_SHA"
-          if [ -z "${BASE_SHA:-}" ] || ! git merge-base --is-ancestor "$BASE_SHA" "$RELEASE_SHA"; then
-            echo '无可用基线，本次发布将回退到 GitHub 拉取'
-            exit 0
-          fi
+          hex='^[0-9a-f]{40}$'
           BUNDLE="release-$RELEASE_SHA.bundle"
           CHECKSUM="release-$RELEASE_SHA.sha256"
-          # git bundle 的 rev 必须能命名成 ref：传裸 SHA 会以
-          # "fatal: Refusing to create empty bundle." 退出 128（2026-09-07 实测，
-          # 因为 continue-on-error 这一步一直"绿着"却从未上传过任何包）。
-          # actions/checkout 让 HEAD 正好指向 GITHUB_SHA，用具名 ref 才有 bundle 头。
+          # 裸 SHA 会让 git bundle 以 Refusing to create empty bundle 退出 128。
           git update-ref refs/release/target "$RELEASE_SHA"
-          git bundle create "$BUNDLE" refs/release/target "^$BASE_SHA"
+          record_mode() {
+            release_bundle_mode=$1
+            echo "release-bundle mode=$1 reason=$2"
+            printf 'release-bundle mode=%s reason=%s\n' "$1" "$2" >> "$GITHUB_STEP_SUMMARY"
+          }
+          if [[ "${BASE_SHA:-}" =~ $hex ]] \
+            && [ "$BASE_SHA" != "$RELEASE_SHA" ] \
+            && [ "$(git cat-file -t "$BASE_SHA" 2>/dev/null)" = commit ] \
+            && git merge-base --is-ancestor "$BASE_SHA" "$RELEASE_SHA"
+          then
+            record_mode incremental strict-ancestor
+            git bundle create "$BUNDLE" refs/release/target "^$BASE_SHA"
+          else
+            if [ -z "${BASE_SHA:-}" ]; then
+              reason=baseline-missing
+            elif [[ ! "${BASE_SHA:-}" =~ $hex ]]; then
+              reason=baseline-invalid
+            elif [ "$BASE_SHA" = "$RELEASE_SHA" ]; then
+              reason=target-equals-baseline
+            elif [ "$(git cat-file -t "$BASE_SHA" 2>/dev/null)" != commit ]; then
+              reason=baseline-unavailable
+            else
+              reason=baseline-not-ancestor
+            fi
+            record_mode full "$reason"
+            git bundle create "$BUNDLE" refs/release/target
+          fi
           git bundle verify "$BUNDLE"
           sha256sum "$BUNDLE" | sed "s|  $BUNDLE$|  release.bundle|" > "$CHECKSUM"
+          # release-bundle-pack:end
           node scripts/release-bundle/bos-object.mjs put "$BUNDLE" "$BUNDLE"
           node scripts/release-bundle/bos-object.mjs put "$CHECKSUM" "$CHECKSUM"
+          node scripts/release-bundle/bos-object.mjs head "$BUNDLE"
+          node scripts/release-bundle/bos-object.mjs head "$CHECKSUM"
+          if [ "$release_bundle_mode" = full ]; then
+            verify_dir=$(mktemp -d "${RUNNER_TEMP}/release-readback.XXXXXX")
+            trap 'rm -rf "$verify_dir"' EXIT
+            node scripts/release-bundle/bos-object.mjs get "$BUNDLE" "$verify_dir/release.bundle"
+            node scripts/release-bundle/bos-object.mjs get "$CHECKSUM" "$verify_dir/release.sha256"
+            cmp "$verify_dir/release.sha256" "$CHECKSUM"
+            ( cd "$verify_dir" && sha256sum -c release.sha256 )
+            empty_repo="$verify_dir/empty"
+            git init -q --initial-branch=main "$empty_repo"
+            if git -C "$empty_repo" cat-file -e "${RELEASE_SHA}^{commit}"; then
+              exit 1
+            fi
+            git -C "$empty_repo" bundle verify "$verify_dir/release.bundle"
+            git -C "$empty_repo" fetch --no-tags "$verify_dir/release.bundle" "$RELEASE_SHA"
+            git -C "$empty_repo" checkout -q --detach "$RELEASE_SHA"
+            actual=$(git -C "$empty_repo" rev-parse HEAD)
+            if [ "$actual" != "$RELEASE_SHA" ]; then
+              exit 1
+            fi
+            bytes=$(wc -c < "$verify_dir/release.bundle" | tr -d '[:space:]')
+            echo "release-bundle full-download-verified=$RELEASE_SHA bytes=$bytes"
+            printf 'release-bundle full-download-verified=%s bytes=%s\n' "$RELEASE_SHA" "$bytes" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "release-bundle uploaded=$BUNDLE checksum=$CHECKSUM"
+          printf 'release-bundle uploaded=%s checksum=%s\n' "$BUNDLE" "$CHECKSUM" >> "$GITHUB_STEP_SUMMARY"
+          # release-bundle-publish:end
