@@ -101,7 +101,9 @@ assertNotContains(tts_record_block, 'estimatedCostCny: 0', 'TTS log block 未编
 
 assertContains(aiServicesRoute, 'NON_TOKEN_BILLED_OPS', 'ai-services route: 声明 NON_TOKEN_BILLED_OPS')
 assertContains(aiServicesRoute, 'operationRows', 'ai-services route: 存在全量 operation 明细表数据')
-assertContains(aiServicesRoute, '未估算', 'ai-services route: 非 token 计费能力显示「未估算」而非 ¥0')
+assertContains(aiServicesRoute, '未配置单价', 'ai-services route: 语音费用显示未配置单价')
+assertContains(aiServicesRoute, 'voiceUsageTotals', 'ai-services route: 显示语音物理用量')
+assertContains(aiServicesRoute, '未估算', 'ai-services route: token 成本未采集显示未估算')
 assertContains(
   aiServicesRoute,
   /分能力调用量与成本/,
