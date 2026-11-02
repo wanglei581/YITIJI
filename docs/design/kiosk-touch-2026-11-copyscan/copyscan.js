@@ -266,6 +266,91 @@
 .cs-can b{font-size:31px;flex:none;min-width:170px}
 .cs-can .d{flex:1;font-size:25px;line-height:1.4;color:var(--ink-2)}
 .cs-can .chip{height:48px;padding:0 20px;font-size:22px;border-radius:24px}
+/* 面板复印图文引导（cs-copy-guide、cs-copy-guide-more）：只加 cs-g- 开头的类，前面的类一个不改 */
+.cs-body.cs-g-body{gap:10px;padding:14px 40px 12px}
+.cs-g-card{display:grid;grid-template-columns:44px minmax(0,1fr);column-gap:14px;align-items:start;padding:12px 22px 14px;border-radius:28px;background:var(--card);border:2px solid var(--edge)}
+.cs-g-n{width:44px;height:44px;border-radius:50%;background:var(--deep);color:var(--cream);display:grid;place-items:center;font:700 23px/1 var(--sans)}
+.cs-g-m{min-width:0;display:flex;flex-direction:column;gap:6px}
+.cs-g-m h2{margin:0;min-height:44px;display:flex;align-items:center;font:700 32px/1.25 var(--serif);color:var(--ink)}
+.cs-g-p{margin:0;font-size:23px;line-height:1.45;color:var(--ink-2);text-wrap:pretty}
+.cs-g-p b{font-weight:700;color:var(--ink);white-space:nowrap}
+.cs-g-p .nw{white-space:nowrap}
+.cs-g-two{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:2px}
+.cs-g-pick{display:grid;grid-template-columns:104px minmax(0,1fr);gap:12px;align-items:center}
+.cs-g-pick .vis{width:104px;height:104px;border-radius:20px;background:var(--well);display:grid;place-items:center;overflow:hidden}
+.cs-g-pick .vis svg{width:100%;height:auto}
+.cs-g-warn{display:flex;align-items:center;gap:12px;margin:2px 0 0;padding:9px 16px;border-radius:16px;background:var(--clay-wash);color:var(--clay-ink);font-size:23px;font-weight:600;line-height:1.4}
+.cs-g-warn svg{flex:none}
+.cs-g-hint{display:flex;align-items:center;gap:10px;margin-top:-2px}
+.cs-g-hint svg{flex:none;color:var(--teal-ink)}
+.cs-g-sp{display:flex;gap:20px;align-items:center;margin-top:4px}
+.cs-g-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.cs-g-panel{position:relative;display:flex;gap:12px;flex:none;width:520px;height:212px;padding:12px;border-radius:26px;background:#14231f;box-shadow:inset 0 0 0 2px #2d4540,0 8px 18px rgba(11,36,30,.16)}
+.cs-g-panel .keys{display:flex;flex-direction:column;justify-content:center;gap:10px;width:56px;flex:none}
+.cs-g-panel .key{width:56px;height:56px;border-radius:16px;background:#2a3e38;color:#d9e6e0;display:grid;place-items:center;box-shadow:inset 0 0 0 1.5px #3b544c}
+.cs-g-panel .key.home{box-shadow:inset 0 0 0 2.5px var(--glow);color:#fff}
+.cs-g-panel .scr{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;padding:9px;border-radius:16px;background:#f4f7f5}
+.cs-g-panel .btns{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.cs-g-panel .b{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;padding:11px 2px 6px;border-radius:12px;background:#fff;box-shadow:inset 0 0 0 1.5px #d3dad6;color:#4c5c56;text-align:center}
+.cs-g-panel .b em{font:700 21px/1.2 var(--sans);font-style:normal}
+.cs-g-panel .b.on{background:var(--teal);color:#fff;box-shadow:0 0 0 4px rgba(46,230,168,.5)}
+.cs-g-panel .b.sub{background:var(--teal-wash);color:var(--teal-ink);box-shadow:inset 0 0 0 2px var(--teal)}
+.cs-g-panel .bar{height:30px;border-radius:9px;background:#dde4e0;display:flex;align-items:center;gap:10px;padding:0 12px;font-size:20px;line-height:1;color:#43544d}
+.cs-g-panel .bar i{width:12px;height:12px;border-radius:50%;background:var(--teal)}
+.cs-g-panel .tap{position:absolute;right:-14px;bottom:-24px;color:var(--deep);filter:drop-shadow(0 2px 3px rgba(0,0,0,.3))}
+.cs-g-panel.md{width:480px;height:216px}
+.cs-g-panel.md .keys{width:54px}
+.cs-g-panel.md .key{width:54px;height:54px}
+.cs-g-more{display:flex;align-items:center;gap:10px;width:100%;min-height:80px;padding:8px 12px 8px 10px;border-radius:22px;background:var(--teal-wash);border:2px solid var(--teal);text-align:left;color:var(--teal-ink);transition:transform var(--t-press)}
+.cs-g-more:active{transform:scale(.985)}
+.cs-g-more .tx{flex:1;min-width:0}
+.cs-g-more b{display:block;font-size:23px;line-height:1.3}
+.cs-g-more small{display:block;font-size:21px;line-height:1.3;color:var(--teal-ink);opacity:.85}
+.cs-g-list{display:flex;flex-direction:column;align-items:stretch;padding:2px 22px}
+.cs-g-list .row{display:grid;grid-template-columns:44px minmax(0,1fr) auto;column-gap:14px;align-items:start;padding:10px 0 12px;border-top:1.5px solid var(--line)}
+.cs-g-list .row:first-child{border-top:0}
+.cs-g-list .cs-g-m h2{min-height:44px}
+.cs-g-art{align-self:center;display:grid;place-items:center}
+.cs-g-art .well{width:84px;height:84px;border-radius:22px;background:var(--teal-wash);color:var(--teal-ink);display:grid;place-items:center}
+.cs-g-mfp{position:relative;display:block;flex:none}
+.cs-g-mfp .in{position:absolute;left:0;top:0;width:620px;height:600px;transform-origin:0 0}
+.cs-g-mfp .in>svg{position:absolute;left:0;top:0}
+.cs-g-mfp .sh{position:absolute;left:150px;top:276px;width:320px;height:118px;border-radius:6px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.16);transform:translateY(124px) rotate(-2deg);transform-origin:top center}
+.cs-g-mfp .sh.b{transform:translateY(120px) rotate(1.5deg)}
+.cs-g-mfp .sh.c{transform:translateY(116px)}
+.cs-g-mfp .sh::before{content:"";position:absolute;left:28px;right:90px;top:30px;height:8px;border-radius:4px;background:#d9ded9;box-shadow:0 22px 0 #d9ded9,0 44px 0 #d9ded9}
+.cs-body.cs-g-s2{justify-content:space-between}
+.cs-g-kind{display:grid;grid-template-columns:540px minmax(0,1fr);gap:26px;align-items:center;padding:18px 26px 18px 18px;border-radius:28px;background:var(--card);border:2px solid var(--edge)}
+.cs-g-kind .pic{display:grid;place-items:center;border-radius:22px;background:var(--well);padding:22px 0}
+.cs-g-kind h2{margin:0 0 8px;font:700 36px/1.25 var(--serif);color:var(--ink)}
+.cs-g-kind .cs-g-p{font-size:24px;line-height:1.5}
+.cs-g-kind .illus{max-width:100%;height:auto}
+.cs-g-s2.tight .cs-g-kind{padding:10px 24px 10px 14px}
+.cs-g-s2.tight .cs-g-kind .pic{padding:14px 0}
+.cs-g-pill{display:flex;align-items:flex-start;gap:10px;margin:10px 0 0;padding:10px 14px;border-radius:16px;background:var(--teal-wash);color:var(--teal-ink);font-size:23px;font-weight:600;line-height:1.45;text-wrap:balance}
+.cs-g-pill.clay{background:var(--clay-wash);color:var(--clay-ink)}
+.cs-g-pill svg{flex:none;margin-top:3px}
+.cs-g-big{display:flex;align-items:center;gap:22px;padding:22px 28px;border-radius:26px;background:var(--clay-wash);color:var(--clay-ink);font:700 30px/1.45 var(--serif)}
+.cs-g-big svg{flex:none}
+.cs-g-notes{display:flex;flex-direction:column;gap:10px}
+.cs-g-notes .remind{min-height:0;padding:12px 22px;font-size:23px;line-height:1.45}
+.cs-g-s1.roomy{gap:14px}
+.cs-g-s1.roomy .cs-g-card{padding:16px 22px 18px}
+.cs-g-s1.roomy .cs-g-pick{grid-template-columns:116px minmax(0,1fr)}
+.cs-g-s1.roomy .cs-g-pick .vis{width:116px;height:116px}
+.cs-g-s1.roomy .cs-g-panel{height:228px}
+.cs-g-s1.roomy .cs-g-panel .b em{font-size:22px}
+.cs-g-s1.roomy .cs-g-list{padding:4px 22px}
+.cs-g-s1.roomy .cs-g-list .row{padding:14px 0 16px}
+.cs-g-s1.roomy .cs-g-notes .remind{padding:14px 22px}
+.cs-g-s1.tight{gap:8px}
+.cs-g-s1.tight .cs-g-card{padding:8px 20px 10px}
+.cs-g-s1.tight .cs-g-pick{grid-template-columns:88px minmax(0,1fr)}
+.cs-g-s1.tight .cs-g-pick .vis{width:88px;height:88px}
+.cs-g-s1.tight .cs-g-panel{height:196px}
+.cs-g-s1.tight .cs-g-list .row{padding:6px 0 8px}
+.cs-g-s1.tight .cs-g-notes{gap:8px}
+.cs-g-s1.tight .cs-g-notes .remind{padding:8px 20px}
 `;
   document.head.appendChild(css);
 
@@ -676,7 +761,7 @@
       band: { eyebrow: '复印', title: '怎么复印？', status: copyChip(), rail: { labels: COPY_RAIL, now: -1 } },
       cls: 'cs-chow',
       body: `<div class="cs-ways">
-          ${wayCard({ big: 1, go: 'copy', chip: '最快', t: '在打印机面板上快速复印', d: '身份证复印、票据复印也在面板上', vis: mfp() })}
+          ${wayCard({ big: 1, go: 'cs-copy-guide', chip: '最快', t: '在打印机面板上快速复印', d: '身份证复印、票据复印也在面板上', vis: mfp() })}
           ${wayCard({ big: 1, cs: 'copy-screen', dis: !!blocked || off, chip: blocked || off ? '' : '可先看效果', t: '在这块屏上复印', d: blocked || (off ? '这台机器暂时打不了，先用面板复印' : '先看扫描效果再打印，能改份数，彩色原件也能印成黑白；比面板慢；扫描件只在这台机器上处理，不上传'), vis: scanPaper(250) })}
         </div>
         ${remind('不得复印伪造的证件、印章、票据。只能复印本人的真实证件和票据。', 'shield')}`,
@@ -776,10 +861,106 @@
       cls: 'cs-coff',
       body: `<div class="cs-ways">
           <button class="cs-way big" disabled><span class="vis">${scanPaper(250)}</span><span class="tx"><span class="chip clay">这台机器还没开通</span><h3>在这块屏上复印</h3><p>先看扫描效果再打印、能改份数。这台机器暂时做不到。</p></span><span></span></button>
-          <button class="cs-way big" data-go="copy"><span class="vis">${mfp()}</span><span class="tx"><span class="chip">现在可以用</span><h3>在打印机面板上复印</h3><p>复印、身份证复印、票据复印，都在打印机屏幕上点。</p></span><span class="arrow">${icon('arrowR', 30, 2.4)}</span></button>
+          <button class="cs-way big" data-go="cs-copy-guide"><span class="vis">${mfp()}</span><span class="tx"><span class="chip">现在可以用</span><h3>在打印机面板上复印</h3><p>复印、身份证复印、票据复印，都在打印机屏幕上点。</p></span><span class="arrow">${icon('arrowR', 30, 2.4)}</span></button>
         </div>
         ${remind(HELP)}`,
-      dock: D({ back: { go: 'cs-copy-how' }, ask: '问小青：面板上怎么复印', pri: pri('怎么在打印机上复印', 'data-go="copy"') })
+      dock: D({ back: { go: 'cs-copy-how' }, ask: '问小青：面板上怎么复印', pri: pri('怎么在打印机上复印', 'data-go="cs-copy-guide"') })
+    });
+  }
+
+  /* ═════════ 面板复印图文引导 ═════════ */
+  /* 定稿「复印」说明屏（kiosk-touch-2026-10/fix-scan.js 的 copyPage）的图文版：五步的标题和正文照定稿原句，只加协调方给的两句。
+     配图只画手册核实过的东西：玻璃、进纸器、打印机面板主屏（一排四个按钮 + 左边三个实体键）、出纸口用现成的 mfp()。
+     不画设置屏、开始键位置，也不画身份证、票据放在玻璃上的位置。 */
+  const GI = {
+    back: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+    sliders: '<path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3"/><path d="M14 2v4M8 10v4M16 18v4"/>',
+    tap: '<path d="M22 14a8 8 0 0 1-8 8"/><path d="M18 11v-1a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V9a2 2 0 0 0-2-2a2 2 0 0 0-2 2v1"/><path d="M10 9.5V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v10"/><path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>'
+  };
+  const gicon = (p, s, w) => `<svg class="i" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w || 2}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+  /* 打印机面板主屏：触摸屏上一排四个按钮、最下面一条状态栏；触摸屏左边竖排三个实体键（返回、主页、说明）。
+     hl='all'：第 2 步，突出「复印」，身份证复印、票据复印次级突出，主页键描边；hl='id' / 'bill'：只突出对应那一个按钮。 */
+  function panelDraw(hl, md) {
+    const all = hl === 'all', tap = `<span class="tap">${gicon(GI.tap, 40, 1.8)}</span>`;
+    const b = (key, ic, lab) => {
+      const on = all ? key === 'copy' : key === hl, sub = all && (key === 'id' || key === 'bill');
+      return `<span class="b${on ? ' on' : sub ? ' sub' : ''}"><span class="ic">${icon(ic, md ? 40 : 42, 2)}</span><em>${lab}</em>${on ? tap : ''}</span>`;
+    };
+    return `<div class="cs-g-panel${md ? ' md' : ''}" role="img" aria-label="打印机触摸屏主屏：一排四个按钮，复印、扫描、身份证复印、票据复印；触摸屏左边三个实体键">
+      <div class="keys"><span class="key">${gicon(GI.back, 30, 2.2)}</span><span class="key${all ? ' home' : ''}">${icon('home', 30, 2.2)}</span><span class="key">${icon('help', 30, 2.2)}</span></div>
+      <div class="scr"><div class="btns">${b('copy', 'copy', '复印')}${b('scan', 'scan', '扫描')}${b('id', 'idcard', '身份证<br>复印')}${b('bill', 'receipt', '票据<br>复印')}</div>
+        <div class="bar"><i></i>就绪</div></div></div>`;
+  }
+  /* 出纸口：现成的 mfp()，托盘里放三张纸（样子同 cs-copy-done），按宽度缩小 */
+  function mfpMini(w) {
+    const k = w / 620;
+    return `<span class="cs-g-mfp" style="width:${w}px;height:${Math.round(600 * k)}px" aria-hidden="true"><span class="in" style="transform:scale(${k.toFixed(4)})">${mfp()}<span class="sh"></span><span class="sh b"></span><span class="sh c"></span></span></span>`;
+  }
+  /* 两条提醒：不得复印伪造的证件、印章、票据；复印件和原件一起带走。big 为真时第一条放大（第二屏，正好在说身份证、票据之后） */
+  const guideNotes = (big) => `<div class="cs-g-notes">
+          ${big ? `<div class="cs-g-big">${icon('shield', 52, 1.8)}<span>不得复印伪造的证件、印章、票据。<br>只能复印本人的真实证件和票据。</span></div>`
+            : `<div class="remind">${icon('shield', 34, 2)}<span>不得复印伪造的证件、印章、票据。只能复印本人的真实证件和票据。</span></div>`}
+          <div class="remind">${icon('call', 34, 2)}<span>复印件和原件一起带走。原件还在玻璃上或进纸口里，请务必取回。${HELP}</span></div>
+        </div>`;
+  const guideOff = () => (printerOff() ? '<p class="cs-warn">打印机离线时复印可能也用不了，以打印机屏幕为准。</p>' : '');
+  const guideChip = { text: '复印在打印机面板上操作' };
+  const guideRow = (n, t, p, art) => `<div class="row"><span class="cs-g-n">${n}</span><div class="cs-g-m"><h2>${t}</h2><p class="cs-g-p">${p}</p></div><span class="cs-g-art">${art}</span></div>`;
+  const guideDock = (back) => D({ back, ask: '问小青：复印要注意什么', pri: pri('去打印文件', 'data-go="print-src"') });
+  /* 1 怎么在打印机上复印：五步 + 两条提醒；身份证、发票、双面放在 cs-copy-guide-more，从第 2 步旁边的按钮进 */
+  function copyGuide() {
+    const nb = (S().ai === 'down' ? 1 : 0) + (printerOff() ? 1 : 0);
+    return shell({
+      band: { eyebrow: '复印', title: '怎么在打印机上复印', sub: '复印不用在这台屏幕上下单，也不会出现在「我的打印订单」里。照下面五步做就行。', status: guideChip },
+      cls: 'cs-g-body cs-g-s1 ' + (nb === 0 ? 'roomy' : nb === 2 ? 'tight' : ''),
+      body: `${guideOff()}
+        <section class="cs-g-card"><span class="cs-g-n">1</span><div class="cs-g-m"><h2>放原件</h2>
+          <div class="cs-g-two">
+            <div class="cs-g-pick"><span class="vis">${feederSvg(104)}</span><p class="cs-g-p"><b>多页普通纸：</b>放进打印机上方的进纸口，字朝上。</p></div>
+            <div class="cs-g-pick"><span class="vis">${glassSvg(104)}</span><p class="cs-g-p"><b>单页、证件、书本：</b>掀开上盖，字朝下放在玻璃上，对齐左上角，再合上盖。</p></div>
+          </div>
+          <p class="cs-g-warn">${icon('alert', 28, 2)}<span>进纸器里有纸时先扫进纸器，玻璃上的不会被复印。</span></p></div></section>
+        <section class="cs-g-card"><span class="cs-g-n">2</span><div class="cs-g-m"><h2>在打印机屏幕上选功能</h2>
+          <p class="cs-g-p cs-g-hint">${icon('home', 28, 2)}<span>屏幕不在主屏时，先按触摸屏左边的主页键（小房子）。</span></p>
+          <div class="cs-g-sp">${panelDraw('all')}<div class="cs-g-tx">
+            <p class="cs-g-p"><b>普通复印</b>点<b>「复印」</b></p>
+            <p class="cs-g-p"><b>复印身份证</b>点<b>「身份证复印」</b></p>
+            <p class="cs-g-p"><b>复印发票、收据</b>点<b>「票据复印」</b></p>
+            <button class="cs-g-more" data-go="cs-copy-guide-more">${icon('idcard', 40, 2)}<span class="tx"><b>这几种原件这样复印</b><small>身份证、发票、双面</small></span>${icon('chevR', 28, 2.4)}</button></div></div></div></section>
+        <section class="cs-g-card cs-g-list">
+          ${guideRow(3, '需要时改设置', '可以改份数、黑白或彩色、单面或双面、放大缩小。每一项在哪里改，以打印机屏幕显示为准；上一位调过的设置可能还在，开始前看一眼。', `<span class="well">${gicon(GI.sliders, 48, 1.8)}</span>`)}
+          ${guideRow(4, '开始复印', '点打印机屏幕上的「复印」开始。原件放在玻璃上时，扫描过程中不要掀盖。', `<span class="well">${gicon(GI.tap, 48, 1.8)}</span>`)}
+          ${guideRow(5, '取走复印件和原件', '复印件从出纸口取。原件还在玻璃上或进纸口里，一起带走。', mfpMini(108))}
+        </section>
+        ${guideNotes()}`,
+      dock: guideDock({ go: 'print', label: '返回打印扫描' })
+    });
+  }
+
+  /* 双面原件：第一面印完，原件从进纸器出口出来，照原样放回进纸口。两张纸上同一个字母在同一个角，表示朝向不变。 */
+  function flipDraw() {
+    const sheet = (x) => `<g transform="translate(${x} 14)"><rect width="112" height="156" rx="10" fill="#fff" stroke="#9aa6a1" stroke-width="2.5"/><text x="16" y="62" font-size="56" font-weight="800" fill="#1f9e86">A</text><rect x="16" y="84" width="72" height="7" rx="3" fill="#d9ded9"/><rect x="16" y="104" width="58" height="7" rx="3" fill="#d9ded9"/><rect x="16" y="124" width="72" height="7" rx="3" fill="#d9ded9"/></g>`;
+    return `<svg class="illus" width="496" height="244" viewBox="0 0 460 226" role="img" aria-label="第一面印完，原件从进纸器出口出来，照原样放回进纸口，不翻面、不转方向；两张纸上的字母 A 在同一个角">
+      ${sheet(8)}${sheet(340)}
+      <path d="M142 92H318M296 70l24 22-24 22" fill="none" stroke="#1f9e86" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="230" y="62" text-anchor="middle" font-size="24" font-weight="700" fill="#0f6e5c">原样放回</text>
+      <text x="230" y="140" text-anchor="middle" font-size="22" fill="#43544d">不翻面、不转方向</text>
+      <text x="64" y="204" text-anchor="middle" font-size="22" fill="#43544d">第一面印完</text>
+      <text x="396" y="204" text-anchor="middle" font-size="22" fill="#43544d">放回进纸口</text></svg>`;
+  }
+  /* 2 这几种原件这样复印：身份证、发票收据、正反两面都有字 */
+  function copyGuideMore() {
+    /* 一张卡：左边图，右边标题 + 一两句话 + 一条小提示（提示条用 teal 或 clay 底，里头是原来同一段话的后半句） */
+    const kind = (pic, t, p, note, cls) => `<section class="cs-g-kind${cls ? ' ' + cls : ''}"><div class="pic">${pic}</div><div class="tx"><h2>${t}</h2><p class="cs-g-p">${p}</p>${note}</div></section>`;
+    const pill = (ic, t, clay) => `<p class="cs-g-pill${clay ? ' clay' : ''}">${icon(ic, 28, 2)}<span>${t}</span></p>`;
+    return shell({
+      band: { eyebrow: '复印', title: '这几种原件这样复印', sub: '身份证、发票收据、正反两面都有字，各有一点不同。', status: guideChip },
+      cls: 'cs-g-body cs-g-s2' + (S().ai === 'down' && printerOff() ? ' tight' : ''),
+      body: `${guideOff()}
+        ${kind(panelDraw('id', 1), '身份证', '在打印机屏幕上点<b>「身份证复印」</b>，<span class="nw">需要时改设置</span>，再点<b>「复印」</b>开始。', pill('eye', '身份证怎么放、怎么翻面，请看打印机屏幕上的图示。'))}
+        ${kind(panelDraw('bill', 1), '发票、收据', '在打印机屏幕上点<b>「票据复印」</b>，<span class="nw">需要时改设置</span>，再点<b>「复印」</b>开始。', pill('eye', '摆放位置以打印机屏幕提示为准。'))}
+        ${kind(flipDraw(), '正反两面都有字', '用进纸器放原件，选<b>「双面复印」</b>。第一面印完，原件会从进纸器出口出来。照原样放回进纸口，不翻面、不转方向，再按打印机屏幕提示印第二面。', pill('clock', '等太久没放，就只印单面。', 1), 'flip')}
+        ${guideNotes(!(S().ai === 'down' || printerOff()))}`,
+      dock: guideDock({ go: 'cs-copy-guide', label: '返回' })
     });
   }
 
@@ -1002,7 +1183,17 @@
   reg('cs-copy-how', G_COPY, '怎么复印', copyHow, {
     does: '复印的第一问：在打印机面板上快速复印，还是在这块屏上复印。两条路点了就走。',
     motion: '无。',
-    keep: '第一条「在打印机面板上快速复印」标「最快」，写「身份证复印、票据复印也在面板上」，点了去定稿现有的「怎么在打印机上复印」（copy）。第二条「在这块屏上复印」标「可先看效果」，写「先看扫描效果再打印，能改份数，彩色原件也能印成黑白；比面板慢；扫描件只在这台机器上处理，不上传」。没有「推荐」字样。底部边界句：不得复印伪造的证件、印章、票据，只能复印本人的真实证件和票据。屏上复印没开通、扫描仪状态过期、打印机离线时第二条灰掉并写原因。' + NK
+    keep: '第一条「在打印机面板上快速复印」标「最快」，写「身份证复印、票据复印也在面板上」，点了去本目录的图文版 cs-copy-guide（定稿 copy 屏的图文版）。第二条「在这块屏上复印」标「可先看效果」，写「先看扫描效果再打印，能改份数，彩色原件也能印成黑白；比面板慢；扫描件只在这台机器上处理，不上传」。没有「推荐」字样。底部边界句：不得复印伪造的证件、印章、票据，只能复印本人的真实证件和票据。屏上复印没开通、扫描仪状态过期、打印机离线时第二条灰掉并写原因。' + NK
+  });
+  reg('cs-copy-guide', G_COPY, '怎么在打印机上复印（图文）', copyGuide, {
+    does: '定稿「怎么在打印机上复印」（copy 屏）的图文版：五步，每步配图或图标，下面两条提醒。复印不在这块屏上下单，所以没有进度、完成页，也不进「我的打印订单」。',
+    motion: '无。步骤卡是静态的，不是按钮。',
+    keep: '标题、副标题和五步的标题与正文照定稿 copy 屏原句，只加两句：第 1 步「进纸器里有纸时先扫进纸器，玻璃上的不会被复印」（后半句出自厂家官方手册，免得「先扫」被读成「两处都扫」），第 2 步「屏幕不在主屏时，先按触摸屏左边的主页键（小房子）」。配图只画手册核实过的：第 1 步进纸器和玻璃两小图；第 2 步打印机面板主屏（触摸屏上一排四个按钮：复印、扫描、身份证复印、票据复印，最下面一条状态栏「就绪」，左边竖排三个实体键，从上到下返回、主页、说明；突出「复印」，身份证复印、票据复印次级突出，主页键描边）；第 3、4 步只用图标（设置、点一下），不画设置屏，不画开始键在屏上哪里；第 5 步用现成的 mfp()。身份证、票据放在玻璃上的位置和翻面手册没写，不画，也不写。状态胶囊「复印在打印机面板上操作」；?printer=down 时多一条「打印机离线时复印可能也用不了，以打印机屏幕为准」（同定稿打印服务台）；?ai=down 时多小青接不上的一句，步骤照样能做。可点只有：第 2 步旁的「这几种原件这样复印」（去 cs-copy-guide-more）和底栏三个。底栏：返回打印扫描去 print，问小青：复印要注意什么，主按钮「去打印文件」去 print-src。法律两句、带走原件加服务电话都在，号码与服务时间从后台读，读不到不显示。一屏放不下的身份证、发票、双面三种原件放第二屏。' + NK
+  });
+  reg('cs-copy-guide-more', G_COPY, '这几种原件这样复印（图文）', copyGuideMore, {
+    does: '图文版的第二屏：身份证、发票收据、正反两面都有字，三张卡各配一张图。从 cs-copy-guide 第 2 步旁的按钮进来，返回回到第一屏。',
+    motion: '无。',
+    keep: '身份证：点「身份证复印」，需要时改设置，再点「复印」开始；怎么放、怎么翻面只写「请看打印机屏幕上的图示」。发票、收据：点「票据复印」，需要时改设置，再点「复印」开始；摆放位置以打印机屏幕提示为准。（定稿 copy 屏这一条还写了「原件字朝下放在玻璃上、合上盖」，手册没写票据怎么摆，这里先不写，改程序前请产品负责人定。）正反两面都有字：用进纸器放原件，选「双面复印」；第一面印完，原件会从进纸器出口出来；照原样放回进纸口，不翻面、不转方向，再按打印机屏幕提示印第二面；等太久没放，就只印单面。图：身份证、发票两张用面板主屏，只突出对应那一个按钮；双面那张画两张纸，同一个字母在同一个角，表示朝向不变。不画身份证、票据放在玻璃上的位置和翻面。法律提醒放大（有提示条时缩成细条），带走原件和服务电话也在。底栏同第一屏，返回回 cs-copy-guide。' + NK
   });
   reg('cs-copy-set', G_COPY, '复印设置', copySet, {
     does: '放好原件，选份数、颜色、单面还是双面，然后开始复印。',
@@ -1037,7 +1228,7 @@
   reg('cs-copy-off', G_COPY, '屏上复印没开通', copyOff, {
     does: '这台机器还没开通屏上复印：说清楚，并把面板复印放成主按钮。',
     motion: '无。',
-    keep: '主按钮「怎么在打印机上复印」去定稿现有的 copy。屏上方式灰掉、写「这台机器还没开通」。可用地址 #cs-copy-off 直接打开。' + NK
+    keep: '大卡和主按钮「怎么在打印机上复印」都去本目录的图文版 cs-copy-guide。屏上方式灰掉、写「这台机器还没开通」。可用地址 #cs-copy-off 直接打开。' + NK
   });
 
   reg('cs-device', G_DEV, '设备状态（细分）', device, {
@@ -1052,6 +1243,7 @@
     { n: '屏上扫描（新）', ids: ['print', 'cs-scan-what', 'cs-scan-how', 'cs-scan-set', 'cs-scan-run', 'cs-scan-more', 'cs-scan-make', 'cs-scan-done', 'pii'] },
     { n: '屏上扫描出错（新）', ids: ['cs-scan-run', 'cs-scan-err-nopaper', 'cs-scan-err-jam', 'cs-scan-err-busy', 'cs-scan-err-noresp', 'cs-scan-timeout', 'cs-scan-stopped', 'cs-scan-off'] },
     { n: '屏上复印（新）', ids: ['print', 'cs-copy-how', 'cs-copy-set', 'cs-copy-scan', 'cs-copy-check', 'cs-copy-print', 'cs-copy-done', 'cs-copy-unconfirmed', 'cs-copy-off'] },
+    { n: '面板复印图文指引（新）', ids: ['print', 'cs-copy-how', 'cs-copy-guide', 'cs-copy-guide-more', 'print-src'] },
     { n: '设备状态（新）', ids: ['offline', 'cs-device'] }
   );
 })();
