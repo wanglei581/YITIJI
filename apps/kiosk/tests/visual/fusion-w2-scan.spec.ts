@@ -936,9 +936,10 @@ test('successful scan tells a guest the file will not reach 我的文档 @w2', a
   const destination = page.getByRole('button', { name: /本次不进入我的文档/ })
   await expect(destination).toBeVisible()
   await expect(destination).toBeDisabled()
-  // 走查 I-15：不再只说「请在本次操作内完成打印或识别」——补上两条真能走的路：当场扫码带走，或登录后重新扫（补不进账号，所以说「重新扫一次」）。
+  // 走查 I-15：不再只说「请在本次操作内完成打印或识别」——补一句实话：要留在账号里，先登录，再重新扫一次（补不进账号，所以说「重新扫一次」）。
+  // 游客扫码带走电子版已撤（见下面那条防回退用例），这一屏没有任何下载码入口。
   await expect(page.getByText('未登录扫描件不会进入「我的文档」。要留在账号里：先登录，再重新扫一次。')).toBeVisible()
-  await expect(page.getByTestId('scan-takeaway-open')).toBeEnabled()
+  await expect(page.locator('[data-testid^="scan-takeaway"]')).toHaveCount(0)
 
   // 旧的不实承诺不得再出现在页面上。
   await expect(page.getByText(/登录后管理文件|登录后可在「我的文档」管理/)).toHaveCount(0)
@@ -947,13 +948,16 @@ test('successful scan tells a guest the file will not reach 我的文档 @w2', a
   await expectHealthy(page, errors)
 })
 
-// 走查 I-15：游客扫完纸质材料原来只能「拿去打印」，拿不到电子版。扫描件事后补不进账号，所以当场给「扫码带走」。
-for (const scanType of ['resume', 'document'] as const) {
-test(`guest ${scanType} scan result lets the phone take the e-copy away by QR @w2`, async ({ page, api }, testInfo) => {
+// 走查 I-15 的收口（总指挥 11/2 按 10/12 认可的小程序方案撤掉「游客扫码带走电子版」，提交 8ac655ae1 已 revert）：
+// 方案「十、明确不做」写着「游客扫码领扫描件」——屏上的码会被旁人拍走；没登录的人用 U 盘，登录的人进「我的文档」。
+// 所以游客在简历、证件、普通文档三类扫描的结果页都不出下载码，也没有 scan-takeaway-* 元素，只留一句实话。
+// 防回退：结果里带着一条合格的、签好名的短时内容链接（以前就是拿它出码），页面也不许再拿它出码。
+for (const scanType of ['resume', 'id', 'document'] as const) {
+test(`guest ${scanType} scan result has no download QR and no takeaway entry, only the honest sentence @w2`, async ({ page, api }, testInfo) => {
   const errors = collectRuntimeErrors(page, TWO_PAGE_PDF_PATH)
   await installPreviewFixtures(page)
   registerShell(api)
-  const contentPath = '/api/v1/files/w2-scan-takeaway/content'
+  const contentPath = '/api/v1/files/w2-scan-guest/content'
   await page.route(`**${contentPath}?*`, route => route.fulfill({ status: 200, contentType: 'application/pdf', body: TWO_PAGE_PDF }))
   const expiresMs = Date.now() + 20 * 60 * 1000
   await seedScanResult(page, { ...previewResult({
@@ -967,86 +971,17 @@ test(`guest ${scanType} scan result lets the phone take the e-copy away by QR @w
   // 等预览真渲染出来再看版面、再截图（否则预览井是一块空白）
   await expect(page.locator('.sw-pvstage [data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
 
-  const take = page.getByTestId('scan-takeaway-open')
-  await expect(take).toBeEnabled()
-  await expect(take).toContainText('扫码带走电子版')
-  const takeBox = await boxOf(take, '扫码带走电子版')
-  expect(takeBox.height, '扫码带走电子版 高').toBeGreaterThanOrEqual(64)
-  expect(takeBox.width, '扫码带走电子版 宽').toBeGreaterThanOrEqual(64)
-  await expect(page.getByTestId('scan-takeaway-layer')).toHaveCount(0)
-  await page.screenshot({ path: testInfo.outputPath('qx-scan-result-guest.png'), fullPage: false })
-  await take.click()
-  const layer = page.getByTestId('scan-takeaway-layer')
-  await expect(layer.getByText('扫码带走这份扫描件', { exact: true })).toBeVisible()
-  const qr = layer.getByTestId('scan-takeaway-qr')
-  await expect(qr.locator('svg')).toBeVisible()
-  await page.screenshot({ path: testInfo.outputPath('qx-scan-takeaway-layer.png'), fullPage: false })
-  // 码里是完整地址（手机要打开得有域名），指向本系统的内容端点；签名不进 DOM 属性
-  await expect(qr).toHaveAttribute('data-qr-origin', /^http:\/\/127\.0\.0\.1:\d+$/)
-  await expect(qr).toHaveAttribute('data-qr-path', contentPath)
-  await expect(layer).toContainText('w2-scan-two-page.pdf')
-  await expect(layer).toContainText(/剩余 \d+ 分 \d{2} 秒/)
-  await expect(layer.getByText(/只在你自己的手机上打开/).first()).toBeVisible()
-  await expect(layer.locator('a[href]')).toHaveCount(0)
-  // 关掉就收起来，页面回到原样；关闭键够大
-  const close = page.getByTestId('scan-takeaway-close')
-  const closeBox = await boxOf(close, '关闭')
-  expect(closeBox.height, '关闭 高').toBeGreaterThanOrEqual(64)
-  await close.click()
-  await expect(page.getByTestId('scan-takeaway-layer')).toHaveCount(0)
-  await expect(take).toBeEnabled()
-  // 过期之后不再出码，说明手机打不开了
-  await page.clock.install({ time: expiresMs - 3_000 })
-  await take.click()
-  await expect(page.getByTestId('scan-takeaway-qr')).toBeVisible()
-  await page.clock.runFor(5_000)
-  await expect(page.getByTestId('scan-takeaway-expired')).toBeVisible()
-  await expect(page.getByTestId('scan-takeaway-qr')).toHaveCount(0)
+  await expect(page.locator('[data-testid^="scan-takeaway"]'), '游客结果页不得有扫码带走的任何元素').toHaveCount(0)
+  await expect(page.locator('[data-qr-origin], [data-qr-path]'), '游客结果页不得有下载二维码').toHaveCount(0)
+  await expect(page.locator('body')).not.toContainText(/扫码带走|带走这份扫描件|证件扫描不提供/)
+  // 只留一句实话，和灰着的「本次不进入我的文档」；这一屏没有任何去 /login 的出口。
+  await expect(page.getByText('未登录扫描件不会进入「我的文档」。要留在账号里：先登录，再重新扫一次。')).toBeVisible()
+  await expect(page.getByRole('button', { name: /本次不进入我的文档/ })).toBeDisabled()
+  await expect(page.locator('a[href^="/login"]')).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath(`qx-scan-result-guest-${scanType}.png`), fullPage: false })
   await expectHealthy(page, errors)
 })
-
 }
-
-test('malformed scan download expiry is unavailable, never a permanent QR @w2', async ({ page, api }) => {
-  const errors = collectRuntimeErrors(page)
-  registerShell(api)
-  const contentPath = '/api/v1/files/w2-invalid-expiry/content'
-  await page.route(`**${contentPath}?*`, route => route.fulfill({ status: 200, contentType: 'application/pdf', body: TWO_PAGE_PDF }))
-  await seedScanResult(page, previewResult({
-    fileUrl: `${contentPath}?expires=1e100&sig=${'a'.repeat(64)}`,
-    name: '扫描.pdf', pages: 2, mimeType: 'application/pdf', format: 'PDF',
-  }))
-  await page.goto('/scan?stage=result')
-  await page.getByTestId('scan-takeaway-open').click()
-  await expect(page.getByTestId('scan-takeaway-unavailable')).toBeVisible()
-  await expect(page.getByTestId('scan-takeaway-qr')).toHaveCount(0)
-  await page.getByTestId('scan-takeaway-close').click()
-  await expect(page.getByTestId('scan-takeaway-layer')).toHaveCount(0)
-  await expectHealthy(page, errors)
-})
-
-// 证件是高敏感材料：公共屏幕上不放它的下载码（链接有效期内谁拍到谁就能下）。
-test('guest ID scan result never shows a download QR and says how to get the e-copy @w2', async ({ page, api }, testInfo) => {
-  const errors = collectRuntimeErrors(page, TWO_PAGE_PDF_PATH)
-  await installPreviewFixtures(page)
-  registerShell(api)
-  await seedScanResult(page, {
-    ...previewResult({ fileUrl: TWO_PAGE_PDF_PATH, name: 'w2-scan-two-page.pdf', pages: 2, mimeType: 'application/pdf', format: 'PDF' }),
-    scanType: 'id',
-  })
-  await page.goto('/scan?stage=result')
-  await expect(page.locator('.sw-pvstage [data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
-
-  const take = page.getByTestId('scan-takeaway-open')
-  await expect(take).toBeDisabled()
-  await page.screenshot({ path: testInfo.outputPath('qx-scan-result-guest-id.png'), fullPage: false })
-  await expect(take).toContainText('证件扫描不提供扫码带走')
-  await expect(take).toContainText('要电子版：先登录，再重新扫一次')
-  await take.click({ force: true })
-  await expect(page.getByTestId('scan-takeaway-layer')).toHaveCount(0)
-  await expect(page.locator('[data-testid="scan-takeaway-qr"]')).toHaveCount(0)
-  await expectHealthy(page, errors)
-})
 
 test('failed scan retry strips control fields but preserves scan parameters @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
