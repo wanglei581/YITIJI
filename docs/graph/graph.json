@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 621,
+    "endpointCount": 624,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -7886,6 +7886,60 @@
         ]
       },
       {
+        "controller": "services/api/src/print-jobs/free-print-quota.controller.ts",
+        "handler": "KioskPrintQuotaController.get",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "PlatformSetting",
+          "Terminal"
+        ],
+        "path": "/api/v1/kiosk/print-quota",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/print-jobs/free-print-quota.service.ts"
+        ],
+        "services": [
+          "FreePrintQuotaService"
+        ]
+      },
+      {
+        "controller": "services/api/src/print-jobs/free-print-quota.controller.ts",
+        "handler": "KioskPrintQuotaController.get",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "PlatformSetting",
+          "Terminal"
+        ],
+        "path": "/api/v1/kiosk/print-quota",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/print-jobs/free-print-quota.service.ts"
+        ],
+        "services": [
+          "FreePrintQuotaService"
+        ]
+      },
+      {
+        "controller": "services/api/src/print-jobs/free-print-quota.controller.ts",
+        "handler": "KioskPrintQuotaController.update",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "PlatformSetting",
+          "Terminal"
+        ],
+        "path": "/api/v1/kiosk/print-quota",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/print-jobs/free-print-quota.service.ts"
+        ],
+        "services": [
+          "FreePrintQuotaService"
+        ]
+      },
+      {
         "controller": "services/api/src/screensaver/screensaver.controller.ts",
         "handler": "ScreensaverController.findAll",
         "method": "GET",
@@ -11484,6 +11538,7 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
+          "OrderItem",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -11533,6 +11588,7 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
+          "OrderItem",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -11559,6 +11615,7 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
+          "OrderItem",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -11585,6 +11642,7 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
+          "OrderItem",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -18542,6 +18600,7 @@
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
+          "services/api/src/print-jobs/free-print-quota.usage.ts",
           "services/api/src/print-jobs/paid-reprint-eligibility.ts",
           "services/api/src/print-jobs/pickup-code-resume.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
@@ -18562,7 +18621,10 @@
           "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/payment/pickup-expiry-refund.service.ts",
           "services/api/src/payment/pickup-validity.ts",
+          "services/api/src/print-jobs/free-print-quota.usage.ts",
+          "services/api/src/print-jobs/pickup-code-resume.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
+          "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
         ]
       },
@@ -18675,6 +18737,7 @@
         "usedBy": [
           "services/api/src/branding/brand-logo.service.ts",
           "services/api/src/branding/branding.service.ts",
+          "services/api/src/print-jobs/free-print-quota.config.ts",
           "services/api/src/support-contact/support-contact.service.ts"
         ]
       },
@@ -18767,6 +18830,7 @@
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts",
+          "services/api/src/print-jobs/free-print-quota.usage.ts",
           "services/api/src/print-jobs/pickup-code-resume.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
@@ -18994,7 +19058,7 @@
         ]
       },
       {
-        "fieldCount": 30,
+        "fieldCount": 31,
         "name": "Terminal",
         "relations": [
           "ActiveReleaseObservationAssignment",
@@ -19012,6 +19076,7 @@
         "usedBy": [
           "services/api/src/activity/activity.controller.ts",
           "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/admin-ops/derived-print-quota-alerts.ts",
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/ai/usage/ai-usage-context.ts",
@@ -19040,6 +19105,7 @@
           "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/payment/order-quote.service.ts",
           "services/api/src/policies/policy-scope.service.ts",
+          "services/api/src/print-jobs/free-print-quota.decide.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
@@ -19327,6 +19393,7 @@
       "scripts/verify-ci-main-runs-complete.mjs",
       "scripts/verify-release-bundle.mjs",
       "services/api/scripts/verify-contract-review-preprod-readiness.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
@@ -23488,6 +23555,7 @@
       "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-contract-review-preprod-readiness.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-job-customer-sample-readiness.ts",
       "services/api/scripts/verify-job-info-ai-real-acceptance.ts",
       "services/api/scripts/verify-print-scan-first-release.ts",
@@ -23982,6 +24050,12 @@
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
       "services/api/scripts/verify-partner-account-action-schema.ts"
     ],
+    "services/api/prisma/migrations/20260724200000_guard_planned_terminal_updates/migration.sql": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
+    "services/api/prisma/migrations/20260726003000_guard_retired_terminal/migration.sql": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
     "services/api/prisma/migrations/20260901090000_add_agent_release_observation/migration.sql": [
       "services/api/scripts/verify-release-observation-contract.mjs"
     ],
@@ -23990,6 +24064,9 @@
     ],
     "services/api/prisma/migrations/20260929230000_ai_usage_retention_summary/migration.sql": [
       "services/api/scripts/verify-ai-usage-retention.ts"
+    ],
+    "services/api/prisma/migrations/20261102090000_add_terminal_daily_free_print_sides/migration.sql": [
+      "services/api/scripts/verify-free-print-quota.ts"
     ],
     "services/api/prisma/postgres/migrations/20260701123000_add_toolbox_launch_events/migration.sql": [
       "services/api/scripts/verify-toolbox-launch-events.ts"
@@ -24037,6 +24114,9 @@
     "services/api/prisma/postgres/migrations/20261003090000_member_closure_storage_deletion/migration.sql": [
       "services/api/scripts/verify-http-exception-filter.ts"
     ],
+    "services/api/prisma/postgres/migrations/20261102090000_add_terminal_daily_free_print_sides/migration.sql": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
     "services/api/prisma/postgres/schema.prisma": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
@@ -24073,6 +24153,7 @@
       "services/api/scripts/verify-branding-license-migrations.ts",
       "services/api/scripts/verify-db-load-indexes.ts",
       "services/api/scripts/verify-first-order-migrations.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-job-ai.ts",
       "services/api/scripts/verify-job-application-track.ts",
       "services/api/scripts/verify-job-fit-governance.ts",
@@ -24342,6 +24423,7 @@
       "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-login-real-redis.ts",
@@ -24396,6 +24478,7 @@
     ],
     "services/api/scripts/support/minimal-pdf.ts": [
       "services/api/scripts/verify-derivation-kind.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
@@ -24738,13 +24821,15 @@
     ],
     "services/api/src/admin-ops/derived-alert-identity.ts": [
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
-      "services/api/scripts/verify-admin-ops.ts"
+      "services/api/scripts/verify-admin-ops.ts",
+      "services/api/scripts/verify-free-print-quota.ts"
     ],
     "services/api/src/admin-ops/derived-alerts.ts": [
       "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-beijing-display-time.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-queue-dispatch-printer-status.ts"
     ],
     "services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts": [
@@ -24759,8 +24844,12 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-payment-flow.ts"
     ],
+    "services/api/src/admin-print-scan/admin-print-scan.controller.ts": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
     "services/api/src/admin-print-scan/admin-print-scan.service.ts": [
       "services/api/scripts/verify-admin-print-scan.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
@@ -25096,7 +25185,8 @@
       "services/api/scripts/verify-ai-cost-runtime.ts"
     ],
     "services/api/src/ai/quota/ai-quota.policy.ts": [
-      "services/api/scripts/verify-ai-quota.ts"
+      "services/api/scripts/verify-ai-quota.ts",
+      "services/api/scripts/verify-free-print-quota.ts"
     ],
     "services/api/src/ai/quota/ai-quota.service.ts": [
       "services/api/scripts/verify-ai-quota.ts"
@@ -25139,7 +25229,8 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts",
-      "services/api/scripts/verify-self-assessment-ai-gate.ts"
+      "services/api/scripts/verify-self-assessment-ai-gate.ts",
+      "services/api/scripts/verify-upload-sessions-member-file.ts"
     ],
     "services/api/src/ai/resume/career-plan-degraded-pdf.service.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -25379,7 +25470,8 @@
     "services/api/src/ai/resume/self-assessment-questions.ts": [
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts",
-      "services/api/scripts/verify-self-assessment-ai-gate.ts"
+      "services/api/scripts/verify-self-assessment-ai-gate.ts",
+      "services/api/scripts/verify-self-assessment-bank-sync.ts"
     ],
     "services/api/src/ai/resume/self-assessment-scoring.ts": [
       "services/api/scripts/verify-self-assessment-ai-gate.ts",
@@ -25527,6 +25619,7 @@
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-field-mapping-rule.ts",
       "services/api/scripts/verify-first-order-http.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
@@ -25798,6 +25891,7 @@
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-kiosk-anonymous-feedback.ts",
@@ -25817,6 +25911,7 @@
     ],
     "services/api/src/common/crypto/secret-cipher.ts": [
       "services/api/scripts/verify-content-pipeline-e2e.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-llm-thinking-live-gate.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
@@ -25880,6 +25975,7 @@
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-contract-review-http.ts",
       "services/api/scripts/verify-error-observability.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-http-exception-filter.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-job-favorites-http.ts",
@@ -25912,6 +26008,7 @@
       "services/api/scripts/verify-content-pipeline-e2e.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-job-favorites-http.ts",
       "services/api/scripts/verify-kiosk-anonymous-feedback.ts",
       "services/api/scripts/verify-member-account-status.ts",
@@ -25937,6 +26034,7 @@
       "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
@@ -25962,6 +26060,7 @@
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-legal-doc-version.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-member-closure.ts",
@@ -26014,6 +26113,7 @@
     ],
     "services/api/src/common/pickup-code.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-package-order-idempotency.ts"
@@ -26077,6 +26177,7 @@
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-change-password.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
@@ -26408,9 +26509,13 @@
     "services/api/src/files/retention-policy.ts": [
       "apps/kiosk/scripts/verify-file-retention-ui.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-document-conversion.ts",
       "services/api/scripts/verify-file-retention.ts",
       "services/api/scripts/verify-member-data-retention.ts",
+      "services/api/scripts/verify-print-conversion.ts",
+      "services/api/scripts/verify-print-sign.ts",
       "services/api/scripts/verify-resume-generate.ts",
+      "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ],
     "services/api/src/files/signing.ts": [
@@ -26420,6 +26525,7 @@
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-document-conversion.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
@@ -27266,7 +27372,8 @@
       "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-job-application-track.ts",
       "services/api/scripts/verify-member-data-export.ts",
-      "services/api/scripts/verify-member-data-request-contract.ts"
+      "services/api/scripts/verify-member-data-request-contract.ts",
+      "services/api/scripts/verify-upload-sessions-member-file.ts"
     ],
     "services/api/src/member-privacy/member-data-export.service.ts": [
       "services/api/scripts/verify-member-data-export.ts"
@@ -27530,6 +27637,7 @@
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-career-plan-degraded.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-audit-postgres.ts",
@@ -27629,6 +27737,7 @@
     "services/api/src/payment/price-config.seed.ts": [
       "services/api/scripts/verify-admin-billing.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
@@ -27658,6 +27767,7 @@
       "services/api/scripts/verify-admin-billing.ts",
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-audit-postgres.ts",
@@ -27804,6 +27914,21 @@
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-parameter-capability.ts"
     ],
+    "services/api/src/print-jobs/free-print-quota.controller.ts": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
+    "services/api/src/print-jobs/free-print-quota.decide.ts": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
+    "services/api/src/print-jobs/free-print-quota.policy.ts": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
+    "services/api/src/print-jobs/free-print-quota.service.ts": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
+    "services/api/src/print-jobs/free-print-quota.usage.ts": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
     "services/api/src/print-jobs/material-check-policy.ts": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-derivation-kind.ts"
@@ -27825,6 +27950,7 @@
     "services/api/src/print-jobs/pickup-order.service.ts": [
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
@@ -27842,6 +27968,7 @@
     ],
     "services/api/src/print-jobs/print-jobs.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -27859,6 +27986,7 @@
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-closed-pending-print-task-disposition.ts",
       "services/api/scripts/verify-document-conversion.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
       "services/api/scripts/verify-member-data-retention.ts",
@@ -27883,6 +28011,7 @@
     "services/api/src/print-jobs/print-page-count.service.ts": [
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-audit-postgres.ts",
@@ -28011,6 +28140,7 @@
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
       "services/api/scripts/verify-first-admin-bootstrap-postgres.ts",
       "services/api/scripts/verify-first-admin-bootstrap.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
@@ -28241,6 +28371,7 @@
       "services/api/scripts/verify-member-data-export-files.ts"
     ],
     "services/api/src/storage/storage.interface.ts": [
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
@@ -28278,6 +28409,7 @@
       "services/api/scripts/verify-external-video-e2e.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-job-materials.ts",
       "services/api/scripts/verify-jobfair-venue-guide.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
@@ -28355,6 +28487,7 @@
     ],
     "services/api/src/terminals/admin-terminals.controller.ts": [
       "services/api/scripts/verify-admin-print-scan.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-provisioning.ts"
@@ -28408,6 +28541,7 @@
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
@@ -28446,6 +28580,7 @@
       "services/api/scripts/verify-terminal-network-diagnostics.ts"
     ],
     "services/api/src/terminals/terminal-identity.guard.ts": [
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-session.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-official-channels.ts",
@@ -28463,6 +28598,7 @@
     "services/api/src/terminals/terminal-session.service.ts": [
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-branding.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-license-state.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
@@ -28495,6 +28631,7 @@
       "services/api/scripts/verify-terminal-bind-code.ts"
     ],
     "services/api/src/terminals/terminals-admin.service.ts": [
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
@@ -28558,6 +28695,7 @@
       "services/api/scripts/verify-terminal-network-diagnostics.ts"
     ],
     "services/api/src/terminals/terminals.service.ts": [
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
       "services/api/scripts/verify-order.ts",
@@ -37843,6 +37981,7 @@
           "services/api/src/document-conversion/document-conversion.service.ts",
           "services/api/src/document-conversion/document-conversion.types.ts",
           "services/api/src/files/file-validation.ts",
+          "services/api/src/files/retention-policy.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/print-jobs/print-jobs.service.ts"
         ],
@@ -38427,6 +38566,70 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:first-order-migrations"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "services"
+        ],
+        "files": [
+          ".github/workflows/ci.yml",
+          "docs/progress/current-progress.md",
+          "services/api/prisma/migrations/20260724200000_guard_planned_terminal_updates/migration.sql",
+          "services/api/prisma/migrations/20260726003000_guard_retired_terminal/migration.sql",
+          "services/api/prisma/migrations/20261102090000_add_terminal_daily_free_print_sides/migration.sql",
+          "services/api/prisma/postgres/migrations/20261102090000_add_terminal_daily_free_print_sides/migration.sql",
+          "services/api/prisma/schema.prisma",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/src/admin-ops/derived-alert-identity.ts",
+          "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/admin-print-scan/admin-print-scan.controller.ts",
+          "services/api/src/admin-print-scan/admin-print-scan.service.ts",
+          "services/api/src/ai/quota/ai-quota.policy.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/common/crypto/secret-cipher.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/pickup-code.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/files/signing.ts",
+          "services/api/src/payment/order-status.service.ts",
+          "services/api/src/payment/price-config.seed.ts",
+          "services/api/src/payment/pricing.service.ts",
+          "services/api/src/print-jobs/free-print-quota.controller.ts",
+          "services/api/src/print-jobs/free-print-quota.decide.ts",
+          "services/api/src/print-jobs/free-print-quota.policy.ts",
+          "services/api/src/print-jobs/free-print-quota.service.ts",
+          "services/api/src/print-jobs/free-print-quota.usage.ts",
+          "services/api/src/print-jobs/pickup-order.service.ts",
+          "services/api/src/print-jobs/print-jobs.controller.ts",
+          "services/api/src/print-jobs/print-jobs.service.ts",
+          "services/api/src/print-jobs/print-page-count.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.interface.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/terminals/admin-terminals.controller.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts",
+          "services/api/src/terminals/terminal-identity.guard.ts",
+          "services/api/src/terminals/terminal-session.service.ts",
+          "services/api/src/terminals/terminals-admin.service.ts",
+          "services/api/src/terminals/terminals.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-free-print-quota.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:free-print-quota"
       ],
       "wired": true
     },
@@ -41960,6 +42163,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/files/retention-policy.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/print-conversion/print-conversion.controller.ts",
           "services/api/src/print-conversion/print-conversion.dto.ts",
@@ -42167,6 +42371,7 @@
         "files": [
           "services/api/src/files/dto/kiosk-upload-options.dto.ts",
           "services/api/src/files/file-page-count.util.ts",
+          "services/api/src/files/retention-policy.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/print-sign/print-sign-geometry.ts",
           "services/api/src/print-sign/print-sign.service.ts",
@@ -43550,6 +43755,24 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/ai/resume/self-assessment-questions.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-self-assessment-bank-sync.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:assess-isolation"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/src/ai/resume/self-assessment-scoring.ts"
         ],
         "missing": []
@@ -44283,13 +44506,16 @@
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
           "services/api/scripts/support/upload-session-verifier.ts",
+          "services/api/src/ai/resume/appended-self-assessment.service.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/common/guards/end-user-auth.guard.ts",
           "services/api/src/common/jwt-verifier.module.ts",
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/files/file.types.ts",
           "services/api/src/files/files.service.ts",
+          "services/api/src/files/retention-policy.ts",
           "services/api/src/member-assets/member-assets.service.ts",
+          "services/api/src/member-privacy/member-data-export.mapper.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/storage/storage.service.ts",
           "services/api/src/upload-sessions/upload-sessions.controller.ts",
