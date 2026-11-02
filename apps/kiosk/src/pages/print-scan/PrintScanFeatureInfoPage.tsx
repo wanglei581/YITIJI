@@ -153,7 +153,7 @@ function PanelArt({ lit, compact }: { lit: 'all' | 'id' | 'bill'; compact?: bool
       aria-label="打印机触摸屏主屏：一排四个按钮，复印、扫描、身份证复印、票据复印；触摸屏左边三个实体键"
     >
       <div className="qx-copy-guide-keys">
-        <span className="qx-copy-guide-key"><Undo2Icon size={30} strokeWidth={2.2} /></span>
+        <span className="qx-copy-guide-key"><Undo2Icon size={30} strokeWidth={2.2} aria-hidden="true" /></span>
         <span className="qx-copy-guide-key" data-lit={lit === 'all' ? 'home' : undefined}><QxTouchIcon name="home" size={30} strokeWidth={2.2} /></span>
         <span className="qx-copy-guide-key"><QxTouchIcon name="help" size={30} strokeWidth={2.2} /></span>
       </div>
@@ -168,7 +168,7 @@ function PanelArt({ lit, compact }: { lit: 'all' | 'id' | 'bill'; compact?: bool
                 <span className="qx-copy-guide-lab">
                   {button.lines.map((line, index) => <Fragment key={line}>{index > 0 ? <br /> : null}{line}</Fragment>)}
                 </span>
-                {on ? <PointerIcon className="qx-copy-guide-tap" size={40} strokeWidth={1.8} /> : null}
+                {on ? <PointerIcon className="qx-copy-guide-tap" size={40} strokeWidth={1.8} aria-hidden="true" /> : null}
               </span>
             )
           })}
@@ -359,6 +359,7 @@ function CopyGuide({ pill }: { pill: ReturnType<typeof toolBandStatus> }) {
       onBack={() => (cases ? navigate(COPY_GUIDE_ROUTE, { replace: true }) : navigate('/print-scan'))}
     >
       <div
+        key={cases ? COPY_GUIDE_CASES_VIEW : 'steps'}
         className="qx-scroll ph-page sx-page qx-copy-guide-page"
         data-w2-page="print-scan-feature"
         data-qx-page="print-hub"
