@@ -1,5 +1,18 @@
 # 当前开发进度
 
+## 2026-11-03：一体机扫描页按职责拆开（K1a，只拆不改行为；分支 `claude/scan-k1a-split-1102`，未合并、未部署）
+
+- 为什么：下一步 K1b 要把屏上扫描做进扫描页。`ScanSettingsPage.tsx` 原来 784 行，离 800 行硬线只剩 16 行；`ScanResultPage.tsx` 512 行。本批只拆，让 K1b 能复用建会话、投递确认、重扫授权和出口。基线 `317e54442`。实现提交：`12cc15320`（设置页五个 hook）、`b0d6847e0`（结果页两个 hook、三个组件）、`ec56da22a`（六个门禁改读新文件，断言不删不放宽）、`a1e9ca34c`（游客结果页文案）。
+- 怎么拆：设置页拆成 `useScanSettingsState`、`useScanSessionCreate`、`useScanSettingsDeliveryAck`、`useScanSettingsExpiry`、`useScanSettingsActions`，页面只留装配与渲染（123 行）。投递确认和进度页不同构，没有抽成共用 hook。结果页拆成 `useScanResultRescan`、`useScanResultExits`、`ScanResultFailedView`、`ScanResultPreviewBlock`、`ScanResultExitRow`、`scanResultModel`，页面 122 行。`leaveScanFlow` 仍是先撤会话、再清登记、再 replace 导航。拆完每个文件都不超过 500 行，最长的是 `useScanSessionCreate.ts`（394 行）。
+- 文案（R-03，产品负责人 11/02 拍板，照触屏版补稿 cs-scan-done）：游客成功说明改为「未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。要带走电子版，下次先扫码登录再扫。」再加「用 U 盘带走：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。」不加登录按钮（游客一登录，这次扫描会被清掉）。禁用的「本次不进入我的文档」不动。登录后仍是「前往我的文档」。
+- 没改：路由、阶段机、扫描登记的存储格式、后端、终端程序、共享包、小程序、两个后台。触屏版那四处（U 盘卡「暂未开通」、证件 JPG 的 `role="note"`、游客结果页没有下载码、`SCAN_FILE_TYPE_NOT_ALLOWED` 的说法）没改回去。
+- 本机验证（系统 Chrome；Playwright 自带 Chromium 缓存是空的）：kiosk typecheck 通过；lint 0 error（27 条原有 warning，不在扫描页）。门禁全绿：`verify:fusion-w2`、`verify:scan-session-truth`、`verify:scan-quiet-period`、`verify:print-done-truth`（47 过）、`verify:kiosk-ai-declaration`、`verify:kiosk-runtime-error-boundary`、`verify:kiosk-unattended-copy`、`verify:kiosk-font-subset`（7168 字）、`verify:compliance-copy`（含 `verify:no-raw-error-render`）、图谱多列出的 `verify:fusion-w6`。浏览器：w2 243/243（含 fusion-w2-scan 36）；truth 177 过、1 条红；scan-safety 37 过、1 条红；会话警告 35/35；隐私超时 42/42；w6 里路径含 `/scan` 的 8/8；旅程 F 1/1。
+- 两条红不是这次拆分。`unfinished privacy check keeps the recovery exit` 在 origin/main 副本（`7af05df97`）上同一条同样红：收尾报未登记的 `POST /api/v1/materials/tasks`，屏上的恢复出口本身在。`payment code never renders` 是全套一起跑时，付款失败后界面已经回到「等待扫码」，单独再跑本分支与 origin/main 都过（本分支 1 过 / 2.2 秒，origin/main 1 过 / 2.7 秒）。一体机目录相对基线与 origin/main 没有别的差；origin/main 只多小程序 #1538。
+- 截图在 `~/.cache/claude-lanes/copyscan-1102/code-shots/k1a/`，`main-*` 与 `branch-*` 各 10 张（游客、登录 × 选类型、指引、等待、成功、失败）。文字除游客成功那句外一致。像素：选类型、等待、两种失败、登录成功为 0 差；指引只差倒计时秒数（同一时刻起算，拍摄耗时差几秒）；游客成功那张差在新句子多出来的行。
+- 反向检查（改坏后 `git checkout` 恢复，没有提交改坏的状态）：删掉 `leaveScanFlow` 里的撤会话 → `verify:scan-session-truth` 红在「先撤服务端任务」；游客句改回旧句 → 同一门禁红在 11/02 原话；静默期去掉减一 → `verify:scan-quiet-period` 红。恢复后这两条门禁再绿，工作区干净。
+- 图谱：新文件入库后 `pnpm graph` 重出，`pnpm graph:check` 通过（`docs/graph/` 3 个文件有变化）。新文件被 fusion-w2 与 scan-session-truth 钉住；设置页那一组还被 runtime-error-boundary 与 no-raw-error-render 钉住；`useScanResultExits` 还被 print-done-truth 钉住；`useScanSessionCreate` 还被 scan-quiet-period 钉住。这些门禁本轮都已跑过，没有新冒出来还没跑的。
+- 合并注意：origin/main 比本分支基线多 #1538，进度文档顶部多一节小程序签名图。合的时候两节都留，这一节放在上面。
+
 ## 2026-11-02：本人数据导出不再把编号当手机号打码（顺带消除上传会话门禁约 1% 的偶发红）
 
 - 问题：本人数据导出对所有字符串套手机号打码（「1[3-9]」开头的 11 位数字串，留前 3 位和后 4 位），编号也被打。文件编号是 32 位十六进制，本机模拟 40 万次约 0.93% 碰巧含这种数字串，导出里变成 `139****5678` 的样子，跟「我的文档」对不上；自我探索任务编号（sa- 加 24 位十六进制）约 0.52%，带横杠的标准编号约 0.08%。上传会话门禁 h 用例的正向对照因此约 1% 偶发红（#1524 只改文档，CI 第一次就撞上），同一处的反向断言也可能因编号被打坏而误放行。
