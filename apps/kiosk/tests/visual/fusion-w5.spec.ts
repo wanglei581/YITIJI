@@ -2008,7 +2008,7 @@ test('documents: derived AI output skips the material check and goes straight to
   registerAuthenticatedShell(api)
   registerPrintConfirm(api)
   api.respond('GET', '/api/v1/me/documents', memberPage([
-    memberDocument({ id: 'doc-ai-report', filename: '简历对照.pdf', assetCategory: 'derived' }),
+    memberDocument({ id: 'doc-ai-report', filename: '简历对照.pdf', assetCategory: 'derived', materialCheckRequired: false }),
   ]))
   api.respond('GET', '/api/v1/files/doc-ai-report/preview-url', {
     status: 200,
@@ -2041,6 +2041,52 @@ test('documents: derived AI output skips the material check and goes straight to
   expect((await quoteRequest).postDataJSON()).toMatchObject({ fileUrl: '/api/v1/files/doc-ai-report/content?sig=print' })
   expect(api.requestCount('POST', '/api/v1/materials/tasks'), '派生产物不进材料检查').toBe(0)
   expect(errors).toEqual([])
+})
+
+test('R-04 documents: photo composite requiring check opens material check @w5-kiosk', async ({ page, api }) => {
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  api.respond('GET', '/api/v1/me/documents', memberPage([
+    memberDocument({ id: 'doc-photo-pdf', filename: '照片合成.pdf', assetCategory: 'derived', derivationKind: 'format_conversion', materialCheckRequired: true }),
+  ]))
+  api.respond('GET', '/api/v1/files/doc-photo-pdf/preview-url', {
+    status: 200, json: { success: true, data: { fileId: 'doc-photo-pdf', printFileUrl: '/api/v1/files/doc-photo-pdf/content?sig=print', expiresAt: FUTURE } },
+  })
+  api.respond('POST', '/api/v1/materials/tasks', { status: 200, json: { success: true, data: { ...W5_DOC_INSPECTION, sourceFileId: 'doc-photo-pdf' } } })
+  api.respond('GET', `/api/v1/materials/tasks/${W5_DOC_INSPECTION.id}`, { status: 200, json: { success: true, data: { ...W5_DOC_INSPECTION, sourceFileId: 'doc-photo-pdf' } } })
+  await loginThroughVisibleUi(page, '/me/documents')
+  const row = page.getByTestId('member-assets-document').filter({ hasText: '照片合成.pdf' })
+  await openRow(row)
+  const created = page.waitForRequest((request) => request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/materials/tasks')
+  await row.getByRole('button', { name: '打印', exact: true }).click()
+  await page.waitForURL(/\/print\/desk\?step=check$/)
+  expect((await created).postDataJSON()).toMatchObject({ sourceFileId: 'doc-photo-pdf', kind: 'inspection' })
+})
+
+test('R-08 member USB import carries anonymous task token into material check @w5-kiosk', async ({ page, api }) => {
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200, json: { terminalCode: 'KSK-001', capabilities: [{ capabilityKey: 'usb_import', status: 'available', configured: true, note: null, updatedAt: null }] },
+  })
+  const usbFile = { fileId: 'usb-anon', filename: '材料.pdf', sizeBytes: 100, mimeType: 'application/pdf', sha256: 'a'.repeat(64), fileUrl: '/api/v1/files/usb-anon/content', fileUrlExpiresAt: FUTURE }
+  await page.route('http://127.0.0.1:9527/local/usb/**', (route) => {
+    const path = new URL(route.request().url()).pathname
+    const data = path.endsWith('/status') ? { present: true, driveLabel: 'USB' }
+      : path.endsWith('/files') ? { present: true, driveLabel: 'USB', files: [{ safeId: 'usb-1', filename: '材料.pdf', extension: 'pdf', sizeBytes: 100 }] } : usbFile
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ success: true, data }) })
+  })
+  const task = { ...W5_DOC_INSPECTION, sourceFileId: 'usb-anon', endUserId: null, accessToken: 'usb-task-token' }
+  api.respond('POST', '/api/v1/materials/tasks', { status: 200, json: { success: true, data: task } })
+  api.respond('GET', `/api/v1/materials/tasks/${task.id}`, { status: 200, json: { success: true, data: { ...task, accessToken: undefined } } })
+  await loginThroughVisibleUi(page, '/print/upload?tab=usb')
+  await page.getByTestId('file-source-usb-file-usb-1').click()
+  await page.getByRole('button', { name: '导入这份文件' }).click()
+  const readRequest = page.waitForRequest((request) => request.method() === 'GET' && new URL(request.url()).pathname === `/api/v1/materials/tasks/${task.id}`)
+  await page.getByRole('button', { name: '下一步：材料检查' }).click()
+  const read = await readRequest
+  expect(read.headers()['x-material-task-token']).toBe('usb-task-token')
+  await expect(page.locator('[data-w2-page="print-material-check"]')).toBeVisible()
 })
 
 test('documents and orders: error then empty come from the server, never a cached list @w5-kiosk', async ({ page, api }) => {

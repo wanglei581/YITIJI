@@ -22,11 +22,11 @@ function verifyAccessToken(token: string, expectedHash: string): boolean {
 
 export function assertCanAccessTask(task: { endUserId: string | null }, requester: MaterialsRequester): void {
   if (!task.endUserId) {
-    if (requester.kind !== 'anonymous') {
-      throw new ForbiddenException({ error: { code: 'MATERIAL_TASK_ACCESS_DENIED', message: '无权访问该材料处理任务' } })
-    }
     const tokenHash = (task as { accessTokenHash?: string | null }).accessTokenHash
     if (tokenHash && requester.accessToken && verifyAccessToken(requester.accessToken, tokenHash)) return
+    if (requester.kind === 'member') {
+      throw new ForbiddenException({ error: { code: 'MATERIAL_TASK_ACCESS_DENIED', message: '无权访问该材料处理任务' } })
+    }
     throw new ForbiddenException({ error: { code: 'MATERIAL_TASK_TOKEN_REQUIRED', message: '缺少或无效的材料任务访问凭证' } })
   }
   if (requester.kind === 'member' && requester.endUserId === task.endUserId) return
