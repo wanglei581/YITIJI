@@ -270,7 +270,7 @@ export class ScanDeviceSessionsService {
    * 会话、控制令牌、ACK 原样保留。出错状态（error）只有经这个用户动作才会回到 ready，不进终端程序回报转移表
    * （见 scan-device-protocol.ts 的状态转移表注释）；之后终端程序下一次回报 scanning 走 ready → scanning。
    * 幂等：要改的值与现值相同、且已是 ready 无错误码 0 页时，原样返回，不写库、不续期。
-   * 并发：条件更新（CAS）把读到的 deviceState / 来源 / 颜色一并写进 where，读写之间有人改了就重读重判，最多 3 轮。
+   * 并发：条件更新（CAS）把读到的 deviceState / 来源 / 颜色 / expiresAt 一并写进 where，读写之间有人改了就重读重判，最多 3 轮。
    */
   async updateDeviceSettings(
     scanTaskId: string,
