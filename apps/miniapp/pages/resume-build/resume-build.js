@@ -35,6 +35,7 @@ const ROWS = {
 Page({
   data: {
     statusBarHeight: 20,
+    aiLabelNote: model.RESUME_AI_LABEL_NOTE,
 
     /**
      * 页面阶段。单一取值，不要再加并行布尔：

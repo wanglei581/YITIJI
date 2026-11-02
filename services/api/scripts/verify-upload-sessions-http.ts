@@ -36,6 +36,8 @@ process.env['FILE_SIGNING_SECRET'] ||= 'verify-upload-sessions-secret-0123456789
 
 let BASE = ''
 const PDF_BYTES = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n')
+// 签名图用的最小 PNG（8 字节签名 + 内容），魔数嗅探只看文件头。
+const PNG_BYTES = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('http-e2e-signature')])
 
 interface ApiEnvelope<T> {
   success?: boolean
@@ -220,6 +222,107 @@ async function uploadFile(args: {
   })
 }
 
+async function uploadBytes(args: {
+  sessionId: string
+  uploadToken: string
+  filename: string
+  mimeType: string
+  bytes: Buffer
+}): Promise<{ status: number; body: ApiEnvelope<SessionStatusResponse> }> {
+  const form = new FormData()
+  form.append('uploadToken', args.uploadToken)
+  form.append('file', new Blob([new Uint8Array(args.bytes)], { type: args.mimeType }), args.filename)
+  return requestJson<ApiEnvelope<SessionStatusResponse>>(`/upload-sessions/${args.sessionId}/files`, {
+    method: 'POST',
+    body: form,
+  })
+}
+
+/**
+ * 触屏版走查 I-14：一体机「签名」第 2 步「手机扫码上传签名图」的真实链路。
+ * 此前 POST /upload-sessions {purpose:'signature_image'} 被 DTO 挡成 400（service 早已放行，DTO 漏了）。
+ * 这里走真实 HTTP + 真实库：建会话 → 手机端传 → 一体机确认 → 取回图片，并钉死只收图片、会员绑定、不进「我的文档」。
+ */
+async function verifySignatureImageSession(member: { endUserId: string; token: string }): Promise<void> {
+  console.log('\n  -- signature_image 会话（签名第 2 步，走查 I-14）--')
+  const bad = await requestJson<ApiEnvelope<unknown>>('/upload-sessions', {
+    method: 'POST',
+    body: JSON.stringify({ purpose: 'id_scan', mode: 'temporary', channel: 'phone_h5', terminalId: 'http-e2e-signature' }),
+  })
+  expectError(bad.status, bad.body, 400, 'VALIDATION_FAILED', 'create still rejects purposes outside the session list (id_scan)')
+
+  const createRes = await requestJson<ApiEnvelope<CreateSessionResponse>>('/upload-sessions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${member.token}` },
+    body: JSON.stringify({ purpose: 'signature_image', mode: 'member', channel: 'phone_h5', terminalId: 'http-e2e-signature' }),
+  })
+  const created = expectOkData(createRes.status, createRes.body, 'create member signature_image session (was 400 VALIDATION_FAILED)')
+  assert.ok(created.sessionId && created.uploadToken && created.controlToken, 'signature create: tokens are required')
+
+  const pdf = await uploadBytes({
+    sessionId: created.sessionId,
+    uploadToken: created.uploadToken,
+    filename: 'http-e2e-signature.pdf',
+    mimeType: 'application/pdf',
+    bytes: PDF_BYTES,
+  })
+  expectError(pdf.status, pdf.body, 400, 'FILE_MIME_NOT_ALLOWED', 'signature session refuses a PDF')
+  const disguised = await uploadBytes({
+    sessionId: created.sessionId,
+    uploadToken: created.uploadToken,
+    filename: 'http-e2e-signature.png',
+    mimeType: 'image/png',
+    bytes: PDF_BYTES,
+  })
+  expectError(disguised.status, disguised.body, 400, 'FILE_CONTENT_MISMATCH', 'signature session refuses a PDF disguised as PNG')
+  const pending = await requestJson<ApiEnvelope<SessionStatusResponse>>(`/upload-sessions/${created.sessionId}`, {
+    headers: { 'x-upload-session-control': created.controlToken },
+  })
+  assert.equal(expectOkData(pending.status, pending.body, 'refused uploads leave the session pending').status, 'pending')
+
+  const uploaded = await uploadBytes({
+    sessionId: created.sessionId,
+    uploadToken: created.uploadToken,
+    filename: '手写签名.png',
+    mimeType: 'image/png',
+    bytes: PNG_BYTES,
+  })
+  const uploadedData = expectOkData(uploaded.status, uploaded.body, 'PNG signature upload succeeds')
+  assert.equal(uploadedData.status, 'uploaded')
+  assert.equal(uploadedData.purpose, 'signature_image', 'receipt purpose is what the miniapp / phone page read')
+  assert.equal(uploadedData.file?.filename, '手写签名.png', 'Chinese file name survives the multipart round trip')
+  createdFileIds.push(uploadedData.file!.fileId)
+
+  const confirmed = await requestJson<ApiEnvelope<SessionStatusResponse>>(`/upload-sessions/${created.sessionId}/confirm`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${member.token}`, 'x-upload-session-control': created.controlToken },
+  })
+  const confirmedData = expectOkData(confirmed.status, confirmed.body, 'member confirm of the signature image')
+  assertKioskConfirmFile(confirmedData.file, 'signature confirm response')
+
+  const row = await findFileRow(confirmedData.file!.fileId)
+  assert.equal(row?.purpose, 'signature_image')
+  assert.equal(row?.endUserId, member.endUserId, 'signature image binds to the member')
+  assert.equal(row?.retentionPolicy, 'system_short', 'signature image is system short retention, not the 90-day resume default')
+  const hours = ((row?.expiresAt?.getTime() ?? 0) - Date.now()) / 3_600_000
+  assert.ok(hours > 0 && hours <= 1.1, `signature image lives about an hour, got ${hours.toFixed(2)}h`)
+  console.log('  PASS signature image: bound to member, system_short, ~1h')
+
+  const content = await fetch(`${BASE}${confirmedData.file!.fileUrl!.replace(/^\/api\/v1/, '')}`)
+  assert.equal(content.status, 200, 'the signed fileUrl serves the signature image back')
+  assert.equal(content.headers.get('content-type')?.startsWith('image/png'), true, 'served as image/png')
+  assert.deepEqual(Buffer.from(await content.arrayBuffer()), PNG_BYTES, 'served bytes are the uploaded bytes')
+  console.log('  PASS signed fileUrl returns the uploaded PNG')
+
+  const documents = await requestJson<ApiEnvelope<{ items?: Array<{ id: string }> } | Array<{ id: string }>>>('/me/documents', {
+    headers: { Authorization: `Bearer ${member.token}` },
+  })
+  const docsData = expectOkData(documents.status, documents.body, 'member documents list')
+  const listed = Array.isArray(docsData) ? docsData : (docsData.items ?? [])
+  assert.equal(listed.some((item) => item.id === confirmedData.file!.fileId), false, 'signature image never shows in 我的文档')
+  console.log('  PASS signature image is not listed in 我的文档')
+}
+
 async function createTemporarySession(terminalId: string): Promise<CreateSessionResponse> {
   const createRes = await requestJson<ApiEnvelope<CreateSessionResponse>>('/upload-sessions', {
     method: 'POST',
@@ -375,6 +478,8 @@ async function runVerifier(): Promise<void> {
   assert.equal(memberFile?.endUserId, member.endUserId, 'member file should bind endUserId')
   assert.equal(memberFile?.ownerType, 'user', 'member file should bind ownerType=user')
   assert.equal(memberFile?.ownerId, member.endUserId, 'member file should bind ownerId=endUserId')
+
+  await verifySignatureImageSession(member)
 
   const missing = await requestJson<ApiEnvelope<unknown>>('/upload-sessions/not-a-real-session', {
     headers: { 'x-upload-session-control': 'irrelevant' },
@@ -532,6 +637,19 @@ async function findFileOwner(fileId: string): Promise<{ endUserId: string | null
     return await prisma.fileObject.findUnique({
       where: { id: fileId },
       select: { endUserId: true, ownerType: true, ownerId: true },
+    })
+  } finally {
+    await prisma.onModuleDestroy()
+  }
+}
+
+async function findFileRow(fileId: string): Promise<{ purpose: string; endUserId: string | null; retentionPolicy: string | null; expiresAt: Date | null } | null> {
+  const prisma = new PrismaService()
+  await prisma.onModuleInit()
+  try {
+    return await prisma.fileObject.findUnique({
+      where: { id: fileId },
+      select: { purpose: true, endUserId: true, retentionPolicy: true, expiresAt: true },
     })
   } finally {
     await prisma.onModuleDestroy()

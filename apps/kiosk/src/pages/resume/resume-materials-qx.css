@@ -12,7 +12,7 @@
 .qx-resume-materials .qx-rm-filters { flex: none; display: flex; gap: 9px; overflow-x: auto; padding: 2px 0; scrollbar-width: none; }
 .qx-resume-materials .qx-rm-filters::-webkit-scrollbar { display: none; }
 .qx-resume-materials .qx-rm-filters button {
-  flex: none; min-height: 56px; padding: 0 17px;
+  flex: none; min-height: var(--qxt-tap); padding: 0 17px;
   border: 1px solid var(--qx-line-2); border-radius: var(--qx-r); background: var(--qx-surface);
   font: inherit; font-size: var(--qx-fs-body); font-weight: 700; color: var(--qx-ink-2); cursor: pointer;
 }
@@ -20,12 +20,12 @@
 
 /* ── 工作区：定宽目录 + 详情。工作区吸收余量（.qx-grow 口径），详情随之拉满到底。 ── */
 .qx-resume-materials .qx-rm-workspace { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: 410px minmax(0, 1fr); gap: 14px; }
+@media (max-width: 390px) {
+  .qx-resume-materials .qx-rm-workspace { grid-template-columns: minmax(0, 1fr); }
+}
 .qx-resume-materials .qx-rm-catalog {
   display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0;
   overflow-y: auto; overscroll-behavior: contain; padding-bottom: 8px;
-}
-.qx-resume-materials .qx-rm-catalog-hint {
-  flex: none; margin: 0; font-size: var(--qx-fs-aux); line-height: 1.4; color: var(--qx-ink-3);
 }
 .qx-resume-materials .qx-rm-template {
   display: block; width: 100%; padding: 15px 18px; text-align: left;

@@ -16,9 +16,12 @@
 
 import { type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
-import { getTerminalCode } from '../../services/api/terminalConfig'
+import { QxTouchBand, type QxTouchStatus } from '../../components/qingxu/touch/QxTouchBand'
+import { QxTouchDock, type QxTouchPrimary } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
+import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
+import { RtHelpLine } from '../recruitment-touch/RtHelpLine'
+import { RtRibbon } from '../recruitment-touch/RtRibbon'
 import {
   FAIR_HEAD,
   FAIR_TRUTH_LEAD,
@@ -27,10 +30,48 @@ import {
   fairBackOf,
   fairIsCentered,
   fairPillOf,
+  type FairPill,
   type FairScreen,
 } from './fairWorkbenchSpecs'
+import '../recruitment-touch/recruit-touch.css'
 import '../../components/qingxu/directory/directory-qx.css'
 import './styles/fair-workbench-qx.css'
+
+const FAIR_EYEBROW: Record<FairScreen, string> = {
+  list: '招聘会',
+  checkin: '到场指引',
+  detail: '招聘会详情',
+  companies: '参展企业',
+  map: '展位分布',
+  materials: '活动物料',
+  'visit-plan': '参会准备',
+  stats: '现场统计',
+}
+
+const FAIR_ASK: Record<FairScreen, string> = {
+  list: '问小青',
+  checkin: '问小青：怎么签到',
+  detail: '问小青',
+  companies: '问小青：这家企业',
+  map: '问小青：展位怎么看',
+  materials: '问小青：打印哪一份',
+  'visit-plan': '问小青：准备单怎么用',
+  stats: '问小青：这些数怎么来',
+}
+
+/** 稿里招聘会详情的底栏：读到详情时只写「问小青」，详情在读、没取到、已下架时写「问小青：这场怎么走」。 */
+function askLabelOf(screen: FairScreen, state: string): string {
+  if (screen === 'detail' && state !== 'detail' && state !== 'ended') return '问小青：这场怎么走'
+  return FAIR_ASK[screen]
+}
+
+/** 胶囊只有明确 ok 才亮绿。bad / warn 用提醒色，unknown 保持灰点。 */
+function pillStatus(pill: FairPill): QxTouchStatus {
+  if (!pill.label) return false
+  if (pill.tone === 'ok') return { text: pill.label, tone: 'ok' }
+  if (pill.tone === 'warn' || pill.tone === 'bad') return { text: pill.label, tone: 'warn' }
+  return { text: pill.label }
+}
 
 export interface QxFairWorkbenchProps {
   /** 稿里的 screen 键。决定 h1 / 副标题 / 返回落点 / 胶囊查表口径。 */
@@ -49,8 +90,11 @@ export interface QxFairWorkbenchProps {
   subtitle?: ReactNode
   /** 返回键落点覆盖。默认按稿 BACK 表。 */
   back?: { label: string; onBack: () => void }
-  /** 页面底部操作条（稿 .ctabar）。不传则不渲染。 */
-  ctabar?: ReactNode
+  /** 底栏上方的一行边界句。声明条三段原文仍由壳渲染。 */
+  boundary?: ReactNode
+  /** 问小青和主按钮之间的次操作。不要再放第二个返回。 */
+  secondary?: ReactNode
+  primary?: QxTouchPrimary
   children: ReactNode
 }
 
@@ -61,49 +105,62 @@ export function QxFairWorkbench({
   title,
   subtitle,
   back,
-  ctabar,
+  boundary,
+  secondary,
+  primary,
   children,
 }: QxFairWorkbenchProps) {
   const navigate = useNavigate()
   const [headTitle, headSubtitle] = FAIR_HEAD[screen]
   const defaultBack = fairBackOf(screen, fairId)
+  const resolvedBack = back ?? { label: defaultBack.label, onBack: () => navigate(defaultBack.route) }
   const pill = fairPillOf(screen, state)
+  const askLabel = askLabelOf(screen, state)
 
   return (
-    <QxPageFrame
-      back={back ?? { label: defaultBack.label, onBack: () => navigate(defaultBack.route) }}
-      title={title ?? headTitle}
-      subtitle={subtitle ?? headSubtitle}
-      status={pill}
-      terminalLabel={getTerminalCode() || '设备未绑定'}
-      /*
-       * QxPageFrame 的 ctabar 槽是壳里**唯一**不随正文滚动的那条带（有 border-top
-       * 与 surface 底色，永远压在三项导航之上）。本页的主操作必须落在这里。
-       *
-       * 2026-09-20 修正：此前这个槽被合规 truth 条独占，业务页的操作按钮以
-       * `.qxfw-ctabar` 的身份渲染在 children 里。它虽然也是 flex:none 不会滚走，
-       * 但没有底色也没有分隔线，与正文连成一片 —— 一体机上「哪一条是操作区」
-       * 全靠这条带的视觉定型，糊在一起等于主操作没有固定位。
-       *
-       * 现在两者同在这条带里、上下排：操作在上（近拇指），合规声明在下。
-       * 声明仍然写在壳里，业务页删不掉；顺序与稿一致（.ctabar 在 .truth 之上）。
-       */
-      ctabar={
-        <div className="qxfw-bottom">
-          {ctabar ? <div className="qxfw-ctabar">{ctabar}</div> : null}
+    <QxTouchScreen
+      page="recruit"
+      stateId={`${screen}:${state}`}
+      bodyClassName="qxt-body-scroll"
+      band={
+        <>
+          <RtRibbon />
+          <QxTouchBand
+            kind="compact"
+            eyebrow={FAIR_EYEBROW[screen]}
+            title={title ?? headTitle}
+            sub={subtitle ?? headSubtitle}
+            seal={null}
+            status={pillStatus(pill)}
+            back
+            onBack={resolvedBack.onBack}
+          />
+        </>
+      }
+      dock={
+        <div className="rt-fair-dock">
+          {boundary ? <div className="rt-boundary">{boundary}</div> : null}
           <div className="qxfw-truth">
             <p>
               <b>{FAIR_TRUTH_LEAD}</b>
               {FAIR_TRUTH_REST}
             </p>
-            <button type="button" className="qxfw-truth-link" onClick={() => navigate('/help')}>
+            <button type="button" className="rt-textbtn qxfw-truth-link" onClick={() => navigate('/help')}>
               {FAIR_TRUTH_LINK}
             </button>
           </div>
+          <QxTouchDock
+            back
+            backLabel={resolvedBack.label}
+            onBack={resolvedBack.onBack}
+            ask={{ label: askLabel, draft: askLabel.replace(/^问小青：?/, '') || '招聘会怎么看', voice: true }}
+            secondary={secondary}
+            primary={primary}
+          />
         </div>
       }
-      navbar={
-        <QxAppNavbar
+      nav={
+        <QxTouchNav
           onHome={() => navigate('/')}
           onAdvisor={() => navigate('/assistant')}
           onProfile={() => navigate('/profile')}
@@ -120,7 +177,8 @@ export function QxFairWorkbench({
         data-testid={`fair-${screen}-state-${state}`}
       >
         {children}
+        {fairIsCentered(screen, state) ? <RtHelpLine /> : null}
       </div>
-    </QxPageFrame>
+    </QxTouchScreen>
   )
 }

@@ -36,6 +36,7 @@ import { ForbiddenException } from '@nestjs/common'
 import { validate } from 'class-validator'
 import { plainToInstance } from 'class-transformer'
 import { PrintSignService } from '../src/print-sign/print-sign.service'
+import { UPLOAD_SESSION_ORDER_ONLY_REASON } from '../src/files/retention-policy'
 import { computeStampDrawParams, normalizeRotation, type StampDrawParams } from '../src/print-sign/print-sign-geometry'
 import type { SignStampPosition, SignStampSize } from '../src/print-sign/print-sign.types'
 import { signFileUrl } from '../src/files/signing'
@@ -237,6 +238,7 @@ interface StoredFile {
   ownerType: string
   ownerId: string | null
   sensitiveLevel: string
+  retentionLockedReason?: string | null
 }
 
 class FakePrisma {
@@ -303,6 +305,7 @@ interface FakeUploadCall {
   assetCategory?: string
   sourceFileId?: string | null
   createdBy?: string | null
+  orderOnly?: boolean
 }
 
 class FakeFiles {
@@ -1160,7 +1163,8 @@ async function main() {
     assert.equal(lastCall.assetCategory, 'derived')
     assert.equal(lastCall.sourceFileId, 'd1-doc')
     assert.equal(lastCall.purpose, 'print_doc')
-    pass('D1 FakeFiles 收到 assetCategory=derived / sourceFileId=documentId / purpose=print_doc')
+    assert.equal(lastCall.orderOnly, false, 'D1 签名图不锁时输出不锁')
+    pass('D1 FakeFiles 收到 assetCategory=derived / sourceFileId=documentId / purpose=print_doc / orderOnly=false')
 
     assert.equal(lastCall.sensitiveLevel, 'sensitive', 'D1 document 为 normal 时输出应提升为 sensitive')
     pass('D1 document sensitiveLevel=normal → 输出 sensitiveLevel=sensitive')
@@ -1206,6 +1210,27 @@ async function main() {
     const lastCall = files.calls[files.calls.length - 1]!
     assert.equal(lastCall.sensitiveLevel, 'highly_sensitive')
     pass('D1b document sensitiveLevel=highly_sensitive → 输出保持 highly_sensitive')
+  }
+
+  {
+    // D1c：只用于这一单（11/02 拍板）。签名图是一体机这一单里从手机传来的（锁 upload_session_order_only），
+    // 它没有原件号可带，输出必须显式带 orderOnly，否则签了名的 PDF 会进登录人的「我的文档」。
+    const { service, prisma, storage, files } = makeService()
+    seedDoc(prisma, storage, 'd1c-doc', makePdf({ pages: 1 }), { endUserId: 'member_d1c', ownerType: 'user', ownerId: 'member_d1c' })
+    seedStamp(prisma, storage, 'd1c-stamp', makePng(100, 100), {
+      endUserId: 'member_d1c', ownerType: 'user', ownerId: 'member_d1c', retentionLockedReason: UPLOAD_SESSION_ORDER_ONLY_REASON,
+    })
+    await service.compose({
+      terminalId: 't1',
+      document: { fileId: 'd1c-doc', fileAccessUrl: '' },
+      stamp: { fileId: 'd1c-stamp', fileAccessUrl: '' },
+      placement: DEFAULT_PLACEMENT,
+      authorizationConfirmed: true,
+      endUserId: 'member_d1c',
+    })
+    const lastCall = files.calls[files.calls.length - 1]!
+    assert.equal(lastCall.orderOnly, true, 'D1c 签名图只用于这一单 → 签好的 PDF 也只用于这一单')
+    pass('D1c 签名图只用于这一单 → 输出 orderOnly=true')
   }
 
   {

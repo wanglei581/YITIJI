@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
@@ -27,11 +27,16 @@ function transpile(absolutePath, replacements = {}) {
 
 const pageRange = transpile(join(kioskRoot, 'src/pages/print/pageRange.ts'))
 const cashier = transpile(join(kioskRoot, 'src/pages/print/cashierStatus.ts'))
+const unattendedUrl = transpile(join(kioskRoot, 'src/copy/unattendedCopy.ts'))
 const progressUrl = transpile(join(kioskRoot, 'src/pages/print/printProgressModel.ts'), {
   './cashierStatus': cashier,
   './pageRange': pageRange,
+  '../../copy/unattendedCopy': unattendedUrl,
 })
 const paymentUrl = transpile(join(kioskRoot, 'src/pages/profile/me/printOrders/paymentCopy.ts'))
+const missResumeUrl = transpile(join(kioskRoot, 'src/pages/print/components/printMissResumeCopy.ts'), {
+  '../../../copy/unattendedCopy': unattendedUrl,
+})
 
 const httpStub = toDataUrl('export class ApiHttpError extends Error { constructor(status, code) { super(String(code)); this.status = status; this.code = code } }')
 const phoneUrl = transpile(join(kioskRoot, 'src/pages/upload/phoneUploadModel.ts'), {
@@ -43,6 +48,8 @@ const previewKindUrl = transpile(join(kioskRoot, 'src/pages/print/components/pri
 })
 
 const progress = await import(progressUrl)
+const fileSourceErrorModel = await import(transpile(join(kioskRoot, 'src/pages/print/file-source/fileSourceErrorModel.ts')))
+const missResume = await import(missResumeUrl)
 const payment = await import(paymentUrl)
 const previewKind = await import(previewKindUrl)
 const phone = await import(phoneUrl)
@@ -161,15 +168,11 @@ test('0 元实付写免费试运营，其余仍标未记录且不推算', () => 
 })
 
 test('0 元失败页不提已付金额，收费单保留原句', () => {
-  assert.equal(progress.jamOrderKeptLine('paid'), '你的订单和已付金额都保留着')
-  assert.equal(progress.jamOrderKeptLine('free'), '你的订单还在，处理好后可以继续打印')
-  assert.equal(progress.jamOrderKeptLine('unknown'), '你的订单还在，处理好后可以继续打印')
-  assert.equal(progress.failureStaffDoing('paid'), '订单和支付记录都在，请凭订单找现场工作人员处理。')
-  assert.equal(progress.failureStaffDoing('free'), '你的订单还在，请凭订单找现场工作人员处理。')
-  assert.equal(progress.failureStaffDoing('unknown'), '你的订单还在，请凭订单找现场工作人员处理。')
-  assert.match(progress.outOfPaperDoing({ fact: 'paid', amountCents: 200 }), /已付金额/)
-  assert.doesNotMatch(progress.outOfPaperDoing({ fact: 'free', amountCents: 0 }), /已付金额|支付/)
-  assert.doesNotMatch(progress.outOfPaperDoing({ fact: 'unknown', amountCents: null }), /已付金额|支付/)
+  assert.equal(progress.jamOrderKeptLine('paid'), '你的订单和已付金额都保留着。机器卡纸，我们已经收到提醒，会尽快处理')
+  // 走查 I-11：现场没人「处理好」，不写「处理好后可以继续打印」，改说谁在管（我们已收到提醒）。
+  assert.equal(progress.jamOrderKeptLine('free'), '你的订单还在。机器卡纸，我们已经收到提醒，会尽快处理')
+  assert.equal(progress.jamOrderKeptLine('unknown'), '你的订单还在。机器卡纸，我们已经收到提醒，会尽快处理')
+  for (const fact of ['paid', 'free', 'unknown']) assert.doesNotMatch(progress.jamOrderKeptLine(fact), /处理好后|加完纸/)
 })
 
 test('0 元订单不算收费单', () => {
@@ -179,7 +182,7 @@ test('0 元订单不算收费单', () => {
   assert.equal(payment.isFreeMemberOrder({ payStatus: null, amountCents: 0 }), false)
 })
 
-const QUIET_COPY = '这台机器暂时没有回报打印进度，请看出纸口或找现场工作人员'
+const QUIET_COPY = '这台机器暂时没有回报打印进度，请看出纸口。打印有问题？查看《隐私政策》里的联系方式，或问小青'
 const ENCRYPTED_COPY = '这份 PDF 设置了打开密码，本机没法读取。请在手机或电脑上去掉密码后重新上传'
 
 test('W-91 出纸中长时间没有新状态就换掉正在出纸', () => {
@@ -204,7 +207,7 @@ test('W-88 已知失败不再说排队', () => {
   assert.doesNotMatch(view.wayOut, /打印机缺纸/)
   assert.doesNotMatch(`${view.headerTitle}${view.badge}${view.ask}${view.doing}${view.wayOut}`, /排队|等待终端领取|正在出纸/)
   const blank = progress.progressFailurePresentation('   ')
-  assert.match(blank.ask, /请联系现场工作人员/)
+  assert.match(blank.ask, /打印有问题/)
   assert.doesNotMatch(blank.badge, /排队/)
   assert.match(progressPage, /progressFailurePresentation/)
   assert.match(progressPage, /failed && !isSim \? failureView\.badge/)
@@ -214,11 +217,13 @@ test('W-88 已知失败不再说排队', () => {
   assert.match(progressSections, /data-testid="print-progress-failure"/)
   assert.match(progressSections, /\{wayOut\}/)
   assert.doesNotMatch(progressSections, /\{ask\}/)
-  assert.match(progressSections, /<p className="why">\{hint\}<\/p>/)
-  assert.match(progressSections, />\s*重新打印\s*</)
+  // 失败出口：说明行独占一行（在按钮外面），使用帮助、查看订单在下；主按钮「重新打印」是触屏底栏的主键，标签里不带价目小字。
+  assert.match(progressSections, /<p className="qxt-fine">\{hint\}<\/p>/)
   assert.match(progressSections, /查看订单/)
-  assert.match(progressSections, /联系工作人员/)
-  assert.doesNotMatch(progressSections, /重新打印[\s\S]{0,40}<small>/)
+  assert.match(progressSections, /使用帮助/)
+  assert.match(progressPage, /label: '重新打印',\s*testId: 'print-fulfill-reprint'/)
+  assert.doesNotMatch(progressPage, /label: '重新打印'[\s\S]{0,80}<small>/)
+  assert.doesNotMatch(progressPage, /ctabar=/, '出纸页不再传旧的小号 ctabar，底栏用触屏三槽')
 })
 
 test('W-93 加密 PDF 说明原因并重新选择，页数未识别本身不算加密', () => {
@@ -290,9 +295,17 @@ const partsUrl = transpile(join(kioskRoot, 'src/pages/print/components/PrintConf
 })
 const queryUrl = toDataUrl('export const isRegisteredScreen = () => true')
 const confirmModelUrl = transpile(join(kioskRoot, 'src/pages/print/printConfirmModel.ts'), { './printConfirmQuery': queryUrl })
+// 2026-10-28 触屏版第 5 版：核对价格页的线条图标改用页面本地的 PrintIcon（纯 SVG 常量，无外部依赖）。
+const printIconUrl = transpile(join(kioskRoot, 'src/pages/print/art/PrintIcon.tsx'), { 'react/jsx-runtime': jsxUrl })
+// 缺文件 / 交接没通过核对两态底下放一块「纸」的实物小样吃掉剩下的高度（PrintFillArt）：纯装饰、读屏跳过、没有文字，
+// 文案断言用不着它的 SVG 与样式依赖，和别的纯装饰件一样在这里换成空件。
+const fillArtUrl = toDataUrl('export function PrintFillArt() { return null }')
 const viewUrl = transpile(join(kioskRoot, 'src/pages/print/components/PrintConfirmView.tsx'), {
   'react/jsx-runtime': jsxUrl,
   'lucide-react': iconUrl,
+  '../art/PrintIcon': printIconUrl,
+  '../art/PrintFillArt': fillArtUrl,
+  '../../../copy/unattendedCopy': unattendedUrl,
   '../printConfirmModel': confirmModelUrl,
   './PrintConfirmParts': partsUrl,
 })
@@ -308,14 +321,16 @@ const confirmProps = {
 }
 const visibleMarkup = (props) => renderToStaticMarkup(createElement(PrintConfirmView, props)).replace(/<[^>]*>/g, '')
 test('B 补：零元加载、失败、确认与参数收口的真实 JSX 不说收费或权益机制', () => {
-  for (const [screen, quote, adjustments] of [
-    ['quoting', { status: 'loading' }, []],
-    ['quote-failed', { status: 'unavailable', reason: '页数以实际结果为准，确认前不显示金额' }, []],
-    ['zero-amount', { status: 'ready', amountCents: 0, billablePages: 2 }, []],
-    ['capability-invalid-params', { status: 'ready', amountCents: 0, billablePages: 2 }, [{ field: 'colorMode' }]],
+  // 2026-10-28 稿 confirm：页数核对成功后「页数」成了摘要里的一行，「页数核定」只在加载与失败两态作为状态块标题。
+  for (const [screen, quote, adjustments, pagesLabel] of [
+    ['quoting', { status: 'loading' }, [], /页数核定/],
+    ['quote-failed', { status: 'unavailable', reason: '页数以实际结果为准，确认前不显示金额' }, [], /页数核定/],
+    ['zero-amount', { status: 'ready', amountCents: 0, billablePages: 2 }, [], /页数/],
+    ['capability-invalid-params', { status: 'ready', amountCents: 0, billablePages: 2 }, [{ field: 'colorMode' }], /页数/],
   ]) {
-    const text = visibleMarkup({ ...confirmProps, screen, quote, adjustments })
-    assert.match(text, /页数核定/)
+    // 稿 confirm 的摘要里有一行「费用 免费试运营，本单 0 元」：这一句是稿给定的免费说法，其余地方仍不许出现「费用」。
+    const text = visibleMarkup({ ...confirmProps, screen, quote, adjustments }).replace('费用免费试运营，本单 0 元', '')
+    assert.match(text, pagesLabel)
     assert.doesNotMatch(text, /报价|价格|费用|付款|扣费|收款|抵扣|权益/)
   }
 })
@@ -332,11 +347,20 @@ test('W-117：收费闸门拒单原因只上屏一次，单卡占满现有栅格
 
 const hubIconUrl = toDataUrl('export const ArrowRightIcon = () => null; export const CopyIcon = () => null; export const InfoIcon = () => null; export const LockIcon = () => null;')
 const hubContentUrl = transpile(join(kioskRoot, 'src/pages/print-scan/printHubContent.ts'))
+const touchChipUrl = toDataUrl(`import { jsx } from '${jsxUrl}'; export function QxTouchChip({children}) { return jsx('span', {children}) }`)
+const touchIconUrl = toDataUrl(`import { jsx } from '${jsxUrl}'; export function QxTouchIcon() { return jsx('span', {}) }`)
 const hubViewUrl = transpile(join(kioskRoot, 'src/pages/print-scan/components/QxPrintHubView.tsx'), {
+  // 入口卡的读屏名取标题、说明句进描述，用 useId 配对；静态渲染只看文案，id 给个递增数即可。
+  react: toDataUrl('let n = 0; export function useId() { n += 1; return `hub-id-${n}` }'),
   'react/jsx-runtime': jsxUrl,
   'lucide-react': hubIconUrl,
   '../../print/components/PrintAiHelp': aiUrl,
+  '../../../copy/unattendedCopy': unattendedUrl,
   '../../../components/qingxu/QxAppNavbar': toDataUrl('export const QxAppNavbar = () => null'),
+  '../../../components/qingxu/touch/QxTouchChip': touchChipUrl,
+  '../../../components/qingxu/touch/QxTouchIcon': touchIconUrl,
+  // 2026-10-28 稿 print：入口卡里的实物小样是纯装饰 SVG，本测试只看文案，换成空件。
+  '../../print/art/PrintArt': toDataUrl('export const PrintArt = () => null'),
   '../printHubContent': hubContentUrl,
 })
 const { QxPrintHubView } = await import(hubViewUrl)
@@ -352,12 +376,16 @@ test('BFIX：Hub 不额外读取价目，入口与展开说明均使用中性文
     }))
     const text = html.replace(/<[^>]*>/g, '')
     // 未办理、未核价的入口无需钱的字眼，也不得凭入口状态承诺免费；付费核对仍在确认页。
-    assert.doesNotMatch(text, /价格|报价|费用|付款|收款|抵扣|权益|免费/)
+    assert.doesNotMatch(text, /报价|价格|费用|付款|收款|抵扣|权益|免费/)
     assert.match(text, /可用服务，以办理时显示为准/)
     assert.match(text, /隐私与电子签说明/)
     assert.match(text, /按 A4 出纸；结束办理清除本机临时信息，文件按留存期限管理/)
-    if (hubState === 'default') assert.match(text, /文件检查 → 设置参数 → 确认打印/)
   }
+  const frame = readFileSync(join(kioskRoot, 'src/pages/print/PrintTouchFrame.tsx'), 'utf8')
+  assert.match(frame, /选文件/)
+  assert.match(frame, /材料检查/)
+  assert.match(frame, /预览与参数/)
+  assert.match(frame, /核对价格/)
 })
 
 test('W-117：缺纸、异常、离线分别说明，签名提示只在真开通时出现', () => {
@@ -377,10 +405,16 @@ test('W-117：缺纸、异常、离线分别说明，签名提示只在真开通
       }))
       const banner = /<section class="ph-fallback"[^>]*>(.*?)<\/section>/s.exec(html)?.[1]
       assert.ok(banner)
-      assert.match(banner, new RegExp(notice))
-      if (label !== '打印机离线') assert.doesNotMatch(banner, /离线|无法连接/)
-      if (actionable) assert.match(banner, /签名仍可使用/)
-      else assert.doesNotMatch(banner, /签名仍可使用/)
+      // 2026-10-28 稿 print：提醒条只留标准句；离线、异常、缺纸由卡片角标上取自真实设备状态的状态词各说各的，
+      // 缺纸另成一版（ph-paper）。签名磁贴真开通才可点，没开通就是自带「暂不可用」的灰磁贴。
+      assert.match(banner, /这台机器暂时打不了/)
+      assert.doesNotMatch(banner, /工作人员/)
+      assert.equal(/ph-paper/.test(html), label === '打印机缺纸')
+      if (label !== '打印机离线') assert.doesNotMatch(html, /离线|无法连接/)
+      const signTile = /<button[^>]*data-testid="print-hub-cap-sign"[^>]*>/.exec(html)?.[0] ?? ''
+      assert.ok(signTile)
+      if (actionable) assert.doesNotMatch(signTile, /aria-disabled="true"/)
+      else assert.match(signTile, /aria-disabled="true"/)
     }
   }
 })
@@ -388,12 +422,18 @@ test('W-117：缺纸、异常、离线分别说明，签名提示只在真开通
 const cashierIcons = toDataUrl('export const AlertTriangleIcon = () => null; export const CheckCircle2Icon = () => null; export const Clock3Icon = () => null; export const FileXIcon = () => null; export const InfoIcon = () => null; export const LockIcon = () => null; export const QrCodeIcon = () => null; export const ScanLineIcon = () => null; export const Undo2Icon = () => null;')
 const cashierModelUrl = transpile(join(kioskRoot, 'src/pages/print/cashierQxModel.tsx'), {
   'react/jsx-runtime': jsxUrl, 'lucide-react': cashierIcons, './cashierStatus': cashier,
+  '../../copy/unattendedCopy': unattendedUrl,
 })
 const cashierViewUrl = transpile(join(kioskRoot, 'src/pages/print/components/CashierQxView.tsx'), {
   'react/jsx-runtime': jsxUrl, 'lucide-react': cashierIcons, './PrintAiHelp': aiUrl,
+  '../../../copy/unattendedCopy': unattendedUrl,
   '../cashierStatus': cashier, '../printConfirmModel': confirmModelUrl,
   '../cashierQxModel': cashierModelUrl,
   '../CashierPaymentPanel': toDataUrl('export const CashierPaymentPanel = () => null'),
+  // 2026-10-28 稿 cashier：状态说明不够高时画一块装饰小样，本测试只看文案，换成空件。
+  '../art/PrintFillArt': toDataUrl('export const PrintFillArt = () => null'),
+  // 订单摘要里的「内容」行把文件名中段截断（扩展名保留）。
+  '../../../lib/fileName': transpile(join(kioskRoot, 'src/lib/fileName.ts')),
 })
 const { CashierQxView } = await import(cashierViewUrl)
 test('B 补：零元收银台与放行失败只说免费试运营，不说收款、付款或权益机制', () => {
@@ -408,35 +448,208 @@ test('B 补：零元收银台与放行失败只说免费试运营，不说收款
   }
 })
 
-const doneSectionsUrl = transpile(join(kioskRoot, 'src/pages/print/components/PrintDoneSections.tsx'), {
-  'react': import.meta.resolve('react'), 'react/jsx-runtime': jsxUrl,
-  'lucide-react': toDataUrl('export const FileTextIcon = () => null; export const PrinterIcon = () => null'),
+const doneFailedModelUrl = transpile(join(kioskRoot, 'src/pages/print/components/printDoneFailedModel.ts'), {
+  '../../../copy/unattendedCopy': unattendedUrl,
+  '../../../copy/miniappLinkCopy': transpile(join(kioskRoot, 'src/copy/miniappLinkCopy.ts'), { './unattendedCopy': unattendedUrl }),
   '../../../lib/fileName': transpile(join(kioskRoot, 'src/lib/fileName.ts')),
-  '../cashierStatus': cashier, '../printProgressModel': progressUrl,
-  './PrintFileDeletionRecords': toDataUrl('export const PrintFileDeletionRecords = () => null'),
-  './PrintFileRetentionNotice': toDataUrl('export const PrintFileRetentionNotice = () => null'),
-  './PrintProgressSections': toDataUrl('export const PrintJobRow = () => null'),
-  './PrintAiHelp': aiUrl,
+  '../cashierStatus': cashier,
+  '../printProgressModel': progressUrl,
 })
-const { PrintOutOfPaperPanel } = await import(doneSectionsUrl)
+const failedModel = await import(doneFailedModelUrl)
+const copyText = (copy) => [copy.title, copy.subtitle, copy.pill, copy.stepsLabel, ...copy.steps.flatMap((step) => [step.title, step.detail]), copy.fine].join(' ')
+const stepsText = (copy) => [copy.stepsLabel, ...copy.steps.flatMap((step) => [step.title, step.detail]), copy.fine].join(' ')
+const rowsText = (rows) => rows.map((row) => `${row.label}${row.value}`).join(' ')
+
 test('B 补：零元缺纸页两种重试权限均不说收费，付费分支保留原说明', () => {
   for (const canRetry of [false, true]) {
-    const props = { file: null, params: null, taskId: 'internal-task', orderNo: 'ORD-20261003-PAPER', failureReason: '打印机缺纸', canRetry, takeaway: null }
-    const textOf = (money) => renderToStaticMarkup(createElement(PrintOutOfPaperPanel, { ...props, money })).replace(/<[^>]*>/g, '')
-    const freeText = textOf({ fact: 'free', amountCents: 0 })
+    const base = { variant: 'out-of-paper', orderNo: 'ORD-20261003-PAPER', canRetry }
+    const freeMoney = { fact: 'free', amountCents: 0 }
+    const freeText = `${copyText(failedModel.failureCopy({ ...base, money: freeMoney }))} ${rowsText(failedModel.failureSummaryRows({ orderNo: base.orderNo, file: null, params: null, money: freeMoney, reason: '打印机缺纸' }))}`
     assert.match(freeText, /免费试运营/)
     assert.doesNotMatch(freeText, /报价|价格|费用|付款|收费|收款|扣费|抵扣|权益|internal-task/)
-    assert.match(textOf({ fact: 'paid', amountCents: 200 }), /不会重复收费/)
+    const paidText = copyText(failedModel.failureCopy({ ...base, money: { fact: 'paid', amountCents: 200 } }))
+    assert.match(paidText, /不会重复收费/)
   }
 })
 
-const { PrintJamGuide } = await import(doneSectionsUrl)
+test('缺纸页不承诺补纸后自动续打，重打只在 canRetry 时出现且说清整份', () => {
+  const money = { fact: 'paid', amountCents: 200 }
+  const noRetry = failedModel.failureCopy({ variant: 'out-of-paper', money, orderNo: 'ORD-20261003-PAPER', canRetry: false })
+  const withRetry = failedModel.failureCopy({ variant: 'out-of-paper', money, orderNo: 'ORD-20261003-PAPER', canRetry: true })
+  assert.equal(noRetry.steps.length, 3)
+  assert.match(noRetry.steps[0].detail, /本机不知道出了几页/)
+  assert.match(noRetry.steps[2].title, /订单号 ORD-20261003-PAPER/)
+  assert.match(withRetry.steps[2].detail, /整份重打/)
+  for (const copy of [noRetry, withRetry]) {
+    assert.match(copyText(copy), /不会在加纸后自动继续/)
+    assert.doesNotMatch(copyText(copy), /加纸后可以继续|加纸后可继续打印|剩下没打的部分会在加纸后继续|不需要重新下单|已出 1|等待加纸|退款|自动续打后/)
+  }
+})
+
 test('卡纸三步不提收款', () => {
-  const text = renderToStaticMarkup(createElement(PrintJamGuide, { orderNo: 'ORD-20261003-JAM' })).replace(/<[^>]*>/g, '')
-  assert.match(text, /找工作人员之前先做这三件/)
-  assert.match(text, /别硬拉纸/)
-  assert.match(text, /订单号 ORD-20261003-JAM/)
-  assert.doesNotMatch(text, /已付金额|已支付|支付|报价|价格/)
+  for (const fact of ['free', 'unknown', 'paid']) {
+    const copy = failedModel.failureCopy({ variant: 'paper-jam', money: { fact, amountCents: fact === 'paid' ? 200 : fact === 'free' ? 0 : null }, orderNo: 'ORD-20261003-JAM', canRetry: false })
+    const text = stepsText(copy)
+    assert.equal(copy.stepsLabel, '处理之前先做这三件')
+    assert.match(text, /别硬拉纸/)
+    assert.match(text, /订单号 ORD-20261003-JAM/)
+    assert.doesNotMatch(text, /已付金额|已支付|支付|报价|价格/)
+  }
+})
+
+test('普通失败三步：免费与金额未知不提已付，收费单保留原句；标准求助句只出现在一处完整元素里', () => {
+  const problem = '打印有问题？查看《隐私政策》里的联系方式，或问小青'
+  const copyOf = (fact, canRetry = false) => failedModel.failureCopy({ variant: 'failed', money: { fact, amountCents: fact === 'paid' ? 200 : fact === 'free' ? 0 : null }, orderNo: 'ORD-20261003-FAIL', canRetry })
+  assert.match(copyText(copyOf('paid')), /订单和支付记录都在/)
+  for (const fact of ['free', 'unknown']) {
+    assert.match(copyText(copyOf(fact)), /你的订单还在/)
+    assert.doesNotMatch(stepsText(copyOf(fact)), /已付金额|支付|收费|报价|价格|费用/)
+  }
+  const plain = copyOf('paid')
+  assert.equal(plain.steps.filter((step) => step.detail === problem).length, 1, '没有重提出口时，求助句整句只在第三步出现一次')
+  assert.doesNotMatch(plain.fine, /联系|找.*工作人员/)
+  const retry = copyOf('paid', true)
+  assert.equal(retry.steps.filter((step) => step.detail === problem).length, 0)
+  assert.match(retry.steps[2].detail, /整份重打、不再收费/)
+  assert.match(retry.fine, /打印有问题？/, '第三步换成重提说明后，求助句补在小字行')
+})
+
+// ── 走查 I-11（2026-10-29）：缺纸 / 卡纸 / 结果未确认三屏，现场没人加纸、没人处理 ──
+const contactEntry = await import(transpile(join(kioskRoot, 'src/pages/print/components/printContactEntry.ts')))
+
+test('I-11 缺纸、卡纸的下一步不等人「加完纸」「处理好」，说清我们已收到提醒、请稍后再来', () => {
+  const money = { fact: 'free', amountCents: 0 }
+  const jam = failedModel.failureCopy({ variant: 'paper-jam', money, orderNo: 'ORD-20261029-JAM', canRetry: false })
+  const noRetry = failedModel.failureCopy({ variant: 'out-of-paper', money, orderNo: 'ORD-20261029-PAPER', canRetry: false })
+  const withRetry = failedModel.failureCopy({ variant: 'out-of-paper', money, orderNo: 'ORD-20261029-PAPER', canRetry: true })
+  for (const copy of [jam, noRetry, withRetry]) {
+    assert.doesNotMatch(copyText(copy), /加完纸|处理好后|加纸之后|等人|工作人员/)
+  }
+  // 卡纸、缺纸（没有重提出口）的第三步用「机器暂时打不了」的标准句：我们已收到提醒、请稍后再来、怎么找到我们。
+  for (const copy of [jam, noRetry]) {
+    assert.match(copy.steps[2].detail, /这台机器暂时打不了，我们已经收到提醒，会尽快处理。请稍后再来；需要帮助请/)
+    assert.match(copy.steps[2].title, /订单号 ORD-2026102/)
+  }
+  // 有重提出口：第三步说清是机器恢复后才点，整份重打。
+  assert.equal(withRetry.steps[2].title, '机器恢复后可点下方「重新提交打印」')
+  assert.match(withRetry.steps[2].detail, /整份重打/)
+})
+
+test('I-11 重新提交打印：打印机现在不能出纸就给出原因，能出纸才返回 null', () => {
+  const dev = (over) => ({ loading: false, printerReady: false, kind: 'unknown', printer: {}, ...over })
+  assert.equal(failedModel.retryBlockedReason(dev({ printerReady: true, kind: 'ready' })), null)
+  assert.equal(failedModel.retryBlockedReason(dev({ printerReady: true, kind: 'low_paper' })), null)
+  assert.match(failedModel.retryBlockedReason(dev({ loading: true })), /正在确认/)
+  assert.match(failedModel.retryBlockedReason(dev({ kind: 'offline' })), /离线/)
+  assert.match(failedModel.retryBlockedReason(dev({ kind: 'error', printer: { errorCode: 'paperEmpty' } })), /缺纸/)
+  assert.match(failedModel.retryBlockedReason(dev({ kind: 'error', printer: { errorCode: 'hardwareError' } })), /故障/)
+  assert.match(failedModel.retryBlockedReason(dev({ kind: 'unknown' })), /读不到打印机状态/)
+  assert.equal(failedModel.retryBlockedReason(dev({ kind: 'error', printerNotice: '这台机器暂时不能用，请稍后再来' })), '这台机器暂时不能用，请稍后再来')
+  for (const kind of ['offline', 'error', 'unknown']) {
+    assert.match(failedModel.retryBlockedReason(dev({ kind })), /订单还在/)
+  }
+})
+
+test('I-11 联系方式入口：没配服务电话才要，去隐私政策「联系」那一章', () => {
+  assert.equal(contactEntry.needsContactEntry({ servicePhone: null }), true)
+  assert.equal(contactEntry.needsContactEntry({ servicePhone: '' }), true)
+  assert.equal(contactEntry.needsContactEntry({ servicePhone: '0532-82870136' }), false)
+  assert.equal(contactEntry.PRIVACY_CONTACT_ROUTE, '/legal/privacy?section=%E8%81%94%E7%B3%BB')
+  assert.equal(contactEntry.CONTACT_ENTRY_LABEL, '查看联系方式')
+})
+
+// ── 走查 I-30（2026-10-29）：打印途中后端断开，完成页「无法确认」态要能自己好起来 ──
+const progressStatus = await import(transpile(join(kioskRoot, 'src/pages/print/printProgressStatus.ts')))
+const donePage = readFileSync(join(kioskRoot, 'src/pages/print/PrintDonePage.tsx'), 'utf8')
+
+test('I-30 读不到状态按退避重查：3、6、12、24 秒，封顶 30 秒；窗口与进度页查询超时同为 10 分钟', () => {
+  assert.deepEqual([0, 1, 2, 3, 4, 5, 9, 40].map((n) => progressStatus.statusRetryDelayMs(n)), [3000, 6000, 12000, 24000, 30000, 30000, 30000, 30000])
+  for (const bad of [-1, Number.NaN, Number.POSITIVE_INFINITY, undefined]) assert.equal(progressStatus.statusRetryDelayMs(bad), 3000)
+  assert.equal(progressStatus.STATUS_RECHECK_WINDOW_MS, progressStatus.REAL_POLL_TIMEOUT_MS)
+  assert.equal(progressStatus.STATUS_RECHECK_WINDOW_MS, 10 * 60 * 1000)
+  assert.equal(progressStatus.STATUS_RECHECK_REQUEST_TIMEOUT_MS, 8000)
+})
+
+test('I-30 进度页连续读不到状态不再判失败，转去完成页；完成页按退避自动重查并在窗口内持忙碌锁', () => {
+  // 进度页：到了 POLL_FAIL_LIMIT 只是离开去完成页核验，不是 navigateFail（那会闪「打印没有完成」并写成失败）。
+  const limitBlock = /pollFailsRef\.current >= POLL_FAIL_LIMIT\) \{([\s\S]*?)\n        \}/.exec(progressPage)?.[1] ?? ''
+  assert.match(limitBlock, /navigate\('\/print\/done'/)
+  assert.doesNotMatch(limitBlock, /navigateFail/)
+  // 完成页：重查循环、忙碌锁、手动再查、窗口到点放开。
+  assert.match(donePage, /statusRetryDelayMs\(attempts\)/)
+  assert.match(donePage, /useBusyLock\(awaitingRecheck && recheckWindowOpen\)/)
+  assert.match(donePage, /STATUS_RECHECK_WINDOW_MS/)
+  assert.match(donePage, /manualRecheckRef\.current = true/)
+  assert.match(donePage, /getPrintJobStatus\(taskId, \{ signal: abort\.signal \}\)/)
+  // 首次核验和重查共用同一个读数翻译，不各写一套。
+  assert.equal((donePage.match(/interpretStatus\(taskId, result\)/g) ?? []).length, 2)
+})
+
+test('I-30 有任务号的「无法确认」三步：先看出纸口、别重新下单、订单号出口；免费单不提钱，没关联账号不说手机上能查', () => {
+  const copyWith = (over) => failedModel.unverifiedTaskCopy({ money: { fact: 'free', amountCents: 0 }, orderNo: 'ORD-20261029-OUT', viewable: false, miniappPublished: false, autoRechecking: true, ...over })
+  const all = (copy) => [copy.stepsLabel, ...copy.steps.flatMap((step) => [step.title, step.detail]), copy.fine].join(' ')
+  const guest = copyWith({})
+  assert.match(guest.steps[0].title, /先看出纸口/)
+  assert.match(guest.steps[1].title, /请不要重新下单/)
+  assert.match(guest.steps[2].title, /记下订单号 ORD-20261029-OUT，需要时报给我们/)
+  assert.match(guest.steps[2].detail, /^需要帮助？/)
+  assert.doesNotMatch(all(guest), /手机|已付|费用|付款|收费|没出纸了|请勿据此判断/)
+  const machine = copyWith({ viewable: true })
+  assert.match(machine.steps[2].detail, /查看打印订单.*ORD-20261029-OUT/)
+  assert.doesNotMatch(all(machine), /手机/)
+  const phone = copyWith({ viewable: true, miniappPublished: true })
+  assert.equal(phone.steps[2].title, '在手机上查看这一单')
+  assert.match(phone.steps[2].detail, /小程序「我的 → 打印订单」.*ORD-20261029-OUT/)
+  // 收费单才提两笔费用；窗口外把「自动重查」换成手动按钮。
+  assert.match(copyWith({ money: { fact: 'paid', amountCents: 200 } }).steps[1].detail, /两笔费用/)
+  assert.match(copyWith({ autoRechecking: true }).steps[1].detail, /自动重新查/)
+  assert.match(copyWith({ autoRechecking: false }).steps[1].detail, /重新查看这一单/)
+  // 一句都不叫人去找现场的人。
+  for (const copy of [guest, machine, phone]) assert.equal(unattended.containsStaffHandoff(all(copy)), false)
+})
+
+test('失败摘要行：订单号、文件、参数、支付事实；原因已被标准句替换就不再占一行', () => {
+  const file = { name: 'w2-sample.pdf', pages: 2 }
+  const params = { paperSize: 'A4', colorMode: 'black_white', duplex: 'simplex', copies: 1, pageRange: 'all' }
+  const rowsOf = (money, reason) => failedModel.failureSummaryRows({ orderNo: 'ORD-20261003-ROW', file, params, money, reason })
+  const paid = rowsOf({ fact: 'paid', amountCents: 200 }, '新任务已确认失败')
+  assert.deepEqual(paid.map((row) => row.label), ['订单号', '文件', '参数', '支付状态', '设备上报'])
+  assert.equal(paid.find((row) => row.key === 'pay').value, '已付 ¥2.00')
+  assert.equal(paid.find((row) => row.key === 'file').value, 'w2-sample.pdf')
+  assert.equal(rowsOf({ fact: 'free', amountCents: 0 }, '').find((row) => row.key === 'pay').label, '办理方式')
+  assert.equal(rowsOf({ fact: 'free', amountCents: 0 }, '').find((row) => row.key === 'pay').value, '免费试运营')
+  assert.equal(rowsOf({ fact: 'unknown', amountCents: null }, '').find((row) => row.key === 'pay').value, '以订单为准')
+  const helpLine = '打印有问题？查看《隐私政策》里的联系方式，或问小青'
+  assert.equal(rowsOf({ fact: 'paid', amountCents: 200 }, helpLine).some((row) => row.key === 'reason'), false)
+  assert.equal(failedModel.failureSummaryRows({ orderNo: null, file: null, params: null, money: { fact: 'unknown', amountCents: null }, reason: '' })[0].value, '本次打印任务')
+})
+
+test('费用与订单边界：免费写订单记录，收费单不承诺自动处理，任何一支都不写退款', () => {
+  const free = failedModel.feeInfoCopy({ free: true, orderNo: 'ORD-20261003-FEE' })
+  const paid = failedModel.feeInfoCopy({ free: false, orderNo: null })
+  assert.equal(free.title, '订单记录')
+  assert.equal(paid.title, '费用与订单边界')
+  assert.match(free.steps[0].title, /订单号 ORD-20261003-FEE/)
+  assert.match(paid.steps[0].title, /记下这台机器的位置/)
+  assert.match(paid.fine, /本机不承诺自动处理/)
+  for (const copy of [free, paid]) assert.doesNotMatch([copy.title, copy.subtitle, ...copy.steps.flatMap((step) => [step.title, step.detail]), copy.fine].join(' '), /退款|赔付|联系现场|联系工作人员|找现场|找工作人员/)
+  assert.doesNotMatch(free.fine, /费用|付款|收费/)
+})
+
+test('失败态版式：二维码不小于 168、重提被拒的提示 role=alert、不再传旧 ctabar，底栏触屏三槽', () => {
+  // 剥注释再判：头注里会写「不让用户去找现场的人」这类说明，不是上屏文案。
+  const failedView = readFileSync(join(kioskRoot, 'src/pages/print/components/PrintDoneFailed.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+  const qrSize = Number(/TAKEAWAY_QR_SIZE = (\d+)/.exec(failedView)?.[1])
+  assert.ok(qrSize >= 168, `文件带走二维码 ${qrSize} 不小于 168`)
+  assert.match(failedView, /<p role="alert" className="pft-fail-alert">\{retry\.error\}<\/p>/)
+  assert.match(failedView, /role="region" aria-label="文件带走"/)
+  assert.doesNotMatch(failedView, /ctabar=/)
+  assert.match(failedView, /back=\{\{ label: '返回首页'/)
+  assert.match(failedView, /ask=\{printAsk\(ASK_LABEL, ASK_DRAFT\)\}/)
+  assert.match(failedView, /primary=\{\{ label: '使用帮助'/)
+  assert.doesNotMatch(failedView, /联系现场|找现场|联系工作人员|找工作人员/)
 })
 
 // W-118：执行真实配置回调；测试随 verify:print-done-truth 已进入 CI，无需另加登记。
@@ -546,4 +759,186 @@ test('W-118：重复挂载与重挂共享检查结果，不同文件隔离，失
   const failed = checkFlight.shareMaterialChecks('context:file', async () => { throw new Error('failed') })
   await assert.rejects(failed, /failed/)
   assert.deepEqual(await checkFlight.shareMaterialChecks('context:file', async () => ({ pii: { id: 'retry' } })), { pii: { id: 'retry' } })
+})
+
+// ── 出纸页、完成页「没拿到任务」空态：订单可能已建、已付，不得说「没有订单、没有扣费」 ──
+const NO_ORDER_CLAIM = /没有订单|没有扣费|没有收款/
+const PRE_ORDER_ORIGINAL = '文件还没选，或者上一位的文件已经清除。到这一步没有订单，也没有扣费。'
+
+test('PrintMissResume：订单可能已存在（出纸页、完成页）时渲染文字不下「没有订单、没有扣费、没有收款」的结论', () => {
+  const contact = { servicePhone: '18369161921', serviceHours: '工作日 9:00–18:00', otherOnlineTerminalNearby: false, miniappPublished: true }
+  for (const support of [undefined, null, contact]) {
+    for (const note of ['这一页不会把没核验到的结果说成已经出纸。', '没有真实任务编号，这一页不会假装已经出纸。']) {
+      const rendered = `${missResume.missResumeHowto(true)}${missResume.missResumeFine(true, note, support)}`
+      assert.doesNotMatch(rendered, NO_ORDER_CLAIM)
+      assert.match(rendered, /说不准有没有下过单、扣没扣费/)
+      assert.match(rendered, /我的 → 打印订单/)
+      assert.match(rendered, /打印有问题？/, '求助用 printProblemLine 的标准句')
+      assert.doesNotMatch(rendered, /联系现场|找现场|工作人员/)
+    }
+  }
+})
+
+test('PrintMissResume：付款之前（材料检查、预览的空态）保留原句，小字行不加求助句', () => {
+  assert.equal(missResume.missResumeHowto(false), PRE_ORDER_ORIGINAL)
+  assert.equal(missResume.missResumeFine(false, '这一页本身不保存文件'), '这一页本身不保存文件')
+})
+
+test('PrintMissResume：我的文档卡说明句按登录状态写', () => {
+  assert.equal(missResume.missResumeDocumentsDesc(true), '你保存过的文件在这里，选一份再来')
+  assert.equal(missResume.missResumeDocumentsDesc(false), '登录后才能看到你保存的文件')
+})
+
+test('PrintMissResume：orderMayExist 必传；出纸页、完成页三处传 true，材料检查与预览的空态传 false', () => {
+  const read = (path) => readFileSync(join(kioskRoot, path), 'utf8')
+  assert.match(read('src/pages/print/components/PrintMissResume.tsx'), /orderMayExist: boolean/)
+  assert.doesNotMatch(read('src/pages/print/components/PrintMissResume.tsx'), /orderMayExist\?:/)
+  const callsWithTrue = (src) => [...src.matchAll(/<PrintMissResume\s+orderMayExist\s/g)].length
+  const callsTotal = (src) => [...src.matchAll(/<PrintMissResume\b/g)].length
+  // 出纸页的两种「没有任务可看」拆在 PrintProgressMissing（一处调用，两种情形共用）；页面本身只挑走哪一支。
+  const progress = read('src/pages/print/PrintProgressPage.tsx')
+  const progressMissing = read('src/pages/print/components/PrintProgressMissing.tsx')
+  // 完成页「没拿到可信结果」的两态（正在核验、无法确认）拆在 PrintDoneUnverified（一处调用，只有「无法确认」那一支画它）；页面本身只挑走哪一支。
+  const done = read('src/pages/print/PrintDonePage.tsx')
+  const doneUnverified = read('src/pages/print/components/PrintDoneUnverified.tsx')
+  assert.equal(callsTotal(progress), 0)
+  assert.match(progress, /<PrintProgressMissing variant="no-context"/)
+  assert.match(progress, /<PrintProgressMissing variant="not-created"/)
+  assert.equal(callsTotal(progressMissing), 1)
+  assert.equal(callsWithTrue(progressMissing), 1)
+  assert.equal(callsTotal(done), 0)
+  assert.match(done, /<PrintDoneUnverified\b/)
+  assert.equal(callsTotal(doneUnverified), 1)
+  assert.equal(callsWithTrue(doneUnverified), 1)
+  assert.match(read('src/pages/print/components/PrintEmptyDesk.tsx'), /<PrintMissResume orderMayExist=\{false\}/)
+  assert.doesNotMatch(progress + progressMissing + done + doneUnverified, /没有订单，也没有扣费/)
+})
+
+// ── 完成页「正在核验 / 无法确认」两态：底栏触屏三槽，问小青带本屏专属的一句话，核验期间主键不可点并写明原因 ──
+const unverifiedCopy = await import(transpile(join(kioskRoot, 'src/pages/print/components/printDoneUnverifiedCopy.ts')))
+
+test('完成页「无法确认」的问小青草稿：如实说没能确认、订单可能已建，不让小青假装查过订单或替人判断扣款', () => {
+  const { UNKNOWN_ASK_LABEL, UNKNOWN_ASK_DRAFT } = unverifiedCopy
+  assert.match(UNKNOWN_ASK_LABEL, /^问小青：/)
+  assert.match(UNKNOWN_ASK_DRAFT, /没能确认这次打印的结果/)
+  assert.match(UNKNOWN_ASK_DRAFT, /订单可能已经建立/)
+  assert.match(UNKNOWN_ASK_DRAFT, /不要假装已经查过我的订单/)
+  assert.match(UNKNOWN_ASK_DRAFT, /不要替我判断有没有扣款/)
+  assert.match(UNKNOWN_ASK_DRAFT, /不要猜成功或失败/)
+  assert.match(UNKNOWN_ASK_DRAFT, /不要让我重复打印/)
+  assert.doesNotMatch(UNKNOWN_ASK_DRAFT, NO_ORDER_CLAIM)
+  assert.doesNotMatch(UNKNOWN_ASK_DRAFT, /帮你查|联系现场|找现场|联系工作人员|找工作人员/)
+})
+
+test('完成页「正在核验」的问小青草稿与主键原因：不假装查到结果，不替人判断出纸或扣款，原因写明', () => {
+  const { LOADING_ASK_LABEL, LOADING_ASK_DRAFT, LOADING_PRIMARY_LABEL, LOADING_PRIMARY_WHY } = unverifiedCopy
+  assert.match(LOADING_ASK_LABEL, /^问小青：/)
+  assert.match(LOADING_ASK_DRAFT, /不要假装已经查到结果/)
+  assert.match(LOADING_ASK_DRAFT, /不要替我判断有没有出纸或扣款/)
+  assert.doesNotMatch(LOADING_ASK_DRAFT, NO_ORDER_CLAIM)
+  assert.match(LOADING_PRIMARY_LABEL, /正在核验/)
+  // 旁边的小字是对办事的人说的话：说清在核对什么、核对完能做什么；不写「主按钮」「真实状态」这类写给开发看的字眼。
+  assert.equal(LOADING_PRIMARY_WHY, '正在核对这一单的打印结果，核对完才能继续。')
+  assert.doesNotMatch(LOADING_PRIMARY_WHY, /主按钮|真实状态|不知道下一步|不承诺/)
+  assert.doesNotMatch(`${LOADING_ASK_DRAFT}${LOADING_PRIMARY_WHY}`, /帮你查|联系现场|找现场|联系工作人员|找工作人员/)
+})
+
+test('完成页「正在核验 / 无法确认」版式：底栏触屏三槽、不再传旧 ctabar；核验期间主键 disabled 并连着原因', () => {
+  // 剥注释再判：头注里会写「不说没有订单」这类说明，不是上屏文案。
+  const view = readFileSync(join(kioskRoot, 'src/pages/print/components/PrintDoneUnverified.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+  assert.doesNotMatch(view, /ctabar=|navbar=/)
+  assert.match(view, /back=\{\{ label: '返回首页', onBack: onHome \}\}/)
+  assert.match(view, /printAsk\(LOADING_ASK_LABEL, LOADING_ASK_DRAFT\)/)
+  assert.match(view, /printAsk\(UNKNOWN_ASK_LABEL, UNKNOWN_ASK_DRAFT\)/)
+  // 没有任务号：主键仍是「使用帮助」；有任务号读不到结果（走查 I-30）：主键换成「重新查看这一单」，查的时候不可点，「使用帮助」挪进正文出口。
+  assert.match(view, /primary=\{loading\s*\?\s*undefined\s*:\s*recheck\s*\?\s*\{ label: recheck\.busy \? RECHECK_BUSY_LABEL : RECHECK_PRIMARY_LABEL, testId: 'print-fulfill-primary', disabled: recheck\.busy, onClick: recheck\.onRecheck \}\s*:\s*\{ label: '使用帮助', testId: 'print-fulfill-primary'/)
+  assert.match(view, /<button[^>]*className="qxt-btn qxt-btn-pri"[^>]*\sdisabled\s[^>]*aria-describedby=\{LOADING_WHY_ID\}/)
+  assert.match(view, /id=\{LOADING_WHY_ID\}/)
+  assert.doesNotMatch(view, /联系现场|找现场|联系工作人员|找工作人员/)
+})
+
+// ── 打印链上「去我的文档选一份来打印」只经 usePickPrintDocuments，落点带 ?pick=print ──
+function printSourceFiles(dir) {
+  return readdirSync(dir).flatMap((name) => {
+    const full = join(dir, name)
+    if (statSync(full).isDirectory()) return printSourceFiles(full)
+    return /\.(ts|tsx)$/.test(name) ? [full] : []
+  })
+}
+
+test('打印链：我的文档入口一律走 usePickPrintDocuments（/me/documents?pick=print），登录回跳也带上', () => {
+  const hookPath = join(kioskRoot, 'src/pages/print/usePickPrintDocuments.ts')
+  const hook = readFileSync(hookPath, 'utf8')
+  assert.match(hook, /PRINT_PICK_DOCUMENTS_PATH = '\/me\/documents\?pick=print'/)
+  assert.match(hook, /navigate\(PRINT_PICK_DOCUMENTS_PATH\)/)
+  assert.match(hook, /navigate\('\/login', \{ state: \{ from: PRINT_PICK_DOCUMENTS_PATH \} \}\)/)
+  for (const file of printSourceFiles(join(kioskRoot, 'src/pages/print'))) {
+    if (file === hookPath) continue
+    assert.doesNotMatch(readFileSync(file, 'utf8'), /['"`]\/me\/documents['"`]/, `${file} 不得再直接去不带 pick 的 /me/documents`)
+  }
+  assert.match(readFileSync(join(kioskRoot, 'src/pages/print/PrintUploadPage.tsx'), 'utf8'), /onDocuments=\{pickDocuments\}/)
+  assert.match(readFileSync(join(kioskRoot, 'src/pages/print/components/PrintMissResume.tsx'), 'utf8'), /usePickPrintDocuments\(\)/)
+})
+
+// ── 选文件页上传类出错屏（稿 st-error）：八种出错屏共用一块版式，文案只写页面真的知道的事 ──
+test('出错屏文案：八种各有本屏问句与重试、换办法两张出口，只在真有帮助入口的几屏多一行使用帮助', () => {
+  const { FILE_SOURCE_ERROR_SCREENS, fileSourceErrorCopy, isFileSourceErrorScreen } = fileSourceErrorModel
+  assert.deepEqual([...FILE_SOURCE_ERROR_SCREENS].sort(), [
+    'local-oversize', 'local-rejected', 'local-unreadable', 'local-upload-failed',
+    'phone-confirm-failed', 'phone-gen-failed', 'usb-import-failed', 'usb-read-failed',
+  ])
+  const staff = /联系现场|联系工作人员|找现场|找工作人员/
+  const asks = new Set()
+  for (const screen of FILE_SOURCE_ERROR_SCREENS) {
+    assert.equal(isFileSourceErrorScreen(screen), true)
+    const copy = fileSourceErrorCopy(screen)
+    const all = [copy.title, copy.subtitle, copy.pill, copy.chip, copy.reason, copy.retry.title, copy.retry.desc, copy.alt.title, copy.alt.desc, copy.ask.label, copy.ask.draft].join(' ')
+    for (const part of [copy.title, copy.subtitle, copy.pill, copy.reason, copy.retry.title, copy.retry.desc, copy.alt.title, copy.alt.desc, copy.ask.label, copy.ask.draft]) assert.ok(part.trim(), `${screen} 有空字段`)
+    assert.doesNotMatch(all, staff, `${screen} 不让用户去找人`)
+    assert.match(copy.ask.label, /^问小青：.{4,16}$/, `${screen} 的问小青带本屏专属问句，且放得进底栏`)
+    assert.match(copy.ask.draft, /不要假装/, `${screen} 的问句草稿让小青不替页面编结果`)
+    assert.equal(asks.has(copy.ask.label), false, `${screen} 的问句不与别的屏重复`)
+    asks.add(copy.ask.label)
+    // 没传上来的几屏不说已经收到；只有「确认没成功」一屏系统确实收到了手机传来的文件。
+    if (screen !== 'phone-confirm-failed') assert.doesNotMatch(`${copy.subtitle} ${copy.reason}`, /已收到|收到了/)
+  }
+  assert.deepEqual(FILE_SOURCE_ERROR_SCREENS.filter((screen) => fileSourceErrorCopy(screen).helpRow).sort(), ['local-upload-failed', 'phone-gen-failed', 'usb-read-failed'])
+  assert.equal(isFileSourceErrorScreen('phone-ready'), false)
+  assert.equal(isFileSourceErrorScreen('usb-safeid-expired'), false)
+})
+
+test('出错屏文案：当前文件仍是空的、各自的真实原因保留，draft 的 oversize 问句原样', () => {
+  const copyOf = (screen, options) => fileSourceErrorModel.fileSourceErrorCopy(screen, options)
+  assert.equal(copyOf('local-oversize').ask.label, '问小青：这份太大了怎么办？')
+  assert.match(copyOf('local-oversize').reason, /15MB/)
+  assert.match(copyOf('local-rejected').reason, /支持 PDF、JPG、PNG/)
+  assert.match(copyOf('local-unreadable').reason, /大小取不到/)
+  assert.match(copyOf('phone-confirm-failed').reason, /当前文件仍然是空的/)
+  assert.match(copyOf('usb-import-failed').reason, /当前文件仍然是空的/)
+  assert.match(copyOf('usb-read-failed').reason, /本机不显示上一次的列表/)
+  assert.equal(copyOf('phone-confirm-failed').pill, '确认没成功')
+  // 二维码没出来：U 盘通道放行就改用 U 盘，没放行就去我的文档，不指一个点了会被拒的入口。
+  assert.match(copyOf('phone-gen-failed', { usbSwitchAllowed: true }).alt.desc, /U 盘/)
+  assert.match(copyOf('phone-gen-failed', { usbSwitchAllowed: false }).alt.desc, /我的文档/)
+})
+
+test('出错屏版式：文件卡可省、原因卡、两张出口卡、求助行；视图把八种出错屏都交给同一块板件', () => {
+  const read = (path) => readFileSync(join(kioskRoot, path), 'utf8')
+  const board = read('src/pages/print/file-source/FileSourceError.tsx')
+  assert.match(board, /file \? \(\s*<div className="qxt-file qxt-rise"/)
+  assert.match(board, /<QxTouchSlab row index=\{2\}/)
+  assert.match(board, /<QxTouchSlab row index=\{3\}/)
+  assert.match(board, /<QxTouchCallout kind="remind" icon="call">\{remind\}<\/QxTouchCallout>/)
+  const view = read('src/pages/print/file-source/FileSourceView.tsx')
+  for (const screen of ['local-rejected', 'local-oversize', 'local-unreadable', 'local-upload-failed', 'phone-gen-failed', 'phone-confirm-failed', 'usb-import-failed', 'usb-read-failed']) {
+    assert.match(view, new RegExp(`case '${screen}':`), `${screen} 走出错板件`)
+  }
+  assert.match(view, /body = errorBoard/)
+  assert.doesNotMatch(view, /RejectBoard|boardActions|ghostInBoard/, '旧的出错板件与按钮条不再保留')
+  // 三个超大文件都不超 800 行（拆分只搬不改行为）。
+  for (const path of ['src/pages/print/file-source/FileSourceBits.tsx', 'src/pages/print/file-source/FileSourceView.tsx', 'src/pages/print/PrintDonePage.tsx', 'src/pages/print/PrintProgressPage.tsx']) {
+    assert.ok(read(path).split('\n').length <= 800, `${path} 不超过 800 行`)
+  }
 })

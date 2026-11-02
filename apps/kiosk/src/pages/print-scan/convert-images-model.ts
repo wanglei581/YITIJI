@@ -222,54 +222,30 @@ export function statusForPhase(
   return { tone: 'unknown', label: '图片转 PDF · 最多 20 张' }
 }
 
-export function advisorCopy(
+/**
+ * 意图带的标题与副标题，逐态照稿 18「照片合成 PDF」。
+ * 空态的标题仍是「图片转 PDF」：路由就绪锚点（h1）和路由巡检都按这个名字找这一页。
+ */
+export function convertBandCopy(
   phase: ConvertPhase,
-  imageCount: number,
+  images: SelectedImage[],
   error: ConvertError | null,
-): { ask: string; doing: string } {
-  if (phase === 'usb') {
-    return { ask: 'U 盘来源还没接进来。', doing: '入口和边界都写清楚了，但 U 盘里的图片现在还回不到这个列表。这里不伪造可用。' }
+): { title: string; sub: string } {
+  if (error?.kind === 'capability') return { title: '图片转 PDF：本机暂未开通', sub: '这项现在不能合成' }
+  if (phase === 'usb') return { title: 'U 盘图片还没接到这里', sub: '这一页现在只接了手机扫码' }
+  if (phase === 'uploading') return { title: '正在接收这一张', sub: '取消就停下这一张' }
+  if (phase === 'converting') return { title: '正在合成', sub: '合成好了，这一页才会换成结果' }
+  if (phase === 'rechecking') return { title: '正在用同一标记查询', sub: '不另起一次合成' }
+  if (phase === 'completed') return { title: 'PDF 已经合成', sub: '页数等于这次的张数' }
+  if (phase === 'conflict') return { title: '这个标记和上一次撞了', sub: '可以换一个新标识，或恢复上一次的顺序' }
+  if (error?.kind === 'result-unknown' || error?.kind === 'in-progress') {
+    return { title: '这一次的结果没有确认', sub: '用同一个标记再查，不重新合成' }
   }
-  if (phase === 'uploading') {
-    return { ask: '正在传这一张。', doing: '一次一张，没有进度百分比可显示。传成功它才进列表。' }
+  if (phase === 'empty') return { title: '图片转 PDF', sub: '还没有图片。加上之后才能合成' }
+  return {
+    title: '排好顺序再合成',
+    sub: `已有 ${images.length} 张 · 合计 ${formatBytes(totalBytesOf(images))} · 最多 ${MAX_IMAGES} 张`,
   }
-  if (phase === 'converting') {
-    return { ask: '正在合成。', doing: '一次性请求，没有进度回传。结果出来之前我不说做完了。' }
-  }
-  if (phase === 'rechecking') {
-    return { ask: '正在再查一次。', doing: '还是用同一个标记，没有另起一次。这一屏不会自己变成完成。' }
-  }
-  if (phase === 'completed') {
-    return { ask: '合好了。', doing: `${imageCount} 张图 ${imageCount} 页，页序和你排的一样。` }
-  }
-  if (phase === 'conflict') {
-    return { ask: '这个标识对不上。', doing: '同一个标记，顺序变了就是另一批输入。我停在这里，等你决定。' }
-  }
-  if (error?.kind === 'format') {
-    return { ask: '这张加不进来。', doing: '只收 JPG / PNG。它没进列表，顺序没被打乱。' }
-  }
-  if (error?.kind === 'too-large') {
-    return { ask: '这张太大了。', doing: '单张 10 MB 以内。它没进列表，顺序没被打乱。' }
-  }
-  if (error?.kind === 'upload-failed') {
-    return { ask: '这张没传上去。', doing: '没拿到系统确认。它没进列表，已有的还在。' }
-  }
-  if (error?.kind === 'in-progress') {
-    return { ask: '上一次还在跑。', doing: '同一个标记下已经有一次在合成。不发起新的生成，拿同一个标记再查。' }
-  }
-  if (error?.kind === 'result-unknown') {
-    return { ask: '结果还不知道：系统的确认没送到这台机器。', doing: '不能直接再发一次，得拿同一个标记去查。' }
-  }
-  if (error?.kind === 'known-failed') {
-    return { ask: '这次明确失败。', doing: '图片和顺序都还在，不用重传。用同一个标记原样重试。' }
-  }
-  if (imageCount >= MAX_IMAGES) {
-    return { ask: '已经 20 张了。', doing: '到上限了。想换一张，先选中列表里的某一张再移除。' }
-  }
-  if (imageCount > 0) {
-    return { ask: '顺序你自己排。', doing: '选中一张就能上移下移；列表顺序就是 PDF 页序。' }
-  }
-  return { ask: '几张图，拼成一份 PDF。', doing: '只收 JPG / PNG，单张不超过 10 MB，一次最多 20 张。先加第一张。' }
 }
 
 export function outputFileName(count: number): string {

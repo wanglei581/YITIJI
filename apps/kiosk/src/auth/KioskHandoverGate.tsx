@@ -1,10 +1,9 @@
-import { useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
-import { QxPageFrame } from '../components/qingxu/QxPageFrame'
 import { SettingsConfirm } from '../pages/profile/me/components/SettingsConfirm'
-import { QxMemberNavbar } from '../pages/profile/components/QxMemberNavbar'
+import { MeTouchShell } from '../pages/profile/touch/MeTouchShell'
 import { useKioskSessionControl } from './KioskSessionControlContext'
-import { markKioskPresenceConfirmed, needsHandoverConfirm } from './kioskPresence'
+import { markHandoverPending, markKioskPresenceConfirmed, needsHandoverConfirm } from './kioskPresence'
 import { useAuth } from './useAuth'
 import '../pages/profile/me/styles/settings-qx2.css'
 
@@ -19,6 +18,17 @@ import '../pages/profile/me/styles/settings-qx2.css'
  * **先确认、后读取**：确认层出现时根本不挂载资产页，资产页的读取请求一条都不发，
  * 屏上也不出现任何上一位的文件名、订单号或手机号。深链、浏览器后退进来走的是同一个判断
  * （每换一次地址重新判一次）。没登录时资产页只显示登录引导，不问。
+ *
+ * **弹出了没回答，就一直是待确认**：浏览器后退、问小青这些路能把人带离这一屏，
+ * 再点底部「我的」时进页前只空了几秒，光看空闲时长不会再问。所以确认层一弹出就记下「待确认」
+ * （kioskPresence.markHandoverPending，只在内存里），每次判断都先看它：待确认期间，
+ * 不管从底导航、后退、问小青回来还是站内直达地址进来，都先回到这一屏。
+ * 解除只有三条路：本人答「是我，继续」、答「不是我」走清场（退出登录一并清掉）、新的一位登录成功。
+ *
+ * **空档一到就当时记，不等确认层弹出**：上一位走开 30 秒以上、没人点过屏，下一位先碰屏上别处，隔几秒再点「我的」，
+ * 进页前只空了几秒，确认层从没弹过，也就从没记过标记。所以 kioskPresence 在空档满判据时长的当时
+ * （定时器到点，或下一下触碰发现空档早已超时）就记为待确认，之后任何触碰都解除不了，解除的路同上面三条。
+ * 本组件仍在确认层弹出时记一次（空档不够长、但从没见过触碰的刚加载状态也是这条路）。
  */
 export function KioskHandoverGate() {
   const location = useLocation()
@@ -33,32 +43,45 @@ export function KioskHandoverGate() {
     setDecision(current)
   }
 
-  if (!isLoggedIn || !current.ask) return <Outlet />
+  const showConfirm = isLoggedIn && current.ask
+  // 确认层与「待确认」在同一次提交里就位：没有「已经画出来、标记还没记」的间隙。
+  useLayoutEffect(() => {
+    if (showConfirm) markHandoverPending()
+  }, [showConfirm])
+
+  if (!showConfirm) return <Outlet />
 
   return (
     <div className="h-full" data-kiosk-screen="handover-confirm" data-testid="handover-confirm-page">
-      <QxPageFrame
-        title="我的"
-        subtitle="先确认是不是本人，再打开个人资料。"
-        status={{ tone: 'warn', label: '公共设备，请保护个人信息' }}
-        navbar={<QxMemberNavbar current="profile" />}
-      >
-        <div className="qx-card" role="note" style={{ fontSize: 'var(--qx-fs-body)', lineHeight: 1.45 }}>
-          这台机器上有人登录着，已经有一会儿没人点屏幕了。本人请点「是我，继续」；不是的话点「不是我」，会结束上一位的使用并回到首页。
-        </div>
-      </QxPageFrame>
-      <SettingsConfirm
-        testId="handover-confirm"
+      <MeTouchShell
+        eyebrow="继续使用前"
         title="还是你吗？"
-        description="这台机器上有人登录着，已经有一会儿没人点屏幕了。不是本人请点「不是我」，会结束上一位的使用并回到首页。"
-        confirmLabel="是我，继续"
-        cancelLabel="不是我"
-        onConfirm={() => {
-          markKioskPresenceConfirmed()
-          setDecision({ key: location.key, ask: false })
-        }}
-        onCancel={() => endKioskUse('handover')}
-      />
+        titleId="handover-title"
+        sub="离开屏幕超过 30 秒后再进来，会先问这一句"
+        status={{ tone: 'warn', label: '待确认是不是你' }}
+        back={false}
+        nav={false}
+        ask={{ label: '问小青：这一页是什么意思？', draft: '这一页是什么意思？' }}
+      >
+        <p id="handover-desc">确认之前不会显示上一位的文件和订单。</p>
+        <SettingsConfirm
+          layout="cards"
+          testId="handover-confirm"
+          labelledBy="handover-title"
+          describedBy="handover-desc"
+          title="还是你吗？"
+          description="确认之前不会显示上一位的文件和订单。"
+          confirmLabel="是我，继续"
+          confirmDetail="接着看简历、文档和订单。"
+          cancelLabel="不是我，结束上一位的使用"
+          cancelDetail="退出登录，并清掉这台机器上这一次的临时信息。"
+          onConfirm={() => {
+            markKioskPresenceConfirmed()
+            setDecision({ key: location.key, ask: false })
+          }}
+          onCancel={() => endKioskUse('handover')}
+        />
+      </MeTouchShell>
     </div>
   )
 }

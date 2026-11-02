@@ -166,7 +166,7 @@ const lightflowProfileVerify = read('scripts/verify-lightflow-profile-entry.mjs'
 
 // 1) /profile 主入口迁入青序流光（30-my-profile），不再使用 V6 / LightFlow 壳。
 expectIncludes(profile, "import './styles/profile-qx.css'", 'ProfilePage 引入青序局部 profile-qx.css')
-expectIncludes(profile, 'QxPageFrame', 'ProfilePage 使用青序页框')
+expectIncludes(profile, 'MeTouchShell', 'ProfilePage 使用触屏页壳')
 expectAbsent(profile, /KioskPageFrame/, 'ProfilePage has left the V6 frame')
 expectAbsent(profile, /ReferenceServiceNav|lf-reference-/, 'ProfilePage 移除首页专属导航与服务卡骨架')
 expectAbsent(profile, /kprofile-sr-only/, 'ProfilePage 不再用负 margin 的 sr-only 标题')
@@ -317,13 +317,13 @@ expectAbsent(favoritesPage, /KioskPageFrame/, 'MyFavoritesPage 已离开 V6 Kios
 // MyFavoritesPage（#934）先后迁走；2026-09-23 最后一页 MySettingsPage 也迁入青序会员壳
 // 的 settings 视图，表空了，换成下面的同位青序断言。能力断言（授权查询/撤回、登录、会话说明、
 // 退出、未开放说明）在本文件下方一条不删。
-expectIncludes(settingsPage, "from '../../../components/qingxu/QxPageFrame'", 'MySettingsPage 复用青序共享页框')
-expectMatches(settingsPage, /data-qx-view="settings"[\s\S]*<QxPageFrame/, 'MySettingsPage 使用青序会员壳的「账号设置」视图')
+expectIncludes(settingsPage, "from '../touch/MeTouchShell'", 'MySettingsPage 复用触屏页壳')
+expectMatches(settingsPage, /data-qx-view="settings"[\s\S]*<MeTouchShell/, 'MySettingsPage 使用触屏壳的「账号设置」视图')
 expectAbsent(settingsPage, /KioskPageFrame|me-detail-inkpaper|useInkRipple|me-inkdetail/, 'MySettingsPage 已离开墨青纸感 / V6 旧壳')
 expectIncludes(settingsPage, "navigate('/login', { state: { from: '/me/settings' } })", '账号设置保留登录回跳 /me/settings')
 expectIncludes(settingsPage, "error: { text: '本次未取到'", '账号设置授权读取失败显示「本次未取到」，不猜成未授权')
 expectIncludes(benefitsPage, "import './styles/benefits-qx.css'", 'MyBenefitsPage 引入青序局部 CSS')
-expectIncludes(benefitsPage, 'QxPageFrame', 'MyBenefitsPage 使用青序页框')
+expectIncludes(benefitsPage, 'MeTouchShell', 'MyBenefitsPage 使用触屏页壳')
 expectAbsent(benefitsPage, /KioskPageFrame/, 'MyBenefitsPage has left the V6 frame')
 
 // 方案 B：明细页纸面绑定 --k-paper / --color-canvas，不再锁定米纸裸 hex。
@@ -343,7 +343,8 @@ expectIncludes(favoritesPage, 'return `/renshi?policy=${encodeURIComponent(item.
 expectAbsent(favoritesPage, /return '\/renshi\?tab=policy'/, '我的收藏不再只跳到政策列表')
 expectAbsent(favoritesPage, /对应政策页待建设/, '我的收藏不再写政策页待建设')
 expectIncludes(favoritesPage, '还没有收藏', '我的收藏保留空态标题')
-expectIncludes(favoritesPage, '在岗位 / 招聘会 / 政策详情页点收藏', '我的收藏保留空态说明')
+// 证据锚点随稿换字，判据不变：空态仍说明收藏不含投递结果。
+expectIncludes(favoritesPage, '还没有收藏。收藏只是方便下次再找，不含投递结果。', '我的收藏保留空态说明')
 
 expectIncludes(benefitsPage, 'getMyBenefits(token, { pageSize: 50, cursor })', '我的权益保留真实 API 拉取')
 expectIncludes(benefitsPage, '还没有权益', '我的权益保留空态标题')
@@ -352,7 +353,8 @@ expectAbsent(benefitsPage, /立即支付|去支付|确认核销|核销成功|办
 
 expectIncludes(settingsPage, 'getJobAiConsentStatus', '账号设置保留岗位 AI 授权状态查询')
 expectIncludes(settingsPage, 'revokeJobAiConsent', '账号设置保留撤回岗位 AI 授权能力')
-expectIncludes(settingsPage, '手机号登录', '账号设置保留游客登录按钮')
+expectIncludes(settingsPage, '>去登录</button>', '账号设置游客登录按钮为「去登录」')
+expectIncludes(settingsPage, '换绑成功，请用新手机号登录', '换绑成功提示仍要求用新手机号登录')
 expectIncludes(settingsPage, '公共终端使用说明', '账号设置保留公共终端使用说明')
 expectIncludes(settingsPage, '退出登录', '账号设置保留退出登录操作')
 // Wave 2 已实现换绑，只有注销和数据导出仍未开放
@@ -446,6 +448,17 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/styles/feedback-qx.css',
   'apps/kiosk/src/pages/profile/me/styles/privacy-qx.css',
   'apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx',
+  // 2026-10-27 触屏版第 6 包：我的与权益共用页壳。只加白名单行，不改上面的行为断言。
+  'apps/kiosk/src/pages/profile/touch/MeTouchShell.tsx',
+  'apps/kiosk/src/pages/profile/touch/MeStatePacks.tsx',
+  'apps/kiosk/src/pages/profile/touch/MeIllus.tsx',
+  'apps/kiosk/src/pages/profile/touch/MeKit.tsx',
+  'apps/kiosk/src/pages/profile/touch/me-pages.css',
+  'apps/kiosk/src/pages/profile/touch/me-states.css',
+  'apps/kiosk/src/pages/profile/touch/me-tokens.css',
+  'apps/kiosk/src/pages/profile/touch/meGatePage.ts',
+  'apps/kiosk/src/pages/profile/touch/me-touch.css',
+  'apps/kiosk/src/pages/profile/touch/meTouchStatus.ts',
   'apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs',
   'apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs',
   'apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs',

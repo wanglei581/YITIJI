@@ -10,14 +10,13 @@ import {
 } from '@ai-job-print/shared'
 import { Loader2Icon, MapPinIcon, SearchIcon, SlidersHorizontalIcon } from 'lucide-react'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
-import { DirAiAssist, DirNote, DirSec, DirState } from '../../components/qingxu/directory/DirectoryBits'
+import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
+import { RtFill } from '../recruitment-touch/RtFill'
+import { DirNote, DirSec, DirState } from '../../components/qingxu/directory/DirectoryBits'
 import '../../components/qingxu/directory/directory-qx.css'
 import { getCompanies, getCompanyStats, type CompanyQuery } from '../../services/api/companies'
 import { COMPANY_NO_OPEN_JOBS_REASON } from '../../lib/capabilityReasons'
 import { PROVINCES, citiesOf, districtsOf, isMunicipality } from '../../lib/regions'
-import { getTerminalCode } from '../../services/api/terminalConfig'
 
 const PAGE_SIZE = 10
 const BOUNDARY = '本机只做来源企业与岗位导览：不收简历、不做筛选、不安排面试，投递在来源平台完成。'
@@ -47,9 +46,9 @@ function ChipRow({
     <div className="dw-fgrp">
       <span className="fl">{label}</span>
       <span className="fc">
-        <button type="button" onClick={() => onChange('')} className={`dw-chip ${active === '' ? 'on' : ''}`}>全部</button>
+        <button type="button" onClick={() => onChange('')} aria-pressed={active === ''} className={`dw-chip ${active === '' ? 'on' : ''}`}>全部</button>
         {options.map((o) => (
-          <button key={o.value} type="button" onClick={() => onChange(active === o.value ? '' : o.value)} className={`dw-chip ${active === o.value ? 'on' : ''}`}>{o.text}</button>
+          <button key={o.value} type="button" onClick={() => onChange(active === o.value ? '' : o.value)} aria-pressed={active === o.value} className={`dw-chip ${active === o.value ? 'on' : ''}`}>{o.text}</button>
         ))}
         {onMore && totalCount && totalCount > options.length ? (
           <button type="button" className="dw-chip" aria-haspopup="dialog" onClick={onMore}>
@@ -196,20 +195,15 @@ export function CompaniesPage() {
   )
 
   return (
-    <QxPageFrame
-      // 稿 43 原文：data-route="/jobs-service" aria-label="返回岗位服务"。
-      back={{ label: '返回岗位服务', onBack: () => navigate('/jobs-service') }}
-      title="找企业"
+    <RecruitTouchFrame
+      eyebrow="找企业"
+      back={{ label: '返回社会招聘', onBack: () => navigate('/jobs-service') }}
+      ask={{ label: '问小青：怎么挑企业？', draft: '怎么挑企业？', voice: true }}
+      title="想看哪类企业？"
       subtitle={state === 'loading' ? '企业列表与在招岗位数一起返回，取到之前不显示数字。' : '先定行业和地区，再看企业与在招岗位。'}
       status={pill}
-      terminalLabel={getTerminalCode() || '设备未绑定'}
-      ctabar={
-        <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs-service')}>返回岗位服务</button>
-          <button type="button" className="qx-btn" data-variant="primary" onClick={load}>按条件筛选</button>
-        </>
-      }
-      navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
+      boundary={BOUNDARY}
+      primary={{ label: '按条件筛选', onClick: load }}
     >
       <KioskFilterPickerModal
         open={showTaxonomyPicker}
@@ -227,7 +221,7 @@ export function CompaniesPage() {
         onClose={() => setShowTaxonomyPicker(false)}
       />
       <div className="dw-page qx-grow" data-state={uiState} data-testid={`company-directory-state-${uiState}`}>
-        <DirSec no="01" title="按条件找企业" hint="所有条件均对应真实 CompanyQuery">
+        <DirSec no="01" title="按条件找企业" hint="行业、地区、招聘类型、来源种类都对应真实查询">
           <div className="dw-qbar" role="search">
             <span className="qi"><SearchIcon size={26} aria-hidden /></span>
             <input
@@ -306,10 +300,9 @@ export function CompaniesPage() {
             )}
           </div>
         </DirSec>
-        {state === 'loading' || state === 'error' || items.length === 0
-          ? <DirNote>{BOUNDARY}</DirNote>
-          : <DirAiAssist screen="company-directory" onProfile={() => navigate('/profile')} onAssistant={() => navigate('/assistant')} />}
+        <DirNote>{BOUNDARY}</DirNote>
+        <RtFill preset="directory" />
       </div>
-    </QxPageFrame>
+    </RecruitTouchFrame>
   )
 }
