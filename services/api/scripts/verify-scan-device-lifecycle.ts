@@ -374,6 +374,83 @@ async function main(): Promise<void> {
       pass('截止时间只增不减：两条同状态回报交错、改用面板与别人的续期交错、改设置与别人的续期交错——条件更新钉住读到的 expiresAt，对不上就重读重判')
     }
 
+    // ── C. 续期窗口 ────────────────────────────────────────────────────────────
+    console.log('\n-- C. 回报续期窗口：page_ready 10 分钟，其余 3 分钟（补稿 cs-scan-more）--')
+    {
+      const MIN = 60_000
+      // 规格写死：补稿 cs-scan-more（玻璃台「这一页扫好了」屏）写「最多 20 页；10 分钟内没操作会自动结束，并删除已扫的页」，
+      // 用户放下一页稍慢一点，会话不能只剩 3 分钟就过期；其余回报沿用 B1 的 3 分钟。
+      assert.equal(protocol.SCAN_DEVICE_PAGE_READY_RENEW_WINDOW_MS, 10 * MIN)
+      assert.equal(protocol.SCAN_DEVICE_RENEW_WINDOW_MS, 3 * MIN)
+      for (const state of protocol.SCAN_DEVICE_STATES) {
+        assert.equal(protocol.scanDeviceReportRenewWindowMs(state), state === 'page_ready' ? 10 * MIN : 3 * MIN, `${state} 回报的续期窗口`)
+      }
+
+      const near = (actual: number, expected: number) => Math.abs(actual - expected) < 10_000
+      const s = await deviceSession('pageready')
+      const squeeze = (id = s.id) => prisma.scanTask.update({ where: { id }, data: { expiresAt: new Date(Date.now() + 30_000) } })
+      const report = async (input: Parameters<ScanDeviceSessionsService['report']>[2]) => {
+        const t0 = Date.now()
+        const result = await deviceSvc.report(s.t.id, s.id, input)
+        const row = await rowOf(s.id)
+        assert.equal(result.expiresAt, row.expiresAt.toISOString(), `${input.state}：响应里的 expiresAt 与库一致`)
+        assert.ok(row.expiresAt.getTime() <= (row.hardExpiresAt as Date).getTime(), `${input.state}：续期不超过 hardExpiresAt`)
+        return { t0, row }
+      }
+
+      // 只剩 30 秒时回报：scanning 仍续到约 3 分钟
+      await squeeze()
+      let r = await report({ state: 'scanning', pageCount: 1 })
+      assert.ok(near(r.row.expiresAt.getTime(), r.t0 + 3 * MIN), `scanning 回报应续到约 now+3 分钟，实际差 ${r.row.expiresAt.getTime() - r.t0 - 3 * MIN}ms`)
+
+      // page_ready：续到至少 now+10 分钟（且不超过 hardExpiresAt）
+      await squeeze()
+      r = await report({ state: 'page_ready', pageCount: 1 })
+      assert.ok(r.row.expiresAt.getTime() >= r.t0 + 10 * MIN, `page_ready 回报后 expiresAt 应 ≥ now+10 分钟，实际只剩 ${Math.round((r.row.expiresAt.getTime() - r.t0) / 1000)} 秒`)
+      assert.ok(near(r.row.expiresAt.getTime(), r.t0 + 10 * MIN), 'page_ready 回报续到约 now+10 分钟（不是更久）')
+
+      // 同状态重复回报 page_ready：仍是 10 分钟
+      await squeeze()
+      r = await report({ state: 'page_ready' })
+      assert.ok(r.row.expiresAt.getTime() >= r.t0 + 10 * MIN, '重复回报 page_ready 同样续到 ≥ now+10 分钟')
+
+      // 用户点「再扫一页」：page_ready → scanning。截止时间不缩短（max 取较大者）
+      const beforeNext = (await rowOf(s.id)).expiresAt.getTime()
+      r = await report({ state: 'scanning', pageCount: 2 })
+      assert.ok(r.row.expiresAt.getTime() >= beforeNext, '再扫下一页的 scanning 回报不得把已续到的 10 分钟缩回 3 分钟')
+
+      // 第二页扫好：又是 10 分钟
+      await squeeze()
+      r = await report({ state: 'page_ready', pageCount: 2 })
+      assert.ok(r.row.expiresAt.getTime() >= r.t0 + 10 * MIN, '第二页 page_ready 也续到 ≥ now+10 分钟')
+
+      // 点「扫完了」：composing 与 error 仍是 3 分钟
+      await squeeze()
+      r = await report({ state: 'composing' })
+      assert.ok(near(r.row.expiresAt.getTime(), r.t0 + 3 * MIN), `composing 回报应续到约 now+3 分钟，实际差 ${r.row.expiresAt.getTime() - r.t0 - 3 * MIN}ms`)
+      await squeeze()
+      r = await report({ state: 'error', errorCode: 'paper_jam' })
+      assert.ok(near(r.row.expiresAt.getTime(), r.t0 + 3 * MIN), `error 回报应续到约 now+3 分钟，实际差 ${r.row.expiresAt.getTime() - r.t0 - 3 * MIN}ms`)
+
+      // 封顶：hardExpiresAt 只剩 6 分钟，page_ready 的 10 分钟窗口也只能续到 hardExpiresAt
+      const capped = await deviceSession('pagereadycap')
+      await deviceSvc.report(capped.t.id, capped.id, { state: 'scanning', pageCount: 1 })
+      const hardAt = new Date(Date.now() + 6 * MIN)
+      await prisma.scanTask.update({ where: { id: capped.id }, data: { hardExpiresAt: hardAt, expiresAt: new Date(Date.now() + 30_000) } })
+      const cappedResult = await deviceSvc.report(capped.t.id, capped.id, { state: 'page_ready', pageCount: 1 })
+      assert.equal((await rowOf(capped.id)).expiresAt.getTime(), hardAt.getTime(), 'page_ready 的续期也必须封顶在 hardExpiresAt')
+      assert.equal(cappedResult.expiresAt, hardAt.toISOString())
+
+      // 已经更长不缩短：截止时间已是 20 分钟后（仍在 hardExpiresAt 之内），page_ready 不得缩短它
+      const longer = await deviceSession('pagereadylonger')
+      await deviceSvc.report(longer.t.id, longer.id, { state: 'scanning', pageCount: 1 })
+      const farAt = new Date(Date.now() + 20 * MIN)
+      await prisma.scanTask.update({ where: { id: longer.id }, data: { expiresAt: farAt } })
+      await deviceSvc.report(longer.t.id, longer.id, { state: 'page_ready', pageCount: 1 })
+      assert.equal((await rowOf(longer.id)).expiresAt.getTime(), farAt.getTime(), '已超过 now+10 分钟的截止时间不被缩短')
+      pass('page_ready 回报续到 ≥ now+10 分钟且 ≤ hardExpiresAt（重复回报同样）；scanning / composing / error 仍是 3 分钟；再扫下一页不缩短；封顶 hardExpiresAt；已更长不缩短')
+    }
+
     // @@NEXT-SECTION@@
 
     console.log('\nPASS verify-scan-device-lifecycle')

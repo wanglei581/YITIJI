@@ -11,6 +11,7 @@ import {
   planScanDeviceReport,
   renewScanDeviceExpiry,
   resolveScanDeviceSettingsInput,
+  scanDeviceReportRenewWindowMs,
   type ScanDeviceColorMode,
   type ScanDeviceErrorCode,
   type ScanDeviceReportInput,
@@ -77,7 +78,8 @@ export class ScanDeviceSessionsService {
   /**
    * 终端程序回报一次屏上扫描进度。守卫（终端身份）在 controller。
    * 只收：device 任务、属于本终端、已 ACK、waiting 且未过期、scan_device 仍 available、转移表允许。
-   * 每次收下续期 expiresAt = min(max(expiresAt, now + 3 分钟), hardExpiresAt)，并写 deviceUpdatedAt。
+   * 每次收下续期 expiresAt = min(max(expiresAt, now + 窗口), hardExpiresAt)，并写 deviceUpdatedAt。
+   * 窗口：state=page_ready（玻璃台这一页扫好了，等用户放下一页）10 分钟，其余 3 分钟（见 scanDeviceReportRenewWindowMs）。
    */
   async report(
     terminalId: string,
@@ -135,7 +137,12 @@ export class ScanDeviceSessionsService {
       }
 
       const plan = planScanDeviceReport(task, input)
-      const expiresAt = renewScanDeviceExpiry({ expiresAt: task.expiresAt, hardExpiresAt, now })
+      const expiresAt = renewScanDeviceExpiry({
+        expiresAt: task.expiresAt,
+        hardExpiresAt,
+        now,
+        windowMs: scanDeviceReportRenewWindowMs(plan.deviceState),
+      })
 
       const updated = await this.prisma.scanTask.updateMany({
         where: {

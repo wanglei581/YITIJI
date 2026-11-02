@@ -54,8 +54,14 @@ export type ScanDeliverOrigin = (typeof SCAN_DELIVER_ORIGINS)[number]
 
 /** 续期上限：从建会话起最多 30 分钟（hardExpiresAt = createdAt + 30 分钟）。 */
 export const SCAN_DEVICE_HARD_LIFETIME_MS = 30 * 60 * 1000
-/** 每次收下终端程序回报，把 expiresAt 至少续到「现在 + 3 分钟」（不超过上限）。 */
+/** 每次收下终端程序回报，把 expiresAt 至少续到「现在 + 3 分钟」（不超过上限）；page_ready 例外，见下一个常量。 */
 export const SCAN_DEVICE_RENEW_WINDOW_MS = 3 * 60 * 1000
+/**
+ * 玻璃台「这一页扫好了」（回报 state = page_ready）时，把 expiresAt 至少续到「现在 + 10 分钟」（不超过上限）。
+ * 来源：补稿 cs-scan-more（玻璃台「这一页扫好了」屏）写的「最多 20 页；10 分钟内没操作会自动结束，并删除已扫的页」——
+ * 用户放下一页稍慢一点，会话不能只剩 3 分钟就过期。其余 state 的回报仍续 3 分钟。
+ */
+export const SCAN_DEVICE_PAGE_READY_RENEW_WINDOW_MS = 10 * 60 * 1000
 /**
  * 用户「改用面板扫描」时，把 expiresAt 至少续到「现在 + 10 分钟」（= 面板会话的初始时长，不超过上限）。
  * 用户在屏上试了很久（出错、重试）再切回面板，不能只剩一两分钟去面板上操作。
@@ -121,8 +127,16 @@ export function canTransitionScanDeviceState(from: ScanDeviceState, to: ScanDevi
 }
 
 /**
- * 续期：min(max(expiresAt, now + 窗口), hardExpiresAt)。窗口缺省 3 分钟（终端程序每次回报）；
- * 改用面板扫描时传 SCAN_DEVICE_SWITCH_RENEW_WINDOW_MS（10 分钟）。
+ * 终端程序回报被收下后，按收下的 state 选续期窗口：page_ready 10 分钟（用户要放下一页，补稿 cs-scan-more），
+ * 其余 3 分钟。改用面板扫描、改扫描设置各自传 SCAN_DEVICE_SWITCH_RENEW_WINDOW_MS（10 分钟）。
+ */
+export function scanDeviceReportRenewWindowMs(state: ScanDeviceState): number {
+  return state === 'page_ready' ? SCAN_DEVICE_PAGE_READY_RENEW_WINDOW_MS : SCAN_DEVICE_RENEW_WINDOW_MS
+}
+
+/**
+ * 续期：min(max(expiresAt, now + 窗口), hardExpiresAt)。窗口缺省 3 分钟（终端程序每次回报，见 scanDeviceReportRenewWindowMs）；
+ * 改用面板扫描、改扫描设置时传 SCAN_DEVICE_SWITCH_RENEW_WINDOW_MS（10 分钟）。
  * 只会把截止时间往后推、且永远不超过 hardExpiresAt；已经过了上限的会话不会被续命。
  */
 export function renewScanDeviceExpiry(args: {
