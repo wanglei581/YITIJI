@@ -1,6 +1,7 @@
 // 模拟面试作答页。文字是硬兜底；麦克风、播报、转写任何一步失败都不阻塞。
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { interviewAiPill, isAiGateDown, useInterviewAiCapabilities, type InterviewAiState } from './useInterviewAiCapabilities'
 import { InterviewSessionInvalid } from './session/InterviewSessionInvalid'
 import { resolveInterviewSessionState } from './session/resolveInterviewSessionState'
 import { fetchQuestionAudio, getVoiceCapability, transcribeAnswer } from '../../services/api/interview'
@@ -10,31 +11,33 @@ import {
   detectMicCapability,
   subscribeMicDeviceChange,
   MIC_FAILURE_REASON,
+  MIC_DETECTED_LABEL,
   MIC_REASON,
   MIC_STATUS_LABEL,
   type MicCapabilityState,
 } from '../../utils/micCapability'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { InterviewAnswerDock } from './session/InterviewAnswerDock'
 import { InterviewSessionBar } from './session/InterviewSessionBar'
 import { InterviewSessionPanels } from './session/InterviewSessionPanels'
 import { speakInterview } from './session/speakInterview'
 import { useInterviewLivePersist } from './session/useInterviewLivePersist'
 import { InterviewShell } from './InterviewShell'
+import { interviewMicLine } from './interviewMicCopy'
 import type { InterviewMessage, InterviewSessionPhase, InterviewSessionRouteState, InterviewVoiceState } from './session/types'
-import { INTERVIEW_AI_DOWN_HINT, INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
+import { INTERVIEW_AI_DOWN_HINT, INTERVIEW_STAGE_COPY, type InterviewStage } from './interviewWorkbenchModel'
 import { readInterviewWorkbenchSession } from './interviewWorkbenchSession'
 import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
 import './styles/interview-qx2.css'
+import './styles/interview-touch-run.css'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { isAiOutage } from '../../ai/aiOutage'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import type { InterviewFinishRecovery } from './session/interviewAnswerRecovery'
 import { finishInterview, submitInterviewAnswer } from './session/interviewTurnActions'
-
-const advisorPortrait = '/assets/ai-advisor.png'
 
 const INTERVIEWER_LABEL: Record<string, string> = {
   hr: 'HR 面试',
@@ -50,6 +53,8 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const navigate = useNavigate()
   const location = useLocation()
   const { getToken } = useAuth()
+  const contact = useSupportContact()
+  const capabilities = useInterviewAiCapabilities()
   const storedLive = readInterviewWorkbenchSession()?.live
   const state = resolveInterviewSessionState(location.state as InterviewSessionRouteState | null)
 
@@ -61,6 +66,9 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const [questionIndex, setQuestionIndex] = useState(storedLive?.questionIndex ?? 1)
   const [draft, setDraft] = useState('')
   const [phase, setPhase] = useState<InterviewSessionPhase>('answering')
+  const [aiOutage, setAiOutage] = useState(false)
+  // 本场某次 AI 调用被服务端 AI 闸门（暂停、额度）拦下：小青这次也用不了。成功一次就清掉。
+  const [assistantDown, setAssistantDown] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [omitPrintAnswers, setOmitPrintAnswers] = useState(storedLive?.omitPrintAnswers ?? false)
   // 只认本场亲眼成功过的非跳过回答。乐观写进对话的那条不算，刷新也不能把没成功的说成已保存。
@@ -160,7 +168,6 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const interviewerMsgs = messages.filter((m) => m.role === 'interviewer')
   const lastInterviewerMsg = interviewerMsgs.slice(-1)[0]?.content ?? ''
   const lastInterviewerTurnIdx = (interviewerMsgs.length - 1) * 2
-  const lastInterviewerMessageIndex = messages.map((m) => m.role).lastIndexOf('interviewer')
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const stopPlayback = () => {
@@ -287,6 +294,8 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
       const { text } = await transcribeAnswer(state.sessionId, wav, access)
       setVoice({ kind: 'review', transcript: text, edited: text, durationSec })
     } catch (err) {
+      // 转写同样过服务端 AI 闸门：暂停 / 额度到了，小青这次也用不了（文字作答照常，提示语不变）。
+      if (isAiGateDown(err)) setAssistantDown(true)
       const declined = aiDeclarationDeclineMessage(err)
       const msg = declined ?? userMessageOf(err, '语音转写失败')
       if (declined) {
@@ -305,7 +314,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     void submitInterviewAnswer({
       args, state, access, messages, draft, voiceKind: voice.kind, questionShownAtRef,
       setMessages, setDraft, setMode, setVoice, setPhase, setError, setMicError,
-      setFinishRecovery, setAnswersRecorded, setQuestionIndex,
+      setFinishRecovery, setAnswersRecorded, setQuestionIndex, setAiOutage, setAssistantDown,
     })
   }
 
@@ -313,7 +322,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     void finishInterview({
       state, access, phase, voiceKind: voice.kind, messages, answersRecorded, omitPrintAnswers,
       onGoStage, navigate, stopPlayback, resetVoiceState,
-      setPhase, setError, setMicError, setFinishRecovery,
+      setPhase, setError, setMicError, setFinishRecovery, setAssistantDown,
     })
   }
 
@@ -333,10 +342,13 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const busyTurn = phase === 'thinking' || phase === 'finishing'
   const voiceLocked = voice.kind === 'requesting_permission' || voice.kind === 'transcribing'
   const ttsLabel = ttsOfficial ? '官方语音播报' : '本机语音播报'
-  // 状态胶囊直述硬件事实：探测中不下结论，只有确实探到设备才敢说「可用」。
-  const micStatusLabel = micCapability === null ? '正在检测麦克风…' : MIC_STATUS_LABEL[micCapability]
+  // 状态胶囊直述硬件事实：探测中不下结论，只有探到设备、转写服务也开着才敢说「语音回答可用」；
+  // 转写没开时只说检测到了麦克风，「转写服务未启用」交给下面的常显原因讲一次，不自相矛盾（走查 I-24）。
+  const micNoTranscribe = micCapability === 'available' && !asrEnabled
+  const micStatusLabel =
+    micCapability === null ? '正在检测麦克风…' : micNoTranscribe ? MIC_DETECTED_LABEL : MIC_STATUS_LABEL[micCapability]
   const micStatusTone =
-    micCapability === null ? 'blue' : micCapability === 'available' ? 'green' : 'red'
+    micCapability === null || micNoTranscribe ? 'blue' : micCapability === 'available' ? 'green' : 'red'
   // 语音入口是否放行 = 服务端 ASR 已启用 且 本机确实有可用麦克风。
   const voiceAvailable = asrEnabled && micCapability === 'available'
   // 门禁置灰就必须有常显原因，一个都不能漏：硬件原因优先，其次是服务端未启用。
@@ -345,41 +357,46 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     : micCapability !== 'available' ? MIC_REASON[micCapability]
     : !asrEnabled ? '语音转写服务未启用，请用文字作答'
     : null
+  const shownVoiceHint = interviewMicLine(voiceHint, contact)
+  const shownError = interviewMicLine(error, contact)
+  const shownMicBlocked = interviewMicLine(micBlockedReason, contact)
 
   const copy = INTERVIEW_STAGE_COPY.session
-  const titleParts = emphasizedTitle(copy)
+  // 会话已经建好、正在作答：能力状态「还没读回来」时不闪顶栏和底栏（它们只是提示，不拦作答）；读不到才写「没确认」。
+  const settled = (s: InterviewAiState): InterviewAiState => (s === 'checking' ? 'available' : s)
 
   return (
     <InterviewShell
-      title={<>第 {questionIndex} 题，<em>{titleParts.em}</em>。</>}
+      eyebrow="练面试 · 作答"
+      title={copy.title}
       subtitle={copy.subtitle}
-      status={{ tone: timeUp ? 'warn' : 'ok', label: timeUp ? '练习时间已到' : 'AI 模拟面试' }}
+      // 顶栏：本场作答 / 出报告已观测到 AI 故障，或配置明确关闭 → 不能出题；读不到 → 没确认；否则才是到点或正常。
+      status={interviewAiPill(
+        settled(capabilities.state('mock_interview')),
+        aiOutage || finishRecovery === 'outage',
+        timeUp ? { tone: 'warn', label: '练习时间已到' } : undefined,
+      )}
       live={voice.kind === 'recording'}
       ctabar={(
         <InterviewSessionBar
+          assistantState={assistantDown ? 'off' : settled(capabilities.state('assistant_chat'))}
           mode={mode}
           phase={phase}
           voiceKind={voice.kind}
-          voiceAvailable={voiceAvailable}
           busy={busyTurn || voiceLocked}
           onFinish={() => void finish()}
           onSubmit={() => void submit({ text: draft, skip: false })}
-          onUseText={() => { resetVoiceState(); setMode('text'); setMicError(false) }}
+          onStart={() => void startRecording()}
           onStop={() => void stopRecording()}
           onConfirm={() => {
             if (voice.kind !== 'review') return
             void submit({ text: voice.edited, skip: false, voiceMeta: { transcript: voice.transcript, edited: voice.edited.trim() !== voice.transcript.trim(), durationSec: voice.durationSec } })
-          }}
-          onUseVoice={() => {
-            if (!voiceAvailable) return
-            setMode('voice'); setMicError(false); setError(null)
           }}
         />
       )}
     >
     <div data-kiosk-domain="interview" data-kiosk-screen="interview-session" data-qx-interview="" className="interview-flow interview-session" data-visual-theme="service-desk" data-ux-density="touch">
       <InterviewSessionPanels
-        advisorPortrait={advisorPortrait}
         interviewerLabel={interviewerLabel}
         position={state.position}
         remainingSec={remainingSec}
@@ -394,15 +411,16 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         micStatusTone={micStatusTone}
         speaking={speaking}
         lastInterviewerMsg={lastInterviewerMsg}
-        voiceHint={voiceHint}
+        voiceHint={shownVoiceHint === shownMicBlocked ? null : shownVoiceHint}
         messages={messages}
-        lastInterviewerMessageIndex={lastInterviewerMessageIndex}
         phase={phase}
         listRef={listRef}
       >
       <InterviewAnswerDock
+        aiOutage={aiOutage}
+        answersRecorded={answersRecorded}
         micError={micError}
-        error={error}
+        error={shownError}
         voiceLocked={voiceLocked}
         busyTurn={busyTurn}
         phase={phase}
@@ -412,20 +430,11 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         maxRecordSec={MAX_RECORD_SEC}
         draft={draft}
         voiceAvailable={voiceAvailable}
-        micBlockedReason={micBlockedReason}
+        micBlockedReason={shownMicBlocked}
         onRecheckMic={recheckMic}
         onDraftChange={setDraft}
         onReviewChange={(edited) => setVoice((current) => current.kind === 'review' ? { ...current, edited } : current)}
-        onReviewSubmit={() => {
-          if (voice.kind !== 'review') return
-          void submit({
-            text: voice.edited,
-            skip: false,
-            voiceMeta: { transcript: voice.transcript, edited: voice.edited.trim() !== voice.transcript.trim(), durationSec: voice.durationSec },
-          })
-        }}
         onRetryVoice={() => void startRecording()}
-        onStopRecording={() => void stopRecording()}
         onUseText={() => {
           // 麦克风失败、转写确认和语音空闲态共用幂等清场，再回到文字输入。
           resetVoiceState()
@@ -444,7 +453,6 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
           setMode('voice'); setMicError(false); setError(null)
         }}
         onSkip={() => void submit({ text: '', skip: true })}
-        onSubmitText={() => void submit({ text: draft, skip: false })}
         onFinish={() => void finish()}
         finishRecovery={finishRecovery}
         onContinueAnswering={() => {

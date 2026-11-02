@@ -144,6 +144,27 @@ test('导出直达已下线为优化页兼容重定向 @kiosk', async ({ page, a
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
 })
 
+/**
+ * 原文 / 改写两张卡随内容高：卡里不留大片空白。
+ * toBeVisible 量不出这件事，所以直接量几何：每张卡里最后一个子元素的下沿到卡片下沿不超过 105px；
+ * 出处小字钉在卡片底部，所以再量正文下沿到小字上沿（较短的那张卡的空隙落在这里）也不超过 105px。
+ * 此前两张卡被拉伸到占满余高，内容只占顶上约 120px，卡里空了 360–390px。
+ */
+async function expectCompareCardsHugTheirContent(page: Page, label: string): Promise<void> {
+  const cards = await page.locator('[data-qx-page="compare"] .qxt-col').evaluateAll((columns) => columns.map((column) => {
+    const box = column.getBoundingClientRect()
+    const last = (column.lastElementChild as Element).getBoundingClientRect()
+    const text = (column.querySelector('p') as Element).getBoundingClientRect()
+    const foot = (column.querySelector('small') as Element).getBoundingClientRect()
+    return { title: column.querySelector('b')?.textContent ?? '', below: box.bottom - last.bottom, between: foot.top - text.bottom }
+  }))
+  expect(cards, `${label}：原文与改写两张卡`).toHaveLength(2)
+  for (const card of cards) {
+    expect(card.below, `${label}：「${card.title}」卡内容底边到卡片底边`).toBeLessThanOrEqual(105)
+    expect(card.between, `${label}：「${card.title}」卡正文与出处小字之间`).toBeLessThanOrEqual(105)
+  }
+}
+
 test('逐条对照要求新增事实确认并回传裁决 @kiosk', async ({ page, api }) => {
   const optimizeRequest = await openResumeCompare(page, api)
   expect((await optimizeRequest.allHeaders())['x-resume-access-token']).toBe(COMPARE_ACCESS_TOKEN)
@@ -151,14 +172,19 @@ test('逐条对照要求新增事实确认并回传裁决 @kiosk', async ({ page
   const useRewrite = page.getByRole('button', { name: '用改写' })
   await expect(useRewrite).toBeDisabled()
   await expect(page.getByText('5000', { exact: true }).first()).toBeVisible()
+  // 第 1 条有待确认的新增事实：两张文字卡随内容高。
+  await expectCompareCardsHugTheirContent(page, '第 1 条（有待确认事实）')
   await page.getByRole('checkbox', { name: /5000/ }).check()
   await page.getByRole('checkbox', { name: /主导/ }).check()
   await useRewrite.click()
   await page.getByRole('button', { name: '下一条' }).click()
   await expect(page.getByText('第 2 / 2 条')).toBeVisible()
   await expect(page.getByText('对齐需求，持续跟进问题至闭环。')).toBeVisible()
+  // 第 2 条没有待确认事实，页面更空：多出的高度摊进各块之间，不撑大文字卡。
+  await expectCompareCardsHugTheirContent(page, '第 2 条（无待确认事实）')
   await page.getByRole('button', { name: '保留原文', exact: true }).click()
-  await page.getByRole('button', { name: '下一条' }).click()
+  // 稿 compare：最后一条没有下一条，底栏主按钮是「去编辑」，带着裁决回优化页。
+  await page.getByRole('button', { name: '去编辑', exact: true }).click()
   await expect(page).toHaveURL(/\/resume\/optimize$/)
   const returnedState = await page.evaluate(() => window.history.state?.usr)
   expect(returnedState).toEqual({
@@ -533,4 +559,27 @@ test('生成预览页删掉一条经历后没删的那条仍在导出里 @kiosk'
   const companies = body.experience?.map((item) => item.company) ?? []
   expect(companies).toContain(SHORT_COMPANY)
   expect(companies).not.toContain(LONG_COMPANY)
+})
+
+test('导出失败后可见重新导出与换个格式并保留内容 @kiosk', async ({ page, api }) => {
+  await openGenerateTitleEditor(page, api, 'export-failure-w2', [{ company: '原公司', role: '职员', period: '2020-2022', description: '工作经历' }])
+  api.respond('POST', '/api/v1/resume/generate/export', { status: 503, json: { error: { message: '导出失败' } } })
+  await page.getByTestId('resume-generate-preview-cta-export').click()
+  await page.getByTestId('resume-generate-preview-cta-confirm-export').click()
+  await confirmGenerateExportFacts(page)
+  const failure = page.locator('[data-export-screen="export-failed"]')
+  await expect(failure.getByRole('alert')).toContainText('底部「重新导出」')
+  await expect(page.getByTestId('resume-generate-preview-cta-confirm-export')).toHaveText('重新导出')
+  const retryRequest = page.waitForRequest((request) => request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/resume/generate/export')
+  await page.getByTestId('resume-generate-preview-cta-confirm-export').click()
+  await confirmGenerateExportFacts(page)
+  expect((await retryRequest).postDataJSON().format).toBe('pdf')
+  await expect(failure.getByRole('alert')).toBeVisible()
+  const change = failure.getByRole('button', { name: '换个格式', exact: true })
+  await expect(change).toBeVisible()
+  await expect(change.locator('xpath=ancestor::details')).toHaveCount(0)
+  await change.click()
+  await expect(page.getByRole('heading', { name: '选导出格式' })).toBeVisible()
+  await page.getByRole('button', { name: '返回预览' }).click()
+  await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toHaveValue('原公司')
 })

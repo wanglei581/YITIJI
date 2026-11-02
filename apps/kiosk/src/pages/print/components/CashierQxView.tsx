@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react'
 import { PrintAiHelp } from './PrintAiHelp'
+import { PrintFillArt } from '../art/PrintFillArt'
+import { printProblemLine } from '../../../copy/unattendedCopy'
+import { truncateFileNameMiddle } from '../../../lib/fileName'
 import { AlertTriangleIcon, FileXIcon, QrCodeIcon, ScanLineIcon } from 'lucide-react'
 import type { PrintJobParams, PrintPriceLine } from '@ai-job-print/shared'
 import type { CashierView } from '../cashierStatus'
@@ -60,6 +63,10 @@ interface CashierQxViewProps {
   onReconcile: () => void
   onReissue: () => void
   onSimulateSandbox: (result: 'success' | 'failed') => void
+  /** 这一次可能扣款的通道。免费单不传，正文也不画付款说明。 */
+  billingChannel?: string | null
+  /** 次出口一排（退出支付等）。紧跟在付款区后面画，让「退出支付」落在收款码卡下面、底栏之上（稿 cashier）。 */
+  acts?: ReactNode
 }
 export function CashierQxView(props: CashierQxViewProps) {
   const { state } = props
@@ -77,32 +84,31 @@ export function CashierQxView(props: CashierQxViewProps) {
     free,
   }
   const copy = copyFor(state, ctx)
+  const orderRows = splitOrderRows(props, label, copy.rows)
   const instrument = INSTRUMENT_STATES.has(state)
-  // 解释卡放在较矮的那一栏（稿 32 的做法）：付款码读取卡比右栏矮，所以 pending-scan 放左栏。
-  const noteInPaycol = !instrument || state === 'pending-scan'
+  // 稿：出码、读付款码时收款码先上屏，状态说明跟在码框后面；其余状态说明在前。
+  const stateCardFirst = !(state === 'pending-qr' || state === 'pending-scan')
+  const stateCard = (
+    <section className="cashier-qx-state pct-card" data-kind={copy.kind}>
+      <h2 className="cashier-qx-state-h">
+        {copy.icon}
+        <span className="qx-state-t">{copy.title}</span>
+      </h2>
+      {copy.paras.map((para, index) => <p key={index} className="cashier-qx-p">{para}</p>)}
+      {copy.chips.length > 0 ? (
+        <div className="cashier-qx-chips">
+          {copy.chips.map(([tone, text]) => <span key={text} className="cashier-qx-chip" data-tone={tone}>{text}</span>)}
+        </div>
+      ) : null}
+    </section>
+  )
   const pickersEnabled = PICKERS_ENABLED.has(state) && !props.selectionLocked
   const activeMethod = props.displayedPaymentMethod
     ?? (props.snapshot?.attempt ? (props.snapshot.attempt.qrCodeContent === null ? 'code' : 'qr') : null)
 
   return (
-    <div className="cashier-qx-page" data-qx-state={state}>
+    <div className="cashier-qx-page pct-page" data-qx-state={state}>
       <div className="qx-scroll cashier-qx-scroll">
-        <section className="cashier-qx-xq" aria-label="小青提示">
-          <div className="cashier-qx-xq-row">
-            <div className="cashier-qx-xq-face" aria-hidden="true">青</div>
-            <div className="cashier-qx-xq-main">
-              <div className="cashier-qx-xq-eyebrow">{free ? '确认打印' : '付款'}</div>
-              <p className="cashier-qx-xq-ask">{copy.ask[0]}</p>
-              <p className="cashier-qx-xq-doing">{copy.ask[1]}</p>
-            </div>
-          </div>
-          <ol className="cashier-qx-xq-steps">
-            <li><b>1</b>看清本页结果<small>{free ? '查看订单记录与打印状态。' : '先确认是等待、成功、失败、关闭还是退款。'}</small></li>
-            <li><b>2</b>{free ? '核对订单' : '不重复付款'}<small>{free ? '任务未建立时，只恢复同一打印任务。' : '结果异常或长时间未更新时，先查看支付账单。'}</small></li>
-            <li><b>3</b>按底部按钮继续<small>当前可用的处理动作已经放在屏幕下方。</small></li>
-          </ol>
-        </section>
-
         <Pickers
           {...props}
           enabled={pickersEnabled}
@@ -111,38 +117,41 @@ export function CashierQxView(props: CashierQxViewProps) {
           note={pickerNote(state, free, props.channels.length)}
         />
 
-        <section className="cashier-qx-state" data-kind={copy.kind}>
-          <h2 className="cashier-qx-state-h">
-            {copy.icon}
-            <span className="qx-state-t">{copy.title}</span>
-          </h2>
-          {copy.paras.map((para, index) => <p key={index} className="cashier-qx-p">{para}</p>)}
-          {copy.chips.length > 0 ? (
-            <div className="cashier-qx-chips">
-              {copy.chips.map(([tone, text]) => <span key={text} className="cashier-qx-chip" data-tone={tone}>{text}</span>)}
-            </div>
-          ) : null}
-        </section>
+        {!free && props.reconciling ? (
+          <p className="pct-note" role="status">正在向支付渠道核实这一次的结果。这一次还没有确认到账。</p>
+        ) : null}
 
         {state === 'no-order' ? null : (
           <section className="cashier-qx-paywrap">
-            <div className="cashier-qx-paycol">
-              {instrument ? <Instrument {...props} ctx={ctx} /> : <AmountCard {...props} free={free} />}
-              {noteInPaycol ? <SideNote state={state} ctx={ctx} /> : null}
-            </div>
-            <div className="cashier-qx-side">
-              {instrument ? <AmountCard {...props} free={free} /> : null}
-              <OrderInfo {...props} channelLabel={label} rows={copy.rows} />
-              {noteInPaycol ? null : <SideNote state={state} ctx={ctx} />}
-            </div>
+            <OrderInfo rows={orderRows.core} />
+            {stateCardFirst ? stateCard : null}
+            {instrument ? <Instrument {...props} ctx={ctx} /> : <AmountCard {...props} free={free} />}
+            {/* 出码、读付款码时（稿 cashier）：收款码卡后面紧跟次出口，「退出支付」落在码下面、底栏之上；状态说明、金额、侧注再往下排。 */}
+            {stateCardFirst ? null : <>{props.acts}{stateCard}</>}
+            {instrument ? <AmountCard {...props} free={free} /> : null}
+            <SideNote state={state} ctx={ctx} />
           </section>
         )}
 
-        <Closure state={state} ctx={ctx} />
+        {stateCardFirst ? props.acts : null}
+
+        {state === 'no-order' ? <Closure state={state} ctx={ctx} /> : (
+          <>
+          <OrderMoreInfo rows={orderRows.more} />
+          <details className="cashier-qx-more">
+            <summary>{free ? '说明' : '付款说明'} · 接下来怎么办</summary>
+            <Closure state={state} ctx={ctx} />
+            <p className="cashier-qx-p">{props.amountCents === 0 ? printProblemLine() : props.refundAssistanceCopy + '。'}</p>
+            {free ? null : <CashierQxDock truthOnly reason={null} billingChannel={props.billingChannel ?? null} />}
+          </details>
+          </>
+        )}
 
         {props.issueError ? (
           <div className="cashier-qx-error" role="alert"><AlertTriangleIcon aria-hidden="true" />{props.issueError}</div>
         ) : null}
+        {/* 状态说明不够高时，用一块实物小样吃掉剩下的高度（付款那几态画手机，其余画纸）。 */}
+        <PrintFillArt name={state === 'pending-qr' || state === 'pending-scan' || state === 'pending' || state === 'channel-selected' ? 'phone' : 'stack'} />
       </div>
     </div>
   )
@@ -162,11 +171,21 @@ function Pickers(props: CashierQxViewProps & {
   const channelDisabled = !props.enabled || busy
   const methodDisabled = !props.enabled || busy || !props.selectedChannel
   const showChannels = !props.note
+  // 稿：只启用一个通道且已采用时，只写「这台机器只启用了一个支付通道，已自动采用」，不再摆一颗通道按钮。
+  const singleAdopted = props.channels.length === 1 && (props.amountCents ?? 0) > 0 && showChannels
   return (
     <section className="cashier-qx-modes" aria-label="支付方式选择">
       <div className="cashier-qx-picker" data-kind="channels">
         <span className="cashier-qx-picker-label">{free ? '办理方式' : '支付通道'}</span>
-        {showChannels ? props.channels.map((channel) => (
+        {showChannels && props.channels.length === 1 && (props.amountCents ?? 0) > 0 ? (
+          <p className="pct-chline">
+            这台机器只启用了一个支付通道，已自动采用。
+            {props.channels[0] === 'sandbox'
+              ? '测试支付通道 · 非真实收款'
+              : `${channelLabelOf(props.channels[0])} · 支付结果以实际到账为准`}
+          </p>
+        ) : null}
+        {showChannels ? props.channels.filter((channel) => !(singleAdopted && props.activeChannel === channel)).map((channel) => (
           <button
             key={channel}
             type="button"
@@ -193,6 +212,7 @@ function Pickers(props: CashierQxViewProps & {
               data-active={props.activeMethod === method ? 'true' : undefined}
               aria-pressed={props.activeMethod === method}
               disabled={methodDisabled}
+              aria-label={`${labels.action} ${labels.name} · ${labels.desc}`}
               onClick={() => props.onSelectMethod(method)}
             >
               <span className="cashier-qx-mode-ic">{method === 'qr' ? <QrCodeIcon aria-hidden="true" /> : <ScanLineIcon aria-hidden="true" />}</span>
@@ -263,15 +283,29 @@ function priceLineLabel(line: PrintPriceLine): string {
   return line.description ?? line.serviceKey
 }
 
-function OrderInfo(props: CashierQxViewProps & { channelLabel: string; rows: Row[] }) {
-  const rows: Row[] = [['订单号', props.orderNo ?? props.orderId ?? '状态未知']]
+/**
+ * 订单摘要（稿 cashier）首屏只有三行：订单号、内容「文件名 · 张数 · 份数 · 颜色」、应付。
+ * 其余事实一个不删，收进页底「更多订单信息」折叠：纸张与单双面、支付通道、支付状态和各态自己的补充行。
+ * 支付通道、支付状态在顶栏胶囊（等待支付 · 未确认）和收款码标题（请使用微信支付扫码支付）里已经各说过一次，
+ * 不再单独占首屏的行；收款码卡要整块落在底栏之上，靠的就是这几行让位。
+ */
+function splitOrderRows(
+  props: CashierQxViewProps,
+  channelLabel: string,
+  stateRows: Row[],
+): { core: Row[]; more: Row[] } {
+  const core: Row[] = [['订单号', props.orderNo ?? props.orderId ?? '状态未知']]
+  const more: Row[] = []
   if (props.file?.name) {
-    const parts = [props.file.name]
+    // 一行放得下：文件名中段截断（扩展名保留），份数只有多于一份才写进这一行，完整份数在「更多订单信息」里。
+    const parts = [truncateFileNameMiddle(props.file.name, { maxLength: 20 })]
     if (props.file.pages !== null && props.file.pages !== undefined) parts.push(`${props.file.pages} 页`)
-    if (props.params?.copies) parts.push(`${props.params.copies} 份`)
-    rows.push(['内容', parts.join(' · ')])
+    if (props.params?.copies && props.params.copies > 1) parts.push(`${props.params.copies} 份`)
+    const color = props.params ? COLOR_MODE_LABEL[props.params.colorMode] ?? null : null
+    if (color) parts.push(color)
+    core.push(['内容', parts.join(' · ')])
   } else {
-    rows.push(['内容', '尚未取得文件信息，请到订单详情核对'])
+    core.push(['内容', '尚未取得文件信息，请到订单详情核对'])
   }
   if (props.params) {
     const params = [
@@ -279,14 +313,23 @@ function OrderInfo(props: CashierQxViewProps & { channelLabel: string; rows: Row
       COLOR_MODE_LABEL[props.params.colorMode] ?? null,
       DUPLEX_LABEL[props.params.duplex] ?? null,
     ].filter(Boolean)
-    if (params.length > 0) rows.push(['参数', params.join(' · ')])
+    if (params.length > 0) more.push(['参数', params.join(' · ')])
+    if (props.params.copies) more.push(['份数', `${props.params.copies} 份`])
   } else {
-    rows.push(['参数', '尚未取得参数信息，请到订单详情核对'])
+    more.push(['参数', '尚未取得参数信息，请到订单详情核对'])
   }
-  if (props.amountCents !== 0 && props.channelLabel && !props.rows.some(([key]) => key === '支付通道')) rows.push(['支付通道', props.channelLabel])
-  rows.push(...props.rows)
+  if ((props.amountCents ?? 0) > 0) {
+    const yuan = formatCents(props.amountCents ?? 0).replace(/^¥/, '')
+    core.push(['应付', `${yuan} 元`])
+  }
+  if (props.amountCents !== 0 && channelLabel && !stateRows.some(([key]) => key === '支付通道')) more.push(['支付通道', channelLabel])
+  more.push(...stateRows)
+  return { core, more }
+}
+
+function OrderInfo({ rows }: { rows: Row[] }) {
   return (
-    <section className="cashier-qx-group" aria-label="订单信息">
+    <section className="cashier-qx-group pct-sum" aria-label="订单信息">
       <h3>订单信息</h3>
       <dl className="cashier-qx-kv">
         {rows.map(([key, value]) => (
@@ -296,8 +339,25 @@ function OrderInfo(props: CashierQxViewProps & { channelLabel: string; rows: Row
           </div>
         ))}
       </dl>
-      <p className="cashier-qx-p">{props.amountCents === 0 ? '如需核对出纸结果，请联系现场工作人员。' : props.refundAssistanceCopy + '。'}</p>
     </section>
+  )
+}
+
+/** 首屏没有的订单事实，折叠在页底，不删。 */
+function OrderMoreInfo({ rows }: { rows: Row[] }) {
+  if (rows.length === 0) return null
+  return (
+    <details className="cashier-qx-more cashier-qx-moreinfo">
+      <summary>更多订单信息</summary>
+      <dl className="cashier-qx-kv">
+        {rows.map(([key, value]) => (
+          <div key={key}>
+            <dt>{key}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
   )
 }
 
@@ -404,7 +464,7 @@ function Closure({ state, ctx }: { state: CashierQxState; ctx: CopyContext }) {
       <section className="cashier-qx-closure qx-grow" aria-label="没有订单上下文">
         <div className="cashier-qx-empty">
           <span className="cashier-qx-empty-ic"><FileXIcon aria-hidden="true" /></span>
-          <span>没有订单上下文。<br /><b>这里不显示金额，也不出码 —— 出一张扫不通的码只会让你白扫。</b></span>
+          <span><b className="qx-state-t">没有待支付的订单</b><br />没有订单上下文。<br /><b>这里不显示金额，也不出码 —— 出一张扫不通的码只会让你白扫。</b></span>
         </div>
       </section>
     )
@@ -454,12 +514,28 @@ export function CashierQxDock({
   reason,
   children,
   billingChannel,
+  truthOnly = false,
 }: {
   reason: string | null
-  children: ReactNode
+  children?: ReactNode
   /** 这一次真的可能扣款的通道；未确认时为 null，不点名任何一家。 */
   billingChannel: string | null
+  /** 只放事实说明。免费单不要挂这张条，上面有付款、收款。 */
+  truthOnly?: boolean
 }) {
+  const truth = (
+    <div className="cashier-qx-truth pct-note" data-disclaimer="true">
+      <p><b>付款安全</b>请勿重复付款；页面会在系统确认结果后更新。付款码不会在屏幕上完整显示或保存。</p>
+      <p><b>金额确认</b>只有这笔账的金额明确后，才会出收款码。</p>
+      <p>
+        <b>异常处理</b>
+        {billingChannel === 'sandbox'
+          ? `本次走的是测试支付通道，不产生真实账单。结果长时间未更新时，${printProblemLine()}`
+          : `结果长时间未更新时，请先查看你的${channelLabelOf(billingChannel) || '支付'}账单。${printProblemLine()}`}
+      </p>
+    </div>
+  )
+  if (truthOnly) return truth
   return (
     <>
       <div className="cashier-qx-cta-reason">
@@ -470,16 +546,7 @@ export function CashierQxDock({
         />
       </div>
       <div className="cashier-qx-cta-row">{children}</div>
-      <div className="cashier-qx-truth" data-disclaimer="true">
-        <p><b>付款安全</b>请勿重复付款；页面会在系统确认结果后更新。付款码不会在屏幕上完整显示或保存。</p>
-        <p><b>金额确认</b>只有这笔账的金额明确后，才会出收款码。</p>
-        <p>
-          <b>异常处理</b>
-          {billingChannel === 'sandbox'
-            ? '本次走的是测试支付通道，不产生真实账单；结果长时间未更新时请联系工作人员。'
-            : `结果长时间未更新时，请先查看你的${channelLabelOf(billingChannel) || '支付'}账单，再联系工作人员。`}
-        </p>
-      </div>
+      {truth}
     </>
   )
 }

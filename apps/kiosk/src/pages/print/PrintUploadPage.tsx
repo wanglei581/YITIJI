@@ -25,6 +25,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/files/filesApi'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { machineCannotPrintLine, preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
 import {
   getUsbStatus,
   isUsbImportConfigured,
@@ -41,6 +42,7 @@ import {
 } from '../../services/api/documentConversion'
 import { useUploadSession, type PhoneUploadedFile } from '../upload/hooks/useUploadSession'
 import { useStartPrintHandoff } from './usePrintHandoff'
+import { usePickPrintDocuments } from './usePickPrintDocuments'
 import {
   clearPrintMaterialSession,
   type PrintFileState,
@@ -123,6 +125,7 @@ export function PrintUploadPage() {
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const { getToken, isLoggedIn } = useAuth()
+  const pickDocuments = usePickPrintDocuments()
   const device = useTerminalDeviceStatus()
   const { capabilities: conversionCapabilities } = useDocumentConversionCapabilities()
   const wordConversionAvailable = conversionCapabilities.wordToPdf
@@ -159,7 +162,7 @@ export function PrintUploadPage() {
         ? '照片打印'
         : '文档打印'
   const pageSubtitle = device.printerNotice
-    ? device.printerNotice
+    ? preferUnattended(device.printerNotice, machineCannotPrintLine())
     : !isDocumentPrint
       ? '从我的简历或上传一份简历进入打印'
       : isTransferMode
@@ -233,7 +236,7 @@ export function PrintUploadPage() {
           setUsbAgentOffline(false)
           setUsbReadFailed(true)
         }
-        setUsbError(userMessageOf(err, '暂时无法读取 U 盘，请重试或联系工作人员'))
+        setUsbError(preferUnattended(userMessageOf(err, `暂时无法读取 U 盘，请重试。${printProblemLine()}`), `暂时无法读取 U 盘。${printProblemLine()}`))
       }
     }
 
@@ -321,7 +324,7 @@ export function PrintUploadPage() {
     } catch (err) {
       const kind = classifyUploadError(err)
       if (kind !== 'failed') setLocalRejectKind(kind)
-      setUploadError(userMessageOf(err, '上传失败，请重试'))
+      setUploadError(preferUnattended(userMessageOf(err, '上传失败，请重试'), `上传没做成。${printProblemLine()}`))
     } finally {
       setUploading(false)
     }
@@ -371,7 +374,7 @@ export function PrintUploadPage() {
       } else {
         setUsbImportFailed(true)
       }
-      setUsbError(userMessageOf(err, 'U 盘文件导入失败，请重试'))
+      setUsbError(preferUnattended(userMessageOf(err, 'U 盘文件导入失败，请重试'), `U 盘文件没导入。${printProblemLine()}`))
     } finally {
       setUsbUploading(false)
     }
@@ -444,8 +447,6 @@ export function PrintUploadPage() {
     usbReadFailed: Boolean(usbReadFailed && usbError),
   })
 
-  const fromQuery = `${location.pathname}${location.search}`
-
   return (
     <>
     <span
@@ -466,7 +467,7 @@ export function PrintUploadPage() {
       pageSubtitle={pageSubtitle}
       terminalLabel=""
       status={qxStatusFromDevice(device)}
-      orderPausedNotice={device.printerNotice}
+      orderPausedNotice={device.printerNotice ? preferUnattended(device.printerNotice, machineCannotPrintLine()) : device.printerNotice}
       isResumePrint={isResumePrint}
       showFileChannel={showFileChannel}
       showScan={!isResumePrint}
@@ -515,10 +516,7 @@ export function PrintUploadPage() {
       onExit={() => navigate(exitPath)}
       onHelp={() => navigate('/help')}
       onScan={() => navigate('/scan')}
-      onDocuments={() => {
-        if (isLoggedIn) navigate('/me/documents')
-        else navigate('/login', { state: { from: fromQuery } })
-      }}
+      onDocuments={pickDocuments}
       onResumes={() => {
         if (isLoggedIn) navigate('/me/resumes')
         else navigate('/login', { state: { from: '/print/upload?source=resume' } })

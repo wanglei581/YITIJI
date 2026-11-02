@@ -1,0 +1,192 @@
+/* 练面试技巧与练习记录（稿 iv-tips / iv-reports）。只挂在 [data-qx-page="interview"] 下。 */
+
+/* ── 技巧：清单与高频问题是两列大格，下面一张读卡 ── */
+[data-qx-page="interview"] [data-qx-interview].interview-tips .interview-flow__scroll {
+  gap: 6px;
+  padding: 8px 40px 8px;
+}
+
+[data-qx-page="interview"] .interview-tips .qxt-iv-sec {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+[data-qx-page="interview"] .interview-tips .qxt-iv-sec h2 {
+  margin: 0;
+  color: inherit;
+  font: inherit;
+}
+
+[data-qx-page="interview"] .qxt-iv-ckgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+[data-qx-page="interview"] .qxt-iv-ck {
+  display: flex;
+  align-items: center;
+  min-height: 88px;
+  padding: 6px 12px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 16px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: left;
+}
+
+[data-qx-page="interview"] .qxt-iv-ckgrid.is-faq .qxt-iv-ck {
+  min-height: 94px;
+}
+
+[data-qx-page="interview"] .interview-tips.is-gated .qxt-iv-ck {
+  min-height: 76px;
+}
+
+[data-qx-page="interview"] .qxt-iv-ck[aria-pressed="true"] {
+  border-color: var(--qx-teal);
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page="interview"] .qxt-iv-ckgrid.is-faq .qxt-iv-ck[aria-pressed="true"] {
+  border-color: var(--qx-deep);
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+[data-qx-page="interview"] .qxt-iv-recheck {
+  min-height: var(--qxt-tap);
+  justify-content: center;
+}
+
+[data-qx-page="interview"] .qxt-iv-read {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 28px;
+  background: var(--qxt-card);
+}
+
+[data-qx-page="interview"] .qxt-iv-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+}
+
+[data-qx-page="interview"] .qxt-iv-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+[data-qx-page="interview"] .qxt-iv-colhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+[data-qx-page="interview"] .qxt-iv-colhead h2 {
+  margin: 0;
+  color: var(--qxt-ink);
+  font-family: var(--qx-sans);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+[data-qx-page="interview"] .qxt-iv-colhead span {
+  color: var(--qxt-ink-3);
+  font-size: var(--qxt-fs-aux);
+}
+
+[data-qx-page="interview"] .qxt-iv-line {
+  display: block;
+  padding: 2px 0 4px;
+}
+
+[data-qx-page="interview"] .qxt-iv-line b {
+  display: block;
+  font-size: var(--qxt-fs-sub);
+  line-height: 1.3;
+}
+
+[data-qx-page="interview"] .qxt-iv-line span {
+  display: block;
+  color: var(--qxt-ink-2);
+  font-size: var(--qxt-fs-sub);
+  line-height: 1.35;
+}
+
+[data-qx-page="interview"] .qxt-iv-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+[data-qx-page="interview"] .qxt-iv-detail p,
+[data-qx-page="interview"] .qxt-iv-foot {
+  margin: 0;
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  line-height: 1.35;
+}
+
+[data-qx-page="interview"] .qxt-iv-foot {
+  color: var(--qxt-ink-2);
+}
+
+/* ── 练习记录：每条一张记录卡，行业占整行，时长与报告并排，下面查看与删除 ── */
+[data-qx-page="interview"] .qxt-iv-recs {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-qx-page="interview"] .qxt-iv-rec {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 22px;
+  background: var(--qxt-card);
+}
+
+[data-qx-page="interview"] .qxt-iv-rec-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+[data-qx-page="interview"] .qxt-iv-rec-head small {
+  color: var(--qxt-ink-3);
+  font-size: var(--qxt-fs-aux);
+}
+
+[data-qx-page="interview"] .qxt-iv-rec-head b {
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-body);
+  line-height: 1.3;
+}
+
+[data-qx-page="interview"] .qxt-iv-rec .qxt-iv-cells {
+  flex: 1 0 auto;
+  grid-auto-rows: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+[data-qx-page="interview"] .qxt-iv-rec .qxt-iv-cells > div.is-span {
+  grid-column: 1 / -1;
+}

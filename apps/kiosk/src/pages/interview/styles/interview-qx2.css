@@ -161,6 +161,28 @@
   color: var(--qx-teal-d) !important;
 }
 
+/* 触屏壳内的选项必须盖过上面的 52px。选择器只在 .qxt-screen 里生效。 */
+.qxt-screen [data-qx-interview].interview-setup .iv-fields {
+  grid-template-columns: 1fr;
+}
+
+.qxt-screen [data-qx-interview].interview-setup .iv-chips {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.qxt-screen [data-qx-interview].interview-setup .interview-option {
+  width: 100%;
+  min-height: 96px !important;
+  padding: 16px !important;
+  font-size: var(--qxt-fs-body) !important;
+}
+
+.qxt-screen [data-qx-interview].interview-setup .iv-mini-btn {
+  width: 100%;
+  min-height: var(--qxt-tap) !important;
+}
+
 [data-qx-interview] .iv-steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

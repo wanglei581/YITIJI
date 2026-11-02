@@ -1,4 +1,4 @@
-// /legal/:doc 的呈现件（稿 08-legal）。只管排版，不取数、不拼条款正文。
+// /legal/:doc 的呈现件（触屏稿 legal）：文档切换、章节阅读、字号。只管排版，不取数、不拼条款正文。
 // 图标沿用稿里那一套线性路径（stroke 1.9），与 lucide 同体系，逐条对得上稿。
 
 import type { CSSProperties, ReactNode, Ref } from 'react'
@@ -41,30 +41,6 @@ export interface DocMeta {
   sections: Section[]
 }
 
-/** 稿里的区块：编号 + 标题 + 右侧提示，下面是内容。 */
-export function LegalSec({ no, title, hint, aside, className, children }: {
-  no?: string
-  title?: string
-  hint?: string
-  aside?: ReactNode
-  className?: string
-  children: ReactNode
-}) {
-  return (
-    <section className={`legal-doc-sec${className ? ` ${className}` : ''}`}>
-      {title ? (
-        <div className="legal-doc-label">
-          {no ? <span className="no" aria-hidden="true">{no}</span> : null}
-          <h2 className="t">{title}</h2>
-          {hint ? <span className="hint">{hint}</span> : null}
-          {aside}
-        </div>
-      ) : null}
-      {children}
-    </section>
-  )
-}
-
 export function DocTabs({ docs, active, onSwitch }: { docs: DocMeta[]; active: DocMeta['key']; onSwitch: (key: DocMeta['key']) => void }) {
   return (
     <div className="legal-doc-tabs" role="group" aria-label="法律文档">
@@ -74,20 +50,6 @@ export function DocTabs({ docs, active, onSwitch }: { docs: DocMeta[]; active: D
           <Glyph name={doc.glyph} size={26} />{doc.title}
         </button>
       ))}
-    </div>
-  )
-}
-
-export function DocHead({ doc, meta }: { doc: DocMeta; meta: ReactNode }) {
-  return (
-    <div className="legal-doc-head">
-      <span className="legal-doc-ic" data-tone={doc.tone}><Glyph name={doc.glyph} size={38} /></span>
-      <div className="legal-doc-head-main">
-        <div className="legal-doc-eyebrow" aria-hidden="true">{doc.eyebrow}</div>
-        <h2 className="legal-doc-title">{doc.title}</h2>
-        <p className="legal-doc-sum">{doc.summary}</p>
-        <div className="legal-doc-meta">{meta}</div>
-      </div>
     </div>
   )
 }
@@ -115,7 +77,8 @@ export function LegalReader({ sections, active, onSelect, fontPercent, bodyRef }
   return (
     <div className="legal-doc-reader">
       <aside className="legal-doc-toc" aria-label="章节目录" data-testid="legal-list">
-        <p className="legal-doc-toc-title" aria-hidden="true">章节目录</p>
+        {/* 稿上目录没有标题字，样式把它收起来；给读屏留一个 h2，章节标题仍是下面的 h3。 */}
+        <h2 className="legal-doc-toc-title">章节目录</h2>
         {sections.map((item, index) => (
           <button key={`${index}-${item.title}`} type="button" aria-current={index === active ? 'true' : undefined}
                   data-testid={`legal-sec-${index}`} onClick={() => onSelect(index)}>
@@ -128,65 +91,6 @@ export function LegalReader({ sections, active, onSelect, fontPercent, bodyRef }
         <h3>{section.title}</h3>
         {section.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
       </article>
-    </div>
-  )
-}
-
-/** 取正文期间只放槽位：六条目录形状 + 八行正文形状，不放任何文字。 */
-export function ReaderSkeleton() {
-  return (
-    <div className="legal-doc-sk" aria-hidden="true">
-      <div className="legal-doc-sk-toc">{Array.from({ length: 6 }, (_, index) => <i key={index} />)}</div>
-      <div className="legal-doc-sk-body">{Array.from({ length: 8 }, (_, index) => <i key={index} />)}</div>
-    </div>
-  )
-}
-
-export function LegalCard({ tone, glyph, title, children }: { tone: Tone; glyph: GlyphName; title: string; children: ReactNode }) {
-  return (
-    <div className="legal-doc-card">
-      <h3><span className="legal-doc-ic" data-tone={tone}><Glyph name={glyph} size={26} /></span>{title}</h3>
-      {children}
-    </div>
-  )
-}
-
-export function StateBlock({ kind, glyph, title, testId, live, children }: {
-  kind: 'warn' | 'error'
-  glyph: GlyphName
-  title: string
-  testId?: string
-  live?: boolean
-  children: ReactNode
-}) {
-  return (
-    <div className="legal-doc-state" data-kind={kind} data-testid={testId} role={live ? 'status' : undefined}>
-      <h2 className="legal-doc-state-h"><Glyph name={glyph} size={28} />{title}</h2>
-      {children}
-    </div>
-  )
-}
-
-/** not-found 的大选择卡：带前三章标题，点之前就知道两份文档不是同一个东西。 */
-export function PickCard({ doc, sections, onPick }: { doc: DocMeta; sections: Section[]; onPick: () => void }) {
-  return (
-    <button type="button" className="legal-doc-pick" data-testid={`legal-pick-${doc.key}`} onClick={onPick}>
-      <span className="legal-doc-ic" data-tone={doc.tone}><Glyph name={doc.glyph} size={30} /></span>
-      <span className="legal-doc-pick-t">{doc.title}</span>
-      <span className="legal-doc-pick-d">{doc.summary}</span>
-      <span className="legal-doc-pick-secs">
-        {sections.slice(0, 3).map((section, index) => <span key={`${index}-${section.title}`}>· {section.title}</span>)}
-        <span>· 等共 {sections.length} 章</span>
-      </span>
-    </button>
-  )
-}
-
-export function LegalTruth() {
-  return (
-    <div className="legal-doc-truth" data-disclaimer="true" data-testid="legal-truth">
-      <p><b>正文从哪来</b>条款正文由运营方发布、经系统返回；本机留存文本只在取不到时出现，并标明不作为正式版本。</p>
-      <p><b>怎么算数</b>以运营方正式发布的版本为准。取不到正文时这里会明说取不到，不会拿旧文本顶上让你误以为读到了现行条款。</p>
     </div>
   )
 }

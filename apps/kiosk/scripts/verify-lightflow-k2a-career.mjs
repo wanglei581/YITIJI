@@ -34,10 +34,16 @@ check(page.includes("import './resume-decision-qx.css'"), '职业规划页必须
 check(!/careerPlan-(?:inkpaper|lightflow)\.css/.test(page), '职业规划页不得再导入 InkPaper / LightFlow 样式')
 check(!/KioskFullscreenShell|KioskPageFrame|service-desk/.test(page), '职业规划页不再混入旧壳与旧色系')
 check(page.includes('<JobFitStage>'), '职业规划页挂宿主 46 的共用舞台（1080×1920 定高；手机流式，横屏电脑与一体机同缩放）')
-check((page.match(/<QxPageFrame/g) ?? []).length === 1, '全部状态共用一层 QxPageFrame，不按屏各挂一个壳')
+check((page.match(/<ResumeTouchFrame/g) ?? []).length === 1, '全部状态共用一层触屏壳，不按屏各挂一个壳')
 check(page.includes('data-kiosk-screen="resume-career-plan"'), '职业规划保留稳定 landmark')
 check(page.includes('data-state={screen}'), '职业规划把当前状态铺到 DOM 上供断言')
-check(page.includes('<Waiting') && kit.includes('role="status" aria-live="polite"'), '职业规划读取与生成中必须提供状态播报（Waiting 自带 status + polite）')
+// 读取中走本包的 ResumeWaitState（里面渲染 Waiting），生成中走 CareerPlanGenerateRegion 的 Waiting；
+// 两条路径都要落到带 status + polite 的 Waiting 上。比原来只看页面里有没有 <Waiting 多钉了两处出处。
+const states = readRequired('src/pages/resume/touch/ResumeStates.tsx')
+check(
+  page.includes('<ResumeWaitState') && states.includes('<Waiting') && section.includes('<Waiting') && kit.includes('role="status" aria-live="polite"'),
+  '职业规划读取与生成中必须提供状态播报（读取走 ResumeWaitState → Waiting，生成走 CareerPlanGenerateRegion 的 Waiting；Waiting 自带 status + polite）',
+)
 check(page.includes('role="alert"'), '职业规划错误必须提供告警语义')
 check(page.includes('className="qx-scroll"') && page.includes('ctabar={view.cta}'), '内容区独立滚动，出口按钮留在滚动区之外的操作条上')
 
@@ -141,6 +147,9 @@ check(
   'ai-down 自查三条必须如实说明它不是针对本人简历的结论',
 )
 check(/aiOutage \? 'ai-down'/.test(page) && page.includes('<CareerPlanSelfCheck />'), 'ai-down 自查三条只在真的 ai-down 屏出现')
+// 生成中屏的边界声明是稿 career 的原句，不写讲页面自己怎么做的话（进度百分比、阶段名称、不生成打印文件、不发起支付）。
+check(page.includes('<QxTouchCallout kind="fine">不承诺录用或收入。</QxTouchCallout>'), '求职方案生成中屏的边界声明是稿原句「不承诺录用或收入。」')
+check(!/不显示进度百分比或阶段名称|也不生成打印文件、不发起支付/.test(page), '求职方案生成中屏不写讲页面自己怎么做的批注')
 
 check(css.length > 0, '宿主 46 四栏样式不得为空')
 check(lineCount(css) < 300, `宿主 46 四栏样式必须少于 300 行（当前 ${lineCount(css)}）`)

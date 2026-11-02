@@ -8,7 +8,9 @@ for (const page of ['Documents', 'Resumes', 'AiRecords', 'Benefits', 'Feedback',
   const source = read(`src/pages/profile/me/My${page}Page.tsx`)
   assert.ok(source.includes('useMemberCursorPage') && source.includes('MemberLoadMore'), `${page}: real cursor hook and touch action`)
 }
-assert.match(read('src/pages/profile/me/MemberLoadMore.tsx'), /minHeight: 56/)
+// 触屏版第 6 包：加载更多键改用 MeBtn，触控高度由 .me-btn 的 min-height: var(--qxt-tap)（64px）保证，比原来的 56 更高。
+assert.match(read('src/pages/profile/me/MemberLoadMore.tsx'), /<MeBtn[^>]*className="me-wide"/)
+assert.match(read('src/pages/profile/touch/me-touch.css'), /\.me-btn\s*\{[^}]*min-height:\s*var\(--qxt-tap\)/)
 assert.match(read('src/pages/profile/me/MyDocumentsPage.tsx'), /items.length === 0 && !pagination.nextCursor/)
 assert.match(read('src/pages/profile/me/MyResumesPage.tsx'), /confirmDelete.ownerToken === token/)
 assert.match(read('src/pages/profile/me/MyResumesPage.tsx'), /taskId: item.taskId, resumeName: resumeLabel\(item\)/)
