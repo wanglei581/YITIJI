@@ -1,5 +1,16 @@
 # 当前开发进度
 
+## 2026-11-03：屏上扫描 ③ 后端 B6（扫描轮次替换 deviceUpdatedAt 钉；取消倒计时不再另查库；分支 `claude/scan-device-b2-1102`，叠在 B5 头 `dec1dfb2e` 上，未推送、未部署）
+
+- Codex 复审 B4 的三条都按协调方的判定改了。`ScanTask` 加 `deviceRound Int @default(0)`（两套 schema）。新迁移 `20261103030000_add_scan_device_round`，两套目录同名，排在 `20261102230000_add_scan_device_session_fields` 之后。`verify-first-order-migrations` 的升级清单补了这一行：升级前的旧行取 0，新行默认 0，可以加一。
+- 轮次只在回报从 `ready` 或 `error` 转到 `scanning` 时加一（`deviceState` 还是空时按 `ready`）。同状态重发、`page_ready` 与 `scanning` 之间翻页、改设置回到 `ready` 都不加。加一写在回报那次条件更新里，where 仍钉读到的 `deviceState`，同一次转移不会被并发回报加两次。
+- current-lease 对 device 任务把当时的 `deviceRound` 放进签名负载（在 nonce 之后；0 也写进去）。响应顶层和 `device` 段不多这个字段。面板任务不传，签名负载没有这个键。投递先比对已验签轮次和库里的 `deviceRound`，不等就 409 `SCAN_TASK_STATE_CHANGED`，不建文件；抢占再钉读到的 `deviceRound`。B4 的 `deviceUpdatedAt` 钉已去掉。面板租约与投递不比轮次。
+- 取消成功后不再为倒计时另查库。这次取消自己的时间写进 `updatedAt`，`quietPeriodEndsAt` 和 `serverNow` 用它和静默期窗口算出。静默期关着时两个时刻仍相同。
+- 门禁 `verify:scan-device-b6` 进 `package.json` 和 `ci.yml` 的 SQLite、postgres-readiness 两处。生命周期门禁里「没读到 `deviceUpdatedAt` 就钉 null」改成「没读到 `deviceRound` 就钉 0」；「钉读到的时间」改成「钉读到的轮次」。时间会被合法的同状态重发改掉，轮次不会。A2b 仍是 409、不建文件、新一轮 delivering 还在。
+- 终端程序没改。这份工作区里的终端程序只把 `deliveryLease` 当整段字符串附上，不解析负载；屏上扫描的投递代码不在 `apps/terminal-agent` 里。
+- 验证（本机隔离库，`RECRUITMENT_CONTENT_HOSTING_ENABLED=false`，独立 Redis `127.0.0.1:57267`，用完已停）：api typecheck、`eslint src/`、`db:pg:sync:check`（「postgres schema 同步校验通过」）过。SQLite 空库 `file:/tmp/verify-b6-sqlite.db` 的 `migrate deploy` 129 条全部应用，含这条新迁移。临时 PostgreSQL 16（127.0.0.1:57269，时区 UTC，库名 `b6_verify`，用完已停）空库 `migrate deploy` 101 条全部应用，`migrate diff` 无差异。`verify:first-order-migrations` 在 SQLite 与它自己的临时库上都打印了 `scan deviceRound defaults to 0 ... can increment`。扫描、文件留存、材料处理相关门禁在两套库上都过；`verify:scan-tasks` 在 PostgreSQL 上没有「SKIPPED real DB」。`verify:repository-integrity` 三项 OK。`pnpm graph:check` 通过。反向检查三处（轮次不进签名负载、投递不比轮次、同状态回报也加轮次）都让 `verify:scan-device-b6` 变红，`git checkout --` 恢复后工作区干净。
+- 没做：一体机、终端程序、小程序、两个后台没动。未推送、未部署。哪台机器都不许因此把 `scan_device` 配成 available。
+
 ## 2026-11-03：屏上扫描 ③ 后端 B5（证件 PDF 每页 OCR、页数读不出就拒收；分支 `claude/scan-device-b2-1102`，叠在 B4 头 `dfd2ab8a0` 上，未推送、未部署）
 
 - Codex 复审 B3 第 1–6 条回源码后属实，按协调方定的做法修。第 7 条（本线门禁里 `lease.device` 的整对象精确比对、补 maxPages / maxBytes）没动。
