@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
+import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { useLocalScanProbe } from '../../hooks/useTerminalDeviceStatus'
+import { FeederArt, GlassArt } from './ScanGuideArt'
 import { SCAN_MATERIALS, defaultDeviceChoice, type ScanDeviceChoice, type ScanMaterial } from './scanMaterials'
 import { scanReadyChipText } from './scanProbeCopy'
 import { SCAN_DEVICE_RAIL, ScanWorkbenchShell } from './ScanWorkbenchChrome'
@@ -56,6 +58,7 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
       onBandBack={() => onGoStage?.('how')}
       dock={{ left: { label: '返回', onClick: () => onGoStage?.('how') } }}
     >
+      <div className="cs-set">
       <div className="cs-sec">纸放哪？</div>
       <div className="cs-two">
         <button
@@ -65,11 +68,11 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
           aria-pressed={choice.source === 'flatbed'}
           onClick={() => pick({ ...choice, source: 'flatbed' })}
         >
-          <span>
-            <b>玻璃台</b>
-            <span className="d">一次一页，适合证件、书本</span>
-            <span className="d2">字朝下，对齐左上角</span>
-          </span>
+          <span className="vis" aria-hidden="true"><GlassArt /></span>
+          <b>玻璃台</b>
+          <span className="d">一次一页，适合证件、书本</span>
+          <span className="d2">字朝下，对齐左上角</span>
+          <span className="cs-tick" aria-hidden="true"><QxTouchIcon name="check" size={26} strokeWidth={3} /></span>
         </button>
         <button
           type="button"
@@ -78,11 +81,11 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
           aria-pressed={choice.source === 'feeder'}
           onClick={() => pick({ ...choice, source: 'feeder' })}
         >
-          <span>
-            <b>进纸器</b>
-            <span className="d">一叠最多 50 页，只扫单面</span>
-            <span className="d2">字朝上</span>
-          </span>
+          <span className="vis" aria-hidden="true"><FeederArt /></span>
+          <b>进纸器</b>
+          <span className="d">一叠最多 50 页，只扫单面</span>
+          <span className="d2">字朝上</span>
+          <span className="cs-tick" aria-hidden="true"><QxTouchIcon name="check" size={26} strokeWidth={3} /></span>
         </button>
       </div>
       <div className="cs-sec">黑白还是彩色？</div>
@@ -104,7 +107,11 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
           彩色<small>带照片、带颜色的材料</small>
         </button>
       </div>
-      <p className="cs-howto">多页单面材料用进纸器一次扫完；玻璃台适合证件、书本，一面一面扫</p>
+      <div className="cs-howto">
+        <QxTouchIcon name="help" size={34} strokeWidth={2} />
+        <span>多页单面材料用进纸器一次扫完；玻璃台适合证件、书本，一面一面扫</span>
+      </div>
+      </div>
     </ScanWorkbenchShell>
   )
 }
