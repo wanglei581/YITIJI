@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-11-02：依赖安全——follow-redirects 1.16.1 → 1.16.2（单独先进 main，解开全仓 CI）
+
+- 原因：10/30 收录的高危公告 GHSA-mrwp-f3q8-3g9p（跨 realm 的敏感请求头数组被丢弃、自定义凭据可随重定向带出）打中仓库钉住的 follow-redirects 1.16.1，修复版 1.16.2；main 上所有 PR 的 build-and-verify 都红在「Dependency security gate」。
+- 改动：只拣触屏线的修复提交 8d0b2f9e9（在 #1525 发布准备线上）里的 `pnpm-workspace.yaml` 钉子与 `pnpm-lock.yaml`；不带该线的其它内容。#1525 以后合进来是同一份改动。
+- 验证：`pnpm install --frozen-lockfile` 通过；`node scripts/verify-dependency-security.mjs` 全部 OK（full tree 与 --prod 的未接受高危 / 严重均为 0）。
+
 ## 2026-10-29：一体机共享模块的「找 / 联系现场工作人员」说法换成无人值守标准句，加只减不增门禁（分支 `claude/kiosk-unattended-shared-copy`）
 
 - 依据：产品负责人定「一体机在政府就业服务大厅等场所无人值守，现场没有工作人员；任何错误分支都不许出现联系 / 找（现场）工作人员，需要求助时只给服务电话或站内出路」。标准句与禁用说法在 `apps/kiosk/src/copy/unattendedCopy.ts`（10/6 先行合入），本包只换页面目录（`src/pages/`）以外的共享模块；页面目录正被触屏版各页面包整页重写，不在这里改，免得和它们冲突。
