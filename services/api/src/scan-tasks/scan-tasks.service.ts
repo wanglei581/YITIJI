@@ -162,6 +162,7 @@ export const SCAN_TYPE_TO_PURPOSE: Record<ScanType, FilePurpose> = {
 // 面向用户的失败原因必须是白名单文案，绝不透出内部错误细节（对齐 print-jobs.service.ts 同类做法）。
 const USER_FACING_SCAN_ERROR: Record<string, string> = {
   SCAN_UPLOAD_FAILED: '扫描文件处理失败，请重新扫描',
+  SCAN_FILE_TYPE_NOT_ALLOWED: '这次扫出来的文件格式不收：证件扫描请在打印机屏幕上选图片格式（JPG）后重扫。',
   // B1-5：ScanTaskReaperTask 收敛卡在 'matched' 状态太久的任务时写入的 errorCode，
   // 必须在这里登记白名单文案，否则 getStatus() 会把它 fallback 成通用的
   // '扫描处理失败，请重试'，用户看不到"超时未完成"这个更准确的原因。
@@ -1124,12 +1125,17 @@ export class ScanTasksService {
       }
       return { scanTaskId: task.id, fileId: uploaded.fileId }
     } catch (error) {
+      const response = error instanceof BadRequestException ? error.getResponse() : null
+      const detail = response && typeof response === 'object' && 'error' in response ? response.error : null
+      const errorCode = detail && typeof detail === 'object' && 'code' in detail && detail.code === 'FILE_MIME_NOT_ALLOWED'
+        ? 'SCAN_FILE_TYPE_NOT_ALLOWED'
+        : 'SCAN_UPLOAD_FAILED'
       await this.prisma.scanTask.updateMany({
         where: { id: task.id, status: 'matched' },
         data: {
           status: 'failed',
-          errorCode: 'SCAN_UPLOAD_FAILED',
-          errorMessage: USER_FACING_SCAN_ERROR.SCAN_UPLOAD_FAILED,
+          errorCode,
+          errorMessage: USER_FACING_SCAN_ERROR[errorCode],
           retryAuthorityExpiresAt: new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS),
         },
       })

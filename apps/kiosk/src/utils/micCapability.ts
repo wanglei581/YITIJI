@@ -43,6 +43,12 @@ export const MIC_STATUS_LABEL: Record<MicCapabilityState, string> = {
 }
 
 /**
+ * 本机探到了麦克风，但语音转写服务没开时的状态格说法。
+ * 只陈述硬件事实，不说「可用」：能不能语音回答还要看转写服务，那件事由常显原因讲一次（走查 I-24）。
+ */
+export const MIC_DETECTED_LABEL = '已检测到麦克风'
+
+/**
  * 常显原因 + 可执行的下一步。
  * 一体机没有 hover，原因不能塞进 title，必须常驻在页面上（见 CLAUDE.md §9）。
  * 「无权限」文案不能把人指去地址栏：一体机是全屏模式、没有地址栏，所以写成两边都成立的说法。

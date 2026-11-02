@@ -49,6 +49,12 @@ async function main(): Promise<void> {
     terminal: {
       update: async () => ({}),
       updateMany: async () => ({ count: 0 }),
+      // 公开只读 printer-status（一体机「机器状态」页读）：按终端取最近一条心跳。
+      findFirst: async () => ({
+        id: terminalId,
+        terminalCode: 'SCAN-TELEMETRY-001',
+        heartbeats: latestHeartbeat ? [latestHeartbeat] : [],
+      }),
       findMany: async () => [{
         id: terminalId,
         terminalCode: 'SCAN-TELEMETRY-001',
@@ -102,10 +108,25 @@ async function main(): Promise<void> {
   assert.equal(projected?.scanInputReason, 'watcher_error')
   assert.equal(projected?.scanInputObservedAt, '2026-09-13T10:20:30.123Z')
 
+  // 10/29 本机走查 I-01：一体机「机器状态」页要读到「扫描件的存放」这一项的真实读数。公开只读的 printer-status
+  // 只给这一档（不带原因码、恢复动作、路径），锁死时给 locked_out，不冒充可用。
+  const publicLocked = await admin.getTerminalPrinterStatus(terminalId)
+  assert.equal(publicLocked.found, true)
+  assert.equal(publicLocked.scanInputHealth, 'locked_out')
+  assert.deepEqual(
+    Object.keys(publicLocked).sort(),
+    ['found', 'isOnline', 'lastSeenAt', 'printerStatus', 'scanInputHealth'],
+    'public printer-status must not leak scan input reason, action or observation time',
+  )
+
   await agent.heartbeat(terminalId, validHealthy, 'Bearer redacted')
   assert.equal(latestHeartbeat?.scanInputHealth, 'healthy')
   assert.equal(latestHeartbeat?.scanInputAction, 'none')
   assert.equal(latestHeartbeat?.scanInputReason, null)
+  assert.equal((await admin.getTerminalPrinterStatus(terminalId)).scanInputHealth, 'healthy')
+  // 库里出现不认识的值：当 unknown，不冒充 healthy。
+  latestHeartbeat = { ...latestHeartbeat!, scanInputHealth: 'ok-ish' }
+  assert.equal((await admin.getTerminalPrinterStatus(terminalId)).scanInputHealth, 'unknown')
 
   latestHeartbeat = undefined
   await agent.heartbeat(terminalId, plainToInstance(HeartbeatDto, { status: 'online' }), 'Bearer redacted')
@@ -118,6 +139,11 @@ async function main(): Promise<void> {
   assert.equal(oldAgentProjection?.scanInputAction, null)
   assert.equal(oldAgentProjection?.scanInputReason, null)
   assert.equal(oldAgentProjection?.scanInputObservedAt, null)
+  assert.equal(
+    (await admin.getTerminalPrinterStatus(terminalId)).scanInputHealth,
+    null,
+    'old Agents do not report scan input health: the kiosk must read null as unread, not as healthy',
+  )
 
   for (const invalidSemanticDto of [
     { scanInputHealth: 'locked_out', scanInputAction: 'none', scanInputReason: 'watcher_error', scanInputObservedAt: '2026-09-13T10:20:30.123Z' },

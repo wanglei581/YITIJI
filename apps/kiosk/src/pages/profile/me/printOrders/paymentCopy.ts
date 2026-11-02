@@ -149,7 +149,7 @@ export const NET_PAID_UNRECORDED_HINT = '没有单独记下实付，不按应付
 /** API-20：已付款未出纸的待退款展示。到账时间不以天数承诺，渠道不在我们控制范围内。 */
 export const PENDING_REFUND_LABEL = '待退款'
 export const PENDING_REFUND_EXPLANATION =
-  '本单已确认未出纸，退款由工作人员处理，到账时间以支付渠道为准'
+  '本单已确认未出纸，退款会按支付渠道处理，到账时间以支付渠道为准'
 
 /**
  * 0 元单：已经有订单，且金额为 0 或来源是免费。

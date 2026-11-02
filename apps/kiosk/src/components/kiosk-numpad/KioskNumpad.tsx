@@ -22,6 +22,7 @@ export function KioskNumpad({
   disabled = false,
   label = '数字键盘',
   leadKey,
+  delText = '删除',
 }: {
   value: string
   onChange: (next: string) => void
@@ -31,6 +32,8 @@ export function KioskNumpad({
   /** 左下角功能键槽。不传时是「清空」；页面另有更该占这个位置的动作时替换它
    *  （取件码页放「输入历史码」——用户拿的是哪种码，比清空更早需要决定）。 */
   leadKey?: { text: string; onPress: () => void; ariaLabel?: string; active?: boolean }
+  /** 右下角删除键上的字（稿「删一位」）。读屏名仍是「删除」。 */
+  delText?: string
 }) {
   const press = (next: string) => {
     if (disabled) return
@@ -82,7 +85,7 @@ export function KioskNumpad({
         if (maxLength && value.length >= maxLength) return
         press(value + '0')
       })}
-      {key('删除', () => press(value.slice(0, -1)), {
+      {key(delText, () => press(value.slice(0, -1)), {
         className: 'knp-fn knp-del',
         ariaLabel: '删除',
         disabled: value.length === 0,

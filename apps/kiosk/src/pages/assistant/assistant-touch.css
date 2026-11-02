@@ -1,0 +1,453 @@
+/* 问小青触屏版正文。只挂在本页，不改 .qxt-* 默认；块的通用样式在 public-touch.css。
+   选择器多带一层 .kassist.kassist-qingxu，压过 assistant-qingxu*.css 里的旧规则。 */
+
+.qxt-screen[data-qx-page='assistant'] .qxt-body { padding: 0; gap: 0; }
+.qxt-screen[data-qx-page='assistant'] .qxp-fill { overflow: hidden; gap: 0; }
+.qxt-screen[data-qx-page='assistant'] .kassist.kassist-qingxu {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.qxt-screen[data-qx-page='assistant'] .kassist.kassist-qingxu .assistant-workbench {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  gap: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.qxt-screen[data-qx-page='assistant'] .kassist.kassist-qingxu .assistant-workbench[data-kb-open] { padding-bottom: max(0px, calc(var(--kassist-kb-h) - var(--qxt-nav-h))); }
+
+/* 正文：左右 40，纵向排；吸收块拿余高 */
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-cockpit-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 40px 12px;
+}
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-cockpit-body > * { flex-shrink: 0; }
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-task-picker {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-conversation {
+  flex: 1 0 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* AI 暂不可用：同屏有失败说明、通知条、专项行、四张入口和求助句，行距收紧一点，求助句不被挤出这一屏。
+   通知条本身用共享的 qxt-body-aidown 紧凑样式（页面传 bodyClassName，见 AssistantPage）。 */
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-conversation[data-turn='locked'] { gap: 8px; }
+
+/* 本机 AI 专项这一行 */
+.qxt-screen[data-qx-page='assistant'] .assistant-tools-open { min-height: 94px; }
+
+/* 四张主题卡：2×2，余高平分 */
+.qxt-screen[data-qx-page='assistant'] .kassist.kassist-qingxu .assistant-task-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 12px;
+  padding: 0;
+}
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-task {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  color: var(--qxt-ink);
+  text-align: left;
+  overflow: hidden;
+}
+.qxt-screen[data-qx-page='assistant'] .assistant-task-top { display: flex; gap: 14px; align-items: flex-start; }
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-task-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+}
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-task-icon svg { width: 32px; height: 32px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-task-copy { min-width: 0; }
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-task-copy strong { display: block; font-size: 28px; line-height: 1.3; }
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-task-copy small { display: block; margin-top: 4px; font-size: var(--qxt-fs-aux); line-height: 1.4; color: var(--qxt-ink-2); font-weight: 500; }
+.qxt-screen[data-qx-page='assistant'] .assistant-task-art { flex: 1; min-height: 0; display: flex; justify-content: flex-end; align-items: flex-end; overflow: hidden; }
+.qxt-screen[data-qx-page='assistant'] .assistant-task-art > svg { height: auto; max-height: 100%; width: auto; max-width: 100%; }
+
+/* 两个或三个按钮一排 */
+.qxt-screen[data-qx-page='assistant'] .assistant-task-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-task-actions[data-cols='3'] { grid-template-columns: repeat(3, 1fr); }
+.qxt-screen[data-qx-page='assistant'] .kassist :is(.assistant-direct-question, .assistant-complaint) {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 0;
+  min-height: 80px;
+  padding: 12px 16px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  color: var(--qxt-ink);
+  text-align: left;
+}
+.qxt-screen[data-qx-page='assistant'] .assistant-task-actions strong { font-size: 28px; line-height: 1.3; }
+.qxt-screen[data-qx-page='assistant'] .assistant-task-actions small { margin-top: 4px; font-size: var(--qxt-fs-aux); line-height: 1.4; color: var(--qxt-ink-2); font-weight: 500; }
+
+/* 选了主题：三张问题卡，点一下就发 */
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-quick-questions { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 0; }
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-quick-question {
+  flex: 1;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 24px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  color: var(--qxt-ink);
+  text-align: center;
+  overflow: hidden;
+}
+.qxt-screen[data-qx-page='assistant'] .assistant-quick-question b { font-size: 28px; line-height: 1.3; }
+.qxt-screen[data-qx-page='assistant'] .assistant-quick-question small { font-size: var(--qxt-fs-aux); line-height: 1.4; color: var(--qxt-ink-2); font-weight: 500; }
+.qxt-screen[data-qx-page='assistant'] .assistant-quick-art { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; width: 100%; }
+.qxt-screen[data-qx-page='assistant'] .assistant-quick-art > svg { max-height: 100%; width: auto; height: auto; }
+
+/* 专项场景：两张说明卡 */
+.qxt-screen[data-qx-page='assistant'] .assistant-scene-pair { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+.qxt-screen[data-qx-page='assistant'] .assistant-scene-pair .qxp-card { overflow: hidden; }
+
+/* 对话区：标题只留给读屏 */
+.qxt-screen[data-qx-page='assistant'] .kassist-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-transcript { display: flex; flex-direction: column; gap: 12px; min-height: 0; padding: 0; }
+.qxt-screen[data-qx-page='assistant'] .assistant-message { display: block; margin: 0; max-width: none; }
+.qxt-screen[data-qx-page='assistant'] .assistant-message-avatar { display: none; }
+.qxt-screen[data-qx-page='assistant'] .assistant-message-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: none;
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: 24px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-body);
+  line-height: 1.5;
+}
+.qxt-screen[data-qx-page='assistant'] .assistant-message-bubble p { margin: 0; font-size: 28px; line-height: 1.5; }
+.qxt-screen[data-qx-page='assistant'] .assistant-message--user .assistant-message-bubble p { font-size: var(--qxt-fs-body); }
+.qxt-screen[data-qx-page='assistant'] .assistant-message-who,
+.qxt-screen[data-qx-page='assistant'] .assistant-message-provider { font-size: var(--qxt-fs-aux); font-weight: 700; color: var(--qxt-teal-ink); }
+.qxt-screen[data-qx-page='assistant'] .assistant-message-bubble:has(.assistant-message-evrow) { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 12px; row-gap: 8px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-message-bubble:has(.assistant-message-evrow) > p { flex: 1 0 100%; }
+.qxt-screen[data-qx-page='assistant'] .assistant-message-evrow { order: -2; font-size: var(--qxt-fs-aux); }
+.qxt-screen[data-qx-page='assistant'] .assistant-message-provider { order: -1; }
+.qxt-screen[data-qx-page='assistant'] .assistant-conversation:is([data-turn='notai'], [data-turn='error'], [data-turn='locked']) .assistant-message--user { display: none; }
+.qxt-screen[data-qx-page='assistant'] .assistant-message-kept { color: var(--qxt-ink); font-weight: 700; }
+.qxt-screen[data-qx-page='assistant'] .assistant-message-bubble--error,
+.qxt-screen[data-qx-page='assistant'] .assistant-message-bubble--not-ai { background: var(--qxt-well); border-color: transparent; border-radius: var(--qxt-r-btn); padding: 18px 26px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-message-bubble--error strong,
+.qxt-screen[data-qx-page='assistant'] .assistant-message-bubble--not-ai strong { font-size: var(--qxt-fs-step); }
+.qxt-screen[data-qx-page='assistant'] .assistant-message-bubble--error p,
+.qxt-screen[data-qx-page='assistant'] .assistant-message-bubble--not-ai p { font-size: var(--qxt-fs-body); color: var(--qxt-ink-2); }
+.qxt-screen[data-qx-page='assistant'] .assistant-provenance { display: flex; gap: 12px; margin: 0; font-size: var(--qxt-fs-aux); color: var(--qxt-ink-2); }
+.qxt-screen[data-qx-page='assistant'] .assistant-provenance div { display: flex; gap: 8px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-provenance dd { margin: 0; }
+
+/* 只留给读屏的任务区：失败说明与空闲句；在等的时候才画出来 */
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* 任务区里降级卡的动作（「去打印扫描」）：旧样式 assistant-qingxu-content.css 写死 56，这里抬到 64×64 以上。
+   ai/ 共享件和 ai-primitives.css 的默认不动；这一格目前在上面那个读屏区里，抬高只为任何一态露出来时都够大。 */
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-ai-status .kiosk-ai-fallback__action { min-height: 64px; min-width: 64px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-wait-pair { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+.qxt-screen[data-qx-page='assistant'] .assistant-wait-card { overflow: hidden; }
+.qxt-screen[data-qx-page='assistant'] .assistant-thinking-bar,
+.qxt-screen[data-qx-page='assistant'] .assistant-thinking-slot { margin: 0; font-size: var(--qxt-fs-sub); line-height: 1.5; color: var(--qxt-ink-2); }
+.qxt-screen[data-qx-page='assistant'] .assistant-thinking-bar { font-weight: 700; color: var(--qxt-ink); }
+
+/* 回答之后：一张大卡吸收余高（回答、不替你决定、去办理、插画），下面三个按钮 */
+.qxt-screen[data-qx-page='assistant'] .assistant-reply-card { flex: 1 1 0; min-height: 0; gap: 10px; overflow: hidden; padding: 14px 16px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-reply-card > * { flex-shrink: 0; }
+.qxt-screen[data-qx-page='assistant'] .assistant-reply-card > .qxp-artbox { flex: 1 1 0; min-height: 0; }
+.qxt-screen[data-qx-page='assistant'] .assistant-reply-card .assistant-transcript { gap: 10px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-reply-card .assistant-message-bubble { padding: 0; border: 0; background: transparent; border-radius: 0; }
+.qxt-screen[data-qx-page='assistant'] .assistant-reply-card .assistant-message-bubble p { font-size: 34px; line-height: 1.45; font-family: var(--qx-serif); font-weight: 700; }
+.qxt-screen[data-qx-page='assistant'] .assistant-reply-card .assistant-message--user .assistant-message-bubble p { font-size: var(--qxt-fs-body); font-family: var(--qx-sans); font-weight: 500; }
+.qxt-screen[data-qx-page='assistant'] .assistant-bounds { display: flex; flex-direction: column; gap: 6px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-bounds ul { margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 22px; list-style: none; }
+.qxt-screen[data-qx-page='assistant'] .assistant-bounds li { font-size: var(--qxt-fs-sub); color: var(--qxt-ink-2); }
+.qxt-screen[data-qx-page='assistant'] .assistant-bounds li::before { content: '· '; color: var(--qxt-teal-ink); font-weight: 700; }
+.qxt-screen[data-qx-page='assistant'] .action-chips { display: flex; flex-direction: column; gap: 10px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-go-hit {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 96px;
+  padding: 12px 22px;
+  border-radius: var(--qxt-r-btn);
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  text-align: left;
+}
+.qxt-screen[data-qx-page='assistant'] .assistant-go-ic { width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center; flex: none; background: var(--qx-teal); color: var(--qx-on-solid); }
+.qxt-screen[data-qx-page='assistant'] .assistant-go-tx b { display: block; font-size: 28px; line-height: 1.3; }
+.qxt-screen[data-qx-page='assistant'] .assistant-go-tx small { display: block; margin-top: 2px; font-size: var(--qxt-fs-aux); color: var(--qxt-ink-2); }
+
+/* 没回答、失败、AI 暂不可用：四张手动入口 */
+.qxt-screen[data-qx-page='assistant'] .assistant-exits-title { margin: 4px 0 0; font: 700 26px/1.3 var(--qx-sans); color: var(--qxt-ink); }
+.qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] { flex: 1 0 auto; display: flex; flex-direction: column; gap: 10px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] .qxt-slab {
+  flex: 1 1 0;
+  min-height: 150px;
+  padding: 12px 18px;
+  gap: 18px;
+  grid-template-columns: 190px minmax(0, 1fr);
+  align-items: stretch;
+}
+.qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] .qxt-vis { min-height: 0; height: 100%; }
+.qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] .qxt-vis > svg { height: 88%; width: auto; max-width: 100%; }
+.qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] .qxt-slab h3 { font-size: 34px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] .qxt-slab-txt { justify-content: flex-start; }
+/* 卡高只有 150 左右，装不下「标题 + 说明 + 底部箭头圆钮」三层（内容约 177），圆钮会探出卡底被下一张压住：
+   箭头圆钮改到卡片右侧垂直居中，文字只留给左边。 */
+.qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] .qxt-slab { position: relative; }
+.qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] .qxt-slab-txt { padding-right: 96px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] .qxt-slab .qxt-take { position: absolute; right: 22px; top: 50%; margin: 0; padding: 0; transform: translateY(-50%); }
+.qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='sheet'] { display: flex; flex-direction: column; gap: 12px; }
+
+/* 输入坞：照稿 composer，米色底、一行三件；下面一行是语音，再下是声明 */
+.qxt-screen[data-qx-page='assistant'] .assistant-composer {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 40px 8px;
+  background: var(--qxt-paper-2);
+  border-top: 1px solid var(--qxt-line);
+}
+.qxt-screen[data-qx-page='assistant'] .assistant-dock-row { display: flex; align-items: center; gap: 16px; }
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-type {
+  height: var(--qxt-btn-h);
+  min-height: var(--qxt-btn-h);
+  padding: 0 30px;
+  border-radius: var(--qxt-r-btn);
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  color: var(--qxt-ink);
+  font: 700 var(--qxt-fs-btn)/1 var(--qx-sans);
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+}
+.qxt-screen[data-qx-page='assistant'] .assistant-type svg { width: 30px; height: 30px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-composer textarea {
+  flex: 1;
+  min-width: 0;
+  field-sizing: content;
+  align-self: center;
+  min-height: 64px;
+  max-height: var(--qxt-btn-h);
+  padding: 12px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  resize: none;
+  font: 500 var(--qxt-fs-body)/1.4 var(--qx-sans);
+  color: var(--qxt-ink);
+}
+.qxt-screen[data-qx-page='assistant'] .assistant-field { position: relative; flex: 1; min-width: 0; display: flex; align-self: center; }
+/* 屏上的草稿是遮过电话、邮箱的镜像；文本框叠在上面收键、字色透明，原文留在文本框里 */
+.qxt-screen[data-qx-page='assistant'] .assistant-draft-text { width: 100%; max-height: var(--qxt-btn-h); margin: 0; padding: 12px 0; overflow: hidden; overflow-wrap: anywhere; white-space: pre-wrap; font: 500 var(--qxt-fs-body)/1.4 var(--qx-sans); color: var(--qxt-ink); }
+.qxt-screen[data-qx-page='assistant'] .assistant-composer textarea[data-masked] { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; color: transparent; caret-color: transparent; }
+.qxt-screen[data-qx-page='assistant'] .assistant-composer textarea::placeholder { color: var(--qxt-ink-2); opacity: 1; }
+.qxt-screen[data-qx-page='assistant'] .assistant-composer textarea:focus { outline: none; }
+.qxt-screen[data-qx-page='assistant'] .assistant-composer textarea:focus-visible { outline: 3px solid var(--qx-emerald); outline-offset: 3px; border-radius: 12px; }
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-send {
+  min-width: 162px;
+  height: var(--qxt-btn-h);
+  min-height: var(--qxt-btn-h);
+  padding: 0 30px;
+  border-radius: var(--qxt-r-btn);
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+  font: 700 var(--qxt-fs-btn)/1 var(--qx-sans);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex: none;
+  border: 0;
+}
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-send:disabled { opacity: 0.42; }
+.qxt-screen[data-qx-page='assistant'] .assistant-send svg { width: 28px; height: 28px; }
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-dock-clear { min-width: 80px; min-height: 64px; padding: 0 18px; border-radius: 20px; background: var(--qxt-card); border: 1.5px solid var(--qxt-edge); font-size: var(--qxt-fs-aux); font-weight: 700; }
+.qxt-screen[data-qx-page='assistant'] .assistant-voice-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-height: 64px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-hold-talk { display: contents; }
+.qxt-screen[data-qx-page='assistant'] .assistant-hold-talk-btn { order: 1; }
+.qxt-screen[data-qx-page='assistant'] .assistant-hold-talk-switch { order: 2; }
+.qxt-screen[data-qx-page='assistant'] .assistant-voice-trigger { order: 3; }
+.qxt-screen[data-qx-page='assistant'] .assistant-hold-talk-reason { order: 4; }
+.qxt-screen[data-qx-page='assistant'] .kassist :is(.assistant-hold-talk-btn, .assistant-voice-trigger) {
+  min-height: 64px;
+  min-width: 64px;
+  padding: 0 24px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.qxt-screen[data-qx-page='assistant'] .assistant-hold-talk-switch { min-height: 64px; padding: 0 16px; display: inline-flex; align-items: center; gap: 10px; border-radius: 22px; font-size: var(--qxt-fs-aux); color: var(--qxt-ink-2); }
+.qxt-screen[data-qx-page='assistant'] .assistant-hold-talk-reason { margin: 0; flex: 1 1 100%; font-size: var(--qxt-fs-aux); color: var(--qxt-ink-2); }
+.qxt-screen[data-qx-page='assistant'] .assistant-fine { display: flex; flex-wrap: wrap; align-items: center; column-gap: 20px; row-gap: 0; }
+.qxt-screen[data-qx-page='assistant'] .assistant-fine p,
+.qxt-screen[data-qx-page='assistant'] .assistant-fine > * { margin: 0; font-size: var(--qxt-fs-aux); line-height: 1.4; color: var(--qxt-ink-2); }
+
+/* AI 身份与边界：一行 AIGC 标识，一行不由 AI 决定 */
+.qxt-screen[data-qx-page='assistant'] .assistant-truth {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 2px;
+  padding: 6px 40px 10px;
+  background: var(--qxt-paper-2);
+  color: var(--qxt-ink-2);
+  font-size: var(--qxt-fs-aux);
+  line-height: 1.4;
+}
+.qxt-screen[data-qx-page='assistant'] .assistant-truth p { margin: 0; font-size: var(--qxt-fs-aux); }
+.qxt-screen[data-qx-page='assistant'] .assistant-disclosure { display: flex; align-items: center; gap: 12px; }
+.qxt-screen[data-qx-page='assistant'] .kiosk-aigc-mark { font-size: var(--qxt-fs-aux); color: var(--qxt-teal-ink); background: var(--qxt-teal-wash); border-color: transparent; }
+.qxt-screen[data-qx-page='assistant'] .assistant-advisor-disclosure { display: block; margin: 0; }
+
+/* 底部弹层里的 AI 专项 */
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-tools { margin: 0; padding: 0; border: 0; color: var(--qxt-ink); }
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-tools-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 8px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-tools-header h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; }
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-tools-count,
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-tools-reason { font-size: var(--qxt-fs-aux); color: var(--qxt-ink-2); margin: 0 0 8px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-tools-grid { display: flex; flex-direction: column; gap: 10px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-tools-group { display: grid; grid-template-columns: 150px 1fr; gap: 10px; align-items: start; }
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-tools-group-label { padding-top: 18px; font-size: var(--qxt-fs-aux); font-weight: 700; color: var(--qxt-teal-ink); }
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-tools-group-items { display: flex; flex-wrap: wrap; gap: 10px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-tool-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 0 20px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  text-align: left;
+}
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-tool-card[data-active] { border-color: var(--qx-teal); background: var(--qxt-teal-wash); }
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-tool-card[aria-disabled='true'] { background: var(--qxt-well); color: var(--qxt-ink-2); }
+.qxt-screen[data-qx-page='assistant'] .aat-body { min-width: 0; }
+.qxt-screen[data-qx-page='assistant'] .aat-body strong { font-size: var(--qxt-fs-sub); font-weight: 700; }
+.qxt-screen[data-qx-page='assistant'] .aat-body small { display: none; }
+.qxt-screen[data-qx-page='assistant'] .aat-icon { display: none; }
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-lamp { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--qxt-unknown-dot); }
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-lamp[data-lamp='available'] { background: var(--qx-teal); }
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-lamp[data-lamp='unavailable'] { background: var(--qxt-warn-dot); }
+
+/* 保存要点 */
+.qxt-screen[data-qx-page='assistant'] .assistant-summary-bar { display: contents; }
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-summary-save {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 80px;
+  padding: 12px 16px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  color: var(--qxt-ink);
+  text-align: left;
+}
+.qxt-screen[data-qx-page='assistant'] .assistant-summary-save strong { font-size: 28px; line-height: 1.3; }
+.qxt-screen[data-qx-page='assistant'] .assistant-summary-save small { margin-top: 4px; font-size: var(--qxt-fs-aux); line-height: 1.4; color: var(--qxt-ink-2); font-weight: 500; }
+.qxt-screen[data-qx-page='assistant'] .assistant-summary-reason,
+.qxt-screen[data-qx-page='assistant'] .assistant-summary-result { grid-column: 1 / -1; order: 10; margin: 0; font-size: var(--qxt-fs-aux); line-height: 1.4; color: var(--qxt-ink-2); }
+.qxt-screen[data-qx-page='assistant'] .qxt-fill { flex: 1; min-width: 0; }
+
+/* 手机 / 窄窗口：主题卡单列、正文按内容排，整块滚动，不再把卡压扁 */
+@media (max-width: 600px) {
+  /* 整个工作台在 .kassist 里滚：正文在上、输入坞跟在正文后面，滚到底就是输入坞 */
+  .qxt-screen[data-qx-page='assistant'] .kassist.kassist-qingxu { overflow-x: hidden; overflow-y: auto; }
+  .qxt-screen[data-qx-page='assistant'] .kassist.kassist-qingxu .assistant-workbench { flex: none; height: auto; min-height: 100%; overflow: visible; }
+  .qxt-screen[data-qx-page='assistant'] .kassist .assistant-cockpit-body { flex: none; overflow: visible; padding: 12px 16px; }
+  .qxt-screen[data-qx-page='assistant'] .kassist .assistant-task-picker,
+  .qxt-screen[data-qx-page='assistant'] .kassist.kassist-qingxu .assistant-task-grid { flex: none; }
+  .qxt-screen[data-qx-page='assistant'] .kassist.kassist-qingxu .assistant-task-grid { grid-template-columns: 1fr; grid-auto-rows: auto; }
+  .qxt-screen[data-qx-page='assistant'] .kassist .assistant-task { min-height: 112px; }
+  .qxt-screen[data-qx-page='assistant'] .assistant-composer { padding: 12px 16px 8px; }
+  .qxt-screen[data-qx-page='assistant'] .assistant-dock-row { flex-wrap: wrap; }
+  .qxt-screen[data-qx-page='assistant'] .assistant-field { flex-basis: 100%; order: 3; }
+  .qxt-screen[data-qx-page='assistant'] .kassist .assistant-send { min-width: 0; flex: 1; }
+  .qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] .qxt-slab { flex: none; grid-template-columns: 1fr; min-height: 96px; }
+  .qxt-screen[data-qx-page='assistant'] .kassist .assistant-task-actions { grid-template-columns: 1fr; }
+  .qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] .qxt-vis { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qxt-screen[data-qx-page='assistant'] * { transition: none; }
+}

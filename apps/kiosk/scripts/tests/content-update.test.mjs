@@ -300,7 +300,7 @@ test(
         })
         await page.clock.install()
         await page.goto(base)
-        await expect(page.locator('.qx-home-host')).toBeVisible()
+        await expect(page.locator('[data-testid="qx-home"]')).toBeVisible()
         await expect.poll(() => checks).toBeGreaterThan(0)
         // The initial background check sees a newer release than the loaded document.
         await page.evaluate(() => {
@@ -332,7 +332,7 @@ test(
           history.pushState(history.state, '', '/')
           window.dispatchEvent(new PopStateEvent('popstate'))
         })
-        await expect(page.locator('.qx-home-host')).toBeVisible()
+        await expect(page.locator('[data-testid="qx-home"]')).toBeVisible()
         await page.clock.fastForward(1_000)
         await page.clock.fastForward(58_000)
         assert.equal(navigations, 1)
@@ -342,7 +342,7 @@ test(
           'content',
           NEW
         )
-        await expect(page.locator('.qx-home-host')).toBeVisible()
+        await expect(page.locator('[data-testid="qx-home"]')).toBeVisible()
         await page.screenshot({
           path: new URL(
             `../../../../test-results/content-update/home-${viewport.width}.png`,

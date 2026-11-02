@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { BuildingIcon, MapPinIcon, PrinterIcon } from 'lucide-react'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
+import { RtFill } from '../recruitment-touch/RtFill'
+import { RtHelpLine } from '../recruitment-touch/RtHelpLine'
+import { RtAskCard } from '../recruitment-touch/RtAskCard'
+import { OFFLINE_AGENCY_ASK, askDraftWith } from '../recruitment-touch/askCopy'
 import {
-  DirAiAssist,
   DirKv,
   DirMiss,
   DirNote,
@@ -19,7 +21,6 @@ import '../../components/qingxu/directory/directory-qx.css'
 import { JobAntiFraudNotice } from '../jobs/components/JobAntiFraudNotice'
 import { evaluateJobSourceTrust, SOURCE_ELEMENT_MISSING_TEXT, sourceTrustReason } from '../jobs/utils/sourceTrust'
 import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
-import { getTerminalCode } from '../../services/api/terminalConfig'
 import {
   getOfflineJobDetail,
   type OfflineJobDetailDTO,
@@ -79,51 +80,43 @@ export default function OfflineJobDetailPage() {
   const applyReason = trust ? sourceTrustReason(trust, SOURCE_APPLY_UNAVAILABLE_REASON) : SOURCE_APPLY_UNAVAILABLE_REASON
 
   return (
-    <QxPageFrame
-      // 岗位挂在机构下：能拿到 agencyId 就回那家机构，拿不到回目录（不做 history back）。
-      back={{ label: '返回机构详情', onBack: () => navigate(job ? `/offline-agencies/${job.agencyId}` : '/offline-agencies') }}
+    <RecruitTouchFrame
+      eyebrow="线下机构岗位"
+      back={{ label: job ? '返回机构' : '返回机构目录', onBack: () => navigate(job ? `/offline-agencies/${job.agencyId}` : '/offline-agencies') }}
+      ask={{ label: '问小青：到店要带什么？', draft: '到店要带什么？', voice: true }}
       title="线下机构岗位"
       subtitle={incomplete ? '缺少可核对的来源要素，外跳和到店指引一律不给。' : '先看岗位信息，再决定要不要自行到店咨询。'}
       status={pill}
-      terminalLabel={getTerminalCode() || '设备未绑定'}
-      ctabar={
-        incomplete ? (
-          <>
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="ghost"
-              aria-disabled={!storeReady || undefined}
-              aria-describedby={!storeReady ? blockedReasonId : undefined}
-              onClick={() => { if (storeReady && job) navigate(`/offline-agencies/${job.agencyId}`) }}
-            >
-              查看来源机构门店
-            </button>
-            {!storeReady ? <span id={blockedReasonId} className="why">缺少门店地址与来源编号，无法给出到店指引</span> : null}
-            <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/offline-agencies')}>回机构目录</button>
-          </>
-        ) : (
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => job && navigate(`/offline-agencies/${job.agencyId}`)}>
-              <BuildingIcon aria-hidden size={22} />
-              查看来源机构门店
-            </button>
-            <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print/upload')}>
-              <PrinterIcon aria-hidden size={22} />
-              上传自备材料打印
-            </button>
-          </>
-        )
+      boundary={!storeReady ? <span id={blockedReasonId}>缺少门店地址与来源编号，无法给出到店指引</span> : undefined}
+      secondary={
+        <button
+          type="button"
+          className="qxt-btn qxt-btn-sec"
+          aria-disabled={!storeReady || undefined}
+          aria-describedby={!storeReady ? blockedReasonId : undefined}
+          onClick={() => { if (storeReady && job) navigate(`/offline-agencies/${job.agencyId}`) }}
+        >
+          查看来源机构门店
+        </button>
       }
-      navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
+      primary={incomplete
+        ? { label: '回机构目录', onClick: () => navigate('/offline-agencies') }
+        : { label: '上传自备材料打印', onClick: () => navigate('/print/upload') }}
     >
       <div className="dw-page qx-grow" data-state={uiState} data-testid={`offline-agency-state-${uiState}`}>
         {loading ? (
-          <DirState tone="info" testId="offline-job-loading" title="正在读取线下岗位">取到之前不显示岗位名称或来源编号。</DirState>
+          <>
+            <DirState tone="info" testId="offline-job-loading" title="正在读取线下岗位">取到之前不显示岗位名称或来源编号。</DirState>
+            <RtFill preset="directory" />
+          </>
         ) : error || !job || !trust ? (
-          <DirState tone="error" testId="offline-job-error" title="岗位信息加载失败">
-            <button type="button" className="dw-chip" onClick={() => setRetryKey((key) => key + 1)}>重试</button>
-          </DirState>
+          <>
+            <DirState tone="error" testId="offline-job-error" title="岗位信息加载失败">
+              <button type="button" className="dw-chip" onClick={() => setRetryKey((key) => key + 1)}>重试</button>
+            </DirState>
+            <RtHelpLine />
+            <RtFill preset="directory" />
+          </>
         ) : (
           <>
             <JobAntiFraudNotice />
@@ -185,7 +178,7 @@ export default function OfflineJobDetailPage() {
                         ['机构名称', job.agencyName],
                         ['机构类型', job.agencyType],
                         ['营业时间', job.agencyHours || '以机构公示为准'],
-                        ['联系电话', job.agencyPhone || '请向门店工作人员咨询'],
+                        ['联系电话', job.agencyPhone || '来源未提供电话'],
                         ['服务项目', '以机构公示为准'],
                         ['机构地址', job.agencyAddress],
                         ['来源编号', job.externalId || SOURCE_ELEMENT_MISSING_TEXT],
@@ -209,19 +202,18 @@ export default function OfflineJobDetailPage() {
             )}
 
             {incomplete ? (
-              <DirSec no="03" title="现在可以怎么办" hint="两条真的能走的路">
+              <DirSec no="03" title="现在可以怎么办" hint="不依赖这条岗位">
                 <DirStrip>
-                  <DirStripItem icon={BuildingIcon} title="回机构目录重新找" desc="目录里的机构带地址与来源编号" onClick={() => navigate('/offline-agencies')} />
                   <DirStripItem icon={PrinterIcon} tone="wheat" title="先把材料打好" desc="不依赖这条岗位信息" onClick={() => navigate('/print/upload')} />
                 </DirStrip>
               </DirSec>
             ) : (
-              <DirAiAssist screen="offline-agency" onProfile={() => navigate('/profile')} onAssistant={() => navigate('/assistant')} />
+              <RtAskCard {...OFFLINE_AGENCY_ASK} draft={askDraftWith(OFFLINE_AGENCY_ASK.draft, job.title, job.agencyName)} />
             )}
             <DirNote>{BOUNDARY}</DirNote>
           </>
         )}
       </div>
-    </QxPageFrame>
+    </RecruitTouchFrame>
   )
 }

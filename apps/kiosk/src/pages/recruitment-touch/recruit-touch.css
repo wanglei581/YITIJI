@@ -1,0 +1,421 @@
+/* 第 11 包页面局部版式。每条都挂在本页 data-qx-page 下，不改 .qxt-* 默认。 */
+
+/* 私有化版标识条：照稿 .b-ribbon，斜纹两种深赭色，白字 21px。颜色只取令牌，不写裸色值。 */
+.qxt-screen[data-qx-page='recruit'] .rt-ribbon {
+  flex: none;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 24px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--qxt-clay-ink) 0 18px,
+    color-mix(in srgb, var(--qxt-clay-ink) 82%, black) 18px 36px
+  );
+  color: var(--qxt-cream);
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.qxt-screen[data-qx-page='recruit'] .rt-hub {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.qxt-screen[data-qx-page='recruit'] .rt-doors {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 12px;
+}
+.qxt-screen[data-qx-page='recruit'] .rt-span { grid-column: 1 / -1; }
+.qxt-screen[data-qx-page='recruit'] .rt-doors .qxt-tile {
+  height: 100%;
+  min-height: 64px;
+  align-items: center;
+}
+.qxt-screen[data-qx-page='recruit'] .rt-more {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.qxt-screen[data-qx-page='recruit'] .rt-more .qxt-tile { min-height: 96px; }
+.qxt-screen[data-qx-page='recruit'] .rt-hint {
+  margin: 0;
+  font-size: 24px;
+  color: var(--qxt-ink-2);
+  line-height: 1.45;
+}
+.qxt-screen[data-qx-page='recruit'] .rt-hint button {
+  min-height: 64px;
+  min-width: 64px;
+  padding: 0 8px;
+  color: var(--qxt-teal-ink);
+  font-weight: 700;
+  font-size: 24px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.qxt-screen[data-qx-page='recruit'] .rt-note,
+.qxt-screen[data-qx-page='recruit'] .rt-declarations {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.5;
+  color: var(--qxt-ink-3);
+}
+.qxt-screen[data-qx-page='recruit'] .rt-declarations { display: flex; flex-direction: column; gap: 4px; }
+.qxt-screen[data-qx-page='recruit'] .rt-state {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.qxt-screen[data-qx-page='recruit'] .rt-statecard {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 20px 24px;
+  border-radius: var(--qxt-r-card);
+  border: 1.5px solid var(--qxt-line);
+  background: var(--qxt-card);
+}
+.qxt-screen[data-qx-page='recruit'] .rt-statecard h2 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.3;
+}
+.qxt-screen[data-qx-page='recruit'] .rt-list {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.qxt-screen[data-qx-page='recruit'] .rt-boundary,
+.qxt-screen[data-qx-page='recruit'] .qxfw-truth {
+  flex: none;
+  margin: 0;
+  padding: 10px 40px 0;
+  font-size: 20px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+  background: var(--qxt-paper-2);
+}
+.qxt-screen[data-qx-page='recruit'] .qxfw-truth {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.qxt-screen[data-qx-page='recruit'] .rt-boundary p.why {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.45;
+}
+.qxt-screen[data-qx-page='recruit'] .qxfw-truth p {
+  flex: 1;
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.45;
+}
+.qxt-screen[data-qx-page='recruit'] .rt-textbtn {
+  min-height: 64px;
+  min-width: 64px;
+  padding: 0 16px;
+  color: var(--qxt-teal-ink);
+  font-size: 20px;
+  font-weight: 700;
+}
+.qxt-screen[data-qx-page='recruit'] .rt-fair-dock {
+  display: flex;
+  flex-direction: column;
+  background: var(--qxt-paper-2);
+}
+.qxt-screen[data-qx-page='recruit'] .rt-fair-dock .qxt-dock { border-top: 0; }
+.qxt-screen[data-qx-page='recruit'] .rt-fair {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 6px;
+  width: 100%;
+  min-height: 168px;
+  padding: 16px 18px;
+  border-radius: var(--qxt-r-card);
+  border: 1.5px solid var(--qxt-line);
+  background: var(--qxt-card);
+  text-align: left;
+}
+.qxt-screen[data-qx-page='recruit'] .rt-fair b { font-size: 28px; line-height: 1.3; }
+.qxt-screen[data-qx-page='recruit'] .rt-fair small { font-size: 20px; color: var(--qxt-ink-2); line-height: 1.35; }
+.qxt-screen[data-qx-page='recruit'] .rt-tag {
+  flex: none;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 18px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: 20px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+}
+.qxt-screen[data-qx-page='recruit'] .rt-fair-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.qxt-screen[data-qx-page='recruit'] .rt-fair-top b { flex: 1; min-width: 0; }
+
+/* 选中芯片：--dark 只在旧原型壳里有定义，触屏上改用深底浅字。 */
+.qxt-screen[data-qx-page='recruit'] .jf-f-chip,
+.qxt-screen[data-qx-page='recruit'] .jf-f-chip.sm {
+  min-height: 64px;
+  min-width: 64px;
+  padding: 0 16px;
+  font-size: 20px;
+  white-space: nowrap;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+}
+.qxt-screen[data-qx-page='recruit'] .jf-f-chip.on,
+.qxt-screen[data-qx-page='recruit'] .jf-f-chip[aria-pressed='true'],
+.qxt-screen[data-qx-page='recruit'] .dw-chip.on,
+.qxt-screen[data-qx-page='recruit'] .dw-chip[aria-pressed='true'] {
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+.qxt-screen[data-qx-page='recruit'] .dw-chip { white-space: nowrap; }
+.qxt-screen[data-qx-page='recruit'] .jf-sort-group,
+.qxt-screen[data-qx-page='recruit'] .jf-list-meta {
+  flex-wrap: nowrap;
+}
+
+/* 正文不小于 20。内芯沿用旧类，只在本页把字号抬上来，不改那些 css 的全局默认。 */
+.qxt-screen[data-qx-page='recruit'] .dw-page,
+.qxt-screen[data-qx-page='recruit'] .qxfw,
+.qxt-screen[data-qx-page='recruit'] .campus-proto,
+.qxt-screen[data-qx-page='recruit'] .qx-jobs-page,
+.qxt-screen[data-qx-page='recruit'] .qx-job-detail-page,
+.qxt-screen[data-qx-page='recruit'] .jf-content {
+  min-height: 0;
+  font-size: 24px;
+  color: var(--qxt-ink);
+}
+.qxt-screen[data-qx-page='recruit'] .dw-page *,
+.qxt-screen[data-qx-page='recruit'] .qxfw *,
+.qxt-screen[data-qx-page='recruit'] .campus-proto *,
+.qxt-screen[data-qx-page='recruit'] .qx-jobs-page *,
+.qxt-screen[data-qx-page='recruit'] .qx-job-detail-page * {
+  font-size: inherit;
+}
+.qxt-screen[data-qx-page='recruit'] .dw-qinput,
+.qxt-screen[data-qx-page='recruit'] .jf-searchbox input,
+.qxt-screen[data-qx-page='recruit'] .qx-btn,
+.qxt-screen[data-qx-page='recruit'] .dw-chip,
+.qxt-screen[data-qx-page='recruit'] .jf-btn,
+.qxt-screen[data-qx-page='recruit'] .qx-job-view,
+.qxt-screen[data-qx-page='recruit'] .jf-fav,
+.qxt-screen[data-qx-page='recruit'] .jf-next-grid .jf-tile,
+.qxt-screen[data-qx-page='recruit'] .campus-tab {
+  min-height: 64px;
+  min-width: 64px;
+  font-size: 24px;
+}
+.qxt-screen[data-qx-page='recruit'] .qxt-dock .qxt-askq { font-size: var(--qxt-fs-askq); }
+
+/* 短页：说明保持内容高，剩下的高度交给两列真实入口。格子本身不涂底。 */
+.qxt-screen[data-qx-page='recruit'] .rt-fill {
+  flex: 1 1 auto;
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: minmax(64px, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+.qxt-screen[data-qx-page='recruit'] .rt-fill .qxt-tile {
+  height: 100%;
+  min-height: 100%;
+  align-self: stretch;
+}
+.qxt-screen[data-qx-page='recruit'] :is(.rt-state, .qxfw, .dw-page, .qx-jobs-page, .qx-job-detail-page, .campus-proto):has(.rt-fill) {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.qxt-screen[data-qx-page='recruit'] :is(.rt-state, .qxfw, .dw-page, .qx-jobs-page, .qx-job-detail-page, .campus-proto):has(.rt-fill) :is(.qx-grow, .dw-rlist, .dw-rbox, .dw-sec.grow, .campus-tab-body) {
+  flex: none;
+  min-height: auto;
+}
+.qxt-screen[data-qx-page='recruit'] .qxt-body:has(.rt-fill) > [data-kiosk-screen='campus-freshman-insights'] {
+  flex: none;
+  overflow: visible;
+}
+
+/* 吸收块只涨不缩（第二轮审查补）。触屏壳比旧壳少一截正文高度（顶上标识条，底下 88px 底栏与三项导航），
+   旧目录页里「吸收余量」的块写的是 flex:1 + min-height:0：余量不够时被压到比内容还矮，列表行被裁掉、
+   标题互相盖住。这里在本页作用域里改成：余量有多就吃多（短页仍填满，不留大片空白），不够时按内容自然高度排，
+   放不下就整页滚动（.qxt-body-scroll / .dw-page / .qx-scroll 本来就是滚动容器）。
+   旧样式的全局默认不动：官方渠道等页还在用。页里有 RtFill 的由上面那条 :has(.rt-fill) 规则管（更具体，仍胜出）。 */
+.qxt-screen[data-qx-page='recruit'] :is(.dw-rlist, .dw-sec.grow, .qx-grow, .dw-rbox:not(:has(> .qx-state))):not(.dw-page, .qx-scroll) {
+  flex: 1 0 auto;
+  min-height: auto;
+}
+.qxt-screen[data-qx-page='recruit'] .dw-rlist { overflow: visible; }
+/* 容器里的直接子块一律不缩：.jf-card 这类自带 overflow:hidden 的卡，被压扁时里头的内容会被静默裁掉。RtFill 是例外，它要让出余量。 */
+.qxt-screen[data-qx-page='recruit'] :is(.dw-page, .dw-sec, .dw-rbox, .dw-rlist, .qx-scroll, .campus-proto) > :not(.rt-fill) {
+  flex-shrink: 0;
+}
+
+/* 芯片不折行。超出时在本行里横滑，滑块本身不越出正文。 */
+.qxt-screen[data-qx-page='recruit'] .qx-jobs-page .jf-filter-bar,
+.qxt-screen[data-qx-page='recruit'] .qx-jobs-page .jf-list-meta {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  max-width: 100%;
+  min-width: 0;
+}
+.qxt-screen[data-qx-page='recruit'] .qx-jobs-page .jf-sort-group {
+  flex: none;
+  margin-left: 16px;
+  white-space: nowrap;
+}
+
+/* 底栏一条：返回、问小青、本页次主操作同在一行，照稿 .fj-dock 把按钮收紧（左右 16px、24px 字）。
+   高度仍是 88px、字不小于 20px；问小青放不下时照稿用省略号收尾，不换行。
+   只管一体机宽度；手机宽度（≤760px）交给共享底栏的收紧规则（touch-hero.css）。 */
+@media (min-width: 761px) {
+  .qxt-screen[data-qx-page='recruit'] .qxt-dock .qxt-btn {
+    padding: 0 16px;
+    min-width: 0;
+    font-size: 24px;
+  }
+}
+
+/* 可点区不小于 64×64：旧内芯里的小按钮、下拉、输入框、标签页一并抬上来。 */
+.qxt-screen[data-qx-page='recruit'] :is(button, select, [role='button'], a[href], input:not([type='checkbox'], [type='radio'], [type='hidden'], [type='file'])) {
+  min-height: var(--qxt-tap);
+  min-width: var(--qxt-tap);
+}
+
+/* 旧校园页签（Tailwind 小字与 campus-policy-fusion.css）里不足 20px 的说明，在本页抬到 20px。
+   旧样式的全局默认不动，只在本页作用域里覆盖。 */
+.qxt-screen[data-qx-page='recruit'] .campus-proto :is(
+  .text-xs, .text-sm, .text-base, .text-lg,
+  .text-\[17px\], .text-\[18px\], .text-\[19px\],
+  .kproto-card-head .sub, .kproto-notice, .kproto-badge, .kproto-chip, .kproto-btn.sm, .kproto-tile span span,
+  .campus-status, .campus-tab, .campus-band4 .campus-band-cell span, .campus-qk4 .kproto-tile span
+) {
+  font-size: 20px;
+  line-height: 1.4;
+}
+.qxt-screen[data-qx-page='recruit'] .rt-boundary * { font-size: inherit; }
+/* 「问小青」卡（RtAskCard）的按钮：触屏壳的按钮重置（.qxt-screen button，权重 0,1,1）比 directory-qx.css 的 .dw-ai-run（0,1,0）高，
+   深底被抹成透明，主动作看起来像一段字。在本页作用域里把深底、字色、圆角与内边距写回来。 */
+.qxt-screen[data-qx-page='recruit'] .dw-ai-run {
+  padding: 0 24px;
+  border-radius: 16px;
+  background: var(--qx-deep);
+  color: var(--qx-emerald);
+  font-weight: 700;
+}
+/* 岗位列表底部「AI岗位推荐」磁贴：旧样式的图标是白色（var(--k-surface)）叠在浅底上几乎看不见，
+   本页作用域里给图标块上浅青底、深青字；jobs-fairs-foundation.css 的默认不动。 */
+.qxt-screen[data-qx-page='recruit'] .jf-tile.tinted .jf-tile-icon {
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+}
+/* 二维码弹层（FairQrOverlay）里的来源三要素与说明：旧样式 18–19px，本页作用域里抬到 20px。
+   校园页签的弹层走触屏壳的 overlay 槽，在 .dw-page 之外，吃不到上面那条「内芯字号继承」，所以单独写。 */
+.qxt-screen[data-qx-page='recruit'] .qxfw-overlay :is(.dw-kv > div, .qxfw-overlay-note, .qxfw-overlay-sub) {
+  font-size: 20px;
+}
+/* 校园页签里「扫码预约」来源要素缺项时是 aria-disabled：保持可聚焦（读屏能播报按钮下面那句原因），样子置灰。 */
+.qxt-screen[data-qx-page='recruit'] .campus-proto .kproto-btn[aria-disabled='true'] {
+  opacity: .45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* 岗位页 AI 入口的登录提示：开始推荐 / AI 岗位解读下面一行「要先登录」，不抢按钮的位置。 */
+.qxt-screen[data-qx-page='recruit'] .qx-ai-login-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--qxt-ink-2);
+}
+
+/* 状态页：状态卡保持内容高，紧跟其后的去处排成两列大块，撑满剩下的高度；块与块之间留 12px 缝，
+   样子和 RtFill 的整块磁贴一致。页里已经有 RtFill 时不再拉伸，免得两处抢同一块余量。 */
+.qxt-screen[data-qx-page='recruit'] .qx-state ~ :is(.dw-strip, .dw-exitlist):not(:has(~ .rt-fill)) {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(120px, 1fr);
+  gap: 12px;
+}
+.qxt-screen[data-qx-page='recruit'] .qx-state ~ :is(.dw-strip, .dw-exitlist):not(:has(~ .rt-fill)) > .dw-stripitem {
+  min-height: 120px;
+  height: 100%;
+  padding: 20px 24px;
+  gap: 20px;
+  border: 1.5px solid var(--qxt-line);
+  border-radius: var(--qxt-r-card);
+  background: var(--qxt-card);
+}
+.qxt-screen[data-qx-page='recruit'] .qx-state ~ :is(.dw-strip, .dw-exitlist):not(:has(~ .rt-fill)) > .dw-stripitem:only-child {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 760px) {
+  .qxt-screen[data-qx-page='recruit'] .qxt-halo {
+    width: 100%;
+    left: 0;
+    right: 0;
+    transform: none;
+    animation: none;
+  }
+  .qxt-screen[data-qx-page='recruit'] .qxt-hdr {
+    height: auto;
+    min-height: 76px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .qxt-screen[data-qx-page='recruit'] .qxt-hdr-right {
+    flex: 1 1 100%;
+    max-width: 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  .qxt-screen[data-qx-page='recruit'] .qxt-status {
+    height: auto;
+    min-height: 46px;
+    max-width: 100%;
+    white-space: normal;
+  }
+  .qxt-screen[data-qx-page='recruit'] .qxt-band { padding-left: 16px; padding-right: 16px; }
+  .qxt-screen[data-qx-page='recruit'] .qxt-body { padding-left: 16px; padding-right: 16px; }
+  /* 手机宽度：只有返回与问小青两件时交给共享底栏收进一行；三件以上（加本页操作、次操作）共享的一行会把问小青
+     挤成只剩话筒，所以问小青独占第一行，其余排第二行。一体机 1080 宽仍是单行。 */
+  .qxt-screen[data-qx-page='recruit'] .qxt-dock:has(> :nth-child(3)) { flex-wrap: wrap; }
+  .qxt-screen[data-qx-page='recruit'] .qxt-dock:has(> :nth-child(3)) .qxt-askq { flex: 1 1 100%; order: -1; }
+  .qxt-screen[data-qx-page='recruit'] .qxt-btn-pri { min-width: 0; max-width: 100%; }
+  .qxt-screen[data-qx-page='recruit'] .qxt-dock .qxt-btn,
+  .qxt-screen[data-qx-page='recruit'] .qxt-dock .qxt-askq { max-width: 100%; }
+}

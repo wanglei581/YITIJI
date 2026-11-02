@@ -138,6 +138,10 @@ interface PolicyRouteState {
   holdSlow: Promise<void> | null
   withdrawn?: Set<string>
   failDetail?: Set<string>
+  /** 按条读取这些 id 时把应答压住，直到对应的 Promise 放行。 */
+  holdDetail?: Map<string, Promise<void>>
+  /** 按条读取的请求按序记在这里。 */
+  detailLog?: string[]
 }
 
 function isPolicyRequest(url: URL): boolean {
@@ -152,6 +156,9 @@ async function routePolicies(page: Page, state: PolicyRouteState): Promise<void>
     const detail = url.pathname.match(/^\/api\/v1\/policies\/([^/]+)$/)
     if (detail) {
       const id = decodeURIComponent(detail[1] ?? '')
+      state.detailLog?.push(id)
+      const hold = state.holdDetail?.get(id)
+      if (hold) await hold
       if (id === 'policy-slow' && state.holdSlow) await state.holdSlow
       if ((id === 'policy-broken' && state.broken) || state.failDetail?.has(id)) {
         await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: { code: 'UPSTREAM' } }) })
@@ -219,7 +226,9 @@ test('收藏的政策打开那一条，发布日期用确认发布时间 @kiosk'
   await routePolicies(page, state)
   await loginThroughVisibleUi(page, '/me/favorites')
   await expect(page.getByText('对应政策页待建设')).toHaveCount(0)
-  await expect(page.getByText('再打开这则说明，办理仍以官方入口为准。')).toBeVisible()
+  // 证据锚点随稿换字，判据不变：我的收藏改按触屏稿后，列表下面写「点一条打开政策」，不再写旧的「再打开这则说明…」；
+  // 要证明的仍是「收藏的政策是点开那一条，不是平台代办」。
+  await expect(page.getByText('点一条打开政策', { exact: false })).toBeVisible()
   await shot(page, 'W-49-favorites.png')
   await page.getByTestId('member-records-fav-fav-row').click()
   await page.waitForURL((url) => url.pathname === '/renshi' && url.searchParams.get('policy') === 'policy-fav')
@@ -274,7 +283,8 @@ test('政策找不到时说明打不开，并能去看其他政策或回到收�
   await expect(page.getByText('这条政策现在打不开', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: /返回我的收藏/ }).click()
   await page.waitForURL((url) => url.pathname === '/me/favorites')
-  await expect(page.getByText('登录后查看我的收藏')).toBeVisible()
+  // 登录门的标题现在同时出现在意图带和登录卡里（稿如此），按标题角色取意图带那一个。
+  await expect(page.getByRole('heading', { name: '登录后看你的收藏' })).toBeVisible()
 })
 
 test('这次没读到可以再试一次，成功后打开那一条 @kiosk', async ({ page }) => {
@@ -362,7 +372,8 @@ test('还在的公告可以进入上传自备材料 @kiosk', async ({ page }) =>
   await expect(upload).toHaveAttribute('data-upload-target', 'notice-listed')
   await upload.click()
   await page.waitForURL((url) => url.pathname === '/print/upload')
-  await expect(page.getByText('怎么进来')).toBeVisible()
+  // 2026-10-28 稿 print-src：来源选择页的标题是「文件在哪里？」（原「文件怎么进来」）。
+  await expect(page.getByText('文件在哪里？')).toBeVisible()
   await expect(page.getByText('选文件').first()).toBeVisible()
   await shot(page, 'W-90-upload-entry-open.png')
 })
@@ -378,5 +389,130 @@ test('这次没确认政策还在时不说已经撤下，也不打开来源码 @
   await expect(page.getByText('这次没有确认这条还在，先不打开来源入口。', { exact: true })).toBeVisible()
   await expect(page.getByText('这条政策已经撤下，不再提供来源入口')).toHaveCount(0)
   await expect(page.getByRole('heading', { name: '扫码打开来源链接' })).toHaveCount(0)
+  await expect(fav).toHaveClass(/is-open/)
+})
+
+
+// ── 无人值守：政策紧急下架后，已打开的页面要在一个刷新间隔内自己撤掉，不留旧正文 ──
+// 间隔是 RenshiPage 的 POLICY_REFRESH_MS（30 秒）；这里用假时钟快进 31 秒。
+
+test('政策下架自动刷新：本人点开的那一条被下架，整页换成已下架，不留旧正文，出路是回列表 @kiosk', async ({ page }) => {
+  const state: PolicyRouteState = { broken: false, holdSlow: null, withdrawn: new Set() }
+  await page.clock.install()
+  await routePolicies(page, state)
+  await page.goto('/renshi', { waitUntil: 'domcontentloaded' })
+  const fav = page.locator('[data-policy-id="policy-fav"]')
+  await expect(fav).toBeVisible()
+  await fav.getByRole('button', { name: /高校毕业生求职创业补贴/ }).click()
+  await expect(fav).toHaveClass(/is-open/)
+  state.withdrawn?.add('policy-fav')
+  await page.clock.fastForward(31_000)
+
+  const withdrawn = page.getByTestId('renshi-policy-withdrawn')
+  await expect(withdrawn).toBeVisible()
+  await expect(withdrawn).toContainText('这条政策已下架')
+  await expect(page.getByText('这条政策已不在可查看范围内。')).toBeVisible()
+  // 顶栏也同步说，不再说「政策库与办事指引」。
+  await expect(page.locator('.qxt-status')).toHaveText('这条已下架')
+  // 不留旧正文：卡片、标题、摘要、来源入口都没了；整页没有任何政策卡。
+  await expect(fav).toHaveCount(0)
+  await expect(page.getByText('高校毕业生求职创业补贴', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('收藏的这一条。', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /扫码打开来源链接/ })).toHaveCount(0)
+  await expect(page.locator('[data-policy-id]')).toHaveCount(0)
+  // 出路：底栏与页内各有一个回列表；打印自备材料的出口仍在。
+  await expect(page.locator('.qxt-dock').getByRole('button', { name: '返回政策列表' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /打印你自己带来的文件/ })).toBeVisible()
+  await page.locator('.qxt-dock').getByRole('button', { name: '返回政策列表' }).click()
+  await expect(withdrawn).toHaveCount(0)
+  await expect(page.locator('[data-policy-id="policy-other"]')).toBeVisible()
+  await expect(page.locator('[data-policy-id="policy-fav"]')).toHaveCount(0)
+  await expect(page.locator('.qxt-status')).not.toHaveText('这条已下架')
+  // 回到列表后，默认自动展开的那一条不算「本人点开」：它再被下架只摘掉，不整页换成已下架（见下一条）。
+})
+
+test('政策下架自动刷新：默认自动展开的第一条被下架，只从列表摘掉，不整页换成已下架 @kiosk', async ({ page }) => {
+  const state: PolicyRouteState = { broken: false, holdSlow: null, withdrawn: new Set() }
+  await page.clock.install()
+  await routePolicies(page, state)
+  await page.goto('/renshi', { waitUntil: 'domcontentloaded' })
+  const first = page.locator('[data-policy-id="policy-other"]')
+  await expect(first).toHaveClass(/is-open/)
+  state.withdrawn?.add('policy-other')
+  await page.clock.fastForward(31_000)
+  await expect(first).toHaveCount(0)
+  await expect(page.getByTestId('renshi-policy-withdrawn')).toHaveCount(0)
+  await expect(page.getByText('灵活就业社保补贴说明', { exact: true })).toHaveCount(0)
+  await expect(page.locator('[data-policy-id="policy-fav"]')).toBeVisible()
+})
+
+test('政策下架自动刷新：别处被下架的条目，列表在刷新间隔内自己撤掉，展开着的那一条不受影响 @kiosk', async ({ page }) => {
+  const state: PolicyRouteState = { broken: false, holdSlow: null, withdrawn: new Set() }
+  await page.clock.install()
+  await routePolicies(page, state)
+  await page.goto('/renshi', { waitUntil: 'domcontentloaded' })
+  const fav = page.locator('[data-policy-id="policy-fav"]')
+  await fav.getByRole('button', { name: /高校毕业生求职创业补贴/ }).click()
+  await expect(fav).toHaveClass(/is-open/)
+  state.withdrawn?.add('policy-dated')
+  await page.clock.fastForward(31_000)
+  await expect(page.locator('[data-policy-id="policy-dated"]')).toHaveCount(0)
+  await expect(page.getByTestId('renshi-policy-withdrawn')).toHaveCount(0)
+  await expect(fav).toHaveClass(/is-open/)
+})
+
+test('政策下架自动刷新：读取失败时不说已下架，列表保持原样 @kiosk', async ({ page }) => {
+  const state: PolicyRouteState = { broken: false, holdSlow: null, withdrawn: new Set(), failDetail: new Set() }
+  await page.clock.install()
+  await routePolicies(page, state)
+  await page.goto('/renshi', { waitUntil: 'domcontentloaded' })
+  const fav = page.locator('[data-policy-id="policy-fav"]')
+  await fav.getByRole('button', { name: /高校毕业生求职创业补贴/ }).click()
+  await expect(fav).toHaveClass(/is-open/)
+  // 这一条按条读取失败（不是 404）：只说明这次没确认，不能当成已下架。
+  state.failDetail?.add('policy-fav')
+  await page.clock.fastForward(31_000)
+  await expect(page.getByTestId('renshi-policy-withdrawn')).toHaveCount(0)
+  await expect(fav).toHaveClass(/is-open/)
+})
+
+test('政策下架自动刷新：核对期间本人换到别的条目，不把新看的这条换成已下架，旧的那条只从列表摘掉 @kiosk', async ({ page }) => {
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  const state: PolicyRouteState = { broken: false, holdSlow: null, withdrawn: new Set(), holdDetail: new Map([['policy-fav', gate]]) }
+  await page.clock.install()
+  await routePolicies(page, state)
+  await page.goto('/renshi', { waitUntil: 'domcontentloaded' })
+  const fav = page.locator('[data-policy-id="policy-fav"]')
+  await fav.getByRole('button', { name: /高校毕业生求职创业补贴/ }).click()
+  await expect(fav).toHaveClass(/is-open/)
+  state.withdrawn?.add('policy-fav')
+  await page.clock.fastForward(31_000)
+  // 刷新已对 policy-fav 发出按条读取，应答被压住；本人这时换去看另一条。
+  const dated = page.locator('[data-policy-id="policy-dated"]')
+  await dated.getByRole('button', { name: /已写明发布日期的补贴说明/ }).click()
+  await expect(dated).toHaveClass(/is-open/)
+  release()
+  await expect(page.locator('[data-policy-id="policy-fav"]')).toHaveCount(0)
+  await expect(page.getByTestId('renshi-policy-withdrawn')).toHaveCount(0)
+  await expect(dated).toHaveClass(/is-open/)
+})
+
+test('政策下架自动刷新：一次按条核对挂住，8 秒后放弃，下一轮照常刷新 @kiosk', async ({ page }) => {
+  const never = new Promise<void>(() => {})
+  const state: PolicyRouteState = { broken: false, holdSlow: null, withdrawn: new Set(), holdDetail: new Map([['policy-fav', never]]), detailLog: [] }
+  await page.clock.install()
+  await routePolicies(page, state)
+  await page.goto('/renshi', { waitUntil: 'domcontentloaded' })
+  const fav = page.locator('[data-policy-id="policy-fav"]')
+  await fav.getByRole('button', { name: /高校毕业生求职创业补贴/ }).click()
+  await expect(fav).toHaveClass(/is-open/)
+  await page.clock.fastForward(31_000)
+  await expect.poll(() => state.detailLog?.length).toBe(1)
+  // 挂住的那一次在 8 秒上限后被放弃（不等于下架）；再过一个间隔，下一轮照常发出。
+  await page.clock.fastForward(8_100)
+  await page.clock.fastForward(31_000)
+  await expect.poll(() => state.detailLog?.length).toBe(2)
+  await expect(page.getByTestId('renshi-policy-withdrawn')).toHaveCount(0)
   await expect(fav).toHaveClass(/is-open/)
 })
