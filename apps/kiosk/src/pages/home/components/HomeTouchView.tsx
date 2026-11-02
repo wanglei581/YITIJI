@@ -1,3 +1,7 @@
+import { LicenseLock } from '../../../layouts/LicenseLock'
+import { useKioskLicense } from '../../../layouts/KioskLicenseContext'
+import { useSupportContactSnapshot } from '../../../hooks/useSupportContact'
+import { LICENSE_NO_NEW_TASK_REASON, machineUnusableLine } from '../../../copy/unattendedCopy'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { QxTouchArtChecklist, QxTouchArtReport, QxTouchArtResume, QxTouchArtStack } from '../../../components/qingxu/touch/QxTouchArt'
 import { QxTouchAskBar } from '../../../components/qingxu/touch/QxTouchAskBar'
@@ -73,6 +77,9 @@ export function HomeTouchView({
   onOpenDevice,
   onEndPrevious,
 }: HomeTouchViewProps) {
+  const { mode, notice } = useKioskLicense()
+  const contact = useSupportContactSnapshot()
+  const winding = mode === 'winding-down'
   const kiosk = useTerminalKiosk()
   const price = usePrintPriceConfig()
   const bwUnit = unitCentsFor(price.config, 'black_white')
@@ -177,6 +184,7 @@ export function HomeTouchView({
             sub="今天想办哪件事？下面选一项，或者直接问我"
             status={{ text: deviceStatus.label, tone: deviceStatus.tone }}
           />
+          <LicenseLock>
           <QxTouchAskBar
             testId="home-primary"
             voice={ASSISTANT_VOICE_ENTRY}
@@ -188,6 +196,7 @@ export function HomeTouchView({
               onAction('assistant')
             }}
           />
+          </LicenseLock>
         </>
       )}
       nav={(
@@ -199,18 +208,20 @@ export function HomeTouchView({
         />
       )}
     >
+      {winding ? <p className="qxt-remind" role="status">{notice} {machineUnusableLine(contact)}</p> : null}
       <div className="qxt-home-go" data-testid="home-context-region">{continueSlot}</div>
       <div className="qxt-home-tasks">
-        <QxTouchTask actionId="resume-hub" icon="file" title="改简历" desc="上传或扫描，诊断、优化或生成新简历，改不改你定" chip="AI 诊断改写" chipAi take="带走：新简历" takeIcon="check" visual={<QxTouchArtResume />} index={1} onClick={() => onAction('resume-hub')} />
-        <QxTouchTask actionId="interview-hub" icon="mic" title="练面试" desc="回答常见问题，当场看反馈，不做录用判断" chip="AI 模拟面试" chipAi take="带走：面试反馈" takeIcon="check" visual={<QxTouchArtReport />} index={2} onClick={() => onAction('interview-hub')} />
+        <QxTouchTask held={winding} note={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} actionId="resume-hub" icon="file" title="改简历" desc="上传或扫描，诊断、优化或生成新简历，改不改你定" chip="AI 诊断改写" chipAi take="带走：新简历" takeIcon="check" visual={<QxTouchArtResume />} index={1} onClick={() => onAction('resume-hub')} />
+        <QxTouchTask held={winding} note={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} actionId="interview-hub" icon="mic" title="练面试" desc="回答常见问题，当场看反馈，不做录用判断" chip="AI 模拟面试" chipAi take="带走：面试反馈" takeIcon="check" visual={<QxTouchArtReport />} index={2} onClick={() => onAction('interview-hub')} />
         <QxTouchTask
+          held={winding}
           actionId="print-hub"
           icon="printer"
           title="打印 · 扫描"
           desc="手机扫码传文件、插 U 盘，或扫描原件"
           chip={printChip}
           chipTone={device.printerReady && !device.loading ? 'ghost' : 'clay'}
-          note={printNote}
+          note={winding ? LICENSE_NO_NEW_TASK_REASON : printNote}
           take="开始选择材料"
           takeIcon="check"
           dark
@@ -219,33 +230,33 @@ export function HomeTouchView({
           dataAttrs={{ 'home-device-panel': '', 'panel-state': device.loading ? 'loading' : serviceDown ? 'unreachable' : device.kind }}
           onClick={() => onAction('print-hub')}
         />
-        <QxTouchTask actionId="policy-hub" icon="landmark" title="查政策" desc="补贴、社保怎么办，要带哪些材料，以官方发布为准" chip="官方发布" chipTone="slate" take="查看政策说明" takeIcon="check" visual={<QxTouchArtChecklist />} index={4} onClick={() => onAction('policy-hub')} />
+        <QxTouchTask held={winding} note={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} actionId="policy-hub" icon="landmark" title="查政策" desc="补贴、社保怎么办，要带哪些材料，以官方发布为准" chip="官方发布" chipTone="slate" take="查看政策说明" takeIcon="check" visual={<QxTouchArtChecklist />} index={4} onClick={() => onAction('policy-hub')} />
       </div>
       <div className="qxt-home-tiles" data-count={tileCount}>
-        <QxTouchTile chevron={false} layout="stack" icon="ticket" title="到机取件" desc="手机上下了单，来这里取" actionId="pickup-claim" index={nextTile()} onClick={() => onAction('pickup-claim')} />
+        <QxTouchTile off={winding} reason={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} chevron={false} layout="stack" icon="ticket" title="到机取件" desc="手机上下了单，来这里取" actionId="pickup-claim" index={nextTile()} onClick={() => onAction('pickup-claim')} />
         {recruitmentOpen ? (
           jobs.status === 'error' ? (
-            <QxTouchTile key={`jobs-${jobs.status}`} chevron={false} layout="stack" icon="refresh" tone="slate" title="社会招聘" desc={job.description} badge={job.badge} cue={RETRY_CUE} label={`社会招聘，${RETRY_CUE}`} actionId="jobs-retry" dataAttrs={{ 'home-jobs-panel': '', 'panel-state': 'error', 'jobs-badge': job.badge }} index={nextTile()} onClick={jobs.retry} />
+            <QxTouchTile off={winding} reason={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} key={`jobs-${jobs.status}`} chevron={false} layout="stack" icon="refresh" tone="slate" title="社会招聘" desc={job.description} badge={job.badge} cue={RETRY_CUE} label={`社会招聘，${RETRY_CUE}`} actionId="jobs-retry" dataAttrs={{ 'home-jobs-panel': '', 'panel-state': 'error', 'jobs-badge': job.badge }} index={nextTile()} onClick={jobs.retry} />
           ) : (
-            <QxTouchTile key={`jobs-${jobs.status}`} chevron={false} layout="stack" icon="clipboard" tone="slate" title="社会招聘" desc={job.description} badge={job.badge} actionId="jobs-hub" dataAttrs={{ 'home-jobs-panel': '', 'panel-state': jobs.status, 'jobs-badge': job.badge }} index={nextTile()} onClick={() => onAction('jobs-hub')} />
+            <QxTouchTile off={winding} reason={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} key={`jobs-${jobs.status}`} chevron={false} layout="stack" icon="clipboard" tone="slate" title="社会招聘" desc={job.description} badge={job.badge} actionId="jobs-hub" dataAttrs={{ 'home-jobs-panel': '', 'panel-state': jobs.status, 'jobs-badge': job.badge }} index={nextTile()} onClick={() => onAction('jobs-hub')} />
           )
         ) : null}
         {recruitmentOpen ? (
           jobFair.status === 'error' ? (
-            <QxTouchTile key={`fair-${jobFair.status}`} chevron={false} layout="stack" icon="refresh" tone="slate" title="校园招聘" desc={fair.description} badge={fair.badge} cue={RETRY_CUE} label={`校园招聘，${RETRY_CUE}`} actionId="fairs-retry" dataAttrs={{ 'home-job-fair-panel': '', 'panel-state': 'error' }} index={nextTile()} onClick={jobFair.retry} />
+            <QxTouchTile off={winding} reason={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} key={`fair-${jobFair.status}`} chevron={false} layout="stack" icon="refresh" tone="slate" title="校园招聘" desc={fair.description} badge={fair.badge} cue={RETRY_CUE} label={`校园招聘，${RETRY_CUE}`} actionId="fairs-retry" dataAttrs={{ 'home-job-fair-panel': '', 'panel-state': 'error' }} index={nextTile()} onClick={jobFair.retry} />
           ) : (
-            <QxTouchTile key={`fair-${jobFair.status}`} chevron={false} layout="stack" icon="book" tone="slate" title="校园招聘" desc={fair.description} badge={fair.badge} actionId="campus-zone" dataAttrs={{ 'home-job-fair-panel': '', 'panel-state': jobFair.status }} index={nextTile()} onClick={() => onAction('campus-zone')} />
+            <QxTouchTile off={winding} reason={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} key={`fair-${jobFair.status}`} chevron={false} layout="stack" icon="book" tone="slate" title="校园招聘" desc={fair.description} badge={fair.badge} actionId="campus-zone" dataAttrs={{ 'home-job-fair-panel': '', 'panel-state': jobFair.status }} index={nextTile()} onClick={() => onAction('campus-zone')} />
           )
         ) : null}
         {channelsTile ? (
-          <QxTouchTile chevron={false} layout="stack" icon="qr" tone="slate" title="本机构官方渠道" desc={`本机有 ${officialChannelCount} 个渠道，扫码到机构官网`} actionId="official-channels" index={nextTile()} onClick={() => onAction('official-channels')} />
+          <QxTouchTile off={winding} reason={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} chevron={false} layout="stack" icon="qr" tone="slate" title="本机构官方渠道" desc={`本机有 ${officialChannelCount} 个渠道，扫码到机构官网`} actionId="official-channels" index={nextTile()} onClick={() => onAction('official-channels')} />
         ) : null}
-        <QxTouchTile chevron={false} layout="stack" icon="help" tone="clay" title="帮助" desc="常见问题、服务电话" actionId="help" index={nextTile()} onClick={() => onAction('help')} />
+        <QxTouchTile off={winding} reason={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} chevron={false} layout="stack" icon="help" tone="clay" title="帮助" desc="常见问题、服务电话" actionId="help" index={nextTile()} onClick={() => onAction('help')} />
         {toolboxReady ? (
-          <QxTouchTile chevron={false} layout="stack" icon="layers" title="百宝箱" desc="按本机已上架的扩展服务进入" actionId="toolbox" index={nextTile()} onClick={() => onAction('toolbox')} />
+          <QxTouchTile off={winding} reason={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} chevron={false} layout="stack" icon="layers" title="百宝箱" desc="按本机已上架的扩展服务进入" actionId="toolbox" index={nextTile()} onClick={() => onAction('toolbox')} />
         ) : null}
         {campusReady ? (
-          <QxTouchTile chevron={false} layout="stack" icon="landmark" tone="slate" title="智慧校园" desc="按本机开通范围进入校园服务" actionId="smart-campus" index={nextTile()} onClick={() => onAction('smart-campus')} />
+          <QxTouchTile off={winding} reason={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} chevron={false} layout="stack" icon="landmark" tone="slate" title="智慧校园" desc="按本机开通范围进入校园服务" actionId="smart-campus" index={nextTile()} onClick={() => onAction('smart-campus')} />
         ) : null}
       </div>
       <div className="qxt-home-id" data-member={isLoggedIn ? 'true' : undefined}>

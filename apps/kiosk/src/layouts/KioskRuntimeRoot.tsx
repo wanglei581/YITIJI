@@ -9,6 +9,7 @@ import { KioskHidScanGuard } from '../components/hid-guard/KioskHidScanGuard'
 import { useContentUpdate } from '../hooks/useContentUpdate'
 import { startSupportContactKeeper } from '../services/api/supportContact'
 import { KioskLicenseProvider, useKioskLicense } from './KioskLicenseContext'
+import { LicenseWindDownPrompt } from './LicenseWindDownPrompt'
 import { KioskPausedScreen } from '../components/KioskPausedScreen'
 
 function ContentUpdateGuard() {
@@ -69,6 +70,7 @@ export function KioskRuntimeRoot() {
           <ContentUpdateGuard />
           <KioskHidScanGuard />
           <LicensedOutlet />
+          <LicenseWindDownPrompt />
         </KioskPrivacyGuard>
       </KioskLicenseProvider>
     </KioskBusyProvider>
