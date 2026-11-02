@@ -6,6 +6,7 @@ import { isAiOutage } from '../../../ai/aiOutage'
 import { aiDeclarationDeclineMessage } from '../../../ai/aiDeclarationErrors'
 import { INTERVIEW_AI_DOWN_HINT, type InterviewStage } from '../interviewWorkbenchModel'
 import { patchInterviewWorkbenchSession } from '../interviewWorkbenchSession'
+import { isAiGateDown } from '../useInterviewAiCapabilities'
 import type { InterviewMessage, InterviewSessionPhase, InterviewSessionRouteState, InterviewVoiceState } from './types'
 import {
   classifyInterviewFinishFailure,
@@ -38,6 +39,9 @@ export async function submitInterviewAnswer(ctx: {
   setMicError: Dispatch<SetStateAction<boolean>>
   setFinishRecovery: Dispatch<SetStateAction<InterviewFinishRecovery | null>>
   setAnswersRecorded: Dispatch<SetStateAction<boolean>>
+  setAiOutage: Dispatch<SetStateAction<boolean>>
+  /** 服务端 AI 闸门（暂停、额度）拦下这次调用：小青这次也用不了。 */
+  setAssistantDown: Dispatch<SetStateAction<boolean>>
   setQuestionIndex: Dispatch<SetStateAction<number>>
 }): Promise<void> {
   const { args, state, access } = ctx
@@ -71,6 +75,8 @@ export async function submitInterviewAnswer(ctx: {
           },
       access,
     )
+    ctx.setAiOutage(false)
+    ctx.setAssistantDown(false)
     if (!args.skip) ctx.setAnswersRecorded(true)
     if (res.done) {
       ctx.setPhase('done_suggest')
@@ -88,7 +94,9 @@ export async function submitInterviewAnswer(ctx: {
       ctx.setDraft(answer)
       if (args.voiceMeta) ctx.setMode('text')
     }
-    const base = aiDeclarationDeclineMessage(err) ?? (isAiOutage(err) ? INTERVIEW_AI_DOWN_HINT : userMessageOf(err, '提交失败，请重试'))
+    ctx.setAiOutage(isAiOutage(err))
+    ctx.setAssistantDown(isAiGateDown(err))
+    const base =aiDeclarationDeclineMessage(err) ?? (isAiOutage(err) ? INTERVIEW_AI_DOWN_HINT : userMessageOf(err, '提交失败，请重试'))
     ctx.setError(submitFailureMessage(base, draftRestored))
     ctx.setPhase('answering')
   }
@@ -110,6 +118,7 @@ export async function finishInterview(ctx: {
   setError: Dispatch<SetStateAction<string | null>>
   setMicError: Dispatch<SetStateAction<boolean>>
   setFinishRecovery: Dispatch<SetStateAction<InterviewFinishRecovery | null>>
+  setAssistantDown: Dispatch<SetStateAction<boolean>>
 }): Promise<void> {
   const {
     state, access, omitPrintAnswers, onGoStage, navigate, stopPlayback, resetVoiceState,
@@ -133,6 +142,7 @@ export async function finishInterview(ctx: {
     if (onGoStage) onGoStage('report')
     else navigate('/interview/report', { state: { sessionId: state.sessionId, accessToken: state.accessToken, report } })
   } catch (err) {
+    ctx.setAssistantDown(isAiGateDown(err))
     const declined = aiDeclarationDeclineMessage(err)
     const classified = classifyInterviewFinishFailure({
       code: errorCodeOf(err),

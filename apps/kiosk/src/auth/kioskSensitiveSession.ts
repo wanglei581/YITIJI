@@ -1,3 +1,4 @@
+import { clearResumeGenerateDraft, hasResumeGenerateDraft } from '../pages/resume/resumeGenerateDraft'
 import { clearPrintMaterialSession } from '../pages/print/printMaterialSession'
 import { clearAiResumeSession } from '../pages/resume/aiResumeSession'
 import { clearAllResumeParseIntents, RESUME_PARSE_INTENT_STORAGE_KEY } from '../services/resumeParseIntent'
@@ -69,6 +70,7 @@ export function clearKioskSensitiveSession(outgoingMemberToken?: string | null):
   clearContractReviewSession()
   clearPrintMaterialSession()
   clearAiResumeSession()
+  clearResumeGenerateDraft()
   clearAllResumeParseIntents()
   clearJobMaterialDraft()
   clearSelfAssessmentSession()
@@ -98,7 +100,7 @@ export function clearKioskSharedDeviceResidue(): void {
  * 匿名本机收藏单独探测：读失败视为没有残留（写不进去也就漏不出去）。
  */
 export function hasKioskSensitiveSession(): boolean {
-  if (hasContractReviewSession()) return true
+  if (hasContractReviewSession() || hasResumeGenerateDraft()) return true
   try {
     if (typeof window === 'undefined' || !window.sessionStorage) return true
     if (

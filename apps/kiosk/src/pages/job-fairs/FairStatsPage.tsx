@@ -12,7 +12,6 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { FairLiveStatsDTO } from '@ai-job-print/shared'
 import {
-  BuildingIcon,
   FileTextIcon,
   InfoIcon,
   PrinterIcon,
@@ -21,6 +20,7 @@ import {
   UsersIcon,
 } from 'lucide-react'
 import { getFairStats } from '../../services/api'
+import { RtFill } from '../recruitment-touch/RtFill'
 import { QxFairWorkbench } from './QxFairWorkbench'
 import { FairSkeletonList } from './components/FairWorkbenchBits'
 import { fmtFairTime } from './fairFormat'
@@ -77,53 +77,42 @@ export function FairStatsPage() {
   const mockOnly = Boolean(stats?.isMockData)
   const uiState = loading ? 'ready' : error ? 'error' : !stats || mockOnly ? 'empty' : 'ready'
 
-  const ctabar = uiState === 'error'
-    ? (
-      <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}`)}>返回招聘会</button>
-        <button type="button" className="qx-btn" data-variant="primary" onClick={() => setRetryKey((k) => k + 1)}>重新加载</button>
-      </>
-    )
-    : uiState === 'empty'
-      ? (
-        <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>看参展名单</button>
-          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(`/job-fairs/${fairId}`)}>返回招聘会</button>
-        </>
-      )
-      : (
-        <>
-          <p className="why">数值由主办方回传，本机不估算、不推算。</p>
-          <button type="button" className="qx-btn narrow" data-variant="primary" onClick={() => navigate(`/job-fairs/${fairId}`)}>返回招聘会</button>
-        </>
-      )
+  const statsBoundary = uiState === 'ready' ? '数值由主办方回传，本机不估算、不推算。' : undefined
+  const statsSecondary = uiState === 'empty'
+    ? <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>看参展名单</button>
+    : undefined
+  const statsPrimary = uiState === 'error'
+    ? { label: '重新加载', onClick: () => setRetryKey((k) => k + 1), noArrow: true as const }
+    : undefined
 
   if (loading) {
     return (
       <QxFairWorkbench screen="stats" state="ready" fairId={fairId}>
         <div className="dw-sec-h"><span className="t">正在取主办方回传的统计</span><span className="hint">未返回前不显示任何数字</span></div>
         <FairSkeletonList rows={2} />
+        <RtFill preset="fair" />
       </QxFairWorkbench>
     )
   }
 
   if (error) {
     return (
-      <QxFairWorkbench screen="stats" state="error" fairId={fairId} ctabar={ctabar}>
+      <QxFairWorkbench screen="stats" state="error" fairId={fairId} primary={statsPrimary}>
         <DirState tone="error" testId="fair-stats-error" title="统计数据没取到">
           请求失败。本机<b>不显示上一次的数字</b>——统计一旦过时就会误导人。
         </DirState>
         <DirStrip>
           <DirStripItem icon={UsersIcon} title="看参展名单" desc="名单是另一页，可能还能打开" onClick={() => navigate(`/job-fairs/${fairId}/companies`)} />
-          <DirStripItem icon={InfoIcon} tone="slate" title="找工作人员" desc="需要官方数据可以到服务台咨询" onClick={() => navigate('/help')} />
+          <DirStripItem icon={InfoIcon} tone="slate" title="去帮助中心" desc="需要官方数据时，查看帮助中心里的服务电话" onClick={() => navigate('/help')} />
         </DirStrip>
+        <RtFill preset="fair" />
       </QxFairWorkbench>
     )
   }
 
   if (!stats || mockOnly) {
     return (
-      <QxFairWorkbench screen="stats" state="empty" fairId={fairId} ctabar={ctabar}>
+      <QxFairWorkbench screen="stats" state="empty" fairId={fairId} secondary={statsSecondary}>
         <DirState
           tone="empty"
           testId="fair-stats-empty"
@@ -138,6 +127,7 @@ export function FairStatsPage() {
           <DirStripItem icon={FileTextIcon} title="看活动物料" desc="手册里有时会带官方的总结数据" onClick={() => navigate(`/job-fairs/${fairId}/materials`)} />
           <DirStripItem icon={UsersIcon} tone="wheat" title="看参展名单" desc="数字背后的单位清单在这里" onClick={() => navigate(`/job-fairs/${fairId}/companies`)} />
         </DirStrip>
+        <RtFill preset="fair" />
       </QxFairWorkbench>
     )
   }
@@ -167,7 +157,7 @@ export function FairStatsPage() {
       state="ready"
       fairId={fairId}
       subtitle={`${stats.fairName} · ${dataSourceLabel}`}
-      ctabar={ctabar}
+      boundary={statsBoundary}
     >
       <div className="dw-sec-h"><span className="t">现场统计</span><span className="hint">由主办方回传，数值不由本机估算</span></div>
       <DirTiles items={[
@@ -278,12 +268,12 @@ export function FairStatsPage() {
       <DirStrip>
         <DirStripItem icon={UsersIcon} tone="wheat" title="看参展名单" desc="数字背后的单位清单在这里" onClick={() => navigate(`/job-fairs/${fairId}/companies`)} />
         <DirStripItem icon={FileTextIcon} title="看活动物料" desc="主办方的总结材料如果有，也在这里" onClick={() => navigate(`/job-fairs/${fairId}/materials`)} />
-        <DirStripItem icon={BuildingIcon} tone="slate" title="返回招聘会" desc="时间、地点与来源三要素" onClick={() => navigate(`/job-fairs/${fairId}`)} />
       </DirStrip>
 
       <DirNote>
         {dataSourceLabel}；系统仅记录可证明的服务行为，不记录求职者个人信息；活动办理结果以来源平台和现场为准。
       </DirNote>
+      <RtFill preset="fair" />
     </QxFairWorkbench>
   )
 }

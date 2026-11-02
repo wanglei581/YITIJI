@@ -39,12 +39,13 @@ function knownPageCount(pages: number | null): number | null {
 
 /**
  * 预览层之下的整片页面 inert：点不到、Tab 不到、读屏也不会串进来。
- * 从本层往上走到 .qx-stage，把沿途每一层的兄弟节点都挂上 inert；只撤自己挂上的那些。
+ * 从本层往上走到触屏壳的根，把沿途每一层的兄弟节点都挂上 inert；只撤自己挂上的那些。
  */
 function useInertBackground(ref: RefObject<HTMLElement | null>): void {
   useEffect(() => {
     const root = ref.current
-    const stage = root?.closest('.qx-stage')
+    // 触屏壳的根（.qxt-screen）。曾经停在 .qx-stage，去掉旧类名后找不到它，整片底层就没有被 inert。
+    const stage = root?.closest('[data-qxt-screen]')
     if (!root || !stage) return undefined
     const touched: Element[] = []
     let node: Element = root

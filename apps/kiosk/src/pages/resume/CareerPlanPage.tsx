@@ -17,11 +17,9 @@ import {
   BotIcon,
   CompassIcon,
   FileTextIcon,
-  HelpCircleIcon,
   ListIcon,
   PencilLineIcon,
   PrinterIcon,
-  RefreshCwIcon,
   RouteIcon,
   TargetIcon,
 } from 'lucide-react'
@@ -45,17 +43,23 @@ import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useAuth } from '../../auth/useAuth'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
+import type { QxTouchRail } from '../../components/qingxu/touch/QxTouchBand'
+import { ResumeStepPreview } from './touch/ResumeStepPreview'
+import { ResumeErrorState, ResumeStepsState, ResumeWaitState } from './touch/ResumeStates'
+import { ASKS, type ResumeAsk } from './touch/resumeAsks'
+import { unattendedReason } from './touch/unattendedReason'
+import { ResumeTouchActs } from './touch/ResumeTouchActs'
+import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { readAiResumeSession } from './aiResumeSession'
 import { JobFitStage } from './JobFitPage'
 import { useRouteIdentityGuard } from './hooks/useRouteIdentityGuard'
 import { CareerPlanExistingMaterials } from './components/career-plan/CareerPlanExistingMaterials'
 import { CareerPlanSelfAssessmentExcluded } from './components/career-plan/CareerPlanSelfAssessmentExcluded'
 import { CareerPlanColumns, CareerPlanGenerateRegion, CareerPlanSelfCheck } from './components/career-plan/CareerPlanSection'
-import {
-  CtaNote, Ghosts, Guardline, KitRows, ListRows, Nots, RouteCards, Sec, Slots, Steps, Verdict, Waiting,
-} from './jobFit/jobFitQxKit'
+import { CareerPlanGenerateKey } from './components/career-plan/CareerPlanGenerateKey'
+import { CAREER_AI_DOWN_WHY_ID, careerAiDownWhy } from './components/career-plan/careerPlanGenerateCopy'
+import { CtaNote, Guardline, KitRows, Sec, Verdict } from './jobFit/jobFitQxKit'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './job-fit-qx.css'
 import './resume-decision-qx.css'
@@ -98,6 +102,22 @@ function errorCodeOf(error: unknown): string {
 }
 
 const CAREER_PLAN_OUTAGE_COPY = 'AI 暂时不可用，你可以先打印求职参考单（未含 AI 规划）'
+
+/** 每个状态底栏的「问小青」（稿 career 各状态）。 */
+const CAREER_ASKS: Record<CareerScreen, ResumeAsk> = {
+  'session-ended': ASKS.careerEnded,
+  'missing-task': ASKS.careerMissing,
+  'rejected-task': ASKS.careerMissing,
+  loading: ASKS.careerWait,
+  guide: ASKS.careerGuide,
+  generating: ASKS.careerGen,
+  'ai-down': ASKS.careerDown,
+  failed: ASKS.careerFailed,
+  ready: ASKS.careerReady,
+  'print-pending': ASKS.careerPrintWait,
+  'print-failed': ASKS.careerPrintFailed,
+  'print-degraded': ASKS.careerDegraded,
+}
 
 /** 置灰一律 aria-disabled + onClick 自己短路；原生 disabled 会让读屏跳过、触屏读不到原因。 */
 function Action({ label, variant, onClick, busy, icon }: {
@@ -154,6 +174,8 @@ export function CareerPlanPage() {
   const [probed, setProbed] = useState(false)
   /** 模型跑了但没给出可用规划（status:'failed'），与「AI 连不上」不是一回事。 */
   const [taskFailReason, setTaskFailReason] = useState<string | null>(null)
+  /** 上一次生成撞上了临时性错误（网络、超时、限流……）：生成钮保持可点，字改成「重试…」。 */
+  const [genFailed, setGenFailed] = useState(false)
 
   useBusyLock(generating || printing)
 
@@ -255,18 +277,20 @@ export function CareerPlanPage() {
     // 写死、canStart 恒 false，生成钮一旦被它包住就再也回不来（AI 恢复了也只能退出重进）。
     // 用户主动点一次就清掉上次的能力判定，再发一次真实请求，由结果重新决定。
     // 不加轮询、不自动重探：只有用户按下去才会再打一次。
+    // 例外：服务端已明确回了能力级停用码（aiOutage 有值）时生成钮置灰、不会走到这里（见 CareerPlanGenerateKey）；重试不会变好。
     if (!taskId || generating) return
     const run = begin('generate')
     if (!run) return
     setGenerating(true)
     setAiOutage(null)
     setError(null)
+    setGenFailed(false)
     setTaskFailReason(null)
     try {
       const result = await generateCareerPlan(taskId, { token: getToken(), accessToken })
       if (!isLive(run)) return
       if (result.status === 'failed') {
-        setTaskFailReason(result.failReason ?? '模型这次没有返回可用的规划内容')
+        setTaskFailReason(unattendedReason(result.failReason, '模型这次没有返回可用的规划内容'))
       } else {
         setPlan(result)
         setProbed(true)
@@ -276,7 +300,7 @@ export function CareerPlanPage() {
       const code = errorCodeOf(err)
       if (code === 'AI_TASK_NOT_FOUND') setRejectedTask(true)
       else if (AI_OUTAGE_CODES.has(code)) setAiOutage(CAREER_PLAN_OUTAGE_COPY)
-      else setError(userMessageOf(err, '生成失败，请稍后重试'))
+      else { setError(unattendedReason(userMessageOf(err, '生成失败，请稍后重试'), '生成失败，请稍后重试')); setGenFailed(true) }
     } finally {
       setGenerating(false)
       settle(run)
@@ -354,48 +378,29 @@ export function CareerPlanPage() {
       {plan ? '打印建议单' : '打印求职参考单（未含 AI 规划）'}
     </button>
   )
-  // 生成钮**无条件**渲染，不被 aiTask.canStart 包住（见 handleGenerate 顶部注释）。
+  // 生成钮**无条件**渲染，不被 aiTask.canStart 包住（见 handleGenerate 顶部注释）；已知停用时置灰（见 CareerPlanGenerateKey）。
   const generateButton = (
     <span className="qx-ai-declaration-slot">
-      <Action
-        variant="primary"
-        busy={generating}
-        onClick={() => void handleGenerate()}
-        label={generating ? '正在生成…' : aiOutage ? (plan ? '重试生成' : '重试生成求职方案') : plan ? '重新生成' : '生成求职方案'}
-        icon={generating ? null : <ArrowRightIcon size={22} aria-hidden="true" />}
-      />
+      <CareerPlanGenerateKey hasPlan={Boolean(plan)} generating={generating} knownDown={Boolean(aiOutage)} retry={genFailed} onGenerate={() => void handleGenerate()} />
       <AiDeclarationNote />
     </span>
   )
 
-  function buildView(): { title: string; subtitle: string; pill: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }; body: ReactNode; cta: ReactNode } {
+  function buildView(): { title: string; subtitle: string; pill: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }; rail?: QxTouchRail; body: ReactNode; cta: ReactNode } {
     if (screen === 'missing-task') return {
       title: '规划要基于真实材料',
       subtitle: '求职方案会基于已完成的简历诊断整理已有材料、目标与方向、尚需准备和执行计划；没有可读取的本人简历任务时，不生成任何个人规划内容。',
       pill: { tone: 'warn', label: '缺少可读取的本人简历任务' },
       body: (
-        <>
-          <Sec title="当前状态" hint="只写已确认的事实">
-            <Verdict items={[
-              { tone: 'bad', label: '本人简历任务', value: '尚未可用' },
-              { tone: 'warn', label: '求职方案', value: '尚未生成' },
-              { tone: 'ok', label: '材料与打印', value: '不受影响' },
-            ]} />
-          </Sec>
-          <Sec title="规划会用到、也只会用到这些" hint="输入范围写在前面" grow>
-            <ListRows items={[
-              '当前本人简历任务里的经历、技能与教育信息',
-              '本人此前的岗位匹配参考或模拟面试摘要（有记录时才会用到）',
-              '不使用他人材料，不引入企业侧数据，不做录用或收入承诺',
-            ]} />
-          </Sec>
-          <Sec title="现在能做的两件事" hint="按你手上有什么来选">
-            <RouteCards items={[
-              { title: '上传或扫描简历', desc: '有了可读取的简历任务，才能开始做规划。', action: '去简历上传', onClick: goUpload },
-              { title: '先和 AI 顾问聊目标', desc: '还没想清楚方向时，可以先把想法说出来。', action: '去 AI 顾问', onClick: () => navigate('/assistant') },
-            ]} />
-          </Sec>
-        </>
+        <ResumeTouchActs
+          note="没有可读取的本人简历任务时，不生成任何个人规划内容。"
+          items={[
+            { title: '上传或扫描简历', desc: '有了可读取的简历任务，才能开始做规划。', take: '去简历上传', art: 'resume', onClick: goUpload },
+            { title: '打印现有简历', desc: '已有电子稿或纸质件，规划之外也能先打印。', take: '去打印', art: 'report', onClick: () => navigate('/print-scan') },
+            { title: '先和 AI 顾问聊目标', desc: '还没想清楚方向时，可以先把想法说出来。', take: '去 AI 顾问', icon: 'sparkle', onClick: () => navigate('/assistant') },
+          ]}
+          fine="规划只用本人简历里的经历、技能与教育信息，和本人此前的岗位匹配参考或模拟面试摘要；不使用他人材料，不引入企业数据，不做录用或收入承诺。"
+        />
       ),
       cta: (
         <>
@@ -412,9 +417,18 @@ export function CareerPlanPage() {
       subtitle: '登录状态或这台机器上的这次使用刚刚变化（退出、过期或清场）。刚才的求职方案、打印件和还在路上的请求都不再显示或继续。',
       pill: { tone: 'warn', label: '这次办理已结束 · 内容已隐藏' },
       body: (
-        <Sec title="这次没有发生的事" hint="明确否定，避免误解" grow>
-          <Nots items={['不再显示刚才的规划、依据或材料', '不再用刚才的登录凭证读取、生成或打印', '还在路上的返回结果不会再进入打印确认']} />
-        </Sec>
+        <ResumeErrorState
+          reasonTitle="这次没有发生的事"
+          rows={[
+            { title: '不再显示刚才的内容', desc: '刚才的规划、依据和材料都已隐藏。' },
+            { title: '不再用刚才的登录凭证', desc: '读取、生成或打印都不会再用它。' },
+            { title: '不会再进入打印确认', desc: '还在路上的返回结果不会再把你带去打印确认页。' },
+          ]}
+          acts={[
+            { title: '重新上传简历', desc: '需要继续时，重新登录或重新上传一份简历，再回到这一页。', take: '去上传', art: 'resume', onClick: goUpload },
+            { title: '先打印现有简历', desc: '已有电子稿或纸质件时，不需要这份规划，直接走打印流程。', take: '去打印', art: 'report', onClick: goPrintHub },
+          ]}
+        />
       ),
       cta: (
         <>
@@ -430,18 +444,19 @@ export function CareerPlanPage() {
       subtitle: '解析结果有保存期限，也只对本人开放。这次读不到它，所以本页拿不到任何依据 —— 重新上传一次简历、跑完诊断，就能回到这里生成。',
       pill: { tone: 'bad', label: '简历任务不可读取' },
       body: (
-        <>
-          <Sec title="让它重新可用的三步" hint="每一步都在既有流程里" grow>
-            <Steps items={[
-              { title: '重新上传或扫描一份简历', desc: '进入简历材料入口，选择文件上传、纸质扫描或手机传输。' },
-              { title: '等待解析完成', desc: '解析成功后才会出现可用任务；失败会直接显示失败原因。' },
-              { title: '回到求职方案生成', desc: '任务可用后，再由你确认开始生成。' },
-            ]} />
-          </Sec>
-          <Sec title="这次没有发生的事" hint="明确否定，避免误解">
-            <Nots items={['没有读取到本人简历原文', '没有生成任何方向或计划', '没有把简历内容提供给企业或第三方']} />
-          </Sec>
-        </>
+        <ResumeErrorState
+          reasonTitle="读不出来的三种可能"
+          rows={[
+            { title: '任务已过期', desc: '临时任务有保存期限，过期后不再返回原文，也不保留分析结果。' },
+            { title: '不属于这次使用', desc: '换人使用或重新登录后，上一次的任务不会带到这次使用里。' },
+            { title: '已经停止读取', desc: '系统可以主动停止某份任务的读取，此时不展示任何原文片段。' },
+          ]}
+          acts={[
+            { title: '重新上传或扫描一份简历', desc: '进入简历材料入口上传或扫描；解析成功、跑完诊断后，再回到这里由你确认开始生成。', take: '去上传', art: 'resume', onClick: goUpload },
+            { title: '先打印现有简历', desc: '已有电子稿或纸质件时不需要这份任务，直接走打印流程。', take: '去打印', art: 'report', onClick: goPrintHub },
+          ]}
+          fine="这次没有读取到本人简历原文，没有生成任何方向或计划，也没有把简历内容提供给企业或第三方。"
+        />
       ),
       cta: (
         <>
@@ -456,26 +471,16 @@ export function CareerPlanPage() {
       title: '正在读取你的求职方案',
       subtitle: '读取的是本人此前保存的规划。读到才显示；没有或读取失败会直接说明。',
       pill: { tone: 'unknown', label: '正在读取已有求职方案' },
+      rail: { labels: ['读取已有方案', '确认生成', '看求职方案'], now: 0 },
       body: (
-        <>
-          <Sec title="正在确认是否存在可继续查看的真实规划结果" hint="无进度条 · 无预计时间">
-            <Waiting icon={<RouteIcon size={34} />} title="读取请求已提交，等待返回" desc="读取成功才显示方向、技能计划和行动清单；没有已有规划时会转到生成入口，不显示空壳内容。" tag="整体等待中，没有百分比" />
-          </Sec>
-          <Sec title="读取之后会怎么走" hint="三种结果都写清楚" grow>
-            <Steps items={[
-              { title: '读到已有规划', desc: '直接显示上一次生成的内容，全部由系统提供。' },
-              { title: '没有已有规划', desc: '转到生成入口，由你确认后再开始，不会自动替你生成。' },
-              { title: '读取失败', desc: '直接显示失败状态，不用模板内容或他人内容顶替。' },
-            ]} />
-          </Sec>
-          <Sec title="还没有返回的内容" hint="返回前一律留空">
-            <Ghosts items={[
-              { title: '目标与方向', desc: '方向、原因与第一步由结果给出。', tag: '等待返回' },
-              { title: '尚需准备', desc: '技能缺口按阶段返回后才显示。', tag: '等待返回' },
-              { title: '执行计划', desc: '近期清单返回后才显示。', tag: '等待返回' },
-            ]} />
-          </Sec>
-        </>
+        <ResumeWaitState
+          icon={<RouteIcon size={34} />}
+          title="读取请求已提交，等待返回"
+          desc="读取成功才显示方向、技能计划和行动清单；没有已有规划时会转到生成入口，不显示空壳内容。"
+          tag="整体等待中，没有百分比"
+          fine="读取期间不生成、不保存、不打印任何内容；读取失败会直接显示失败状态，不用模板或他人内容顶替。"
+          take={{ art: 'report', kicker: '读到之后，你可以带走', title: '一份求职建议单', lines: ['目标与方向、尚需准备、执行计划', '只供本人参考，可打印'] }}
+        />
       ),
       cta: (
         <>
@@ -491,20 +496,22 @@ export function CareerPlanPage() {
       subtitle: '文件真实生成后才进入既有打印确认流程；本页不代表已经打印。',
       pill: { tone: 'unknown', label: '等待生成打印文件' },
       body: (
-        <>
-          <Sec title="已提交生成打印件" hint="生成 ≠ 打印">
-            <Waiting icon={<PrinterIcon size={34} />} title="请求已提交，等待文件生成" desc="生成成功后进入打印确认页，由你确认份数、单双面和费用。" tag="等待生成，没有进度和预计时间" />
-          </Sec>
-          <Sec title="打印这件事的真实状态" hint="逐条对照，不含糊" grow>
-            <ListRows items={[
-              '打印文件还没有返回，没有可预览的版本',
-              '打印机没有收到任务，也没有开始出纸',
-              '没有取件码，也没有订单号',
-              '本页没有发起支付',
-              '生成成功后会进入打印确认页，由你逐项确认后再打印',
-            ]} />
-          </Sec>
-        </>
+        <ResumeStepsState
+          steps={[
+            { title: '求职方案已可读', detail: '屏上的方案是已经读回的内容；打印文件还没有生成。' },
+            { title: '等待生成打印文件', detail: '文件真实生成之前不进入打印，也没有进度和预计时间。', now: true },
+            { title: '进入打印确认', detail: '生成成功后，份数、单双面和费用在确认页由你逐项确认。' },
+          ]}
+          summary={[
+            { label: '打印文件', value: '打印文件还没有返回，没有可预览的版本' },
+            { label: '打印机', value: '打印机没有收到任务，也没有开始出纸' },
+            { label: '取件码', value: '没有取件码，也没有订单号' },
+            { label: '支付', value: '本页没有发起支付' },
+            { label: '接下来', value: '生成成功后会进入打印确认页，由你逐项确认后再打印' },
+          ]}
+          fine="生成 ≠ 打印：文件返回之前，什么都没有发送到打印机。"
+          take={{ art: 'report', kicker: '生成之后，你可以带走', title: '一份求职建议单', lines: ['目标与方向、尚需准备、执行计划', '只供本人参考，可打印'] }}
+        />
       ),
       cta: (
         <>
@@ -520,23 +527,22 @@ export function CareerPlanPage() {
       subtitle: '文件生成失败。系统不会把失败写成已发送到打印机，也不产生取件码。',
       pill: { tone: 'bad', label: '打印文件生成失败' },
       body: (
-        <>
-          <Sec title="这次的结果" hint="只写已确认的事实">
-            <Verdict items={[
-              { tone: 'bad', label: '打印文件', value: '未生成' },
-              { tone: 'ok', label: plan ? '规划内容' : '生成入口', value: plan ? '仍可查看' : '仍可使用' },
-              { tone: 'ok', label: '打印机', value: '未收到任务' },
-            ]} />
-            {printError && <p className="jfq-alert" role="alert">{printError}</p>}
-          </Sec>
-          <Sec title="三个既有入口" hint="按需要选一个" grow>
-            <KitRows items={[
-              { icon: <RefreshCwIcon size={22} />, title: '重新生成打印件', desc: '沿用当前内容再试一次', onClick: () => void handlePrint() },
-              { icon: <PrinterIcon size={22} />, title: '打印现有文件', desc: '走既有打印流程，不依赖生成', onClick: goPrintHub },
-              { icon: <HelpCircleIcon size={22} />, title: '查看帮助', desc: '现场操作说明与联系方式', onClick: () => navigate('/help') },
-            ]} />
-          </Sec>
-        </>
+        <ResumeErrorState
+          reasonTitle="这次的结果"
+          reason={printError && (
+            <span role="alert">{unattendedReason(printError, '打印文件这次没有生成成功，请重新生成，或改用现有文件打印。')}</span>
+          )}
+          rows={[
+            { title: '打印文件', desc: '未生成' },
+            { title: plan ? '规划内容' : '生成入口', desc: plan ? '仍可查看' : '仍可使用' },
+            { title: '打印机', desc: '未收到任务' },
+          ]}
+          acts={[
+            { title: '重新生成打印件', desc: '沿用当前内容再试一次，不需要重新跑规划。', take: '重新生成', art: 'report', onClick: () => void handlePrint() },
+            { title: '打印现有文件', desc: '走既有打印流程，不依赖打印件生成。', take: '去打印', art: 'resume', onClick: goPrintHub },
+          ]}
+          onHelp={() => navigate('/help')}
+        />
       ),
       cta: (
         <>
@@ -552,27 +558,25 @@ export function CareerPlanPage() {
       subtitle: `生成出来的是「${degradedPrint.filename}」。要拿到按你简历原文逐条对应的完整版本，需要重新生成一次。`,
       pill: { tone: 'warn', label: '打印件未含 AI 规划正文' },
       body: (
-        <>
-          <Sec title="打印前先说清楚" hint="由你自己决定">
-            <div className="qx-card jfq-consent-card" role="alert">
-              <p>
-                你屏幕上这份 AI 规划已经按留存期限到期清理了，所以本次打印件里<strong>没有</strong> AI 规划正文，
-                只有你自己填的自我探索记分、通用求职自检清单和岗位要求计数（共 {degradedPrint.pageCount} 页）。
-              </p>
-            </div>
-            <Verdict items={[
-              { tone: 'warn', label: '本次打印件', value: '未含 AI 规划' },
-              { tone: 'warn', label: '屏幕上的规划', value: '已按期限清理' },
-              { tone: 'ok', label: '打印机', value: '未收到任务' },
-            ]} />
-          </Sec>
-          <Sec title="两条路，由你选" hint="都进入既有流程" grow>
-            <RouteCards items={[
-              { title: '重新生成完整版', desc: '按你的简历原文再生成一次规划，之后再打印。', action: '重新生成', onClick: () => { setDegradedPrint(null); void handleGenerate() } },
-              { title: '仍然打印这份参考单', desc: '只含自我探索记分、通用自检清单和岗位要求计数。', action: '去打印确认', onClick: degradedPrint.go },
-            ]} />
-          </Sec>
-        </>
+        <ResumeErrorState
+          reasonTitle="打印前先说清楚"
+          alert
+          reason={(
+            <>
+              你屏幕上这份 AI 规划已经按留存期限到期清理了，所以本次打印件里<strong>没有</strong> AI 规划正文，
+              只有你自己填的自我探索记分、通用求职自检清单和岗位要求计数（共 {degradedPrint.pageCount} 页）。
+            </>
+          )}
+          rows={[
+            { title: '本次打印件', desc: '未含 AI 规划' },
+            { title: '屏幕上的规划', desc: '已按期限清理' },
+            { title: '打印机', desc: '未收到任务' },
+          ]}
+          acts={[
+            { title: '重新生成完整版', desc: '按你的简历原文再生成一次规划，之后再打印。', take: '重新生成', art: 'report', onClick: () => { setDegradedPrint(null); void handleGenerate() } },
+            { title: '仍然打印这份参考单', desc: '只含自我探索记分、通用自检清单和岗位要求计数。', take: '去打印确认', art: 'checklist', onClick: degradedPrint.go },
+          ]}
+        />
       ),
       cta: (
         <>
@@ -633,7 +637,7 @@ export function CareerPlanPage() {
       ),
       cta: (
         <>
-          <CtaNote>规划只供本人参考，不构成录用或收入承诺。</CtaNote>
+          {aiOutage ? <CtaNote id={CAREER_AI_DOWN_WHY_ID}>{careerAiDownWhy(true)}</CtaNote> : <CtaNote>规划只供本人参考，不构成录用或收入承诺。</CtaNote>}
           {printButton}
           {generateButton}
         </>
@@ -648,25 +652,18 @@ export function CareerPlanPage() {
       title: '已提交生成，等待返回',
       subtitle: '生成请求已提交。返回之前，不显示方向、技能计划或行动清单。',
       pill: { tone: 'unknown', label: '规划生成中，等待返回' },
+      rail: { labels: ['确认生成', '等待返回', '看求职方案'], now: 1 },
       body: (
-        <>
-          <Sec title="正在等待求职方案结果" hint="无阶段名 · 无百分比">{generationRegion}</Sec>
-          <Sec title="本次生成提交的输入" hint="只用你本人的材料">
-            <Slots items={[
-              { label: '本人简历任务', value: '已随请求提交' },
-              { label: '可选上下文', value: '以已有记录为准' },
-              { label: '结果归属', value: '仅本人可见', fixed: true },
-            ]} />
-          </Sec>
-          <Sec title="生成期间不会发生的事" hint="边界不随状态放宽" grow>
-            <Nots items={[
-              '不显示生成进度百分比或阶段名称',
-              '不承诺薪资、录用或跳槽结果',
-              '不把简历或规划内容提供给企业',
-              '不生成打印文件、不发起支付',
-            ]} />
-          </Sec>
-        </>
+        <div className="rtp-state">
+          {generationRegion}
+          <QxTouchCallout kind="fine">不承诺录用或收入。</QxTouchCallout>
+          <ResumeStepPreview
+            art="report"
+            kicker="返回之后，你可以带走 · 示例版式"
+            title="一份求职建议单"
+            lines={['目标与方向、尚需准备、执行计划', '只供本人参考，可打印']}
+          />
+        </div>
       ),
       cta: (
         <>
@@ -703,7 +700,7 @@ export function CareerPlanPage() {
       ),
       cta: (
         <>
-          <CtaNote>服务不可用时不显示任何规划内容，也不承诺恢复时间。</CtaNote>
+          <CtaNote id={CAREER_AI_DOWN_WHY_ID}>{careerAiDownWhy(false)}</CtaNote>
           {printButton}
           {generateButton}
         </>
@@ -715,22 +712,14 @@ export function CareerPlanPage() {
       subtitle: '没有可确认的规划结果。系统不保留半截内容，也不把上一次的结果当成这次的。',
       pill: { tone: 'bad', label: '本次职业规划生成未完成' },
       body: (
-        <>
-          <Sec title="这次请求的结果" hint="只写事实，不猜原因">
-            <Verdict items={[
-              { tone: 'bad', label: '本次生成', value: '未完成' },
-              { tone: 'warn', label: '可用规划', value: '没有返回' },
-            ]} />
-            {generationRegion}
-          </Sec>
-          <Sec title="接下来三选一" hint="都进入既有流程" grow>
-            <RouteCards items={[
-              { title: '重新生成规划', desc: '沿用当前材料再试一次，不需要重新上传。', action: '重新生成', onClick: () => void handleGenerate() },
-              { title: '先做岗位匹配', desc: '先看清目标岗位的差距，再谈长期规划。', action: '去岗位匹配', onClick: goJobFit },
-              { title: '先改简历', desc: '按自己的判断调整材料重点，不依赖规划结果。', action: '去简历优化', onClick: goOptimize },
-            ]} />
-          </Sec>
-        </>
+        <ResumeErrorState
+          region={generationRegion}
+          acts={[
+            { title: '重新生成规划', desc: '沿用当前材料再试一次，不需要重新上传。', take: '重新生成', art: 'report', onClick: () => void handleGenerate() },
+            { title: '先做岗位匹配', desc: '先看清目标岗位的差距，再谈长期规划。', take: '去岗位匹配', art: 'checklist', onClick: goJobFit },
+            { title: '先改简历', desc: '按自己的判断调整材料重点，不依赖规划结果。', take: '去简历优化', art: 'resume', onClick: goOptimize },
+          ]}
+        />
       ),
       cta: (
         <>
@@ -749,19 +738,20 @@ export function CareerPlanPage() {
         : { tone: 'unknown', label: '服务状态未确认' },
       body: (
         <>
-          <Sec title="生成前说明" hint="把简历经历变成可执行的下一步" grow>
+          <Sec title="生成前说明" hint="把简历经历变成可执行的下一步">
             {generationRegion}
             <Guardline
               head="只供本人参考"
               body="本机不预测前景、不预测薪资、不说「三年后你能到什么岗」—— 那些本机没有依据。本建议仅供本人职业发展参考，不构成任何就业、薪资或录用承诺。"
             />
           </Sec>
-          <Sec title="生成之后能做的" hint="都是既有流程">
-            <KitRows items={[
-              { icon: <PencilLineIcon size={22} />, title: '按方向改简历', desc: '去简历优化调整内容重点', onClick: goOptimize },
-              { icon: <TargetIcon size={22} />, title: '对照一个岗位', desc: '去岗位匹配看具体差距', onClick: goJobFit },
-            ]} />
-          </Sec>
+          <ResumeTouchActs
+            heading={{ title: '生成之后能做的', hint: '都是既有流程' }}
+            items={[
+              { title: '按方向改简历', desc: '去简历优化调整内容重点。', take: '去简历优化', art: 'resume', onClick: goOptimize },
+              { title: '对照一个岗位', desc: '去岗位匹配看具体差距。', take: '去岗位匹配', art: 'report', onClick: goJobFit },
+            ]}
+          />
         </>
       ),
       cta: (
@@ -778,19 +768,15 @@ export function CareerPlanPage() {
 
   return (
     <JobFitStage>
-      <QxPageFrame
+      <ResumeTouchFrame
+        eyebrow="改简历 · 求职方案"
         title={view.title}
         subtitle={view.subtitle}
         status={view.pill}
+        rail={view.rail}
         back={{ label: '返回简历服务', onBack: goResumeHub }}
         ctabar={view.cta}
-        navbar={(
-          <QxAppNavbar
-            onHome={() => navigate('/')}
-            onAdvisor={() => navigate('/assistant')}
-            onProfile={() => navigate('/profile')}
-          />
-        )}
+        ask={{ ...CAREER_ASKS[screen], testId: 'career-plan-ai-ask' }}
       >
         <main
           className="qx-scroll"
@@ -801,7 +787,7 @@ export function CareerPlanPage() {
         >
           {view.body}
         </main>
-      </QxPageFrame>
+      </ResumeTouchFrame>
     </JobFitStage>
   )
 }

@@ -193,7 +193,75 @@ function assertRefreshButtonLockedWhileUploaded(src, label) {
   console.log(`PASS ${label}（disabled 由 ${source} 参与判定）`)
 }
 
-const source = read('src/pages/resume/ResumeSourcePage.tsx')
+/**
+ * 2026-10-28 简历三条主路返工：手机确认只许发一次。
+ * 交给页面的确认函数可能是旧一帧的闭包，闭包里的 confirming 不可靠，所以 handleConfirm 必须靠一个不随渲染变的
+ * 在途标记（confirmingRef）：先看标记、再立标记、立完才开始 await；try 的 finally 里放掉标记。
+ * 面板另在 effect 里把确认函数交给页面：只有「有文件且不在确认中」才交，其余交 null，卸载时也交一次 null。
+ */
+function assertConfirmSentOnce(src, label) {
+  const sourceFile = parsePanel(src)
+  const body = collectNamedBodies(sourceFile).get('handleConfirm')
+  if (!body) throw new Error(`${label}: 找不到 handleConfirm（结构已变，断言必须同步更新而不是删除）`)
+  const isMark = (node) => ts.isPropertyAccessExpression(node)
+    && ts.isIdentifier(node.expression)
+    && node.expression.text === 'confirmingRef'
+    && node.name.text === 'current'
+  let firstAwait = Infinity
+  let guardPosition = Infinity
+  let setPosition = Infinity
+  let releasedInFinally = false
+  const visit = (node, inFinally) => {
+    if (ts.isAwaitExpression(node)) firstAwait = Math.min(firstAwait, node.getStart())
+    if (ts.isIfStatement(node)) {
+      let mentions = false
+      const scan = (child) => { if (isMark(child)) mentions = true; ts.forEachChild(child, scan) }
+      scan(node.expression)
+      const thenReturns = ts.isReturnStatement(node.thenStatement)
+        || (ts.isBlock(node.thenStatement) && node.thenStatement.statements.some((statement) => ts.isReturnStatement(statement)))
+      if (mentions && thenReturns) guardPosition = Math.min(guardPosition, node.getStart())
+    }
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken && isMark(node.left)) {
+      if (node.right.kind === ts.SyntaxKind.TrueKeyword) setPosition = Math.min(setPosition, node.getStart())
+      if (node.right.kind === ts.SyntaxKind.FalseKeyword && inFinally) releasedInFinally = true
+    }
+    if (ts.isTryStatement(node)) {
+      ts.forEachChild(node.tryBlock, (child) => visit(child, inFinally))
+      if (node.catchClause) ts.forEachChild(node.catchClause, (child) => visit(child, inFinally))
+      if (node.finallyBlock) ts.forEachChild(node.finallyBlock, (child) => visit(child, true))
+      return
+    }
+    ts.forEachChild(node, (child) => visit(child, inFinally))
+  }
+  visit(body, false)
+  if (!Number.isFinite(guardPosition)) throw new Error(`${label}: handleConfirm 没有先看在途标记（confirmingRef.current）就返回的守卫，旧闭包能把确认发两遍`)
+  if (!Number.isFinite(setPosition)) throw new Error(`${label}: handleConfirm 从未把在途标记立起来（confirmingRef.current = true）`)
+  if (setPosition > firstAwait) throw new Error(`${label}: handleConfirm 先 await 才立在途标记，两次点击之间仍有窗口`)
+  if (guardPosition > setPosition) throw new Error(`${label}: handleConfirm 先立标记、后看标记，守卫形同虚设`)
+  if (!releasedInFinally) throw new Error(`${label}: handleConfirm 的 finally 里没有放掉在途标记，确认失败后再也点不了`)
+
+  // 交给页面的确认函数：只在「有文件且不在确认中」时有值。
+  let handOver = null
+  const findHandOver = (node) => {
+    if (!handOver && ts.isCallExpression(node) && node.expression.getText() === 'onConfirmReady' && node.arguments.length === 1) {
+      const arg = node.arguments[0]
+      if (ts.isConditionalExpression(arg)) handOver = arg
+    }
+    ts.forEachChild(node, findHandOver)
+  }
+  findHandOver(sourceFile)
+  if (!handOver) throw new Error(`${label}: 找不到 onConfirmReady?.(条件 ? 确认函数 : null)（结构已变，断言必须同步更新而不是删除）`)
+  const condition = handOver.condition.getText()
+  if (!/\buploaded\b/.test(condition) || !/!\s*confirming\b/.test(condition)) {
+    throw new Error(`${label}: 交给页面的确认函数没有同时要求「有文件」和「不在确认中」：${condition}`)
+  }
+  if (handOver.whenFalse.kind !== ts.SyntaxKind.NullKeyword) throw new Error(`${label}: 不可确认时必须交 null`)
+  console.log(`PASS ${label}`)
+}
+
+// 2026-10-28 触屏版：来源页「在哪里」一步的版面（来源卡、手机 / U 盘面板、原件预览）在 touch/ResumeSourceWhere.tsx。
+// 判据对「页面 + 它的版面组件」整体成立（assertNotIncludes 因此只会更严）。
+const source = `${read('src/pages/resume/ResumeSourcePage.tsx')}\n${read('src/pages/resume/touch/ResumeSourceWhere.tsx')}`
 const panel = read('src/pages/upload/components/UploadSessionQrPanel.tsx')
 const phone = read('src/pages/upload/PhoneUploadPage.tsx')
 const phoneModel = read('src/pages/upload/phoneUploadModel.ts')
@@ -254,24 +322,54 @@ assertIncludes(selfAssessment, 'useSelfAssessmentIdleExit', 'self-assessment pag
   console.log('PASS self-assessment idle exit covers all four public-screen pages')
 }
 assertIncludes(panel, 'QRCodeSVG', 'QR panel renders real QR')
+// 走查 I-14：签名图确认后只留系统短期、不进「我的文档」，「会员文件确认后归档」对它不成立；别的用途的会员会话仍说这句。
+assertIncludes(panel, "status?.mode === 'member' && purpose !== 'signature_image' &&", 'archive badge is not shown for a signature image')
+assertIncludes(panel, '会员文件确认后归档', 'archive badge still shown for member sessions of other purposes')
 assertIncludes(panel, 'confirmUploadSession', 'Kiosk confirmation is explicit')
 assertIncludes(panel, 'requiresKioskConfirmation', 'panel understands confirmation state')
 assertIncludes(panel, 'created.controlToken', 'Kiosk keeps control token outside QR URL')
 assertIncludes(panel, 'UPLOAD_SESSION_NOT_FOUND', 'polling stops when session disappears')
 assertRefreshRevokesOldQrBeforeMinting(panel, 'refresh revokes the previous QR before minting a replacement')
 assertRefreshButtonLockedWhileUploaded(panel, 'an uploaded file cannot be discarded by refreshing the QR')
+assertConfirmSentOnce(panel, 'QR panel confirm is guarded by an in-flight ref and handed to the page only while a file waits and no confirm runs')
+assertMatches(panel, /return \(\) => \{\s*onConfirmReady\?\.\(null\)\s*\}/, 'QR panel hands the page a null confirm when it unmounts')
+assertNotIncludes(panel, 'confirmRef', 'QR panel no longer writes a ref during render for the page confirm')
+assertNotIncludes(source, 'phoneConfirmRef', 'resume source no longer reads a stale render-phase ref for the phone confirm')
+assertIncludes(source, 'const [phoneConfirm, setPhoneConfirm] = useState<(() => void) | null>(null)', 'resume source keeps the phone confirm in state so the dock redraws when it is taken away')
+assertIncludes(source, "label: phoneConfirmNow ? '确认使用这份文件' : '正在确认…', onClick: () => phoneConfirmNow?.(), disabled: !phoneConfirmNow", 'dock primary says 正在确认… and is disabled while the phone confirm is running')
 assertIncludes(panel, 'window.setInterval(() => setNow(Date.now()), 1_000)', 'QR countdown is driven by the server expiry timestamp')
 assertIncludes(panel, 'uploadSessionUserMessage', 'Kiosk QR errors use public-safe copy')
 assertIncludes(api, 'url.hash = fragment.toString()', 'phone upload token stays in URL fragment')
 assertIncludes(phone, '一体机上确认', 'phone page explains kiosk confirmation')
 assertIncludes(phone, 'PHONE_UPLOAD_PURPOSES', 'phone page maps each supported purpose explicitly')
-// 稿 51 ⑥：CreateUploadSessionDto 的 @IsIn 不含 signature_image，一体机开不出这种会话。
-// 手机端不给它任何「看起来能走通」的上传配置，只给诚实不可用态，并指回现场已验证的「本机上传」。
-assertIncludes(phoneModel, "if (purpose === 'signature_image') return 'signature-blocked'", 'signature links are an honest dead end, not an upload flow')
-assertIncludes(phoneModel, '本人手写签名暂不支持手机上传', 'signature dead end tells the user it is unavailable on the phone')
-assertNotIncludes(phone, 'signature_image', 'phone page offers no signature_image purpose config or file filter')
-// 稿 51 ⑧：fragment 里的 purpose 可被随手改掉，上传前只按受支持用途 accept 的交集放行。
-assertIncludes(phone, 'genericPolicy(SESSION_PURPOSES.map((purpose) => purposes[purpose].accept))', 'phone pre-upload filter is the intersection of all supported purposes')
+// 走查 I-14：CreateUploadSessionDto 现在放行 signature_image（与 service 共用 UPLOAD_SESSION_PURPOSES），
+// 一体机「签名」第 2 步能开出这种会话。手机页因此不能再给「手机端不可用」的死胡同，而要真的收签名图：
+// 只收 JPG / PNG，回执认 signature_image；缺了会话号或令牌才算坏链接。
+assertNotIncludes(phoneModel, 'signature-blocked', 'phone model has no signature dead end any more')
+assertNotIncludes(phoneModel, '本人手写签名暂不支持手机上传', 'phone model no longer tells the user signature upload is unsupported')
+assertIncludes(phone, 'signature_image: {', 'phone page maps signature_image explicitly')
+assertIncludes(phone, "const SIGNATURE_ACCEPT = '.jpg,.jpeg,.png,image/jpeg,image/png'", 'signature image accepts only JPG / PNG on the phone page')
+{
+  // 一体机认的会话用途必须与后端 DTO 放行的是同一份清单：谁漏一边，这里或后端门禁就红。
+  const dto = readFileSync(new URL('../../../services/api/src/upload-sessions/upload-sessions.dto.ts', import.meta.url), 'utf8')
+  const listOf = (src, name) => {
+    const match = src.match(new RegExp(`${name}\\s*=\\s*\\[([^\\]]*)\\]`))
+    if (!match) throw new Error(`cannot find the ${name} list`)
+    return [...match[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort()
+  }
+  const apiPurposes = listOf(dto, 'UPLOAD_SESSION_PURPOSES')
+  const kioskPurposes = listOf(phoneModel, 'SESSION_PURPOSES')
+  if (JSON.stringify(apiPurposes) !== JSON.stringify(kioskPurposes)) {
+    throw new Error(`phone SESSION_PURPOSES ${kioskPurposes} must equal upload-sessions.dto UPLOAD_SESSION_PURPOSES ${apiPurposes}`)
+  }
+  console.log('PASS phone SESSION_PURPOSES equals the API upload-session purposes')
+}
+// 稿 51 ⑧：fragment 里的 purpose 可被随手改掉，上传前只按文档类用途 accept 的交集放行；
+// 链接写着是签名图时只能再收紧（并上签名图的 accept），永不放宽。签名图不能算进通用档，否则简历 / 打印连 PDF 都选不了。
+assertIncludes(phoneModel, "purposeHint === 'signature_image' ? SESSION_PURPOSES : DOCUMENT_PURPOSES", 'a signature hint can only tighten the pre-upload filter')
+assertIncludes(phoneModel, "export const DOCUMENT_PURPOSES = ['resume_upload', 'print_doc', 'contract_upload'] as const", 'the generic pre-upload filter is the intersection of document purposes only')
+assertIncludes(phone, 'preUploadPolicy({', 'phone pre-upload filter comes from preUploadPolicy')
+assertNotIncludes(phone, 'genericPolicy(', 'phone page does not hand-roll the pre-upload filter')
 assertNotIncludes(phone, '就业服务大厅 · 01号机', 'phone page does not invent a terminal name')
 assertIncludes(phone, 'uploadSessionUserMessage', 'phone upload errors use public-safe copy')
 assertIncludes(phone, "state !== 'success'", 'successful uploads cannot be reset into a false re-upload state')

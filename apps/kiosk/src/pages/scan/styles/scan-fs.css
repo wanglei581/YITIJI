@@ -1,0 +1,673 @@
+/* 扫描工作台正文。只挂在本页，不改 .qxt-* 默认。颜色只用 --qxt-* / --qx-*。 */
+
+.qxt-screen [data-qx-page='scan-workbench'].sw-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 10px;
+}
+
+[data-qx-page='scan-workbench'] {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+[data-qx-page='scan-workbench'] .fs-grow {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-qx-page='scan-workbench'] .fs-types {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-qx-page='scan-workbench'] .fs-type {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-height: 96px;
+  padding: 12px 14px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  text-align: left;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-type:active {
+  transform: scale(0.98);
+}
+
+[data-qx-page='scan-workbench'] .fs-type b {
+  font-size: 28px;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+[data-qx-page='scan-workbench'] .fs-type .fs-sub {
+  font-size: 22px;
+  line-height: 1.35;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .sx-chips {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+[data-qx-page='scan-workbench'] .sx-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 18px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+[data-qx-page='scan-workbench'] .sx-chip.is-warn {
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'] {
+  background: var(--qx-deep, var(--qxt-deep-2));
+  color: var(--qxt-cream);
+  border-color: var(--qx-deep, var(--qxt-deep-2));
+}
+
+[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'] .fs-sub {
+  color: var(--qxt-mint);
+}
+
+[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'] .sx-chip {
+  background: var(--qxt-chip-ghost);
+  color: var(--qxt-cream);
+}
+
+[data-qx-page='scan-workbench'] .fs-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 76px;
+  padding: 10px 14px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  text-align: left;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-row:active {
+  transform: scale(0.98);
+}
+
+[data-qx-page='scan-workbench'] .fs-row b {
+  display: block;
+  font-size: 24px;
+  line-height: 1.3;
+}
+
+[data-qx-page='scan-workbench'] .fs-row small {
+  display: block;
+  font-size: 22px;
+  line-height: 1.35;
+  color: var(--qxt-ink-2);
+  font-weight: 500;
+}
+
+[data-qx-page='scan-workbench'] .fs-row[disabled] {
+  opacity: 0.45;
+}
+
+/* 稿的说明格：两列、行高相等、宽格占满一行。双列小组（.fs-pairgrid）用 display: contents
+ * 并进同一张网格，各屏就不用管哪几格是一对。 */
+[data-qx-page='scan-workbench'] .fs-facts {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr;
+  gap: 8px;
+}
+
+[data-qx-page='scan-workbench'] .fs-pairgrid {
+  display: contents;
+}
+
+/* 状态屏：说明格按内容定高，不拉伸（稿的 .fs-facts 是拉满整屏的网格，每格 250–290px 里只有一两行字，
+ * 量出来整屏大片空白）；多出来的高度只给示意小样 .sx-sample，不撑空卡。 */
+[data-qx-page='scan-workbench'] .fs-grow.is-status .fs-facts {
+  flex: none;
+  grid-auto-rows: auto;
+}
+
+[data-qx-page='scan-workbench'] .sx-sample {
+  flex: 1 1 0;
+  min-height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 20px;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  overflow: hidden;
+}
+
+[data-qx-page='scan-workbench'] .sx-sample .sx-art {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+
+[data-qx-page='scan-workbench'] .fs-fact {
+  background: var(--qxt-well);
+  border-radius: 18px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 0;
+}
+
+[data-qx-page='scan-workbench'] .fs-fact.wide {
+  grid-column: 1 / -1;
+}
+
+[data-qx-page='scan-workbench'] .fs-fact b {
+  font-size: 22px;
+  line-height: 1.3;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-fact span,
+[data-qx-page='scan-workbench'] .fs-p {
+  font-size: 22px;
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .fs-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+[data-qx-page='scan-workbench'] .fs-kvs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+[data-qx-page='scan-workbench'] .fs-kv {
+  background: var(--qxt-well);
+  border-radius: 18px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 84px;
+}
+
+[data-qx-page='scan-workbench'] .fs-kv span {
+  font-size: 20px;
+  line-height: 1.3;
+  color: var(--qxt-ink-3);
+}
+
+[data-qx-page='scan-workbench'] .fs-kv b {
+  font-size: 24px;
+  line-height: 1.35;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .sx-steps {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-qx-page='scan-workbench'] .fs-step {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 4px 12px;
+  align-content: center;
+  background: var(--qxt-well);
+  border-radius: 20px;
+  padding: 12px 14px;
+  min-height: 76px;
+  flex: 1 1 auto;
+}
+
+[data-qx-page='scan-workbench'] .fs-step .n {
+  grid-row: 1 / span 2;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--qx-deep, var(--qxt-deep-2));
+  color: var(--qxt-cream);
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+[data-qx-page='scan-workbench'] .fs-step b {
+  font-size: 24px;
+  line-height: 1.3;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-step .d {
+  font-size: 22px;
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .fs-scanhero {
+  /* 示意图区不再吃掉全部余量：封顶 470px，余量给上面的步骤卡（每步一张大卡，读起来也更省力）。 */
+  flex: 0 1 auto;
+  height: 470px;
+  min-height: 180px;
+  display: grid;
+  grid-template-columns: minmax(180px, 56%) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+  background: var(--qxt-well);
+  border-radius: 22px;
+  padding: 16px 20px;
+}
+
+[data-qx-page='scan-workbench'] .fs-sheet {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  min-height: 140px;
+  margin: 0;
+  border-radius: 8px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  box-shadow: var(--qxt-shadow);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: 10px;
+  padding: 18px 14px;
+}
+
+[data-qx-page='scan-workbench'] .fs-sheet i {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--qxt-line);
+}
+
+[data-qx-page='scan-workbench'] .fs-sheet i:nth-child(2) {
+  width: 72%;
+  background: var(--qxt-mint);
+}
+
+[data-qx-page='scan-workbench'] .fs-scanhero .vis {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+[data-qx-page='scan-workbench'] .fs-scanhero .vis svg {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+[data-qx-page='scan-workbench'] .fs-scanhero p {
+  margin: 0;
+  align-self: center;
+  font-size: 26px;
+  line-height: 1.45;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-warn,
+[data-qx-page='scan-workbench'] .fs-help {
+  margin: 0;
+  border-radius: 18px;
+  padding: 12px 14px;
+  font-size: 22px;
+  line-height: 1.45;
+}
+
+[data-qx-page='scan-workbench'] .fs-warn {
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-help {
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page='scan-workbench'] .sx-hero {
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--qxt-well);
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* 余量摊在示意图与各行之间，不在上下各留一大片。 */
+  justify-content: space-evenly;
+  gap: 6px;
+  padding: 12px 16px;
+}
+
+[data-qx-page='scan-workbench'] .sx-hero .fs-doc {
+  height: 64%;
+  max-width: 78%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+[data-qx-page='scan-workbench'] .sx-hero .fs-doc svg {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+}
+
+[data-qx-page='scan-workbench'] .sx-hero .fs-time {
+  font-size: 48px;
+  line-height: 1.15;
+  font-weight: 700;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-h {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.3;
+  font-weight: 700;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-created {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.45;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .sw-result {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+[data-qx-page='scan-workbench'] .sw-preview {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  /* 预览井封了顶，多出来的高度摊进各块之间，不在卡片底下留成一整片空白。 */
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 26px;
+  padding: 14px 16px;
+  min-height: 0;
+}
+
+/* 预览井是单列：预览占满井宽、水平居中。它原来是两列网格（minmax(140px, 28%) 1fr），那是给
+ * 「左边扫描示意图 + 右边预览」写的；示意图拿掉以后预览落进了第一列，只剩 263px 宽，翻页键被挤成竖排。 */
+[data-qx-page='scan-workbench'] .sw-pvstage {
+  flex: 1 1 auto;
+  min-height: 180px;
+  /* 封顶：整页适配的预览里，一页纸比井矮时上下会留白，井越高留得越多；多出来的高度留在卡片底部（实在的内容区），不留在预览里。 */
+  max-height: 590px;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  padding: 12px;
+}
+
+[data-qx-page='scan-workbench'] .sw-pvdoc {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 140px;
+  border-radius: 16px;
+  background: var(--qxt-card);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+[data-qx-page='scan-workbench'] .sw-pvstage [data-file-preview-kind] {
+  flex: 1 1 auto;
+  min-height: 140px;
+  height: 100%;
+  border-radius: 16px;
+  background: var(--qxt-card);
+  overflow: hidden;
+}
+
+/* 文件信息条：名字、格式大小页数、类型都在预览下面，不再有自己的边框盒（外面那张卡就是它的底）。 */
+[data-qx-page='scan-workbench'] .sw-pvhead {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+}
+
+[data-qx-page='scan-workbench'] .sw-pvh-2 {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin: 0;
+  min-height: 0;
+  min-width: 0;
+}
+
+[data-qx-page='scan-workbench'] .sw-pvh-2 b {
+  max-width: 100%;
+  font-size: 26px;
+  line-height: 1.3;
+  color: var(--qxt-ink);
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-overflow: clip;
+}
+
+[data-qx-page='scan-workbench'] .sw-pvh-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 22px;
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .sw-pvh-1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-height: 0;
+}
+
+[data-qx-page='scan-workbench'] .sw-pvh-t {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 22px;
+  line-height: 1.3;
+  font-weight: 700;
+  color: var(--qxt-ink);
+}
+
+/* 「整屏查看」是预览下面的一整行按钮（稿：整行、不挤在文件头里），可点区不小于 64。 */
+[data-qx-page='scan-workbench'] .sw-pvh-open {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 76px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 22px;
+  border: 1.5px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+/* 手机不缩放时，预览头不许被挤扁后把「整屏查看」的盒子摊到下一张卡片上。 */
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-result,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-preview,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-pvhead,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-pvstage,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-pvstage [data-file-preview-kind] {
+  flex: none;
+  overflow: visible;
+  height: auto;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-pvstage,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-pvstage [data-file-preview-kind] {
+  height: 140px;
+  min-height: 96px;
+  overflow: hidden;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-pvh-1 {
+  align-content: flex-start;
+  height: auto;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-pvh-open {
+  flex: 1 0 100%;
+  width: 100%;
+  height: 64px;
+  min-height: 64px;
+  max-height: 64px;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-truth {
+  flex: none;
+}
+
+[data-kiosk-stage-fit='on'] .qxt-screen.scan-touch .qxt-rail-st {
+  white-space: nowrap;
+}
+
+[data-qx-page='scan-workbench'] .sw-actrow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-qx-page='scan-workbench'] .sw-actrow .sw-exit {
+  /* 旧表把出口按钮 height:100%，百分比高度会把其中一颗压到 56px。 */
+  height: auto;
+  min-height: 76px;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-actrow .sw-exit {
+  min-height: 64px;
+}
+
+[data-qx-page='scan-workbench'] .sw-exit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 76px;
+  padding: 10px 14px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  text-align: left;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .sw-exit-title {
+  display: block;
+  font-size: 24px;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+[data-qx-page='scan-workbench'] .sw-exit small {
+  display: block;
+  font-size: 22px;
+  line-height: 1.35;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .sw-exit.is-off {
+  opacity: 0.55;
+}
+
+/* 一体机尺寸底线：正文 ≥20px，可点 ≥64×64。旧工作台样式里 17–18px 的小字与 56px 的小按钮在这里抬起来。 */
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-truth div,
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-truth b,
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-preview-cap,
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-pvh-1 .sw-chip,
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-pvdoc .text-lg {
+  font-size: 20px;
+}
+
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-pvh-open {
+  min-height: 76px;
+  min-width: 64px;
+}
+
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-pvdoc .min-h-14,
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-pvdoc .min-w-14 {
+  min-height: 64px;
+  min-width: 64px;
+}
+
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-offtag {
+  font-size: 20px;
+}

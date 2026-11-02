@@ -164,7 +164,7 @@ mustContain(
 // 要求：statusBadge 在 !config.enabled 时为 null，且 badge 仅在 statusBadge 有值时渲染。
 mustContain(
   CAMPUS_PAGE,
-  ['!config.enabled', '? null', 'badge={statusBadge ?'],
+  ['!config.enabled', '? null', 'status={statusBadge ?'],
   'F3 enabled===false 时 statusBadge 为 null，不渲染 header badge（避免「可查看指引 0 项」）',
 )
 

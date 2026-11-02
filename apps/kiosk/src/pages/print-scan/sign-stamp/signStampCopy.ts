@@ -52,7 +52,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
       kind: 'error',
       title: '这台机器还没完成登记',
       body: '签名要先确认这台机器是否被允许使用。读不到登记信息就不放行，不把读不到当成可以用。',
-      chips: [{ text: '不假设读不到就是可用' }, { text: '请联系现场工作人员' }],
+      chips: [{ text: '不假设读不到就是可用' }, { text: '读不到登记就不放行' }],
     },
     'capability-loading': {
       kind: 'info',
@@ -64,13 +64,13 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
       kind: 'lock',
       title: '这台机器没有开放签名',
       body: '管理员没有为这台机器开放「签名」。未登记一律按不允许处理，不做静默降级。',
-      chips: [{ text: '文档打印扫描不受影响', tone: 'ok' }, { text: '需要开放请联系工作人员' }],
+      chips: [{ text: '文档打印扫描不受影响', tone: 'ok' }, { text: '需要开放时由管理员配置' }],
     },
     'capability-maintenance': {
       kind: 'warn',
       title: '签名正在维护',
       body: '这台机器的签名功能被管理员置为维护状态，暂时不受理新的合成。已生成的文件不受影响。',
-      chips: [{ text: '维护是管理员登记的真实状态' }, { text: '恢复时间请问现场工作人员' }],
+      chips: [{ text: '维护是管理员登记的真实状态' }, { text: '恢复时间以管理员登记为准' }],
     },
     'capability-error': {
       kind: 'error',

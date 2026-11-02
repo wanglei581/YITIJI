@@ -1,4 +1,5 @@
 import { Button, Card } from '@ai-job-print/ui'
+import { QxTouchOverlay } from '../../../components/qingxu/touch/QxTouchOverlay'
 
 interface ResumeAiConsentDialogProps {
   busy: boolean
@@ -6,6 +7,11 @@ interface ResumeAiConsentDialogProps {
   guest: boolean
   onCancel: () => void
   onConfirm: () => void
+  /**
+   * 可选。touch：用触屏弹层画（正文 20px 以上、按钮高 88），必须放进触屏页的 overlay 槽里。
+   * 不传时仍是原来的弹层，生成页等其它调用方不变。
+   */
+  variant?: 'touch'
 }
 
 /** 简历类 AI（诊断 / 优化 / 生成）首次确认。会员入库，游客只记本机会话。 */
@@ -15,7 +21,31 @@ export function ResumeAiConsentDialog({
   guest,
   onCancel,
   onConfirm,
+  variant,
 }: ResumeAiConsentDialogProps) {
+  const memberLine = guest
+    ? '本次确认只在本机这次使用期间有效，不会写入账号。'
+    : '授权保存在你的会员账号中，可随时在隐私设置撤回。'
+  if (variant === 'touch') {
+    return (
+      <QxTouchOverlay
+        kind="dialog"
+        title="确认使用简历 AI"
+        onClose={onCancel}
+        actions={(
+          <>
+            <button type="button" className="qxt-btn qxt-btn-sec" disabled={busy} onClick={onCancel}>暂不使用</button>
+            <button type="button" className="qxt-btn qxt-btn-pri" disabled={busy} onClick={onConfirm}>{busy ? '正在确认…' : '同意并继续'}</button>
+          </>
+        )}
+      >
+        <p>诊断、优化和生成会把你上传或填写的简历内容发送到系统里的 AI 进行分析。</p>
+        <p>结果只给你本人看，不会发送给企业或合作机构，也不进入平台候选人简历库。</p>
+        <p>{memberLine}</p>
+        {error ? <p role="status" aria-live="polite" data-tone="bad">{error}</p> : null}
+      </QxTouchOverlay>
+    )
+  }
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5"
@@ -34,9 +64,7 @@ export function ResumeAiConsentDialog({
           结果只给你本人看，不会发送给企业或合作机构，也不进入平台候选人简历库。
         </p>
         <p className="mt-2 text-sm leading-relaxed text-neutral-500">
-          {guest
-            ? '本次确认只在本机这次使用期间有效，不会写入账号。'
-            : '授权保存在你的会员账号中，可随时在隐私设置撤回。'}
+          {memberLine}
         </p>
         {error && (
           <p className="mt-4 rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg" aria-live="polite">
