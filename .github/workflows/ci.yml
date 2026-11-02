@@ -665,6 +665,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-lifecycle
           # 屏上扫描 B4：取消响应的静默期倒计时、GET 页数上限、扫描仪找不到或出错时的派生告警。SQLite 与 PG 两侧各跑一遍。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b4
+          # 屏上扫描 B6：投递钉扫描轮次（替换 deviceUpdatedAt）。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b6
           pnpm --filter @ai-job-print/api verify:print-conversion
           # 包 K1：中文字体解析收口 + 探测（缺候选路径即红）
           pnpm --filter @ai-job-print/api verify:cjk-font
@@ -1211,6 +1213,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-lifecycle
           # 屏上扫描 B4：取消响应的静默期倒计时、GET 页数上限、扫描仪找不到或出错时的派生告警。SQLite 与 PG 两侧各跑一遍。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b4
+          # 屏上扫描 B6：投递钉扫描轮次（替换 deviceUpdatedAt）。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b6
           pnpm --filter @ai-job-print/api verify:print-conversion
           # 包 K1：中文字体解析收口 + 探测（缺候选路径即红）
           pnpm --filter @ai-job-print/api verify:cjk-font

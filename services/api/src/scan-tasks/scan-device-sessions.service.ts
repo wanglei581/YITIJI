@@ -11,6 +11,7 @@ import {
   isSwitchedToPanel,
   parseScanDeviceReportSettings,
   planScanDeviceReport,
+  scanDeviceRoundStarts,
   renewScanDeviceExpiry,
   resolveScanDeviceSettingsInput,
   scanDeviceReportRenewWindowMs,
@@ -175,6 +176,10 @@ export class ScanDeviceSessionsService {
           devicePageCount: plan.devicePageCount,
           deviceErrorCode: plan.deviceErrorCode,
           deviceUpdatedAt: now,
+          // 新一轮开始扫描才加一。where 钉着读到的 deviceState，同一次转移不会被并发回报加两次。
+          ...(scanDeviceRoundStarts(task.deviceState, plan.deviceState)
+            ? { deviceRound: { increment: 1 } }
+            : {}),
           expiresAt,
         },
       })

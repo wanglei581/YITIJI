@@ -5,8 +5,8 @@
  * 都已经够大（CLAUDE.md §8），这三处修复的用例不再往里堆。
  *
  * 覆盖：
- *   A. 投递抢占（B1 复审修复，B4 再钉 deviceUpdatedAt）：deliverScanFile 第 6 步把任务从 waiting 抢占成 matched 的那次条件更新，必须钉住读到的 startMode；
- *      device 任务另钉 deviceState ∈ composing / delivering、devicePageCount ≥ 1，以及读到的 deviceUpdatedAt。用包一层 PrismaService 的办法，
+ *   A. 投递抢占（B1 复审修复，B6 用 deviceRound 替换 B4 的 deviceUpdatedAt 钉）：deliverScanFile 第 6 步把任务从 waiting 抢占成 matched 的那次条件更新，必须钉住读到的 startMode；
+ *      device 任务另钉 deviceState ∈ composing / delivering、devicePageCount ≥ 1，以及读到的 deviceRound。用包一层 PrismaService 的办法，
  *      在那次 updateMany 真正执行前先让别的请求赢（用户改用面板、终端程序回报 error / aborted、出错重扫又回到 delivering……），断言投递被
  *      409 SCAN_TASK_STATE_CHANGED 拒、任务仍是 waiting、没有挂上文件、没留下「已尝试」的去重痕迹；面板投递不受影响；进纸器与玻璃台的正常投递照常通过
  *   B. 截止时间只增不减（B1 复审修复）：report / switch-to-panel / device-settings 的条件更新都钉住读到的 expiresAt，
@@ -173,21 +173,20 @@ async function main(): Promise<void> {
         return { svc: new ScanTasksService(wrapped, files, capabilities), ran: () => ran }
       }
 
-      // A0. 钉住的列（纯函数）：面板任务只多一条恒真的 startMode，device 任务再多 deviceState / devicePageCount / deviceUpdatedAt
+      // A0. 钉住的列（纯函数）：面板任务只多一条恒真的 startMode，device 任务再多 deviceState / devicePageCount / deviceRound
       assert.deepEqual([...protocol.SCAN_DEVICE_DELIVERABLE_STATES], SPEC_DELIVERABLE_STATES, '可投递的设备状态 = composing / delivering')
       assert.deepEqual(protocol.scanDeliverClaimPins({ startMode: 'panel' }), { startMode: 'panel' }, '面板任务只钉 startMode，不加设备条件')
-      const readAt = new Date('2026-11-03T08:00:00.000Z')
       assert.deepEqual(
         protocol.scanDeliverClaimPins({ startMode: 'device' }),
-        { startMode: 'device', deviceState: { in: SPEC_DELIVERABLE_STATES }, devicePageCount: { gte: 1 }, deviceUpdatedAt: null },
-        'device 任务没读到 deviceUpdatedAt 时钉 null',
+        { startMode: 'device', deviceState: { in: SPEC_DELIVERABLE_STATES }, devicePageCount: { gte: 1 }, deviceRound: 0 },
+        'device 任务没读到 deviceRound 时按列默认值钉 0',
       )
       assert.deepEqual(
-        protocol.scanDeliverClaimPins({ startMode: 'device', deviceUpdatedAt: readAt }),
-        { startMode: 'device', deviceState: { in: SPEC_DELIVERABLE_STATES }, devicePageCount: { gte: 1 }, deviceUpdatedAt: readAt },
-        'device 任务钉的是读到的那一个 deviceUpdatedAt，不是「现在」',
+        protocol.scanDeliverClaimPins({ startMode: 'device', deviceRound: 2 }),
+        { startMode: 'device', deviceState: { in: SPEC_DELIVERABLE_STATES }, devicePageCount: { gte: 1 }, deviceRound: 2 },
+        'device 任务钉的是读到的那一个 deviceRound，不是「现在」',
       )
-      pass('抢占要钉的列：面板任务只有 startMode；device 任务另有 deviceState、devicePageCount ≥ 1、读到的 deviceUpdatedAt')
+      pass('抢占要钉的列：面板任务只有 startMode；device 任务另有 deviceState、devicePageCount ≥ 1、读到的 deviceRound')
 
       /** 钩子先赢：投递被 409 拒、任务仍 waiting、没挂文件、没留去重痕迹。返回这次用的 PDF，供之后验证同一份内容还能投。 */
       async function expectClaimLost(label: string, s: Session, hook: () => Promise<void>): Promise<Buffer> {
@@ -231,7 +230,7 @@ async function main(): Promise<void> {
         assert.equal((await rowOf(s.id)).status, 'completed', '终端程序恢复后同一份内容能投进去')
       }
 
-      // A2b. B4 防 ABA：抢占前出错重扫已经回到 delivering（状态和页数再次可投递），旧投递仍不得挂上新一轮
+      // A2b. 轮次防 ABA：抢占前出错重扫已经回到 delivering（状态和页数再次可投递，deviceRound 已加一），旧投递仍不得挂上新一轮
       {
         const s = await readyToDeliver('claimaba')
         await expectClaimLost('出错重扫回到 delivering 后旧投递迟到', s, async () => {

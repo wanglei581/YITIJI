@@ -131,6 +131,16 @@ export function canTransitionScanDeviceState(from: ScanDeviceState, to: ScanDevi
 }
 
 /**
+ * 新一轮开始扫描：回报从 ready 或 error 转到 scanning 这一次。
+ * 同状态重发、page_ready ↔ scanning 的翻页都不算。改设置回到 ready 不走这里，下一次开始扫描才加。
+ * deviceState 还是空时与 planScanDeviceReport 一样按 ready 看。
+ */
+export function scanDeviceRoundStarts(from: string | null | undefined, to: string): boolean {
+  const normalized = isScanDeviceState(from) ? from : 'ready'
+  return (normalized === 'ready' || normalized === 'error') && to === 'scanning'
+}
+
+/**
  * 终端程序回报被收下后，按收下的 state 选续期窗口：page_ready 10 分钟（用户要放下一页，补稿 cs-scan-more），
  * 其余 3 分钟。改用面板扫描、改扫描设置各自传 SCAN_DEVICE_SWITCH_RENEW_WINDOW_MS（10 分钟）。
  */
@@ -292,6 +302,7 @@ type DeviceFieldsRow = {
   devicePageCount?: number | null
   deviceErrorCode?: string | null
   deviceUpdatedAt?: Date | null
+  deviceRound?: number | null
 }
 
 export function isScanDeviceTask(task: Pick<DeviceFieldsRow, 'startMode'>): boolean {
@@ -527,20 +538,21 @@ export function normalizeScanDeliverOrigin(raw: unknown): ScanDeliverOrigin {
 /**
  * 投递时把任务从 waiting 抢占成 matched 的那次条件更新（deliverScanFile 第 6 步）要钉住的扫描方式与设备状态。
  * assertScanDeliverOriginAllowed 是在读到的快照上判的；读与这次抢占之间，用户可能「改用面板」（startMode→panel、
- * deviceState→aborted），终端程序也可能回报 error / aborted。条件更新里没有这几条，已切面板 / 已中止的会话
- * 仍会被挂上设备扫描件。所以：
+ * deviceState→aborted），终端程序也可能回报 error / aborted，或从 error 再开一轮。条件更新里没有这几条，
+ * 已切面板 / 已中止 / 新一轮的会话仍会被挂上上一轮的文件。所以：
  *   - 所有任务都钉读到的 startMode（面板任务恒为 'panel'，是一条恒真条件，行为不变）；
  *   - device 任务再钉 deviceState ∈ composing / delivering 且 devicePageCount ≥ 1（与 assertScanDeliverOriginAllowed 同一组条件）；
- *   - device 任务再钉读到的 deviceUpdatedAt（B4 防 ABA，不加列）。出错重扫会把状态和页数重新走回 composing / delivering，
- *     只钉那两列时，上一轮还没抢占成功的旧投递会把旧 PDF 挂到新一轮。正常流程里 delivering 回报在投递之前，
- *     投递期间只有用户动作或新一轮回报会改 deviceUpdatedAt。没读到（一直是 null）就钉 null。
- * 面板任务不加后三条：面板路线行为一字不变。条件失效按现有写法回 409 SCAN_TASK_STATE_CHANGED。
+ *   - device 任务再钉读到的 deviceRound（B6，替换 B4 的 deviceUpdatedAt 钉）。轮次只在 ready / error → scanning 时加一，
+ *     同状态重发（例如网络重试再报一次 delivering）不改它，不会误拒正常投递。没读到时按列默认值钉 0。
+ * 只钉读到的轮次挡不住「服务端第一次读到的已经是新一轮」——那一步用已验签租约里的 deviceRound 比对
+ * （assertScanDeliverRoundMatches）。面板任务不加后三条：面板路线行为一字不变。
+ * 条件失效按现有写法回 409 SCAN_TASK_STATE_CHANGED。
  */
-export function scanDeliverClaimPins(task: Pick<DeviceFieldsRow, 'startMode' | 'deviceUpdatedAt'>): {
+export function scanDeliverClaimPins(task: Pick<DeviceFieldsRow, 'startMode' | 'deviceRound'>): {
   startMode: string
   deviceState?: { in: string[] }
   devicePageCount?: { gte: number }
-  deviceUpdatedAt?: Date | null
+  deviceRound?: number
 } {
   const startMode = task.startMode ?? 'panel'
   if (!isScanDeviceTask(task)) return { startMode }
@@ -548,7 +560,23 @@ export function scanDeliverClaimPins(task: Pick<DeviceFieldsRow, 'startMode' | '
     startMode,
     deviceState: { in: [...SCAN_DEVICE_DELIVERABLE_STATES] },
     devicePageCount: { gte: 1 },
-    deviceUpdatedAt: task.deviceUpdatedAt ?? null,
+    deviceRound: typeof task.deviceRound === 'number' ? task.deviceRound : 0,
+  }
+}
+
+/**
+ * 屏上扫描投递：已验签租约里的轮次必须等于库里当前的 deviceRound。
+ * 不等（旧一轮的租约迟到，服务端读到的已是新一轮）→ 409 SCAN_TASK_STATE_CHANGED。
+ * 面板任务不比轮次，调用方传入的值一律忽略。
+ */
+export function assertScanDeliverRoundMatches(
+  task: Pick<DeviceFieldsRow, 'startMode' | 'deviceRound'>,
+  leasedRound: unknown,
+): void {
+  if (!isScanDeviceTask(task)) return
+  const current = typeof task.deviceRound === 'number' ? task.deviceRound : 0
+  if (typeof leasedRound !== 'number' || !Number.isInteger(leasedRound) || leasedRound !== current) {
+    conflict('SCAN_TASK_STATE_CHANGED', '扫描任务状态已变化，请重新发起扫描')
   }
 }
 

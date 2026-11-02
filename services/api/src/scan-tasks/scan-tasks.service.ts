@@ -23,7 +23,9 @@ import {
 } from './scan-lease'
 import {
   assertScanDeliverOriginAllowed,
+  assertScanDeliverRoundMatches,
   buildScanDeviceCreateData,
+  isScanDeviceTask,
   normalizeScanDeliverOrigin,
   quietPeriodEndsAtIso,
   resolveScanStartParams,
@@ -277,6 +279,7 @@ export interface ScanTaskStatusResult {
  * current-lease 的响应：面板任务就是 ScanDeliveryLeaseResult 本身，不多任何字段。
  * device 任务多带 startMode 与 device。device 里的 maxPages / maxBytes 按扫描类型取
  * （证件 4 页 / 10 MiB，其余 20 页 / 18 MiB），一体机不读这份租约。
+ * deviceRound 不放在这层响应里，只放进 deliveryLease 的签名负载。面板任务的签名负载也不多这个字段。
  */
 export type ScanDeliveryLeaseView = ScanDeliveryLeaseResult & {
   startMode?: 'device'
@@ -994,6 +997,8 @@ export class ScanTasksService {
         taskCreatedAt: task.createdAt,
         taskExpiresAt: task.expiresAt,
         now,
+        // 轮次放进签名负载。面板不传，签名里就没有这个字段，响应形状也不变。
+        ...(isScanDeviceTask(task) ? { deviceRound: task.deviceRound } : {}),
       }),
       // device 任务多带 startMode 与 device 参数；面板任务这里是空对象，响应里不多出任何键。
       ...scanDeviceLeaseFields(task),
@@ -1085,6 +1090,9 @@ export class ScanTasksService {
         error: { code: 'SCAN_LEASE_INVALID', message: '扫描租约绑定的任务版本不一致' },
       })
     }
+    // 旧一轮的租约在新一轮已经走到可投递时才到：服务端这次读到的就是新轮次。
+    // 只钉读到的 deviceRound 会把旧 PDF 挂到新一轮，所以先拿已验签负载里的轮次比对。面板不比。
+    assertScanDeliverRoundMatches(task, leasePayload.deviceRound)
 
     // 3b. 投递来源必须与会话一致：device 会话只收终端程序自己扫的 PDF（origin=device，且已整理好文件），
     // 面板会话只收 watcher；没带 origin 一律按 watcher（兼容现有终端程序）。
@@ -1183,11 +1191,12 @@ export class ScanTasksService {
     // ATOMIC_SCAN_DELIVER_CAS_ACK_EXPIRY: re-pin ACK + expiry (and signed
     // task identity already in where) so mixed/raced state cannot go
     // waiting → matched after ACK/expiry eligibility changed.
-    // 屏上扫描（B1 复审修复）：3b 的来源校验是在读到的快照上判的，这里再把读到的 startMode 钉进 where；
-    // device 任务另钉 deviceState ∈ composing / delivering、devicePageCount ≥ 1，以及读到的 deviceUpdatedAt（scanDeliverClaimPins）。
-    // 否则读与这次抢占之间用户「改用面板」或终端程序回报 error / aborted，已切面板 / 已中止的会话仍会被挂上设备扫描件；
-    // 出错重扫回到 composing / delivering 后，上一轮迟到的投递也会挂到新一轮。
-    // 面板任务只多一条恒真的 startMode，其余不变。条件失效 → count 0 → 下面的 SCAN_TASK_STATE_CHANGED。
+    // 屏上扫描（B1 复审修复，B6 用 deviceRound 替换 B4 的 deviceUpdatedAt 钉）：3b 的来源校验是在读到的快照上判的，
+    // 这里再把读到的 startMode 钉进 where；device 任务另钉 deviceState ∈ composing / delivering、devicePageCount ≥ 1，
+    // 以及读到的 deviceRound（scanDeliverClaimPins）。否则读与这次抢占之间用户「改用面板」或终端程序回报 error / aborted，
+    // 已切面板 / 已中止的会话仍会被挂上设备扫描件；出错重扫回到 composing / delivering 后，上一轮迟到的投递也会挂到新一轮。
+    // 同状态重发不改 deviceRound，不会误拒。面板任务只多一条恒真的 startMode，其余不变。
+    // 条件失效 → count 0 → 下面的 SCAN_TASK_STATE_CHANGED。
     const claimed = await this.prisma.scanTask.updateMany({
       where: {
         id: task.id,
