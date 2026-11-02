@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-11-03：屏上扫描 ③ 终端程序第二批 A2 第二轮——复审返工（分支 `claude/scan-device-a2-1102`，未合并、未部署）
+
+- 做了：按 Codex 复审把 12 条都修了。玻璃台按页序累计，合成前页列表对不上回报页数就判错删页（`SCAN_DEVICE_FAILED`），不合成残缺 PDF。强杀没确认进程退出时返回未确认停止，扫描仪健康态记 `error`，不宣称清理完成，15 秒后重试；下次开始前必须探测成功且确认旧进程不在。扫描和探测在可疑解除前回 busy/error，设备锁照放（打印不经 WIA）。投递的每个异步边界之后再查中止标记和本场代次；中止已受理就不再上传；上传已被后端收下时，中止接口返回 `delivering`（已投递）。WIA 必需属性（3088、6146、4103、6147、6148、6151、6152）设失败或缺失报 `not_ready`；3096、6149、6150 失败只记日志。卡纸不再由运行器逐页删除，页文件留给调用方按 `SCAN_DEVICE_FAILED` 整目录清理。再扫一页等锁超时保留已扫页和 `page_ready`，本机回 409 `LOCAL_SCAN_BUSY`。等锁时中止先置标记立即受理，拿到锁之后、开扫之前再查一次。玻璃台进入 `page_ready` 后 10 分钟空闲计时，每 1 分钟向后端对一次租约，到点或会话没了就删页。回报重试耗尽后，下一拍先按转移表补中间状态，补不上（409 转移不合法）就删页，不投递。清理失败时响应 `purged: false` 并重试，成功是 `purged: true`。租约里的 `maxPages` / `maxBytes` 与本机 `scanDeviceMaxPages` 取更严者，没有就用原来的默认。`source` 和 `colorMode` 只在 `scanDeviceReportSettings` 为 true 时放进 device-report；`SCAN_DEVICE_SETTINGS_CHANGED` 停扫并删页，原因 `SCAN_DEVICE_SESSION_CLEARED`。
+- 门禁：`verify:scan-device-engine` 53 组。卡纸那一处断言改了，删页的责任从运行器移到调用方。旧断言是步骤「扫描：中途卡纸 → 已扫页全部删除并清空，错误码 paper_jam」，`discardedPages === 2`、`pages === []`（「一期不做只交已扫部分」）、磁盘空（「卡纸后磁盘上不能留任何扫描页」）。新断言是「扫描：中途卡纸 → 页文件留给调用方整目录清理，错误码 paper_jam」，`discardedPages === 0`、页序 `[1, 2]`、磁盘仍有 `page-001.jpg` 和 `page-002.jpg`。其余断言没动。`verify:scan-device-runner` 18 组。
+- 开关：`scanDeviceEnabled` 仍默认关，B1 上生产前不得打开。`scanDeviceReportSettings` 默认关。B4 上生产前不得开开关。版本仍是 0.4.14。
+- 没做：没碰真机，没打安装包，没部署。#1465 去留定下来之前，不往真机发新的终端程序安装包。
+
 ## 2026-11-02：屏上扫描 ③ 终端程序第二批 A2——接线（分支 `claude/scan-device-a2-1102`，未合并、未部署）
 
 - 做了：在 A1 底座上接配置开关（默认关）、current-lease 核对、调度、本机 HTTP、健康探测、心跳两个字段、删除审计原因码。开关不是 true 时不注册扫描路由、不探测、不清理残留、心跳不带新字段，删除审计仍只上报原来的原因码白名单之外会进死信。
