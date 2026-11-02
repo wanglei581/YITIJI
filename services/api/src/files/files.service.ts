@@ -40,11 +40,16 @@ import {
   DEFAULT_SENSITIVE_BY_PURPOSE,
   PURPOSE_POLICY,
   validateUpload,
+  validateVerifiedDeviceScanUpload,
+  scanDeviceDeliveryLimits,
+  scanDeviceTooManyPagesMessage,
   isPurpose,
   canActorUseUploadPurpose,
   rawUploadByteLimitForPurpose,
   type UploadValidationMode,
+  type ValidationResult,
 } from './file-validation'
+import { isVerifiedDeviceScanDelivery } from '../scan-tasks/scan-device-protocol'
 import { sniffDeclaredMimeMismatch } from './content-sniff'
 import { recognizeStoredPageCount } from './file-page-count.util'
 import { toMetadata } from './file-metadata'
@@ -96,6 +101,47 @@ export type FileRequester =
   | { kind: 'member'; endUserId: string }
 
 /**
+ * 屏上扫描投递先按自己的校验得到结果，再交给 upload() 落库。
+ * 键是 uploadVerifiedDeviceScan 当场新建的参数对象，请求体里塞任何字段都进不了这张表。
+ * 建档对象字面量留在 upload()：派生种类门禁只把 FilesService.upload 认作透传建档点。
+ */
+const verifiedDeviceUploadPlan = new WeakMap<object, ValidationResult>()
+
+type FileUploadArgs = {
+  buffer: Buffer
+  filename: string
+  mimeType: string
+  purpose: FilePurpose
+  sensitiveLevel?: FileSensitiveLevel
+  uploaderId: string | null
+  endUserId?: string | null
+  assetCategory?: FileAssetCategory
+  /** 派生件怎么来的（1.8 P-1）：derived / optimized 必传。 */
+  derivationKind?: import('../print-jobs/material-check-policy').DerivationKind
+  sourceFileId?: string | null
+  actorRole?: UserRole | null
+  actorOrgId?: string | null
+  createdBy?: string | null
+  /** 仅服务端内部调用可设 intent；外部 multipart 调用省略时固定为 proxy(15MB)。 */
+  validationMode?: UploadValidationMode
+  /** 仅服务端派生成果可收紧默认 system_short 到明确到期时间。 */
+  expiresAtOverride?: Date
+  /** 只用于这一单的源文件转出来的派生件：系统短期保存并锁定，不进「我的文档」（retention-policy.ts）。 */
+  orderOnly?: boolean
+  /**
+   * 收费导出预写：对象先落库为 uploading + 短寿命，会员列表和访问 URL 看不到。
+   * 核销事务提交时再激活并恢复正式保存期限。endUserId 在激活前不写入，
+   * 避免会员数据导出按 endUserId 把未付款文件列出来。
+   */
+  paidExportStaging?: { endUserId: string; expiresAt: Date }
+  /**
+   * 渲染前已经写进 AIGC.ProduceID 的编号。传入则作为 FileObject.id，
+   * 缺省时在这里生成。只接受 32 位十六进制，和对象键里的文件段一致。
+   */
+  id?: string
+}
+
+/**
  * 文件服务:落库 + 对象存储(COS / 本地)写入 + 签名 + 软删 + 物理清理。
  *
  * 所有物理读写经 StorageService 路由到 COS 或本地后端,FilesService 不再直接
@@ -113,38 +159,100 @@ export class FilesService {
 
   // ── 服务端代理上传(multipart;校验后的 buffer 经服务端推送到对象存储)──────
 
-  async upload(args: {
-    buffer: Buffer
-    filename: string
-    mimeType: string
-    purpose: FilePurpose
-    sensitiveLevel?: FileSensitiveLevel
-    uploaderId: string | null
-    endUserId?: string | null
-    assetCategory?: FileAssetCategory
-    derivationKind?: import('../print-jobs/material-check-policy').DerivationKind // 派生件怎么来的（1.8 P-1）：derived / optimized 必传
-    sourceFileId?: string | null
-    actorRole?: UserRole | null
-    actorOrgId?: string | null
-    createdBy?: string | null
-    /** 仅服务端内部调用可设 intent；外部 multipart 调用省略时固定为 proxy(15MB)。 */
-    validationMode?: UploadValidationMode
-    /** 仅服务端派生成果可收紧默认 system_short 到明确到期时间。 */
-    expiresAtOverride?: Date
-    /** 只用于这一单的源文件转出来的派生件：系统短期保存并锁定，不进「我的文档」（retention-policy.ts）。 */
-    orderOnly?: boolean
-    /**
-     * 收费导出预写：对象先落库为 uploading + 短寿命，会员列表和访问 URL 看不到。
-     * 核销事务提交时再激活并恢复正式保存期限。endUserId 在激活前不写入，
-     * 避免会员数据导出按 endUserId 把未付款文件列出来。
-     */
-    paidExportStaging?: { endUserId: string; expiresAt: Date }
-    /**
-     * 渲染前已经写进 AIGC.ProduceID 的编号。传入则作为 FileObject.id，
-     * 缺省时在这里生成。只接受 32 位十六进制，和对象键里的文件段一致。
-     */
-    id?: string
-  }): Promise<FileUploadResponse> {
+  async upload(args: FileUploadArgs): Promise<FileUploadResponse> {
+    const planned = verifiedDeviceUploadPlan.get(args) ?? null
+    if (planned) verifiedDeviceUploadPlan.delete(args)
+    this.rejectDisallowedUpload(args)
+    const validation = planned ?? validateUpload({
+      purpose: args.purpose,
+      mimeType: args.mimeType,
+      filename: args.filename,
+      sizeBytes: args.buffer.length,
+      mode: args.validationMode ?? 'proxy',
+    })
+    const ready = await this.stageUpload(args, validation, planned !== null)
+    const bucket = ready.bucket
+    let record
+    try {
+      record = await this.prisma.fileObject.create({
+        data: {
+          id: ready.id,
+          storageKey: ready.objectKey,
+          bucket,
+          region: ready.region,
+          filename: args.filename,
+          mimeType: args.mimeType,
+          sizeBytes: ready.put.sizeBytes,
+          sha256: ready.put.sha256,
+          pageCount: ready.pageCount,
+          uploaderId: args.uploaderId,
+          endUserId: ready.staging ? null : (args.endUserId ?? null),
+          ownerType: ready.owner.ownerType,
+          ownerId: ready.owner.ownerId,
+          purpose: args.purpose,
+          sensitiveLevel: ready.sensitiveLevel,
+          visibility: 'private',
+          status: ready.staging ? 'uploading' : 'active',
+          createdBy: args.createdBy ?? args.uploaderId ?? null,
+          assetCategory: args.assetCategory ?? 'original',
+          derivationKind: args.derivationKind ?? null,
+          sourceFileId: args.sourceFileId ?? null,
+          expiresAt: ready.staging ? ready.staging.expiresAt : (ready.expiresAtOverride ?? ready.retention.expiresAt),
+          retentionPolicy: ready.retention.retentionPolicy,
+          retentionSetBy: ready.retention.retentionSetBy,
+          retentionConsentAt: ready.retention.retentionConsentAt,
+          retentionConsentVersion: ready.retention.retentionConsentVersion,
+          retentionLockedReason: ready.staging
+            ? RESUME_EXPORT_STAGING_LOCK
+            : (args.purpose === 'contract_upload'
+              ? 'contract_review_session_only'
+              : (ready.orderOnly ? UPLOAD_SESSION_ORDER_ONLY_REASON : null)),
+        },
+      })
+    } catch (createError) {
+      try {
+        await this.storage.deleteObject(ready.objectKey, bucket)
+      } catch {
+        // 不记录 key / 文件名 / owner；原始 create 错误仍是调用方看到的失败。
+        this.logger.warn('Object cleanup compensation failed after file metadata persistence error')
+      }
+      throw createError
+    }
+    return this.respondToCreatedUpload(record, ready.staging)
+  }
+
+  /**
+   * 屏上扫描投递专用。只有 assertScanDeliverOriginAllowed 签发的凭据才能走证件 PDF。
+   * 凭据不是请求字段：伪造对象会退回普通 upload，证件 PDF 仍按图片白名单被拒。
+   * 控制器和 DTO 不调用本方法，upload() 也不接受这个凭据。
+   */
+  async uploadVerifiedDeviceScan(args: FileUploadArgs & { clearance: unknown }): Promise<FileUploadResponse> {
+    const { clearance, ...rest } = args
+    if (!isVerifiedDeviceScanDelivery(clearance)) {
+      return this.upload(rest)
+    }
+    this.rejectDisallowedUpload(rest)
+    const validation = validateVerifiedDeviceScanUpload({
+      purpose: rest.purpose,
+      mimeType: rest.mimeType,
+      filename: rest.filename,
+      sizeBytes: rest.buffer.length,
+    })
+    if (!validation.ok) {
+      throw new BadRequestException({
+        error: { code: validation.code, message: validation.message },
+      })
+    }
+    const tagged: FileUploadArgs = { ...rest }
+    verifiedDeviceUploadPlan.set(tagged, validation)
+    try {
+      return await this.upload(tagged)
+    } finally {
+      verifiedDeviceUploadPlan.delete(tagged)
+    }
+  }
+
+  private rejectDisallowedUpload(args: { purpose: FilePurpose; actorRole?: UserRole | null }): void {
     if (args.purpose === 'member_data_export' || args.purpose === 'contract_review_report') {
       throw new BadRequestException({
         error: {
@@ -158,13 +266,35 @@ export class FilesService {
         error: { code: 'FILE_PURPOSE_FORBIDDEN', message: '当前身份不能使用该文件用途' },
       })
     }
-    const validation = validateUpload({
-      purpose: args.purpose,
-      mimeType: args.mimeType,
-      filename: args.filename,
-      sizeBytes: args.buffer.length,
-      mode: args.validationMode ?? 'proxy',
-    })
+  }
+
+  /** 屏上扫描投递在落库前按类型再核页数。普通上传不设页数上限。证件读不出页数也拒。 */
+  private async resolveStoredPageCount(
+    args: { buffer: Buffer; mimeType: string; purpose: FilePurpose },
+    capPages: boolean,
+  ): Promise<number | null> {
+    const pageCount = await recognizeStoredPageCount(args.buffer, args.mimeType)
+    if (!capPages) return pageCount
+    const limits = scanDeviceDeliveryLimits(args.purpose)
+    const tooMany = args.purpose === 'id_scan'
+      ? pageCount === null || pageCount < 1 || pageCount > limits.maxPages
+      : pageCount !== null && pageCount > limits.maxPages
+    if (tooMany) {
+      throw new ConflictException({
+        error: {
+          code: 'SCAN_DEVICE_TOO_MANY_PAGES',
+          message: scanDeviceTooManyPagesMessage(limits.maxPages, pageCount),
+        },
+      })
+    }
+    return pageCount
+  }
+
+  private async stageUpload(
+    args: FileUploadArgs,
+    validation: ValidationResult,
+    capPages: boolean,
+  ) {
     if (!validation.ok) {
       throw new BadRequestException({
         error: { code: validation.code, message: validation.message },
@@ -240,58 +370,38 @@ export class FilesService {
       ext: validation.ext,
     })
 
+    const pageCount = await this.resolveStoredPageCount(args, capPages)
     const put = await this.storage.putObject(objectKey, args.buffer, args.mimeType)
-    const pageCount = await recognizeStoredPageCount(args.buffer, args.mimeType)
-
-    const bucket = this.storage.defaultBucket
-    const region = this.storage.defaultRegion
-    let record
-    try {
-      record = await this.prisma.fileObject.create({
-        data: {
-          id,
-          storageKey: objectKey,
-          bucket,
-          region,
-          filename: args.filename,
-          mimeType: args.mimeType,
-          sizeBytes: put.sizeBytes,
-          sha256: put.sha256,
-          pageCount,
-          uploaderId: args.uploaderId,
-          endUserId: staging ? null : (args.endUserId ?? null),
-          ownerType: owner.ownerType,
-          ownerId: owner.ownerId,
-          purpose: args.purpose,
-          sensitiveLevel,
-          visibility: 'private',
-          status: staging ? 'uploading' : 'active',
-          createdBy: args.createdBy ?? args.uploaderId ?? null,
-          assetCategory: args.assetCategory ?? 'original',
-          derivationKind: args.derivationKind ?? null,
-          sourceFileId: args.sourceFileId ?? null,
-          expiresAt: staging ? staging.expiresAt : (expiresAtOverride ?? retention.expiresAt),
-          retentionPolicy: retention.retentionPolicy,
-          retentionSetBy: retention.retentionSetBy,
-          retentionConsentAt: retention.retentionConsentAt,
-          retentionConsentVersion: retention.retentionConsentVersion,
-          retentionLockedReason: staging
-            ? RESUME_EXPORT_STAGING_LOCK
-            : (args.purpose === 'contract_upload'
-              ? 'contract_review_session_only'
-              : (orderOnly ? UPLOAD_SESSION_ORDER_ONLY_REASON : null)),
-        },
-      })
-    } catch (createError) {
-      try {
-        await this.storage.deleteObject(objectKey, bucket)
-      } catch {
-        // 不记录 key / 文件名 / owner；原始 create 错误仍是调用方看到的失败。
-        this.logger.warn('Object cleanup compensation failed after file metadata persistence error')
-      }
-      throw createError
+    return {
+      id,
+      objectKey,
+      bucket: this.storage.defaultBucket,
+      region: this.storage.defaultRegion,
+      put,
+      owner,
+      staging,
+      sensitiveLevel,
+      pageCount,
+      retention,
+      expiresAtOverride,
+      orderOnly,
     }
+  }
 
+  private async respondToCreatedUpload(
+    record: {
+      id: string
+      filename: string
+      sizeBytes: number
+      mimeType: string
+      sha256: string
+      storageKey: string
+      bucket: string
+      expiresAt: Date | null
+      purpose: string
+    },
+    staging: FileUploadArgs['paidExportStaging'],
+  ): Promise<FileUploadResponse> {
     // 预写行还不是已购文件：不签发下载 URL。签名失败也不能 systemDelete，
     // 否则会把尚未核销的对象提前抹掉；短 expiresAt 交给 cleanupExpired。
     if (staging) {

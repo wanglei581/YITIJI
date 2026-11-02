@@ -292,7 +292,12 @@ async function main(): Promise<void> {
       const lease = await scanSvc.getScanDeliveryLease(s.t.id)
       assert.equal(lease.scanTaskId, s.id)
       assert.equal(lease.startMode, 'device')
-      assert.deepEqual(lease.device, { source: 'flatbed', colorMode: 'gray' }, '终端程序下一次取租约拿到的是改过的来源')
+      // B3：device 段多带 maxPages / maxBytes。仍是整对象精确相等。本会话是 document，20 页 / 18 MiB。
+      assert.deepEqual(
+        lease.device,
+        { source: 'flatbed', colorMode: 'gray', maxPages: 20, maxBytes: 18 * 1024 * 1024 },
+        '终端程序下一次取租约拿到的是改过的来源，并带上该类型的页数与大小上限',
+      )
       await scanSvc.deliverScanFile({
         terminalId: s.t.id, scanTaskId: s.id, deliveryLease: lease.deliveryLease, buffer: uniquePdf(), filename: 'scan.pdf',
         mimeType: 'application/pdf', observedAt: new Date().toISOString(), origin: 'device',

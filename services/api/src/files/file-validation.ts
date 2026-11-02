@@ -196,6 +196,87 @@ export function isPurpose(value: string): value is FilePurpose {
 }
 
 /**
+ * 屏上扫描（device 投递）的页数与字节上限。租约下发和投递时再拦，用的是同一组数。
+ *
+ * 证件：4 页 / 10 MiB。10 MiB 就是 PURPOSE_POLICY.id_scan.maxBytes，不另写一个数。
+ * 4 页必须 ≤ 个人信息检查的默认识别页数（pii-scan.util 的 PII_SCAN_OCR_PAGE_LIMIT_DEFAULT，默认 5），
+ * 这样每一页都会进和图片证件同一套检查。
+ *
+ * 其余：20 页 / 18 MiB。20 页来自任务包 ③ §2.4 和补稿 cs-scan-more。
+ * 18 MiB 与终端程序 `SCAN_PDF_MAX_BYTES` 相同：
+ * `apps/terminal-agent/src/agent/scan-device/scan-pdf-compose.ts`
+ * （合成 PDF 超过 18 MiB 报 too_large；注释写明是给后端 deliver 的 20 MiB 留出 multipart 开销）。
+ * 该文件在终端程序批次，本服务不 import 它，数值在这里写死。
+ */
+export const SCAN_DEVICE_ID_MAX_PAGES = 4
+export const SCAN_DEVICE_OTHER_MAX_PAGES = 20
+export const SCAN_DEVICE_OTHER_MAX_BYTES = 18 * MB
+
+export function scanDeviceDeliveryLimits(purpose: string): { maxPages: number; maxBytes: number } {
+  if (purpose === 'id_scan') {
+    return { maxPages: SCAN_DEVICE_ID_MAX_PAGES, maxBytes: PURPOSE_POLICY.id_scan.maxBytes }
+  }
+  if (!isPurpose(purpose)) {
+    return { maxPages: SCAN_DEVICE_OTHER_MAX_PAGES, maxBytes: SCAN_DEVICE_OTHER_MAX_BYTES }
+  }
+  return {
+    maxPages: SCAN_DEVICE_OTHER_MAX_PAGES,
+    maxBytes: Math.min(PURPOSE_POLICY[purpose].maxBytes, SCAN_DEVICE_OTHER_MAX_BYTES),
+  }
+}
+
+/** 租约按扫描类型取上限。证件 4 页 / 10 MiB；其余一律 20 页 / 18 MiB。 */
+export function scanDeviceLeaseLimits(scanType: string | null | undefined): { maxPages: number; maxBytes: number } {
+  if (scanType === 'id') {
+    return { maxPages: SCAN_DEVICE_ID_MAX_PAGES, maxBytes: PURPOSE_POLICY.id_scan.maxBytes }
+  }
+  return { maxPages: SCAN_DEVICE_OTHER_MAX_PAGES, maxBytes: SCAN_DEVICE_OTHER_MAX_BYTES }
+}
+
+/** 页数超限或读不出页数。无人值守口径，不出现「找工作人员」。 */
+export function scanDeviceTooManyPagesMessage(maxPages: number, recognized: number | null): string {
+  if (recognized === null) return '这份扫描件的页数没能读出来，请重新扫描。'
+  return `这次最多扫 ${maxPages} 页。请少扫几页，分成几次办理。`
+}
+
+function concludeUploadValidation(args: {
+  mimeType: string
+  filename: string
+  sizeBytes: number
+  maxBytes: number
+}): ValidationResult {
+  // 扩展名必须与 MIME 一致(防伪装)
+  const allowedExts = MIME_EXTS[args.mimeType] ?? []
+  const nameExt = extFromFilename(args.filename)
+  if (nameExt && allowedExts.length > 0 && !allowedExts.includes(nameExt)) {
+    return {
+      ok: false,
+      code: 'FILE_EXT_MISMATCH',
+      message: '文件扩展名与声明类型不一致',
+    }
+  }
+  const ext = nameExt && allowedExts.includes(nameExt) ? nameExt : extFromMime(args.mimeType)
+
+  if (!Number.isFinite(args.sizeBytes) || args.sizeBytes <= 0) {
+    return { ok: false, code: 'FILE_EMPTY', message: '文件为空或大小未知' }
+  }
+  if (args.sizeBytes > args.maxBytes) {
+    // 文案面向一体机终端用户:说清「多大」「超了多少」「怎么办」。
+    // 原文案「大文件请用直传」是内部实现词——kiosk 前台没有任何叫「直传」的入口,
+    // 用户看到只会卡住(2026-08-17 真实文件走查:16.9MB 图片被拒后无可执行下一步)。
+    const limitMb = Math.round(args.maxBytes / MB)
+    const actualMb = (args.sizeBytes / MB).toFixed(1)
+    return {
+      ok: false,
+      code: 'FILE_TOO_LARGE',
+      message: `文件 ${actualMb}MB，超过单份上限 ${limitMb}MB。请压缩后重试，或分成多份分别上传。`,
+    }
+  }
+
+  return { ok: true, ext }
+}
+
+/**
  * 综合校验:purpose / MIME / 扩展名 / 大小。
  *
  * @param mode 'proxy'=服务端代理上传(额外受 PROXY_MAX_BYTES 约束);
@@ -220,37 +301,62 @@ export function validateUpload(args: {
     return { ok: false, code: 'FILE_MIME_NOT_ALLOWED', message: '该文件用途不支持此文件类型' }
   }
 
-  // 扩展名必须与 MIME 一致(防伪装)
-  const allowedExts = MIME_EXTS[args.mimeType] ?? []
-  const nameExt = extFromFilename(args.filename)
-  if (nameExt && allowedExts.length > 0 && !allowedExts.includes(nameExt)) {
-    return {
-      ok: false,
-      code: 'FILE_EXT_MISMATCH',
-      message: '文件扩展名与声明类型不一致',
-    }
-  }
-  const ext = nameExt && allowedExts.includes(nameExt) ? nameExt : extFromMime(args.mimeType)
-
-  if (!Number.isFinite(args.sizeBytes) || args.sizeBytes <= 0) {
-    return { ok: false, code: 'FILE_EMPTY', message: '文件为空或大小未知' }
-  }
   const maxBytes =
     args.mode === 'proxy' ? Math.min(policy.maxBytes, PROXY_MAX_BYTES) : policy.maxBytes
-  if (args.sizeBytes > maxBytes) {
-    // 文案面向一体机终端用户:说清「多大」「超了多少」「怎么办」。
-    // 原文案「大文件请用直传」是内部实现词——kiosk 前台没有任何叫「直传」的入口,
-    // 用户看到只会卡住(2026-08-17 真实文件走查:16.9MB 图片被拒后无可执行下一步)。
-    const limitMb = Math.round(maxBytes / MB)
-    const actualMb = (args.sizeBytes / MB).toFixed(1)
-    return {
-      ok: false,
-      code: 'FILE_TOO_LARGE',
-      message: `文件 ${actualMb}MB，超过单份上限 ${limitMb}MB。请压缩后重试，或分成多份分别上传。`,
-    }
-  }
+  return concludeUploadValidation({
+    mimeType: args.mimeType,
+    filename: args.filename,
+    sizeBytes: args.sizeBytes,
+    maxBytes,
+  })
+}
 
-  return { ok: true, ext }
+/**
+ * 只给「服务端已经核实过的屏上扫描投递」用。
+ *
+ * 证件（id_scan）在这条路径上额外收 application/pdf，大小仍是证件用途自己的 10 MiB。
+ * 其余用途的 MIME 白名单不变，字节上限取「用途上限」和「屏上扫描 18 MiB」里更严的那个，
+ * 并且不受代理上传 15 MiB 天花板约束（屏上扫描的合成 PDF 按 18 MiB 收）。
+ *
+ * 没有布尔开关。调用方不能传「允许 PDF」；证件 PDF 只在 purpose 已经是 id_scan、
+ * 且声明类型就是 PDF 时走进这个分支。公共 validateUpload 不调用本函数。
+ */
+export function validateVerifiedDeviceScanUpload(args: {
+  purpose: string
+  mimeType: string
+  filename: string
+  sizeBytes: number
+}): ValidationResult {
+  if (!isPurpose(args.purpose)) {
+    return { ok: false, code: 'FILE_PURPOSE_INVALID', message: '不支持的文件用途' }
+  }
+  const mime = (args.mimeType ?? '').split(';')[0]!.trim().toLowerCase()
+  if (args.purpose === 'id_scan' && mime === 'application/pdf') {
+    return concludeUploadValidation({
+      mimeType: 'application/pdf',
+      filename: args.filename,
+      sizeBytes: args.sizeBytes,
+      maxBytes: PURPOSE_POLICY.id_scan.maxBytes,
+    })
+  }
+  const base = validateUpload({
+    purpose: args.purpose,
+    mimeType: args.mimeType,
+    filename: args.filename,
+    sizeBytes: args.sizeBytes,
+    mode: 'intent',
+  })
+  if (!base.ok) return base
+  const maxBytes = scanDeviceDeliveryLimits(args.purpose).maxBytes
+  if (args.sizeBytes > maxBytes) {
+    return concludeUploadValidation({
+      mimeType: mime || args.mimeType,
+      filename: args.filename,
+      sizeBytes: args.sizeBytes,
+      maxBytes,
+    })
+  }
+  return base
 }
 
 /**

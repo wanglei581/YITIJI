@@ -1,4 +1,8 @@
 import { BadRequestException, ConflictException } from '@nestjs/common'
+import {
+  scanDeviceLeaseLimits,
+  scanDeviceTooManyPagesMessage,
+} from '../files/file-validation'
 
 /**
  * 屏上扫描（device 路线）协议：常量、状态转移表、纯校验函数。
@@ -332,14 +336,26 @@ export function scanDeviceStatusFields(task: DeviceFieldsRow): {
 /**
  * current-lease 对 device 任务多带的字段。面板任务返回空对象——响应里不多出任何键，
  * 免得现有终端程序解析变化。
+ *
+ * device 段在 source / colorMode 之外还有 maxPages、maxBytes，按扫描类型从
+ * scanDeviceLeaseLimits 取（证件 4 页 / 10 MiB，其余 20 页 / 18 MiB）。一体机不读租约。
  */
-export function scanDeviceLeaseFields(task: DeviceFieldsRow):
-  | { startMode: 'device'; device: { source: string | null; colorMode: string | null } }
+export function scanDeviceLeaseFields(task: DeviceFieldsRow & { scanType?: string | null }):
+  | {
+      startMode: 'device'
+      device: { source: string | null; colorMode: string | null; maxPages: number; maxBytes: number }
+    }
   | Record<string, never> {
   if (!isScanDeviceTask(task)) return {}
+  const limits = scanDeviceLeaseLimits(task.scanType)
   return {
     startMode: 'device',
-    device: { source: task.deviceSource ?? null, colorMode: task.deviceColorMode ?? null },
+    device: {
+      source: task.deviceSource ?? null,
+      colorMode: task.deviceColorMode ?? null,
+      maxPages: limits.maxPages,
+      maxBytes: limits.maxBytes,
+    },
   }
 }
 
@@ -376,7 +392,7 @@ function conflict(code: string, message: string): never {
  * 那一轮已扫的页在出错时已被终端程序删除，新一轮从 0 页重新数。
  */
 export function planScanDeviceReport(
-  current: { deviceState: string | null; devicePageCount: number },
+  current: { deviceState: string | null; devicePageCount: number; scanType?: string | null },
   input: ScanDeviceReportInput,
 ): ScanDeviceReportPlan {
   const from: ScanDeviceState = isScanDeviceState(current.deviceState) ? current.deviceState : 'ready'
@@ -412,6 +428,13 @@ export function planScanDeviceReport(
   if (to === 'ready' && nextCount !== 0) badReport('state=ready 时还没有收到任何页，pageCount 只能是 0')
   if ((STATES_REQUIRING_PAGES as readonly string[]).includes(to) && nextCount < 1) {
     badReport(`state=${to} 至少要已收到 1 页`)
+  }
+
+  // 0…200 的整数检查在上面（格式不对是 400）。这里按扫描类型再拦一次：
+  // 证件 4 页，其余 20 页。超过是业务上限，不是报文格式错误，所以 409。
+  const maxPages = scanDeviceLeaseLimits(current.scanType).maxPages
+  if (nextCount > maxPages) {
+    conflict('SCAN_DEVICE_TOO_MANY_PAGES', scanDeviceTooManyPagesMessage(maxPages, nextCount))
   }
 
   return { deviceState: to, devicePageCount: nextCount, deviceErrorCode: to === 'error' ? errorCode : null }
@@ -463,21 +486,51 @@ function isPdfMimeType(mimeType: string): boolean {
 }
 
 /**
+ * 屏上扫描投递凭据。只有 assertScanDeliverOriginAllowed 在 device 检查全部通过后签发。
+ * 用模块内的 Symbol 做记号，请求体、DTO、控制器拼不出这个对象。
+ * 面板投递不签发（返回 null）。
+ */
+const VERIFIED_DEVICE_SCAN_DELIVERY = Symbol('verified-device-scan-delivery')
+
+export type VerifiedDeviceScanDelivery = {
+  readonly kind: 'verified-device-scan-delivery'
+  readonly [VERIFIED_DEVICE_SCAN_DELIVERY]: true
+}
+
+export function isVerifiedDeviceScanDelivery(value: unknown): value is VerifiedDeviceScanDelivery {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as { [VERIFIED_DEVICE_SCAN_DELIVERY]?: unknown })[VERIFIED_DEVICE_SCAN_DELIVERY] === true
+  )
+}
+
+function issueVerifiedDeviceScanDelivery(): VerifiedDeviceScanDelivery {
+  return Object.freeze({
+    kind: 'verified-device-scan-delivery' as const,
+    [VERIFIED_DEVICE_SCAN_DELIVERY]: true as const,
+  })
+}
+
+/**
  * 投递来源必须与会话一致：
  *   - device 会话只收 origin=device，且回报状态在 composing / delivering、已收到 ≥ 1 页、文件是 PDF；
  *   - panel 会话（含已「改用面板扫描」的）只收 watcher。
  * 来源错配、状态不对 → 409；device 投递的不是 PDF → 400。
+ *
+ * device 检查全部通过时返回凭据，供文件服务放行证件 PDF。面板检查通过返回 null。
+ * 凭据不能由调用方自己造：没有布尔参数。
  */
 export function assertScanDeliverOriginAllowed(
   task: DeviceFieldsRow,
   origin: ScanDeliverOrigin,
   file: { buffer: Buffer; mimeType: string },
-): void {
+): VerifiedDeviceScanDelivery | null {
   if (!isScanDeviceTask(task)) {
     if (origin !== 'watcher') {
       conflict('SCAN_DELIVER_ORIGIN_MISMATCH', '该扫描会话是面板扫描，只接收面板投递')
     }
-    return
+    return null
   }
   if (origin !== 'device') {
     conflict('SCAN_DELIVER_ORIGIN_MISMATCH', '该扫描会话是屏上扫描，只接收终端程序自己扫描的投递')
@@ -496,4 +549,5 @@ export function assertScanDeliverOriginAllowed(
       error: { code: 'SCAN_DEVICE_FILE_NOT_PDF', message: '屏上扫描只接收 PDF' },
     })
   }
+  return issueVerifiedDeviceScanDelivery()
 }

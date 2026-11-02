@@ -36,10 +36,16 @@ const MAX_SNIPPET_CHARS = 32
 export const HIGH_RISK_PII_PURPOSES: readonly FilePurpose[] = ['resume_upload', 'resume_scan', 'id_scan', 'cover_letter']
 /** 低于此字符数视为"没有可用文字层"，判定为扫描件走 OCR（与 resume-extraction.service.ts 同一阈值概念）。 */
 const MIN_TEXT_CHARS_FOR_BORN_DIGITAL = 30
+/**
+ * 扫描版 PDF 默认识别页数。环境变量 PII_SCAN_MAX_OCR_PAGES 可改成 1–10，非法值回落到这里。
+ * 证件屏上扫描的页数上限（SCAN_DEVICE_ID_MAX_PAGES = 4）必须 ≤ 这个默认值，
+ * 这样每一页都会进和图片证件同一套检查。
+ */
+export const PII_SCAN_OCR_PAGE_LIMIT_DEFAULT = 5
 /** 扫描版 PDF 最多渲染识别的页数（控费 + 控时延）。 */
 const PII_SCAN_MAX_OCR_PAGES = (() => {
   const n = Number(process.env['PII_SCAN_MAX_OCR_PAGES'])
-  return Number.isInteger(n) && n > 0 && n <= 10 ? n : 5
+  return Number.isInteger(n) && n > 0 && n <= 10 ? n : PII_SCAN_OCR_PAGE_LIMIT_DEFAULT
 })()
 /** OCR 渲染缩放（与 resume-extraction.service.ts 保持一致的清晰度/体积权衡）。 */
 const PII_SCAN_OCR_RENDER_SCALE = 2

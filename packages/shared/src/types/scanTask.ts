@@ -16,6 +16,11 @@ export type ScanTaskStatus =
 // **契约源**：下面五个常量数组的后端副本在 services/api/src/scan-tasks/scan-device-protocol.ts
 // （后端是 CommonJS，不直接 import 本包，沿用本仓库「共享契约 + 后端副本 + 门禁比对」的惯例）。
 // 改任何一边都要同时改另一边：门禁 verify:scan-device-settings 把两边逐项比对，不一致就红。
+//
+// current-lease（终端程序取投递租约）对 device 任务的 device 段还会带 maxPages、maxBytes，
+// 按扫描类型从后端常量取：证件 4 页 / 10 MiB，其余 20 页 / 18 MiB（18 MiB 与终端程序
+// apps/terminal-agent/src/agent/scan-device/scan-pdf-compose.ts 的 SCAN_PDF_MAX_BYTES 一致）。
+// 一体机不读这份租约，所以这里不另建响应类型。面板任务的租约响应没有 device 对象，也不多任何字段。
 
 /** 会话怎么开始：panel = 用户在打印机面板扫描（现有行为）；device = 用户在屏上点「开始扫描」。 */
 export const SCAN_START_MODES = ['panel', 'device'] as const

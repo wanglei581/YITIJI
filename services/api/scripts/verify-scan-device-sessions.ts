@@ -323,7 +323,14 @@ async function main(): Promise<void> {
       const lease = await scanSvc.getScanDeliveryLease(t.id)
       assert.equal(lease.scanTaskId, created.scanTaskId)
       assert.equal(lease.startMode, 'device')
-      assert.deepEqual(lease.device, { source: 'feeder', colorMode: 'gray' })
+      // B3：device 段按扫描类型多带 maxPages / maxBytes。这里仍是整对象精确相等，不是放宽。
+      // 本会话 scanType=document，上限是 20 页 / 18 MiB（与终端程序 SCAN_PDF_MAX_BYTES 一致）。
+      assert.deepEqual(lease.device, {
+        source: 'feeder',
+        colorMode: 'gray',
+        maxPages: 20,
+        maxBytes: 18 * 1024 * 1024,
+      })
       assert.ok(lease.deliveryLease)
       assert.deepEqual(Object.keys(lease).sort(), ['deliveryLease', 'device', 'expiresAt', 'notBefore', 'scanTaskId', 'serverNow', 'startMode'])
       pass('device 任务 ACK 后 current-lease 多带 startMode:device 与 device:{source,colorMode}')
