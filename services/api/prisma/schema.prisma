@@ -242,7 +242,10 @@ model ScanTask {
 
 // ── TerminalHeartbeat ─────────────────────────────────────────────────────────
 
-// PII-safe cloud receipt of Terminal Agent `_unclaimed` TTL deletion evidence.
+// PII-safe cloud receipt of Terminal Agent local scan-file deletion evidence: the `_unclaimed` TTL
+// deletion of panel scans (UNCLAIMED_TTL_EXPIRED) and the temp-page deletions of on-screen (device)
+// scans (SCAN_DEVICE_*). reasonCode is a plain String column; the accepted values live in
+// src/terminals/scan-deletion-reason-codes.ts, so adding a code never needs a migration.
 // Paths, filenames, content, exception text, and the local HMAC key are absent.
 model TerminalScanDeletionAudit {
   terminalId          String
