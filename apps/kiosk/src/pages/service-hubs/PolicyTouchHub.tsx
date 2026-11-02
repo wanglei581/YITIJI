@@ -1,3 +1,5 @@
+import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
+import { useKioskLicense } from '../../layouts/KioskLicenseContext'
 import { useNavigate } from 'react-router-dom'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
@@ -63,6 +65,7 @@ function policyStatus(state: HubAvailability): { text: string; tone: 'ok' | 'war
  * 不重复铺七张能力卡。放行仍走 unavailableReason。
  */
 export function PolicyTouchHub() {
+  const winding = useKioskLicense().mode === 'winding-down'
   const navigate = useNavigate()
   const spec = SERVICE_HUB_SPECS.policy
   const { status: apiStatus, retry: retryApi } = useApiReadiness()
@@ -77,7 +80,7 @@ export function PolicyTouchHub() {
   const notice = policyNotice(availability)
   const status = policyStatus(availability)
   const mainRoute = '/renshi?tab=policy'
-  const mainReason = unavailableReason('info', mainRoute, availability)
+  const mainReason = (winding ? LICENSE_NO_NEW_TASK_REASON : null) ?? unavailableReason('info', mainRoute, availability)
 
   const go = (route: string) => navigate(route)
 
@@ -100,7 +103,7 @@ export function PolicyTouchHub() {
         <QxTouchDock
           onBack={() => navigate('/')}
           backLabel="返回首页"
-          ask={{
+          ask={winding ? { label: '问小青', disabled: true } : {
             label: '问小青：这一步怎么看来源？',
             draft: '这一步怎么看政策来源？请说明如何核对发布机构和来源地址，不要解释政策原文或判断我能不能办。',
           }}
@@ -146,7 +149,7 @@ export function PolicyTouchHub() {
           <div className="p10-grid">
             {spec.goals.map((goal, index) => {
               const kind = capabilityKindFor(spec, goal.route)
-              const reason = unavailableReason(kind, goal.route, availability)
+              const reason = (winding ? LICENSE_NO_NEW_TASK_REASON : null) ?? unavailableReason(kind, goal.route, availability)
               return (
                 <div key={goal.route} data-hub-goal="">
                   <QxTouchTile
@@ -168,7 +171,7 @@ export function PolicyTouchHub() {
           <h2>常用入口</h2>
           <div className="p10-grid">
             {QUICK.map((link, index) => {
-              const reason = unavailableReason(link.kind, link.route, availability)
+              const reason = (winding ? LICENSE_NO_NEW_TASK_REASON : null) ?? unavailableReason(link.kind, link.route, availability)
               return (
                 <div key={link.route} data-hub-quick="">
                   <QxTouchTile
