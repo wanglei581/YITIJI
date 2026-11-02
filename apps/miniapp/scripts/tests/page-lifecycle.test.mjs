@@ -1321,7 +1321,7 @@ test('P1-9 store-select 列表乱序返回：旧响应不得盖掉新结果', as
 // O. P1-10 协议同意默认不勾选
 // ══════════════════════════════════════════════════════════════════════
 
-test('P1-10 《打印服务协议》默认不勾选，不勾不许下单', async () => {
+test('P1-10 《用户服务协议》默认不勾选，不勾不许下单', async () => {
   const auth = createAuth('A')
   const wx = createWx()
   const quote = deferred()
