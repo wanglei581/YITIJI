@@ -42,8 +42,8 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
 | **high** | 仍被 CI / 门禁 / 包脚本引用 | 83 |
-| **medium** | 只被文档或其它文件提及 | 30 |
-| **low** | 全仓零提及 | 96 |
+| **medium** | 只被文档或其它文件提及 | 19 |
+| **low** | 全仓零提及 | 41 |
 
 
 ──────────────────────────────────────────────────────────────────────
@@ -69,25 +69,19 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## low — 全仓零提及（96）
+## low — 全仓零提及（41）
 
 五条证据全部满足。**仍需人确认**：脚本看不见运行时动态引用，也不知道
 某个文件是不是刻意保留的下一步入口。
 
-### 页面/组件（8）
+### 页面/组件（2）
 
 | 路径 | 判定依据 |
 | --- | --- |
 | `apps/kiosk/src/pages/home/components/HomeHeroHeader.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `apps/kiosk/src/pages/home/components/V6HomeFooterPanels.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `apps/kiosk/src/pages/home/prototypeIcons.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/pages/profile/assets/ui.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `apps/kiosk/src/pages/scan/ScanFlowSteps.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `apps/kiosk/src/services/api/smartCampus.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `apps/kiosk/src/services/api/smartCampusHttpAdapter.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `apps/kiosk/src/services/api/smartCampusMockAdapter.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 
-### 文档（83）
+### 文档（38）
 
 | 路径 | 判定依据 |
 | --- | --- |
@@ -111,10 +105,9 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `docs/delivery/miniapp-fair-onsite-2026-09/release-plan.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/delivery/miniapp-fair-onsite-2026-09/scope.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/delivery/miniapp-fair-onsite-2026-09/uat-signoff.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/design/campus-fair-visibility-structure.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/design/kiosk-ai-orchestration-2026-08/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/design/kiosk-ai-orchestration-2026-08/_RESUME-NOTE.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/design/kiosk-ai-os-fusion-2026-08/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/design/kiosk-migration-capability-contracts.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/design/kiosk-redesign-2026-08/DESIGN-PHASE2-RESUME.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/design/ops-screen-2026-09/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/device/release-batching-2026-08-17.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
@@ -124,111 +117,52 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `docs/product/operation-manual-benchmark-plan.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/progress/audit/2026-06-09-doc-consistency.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/progress/owners.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/branch-split-plan-2026-09-02.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/kiosk-management-requirements-2026-09-02.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/kiosk-route-vs-design-page-audit-2026-09-08.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/legacy-capability-inventory-2026-08-16.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/page-audit-print-2026-09-02.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/page-audit-resume-profile-2026-09-02.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/partner-capability-inventory-2026-09-02.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/project-normalization-ignore-proposal.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/project-normalization-local-tools-landing.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/project-normalization-task-evidence-triage.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/qx-b1-arrival-hid-2026-09-07/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/real-file-print-2026-08-17/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/repo-size-and-structure-2026-09-06.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-03-deploy-data-safety-gate.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-04-profile-commercial-first-batch-execution.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-10-real-scan-implementation-plan.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-11-material-check-real-implementation-plan.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-12-c5-4-redemption-settlement-consistency.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-12-isolated-production-p0-launch.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-12-preprod-test-print-seed-guard-implementation.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-13-payment-qr-auto-reconcile.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-13-preprod-payment-timeout-acceptance.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-13-print-unpaid-task-controlled-cancellation.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-13-qingxu-lightflow-core-tabs-4188-layout.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2a-ai-career.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2b-ai-resume.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-14-alipay-f2f-codepay.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-14-windows-agent-reliability-p0.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-15-production-deployment-integrated.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-15-terminal-fleet-f0-overview.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w1.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w2.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w6.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-26-kiosk82-visual-evidence-and-truth-batch2.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-26-qingxu-lightflow-kiosk87-shell-closure.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-29-p0-1b-kiosk-session-warning.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-30-f1-d3-single-owner-governance.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-08-01-f1-d2-integration-reconcile.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-08-01-f1-d2-invocation-uniqueness.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-08-09-contract-review-report-printing.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-07-12-preprod-test-print-seed-guard-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-07-13-payment-qr-auto-reconcile-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-07-13-qingxu-lightflow-core-tabs-4188-layout-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-07-14-qingxu-lightflow-4188-layout-parity-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-07-15-production-deployment-integrated-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-07-16-f1-release-provenance-manifest-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-07-29-p0-1b-kiosk-session-warning-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/reviews/admin-capability-inventory-2026-09-02.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2-ai-resume-interview.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/superpowers/specs/2026-07-10-real-scan-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/superpowers/specs/2026-07-11-material-check-real-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/superpowers/specs/2026-07-30-f1-d3-single-owner-governance-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 
-### 样式（5）
+### 样式（1）
 
 | 路径 | 判定依据 |
 | --- | --- |
 | `apps/kiosk/src/pages/assistant/assistant-cockpit-body.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `apps/kiosk/src/pages/home/styles/home-v6-footer.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `apps/kiosk/src/pages/resume/job-fit-actions.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `apps/kiosk/src/pages/resume/jobFit-inkpaper-ext.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `apps/kiosk/src/pages/resume/resume-library-ext.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 
 
 ──────────────────────────────────────────────────────────────────────
 
-## medium — 只被文档或其它文件提及（30）
+## medium — 只被文档或其它文件提及（19）
 
-### 页面/组件（13）
+### 页面/组件（7）
 
 | 路径 | 判定依据 |
 | --- | --- |
 | `apps/admin/src/routes/offline-agencies/index.tsx` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被其它文件提及：apps/admin/src/routes/offline-agencies/AgencyForm.tsx、apps/admin/src/routes/offline-agencies/GovernanceDrawer.tsx、apps/admin/src/routes/offline-agencies/JobsDrawer.tsx |
 | `apps/admin/src/services/api/bulkPublish.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/operations/seed-content-entry-checklist-2026-08.md、docs/progress/current-progress.md |
-| `apps/kiosk/src/App.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/legacy-capability-inventory-2026-08-16.md |
-| `apps/kiosk/src/components/AiDriverBanner.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/kiosk-resume-context-ai-assist-audit-2026-08-06.md |
-| `apps/kiosk/src/components/KioskNumPad.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/progress/archive/2026-06-20-current-progress-pre-normalization.md |
 | `apps/kiosk/src/pages/home/components/HomeTile.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被其它文件提及：apps/kiosk/tests/visual/human-journey.spec.ts |
-| `apps/kiosk/src/pages/home/components/QxHomeView.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/device/onsite-acceptance-runsheet-2026-09.md、docs/device/onsite-failure-recovery-runsheet-2026-09.md、docs/progress/next-tasks.md |
+| `apps/kiosk/src/pages/home/components/QxHomeView.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/device/onsite-acceptance-runsheet-2026-09.md、docs/device/onsite-failure-recovery-runsheet-2026-09.md、docs/progress/current-progress.md |
 | `apps/kiosk/src/pages/home/components/V6HomeView.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/progress/current-progress.md |
-| `apps/kiosk/src/pages/interview/InterviewTopbar.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md |
-| `apps/kiosk/src/pages/jobs-fairs-prototype.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-proto-2026-07-migration-matrix.md、docs/reviews/launch-audit-2026-09-05.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w4.md |
-| `apps/kiosk/src/pages/jobs/components/JobAiEntryPanel.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md、docs/superpowers/plans/2026-06-30-job-info-ai-commercial-closure.md |
 | `apps/kiosk/src/pages/jobs/components/JobFilterAssistant.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md |
 | `apps/kiosk/src/pages/jobs/components/JobListInsights.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md、docs/reviews/kiosk-runtime-engineering-words-2026-09-28.md、docs/superpowers/plans/2026-06-30-job-info-ai-commercial-closure.md |
 
-### 样式（17）
+### 样式（12）
 
 | 路径 | 判定依据 |
 | --- | --- |
-| `apps/kiosk/src/pages/assistant/assistant-batch8.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md、docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md |
+| `apps/kiosk/src/pages/assistant/assistant-batch8.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md |
 | `apps/kiosk/src/pages/assistant/assistant-cockpit.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被其它文件提及：apps/kiosk/src/pages/assistant/assistant-cockpit-body.css |
-| `apps/kiosk/src/pages/assistant/assistant-lightflow-call-gate.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md |
-| `apps/kiosk/src/pages/assistant/assistant-lightflow-call-live.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md |
-| `apps/kiosk/src/pages/assistant/assistant-lightflow-call-responsive.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md |
-| `apps/kiosk/src/pages/assistant/assistant-lightflow-call-shell.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md |
-| `apps/kiosk/src/pages/assistant/assistant-lightflow-call.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md |
-| `apps/kiosk/src/pages/assistant/assistant-lightflow-chat.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md、docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md |
-| `apps/kiosk/src/pages/assistant/assistant-lightflow-content.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md、docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md |
-| `apps/kiosk/src/pages/assistant/assistant-lightflow-shell.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md、docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md |
-| `apps/kiosk/src/pages/auth/login-batch8.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md、docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md |
-| `apps/kiosk/src/pages/home/styles/home-v6-motion-responsive.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被其它文件提及：apps/kiosk/src/pages/home/styles/home-v6.css |
-| `apps/kiosk/src/pages/home/styles/home-v6.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-v6-migration-matrix.md、docs/progress/current-progress.md |
-| `apps/kiosk/src/pages/placeholders/system-pages-batch8.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md |
+| `apps/kiosk/src/pages/assistant/assistant-lightflow-call-gate.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被其它文件提及：apps/kiosk/src/pages/assistant/assistant-lightflow-call.css |
+| `apps/kiosk/src/pages/assistant/assistant-lightflow-call-live.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被其它文件提及：apps/kiosk/src/pages/assistant/assistant-lightflow-call.css |
+| `apps/kiosk/src/pages/assistant/assistant-lightflow-call-responsive.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被其它文件提及：apps/kiosk/src/pages/assistant/assistant-lightflow-call.css |
+| `apps/kiosk/src/pages/assistant/assistant-lightflow-call-shell.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被其它文件提及：apps/kiosk/src/pages/assistant/assistant-lightflow-call.css |
+| `apps/kiosk/src/pages/assistant/assistant-lightflow-call.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md |
+| `apps/kiosk/src/pages/assistant/assistant-lightflow-chat.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md |
+| `apps/kiosk/src/pages/assistant/assistant-lightflow-content.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md |
+| `apps/kiosk/src/pages/assistant/assistant-lightflow-shell.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：.ccg/tasks/archive/2026-07/fix-lightflow-4188-visual-parity/plan.md |
+| `apps/kiosk/src/pages/placeholders/system-pages-batch8.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md |
 | `apps/kiosk/src/pages/print-scan/styles/print-scan-home.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被其它文件提及：apps/kiosk/src/pages/print-scan/styles/print-scan-uplift.css |
-| `apps/kiosk/src/pages/resume/careerPlan-lightflow.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-v6-migration-matrix.md |
-| `apps/kiosk/src/pages/resume/resume-diagnosis-ext.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/progress/current-progress.md、docs/progress/next-tasks.md |
 
 
 ──────────────────────────────────────────────────────────────────────

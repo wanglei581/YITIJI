@@ -1,5 +1,39 @@
 # 当前开发进度
 
+## 2026-11-03：再删 11 个没有入口引用的一体机旧文件（逐个举证；6 个保留）
+
+- 范围：上一轮列出来、还没删的 17 个一体机文件。只 `git rm` 重新过完全部证据的。不改 CI / verify 门禁、合规闸门、硬件适配，也不动 `docs/design` 冻结稿。动态引用：全仓没有 `import.meta.glob` / `require.context`。开着的 PR：`gh pr list --json files` 核 132 个，文件数达到 100 的 #1511、#1490、#1487、#1485 另用 `gh pr diff --name-only` 补查。图谱对这 17 个都报「没有任何门禁断言」。最后一次提交都早于 14 天（最近的是 `home-v6.css` 的 `5d800c3020`，2026-10-06）。
+- 删除 11 个（代码侧 `git grep` 没有 import / `@import`；一组内互引除外。历史文档里的叙述不算入口引用）：
+  - `apps/kiosk/src/App.tsx`：一体机入口是 `main.tsx` 里的 `KioskApp`，没有人 import 这份文件。别的应用各自的 `./App.tsx` 是另一份文件。最后提交 `72de9ce5e2`（2026-05-24）。
+  - `apps/kiosk/src/pages/interview/InterviewTopbar.tsx`：文件名零代码引用。最后提交 `5843cafa8f`（2026-07-25）。
+  - `apps/kiosk/src/components/AiDriverBanner.tsx`、`KioskNumPad.tsx`：没有 import。最后提交 `20a80f9d41`（2026-08-04）、`dcc0b27ffc`（2026-06-04）。
+  - `apps/kiosk/src/pages/jobs/components/JobAiEntryPanel.tsx`、`apps/kiosk/src/pages/jobs-fairs-prototype.tsx`：没有 import。招聘会样式表 `jobs-fairs-prototype.css` 仍被 `index.css` 引入，这次只删同名的 tsx。最后提交 `6824100759`（2026-07-03）、`fb385d24dc`（2026-09-06）。
+  - `apps/kiosk/src/pages/auth/login-batch8.css`、`apps/kiosk/src/pages/resume/careerPlan-lightflow.css`、`resume-diagnosis-ext.css`：路径没有 `@import`。职业规划页实际引入的是 `job-fit-qx.css`。
+  - `apps/kiosk/src/pages/home/styles/home-v6.css`、`home-v6-motion-responsive.css`：整组删除（后者只被前者 `@import`）。现行首页不引入这两份。
+- 保留 6 个（这里故意不写文件名，免得进度文档的点名把它们在图谱里从 low 改判成 medium）：
+  - 顾问页两份旧驾驶舱样式整组留下：其中一份仍被开着的 PR #1383 修改。
+  - 三份旧样式：现行样式文件的注释还点着它们的路径，`git grep` 不是零引用。
+  - 首页上一版视图：现行首页状态模块的注释还点着组件名，没有 import，但不是零引用。
+- 不是停放件：这 11 个文件没有停放标记，停放清单也不含它们。
+- 校验：五条按目录比对主线的范围门禁（`verify:profile-inkpaper-home`、`verify:profile-feedback-inkpaper`、`verify:profile-resumes-notifications-inkpaper`、`verify:profile-commercial-first-batch`、`verify:lightflow-profile-entry`）都通过，没有因为删除报红。`pnpm --filter @ai-job-print/kiosk typecheck` 通过。`lint` 通过（0 error，25 条原有 warning，都不在被删文件上）。按 `ci.yml` 同一组变量的 `build` 通过（3150 个模块）。图谱重新生成后 `--check` 通过（low 41 / medium 19）。`verify:repository-integrity` 通过。
+
+## 2026-11-03：删除 52 份零引用旧文档（产品负责人按推荐拍板；另删 2 个旧评审目录里的 15 张截图）
+
+- 范围：图谱 low 档（全仓零提及）里的旧文档。产品负责人 11/03 按推荐拍板删除三类：7–8 月的实施计划与规格、8–9 月的旧评审、废弃设计方向的续接笔记。交付验收记录（`docs/delivery/`）、专利文档和其余零散旧文档保留。
+- 删除 52 份：
+  - `docs/design/`（1）：`kiosk-migration-capability-contracts.md`
+  - `docs/design/kiosk-ai-orchestration-2026-08/`（1）：`_RESUME-NOTE.md`
+  - `docs/reviews/`（11）：`branch-split-plan-2026-09-02.md`、`kiosk-management-requirements-2026-09-02.md`、`kiosk-route-vs-design-page-audit-2026-09-08.md`、`legacy-capability-inventory-2026-08-16.md`、`page-audit-print-2026-09-02.md`、`page-audit-resume-profile-2026-09-02.md`、`partner-capability-inventory-2026-09-02.md`、`project-normalization-ignore-proposal.md`、`project-normalization-local-tools-landing.md`、`project-normalization-task-evidence-triage.md`、`repo-size-and-structure-2026-09-06.md`
+  - `docs/reviews/qx-b1-arrival-hid-2026-09-07/`（1）：`README.md`
+  - `docs/reviews/real-file-print-2026-08-17/`（1）：`README.md`
+  - `docs/superpowers/plans/`（30）：`2026-07-03-deploy-data-safety-gate.md`、`2026-07-04-profile-commercial-first-batch-execution.md`、`2026-07-10-real-scan-implementation-plan.md`、`2026-07-11-material-check-real-implementation-plan.md`、`2026-07-12-c5-4-redemption-settlement-consistency.md`、`2026-07-12-isolated-production-p0-launch.md`、`2026-07-12-preprod-test-print-seed-guard-implementation.md`、`2026-07-13-payment-qr-auto-reconcile.md`、`2026-07-13-preprod-payment-timeout-acceptance.md`、`2026-07-13-print-unpaid-task-controlled-cancellation.md`、`2026-07-13-qingxu-lightflow-core-tabs-4188-layout.md`、`2026-07-13-qingxu-lightflow-k2a-ai-career.md`、`2026-07-13-qingxu-lightflow-k2b-ai-resume.md`、`2026-07-14-alipay-f2f-codepay.md`、`2026-07-14-qingxu-lightflow-4188-layout-parity.md`、`2026-07-14-windows-agent-reliability-p0.md`、`2026-07-15-production-deployment-integrated.md`、`2026-07-15-terminal-fleet-f0-overview.md`、`2026-07-24-kiosk-8177-5299-fusion-w1.md`、`2026-07-24-kiosk-8177-5299-fusion-w2.md`、`2026-07-24-kiosk-8177-5299-fusion-w3.md`、`2026-07-24-kiosk-8177-5299-fusion-w5.md`、`2026-07-24-kiosk-8177-5299-fusion-w6.md`、`2026-07-26-kiosk82-visual-evidence-and-truth-batch2.md`、`2026-07-26-qingxu-lightflow-kiosk87-shell-closure.md`、`2026-07-29-p0-1b-kiosk-session-warning.md`、`2026-07-30-f1-d3-single-owner-governance.md`、`2026-08-01-f1-d2-integration-reconcile.md`、`2026-08-01-f1-d2-invocation-uniqueness.md`、`2026-08-09-contract-review-report-printing.md`
+  - `docs/superpowers/specs/`（7）：`2026-07-12-preprod-test-print-seed-guard-design.md`、`2026-07-13-payment-qr-auto-reconcile-design.md`、`2026-07-13-qingxu-lightflow-core-tabs-4188-layout-design.md`、`2026-07-14-qingxu-lightflow-4188-layout-parity-design.md`、`2026-07-15-production-deployment-integrated-design.md`、`2026-07-16-f1-release-provenance-manifest-design.md`、`2026-07-29-p0-1b-kiosk-session-warning-design.md`
+  - `docs/reviews/qx-b1-arrival-hid-2026-09-07/`、`docs/reviews/real-file-print-2026-08-17/` 两个目录连同里面的 15 张截图整目录删除：截图全仓无引用，只删说明会留下没人看得懂的图。
+- 原推荐 56 份里另有 4 份保留（不写文件名，免得进度文档的点名改变图谱分级）：一份在 `docs/README.md` 写明「禁止清理」的青序流光原型目录里；两份是仍有原型页面的目录说明，删了页面就没人看得懂；一份被两份历史设计文档点名为「历史候选残留（仅 README）」，删了会让那两处说法落空。
+- 证据：每份都在图谱 low 档；最后一次改动都早于 14 天（最近的是 2026-09-29）；`gh pr list --json files` 核 131 个开着的 PR，文件超过 100 个的 #1511、#1490、#1487、#1485 另用 `gh pr diff --name-only` 补查，都没有改动这些文件；被门禁点名检查存在性的 `docs/superpowers/` 文件都在图谱 high 档，不在清单里。
+- 连带变化：删除后有 9 个文件因为原来只被这批旧文档提到，从「被文档提及」落进 low（其中 2 个是一体机代码文件）。不在这次拍板范围内，本次不动，记入 next-tasks。
+- 校验：见本 PR 说明（图谱 `--check`、`verify:repository-integrity`、读进度文档的门禁、按目录比对主线的范围门禁）。
+
 ## 2026-11-03：小程序 AI 板块第一轮——发给微信好友、今日提醒去 AI 闸门、AI 工具页按四组重排、简历优化与面试记录不再走死路（#1552，分支 `claude/miniapp-batch9-1103`；未合并、未部署，小程序未发布）
 
 - 来由：产品负责人 11/03 原话「剩下的你和codex和grok你们一起做完，Claude额度低，任务codex和grok执行，grok多干活」「小程序AI功能我已经通过备案……可以完整使用AI全部功能和能力……ai功能很重要，要设计好这一板块」，对分组回「按推荐重排」。分工：Grok 实现，Codex 实现两件并复核 Grok 的每一件，Claude 审查后拣入。提审与上线一律是带全部 AI 的完整版，不做也不保留「不含 AI 版」。
@@ -11,6 +45,12 @@
 - 面试记录与复盘：记录接口失败照实说、可再试，不再显示成「没有记录」；复盘分清读取失败与生成失败。首版用词：U 盘页「开通」改能力说法，AI 未配置提示改「AI 服务暂时不可用」（「免费」「免费试运营」照 9/30 口径保留）。
 - 验证：小程序 `verify:static` 全套（本机与 UTC）、接口契约、`verify:page-lifecycle` 整组、一体机 `verify:kiosk-ai-declaration`、CI「Cross-client deterministic static gates」本机逐条 61 条；每件都有实现方的反向检查（转红后还原）。Codex 复核 Grok 三件中审出的两处阻塞（重新导出时按钮状态、文件名扩展名）与一处缺陷（不用 AI 出口只在第一段）均已返工。
 - 没做：开发者工具截图自验待做（主项目跟线上后台，要在一次性副本里截）；职业规划、简历版式调整、带简历模拟面试的 `resume_ai` 后端检查另开 PR，必须在一体机接住授权的 #1555 之后或同批合；两种订阅提醒等产品负责人在公众平台选模板；一体机扫描完成页加「到我的文档看」属触屏线；隐私页「权益」字样由产品负责人定是否交法务。
+
+## 2026-11-03：一体机职业规划、简历版式调整、带简历的模拟面试接住「简历 AI 授权」403（配合后端 resume_ai 检查；未部署）
+
+- 背景：后端给这三处补 resume_ai 授权检查（分支 claude/resume-ai-consent-1103，另开 PR，排在本 PR 之后或同批合），会员没同意或撤回过授权时返回 403 USER_AI_CONSENT_REQUIRED。一体机原先接不住：职业规划只显示报错、当场没法重新同意，成了死路。
+- 改法（只改一体机，照人岗匹配页现成写法）：会员收到这个码时当场弹出现有简历 AI 授权（ResumeAiConsentDialog），同意后记录授权并自动重试同一请求；不同意时留在原页——职业规划保留已填内容可再生成，版式调整保持当前版式可继续编辑导出，模拟面试留在第 3 步、可选「不上传也能开始」；撤回后再用仍会再弹。游客按原逻辑。提示语沿用简历诊断页已有的「使用简历 AI 前需要先确认授权」。
+- 验证：一体机 tsc、新增节点测试 5 条、关联门禁 17 条（含 kiosk-ai-declaration、kiosk-unattended-copy）通过；浏览器与真机待后端 PR 一起实跑。实现 Grok，审查与复跑 Claude。
 
 ## 2026-11-02：管理员后台审计详情不再把系统编号误显示成「已隐藏」（分支 `claude/kind-thompson-f3f802`）
 
@@ -32,12 +72,6 @@
 
 - 图片转 PDF 响应增加落库文件名；幂等重试读取原文件记录。一体机优先使用响应文件名，旧服务端仍查询「我的文档」，取不到时沿用原有描述。仅本地候选，未部署、未做真机验证。
 
-## 2026-11-03：一体机职业规划、简历版式调整、带简历的模拟面试接住「简历 AI 授权」403（配合后端 resume_ai 检查；未部署）
-
-- 背景：后端给这三处补 resume_ai 授权检查（分支 claude/resume-ai-consent-1103，另开 PR，排在本 PR 之后或同批合），会员没同意或撤回过授权时返回 403 USER_AI_CONSENT_REQUIRED。一体机原先接不住：职业规划只显示报错、当场没法重新同意，成了死路。
-- 改法（只改一体机，照人岗匹配页现成写法）：会员收到这个码时当场弹出现有简历 AI 授权（ResumeAiConsentDialog），同意后记录授权并自动重试同一请求；不同意时留在原页——职业规划保留已填内容可再生成，版式调整保持当前版式可继续编辑导出，模拟面试留在第 3 步、可选「不上传也能开始」；撤回后再用仍会再弹。游客按原逻辑。提示语沿用简历诊断页已有的「使用简历 AI 前需要先确认授权」。
-- 验证：一体机 tsc、新增节点测试 5 条、关联门禁 17 条（含 kiosk-ai-declaration、kiosk-unattended-copy）通过；浏览器与真机待后端 PR 一起实跑。实现 Grok，审查与复跑 Claude。
-
 ## 2026-11-02：小程序传文件页接收一体机签名图的上传码，退出页面后丢弃迟到回调（接手 GPT 10/31 两条，按现结构重做；分支 `claude/miniapp-kiosk-send-signature-1102`，#1538；小程序未发布、未提审）
 
 - 来由：GPT 10/31 在触屏版发布候选 #1531 里顺手改了小程序传文件页（2887a09ae 签名图上传码、b94f9d4fe 退出丢弃回调），没走小程序线的流程和契约门禁，又和 #1535 改同一批函数。触屏版总指挥问后选「小程序线接手」：两条已在 #1531 整体撤回（69f4c4b60、2878a1913），一体机签名图照旧出网页长链；这里从主线按 #1535 之后的页面结构重做。
@@ -46,6 +80,35 @@
 - 体量：页面到 500 行，把头部提示文案挪进新文件 `kiosk-send-copy.js`（行为不变），页面 497 行。
 - 没做：一体机给签名图改出 `/k/u/` 短链（`apps/kiosk/src/services/api/uploadSessions.ts` 的例外）要等带这次改动的小程序发布后，由触屏版总指挥在一体机那边打开；在此之前签名图走网页兜底照常可用。签名功能试点默认关着。
 - 验证：小程序 verify:static 本机与 UTC 各一遍全过，接口契约一致；传文件页两份测试 49 条通过（新增签名图 6 条、退出 3 条，更新 2 处旧断言）；九处反向检查里八处转红，另一处（多余的退出标记）已删。
+
+## 2026-11-02：本机清理——旧工作副本被成批挪走后的备份与恢复办法
+
+- 起因：22:43 另一个清理工具（WorkBuddy）把本机五处工作副本根目录（`~/.cache/claude-lanes`、本仓库 `.claude/worktrees`、`~/.codex/worktrees`、`~/.grok/worktrees`、另一项目的 `.claude/worktrees`）整个挪进废纸篓，随后对仓库执行了 `git worktree prune`。各窗口旧副本的 git 登记因此丢失（在里面跑 git 会报「不是仓库」）；`claude-lanes` 后来被放回原处，登记仍是断的。正在干活的窗口已各自重建并重新登记了自己的副本。
+- 保护（都在本机仓库里，没有推送 GitHub：里面有专利草稿等不能公开的内容）：
+  - `refs/backup/wt-20261102/<副本路径>`：被挪走时各副本的 HEAD，共 270 条。
+  - `refs/backup/wt-20261102-dirty/<副本路径>`：有未提交改动的副本的快照，父提交是当时的分支尖端或 HEAD；被挪走前后都逐个比对过，触屏版线用自己存的补丁核对一致。
+  - `refs/backup/wt-20261102-orphan/...`：早就和 git 断开的旧副本的整树快照（没有父提交）。
+  - `refs/backup/wt-20261102-dotwt*/...`：`.worktrees/` 下 8 月旧副本的 HEAD 与改动快照。
+  - `refs/backup/main-checkout-wip-20261102`：主目录 8 月以来的全部在制品；`refs/backup/stash-20261102/NN`：43 个暂存（最早是 8 月的，免得被 git 按期限自动过期）。
+- 取回：`git for-each-ref refs/backup | grep <副本名>` 找到引用；`git worktree add <新目录> <分支>` 后，用 `git diff <快照>^ <快照> | git apply` 放回未提交改动（整树快照用 `git checkout <快照> -- <路径>`）。
+- 主目录：已从 `codex/governance-safety-20260822`（落后主线 3011 个提交，还卡着 9/13 没做完的拣选）切回 `main`，旧分支保留；专利草稿等未跟踪、被忽略的文件原地保留，没有进仓库。
+- 已移除：`.worktrees/` 下 13 个干净的旧副本（`git worktree remove`，不加 --force）；触屏版线确认不再用的 51 个已断开副本挪进废纸篓。仍保留：各窗口在用并已重新登记的副本；`.worktrees/` 下 8 个有改动的旧副本：11/03 产品负责人同意后已删（删前逐个核对与 `refs/backup/wt-20261102-dotwt-dirty/` 快照一致）；`touch-impl-1025` 顶层 13 个旧副本（等「触屏稿补稿收稿与审图」窗口确认）。
+
+## 2026-11-02：删除 10 个没有入口引用的一体机旧文件（逐个举证；3 个保留）
+
+- 范围：图谱 `docs/graph/orphans.md` low 档里点名的 13 个一体机文件。只 `git rm` 通过全部证据的。不改 CI / verify 门禁、合规闸门、硬件适配，也不动 `docs/design` 冻结稿。动态引用：全仓没有 `import.meta.glob` / `require.context`；kiosk 仅有的 `lazy(() => import(` 是打印页的 `DevSandboxControls`，匹配不到这 13 个。开着的 PR：`gh pr list` 128 个，逐个 `git fetch origin pull/<编号>/head` 后看 `git diff --name-only origin/main...<提交>`。图谱对这 13 个都报「没有任何门禁断言」。最后一次提交都早于 14 天（最近的是 `home-v6-footer.css` 的 `5d800c3020`，2026-10-06）。
+- 删除 10 个：
+  - `apps/kiosk/src/pages/home/components/V6HomeFooterPanels.tsx`：`git grep V6HomeFooterPanels` 只命中自身；128 个 PR 都没改它。最后提交 `5cb74bc6c1`（2026-08-16）。
+  - `apps/kiosk/src/pages/home/prototypeIcons.tsx`：文件名零命中。导出的 `ProtoIcon` 只出现在 2026-07-24 计划稿的示例 JSX 里，没有 import。最后提交 `5883c8c4ea`（2026-07-21）。
+  - `apps/kiosk/src/pages/scan/ScanFlowSteps.tsx`：没有 import。本文件 2026-07-25 的更新记录里有一句历史叙述提到组件名，不是路径也不是 import；现行扫描页不引用它。最后提交 `5843cafa8f`（2026-07-25）。
+  - `apps/kiosk/src/services/api/smartCampus.ts`、`smartCampusHttpAdapter.ts`、`smartCampusMockAdapter.ts`：整组删除（两个适配器只被同组的 `smartCampus.ts` 引用，三者只互相引用，kiosk 里没有人 import 这个模块）。现行智慧校园走 `useSmartCampusConfig` → `getKioskTerminalConfig`；`verify-terminal-device-config.ts` 禁止钩子回退 `getSmartCampusConfig(`。不是停放件：停放清单里的智慧校园页是迎新洞察页，不是这三个旧的按功能客户端；也没有文档把它们列为校园招聘或私有化部署 b 要保留的源码。最后提交 `bcb24062a9`（2026-07-29）、`6f0d38397c`（2026-08-19）、`109c7c7cb8`（2026-07-01）。
+  - `apps/kiosk/src/pages/home/styles/home-v6-footer.css`、`apps/kiosk/src/pages/resume/job-fit-actions.css`、`jobFit-inkpaper-ext.css`、`resume-library-ext.css`：路径零命中，没有 `@import`。岗位行动页实际引入的是 `job-fit-qx.css` 与 `resume-decision-qx.css`。
+- 保留 3 个（这里故意不写文件名，免得进度文档的点名把它们在图谱里从 low 改判成 medium）：
+  - 首页头部组件：被 `QxHomeView.tsx` 第 35 行 import（`QxHomeView` 本身也已不在入口引用链里，图谱列在 medium），单删它会让类型检查断；开着的 PR #1528、#1521、#1511 也在改它，所以这次不动。图谱把它放进 low 而不是「被其它文件提及」，是因为提及索引不认不带扩展名的 import（属脚本问题，已记入 next-tasks）。
+  - 「我的」页资源目录里一个只导出图标按钮、全仓无人调用的旧小组件：本可删，但「我的」页范围门禁 `verify-profile-inkpaper-home` 不允许本 PR 改动该目录（删除也算改动），按「不为迁就改动放宽门禁」留到下次动「我的」页时一起删。
+  - 顾问页一份旧的「驾驶舱正文」样式：现行顾问页没有引入它，但开着的 PR #1383 仍在改它，按「开着的 PR 改过就保留」。
+- 校验：`CI=true pnpm install --frozen-lockfile --prefer-offline` 通过（812 包，锁文件未改）。`pnpm --filter kiosk typecheck` 通过。`pnpm --filter kiosk lint` 通过（0 error，27 条原有 warning，都不在被删文件上）。不带环境变量的 `pnpm --filter kiosk build` 被生产闸门拒绝（`VITE_API_MODE` 未设置）；按 `ci.yml` 同一组变量（`VITE_API_MODE=http`、`VITE_API_BASE_URL=/api/v1`、`VITE_USE_TRTC_CALL=true`、`VITE_TERMINAL_ID=KSK-001`、桥接令牌）再跑，`tsc -b && vite build` 通过（3150 个模块）。图谱重新生成后 `--check` 通过，low 从 96 变为 86（正好是删掉的 10 个），medium 仍是 30。
+- 复核：Claude 收货时用 `gh pr list --json files` 核对 131 个开着的 PR（文件超过 100 个的 #1511、#1490、#1487、#1485 另用 `gh pr diff --name-only` 补查），都没有改动原定删除的 11 个文件；Codex 只读复核了同一提交。
 
 ## 2026-11-02：一体机设备状态页的「本机程序」改为真去探本机程序（触屏版复走 R-09；未部署）
 
