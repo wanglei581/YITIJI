@@ -11,7 +11,7 @@
     <view class="usb-hero rise-d1">
       <view class="usb-ic"><text class="ficon i-usb"></text></view>
       <view class="usb-title">U盘打印在一体机上操作</view>
-      <view class="usb-sub">手机读不了 U 盘。请带上 U 盘到一体机前，按下面的步骤在一体机上导入打印。U 盘导入按机器开通，没开通的机器会显示「暂未开通」，可以改用手机上传。</view>
+      <view class="usb-sub">手机读不了 U 盘。请带上 U 盘到一体机前，按下面的步骤在一体机上导入打印。U 盘导入要看这台机器是否支持；这台机器暂不支持时，可以改用手机上传。</view>
     </view>
 
     <view class="section-t rise-d2">操作步骤</view>
