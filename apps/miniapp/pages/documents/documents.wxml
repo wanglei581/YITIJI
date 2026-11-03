@@ -110,7 +110,15 @@
               catchtap="reprintDoc"
               data-id="{{item.id}}"
             >重新打印</view>
+            <view
+              class="doc-action {{item.friendBusy ? 'is-disabled' : ''}}"
+              hover-class="tap-press"
+              aria-disabled="{{item.friendBusy}}"
+              catchtap="shareToFriend"
+              data-id="{{item.id}}"
+            >{{item.friendPhase === 'ready' ? '发送给微信好友' : '发给微信好友'}}</view>
           </view>
+          <view wx:if="{{item.friendMessage}}" class="doc-hint">{{item.friendMessage}}</view>
           <view wx:if="{{item.isWord}}" class="doc-hint">{{wordConversionCopy}}</view>
           <view wx:if="{{!item.reprintable}}" class="doc-hint">该报告仅可查看，不可打印</view>
         </view>

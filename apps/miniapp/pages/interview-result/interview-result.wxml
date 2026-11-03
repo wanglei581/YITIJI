@@ -10,14 +10,15 @@
     <!-- 生成中 -->
     <view wx:if="{{phase === 'loading'}}" class="ri-state">
       <view class="spinner"></view>
-      <text class="state-tip">AI 正在生成复盘报告，约需 30 秒，请稍候…</text>
+      <text class="state-tip">正在读取复盘报告；若还没有报告，会继续生成，请稍候…</text>
     </view>
 
     <!-- 失败 -->
     <view wx:if="{{phase === 'failed'}}" class="ri-state">
       <text class="ficon i-info ri-fail-ic"></text>
       <text class="state-tip">{{failMsg}}</text>
-      <view class="btn ghost tap ri-retry-btn" bindtap="tapRetry">重新开始</view>
+      <view wx:if="{{sessionId}}" class="btn ghost tap ri-retry-btn" bindtap="retryReport">再试一次</view>
+      <view class="btn ghost tap ri-retry-btn" bindtap="goBack">返回</view>
     </view>
 
     <!-- 报告 -->

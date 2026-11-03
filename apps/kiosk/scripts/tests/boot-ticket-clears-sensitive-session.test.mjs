@@ -157,6 +157,7 @@ export function useState(initial) { return [typeof initial === 'function' ? init
     .replaceAll("from '../ai/aiDeclarationSession'", `from '${toDataUrl(declarationSessionCode)}'`)
     .replaceAll("from '../ai/aiDeclarationVersions'", `from '${declarationVersions}'`)
     .replaceAll("from '../pages/print/printMaterialSession'", `from '${leaf('src/pages/print/printMaterialSession.ts')}'`)
+    .replaceAll("from '../pages/print/pickupClaimResume'", `from '${leaf('src/pages/print/pickupClaimResume.ts')}'`)
     .replaceAll("from '../pages/resume/aiResumeSession'", `from '${leaf('src/pages/resume/aiResumeSession.ts')}'`)
     .replaceAll("from '../services/resumeParseIntent'", `from '${leaf('src/services/resumeParseIntent.ts')}'`)
     .replaceAll("from '../services/assistantDraft'", `from '${toDataUrl(assistantDraftCode)}'`)

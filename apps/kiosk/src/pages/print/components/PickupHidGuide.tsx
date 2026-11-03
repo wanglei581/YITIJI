@@ -18,6 +18,7 @@ import {
   type PickupFailure,
   type PickupScreen,
 } from '../pickupClaimModel'
+import type { PickupQuotaExit } from '../pickupQuotaExit'
 
 // 到机码页（原型 11-arrival-code.html）的展示件。只接收页面算好的数据与回调，
 // 不发请求、不判定成败；认领、终端身份与离页作废都在 PrintPickupClaimPage 里。
@@ -326,18 +327,48 @@ export function PickupOutsStrip({ onHid, onHelp }: { onHid: () => void; onHelp: 
 export function PickupFailurePanel({
   failure,
   message,
+  quotaExit = null,
   onReset,
   onRetry,
   onHelp,
   onHome,
+  onLogin,
 }: {
   failure: PickupFailure
   message: string
+  /** 额度被拒才有。login 给「去登录」；wait 不给，主按钮回首页。 */
+  quotaExit?: PickupQuotaExit | null
   onReset: () => void
   onRetry: () => void
   onHelp: () => void
   onHome: () => void
+  onLogin?: () => void
 }) {
+  if (quotaExit === 'login' || quotaExit === 'wait') {
+    return (
+      <>
+        <div id="pcp-error-msg" className="pcp-strip pcp-strip--error pcp-enter" role="alert">
+          <AlertCircleIcon size={28} aria-hidden="true" />
+          <span>{message}</span>
+        </div>
+        <div className="pcp-actions">
+          {quotaExit === 'login' ? (
+            <button type="button" className="qx-btn pcp-act pcp-act--go" data-testid="arrival-code-primary" onClick={onLogin}>
+              去登录
+            </button>
+          ) : (
+            <button type="button" className="qx-btn pcp-act pcp-act--go" data-testid="arrival-code-primary" onClick={onHome}>
+              回到首页
+            </button>
+          )}
+          <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={quotaExit === 'login' ? onHome : onReset}>
+            {quotaExit === 'login' ? '回到首页' : '输另一个到机码'}
+          </button>
+        </div>
+      </>
+    )
+  }
+
   if (failure === 'locked' || failure === 'network') {
     const locked = failure === 'locked'
     return (

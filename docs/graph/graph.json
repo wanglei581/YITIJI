@@ -14016,7 +14016,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 814,
+      "reachableFileCount": 819,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -17391,7 +17391,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 916
+      "sourceFileCount": 921
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -21778,6 +21778,9 @@
     "apps/kiosk/src/pages/print/pickupClaimModel.ts": [
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
+    ],
+    "apps/kiosk/src/pages/print/pickupClaimResume.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
     "apps/kiosk/src/pages/print/piiRedaction.ts": [
       "apps/kiosk/scripts/verify-pii-redaction-contract.mjs"
@@ -31798,6 +31801,7 @@
           "apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx",
           "apps/kiosk/src/pages/jobs/components/JobDetailSections.tsx",
           "apps/kiosk/src/pages/jobs/components/JobsQxChrome.tsx",
+          "apps/kiosk/src/pages/print/pickupClaimResume.ts",
           "apps/kiosk/src/pages/print/printMaterialSession.ts",
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
           "apps/kiosk/src/pages/resume/JobFitPage.tsx",
