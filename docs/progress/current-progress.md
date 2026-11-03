@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-11-03：简历 AI 授权装配门禁登记招聘托管豁免（分支 `claude/resume-ai-consent-1103`，未合并、未部署）
+
+- CI `build-and-verify` 的招聘托管声明门禁红在 `scripts/verify-resume-ai-consent-wiring.ts`：它直接引用 `career-plan.service.ts`，但只核对职业规划、版式调整与模拟面试四处简历 AI 授权服务的必填注入，不调用招聘内容读取或写入。已在 `verify-recruitment-hosting-gate-declares.ts` 的 exemptions 登记。`verify-mock-interview-consent.ts` 与 `verify-resume-layout-adjust.ts` 不引用托管模块，原清单没有违规。
+- 未改业务代码，未删断言，也没有给这条门禁改写托管开关。图谱把这条豁免记成对该装配脚本的断言。
+- 验证：托管声明门禁「声明 43、豁免 35、违规 0」；装配门禁 4 处注入；模拟面试 25 条、授权 6 条；职业规划 23 条、降级 13 条；版式调整 ALL PASS；AI 访问 ALL PASS；自我探索同意 26 通过 / 1 跳过；API 类型检查通过；图谱 `--check` 通过。
+
 ## 2026-11-03：简历 AI 授权改为必需注入，并拆出模拟面试授权门禁（分支 `claude/resume-ai-consent-1103`，未合并、未部署）
 
 - 职业规划控制器、职业规划服务、版式调整控制器、模拟面试服务里的授权服务改为和现有简历 AI 控制器一样的必需注入。漏注册时应用启动失败，不再静默放行。岗位要求计数端口仍可选，排在授权服务之后。

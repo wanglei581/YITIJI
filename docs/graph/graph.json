@@ -24907,6 +24907,9 @@
     "services/api/scripts/verify-refund-idempotent.ts": [
       "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
+    "services/api/scripts/verify-resume-ai-consent-wiring.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
     "services/api/scripts/verify-resume-draft-versions.ts": [
       "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
@@ -42860,6 +42863,7 @@
           "services/api/scripts/verify-print-jobs.ts",
           "services/api/scripts/verify-recruitment-integration-readiness.ts",
           "services/api/scripts/verify-refund-idempotent.ts",
+          "services/api/scripts/verify-resume-ai-consent-wiring.ts",
           "services/api/scripts/verify-resume-draft-versions.ts",
           "services/api/scripts/verify-resume-export-draft-source.ts",
           "services/api/scripts/verify-resume-export-formats.ts",
@@ -43243,7 +43247,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-resume-ai-consent-wiring.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
