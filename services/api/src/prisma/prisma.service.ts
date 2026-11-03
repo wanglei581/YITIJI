@@ -48,6 +48,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     const created = createPrismaClient(url)
     this.client = created.client
     this.dbKind = created.kind
+    for (const warning of created.pgSessionWarnings) {
+      this.logger.warn(warning)
+    }
   }
 
   async onModuleInit(): Promise<void> {

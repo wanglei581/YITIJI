@@ -13,6 +13,7 @@
  * 因缺少生成产物而加载失败。
  */
 import { PrismaClient as SqlitePrismaClient } from '../generated/prisma/client'
+import { resolvePgSessionTimeouts } from './pg-session-timeouts'
 
 export type AppPrismaClient = InstanceType<typeof SqlitePrismaClient>
 
@@ -40,7 +41,7 @@ export function assertRuntimeDatabaseAllowed(
 export function createPrismaClient(
   url: string,
   options: { allowProductionSqliteSource?: boolean } = {},
-): { client: AppPrismaClient; kind: DbKind } {
+): { client: AppPrismaClient; kind: DbKind; pgSessionWarnings: string[] } {
   assertRuntimeDatabaseAllowed(url, process.env['NODE_ENV'], options)
   const kind = dbKindOf(url)
   if (kind === 'postgres') {
@@ -50,13 +51,22 @@ export function createPrismaClient(
     const { PrismaClient: PgPrismaClient } = require('../generated/prisma-pg/client') as {
       PrismaClient: typeof SqlitePrismaClient
     }
-    const adapter = new PrismaPg({ connectionString: url })
+    // pg 在连接启动包里带上这三个 GUC（毫秒）。0 会被驱动当成未设置，所以越界回落的缺省都是正数。
+    // 不写数据库级 ALTER，迁移命令的连接不经过这个池。
+    const session = resolvePgSessionTimeouts(process.env)
+    const adapter = new PrismaPg({
+      connectionString: url,
+      lock_timeout: session.lockTimeoutMs,
+      statement_timeout: session.statementTimeoutMs,
+      idle_in_transaction_session_timeout: session.idleTxTimeoutMs,
+    })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return { client: new PgPrismaClient({ adapter } as any) as AppPrismaClient, kind }
+    const client = new PgPrismaClient({ adapter } as any) as AppPrismaClient
+    return { client, kind, pgSessionWarnings: session.warnings }
   }
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { PrismaLibSql } = require('@prisma/adapter-libsql') as typeof import('@prisma/adapter-libsql')
   const adapter = new PrismaLibSql({ url })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return { client: new SqlitePrismaClient({ adapter } as any) as AppPrismaClient, kind }
+  return { client: new SqlitePrismaClient({ adapter } as any) as AppPrismaClient, kind, pgSessionWarnings: [] }
 }
