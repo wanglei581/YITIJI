@@ -47,12 +47,12 @@ export const AI_PUBLIC_QUOTA_EXCEEDED_COPY = '今天的 AI 次数用完了，明
  * 服务端若带回 `bucket`（或 `details.bucket`）就按简历类 / 小青 / 模拟面试说；没有就不猜是哪一类，也不写数字额度。
  * 不写价格、购买或充值。
  */
-export const AI_QUOTA_EXHAUSTED_COPY = '今天的 AI 次数用完了，明天 0 点恢复；可以先按这一页的手动方式继续，打印、扫描照常可用'
-export const AI_QUOTA_EXHAUSTED_RESUME_COPY = '今天的简历类 AI 次数用完了，明天 0 点恢复；可以先按模板手动填写，打印照常可用'
-export const AI_QUOTA_EXHAUSTED_ASSISTANT_COPY = '今天的小青次数用完了，明天 0 点恢复；打印、扫描和查政策可以回首页照常办'
+export const AI_QUOTA_EXHAUSTED_COPY = '今天的 AI 次数用完了，明天 0 点恢复。'
+export const AI_QUOTA_EXHAUSTED_RESUME_COPY = '今天的简历类 AI 次数用完了，明天 0 点恢复。'
+export const AI_QUOTA_EXHAUSTED_ASSISTANT_COPY = '今天的小青次数用完了，明天 0 点恢复；你可以回到首页。'
 export const AI_QUOTA_EXHAUSTED_INTERVIEW_COPY = '今天的模拟面试次数用完了，明天 0 点恢复；可以回到上一页，或先看面试技巧'
 /** 自我探索是 200，解读缺席但记分已完成。这句话只给结果页，不进桶映射。 */
-export const AI_QUOTA_SELF_ASSESSMENT_COPY = '今天的 AI 解读次数用完了，明天 0 点恢复。作答和记分已经完成，可以直接打印。'
+export const AI_QUOTA_SELF_ASSESSMENT_COPY = '今天的 AI 解读次数用完了，明天 0 点恢复。作答和记分已经完成。'
 
 /**
  * 「这项 AI 服务没开」：如实说没开，出路是不用 AI 的手动方式。

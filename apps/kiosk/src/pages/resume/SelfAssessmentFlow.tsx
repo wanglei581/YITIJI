@@ -957,7 +957,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
     ...(suppressReanswer
       ? {
           retryHint: quotaExhausted
-            ? '作答和记分已经完成，可以直接打印。'
+            ? '作答和记分已经完成。'
             : '下面的维度强度与依据题号不依赖 AI，现在就能看、能打印。',
         }
       : {

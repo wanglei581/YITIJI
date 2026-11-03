@@ -1727,7 +1727,7 @@ test('assistant: per-person quota exhaustion stays locked until tomorrow without
   await expect(page.getByText('这会儿没有接上')).toHaveCount(0)
   await expect(page.getByText('当前使用的人较多')).toHaveCount(0)
   await expect(page.getByText('今天的小青次数用完了，明天 0 点恢复').first()).toBeVisible()
-  await expect(page.getByText('打印、扫描和查政策可以回首页照常办').first()).toBeVisible()
+  await expect(page.getByText('你可以回到首页').first()).toBeVisible()
   await expect(page.getByRole('navigation', { name: '不依赖 AI 的功能入口' })).toBeVisible()
   await expect(page.getByRole('button', { name: /^打印扫描/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /^政策服务/ })).toBeVisible()

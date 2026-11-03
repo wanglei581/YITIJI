@@ -328,7 +328,7 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
       },
     })
     await page.goto(`/resume/self-assessment/result?taskId=${taskId}`)
-    await expect(page.getByText('今天的 AI 解读次数用完了，明天 0 点恢复。作答和记分已经完成，可以直接打印。')).toBeVisible()
+    await expect(page.getByText('今天的 AI 解读次数用完了，明天 0 点恢复。作答和记分已经完成。')).toBeVisible()
     await expect(page.getByText('协作偏好')).toBeVisible()
     await expect(page.getByRole('button', { name: /生成 PDF 预览/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /重新作答/ })).toHaveCount(0)
