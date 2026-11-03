@@ -157,6 +157,8 @@ const ACTION_LABELS: Record<string, string> = {
   'order.paid_unfulfilled_file_unavailable': '已付款未履约订单文件不可用',
   'order.pickup_expired_auto_refund': '取件到期自动退款',
   'order.pickup_expired_auto_refund_skipped': '跳过取件到期自动退款',
+  'order.paid_output_anomaly_auto_refund': '付费出纸异常自动退款',
+  'order.paid_output_anomaly_auto_refund_skipped': '跳过付费出纸异常自动退款',
   'order.refund': '订单退款',
   'org.account.action_cancelled': '取消机构账号敏感操作',
   'org.account.action_challenge_started': '发送机构账号操作验证码',
