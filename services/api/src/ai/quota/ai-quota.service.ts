@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import type { AiQuotaReservation } from '../../generated/prisma/client'
 import type { AiQuotaBucket } from '../../member-benefits/member-benefits.types'
 import { PrismaService, type PrismaTransactionClient } from '../../prisma/prisma.service'
+import { isPostgresBusyError } from '../../common/prisma/postgres-busy'
 import { isSerializationConflict, waitBeforeSerializationRetry } from '../../common/prisma/serialization-conflict'
 import { currentAiRequestContext } from '../usage/ai-usage-context'
 import { activeGrants, AI_QUOTA_BUCKETS, dailyLimit, exhausted, hashQuotaOperation, quotaDay, quotaEnv, quotaResetsAt, RELEASE_REASONS, type ReleaseReason } from './ai-quota.policy'
@@ -195,6 +196,7 @@ export class AiQuotaService {
     for (let attempt = 0; ; attempt++) {
       try { return await this.prisma.$transaction(fn, { isolationLevel: 'Serializable', maxWait: 10_000, timeout: 10_000 }) } catch (error) {
         // 唯一冲突（同 operationKey）回滚整个扣次后重试，重新检查归属与重放状态。
+        if (isPostgresBusyError(error)) throw error
         const code = (error as { code?: string }).code
         if (attempt >= 11 || !(isSerializationConflict(error) || code === 'P2002' || /SQLITE_BUSY|database is locked/.test(String(error)))) throw error
         await waitBeforeSerializationRetry(attempt + 1)

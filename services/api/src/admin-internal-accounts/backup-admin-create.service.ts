@@ -16,6 +16,7 @@ import {
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { PartnerAccountActionRedisService } from '../common/redis/partner-account-action-redis.service'
 import { RedisService } from '../common/redis/redis.service'
+import { isPostgresBusyError } from '../common/prisma/postgres-busy'
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import { verifyAdminStepUp } from './admin-step-up'
 import {
@@ -281,6 +282,7 @@ async function withSerializableRetry<T>(operation: () => Promise<T>): Promise<T>
     try {
       return await operation()
     } catch (error) {
+      if (isPostgresBusyError(error)) throw error
       if (!isSerializationConflict(error) || attempt === 2) throw error
     }
   }
