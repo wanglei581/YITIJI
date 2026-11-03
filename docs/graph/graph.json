@@ -595,6 +595,8 @@
         "handler": "AiController.getAiUsage",
         "method": "GET",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
@@ -5496,8 +5498,12 @@
           "AdvisorArtifact",
           "AdvisorPin",
           "AdvisorSession",
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "BenefitGrant",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/advisor/availability",
         "roles": [],
@@ -5516,8 +5522,12 @@
           "AdvisorArtifact",
           "AdvisorPin",
           "AdvisorSession",
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "BenefitGrant",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/advisor/sessions",
         "roles": [],
@@ -5536,8 +5546,12 @@
           "AdvisorArtifact",
           "AdvisorPin",
           "AdvisorSession",
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "BenefitGrant",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId",
         "roles": [],
@@ -5556,8 +5570,12 @@
           "AdvisorArtifact",
           "AdvisorPin",
           "AdvisorSession",
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "BenefitGrant",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/artifacts/:artifactId/print",
         "roles": [],
@@ -5576,8 +5594,12 @@
           "AdvisorArtifact",
           "AdvisorPin",
           "AdvisorSession",
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "BenefitGrant",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/ask",
         "roles": [],
@@ -5596,8 +5618,12 @@
           "AdvisorArtifact",
           "AdvisorPin",
           "AdvisorSession",
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "BenefitGrant",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/pins",
         "roles": [],
@@ -5616,8 +5642,12 @@
           "AdvisorArtifact",
           "AdvisorPin",
           "AdvisorSession",
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "BenefitGrant",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/pins/:pinId",
         "roles": [],
@@ -5636,8 +5666,12 @@
           "AdvisorArtifact",
           "AdvisorPin",
           "AdvisorSession",
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "BenefitGrant",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/run",
         "roles": [],
@@ -5656,8 +5690,12 @@
           "AdvisorArtifact",
           "AdvisorPin",
           "AdvisorSession",
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "BenefitGrant",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/skill",
         "roles": [],
@@ -5676,8 +5714,12 @@
           "AdvisorArtifact",
           "AdvisorPin",
           "AdvisorSession",
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "BenefitGrant",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/slots",
         "roles": [],
@@ -5693,6 +5735,8 @@
         "handler": "AiController.chatWithAssistant",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
@@ -5743,8 +5787,12 @@
         "models": [
           "AdvisorArtifact",
           "AdvisorSession",
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "BenefitGrant",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/assistant/sessions/:sessionId/summary",
         "roles": [],
@@ -6714,14 +6762,18 @@
         "handler": "FairVisitPlanController.latest",
         "method": "GET",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "ExternalJumpLog",
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/job-fairs/:fairId/visit-plan/:taskId",
         "roles": [],
@@ -6737,14 +6789,18 @@
         "handler": "FairVisitPlanController.generate",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "ExternalJumpLog",
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/job-fairs/:fairId/visit-plan/:taskId",
         "roles": [],
@@ -6760,14 +6816,18 @@
         "handler": "FairVisitPlanController.print",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "ExternalJumpLog",
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/job-fairs/:fairId/visit-plan/:taskId/print",
         "roles": [],
@@ -7239,13 +7299,18 @@
         "handler": "JobAiController.list",
         "method": "GET",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
+          "AuditLog",
+          "BenefitGrant",
           "ContractReviewTask",
           "Job",
           "JobAiRecommendation",
           "JobAiSession",
           "KioskJobBoardConfig",
+          "RedemptionRecord",
           "Terminal",
           "UserAiConsent"
         ],
@@ -7292,12 +7357,17 @@
         "handler": "JobAiController.remove",
         "method": "DELETE",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
+          "AuditLog",
+          "BenefitGrant",
           "ContractReviewTask",
           "Job",
           "JobAiRecommendation",
           "JobAiSession",
+          "RedemptionRecord",
           "UserAiConsent"
         ],
         "path": "/api/v1/jobs/:id",
@@ -7341,12 +7411,17 @@
         "handler": "JobAiController.explain",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
+          "AuditLog",
+          "BenefitGrant",
           "ContractReviewTask",
           "Job",
           "JobAiRecommendation",
           "JobAiSession",
+          "RedemptionRecord",
           "UserAiConsent"
         ],
         "path": "/api/v1/jobs/:id/ai/explain",
@@ -7363,12 +7438,17 @@
         "handler": "JobAiController.match",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
+          "AuditLog",
+          "BenefitGrant",
           "ContractReviewTask",
           "Job",
           "JobAiRecommendation",
           "JobAiSession",
+          "RedemptionRecord",
           "UserAiConsent"
         ],
         "path": "/api/v1/jobs/:id/ai/match",
@@ -7385,12 +7465,17 @@
         "handler": "JobAiController.recommendations",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
+          "AuditLog",
+          "BenefitGrant",
           "ContractReviewTask",
           "Job",
           "JobAiRecommendation",
           "JobAiSession",
+          "RedemptionRecord",
           "UserAiConsent"
         ],
         "path": "/api/v1/jobs/ai/recommendations",
@@ -8900,14 +8985,18 @@
         "handler": "CreateInterviewDto.list",
         "method": "GET",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews",
         "roles": [],
@@ -8923,14 +9012,18 @@
         "handler": "CreateInterviewDto.create",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews",
         "roles": [],
@@ -8946,14 +9039,18 @@
         "handler": "CreateInterviewDto.remove",
         "method": "DELETE",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id",
         "roles": [],
@@ -8969,14 +9066,18 @@
         "handler": "CreateInterviewDto.get",
         "method": "GET",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id",
         "roles": [],
@@ -8992,14 +9093,18 @@
         "handler": "CreateInterviewDto.answer",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/answer",
         "roles": [],
@@ -9015,14 +9120,18 @@
         "handler": "CreateInterviewDto.end",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/end",
         "roles": [],
@@ -9038,14 +9147,18 @@
         "handler": "CreateInterviewDto.practiceSheet",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/practice-sheet",
         "roles": [],
@@ -9061,14 +9174,18 @@
         "handler": "CreateInterviewDto.report",
         "method": "GET",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/report",
         "roles": [],
@@ -9084,14 +9201,18 @@
         "handler": "CreateInterviewDto.print",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/report/print",
         "roles": [],
@@ -9107,14 +9228,18 @@
         "handler": "CreateInterviewDto.start",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/start",
         "roles": [],
@@ -9130,14 +9255,18 @@
         "handler": "CreateInterviewDto.transcribe",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/transcribe",
         "roles": [],
@@ -9179,14 +9308,18 @@
         "handler": "CreateInterviewDto.questionAudio",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/turns/:idx/audio",
         "roles": [],
@@ -11472,13 +11605,17 @@
         "handler": "CareerPlanController.latest",
         "method": "GET",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewSession",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/resume/career-plan/:taskId",
         "roles": [],
@@ -11494,13 +11631,17 @@
         "handler": "CareerPlanController.generate",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewSession",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/resume/career-plan/:taskId",
         "roles": [],
@@ -11516,13 +11657,17 @@
         "handler": "CareerPlanController.print",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewSession",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/resume/career-plan/:taskId/print",
         "roles": [],
@@ -11538,6 +11683,8 @@
         "handler": "AiController.getResumeExportPricing",
         "method": "GET",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
@@ -11563,6 +11710,8 @@
         "handler": "AiController.submitResumeGenerate",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
@@ -11598,6 +11747,8 @@
         "handler": "AiController.getResumeGenerate",
         "method": "GET",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
@@ -11623,6 +11774,8 @@
         "handler": "AiController.exportGeneratedResume",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
@@ -11658,12 +11811,17 @@
         "handler": "JobFitRequestDto.analyze",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
+          "AuditLog",
+          "BenefitGrant",
           "ContractReviewTask",
           "Job",
           "JobAiRecommendation",
           "JobAiSession",
+          "RedemptionRecord",
           "UserAiConsent"
         ],
         "path": "/api/v1/resume/job-fit",
@@ -11785,6 +11943,8 @@
         "handler": "AiController.submitResumeParse",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
@@ -11816,6 +11976,8 @@
         "handler": "AiController.getResumeRecord",
         "method": "GET",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
@@ -11841,6 +12003,8 @@
         "handler": "AiController.getResumeDraft",
         "method": "GET",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
@@ -11866,6 +12030,8 @@
         "handler": "AiController.putResumeDraft",
         "method": "PUT",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
@@ -11905,6 +12071,8 @@
         "handler": "AiController.factCheckResume",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
@@ -11934,6 +12102,8 @@
         "handler": "AiController.adjustResumeLayout",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
@@ -11961,6 +12131,8 @@
         "handler": "AiController.getResumeOptimize",
         "method": "GET",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
@@ -11999,6 +12171,8 @@
         "handler": "AiController.listResumeVersions",
         "method": "GET",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
@@ -12024,12 +12198,16 @@
         "handler": "SelfAssessmentController.submit",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/resume/self-assessment",
         "roles": [],
@@ -12045,12 +12223,16 @@
         "handler": "SelfAssessmentController.withdraw",
         "method": "DELETE",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/resume/self-assessment/:taskId",
         "roles": [],
@@ -12066,12 +12248,16 @@
         "handler": "SelfAssessmentController.latest",
         "method": "GET",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/resume/self-assessment/:taskId",
         "roles": [],
@@ -12107,12 +12293,16 @@
         "handler": "SelfAssessmentController.print",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/resume/self-assessment/:taskId/print",
         "roles": [],
@@ -18453,6 +18643,7 @@
           "services/api/src/member-privacy/member-closure-files.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
           "services/api/src/mock-interview/interview-transcript-print.service.ts",
+          "services/api/src/mock-interview/mock-interview-charge.ts",
           "services/api/src/mock-interview/mock-interview.service.ts"
         ]
       },
@@ -18465,6 +18656,7 @@
         "usedBy": [
           "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/mock-interview/interview-transcript-print.service.ts",
+          "services/api/src/mock-interview/mock-interview-charge.ts",
           "services/api/src/mock-interview/mock-interview.service.ts"
         ]
       },
@@ -24564,6 +24756,7 @@
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-order-filters.ts",
       "services/api/scripts/verify-admin-session-revocation.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
@@ -25017,6 +25210,7 @@
     "services/api/src/advisor/advisor-artifact.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "services/api/scripts/verify-advisor-work.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-beijing-display-time.ts"
     ],
     "services/api/src/advisor/advisor-artifact.types.ts": [
@@ -25035,16 +25229,19 @@
       "services/api/scripts/verify-advisor-work.ts"
     ],
     "services/api/src/advisor/advisor.controller.ts": [
-      "services/api/scripts/verify-ai-access.ts"
+      "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts"
     ],
     "services/api/src/advisor/advisor.module.ts": [
       "services/api/scripts/verify-ai-user-text-retention.ts"
     ],
     "services/api/src/advisor/advisor.service.ts": [
       "services/api/scripts/verify-advisor-work.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts"
     ],
     "services/api/src/advisor/assistant-summary.service.ts": [
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-assistant-voice.ts",
@@ -25062,6 +25259,7 @@
     ],
     "services/api/src/ai-access/ai-access.decorator.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai-access/ai-access.guard.ts": [
@@ -25097,6 +25295,7 @@
     ],
     "services/api/src/ai/ai-public-quota.service.ts": [
       "services/api/scripts/verify-ai-public-quota.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
@@ -25120,6 +25319,7 @@
       "services/api/scripts/verify-ai-cost-runtime.ts",
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
       "services/api/scripts/verify-ai-public-quota.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
@@ -25149,6 +25349,7 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-persistence-consistency.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-result-ownership.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
@@ -25171,6 +25372,7 @@
     ],
     "services/api/src/ai/career-plan.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
@@ -25194,6 +25396,7 @@
     ],
     "services/api/src/ai/fair-visit-plan.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-fair-visit-plan.ts"
     ],
     "services/api/src/ai/interfaces/ai-provider.interface.ts": [
@@ -25217,6 +25420,7 @@
     "services/api/src/ai/job-fit.controller.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-governed-job-fit.ts",
       "services/api/scripts/verify-job-fit-governance.ts",
       "services/api/scripts/verify-job-fit-print.ts",
@@ -25327,11 +25531,20 @@
     "services/api/src/ai/providers/zhipu.provider.stub.ts": [
       "services/api/scripts/verify-ai-cost-runtime.ts"
     ],
+    "services/api/src/ai/quota/ai-assistant-charge.ts": [
+      "services/api/scripts/verify-ai-cost-coverage.ts"
+    ],
+    "services/api/src/ai/quota/ai-quota-run.ts": [
+      "services/api/scripts/verify-ai-quota-coverage.ts",
+      "services/api/scripts/verify-ai-quota.ts"
+    ],
     "services/api/src/ai/quota/ai-quota.policy.ts": [
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts"
     ],
     "services/api/src/ai/quota/ai-quota.service.ts": [
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-quota.ts"
     ],
     "services/api/src/ai/redis-inflight-lock.ts": [
@@ -25395,6 +25608,7 @@
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
@@ -25419,6 +25633,7 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-fair-visit-review.ts"
@@ -25438,6 +25653,7 @@
     "services/api/src/ai/resume/job-fit.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-governed-job-fit.ts",
@@ -25487,6 +25703,7 @@
     "services/api/src/ai/resume/llm-resume-optimize.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-feature-keys.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
@@ -25611,6 +25828,7 @@
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai/resume/self-assessment-questions.ts": [
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts",
@@ -25623,6 +25841,7 @@
     "services/api/src/ai/resume/self-assessment.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-compliance.ts",
@@ -25630,6 +25849,7 @@
     ],
     "services/api/src/ai/resume/self-assessment.types.ts": [
       "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
@@ -25712,9 +25932,11 @@
     ],
     "services/api/src/assistant/daily-brief.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-community-daily-brief.ts"
     ],
     "services/api/src/assistant/daily-brief.service.ts": [
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-recruitment-hosting-default-off.ts"
@@ -25736,6 +25958,7 @@
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-advisor-work.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
@@ -26002,6 +26225,7 @@
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-admin-users.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
@@ -26113,6 +26337,7 @@
     ],
     "services/api/src/common/guards/end-user-auth.guard.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-benefit-activities.ts",
@@ -26423,6 +26648,7 @@
       "services/api/scripts/verify-contract-review-timeout.ts"
     ],
     "services/api/src/contract-review/contract-review-extraction.service.ts": [
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-pdfjs-engine.ts"
     ],
     "services/api/src/contract-review/contract-review-failure-reason.ts": [
@@ -26433,8 +26659,12 @@
     "services/api/src/contract-review/contract-review-http.module.ts": [
       "services/api/scripts/verify-contract-review-http.ts"
     ],
+    "services/api/src/contract-review/contract-review-lifecycle.service.ts": [
+      "services/api/scripts/verify-ai-quota-coverage.ts"
+    ],
     "services/api/src/contract-review/contract-review-orchestrator.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
@@ -26461,10 +26691,12 @@
       "services/api/scripts/verify-contract-review-timeout.ts"
     ],
     "services/api/src/contract-review/contract-review-timing.ts": [
+      "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-contract-review-timeout.ts"
     ],
     "services/api/src/contract-review/contract-review.controller.ts": [
-      "services/api/scripts/verify-ai-access.ts"
+      "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts"
     ],
     "services/api/src/contract-review/contract-review.queue.ts": [
       "services/api/scripts/verify-contract-review-http.ts"
@@ -26659,6 +26891,7 @@
     ],
     "services/api/src/job-ai/governed-job-fit.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-governed-job-fit.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts"
@@ -26673,12 +26906,14 @@
       "services/api/scripts/verify-llm-thinking-off.ts"
     ],
     "services/api/src/job-ai/job-ai-quota.service.ts": [
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts"
     ],
     "services/api/src/job-ai/job-ai.controller.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-governed-job-fit.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
@@ -26691,6 +26926,7 @@
     ],
     "services/api/src/job-ai/job-ai.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
@@ -26698,6 +26934,7 @@
       "services/api/scripts/verify-job-validity-expiry.ts"
     ],
     "services/api/src/job-ai/job-context.service.ts": [
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-job-ai-backend.ts"
     ],
     "services/api/src/job-ai/job-quality.service.ts": [
@@ -27130,11 +27367,13 @@
     ],
     "services/api/src/materials/materials.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-material-task-token-transport.ts",
       "services/api/scripts/verify-throttle-dimension.ts"
     ],
     "services/api/src/materials/materials.service.ts": [
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
@@ -27485,6 +27724,7 @@
     "services/api/src/member-privacy/member-privacy.service.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
@@ -27543,6 +27783,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-cost-runtime.ts",
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts"
@@ -27555,6 +27796,7 @@
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
@@ -28177,6 +28419,7 @@
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-result-ownership.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -28806,6 +29049,7 @@
     ],
     "services/api/src/trtc/trtc.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
@@ -28814,6 +29058,7 @@
     ],
     "services/api/src/trtc/trtc.service.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-llm-thinking-off.ts",
@@ -36462,6 +36707,7 @@
           "services/api/src/ai/interfaces/ai-provider.interface.ts",
           "services/api/src/ai/llm/llm-chat.service.ts",
           "services/api/src/ai/providers/llm.provider.ts",
+          "services/api/src/ai/quota/ai-assistant-charge.ts",
           "services/api/src/ai/resume/llm-resume-generate.service.ts",
           "services/api/src/ai/resume/llm-resume-optimize.service.ts",
           "services/api/src/ai/resume/llm-resume.service.ts",
@@ -36658,17 +36904,82 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [
+          "services/api/src"
+        ],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/advisor/advisor-artifact.service.ts",
+          "services/api/src/advisor/advisor.controller.ts",
+          "services/api/src/advisor/advisor.service.ts",
+          "services/api/src/advisor/assistant-summary.service.ts",
+          "services/api/src/ai-access/ai-access.decorator.ts",
+          "services/api/src/ai/ai-public-quota.service.ts",
+          "services/api/src/ai/ai.controller.ts",
+          "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/career-plan.controller.ts",
+          "services/api/src/ai/fair-visit-plan.controller.ts",
+          "services/api/src/ai/job-fit.controller.ts",
+          "services/api/src/ai/quota/ai-quota-run.ts",
+          "services/api/src/ai/quota/ai-quota.policy.ts",
+          "services/api/src/ai/quota/ai-quota.service.ts",
+          "services/api/src/ai/resume/career-plan.service.ts",
+          "services/api/src/ai/resume/fair-visit-plan.service.ts",
+          "services/api/src/ai/resume/job-fit.service.ts",
+          "services/api/src/ai/resume/llm-resume-optimize.service.ts",
+          "services/api/src/ai/resume/self-assessment-questions.ts",
+          "services/api/src/ai/resume/self-assessment.service.ts",
+          "services/api/src/ai/resume/self-assessment.types.ts",
+          "services/api/src/assistant/daily-brief.controller.ts",
+          "services/api/src/assistant/daily-brief.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/contract-review/contract-review-extraction.service.ts",
+          "services/api/src/contract-review/contract-review-lifecycle.service.ts",
+          "services/api/src/contract-review/contract-review-orchestrator.service.ts",
+          "services/api/src/contract-review/contract-review.controller.ts",
+          "services/api/src/job-ai/governed-job-fit.service.ts",
+          "services/api/src/job-ai/job-ai-quota.service.ts",
+          "services/api/src/job-ai/job-ai.controller.ts",
+          "services/api/src/job-ai/job-ai.service.ts",
+          "services/api/src/job-ai/job-context.service.ts",
+          "services/api/src/materials/materials.controller.ts",
+          "services/api/src/materials/materials.service.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts",
+          "services/api/src/mock-interview/mock-interview.controller.ts",
+          "services/api/src/mock-interview/mock-interview.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/trtc/trtc.controller.ts",
+          "services/api/src/trtc/trtc.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-ai-quota-coverage.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:ai-quota-coverage"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [],
         "files": [
           "packages/shared/src/types/memberBenefits.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/ai/ai-result.cleanup.task.ts",
+          "services/api/src/ai/quota/ai-quota-run.ts",
           "services/api/src/ai/quota/ai-quota.policy.ts",
           "services/api/src/ai/quota/ai-quota.service.ts",
           "services/api/src/ai/usage/ai-usage-context.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
           "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/contract-review/contract-review-timing.ts",
           "services/api/src/member-benefits/admin-member-benefits.service.ts",
           "services/api/src/member-benefits/dto/admin-member-benefits.dto.ts",
           "services/api/src/member-benefits/member-benefits.types.ts",
