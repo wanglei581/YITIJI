@@ -52,6 +52,8 @@ import { unattendedReason } from './touch/unattendedReason'
 import { ResumeTouchActs } from './touch/ResumeTouchActs'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { readAiResumeSession } from './aiResumeSession'
+import { RESUME_AI_CONSENT_NEEDED_COPY } from './resumeAiConsentPrompt'
+import { useInlineResumeAiConsent } from './useInlineResumeAiConsent'
 import { JobFitStage } from './JobFitPage'
 import { useRouteIdentityGuard } from './hooks/useRouteIdentityGuard'
 import { CareerPlanExistingMaterials } from './components/career-plan/CareerPlanExistingMaterials'
@@ -176,6 +178,10 @@ export function CareerPlanPage() {
   const [taskFailReason, setTaskFailReason] = useState<string | null>(null)
   /** 上一次生成撞上了临时性错误（网络、超时、限流……）：生成钮保持可点，字改成「重试…」。 */
   const [genFailed, setGenFailed] = useState(false)
+  const resumeAiConsent = useInlineResumeAiConsent(() => {
+    setGenFailed(false)
+    setError(RESUME_AI_CONSENT_NEEDED_COPY)
+  })
 
   useBusyLock(generating || printing)
 
@@ -190,7 +196,8 @@ export function CareerPlanPage() {
     setGenerating(false)
     setPrinting(false)
     setLoading(false)
-  }, [identityEnded])
+    resumeAiConsent.dismiss()
+  }, [identityEnded, resumeAiConsent.dismiss])
 
   useEffect(() => {
     if (identityEnded) return
@@ -299,6 +306,7 @@ export function CareerPlanPage() {
       if (!isLive(run)) return
       const code = errorCodeOf(err)
       if (code === 'AI_TASK_NOT_FOUND') setRejectedTask(true)
+      else if (resumeAiConsent.promptIfNeeded(err, Boolean(getToken()), () => { void handleGenerate() })) return
       else if (AI_OUTAGE_CODES.has(code)) setAiOutage(CAREER_PLAN_OUTAGE_COPY)
       else { setError(unattendedReason(userMessageOf(err, '生成失败，请稍后重试'), '生成失败，请稍后重试')); setGenFailed(true) }
     } finally {
@@ -768,6 +776,7 @@ export function CareerPlanPage() {
 
   return (
     <JobFitStage>
+      {resumeAiConsent.dialog}
       <ResumeTouchFrame
         eyebrow="改简历 · 求职方案"
         title={view.title}

@@ -28,6 +28,8 @@ import { userMessageOf } from '../../services/api/userErrorMessage'
 import { DEFAULT_RESUME_LAYOUT, useResumeLayout } from './hooks/useResumeLayout'
 import { readAiResumeSession } from './aiResumeSession'
 import { useResumeAiConsent } from './resumeAiConsent'
+import { RESUME_AI_CONSENT_NEEDED_COPY } from './resumeAiConsentPrompt'
+import { useInlineResumeAiConsent } from './useInlineResumeAiConsent'
 import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import { OptimizeEmptyState } from './components/resume-deliver/OptimizeEmptyState'
 import { optimizeExportErrorMessage, optimizeStateDescription, optimizeStateTitle } from './components/resume-deliver/optimizeStateCopy'
@@ -70,7 +72,6 @@ export function ResumeOptimizePage() {
   const startPrint = useStartPrintHandoff()
   const location = useLocation()
   const { getToken } = useAuth()
-  const consent = useResumeAiConsent()
   const state = location.state as Record<string, unknown> | null
   const windDownViewOnly = useWindDownViewOnly('resume')
   const licenseFlagViewOnly = useKioskLicense().mode === 'winding-down' && state?.licenseViewOnly === true
@@ -100,6 +101,10 @@ export function ResumeOptimizePage() {
     adjustError, setAdjustError, factOpen, setFactOpen, savedToDocuments, setSavedToDocuments,
     decisions, setDecisions, draftAccepted, setDraftAccepted,
   } = useOptimizeSession(query.format, Boolean(token))
+  const consent = useResumeAiConsent()
+  const resumeAiConsent = useInlineResumeAiConsent(() => {
+    setAdjustError(RESUME_AI_CONSENT_NEEDED_COPY)
+  })
   const [adjustOutage, setAdjustOutage] = useState(false)
   const [clearedChoices, setClearedChoices] = useState<ReadonlySet<string>>(new Set())
   const [decisionIssues, setDecisionIssues] = useState<Record<string, string>>({})
@@ -315,6 +320,7 @@ export function ResumeOptimizePage() {
       const result = await adjustResumeLayoutDraft(taskId, resume, action, layout, access)
       setLastResumeBeforeAiAdjust(before); setOptimizedResume(result.resume); setAdjustWarnings(result.warnings?.length ? ['调整后的内容仍需你逐项核对，确认事实无误。'] : []); setExported(null); setIsDirty(true)
     } catch (err) {
+      if (resumeAiConsent.promptIfNeeded(err, Boolean(token), () => { void handleAiAdjust(action) })) return
       if (isAiOutage(err)) setAdjustOutage(true)
       setAdjustError(aiDeclarationDeclineMessage(err) ?? userMessageOf(err, 'AI 调整失败，请稍后重试或继续手动编辑'))
     } finally { setAdjusting(null) }
@@ -391,13 +397,13 @@ export function ResumeOptimizePage() {
   const primary = viewOnly && rawPrimary && rawPrimary.label !== '重试' && rawPrimary.label !== '扫码带走'
     ? { ...rawPrimary, disabled: true, ariaDisabled: undefined, title: LICENSE_NO_NEW_TASK_REASON }
     : rawPrimary
-  const dialogs = confirmLeave ? (
+  const dialogs = resumeAiConsent.dialog ?? (confirmLeave ? (
     <ResumeOptimizeLeaveDialog guest={!token} onStay={() => setConfirmLeave(null)} onLeave={() => { const action = confirmLeave; setConfirmLeave(null); action() }} />
   ) : factOpen && assembled ? (
     <ResumeFactConfirmDialog variant="touch" facts={facts} unconfirmed={unconfirmed} busy={exporting} onCancel={() => setFactOpen(null)} onConfirm={confirmFacts} />
   ) : compareReturn.pending ? (
     <CompareDecisionsApplyDialog count={compareReturn.pending.count} customCount={compareReturn.pending.customCount} onApply={compareReturn.confirm} onSkip={compareReturn.dismiss} />
-  ) : undefined
+  ) : undefined)
 
   return (
     <ResumeTouchPage

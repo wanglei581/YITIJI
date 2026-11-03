@@ -804,6 +804,7 @@ async function loadClearance() {
     .replaceAll("from '../ai/aiDeclarationSession'", `from '${sessionUrl}'`)
     .replaceAll("from '../ai/aiDeclarationVersions'", `from '${versionsUrl}'`)
     .replaceAll("from '../pages/print/printMaterialSession'", `from '${leaf('src/pages/print/printMaterialSession.ts')}'`)
+    .replaceAll("from '../pages/print/pickupClaimResume'", `from '${leaf('src/pages/print/pickupClaimResume.ts')}'`)
     .replaceAll("from '../pages/resume/aiResumeSession'", `from '${leaf('src/pages/resume/aiResumeSession.ts')}'`)
     .replaceAll("from '../services/resumeParseIntent'", `from '${leaf('src/services/resumeParseIntent.ts')}'`)
     .replaceAll("from '../services/assistantDraft'", `from '${toDataUrl(assistantDraftCode)}'`)

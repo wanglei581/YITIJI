@@ -15,6 +15,7 @@ import { useSupportContact } from '../../hooks/useSupportContact'
 import {
   EMPLOYMENT_INDUSTRY_SECTORS,
   type CreateInterviewInput,
+  type CreateInterviewResponse,
   type InterviewDifficulty,
   type InterviewDuration,
   type InterviewExperience,
@@ -35,6 +36,8 @@ import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { createInterview, printInterviewPracticeSheet, startInterview } from '../../services/api/interview'
 import { kioskUploadFile } from '../../services/api/files'
 import { useAuth } from '../../auth/useAuth'
+import { RESUME_AI_CONSENT_NEEDED_COPY } from '../resume/resumeAiConsentPrompt'
+import { useInlineResumeAiConsent } from '../resume/useInlineResumeAiConsent'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { InterviewShell } from './InterviewShell'
 import { assistantOffAsk, interviewAiPill, isAiGateDown, useInterviewAiCapabilities } from './useInterviewAiCapabilities'
@@ -134,6 +137,13 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
    */
   const [startFailed, setStartFailed] = useState(setupDraft?.startFailed ?? false)
   const [step, setStep] = useState<1 | 2 | 3>(1)
+  /** 带简历开始被授权拦住且本人点了暂不使用：本页留下不带简历开练的入口。 */
+  const [offerStartWithoutResume, setOfferStartWithoutResume] = useState(false)
+  const resumeAiConsent = useInlineResumeAiConsent(() => {
+    setStartFailed(false)
+    setError(RESUME_AI_CONSENT_NEEDED_COPY)
+    setOfferStartWithoutResume(true)
+  })
 
   useBusyLock(creating || uploading || printingSheet || qrBusy || usbBusy)
 
@@ -173,7 +183,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     }
   }
 
-  const handleStart = async () => {
+  const handleStart = async (omitResume = false) => {
     const pos = position.trim()
     if (!pos) {
       setError('请先填写目标岗位，例如：前端开发工程师、行政专员')
@@ -192,6 +202,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     setAiOutage(null)
     setAssistantDown(false)
     setStartFailed(false)
+    let created: CreateInterviewResponse | undefined
     try {
       const input: CreateInterviewInput = {
         interviewerType,
@@ -200,10 +211,10 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         experience,
         difficulty,
         durationMin: duration,
-        ...(resumeFile ? { resumeFileId: resumeFile.fileId } : {}),
+        ...(!omitResume && resumeFile ? { resumeFileId: resumeFile.fileId } : {}),
       }
       const token = getToken()
-      const created = await createInterview(input, { token })
+      created = await createInterview(input, { token })
       // 先记下来再 start：start 一旦 503，这个 sessionId 就是通用题目单的落点。
       setPendingSession({ sessionId: created.sessionId, accessToken: created.accessToken })
       const first = await startInterview(created.sessionId, { token, accessToken: created.accessToken })
@@ -248,12 +259,79 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         setError(declined)
         return
       }
+      if (!omitResume && created && resumeFile) {
+        const started = created
+        setOfferStartWithoutResume(false)
+        if (resumeAiConsent.promptIfNeeded(err, Boolean(getToken()), () => { void continueWithResume(started, pos) })) return
+      }
       const message = aiErrorMessageOf(err, '创建练习失败，请稍后重试')
       setError(message)
       setStartFailed(true)
       // 服务端 AI 闸门（暂停、额度）拦下的，小青这次也用不了：底栏问小青换停用态。
       setAssistantDown(isAiGateDown(err))
       // 只有能力级故障才判成「AI 不可用」；限流 / 参数错误只是本次失败，保留重试入口。
+      if (isAiOutage(err)) setAiOutage(message)
+      else setProbed(true)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  /** 授权后重试刚才那场带简历的 start，不再新建一场。 */
+  const continueWithResume = async (created: CreateInterviewResponse, pos: string) => {
+    setCreating(true)
+    setError(null)
+    setAiOutage(null)
+    setAssistantDown(false)
+    setStartFailed(false)
+    setOfferStartWithoutResume(false)
+    try {
+      const token = getToken()
+      const first = await startInterview(created.sessionId, { token, accessToken: created.accessToken })
+      setProbed(true)
+      patchInterviewWorkbenchSession({
+        stage: 'session',
+        live: {
+          sessionId: created.sessionId,
+          accessToken: created.accessToken,
+          questionTarget: created.questionTarget,
+          durationMin: duration,
+          interviewerType,
+          position: pos,
+          firstQuestion: first.question ?? '',
+          messages: [{ role: 'interviewer', content: first.question ?? '' }],
+          questionIndex: 1,
+          remainingSec: duration * 60,
+          omitPrintAnswers: false,
+        },
+      })
+      if (onGoStage) {
+        onGoStage('session')
+      } else {
+        navigate('/interview/session', {
+          replace: true,
+          state: {
+            sessionId: created.sessionId,
+            accessToken: created.accessToken,
+            questionTarget: created.questionTarget,
+            durationMin: duration,
+            interviewerType,
+            position: pos,
+            firstQuestion: first.question ?? '',
+          },
+        })
+      }
+    } catch (err) {
+      const declined = aiDeclarationDeclineMessage(err)
+      if (declined) {
+        setError(declined)
+        return
+      }
+      if (resumeAiConsent.promptIfNeeded(err, Boolean(getToken()), () => { void continueWithResume(created, pos) })) return
+      const message = aiErrorMessageOf(err, '创建练习失败，请稍后重试')
+      setError(message)
+      setStartFailed(true)
+      setAssistantDown(isAiGateDown(err))
       if (isAiOutage(err)) setAiOutage(message)
       else setProbed(true)
     } finally {
@@ -435,6 +513,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         />
       }
     >
+    {resumeAiConsent.dialog}
     <KioskFilterPickerModal
       open={showIndustryPicker}
       title="选择面试行业"
@@ -599,6 +678,12 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                 />
               )}
             </div>
+            {offerStartWithoutResume ? (
+              <button type="button" className="qxt-iv-wide" onClick={() => { setOfferStartWithoutResume(false); void handleStart(true) }}>
+                <b>不上传也能开始</b>
+                <small>没有简历时按通用问题练习，不会因此少一道题。</small>
+              </button>
+            ) : null}
             <button type="button" className="qxt-iv-wide" onClick={goTips}>
               <b>先看面试技巧</b>
               <small>公开的准备方法，不依赖 AI</small>

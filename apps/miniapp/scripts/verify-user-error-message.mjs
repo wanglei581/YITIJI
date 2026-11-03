@@ -110,6 +110,11 @@ for (const [code, required] of [
   }
 }
 
+{
+  const e = await errorOf(503, { success: false, error: { code: 'AI_PROVIDER_NOT_CONFIGURED', message: 'AI_PROVIDER_NOT_CONFIGURED' } })
+  assert(e.message === 'AI 服务暂时不可用，本次没有生成结果；打印等其他功能照常', 'AI 未配置时如实提示没有生成结果，不出现付费或开通引导')
+}
+
 // G. 登录失败必须说得出原因
 //
 // 2026-09-08 回归：本模块首版把登录链路的码一并挡在 fail-closed 之外，用户在
