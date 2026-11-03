@@ -43,6 +43,7 @@ export const SELF_ASSESSMENT_SYSTEM_PROMPT = withAiSafety(
   '\n4. 整体解读末尾追加：「本解读基于本人作答，仅作为自助参考，不代任何招聘结果、能力证明或心理评估」。' +
   '\n只输出 JSON（不要 markdown 代码块）：' +
   '{"dimensions":[{"key":"interest","note":"..."},{"key":"style","note":"..."},{"key":"team","note":"..."},{"key":"value","note":"..."},{"key":"motivation","note":"..."}],"summary":"整体解读"}',
+  { policyVariant: 'draft' },
 )
 
 const MAX_NOTE_CHARS = 300

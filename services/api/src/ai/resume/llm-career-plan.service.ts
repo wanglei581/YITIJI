@@ -32,6 +32,7 @@ export const CAREER_PLAN_SYSTEM_PROMPT = withAiSafety(
   '"directions":[{"title":"方向名","why":"简历里已有事实的延伸","firstStep":"第一步行动"}](1-3 个),' +
   '"skillPlan":[{"skill":"要提升的能力","action":"具体行动","timeframe":"阶段，如 1-3 个月"}](2-4 条),' +
   '"actionChecklist":["近期可执行行动"](3-6 条)}',
+  { policyVariant: 'draft' },
 )
 
 // ============================================================
