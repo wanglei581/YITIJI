@@ -37,7 +37,8 @@ import {
   llmUpstreamStatusError,
 } from './llm-failure'
 import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-allowlist'
-import { AiContentBlockedError, buildGuardedSystemPrompt, configuredForbiddenWords, enforceForbiddenWords, safeRefusalReply } from './llm-guard'
+import { AiContentBlockedError, buildGuardedSystemPrompt, enforceForbiddenWords } from './llm-guard'
+import { refusalMessage } from '../safety/refusal'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { withAiSafety } from './ai-prompt-safety'
 import { applyAssistantChannel, kioskChannelConstraint, miniappChannelConstraint, resolveAssistantChannel } from './assistant-channel'
@@ -368,9 +369,7 @@ export class LlmChatService {
       rawReply = await this.callLlm('assistant_chat', cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, payloadMessages, cfg.forbiddenWords, onLlmCall)
     } catch (error) {
       if (error instanceof AiContentBlockedError) {
-        // 命中禁词：和输出侧原有做法一样给礼貌拒答，不报错。
-        const reply = safeRefusalReply(configuredForbiddenWords(cfg.forbiddenWords))
-          || '这个问题超出当前助手的服务范围，请换一个合规问题。'
+        const reply = refusalMessage(error.category)
         // 被拦的原话不能留在会话历史里：下一轮会带着整段历史再发给模型，检查点会再次命中，
         // 这个会话之后每句话都会被拒答。输出侧命中时用户原话没问题，保留它，把拒答记进历史。
         if (error.direction === 'input') session.messages.pop()

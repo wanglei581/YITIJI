@@ -2,6 +2,8 @@
 // 两句必须原样出现在每一段 system prompt 里。半截禁令（只点到年龄、性别）
 // 要换成第二句，不能和它并存。
 
+import { AI_SAFETY_REFUSAL_INSTRUCTION } from '../safety/refusal'
+
 export const AI_SAFETY_NO_FABRICATION = '不得编造学历、工作经历或证书。'
 
 export const AI_SAFETY_NO_DISCRIMINATION =
@@ -13,6 +15,7 @@ export function withAiSafety(prompt: string): string {
   const extra: string[] = []
   if (!base.includes(AI_SAFETY_NO_FABRICATION)) extra.push(AI_SAFETY_NO_FABRICATION)
   if (!base.includes(AI_SAFETY_NO_DISCRIMINATION)) extra.push(AI_SAFETY_NO_DISCRIMINATION)
+  if (!base.includes(AI_SAFETY_REFUSAL_INSTRUCTION)) extra.push(AI_SAFETY_REFUSAL_INSTRUCTION)
   return extra.length === 0 ? base : `${base}\n${extra.join('\n')}`
 }
 
@@ -21,5 +24,5 @@ export function withAiSafety(prompt: string): string {
  * 后台或环境变量换掉的提示词删不掉这两句（审计表第 95 行）。
  */
 export function appendAiSafetySentences(prompt: string): string {
-  return `${prompt.trimEnd()}\n\n${AI_SAFETY_NO_FABRICATION}\n${AI_SAFETY_NO_DISCRIMINATION}`
+  return `${prompt.trimEnd()}\n\n${AI_SAFETY_NO_FABRICATION}\n${AI_SAFETY_NO_DISCRIMINATION}\n${AI_SAFETY_REFUSAL_INSTRUCTION}`
 }
