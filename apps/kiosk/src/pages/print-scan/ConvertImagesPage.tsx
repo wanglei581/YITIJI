@@ -250,8 +250,8 @@ export function ConvertImagesPage() {
         },
         { token: getToken(), idempotencyKey: nextKey.key },
       )
-      let filename: string | null = null
-      if (converted.savedToDocuments) {
+      let filename: string | null = converted.filename || null
+      if (!filename && converted.savedToDocuments) {
         try {
           const documents = await getMyDocuments(getToken(), { pageSize: 50 })
           filename = documents.items.find((item) => item.id === converted.fileId)?.filename ?? null

@@ -6561,10 +6561,10 @@ test('interview-qa：开场失败同样显示原话；会话不存在按错误�
 
 test('interview-result：生成报告失败时显示服务端原话；会话不存在按错误码认；没有原话才用兜底句', async () => {
   for (const [err, shown] of [
-    [serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), QUOTA_PLAIN],
-    [netError(), NET_MSG],
+    [serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), `复盘生成失败：${QUOTA_PLAIN}`],
+    [netError(), `复盘生成失败：${NET_MSG}`],
     [serverError('', 'INTERVIEW_SESSION_NOT_FOUND', 404), '面试会话不存在或无权访问'],
-    [serverError('', undefined, 500), 'AI 报告生成失败，请稍后重试'],
+    [serverError('', undefined, 500), '复盘生成失败：请稍后再试'],
   ]) {
     const wx = createWx()
     const api = {
@@ -6577,7 +6577,59 @@ test('interview-result：生成报告失败时显示服务端原话；会话不�
     await flush()
     assert.equal(page.data.phase, 'failed')
     assert.equal(page.data.failMsg, shown)
+    assert.equal(page.data.failKind, 'generate')
   }
+})
+
+test('interview-result：读失败只重读，不误触发生成；重读成功才显示报告', async () => {
+  let reads = 0
+  let ends = 0
+  const wx = createWx()
+  const api = {
+    getInterviewReport: () => {
+      reads += 1
+      return reads === 1 ? Promise.reject(netError()) : Promise.resolve({ endedAt: '2026-11-03T01:00:00Z', report: { overall: { summary: '练习完成' } } })
+    },
+    endInterview: () => { ends += 1; return Promise.resolve({}) },
+  }
+  const page = makePage('pages/interview-result/interview-result.js', { auth: createAuth('A'), api, wx })
+  page.onLoad({ sessionId: 's1' })
+  await flush()
+  assert.equal(page.data.phase, 'failed')
+  assert.equal(page.data.failKind, 'read')
+  assert.match(page.data.failMsg, /复盘读取失败/)
+  assert.equal(ends, 0)
+  page.retryReport()
+  await flush()
+  assert.equal(page.data.phase, 'done')
+  assert.equal(ends, 0)
+  assert.equal(reads, 2)
+})
+
+test('interview-result：生成失败有重试；重试先读已有报告，避免重复生成', async () => {
+  let reads = 0
+  let ends = 0
+  const wx = createWx()
+  const api = {
+    getInterviewReport: () => {
+      reads += 1
+      return reads === 1 ? Promise.reject(serverError('', 'INTERVIEW_REPORT_NOT_FOUND', 404)) : Promise.resolve({ endedAt: '2026-11-03T01:00:00Z', report: { overall: { summary: '练习完成' } } })
+    },
+    endInterview: () => { ends += 1; return Promise.reject(netError()) },
+  }
+  const page = makePage('pages/interview-result/interview-result.js', { auth: createAuth('A'), api, wx })
+  page.onLoad({ sessionId: 's1' })
+  await flush()
+  await flush()
+  assert.equal(page.data.phase, 'failed')
+  assert.equal(page.data.failKind, 'generate')
+  assert.match(page.data.failMsg, /复盘生成失败/)
+  assert.equal(ends, 1)
+  page.retryReport()
+  await flush()
+  assert.equal(page.data.phase, 'done')
+  assert.equal(ends, 1)
+  assert.equal(reads, 2)
 })
 
 test('interview-result：打印复盘报告失败时显示服务端原话', async () => {
@@ -6994,10 +7046,10 @@ test('简历导出：免费时只写「当前免费」，不提权益', () => {
 // ══════════════════════════════════════════════════════════════════════
 // U 盘打印指引：按一体机实际能力说（2026-10-06，评审 P0）
 // Terminal Agent 只列 U 盘最外层的 pdf/jpg/jpeg/png（apps/terminal-agent/src/usb/usb-files.ts）；
-// 彩色、双面、U 盘导入都按终端逐台开通，默认关闭。
+// 彩色、双面、U 盘导入都按终端逐台配置，默认不可用。
 // ══════════════════════════════════════════════════════════════════════
 
-test('U 盘指引：只列一体机真能读的格式，Word 说另存为 PDF，彩色双面说按机器开通', () => {
+test('U 盘指引：只列一体机真能读的格式，Word 说另存为 PDF，彩色双面说机器能力', () => {
   const page = makePage('pages/usb-import/usb-import.js', { auth: createAuth('A'), api: {}, wx: createWx() })
   const formats = Array.from(page.data.formats)
   assert.equal(formats.join('|'), 'PDF|JPG|PNG', '与 usb-files.ts 的 ALLOWED_USB_EXTENSIONS 对应')
@@ -7008,11 +7060,13 @@ test('U 盘指引：只列一体机真能读的格式，Word 说另存为 PDF，
   assert.doesNotMatch(steps, /不要放进文件夹|不进子文件夹/, '与 Agent 实际行为一致')
   assert.match(steps, /15MB/)
   assert.match(steps, /「U 盘导入打印」/, '入口名与一体机打印扫描页的卡片标题一致')
-  assert.match(steps, /彩色、双面按每台机器开通[^。]*暂未开通/)
+  assert.match(steps, /彩色、双面要看这台机器是否支持；暂不支持时只能黑白、单面打印/)
+  assert.doesNotMatch(steps, /开通/)
   assert.doesNotMatch(steps, /右下方|黑白\/彩色/, '不写口位置、不把彩色说成一定能选')
   assert.match(page.data.formatNote, /另存为 PDF/)
   const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/usb-import/usb-import.wxml'), 'utf8')
-  assert.match(wxml, /暂未开通/)
+  assert.match(wxml, /U 盘导入要看这台机器是否支持；这台机器暂不支持时，可以改用手机上传/)
+  assert.doesNotMatch(wxml, /开通/)
   assert.match(wxml, /\{\{formatNote\}\}/)
   const help = makePage('pages/help/help.js', { auth: createAuth('A'), api: {}, wx: createWx() })
   const usbFaq = help.data.faqs.find((f) => f.id === 'usb')

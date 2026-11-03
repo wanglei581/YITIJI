@@ -20,6 +20,8 @@ export interface ConvertImageSource {
 
 export interface ConvertImagesResponse {
   fileId: string
+  /** 落库的文件名；旧缓存对应的文件记录不存在时可能缺省。 */
+  filename?: string
   /** 内部 HMAC 打印链路 URL（30 分钟 TTL），不是 COS 预签名 URL。 */
   printFileUrl: string
   fileMd5: string
