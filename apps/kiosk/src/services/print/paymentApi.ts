@@ -1,3 +1,4 @@
+import { throwPrintQuotaError } from './printJobsApi'
 // ============================================================
 // Payment API — C5-3 Kiosk 收银 / 支付状态轮询
 //
@@ -160,7 +161,10 @@ export async function releasePickupOrder(
   } catch (err) {
     throw networkError(err)
   }
-  if (!res.ok) await throwHttpError(res)
+  if (!res.ok) {
+    await throwPrintQuotaError(res)
+    await throwHttpError(res)
+  }
   return res.json() as Promise<PickupReleaseView>
 }
 

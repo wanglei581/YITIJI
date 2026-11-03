@@ -117,7 +117,7 @@ async function claimPickup(code: string, staleSignal?: AbortSignal): Promise<Cla
     paymentSessionToken?: string
     taskStatus?: string
     printTaskStatus?: string
-    error?: { code?: string; message?: string }
+    error?: { code?: string; message?: string; details?: unknown }
     message?: string | string[]
   }
   try {
@@ -135,7 +135,7 @@ async function claimPickup(code: string, staleSignal?: AbortSignal): Promise<Cla
       (Array.isArray(body.message) ? body.message.join('; ') : (body.message as string | undefined)) ??
       `到机码无效或已过期（${errCode}）`
     // 带错误码抛出，pickupClaimMessage 才能按 PICKUP_CODE_* 映射用户文案，而不是落到通用兜底
-    throw new ApiHttpError(errCode, errMsg, res.status)
+    throw Object.assign(new ApiHttpError(errCode, errMsg, res.status), { details: body.error?.details })
   }
   if (
     typeof body.released !== 'boolean' ||

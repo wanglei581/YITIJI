@@ -188,6 +188,15 @@ function parsePriceChangedQuote(details: unknown): PrintPriceChangedQuote | null
   return { amountCents, billablePages, priceLines }
 }
 
+/** 只保留额度错误的结构化详情，其他错误仍走通用适配器。 */
+export async function throwPrintQuotaError(res: Response): Promise<void> {
+  const body = await res.clone().json().catch(() => null) as { error?: { code?: string; message?: string; details?: unknown } } | null
+  const error = body?.error
+  if (error?.code && ['PRINT_TERMINAL_DAILY_QUOTA_REACHED', 'PRINT_MEMBER_DAILY_QUOTA_REACHED', 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED'].includes(error.code)) {
+    throw Object.assign(new ApiHttpError(error.code, error.message ?? '', res.status), { details: error.details })
+  }
+}
+
 export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJobCreated> {
   const { token, ...body } = input
   const terminalId = getTerminalId()
@@ -219,6 +228,7 @@ export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJ
         )
       }
     }
+    await throwPrintQuotaError(res)
     await throwHttpError(res, token)
   }
   return res.json() as Promise<PrintJobCreated>
