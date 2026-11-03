@@ -265,8 +265,8 @@ assert.deepEqual(
   assert.equal(typeof ApiHttpError, 'function', '测试桩必须导出 ApiHttpError，否则无法构造带服务端原文的错误')
 
   for (const [code, expected] of [
-    ['PRINT_TERMINAL_DAILY_QUOTA_REACHED', '这台机器今天的免费打印量'],
-    ['PRINT_MEMBER_DAILY_QUOTA_REACHED', '你今天已免费打印 50 面'],
+    ['PRINT_TERMINAL_DAILY_QUOTA_REACHED', '这台机器今天剩下的打印量不够打这一单，明天恢复'],
+    ['PRINT_MEMBER_DAILY_QUOTA_REACHED', '你今天剩下的打印量不够打这一单，明天恢复'],
     ['PRINT_GUEST_ORDER_QUOTA_EXCEEDED', '最多打印 20 面'],
   ]) {
     const limit = code === 'PRINT_MEMBER_DAILY_QUOTA_REACHED' ? 50 : 20

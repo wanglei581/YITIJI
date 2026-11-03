@@ -535,6 +535,33 @@ test('I-11 缺纸、卡纸的下一步不等人「加完纸」「处理好」，
   assert.match(withRetry.steps[2].detail, /整份重打/)
 })
 
+test('到机码失败屏只在后端还允许续打时说出同码续打，不按价格', () => {
+  const line = progress.SAME_CODE_RESUME_LINE
+  assert.match(line, /同一个到机码就能接着打/)
+  assert.match(line, /请在手机上重新下单/)
+  const paid = { variant: 'failed', money: { fact: 'paid', amountCents: 200 }, orderNo: 'ORD-RESUME', canRetry: true }
+  assert.equal(failedModel.failureCopy(paid).resumeLine, null, '不是到机码单，即使能重提也不说同码续打')
+  assert.equal(failedModel.failureCopy({ ...paid, pickupSource: true }).resumeLine, line)
+  assert.equal(failedModel.failureCopy({ ...paid, pickupSource: true, canRetry: false }).resumeLine, null)
+  assert.equal(failedModel.failureCopy({ ...paid, variant: 'paper-jam', pickupSource: true }).resumeLine, line)
+  assert.equal(failedModel.failureCopy({ ...paid, variant: 'out-of-paper', money: { fact: 'free', amountCents: 0 }, pickupSource: true }).resumeLine, line)
+  assert.equal(progress.sameCodeResumeLine({ pickupSource: true, canRetry: true, reprintAllowed: false, reprintRemaining: 0 }), null)
+  assert.equal(progress.sameCodeResumeLine({ pickupSource: true, canRetry: true, reprintAllowed: true, reprintRemaining: 1 }), line)
+  assert.equal(progress.sameCodeResumeLine({ pickupSource: true, canRetry: false, reprintAllowed: true, reprintRemaining: 2 }), line)
+  assert.equal(progress.sameCodeResumeLine({ canRetry: true }), null)
+})
+
+test('续打成功只在后端标明上次可能出过纸时提醒看出纸口', () => {
+  const line = progress.PRIOR_OUTPUT_TRAY_LINE
+  assert.match(line, /看出纸口有没有上次的纸/)
+  assert.equal(progress.priorOutputTrayLine({}), null)
+  assert.equal(progress.priorOutputTrayLine({ mayHavePrinted: false, partialOutput: false }), null)
+  assert.equal(progress.priorOutputTrayLine({ mayHavePrinted: true }), line)
+  assert.equal(progress.priorOutputTrayLine({ partialOutput: true }), line)
+  assert.match(progressPage, /priorOutputTrayLine\(/)
+  assert.match(progressPage, /print-progress-prior-output/)
+})
+
 test('I-11 重新提交打印：打印机现在不能出纸就给出原因，能出纸才返回 null', () => {
   const dev = (over) => ({ loading: false, printerReady: false, kind: 'unknown', printer: {}, ...over })
   assert.equal(failedModel.retryBlockedReason(dev({ printerReady: true, kind: 'ready' })), null)

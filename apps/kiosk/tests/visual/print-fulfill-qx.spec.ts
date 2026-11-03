@@ -213,6 +213,7 @@ test('PAPER_EMPTY with server canRetry offers whole-file resubmit and server ord
   await expect(outOfPaper.locator('.qxt-step').nth(2)).toContainText('整份重打')
   await expect(outOfPaper).toContainText('不会在加纸后自动继续')
   await expect(outOfPaper.getByRole('region', { name: '文件带走' })).toBeVisible()
+  await expect(page.getByTestId('print-fulfill-resume-line')).toHaveCount(0)
 
   await expectTouchAndBounds(page)
   await page.screenshot({ path: test.info().outputPath('fulfill-out-of-paper-retry.png'), fullPage: true })
@@ -310,6 +311,99 @@ test('failed done retry posts the real taskId and payment session @w2', async ({
   ])
   await expect(page.locator('[data-w2-page="print-progress"]')).toBeVisible()
   await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
+  await expect(page.getByTestId('print-progress-prior-output')).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
+test('pickup failure with canRetry tells the person to resume with the same code @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 200,
+    json: {
+      taskId: W2_ORDER.taskId,
+      status: 'failed',
+      errorCode: 'PAPER_EMPTY',
+      failureReasonForUser: '打印机缺纸，当前无法打印，请联系工作人员补纸后重试',
+    },
+  })
+  api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.taskId}/takeaway-url`, {
+    status: 200,
+    json: {
+      signedUrl: '/api/v1/files/signed/takeaway-demo',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      filename: W2_FILE.name,
+      mimeType: 'application/pdf',
+      sizeBytes: 128,
+      orderId: W2_ORDER.orderId,
+      orderNo: W2_ORDER.orderNo,
+      payStatus: 'paid',
+      amountCents: W2_ORDER.amountCents,
+      canRetry: true,
+    },
+  })
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', { ...flowState, pickupSource: true })
+  const line = page.getByTestId('print-fulfill-resume-line')
+  await expect(line).toBeVisible()
+  await expect(line).toContainText('回来再输一次同一个到机码就能接着打')
+  await expect(line).toContainText('请在手机上重新下单')
+  expect(errors).toEqual([])
+})
+
+test('resume success with mayHavePrinted asks to check the output tray @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  let jobStatus: 'failed' | 'pending' = 'failed'
+  api.respondWith('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, () => ({
+    status: 200,
+    json: jobStatus === 'failed'
+      ? {
+          taskId: W2_ORDER.taskId,
+          status: 'failed',
+          errorCode: 'PRINTER_ERROR',
+          failureReasonForUser: '打印机可能卡纸或发生设备故障，当前暂时无法继续使用，请联系工作人员处理',
+        }
+      : { taskId: W2_ORDER.taskId, status: 'pending' },
+  }))
+  api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.taskId}/takeaway-url`, {
+    status: 200,
+    json: {
+      signedUrl: '/api/v1/files/signed/takeaway-demo',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      filename: W2_FILE.name,
+      mimeType: 'application/pdf',
+      sizeBytes: 128,
+      orderId: W2_ORDER.orderId,
+      orderNo: W2_ORDER.orderNo,
+      payStatus: 'paid',
+      amountCents: W2_ORDER.amountCents,
+      canRetry: true,
+    },
+  })
+  api.respondWith('POST', `/api/v1/print/jobs/${W2_ORDER.taskId}/retry`, () => {
+    jobStatus = 'pending'
+    return {
+      status: 200,
+      json: {
+        taskId: W2_ORDER.taskId,
+        orderId: W2_ORDER.orderId,
+        orderNo: W2_ORDER.orderNo,
+        amountCents: W2_ORDER.amountCents,
+        payStatus: 'paid',
+        status: 'pending',
+        partialOutput: true,
+      },
+    }
+  })
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', { ...flowState, pickupSource: true })
+  await expect(page.getByTestId('print-fulfill-resume-line')).toContainText('同一个到机码就能接着打')
+  await page.getByRole('button', { name: '重新提交打印' }).click()
+  await page.waitForURL('**/print/progress')
+  const note = page.getByTestId('print-progress-prior-output')
+  await expect(note).toBeVisible()
+  await expect(note).toContainText('请先看出纸口有没有上次的纸')
   expect(errors).toEqual([])
 })
 

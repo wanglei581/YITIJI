@@ -141,6 +141,46 @@ export function outOfPaperPill(money: OutOfPaperMoney): string {
   return '订单保留 · 缺纸'
 }
 
+/**
+ * 失败 / 卡纸 / 缺纸屏：到机码单且后端还允许续打时加这一句（#1370）。
+ * 不按价格判断。订单视图若给出剩余次数，剩余为 0 就不再说还能续打。
+ */
+export const SAME_CODE_RESUME_LINE =
+  '没打完？等这台机器能打了，回来再输一次同一个到机码就能接着打（整份重打），每单最多 2 次；2 次用完后，请在手机上重新下单。'
+
+export function sameCodeResumeLine(input: {
+  pickupSource?: boolean
+  canRetry?: boolean
+  reprintAllowed?: boolean | null
+  reprintRemaining?: number | null
+}): string | null {
+  if (input.pickupSource !== true) return null
+  const remainingKnown =
+    typeof input.reprintRemaining === 'number' ||
+    input.reprintAllowed === true ||
+    input.reprintAllowed === false
+  if (remainingKnown) {
+    if (input.reprintAllowed !== true) return null
+    if (typeof input.reprintRemaining !== 'number' || !Number.isInteger(input.reprintRemaining) || input.reprintRemaining <= 0) {
+      return null
+    }
+    return SAME_CODE_RESUME_LINE
+  }
+  return input.canRetry === true ? SAME_CODE_RESUME_LINE : null
+}
+
+/** 续打进了队列，且后端标明上次可能已经出过纸。提醒先看出纸口，不说纸一定还在。 */
+export const PRIOR_OUTPUT_TRAY_LINE =
+  '接着打之前，请先看出纸口有没有上次的纸。有的话先取走，再等这一次出纸。'
+
+export function priorOutputTrayLine(flags: {
+  mayHavePrinted?: boolean
+  partialOutput?: boolean
+}): string | null {
+  if (flags.mayHavePrinted === true || flags.partialOutput === true) return PRIOR_OUTPUT_TRAY_LINE
+  return null
+}
+
 /** 卡纸说明的副标题。只有确实收过钱才提已付金额；0 元和金额未知都不说收款。 */
 export function jamOrderKeptLine(fact: PaymentFact): string {
   // 不写「处理好后可以继续打印」：现场没人处理，说清是谁在管（我们已收到提醒）、订单还在就够了（走查 I-11）。

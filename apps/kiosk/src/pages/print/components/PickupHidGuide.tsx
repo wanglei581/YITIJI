@@ -336,7 +336,7 @@ export function PickupFailurePanel({
 }: {
   failure: PickupFailure
   message: string
-  /** 额度被拒才有。login 给「去登录」；wait 不给，主按钮回首页。 */
+  /** 额度被拒才有。login 给「去登录」；wait 主按钮回首页，次要出口是求助（换一个 0 元码今天也一样被拒）。 */
   quotaExit?: PickupQuotaExit | null
   onReset: () => void
   onRetry: () => void
@@ -361,8 +361,8 @@ export function PickupFailurePanel({
               回到首页
             </button>
           )}
-          <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={quotaExit === 'login' ? onHome : onReset}>
-            {quotaExit === 'login' ? '回到首页' : '输另一个到机码'}
+          <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={quotaExit === 'login' ? onHome : onHelp}>
+            {quotaExit === 'login' ? '回到首页' : '求助'}
           </button>
         </div>
       </>

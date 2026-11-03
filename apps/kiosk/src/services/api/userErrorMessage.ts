@@ -62,11 +62,34 @@ function quotaLimit(error: unknown): number | undefined {
   return typeof limit === 'number' && Number.isInteger(limit) && limit > 0 ? limit : undefined
 }
 
+/**
+ * 合规 2026-10-12：不写「免费」、不说「已经用完」。
+ * 到机码页在这句后面另接「明天再来输这个码」；确认页停在这一句，再接无人值守的求助句。
+ */
+export const PRINT_TERMINAL_DAILY_QUOTA_COPY = '这台机器今天剩下的打印量不够打这一单，明天恢复。'
+export const PRINT_MEMBER_DAILY_QUOTA_COPY = '你今天剩下的打印量不够打这一单，明天恢复。'
+
+/**
+ * 不存在、已过期、不属于这台机器三种情况共用，不分开说。
+ * 后半句是 2026-10-12 合规定的下一步：核对后还是不行，回手机看订单。
+ */
+export const PICKUP_CODE_REJECTED_COPY =
+  '到机码无效或已过期，请核对后重新输入。核对后还是不行的，请在手机上查看这笔订单，需要的话重新下单。'
+
+/**
+ * 付费异常单的费用还没退完。不写「已退款」。
+ * 前半句对齐后端「按原路退回」；「不是当场到账」「不用再输这个到机码」是一体机补的下一步。
+ */
+export const PICKUP_RESUME_REFUND_PENDING_COPY =
+  '这单没有打完，费用会按原路退回，不是当场到账。不用再输这个到机码。需要帮助请查看《隐私政策》里的联系方式。'
+
 const SHARED_USER_MESSAGES: Readonly<Record<string, SharedUserMessage>> = {
   NETWORK_ERROR: '网络连接失败，请检查网络后重试',
-  // 到机码（取件码）：服务端 message 本就是面向用户的中文，这里给同义的稳定文案，避免落到通用兜底
-  PICKUP_CODE_INVALID: '到机码无效或已过期，请核对后重新输入',
-  PICKUP_CODE_EXPIRED: '到机码无效或已过期，请核对后重新输入',
+  // 到机码（取件码）：服务端 message 本就是面向用户的中文，这里给同义的稳定文案，避免落到通用兜底。
+  // 过期与无效共用一句，避免本地短句盖住「请在小程序重新下单」却不告诉人下一步。
+  PICKUP_CODE_INVALID: PICKUP_CODE_REJECTED_COPY,
+  PICKUP_CODE_EXPIRED: PICKUP_CODE_REJECTED_COPY,
+  PICKUP_RESUME_REFUND_PENDING: PICKUP_RESUME_REFUND_PENDING_COPY,
   PICKUP_CODE_UNAVAILABLE: () => `这个到机码对应的文件暂时不可用。${helpNeededLine()}。`,
   // 2026-09-07 产品裁决「退款则不出文件」：服务端在任何状态写入前拦下，这里给同义稳定文案。
   ORDER_REFUNDED: '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度',
@@ -79,8 +102,8 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, SharedUserMessage>> = {
   AI_PUBLIC_QUOTA_EXCEEDED: AI_PUBLIC_QUOTA_EXCEEDED_COPY,
   AI_BUSY: 'AI 服务正忙，请稍后再试',
   FILE_TOO_LARGE: '文件过大，请压缩后重试',
-  PRINT_TERMINAL_DAILY_QUOTA_REACHED: () => `这台机器今天的免费打印量已用完，明天 0 点恢复。${helpNeededLine()}。`,
-  PRINT_MEMBER_DAILY_QUOTA_REACHED: (error) => `${quotaLimit(error) ? `你今天已免费打印 ${quotaLimit(error)} 面，达到每日上限` : '你今天的免费打印量已达上限'}，明天 0 点恢复。${helpNeededLine()}。`,
+  PRINT_TERMINAL_DAILY_QUOTA_REACHED: () => `${PRINT_TERMINAL_DAILY_QUOTA_COPY}${helpNeededLine()}。`,
+  PRINT_MEMBER_DAILY_QUOTA_REACHED: () => `${PRINT_MEMBER_DAILY_QUOTA_COPY}${helpNeededLine()}。`,
   PRINT_GUEST_ORDER_QUOTA_EXCEEDED: (error) => `免登录每次${quotaLimit(error) ? `最多打印 ${quotaLimit(error)} 面` : '打印面数超过上限'}。`,
   PRINT_JOB_TOO_LARGE: '每单最多打印 100 面，请分几单打印',
   MEMBER_AUTH_REQUIRED: '登录状态已失效，请重新登录后重试',
