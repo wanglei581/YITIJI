@@ -39,7 +39,7 @@
       <view class="empty-slot compact">
         <view class="es-t">加载失败</view>
         <view class="es-d">{{loadError}}</view>
-        <view class="btn ghost sm" style="margin-top:24rpx" bindtap="retryLoad">重新加载</view>
+        <view class="btn ghost sm" style="margin-top:24rpx" bindtap="retryLoad">再试一次</view>
       </view>
     </view>
 
