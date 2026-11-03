@@ -10,11 +10,19 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
 import { createRequire } from 'node:module'
 import { deferred, flush, instantiate, loadPageDefinition } from './page-sandbox.mjs'
 
 const require = createRequire(import.meta.url)
 const qaMod = require('../../pages/ai-records/qa-records.js')
+
+test('模板：加载失败优先于空态，并有页面内重试', () => {
+  const wxml = fs.readFileSync(path.join(import.meta.dirname, '../../pages/ai-records/ai-records.wxml'), 'utf8')
+  assert.match(wxml, /wx:elif="\{\{loadError\}\}"[\s\S]*bindtap="retryLoad">再试一次/)
+  assert.ok(wxml.indexOf('wx:elif="{{loadError}}"') < wxml.indexOf('wx:else>'))
+})
 
 function titlesOf(page) {
   const out = []
@@ -229,8 +237,8 @@ test('qaNextCursor 翻页带 qaCursor；只翻记录时不会把问答第一页�
   assert.match(titleText(page), /简历优化/)
 })
 
-test('加载更多失败时不清空已经显示的要点', async () => {
-  const { page, toasts } = setup({
+test('加载更多失败时不清空已经显示的要点，并给出重试', async () => {
+  const { page } = setup({
     pages: (n) => (n === 1
       ? Promise.resolve(attach([resume], { qaRecords: [qaMeta], qaNextCursor: 'qa-2' }))
       : Promise.reject(new Error('网络错误'))),
@@ -241,9 +249,49 @@ test('加载更多失败时不清空已经显示的要点', async () => {
   await flush()
   assert.match(titleText(page), /小青本次要点/)
   assert.match(titleText(page), /简历诊断/)
-  assert.equal(page.data.loadError, '')
+  assert.match(page.data.loadError, /读取失败.*再试一次/)
   assert.equal(page.data.loginRequired, false)
-  assert.equal(toasts[0].title, '网络错误')
+})
+
+test('面试记录接口失败不显示空态；重试成功显示真实记录', async () => {
+  let attempts = 0
+  const auth = { isLoggedIn: () => true, getUser: () => ({ id: 'A' }), sessionGeneration: () => 1 }
+  const api = {
+    getMyAiRecords: () => Promise.resolve([]),
+    getMyMockInterviews: () => {
+      attempts += 1
+      return attempts === 1 ? Promise.reject(new Error('断网')) : Promise.resolve([{ sessionId: 's1', hasReport: true, createdAt: '2026-11-03T01:00:00Z' }])
+    },
+  }
+  const def = loadPageDefinition('pages/ai-records/ai-records.js', { wx: {}, modules: { auth, api } })
+  const actual = instantiate(def)
+  actual.onShow()
+  await flush()
+  await flush()
+  assert.match(actual.data.loadError, /模拟面试记录读取失败.*再试一次/)
+  assert.equal(actual.data.groups.length, 0)
+  actual.retryLoad()
+  await flush()
+  await flush()
+  assert.equal(actual.data.loadError, '')
+  assert.match(titleText(actual), /模拟面试/)
+  assert.equal(attempts, 2)
+})
+
+test('AI 记录主接口失败也不显示空态；重试成功恢复列表', async () => {
+  const { page, calls } = setup({
+    pages: (n) => n === 1 ? Promise.reject(new Error('网络连接失败')) : Promise.resolve([resume]),
+  })
+  page.onShow()
+  await flush()
+  assert.match(page.data.loadError, /网络连接失败/)
+  assert.equal(page.data.groups.length, 0)
+  page.retryLoad()
+  await flush()
+  await flush()
+  assert.equal(page.data.loadError, '')
+  assert.equal(titleText(page), '简历诊断')
+  assert.equal(calls.length, 2)
 })
 
 test('换账号和退出登录都会清掉上一个人的要点，晚到的旧响应写不回来', async () => {

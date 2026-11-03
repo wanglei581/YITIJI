@@ -225,6 +225,8 @@ async function main(): Promise<void> {
     const imagePdf = await conversion.convertImagesToPdf({
       sources: [{ fileId: photo.fileId, fileAccessUrl: signFileUrl(photo.fileId, 600_000).url }], endUserId, terminalId: 'verify',
     })
+    const imageRecord = await prisma.fileObject.findUnique({ where: { id: imagePdf.fileId }, select: { filename: true } })
+    check('图片转 PDF 响应文件名与落库文件名一致', !!imageRecord && imagePdf.filename === imageRecord.filename)
     const imageOrder = await memberOrder(imagePdf.fileId)
     check('图片转 PDF 产物：没做隐私检查，建单被拒 PRINT_PII_SCAN_REQUIRED（旧代码放行）', imageOrder === 'PRINT_PII_SCAN_REQUIRED', imageOrder)
 

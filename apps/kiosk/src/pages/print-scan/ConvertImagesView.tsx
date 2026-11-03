@@ -57,6 +57,7 @@ interface ConvertImagesViewProps {
   rechecking: boolean
   error: ConvertError | null
   result: ConvertImagesResponse | null
+  resultName: string | null
   recovered: boolean
   /** 冲突屏上「上一次的顺序」：上一次提交的图片名，没记下就是 null。 */
   previousOrder: string[] | null
@@ -172,7 +173,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
               ]}
             >
               <p className="i2p-band-p">
-                系统返回了合成结果：<b>{outputFileName(result.pages)}，共 {result.pages} 页</b>，页序与你排的顺序一致。
+                系统返回了合成结果：<b>{props.resultName ?? outputFileName(result.pages)}，共 {result.pages} 页</b>，页序与你排的顺序一致。
                 {hasEndUser === false ? (
                   <>
                     <b>你现在没登录，这份 PDF 不会进「我的文档」，转好之后再登录也存不进去。</b>
@@ -187,7 +188,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
             </Band>
             <div className="i2p-outcard" data-testid="img2pdf-outfacts">
               <div className="i2p-kv">
-                <div><span>文件名</span><b>{outputFileName(result.pages)}</b></div>
+                <div><span>文件名</span><b>{props.resultName ?? outputFileName(result.pages)}</b></div>
                 <div><span>页数</span><b>{result.pages} 页（每张图一页）</b></div>
                 <div><span>大小</span><b>{formatBytes(result.sizeBytes)}（上限 {formatBytes(MAX_OUTPUT_BYTES)}）</b></div>
                 <div><span>打印链接</span><b>临时链接，30 分钟内有效</b></div>
