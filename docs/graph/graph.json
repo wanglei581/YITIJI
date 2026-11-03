@@ -25128,6 +25128,7 @@
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
+      "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts"
     ],
@@ -25208,7 +25209,8 @@
     "services/api/src/ai/career-plan.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-career-plan.ts",
-      "services/api/scripts/verify-kiosk-job-board-switch.ts"
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
+      "services/api/scripts/verify-resume-ai-consent-wiring.ts"
     ],
     "services/api/src/ai/dto/assistant-chat.dto.ts": [
       "services/api/scripts/verify-assistant-provider-label.ts",
@@ -25375,6 +25377,7 @@
     ],
     "services/api/src/ai/resume-layout-adjust.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-resume-ai-consent-wiring.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts"
     ],
     "services/api/src/ai/resume-parse-intent-runner.service.ts": [
@@ -25441,7 +25444,8 @@
       "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-compliance.ts",
       "services/api/scripts/verify-member-qa-records.ts",
-      "services/api/scripts/verify-official-channels.ts"
+      "services/api/scripts/verify-official-channels.ts",
+      "services/api/scripts/verify-resume-ai-consent-wiring.ts"
     ],
     "services/api/src/ai/resume/diagnosis-report-pdf.service.ts": [
       "services/api/scripts/verify-beijing-display-time.ts",
@@ -25687,7 +25691,8 @@
     "services/api/src/ai/usage/ai-budget.service.ts": [
       "apps/admin/scripts/verify-admin-ai-usage-contract.mjs",
       "services/api/scripts/verify-ai-usage-budget.ts",
-      "services/api/scripts/verify-ai-usage-coverage.ts"
+      "services/api/scripts/verify-ai-usage-coverage.ts",
+      "services/api/scripts/verify-mock-interview-consent.ts"
     ],
     "services/api/src/ai/usage/ai-pricing.ts": [
       "services/api/scripts/verify-ai-usage-budget.ts",
@@ -25705,7 +25710,8 @@
     ],
     "services/api/src/ai/usage/ai-usage-meter.ts": [
       "services/api/scripts/verify-ai-usage-budget.ts",
-      "services/api/scripts/verify-ai-usage-coverage.ts"
+      "services/api/scripts/verify-ai-usage-coverage.ts",
+      "services/api/scripts/verify-mock-interview-consent.ts"
     ],
     "services/api/src/ai/usage/ai-usage-retention.ts": [
       "services/api/scripts/verify-ai-usage-retention.ts",
@@ -25736,6 +25742,7 @@
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
+      "services/api/scripts/verify-resume-ai-consent-wiring.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-upload-sessions-http.ts"
@@ -25826,6 +25833,7 @@
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
+      "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-order.ts",
@@ -27532,7 +27540,9 @@
       "services/api/scripts/verify-member-data-request-state-machine.ts",
       "services/api/scripts/verify-member-data-request-truth.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
+      "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-pg-serialization-conflict.ts",
+      "services/api/scripts/verify-resume-ai-consent-wiring.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
@@ -27553,6 +27563,7 @@
     "services/api/src/mock-interview/interview-practice-sheet-pdf.service.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/interview-practice-sheet.ts": [
@@ -27564,6 +27575,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
       "services/api/scripts/verify-cjk-font.ts",
+      "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/interview-transcript-pdf.service.ts": [
@@ -27577,6 +27589,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
+      "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/mock-interview.controller.ts": [
@@ -27601,7 +27614,9 @@
       "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-member-data-retention.ts",
-      "services/api/scripts/verify-mock-interview.ts"
+      "services/api/scripts/verify-mock-interview-consent.ts",
+      "services/api/scripts/verify-mock-interview.ts",
+      "services/api/scripts/verify-resume-ai-consent-wiring.ts"
     ],
     "services/api/src/notifications/notifications.controller.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs"
@@ -28301,6 +28316,7 @@
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
+      "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-offline-agencies-contract.ts",
@@ -40945,6 +40961,33 @@
         "dirs": [],
         "files": [
           "services/api/src/ai/ai-log.service.ts",
+          "services/api/src/ai/usage/ai-budget.service.ts",
+          "services/api/src/ai/usage/ai-usage-meter.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts",
+          "services/api/src/mock-interview/interview-practice-sheet-pdf.service.ts",
+          "services/api/src/mock-interview/interview-report-pdf.service.ts",
+          "services/api/src/mock-interview/mock-interview-llm.service.ts",
+          "services/api/src/mock-interview/mock-interview.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-mock-interview-consent.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:mock-interview-consent"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/ai-log.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/pdf/pdfjs-document.ts",
           "services/api/src/mock-interview/asr/asr.service.ts",
@@ -43182,6 +43225,29 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:release-provenance"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/career-plan.controller.ts",
+          "services/api/src/ai/resume-layout-adjust.controller.ts",
+          "services/api/src/ai/resume/career-plan.service.ts",
+          "services/api/src/app.module.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts",
+          "services/api/src/mock-interview/mock-interview.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-resume-ai-consent-wiring.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:resume-ai-consent-wiring"
       ],
       "wired": true
     },
