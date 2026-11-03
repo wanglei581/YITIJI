@@ -80,7 +80,7 @@ param(
   [int]$HeartbeatIntervalMs = 30000,
 
   [Parameter(Mandatory = $false)]
-  [string]$AgentVersion = "0.4.17-production",
+  [string]$AgentVersion = "0.4.18-production",
 
   [Parameter(Mandatory = $false)]
   [string]$InstalledAgentRoot,
