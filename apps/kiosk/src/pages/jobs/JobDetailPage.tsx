@@ -385,10 +385,13 @@ const JOB_AI_RETRY_TEXT = 'AI 这次没有生成出来。岗位原文和扫码�
 function formatJobAiError(err: unknown): string {
   const declined = aiDeclarationDeclineMessage(err)
   if (declined) return declined
+  // 次数用完先于能力级停用：沿用原来的岗位句，重试按钮的显隐也跟旧码一样。
+  if (err instanceof ApiHttpError && (err.code === 'JOB_AI_QUOTA_EXCEEDED' || err.code === 'AI_QUOTA_EXHAUSTED')) {
+    return '今日 AI 辅助额度已用完，请明天再试。'
+  }
   // 整条 AI 能力不可用（未配置、连不上、后台暂停等，重试不会变好）：照稿说清哪些不受影响，不再引导重试。
   if (isAiOutage(err)) return JOB_AI_OUTAGE_TEXT
   if (err instanceof ApiHttpError) {
-    if (err.code === 'JOB_AI_QUOTA_EXCEEDED') return '今日 AI 辅助额度已用完，请明天再试。'
     if (err.code === 'JOB_AI_QUOTA_UNAVAILABLE') return `岗位 AI 配额服务暂不可用。${helpNeededLine()}`
     if (err.code === 'USER_AI_CONSENT_REQUIRED') return '请先确认岗位 AI 辅助授权。'
     if (err.code === 'JOB_AI_MOCK_DISABLED') return '岗位 AI 需要连上真实服务后才能使用。'

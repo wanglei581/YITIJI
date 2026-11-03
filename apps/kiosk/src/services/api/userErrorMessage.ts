@@ -42,6 +42,19 @@ import { ApiHttpError } from './httpAdapter'
 export const AI_PUBLIC_QUOTA_EXCEEDED_COPY = '今天的 AI 次数用完了，明天恢复；可以先打印原件。'
 
 /**
+ * 每人每天的 AI 次数封顶（429 `AI_QUOTA_EXHAUSTED`）。
+ * 当天重试不会成功，不要并进「当前使用的人较多」。
+ * 服务端若带回 `bucket`（或 `details.bucket`）就按简历类 / 小青 / 模拟面试说；没有就不猜是哪一类，也不写数字额度。
+ * 不写价格、购买或充值。
+ */
+export const AI_QUOTA_EXHAUSTED_COPY = '今天的 AI 次数用完了，明天 0 点恢复；可以先按这一页的手动方式继续，打印、扫描照常可用'
+export const AI_QUOTA_EXHAUSTED_RESUME_COPY = '今天的简历类 AI 次数用完了，明天 0 点恢复；可以先按模板手动填写，打印照常可用'
+export const AI_QUOTA_EXHAUSTED_ASSISTANT_COPY = '今天的小青次数用完了，明天 0 点恢复；打印、扫描和查政策可以回首页照常办'
+export const AI_QUOTA_EXHAUSTED_INTERVIEW_COPY = '今天的模拟面试次数用完了，明天 0 点恢复；可以回到上一页，或先看面试技巧'
+/** 自我探索是 200，解读缺席但记分已完成。这句话只给结果页，不进桶映射。 */
+export const AI_QUOTA_SELF_ASSESSMENT_COPY = '今天的 AI 解读次数用完了，明天 0 点恢复。作答和记分已经完成，可以直接打印。'
+
+/**
  * 「这项 AI 服务没开」：如实说没开，出路是不用 AI 的手动方式。
  * 不写「已收到提醒」「会尽快处理」这类没有核实过的话。两个码同义，只是简历链用了另一个名字。
  */
@@ -62,6 +75,32 @@ function quotaLimit(error: unknown): number | undefined {
   return typeof limit === 'number' && Number.isInteger(limit) && limit > 0 ? limit : undefined
 }
 
+/** 只认服务端明示的桶名。没有桶、或桶名对不上，就用上面那句不分类的话。 */
+function aiQuotaBucket(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object') return undefined
+  const record = error as { bucket?: unknown; details?: unknown }
+  if (typeof record.bucket === 'string' && record.bucket.length > 0) return record.bucket
+  const details = record.details
+  if (details && typeof details === 'object' && !Array.isArray(details) && 'bucket' in details) {
+    const bucket = (details as { bucket?: unknown }).bucket
+    if (typeof bucket === 'string' && bucket.length > 0) return bucket
+  }
+  return undefined
+}
+
+function aiQuotaExhaustedMessage(error: unknown): string {
+  switch (aiQuotaBucket(error)) {
+    case 'ai_resume':
+      return AI_QUOTA_EXHAUSTED_RESUME_COPY
+    case 'ai_assistant':
+      return AI_QUOTA_EXHAUSTED_ASSISTANT_COPY
+    case 'ai_interview':
+      return AI_QUOTA_EXHAUSTED_INTERVIEW_COPY
+    default:
+      return AI_QUOTA_EXHAUSTED_COPY
+  }
+}
+
 const SHARED_USER_MESSAGES: Readonly<Record<string, SharedUserMessage>> = {
   NETWORK_ERROR: '网络连接失败，请检查网络后重试',
   // 到机码（取件码）：服务端 message 本就是面向用户的中文，这里给同义的稳定文案，避免落到通用兜底
@@ -77,6 +116,8 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, SharedUserMessage>> = {
   AI_RATE_LIMITED: '当前使用的人较多，请稍后再试',
   // 公共日额度：当天重试不会成功。不要并进上面的普通限流句。
   AI_PUBLIC_QUOTA_EXCEEDED: AI_PUBLIC_QUOTA_EXCEEDED_COPY,
+  // 每人每天次数封顶。同样是 429，但不是「人多请稍后再试」：当天重试不会成功。
+  AI_QUOTA_EXHAUSTED: aiQuotaExhaustedMessage,
   AI_BUSY: 'AI 服务正忙，请稍后再试',
   FILE_TOO_LARGE: '文件过大，请压缩后重试',
   PRINT_TERMINAL_DAILY_QUOTA_REACHED: () => `这台机器今天的免费打印量已用完，明天 0 点恢复。${helpNeededLine()}。`,

@@ -83,6 +83,7 @@ const AI_GATE_CODES: ReadonlySet<string> = new Set([
   'AI_BUDGET_EXHAUSTED',
   'AI_BUDGET_UNAVAILABLE',
   'AI_PUBLIC_QUOTA_EXCEEDED',
+  'AI_QUOTA_EXHAUSTED',
 ])
 
 export function isAiGateDown(error: unknown): boolean {

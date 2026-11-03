@@ -50,7 +50,7 @@ import {
 } from '../../ai'
 import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { AI_QUOTA_SELF_ASSESSMENT_COPY, userMessageOf } from '../../services/api/userErrorMessage'
 import {
   SelfAssessmentApiError,
   getLatestSelfAssessment,
@@ -935,11 +935,17 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
   const hasAccess = Boolean(getToken() || session.accessToken)
   const accessReason = hasAccess ? null : '本次未拿到访问凭证（AI 解读整体失败时系统不提供），无法生成打印件或撤回；记录会在到期后自动清理。'
 
+  // 次数用完单独判：记分已经在这次响应里，不要落到「重新作答」。
+  // 停用码进共享表后 gap 也会是 stopped；这里仍显式认这个原因，避免句子被停用通稿盖掉。
+  const quotaExhausted = result.aiUnavailableReason === 'AI_QUOTA_EXHAUSTED'
+  const suppressReanswer = quotaExhausted || gap === 'stopped'
   const fallback: AiTaskFallback = {
     // AI 是这几段解读的唯一产出源，且没有「点一下重试」的入口 —— 结果区直接说办不到，
     // 不编一条假的手动路径（三种降级里只有 result-unavailable 对得上本页）。
     mode: 'result-unavailable',
-    reason: gap === 'declaration'
+    reason: quotaExhausted
+      ? AI_QUOTA_SELF_ASSESSMENT_COPY
+      : gap === 'declaration'
       ? '这次没有确认是否年满 14 周岁，所以没有生成 AI 解读。完成确认后重新作答，可以获得 AI 解读。'
       : gap === 'login'
         ? '按规定登录后才能生成 AI 解读，这次没有生成。登录后重新作答，可以获得 AI 解读。'
@@ -948,8 +954,12 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
           : gap === 'unavailable'
             ? 'AI 解读服务当前不可用，这几段陈述这次没有生成。前面三步（作答、记分、依据题号）都已完成。'
             : unattendedReason(result.failReason, '本次解读未能生成合规结果，已整体丢弃，不做任何替换或补写。'),
-    ...(gap === 'stopped'
-      ? { retryHint: '下面的维度强度与依据题号不依赖 AI，现在就能看、能打印。' }
+    ...(suppressReanswer
+      ? {
+          retryHint: quotaExhausted
+            ? '作答和记分已经完成，可以直接打印。'
+            : '下面的维度强度与依据题号不依赖 AI，现在就能看、能打印。',
+        }
       : {
           retryHint: '答案原文不留存，服务恢复后也补不回这一次；要拿到解读需要重新作答（约 5 分钟）。下面的维度强度与依据题号不依赖 AI，现在就能看、能打印。',
           action: gap === 'login'
