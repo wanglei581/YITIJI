@@ -46,6 +46,7 @@ import { signFileUrl, verifyFileSignature } from '../src/files/signing'
 import { createPaymentSessionToken } from '../src/payment/payment-session-token'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
+import { isPaidUnfulfilledRefundRequired } from '../src/payment/pending-refund-signal'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { StorageService } from '../src/storage/storage.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
@@ -1258,10 +1259,19 @@ async function main() {
     )
     await expectCode(
       async () => printJobs.retryPaidFailedJob(unconfirmedId, { paymentSessionToken: await sessionFor(unconfirmedId) }),
-      'PRINT_RETRY_UNCONFIRMED_FORBIDDEN',
-      '8g. PRINT_JOB_UNCONFIRMED 禁止重新提交',
-      '打印结果未确认，不能重新提交，请联系工作人员核查',
+      'PICKUP_RESUME_REFUND_PENDING',
+      '8g. 付费单 PRINT_JOB_UNCONFIRMED 不自助重打，标记已付未履约',
+      '这单没有打完，费用会按原路退回，需要帮助请拨打服务电话',
     )
+    const unconfirmedPaid = await prisma.order.findFirst({ where: { printTaskId: unconfirmedId } })
+    if (
+      !unconfirmedPaid
+      || !isPaidUnfulfilledRefundRequired(unconfirmedPaid)
+      || unconfirmedPaid.payStatus !== 'paid'
+      || await prisma.refund.count({ where: { orderId: unconfirmedPaid.id } }) !== 0
+    ) {
+      fail(`8g. 付费未确认应只标待退款，不建退款行 ${JSON.stringify(unconfirmedPaid)}`)
+    }
 
     const partialId = await createClaimAndFail(
       '失败任务-只出一部分',
@@ -1271,10 +1281,14 @@ async function main() {
     )
     await expectCode(
       async () => printJobs.retryPaidFailedJob(partialId, { paymentSessionToken: await sessionFor(partialId) }),
-      'PRINT_RETRY_PARTIAL_OUTPUT_FORBIDDEN',
-      '8g2. 只出了一部分禁止重新提交',
-      '这单已经出了一部分纸，不能整单重打；需要补打请另下新单',
+      'PICKUP_RESUME_REFUND_PENDING',
+      '8g2. 付费单只出一部分不自助重打，标记已付未履约',
+      '这单没有打完，费用会按原路退回，需要帮助请拨打服务电话',
     )
+    const partialPaid = await prisma.order.findFirst({ where: { printTaskId: partialId } })
+    if (!partialPaid || !isPaidUnfulfilledRefundRequired(partialPaid) || partialPaid.taskStatus !== 'failed') {
+      fail(`8g2. 付费部分出纸应标待退款且任务仍失败 ${JSON.stringify(partialPaid)}`)
+    }
 
     const unpaid = await printJobs.create({
       fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,

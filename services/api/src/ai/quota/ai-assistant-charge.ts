@@ -2,7 +2,8 @@ import { randomBytes } from 'node:crypto'
 import type { AssistantChatResult, ChatInput, ChatOutput } from '../interfaces/ai-provider.interface'
 import { isLlmProviderLabel } from '../interfaces/ai-provider.interface'
 import { AiUsageAccumulator, aiLogFieldsFromUsageReport, type AiLlmCallSink, type AiLogService } from '../ai-log.service'
-import { quotaSequence, runWithAiQuota, type QuotaAbortRequest } from './ai-quota-run'
+import { currentAiRequestContext } from '../usage/ai-usage-context'
+import { quotaSequence, runWithAiQuota, type QuotaAbortRequest, type ReleaseReason } from './ai-quota-run'
 import type { AiQuotaService } from './ai-quota.service'
 
 /** 小青一轮文字的计次。从 AiService 拆出，避免服务文件继续加长。 */
@@ -10,6 +11,7 @@ export interface AssistantChargeRunInput<T> {
   endUserId?: string | null
   operationKey: string
   req?: QuotaAbortRequest
+  failureOf?: (value: T) => ReleaseReason | null
   work: () => Promise<T>
   saveResult: (value: T) => Promise<string>
 }
@@ -21,6 +23,8 @@ export interface AssistantChatDeps {
   }
   llmChat: {
     chat(input: ChatInput, onLlmCall?: AiLlmCallSink, ownerKey?: string): Promise<ChatOutput>
+    /** 真实对话服务才有。覆盖率桩没有这个方法时，设备故障仍走对话内部的固定回答。 */
+    wouldDeviceFault?(input: ChatInput, ownerKey?: string): boolean
   }
   provider: { name: string; chatAssistant(input: ChatInput): Promise<ChatOutput> }
   log: Pick<AiLogService, 'record'>
@@ -49,7 +53,20 @@ export function executeAssistantCharge<T>(
     operationKey: input.operationKey,
     endUserId: input.endUserId,
     req: input.req,
+    failureOf: input.failureOf,
   }, input.work, input.saveResult)
+}
+
+/**
+ * 这一轮小青要不要把预占退回去。
+ * 词库拦住提问或生成：content_rejected，不扣。
+ * 设备故障固定回答没调模型，也不扣；它不是词库命中，不能记成 content_rejected。
+ * 正常路径在预占前就返回固定回答，走不到这里。模型教人动手的替换不设退次标记，照常结算。
+ */
+export function assistantTurnReleaseReason(value: { fixedNotice?: boolean }): ReleaseReason | null {
+  if (currentAiRequestContext()?.safetyRefund !== true) return null
+  if (value.fixedNotice) return 'provider_error'
+  return 'content_rejected'
 }
 
 /**
@@ -64,10 +81,15 @@ export function chargeAssistantChat(
   req: QuotaAbortRequest | undefined,
   runCharge: <T>(input: AssistantChargeRunInput<T>) => Promise<T>,
 ): Promise<AssistantChatResult> {
+  // 设备故障固定回答不调模型，不预占。公网次数仍由对话里的退次标记退回。
+  if (deps.llmConfig.isReady('assistant_chat') && deps.llmChat.wouldDeviceFault?.(input, ownerKey)) {
+    return completeAssistantTurn(deps, input, ownerKey, endUserId)
+  }
   return runCharge({
     endUserId,
     operationKey: `assistant-chat:${quotaSequence()}`,
     req,
+    failureOf: assistantTurnReleaseReason,
     work: () => completeAssistantTurn(deps, input, ownerKey, endUserId),
     saveResult: async (value) => assistantResultRef(value.sessionId),
   })

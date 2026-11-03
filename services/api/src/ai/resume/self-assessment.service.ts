@@ -217,7 +217,8 @@ export class SelfAssessmentService {
     const applyLlm = (llmResult: LlmSelfAssessmentOutput) => {
       if (llmResult.status === 'rejected') {
         dimensions = scored.dimensions.map((d) => ({ ...d, note: null }))
-        summary = null
+        // 词库拒答把统一拒答语放在 summary；合规硬拒答的 summary 仍是 null。
+        summary = llmResult.summary
         providerName = LLM_UNAVAILABLE_PROVIDER
         aiUnavailableReason = 'COMPLIANCE_REJECT'
         llmErrorCode = 'COMPLIANCE_REJECT'

@@ -1,12 +1,12 @@
 import { AiContentBlockedError } from '../ai/llm/llm-guard'
 import {
-  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
   Optional,
   ServiceUnavailableException,
 } from '@nestjs/common'
+import { contentBlockedException } from '../ai/safety/content-blocked'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import {
@@ -32,6 +32,7 @@ import { AiEndpointNotAllowedError } from '../common/outbound/ai-endpoint-allowl
 import { LlmChatService, assistantOwnerKey } from '../ai/llm/llm-chat.service'
 import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
 import { withAiSafety } from '../ai/llm/ai-prompt-safety'
+import { DEVICE_FAULT_PROMPT_RULE, hasHandsOnMachineInstruction } from '../ai/safety/device-fault'
 
 export const ASSISTANT_SUMMARY_SYSTEM_PROMPT = withAiSafety([
   '你把求职者与小青的本次对话浓缩成要点和待办。',
@@ -41,6 +42,7 @@ export const ASSISTANT_SUMMARY_SYSTEM_PROMPT = withAiSafety([
   '3. 不出现一键投递 / 立即投递 / 平台投递；岗位申请只能提醒用户去来源平台。',
   '4. 要点 ≤8 条，待办 ≤5 条；每条不超过 80 字，口语、可执行。',
   '5. 没有待办就返回空数组，不要编「下一步」。',
+  DEVICE_FAULT_PROMPT_RULE,
   '只输出 JSON（不要 markdown 代码块）：{"highlights":["要点"],"todos":["待办"]}',
 ].join('\n'))
 import { AiQuotaService } from '../ai/quota/ai-quota.service'
@@ -311,7 +313,7 @@ export class AssistantSummaryService {
         { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: 'assistant_summary', forbiddenWords: cfg.forbiddenWords } },
       )
     } catch (error) {
-      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
+      if (error instanceof AiContentBlockedError) throw contentBlockedException(error)
       // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
       if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       if (error instanceof LlmBusyError) {
@@ -347,7 +349,9 @@ export class AssistantSummaryService {
 
     const parsed = parseSummaryJson(raw)
     const highlights = sanitizeLines(parsed?.highlights, MAX_HIGHLIGHTS)
+      .filter((line) => !hasHandsOnMachineInstruction(line))
     const todos = sanitizeLines(parsed?.todos, MAX_TODOS)
+      .filter((line) => !hasHandsOnMachineInstruction(line))
     if (highlights.length === 0) {
       throw new ServiceUnavailableException({
         error: { code: 'ASSISTANT_SUMMARY_FAILED', message: '这一轮对话暂时总结不了，请再问几句后再试' },

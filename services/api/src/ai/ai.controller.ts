@@ -42,6 +42,7 @@ import { Roles } from '../common/decorators/roles.decorator'
 import { BenefitRedemptionService } from '../benefit-redemption/benefit-redemption.service'
 import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
 import { runWithPublicQuota } from './ai-request-guard'
+import { consumeSafetyRefund } from './safety/block-log'
 import { isRefundableAiFailure } from './llm/llm-failure'
 import { readResumeParseIntentHeaders } from './resume-parse-intent'
 import { ResumeParseIntentRunner } from './resume-parse-intent-runner.service'
@@ -625,14 +626,20 @@ export class AiController {
       terminal: await this.verifiedQuotaTerminal(req),
       ip: ipOf(req),
     })
-    const result = await runWithPublicQuota(this.publicQuota, quotaTicket, req, () =>
-      this.aiService.chatWithAssistant(
+    const result = await runWithPublicQuota(this.publicQuota, quotaTicket, req, async () => {
+      const chat = await this.aiService.chatWithAssistant(
         dto,
         assistantOwnerKey(chatMember?.endUserId ?? null, ipOf(req)),
         chatMember?.endUserId ?? null,
         req,
-      ),
-    )
+      )
+      // 内容拦截或设备故障固定回答：退回本次公网次数。会员次数在计次里另按原因归还。
+      if (consumeSafetyRefund()) {
+        await this.publicQuota.rollback(quotaTicket)
+        if (quotaTicket) quotaTicket.keys.length = 0
+      }
+      return chat
+    })
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',
