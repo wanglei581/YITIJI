@@ -58,7 +58,7 @@ function auditContextOf(req: ReqLike): AuditContext {
  * 全机维护照旧拦（@MaintenanceBlocked），那是设备停办，不是 AI 闸门。
  */
 const SCORING_EXEMPT_REASON =
-  '维度打分是纯函数，不调模型；AI 解读是否调用由接口内按同一 AI 闸门判定，拦下时只回打分'
+  '维度打分是纯函数，不调模型；AI 解读在闸门放行后计入每人每天简历次数，闸门拦下或次数用完时只回打分'
 const RULE_ONLY_FILE_EXEMPT_REASON =
   '只有打分的报告不含 AI 内容、不写 AIGC 标识；含 AI 解读时接口内照旧过 AI 闸门'
 

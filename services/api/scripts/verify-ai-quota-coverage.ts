@@ -61,6 +61,9 @@ import { MemberPrivacyService } from '../src/member-privacy/member-privacy.servi
 import { MemberMockInterviewController, MockInterviewController } from '../src/mock-interview/mock-interview.controller'
 import { MockInterviewService } from '../src/mock-interview/mock-interview.service'
 import { PrismaService } from '../src/prisma/prisma.service'
+import { SelfAssessmentService } from '../src/ai/resume/self-assessment.service'
+import { SELF_ASSESSMENT_QUESTIONS_V1 } from '../src/ai/resume/self-assessment-questions'
+import { SELF_ASSESSMENT_CONSENT_VERSION } from '../src/ai/resume/self-assessment.types'
 import { TrtcController } from '../src/trtc/trtc.controller'
 import { TrtcService } from '../src/trtc/trtc.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
@@ -273,6 +276,41 @@ function staticScan(): { line: string; violations: string[] } {
   return { line, violations }
 }
 
+function bodyOf(fn: unknown): string {
+  return typeof fn === 'function' ? Function.prototype.toString.call(fn) : ''
+}
+
+/** 被拒绝的请求不能扣次数：同意 / 闸门必须出现在预占之前。认不出的错误不得归还。用完必须带回 AI_QUOTA_EXHAUSTED。 */
+function assertChargeGuards(): void {
+  const earlier = (label: string, source: string, first: string, second: string) => {
+    const atFirst = source.indexOf(first)
+    const atSecond = source.indexOf(second)
+    assert.ok(atFirst >= 0, `${label} 缺少 ${first}`)
+    assert.ok(atSecond > atFirst, `${label} 必须先经过 ${first}，被拒的请求不能扣次数`)
+  }
+  earlier('简历解析', bodyOf(AiController.prototype.submitResumeParse), 'requireActiveConsent', 'this.aiService.submitResumeParse')
+  earlier('简历优化', bodyOf(AiController.prototype.getResumeOptimize), 'requireActiveConsent', 'this.aiService.getResumeOptimize')
+  earlier('简历生成', bodyOf(AiController.prototype.submitResumeGenerate), 'requireActiveConsent', 'this.aiService.submitResumeGenerate')
+  earlier('岗位推荐', bodyOf(JobAiService.prototype.recommendations), 'assertResumeAiConsent', 'this.chargeAssistant')
+  earlier('岗位解读', bodyOf(JobAiService.prototype.explainJob), 'requireActiveConsent', 'this.chargeAssistant')
+  earlier('岗位对照', bodyOf(GovernedJobFitService.prototype.analyzeForJobFit), 'authorizeForAnalysis', 'runWithAiQuota')
+  earlier('岗位匹配', bodyOf(GovernedJobFitService.prototype.matchForMember), 'authorizeForAnalysis', 'this.chargeMatch')
+  const submit = bodyOf(SelfAssessmentService.prototype.submit)
+  earlier('自我探索同意', submit, 'SELF_ASSESSMENT_CONSENT_VERSION_STALE', 'runWithAiQuota')
+  earlier('自我探索闸门', submit, 'gates.interpretation', 'runWithAiQuota')
+  assert.match(submit, /bucket:\s*['"]ai_resume['"]/)
+  assert.match(submit, /AI_QUOTA_EXHAUSTED/)
+  const run = bodyOf(runWithAiQuota)
+  assert.match(
+    run,
+    /const reason = quotaReleaseReason\(error\);?\s*if \(reason\) await input\.quota\.release\(receipt\.reservationId, reason\);?/,
+    '认不出的错误不得归还',
+  )
+  const policy = readFileSync(resolve(__dirname, '../src/ai/quota/ai-quota.policy.ts'), 'utf8')
+  assert.match(policy, /code:\s*'AI_QUOTA_EXHAUSTED'/)
+  assert.match(policy, /HttpStatus\.TOO_MANY_REQUESTS/)
+}
+
 function extractionStub() {
   return {
     async extractResumeText(input: { fileId?: string }) {
@@ -297,6 +335,8 @@ async function main() {
     process.exit(1)
   }
   assert.equal(scanned.line, '接入 16、不计次 15、待 Q2b 0、待裁定 0、违规 0')
+  assertChargeGuards()
+  console.log('PASS 授权先于扣次、失败才归还、用完返回 AI_QUOTA_EXHAUSTED、自我探索解读计入简历次数')
 
   const apiRoot = resolve(__dirname, '..')
   const temporary = mkdtempSync(join(tmpdir(), 'verify-ai-quota-coverage-'))
@@ -354,6 +394,7 @@ async function main() {
       ['顾清晏', 'xiaoqing'], ['江晚宁', 'assistant-voice'], ['宋知微', 'ask'], ['叶安然', 'chat-fail'], ['陆知夏', 'summary'], ['程以宁', 'summary-fail'],
       ['顾言川', 'interview'], ['宋予宁', 'interviewFail'], ['叶晚宁', 'interviewTurn'], ['江澄', 'interviewEmpty'],
       ['许南枝', 'recommend'], ['沈望舒', 'explain'], ['周晚舟', 'jobMatch'], ['梁书衡', 'fitRedis'],
+      ['乔知夏', 'sa'], ['唐清和', 'saGate'], ['沈拒之', 'explainDenied'], ['温不还', 'stuck'],
     ] as const
     const userOf = new Map<string, string>()
     for (let i = 0; i < people.length; i++) {
@@ -635,7 +676,7 @@ async function main() {
         rulePackVersion: 'labor-contract-cn-p0-v1', extractionFingerprint: fingerprint, confirmedAt: now,
         expiresAt: new Date(Date.now() + 24 * 3600_000), resultJson: null, ocrConfidence: null, analyzedPages: 1, errorCode: null,
       })
-      let current = task(`crLi${run}`)
+      const current = task(`crLi${run}`)
       let providerCalls = 0
       const fake = {
         current,
@@ -693,6 +734,16 @@ async function main() {
         quota, bucket: 'ai_resume', operationKey: `broken:${ma}`, endUserId: ma,
       }, async () => { throw broken }, async () => 'no-ref'))
       assert.equal(await used('failure'), 0)
+      const stuck = userOf.get('stuck')!
+      const reservedBefore = await dbPrisma.aiQuotaReservation.count({ where: { endUserId: stuck, status: 'reserved' } })
+      await assert.rejects(() => runWithAiQuota({
+        quota, bucket: 'ai_resume', operationKey: `unknown:${run}`, endUserId: stuck,
+      }, async () => { throw new Error('不是服务端确认的失败') }, async () => 'no-ref'))
+      assert.equal(
+        await dbPrisma.aiQuotaReservation.count({ where: { endUserId: stuck, status: 'reserved' } }),
+        reservedBefore + 1,
+        '认不出的错误不得归还',
+      )
       // 断开时模型失败：没有结果可重开，服务端确认的失败照常归还（失败不扣，总指挥 10/4）。
       await assert.rejects(() => runWithAiQuota({
         quota, bucket: 'ai_resume', operationKey: `disc-broken:${ma}`, endUserId: ma, req: { aborted: true },
@@ -1175,6 +1226,17 @@ async function main() {
       assert.equal(jobRedisKeys.length, keysAfter)
     })
 
+    await check('岗位解读：没有授权不扣次数也不调模型', async () => {
+      const before = await dbPrisma.aiQuotaReservation.count({ where: { endUserId: userOf.get('explainDenied')! } })
+      await expectCode('未授权', 'USER_AI_CONSENT_REQUIRED', () => jobAi.explainJob(
+        publishedJob.id, requester('explainDenied'), 'desk-shinan-03',
+        { member: userOf.get('explainDenied')!, terminal: 'desk-shinan-03', ip: '10.8.4.31' },
+      ))
+      assert.equal(jobCalls.explain, 0)
+      assert.equal(await usedAssistant('explainDenied'), 0)
+      assert.equal(await dbPrisma.aiQuotaReservation.count({ where: { endUserId: userOf.get('explainDenied')! } }), before)
+    })
+
     await check('岗位解读：成功扣 1，缓存命中不扣也不调模型', async () => {
       await dbPrisma.userAiConsent.create({ data: { endUserId: userOf.get('explain')!, scope: 'job_ai', consentVersion: '20260701' } })
       const context = { member: userOf.get('explain')!, terminal: 'desk-shinan-03', ip: '10.8.4.31' }
@@ -1240,6 +1302,59 @@ async function main() {
       assert.equal(fitKeys.some((key) => key.includes(':member:')), false)
       assert.equal(fitKeys.some((key) => key.includes(':terminal:')), true)
       assert.equal(fitKeys.some((key) => key.includes(':ip:')), true)
+    })
+
+    await check('自我探索：解读计入简历次数；闸门拒绝、同意版本不对、次数用完都不调模型', async () => {
+      let calls = 0
+      const saLlm = {
+        async summarize(input: { scored: { dimensions: Array<{ note?: string | null }> }; onLlmCall?: (meta: { provider: string; tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number } }) => void }) {
+          calls += 1
+          input.onLlmCall?.({ provider: 'coverage', tokenUsage: { promptTokens: 2, completionTokens: 1, totalTokens: 3 } })
+          return {
+            status: 'completed' as const,
+            dimensions: input.scored.dimensions.map((d) => ({ ...d, note: '材料可以一次备齐' })),
+            summary: '乔知夏的作答倾向已整理',
+            providerName: 'coverage',
+          }
+        },
+      }
+      const sa = new SelfAssessmentService(dbPrisma, saLlm as never, {} as never, {} as never, audit, quiet as never, quota)
+      const answers = SELF_ASSESSMENT_QUESTIONS_V1.dimensions.flatMap((dim) =>
+        dim.questions.map((q) => ({ dim: dim.key, idx: q.idx, choice: q.choices[0]?.key ?? 'a' })),
+      )
+      const input = {
+        answers,
+        consent: { nonSensitive: true, sensitive: false, consentVersion: SELF_ASSESSMENT_CONSENT_VERSION },
+      }
+      await expectCode('同意版本过期', 'SELF_ASSESSMENT_CONSENT_VERSION_STALE', () => sa.submit(
+        requester('saGate'),
+        { ...input, consent: { ...input.consent, consentVersion: 'sa-consent-old' } },
+      ))
+      assert.equal(calls, 0)
+      assert.equal(await used('saGate'), 0)
+      const paused = await sa.submit(requester('saGate'), input, undefined, { interpretation: async () => 'AI_PAUSED' })
+      assert.equal(paused.status, 'completed')
+      assert.equal(paused.aiUnavailableReason, 'AI_PAUSED')
+      assert.equal(paused.interpretationAvailable, false)
+      assert.equal(calls, 0)
+      assert.equal(await used('saGate'), 0)
+      const first = await sa.submit(requester('sa'), input, undefined, { interpretation: async () => null })
+      assert.equal(first.status, 'completed')
+      assert.equal(first.interpretationAvailable, true)
+      assert.equal(calls, 1)
+      assert.equal(await used('sa'), 1)
+      const second = await sa.submit(requester('sa'), input, undefined, { interpretation: async () => null })
+      assert.equal(second.status, 'completed')
+      assert.equal(second.interpretationAvailable, false)
+      assert.equal(second.aiUnavailableReason, 'AI_QUOTA_EXHAUSTED')
+      assert.equal(calls, 1)
+      assert.equal(await used('sa'), 1)
+      const beforeAnon = await dbPrisma.aiQuotaReservation.count()
+      const anon = await sa.submit({ endUserId: null, accessToken: null }, input)
+      assert.equal(anon.status, 'completed')
+      assert.equal(anon.interpretationAvailable, true)
+      assert.equal(calls, 2)
+      assert.equal(await dbPrisma.aiQuotaReservation.count(), beforeAnon, '未登录的自我探索不进按人账本')
     })
   } finally {
     LlmResumeOptimizeService.prototype.adjustLayoutDraft = originalLayout
