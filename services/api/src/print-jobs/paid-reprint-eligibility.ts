@@ -41,8 +41,8 @@ export const REPRINT_BLOCKED_CODE: Record<PaidReprintBlockReason, string> = {
 
 export const REPRINT_BLOCKED_MESSAGE: Record<PaidReprintBlockReason, string> = {
   not_failed: '只有失败的打印任务可以重新提交',
-  unconfirmed: '打印结果未确认，不能重新提交，请联系工作人员核查',
-  partial_output: '这单已经出了一部分纸，不能整单重打；需要补打请另下新单',
+  unconfirmed: '这单的出纸结果还没确认，请 5 分钟后再试',
+  partial_output: '这单只出了一部分纸',
   refunding: '这单已退款或正在退款，不能重新提交',
   not_paid: '订单未付款，不能重试出纸',
   file_unavailable: '打印文件已过期或已清理，不能重新提交',
@@ -84,10 +84,15 @@ export function paidReprintBlockReason(input: {
   agentVersion?: string | null
   /** 事务外的预检跳过版本。真正放行必须在锁住 PrintTask 之后再读心跳。 */
   skipAgentVersion?: boolean
+  /**
+   * 自助续打已经按免费 / 付费 / 冷却期处理过这两种异常。
+   * 管理员不得传 true：未确认和部分出纸在后台仍然拒绝，不提供强制重打。
+   */
+  selfServiceAnomalyCleared?: boolean
 }): PaidReprintBlockReason | null {
   if (input.status !== 'failed') return 'not_failed'
-  if (input.errorCode === PRINT_JOB_UNCONFIRMED_ERROR_CODE) return 'unconfirmed'
-  if (input.errorCode === PARTIAL_OUTPUT_ERROR_CODE) return 'partial_output'
+  if (!input.selfServiceAnomalyCleared && input.errorCode === PRINT_JOB_UNCONFIRMED_ERROR_CODE) return 'unconfirmed'
+  if (!input.selfServiceAnomalyCleared && input.errorCode === PARTIAL_OUTPUT_ERROR_CODE) return 'partial_output'
   if (input.hasOrder && input.payStatus != null && REFUND_PAY_STATUSES.has(input.payStatus)) return 'refunding'
   if (input.hasOrder && input.payStatus !== 'paid') return 'not_paid'
   if (!isPrintableFileRecord(input.file)) return 'file_unavailable'

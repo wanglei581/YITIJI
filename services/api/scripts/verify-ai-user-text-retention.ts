@@ -176,6 +176,8 @@ section('2. 落库面：AI 模块写入的模型必须有留存期限')
  * 想新增一条，必须写清为什么它不承载用户原话（理由 < 20 字直接 FAIL）。
  */
 const NO_TTL_REGISTRY: Record<string, string> = {
+  AiSafetyTerm:
+    '只存安全词库的类别、词条和开关，不含会员身份或用户提问，作为运营配置长期保留。',
   AiServiceLog:
     '只落 operation/provider/status/latency/token 等元数据，无任何用户文本字段；按 AI_SERVICE_LOG_RETENTION_DAYS 由 AiResultCleanupTask 定期硬删',
   AuditLog:

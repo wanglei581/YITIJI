@@ -160,6 +160,14 @@ test('小青在四组之前，AI 服务记录和我的文档在四组之后', ()
   assert.ok(wxml.slice(groupsAt, groupsEnd).indexOf('documents') < 0, '四组循环里不再放我的文档')
 })
 
+test('我的文档磁贴与上面的记录卡之间用现有间距类拉开', () => {
+  const wxml = visibleWxml()
+  const records = wxml.indexOf('bindtap="toRecords"')
+  const documents = wxml.indexOf('data-id="{{documents.id}}"')
+  const between = wxml.slice(records, documents)
+  assert.match(between, /<view class="tiles mt12">/, '我的文档所在磁贴要用现有 mt12，与本页卡片 12px 间距一致')
+})
+
 test('统一 AI 声明不覆盖材料模板，仍覆盖其余 AI 项和小青', () => {
   const data = loadAi().data
   const wxml = visibleWxml()
