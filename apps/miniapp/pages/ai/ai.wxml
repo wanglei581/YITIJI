@@ -100,8 +100,9 @@
       <view class="ae-sub">从服务端读取诊断、优化和规划记录</view>
     </view>
 
-    <!-- 我的文档从磁贴组挪到结果区，仍用原来的磁贴。不另做一条同义入口。 -->
-    <view class="tiles">
+    <!-- 我的文档从磁贴组挪到结果区，仍用原来的磁贴。不另做一条同义入口。
+         与上面的记录卡拉开，用全局卡片间距 mt12（12px），与本页小青卡、.card 的下边距一致。 -->
+    <view class="tiles mt12">
       <view
         class="tile sheen tap"
         hover-class="tap-press"
