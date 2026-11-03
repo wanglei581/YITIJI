@@ -94,7 +94,8 @@ async function openWaiting(page: Page, api: ApiRouter, item: ScanOpen) {
   }
   // 触屏版简历来源默认不是手机。点「在手机里」才出上传码。其它页用自己的 open。
   if (item.open) await item.open(page)
-  else if (item.path.startsWith('/resume/source')) await page.getByRole('button', { name: '在手机里', exact: true }).click()
+  // 触屏版来源卡的可读名是「在手机里」加一行说明，按开头匹配。
+  else if (item.path.startsWith('/resume/source')) await page.getByRole('button', { name: /^在手机里/ }).click()
   await expect(page.getByText(NOTICE, { exact: true })).toBeVisible()
   await expect(page.locator(item.qr)).toBeVisible()
   await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000)
@@ -145,7 +146,7 @@ for (const item of CASES) {
     await expectOriginalPage(page, item)
     if (item.path.startsWith('/resume/source')) {
       // 触屏版换来源的出口是来源卡。等码期间「在 U 盘里」不能被锁住。
-      const back = page.getByRole('button', { name: '在 U 盘里', exact: true })
+      const back = page.getByRole('button', { name: /^在 U 盘里/ })
       await expect(back).toBeEnabled()
       await expectTapTarget(back)
     }
@@ -195,7 +196,8 @@ for (const item of CASES) {
     const state = await openWaiting(page, api, item)
     expect(state.creates()).toBe(1)
     expect(state.cancelled).toHaveLength(0)
-    await page.getByRole('button', { name: item.leave, exact: true }).click()
+    // 简历来源页头尾各有一个「上一步」，点第一个即可离页。
+    await page.getByRole('button', { name: item.leave, exact: true }).first().click()
     await expect(page).not.toHaveURL((url) => url.pathname === item.path.split('?')[0])
     await expect.poll(() => state.cancelled.length).toBe(1)
     await page.clock.runFor(5_000)
@@ -258,10 +260,12 @@ const HELD = [
       await page.getByRole('button', { name: '前端开发工程师', exact: true }).click()
       await page.getByRole('button', { name: /选择行业/ }).click()
       await page.getByRole('button', { name: '制造业', exact: true }).click()
+      // 行业选择框选完要点「完成」才收起，不然下面的经验按钮被挡住。
+      await page.getByRole('button', { name: '完成', exact: true }).click()
       await page.getByRole('button', { name: '应届生', exact: true }).click()
       await page.getByRole('button', { name: '下一步', exact: true }).click()
       await page.getByRole('button', { name: '下一步', exact: true }).click()
-      await page.getByRole('button', { name: '手机扫码上传', exact: true }).click()
+      await page.getByRole('button', { name: /^手机扫码上传/ }).click()
     },
   },
   { label: '合同审查', path: '/contract-review', pathname: '/contract-review', purpose: 'contract_upload', qr: 'svg[width="150"]', confirm: '确认使用这份合同' },
