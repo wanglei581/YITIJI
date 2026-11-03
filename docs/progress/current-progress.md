@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-11-03：一体机扫码上传共用面板取消失败不再清屏（重做旧候选 #1461；分支 `claude/kiosk-upload-cancel-keep-1103`；未合并、未部署）
+
+- 旧候选 #1461（10/14，未进 main）在触屏版上重做：会员确认时后端锁着复制文件，这时点「取消」会回 400 `UPLOAD_SESSION_ACTION_IN_PROGRESS`。共用面板原来吞掉失败并无条件清空，屏上像取消成功，文件随后仍会归档进会员名下。
+- 改法只在 `UploadSessionQrPanel`，照打印上传页 `useUploadSession`：取消答复回来前刷新、取消、确认都禁用；成功才清空并通知页面；已作废码清二维码、按过期显示；其余失败留下二维码、已收到的文件和状态，兜底句沿用「这次上传没能取消，文件还留着。」。不恢复轮询，不自动接走文件。
+- 验证：一体机 tsc、lint 无 error；冻结哈希三条、`verify:resume-phone-upload-ui`、`verify:public-screen-mask`、`verify:kiosk-unattended-copy`、两份 profile 守卫、仓库完整性，以及进度文档上不依赖数据库的后端文档门禁通过。`verify:ai-usage-retention` 缺隔离库，`verify:free-print-quota` 与 `verify:support-contact` 缺本机 Prisma 客户端，未跑成（与本次改动无关）。浏览器用例已写入，本机未跑浏览器。
+
 ## 2026-11-03：小程序 AI 板块第一轮——发给微信好友、今日提醒去 AI 闸门、AI 工具页按四组重排、简历优化与面试记录不再走死路（#1552，分支 `claude/miniapp-batch9-1103`；未合并、未部署，小程序未发布）
 
 - 来由：产品负责人 11/03 原话「剩下的你和codex和grok你们一起做完，Claude额度低，任务codex和grok执行，grok多干活」「小程序AI功能我已经通过备案……可以完整使用AI全部功能和能力……ai功能很重要，要设计好这一板块」，对分组回「按推荐重排」。分工：Grok 实现，Codex 实现两件并复核 Grok 的每一件，Claude 审查后拣入。提审与上线一律是带全部 AI 的完整版，不做也不保留「不含 AI 版」。

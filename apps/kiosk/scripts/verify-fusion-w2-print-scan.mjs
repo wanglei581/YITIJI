@@ -77,9 +77,13 @@ const frozenHashes = new Map([
   // 2026-10-29 重新冻结（触屏版走查 I-14，B 路）：签名图（signature_image）确认后只留系统短期、不进「我的文档」，面板里「会员文件确认后归档」对它不成立；
   // 只在那一处条件上加 purpose !== 'signature_image'，二维码、轮询、取消、确认、刷新先撤销旧会话等都逐字未动。冻结契约不放宽，仍逐字节校验。
   // 旧哈希 7f0cacce1e2b505548a4a141e2b63c71517c8ec5fe5d47fc827732a461f3e524。
+  // 2026-11-03 重新冻结（重做旧候选 #1461）：取消失败不再清屏——二维码和已收到的文件留着，屏上沿用打印上传页那句兜底，
+  // 可以重试取消或去确认；取消中三个按钮都禁用。成功才清空，已作废码清二维码并按过期显示。不恢复轮询、不自动接走文件。
+  // 新行为由 verify:resume-phone-upload-ui 的断言钉住。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
   [
     'src/pages/upload/components/UploadSessionQrPanel.tsx',
-    '412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357',
+    '018fd611a3350ce53fa3b79fceb887c5a5b0d56a2d47f36d418f3b6745b816ca',
   ],
   [
     'src/pages/print/DevSandboxControls.tsx',
