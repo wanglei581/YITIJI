@@ -642,6 +642,21 @@ async function main(): Promise<void> {
     }
     pass('免费未确认 5 分钟内 409，视图 reprintNotice=may_have_printed；没有完成时间不放行')
 
+    const staleBefore = await loadFreePrintUsage(prisma, terminalId, userId, new Date())
+    const staleAt = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+    for (const status of ['pending', 'claimed'] as const) {
+      const stale = await releaseFailed('PRINT_JOB_UNCONFIRMED', { free: 'zero', completedAt: cooledAt })
+      await prisma.printTask.update({
+        where: { id: stale.taskId },
+        data: { status, createdAt: staleAt, updatedAt: staleAt },
+      })
+    }
+    const staleAfter = await loadFreePrintUsage(prisma, terminalId, userId, new Date())
+    if (staleAfter.terminalInFlight !== staleBefore.terminalInFlight || staleAfter.memberInFlight !== staleBefore.memberInFlight) {
+      fail(`三天未更新的 pending 和 claimed 不应占当天额度 before=${JSON.stringify(staleBefore)} after=${JSON.stringify(staleAfter)}`)
+    }
+    pass('三天未更新的 pending 和 claimed 不占当天额度')
+
     const freeUnconfirmed = await releaseFailed('PRINT_JOB_UNCONFIRMED', { free: 'zero', completedAt: cooledAt })
     const freeView = await cloudOrders.detail(userId, freeUnconfirmed.orderId)
     if (freeView.reprintAllowed !== true || freeView.reprintRemaining !== 2 || freeView.reprintNotice !== 'may_have_printed') {
