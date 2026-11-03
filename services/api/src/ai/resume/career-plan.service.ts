@@ -111,25 +111,29 @@ export class CareerPlanService {
     }
 
     // 可选上下文（如实分层，绝不跨归属）：
-    // 1) 同 taskId 的最近岗位匹配参考
+    // 1) 同 taskId 的最近岗位匹配参考。
+    // 板块关闭时整段不读。系统内岗位还要托管开着才带进生成；手填对照不是招聘内容，板块开着就保留。
     let jobFitCtx: { jobTitle: string; gaps: string[]; source: 'system' | 'manual' } | null = null
     const jobFitRow = includeJobFitTitle
       ? await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
       : null
     if (jobFitRow && jobFitRow.expiresAt && jobFitRow.expiresAt.getTime() > Date.now()) {
-      try {
-        const stored = JSON.parse(jobFitRow.payloadJson) as {
-          job?: { title?: string }
-          payload?: { gapPoints?: Array<{ gap?: string }> }
-        }
-        if (stored.job?.title) {
-          jobFitCtx = {
-            jobTitle: stored.job.title,
-            gaps: (stored.payload?.gapPoints ?? []).map((g) => g.gap ?? '').filter(Boolean).slice(0, 3),
-            source: storedJobFitUsesSystemJob(jobFitRow.payloadJson) ? 'system' : 'manual',
+      const usesSystemJob = storedJobFitUsesSystemJob(jobFitRow.payloadJson)
+      if (!usesSystemJob || isRecruitmentContentHostingEnabled()) {
+        try {
+          const stored = JSON.parse(jobFitRow.payloadJson) as {
+            job?: { title?: string }
+            payload?: { gapPoints?: Array<{ gap?: string }> }
           }
-        }
-      } catch { /* 损坏行按无上下文处理 */ }
+          if (stored.job?.title) {
+            jobFitCtx = {
+              jobTitle: stored.job.title,
+              gaps: (stored.payload?.gapPoints ?? []).map((g) => g.gap ?? '').filter(Boolean).slice(0, 3),
+              source: usesSystemJob ? 'system' : 'manual',
+            }
+          }
+        } catch { /* 损坏行按无上下文处理 */ }
+      }
     }
     // 2) 最近模拟面试表现摘要（仅会员；匿名面试凭证独立不跨链）
     let interviewCtx: { position: string; level: string; risks: string[] } | null = null

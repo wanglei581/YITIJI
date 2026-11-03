@@ -44,15 +44,35 @@ export function invalidAuditPayloadText(length: number): string {
   return `详情无法解析（原始记录约 ${length} 个字符，需要时请联系技术人员从服务器查看）`
 }
 
-export function safeAuditText(value: string): string {
+// 手机号前后不能紧挨别的数字：13 位时间戳、长编号里碰巧含 11 位不算手机号。
+const PHONE_PATTERN = /(?<!\d)(?:\+?86[\s-]*)?1[3-9](?:[\s-]*\d){9}(?!\d)/
+// 系统生成的编号与校验值：十六进制里的字母会让碰巧出现的 11 位数字被认成手机号。
+// 只有整段值完全是下列格式之一才不按手机号判断，不看键名——登录名这类字段的值本身就可能是手机号。
+// · 32/40/64 位十六进制（同一大小写，可带一对英文双引号）：文件、上传会话、AI 会话编号，对象存储与报告、安装包校验值，证书指纹
+// · 标准 UUID：服务端生成的请求编号、会话编号
+// · 小写字母前缀加「-」或「_」再加 16/24/32 位十六进制：自我探索任务 sa-、终端 t_、终端凭据 tc_、打印任务 ptask_
+const SYSTEM_ID_PATTERNS = [
+  /^("?)(?:[0-9a-f]{32}|[0-9a-f]{40}|[0-9a-f]{64}|[0-9A-F]{32}|[0-9A-F]{40}|[0-9A-F]{64})\1$/,
+  /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i,
+  /^[a-z]+(?:_[a-z]+)*[-_](?:[0-9a-f]{16}|[0-9a-f]{24}|[0-9a-f]{32})$/,
+]
+// 12 位短摘要单看格式分不清（一个字母加手机号也是 12 位），只在这三个服务端算出的摘要字段里放行。
+const SHORT_DIGEST_KEYS = new Set(['fileIdDigest', 'previousHashPrefix', 'deviceFingerprintPrefix'])
+
+function isSystemGeneratedId(value: string, key: string): boolean {
+  if (SYSTEM_ID_PATTERNS.some((pattern) => pattern.test(value))) return true
+  return SHORT_DIGEST_KEYS.has(key) && /^[0-9a-f]{12}$/.test(value)
+}
+
+export function safeAuditText(value: string, fieldKey = ''): string {
   // 字符串里的 JSON 也按结构脱敏；解析失败不回显原始记录。
   const trimmed = value.trimStart()
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     try { return JSON.stringify(sanitizeAuditValue(JSON.parse(value))) }
     catch { return invalidAuditPayloadText(value.length) }
   }
-  if (/(?<!\d)(?:\+?86[\s-]*)?1[3-9](?:[\s-]*\d){9}(?!\d)|[\w.+-]+@[\w.-]+\.[a-z]{2,}|bearer\s+\S+/i.test(value)) return '已隐藏'
-  // 手机号前后不能紧挨别的数字：13 位时间戳、长编号里碰巧含 11 位不算手机号。
+  if (!isSystemGeneratedId(value, fieldKey) && PHONE_PATTERN.test(value)) return '已隐藏'
+  if (/[\w.+-]+@[\w.-]+\.[a-z]{2,}|bearer\s+\S+/i.test(value)) return '已隐藏'
   // 兼容参数、普通键值对及嵌入文本的 JSON 写法，签名 URL 整段隐藏。
   const pairs = value.matchAll(/(?:^|[\s?&,;{[])['"]?([\w\u4e00-\u9fff-]+)['"]?\s*[=:]\s*/g)
   for (const [, key] of pairs) {
@@ -68,7 +88,7 @@ export function sanitizeAuditValue(value: unknown, key = ''): unknown {
     return Object.fromEntries(Object.entries(value).map(([name, item]) => [name, sanitizeAuditValue(item, name)]))
   }
   if (typeof value !== 'string') return value
-  const safe = safeAuditText(value)
+  const safe = safeAuditText(value, key)
   if (safe !== value) return safe
   if (key === 'sections') return Object.prototype.hasOwnProperty.call(SECTION_LABELS, value) ? SECTION_LABELS[value] : value
   if (['fromStatus', 'toStatus', 'status', 'result'].includes(key)) {

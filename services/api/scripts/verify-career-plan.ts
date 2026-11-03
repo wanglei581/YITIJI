@@ -12,6 +12,8 @@
  *  8. 简历文件已清理 → 诚实 failed（不调 LLM）
  *  9. 建议单 PDF 真实渲染（%PDF + 免责声明 + 行动清单）
  * 10. 日志脱敏：简历/规划文本不出现在日志
+ * 11. 反向：托管关闭、板块仍开时，系统岗位对照不得进入生成请求
+ * 12. 简历 AI 授权：未同意拒绝且不调模型；游客放行；同意后生成；撤回后再拒绝，已生成结果仍可读取
  *
  * 运行：pnpm --filter @ai-job-print/api verify:career-plan
  */
@@ -361,6 +363,38 @@ async function main() {
       if (joined.includes(secret)) fail(`10. 日志泄露内容: ${secret.slice(0, 10)}`)
     }
     pass('10. 日志脱敏：简历/规划文本不出现在日志')
+
+    // ── 11. 反向：托管关闭时，系统岗位对照不得进入生成请求 ──────────────────
+    // 板块仍开着（includeJobFitTitle）。手填对照不在这条里：现有 5a 在托管默认关闭时仍要求手填标题进 prompt。
+    const generationHosting = process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+    try {
+      process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+      await prisma.aiResumeResult.update({
+        where: { taskId_kind: { taskId: taskAnon, kind: 'job_fit' } },
+        data: {
+          payloadJson: JSON.stringify({
+            job: { id: 'system-cp-hosting', title: '系统标题_唯一标记SYSCP' },
+            payload: { gapPoints: [{ gap: '系统差距_唯一标记SYSGAPCP' }] },
+          }),
+          expiresAt: new Date(Date.now() + 3600_000),
+        },
+      })
+      llmRequestBodies.length = 0
+      responseQueue.push(vjson())
+      const plan = await svc.generate(taskAnon, anonReq, { includeJobFitTitle: true })
+      const request = llmRequestBodies[0] ?? ''
+      if (plan.status !== 'completed' || !('basedOn' in plan)) fail('11. 托管关闭时仍应基于简历正常生成')
+      if (!request.includes('简历标记CPRS') || !request.includes('档案管理与会议安排')) fail('11. 剔除系统对照时简历原文丢失')
+      if (request.includes('系统标题_唯一标记SYSCP') || request.includes('系统差距_唯一标记SYSGAPCP')
+        || request.includes('【最近简历对照】')
+        || plan.basedOn.jobFit !== null || plan.basedOn.jobFitSource !== null) {
+        fail('11. 托管关闭时生成输入不得出现岗位对照')
+      }
+      pass('11. 托管关闭时生成输入不得出现岗位对照')
+    } finally {
+      if (generationHosting === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+      else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = generationHosting
+    }
 
     // ── 11. 简历 AI 授权：未同意拒绝且不调模型；同意后放行；撤回后再拒绝 ──
     {

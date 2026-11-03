@@ -1752,13 +1752,13 @@ const api = {
   /**
    * 今日提醒办事清单。契约：POST /assistant/daily-report { city? }
    * → { date, empty, modules[ pickup_expiring | fair_countdown | city_new | broadcast ] }
-   * 需登录。city 由页面从岗位页 storage 读取，没有就不传。
+   * 需登录。city 由页面从岗位页 storage 读取，没有就不传。规则聚合不调用模型，不经过 AI 授权或额度闸门。
    */
   getDailyBrief({ city } = {}) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('今日提醒'));
     const data = {};
     if (city) data.city = city;
-    return request('/assistant/daily-report', { method: 'POST', data, needAuth: true, ai: 'generate' });
+    return request('/assistant/daily-report', { method: 'POST', data, needAuth: true });
   },
 
   // ---------- 合同审查（后端 contract-review.controller.ts 已实现） ----------
