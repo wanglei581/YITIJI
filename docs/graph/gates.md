@@ -70,7 +70,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1985 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1986 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -427,7 +427,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 600 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 601 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -683,6 +683,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/print/file-source/FileSourceView.tsx` | `verify-device-status-honest.mjs`<br/>`verify-file-display-truth.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-print-entry-source-split.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
 | `apps/kiosk/src/pages/print/file-source/fileSourceModel.ts` | `verify-file-display-truth.mjs`<br/>`verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/print/pickupClaimModel.ts` | `verify-pickup-claim-error-coverage.mjs`<br/>`verify-miniapp-cloud-print-m2.ts` |
+| `apps/kiosk/src/pages/print/pickupClaimResume.ts` | `verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/pages/print/piiRedaction.ts` | `verify-pii-redaction-contract.mjs` |
 | `apps/kiosk/src/pages/print/print-prototype.css` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-visual-unity.mjs`<br/>`verify-print-cta-contrast.mjs` |
 | `apps/kiosk/src/pages/print/printConfirmModel.ts` | `verify-print-confirm-honest.mjs` |

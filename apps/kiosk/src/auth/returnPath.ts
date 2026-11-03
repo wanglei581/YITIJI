@@ -14,10 +14,15 @@ export function loginPathForCurrentLocation(): string {
 }
 
 /**
- * 打印链上的「去登录」：回跳地址只放路由路径，不带当前查询串、文件编号、打印链接或交接编号。
- * 回来之后由打印交接上下文决定是哪一份文件（归属、有效期当场核对）。
+ * 打印链上的「去登录」：回跳地址只放路由路径，不带当前查询串、文件编号、打印链接、交接编号或到机码。
+ * 确认页回来之后由打印交接上下文决定是哪一份文件（归属、有效期当场核对）。
+ * 到机码认领回来之后由 sessionStorage 里的那一串接着认领，不写进 from。
  */
-export function loginPathForPrintStep(step: 'confirm' | 'preview'): string {
-  const from = step === 'confirm' ? '/print/confirm' : '/print/desk?step=preview'
+export function loginPathForPrintStep(step: 'confirm' | 'preview' | 'pickup'): string {
+  const from = step === 'confirm'
+    ? '/print/confirm'
+    : step === 'preview'
+      ? '/print/desk?step=preview'
+      : '/print/pickup-claim'
   return `/login?from=${encodeURIComponent(from)}`
 }

@@ -1,5 +1,6 @@
 import { clearResumeGenerateDraft, hasResumeGenerateDraft } from '../pages/resume/resumeGenerateDraft'
 import { clearPrintMaterialSession } from '../pages/print/printMaterialSession'
+import { clearPickupClaimCode, PICKUP_CLAIM_RESUME_KEY } from '../pages/print/pickupClaimResume'
 import { clearAiResumeSession } from '../pages/resume/aiResumeSession'
 import { clearAllResumeParseIntents, RESUME_PARSE_INTENT_STORAGE_KEY } from '../services/resumeParseIntent'
 import { clearJobMaterialDraft } from '../pages/resume/jobMaterialDraft'
@@ -37,6 +38,7 @@ import { AI_DECLARATION_SESSION_KEY } from '../ai/aiDeclarationVersions'
  */
 const SENSITIVE_SESSION_STORAGE_KEYS = [
   'ai-job-print:current-print-material-check',
+  PICKUP_CLAIM_RESUME_KEY,
   'ai-job-print:current-ai-resume',
   RESUME_PARSE_INTENT_STORAGE_KEY,
   'ai-job-print:job-material-draft:v1',
@@ -75,6 +77,7 @@ export function clearKioskSensitiveSession(outgoingMemberToken?: string | null):
   clearAiDeclarationSession()
   clearContractReviewSession()
   clearPrintMaterialSession()
+  clearPickupClaimCode()
   clearAiResumeSession()
   clearResumeGenerateDraft()
   clearAllResumeParseIntents()
