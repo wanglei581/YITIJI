@@ -104,9 +104,12 @@ const frozenHashes = new Map([
   // 2026-11-03 重新冻结（B6b-1）：面板在「码有效、文件还没到」时自己持清场锁，到期前 60 秒提醒，
   // 真实卸载作废还没收到文件的上传码；取消请求在途也持锁。新内容断言在本文件哈希检查之前。
   // 冻结契约不放宽，仍逐字节校验。旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
+  // 2026-11-03 再次冻结（B6b-1 返工）：同一页切换来源不再作废上传码，切回来继续用同一张；
+  // 离开页面才作废还没收到文件的会话。已卸载的实例不得作废屏上正在显示的那张码。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e。
   [
     'src/pages/upload/components/UploadSessionQrPanel.tsx',
-    'e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e',
+    '2109b8ce60b6d58f7f5028435a51ef3544310f2c00549e587bc2688058da91e3',
   ],
   [
     'src/pages/print/DevSandboxControls.tsx',

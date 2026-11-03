@@ -16,6 +16,15 @@ import {
   getUploadSessionStatus,
   uploadSessionUserMessage,
 } from '../../../services/api/uploadSessions'
+import {
+  beginUploadSessionCancel,
+  claimUploadSession,
+  dropUploadSession,
+  isUploadSessionDisplayed,
+  releaseUploadSession,
+  settleUnmountedUploadSession,
+  takeParkedUploadSession,
+} from '../uploadSessionLease'
 
 export interface PhoneUploadedFile {
   name: string
@@ -141,6 +150,9 @@ export function UploadSessionQrPanel({
   const pollFailuresRef = useRef(0)
   const qrRef = useRef<QrState | null>(null)
   const statusRef = useRef<UploadSessionStatusResponse | null>(null)
+  const heldIdRef = useRef<string | null>(null)
+  const pagePathRef = useRef(typeof window !== 'undefined' ? window.location.pathname : '')
+  pagePathRef.current = typeof window !== 'undefined' ? window.location.pathname : pagePathRef.current
   // 确认的在途标记：交给页面的确认函数可能是旧一帧的闭包，闭包里的 confirming 不可靠，所以另留一个不随渲染变的标记。
   const confirmingRef = useRef(false)
   const handleConfirmRef = useRef<() => Promise<void>>(async () => undefined)
@@ -172,6 +184,7 @@ export function UploadSessionQrPanel({
   }, [onBusyChange])
 
   // 和 ResumeUsbImportPanel 一样，effect 重放时重新置真；微任务只处理真实卸载。
+  // 同一页切来源只把码停放，切回来继续用；离开页面才作废。屏上还有人显示同一张码时，这份已卸载的实例不作废。
   useEffect(() => {
     mountedRef.current = true
     return () => {
@@ -180,7 +193,18 @@ export function UploadSessionQrPanel({
         if (mountedRef.current || confirmingRef.current) return
         const existing = qrRef.current
         const phase = statusRef.current?.status
+        if (existing && (phase === 'uploaded' || phase === 'confirmed' || phase === 'cancelled' || phase === 'expired')) {
+          dropUploadSession(existing.sessionId)
+          if (heldIdRef.current === existing.sessionId) heldIdRef.current = null
+        }
         if (!existing || phase === 'uploaded' || phase === 'confirmed' || phase === 'cancelled' || phase === 'expired') return
+        if (heldIdRef.current === existing.sessionId) {
+          releaseUploadSession(existing.sessionId)
+          heldIdRef.current = null
+        }
+        if (isUploadSessionDisplayed(existing.sessionId)) return
+        if (window.location.pathname === pagePathRef.current) return
+        if (!beginUploadSessionCancel(existing.sessionId)) return
         void cancelUploadSession(existing.sessionId, existing.controlToken).catch(() => undefined)
       })
     }
@@ -238,9 +262,43 @@ export function UploadSessionQrPanel({
         setError('手机端已上传文件，请先在一体机确认，或取消本次上传后重新开始。')
         return
       }
+      if (!existing) {
+        const parked = takeParkedUploadSession(pagePathRef.current, purpose)
+        if (parked) {
+          if (!mountedRef.current) {
+            releaseUploadSession(parked.sessionId)
+            return
+          }
+          const next = {
+            sessionId: parked.sessionId,
+            uploadToken: parked.uploadToken,
+            controlToken: parked.controlToken,
+            qrUrl: parked.qrUrl,
+            expiresAt: parked.expiresAt,
+          }
+          heldIdRef.current = parked.sessionId
+          qrRef.current = next
+          statusRef.current = {
+            sessionId: parked.sessionId,
+            status: 'pending',
+            purpose,
+            mode: 'temporary',
+            file: null,
+            requiresKioskConfirmation: false,
+            expiresAt: parked.expiresAt,
+          }
+          setQr(next)
+          setStatus(statusRef.current)
+          return
+        }
+      }
       if (existing) {
         // 新码只有在旧码已被服务端撤销（或已确认失效）时才生成，避免旁人手里的旧码继续可用。
         await revokePreviousSession(existing)
+        dropUploadSession(existing.sessionId)
+        if (heldIdRef.current === existing.sessionId) heldIdRef.current = null
+        qrRef.current = null
+        statusRef.current = null
         if (!mountedRef.current) return
         setQr(null)
         setStatus(null)
@@ -265,18 +323,14 @@ export function UploadSessionQrPanel({
         setError('会员登录已过期，已切换为临时上传；本次文件仅用于当前操作，不会自动归档到会员账号。')
         return fallback
       })
-      if (!mountedRef.current) {
-        void cancelUploadSession(created.sessionId, created.controlToken).catch(() => undefined)
-        return
-      }
-      setQr({
+      const next = {
         sessionId: created.sessionId,
         uploadToken: created.uploadToken,
         controlToken: created.controlToken,
         qrUrl: buildPhoneUploadQrUrl(created, purpose),
         expiresAt: created.expiresAt,
-      })
-      setStatus({
+      }
+      const nextStatus: UploadSessionStatusResponse = {
         sessionId: created.sessionId,
         status: 'pending',
         purpose,
@@ -284,7 +338,17 @@ export function UploadSessionQrPanel({
         file: null,
         requiresKioskConfirmation: effectiveMemberMode,
         expiresAt: created.expiresAt,
-      })
+      }
+      if (!mountedRef.current) {
+        settleUnmountedUploadSession({ ...next, purpose, pathname: pagePathRef.current })
+        return
+      }
+      claimUploadSession({ ...next, purpose, pathname: pagePathRef.current })
+      heldIdRef.current = next.sessionId
+      qrRef.current = next
+      statusRef.current = nextStatus
+      setQr(next)
+      setStatus(nextStatus)
     } catch (err) {
       if (!mountedRef.current) return
       setError(uploadSessionUserMessage(err, '二维码生成失败，请稍后重试。'))
@@ -364,6 +428,10 @@ export function UploadSessionQrPanel({
     } catch {
       // best-effort only
     } finally {
+      dropUploadSession(qr.sessionId)
+      if (heldIdRef.current === qr.sessionId) heldIdRef.current = null
+      qrRef.current = null
+      statusRef.current = null
       setCancelling(false)
       setQr(null)
       setStatus(null)

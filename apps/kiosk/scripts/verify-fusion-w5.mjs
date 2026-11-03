@@ -126,7 +126,10 @@ const FROZEN = new Map([
   // 旧哈希 7f0cacce1e2b505548a4a141e2b63c71517c8ec5fe5d47fc827732a461f3e524。
   // 2026-11-03 重新冻结（B6b-1）：独立等待锁、到期提醒、真实卸载作废。新内容断言在哈希检查之前。
   // 冻结契约不放宽，仍逐字节校验。旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
-  ['src/pages/upload/components/UploadSessionQrPanel.tsx', 'e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e'],
+  // 2026-11-03 再次冻结（B6b-1 返工）：同一页切换来源不再作废上传码，切回来继续用同一张；
+  // 离开页面才作废还没收到文件的会话。已卸载的实例不得作废屏上正在显示的那张码。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e。
+  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '2109b8ce60b6d58f7f5028435a51ef3544310f2c00549e587bc2688058da91e3'],
 ])
 
 function propertyName(node) {
