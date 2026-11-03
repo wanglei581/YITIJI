@@ -9,6 +9,13 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 const sha256 = (path) => createHash('sha256').update(read(path)).digest('hex')
 
+// 真实卸载作废未收文件的会话，StrictMode 重放和确认过程有守卫。
+for (const path of ['src/pages/upload/components/UploadSessionQrPanel.tsx', 'src/pages/upload/hooks/useUploadSession.ts']) {
+  const source = read(path)
+  assert.match(source, /mountedRef\.current = true[\s\S]*return \(\) => \{[\s\S]*mountedRef\.current = false[\s\S]*queueMicrotask\(\(\) => \{[\s\S]*if \(mountedRef\.current \|\| confirmingRef\.current\) return[\s\S]*if \(!existing \|\| phase === 'uploaded' \|\| phase === 'confirmed' \|\| phase === 'cancelled' \|\| phase === 'expired'\) return[\s\S]*void cancelUploadSession\(existing\.sessionId, existing\.controlToken\)\.catch\(\(\) => undefined\)/, `${path} 卸载静默作废且避开重放与确认`)
+}
+console.log('PASS 两套上传真实卸载静默作废')
+
 const W5_ROUTES = [
   '/member/qr-login', '/upload/phone', '/login', '/legal/:doc',
   // 2026-10-29 一体机手机码短链的网页中转（兑换或校验后 replace 到上面两个手机页）。
@@ -117,7 +124,9 @@ const FROZEN = new Map([
   // 2026-10-29 重新冻结（触屏版走查 I-14，B 路）：签名图（signature_image）确认后只留系统短期、不进「我的文档」，面板里「会员文件确认后归档」对它不成立；
   // 只在那一处条件上加 purpose !== 'signature_image'，二维码、轮询、取消、确认、刷新先撤销旧会话等都逐字未动。冻结契约不放宽，仍逐字节校验。
   // 旧哈希 7f0cacce1e2b505548a4a141e2b63c71517c8ec5fe5d47fc827732a461f3e524。
-  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357'],
+  // 2026-11-03 重新冻结（B6b-1）：独立等待锁、到期提醒、真实卸载作废。新内容断言在哈希检查之前。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
+  ['src/pages/upload/components/UploadSessionQrPanel.tsx', 'e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e'],
 ])
 
 function propertyName(node) {

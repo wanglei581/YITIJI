@@ -109,7 +109,6 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const [resumeFile, setResumeFile] = useState<{ fileId: string; name: string } | null>(setupDraft?.resumeFile ?? null)
   const [resumeChannel, setResumeChannel] = useState<ResumeChannel | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [qrBusy, setQrBusy] = useState(false)
   const [usbBusy, setUsbBusy] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -145,7 +144,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     setOfferStartWithoutResume(true)
   })
 
-  useBusyLock(creating || uploading || printingSheet || qrBusy || usbBusy)
+  useBusyLock(creating || uploading || printingSheet || usbBusy)
 
   useEffect(() => {
     patchInterviewWorkbenchSession({
@@ -665,7 +664,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                 uploading={uploading}
                 onPickFile={() => { if (!isTerminalKiosk()) fileInputRef.current?.click() }}
                 onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name })}
-                onQrBusy={setQrBusy}
+                onQrBusy={() => undefined}
                 onUsbBusy={setUsbBusy}
               />
               {!kiosk && (

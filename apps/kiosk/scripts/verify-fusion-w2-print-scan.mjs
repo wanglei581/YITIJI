@@ -9,6 +9,30 @@ const kioskRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(join(kioskRoot, path), 'utf8')
 const sha256 = (path) => createHash('sha256').update(read(path)).digest('hex')
 
+// 等手机传文件：面板自己的忙碌锁和页面清场锁分开。码有效、文件还没到才算忙；文件一到就放开。
+assert.match(read('src/pages/upload/components/UploadSessionQrPanel.tsx'), /useBusyLock\(\(active && status\?\.status !== 'uploaded'\) \|\| loading \|\| confirming \|\| cancelling\)/, '面板独立持忙碌锁，文件已到不再顺延')
+assert.match(read('src/pages/print/PrintUploadPage.tsx'), /useBusyLock\([^\n]*phoneSession\.waiting\)/, '打印等待有效会话时持忙碌锁')
+assert.match(read('src/pages/upload/hooks/useUploadSession.ts'), /const waiting = Boolean\(enabled && qr && remainingSeconds > 0 && status\?\.status !== 'uploaded' && status\?\.status !== 'confirmed' && status\?\.status !== 'cancelled' && status\?\.status !== 'expired'\)/, '打印等待锁受真实到期和终态约束')
+const pageClearLocks = [
+  ['src/pages/contract-review/ContractReviewHomePage.tsx', 'useBusyLock(submitting)'],
+  ['src/pages/resume/ResumeSourcePage.tsx', 'useBusyLock(uploading || usbBusy)'],
+  ['src/pages/print-scan/ConvertImagesPage.tsx', 'useBusyLock(uploading || generating || rechecking)'],
+  ['src/pages/interview/InterviewSetupPage.tsx', 'useBusyLock(creating || uploading || printingSheet || usbBusy)'],
+  ['src/pages/print-scan/sign-stamp/useSignStampFlow.ts', 'useBusyLock(busy)'],
+]
+for (const [file, expected] of pageClearLocks) {
+  // 去掉注释后，文件里每一处 useBusyLock 调用都要查：只看第一处的话，再加一把锁就绕过去了。
+  const text = read(file).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const calls = [...text.matchAll(/useBusyLock\(([^\n]*)\)\s*$/gm)].map((match) => `useBusyLock(${match[1]})`)
+  assert.deepEqual(calls, [expected], `${file} 只许有一处清场锁，且不含扫码面板的忙：应为 ${expected}`)
+  assert.doesNotMatch(
+    calls.join('\n'),
+    /\b(?:qrBusy|phoneBusy|sourceBusy|showQr)\b/,
+    `${file} 的 useBusyLock 实参不得再出现 qrBusy / phoneBusy / sourceBusy / showQr`,
+  )
+}
+console.log('PASS 两套上传等待锁及到期边界')
+
 const directRoutes = new Map([
   ['/print-scan', 'PrintScanHomePage'],
   ['/print-scan/feature/:key', 'PrintScanFeatureInfoPage'],
@@ -77,9 +101,12 @@ const frozenHashes = new Map([
   // 2026-10-29 重新冻结（触屏版走查 I-14，B 路）：签名图（signature_image）确认后只留系统短期、不进「我的文档」，面板里「会员文件确认后归档」对它不成立；
   // 只在那一处条件上加 purpose !== 'signature_image'，二维码、轮询、取消、确认、刷新先撤销旧会话等都逐字未动。冻结契约不放宽，仍逐字节校验。
   // 旧哈希 7f0cacce1e2b505548a4a141e2b63c71517c8ec5fe5d47fc827732a461f3e524。
+  // 2026-11-03 重新冻结（B6b-1）：面板在「码有效、文件还没到」时自己持清场锁，到期前 60 秒提醒，
+  // 真实卸载作废还没收到文件的上传码；取消请求在途也持锁。新内容断言在本文件哈希检查之前。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
   [
     'src/pages/upload/components/UploadSessionQrPanel.tsx',
-    '412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357',
+    'e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e',
   ],
   [
     'src/pages/print/DevSandboxControls.tsx',

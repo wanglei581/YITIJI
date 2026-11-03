@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { CheckCircleIcon, Loader2Icon, RefreshCwIcon, SmartphoneIcon, XCircleIcon } from 'lucide-react'
 import type { FilePurpose, UploadSessionStatusResponse } from '@ai-job-print/shared'
 import { Button, Card } from '@ai-job-print/ui'
+import { useBusyLock } from '../../../contexts/KioskBusyContext'
 import { useAuth } from '../../../auth/useAuth'
 import { notYourFileHint, phoneUploadScanHint, uploadedFileSourceLine } from '../../../copy/miniappLinkCopy'
 import { useSupportContact } from '../../../hooks/useSupportContact'
@@ -136,6 +137,7 @@ export function UploadSessionQrPanel({
 }: UploadSessionQrPanelProps) {
   const { getToken, isLoggedIn } = useAuth()
   const supportContact = useSupportContact()
+  const mountedRef = useRef(false)
   const pollFailuresRef = useRef(0)
   const qrRef = useRef<QrState | null>(null)
   const statusRef = useRef<UploadSessionStatusResponse | null>(null)
@@ -147,10 +149,15 @@ export function UploadSessionQrPanel({
   const [status, setStatus] = useState<UploadSessionStatusResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
 
   const active = Boolean(qr && status?.status !== 'confirmed' && status?.status !== 'cancelled' && status?.status !== 'expired')
+
+  // 这把锁只管「码有效、文件还没到」这一段。文件一到，下一步在本机，屏上有文件名：回到正常的无操作计时（合规 10/10）。
+  // 取消请求在途的那几秒也算正在办事（文件已收到时点取消，上面那一项已经放开了）。
+  useBusyLock((active && status?.status !== 'uploaded') || loading || confirming || cancelling)
 
   useEffect(() => {
     const received = status?.status === 'uploaded' || confirming
@@ -163,6 +170,21 @@ export function UploadSessionQrPanel({
       onBusyChange?.(false)
     }
   }, [onBusyChange])
+
+  // 和 ResumeUsbImportPanel 一样，effect 重放时重新置真；微任务只处理真实卸载。
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      queueMicrotask(() => {
+        if (mountedRef.current || confirmingRef.current) return
+        const existing = qrRef.current
+        const phase = statusRef.current?.status
+        if (!existing || phase === 'uploaded' || phase === 'confirmed' || phase === 'cancelled' || phase === 'expired') return
+        void cancelUploadSession(existing.sessionId, existing.controlToken).catch(() => undefined)
+      })
+    }
+  }, [])
 
   const receivedFile = status?.status === 'uploaded' ? status.file : null
   useEffect(() => {
@@ -187,13 +209,16 @@ export function UploadSessionQrPanel({
   }, [qr, status?.status])
 
   useEffect(() => {
-    if (!qr || !status || status.status === 'uploaded' || status.status === 'confirmed' || status.status === 'cancelled' || status.status === 'expired') {
+    if (!qr || status?.status === 'uploaded' || status?.status === 'confirmed' || status?.status === 'cancelled' || status?.status === 'expired') {
       return
     }
     if (new Date(qr.expiresAt).getTime() <= now) {
       setStatus((current) => expiredStatus(qr, current, purpose))
     }
   }, [now, purpose, qr, status])
+
+  const remainingSeconds = qr ? Math.max(0, Math.ceil((new Date(qr.expiresAt).getTime() - now) / 1000)) : 0
+  const waiting = active && !loading && !confirming && status?.status !== 'uploaded'
 
   const expiresLabel = useMemo(() => {
     if (!qr) return ''
@@ -216,6 +241,7 @@ export function UploadSessionQrPanel({
       if (existing) {
         // 新码只有在旧码已被服务端撤销（或已确认失效）时才生成，避免旁人手里的旧码继续可用。
         await revokePreviousSession(existing)
+        if (!mountedRef.current) return
         setQr(null)
         setStatus(null)
       }
@@ -239,6 +265,10 @@ export function UploadSessionQrPanel({
         setError('会员登录已过期，已切换为临时上传；本次文件仅用于当前操作，不会自动归档到会员账号。')
         return fallback
       })
+      if (!mountedRef.current) {
+        void cancelUploadSession(created.sessionId, created.controlToken).catch(() => undefined)
+        return
+      }
       setQr({
         sessionId: created.sessionId,
         uploadToken: created.uploadToken,
@@ -256,6 +286,7 @@ export function UploadSessionQrPanel({
         expiresAt: created.expiresAt,
       })
     } catch (err) {
+      if (!mountedRef.current) return
       setError(uploadSessionUserMessage(err, '二维码生成失败，请稍后重试。'))
     } finally {
       setLoading(false)
@@ -263,7 +294,9 @@ export function UploadSessionQrPanel({
   }, [getToken, isLoggedIn, purpose])
 
   useEffect(() => {
-    void refresh()
+    let disposed = false
+    queueMicrotask(() => { if (!disposed) void refresh() })
+    return () => { disposed = true }
   }, [refresh])
 
   useEffect(() => {
@@ -274,11 +307,14 @@ export function UploadSessionQrPanel({
       getUploadSessionStatus(qr.sessionId, qr.controlToken)
         .then((next) => {
           pollFailuresRef.current = 0
-          setStatus(next)
+          if (!mountedRef.current) return
+          setStatus(new Date(qr.expiresAt).getTime() <= Date.now() && (next.status === 'pending' || next.status === 'uploading')
+            ? expiredStatus(qr, next, purpose) : next)
         })
         .catch((err) => {
           pollFailuresRef.current += 1
           const code = apiErrorCode(err)
+          if (!mountedRef.current) return
           if (code === 'UPLOAD_SESSION_NOT_FOUND' || code === 'UPLOAD_SESSION_EXPIRED' || pollFailuresRef.current >= 3) {
             setStatus((current) => expiredStatus(qr, current, purpose))
             setError(code === 'UPLOAD_SESSION_NOT_FOUND' || code === 'UPLOAD_SESSION_EXPIRED'
@@ -300,6 +336,7 @@ export function UploadSessionQrPanel({
     try {
       const result = await confirmUploadSession(qr.sessionId, qr.controlToken, getToken())
       const file = result.file
+      statusRef.current = { ...status, status: 'confirmed', file }
       onUploaded({
         name: file.filename,
         size: formatSize(file.sizeBytes),
@@ -320,12 +357,14 @@ export function UploadSessionQrPanel({
   }
 
   const handleCancel = async () => {
-    if (!qr) return
+    if (!qr || cancelling) return
+    setCancelling(true)
     try {
       await cancelUploadSession(qr.sessionId, qr.controlToken)
     } catch {
       // best-effort only
     } finally {
+      setCancelling(false)
       setQr(null)
       setStatus(null)
       setError(null)
@@ -393,6 +432,14 @@ export function UploadSessionQrPanel({
                   ? '请刷新二维码后重新上传，旧二维码不再接收文件。'
                   : `二维码有效期 ${expiresLabel || '10:00'}，文件最大 10MB。`}
             </p>
+            {waiting && (
+              <p className="mt-2 text-sm leading-relaxed text-neutral-600">等你传文件期间，这台机器不会自动退出，请不要走开。二维码到期后没有操作，就会自动退出。</p>
+            )}
+            {waiting && remainingSeconds > 0 && remainingSeconds <= 60 && (
+              <div role="status" className="mt-3 rounded-xl bg-error-bg px-3 py-2 text-sm font-semibold text-error-fg">
+                二维码还剩 {expiresLabel}。还在传的话点一下屏幕，到期后可以在这里重新出码。
+              </div>
+            )}
             {uploaded && sourceLine ? <p className="mt-1 text-sm leading-relaxed text-neutral-600">{sourceLine}</p> : null}
             {uploaded ? <p className="mt-1 text-sm font-semibold leading-relaxed text-neutral-700">{notYourFileHint()}</p> : null}
             {error && (
@@ -410,16 +457,16 @@ export function UploadSessionQrPanel({
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" disabled={loading || confirming || uploaded} onClick={refresh}>
+            <Button size="sm" className="min-h-[56px] min-w-[48px]" variant="secondary" disabled={loading || confirming || uploaded || cancelling} onClick={refresh}>
               <RefreshCwIcon className="mr-1 h-4 w-4" aria-hidden="true" />
               刷新二维码
             </Button>
             {qr && (
-              <Button size="sm" variant="secondary" disabled={confirming} onClick={handleCancel}>
+              <Button size="sm" className="min-h-[56px] min-w-[48px]" variant="secondary" disabled={confirming || cancelling} onClick={handleCancel}>
                 取消
               </Button>
             )}
-            <Button size="sm" disabled={!uploaded || confirming} onClick={handleConfirm}>
+            <Button size="sm" className="min-h-[56px] min-w-[48px]" disabled={!uploaded || confirming || cancelling} onClick={handleConfirm}>
               {confirming ? '确认中...' : confirmLabel}
             </Button>
           </div>
