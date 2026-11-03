@@ -11,6 +11,8 @@
  * create session -> control token gate -> phone multipart upload -> kiosk status
  * -> kiosk confirm/cancel，以及关键安全错误码。
  * 会员上传后，把对象读卡住直到上传锁真实过期，再并发取消，重复两轮。
+ * 应用自带的定时任务起好服务就全部停掉（见 pauseScheduledCronJobs）：这条门禁不测定时任务，
+ * 而每分钟的扫码会话清扫会在确认的锁到期那一刻接管同一把锁，让竞争用例看整分钟落点。
  *
  * 默认不触发 /resume/parse，避免误耗 OCR / AI 配额；需要验证上传 fileId
  * 进入解析入口时，显式设置 UPLOAD_SESSION_HTTP_INCLUDE_PARSE=1。
@@ -21,9 +23,10 @@ import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { constants as fsConstants, promises as fs } from 'node:fs'
 import path from 'node:path'
-import { BadRequestException, ValidationPipe } from '@nestjs/common'
+import { BadRequestException, ValidationPipe, type INestApplication } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { JwtService } from '@nestjs/jwt'
+import { SchedulerRegistry } from '@nestjs/schedule'
 import { Redis } from 'ioredis'
 import { AppModule } from '../src/app.module'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
@@ -704,6 +707,32 @@ async function cleanup(): Promise<void> {
 
 const MEMBER_RACE_ROUNDS = 2
 
+type CronJobRef = ReturnType<SchedulerRegistry['getCronJob']>
+let scheduler: SchedulerRegistry | undefined
+let pausedCronJobs: Array<{ name: string; job: CronJobRef }> = []
+
+/**
+ * 竞争用例只有两方：确认和取消。应用自带的定时任务是第三方，和本脚本手工驱动的会话没有同步关系：
+ * 每分钟的扫码会话清扫（files.cleanup.task → cleanupExpiredSessions）会推进没做完的会员绑定，
+ * 确认的锁一到期、整分钟恰好落在那一刻，它就拿到同一把锁，自己读对象也卡在同一个 FIFO 上，又占 30 秒，
+ * 门禁于是报「lock did not expire」（CI run 41459811424：第 2 轮 14:44:30 上锁、14:45:00 到期）。
+ * 清扫接管锁的行为另有内存替身门禁 verify-upload-sessions-bind.ts 覆盖；这里起好服务就全部停掉、移出调度表。
+ */
+function pauseScheduledCronJobs(app: INestApplication): void {
+  const registry = app.get(SchedulerRegistry)
+  pausedCronJobs = [...registry.getCronJobs().entries()].map(([name, job]) => ({ name, job }))
+  for (const { name } of pausedCronJobs) registry.deleteCronJob(name)
+  scheduler = registry
+}
+
+function assertScheduledJobsPaused(round: number): void {
+  assert.ok(scheduler, `race ${round}: scheduled jobs were never paused`)
+  assert.ok(pausedCronJobs.length > 0, `race ${round}: AppModule registered no cron jobs to pause (the minute upload-session sweep is one)`)
+  const running = pausedCronJobs.filter(({ job }) => job.isActive).map(({ name }) => name)
+  assert.deepEqual(running, [], `race ${round}: paused cron jobs must stay stopped during the confirm/cancel race`)
+  assert.deepEqual([...scheduler.getCronJobs().keys()], [], `race ${round}: no cron job may be scheduled during the confirm/cancel race`)
+}
+
 type FifoHandle = Awaited<ReturnType<typeof fs.open>>
 
 /**
@@ -727,6 +756,7 @@ async function releaseBlockedFifoWriter(fifo: string, writerOpen: Promise<FifoHa
 
 async function raceMemberConfirmAgainstCancel(): Promise<void> {
   for (let round = 1; round <= MEMBER_RACE_ROUNDS; round += 1) {
+    assertScheduledJobsPaused(round)
     const member = await createLocalMemberToken()
     const created = await createMemberSession(`http-e2e-race-${round}`, member.token)
     const uploaded = await uploadFile({
@@ -766,8 +796,14 @@ async function raceMemberConfirmAgainstCancel(): Promise<void> {
       writer = await Promise.race([writerOpen, early])
       writerGate = 'held'
       assert.ok((await readRaceFile(fileId))?.pendingStorageKey, `race ${round}: pendingStorageKey missing while copy is blocked`)
+      const lockKey = `upload_session_upload_lock:${created.sessionId}`
+      // 确认先上锁再读对象，读卡在 FIFO 上，此刻的锁只能是确认那一把；等的是它自己 30 秒到期。
+      const confirmLease = await redis.get(lockKey)
+      assert.ok(confirmLease, `race ${round}: confirm must hold the upload lock while its copy is blocked`)
       const deadline = Date.now() + 45_000
-      while ((await redis.pttl(`upload_session_upload_lock:${created.sessionId}`)) >= 0) {
+      for (let holder: string | null = confirmLease; holder !== null; holder = await redis.get(lockKey)) {
+        // 换了持有者就是第三方接管了锁，当场报出来，不再等满 45 秒才说「没过期」。
+        assert.equal(holder, confirmLease, `race ${round}: upload lock was taken over by another holder before the confirm's lease lapsed`)
         if (Date.now() >= deadline) throw new Error(`race ${round}: lock did not expire`)
         await new Promise((resolve) => setTimeout(resolve, 200))
       }
@@ -899,6 +935,7 @@ async function main(): Promise<void> {
       throw new Error('upload-sessions HTTP verifier failed to bind a TCP port')
     }
     BASE = `http://127.0.0.1:${address.port}/api/v1`
+    pauseScheduledCronJobs(app)
 
     try {
       await runVerifier()
