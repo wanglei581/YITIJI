@@ -46,6 +46,13 @@ export const ANONYMOUS_AI_CALLER: Readonly<AiCallerIdentity> = Object.freeze({
 export interface AiRequestContext {
   /** 本请求的调用方身份；第一次调用时解析，之后返回同一个结果。永不 reject。 */
   identity(): Promise<AiCallerIdentity>
+  /**
+   * 请求头里的终端编号。未验签，只给内容拦截日志用，不进计量账。
+   * 没有就不要设，日志写 none。
+   */
+  terminalCode?: string
+  /** 内容拦截后置位。调用方消费一次再退公网次数，避免回滚做两次。 */
+  safetyRefund?: boolean
 }
 
 const store = new AsyncLocalStorage<AiRequestContext>()
