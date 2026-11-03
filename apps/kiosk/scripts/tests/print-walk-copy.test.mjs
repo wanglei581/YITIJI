@@ -537,7 +537,8 @@ test('I-11 缺纸、卡纸的下一步不等人「加完纸」「处理好」，
 
 test('到机码失败屏只在后端还允许续打时说出同码续打，不按价格', () => {
   const line = progress.SAME_CODE_RESUME_LINE
-  assert.match(line, /同一个到机码就能接着打/)
+  assert.match(line, /可以回到这里再输一次同一个到机码，按屏幕提示办理/)
+  assert.match(line, /符合条件时会整份重打/)
   assert.match(line, /请在手机上重新下单/)
   const paid = { variant: 'failed', money: { fact: 'paid', amountCents: 200 }, orderNo: 'ORD-RESUME', canRetry: true }
   assert.equal(failedModel.failureCopy(paid).resumeLine, null, '不是到机码单，即使能重提也不说同码续打')
@@ -553,7 +554,7 @@ test('到机码失败屏只在后端还允许续打时说出同码续打，不�
 
 test('续打成功只在后端标明上次可能出过纸时提醒看出纸口', () => {
   const line = progress.PRIOR_OUTPUT_TRAY_LINE
-  assert.match(line, /看出纸口有没有上次的纸/)
+  assert.match(line, /请留意出纸口，取走已有的纸，并留意这一次的出纸/)
   assert.equal(progress.priorOutputTrayLine({}), null)
   assert.equal(progress.priorOutputTrayLine({ mayHavePrinted: false, partialOutput: false }), null)
   assert.equal(progress.priorOutputTrayLine({ mayHavePrinted: true }), line)

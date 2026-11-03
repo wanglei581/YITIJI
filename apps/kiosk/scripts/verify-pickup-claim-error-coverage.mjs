@@ -295,11 +295,11 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
 }
 
 // 方案②：三个续打错误码的句子与分类。
-// 次数用尽要给回手机重新下单的下一步；出纸未确认说清 5 分钟后再输同一个码，按可恢复处理。
+// 次数用尽要给回手机重新下单的下一步；出纸未确认说清过 5 分钟后再输同一个码，符合条件时才整份重打，按可恢复处理。
 // 已经出过一部分纸的旧句仍归 closed，不放进 CLOSED_REQUIRED（那一句没有手机 / 小程序出路）。
 {
   const limit = '这单已经接着打过 2 次，不能再打了。还要打，请在手机上重新下单'
-  const unconfirmed = '这单的出纸结果还没确认。5 分钟后在这台机器上再输一次同一个到机码，就能接着打'
+  const unconfirmed = '这单的出纸结果还没确认。请过 5 分钟后回到这台机器，再输一次同一个到机码，按屏幕提示办理；符合条件时可以整份重打。'
   const partial = '这单已经出了一部分纸，不能整单重打'
   const already = '这个到机码已经用过，这单已经交给打印机，不能再次取件。要再打一份，请重新下单；没拿到纸，可以问小青，或查看《隐私政策》里的联系方式。'
   const resume = '没打完？回到出纸失败的那台机器上，再输一次同一个到机码就能接着打，每单最多 2 次。'
@@ -324,7 +324,7 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
 
 // 付费异常待退回、文件失效、程序太旧、当天额度、过期码。抽取器看不到这几个码（不在 new Exception 字面量里），这里逐个钉死。
 {
-  const refund = userMessages.PICKUP_RESUME_REFUND_PENDING_COPY
+  const refund = '这单没有打完，退款待处理，输码时不会当场退款。请不要再输这个到机码；需要帮助请查看《隐私政策》里的联系方式。'
   const refundErr = new ApiHttpError('PICKUP_RESUME_REFUND_PENDING', 'server says', 409)
   if (!Object.prototype.hasOwnProperty.call(table, 'PICKUP_RESUME_REFUND_PENDING')) fail('取件码表没有登记 PICKUP_RESUME_REFUND_PENDING')
   else if (!userMessages.SHARED_USER_MESSAGE_CODES.includes('PICKUP_RESUME_REFUND_PENDING')) fail('共享码表没有登记 PICKUP_RESUME_REFUND_PENDING')
@@ -336,7 +336,7 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
   else if (/重试|重新输入|再试/.test(refund)) fail('退款待处理仍叫人重试')
   else pass('PICKUP_RESUME_REFUND_PENDING：两张码表同一句，closed，不写已退款')
 
-  const fileSentence = '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单'
+  const fileSentence = '这笔订单的文件现在无法用于打印。请在手机上重新上传文件、重新下单。'
   const agentSentence = '这台机器暂时不能用同一个到机码接着打。还要打，请在手机上重新下单。'
   for (const [code, sentence] of [
     ['PRINT_RETRY_FILE_UNAVAILABLE', fileSentence],
@@ -366,21 +366,25 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
     fail('共享码表的过期句和取件码表不一致')
   } else pass('过期码：共享码表与取件码表同一句，不再被短句盖住')
 
-  for (const [code, shortCopy] of [
-    ['PRINT_TERMINAL_DAILY_QUOTA_REACHED', userMessages.PRINT_TERMINAL_DAILY_QUOTA_COPY],
-    ['PRINT_MEMBER_DAILY_QUOTA_REACHED', userMessages.PRINT_MEMBER_DAILY_QUOTA_COPY],
+  // 当天额度沿用批次上的共享短句：不进到机码表，认领页与确认页同一句，次要按钮是「输另一个到机码」。
+  for (const [code, expected] of [
+    ['PRINT_TERMINAL_DAILY_QUOTA_REACHED', '这台机器今天的免费打印量已用完，明天 0 点恢复'],
+    ['PRINT_MEMBER_DAILY_QUOTA_REACHED', '你今天的免费打印量已达上限，明天 0 点恢复'],
   ]) {
     const err = new ApiHttpError(code, 'server says', 429)
     const said = model.pickupClaimMessage(err)
     const shared = userMessages.userMessageOf(err, '兜底')
-    if (model.classifyClaimFailure(err) !== 'other') fail(`${code} 不应进 closed 屏（明天还能用），实际 ${model.classifyClaimFailure(err)}`)
-    else if (!said.includes(shortCopy) || !said.includes(model.PICKUP_QUOTA_NEXT_STEP)) fail(`${code} 取件句没有短句加下一步：${said}`)
-    else if (/免费|人较多|已经用完/.test(said)) fail(`${code} 取件句出现了不该说的词：${said}`)
-    else if (!shared.startsWith(shortCopy)) fail(`${code} 共享短句变了：${shared}`)
-    else if (shared.includes(model.PICKUP_QUOTA_NEXT_STEP)) fail(`${code} 共享短句带上了到机码下一步，确认页会被带着走`)
-    else if (!shared.includes('需要帮助？')) fail(`${code} 共享短句丢了求助句`)
-    else pass(`${code}：取件页有下一步，共享码表停在明天恢复`)
+    if (Object.prototype.hasOwnProperty.call(table, code)) fail(`${code} 不该登记进到机码表，原话在共享码表`)
+    else if (model.classifyClaimFailure(err) !== 'other') fail(`${code} 应分类为 other，实际 ${model.classifyClaimFailure(err)}`)
+    else if (said !== shared) fail(`${code} 认领页没有沿用共享短句：${said}`)
+    else if (!said.includes(expected)) fail(`${code} 共享短句不是批次原话：${said}`)
+    else if (!said.includes('免费')) fail(`${code} 丢掉了「免费」：${said}`)
+    else if (!said.includes('需要帮助？')) fail(`${code} 共享短句丢了求助句`)
+    else pass(`${code}：不进到机码表，认领页与确认页同一句共享短句`)
   }
+  const memberLimited = userMessages.userMessageOf({ code: 'PRINT_MEMBER_DAILY_QUOTA_REACHED', details: { limit: 50 } }, '兜底')
+  if (!memberLimited.includes('你今天已免费打印 50 面')) fail(`会员当天额度带面数时不是批次原话：${memberLimited}`)
+  else pass('会员当天额度：有面数时写出免费打印了多少面')
 }
 {
   const rel = 'apps/kiosk/src/pages/print/components/PickupHidGuide.tsx'
@@ -394,10 +398,10 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
   if (!quotaBranch) fail(`${rel}：额度被拒没有单独的按钮分支`)
   else {
     const text = quotaBranch.getText(sf)
-    if (!text.includes('求助')) fail('当天额度用完的次要按钮不是「求助」')
-    else if (/输另一个到机码/.test(text)) fail('当天额度用完仍给「输另一个到机码」')
-    else if (!/onHelp/.test(text)) fail('求助按钮没有接到 onHelp')
-    else pass('当天额度用完：主按钮回首页，次要出口是求助')
+    if (!text.includes('输另一个到机码')) fail('当天额度用完的次要按钮不是「输另一个到机码」')
+    else if (/求助/.test(text)) fail('当天额度用完的次要按钮被改成了「求助」')
+    else if (!/onReset/.test(text)) fail('次要按钮没有接到重新输入')
+    else pass('当天额度用完：主按钮回首页，次要按钮是输另一个到机码')
   }
 }
 

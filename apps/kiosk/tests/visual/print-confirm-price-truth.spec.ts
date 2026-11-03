@@ -538,8 +538,8 @@ for (const state of ['loading', 'failed'] as const) {
 }
 
 for (const scenario of [
-  { code: 'PRINT_TERMINAL_DAILY_QUOTA_REACHED', message: '这台机器今天剩下的打印量不够打这一单，明天恢复', limit: 300 },
-  { code: 'PRINT_MEMBER_DAILY_QUOTA_REACHED', message: '你今天剩下的打印量不够打这一单，明天恢复', limit: 50 },
+  { code: 'PRINT_TERMINAL_DAILY_QUOTA_REACHED', message: '这台机器今天的免费打印量已用完，明天 0 点恢复', limit: 300 },
+  { code: 'PRINT_MEMBER_DAILY_QUOTA_REACHED', message: '你今天已免费打印 50 面，达到每日上限，明天 0 点恢复', limit: 50 },
   { code: 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED', message: '免登录每次最多打印 20 面', limit: 20 },
 ] as const) {
   test(`free print quota ${scenario.code} gives an exit @kiosk`, async ({ page, api }) => {
@@ -562,7 +562,6 @@ for (const scenario of [
       await expect(page).toHaveURL(/\/login\?from=%2Fprint%2Fconfirm/)
     } else {
       await expect(page.getByRole('alert')).toContainText('需要帮助？')
-      await expect(page.getByRole('alert')).not.toContainText('免费')
       await expect(page.getByRole('button', { name: '返回修改' })).toBeVisible()
     }
   })

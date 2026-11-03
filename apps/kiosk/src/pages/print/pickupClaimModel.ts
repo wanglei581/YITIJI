@@ -21,8 +21,6 @@ import { formatCents } from './cashierStatus'
 import {
   PICKUP_CODE_REJECTED_COPY,
   PICKUP_RESUME_REFUND_PENDING_COPY,
-  PRINT_MEMBER_DAILY_QUOTA_COPY,
-  PRINT_TERMINAL_DAILY_QUOTA_COPY,
   SHARED_USER_MESSAGE_CODES,
   errorCodeOf,
   userMessageOf,
@@ -86,9 +84,6 @@ const ORDER_BUSY_MESSAGE = `这笔订单正在处理，请等几秒再输一次�
 export const PICKUP_SAME_CODE_RESUME_NOTE =
   '没打完？回到出纸失败的那台机器上，再输一次同一个到机码就能接着打，每单最多 2 次。'
 
-/** 当天额度不够时接在共享短句后面。换一个 0 元到机码今天也不会成，所以说明天再来，或回手机重新下单。 */
-export const PICKUP_QUOTA_NEXT_STEP = '明天可以再来输这个到机码；到机码过期了的话，请在手机上重新下单。'
-
 /**
  * 认领接口（POST /print/jobs/claim-pickup）会回的错误码 → 站在机器前的人能照着做的一句话。
  *
@@ -107,14 +102,12 @@ export const PICKUP_CLAIM_MESSAGES: Readonly<Record<string, string>> = {
   // 所以不写「再输一次试试」，也不找人；没拿到纸给问小青或隐私政策联系方式（标准句接上服务电话后再换）。
   PICKUP_CODE_ALREADY_USED: '这个到机码已经用过，这单已经交给打印机，不能再次取件。要再打一份，请重新下单；没拿到纸，可以问小青，或查看《隐私政策》里的联系方式。',
   PICKUP_RESUME_LIMIT_REACHED: '这单已经接着打过 2 次，不能再打了。还要打，请在手机上重新下单',
-  PICKUP_RESUME_UNCONFIRMED: '这单的出纸结果还没确认。5 分钟后在这台机器上再输一次同一个到机码，就能接着打',
+  PICKUP_RESUME_UNCONFIRMED: '这单的出纸结果还没确认。请过 5 分钟后回到这台机器，再输一次同一个到机码，按屏幕提示办理；符合条件时可以整份重打。',
   PICKUP_RESUME_PARTIAL_OUTPUT: '这单已经出了一部分纸，不能整单重打',
   PICKUP_RESUME_REFUND_PENDING: PICKUP_RESUME_REFUND_PENDING_COPY,
-  PRINT_RETRY_FILE_UNAVAILABLE: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
+  PRINT_RETRY_FILE_UNAVAILABLE: '这笔订单的文件现在无法用于打印。请在手机上重新上传文件、重新下单。',
   // 后端那句带版本号，是给维护看的，不上屏。
   PRINT_RETRY_AGENT_VERSION: '这台机器暂时不能用同一个到机码接着打。还要打，请在手机上重新下单。',
-  PRINT_TERMINAL_DAILY_QUOTA_REACHED: `${PRINT_TERMINAL_DAILY_QUOTA_COPY}${PICKUP_QUOTA_NEXT_STEP}`,
-  PRINT_MEMBER_DAILY_QUOTA_REACHED: `${PRINT_MEMBER_DAILY_QUOTA_COPY}${PICKUP_QUOTA_NEXT_STEP}`,
   PICKUP_CODE_UNAVAILABLE: '这个到机码已经不能使用。请在手机小程序「我的 → 打印订单」查看这笔订单，需要的话重新下单',
   ORDER_REFUNDED: '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度',
   ORDER_PAYMENT_UNAVAILABLE: '这笔订单已经不能付款（可能已关闭）。请在手机小程序「我的 → 打印订单」查看，需要的话重新下单',
@@ -158,8 +151,8 @@ export const PICKUP_CLAIM_FALLBACK_MESSAGE = `到机码校验没有完成，请�
 
 /**
  * 认领失败时屏上那一句话。未登记的 401/403 不能落成共享码表的「登录状态已失效」，
- * 按「本机安全校验」说。终端和会员当天额度在上面的取件码表里接了下一步；
- * 免登录面数上限仍用共享短句。出口（去登录 / 回首页 / 求助）在 pickupQuotaExit，不在这句文案里另写按钮。
+ * 按「本机安全校验」说。免费额度三个码不进上面的取件码表：原话在 userErrorMessage，
+ * 出口（去登录 / 回首页）在 pickupQuotaExit，不在这句文案里另写按钮。
  */
 export function pickupClaimMessage(error: unknown): string {
   const code = errorCodeOf(error)
