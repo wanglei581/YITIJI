@@ -695,6 +695,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:console-screen-usage
           # 大屏累计打印页数 = 出纸任务 × 份数（W-68）；服务人次读一体机会话（W-69）。自建临时 SQLite。
           pnpm --filter @ai-job-print/api verify:console-screen-printed-visits
+          # 设备管理打印机「本系统出纸」复用同一出纸页数。脚本自建临时 SQLite。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-printer-output
           pnpm --filter @ai-job-print/api verify:admin-orders-readonly
           pnpm --filter @ai-job-print/api verify:isolated-verification-database
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:order

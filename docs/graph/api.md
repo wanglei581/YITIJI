@@ -1079,7 +1079,7 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/printers` | AdminPrintersController.list | admin | — | — |
+| GET | `/api/v1/admin/printers` | AdminPrintersController.list | admin | AdminPrinterOutputService<br/>TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 
 ## `services/api/src/terminals/admin-release-observation.controller.ts`
 
