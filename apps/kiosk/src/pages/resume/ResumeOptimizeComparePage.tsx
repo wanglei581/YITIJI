@@ -6,6 +6,7 @@ import { resumeUserReason } from './resumeUserCopy'
 import { ResumeTouchPage } from './touch/ResumeTouchPage'
 import { useAuth } from '../../auth/useAuth'
 import { aiErrorMessageOf, isAiOutage, useAiTask } from '../../ai'
+import { AI_QUOTA_EXHAUSTED_RESUME_COPY } from '../../services/api/userErrorMessage'
 import { getResumeOptimize } from '../../services/api'
 import { readAiResumeSession } from './aiResumeSession'
 import { ResumeCompareBatchBar } from './components/resume-compare/ResumeCompareBatchBar'
@@ -89,7 +90,10 @@ export function ResumeOptimizeComparePage() {
         if (cancelled) return
         setProviderName(response.providerName ?? null)
         if (response.status !== 'completed') {
-          if (isAiOutage({ code: response.failCode })) { setOutage('AI 服务当前不可用'); return }
+          if (isAiOutage({ code: response.failCode })) {
+            setOutage(response.failCode === 'AI_QUOTA_EXHAUSTED' ? AI_QUOTA_EXHAUSTED_RESUME_COPY : 'AI 服务当前不可用')
+            return
+          }
           setFailure(resumeUserReason(response.failReason, '这次没有生成逐条改写候选。'))
           return
         }

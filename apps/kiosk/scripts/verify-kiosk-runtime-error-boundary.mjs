@@ -264,6 +264,15 @@ assert.deepEqual(
   assert.equal(typeof userMessageOf, 'function', 'userMessageOf 必须被导出')
   assert.equal(typeof ApiHttpError, 'function', '测试桩必须导出 ApiHttpError，否则无法构造带服务端原文的错误')
 
+  for (const [code, expected] of [
+    ['PRINT_TERMINAL_DAILY_QUOTA_REACHED', '这台机器今天的免费打印量'],
+    ['PRINT_MEMBER_DAILY_QUOTA_REACHED', '你今天已免费打印 50 面'],
+    ['PRINT_GUEST_ORDER_QUOTA_EXCEEDED', '最多打印 20 面'],
+  ]) {
+    const limit = code === 'PRINT_MEMBER_DAILY_QUOTA_REACHED' ? 50 : 20
+    assert.ok(userMessageOf({ code, details: { limit } }, '兜底').includes(expected), code)
+  }
+  assert.ok(!userMessageOf({ code: 'PRINT_MEMBER_DAILY_QUOTA_REACHED' }, '兜底').includes('面'))
   const FALLBACK = '导出失败，请稍后重试'
   // 这四条是用户实际会撞到的技术串，一条都不许显示出去。
   for (const probe of [

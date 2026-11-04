@@ -180,6 +180,7 @@ function withLyingDimensions(png: Buffer, width: number, height: number): Buffer
 
 interface StoredFile {
   id: string
+  filename: string
   storageKey: string
   bucket: string
   mimeType: string
@@ -249,6 +250,7 @@ class FakeFiles {
     this.uploadedFilenames.push(args.filename)
     const record: StoredFile = {
       id,
+      filename: args.filename,
       storageKey: `key_${id}`,
       bucket: 'local-fs',
       mimeType: args.mimeType,
@@ -307,6 +309,7 @@ class FakeRedis {
 function file(overrides: Partial<StoredFile> = {}): StoredFile {
   return {
     id: overrides.id ?? 'file_1',
+    filename: 'source.png',
     storageKey: 'key_1',
     bucket: 'local-fs',
     mimeType: 'image/png',
@@ -489,6 +492,7 @@ async function main() {
     })
     const result = await runConvert(service, { sources, endUserId: null })
     assert.equal(result.pages, 3, 'output should have 3 pages')
+    assert.equal(result.filename, prisma.files.get(result.fileId)?.filename, 'response filename equals stored filename for guest')
     // 合成件在「我的文档」里的名字（10/29 本机走查 I-26）：人能认的中文 + 北京时间日期时刻，
     // 不是 format-convert-<毫秒时间戳>.pdf 这种内部名字。
     assert.equal(files.uploadedFilenames.length, 1, 'exactly one derived file is stored')
@@ -511,6 +515,7 @@ async function main() {
     const first = await runConvert(service, { sources, endUserId: null, idempotencyKey: 'k1' })
     const second = await runConvert(service, { sources, endUserId: null, idempotencyKey: 'k1' })
     assert.equal(first.fileId, second.fileId, 'same idempotency key must reuse output')
+    assert.equal(second.filename, prisma.files.get(second.fileId)?.filename, 'cached response filename equals stored filename')
     assert.equal(audit.entries.length, 1, 'must not audit-log twice for the same idempotency key')
     pass('相同 idempotencyKey 复用同一输出，且不重复审计')
   }

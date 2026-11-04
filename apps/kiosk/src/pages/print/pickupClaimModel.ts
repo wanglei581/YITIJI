@@ -134,8 +134,9 @@ export function classifyClaimFailure(error: unknown): PickupFailure {
 export const PICKUP_CLAIM_FALLBACK_MESSAGE = `到机码校验没有完成，请重试。${printProblemLine()}`
 
 /**
- * 认领失败时屏上那一句话。取件页没有会员登录：未登记的 401/403 不能落成共享码表的
- * 「登录状态已失效」，按「本机安全校验」说。
+ * 认领失败时屏上那一句话。未登记的 401/403 不能落成共享码表的「登录状态已失效」，
+ * 按「本机安全校验」说。免费额度三个码不进上面的取件码表：原话在 userErrorMessage，
+ * 出口（去登录 / 回首页）在 pickupQuotaExit，不在这句文案里另写按钮。
  */
 export function pickupClaimMessage(error: unknown): string {
   const code = errorCodeOf(error)

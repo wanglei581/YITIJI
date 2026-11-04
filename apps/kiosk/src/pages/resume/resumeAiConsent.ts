@@ -47,7 +47,8 @@ async function fetchResumeAiGranted(token: string): Promise<boolean> {
   return Array.isArray(rows) && rows.some((row) => row.scope === 'resume_ai' && row.granted)
 }
 
-async function grantResumeAiConsent(token: string): Promise<void> {
+/** 只记录 resume_ai 授权，不查询状态。供当场重新授权在用户点同意时调用。 */
+export async function grantResumeAiConsent(token: string): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/me/ai-consents`, {
     method: 'POST',
     headers: {

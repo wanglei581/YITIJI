@@ -28,7 +28,7 @@ import { GenerateResumeEditor } from './components/resume-deliver/GenerateResume
 import { focusResumeTitleIssue, resumeTitleIssues } from './components/resume-deliver/resumeEntryTitles'
 import { ResumeFormatChooser } from './components/resume-deliver/ResumeFormatChooser'
 import { useResumeExportPricing } from './components/resume-deliver/useResumeExportPricing'
-import { detectUnconfirmedAdditions, extractConfirmableFacts, UNCONFIRMED_WHY } from './components/resume-deliver/facts'
+import { detectGeneratedUnconfirmedAdditions, detectUserResumeEdits, extractConfirmableFacts, UNCONFIRMED_WHY } from './components/resume-deliver/facts'
 import { SYNTHETIC_GENERATE } from './components/resume-deliver/fixtures'
 import { parseGeneratePreviewQuery, resolveGeneratePreviewView } from './components/resume-deliver/generatePreviewQuery'
 import type { GeneratePreviewViewState } from './components/resume-deliver/constants'
@@ -101,6 +101,7 @@ export function ResumeGeneratePreviewPage() {
   const [templatesError, setTemplatesError] = useState(false)
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [editing, setEditing] = useState(false)
+  const [userAdditions, setUserAdditions] = useState<string[]>([])
   const [factOpen, setFactOpen] = useState(false)
   const [retryNonce, setRetryNonce] = useState(0)
 
@@ -182,7 +183,8 @@ export function ResumeGeneratePreviewPage() {
     ? (query.requested && EXPORT_VIEWS.has(query.requested) ? 'export' : 'preview')
     : (readPhase(location.state) === 'export' ? 'export' : 'preview')
   const exportScreen: GeneratePreviewViewState = view.startsWith('export-') ? view : 'export-chooser'
-  const unconfirmed = resume ? detectUnconfirmedAdditions(resume, undefined, input) : []
+  // 只追踪生成结果里已有的候选词；预览中后来由本人输入的词不归给 AI。
+  const unconfirmed = resume && result?.resume ? detectGeneratedUnconfirmedAdditions(resume, result.resume, input, userAdditions) : []
   const facts = resume ? extractConfirmableFacts(resume) : []
   const hints = result?.missingHints ?? []
   const exportBlocked = pricing.unavailable || pricing.chargedBlocked || !resume || exporting
@@ -420,7 +422,10 @@ export function ResumeGeneratePreviewPage() {
               <GenerateResumeEditor
                 resume={resume}
                 summaryRef={summaryRef}
-                onChange={(next) => { setResume(next); setExported(null); setExportError(null) }}
+                onChange={(next) => {
+                  setUserAdditions((words) => [...new Set([...words, ...detectUserResumeEdits(resume, next)])])
+                  setResume(next); setExported(null); setExportError(null)
+                }}
                 previewClassName={previewClassName}
                 previewStyle={previewStyle}
                 onEditingChange={setEditing}

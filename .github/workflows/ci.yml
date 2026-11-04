@@ -397,6 +397,8 @@ jobs:
           pnpm run verify:agent-config-resilience
           pnpm run verify:windows-service-recovery
           pnpm run verify:print-scan-agent
+          # Preserve the installed boot spool protection verification.
+          pnpm run verify:boot-spool-guard
           pnpm run verify:agent-unauthorized
           pnpm run verify:production-provisioning
           pnpm run verify:scan-watcher
@@ -503,6 +505,8 @@ jobs:
           # 「Cross-client deterministic static gates」步，那时客户端还没生成，
           # 报 Cannot find module '../generated/prisma/client'。
           pnpm --filter @ai-job-print/api verify:assistant-provider-label
+          # 真机实操 F-04（2026-10-10）：小青文字、语音、作业面三处提示词里都带着「不教人拆机」那一句约束。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:assistant-device-fault
           pnpm --filter @ai-job-print/api verify:llm-input-pii-mask
           pnpm --filter @ai-job-print/api verify:ai-feature-keys
           # 2026-09-03 新增：断言 shared 与 API 两侧 AI 类型契约一致，
@@ -747,6 +751,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:ai-result-ownership
           pnpm --filter @ai-job-print/api verify:llm-guard
           pnpm --filter @ai-job-print/api verify:ai-content-moderation
+          pnpm --filter @ai-job-print/api verify:ai-safety-lexicon
           pnpm --filter @ai-job-print/api verify:member-account-status
           pnpm --filter @ai-job-print/api verify:member-auth
           pnpm --filter @ai-job-print/api verify:legal-doc-version
@@ -807,6 +812,9 @@ jobs:
           # P1-2a 计量表留存：与 AiServiceLog 同一保留期，到期先按月汇总再分批删；汇总表无个人字段。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-retention
           pnpm --filter @ai-job-print/api verify:ai-quota
+          # Q2 全入口登记：每个 @AiUse('generate'|'voice') 路由要么接入按人次数、要么写明不计次理由；
+          # 运行时用例 import services/api/src 并写隔离库，所以放在「Prepare fresh SQLite db」之后。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-quota-coverage
           # 后台定时任务一次失败不能让 API 进程退出（10/6 P0：P2028 让 Node 22 直接退出）；import src，放在建库之后。
           pnpm --filter @ai-job-print/api verify:background-task-safety
           pnpm --filter @ai-job-print/api verify:activity-logs
@@ -1243,6 +1251,7 @@ jobs:
           # DriverAdapterError（不是 P2034），重试逻辑必须认得出，不能变成 500。
           pnpm --filter @ai-job-print/api verify:pg-serialization-conflict
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:pg-serialization-conflict:postgres
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:pg-lock-timeout:postgres
           pnpm --filter @ai-job-print/api verify:partner-contact-phone-registration
           pnpm --filter @ai-job-print/api verify:upload-sessions
           pnpm --filter @ai-job-print/api verify:cos:files
@@ -1405,6 +1414,9 @@ jobs:
         run: pnpm --filter @ai-job-print/kiosk test:browser:route-sweep
 
       - name: Upload Kiosk browser failure artifacts
+        # 清单要覆盖本 job 跑的每一套 Playwright 配置：outputDir（trace、截图）+ html 报告目录。
+        # 新增一套浏览器用例时同步加这里，否则它在 CI 上红了只能本机复现（2026-11-03 合作机构大屏用例即如此）。
+        # admin 的 users 配置继承主配置的 html 报告目录，报告落在 admin-e2e-report。
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -1426,14 +1438,21 @@ jobs:
             test-results/kiosk-fusion-w6-report/**
             test-results/kiosk-privacy-timeout/**
             test-results/kiosk-session-warning/**
+            test-results/kiosk-privacy-clear/**
+            test-results/kiosk-contract-review-session/**
             test-results/kiosk-scan-safety/**
             test-results/kiosk-mic-capability/**
             test-results/kiosk-mic-capability-report/**
             test-results/first-order/**
             test-results/admin-e2e/**
             test-results/admin-e2e-report/**
+            test-results/admin-screen-e2e/**
+            test-results/admin-screen-e2e-report/**
+            test-results/admin-users-e2e/**
             test-results/partner-e2e/**
             test-results/partner-e2e-report/**
+            test-results/partner-screen-e2e/**
+            test-results/partner-screen-e2e-report/**
           if-no-files-found: ignore
           retention-days: 7
 

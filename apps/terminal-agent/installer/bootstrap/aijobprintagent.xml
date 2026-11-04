@@ -8,7 +8,7 @@
   <stoptimeout>15 sec</stoptimeout>
   <onfailure action="restart" delay="60 sec" />
   <onfailure action="restart" delay="300 sec" />
-  <onfailure action="none" />
+  <onfailure action="restart" delay="1800 sec" />
   <resetfailure>1 day</resetfailure>
   <logpath>%ProgramData%\AIJobPrintAgent\logs</logpath>
   <log mode="roll-by-size">
