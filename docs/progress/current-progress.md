@@ -1,6 +1,6 @@
 # 当前开发进度
 
-## 2026-11-04：一体机证件照卡停放（B12；分支 `claude/kiosk-idphoto-park-b12`；未推送、未发布）
+## 2026-11-04：一体机证件照卡停放（B12；分支 `claude/kiosk-idphoto-park-b12`；未合并、未发布）
 
 - **依据**：产品负责人 2026-10-12 定一体机证件照「尚未开放」卡停放（代码留着、不显示，以后能再打开；电子版证件照放小程序上架后做，只裁切、换底色）。合规线同日同意停放带来的删字。2026-11-04 他同意改功能范围文档那一行和触屏稿里那张磁贴，看过对照图后回「可以，照这个改」。停放是源码保留、入口不显示、地址进不去，不是删除。本条是隐藏页面。
 - **稿**（`docs/design/kiosk-touch-2026-10/`，这次改稿他已同意）：`screens.js`、`screens2.js`、`screens3.js`、`fix-scan.js` 从对照稿原样拷入。`print` 与 `st-loading` 去掉证件照磁贴，其他工具改成两行（上行照片打印、照片合成 PDF、签名，下行我的文档、打印订单各占半行）。`feature-info` 改名「已停放，只留档」。`fix-scan.js` 能力名不认识一态去掉指向证件照的一条。`map.js` 是生成文件，未手改；运行页把 `/print/scan-feature` 回 `/print-scan`。README 在「冻结」前加「证件照停放（2026-11-04 改稿）」，并留下改前哈希。`node apps/kiosk/scripts/verify-kiosk-touch-frozen.mjs --update` 重写 `FROZEN.json`（`frozenAt` 仍是 2026-10-26，`updatedAt` 改为 2026-11-04）。改前哈希：`screens.js` `750fa506dae476bc8cf4e90657ab3bee8db0d0fce57daafd634b644d3759675c`，`screens2.js` `f6c86e8fc0ae2f7c94c929c1de3d6ea832b8fd7381da85f5b0b8ded3af925fee`，`screens3.js` `23ad15bf1b21ffb33fb85ab93a822290ad64f117fa8763aa72162db1aa92795b`，`fix-scan.js` `5eb2c4fee81389dea5291e1b0061442208b98864c8efa1c384f21618461d3881`。
@@ -9,7 +9,21 @@
 - **功能范围**：`docs/product/feature-scope.md` 证件照行改为一体机停放，状态列「停放」。其余行不动。
 - **门禁真值**（只把「卡在 / 地址进说明页」改成「卡不在 / 地址回打印扫描」，没有删断言、没有放宽）：`verify-fusion-w2-print-scan.mjs` 旧地址目标 `/print-scan/feature/id-photo` → `/print-scan`，并断言停放跳转、`IdPhotoParkedScreen` 仍在、说明页源码没有「看证件照说明」和「证件照这一页写的是尚未开放」。`verify-p39-print-hub-fidelity.mjs` 新增停放常量为 true、其他工具用停放三元挡住 idPhoto、六列栅格、源码没有「看证件照说明」；八张能力定义和顺序仍按原断言。`fusion-baseline-contract.test.mjs` 夹具五处目标改为 `/print-scan`（scan-sign 对 `/print-scan/sign-v2` 的故意不一致没动）。`route-manifest.ts` 旧地址改为 `/print-scan`（注释留下旧目标）。`route-sweep-cases.ts` 只有样本 `/print-scan/feature/id-photo` 落到 `/print-scan`。`fusion-w6-route-cases.ts` 证件照样本与旧地址都落到 `/print-scan`，标记 `print-scan-home`，文案「打印扫描服务」（此前标记说明页、文案「证件照」）。证据目标 68 的活页捕获改为仍在本页的 `/print-scan/feature/copy`，旧地址重定向改为 `/print-scan`。`qingxu-pair-targets.ts` 规范路由改为 `/print-scan`，`feature-id-photo` 对照落到服务台；`feature-not-found` 仍在说明页。`print-hub-qx.spec.ts` 与 `fusion-w2-tools.spec.ts` 默认能力卡 6 → 5，并断言 `print-hub-cap-id-photo` 为 0；未知能力加上那两句不在；旧地址落到服务台。`fusion-w2-scan.spec.ts` 小青不可用时复印说明仍留在说明页，证件照地址单独断言回到服务台。冻结哈希四个稿文件的旧值写在 README；`FROZEN.json` 换成新哈希。
 - **验证**（本机，未发布）：`pnpm lint` 0 error（既有 warning 不在本次文件里）；一体机 `npx tsc --noEmit` 通过；生产构建带 `VITE_API_MODE=http`、`VITE_API_BASE_URL=/api/v1`、`VITE_USE_TRTC_CALL=true` 通过（3168 个模块）。冻结门禁 18 个文件 PASS；p39、fusion W2、fusion W6、fusion baseline、视觉证据清单（77 个主目标）PASS；`fusion-baseline-contract` 10/10；`kiosk-license-gate` 23/23。Playwright `playwright.w2.config.ts` 上 `print-hub-qx.spec.ts` 与 `fusion-w2-tools.spec.ts` 46 passed。图谱点名的进度文档门禁、`verify:print-color-duplex-capability`、`verify:ai-usage-retention`（66/66）、`verify:support-contact`、`verify:free-print-quota`（带 CI 测试用终端密钥才起得来）都通过。
-- **不发布**。本分支未推送。
+- **审查补两处**（Claude）：停放后「已经有证件照文件 → 按普通照片打印」这条正向流程只剩服务台的照片打印卡，`print-hub-qx.spec.ts` 补一条用例点它、断言进上传页带 `category=photo`（反向检查：把卡的去向去掉 `category=photo`，用例红在 URL 不匹配）；能力名不认识一态补回运行页原有的「多半是旧二维码或旧链接。」（2.0 稿 10-print-hub 也有这句，稿上没画但不该丢）。服务台四条加新用例共 5 条浏览器用例本机通过。
+- **不发布**。
+
+## 2026-11-04：简历优化的改写要能在最终稿里逐字找到（只改后端；分支 `claude/optimize-after-match-1104`；未合并、未部署）
+
+- 来由：11/04 测试机一份真实简历走出 8 条优化建议，全部是「只能手改」。一体机只在优化稿的单个字符串字段里用 `includes(after)` 判断能不能换上；提示词没有要求改写逐字落在同一字段，补回和篇幅收口之后也没有再核对。
+- 改法：提示词写明每条 `after` 必须与优化稿某一个字符串字段逐字一致，不得拆到两个字段。最终返回前按同一判据核对。对不上时，仅当全稿只有一处、且只差首尾空白或全半角标点，才把 `after` 改成稿里的原文。多处相似、跨字段拼接保持原样，不改优化稿正文。空 `after` 仍在解析时丢弃。日志只记条数。全部对不上时不再多打一次模型，沿用现有的非法输出重试，仍算同一次扣次。
+- 验证：后端类型检查 0 错；仓库 lint 0 错；优化服务在图谱里列出的门禁通过。新样本覆盖逐字命中、首尾空白、唯一全半角标点、多处相似、跨字段拆分、空 `after`。一体机、小程序、终端程序未改。
+- 没做：这一版还在本分支，没有推送。模型仍可能写出对不上的改写，那些条继续只能手改。
+
+## 2026-11-04：一体机简历 U 盘导入不再无限等，逐条对照保留带入的条目（分支 `claude/kiosk-resume-fixes-1104`；未推送、未部署）
+
+- 问题 A：浏览器到本机程序的 U 盘上传没有截止时间。`uploadUsbFile` 45 秒后中止（本机程序到后端是 30 秒，这里再留 15 秒）。到点或连接中断不判失败、不自动重发。屏上写「这次导入没有等到结果，请重新选择文件再导一次」，导入状态和忙碌锁释放。打印共用同一函数；未确认时停在已选文件，不走进「这一份没导进来」。
+- 问题 B：对照页同一次进入会把带入的条目和选择清掉。现在先清上一份，再放回 `focusIndex` 和已选。匿名链「手机上传 → 诊断 → 优化建议 → 逐条看」在夹具里没有回到首页（立刻点并停约 4 秒、未保存编辑后进第 2 条、优化页时钟快进 60 秒再点）。清场在控制台记原因码和时刻（idle_timeout、history_fallback、privacy_deadline、explicit_end），不记简历、令牌、文件名。
+- 验证：lint 0 error；一体机 `tsc --noEmit` 通过；新浏览器用例 3 条通过。图谱门禁首轮除 `verify:w3a-ai-records` 外退出码为 0（当时 12 过 3 败，因新文案模块未进单测模拟）；补上真实文案加载后 15 过 0 败。反向检查：去掉截止时间，U 盘用例红在等不到那句；去掉条目放回，「第 2 / 2 条」红。均用 `git checkout` 还原。本机冷构建超过配置里的 180 秒，跑浏览器用例时临时把等待调到 600 秒，仓库里的超时未改。
 
 ## 2026-11-04：触屏稿第 5 版与冻结门禁补进 main（#1495 叠着 #1494 一次合入，五项承诺 B9）
 
