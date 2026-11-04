@@ -18,6 +18,10 @@ export function ResumeExportResult(props: {
   const expired = countdown.expired
   const hasFile = Boolean(props.exported.signedUrl)
   const isPdf = props.formatLabel === 'PDF' || props.kind === 'change_list'
+  // 页内预览自己取 PDF 字节。signedUrl 在对象存储上是另一个域名，页面取它属于跨站；
+  // printFileUrl 经我们自己的服务器出同一份 PDF。有它且是 PDF 才用它，没有才退回直链。
+  // 二维码仍用 signedUrl：手机扫码是整页打开。Word 的 printFileUrl 是另一份 PDF，不拿来冒充预览。
+  const previewUrl = isPdf && props.exported.printFileUrl ? props.exported.printFileUrl : props.exported.signedUrl
 
   return (
     <section className="qx-card qx-rd-result" data-has-file={hasFile ? '1' : '0'}>
@@ -48,7 +52,7 @@ export function ResumeExportResult(props: {
       {!props.guest && props.savedToDocuments === false ? <p>这次未存入「我的文档」，请在有效期内扫码带走。</p> : null}
       {hasFile && isPdf && (
         <FileContentPreview
-          fileUrl={props.exported.signedUrl}
+          fileUrl={previewUrl}
           fileName={props.exported.filename}
           mimeType="application/pdf"
           format="pdf"

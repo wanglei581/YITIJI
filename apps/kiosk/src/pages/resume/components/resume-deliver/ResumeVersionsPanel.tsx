@@ -16,7 +16,7 @@ export function ResumeVersionsPanel(props: {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [opening, setOpening] = useState(false)
   const [openError, setOpenError] = useState<string | null>(null)
-  const [preview, setPreview] = useState<{ url: string; name: string; expiresAt?: string } | null>(null)
+  const [preview, setPreview] = useState<{ url: string; printFileUrl?: string; name: string; expiresAt?: string } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -48,6 +48,7 @@ export function ResumeVersionsPanel(props: {
       }
       setPreview({
         url: access.url,
+        printFileUrl: access.printFileUrl,
         name: `已确认版本 v${item.version}`,
         expiresAt: access.expiresAt,
       })
@@ -84,7 +85,7 @@ export function ResumeVersionsPanel(props: {
       {openError ? <p className="qx-rd-error" role="alert">{openError}</p> : null}
       {preview ? (
         <FilePreviewDialog
-          fileUrl={preview.url}
+          fileUrl={preview.printFileUrl || preview.url}
           fileName={preview.name}
           format="pdf"
           mimeType="application/pdf"
