@@ -333,6 +333,7 @@ const ACTION_LABELS: Record<string, string> = {
   'legal_doc.create': '新建法务文档版本',
   'legal_doc.activate': '启用法务文档版本',
   'support_contact.update': '修改服务联系方式',
+  'self_note_tab.update': '修改一体机求职进度页签开关',
   'print_free_quota.update': '修改免费打印额度',
   'terminal.daily_free_print_sides.update': '修改终端每日免费打印上限',
   'policy.publish': '政策发布',
