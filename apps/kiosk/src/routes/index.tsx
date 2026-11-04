@@ -213,7 +213,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'print-scan/sign',         element: <SignStampPage /> },
       { path: 'print/scan-convert',      element: <Navigate to="/print-scan/convert" replace /> },
       { path: 'print/scan-sign',         element: <Navigate to="/print-scan/sign" replace /> },
-      { path: 'print/scan-feature',      element: <Navigate to="/print-scan/feature/id-photo" replace /> },
+      { path: 'print/scan-feature',      element: <Navigate to="/print-scan" replace /> },
       // 打印扫描流程（Phase 3）
       { path: 'print/upload',      element: <PrintUploadPage /> },
       { path: 'print/desk',        element: <PrintDeskPage /> },

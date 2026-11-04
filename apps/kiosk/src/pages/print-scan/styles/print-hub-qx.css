@@ -948,3 +948,18 @@ button.ph-chip { cursor: pointer; }
   [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qx-copy-guide-notes .qx-copy-guide-big { gap: 12px; padding: 12px 14px; font-size: 18px; }
   [data-kiosk-stage-fit='off'] .qx-copy-guide-big svg { width: 34px; height: 34px; }
 }
+
+/* 触屏稿 print / st-loading（2026-11-04 证件照停放）：其他工具六列。
+   前几张各占两列，最后两张（我的文档、打印订单）各占半行。
+   选择器压过 touch.css 的三列 .qxt-tools，只管本页。 */
+[data-qx-page='print-hub'] .qxt-print-hub .qxt-tools {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+}
+[data-qx-page='print-hub'] .qxt-print-hub .qxt-tools > * {
+  grid-column: span 2;
+}
+[data-qx-page='print-hub'] .qxt-print-hub .qxt-tools > :nth-last-child(-n+2) {
+  grid-column: span 3;
+}

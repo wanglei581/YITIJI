@@ -79,7 +79,8 @@ test('tool center exposes the miniapp arrival-code claim entry @w2', async ({ pa
   // 2.0 卡面用徽标「不是取件码」区分（稿 10），不再重复长句。
   await expect(entry).toContainText('不是取件码')
   // 它不占「七件事」栅格的格子 —— 标题写着七件事，就必须只有七张能力卡。
-  await expect(page.locator('[data-testid^="print-hub-cap-"]')).toHaveCount(6)
+  await expect(page.locator('[data-testid^="print-hub-cap-"]')).toHaveCount(5)
+  await expect(page.getByTestId('print-hub-cap-id-photo')).toHaveCount(0)
   await entry.click()
 
   await expect(page).toHaveURL(/\/print\/pickup-claim$/)
@@ -93,6 +94,8 @@ test('unknown tool feature key fails closed with a real recovery action @w2', as
 
   await page.goto('/print-scan/feature/not-a-real-feature')
   await expect(page.getByRole('heading', { name: '这个能力名我不认识' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '看证件照说明' })).toHaveCount(0)
+  await expect(page.getByText('证件照这一页写的是尚未开放，和两条替代路径')).toHaveCount(0)
   await expect(page.getByTestId('print-hub-primary')).toHaveText('返回打印扫描')
   await expectHealthy(page, errors, 'print-scan-feature')
 })
@@ -896,7 +899,7 @@ test('signature compose 429 shows rate-limited and does not silently retry @w2',
 for (const alias of [
   { from: '/print/scan-convert', to: '/print-scan/convert', marker: 'print-scan-convert' },
   { from: '/print/scan-sign', to: '/print-scan/sign', marker: 'print-scan-sign' },
-  { from: '/print/scan-feature', to: '/print-scan/feature/id-photo', marker: 'print-scan-feature' },
+  { from: '/print/scan-feature', to: '/print-scan', marker: 'print-scan-home' },
 ] as const) {
   test(`${alias.from} redirects to ${alias.to} @w2`, async ({ page, api }) => {
     const errors = collectRuntimeErrors(page)

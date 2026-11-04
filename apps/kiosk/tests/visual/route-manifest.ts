@@ -53,7 +53,8 @@ export const productionRoutePatterns = [
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',
   '/print/scan-sign': '/print-scan/sign',
-  '/print/scan-feature': '/print-scan/feature/id-photo',
+  // 2026-11-04 证件照停放：旧地址回打印扫描。此前目标是 /print-scan/feature/id-photo。
+  '/print/scan-feature': '/print-scan',
   // 2026-08-18：打印参数页下线（控件与预览阶段完全重复且全站零导航），
   // 2026-09-08 起随预览一并进入打印台。
   '/print/params': '/print/desk?step=preview',
