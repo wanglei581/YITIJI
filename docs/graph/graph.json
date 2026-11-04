@@ -25150,6 +25150,9 @@
     "services/api/scripts/support/content-pipeline-harness.ts": [
       "services/api/scripts/verify-content-pipeline-e2e.ts"
     ],
+    "services/api/scripts/support/copy-c1c-verification.ts": [
+      "services/api/scripts/verify-copy-c1b.ts"
+    ],
     "services/api/scripts/support/dead-redis-gate-env.ts": [
       "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-error-observability.ts",
@@ -39184,6 +39187,7 @@
         "dirs": [],
         "files": [
           ".github/workflows/ci.yml",
+          "services/api/scripts/support/copy-c1c-verification.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/app.module.ts",
           "services/api/src/audit/audit.service.ts",

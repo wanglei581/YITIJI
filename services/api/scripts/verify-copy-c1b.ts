@@ -24,6 +24,7 @@ import { COPY_MAX_COPIES, type CopyJobView, type CopyPermit } from '../src/copy-
 import { SCAN_DEVICE_OTHER_MAX_PAGES } from '../src/files/file-validation'
 import { MemberPrintOrdersService } from '../src/member-print-orders/member-print-orders.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
+import { verifyCopyC1c } from './support/copy-c1c-verification'
 const pass = (s: string) => console.log(`PASS ${s}`)
 type View = CopyJobView & { controlToken: string }
 async function main() {
@@ -97,6 +98,7 @@ async function main() {
     assert.equal(await request('POST', '/copy/jobs', input, 0, undefined, 401, 'none'), 'TERMINAL_SESSION_INVALID')
     assert.equal(await request('POST', '/copy/jobs', input, 0, undefined, 409), 'COPY_CAPABILITY_REVOKED')
     for (const key of ['copy', 'scan_device', 'color_print', 'duplex_print']) await cap(key, 'available')
+    await verifyCopyC1c(store, jobs, agent, tids[0], (id, op) => request<CopyPermit>('GET', pp(id, op)))
     const first = await create({ requestKey: input.requestKey }), id = first.copyId
     assert.equal(first.state, 'ready'); assert.ok(first.controlToken)
     const replay = await request('POST', '/copy/jobs', input)
@@ -193,7 +195,7 @@ async function main() {
       await request('POST', rp(terminal.copyId), { ...event, eventId: randomUUID(), state: 'handed' })
       assert.equal((await store.find(terminal.copyId)).state, state)
       const order = await prisma.order.findUniqueOrThrow({ where: { id: (await store.find(terminal.copyId)).orderId! } })
-      assert.equal(order.taskStatus, state)
+      assert.equal(order.taskStatus, state === 'failed' ? 'failed' : 'completed')
     }
     for (const key of ['scan_device', 'color_print', 'duplex_print']) {
       await cap(key, 'testing')

@@ -10,7 +10,7 @@ export class CopyAgentService {
 
   async permit(terminalId: string, id: string, op: string): Promise<CopyPermit> {
     if (op !== 'scan' && op !== 'print') copyError(400, 'COPY_BAD_REQUEST')
-    let job = await this.store.find(id, terminalId)
+    const job = await this.store.find(id, terminalId)
     let reason: string | null = null
     const params = { ...job, colorMode: job.colorMode as CopyPermit['parameters']['colorMode'],
       duplex: job.duplex as CopyPermit['parameters']['duplex'] }
@@ -41,8 +41,21 @@ export class CopyAgentService {
         expiresAt: { gt: new Date() } }, data: { state: op === 'scan' ? 'scanning' : 'dispatching' } })
       if (!changed.count) reason = 'COPY_STATE_CONFLICT'
       else {
-        job = await this.store.find(id, terminalId)
-        await this.store.record('permit', job, { op })
+        const permittedState = op === 'scan' ? 'scanning' : 'dispatching'
+        // CAS 前的能力快照可能已被管理员撤销；复查失败则撤回本次派发并作废授权。
+        try { await this.store.capable(params) } catch (error) {
+          if (!(error instanceof HttpException)) throw error
+          reason = (error.getResponse() as { error: { code: string } }).error.code
+          await this.store.prisma.copyJob.updateMany({ where: { id, terminalId,
+            generation: job.generation, authorizationVersion: job.authorizationVersion, state: permittedState },
+          data: { state: op === 'scan' ? 'ready' : 'confirmed', authorizationVersion: { increment: 1 } } })
+        }
+        const fresh = await this.store.find(id, terminalId)
+        if (!reason && (fresh.state !== permittedState || fresh.generation !== job.generation
+          || fresh.authorizationVersion !== job.authorizationVersion)) reason = 'COPY_STATE_CONFLICT'
+        if (!reason && fresh.expiresAt.getTime() <= Date.now()) reason = 'COPY_EXPIRED'
+        // 响应始终携带成功 CAS 的授权快照，绝不把重读到的撤销版本包装成许可。
+        if (!reason) await this.store.record('permit', job, { op })
       }
     }
     return { allowed: reason === null, reason, copyId: id, op, generation: job.generation,
@@ -89,7 +102,8 @@ export class CopyAgentService {
       const changed = await tx.copyJob.updateMany({ where: { id, terminalId, generation: input.generation,
         state: job.state, orderId: job.orderId },
       data: { state: input.state, resultCode: input.errorCode ?? null, authorizationVersion: { increment: 1 } } })
-      if (changed.count) await tx.order.update({ where: { id: job.orderId! }, data: { taskStatus: input.state } })
+      if (changed.count) await tx.order.update({ where: { id: job.orderId! },
+        data: { taskStatus: input.state === 'failed' ? 'failed' : 'completed' } })
       return this.store.find(id, terminalId, tx)
     })
     await this.store.record('print_result', updated, { eventId: input.eventId, state: input.state,

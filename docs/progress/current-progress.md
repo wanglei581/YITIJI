@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-11-04：屏上复印 C1c——收掉 C1 复审的 3 条 P1（分支 `claude/copy-c1-1104`，未合并、未部署）
+
+- ① 复印终态阻断会员注销：`CopyJob` 照旧记已交给打印机 / 失败 / 结果未确认，`Order` 侧映射为 completed / failed / completed，复用现有订单终态规则（注销服务的终态集合未改）。② 取许可 CAS 后重读要再核状态、代次、授权版本与到期，响应只用成功 CAS 的快照，用户取消后不会拿到有效许可。③ 读能力与 CAS 之间关能力的窗口：CAS 后再查一次能力，已关就撤回（回到 ready/confirmed、授权版本递增）并拒绝；已派发任务的终态回报照收。
+- 验证（Codex 实现，Claude 收货）：新增 6 条并发与注销用例（`scripts/support/copy-c1c-verification.ts`，由 `verify:copy-c1b` 调用）全过；`verify:copy-c1a`、`verify:member-closure`（SQLite、真 Redis、HTTP）过；反向检查三项各自变红。PostgreSQL 交 CI。
+
 ## 2026-11-04：屏上复印 C1b——后端接口、终端许可与上限（分支 `claude/copy-c1-1104`，未合并、未部署）
 
 - 做了什么（Codex 实现，Claude 收货）：一体机侧 `POST /copy/jobs`（游客可用、幂等键同参同单、控制令牌只首次返回）、查单、取消、确认（读扫描页数用 `quoteCopy` 报价，事务内建 `type=copy` 订单并走现有免费订单状态机，重复确认同一订单；只有明确 0 元报价才允许履约）；终端程序侧用 Agent 凭证 `GET /terminals/:terminalId/copy/jobs/:id/permit?op=scan|print`（不做签名许可，许可最长 30 秒，未确认 / 过期 / 能力关 / 跨终端不给打印许可）、扫描结果回报（同代同值幂等、旧代次不覆盖、超上限拒绝）、打印结果回报（已交给打印机 / 失败 / 结果未确认，终态不回退）。上限：单次 20 页（复用屏上扫描常量）、99 份（设计稿 cs-copy-set「1–99 份」）；双面 + 多份 + 奇数页默认拒绝（`COPY_ALLOW_ODD_DUPLEX_MULTICOPY` 显式开）。建单、确认、许可、结果都记审计，不记控制令牌与扫描内容。
