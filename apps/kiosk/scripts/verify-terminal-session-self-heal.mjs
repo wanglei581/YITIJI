@@ -204,7 +204,9 @@ check(
   const body = fn.slice(0, fn.indexOf('\n}\n') + 3)
   check(
     '续期主路同样不拿旧会话票（身份恢复回调、按台计请求的 401 都走这里）',
-    /for \(const delay of bootExchangeUnsettled \? \[\] : \[0, \.\.\.RETRY_DELAYS_MS\]\)/.test(body),
+    // 2026-11-04 并入 #1511（授权暂停时续期只试一次、不等不重试）：允许中间多一段 licenseRenewalSuspended ? [0] :，
+    // 「引导票没换成就一次都不拿旧票续」这条要求不变——开头仍必须是 bootExchangeUnsettled ? [] :。
+    /for \(const delay of bootExchangeUnsettled \? \[\] : (?:licenseRenewalSuspended \? \[0\] : )?\[0, \.\.\.RETRY_DELAYS_MS\]\)/.test(body),
     '只挡后台恢复一处，身份恢复回调仍能拿旧票续上而不清场',
   )
 }

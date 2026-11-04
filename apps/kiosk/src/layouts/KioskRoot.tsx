@@ -1,3 +1,4 @@
+import { kioskBrandMark, useKioskProfile } from '../services/api/kioskProfile'
 import { KioskLayout, type KioskTab } from '@ai-job-print/ui'
 import { useLayoutEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -363,9 +364,9 @@ function isTouchRoute(pathname: string): boolean {
   return QX_TOUCH_PATTERNS.some((pattern) => pattern.test(pathname))
 }
 
-function v6ShellSubtitle(entry: V6ShellRoute, terminalCode: string): string {
+function v6ShellSubtitle(entry: V6ShellRoute, terminalCode: string, brandName: string): string {
   // 域名已经在顶栏主标题上时，副标题回落到品牌名，避免「职易达 / 职易达 · 机号」自我重复。
-  const base = entry.domainTitle === null ? 'AI 求职操作系统' : '职易达'
+  const base = entry.domainTitle === null ? 'AI 求职操作系统' : brandName
   return entry.withTerminalCode ? `${base} · ${terminalCode}` : base
 }
 
@@ -389,6 +390,7 @@ export function KioskRoot() {
 }
 
 function KioskShell() {
+  const brand = useKioskProfile()
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { viewportW, viewportH } = useKioskStageFit()
@@ -449,10 +451,10 @@ function KioskShell() {
       viewport={isCompactViewport ? 'mobile' : 'kiosk'}
       hideHeader={isCampusZone || isQxRoute || touchRoute}
       hideBottomNav={isCampusZone || isQxRoute || usesPageActionbar || touchRoute}
-      brandMark={isV6Route ? '职' : undefined}
-      brandTitle={v6DomainTitle ?? (isV6Route ? '职易达' : `就业服务大厅 · ${terminalCode}`)}
+      brandMark={isV6Route ? kioskBrandMark(brand) : undefined}
+      brandTitle={v6DomainTitle ?? (isV6Route ? brand.brandName : `就业服务大厅 · ${terminalCode}`)}
       brandSubtitle={
-        v6Shell ? v6ShellSubtitle(v6Shell, terminalCode) : 'AI求职打印服务终端'
+        v6Shell ? v6ShellSubtitle(v6Shell, terminalCode, brand.brandName) : 'AI求职打印服务终端'
       }
       onBrandClick={v6Shell?.brandReturnsHome ? () => navigate('/') : undefined}
       brandActionLabel={v6Shell?.brandReturnsHome ? '返回首页' : undefined}

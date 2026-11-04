@@ -1,3 +1,6 @@
+import { useKioskLicense } from '../../../layouts/KioskLicenseContext'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../../copy/unattendedCopy'
+import { LicenseLock } from '../../../layouts/LicenseLock'
 import { useMemberCursorPage } from './useMemberCursorPage'
 import { MemberLoadMore } from './MemberLoadMore'
 // ============================================================
@@ -126,6 +129,7 @@ function isPrintableMime(mimeType: string): boolean {
 
 export function MyDocumentsPage() {
   const navigate = useNavigate()
+  const winding = useKioskLicense().mode === 'winding-down'
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const pickPrint = searchParams.get('pick') === 'print' || (location.state as { pick?: string } | null)?.pick === 'print'
@@ -339,7 +343,7 @@ export function MyDocumentsPage() {
         <MeEmptyPack sentence={`登录后上传的文档才会出现在这里。游客上传的文件不会自动归入你的账号。${miniappLine ? '在手机小程序登录后传的文件也会出现在这里。' : ''}`}>
           {pickPrint
             ? <MeExitCard art="resume" artWidth={200} tall title="返回选文件" desc="回到刚才的打印" onClick={() => navigate('/print/upload')} />
-            : <MeExitCard art="phone" artWidth={150} tall title="去打印" desc="U 盘、手机或扫描都可以" onClick={() => navigate('/print/upload')} />}
+            : <LicenseLock><MeExitCard art="phone" artWidth={150} tall title="去打印" desc="U 盘、手机或扫描都可以" onClick={() => navigate('/print/upload')} /></LicenseLock>}
           <MeExitCard art="report" artWidth={180} tall title="看看打印订单" desc="已经打过的，进度在订单里" onClick={() => navigate('/me/print-orders')} />
         </MeEmptyPack>
       </div>
@@ -358,7 +362,7 @@ export function MyDocumentsPage() {
             const printable = doc.mimeType === 'application/pdf' || doc.mimeType === 'image/jpeg' || doc.mimeType === 'image/png'
             const reprintBlocked = !isDocumentReprintable(doc)
             const viewDisabled = expired || isAnyPending
-            const printDisabled = expired || !printable || isAnyPending || reprintBlocked
+            const printDisabled = (winding && !pickPrint) || expired || !printable || isAnyPending || reprintBlocked
             const deleteDisabled = isAnyPending
             const policies = selectablePolicies(doc)
             const canChangeRetention = !expired && policies.length > 1
@@ -387,6 +391,7 @@ export function MyDocumentsPage() {
                       mimeType={doc.mimeType}
                       token={getToken()}
                       busy={isAnyPending}
+                      winding={winding && !pickPrint}
                       reprintable={isDocumentReprintable(doc)}
                       onConverted={() => setReloadKey((key) => key + 1)}
                       onError={(text) => setHint({ tone: 'bad', text })}
@@ -401,6 +406,7 @@ export function MyDocumentsPage() {
                     <MeBtn
                       v={printDisabled ? 'sec' : 'pri'}
                       disabled={printDisabled}
+                      title={winding && !pickPrint ? LICENSE_NO_NEW_TASK_REASON : undefined}
                       aria-disabled={reprintBlocked || undefined}
                       aria-describedby={printReasonId}
                       onClick={() => { if (reprintBlocked) return; void print(doc) }}
@@ -416,7 +422,7 @@ export function MyDocumentsPage() {
                       </MeBtn>
                     ) : null}
                     {doc.mimeType === 'application/pdf' && SIGNABLE_PURPOSES.has(doc.purpose) ? (
-                      <MeBtn v="sec" disabled={isAnyPending || signCapability !== 'ready'} onClick={() => void signStamp(doc)}>
+                      <MeBtn v="sec" disabled={winding || isAnyPending || signCapability !== 'ready'} title={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={() => void signStamp(doc)}>
                         {signCapability === 'loading' ? '签名 · 检查中' : signCapability === 'error' ? '签名 · 服务状态无法确认' : signCapability === 'closed' ? '签名 · 本机暂未开通' : signingId === doc.id ? '准备中' : '签名'}
                       </MeBtn>
                     ) : null}
@@ -452,7 +458,7 @@ export function MyDocumentsPage() {
         </MeRows>
         {items.length < 7 && openDocId === null ? (
           <div className="me-stack">
-            <MeExitCard art={pickPrint ? 'resume' : 'usb'} artWidth={110} title={pickPrint ? '返回选文件' : '去打印'} desc={pickPrint ? '回到刚才的打印' : 'U 盘、手机或扫描都可以'} onClick={() => navigate('/print/upload')} />
+            {pickPrint ? <MeExitCard art="resume" artWidth={110} title="返回选文件" desc="回到刚才的打印" onClick={() => navigate('/print/upload')} /> : <LicenseLock><MeExitCard art="usb" artWidth={110} title="去打印" desc="U 盘、手机或扫描都可以" onClick={() => navigate('/print/upload')} /></LicenseLock>}
             <MeExitCard art="report" artWidth={100} title="看看打印订单" desc="已经打过的，进度在订单里" onClick={() => navigate('/me/print-orders')} />
           </div>
         ) : null}
@@ -460,7 +466,7 @@ export function MyDocumentsPage() {
     )
   }
 
-  const ctabar = pickPrint ? null : recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/documents', uiState === 'empty' ? '去打印' : '去打印', () => navigate('/print/upload'))
+  const ctabar = pickPrint ? null : uiState === 'login' || uiState === 'loading' || uiState === 'error' ? recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/documents', '去打印', () => navigate('/print/upload')) : <LicenseLock>{recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/documents', uiState === 'empty' ? '去打印' : '去打印', () => navigate('/print/upload'))}</LicenseLock>
 
   return (
     <QxMePage

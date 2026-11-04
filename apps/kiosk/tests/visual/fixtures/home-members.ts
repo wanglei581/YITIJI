@@ -126,7 +126,7 @@ const OFFICIAL_CHANNELS = [
 /**
  * 首页第三行的磁贴数跟着终端配置走，≥ 4 块时首页进「压紧」版式（大卡矮一些）：
  *   default 2 块（到机取件、帮助）；channels 3 块（+ 本机构官方渠道）；
- *   hosting 4 块（托管打开：+ 社会招聘、校园招聘）；gov 5 块（渠道 + 百宝箱 + 智慧校园）；full 6 块。
+ *   hosting 4 块（托管打开：+ 社会招聘、校园招聘）；gov 4 块（渠道 + 智慧校园；百宝箱 items 为空不算上架）；full 5 块。
  * 要在登录之前调用（终端配置在首页挂载时读）。
  */
 export function configureHomeVariant(api: ApiRouter, variant: HomeVariant): void {

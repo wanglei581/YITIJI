@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 611,
+    "endpointCount": 628,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -912,6 +912,66 @@
         ],
         "services": [
           "ReconciliationService"
+        ]
+      },
+      {
+        "controller": "services/api/src/branding/branding.admin.controller.ts",
+        "handler": "BrandingAdminController.get",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "BrandLogo",
+          "PlatformSetting"
+        ],
+        "path": "/api/v1/admin/branding",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/branding/branding.service.ts"
+        ],
+        "services": [
+          "BrandingService"
+        ]
+      },
+      {
+        "controller": "services/api/src/branding/branding.admin.controller.ts",
+        "handler": "BrandingAdminController.update",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "BrandLogo",
+          "PlatformSetting"
+        ],
+        "path": "/api/v1/admin/branding",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/branding/branding.service.ts"
+        ],
+        "services": [
+          "BrandingService"
+        ]
+      },
+      {
+        "controller": "services/api/src/branding/branding.admin.controller.ts",
+        "handler": "BrandingAdminController.uploadLogo",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "BrandLogo",
+          "PlatformSetting"
+        ],
+        "path": "/api/v1/admin/branding/logo",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/branding/brand-logo.service.ts"
+        ],
+        "services": [
+          "BrandLogoService"
         ]
       },
       {
@@ -2826,6 +2886,153 @@
         ]
       },
       {
+        "controller": "services/api/src/licenses/license.admin.controller.ts",
+        "handler": "LicenseAdminController.getOne",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "License",
+          "Organization",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/licenses/:id",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/licenses/license.service.ts"
+        ],
+        "services": [
+          "LicenseService"
+        ]
+      },
+      {
+        "controller": "services/api/src/licenses/license.admin.controller.ts",
+        "handler": "LicenseAdminController.update",
+        "method": "PATCH",
+        "models": [
+          "AuditLog",
+          "License",
+          "Organization",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/licenses/:id",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/licenses/license.service.ts"
+        ],
+        "services": [
+          "LicenseService"
+        ]
+      },
+      {
+        "controller": "services/api/src/licenses/license.admin.controller.ts",
+        "handler": "LicenseAdminController.renew",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "License",
+          "Organization",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/licenses/:id/renew",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/licenses/license.service.ts"
+        ],
+        "services": [
+          "LicenseService"
+        ]
+      },
+      {
+        "controller": "services/api/src/licenses/license.admin.controller.ts",
+        "handler": "LicenseAdminController.resume",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "License",
+          "Organization",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/licenses/:id/resume",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/licenses/license.service.ts"
+        ],
+        "services": [
+          "LicenseService"
+        ]
+      },
+      {
+        "controller": "services/api/src/licenses/license.admin.controller.ts",
+        "handler": "LicenseAdminController.revoke",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "License",
+          "Organization",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/licenses/:id/revoke",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/licenses/license.service.ts"
+        ],
+        "services": [
+          "LicenseService"
+        ]
+      },
+      {
+        "controller": "services/api/src/licenses/license.admin.controller.ts",
+        "handler": "LicenseAdminController.suspend",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "License",
+          "Organization",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/licenses/:id/suspend",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/licenses/license.service.ts"
+        ],
+        "services": [
+          "LicenseService"
+        ]
+      },
+      {
+        "controller": "services/api/src/licenses/license.admin.controller.ts",
+        "handler": "LicenseAdminController.attention",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "License",
+          "Organization",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/licenses/attention",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/licenses/license.service.ts"
+        ],
+        "services": [
+          "LicenseService"
+        ]
+      },
+      {
         "controller": "services/api/src/member-benefits/admin-member-benefits.controller.ts",
         "handler": "AdminMemberBenefitsController.list",
         "method": "GET",
@@ -3818,6 +4025,69 @@
         ],
         "services": [
           "PartnerPhoneRebindService"
+        ]
+      },
+      {
+        "controller": "services/api/src/licenses/license.admin.controller.ts",
+        "handler": "LicenseAdminController.setMode",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "License",
+          "Organization",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/orgs/:orgId/license-mode",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/licenses/license.service.ts"
+        ],
+        "services": [
+          "LicenseService"
+        ]
+      },
+      {
+        "controller": "services/api/src/licenses/license.admin.controller.ts",
+        "handler": "LicenseAdminController.orgDetail",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "License",
+          "Organization",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/orgs/:orgId/licenses",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/licenses/license.service.ts"
+        ],
+        "services": [
+          "LicenseService"
+        ]
+      },
+      {
+        "controller": "services/api/src/licenses/license.admin.controller.ts",
+        "handler": "LicenseAdminController.create",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "License",
+          "Organization",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/orgs/:orgId/licenses",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/licenses/license.service.ts"
+        ],
+        "services": [
+          "LicenseService"
         ]
       },
       {
@@ -10604,6 +10874,27 @@
         ]
       },
       {
+        "controller": "services/api/src/licenses/license.partner.controller.ts",
+        "handler": "LicensePartnerController.get",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "License",
+          "Organization",
+          "Terminal"
+        ],
+        "path": "/api/v1/partner/license",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/licenses/license.service.ts"
+        ],
+        "services": [
+          "LicenseService"
+        ]
+      },
+      {
         "controller": "services/api/src/official-channels/official-channels.controller.ts",
         "handler": "OfficialChannelsController.listOwn",
         "method": "GET",
@@ -11618,6 +11909,59 @@
         ],
         "services": [
           "PrintSignService"
+        ]
+      },
+      {
+        "controller": "services/api/src/branding/branding.public.controller.ts",
+        "handler": "BrandingPublicController.brand",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "BrandLogo",
+          "PlatformSetting"
+        ],
+        "path": "/api/v1/public/brand",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/branding/branding.service.ts"
+        ],
+        "services": [
+          "BrandingService"
+        ]
+      },
+      {
+        "controller": "services/api/src/branding/branding.public.controller.ts",
+        "handler": "BrandingPublicController.logo",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "BrandLogo",
+          "PlatformSetting"
+        ],
+        "path": "/api/v1/public/brand-logo/:assetId",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/branding/brand-logo.service.ts"
+        ],
+        "services": [
+          "BrandLogoService"
+        ]
+      },
+      {
+        "controller": "services/api/src/branding/branding.public.controller.ts",
+        "handler": "BrandingPublicController.kioskProfile",
+        "method": "GET",
+        "models": [
+          "PlatformSetting",
+          "Terminal"
+        ],
+        "path": "/api/v1/public/kiosk-profile",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/branding/kiosk-profile.service.ts"
+        ],
+        "services": [
+          "KioskProfileService"
         ]
       },
       {
@@ -13946,7 +14290,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 812,
+      "reachableFileCount": 821,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -13995,6 +14339,7 @@
           ],
           "path": "/",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/home/styles/home-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
@@ -14058,6 +14403,7 @@
           ],
           "path": "/activities",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/activities/activities-batch8.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
             "apps/kiosk/src/pages/profile/touch/me-states.css",
@@ -14094,6 +14440,7 @@
           ],
           "path": "/activities/:id",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/activities/activities-detail-inkpaper.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
             "apps/kiosk/src/pages/profile/touch/me-states.css",
@@ -14237,7 +14584,17 @@
             "GET /companies/:param",
             "GET /companies/:param/jobs",
             "GET /companies/filters",
-            "GET /companies/stats"
+            "GET /companies/stats",
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
           ],
           "file": "apps/kiosk/src/pages/companies/CompaniesPage.tsx",
           "layout": [
@@ -15209,6 +15566,7 @@
           ],
           "path": "/me/activity",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15259,6 +15617,7 @@
           ],
           "path": "/me/ai-records",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15297,6 +15656,7 @@
           ],
           "path": "/me/benefits",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/benefits-qx.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
             "apps/kiosk/src/pages/profile/touch/me-states.css",
@@ -15333,6 +15693,7 @@
           ],
           "path": "/me/documents",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15371,6 +15732,7 @@
           ],
           "path": "/me/favorites",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15409,6 +15771,7 @@
           ],
           "path": "/me/feedback",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/feedback-qx.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
             "apps/kiosk/src/pages/profile/touch/me-states.css",
@@ -15446,6 +15809,7 @@
           ],
           "path": "/me/notifications",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/notifications-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15483,6 +15847,7 @@
           ],
           "path": "/me/print-orders",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15520,6 +15885,7 @@
           ],
           "path": "/me/privacy-requests",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/privacy-qx.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
             "apps/kiosk/src/pages/profile/touch/me-states.css",
@@ -15556,6 +15922,7 @@
           ],
           "path": "/me/resumes",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -15660,6 +16027,7 @@
           "path": "/print-scan",
           "styles": [
             "apps/kiosk/src/components/styles/kiosk-feedback-dialog.css",
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/print-scan/styles/print-hub-qx.css",
             "apps/kiosk/src/pages/print-scan/styles/print-hub-touch.css",
             "apps/kiosk/src/pages/print/art/print-art-tokens.css",
@@ -16158,6 +16526,7 @@
           ],
           "path": "/profile",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/profile/styles/profile-qx.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
             "apps/kiosk/src/pages/profile/touch/me-states.css",
@@ -16787,6 +17156,7 @@
           ],
           "path": "/resume/report",
           "styles": [
+            "apps/kiosk/src/layouts/license-gate.css",
             "apps/kiosk/src/pages/resume/resume-r1-qx2.css",
             "apps/kiosk/src/pages/resume/resume-report-qx.css",
             "apps/kiosk/src/pages/resume/touch/frame.css",
@@ -17295,7 +17665,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 914
+      "sourceFileCount": 923
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -17818,7 +18188,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 119,
+    "modelCount": 121,
     "models": [
       {
         "fieldCount": 7,
@@ -18117,6 +18487,15 @@
           "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts"
+        ]
+      },
+      {
+        "fieldCount": 9,
+        "name": "BrandLogo",
+        "relations": [],
+        "usedBy": [
+          "services/api/src/branding/brand-logo.service.ts",
+          "services/api/src/branding/org-brand-patch.ts"
         ]
       },
       {
@@ -18696,6 +19075,19 @@
         ]
       },
       {
+        "fieldCount": 21,
+        "name": "License",
+        "relations": [
+          "Organization"
+        ],
+        "usedBy": [
+          "services/api/src/licenses/license-gate.ts",
+          "services/api/src/licenses/license-queries.ts",
+          "services/api/src/licenses/license-write.ts",
+          "services/api/src/licenses/license.service.ts"
+        ]
+      },
+      {
         "fieldCount": 10,
         "name": "MemberLegalConsent",
         "relations": [
@@ -18889,7 +19281,7 @@
         ]
       },
       {
-        "fieldCount": 29,
+        "fieldCount": 34,
         "name": "Organization",
         "relations": [
           "CompanyProfile",
@@ -18897,6 +19289,7 @@
           "JobDataQualitySnapshot",
           "JobFair",
           "JobSource",
+          "License",
           "OfflineAgencyProfile",
           "OnlinePlatformDirectory",
           "PolicyPost",
@@ -18910,6 +19303,7 @@
           "services/api/src/auth/auth.service.ts",
           "services/api/src/auth/partner-account-action.service.ts",
           "services/api/src/auth/partner-phone-rebind.service.ts",
+          "services/api/src/branding/org-brand-patch.ts",
           "services/api/src/common/auth/optional-internal-user.ts",
           "services/api/src/common/content-trust.ts",
           "services/api/src/companies/companies.service.ts",
@@ -18917,6 +19311,11 @@
           "services/api/src/jobs/jobs-admin.service.ts",
           "services/api/src/jobs/jobs-excel.service.ts",
           "services/api/src/jobs/jobs-partner.service.ts",
+          "services/api/src/licenses/license-expiry-alert.service.ts",
+          "services/api/src/licenses/license-gate.ts",
+          "services/api/src/licenses/license-queries.ts",
+          "services/api/src/licenses/license-write.ts",
+          "services/api/src/licenses/license.service.ts",
           "services/api/src/official-channels/official-channels.service.ts",
           "services/api/src/orgs/admin-org-account-security.ts",
           "services/api/src/orgs/admin-org-content-trust.service.ts",
@@ -18979,6 +19378,8 @@
         "name": "PlatformSetting",
         "relations": [],
         "usedBy": [
+          "services/api/src/branding/brand-logo.service.ts",
+          "services/api/src/branding/branding.service.ts",
           "services/api/src/print-jobs/free-print-quota.config.ts",
           "services/api/src/support-contact/support-contact.service.ts"
         ]
@@ -19324,6 +19725,7 @@
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/ai/usage/ai-usage-context.ts",
           "services/api/src/ai/usage/ai-usage-summary.ts",
+          "services/api/src/branding/kiosk-profile.service.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/console-screen/console-screen.service.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
@@ -19335,6 +19737,8 @@
           "services/api/src/first-order/first-order-report-builder.ts",
           "services/api/src/jobs/jobs-kiosk.service.ts",
           "services/api/src/kiosk-session/kiosk-session.service.ts",
+          "services/api/src/licenses/license-gate.ts",
+          "services/api/src/licenses/license-queries.ts",
           "services/api/src/member-feedback/kiosk-feedback.service.ts",
           "services/api/src/member-print-orders/member-order-claim-here.service.ts",
           "services/api/src/member-print-orders/member-order-timeline.service.ts",
@@ -20659,6 +21063,12 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
+    "apps/kiosk/src/components/qingxu/QxPageFrame.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-brand-display.mjs"
+    ],
+    "apps/kiosk/src/components/qingxu/touch/QxTouchBand.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-brand-display.mjs"
+    ],
     "apps/kiosk/src/components/qingxu/touch/QxTouchOverlay.tsx": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
@@ -20668,6 +21078,9 @@
     "apps/kiosk/src/components/qingxu/touch/QxTouchTile.tsx": [
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
+    ],
+    "apps/kiosk/src/copy/miniappLinkCopy.ts": [
+      "apps/kiosk/scripts/verify-kiosk-brand-display.mjs"
     ],
     "apps/kiosk/src/copy/unattendedCopy.ts": [
       "apps/kiosk/scripts/verify-kiosk-feedback-entry.mjs",
@@ -20726,6 +21139,7 @@
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-fusion-w6.mjs",
+      "apps/kiosk/scripts/verify-kiosk-brand-display.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-kiosk-shell-active-nav.mjs",
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs",
@@ -21038,6 +21452,9 @@
     ],
     "apps/kiosk/src/pages/home/components/ContinuePanel.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
+    ],
+    "apps/kiosk/src/pages/home/components/HomeHeroHeader.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-brand-display.mjs"
     ],
     "apps/kiosk/src/pages/home/components/HomeIdentityActions.tsx": [
       "apps/kiosk/scripts/verify-kiosk-end-use.mjs"
@@ -22714,6 +23131,7 @@
       "apps/kiosk/scripts/verify-screensaver-empty-shell.mjs"
     ],
     "apps/kiosk/src/pages/screensaver/StandbyView.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-brand-display.mjs",
       "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs",
       "apps/kiosk/scripts/verify-screensaver-empty-shell.mjs"
     ],
@@ -24189,6 +24607,9 @@
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
+    "packages/shared/src/types/branding.ts": [
+      "services/api/scripts/verify-branding.ts"
+    ],
     "packages/shared/src/types/campusRecruitmentStats.ts": [
       "services/api/scripts/verify-campus-recruitment-stats.ts"
     ],
@@ -24245,6 +24666,9 @@
     ],
     "packages/shared/src/types/legalDocs.ts": [
       "services/api/scripts/verify-legal-doc-version.ts"
+    ],
+    "packages/shared/src/types/license.ts": [
+      "services/api/scripts/verify-license-state.ts"
     ],
     "packages/shared/src/types/member-privacy.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -24616,6 +25040,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
       "services/api/scripts/verify-ai-usage-retention.ts",
+      "services/api/scripts/verify-branding-license-migrations.ts",
       "services/api/scripts/verify-db-load-indexes.ts",
       "services/api/scripts/verify-first-order-migrations.ts",
       "services/api/scripts/verify-job-ai.ts",
@@ -24624,6 +25049,7 @@
       "services/api/scripts/verify-job-headcount.ts",
       "services/api/scripts/verify-jobfair-checkin.ts",
       "services/api/scripts/verify-legal-doc-version.ts",
+      "services/api/scripts/verify-license-state.ts",
       "services/api/scripts/verify-member-account-status.ts",
       "services/api/scripts/verify-member-data-request-contract.ts",
       "services/api/scripts/verify-partner-account-action-schema.ts",
@@ -24643,6 +25069,7 @@
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
       "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
+      "services/api/scripts/verify-branding-license-migrations.ts",
       "services/api/scripts/verify-db-load-indexes.ts",
       "services/api/scripts/verify-first-order-migrations.ts",
       "services/api/scripts/verify-free-print-quota.ts",
@@ -24652,6 +25079,7 @@
       "services/api/scripts/verify-job-headcount.ts",
       "services/api/scripts/verify-jobfair-checkin.ts",
       "services/api/scripts/verify-legal-doc-version.ts",
+      "services/api/scripts/verify-license-state.ts",
       "services/api/scripts/verify-member-account-status.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-data-request-contract.ts",
@@ -24858,6 +25286,11 @@
       "services/api/scripts/verify-internal-login-real-redis.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts"
     ],
+    "services/api/scripts/support/branding-license-support.ts": [
+      "services/api/scripts/verify-brand-logo-image.ts",
+      "services/api/scripts/verify-branding.ts",
+      "services/api/scripts/verify-license-state.ts"
+    ],
     "services/api/scripts/support/content-pipeline-fixtures.ts": [
       "services/api/scripts/verify-content-pipeline-e2e.ts"
     ],
@@ -24906,6 +25339,7 @@
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-assistant-device-fault-intercept.ts",
+      "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-demo-company-unpublish.ts",
@@ -24955,6 +25389,11 @@
       "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ],
+    "services/api/scripts/support/license-harness.ts": [
+      "services/api/scripts/verify-license-runtime.ts",
+      "services/api/scripts/verify-license-writes.ts",
+      "services/api/scripts/verify-license.ts"
+    ],
     "services/api/scripts/support/llm-pii-callsite-checks.ts": [
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
@@ -24993,6 +25432,10 @@
     ],
     "services/api/scripts/support/payment-callback-race-cases.ts": [
       "services/api/scripts/verify-payment-flow.ts"
+    ],
+    "services/api/scripts/support/png-fixtures.ts": [
+      "services/api/scripts/verify-brand-logo-image.ts",
+      "services/api/scripts/verify-branding.ts"
     ],
     "services/api/scripts/support/recruitment-wave2-full-inventory.ts": [
       "services/api/scripts/verify-recruitment-wave2-full-inventory.ts"
@@ -26119,6 +26562,7 @@
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-platform-degradation.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-contract-review-http.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
@@ -26126,6 +26570,7 @@
       "services/api/scripts/verify-job-application-track.ts",
       "services/api/scripts/verify-job-favorites-http.ts",
       "services/api/scripts/verify-job-materials.ts",
+      "services/api/scripts/verify-license-state.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-qr-login.ts",
@@ -26185,6 +26630,7 @@
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-benefit-redemption.ts",
+      "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-bulk-publish.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-career-plan.ts",
@@ -26399,6 +26845,35 @@
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts"
     ],
+    "services/api/src/branding/brand-logo-image.ts": [
+      "services/api/scripts/verify-brand-logo-image.ts"
+    ],
+    "services/api/src/branding/brand-logo.service.ts": [
+      "services/api/scripts/verify-branding.ts"
+    ],
+    "services/api/src/branding/branding.admin.controller.ts": [
+      "services/api/scripts/verify-branding.ts",
+      "services/api/scripts/verify-multipart-field-nesting.ts"
+    ],
+    "services/api/src/branding/branding.module.ts": [
+      "services/api/scripts/verify-branding.ts"
+    ],
+    "services/api/src/branding/branding.public.controller.ts": [
+      "services/api/scripts/verify-branding.ts"
+    ],
+    "services/api/src/branding/branding.service.ts": [
+      "services/api/scripts/verify-branding.ts"
+    ],
+    "services/api/src/branding/branding.types.ts": [
+      "services/api/scripts/verify-brand-logo-image.ts",
+      "services/api/scripts/verify-branding.ts"
+    ],
+    "services/api/src/branding/kiosk-profile-throttle.ts": [
+      "services/api/scripts/verify-branding.ts"
+    ],
+    "services/api/src/branding/kiosk-profile.service.ts": [
+      "services/api/scripts/verify-branding.ts"
+    ],
     "services/api/src/bulk-publish/bulk-publish-expiry.ts": [
       "services/api/scripts/verify-beijing-display-time.ts"
     ],
@@ -26519,9 +26994,11 @@
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-benefit-activities.ts",
+      "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-legal-doc-version.ts",
+      "services/api/scripts/verify-license-state.ts",
       "services/api/scripts/verify-member-benefits-admin.ts"
     ],
     "services/api/src/common/filters/http-exception.filter.ts": [
@@ -26592,6 +27069,7 @@
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-benefit-activities.ts",
+      "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-free-print-quota.ts",
@@ -26619,6 +27097,7 @@
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-benefit-activities.ts",
+      "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-legal-doc-version.ts",
@@ -26718,6 +27197,7 @@
     "services/api/src/common/redis/redis-degradation.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-orgs.ts",
+      "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
       "services/api/scripts/verify-member-print-orders.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts",
@@ -26738,12 +27218,14 @@
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-alert-push.cjs",
       "services/api/scripts/verify-backend-p0-http.ts",
+      "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
+      "services/api/scripts/verify-license-runtime.ts",
       "services/api/scripts/verify-member-auth-races.ts",
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-closure.ts",
@@ -26784,6 +27266,7 @@
     "services/api/src/common/throttler/terminal-throttle.ts": [
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
+      "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-kiosk-session.ts",
       "services/api/scripts/verify-partner-source-capabilities.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
@@ -27586,6 +28069,37 @@
     "services/api/src/legal/legal.service.ts": [
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
+    "services/api/src/licenses/credit-code.ts": [
+      "services/api/scripts/verify-license-state.ts"
+    ],
+    "services/api/src/licenses/license-clock.ts": [
+      "services/api/scripts/verify-branding.ts"
+    ],
+    "services/api/src/licenses/license-expiry-alert.service.ts": [
+      "services/api/scripts/verify-license-runtime.ts",
+      "services/api/scripts/verify-license-state.ts"
+    ],
+    "services/api/src/licenses/license-input.ts": [
+      "services/api/scripts/verify-license-state.ts"
+    ],
+    "services/api/src/licenses/license-state.ts": [
+      "services/api/scripts/verify-license-state.ts"
+    ],
+    "services/api/src/licenses/license-time.ts": [
+      "services/api/scripts/verify-license-state.ts"
+    ],
+    "services/api/src/licenses/license.module.ts": [
+      "services/api/scripts/verify-license-state.ts"
+    ],
+    "services/api/src/licenses/license.types.ts": [
+      "services/api/scripts/verify-license-state.ts"
+    ],
+    "services/api/src/licenses/partner-license-write.interceptor.ts": [
+      "services/api/scripts/verify-license-state.ts"
+    ],
+    "services/api/src/licenses/partner-write-policy.ts": [
+      "services/api/scripts/verify-license-state.ts"
+    ],
     "services/api/src/main.ts": [
       "services/api/scripts/verify-sms-egress-limits.ts"
     ],
@@ -28096,6 +28610,7 @@
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
       "services/api/scripts/verify-admin-orgs.ts",
       "services/api/scripts/verify-admin-session-revocation.ts",
+      "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-org-type-enum-sync.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action-schema.ts",
@@ -28111,6 +28626,7 @@
       "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/orgs/dto/admin-org.dto.ts": [
+      "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-org-type-enum-sync.ts"
     ],
     "services/api/src/orgs/dto/partner-account-action.dto.ts": [
@@ -28405,6 +28921,7 @@
       "services/api/scripts/verify-policy-eligibility.ts"
     ],
     "services/api/src/policies/policies.controller.ts": [
+      "services/api/scripts/verify-license-state.ts",
       "services/api/scripts/verify-policies.ts",
       "services/api/scripts/verify-policy-scope.ts"
     ],
@@ -28415,6 +28932,7 @@
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-bulk-publish.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
+      "services/api/scripts/verify-license-state.ts",
       "services/api/scripts/verify-policies.ts",
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts",
@@ -28635,6 +29153,7 @@
       "services/api/scripts/verify-print-sign.ts"
     ],
     "services/api/src/prisma/create-client.ts": [
+      "services/api/scripts/verify-branding-license-migrations.ts",
       "services/api/scripts/verify-first-order-migrations.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-production-db-guard.ts",
@@ -28681,6 +29200,7 @@
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-benefit-redemption.ts",
+      "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-bulk-publish.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-career-plan.ts",
@@ -28988,6 +29508,7 @@
     "services/api/src/storage/storage.service.ts": [
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-cos-files.ts",
@@ -29185,12 +29706,16 @@
     ],
     "services/api/src/terminals/terminal-org-assignment.ts": [
       "services/api/scripts/verify-first-order-http.ts",
+      "services/api/scripts/verify-license-runtime.ts",
+      "services/api/scripts/verify-license-state.ts",
       "services/api/scripts/verify-partner-smart-campus.ts"
     ],
     "services/api/src/terminals/terminal-session.service.ts": [
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
+      "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-license-state.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
@@ -29227,6 +29752,7 @@
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
+      "services/api/scripts/verify-license-runtime.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-partner-smart-campus.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
@@ -31906,6 +32432,29 @@
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
         "@ai-job-print/kiosk::verify:kiosk-ai-primitives"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/src/components/qingxu/QxPageFrame.tsx",
+          "apps/kiosk/src/components/qingxu/touch/QxTouchBand.tsx",
+          "apps/kiosk/src/copy/miniappLinkCopy.ts",
+          "apps/kiosk/src/layouts/KioskRoot.tsx",
+          "apps/kiosk/src/pages/home/components/HomeHeroHeader.tsx",
+          "apps/kiosk/src/pages/screensaver/StandbyView.tsx"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-kiosk-brand-display.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:kiosk-brand-display"
       ],
       "wired": true
     },
@@ -38149,6 +38698,96 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/branding-license-support.ts",
+          "services/api/scripts/support/png-fixtures.ts",
+          "services/api/src/branding/brand-logo-image.ts",
+          "services/api/src/branding/branding.types.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-brand-logo-image.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:branding"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "services/api/prisma/migrations",
+          "services/api/prisma/postgres/migrations"
+        ],
+        "files": [
+          "services/api/prisma/postgres/schema.prisma",
+          "services/api/prisma/schema.prisma",
+          "services/api/src/prisma/create-client.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-branding-license-migrations.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:branding-license-migrations"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "services",
+          "services/api/src/branding"
+        ],
+        "files": [
+          "packages/shared/src/types/branding.ts",
+          "services/api/scripts/support/branding-license-support.ts",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/png-fixtures.ts",
+          "services/api/src/app.module.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/branding/brand-logo.service.ts",
+          "services/api/src/branding/branding.admin.controller.ts",
+          "services/api/src/branding/branding.module.ts",
+          "services/api/src/branding/branding.public.controller.ts",
+          "services/api/src/branding/branding.service.ts",
+          "services/api/src/branding/branding.types.ts",
+          "services/api/src/branding/kiosk-profile-throttle.ts",
+          "services/api/src/branding/kiosk-profile.service.ts",
+          "services/api/src/common/decorators/roles.decorator.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/redis/redis-degradation.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/common/throttler/terminal-throttle.ts",
+          "services/api/src/licenses/license-clock.ts",
+          "services/api/src/orgs/admin-orgs.service.ts",
+          "services/api/src/orgs/dto/admin-org.dto.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/terminals/terminal-session.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-branding.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:branding"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/src/audit/audit.service.ts",
           "services/api/src/bulk-publish/bulk-publish.service.ts",
           "services/api/src/common/decorators/current-user.decorator.ts",
@@ -40644,6 +41283,104 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/license-harness.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/licenses/license-expiry-alert.service.ts",
+          "services/api/src/terminals/terminal-org-assignment.ts",
+          "services/api/src/terminals/terminals-admin.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-license-runtime.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:license"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "services",
+          "services/api/prisma/migrations",
+          "services/api/prisma/postgres/migrations"
+        ],
+        "files": [
+          "packages/shared/src/types/license.ts",
+          "services/api/prisma/postgres/schema.prisma",
+          "services/api/prisma/schema.prisma",
+          "services/api/scripts/support/branding-license-support.ts",
+          "services/api/src/app.module.ts",
+          "services/api/src/common/decorators/roles.decorator.ts",
+          "services/api/src/licenses/credit-code.ts",
+          "services/api/src/licenses/license-expiry-alert.service.ts",
+          "services/api/src/licenses/license-input.ts",
+          "services/api/src/licenses/license-state.ts",
+          "services/api/src/licenses/license-time.ts",
+          "services/api/src/licenses/license.module.ts",
+          "services/api/src/licenses/license.types.ts",
+          "services/api/src/licenses/partner-license-write.interceptor.ts",
+          "services/api/src/licenses/partner-write-policy.ts",
+          "services/api/src/policies/policies.controller.ts",
+          "services/api/src/policies/policies.service.ts",
+          "services/api/src/terminals/terminal-org-assignment.ts",
+          "services/api/src/terminals/terminal-session.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-license-state.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:license"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/license-harness.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-license-writes.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:license"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/license-harness.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-license.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:license"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/src/advisor/assistant-summary.service.ts",
           "services/api/src/advisor/llm-advisor.service.ts",
           "services/api/src/ai/ai-public-quota.service.ts",
@@ -41726,6 +42463,7 @@
         "dirs": [],
         "files": [
           "services/api/src/ai/ai.controller.ts",
+          "services/api/src/branding/branding.admin.controller.ts",
           "services/api/src/content/content.controller.ts",
           "services/api/src/files/files.controller.ts",
           "services/api/src/jobs/admin-fairs.controller.ts",
@@ -46330,10 +47068,12 @@
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/home/components/HomeHeroHeader.tsx",
         "kind": "component",
-        "mentions": [],
-        "risk": "low",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-brand-display.mjs"
+        ],
+        "risk": "high",
         "scope": "kiosk",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-brand-display.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

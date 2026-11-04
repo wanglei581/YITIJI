@@ -1,3 +1,4 @@
+import { kioskBrandMark, useKioskProfile } from '../../services/api/kioskProfile'
 // QxPageFrame — 青序流光页面壳。
 //
 // 为什么不复用 packages/ui 的 KioskPageFrame：
@@ -50,6 +51,7 @@ export function QxPageFrame({
   navbar,
   back,
 }: QxPageFrameProps) {
+  const brand = useKioskProfile()
   return (
     <div className="qx-stage" data-qx-frame="true">
       <header className="qx-topbar">
@@ -62,8 +64,8 @@ export function QxPageFrame({
           </button>
         ) : null}
         <span className="qx-topbar-brand">
-          <span className="qx-topbar-mark">职</span>
-          职易达
+          <span className="qx-topbar-mark">{kioskBrandMark(brand)}</span>
+          {brand.brandName}
         </span>
         {/* 2.0 顶栏只留品牌、状态胶囊与时钟（v2 README）；终端编号与「就业服务大厅」副标题不再上屏。
             terminalLabel 仍接收，页面逐个迁 2.0 时再删调用处。 */}
