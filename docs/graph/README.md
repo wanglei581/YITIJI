@@ -33,7 +33,7 @@ node scripts/project-graph-query.mjs model PrintTask
 
 | 应用 | 目录 | 路由数 | 源文件 | 入口可达 |
 | --- | --- | --- | --- | --- |
-| kiosk | `apps/kiosk` | 91 | 925 | 823 |
+| kiosk | `apps/kiosk` | 90 | 925 | 809 |
 | admin | `apps/admin` | 38 | 282 | 256 |
 | partner | `apps/partner` | 15 | 94 | 93 |
 
@@ -41,14 +41,14 @@ node scripts/project-graph-query.mjs model PrintTask
 | --- | --- |
 | HTTP 端点（services/api） | 628 |
 | Prisma 模型 | 121 |
-| 门禁脚本文件 | 619 |
+| 门禁脚本文件 | 620 |
 | ├ 其中辅助库（被别的门禁 import） | 140 |
-| ├ 已在 package.json 里有脚本名 | 563 |
-| ├ 在 CI 执行闭包里 | 548 |
+| ├ 已在 package.json 里有脚本名 | 564 |
+| ├ 在 CI 执行闭包里 | 549 |
 | └ **无脚本名，从未被执行** | 0 |
 | 被至少一条门禁断言的文件 | 2028 |
 | 孤儿候选 · protected（不得删） | 4 |
-| 孤儿候选 · high（仍被 CI/门禁引用） | 84 |
+| 孤儿候选 · high（仍被 CI/门禁引用） | 98 |
 | 孤儿候选 · medium（仅文档提及） | 30 |
 | 孤儿候选 · low（全仓零提及） | 95 |
 
@@ -67,12 +67,12 @@ node scripts/project-graph-query.mjs model PrintTask
 
 ```mermaid
 flowchart LR
-  kiosk["apps/kiosk<br/>一体机前台<br/>91 路由"]
+  kiosk["apps/kiosk<br/>一体机前台<br/>90 路由"]
   admin["apps/admin<br/>管理员后台<br/>38 路由"]
   partner["apps/partner<br/>合作机构后台<br/>15 路由"]
   api["services/api<br/>NestJS<br/>628 端点"]
   db[("Prisma<br/>121 模型")]
-  gates{{"verify 门禁<br/>619 个脚本"}}
+  gates{{"verify 门禁<br/>620 个脚本"}}
 
   kiosk -->|"/api/v1"| api
   admin -->|"/api/v1"| api

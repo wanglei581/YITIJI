@@ -123,7 +123,7 @@ console.log('\n=== 智慧校园管理员视角文案 ===')
 const adminSmartCampus = readFileSync(join(adminRoot, 'src/routes/smart-campus/index.tsx'), 'utf8')
 for (const phrase of [
   '按终端配置「智慧校园」模块的显示开关。',
-  '保存后一体机首页按开关显示或隐藏「智慧校园」',
+  '2026-11-04 起一体机端停放「智慧校园」：开关照常保存，一体机暂不显示，恢复后按开关生效',
   '学校账号在机构后台只能配置本校终端',
   '迎新内容 / 使用统计',
   '校园大数据',

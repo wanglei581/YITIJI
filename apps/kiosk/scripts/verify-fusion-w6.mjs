@@ -210,8 +210,8 @@ const WAVE_ROUTES = new Map([
     '/job-fairs/:id/companies', '/job-fairs/:id/companies/:companyId',
     '/job-fairs/:id/map', '/job-fairs/:id/materials', '/job-fairs/:id/visit-plan',
     '/job-fairs/:id/stats', '/fairs-service', '/campus', '/campus/welcome', '/campus/freshman-insights',
-    '/smart-campus', '/smart-campus/welcome',
-    '/smart-campus/service/:key', '/renshi', '/jobs/online-platforms', '/jobs-service',
+    // 2026-11-04 产品负责人定停放：三条在用页收成一条跳回首页的 splat。
+    '/smart-campus/*', '/renshi', '/jobs/online-platforms', '/jobs-service',
     // 3.14：稿 45 的宿主换成本机构官方渠道，/jobs/online-platforms 留作重定向，两条都归 W4。
     '/official-channels',
   ]],
@@ -223,7 +223,8 @@ const WAVE_ROUTES = new Map([
     '/me/documents', '/me/favorites', '/me/ai-records', '/me/benefits', '/me/activity',
     '/me/activity/:id', '/me/notifications', '/me/feedback', '/me/settings',
     '/me/privacy-requests', '/help',
-    '/activities', '/activities/:id', '/toolbox', '/notifications',
+    // 2026-11-04 产品负责人定停放：/toolbox 收成跳回首页的 splat。
+    '/activities', '/activities/:id', '/toolbox/*', '/notifications',
     // v1: 自我探索 · 倾向参考四步路由（PR ③）
     '/resume/self-assessment/intro',
     '/resume/self-assessment/questions',
@@ -566,7 +567,7 @@ check('W6 browser collection contract', () => {
   assert.match(config, /name: 'mobile-390x844', grep: \/@w6-mobile\$\//, 'mobile project must own only @w6-mobile tests')
   assert.match(routes, /pattern: '\/resume\/career-plan'[\s\S]*featureText: '求职方案'/, 'career-plan W6 路由面必须断言求职方案')
   assert.match(spec, /\/resume\/career-plan mobile breakpoint @w6-mobile/, 'career-plan 必须有 390×844 断点')
-  assert.match(spec, /\/smart-campus\/freshman-insights 已停放，路由不存在 @w6-kiosk/, '停放的 freshman-insights 必须断言直达路由不存在')
+  assert.match(spec, /旧链接 \/toolbox、\/smart-campus、\/smart-campus\/welcome、\/smart-campus\/service\/campus-card 都回到首页 @w6-kiosk/, '2026-11-04 产品负责人定停放：旧链接必须断言回到首页')
 })
 
 check('W6 legal and long-text fixture', () => {

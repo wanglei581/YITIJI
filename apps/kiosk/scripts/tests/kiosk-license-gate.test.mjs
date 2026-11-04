@@ -502,6 +502,13 @@ test('按服务只读、交接来源及重定向分类', async () => {
     assert.equal(routes.windDownRoute(path).kind, 'work', path)
   }
   for (const path of ['/print/scan-feature', '/jobs/online-platforms']) assert.equal(routes.windDownRoute(path).kind, 'always', path)
+  // 停放的百宝箱、智慧校园（#1583）：根路由与深链都按首页算，收尾期间也放行回首页；不误吞同前缀的别的路径。
+  for (const path of ['/toolbox', '/toolbox/resume-tools', '/smart-campus', '/smart-campus/welcome', '/smart-campus/service/library']) {
+    assert.equal(routes.windDownRoute(path).kind, 'always', path)
+    assert.equal(routes.windDownAllows(path, 'resume'), true, path)
+  }
+  assert.equal(routes.windDownRoute('/toolboxes'), undefined)
+  assert.equal(routes.windDownRoute('/dev/touch-gallery').service, 'toolbox')
 })
 
 test('交接来源只认当前有效编号，不带文件或用户资料', async () => {
