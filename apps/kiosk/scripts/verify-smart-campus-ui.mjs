@@ -234,7 +234,7 @@ function capabilityRouteInventory() {
       if (name === 'children' && ts.isArrayLiteralExpression(property.initializer)) children = property.initializer
     }
     const nextAncestors = element ? [...ancestors, element] : ancestors
-    if (path === 'toolbox' || path?.startsWith('smart-campus')) {
+    if (path === 'toolbox' || path?.startsWith('toolbox/') || path?.startsWith('smart-campus')) {
       inventory.push({ path, ancestors: nextAncestors, element })
     }
     if (children) {
@@ -247,28 +247,40 @@ function capabilityRouteInventory() {
 
 const capabilityRoutes = capabilityRouteInventory()
 const smartRoutes = capabilityRoutes.filter((route) => route.path.startsWith('smart-campus'))
-const toolboxRoutes = capabilityRoutes.filter((route) => route.path === 'toolbox')
-const expectedPatterns = [
-  'smart-campus',
-  'smart-campus/welcome',
-  'smart-campus/service/:key',
-]
+const toolboxRoutes = capabilityRoutes.filter((route) => route.path.startsWith('toolbox'))
+const routesSource = read('src/routes/index.tsx')
+// 2026-11-04 产品负责人定停放：两组路由都是 splat，跳回首页，不再包进能力边界。
+const parkedHomeRedirect = (route) => /<Navigate\s+to="\/"\s+replace\s*\/>/.test(route.element.replace(/\s+/g, ' '))
+const routesDoNotImportParked = ![
+  'ToolboxZonePage',
+  'SmartCampusHomePage',
+  'SmartCampusWelcomePage',
+  'SmartCampusServicePage',
+  'FreshmanInsightsPage',
+  'KioskCapabilityGuard',
+  'useToolboxConfig',
+  'useSmartCampusConfig',
+].some((name) => new RegExp(`from\\s+['"][^'"]*${name}['"]`).test(routesSource))
 if (
-  smartRoutes.length === 3 &&
-  expectedPatterns.every((path) => smartRoutes.some((route) => route.path === path)) &&
-  smartRoutes.every((route) => route.ancestors.some((element) => element.includes('SmartCampusCapabilityBoundary')))
+  smartRoutes.length === 1 &&
+  smartRoutes[0].path === 'smart-campus/*' &&
+  parkedHomeRedirect(smartRoutes[0]) &&
+  !smartRoutes[0].ancestors.some((element) => element.includes('SmartCampusCapabilityBoundary')) &&
+  routesDoNotImportParked
 ) {
-  pass('G7 三个智慧校园路由 pattern 全是 SmartCampusCapabilityBoundary 后代且 freshman-insights 已停放（见 current-progress）')
+  pass('G7 /smart-campus/* 停放跳回首页，不再包在能力边界里（2026-11-04 产品负责人定停放）')
 } else {
-  fail(`G7 智慧校园路由门禁 AST 不成立: ${JSON.stringify(smartRoutes)}`)
+  fail(`G7 智慧校园停放跳转不成立: ${JSON.stringify(smartRoutes)}`)
 }
 if (
   toolboxRoutes.length === 1 &&
-  toolboxRoutes[0].ancestors.some((element) => element.includes('ToolboxCapabilityBoundary'))
+  toolboxRoutes[0].path === 'toolbox/*' &&
+  parkedHomeRedirect(toolboxRoutes[0]) &&
+  !toolboxRoutes[0].ancestors.some((element) => element.includes('ToolboxCapabilityBoundary'))
 ) {
-  pass('G7a /toolbox 是 ToolboxCapabilityBoundary 后代且不存在无守卫同路径')
+  pass('G7a /toolbox/* 停放跳回首页，不再包在能力边界里（2026-11-04 产品负责人定停放）')
 } else {
-  fail(`G7a 百宝箱路由门禁 AST 不成立: ${JSON.stringify(toolboxRoutes)}`)
+  fail(`G7a 百宝箱停放跳转不成立: ${JSON.stringify(toolboxRoutes)}`)
 }
 mustContain(
   'src/pages/smart-campus/SmartCampusServicePage.tsx',

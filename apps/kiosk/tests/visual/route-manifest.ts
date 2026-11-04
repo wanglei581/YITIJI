@@ -11,9 +11,10 @@ export const productionRoutePatterns = [
   '/me/activity/:id', '/me/notifications', '/me/feedback', '/me/settings',
   '/me/privacy-requests',
   '/help', '/activities', '/activities/:id', '/renshi', '/campus',
-  '/campus/welcome', '/campus/freshman-insights', '/toolbox', '/smart-campus',
-  '/smart-campus/welcome',
-  '/smart-campus/service/:key', '/print-scan', '/print-scan/feature/:key',
+  '/campus/welcome', '/campus/freshman-insights',
+  // 2026-11-04 产品负责人定停放：百宝箱、智慧校园不再是在用页面，旧链跳回首页。
+  '/toolbox/*', '/smart-campus/*',
+  '/print-scan', '/print-scan/feature/:key',
   '/print-scan/convert', '/print-scan/sign', '/print/scan-convert',
   '/print/scan-sign', '/print/scan-feature', '/print/upload',
   '/print/desk', '/print/material-check', '/print/preview', '/print/params', '/print/confirm',
@@ -48,7 +49,7 @@ export const productionRoutePatterns = [
   '/policy-service',
   // 触屏版第一包：开发样板（非业务屏）。生产构建不挂载，直接访问回到首页。
   '/dev/touch-gallery',
-] as const // 112 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan；2026-09-27 + /official-channels；2026-09-30 停放 smart-campus/freshman-insights；2026-10-29 + /k/u/:scene、/k/l/:ticketId；2026-10-27 + 触屏版开发样板 /dev/touch-gallery)
+] as const // 110 routes (112 − 2026-11-04 停放百宝箱与智慧校园：去掉 4 条在用页，加上 toolbox/*、smart-campus/* 两条跳转；此前：106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan；2026-09-27 + /official-channels；2026-09-30 停放 smart-campus/freshman-insights；2026-10-29 + /k/u/:scene、/k/l/:ticketId；2026-10-27 + 触屏版开发样板 /dev/touch-gallery)
 
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',
@@ -76,4 +77,7 @@ export const compatibilityRedirects = {
   '/scan/result': '/scan?stage=result',
   // 2026-09-27（3.14）：线上招聘平台目录并入本机构官方渠道，两种托管状态都转过去。
   '/jobs/online-platforms': '/official-channels',
+  // 2026-11-04 产品负责人定停放：旧百宝箱、智慧校园链接回首页。
+  '/toolbox/*': '/',
+  '/smart-campus/*': '/',
 } as const
