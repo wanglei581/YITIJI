@@ -7,6 +7,7 @@ import { FilterChip } from '../components/FilterChip'
 import { API_MODE } from '../../services/api/client'
 import { getPrinters, type AdminPrinterRecord } from '../../services/api/devices'
 import { printerStatusView } from '../terminals/terminalStatusViews'
+import { PrinterOutputCell } from './PrinterOutputCell'
 
 const PRINTERS_REFRESH_KEY = 'admin:printers'
 const STATUS_MAP: Record<AdminPrinterRecord['status'], { badge: 'success' | 'error'; label: string }> = {
@@ -58,7 +59,8 @@ export default function PrintersPage() {
     intervalMs: 30_000,
     merge: (current, incoming) => {
       const printers = mergeById<AdminPrinterRecord>((item) => item.id)(current?.printers, incoming.printers)
-      return current && printers === current.printers ? current : { printers }
+      if (current && printers === current.printers && current.outputStatus === incoming.outputStatus) return current
+      return { printers, outputStatus: incoming.outputStatus }
     },
     failPolicy: 'keep-last',
   })
@@ -76,6 +78,7 @@ export default function PrintersPage() {
     { id: 'terminal', header: '绑定终端', truncate: true, cell: (p) => <span className="font-mono text-xs">{p.terminalCode}</span> },
     { id: 'status', header: '状态', cell: (p) => <StatusBadge dot status={STATUS_MAP[p.status].badge} label={STATUS_MAP[p.status].label} /> },
     { id: 'task', header: '当前任务', truncate: true, title: (p) => p.currentTask ?? '空闲', cell: (p) => p.currentTask ?? <span className="text-neutral-400">空闲</span> },
+    { id: 'output', header: '本系统出纸', cell: (p) => <PrinterOutputCell output={p.output} outputStatus={data?.outputStatus} /> },
     { id: 'toner', header: '碳粉余量', cell: (p) => p.tonerLevel === null ? <span className="text-xs text-neutral-500">未上报</span> : <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-[52px] overflow-hidden rounded-full bg-neutral-100"><span className={'block h-full rounded-full ' + (p.tonerLevel < 20 ? 'bg-gradient-to-r from-[#c9764a] to-[#9e5330]' : 'bg-primary-600')} style={{ width: `${Math.max(0, Math.min(100, p.tonerLevel))}%` }} /></span><span className="text-xs tabular-nums text-neutral-500">{p.tonerLevel}%</span></span> },
     { id: 'paper', header: '纸张状态', cell: (p) => { const paper = PAPER_MAP[p.paperStatus ?? 'unknown'] ?? PAPER_MAP.unknown; return <span className="inline-flex items-center"><StatusBadge dot status={paper.badge} label={paper.label} />{formatPaperTrayLevel(p.paperTrayLevel)}</span> } },
     { id: 'fault', header: '故障信息', truncate: true, cell: (p) => <FaultCell printer={p} /> },
@@ -91,6 +94,7 @@ export default function PrintersPage() {
       </div>
       <Card className="overflow-hidden p-0"><ConsoleTable items={paged} columns={columns} loading={loading} error={errorMessage ? { title: '打印机数据加载失败', message: errorMessage, onRetry: () => void refresh() } : null} empty={{ title: '暂无打印机', description: search ? `未找到包含"${search}"的打印机` : '当前筛选条件下没有打印机' }} page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1) }} /></Card>
       <p className="mt-3 text-xs text-neutral-400">设备状态由终端程序定时上报；型号、SN、耗材和纸盒余量未上报时显示为未上报{API_MODE !== 'http' && '（当前为 mock 演示数据）'}</p>
+      <p className="mt-1 text-xs text-neutral-400">「本系统出纸」只算从本系统发出、已确认出纸的打印，按计费页数 × 份数计面数（双面一张纸算两面）；不含打印机面板复印和打印机自己读 U 盘直接打印。今天、本月按北京时间。</p>
     </>
   )
 }

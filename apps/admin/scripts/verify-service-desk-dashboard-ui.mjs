@@ -204,6 +204,24 @@ check(
   'OPS-07: paperTrayLevel uses percent like the dashboard, never 张',
 )
 
+const outputCell = readFileSync(new URL('../src/routes/printers/PrinterOutputCell.tsx', import.meta.url), 'utf8')
+const nullAt = outputCell.indexOf('output == null')
+const nullBranch = nullAt >= 0 ? outputCell.slice(nullAt, nullAt + 160) : ''
+check(
+  printers.includes("header: '本系统出纸'") &&
+    printers.indexOf("header: '当前任务'") < printers.indexOf("header: '本系统出纸'") &&
+    printers.includes('<PrinterOutputCell output={p.output}') &&
+    printers.includes('不含打印机面板复印') &&
+    outputCell.includes('暂时读不到') &&
+    outputCell.includes('数据量超出统计上限，没给数') &&
+    outputCell.includes('本月另有') &&
+    outputCell.includes('单出纸未确认，没算进去') &&
+    outputCell.includes('formatCount') &&
+    nullBranch.includes('暂时读不到') &&
+    !nullBranch.includes('0'),
+  'printer page column 本系统出纸 reads output; null says 暂时读不到, not zero; footer excludes copier panel copies',
+)
+
 const loginLegal = readFileSync(new URL('../src/routes/login/LegalDocsModal.tsx', import.meta.url), 'utf8')
 check(
   loginLegal.includes("legalDocsService") &&

@@ -339,6 +339,19 @@ export interface TerminalBindCodeCreated {
 export type AdminPrinterStatus = 'online' | 'offline' | 'error'
 export type AdminPaperStatus = 'normal' | 'low' | 'empty' | 'jam' | 'unknown'
 
+export interface AdminPrinterOutputSides {
+  sides: number
+  colorSides: number
+  duplexSides: number
+}
+
+/** 本系统已确认出纸的面数。null 表示这次没读到，不能当成 0。 */
+export interface AdminPrinterOutput {
+  today: AdminPrinterOutputSides
+  month: AdminPrinterOutputSides
+  monthUnconfirmedTasks: number
+}
+
 export interface AdminPrinterRecord {
   id: string
   terminalId: string
@@ -355,10 +368,12 @@ export interface AdminPrinterRecord {
   fault: string | null
   lastHeartbeatAt: string | null
   lastSyncAt: string | null
+  output?: AdminPrinterOutput | null
 }
 
 export interface AdminPrintersResponse {
   printers: AdminPrinterRecord[]
+  outputStatus?: 'ok' | 'capped' | 'unavailable'
 }
 
 // R1: Added sourceOrgId, sourceUrl, description, tags, requirements
