@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-11-04：终端程序 A2 第五轮——U 盘中文卷标乱码（分支 `claude/scan-device-a2-1102`，随 0.4.19，未部署）
+
+- 现象：11/04 真机「打印 → U 盘导入」选中文件后，文件卡第二行卷标显示乱码。原因：`usb-files.ts` 的 `runPowerShellJson` 没设输出编码，现场 PowerShell 按系统代码页输出，Node 按 UTF-8 解码。
+- 改法（Codex 实现，Claude 收货）：共用入口在查询前设 `[Console]::OutputEncoding` 为无 BOM UTF-8，卷标与隐藏文件名两处查询一起生效；其余 U 盘行为不变。`verify:usb-import-agent` 加中文卷标「工作资料」「新加卷」、中文隐藏文件名（单值 / 数组）与编码顺序断言；去掉编码那一行门禁变红，恢复后绿。`verify:local-qr-proxy`、repository-integrity 通过。
+- 旁查同类缺口（本轮不改）：`printer/printer-status.ts`（打印机名可能含中文）、`agent/scan-device/scan-device-health.ts`（命令行可能含中文路径）也没设输出编码；WIA 探测与扫描脚本协议只有 ASCII。
+- 真机未核：装 0.4.19 时按 `~/.cache/claude-lanes/copyscan-1102/acceptance.md` 末尾四处一致（CIM 原值、stdout 字节、`/local/usb/status`、一体机显示）核一次。
+
 ## 2026-11-04：屏上扫描 ③ 终端程序第二批 A2 第四轮——收掉复审高优先级问题（分支 `claude/scan-device-a2-1102`，随后并入 main 的提交，未部署）
 
 - 做了：开始在取租约这个第一个异步等待之前就占下这一场的场次号和取消标记；租约回来、建目录前、开扫前都再查。待翻页回报回来后先查取消，取消了不起 10 分钟空闲计时。下一页的租约改到串行队列外面取，回来之后若已经过了绝对截止或已经取消，就不再扫。上传异常不再用租约还在不在推断：用一次 device-report（投递中）按 409 的 `taskStatus` / `fileDelivered` 判定。`completed` 或 `fileDelivered` 为真算已投递并删页；`cancelled` / `expired` / `failed` 且没投出算未投递并删页；仍是 `waiting` 就用同一份 PDF 再投一次，`SCAN_FILE_ALREADY_DELIVERED` 也算已投递；`matched` 且未交出、旧后端没有 `taskStatus`、断网都保持不确定。不确定时每 30 秒再探，到 `hardExpiresAt`（没有就用投递前租约的 `expiresAt`）仍不确定，就按 `SCAN_DEVICE_FAILED` 删页，本机接口仍回「投递结果不确定」。`scanning` 回报被收下时记下 `deviceRound`，投递的 multipart 带上它；没记下就不传这个字段。换了轮次就作废这一场的页和 PDF，不合成到一起。第三轮里用租约推断结果的两则夹具改成看 409 补充，结果断言仍是未投递 / 已投递。
