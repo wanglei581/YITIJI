@@ -2001,6 +2001,8 @@ test('interview setup per-person quota exhaustion offers the previous step and i
   const runtimeErrors: string[] = []
   page.on('pageerror', (error) => runtimeErrors.push(error.message))
   terminalBaseline(api)
+  // 面试设置页会定时探一次服务健康；跑得慢时这次请求落在用例里，没登记就被夹具判成未处理。
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
   api.respond('POST', '/api/v1/mock-interviews', { status: 200, json: interviewCreated })
   api.respond('POST', '/api/v1/mock-interviews/interview-w3-public-fixture/start', {
     status: 429,

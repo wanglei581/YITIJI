@@ -75,6 +75,20 @@ function quotaLimit(error: unknown): number | undefined {
   return typeof limit === 'number' && Number.isInteger(limit) && limit > 0 ? limit : undefined
 }
 
+/**
+ * 不存在、已过期、不属于这台机器三种情况共用，不分开说。
+ * 后半句是 2026-10-12 合规定的下一步：核对后还是不行，回手机看订单。
+ */
+export const PICKUP_CODE_REJECTED_COPY =
+  '到机码无效或已过期，请核对后重新输入。核对后还是不行的，请在手机上查看这笔订单，需要的话重新下单。'
+
+/**
+ * 付费异常单的退款还没办完。不写「已退款」，也不承诺费用会按原路退回：
+ * 输码时只标记待处理，不会当场发起退款。
+ */
+export const PICKUP_RESUME_REFUND_PENDING_COPY =
+  '这单没有打完，退款待处理，输码时不会当场退款。请不要再输这个到机码；需要帮助请查看《隐私政策》里的联系方式。'
+
 /** 只认服务端明示的桶名。没有桶、或桶名对不上，就用上面那句不分类的话。 */
 function aiQuotaBucket(error: unknown): string | undefined {
   if (!error || typeof error !== 'object') return undefined
@@ -104,9 +118,11 @@ function aiQuotaExhaustedMessage(error: unknown): string {
 const SHARED_USER_MESSAGES: Readonly<Record<string, SharedUserMessage>> = {
   // 一体机靠 4G，用户查不了线。事实仍说连接失败，后半用无人值守标准句，不叫用户自己查网络。
   NETWORK_ERROR: () => `网络连接失败。${networkDisconnectLine()}。`,
-  // 到机码（取件码）：服务端 message 本就是面向用户的中文，这里给同义的稳定文案，避免落到通用兜底
-  PICKUP_CODE_INVALID: '到机码无效或已过期，请核对后重新输入',
-  PICKUP_CODE_EXPIRED: '到机码无效或已过期，请核对后重新输入',
+  // 到机码（取件码）：服务端 message 本就是面向用户的中文，这里给同义的稳定文案，避免落到通用兜底。
+  // 过期与无效共用一句，避免本地短句盖住「请在小程序重新下单」却不告诉人下一步。
+  PICKUP_CODE_INVALID: PICKUP_CODE_REJECTED_COPY,
+  PICKUP_CODE_EXPIRED: PICKUP_CODE_REJECTED_COPY,
+  PICKUP_RESUME_REFUND_PENDING: PICKUP_RESUME_REFUND_PENDING_COPY,
   PICKUP_CODE_UNAVAILABLE: () => `这个到机码对应的文件暂时不可用。${helpNeededLine()}。`,
   // 2026-09-07 产品裁决「退款则不出文件」：服务端在任何状态写入前拦下，这里给同义稳定文案。
   ORDER_REFUNDED: '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度',

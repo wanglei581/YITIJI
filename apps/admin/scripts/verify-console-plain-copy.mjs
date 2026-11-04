@@ -95,6 +95,7 @@ const batchFiles = [
   join(adminRoot, 'src/routes/terminals/TerminalLifecycleActions.tsx'),
   join(adminRoot, 'src/routes/terminals/ReleaseObservationPanel.tsx'),
   join(adminRoot, 'src/routes/printers/index.tsx'),
+  join(adminRoot, 'src/routes/printers/PrinterOutputCell.tsx'),
   join(adminRoot, 'src/routes/peripherals/index.tsx'),
   join(adminRoot, 'src/routes/peripherals/PeripheralDrawer.tsx'),
   join(adminRoot, 'src/routes/peripherals/peripheralViews.ts'),

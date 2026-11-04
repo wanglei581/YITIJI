@@ -369,14 +369,19 @@ export function PrintDonePage() {
     setRetrying(true)
     setRetryError(null)
     try {
-      await retryPrintJob({
+      const retried = await retryPrintJob({
         taskId,
         paymentSessionToken: state.paymentSessionToken,
         token: getToken(),
       })
       navigate('/print/progress', {
         replace: true,
-        state: { ...((location.state ?? {}) as object), taskId },
+        state: {
+          ...((location.state ?? {}) as object),
+          taskId,
+          mayHavePrinted: retried.mayHavePrinted === true,
+          partialOutput: retried.partialOutput === true,
+        },
       })
     } catch (err: unknown) {
       setRetryError(errorCodeOf(err) === 'PRINT_RETRY_AGENT_VERSION'
@@ -536,7 +541,7 @@ export function PrintDonePage() {
     return (
       <PrintDoneFailed
         variant={variant}
-        copy={failureCopy({ variant, money, orderNo: faultOrderNo, canRetry })}
+        copy={failureCopy({ variant, money, orderNo: faultOrderNo, canRetry, pickupSource: state.pickupSource === true })}
         rows={failureSummaryRows({ orderNo: faultOrderNo, file: file ?? null, params: params ?? null, money, reason: failureReason })}
         free={amountCents === 0}
         retry={{ available: canRetry, blockedReason: retryBlockedReason(device), busy: retrying, error: retryError, onRetry: () => { void handleResubmitPrint() } }}
