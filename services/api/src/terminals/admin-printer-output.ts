@@ -3,12 +3,13 @@
  * 出纸判据与「计费页 × 份数」复用大屏 W-68：PRINTED_TASK_WHERE、pagesByPrintedTask。
  * 今天的落日复用 shanghaiDayStart。本月是上海自然月（无夏令时）。
  * 彩色、双面只看这条任务自己的 paramsJson（终端程序按它打）。
- * 一次按终端 id 列表查完再加总。行数超过上限时整批不给数。
+ * 一次按终端 id 列表查完再加总。出纸面数超过行数上限时整批不给数。
+ * 未确认笔数按终端 groupBy 计数，不把行取进内存，也不受这个上限约束。
  */
 import { Injectable } from '@nestjs/common'
 import { PRINTED_TASK_WHERE, pagesByPrintedTask } from '../console-screen/console-screen.printed-pages'
 import { shanghaiDayStart } from '../console-screen/console-screen.metric'
-import type { PrismaService } from '../prisma/prisma.service'
+import { PrismaService } from '../prisma/prisma.service'
 
 const TZ_OFFSET_MS = 8 * 60 * 60 * 1000
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -109,7 +110,8 @@ export class AdminPrinterOutputService {
     })
     if (printed.length > rowCap) return { status: 'capped' }
 
-    const unconfirmed = await this.prisma.printTask.findMany({
+    const unconfirmed = await this.prisma.printTask.groupBy({
+      by: ['terminalId'],
       where: {
         terminalId: { in: ids },
         status: 'failed',
@@ -117,10 +119,8 @@ export class AdminPrinterOutputService {
         printOutcome: null,
         completedAt,
       },
-      select: { terminalId: true, completedAt: true },
-      take: rowCap + 1,
+      _count: { _all: true },
     })
-    if (unconfirmed.length > rowCap) return { status: 'capped' }
 
     const pages = await pagesByPrintedTask(this.prisma, printed)
     for (const row of printed) {
@@ -141,9 +141,7 @@ export class AdminPrinterOutputService {
       if (!row.terminalId) continue
       const bucket = byTerminal.get(row.terminalId)
       if (!bucket) continue
-      const at = row.completedAt
-      if (!(at instanceof Date) || at.getTime() < monthStart.getTime() || at.getTime() >= monthEnd.getTime()) continue
-      bucket.monthUnconfirmedTasks += 1
+      bucket.monthUnconfirmedTasks = row._count._all
     }
     return { status: 'ok', byTerminal }
   }
