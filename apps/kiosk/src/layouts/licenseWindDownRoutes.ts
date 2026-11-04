@@ -6,10 +6,12 @@ const groups: Array<[string, WindDownRouteKind, string[]]> = [
   ['public', 'always', ['/', '/login', '/legal/:doc', '/screensaver', '/session-timeout', '/error-offline', '/help', '/notifications', '/official-channels', '/jobs/online-platforms', '/member/qr-login', '/k/l/:ticketId']],
   ['mine', 'always', ['/profile', '/me/resumes', '/me/print-orders', '/me/documents', '/me/favorites', '/me/ai-records', '/me/benefits', '/me/activity', '/me/activity/:id', '/me/notifications', '/me/feedback', '/me/settings', '/me/privacy-requests']],
   ['information', 'always', ['/renshi', '/print-scan', '/print-scan/feature/:key', '/print/scan-feature', '/jobs', '/jobs/:id', '/jobs/:id/offline', '/offline-agencies', '/offline-agencies/:id', '/companies', '/companies/:id', '/job-fairs', '/job-fairs/:id', '/job-fairs/:id/companies', '/job-fairs/:id/companies/:companyId', '/job-fairs/:id/map', '/job-fairs/:id/stats', '/campus', '/campus/welcome', '/jobs-service', '/fairs-service']],
+  // 百宝箱、智慧校园已停放（#1583）：旧链接与全部深链一律回首页，按首页算，收尾期间也照常回首页。
+  ['public', 'always', ['/toolbox/*', '/smart-campus/*']],
   ['activities', 'work', ['/activities', '/activities/:id']],
-  ['campus', 'work', ['/smart-campus', '/smart-campus/welcome', '/smart-campus/service/:key', '/campus/freshman-insights']],
+  ['campus', 'work', ['/campus/freshman-insights']],
   ['fair', 'work', ['/job-fairs/checkin', '/job-fairs/:id/materials', '/job-fairs/:id/visit-plan']],
-  ['toolbox', 'work', ['/toolbox', '/dev/touch-gallery']],
+  ['toolbox', 'work', ['/dev/touch-gallery']],
   ['print', 'work', ['/print/upload', '/print/desk', '/print/material-check', '/print/preview', '/print/params', '/print/confirm', '/print/cashier', '/print/progress', '/print/pickup-claim', '/upload/phone', '/k/u/:scene']],
   ['print', 'result', ['/print/done']],
   ['convert', 'work', ['/print-scan/convert', '/print/scan-convert']],
@@ -33,13 +35,21 @@ const groups: Array<[string, WindDownRouteKind, string[]]> = [
 
 export const WIND_DOWN_ROUTES: WindDownRoute[] = groups.flatMap(([service, kind, paths]) => paths.map((path) => ({ path, service, kind })))
 
+function segmentsMatch(pattern: string[], parts: string[]): boolean {
+  return pattern.every((part, i) => part.startsWith(':') ? !!parts[i] : part.toLowerCase() === parts[i]?.toLowerCase())
+}
+
+// 「/x/*」和路由表里的 splat 一样按前缀匹配（/x 本身与其下任意深链）；排在确切路径之后。
+const matchRank = (path: string) => (path.endsWith('/*') ? 100 : 0) + (path.match(/:/g)?.length ?? 0)
+
 export function windDownRoute(pathname: string): WindDownRoute | undefined {
   const parts = pathname.replace(/\/+$/, '').split('/')
   return WIND_DOWN_ROUTES.filter(({ path }) => path !== '*')
-    .sort((a, b) => (a.path.match(/:/g)?.length ?? 0) - (b.path.match(/:/g)?.length ?? 0))
+    .sort((a, b) => matchRank(a.path) - matchRank(b.path))
     .find(({ path }) => {
     const pattern = path.replace(/\/+$/, '').split('/')
-    return pattern.length === parts.length && pattern.every((part, i) => part.startsWith(':') ? !!parts[i] : part.toLowerCase() === parts[i].toLowerCase())
+    if (pattern[pattern.length - 1] === '*') return parts.length >= pattern.length - 1 && segmentsMatch(pattern.slice(0, -1), parts)
+    return pattern.length === parts.length && segmentsMatch(pattern, parts)
   })
 }
 
