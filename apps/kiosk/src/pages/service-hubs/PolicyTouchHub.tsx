@@ -5,7 +5,7 @@ import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
 import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
-import { QxTouchTile } from '../../components/qingxu/touch/QxTouchTile'
+import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { useApiReadiness } from '../../hooks/useApiReadiness'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import {
@@ -105,6 +105,7 @@ export function PolicyTouchHub() {
           backLabel="返回首页"
           ask={winding ? { label: '问小青', disabled: true } : {
             label: '问小青：这一步怎么看来源？',
+            voice: import.meta.env.VITE_USE_TRTC_CALL === 'true',
             draft: '这一步怎么看政策来源？请说明如何核对发布机构和来源地址，不要解释政策原文或判断我能不能办。',
           }}
         />
@@ -125,6 +126,7 @@ export function PolicyTouchHub() {
         data-hub-device-probe={deviceAware ? 'on' : 'off'}
       >
         <div className="p10-notice" data-hub-notice="" data-readiness={notice.readiness} role="status">
+          <QxTouchIcon name={notice.readiness === 'ready' ? 'book' : 'alert'} />
           <div className="p10-notice-copy">
             <b>{notice.title}</b>
             <span>{notice.detail}</span>
@@ -135,32 +137,21 @@ export function PolicyTouchHub() {
         </div>
 
         <div className="p10-entry" data-hub-entry="">
-          <QxTouchTile
-            icon="file"
-            title="查政策与公告"
-            desc={mainReason ?? '就业政策和公告都在下一页，按分区查看'}
-            off={Boolean(mainReason)}
-            onClick={() => go(mainRoute)}
-            label={mainReason ? `查政策与公告：${mainReason}` : undefined}
-          />
+          <button type="button" className={`qxt-tile p10-tile${mainReason ? ' qxt-off' : ''}`} aria-disabled={Boolean(mainReason) || undefined} aria-label={mainReason ? `查政策与公告：${mainReason}` : undefined} onClick={() => { if (!mainReason) go(mainRoute) }}>
+            <b>查政策与公告</b><small>{mainReason ?? '就业政策和公告都在下一页，按分区查看'}</small>{!mainReason && <span>进入</span>}
+          </button>
         </div>
 
         <section className="p10-sec" aria-label="四个目标">
           <div className="p10-grid">
-            {spec.goals.map((goal, index) => {
+            {spec.goals.map((goal) => {
               const kind = capabilityKindFor(spec, goal.route)
               const reason = (winding ? LICENSE_NO_NEW_TASK_REASON : null) ?? unavailableReason(kind, goal.route, availability)
               return (
                 <div key={goal.route} data-hub-goal="">
-                  <QxTouchTile
-                    icon={goal.route.includes('eligibility') ? 'clipboard' : 'file'}
-                    title={goal.label}
-                    desc={reason ?? (GOAL_DESC[goal.route] ?? goal.label)}
-                    off={Boolean(reason)}
-                    onClick={() => go(goal.route)}
-                    index={index}
-                    label={reason ? `${goal.label}：${reason}` : undefined}
-                  />
+                  <button type="button" className={`qxt-tile p10-tile${reason ? ' qxt-off' : ''}`} aria-disabled={Boolean(reason) || undefined} aria-label={reason ? `${goal.label}：${reason}` : undefined} onClick={() => { if (!reason) go(goal.route) }}>
+                    <b>{goal.label}</b><small>{reason ?? (GOAL_DESC[goal.route] ?? goal.label)}</small>{!reason && <span>进入</span>}
+                  </button>
                 </div>
               )
             })}
@@ -170,20 +161,13 @@ export function PolicyTouchHub() {
         <section className="p10-sec" aria-label="常用入口">
           <h2>常用入口</h2>
           <div className="p10-grid">
-            {QUICK.map((link, index) => {
+            {QUICK.map((link) => {
               const reason = (winding ? LICENSE_NO_NEW_TASK_REASON : null) ?? unavailableReason(link.kind, link.route, availability)
               return (
                 <div key={link.route} data-hub-quick="">
-                  <QxTouchTile
-                    icon="file"
-                    title={link.title}
-                    desc={reason ?? link.description}
-                    tone="slate"
-                    off={Boolean(reason)}
-                    onClick={() => go(link.route)}
-                    index={index}
-                    label={reason ? `${link.title}：${reason}` : undefined}
-                  />
+                  <button type="button" className={`qxt-tile p10-tile${reason ? ' qxt-off' : ''}`} aria-disabled={Boolean(reason) || undefined} aria-label={reason ? `${link.title}：${reason}` : undefined} onClick={() => { if (!reason) go(link.route) }}>
+                    <b>{link.title}</b><small>{reason ?? link.description}</small>{!reason && <span>进入</span>}
+                  </button>
                 </div>
               )
             })}

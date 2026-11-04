@@ -76,7 +76,12 @@ test('progress renders Agent-polled pending job fields and never claims printed 
   await expect(page.locator('[data-testid="print-fulfill-state-printing"]')).toBeVisible()
   await expect(page.getByText(W2_FILE.name, { exact: true })).toBeVisible()
   await expect(page.getByText('等待终端领取', { exact: false }).first()).toBeVisible()
+  // B10 按稿收起详细状态；展开后仍核对真实页数，再回到默认版式验触控与边界。
+  const printDetails = page.locator('.pfp-privacy')
+  await printDetails.locator('summary').click()
   await expect(page.getByText('共 2 页', { exact: true })).toBeVisible()
+  await printDetails.locator('summary').click()
+  await expect(page.getByText('共 2 页', { exact: true })).not.toBeVisible()
   await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
   await expect(page.getByText('已打印', { exact: true })).toHaveCount(0)
   await expect(page.getByText('机身灯亮绿')).toHaveCount(0)

@@ -108,6 +108,34 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
         <PrintIcon name="shield" size={34} />
         <span>{props.precheckLine}</span>
       </div>
+      {props.stage === 'review' && (props.inspection || (props.normalization && !props.encryptedPdf)) ? (
+        <details className="pdk-assessment">
+          <summary>
+            {props.inspection ? `文件体检：${props.encryptedPdf ? '打不开' : props.inspection.canPrint === true ? '可继续' : props.requiresFormatReview ? '需重新上传' : '请核对文件'} · ${props.inspection.pageLabel}` : ''}
+            {props.normalization && !props.encryptedPdf ? ` · ${props.normalization.targetPaperSize} 版式评估：${props.normalization.canNormalize === true ? '已完成评估' : '请核对版式'}` : ''} ›
+          </summary>
+          <div className="qpd-summary-grid pdk-summaries" data-single={props.encryptedPdf ? 'true' : undefined}>
+            {props.inspection ? (
+              <Summary
+                title="文件体检"
+                detail={props.inspection.pageLabel}
+                state={props.encryptedPdf ? '打不开' : props.inspection.canPrint === true ? '可继续' : props.requiresFormatReview ? '需重新上传' : '请核对文件'}
+                warning={Boolean(props.encryptedPdf) || props.requiresFormatReview}
+                messages={props.inspection.messages}
+              />
+            ) : null}
+            {props.normalization && !props.encryptedPdf ? (
+              <Summary
+                title="A4 版式评估"
+                detail={`目标纸张：${props.normalization.targetPaperSize}`}
+                state={props.normalization.canNormalize === true ? '已完成评估' : '请核对版式'}
+                warning={props.normalization.canNormalize !== true}
+                messages={props.normalization.messages}
+              />
+            ) : null}
+          </div>
+        </details>
+      ) : null}
       {props.stage === 'error' ? (
         // 没做成时不去取文件内容画小样，但这一份文件的名字仍要在屏上，别让人以为文件没了。
         <div className="pdk-doc pdk-doc-sm" data-testid="print-check-file-line">
@@ -249,10 +277,15 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
                   </article>
                 ))}
               </div>
+              <div className="pdk-decisions-row">
               <p className="pdk-count qpd-decision-counts">已决定 {decidedCount} / {props.findings.length} · 保留 {keptCount} 处 · 遮挡 {redactedCount} 处</p>
               <p className="pdk-opt qpd-decision-status">{remaining > 0 ? `还有 ${remaining} 处等你决定` : '每一处都已决定，可以继续核对遮挡结果。'}</p>
+              </div>
+              <details className="pdk-finding-guide">
+                <summary>保留会原样打印 · 遮挡另生成涂黑文件，原件不变 ›</summary>
               <p className="pdk-opt"><b>保留：</b>这一处原样印在纸上。</p>
               <p className="pdk-opt"><b>遮挡：</b>另生成一份把这一处涂黑的文件，打印用这一份；你上传的原文件不变。下一步可以逐页核对遮挡结果。</p>
+              </details>
               <div className="pdk-batch pdk-batch-btns">
                 <button className="qxt-btn qxt-btn-sec" type="button" onClick={props.onApplySuggested}>按风险建议处理</button>
                 <button className="qxt-btn qxt-btn-sec" type="button" onClick={props.onKeepAll}>全部保留</button>
@@ -260,28 +293,6 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
             </>
           ) : null}
 
-          {props.inspection || (props.normalization && !props.encryptedPdf) ? (
-            <div className="qpd-summary-grid pdk-summaries" data-single={props.encryptedPdf ? 'true' : undefined}>
-              {props.inspection ? (
-                <Summary
-                  title="文件体检"
-                  detail={props.inspection.pageLabel}
-                  state={props.encryptedPdf ? '打不开' : props.inspection.canPrint === true ? '可继续' : props.requiresFormatReview ? '需重新上传' : '请核对文件'}
-                  warning={Boolean(props.encryptedPdf) || props.requiresFormatReview}
-                  messages={props.inspection.messages}
-                />
-              ) : null}
-              {props.normalization && !props.encryptedPdf ? (
-                <Summary
-                  title="A4 版式评估"
-                  detail={`目标纸张：${props.normalization.targetPaperSize}`}
-                  state={props.normalization.canNormalize === true ? '已完成评估' : '请核对版式'}
-                  warning={props.normalization.canNormalize !== true}
-                  messages={props.normalization.messages}
-                />
-              ) : null}
-            </div>
-          ) : null}
           {props.encryptedPdf ? null : (
             <QxTouchCallout kind="fine">
               {props.privacyModeWarning
@@ -310,7 +321,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
         </>
       ) : null}
       {/* 检查中、没做成、没有可处理项时内容不够高：用一块纸张小样吃掉剩下的高度。 */}
-      <PrintFillArt name="stack" />
+      {props.stage === 'review' && props.findings.length > 0 ? null : <PrintFillArt name="stack" />}
     </div>
   )
 }

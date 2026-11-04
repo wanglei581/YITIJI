@@ -268,7 +268,7 @@ test('收尾开始时正在图片转 PDF：转完点「拿这份 PDF 去打印�
   await page.getByRole('button', { name: /手机扫码传图片/ }).click()
   await page.getByRole('button', { name: '确认加入待合并列表' }).click()
   await expect(page.getByText('license-image.png', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: /合成 1 张为一份 PDF/ }).click()
+  await page.getByRole('button', { name: '合成', exact: true }).click()
   await expect(page.getByTestId('img2pdf-band').getByText('PDF 已生成')).toBeVisible()
   await page.getByRole('button', { name: '拿这份 PDF 去打印' }).click()
   await page.waitForURL((url) => url.pathname === '/print/desk')

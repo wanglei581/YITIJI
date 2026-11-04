@@ -25,7 +25,7 @@
   flex: 1 0 auto;
 }
 
-/* 第 3 步内容少时，余高分到各块之间的间距里，不拉成空盒 */
+/* 第 3 步核对卡吃余高到 490px 为止，其余分到块间距，不拉成空盒 */
 [data-qx-page="interview"] [data-qx-interview] .qxt-iv-stack.is-spread {
   justify-content: space-between;
 }
@@ -247,7 +247,7 @@
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  max-height: 396px;
+  max-height: 490px;
   border: 1.5px solid var(--qxt-edge);
   border-radius: 30px;
   background: var(--qxt-card);

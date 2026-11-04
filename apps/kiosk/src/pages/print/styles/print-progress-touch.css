@@ -10,7 +10,8 @@
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 4px;
+  padding: 0;
   min-width: 0;
   font-size: 22px;
   line-height: 1.45;
@@ -35,7 +36,12 @@
   order: 0;
   display: flex;
   align-items: baseline;
+  justify-content: flex-start;
   gap: 14px;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  border: 0;
 }
 
 [data-qx-page='print-progress'] .pff-sec-h .t {
@@ -44,15 +50,20 @@
 }
 
 [data-qx-page='print-progress'] .pff-sec-h .hint {
+  margin-left: 0;
   font-size: 21px;
+  text-align: left;
   color: var(--qxt-ink-3);
 }
 
 [data-qx-page='print-progress'] .pfp-steps {
   order: 1;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 [data-qx-page='print-progress'] .pfp-step {
@@ -126,7 +137,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -135,11 +146,13 @@
 }
 
 [data-qx-page='print-progress'] .pff-out-stage.pfp-printer {
-  display: block;
+  display: flex;
+  flex: 1 0 420px;
   position: static;
   width: 100%;
-  max-width: 400px;
-  height: auto;
+  max-width: 620px;
+  min-height: 420px;
+  height: 420px;
   padding: 0;
   border: 0;
   background: none;
@@ -151,10 +164,12 @@
 [data-qx-page='print-progress'] .pfp-printer .pa-svg {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
 }
 
 [data-qx-page='print-progress'] .pff-out-main {
+  width: 100%;
+  padding: 0;
   text-align: center;
 }
 
@@ -174,7 +189,7 @@
   display: flex;
   align-items: center;
   gap: 18px;
-  padding: 16px 24px;
+  padding: 8px 20px;
   border-radius: 28px;
   background: var(--qxt-card);
   border: 1.5px solid var(--qxt-edge);
@@ -189,27 +204,8 @@
   font-size: 20px;
 }
 
-[data-qx-page='print-progress'] .pfp-page > .pft-actions {
-  order: 4;
-}
-
-[data-qx-page='print-progress'] .pfp-page > .pff-sec:not([aria-label='打印进度']) {
-  order: 5;
-}
-
 [data-qx-page='print-progress'] .pfp-page :where(p, li, span, small, em, b) {
   font-size: max(20px, 1em);
-}
-
-[data-qx-page='print-progress'] .pft-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-}
-
-[data-qx-page='print-progress'] .pft-actions .qxt-btn {
-  height: 80px;
 }
 
 [data-qx-page='print-progress'] .qx-btn,
@@ -223,4 +219,95 @@
 /* 没有任务上下文时的出路（稿 st-empty）：两张大卡再高一点，不在底栏上方留整块空白 */
 [data-qx-page='print-progress'] .pff-page > .qxt-slab {
   min-height: 290px;
+}
+
+/* 压紧页框上下内边距，标题行紧贴步骤；不改其他触屏页的默认值。 */
+[data-qx-page='print-progress'] .qxt-body {
+  padding-top: 14px;
+  padding-bottom: 10px;
+}
+
+[data-qx-page='print-progress'] .pfp-prompt {
+  margin: 0;
+  padding: 10px 20px;
+  border-radius: 20px;
+  background: var(--qxt-well);
+  font-size: 22px;
+  line-height: 1.4;
+}
+
+[data-qx-page='print-progress'] [data-progress-quiet='true'] .pfp-prompt {
+  background: var(--qx-cinnabar-soft);
+}
+
+[data-qx-page='print-progress'] .pfp-job-main {
+  display: block;
+}
+
+[data-qx-page='print-progress'] .pfp-job-name { display: block; }
+[data-qx-page='print-progress'] .pfp-job-id { margin-left: 12px; }
+
+[data-qx-page='print-progress'] .pfp-guidance {
+  order: 4;
+  flex: none;
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+[data-qx-page='print-progress'] .pfp-help-controls {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+[data-qx-page='print-progress'] .pfp-faq-toggle,
+[data-qx-page='print-progress'] .pfp-privacy > summary,
+[data-qx-page='print-progress'] .pfp-contact {
+  min-height: 64px;
+  padding: 8px 12px;
+  border: 1px solid var(--qxt-edge);
+  border-radius: 18px;
+  background: var(--qxt-well);
+  color: var(--qxt-ink-2);
+  font: inherit;
+  cursor: pointer;
+}
+
+[data-qx-page='print-progress'] .pfp-privacy > summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+[data-qx-page='print-progress'] .pfp-privacy-body {
+  padding: 10px 0;
+}
+
+[data-qx-page='print-progress'] .pfp-privacy-body p { margin: 0; }
+
+[data-qx-page='print-progress'] .pfp-help-faq {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+[data-qx-page='print-progress'] .pfp-support p {
+  margin: 4px 0 0;
+  font-size: 20px;
+  text-align: center;
+}
+
+[data-qx-page='print-progress'] .pfp-help-controls .pff-help-btn {
+  height: 64px;
+  min-height: 64px;
+  font-size: 22px;
+  padding: 0 18px;
+}
+
+@media (max-width: 700px) {
+  [data-qx-page='print-progress'] .pfp-help-controls { grid-template-columns: 1fr; }
 }

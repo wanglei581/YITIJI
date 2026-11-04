@@ -105,6 +105,7 @@ export function PrintConfirmView(props: Props) {
       className="qx-scroll pcf-page pct-page qx-grow"
       data-w2-page="print-confirm"
       data-state={screen}
+      data-free-pricing={freePricing ? 'true' : 'false'}
       data-testid={`print-confirm-state-${screen}`}
     >
       {printerBlocked && !idle && !halted ? <div className="pct-alert" role="status">{printerLine}</div> : null}
@@ -206,13 +207,20 @@ export function PrintConfirmView(props: Props) {
           {submitError ? <div className="pct-alert" data-tone="error" role="alert">{submitError}</div> : null}
           <div className="pct-grid">
             <div className="pct-thumb">
-              {preview ?? <p>这一页没有可显示的预览。</p>}
+              <div className="pct-preview-sheet">
+                {preview ?? <p>这一页没有可显示的预览。</p>}
+                {preview && ready ? <span className="pct-check" aria-label="文件与报价已就绪"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg></span> : null}
+              </div>
             </div>
             <section className="pct-sum" aria-label="打印摘要">
               <div className="pct-row"><span>文件</span><b>{file.name}</b></div>
               <div className="pct-row"><span>页数</span><b>{pagesCopies(quote, file, copiesLabel)}</b></div>
-              <div className="pct-row"><span>设置</span><b>{settingsText}</b></div>
+              <div className="pct-row">
+                <span>设置</span>
+                <b>{settingsText}{summaryRows.filter((row) => row.off && row.note).map((row) => <small className="pct-setting-note" key={row.label}>{row.note}</small>)}</b>
+              </div>
               <div className="pct-row"><span>用纸</span><b>{sheetsText}</b></div>
+              <Review file={file} summaryRows={summaryRows} redactionText={redactionText} materialDemo={materialDemo} />
             </section>
           </div>
 
@@ -258,7 +266,7 @@ export function PrintConfirmView(props: Props) {
               {ready ? (
                 <>
                   <div>
-                    <b>应付 <span data-testid="print-confirm-amount">{`¥${amountText}`}</span> 元</b>
+                    <b>应付 <span data-testid="print-confirm-amount">{amountText}</span> 元</b>
                     <small>金额以订单为准</small>
                     <small><span data-cost-calc="true">{costCalcLabel}</span></small>
                   </div>
@@ -292,12 +300,13 @@ export function PrintConfirmView(props: Props) {
           </div>
           <p className="pdk-fine">隐私检查仅用于本次打印前确认，扫描件 / 图片可能经第三方 OCR 识别文字。</p>
 
-          <Review file={file} summaryRows={summaryRows} redactionText={redactionText} materialDemo={materialDemo} />
           {selfAssessment}
-          {!freePricing && ready && (quotedLike || screen === 'capability-invalid-params') ? (
-            <CouponUnavailable free={quote.amountCents === 0} />
-          ) : null}
-          {!freePricing && benefitView ? <BenefitCard view={{ ...benefitView, detail: preferUnattended(benefitView.detail, `价目与权益都来自机构配置。取不到就不显示金额、不试算抵扣，也不会拿上一次的价格当现价。请稍后重试。${helpNeededLine()}`) }} onLogin={onLogin} /> : null}
+          <div className="pct-benefit-row">
+            {!freePricing && ready && (quotedLike || screen === 'capability-invalid-params') ? (
+              <CouponUnavailable free={quote.amountCents === 0} />
+            ) : null}
+            {!freePricing && benefitView ? <BenefitCard view={{ ...benefitView, detail: preferUnattended(benefitView.detail, `价目与权益都来自机构配置。取不到就不显示金额、不试算抵扣，也不会拿上一次的价格当现价。请稍后重试。${helpNeededLine()}`) }} onLogin={onLogin} /> : null}
+          </div>
           {printNotes}
           {actions ? <div className="pct-acts">{actions}</div> : null}
         </>

@@ -208,7 +208,6 @@ export function FileSourceView(props: FileSourceViewProps) {
   const waitCountdown = waitRemainingSeconds === null ? '' : `${Math.floor(waitRemainingSeconds / 60)}:${String(waitRemainingSeconds % 60).padStart(2, '0')}`
   const phoneWaitNotice = waitRemainingSeconds !== null ? (
     <>
-      <FileSourceNote>等你传文件期间，这台机器不会自动退出，请不要走开。二维码到期后没有操作，就会自动退出。</FileSourceNote>
       {waitRemainingSeconds > 0 && waitRemainingSeconds <= 60 && (
         <div role="status" className="fs-status" data-kind="warn">
           <div className="fs-status-p">二维码还剩 {waitCountdown}。还在传的话点一下屏幕，到期后可以在这里重新出码。</div>
@@ -280,9 +279,7 @@ export function FileSourceView(props: FileSourceViewProps) {
     secondary = ghost('换一种方式', () => onSelectChannel('qr'), 'file-source-switch-source')
   } else if (screen === 'usb-read-failed' || screen === 'usb-unavailable') {
     secondary = ghost('使用帮助', onHelp, 'file-source-help')
-  } else if (screen === 'phone-ready') {
-    secondary = ghost('刷新二维码', onPhoneRefresh, 'file-source-refresh')
-  } else if (screen === 'phone-waiting' || screen === 'phone-uploading' || screen === 'phone-uploaded' || screen === 'phone-confirming') {
+  } else if (screen === 'phone-ready' || screen === 'phone-waiting' || screen === 'phone-uploading' || screen === 'phone-uploaded' || screen === 'phone-confirming') {
     secondary = ghost('取消这次上传', onPhoneCancel, 'file-source-cancel')
   } else if (screen === 'phone-status-unknown' || screen === 'phone-confirm-failed') {
     secondary = ghost('重新出一张码', onPhoneRefresh, 'file-source-refresh')
@@ -523,6 +520,7 @@ export function FileSourceView(props: FileSourceViewProps) {
             usbMode={usbMode}
             helpText={['phone-status-unknown', 'phone-expired', 'phone-cancel-failed'].includes(screen) ? helpNeededLine(support) : ''}
             onSelectChannel={onSelectChannel}
+            onPhoneRefresh={onPhoneRefresh}
           />
           {phoneWaitNotice}
         </>
@@ -662,12 +660,19 @@ export function FileSourceView(props: FileSourceViewProps) {
           </button>
         ) : null}
         {usbHoldActive ? <UsbImportHoldNotice hold={usbHoldActive} /> : body}
-        <FileSourceTruth />
+        {screen.startsWith('phone') && !previewOpen && !errorCopy ? <div className="print-upload-footer" data-testid="file-source-ctabar">{secondary}</div> : null}
+        {screen === 'phone-ready' || screen === 'phone-waiting' || screen === 'phone-uploading' ? (
+          <details className="fs-upload-fine">
+            <summary>本机只认收到文件 · 等上传时请勿走开 · 清场与文件留存说明</summary>
+            <p>本机看不到你扫没扫，只认系统收到文件。等你传文件期间，这台机器不会自动退出，请不要走开。二维码到期后没有操作，就会自动退出。{screen === 'phone-uploading' ? '请保持手机上传页面打开，传完后回来确认文件。' : ''}</p>
+            <FileSourceTruth />
+          </details>
+        ) : <FileSourceTruth />}
         {/* 出错板件里两张出口卡自己吃掉剩下的高度（稿 st-error），不再叠一幅填充小样。 */}
-        {screen === 'source-chooser' || errorCopy ? null : <PrintFillArt name={screen.startsWith('phone') ? 'phone' : screen.startsWith('usb') ? 'usb' : 'scan-paper'} />}
-        <div className="print-upload-footer" data-testid="file-source-ctabar">
+        {screen === 'source-chooser' || screen.startsWith('phone') || errorCopy ? null : <PrintFillArt name={screen.startsWith('phone') ? 'phone' : screen.startsWith('usb') ? 'usb' : 'scan-paper'} />}
+        {!screen.startsWith('phone') ? <div className="print-upload-footer" data-testid="file-source-ctabar">
           {previewOpen || errorCopy ? null : secondary}
-        </div>
+        </div> : null}
         {previewOpen && currentFile ? (
           <PrintFilePreviewModal file={currentFile} token={previewToken} onClose={onClosePreview} />
         ) : null}

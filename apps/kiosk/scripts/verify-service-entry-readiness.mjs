@@ -183,7 +183,7 @@ check(
   )
   // 本地技巧内容一条都不许因此消失：拦的是出口，不是这一页。
   // 白名单当初把它登记进来，就是为了后端断开时还有东西可读。
-  for (const local of ['面试前准备清单', '高频问题应对', 'STAR', '自我介绍结构建议']) {
+  for (const local of ['>准备清单</h2>', '高频问题应对', 'STAR', '>自我介绍怎么说</h2>']) {
     check(tips.includes(local), `在线服务不可用不影响本地技巧内容「${local}」仍然渲染`)
   }
   // 触屏版按稿 iv-tips：「重新检测」是一颗宽按钮（qxt-iv-wide qxt-iv-recheck），不再是旧的 qx-btn。
