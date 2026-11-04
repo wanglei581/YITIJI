@@ -1,5 +1,15 @@
 # 当前开发进度
 
+## 2026-11-04：一体机停放百宝箱、智慧校园（产品负责人定；分支 `claude/park-toolbox-campus-1104`；未部署）
+
+- **来由：** 产品负责人 11/04 原话「先不做，百宝箱和智慧校园，这个不要显示出来，先把 AI简历优化，ai模拟面试，还有打印，扫描，政策这些做好做完整，功能做到没有问题，可以让用户和客户正常使用起来就行」。按「停放」处理：源码保留，不注册、不打包，不是删除。
+- **一体机：** 路由 `toolbox/*`、`smart-campus/*` 两条一律 `<Navigate to="/" replace />`，旧链接与全部深链回首页，不落报错页；路由文件不再引用两个区页、能力守卫和配置 hook。首页不再读两项终端配置、不摆两张瓦片（`data-toolbox` / `data-campus` 固定为 `parked`），带旧动作进来原地不动。校园招聘迎新占位页删去「智慧校园迎新服务位于独立专区」半句。
+- **两个后台：** 开关、配置和接口都不动。管理员后台智慧校园页说明、百宝箱终端空配置提示，合作机构后台智慧校园页两句与功能页提示，改成「配置照常保存，一体机暂不显示」，免得写着一体机会显示。
+- **门禁与用例：** 新增 `verify:kiosk-parked-toolbox-campus` 进 CI（停放源码都在、两条跳回首页、在用代码不值导入停放模块（含 `@/` 别名）、首页不读配置不摆瓦片；七处改坏各红一次）。`verify:smart-campus-ui`、`verify:home-toolbox-ui`、`verify:fusion-home`、`verify:fusion-w4` / `w5` / `w6`、`verify:kiosk-runtime-error-boundary`、`verify:visual-evidence-manifest`、API `verify:terminal-device-config` 的路由与首页断言改成停放后的样子，区页源码断言保留。浏览器用例 w4 删 15 条、w5 删 2 条区页内部用例（区页不再挂载，跑不了）；旧链接回首页的用例在 w4、w6，首页在两项都配成开时仍不摆。
+- **停放的文件：** `apps/kiosk/src/pages/toolbox/`、`pages/smart-campus/`、`auth/KioskCapabilityGuard.tsx`、`hooks/useToolboxConfig.ts`、`hooks/useSmartCampusConfig.ts`、`services/api/kioskCapabilityValidation.ts`、`services/api/toolboxLaunchEvents.ts`、`pages/home/components/ToolboxLaunchModals.tsx`、`kioskAppLaunch.ts`。
+- **怎么恢复：** 回滚本次合并（删掉的浏览器用例一起回来）；后台配置一直照常保存，恢复后按开关生效。
+- **没动：** 小程序；后台开关与接口。首页旧视图 `QxHomeView` / `V6HomeView`、`homeV6Domains` 两项旧映射、`KioskRoot` 已迁移路由集合里的旧路径，停放前就没人引用或已不可达，没有顺手清。
+
 ## 2026-11-04：心跳认打印队列新字段（后端半；分支 `claude/printer-queue-api-1104`；未合并、未部署）
 
 - 做了：终端心跳多收五个可选字段（队列名、端口种类、USB 端口名、驱动五个原值、Windows 打印服务状态）。SQLite 与 PostgreSQL 各加五列，迁移 `20261104150000_add_terminal_heartbeat_printer_queue`。老终端程序不带这五项仍然接受。后台终端详情只读显示「打印队列」；五列都空显示未上报；终端离线不把旧上报当现状。不保存、不显示打印机地址。队列名与终端程序同一条规则、拒绝地址形名字；状态位表按 Windows 的 25 个状态位补全，未识别位不再盖掉已识别的名字。
@@ -20,6 +30,7 @@
 - 待现场核实（菜单名或默认值，官网和手册都没写）：SNMP 在网页哪一页、CM2820ADN 有没有 SNMP、只读和读写是否分开；9100 / IPP / WSD / LPR 能不能关，AirPrint 规格页未列；SMB 地址簿的账号和共享名怎么填；面板语言、时间、SNTP、纸盒尺寸与类型的菜单（独立小内网手动对时，网口接了外网才用 SNTP）；「彩粉用尽后继续黑白」的默认值和设置位置；本机有没有打印机自带的 U 盘直接打印、能不能关（关不了则端口锁与「扫描到 U 盘」一起定，本文不定）；复印自动恢复的选项名；信息页和网页「产品信息」上有没有固件版本。
 - 面板扫描到 SMB 要走打印机网口，G8 首装验收的扫描项不接网口过不了。照 A9（收件目录只许 SYSTEM 和管理员写）和 A11（防火墙只放行本机 9527）现在的写法，面板推扫进不来：要另开只对打印机地址放行的 445 入站和一个只能写收件目录的本地账号，怎么开待现场核实，和接网口一起先问产品负责人。
 - **接打印机网口、开 SNMP 之前先问产品负责人。** 团体名、v3 口令、管理员密码只进密码库，不写入文档、仓库、后台或一体机。
+
 
 ## 2026-11-04：简历优化的改写要能在最终稿里逐字找到（只改后端；分支 `claude/optimize-after-match-1104`；未合并、未部署）
 

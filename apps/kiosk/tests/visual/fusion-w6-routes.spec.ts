@@ -259,13 +259,20 @@ for (const route of w6MobileCases) {
   })
 }
 
-test('/smart-campus/freshman-insights 已停放，路由不存在 @w6-kiosk', async ({ page, api }) => {
+test('旧链接 /toolbox、/smart-campus、/smart-campus/welcome、/smart-campus/service/campus-card 都回到首页 @w6-kiosk', async ({ page, api }) => {
+  // 2026-11-04 产品负责人定停放：夹具里两项仍可开着，旧链也只回首页，不出报错页。
   const errors = collectRuntimeErrors(page)
   registerW6Api(api)
-  await page.goto('/smart-campus/freshman-insights')
-  await expect(page.locator('[data-kiosk-screen="route-error"]')).toBeVisible()
-  await expect(page.getByRole('heading', { name: '页面不存在', exact: true })).toBeVisible()
-  await expect(page.getByText('当前入口可能已经调整，请返回首页重新选择服务。')).toBeVisible()
+  for (const url of ['/toolbox', '/smart-campus', '/smart-campus/welcome', '/smart-campus/service/campus-card']) {
+    await page.goto(url)
+    await expect(page, url).toHaveURL((current) => current.pathname === '/')
+    const home = page.getByTestId('qx-home')
+    await expect(home, url).toBeVisible()
+    await expect(home, url).toHaveAttribute('data-toolbox', 'parked')
+    await expect(home, url).toHaveAttribute('data-campus', 'parked')
+    await expect(page.locator('[data-kiosk-screen="route-error"]'), url).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: '页面不存在', exact: true }), url).toHaveCount(0)
+  }
   expect(errors).toEqual([])
 })
 

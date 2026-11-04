@@ -66,15 +66,7 @@ import { HomePage } from '../pages/home/HomePage'
 import { RenshiPage } from '../pages/renshi/RenshiPage'
 import { CampusPage } from '../pages/campus/CampusPage'
 import { ScreensaverPage } from '../pages/screensaver/ScreensaverPage'
-import { SmartCampusHomePage } from '../pages/smart-campus/SmartCampusHomePage'
-import { SmartCampusGuard } from '../pages/smart-campus/SmartCampusGuard'
-import { SmartCampusWelcomePage } from '../pages/smart-campus/SmartCampusWelcomePage'
-import { SmartCampusServicePage } from '../pages/smart-campus/SmartCampusServicePage'
 import { KioskRouteErrorPage } from '../pages/errors/KioskRouteErrorPage'
-import {
-  SmartCampusCapabilityBoundary,
-  ToolboxCapabilityBoundary,
-} from '../auth/KioskCapabilityGuard'
 import { RecruitmentHostingBoundary } from '../auth/RecruitmentHostingBoundary'
 
 // Gate 0 requires production_default=false. Only an explicit build-time grant
@@ -191,21 +183,11 @@ export const kioskRouter = createBrowserRouter([
       { path: 'activities',         element: <BenefitActivitiesPage /> },
       { path: 'activities/:id',     element: <BenefitActivityDetailPage /> },
       { path: 'renshi',            element: <RenshiPage /> },
-      // 百宝箱与智慧校园的根路由、所有深链先经终端配置能力边界；未知、失败和关闭均不挂载业务页。
-      {
-        element: <ToolboxCapabilityBoundary />,
-        children: [
-          { path: 'toolbox', lazy: async () => ({ Component: (await import('../pages/toolbox/ToolboxZonePage')).default }) },
-        ],
-      },
-      {
-        element: <SmartCampusCapabilityBoundary />,
-        children: [
-          { path: 'smart-campus', element: <SmartCampusHomePage /> },
-          { path: 'smart-campus/welcome', element: <SmartCampusGuard module="welcome"><SmartCampusWelcomePage /></SmartCampusGuard> },
-          { path: 'smart-campus/service/:key', element: <SmartCampusGuard><SmartCampusServicePage /></SmartCampusGuard> },
-        ],
-      },
+      // 百宝箱与智慧校园停放（2026-11-04 产品负责人定「先不做……不要显示出来」）：
+      // 页面源码留在 pages/toolbox、pages/smart-campus 与 auth/KioskCapabilityGuard，不注册、不打包；
+      // 旧链接（根路由与全部深链）一律回首页，不落到报错页。恢复办法见 docs/product/feature-scope.md。
+      { path: 'toolbox/*',      element: <Navigate to="/" replace /> },
+      { path: 'smart-campus/*', element: <Navigate to="/" replace /> },
       // 打印扫描服务中心
       { path: 'print-scan',              element: <PrintScanHomePage /> },
       { path: 'print-scan/feature/:key', element: <PrintScanFeatureInfoPage /> },
