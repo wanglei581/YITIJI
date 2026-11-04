@@ -1,5 +1,8 @@
 import { expect } from '@playwright/test'
-import { JOB_MATERIAL_TEMPLATES, type GeneratedResume, type ResumeParseResponse } from '@ai-job-print/shared'
+import type { GeneratedResume, ResumeParseResponse } from '@ai-job-print/shared'
+// 只引模板常量所在的单个文件：从 shared 包入口引运行时值会把 regions.ts 的 china-division JSON 一并加载，
+// Node 要求 JSON 导入带 type 属性，并排工具配置会整个加载失败（「No tests found」）。
+import { JOB_MATERIAL_TEMPLATES } from '../../../../../packages/shared/src/types/jobMaterials'
 import { diagnosis } from './fusion-w3-states'
 import { loginTo, see, spaGo, terminalReady, writeSession } from './touch-pair-shell'
 import { openResumeUsb, pauseResumeAi, resumeDirection, resumeReading, resumeShell } from './touch-pair-resume-seeds'
