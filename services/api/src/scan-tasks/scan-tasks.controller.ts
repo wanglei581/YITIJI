@@ -146,6 +146,10 @@ export class ScanTasksController {
     @Body('candidateSnapshotAt') candidateSnapshotAt: unknown,
     @Body('observedAt') observedAt: unknown,
     @Headers('authorization') authHeader: string | undefined,
+    // 屏上扫描（2026-11-02）：投递来源 watcher（缺省，现有终端程序）/ device。
+    // 追加在最后，保持既有位置参数不变；和上面几个字段一样逐字段取（不经 DTO 白名单），
+    // 所以不会被全局 forbidNonWhitelisted 拦成 400。取值校验在 service。
+    @Body('origin') origin?: unknown,
   ) {
     await this.terminals.assertAgentAuthorized(terminalId, authHeader)
     if (!file) {
@@ -162,6 +166,7 @@ export class ScanTasksController {
       mimeType: file.mimetype,
       candidateSnapshotAt,
       observedAt,
+      origin,
     })
     return ApiResponse.ok(result)
   }

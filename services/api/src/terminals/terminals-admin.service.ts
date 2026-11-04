@@ -26,7 +26,12 @@ import { PARKED_TERMINAL_ORG_TYPES, isParkedTerminalOrgType, orgTypeParkedError 
 import { terminalOrgBindingOnCreate } from './terminal-org-binding'
 import { assignTerminalOrganization, type TerminalOrgAssignmentAudit } from './terminal-org-assignment'
 import { TERMINAL_ONLINE_WINDOW_MS } from './printer-availability'
-import { publicScanInputHealth, type PublicScanInputHealth } from './printer-status'
+import {
+  publicScanDeviceHealth,
+  publicScanInputHealth,
+  type PublicScanDeviceHealth,
+  type PublicScanInputHealth,
+} from './printer-status'
 import type { KioskTerminalConfigView } from './terminal-config.types'
 import {
   cleanNullable,
@@ -784,6 +789,10 @@ export class TerminalAdminService {
     isOnline: boolean
     /** 最近一次心跳里扫描输入是否可用（一体机「机器状态」页读）。老 Agent 不上报时为 null。 */
     scanInputHealth: PublicScanInputHealth | null
+    /** 最近一次心跳里终端程序探测扫描仪的结果（屏上扫描用）。老 Agent 不上报时为 null；不认识的值给 unknown。 */
+    scanDeviceHealth: PublicScanDeviceHealth | null
+    /** 上面这次探测发生的时刻（ISO）。老 Agent 不上报时为 null。 */
+    scanDeviceObservedAt: string | null
   }> {
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: terminalId }, { terminalCode: terminalId }] },
@@ -791,12 +800,26 @@ export class TerminalAdminService {
         heartbeats: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          select: { printerStatus: true, scanInputHealth: true, createdAt: true },
+          select: {
+            printerStatus: true,
+            scanInputHealth: true,
+            scanDeviceHealth: true,
+            scanDeviceObservedAt: true,
+            createdAt: true,
+          },
         },
       },
     })
     if (!terminal) {
-      return { found: false, printerStatus: null, lastSeenAt: null, isOnline: false, scanInputHealth: null }
+      return {
+        found: false,
+        printerStatus: null,
+        lastSeenAt: null,
+        isOnline: false,
+        scanInputHealth: null,
+        scanDeviceHealth: null,
+        scanDeviceObservedAt: null,
+      }
     }
     const latest = terminal.heartbeats[0]
     const lastSeenAt = latest?.createdAt?.toISOString() ?? null
@@ -807,6 +830,8 @@ export class TerminalAdminService {
       lastSeenAt,
       isOnline,
       scanInputHealth: publicScanInputHealth(latest?.scanInputHealth),
+      scanDeviceHealth: publicScanDeviceHealth(latest?.scanDeviceHealth),
+      scanDeviceObservedAt: latest?.scanDeviceObservedAt?.toISOString() ?? null,
     }
   }
 
