@@ -13120,7 +13120,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 253,
+      "reachableFileCount": 255,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -13891,7 +13891,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 279
+      "sourceFileCount": 281
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -19345,7 +19345,7 @@
         ]
       },
       {
-        "fieldCount": 16,
+        "fieldCount": 21,
         "name": "TerminalHeartbeat",
         "relations": [
           "Terminal"
@@ -20140,6 +20140,9 @@
     "apps/admin/src/routes/terminals/TerminalNetworkDiagnostics.tsx": [
       "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs"
     ],
+    "apps/admin/src/routes/terminals/TerminalPrinterQueue.tsx": [
+      "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs"
+    ],
     "apps/admin/src/routes/terminals/index.tsx": [
       "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs",
       "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs",
@@ -20147,6 +20150,9 @@
       "scripts/verify-datetime-honesty.mjs",
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-terminal-device-config.ts"
+    ],
+    "apps/admin/src/routes/terminals/printerQueueView.ts": [
+      "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs"
     ],
     "apps/admin/src/routes/terminals/terminalStatusViews.ts": [
       "apps/admin/scripts/verify-admin-peripheral-views.mjs",
@@ -24508,6 +24514,9 @@
     "services/api/prisma/migrations/20261102090000_add_terminal_daily_free_print_sides/migration.sql": [
       "services/api/scripts/verify-free-print-quota.ts"
     ],
+    "services/api/prisma/migrations/20261104150000_add_terminal_heartbeat_printer_queue/migration.sql": [
+      "services/api/scripts/verify-terminal-printer-queue.ts"
+    ],
     "services/api/prisma/postgres/migrations/20260701123000_add_toolbox_launch_events/migration.sql": [
       "services/api/scripts/verify-toolbox-launch-events.ts"
     ],
@@ -24557,6 +24566,9 @@
     "services/api/prisma/postgres/migrations/20261102090000_add_terminal_daily_free_print_sides/migration.sql": [
       "services/api/scripts/verify-free-print-quota.ts"
     ],
+    "services/api/prisma/postgres/migrations/20261104150000_add_terminal_heartbeat_printer_queue/migration.sql": [
+      "services/api/scripts/verify-terminal-printer-queue.ts"
+    ],
     "services/api/prisma/postgres/schema.prisma": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
@@ -24580,6 +24592,7 @@
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-network-diagnostics.ts",
+      "services/api/scripts/verify-terminal-printer-queue.ts",
       "services/api/scripts/verify-toolbox-launch-events.ts",
       "services/api/scripts/verify-toolbox-review-workflow.ts"
     ],
@@ -24612,6 +24625,7 @@
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-network-diagnostics.ts",
+      "services/api/scripts/verify-terminal-printer-queue.ts",
       "services/api/scripts/verify-toolbox-launch-events.ts",
       "services/api/scripts/verify-toolbox-review-workflow.ts"
     ],
@@ -29018,13 +29032,17 @@
     "services/api/src/terminals/dto/heartbeat.dto.ts": [
       "services/api/scripts/verify-queue-dispatch-printer-status.ts",
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
-      "services/api/scripts/verify-terminal-network-diagnostics.ts"
+      "services/api/scripts/verify-terminal-network-diagnostics.ts",
+      "services/api/scripts/verify-terminal-printer-queue.ts"
     ],
     "services/api/src/terminals/dto/record-toolbox-launch-event.dto.ts": [
       "services/api/scripts/verify-toolbox-launch-events.ts"
     ],
     "services/api/src/terminals/dto/save-toolbox-config.dto.ts": [
       "services/api/scripts/verify-terminal-device-config.ts"
+    ],
+    "services/api/src/terminals/heartbeat-printer-queue.ts": [
+      "services/api/scripts/verify-terminal-printer-queue.ts"
     ],
     "services/api/src/terminals/kiosk-job-board.service.ts": [
       "services/api/scripts/verify-backend-p0-http.ts",
@@ -29152,6 +29170,7 @@
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-network-diagnostics.ts",
+      "services/api/scripts/verify-terminal-printer-queue.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-terminal-test-print-seed-guard.ts"
     ],
@@ -29181,6 +29200,7 @@
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-network-diagnostics.ts",
+      "services/api/scripts/verify-terminal-printer-queue.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-terminal-status-idempotency.ts",
       "services/api/scripts/verify-terminal-test-print-seed-guard.ts"
@@ -29802,7 +29822,9 @@
           "apps/admin/src/routes/peripherals/index.tsx",
           "apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx",
           "apps/admin/src/routes/terminals/TerminalNetworkDiagnostics.tsx",
+          "apps/admin/src/routes/terminals/TerminalPrinterQueue.tsx",
           "apps/admin/src/routes/terminals/index.tsx",
+          "apps/admin/src/routes/terminals/printerQueueView.ts",
           "apps/admin/src/routes/terminals/terminalStatusViews.ts",
           "apps/admin/src/services/api/types.ts"
         ],
@@ -44820,6 +44842,31 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:terminal-network-diagnostics"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/prisma/migrations/20261104150000_add_terminal_heartbeat_printer_queue/migration.sql",
+          "services/api/prisma/postgres/migrations/20261104150000_add_terminal_heartbeat_printer_queue/migration.sql",
+          "services/api/prisma/postgres/schema.prisma",
+          "services/api/prisma/schema.prisma",
+          "services/api/src/terminals/dto/heartbeat.dto.ts",
+          "services/api/src/terminals/heartbeat-printer-queue.ts",
+          "services/api/src/terminals/terminals-admin.service.ts",
+          "services/api/src/terminals/terminals-agent.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-terminal-printer-queue.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:terminal-printer-queue"
       ],
       "wired": true
     },

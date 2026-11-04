@@ -70,7 +70,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1984 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1989 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -186,7 +186,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 173 个文件</summary>
+<summary><code>apps/admin/src/</code> — 175 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -316,7 +316,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-terminal-device-config.ts` |
 | `apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/terminals/TerminalNetworkDiagnostics.tsx` | `verify-admin-terminal-network-diagnostics-ui.mjs` |
+| `apps/admin/src/routes/terminals/TerminalPrinterQueue.tsx` | `verify-admin-terminal-network-diagnostics-ui.mjs` |
 | `apps/admin/src/routes/terminals/index.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-datetime-honesty.mjs`<br/>`verify-print-scan-first-release.ts`<br/>`verify-terminal-device-config.ts` |
+| `apps/admin/src/routes/terminals/printerQueueView.ts` | `verify-admin-terminal-network-diagnostics-ui.mjs` |
 | `apps/admin/src/routes/terminals/terminalStatusViews.ts` | `verify-admin-peripheral-views.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs` |
 | `apps/admin/src/routes/toolbox/components/TerminalToolboxPanel.tsx` | `verify-toolbox-review-ui.mjs` |
 | `apps/admin/src/routes/toolbox/components/TerminalToolboxRow.tsx` | `verify-toolbox-review-ui.mjs`<br/>`verify-terminal-device-config.ts` |
@@ -2162,7 +2164,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/prisma/</code> — 39 个文件</summary>
+<summary><code>services/api/prisma/</code> — 41 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2185,6 +2187,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/prisma/migrations/20260913210000_add_scan_input_lockout_telemetry/migration.sql` | `verify-scan-input-lockout-telemetry.ts` |
 | `services/api/prisma/migrations/20260929230000_ai_usage_retention_summary/migration.sql` | `verify-ai-usage-retention.ts` |
 | `services/api/prisma/migrations/20261102090000_add_terminal_daily_free_print_sides/migration.sql` | `verify-free-print-quota.ts` |
+| `services/api/prisma/migrations/20261104150000_add_terminal_heartbeat_printer_queue/migration.sql` | `verify-terminal-printer-queue.ts` |
 | `services/api/prisma/postgres/migrations/20260701123000_add_toolbox_launch_events/migration.sql` | `verify-toolbox-launch-events.ts` |
 | `services/api/prisma/postgres/migrations/20260702002000_add_toolbox_governance/migration.sql` | `verify-toolbox-review-workflow.ts` |
 | `services/api/prisma/postgres/migrations/20260706070000_add_db_load_indexes/migration.sql` | `verify-db-load-indexes.ts` |
@@ -2201,8 +2204,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/prisma/postgres/migrations/20260929230000_ai_usage_retention_summary/migration.sql` | `verify-ai-usage-retention.ts` |
 | `services/api/prisma/postgres/migrations/20261003090000_member_closure_storage_deletion/migration.sql` | `verify-http-exception-filter.ts` |
 | `services/api/prisma/postgres/migrations/20261102090000_add_terminal_daily_free_print_sides/migration.sql` | `verify-free-print-quota.ts` |
-| `services/api/prisma/postgres/schema.prisma` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-admin-orgs-delete-schema.ts`<br/>`verify-ai-usage-retention.ts`<br/>`verify-db-load-indexes.ts`<br/>`verify-first-order-migrations.ts`<br/>`verify-job-ai.ts`<br/>`verify-job-application-track.ts`<br/>`verify-job-fit-governance.ts`<br/>`verify-job-headcount.ts`<br/>`verify-jobfair-checkin.ts`<br/>`verify-legal-doc-version.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-data-request-contract.ts`<br/>`verify-partner-account-action-schema.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-recruitment-capability-gate.ts`<br/>`verify-recruitment-p1-schema.ts`<br/>`verify-release-observation-contract.mjs`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-terminal-bind-code.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-network-diagnostics.ts`<br/>`verify-toolbox-launch-events.ts`<br/>`verify-toolbox-review-workflow.ts` |
-| `services/api/prisma/schema.prisma` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-admin-orgs-delete-schema.ts`<br/>`verify-ai-usage-retention.ts`<br/>`verify-ai-user-text-retention.ts`<br/>`verify-db-load-indexes.ts`<br/>`verify-first-order-migrations.ts`<br/>`verify-free-print-quota.ts`<br/>`verify-job-ai.ts`<br/>`verify-job-application-track.ts`<br/>`verify-job-fit-governance.ts`<br/>`verify-job-headcount.ts`<br/>`verify-jobfair-checkin.ts`<br/>`verify-legal-doc-version.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-closure.ts`<br/>`verify-member-data-request-contract.ts`<br/>`verify-partner-account-action-schema.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-recruitment-capability-gate.ts`<br/>`verify-recruitment-p1-schema.ts`<br/>`verify-release-observation-contract.mjs`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-support-contact.ts`<br/>`verify-terminal-bind-code.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-network-diagnostics.ts`<br/>`verify-toolbox-launch-events.ts`<br/>`verify-toolbox-review-workflow.ts` |
+| `services/api/prisma/postgres/migrations/20261104150000_add_terminal_heartbeat_printer_queue/migration.sql` | `verify-terminal-printer-queue.ts` |
+| `services/api/prisma/postgres/schema.prisma` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-admin-orgs-delete-schema.ts`<br/>`verify-ai-usage-retention.ts`<br/>`verify-db-load-indexes.ts`<br/>`verify-first-order-migrations.ts`<br/>`verify-job-ai.ts`<br/>`verify-job-application-track.ts`<br/>`verify-job-fit-governance.ts`<br/>`verify-job-headcount.ts`<br/>`verify-jobfair-checkin.ts`<br/>`verify-legal-doc-version.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-data-request-contract.ts`<br/>`verify-partner-account-action-schema.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-recruitment-capability-gate.ts`<br/>`verify-recruitment-p1-schema.ts`<br/>`verify-release-observation-contract.mjs`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-terminal-bind-code.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-network-diagnostics.ts`<br/>`verify-terminal-printer-queue.ts`<br/>`verify-toolbox-launch-events.ts`<br/>`verify-toolbox-review-workflow.ts` |
+| `services/api/prisma/schema.prisma` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-admin-orgs-delete-schema.ts`<br/>`verify-ai-usage-retention.ts`<br/>`verify-ai-user-text-retention.ts`<br/>`verify-db-load-indexes.ts`<br/>`verify-first-order-migrations.ts`<br/>`verify-free-print-quota.ts`<br/>`verify-job-ai.ts`<br/>`verify-job-application-track.ts`<br/>`verify-job-fit-governance.ts`<br/>`verify-job-headcount.ts`<br/>`verify-jobfair-checkin.ts`<br/>`verify-legal-doc-version.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-closure.ts`<br/>`verify-member-data-request-contract.ts`<br/>`verify-partner-account-action-schema.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-recruitment-capability-gate.ts`<br/>`verify-recruitment-p1-schema.ts`<br/>`verify-release-observation-contract.mjs`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-support-contact.ts`<br/>`verify-terminal-bind-code.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-network-diagnostics.ts`<br/>`verify-terminal-printer-queue.ts`<br/>`verify-toolbox-launch-events.ts`<br/>`verify-toolbox-review-workflow.ts` |
 | `services/api/prisma/seed-guard.ts` | `verify-demo-seed-guard.ts` |
 | `services/api/prisma/seed.ts` | `verify-partner-account-action-schema.ts` |
 
@@ -2355,7 +2359,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 628 个文件</summary>
+<summary><code>services/api/src/</code> — 629 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2949,9 +2953,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/terminals/claim-unprintable-file.ts` | `verify-payment-flow.ts` |
 | `services/api/src/terminals/dto/create-terminal-bind-code.dto.ts` | `verify-terminal-bind-code.ts` |
 | `services/api/src/terminals/dto/exchange-terminal-bind-code.dto.ts` | `verify-terminal-bind-code.ts` |
-| `services/api/src/terminals/dto/heartbeat.dto.ts` | `verify-queue-dispatch-printer-status.ts`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-terminal-network-diagnostics.ts` |
+| `services/api/src/terminals/dto/heartbeat.dto.ts` | `verify-queue-dispatch-printer-status.ts`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-terminal-network-diagnostics.ts`<br/>`verify-terminal-printer-queue.ts` |
 | `services/api/src/terminals/dto/record-toolbox-launch-event.dto.ts` | `verify-toolbox-launch-events.ts` |
 | `services/api/src/terminals/dto/save-toolbox-config.dto.ts` | `verify-terminal-device-config.ts` |
+| `services/api/src/terminals/heartbeat-printer-queue.ts` | `verify-terminal-printer-queue.ts` |
 | `services/api/src/terminals/kiosk-job-board.service.ts` | `verify-backend-p0-http.ts`<br/>`verify-job-fit.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-recruitment-hosting-default-off.ts` |
 | `services/api/src/terminals/print-status-attempt.ts` | `verify-print-jobs.ts` |
 | `services/api/src/terminals/printer-availability.ts` | `verify-pickup-claim-error-coverage.mjs`<br/>`verify-print-monitor-truth.ts`<br/>`verify-admin-ops.ts`<br/>`verify-queue-dispatch-printer-status.ts` |
@@ -2966,8 +2971,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/terminals/terminal-session.service.ts` | `verify-ai-safety-lexicon.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-free-print-quota.ts`<br/>`verify-member-closure.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-print-jobs.ts`<br/>`verify-terminal-identity.ts`<br/>`verify-trtc-terminal-http.ts` |
 | `services/api/src/terminals/terminal-toolbox.service.ts` | `verify-kiosk-cashier-ui.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-order.ts`<br/>`verify-partner-smart-campus.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-print-jobs.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-terminal-credentials.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-provisioning.ts`<br/>`verify-terminal-test-print-seed-guard.ts`<br/>`verify-toolbox-launch-events.ts`<br/>`verify-toolbox-micro-app-platform.ts`<br/>`verify-toolbox-review-workflow.ts` |
 | `services/api/src/terminals/terminal-utils.ts` | `verify-kiosk-job-board-switch.ts`<br/>`verify-print-rollout-config.ts`<br/>`verify-terminal-bind-code.ts` |
-| `services/api/src/terminals/terminals-admin.service.ts` | `verify-free-print-quota.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-legacy-pending-print-task-disposition.ts`<br/>`verify-order.ts`<br/>`verify-partner-smart-campus.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-print-jobs.ts`<br/>`verify-print-rollout-config.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-terminal-credentials.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-network-diagnostics.ts`<br/>`verify-terminal-provisioning.ts`<br/>`verify-terminal-test-print-seed-guard.ts` |
-| `services/api/src/terminals/terminals-agent.service.ts` | `verify-print-truth-hardening.ts`<br/>`verify-admin-ops.ts`<br/>`verify-admin-print-scan.ts`<br/>`verify-background-task-safety.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-legacy-pending-print-task-disposition.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-partner-smart-campus.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pg-lock-timeout-postgres.ts`<br/>`verify-print-jobs.ts`<br/>`verify-print-rollout-config.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-queue-dispatch-printer-status.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-scan-deletion-audit-reporting.ts`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-terminal-bind-code.ts`<br/>`verify-terminal-credentials.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-network-diagnostics.ts`<br/>`verify-terminal-provisioning.ts`<br/>`verify-terminal-status-idempotency.ts`<br/>`verify-terminal-test-print-seed-guard.ts` |
+| `services/api/src/terminals/terminals-admin.service.ts` | `verify-free-print-quota.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-legacy-pending-print-task-disposition.ts`<br/>`verify-order.ts`<br/>`verify-partner-smart-campus.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-print-jobs.ts`<br/>`verify-print-rollout-config.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-terminal-credentials.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-network-diagnostics.ts`<br/>`verify-terminal-printer-queue.ts`<br/>`verify-terminal-provisioning.ts`<br/>`verify-terminal-test-print-seed-guard.ts` |
+| `services/api/src/terminals/terminals-agent.service.ts` | `verify-print-truth-hardening.ts`<br/>`verify-admin-ops.ts`<br/>`verify-admin-print-scan.ts`<br/>`verify-background-task-safety.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-legacy-pending-print-task-disposition.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-partner-smart-campus.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pg-lock-timeout-postgres.ts`<br/>`verify-print-jobs.ts`<br/>`verify-print-rollout-config.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-queue-dispatch-printer-status.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-scan-deletion-audit-reporting.ts`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-terminal-bind-code.ts`<br/>`verify-terminal-credentials.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-network-diagnostics.ts`<br/>`verify-terminal-printer-queue.ts`<br/>`verify-terminal-provisioning.ts`<br/>`verify-terminal-status-idempotency.ts`<br/>`verify-terminal-test-print-seed-guard.ts` |
 | `services/api/src/terminals/terminals.controller.ts` | `verify-ai-access.ts`<br/>`verify-print-color-duplex-capability.ts`<br/>`verify-release-observation-contract.mjs`<br/>`verify-scan-deletion-audit-reporting.ts`<br/>`verify-terminal-bind-code.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-identity.ts`<br/>`verify-terminal-provisioning.ts`<br/>`verify-throttle-dimension.ts`<br/>`verify-toolbox-launch-events.ts` |
 | `services/api/src/terminals/terminals.module.ts` | `verify-terminal-network-diagnostics.ts` |
 | `services/api/src/terminals/terminals.service.ts` | `verify-free-print-quota.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-legacy-pending-print-task-disposition.ts`<br/>`verify-order.ts`<br/>`verify-partner-smart-campus.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-print-jobs.ts`<br/>`verify-print-rollout-config.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-terminal-bind-code.ts`<br/>`verify-terminal-credentials.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-provisioning.ts`<br/>`verify-terminal-test-print-seed-guard.ts` |

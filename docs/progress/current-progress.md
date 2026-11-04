@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-11-04：心跳认打印队列新字段（后端半；分支 `claude/printer-queue-api-1104`；未合并、未部署）
+
+- 做了：终端心跳多收五个可选字段（队列名、端口种类、USB 端口名、驱动五个原值、Windows 打印服务状态）。SQLite 与 PostgreSQL 各加五列，迁移 `20261104150000_add_terminal_heartbeat_printer_queue`。老终端程序不带这五项仍然接受。后台终端详情只读显示「打印队列」；五列都空显示未上报；终端离线不把旧上报当现状。不保存、不显示打印机地址。
+- 边界：没改 `apps/terminal-agent/`。后端先认字段。终端程序要等这条上生产才发这些字段，否则多出来的字段会被整条拒绝，终端看起来像离线。
+- 验证：两套空库 `migrate deploy` 都套上了这条迁移；首单迁移升级路径能写入并读回五列。新门禁挂在 `verify:terminal-network-diagnostics` 后面，`verify:ci-gate-coverage` 通过，没有改 workflow。
+
 ## 2026-11-03：一体机扫码上传共用面板取消失败不再清屏（重做旧候选 #1461；分支 `claude/kiosk-upload-cancel-keep-1103`；未合并、未部署）
 
 - 旧候选 #1461（10/14，未进 main）在触屏版上重做：会员确认时后端锁着复制文件，这时点「取消」会回 400 `UPLOAD_SESSION_ACTION_IN_PROGRESS`。共用面板原来吞掉失败并无条件清空，屏上像取消成功，文件随后仍会归档进会员名下。
