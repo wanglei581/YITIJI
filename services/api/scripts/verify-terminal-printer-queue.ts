@@ -120,6 +120,7 @@ async function main() {
   assert.equal(full.printerQueueName, '前台队列')
   assert.equal(full.printerQueuePortName, 'USB001')
   assert.equal(full.printerQueueRawStatus, '3,0,False,0,0')
+  assert.equal(printerQueueHeartbeatData(full).printerQueuePortName, 'USB001')
 
   const oldAgent = await accept({ status: 'online', printerStatus: 'ready' }, 'old agent')
   assert.equal(oldAgent.printerQueueName, undefined)
@@ -141,7 +142,17 @@ async function main() {
   ] as const) {
     const parsed = await accept({ ...body }, label)
     if ('printerQueueRawStatus' in body) assert.equal(parsed.printerQueueRawStatus, body.printerQueueRawStatus)
+    if (label === 'port USB1') assert.equal(printerQueueHeartbeatData(parsed).printerQueuePortName, null)
   }
+
+  const networkWithPortName = await accept(
+    { printerQueuePortKind: 'network', printerQueuePortName: 'USB001' },
+    'network kind keeps the request, drops the port name',
+  )
+  assert.equal(networkWithPortName.printerQueuePortKind, 'network')
+  assert.equal(networkWithPortName.printerQueuePortName, 'USB001')
+  assert.equal(printerQueueHeartbeatData(networkWithPortName).printerQueuePortKind, 'network')
+  assert.equal(printerQueueHeartbeatData(networkWithPortName).printerQueuePortName, null)
 
   for (const [label, body] of [
     ['port address', { printerQueuePortName: '192.168.50.2' }],

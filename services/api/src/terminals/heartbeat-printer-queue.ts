@@ -35,10 +35,12 @@ export interface PrinterQueueHeartbeatData {
 }
 
 export function printerQueueHeartbeatData(dto: PrinterQueueHeartbeatInput): PrinterQueueHeartbeatData {
+  const portKind = dto.printerQueuePortKind ?? null
   return {
     printerQueueName: dto.printerQueueName ?? null,
-    printerQueuePortKind: dto.printerQueuePortKind ?? null,
-    printerQueuePortName: dto.printerQueuePortName ?? null,
+    printerQueuePortKind: portKind,
+    // 端口名只在 USB 时落库。其它种类即使带了名字也存 null，请求本身仍然接受。
+    printerQueuePortName: portKind === 'usb' ? (dto.printerQueuePortName ?? null) : null,
     printerQueueRawStatus: dto.printerQueueRawStatus ?? null,
     printerQueueSpooler: dto.printerQueueSpooler ?? null,
   }
