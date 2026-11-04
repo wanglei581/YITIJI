@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-11-04：终端程序 A2 第六轮——收掉第四轮复审的 2 条 P1（分支 `claude/scan-device-a2-1102`，随 0.4.19，未部署）
+
+- ① 后台重投复用过期签名租约（默认 60 秒）：断网一分钟以上恢复、探查确认仍可投递后，带旧签名重投被拒，会删掉本可交付的页。改为探查确认后复用现有取租约路径重取签名，PDF 字节、快照时间、`deviceRound` 不变；`SCAN_LEASE_EXPIRED` 归为不确定、回探查核对；重取失败保持不确定。
+- ② 缺硬截止时清理上限随回报续期（`Math.max`）：改为只认首次投递前租约的截止，普通回报、探查、重取租约都不延长；有 `hardExpiresAt` 时照旧以它为准；到期仍不确定按 `SCAN_DEVICE_FAILED` 删页、本机回 `LOCAL_SCAN_DELIVERY_UNCONFIRMED`。
+- 门禁：新增 `verify-scan-device-runner-r6.ts`（6 组：过期签名同 PDF 重投、过期重投回探查、重取失败保持不确定、持续续期截止不变、100 次续期截止不动、硬截止回归），接进 `verify:scan-device-runner`（21 组）。`verify:scan-device-engine`、`verify:scan-watcher`、`verify:scan-deletion-audit`、`verify:usb-import-agent`、`verify:boot-spool-guard`、tsc、lint、repository-integrity 通过（Codex 实现，Claude 收货）。
+
 ## 2026-11-04：终端程序 A2 第五轮——U 盘中文卷标乱码（分支 `claude/scan-device-a2-1102`，随 0.4.19，未部署）
 
 - 现象：11/04 真机「打印 → U 盘导入」选中文件后，文件卡第二行卷标显示乱码。原因：`usb-files.ts` 的 `runPowerShellJson` 没设输出编码，现场 PowerShell 按系统代码页输出，Node 按 UTF-8 解码。

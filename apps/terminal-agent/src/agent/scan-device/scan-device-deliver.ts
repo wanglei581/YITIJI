@@ -24,6 +24,8 @@ const ENDED_NOT_DELIVERED = new Set(['cancelled', 'expired', 'failed'])
 /** 上传抛错时先看服务端有没有把结果说死。网络错误和没有响应体都算不确定。 */
 export function verdictFromUploadError(error: unknown): DeliveryVerdict {
   const failure = classifyScanDeliveryFailure(error)
+  // 签名过期只说明这次请求不能收下，不能证明此前丢失响应的上传没有成功。
+  if (failure.code === 'SCAN_LEASE_EXPIRED') return 'uncertain'
   if (failure.kind === 'refused') {
     return failure.refusal === 'file_already_delivered' ? 'received' : 'rejected'
   }
@@ -61,18 +63,22 @@ function isoTime(value: string | undefined): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
-/** 硬截止优先。没有就用目前见过的最晚 expiresAt，不用租约在不在猜结果。 */
-export function noteDeliveryDeadline(session: RoundSession, input: { hardExpiresAt?: string; expiresAt?: string }): void {
+/** 硬截止优先。兼容后端只在首次投递前取租约时固定兜底，回报和重取租约不得续期。 */
+export function noteDeliveryDeadline(
+  session: RoundSession,
+  input: { hardExpiresAt?: string; expiresAt?: string },
+  initialDeliveryLease = false,
+): void {
   const hard = isoTime(input.hardExpiresAt)
   if (hard !== undefined) {
     session.confirmUntil = hard
     session.deadlineIsHard = true
     return
   }
-  if (session.deadlineIsHard) return
+  if (session.deadlineIsHard || !initialDeliveryLease || session.pendingUpload) return
   const soft = isoTime(input.expiresAt)
   if (soft === undefined) return
-  session.confirmUntil = Math.max(session.confirmUntil ?? 0, soft)
+  session.confirmUntil = soft
 }
 
 function noteProbeDeadline(session: RoundSession, result: DeviceReportResult): void {
@@ -195,7 +201,7 @@ export async function deliverComposedRound(
   const leaseStop = stopOrAbort(afterLease)
   if (leaseStop) return leaseStop
   if (fetched.kind !== 'lease' || fetched.lease.scanTaskId !== afterLease.taskId) return hooks.fail('unknown')
-  noteDeliveryDeadline(afterLease, { hardExpiresAt: fetched.lease.hardExpiresAt, expiresAt: fetched.lease.expiresAt })
+  noteDeliveryDeadline(afterLease, { hardExpiresAt: fetched.lease.hardExpiresAt, expiresAt: fetched.lease.expiresAt }, true)
   let snapshotMs = composedAt
   const notBefore = Date.parse(fetched.lease.notBefore)
   if (Number.isFinite(notBefore) && snapshotMs <= notBefore) snapshotMs = notBefore + 1
@@ -285,7 +291,7 @@ function roundStill(host: RoundHost, generation: number): RoundSession | undefin
   return session
 }
 
-/** 仍在 waiting 时用记下的那一份 PDF 再投一次。重复内容回已投递也算收下。换了轮次就作废，不再传。 */
+/** waiting 时重取同一任务的签名，只换凭据，PDF、快照和轮次保持原样。 */
 async function retrySamePdf(host: RoundHost, session: RoundSession): Promise<DeliveryVerdict> {
   const draft = session.pendingUpload
   if (!draft) return 'uncertain'
@@ -298,8 +304,22 @@ async function retrySamePdf(host: RoundHost, session: RoundSession): Promise<Del
     session.pendingUpload = undefined
     return 'rejected'
   }
+  let fetched: Awaited<ReturnType<typeof host.deps.fetchLease>>
   try {
-    await host.deps.deliver(draft)
+    fetched = await host.deps.fetchLease(host.deps.clock.now())
+  } catch {
+    return 'uncertain'
+  }
+  if (host.state.session !== session || session.pendingUpload !== draft) return 'uncertain'
+  if (fetched.kind !== 'lease' || fetched.lease.scanTaskId !== session.taskId) return 'uncertain'
+  noteDeliveryDeadline(session, fetched.lease)
+  const now = host.deps.clock.now()
+  if (session.confirmUntil !== undefined && now >= session.confirmUntil) return 'uncertain'
+  if (!(Date.parse(fetched.lease.expiresAt) > now)) return 'uncertain'
+  const delivery = { ...draft, deliveryLease: fetched.lease.deliveryLease }
+  session.pendingUpload = delivery
+  try {
+    await host.deps.deliver(delivery)
     return 'received'
   } catch (error) {
     if (isUnauthorizedHttpError(error)) {
