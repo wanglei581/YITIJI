@@ -399,10 +399,10 @@ export function RenshiPage() {
   const backToPolicyList = () => { setWithdrawnDetail(null); guard.release(); setDetailSelected(false); setActiveId(null); setListVersion((v) => v + 1); setActiveTab('policy') }
   const bandStatus: Pill = withdrawnDetail
     ? { tone: 'warn', label: '这条已下架' }
-    : focusOnList && focusFrame ? focusFrame.status : onDetail && activeItem ? guard.phase === 'checking' ? { tone: 'unknown', label: '正在确认来源' } : guard.phase === 'unconfirmed' ? { tone: 'warn', label: '这次未确认' } : { tone: 'unknown', label: isBuiltin(activeItem.id) ? '办事参考' : activeItem.tagLabel } : frame.status
+    : focusOnList && focusFrame ? focusFrame.status : onDetail && activeItem ? guard.phase === 'checking' ? { tone: 'unknown', label: '正在确认' } : guard.phase === 'unconfirmed' ? { tone: 'warn', label: '来源暂不可用' } : { tone: 'unknown', label: isBuiltin(activeItem.id) ? '办事参考' : activeItem.tagLabel } : frame.status
   const bandSub = withdrawnDetail
     ? '这条政策已不在可查看范围内，下架后的正文和来源入口不再显示。'
-    : focusOnList && focusFrame ? focusFrame.subtitle : onDetail && activeItem ? guard.phase === 'checking' ? '正在确认来源，确认之前不打开入口。' : guard.phase === 'unconfirmed' ? '这次没有确认这条还在，先不打开来源入口。' : isBuiltin(activeItem.id) ? '办事参考' : '合作机构发布' : frame.subtitle
+    : focusOnList && focusFrame ? focusFrame.subtitle : onDetail && activeItem ? (isBuiltin(activeItem.id) ? '办事参考' : '合作机构发布') : frame.subtitle
   const renshiPageAttr = { 'data-qx-page': 'renshi' } as const
   return (
     <div {...renshiPageAttr} className="rq-touch-fill">
