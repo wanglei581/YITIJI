@@ -2,7 +2,7 @@
  * 页面专用样式，颜色一律走 --qxt-* / --qx-* 令牌，不改 .qxt-*。
  * 说明格 / 整行按钮的基础样式在 tool-fs.css（.fs-fact / .fs-row / .fs-2 …），这里只补本页独有的件：
  *   待合并列表（缩略图 + 名字 + 第几张）、更多设置、示意小样、完成页的状态卡、查看大图层。
- * 版式规矩（审查意见 A1）：卡片按内容定高，多出来的高度只给 .i2p-sample（一块示意小样），不撑空卡；
+ * 编辑页余量给真实图片，两张上下排满中部；其他状态先放说明，示意图留在下方。
  * 列表在自己的滚动区里滚（.i2p-lrows），其余块都是 .i2p-scroll 的直接子块，上下相邻、互不压盖。
  */
 
@@ -25,8 +25,7 @@
   overscroll-behavior: contain;
 }
 
-/* 子块一律按内容定高，不被 flex 压扁（压扁会让里面的字溢出去盖住下一块）。
- * 只有示意小样（.i2p-sample）吃余量，也只有它能缩。 */
+/* 子块不被 flex 压扁；示意图可以让出高度，正文和操作键优先。 */
 .i2p-scroll > * {
   flex: none;
 }
@@ -42,17 +41,62 @@
   flex: 1 1 auto;
 }
 
-/* 停用的 U 盘卡按内容定高（虚线卡、底和井同色，拉高了就是一大片空白）；余量给手机扫码那张卡。 */
-[data-qx-page='img2pdf'][data-state='empty'] .i2p-scroll .fs-act:disabled {
-  flex: 0 0 auto;
+/* 两张大卡均分余量；U 盘说明入口放在虚线卡内，停用导入按钮照旧停用。 */
+[data-qx-page='img2pdf'][data-state='empty'] .fs-pair > * {
+  flex: 1 0 0;
+  min-height: 240px;
+}
+
+.i2p-empty-usb {
+  display: flex;
+  flex-direction: column;
+  padding: 0 18px 16px;
+  border: 1.5px dashed var(--qxt-edge);
+  border-radius: 28px;
+  background: var(--qxt-well);
+}
+
+[data-qx-page='img2pdf'] .i2p-empty-usb .fs-act {
+  flex: 1 1 0;
+  min-height: 160px;
+  padding-inline: 0;
+  border: 0;
+}
+
+[data-qx-page='img2pdf'][data-state='empty'] .fine {
+  margin: 0;
+  font-size: 20px;
 }
 
 [data-qx-page='img2pdf'] .i2p-scroll .fs-fact {
   min-height: 0;
 }
 
+/* 状态说明占主位，次出口在小样之后贴近底栏；小样最多占下方 300px。 */
+[data-qx-page='img2pdf'] .i2p-scroll:has(> .i2p-sample) > .fs-facts {
+  flex: 1 0 auto;
+}
+
+[data-qx-page='img2pdf'] .i2p-scroll:has(> .i2p-sample) .fs-pairgrid {
+  flex: 2 0 auto;
+}
+
+[data-qx-page='img2pdf'] .i2p-scroll:has(> .i2p-sample) .fs-fact.wide {
+  flex: 1 0 auto;
+}
+
+/* 本页问句用完整短句；空间不足可换行，不省略最后几个字。 */
+.qxt-screen:has([data-qx-page='img2pdf']) .qxt-dock .qxt-askq > span:last-child {
+  display: block;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  -webkit-line-clamp: unset;
+}
+
 /* ── 待合并列表：一张卡（表头 + 行 + 两句限制）。行多了在 .i2p-lrows 里滚。 ── */
 .i2p-list {
+  flex: 1 0 800px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -81,8 +125,9 @@
 }
 
 .i2p-lrows {
-  flex: none;
-  max-height: 540px;
+  position: relative;
+  flex: 1 1 0;
+  min-height: 560px;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
@@ -97,20 +142,24 @@
 .i2p-lrows::-webkit-scrollbar-thumb { background: var(--qxt-line); border-radius: 5px; }
 
 .i2p-irow {
-  flex: none;
+  position: relative;
+  flex: 0 0 calc((100% - 8px) / 2);
   display: flex;
   align-items: stretch;
   gap: 8px;
-  min-height: 104px;
+  min-height: 276px;
 }
+
+.i2p-list[data-count='1'] .i2p-irow { flex-basis: 100%; }
 
 [data-qx-page='img2pdf'] .i2p-ipick {
   flex: 1;
   min-width: 0;
   display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 8px 14px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 14px;
   border-radius: 20px;
   background: var(--qxt-well);
   border: 1.5px solid transparent;
@@ -125,9 +174,9 @@
 }
 
 .i2p-ithumb {
-  flex: none;
-  width: 72px;
-  height: 88px;
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 160px;
   border-radius: 8px;
   border: 1px solid var(--qxt-line);
   background: var(--qxt-card);
@@ -145,8 +194,9 @@
 }
 
 .i2p-imeta {
-  flex: 1;
+  flex: none;
   min-width: 0;
+  padding-right: 80px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -170,6 +220,9 @@
 }
 
 [data-qx-page='img2pdf'] .i2p-ibtn {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
   flex: none;
   width: 72px;
   min-height: 72px;
@@ -183,9 +236,10 @@
 }
 
 .i2p-list .fs-p,
-.i2p-more .fs-p {
+.i2p-more .fs-p,
+.i2p-output-note {
   margin: 0;
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1.45;
   color: var(--qxt-ink-2);
 }
@@ -213,8 +267,8 @@
 
 /* ── 示意小样：多出来的高度给它（带走什么的实物小样，不撑空卡）。有字的版本在右边讲这份文件。 ── */
 .i2p-sample {
-  flex: 1 1 0;
-  min-height: 160px;
+  flex: 0 1 300px;
+  min-height: 0;
   display: flex;
   align-items: stretch;
   justify-content: center;
@@ -350,6 +404,7 @@
 
 /* 完成页「这份文件」：名字、页数、大小、打印链接，一行一格。 */
 .i2p-outcard {
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -360,12 +415,15 @@
 }
 
 .i2p-kv {
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
 .i2p-kv > div {
+  flex: 1 0 auto;
+  align-items: center;
   display: flex;
   gap: 12px;
   font-size: 22px;

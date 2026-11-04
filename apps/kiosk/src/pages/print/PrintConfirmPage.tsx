@@ -647,8 +647,8 @@ export function PrintConfirmPage() {
   ) : null
 
   const printNotes = (
-    <section className="qx-card pcf-notes" aria-label="打印须知">
-      <h2 className="pcf-notes-t">打印须知</h2>
+    <details className="qx-card pcf-notes" aria-label="打印须知">
+      <summary className="pcf-notes-t">打印须知 ›</summary>
       <ol className="pcf-plan">
         {isContractReport ? (
           <>
@@ -664,7 +664,7 @@ export function PrintConfirmPage() {
         <li>{freePricing ? '提交后请留在机器旁，任务确认后自动开始打印。' : '提交后请留在机器旁，任务确认后自动开始打印（免费任务直接进入打印队列，付费任务完成支付后开始）。'}</li>
         <li>打印完成请从出纸口取件。如有质量问题，{printProblemLine(support)}</li>
       </ol>
-    </section>
+    </details>
   )
 
   const guestQuotaExceeded = quotaCode === 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED'

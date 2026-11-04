@@ -25,6 +25,12 @@ const NOW = '2026-09-29T00:00:00.000Z'
 const FAR_EXPIRES = 4102444800000
 const MEMBER_TOKEN = 'p05-handoff-member-token'
 const STALE_NAME = W2_FILE.name
+const CONFIRM_QUOTE = {
+  amountCents: 200,
+  billablePages: 2,
+  billingPageSource: 'detected',
+  priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents: 200 }],
+}
 
 const CAPABILITY_KEYS = [
   'document_print', 'phone_upload', 'cloud_upload', 'usb_import', 'material_pack',
@@ -73,12 +79,7 @@ function registerPrintShell(api: ApiRouter, available: string[] = []): void {
   })
   api.respond('POST', '/api/v1/orders/quote', {
     status: 200,
-    json: {
-      amountCents: 200,
-      billablePages: 2,
-      billingPageSource: 'detected',
-      priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents: 200 }],
-    },
+    json: CONFIRM_QUOTE,
   })
 }
 
@@ -320,9 +321,18 @@ test('H3 F02 a two-page job material on a simplex-only terminal is quoted single
   // 不拦截：不再出「参数回到黑白单面后可确认」的锁死按钮（旧代码红在这一句）。
   await expect(page.getByRole('button', { name: '参数回到黑白单面后可确认' })).toHaveCount(0)
   // 被改的那一项就地写明「已按单面报价」，价格照常报出来，主按钮能点。
-  await expect(confirm.getByText('已按单面报价')).toBeVisible()
+  await expect(confirm.locator('.pcf-parameters')).toHaveJSProperty('open', false)
+  const settingNote = confirm.locator('.pct-row').filter({ has: page.getByText('设置', { exact: true }) }).locator('.pct-setting-note')
+  await expect(settingNote).toContainText('已按单面报价')
+  await expect(settingNote).toBeVisible()
+  await page.locator('.pcf-parameters > summary', { hasText: '查看全部参数' }).click()
+  await expect(confirm.locator('[data-sum-row="单双面"]')).toContainText('已按单面报价')
+  await expect(confirm.locator('[data-sum-row="单双面"] em')).toBeVisible()
   await expect.poll(() => lastQuoteBody(page).then((body) => body?.params?.['duplex'] ?? null)).toBe('simplex')
-  await expect(page.getByTestId('print-confirm-amount')).toHaveText(/2\.00/)
+  const amount = page.getByTestId('print-confirm-amount')
+  const quotedAmount = (CONFIRM_QUOTE.amountCents / 100).toFixed(2)
+  await expect(amount).toHaveText(quotedAmount)
+  await expect(amount.locator('..')).toHaveText(`应付 ${quotedAmount} 元`)
   await expect(page.getByRole('button', { name: /^去付款$/ })).toBeEnabled()
   expect(errors).toEqual([])
 })
@@ -341,7 +351,8 @@ test('H4 F20 color and duplex picked on a verified terminal survive the round tr
   const preview = page.locator('[data-w2-page="print-preview"]')
   await expect(preview).toHaveAttribute('data-qx-state', 'preview')
   await preview.getByRole('button', { name: '彩色', exact: true }).click()
-  await preview.getByRole('button', { name: '双面（长边）', exact: true }).click()
+  await preview.getByRole('button', { name: '双面', exact: true }).click()
+  await preview.getByRole('button', { name: '长边翻页', exact: true }).click()
   await expect(preview.getByRole('button', { name: '彩色', exact: true })).toHaveAttribute('data-selected', 'true')
   await page.getByRole('button', { name: '下一步：核对价格' }).click()
   await page.waitForURL((url) => url.pathname === '/print/confirm')
@@ -351,7 +362,8 @@ test('H4 F20 color and duplex picked on a verified terminal survive the round tr
   await page.waitForURL((url) => url.pathname === '/print/desk' && url.searchParams.get('step') === 'preview')
   await expect(preview).toHaveAttribute('data-qx-state', 'preview')
   await expect(preview.getByRole('button', { name: '彩色', exact: true })).toHaveAttribute('data-selected', 'true')
-  await expect(preview.getByRole('button', { name: '双面（长边）', exact: true })).toHaveAttribute('data-selected', 'true')
+  await expect(preview.getByRole('button', { name: '长边翻页', exact: true })).toHaveAttribute('data-selected', 'true')
+  await expect(preview.getByRole('button', { name: '双面', exact: true })).toHaveAttribute('data-selected', 'true')
   expect(errors).toEqual([])
 })
 

@@ -73,16 +73,16 @@ export function OptimizeEditView(props: {
         </div>
         <div className="qxt-sheetfacts">
           <div><b>页数</b><span>{props.estimatedPagesLabel}</span></div>
-          <div className="qxt-wide"><b>模板</b><span>{selected ? `当前选中「${selected.title}」。想换别的，去右边素材库。` : '没有选中模板，导出用默认版式。想换，去右边素材库。'}</span></div>
+          <div><b>模板</b><span>{selected ? `当前选中「${selected.title}」。想换别的，去右边素材库。` : '没有选中模板，导出用默认版式。想换，去右边素材库。'}</span></div>
           <div><b>状态</b><span>{props.saveText}。选择和版式要在编辑区里才进导出。</span></div>
-          <div className="qxt-wide"><b>事实</b><span>{pending > 0 ? `还有 ${pending} 处待确认：${props.unconfirmed.join('、')}。${UNCONFIRMED_WHY}未全勾不能出文件。` : '改写里没有原文之外的新增事实；导出前仍要逐项核对。'}</span></div>
+          <div><b>事实</b><span>{pending > 0 ? `还有 ${pending} 处待确认：${props.unconfirmed.join('、')}。未全勾不能出文件。` : '改写里没有原文之外的新增事实；导出前仍要逐项核对。'}</span></div>
           <div><b>主色</b><span>现在是{ACCENT_NAME[layout.accent] ?? layout.accent}。要改就点右边的色块，绿和灰同样能选。</span></div>
           <div><b>栏数</b><span>现在是{layout.columns === 2 ? '双栏' : '单栏'}。字号、行距、页边距在「更多版式」里。</span></div>
         </div>
       </div>
       <div className="qxt-side">
         <p className="qxt-savestat" data-tone={props.saveTone} role="status">{props.saveText}</p>
-        {pending > 0 ? <p className="qxt-warn">还有 {pending} 处事实待你确认，确认后才能导出</p> : null}
+        {pending > 0 ? <p className="qxt-warn">还有 {pending} 处事实待你确认，确认后才能导出<span>{UNCONFIRMED_WHY}</span></p> : null}
         <div className="qxt-block">
           <div className="qxt-lab">模板</div>
           {props.templatesError ? <p className="qxt-note">模板列表这次没读取到，不是没有模板。导出仍可进行，会使用默认版式；排版调整照常可用。</p> : null}
