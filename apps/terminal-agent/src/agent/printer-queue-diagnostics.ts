@@ -28,6 +28,8 @@ function runPowerShell(script: string, stdin?: string, timeoutMs = 5_000): Promi
     const child = spawn('powershell', ['-NonInteractive', '-NoProfile', '-Command', script], {
       stdio: ['pipe', 'pipe', 'pipe'],
     })
+    // 读掉 stderr。管道写满会把 PowerShell 卡到超时；内容不使用。
+    child.stderr?.resume()
     let stdout = ''
     let settled = false
     const finish = (value: string | null) => {
@@ -67,11 +69,11 @@ export const PRINTER_QUEUE_SCRIPT = [
   '} catch {',
   "  $spooler = 'unknown'",
   '};',
-  "if ($spooler -ne 'running') { \"$spooler|unknown|\"; exit };",
+  "if ($spooler -ne 'running') { \"$spooler|unknown|\"; exit 0 };",
   "$portKind = 'unknown';",
   "$portName = '';",
   'try {',
-  '  $printer = Get-Printer -Name $name -ErrorAction Stop;',
+  '  $printer = Get-Printer -Name ([WildcardPattern]::Escape($name)) -ErrorAction Stop | Select-Object -First 1;',
   '  $rawPort = [string]$printer.PortName;',
   '  $printerPort = $null;',
   '  if (-not [string]::IsNullOrWhiteSpace($rawPort)) {',
@@ -86,7 +88,7 @@ export const PRINTER_QUEUE_SCRIPT = [
   '    $portName = $rawPort',
   '  } elseif ($hasPrinterHostAddress) {',
   "    $portKind = 'network'",
-  "  } elseif ($rawPort.StartsWith('WSD-')) {",
+  "  } elseif ($rawPort -like 'WSD-*') {",
   "    $portKind = 'wsd'",
   '  } elseif (-not [string]::IsNullOrWhiteSpace($rawPort)) {',
   "    $portKind = 'other'",

@@ -63,7 +63,13 @@ function verifyScriptText(): void {
   assert.ok(PRINTER_QUEUE_SCRIPT.startsWith(POWERSHELL_STDIN_UTF8), 'script must start with the stdin UTF-8 switch')
   assert.match(PRINTER_QUEUE_SCRIPT, /\[Console\]::In\.ReadLine\(\)/, 'printer name must be read from stdin')
   assert.match(PRINTER_QUEUE_SCRIPT, /Get-Service -Name Spooler/)
-  assert.match(PRINTER_QUEUE_SCRIPT, /Get-Printer -Name \$name/)
+  assert.match(PRINTER_QUEUE_SCRIPT, /Get-Printer -Name \(\[WildcardPattern\]::Escape\(\$name\)\)/)
+  assert.match(PRINTER_QUEUE_SCRIPT, /\[WildcardPattern\]::Escape\(/)
+  assert.match(PRINTER_QUEUE_SCRIPT, /Select-Object -First 1/)
+  assert.match(PRINTER_QUEUE_SCRIPT, /exit 0/)
+  assert.doesNotMatch(PRINTER_QUEUE_SCRIPT, /\bexit\s*\}/)
+  assert.match(PRINTER_QUEUE_SCRIPT, /-like 'WSD-\*'/)
+  assert.doesNotMatch(PRINTER_QUEUE_SCRIPT, /StartsWith\(/)
   assert.match(PRINTER_QUEUE_SCRIPT, /Get-PrinterPort -Name/)
   assert.match(PRINTER_QUEUE_SCRIPT, /\$printerPort\.PrinterHostAddress/, 'host address is only a presence check')
   assert.doesNotMatch(PRINTER_QUEUE_SCRIPT, /Write-Output \$port\b/)
@@ -82,6 +88,7 @@ function verifyScriptText(): void {
 
   const source = fs.readFileSync(path.join(__dirname, '../src/agent/printer-queue-diagnostics.ts'), 'utf8')
   assert.match(source, /timeoutMs = 5_000/)
+  assert.match(source, /stderr\?\.resume\(\)/)
   assert.ok(source.split('\n').length <= 180, 'printer-queue-diagnostics.ts must stay within 180 lines')
 }
 
