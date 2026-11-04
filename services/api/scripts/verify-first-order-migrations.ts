@@ -34,6 +34,7 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', migration)])
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261028120000_ai_service_fact/migration.sql')])
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261102090000_add_terminal_daily_free_print_sides/migration.sql')])
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261104150000_add_terminal_heartbeat_printer_queue/migration.sql')])
     await client.aiServiceFact.create({ data: { serviceType: 'resume_optimize', serviceKey: 'migration-test', orgId: 'org-snapshot', terminalId: 'terminal-snapshot' } })
     if (await client.aiServiceFact.count() !== 1) throw new Error(`${kind}: fact table unavailable`)
     const sentinel = await client.organization.findUnique({ where: { id: 'first-order-migration-sentinel' } })
@@ -45,6 +46,22 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
       serviceEndAt: new Date('2027-01-01T00:00:00Z'), serviceScope: 'Migration only', supportContact: 'Test support',
     } })
     await client.terminal.create({ data: { id: 'migration-terminal', terminalCode: 'MIGRATION-TERMINAL', agentToken: 'migration-only-no-device', deviceFingerprint: 'migration', orgId: sentinel.id } })
+    const heartbeat = await client.terminalHeartbeat.create({ data: {
+      terminalId: 'migration-terminal',
+      printerQueueName: 'Queue-A',
+      printerQueuePortKind: 'usb',
+      printerQueuePortName: 'USB001',
+      printerQueueRawStatus: '3,0,False,0,0',
+      printerQueueSpooler: 'running',
+    } })
+    const heartbeatRead = await client.terminalHeartbeat.findUnique({ where: { id: heartbeat.id } })
+    if (
+      heartbeatRead?.printerQueueName !== 'Queue-A'
+      || heartbeatRead.printerQueuePortKind !== 'usb'
+      || heartbeatRead.printerQueuePortName !== 'USB001'
+      || heartbeatRead.printerQueueRawStatus !== '3,0,False,0,0'
+      || heartbeatRead.printerQueueSpooler !== 'running'
+    ) throw new Error(`${kind}: printer queue heartbeat columns were not readable`)
     const deployment = await client.serviceDeployment.create({ data: {
       projectId: project.id, orgId: sentinel.id, terminalId: 'migration-terminal', activeTerminalId: 'migration-terminal', terminalCode: 'MIGRATION-TERMINAL', locationLabel: 'Test',
     } })

@@ -259,6 +259,11 @@ model TerminalHeartbeat {
   printerStatus              String?
   wiredNetworkStatus         String?
   printerNetworkStatus       String?
+  printerQueueName           String?
+  printerQueuePortKind       String?
+  printerQueuePortName       String?
+  printerQueueRawStatus      String?
+  printerQueueSpooler        String?
   localTaskDatabaseAvailable Boolean?
   scanInputHealth            String?
   scanInputAction            String?

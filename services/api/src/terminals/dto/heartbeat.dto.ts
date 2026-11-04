@@ -1,10 +1,12 @@
-import { IsBoolean, IsDateString, IsIn, IsNumber, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator'
+import { IsBoolean, IsDateString, IsIn, IsNumber, IsOptional, IsString, Matches, MaxLength, ValidateIf } from 'class-validator'
 import { Type } from 'class-transformer'
 
 const WIRED_NETWORK_STATUSES = ['connected', 'disconnected', 'unknown'] as const
 const PRINTER_NETWORK_STATUSES = ['reachable', 'unreachable', 'not_network_printer', 'unknown'] as const
 export const SCAN_INPUT_HEALTHS = ['healthy', 'locked_out', 'unknown'] as const
 export const SCAN_INPUT_ACTIONS = ['none', 'restart_required'] as const
+export const PRINTER_QUEUE_PORT_KINDS = ['usb', 'network', 'wsd', 'other', 'unknown'] as const
+export const PRINTER_QUEUE_SPOOLERS = ['running', 'stopped', 'other', 'unknown'] as const
 export const SCAN_INPUT_REASONS = [
   'not_configured',
   'reparse_point_unverifiable',
@@ -113,4 +115,31 @@ export class HeartbeatDto {
   @MaxLength(64)
   @ValidateIf((_object, value) => value !== undefined)
   scanInputObservedAt?: string
+
+  @IsString()
+  @MaxLength(128)
+  // eslint-disable-next-line no-control-regex -- 刻意拒绝队列名里的控制字符
+  @Matches(/^[^\u0000-\u001f\u007f]+$/)
+  @ValidateIf((_o, v) => v !== undefined)
+  printerQueueName?: string
+
+  @IsIn(PRINTER_QUEUE_PORT_KINDS)
+  @ValidateIf((_o, v) => v !== undefined)
+  printerQueuePortKind?: (typeof PRINTER_QUEUE_PORT_KINDS)[number]
+
+  @IsString()
+  @MaxLength(8)
+  @Matches(/^(USB|DOT4_)\d{1,3}$/)
+  @ValidateIf((_o, v) => v !== undefined)
+  printerQueuePortName?: string
+
+  @IsString()
+  @MaxLength(64)
+  @Matches(/^(\d{0,10},\d{0,10},(True|False)?,\d{0,10},\d{0,10}|not_found|query_failed)$/)
+  @ValidateIf((_o, v) => v !== undefined)
+  printerQueueRawStatus?: string
+
+  @IsIn(PRINTER_QUEUE_SPOOLERS)
+  @ValidateIf((_o, v) => v !== undefined)
+  printerQueueSpooler?: (typeof PRINTER_QUEUE_SPOOLERS)[number]
 }
