@@ -2956,12 +2956,15 @@ async function captureDecisionViewports(page: Parameters<typeof assertNoHorizont
     }, { message: `${name} ${size.width}x${size.height} 操作条与滚动区` }).toBe('ok')
     await assertNoHorizontalOverflow(page)
     // 横屏电脑改为舞台缩放后，屏上像素要除回 scale；舞台关闭（手机）时 scale 取 1，门槛仍是 48。
-    const scale = await readEnabledStageScale(page)
+    // 缩放比与控件尺寸在同一次轮询里一起读：换视口后舞台缩放可能晚一拍生效，先读的 scale 会和后量的 box
+    // 对不上（实测 88px 按钮量成 88×0.46875=41.25 而 scale 仍读到 1）。门槛不变，真小于 48 时轮询超时照样红。
     for (const target of [page.locator('.qxt-back'), page.locator('.qxt-dock .qx-btn').last()]) {
-      const box = await target.boundingBox()
-      expect(box, '可点区域必须可见').not.toBeNull()
-      expect(box!.height / scale, `${name} ${size.width}x${size.height} 触控高度`).toBeGreaterThanOrEqual(48)
-      expect(box!.width / scale).toBeGreaterThanOrEqual(48)
+      await expect(target, '可点区域必须可见').toBeVisible()
+      await expect.poll(async () => {
+        const box = await target.boundingBox()
+        const scale = await readEnabledStageScale(page)
+        return box ? Math.min(box.height, box.width) / scale : 0
+      }, { message: `${name} ${size.width}x${size.height} 触控高度与宽度` }).toBeGreaterThanOrEqual(48)
     }
     await page.screenshot({ path: test.info().outputPath(`${name}-${size.width}x${size.height}.png`) })
   }
