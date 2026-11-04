@@ -47,6 +47,7 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     await client.terminal.create({ data: { id: 'scan-device-legacy-terminal', terminalCode: 'SCAN-DEVICE-LEGACY', agentToken: 'migration-only-no-device-legacy', deviceFingerprint: 'migration' } })
     await client.$executeRawUnsafe(`INSERT INTO "ScanTask" ("id", "terminalId", "scanType", "status", "expiresAt", "updatedAt") VALUES ('${legacyScanId}', 'scan-device-legacy-terminal', 'document', 'completed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', scanDeviceMigration)])
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261104150000_add_terminal_heartbeat_printer_queue/migration.sql')])
     await client.aiServiceFact.create({ data: { serviceType: 'resume_optimize', serviceKey: 'migration-test', orgId: 'org-snapshot', terminalId: 'terminal-snapshot' } })
     if (await client.aiServiceFact.count() !== 1) throw new Error(`${kind}: fact table unavailable`)
     const sentinel = await client.organization.findUnique({ where: { id: 'first-order-migration-sentinel' }, select: { id: true } })
@@ -58,6 +59,22 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
       serviceEndAt: new Date('2027-01-01T00:00:00Z'), serviceScope: 'Migration only', supportContact: 'Test support',
     } })
     await client.terminal.create({ data: { id: 'migration-terminal', terminalCode: 'MIGRATION-TERMINAL', agentToken: 'migration-only-no-device', deviceFingerprint: 'migration', orgId: sentinel.id }, select: { id: true } })
+    const queueHeartbeat = await client.terminalHeartbeat.create({ data: {
+      terminalId: 'migration-terminal',
+      printerQueueName: 'Queue-A',
+      printerQueuePortKind: 'usb',
+      printerQueuePortName: 'USB001',
+      printerQueueRawStatus: '3,0,False,0,0',
+      printerQueueSpooler: 'running',
+    } })
+    const queueHeartbeatRead = await client.terminalHeartbeat.findUnique({ where: { id: queueHeartbeat.id } })
+    if (
+      queueHeartbeatRead?.printerQueueName !== 'Queue-A'
+      || queueHeartbeatRead.printerQueuePortKind !== 'usb'
+      || queueHeartbeatRead.printerQueuePortName !== 'USB001'
+      || queueHeartbeatRead.printerQueueRawStatus !== '3,0,False,0,0'
+      || queueHeartbeatRead.printerQueueSpooler !== 'running'
+    ) throw new Error(`${kind}: printer queue heartbeat columns were not readable`)
     const deployment = await client.serviceDeployment.create({ data: {
       projectId: project.id, orgId: sentinel.id, terminalId: 'migration-terminal', activeTerminalId: 'migration-terminal', terminalCode: 'MIGRATION-TERMINAL', locationLabel: 'Test',
     } })

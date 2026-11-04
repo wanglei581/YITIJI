@@ -22,6 +22,11 @@ import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recru
 import { TerminalToolboxService } from './terminal-toolbox.service'
 import { TerminalAgentService } from './terminals-agent.service'
 import { adminPaperStatus, describePrinterFault, normalizeDiskFreeGb, toAdminPrinterStatus } from './admin-printer-status'
+import {
+  PRINTER_QUEUE_HEARTBEAT_SELECT,
+  toAdminPrinterQueue,
+  type AdminPrinterQueueView,
+} from './heartbeat-printer-queue'
 import { PARKED_TERMINAL_ORG_TYPES, isParkedTerminalOrgType, orgTypeParkedError } from './terminal-org-parking'
 import { terminalOrgBindingOnCreate } from './terminal-org-binding'
 import { assignTerminalOrganization, type TerminalOrgAssignmentAudit } from './terminal-org-assignment'
@@ -84,6 +89,7 @@ export interface AdminTerminalView {
   printerStatus: string | null
   wiredNetworkStatus: string | null
   printerNetworkStatus: string | null
+  printerQueue: AdminPrinterQueueView | null
   scanInputHealth: string | null
   scanInputAction: string | null
   scanInputReason: string | null
@@ -287,6 +293,7 @@ export class TerminalAdminService {
             printerStatus: true,
             wiredNetworkStatus: true,
             printerNetworkStatus: true,
+            ...PRINTER_QUEUE_HEARTBEAT_SELECT,
             localTaskDatabaseAvailable: true,
             scanInputHealth: true,
             scanInputAction: true,
@@ -347,6 +354,7 @@ export class TerminalAdminService {
         printerStatus: hb?.printerStatus ?? null,
         wiredNetworkStatus: hb?.wiredNetworkStatus ?? null,
         printerNetworkStatus: hb?.printerNetworkStatus ?? null,
+        printerQueue: toAdminPrinterQueue(hb),
         scanInputHealth: hb?.scanInputHealth ?? null,
         scanInputAction: hb?.scanInputAction ?? null,
         scanInputReason: hb?.scanInputReason ?? null,
