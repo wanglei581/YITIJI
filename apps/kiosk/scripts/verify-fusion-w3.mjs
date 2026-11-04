@@ -19,7 +19,15 @@ for (const [path, seconds, label] of [
   ['src/pages/print/file-source/FileSourceView.tsx', 'waitRemainingSeconds', 'waitCountdown'],
 ]) {
   const source = read(path)
-  check(source.includes('>等你传文件期间，这台机器不会自动退出，请不要走开。二维码到期后没有操作，就会自动退出。</'), `${path} 常驻等待说明`)
+  if (path === 'src/pages/print/file-source/FileSourceView.tsx') {
+    // B10：三段说明收进一行可展开说明，等待锁与到期边界不变。
+    check(source.includes('<details className="fs-upload-fine">')
+      && source.includes('<summary>本机只认收到文件 · 等上传时请勿走开 · 清场与文件留存说明</summary>')
+      && source.includes('等你传文件期间，这台机器不会自动退出，请不要走开。二维码到期后没有操作，就会自动退出。')
+      && source.includes('<FileSourceTruth />'), `${path} 等待与清场说明保留在可展开行`)
+  } else {
+    check(source.includes('>等你传文件期间，这台机器不会自动退出，请不要走开。二维码到期后没有操作，就会自动退出。</'), `${path} 常驻等待说明`)
+  }
   check(source.includes(`${seconds} > 0 && ${seconds} <= 60 && (`) && /role="status"/.test(source) && source.includes(`二维码还剩 {${label}}。还在传的话点一下屏幕，到期后可以在这里重新出码。`), `${path} 真实倒计时及 60 秒醒目提示`)
 }
 

@@ -15,11 +15,13 @@ function PhoneQrSlot({
   loading,
   expiresLabel,
   inactive = false,
+  onRefresh,
 }: {
   qrUrl: string | null
   loading: boolean
   expiresLabel: string
   inactive?: boolean
+  onRefresh: () => void
 }) {
   if (inactive) {
     return <div className="fs-qr-blank" data-testid="file-source-qr"><InfoIcon size={38} aria-hidden="true" /><strong>这张上传码已失效</strong><span>旧码不再接收文件，请重新出一张码。</span></div>
@@ -32,6 +34,7 @@ function PhoneQrSlot({
           {expiresLabel && !expiresLabel.includes('NaN')
             ? `二维码有效期 ${expiresLabel}。单份不超过 10MB。`
             : '二维码有效期从生成时起算，10 分钟。单份不超过 10MB。'}
+          <button type="button" className="fs-qr-refresh" onClick={onRefresh} data-testid="file-source-refresh">刷新二维码</button>
         </span>
       </div>
     )
@@ -48,7 +51,7 @@ function PhoneQrSlot({
 const PHONE_STEPS = [
   { title: '扫码', detail: '相机或微信' },
   { title: '在手机上选文件、点上传', detail: 'PDF、JPG、PNG' },
-  { title: '回到这台机器点确认', detail: '确认前不会进入下一步' },
+  { title: '回到这台机器点确认', detail: '传好后再点下面的确认' },
 ] as const
 
 export function PhoneBoard({
@@ -60,6 +63,7 @@ export function PhoneBoard({
   usbMode,
   helpText,
   onSelectChannel,
+  onPhoneRefresh,
 }: {
   screen: FileSourceScreen
   phone: PhoneSessionView
@@ -69,6 +73,7 @@ export function PhoneBoard({
   usbMode: 'ok' | 'unavailable' | 'offline'
   helpText: string
   onSelectChannel: (key: UploadTab) => void
+  onPhoneRefresh: () => void
 }) {
   const received = ['phone-uploaded', 'phone-confirming', 'phone-cancel-requesting', 'phone-cancel-failed'].includes(screen)
   const showQr = !received
@@ -87,6 +92,7 @@ export function PhoneBoard({
       {showQr ? (
         <PhoneQrSlot
           qrUrl={qrUrl}
+          onRefresh={onPhoneRefresh}
           loading={phone.loading}
           expiresLabel={expiresLabel}
           inactive={screen === 'phone-expired' || screen === 'phone-cancelled'}
@@ -142,12 +148,6 @@ export function PhoneBoard({
       ) : null}
       {screen === 'phone-cancel-failed' ? (
         <QxTouchCallout kind="remind" icon="alert">取消未成功，旧二维码可能仍有效。可以重试取消，或确认使用这份文件。</QxTouchCallout>
-      ) : null}
-      {screen === 'phone-uploading' ? (
-        <QxTouchCallout kind="fine">请保持手机上传页面打开，传完后回来确认文件。本机看不到你扫没扫，只认系统收到文件。</QxTouchCallout>
-      ) : null}
-      {waiting && screen !== 'phone-uploading' ? (
-        <QxTouchCallout kind="fine">本机看不到你扫没扫，只认系统收到文件。</QxTouchCallout>
       ) : null}
       {screen === 'phone-cancelled' || screen === 'phone-generating' ? (
         <ChannelGrid keys={channelKeys} active={screen === 'phone-cancelled' ? 'qr' : null} usbMode={usbMode} onSelect={onSelectChannel} />
