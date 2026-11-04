@@ -23,6 +23,12 @@ import { configureHomeVariant, MEI, routeMembers, WANG, type HomeVariant } from 
 /** 一屏里最长留白的项目门槛（和样式验收的空带扫描同一个数）。 */
 const MAX_BLANK_PX = 105
 const VARIANTS: HomeVariant[] = ['default', 'channels', 'hosting', 'gov', 'full']
+/**
+ * 每种配置首页第三行最终有几块磁贴。磁贴数来自终端配置与官方渠道两个异步读取，量版面之前要先等它到齐：
+ * 本组走查配置了 reducedMotion，`data-qx-intro=done` 在挂载那一刻就成立，不代表数据已到。
+ * gov 的百宝箱 items 为空，不算上架，所以只有 4 块，恰在压紧门槛上，少任何一个读取都会退回 16px。
+ */
+const EXPECTED_TILES: Record<HomeVariant, number> = { default: 2, channels: 3, hosting: 4, gov: 4, full: 5 }
 
 /** 一体机设计稿里的版心宽度；页面缩放时按它折算。 */
 const DESIGN_WIDTH = 1080
@@ -80,6 +86,7 @@ async function expectFilled(page: Page, label: string): Promise<HomeLayout> {
  * 磁贴少（不进压紧版式）的配置，段间距也和未登录态一样（压紧版式本来就是 12px，不动）。
  */
 async function expectFilledLikeSignedOut(page: Page, label: string, variant: HomeVariant): Promise<HomeLayout> {
+  await expect(page.locator('.qxt-home-tiles')).toHaveAttribute('data-count', String(EXPECTED_TILES[variant]))
   const layout = await expectFilled(page, label)
   expect(layout.cardHeight, `${label}：大卡 ${layout.cardHeight.toFixed(1)}px，不得比未登录态（${SIGNED_OUT_CARD_PX}px）更高`).toBeLessThanOrEqual(SIGNED_OUT_CARD_PX + 0.5)
   if (variant === 'default' || variant === 'channels') {
