@@ -193,6 +193,16 @@
 .cs-err .cs-ways{flex:none}
 .cs-err .cs-ways>.cs-way{flex:none;min-height:196px}
 .cs-err2 .cs-ways>.cs-way{min-height:232px}
+/* 11/04 三张出错补稿：只作用于新屏。大纸照 K1b-2 铺满，不留固定 736px 后的空带。 */
+.cs-issue .cs-hero{align-items:stretch;justify-content:stretch;padding:16px 28px}
+.cs-issue .cs-hrow{flex:1;min-height:0;align-items:stretch;gap:30px;width:100%}
+.cs-issue .cs-hero.none .cs-reader{width:520px;height:auto;min-height:0;align-self:stretch}
+.cs-issue .cs-hero.none .cs-side{flex:1;min-width:0;width:auto;justify-content:center}
+.cs-issue .cs-big{font-size:42px;overflow-wrap:anywhere}
+.cs-issue .cs-cap{font-size:26px;line-height:1.5}
+.cs-net-ask{height:auto;min-height:88px;border-radius:26px;cursor:default;opacity:1}
+.cs-net-ask .cs-net-copy{white-space:normal;overflow:visible}
+.cs-net-ask small{display:block;font-size:20px;line-height:1.4;font-weight:500}
 .cs-ring{position:relative;width:480px;height:480px;flex:none}
 .cs-ring svg{transform:rotate(-90deg)}
 .cs-ring b{position:absolute;inset:0;display:grid;place-items:center;align-content:center;font:700 180px/1 var(--sans);font-variant-numeric:tabular-nums;color:var(--deep)}
@@ -466,7 +476,10 @@
         duplex: q.get('duplex') === 'off' ? 'off' : 'on',
         device: q.get('device') === 'stale' ? 'stale' : 'ok',
         mat: MATS[q.get('mat')] ? q.get('mat') : 'doc', way: 'screen', src: '', ink: '', flow: 'scan', rec: null, stopArm: false,
-        copies: 2, orig: 'glass', cink: 'bw', dup: 'double', pstage: q.get('stage') === '2' ? 2 : 3, mini: true, tel: false
+        copies: 2, orig: 'glass', cink: 'bw', dup: 'double', pstage: q.get('stage') === '2' ? 2 : 3, mini: true, tel: false,
+        unknownTone: q.get('unknown') === 'unreachable' ? 'unreachable' : 'unconfirmed', unknownStop: '',
+        gone: ['nofile', 'link'].includes(q.get('gone')) ? q.get('gone') : 'unavailable',
+        offlineStage: ['start', 'make'].includes(q.get('offline')) ? q.get('offline') : 'run', netChecking: false
       };
     }
     if (!window.__csClear && typeof window.doClear === 'function') {
@@ -847,6 +860,60 @@
   };
   const errOf = (k) => () => errScreen(E[k]);
 
+  /* 11/04 待审补稿。事实只读 wt-k1b-grok 的 c26661cd0，不读并行实现方的工作区。
+     未确认屏：UnknownView 15–17、StopButton 27/46、useScanDeviceFlow 26/126–160。
+     文件：scanDeviceState 110–117、DonePage 36–60、FailedView 67–71；预览失败不等于删除。
+     断网：useScanDeviceStart 104–111，useScanDeviceFlow 119–143；独立断网页与手动重查是待审方案。 */
+  const issueAi = () => S().ai === 'down' ? '<p class="cs-ai">小青也要联网，恢复后再问</p>' : '';
+  function issueShell(o) {
+    return B(o.band) + `<main class="body cs-body cs-issue ${o.cls || ''}">${o.offline ? '' : issueAi()}${o.body}</main>` + o.dock + nav(null);
+  }
+  function issuePaper(title, detail) {
+    // 现成纸页插画，不充当本次文件预览；stretch 与 K1b-2 的 ScanSheetArt 一致。
+    return `<div class="cs-hero none"><div class="cs-hrow"><div class="cs-reader" aria-hidden="true">${pageSvg(520, 736, 0).replace('<svg ', '<svg preserveAspectRatio="none" ')}
+      </div><div class="cs-side"><b class="cs-big">${title}</b><p class="cs-cap">${detail}</p></div></div></div>`;
+  }
+  function scanUnknown() {
+    const c = st(), detail = c.unknownTone === 'unreachable' ? '本机程序连不上。这一步还没有结果。' : '这一步的结果还没确认。';
+    const stop = `<button class="btn cs-stop${c.stopArm ? ' armed' : ''}" data-cs="unknown-stop"${c.unknownStop ? ' disabled' : ''}>${icon('x', 30, 2.6)}${c.unknownStop === 'busy' ? '正在停止' : c.stopArm ? '再点一次确认停止' : '停止扫描'}</button>`;
+    return issueShell({
+      band: { eyebrow: '屏上扫描', title: '状态未知', sub: detail, status: { text: '状态未知', warn: 1 }, rail: { labels: SCAN_RAIL, now: 3 } },
+      cls: 'cs-unknown', body: issuePaper('状态未知', detail) + armNote(),
+      dock: dock({ back: false, ask: '问小青：这一步还没有结果', mid: stop })
+    });
+  }
+  function scanFileGone() {
+    const c = st();
+    const detail = c.gone === 'nofile'
+      ? '系统确认这次扫描已经完成，可是同一份结果里没有带可用的文件信息。这份文件现在打不开，本机没法确认它还在不在。'
+      : c.gone === 'link'
+        ? '打不开的是这条链接，不是这次扫描；这份文件现在还能不能用，本机没法确认。'
+        : '这份文件现在打不开，本机没法确认它还在不在。';
+    return issueShell({
+      band: { eyebrow: '扫描结果', title: '这份文件在本页已经拿不到了', sub: '这份文件现在打不开，本机没法确认它还在不在。', status: { text: '暂时读不到', warn: 1 }, rail: { labels: SCAN_RAIL, now: 3 } },
+      cls: 'cs-file-gone',
+      body: `${issuePaper('这份文件在本页已经拿不到了', detail)}
+        ${remind('原件还在玻璃台或进纸器里，请取走', 'hand')}`,
+      dock: D({ back: { go: 'home', label: '回首页' }, ask: '问小青：扫描失败怎么办', pri: pri('再扫一份', 'data-cs="again"') })
+    });
+  }
+  const OFFLINE = {
+    start: { title: '开始扫描', now: 2, detail: '状态未知。这一次没能确认有没有建成扫描，请先返回，过一会儿再试。不要再点开始。' },
+    run: { title: '扫描', now: 3, detail: '这一步的结果还没确认。' },
+    make: { title: '生成文件并传回', now: 3, detail: '文件有没有传回来，这一步还没确认。' }
+  };
+  function scanOffline() {
+    const c = st(), phase = OFFLINE[c.offlineStage];
+    const ask = `<button class="askq cs-net-ask" disabled><span class="mic">${icon('mic', 30, 2.2)}</span><span class="cs-net-copy">问小青：这一步还没有结果<small>小青也要联网，恢复后再问</small></span></button>`;
+    return issueShell({
+      offline: true,
+      band: { eyebrow: '屏上扫描', title: '和服务器连不上', sub: '网络断开时，这台机器暂时办不了需要联网的事，请稍后再来。', status: { text: c.netChecking ? '正在确认' : '连不上服务器', warn: 1 }, rail: { labels: SCAN_RAIL, now: phase.now } },
+      cls: 'cs-offline',
+      body: `${issuePaper(phase.title, phase.detail)}${howto('网络和这次扫描的状态会重新检查，不会重新开始扫描。', 'refresh')}${remind('扫完请取回原件。', 'hand')}`,
+      dock: dock({ back: false, ask: false, left: `<button class="btn sec" data-go="home">${icon('chevL', 30, 2.4)}回首页</button>`, mid: ask + pri('再试一次', 'data-cs="net-retry"', { dis: c.netChecking }) })
+    });
+  }
+
   /* 12 已停止 */
   function scanStopped() {
     const c = st(), copy = c.flow === 'copy';
@@ -1144,6 +1211,12 @@
       case 'restart': return go('cs-scan-what');
       case 'restart-copy': return go('cs-copy-set');
       case 'again': c.rec = null; return go('cs-scan-what');
+      case 'unknown-stop': {
+        if (c.unknownStop) return;
+        if (!c.stopArm) { c.stopArm = true; return refresh(); }
+        c.stopArm = false; c.unknownStop = 'busy'; return refresh();
+      }
+      case 'net-retry': c.netChecking = true; return refresh();
       case 'stop': {
         if (!c.stopArm) { c.stopArm = true; return refresh(); }
         c.rec = null; return go('cs-scan-stopped');
@@ -1166,6 +1239,19 @@
     const c = st();
     if (ERRS[ev]) return go(ERRS[ev]);
     switch (ev) {
+      case 'unknown': case 'unreachable':
+        c.unknownTone = ev === 'unreachable' ? 'unreachable' : 'unconfirmed'; c.unknownStop = ''; return go('cs-scan-unknown');
+      case 'stop-unconfirmed': c.unknownStop = 'locked'; c.stopArm = false; return refresh();
+      case 'cloud-run': c.unknownStop = ''; return go('cs-scan-run');
+      case 'cloud-make': c.unknownStop = ''; return go('cs-scan-make');
+      case 'cloud-done': c.unknownStop = ''; return go('cs-scan-done');
+      case 'file-unavailable': case 'file-nofile': case 'file-link':
+        c.gone = ev === 'file-nofile' ? 'nofile' : ev === 'file-link' ? 'link' : 'unavailable'; return go('cs-scan-file-gone');
+      case 'file-guest': S().logged = false; return refresh();
+      case 'file-member': S().logged = true; return refresh();
+      case 'offline-start': case 'offline-run': case 'offline-make':
+        c.offlineStage = ev.slice(8); c.netChecking = false; return go('cs-scan-offline');
+      case 'net-still-offline': c.netChecking = false; return refresh();
       case 'stale': c.scanner = 'stale'; return refresh();
       case 'ok': c.scanner = 'ok'; c.scandev = 'on'; c.copydev = 'on'; c.device = 'ok'; c.pages = 'known'; return refresh();
       case 'scandev-off': c.scandev = 'off'; return refresh();
@@ -1194,11 +1280,14 @@
   const demos = {
     'cs-scan-what': [{ label: '演示：扫描仪状态过期', ev: 'stale' }, { label: '演示：没开通屏上扫描', ev: 'scandev-off' }, { label: '演示：恢复正常', ev: 'ok' }],
     'cs-scan-how': [{ label: '演示：扫描仪状态过期', ev: 'stale' }, { label: '演示：没开通屏上扫描', ev: 'scandev-off' }, { label: '演示：恢复正常', ev: 'ok' }],
-    'cs-scan-set': [{ label: '演示：扫描仪状态过期', ev: 'stale' }, { label: '演示：没开通屏上扫描', ev: 'scandev-off' }, { label: '演示：恢复正常', ev: 'ok' }],
-    'cs-scan-run': [{ label: '演示：扫描仪不回报页数', ev: 'nopages' }, { label: '演示：页数恢复', ev: 'pages' }, { label: '演示：这一页扫好了（玻璃台）', ev: 'pagedone' }, { label: '演示：整叠扫完了（进纸器）', ev: 'alldone' }].concat(demoErrs),
+    'cs-scan-set': [{ label: '演示：扫描仪状态过期', ev: 'stale' }, { label: '演示：没开通屏上扫描', ev: 'scandev-off' }, { label: '演示：恢复正常', ev: 'ok' }, { label: '演示：开始前断网', ev: 'offline-start' }],
+    'cs-scan-run': [{ label: '演示：扫描仪不回报页数', ev: 'nopages' }, { label: '演示：页数恢复', ev: 'pages' }, { label: '演示：这一页扫好了（玻璃台）', ev: 'pagedone' }, { label: '演示：整叠扫完了（进纸器）', ev: 'alldone' }, { label: '演示：这一步结果未确认', ev: 'unknown' }, { label: '演示：扫描中断网', ev: 'offline-run' }].concat(demoErrs),
     'cs-scan-more': [{ label: '演示：等太久没操作', ev: 'timeout' }],
-    'cs-scan-make': [{ label: '演示：文件传回来了', ev: 'made' }],
-    'cs-scan-done': [{ label: '演示：小程序还没发布（收起「手机上也能看到」）', ev: 'mini-off' }, { label: '演示：小程序已发布', ev: 'mini-on' }],
+    'cs-scan-make': [{ label: '演示：文件传回来了', ev: 'made' }, { label: '演示：生成文件时断网', ev: 'offline-make' }, { label: '演示：完成但文件不可用', ev: 'file-nofile' }],
+    'cs-scan-done': [{ label: '演示：小程序还没发布（收起「手机上也能看到」）', ev: 'mini-off' }, { label: '演示：小程序已发布', ev: 'mini-on' }, { label: '演示：本页拿不到文件', ev: 'file-unavailable' }, { label: '演示：文件链接没打开', ev: 'file-link' }],
+    'cs-scan-unknown': [{ label: '演示：这一步结果未确认', ev: 'unknown' }, { label: '演示：本机程序连不上', ev: 'unreachable' }, { label: '演示：停止结果未确认（停止不可再点）', ev: 'stop-unconfirmed' }, { label: '演示：云端确认正在扫描', ev: 'cloud-run' }, { label: '演示：云端确认正在生成', ev: 'cloud-make' }, { label: '演示：云端确认完成且文件可用', ev: 'cloud-done' }, { label: '演示：云端完成但文件不可用', ev: 'file-nofile' }],
+    'cs-scan-file-gone': [{ label: '演示：本页拿不到文件', ev: 'file-unavailable' }, { label: '演示：完成但结果里没有文件', ev: 'file-nofile' }, { label: '演示：签名链接没打开', ev: 'file-link' }, { label: '演示：游客', ev: 'file-guest' }, { label: '演示：已登录（仍不声称已保存）', ev: 'file-member' }],
+    'cs-scan-offline': [{ label: '演示：开始前断网', ev: 'offline-start' }, { label: '演示：扫描中断网', ev: 'offline-run' }, { label: '演示：生成文件时断网', ev: 'offline-make' }, { label: '演示：查询后仍连不上', ev: 'net-still-offline' }, { label: '演示：恢复后会话结果仍未知', ev: 'unknown' }, { label: '演示：恢复后确认正在扫描', ev: 'cloud-run' }, { label: '演示：恢复后确认正在生成', ev: 'cloud-make' }, { label: '演示：恢复后确认完成且文件可用', ev: 'cloud-done' }],
     'cs-copy-how': [{ label: '演示：没开通屏上复印', ev: 'copydev-off' }, { label: '演示：扫描仪状态过期', ev: 'stale' }, { label: '演示：恢复正常', ev: 'ok' }],
     'cs-copy-set': [{ label: '演示：彩色没开通', ev: 'coloroff' }, { label: '演示：双面没开通', ev: 'duplexoff' }, { label: '演示：都恢复', ev: 'allon' }],
     'cs-copy-scan': [{ label: '演示：原件扫完了', ev: 'copy-scanned' }, { label: '演示：扫描仪不回报页数', ev: 'nopages' }, { label: '演示：页数恢复', ev: 'pages' }].concat(demoErrs),
@@ -1206,7 +1295,7 @@
     'cs-device': [{ label: '演示：扫描仪状态过期', ev: 'stale' }, { label: '演示：恢复正常', ev: 'ok' }]
   };
   /* 打开某一屏时，记下它属于扫描还是复印，出错屏照这个换写法 */
-  const FLOW = (id) => (/^cs-copy-/.test(id) ? 'copy' : (/^cs-scan-(what|how|set|run|more|make|done|off)$/.test(id) ? 'scan' : ''));
+  const FLOW = (id) => (/^cs-copy-/.test(id) ? 'copy' : (/^cs-scan-(what|how|set|run|more|make|done|off|unknown|file-gone|offline)$/.test(id) ? 'scan' : ''));
   function mount(el) {
     const c = st(), id = el.dataset.id;
     if (FLOW(id)) c.flow = FLOW(id);
@@ -1290,6 +1379,21 @@
     motion: '无。',
     keep: '原话：超过 3 分钟没有收到扫描结果，这次不会自动重扫。选项：重新开始 / 改用面板扫描。不自己重扫，也不判成功。' + NK
   });
+  reg('cs-scan-unknown', G_SCAN, '状态未知（11/04 待审）', scanUnknown, {
+    does: '照 c26661cd0:ScanDeviceUnknownView.tsx 15–17/20–40 补现有运行页：两种说法，停止扫描，没有返回或重新开始按钮。?unknown=unreachable 切本机程序连不上；默认结果还没确认。路径停在扫描，不点亮拿走文件。',
+    motion: '纸页静止、铺满正文，照 K1b-2 scan-device-flow.css 166–198 的 stretch。没有四段进度、光带、百分比或成功计时器。运行页每 3 秒继续查云端（useScanDeviceFlow.ts 26/126–160），连续两次查不到进入未知；稿只由说明栏回报切屏，不发真实请求。',
+    keep: '版式沿用本稿 cs-scan-run 的大纸与底栏；问句逐字取 ScanWorkbenchChrome.tsx 66。停止先改成「再点一次确认停止」，6 秒不按收回；第二次只到「正在停止」，不跳旧稿的已删除屏。说明栏可演示停止未确认：锁住停止，仍留未知，等待云端回报（useScanDeviceFlow.ts 244–278）。主导航与问小青是离开扫描的出口，运行页尽力撤销并清本机登记，不承诺后台已停止。可点 5（停止 1、问小青 1、导航 3）；正在停止或锁住时 4。新句：无。' + NK
+  });
+  reg('cs-scan-file-gone', G_SCAN, '文件失效：本页拿不到（11/04 待审）', scanFileGone, {
+    does: '扫描结果已返回，但本页拿不到可用文件的待审补稿。?gone=nofile 照完成但无文件原句；?gone=link 照旧定稿预览失败句；默认只说本页拿不到，不判断已清理或仍存在。游客与 ?login=1 共用此屏，也能用说明栏切换。',
+    motion: '纸页为本稿 pageSvg 的静态插画，aria-hidden，不是这次扫描的预览；不放文件名、页数、保存成功或已删除标记。大纸填满余量，底部两张说明卡是静态文字，可点只放底栏。',
+    keep: '事实：c26661cd0:scanDeviceState.ts 110–117 完成但无可用文件走失败；ScanResultPage.tsx 64–75 进 ScanResultFailedView；ScanDeviceDonePage.tsx 36–60 仅在文件 id 匹配本人文档时才说已存。失效链接现有程序只退化预览，不自动改判文件被删。借字：触屏定稿 fix-scan.js 472–496；v2/18-scan-workbench.html 1871；本稿 scanDone 的再扫一份与取原件句。按任务只给再扫一份（cs-scan-what，普通新会话）和回首页，不给打印/识别/我的文档。路径仍停扫描。可点 6（底栏 3、导航 3）。新句待审：「这份文件在本页已经拿不到了」——统一无文件信息、链接打不开、清理原因不明时的本页事实，不替系统判删除。' + NK
+  });
+  reg('cs-scan-offline', G_SCAN, '断网：三阶段共用（11/04 待审）', scanOffline, {
+    does: '同一屏三种阶段，?offline=start|run|make；默认 run。开始前停在放纸设置，其余停在扫描。代码事实：c26661cd0:useScanDeviceStart.ts 104–111 在建会话断网时留设置页并锁 60 秒，不能说还没开扫；ACK 结果不明确时留流程；useScanDeviceFlow.ts 119–143 连续两次查不到转未知，扫描/生成共用，云端不通也可能用本机连不上句。独立断网页是本次待审方案，并非已实现。',
+    motion: '纸页静止。再试一次只演示重新检测网络与读取原会话，状态变正在确认、按钮停用，等待说明栏回报，不自动跳成功，不发新建/开始/重扫命令。没有会话凭据时只能检测网络，仍不能确认建没建成，不按已停止或已删除收口。',
+    keep: '版式照本稿大纸出错屏；联网标题照触屏定稿 fix-public.js 853，网络句与小青不可用照 screens3.js 172–190；开始前整句照 useScanDeviceStart.ts 21，扫描中照 UnknownView.tsx 17。再试一次与回首页两项，问小青保留但不可点，导航沿用；可点 5（重查 1、回首页 1、导航 3），查询中 4。新句待审：「文件有没有传回来，这一步还没确认。」——生成阶段查不到回执，不能断言文件没传；「网络和这次扫描的状态会重新检查，不会重新开始扫描。」——说清按钮只重查，是本次补稿的行为约束，现有未知页没有这个手动按钮。恢复后必须按真实回执去未知/扫描/生成/可用文件完成，稿通过说明栏分别演示。' + NK
+  });
   reg('cs-scan-stopped', G_SCAN, '已停止', scanStopped, {
     does: '用户确认停止之后：已收到的页从这台机器删除，并锁一段时间不能开始新的扫描。',
     motion: '倒计时数字这里静态画；运行时每秒减一。',
@@ -1362,7 +1466,7 @@
   [G_SCAN, G_COPY, G_DEV].forEach((g) => { if (window.SCREEN_GROUPS.indexOf(g) < 0) window.SCREEN_GROUPS.push(g); });
   window.FLOWS.push(
     { n: '屏上扫描（新）', ids: ['print', 'cs-scan-what', 'cs-scan-how', 'cs-scan-set', 'cs-scan-run', 'cs-scan-more', 'cs-scan-make', 'cs-scan-done', 'pii'] },
-    { n: '屏上扫描出错（新）', ids: ['cs-scan-run', 'cs-scan-err-nopaper', 'cs-scan-err-jam', 'cs-scan-err-busy', 'cs-scan-err-noresp', 'cs-scan-timeout', 'cs-scan-stopped', 'cs-scan-off'] },
+    { n: '屏上扫描出错（新）', ids: ['cs-scan-run', 'cs-scan-err-nopaper', 'cs-scan-err-jam', 'cs-scan-err-busy', 'cs-scan-err-noresp', 'cs-scan-timeout', 'cs-scan-unknown', 'cs-scan-file-gone', 'cs-scan-offline', 'cs-scan-stopped', 'cs-scan-off'] },
     { n: '屏上复印（新）', ids: ['print', 'cs-copy-how', 'cs-copy-set', 'cs-copy-scan', 'cs-copy-check', 'cs-copy-print', 'cs-copy-done', 'cs-copy-unconfirmed', 'cs-copy-off'] },
     { n: '面板复印图文指引（新）', ids: ['print', 'cs-copy-how', 'cs-copy-guide', 'cs-copy-guide-more', 'print-src'] },
     { n: '设备状态（新）', ids: ['offline', 'cs-device'] }
