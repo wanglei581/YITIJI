@@ -132,8 +132,8 @@ export function CashierQxView(props: CashierQxViewProps) {
             <OrderInfo rows={orderRows.core} />
             {stateCardFirst ? stateCard : null}
             {state === 'expired' ? null : instrument ? <Instrument {...props} ctx={ctx} /> : <AmountCard {...props} free={free} />}
-            {/* 出码、读付款码时（稿 cashier）：收款码卡后面紧跟次出口，「退出支付」落在码下面、底栏之上；状态说明、金额、侧注再往下排。 */}
-            {stateCardFirst ? null : <>{props.acts}{stateCard}</>}
+            {/* 出码说明已并进码卡，次出口紧跟其后；读付款码仍保留独立状态卡。 */}
+            {stateCardFirst ? null : <>{props.acts}{state === 'pending-qr' ? null : stateCard}</>}
             {state === 'pending-qr' ? (
               <details className="cashier-qx-more"><summary>金额与价目明细 ›</summary><AmountCard {...props} free={free} /></details>
             ) : state !== 'expired' && instrument ? <AmountCard {...props} free={free} /> : null}
@@ -374,12 +374,14 @@ function OrderMoreInfo({ rows, children }: { rows: Row[]; children?: ReactNode }
 function Instrument(props: CashierQxViewProps & { ctx: CopyContext }) {
   const { state } = props
   const waiting = state === 'awaiting-code-confirmation' || state === 'pending-verification'
+  const qrCopy = state === 'pending-qr' ? copyFor(state, props.ctx) : null
   return (
     <>
       {waiting ? <ProgressSteps state={state} /> : null}
       <div className={`cashier-qx-instrument${state === 'pending-scan' ? ' cashier-qx-hid' : ''}`} data-live={state === 'pending-qr' || state === 'pending-scan' ? 'true' : undefined}>
         <CashierPaymentPanel
           titleShownByPage
+          qrNotice={qrCopy ? <div className="cashier-qr-notice"><b>{qrCopy.title}</b>{qrCopy.paras.map((para, index) => <p key={index}>{para}</p>)}</div> : undefined}
           terminalTitle={TERMINAL_CARD[state]?.[0]}
           terminalDescription={TERMINAL_CARD[state]?.[1]}
           terminalActionShownByPage={state === 'expired' || state === 'attempt-failed'}

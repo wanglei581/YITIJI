@@ -215,7 +215,10 @@ export function PrintConfirmView(props: Props) {
             <section className="pct-sum" aria-label="打印摘要">
               <div className="pct-row"><span>文件</span><b>{file.name}</b></div>
               <div className="pct-row"><span>页数</span><b>{pagesCopies(quote, file, copiesLabel)}</b></div>
-              <div className="pct-row"><span>设置</span><b>{settingsText}</b></div>
+              <div className="pct-row">
+                <span>设置</span>
+                <b>{settingsText}{summaryRows.filter((row) => row.off && row.note).map((row) => <small className="pct-setting-note" key={row.label}>{row.note}</small>)}</b>
+              </div>
               <div className="pct-row"><span>用纸</span><b>{sheetsText}</b></div>
               <Review file={file} summaryRows={summaryRows} redactionText={redactionText} materialDemo={materialDemo} />
             </section>
@@ -263,7 +266,7 @@ export function PrintConfirmView(props: Props) {
               {ready ? (
                 <>
                   <div>
-                    <b>应付 <span data-testid="print-confirm-amount">{`¥${amountText}`}</span> 元</b>
+                    <b>应付 <span data-testid="print-confirm-amount">{amountText}</span> 元</b>
                     <small>金额以订单为准</small>
                     <small><span data-cost-calc="true">{costCalcLabel}</span></small>
                   </div>

@@ -232,8 +232,8 @@
 [data-qx-page='print-confirm'] .pcf-rev-file { padding: 0; border: 0; gap: 8px; }
 [data-qx-page='print-confirm'] .pcf-rf-ic,
 [data-qx-page='print-confirm'] .pcf-rev-file .print-file-meta { display: none; }
-[data-qx-page='print-confirm'] .pcf-rf-m { display: flex; flex-direction: row; gap: 8px; align-items: center; min-width: 0; }
-[data-qx-page='print-confirm'] .pcf-rf-m > .print-file-name { max-width: 38%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[data-qx-page='print-confirm'] .pcf-rf-m { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; }
+[data-qx-page='print-confirm'] .pcf-rf-m > .print-file-name { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 [data-qx-page='print-confirm'] .pcf-rf-check { font-weight: 500; font-size: 20px; }
 [data-qx-page='print-confirm'] .pcf-parameters,
 [data-qx-page='print-confirm'] .pcf-coupon-wrap,
@@ -259,9 +259,9 @@
 [data-qx-page='print-confirm'] .pcf-parameters { margin-top: 4px; }
 [data-qx-page='print-confirm'] .pcf-notes .pcf-plan { padding-bottom: 14px; }
 
-[data-qx-page='print-confirm'] .pcf-rf-check { display: block; min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[data-qx-page='print-confirm'] .pcf-rf-check { display: block; min-width: 0; flex: 1 0 100%; white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
 [data-qx-page='print-confirm'] .pcf-rf-check svg { display: inline; vertical-align: middle; }
-[data-qx-page='print-confirm'] .pcf-privacy-detail { margin: 8px 0; font-size: 20px; line-height: 1.45; }
+[data-qx-page='print-confirm'] .pct-setting-note { display: block; margin-top: 4px; font-size: 20px; line-height: 1.4; font-weight: 500; color: var(--qxt-teal-ink); }
 
 /* 完整参数收在摘要卡末行，主核对区保留稿的高比例。展开时自然增高，可滚动查看。 */
 [data-qx-page='print-confirm'] .pct-sum > .pcf-rev { padding: 12px 16px; border-top: 1px solid var(--qxt-line); border-radius: 0; }

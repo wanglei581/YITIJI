@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
   AlertCircleIcon,
   ChevronRightIcon,
@@ -52,6 +52,7 @@ export function Review({
   redactionText: string | null
   materialDemo: boolean
 }) {
+  const [parametersOpen, setParametersOpen] = useState(false)
   return (
     <div className="pcf-rev" data-testid="print-confirm-review">
       <div className="pcf-rev-file">
@@ -68,9 +69,8 @@ export function Review({
           ) : null}
         </span>
       </div>
-      <details className="pcf-parameters">
+      <details className="pcf-parameters" onToggle={(event) => setParametersOpen(event.currentTarget.open)}>
         <summary>查看全部参数 ›</summary>
-        {redactionText ? <p className="pcf-privacy-detail">隐私检查摘要{materialDemo ? '（流程演示）' : ''}：{redactionText}</p> : null}
         <div className="pcf-rev-grid">
           {summaryRows.map((row) => (
             <div
@@ -81,7 +81,7 @@ export function Review({
             >
               <span>{row.label}</span>
               <b className="v">{row.off ? <LockIcon size={22} aria-hidden="true" /> : null}{row.value}</b>
-              {row.note ? <em>{row.note}</em> : null}
+              {parametersOpen && row.note ? <em>{row.note}</em> : null}
             </div>
           ))}
         </div>
@@ -306,4 +306,3 @@ export function Plan({ items }: { items: string[] }) {
     </ul>
   )
 }
-

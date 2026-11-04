@@ -290,8 +290,8 @@
 
 [data-qx-page='print-cashier'] .cashier-qx-instrument .cashier-qr-frame > svg {
   display: block;
-  width: 400px;
-  height: 400px;
+  width: 380px;
+  height: 380px;
 }
 
 [data-qx-page='print-cashier'] .cashier-qr-title {
@@ -581,9 +581,11 @@
 }
 
 
-/* 收款码实际边长 400：覆盖老版框宽与 78% 缩放。 */
-[data-qx-page='print-cashier'] .cashier-qx-instrument .cashier-qr-frame { width: 426px; max-width: 100%; aspect-ratio: 1; }
-[data-qx-page='print-cashier'] .cashier-qx-instrument .cashier-qr-frame > svg { width: 400px; height: auto; max-width: 100%; }
+/* 收款码实际边长 380：覆盖老版框宽与 78% 缩放。 */
+[data-qx-page='print-cashier'] .cashier-qx-instrument .cashier-qr-frame { width: 406px; max-width: 100%; aspect-ratio: 1; }
+[data-qx-page='print-cashier'] .cashier-qx-instrument .cashier-qr-frame > svg { width: 380px; height: auto; max-width: 100%; }
+[data-qx-page='print-cashier'] .cashier-qr-notice { font-size: 20px; line-height: 1.4; }
+[data-qx-page='print-cashier'] .cashier-qr-notice p { margin: 0; font-size: 20px; }
 [data-qx-page='print-cashier'] .cashier-qx-page[data-qx-state='pending-qr'] .cashier-qx-paywrap { gap: 8px; }
 [data-qx-page='print-cashier'] .cashier-qx-page[data-qx-state='pending-qr'] .cashier-qx-instrument { padding: 10px; }
 [data-qx-page='print-cashier'] .cashier-qx-page[data-qx-state='pending-qr'] .cashier-qr-sub { font-size: 22px; }
