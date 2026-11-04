@@ -70,7 +70,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2011 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2012 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -427,7 +427,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 601 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 602 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -542,7 +542,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/campus/components/CampusTabs.tsx` | `verify-fusion-w4.mjs`<br/>`verify-jobfair-commercial-closure.mjs` |
 | `apps/kiosk/src/pages/companies/CompaniesPage.tsx` | `verify-fusion-w4.mjs` |
 | `apps/kiosk/src/pages/companies/CompanyDetailPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-kiosk-frontend-debt.mjs` |
-| `apps/kiosk/src/pages/contract-review/ContractReviewHomePage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-contract-review-session.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
+| `apps/kiosk/src/pages/contract-review/ContractReviewHomePage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-contract-review-session.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
 | `apps/kiosk/src/pages/contract-review/ContractReviewProcessingPage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-contract-review-session.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs` |
 | `apps/kiosk/src/pages/contract-review/ContractReviewResultPage.tsx` | `verify-contract-review-report-print.mjs`<br/>`verify-contract-review-session.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs` |
 | `apps/kiosk/src/pages/contract-review/ContractReviewSessionNotice.tsx` | `verify-contract-review-session.mjs` |
@@ -571,7 +571,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/interview/InterviewReportsPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewSessionPage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-mic-capability-truth.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewSetupExtras.tsx` | `verify-lightflow-k2c-interview.mjs` |
-| `apps/kiosk/src/pages/interview/InterviewSetupPage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/kiosk/src/pages/interview/InterviewSetupPage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewShell.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewTipsPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewWorkbenchPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
@@ -680,7 +680,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/print/file-source/FileSourceError.tsx` | `verify-file-display-truth.mjs` |
 | `apps/kiosk/src/pages/print/file-source/FileSourcePhone.tsx` | `verify-file-display-truth.mjs` |
 | `apps/kiosk/src/pages/print/file-source/FileSourceUsb.tsx` | `verify-file-display-truth.mjs` |
-| `apps/kiosk/src/pages/print/file-source/FileSourceView.tsx` | `verify-device-status-honest.mjs`<br/>`verify-file-display-truth.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-print-entry-source-split.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
+| `apps/kiosk/src/pages/print/file-source/FileSourceView.tsx` | `verify-device-status-honest.mjs`<br/>`verify-file-display-truth.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-print-entry-source-split.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
 | `apps/kiosk/src/pages/print/file-source/fileSourceModel.ts` | `verify-file-display-truth.mjs`<br/>`verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/print/pickupClaimModel.ts` | `verify-pickup-claim-error-coverage.mjs`<br/>`verify-miniapp-cloud-print-m2.ts` |
 | `apps/kiosk/src/pages/print/pickupClaimResume.ts` | `verify-kiosk-ai-declaration.mjs` |
@@ -814,7 +814,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-resume-decisions.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-phone-upload-ui.mjs` |
 | `apps/kiosk/src/pages/resume/ResumeParsePage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/ResumeReportPage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-report-qx.mjs` |
-| `apps/kiosk/src/pages/resume/ResumeSourcePage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-public-screen-mask.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-word-conversion-ui.mjs` |
+| `apps/kiosk/src/pages/resume/ResumeSourcePage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-public-screen-mask.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-word-conversion-ui.mjs` |
 | `apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-self-assessment-consent-source.mjs`<br/>`verify-w3a-ai-records.mjs`<br/>`verify-compliance.ts` |
 | `apps/kiosk/src/pages/resume/aiResumeSession.ts` | `verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs` |
@@ -951,7 +951,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/upload/KioskCodeEntryPage.tsx` | `verify-fusion-shell.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-lightflow-k1-public-entry.mjs` |
 | `apps/kiosk/src/pages/upload/PhoneUploadPage.tsx` | `verify-fusion-shell.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-kiosk-field-safety.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-word-conversion-ui.mjs` |
 | `apps/kiosk/src/pages/upload/components/UploadSessionQrPanel.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-public-screen-mask.mjs`<br/>`verify-resume-phone-upload-ui.mjs` |
-| `apps/kiosk/src/pages/upload/hooks/useUploadSession.ts` | `verify-fusion-w2-print-scan.mjs` |
+| `apps/kiosk/src/pages/upload/hooks/useUploadSession.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w5.mjs` |
 | `apps/kiosk/src/pages/upload/kiosk-code-entry.css` | `verify-lightflow-k1-public-entry.mjs` |
 | `apps/kiosk/src/pages/upload/phone-upload-service-desk.css` | `verify-fusion-w5.mjs`<br/>`verify-lightflow-k1-public-entry.mjs` |
 | `apps/kiosk/src/pages/upload/phoneUploadModel.ts` | `verify-resume-phone-upload-ui.mjs` |
@@ -1018,6 +1018,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/services/print/printJobsApi.ts` | `verify-print-confirm-honest.mjs`<br/>`verify-prod-build-config.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-print-scan-first-release.ts` |
 | `apps/kiosk/src/services/resumeParseIntent.ts` | `verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/services/terminalAuth.ts` | `verify-ai-requests-terminal-session.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-end-use.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-terminal-session-self-heal.mjs` |
+| `apps/kiosk/src/services/terminalSessionRecovery.ts` | `verify-ai-requests-terminal-session.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-terminal-session-self-heal.mjs` |
 | `apps/kiosk/src/styles/ai-primitives.css` | `verify-kiosk-ai-primitives.mjs` |
 | `apps/kiosk/src/styles/fonts/source-han.css` | `verify-kiosk-font-subset.mjs` |
 | `apps/kiosk/src/styles/kiosk-stage-fit.css` | `verify-kiosk-visual-unity.mjs` |

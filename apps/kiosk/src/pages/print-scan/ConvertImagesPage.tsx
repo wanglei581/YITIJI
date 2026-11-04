@@ -67,7 +67,6 @@ export function ConvertImagesPage() {
   const [rechecking, setRechecking] = useState(false)
   const [error, setError] = useState<ConvertError | null>(null)
   const [showQr, setShowQr] = useState(false)
-  const [qrBusy, setQrBusy] = useState(false)
   const [usbOpen, setUsbOpen] = useState(false)
   const [result, setResult] = useState<Awaited<ReturnType<typeof convertImagesToPdf>> | null>(null)
   const [resultName, setResultName] = useState<string | null>(null)
@@ -78,7 +77,7 @@ export function ConvertImagesPage() {
   const [previewFailed, setPreviewFailed] = useState(false)
   const sentRef = useRef(false)
 
-  useBusyLock(uploading || generating || qrBusy || rechecking)
+  useBusyLock(uploading || generating || rechecking)
 
   const atLimit = images.length >= MAX_IMAGES
   const kiosk = useTerminalKiosk()
@@ -351,7 +350,7 @@ export function ConvertImagesPage() {
         <ConvertQrLayer
           onClose={() => setShowQr(false)}
           onUploaded={handlePhoneUploaded}
-          onBusyChange={setQrBusy}
+          onBusyChange={() => undefined}
         />
       ) : undefined}
     >
