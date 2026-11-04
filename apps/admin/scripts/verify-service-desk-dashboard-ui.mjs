@@ -141,6 +141,28 @@ const offlineOnlyHint = printerActionHint(summarizePrinters([{ status: 'offline'
 check(offlineOnlyHint.includes('电源和网络') && !offlineOnlyHint.includes('补充') && !offlineOnlyHint.includes('现场处理'),
 'offline-only printers get a power / network hint, not a field-service or refill hint')
 
+const deviceStatus = readFileSync(new URL('../src/routes/dashboard/DashboardDeviceStatus.tsx', import.meta.url), 'utf8')
+const printerSummarySource = readFileSync(new URL('../src/routes/dashboard/printerStatusSummary.ts', import.meta.url), 'utf8')
+const supplyNote = '纸张和碳粉余量现在读不到：打印机走 USB 连接，缺纸和余量都不会上报，没报警不等于耗材充足；缺纸要等打印失败或现场巡检才知道。'
+const supplyFn = deviceStatus.slice(
+  deviceStatus.indexOf('function supplyLine'),
+  deviceStatus.indexOf('export function DashboardDeviceStatus'),
+)
+const lowSupplyCopy = printerIssueParts({ needsService: 0, offline: 0, lowSupply: 1, normal: 3 })
+check(
+  !deviceStatus.includes('没有报告纸张或墨粉不足') &&
+    deviceStatus.includes('台打印机都在线，没有报告故障。') &&
+    deviceStatus.includes(supplyNote) &&
+    deviceStatus.includes('text-xs leading-relaxed text-neutral-500') &&
+    /printers\.length > 0/.test(deviceStatus) &&
+    !supplyFn.includes(supplyNote) &&
+    !stripComments(deviceStatus).includes('耗材正常') &&
+    printerSummarySource.includes('不代表耗材充足') &&
+    lowSupplyCopy.length === 1 &&
+    lowSupplyCopy[0] === '纸张或碳粉偏少 1 台（仍可打印）',
+  'USB printers: no-alarm is not "supplies are fine"; the unread-supply note renders whenever printers exist, including when there is an issue',
+)
+
 const expectedAlertCtaClass =
   'inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-primary-600 px-4 text-[13px] font-bold text-white shadow-[0_8px_18px_rgba(16,48,43,0.18)] transition-transform hover:-translate-y-px hover:bg-primary-700 active:scale-[0.97]'
 const alertCta = dashboard.match(
