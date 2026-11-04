@@ -618,10 +618,11 @@ export function PrintDonePage() {
         <p className="pft-tray"><PrintIcon name="arrowD" size={72} strokeWidth={2.4} /><span>出纸口在下面</span></p>
 
         {/* 「这一单的记录」只在建单响应确认这一单关联了账号时才成立；没关联（false）或不知道（未知）时只说登录后看你的订单，不多承诺一层。 */}
+        {/* 账号去向与本次记录并成一行（稿上箭头下只有一行）；去向是渲染时就定的静态事实，不做 role=status 播报，免得可点的摘要里套播报区。 */}
         <details className="pft-record">
           <summary>
-            {hasEndUser === false ? <span className="pft-dest" role="status">本次打印未关联账号</span> : null}
-            {hasEndUser === true && miniappPublished ? <span className="pft-dest" role="status">这单在手机『我的 → 打印订单』里能看到</span> : null}
+            {hasEndUser === false ? <span className="pft-dest">本次打印未关联账号</span> : null}
+            {hasEndUser === true && miniappPublished ? <span className="pft-dest">这单在手机『我的 → 打印订单』里能看到</span> : null}
             <span>本次打印记录{displayOrderNo ? ` · 订单 ${displayOrderNo}` : ''}</span>
           </summary>
           {displayOrderNo ? (

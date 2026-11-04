@@ -358,7 +358,7 @@ export function PrintProgressPage() {
       label: isSim ? '打印演示' : '打印中',
       desc: isSim
         ? '演示：未出纸，无真实打印动作'
-        : progressQuiet
+        : progressQuiet && backendStatus === 'printing'
           ? ''
           : backendStatus === 'printing'
             ? '打印机正在出纸，请在出纸口等候'
@@ -589,6 +589,10 @@ export function PrintProgressPage() {
               {progressQuiet ? <>{PRINT_PROGRESS_QUIET_COPY}</> : <>{endLabel}。这一页不会自己报成功。</>}
             </p>}
             {!isSim && !progressQuiet ? <p className="pfp-out-note">纸从打印机出纸口出来。超过 45 秒没有新进度，这里会说明下一步怎么办。</p> : null}
+            {/* 出纸口隐私提醒常驻在屏上（无人值守，材料留在出纸口就是泄露），不收进折叠。 */}
+            {!isSim && (
+              <p className="pfp-out-note">请勿离开，打印完成后请及时取走文件，避免个人材料遗留在出纸口。</p>
+            )}
           </div>
         </div>
       )}
@@ -624,7 +628,7 @@ export function PrintProgressPage() {
                 : <>开始出纸后，纸从<b>打印机出纸口</b>出来。</>)}
             </div>
             {!isSim && (
-              <p className="pfp-out-note">请勿离开，打印完成后请及时取走文件，避免个人材料遗留在出纸口。页数来自文件信息，不逐页播报。</p>
+              <p className="pfp-out-note">页数来自文件信息，不逐页播报。</p>
             )}
           </div>
         </PrintProgressHelp>
