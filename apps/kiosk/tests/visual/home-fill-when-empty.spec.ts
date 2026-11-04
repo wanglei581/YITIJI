@@ -27,9 +27,10 @@ const VARIANTS: HomeVariant[] = ['default', 'channels', 'hosting', 'gov', 'full'
 /**
  * 每种配置首页第三行最终有几块磁贴。磁贴数来自终端配置与官方渠道两个异步读取，量版面之前要先等它到齐：
  * 本组走查配置了 reducedMotion，`data-qx-intro=done` 在挂载那一刻就成立，不代表数据已到。
- * gov 的百宝箱 items 为空，不算上架，所以只有 4 块，恰在压紧门槛上，少任何一个读取都会退回 16px。
+ * gov / full 把百宝箱与智慧校园配成开，2026-11-04 停放后都不占磁贴：gov 与 channels 同为 3 块，
+ * full 与 hosting 同为 4 块，恰在压紧门槛上，少任何一个读取都会退回 16px。
  */
-const EXPECTED_TILES: Record<HomeVariant, number> = { default: 2, channels: 3, hosting: 4, gov: 4, full: 5 }
+const EXPECTED_TILES: Record<HomeVariant, number> = { default: 2, channels: 3, hosting: 4, gov: 3, full: 4 }
 
 /** 一体机设计稿里的版心宽度；页面缩放时按它折算。 */
 const DESIGN_WIDTH = 1080
