@@ -2,9 +2,9 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # 数据模型图谱
 
-`118` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
+`119` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
 
-下图只画**关系度数最高的 18 个模型**：全量 118 个节点的
+下图只画**关系度数最高的 18 个模型**：全量 119 个节点的
 ER 图人是读不了的。全量关系见下方表格和 `graph.json`。
 
 ```mermaid
@@ -70,10 +70,11 @@ flowchart TD
 | **AiQuotaDaily** | 4 | — | 2 个文件<br/>`ai/quota/ai-quota.service.ts`<br/>`member-privacy/member-closure.service.ts` |
 | **AiQuotaReservation** | 12 | — | 2 个文件<br/>`ai/quota/ai-quota.service.ts`<br/>`member-privacy/member-closure.service.ts` |
 | **AiResumeResult** | 16 | EndUser | 15 个文件<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>`ai/resume-parse-submission.service.ts`<br/>… |
+| **AiSafetyTerm** | 7 | — | 1 个文件<br/>`ai/safety/ai-safety-lexicon.service.ts` |
 | **AiServiceFact** | 6 | — | 2 个文件<br/>`ai/usage/ai-service-fact.ts`<br/>`console-screen/console-screen.partner-ai.ts` |
 | **AiServiceLog** | 13 | EndUser | 5 个文件<br/>`ai/ai-log.service.ts`<br/>`ai/ai-result.cleanup.task.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **AiUsageMonthlySummary** | 10 | — | 1 个文件<br/>`ai/usage/ai-usage-retention.ts` |
-| **AiUsageRecord** | 18 | EndUser | 4 个文件<br/>`ai/usage/ai-budget.service.ts`<br/>`ai/usage/ai-usage-retention.ts`<br/>`ai/usage/ai-usage-summary.ts`<br/>… |
+| **AiUsageRecord** | 18 | EndUser | 5 个文件<br/>`admin-ops/derived-ai-alerts.ts`<br/>`ai/usage/ai-budget.service.ts`<br/>`ai/usage/ai-usage-retention.ts`<br/>… |
 | **AlertDisposition** | 12 | — | 2 个文件<br/>`admin-ops/admin-alert-actions.service.ts`<br/>`admin-ops/admin-ops.service.ts` |
 | **AuditLog** | 12 | User | 24 个文件<br/>`admin-internal-accounts/backup-admin-emergency-enable.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`admin-users/admin-user-closure-read.ts`<br/>… |
 | **BenefitActivity** | 19 | BenefitClaim、User | 2 个文件<br/>`benefit-activities/benefit-activities.service.ts`<br/>`community/community.service.ts` |
@@ -119,8 +120,8 @@ flowchart TD
 | **MemberLegalConsent** | 10 | EndUser | 3 个文件<br/>`ai/resume/resume-unlabeled-export.ts`<br/>`member-auth/member-auth.service.ts`<br/>`member-privacy/member-closure-retention.ts` |
 | **MemberNotification** | 12 | EndUser | 2 个文件<br/>`member-notifications/member-notifications.service.ts`<br/>`member-privacy/member-data-export.mapper.ts` |
 | **MockInterviewReport** | 6 | MockInterviewSession | 2 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/mock-interview.service.ts` |
-| **MockInterviewSession** | 21 | MockInterviewReport、MockInterviewTurn | 5 个文件<br/>`ai/resume/career-plan.service.ts`<br/>`member-privacy/member-closure-files.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
-| **MockInterviewTurn** | 13 | MockInterviewSession | 3 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/interview-transcript-print.service.ts`<br/>`mock-interview/mock-interview.service.ts` |
+| **MockInterviewSession** | 21 | MockInterviewReport、MockInterviewTurn | 6 个文件<br/>`ai/resume/career-plan.service.ts`<br/>`member-privacy/member-closure-files.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
+| **MockInterviewTurn** | 13 | MockInterviewSession | 4 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/interview-transcript-print.service.ts`<br/>`mock-interview/mock-interview-charge.ts`<br/>… |
 | **OfflineAgency** | 23 | OfflineJob | 2 个文件<br/>`offline-agencies/offline-agencies.service.ts`<br/>`recruitment-hosting/recruitment-emergency.service.ts` |
 | **OfflineAgencyBranch** | 31 | Job、OfflineAgencyProfile、QualificationRecord | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
 | **OfflineAgencyProfile** | 19 | OfflineAgencyBranch、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |

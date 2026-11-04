@@ -26,7 +26,7 @@ import {
 } from './kiosk-send-harness.mjs'
 
 test('完整回执才算已收到，令牌只留在内存', async () => {
-  for (const purpose of ['resume_upload', 'print_doc', 'contract_upload']) {
+  for (const purpose of ['resume_upload', 'print_doc', 'contract_upload', 'signature_image']) {
     const env = await send(null, receipt({ purpose }))
     assert.equal(env.page.data.phase, 'done', purpose)
     assert.equal(env.page.data.canRetry, false)
@@ -50,7 +50,6 @@ test('空回执、缺字段、非上传成功态都不能说已收到', async ()
     receipt({ file: { fileId: '' } }),
     receipt({ file: { fileId: '   ' } }),
     receipt({ file: { fileId: 1 } }),
-    receipt({ purpose: 'signature_image' }),
     receipt({ purpose: 'not_a_purpose' }),
     receipt({ purpose: '' }),
     receipt({ status: 'pending' }),
@@ -557,4 +556,139 @@ test('返回键：扫码直达时本页在栈底，回首页', () => {
   assert.equal(env.wx.calls.back, 1)
   assert.equal(env.wx.calls.tab, 1)
   assert.equal(env.wx.calls.tabUrl, '/pages/home/home')
+})
+
+
+// ── 签名图那一单（2026-11-02 接手 GPT 10/31 的两条，按现结构重做）────────────────
+async function openSignature(upload) {
+  const env = harness(upload)
+  env.setScene(() => Promise.resolve({ sessionId: SESSION, uploadToken: TOKEN, purpose: 'signature_image' }))
+  env.openLink(UPLOAD_LINK)
+  await flush()
+  return env
+}
+
+test('签名图那一单：兑换带回用途，聊天只开图片；JPG / PNG 传上去回执算收到', async () => {
+  for (const ext of ['jpg', 'jpeg', 'png']) {
+    const env = await openSignature(() => Promise.resolve(receipt({ purpose: 'signature_image' })))
+    assert.equal(env.page.data.purpose, 'signature_image')
+    assert.equal(env.page.data.phase, 'idle')
+    let picker
+    env.wx.chooseMessageFile = (options) => { picker = options }
+    env.page.chooseAndSend()
+    assert.equal(picker.type, 'image')
+    picker.success({ tempFiles: [{ name: `本人签名.${ext}`, path: `wxfile://tmp/s.${ext}`, size: 10 * 1024 * 1024 }] })
+    await flush()
+    assert.equal(env.uploads.length, 1)
+    assert.equal(env.page.data.phase, 'done')
+    assertTokenStaysInMemory(env.page)
+  }
+})
+
+test('签名图那一单：GIF / PDF / 没扩展名 / 超过 10MB 本机就挡，不发出去，可以重选', async () => {
+  for (const file of [
+    { name: '签名.gif', path: 'wxfile://tmp/s.gif', size: 100 },
+    { name: '签名.pdf', path: 'wxfile://tmp/s.pdf', size: 100 },
+    { name: '签名', path: 'wxfile://tmp/unknown', size: 100 },
+    { name: '签名.png', path: 'wxfile://tmp/s.png', size: 10 * 1024 * 1024 + 1 },
+  ]) {
+    const env = await openSignature(() => Promise.reject(new Error('不得上传')))
+    env.wx.setChosen(file)
+    env.page.chooseAndSend()
+    await flush()
+    assert.equal(env.uploads.length, 0, file.name)
+    assert.equal(env.page.data.phase, 'error')
+    assert.equal(env.page.data.canRetry, true)
+    assert.match(env.page.data.errorMsg, /JPG|PNG|10MB/)
+  }
+})
+
+test('签名图那一单：拍照或相册选的 PNG 照常传；认得出但不是 JPG / PNG 的照片本机挡', async () => {
+  const ok = await openSignature(() => Promise.resolve(receipt({ purpose: 'signature_image' })))
+  ok.wx.setMedia({ tempFilePath: 'wxfile://tmp_sig.png', size: 2048 })
+  ok.page.chooseFromAlbum()
+  await flush()
+  assert.equal(ok.uploads.length, 1)
+  assert.equal(ok.page.data.phase, 'done')
+
+  const heic = await openSignature(() => Promise.reject(new Error('不得上传')))
+  heic.wx.setMedia({ tempFilePath: 'wxfile://tmp_sig.heic', size: 2048 })
+  heic.page.chooseFromAlbum()
+  await flush()
+  assert.equal(heic.uploads.length, 0)
+  assert.equal(heic.page.data.errorMsg, '本人签名图片只支持 JPG / PNG，请重新选择')
+})
+
+test('签名图伪装成图片由后端拒收：照实说、可以重选，不伪造成功', async () => {
+  const env = await openSignature(() => Promise.reject(httpError(400, 'FILE_CONTENT_MISMATCH', '文件内容与图片格式不符，请重新选择本人签名图片')))
+  env.wx.setChosen({ name: '签名.png', path: 'wxfile://tmp/s.png', size: 100 })
+  env.page.chooseAndSend()
+  await flush()
+  assert.equal(env.uploads.length, 1)
+  assert.equal(env.page.data.phase, 'error')
+  assert.equal(env.page.data.canRetry, true)
+})
+
+test('签名图那一单：回执用途对不上（不是签名图）算结果不确定', async () => {
+  const env = await openSignature(() => Promise.resolve(receipt({ purpose: 'print_doc' })))
+  env.wx.setChosen({ name: '签名.png', path: 'wxfile://tmp/s.png', size: 100 })
+  env.page.chooseAndSend()
+  await flush()
+  assertUnknown(env.page)
+})
+
+test('原来三种用途：聊天仍是选文件，照常列「我的文档」', async () => {
+  for (const purpose of ['resume_upload', 'print_doc', 'contract_upload']) {
+    const env = harness(() => Promise.resolve(receipt({ purpose })), { loggedIn: true })
+    env.setScene(() => Promise.resolve({ sessionId: SESSION, uploadToken: TOKEN, purpose }))
+    env.openLink(UPLOAD_LINK)
+    await flush()
+    assert.equal(env.docCalls.length, 1, purpose)
+    let picker
+    env.wx.chooseMessageFile = (options) => { picker = options }
+    env.page.chooseAndSend()
+    assert.equal(picker.type, 'file')
+    picker.success({ tempFiles: [FILE] })
+    await flush()
+    assert.equal(env.page.data.phase, 'done', purpose)
+  }
+})
+
+// ── 页面关掉以后（GPT b94f9d4fe）────────────────────────────────────
+test('退出传文件页后，晚到的回执不再写页面、不替下一页关 loading，内存里的令牌清掉', async () => {
+  for (const rejected of [false, true]) {
+    const pending = deferred()
+    const env = harness(() => pending.promise)
+    env.openDirect()
+    await flush()
+    env.wx.setChosen(FILE)
+    env.page.chooseAndSend()
+    assert.equal(env.uploads.length, 1)
+    env.page.onUnload()
+    const snapshot = JSON.stringify(env.page.data)
+    const hides = env.wx.calls.hide
+    if (rejected) pending.reject(httpError(503, 'SERVICE_UNAVAILABLE'))
+    else pending.resolve(receipt())
+    await flush()
+    assert.equal(JSON.stringify(env.page.data), snapshot, '退出后不写页面')
+    assert.equal(env.wx.calls.hide, hides, '晚到的回执不得关掉别的页面的 loading')
+    assert.equal(env.page._uploadToken, '')
+  }
+})
+
+test('退出后，选文件、选照片的回调都不再发上传', async () => {
+  const env = harness(() => Promise.resolve(receipt()))
+  env.openDirect()
+  await flush()
+  let picker
+  env.wx.chooseMessageFile = (opts) => { picker = opts }
+  env.page.chooseAndSend()
+  let mediaPicker
+  env.wx.chooseMedia = (opts) => { mediaPicker = opts }
+  env.page.chooseFromAlbum()
+  env.page.onUnload()
+  picker.success({ tempFiles: [FILE] })
+  mediaPicker.success({ tempFiles: [{ tempFilePath: 'wxfile://tmp_late.jpg', size: 100 }] })
+  await flush()
+  assert.equal(env.uploads.length, 0)
 })

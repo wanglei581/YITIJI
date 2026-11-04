@@ -17,7 +17,8 @@ import { useInkRipple } from '../../hooks/useInkRipple'
 import { chatWithAssistant } from '../../services/api'
 import { API_BASE_URL } from '../../services/api/client'
 import { useAuth } from '../../auth/useAuth'
-import { AiTaskRegion, isAiOutage, useAiTask } from '../../ai'
+import { AiTaskRegion, aiErrorCodeOf, isAiOutage, useAiTask } from '../../ai'
+import { AI_QUOTA_EXHAUSTED_ASSISTANT_COPY } from '../../services/api/userErrorMessage'
 import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import { prepareAiDeclaration } from '../../ai/aiDeclarationGate'
 import { AssistantHoldToTalk } from './AssistantHoldToTalk'
@@ -135,6 +136,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const quickQuestions = selectedTask?.questions ?? GENERAL_QUESTIONS
   const [aiAvailability, setAiAvailability] = useState<AiAvailability>('unknown')
   const [turnFailed, setTurnFailed] = useState(false)
+  // 每人每天的小青次数用完：锁到明天，通知条不用「这会儿没接上」那种本轮故障说法。
+  const [quotaLocked, setQuotaLocked] = useState(false)
 
   useBusyLock(loading)
   useInkRipple('.kassist .assistant-task, .kassist .assistant-direct-question, .kassist .assistant-context-chip, .kassist .assistant-quick-questions button, .kassist .assistant-tool-button, .kassist .assistant-send, .kassist .action-chip, .kassist .assistant-manual-entry, .kassist .assistant-hold-talk-btn, .kassist .assistant-summary-save, .kassist .assistant-turn-action')
@@ -319,11 +322,20 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       // AI 能力级停用（暂停 / 当日额度已到 / 未配置）：重试这一轮不会变好。与「非 AI 回复」同样
       // 锁住输入、转到不经过 AI 的四个入口；恢复后用户可点「重新检查 AI 顾问」再试。
       if (isAiOutage(error)) {
+        const quota = aiErrorCodeOf(error) === 'AI_QUOTA_EXHAUSTED'
+        setQuotaLocked(quota)
         setAiAvailability('unavailable')
         setKeyboardOpen(false)
         setMessages((current) => [
           ...current,
-          { id: `err-${Date.now()}`, role: 'assistant', kind: 'error', text: advisorErrorMessage(error, 'AI 顾问现在停用，下面几项不经过 AI，照常能办。') },
+          {
+            id: `err-${Date.now()}`,
+            role: 'assistant',
+            kind: 'error',
+            text: quota
+              ? AI_QUOTA_EXHAUSTED_ASSISTANT_COPY
+              : advisorErrorMessage(error, 'AI 顾问现在停用，下面几项不经过 AI，照常能办。'),
+          },
         ])
         return
       }
@@ -466,6 +478,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
 
   // 锁死不是终局：配置修好后用户得有办法再试一次，否则本页在本次会话里永远是死的。
   const recheckAdvisor = () => {
+    setQuotaLocked(false)
     setAiAvailability('unknown')
     setTurnFailed(false)
     resetConversation()
@@ -664,7 +677,11 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
                   {body === 'locked' ? (
                     <>
                       {/* 稿 xq ai-down 通知条的原话：先说小青没接上，再说下面这些事不用问也能办。 */}
-                      <QxTouchCallout kind="howto" icon="alert">小青这会儿没有接上。下面这些事不用问也能办。</QxTouchCallout>
+                      <QxTouchCallout kind="howto" icon="alert">
+                        {quotaLocked
+                          ? AI_QUOTA_EXHAUSTED_ASSISTANT_COPY
+                          : '小青这会儿没有接上。下面这些事不用问也能办。'}
+                      </QxTouchCallout>
                       <Hit className="assistant-tools-open" icon={<QxTouchIcon name="sparkle" size={32} />} title="本机 AI 专项" sub={toolsLine} chevron onClick={() => setSheet('tools')} />
                     </>
                   ) : null}

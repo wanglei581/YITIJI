@@ -8,6 +8,17 @@ export const MEMBER_EXPORT_SECTION_ROW_LIMIT = 500
 type JsonScalar = string | number | boolean | null
 type JsonRecord = Record<string, JsonScalar>
 
+/**
+ * 编号类字段原样导出，不做手机号打码：键名为 id、以 Id 结尾（taskId、targetId、jobId、externalId、requestId），
+ * 以及订单号 orderNo。编号是系统或来源平台生成的，不是手机号；打码会把编号打坏，
+ * 用户拿导出里的编号对不上「我的文档」、订单和客服记录。
+ * 例：文件编号是 32 位十六进制，约 0.9% 碰巧含「1[3-9]」开头的 11 位数字串，打码后变成 139****5678 的样子。
+ * 其余字符串（文件名、昵称、标题、正文、备注等自由文本）照旧打码。
+ */
+function isIdentifierKey(key: string): boolean {
+  return key === 'id' || key === 'orderNo' || key.endsWith('Id')
+}
+
 export interface MemberDataExportEnvelope {
   schemaVersion: typeof MEMBER_EXPORT_SCHEMA_VERSION
   generatedAt: string
@@ -371,13 +382,17 @@ export class MemberDataExportMapper {
     return this.sanitizeJson(JSON.parse(JSON.stringify(values))) as JsonRecord[]
   }
 
-  private sanitizeJson(value: unknown): unknown {
-    if (typeof value === 'string') return value.replace(/1[3-9]\d{9}/g, (phone) => `${phone.slice(0, 3)}****${phone.slice(7)}`)
+  /** 自由文本里的手机号打码（保留前 3 位和后 4 位）；编号类字段原样保留，见 isIdentifierKey。 */
+  private sanitizeJson(value: unknown, key?: string): unknown {
+    if (typeof value === 'string') {
+      if (key !== undefined && isIdentifierKey(key)) return value
+      return value.replace(/1[3-9]\d{9}/g, (phone) => `${phone.slice(0, 3)}****${phone.slice(7)}`)
+    }
     if (Array.isArray(value)) return value.map((item) => this.sanitizeJson(item))
     if (!value || typeof value !== 'object') return value
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
-        .map(([key, child]) => [key, this.sanitizeJson(child)]),
+        .map(([childKey, child]) => [childKey, this.sanitizeJson(child, childKey)]),
     )
   }
 }
