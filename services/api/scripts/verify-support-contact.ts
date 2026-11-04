@@ -6,7 +6,7 @@
 import 'reflect-metadata'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs'
 import { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -102,7 +102,9 @@ async function main(): Promise<void> {
   assertStatic()
   process.env['ADMIN_IP_ALLOWLIST'] = ''
   const dir = mkdtempSync(join(tmpdir(), 'support-contact-'))
-  const databaseUrl = `file:${join(dir, 'support.db')}`
+  const databasePath = join(dir, 'support.db')
+  closeSync(openSync(databasePath, 'a'))
+  const databaseUrl = `file:${databasePath}`
   process.env['DATABASE_URL'] = databaseUrl
   const origin = Date.parse('2026-10-04T01:00:00.000Z')
   let now = origin

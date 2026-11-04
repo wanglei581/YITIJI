@@ -506,6 +506,8 @@ jobs:
           # 「Cross-client deterministic static gates」步，那时客户端还没生成，
           # 报 Cannot find module '../generated/prisma/client'。
           pnpm --filter @ai-job-print/api verify:assistant-provider-label
+          # 真机实操 F-04（2026-10-10）：小青文字、语音、作业面三处提示词里都带着「不教人拆机」那一句约束。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:assistant-device-fault
           pnpm --filter @ai-job-print/api verify:llm-input-pii-mask
           pnpm --filter @ai-job-print/api verify:ai-feature-keys
           # 2026-09-03 新增：断言 shared 与 API 两侧 AI 类型契约一致，
@@ -750,6 +752,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:ai-result-ownership
           pnpm --filter @ai-job-print/api verify:llm-guard
           pnpm --filter @ai-job-print/api verify:ai-content-moderation
+          pnpm --filter @ai-job-print/api verify:ai-safety-lexicon
           pnpm --filter @ai-job-print/api verify:member-account-status
           pnpm --filter @ai-job-print/api verify:member-auth
           pnpm --filter @ai-job-print/api verify:legal-doc-version
@@ -1257,6 +1260,7 @@ jobs:
           # DriverAdapterError（不是 P2034），重试逻辑必须认得出，不能变成 500。
           pnpm --filter @ai-job-print/api verify:pg-serialization-conflict
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:pg-serialization-conflict:postgres
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:pg-lock-timeout:postgres
           pnpm --filter @ai-job-print/api verify:partner-contact-phone-registration
           pnpm --filter @ai-job-print/api verify:upload-sessions
           pnpm --filter @ai-job-print/api verify:cos:files
@@ -1419,6 +1423,9 @@ jobs:
         run: pnpm --filter @ai-job-print/kiosk test:browser:route-sweep
 
       - name: Upload Kiosk browser failure artifacts
+        # 清单要覆盖本 job 跑的每一套 Playwright 配置：outputDir（trace、截图）+ html 报告目录。
+        # 新增一套浏览器用例时同步加这里，否则它在 CI 上红了只能本机复现（2026-11-03 合作机构大屏用例即如此）。
+        # admin 的 users 配置继承主配置的 html 报告目录，报告落在 admin-e2e-report。
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -1440,14 +1447,21 @@ jobs:
             test-results/kiosk-fusion-w6-report/**
             test-results/kiosk-privacy-timeout/**
             test-results/kiosk-session-warning/**
+            test-results/kiosk-privacy-clear/**
+            test-results/kiosk-contract-review-session/**
             test-results/kiosk-scan-safety/**
             test-results/kiosk-mic-capability/**
             test-results/kiosk-mic-capability-report/**
             test-results/first-order/**
             test-results/admin-e2e/**
             test-results/admin-e2e-report/**
+            test-results/admin-screen-e2e/**
+            test-results/admin-screen-e2e-report/**
+            test-results/admin-users-e2e/**
             test-results/partner-e2e/**
             test-results/partner-e2e-report/**
+            test-results/partner-screen-e2e/**
+            test-results/partner-screen-e2e-report/**
           if-no-files-found: ignore
           retention-days: 7
 

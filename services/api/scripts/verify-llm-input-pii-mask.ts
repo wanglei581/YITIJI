@@ -13,7 +13,7 @@
  *      这正是不能照抄合同链路 fail-closed 断言的原因，本条是该决策的回归锚
  *   4. 空串 / 非法输入 / 超长输入不抛错
  *   5. \r\n 输入能被正常遮盖（PDF/Windows 抽取文本常见，若不归一会白走兜底路径）
- *   6. 兜底路径本身有效：即使遮盖引擎失败也不会返回原文
+ *   6. 引擎异常后的兜底须通过残留断言；不完整时通用 503，安全结果仍可逆
  *   7. contract-review 侧行为未变：薄壳 re-export 与 common/pii 同一实现，
  *      且仍是默认 fail-closed（assertComplete 默认 true）
  *   8. 静态：4 个 LLM 调用点确实把遮盖后的文本喂进 prompt，
@@ -29,6 +29,7 @@
  */
 import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
+import { ServiceUnavailableException } from '@nestjs/common'
 import {
   maskUserTextForLlm,
   maskUserTextForLlmText,
@@ -190,6 +191,39 @@ if (textOnly === masked.text) pass('API: maskUserTextForLlmText 与 maskUserText
 else fail('API: 两个入口结果不一致')
 if (textOnly !== RESUME) pass('API: 含 PII 的输入绝不原样返回')
 else fail('API: 含 PII 的输入被原样返回')
+
+// 51 段实际触发引擎页数上限，不能只测正常路径来声称兜底可用。
+const fallbackSegments = (first: string) => [first, ...Array.from({ length: 50 }, () => '合成正文。')]
+for (const first of ['无敏感内容。', `联系 ${FAKE.phone}。`]) {
+  const originals = fallbackSegments(first)
+  try {
+    const out = maskUserTextsForLlmReversible(originals, 'verify-fallback-safe')
+    if (out.degraded && out.texts.every((text, i) => out.restore(text) === originals[i])
+      && out.texts.every((text) => !text.includes(FAKE.phone))) pass('兜底: 安全内容可返回，遮盖与逐段还原有效')
+    else fail('兜底: 安全结果的降级标记 / 遮盖 / 还原不正确')
+  } catch { fail('兜底: 安全内容被拒绝') }
+}
+const fallbackResiduals: ReadonlyArray<readonly [string, string[], boolean]> = [
+  ['空格手机号', fallbackSegments('手机号：138 0013 8000'), false],
+  ['全角手机号', fallbackSegments('手机号：１３８００１３８０００'), false],
+  ['姓名标签', fallbackSegments(`姓名：${FAKE.name}`), false],
+  ['地址标签', fallbackSegments(`住址：${FAKE.address}`), false],
+  ['跨段手机号', ['138 0013', ' 8000', ...Array.from({ length: 49 }, () => '合成正文。')], false],
+  ['异常姓名保留档', fallbackSegments(`姓名：${FAKE.name}`), true],
+]
+for (const [label, input, keepNames] of fallbackResiduals) {
+  try {
+    maskUserTextsForLlmReversible(input, 'verify-fallback-residual', { keepNames })
+    fail(`兜底: ${label} 残留应拒绝`)
+  } catch (error) {
+    if (error instanceof ServiceUnavailableException && error.getStatus() === 503) {
+      const response = JSON.stringify(error.getResponse())
+      if (response.includes('AI_INPUT_MASK_UNAVAILABLE') && !response.includes(input[0])
+        && !response.includes(FAKE.name) && !response.includes(FAKE.address)) pass(`兜底: ${label} 通用 503，无原文回显`)
+      else fail(`兜底: ${label} 错误码或无原文要求不符`)
+    } else fail(`兜底: ${label} 未返回通用 503`)
+  }
+}
 
 // ─── 7. contract-review 侧行为未变 ──────────────────────────────────────────
 
@@ -422,6 +456,8 @@ for (const label of ['idNumber', 'phone', 'email', 'bankCard', 'address'] as con
 }
 if (keep.text.includes(`姓名：${FAKE.name}`)) pass('保留姓名档: 姓名原样保留')
 else fail('保留姓名档: 姓名被遮了（小青对话会丢称呼）')
+if (keep.degraded === false) pass('保留姓名档: 正常引擎保持可用，未被异常档拒绝连带影响')
+else fail('保留姓名档: 正常输入不应落入异常档')
 if (!masked.text.includes(FAKE.name)) pass('保留姓名档: 不传开关时（简历链）姓名仍被遮')
 else fail('保留姓名档: 默认档也不遮姓名了 —— 简历链被连带放宽')
 const contractAgain = maskContractText(CONTRACT)
