@@ -22,9 +22,12 @@ import type { AiAvailability } from './useAiTask'
 /**
  * 会把**整条 AI 能力**判成不可用的错误码。
  *
- * 其余错误（限流 429、普通参数 400、上游 5xx、空回复）只是**本次调用**失败，
+ * 其余错误（普通限流 429、普通参数 400、上游 5xx、空回复）只是**本次调用**失败，
  * 不是能力不可用 —— 那些必须保留重试入口，
  * 不许拿去把按钮永久置灰（置灰了用户就再也点不动，而服务其实是好的）。
+ * 例外：`AI_QUOTA_EXHAUSTED` 虽是 HTTP 429，但是每人每天的次数封顶，
+ * 当天重试不会成功，与 `AI_BUDGET_EXHAUSTED` 同类，进这张表。
+ * `AI_RATE_LIMITED` / `RATE_LIMITED` 仍是「一会儿再试」，不进表。
  *
  * 准入标准：**配置恢复之前每一次都会失败**。连不上、账户级拒绝（401/402/403）、
  * 模型名无效（404 或模型名 400）都算。只要后端同一个码还会用于「这次没成」
@@ -80,6 +83,9 @@ export const AI_OUTAGE_CODES: ReadonlySet<string> = new Set([
   'AI_ENDPOINT_NOT_ALLOWED',
   // 当日 AI 金额上限已到（details 为 global | terminal | member，都要等到次日）。
   'AI_BUDGET_EXHAUSTED',
+  // 每人每天 AI 次数封顶（HTTP 429）。当天重试不会成功，与金额上限同类。
+  // 普通限流 AI_RATE_LIMITED 不在这里。
+  'AI_QUOTA_EXHAUSTED',
   // 读不到当日花费，服务端为防超支先停 AI（失败关闭）。
   'AI_BUDGET_UNAVAILABLE',
   // 问 AI 闸门时闸门自己出错（services/api/src/ai/resume/self-assessment-interpretation.ts）：
