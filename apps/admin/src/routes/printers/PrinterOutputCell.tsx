@@ -25,7 +25,7 @@ export function PrinterOutputCell({
       <div>{sidesLine('今天', output.today)}</div>
       <div>{sidesLine('本月', output.month)}</div>
       {output.monthUnconfirmedTasks > 0 ? (
-        <p className={muted}>本月另有 {formatCount(output.monthUnconfirmedTasks)} 单出纸未确认，没算进去</p>
+        <p className={muted}>本月另有 {formatCount(output.monthUnconfirmedTasks)} 笔出纸未确认，没算进去</p>
       ) : null}
     </div>
   )

@@ -215,7 +215,7 @@ check(
     outputCell.includes('暂时读不到') &&
     outputCell.includes('数据量超出统计上限，没给数') &&
     outputCell.includes('本月另有') &&
-    outputCell.includes('单出纸未确认，没算进去') &&
+    outputCell.includes('笔出纸未确认，没算进去') &&
     outputCell.includes('formatCount') &&
     nullBranch.includes('暂时读不到') &&
     !nullBranch.includes('0'),
