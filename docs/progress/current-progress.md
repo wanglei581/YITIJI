@@ -7,6 +7,20 @@
 - 显式 A4：下发 pdf-to-printer 时 paperSize 固定 A4，不再靠驱动默认纸型。待真机试打，试打前问产品负责人。
 - 版本：另提交升到 0.4.19，待与复印扫描线 A2 对齐后再发。升级测试里的旧版本号与兼容下限不改。
 
+## 2026-11-04：简历优化的改写要能在最终稿里逐字找到（只改后端；分支 `claude/optimize-after-match-1104`；未合并、未部署）
+
+- 来由：11/04 测试机一份真实简历走出 8 条优化建议，全部是「只能手改」。一体机只在优化稿的单个字符串字段里用 `includes(after)` 判断能不能换上；提示词没有要求改写逐字落在同一字段，补回和篇幅收口之后也没有再核对。
+- 改法：提示词写明每条 `after` 必须与优化稿某一个字符串字段逐字一致，不得拆到两个字段。最终返回前按同一判据核对。对不上时，仅当全稿只有一处、且只差首尾空白或全半角标点，才把 `after` 改成稿里的原文。多处相似、跨字段拼接保持原样，不改优化稿正文。空 `after` 仍在解析时丢弃。日志只记条数。全部对不上时不再多打一次模型，沿用现有的非法输出重试，仍算同一次扣次。
+- 验证：后端类型检查 0 错；仓库 lint 0 错；优化服务在图谱里列出的门禁通过。新样本覆盖逐字命中、首尾空白、唯一全半角标点、多处相似、跨字段拆分、空 `after`。一体机、小程序、终端程序未改。
+- 没做：这一版还在本分支，没有推送。模型仍可能写出对不上的改写，那些条继续只能手改。
+
+## 2026-11-02：屏上扫描 ③ 后端第一批 B1（云端会话、能力键、心跳；分支 `claude/scan-device-b1-1102`，从发布候选头 3f19aba9c 切出，已并 origin/main 49ed808b6，未推送、未部署）
+
+- 做了什么：任务包 ③（用户在一体机屏上点「开始扫描」，终端程序服务经 WIA 直接扫描）的云端部分。`ScanTask` 加 8 个会话字段（startMode 默认 panel、deviceSource、deviceColorMode、deviceState、devicePageCount、deviceErrorCode、deviceUpdatedAt、hardExpiresAt），`TerminalHeartbeat` 加 scanDeviceHealth / scanDeviceObservedAt；两套迁移同名 `20261102230000_add_scan_device_session_fields`，`verify-first-order-migrations` 升级清单补了这份（旧行取默认值、新列可读写）。能力键 `scan_device` 进共享契约与后端副本、DEFAULT_DENY（逐台到机器旁验过进纸器、无纸、开盖、打印时扫描、中止恢复才登记，同彩色、双面），后台「设备能力」页键名「屏上扫描（需真机验证）」。
+- 接口：建会话可选 startMode / source / colorMode（device 要 scan 与 scan_device 都放行；hardExpiresAt = 建会话起 30 分钟）；current-lease 对 device 任务多带 startMode 与 device 参数，面板任务响应一个键都不多；GET 会话多返回 startMode / deviceState / devicePageCount / deviceErrorCode；新增 `POST /terminals/:terminalId/scan-tasks/:taskId/device-report`（终端令牌；状态转移表 49 个组合里 25 个合法；页数只许不减；每次收下续期到 min(max(expiresAt, now+3 分钟), hardExpiresAt)；已取消 / 已改面板 / 能力被关回 409 带原因码）；新增 `POST /scan/sessions/:id/switch-to-panel`（控制令牌；原地切回面板，会话 / 令牌 / ACK 不变，不触发静默期，幂等；截止时间续到 min(max(expiresAt, now+10 分钟), hardExpiresAt)，免得用户在屏上试了很久再切只剩一两分钟，已到 hardExpiresAt 的会话回 409 SCAN_TASK_NOT_ACTIVE）；deliver 加 multipart 字段 origin（device 会话只收 origin=device、composing 或 delivering、已收 ≥1 页的 PDF；面板会话只收 watcher；没带 origin 一律按 watcher）；心跳与公开 printer-status 多两项（老终端程序不报给 null，不认识的值当 unknown）。新逻辑放在 `scan-device-*.ts` 三个新文件里，没往已 1200 行的 `scan-tasks.service.ts` 里堆。
+- 没做 / 边界：终端程序（A1 底座、A2 接线）、一体机（K1）、小程序都没动；真机验证 V0-3/4/5/11/12 没做，**哪台机器都不许在后台把 scan_device 配成 available**；`packages/shared/src/types/scanTask.ts` 里会话新字段的类型留给 K1；device 会话取消后仍吃 90 秒静默期（任务包 F-5），只有「改用面板扫描」不吃；Playwright 视觉用例没跑（本机没有 Playwright 浏览器）。
+- 超出任务包文字的两处改动（各自单独成提交，不改就红，可单独审、单独撤）：`fusion-w2-print.spec.ts` 的能力假数据补一行 scan_device（`verify:print-color-duplex-capability` 第 I 节要求桩覆盖契约全部能力键）；`verify-scan-input-lockout-telemetry` 的 printer-status 精确键集合加两个键（任务要求公开接口多给两项；仍是精确集合断言，另补三条按名字的不外泄断言，没放宽）。
+- 验证：新门禁 `verify:scan-device-sessions`（进 ci.yml 两处，SQLite 与 PostgreSQL 各跑一遍）；图谱列出的门禁加简报必跑共 114 条，SQLite 口径 85 条 api 门禁加 27 条其它包静态门禁全绿（中途 `verify-recruitment-hosting-gate-declares` 红过一次——新门禁引用了终端管理服务须显式声明托管开关，已补并复跑转绿），PG 作业里同源的 34 条加两条 PG 专用全绿；两套空库 `migrate deploy` 通过且 `migrate diff` 无漂移；15 处反向检查（DEFAULT_DENY、未配置放行、续期封顶、switch 变成取消、origin 校验、PDF 校验、转移表多一条、页数可减、不核终端归属、能力被关仍收、面板 lease 多键、hardExpiresAt 算错、deliver 状态放宽、迁移默认值、公开接口多泄一项）全部变红，恢复后干净。
 ## 2026-11-03：一体机扫码上传共用面板取消失败不再清屏（重做旧候选 #1461；分支 `claude/kiosk-upload-cancel-keep-1103`；未合并、未部署）
 
 - 旧候选 #1461（10/14，未进 main）在触屏版上重做：会员确认时后端锁着复制文件，这时点「取消」会回 400 `UPLOAD_SESSION_ACTION_IN_PROGRESS`。共用面板原来吞掉失败并无条件清空，屏上像取消成功，文件随后仍会归档进会员名下。

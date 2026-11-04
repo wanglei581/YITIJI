@@ -13,7 +13,7 @@
  * 改完搜 git diff 确认两边一致。
  *
  * 未配置行默认放行既有已验证闭环；
- * 例外见下方 DEFAULT_DENY_CAPABILITY_KEYS：color_print / duplex_print / signature_stamp 未配置 = 拒绝。
+ * 例外见下方 DEFAULT_DENY_CAPABILITY_KEYS：color_print / duplex_print / signature_stamp / scan_device 未配置 = 拒绝。
  */
 
 export type PrintScanCapabilityKey =
@@ -29,6 +29,7 @@ export type PrintScanCapabilityKey =
   | 'signature_stamp'
   | 'color_print'
   | 'duplex_print'
+  | 'scan_device'
 
 export type PrintScanCapabilityStatus =
   | 'available'
@@ -50,6 +51,7 @@ export const PRINT_SCAN_CAPABILITY_KEYS: readonly PrintScanCapabilityKey[] = [
   'signature_stamp',
   'color_print',
   'duplex_print',
+  'scan_device',
 ] as const
 
 export const PRINT_SCAN_CAPABILITY_STATUSES: readonly PrintScanCapabilityStatus[] = [
@@ -102,11 +104,18 @@ export const DEPRECATED_CAPABILITY_ALIAS: Partial<Record<PrintScanCapabilityKey,
  * 服务端又识别不了印章，存在为伪造印章提供便利的风险。试点终端先关，新机器默认关；
  * 以后是加图片检查还是整体下线另行拍板。开通同样只有一条路径 —— 管理员逐台显式配成 available。
  * 服务端判定在 TerminalCapabilitiesService.assertUserTaskAllowed。
+ *
+ * scan_device（屏上扫描）列入本名单的理由与彩色、双面相同：没验过（2026-11-02）。
+ * 终端程序服务经 WIA 直接驱动扫描仪，进纸器多页、无纸、开盖、打印时扫描、中止后恢复这些情形，
+ * 每一台机器都要先到机器旁验过，才登记成 available；新机器与试点机默认关，用户只能走面板扫描。
+ * 开通同样只有一条路径 —— 管理员逐台显式配成 available。服务端判定在
+ * TerminalCapabilitiesService.assertScanDeviceAllowed（建 device 会话）与 device-report（能力被关后回报 409）。
  */
 export const DEFAULT_DENY_CAPABILITY_KEYS: readonly PrintScanCapabilityKey[] = [
   'color_print',
   'duplex_print',
   'signature_stamp',
+  'scan_device',
 ] as const
 
 /**
@@ -132,6 +141,7 @@ export function requiredPrintCapabilityKeys(params: {
 export const CAPABILITY_DENIAL_REASON: Partial<Record<PrintScanCapabilityKey, string>> = {
   color_print: '本机彩色打印尚未通过真机验证，暂不能按彩色下单',
   duplex_print: '本机自动双面尚未通过真机验证，暂不能按双面下单',
+  scan_device: '本机屏上扫描尚未通过真机验证，暂不能在屏上开始扫描',
 }
 
 export type PrintScanTaskType =
