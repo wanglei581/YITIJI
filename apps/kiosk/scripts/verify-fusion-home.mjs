@@ -231,6 +231,10 @@ check(
   '首页不渲染没有原因的死按钮'
 )
 check(
+  !(view.includes('LicenseLock') || view.includes('LICENSE_NO_NEW_TASK_REASON')) || view.includes('machineUnusableLine('),
+  '首页授权收尾入口停用时必须显示机器不可用说明'
+)
+check(
   css.includes('.qxt-band-hero') &&
     css.includes('linear-gradient') &&
     !css.includes('bg-hero.jpg'),
