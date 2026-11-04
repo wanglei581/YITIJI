@@ -79,7 +79,7 @@ function stubOptimize(api: import('../../fixtures/api-router').ApiRouter, editor
   // 编辑屏另外保留「主导」这一处新增职责词，与数字 2 一共两处待本人确认。
   const body = editor ? { ...optimizeBody, optimizedResume: { ...optimizedResume, summary: `主导内容复盘，${optimizedResume.summary}` } } : optimizeBody
   api.respond('GET', '/api/v1/resume/records/w6-compare/optimize', { status: 200, json: body })
-  api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: JOB_MATERIAL_TEMPLATES.filter((item) => item.title === '清爽通用简历模板') })
+  api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: JOB_MATERIAL_TEMPLATES.filter((item) => item.title === '清爽通用简历模板') } })
   api.respond('GET', '/api/v1/resume/records/w6-compare/draft', { status: 200, json: { draft: null } })
 }
 
