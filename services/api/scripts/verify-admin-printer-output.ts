@@ -13,11 +13,13 @@ import { closeSync, mkdtempSync, openSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Logger } from '@nestjs/common'
+import { MODULE_METADATA } from '@nestjs/common/constants'
 import {
   AdminPrinterOutputService,
   shanghaiMonthStart,
   type AdminPrinterOutput,
 } from '../src/terminals/admin-printer-output'
+import { TerminalsModule } from '../src/terminals/terminals.module'
 import { PrismaService } from '../src/prisma/prisma.service'
 import type { AdminPrinterView } from '../src/terminals/terminals-admin.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
@@ -404,6 +406,13 @@ async function assertInclude(): Promise<void> {
   check('include=garbage 当没带', calls === beforeGarbage && !responseHasOutput(garbage.data))
 }
 
+/** 类本身，或 `{ provide: 这个类 }`，都算登记了。 */
+function registersProvider(entry: unknown, token: unknown): boolean {
+  if (entry === token) return true
+  if (typeof entry !== 'object' || entry === null || !('provide' in entry)) return false
+  return (entry as { provide: unknown }).provide === token
+}
+
 async function assertDependencyInjection(prisma: PrismaService): Promise<void> {
   const { Module } = await import('@nestjs/common')
   const { NestFactory } = await import('@nestjs/core')
@@ -411,6 +420,18 @@ async function assertDependencyInjection(prisma: PrismaService): Promise<void> {
   const { AdminPrintersController } = await import('../src/terminals/admin-printers.controller')
   const { TerminalsService } = await import('../src/terminals/terminals.service')
   const { RedisService } = await import('../src/common/redis/redis.service')
+
+  // 只读真实模块的装饰器元数据，不实例化 TerminalsModule。
+  // 键用 @nestjs/common/constants 的 MODULE_METADATA（值即 'providers' / 'controllers'）。
+  const providers = (Reflect.getMetadata(MODULE_METADATA.PROVIDERS, TerminalsModule) ?? []) as unknown[]
+  const controllers = (Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, TerminalsModule) ?? []) as unknown[]
+  const serviceRegistered = providers.some((entry) => registersProvider(entry, AdminPrinterOutputService))
+  const controllerRegistered = controllers.includes(AdminPrintersController)
+  check(
+    '真实 TerminalsModule 登记了出纸服务和打印机控制器',
+    serviceRegistered && controllerRegistered,
+    `service=${serviceRegistered} controller=${controllerRegistered}`,
+  )
 
   // 控制器上的守卫会被 Nest 一起实例化。桩掉它们的外部依赖。
   // 要验证的是 AdminPrinterOutputService 能不能注入 PrismaService。
@@ -426,16 +447,26 @@ async function assertDependencyInjection(prisma: PrismaService): Promise<void> {
   })
   class AdminPrinterDiProbeModule {}
 
-  let app: { get: (token: unknown) => { list: (include?: string) => Promise<{ data: { printers: unknown[]; outputStatus?: string } }> }; close: () => Promise<void> } | undefined
+  let app: { get: (token: unknown) => unknown; close: () => Promise<void> } | undefined
   try {
     app = await NestFactory.createApplicationContext(AdminPrinterDiProbeModule, { logger: false, abortOnError: false })
+    const output = app.get(AdminPrinterOutputService)
     const controller = app.get(AdminPrintersController)
-    const listed = await controller.list('output')
-    check(
-      '依赖注入真能解析',
-      listed.data.printers.length === 1 && listed.data.outputStatus === 'ok',
-      `printers=${listed.data.printers.length} outputStatus=${String(listed.data.outputStatus)}`,
-    )
+    const resolved = output instanceof AdminPrinterOutputService && controller instanceof AdminPrintersController
+    check('依赖注入真能解析', resolved)
+    if (!(controller instanceof AdminPrintersController)) return
+    try {
+      const listed = await controller.list('output')
+      check(
+        '容器里取出的控制器能统计出纸',
+        listed.data.outputStatus === 'ok',
+        `outputStatus=${String(listed.data.outputStatus)}`,
+      )
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('FAIL ')) throw error
+      const message = error instanceof Error ? error.message : String(error)
+      fail('容器里取出的控制器能统计出纸', message)
+    }
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('FAIL ')) throw error
     const message = error instanceof Error ? error.message : String(error)

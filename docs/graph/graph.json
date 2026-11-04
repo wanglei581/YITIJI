@@ -29237,6 +29237,7 @@
       "services/api/scripts/verify-toolbox-launch-events.ts"
     ],
     "services/api/src/terminals/terminals.module.ts": [
+      "services/api/scripts/verify-admin-printer-output.ts",
       "services/api/scripts/verify-terminal-network-diagnostics.ts"
     ],
     "services/api/src/terminals/terminals.service.ts": [
@@ -36809,6 +36810,7 @@
           "services/api/src/terminals/admin-printer-output.ts",
           "services/api/src/terminals/admin-printers.controller.ts",
           "services/api/src/terminals/terminals-admin.service.ts",
+          "services/api/src/terminals/terminals.module.ts",
           "services/api/src/terminals/terminals.service.ts"
         ],
         "missing": []
