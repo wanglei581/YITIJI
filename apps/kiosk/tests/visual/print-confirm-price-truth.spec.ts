@@ -193,7 +193,7 @@ test('print confirm falls back to black-and-white and never quotes unverified co
   const settingNote = page.locator('.pct-row').filter({ has: page.getByText('设置', { exact: true }) }).locator('.pct-setting-note')
   await expect(settingNote).toContainText('已按黑白报价')
   await expect(settingNote).toBeVisible()
-  await page.getByRole('button', { name: '查看全部参数 ›', exact: true }).click()
+  await page.locator('.pcf-parameters > summary', { hasText: '查看全部参数' }).click()
   await expect(page.locator('[data-sum-row="色彩模式"]')).toContainText('已按黑白报价')
   await expect(page.locator('[data-sum-row="色彩模式"] em')).toBeVisible()
   await expect(page.locator('[data-sum-row="本次产物"]')).toHaveAttribute('data-file-id', W2_FILE.fileId)

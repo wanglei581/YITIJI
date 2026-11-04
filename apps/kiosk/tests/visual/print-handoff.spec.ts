@@ -325,7 +325,7 @@ test('H3 F02 a two-page job material on a simplex-only terminal is quoted single
   const settingNote = confirm.locator('.pct-row').filter({ has: page.getByText('设置', { exact: true }) }).locator('.pct-setting-note')
   await expect(settingNote).toContainText('已按单面报价')
   await expect(settingNote).toBeVisible()
-  await page.getByRole('button', { name: '查看全部参数 ›', exact: true }).click()
+  await page.locator('.pcf-parameters > summary', { hasText: '查看全部参数' }).click()
   await expect(confirm.locator('[data-sum-row="单双面"]')).toContainText('已按单面报价')
   await expect(confirm.locator('[data-sum-row="单双面"] em')).toBeVisible()
   await expect.poll(() => lastQuoteBody(page).then((body) => body?.params?.['duplex'] ?? null)).toBe('simplex')
