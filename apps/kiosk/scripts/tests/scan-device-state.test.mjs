@@ -116,9 +116,8 @@ test('a lost next-page stays unknown until the cloud leaves page_ready', () => {
 
 test('known faults land on a failure, unknown codes stay unknown', () => {
   const jam = screen({ status: status({ deviceState: 'error', deviceErrorCode: 'paper_jam' }) })
-  assert.equal(jam.kind, 'terminal')
-  assert.equal(jam.result.success, false)
-  assert.match(jam.result.reason, /卡纸/)
+  assert.equal(jam.kind, 'error')
+  assert.equal(jam.fault, 'jam')
   const mystery = screen({ status: status({ deviceState: 'error', deviceErrorCode: 'unknown' }) })
   assert.equal(mystery.kind, 'unknown')
 })

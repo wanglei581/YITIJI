@@ -9,6 +9,7 @@ import { SCAN_DEVICE_RAIL, ScanWorkbenchShell } from './ScanWorkbenchChrome'
 import { type ScanStage } from './scanWorkbenchModel'
 import { patchScanWorkbenchSession, readScanWorkbenchSession } from './scanWorkbenchSession'
 import { useScanDeviceCapability } from './useScanDeviceCapability'
+import { recoverDeviceSession } from './scanDeviceRecovery'
 import { beginDeviceScan, useScanDeviceStartState } from './useScanDeviceStart'
 import './styles/scan-device-qx.css'
 import './styles/scan-device-flow.css'
@@ -27,6 +28,13 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
   const start = useScanDeviceStartState()
   const session = readScanWorkbenchSession()
   const material = session?.material ?? null
+  const recovery = Boolean(session?.live && session.deviceFlow)
+  const [recovering, setRecovering] = useState(false)
+  const back = (): void => {
+    const stage = recovery ? 'progress' : 'how'
+    patchScanWorkbenchSession({ stage })
+    onGoStage?.(stage)
+  }
   const [choice, setChoice] = useState<ScanDeviceChoice>(() => (
     session?.deviceChoice ?? (material ? defaultDeviceChoice(material) : { source: 'feeder', colorMode: 'gray' })
   ))
@@ -36,9 +44,9 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
       onGoStage?.('start')
       return
     }
-    if (cap.loading || probe.phase !== 'done') return
+    if (recovery || cap.loading || probe.phase !== 'done') return
     if (!cap.allowed || !probe.freshReady) onGoStage?.('how')
-  }, [material, cap.loading, cap.allowed, probe.phase, probe.freshReady, onGoStage])
+  }, [material, recovery, cap.loading, cap.allowed, probe.phase, probe.freshReady, onGoStage])
 
   if (!material) return null
 
@@ -60,19 +68,26 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
       bandEyebrow={`屏上扫描 · ${labelOf(material)}`}
       bandRail={{ labels: SCAN_DEVICE_RAIL, now: 2 }}
       bandBackLabel="返回"
-      onBandBack={() => onGoStage?.('how')}
+      onBandBack={back}
       dock={{
-        left: { label: '返回', onClick: () => onGoStage?.('how') },
+        left: { label: '返回', disabled: recovering, onClick: back },
         primary: {
-          label: start.phase === 'starting' ? '正在开始' : '开始扫描',
+          label: recovering || start.phase === 'starting' ? '正在开始' : '开始扫描',
           testId: 'scan-device-start',
-          disabled: !probe.freshReady || !cap.allowed || start.phase === 'starting' || start.locked,
-          onClick: () => beginDeviceScan({
+          disabled: (!recovery && !probe.freshReady) || !cap.allowed || recovering || start.phase === 'starting' || start.locked,
+          onClick: () => {
+            if (recovery) {
+              setRecovering(true)
+              void recoverDeviceSession({ action: 'retry', settings: choice, token: getToken(), onGoStage: onGoStage ?? (() => undefined) }).finally(() => setRecovering(false))
+              return
+            }
+            beginDeviceScan({
             material,
             choice,
             memberToken: getToken(),
             onGoStage: onGoStage ?? (() => undefined),
-          }),
+            })
+          },
         },
       }}
     >

@@ -19,32 +19,22 @@ export interface DeviceTerminalResult {
 }
 
 export type DeviceScreen =
+  | { kind: 'error'; fault: DeviceFault }
   | { kind: 'unknown'; tone: 'unreachable' | 'unconfirmed' }
   | { kind: 'run'; pages: number | null; scannerStarted: boolean }
   | { kind: 'more'; pages: number | null; maxPages: number | null }
   | { kind: 'make'; phase: 'composing' | 'delivering'; pages: number | null }
   | { kind: 'terminal'; result: DeviceTerminalResult }
 
-const KNOWN_FAULTS = new Set([
-  'feeder_empty',
-  'paper_jam',
-  'cover_open',
-  'busy',
-  'warming_up',
-  'not_ready',
-  'timeout',
-  'too_large',
-])
+export type DeviceFault = 'nopaper' | 'jam' | 'busy' | 'noresp' | 'timeout'
 
-const FAULT_REASON: Record<string, string> = {
-  feeder_empty: '进纸器里没有纸。这次先停在这里。',
-  paper_jam: '扫描仪报告卡纸。这次先停在这里。',
-  cover_open: '扫描仪报告盖板没合上。这次先停在这里。',
-  busy: '扫描仪正忙。这次先停在这里。',
-  warming_up: '扫描仪还在预热。这次先停在这里。',
-  not_ready: '扫描仪还没准备好。这次先停在这里。',
-  timeout: '扫描仪超时。这次先停在这里。',
-  too_large: '这一次超过了这台机器能收的大小。这次先停在这里。',
+export function deviceFault(code: string | null | undefined): DeviceFault | null {
+  if (code === 'feeder_empty') return 'nopaper'
+  if (code === 'paper_jam' || code === 'cover_open') return 'jam'
+  if (code === 'busy') return 'busy'
+  if (code === 'not_found' || code === 'error' || code === 'not_ready') return 'noresp'
+  if (code === 'timeout') return 'timeout'
+  return null
 }
 
 function usableFile(file: ScanSessionStatusResponse['file']): boolean {
@@ -108,6 +98,8 @@ export function selectDeviceScreen(input: {
 
   const pages = reportedPageCount(status.devicePageCount)
   const tone = uncertain === 'unreachable' || input.cloudUnreadable ? 'unreachable' as const : 'unconfirmed' as const
+  // 停止任何一边未确认时，云端终态也不能替本机 abort 作证。
+  if (input.uncertainCommand === 'stop') return { kind: 'unknown', tone }
   if (status.status === 'completed') {
     return {
       kind: 'terminal',
@@ -137,12 +129,19 @@ export function selectDeviceScreen(input: {
   }
 
   const deviceState = status.deviceState ?? null
+  if (uncertain && input.uncertainCommand === 'start' && deviceState === 'error') return { kind: 'unknown', tone }
   if (deviceState === 'error') {
     const code = status.deviceErrorCode ?? null
-    if (code && KNOWN_FAULTS.has(code)) {
+    const fault = deviceFault(code)
+    if (fault) return { kind: 'error', fault }
+    // 本批五屏以外的既有已知故障仍保留 K1b-2 行为，未知码仍是状态未知。
+    if (code === 'warming_up' || code === 'too_large') {
       return {
         kind: 'terminal',
-        result: { outcome: 'failed', success: false, reason: FAULT_REASON[code], pages: null },
+        result: {
+          outcome: 'failed', success: false, pages: null,
+          reason: code === 'warming_up' ? '扫描仪还在预热。这次先停在这里。' : '这一次超过了这台机器能收的大小。这次先停在这里。',
+        },
       }
     }
     return { kind: 'unknown', tone: 'unconfirmed' }

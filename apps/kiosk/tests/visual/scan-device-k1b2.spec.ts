@@ -318,7 +318,7 @@ test('an unreachable local program stays unknown and does not claim success or f
   await shot(page, 'cs-scan-unknown')
 })
 
-test('a known jam lands on the existing failure view @w2', async ({ page, api }) => {
+test('a known jam lands on the K1b-3a jam screen, not the generic failure view @w2', async ({ page, api }) => {
   test.setTimeout(90_000)
   const cloud: Cloud = {
     status: 'waiting',
@@ -338,8 +338,9 @@ test('a known jam lands on the existing failure view @w2', async ({ page, api })
   await expect(page.getByTestId('scan-device-run')).toBeVisible({ timeout: 15_000 })
   cloud.deviceState = 'error'
   cloud.deviceErrorCode = 'paper_jam'
-  await expect(page.getByRole('heading', { name: '扫描未完成' })).toBeVisible({ timeout: 15_000 })
-  await expect(page.getByText('扫描仪报告卡纸').first()).toBeVisible()
+  // K1b-3a 起卡纸 / 盖板没合上走稿内 cs-scan-err-jam，不再落 K1b-2 的统一失败视图。
+  await expect(page.getByRole('heading', { name: '卡纸或盖板没合上' })).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByRole('heading', { name: '扫描未完成' })).toHaveCount(0)
 })
 
 function registerLogin(api: ApiRouter, documents: ReturnType<typeof memberDocument>[]): void {

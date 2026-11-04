@@ -3,13 +3,14 @@ import type { ScanSessionFileView, ScanSessionStatusResponse } from '@ai-job-pri
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { cancelScanSession, getScanSessionStatus } from '../../services/api/scanTasks'
-import { ApiHttpError } from '../../services/api/httpAdapter'
 import { postLocalScanCommand, type LocalScanCommandResult } from '../../services/scan/localScanApi'
 import { formatSize } from '../upload/phoneUploadModel'
 import { formatLabelFromMime } from './scanOutputFormat'
 import { readScanDeviceEpoch, subscribeScanDeviceEpoch, bumpScanDeviceEpoch } from './scanDeviceEpoch'
 import { selectDeviceScreen, type DeviceScreen } from './scanDeviceState'
 import { deviceStartInFlight } from './useScanDeviceStart'
+import { deviceRecoveryInFlight, recoverDeviceSession } from './scanDeviceRecovery'
+import { readDeviceStopReceipt, saveDeviceStopReceipt, settleDeviceStop, stopConfirmed } from './scanDeviceStopState'
 import {
   acknowledgeScanDelivery,
   SCAN_ACK_REFUSED_PROGRESS_REASON,
@@ -32,13 +33,6 @@ function fileUsable(file: ScanSessionFileView | null | undefined): file is ScanS
     && file.filename.trim().length > 0
     && typeof file.sizeBytes === 'number'
     && file.mimeType.trim().length > 0
-}
-
-function stopReason(purged: boolean): string {
-  const parts = ['已停止扫描。这次到这里为止，不会再继续。']
-  if (purged) parts.push('已扫的页已从这台机器删除。')
-  parts.push('请稍候再开始新的扫描。')
-  return parts.join('')
 }
 
 function wantedStage(kind: DeviceScreen['kind']): ScanStage {
@@ -64,16 +58,17 @@ export function useScanDeviceFlow(onGoStage: (stage: ScanStage) => void) {
   const [commandBusy, setCommandBusy] = useState(false)
   const stoppingRef = useRef(false)
 
+  const stopReceipt = readDeviceStopReceipt(live?.scanTaskId)
   const screen = selectDeviceScreen({
     status: cloud.status,
     cloudUnreadable: cloud.unreadable,
     startConfirmed: session?.deviceStartConfirmed === true,
     startInFlight: deviceStartInFlight(),
-    localUncertain: session?.deviceLocalUncertain ?? null,
-    uncertainCommand: session?.deviceUncertainCommand ?? null,
+    localUncertain: stopReceipt ? 'unknown' : session?.deviceLocalUncertain ?? null,
+    uncertainCommand: stopReceipt ? 'stop' : session?.deviceUncertainCommand ?? null,
   })
 
-  useBusyLock(Boolean(live) && screen.kind !== 'terminal')
+  useBusyLock(Boolean(live) && screen.kind !== 'terminal' && !(stopReceipt && stopConfirmed(stopReceipt)))
 
   useEffect(() => {
     if (!armed) return undefined
@@ -84,7 +79,7 @@ export function useScanDeviceFlow(onGoStage: (stage: ScanStage) => void) {
   useEffect(() => {
     const current = readScanWorkbenchSession()
     const credentials = current?.live
-    if (!credentials || current?.deviceAcked === true || deviceStartInFlight()) return undefined
+    if (readDeviceStopReceipt(credentials?.scanTaskId) || !credentials || current?.deviceAcked === true || deviceStartInFlight()) return undefined
     const generation = scanLifecycleGeneration()
     const memberToken = getToken()
     let stale = false
@@ -112,19 +107,19 @@ export function useScanDeviceFlow(onGoStage: (stage: ScanStage) => void) {
 
   useEffect(() => {
     const credentials = readScanWorkbenchSession()?.live
-    if (!credentials) return undefined
+    if (!credentials || readDeviceStopReceipt(credentials.scanTaskId)) return undefined
     const generation = scanLifecycleGeneration()
     let cancelled = false
     let misses = 0
     const tick = async (): Promise<void> => {
-      if (cancelled || readScanWorkbenchSession()?.result) return
+      if (cancelled || stoppingRef.current || deviceRecoveryInFlight() || readScanWorkbenchSession()?.result) return
       try {
         const status = await getScanSessionStatus(
           credentials.scanTaskId,
           credentials.controlToken,
           getTokenRef.current(),
         )
-        if (cancelled || scanLifecycleGeneration() !== generation) return
+        if (cancelled || stoppingRef.current || deviceRecoveryInFlight() || scanLifecycleGeneration() !== generation) return
         misses = 0
         noteScanTaskStatusFromServer(status.scanTaskId, status.status)
         setCloud({ status, unreadable: false })
@@ -153,7 +148,7 @@ export function useScanDeviceFlow(onGoStage: (stage: ScanStage) => void) {
   }, [screenKind, onGoStage])
 
   useEffect(() => {
-    if (screen.kind !== 'terminal') return
+    if (screen.kind !== 'terminal' || stoppingRef.current || readDeviceStopReceipt(live?.scanTaskId)) return
     const current = readScanWorkbenchSession()
     if (!current?.live || current.result) return
     const file = cloud.status?.file
@@ -175,7 +170,7 @@ export function useScanDeviceFlow(onGoStage: (stage: ScanStage) => void) {
     }
     patchScanWorkbenchSession({ stage: 'result', result: snapshot })
     onGoStage('result')
-  }, [screen, cloud.status, onGoStage])
+  }, [screen, cloud.status, live?.scanTaskId, onGoStage])
 
   const applyCommand = (command: 'next' | 'finish', result: LocalScanCommandResult): void => {
     const current = readScanWorkbenchSession()
@@ -214,61 +209,49 @@ export function useScanDeviceFlow(onGoStage: (stage: ScanStage) => void) {
     stoppingRef.current = true
     setStopping(true)
     setArmed(false)
-    const taskId = live.scanTaskId
-    const controlToken = live.controlToken
-    const memberToken = getToken()
-    void (async () => {
-      const [abortOutcome, cancelOutcome] = await Promise.allSettled([
-        postLocalScanCommand('abort', taskId),
-        cancelScanSession(taskId, controlToken, memberToken),
-      ])
-      const abort: LocalScanCommandResult = abortOutcome.status === 'fulfilled'
-        ? abortOutcome.value
-        : { ok: false, kind: 'unreachable', code: null }
-      let cancelSure = cancelOutcome.status === 'fulfilled'
-      const cancelError = cancelOutcome.status === 'rejected' ? cancelOutcome.reason : null
-      const cancelUnreachable = !cancelSure && cancelError instanceof ApiHttpError && cancelError.status === 0
-      if (cancelUnreachable) {
-        try {
-          await cancelScanSession(taskId, controlToken, memberToken)
-          cancelSure = true
-        } catch {
-          cancelSure = false
-        }
-      }
-      if (readScanWorkbenchSession()?.result) {
-        stoppingRef.current = false
-        setStopping(false)
-        return
-      }
-      const abortSure = (abort.ok && abort.state === 'aborted') || (!abort.ok && abort.kind === 'not-active')
-      const purged = abort.ok && abort.purged === true
-      if (abortSure && cancelSure) {
-        patchScanWorkbenchSession({
-          stage: 'result',
-          result: { outcome: 'failed', success: false, reason: stopReason(purged) },
-        })
-        onGoStage('result')
-        return
-      }
-      const unreachable = (!abort.ok && abort.kind === 'unreachable') || cancelUnreachable
-      patchScanWorkbenchSession({
-        deviceLocalUncertain: unreachable ? 'unreachable' : 'unknown',
-        deviceUncertainCommand: 'stop',
-      })
-      bumpScanDeviceEpoch()
+    const generation = scanLifecycleGeneration()
+    void settleDeviceStop({
+      scanTaskId: live.scanTaskId,
+      abort: () => postLocalScanCommand('abort', live.scanTaskId),
+      cancel: () => cancelScanSession(live.scanTaskId, live.controlToken, getToken()),
+      onReceipt: (receipt) => {
+        if (scanLifecycleGeneration() !== generation) return
+        saveDeviceStopReceipt(receipt)
+        // 两边的回执逐个记录；刷新遇到 pending 仍是状态未知。
+        patchScanWorkbenchSession({ deviceLocalUncertain: 'unknown', deviceUncertainCommand: 'stop' })
+        bumpScanDeviceEpoch()
+      },
+    }).finally(() => {
       stoppingRef.current = false
       setStopping(false)
-    })()
+    })
+  }
+
+  const recover = (action: 'retry' | 'panel', glass = false): void => {
+    if (stoppingRef.current || stopReceipt || commandBusy) return
+    setCommandBusy(true)
+    void recoverDeviceSession({
+      action,
+      settings: glass ? { source: 'flatbed' } : undefined,
+      token: getToken(), onGoStage,
+      onStatus: (status) => setCloud({ status, unreadable: false }),
+    }).finally(() => {
+      setCommandBusy(false)
+      setPollNonce((value) => value + 1)
+    })
   }
 
   return {
     ready: Boolean(live),
     screen,
+    stopReceipt,
+    retry: () => recover('retry'),
+    useGlass: () => recover('retry', true),
+    usePanel: () => recover('panel'),
     armed,
     stopping,
-    commandBusy,
-    stopLocked: session?.deviceUncertainCommand === 'stop',
+    commandBusy: commandBusy || deviceRecoveryInFlight(),
+    stopLocked: Boolean(stopReceipt) || session?.deviceUncertainCommand === 'stop',
     pressStop: () => {
       if (stopping || session?.deviceUncertainCommand === 'stop') return
       if (!armed) {

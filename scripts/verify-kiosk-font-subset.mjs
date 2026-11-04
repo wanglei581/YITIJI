@@ -39,7 +39,7 @@ const needsSubset = (code) =>
 const chars = new Set(read(`${FONT_DIR}/chars.txt`))
 if (chars.size < 6763) fail(`chars.txt 只有 ${chars.size} 个字符，少于 GB2312 的 6763 个汉字，生成脚本可能没跑完`)
 
-const files = execFileSync('git', ['ls-files', ...SCAN_ROOTS], { cwd: root, encoding: 'utf8' })
+const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', ...SCAN_ROOTS], { cwd: root, encoding: 'utf8' })
   .split('\n')
   .filter((file) => SCAN_EXT.test(file))
 if (files.length < 100) fail(`只扫到 ${files.length} 个源码文件，遍历坏了`)

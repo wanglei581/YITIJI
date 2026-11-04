@@ -16,7 +16,8 @@ export function isScanStageAuthorized(
 ): boolean {
   if (stage === 'start' || stage === 'settings') return true
   if (stage === 'how' || stage === 'device-settings') {
-    return hasMaterialContext && !hasLiveSession && !hasResult
+    return (hasMaterialContext && !hasLiveSession && !hasResult)
+      || (stage === 'device-settings' && hasLiveSession && hasDeviceFlow && !hasResult)
   }
   if (stage === 'progress') return hasLiveSession
   if (stage === 'device-more' || stage === 'device-make') return hasLiveSession && hasDeviceFlow

@@ -1139,15 +1139,15 @@ assert.match(scanSet, /开始扫描/, 'paper settings render the start-scan cont
 assert.match(scanSet, /scan-device-start/, 'the start control has a stable test id')
 assert.match(
   scanSet,
-  /onClick:\s*\(\)\s*=>\s*beginDeviceScan\(/,
-  'start runs only from the button click',
+  /onClick:\s*\(\)\s*=>\s*\{[\s\S]{0,500}?if \(recovery\)[\s\S]{0,350}?recoverDeviceSession\([\s\S]{0,200}?return[\s\S]{0,80}?beginDeviceScan\(/,
+  'start click reuses the live session during recovery and creates only after that branch returns',
 )
 assert.doesNotMatch(scanSet, /useScanSessionCreate/, 'device start does not use the panel create hook')
 {
   const effects = [...scanSet.matchAll(/useEffect\(\(\) => \{([\s\S]*?)\}, \[/g)]
   assert.ok(effects.length >= 1, 'paper settings keep their mount effect')
   for (const effect of effects) {
-    assert.doesNotMatch(effect[1], /beginDeviceScan/, 'device start is not called from an effect')
+    assert.doesNotMatch(effect[1], /beginDeviceScan|recoverDeviceSession/, 'neither create nor retry starts from a mount effect')
   }
 }
 assert.doesNotMatch(scanSet, /扫描仪就绪/, 'settings page must not hard-code the ready phrase')

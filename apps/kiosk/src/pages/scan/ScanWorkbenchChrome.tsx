@@ -100,6 +100,8 @@ export type ScanDockLeft = {
  * 主按钮不传就不画（等回传那一屏的「取消扫描」「立即检查」放在正文里，稿就是这么排的）。
  */
 export type ScanDock = {
+  /** 扫描故障 / 停止屏的稿内专用问句。 */
+  askLabel?: string
   left?: ScanDockLeft
   /** 为真时不画底栏左边的返回。进行中的屏上扫描用它，避免误触离开。 */
   omitLeft?: boolean
@@ -180,7 +182,7 @@ export function ScanWorkbenchShell({
 }) {
   const navigate = useNavigate()
   const { getToken } = useAuth()
-  const askLabel = scanAskLabel(page, state)
+  const askLabel = dock?.askLabel ?? scanAskLabel(page, state)
   const rail = bandRail === null ? undefined : (bandRail ?? { labels: SCAN_RAIL, now: SCAN_RAIL_NOW[page] })
   /* 带去顾问页的草稿：不带按钮上的「问小青：」前缀，是一句自然问句（B1）。 */
   const askDraft = askDraftOf(askLabel)

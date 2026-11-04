@@ -5,6 +5,9 @@ import type {
   ScanSessionCreateRequest,
   ScanSessionCreateResponse,
   ScanSessionStatusResponse,
+  ScanDeviceSettingsRequest,
+  ScanDeviceSettingsResponse,
+  ScanSwitchToPanelResponse,
 } from '@ai-job-print/shared'
 import { SCAN_RETRY_CONTROL_HEADER } from '@ai-job-print/shared'
 import { API_BASE_URL } from './client'
@@ -238,5 +241,27 @@ export function cancelScanSession(
     method: 'DELETE',
     controlToken,
     token,
+  })
+}
+
+/** 同一场改设置 / 改面板：凭证只走控制头，不取消、不重新创建。 */
+export function updateScanDeviceSettings(
+  scanTaskId: string,
+  controlToken: string,
+  settings: ScanDeviceSettingsRequest,
+  token?: string | null,
+): Promise<ScanDeviceSettingsResponse> {
+  return requestJson(`/scan/sessions/${encodeURIComponent(scanTaskId)}/device-settings`, {
+    method: 'POST', controlToken, token, body: JSON.stringify(settings),
+  })
+}
+
+export function switchScanSessionToPanel(
+  scanTaskId: string,
+  controlToken: string,
+  token?: string | null,
+): Promise<ScanSwitchToPanelResponse> {
+  return requestJson(`/scan/sessions/${encodeURIComponent(scanTaskId)}/switch-to-panel`, {
+    method: 'POST', controlToken, token,
   })
 }

@@ -13965,7 +13965,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 847,
+      "reachableFileCount": 853,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -17094,6 +17094,7 @@
             "apps/kiosk/src/pages/print/art/print-art-tokens.css",
             "apps/kiosk/src/pages/print/art/print-art.css",
             "apps/kiosk/src/pages/scan/styles/scan-device-done.css",
+            "apps/kiosk/src/pages/scan/styles/scan-device-errors.css",
             "apps/kiosk/src/pages/scan/styles/scan-device-flow.css",
             "apps/kiosk/src/pages/scan/styles/scan-device-qx.css",
             "apps/kiosk/src/pages/scan/styles/scan-fs.css",
@@ -17319,7 +17320,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 949
+      "sourceFileCount": 955
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -20440,6 +20441,9 @@
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
     "apps/kiosk/scripts/tests/scan-delivery-ack.test.mjs": [
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs"
+    ],
+    "apps/kiosk/scripts/tests/scan-device-recovery.test.mjs": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
     "apps/kiosk/scripts/tests/scan-device-state.test.mjs": [
@@ -34016,6 +34020,7 @@
           "apps/kiosk/scripts/tests/scan-cleanup-gate.test.mjs",
           "apps/kiosk/scripts/tests/scan-create-replay.test.mjs",
           "apps/kiosk/scripts/tests/scan-delivery-ack.test.mjs",
+          "apps/kiosk/scripts/tests/scan-device-recovery.test.mjs",
           "apps/kiosk/scripts/tests/scan-device-state.test.mjs",
           "apps/kiosk/scripts/tests/scan-rescan-authority.test.mjs",
           "apps/kiosk/scripts/tests/scan-session-revoke.test.mjs",

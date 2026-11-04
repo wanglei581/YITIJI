@@ -2189,4 +2189,12 @@ assert.equal(
   `scan cleanup gate behaviour test failed: ${cleanupGateTest.stderr || cleanupGateTest.stdout}`,
 )
 
+// 五张故障屏、同会话改用与双端停止必须有运行时负向覆盖。
+const deviceRecoveryTest = spawnSync(
+  process.execPath,
+  ['--test', resolve(kioskRoot, 'scripts/tests/scan-device-state.test.mjs'), resolve(kioskRoot, 'scripts/tests/scan-device-recovery.test.mjs')],
+  { encoding: 'utf8' },
+)
+assert.equal(deviceRecoveryTest.status, 0, `scan device recovery behaviour failed: ${deviceRecoveryTest.stderr || deviceRecoveryTest.stdout}`)
+
 console.log('ALL PASS scan session truth contract')
