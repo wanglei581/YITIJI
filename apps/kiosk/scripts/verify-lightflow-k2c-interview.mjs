@@ -294,6 +294,18 @@ check(
 check(interviewShellCss.includes('var(--sd-control-min, 48px)'), '普通触控目标未绑定 48px token')
 check(interviewShellCss.includes('var(--sd-primary-control-min, 56px)'), '主操作未绑定 56px token')
 check(read('src/pages/interview/session/InterviewSessionPanels.tsx').includes('role="log" aria-live="polite"'), '对话新增内容缺少读屏播报合同')
+const hubTouch = read('src/pages/interview/touch/InterviewHubTouch.tsx')
+check(
+  hubTouch.includes("['3 生成练习报告', '时间到就结束，尝试生成练习报告']"),
+  '入口第三步须写：时间到就结束，尝试生成练习报告',
+)
+check(!hubTouch.includes('马上出反馈'), '入口不得再写马上出反馈')
+const deadlineWarning = read('src/pages/interview/session/InterviewSessionPanels.tsx')
+check(
+  deadlineWarning.includes('还剩 1 分钟或更少。到点会自动结束这一场，没提交的回答不算进报告。'),
+  '剩余时间提醒须写：还剩 1 分钟或更少',
+)
+check(!deadlineWarning.includes('还剩不到 1 分钟'), '剩余时间提醒不得再写不到 1 分钟')
 check(!read('src/pages/interview/styles/interview-responsive.css').includes('.interview-session__privacy-note { display: none; }'), '短屏不得隐藏全部会话隐私说明')
 
 const packageJson = read('package.json')

@@ -92,7 +92,7 @@ export function InterviewSessionPanels({
         ]}
       />
       {deadlineWarn ? (
-        <p className="qxt-iv-sec" role="status" data-testid="interview-deadline-warning">还剩不到 1 分钟。到点会自动结束这一场，没提交的回答不算进报告。</p>
+        <p className="qxt-iv-sec" role="status" data-testid="interview-deadline-warning">还剩 1 分钟或更少。到点会自动结束这一场，没提交的回答不算进报告。</p>
       ) : null}
       {voiceHint ? <p className="qxt-iv-sec" role="status">{voiceHint}</p> : null}
       {phase === 'done_suggest' ? <p className="qxt-iv-sec">本场问题已问完，可以结束并生成报告</p> : null}

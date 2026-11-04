@@ -112,3 +112,18 @@ test('到点收尾先松开麦克风，再去出报告', () => {
   assert.ok(reportAt > cancelAt, '到点没有在松开麦克风之后结束')
   assert.ok(sealFile.includes('endInterviewAtDeadline('), '到点没有去生成报告')
 })
+
+test('入口第三步和剩余时间提醒不把报告说成一定马上出来', () => {
+  const hub = readFileSync(join(kioskRoot, 'src/pages/interview/touch/InterviewHubTouch.tsx'), 'utf8')
+  const panels = readFileSync(join(kioskRoot, 'src/pages/interview/session/InterviewSessionPanels.tsx'), 'utf8')
+  assert.ok(
+    hub.includes("['3 生成练习报告', '时间到就结束，尝试生成练习报告']"),
+    '入口第三步须写：时间到就结束，尝试生成练习报告',
+  )
+  assert.equal(hub.includes('马上出反馈'), false, '入口不得再写马上出反馈')
+  assert.ok(
+    panels.includes('还剩 1 分钟或更少。到点会自动结束这一场，没提交的回答不算进报告。'),
+    '剩余时间提醒须写：还剩 1 分钟或更少',
+  )
+  assert.equal(panels.includes('还剩不到 1 分钟'), false, '剩余时间提醒不得再写不到 1 分钟')
+})
