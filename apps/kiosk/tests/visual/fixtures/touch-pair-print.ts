@@ -1,0 +1,405 @@
+import type { Page } from '@playwright/test'
+import type { ApiRouter } from '../../fixtures/api-router'
+import { W2_FILE, W2_ORDER, W2_PRINT_PARAMS, setReactRouterState, writePrintHandoff } from './fusion-w2-state'
+import {
+  seedPrintDoneCompleted,
+  seedPrintProgress,
+} from './kiosk-p1-evidence-capture-api'
+import { loginTo, openCashier, openConfirm, registerTouchShell, routeVisiblePdf, see, spaGo, stubTakeaway } from './touch-pair-shell'
+import type { TouchPair } from './touch-pair-types'
+
+const PDF_PHASE = '合成各阶段要走上传接口，现成注册器没有一键造出编辑、上传中、合成中、结果、结果未知、冲突、未开通或 U 盘未接线。不许伪造文件已到。'
+
+function shell(api: ApiRouter, printer?: { isOnline: boolean; printerStatus: string }): void {
+  registerTouchShell(api, printer)
+}
+
+async function openUpload(page: Page, api: ApiRouter, path: string): Promise<void> {
+  shell(api)
+  await page.goto(path, { waitUntil: 'domcontentloaded' })
+  await see(page, '[data-w2-page="print-upload"]')
+}
+
+/** 材料检查三步都当场完成、隐私扫描 0 命中。页面自己发 POST，不能靠交接里的旧结论冒充。 */
+async function stubZeroFindingChecks(page: Page): Promise<void> {
+  const now = '2026-07-24T00:00:00.000Z'
+  const expiresAt = '2026-07-25T00:00:00.000Z'
+  const allowed = new Set(['inspection', 'normalize_a4', 'pii_scan'])
+  await page.route('**/api/v1/materials/tasks', async (route) => {
+    const request = route.request()
+    if (request.method() !== 'POST' || new URL(request.url()).pathname !== '/api/v1/materials/tasks') {
+      await route.fallback()
+      return
+    }
+    let kind: string | undefined
+    try {
+      kind = (request.postDataJSON() as { kind?: unknown }).kind as string | undefined
+    } catch {
+      await route.abort('blockedbyclient')
+      return
+    }
+    if (!kind || !allowed.has(kind)) {
+      await route.abort('blockedbyclient')
+      return
+    }
+    const checks = kind === 'inspection'
+      ? { pageCount: 2, canPrint: true, messages: [] }
+      : kind === 'normalize_a4'
+        ? { targetPaperSize: 'A4', canNormalize: true, messages: [] }
+        : undefined
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          id: `pair-${kind}`,
+          kind,
+          status: 'completed',
+          requesterMode: 'anonymous',
+          accessToken: 'pair-material-access',
+          sourceFileId: W2_FILE.fileId,
+          resultFileId: null,
+          endUserId: null,
+          params: {},
+          result: checks ? { mode: 'real', checks } : { mode: 'real' },
+          errorCode: null,
+          errorMessage: null,
+          expiresAt,
+          createdAt: now,
+          updatedAt: now,
+          ...(kind === 'pii_scan' ? { piiFindings: [] } : {}),
+        },
+      }),
+    })
+  })
+}
+
+/** 预览页会读参数建议。不打桩时卡片显示网络失败，那不是产品文案。 */
+function stubParamSuggestions(api: ApiRouter): void {
+  const item = (field: 'colorMode' | 'duplex' | 'copies', label: string, suggestedValue: string | number) => ({
+    field,
+    label,
+    status: 'suggested',
+    suggestedValue,
+    basis: { code: 'PAGE_COUNT', evidenceLevel: 'E1', text: '按文件页数', facts: {} },
+    reason: null,
+    blockedPreference: null,
+    editable: true,
+  })
+  api.respond('GET', '/api/v1/materials/tasks/w2-inspection-001/print-param-suggestions', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        taskId: 'w2-inspection-001',
+        featureKey: 'print_param_prefill',
+        derivation: 'deterministic_rules',
+        advisory: true,
+        available: true,
+        unavailableReason: null,
+        capabilityProfile: {
+          paperSize: 'A4',
+          verifiedColorModes: ['black_white'],
+          verifiedDuplexModes: ['simplex'],
+          verifiedPagesPerSheet: [1],
+          copiesRange: { min: 1, max: 99 },
+          note: '本机已开通黑白、单面。',
+        },
+        items: [
+          item('colorMode', '颜色', 'black_white'),
+          item('duplex', '单双面', 'simplex'),
+          item('copies', '份数', 1),
+        ],
+        notices: [],
+        evidence: null,
+        disclaimer: '建议可以改，不会自动下单。',
+        generatedAt: '2026-11-04T00:00:00.000Z',
+      },
+    },
+  })
+}
+
+/** 手机扫码默认态：码已出来、还在等手机。不应答上传会话时，这一屏会落成「二维码没出来」。 */
+function stubPhoneQr(api: ApiRouter): void {
+  const sessionId = 'pair-print-upload'
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+  api.respond('POST', '/api/v1/upload-sessions', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        sessionId,
+        uploadUrl: '/upload/phone',
+        uploadToken: 'pair-upload-token',
+        controlToken: 'pair-control',
+        expiresAt,
+      },
+    },
+  })
+  api.respond('GET', `/api/v1/upload-sessions/${sessionId}`, {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        sessionId,
+        status: 'pending',
+        purpose: 'print_doc',
+        mode: 'temporary',
+        file: null,
+        requiresKioskConfirmation: true,
+        expiresAt,
+      },
+    },
+  })
+}
+
+const pdfPhases = ['edit', 'uploading', 'composing', 'result', 'unknown', 'conflict', 'closed', 'usb'] as const
+
+export function printPairs(): TouchPair[] {
+  const pairs: TouchPair[] = [
+    {
+      item: '打印', screen: 'print', state: 'default', route: '/print-scan',
+      seeds: ['registerTouchShell', 'capabilities available'],
+      missingReason: null,
+      prepare: async (page, api) => {
+        shell(api)
+        await page.goto('/print-scan')
+        await see(page, '[data-testid="print-hub-state-default"]')
+      },
+    },
+    {
+      item: '打印', screen: 'print', state: 'printer-down', route: '/print-scan',
+      seeds: ['registerTouchShell', 'printer-status offline'],
+      missingReason: null,
+      proto: { query: { printer: 'down' } },
+      prepare: async (page, api) => {
+        shell(api, { isOnline: false, printerStatus: 'offline' })
+        await page.goto('/print-scan')
+        await see(page, '[data-testid="print-hub-state-device-off"]')
+      },
+    },
+    {
+      item: '打印', screen: 'print-src', state: 'default', route: '/print/upload?source=document',
+      seeds: ['registerTouchShell'],
+      missingReason: null,
+      proto: { patch: { ctx: 'print' } },
+      prepare: (page, api) => openUpload(page, api, '/print/upload?source=document'),
+    },
+    {
+      item: '打印', screen: 'print-src', state: 'logged', route: '/print/upload',
+      seeds: ['registerMemberLogin', 'registerAuthenticatedMemberApis', 'loginThroughVisibleUi'],
+      missingReason: null,
+      proto: { query: { login: '1' }, patch: { ctx: 'print' } },
+      prepare: async (page, api) => {
+        shell(api)
+        await loginTo(page, api, '/print/upload')
+        await see(page, '[data-w2-page="print-upload"]')
+      },
+    },
+    {
+      item: '打印', screen: 'print-src', state: 'printer-down', route: '/print/upload?source=document',
+      seeds: ['registerTouchShell', 'printer-status offline'],
+      missingReason: null,
+      proto: { query: { printer: 'down' }, patch: { ctx: 'print' } },
+      prepare: async (page, api) => {
+        shell(api, { isOnline: false, printerStatus: 'offline' })
+        await page.goto('/print/upload?source=document')
+        await see(page, '[data-w2-page="print-upload"]')
+      },
+    },
+    {
+      item: '打印', screen: 'upload', state: 'phone', route: '/print/upload?source=document&tab=qr',
+      seeds: ['registerTouchShell', 'POST upload-sessions pending'],
+      missingReason: null,
+      proto: { patch: { ctx: 'print' } },
+      prepare: async (page, api) => {
+        shell(api)
+        stubPhoneQr(api)
+        await page.goto('/print/upload?source=document&tab=qr', { waitUntil: 'domcontentloaded' })
+        await see(page, 'text=用手机扫描下方二维码')
+      },
+    },
+    {
+      item: '打印', screen: 'usb', state: 'usb', route: '/print/upload?source=document&tab=usb',
+      seeds: ['registerTouchShell'],
+      missingReason: null,
+      proto: { patch: { ctx: 'print' } },
+      prepare: async (page, api) => {
+        await openUpload(page, api, '/print/upload?source=document&tab=usb')
+        throw new Error('预览没有本机 U 盘网桥，到不了根目录文件列表。屏上是读盘失败或未开通，不是稿上的 3 个文件。')
+      },
+    },
+    {
+      item: '打印', screen: 'pii', state: 'no-findings', route: '/print/desk?step=check',
+      seeds: ['stubZeroFindingChecks', 'writePrintHandoff', 'spaGo'],
+      missingReason: null,
+      prepare: async (page, api) => {
+        // 先换票，再写入还没检查过的文件，软跳进检查。检查页自己打三步接口，0 命中才是这一屏。
+        shell(api)
+        await stubZeroFindingChecks(page)
+        await page.goto('/print-scan')
+        await see(page, '[data-testid="print-hub-state-default"]')
+        await writePrintHandoff(page, { contextId: 'p1-evidence-000000001', materialCheck: null })
+        await spaGo(page, '/print/desk?step=check', { printContextId: 'p1-evidence-000000001' })
+        await see(page, 'text=没有待决定的片段')
+      },
+    },
+    {
+      item: '打印', screen: 'preview', state: 'default', route: '/print/desk?step=preview',
+      seeds: ['writePrintHandoff', 'w2-fixtures PDF', 'print-param-suggestions', 'spaGo'],
+      missingReason: null,
+      prepare: async (page, api) => {
+        // 先在服务台完成换票，再写入带遮挡结论的交接，然后软跳进预览。
+        // 直接打开预览再跳回来时，打印台不会重读交接，右边仍是空桌面。
+        shell(api)
+        stubParamSuggestions(api)
+        await routeVisiblePdf(page)
+        await page.goto('/print-scan')
+        await see(page, '[data-testid="print-hub-state-default"]')
+        await writePrintHandoff(page, { contextId: 'p1-evidence-000000001' })
+        await spaGo(page, '/print/desk?step=preview', { printContextId: 'p1-evidence-000000001' })
+        await see(page, '[data-w2-page="print-preview"][data-qx-state="preview"]')
+        await see(page, 'text=采用这些建议')
+      },
+    },
+    {
+      item: '打印', screen: 'confirm', state: 'free', route: '/print/confirm',
+      seeds: ['writePrintHandoff', 'price-config billingEnabled false', 'orders/quote', 'spaGo'],
+      missingReason: null,
+      prepare: (page, api) => openConfirm(page, api, 'free'),
+    },
+    {
+      item: '打印', screen: 'confirm', state: 'fee', route: '/print/confirm',
+      seeds: ['writePrintHandoff', 'price-config billingEnabled true', 'orders/quote', 'spaGo'],
+      missingReason: null,
+      proto: { query: { fee: '1' } },
+      prepare: (page, api) => openConfirm(page, api, 'fee'),
+    },
+    {
+      item: '打印', screen: 'cashier', state: 'pending-qr', route: '/print/cashier',
+      seeds: ['pay-status pending-qr', 'payment/channels wechat'],
+      missingReason: null,
+      proto: { query: { fee: '1' } },
+      prepare: (page, api) => openCashier(page, api, 'pending-qr'),
+    },
+    {
+      item: '打印', screen: 'cashier', state: 'expired', route: '/print/cashier',
+      seeds: ['pay-status expired', 'payment/channels wechat'],
+      missingReason: null,
+      proto: { query: { fee: '1' }, patch: { fmCash: 'expired' } },
+      prepare: (page, api) => openCashier(page, api, 'expired'),
+    },
+    {
+      item: '打印', screen: 'printing', state: 'default', route: '/print/progress',
+      seeds: ['seedPrintProgress'],
+      missingReason: null,
+      prepare: async (page, api) => {
+        shell(api)
+        await seedPrintProgress(page, api)
+        await see(page, '[data-testid="print-fulfill-state-printing"], [data-w2-page="print-progress"]')
+      },
+    },
+    {
+      item: '打印', screen: 'printing', state: 'quiet', route: '/print/progress',
+      seeds: [],
+      missingReason: '安静态要等大约 45 秒没有新进度才换说明。seedPrintProgress 固定回报正在打印，不能一键停在这一态。',
+      proto: { patch: { fmQuiet: true } },
+    },
+    {
+      item: '打印', screen: 'unconfirmed', state: 'default', route: '/print/done',
+      seeds: ['GET print/jobs PRINT_JOB_UNCONFIRMED', 'setReactRouterState'],
+      missingReason: null,
+      prepare: async (page, api) => {
+        shell(api)
+        stubTakeaway(api, W2_ORDER.taskId)
+        api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+          status: 200,
+          json: {
+            taskId: W2_ORDER.taskId,
+            status: 'failed',
+            errorCode: 'PRINT_JOB_UNCONFIRMED',
+            failureReasonForUser: '打印作业已提交到打印队列，但未确认完成，请工作人员检查纸张、卡纸和出纸状态',
+          },
+        })
+        await page.goto('/print/done')
+        await setReactRouterState(page, '/print/done', {
+          taskId: W2_ORDER.taskId,
+          file: W2_FILE,
+          params: W2_PRINT_PARAMS,
+          source: 'document',
+        })
+        await see(page, 'text=打印结果未确认')
+      },
+    },
+    {
+      item: '打印', screen: 'done', state: 'default', route: '/print/done',
+      seeds: ['seedPrintDoneCompleted'],
+      missingReason: null,
+      prepare: async (page, api) => {
+        shell(api)
+        stubTakeaway(api, W2_ORDER.taskId)
+        await seedPrintDoneCompleted(page, api)
+        await see(page, '[data-w2-page="print-done"]')
+      },
+    },
+    {
+      item: '打印', screen: 'pickup', state: 'default', route: '/print/pickup-claim',
+      seeds: ['registerTouchShell'],
+      missingReason: null,
+      prepare: async (page, api) => {
+        shell(api)
+        await page.goto('/print/pickup-claim')
+        await see(page, '[data-w2-page="pickup-claim"]')
+      },
+    },
+    {
+      item: '打印', screen: 'pickup-ok', state: 'unpaid', route: '/print/pickup-claim',
+      seeds: ['POST print/jobs/claim-pickup'],
+      missingReason: null,
+      prepare: async (page, api) => {
+        shell(api)
+        await page.route('**/api/v1/print/jobs/claim-pickup', async (route) => {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              released: false,
+              orderId: 'receipt-order',
+              orderNo: 'ORD-RECEIPT',
+              terminalId: 'KSK-001',
+              amountCents: 100,
+              priceLines: [],
+              paymentSessionToken: 'receipt-payment-session',
+            }),
+          })
+        })
+        await page.goto('/print/pickup-claim')
+        await page.getByLabel('到机码输入框').fill('28491703')
+        await see(page, 'text=订单核验成功')
+      },
+    },
+    {
+      item: '打印', screen: 'img2pdf', state: 'empty', route: '/print-scan/convert',
+      seeds: ['registerTouchShell'],
+      missingReason: null,
+      prepare: async (page, api) => {
+        shell(api)
+        await page.goto('/print-scan/convert')
+        await see(page, '[data-w2-page="print-scan-convert"]')
+      },
+    },
+  ]
+  for (const phase of pdfPhases) {
+    pairs.push({
+      item: '打印',
+      screen: 'img2pdf',
+      state: phase,
+      route: '/print-scan/convert',
+      seeds: [],
+      missingReason: PDF_PHASE,
+      proto: { patch: { fsPdf: phase } },
+    })
+  }
+  return pairs
+}
