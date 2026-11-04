@@ -6,7 +6,11 @@
 - `terminalSubjectKeysInScope` 没有改，推送「已恢复」仍只有离线和打印机，不含扫描仪。
 - 新门禁 `verify:scan-device-b9` 进 `package.json` 与 `ci.yml` 的 SQLite、postgres-readiness 两处。没有新迁移，没改一体机、终端程序、小程序、两个后台。
 - 验证（本机隔离库，`RECRUITMENT_CONTENT_HOSTING_ENABLED=false`，用完进程另记）：api typecheck 与 `eslint src/` 退出码 0；`db:pg:sync:check`「postgres schema 同步校验通过」。SQLite `file:/tmp/verify-b9-sqlite.db` 与临时 PostgreSQL 16（127.0.0.1:57641，时区 UTC，库 `b9_verify`）上 `verify:scan-device-b9` 都打印 `PASS verify-scan-device-b9`。同一套库上 `verify:scan-device-b4` 都打印 `PASS verify-scan-device-b4`。空库 `migrate deploy` 102 条全部应用，`migrate diff`「No difference detected.」。`pnpm graph:check`「PASS docs/graph/ 与当前代码一致」（门禁脚本 615）。`verify:repository-integrity` 三项 OK（5561 个已跟踪文件、6 个 workflow YAML、无超过 1 MB 的已跟踪文件）。`verify:ci-gate-coverage`：555/565 在 CI 执行闭包内，10 条已登记豁免。
-- 反向检查、告警页浏览器、低负载下的 SQLite `verify:scan-tasks` 在提交后补记。哪台机器都不许因此把 `scan_device` 配成 available。
+- 反向检查（提交 `76d1b01b7` 之后）：临时去掉 `enabled` 与 `lifecycleStatus` 过滤，SQLite `verify:scan-device-b9` 退出码 1，断言「停用终端不出扫描仪告警」（实际 1，期望 0）。已 `git checkout --` 恢复。
+- 告警页：管理员后台开发模式连临时 SQLite `file:/tmp/b9-admin-verify.db`（不进仓库）。用现成密码登录（`passwordProofState=owner_managed` 的管理员，勾选协议），没有新登录后门。1440×900 三张在 `~/.cache/claude-lanes/copyscan-1102/code-shots/b9/`：`alerts-list.png` 告警列表有「终端 B9-SCAN-01 扫描仪找不到」；`alerts-filter-scan.png` 筛选「扫描仪异常」仍是这一条；`dashboard-alert-row.png` 工作台页头是「处理告警 (1)」，铃铛是 1。控制台没有 error，也没有 pageerror。工作台「今天要处理」不逐条画告警（`buildAlertRows` 的结果只参与条数脚注），扫描仪标题只出现在告警中心。没改两个后台。
+- SQLite `verify:scan-tasks`：1 分钟负载 9.08 时单独串行跑，退出码 0。没设 `POSTGRES_URL`，日志有「SKIPPED real DB (postgres) partial unique index check」。末尾 `PASS scan tasks verification`，接着 `PASS verify-scan-deliver-filename`。80 毫秒内心跳要 tick 两次这条这次过了。没改断言，没改等待窗口。
+- 图谱挂在 `derived-scan-device-alerts.ts` 上的门禁只有 `verify:scan-device-b9`，SQLite 与临时 PG 都过；同一收集函数的 `verify:scan-device-b4` 两套库也过。`package.json`、`ci.yml`、进度文档还被一批按文件名做字符串引用的门禁列出来，这次只跑了直接守接线的 `verify:ci-gate-coverage` 和改 workflow 必跑的 `verify:repository-integrity`，没有把那几十条再在两套库上各跑一遍。
+- 哪台机器都不许因此把 `scan_device` 配成 available。未推送、未部署。
 
 ## 2026-11-04：屏上扫描后端 B8（已结束任务的回报带上最终状态；分支 `claude/scan-device-b2-1102`，叠在并入 B1 的头 `22e5f2dd1` 上，未推送、未部署）
 
