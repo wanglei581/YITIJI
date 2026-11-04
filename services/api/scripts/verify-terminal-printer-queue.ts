@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { BadRequestException, ValidationPipe } from '@nestjs/common'
 import { HeartbeatDto } from '../src/terminals/dto/heartbeat.dto'
+import { printerQueueHeartbeatData, toAdminPrinterQueue } from '../src/terminals/heartbeat-printer-queue'
 
 const root = process.cwd()
 const read = (path: string) => readFileSync(join(root, path), 'utf8')
@@ -34,15 +35,61 @@ for (const migrationPath of [
 }
 
 const dto = read('src/terminals/dto/heartbeat.dto.ts')
+const helper = read('src/terminals/heartbeat-printer-queue.ts')
+const agentService = read('src/terminals/terminals-agent.service.ts')
+const adminService = read('src/terminals/terminals-admin.service.ts')
 
 assert.match(dto, /export const PRINTER_QUEUE_PORT_KINDS = \['usb', 'network', 'wsd', 'other', 'unknown'\] as const/)
 assert.match(dto, /export const PRINTER_QUEUE_SPOOLERS = \['running', 'stopped', 'other', 'unknown'\] as const/)
 assert.match(dto, /@IsIn\(PRINTER_QUEUE_PORT_KINDS\)/)
 assert.match(dto, /@IsIn\(PRINTER_QUEUE_SPOOLERS\)/)
+assert.ok(helper.split('\n').length <= 150, 'heartbeat-printer-queue.ts must stay within 150 lines')
 
 for (const forbidden of ['ssid', 'password', 'gateway', 'printerHostAddress', 'agentToken', 'bindCode']) {
   assert.equal(dto.toLowerCase().includes(forbidden.toLowerCase()), false, `DTO must not contain ${forbidden}`)
+  assert.equal(helper.toLowerCase().includes(forbidden.toLowerCase()), false, `printer queue helper must not contain ${forbidden}`)
 }
+
+assert.match(agentService, /\.\.\.printerQueueHeartbeatData\(dto\),/)
+assert.match(adminService, /\.\.\.PRINTER_QUEUE_HEARTBEAT_SELECT,/)
+assert.match(adminService, /printerQueue: toAdminPrinterQueue\(hb\),/)
+for (const column of columns) {
+  assert.equal(agentService.includes(column), false, `agent service must only pass the helper through, found ${column}`)
+  assert.equal(adminService.includes(column), false, `admin service must only pass the helper through, found ${column}`)
+}
+assert.doesNotMatch(agentService, /function printerQueueHeartbeatData|function toAdminPrinterQueue/)
+assert.doesNotMatch(adminService, /function printerQueueHeartbeatData|function toAdminPrinterQueue/)
+const printersAt = adminService.indexOf('async listPrintersForAdmin(')
+assert.notEqual(printersAt, -1, 'listPrintersForAdmin must stay in place')
+assert.doesNotMatch(adminService.slice(printersAt), /printerQueue/)
+
+assert.deepEqual(printerQueueHeartbeatData({}), {
+  printerQueueName: null,
+  printerQueuePortKind: null,
+  printerQueuePortName: null,
+  printerQueueRawStatus: null,
+  printerQueueSpooler: null,
+})
+assert.equal(printerQueueHeartbeatData({ printerQueueRawStatus: '3,,False,,' }).printerQueueRawStatus, '3,,False,,')
+assert.equal(toAdminPrinterQueue(null), null)
+assert.equal(toAdminPrinterQueue(undefined), null)
+assert.equal(toAdminPrinterQueue({
+  printerQueueName: null,
+  printerQueuePortKind: null,
+  printerQueuePortName: null,
+  printerQueueRawStatus: null,
+  printerQueueSpooler: null,
+}), null)
+assert.equal(toAdminPrinterQueue({
+  printerQueueName: '',
+  printerQueuePortKind: '',
+  printerQueuePortName: '',
+  printerQueueRawStatus: '',
+  printerQueueSpooler: '',
+}), null)
+const partial = toAdminPrinterQueue({ printerQueueSpooler: 'stopped' })
+assert.equal(partial?.printerQueueSpooler, 'stopped')
+assert.equal(partial?.printerQueueRawStatus, null)
 
 const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })
 const meta = { type: 'body' as const, metatype: HeartbeatDto, data: '' }
@@ -111,7 +158,7 @@ async function main() {
     await reject({ ...body }, label)
   }
 
-  console.log('PASS terminal printer queue: dual schema, five-column migration, enum heartbeat fields')
+  console.log('PASS terminal printer queue: dual schema, five-column migration, enum heartbeat fields, passthrough only')
 }
 
 void main().catch((error: unknown) => {

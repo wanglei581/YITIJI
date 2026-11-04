@@ -39,6 +39,7 @@ import {
   SCAN_INPUT_REASONS,
   type HeartbeatDto,
 } from './dto/heartbeat.dto'
+import { printerQueueHeartbeatData } from './heartbeat-printer-queue'
 import type { ClaimTasksDto } from './dto/claim-tasks.dto'
 import type { PatchTaskStatusDto } from './dto/patch-task-status.dto'
 import {
@@ -413,6 +414,7 @@ export class TerminalAgentService implements OnModuleInit {
         printerStatus: dto.printerStatus ?? null,
         wiredNetworkStatus: dto.wiredNetworkStatus ?? null,
         printerNetworkStatus: dto.printerNetworkStatus ?? null,
+        ...printerQueueHeartbeatData(dto),
         localTaskDatabaseAvailable: dto.localTaskDatabaseAvailable ?? null,
         scanInputHealth: dto.scanInputHealth ?? null,
         scanInputAction: dto.scanInputAction ?? null,
