@@ -150,7 +150,7 @@ export function classifyConvertError(
     return { kind: 'known-failed', message: fallback }
   }
   if (code === 'CAPABILITY_UNAVAILABLE' || code === 'CAPABILITY_NOT_CONFIGURED') {
-    return { kind: 'capability', message: fallback }
+    return { kind: 'capability', message: '这项现在不能合成' }
   }
   if (sent && (code === 'NETWORK_ERROR' || code === '')) {
     return { kind: 'result-unknown', message: fallback }
@@ -203,6 +203,7 @@ export function statusForPhase(
     return { tone: 'bad', label: '同一标记、不同输入 · 冲突' }
   }
   if (error) {
+    if (error.kind === 'capability') return { tone: 'warn', label: '本机暂未开通' }
     if (error.kind === 'format') return { tone: 'warn', label: '有图片未能加入 · 格式' }
     if (error.kind === 'too-large') return { tone: 'warn', label: '有图片未能加入 · 大小' }
     if (error.kind === 'upload-failed') return { tone: 'bad', label: '有图片没传上去' }
@@ -224,7 +225,7 @@ export function statusForPhase(
 
 /**
  * 意图带的标题与副标题，逐态照稿 18「照片合成 PDF」。
- * 空态的标题仍是「图片转 PDF」：路由就绪锚点（h1）和路由巡检都按这个名字找这一页。
+ * 空态大标题照稿说清要办的事，眉题保留「照片合成 PDF」。
  */
 export function convertBandCopy(
   phase: ConvertPhase,
@@ -241,7 +242,7 @@ export function convertBandCopy(
   if (error?.kind === 'result-unknown' || error?.kind === 'in-progress') {
     return { title: '这一次的结果没有确认', sub: '用同一个标记再查，不重新合成' }
   }
-  if (phase === 'empty') return { title: '图片转 PDF', sub: '还没有图片。加上之后才能合成' }
+  if (phase === 'empty') return { title: '把图片合成一个 PDF', sub: '还没有图片。加上之后才能合成' }
   return {
     title: '排好顺序再合成',
     sub: `已有 ${images.length} 张 · 合计 ${formatBytes(totalBytesOf(images))} · 最多 ${MAX_IMAGES} 张`,

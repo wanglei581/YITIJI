@@ -2,7 +2,7 @@
  * 页面专用样式，颜色一律走 --qxt-* / --qx-* 令牌，不改 .qxt-*。
  * 说明格 / 整行按钮的基础样式在 tool-fs.css（.fs-fact / .fs-row / .fs-2 …），这里只补本页独有的件：
  *   待合并列表（缩略图 + 名字 + 第几张）、更多设置、示意小样、完成页的状态卡、查看大图层。
- * 版式规矩（审查意见 A1）：卡片按内容定高，多出来的高度只给 .i2p-sample（一块示意小样），不撑空卡；
+ * 编辑页余量给真实图片，两张上下排满中部；其他状态余量仍给 .i2p-sample。
  * 列表在自己的滚动区里滚（.i2p-lrows），其余块都是 .i2p-scroll 的直接子块，上下相邻、互不压盖。
  */
 
@@ -53,6 +53,7 @@
 
 /* ── 待合并列表：一张卡（表头 + 行 + 两句限制）。行多了在 .i2p-lrows 里滚。 ── */
 .i2p-list {
+  flex: 1 0 800px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -81,8 +82,9 @@
 }
 
 .i2p-lrows {
-  flex: none;
-  max-height: 540px;
+  position: relative;
+  flex: 1 1 0;
+  min-height: 560px;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
@@ -97,20 +99,24 @@
 .i2p-lrows::-webkit-scrollbar-thumb { background: var(--qxt-line); border-radius: 5px; }
 
 .i2p-irow {
-  flex: none;
+  position: relative;
+  flex: 0 0 calc((100% - 8px) / 2);
   display: flex;
   align-items: stretch;
   gap: 8px;
-  min-height: 104px;
+  min-height: 276px;
 }
+
+.i2p-list[data-count='1'] .i2p-irow { flex-basis: 100%; }
 
 [data-qx-page='img2pdf'] .i2p-ipick {
   flex: 1;
   min-width: 0;
   display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 8px 14px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 14px;
   border-radius: 20px;
   background: var(--qxt-well);
   border: 1.5px solid transparent;
@@ -125,9 +131,9 @@
 }
 
 .i2p-ithumb {
-  flex: none;
-  width: 72px;
-  height: 88px;
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 160px;
   border-radius: 8px;
   border: 1px solid var(--qxt-line);
   background: var(--qxt-card);
@@ -145,8 +151,9 @@
 }
 
 .i2p-imeta {
-  flex: 1;
+  flex: none;
   min-width: 0;
+  padding-right: 80px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -170,6 +177,9 @@
 }
 
 [data-qx-page='img2pdf'] .i2p-ibtn {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
   flex: none;
   width: 72px;
   min-height: 72px;
@@ -183,9 +193,10 @@
 }
 
 .i2p-list .fs-p,
-.i2p-more .fs-p {
+.i2p-more .fs-p,
+.i2p-output-note {
   margin: 0;
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1.45;
   color: var(--qxt-ink-2);
 }
