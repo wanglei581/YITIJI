@@ -22,17 +22,13 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   AlertCircleIcon,
   AlertTriangleIcon,
-  ClockIcon,
-  CreditCardIcon,
-  FileTextIcon,
-  ShieldIcon,
 } from 'lucide-react'
 import { preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
 import { PrintTouchFrame, printAsk } from './PrintTouchFrame'
 import { PrintArt } from './art/PrintArt'
 import { PrintProgressMissing } from './components/PrintProgressMissing'
-import { PrintAiHelp } from './components/PrintAiHelp'
+import { PrintProgressHelp } from './components/PrintProgressHelp'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { truncateFileNameMiddle, FILE_NAME_BUDGET_COMPACT } from '../../lib/fileName'
@@ -76,7 +72,7 @@ export function PrintProgressPage() {
   const location = useLocation()
   const support = useSupportContact()
   // 模块级原句在文件加载时就钉死了，那时服务电话往往还没读到。这里按当前联系方式重拼，读不到号码就不写电话。
-  const PRINT_PROGRESS_QUIET_COPY = `这台机器暂时没有回报打印进度，请看出纸口。${printProblemLine(support)}`
+  const PRINT_PROGRESS_QUIET_COPY = `这台机器暂时没有回报打印进度，请看出纸口。${printProblemLine(support)}。`
   const state = location.state as Record<string, unknown> | null
   const priorOutputLine = priorOutputTrayLine({
     mayHavePrinted: state?.mayHavePrinted === true,
@@ -350,7 +346,7 @@ export function PrintProgressPage() {
     },
     {
       key: 'queue',
-      label: isSim ? '排队等待演示' : showFailure ? failureView.badge : realStatus.queueLabel,
+      label: isSim ? '排队等待演示' : realStatus.queueLabel,
       desc: isSim
         ? '演示：终端未接收、未校验'
         : showFailure
@@ -363,7 +359,7 @@ export function PrintProgressPage() {
       desc: isSim
         ? '演示：未出纸，无真实打印动作'
         : progressQuiet
-          ? PRINT_PROGRESS_QUIET_COPY
+          ? ''
           : backendStatus === 'printing'
             ? '打印机正在出纸，请在出纸口等候'
             : '终端开始打印后才会出纸',
@@ -398,7 +394,7 @@ export function PrintProgressPage() {
       : showFailure
         ? <>{preferUnattended(failureView.ask, printProblemLine())}</>
         : progressQuiet
-          ? <>{PRINT_PROGRESS_QUIET_COPY}</>
+          ? <>进度未更新</>
         : <>{paymentLead(payment)}<em>{realStatus.askPhase}</em>。</>
   const askDoing = isSim
     ? (simDone ? '未真实打印，未创建打印任务' : '当前为演示模式，不会建单、支付或出纸')
@@ -560,20 +556,6 @@ export function PrintProgressPage() {
         </section>
       )}
 
-      {printingNow ? (
-        <div className="pft-actions">
-          <button
-            type="button"
-            className="qxt-btn qxt-btn-sec"
-            data-testid="print-fulfill-reprint"
-            onClick={() => navigate(uploadPath)}
-          >
-            再印一份
-          </button>
-          <p className="qxt-fine">{reprintHint(amountCents)} {endLabel}</p>
-        </div>
-      ) : null}
-
       {isSim && simDone && (
         <div className="pfp-sim-end">
           <p className="pfp-sim-end-t">未真实打印</p>
@@ -599,12 +581,30 @@ export function PrintProgressPage() {
       {!timedOut && !failed && (
         <div className="pff-out pfp-out">
           <div className="pff-out-stage pfp-printer" aria-hidden="true">
-            <PrintArt name="mfp" />
+            <PrintArt name="mfp" crop={{ x: 0.09, top: 0.065, bottom: 0.12 }} />
           </div>
           <div className="pff-out-main">
-            {priorOutputLine ? (
-              <p className="pfp-out-note" data-testid="print-progress-prior-output" role="status">{priorOutputLine}</p>
-            ) : null}
+            {priorOutputLine ? <p className="pfp-out-note" data-testid="print-progress-prior-output" role="status">{priorOutputLine}</p> : null}
+            {isSim ? <p className="pfp-prompt">{stageHeading} · {stageLine}</p> : <p className="pfp-prompt" role="status">
+              {progressQuiet ? <>{PRINT_PROGRESS_QUIET_COPY}</> : <>{endLabel}。这一页不会自己报成功。</>}
+            </p>}
+            {!isSim && !progressQuiet ? <p className="pfp-out-note">纸从打印机出纸口出来。超过 45 秒没有新进度，这里会说明下一步怎么办。</p> : null}
+          </div>
+        </div>
+      )}
+
+      {/* 查询超时后已释放 busy lock，不再显示「打印期间不会清空」。 */}
+      {!isSim && (timedOut ? null : (
+        <PrintProgressHelp
+          key={`${progressQuiet}-${failed || statusReadError}`}
+          quiet={progressQuiet}
+          abnormal={failed || statusReadError}
+          payment={payment}
+          support={support}
+          onHelp={() => navigate('/help')}
+          onContact={needsContactEntry(support) ? () => navigate(PRIVACY_CONTACT_ROUTE) : undefined}
+        >
+          <div className="pff-out-main">
             <div className="pff-out-status">
               {backendStatus === 'printing' && !progressQuiet ? (
                 <span className="pff-pulse"><i /><i /><i />正在出纸</span>
@@ -627,58 +627,7 @@ export function PrintProgressPage() {
               <p className="pfp-out-note">请勿离开，打印完成后请及时取走文件，避免个人材料遗留在出纸口。页数来自文件信息，不逐页播报。</p>
             )}
           </div>
-        </div>
-      )}
-
-      {/* 查询超时时 busy lock 已释放、空闲清场会照常计时，「打印期间不会清空」不再成立，
-          求助也改由底部两枚按钮承接（稿 client-status-timeout 态同样没有这两节）。 */}
-      {!isSim && (timedOut ? null : (
-        <>
-        <section className="pff-sec" aria-label="你的文件，走完就清">
-          <div className="pff-sec-h"><span className="t">你的文件，走完就清</span></div>
-          <div className="pff-wipe" data-live="false">
-            <div>
-              <div className="pff-wipe-t"><ShieldIcon aria-hidden="true" />打印期间不会清空</div>
-              <p className="pff-wipe-s">全部打完、你拿走之后，才开始这次办理清空计时。倒计时不是催你走，你可以核对完再离开。</p>
-            </div>
-          </div>
-        </section>
-
-        <section className="pff-sec" aria-label="常见情况处理">
-          <div className="pff-sec-h">
-            <span className="t">遇到这些情况怎么办</span>
-            <span className="hint">先看下面这几条</span>
-          </div>
-          <div className="pfp-card pfp-faq-card">
-            <ul className="pfp-faq">
-              <li><AlertTriangleIcon aria-hidden="true" /><p><b>打印机缺纸 / 卡纸</b>：别硬拉纸；打印机报告卡纸或缺纸后，本页会转到结果页说明原因。</p></li>
-              <li><ClockIcon aria-hidden="true" /><p><b>长时间没有新进度</b>：如果停在出纸又没有新消息，请看出纸口。查了很久仍没有最终结果时，本页也会另外提示。{printProblemLine()}</p></li>
-              <li><FileTextIcon aria-hidden="true" /><p><b>文件校验未通过</b>：上传可能中断或文件已变化，需返回重新上传。</p></li>
-              <li>
-                <CreditCardIcon aria-hidden="true" />
-                <p>
-                  {isFreeOrder
-                    ? <><b>打印失败</b>：订单记录保留。{printProblemLine()}</>
-                    : payment === 'paid'
-                      ? <><b>已支付但打印失败</b>：订单与支付记录都在。是否退款以订单记录为准，本机不承诺自动退款。{printProblemLine()}</>
-                      : <><b>打印失败</b>：订单记录已保存。{printProblemLine()}</>
-                  }
-                </p>
-              </li>
-            </ul>
-            <div className="pff-help" data-testid="print-fulfill-fallback">
-              <span className="txt">卡纸、缺纸、没出全？<b>别硬拉纸</b>。{printProblemLine()}</span>
-              <button type="button" className="pff-help-btn" data-testid="print-fulfill-primary" onClick={() => navigate('/help')}>
-                使用帮助
-              </button>
-            </div>
-            <PrintAiHelp
-              label="问小青：取纸或异常怎么办 →"
-              draft="打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。"
-            />
-          </div>
-        </section>
-        </>
+        </PrintProgressHelp>
       ))}
 
       {isSim && (
