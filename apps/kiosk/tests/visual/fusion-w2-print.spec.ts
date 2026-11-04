@@ -55,6 +55,7 @@ const UNVERIFIED_CAPABILITIES = [
   'signature_stamp',
   'color_print',
   'duplex_print',
+  'scan_device',
 ].map((capabilityKey) => ({
   capabilityKey,
   status: 'not_verified',
