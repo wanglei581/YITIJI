@@ -162,11 +162,12 @@ function assertNoSqliteDrift(db: string, label: string): void {
 // 117: first-order service project/deployment/incident/event/report; no old model removed.
 // 118（机构 AI 服务计次，+1）：AiServiceFact —— 只存服务类型、服务编号、机构、终端、发生时间，
 //   不含 endUserId，不是会员数据，不进注销删除或置空清单；机构工作台按它显示本机构终端上成功完成的 AI 服务次数。
-// 120（贴牌与授权管理，+2）：
+// 121（贴牌与授权管理 +2，与主线 AiSafetyTerm 合并）：
+//   AiSafetyTerm —— 仅存词库配置，无 endUserId，不进入会员注销清单（主线）；
 //   BrandLogo —— 贴牌 Logo（只收 PNG，解压校验后重编码），与待机宣传屏素材分表；
 //   License   —— 软件使用授权（只按期限与终端台数，不与岗位 / 招聘会 / 浏览 / 投递挂钩）。
-//   120 = 117 + AiServiceFact + BrandLogo + License。
-const EXPECTED_MODEL_COUNT = 120
+//   121 = 117 + AiServiceFact + AiSafetyTerm + BrandLogo + License。
+const EXPECTED_MODEL_COUNT = 121
 
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)
