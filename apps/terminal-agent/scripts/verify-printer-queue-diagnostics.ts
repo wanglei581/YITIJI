@@ -3,8 +3,9 @@ import fs from 'node:fs'
 import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
-import { __resetUnauthorizedForTests, __setUnauthorizedMarkerPathForTests } from '../src/agent/auth-state'
+import { __resetUnauthorizedForTests, __setUnauthorizedMarkerPathForTests, isUnauthorized } from '../src/agent/auth-state'
 import {
+  __printerQueueFieldRetrySuppressedUntilForTests,
   __resetPrinterQueueFieldRetryForTests,
   sendHeartbeat,
   type HeartbeatOptions,
@@ -129,6 +130,8 @@ const QUEUE_KEYS = [
 ] as const
 
 const HOUR_MS = 60 * 60 * 1000
+const QUEUE_FIELD_FALLBACK_WARN =
+  'heartbeat: 带打印队列字段的心跳被拒（400），去掉这些字段后重发成功；1 小时内不带'
 
 function assertQueueKeys(body: HeartbeatPayload, present: boolean, label: string): void {
   for (const key of QUEUE_KEYS) {
@@ -212,7 +215,7 @@ async function verifyHeartbeatAssembly(): Promise<void> {
   assert.match(parallelBlock, /readNetwork\(/)
   assert.match(parallelBlock, /readQueue\(/)
 
-  let mode: 'ok' | 'bad-once' | 'bad-always' | 'unauthorized' = 'ok'
+  let mode: 'ok' | 'bad-once' | 'bad-always' | 'unauthorized' | 'bad-then-401' = 'ok'
   let phaseHits = 0
   const t0 = 1_700_000_000_000
   const config: AgentConfig = {
@@ -229,6 +232,7 @@ async function verifyHeartbeatAssembly(): Promise<void> {
       phaseHits += 1
       if (mode === 'unauthorized') return { status: 401 }
       if (mode === 'bad-always') return { status: 400 }
+      if (mode === 'bad-then-401') return { status: phaseHits === 1 ? 400 : 401 }
       if (mode === 'bad-once' && phaseHits === 1) return { status: 400 }
       return { status: 200 }
     }, async (baseUrl, requests) => {
@@ -241,6 +245,19 @@ async function verifyHeartbeatAssembly(): Promise<void> {
         failureCounter,
         now: () => clock,
         onObservation: (observation) => { observations.push(observation.connected) },
+      }
+      let queueReads = 0
+      let printerReads = 0
+      const readQueueProbe = options.readPrinterQueueDiagnostics
+      const readPrinterProbe = options.readPrinterStatusAndRaw
+      assert.ok(readQueueProbe && readPrinterProbe)
+      options.readPrinterQueueDiagnostics = async (printerName) => {
+        queueReads += 1
+        return readQueueProbe(printerName)
+      }
+      options.readPrinterStatusAndRaw = async (printerName) => {
+        printerReads += 1
+        return readPrinterProbe(printerName)
       }
 
       phaseHits = 0
@@ -285,23 +302,43 @@ async function verifyHeartbeatAssembly(): Promise<void> {
       assert.deepEqual(observations, [true], '400 retry notifies once')
       assert.equal(failureCounter.count, 0, 'successful retry resets the failure counter')
       const warnText = warnChunks.join('')
-      assert.equal(warnText.split('后端还不认打印队列字段').length - 1, 1, 'warn once per rejection')
+      assert.equal(warnText.split(QUEUE_FIELD_FALLBACK_WARN).length - 1, 1, 'warn once after the clean retry')
 
       phaseHits = 0
       mode = 'ok'
       clock = t0 + HOUR_MS - 1
       const withinStart = requests.length
+      const queueReadsBeforeWithin = queueReads
+      const printerReadsBeforeWithin = printerReads
       assert.equal(await sendHeartbeat(options), true)
       assert.equal(requests.length, withinStart + 1, 'within one hour there is no extra retry')
       const within = requests[withinStart]
       assert.ok(within)
       assertQueueKeys(within, false, 'within one hour the next heartbeat omits queue fields')
+      assert.equal(queueReads, queueReadsBeforeWithin, 'within one hour readQueue is not called')
+      assert.equal(printerReads, printerReadsBeforeWithin + 1, 'within one hour readPrinter still runs')
+
+      mode = 'bad-always'
+      phaseHits = 0
+      failureCounter.count = 0
+      const bareStart = requests.length
+      const queueReadsBeforeBare = queueReads
+      assert.equal(await sendHeartbeat(options), false, '400 without queue fields does not retry')
+      assert.equal(requests.length, bareStart + 1, '400 without queue fields is a single request')
+      const bare = requests[bareStart]
+      assert.ok(bare)
+      assertQueueKeys(bare, false, '400 without queue fields')
+      assert.equal(failureCounter.count, 1, '400 without queue fields increments the counter once')
+      assert.equal(queueReads, queueReadsBeforeBare, '400 without queue fields still skips readQueue')
+      mode = 'ok'
 
       phaseHits = 0
       clock = t0 + HOUR_MS
       const afterStart = requests.length
+      const queueReadsBeforeAfter = queueReads
       assert.equal(await sendHeartbeat(options), true)
       assert.equal(requests.length, afterStart + 1, 'after one hour there is no extra retry')
+      assert.equal(queueReads, queueReadsBeforeAfter + 1, 'after one hour readQueue runs again')
       const after = requests[afterStart]
       assert.ok(after)
       assert.equal(after.printerQueueName, 'Configured Queue')
@@ -329,7 +366,19 @@ async function verifyHeartbeatAssembly(): Promise<void> {
       observations.length = 0
       failureCounter.count = 0
       const alwaysStart = requests.length
-      assert.equal(await sendHeartbeat(options), false, 'a second 400 is a normal failure')
+      const alwaysWarnChunks: string[] = []
+      const alwaysOriginalWrite = process.stdout.write.bind(process.stdout)
+      process.stdout.write = ((chunk: string | Uint8Array) => {
+        alwaysWarnChunks.push(String(chunk))
+        return true
+      }) as typeof process.stdout.write
+      let alwaysFailed = true
+      try {
+        alwaysFailed = await sendHeartbeat(options)
+      } finally {
+        process.stdout.write = alwaysOriginalWrite
+      }
+      assert.equal(alwaysFailed, false, 'a second 400 is a normal failure')
       assert.equal(requests.length, alwaysStart + 2, '400 is resent once and then stops')
       const alwaysFirst = requests[alwaysStart]
       const alwaysSecond = requests[alwaysStart + 1]
@@ -338,6 +387,22 @@ async function verifyHeartbeatAssembly(): Promise<void> {
       assertQueueKeys(alwaysSecond, false, 'always-400 retry drops queue fields')
       assert.deepEqual(observations, [false], 'failed retry notifies once')
       assert.equal(failureCounter.count, 1, 'failed retry increments the counter once')
+      assert.equal(
+        alwaysWarnChunks.join('').includes(QUEUE_FIELD_FALLBACK_WARN),
+        false,
+        'failed retry must not warn that queue fields will be omitted',
+      )
+      assert.equal(__printerQueueFieldRetrySuppressedUntilForTests(), 0, 'failed retry does not start suppression')
+
+      phaseHits = 0
+      failureCounter.count = 0
+      const stillStart = requests.length
+      assert.equal(await sendHeartbeat(options), false, 'next heartbeat after 400→400 still fails')
+      const stillFirst = requests[stillStart]
+      assert.ok(stillFirst)
+      assert.equal(stillFirst.printerQueueName, 'Configured Queue', '400→400 后下一次心跳仍带队列名')
+      assert.equal(requests.length, stillStart + 2, '400→400 后下一次心跳仍会重发')
+      assert.equal(failureCounter.count, 1, 'the next 400→400 still increments the counter once')
 
       mode = 'unauthorized'
       phaseHits = 0
@@ -356,6 +421,30 @@ async function verifyHeartbeatAssembly(): Promise<void> {
       assert.equal(unauthorized.printerQueueSpooler, 'running')
       assert.deepEqual(observations, [false], '401 notifies once')
       assert.equal(failureCounter.count, 1)
+
+      __resetPrinterQueueFieldRetryForTests()
+      __resetUnauthorizedForTests(true)
+      mode = 'bad-then-401'
+      phaseHits = 0
+      clock = t0 + (4 * HOUR_MS)
+      observations.length = 0
+      failureCounter.count = 0
+      const authRetryStart = requests.length
+      assert.equal(__printerQueueFieldRetrySuppressedUntilForTests(), 0)
+      assert.equal(await sendHeartbeat(options), false, '400 then 401 is a failure')
+      assert.equal(requests.length, authRetryStart + 2, '400 then 401 resends once')
+      const authFirst = requests[authRetryStart]
+      const authSecond = requests[authRetryStart + 1]
+      assert.ok(authFirst && authSecond)
+      assertQueueKeys(authFirst, true, '400 then 401 first request keeps queue fields')
+      assertQueueKeys(authSecond, false, '400 then 401 retry drops queue fields')
+      assert.equal(isUnauthorized(), true, '400 then 401 calls markUnauthorized')
+      assert.equal(failureCounter.count, 1, '400 then 401 increments the counter once')
+      assert.equal(
+        __printerQueueFieldRetrySuppressedUntilForTests(),
+        0,
+        '400 then 401 does not suppress queue fields',
+      )
     })
   } finally {
     __resetUnauthorizedForTests(true)
@@ -437,12 +526,138 @@ async function verifyQueueNameContract(): Promise<void> {
   })
 }
 
+interface HeldHeartbeat {
+  body: HeartbeatPayload
+  respond: (status: number) => void
+}
+
+async function waitForHeld(inbox: HeldHeartbeat[], count: number): Promise<void> {
+  const started = Date.now()
+  while (inbox.length < count) {
+    if (Date.now() - started > 5_000) {
+      throw new Error(`timed out waiting for ${count} heartbeat requests, saw ${inbox.length}`)
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+}
+
+async function withHeldHeartbeatServer(
+  run: (baseUrl: string, inbox: HeldHeartbeat[]) => Promise<void>,
+): Promise<void> {
+  const inbox: HeldHeartbeat[] = []
+  const server = http.createServer((request, response) => {
+    const chunks: Buffer[] = []
+    request.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)))
+    request.on('end', () => {
+      if (request.method === 'GET' && request.url?.endsWith('/release-observation-plan')) {
+        response.writeHead(200, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ plan: null }))
+        return
+      }
+      if (request.method === 'PUT' && request.url?.endsWith('/heartbeat')) {
+        const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as HeartbeatPayload
+        inbox.push({
+          body,
+          respond: (status: number) => {
+            response.writeHead(status, { 'content-type': 'application/json' })
+            response.end(JSON.stringify(
+              status === 200
+                ? { acknowledged: true }
+                : { error: { code: status === 401 ? 'AUTH_TOKEN_INVALID' : 'BAD_REQUEST' } },
+            ))
+          },
+        })
+        return
+      }
+      response.writeHead(404, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ error: { code: 'NOT_FOUND' } }))
+    })
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  assert.ok(address && typeof address === 'object')
+  try {
+    await run(`http://127.0.0.1:${address.port}`, inbox)
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+}
+
+async function verifyConcurrentQueueFallback(): Promise<void> {
+  __resetUnauthorizedForTests(true)
+  __resetPrinterQueueFieldRetryForTests()
+  const earlySuccess = 2_000
+  const lateSuccess = 5_000
+  let nowValue = 1_000
+  await withHeldHeartbeatServer(async (baseUrl, inbox) => {
+    const options: HeartbeatOptions = {
+      ...queueProbes(),
+      config: {
+        apiBaseUrl: baseUrl,
+        terminalCode: 'VERIFY-PRINTER-QUEUE',
+        agentVersion: 'verify-only',
+        terminalId: 'terminal-printer-queue',
+        agentToken: 'test-only-agent-token',
+        printerName: 'Configured Queue',
+      },
+      now: () => nowValue,
+    }
+    const first = sendHeartbeat(options)
+    await waitForHeld(inbox, 1)
+    const second = sendHeartbeat(options)
+    await waitForHeld(inbox, 2)
+    const earlier = inbox[0]
+    const later = inbox[1]
+    assert.ok(earlier && later)
+    assert.equal(earlier.body.printerQueueName, 'Configured Queue', 'earlier heartbeat sends the queue name')
+    assert.equal(later.body.printerQueueName, 'Configured Queue', 'later heartbeat sends the queue name')
+
+    later.respond(400)
+    await waitForHeld(inbox, 3)
+    const laterRetry = inbox[2]
+    assert.ok(laterRetry)
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(laterRetry.body, 'printerQueueName'),
+      false,
+      'later heartbeat retries without queue fields',
+    )
+
+    earlier.respond(400)
+    await waitForHeld(inbox, 4)
+    const earlierRetry = inbox[3]
+    assert.ok(earlierRetry)
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(earlierRetry.body, 'printerQueueName'),
+      false,
+      'earlier heartbeat retries without queue fields',
+    )
+
+    nowValue = lateSuccess
+    laterRetry.respond(200)
+    assert.equal(await second, true, 'later-sent heartbeat retry succeeds first')
+    const laterDeadline = lateSuccess + HOUR_MS
+    assert.equal(__printerQueueFieldRetrySuppressedUntilForTests(), laterDeadline)
+
+    nowValue = earlySuccess
+    earlierRetry.respond(200)
+    assert.equal(await first, true, 'earlier-sent heartbeat retry succeeds later')
+    assert.equal(
+      __printerQueueFieldRetrySuppressedUntilForTests(),
+      laterDeadline,
+      '并发两次重发成功，截止时间取较晚的那个，不被写回更早',
+    )
+  })
+  __resetUnauthorizedForTests(true)
+  __resetPrinterQueueFieldRetryForTests()
+}
+
 async function main(): Promise<void> {
   verifyParse()
   verifyScriptText()
   verifyRawStatus()
   await verifyCollect()
   await verifyHeartbeatAssembly()
+  await verifyConcurrentQueueFallback()
   await verifyQueueNameContract()
   console.log('ALL PASS: printer queue diagnostics stay enum-only and drop raw values that miss the contract')
 }

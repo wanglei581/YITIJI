@@ -137,6 +137,11 @@ export function __resetPrinterQueueFieldRetryForTests(): void {
   printerQueueUnrecognizedWarnAt = Number.NEGATIVE_INFINITY
 }
 
+/** 门禁读取「一小时内不带」的截止时间。 */
+export function __printerQueueFieldRetrySuppressedUntilForTests(): number {
+  return printerQueueSuppressedUntil
+}
+
 function heartbeatNow(options: HeartbeatOptions): number {
   return options.now?.() ?? Date.now()
 }
@@ -176,10 +181,16 @@ function printerQueueNameForHeartbeat(name: string): string | undefined {
   return name
 }
 
-function rememberUnrecognizedPrinterQueueFields(nowMs: number): void {
-  printerQueueSuppressedUntil = nowMs + PRINTER_QUEUE_SUPPRESS_MS
+function rememberSuccessfulQueueFieldFallback(options: HeartbeatOptions): void {
+  // 截止和警告节流都在重发成功这一刻现取，不用探针开始前的时间。
+  // 两次心跳重叠时取较晚的截止，避免晚返回的那次把时间写回更早。
+  const nowMs = heartbeatNow(options)
+  printerQueueSuppressedUntil = Math.max(
+    printerQueueSuppressedUntil,
+    nowMs + PRINTER_QUEUE_SUPPRESS_MS,
+  )
   if (nowMs - printerQueueUnrecognizedWarnAt >= PRINTER_QUEUE_SUPPRESS_MS) {
-    warn('heartbeat: 后端还不认打印队列字段')
+    warn('heartbeat: 带打印队列字段的心跳被拒（400），去掉这些字段后重发成功；1 小时内不带')
     printerQueueUnrecognizedWarnAt = nowMs
   }
 }
@@ -229,18 +240,19 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
 
   const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
   const nowMs = heartbeatNow(options)
+  const includePrinterQueue = nowMs >= printerQueueSuppressedUntil
   const readPrinter = options.readPrinterStatusAndRaw ?? getPrinterStatusAndRaw
   const readDisk = options.readDiskFreeGB ?? getDiskFreeGB
   const readNetwork = options.readNetworkDiagnostics ?? collectNetworkDiagnostics
   const readQueue = options.readPrinterQueueDiagnostics ?? collectPrinterQueueDiagnostics
 
-  // 状态、磁盘、网口三路与打印队列探针同一次 Promise.all。
-  // 队列探针超时 5 秒，不叠在原来的等待后面，心跳等待上限不增加。
+  // 不带队列字段的这一小时里不跑队列探针，省一次 PowerShell。打印机状态照常查。
+  // 要查的时候，队列探针仍和另外三路同一次 Promise.all，超时 5 秒，不另加等待。
   const [printerReading, diskFreeGB, networkDiagnostics, printerQueue] = await Promise.all([
     readPrinter(config.printerName),
     readDisk(),
     readNetwork(config.printerName),
-    readQueue(config.printerName),
+    includePrinterQueue ? readQueue(config.printerName) : Promise.resolve(undefined),
   ])
   const queriedPrinterStatus = printerReading.status
   const printerStatus = printerStatusForHeartbeat(queriedPrinterStatus)
@@ -256,7 +268,7 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
     localTaskDatabaseAvailable,
     ...networkDiagnostics,
   }
-  if (nowMs >= printerQueueSuppressedUntil) {
+  if (includePrinterQueue && printerQueue) {
     attachPrinterQueueFields(payload, config.printerName, printerQueue, printerReading.rawStatus)
   }
   const scanInputTelemetry = options.getScanInputTelemetry?.()
@@ -305,6 +317,9 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
         `/terminals/${config.terminalId}/heartbeat`,
         body,
       )
+      // allowQueueRetry 为 false 只出现在「去掉队列字段之后的那一次重发」。
+      // 只有这次成功才进入一小时不带。
+      if (!allowQueueRetry) rememberSuccessfulQueueFieldFallback(options)
       log(`heartbeat: ✓ acknowledged`)
       notifyObservation(onObservation, {
         connected: true,
@@ -324,9 +339,9 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
       void observeReleasePlan(config)
       return true
     } catch (error) {
-      // 400 且这次带了打印队列字段：去掉后立刻重发一次。401 和其他错误不走这里。
+      // 400 且这次带了打印队列字段：去掉五个字段立刻重发一次。
+      // 重发仍是 400、401 或网络错误：不进入不带、不打那句警告，走原来的失败路径。
       if (allowQueueRetry && isBadRequestHttpError(error) && hasPrinterQueueFields(body)) {
-        rememberUnrecognizedPrinterQueueFields(nowMs)
         return putOnce(omitPrinterQueueFields(body), false)
       }
       return finishFailure(body, error)
