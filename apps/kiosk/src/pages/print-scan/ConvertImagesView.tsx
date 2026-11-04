@@ -269,8 +269,8 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
     <div className="i2p-page" data-w2-page="print-scan-convert" data-qx-page="img2pdf" data-state={phase}>
       <div className="i2p-scroll qx-grow">
         {body.main}
-        {props.extraRows}
         {sample}
+        {props.extraRows}
       </div>
 
       {!kiosk && (

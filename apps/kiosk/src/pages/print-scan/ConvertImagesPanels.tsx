@@ -72,8 +72,8 @@ export function UsbBody({ kiosk }: { kiosk: boolean }) {
             {kiosk ? '这台机器没有本机文件框。请回到手机扫码，传 JPG 或 PNG。' : '在这台设备上选图，或回到手机扫码，传 JPG 或 PNG。'}
           </Fact>
           <Fact title="现在能用的">手机扫码上传一张 JPG 或 PNG。传到这台机器之后，才会出现在列表里。</Fact>
-          <Fact title="要拼成一份 PDF">图片得先落到手机或这台机器上，再在这一页上传。拷进来之后，就和别的图片一样：一张一页，顺序你自己排。</Fact>
-          <Fact title="只想把原图打出来">那是打印流程，不是这一页：走「打印扫描」里的 U 盘导入打印。那条路不会回到这个列表，也排不出页序。</Fact>
+          <Fact title="要拼成一份 PDF">先把图片存到手机或本机，再上传；一张图一页，顺序自己排。</Fact>
+          <Fact title="只想把原图打出来">到「打印扫描」用 U 盘导入打印；图片不进此列表，不能在这里排页序。</Fact>
         </div>
         <Fact wide title="还没加进来">U 盘里的图片不会出现在这个列表里。</Fact>
       </div>
