@@ -62,8 +62,35 @@ export interface ScanDeviceSettingsResult {
   expiresAt: string
 }
 
-function conflict(code: string, message: string): never {
-  throw new ConflictException({ error: { code, message } })
+/** 已结束任务在 409 details 里能出现的 taskStatus。投递中另用 'matched'，不进这一组。 */
+const SCAN_DEVICE_ENDED_STATUSES = ['completed', 'cancelled', 'expired', 'failed'] as const
+type ScanDeviceEndedStatus = (typeof SCAN_DEVICE_ENDED_STATUSES)[number]
+
+type ScanDeviceReportConflictDetails =
+  | { taskStatus: ScanDeviceEndedStatus; fileDelivered: boolean }
+  | { taskStatus: 'matched' }
+
+function scanFileDelivered(fileId: string | null): boolean {
+  return typeof fileId === 'string' && fileId.length > 0
+}
+
+function endedReportDetails(fileId: string | null, taskStatus: ScanDeviceEndedStatus): {
+  taskStatus: ScanDeviceEndedStatus
+  fileDelivered: boolean
+} {
+  return { taskStatus, fileDelivered: scanFileDelivered(fileId) }
+}
+
+function asEndedStatus(status: string): ScanDeviceEndedStatus | null {
+  return (SCAN_DEVICE_ENDED_STATUSES as readonly string[]).includes(status)
+    ? (status as ScanDeviceEndedStatus)
+    : null
+}
+
+function conflict(code: string, message: string, details?: ScanDeviceReportConflictDetails): never {
+  throw new ConflictException({
+    error: details === undefined ? { code, message } : { code, message, details },
+  })
 }
 
 /**
@@ -77,6 +104,10 @@ function conflict(code: string, message: string): never {
  *              SCAN_DEVICE_SETTINGS_CHANGED
  *   仅此次回报被拒（会话还在）  SCAN_DEVICE_TRANSITION_INVALID / SCAN_DEVICE_PAGE_COUNT_DECREASED /
  *              SCAN_DEVICE_TASK_DELIVERING / SCAN_DEVICE_STATE_CHANGED
+ *
+ * 已结束（completed / cancelled / expired / failed）和投递中（matched）的 409 多带 error.details，
+ * 供终端程序在上传响应丢失后判定投递结果。错误码不变。截止时间已过、或到了最长时限、库里仍是
+ * waiting 时，taskStatus 记为 expired。只属于本终端的任务才带；别的终端仍是 404，面板任务不带。
  */
 @Injectable()
 export class ScanDeviceSessionsService {
@@ -115,13 +146,26 @@ export class ScanDeviceSessionsService {
         conflict('SCAN_TASK_NOT_DEVICE', '该扫描任务不是屏上扫描')
       }
       if (task.status === 'cancelled') {
-        conflict('SCAN_DEVICE_TASK_CANCELLED', '扫描任务已取消，请停止屏上扫描')
+        conflict(
+          'SCAN_DEVICE_TASK_CANCELLED',
+          '扫描任务已取消，请停止屏上扫描',
+          endedReportDetails(task.fileId, 'cancelled'),
+        )
       }
       if (task.status !== 'waiting' && task.status !== 'matched') {
-        conflict('SCAN_DEVICE_TASK_ENDED', '扫描任务已结束，请停止屏上扫描')
+        const taskStatus = asEndedStatus(task.status)
+        conflict(
+          'SCAN_DEVICE_TASK_ENDED',
+          '扫描任务已结束，请停止屏上扫描',
+          taskStatus ? endedReportDetails(task.fileId, taskStatus) : undefined,
+        )
       }
       if (task.status === 'waiting' && task.expiresAt.getTime() <= now.getTime()) {
-        conflict('SCAN_DEVICE_TASK_ENDED', '扫描任务已过期，请停止屏上扫描')
+        conflict(
+          'SCAN_DEVICE_TASK_ENDED',
+          '扫描任务已过期，请停止屏上扫描',
+          endedReportDetails(task.fileId, 'expired'),
+        )
       }
       if (!task.deliveryAckedAt) {
         conflict('SCAN_DEVICE_TASK_NOT_ACKED', '扫描任务尚未确认，不能回报屏上扫描进度')
@@ -142,7 +186,9 @@ export class ScanDeviceSessionsService {
         // 文件正在投递（waiting → matched 之后）。网络重试迟到的同状态回报当作重复，原样应答，
         // 不写库、不续期；其余回报此刻没有意义，如实拒绝。
         if (input.state !== task.deviceState) {
-          conflict('SCAN_DEVICE_TASK_DELIVERING', '文件正在投递，暂不接受新的屏上扫描回报')
+          conflict('SCAN_DEVICE_TASK_DELIVERING', '文件正在投递，暂不接受新的屏上扫描回报', {
+            taskStatus: 'matched',
+          })
         }
         return this.toReportResult(task, task.expiresAt)
       }
@@ -151,7 +197,11 @@ export class ScanDeviceSessionsService {
       const hardExpiresAt =
         task.hardExpiresAt ?? new Date(task.createdAt.getTime() + SCAN_DEVICE_HARD_LIFETIME_MS)
       if (hardExpiresAt.getTime() <= now.getTime()) {
-        conflict('SCAN_DEVICE_TASK_ENDED', '屏上扫描会话已达最长时限，请停止屏上扫描')
+        conflict(
+          'SCAN_DEVICE_TASK_ENDED',
+          '屏上扫描会话已达最长时限，请停止屏上扫描',
+          endedReportDetails(task.fileId, 'expired'),
+        )
       }
 
       const plan = planScanDeviceReport(task, input)

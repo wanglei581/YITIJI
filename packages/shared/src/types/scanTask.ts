@@ -1,4 +1,11 @@
 export type ScanType = 'resume' | 'id' | 'document' | 'contract'
+/**
+ * 扫描任务状态。
+ *
+ * 屏上扫描 device-report（2026-11-04）：任务已结束时，409 的 `error.details.taskStatus`
+ * 取 completed / cancelled / expired / failed 之一，并带 `fileDelivered`（任务已挂上 fileId
+ * 才是 true）。投递中仍是原来的 409，details 只带 `taskStatus: 'matched'`。只属于本终端的任务才带。
+ */
 export type ScanTaskStatus =
   | 'waiting'
   | 'matched'

@@ -13961,7 +13961,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 285
+      "sourceFileCount": 279
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -24975,6 +24975,7 @@
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-scan-device-b4.ts",
       "services/api/scripts/verify-scan-device-b6.ts",
+      "services/api/scripts/verify-scan-device-b8.ts",
       "services/api/scripts/verify-scan-device-idscan.ts",
       "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
@@ -26305,6 +26306,7 @@
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-scan-device-b4.ts",
       "services/api/scripts/verify-scan-device-b6.ts",
+      "services/api/scripts/verify-scan-device-b8.ts",
       "services/api/scripts/verify-scan-device-idscan.ts",
       "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
@@ -26587,6 +26589,7 @@
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
+      "services/api/scripts/verify-scan-device-b8.ts",
       "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-sessions-http.ts",
@@ -27107,6 +27110,7 @@
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-device-b4.ts",
       "services/api/scripts/verify-scan-device-b6.ts",
+      "services/api/scripts/verify-scan-device-b8.ts",
       "services/api/scripts/verify-scan-device-idscan.ts",
       "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
@@ -28856,6 +28860,7 @@
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-scan-device-b4.ts",
       "services/api/scripts/verify-scan-device-b6.ts",
+      "services/api/scripts/verify-scan-device-b8.ts",
       "services/api/scripts/verify-scan-device-idscan.ts",
       "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
@@ -28964,6 +28969,7 @@
     "services/api/src/scan-tasks/scan-device-sessions.service.ts": [
       "services/api/scripts/verify-scan-device-b4.ts",
       "services/api/scripts/verify-scan-device-b6.ts",
+      "services/api/scripts/verify-scan-device-b8.ts",
       "services/api/scripts/verify-scan-device-idscan.ts",
       "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
@@ -29000,6 +29006,7 @@
       "services/api/scripts/verify-pg-serialization-conflict.ts",
       "services/api/scripts/verify-scan-device-b4.ts",
       "services/api/scripts/verify-scan-device-b6.ts",
+      "services/api/scripts/verify-scan-device-b8.ts",
       "services/api/scripts/verify-scan-device-idscan.ts",
       "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
@@ -29108,6 +29115,7 @@
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-device-b4.ts",
       "services/api/scripts/verify-scan-device-b6.ts",
+      "services/api/scripts/verify-scan-device-b8.ts",
       "services/api/scripts/verify-scan-device-idscan.ts",
       "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
@@ -29242,6 +29250,7 @@
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-scan-device-b4.ts",
       "services/api/scripts/verify-scan-device-b6.ts",
+      "services/api/scripts/verify-scan-device-b8.ts",
       "services/api/scripts/verify-scan-device-idscan.ts",
       "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
@@ -44632,6 +44641,32 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:scan-device-b6"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/scan-tasks/scan-device-sessions.service.ts",
+          "services/api/src/scan-tasks/scan-tasks.service.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-scan-device-b8.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:scan-device-b8"
       ],
       "wired": true
     },

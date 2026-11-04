@@ -1,5 +1,13 @@
 # 当前开发进度
 
+## 2026-11-04：屏上扫描后端 B8（已结束任务的回报带上最终状态；分支 `claude/scan-device-b2-1102`，叠在并入 B1 的头 `22e5f2dd1` 上，未推送、未部署）
+
+- device-report 遇到已结束任务时，409 的 `error.details` 带 `taskStatus`（completed / cancelled / expired / failed）和 `fileDelivered`（已挂上 fileId 才是 true）。cancelled 仍是 `SCAN_DEVICE_TASK_CANCELLED`，其余结束仍是 `SCAN_DEVICE_TASK_ENDED`。库里仍是 waiting、但截止时间已过或到了最长时限，taskStatus 记为 expired。投递中仍是 `SCAN_DEVICE_TASK_DELIVERING`，details 只有 `taskStatus: 'matched'`；同状态重发仍成功。别的终端仍是 404 `SCAN_TASK_NOT_FOUND`，不带这些字段。面板任务、已改用面板的任务不带。错误码和原有文案不变。统一错误过滤器只透出这些有界字段，不拷贝 fileId。
+- 新门禁 `verify:scan-device-b8` 进 `package.json` 与 `ci.yml` 的 SQLite、postgres-readiness 两处。`packages/shared` 的 `ScanTaskStatus` 只补了注释。没有新迁移，没改 `scan-tasks.service.ts`。
+- 验证（本机隔离库，`RECRUITMENT_CONTENT_HOSTING_ENABLED=false`，用完已停）：api typecheck 打印 `services/api typecheck: Done`；`eslint src/` EXIT 0；`db:pg:sync:check`「postgres schema 同步校验通过」。SQLite `file:/tmp/verify-b8-sqlite.db` 找到 130 条迁移，无待执行。临时 PostgreSQL 16.15（127.0.0.1:57511，时区 UTC，库 `b8_verify`）空库 `migrate deploy` 102 条全部应用，`migrate diff`「No difference detected.」。两套库上屏上扫描六条加 b8、静默期、文件留存、派生种类、材料处理都过。`verify:http-exception-filter` 末尾 `ALL PASS`。`verify:recruitment-hosting-gate-declares`「声明 45 个、豁免 34 个、违规 0 个」。`verify:scan-tasks` 在 PostgreSQL 上单独跑，日志没有「SKIPPED real DB」，末尾 `PASS scan tasks verification`，接着 `PASS verify-scan-deliver-filename`。`pnpm graph` 后 `pnpm graph:check`「PASS docs/graph/ 与当前代码一致」（门禁脚本 614；管理员后台源文件数按当前索引从 285 改为 279）。`verify:repository-integrity`：5559 个已跟踪文件无冲突标记、6 个 workflow YAML 语法有效、无超过 1 MB 的已跟踪文件（6 个已登记例外）。
+- 反向检查两处都让 `verify:scan-device-b8` 退出 1：去掉 details 时，已完成且已挂上文件的异常体只有 code 和 message；把别的终端的任务状态带进 404 时，实际体多了 `taskStatus: completed` 与 `fileDelivered: true`。两处都已改回。
+- 没做：一体机、终端程序、小程序、两个后台没动。未推送、未部署。哪台机器都不许因此把 `scan_device` 配成 available。
+
 ## 2026-11-04：屏上扫描后端 B2 并入最新 B1（B1 已含 main `3e83449f9`，B1 头 `5612045d6`；分支 `claude/scan-device-b2-1102`，合并前头 `68c030217`，未推送、未部署）
 
 - 按语义合并。main 侧保留：AI 三条派生告警（`ai_provider_unavailable` / `ai_consecutive_failures` / `ai_budget_exhausted`）及 episode、告警页文案与筛选、工作台 Bot 图标和「AI 服务」副标题、终端查询 `enabled: true` 且 `lifecycleStatus: 'active'`、`terminalSubjectKeysInScope` 仍只有离线与打印机。进度文档两侧都留。
