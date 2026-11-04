@@ -675,6 +675,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b6
           # 屏上扫描 B8：已结束任务的回报在 409 details 里带最终状态，供终端程序判定投递结果。别的终端与面板不带。SQLite 与 PG 两侧各跑一遍。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b8
+          # 屏上扫描 B9：扫描仪告警只算仍在运营的终端（enabled 且 active）。停用与非 active 不出告警。不放进已恢复推送范围。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b9
           pnpm --filter @ai-job-print/api verify:print-conversion
           # 包 K1：中文字体解析收口 + 探测（缺候选路径即红）
           pnpm --filter @ai-job-print/api verify:cjk-font
@@ -1229,6 +1231,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b6
           # 屏上扫描 B8：已结束任务的回报在 409 details 里带最终状态，供终端程序判定投递结果。别的终端与面板不带。SQLite 与 PG 两侧各跑一遍。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b8
+          # 屏上扫描 B9：扫描仪告警只算仍在运营的终端（enabled 且 active）。停用与非 active 不出告警。不放进已恢复推送范围。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b9
           pnpm --filter @ai-job-print/api verify:print-conversion
           # 包 K1：中文字体解析收口 + 探测（缺候选路径即红）
           pnpm --filter @ai-job-print/api verify:cjk-font

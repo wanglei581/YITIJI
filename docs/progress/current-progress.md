@@ -1,5 +1,13 @@
 # 当前开发进度
 
+## 2026-11-04：屏上扫描后端 B9（扫描仪告警只算仍在运营的终端；分支 `claude/scan-device-b2-1102`，叠在 B8 头 `d09b3f19d` 上，未推送、未部署）
+
+- `collectScanDeviceAlerts` 与 `resolveScanDeviceAlert` 只算 `enabled: true` 且 `lifecycleStatus: 'active'` 的终端。其余三个条件照旧：`scan_device` 为 available、心跳在在线窗口内、健康值为 `not_found` 或 `error`。停用、维护中（以及计划中、调试中、已暂停、已退役）不出这条告警。
+- `terminalSubjectKeysInScope` 没有改，推送「已恢复」仍只有离线和打印机，不含扫描仪。
+- 新门禁 `verify:scan-device-b9` 进 `package.json` 与 `ci.yml` 的 SQLite、postgres-readiness 两处。没有新迁移，没改一体机、终端程序、小程序、两个后台。
+- 验证（本机隔离库，`RECRUITMENT_CONTENT_HOSTING_ENABLED=false`，用完进程另记）：api typecheck 与 `eslint src/` 退出码 0；`db:pg:sync:check`「postgres schema 同步校验通过」。SQLite `file:/tmp/verify-b9-sqlite.db` 与临时 PostgreSQL 16（127.0.0.1:57641，时区 UTC，库 `b9_verify`）上 `verify:scan-device-b9` 都打印 `PASS verify-scan-device-b9`。同一套库上 `verify:scan-device-b4` 都打印 `PASS verify-scan-device-b4`。空库 `migrate deploy` 102 条全部应用，`migrate diff`「No difference detected.」。`pnpm graph:check`「PASS docs/graph/ 与当前代码一致」（门禁脚本 615）。`verify:repository-integrity` 三项 OK（5561 个已跟踪文件、6 个 workflow YAML、无超过 1 MB 的已跟踪文件）。`verify:ci-gate-coverage`：555/565 在 CI 执行闭包内，10 条已登记豁免。
+- 反向检查、告警页浏览器、低负载下的 SQLite `verify:scan-tasks` 在提交后补记。哪台机器都不许因此把 `scan_device` 配成 available。
+
 ## 2026-11-04：屏上扫描后端 B8（已结束任务的回报带上最终状态；分支 `claude/scan-device-b2-1102`，叠在并入 B1 的头 `22e5f2dd1` 上，未推送、未部署）
 
 - device-report 遇到已结束任务时，409 的 `error.details` 带 `taskStatus`（completed / cancelled / expired / failed）和 `fileDelivered`（已挂上 fileId 才是 true）。cancelled 仍是 `SCAN_DEVICE_TASK_CANCELLED`，其余结束仍是 `SCAN_DEVICE_TASK_ENDED`。库里仍是 waiting、但截止时间已过或到了最长时限，taskStatus 记为 expired。投递中仍是 `SCAN_DEVICE_TASK_DELIVERING`，details 只有 `taskStatus: 'matched'`；同状态重发仍成功。别的终端仍是 404 `SCAN_TASK_NOT_FOUND`，不带这些字段。面板任务、已改用面板的任务不带。错误码和原有文案不变。统一错误过滤器只透出这些有界字段，不拷贝 fileId。

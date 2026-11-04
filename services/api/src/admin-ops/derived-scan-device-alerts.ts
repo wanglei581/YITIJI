@@ -39,9 +39,12 @@ function faultDetail(health: ScanDeviceFaultHealth): string {
 
 /**
  * 扫描仪告警。和打印机异常同一条心跳通道：不写 Alert 行，每次列表现算。
- * 只在终端仍在线、scan_device 已开通（available）、最近一条心跳的 scanDeviceHealth
- * 为 not_found 或 error 时出现。恢复后下一次收集就没有这条，去重键是 type:终端 id。
+ * 终端范围与离线、打印机告警一致：只算 enabled 且 lifecycleStatus 为 active 的终端。
+ * 停用、计划中、调试中、维护中、已暂停、已退役的机器不算。
+ * 其余三个条件照旧：scan_device 已开通（available）、最近一条心跳仍在在线窗口内、
+ * scanDeviceHealth 为 not_found 或 error。恢复后下一次收集就没有这条，去重键是 type:终端 id。
  * 可以和打印机异常同时存在（subjectKey 不同）。
+ * 不放进 terminalSubjectKeysInScope：推送「已恢复」仍只有离线和打印机。
  */
 export async function collectScanDeviceAlerts(prisma: PrismaService, now: Date): Promise<ScanDeviceAlert[]> {
   const caps = await prisma.terminalCapability.findMany({
@@ -51,7 +54,11 @@ export async function collectScanDeviceAlerts(prisma: PrismaService, now: Date):
   if (caps.length === 0) return []
 
   const terminals = await prisma.terminal.findMany({
-    where: { id: { in: caps.map((cap) => cap.terminalId) } },
+    where: {
+      id: { in: caps.map((cap) => cap.terminalId) },
+      enabled: true,
+      lifecycleStatus: 'active',
+    },
     select: {
       id: true,
       terminalCode: true,
@@ -114,6 +121,7 @@ export async function collectScanDeviceAlerts(prisma: PrismaService, now: Date):
   })
 }
 
+/** 正向查证走同一条收集，因此同样只认运营中的终端。 */
 export async function resolveScanDeviceAlert(
   prisma: PrismaService,
   subjectId: string,

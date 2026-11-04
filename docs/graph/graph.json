@@ -24976,6 +24976,7 @@
       "services/api/scripts/verify-scan-device-b4.ts",
       "services/api/scripts/verify-scan-device-b6.ts",
       "services/api/scripts/verify-scan-device-b8.ts",
+      "services/api/scripts/verify-scan-device-b9.ts",
       "services/api/scripts/verify-scan-device-idscan.ts",
       "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
@@ -25342,7 +25343,11 @@
       "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-queue-dispatch-printer-status.ts",
-      "services/api/scripts/verify-scan-device-b4.ts"
+      "services/api/scripts/verify-scan-device-b4.ts",
+      "services/api/scripts/verify-scan-device-b9.ts"
+    ],
+    "services/api/src/admin-ops/derived-scan-device-alerts.ts": [
+      "services/api/scripts/verify-scan-device-b9.ts"
     ],
     "services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts": [
       "services/api/scripts/verify-admin-order-filters.ts"
@@ -28861,6 +28866,7 @@
       "services/api/scripts/verify-scan-device-b4.ts",
       "services/api/scripts/verify-scan-device-b6.ts",
       "services/api/scripts/verify-scan-device-b8.ts",
+      "services/api/scripts/verify-scan-device-b9.ts",
       "services/api/scripts/verify-scan-device-idscan.ts",
       "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
@@ -44667,6 +44673,27 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:scan-device-b8"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/admin-ops/derived-scan-device-alerts.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-scan-device-b9.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:scan-device-b9"
       ],
       "wired": true
     },
