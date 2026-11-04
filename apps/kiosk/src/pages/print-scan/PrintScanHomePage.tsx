@@ -231,6 +231,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     mfpOffStateNote: '照常可用 · 出纸要换机',
   },
   {
+    // 条目与 id_photo 映射保留。服务台是否画出这张卡由 ID_PHOTO_ENTRY_PARKED 决定。
     key: 'id-photo',
     cap: 'idphoto',
     icon: UserSquareIcon,
@@ -382,7 +383,7 @@ export function PrintScanHomePage() {
             : rawCapability
         const capabilityKey = CARD_CAPABILITY_KEY[capability.key]
 
-        // ① 探测轴优先：读不到能力配置 → 八项一律不开（含证件照说明页）。
+        // ① 探测轴优先：读不到能力配置 → 八项一律不开。证件照卡另由停放常量挡住，不在这里删条目。
         //    理由只写在徽标上一次；「重新检测」与服务电话在页顶状态块里，不在八张卡上各抄一遍。
         if (!confirmed && capabilityKey) {
           return {
@@ -406,7 +407,7 @@ export function PrintScanHomePage() {
           resolved = {
             ...capability,
             available,
-            // 管理员关掉的项整卡停用（含证件照说明）。未配置的「尚未开放」说明页仍可进。
+            // 管理员关掉的项整卡停用。证件照卡是否出现只看 ID_PHOTO_ENTRY_PARKED，不看这项覆盖。
             to: available ? capability.to : '',
             state: available ? capability.state : undefined,
             note: available ? capability.note : (override.note ?? undefined),

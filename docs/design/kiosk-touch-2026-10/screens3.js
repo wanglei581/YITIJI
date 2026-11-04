@@ -68,7 +68,7 @@
     notes: {
       does: '打印服务台还在读本机能力时，版式与打印服务台一致：打印、扫描先不开，复印和到机码照常可点。',
       motion: '卡片依次浮入。确认中的状态点不转圈，避免看成马上就好。',
-      keep: '对应运行页 /print-scan 的 capability-loading（printHubContent.ts）。胶囊「正在读取本机能力」。问句「正在确认这台机器能做什么。」副题「确认前，打印、扫描这几项先不进入；到机码、复印照常可用。」打印文件、扫描纸质材料写「正在确认」，浅底虚线。复印、到机码照常可点。其他工具 3×2：照片打印、照片合成 PDF、证件照、签名写「正在确认」；我的文档、打印订单不在能力确认里，照常可点。不画空白骨架，不写时长。不把彩色、双面写成已经开通。'
+      keep: '对应运行页 /print-scan 的 capability-loading（printHubContent.ts）。胶囊「正在读取本机能力」。问句「正在确认这台机器能做什么。」副题「确认前，打印、扫描这几项先不进入；到机码、复印照常可用。」打印文件、扫描纸质材料写「正在确认」，浅底虚线。复印、到机码照常可点。其他工具两行：上行照片打印、照片合成 PDF、签名写「正在确认」，下行我的文档、打印订单不在能力确认里，照常可点（证件照 10/12 定停放，不画）。不画空白骨架，不写时长。不把彩色、双面写成已经开通。'
     },
     render: () => F({
       band: {
@@ -92,7 +92,6 @@
         <div class="d3-tools">
           ${holdTile({ i: 4, icon: 'image', t: '照片打印', d: '正在确认' })}
           ${holdTile({ i: 5, icon: 'layers', t: '照片合成 PDF', d: '正在确认' })}
-          ${holdTile({ i: 6, icon: 'idcard', t: '证件照', d: '正在确认' })}
           ${holdTile({ i: 7, icon: 'pen', tone: 'clay', t: '签名', d: '正在确认' })}
           ${tile({ i: 8, go: 'my-docs', icon: 'folder', tone: 'slate', title: '我的文档', desc: '登录后查看' })}
           ${tile({ i: 9, go: 'my-orders', icon: 'receipt', tone: 'slate', title: '打印订单', desc: '登录后查看' })}

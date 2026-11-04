@@ -294,7 +294,7 @@ const QX_TOUCH_ROUTES = new Set<string>([
   '/print-scan/convert', // 照片合成 PDF
   '/print-scan/sign', // 签名（默认关闭）
   '/print-scan/feature/copy', // 复印
-  '/print-scan/feature/id-photo', // 证件照说明
+  '/print-scan/feature/id-photo', // 证件照说明已停放，页内回到 /print-scan；精确项留着，跳转瞬间仍算触屏路由
   // 第十包 政策与受控扩展
   '/policy-service',
   '/renshi',
@@ -326,7 +326,7 @@ const QX_TOUCH_PREFIXES: readonly string[] = [
   // 第七包 简历其余页
   // 第八包 练面试
   // 第九包 扫描复印
-  '/print-scan/feature/', // 复印、证件照和不认识的能力名是同一页的 :key，精确名单盖不住未知名字
+  '/print-scan/feature/', // 复印和不认识的能力名是同一页的 :key；证件照地址已停放，前缀仍盖住它。精确名单盖不住未知名字
   // 第十包 政策与受控扩展
   '/smart-campus/service/', // 只放窄前缀，不写 /smart-campus（welcome 已在精确集合）
   // 第十一包 私有化版招聘
