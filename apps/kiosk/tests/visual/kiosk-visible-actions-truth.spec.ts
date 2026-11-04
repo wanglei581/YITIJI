@@ -357,6 +357,12 @@ test('生成预览读回真实结果后导出 payload 正确 @kiosk', async ({ p
 
   await page.getByTestId('resume-generate-preview-cta-export').click()
   await expect(page.getByRole('heading', { name: '选导出格式' })).toBeVisible()
+  await expect(page.getByTestId('resume-export-aigc-note')).toHaveText('导出的简历每页底部有一行小字：含人工智能辅助生成内容')
+  await page.getByTestId('resume-generate-preview-fmt-txt').click()
+  await expect(page.getByTestId('resume-export-aigc-note')).toHaveText('导出的文件末尾有一行：含人工智能辅助生成内容')
+  await page.getByTestId('resume-generate-preview-fmt-docx').click()
+  await expect(page.getByTestId('resume-export-aigc-note')).toHaveText('导出的简历每页底部有一行小字：含人工智能辅助生成内容')
+  await page.getByTestId('resume-generate-preview-fmt-pdf').click()
   await expect(page.getByTestId('resume-generate-preview-cta-confirm-export')).toHaveText('导出这一份')
   await page.getByRole('button', { name: '返回预览' }).click()
   await expect(page.getByRole('heading', { name: '生成结果' })).toBeVisible()
