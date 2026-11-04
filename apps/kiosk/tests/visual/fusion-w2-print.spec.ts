@@ -2218,6 +2218,9 @@ test('benefit card reports 价目拉不到 when the quote fails and shows no amo
   await expect(page.getByText('本机没能取到现行价目', { exact: true })).toBeVisible()
   // 反向：报价失败时既不显示金额，也不给出任何「有可用 / 已用完」结论。
   await expect(page.getByTestId('print-confirm-amount')).toHaveCount(0)
+  // 换了「应付 X.XX 元」格式后，屏上任何地方都不许冒出这句或旧的 ¥ 写法（不止 testid 那一处）。
+  await expect(page.getByText('应付 2.00 元', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('¥2.00')).toHaveCount(0)
   await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '重新报价' })).toBeVisible()
   await expect(page.getByRole('button', { name: /^(去付款|确认并打印)$/ })).toHaveCount(0)
@@ -2483,6 +2486,9 @@ test('print confirm fail-closes duplicate query keys and missing file context @w
   await expect(page.locator('[data-testid="print-confirm-state-missing-context"]')).toBeVisible()
   await expect(page.getByText('未找到文件信息')).toBeVisible()
   await expect(page.getByTestId('print-confirm-amount')).toHaveCount(0)
+  // 换了「应付 X.XX 元」格式后，屏上任何地方都不许冒出这句或旧的 ¥ 写法（不止 testid 那一处）。
+  await expect(page.getByText('应付 2.00 元', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('¥2.00')).toHaveCount(0)
   await expectHealthy(page, errors, 'print-confirm')
 })
 
