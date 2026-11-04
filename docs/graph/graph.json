@@ -21562,6 +21562,7 @@
     "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
+      "apps/kiosk/scripts/verify-print-done-truth.mjs",
       "apps/kiosk/scripts/verify-scan-input-safety.mjs",
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
@@ -22010,6 +22011,7 @@
     "apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-member-print-orders-ui.mjs",
+      "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
@@ -32718,6 +32720,7 @@
           "apps/kiosk/src/pages/print/cashierStatus.ts",
           "apps/kiosk/src/pages/print/components/PickupHidGuide.tsx",
           "apps/kiosk/src/pages/print/pickupClaimModel.ts",
+          "apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx",
           "apps/kiosk/src/services/api/httpAdapter.ts",
           "apps/kiosk/src/services/api/userErrorMessage.ts",
           "services/api/src/files/file-content-integrity.ts",
@@ -32878,6 +32881,7 @@
           "apps/kiosk/src/auth/kioskEndUse.ts",
           "apps/kiosk/src/pages/print/PrintConfirmPage.tsx",
           "apps/kiosk/src/pages/print/PrintDonePage.tsx",
+          "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx",
           "apps/kiosk/src/pages/print/PrintProgressPage.tsx",
           "apps/kiosk/src/pages/print/components/PrintDoneFailed.tsx",
           "apps/kiosk/src/pages/print/components/PrintDoneSections.tsx",

@@ -575,6 +575,12 @@ test('unfinished privacy check keeps the recovery exit on screen @kiosk', async 
   await page.route('**/api/v1/print/jobs', async (route) => {
     await route.fulfill({ status: 400, json: { error: { code: 'PRINT_PII_SCAN_REQUIRED', message: 'PRINT_PII_SCAN_REQUIRED' } } })
   })
+  // 回到材料检查后，检查页一进来就建材料任务；不登记时请求有时落在用例结束前，被夹具判成未处理（CI 偶发红）。
+  // 照 fusion-w2 的做法回 503，让页面稳定停在「材料检查未完成」。
+  api.respond('POST', '/api/v1/materials/tasks', {
+    status: 503,
+    json: { success: false, error: { code: 'MATERIAL_UNAVAILABLE', message: '材料服务暂不可用' } },
+  })
   await openConfirm(page)
   await expect(originalConfirm(page)).toBeEnabled()
   await originalConfirm(page).click()
