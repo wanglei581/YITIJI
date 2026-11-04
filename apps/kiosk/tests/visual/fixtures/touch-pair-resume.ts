@@ -241,6 +241,8 @@ export function resumePairs(): TouchPair[] {
       prepare: async (page, api) => {
         resumeShell(api)
         stubOptimize(api, true)
+        // 已登录会员进编辑屏前会读 resume_ai 授权：按「已授权」造，不让授权弹窗挡住编辑器（弹窗本身另有用例）。
+        api.respond('GET', '/api/v1/me/ai-consents/status', { status: 200, json: { success: true, data: [{ scope: 'resume_ai', granted: true }] } })
         await loginTo(page, api, '/resume-service')
         await terminalReady(page)
         await writeSession(page, RESUME_KEY, { taskId: 'w6-compare', accessToken: 'w6-compare-access' })
