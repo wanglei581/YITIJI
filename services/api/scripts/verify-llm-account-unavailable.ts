@@ -365,7 +365,8 @@ async function intentRelease(): Promise<void> {
   }
   const files = { async assertContentAccessibleForEndUser() { return undefined } }
   const runner = new ResumeParseIntentRunner(submission as never, quota, ai as never, files as never)
-  // 会员、终端、IP 三项都要退（总指挥 10/4：上游一次故障不能把整台机、整个场地当天的次数烧掉）。
+  // 会员次数在按人账本，不进这张公共计数（避免和账本双重计数）。
+  // 终端、IP 两项仍要退（总指挥 10/4：上游一次故障不能把整台机、整个场地当天的次数烧掉）。
   const context = { member: 'member-a', terminal: 'KSK-001', ip: '203.0.113.10' }
   const total = () => [...counts.values()].reduce((sum, value) => sum + value, 0)
   const dto = { fileId: 'file-1', fileName: 'a.pdf', fileFormat: 'pdf', source: 'upload' as const }
@@ -374,7 +375,8 @@ async function intentRelease(): Promise<void> {
   canned.set(accountId, { taskId: accountId, status: 'failed', failCode: AI_PROVIDER_ACCOUNT_UNAVAILABLE, failReason: 'AI 暂时不可用，可以先打印原件或手动填写简历' })
   const account = await runner.submit(dto, 'member-a', context, accountId, token())
   assert.equal(account.failCode, AI_PROVIDER_ACCOUNT_UNAVAILABLE)
-  assert.equal(counts.size, 3, 'account failure was charged on member, terminal and ip before release')
+  assert.equal(counts.size, 2, 'account failure was charged on terminal and ip before release')
+  assert.ok([...counts.keys()].every((key) => !key.includes(':member:')), 'member resume-parse count stays off this redis map')
   assert.ok([...counts.values()].every((value) => value === 0), 'account failure released the charged counters')
 
   const fileId = 'b'.repeat(64)
@@ -383,7 +385,7 @@ async function intentRelease(): Promise<void> {
   assert.ok([...counts.values()].some((value) => value > 0), 'unreadable file stays charged')
   const charged = [...counts.values()].reduce((sum, value) => sum + value, 0)
 
-  assert.equal(charged, 3, 'unreadable file charged once on each of the three counters')
+  assert.equal(charged, 2, 'unreadable file charged once on terminal and on ip')
 
   // 模型这一环抛错：退次（失败不扣）。
   thrown = new Error('provider down')
@@ -402,14 +404,14 @@ async function intentRelease(): Promise<void> {
   const blockedId = 'f'.repeat(64)
   canned.set(blockedId, { taskId: blockedId, status: 'failed', failCode: 'AI_CONTENT_BLOCKED', failReason: '这个问题我不能回答' })
   await runner.submit(dto, 'member-a', context, blockedId, token())
-  assert.equal(total(), charged + 3, 'content-moderation block stays charged')
-  // 成功：三项各只扣一次；同一意图重放不再扣。
+  assert.equal(total(), charged + 2, 'content-moderation block stays charged')
+  // 成功：终端、IP 各只扣一次；同一意图重放不再扣。会员次数不在这张公共计数里。
   const okId = '1'.repeat(64)
   canned.set(okId, { taskId: okId, status: 'completed' } as never)
   await runner.submit(dto, 'member-a', context, okId, token())
-  assert.equal(total(), charged + 6, 'success charges exactly once on each counter')
+  assert.equal(total(), charged + 4, 'success charges exactly once on each counter')
   await runner.submit(dto, 'member-a', context, okId, token())
-  assert.equal(total(), charged + 6, 'replaying the same successful intent does not charge again')
+  assert.equal(total(), charged + 4, 'replaying the same successful intent does not charge again')
 
   const source = readFileSync(join(here, '../src/ai/resume-parse-intent-runner.service.ts'), 'utf8')
   assert.equal(source.includes('rollback'), false)
