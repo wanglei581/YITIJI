@@ -1,3 +1,4 @@
+import { LicenseLock } from '../../../layouts/LicenseLock'
 import { useMemberCursorPage } from './useMemberCursorPage'
 import { MemberLoadMore } from './MemberLoadMore'
 // 我的消息通知 — /me/notifications 与 /notifications。
@@ -151,7 +152,7 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
           sentence={canUseRemote ? '还没有消息。' : '当前没有可读取的消息。连接真实服务并登录后，这里会显示本人消息。'}
           note={<MeKinds items={CAT_ORDER.map((cat) => ({ title: CATEGORY_LABEL[cat], note: '暂无' }))} />}
         >
-          <MeExitCard art="usb" artWidth={120} title="去打印" desc="打印和扫描不需要先有消息" onClick={() => navigate('/print-scan')} />
+          <LicenseLock><MeExitCard art="usb" artWidth={120} title="去打印" desc="打印和扫描不需要先有消息" onClick={() => navigate('/print-scan')} /></LicenseLock>
           <MeExitCard art="checklist" artWidth={120} title="去提反馈" desc="设备、打印或文件上的问题可以写在这里" onClick={() => navigate('/me/feedback')} />
         </MeEmptyPack>
       </div>
@@ -161,7 +162,7 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
       <div data-testid="notifications-list" className="me-state">
         <MeEmptyPack sentence="未读里没有消息。">
           <MeExitCard art="checklist" artWidth={120} title="查看全部" desc="已读的消息也在全部里" onClick={() => setUnreadOnly(false)} />
-          <MeExitCard art="usb" artWidth={120} title="去打印" desc="打印和扫描现在就能办" onClick={() => navigate('/print-scan')} />
+          <LicenseLock><MeExitCard art="usb" artWidth={120} title="去打印" desc="打印和扫描现在就能办" onClick={() => navigate('/print-scan')} /></LicenseLock>
         </MeEmptyPack>
       </div>
     )
@@ -192,7 +193,7 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
         {items.length < 7 && openKey === null ? (
           <div className="me-stack">
             <MeExitCard art="checklist" artWidth={110} title="去提反馈" desc="打印或设备上的问题可以写下来" onClick={() => navigate('/me/feedback')} />
-            <MeExitCard art="usb" artWidth={110} title="去打印" desc="不看消息也能打印、扫描" onClick={() => navigate('/print-scan')} />
+            <LicenseLock><MeExitCard art="usb" artWidth={110} title="去打印" desc="不看消息也能打印、扫描" onClick={() => navigate('/print-scan')} /></LicenseLock>
           </div>
         ) : null}
       </>

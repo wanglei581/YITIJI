@@ -64,6 +64,8 @@ export interface FileSourceViewProps {
   conversionReason: string | null
   usbFiles: UsbFileListItem[] | null
   usbSelected: UsbFileListItem | null
+  /** 上传没有等到结果时停在已选文件屏上的那一句。不改屏幕枚举，成功导入不传。 */
+  usbNotice?: string | null
   usbDriveLabel: string | null
   formatBytes: (bytes: number) => string
   phone: PhoneSessionView
@@ -194,7 +196,7 @@ export function FileSourceView(props: FileSourceViewProps) {
   const {
     screen, pageTitle, pageSubtitle, terminalLabel, status, orderPausedNotice, isResumePrint,
     showFileChannel, showScan, tab, usbMode, usbHold = null, usbSwitchAllowed = true, currentFile, blockedName, blockedMeta,
-    wordHint, conversionReason, usbFiles, usbSelected, usbDriveLabel, formatBytes, phone, qrUrl, expiresLabel, waitRemainingSeconds,
+    wordHint, conversionReason, usbFiles, usbSelected, usbNotice = null, usbDriveLabel, formatBytes, phone, qrUrl, expiresLabel, waitRemainingSeconds,
     previewOpen, previewToken, onSelectChannel, onOpenPicker, onRetryLocal, onNext, onExit, onBack,
     onHelp, onScan, onDocuments, onResumes, onPreview, onClosePreview, onReplace, onDelete,
     onUsbSelect, onUsbImport, onUsbRescan, onPhoneRefresh, onPhoneConfirm, onPhoneCancel,
@@ -589,6 +591,7 @@ export function FileSourceView(props: FileSourceViewProps) {
           screen={screen}
           files={usbFiles}
           selected={usbSelected}
+          notice={usbNotice}
           driveLabel={usbDriveLabel}
           formatBytes={formatBytes}
           wordText={conversionReason ?? wordHint}

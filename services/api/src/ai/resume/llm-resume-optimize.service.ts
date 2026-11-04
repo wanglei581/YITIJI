@@ -36,6 +36,7 @@ import {
   buildOriginalCoverage, missingOriginalEntries, originalCoverageRetryHint, preserveOriginalEntries,
   restoreGeneratedResume, restoreOptimizeResult,
 } from './resume-optimize-coverage'
+import { alignOptimizeModuleAfter } from './resume-optimize-after-align'
 
 // ============================================================
 // LlmResumeOptimizeService — 阶段2B 真实简历优化(单轮、结构化 JSON,OpenAI 兼容)
@@ -103,10 +104,11 @@ export const OPTIMIZE_SYSTEM_PROMPT = withAiSafety([
   '8. 若收到"优化方向"提示(专业/学历/目标岗位/经验级别/求职场景),只能用于调整措辞重点与用词方向;不得据此新增、替换或"纠正"任何学校、公司、学历、证书、时间段等事实字段——事实字段仍必须逐字来自简历原文。',
   '9. 必须保留原文全部教育、工作/实习、项目/校园、技能和证书条目，不得省略段落或合并不同经历；只有公司没有职务时 role 留空字符串，仍保留该条经历。',
   `10. 每条 description 最多 ${MAX_OPTIMIZE_DESC_CHARS} 字，不得腰斩句子；原文过长时优先保留完整事实与成果，不得删掉经历条目。`,
+  '11. 每条 after 必须与 resume 中某一个字符串字段里的一段文字逐字一致，并且整段都落在同一个字段里，不得拆开写进两个字段后再拼起来；优化稿不得把这条改写再换成另一种说法。',
 ].join('\n'))
 
 export const OPTIMIZE_RETRY_HINT = withAiSafety(
-  '上一次输出不符合要求。请严格只输出 JSON;resume 中的学校/公司/证书/联系方式必须逐字来自简历原文;modules 的 before 必须是原文连续片段。',
+  '上一次输出不符合要求。请严格只输出 JSON;resume 中的学校/公司/证书/联系方式必须逐字来自简历原文;modules 的 before 必须是原文连续片段;每条 after 必须逐字出现在 resume 的同一个字符串字段里，不得另换说法，也不得拆到多个字段。',
 )
 
 export const LAYOUT_ADJUST_SYSTEM_PROMPT = withAiSafety([
@@ -259,7 +261,7 @@ export class LlmResumeOptimizeService {
         const restored = restoreOptimizeResult(result, masked.restore)
         const missing = missingOriginalEntries(restored.optimizedResume, baseline)
         if (attempt === 2 || missing.length === 0) {
-          return preserveOriginalEntries(restored, [...missing, ...baseline.filter((entry) => entry.overflow)], baseline)
+          return this.returnAligned(preserveOriginalEntries(restored, [...missing, ...baseline.filter((entry) => entry.overflow)], baseline))
         }
         firstValid = restored
         firstMissing = missing
@@ -269,7 +271,7 @@ export class LlmResumeOptimizeService {
     }
 
     if (firstValid) {
-      return preserveOriginalEntries(firstValid, [...firstMissing, ...baseline.filter((entry) => entry.overflow)], baseline)
+      return this.returnAligned(preserveOriginalEntries(firstValid, [...firstMissing, ...baseline.filter((entry) => entry.overflow)], baseline))
     }
     throw new ServiceUnavailableException({
       error: { code: 'AI_OPTIMIZE_INVALID_OUTPUT', message: 'AI 简历优化服务暂时不可用，请稍后重试' },
@@ -354,6 +356,20 @@ export class LlmResumeOptimizeService {
     throw new ServiceUnavailableException({
       error: { code: 'AI_LAYOUT_ADJUST_INVALID_OUTPUT', message: 'AI 排版调整结果包含无法确认的信息，系统已拦截' },
     })
+  }
+
+  /**
+   * 补回和篇幅收口都做完之后，再按一体机的 includes(after) 核对最终稿。
+   * 对不上的只改 after 文本，不改稿。不再为此打模型：上面的循环已经为非法输出重试过，
+   * 这里追加调用会多记一次用量。
+   */
+  private returnAligned(result: OptimizeResult): OptimizeResult {
+    const aligned = alignOptimizeModuleAfter(result)
+    const { total, verbatim, normalized, unmatched } = aligned.stats
+    this.logger.log(
+      `resume optimize: after-match total=${total} pass=${verbatim + normalized} verbatim=${verbatim} normalized=${normalized} unmatched=${unmatched}`,
+    )
+    return aligned.result
   }
 
   // ── OpenAI 兼容 Chat Completions(出错不记正文:输入含简历原文)────────────
@@ -455,6 +471,15 @@ export class LlmResumeOptimizeService {
       if (text && containsForbiddenWord(text, blocked)) return null
       return text
     }
+    // 对比句先留着首尾空白，最终稿上再规范。超长时只留截断后的正文。
+    const moduleAfter = (value: unknown): string | null => {
+      if (typeof value !== 'string') return ''
+      const trimmed = value.trim()
+      if (trimmed && containsForbiddenWord(trimmed, blocked)) return null
+      if (!trimmed || trimmed.length > MAX_MODULE_TEXT_CHARS) return trimmed.slice(0, MAX_MODULE_TEXT_CHARS)
+      if (value.length > MAX_MODULE_TEXT_CHARS) return trimmed
+      return value
+    }
 
     const r = rawResume as Record<string, unknown>
     const basicRaw = (r['basic'] ?? {}) as Record<string, unknown>
@@ -542,9 +567,9 @@ export class LlmResumeOptimizeService {
     for (const item of asArray(obj['modules'], MAX_MODULES)) {
       const title = strOf(item, 'title', 60)
       const before = strOf(item, 'before', MAX_MODULE_TEXT_CHARS)
-      const after = clean(item['after'], MAX_MODULE_TEXT_CHARS)
+      const after = moduleAfter(item['after'])
       if (after === null) return null
-      if (!title || !before || !after) continue
+      if (!title || !before || !after.trim()) continue
       if (before.length < MIN_BEFORE_CHARS) continue
       if (!normText.includes(normalizeResumeFactText(before))) continue
       modules.push({ title, before, after })

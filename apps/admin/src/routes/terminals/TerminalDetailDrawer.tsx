@@ -12,6 +12,7 @@ import type {
 import { isParkedOrgType } from '../partners/orgTypeOptions'
 import { TerminalLifecycleActions } from './TerminalLifecycleActions'
 import { TerminalNetworkDiagnostics } from './TerminalNetworkDiagnostics'
+import { TerminalPrinterQueue } from './TerminalPrinterQueue'
 import { fmtDisk, lifecycleView, printerStatusView, scanInputView } from './terminalStatusViews'
 
 type Notice = { type: 'success' | 'error'; text: string }
@@ -193,6 +194,7 @@ export function TerminalDetailDrawer({
           <DetailRow label="IP 地址"><span className="font-mono text-xs">{terminal.ipAddress ?? '未上报'}</span></DetailRow>
           <DetailRow label="磁盘可用">{fmtDisk(terminal.diskFreeGb)}</DetailRow>
           <div><p className="mb-1 text-xs text-neutral-500">链路诊断</p><TerminalNetworkDiagnostics online={terminal.online} wiredNetworkStatus={terminal.wiredNetworkStatus} printerNetworkStatus={terminal.printerNetworkStatus} /></div>
+          <TerminalPrinterQueue online={terminal.online} printerQueue={terminal.printerQueue ?? null} observedAt={terminal.lastHeartbeatAt} />
           <DetailRow label="打印机状态">{terminal.online ? <StatusBadge dot status={printer.badge} label={printer.label} /> : <OfflineReportedStatus originalLabel={terminal.printerStatus ? printer.label : null} observedAt={terminal.lastHeartbeatAt} />}</DetailRow>
           <div data-testid="terminal-scan-input"><p className="mb-1 text-xs text-neutral-500">扫描输入</p><div className="space-y-1">{terminal.online ? <><StatusBadge dot status={scan.badge} label={scan.label} />{scan.detail && <p className="text-xs text-warning-fg">{scan.detail}</p>}{scan.restart && <p className="text-xs text-warning-fg">需重启终端程序（Terminal Agent）恢复（不支持远程解除）</p>}{terminal.scanInputObservedAt && <p className="text-[11px] text-neutral-500" title={formatDateTime(terminal.scanInputObservedAt)}>{formatRelativeTime(terminal.scanInputObservedAt)}</p>}</> : <OfflineReportedStatus originalLabel={terminal.scanInputHealth ? scan.label : null} observedAt={terminal.scanInputObservedAt ?? terminal.lastHeartbeatAt} />}</div></div>
         </Section>

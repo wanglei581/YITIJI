@@ -120,6 +120,7 @@ expectMatches(panelSrc, /reprintAllowed === true && typeof reprintRemaining === 
 expectMatches(panelSrc, /还能续打 \$\{reprintRemaining\} 次/, '续打句带上剩余次数，不写死次数以外的承诺')
 expectMatches(panelSrc, /reprintAllowed === false && reprintRemaining === 0/, '次数用尽只在 reprintAllowed 为假且剩余为 0 时出现')
 expectMatches(panelSrc, /这单已经接着打过 2 次，不能再打了。/, '次数用尽的句子与后端一致')
+expectMatches(panelSrc, /还要打，请在手机上重新下单。/, '次数用尽给出回手机重新下单的下一步')
 expectMatches(summarySrc, /reprintAllowed=\{item\.reprintAllowed\}/, '详单把 reprintAllowed 原样传给面板')
 expectMatches(summarySrc, /reprintRemaining=\{item\.reprintRemaining\}/, '详单把 reprintRemaining 原样传给面板')
 {

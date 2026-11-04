@@ -5,8 +5,8 @@ test.describe('工作台（mock 口径）', () => {
   for (const [scenario, expected] of [
     ['empty', '还没有打印机上报状态。'],
     ['offline', '离线或未上报 1 台'],
-    ['low', '纸张或墨粉偏少 1 台（仍可打印）'],
-    ['normal', '1 台打印机都在线，没有报告故障，也没有报告纸张或墨粉不足。'],
+    ['low', '纸张或碳粉偏少 1 台（仍可打印）'],
+    ['normal', '1 台打印机都在线，没有报告故障。'],
   ] as const) {
     test(`设备现在：${scenario} 状态如实显示`, async ({ page }) => {
       const guards = await openAuthed(page, `/?mock:printerStatus=${scenario}`)
@@ -17,7 +17,7 @@ test.describe('工作台（mock 口径）', () => {
       // 全部正常时「今天要处理」不能挂着打印机这一行
       if (scenario === 'normal') {
         await expect(today).not.toContainText('离线或未上报')
-        await expect(today).not.toContainText('纸张或墨粉偏少')
+        await expect(today).not.toContainText('纸张或碳粉偏少')
         await expect(today).not.toContainText('要现场处理')
       }
     })
