@@ -20,6 +20,36 @@
 - 改法只在 `UploadSessionQrPanel`，照打印上传页 `useUploadSession`：取消答复回来前刷新、取消、确认都禁用；成功才清空并通知页面；已作废码清二维码、按过期显示；其余失败留下二维码、已收到的文件和状态，兜底句沿用「这次上传没能取消，文件还留着。」。不恢复轮询，不自动接走文件。
 - 验证：一体机 tsc、lint 无 error；冻结哈希三条、`verify:resume-phone-upload-ui`、`verify:public-screen-mask`、`verify:kiosk-unattended-copy`、两份 profile 守卫、仓库完整性，以及进度文档上不依赖数据库的后端文档门禁通过。`verify:ai-usage-retention` 缺隔离库，`verify:free-print-quota` 与 `verify:support-contact` 缺本机 Prisma 客户端，未跑成（与本次改动无关）。浏览器用例已写入，本机未跑浏览器。
 
+## 2026-11-04：简历 AI 授权分支并入当前 main（每人每天次数、内容安全都留着；未推送、未部署）
+
+- 职业规划、简历版式调整、带简历的模拟面试，仍在把简历交给模型之前核「简历 AI 授权」。没同意时返回「请先确认简历 AI 服务授权」，不调模型。游客、只读、打印、不带简历的面试照旧。
+- 这三处授权都排在预占当天次数之前。没同意的不扣次数。每人每天次数、提问和生成的内容检查、政策约束、设备故障的固定回答照旧生效。
+- 职业规划里，招聘内容托管开关和授权检查两处都在。版式调整仍在单独的控制器上。授权服务是必填注入，漏注册时应用起不来。
+
+## 2026-11-03：简历 AI 授权装配门禁登记招聘托管豁免（分支 `claude/resume-ai-consent-1103`，未合并、未部署）
+
+- CI `build-and-verify` 的招聘托管声明门禁红在 `scripts/verify-resume-ai-consent-wiring.ts`：它直接引用 `career-plan.service.ts`，但只核对职业规划、版式调整与模拟面试四处简历 AI 授权服务的必填注入，不调用招聘内容读取或写入。已在 `verify-recruitment-hosting-gate-declares.ts` 的 exemptions 登记。`verify-mock-interview-consent.ts` 与 `verify-resume-layout-adjust.ts` 不引用托管模块，原清单没有违规。
+- 未改业务代码，未删断言，也没有给这条门禁改写托管开关。图谱把这条豁免记成对该装配脚本的断言。
+- 验证：托管声明门禁「声明 43、豁免 35、违规 0」；装配门禁 4 处注入；模拟面试 25 条、授权 6 条；职业规划 23 条、降级 13 条；版式调整 ALL PASS；AI 访问 ALL PASS；自我探索同意 26 通过 / 1 跳过；API 类型检查通过；图谱 `--check` 通过。
+
+## 2026-11-03：简历 AI 授权改为必需注入，并拆出模拟面试授权门禁（分支 `claude/resume-ai-consent-1103`，未合并、未部署）
+
+- 职业规划控制器、职业规划服务、版式调整控制器、模拟面试服务里的授权服务改为和现有简历 AI 控制器一样的必需注入。漏注册时应用启动失败，不再静默放行。岗位要求计数端口仍可选，排在授权服务之后。
+- 直接构造的既有测试显式传入放行替身；专门测授权的仍用真服务。新增 `verify:resume-ai-consent-wiring`，在真实模块装配下证明这四处拿到同一个 `MemberPrivacyService`，且该参数不是可选依赖。
+- `verify-mock-interview.ts` 回到拆出前的 1132 行，原有 25 条正向断言还在。授权用例挪到 `verify-mock-interview-consent.ts`。补上已开始的带简历会话：撤回 `resume_ai` 后，回答出下一题和结束生成报告都返回 403 `USER_AI_CONSENT_REQUIRED`，模型调用、AI 日志和计量不增加，会话仍在进行中；重新同意后能继续并结束。
+- 两条新门禁接进 `services/api/package.json`，并跟在 CI 里两处 `verify:mock-interview` 后面（SQLite 与 PostgreSQL）。
+- 验证：模拟面试 25 条、授权门禁 6 条、职业规划 22 条、版式调整通过、AI 访问通过、注入 4 处、降级出纸 13 条、送模型打码 136 条、自我探索同意 26 通过 / 1 跳过、会员资产与问答记录通过、岗位板块开关通过、API 类型检查通过、一体机声明门禁通过、仓库完整性与图谱检查通过。
+
+## 2026-11-03：简历 AI 授权补到职业规划、版式调整和带简历的模拟面试（分支 `claude/resume-ai-consent-1103`，未合并、未部署）
+
+- 后端：把用户简历内容交给 AI 之前核 `resume_ai`。未同意时与现有简历 AI 端点相同：403，错误码 `USER_AI_CONSENT_REQUIRED`，文案「请先确认简历 AI 服务授权」。游客（`endUserId` 为空）由 `requireActiveConsent` 放行。检查都在调用模型之前。
+- 职业规划：`POST /api/v1/resume/career-plan/:taskId` 在控制器和服务里各查一次（抽简历、调模型之前）。读取已生成结果和打印不查，小程序这两步没有挂简历授权，403 无法恢复。
+- 简历版式调整：`POST /api/v1/resume/records/:taskId/layout-adjust`。这一步总会把简历送进模型。`AiController` 已超过 800 行，端点拆到 `ResumeLayoutAdjustController`，调用服务前检查。
+- 模拟面试：只有简历摘要非空、且马上要出题或写报告时才查。不带简历的面试照常。创建会话只存摘要、不调模型，不查。没有回答就结束、已有报告、提前结束这些不调模型的路径也不查。拒绝时开场失败会把状态滚回已配置。
+- 小程序：按未合并的 #1386 在当前主线上重做，没有合并或摘那个旧分支。职业规划生成标 `resumeAi`，认的就是上面的 403。授权说明沿用 #1386 已过合规的句子。读取和打印职业规划不标。小程序模拟面试仍不传简历。
+- 体量：职业规划服务先拆出打码函数（现 448 行）。版式端点从 `AiController` 拆出（现 810 行，是减不是加）。模拟面试服务 756 行：题目单打印必须留在 `printPracticeSheet` 方法体里，派生上传和降级出纸两道静态门禁按这个方法扫描。
+- 验证：职业规划 22 条、版式调整（含未同意 / 游客 / 已同意 / 撤回）、模拟面试 30 条、派生种类 40 条、降级出纸 13 条、自我探索同意 26 通过 / 1 跳过、官方渠道 212 条、北京时间 29 条、送模型打码 136 条、AI 访问覆盖含新控制器、岗位板块开关、治理匹配 39 条、隔离扫描、审计留存 553 条、类型检查、小程序 verify:static（含接口契约）全部通过。
+
 ## 2026-11-03：合作机构工作台 AI 服务「重试」浏览器用例修偶发红（只改测试，页面不动；分支 `claude/sleepy-stonebraker-31ae12`）
 
 - **现象：** `kiosk-browser-smoke`「Run Partner data-screen browser E2E」里，`apps/partner/tests/e2e/screen/dashboard-ai.spec.ts`「切片不可用可重试；请求失败也可重试」偶发红在等不到「AI 模拟面试：5 场」。#1558 的 CI 连同自动重试两次都红；那次测的合并提交，合作机构后台代码与 main 70d046f7c 相同，main 上是绿的。本机按 CI 同款构建（React 正式版，产物 `jsxDEV` 为 0）连跑原用例 100 次红 7 次，位置一致。

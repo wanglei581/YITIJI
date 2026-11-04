@@ -46,6 +46,7 @@ export interface InterviewStartDeps {
   llm: Pick<MockInterviewLlmService, 'nextQuestion'>
   loadAuthorized(sessionId: string, requester: InterviewChargeRequester): Promise<InterviewChargeSession>
   llmCtx(session: InterviewChargeSession): Omit<NextQuestionInput, 'askedCount' | 'transcript'>
+  requireResumeConsent(session: InterviewChargeSession): Promise<void>
   recordAiLog(
     sessionId: string,
     operation: 'interviewQuestion',
@@ -127,6 +128,8 @@ export async function executeInterviewStart(
   const session = await deps.loadAuthorized(sessionId, requester)
   const stored = await loadFirstQuestion(deps.prisma, session)
   if (stored) return stored
+  // 带简历才核授权。必须在预占之前：未同意不扣次数、不改状态、不调模型。
+  await deps.requireResumeConsent(session)
   return runCharge({
     endUserId: session.endUserId,
     operationKey: `interview:${session.id}`,
@@ -174,6 +177,7 @@ export interface InterviewAnswerDeps {
   prisma: PrismaService
   llm: Pick<MockInterviewLlmService, 'nextQuestion'>
   llmCtx(session: InterviewChargeSession): Omit<NextQuestionInput, 'askedCount' | 'transcript'>
+  requireResumeConsent(session: InterviewChargeSession): Promise<void>
   recordAiLog: InterviewStartDeps['recordAiLog']
 }
 
@@ -192,6 +196,7 @@ export async function deliverNextInterviewQuestion(
 ): Promise<InterviewFirstQuestion> {
   const stored = await storedNextQuestion(deps.prisma, input)
   if (stored) return stored
+  await deps.requireResumeConsent(input.session)
   const qUsage = new AiUsageAccumulator()
   const qStartedAt = Date.now()
   let q: NextQuestionOutput

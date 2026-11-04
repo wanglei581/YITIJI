@@ -20,6 +20,7 @@ import {
   PRACTICE_SHEET_INTERVIEWER_LABEL,
   pickPracticeQuestions,
 } from './interview-practice-sheet'
+import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai/ai-log.service'
 import { AiQuotaService } from '../ai/quota/ai-quota.service'
 import { assertMemberInterviewRemaining, runWithAiQuota } from '../ai/quota/ai-quota-run'
@@ -112,6 +113,7 @@ export class MockInterviewService {
     private readonly extraction: ResumeExtractionService,
     private readonly audit: AuditService,
     private readonly aiLog: AiLogService,
+    private readonly privacy: MemberPrivacyService,
     redis?: RedisService,
     @Optional() private readonly quota?: AiQuotaService,
   ) { this.endLock = new RedisInflightLock(redis) }
@@ -207,6 +209,7 @@ export class MockInterviewService {
       llm: this.llm,
       loadAuthorized: (sessionId: string, requester: InterviewRequester) => this.loadAuthorized(sessionId, requester),
       llmCtx: (session: InterviewChargeSession) => this.llmCtx(session),
+      requireResumeConsent: (session: InterviewChargeSession) => this.requireResumeConsent(session),
       recordAiLog: (
         sessionId: string,
         operation: 'interviewQuestion',
@@ -296,6 +299,7 @@ export class MockInterviewService {
       prisma: this.prisma,
       llm: this.llm,
       llmCtx: (row) => this.llmCtx(row),
+      requireResumeConsent: (row) => this.requireResumeConsent(row),
       recordAiLog: (sessionId, operation, usage, startedAt, status, endUserId, errorCode) =>
         this.recordAiLog(sessionId, operation, usage, startedAt, status, endUserId, errorCode),
     }, {
@@ -365,6 +369,7 @@ export class MockInterviewService {
     const rStartedAt = Date.now()
     let payload: InterviewReportPayload
     try {
+      await this.requireResumeConsent(session)
       payload = await this.llm.buildReport({
         ...this.llmCtx(session),
         transcript: turns.map((t) => ({
@@ -673,6 +678,16 @@ export class MockInterviewService {
       ? `u:${requester.endUserId}`
       : `t:${hashToken(requester.accessToken ?? '')}`
     return `${sessionId}:${owner}`
+  }
+
+  /**
+   * 只有把简历摘要送进模型时才核 resume_ai。没有摘要不拦。
+   * 游客 resume_ai 由授权服务放行。
+   * 开场在预占和改状态之前查；出下一题在写回合之前查；写报告失败时仍把状态留在进行中。
+   */
+  private async requireResumeConsent(session: { resumeDigest: string | null; endUserId: string | null }): Promise<void> {
+    if (!session.resumeDigest?.trim()) return
+    await this.privacy.requireActiveConsent(session.endUserId, 'resume_ai')
   }
 
   private llmCtx(session: InterviewChargeSession) {
