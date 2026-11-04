@@ -14,7 +14,7 @@
 
 | 编号 | 原型文件 | 屏名 | 业务线分组 | 生产路由 path | React 组件 | 页面文件路径 | 数据来源(service/hook/API) | 主要操作 | 页面状态 | 验收脚本(scripts/) |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 01 | 01-home.html | 首页 | 首页登录系统 | `/` (index) | HomePage | src/pages/home/HomePage.tsx | useAuth / useHomeDeviceStatus / useSmartCampusConfig / useToolboxConfig / terminalConfig(getTerminalId) / MemberLoginDialog / ContinuePanel(getMyPrintOrders+getMyResumes) | 服务分组跳转、分组标题→聚合页(titleTo)、扫码登录、设备状态、继续办理(条件)、百宝箱/智慧校园动态专区(prototype-v1 按原型 1:1，不渲染统计) | 游客态 / 登录态 / 离线(设备状态) / 动态专区(有/无) / 继续办理(登录且有可恢复任务) | verify-home-prototype-v1 / verify-home-toolbox-ui / verify-smart-campus-ui |
+| 01 | 01-home.html | 首页 | 首页登录系统 | `/` (index) | HomePage | src/pages/home/HomePage.tsx | useAuth / useHomeDeviceStatus / terminalConfig(getTerminalId) / MemberLoginDialog / ContinuePanel(getMyPrintOrders+getMyResumes) | 服务分组跳转、分组标题→聚合页(titleTo)、扫码登录、设备状态、继续办理(条件)；百宝箱/智慧校园 2026-11-04 起停放，首页不读配置、不摆入口 | 游客态 / 登录态 / 离线(设备状态) / 动态专区(有/无) / 继续办理(登录且有可恢复任务) | verify-home-prototype-v1 / verify-home-toolbox-ui / verify-smart-campus-ui |
 | 02 | 02-print-hub.html | 打印扫描中心 | 打印扫描 | `/print-scan` | PrintScanHomePage | src/pages/print-scan/PrintScanHomePage.tsx | printScanCapabilities.getConfiguredCapabilities | 七能力卡跳转、记录入口 | loading / 能力开关(后台可配) | verify-profile-documents-inkpaper(间接) |
 | 03 | 03-print-settings.html | 打印参数 | 打印扫描 | `/print/params` →（2026-09-08 起重定向）`/print/desk` | PrintDeskPage | src/pages/print/PrintDeskPage.tsx | sessionStorage 流转 | 份数/色彩/双面/缩放/页范围（原型 03 的参数区已由打印台预览阶段承载） | loading / error(文件不可用) | verify-print-parameter-capability |
 | 04 | 04-print-progress.html | 打印进度 | 打印扫描 | `/print/progress` | PrintProgressPage | src/pages/print/PrintProgressPage.tsx | printJobsApi.getPrintJobStatus / API_MODE | 轮询状态、异常指引 | loading / error / 轮询态 | verify-print-confirm-honest |
@@ -143,7 +143,7 @@
 
 1. **73 语音咨询屏无独立路由**:原型 73「语音咨询中」是独立一屏,但生产实现为 `/assistant` 页面内的 `AssistantCallPanel` 组件(通话态子面板),不是单独路由。迁移/截图对比时需在 AssistantPage 内触发通话态,不能按独立页处理。
 2. **12 政策服务 ↔ `/renshi` 语义错位**:原型 12 屏名「政策服务」,生产路由是 `/renshi`(人社),组件 RenshiPage 含 Policy/Social/Register/Notice 多面板,范围比原型单屏「政策服务」更宽。原型未覆盖社保/登记/公告等子面板。
-3. **`/campus/*` 与 `/smart-campus/*` 是两套独立语义**:`/campus/welcome`、`/campus/freshman-insights` 是校园招聘专区自身的直达容错页面,当前仍诚实显示待开发;`/smart-campus/welcome`、`/smart-campus/freshman-insights` 是另一套智慧校园正式能力。二者不是别名或重定向关系,迁移时不可互相替代。
+3. **`/campus/*` 与 `/smart-campus/*` 是两套独立语义**:`/campus/welcome`、`/campus/freshman-insights` 是校园招聘专区自身的直达容错页面,当前仍诚实显示待开发;`/smart-campus/*` 原是另一套智慧校园能力，2026-11-04 起停放，一律跳回首页。二者不是别名或重定向关系,迁移时不可互相替代。
 4. **60/61 已真实实现,仅目录保留历史命名**:`SessionTimeoutPage` 已实现倒计时、继续使用、退出和会话清理;`ErrorOfflinePage` 已实现 `/api/v1/health` 检查、10 秒自动重试、online 恢复监听与功能状态 UI。它们通过 lazy route 加载自 `pages/placeholders/`,但不再是功能占位页。
 5. **22 通知与反馈原型合屏、生产拆两页**:原型 22 单屏合并"通知+反馈",生产拆为 `/me/notifications`(MyNotificationsPage)与 `/me/feedback`(MyFeedbackPage)两条路由两个组件。矩阵已在 22 行合并标注,迁移时注意是两个落点。
 
