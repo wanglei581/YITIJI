@@ -263,9 +263,15 @@ function scanLiterals(): void {
   const deadlineFile = join('mock-interview', 'mock-interview-deadline.ts')
   check(scanned.length > 200, `文案扫描读到的文件数大于 200（实际 ${scanned.length}）`)
   check(scanned.some((file) => file.endsWith(deadlineFile)), '新文件 mock-interview-deadline.ts 在被扫描到的文件里')
-  const only = hits.length === 1 ? hits[0] : undefined
+  // 一体机要认出这个码才能停收音、出到点屏，允许引用 code；但不许抄后端的话（屏上说法走一体机自己的码表）。
+  const kioskDir = join('apps', 'kiosk')
+  const kioskHits = hits.filter((h) => h.file.includes(kioskDir))
+  const serverHits = hits.filter((h) => !h.file.includes(kioskDir))
+  const only = serverHits.length === 1 ? serverHits[0] : undefined
   check(!!only && only.file.endsWith(deadlineFile) && only.message === 1 && only.code === 1,
-    `409 的话和 code 只在新文件里各出现一处（实际 ${hits.map((h) => `${h.file}#m${h.message}c${h.code}`).join(' | ') || '零处'}）`)
+    `409 的话和 code 在后端只在新文件里各出现一处（实际 ${serverHits.map((h) => `${h.file}#m${h.message}c${h.code}`).join(' | ') || '零处'}）`)
+  check(kioskHits.every((h) => h.message === 0),
+    `一体机只引用 409 的 code、不抄后端的话（实际 ${kioskHits.map((h) => `${h.file}#m${h.message}c${h.code}`).join(' | ') || '零处'}）`)
 }
 
 async function untilArrived(arrived: Promise<void>, label: string): Promise<void> {
