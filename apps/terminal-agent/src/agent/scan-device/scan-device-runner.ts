@@ -32,7 +32,8 @@ import {
   type ScanDeviceDeletionReason,
   type ScanTempPurgeResult,
 } from './scan-temp-dir'
-import { createRoundDriver, roundView, type RoundSession, type RoundState } from './scan-device-round'
+import { noteDeliveryDeadline, recheckUncertainDelivery, SCAN_DEVICE_DELIVERY_RECHECK_MS } from './scan-device-deliver'
+import { createRoundDriver, roundView, type RoundHost, type RoundSession, type RoundState } from './scan-device-round'
 import {
   LocalScanError,
   SCAN_DEVICE_REPORT_ATTEMPTS,
@@ -82,6 +83,7 @@ export async function deliverScanDevicePdf(
     deliveryLease: input.deliveryLease,
     candidateSnapshotAt: input.candidateSnapshotAt,
     origin: input.origin,
+    ...(input.deviceRound !== undefined ? { deviceRound: input.deviceRound } : {}),
   })
   await postScanDeliveryForm(client, config.terminalId, form)
 }
@@ -128,6 +130,9 @@ export function createScanDeviceRuntime(
   const root = deps.root
   const state: RoundState = {}
   let generation = 0
+  let startTicket: { taskId: string; generation: number; cancelled: boolean } | undefined
+  let recheckTimer: unknown
+  const hostBox: { current?: RoundHost } = {}
   let inflight = 0
   let tail: Promise<void> = Promise.resolve()
   let gate: Promise<void> = Promise.resolve()
@@ -175,6 +180,13 @@ export function createScanDeviceRuntime(
   const isDeviceView = (value: unknown): value is ScanDeviceView =>
     !!value && typeof value === 'object' && 'state' in value && 'pageCount' in value && !('kind' in value)
 
+  const viewFromPlan = (value: unknown): ScanDeviceView | undefined => {
+    if (!value || typeof value !== 'object' || !('kind' in value) || !('view' in value)) return undefined
+    const plan = value as { kind?: unknown; view?: unknown }
+    if (plan.kind !== 'view' || !isDeviceView(plan.view)) return undefined
+    return plan.view
+  }
+
   /** 开始 / 下一页 / 完成共用这一条队列。中止不进来。 */
   const enqueue = async <T>(fn: () => Promise<T>): Promise<T> => {
     const previous = gate
@@ -186,7 +198,13 @@ export function createScanDeviceRuntime(
     commandRunning = true
     try {
       const value = await fn()
-      if (abortWaiters.length > 0 && isDeviceView(value)) releaseAbort(value)
+      if (abortWaiters.length > 0) {
+        if (isDeviceView(value)) releaseAbort(value)
+        else {
+          const planned = viewFromPlan(value)
+          if (planned) releaseAbort(planned)
+        }
+      }
       return value
     } catch (error) {
       rejectAbort(error)
@@ -361,12 +379,15 @@ export function createScanDeviceRuntime(
         const confirmed = await postAttempts(taskId, confirmBody)
         if (confirmed.kind === 'stop' || confirmed.kind === 'unauthorized') return applyReport(confirmed)
         if (confirmed.kind !== 'ok') return markUnsyncable()
+        rememberAcceptedReport(confirmBody, confirmed)
         for (const hop of bridge) {
           const hopBody = decorate({ state: hop, ...(decorated.pageCount !== undefined ? { pageCount: decorated.pageCount } : {}) })
           const hopResult = await postAttempts(taskId, hopBody)
           if (hopResult.kind === 'stop' || hopResult.kind === 'unauthorized') return applyReport(hopResult)
           if (hopResult.kind !== 'ok') return markUnsyncable()
+          rememberAcceptedReport(hopBody, hopResult)
           ackedState = hop
+          if (state.session?.stopCode) return applyReport({ kind: 'stop', code: state.session.stopCode })
         }
       }
     }
@@ -374,6 +395,7 @@ export function createScanDeviceRuntime(
     if (result.kind === 'ok') {
       ackedState = decorated.state
       unsynced = false
+      rememberAcceptedReport(decorated, result)
       return applyReport(result)
     }
     if (result.kind === 'unavailable') unsynced = true
@@ -390,12 +412,43 @@ export function createScanDeviceRuntime(
     return run
   }
 
+  const rememberAcceptedReport = (body: DeviceReportBody, result: DeviceReportResult): void => {
+    const session = state.session
+    if (!session || result.kind !== 'ok') return
+    noteDeliveryDeadline(session, { hardExpiresAt: result.hardExpiresAt, expiresAt: result.expiresAt })
+    if (body.state !== 'scanning' || result.deviceRound === undefined) return
+    if (session.deviceRound !== undefined && session.deviceRound !== result.deviceRound) {
+      session.pages = []
+      session.pageCount = 0
+      session.bytes = 0
+      session.deviceRound = result.deviceRound
+      session.stopCode = session.stopCode ?? 'SCAN_DEVICE_SESSION_CLEARED'
+      session.handle?.abort()
+      return
+    }
+    session.deviceRound = result.deviceRound
+  }
+
+  const clearDeliveryRecheck = (): void => {
+    if (recheckTimer !== undefined) deps.clock.clearTimeout(recheckTimer)
+    recheckTimer = undefined
+  }
+
+  const scheduleDeliveryRecheck = (current: number): void => {
+    clearDeliveryRecheck()
+    recheckTimer = deps.clock.setTimeout(() => {
+      recheckTimer = undefined
+      const currentHost = hostBox.current
+      if (currentHost) void recheckUncertainDelivery(currentHost, current)
+    }, SCAN_DEVICE_DELIVERY_RECHECK_MS)
+  }
+
   const note = (stateName: string, code?: string | null): void => {
     const session = state.session
     log(`scan-device: task=${session?.taskId ?? '-'} state=${stateName} pageCount=${session?.pageCount ?? 0} code=${code ?? '-'}`)
   }
 
-  roundSlot.driver = createRoundDriver({
+  hostBox.current = {
     state,
     deps,
     maxPages,
@@ -419,7 +472,15 @@ export function createScanDeviceRuntime(
     armIdle: (current) => housekeeping.armIdle(current),
     disarmIdle: () => housekeeping.disarmIdle(),
     resetReportCursor,
-  })
+    startCancelled: (taskId) => startTicket?.taskId === taskId && startTicket.cancelled === true,
+    reservedGeneration: (taskId) => (startTicket?.taskId === taskId ? startTicket.generation : undefined),
+    clearStartTicket: () => {
+      startTicket = undefined
+    },
+    scheduleDeliveryRecheck,
+    clearDeliveryRecheck,
+  }
+  roundSlot.driver = createRoundDriver(hostBox.current)
 
   const requireLease = async (taskId: string): Promise<DeviceLease> => {
     const fetched = await deps.fetchLease(deps.clock.now())
@@ -442,25 +503,63 @@ export function createScanDeviceRuntime(
         if (session && session.taskId !== taskId && LIVE.has(session.phase)) {
           throw new LocalScanError(409, 'LOCAL_SCAN_BUSY', viewOf(session), '本机正在进行另一场扫描')
         }
+        if (session?.taskId === taskId && session.deliveryOutcome === 'uncertain') {
+          throw new LocalScanError(409, 'LOCAL_SCAN_DELIVERY_UNCONFIRMED', { state: 'delivering', pageCount: session.pageCount, errorCode: null }, '投递结果不确定')
+        }
         if (session && session.taskId === taskId && LIVE.has(session.phase)) {
           const fetched = await deps.fetchLease(deps.clock.now())
-          if (fetched.kind === 'lease' && fetched.lease.scanTaskId === taskId) {
-            if (sameParams(fetched.lease)) return { kind: 'view' as const, view: viewOf(session) }
-            if (session.phase === 'scanning' || session.phase === 'page_ready') {
+          const latest = state.session
+          if (latest?.taskId === taskId && latest.abortRequested) {
+            return { kind: 'view' as const, view: await round().finishAbort() }
+          }
+          if (fetched.kind === 'lease' && fetched.lease.scanTaskId === taskId && latest?.taskId === taskId) {
+            if (sameParams(fetched.lease)) return { kind: 'view' as const, view: viewOf(latest) }
+            if (latest.phase === 'scanning' || latest.phase === 'page_ready') {
               if (inflight > 0) {
-                session.stopCode = session.stopCode ?? 'LOCAL_RESTART'
-                session.handle?.abort()
+                latest.stopCode = latest.stopCode ?? 'LOCAL_RESTART'
+                latest.handle?.abort()
                 await tail
+              }
+              if (state.session?.abortRequested) {
+                return { kind: 'view' as const, view: await round().finishAbort() }
               }
               const prepared = await round().prepare(fetched.lease)
               if (!prepared.ok) return { kind: 'view' as const, view: prepared.view }
               return { kind: 'launch' as const, taskId: fetched.lease.scanTaskId, generation: prepared.generation }
             }
           }
-          return { kind: 'view' as const, view: viewOf(session) }
+          return { kind: 'view' as const, view: viewOf(state.session) }
         }
-        const lease = await requireLease(taskId)
+        // 取租约是这一场的第一个异步等待。标记必须在它之前立起来，中止才不会落进「没有会话」。
+        const ticket = { taskId, generation: generation + 1, cancelled: false }
+        generation = ticket.generation
+        startTicket = ticket
+        let lease: DeviceLease
+        try {
+          lease = await requireLease(taskId)
+        } catch (error) {
+          if (ticket.cancelled) {
+            startTicket = undefined
+            const purged = commitPurge(taskId, 'SCAN_DEVICE_ABORTED')
+            return { kind: 'view' as const, view: { state: 'aborted' as const, pageCount: 0, errorCode: null, purged } }
+          }
+          startTicket = undefined
+          throw error
+        }
+        if (ticket.cancelled) {
+          startTicket = undefined
+          const purged = commitPurge(taskId, 'SCAN_DEVICE_ABORTED')
+          return { kind: 'view' as const, view: { state: 'aborted' as const, pageCount: 0, errorCode: null, purged } }
+        }
         const prepared = await round().prepare(lease)
+        if (ticket.cancelled || state.session?.abortRequested) {
+          startTicket = undefined
+          if (state.session?.taskId === taskId && (LIVE.has(state.session.phase) || state.session.abortRequested)) {
+            return { kind: 'view' as const, view: await round().finishAbort() }
+          }
+          const purged = commitPurge(taskId, 'SCAN_DEVICE_ABORTED')
+          return { kind: 'view' as const, view: { state: 'aborted' as const, pageCount: 0, errorCode: null, purged } }
+        }
         if (!prepared.ok) return { kind: 'view' as const, view: prepared.view }
         return { kind: 'launch' as const, taskId: lease.scanTaskId, generation: prepared.generation }
       })
@@ -494,6 +593,13 @@ export function createScanDeviceRuntime(
         }
         throw error
       })
+      // 租约请求放在队列外面，空闲截止才能在它还挂着的时候收场。
+      let fetched: Awaited<ReturnType<ScanDeviceRuntimeDeps['fetchLease']>>
+      try {
+        fetched = await deps.fetchLease(deps.clock.now())
+      } catch {
+        fetched = { kind: 'unavailable' }
+      }
       return enqueue(async () => {
         const current = state.session
         if (!current || current.generation !== generation) {
@@ -518,7 +624,6 @@ export function createScanDeviceRuntime(
           current.nextAccepted = false
           return viewOf(current)
         }
-        const fetched = await deps.fetchLease(deps.clock.now())
         const latest = state.session
         if (!latest || latest.generation !== generation) {
           lock?.release()
@@ -539,6 +644,17 @@ export function createScanDeviceRuntime(
           latest.nextAccepted = false
           throw new LocalScanError(409, 'LOCAL_SCAN_BUSY', viewOf(latest), '扫描仪正忙，已扫的页还在。可以再试、点扫完了，或中止')
         }
+        // 租约已经回来。开扫前再看一次绝对截止和取消标记，截止到了就不再扫。
+        if (latest.abortRequested) {
+          lock.release()
+          latest.nextAccepted = false
+          return round().finishAbort()
+        }
+        if (housekeeping.idleDue()) {
+          lock.release()
+          latest.nextAccepted = false
+          return round().finishAbort()
+        }
         latest.phase = 'scanning'
         latest.nextAccepted = false
         housekeeping.disarmIdle()
@@ -552,6 +668,9 @@ export function createScanDeviceRuntime(
       // 同一次开始（它只该看到当前状态就返回），两边互相等待，进程会直接退出。
       const generation = await enqueue(async () => {
         const session = state.session
+        if (session?.taskId === taskId && session.deliveryOutcome === 'uncertain') {
+          throw new LocalScanError(409, 'LOCAL_SCAN_DELIVERY_UNCONFIRMED', { state: 'delivering', pageCount: session.pageCount, errorCode: null }, '投递结果不确定')
+        }
         if (!session || session.taskId !== taskId || session.phase !== 'page_ready' || session.pageCount < 1) {
           throw new LocalScanError(409, 'LOCAL_SCAN_STATE_CONFLICT', viewOf(session), '现在不能完成扫描')
         }
@@ -586,8 +705,21 @@ export function createScanDeviceRuntime(
           409,
           'LOCAL_SCAN_DELIVERY_UNCONFIRMED',
           { state: 'delivering', pageCount: session.pageCount, errorCode: null },
-          '投递结果还没确认',
+          '投递结果不确定',
         )
+      }
+      if (startTicket?.taskId === taskId) {
+        startTicket.cancelled = true
+        if (!session || session.taskId !== taskId || !LIVE.has(session.phase)) {
+          if (commandRunning) {
+            return new Promise((resolve, reject) => {
+              abortWaiters.push({ resolve, reject })
+            })
+          }
+          const purged = commitPurge(taskId, 'SCAN_DEVICE_ABORTED')
+          startTicket = undefined
+          return { state: 'aborted' as const, pageCount: 0, errorCode: null, purged }
+        }
       }
       if (!session || session.taskId !== taskId || !LIVE.has(session.phase)) {
         const purged = commitPurge(taskId, 'SCAN_DEVICE_ABORTED')
@@ -613,7 +745,7 @@ export function createScanDeviceRuntime(
             409,
             'LOCAL_SCAN_DELIVERY_UNCONFIRMED',
             { state: 'delivering', pageCount: current.pageCount, errorCode: null },
-            '投递结果还没确认',
+            '投递结果不确定',
           )
         }
         if (current?.taskId === taskId) return viewOf(current)
@@ -641,6 +773,7 @@ export function createScanDeviceRuntime(
     stop() {
       health.stop()
       housekeeping.stop()
+      clearDeliveryRecheck()
       armed = false
     },
     whenIdle: () => tail,

@@ -33,6 +33,15 @@ export interface DeviceLease {
   deliveryLease: string
   startMode: 'device'
   device: { source: WiaSource; colorMode: WiaColor; maxPages?: number; maxBytes?: number }
+  /** 会话硬截止。旧租约没有这个字段时不填，调用方改用 expiresAt。 */
+  hardExpiresAt?: string
+}
+
+/** 回报 409 里用来判定投递结果的补充。旧后端不带时保持空。 */
+export interface DeviceReportDetails {
+  taskStatus?: string
+  fileDelivered?: boolean
+  hardExpiresAt?: string
 }
 
 export interface DeviceReportBody {
@@ -52,9 +61,9 @@ export type FetchDeviceLeaseResult =
   | { kind: 'unavailable' }
 
 export type DeviceReportResult =
-  | { kind: 'ok' }
-  | { kind: 'stop'; code: string }
-  | { kind: 'rejected'; code: string }
+  | { kind: 'ok'; deviceRound?: number; expiresAt?: string; hardExpiresAt?: string }
+  | { kind: 'stop'; code: string; details?: DeviceReportDetails }
+  | { kind: 'rejected'; code: string; details?: DeviceReportDetails }
   | { kind: 'unauthorized' }
   | { kind: 'unavailable' }
 
@@ -87,12 +96,55 @@ export function isSwitchedToPanelCode(code: string): boolean {
   return SWITCHED_TO_PANEL_CODES.has(code)
 }
 
-function readErrorCode(error: unknown): { status?: number; code?: string } {
-  const response = (error as { response?: { status?: number; data?: { error?: { code?: string } } } }).response
+function readErrorCode(error: unknown): { status?: number; code?: string; details?: DeviceReportDetails } {
+  const response = (error as {
+    response?: { status?: number; data?: { error?: { code?: string; details?: unknown } } }
+  }).response
   const code = response?.data?.error?.code
+  const details = readReportDetails(response?.data?.error?.details)
   return {
     status: response?.status,
     code: typeof code === 'string' ? code : undefined,
+    ...(details ? { details } : {}),
+  }
+}
+
+function optionalIso(value: unknown): string | undefined {
+  if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) return undefined
+  return value
+}
+
+function optionalRound(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) return undefined
+  return value
+}
+
+/** 只收下能用的补充。空对象不当作带了 taskStatus。 */
+export function readReportDetails(value: unknown): DeviceReportDetails | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const row = value as Record<string, unknown>
+  const taskStatus = typeof row['taskStatus'] === 'string' && row['taskStatus'].length > 0 ? row['taskStatus'] : undefined
+  const fileDelivered = typeof row['fileDelivered'] === 'boolean' ? row['fileDelivered'] : undefined
+  const hardExpiresAt = optionalIso(row['hardExpiresAt'])
+  if (taskStatus === undefined && fileDelivered === undefined && hardExpiresAt === undefined) return undefined
+  return {
+    ...(taskStatus !== undefined ? { taskStatus } : {}),
+    ...(fileDelivered !== undefined ? { fileDelivered } : {}),
+    ...(hardExpiresAt !== undefined ? { hardExpiresAt } : {}),
+  }
+}
+
+function readReportSuccess(body: unknown): { deviceRound?: number; expiresAt?: string; hardExpiresAt?: string } {
+  const data = unwrapData(body)
+  if (!data || typeof data !== 'object') return {}
+  const row = data as Record<string, unknown>
+  const deviceRound = optionalRound(row['deviceRound'])
+  const expiresAt = optionalIso(row['expiresAt'])
+  const hardExpiresAt = optionalIso(row['hardExpiresAt'])
+  return {
+    ...(deviceRound !== undefined ? { deviceRound } : {}),
+    ...(expiresAt !== undefined ? { expiresAt } : {}),
+    ...(hardExpiresAt !== undefined ? { hardExpiresAt } : {}),
   }
 }
 
@@ -125,6 +177,7 @@ export function readDeviceLease(body: unknown, now: number): DeviceLease | undef
   if (typeof expiresAt !== 'string' || !(Date.parse(expiresAt) > now)) return undefined
   const maxPages = optionalDeviceLimit((device as { maxPages?: unknown }).maxPages)
   const maxBytes = optionalDeviceLimit((device as { maxBytes?: unknown }).maxBytes)
+  const hardExpiresAt = optionalIso(row['hardExpiresAt'])
   return {
     scanTaskId,
     serverNow: typeof serverNow === 'string' ? serverNow : new Date(now).toISOString(),
@@ -138,6 +191,7 @@ export function readDeviceLease(body: unknown, now: number): DeviceLease | undef
       ...(maxPages !== undefined ? { maxPages } : {}),
       ...(maxBytes !== undefined ? { maxBytes } : {}),
     },
+    ...(hardExpiresAt !== undefined ? { hardExpiresAt } : {}),
   }
 }
 
@@ -173,6 +227,13 @@ export async function fetchDeviceLease(
   }
 }
 
+function withDetails<T extends { kind: 'stop' | 'rejected'; code: string }>(
+  result: T,
+  details: DeviceReportDetails | undefined,
+): T & { details?: DeviceReportDetails } {
+  return details ? { ...result, details } : result
+}
+
 export async function postDeviceReport(
   client: AxiosInstance,
   terminalId: string | undefined,
@@ -188,20 +249,20 @@ export async function postDeviceReport(
     payload.colorMode = body.colorMode
   }
   try {
-    await client.post(
+    const response = await client.post(
       `/terminals/${encodeURIComponent(terminalId)}/scan-tasks/${encodeURIComponent(taskId)}/device-report`,
       payload,
       NO_RETRY,
     )
-    return { kind: 'ok' }
+    return { kind: 'ok', ...readReportSuccess(response.data) }
   } catch (error) {
     if (isUnauthorizedHttpError(error)) {
       markUnauthorized()
       return { kind: 'unauthorized' }
     }
-    const { status, code } = readErrorCode(error)
-    if (status === 409 && code && isScanDeviceStopCode(code)) return { kind: 'stop', code }
-    if (status === 409) return { kind: 'rejected', code: code ?? 'HTTP_409' }
+    const { status, code, details } = readErrorCode(error)
+    if (status === 409 && code && isScanDeviceStopCode(code)) return withDetails({ kind: 'stop', code }, details)
+    if (status === 409) return withDetails({ kind: 'rejected', code: code ?? 'HTTP_409' }, details)
     return { kind: 'unavailable' }
   }
 }

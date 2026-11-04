@@ -78,6 +78,8 @@ export interface ScanDeviceDeliveryInput {
   deliveryLease: string
   candidateSnapshotAt: string
   origin: 'device'
+  /** scanning 回报被收下时记下的轮次。没记下就不传。 */
+  deviceRound?: number
 }
 
 export interface ScanDeviceRuntimeDeps {

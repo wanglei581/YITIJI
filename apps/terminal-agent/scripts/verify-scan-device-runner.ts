@@ -45,6 +45,7 @@ import {
 } from './verify-scan-device-runner.helper'
 import { verifyRound2 } from './verify-scan-device-runner-r2'
 import { verifyRound3 } from './verify-scan-device-runner-r3'
+import { verifyRound4 } from './verify-scan-device-runner-r4'
 
 const ALLOWED = 'https://kiosk.example.test'
 const BRIDGE = 'bridge-token-scan-device-verify'
@@ -788,6 +789,7 @@ async function main(): Promise<void> {
     await check('打印领取持锁', () => verifyPrintClaimLock(db))
     await check('第二轮', () => verifyRound2(path.join(root, 'r2'), db))
     await check('第三轮', () => verifyRound3(path.join(root, 'r3'), db))
+    await check('第四轮', () => verifyRound4(path.join(root, 'r4'), db))
     console.log(`verify-scan-device-runner: ok（${passed.length} 组）`)
   } finally {
     clearInterval(keepAlive)

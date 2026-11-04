@@ -208,7 +208,11 @@ export async function verifyAbortAfterDeliverySaysDelivered(root: string): Promi
   await harness.runtime.stop()
 }
 
-/** 上传结果不确定时不说已中止，也不说已投递，先按后端状态定。 */
+/**
+ * 上传结果不确定时不说已中止，也不说已投递。
+ * 第四轮起不再用租约还在不在推断：没收下看 409 里的 taskStatus=cancelled，
+ * 已收下看 taskStatus=completed。租约在这两种里都还在。
+ */
 export async function verifyUncertainUploadDoesNotClaimAbort(root: string): Promise<void> {
   const rejected = createHarness({ root: path.join(root, 'rej'), config: agentConfig(), reportDelaysMs: [0, 0] })
   let lost = false
@@ -217,7 +221,13 @@ export async function verifyUncertainUploadDoesNotClaimAbort(root: string): Prom
       lost = true
       throw new Error('lost response')
     },
-    fetchLease: async () => (lost ? rejected.lease.current : rejected.lease.current),
+    fetchLease: async () => rejected.lease.current,
+    report: async (body) => {
+      if (lost && body.state === 'delivering') {
+        return { kind: 'stop', code: 'SCAN_DEVICE_TASK_ENDED', details: { taskStatus: 'cancelled', fileDelivered: false } }
+      }
+      return { kind: 'ok' }
+    },
   })
   rejected.lease.current = { kind: 'lease', lease: deviceLease('rej', rejected.clock.now(), { device: { source: 'flatbed', colorMode: 'gray' } }) }
   pushScript(rejected.scanner, { pages: [{ bytes: 20 }] })
@@ -237,9 +247,11 @@ export async function verifyUncertainUploadDoesNotClaimAbort(root: string): Prom
       uploaded = true
       throw new Error('lost response')
     },
-    fetchLease: async () => (uploaded ? { kind: 'none' } : received.lease.current),
+    fetchLease: async () => received.lease.current,
     report: async (body) => {
-      if (uploaded && body.state === 'delivering') return { kind: 'rejected', code: 'SCAN_DEVICE_TASK_DELIVERING' }
+      if (uploaded && body.state === 'delivering') {
+        return { kind: 'stop', code: 'SCAN_DEVICE_TASK_ENDED', details: { taskStatus: 'completed', fileDelivered: true } }
+      }
       return { kind: 'ok' }
     },
   })

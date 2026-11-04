@@ -30,6 +30,8 @@ export function probeResult(state: WiaProbeResult['state']): WiaProbeResult {
 
 export interface ManualClock extends DeviceLockClock {
   advance(ms: number): void
+  /** 只把当前时间往前拨，不触发已经排上的计时器。用来验「租约回来之后再看截止」。 */
+  jump(ms: number): void
   scheduled: number[]
 }
 
@@ -60,6 +62,9 @@ export function createManualClock(start = 1_700_000_000_000): ManualClock {
         due.cb()
       }
       now = target
+    },
+    jump(ms) {
+      now += ms
     },
   }
 }

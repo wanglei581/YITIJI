@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-11-04：屏上扫描 ③ 终端程序第二批 A2 第四轮——收掉复审高优先级问题（分支 `claude/scan-device-a2-1102`，随后并入 main 的提交，未部署）
+
+- 做了：开始在取租约这个第一个异步等待之前就占下这一场的场次号和取消标记；租约回来、建目录前、开扫前都再查。待翻页回报回来后先查取消，取消了不起 10 分钟空闲计时。下一页的租约改到串行队列外面取，回来之后若已经过了绝对截止或已经取消，就不再扫。上传异常不再用租约还在不在推断：用一次 device-report（投递中）按 409 的 `taskStatus` / `fileDelivered` 判定。`completed` 或 `fileDelivered` 为真算已投递并删页；`cancelled` / `expired` / `failed` 且没投出算未投递并删页；仍是 `waiting` 就用同一份 PDF 再投一次，`SCAN_FILE_ALREADY_DELIVERED` 也算已投递；`matched` 且未交出、旧后端没有 `taskStatus`、断网都保持不确定。不确定时每 30 秒再探，到 `hardExpiresAt`（没有就用投递前租约的 `expiresAt`）仍不确定，就按 `SCAN_DEVICE_FAILED` 删页，本机接口仍回「投递结果不确定」。`scanning` 回报被收下时记下 `deviceRound`，投递的 multipart 带上它；没记下就不传这个字段。换了轮次就作废这一场的页和 PDF，不合成到一起。第三轮里用租约推断结果的两则夹具改成看 409 补充，结果断言仍是未投递 / 已投递。
+- 门禁：`verify:scan-device-runner` 20 组。第四轮用例：`verifyAbortDuringLeaseDoesNotStartScan`、`verifyAbortDuringProbeBeforeDirDoesNotScan`、`verifyAbortAfterPageReadyReportDoesNotArmIdle`、`verifyNextPageLeaseDoesNotBlockIdleCleanup`、`verifyNextPageRechecksDeadlineAfterLease`、`verifyDeliveryProbeMatrix`、`verifyDeliveryIgnoresLeasePresence`、`verifyDeliveryProbeEndedNotDelivered`、`verifyDeliveryProbeWaitingRetriesOnce`、`verifyDeliveryProbeMatchedStaysUncertain`、`verifyDeliveryRecheckUntilHardExpiry`、`verifyDeliveryCarriesDeviceRound`。第三轮 `verifyUncertainUploadDoesNotClaimAbort` 的夹具改了，断言没放宽。
+- 开关：`scanDeviceEnabled` 仍默认关，关着时这些新逻辑不会跑。`scanDeviceReportSettings` 仍默认关。并入 main 之后版本单独从 0.4.18 升到 0.4.19。#1540/#1559 上生产后才合；真机发包先问产品负责人。
+- 没做：没碰真机，没打安装包，没部署。#1465 去留定下来之前，不往真机发新的终端程序安装包。scan-watcher 未改。Windows 进程身份仍未在真机核对。上传以外的丢失响应不是条条都再向后端确认。
+
 ## 2026-11-03：屏上扫描 ③ 终端程序第二批 A2 第三轮——收掉复审剩下的问题（分支 `claude/scan-device-a2-1102`，未合并、未部署）
 
 - 做了：Codex 对第二轮的 7 条「部分」和新问题 1–9 都在源码里属实，收成同一套调度，不再逐条打补丁。本机开始、下一页、完成进同一条串行队列；中止不进队列，只置本场取消标记并立即受理，正在跑的步骤在每个异步边界再看这个标记。每一场有场次号。清理重试、空闲计时、回报补发都绑在场次上，场次变了就作废；新一场开始前先撤销旧场次的清理重试和计时。进程是否确认退出只走健康管理器：扫描和探测都把未确认退出和进程号（可以没有）交进去。没有进程号又未确认退出时不删目录、不宣称清理完成，要等下一次探测成功，并且没有本程序拉起的残留 PowerShell/WIA 进程，才解除。投递结果分三态：已确认收下、确认没收下、不确定（上传异常或响应丢失）。不确定时不说已中止，也不说已投递，按租约或回报的 409 原因再定；会话已经投递之后，中止接口返回已投递。回报补发只在确知后端状态时补；补到最后目标仍被拒（转移不合法）就判错删页，不再投递。下一页在已经等锁或正在扫描时直接返回当前状态，不再排第二个。空闲截止从进入待翻页起算，不跟着租约悬挂或等锁失败顺延。换参数时删不掉旧目录，就在响应里给出未删干净并排队重试，不再另有一处把删除失败丢掉。

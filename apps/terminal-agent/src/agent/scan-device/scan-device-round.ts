@@ -55,6 +55,13 @@ export interface RoundSession {
   reportUnsyncable: boolean
   /** 上传已经分清，或还悬着。不确定时不能报已中止或已投递。 */
   deliveryOutcome?: 'received' | 'rejected' | 'uncertain'
+  /** scanning 回报被收下时记下的轮次。页和 PDF 都属于这一轮，换了就作废。 */
+  deviceRound?: number
+  /** 投递结果重查的绝对截止。有 hardExpiresAt 用它，否则用租约 expiresAt。 */
+  confirmUntil?: number
+  deadlineIsHard?: boolean
+  /** 同一份 PDF，等着不确定时重投。 */
+  pendingUpload?: import('./scan-device-types').ScanDeviceDeliveryInput
   lastResult?: import('./wia-runner').WiaScanResult
 }
 
@@ -87,6 +94,14 @@ export interface RoundHost {
   armIdle(generation: number): void
   disarmIdle(): void
   resetReportCursor(): void
+  /** 这一场是不是在取租约之前就被取消了。 */
+  startCancelled(taskId: string): boolean
+  /** 取租约之前占下的场次。没有就由准备阶段自己加一。 */
+  reservedGeneration(taskId: string): number | undefined
+  clearStartTicket(): void
+  /** 投递结果还不确定时，按固定间隔再探，到截止为止。 */
+  scheduleDeliveryRecheck(generation: number): void
+  clearDeliveryRecheck(): void
 }
 
 export function roundView(session: RoundSession | undefined): ScanDeviceView {
@@ -188,7 +203,7 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
         409,
         'LOCAL_SCAN_DELIVERY_UNCONFIRMED',
         { state: 'delivering', pageCount: current.pageCount, errorCode: null },
-        '投递结果还没确认',
+        '投递结果不确定',
       )
     }
     if (current.phase === 'aborted' && current.purgeSettled) return host.releaseAbort(viewOf(current))
@@ -282,6 +297,14 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
       host.note('page_ready')
       const reported = await host.sendReport({ state: 'page_ready', pageCount: current.pageCount })
       if (current.generation !== currentGen) return
+      if (current.abortRequested) {
+        await finishAbort()
+        return
+      }
+      if (current.stopCode) {
+        finishStop()
+        return
+      }
       if (reported === 'stop') finishStop()
       else if (reported === 'dead') {
         host.commitPurge(current.taskId, 'SCAN_DEVICE_FAILED')
@@ -384,12 +407,42 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
     return { ok: false, view: viewOf(host.state.session) }
   }
 
+  const cancelledBeforeDir = (
+    lease: DeviceLease,
+  ): { ok: false; view: ScanDeviceView } | undefined => {
+    const existing = session()
+    const cancelled = host.startCancelled(lease.scanTaskId)
+      || (existing?.taskId === lease.scanTaskId && existing.abortRequested === true)
+    if (!cancelled) return undefined
+    host.clearStartTicket()
+    const purged = host.commitPurge(lease.scanTaskId, 'SCAN_DEVICE_ABORTED')
+    if (existing?.taskId === lease.scanTaskId) {
+      existing.phase = 'aborted'
+      existing.errorCode = null
+      existing.abortRequested = true
+      existing.purgeSettled = true
+      existing.purged = purged
+      existing.nextAccepted = false
+      existing.awaitingLock = false
+      return { ok: false, view: viewOf(existing) }
+    }
+    return { ok: false, view: { state: 'aborted', pageCount: 0, errorCode: null, purged } }
+  }
+
   const prepare = async (
     lease: DeviceLease,
   ): Promise<{ ok: true; generation: number } | { ok: false; view: ScanDeviceView }> => {
+    const stale = session()
+    if (stale?.taskId === lease.scanTaskId && (stale.phase === 'aborted' || stale.phase === 'error' || stale.phase === 'idle')) {
+      stale.abortRequested = false
+    }
+    const early = cancelledBeforeDir(lease)
+    if (early) return early
     if (host.health.knownProcessAlive()) return errorView(lease, 'busy')
     if (host.health.unidentifiedSuspect() || host.health.hasForceKilled() || host.health.hasSuspect()) {
       const probed = await host.health.probe()
+      const afterProbe = cancelledBeforeDir(lease)
+      if (afterProbe) return afterProbe
       if (host.health.knownProcessAlive() || host.health.unidentifiedSuspect()) return errorView(lease, 'busy')
       if (probed.health !== 'ready') {
         const code: ScanDeviceErrorCode = probed.health === 'busy' ? 'busy' : 'not_ready'
@@ -398,9 +451,12 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
       host.health.clearForceKilled()
       host.health.clearSuspect()
     }
+    const beforeDir = cancelledBeforeDir(lease)
+    if (beforeDir) return beforeDir
     const taskId = lease.scanTaskId
     host.revokeCleanup(taskId)
     host.disarmIdle()
+    host.clearDeliveryRecheck()
     const cleared = host.purge(taskId, 'SCAN_DEVICE_SESSION_CLEARED')
     if (cleared.status === 'failed') {
       host.scheduleCleanup(taskId, 'SCAN_DEVICE_SESSION_CLEARED', {
@@ -419,9 +475,13 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
       return { ok: false, view: { state: 'error', pageCount: 0, errorCode: 'unknown', purged: false } }
     }
     const outDir = host.deps.createDir(taskId, host.root ? { root: host.root } : {})
+    const afterDir = cancelledBeforeDir(lease)
+    if (afterDir) return afterDir
     const limits = resolveScanDeviceLimits(host.maxPages, lease.device)
-    const currentGen = host.getGeneration() + 1
-    host.setGeneration(currentGen)
+    const reserved = host.reservedGeneration(taskId)
+    const currentGen = reserved ?? host.getGeneration() + 1
+    if (reserved === undefined) host.setGeneration(currentGen)
+    host.clearStartTicket()
     host.resetReportCursor()
     host.state.session = fresh({
       taskId,
@@ -461,6 +521,10 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
     if (current.abortRequested) {
       lock.release()
       return finishAbort()
+    }
+    if (current.stopCode) {
+      lock.release()
+      return finishStop()
     }
     if (reported !== 'go') {
       lock.release()
