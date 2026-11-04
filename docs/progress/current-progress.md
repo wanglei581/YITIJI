@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-11-04：产品负责人定「先把五项做完整」，各线按新优先级重排（只改文档；分支 `claude/five-items-1104`）
+
+- 原话见 `next-tasks.md` 同日一节。五项：AI 简历优化、AI 模拟面试、打印、扫描、政策；百宝箱、智慧校园一体机端停放（单独一个 PR）。
+- 已把新优先级告诉派工、触屏、复印扫描（设计与实施）、打印机第 1 步、小程序打通各线，各线回报了谁做、哪天进 main，写进 `next-tasks.md` 同日一节。
+- 暂停派发的新活与「要他做」的九件事也写在那一节。没有发布、没有碰生产。
+
 ## 2026-11-04：一体机停放百宝箱、智慧校园（产品负责人定；分支 `claude/park-toolbox-campus-1104`；未部署）
 
 - **来由：** 产品负责人 11/04 原话「先不做，百宝箱和智慧校园，这个不要显示出来，先把 AI简历优化，ai模拟面试，还有打印，扫描，政策这些做好做完整，功能做到没有问题，可以让用户和客户正常使用起来就行」。按「停放」处理：源码保留，不注册、不打包，不是删除。
@@ -9,6 +15,7 @@
 - **停放的文件：** `apps/kiosk/src/pages/toolbox/`、`pages/smart-campus/`、`auth/KioskCapabilityGuard.tsx`、`hooks/useToolboxConfig.ts`、`hooks/useSmartCampusConfig.ts`、`services/api/kioskCapabilityValidation.ts`、`services/api/toolboxLaunchEvents.ts`、`pages/home/components/ToolboxLaunchModals.tsx`、`kioskAppLaunch.ts`。
 - **怎么恢复：** 回滚本次合并（删掉的浏览器用例一起回来）；后台配置一直照常保存，恢复后按开关生效。
 - **没动：** 小程序；后台开关与接口。首页旧视图 `QxHomeView` / `V6HomeView`、`homeV6Domains` 两项旧映射、`KioskRoot` 已迁移路由集合里的旧路径，停放前就没人引用或已不可达，没有顺手清。
+
 
 ## 2026-11-04：心跳认打印队列新字段（后端半；分支 `claude/printer-queue-api-1104`；未合并、未部署）
 
