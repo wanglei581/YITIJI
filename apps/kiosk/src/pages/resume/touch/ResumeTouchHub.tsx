@@ -310,7 +310,7 @@ export function ResumeTouchHub({
         ? { label: '小青也要联网，恢复后再问', disabled: true }
         : { label: '问小青：我该选哪一个？', draft: ASK_DRAFT }}
       primary={availability.apiDown
-        ? { label: '重新检测', onClick: retryApi, noArrow: true }
+        ? { label: '重新检测', onClick: retryApi }
         : undefined}
       overlay={moreOpen ? (
         <QxTouchOverlay

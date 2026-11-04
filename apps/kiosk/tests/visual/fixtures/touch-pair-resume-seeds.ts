@@ -35,7 +35,11 @@ export function pauseResumeAi(api: ApiRouter): void {
 }
 
 /** 本机 USB 正常态，不依赖真实硬件；端点、文件结构、purpose 均照 fusion-w3。 */
-export async function stubResumeUsb(page: Page): Promise<void> {
+export async function stubResumeUsb(page: Page, filename = 'U盘简历.pdf'): Promise<void> {
+  // 不传参数的打印夹具保持原样；简历稿按本屏文件名造列表和上传回包。
+  const resumeDraft = filename !== 'U盘简历.pdf'
+  const driveLabel = resumeDraft ? '个人资料' : 'TEST-USB'
+  const sizeBytes = filename === '实习证明-盖章版.pdf' ? 1_258_000 : 293_000
   await page.route('**/w3-fixtures/usb-resume.pdf', (route) =>
     route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }))
   await page.route('http://127.0.0.1:9527/local/usb/**', async (route) => {
@@ -53,18 +57,18 @@ export async function stubResumeUsb(page: Page): Promise<void> {
     }
     let data: unknown
     if (request.method() === 'GET' && pathname.endsWith('/status')) {
-      data = { present: true, driveLabel: 'TEST-USB' }
+      data = { present: true, driveLabel }
     } else if (request.method() === 'GET' && pathname.endsWith('/files')) {
       // 稿上 U 盘根目录是 3 个文件；只放 1 个会让列表撑不满、量出的空白偏大。只有第一份会被导入。
-      data = { present: true, driveLabel: 'TEST-USB', files: [
-        { safeId: 'usb-safe-resume', filename: 'U盘简历.pdf', extension: '.pdf', sizeBytes: 293_000 },
-        { safeId: 'usb-safe-intern', filename: '实习证明-盖章版.pdf', extension: '.pdf', sizeBytes: 1_258_000 },
+      data = { present: true, driveLabel, files: [
+        { safeId: 'usb-safe-resume', filename, extension: '.pdf', sizeBytes },
+        { safeId: 'usb-safe-intern', filename: resumeDraft ? '个人作品集-新媒体运营.pdf' : '实习证明-盖章版.pdf', extension: '.pdf', sizeBytes: resumeDraft ? 8_808_000 : 1_258_000 },
         { safeId: 'usb-safe-photo', filename: '蓝底证件照.jpg', extension: '.jpg', sizeBytes: 430_000 },
       ] }
     } else if (request.method() === 'POST' && pathname.endsWith('/upload')) {
       expect(request.postDataJSON()).toEqual({ safeId: 'usb-safe-resume', purpose: 'resume_upload' })
       data = {
-        fileId: 'file-usb-resume', filename: 'U盘简历.pdf', sizeBytes: 293_000,
+        fileId: 'file-usb-resume', filename, sizeBytes,
         mimeType: 'application/pdf', sha256: 'c'.repeat(64), fileUrl: '/w3-fixtures/usb-resume.pdf',
         fileUrlExpiresAt: new Date(Date.now() + 300_000).toISOString(),
       }
@@ -75,19 +79,19 @@ export async function stubResumeUsb(page: Page): Promise<void> {
   })
 }
 
-export async function openResumeUsb(page: Page, api: ApiRouter): Promise<void> {
+export async function openResumeUsb(page: Page, api: ApiRouter, filename = '实习证明-盖章版.pdf'): Promise<void> {
   resumeShell(api)
-  await stubResumeUsb(page)
+  await stubResumeUsb(page, filename)
   await page.goto('/resume/source')
   await terminalReady(page)
   await page.getByRole('button', { name: /在 U 盘里/ }).click()
-  await expect(page.getByRole('button', { name: /U盘简历\.pdf/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: filename })).toBeVisible()
   await expect(page.locator('body')).not.toContainText('网络连接失败')
 }
 
-export async function resumeDirection(page: Page, api: ApiRouter, more = false): Promise<void> {
-  await openResumeUsb(page, api)
-  await page.getByRole('button', { name: /U盘简历\.pdf/ }).click()
+export async function resumeDirection(page: Page, api: ApiRouter, more = false, filename = '李佳怡-产品运营-简历.pdf'): Promise<void> {
+  await openResumeUsb(page, api, filename)
+  await page.getByRole('button', { name: filename }).click()
   await page.getByRole('button', { name: '导入这份文件', exact: true }).click()
   await openResumeDirection(page)
   await see(page, '[data-resume-step="direction"]')
@@ -96,6 +100,11 @@ export async function resumeDirection(page: Page, api: ApiRouter, more = false):
     // 按钮全名是「更多条件（可不填）：经历、场景、专业、学历」，照 fusion-w3 用包含匹配。
     await page.getByRole('button', { name: '更多条件（可不填）' }).click()
     await see(page, '[data-resume-step="more"]')
+    for (const [group, name] of [['经历', '应届'], ['场景', '校招'], ['学历（选填）', '本科']]) {
+      const button = page.getByRole('group', { name: group, exact: true }).getByRole('button', { name, exact: true })
+      await button.click()
+      await expect(button).toHaveAttribute('aria-pressed', 'true')
+    }
   }
 }
 
@@ -113,7 +122,7 @@ export async function resumeReading(page: Page, api: ApiRouter, down = false, fa
   await startResumeDiagnosis(page)
   if (down) {
     await page.waitForURL('**/resume/report')
-    // 标题和摘要里各有一处「这次没诊断出来」，认标题。
+    // 明确等失败标题和出路，不能在解析等待态就拍。
     await expect(page.getByRole('heading', { name: '这次没诊断出来', exact: true })).toBeVisible()
     await expect(page.locator('[data-qxt-ask="off"]')).toBeVisible()
     await expect(page.getByRole('button', { name: '打印我上传的原件', exact: true })).toBeEnabled()

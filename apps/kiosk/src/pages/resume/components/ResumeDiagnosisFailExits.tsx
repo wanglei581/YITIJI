@@ -62,7 +62,7 @@ export function ResumeDiagnosisFailExits({ file, fileId }: Props) {
 
   return (
     <>
-      <div className="qxt-sec">这些都不需要 AI<small>现在就能做</small></div>
+      <div className="qxt-sec">这些都不需要 AI · 现在就能做</div>
       <div className="qxt-exit-col rrp-exits resume-report-fail-exits" data-testid="resume-report-fail-exits">
         {canPrintOriginal ? (
           <ExitRow icon="printer" title="打印我上传的原件" desc="不需要 AI，先检查个人信息再打印" take="去核对" route="/print/material-check" index={0} onClick={printOriginal} />

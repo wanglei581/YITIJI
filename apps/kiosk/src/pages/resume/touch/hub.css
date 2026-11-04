@@ -37,12 +37,13 @@
 [data-qx-page='resume'] .qxt-hub-out {
   display: flex;
   align-items: center;
-  min-height: var(--qxt-tap);
-  padding: 0 22px;
-  border-radius: 20px;
-  background: var(--qxt-teal-wash);
+  min-height: 64px;
+  padding: 0 20px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 22px;
+  background: var(--qxt-card);
   color: var(--qxt-teal-ink);
-  font-size: var(--qxt-fs-sub);
+  font-size: var(--qxt-fs-body);
   font-weight: 700;
   text-align: left;
 }
