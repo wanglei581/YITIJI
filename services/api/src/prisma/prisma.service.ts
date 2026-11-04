@@ -155,6 +155,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.order
   }
 
+  get copyJob() {
+    return this.client.copyJob
+  }
+
   get orderItem() {
     return this.client.orderItem
   }

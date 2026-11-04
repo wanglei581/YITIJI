@@ -260,8 +260,8 @@ export class AdminOrdersReadonlyService {
     const labels = await this.lookupLabels([row])
     const unconfirmed = await this.unconfirmedOrderIdSet([row.id])
     const item = this.toItem(row, labels, unconfirmed.has(row.id))
-    const summary = row.printTask ? parseSafePrintSummary(row.printTask.paramsJson) : null
-    const statusLogs = row.printTask
+    const summary = row.type !== 'copy' && row.printTask ? parseSafePrintSummary(row.printTask.paramsJson) : null
+    const statusLogs = row.type !== 'copy' && row.printTask
       ? await this.prisma.printTaskStatusLog.findMany({
           where: { taskId: row.printTask.id },
           orderBy: { createdAt: 'asc' },
@@ -275,7 +275,7 @@ export class AdminOrdersReadonlyService {
       refundReason: row.refundReason,
       discountCents: row.discountCents,
       refundedAmountCents: row.refundedAmountCents,
-      printTaskId: row.printTaskId ?? null,
+      printTaskId: row.type === 'copy' ? null : row.printTaskId ?? null,
       print: row.printTask && summary
         ? {
             ...summary,
@@ -356,7 +356,7 @@ export class AdminOrdersReadonlyService {
     // 手机单在到机放行前只有 Order：展示已确认的打印快照，不伪造 PrintTask。
     // 有真实任务时只认任务参数；材料包/历史现场单不套用单文件快照。
     const pendingSingle = !row.printTask && row.type === 'print' && row.sourceFileId !== null
-    const printSummary = parseSafePrintSummary(row.printTask?.paramsJson ?? (pendingSingle ? row.printParamsJson : null))
+    const printSummary = parseSafePrintSummary(row.type === 'copy' ? null : row.printTask?.paramsJson ?? (pendingSingle ? row.printParamsJson : null))
     if (pendingSingle && !printSummary.fileName) {
       printSummary.fileName = row.sourceFileName?.trim() || null
     }
@@ -367,6 +367,7 @@ export class AdminOrdersReadonlyService {
       id: row.id,
       orderNo: row.orderNo,
       type: row.type,
+      ...(row.type === 'copy' ? { typeLabel: '复印' as const } : {}),
       ownerType,
       userLabel: ownerType === 'member' ? (nickname && nickname.length > 0 ? nickname : '会员') : '游客',
       terminalCode: effectiveTerminalId ? labels.terminalCodes.get(effectiveTerminalId) ?? null : null,

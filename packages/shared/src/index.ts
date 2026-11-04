@@ -64,3 +64,5 @@ export {
   ADMIN_DATA_REQUEST_EXPORT_COMPLETE_HINT,
   ADMIN_DATA_REQUEST_REJECT_HINT,
 } from './types/memberPrivacy'
+export * from './types/copyJob'
+export * from './types/scanDeletionAudit'

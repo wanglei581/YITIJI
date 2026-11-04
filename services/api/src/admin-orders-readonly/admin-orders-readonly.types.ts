@@ -13,6 +13,7 @@ export interface AdminOrderReadonlyItem {
   id: string
   orderNo: string
   type: string
+  typeLabel?: '复印'
   ownerType: 'member' | 'anonymous'
   userLabel: string
   terminalCode: string | null

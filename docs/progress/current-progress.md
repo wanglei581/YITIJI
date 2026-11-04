@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-11-04：屏上复印 C1a——后端数据底座（分支 `claude/copy-c1-1104`，自 #1559 头 44f13e7fe 开出，未合并、未部署）
+
+- 依据：产品负责人 11/04「复印像打印一样生成订单、按页计价；价目只加行、默认 0 元；先只做最小闭环」；规格书 `codex/copy-spec-out.md`、`copy-decisions.md`。
+- 做了什么（Codex 实现，Claude 收货）：新模型 `CopyJob`（两套 schema、同名迁移 `20261104160000_add_copy_job`；`orderId @unique` 关联现有 `Order`，只记页数、份数、颜色、单双面、计费面数、报价快照、状态与代次，**不存图片、PDF、文件名、路径、内容哈希**）；价目两行 `copy_bw_page`、`copy_color_page` 0 分（沿用现有幂等补行，已有配置不覆盖）与报价纯函数（页数 × 份数 × 每面单价，双面不减半，缺价 / 停用 / 异常价不可报价）；`copy` 进默认拒绝与判定函数（要 `copy`、`scan_device`，彩色加 `color_print`，双面加 `duplex_print`）；七个 `COPY_*` 删除审计码进 API、DTO、共享白名单；用户订单列表、时间线、详情服务端过滤复印单，后台订单带「复印」类型、无文件链接；注销保留履约记录并去标识请求键与快照文本。接口与上限是 C1b。
+- 验证：新门禁 `verify:copy-c1a`（接进 CI 的 SQLite 与 PostgreSQL 两组）；SQLite 空库 migrate deploy、schema 无漂移、PG schema 校验与同步检查；价目、彩色双面能力、后台计费、会员订单、时间线（94）、小程序云打印、后台订单只读与筛选、删除审计上报（14 码）、first-order-migrations（SQLite）、注销、扫描任务等关联门禁通过；PostgreSQL 实跑交 CI。反向检查三项（去掉 copy 默认拒绝、用户列表不过滤、缺价按 0）都变红。`verify-member-closure.ts` 原有 26 处 no-explicit-any lint 不是这次带进来的。
+
 ## 2026-11-04：屏上扫描后端 B10（扫描仪告警移出范围不推「已恢复」；分支 `claude/scan-device-b2-1102`，未部署）
 
 - 起因：Codex 只读复核 B9 报 P1——扫描仪告警推送后，终端停用、非 active、离线或 `scan_device` 关闭，告警从收集结果消失，推送服务会把它推成「已恢复」；重新纳入范围时同一故障回合还会被旧去重键挡住。
