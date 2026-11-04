@@ -420,6 +420,10 @@ test('optimized resume previews inline without opening a new tab @w3-kiosk', asy
   await page.getByRole('button', { name: '去导出', exact: true }).click()
   await page.getByRole('checkbox', { name: /测试大学/ }).click()
   await page.getByRole('button', { name: '确认导出' }).click()
+  await expect(page.getByTestId('resume-export-aigc-note')).toHaveText('导出的简历每页底部有一行小字：含人工智能辅助生成内容')
+  await page.getByRole('group', { name: '导出格式' }).getByRole('button', { name: /^TXT/ }).click()
+  await expect(page.getByTestId('resume-export-aigc-note')).toHaveText('导出的文件末尾有一行：含人工智能辅助生成内容')
+  await page.getByRole('group', { name: '导出格式' }).getByRole('button', { name: /^PDF/ }).click()
   await page.getByRole('button', { name: '导出', exact: true }).click()
   await expect(page.getByRole('button', { name: '扫码带走' })).toBeVisible()
   const pageCount = page.context().pages().length

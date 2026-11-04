@@ -190,6 +190,7 @@
 [data-qx-page='resume-export'] .qxt-export { flex: 1 0 auto; display: flex; flex-direction: column; gap: 12px; }
 
 [data-qx-page='resume-export'] .qxt-fmts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+[data-qx-page='resume-export'] .qxt-aigc-note { margin: 0; font-size: var(--qx-fs-body); line-height: 1.45; color: var(--qxt-ink-2); }
 
 [data-qx-page='resume-export'] .qxt-fmt {
   min-height: 180px;

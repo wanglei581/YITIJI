@@ -202,6 +202,10 @@ test('预览页与核对弹层把「待本人确认」讲明白，并且只列 A
 
   // 去导出 → 选格式 → 导出这一份：核对弹层里同样讲明白
   await page.getByRole('button', { name: '内容没问题，去导出' }).click()
+  await expect(page.getByTestId('resume-export-aigc-note')).toHaveText('导出的简历每页底部有一行小字：含人工智能辅助生成内容')
+  await page.getByTestId('resume-generate-preview-fmt-md').click()
+  await expect(page.getByTestId('resume-export-aigc-note')).toHaveText('导出的文件末尾有一行：含人工智能辅助生成内容')
+  await page.getByTestId('resume-generate-preview-fmt-pdf').click()
   await page.getByRole('button', { name: '导出这一份' }).click()
   const dialog = page.getByRole('dialog', { name: '导出前核对事实' })
   await expect(dialog).toBeVisible()
