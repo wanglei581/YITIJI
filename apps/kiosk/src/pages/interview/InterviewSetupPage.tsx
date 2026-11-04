@@ -40,6 +40,7 @@ import { useAuth } from '../../auth/useAuth'
 import { RESUME_AI_CONSENT_NEEDED_COPY } from '../resume/resumeAiConsentPrompt'
 import { useInlineResumeAiConsent } from '../resume/useInlineResumeAiConsent'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { openedInterviewDeadline } from './session/interviewDeadline'
 import { InterviewShell } from './InterviewShell'
 import { assistantOffAsk, interviewAiPill, isAiGateDown, useInterviewAiCapabilities } from './useInterviewAiCapabilities'
 import { InterviewNote, InterviewStatus } from './interviewQxParts'
@@ -90,9 +91,9 @@ const DIFFICULTIES: Array<{ key: InterviewDifficulty; label: string; desc: strin
 ]
 
 const DURATIONS: Array<{ key: InterviewDuration; label: string; desc: string }> = [
-  { key: 3, label: '3 分钟 / 4 题', desc: '到点不自动交卷，回答完当前题后再结束' },
-  { key: 5, label: '5 分钟 / 6 题', desc: '到点不自动交卷，回答完当前题后再结束' },
-  { key: 8, label: '8 分钟 / 8 题', desc: '到点不自动交卷，回答完当前题后再结束' },
+  { key: 3, label: '3 分钟 / 4 题', desc: '到点自动结束' },
+  { key: 5, label: '5 分钟 / 6 题', desc: '到点自动结束' },
+  { key: 8, label: '8 分钟 / 8 题', desc: '到点自动结束' },
 ]
 
 const POSITION_EXAMPLES = ['前端开发工程师', '行政专员', '市场运营', '机械工程师', '会计', '销售代表']
@@ -224,6 +225,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
       // 先记下来再 start：start 一旦 503，这个 sessionId 就是通用题目单的落点。
       setPendingSession({ sessionId: created.sessionId, accessToken: created.accessToken })
       const first = await startInterview(created.sessionId, { token, accessToken: created.accessToken })
+      const opened = openedInterviewDeadline(first, duration)
       setProbed(true)
       patchInterviewWorkbenchSession({
         stage: 'session',
@@ -237,7 +239,9 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
           firstQuestion: first.question ?? '',
           messages: [{ role: 'interviewer', content: first.question ?? '' }],
           questionIndex: 1,
-          remainingSec: duration * 60,
+          remainingSec: opened.remainingSec,
+          deadlineAtLocalMs: opened.deadlineAtLocalMs,
+          deadlineSource: opened.deadlineSource,
           omitPrintAnswers: false,
         },
       })
@@ -254,6 +258,8 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
             interviewerType,
             position: pos,
             firstQuestion: first.question ?? '',
+            deadlineAtLocalMs: opened.deadlineAtLocalMs,
+            deadlineSource: opened.deadlineSource,
             // 不传 firstQType：会话页读的是 firstQuestion / questionTarget 等键，
             // 从未读过 qType。类型里声明过不等于有人消费。
           },
@@ -294,6 +300,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     try {
       const token = getToken()
       const first = await startInterview(created.sessionId, { token, accessToken: created.accessToken })
+      const opened = openedInterviewDeadline(first, duration)
       setProbed(true)
       patchInterviewWorkbenchSession({
         stage: 'session',
@@ -307,7 +314,9 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
           firstQuestion: first.question ?? '',
           messages: [{ role: 'interviewer', content: first.question ?? '' }],
           questionIndex: 1,
-          remainingSec: duration * 60,
+          remainingSec: opened.remainingSec,
+          deadlineAtLocalMs: opened.deadlineAtLocalMs,
+          deadlineSource: opened.deadlineSource,
           omitPrintAnswers: false,
         },
       })
@@ -324,6 +333,8 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
             interviewerType,
             position: pos,
             firstQuestion: first.question ?? '',
+            deadlineAtLocalMs: opened.deadlineAtLocalMs,
+            deadlineSource: opened.deadlineSource,
           },
         })
       }
@@ -481,7 +492,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const stepCopy = step === 1
     ? { eyebrow: '练面试 · 岗位与经验', title: '这次练哪个岗位？', sub: '选定岗位、面试官和时长后才开始这场练习；语音能否使用，进入后按麦克风实际情况确认。' }
     : step === 2
-      ? { eyebrow: '练面试 · 面试官与时长', title: '选一位面试官', sub: '难度和时长有默认值。到点不自动交卷。' }
+      ? { eyebrow: '练面试 · 面试官与时长', title: '选一位面试官', sub: '难度和时长有默认值。到点自动结束。' }
       : { eyebrow: '练面试 · 核对开始', title: '核对一下，就开始', sub: '面试前，先设置一场练习。' }
 
   return (
@@ -618,7 +629,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
             <InterviewNote lead={echo}>
               <span>这一场：{interviewer?.label}。{interviewer?.desc}</span>
               <span>难度：{difficultyItem?.label}。{difficultyItem?.desc}</span>
-              <span>时长：{durationItem?.label}。练习时长到了，只提示你点结束，不自动出报告。</span>
+              <span>时长：{durationItem?.label}。时间到会自动结束。</span>
             </InterviewNote>
           </section>
         )}

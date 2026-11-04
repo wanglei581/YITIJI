@@ -652,6 +652,20 @@ assert.match(labels(renderResult({ ...fileProps, kind: 'change_list', savedToDoc
 for (const savedToDocuments of [false, undefined]) assert.doesNotMatch(labels(renderResult({ ...fileProps, savedToDocuments })), /已存入/, '未确认保存时不说已存入')
 assert.doesNotMatch(labels(renderResult({ ...fileProps, savedToDocuments: true, exported: { ...fileProps.exported, signedUrl: '' } })), /已存入/, '无真实文件不能宣称已存入')
 assert.doesNotMatch(labels(renderResult({ ...fileProps, savedToDocuments: false })), /未登录/, '会员保存失败不冒充未登录')
+// F-20：页内预览取同站的 printFileUrl（对象存储直链跨站取不到）；没有才退回直链。二维码始终是直链。
+function nodesOf(node, type, out = []) { if (node && typeof node === 'object') { if (node.type === type) out.push(node); (node.children ?? []).forEach((child) => nodesOf(child, type, out)) } return out }
+const sameSite = '/api/v1/files/f1/content?expires=1&sig=x'
+const withPrint = renderResult({ ...fileProps, exported: { ...fileProps.exported, printFileUrl: sameSite } })
+assert.equal(nodesOf(withPrint, 'preview')[0]?.props.fileUrl, sameSite, 'F-20 有 printFileUrl 时预览用同站地址')
+assert.equal(nodesOf(withPrint, 'qr')[0]?.props.value, fileProps.exported.signedUrl, 'F-20 二维码仍是下载直链')
+assert.equal(nodesOf(renderResult(fileProps), 'preview')[0]?.props.fileUrl, fileProps.exported.signedUrl, 'F-20 没有 printFileUrl 时退回直链')
+assertIncludes(read('src/pages/resume/ResumeGeneratePreviewPage.tsx'), "<FilePreviewDialog fileUrl={exportFormat === 'pdf' && exported.printFileUrl ? exported.printFileUrl : exported.signedUrl}", 'F-20 生成导出后的大预览窗用同站地址')
+assertIncludes(read('src/pages/resume/ResumeGeneratePreviewPage.tsx'), 'phoneDownloadUrl={exported.signedUrl}', 'F-20 大预览窗的手机扫码仍是下载直链')
+assertIncludes(read('src/pages/resume/ResumeOptimizePage.tsx'), "fileUrl={(exportKind === 'change_list' || exportFormat === 'pdf') && exported.printFileUrl ? exported.printFileUrl : exported.signedUrl}", 'F-20 优化导出后的大预览窗用同站地址')
+assertIncludes(read('src/pages/resume/ResumeOptimizePage.tsx'), 'phoneDownloadUrl={exported.signedUrl}', 'F-20 优化大预览窗的手机扫码仍是下载直链')
+assertIncludes(read('src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx'), 'fileUrl={exported.printFileUrl || exported.signedUrl}', 'F-20 诊断报告带走的大预览窗用同站地址')
+assertIncludes(read('src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx'), 'phoneDownloadUrl={exported.signedUrl}', 'F-20 诊断报告大预览窗的手机扫码仍是下载直链')
+assert.equal(nodesOf(renderResult({ ...fileProps, formatLabel: 'Word', exported: { ...fileProps.exported, printFileUrl: sameSite } }), 'preview').length, 0, 'F-20 非 PDF 不出页内预览，也就不会拿 PDF 副本冒充')
 const pageSource = read('src/pages/resume/ResumeOptimizePage.tsx')
 const ownershipEffect = /useEffect\(\(\) => \{\n    if \(exportKind !== 'resume'[\s\S]*?\}, \[exported, exportKind, token, setSavedToDocuments\]\)/.exec(pageSource)?.[0]
 assert.ok(ownershipEffect, '优化稿实际查询本人的文件归属')
@@ -676,5 +690,128 @@ const formatChooser = read('src/pages/resume/components/resume-deliver/ResumeFor
 assertIncludes(formatChooser, 'aria-label="文件生成流程"', '导出等待态四步流程常驻')
 assertIncludes(formatChooser, '系统没有提供逐步进度', '流程说明不冒充服务端逐步进度')
 console.log('PASS batch D 免费标签、保存归属、取件摘要、空报告和导出流程')
+
+const PAGE_AIGC_NOTE = '导出的简历每页底部有一行小字：含人工智能辅助生成内容'
+const FILE_AIGC_NOTE = '导出的文件末尾有一行：含人工智能辅助生成内容'
+const exportView = read('src/pages/resume/touch/OptimizeExportView.tsx')
+for (const [src, label] of [[formatChooser, '选格式卡'], [exportView, '导出格式区']]) {
+  assertIncludes(src, PAGE_AIGC_NOTE, `${label}含页脚标注说明`)
+  assertIncludes(src, FILE_AIGC_NOTE, `${label}含文末标注说明`)
+  assertIncludes(src, 'function resumeExportAigcNote', `${label}按格式选择标注说明`)
+}
+assertIncludes(formatChooser, '{resumeExportAigcNote(props.format)}', '选格式卡按当前格式渲染标注说明')
+assertIncludes(exportView, '{resumeExportAigcNote(props.format)}', '导出格式区按当前格式渲染标注说明')
+assertIncludes(formatChooser, "props.screen === 'export-chooser'", '选格式卡只在选格式屏渲染')
+assertIncludes(read('src/pages/resume/touch/edit.css'), ".qxt-aigc-note { margin: 0; font-size: var(--qx-fs-body);", '导出格式区标注说明用正文号')
+
+const useStateStub = (initial) => [typeof initial === 'function' ? initial() : initial, () => {}]
+const renderChooser = new Function('React', 'useState', 'ResumePricingBar', 'ResumeHelpLine', executable([
+  sourceNode(formatChooser, 'FORMATS'),
+  sourceNode(formatChooser, 'FONT_CHOICES'),
+  sourceNode(formatChooser, 'formatName'),
+  sourceNode(formatChooser, 'resumeExportAigcNote'),
+  sourceNode(formatChooser, 'ResumeFormatChooser').replace(/^export /, ''),
+  'return ResumeFormatChooser;',
+].join('\n')))(React, useStateStub, () => null, () => null)
+const chooserProps = {
+  screen: 'export-chooser',
+  format: 'pdf',
+  onFormatChange: () => {},
+  layout: { columns: 1, fontScale: 'standard', lineSpacing: 'standard', margin: 'standard', accent: 'slate' },
+  onLayoutChange: () => {},
+  templates: [],
+  templatesError: false,
+  selectedTemplateId: '',
+  onTemplateChange: () => {},
+  exporting: false,
+  exported: null,
+  exportError: null,
+  exportVersion: 0,
+  pricing: null,
+  pricingLoading: false,
+  blockedReason: null,
+  guest: true,
+  synthetic: false,
+  printNavigating: false,
+  onPrint: () => {},
+  onOpenPreview: () => {},
+  onClearExport: () => {},
+  onHelp: () => {},
+  estimatedPagesLabel: '导出后显示真实页数',
+}
+for (const format of ['pdf', 'docx']) {
+  const shown = labels(renderChooser({ ...chooserProps, format }))
+  assert.match(shown, new RegExp(PAGE_AIGC_NOTE), `${format} 选格式卡渲染页脚标注说明`)
+  assert.doesNotMatch(shown, new RegExp(FILE_AIGC_NOTE), `${format} 选格式卡不渲染文末标注说明`)
+}
+for (const format of ['txt', 'md']) {
+  const shown = labels(renderChooser({ ...chooserProps, format }))
+  assert.match(shown, new RegExp(FILE_AIGC_NOTE), `${format} 选格式卡渲染文末标注说明`)
+  assert.doesNotMatch(shown, new RegExp(PAGE_AIGC_NOTE), `${format} 选格式卡不渲染页脚标注说明`)
+}
+assert.doesNotMatch(labels(renderChooser({ ...chooserProps, screen: 'export-exporting' })), /含人工智能辅助生成内容/, '还没进入选格式时不渲染标注说明')
+
+const renderExport = new Function('React', 'ResumePricingBar', 'AIGC_SCREEN_MARK', executable([
+  sourceNode(exportView, 'FORMATS'),
+  sourceNode(exportView, 'resumeExportAigcNote'),
+  sourceNode(exportView, 'FACTS'),
+  sourceNode(exportView, 'OptimizeExportView').replace(/^export /, ''),
+  'return OptimizeExportView;',
+].join('\n')))(React, () => null, 'AI 生成，仅供参考，请自行核对')
+const exportProps = {
+  format: 'pdf',
+  onFormat: () => {},
+  busy: false,
+  exported: null,
+  exportKind: 'resume',
+  exportVersion: 0,
+  exportError: null,
+  pricing: null,
+  pricingLoading: false,
+  blockedReason: null,
+  guest: false,
+  printNavigating: false,
+  contentBlocked: false,
+  onPrint: () => {},
+  onOpenPreview: () => {},
+  showChangeList: false,
+  changeListBusy: false,
+  changeListBlocked: false,
+  onChangeList: () => {},
+}
+for (const format of ['pdf', 'docx']) {
+  const shown = labels(renderExport({ ...exportProps, format }))
+  assert.match(shown, new RegExp(PAGE_AIGC_NOTE), `${format} 导出格式区渲染页脚标注说明`)
+  assert.doesNotMatch(shown, new RegExp(FILE_AIGC_NOTE), `${format} 导出格式区不渲染文末标注说明`)
+}
+for (const format of ['txt', 'md']) {
+  const shown = labels(renderExport({ ...exportProps, format }))
+  assert.match(shown, new RegExp(FILE_AIGC_NOTE), `${format} 导出格式区渲染文末标注说明`)
+  assert.doesNotMatch(shown, new RegExp(PAGE_AIGC_NOTE), `${format} 导出格式区不渲染页脚标注说明`)
+}
+
+const draftStart = generate.indexOf('const handleExportDraft')
+const draftEnd = generate.indexOf('const availability', draftStart)
+assert.ok(draftStart >= 0 && draftEnd > draftStart, '填写页有按原样导出函数')
+const draftBranch = generate.slice(draftStart, draftEnd)
+assert.match(draftBranch, /exportResumeDraft\(/, '按原样导出走 exportResumeDraft')
+assert.doesNotMatch(draftBranch, /含人工智能辅助生成内容/, '按原样导出分支不渲染人工智能标注说明')
+assert.doesNotMatch(draftBranch, /resumeExportAigcNote/, '按原样导出分支不调用标注说明')
+assertNotIncludes(generate, PAGE_AIGC_NOTE, '按原样导出页不含页脚标注说明')
+assertNotIncludes(generate, FILE_AIGC_NOTE, '按原样导出页不含文末标注说明')
+assertNotIncludes(generate, 'ResumeFormatChooser', '按原样导出不渲染选格式卡')
+
+const keepExperience = new Function(executable(`${sourceNode(read('src/pages/resume/components/ResumeGenerateReview.tsx'), 'experienceRowsForGenerate').replace(/^export /, '')}\nreturn experienceRowsForGenerate;`))()
+assert.deepEqual(keepExperience([
+  { company: '青序门店', role: '', description: '负责门店日常运营' },
+  { company: '  ', role: '店员', description: '收银' },
+  { company: '验证科技', role: '前端实习生', period: ' 2024 ', description: ' 写组件 ' },
+]), [
+  { company: '青序门店', role: '', period: undefined, description: '负责门店日常运营' },
+  { company: '验证科技', role: '前端实习生', period: '2024', description: '写组件' },
+], '只写公司的经历会提交，公司没写的整段不送')
+assertIncludes(generate, 'experience: experienceRowsForGenerate(experience)', '填写页提交用同一条经历规则')
+assert.doesNotMatch(generate, /company\.trim\(\) && e\.role\.trim\(\)/, '填写页不再把没填职务的经历丢掉')
+console.log('PASS 导出标注说明按格式显示，只写公司的经历会提交')
 
 console.log('PASS resume diagnosis flow UI verification')

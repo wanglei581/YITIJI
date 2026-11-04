@@ -146,7 +146,12 @@ function assertNoCanary(label: string, payload: unknown): void {
   if (raw.includes(CANARY)) fail(`${label} 的响应里出现了明文凭证码`)
 }
 
+const REFUND_PENDING_COPY = '这单没有打完，退款待处理，输码时不会当场退款。请不要再输这个到机码；需要帮助请查看《隐私政策》里的联系方式。'
+
 async function main(): Promise<void> {
+  if (PICKUP_RESUME_REFUND_PENDING_MESSAGE !== REFUND_PENDING_COPY || PICKUP_RESUME_REFUND_PENDING_MESSAGE.includes('会按原路退回')) {
+    fail(`退款待处理不得承诺会按原路退回，实际 ${PICKUP_RESUME_REFUND_PENDING_MESSAGE}`)
+  }
   console.log('\n=== 到机码续打 / 凭证码不再下发 ===')
   assertIsolatedVerificationDatabase()
   const prisma = new PrismaService()
@@ -451,7 +456,7 @@ async function main(): Promise<void> {
       || REPRINT_BLOCKED_MESSAGE.partial_output !== '这单只出了一部分纸'
       || REPRINT_BLOCKED_MESSAGE.unconfirmed.includes('工作人员')
       || REPRINT_BLOCKED_MESSAGE.partial_output.includes('工作人员')
-      || PICKUP_RESUME_REFUND_PENDING_MESSAGE !== '这单没有打完，费用会按原路退回，需要帮助请拨打服务电话'
+      || PICKUP_RESUME_REFUND_PENDING_MESSAGE !== REFUND_PENDING_COPY
     ) {
       fail(`两条阻断文案必须去掉工作人员，实际 ${JSON.stringify(REPRINT_BLOCKED_MESSAGE)}`)
     }

@@ -171,9 +171,9 @@ export function refundApplyLine(contact?: PublicSupportContact | null): string {
   return `如需退款，请${servicePhoneLine(contact)}，我们核实后原路退回。`
 }
 
-/** 一体机主机靠 4G CPE 上网。提到网络断开时用这一句，不叫用户自己查线。 */
+/** 一体机主机靠 4G CPE 上网。提到网络断开时用这一句，不叫用户自己查线。句末没有句号，拼接处自己加。 */
 export function networkDisconnectLine(): string {
-  return '网络断开时，我们会收到提醒并远程处理'
+  return '网络断开时，这台机器暂时办不了需要联网的事，请稍后再来'
 }
 
 /** 小程序未发布时，不出现「用手机继续 / 打开小程序」这一类引导。 */

@@ -9,6 +9,7 @@ const api = resolve(__dirname, '..')
 const prismaCli = join(api, 'node_modules/prisma/build/index.js')
 const migration = '20261022080000_first_order_delivery/migration.sql'
 const scanDeviceMigration = '20261102230000_add_scan_device_session_fields/migration.sql'
+const interviewDeadlineMigration = '20261104180000_mock_interview_deadline/migration.sql'
 const baseline = '07f9046c2'
 
 async function freePort(): Promise<number> {
@@ -42,6 +43,7 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     await client.$executeRawUnsafe(`INSERT INTO "ScanTask" ("id", "terminalId", "scanType", "status", "expiresAt", "updatedAt") VALUES ('${legacyScanId}', 'scan-device-legacy-terminal', 'document', 'completed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', scanDeviceMigration)])
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261104150000_add_terminal_heartbeat_printer_queue/migration.sql')])
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', interviewDeadlineMigration)])
     await client.aiServiceFact.create({ data: { serviceType: 'resume_optimize', serviceKey: 'migration-test', orgId: 'org-snapshot', terminalId: 'terminal-snapshot' } })
     if (await client.aiServiceFact.count() !== 1) throw new Error(`${kind}: fact table unavailable`)
     const sentinel = await client.organization.findUnique({ where: { id: 'first-order-migration-sentinel' } })
@@ -100,6 +102,17 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     const heartbeat = await client.terminalHeartbeat.findFirst({ where: { terminalId: 'migration-terminal' }, orderBy: { createdAt: 'desc' } })
     if (heartbeat?.scanDeviceHealth !== 'ready' || heartbeat.scanDeviceObservedAt?.getTime() !== observedAt.getTime()) throw new Error(`${kind}: heartbeat scan-device columns must round-trip`)
     console.log(`PASS ${kind}: scan device session columns — legacy rows default to panel, device rows and heartbeat health round-trip`)
+
+    const deadlineAt = new Date('2026-11-04T12:00:00.000Z')
+    const interview = await client.mockInterviewSession.create({
+      data: {
+        interviewerType: 'hr', industry: '公共就业', position: '窗口服务', experience: 'y1_3', difficulty: 'standard',
+        expiresAt: new Date(Date.now() + 60_000), deadlineAt,
+      },
+    })
+    const interviewBack = await client.mockInterviewSession.findUnique({ where: { id: interview.id } })
+    if (interviewBack?.deadlineAt?.toISOString() !== deadlineAt.toISOString()) throw new Error(`${kind}: interview deadline column must round-trip`)
+    console.log(`PASS ${kind}: mock interview deadline column is writable`)
   } finally { await client.$disconnect() }
 }
 
