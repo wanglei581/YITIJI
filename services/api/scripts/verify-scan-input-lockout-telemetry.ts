@@ -113,11 +113,20 @@ async function main(): Promise<void> {
   const publicLocked = await admin.getTerminalPrinterStatus(terminalId)
   assert.equal(publicLocked.found, true)
   assert.equal(publicLocked.scanInputHealth, 'locked_out')
+  // 2026-11-02 屏上扫描：公开接口按任务要求多给两项（扫描仪探测结果与探测时刻，scanDeviceHealth / scanDeviceObservedAt，
+  // 取值与老 Agent 为 null 的口径见 verify-scan-device-sessions），仍是精确集合断言——再多出任何字段都会红。
   assert.deepEqual(
     Object.keys(publicLocked).sort(),
-    ['found', 'isOnline', 'lastSeenAt', 'printerStatus', 'scanInputHealth'],
-    'public printer-status must not leak scan input reason, action or observation time',
+    ['found', 'isOnline', 'lastSeenAt', 'printerStatus', 'scanDeviceHealth', 'scanDeviceObservedAt', 'scanInputHealth'],
+    'public printer-status must expose exactly these fields',
   )
+  for (const leaked of ['scanInputReason', 'scanInputAction', 'scanInputObservedAt']) {
+    assert.equal(
+      leaked in publicLocked,
+      false,
+      `public printer-status must not leak scan input ${leaked}`,
+    )
+  }
 
   await agent.heartbeat(terminalId, validHealthy, 'Bearer redacted')
   assert.equal(latestHeartbeat?.scanInputHealth, 'healthy')

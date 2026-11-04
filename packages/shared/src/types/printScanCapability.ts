@@ -5,7 +5,7 @@
 // 在任务创建边界强制执行，Kiosk UI 只是体验层）；'testing' 仅测试/运维语境可见；
 // 其余状态一律不可用。未配置行 = 管理员未接管，服务端放行既有已验证闭环。
 //
-// 例外见下方 DEFAULT_DENY_CAPABILITY_KEYS：color_print / duplex_print / signature_stamp 未配置 = 拒绝。
+// 例外见下方 DEFAULT_DENY_CAPABILITY_KEYS：color_print / duplex_print / signature_stamp / scan_device 未配置 = 拒绝。
 
 export type PrintScanCapabilityKey =
   | 'document_print'
@@ -20,6 +20,7 @@ export type PrintScanCapabilityKey =
   | 'signature_stamp'
   | 'color_print'
   | 'duplex_print'
+  | 'scan_device'
 
 export type PrintScanCapabilityStatus =
   | 'available'
@@ -41,6 +42,7 @@ export const PRINT_SCAN_CAPABILITY_KEYS: readonly PrintScanCapabilityKey[] = [
   'signature_stamp',
   'color_print',
   'duplex_print',
+  'scan_device',
 ] as const
 
 export const PRINT_SCAN_CAPABILITY_STATUSES: readonly PrintScanCapabilityStatus[] = [
@@ -82,11 +84,18 @@ export const DEPRECATED_CAPABILITY_ALIAS: Partial<Record<PrintScanCapabilityKey,
  * 只有一个图片位，本人签名与单位印章分不开，试点与新机器默认关，管理员逐台配成
  * available 才开。Kiosk 对未配置的 signature_stamp 必须按「暂未开通」展示，
  * 与服务端 assertUserTaskAllowed 一致（同 color_print / duplex_print 的处理）。
+ *
+ * scan_device（屏上扫描）列入本名单的理由与彩色、双面相同：没验过（2026-11-02）。
+ * 终端程序服务经 WIA 直接驱动扫描仪，进纸器多页、无纸、开盖、打印时扫描、中止后恢复这些情形，
+ * 每一台机器都要先到机器旁验过，才登记成 available；新机器与试点机默认关，用户只能走面板扫描。
+ * 开通同样只有一条路径 —— 管理员逐台显式配成 available。服务端判定在
+ * TerminalCapabilitiesService.assertScanDeviceAllowed（建 device 会话）与 device-report（能力被关后回报 409）。
  */
 export const DEFAULT_DENY_CAPABILITY_KEYS: readonly PrintScanCapabilityKey[] = [
   'color_print',
   'duplex_print',
   'signature_stamp',
+  'scan_device',
 ] as const
 
 /**
@@ -112,6 +121,7 @@ export function requiredPrintCapabilityKeys(params: {
 export const CAPABILITY_DENIAL_REASON: Partial<Record<PrintScanCapabilityKey, string>> = {
   color_print: '本机彩色打印尚未通过真机验证，暂不能按彩色下单',
   duplex_print: '本机自动双面尚未通过真机验证，暂不能按双面下单',
+  scan_device: '本机屏上扫描尚未通过真机验证，暂不能在屏上开始扫描',
 }
 
 /** 统一任务中心的任务类型判别值。photo/copy/material_pack/format_conversion/
