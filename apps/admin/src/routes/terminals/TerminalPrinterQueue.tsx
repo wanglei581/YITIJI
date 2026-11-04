@@ -28,7 +28,12 @@ function CurrentQueue({ view }: { view: PrinterQueuePresentation }) {
         <StatusBadge dot status={view.spoolerBadge ?? 'default'} label={view.spoolerLabel ?? '读不到'} />
       </div>
       {view.spoolerDetail && <p className="text-xs text-error-fg">{view.spoolerDetail}</p>}
-      <p className="text-xs leading-5 text-neutral-700" title={view.rawTitle || undefined}>驱动原值：{view.rawText}</p>
+      <p
+        className={`text-xs leading-5 ${view.rawSeverity === 'error' ? 'text-error-fg' : view.rawSeverity === 'warning' ? 'text-warning-fg' : 'text-neutral-700'}`}
+        title={view.rawTitle || undefined}
+      >
+        驱动原值：{view.rawText}
+      </p>
     </div>
   )
 }

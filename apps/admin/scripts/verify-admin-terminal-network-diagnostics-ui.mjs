@@ -194,5 +194,30 @@ assert.equal(offline.portText, null)
 assert.equal(offline.spoolerLabel, null)
 assert.equal(offline.rawText, null)
 assert.doesNotMatch(offline.statusLabel, /正在运行|USB001/)
+assert.match(offline.historyLabel, /^Windows 打印服务/)
+assert.notEqual(offline.historyLabel, '正在运行')
+
+function withPrinterState(state) {
+  return describePrinterQueue(true, { ...usbRunning, printerQueueRawStatus: `3,0,False,${state},0` })
+}
+assert.match(withPrinterState('4096').rawText, /不可用/)
+assert.match(withPrinterState('2097152').rawText, /内存不足/)
+const printingAndPaper = withPrinterState('1040').rawText
+assert.match(printingAndPaper, /打印中/)
+assert.match(printingAndPaper, /缺纸/)
+const unknownBit = withPrinterState('33554448').rawText
+assert.match(unknownBit, /缺纸/)
+assert.match(unknownBit, /另有未识别位 0x2000000/)
+assert.ok(withPrinterState('0').rawText.split(' · ').includes('队列状态 0'))
+
+assert.equal(notFound.rawSeverity, 'error')
+assert.equal(stopped.rawSeverity, 'warning')
+assert.equal(live.rawSeverity, null)
+assert.equal(offline.rawSeverity, null)
+assert.equal(missing.rawSeverity, null)
+assert.match(
+  queueComponent,
+  /view\.rawSeverity === 'error' \? 'text-error-fg' : view\.rawSeverity === 'warning' \? 'text-warning-fg' : 'text-neutral-700'/,
+)
 
 console.log('ALL PASS: Admin printer queue view is read-only, hides stale reports while offline, and does not show an address')

@@ -20,6 +20,7 @@ export interface PrinterQueuePresentation {
   spoolerDetail: string | null
   rawText: string | null
   rawTitle: string | null
+  rawSeverity: 'error' | 'warning' | null
 }
 
 const PRINTER_STATUS: Record<number, string> = {
@@ -40,14 +41,29 @@ const EXTENDED_STATUS: Record<number, string> = {
 const STATE_BITS: Array<[number, string]> = [
   [0x1, '暂停'],
   [0x2, '错误'],
+  [0x4, '正在删除'],
   [0x8, '卡纸'],
   [0x10, '缺纸'],
+  [0x20, '手动进纸'],
   [0x40, '纸张问题'],
   [0x80, '脱机'],
+  [0x100, '输入输出中'],
+  [0x200, '忙'],
+  [0x400, '打印中'],
+  [0x800, '出纸盒满'],
+  [0x1000, '不可用'],
+  [0x2000, '等待'],
+  [0x4000, '处理中'],
+  [0x8000, '初始化'],
+  [0x10000, '预热'],
   [0x20000, '粉少'],
   [0x40000, '缺粉'],
+  [0x80000, '页面无法打印'],
   [0x100000, '需人工处理'],
+  [0x200000, '内存不足'],
   [0x400000, '开盖'],
+  [0x800000, '服务器状态未知'],
+  [0x1000000, '省电'],
 ]
 
 const BLANK: PrinterQueuePresentation = {
@@ -62,6 +78,7 @@ const BLANK: PrinterQueuePresentation = {
   spoolerDetail: null,
   rawText: null,
   rawTitle: null,
+  rawSeverity: null,
 }
 
 function namedNumber(label: string, raw: string, table: Record<number, string>): string {
@@ -87,7 +104,8 @@ function printerStateText(raw: string): string {
     names.push(name)
     rest -= bit
   }
-  if (rest !== 0 || names.length === 0) return `队列状态 ${raw}`
+  if (names.length === 0) return `队列状态 ${raw}`
+  if (rest !== 0) return `队列状态 ${raw}（${names.join('、')}、另有未识别位 0x${rest.toString(16).toUpperCase()}）`
   return `队列状态 ${raw}（${names.join('、')}）`
 }
 
@@ -145,12 +163,20 @@ function spoolerView(value: string | null): { label: string; badge: 'success' | 
   return { label: value, badge: 'default', detail: null }
 }
 
+function rawSeverityOf(raw: string | null): 'error' | 'warning' | null {
+  if (raw === 'not_found') return 'error'
+  if (raw === 'query_failed') return 'warning'
+  return null
+}
+
 function historyOf(queue: PrinterQueueReport | null): string | null {
   if (!queue) return null
-  if (queue.printerQueueSpooler === 'running' || queue.printerQueueSpooler === 'stopped' || queue.printerQueueSpooler === 'other' || queue.printerQueueSpooler === 'unknown') {
-    return spoolerView(queue.printerQueueSpooler).label
+  const spooler = queue.printerQueueSpooler
+  if (spooler === 'running' || spooler === 'stopped' || spooler === 'other' || spooler === 'unknown') {
+    return `Windows 打印服务${spoolerView(spooler).label}`
   }
-  return queue.printerQueueName || null
+  if (queue.printerQueueName) return `队列名 ${queue.printerQueueName}`
+  return null
 }
 
 export function describePrinterQueue(online: boolean, queue: PrinterQueueReport | null): PrinterQueuePresentation {
@@ -174,5 +200,6 @@ export function describePrinterQueue(online: boolean, queue: PrinterQueueReport 
     spoolerDetail: spooler.detail,
     rawText: raw.text,
     rawTitle: raw.title,
+    rawSeverity: rawSeverityOf(queue.printerQueueRawStatus),
   }
 }
