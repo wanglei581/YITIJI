@@ -235,7 +235,9 @@ test('收藏的政策打开那一条，发布日期用确认发布时间 @kiosk'
   const opened = page.locator('[data-policy-id="policy-fav"]')
   const other = page.locator('[data-policy-id="policy-other"]')
   await expect(opened).toHaveClass(/is-open/)
+  await page.locator('.rq-touch-dock .qxt-btn-sec').click()
   await expect(other).not.toHaveClass(/is-open/)
+  await opened.locator('.rq-item-main').click()
   await expect(opened).toContainText('高校毕业生求职创业补贴')
   await expect(opened.locator('.rq-facts')).toContainText('发布日期')
   await expect(opened.locator('.rq-facts')).toContainText('2026-09-29')
@@ -258,7 +260,9 @@ test('点名的政策不在列表里时先说明正在打开，不拿第一条�
     const opened = page.locator('[data-policy-id="policy-slow"]')
     await expect(opened).toHaveClass(/is-open/)
     await expect(opened).toContainText('补打开的培训补贴说明')
+    await page.locator('.rq-touch-dock .qxt-btn-sec').click()
     await expect(page.locator('[data-policy-id="policy-other"]')).not.toHaveClass(/is-open/)
+    await opened.locator('.rq-item-main').click()
   } finally {
     release()
   }
@@ -428,16 +432,17 @@ test('政策下架自动刷新：本人点开的那一条被下架，整页换�
   await expect(page.locator('[data-policy-id="policy-other"]')).toBeVisible()
   await expect(page.locator('[data-policy-id="policy-fav"]')).toHaveCount(0)
   await expect(page.locator('.qxt-status')).not.toHaveText('这条已下架')
-  // 回到列表后，默认自动展开的那一条不算「本人点开」：它再被下架只摘掉，不整页换成已下架（见下一条）。
+  // 回到列表后所有条目保持收起：未点开的条目下架只摘掉，不整页换成已下架。
 })
 
-test('政策下架自动刷新：默认自动展开的第一条被下架，只从列表摘掉，不整页换成已下架 @kiosk', async ({ page }) => {
+test('政策下架自动刷新：未点开的第一条保持收起并被下架，只从列表摘掉，不整页换成已下架 @kiosk', async ({ page }) => {
   const state: PolicyRouteState = { broken: false, holdSlow: null, withdrawn: new Set() }
   await page.clock.install()
   await routePolicies(page, state)
   await page.goto('/renshi', { waitUntil: 'domcontentloaded' })
   const first = page.locator('[data-policy-id="policy-other"]')
-  await expect(first).toHaveClass(/is-open/)
+  await expect(first).toBeVisible()
+  await expect(first).not.toHaveClass(/is-open/)
   state.withdrawn?.add('policy-other')
   await page.clock.fastForward(31_000)
   await expect(first).toHaveCount(0)
@@ -488,7 +493,8 @@ test('政策下架自动刷新：核对期间本人换到别的条目，不把�
   await expect(fav).toHaveClass(/is-open/)
   state.withdrawn?.add('policy-fav')
   await page.clock.fastForward(31_000)
-  // 刷新已对 policy-fav 发出按条读取，应答被压住；本人这时换去看另一条。
+  // 刷新已对 policy-fav 发出按条读取，应答被压住；本人回列表再点另一条。
+  await page.locator('.rq-touch-dock .qxt-btn-sec').click()
   const dated = page.locator('[data-policy-id="policy-dated"]')
   await dated.getByRole('button', { name: /已写明发布日期的补贴说明/ }).click()
   await expect(dated).toHaveClass(/is-open/)

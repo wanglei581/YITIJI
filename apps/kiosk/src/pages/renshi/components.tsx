@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import {
@@ -134,23 +134,35 @@ export function TabBar({ active, onChange }: { active: TabKey; onChange: (k: Tab
 }
 
 export function AudienceFilter({ value, onChange }: { value: AudienceKey; onChange: (k: AudienceKey) => void }) {
+  const [open, setOpen] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    cardRef.current?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus()
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setOpen(false); return }
+      if (event.key !== 'Tab' || !cardRef.current) return
+      const items = [...cardRef.current.querySelectorAll<HTMLButtonElement>('button')]
+      const first = items[0], last = items[items.length - 1]
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('keydown', onKey); returnFocus?.focus() }
+  }, [open])
   return (
     <div className="rq-aud">
-      {/* 稿 48 这里只有一排身份筛选：「先选你的情况」那一行说明不上屏，筛选的用途写在组的无障碍名里。 */}
-      <div className="rq-chips" role="group" aria-label="按身份筛选政策事项，通用事项始终展示">
-        {AUDIENCE_CHIPS.map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            type="button"
-            className="rq-chip"
-            aria-pressed={value === key}
-            onClick={() => onChange(key)}
-          >
-            <Icon aria-hidden="true" />
-            {label}
-          </button>
-        ))}
-      </div>
+      <button type="button" className="rq-audience-change" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}><span>身份：{AUDIENCE_CHIPS.find((chip) => chip.key === value)?.label}</span><span>更换</span></button>
+      {open && <div className="rq-qr-layer" onClick={() => setOpen(false)}>
+        <div ref={cardRef} className="rq-aud-card" role="dialog" aria-modal="true" aria-labelledby="rq-aud-title" onClick={(event) => event.stopPropagation()}>
+          <h2 id="rq-aud-title">选身份</h2>
+          <div className="rq-chips" role="group" aria-label="按身份筛选政策事项，通用事项始终展示">
+            {AUDIENCE_CHIPS.map(({ key, label }) => <button key={key} type="button" className="rq-chip" aria-pressed={value === key} onClick={() => { onChange(key); setOpen(false) }}>{label}</button>)}
+          </div>
+          <button type="button" className="rq-aud-close" onClick={() => setOpen(false)}>关闭</button>
+        </div>
+      </div>}
     </div>
   )
 }
