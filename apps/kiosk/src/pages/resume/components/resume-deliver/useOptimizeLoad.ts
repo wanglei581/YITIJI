@@ -3,7 +3,7 @@ import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import type { GeneratedResume, ResumeOptimizeModule, ResumeTemplate } from '@ai-job-print/shared'
 import { getResumeOptimize, type ResumeReadAccess } from '../../../../services/api'
 import { getResumeTemplates } from '../../../../services/api/jobMaterials'
-import { errorCodeOf, userMessageOf } from '../../../../services/api/userErrorMessage'
+import { AI_QUOTA_EXHAUSTED_RESUME_COPY, errorCodeOf, userMessageOf } from '../../../../services/api/userErrorMessage'
 import { AI_OUTAGE_CODES, isAiOutage } from '../../../../ai/aiOutage'
 import { SYNTHETIC_MODULES, SYNTHETIC_RESUME } from './fixtures'
 import type { OptimizeViewState } from './constants'
@@ -97,7 +97,9 @@ export function useOptimizeLoad(opts: {
           }
         } else if (typeof res.failCode === 'string' && AI_OUTAGE_CODES.has(res.failCode)) {
           setFailKind('outage')
-          setFailMsg('AI 暂时不可用，你可以先按模板手动填写')
+          setFailMsg(res.failCode === 'AI_QUOTA_EXHAUSTED'
+            ? AI_QUOTA_EXHAUSTED_RESUME_COPY
+            : 'AI 暂时不可用，你可以先按模板手动填写')
         } else {
           const reason = resumeUserReason(res.failReason, '本次没有生成优化建议，可重试或返回重新解析')
           setFailKind(reason.includes('重新上传') ? 'expired' : 'retry')

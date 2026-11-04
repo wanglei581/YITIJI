@@ -173,6 +173,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:file-retention-ui
           pnpm --filter @ai-job-print/kiosk verify:home-narrow-visual-balance
           pnpm --filter @ai-job-print/kiosk verify:home-toolbox-ui
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-parked-toolbox-campus
           pnpm --filter @ai-job-print/kiosk verify:home-jobs-availability
           pnpm --filter @ai-job-print/kiosk verify:jobfair-checkin
           pnpm --filter @ai-job-print/kiosk verify:jobfair-size
@@ -219,6 +220,8 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:screensaver-empty-shell
           pnpm --filter @ai-job-print/kiosk verify:v6-type-floor
           pnpm --filter @ai-job-print/kiosk verify:qingxu-v2-frozen
+          # 触屏版稿（docs/design/kiosk-touch-2026-10）10/26 补稿定稿后冻结：稿文件 sha256 对 FROZEN.json，改稿须产品负责人同意后 --update。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-touch-frozen
           pnpm --filter @ai-job-print/kiosk verify:visual-evidence-manifest
           pnpm --filter @ai-job-print/admin verify:source-publish-actions
           pnpm --filter @ai-job-print/refresh verify:runtime
@@ -664,6 +667,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:device-fleet-overview
           pnpm --filter @ai-job-print/api verify:scan-tasks
           pnpm --filter @ai-job-print/api verify:scan-quiet-period
+          # 屏上扫描(device 路线)云端会话:能力准入、状态转移表、续期上限、改用面板扫描不吃静默期、deliver origin、心跳新字段。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-sessions
           pnpm --filter @ai-job-print/api verify:print-conversion
           # 包 K1：中文字体解析收口 + 探测（缺候选路径即红）
           pnpm --filter @ai-job-print/api verify:cjk-font
@@ -682,6 +687,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:console-screen-usage
           # 大屏累计打印页数 = 出纸任务 × 份数（W-68）；服务人次读一体机会话（W-69）。自建临时 SQLite。
           pnpm --filter @ai-job-print/api verify:console-screen-printed-visits
+          # 设备管理打印机「本系统出纸」复用同一出纸页数。脚本自建临时 SQLite。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-printer-output
           pnpm --filter @ai-job-print/api verify:admin-orders-readonly
           pnpm --filter @ai-job-print/api verify:isolated-verification-database
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:order
@@ -819,6 +826,9 @@ jobs:
           # P1-2a 计量表留存：与 AiServiceLog 同一保留期，到期先按月汇总再分批删；汇总表无个人字段。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-retention
           pnpm --filter @ai-job-print/api verify:ai-quota
+          # Q2 全入口登记：每个 @AiUse('generate'|'voice') 路由要么接入按人次数、要么写明不计次理由；
+          # 运行时用例 import services/api/src 并写隔离库，所以放在「Prepare fresh SQLite db」之后。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-quota-coverage
           # 后台定时任务一次失败不能让 API 进程退出（10/6 P0：P2028 让 Node 22 直接退出）；import src，放在建库之后。
           pnpm --filter @ai-job-print/api verify:background-task-safety
           pnpm --filter @ai-job-print/api verify:activity-logs
@@ -1212,6 +1222,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           pnpm --filter @ai-job-print/api verify:scan-tasks
           pnpm --filter @ai-job-print/api verify:scan-quiet-period
+          # 屏上扫描(device 路线)云端会话:能力准入、状态转移表、续期上限、改用面板扫描不吃静默期、deliver origin、心跳新字段。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-sessions
           pnpm --filter @ai-job-print/api verify:print-conversion
           # 包 K1：中文字体解析收口 + 探测（缺候选路径即红）
           pnpm --filter @ai-job-print/api verify:cjk-font

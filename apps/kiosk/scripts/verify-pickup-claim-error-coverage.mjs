@@ -137,6 +137,7 @@ const modelUrl = transpile('apps/kiosk/src/pages/print/pickupClaimModel.ts', {
   '../../services/api/userErrorMessage': userErrorUrl,
 })
 const model = await import(modelUrl)
+const userMessages = await import(userErrorUrl)
 const { ApiHttpError } = await import(httpAdapterStub)
 
 const table = model.PICKUP_CLAIM_MESSAGES
@@ -293,12 +294,12 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
   if (!/handleClaim\(failure\.code\)/.test(page)) fail('重试必须仍使用内存原码')
 }
 
-// 方案②：三个续打错误码的句子与分类。不放进 CLOSED_REQUIRED——
-// 次数用尽和已经出过一部分纸的句子没有「手机 / 工作人员 / 小程序」；
-// 出纸未确认的句子含「请稍后再试」，按可恢复处理。
+// 方案②：三个续打错误码的句子与分类。
+// 次数用尽要给回手机重新下单的下一步；出纸未确认说清过 5 分钟后再输同一个码，符合条件时才整份重打，按可恢复处理。
+// 已经出过一部分纸的旧句仍归 closed，不放进 CLOSED_REQUIRED（那一句没有手机 / 小程序出路）。
 {
-  const limit = '这单已经接着打过 2 次，不能再打了'
-  const unconfirmed = '这单的出纸结果还没确认，暂时不能接着打，请稍后再试'
+  const limit = '这单已经接着打过 2 次，不能再打了。还要打，请在手机上重新下单'
+  const unconfirmed = '这单的出纸结果还没确认。请过 5 分钟后回到这台机器，再输一次同一个到机码，按屏幕提示办理；符合条件时可以整份重打。'
   const partial = '这单已经出了一部分纸，不能整单重打'
   const already = '这个到机码已经用过，这单已经交给打印机，不能再次取件。要再打一份，请重新下单；没拿到纸，可以问小青，或查看《隐私政策》里的联系方式。'
   const resume = '没打完？回到出纸失败的那台机器上，再输一次同一个到机码就能接着打，每单最多 2 次。'
@@ -308,14 +309,100 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
     ['PICKUP_RESUME_PARTIAL_OUTPUT', partial, 'closed'],
   ]) {
     const err = new ApiHttpError(code, 'server says', 409)
-    if (model.pickupClaimMessage(err) !== sentence) fail(`${code} 文案不是后端那句`)
+    if (model.pickupClaimMessage(err) !== sentence) fail(`${code} 取件文案不对：${model.pickupClaimMessage(err)}`)
     else if (model.classifyClaimFailure(err) !== kind) fail(`${code} 应分类为 ${kind}，实际 ${model.classifyClaimFailure(err)}`)
-    else pass(`${code}：${kind}，文案与后端一致`)
+    else pass(`${code}：${kind}，取件文案是屏上该说的那句`)
   }
   if (table.PICKUP_CODE_ALREADY_USED !== already) fail('PICKUP_CODE_ALREADY_USED 没有改成不找人的说法')
   else pass('PICKUP_CODE_ALREADY_USED：出路是重新下单或问小青，不找现场工作人员、不叫原地重输')
   if (model.PICKUP_SAME_CODE_RESUME_NOTE !== resume) fail('到机码页续打说明丢了或改了次数以外的承诺')
   else pass('到机码页续打说明只承诺每单最多 2 次')
+  const panel = read('apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx')
+  if (!panel.includes('还要打，请在手机上重新下单')) fail('订单面板次数用尽没有给出回手机重新下单的下一步')
+  else pass('次数用尽：认领页和订单面板都告诉人回手机重新下单')
+}
+
+// 付费异常待退回、文件失效、程序太旧、当天额度、过期码。抽取器看不到这几个码（不在 new Exception 字面量里），这里逐个钉死。
+{
+  const refund = '这单没有打完，退款待处理，输码时不会当场退款。请不要再输这个到机码；需要帮助请查看《隐私政策》里的联系方式。'
+  const refundErr = new ApiHttpError('PICKUP_RESUME_REFUND_PENDING', 'server says', 409)
+  if (!Object.prototype.hasOwnProperty.call(table, 'PICKUP_RESUME_REFUND_PENDING')) fail('取件码表没有登记 PICKUP_RESUME_REFUND_PENDING')
+  else if (!userMessages.SHARED_USER_MESSAGE_CODES.includes('PICKUP_RESUME_REFUND_PENDING')) fail('共享码表没有登记 PICKUP_RESUME_REFUND_PENDING')
+  else if (model.pickupClaimMessage(refundErr) !== refund) fail(`退款待处理的取件文案不是登记句：${model.pickupClaimMessage(refundErr)}`)
+  else if (userMessages.userMessageOf(refundErr, '兜底') !== refund) fail('共享码表的退款待处理文案和取件码表不一致')
+  else if (model.classifyClaimFailure(refundErr) !== 'closed') fail('退款待处理应分类为 closed，避免叫人再输这个码')
+  else if (model.pickupClaimMessage(refundErr) === model.PICKUP_CLAIM_FALLBACK_MESSAGE) fail('退款待处理落到了「请重试」兜底')
+  else if (/已退款/.test(refund)) fail('退款待处理写成了「已退款」')
+  else if (/重试|重新输入|再试/.test(refund)) fail('退款待处理仍叫人重试')
+  else pass('PICKUP_RESUME_REFUND_PENDING：两张码表同一句，closed，不写已退款')
+
+  const fileSentence = '这笔订单的文件现在无法用于打印。请在手机上重新上传文件、重新下单。'
+  const agentSentence = '这台机器暂时不能用同一个到机码接着打。还要打，请在手机上重新下单。'
+  for (const [code, sentence] of [
+    ['PRINT_RETRY_FILE_UNAVAILABLE', fileSentence],
+    ['PRINT_RETRY_AGENT_VERSION', agentSentence],
+  ]) {
+    const err = new ApiHttpError(code, 'server says', 409)
+    const said = model.pickupClaimMessage(err)
+    if (!Object.prototype.hasOwnProperty.call(table, code)) fail(`${code} 没有登记，会落到请重试`)
+    else if (said !== sentence) fail(`${code} 文案不是定稿：${said}`)
+    else if (model.classifyClaimFailure(err) !== 'closed') fail(`${code} 应分类为 closed`)
+    else if (/0\.4\.13|免费|请重试|版本|升级/.test(said)) fail(`${code} 把后端维护句带上了屏：${said}`)
+    else pass(`${code}：closed，给出回手机的下一步，不写版本号`)
+  }
+
+  const rejected = userMessages.PICKUP_CODE_REJECTED_COPY
+  const onlyRecheck = '到机码无效或已过期，请核对后重新输入'
+  for (const code of ['PICKUP_CODE_INVALID', 'PICKUP_CODE_EXPIRED', 'PICKUP_TERMINAL_MISMATCH']) {
+    const err = new ApiHttpError(code, '到机码已过期，请在小程序重新下单', 404)
+    const said = model.pickupClaimMessage(err)
+    if (said !== rejected) fail(`${code} 被本地码表盖成了别的句子：${said}`)
+    else if (said === onlyRecheck || said === `${onlyRecheck}。`) fail(`${code} 只剩「请核对后重新输入」，没有下一步`)
+    else if (!/请在手机上查看这笔订单/.test(said) || !/重新下单/.test(said)) fail(`${code} 没有回手机查看或重新下单`)
+    else if (model.classifyClaimFailure(err) !== 'invalid') fail(`${code} 应与无效码同一屏，实际 ${model.classifyClaimFailure(err)}`)
+    else pass(`${code}：同一句防试探，并给出回手机的下一步`)
+  }
+  if (userMessages.userMessageOf(new ApiHttpError('PICKUP_CODE_EXPIRED', '到机码已过期，请在小程序重新下单', 404), '兜底') !== rejected) {
+    fail('共享码表的过期句和取件码表不一致')
+  } else pass('过期码：共享码表与取件码表同一句，不再被短句盖住')
+
+  // 当天额度沿用批次上的共享短句：不进到机码表，认领页与确认页同一句，次要按钮是「输另一个到机码」。
+  for (const [code, expected] of [
+    ['PRINT_TERMINAL_DAILY_QUOTA_REACHED', '这台机器今天的免费打印量已用完，明天 0 点恢复'],
+    ['PRINT_MEMBER_DAILY_QUOTA_REACHED', '你今天的免费打印量已达上限，明天 0 点恢复'],
+  ]) {
+    const err = new ApiHttpError(code, 'server says', 429)
+    const said = model.pickupClaimMessage(err)
+    const shared = userMessages.userMessageOf(err, '兜底')
+    if (Object.prototype.hasOwnProperty.call(table, code)) fail(`${code} 不该登记进到机码表，原话在共享码表`)
+    else if (model.classifyClaimFailure(err) !== 'other') fail(`${code} 应分类为 other，实际 ${model.classifyClaimFailure(err)}`)
+    else if (said !== shared) fail(`${code} 认领页没有沿用共享短句：${said}`)
+    else if (!said.includes(expected)) fail(`${code} 共享短句不是批次原话：${said}`)
+    else if (!said.includes('免费')) fail(`${code} 丢掉了「免费」：${said}`)
+    else if (!said.includes('需要帮助？')) fail(`${code} 共享短句丢了求助句`)
+    else pass(`${code}：不进到机码表，认领页与确认页同一句共享短句`)
+  }
+  const memberLimited = userMessages.userMessageOf({ code: 'PRINT_MEMBER_DAILY_QUOTA_REACHED', details: { limit: 50 } }, '兜底')
+  if (!memberLimited.includes('你今天已免费打印 50 面')) fail(`会员当天额度带面数时不是批次原话：${memberLimited}`)
+  else pass('会员当天额度：有面数时写出免费打印了多少面')
+}
+{
+  const rel = 'apps/kiosk/src/pages/print/components/PickupHidGuide.tsx'
+  const sf = parse(rel)
+  let quotaBranch = null
+  const walk = (n) => {
+    if (!quotaBranch && ts.isIfStatement(n) && /quotaExit === 'login' \|\| quotaExit === 'wait'/.test(n.expression.getText())) quotaBranch = n.thenStatement
+    ts.forEachChild(n, walk)
+  }
+  walk(sf)
+  if (!quotaBranch) fail(`${rel}：额度被拒没有单独的按钮分支`)
+  else {
+    const text = quotaBranch.getText(sf)
+    if (!text.includes('输另一个到机码')) fail('当天额度用完的次要按钮不是「输另一个到机码」')
+    else if (/求助/.test(text)) fail('当天额度用完的次要按钮被改成了「求助」')
+    else if (!/onReset/.test(text)) fail('次要按钮没有接到重新输入')
+    else pass('当天额度用完：主按钮回首页，次要按钮是输另一个到机码')
+  }
 }
 
 // 方案②口径：一体机源码的字符串字面量与 JSX 文本不得再出现旧说法。

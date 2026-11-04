@@ -305,4 +305,33 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
     expect(bodies.map((b) => b.consent?.consentVersion)).toEqual(['sa-consent-v1.2026-08-16', CURRENT_SELF_ASSESSMENT_CONSENT_VERSION])
     expect(api.requestCount('POST', '/api/v1/resume/self-assessment')).toBe(2)
   })
+
+  test('self-assessment quota exhaustion keeps the score and print exit without asking to answer again @w3-kiosk', async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerSelfAssessmentApi(api, page)
+    const taskId = 'sa-quota-exhausted'
+    api.respond('GET', `/api/v1/resume/self-assessment/${taskId}`, {
+      status: 200,
+      json: {
+        taskId,
+        status: 'completed',
+        dimensions: [
+          { key: 'collaboration', label: '协作偏好', strength: 4, note: null, evidenceQuestionIdx: [0] },
+          { key: 'structure', label: '结构化倾向', strength: 3, note: null, evidenceQuestionIdx: [1] },
+        ],
+        summary: null,
+        providerName: 'llm_unavailable',
+        interpretationAvailable: false,
+        aiUnavailableReason: 'AI_QUOTA_EXHAUSTED',
+        accessToken: 'sa-quota-access',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+      },
+    })
+    await page.goto(`/resume/self-assessment/result?taskId=${taskId}`)
+    await expect(page.getByText('今天的 AI 解读次数用完了，明天 0 点恢复。作答和记分已经完成。')).toBeVisible()
+    await expect(page.getByText('协作偏好')).toBeVisible()
+    await expect(page.getByRole('button', { name: /生成 PDF 预览/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /重新作答/ })).toHaveCount(0)
+    expect(errors).toEqual([])
+  })
 })

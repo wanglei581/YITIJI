@@ -18,7 +18,13 @@ import {
 import { helpNeededLine, machineUnusableLine, preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { formatCents } from './cashierStatus'
-import { SHARED_USER_MESSAGE_CODES, errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
+import {
+  PICKUP_CODE_REJECTED_COPY,
+  PICKUP_RESUME_REFUND_PENDING_COPY,
+  SHARED_USER_MESSAGE_CODES,
+  errorCodeOf,
+  userMessageOf,
+} from '../../services/api/userErrorMessage'
 
 /**
  * 认领失败的五种屏。
@@ -37,6 +43,8 @@ export type PickupFailure = 'invalid' | 'locked' | 'network' | 'closed' | 'print
 const INVALID_CODES = new Set([
   'PICKUP_CODE_INVALID',
   'PICKUP_CODE_EXPIRED',
+  // 走错机器与「没有这枚码」同一屏，避免用不同屏头告诉试码的人这枚码是真的。
+  'PICKUP_TERMINAL_MISMATCH',
   'PICKUP_CODE_LENGTH',
   'PICKUP_CODE_PATTERN',
 ])
@@ -56,6 +64,10 @@ export const PICKUP_CLOSED_CODES: ReadonlySet<string> = new Set([
   'FILE_CONTENT_CHANGED',
   'PICKUP_RESUME_LIMIT_REACHED',
   'PICKUP_RESUME_PARTIAL_OUTPUT',
+  // 同码接着打被拒：文件已清理、这台机器的打印程序太旧、付费异常待退回。再输同一个码不会成。
+  'PRINT_RETRY_FILE_UNAVAILABLE',
+  'PRINT_RETRY_AGENT_VERSION',
+  'PICKUP_RESUME_REFUND_PENDING',
 ])
 
 /**
@@ -83,15 +95,19 @@ export const PICKUP_SAME_CODE_RESUME_NOTE =
 export const PICKUP_CLAIM_MESSAGES: Readonly<Record<string, string>> = {
   PRINT_TERMINAL_QUEUE_HALTED: `这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码。${helpNeededLine()}`,
   PRINTER_UNAVAILABLE: `这台终端的打印机暂不可用，你的到机码没有作废，请稍后再来这台终端输码。${helpNeededLine()}`,
-  PICKUP_CODE_INVALID: '到机码无效或已过期，请核对后重新输入',
-  PICKUP_CODE_EXPIRED: '到机码无效或已过期，请核对后重新输入',
+  PICKUP_CODE_INVALID: PICKUP_CODE_REJECTED_COPY,
+  PICKUP_CODE_EXPIRED: PICKUP_CODE_REJECTED_COPY,
   // 2026-10-06 方案②：同机且任务失败会走续打；别的机器回 PICKUP_CODE_INVALID。
   // 这个码只在同机、任务排队/打印中/已完成且过了 10 分钟回放时出现，原地重输仍是同一个错，
   // 所以不写「再输一次试试」，也不找人；没拿到纸给问小青或隐私政策联系方式（标准句接上服务电话后再换）。
   PICKUP_CODE_ALREADY_USED: '这个到机码已经用过，这单已经交给打印机，不能再次取件。要再打一份，请重新下单；没拿到纸，可以问小青，或查看《隐私政策》里的联系方式。',
-  PICKUP_RESUME_LIMIT_REACHED: '这单已经接着打过 2 次，不能再打了',
-  PICKUP_RESUME_UNCONFIRMED: '这单的出纸结果还没确认，暂时不能接着打，请稍后再试',
+  PICKUP_RESUME_LIMIT_REACHED: '这单已经接着打过 2 次，不能再打了。还要打，请在手机上重新下单',
+  PICKUP_RESUME_UNCONFIRMED: '这单的出纸结果还没确认。请过 5 分钟后回到这台机器，再输一次同一个到机码，按屏幕提示办理；符合条件时可以整份重打。',
   PICKUP_RESUME_PARTIAL_OUTPUT: '这单已经出了一部分纸，不能整单重打',
+  PICKUP_RESUME_REFUND_PENDING: PICKUP_RESUME_REFUND_PENDING_COPY,
+  PRINT_RETRY_FILE_UNAVAILABLE: '这笔订单的文件现在无法用于打印。请在手机上重新上传文件、重新下单。',
+  // 后端那句带版本号，是给维护看的，不上屏。
+  PRINT_RETRY_AGENT_VERSION: '这台机器暂时不能用同一个到机码接着打。还要打，请在手机上重新下单。',
   PICKUP_CODE_UNAVAILABLE: '这个到机码已经不能使用。请在手机小程序「我的 → 打印订单」查看这笔订单，需要的话重新下单',
   ORDER_REFUNDED: '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度',
   ORDER_PAYMENT_UNAVAILABLE: '这笔订单已经不能付款（可能已关闭）。请在手机小程序「我的 → 打印订单」查看，需要的话重新下单',
@@ -110,7 +126,7 @@ export const PICKUP_CLAIM_MESSAGES: Readonly<Record<string, string>> = {
   PRINT_TERMINAL_NOT_FOUND: TERMINAL_NOT_READY_MESSAGE,
   TERMINAL_ID_REQUIRED: TERMINAL_NOT_READY_MESSAGE,
   ORDER_NOT_FOUND: '没有找到这笔订单，请核对到机码后重新输入',
-  PICKUP_TERMINAL_MISMATCH: '到机码无效或已过期，请核对后重新输入',
+  PICKUP_TERMINAL_MISMATCH: PICKUP_CODE_REJECTED_COPY,
   PICKUP_NOT_CLAIMED: ORDER_BUSY_MESSAGE,
   ORDER_NOT_PAID: ORDER_BUSY_MESSAGE,
   ORDER_RELEASE_INVALID_STATE: ORDER_BUSY_MESSAGE,

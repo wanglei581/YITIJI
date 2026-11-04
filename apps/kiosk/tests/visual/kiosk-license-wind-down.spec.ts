@@ -71,6 +71,10 @@ function mockSourceUploadSession(api: ApiRouter): void {
   api.respond('GET', '/api/v1/upload-sessions/license-source-upload', { status: 200, json: { success: true, data: {
     sessionId: 'license-source-upload', status: 'pending', purpose: 'resume_upload', mode: 'temporary', file: null, requiresKioskConfirmation: false, expiresAt: '2099-01-01T00:00:00.000Z',
   } } })
+  // 2026-11-04 起（#1570 上传码租约）：离开这一页时作废还没收到文件的码，免得旁人拿着旧码继续传。
+  api.respond('DELETE', '/api/v1/upload-sessions/license-source-upload', { status: 200, json: { success: true, data: {
+    sessionId: 'license-source-upload', status: 'cancelled',
+  } } })
 }
 
 /** 在「我的简历」里点开第一条诊断记录，再点「查看报告」。 */

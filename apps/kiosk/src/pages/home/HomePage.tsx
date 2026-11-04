@@ -6,10 +6,8 @@ import { useAuth } from '../../auth/useAuth'
 import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
 import { useOfficialChannels } from '../../hooks/useOfficialChannels'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
-import { useSmartCampusCapabilityState } from '../../hooks/useSmartCampusConfig'
 import { requestDeviceStatusRefresh, type TerminalDeviceStatusView } from '../../hooks/useTerminalDeviceStatus'
 import { localAgentSnapshot, probeLocalAgent, subscribeLocalAgent } from '../../services/localAgentProbe'
-import { useToolboxCapabilityState } from '../../hooks/useToolboxConfig'
 import { ContinueHandoverGuard } from './components/ContinueHandoverGuard'
 import { ContinuePanel } from './components/ContinuePanel'
 import { HomeTouchView } from './components/HomeTouchView'
@@ -41,8 +39,6 @@ export function HomePage() {
   useEffect(() => {
     requestDeviceStatusRefresh()
   }, [])
-  const toolbox = useToolboxCapabilityState()
-  const campus = useSmartCampusCapabilityState()
   // 招聘内容托管（3.13）：没打开时首页不摆岗位、招聘会入口；两个 hook 自己也不发请求。
   const recruitment = useRecruitmentHosting()
   const jobFair = useHomeJobFairHighlight()
@@ -53,8 +49,8 @@ export function HomePage() {
   const officialChannelCount = recruitment.status === 'ready' && !recruitment.enabled && channels.status === 'ready' ? channels.items.length : 0
 
   const handleAction = (actionId: HomeV6ActionId) => {
-    if (actionId === 'smart-campus' && !(campus.status === 'ready' && campus.enabled && Boolean(campus.configVersion))) return
-    if (actionId === 'toolbox' && !(toolbox.status === 'ready' && toolbox.enabled && Boolean(toolbox.configVersion))) return
+    // 百宝箱、智慧校园停放（2026-11-04 产品负责人定）：首页不摆、也不读它们的终端配置；万一有人带着旧动作进来，原地不动。
+    if (actionId === 'smart-campus' || actionId === 'toolbox') return
     if ((actionId === 'jobs-hub' || actionId === 'fairs-hub' || actionId === 'campus-zone') && !recruitment.enabled) return
     if (actionId === 'official-channels' && officialChannelCount === 0) return
 
@@ -87,8 +83,6 @@ export function HomePage() {
       isLoggedIn={auth.isLoggedIn}
       guestMode={auth.guestMode}
       device={device}
-      toolbox={toolbox}
-      campus={campus}
       jobFair={jobFair}
       jobs={jobs}
       recruitment={recruitment}

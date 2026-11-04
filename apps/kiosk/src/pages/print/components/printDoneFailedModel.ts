@@ -14,7 +14,7 @@ import { helpNeededLine, machineCannotPrintLine, printProblemLine } from '../../
 import { MINIAPP_DISPLAY_NAME } from '../../../copy/miniappLinkCopy'
 import { truncateFileNameMiddle, FILE_NAME_BUDGET_CARD } from '../../../lib/fileName'
 import { formatCents } from '../cashierStatus'
-import { jamOrderKeptLine, jobSubline, outOfPaperPill, type OutOfPaperMoney } from '../printProgressModel'
+import { jamOrderKeptLine, jobSubline, outOfPaperPill, sameCodeResumeLine, type OutOfPaperMoney } from '../printProgressModel'
 
 export type FailureVariant = 'failed' | 'paper-jam' | 'out-of-paper'
 
@@ -34,6 +34,8 @@ export interface FailureCopy {
   stepsLabel: string
   /** 小字：订单边界。标准求助句不在步骤里时，补在这里。 */
   fine: string
+  /** 到机码单且后端还允许续打时的同码续打说明；否则 null。 */
+  resumeLine: string | null
 }
 
 export interface SummaryRow {
@@ -81,8 +83,19 @@ export function failureCopy(input: {
   money: OutOfPaperMoney
   orderNo: string | null
   canRetry: boolean
+  /** 从到机码进来的这一单。缺省不当成到机码单，也不按金额猜测。 */
+  pickupSource?: boolean
+  /** 订单视图上的续打资格。没带来时只看 canRetry。 */
+  reprintAllowed?: boolean | null
+  reprintRemaining?: number | null
 }): FailureCopy {
   const { variant, money, orderNo, canRetry } = input
+  const resumeLine = sameCodeResumeLine({
+    pickupSource: input.pickupSource,
+    canRetry,
+    reprintAllowed: input.reprintAllowed,
+    reprintRemaining: input.reprintRemaining,
+  })
   const orderRef = orderRefOf(orderNo)
   const free = money.fact === 'free'
   const paid = money.fact === 'paid'
@@ -101,6 +114,7 @@ export function failureCopy(input: {
         { title: `记下${orderRef}`, detail: machineCannotPrintLine(undefined, { orderKept: true }) },
       ],
       fine: PAPER_HELP_FINE,
+      resumeLine,
     }
   }
 
@@ -126,6 +140,7 @@ export function failureCopy(input: {
         third,
       ],
       fine: `纸匣已空，这次打印不会在加纸后自动继续。${kept}；只有本页出现「重新提交打印」按钮时，才能自己重打一次${free ? '。' : '，且不会重复收费。'}${money2}${canRetry ? help : ''}`,
+      resumeLine,
     }
   }
 
@@ -145,6 +160,7 @@ export function failureCopy(input: {
         : { title: `记下${orderRef}`, detail: help },
     ],
     fine: `${paid ? '订单和支付记录保留着' : '订单记录保留着'}，不会因为这次失败消失。${canRetry ? help : ''}`,
+    resumeLine,
   }
 }
 

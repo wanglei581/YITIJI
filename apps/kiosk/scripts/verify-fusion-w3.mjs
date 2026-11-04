@@ -13,6 +13,16 @@ const check = (condition, message) => {
 }
 const includes = (path, marker, message) => check(read(path).includes(marker), `${message}: ${marker}`)
 
+// 等手机传文件：两处等待说明和 60 秒提示均须实际在 JSX 中渲染。
+for (const [path, seconds, label] of [
+  ['src/pages/upload/components/UploadSessionQrPanel.tsx', 'remainingSeconds', 'expiresLabel'],
+  ['src/pages/print/file-source/FileSourceView.tsx', 'waitRemainingSeconds', 'waitCountdown'],
+]) {
+  const source = read(path)
+  check(source.includes('>等你传文件期间，这台机器不会自动退出，请不要走开。二维码到期后没有操作，就会自动退出。</'), `${path} 常驻等待说明`)
+  check(source.includes(`${seconds} > 0 && ${seconds} <= 60 && (`) && /role="status"/.test(source) && source.includes(`二维码还剩 {${label}}。还在传的话点一下屏幕，到期后可以在这里重新出码。`), `${path} 真实倒计时及 60 秒醒目提示`)
+}
+
 function stripCssComments(source) {
   return source.replace(/\/\*[\s\S]*?\*\//g, '')
 }
@@ -139,7 +149,22 @@ const frozen = {
   // 2026-10-29 重新冻结（触屏版走查 I-14，B 路）：签名图（signature_image）确认后只留系统短期、不进「我的文档」，面板里「会员文件确认后归档」对它不成立；
   // 只在那一处条件上加 purpose !== 'signature_image'，二维码、轮询、取消、确认、刷新先撤销旧会话等都逐字未动。冻结契约不放宽，仍逐字节校验。
   // 旧哈希 7f0cacce1e2b505548a4a141e2b63c71517c8ec5fe5d47fc827732a461f3e524。
-  'src/pages/upload/components/UploadSessionQrPanel.tsx': '412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357',
+  // 2026-11-03 重新冻结（B6b-1）：独立等待锁、到期提醒、真实卸载作废。新内容断言在哈希检查之前。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
+  // 2026-11-03 重新冻结（重做旧候选 #1461）：取消失败不再清屏——二维码和已收到的文件留着，屏上沿用打印上传页那句兜底，
+  // 可以重试取消或去确认；取消中三个按钮都禁用。成功才清空，已作废码清二维码并按过期显示。不恢复轮询、不自动接走文件。
+  // 新行为由 verify:resume-phone-upload-ui 的断言钉住。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
+  // 2026-11-04 重新冻结（并入 #1566）：取消失败按 #1566 留屏，触控尺寸、忙碌锁与卸载作废仍按 #1570。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e（#1570）、018fd611a3350ce53fa3b79fceb887c5a5b0d56a2d47f36d418f3b6745b816ca（#1566）。
+  // 2026-11-03 再次冻结（B6b-1 返工）：同一页切换来源不再作废上传码，切回来继续用同一张；
+  // 离开页面才作废还没收到文件的会话。已卸载的实例不得作废屏上正在显示的那张码。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e。
+  // 2026-11-04 再次冻结（#1570 返工：并入派工窗口的上传码租约修复 a6a7bbfe3，再与 #1566 合写取消处理）：
+  // 同一页切换来源只停放上传码、离开页面才作废，已卸载的实例不作废屏上正显示的码；取消成功才收租约并清空，
+  // 已作废按过期显示，其他失败码和已收到的文件都留着。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 f0d8bc199b75c6ad6c12b87d517c81c6bef38baea72099231c8c68569802d60e（并入 #1566 后）、2109b8ce60b6d58f7f5028435a51ef3544310f2c00549e587bc2688058da91e3（租约修复）。
+  'src/pages/upload/components/UploadSessionQrPanel.tsx': '738d4f455b926a85e51ad56c38fabe339d1def48fd43a12967bf03e03a8ca4ba',
   'src/pages/resume/aiResumeSession.ts': '5d023ee2388ecb12a3ba84a6b2b28c21e54ad65dece16eccc019f9dc43b5b164',
   'src/pages/resume/jobMaterialDraft.ts': '4a2404627c392c55cd39a6f525c522ce27cfec669f91d3b6ad5bb79f0de358ce',
   'src/pages/resume/hooks/useResumeLayout.ts': '2ef1c554e949344ce9d66430c521b986f5419db8627c4fcde1ef78d5927555e7',
@@ -378,7 +403,11 @@ includes('src/pages/interview/InterviewSessionPage.tsx', 'transcribeAnswer(', 'i
 // 下一题请求挪到 interviewTurnActions.ts（会话页 500 行门禁）。断言仍要求真实 answerInterview，并要求会话页还走这条提交。
 includes('src/pages/interview/session/interviewTurnActions.ts', 'answerInterview(', 'interview keeps question progression')
 includes('src/pages/interview/InterviewSessionPage.tsx', 'submitInterviewAnswer(', 'interview page still submits answers through the extracted turn')
-includes('src/pages/resume/ResumeSourcePage.tsx', 'useBusyLock(sourceBusy)', 'upload busy lock remains')
+includes('src/pages/resume/ResumeSourcePage.tsx', 'useBusyLock(uploading || usbBusy)', '简历来源页的清场锁不含扫码面板的忙')
+check(
+  !/\b(?:qrBusy|phoneBusy|sourceBusy|showQr)\b/.test(read('src/pages/resume/ResumeSourcePage.tsx').match(/useBusyLock\(([^)]*)\)/)?.[1] ?? 'qrBusy'),
+  '简历来源页的 useBusyLock 实参不得再出现 qrBusy / phoneBusy / sourceBusy / showQr',
+)
 includes('src/pages/resume/ResumeSourcePage.tsx', "navigate('/resume/parse'", 'source keeps parse handoff')
 includes('src/pages/resume/ResumeParsePage.tsx', 'saveAiResumeSession({ taskId: result.taskId, accessToken: result.accessToken })', 'anonymous session remains minimal')
 includes('src/pages/resume/ResumeReportPage.tsx', 'getResumeRecord(taskId, { token: getToken(), accessToken })', 'report read remains credential gated')
@@ -487,9 +516,9 @@ if (existsSync(join(ROOT, 'playwright.w3.config.ts'))) {
   const config = read('playwright.w3.config.ts')
   const spec = read('tests/visual/fusion-w3.spec.ts')
   const selfAssessmentSpec = read('tests/visual/fusion-self-assessment-flow.spec.ts')
-  includes('playwright.w3.config.ts', 'testMatch: /(?:fusion-w3|fusion-self-assessment-flow|w16-ai-declaration)\\.spec\\.ts$/', 'W3 browser config collects W3, the sensitive self-assessment preview, and the W-16 declaration scenario')
+  includes('playwright.w3.config.ts', 'testMatch: /(?:fusion-w3|fusion-self-assessment-flow|w16-ai-declaration|upload-scan-wait|resume-usb-compare-1104)\\.spec\\.ts$/', 'W3 browser config collects W3, the sensitive self-assessment preview, the W-16 declaration scenario, phone-upload wait, and the 1104 resume USB / compare fixes')
   includes('playwright.w3.config.ts', "port 4183 --strictPort", 'W3 browser config owns port 4183')
-  for (const env of ['VITE_API_MODE=http', 'VITE_API_BASE_URL=/api/v1', 'VITE_USE_TRTC_CALL=true', 'VITE_ALLOW_TEXT_ONLY_ASSISTANT=false', 'VITE_TERMINAL_ID=KSK-001', 'VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token']) check(config.includes(env), `W3 browser build pins ${env}`)
+  for (const env of ['VITE_API_MODE=http', 'VITE_API_BASE_URL=/api/v1', 'VITE_USE_TRTC_CALL=true', 'VITE_ALLOW_TEXT_ONLY_ASSISTANT=false', 'VITE_TERMINAL_ID=KSK-001', 'VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token', 'VITE_ENABLE_CONTRACT_REVIEW=true']) check(config.includes(env), `W3 browser build pins ${env}`)
   for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report', 'advisor artifact eight proto states fit the kiosk stage', 'advisor artifact renders covered evidence as a quotation', 'advisor artifact print-unavailable state has no print button', 'advisor artifact print waits for the server receipt', 'advisor artifact no-artifact shows the three jobs and opens AI records', 'advisor artifact expired offers only a redo', 'advisor artifact content state opens my documents']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
   check(selfAssessmentSpec.includes('自评 PDF 在隐私根内预览且不打开新标签页 @w3-kiosk'), 'W3 browser scenario exists: self-assessment PDF stays inside the privacy root')
   for (const forbidden of ['addInitScript', 'localStorage', 'sessionStorage', 'waitForTimeout']) check(!spec.includes(forbidden), `W3 browser spec avoids ${forbidden}`)
