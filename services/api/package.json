@@ -363,6 +363,7 @@
     "verify:scan-device-b4": "node -r @swc-node/register scripts/verify-scan-device-b4.ts",
     "verify:scan-device-b6": "node -r @swc-node/register scripts/verify-scan-device-b6.ts",
     "verify:scan-device-b8": "node -r @swc-node/register scripts/verify-scan-device-b8.ts",
+    "verify:copy-c1b": "node -r @swc-node/register scripts/verify-copy-c1b.ts",
     "verify:copy-c1a": "node -r @swc-node/register scripts/verify-copy-c1a.ts",
     "verify:scan-device-b9": "node -r @swc-node/register scripts/verify-scan-device-b9.ts",
     "verify:print-conversion": "node -r @swc-node/register scripts/verify-print-conversion.ts",

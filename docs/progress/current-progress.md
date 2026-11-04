@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-11-04：屏上复印 C1b——后端接口、终端许可与上限（分支 `claude/copy-c1-1104`，未合并、未部署）
+
+- 做了什么（Codex 实现，Claude 收货）：一体机侧 `POST /copy/jobs`（游客可用、幂等键同参同单、控制令牌只首次返回）、查单、取消、确认（读扫描页数用 `quoteCopy` 报价，事务内建 `type=copy` 订单并走现有免费订单状态机，重复确认同一订单；只有明确 0 元报价才允许履约）；终端程序侧用 Agent 凭证 `GET /terminals/:terminalId/copy/jobs/:id/permit?op=scan|print`（不做签名许可，许可最长 30 秒，未确认 / 过期 / 能力关 / 跨终端不给打印许可）、扫描结果回报（同代同值幂等、旧代次不覆盖、超上限拒绝）、打印结果回报（已交给打印机 / 失败 / 结果未确认，终态不回退）。上限：单次 20 页（复用屏上扫描常量）、99 份（设计稿 cs-copy-set「1–99 份」）；双面 + 多份 + 奇数页默认拒绝（`COPY_ALLOW_ODD_DUPLEX_MULTICOPY` 显式开）。建单、确认、许可、结果都记审计，不记控制令牌与扫描内容。
+- 验证：新门禁 `verify:copy-c1b`（HTTP + 隔离库，接进 CI 的 SQLite 与 PostgreSQL 两组）与 `verify:copy-c1a` 通过；图谱列出的关联门禁 57/58 过，唯一红的冻结门禁 `verify:file-assets-trial-acceptance` 是因为未提交文件，提交后重跑过。反向检查三项（未确认给打印许可、重复确认再建订单、旧代次覆盖页数）都变红。PostgreSQL 交 CI。
+
 ## 2026-11-04：屏上复印 C1a——后端数据底座（分支 `claude/copy-c1-1104`，自 #1559 头 44f13e7fe 开出，未合并、未部署）
 
 - 依据：产品负责人 11/04「复印像打印一样生成订单、按页计价；价目只加行、默认 0 元；先只做最小闭环」；规格书 `codex/copy-spec-out.md`、`copy-decisions.md`。
