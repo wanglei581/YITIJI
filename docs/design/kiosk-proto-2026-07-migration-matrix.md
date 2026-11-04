@@ -65,8 +65,8 @@
 | 48 | 48-fair-visit-plan.html | AI参会准备单 | 招聘会校园 | `/job-fairs/:id/visit-plan` | FairVisitPlanPage | src/pages/job-fairs/FairVisitPlanPage.tsx | fairVisitPlan.generateFairVisitPlan+getLatestFairVisitPlan+printFairVisitPlan | 基于本人简历+公开信息生成、打印 | loading / error / 未登录 | verify-ai-artifact-print-url-contract |
 | 49 | 49-fair-stats.html | 现场数据 | 招聘会校园 | `/job-fairs/:id/stats` | FairStatsPage | src/pages/job-fairs/FairStatsPage.tsx | api.getFairStats / FairDataScreen | 签到进度、行业/意向分布 | loading / empty / error | (无专项) |
 | 50 | 50-campus.html | 校园招聘专区 | 招聘会校园 | `/campus` | CampusPage | src/pages/campus/CampusPage.tsx | api.getJobFairs+getFairCompanies+getFairStats+getFairZones+getTerminalId / activity.record* / CampusTabs | 校招双选会 5-Tab 沉浸浏览 | loading / empty / error | verify-jobfair-ui / verify-jobfair-commercial-closure |
-| 51 | 51-smart-campus.html | 智慧校园 | 招聘会校园 | `/smart-campus` | SmartCampusHomePage | src/pages/smart-campus/SmartCampusHomePage.tsx | useSmartCampusConfig | 迎新+校园自助 6 卡(后台开关) | loading / 开关态 | verify-smart-campus-ui |
-| 52 | 52-smart-campus-service.html | 校园卡办理 | 招聘会校园 | `/smart-campus/service/:key` | SmartCampusServicePage | src/pages/smart-campus/SmartCampusServicePage.tsx | 静态(按 key 渲染指引;含"即将上线"标注) | 自助服务办理指引 | 静态 / 即将上线标注 | verify-smart-campus-ui |
+| 51 | 51-smart-campus.html | 智慧校园 | 招聘会校园 | `/smart-campus/*`（2026-11-04 停放，跳回 `/`） | SmartCampusHomePage | src/pages/smart-campus/SmartCampusHomePage.tsx | useSmartCampusConfig | 迎新+校园自助 6 卡(后台开关) | loading / 开关态 | verify-smart-campus-ui |
+| 52 | 52-smart-campus-service.html | 校园卡办理 | 招聘会校园 | `/smart-campus/*`（服务深链一并跳回 `/`） | SmartCampusServicePage | src/pages/smart-campus/SmartCampusServicePage.tsx | 静态(按 key 渲染指引;含"即将上线"标注) | 自助服务办理指引 | 静态 / 即将上线标注 | verify-smart-campus-ui |
 | 53 | 53-companies.html | 找企业 | 岗位企业 | `/companies` | CompaniesPage | src/pages/companies/CompaniesPage.tsx | companies.getCompanies+getCompanyStats | 来源企业与岗位导览、筛选 | loading / empty / error | (无专项) |
 | 54 | 54-company-detail.html | 企业详情 | 岗位企业 | `/companies/:id` | CompanyDetailPage | src/pages/companies/CompanyDetailPage.tsx | companies.getCompanyById+getCompanyJobs / activity.record* | 在招岗位、来源说明、跳转埋点 | loading / error | (无专项) |
 | 55 | 55-job-fit.html | 岗位匹配参考 | 岗位企业 | `/resume/job-fit` | JobFitPage | src/pages/resume/JobFitPage.tsx | api.getJobs / jobFit 子组件(ConsentCard/SkillMap/GapActionCards/RewriteCard) | 三档匹配参考(较高/中等/偏低)、改写建议 | loading / error / 登录态+匿名同意 | verify-job-fit-m1-5-ui |
@@ -83,8 +83,8 @@
 | 66 | 66-print-scan-convert.html | 格式转换 | 打印扫描 | `/print-scan/convert` | ConvertImagesPage | src/pages/print-scan/ConvertImagesPage.tsx | filesApi.kioskUploadFile / printConversion.convertImagesToPdf | 图片合并 PDF、排序、双通道添加 | loading / error | (无专项) |
 | 67 | 67-print-scan-sign.html | 签名盖章 | 打印扫描 | `/print-scan/sign` | SignStampPage | src/pages/print-scan/SignStampPage.tsx | files.kioskUploadFile / printSign.signCompose+signInspect / screensaver.getTerminalId | 四步签章、授权勾选、非 CA 声明 | loading / error | verify-profile-documents-inkpaper(间接) |
 | 68 | 68-print-scan-feature.html | 功能介绍 | 打印扫描 | `/print-scan/feature/:key` | PrintScanFeatureInfoPage | src/pages/print-scan/PrintScanFeatureInfoPage.tsx | 静态(证件照"即将上线"+替代路径) | 功能说明、即将上线标注 | 静态 / 即将上线 | verify-profile-commercial-first-batch / verify-profile-documents-inkpaper |
-| 69 | 69-smart-campus-welcome.html | 迎新系统 | 招聘会校园 | `/smart-campus/welcome` | SmartCampusWelcomePage | src/pages/smart-campus/SmartCampusWelcomePage.tsx | 静态只读(Phase1;含"即将上线"标注) | 报到流程、办事窗口、求职准备 | 静态 / 即将上线 | verify-smart-campus-ui |
-| 70 | 70-freshman-insights.html | 校园大数据 | 招聘会校园 | `/smart-campus/freshman-insights` | FreshmanInsightsPage | src/pages/smart-campus/FreshmanInsightsPage.tsx | 静态(仅"未开放"兜底,绝不展示假数据) | 未开放锁定态、合规兜底 | 未开放锁定态 | verify-smart-campus-ui |
+| 69 | 69-smart-campus-welcome.html | 迎新系统 | 招聘会校园 | `/smart-campus/*`（2026-11-04 停放，旧迎新链跳回 `/`；校园招聘 `/campus/welcome` 仍复用结构） | SmartCampusWelcomePage | src/pages/smart-campus/SmartCampusWelcomePage.tsx | 静态只读(Phase1;含"即将上线"标注) | 报到流程、办事窗口、求职准备 | 静态 / 即将上线 | verify-smart-campus-ui |
+| 70 | 70-freshman-insights.html | 校园大数据 | 招聘会校园 | `/smart-campus/*`（2026-11-04 停放，旧链跳回 `/`，不是报错页） | FreshmanInsightsPage | src/pages/smart-campus/FreshmanInsightsPage.tsx | 静态(仅"未开放"兜底,绝不展示假数据) | 未开放锁定态、合规兜底 | 未开放锁定态 | verify-smart-campus-ui |
 | 71 | 71-me-activity.html | 浏览与跳转记录 | 我的 | `/me/activity` | MyActivityPage | src/pages/profile/me/MyActivityPage.tsx | activity.getMyBrowseLogs+getMyJumpLogs / useInkRipple | 浏览/外部跳转两 Tab(只记动作) | loading / empty / error / 未登录 | verify-profile-activity-inkpaper |
 | 72 | 72-activity-detail.html | 权益活动详情 | 我的 | `/activities/:id` | BenefitActivityDetailPage | src/pages/activities/BenefitActivityDetailPage.tsx | benefitActivities.getBenefitActivity+claimBenefitActivity | 额度/有效期/规则、领取 | loading / error / 领取态 / 未登录 | (无专项) |
 | 73 | 73-assistant-call.html | 语音咨询中 | 面试助手政策 | (无独立路由;`/assistant` 内 AssistantCallPanel) | AssistantCallPanel | src/pages/assistant/AssistantCallPanel.tsx | useAiAdvisorCallSession | 声纹、实时字幕、通话控制 | loading / error / 通话态 | verify-assistant-trtc-guard |
@@ -302,18 +302,18 @@
 | 22B 意见反馈 | `/me/feedback` | `MyFeedbackPage` 的反馈提交与工单分支，不是 `/me/notifications` 的复制路由。 |
 | 32A 支付未成功 | `/print/cashier` | `PrintCashierPage` 的失败 / 关闭 / 失败或过期 attempt 分支，不是新支付页面。 |
 | 34A 扫描仪暂不可用 | `/scan/start`、`/scan/settings` | 生产端没有可核验的实时扫描仪状态源：`/scan/start` 仅对应会话创建前边界，`/scan/settings` 仅对应真实创建会话失败；不得把任一状态宣称为已确认真机离线，也不创建另一条扫描路由。 |
-| 76 百宝箱主态 | `/toolbox` | `ToolboxZonePage` 的已配置服务区。 |
-| 76A 百宝箱待配置 | `/toolbox` | 历史空态视觉参考；当前无安全可启动项时由父级 Capability Boundary 输出 unavailable，且不挂载 `ToolboxZonePage`，不是新路由。 |
+| 76 百宝箱主态 | `/toolbox/*` → `/` | 历史原型。2026-11-04 产品负责人定停放：运行时跳回首页，源码 `ToolboxZonePage` 保留但不注册。 |
+| 76A 百宝箱待配置 | `/toolbox/*` → `/` | 历史空态视觉参考。2026-11-04 产品负责人定停放：不再由能力边界挂载，运行时跳回首页。 |
 | 77 文档打印上传 | `/print/upload` | 打印七步流程第一步；纸质扫描 CTA 独立导航到 `/scan/start`。 |
 | 73 语音咨询中 | `/assistant` 内 call state | `AssistantCallPanel` 通话态，不是独立 route。 |
 
-`/campus`、`/campus/welcome`、`/campus/freshman-insights` 与 `/smart-campus`、`/smart-campus/welcome`、`/smart-campus/freshman-insights`、`/smart-campus/service/:key` 保留各自语义：前者是校园招聘专区及其直达容错页面，后者是智慧校园正式能力；它们不是互为同义重定向。
+`/campus`、`/campus/welcome`、`/campus/freshman-insights` 仍是校园招聘专区及其直达容错页面。`/toolbox/*`、`/smart-campus/*` 在 2026-11-04 产品负责人定停放后只跳回 `/`，不再作为百宝箱或智慧校园的在用页面，也不是校园招聘的同义重定向。
 
 ### 8.2 生产路由全集（87 个 normalized patterns）
 
 - 系统与顶级页面：`/`、`/login`、`/member/qr-login`、`/upload/phone`、`/legal/:doc`、`/resume/job-fit`、`/resume/job-fit/actions`、`/resume/career-plan`、`/interview`、`/interview/setup`、`/interview/session`、`/interview/report`、`/interview/tips`、`/interview/reports`、`/screensaver`、`/session-timeout`、`/error-offline`。
 - 助手、我的与公共入口：`/assistant`、`/profile`、`/me/resumes`、`/me/print-orders`、`/me/documents`、`/me/favorites`、`/me/ai-records`、`/me/benefits`、`/me/activity`、`/me/activity/:id`、`/me/notifications`、`/me/feedback`、`/me/settings`、`/me/privacy-requests`、`/help`、`/activities`、`/activities/:id`、`/renshi`。
-- 校园与百宝箱：`/campus`、`/campus/welcome`、`/campus/freshman-insights`、`/toolbox`、`/smart-campus`、`/smart-campus/welcome`、`/smart-campus/freshman-insights`、`/smart-campus/service/:key`。
+- 校园与百宝箱：`/campus`、`/campus/welcome`、`/campus/freshman-insights`、`/toolbox/*`、`/smart-campus/*`。2026-11-04 产品负责人定停放：百宝箱与智慧校园不再是在用页面。
 - 打印扫描服务中心与打印流程：`/print-scan`、`/print-scan/feature/:key`、`/print-scan/convert`、`/print-scan/sign`、`/print/scan-convert`、`/print/scan-sign`、`/print/scan-feature`、`/print/upload`、`/print/desk`、`/print/material-check`、`/print/preview`、`/print/params`、`/print/confirm`、`/print/cashier`、`/print/progress`、`/print/done`、`/print/pickup-claim`、`/ai/plan`、`/session-resume`、`/jobs/online-platforms`。
 - AI 简历与扫描流程：`/resume`、`/resume/upload`、`/resume/source`、`/resume/generate`、`/resume/generate/preview`、`/resume/parse`、`/resume/report`、`/resume/optimize`、`/resume/optimize/compare`、`/resume/export`、`/resume/templates`、`/resume/materials`、`/scan`、`/scan/start`、`/scan/settings`、`/scan/progress`、`/scan/result`。
 - 岗位、企业与招聘会：`/jobs`、`/jobs/:id`、`/jobs/:id/offline`、`/offline-agencies`、`/offline-agencies/:id`、`/notifications`、`/companies`、`/companies/:id`、`/job-fairs`、`/job-fairs/checkin`、`/job-fairs/:id`、`/job-fairs/:id/companies`、`/job-fairs/:id/companies/:companyId`、`/job-fairs/:id/map`、`/job-fairs/:id/materials`、`/job-fairs/:id/visit-plan`、`/job-fairs/:id/stats`。
@@ -328,6 +328,8 @@
 - `/print/scan-feature` → `/print-scan/feature/id-photo`
 - `/resume` → `/resume/source`
 - `/resume/upload` → `/resume/source`
+- `/toolbox/*` → `/`（2026-11-04 产品负责人定停放）
+- `/smart-campus/*` → `/`（2026-11-04 产品负责人定停放）
 
 （2026-09-27 补记：上面「五条」是当时口径，现行重定向全集以 `apps/kiosk/tests/visual/route-manifest.ts` 的
 `compatibilityRedirects` 为准；其中 3.14 新增 `/jobs/online-platforms` → `/official-channels`。）
