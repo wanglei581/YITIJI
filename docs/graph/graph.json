@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 649,
+    "endpointCount": 611,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -626,104 +626,6 @@
         ],
         "services": [
           "AiLogService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.getAiLogs",
-        "method": "GET",
-        "models": [
-          "AiServiceLog"
-        ],
-        "path": "/api/v1/admin/ai/logs",
-        "roles": [
-          "admin"
-        ],
-        "serviceFiles": [
-          "services/api/src/ai/ai-log.service.ts"
-        ],
-        "services": [
-          "AiLogService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.getAiLogs",
-        "method": "GET",
-        "models": [
-          "AiServiceLog"
-        ],
-        "path": "/api/v1/admin/ai/logs",
-        "roles": [
-          "admin"
-        ],
-        "serviceFiles": [
-          "services/api/src/ai/ai-log.service.ts"
-        ],
-        "services": [
-          "AiLogService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.getAiUsage",
-        "method": "GET",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord"
-        ],
-        "path": "/api/v1/admin/ai/usage",
-        "roles": [
-          "admin"
-        ],
-        "serviceFiles": [
-          "services/api/src/ai/ai-log.service.ts",
-          "services/api/src/ai/ai.service.ts"
-        ],
-        "services": [
-          "AiLogService",
-          "AiService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.getAiUsage",
-        "method": "GET",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord"
-        ],
-        "path": "/api/v1/admin/ai/usage",
-        "roles": [
-          "admin"
-        ],
-        "serviceFiles": [
-          "services/api/src/ai/ai-log.service.ts",
-          "services/api/src/ai/ai.service.ts"
-        ],
-        "services": [
-          "AiLogService",
-          "AiService"
         ]
       },
       {
@@ -5896,64 +5798,6 @@
         ]
       },
       {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.chatWithAssistant",
-        "method": "POST",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord"
-        ],
-        "path": "/api/v1/assistant/chat",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts",
-          "services/api/src/audit/audit.service.ts"
-        ],
-        "services": [
-          "AiService",
-          "AuditService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.chatWithAssistant",
-        "method": "POST",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord"
-        ],
-        "path": "/api/v1/assistant/chat",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts",
-          "services/api/src/audit/audit.service.ts"
-        ],
-        "services": [
-          "AiService",
-          "AuditService"
-        ]
-      },
-      {
         "controller": "services/api/src/assistant/daily-brief.controller.ts",
         "handler": "DailyBriefController.create",
         "method": "POST",
@@ -5996,72 +5840,6 @@
         "services": [
           "AssistantSummaryService"
         ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.summarizeAssistantSession",
-        "method": "POST",
-        "models": [
-          "AdvisorArtifact",
-          "AdvisorSession",
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "RedemptionRecord"
-        ],
-        "path": "/api/v1/assistant/sessions/:sessionId/summary",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/advisor/assistant-summary.service.ts"
-        ],
-        "services": [
-          "AssistantSummaryService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.summarizeAssistantSession",
-        "method": "POST",
-        "models": [
-          "AdvisorArtifact",
-          "AdvisorSession",
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "RedemptionRecord"
-        ],
-        "path": "/api/v1/assistant/sessions/:sessionId/summary",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/advisor/assistant-summary.service.ts"
-        ],
-        "services": [
-          "AssistantSummaryService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.transcribeAssistantVoice",
-        "method": "POST",
-        "models": [],
-        "path": "/api/v1/assistant/voice",
-        "roles": [],
-        "serviceFiles": [],
-        "services": []
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.transcribeAssistantVoice",
-        "method": "POST",
-        "models": [],
-        "path": "/api/v1/assistant/voice",
-        "roles": [],
-        "serviceFiles": [],
-        "services": []
       },
       {
         "controller": "services/api/src/ai/ai.controller.ts",
@@ -9250,15 +9028,13 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
-          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews",
         "roles": [],
@@ -9279,15 +9055,13 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
-          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews",
         "roles": [],
@@ -9308,15 +9082,13 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
-          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id",
         "roles": [],
@@ -9337,15 +9109,13 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
-          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id",
         "roles": [],
@@ -9366,15 +9136,13 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
-          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/answer",
         "roles": [],
@@ -9395,15 +9163,13 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
-          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/end",
         "roles": [],
@@ -9424,15 +9190,13 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
-          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/practice-sheet",
         "roles": [],
@@ -9453,15 +9217,13 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
-          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/report",
         "roles": [],
@@ -9482,15 +9244,13 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
-          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/report/print",
         "roles": [],
@@ -9511,15 +9271,13 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
-          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/start",
         "roles": [],
@@ -9540,15 +9298,13 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
-          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/transcribe",
         "roles": [],
@@ -9595,15 +9351,13 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
-          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/turns/:idx/audio",
         "roles": [],
@@ -11895,284 +11649,25 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
-          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewSession",
-          "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/career-plan/:taskId",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/resume/career-plan.service.ts"
-        ],
-        "services": [
-          "CareerPlanService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/career-plan.controller.ts",
-        "handler": "CareerPlanController.latest",
-        "method": "GET",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "MockInterviewSession",
-          "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/career-plan/:taskId",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/resume/career-plan.service.ts"
-        ],
-        "services": [
-          "CareerPlanService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/career-plan.controller.ts",
-        "handler": "CareerPlanController.latest",
-        "method": "GET",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "MockInterviewSession",
-          "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/career-plan/:taskId",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/resume/career-plan.service.ts"
-        ],
-        "services": [
-          "CareerPlanService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/career-plan.controller.ts",
-        "handler": "CareerPlanController.generate",
-        "method": "POST",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "MockInterviewSession",
-          "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/career-plan/:taskId",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/resume/career-plan.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
-        ],
-        "services": [
-          "CareerPlanService",
-          "MemberPrivacyService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/career-plan.controller.ts",
-        "handler": "CareerPlanController.generate",
-        "method": "POST",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "MockInterviewSession",
-          "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/career-plan/:taskId",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/resume/career-plan.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
-        ],
-        "services": [
-          "CareerPlanService",
-          "MemberPrivacyService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/career-plan.controller.ts",
-        "handler": "CareerPlanController.generate",
-        "method": "POST",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "MockInterviewSession",
-          "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/career-plan/:taskId",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/resume/career-plan.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
-        ],
-        "services": [
-          "CareerPlanService",
-          "MemberPrivacyService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/career-plan.controller.ts",
-        "handler": "CareerPlanController.print",
-        "method": "POST",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "MockInterviewSession",
-          "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/career-plan/:taskId/print",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/resume/career-plan.service.ts"
-        ],
-        "services": [
-          "CareerPlanService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/career-plan.controller.ts",
-        "handler": "CareerPlanController.print",
-        "method": "POST",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "MockInterviewSession",
-          "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/career-plan/:taskId/print",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/resume/career-plan.service.ts"
-        ],
-        "services": [
-          "CareerPlanService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/career-plan.controller.ts",
-        "handler": "CareerPlanController.print",
-        "method": "POST",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "MockInterviewSession",
-          "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/career-plan/:taskId/print",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/resume/career-plan.service.ts"
-        ],
-        "services": [
-          "CareerPlanService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.getResumeExportPricing",
-        "method": "GET",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
           "PrintTask",
           "RedemptionRecord"
         ],
-        "path": "/api/v1/resume/export/pricing",
+        "path": "/api/v1/resume/career-plan/:taskId",
         "roles": [],
         "serviceFiles": [
-          "services/api/src/ai/ai.service.ts"
+          "services/api/src/ai/resume/career-plan.service.ts"
         ],
         "services": [
-          "AiService"
+          "CareerPlanService"
         ]
       },
       {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.getResumeExportPricing",
-        "method": "GET",
+        "controller": "services/api/src/ai/career-plan.controller.ts",
+        "handler": "CareerPlanController.generate",
+        "method": "POST",
         "models": [
           "AiQuotaDaily",
           "AiQuotaReservation",
@@ -12182,18 +11677,43 @@
           "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
+          "MockInterviewSession",
           "PrintTask",
           "RedemptionRecord"
         ],
-        "path": "/api/v1/resume/export/pricing",
+        "path": "/api/v1/resume/career-plan/:taskId",
         "roles": [],
         "serviceFiles": [
-          "services/api/src/ai/ai.service.ts"
+          "services/api/src/ai/resume/career-plan.service.ts"
         ],
         "services": [
-          "AiService"
+          "CareerPlanService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai/career-plan.controller.ts",
+        "handler": "CareerPlanController.print",
+        "method": "POST",
+        "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
+          "AiResumeResult",
+          "AiServiceLog",
+          "AuditLog",
+          "BenefitGrant",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "MockInterviewSession",
+          "PrintTask",
+          "RedemptionRecord"
+        ],
+        "path": "/api/v1/resume/career-plan/:taskId/print",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/ai/resume/career-plan.service.ts"
+        ],
+        "services": [
+          "CareerPlanService"
         ]
       },
       {
@@ -12262,80 +11782,6 @@
       },
       {
         "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.submitResumeGenerate",
-        "method": "POST",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "KioskSession",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord",
-          "Terminal",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/generate",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts",
-          "services/api/src/ai/resume/resume-draft-source.service.ts",
-          "services/api/src/audit/audit.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
-        ],
-        "services": [
-          "AiService",
-          "AuditService",
-          "MemberPrivacyService",
-          "ResumeDraftSourceService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.submitResumeGenerate",
-        "method": "POST",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "KioskSession",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord",
-          "Terminal",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/generate",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts",
-          "services/api/src/ai/resume/resume-draft-source.service.ts",
-          "services/api/src/audit/audit.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
-        ],
-        "services": [
-          "AiService",
-          "AuditService",
-          "MemberPrivacyService",
-          "ResumeDraftSourceService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
         "handler": "AiController.getResumeGenerate",
         "method": "GET",
         "models": [
@@ -12359,134 +11805,6 @@
         ],
         "services": [
           "AiService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.getResumeGenerate",
-        "method": "GET",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord"
-        ],
-        "path": "/api/v1/resume/generate/:taskId",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts"
-        ],
-        "services": [
-          "AiService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.getResumeGenerate",
-        "method": "GET",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord"
-        ],
-        "path": "/api/v1/resume/generate/:taskId",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts"
-        ],
-        "services": [
-          "AiService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.exportGeneratedResume",
-        "method": "POST",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "KioskSession",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord",
-          "Terminal",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/generate/export",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts",
-          "services/api/src/ai/resume/resume-draft-source.service.ts",
-          "services/api/src/audit/audit.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
-        ],
-        "services": [
-          "AiService",
-          "AuditService",
-          "MemberPrivacyService",
-          "ResumeDraftSourceService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.exportGeneratedResume",
-        "method": "POST",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "KioskSession",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord",
-          "Terminal",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/generate/export",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts",
-          "services/api/src/ai/resume/resume-draft-source.service.ts",
-          "services/api/src/audit/audit.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
-        ],
-        "services": [
-          "AiService",
-          "AuditService",
-          "MemberPrivacyService",
-          "ResumeDraftSourceService"
         ]
       },
       {
@@ -12693,126 +12011,6 @@
       },
       {
         "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.submitResumeParse",
-        "method": "POST",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/parse",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts",
-          "services/api/src/audit/audit.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
-        ],
-        "services": [
-          "AiService",
-          "AuditService",
-          "MemberPrivacyService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.submitResumeParse",
-        "method": "POST",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/parse",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts",
-          "services/api/src/audit/audit.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
-        ],
-        "services": [
-          "AiService",
-          "AuditService",
-          "MemberPrivacyService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.getResumeRecord",
-        "method": "GET",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord"
-        ],
-        "path": "/api/v1/resume/records/:taskId",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts"
-        ],
-        "services": [
-          "AiService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.getResumeRecord",
-        "method": "GET",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord"
-        ],
-        "path": "/api/v1/resume/records/:taskId",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts"
-        ],
-        "services": [
-          "AiService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
         "handler": "AiController.getResumeRecord",
         "method": "GET",
         "models": [
@@ -12863,122 +12061,6 @@
         ],
         "services": [
           "AiService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.getResumeDraft",
-        "method": "GET",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord"
-        ],
-        "path": "/api/v1/resume/records/:taskId/draft",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts"
-        ],
-        "services": [
-          "AiService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.getResumeDraft",
-        "method": "GET",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord"
-        ],
-        "path": "/api/v1/resume/records/:taskId/draft",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts"
-        ],
-        "services": [
-          "AiService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.putResumeDraft",
-        "method": "PUT",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/records/:taskId/draft",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
-        ],
-        "services": [
-          "AiService",
-          "MemberPrivacyService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.putResumeDraft",
-        "method": "PUT",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/records/:taskId/draft",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
-        ],
-        "services": [
-          "AiService",
-          "MemberPrivacyService"
         ]
       },
       {
@@ -13055,7 +12137,7 @@
       },
       {
         "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.factCheckResume",
+        "handler": "AiController.adjustResumeLayout",
         "method": "POST",
         "models": [
           "AiQuotaDaily",
@@ -13064,88 +12146,22 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
-          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/records/:taskId/fact-check",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
-        ],
-        "services": [
-          "AiService",
-          "MemberPrivacyService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.factCheckResume",
-        "method": "POST",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/records/:taskId/fact-check",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
-        ],
-        "services": [
-          "AiService",
-          "MemberPrivacyService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/resume-layout-adjust.controller.ts",
-        "handler": "ResumeLayoutAdjustController.adjustResumeLayout",
-        "method": "POST",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
+          "RedemptionRecord"
         ],
         "path": "/api/v1/resume/records/:taskId/layout-adjust",
         "roles": [],
         "serviceFiles": [
           "services/api/src/ai/ai.service.ts",
-          "services/api/src/audit/audit.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
+          "services/api/src/audit/audit.service.ts"
         ],
         "services": [
           "AiService",
-          "AuditService",
-          "MemberPrivacyService"
+          "AuditService"
         ]
       },
       {
@@ -13186,140 +12202,6 @@
           "BenefitRedemptionService",
           "MemberPrivacyService",
           "ResumeDraftSourceService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.getResumeOptimize",
-        "method": "GET",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "KioskSession",
-          "Order",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord",
-          "Terminal",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/records/:taskId/optimize",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts",
-          "services/api/src/ai/resume/resume-draft-source.service.ts",
-          "services/api/src/audit/audit.service.ts",
-          "services/api/src/benefit-redemption/benefit-redemption.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
-        ],
-        "services": [
-          "AiService",
-          "AuditService",
-          "BenefitRedemptionService",
-          "MemberPrivacyService",
-          "ResumeDraftSourceService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.getResumeOptimize",
-        "method": "GET",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "KioskSession",
-          "Order",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord",
-          "Terminal",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/records/:taskId/optimize",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts",
-          "services/api/src/ai/resume/resume-draft-source.service.ts",
-          "services/api/src/audit/audit.service.ts",
-          "services/api/src/benefit-redemption/benefit-redemption.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
-        ],
-        "services": [
-          "AiService",
-          "AuditService",
-          "BenefitRedemptionService",
-          "MemberPrivacyService",
-          "ResumeDraftSourceService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.listResumeVersions",
-        "method": "GET",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord"
-        ],
-        "path": "/api/v1/resume/records/:taskId/versions",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts"
-        ],
-        "services": [
-          "AiService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.listResumeVersions",
-        "method": "GET",
-        "models": [
-          "AiQuotaDaily",
-          "AiQuotaReservation",
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord"
-        ],
-        "path": "/api/v1/resume/records/:taskId/versions",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts"
-        ],
-        "services": [
-          "AiService"
         ]
       },
       {
@@ -13498,42 +12380,6 @@
         ]
       },
       {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.transcribeResumeVoice",
-        "method": "POST",
-        "models": [
-          "AiServiceLog"
-        ],
-        "path": "/api/v1/resume/voice/transcribe",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai-log.service.ts",
-          "services/api/src/asr/asr.service.ts"
-        ],
-        "services": [
-          "AiLogService",
-          "AsrService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.transcribeResumeVoice",
-        "method": "POST",
-        "models": [
-          "AiServiceLog"
-        ],
-        "path": "/api/v1/resume/voice/transcribe",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai-log.service.ts",
-          "services/api/src/asr/asr.service.ts"
-        ],
-        "services": [
-          "AiLogService",
-          "AsrService"
-        ]
-      },
-      {
         "controller": "services/api/src/scan-tasks/scan-tasks.controller.ts",
         "handler": "ScanTasksController.create",
         "method": "POST",
@@ -13619,6 +12465,25 @@
         ],
         "services": [
           "ScanTasksService"
+        ]
+      },
+      {
+        "controller": "services/api/src/scan-tasks/scan-device.controller.ts",
+        "handler": "ScanDeviceController.switchToPanel",
+        "method": "POST",
+        "models": [
+          "FileObject",
+          "ScanTask",
+          "Terminal",
+          "TerminalCapability"
+        ],
+        "path": "/api/v1/scan/sessions/:id/switch-to-panel",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/scan-tasks/scan-device-sessions.service.ts"
+        ],
+        "services": [
+          "ScanDeviceSessionsService"
         ]
       },
       {
@@ -13867,6 +12732,38 @@
         ],
         "services": [
           "ScanTasksService",
+          "TerminalsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/scan-tasks/scan-device.controller.ts",
+        "handler": "ScanDeviceController.deviceReport",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "FileObject",
+          "Order",
+          "OrderItem",
+          "Organization",
+          "PrintTask",
+          "PrintTaskStatusLog",
+          "ScanTask",
+          "ServiceDeployment",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCapability",
+          "TerminalCredential",
+          "TerminalHeartbeat",
+          "TerminalSmartCampusConfig"
+        ],
+        "path": "/api/v1/terminals/:terminalId/scan-tasks/:taskId/device-report",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/scan-tasks/scan-device-sessions.service.ts",
+          "services/api/src/terminals/terminals.service.ts"
+        ],
+        "services": [
+          "ScanDeviceSessionsService",
           "TerminalsService"
         ]
       },
@@ -15049,7 +13946,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 810,
+      "reachableFileCount": 812,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -18398,7 +17295,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 912
+      "sourceFileCount": 914
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -20275,7 +19172,7 @@
         "usedBy": []
       },
       {
-        "fieldCount": 22,
+        "fieldCount": 30,
         "name": "ScanTask",
         "relations": [
           "EndUser",
@@ -20290,6 +19187,7 @@
           "services/api/src/member-feedback/kiosk-feedback.service.ts",
           "services/api/src/member-privacy/member-closure-files.ts",
           "services/api/src/orgs/partner-stats.service.ts",
+          "services/api/src/scan-tasks/scan-device-sessions.service.ts",
           "services/api/src/scan-tasks/scan-task-reaper.task.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
           "services/api/src/terminals/terminals-admin.service.ts"
@@ -20499,7 +19397,7 @@
         ]
       },
       {
-        "fieldCount": 16,
+        "fieldCount": 18,
         "name": "TerminalHeartbeat",
         "relations": [
           "Terminal"
@@ -21172,7 +20070,8 @@
     ],
     "apps/admin/src/routes/print-scan/CapabilityCenter.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
-      "services/api/scripts/verify-print-color-duplex-capability.ts"
+      "services/api/scripts/verify-print-color-duplex-capability.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts"
     ],
     "apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
@@ -21435,7 +20334,8 @@
     ],
     "apps/admin/src/services/api/printScan.ts": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
-      "services/api/scripts/verify-print-color-duplex-capability.ts"
+      "services/api/scripts/verify-print-color-duplex-capability.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts"
     ],
     "apps/admin/src/services/api/registerPartnerContactPhone.ts": [
       "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs"
@@ -22079,6 +20979,7 @@
     "apps/kiosk/src/pages/contract-review/ContractReviewHomePage.tsx": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-contract-review-session.mjs",
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
@@ -22213,6 +21114,7 @@
     ],
     "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
@@ -22740,6 +21642,7 @@
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-file-display-truth.mjs",
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
@@ -23406,6 +22309,7 @@
     ],
     "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
@@ -23923,7 +22827,8 @@
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
     ],
     "apps/kiosk/src/pages/upload/hooks/useUploadSession.ts": [
-      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
     "apps/kiosk/src/pages/upload/kiosk-code-entry.css": [
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs"
@@ -24235,6 +23140,11 @@
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
+      "apps/kiosk/scripts/verify-terminal-session-self-heal.mjs"
+    ],
+    "apps/kiosk/src/services/terminalSessionRecovery.ts": [
+      "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-terminal-session-self-heal.mjs"
     ],
     "apps/kiosk/src/styles/ai-primitives.css": [
@@ -25385,7 +24295,8 @@
     ],
     "packages/shared/src/types/printScanCapability.ts": [
       "services/api/scripts/verify-admin-print-scan.ts",
-      "services/api/scripts/verify-print-color-duplex-capability.ts"
+      "services/api/scripts/verify-print-color-duplex-capability.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts"
     ],
     "packages/shared/src/types/printSign.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
@@ -26039,6 +24950,7 @@
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions.ts"
@@ -26299,9 +25211,6 @@
     "services/api/scripts/verify-refund-idempotent.ts": [
       "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
-    "services/api/scripts/verify-resume-ai-consent-wiring.ts": [
-      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
-    ],
     "services/api/scripts/verify-resume-draft-versions.ts": [
       "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
@@ -26538,7 +25447,6 @@
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
-      "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts"
     ],
@@ -26626,8 +25534,7 @@
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-career-plan.ts",
-      "services/api/scripts/verify-kiosk-job-board-switch.ts",
-      "services/api/scripts/verify-resume-ai-consent-wiring.ts"
+      "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/ai/dto/assistant-chat.dto.ts": [
       "services/api/scripts/verify-assistant-provider-label.ts",
@@ -26812,12 +25719,6 @@
     "services/api/src/ai/redis-inflight-lock.ts": [
       "services/api/scripts/verify-resume-optimize.ts"
     ],
-    "services/api/src/ai/resume-layout-adjust.controller.ts": [
-      "services/api/scripts/verify-ai-access.ts",
-      "services/api/scripts/verify-ai-quota-coverage.ts",
-      "services/api/scripts/verify-resume-ai-consent-wiring.ts",
-      "services/api/scripts/verify-resume-layout-adjust.ts"
-    ],
     "services/api/src/ai/resume-parse-intent-runner.service.ts": [
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
@@ -26883,8 +25784,7 @@
       "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-compliance.ts",
       "services/api/scripts/verify-member-qa-records.ts",
-      "services/api/scripts/verify-official-channels.ts",
-      "services/api/scripts/verify-resume-ai-consent-wiring.ts"
+      "services/api/scripts/verify-official-channels.ts"
     ],
     "services/api/src/ai/resume/diagnosis-report-pdf.service.ts": [
       "services/api/scripts/verify-beijing-display-time.ts",
@@ -27178,8 +26078,7 @@
       "apps/admin/scripts/verify-admin-ai-usage-contract.mjs",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
-      "services/api/scripts/verify-ai-usage-coverage.ts",
-      "services/api/scripts/verify-mock-interview-consent.ts"
+      "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
     "services/api/src/ai/usage/ai-pricing.ts": [
       "services/api/scripts/verify-ai-usage-budget.ts",
@@ -27201,8 +26100,7 @@
     "services/api/src/ai/usage/ai-usage-meter.ts": [
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
-      "services/api/scripts/verify-ai-usage-coverage.ts",
-      "services/api/scripts/verify-mock-interview-consent.ts"
+      "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
     "services/api/src/ai/usage/ai-usage-retention.ts": [
       "services/api/scripts/verify-ai-usage-retention.ts",
@@ -27233,7 +26131,6 @@
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
-      "services/api/scripts/verify-resume-ai-consent-wiring.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-upload-sessions-http.ts"
@@ -27330,7 +26227,6 @@
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
-      "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-order.ts",
@@ -27377,6 +26273,7 @@
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-screensaver-content.ts",
       "services/api/scripts/verify-support-contact.ts",
@@ -27875,6 +26772,7 @@
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-parse-quota-once.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-sms-budget.ts",
       "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
@@ -28169,6 +27067,7 @@
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions-member-file.ts",
@@ -29062,18 +27961,14 @@
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
-      "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
       "services/api/scripts/verify-member-data-request-state-machine.ts",
       "services/api/scripts/verify-member-data-request-truth.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
-      "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-pg-lock-timeout-postgres.ts",
       "services/api/scripts/verify-pg-serialization-conflict.ts",
-      "services/api/scripts/verify-resume-ai-consent-wiring.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
-      "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-report-export.ts"
     ],
@@ -29092,7 +27987,6 @@
     "services/api/src/mock-interview/interview-practice-sheet-pdf.service.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "services/api/scripts/verify-ai-safety-aigc.ts",
-      "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/interview-practice-sheet.ts": [
@@ -29104,7 +27998,6 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
       "services/api/scripts/verify-cjk-font.ts",
-      "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/interview-transcript-pdf.service.ts": [
@@ -29113,16 +28006,12 @@
     "services/api/src/mock-interview/interview-transcript-print.service.ts": [
       "services/api/scripts/verify-mock-interview.ts"
     ],
-    "services/api/src/mock-interview/mock-interview-charge.ts": [
-      "services/api/scripts/verify-ai-quota-coverage.ts"
-    ],
     "services/api/src/mock-interview/mock-interview-llm.service.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
-      "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/mock-interview.controller.ts": [
@@ -29149,9 +28038,7 @@
       "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-member-data-retention.ts",
-      "services/api/scripts/verify-mock-interview-consent.ts",
-      "services/api/scripts/verify-mock-interview.ts",
-      "services/api/scripts/verify-resume-ai-consent-wiring.ts"
+      "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/notifications/notifications.controller.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs"
@@ -29864,7 +28751,6 @@
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
-      "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-offline-agencies-contract.ts",
@@ -29922,6 +28808,7 @@
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-screensaver-content.ts",
       "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
@@ -30008,7 +28895,20 @@
     ],
     "services/api/src/scan-tasks/dto/create-scan-task.dto.ts": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs",
+      "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-tasks.ts"
+    ],
+    "services/api/src/scan-tasks/dto/scan-device-report.dto.ts": [
+      "services/api/scripts/verify-scan-device-sessions.ts"
+    ],
+    "services/api/src/scan-tasks/scan-device-protocol.ts": [
+      "services/api/scripts/verify-scan-device-sessions.ts"
+    ],
+    "services/api/src/scan-tasks/scan-device-sessions.service.ts": [
+      "services/api/scripts/verify-scan-device-sessions.ts"
+    ],
+    "services/api/src/scan-tasks/scan-device.controller.ts": [
+      "services/api/scripts/verify-scan-device-sessions.ts"
     ],
     "services/api/src/scan-tasks/scan-task-reaper.task.ts": [
       "services/api/scripts/verify-scan-tasks.ts"
@@ -30018,13 +28918,18 @@
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts",
       "services/api/scripts/verify-scan-deliver-filename.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-throttle-dimension.ts"
+    ],
+    "services/api/src/scan-tasks/scan-tasks.module.ts": [
+      "services/api/scripts/verify-scan-device-sessions.ts"
     ],
     "services/api/src/scan-tasks/scan-tasks.service.ts": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs",
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-pg-serialization-conflict.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-quiet-period.ts",
       "services/api/scripts/verify-scan-tasks.ts"
     ],
@@ -30127,6 +29032,7 @@
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-screensaver-content.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
@@ -30190,6 +29096,7 @@
     ],
     "services/api/src/terminals/dto/heartbeat.dto.ts": [
       "services/api/scripts/verify-queue-dispatch-printer-status.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
       "services/api/scripts/verify-terminal-network-diagnostics.ts"
     ],
@@ -30213,6 +29120,9 @@
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-queue-dispatch-printer-status.ts"
+    ],
+    "services/api/src/terminals/printer-status.ts": [
+      "services/api/scripts/verify-scan-device-sessions.ts"
     ],
     "services/api/src/terminals/release-observation.service.ts": [
       "services/api/scripts/verify-pg-serialization-conflict.ts",
@@ -30243,13 +29153,15 @@
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
     "services/api/src/terminals/terminal-capabilities.types.ts": [
       "services/api/scripts/verify-admin-print-scan.ts",
-      "services/api/scripts/verify-print-color-duplex-capability.ts"
+      "services/api/scripts/verify-print-color-duplex-capability.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts"
     ],
     "services/api/src/terminals/terminal-config.types.ts": [
       "services/api/scripts/verify-terminal-device-config.ts"
@@ -30285,6 +29197,7 @@
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-terminal-identity.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
@@ -30321,6 +29234,7 @@
       "services/api/scripts/verify-print-rollout-config.ts",
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
@@ -30349,6 +29263,7 @@
       "services/api/scripts/verify-queue-dispatch-printer-status.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
@@ -30384,6 +29299,7 @@
       "services/api/scripts/verify-print-rollout-config.ts",
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
@@ -31783,7 +30699,8 @@
           "apps/kiosk/src/services/api/jobFit.ts",
           "apps/kiosk/src/services/api/selfAssessment.ts",
           "apps/kiosk/src/services/auth/memberAuthApi.ts",
-          "apps/kiosk/src/services/terminalAuth.ts"
+          "apps/kiosk/src/services/terminalAuth.ts",
+          "apps/kiosk/src/services/terminalSessionRecovery.ts"
         ],
         "missing": []
       },
@@ -32168,6 +31085,8 @@
           "apps/kiosk/src/components/qingxu/QxAppNavbar.tsx",
           "apps/kiosk/src/hooks/useTerminalDeviceStatus.ts",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
+          "apps/kiosk/src/pages/contract-review/ContractReviewHomePage.tsx",
+          "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
           "apps/kiosk/src/pages/print-scan/AiDownNote.tsx",
           "apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx",
           "apps/kiosk/src/pages/print-scan/ConvertImagesPanels.tsx",
@@ -32213,6 +31132,7 @@
           "apps/kiosk/src/pages/print/styles/pickup-claim-qx.css",
           "apps/kiosk/src/pages/print/styles/print-pickup-claim.css",
           "apps/kiosk/src/pages/print/styles/print-upload.css",
+          "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
           "apps/kiosk/src/pages/scan/ScanProgressPage.tsx",
           "apps/kiosk/src/pages/scan/ScanResultPage.tsx",
           "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx",
@@ -32268,6 +31188,7 @@
           "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts",
           "apps/kiosk/src/pages/interview/session/types.ts",
           "apps/kiosk/src/pages/interview/styles/interview-shell.css",
+          "apps/kiosk/src/pages/print/file-source/FileSourceView.tsx",
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
           "apps/kiosk/src/pages/resume/JobFitActionsPage.tsx",
           "apps/kiosk/src/pages/resume/JobFitPage.tsx",
@@ -32455,6 +31376,7 @@
           "apps/kiosk/src/pages/toolbox/toolbox-zone.css",
           "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
           "apps/kiosk/src/pages/upload/components/UploadSessionQrPanel.tsx",
+          "apps/kiosk/src/pages/upload/hooks/useUploadSession.ts",
           "apps/kiosk/src/pages/upload/phone-upload-service-desk.css",
           "apps/kiosk/src/routes/index.tsx"
         ],
@@ -32909,6 +31831,7 @@
           "apps/kiosk/src/services/assistantDraft.ts",
           "apps/kiosk/src/services/resumeParseIntent.ts",
           "apps/kiosk/src/services/terminalAuth.ts",
+          "apps/kiosk/src/services/terminalSessionRecovery.ts",
           "apps/kiosk/src/styles/qingxu/primitives.css",
           "services/api/src/common/privacy/client-declaration.ts",
           "services/api/src/member-privacy/member-privacy.service.ts"
@@ -35090,7 +34013,8 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "apps/kiosk/src/services/terminalAuth.ts"
+          "apps/kiosk/src/services/terminalAuth.ts",
+          "apps/kiosk/src/services/terminalSessionRecovery.ts"
         ],
         "missing": []
       },
@@ -38017,7 +36941,6 @@
           "services/api/src/ai/fair-visit-plan.controller.ts",
           "services/api/src/ai/job-fit.controller.ts",
           "services/api/src/ai/kiosk-ai-capabilities.controller.ts",
-          "services/api/src/ai/resume-layout-adjust.controller.ts",
           "services/api/src/ai/resume-report-export.controller.ts",
           "services/api/src/ai/self-assessment.controller.ts",
           "services/api/src/app.module.ts",
@@ -38344,7 +37267,6 @@
           "services/api/src/ai/quota/ai-quota-run.ts",
           "services/api/src/ai/quota/ai-quota.policy.ts",
           "services/api/src/ai/quota/ai-quota.service.ts",
-          "services/api/src/ai/resume-layout-adjust.controller.ts",
           "services/api/src/ai/resume/career-plan.service.ts",
           "services/api/src/ai/resume/fair-visit-plan.service.ts",
           "services/api/src/ai/resume/job-fit.service.ts",
@@ -38369,7 +37291,6 @@
           "services/api/src/materials/materials.controller.ts",
           "services/api/src/materials/materials.service.ts",
           "services/api/src/member-privacy/member-privacy.service.ts",
-          "services/api/src/mock-interview/mock-interview-charge.ts",
           "services/api/src/mock-interview/mock-interview.controller.ts",
           "services/api/src/mock-interview/mock-interview.service.ts",
           "services/api/src/prisma/prisma.service.ts",
@@ -39304,7 +38225,6 @@
           "services/api/src/ai/resume/llm-career-plan.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/member-assets/member-assets.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
         "missing": []
@@ -42757,33 +41677,6 @@
         "dirs": [],
         "files": [
           "services/api/src/ai/ai-log.service.ts",
-          "services/api/src/ai/usage/ai-budget.service.ts",
-          "services/api/src/ai/usage/ai-usage-meter.ts",
-          "services/api/src/audit/audit.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts",
-          "services/api/src/mock-interview/interview-practice-sheet-pdf.service.ts",
-          "services/api/src/mock-interview/interview-report-pdf.service.ts",
-          "services/api/src/mock-interview/mock-interview-llm.service.ts",
-          "services/api/src/mock-interview/mock-interview.service.ts",
-          "services/api/src/prisma/prisma.service.ts"
-        ],
-        "missing": []
-      },
-      "file": "services/api/scripts/verify-mock-interview-consent.ts",
-      "helper": false,
-      "inCi": true,
-      "package": "@ai-job-print/api",
-      "scriptNames": [
-        "@ai-job-print/api::verify:mock-interview-consent"
-      ],
-      "wired": true
-    },
-    {
-      "asserts": {
-        "absent": [],
-        "dirs": [],
-        "files": [
-          "services/api/src/ai/ai-log.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/pdf/pdfjs-document.ts",
           "services/api/src/mock-interview/asr/asr.service.ts",
@@ -44686,7 +43579,6 @@
           "services/api/scripts/verify-print-jobs.ts",
           "services/api/scripts/verify-recruitment-integration-readiness.ts",
           "services/api/scripts/verify-refund-idempotent.ts",
-          "services/api/scripts/verify-resume-ai-consent-wiring.ts",
           "services/api/scripts/verify-resume-draft-versions.ts",
           "services/api/scripts/verify-resume-export-draft-source.ts",
           "services/api/scripts/verify-resume-export-formats.ts",
@@ -45060,29 +43952,6 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "services/api/src/ai/career-plan.controller.ts",
-          "services/api/src/ai/resume-layout-adjust.controller.ts",
-          "services/api/src/ai/resume/career-plan.service.ts",
-          "services/api/src/app.module.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts",
-          "services/api/src/mock-interview/mock-interview.service.ts"
-        ],
-        "missing": []
-      },
-      "file": "services/api/scripts/verify-resume-ai-consent-wiring.ts",
-      "helper": true,
-      "inCi": true,
-      "package": "@ai-job-print/api",
-      "scriptNames": [
-        "@ai-job-print/api::verify:resume-ai-consent-wiring"
-      ],
-      "wired": true
-    },
-    {
-      "asserts": {
-        "absent": [],
-        "dirs": [],
-        "files": [
           "packages/shared/src/types/ai.ts",
           "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/dto/resume-parse.dto.ts",
@@ -45290,11 +44159,9 @@
           "services/api/src/ai/ai.service.ts",
           "services/api/src/ai/dto/resume-generate.dto.ts",
           "services/api/src/ai/interfaces/ai-provider.interface.ts",
-          "services/api/src/ai/resume-layout-adjust.controller.ts",
           "services/api/src/ai/resume/llm-resume-optimize.service.ts",
           "services/api/src/ai/resume/resume-pdf.service.ts",
-          "services/api/src/common/pdf/pdfjs-document.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
+          "services/api/src/common/pdf/pdfjs-document.ts"
         ],
         "missing": []
       },
@@ -45606,6 +44473,48 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:scan-tasks"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/admin/src/routes/print-scan/CapabilityCenter.tsx",
+          "apps/admin/src/services/api/printScan.ts",
+          "packages/shared/src/types/printScanCapability.ts",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/scan-tasks/dto/create-scan-task.dto.ts",
+          "services/api/src/scan-tasks/dto/scan-device-report.dto.ts",
+          "services/api/src/scan-tasks/scan-device-protocol.ts",
+          "services/api/src/scan-tasks/scan-device-sessions.service.ts",
+          "services/api/src/scan-tasks/scan-device.controller.ts",
+          "services/api/src/scan-tasks/scan-tasks.controller.ts",
+          "services/api/src/scan-tasks/scan-tasks.module.ts",
+          "services/api/src/scan-tasks/scan-tasks.service.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/terminals/dto/heartbeat.dto.ts",
+          "services/api/src/terminals/printer-status.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts",
+          "services/api/src/terminals/terminal-capabilities.types.ts",
+          "services/api/src/terminals/terminal-session.service.ts",
+          "services/api/src/terminals/terminals-admin.service.ts",
+          "services/api/src/terminals/terminals-agent.service.ts",
+          "services/api/src/terminals/terminals.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-scan-device-sessions.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:scan-device-sessions"
       ],
       "wired": true
     },

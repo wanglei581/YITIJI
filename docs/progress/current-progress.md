@@ -1,5 +1,18 @@
 # 当前开发进度
 
+## 2026-11-02：屏上扫描 ③ 后端第一批 B1（云端会话、能力键、心跳；分支 `claude/scan-device-b1-1102`，从发布候选头 3f19aba9c 切出，已并 origin/main 49ed808b6，未推送、未部署）
+
+- 做了什么：任务包 ③（用户在一体机屏上点「开始扫描」，终端程序服务经 WIA 直接扫描）的云端部分。`ScanTask` 加 8 个会话字段（startMode 默认 panel、deviceSource、deviceColorMode、deviceState、devicePageCount、deviceErrorCode、deviceUpdatedAt、hardExpiresAt），`TerminalHeartbeat` 加 scanDeviceHealth / scanDeviceObservedAt；两套迁移同名 `20261102230000_add_scan_device_session_fields`，`verify-first-order-migrations` 升级清单补了这份（旧行取默认值、新列可读写）。能力键 `scan_device` 进共享契约与后端副本、DEFAULT_DENY（逐台到机器旁验过进纸器、无纸、开盖、打印时扫描、中止恢复才登记，同彩色、双面），后台「设备能力」页键名「屏上扫描（需真机验证）」。
+- 接口：建会话可选 startMode / source / colorMode（device 要 scan 与 scan_device 都放行；hardExpiresAt = 建会话起 30 分钟）；current-lease 对 device 任务多带 startMode 与 device 参数，面板任务响应一个键都不多；GET 会话多返回 startMode / deviceState / devicePageCount / deviceErrorCode；新增 `POST /terminals/:terminalId/scan-tasks/:taskId/device-report`（终端令牌；状态转移表 49 个组合里 25 个合法；页数只许不减；每次收下续期到 min(max(expiresAt, now+3 分钟), hardExpiresAt)；已取消 / 已改面板 / 能力被关回 409 带原因码）；新增 `POST /scan/sessions/:id/switch-to-panel`（控制令牌；原地切回面板，会话 / 令牌 / ACK 不变，不触发静默期，幂等；截止时间续到 min(max(expiresAt, now+10 分钟), hardExpiresAt)，免得用户在屏上试了很久再切只剩一两分钟，已到 hardExpiresAt 的会话回 409 SCAN_TASK_NOT_ACTIVE）；deliver 加 multipart 字段 origin（device 会话只收 origin=device、composing 或 delivering、已收 ≥1 页的 PDF；面板会话只收 watcher；没带 origin 一律按 watcher）；心跳与公开 printer-status 多两项（老终端程序不报给 null，不认识的值当 unknown）。新逻辑放在 `scan-device-*.ts` 三个新文件里，没往已 1200 行的 `scan-tasks.service.ts` 里堆。
+- 没做 / 边界：终端程序（A1 底座、A2 接线）、一体机（K1）、小程序都没动；真机验证 V0-3/4/5/11/12 没做，**哪台机器都不许在后台把 scan_device 配成 available**；`packages/shared/src/types/scanTask.ts` 里会话新字段的类型留给 K1；device 会话取消后仍吃 90 秒静默期（任务包 F-5），只有「改用面板扫描」不吃；Playwright 视觉用例没跑（本机没有 Playwright 浏览器）。
+- 超出任务包文字的两处改动（各自单独成提交，不改就红，可单独审、单独撤）：`fusion-w2-print.spec.ts` 的能力假数据补一行 scan_device（`verify:print-color-duplex-capability` 第 I 节要求桩覆盖契约全部能力键）；`verify-scan-input-lockout-telemetry` 的 printer-status 精确键集合加两个键（任务要求公开接口多给两项；仍是精确集合断言，另补三条按名字的不外泄断言，没放宽）。
+- 验证：新门禁 `verify:scan-device-sessions`（进 ci.yml 两处，SQLite 与 PostgreSQL 各跑一遍）；图谱列出的门禁加简报必跑共 114 条，SQLite 口径 85 条 api 门禁加 27 条其它包静态门禁全绿（中途 `verify-recruitment-hosting-gate-declares` 红过一次——新门禁引用了终端管理服务须显式声明托管开关，已补并复跑转绿），PG 作业里同源的 34 条加两条 PG 专用全绿；两套空库 `migrate deploy` 通过且 `migrate diff` 无漂移；15 处反向检查（DEFAULT_DENY、未配置放行、续期封顶、switch 变成取消、origin 校验、PDF 校验、转移表多一条、页数可减、不核终端归属、能力被关仍收、面板 lease 多键、hardExpiresAt 算错、deliver 状态放宽、迁移默认值、公开接口多泄一项）全部变红，恢复后干净。
+## 2026-11-03：一体机扫码上传共用面板取消失败不再清屏（重做旧候选 #1461；分支 `claude/kiosk-upload-cancel-keep-1103`；未合并、未部署）
+
+- 旧候选 #1461（10/14，未进 main）在触屏版上重做：会员确认时后端锁着复制文件，这时点「取消」会回 400 `UPLOAD_SESSION_ACTION_IN_PROGRESS`。共用面板原来吞掉失败并无条件清空，屏上像取消成功，文件随后仍会归档进会员名下。
+- 改法只在 `UploadSessionQrPanel`，照打印上传页 `useUploadSession`：取消答复回来前刷新、取消、确认都禁用；成功才清空并通知页面；已作废码清二维码、按过期显示；其余失败留下二维码、已收到的文件和状态，兜底句沿用「这次上传没能取消，文件还留着。」。不恢复轮询，不自动接走文件。
+- 验证：一体机 tsc、lint 无 error；冻结哈希三条、`verify:resume-phone-upload-ui`、`verify:public-screen-mask`、`verify:kiosk-unattended-copy`、两份 profile 守卫、仓库完整性，以及进度文档上不依赖数据库的后端文档门禁通过。`verify:ai-usage-retention` 缺隔离库，`verify:free-print-quota` 与 `verify:support-contact` 缺本机 Prisma 客户端，未跑成（与本次改动无关）。浏览器用例已写入，本机未跑浏览器。
+
 ## 2026-11-04：简历 AI 授权分支并入当前 main（每人每天次数、内容安全都留着；未推送、未部署）
 
 - 职业规划、简历版式调整、带简历的模拟面试，仍在把简历交给模型之前核「简历 AI 授权」。没同意时返回「请先确认简历 AI 服务授权」，不调模型。游客、只读、打印、不带简历的面试照旧。

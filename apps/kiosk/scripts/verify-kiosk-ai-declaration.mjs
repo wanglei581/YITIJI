@@ -280,14 +280,15 @@ function sourceChecks() {
   const auth = read('src/services/terminalAuth.ts')
   const imports = [...auth.matchAll(/^import .+$/gm)].map((match) => match[0])
   const expectedImports = [
-    "import { clearKioskSensitiveSession, clearKioskSharedDeviceResidue } from '../auth/kioskSensitiveSession'",
+    "import { clearKioskSensitiveSession, clearKioskSharedDeviceResidue, kioskSensitiveSessionScope, type KioskClearScope } from '../auth/kioskSensitiveSession'",
     "import { API_BASE_URL, API_MODE } from './api/client'",
     "import { ApiHttpError } from './api/httpAdapter'",
     "import { getTerminalId } from './api/screensaver'",
     "import { readHttpError } from './api/throwHttpError'",
+    "import { applyE2ERecoveryView, attachRecoveryRuntime, cancelRecovery, dropRecoveryHold, hadSettled, holdRecoveryForOtherContent, isBootExchangeUnsettled, markBootExchangeSettled, markBootExchangeUnsettled, noteRejectedToken, noteStateEntered, rememberRecoveryClearScope, scheduleRecovery } from './terminalSessionRecovery'",
   ]
   if (imports.length !== expectedImports.length || expectedImports.some((line) => !imports.includes(line))) {
-    fail(`terminalAuth.ts 的 import 必须仍是原来的五条，实际：${imports.join(' || ')}`)
+    fail(`terminalAuth.ts 的 import 必须仍是这六条，实际：${imports.join(' || ')}`)
   }
   if (!auth.includes('export function registerAiDeclarationBridge')) fail('terminalAuth.ts 必须导出 registerAiDeclarationBridge')
   if (!auth.includes('if (!sessionInvalid(error)) return response')) fail('terminalAuth.ts 丢掉了非会话 401 原样交还')
@@ -421,9 +422,12 @@ async function loadRuntime({ terminalId = '', enforced = null, grantOk = false, 
     "from './api/screensaver'": toDataUrl(`export function getTerminalId() { return ${JSON.stringify(terminalId)} }\n`),
     "from './api/httpAdapter'": toDataUrl('export class ApiHttpError extends Error { constructor(code, message, status) { super(message); this.name = "ApiHttpError"; this.code = code; this.status = status } }\n'),
     "from './api/throwHttpError'": toDataUrl('export async function readHttpError(r) { const b = await r.json().catch(() => ({})); return { code: b?.error?.code ?? "UNKNOWN_ERROR", message: b?.error?.message ?? "" } }\n'),
-    "from '../auth/kioskSensitiveSession'": toDataUrl('export function clearKioskSensitiveSession() {}\nexport function clearKioskSharedDeviceResidue() {}\n'),
+    "from '../auth/kioskSensitiveSession'": toDataUrl('export function clearKioskSensitiveSession() {}\nexport function clearKioskSharedDeviceResidue() {}\nexport function kioskSensitiveSessionScope() { return \'none\' }\n'),
   }
+  const recoveryUrl = toDataUrl(`${transpile('src/services/terminalSessionRecovery.ts')}${tag}`)
   let authCode = `${transpile('src/services/terminalAuth.ts')}${tag}`.replaceAll('import.meta.env', `globalThis[${JSON.stringify(envName)}]`)
+  if (!authCode.includes("from './terminalSessionRecovery'")) throw new Error('terminalAuth 不再引入 terminalSessionRecovery')
+  authCode = authCode.replaceAll("from './terminalSessionRecovery'", `from '${recoveryUrl}'`)
   for (const [from, url] of Object.entries(stubs)) {
     if (!authCode.includes(from)) throw new Error(`terminalAuth 不再引入 ${from}`)
     authCode = authCode.replaceAll(from, `from '${url}'`)
