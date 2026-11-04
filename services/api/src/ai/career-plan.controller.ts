@@ -16,6 +16,7 @@ import {
 
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
+  aborted?: boolean
 }
 
 function headerOf(req: ReqLike, name: string): string | null {
@@ -61,7 +62,7 @@ export class CareerPlanController {
     const requester = await this.requesterOf(req)
     await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
     const open = await this.jobBoardOpen(req)
-    return this.service.generate(taskId, requester, { includeJobFitTitle: open })
+    return this.service.generate(taskId, requester, { includeJobFitTitle: open }, req)
   }
 
   @Get(':taskId')

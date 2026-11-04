@@ -24,5 +24,36 @@ state.alerts = []; await service.pushDerivedAlerts(); assert.equal(calls.length,
 await service.pushDerivedAlerts(); assert.equal(calls.length, 2)
 const retryCalls = []; const retry = make('https://example.invalid', { alerts: [alert] }, retryCalls, true)
 await retry.pushDerivedAlerts(); await retry.pushDerivedAlerts(); assert.equal(retryCalls.length, 2)
+// 终端被转成计划中 / 退役 / 停用后从告警里消失：不推「已恢复」；仍在考察范围内的真恢复照推。
+{
+  const scopeState = { alerts: [alert], terminalSubjectKeysInScope: ['terminal_offline:t1', 'printer_issue:t1'] }
+  const scopeCalls = []
+  const scoped = make('https://example.invalid', scopeState, scopeCalls)
+  scoped.collectAlerts = async () => ({ alerts: scopeState.alerts, terminalSubjectKeysInScope: scopeState.terminalSubjectKeysInScope })
+  await scoped.pushDerivedAlerts(); assert.equal(scopeCalls.length, 1)
+  scopeState.alerts = []; scopeState.terminalSubjectKeysInScope = []
+  await scoped.pushDerivedAlerts(); assert.equal(scopeCalls.length, 1, '被筛掉的终端不得推「已恢复」')
+  const backCalls = []
+  const back = make('https://example.invalid', { alerts: [{ ...alert, episodeToken: 'ep2' }] }, backCalls)
+  const backState = { alerts: [{ ...alert, episodeToken: 'ep2' }], terminalSubjectKeysInScope: ['terminal_offline:t1'] }
+  back.collectAlerts = async () => ({ alerts: backState.alerts, terminalSubjectKeysInScope: backState.terminalSubjectKeysInScope })
+  await back.pushDerivedAlerts(); backState.alerts = []
+  await back.pushDerivedAlerts(); assert.equal(backCalls.length, 2, '仍在范围内的终端回到在线要推「已恢复」')
+  assert.match(JSON.parse(String(backCalls[1].body)).text.content, /已恢复/)
+}
+
+// 新的 AI 告警不是终端类。推送端不按类型过滤：消失时同样推「已恢复」，正文仍不带 detail。
+const aiAlert = { id: 'ai', subjectKey: 'ai_provider_unavailable:global', subjectId: 'global', episodeToken: '2026-10-06T06:00:00.000Z', type: 'ai_provider_unavailable', severity: 'error', title: 'AI 服务账户不可用（余额或密钥问题），用户只能用手动方式', detail: 'SENTINEL_DETAIL', terminalCode: null, occurredAt: new Date().toISOString() }
+const aiState = { alerts: [aiAlert] }
+const aiCalls = []
+const aiService = make('https://example.invalid', aiState, aiCalls)
+await aiService.pushDerivedAlerts()
+aiState.alerts = []
+await aiService.pushDerivedAlerts()
+assert.equal(aiCalls.length, 2)
+const aiRecovered = JSON.parse(String(aiCalls[1].body))
+assert.match(aiRecovered.text.content, /已恢复/)
+assert.match(aiRecovered.text.content, /AI 服务账户不可用/)
+assert.doesNotMatch(aiRecovered.text.content, /SENTINEL_DETAIL/)
 console.log('alert push gates passed')
 })().catch((error) => { console.error(error); process.exitCode = 1 })

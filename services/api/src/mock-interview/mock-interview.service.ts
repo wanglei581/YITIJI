@@ -1,5 +1,5 @@
 import { captureFactIdentity, recordAiServiceFact } from '../ai/usage/ai-service-fact'
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
@@ -7,7 +7,7 @@ import { AuditService } from '../audit/audit.service'
 import { FilesService } from '../files/files.service'
 import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
 import { ResumeExtractionService } from '../ai/resume/resume-extraction.service'
-import { MockInterviewLlmService, type InterviewReportPayload, type NextQuestionOutput } from './mock-interview-llm.service'
+import { MockInterviewLlmService, type InterviewReportPayload } from './mock-interview-llm.service'
 import {
   buildQaExcerpts,
   parseStoredInterviewReport,
@@ -22,11 +22,21 @@ import {
 } from './interview-practice-sheet'
 import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai/ai-log.service'
+import { AiQuotaService } from '../ai/quota/ai-quota.service'
+import { assertMemberInterviewRemaining, runWithAiQuota } from '../ai/quota/ai-quota-run'
 import { InflightCoalescer } from '../ai/ai-inflight'
 import { RedisInflightLock } from '../ai/redis-inflight-lock'
 import { RedisService } from '../common/redis/redis.service'
 import { formatBeijingDate } from '../common/beijing-display-time'
 import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
+import {
+  deliverNextInterviewQuestion,
+  executeInterviewCharge,
+  executeInterviewStart,
+  type InterviewChargeRunInput,
+  type InterviewChargeSession,
+  type InterviewFirstQuestion,
+} from './mock-interview-charge'
 
 /** 练习报告和通用题单印在纸上的日期。北京时间自然日。 */
 export function interviewReportDisplayDate(at: Date): string {
@@ -91,6 +101,7 @@ export class MockInterviewService {
     questionTarget: number
     done: false
   }>()
+  private readonly answerInflight = new InflightCoalescer<InterviewFirstQuestion>()
   private readonly endLock: RedisInflightLock
 
   constructor(
@@ -104,6 +115,7 @@ export class MockInterviewService {
     private readonly aiLog: AiLogService,
     private readonly privacy: MemberPrivacyService,
     redis?: RedisService,
+    @Optional() private readonly quota?: AiQuotaService,
   ) { this.endLock = new RedisInflightLock(redis) }
 
   // ── 创建 / 开始 ────────────────────────────────────────────────────────────
@@ -177,39 +189,44 @@ export class MockInterviewService {
     return this.startInflight.run(this.coalesceKey(sessionId, requester), () => this.startOnce(sessionId, requester, identity))
   }
 
-  private async startOnce(sessionId: string, requester: InterviewRequester, identity: ReturnType<typeof captureFactIdentity>) {
+  private startOnce(sessionId: string, requester: InterviewRequester, identity: ReturnType<typeof captureFactIdentity>) {
+    return executeInterviewStart(
+      this.interviewStartDeps(),
+      sessionId,
+      requester,
+      (spec) => this.runInterviewQuota(spec),
+      () => recordAiServiceFact(this.prisma, this.logger, identity, 'mock_interview', sessionId),
+    )
+  }
+
+  private runInterviewQuota<T>(input: InterviewChargeRunInput<T>): Promise<T> {
+    return executeInterviewCharge(this.quota, input, { bucket: 'ai_interview', runWithAiQuota })
+  }
+
+  private interviewStartDeps() {
+    return {
+      prisma: this.prisma,
+      llm: this.llm,
+      loadAuthorized: (sessionId: string, requester: InterviewRequester) => this.loadAuthorized(sessionId, requester),
+      llmCtx: (session: InterviewChargeSession) => this.llmCtx(session),
+      requireResumeConsent: (session: InterviewChargeSession) => this.requireResumeConsent(session),
+      recordAiLog: (
+        sessionId: string,
+        operation: 'interviewQuestion',
+        usage: Pick<AiUsageAccumulator, 'callCount' | 'provider' | 'tokenUsage'>,
+        startedAt: number,
+        status: 'success' | 'failed',
+        endUserId: string | null,
+        errorCode?: string,
+      ) => this.recordAiLog(sessionId, operation, usage, startedAt, status, endUserId, errorCode),
+    }
+  }
+
+  /** 开场前没有面试余量时拒绝。场内转写不再查。匿名不进账本。 */
+  async assertTranscribeAllowed(sessionId: string, requester: InterviewRequester): Promise<void> {
     const session = await this.loadAuthorized(sessionId, requester)
-    const claimed = await this.prisma.mockInterviewSession.updateMany({
-      where: { id: session.id, status: 'configured' },
-      data: { status: 'in_progress', startedAt: new Date() },
-    })
-    if (claimed.count === 0) {
-      throw new BadRequestException({ error: { code: 'INTERVIEW_ALREADY_STARTED', message: '本场练习已开始或已结束' } })
-    }
-    const usage = new AiUsageAccumulator()
-    const startedAt = Date.now()
-    let q: NextQuestionOutput
-    try {
-      await this.requireResumeConsent(session)
-      q = await this.llm.nextQuestion({ ...this.llmCtx(session), askedCount: 0, transcript: [] }, usage.add)
-      this.recordAiLog(session.id, 'interviewQuestion', usage, startedAt, 'success', session.endUserId)
-      const content = q.greeting ? `${q.greeting}\n${q.question}` : q.question
-      await this.prisma.mockInterviewTurn.create({
-        data: { sessionId: session.id, idx: 0, role: 'interviewer', qType: q.qType, content },
-      })
-      recordAiServiceFact(this.prisma, this.logger, identity, 'mock_interview', session.id)
-      return { question: content, qType: q.qType, questionIndex: 1, questionTarget: session.questionTarget, done: false as const }
-    } catch (error) {
-      this.recordAiLog(session.id, 'interviewQuestion', usage, startedAt, 'failed', session.endUserId, aiErrorCodeOf(error, 'AI_INTERVIEW_QUESTION_FAILED'))
-      await this.prisma.$transaction([
-        this.prisma.mockInterviewTurn.deleteMany({ where: { sessionId: session.id } }),
-        this.prisma.mockInterviewSession.updateMany({
-          where: { id: session.id, status: 'in_progress' },
-          data: { status: 'configured', startedAt: null },
-        }),
-      ])
-      throw error
-    }
+    if (session.status !== 'configured') return
+    await assertMemberInterviewRemaining(this.quota, session.endUserId)
   }
 
   /** 提交回答（或跳过）→ 返回下一题或结束建议。语音回合附转写元数据（2C+）。 */
@@ -278,52 +295,22 @@ export class MockInterviewService {
       return { done: true, questionIndex: asked, questionTarget: session.questionTarget }
     }
 
-    const qUsage = new AiUsageAccumulator()
-    const qStartedAt = Date.now()
-    let q: NextQuestionOutput
-    try {
-      await this.requireResumeConsent(session)
-      q = await this.llm.nextQuestion({ ...this.llmCtx(session), askedCount: asked, transcript }, qUsage.add)
-    } catch (error) {
-      this.recordAiLog(session.id, 'interviewQuestion', qUsage, qStartedAt, 'failed', session.endUserId, aiErrorCodeOf(error, 'AI_INTERVIEW_QUESTION_FAILED'))
-      throw error
-    }
-    this.recordAiLog(session.id, 'interviewQuestion', qUsage, qStartedAt, 'success', session.endUserId)
-
-    try {
-      await this.prisma.$transaction(async (tx) => {
-        if (!lastIsCandidate) {
-          await tx.mockInterviewTurn.create({
-            data: {
-              sessionId: session.id,
-              idx: turns.length,
-              role: 'candidate',
-              content: input.skip ? '（跳过）' : answerText,
-              skipped: !!input.skip,
-              inputMode: input.inputMode === 'voice' ? 'voice' : 'text',
-              transcriptText: input.transcriptText?.slice(0, MAX_ANSWER_CHARS) ?? null,
-              transcriptEdited: input.transcriptEdited === true,
-              answerDurationSec: typeof input.answerDurationSec === 'number' ? Math.max(0, Math.min(600, Math.round(input.answerDurationSec))) : null,
-            },
-          })
-        }
-        await tx.mockInterviewTurn.create({
-          data: {
-            sessionId: session.id,
-            idx: lastIsCandidate ? turns.length : turns.length + 1,
-            role: 'interviewer',
-            qType: q.qType,
-            content: q.question,
-          },
-        })
-      })
-    } catch (error) {
-      if (isUniqueConflict(error)) {
-        throw new BadRequestException({ error: { code: 'INTERVIEW_TURN_CONFLICT', message: '本题已提交，请刷新后继续' } })
-      }
-      throw error
-    }
-    return { done: false, question: q.question, qType: q.qType, questionIndex: asked + 1, questionTarget: session.questionTarget }
+    return this.answerInflight.run(`${session.id}:q:${last.idx}`, () => deliverNextInterviewQuestion({
+      prisma: this.prisma,
+      llm: this.llm,
+      llmCtx: (row) => this.llmCtx(row),
+      requireResumeConsent: (row) => this.requireResumeConsent(row),
+      recordAiLog: (sessionId, operation, usage, startedAt, status, endUserId, errorCode) =>
+        this.recordAiLog(sessionId, operation, usage, startedAt, status, endUserId, errorCode),
+    }, {
+      session,
+      turns,
+      asked,
+      lastIsCandidate,
+      lastIdx: last.idx,
+      draft: input,
+      transcript,
+    }))
   }
 
   /** 结束并生成练习报告（幂等：已有报告直接返回）。 */
@@ -666,7 +653,7 @@ export class MockInterviewService {
   private recordAiLog(
     sessionId: string,
     operation: 'interviewQuestion' | 'interviewReport',
-    usage: AiUsageAccumulator,
+    usage: Pick<AiUsageAccumulator, 'callCount' | 'provider' | 'tokenUsage'>,
     startedAt: number,
     status: 'success' | 'failed',
     endUserId: string | null,
@@ -696,14 +683,14 @@ export class MockInterviewService {
   /**
    * 只有把简历摘要送进模型时才核 resume_ai。没有摘要不拦。
    * 游客 resume_ai 由授权服务放行。
-   * 调用点都在 nextQuestion / buildReport 之前；开场失败的 catch 会把状态滚回去。
+   * 开场在预占和改状态之前查；出下一题在写回合之前查；写报告失败时仍把状态留在进行中。
    */
   private async requireResumeConsent(session: { resumeDigest: string | null; endUserId: string | null }): Promise<void> {
     if (!session.resumeDigest?.trim()) return
     await this.privacy.requireActiveConsent(session.endUserId, 'resume_ai')
   }
 
-  private llmCtx(session: SessionRow) {
+  private llmCtx(session: InterviewChargeSession) {
     return {
       interviewerType: session.interviewerType,
       industry: session.industry,

@@ -61,16 +61,19 @@ import { DiagnosisReportPdfService } from './resume/diagnosis-report-pdf.service
 import { KioskAiCapabilitiesController } from './kiosk-ai-capabilities.controller'
 import { TerminalsModule } from '../terminals/terminals.module'
 import { ResumeDraftSourceService } from './resume/resume-draft-source.service'
+import { AiSafetyLexiconController } from './safety/ai-safety-lexicon.controller'
+import { AiSafetyLexiconService } from './safety/ai-safety-lexicon.service'
 
 @Module({
   // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
   // BenefitRedemptionModule：AI 简历优化端点可选核销会员权益（P1 权益核销 SSOT）。
   // AiAccessModule：自我探索提交 / 打印在接口内按同一 AI 闸门判定（打分不被 AI 闸门拦）
   imports: [AiQuotaModule, AuthModule, FilesModule, AsrModule, BenefitRedemptionModule, MemberPrivacyModule, JobMaterialsModule, TerminalsModule, AiAccessModule],
-  controllers: [AiController, ResumeLayoutAdjustController, ResumeReportExportController, KioskAiCapabilitiesController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController, SelfAssessmentController],
+  controllers: [AiController, ResumeLayoutAdjustController, ResumeReportExportController, KioskAiCapabilitiesController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController, SelfAssessmentController, AiSafetyLexiconController],
   providers: [
     AiService,
     AiLogService,
+    AiSafetyLexiconService,
     // 匿名公网 AI 端点（/assistant/chat、/resume/parse）的日配额闸门。
     AiPublicQuotaService,
     ResumeParseSubmissionService,
@@ -129,6 +132,6 @@ import { ResumeDraftSourceService } from './resume/resume-draft-source.service'
   ],
   // 导出 ResumeExtractionService 供 Phase 1B 的 AiService / 诊断 provider 复用。
   // 导出 OcrService 供 MaterialsModule 复用做打印材料真实内容扫描（文件体检真实化）。
-  exports: [AiService, AiLogService, ResumeExtractionService, LlmConfigService, JobFitService, LlmJobFitService, OcrService],
+  exports: [AiQuotaModule, AiService, AiLogService, ResumeExtractionService, LlmConfigService, JobFitService, LlmJobFitService, OcrService],
 })
 export class AiModule {}

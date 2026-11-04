@@ -16,6 +16,7 @@ interface ReqLike {
   headers: Record<string, string | string[] | undefined>
   ip?: string
   socket?: { remoteAddress?: string }
+  aborted?: boolean
 }
 
 function ipOf(req: unknown): string | null {
@@ -77,7 +78,7 @@ export class ResumeLayoutAdjustController {
   ) {
     const requester = await this.resolveAiResultRequester(req)
     await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
-    const result = await this.aiService.adjustResumeLayout(taskId, dto.resume, dto.action, dto.layout, requester)
+    const result = await this.aiService.adjustResumeLayout(taskId, dto.resume, dto.action, dto.layout, requester, req)
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',

@@ -39,7 +39,7 @@ import {
   WrenchIcon,
 } from 'lucide-react'
 import { exportResumeDraft, submitResumeGenerate } from '../../services/api'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { AI_QUOTA_EXHAUSTED_RESUME_COPY, userMessageOf } from '../../services/api/userErrorMessage'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { useResumeAiConsent } from './resumeAiConsent'
@@ -231,7 +231,9 @@ export function ResumeGeneratePage() {
       const result: ResumeGenerateResponse = await submitResumeGenerate(input, getToken())
       if (!request.valid()) return
       if (result.failCode && isAiOutage({ code: result.failCode })) {
-        setAiOutage('AI 暂时不可用，你可以先导出并打印已填的内容')
+        setAiOutage(result.failCode === 'AI_QUOTA_EXHAUSTED'
+          ? AI_QUOTA_EXHAUSTED_RESUME_COPY
+          : 'AI 暂时不可用，你可以先导出并打印已填的内容')
         return
       }
       // 拿到结构化响应就算一次真实往返 —— 账户级 / 模型名问题除外，那种每次都会失败。
