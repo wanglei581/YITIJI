@@ -42,6 +42,19 @@ import { ApiHttpError } from './httpAdapter'
 export const AI_PUBLIC_QUOTA_EXCEEDED_COPY = '今天的 AI 次数用完了，明天恢复；可以先打印原件。'
 
 /**
+ * 每人每天的 AI 次数封顶（429 `AI_QUOTA_EXHAUSTED`）。
+ * 当天重试不会成功，不要并进「当前使用的人较多」。
+ * 服务端若带回 `bucket`（或 `details.bucket`）就按简历类 / 小青 / 模拟面试说；没有就不猜是哪一类，也不写数字额度。
+ * 不写价格、购买或充值。
+ */
+export const AI_QUOTA_EXHAUSTED_COPY = '今天的 AI 次数用完了，明天 0 点恢复。'
+export const AI_QUOTA_EXHAUSTED_RESUME_COPY = '今天的简历类 AI 次数用完了，明天 0 点恢复。'
+export const AI_QUOTA_EXHAUSTED_ASSISTANT_COPY = '今天的小青次数用完了，明天 0 点恢复；你可以回到首页。'
+export const AI_QUOTA_EXHAUSTED_INTERVIEW_COPY = '今天的模拟面试次数用完了，明天 0 点恢复；可以回到上一页，或先看面试技巧'
+/** 自我探索是 200，解读缺席但记分已完成。这句话只给结果页，不进桶映射。 */
+export const AI_QUOTA_SELF_ASSESSMENT_COPY = '今天的 AI 解读次数用完了，明天 0 点恢复。作答和记分已经完成。'
+
+/**
  * 「这项 AI 服务没开」：如实说没开，出路是不用 AI 的手动方式。
  * 不写「已收到提醒」「会尽快处理」这类没有核实过的话。两个码同义，只是简历链用了另一个名字。
  */
@@ -62,11 +75,53 @@ function quotaLimit(error: unknown): number | undefined {
   return typeof limit === 'number' && Number.isInteger(limit) && limit > 0 ? limit : undefined
 }
 
+/**
+ * 不存在、已过期、不属于这台机器三种情况共用，不分开说。
+ * 后半句是 2026-10-12 合规定的下一步：核对后还是不行，回手机看订单。
+ */
+export const PICKUP_CODE_REJECTED_COPY =
+  '到机码无效或已过期，请核对后重新输入。核对后还是不行的，请在手机上查看这笔订单，需要的话重新下单。'
+
+/**
+ * 付费异常单的退款还没办完。不写「已退款」，也不承诺费用会按原路退回：
+ * 输码时只标记待处理，不会当场发起退款。
+ */
+export const PICKUP_RESUME_REFUND_PENDING_COPY =
+  '这单没有打完，退款待处理，输码时不会当场退款。请不要再输这个到机码；需要帮助请查看《隐私政策》里的联系方式。'
+
+/** 只认服务端明示的桶名。没有桶、或桶名对不上，就用上面那句不分类的话。 */
+function aiQuotaBucket(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object') return undefined
+  const record = error as { bucket?: unknown; details?: unknown }
+  if (typeof record.bucket === 'string' && record.bucket.length > 0) return record.bucket
+  const details = record.details
+  if (details && typeof details === 'object' && !Array.isArray(details) && 'bucket' in details) {
+    const bucket = (details as { bucket?: unknown }).bucket
+    if (typeof bucket === 'string' && bucket.length > 0) return bucket
+  }
+  return undefined
+}
+
+function aiQuotaExhaustedMessage(error: unknown): string {
+  switch (aiQuotaBucket(error)) {
+    case 'ai_resume':
+      return AI_QUOTA_EXHAUSTED_RESUME_COPY
+    case 'ai_assistant':
+      return AI_QUOTA_EXHAUSTED_ASSISTANT_COPY
+    case 'ai_interview':
+      return AI_QUOTA_EXHAUSTED_INTERVIEW_COPY
+    default:
+      return AI_QUOTA_EXHAUSTED_COPY
+  }
+}
+
 const SHARED_USER_MESSAGES: Readonly<Record<string, SharedUserMessage>> = {
   NETWORK_ERROR: '网络连接失败，请检查网络后重试',
-  // 到机码（取件码）：服务端 message 本就是面向用户的中文，这里给同义的稳定文案，避免落到通用兜底
-  PICKUP_CODE_INVALID: '到机码无效或已过期，请核对后重新输入',
-  PICKUP_CODE_EXPIRED: '到机码无效或已过期，请核对后重新输入',
+  // 到机码（取件码）：服务端 message 本就是面向用户的中文，这里给同义的稳定文案，避免落到通用兜底。
+  // 过期与无效共用一句，避免本地短句盖住「请在小程序重新下单」却不告诉人下一步。
+  PICKUP_CODE_INVALID: PICKUP_CODE_REJECTED_COPY,
+  PICKUP_CODE_EXPIRED: PICKUP_CODE_REJECTED_COPY,
+  PICKUP_RESUME_REFUND_PENDING: PICKUP_RESUME_REFUND_PENDING_COPY,
   PICKUP_CODE_UNAVAILABLE: () => `这个到机码对应的文件暂时不可用。${helpNeededLine()}。`,
   // 2026-09-07 产品裁决「退款则不出文件」：服务端在任何状态写入前拦下，这里给同义稳定文案。
   ORDER_REFUNDED: '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度',
@@ -77,6 +132,8 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, SharedUserMessage>> = {
   AI_RATE_LIMITED: '当前使用的人较多，请稍后再试',
   // 公共日额度：当天重试不会成功。不要并进上面的普通限流句。
   AI_PUBLIC_QUOTA_EXCEEDED: AI_PUBLIC_QUOTA_EXCEEDED_COPY,
+  // 每人每天次数封顶。同样是 429，但不是「人多请稍后再试」：当天重试不会成功。
+  AI_QUOTA_EXHAUSTED: aiQuotaExhaustedMessage,
   AI_BUSY: 'AI 服务正忙，请稍后再试',
   FILE_TOO_LARGE: '文件过大，请压缩后重试',
   PRINT_TERMINAL_DAILY_QUOTA_REACHED: () => `这台机器今天的免费打印量已用完，明天 0 点恢复。${helpNeededLine()}。`,

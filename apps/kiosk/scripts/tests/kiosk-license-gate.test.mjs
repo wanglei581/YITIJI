@@ -244,7 +244,8 @@ test('收尾和暂停都挂起例行续期，恢复正常后重启', async () =>
   const stub = (source) => url(source)
   const auth = await import(url(transpile('src/services/terminalAuth.ts')
     .replaceAll('import.meta.env', 'globalThis.__gateEnv')
-    .replaceAll("from '../auth/kioskSensitiveSession'", `from '${stub('export function clearKioskSensitiveSession() {}\nexport function clearKioskSharedDeviceResidue() {}')}'`)
+    .replaceAll("from '../auth/kioskSensitiveSession'", `from '${stub('export function clearKioskSensitiveSession() {}\nexport function clearKioskSharedDeviceResidue() {}\nexport function kioskSensitiveSessionScope() { return "none" }')}'`)
+    .replaceAll("from './terminalSessionRecovery'", `from '${stub(transpile('src/services/terminalSessionRecovery.ts') + '\n// recovery-1')}'`)
     .replaceAll("from './api/client'", `from '${stub("export const API_BASE_URL='/api/v1'; export const API_MODE='http'")}'`)
     .replaceAll("from './api/httpAdapter'", `from '${stub('export class ApiHttpError extends Error {}')}'`)
     .replaceAll("from './api/screensaver'", `from '${stub("export function getTerminalId() { return 'terminal' }")}'`)
@@ -278,6 +279,45 @@ test('收尾和暂停都挂起例行续期，恢复正常后重启', async () =>
   assert.ok(paths[2].endsWith('/terminals/session-token'))
 })
 
+test('授权暂停时落到 failed 不排后台恢复，解除暂停后补排，再暂停就撤掉', async () => {
+  // 2026-11-04 并入 #1570（failed 后每分钟一轮后台恢复）：暂停期间复查由授权闸门限频（≥5 分钟），
+  // 后台恢复不能在暂停时自己每分钟去续期或换票。
+  globalThis.__gateEnv = { VITE_TERMINAL_AGENT_LOCAL_URL: '', VITE_TERMINAL_AGENT_BRIDGE_TOKEN: 'bridge', VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN: '' }
+  const store = new Map([['terminal_session_token_v1', 'old']]), timers = new Map()
+  let nextId = 0
+  globalThis.window = {
+    sessionStorage: { getItem: (key) => store.get(key) ?? null, setItem: (key, value) => store.set(key, value), removeItem: (key) => store.delete(key) },
+    localStorage: { getItem: () => null }, location: { href: 'http://localhost/', origin: 'http://localhost' },
+    setTimeout: (fn, ms) => { const id = ++nextId; timers.set(id, { fn, ms }); return id }, clearTimeout: (id) => timers.delete(id),
+  }
+  const paths = []
+  globalThis.fetch = async (input) => {
+    paths.push(String(input))
+    return { ok: false, status: 401, json: async () => ({ code: 'TERMINAL_SESSION_INVALID' }) }
+  }
+  const stub = (source) => url(source)
+  const auth = await import(url(transpile('src/services/terminalAuth.ts')
+    .replaceAll('import.meta.env', 'globalThis.__gateEnv')
+    .replaceAll("from '../auth/kioskSensitiveSession'", `from '${stub('export function clearKioskSensitiveSession() {}\nexport function clearKioskSharedDeviceResidue() {}\nexport function kioskSensitiveSessionScope() { return "none" }')}'`)
+    .replaceAll("from './terminalSessionRecovery'", `from '${stub(transpile('src/services/terminalSessionRecovery.ts') + '\n// recovery-gating')}'`)
+    .replaceAll("from './api/client'", `from '${stub("export const API_BASE_URL='/api/v1'; export const API_MODE='http'")}'`)
+    .replaceAll("from './api/httpAdapter'", `from '${stub('export class ApiHttpError extends Error { constructor(code,message,status) { super(message); this.code=code; this.status=status } }')}'`)
+    .replaceAll("from './api/screensaver'", `from '${stub("export function getTerminalId() { return 'terminal' }")}'`)
+    .replaceAll("from './api/throwHttpError'", `from '${stub('export async function readHttpError(response) { return response.json() }')}'`) + '\n// recovery gating test'))
+  // 后台恢复一轮的间隔是 60 秒加最多 15 秒抖动。
+  const recoveryTimers = () => [...timers.values()].filter((timer) => timer.ms >= 60_000 && timer.ms < 75_000).length
+  auth.setLicenseRenewalSuspended(true)
+  await auth.recheckTerminalSessionAfterLicensePause({ credentialExpired: false })
+  assert.equal(auth.terminalSessionState(), 'failed')
+  assert.equal(paths.length, 1, '暂停复查只续一次，不另向本机要票')
+  assert.equal(recoveryTimers(), 0, '暂停时落到 failed 不排后台恢复')
+  auth.setLicenseRenewalSuspended(false)
+  assert.equal(recoveryTimers(), 1, '解除暂停、仍是 failed 时补排一轮后台恢复')
+  auth.setLicenseRenewalSuspended(true)
+  assert.equal(recoveryTimers(), 0, '再次暂停时撤掉已排的后台恢复')
+  assert.equal(paths.length, 1, '整个过程没有多发请求')
+})
+
 test('授权复查清除被拒标记并实际再走续期', async () => {
   const stub = (s) => url(s)
   const env = { VITE_TERMINAL_AGENT_LOCAL_URL: '', VITE_TERMINAL_AGENT_BRIDGE_TOKEN: '', VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN: '' }
@@ -290,7 +330,8 @@ test('授权复查清除被拒标记并实际再走续期', async () => {
     : { ok: true, json: async () => ({ sessionToken: 'new' }) } }
   const auth = await import(url(transpile('src/services/terminalAuth.ts')
     .replaceAll('import.meta.env', 'globalThis.__gateEnv')
-    .replaceAll("from '../auth/kioskSensitiveSession'", `from '${stub('export function clearKioskSensitiveSession() {}\nexport function clearKioskSharedDeviceResidue() {}')}'`)
+    .replaceAll("from '../auth/kioskSensitiveSession'", `from '${stub('export function clearKioskSensitiveSession() {}\nexport function clearKioskSharedDeviceResidue() {}\nexport function kioskSensitiveSessionScope() { return "none" }')}'`)
+    .replaceAll("from './terminalSessionRecovery'", `from '${stub(transpile('src/services/terminalSessionRecovery.ts') + '\n// recovery-2')}'`)
     .replaceAll("from './api/client'", `from '${stub("export const API_BASE_URL='/api/v1'; export const API_MODE='http'")}'`)
     .replaceAll("from './api/httpAdapter'", `from '${stub('export class ApiHttpError extends Error { constructor(code,message,status) { super(message); this.code=code; this.status=status } }')}'`)
     .replaceAll("from './api/screensaver'", `from '${stub("export function getTerminalId() { return 'terminal' }")}'`)
@@ -327,7 +368,8 @@ test('换票被授权拒绝时通知闸门，复查可恢复', async () => {
     const stub = (s) => url(s)
     const auth = await import(url(transpile('src/services/terminalAuth.ts')
       .replaceAll('import.meta.env', 'globalThis.__gateEnv')
-      .replaceAll("from '../auth/kioskSensitiveSession'", `from '${stub('export function clearKioskSensitiveSession() {}\nexport function clearKioskSharedDeviceResidue() {}')}'`)
+      .replaceAll("from '../auth/kioskSensitiveSession'", `from '${stub('export function clearKioskSensitiveSession() {}\nexport function clearKioskSharedDeviceResidue() {}\nexport function kioskSensitiveSessionScope() { return "none" }')}'`)
+      .replaceAll("from './terminalSessionRecovery'", `from '${stub(transpile('src/services/terminalSessionRecovery.ts') + '\n// recovery-3')}'`)
       .replaceAll("from './api/client'", `from '${stub("export const API_BASE_URL='/api/v1'; export const API_MODE='http'")}'`)
       .replaceAll("from './api/httpAdapter'", `from '${stub('export class ApiHttpError extends Error { constructor(code,message,status) { super(message); this.code=code; this.status=status } }')}'`)
       .replaceAll("from './api/screensaver'", `from '${stub("export function getTerminalId() { return 'terminal' }")}'`)
@@ -460,6 +502,13 @@ test('按服务只读、交接来源及重定向分类', async () => {
     assert.equal(routes.windDownRoute(path).kind, 'work', path)
   }
   for (const path of ['/print/scan-feature', '/jobs/online-platforms']) assert.equal(routes.windDownRoute(path).kind, 'always', path)
+  // 停放的百宝箱、智慧校园（#1583）：根路由与深链都按首页算，收尾期间也放行回首页；不误吞同前缀的别的路径。
+  for (const path of ['/toolbox', '/toolbox/resume-tools', '/smart-campus', '/smart-campus/welcome', '/smart-campus/service/library']) {
+    assert.equal(routes.windDownRoute(path).kind, 'always', path)
+    assert.equal(routes.windDownAllows(path, 'resume'), true, path)
+  }
+  assert.equal(routes.windDownRoute('/toolboxes'), undefined)
+  assert.equal(routes.windDownRoute('/dev/touch-gallery').service, 'toolbox')
 })
 
 test('交接来源只认当前有效编号，不带文件或用户资料', async () => {

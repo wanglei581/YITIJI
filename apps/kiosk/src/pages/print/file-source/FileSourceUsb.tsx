@@ -10,6 +10,7 @@ export function UsbPickBoard({
   screen,
   files,
   selected,
+  notice,
   driveLabel,
   formatBytes,
   wordText,
@@ -19,6 +20,7 @@ export function UsbPickBoard({
   screen: FileSourceScreen
   files: { safeId: string; filename: string; sizeBytes: number }[] | null
   selected: { safeId: string; filename: string; sizeBytes: number } | null
+  notice?: string | null
   driveLabel: string | null
   formatBytes: (bytes: number) => string
   /** 稿 usb 页脚第一句：Word 能不能转。 */
@@ -71,6 +73,9 @@ export function UsbPickBoard({
       ) : null}
       {screen === 'usb-importing' ? (
         <QxTouchCallout kind="remind" icon="usb">正在导入选中的文件，请暂时不要拔出 U 盘。系统确认保存之前，当前文件仍然是空的。这期间别拔 U 盘。</QxTouchCallout>
+      ) : null}
+      {screen === 'usb-selected' && notice ? (
+        <p className="qxt-usb-error" role="alert" data-testid="print-usb-import-note">{notice}</p>
       ) : null}
       {screen === 'usb-selected' ? (
         <QxTouchCallout kind="remind" icon="usb">只导入这一份，U 盘上其它文件不会被读走。导入完成前它还不是当前文件。</QxTouchCallout>

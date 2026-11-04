@@ -17,6 +17,7 @@ import { dirname, resolve } from 'node:path'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const src = readFileSync(resolve(here, '../src/services/terminalAuth.ts'), 'utf8')
+const recoverySrc = readFileSync(resolve(here, '../src/services/terminalSessionRecovery.ts'), 'utf8')
 
 const results = []
 const check = (name, ok, detail = '') => {
@@ -138,6 +139,122 @@ check(
     '业务请求先等会话闸门，再组 headers',
     awaitAt > -1 && headersAt > -1 && awaitAt < headersAt,
     'headers 排在 await 之前会把刚被换掉的旧票发出去：等到了也没用',
+  )
+}
+
+// ── 七、failed 不是终点：判死之后后台每分钟再试，网关 5xx 算可重试 ──────────
+// 防的是 2026-10-10 走查实测到的故障：开机换票那一下撞上一次网关 503（不带业务错误码），
+// 一次就判 failed，此后不再恢复。行为由同目录下的 node:test 真跑；这里钉结构。
+// 恢复循环在 terminalSessionRecovery.ts（terminalAuth.ts 超过 500 行后拆出），闸门与续期主路仍在 terminalAuth.ts。
+{
+  const transientBody = src.match(/function transient\(error: unknown\): boolean \{([\s\S]*?)\n\}/)?.[1] ?? ''
+  check(
+    '网关 502 / 503 / 504 算可重试',
+    /502/.test(transientBody) && /503/.test(transientBody) && /504/.test(transientBody),
+    '后端重启那几十秒里网关回的就是这三个',
+  )
+  check('可重试判定里没有 401', !/401/.test(transientBody), '作废的票重试不会变好')
+}
+{
+  const fn = src.slice(src.indexOf('function setState(next: TerminalSessionState): void'))
+  const body = fn.slice(0, fn.indexOf('\n}\n') + 3)
+  check(
+    '每次落到 failed 都排后台恢复',
+    /if \(next === 'failed'\) \{[\s\S]*?scheduleRecovery\(\)\n  \} else \{/.test(body),
+    '排在各个判死分支里迟早会漏一个',
+  )
+  check('离开 failed 就撤掉后台恢复', /\} else \{\n    cancelRecovery\(\)\n  \}/.test(body))
+  check(
+    '落到 failed 时撤掉残留的十分钟续期定时器',
+    /if \(next === 'failed'\) \{[\s\S]*?window\.clearTimeout\(refreshTimer\); refreshTimer = null[\s\S]*?\} else \{/.test(body),
+    '留着它会在恢复中途把状态翻回 checking',
+  )
+}
+{
+  const fn = recoverySrc.slice(recoverySrc.indexOf('async function recoverInBackground'))
+  const body = fn.slice(0, fn.indexOf('\n}\n') + 3)
+  check(
+    '后台恢复不把状态改成 checking',
+    !/setState\('checking'\)/.test(body),
+    'checking 会让闸门去等在飞的续期；恢复期间必须照旧立即拦',
+  )
+  check('没恢复成且仍是 failed 时排下一轮', /catch \{\s*if \(api\.getState\(\) === 'failed'\) scheduleRecovery\(\)/.test(body))
+  check(
+    '后台恢复与 retryRefresh 共用同一把锁',
+    /setRefreshInflight\(attempt\.finally\(\(\) => \{ api\.setRefreshInflight\(null\) \}\)\)/.test(body),
+    '否则恢复在飞时别处的 401 会并发出第二个续期请求',
+  )
+}
+{
+  const fn = recoverySrc.slice(recoverySrc.indexOf('async function recoverOnce'))
+  const body = fn.slice(0, fn.indexOf('\n}\n') + 3)
+  check(
+    '续期只在服务端明确判作废时才改走「要新引导票」',
+    /if \(!sessionInvalid\(error\)\) return false/.test(body),
+    '服务器只是没回来就去换新会话，会把这一位办到一半的材料清掉',
+  )
+  check(
+    '带引导票打开而没换成的页不拿旧会话票续期',
+    /if \(!bootExchangeUnsettled && current && current !== rejectedSessionToken\)/.test(body),
+    '否则「换引导票即清场」可以被后台恢复绕开',
+  )
+}
+{
+  const fn = src.slice(src.indexOf('async function retryRefreshOnce'))
+  const body = fn.slice(0, fn.indexOf('\n}\n') + 3)
+  check(
+    '续期主路同样不拿旧会话票（身份恢复回调、按台计请求的 401 都走这里）',
+    // 2026-11-04 并入 #1511（授权暂停时续期只试一次、不等不重试）：允许中间多一段 licenseRenewalSuspended ? [0] :，
+    // 「引导票没换成就一次都不拿旧票续」这条要求不变——开头仍必须是 bootExchangeUnsettled ? [] :。
+    /for \(const delay of bootExchangeUnsettled \? \[\] : (?:licenseRenewalSuspended \? \[0\] : )?\[0, \.\.\.RETRY_DELAYS_MS\]\)/.test(body),
+    '只挡后台恢复一处，身份恢复回调仍能拿旧票续上而不清场',
+  )
+}
+{
+  const fn = src.slice(src.indexOf('async function awaitReadySessionOrFailClosed'))
+  const body = fn.slice(0, fn.indexOf('\n}\n') + 3)
+  check(
+    '闸门没变：不是 ready 就抛 TERMINAL_SESSION_INVALID',
+    /if \(state !== 'ready'\) throw new ApiHttpError\('TERMINAL_SESSION_INVALID'/.test(body),
+  )
+  check('闸门不等后台恢复', !/recover/.test(body.replace(/\/\*[\s\S]*?\*\//g, '')))
+}
+
+// ── 八、「上一次恢复清掉了什么」只是给页面照实说话用的标记，不参与放行 ──────────
+{
+  const fn = recoverySrc.slice(recoverySrc.indexOf('export function takeTerminalSessionRecoveryClearScope'))
+  const body = fn.slice(0, fn.indexOf('\n}\n') + 3)
+  check('标记读一次就复位', /recoveryClearScope = 'none'/.test(body) && /return scope/.test(body))
+  check(
+    '标记只在 hadSettledState 为真时记，且只记一处',
+    /if \(hadSettledState\) recoveryClearScope = clearedScope/.test(recoverySrc)
+      && recoverySrc.split('recoveryClearScope = clearedScope').length === 2,
+    '续期成功也记的话，页面会对没被清场的人说清过；记两处就会有一条不看 hadSettledState',
+  )
+  const reboot = src.slice(src.indexOf('async function reBootstrapFromLocalAgent'))
+  const rebootBody = reboot.slice(0, reboot.indexOf('\n}\n') + 3)
+  check(
+    '重建成功只经 rememberRecoveryClearScope 记一次',
+    rebootBody.split('rememberRecoveryClearScope(').length === 2,
+  )
+  const gate = src.slice(src.indexOf('async function awaitReadySessionOrFailClosed'))
+  const gateBody = gate.slice(0, gate.indexOf('\n}\n') + 3)
+  check('闸门不读这个标记', !/recoveryClearScope|takeTerminalSessionRecoveryClearScope/.test(gateBody))
+  check(
+    '闸门函数体里不出现 Deferred、NeedsNewTicket、ClearScope',
+    !/Deferred|NeedsNewTicket|ClearScope/.test(gateBody),
+  )
+  const ticketAt = rebootBody.indexOf('requestLocalBootTicket()')
+  const exchangeAt = rebootBody.indexOf('exchangeBootTicket(')
+  const firstHold = rebootBody.indexOf("kioskSensitiveSessionScope() === 'with-other'")
+  const secondHold = rebootBody.indexOf("kioskSensitiveSessionScope() === 'with-other'", firstHold + 1)
+  check(
+    '取票之前：有别的内容就不往下走',
+    firstHold > -1 && ticketAt > firstHold,
+  )
+  check(
+    '换票之前：有别的内容就不往下走',
+    secondHold > ticketAt && exchangeAt > secondHold,
   )
 }
 

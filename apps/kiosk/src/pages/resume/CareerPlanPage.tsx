@@ -39,7 +39,7 @@ import {
   getLatestCareerPlan,
   printCareerPlan,
 } from '../../services/api/careerPlan'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { AI_QUOTA_EXHAUSTED_RESUME_COPY, userMessageOf } from '../../services/api/userErrorMessage'
 import { useAuth } from '../../auth/useAuth'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -104,6 +104,12 @@ function errorCodeOf(error: unknown): string {
 }
 
 const CAREER_PLAN_OUTAGE_COPY = 'AI 暂时不可用，你可以先打印求职参考单（未含 AI 规划）'
+
+function careerOutageCopy(code: string): string | null {
+  if (code === 'AI_QUOTA_EXHAUSTED') return AI_QUOTA_EXHAUSTED_RESUME_COPY
+  if (AI_OUTAGE_CODES.has(code)) return CAREER_PLAN_OUTAGE_COPY
+  return null
+}
 
 /** 每个状态底栏的「问小青」（稿 career 各状态）。 */
 const CAREER_ASKS: Record<CareerScreen, ResumeAsk> = {
@@ -222,8 +228,9 @@ export function CareerPlanPage() {
         if (code === 'CAREER_PLAN_NOT_FOUND') { setProbed(true); setError('这份简历还没有可查看的职业规划，原结果可能已过期或删除；可重新生成。'); return }
         // 前置校验的落点：后端不认这个 taskId，继续留在本页只会让用户白点一次生成。
         if (code === 'AI_TASK_NOT_FOUND') { setRejectedTask(true); return }
-        if (AI_OUTAGE_CODES.has(code)) {
-          setAiOutage(CAREER_PLAN_OUTAGE_COPY)
+        const outageCopy = careerOutageCopy(code)
+        if (outageCopy) {
+          setAiOutage(outageCopy)
           return
         }
         // 其余错误不足以判定能力不可用，标记已探测，让用户能真的点一次生成看结果。
@@ -305,9 +312,10 @@ export function CareerPlanPage() {
     } catch (err) {
       if (!isLive(run)) return
       const code = errorCodeOf(err)
+      const outageCopy = careerOutageCopy(code)
       if (code === 'AI_TASK_NOT_FOUND') setRejectedTask(true)
       else if (resumeAiConsent.promptIfNeeded(err, Boolean(getToken()), () => { void handleGenerate() })) return
-      else if (AI_OUTAGE_CODES.has(code)) setAiOutage(CAREER_PLAN_OUTAGE_COPY)
+      else if (outageCopy) setAiOutage(outageCopy)
       else { setError(unattendedReason(userMessageOf(err, '生成失败，请稍后重试'), '生成失败，请稍后重试')); setGenFailed(true) }
     } finally {
       setGenerating(false)

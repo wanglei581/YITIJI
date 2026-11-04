@@ -19,6 +19,7 @@ import {
 import { useKioskBusy } from '../contexts/KioskBusyContext'
 import { useAuth } from './useAuth'
 import { useIdleLogout, type KioskIdleWarningRequest } from './useIdleLogout'
+import { noteKioskClear } from './kioskClearDiag'
 import { endKioskVisit, useKioskSessionReporting } from './useKioskSessionReporting'
 import {
   runEndKioskUse,
@@ -339,6 +340,7 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
    */
   const endKioskUse = useCallback((reason: KioskClearReason, options?: KioskEndUseOptions) => {
     if (!claimClearing('hard')) return
+    noteKioskClear(reason, options?.diag)
     returningWarningRef.current = false
     // 先 fail-closed 阻断交互；本地敏感状态同步清除，不等待网络。
     setClearing(true)
@@ -392,6 +394,7 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
       return
     }
     if (!claimClearing('screensaver')) return
+    noteKioskClear('idle_timeout')
     returningWarningRef.current = false
     setClearing(true)
     // 进屏保同样是「这一位用完了」：同一套四步，只是最后一步落到屏保而不是首页。
@@ -661,7 +664,8 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
         timer = window.setTimeout(checkDeadline, Math.min(1000, busyCapDeadline - now))
         return
       }
-      hardClear('idle_timeout')
+      // 这是隐私硬截止，不是结果页闲置。人次原因仍用 idle_timeout，控制台单独记 privacy_deadline。
+      endKioskUse('idle_timeout', { diag: 'privacy_deadline' })
     }
 
     const scheduleFromNow = (): void => {
@@ -709,7 +713,7 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
       document.removeEventListener('playing', markActivity, { capture: true })
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [hardClear, isStaleHistoryEntry, onScreensaverRoute])
+  }, [endKioskUse, hardClear, isStaleHistoryEntry, onScreensaverRoute])
 
   const sessionControlValue = useMemo<KioskSessionControlValue>(
     () => ({
