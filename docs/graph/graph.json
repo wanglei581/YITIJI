@@ -26706,6 +26706,7 @@
       "services/api/scripts/verify-activity-logs.ts",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
+      "services/api/scripts/verify-admin-printer-output.ts",
       "services/api/scripts/verify-ai-public-quota.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
@@ -29239,6 +29240,7 @@
       "services/api/scripts/verify-terminal-network-diagnostics.ts"
     ],
     "services/api/src/terminals/terminals.service.ts": [
+      "services/api/scripts/verify-admin-printer-output.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
@@ -36802,10 +36804,12 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/common/redis/redis.service.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/terminals/admin-printer-output.ts",
           "services/api/src/terminals/admin-printers.controller.ts",
-          "services/api/src/terminals/terminals-admin.service.ts"
+          "services/api/src/terminals/terminals-admin.service.ts",
+          "services/api/src/terminals/terminals.service.ts"
         ],
         "missing": []
       },

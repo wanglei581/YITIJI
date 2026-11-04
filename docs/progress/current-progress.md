@@ -6,7 +6,7 @@
 - 工作台：没有异常时只写「N 台打印机都在线，没有报告故障。」只要有打印机，下面另起一行小字：USB 连接读不到纸张和碳粉余量，没报警不等于耗材充足。偏少改称「碳粉」，与打印机页列名一致。分组键 `normal` 没改名。
 - 「本系统出纸」复用大屏走查 W-68 的出纸页数：`PRINTED_TASK_WHERE`、`pagesByPrintedTask`（计费页 × 份数），今天按 `PrintTask.completedAt` 的上海自然日（`shanghaiDayStart`）。本月是上海自然月。彩色、双面看这条任务自己的 `paramsJson`。只算从本系统发出、已确认出纸的打印；不含打印机面板复印，也不含打印机自己读 U 盘直接打印。读不到或超出统计上限时不显示成 0。未确认的任务另写「本月另有 N 笔出纸未确认，没算进去」。
 - 统计在新文件 `services/api/src/terminals/admin-printer-output.ts`，一次按终端列表查完。`terminals-admin.service.ts` 一行没改。出纸面数仍有行数上限；未确认笔数按终端 `groupBy` 计数，不再把行取进内存。
-- 返工：`PrismaService` 改为值导入，否则 Nest 启动解析不到 `AdminPrinterOutputService`。`GET /admin/printers` 只有 `?include=output` 才统计并返回 `output` / `outputStatus`；工作台不带这个参数，设备管理 → 打印机才带。打印机页底补上：打印机走 USB 连接时，型号、SN、耗材和纸盒余量读不到，会一直显示未上报；没报警不等于耗材充足。
+- 返工：`PrismaService` 改为值导入，否则 Nest 启动解析不到 `AdminPrinterOutputService`。门禁用应用上下文取出控制器，确认能解析并在 `?include=output` 时返回 `outputStatus=ok`。`GET /admin/printers` 只有 `?include=output` 才统计并返回 `output` / `outputStatus`；工作台不带这个参数，设备管理 → 打印机才带。打印机页底补上：打印机走 USB 连接时，型号、SN、耗材和纸盒余量读不到，会一直显示未上报；没报警不等于耗材充足。
 
 ## 2026-11-03：一体机扫码上传共用面板取消失败不再清屏（重做旧候选 #1461；分支 `claude/kiosk-upload-cancel-keep-1103`；未合并、未部署）
 

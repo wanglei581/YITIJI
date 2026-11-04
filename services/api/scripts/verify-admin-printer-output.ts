@@ -404,6 +404,47 @@ async function assertInclude(): Promise<void> {
   check('include=garbage 当没带', calls === beforeGarbage && !responseHasOutput(garbage.data))
 }
 
+async function assertDependencyInjection(prisma: PrismaService): Promise<void> {
+  const { Module } = await import('@nestjs/common')
+  const { NestFactory } = await import('@nestjs/core')
+  const { JwtService } = await import('@nestjs/jwt')
+  const { AdminPrintersController } = await import('../src/terminals/admin-printers.controller')
+  const { TerminalsService } = await import('../src/terminals/terminals.service')
+  const { RedisService } = await import('../src/common/redis/redis.service')
+
+  // 控制器上的守卫会被 Nest 一起实例化。桩掉它们的外部依赖。
+  // 要验证的是 AdminPrinterOutputService 能不能注入 PrismaService。
+  @Module({
+    controllers: [AdminPrintersController],
+    providers: [
+      AdminPrinterOutputService,
+      { provide: PrismaService, useValue: prisma },
+      { provide: TerminalsService, useValue: { listPrintersForAdmin: async () => ({ printers: [PRINTER] }) } },
+      { provide: JwtService, useValue: {} },
+      { provide: RedisService, useValue: {} },
+    ],
+  })
+  class AdminPrinterDiProbeModule {}
+
+  let app: { get: (token: unknown) => { list: (include?: string) => Promise<{ data: { printers: unknown[]; outputStatus?: string } }> }; close: () => Promise<void> } | undefined
+  try {
+    app = await NestFactory.createApplicationContext(AdminPrinterDiProbeModule, { logger: false, abortOnError: false })
+    const controller = app.get(AdminPrintersController)
+    const listed = await controller.list('output')
+    check(
+      '依赖注入真能解析',
+      listed.data.printers.length === 1 && listed.data.outputStatus === 'ok',
+      `printers=${listed.data.printers.length} outputStatus=${String(listed.data.outputStatus)}`,
+    )
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('FAIL ')) throw error
+    const message = error instanceof Error ? error.message : String(error)
+    fail('依赖注入真能解析', message)
+  } finally {
+    if (app) await app.close()
+  }
+}
+
 async function main(): Promise<void> {
   console.log('\n=== 管理员打印机本系统出纸 ===')
   check(
@@ -423,6 +464,7 @@ async function main(): Promise<void> {
   try {
     await seed(prisma)
     await assertNumbers(prisma)
+    await assertDependencyInjection(prisma)
   } finally {
     await prisma.onModuleDestroy()
     db.cleanup()
