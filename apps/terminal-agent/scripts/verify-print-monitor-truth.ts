@@ -219,6 +219,37 @@ async function main(): Promise<void> {
   assert.equal(dispatched[1]?.side, 'duplexshort', 'short-edge duplex must be sent explicitly')
   assert.equal(dispatched[2]?.side, 'simplex', 'simplex must be sent explicitly, not left to the driver default')
   assert.equal('monochrome' in (dispatched[2] ?? {}), false, 'no colour choice in the params means no colour setting is invented')
+  assert.equal(dispatched[0]?.paperSize, 'A4', 'color long-edge duplex must send paperSize A4')
+  assert.equal(dispatched[1]?.paperSize, 'A4', 'black-and-white short-edge duplex must send paperSize A4')
+  assert.equal(dispatched[2]?.paperSize, 'A4', 'simplex must send paperSize A4')
+
+  await printWithPdfToPrinter('/params/unset.pdf', 'Configured Printer', undefined, { dispatch: capture })
+  await printWithPdfToPrinter(
+    '/params/bw-simplex.pdf',
+    'Configured Printer',
+    { colorMode: 'black_white', duplex: 'simplex', copies: 1 },
+    { dispatch: capture },
+  )
+  await printWithPdfToPrinter(
+    '/params/range.pdf',
+    'Configured Printer',
+    { pageRange: '2-4', colorMode: 'color', duplex: 'duplex_long_edge', copies: 2 },
+    { dispatch: capture },
+  )
+  assert.equal(dispatched[3]?.paperSize, 'A4', 'params undefined must still send paperSize A4')
+  assert.equal('monochrome' in (dispatched[3] ?? {}), false, 'undefined params must not invent a colour setting')
+  assert.equal('side' in (dispatched[3] ?? {}), false, 'undefined params must not invent a side setting')
+  assert.equal('copies' in (dispatched[3] ?? {}), false, 'undefined params must not invent copies')
+  assert.equal('pages' in (dispatched[3] ?? {}), false, 'undefined params must not invent a page range')
+  assert.equal(dispatched[4]?.paperSize, 'A4', 'black-and-white simplex must send paperSize A4')
+  assert.equal(dispatched[4]?.monochrome, true, 'black-and-white simplex must force monochrome')
+  assert.equal(dispatched[4]?.side, 'simplex', 'black-and-white simplex must send simplex')
+  assert.equal(dispatched[4]?.copies, 1, 'black-and-white simplex must keep copies')
+  assert.equal(dispatched[5]?.paperSize, 'A4', 'page range must send paperSize A4')
+  assert.equal(dispatched[5]?.pages, '2-4', 'page range must stay on pages')
+  assert.equal(dispatched[5]?.monochrome, false, 'color page-range job must force color')
+  assert.equal(dispatched[5]?.side, 'duplexlong', 'color page-range job must keep long-edge duplex')
+  assert.equal(dispatched[5]?.copies, 2, 'color page-range job must keep copies')
 
   try {
     const nonWindows = await monitorPrintJob('Configured Printer', 'task-non-windows', 10, 1, {
