@@ -70,9 +70,11 @@ export async function openConvert(page: Page, api: ApiRouter, state: ConvertStat
   } else {
     api.respond('POST', CONVERT, { status: 200, json: { success: true, data: {
       fileId: 'w2-pdf-001', printFileUrl: W2_FILE.fileUrl, fileMd5: 'd'.repeat(32), sizeBytes: 4096, pages: 1,
+      // 服务端转换响应恒带这两项（print-conversion.types.ts）；并排图拍的是未登录游客合成完的样子。
+      hasEndUser: false, savedToDocuments: false,
     } } })
   }
-  await page.getByRole('button', { name: /合成 1 张为一份 PDF/ }).click()
+  await page.getByRole('button', { name: '合成', exact: true }).click()
   const title = {
     composing: '正在合成', result: 'PDF 已经合成', unknown: '这一次的结果没有确认',
     conflict: '这个标记和上一次撞了', closed: '图片转 PDF：本机暂未开通',
