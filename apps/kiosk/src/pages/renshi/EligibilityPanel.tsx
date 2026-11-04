@@ -16,12 +16,12 @@
 // 两种空的区分见 eligibilityOutcome.ts。
 // ============================================================
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { QxTouchArtChecklist } from '../../components/qingxu/touch/QxTouchArt'
 import { helpNeededLine } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
-import { type ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useIdleTimer } from '../../hooks/useIdleTimer'
 import {

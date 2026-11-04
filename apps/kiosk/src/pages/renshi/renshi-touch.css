@@ -224,6 +224,7 @@
   [data-qx-page="renshi"] .rq-policy-dense [data-policy-section="library"] .rq-item-main { min-height: 96px; }
   [data-qx-page="renshi"] .rq-policy-dense .rq-list { gap: 6px; }
   [data-qx-page="renshi"] .rq-policy-roomy [data-policy-section="library"] .rq-list .rq-item-main { min-height: 182px; }
+  [data-qx-page="renshi"] .rq-policy-roomy [data-policy-section="builtin"] .rq-list .rq-item-main { min-height: 128px; }
   [data-qx-page="renshi"] .rq-policy [data-policy-section="builtin"] .rq-list .rq-item-sub { -webkit-line-clamp: 1; }
 }
 

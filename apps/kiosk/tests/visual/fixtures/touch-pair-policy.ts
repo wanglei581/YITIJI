@@ -374,7 +374,7 @@ export function policyPairs(): TouchPair[] {
         const main = page.locator('[data-policy-section="library"] .rq-item-main').filter({ hasText: TITLE })
         await see(page, `text=${TITLE}`)
         await main.click()
-        await expect(main).toHaveAttribute('aria-expanded', 'true')
+        await expect(page.getByRole('heading', { level: 1, name: TITLE, exact: true })).toBeVisible()
         await see(page, 'text=申领方式')
       },
     },

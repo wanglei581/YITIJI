@@ -121,14 +121,14 @@ export function PolicyPanel({
     return (
       <article key={item.id} className={`k8-policy-list-item${open ? ' is-open' : ''}`} data-policy-id={item.id}>
         <div className={open ? 'rq-detail-card' : undefined}>
-        <div className="rq-item-head">
+        {!(userOpened && open) && <div className="rq-item-head">
           <button type="button" className="rq-item-main" aria-expanded={open} onClick={() => toggle(item)}>
             <span className="rq-item-tx"><b>{item.title}</b>
               {!open && (kind === 'builtin' || visibleLibrary.length < 5) && item.summary ? <span className="rq-item-sub">{item.summary}</span> : null}
               {!open && <small className="rq-item-meta">{kind === 'library' ? `${item.tagLabel} · ${item.publishedDate ? `发布于 ${item.publishedDate.slice(0, 10)}` : '发布日期未提供'} · 看原文` : '办事参考 · 查看'}</small>}
             </span>
           </button>
-        </div>
+        </div>}
         {open && (
           <div className="rq-acc">
             {canFavorite && <button type="button" className={favorite ? 'rq-fav is-on' : 'rq-fav'} aria-label={favorite ? '取消收藏' : '收藏政策'} onClick={() => toggleFavorite({ type: 'policy', id: item.id, title: item.title })}>

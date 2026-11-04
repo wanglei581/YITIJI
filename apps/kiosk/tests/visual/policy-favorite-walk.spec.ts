@@ -238,7 +238,8 @@ test('收藏的政策打开那一条，发布日期用确认发布时间 @kiosk'
   await page.locator('.rq-touch-dock .qxt-btn-sec').click()
   await expect(other).not.toHaveClass(/is-open/)
   await opened.locator('.rq-item-main').click()
-  await expect(opened).toContainText('高校毕业生求职创业补贴')
+  await expect(page.getByRole('heading', { level: 1, name: '高校毕业生求职创业补贴', exact: true })).toBeVisible()
+  await expect(opened.locator('.rq-item-head')).toHaveCount(0)
   await expect(opened.locator('.rq-facts')).toContainText('发布日期')
   await expect(opened.locator('.rq-facts')).toContainText('2026-09-29')
   await shot(page, 'W-49-policy-opened.png')
@@ -259,7 +260,7 @@ test('点名的政策不在列表里时先说明正在打开，不拿第一条�
     release()
     const opened = page.locator('[data-policy-id="policy-slow"]')
     await expect(opened).toHaveClass(/is-open/)
-    await expect(opened).toContainText('补打开的培训补贴说明')
+    await expect(page.getByRole('heading', { level: 1, name: '补打开的培训补贴说明', exact: true })).toBeVisible()
     await page.locator('.rq-touch-dock .qxt-btn-sec').click()
     await expect(page.locator('[data-policy-id="policy-other"]')).not.toHaveClass(/is-open/)
     await opened.locator('.rq-item-main').click()
@@ -302,7 +303,7 @@ test('这次没读到可以再试一次，成功后打开那一条 @kiosk', asyn
   await page.getByRole('button', { name: /再试一次/ }).click()
   const opened = page.locator('[data-policy-id="policy-broken"]')
   await expect(opened).toHaveClass(/is-open/)
-  await expect(opened).toContainText('重试后打开的登记说明')
+  await expect(page.getByRole('heading', { level: 1, name: '重试后打开的登记说明', exact: true })).toBeVisible()
 })
 
 test('填写了发布日期时不用确认发布时间覆盖 @kiosk', async ({ page }) => {
