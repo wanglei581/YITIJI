@@ -12,10 +12,9 @@
 // 不要在调用方用内联 style 压小。
 
 import { type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { QxPageFrame } from '../../../../components/qingxu/QxPageFrame'
-import { QxAppNavbar } from '../../../../components/qingxu/QxAppNavbar'
 import { KioskStageFit } from '../../../../components/kiosk-shell/KioskStageFit'
+import { ResumeTouchFrame } from '../../touch/ResumeTouchFrame'
+import type { ResumeAsk } from '../../touch/resumeAsks'
 import { getTerminalCode } from '../../../../services/api/terminalConfig'
 import '../../self-assessment-qx.css'
 
@@ -44,7 +43,6 @@ export interface SaStatus {
 export function SaFrame({
   screen,
   state,
-  title,
   status,
   eyebrow,
   ask,
@@ -53,12 +51,12 @@ export function SaFrame({
   gate,
   back,
   ctabar,
+  aiAsk,
   children,
 }: {
   screen: SaScreen
   /** 会同时落到 `data-state` 与 `data-testid`，是浏览器用例唯一的状态锚点。 */
   state: string
-  title: ReactNode
   /** 拿不到真实状态就传 unknown；这一格不许默认「正常」。 */
   status: SaStatus
   eyebrow: string
@@ -74,26 +72,24 @@ export function SaFrame({
   gate?: ReactNode
   back: { label: string; onBack: () => void }
   ctabar: ReactNode
+  /** 底栏的「问小青」（稿每屏的 ask）。作答与提交前复核两屏稿里没有，不传。 */
+  aiAsk?: ResumeAsk | false
   children: ReactNode
 }) {
-  const navigate = useNavigate()
   const terminalLabel = getTerminalCode() || '设备未绑定'
 
   return (
     <KioskStageFit>
-      <QxPageFrame
-        title={title}
+      <ResumeTouchFrame
+        eyebrow={eyebrow}
+        title={ask}
+        subtitle={doing}
         status={status}
         terminalLabel={terminalLabel}
         back={back}
         ctabar={ctabar}
-        navbar={
-          <QxAppNavbar
-            onHome={() => navigate('/')}
-            onAdvisor={() => navigate('/assistant')}
-            onProfile={() => navigate('/profile')}
-          />
-        }
+        ask={aiAsk}
+        stateId={state}
       >
         <main
           className="sa-qx"
@@ -102,17 +98,6 @@ export function SaFrame({
           data-state={state}
           data-testid={`self-assessment-state-${state}`}
         >
-          <section className="sa-xq">
-            <div className="sa-xq-row">
-              <div className="sa-xq-face" aria-hidden="true">青</div>
-              <div>
-                <div className="sa-xq-eyebrow">{eyebrow}</div>
-                <p className="sa-xq-ask">{ask}</p>
-                <p className="sa-xq-doing">{doing}</p>
-              </div>
-            </div>
-          </section>
-
           <div className="qx-scroll">{children}</div>
 
           {gate}
@@ -121,7 +106,7 @@ export function SaFrame({
             {rail.map((item) => <span key={item}>{item}</span>)}
           </p>
         </main>
-      </QxPageFrame>
+      </ResumeTouchFrame>
     </KioskStageFit>
   )
 }
@@ -196,37 +181,6 @@ export function SaGate({ tone, children }: { tone: 'ok' | 'warn'; children: Reac
     <div className="sa-gate" data-tone={tone} data-testid="self-assessment-gate" role={tone === 'warn' ? 'status' : undefined}>
       <i aria-hidden="true">{tone === 'warn' ? '!' : '✓'}</i>
       <div>{children}</div>
-    </div>
-  )
-}
-
-/** 稿的 `.picks`：现在就能打开的出口。没有 onClick 的一律不渲染成按钮。 */
-export function SaPicks({
-  cols = 2,
-  items,
-}: {
-  cols?: 2 | 3
-  items: readonly { key: string; icon: string; title: string; desc: string; lead?: boolean; onClick: () => void; route: string }[]
-}) {
-  return (
-    <div className="sa-picks" data-cols={String(cols)}>
-      {items.map((item) => (
-        <button
-          key={item.key}
-          type="button"
-          className="sa-pick"
-          data-lead={item.lead ? 'true' : undefined}
-          data-route={item.route}
-          data-testid={`self-assessment-pick-${item.key}`}
-          onClick={item.onClick}
-        >
-          <i aria-hidden="true">{item.icon}</i>
-          <span>
-            <b>{item.title}</b>
-            <p>{item.desc}</p>
-          </span>
-        </button>
-      ))}
     </div>
   )
 }

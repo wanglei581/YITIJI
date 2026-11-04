@@ -5,7 +5,7 @@ test.describe('AI 服务 / 配置（mock 口径）', () => {
   test('AI 服务管理渲染统计与日志区', async ({ page }) => {
     const guards = await openAuthed(page, '/ai-services')
     await settleAdminPage(page, guards)
-    await expect(page.getByRole('heading', { name: 'AI 服务管理' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'AI服务管理' })).toBeVisible()
     await expect(page.getByText('AI 开关、用量与额度、调用记录', { exact: true })).toBeVisible()
     await expect(page.getByRole('region', { name: '最近 AI 调用日志' }).locator('thead th').filter({ hasText: /^厂商与模型$/ })).toBeVisible()
     await expect(page.getByRole('region', { name: '最近 AI 调用日志' }).locator('thead th').filter({ hasText: /^Task ID$/ })).toHaveCount(0)
@@ -57,9 +57,36 @@ test.describe('AI 服务 / 配置（mock 口径）', () => {
     const guards = await openAuthed(page, '/ai-config')
     await settleAdminPage(page, guards)
     await expect(page.getByRole('heading', { name: 'AI大模型' })).toBeVisible()
-    await expect(page.getByText('已接入的功能保存后生效；标为「未接入」的功能可以先保存配置，接入前不影响一体机。')).toBeVisible()
+    await expect(page.getByText('已接入的功能保存后生效。标为「规划中，暂不生效」的功能保存后不会被使用，因此不能在这里保存或测试。')).toBeVisible()
     await expect(page.getByRole('button', { name: /AI顾问对话/ }).first()).toBeVisible()
     await page.getByRole('button', { name: '保存并测试连通' }).click()
     await expect(page.getByText('当前为 mock 模式，连通性测试需要连接真实后端')).toBeVisible()
+  })
+
+  test('规划中的功能标出暂不生效，不能保存或测试', async ({ page }) => {
+    const guards = await openAuthed(page, '/ai-config')
+    await settleAdminPage(page, guards)
+    for (const name of ['AI数字人引导', 'AI海报生成']) {
+      const card = page.getByRole('button', { name: new RegExp(name) })
+      await expect(card).toContainText('规划中，暂不生效')
+      await card.click()
+      await expect(page.getByRole('button', { name: '保存配置' })).toBeDisabled()
+      await expect(page.getByRole('button', { name: '保存并测试连通' })).toBeDisabled()
+      await expect(page.getByText('规划中，暂不生效：保存后没有任何功能会读取这项配置。')).toBeVisible()
+    }
+  })
+
+  test('打印参数预填只让启用开关可改', async ({ page }) => {
+    const guards = await openAuthed(page, '/ai-config')
+    await settleAdminPage(page, guards)
+    await page.getByRole('button', { name: /打印参数预填/ }).click()
+    await expect(page.getByText('本功能按规则预填，不调用大模型，只有启用开关生效')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'DeepSeek', exact: true })).toBeDisabled()
+    await expect(page.getByPlaceholder('如 deepseek-v4-flash')).toBeDisabled()
+    await expect(page.getByPlaceholder('请输入 API Key')).toBeDisabled()
+    await expect(page.locator('textarea').first()).toBeDisabled()
+    await expect(page.locator('input[type=range]')).toBeDisabled()
+    await expect(page.getByRole('checkbox', { name: /启用当前功能模型/ })).toBeEnabled()
+    await expect(page.getByRole('button', { name: '保存配置' })).toBeEnabled()
   })
 })

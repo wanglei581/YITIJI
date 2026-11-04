@@ -12,7 +12,7 @@
 // - 打印文件名带 -self-assessment 前缀；不进分享用途的 FileObject。
 // ============================================================
 
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { randomBytes, createHash, timingSafeEqual } from 'node:crypto'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuditService } from '../../audit/audit.service'
@@ -21,7 +21,9 @@ import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../../files/signing'
 import { SELF_ASSESSMENT_QUESTIONS_V1 } from './self-assessment-questions'
 import type { SelfAssessmentAnswerV1, SelfAssessmentDimensionResult } from './self-assessment.types'
 import { isAcceptedSelfAssessmentConsentVersion, SELF_ASSESSMENT_CONSENT_VERSION } from './self-assessment.types'
-import { LlmSelfAssessmentService } from './llm-self-assessment.service'
+import { LlmSelfAssessmentService, type LlmSelfAssessmentOutput } from './llm-self-assessment.service'
+import { AiQuotaService } from '../quota/ai-quota.service'
+import { quotaHttpCode, runWithAiQuota } from '../quota/ai-quota-run'
 import { SelfAssessmentPdfService } from './self-assessment-pdf.service'
 import { scoreSelfAssessment } from './self-assessment-scoring'
 import { formatBeijingDate } from '../../common/beijing-display-time'
@@ -140,6 +142,7 @@ export class SelfAssessmentService {
     private readonly files: FilesService,
     private readonly audit: AuditService,
     private readonly log: AiLogService,
+    @Optional() private readonly quota?: AiQuotaService,
   ) {}
 
   /**
@@ -208,31 +211,94 @@ export class SelfAssessmentService {
     // 等于对一次真实花钱的调用谎称免费。这里改为与 careerPlan / fairVisitPlan 同一套
     // AiUsageAccumulator 口径：真实 token 落账，成本按 provider 单价估算。
     const usage = new AiUsageAccumulator()
-    // AI 闸门（暂停 / 额度 / 未开通 / 声明 / 登录档位）拦下 ⇒ 不调模型，只回打分。
+    const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)
+    const completedAt = new Date().toISOString()
+    let persistedByQuota = false
+    const applyLlm = (llmResult: LlmSelfAssessmentOutput) => {
+      if (llmResult.status === 'rejected') {
+        dimensions = scored.dimensions.map((d) => ({ ...d, note: null }))
+        // 词库拒答把统一拒答语放在 summary；合规硬拒答的 summary 仍是 null。
+        summary = llmResult.summary
+        providerName = LLM_UNAVAILABLE_PROVIDER
+        aiUnavailableReason = 'COMPLIANCE_REJECT'
+        llmErrorCode = 'COMPLIANCE_REJECT'
+        complianceRejected = true
+        return
+      }
+      dimensions = llmResult.dimensions
+      summary = llmResult.summary
+      providerName = llmResult.providerName
+      aiUnavailableReason = llmResult.unavailableReason ?? null
+    }
+    const storeCompleted = async () => {
+      const storedState = interpretationStateOf(dimensions, summary, aiUnavailableReason)
+      const persisted: StoredSelfAssessment = {
+        version: 'v1',
+        answersHash: scored.answersHash,
+        dimensions,
+        summary,
+        aiProvider: providerName,
+        aiUnavailableReason: storedState.aiUnavailableReason,
+        completedAt,
+        consentVersion,
+        consentedAt,
+      }
+      await this.prisma.aiResumeResult.create({
+        data: {
+          taskId,
+          kind: 'self_assessment',
+          status: 'completed',
+          provider: providerName ?? 'llm',
+          payloadJson: JSON.stringify(persisted),
+          endUserId: requester.endUserId,
+          accessTokenHash: accessToken ? hashToken(accessToken) : null,
+          expiresAt,
+        },
+      })
+    }
+    // 顺序：知情同意版本（上面已拒绝）→ 纯函数打分 → AI 闸门 → 才预占简历次数。
+    // 闸门拦下、同意版本不对、次数用完，都不调模型，打分照常落库。
     const gateRefusal = gates.interpretation ? await gates.interpretation() : null
     if (gateRefusal) {
       providerName = LLM_UNAVAILABLE_PROVIDER
       aiUnavailableReason = gateRefusal
-    } else {
+    } else if (this.quota && requester.endUserId) {
       try {
-        const llmResult = await this.llm.summarize({
+        await runWithAiQuota({
+          quota: this.quota,
+          bucket: 'ai_resume',
+          operationKey: `${taskId}:self_assessment`,
+          endUserId: requester.endUserId,
+          failureOf: (value) => (
+            value.status === 'rejected' ? 'content_rejected' : value.unavailableReason ? 'provider_error' : null
+          ),
+          persistFailure: true,
+        }, () => this.llm.summarize({
           scored: { dimensions: scored.dimensions, summary: null },
           consent,
           onLlmCall: usage.add,
+        }), async (llmResult) => {
+          applyLlm(llmResult)
+          await storeCompleted()
+          persistedByQuota = true
+          return taskId
         })
-        if (llmResult.status === 'rejected') {
-          dimensions = scored.dimensions.map((d) => ({ ...d, note: null }))
-          summary = null
+      } catch (err) {
+        if (quotaHttpCode(err) === 'AI_QUOTA_EXHAUSTED') {
           providerName = LLM_UNAVAILABLE_PROVIDER
-          aiUnavailableReason = 'COMPLIANCE_REJECT'
-          llmErrorCode = 'COMPLIANCE_REJECT'
-          complianceRejected = true
+          aiUnavailableReason = 'AI_QUOTA_EXHAUSTED'
         } else {
-          dimensions = llmResult.dimensions
-          summary = llmResult.summary
-          providerName = llmResult.providerName
-          aiUnavailableReason = llmResult.unavailableReason ?? null
+          overallRejectReason = err instanceof Error ? err.message : 'LLM 调用失败'
+          llmErrorCode = quotaHttpCode(err) ?? 'LLM_ERROR'
         }
+      }
+    } else {
+      try {
+        applyLlm(await this.llm.summarize({
+          scored: { dimensions: scored.dimensions, summary: null },
+          consent,
+          onLlmCall: usage.add,
+        }))
       } catch (err) {
         overallRejectReason = err instanceof Error ? err.message : 'LLM 调用失败'
         llmErrorCode = 'LLM_ERROR'
@@ -254,37 +320,10 @@ export class SelfAssessmentService {
     }
 
     // 4) 落库（会员归属本人；匿名结果按 TTL 短期保存，不存答案原文）
-    const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)
-    const completedAt = new Date().toISOString()
-
-    const persisted: StoredSelfAssessment = {
-      version: 'v1',
-      answersHash: scored.answersHash,
-      dimensions,
-      summary,
-      aiProvider: providerName,
-      aiUnavailableReason: interpretation.aiUnavailableReason,
-      completedAt,
-      consentVersion,
-      consentedAt,
-    }
-
-    if (!overallRejectReason) {
-      // 匿名结果按 TTL 短期保存（accessTokenHash 持有），不存答案原文。
-      // 模型抛错不走这里。整体合规拒答走这里：打分落完成行。
-      await this.prisma.aiResumeResult.create({
-        data: {
-          taskId,
-          kind: 'self_assessment',
-          status: 'completed',
-          provider: providerName ?? 'llm',
-          payloadJson: JSON.stringify(persisted),
-          endUserId: requester.endUserId,
-          accessTokenHash: accessToken ? hashToken(accessToken) : null,
-          expiresAt,
-        },
-      })
-    } else if (isAnonymous && accessToken) {
+    // 登录会员的解读已在结算前写入；这里只补闸门拦下、次数用完、未登录这几条。
+    if (!overallRejectReason && !persistedByQuota) {
+      await storeCompleted()
+    } else if (overallRejectReason && isAnonymous && accessToken) {
       // 模型抛错时匿名保留最小拒答行。整体合规拒答不进这个分支。
       const rejectedMinimal: StoredSelfAssessment = {
         version: 'v1',

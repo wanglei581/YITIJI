@@ -1,5 +1,7 @@
 import { type ReactNode } from 'react'
 import { ConsolePager, PageHeader } from '@ai-job-print/ui'
+import { ConsoleTabStrip } from '../layouts/ConsoleTabStrip'
+import { useConsoleChrome } from '../layouts/consoleChrome'
 import { API_MODE } from '../services/api/client'
 
 const DEMO_NOTICE = '当前是演示数据，没有连上真实后台。页面上的内容和操作不会保存。'
@@ -14,11 +16,11 @@ interface PageProps {
 export const FRONTEND_HINT = {
   jobs: '对应一体机「岗位信息」/ 小程序「求职」',
   fairs: '对应一体机「招聘会信息」',
-  policy: '对应一体机「政策服务」',
+  policy: '对应一体机首页「查政策」',
   smartCampus: '对应一体机首页「智慧校园」',
-  profile: '对应一体机「本机构官方渠道」与政策的来源机构',
+  profile: '对应一体机首页磁贴「机构官方渠道」，打开后页标题是「本机构官方渠道」',
   /** 招聘内容托管打开（私有化部署 b）时机构资料还对应找企业与岗位详情 */
-  profileHosted: '对应一体机「本机构官方渠道」「找企业」与岗位、政策的来源机构',
+  profileHosted: '对应一体机首页磁贴「机构官方渠道」，打开后页标题是「本机构官方渠道」；以及一体机「找企业」与岗位、政策的来源机构',
   companies: '对应一体机「找企业」与岗位详情来源机构',
   screen: '汇总本机构在一体机与小程序上的可见内容与终端状态',
   terminals: '对应本机构一体机的打印扫描服务与设备运行',
@@ -62,9 +64,15 @@ export function ListPagination({
 }
 
 export function Page({ title, subtitle, actions, children }: PageProps) {
+  const chrome = useConsoleChrome()
+  const tabs = chrome.tabs
+  const groupLabel = chrome.groupLabel
+  const showTabs = Boolean(groupLabel && tabs && tabs.length > 0)
   return (
     <div className="min-w-0">
+      {showTabs && <p className="mb-1 text-xs font-medium text-neutral-500">{groupLabel}</p>}
       <PageHeader className="min-w-0 flex-wrap items-start gap-3" title={title} subtitle={subtitle} actions={actions} />
+      {showTabs && groupLabel && tabs && <ConsoleTabStrip label={groupLabel} tabs={tabs} />}
       {API_MODE !== 'http' && (
         <div className="mt-4 rounded-lg border border-warning/30 bg-warning-bg px-4 py-3 text-sm text-warning-fg">
           {DEMO_NOTICE}

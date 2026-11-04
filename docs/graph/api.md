@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`601` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`611` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -81,16 +81,16 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/advisor/availability` | CreateAdvisorSessionDto.availability | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
-| POST | `/api/v1/advisor/sessions` | CreateAdvisorSessionDto.create | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
-| GET | `/api/v1/advisor/sessions/:sessionId` | CreateAdvisorSessionDto.get | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
-| POST | `/api/v1/advisor/sessions/:sessionId/artifacts/:artifactId/print` | CreateAdvisorSessionDto.print | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
-| POST | `/api/v1/advisor/sessions/:sessionId/ask` | CreateAdvisorSessionDto.ask | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
-| POST | `/api/v1/advisor/sessions/:sessionId/pins` | CreateAdvisorSessionDto.pin | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
-| DELETE | `/api/v1/advisor/sessions/:sessionId/pins/:pinId` | CreateAdvisorSessionDto.unpin | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
-| POST | `/api/v1/advisor/sessions/:sessionId/run` | CreateAdvisorSessionDto.run | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
-| PATCH | `/api/v1/advisor/sessions/:sessionId/skill` | CreateAdvisorSessionDto.switchSkill | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
-| POST | `/api/v1/advisor/sessions/:sessionId/slots` | CreateAdvisorSessionDto.fillSlot | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
+| GET | `/api/v1/advisor/availability` | CreateAdvisorSessionDto.availability | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>RedemptionRecord |
+| POST | `/api/v1/advisor/sessions` | CreateAdvisorSessionDto.create | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>RedemptionRecord |
+| GET | `/api/v1/advisor/sessions/:sessionId` | CreateAdvisorSessionDto.get | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>RedemptionRecord |
+| POST | `/api/v1/advisor/sessions/:sessionId/artifacts/:artifactId/print` | CreateAdvisorSessionDto.print | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>RedemptionRecord |
+| POST | `/api/v1/advisor/sessions/:sessionId/ask` | CreateAdvisorSessionDto.ask | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>RedemptionRecord |
+| POST | `/api/v1/advisor/sessions/:sessionId/pins` | CreateAdvisorSessionDto.pin | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>RedemptionRecord |
+| DELETE | `/api/v1/advisor/sessions/:sessionId/pins/:pinId` | CreateAdvisorSessionDto.unpin | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>RedemptionRecord |
+| POST | `/api/v1/advisor/sessions/:sessionId/run` | CreateAdvisorSessionDto.run | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>RedemptionRecord |
+| PATCH | `/api/v1/advisor/sessions/:sessionId/skill` | CreateAdvisorSessionDto.switchSkill | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>RedemptionRecord |
+| POST | `/api/v1/advisor/sessions/:sessionId/slots` | CreateAdvisorSessionDto.fillSlot | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>RedemptionRecord |
 
 ## `services/api/src/ai-access/admin-ai-access.controller.ts`
 
@@ -104,45 +104,45 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/ai/logs` | AiController.getAiLogs | admin | AiLogService | AiServiceLog |
-| GET | `/api/v1/admin/ai/usage` | AiController.getAiUsage | admin | AiLogService<br/>AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
-| POST | `/api/v1/assistant/chat` | AiController.chatWithAssistant | — | AiService<br/>AuditService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
-| POST | `/api/v1/assistant/sessions/:sessionId/summary` | AiController.summarizeAssistantSession | — | AssistantSummaryService | AdvisorArtifact<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
+| GET | `/api/v1/admin/ai/usage` | AiController.getAiUsage | admin | AiLogService<br/>AiService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/assistant/chat` | AiController.chatWithAssistant | — | AiService<br/>AuditService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/assistant/sessions/:sessionId/summary` | AiController.summarizeAssistantSession | — | AssistantSummaryService | AdvisorArtifact<br/>AdvisorSession<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>RedemptionRecord |
 | POST | `/api/v1/assistant/voice` | AiController.transcribeAssistantVoice | — | — | — |
-| GET | `/api/v1/resume/export/pricing` | AiController.getResumeExportPricing | — | AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
-| POST | `/api/v1/resume/generate` | AiController.submitResumeGenerate | — | AiService<br/>AuditService<br/>MemberPrivacyService<br/>ResumeDraftSourceService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>KioskSession<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>Terminal<br/>UserAiConsent |
-| GET | `/api/v1/resume/generate/:taskId` | AiController.getResumeGenerate | — | AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
-| POST | `/api/v1/resume/generate/export` | AiController.exportGeneratedResume | — | AiService<br/>AuditService<br/>MemberPrivacyService<br/>ResumeDraftSourceService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>KioskSession<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>Terminal<br/>UserAiConsent |
-| POST | `/api/v1/resume/parse` | AiController.submitResumeParse | — | AiService<br/>AuditService<br/>MemberPrivacyService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
-| GET | `/api/v1/resume/records/:taskId` | AiController.getResumeRecord | — | AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
-| GET | `/api/v1/resume/records/:taskId/draft` | AiController.getResumeDraft | — | AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
-| PUT | `/api/v1/resume/records/:taskId/draft` | AiController.putResumeDraft | — | AiService<br/>MemberPrivacyService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
-| POST | `/api/v1/resume/records/:taskId/fact-check` | AiController.factCheckResume | — | AiService<br/>MemberPrivacyService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
-| POST | `/api/v1/resume/records/:taskId/layout-adjust` | AiController.adjustResumeLayout | — | AiService<br/>AuditService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
-| GET | `/api/v1/resume/records/:taskId/optimize` | AiController.getResumeOptimize | — | AiService<br/>AuditService<br/>BenefitRedemptionService<br/>MemberPrivacyService<br/>ResumeDraftSourceService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>KioskSession<br/>Order<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>Terminal<br/>UserAiConsent |
-| GET | `/api/v1/resume/records/:taskId/versions` | AiController.listResumeVersions | — | AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
+| GET | `/api/v1/resume/export/pricing` | AiController.getResumeExportPricing | — | AiService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/resume/generate` | AiController.submitResumeGenerate | — | AiService<br/>AuditService<br/>MemberPrivacyService<br/>ResumeDraftSourceService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>KioskSession<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>Terminal<br/>UserAiConsent |
+| GET | `/api/v1/resume/generate/:taskId` | AiController.getResumeGenerate | — | AiService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/resume/generate/export` | AiController.exportGeneratedResume | — | AiService<br/>AuditService<br/>MemberPrivacyService<br/>ResumeDraftSourceService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>KioskSession<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>Terminal<br/>UserAiConsent |
+| POST | `/api/v1/resume/parse` | AiController.submitResumeParse | — | AiService<br/>AuditService<br/>MemberPrivacyService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
+| GET | `/api/v1/resume/records/:taskId` | AiController.getResumeRecord | — | AiService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
+| GET | `/api/v1/resume/records/:taskId/draft` | AiController.getResumeDraft | — | AiService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
+| PUT | `/api/v1/resume/records/:taskId/draft` | AiController.putResumeDraft | — | AiService<br/>MemberPrivacyService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
+| POST | `/api/v1/resume/records/:taskId/fact-check` | AiController.factCheckResume | — | AiService<br/>MemberPrivacyService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
+| POST | `/api/v1/resume/records/:taskId/layout-adjust` | AiController.adjustResumeLayout | — | AiService<br/>AuditService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
+| GET | `/api/v1/resume/records/:taskId/optimize` | AiController.getResumeOptimize | — | AiService<br/>AuditService<br/>BenefitRedemptionService<br/>MemberPrivacyService<br/>ResumeDraftSourceService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>KioskSession<br/>Order<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>Terminal<br/>UserAiConsent |
+| GET | `/api/v1/resume/records/:taskId/versions` | AiController.listResumeVersions | — | AiService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
 | POST | `/api/v1/resume/voice/transcribe` | AiController.transcribeResumeVoice | — | AiLogService<br/>AsrService | AiServiceLog |
 
 ## `services/api/src/ai/career-plan.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/resume/career-plan/:taskId` | CareerPlanController.latest | — | CareerPlanService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewSession<br/>PrintTask |
-| POST | `/api/v1/resume/career-plan/:taskId` | CareerPlanController.generate | — | CareerPlanService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewSession<br/>PrintTask |
-| POST | `/api/v1/resume/career-plan/:taskId/print` | CareerPlanController.print | — | CareerPlanService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewSession<br/>PrintTask |
+| GET | `/api/v1/resume/career-plan/:taskId` | CareerPlanController.latest | — | CareerPlanService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewSession<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/resume/career-plan/:taskId` | CareerPlanController.generate | — | CareerPlanService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewSession<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/resume/career-plan/:taskId/print` | CareerPlanController.print | — | CareerPlanService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewSession<br/>PrintTask<br/>RedemptionRecord |
 
 ## `services/api/src/ai/fair-visit-plan.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/job-fairs/:fairId/visit-plan/:taskId` | FairVisitPlanController.latest | — | FairVisitPlanService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>ExternalJumpLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobFair<br/>PrintTask |
-| POST | `/api/v1/job-fairs/:fairId/visit-plan/:taskId` | FairVisitPlanController.generate | — | FairVisitPlanService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>ExternalJumpLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobFair<br/>PrintTask |
-| POST | `/api/v1/job-fairs/:fairId/visit-plan/:taskId/print` | FairVisitPlanController.print | — | FairVisitPlanService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>ExternalJumpLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobFair<br/>PrintTask |
+| GET | `/api/v1/job-fairs/:fairId/visit-plan/:taskId` | FairVisitPlanController.latest | — | FairVisitPlanService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ExternalJumpLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobFair<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/job-fairs/:fairId/visit-plan/:taskId` | FairVisitPlanController.generate | — | FairVisitPlanService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ExternalJumpLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobFair<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/job-fairs/:fairId/visit-plan/:taskId/print` | FairVisitPlanController.print | — | FairVisitPlanService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ExternalJumpLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobFair<br/>PrintTask<br/>RedemptionRecord |
 
 ## `services/api/src/ai/job-fit.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/resume/job-fit` | JobFitRequestDto.analyze | — | GovernedJobFitService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
+| POST | `/api/v1/resume/job-fit` | JobFitRequestDto.analyze | — | GovernedJobFitService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>RedemptionRecord<br/>UserAiConsent |
 | GET | `/api/v1/resume/job-fit/:taskId` | JobFitRequestDto.latest | — | JobFitService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>PrintTask |
 | POST | `/api/v1/resume/job-fit/:taskId/print` | JobFitRequestDto.print | — | JobFitService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>PrintTask |
 | POST | `/api/v1/resume/job-fit/consent` | JobFitRequestDto.grantConsent | — | JobFitService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>PrintTask |
@@ -173,15 +173,22 @@
 | --- | --- | --- | --- | --- | --- |
 | POST | `/api/v1/resume/records/:taskId/export` | ResumeReportExportController.export | — | — | — |
 
+## `services/api/src/ai/safety/ai-safety-lexicon.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/ai-safety/lexicon` | AiSafetyLexiconController.get | admin | AiSafetyLexiconService | AiSafetyTerm<br/>AuditLog |
+| PUT | `/api/v1/admin/ai-safety/lexicon` | AiSafetyLexiconController.put | admin | AiSafetyLexiconService | AiSafetyTerm<br/>AuditLog |
+
 ## `services/api/src/ai/self-assessment.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/resume/self-assessment` | SelfAssessmentController.submit | — | SelfAssessmentService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| DELETE | `/api/v1/resume/self-assessment/:taskId` | SelfAssessmentController.withdraw | — | SelfAssessmentService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| GET | `/api/v1/resume/self-assessment/:taskId` | SelfAssessmentController.latest | — | SelfAssessmentService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| POST | `/api/v1/resume/self-assessment` | SelfAssessmentController.submit | — | SelfAssessmentService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>RedemptionRecord |
+| DELETE | `/api/v1/resume/self-assessment/:taskId` | SelfAssessmentController.withdraw | — | SelfAssessmentService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>RedemptionRecord |
+| GET | `/api/v1/resume/self-assessment/:taskId` | SelfAssessmentController.latest | — | SelfAssessmentService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>RedemptionRecord |
 | POST | `/api/v1/resume/self-assessment/:taskId/append` | SelfAssessmentController.appendToResume | — | AppendedSelfAssessmentService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/resume/self-assessment/:taskId/print` | SelfAssessmentController.print | — | SelfAssessmentService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| POST | `/api/v1/resume/self-assessment/:taskId/print` | SelfAssessmentController.print | — | SelfAssessmentService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>RedemptionRecord |
 | GET | `/api/v1/resume/self-assessment/questions` | SelfAssessmentController.questions | — | — | — |
 
 ## `services/api/src/ai/usage/admin-ai-usage.controller.ts`
@@ -316,8 +323,8 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/screen/usage` | UsageRangeQueryDto.getAdminUsage | admin | ConsoleScreenUsageService | AiServiceLog<br/>AuditLog<br/>BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Favorite<br/>Job<br/>JobFair<br/>KioskSession<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal |
-| GET | `/api/v1/partner/screen/usage` | UsageRangeQueryDto.getPartnerUsage | admin | ConsoleScreenUsageService | AiServiceLog<br/>AuditLog<br/>BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Favorite<br/>Job<br/>JobFair<br/>KioskSession<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal |
+| GET | `/api/v1/admin/screen/usage` | UsageRangeQueryDto.getAdminUsage | admin | ConsoleScreenUsageService | AiServiceFact<br/>AiServiceLog<br/>AuditLog<br/>BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Favorite<br/>Job<br/>JobFair<br/>KioskSession<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal |
+| GET | `/api/v1/partner/screen/usage` | UsageRangeQueryDto.getPartnerUsage | admin | ConsoleScreenUsageService | AiServiceFact<br/>AiServiceLog<br/>AuditLog<br/>BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Favorite<br/>Job<br/>JobFair<br/>KioskSession<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal |
 
 ## `services/api/src/content/ai-poster.controller.ts`
 
@@ -396,6 +403,7 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/first-order/incidents` | AdminFirstOrderIncidentsController.directory | admin | FirstOrderIncidentsService | AuditLog<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceIncidentEvent<br/>ServiceProject<br/>ServiceReport<br/>Terminal |
 | POST | `/api/v1/admin/first-order/incidents` | AdminFirstOrderIncidentsController.create | admin | FirstOrderIncidentsService | AuditLog<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceIncidentEvent<br/>ServiceProject<br/>ServiceReport<br/>Terminal |
 | POST | `/api/v1/admin/first-order/incidents` | AdminFirstOrderIncidentsController.create | admin | FirstOrderIncidentsService | AuditLog<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceIncidentEvent<br/>ServiceProject<br/>ServiceReport<br/>Terminal |
 | PATCH | `/api/v1/admin/first-order/incidents/:id` | AdminFirstOrderIncidentsController.update | admin | FirstOrderIncidentsService | AuditLog<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceIncidentEvent<br/>ServiceProject<br/>ServiceReport<br/>Terminal |
@@ -415,6 +423,7 @@
 | GET | `/api/v1/admin/first-order/projects/:id/report-preview` | AdminFirstOrderController.preview | admin | FirstOrderReportsService | AuditLog<br/>KioskSession<br/>PrintTask<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceProject<br/>ServiceReport<br/>Terminal<br/>TerminalHeartbeat |
 | POST | `/api/v1/admin/first-order/projects/:id/reports` | AdminFirstOrderController.createReport | admin | FirstOrderReportsService | AuditLog<br/>KioskSession<br/>PrintTask<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceProject<br/>ServiceReport<br/>Terminal<br/>TerminalHeartbeat |
 | POST | `/api/v1/admin/first-order/projects/:id/reports` | AdminFirstOrderController.createReport | admin | FirstOrderReportsService | AuditLog<br/>KioskSession<br/>PrintTask<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceProject<br/>ServiceReport<br/>Terminal<br/>TerminalHeartbeat |
+| GET | `/api/v1/admin/first-order/reports` | AdminFirstOrderController.reportDirectory | admin | FirstOrderReportsService | AuditLog<br/>KioskSession<br/>PrintTask<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceProject<br/>ServiceReport<br/>Terminal<br/>TerminalHeartbeat |
 | GET | `/api/v1/admin/first-order/reports/:id` | AdminFirstOrderController.report | admin | FirstOrderReportsService | AuditLog<br/>KioskSession<br/>PrintTask<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceProject<br/>ServiceReport<br/>Terminal<br/>TerminalHeartbeat |
 | GET | `/api/v1/admin/first-order/reports/:id` | AdminFirstOrderController.report | admin | FirstOrderReportsService | AuditLog<br/>KioskSession<br/>PrintTask<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceProject<br/>ServiceReport<br/>Terminal<br/>TerminalHeartbeat |
 | POST | `/api/v1/admin/first-order/reports/:id/acknowledge` | AdminFirstOrderController.acknowledge | admin | FirstOrderReportsService | AuditLog<br/>KioskSession<br/>PrintTask<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceProject<br/>ServiceReport<br/>Terminal<br/>TerminalHeartbeat |
@@ -431,11 +440,11 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/jobs` | JobAiController.list | — | JobAiService<br/>KioskJobBoardService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>KioskJobBoardConfig<br/>Terminal<br/>UserAiConsent |
-| DELETE | `/api/v1/jobs/:id` | JobAiController.remove | — | JobAiService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
-| POST | `/api/v1/jobs/:id/ai/explain` | JobAiController.explain | — | JobAiService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
-| POST | `/api/v1/jobs/:id/ai/match` | JobAiController.match | — | GovernedJobFitService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
-| POST | `/api/v1/jobs/ai/recommendations` | JobAiController.recommendations | — | JobAiService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
+| GET | `/api/v1/jobs` | JobAiController.list | — | JobAiService<br/>KioskJobBoardService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>KioskJobBoardConfig<br/>RedemptionRecord<br/>Terminal<br/>UserAiConsent |
+| DELETE | `/api/v1/jobs/:id` | JobAiController.remove | — | JobAiService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>RedemptionRecord<br/>UserAiConsent |
+| POST | `/api/v1/jobs/:id/ai/explain` | JobAiController.explain | — | JobAiService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>RedemptionRecord<br/>UserAiConsent |
+| POST | `/api/v1/jobs/:id/ai/match` | JobAiController.match | — | GovernedJobFitService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>RedemptionRecord<br/>UserAiConsent |
+| POST | `/api/v1/jobs/ai/recommendations` | JobAiController.recommendations | — | JobAiService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>RedemptionRecord<br/>UserAiConsent |
 
 ## `services/api/src/job-applications/job-applications.controller.ts`
 
@@ -768,19 +777,19 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/mock-interviews` | CreateInterviewDto.list | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| POST | `/api/v1/mock-interviews` | CreateInterviewDto.create | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| DELETE | `/api/v1/mock-interviews/:id` | CreateInterviewDto.remove | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| GET | `/api/v1/mock-interviews/:id` | CreateInterviewDto.get | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| POST | `/api/v1/mock-interviews/:id/answer` | CreateInterviewDto.answer | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| POST | `/api/v1/mock-interviews/:id/end` | CreateInterviewDto.end | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| POST | `/api/v1/mock-interviews/:id/practice-sheet` | CreateInterviewDto.practiceSheet | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| GET | `/api/v1/mock-interviews/:id/report` | CreateInterviewDto.report | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| POST | `/api/v1/mock-interviews/:id/report/print` | CreateInterviewDto.print | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| POST | `/api/v1/mock-interviews/:id/start` | CreateInterviewDto.start | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| POST | `/api/v1/mock-interviews/:id/transcribe` | CreateInterviewDto.transcribe | — | AiLogService<br/>AsrService<br/>MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
+| GET | `/api/v1/mock-interviews` | CreateInterviewDto.list | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/mock-interviews` | CreateInterviewDto.create | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord |
+| DELETE | `/api/v1/mock-interviews/:id` | CreateInterviewDto.remove | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord |
+| GET | `/api/v1/mock-interviews/:id` | CreateInterviewDto.get | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/mock-interviews/:id/answer` | CreateInterviewDto.answer | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/mock-interviews/:id/end` | CreateInterviewDto.end | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/mock-interviews/:id/practice-sheet` | CreateInterviewDto.practiceSheet | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord |
+| GET | `/api/v1/mock-interviews/:id/report` | CreateInterviewDto.report | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/mock-interviews/:id/report/print` | CreateInterviewDto.print | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/mock-interviews/:id/start` | CreateInterviewDto.start | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/mock-interviews/:id/transcribe` | CreateInterviewDto.transcribe | — | AiLogService<br/>AsrService<br/>MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord |
 | POST | `/api/v1/mock-interviews/:id/transcript/print` | CreateInterviewDto.printTranscript | — | InterviewTranscriptPrintService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| POST | `/api/v1/mock-interviews/:id/turns/:idx/audio` | CreateInterviewDto.questionAudio | — | AiLogService<br/>MockInterviewService<br/>TtsService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
+| POST | `/api/v1/mock-interviews/:id/turns/:idx/audio` | CreateInterviewDto.questionAudio | — | AiLogService<br/>MockInterviewService<br/>TtsService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord |
 | GET | `/api/v1/mock-interviews/capabilities/voice` | CreateInterviewDto.voiceCapability | — | — | — |
 
 ## `services/api/src/notifications/notifications.controller.ts`
@@ -949,15 +958,23 @@
 | POST | `/api/v1/admin/print-jobs/:id/abandon` | AdminPrintJobsController.abandonPending | admin | AdminPrintJobsAbandonService | AuditLog<br/>Order<br/>PrintTask<br/>PrintTaskStatusLog<br/>User |
 | POST | `/api/v1/admin/print-jobs/:id/verify-outcome` | AdminPrintJobsController.verifyOutcome | admin | — | — |
 
+## `services/api/src/print-jobs/free-print-quota.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/kiosk/print-quota` | KioskPrintQuotaController.get | — | FreePrintQuotaService | AuditLog<br/>PlatformSetting<br/>Terminal |
+| GET | `/api/v1/kiosk/print-quota` | KioskPrintQuotaController.get | — | FreePrintQuotaService | AuditLog<br/>PlatformSetting<br/>Terminal |
+| PUT | `/api/v1/kiosk/print-quota` | KioskPrintQuotaController.update | — | FreePrintQuotaService | AuditLog<br/>PlatformSetting<br/>Terminal |
+
 ## `services/api/src/print-jobs/print-jobs.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/print/jobs` | PrintJobsController.create | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| POST | `/api/v1/print/jobs` | PrintJobsController.create | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
 | POST | `/api/v1/print/jobs/:orderId/release` | PrintJobsController.releasePickup | — | PickupOrderService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability |
-| GET | `/api/v1/print/jobs/:taskId` | PrintJobsController.getStatus | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
-| POST | `/api/v1/print/jobs/:taskId/retry` | PrintJobsController.retryPaidFailedJob | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
-| POST | `/api/v1/print/jobs/:taskId/takeaway-url` | PrintJobsController.issueTakeawayUrl | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| GET | `/api/v1/print/jobs/:taskId` | PrintJobsController.getStatus | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| POST | `/api/v1/print/jobs/:taskId/retry` | PrintJobsController.retryPaidFailedJob | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| POST | `/api/v1/print/jobs/:taskId/takeaway-url` | PrintJobsController.issueTakeawayUrl | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
 | POST | `/api/v1/print/jobs/claim-pickup` | PrintJobsController.claimPickup | — | PickupOrderService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability |
 
 ## `services/api/src/print-sign/print-sign.controller.ts`
@@ -993,6 +1010,13 @@
 | POST | `/api/v1/admin/recruitment-emergency/circuit-break` | EmergencyTakedownDto.circuitBreak | admin | RecruitmentEmergencyService | AuditLog<br/>CompanyProfile<br/>FairMaterial<br/>Job<br/>JobFair<br/>JobSource<br/>OfflineAgency<br/>OnlinePlatformDirectory<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentCircuitBreak<br/>RecruitmentEmergencyHold |
 | POST | `/api/v1/admin/recruitment-emergency/takedown` | EmergencyTakedownDto.takedown | admin | RecruitmentEmergencyService | AuditLog<br/>CompanyProfile<br/>FairMaterial<br/>Job<br/>JobFair<br/>JobSource<br/>OfflineAgency<br/>OnlinePlatformDirectory<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentCircuitBreak<br/>RecruitmentEmergencyHold |
 | GET | `/api/v1/partner/org-notices` | EmergencyTakedownDto.notices | partner | RecruitmentEmergencyService | AuditLog<br/>CompanyProfile<br/>FairMaterial<br/>Job<br/>JobFair<br/>JobSource<br/>OfflineAgency<br/>OnlinePlatformDirectory<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentCircuitBreak<br/>RecruitmentEmergencyHold |
+
+## `services/api/src/scan-tasks/scan-device.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/scan/sessions/:id/switch-to-panel` | ScanDeviceController.switchToPanel | — | ScanDeviceSessionsService | FileObject<br/>ScanTask<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/terminals/:terminalId/scan-tasks/:taskId/device-report` | ScanDeviceController.deviceReport | — | ScanDeviceSessionsService<br/>TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 
 ## `services/api/src/scan-tasks/scan-tasks.controller.ts`
 
@@ -1135,9 +1159,10 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/upload-sessions` | UploadSessionsController.create | — | UploadSessionsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| DELETE | `/api/v1/upload-sessions/:sessionId` | UploadSessionsController.cancel | — | UploadSessionsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| GET | `/api/v1/upload-sessions/:sessionId` | UploadSessionsController.status | — | UploadSessionsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/upload-sessions/:sessionId/confirm` | UploadSessionsController.confirm | — | UploadSessionsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/upload-sessions/:sessionId/files` | UploadSessionsController.upload | — | UploadSessionsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/upload-sessions/scene/resolve` | UploadSessionsController.resolveScene | — | UploadSessionsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| POST | `/api/v1/upload-sessions` | UploadSessionsController.create | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| DELETE | `/api/v1/upload-sessions/:sessionId` | UploadSessionsController.cancel | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| GET | `/api/v1/upload-sessions/:sessionId` | UploadSessionsController.status | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| POST | `/api/v1/upload-sessions/:sessionId/confirm` | UploadSessionsController.confirm | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| POST | `/api/v1/upload-sessions/:sessionId/files` | UploadSessionsController.upload | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| POST | `/api/v1/upload-sessions/:sessionId/member-file` | UploadSessionsController.uploadMemberFile | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| POST | `/api/v1/upload-sessions/scene/resolve` | UploadSessionsController.resolveScene | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |

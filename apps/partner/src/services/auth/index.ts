@@ -257,14 +257,25 @@ export async function verifyToken(): Promise<AuthedUser | null> {
 }
 
 export function logout(): void {
+  const token = getToken()
+  if (token && API_MODE === 'http') {
+    void fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+      credentials: 'include',
+      // 下一行就跳登录页；keepalive 让这次请求在页面卸载后仍能发完
+      keepalive: true,
+    }).catch(() => undefined)
+  }
   clearAuth()
   if (typeof window !== 'undefined') {
     window.location.href = '/login'
   }
 }
 
-/** 登录态自助改密:成功后旧 token 立即失效,调用方需自行清 session 并跳登录页 */
+/** 登录态自助改密:成功后调用方需自行清 session 并跳登录页。演示模式不发请求。 */
 export async function changePassword(currentPassword: string, newPassword: string): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
+  if (API_MODE === 'mock') return { ok: false, code: 'DEMO_MODE_READONLY', message: '演示模式不执行' }
   const r = await postJson<{ success: true }>('/auth/password/change', { currentPassword, newPassword })
   if (!r.ok) return { ok: false, code: r.code, message: r.message }
   return { ok: true }

@@ -1,0 +1,154 @@
+/* 公共与系统页的版块与插画。颜色只走令牌，不写裸色值；规则都挂在 .qxt-screen 下，不改 .qxt-* 的默认。
+   页面自己的版式放各页的 *-touch.css，挂在 [data-qx-page='…'] 下。 */
+
+/* 页框：稿的正文左右各 40px，纵向从上往下排，余高由各页自己的吸收块拿。 */
+.qxt-screen.qxp-app .qxt-body { padding-left: 40px; padding-right: 40px; }
+.qxt-screen .qxp-fill {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+}
+.qxt-screen .qxp-fill > * { min-width: 0; }
+.qxt-screen .qxp-grow { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.qxt-screen .qxp-col { display: flex; flex-direction: column; gap: 10px; }
+.qxt-screen .qxp-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: stretch; }
+.qxt-screen .qxp-pair-grow { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+.qxt-screen .qxp-row { display: flex; gap: 12px; }
+.qxt-screen .qxp-row > * { flex: 1; min-width: 0; }
+
+/* 一行入口 */
+.qxt-screen .qxp-hit {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 72px;
+  padding: 12px 16px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  text-align: left;
+  font-size: var(--qxt-fs-body);
+  line-height: 1.35;
+  color: var(--qxt-ink);
+  transition: transform var(--qxt-t-press) ease;
+}
+.qxt-screen button.qxp-hit:active { transform: scale(0.985); }
+.qxt-screen .qxp-hit .qxp-tx { min-width: 0; flex: 1; }
+.qxt-screen .qxp-hit b { display: block; font-size: 28px; line-height: 1.3; font-weight: 700; }
+.qxt-screen .qxp-hit small { display: block; margin-top: 4px; font-size: var(--qxt-fs-aux); line-height: 1.4; color: var(--qxt-ink-2); font-weight: 500; }
+.qxt-screen .qxp-hit .qxp-ic {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+}
+.qxt-screen .qxp-hit .qxp-go { margin-left: auto; color: var(--qxt-ink-3); flex: none; }
+.qxt-screen .qxp-hit-off { background: var(--qxt-well); border-style: dashed; cursor: default; }
+.qxt-screen .qxp-hit-off b { color: var(--qxt-ink-2); }
+
+/* 去处卡：标题居中、说明一行、插画吸收余高 */
+.qxt-screen .qxp-pair-card { align-items: center; text-align: center; overflow: hidden; }
+.qxt-screen .qxp-pair-card > .qxp-k,
+.qxt-screen .qxp-pair-card > .qxp-note { display: block; width: 100%; text-align: center; }
+
+/* 块、说明底、小标题、段落 */
+.qxt-screen .qxp-card {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 24px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  text-align: left;
+  color: var(--qxt-ink);
+}
+.qxt-screen button.qxp-card { cursor: pointer; transition: transform var(--qxt-t-press) ease; }
+.qxt-screen button.qxp-card:active { transform: scale(0.985); }
+.qxt-screen .qxp-well { background: var(--qxt-well); border-radius: 24px; padding: 16px 18px; }
+.qxt-screen .qxp-k { margin: 0; font-size: var(--qxt-fs-aux); font-weight: 700; color: var(--qxt-teal-ink); }
+.qxt-screen .qxp-note { margin: 0; font-size: var(--qxt-fs-sub); line-height: 1.5; color: var(--qxt-ink-2); }
+.qxt-screen .qxp-note b { color: var(--qxt-ink); font-weight: 700; }
+.qxt-screen .qxp-artbox { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.qxt-screen .qxp-artbox > svg { height: 92%; width: auto; max-width: 100%; }
+
+/* 间隔句挂在这里给读屏和门禁核对，可见性交给子元素。不用 1px 负边距，避免越出视口。 */
+.qxt-screen .qxp-sr { visibility: hidden; font-size: 0; line-height: 0; margin: 0; padding: 0; }
+/* 只给读屏的页内标题（SrHeading）：稿上没有这行字，但这一组内容该有个标题。不占版面，也不用 1px 负边距。 */
+.qxt-screen .qxp-sr-h { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* 插画：颜色取自令牌。灰色由墨色按比例混进卡色得到，不用裸色值。 */
+.qxt-screen .qxp-illus {
+  display: block;
+  --pi-g1: color-mix(in srgb, var(--qxt-ink) 8%, var(--qxt-card));
+  --pi-g2: color-mix(in srgb, var(--qxt-ink) 16%, var(--qxt-card));
+  --pi-g3: color-mix(in srgb, var(--qxt-ink) 28%, var(--qxt-card));
+  --pi-g4: color-mix(in srgb, var(--qxt-ink) 36%, var(--qxt-card));
+}
+.qxt-screen .qxp-paper-shadow { filter: drop-shadow(0 6px 10px rgba(11, 36, 30, 0.12)); }
+.qxt-screen .qxp-illus .pi-paper { fill: var(--qxt-card); }
+.qxt-screen .qxp-illus .pi-ink { fill: var(--qxt-ink); }
+.qxt-screen .qxp-illus .pi-grey { fill: var(--pi-g3); }
+.qxt-screen .qxp-illus .pi-line { fill: var(--pi-g2); }
+.qxt-screen .qxp-illus .pi-track { fill: var(--pi-g1); }
+.qxt-screen .qxp-illus .pi-teal { fill: var(--qx-teal); }
+.qxt-screen .qxp-illus .pi-dim { opacity: 0.85; }
+.qxt-screen .qxp-illus .pi-mint { fill: var(--qx-emerald); }
+.qxt-screen .qxp-illus .pi-glow { opacity: 0.35; }
+.qxt-screen .qxp-illus .pi-clay { fill: var(--qxt-clay); }
+.qxt-screen .qxp-illus .pi-mark { fill: color-mix(in srgb, var(--qxt-clay) 28%, transparent); }
+.qxt-screen .qxp-illus .pi-num { fill: var(--qx-on-solid); font-family: var(--qx-sans); }
+.qxt-screen .qxp-illus .pi-blue { fill: var(--qxt-slate-ink); }
+.qxt-screen .qxp-illus .pi-box { fill: none; stroke: var(--qxt-slate-ink); stroke-width: 2; }
+.qxt-screen .qxp-illus .pi-tick { fill: none; stroke: var(--qxt-slate-ink); stroke-width: 2.4; stroke-linecap: round; }
+.qxt-screen .qxp-illus .pi-sheet { fill: var(--qxt-well); stroke: var(--qxt-edge); stroke-width: 1.5; }
+.qxt-screen .qxp-illus .pi-sheet-top { fill: var(--qxt-card); }
+.qxt-screen .qxp-illus .pi-screen { fill: var(--qx-paper); }
+.qxt-screen .qxp-illus .pi-notch { fill: var(--pi-g4); }
+.qxt-screen .qxp-illus .pi-doc { fill: var(--qxt-card); stroke: var(--pi-g3); stroke-width: 2; }
+.qxt-screen .qxp-illus .pi-fold { fill: none; stroke: var(--pi-g3); stroke-width: 2; }
+.qxt-screen .qxp-illus .pi-up { fill: none; stroke: var(--qx-on-solid); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.qxt-screen .qxp-illus .pi-cream { fill: var(--qxt-cream); font-family: var(--qx-sans); }
+.qxt-screen .qxp-illus .pi-lid { fill: var(--pi-g1); stroke: var(--pi-g3); stroke-width: 2; }
+.qxt-screen .qxp-illus .pi-body { fill: var(--pi-g1); stroke: var(--pi-g3); stroke-width: 2; }
+.qxt-screen .qxp-illus .pi-tray { fill: var(--pi-g3); stroke: var(--pi-g4); stroke-width: 2; }
+.qxt-screen .qxp-illus .pi-base { fill: var(--pi-g4); }
+
+/* 手机 / 窄窗口：稿按 1080 宽画。窄屏下意图带收低、顶栏允许换行，正文按内容往下排，超出由各页自己的滚动区接住 */
+@media (max-width: 600px) {
+  .qxt-screen.qxp-app .qxt-band,
+  .qxt-screen.qxp-app .qxt-band-compact { min-height: 0; padding: 14px 16px 0; }
+  .qxt-screen.qxp-app .qxt-hdr { height: auto; flex-wrap: wrap; gap: 8px 10px; }
+  .qxt-screen.qxp-app .qxt-brand b { white-space: nowrap; font-size: 22px; }
+  .qxt-screen.qxp-app .qxt-hdr-right { gap: 10px; }
+  .qxt-screen.qxp-app .qxt-clock small { white-space: nowrap; }
+  .qxt-screen.qxp-app .qxt-status { height: auto; min-height: 36px; padding: 4px 12px; white-space: normal; }
+  .qxt-screen.qxp-app .qxt-band-compact .qxt-ask { padding: 8px 0 16px; }
+  .qxt-screen.qxp-app .qxt-ask h1 { font-size: 28px; }
+  .qxt-screen.qxp-app .qxt-ask p { margin-top: 6px; font-size: 20px; }
+  .qxt-screen.qxp-app .qxt-body { padding-left: 16px; padding-right: 16px; }
+  /* 意图带里的光晕和流线只是装饰，窄屏上会画出视口，收掉 */
+  .qxt-screen.qxp-app .qxt-flow,
+  .qxt-screen.qxp-app .qxt-halo { display: none; }
+  /* 底栏：问小青占满一行，其余按钮两两并排，每颗都不窄过 48 */
+  .qxt-screen.qxp-app .qxt-dock { flex-wrap: wrap; gap: 8px; padding-left: 16px; padding-right: 16px; }
+  .qxt-screen.qxp-app .qxt-dock > * { flex: 1 1 calc(50% - 8px); min-width: 0; }
+  .qxt-screen.qxp-app .qxt-dock > .qxt-askq { order: -1; flex-basis: 100%; }
+  .qxt-screen.qxp-app .qxt-dock .qxt-btn { min-width: 0; padding-left: 12px; padding-right: 12px; }
+  .qxt-screen.qxp-app .qxt-dock > .qxt-btn-pri { flex: 2 1 0; font-size: 24px; }
+  .qxt-screen.qxp-app .qxt-dock > .qxt-btn-sec { flex: 1 1 0; }
+}
+
+/* 待机屏整屏深色，不画意图带和底栏 */
+.qxt-screen.qxp-standby { background: var(--qxt-band-b); color: var(--qx-paper); }
+.qxt-screen.qxp-standby .qxt-body { padding: 0; gap: 0; }
+.qxt-screen.qxp-standby .qxp-fill { padding: 0; gap: 0; border-radius: 0; background: transparent; overflow: hidden; }

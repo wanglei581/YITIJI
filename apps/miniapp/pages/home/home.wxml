@@ -121,7 +121,7 @@
       <view class="home-legal">
         <text class="home-legal-link" bindtap="tapLegal" data-type="operator_info" role="link" aria-label="经营者信息">经营者信息</text>
         <text class="home-legal-sep" aria-hidden="true">·</text>
-        <text class="home-legal-link" bindtap="tapLegal" data-type="ai_disclaimer" role="link" aria-label="AI 服务说明，所用模型与备案号">AI 服务说明</text>
+        <text class="home-legal-link" bindtap="tapLegal" data-type="ai_disclaimer" role="link" aria-label="AI 服务说明，所用模型与备案情况">AI 服务说明</text>
       </view>
       <view class="tab-spacer"></view>
     </view>

@@ -186,6 +186,7 @@
           </view>
         </view>
         <view class="rb-fine">排版设置只对 PDF 生效。Word / 纯文本 / Markdown 由服务端按各自格式渲染，不套用这里的选择，页面也不假装它生效了。</view>
+        <view class="rb-fine">{{aiLabelNote}}</view>
       </view></view>
 
       <view class="notice info">
@@ -457,6 +458,10 @@
       <view wx:if="{{step === 5}}" class="notice plum">
         <text class="ficon i-robot n-ic"></text>
         <text>提交后 AI 会对你填的描述文字做表达润色，通常需要几十秒。学校、单位、职务、时间、证书等事实字段由服务端逐字保留，不会被改动。</text>
+      </view>
+      <view wx:if="{{step === 5 && !historyMode}}" class="btn lg ghost-ink block tap {{exporting ? 'disabled' : ''}}" hover-class="tap-press"
+            bindtap="tapExportDraft" role="button" aria-label="{{fromVoice ? '按你说的原话出稿' : '按填写内容导出未润色版本'}}">
+        {{exporting ? '正在排版…' : (fromVoice ? '按你说的原话出稿' : '按填写内容导出（未润色）')}}
       </view>
 
       <view class="compliance-note">简历内容由你本人填写并负责。本平台不代收简历，也不代为投递。</view>

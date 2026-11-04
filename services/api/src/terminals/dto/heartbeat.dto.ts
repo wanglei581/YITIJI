@@ -1,5 +1,6 @@
 import { IsBoolean, IsDateString, IsIn, IsNumber, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator'
 import { Type } from 'class-transformer'
+import { SCAN_DEVICE_HEALTHS } from '../printer-status'
 
 const WIRED_NETWORK_STATUSES = ['connected', 'disconnected', 'unknown'] as const
 const PRINTER_NETWORK_STATUSES = ['reachable', 'unreachable', 'not_network_printer', 'unknown'] as const
@@ -113,4 +114,18 @@ export class HeartbeatDto {
   @MaxLength(64)
   @ValidateIf((_object, value) => value !== undefined)
   scanInputObservedAt?: string
+
+  /**
+   * 屏上扫描：终端程序最近一次探测扫描仪的结果与探测时刻。两项都可选、可单独出现；
+   * 旧版终端程序不带，照常收下。探测时刻必须带时区（见 TerminalAgentService.parseScanDeviceObservedAt）。
+   */
+  @IsIn(SCAN_DEVICE_HEALTHS)
+  @ValidateIf((_object, value) => value !== undefined)
+  scanDeviceHealth?: (typeof SCAN_DEVICE_HEALTHS)[number]
+
+  @IsDateString({ strict: true })
+  @IsString()
+  @MaxLength(64)
+  @ValidateIf((_object, value) => value !== undefined)
+  scanDeviceObservedAt?: string
 }

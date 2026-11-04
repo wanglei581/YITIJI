@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
+import { ForbiddenException, Injectable, NotFoundException, Optional, ServiceUnavailableException } from '@nestjs/common'
 import { createHash, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { AiLogService } from '../ai/ai-log.service'
@@ -8,7 +8,17 @@ import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
 import type { MemberPageQuery } from '../common/utils/member-page'
 import { buildMemberPage, memberPageArgs } from '../common/utils/member-page'
 import { jobValidityWhere } from '../jobs/job-validity'
+import { AiQuotaService } from '../ai/quota/ai-quota.service'
+import { runWithAiQuota } from '../ai/quota/ai-quota-run'
 import { JobAiLlmService } from './job-ai-llm.service'
+import {
+  executeJobAiCharge,
+  explainQuotaKey,
+  loadCachedExplanation,
+  loadCachedRecommendation,
+  recommendationQuotaKey,
+  type JobAiChargeRunInput,
+} from './job-ai-charge'
 import { JobContextService } from './job-context.service'
 import { JobAiQuotaService } from './job-ai-quota.service'
 import { GovernedJobFitService } from './governed-job-fit.service'
@@ -46,12 +56,18 @@ export class JobAiService {
     private readonly privacy: MemberPrivacyService,
     private readonly quota: JobAiQuotaService,
     private readonly governed: GovernedJobFitService,
+    @Optional() private readonly memberQuota?: AiQuotaService,
   ) {}
 
   async recommendations(input: JobRecommendationInput, requester: JobAiRequester, quotaContext?: JobAiQuotaContext) {
     const startedAt = Date.now()
     const parse = await this.loadAuthorizedParse(input.resumeTaskId, requester)
     await this.assertResumeAiConsent(parse.endUserId)
+    const quotaKey = parse.endUserId ? recommendationQuotaKey(parse.endUserId, input.resumeTaskId, input) : null
+    if (quotaKey) {
+      const cached = await loadCachedRecommendation(this.prisma, parse.endUserId, input.resumeTaskId, quotaKey)
+      if (cached) return cached
+    }
     const session = await this.createSession({
       operation: 'recommend',
       resumeTaskId: input.resumeTaskId,
@@ -73,33 +89,13 @@ export class JobAiService {
       }
 
       quotaTicket = await this.consumeJobAiQuota('recommend', parse.endUserId, input.terminalId ?? null, quotaContext)
-      const llmResult = await this.llm.recommend(resumeText, candidates)
-      const payload = llmResult.items
-      const byJob = new Map(payload.map((item) => [item.jobId, item]))
-      const rows = candidates
-        .filter((job) => byJob.has(job.jobId))
-        .map((job, index) => {
-          const item = byJob.get(job.jobId)!
-          return {
-            sessionId: session.id,
-            jobId: job.jobId,
-            rank: index + 1,
-            fitLevel: item.fitLevel,
-            summary: item.summary,
-            matchPointsJson: JSON.stringify(item.matchPoints),
-            gapPointsJson: JSON.stringify(item.gapPoints),
-            actionChecklistJson: JSON.stringify(item.actionChecklist),
-          }
-        })
-      if (rows.length > 0) await this.prisma.jobAiRecommendation.createMany({ data: rows })
-      const updated = await this.prisma.jobAiSession.update({ where: { id: session.id }, data: { status: 'completed', provider: llmResult.provider } })
-      this.recordAiServiceLog(session.id, 'jobRecommend', 'success', startedAt, parse.endUserId, input.terminalId ?? null, undefined, llmResult.tokenUsage, llmResult.provider)
-      const contextById = new Map(candidates.map((job) => [job.jobId, job]))
-      return {
-        session: this.sessionDto(updated),
-        recommendations: rows.map((row) => this.recommendationDto(row, contextById.get(row.jobId)!)),
-        disclaimer: '仅供参考' as const,
-      }
+      return await this.chargeAssistant({
+        endUserId: parse.endUserId,
+        operationKey: quotaKey ?? `rec:${session.id}`,
+        loadStored: () => loadCachedRecommendation(this.prisma, parse.endUserId, input.resumeTaskId, quotaKey ?? ''),
+        work: () => this.finishRecommendations(session, candidates, resumeText, startedAt, parse.endUserId, input.terminalId ?? null),
+        saveResult: async () => session.id,
+      })
     } catch (error) {
       await this.rollbackJobAiQuota(quotaTicket)
       await this.markSessionFailed(session.id, error)
@@ -116,12 +112,24 @@ export class JobAiService {
   ) {
     const startedAt = Date.now()
     this.assertMemberAiRequester(requester.endUserId)
-    await this.privacy.requireActiveConsent(requester.endUserId, 'job_ai')
+    const endUserId = requester.endUserId
+    await this.privacy.requireActiveConsent(endUserId, 'job_ai')
+    const cached = await loadCachedExplanation(this.prisma, endUserId, jobId)
     const job = await this.context.buildTargetJobContext(jobId)
+    if (cached) {
+      return {
+        session: cached.session,
+        job,
+        ...cached.explanation,
+        dataQualityWarning: this.dataQualityWarning(job),
+        disclaimer: '仅供参考' as const,
+      }
+    }
+    const quotaKey = explainQuotaKey(endUserId, jobId)
     const session = await this.createSession({
       operation: 'explain',
       resumeTaskId: null,
-      endUserId: requester.endUserId,
+      endUserId,
       accessTokenHash: null,
       intent: { jobId },
       terminalId,
@@ -129,22 +137,98 @@ export class JobAiService {
     })
     let quotaTicket: JobAiQuotaTicket | null = null
     try {
-      quotaTicket = await this.consumeJobAiQuota('explain', requester.endUserId, terminalId, quotaContext)
-      const llmResult = await this.llm.explain(job)
-      const updated = await this.prisma.jobAiSession.update({ where: { id: session.id }, data: { status: 'completed', provider: llmResult.provider } })
-      this.recordAiServiceLog(session.id, 'jobExplain', 'success', startedAt, requester.endUserId, terminalId, undefined, llmResult.tokenUsage, llmResult.provider)
-      return {
-        session: this.sessionDto(updated),
-        job,
-        ...llmResult.payload,
-        dataQualityWarning: this.dataQualityWarning(job),
-        disclaimer: '仅供参考' as const,
-      }
+      quotaTicket = await this.consumeJobAiQuota('explain', endUserId, terminalId, quotaContext)
+      return await this.chargeAssistant({
+        endUserId,
+        operationKey: quotaKey,
+        loadStored: async () => {
+          const hit = await loadCachedExplanation(this.prisma, endUserId, jobId)
+          if (!hit) return null
+          return {
+            session: hit.session,
+            job,
+            ...hit.explanation,
+            dataQualityWarning: this.dataQualityWarning(job),
+            disclaimer: '仅供参考' as const,
+          }
+        },
+        work: () => this.finishExplanation(session, job, jobId, quotaKey, startedAt, endUserId, terminalId),
+        saveResult: async () => session.id,
+      })
     } catch (error) {
       await this.rollbackJobAiQuota(quotaTicket)
       await this.markSessionFailed(session.id, error)
-      this.recordAiServiceLog(session.id, 'jobExplain', 'failed', startedAt, requester.endUserId, terminalId, errorCodeOf(error))
+      this.recordAiServiceLog(session.id, 'jobExplain', 'failed', startedAt, endUserId, terminalId, errorCodeOf(error))
       throw error
+    }
+  }
+
+  private chargeAssistant<T>(input: JobAiChargeRunInput<T>): Promise<T> {
+    return executeJobAiCharge(this.memberQuota, input, { bucket: 'ai_assistant', runWithAiQuota })
+  }
+
+  private async finishRecommendations(
+    session: { id: string; resumeTaskId: string | null; operation: string; status: string; provider: string | null; terminalId: string | null; createdAt: Date; expiresAt: Date | null },
+    candidates: CandidateJob[],
+    modelInput: string,
+    startedAt: number,
+    endUserId: string | null,
+    terminalId: string | null,
+  ) {
+    const llmResult = await this.llm.recommend(modelInput, candidates)
+    const payload = llmResult.items
+    const byJob = new Map(payload.map((item) => [item.jobId, item]))
+    const rows = candidates
+      .filter((job) => byJob.has(job.jobId))
+      .map((job, index) => {
+        const item = byJob.get(job.jobId)!
+        return {
+          sessionId: session.id,
+          jobId: job.jobId,
+          rank: index + 1,
+          fitLevel: item.fitLevel,
+          summary: item.summary,
+          matchPointsJson: JSON.stringify(item.matchPoints),
+          gapPointsJson: JSON.stringify(item.gapPoints),
+          actionChecklistJson: JSON.stringify(item.actionChecklist),
+        }
+      })
+    if (rows.length > 0) await this.prisma.jobAiRecommendation.createMany({ data: rows })
+    const updated = await this.prisma.jobAiSession.update({ where: { id: session.id }, data: { status: 'completed', provider: llmResult.provider } })
+    this.recordAiServiceLog(session.id, 'jobRecommend', 'success', startedAt, endUserId, terminalId, undefined, llmResult.tokenUsage, llmResult.provider)
+    const contextById = new Map(candidates.map((job) => [job.jobId, job]))
+    return {
+      session: this.sessionDto(updated),
+      recommendations: rows.map((row) => this.recommendationDto(row, contextById.get(row.jobId)!)),
+      disclaimer: '仅供参考' as const,
+    }
+  }
+
+  private async finishExplanation(
+    session: { id: string },
+    job: TargetJobContext,
+    jobId: string,
+    quotaKey: string,
+    startedAt: number,
+    endUserId: string | null,
+    terminalId: string | null,
+  ) {
+    const llmResult = await this.llm.explain(job)
+    const updated = await this.prisma.jobAiSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'completed',
+        provider: llmResult.provider,
+        intentJson: JSON.stringify({ jobId, quotaKey, explanation: llmResult.payload }),
+      },
+    })
+    this.recordAiServiceLog(session.id, 'jobExplain', 'success', startedAt, endUserId, terminalId, undefined, llmResult.tokenUsage, llmResult.provider)
+    return {
+      session: this.sessionDto(updated),
+      job,
+      ...llmResult.payload,
+      dataQualityWarning: this.dataQualityWarning(job),
+      disclaimer: '仅供参考' as const,
     }
   }
 
@@ -249,7 +333,7 @@ export class JobAiService {
     return text
   }
 
-  private assertMemberAiRequester(endUserId: string | null): void {
+  private assertMemberAiRequester(endUserId: string | null): asserts endUserId is string {
     if (!endUserId) {
       throw new ForbiddenException({
         error: {
@@ -275,7 +359,7 @@ export class JobAiService {
       member: endUserId,
       terminal: terminalId ?? quotaContext?.terminal ?? null,
       ip: quotaContext?.ip ?? null,
-    })
+    }, this.memberQuota && endUserId ? { skipMember: true } : undefined)
   }
 
   private async rollbackJobAiQuota(ticket: JobAiQuotaTicket | null): Promise<void> {

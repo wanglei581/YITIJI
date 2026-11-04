@@ -29,6 +29,7 @@ export function PolicyPanel({
   onAudienceChange,
   onOpened,
   onActiveId,
+  onDetailSelected,
   onUpload,
   onOfficialEntry,
   aiLabel,
@@ -44,6 +45,7 @@ export function PolicyPanel({
   onAudienceChange: (k: AudienceKey) => void
   onOpened: (item: PolicyItem) => void
   onActiveId: (id: string | null) => void
+  onDetailSelected: (selected: boolean) => void
   onUpload: (id: string) => void
   onOfficialEntry: (item: PolicyItem, target: SourceQrTarget) => void
   aiLabel: string
@@ -91,6 +93,14 @@ export function PolicyPanel({
     onActiveId(openId)
     return () => onActiveId(null)
   }, [onActiveId, openId])
+
+  // 本人点开（或地址点名）的那一条才算「正在看详情」，默认自动展开的第一条不算：
+  // 页面据此决定问小青的问句，以及被下架时是整页换成「已下架」还是只从列表里摘掉。
+  const userOpened = openId !== null && (touched || openId === focusHit)
+  useEffect(() => {
+    onDetailSelected(userOpened)
+    return () => onDetailSelected(false)
+  }, [onDetailSelected, userOpened])
 
   useEffect(() => {
     const item = selectable.find((entry) => entry.id === openId)
@@ -169,9 +179,9 @@ export function PolicyPanel({
             )}
             {kind === 'library' ? (
               <div className="rq-ai-off">
-                <b>本条政策暂未接入小青</b>
+                <b>小青还不能解释这条政策</b>
                 <span>小青还不能解释政策原文。看原文、来源二维码和条件核对都不经过它。</span>
-                <QxAiHelp label={aiLabel} draft={aiDraft} testId="renshi-ask-ai" />
+                <QxAiHelp label="问小青别的问题，不判断能不能办" draft={`关于「${item.title}」，如何核对发布机构和来源地址？小青还不能解释政策原文，也不判断能否办理。`} testId="renshi-ask-ai" />
               </div>
             ) : (
               <p className="rq-note">{SRC_RULE}</p>
@@ -235,18 +245,16 @@ export function PolicyPanel({
       <section className="rq-sec" data-policy-section="library">
         <header className="rq-grp">
           <b>政策库</b>
-          <span>
-            {visibleLibrary.length === 0
-              ? (libraryEmpty ? '本次没有读到条目' : '当前筛选无匹配')
-              : '读到的条目按下面的结构展示'}
-          </span>
+          {visibleLibrary.length === 0 ? (
+            <span>{libraryEmpty ? '本次没有读到条目' : '当前筛选无匹配'}</span>
+          ) : null}
         </header>
         {visibleLibrary.length === 0 ? (
           <div className="rq-state" data-kind={libraryEmpty ? 'empty' : 'filter'}>
             <b>{libraryEmpty ? '政策库暂无内容' : '当前身份暂无匹配政策'}</b>
             <p>
               {libraryEmpty
-                ? '这里只展示合作机构发布、管理员审核通过的政策。下方「通用办事指引」是本机整理的参考，不属于政策库。'
+                ? '这里只展示发布机构自己审核并发布的政策。下方「通用办事指引」是本机整理的参考，不属于政策库。'
                 : '可切换身份或选择「全部」再看一次；这只是筛选结果，不代表库里没有政策。'}
             </p>
           </div>

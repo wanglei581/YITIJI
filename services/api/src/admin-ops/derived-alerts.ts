@@ -3,6 +3,8 @@ import { describePrinterFault } from '../terminals/admin-printer-status'
 import type { PrismaService } from '../prisma/prisma.service'
 import { HEALTHY_PRINTER_STATUS_VALUES, isHealthyPrinterStatus, isLowPaperWarning } from '../terminals/printer-status'
 import { TERMINAL_ONLINE_WINDOW_MS } from '../terminals/printer-availability'
+import { collectPrintQuotaAlerts, resolvePrintQuotaAlert } from './derived-print-quota-alerts'
+import { collectAiDerivedAlerts, resolveAiDerivedAlert } from './derived-ai-alerts'
 import {
   buildSubjectKey,
   offlineEpisodeToken,
@@ -115,6 +117,11 @@ export interface DerivedAlertCollection {
   omitted: number
   /** 触发截断的上限值,便于界面如实说明。 */
   cap: number
+  /**
+   * 本次纳入终端类告警考察的主题键(只含正常运营的终端,每台两种类型)。推送据此区分
+   * 「真恢复」与「因转为计划中 / 退役 / 停用 / 删除而不再考察」:后者不推「已恢复」。
+   */
+  terminalSubjectKeysInScope: string[]
 }
 
 type TerminalRow = {
@@ -426,7 +433,11 @@ export async function collectDerivedAlerts(
   const nowMs = now.getTime()
   const alerts: DerivedAlert[] = []
 
+  // 终端类告警只看正常运营的终端(与 pickup-order.service.ts 的放行口径一致):
+  // 计划中、调试中、维护中、已暂停、已退役、停用的机器没人用,不算「离线」或「打印机异常」。
+  // 10/4 线上第一轮推送就把一台从没开过机的计划中终端 new01 报成了离线。
   const terminals = (await prisma.terminal.findMany({
+    where: { enabled: true, lifecycleStatus: 'active' },
     select: TERMINAL_SELECT,
   })) as unknown as TerminalRow[]
 
@@ -492,6 +503,11 @@ export async function collectDerivedAlerts(
   const feedbackAlert = buildPendingFeedbackAlert(await pendingAiContentFeedback(prisma))
   if (feedbackAlert) alerts.push(feedbackAlert)
 
+  alerts.push(...await collectPrintQuotaAlerts(prisma, now))
+  // AI 三条与上面的计数同一口径：每条都进列表，也加进 firingTotal，没有单独的截断。
+  const aiAlerts = await collectAiDerivedAlerts(prisma, now)
+  alerts.push(...aiAlerts)
+
   alerts.sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1))
   // count() 与 findMany 之间可能有新失败写入,omitted 用 max(0,…) 兜底,不出现负数。
   const omitted = Math.max(0, failedTotal - failedTasks.length)
@@ -499,9 +515,13 @@ export async function collectDerivedAlerts(
     alerts,
     firingTotal: terminalAlertCount + Math.max(failedTotal, failedTasks.length) + unavailableTasks.reduce((count, task) => (
       count + (buildPaidPendingFileUnavailableAlert(task, nowMs) ? 1 : 0)
-    ), 0) + (feedbackAlert ? 1 : 0),
+    ), 0) + (feedbackAlert ? 1 : 0) + alerts.filter((alert) => alert.type === 'print_terminal_quota_high').length + aiAlerts.length,
     omitted,
     cap: PRINT_FAILED_LIST_CAP,
+    terminalSubjectKeysInScope: terminals.flatMap((t) => [
+      buildSubjectKey('terminal_offline', t.id),
+      buildSubjectKey('printer_issue', t.id),
+    ]),
   }
 }
 
@@ -541,6 +561,13 @@ export async function resolveDerivedAlert(
 
   if (type === 'feedback_pending') {
     return buildPendingFeedbackAlert(await pendingAiContentFeedback(prisma))
+  }
+
+  if (type === 'print_terminal_quota_high') {
+    return resolvePrintQuotaAlert(prisma, subjectId, now)
+  }
+  if (type === 'ai_provider_unavailable' || type === 'ai_consecutive_failures' || type === 'ai_budget_exhausted') {
+    return resolveAiDerivedAlert(prisma, type, subjectId, now)
   }
 
   const terminal = (await prisma.terminal.findUnique({

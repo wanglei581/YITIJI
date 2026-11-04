@@ -3,6 +3,7 @@ import type { PrintJobTakeawayUrl } from '@ai-job-print/shared'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { setReactRouterState, W2_FILE, W2_PRINT_PARAMS } from './fixtures/fusion-w2-state'
+import { HELP_NEEDED_LINE, containsStaffHandoff } from '../fixtures/unattended-lines'
 
 const TASK_ID = 'truth-task-001'
 const taskState = {
@@ -67,7 +68,8 @@ test('forged success cannot override pending or failed backend status @kiosk', a
   })
   await openDoneWithState(page, { ...taskState, success: true, reason: '伪造成功' })
   await expect(page.getByText('打印失败', { exact: true }).first()).toBeVisible()
-  await expect(page.getByText('打印机暂时离线，请联系现场工作人员', { exact: true })).toBeVisible()
+  await expect(page.getByText('打印有问题？拨打服务电话 18369161921（工作日 9:00–18:00），或问小青', { exact: true })).toBeVisible()
+  await expect(page.getByText('请联系现场工作人员')).toHaveCount(0)
   await expect(page.getByText('private agent stack must remain hidden')).toHaveCount(0)
 })
 
@@ -99,7 +101,7 @@ test('an unconfirmed print is never presented as a confirmed failure @kiosk', as
   await expect(page.getByText('打印结果未确认', { exact: true }).first()).toBeVisible()
   const body = await page.locator('body').innerText()
   expect(body).toContain('出纸口')
-  expect(body).toContain('联系现场工作人员')
+  expect(body).toContain('系统已明确登记，等待人工核查')
   // 不承诺退款、也不替现场断言纸没出来。
   expect(body).not.toContain('已为你退款')
 })
@@ -300,8 +302,10 @@ for (const errorCode of ['PRINTER_ERROR', 'PAPER_EMPTY']) {
     await expect(retryButton).toBeInViewport({ ratio: 1 })
     await retryButton.click()
 
-    const alert = page.locator('.qx-ctabar').getByRole('alert')
-    await expect(alert).toHaveText('这台机器的打印程序需要升级后才能重新提交，请找现场工作人员')
+    // 重提被拒的提示放在出口按钮的第一行（失败态照稿骨架，没有旧的 ctabar 条）。
+    const alert = page.locator('.pft-fail-exits').getByRole('alert')
+    await expect(alert).toHaveText(/这台机器的打印程序需要升级后才能重新提交。打印有问题？/)
+    await expect(alert).not.toContainText('找现场工作人员')
     // 不滚动找提示：toBeVisible 不能证明没有落在二维码下面的滚动区。
     await expect(alert).toBeInViewport({ ratio: 1 })
     const box = await alert.boundingBox()
@@ -384,13 +388,43 @@ test('a rejected submission is shown honestly and never fakes success @kiosk', a
   await page.getByRole('button', { name: '卡住没出完' }).click()
   await page.getByRole('button', { name: '提交反馈' }).click()
 
-  // 服务端的真实原因原样展示。
-  await expect(page.getByRole('alert')).toContainText('该设备反馈提交过于频繁')
+  // 真实原因如实展示。服务端这句原话末尾叫用户「联系现场工作人员」，现场不安排人，
+  // 所以换成一体机登记过的同一原因（KIOSK_FEEDBACK_RATE_LIMITED），不照抄那半句。
+  const alert = page.getByRole('alert')
+  await expect(alert).toContainText('反馈提交过于频繁，请稍后再试')
+  expect(containsStaffHandoff(await alert.innerText()), '反馈失败提示不得叫用户去找现场的人').toBe(false)
   // 绝不出现回执 / 成功态。
   await expect(page.getByText('已收到你的反馈')).toHaveCount(0)
   await expect(page.locator('[data-kiosk-feedback-result="submitted"]')).toHaveCount(0)
   // 表单仍在，用户可以重试。
   await expect(page.getByRole('button', { name: '提交反馈' })).toBeVisible()
+})
+
+test('a clean server reason is shown verbatim, and an unregistered one that sends users to staff falls back to the phone line @kiosk', async ({ page, api }) => {
+  let nextBody: { code: string; message: string } = {
+    code: 'KIOSK_FEEDBACK_PRINT_TASK_INVALID',
+    message: '关联打印任务不属于本终端',
+  }
+  await page.route('**/api/v1/kiosk/feedback', async (route) => {
+    await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: nextBody }) })
+  })
+
+  await openFailedDone(page, api)
+  await page.getByRole('button', { name: '反馈问题' }).click()
+  await page.getByRole('button', { name: '卡住没出完' }).click()
+  await page.getByRole('button', { name: '提交反馈' }).click()
+
+  // 阳性对照：不含「找现场的人」的服务端原话原样展示（没有被统一改写成兜底句）。
+  await expect(page.getByRole('alert')).toContainText('关联打印任务不属于本终端')
+
+  // 码没有登记、原话又叫人找现场的人：退回兜底句 = 提交失败 + 标准句 1。
+  nextBody = { code: 'KIOSK_FEEDBACK_SOMETHING_NEW', message: '提交失败，请联系现场工作人员处理' }
+  await page.getByRole('button', { name: '提交反馈' }).click()
+  const alert = page.getByRole('alert')
+  await expect(alert).toContainText('提交失败，反馈未送出。')
+  await expect(alert).toContainText(HELP_NEEDED_LINE)
+  expect(containsStaffHandoff(await alert.innerText()), '兜底提示不得叫用户去找现场的人').toBe(false)
+  await expect(page.getByText('已收到你的反馈')).toHaveCount(0)
 })
 
 test('network failure does not fabricate a receipt @kiosk', async ({ page, api }) => {
@@ -422,10 +456,36 @@ test('pickup completed receipt shows real summary and directs reorders to phone 
   registerShell(api)
   api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, { status: 200, json: { taskId: TASK_ID, status: 'completed' } })
   await openDoneWithState(page, { taskId: TASK_ID, pickupSource: true, file: { name: '取件文件.pdf', size: '', pages: 3 }, params: { copies: 2, colorMode: 'color', duplex: 'duplex_long_edge' } })
+  // 2026-10-28 稿 done：完成页只留取走、入口和结束使用，打印记录收在「本次打印记录」折叠里，点开才是真实摘要。
+  await page.locator('summary', { hasText: '本次打印记录' }).click()
   await expect(page.getByText('本次任务摘要', { exact: true })).toBeVisible()
   await expect(page.getByText('3 页 × 2 份', { exact: true })).toBeVisible()
   await expect(page.getByText('双面（长边）', { exact: true })).toBeVisible()
   await expect(page.getByText('彩色', { exact: true })).toBeVisible()
   await expect(page.getByTestId('print-fulfill-reprint')).toHaveCount(0)
   await expect(page.getByText('要再打一份请在手机上重新下单', { exact: true })).toBeVisible()
+})
+
+
+test('游客完成页首屏显示提示和订单记录，不被底栏遮住 @kiosk', async ({ page, api }) => {
+  await page.setViewportSize({ width: 1080, height: 1920 })
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, { status: 200, json: { taskId: TASK_ID, status: 'completed' } })
+  await openDoneWithState(page, { ...taskState, orderNo: 'ORD-20261102-A7A1F567E5', hasEndUser: false })
+  const record = page.locator('summary', { hasText: '本次打印记录' })
+  await expect(record).toBeVisible()
+  const dock = page.locator('.qxt-dock')
+  const recordBox = await record.boundingBox()
+  const hintBox = await page.getByText('不再点屏幕，60 秒后结束本次使用', { exact: false }).boundingBox()
+  const dockBox = await dock.boundingBox()
+  expect(recordBox!.y + recordBox!.height).toBeLessThanOrEqual(dockBox!.y)
+  expect(hintBox!.y + hintBox!.height).toBeLessThanOrEqual(dockBox!.y)
+})
+
+test('游客状态未知时保留订单号和查询提示 @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  api.abort('GET', `/api/v1/print/jobs/${TASK_ID}`, 'internetdisconnected')
+  await openDoneWithState(page, { ...taskState, orderNo: 'ORD-20261102-A7A1F567E5', hasEndUser: false })
+  await expect(page.getByText('订单号是 ORD-20261102-A7A1F567E5')).toBeVisible()
+  await expect(page.getByText('需要时报这个订单号查询', { exact: false })).toBeVisible()
 })

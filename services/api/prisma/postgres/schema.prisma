@@ -50,6 +50,10 @@ model Terminal {
   /// 最近一次 Agent 心跳写入的时间，只在心跳时写。null = 从未心跳。
   /// 不能用 lastSeenAt 代替：它是 @updatedAt，后台改名、改点位等任何编辑都会刷新它。
   lastHeartbeatAt   DateTime?
+  /// 本机每日免费打印上限（面）。null = 用平台设置 print.freeQuota.terminalDailySides。
+  /// 计划中 / 已退役触发器不拦这一列：前者只拦 agentToken、lifecycleStatus、credentialGeneration，
+  /// 后者只在身份列变化时拦截。
+  dailyFreePrintSides Int?
 
   heartbeats   TerminalHeartbeat[]
   printTasks   PrintTask[]
@@ -208,6 +212,19 @@ model ScanTask {
   // Null until Kiosk ACKs that it durably holds this task's control credentials.
   // Agent current-lease must not see waiting rows while this is null.
   deliveryAckedAt  DateTime?
+  // ── 屏上扫描（device 路线，2026-11-02）──────────────────────────────────────
+  // startMode='panel'（默认）= 现有面板扫描：用户在打印机面板扫描到 SMB，Agent watcher 投递。
+  // startMode='device' = 用户在一体机屏上点「开始扫描」，终端程序服务经 WIA 直接扫描、合成 PDF 后投递。
+  // device* 字段只由终端程序回报（device-report）与「改用面板扫描」（switch-to-panel）写入；
+  // 面板路线这些字段恒为默认/空。status 仍是上面那套（waiting → matched → completed 等），device* 只是附加进度。
+  startMode        String    @default("panel") // 'panel' | 'device'
+  deviceSource     String?   // 'flatbed' | 'feeder'
+  deviceColorMode  String?   // 'gray' | 'color'
+  deviceState      String?   // ready | scanning | page_ready | composing | delivering | error | aborted
+  devicePageCount  Int       @default(0) // 只数整页收到的图
+  deviceErrorCode  String?   // feeder_empty | paper_jam | cover_open | busy | warming_up | not_ready | timeout | too_large | unknown
+  deviceUpdatedAt  DateTime? // 终端程序最近一次回报
+  hardExpiresAt    DateTime? // 续期上限 = createdAt + 30 分钟（仅 device 会话）
   expiresAt        DateTime
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -265,6 +282,10 @@ model TerminalHeartbeat {
   scanInputAction            String?
   scanInputReason            String?
   scanInputObservedAt        DateTime?
+  // 屏上扫描：终端程序最近一次探测扫描仪的结果（ready/busy/not_found/error/unknown）与探测时刻。
+  // 旧版终端程序不报这两项，库里就是 null。
+  scanDeviceHealth           String?
+  scanDeviceObservedAt       DateTime?
   agentVersion               String?
   ipAddress                  String?
   diskFreeGb                 Float?
@@ -2017,6 +2038,20 @@ model AiUsageMonthlySummary {
   @@unique([monthKey, featureKey, vendor, model, status], map: "AiUsageMonthly_dims_key")
 }
 
+/// 违法和不良信息词库。只存类别、词条和开关，不含用户提问。种子在代码里，这张表只记增删。
+model AiSafetyTerm {
+  id        String   @id @default(cuid())
+  category  String
+  term      String
+  kind      String
+  enabled   Boolean  @default(true)
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+
+  @@unique([category, kind, term])
+  @@index([enabled])
+}
+
 model UserAiConsent {
   id             String    @id @default(cuid())
   endUserId      String
@@ -2936,6 +2971,7 @@ model OnlinePlatformDirectory {
   evidenceFileId       String?
   evidenceFile         FileObject? @relation("OnlinePlatformEvidence", fields: [evidenceFileId], references: [id], onDelete: Restrict)
   displayOrder         Int      @default(0)
+  audience             String   @default("general")
   status               String   @default("inactive")
   reviewStatus         String   @default("pending")
   publishStatus        String   @default("draft")
@@ -3466,4 +3502,16 @@ model ServiceReport {
 
   @@unique([projectId, month])
   @@index([orgId, month])
+}
+
+model AiServiceFact {
+  id          String   @id @default(cuid())
+  serviceType String
+  serviceKey  String
+  orgId       String
+  terminalId  String
+  occurredAt  DateTime @default(now())
+
+  @@unique([serviceType, serviceKey])
+  @@index([orgId, occurredAt])
 }

@@ -412,6 +412,7 @@ const memberAgreement = read('src/pages/auth/components/MemberAgreement.tsx')
 const mobileQrPage = read('src/pages/auth/MobileQrLoginPage.tsx')
 const scanQrPanel = read('src/pages/auth/ScanQrLoginPanel.tsx')
 const phoneUploadPage = read('src/pages/upload/PhoneUploadPage.tsx')
+const kioskCodeEntryPage = read('src/pages/upload/KioskCodeEntryPage.tsx')
 const legalDocPage = read('src/pages/legal/LegalDocPage.tsx')
 const legalDocCss = read('src/pages/legal/legal-service-desk.css')
 const screensaverPage = read('src/pages/screensaver/ScreensaverPage.tsx')
@@ -427,6 +428,9 @@ for (const [path, component] of [
   ['/login', 'LoginPage'],
   ['/member/qr-login', 'MobileQrLoginPage'],
   ['/upload/phone', 'PhoneUploadPage'],
+  // 2026-10-29 一体机手机码短链的网页中转。
+  ['/k/u/:scene', 'UploadSceneEntry'],
+  ['/k/l/:ticketId', 'LoginTicketEntry'],
   ['/legal/:doc', 'LegalDocPage'],
   ['/screensaver', 'ScreensaverPage'],
 ]) {
@@ -478,13 +482,13 @@ for (const [source, marker, label] of [
 ]) {
   expectIncludes(source, marker, label)
 }
-// 2026-09-25 稿 08-legal 迁入青序流光：共享页壳 KioskPageFrame + KioskPageHeader 换成 QxPageFrame，
-// 三条同强度替换 —— 用青序共享壳、已退出 V6 壳、顶栏返回槽接到「回上一页」（来路不明才回受控来源 / 首页）。
-expectIncludes(legalDocPage, '<QxPageFrame', 'LegalDocPage 必须使用青序共享页壳 QxPageFrame')
+// 2026-10-27 触屏版：共享页壳换成 PublicTouchFrame。
+// 三条同强度替换 —— 用触屏共享壳、已退出 V6 壳、顶栏返回槽接到「回上一页」（来路不明才回受控来源 / 首页）。
+expectIncludes(legalDocPage, '<PublicTouchFrame', 'LegalDocPage 必须使用触屏共享页壳 PublicTouchFrame')
 expectNotIncludes(legalDocPage, 'KioskPageFrame', 'LegalDocPage 已退出 V6 KioskPageFrame')
 expectPattern(
   legalDocPage,
-  /<QxPageFrame\b[\s\S]{0,400}?back=\{\{\s*label:\s*backLabel,\s*onBack:\s*goBack\s*\}\}/,
+  /<PublicTouchFrame\b[\s\S]{0,400}?back=\{\{\s*label:\s*backLabel,\s*onBack:\s*goBack\s*\}\}/,
   'LegalDocPage 顶栏返回槽必须接到 goBack',
 )
 expectPattern(
@@ -560,6 +564,7 @@ for (const forbiddenCopy of ['一键投递', '立即投递', '平台投递']) {
     [mobileQrPage, 'MobileQrLoginPage'],
     [scanQrPanel, 'ScanQrLoginPanel'],
     [phoneUploadPage, 'PhoneUploadPage'],
+    [kioskCodeEntryPage, 'KioskCodeEntryPage'],
     [legalDocPage, 'LegalDocPage'],
     [screensaverPage, 'ScreensaverPage'],
     [helpCenterPage, 'HelpCenterPage'],
@@ -588,6 +593,8 @@ for (const [source, componentName, rootClass, label] of [
   [mobileQrPage, 'MobileQrLoginPage', 'k1-mobile-qr-login', 'MobileQrLoginPage'],
   [scanQrPanel, 'ScanQrLoginPanel', 'k1-scan-qr-login', 'ScanQrLoginPanel'],
   [phoneUploadPage, 'PhoneUploadPage', 'k1-phone-upload', 'PhoneUploadPage'],
+  [kioskCodeEntryPage, 'UploadSceneEntry', 'k1-phone-upload', 'UploadSceneEntry'],
+  [kioskCodeEntryPage, 'LoginTicketEntry', 'k1-phone-upload', 'LoginTicketEntry'],
   [legalDocPage, 'LegalDocPage', 'k1-legal-doc', 'LegalDocPage'],
   [screensaverPage, 'ScreensaverPage', 'k1-screensaver', 'ScreensaverPage'],
   [helpCenterPage, 'HelpCenterPage', 'k1-help-center', 'HelpCenterPage'],
@@ -599,6 +606,8 @@ for (const [componentName, label] of [
   ['LoginPage', 'LoginPage'],
   ['MobileQrLoginPage', 'MobileQrLoginPage'],
   ['PhoneUploadPage', 'PhoneUploadPage'],
+  ['UploadSceneEntry', 'UploadSceneEntry'],
+  ['LoginTicketEntry', 'LoginTicketEntry'],
   ['LegalDocPage', 'LegalDocPage'],
   ['ScreensaverPage', 'ScreensaverPage'],
 ]) {
@@ -689,6 +698,19 @@ for (const { page, cssPath, rootClass, label } of [
     cssPath: 'src/pages/upload/phone-upload-service-desk.css',
     rootClass: 'k1-phone-upload',
     label: 'PhoneUploadPage',
+  },
+  // 中转页照用上传页样式，自己只补一份「重试」按钮样式；两份都要导入、都要守住 k1-phone-upload 作用域。
+  {
+    page: kioskCodeEntryPage,
+    cssPath: 'src/pages/upload/phone-upload-service-desk.css',
+    rootClass: 'k1-phone-upload',
+    label: 'KioskCodeEntryPage',
+  },
+  {
+    page: kioskCodeEntryPage,
+    cssPath: 'src/pages/upload/kiosk-code-entry.css',
+    rootClass: 'k1-phone-upload',
+    label: 'KioskCodeEntryPage',
   },
   {
     page: legalDocPage,

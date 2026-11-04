@@ -217,6 +217,8 @@ const WAVE_ROUTES = new Map([
   ]],
   ['W5', [
     '/login', '/member/qr-login', '/upload/phone', '/legal/:doc', '/screensaver',
+    // 2026-10-29 一体机手机码短链的网页中转，与上面两个手机辅助页同一口径（顶层、手机视口）。
+    '/k/u/:scene', '/k/l/:ticketId',
     '/session-timeout', '/error-offline', '/profile', '/me/resumes', '/me/print-orders',
     '/me/documents', '/me/favorites', '/me/ai-records', '/me/benefits', '/me/activity',
     '/me/activity/:id', '/me/notifications', '/me/feedback', '/me/settings',
@@ -231,6 +233,8 @@ const WAVE_ROUTES = new Map([
     '/contract-review',
     '/contract-review/processing',
     '/contract-review/result', '/policy-service',
+    // 开发样板（非业务屏）：触屏公共件，不占业务波次。
+    '/dev/touch-gallery',
   ]],
 ])
 
@@ -301,7 +305,14 @@ check('single main landmark', () => {
 })
 
 check('mobile routes', () => {
-  const mobile = ['/member/qr-login', '/upload/phone']
+  // 后两条是一体机手机码短链的网页中转（2026-10-29），兑换或校验后 replace 到前两条。
+  const mobilePages = {
+    '/member/qr-login': 'src/pages/auth/MobileQrLoginPage.tsx',
+    '/upload/phone': 'src/pages/upload/PhoneUploadPage.tsx',
+    '/k/u/:scene': 'src/pages/upload/KioskCodeEntryPage.tsx',
+    '/k/l/:ticketId': 'src/pages/upload/KioskCodeEntryPage.tsx',
+  }
+  const mobile = Object.keys(mobilePages)
   for (const path of mobile) {
     const route = routeInventory.find((candidate) => candidate.path === path)
     assert.ok(route, `missing mobile helper ${path}`)
@@ -309,12 +320,12 @@ check('mobile routes', () => {
   }
   assert.ok(!manifest.paths.includes('/login/mobile'), 'obsolete /login/mobile alias must not be introduced')
   const expectedFullScreen = [
-    '/login', '/member/qr-login', '/upload/phone', '/legal/:doc', '/resume/job-fit',
+    '/login', '/member/qr-login', '/upload/phone', '/k/u/:scene', '/k/l/:ticketId', '/legal/:doc', '/resume/job-fit',
     '/resume/career-plan', '/interview/setup', '/interview/session', '/interview/report',
     '/interview/tips', '/interview/reports', '/screensaver', '/session-timeout', '/error-offline',
   ]
   for (const path of expectedFullScreen) {
-    const expectedDepth = ['/member/qr-login', '/upload/phone'].includes(path) ? 0 : 2
+    const expectedDepth = mobile.includes(path) ? 0 : 2
     assert.equal(
       routeInventory.find((route) => route.path === path)?.depth,
       expectedDepth,
@@ -324,7 +335,7 @@ check('mobile routes', () => {
   const routesSource = readKiosk('src/routes/index.tsx')
   assert.match(routesSource, /element:\s*<KioskRuntimeRoot\s*\/>/, 'terminal full-screen routes retain the non-visual security root')
   for (const path of mobile) {
-    const page = path === '/member/qr-login' ? 'src/pages/auth/MobileQrLoginPage.tsx' : 'src/pages/upload/PhoneUploadPage.tsx'
+    const page = mobilePages[path]
     const source = readKiosk(page)
     assert.match(source, /data-kiosk-presentation=["']fusion-youth["']/, `${path} retains fusion presentation`)
     assert.match(source, /data-kiosk-viewport=["']mobile["']/, `${path} retains mobile viewport`)
@@ -453,21 +464,23 @@ check('W2-W5 state coverage', () => {
     "registerMemberLogin(api)",
     "loginThroughVisibleUi(page, '/me/resumes')",
     "status: 503",
-    "page.getByRole('heading', { name: '简历记录这次没有加载出来' })",
+    "page.getByRole('heading', { name: '这次没读到', exact: true })",
     "json: { success: true, data: { items: [], nextCursor: null, total: 0 } }",
-    "page.getByText('还没有登录后保存的简历', { exact: true })",
+    "page.getByText('这个账号还没有简历记录', { exact: true })",
   ])
   // 稿 09-system-state（2026-09-25 迁入）：主操作按稿叫「重新检测」（旧页叫「重试连接」），证据锚点随稿换字，判据不变。
+  // 2026-10-28 触屏稿：屏上不写重测次数和秒数，次数只留给读屏（.qxp-sr），证据锚点换成读屏文字节点；进页自动检测后手动重试，判据仍是失败后状态还在且计数累加。
   assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'offline page retains the 8177 state after an aborted health request @w5-kiosk'", [
     "api.abort('GET', '/api/v1/health', 'internetdisconnected')",
     "page.getByRole('button', { name: '重新检测', exact: true }).click()",
-    "page.getByText(/已重试 1 次/)",
+    "page.getByTestId('system-state-auto')).toContainText('已重试 1 次')",
   ])
+  // 证据锚点随稿换字，判据不变：未登录仍有去登录，仍不预渲染资产，仍有不登录出口。
   assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'profile permission state uses the canonical fusion shell @w5-kiosk'", [
     "page.goto('/profile')",
     "page.getByRole('button', { name: '去登录', exact: true })",
     "page.getByRole('region', { name: '我的资产' })",
-    "page.getByRole('region', { name: '登录与不登录的分界' })",
+    "page.getByRole('region', { name: '不登录也能办' })",
   ])
   assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'mobile QR login renders a real API error and touch-safe retry @w5-mobile'", [
     "status: 410",
@@ -522,7 +535,7 @@ check('W6 route acceptance contract', () => {
     const object = element
     const pattern = directString(object, 'pattern')
     assert.ok(pattern, 'W6 route pattern must be a direct string')
-    const viewport = ['/member/qr-login', '/upload/phone'].includes(pattern) ? 'mobile' : 'kiosk'
+    const viewport = ['/member/qr-login', '/upload/phone', '/k/u/:scene', '/k/l/:ticketId'].includes(pattern) ? 'mobile' : 'kiosk'
     const landmark = directString(object, 'landmark') ?? 'main'
     const requiresFusionRoot = directBoolean(object, 'requiresFusionRoot') ?? true
     const explicitTouchTargets = directBoolean(object, 'requiresTouchTargets')
@@ -539,7 +552,8 @@ check('W6 route acceptance contract', () => {
   assert.equal(new Set(routes.map(({ pattern }) => pattern)).size, routes.length, 'W6 route cases must be unique')
   assert.deepEqual(routes.map(({ pattern }) => pattern).sort(), [...manifest.paths].sort(), 'W6 cases and manifest differ')
   const mobileCount = routes.filter(({ viewport }) => viewport === 'mobile').length
-  assert.equal(mobileCount, 2, 'W6 mobile allocation')
+  // 2 → 4（2026-10-29）：扫码登录、手机上传，加两者的短链网页中转。
+  assert.equal(mobileCount, 4, 'W6 mobile allocation')
 })
 
 check('W6 browser collection contract', () => {

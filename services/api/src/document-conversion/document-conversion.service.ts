@@ -18,6 +18,7 @@ import { PDFDocument } from 'pdf-lib'
 import { withBootTimeout } from '../common/boot/boot-readiness'
 import { FilesService } from '../files/files.service'
 import type { FilePurpose, FileSensitiveLevel } from '../files/file.types'
+import { isOrderOnlyFile } from '../files/retention-policy'
 import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { ConcurrencyLimiter } from './concurrency-limiter'
@@ -183,6 +184,7 @@ export class DocumentConversionService implements OnModuleInit {
         status: true,
         deletedAt: true,
         expiresAt: true,
+        retentionLockedReason: true,
       },
     })
     if (!source || source.status !== 'active' || source.deletedAt || (source.expiresAt && source.expiresAt <= new Date())) {
@@ -217,6 +219,8 @@ export class DocumentConversionService implements OnModuleInit {
       actorOrgId: role === 'partner' ? source.ownerId : null,
       createdBy: 'document_conversion',
       validationMode: 'intent',
+      // 源文件只用于这一单（一体机这一单里从手机传来的）时，转出来的 PDF 跟着锁，不进「我的文档」。
+      orderOnly: isOrderOnlyFile(source),
     })
     return {
       fileId: uploaded.fileId,

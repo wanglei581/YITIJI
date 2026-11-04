@@ -71,6 +71,7 @@ interface Props {
   logsOffset: number
   logsLoading: boolean
   logsError: string | null
+  onReload?: () => void
   opFilter: OpFilter
   statusFilter: StatusFilter
   applyOpFilter: (filter: OpFilter) => void
@@ -84,6 +85,7 @@ export function AiLogsTable({
   logsOffset,
   logsLoading,
   logsError,
+  onReload,
   opFilter,
   statusFilter,
   applyOpFilter,
@@ -193,12 +195,25 @@ export function AiLogsTable({
         </div>
       </div>
 
+      {logsError ? (
+        <Card className="p-6 text-center">
+          <p className="text-sm font-medium text-neutral-800">调用日志加载失败</p>
+          <p className="mt-1 text-sm text-neutral-500">{logsError}</p>
+          <button
+            type="button"
+            onClick={onReload}
+            className="mt-3 inline-flex h-11 items-center rounded-lg border border-neutral-200 bg-surface px-4 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
+          >
+            重新加载
+          </button>
+        </Card>
+      ) : (
       <Card className="overflow-hidden p-0">
         <ConsoleTable
           items={logs}
           columns={columns}
           loading={logsLoading}
-          error={logsError ? { title: '调用日志加载失败', message: logsError } : null}
+          error={null}
           empty={{
             title: '该筛选条件下没有调用记录（已按条件查全库，不是只翻了最近 100 条）',
             description: '请调整筛选条件。',
@@ -209,6 +224,7 @@ export function AiLogsTable({
           onPageChange={(page) => setLogsOffset((page - 1) * LOGS_PAGE_SIZE)}
         />
       </Card>
+      )}
     </section>
   )
 }

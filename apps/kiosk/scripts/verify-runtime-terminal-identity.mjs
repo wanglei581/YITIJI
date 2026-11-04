@@ -15,10 +15,12 @@ const advisorCall = read('src/hooks/useAiAdvisorCallSession.ts')
 const shell = read('src/layouts/KioskRoot.tsx')
 const topbar = read('src/components/kiosk-shell/KioskAppTopbar.tsx')
 
-// 拍板②：只有网络抖动 / 503 TERMINAL_SESSION_RETRYABLE 自动重试；401 TERMINAL_SESSION_INVALID 立即 fail-closed。
+// 拍板②：网络抖动以及网关 502 / 503 / 504 自动重试（不看业务错误码）；401 TERMINAL_SESSION_INVALID 立即 fail-closed。
 const transientBody = terminalAuth.match(/function transient\(error: unknown\): boolean \{([\s\S]*?)\n\}/)?.[1] ?? ''
 assert.ok(transientBody, 'terminalAuth must classify retryable errors in transient()')
-assert.match(transientBody, /503/, 'transient() must treat 503 TERMINAL_SESSION_RETRYABLE as retryable')
+assert.match(transientBody, /502/, 'transient() must treat gateway 502 as retryable')
+assert.match(transientBody, /503/, 'transient() must treat 503 (including TERMINAL_SESSION_RETRYABLE and a gateway error page) as retryable')
+assert.match(transientBody, /504/, 'transient() must treat gateway 504 as retryable')
 assert.doesNotMatch(transientBody, /401/, 'transient() must not retry 401 TERMINAL_SESSION_INVALID (revoked / used ticket cannot recover by retrying)')
 assert.match(terminalAuth, /if \(!sessionInvalid\(error\)\) return response/, 'a business 401 must trigger exactly one session refresh, other errors go back to the caller')
 assert.match(terminalAuth, /refreshInflight/, 'concurrent 401s must share one refresh (no thundering herd on /session-token/refresh)')
@@ -143,7 +145,7 @@ for (const [file, guard] of filePickers) {
 }
 assert.match(read('src/pages/resume/ResumeSourcePage.tsx'), /isTerminalKiosk\(\) \? 'phone' : 'cloud'/, 'terminal resume source defaults to an allowed channel')
 assert.match(read('src/pages/print/PrintUploadPage.tsx'), /if \(!isTerminalKiosk\(\)\) inputRef\.current\?\.click\(\)/, 'delayed replace-file callback rechecks terminal identity')
-for (const file of ['src/pages/home/components/QxHomeView.tsx', 'src/pages/help/HelpCenterPage.tsx']) {
+for (const file of ['src/pages/home/components/HomeTouchView.tsx', 'src/pages/help/HelpCenterPage.tsx']) {
   const source = read(file)
   assert.match(source, /kiosk \? <span>鲁ICP备[^<]+<\/span> : \(<a href="https:\/\/beian\.miit\.gov\.cn\//)
   assert.match(source, /kiosk \? <span>鲁公网安备[^<]+<\/span> : \(<a href="https:\/\/beian\.mps\.gov\.cn\//)

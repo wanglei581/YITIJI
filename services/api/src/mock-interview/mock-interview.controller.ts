@@ -1,3 +1,4 @@
+import { wavDuration } from '../asr/wav-duration'
 import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
 import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { FileInterceptor } from '@nestjs/platform-express'
@@ -173,9 +174,9 @@ export class MockInterviewController {
     @UploadedFile() audio: Express.Multer.File | undefined,
     @Req() req: ReqLike,
   ) {
-    // 先做归属校验(借 getSession 的门禁;不存在/越权统一 404),再消费音频
+    // 先做归属校验。尚未开场且面试余量已用完时拒绝，场内转写不再查。
     const requester = await this.requesterOf(req)
-    await this.service.getSession(id, requester)
+    await this.service.assertTranscribeAllowed(id, requester)
     if (!audio?.buffer?.length) {
       throw new BadRequestException({ error: { code: 'AUDIO_MISSING', message: '缺少音频内容' } })
     }
@@ -185,6 +186,7 @@ export class MockInterviewController {
     this.aiLog.record({
       taskId: id,
       operation: 'voiceTranscribe',
+      voiceUsage: wavDuration(audio.buffer),
       provider: this.asr.activeProviderName,
       status: result.ok ? 'success' : 'failed',
       latencyMs: Math.max(0, Date.now() - asrStartedAt),
@@ -223,6 +225,7 @@ export class MockInterviewController {
     this.aiLog.record({
       taskId: id,
       operation: 'voiceSynthesize',
+      voiceUsage: result.voiceUsage,
       provider: 'tts:tencent',
       status: result.ok ? 'success' : 'failed',
       latencyMs: Math.max(0, Date.now() - ttsStartedAt),

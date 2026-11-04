@@ -36,8 +36,9 @@
       </view>
     </view>
 
-    <!-- 未登录：确认要用小程序里的账号 -->
-    <block wx:if="{{!isLoggedIn}}">
+    <!-- 未登录：确认要用小程序里的账号。票据在页面内存里，登录回来接着确认。
+         扫的不是一体机的码、或这张码已经不能再确认，不必先登录，直接说清（落到下面对应分支）。 -->
+    <block wx:if="{{!isLoggedIn && phase !== 'scan-error' && phase !== 'ticket-dead'}}">
       <view class="statecard">
         <view class="glyph"><text class="ficon i-user"></text></view>
         <view class="sc-title">请先登录小程序</view>

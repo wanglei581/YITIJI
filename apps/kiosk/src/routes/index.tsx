@@ -5,6 +5,7 @@ import { KioskRuntimeRoot } from '../layouts/KioskRuntimeRoot'
 import { LoginPage } from '../pages/auth/LoginPage'
 import { MobileQrLoginPage } from '../pages/auth/MobileQrLoginPage'
 import { PhoneUploadPage } from '../pages/upload/PhoneUploadPage'
+import { LoginTicketEntry, UploadSceneEntry } from '../pages/upload/KioskCodeEntryPage'
 import { LegalDocPage } from '../pages/legal/LegalDocPage'
 import { JobFitPage } from '../pages/resume/JobFitPage'
 import { JobFitActionsPage } from '../pages/resume/JobFitActionsPage'
@@ -84,6 +85,9 @@ export const kioskRouter = createBrowserRouter([
   // 只有明确的手机辅助入口豁免 27 寸公共终端运行时超时。
   { path: '/member/qr-login', element: <MobileQrLoginPage />, errorElement: <KioskRouteErrorPage /> },
   { path: '/upload/phone', element: <PhoneUploadPage />, errorElement: <KioskRouteErrorPage /> },
+  // 一体机手机码短链的网页中转（微信规则没生效或用别的软件扫时打开）：兑换或校验后 replace 到上面两页。
+  { path: '/k/u/:scene', element: <UploadSceneEntry />, errorElement: <KioskRouteErrorPage /> },
+  { path: '/k/l/:ticketId', element: <LoginTicketEntry />, errorElement: <KioskRouteErrorPage /> },
   {
     element: <KioskRuntimeRoot />,
     errorElement: <KioskRouteErrorPage />,
@@ -307,15 +311,15 @@ export const kioskRouter = createBrowserRouter([
           {
             path: 'jobs-service',
             lazy: async () => {
-              const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
-              return { Component: () => <QxServiceHubPage hub="jobs" /> }
+              const { SocialHubPage } = await import('../pages/recruitment-touch/SocialHubPage')
+              return { Component: SocialHubPage }
             },
           },
           {
             path: 'fairs-service',
             lazy: async () => {
-              const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
-              return { Component: () => <QxServiceHubPage hub="fairs" /> }
+              const { CampusServicePage } = await import('../pages/recruitment-touch/CampusServicePage')
+              return { Component: CampusServicePage }
             },
           },
         ],
@@ -347,9 +351,19 @@ export const kioskRouter = createBrowserRouter([
       {
         path: 'policy-service',
         lazy: async () => {
-          const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
-          return { Component: () => <QxServiceHubPage hub="policy" /> }
+          const { PolicyTouchHub } = await import('../pages/service-hubs/PolicyTouchHub')
+          return { Component: () => <PolicyTouchHub /> }
         },
+      },
+      {
+        path: 'dev/touch-gallery',
+        ...(import.meta.env.DEV
+          ? {
+              lazy: async () => ({
+                Component: (await import('../pages/dev/QxTouchGalleryPage')).QxTouchGalleryPage,
+              }),
+            }
+          : { element: <Navigate to="/" replace /> }),
       },
         ],
       },

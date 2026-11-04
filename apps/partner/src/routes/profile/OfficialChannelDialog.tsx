@@ -1,4 +1,9 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import {
+  OFFICIAL_CHANNEL_AUDIENCES,
+  OFFICIAL_CHANNEL_AUDIENCE_LABELS,
+  type OfficialChannelAudience,
+} from '@ai-job-print/shared'
 import { Button, Card } from '@ai-job-print/ui'
 import { AlertCircleIcon, CheckCircle2Icon, InfoIcon, XIcon } from 'lucide-react'
 import {
@@ -55,10 +60,12 @@ export function OfficialChannelDialog({
   onSaved: (item: OfficialChannelPartnerItem) => void
 }) {
   const titleId = useId()
+  const audienceGroup = useId()
   const editing = target.mode === 'edit' ? target.channel : null
   const [name, setName] = useState(editing?.name ?? '')
   const [url, setUrl] = useState(editing?.url ?? '')
   const [order, setOrder] = useState(String(editing ? editing.displayOrder : target.mode === 'create' ? target.nextOrder : 0))
+  const [audience, setAudience] = useState<OfficialChannelAudience>(editing?.audience ?? 'general')
   const [enabled, setEnabled] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -86,6 +93,7 @@ export function OfficialChannelDialog({
     if (trimmedName !== editing.name) changes.name = trimmedName
     if (canonicalChannelUrl(url) !== editing.url) changes.url = url.trim()
     if (orderValue !== null && orderValue !== editing.displayOrder) changes.displayOrder = orderValue
+    if (audience !== editing.audience) changes.audience = audience
   }
   const unchanged = editing !== null && Object.keys(changes).length === 0
   const canSubmit = nameOk && urlOk && orderValue !== null && !unchanged && !saving
@@ -102,6 +110,7 @@ export function OfficialChannelDialog({
             url: url.trim(),
             displayOrder: orderValue,
             enabled,
+            audience,
           })
       onSaved(saved)
     } catch (e) {
@@ -186,6 +195,25 @@ export function OfficialChannelDialog({
               <li>商业招聘网站不能设为本机构官方渠道。</li>
             </ul>
           </div>
+
+          <fieldset className="text-sm" disabled={saving}>
+            <legend className="mb-1 text-neutral-600">面向对象</legend>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {OFFICIAL_CHANNEL_AUDIENCES.map((value) => (
+                <label key={value} className="flex items-center gap-2 text-sm text-neutral-700">
+                  <input
+                    type="radio"
+                    name={audienceGroup}
+                    className="h-4 w-4 border-neutral-300"
+                    checked={audience === value}
+                    onChange={() => setAudience(value)}
+                  />
+                  {OFFICIAL_CHANNEL_AUDIENCE_LABELS[value]}
+                </label>
+              ))}
+            </div>
+            <span className="mt-1 block text-xs text-neutral-500">一体机按这里分组显示；都选通用就不分组。</span>
+          </fieldset>
 
           <label className="block text-sm">
             <span className="mb-1 block text-neutral-600">排序</span>

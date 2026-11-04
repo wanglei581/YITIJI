@@ -99,6 +99,40 @@ export class TerminalCapabilitiesService {
     return { terminalCode: terminal.terminalCode, capabilities }
   }
 
+  async readDailyFreePrintSides(terminalId: string): Promise<number | null> {
+    const terminal = await this.prisma.terminal.findUnique({
+      where: { id: terminalId },
+      select: { dailyFreePrintSides: true },
+    })
+    if (!terminal) {
+      throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
+    }
+    return terminal.dailyFreePrintSides
+  }
+
+  async setDailyFreePrintSides(
+    terminalId: string,
+    value: number | null,
+  ): Promise<{ terminalCode: string; previous: number | null; dailyFreePrintSides: number | null }> {
+    if (value !== null && (!Number.isInteger(value) || value < 1 || value > 10_000)) {
+      throw new BadRequestException({
+        error: { code: 'VALIDATION_FAILED', message: '每日免费打印上限须为 1 到 10000 的整数，或留空使用全局默认' },
+      })
+    }
+    const terminal = await this.prisma.terminal.findUnique({
+      where: { id: terminalId },
+      select: { terminalCode: true, dailyFreePrintSides: true },
+    })
+    if (!terminal) {
+      throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
+    }
+    await this.prisma.terminal.update({
+      where: { id: terminalId },
+      data: { dailyFreePrintSides: value },
+    })
+    return { terminalCode: terminal.terminalCode, previous: terminal.dailyFreePrintSides, dailyFreePrintSides: value }
+  }
+
   async upsert(
     terminalId: string,
     capabilityKey: string,
@@ -292,6 +326,54 @@ export class TerminalCapabilitiesService {
             : `${reason}。可改用黑白单面打印，或联系现场工作人员。`,
         },
       })
+    }
+  }
+
+  /**
+   * 屏上扫描（device 会话）准入：**按终端判定 `scan_device` 是否验过**（fail-closed，写法同彩色 / 双面）。
+   *
+   * 未配置 = 拒绝，且不看 PRINT_SCAN_CAPABILITY_MODE：屏上扫描没有「能力开关引入前就已验收」的既有闭环，
+   * 未配置的真实含义是「这台机器没验过进纸器、无纸、开盖、打印时扫描、中止恢复」。放行只有一条路径：
+   * 管理员在该终端真机验过后显式配成 available。
+   *
+   * 错误码单列 SCAN_DEVICE_NOT_VERIFIED_ON_TERMINAL（403），便于一体机精确提示「改用面板扫描」与门禁断言。
+   * 建 device 会话时调用；`scan` 本身的准入仍由 assertUserTaskAllowed(…, 'scan') 先行把关。
+   */
+  async assertScanDeviceAllowed(terminalId: string): Promise<void> {
+    const availability = await this.scanDeviceAvailability(terminalId)
+    if (availability.available) return
+    const reason = CAPABILITY_DENIAL_REASON.scan_device ?? '本机屏上扫描尚未通过真机验证'
+    throw new ForbiddenException({
+      error: {
+        code: 'SCAN_DEVICE_NOT_VERIFIED_ON_TERMINAL',
+        message: availability.note ? `${reason}：${availability.note}` : `${reason}。可改用面板扫描。`,
+      },
+    })
+  }
+
+  /**
+   * `scan_device` 当前是否可用（不抛）。device-report 用它判断能力中途被关：
+   * 终端程序此时拿到的是 409（据此停扫），而不是建会话时的 403。
+   */
+  async scanDeviceAvailability(
+    terminalId: string,
+  ): Promise<{ available: boolean; configured: boolean; note: string | null }> {
+    const row = await this.prisma.terminalCapability.findUnique({
+      where: { terminalId_capabilityKey: { terminalId, capabilityKey: 'scan_device' } },
+      select: { status: true, note: true },
+    })
+    if (!row) {
+      // 未配置行的判定与 assertUserTaskAllowed 同一套：在 DEFAULT_DENY 里 = 拒绝（不看模式）；
+      // 不在名单里时由 PRINT_SCAN_CAPABILITY_MODE 决定。「默认关」只由名单这一处决定，不另写死一份。
+      const denyUnconfigured =
+        (DEFAULT_DENY_CAPABILITY_KEYS as readonly string[]).includes('scan_device') ||
+        resolvePrintScanCapabilityMode() === 'strict'
+      return { available: !denyUnconfigured, configured: false, note: null }
+    }
+    return {
+      available: canCreateFormalPrintScanTask(this.asStatus(row.status)),
+      configured: true,
+      note: row.note,
     }
   }
 

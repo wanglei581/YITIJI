@@ -1,8 +1,9 @@
 import 'reflect-metadata'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import type { FirstOrderIncident, FirstOrderOverview, FirstOrderProject, FirstOrderReport, FirstOrderReportSnapshot } from '@ai-job-print/shared'
+import type { FirstOrderIncident, FirstOrderIncidentDirectory, FirstOrderOverview, FirstOrderProject, FirstOrderReport, FirstOrderReportDirectory, FirstOrderReportSnapshot } from '@ai-job-print/shared'
 import { createFirstOrderFixture, seedFirstOrderMonth } from './support/first-order-fixture'
+import { previousClosedMonth } from '../src/first-order/first-order-report-metrics'
 import { assignTerminalOrganization } from '../src/terminals/terminal-org-assignment'
 import { AuditService } from '../src/audit/audit.service'
 import { verifyFirstOrderReviewBoundaries } from './support/first-order-review-boundaries'
@@ -208,6 +209,95 @@ async function main() {
     const terminalAfterOldEnd = await f.prisma.terminal.findUniqueOrThrow({ where: { id: f.terminals.monthly } })
     const newBindingAfterOldEnd = await f.prisma.serviceDeployment.findUniqueOrThrow({ where: { id: transferredDeployment.id } })
     check('结束旧机构历史登记绝不恢复旧归属或结束新机构登记', terminalAfterOldEnd.orgId === f.orgs.other && newBindingAfterOldEnd.activeTerminalId === f.terminals.monthly && newBindingAfterOldEnd.endedAt === null)
+
+    const secretNote = '现场说明正文不应出现'
+    const secretPhone = '13900001111'
+    const secretContact = '群众联系人张三'
+    const ownOrgBefore = await f.prisma.organization.findUniqueOrThrow({ where: { id: f.orgs.own } })
+    await f.prisma.organization.update({ where: { id: f.orgs.own }, data: { contact: secretContact, contactPhone: secretPhone } })
+    await f.prisma.serviceIncident.update({ where: { id: incident.id }, data: { createdAt: new Date('2026-05-01T00:00:00.000Z') } })
+    await f.prisma.serviceIncident.update({ where: { id: concurrent[0].id }, data: { createdAt: new Date('2026-06-01T00:00:00.000Z') } })
+    const otherOpen = await f.prisma.serviceIncident.create({ data: {
+      orgId: f.orgs.other, projectId: transferredProject.id, deploymentId: transferredDeployment.id,
+      terminalCode: f.terminals.monthly.toUpperCase(), issueCode: 'offline', note: `${secretNote}${secretPhone}`,
+      requestKey: randomUUID(), status: 'open', assignee: '目录维修员', createdAt: new Date('2026-03-01T00:00:00.000Z'),
+      events: { create: { action: 'create', note: `${secretNote}${secretPhone}`, actorRole: 'partner' } },
+    } })
+    const ownOpen = await f.prisma.serviceIncident.create({ data: {
+      orgId: f.orgs.own, projectId: project.id, deploymentId: deployment.id, terminalCode: f.terminals.spare.toUpperCase(),
+      issueCode: 'jam', note: secretNote, requestKey: randomUUID(), status: 'open', createdAt: new Date('2026-04-01T00:00:00.000Z'),
+    } })
+    const processingRow = await f.prisma.serviceIncident.create({ data: {
+      orgId: f.orgs.own, projectId: project.id, deploymentId: deployment.id, terminalCode: f.terminals.spare.toUpperCase(),
+      issueCode: 'scan', note: secretNote, requestKey: randomUUID(), status: 'processing', assignee: '目录维修员乙', createdAt: new Date('2026-02-01T00:00:00.000Z'),
+    } })
+    const resolvedRow = await f.prisma.serviceIncident.create({ data: {
+      orgId: f.orgs.own, projectId: project.id, deploymentId: deployment.id, terminalCode: f.terminals.spare.toUpperCase(),
+      issueCode: 'quality', note: secretNote, requestKey: randomUUID(), status: 'resolved', createdAt: new Date('2026-01-15T00:00:00.000Z'),
+    } })
+    const closedRow = await f.prisma.serviceIncident.create({ data: {
+      orgId: f.orgs.own, projectId: project.id, deploymentId: deployment.id, terminalCode: f.terminals.spare.toUpperCase(),
+      issueCode: 'other', note: secretNote, requestKey: randomUUID(), status: 'closed', createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    } })
+    await request(null, `${A}/incidents`, 401)
+    await request('partner', `${A}/incidents`, 403)
+    await request('kiosk', `${A}/incidents`, 403)
+    await request('partner', `${P}/incidents`, 404)
+    await request('admin', `${A}/incidents?status=nope`, 400)
+    await request('admin', `${A}/incidents?limit=0`, 400)
+    const auditsBeforeIncidents = await f.prisma.auditLog.count()
+    const incidentList = await request<FirstOrderIncidentDirectory>('admin', `${A}/incidents`)
+    const incidentKeys = ['assignee', 'createdAt', 'id', 'issueCode', 'orgId', 'orgName', 'projectId', 'projectName', 'status', 'terminalCode', 'updatedAt'].join(',')
+    const incidentJson = JSON.stringify(incidentList)
+    check('跨机构工单只给管理员且读取不写审计', await f.prisma.auditLog.count() === auditsBeforeIncidents)
+    check('未关闭工单按状态和创建时间排列并跨两家机构', incidentList.items.map((row) => row.id).join(',') === [otherOpen.id, ownOpen.id, incident.id, processingRow.id, concurrent[0].id, resolvedRow.id].join(',') && incidentList.total === 6 && incidentList.truncated === false)
+    check('工单目录字段只有白名单且不含说明、事件和联系方式', incidentList.items.every((row) => Object.keys(row).sort().join(',') === incidentKeys) && !incidentJson.includes(secretNote) && !incidentJson.includes(secretPhone) && !incidentJson.includes(secretContact) && !incidentJson.includes('缺纸，请安排补纸'))
+    check('目录保留机构名、项目名和内部负责人', incidentList.items[0].orgId === f.orgs.other && incidentList.items[0].orgName === '另一验证机构' && incidentList.items[0].projectName === transferredProject.name && incidentList.items[0].assignee === '目录维修员' && incidentList.items[0].terminalCode === f.terminals.monthly.toUpperCase())
+    const openOnly = await request<FirstOrderIncidentDirectory>('admin', `${A}/incidents?status=open`)
+    check('按状态筛选只返回该状态', openOnly.items.every((row) => row.status === 'open') && openOnly.total === 3 && openOnly.items.map((row) => row.id).join(',') === [otherOpen.id, ownOpen.id, incident.id].join(','))
+    const closedOnly = await request<FirstOrderIncidentDirectory>('admin', `${A}/incidents?status=closed`)
+    check('显式查询已关闭时才返回已关闭', closedOnly.total === 1 && closedOnly.items[0]?.id === closedRow.id && closedOnly.truncated === false)
+    const incidentPage = await request<FirstOrderIncidentDirectory>('admin', `${A}/incidents?limit=1`)
+    check('工单超过本次条数时总数准确且标明未列全', incidentPage.items.length === 1 && incidentPage.items[0]?.id === otherOpen.id && incidentPage.total === 6 && incidentPage.truncated === true)
+    const bulkNote = `bulk-cap-${randomUUID()}`
+    await f.prisma.serviceIncident.createMany({ data: Array.from({ length: 201 }, (_, index) => ({
+      orgId: f.orgs.own, projectId: project.id, deploymentId: deployment.id, terminalCode: f.terminals.spare.toUpperCase(),
+      issueCode: 'other', note: bulkNote, requestKey: randomUUID(), status: 'resolved', createdAt: new Date(Date.UTC(2026, 5, 1, 0, 0, index)),
+    })) })
+    const cappedIncidents = await request<FirstOrderIncidentDirectory>('admin', `${A}/incidents?status=resolved&limit=500`)
+    check('工单条数超过上限不报错，总数仍准确', cappedIncidents.items.length === 200 && cappedIncidents.total === 202 && cappedIncidents.truncated === true && !JSON.stringify(cappedIncidents).includes(bulkNote))
+    await f.prisma.serviceIncident.deleteMany({ where: { note: bulkNote } })
+    await f.prisma.organization.update({ where: { id: f.orgs.own }, data: { contact: ownOrgBefore.contact, contactPhone: ownOrgBefore.contactPhone } })
+
+    await request(null, `${A}/reports`, 401)
+    await request('partner', `${A}/reports`, 403)
+    await request('kiosk', `${A}/reports`, 403)
+    await request('admin', `${A}/reports?month=2026-13`, 400)
+    await request('admin', `${A}/reports?month=2026/09`, 400)
+    await request('admin', `${A}/reports?limit=abc`, 400)
+    const bareProject = await f.prisma.serviceProject.create({ data: {
+      orgId: f.orgs.own, name: '无部署不应出现', reference: `BARE-${randomUUID()}`, serviceStartAt: new Date('2026-01-01T00:00:00.000Z'),
+      serviceEndAt: new Date('2027-12-01T00:00:00.000Z'), serviceScope: '无部署范围', supportContact: '无部署联系窗口',
+    } })
+    const auditsBeforeReports = await f.prisma.auditLog.count()
+    const reportList = await request<FirstOrderReportDirectory>('admin', `${A}/reports`)
+    const reportKeys = ['acknowledgedAt', 'month', 'orgId', 'orgName', 'projectId', 'projectName', 'reportId', 'status'].join(',')
+    const retained = reportList.items.find((row) => row.projectId === monthly.project.id)
+    const missingReport = reportList.items.find((row) => row.projectId === small.project.id)
+    check('默认月份是北京时间上一个完整自然月且读取不写审计', reportList.month === monthly.month && reportList.month === previousClosedMonth().month && await f.prisma.auditLog.count() === auditsBeforeReports)
+    check('已结束月份列出留存与未留存，部署已结束的不计入', !!retained && retained.reportId === report.id && retained.acknowledgedAt === ack.acknowledgedAt && retained.status === null && retained.orgName === '首单验证机构' && !!missingReport && missingReport.reportId === null && missingReport.acknowledgedAt === null && missingReport.status === null && reportList.items.some((row) => row.projectId === newProject.id && row.orgId === f.orgs.other) && !reportList.items.some((row) => row.projectId === oldProject.id || row.projectId === bareProject.id))
+    check('月报目录只有约定字段且不含会话明细', Object.keys(reportList).sort().join(',') === 'items,month,total,truncated' && reportList.items.every((row) => Object.keys(row).sort().join(',') === reportKeys) && !/平台验证服务窗口|免费打印与年度技术服务|snapshot|sessions|metrics|PRIVATE_RESUME_BODY|endUserId/.test(JSON.stringify(reportList)))
+    const reportPage = await request<FirstOrderReportDirectory>('admin', `${A}/reports?limit=1`)
+    check('月报超过本次条数时总数准确且标明未列全', reportPage.total === reportList.total && reportPage.total > 1 && reportPage.items.length === 1 && reportPage.truncated === true)
+    const reportWide = await request<FirstOrderReportDirectory>('admin', `${A}/reports?limit=500`)
+    check('月报条数超过上限不报错', reportWide.total === reportList.total && reportWide.items.length === reportList.total && reportWide.truncated === false)
+    const [yearText, monthText] = currentMonth.split('-')
+    const futureMonth = monthText === '12' ? `${Number(yearText) + 1}-01` : `${yearText}-${String(Number(monthText) + 1).padStart(2, '0')}`
+    const currentReports = await request<FirstOrderReportDirectory>('admin', `${A}/reports?month=${currentMonth}`)
+    const futureReports = await request<FirstOrderReportDirectory>('admin', `${A}/reports?month=${futureMonth}`)
+    check('当前月和以后的月份只能预览，不当成缺报', currentReports.items.length > 0 && futureReports.items.length > 0 && [...currentReports.items, ...futureReports.items].every((row) => row.status === '本月尚未结束，只能预览') && currentReports.items.some((row) => row.reportId === null))
+    const pastReports = await request<FirstOrderReportDirectory>('admin', `${A}/reports?month=2025-12`)
+    check('早于首单年份的合法月份按空目录返回，不报格式错误', pastReports.month === '2025-12' && pastReports.total === 0 && pastReports.items.length === 0 && pastReports.truncated === false)
 
     let previousDeploymentId = deployment.id
     // A slightly ahead fixture timestamp models clock regression without changing the system clock.

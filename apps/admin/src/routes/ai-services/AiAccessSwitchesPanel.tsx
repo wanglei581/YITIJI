@@ -1,8 +1,8 @@
 // ============================================================
 // AI 服务开关面板（D6 一键暂停与全机维护 + C6 使用声明 + C7 登录档位）
 //
-// 挂在 AI 服务管理页（index.tsx）的加载中、加载失败、正常三个分支里，都是 <Page> 的第一个子元素：
-// 面板自己取数，统计接口挂了也找得到紧急暂停；三个分支放在同一位置，统计数据加载完
+// 挂在 AI 服务管理页（index.tsx）的加载中、加载失败、正常三个分支里，紧跟近 24 小时概览，三个分支位置相同：
+// 面板自己取数，统计没读到也找得到紧急暂停；三个分支放在同一位置，统计数据加载完
 // 切到正常分支时面板不会被重建，写了一半的事由不会丢。
 //
 // 说明文字逐条对齐 services/api/src/ai-access/ 的行为，不许夸大：
@@ -18,7 +18,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { StatusBadge } from '@ai-job-print/ui'
-import { AlertTriangleIcon, RefreshCwIcon } from 'lucide-react'
+import { RefreshCwIcon } from 'lucide-react'
 import {
   AI_ACCESS_DEMO,
   AI_ACCESS_REASON_MAX,
@@ -376,7 +376,8 @@ export function AiAccessSwitchesPanel() {
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-sm font-semibold text-neutral-800">{row.title}</h3>
                     <StatusBadge dot status={state.tone} label={state.label} />
-                    <div className="ml-auto flex flex-wrap gap-2">
+                    <p className="min-w-0 flex-1 truncate text-xs text-neutral-500" title={row.explain}>{row.explain}</p>
+                    <div className="flex flex-wrap gap-2">
                       {actionsFor(row.key, load.config).map((action) => (
                         <button
                           key={String(action.change.to)}
@@ -390,12 +391,11 @@ export function AiAccessSwitchesPanel() {
                       ))}
                     </div>
                   </div>
-                  <p className="mt-1.5 text-xs leading-relaxed text-neutral-500">{row.explain}</p>
                   {row.kioskNote && (
-                    <p className="mt-2 flex items-start gap-1.5 rounded-md border border-warning/30 bg-warning-bg px-2.5 py-1.5 text-xs leading-relaxed text-warning-fg">
-                      <AlertTriangleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                      <span>{row.kioskNote}</span>
-                    </p>
+                    <details className="mt-2 rounded-md border border-warning/30 bg-warning-bg px-2.5 py-1.5 text-xs leading-relaxed text-warning-fg">
+                      <summary className="cursor-pointer font-semibold">一体机升级说明</summary>
+                      <p className="mt-1">{row.kioskNote}</p>
+                    </details>
                   )}
                   {change?.key === row.key && renderForm(change, load.config)}
                 </li>

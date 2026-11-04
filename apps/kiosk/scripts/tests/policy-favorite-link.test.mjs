@@ -8,7 +8,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (rel) => readFileSync(join(root, rel), 'utf8')
 
 const favorites = read('src/pages/profile/me/MyFavoritesPage.tsx')
-const home = read('src/pages/home/components/QxHomeView.tsx')
+const home = read('src/pages/home/components/HomeTouchView.tsx')
 const page = read('src/pages/renshi/RenshiPage.tsx')
 const focus = read('src/pages/renshi/usePolicyFocus.ts')
 const deadEnd = read('src/pages/renshi/policyFocus.tsx')
@@ -28,8 +28,10 @@ test('收藏的政策打开对应那一条，不再停在待建设', () => {
   assert.match(favorites, /return `\/renshi\?policy=\$\{encodeURIComponent\(item\.targetId\)\}`/)
   assert.doesNotMatch(favorites, /return '\/renshi\?tab=policy'/)
   assert.equal(favorites.includes('对应政策页待建设'), false)
-  assert.equal(favorites.includes('再打开这则政策说明'), true)
-  assert.equal(favorites.includes('再打开这则说明，办理仍以官方入口为准。'), true)
+  // 证据锚点随稿换字，判据不变：我的收藏改按触屏稿后，说明写在列表下面的小字里——
+  // 点一条是打开那一条政策，办理仍以官方入口为准，不是平台代办。
+  assert.equal(favorites.includes('点一条打开政策'), true)
+  assert.equal(favorites.includes('办理仍以官方入口为准'), true)
 })
 
 test('点名的政策会去读那一条，找不到或失败时有出路', () => {
@@ -68,7 +70,7 @@ test('官方渠道打开时重新读，点卡片前再核对，不另加定时�
 })
 
 test('首页查政策不再写带走材料清单', () => {
-  assert.match(home, /actionId="policy-hub"[^>]*foot="查看政策说明"/)
+  assert.match(home, /actionId="policy-hub"[\s\S]{0,400}take="查看政策说明"/)
   assert.equal(home.includes('带走：材料清单'), false)
   assert.equal(home.includes('title="查政策"'), true)
 })

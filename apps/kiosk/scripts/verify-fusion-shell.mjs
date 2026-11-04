@@ -133,6 +133,9 @@ function assertTopLevelHelperRoutes(routes) {
   for (const [path, component] of [
     ['/member/qr-login', 'MobileQrLoginPage'],
     ['/upload/phone', 'PhoneUploadPage'],
+    // 2026-10-29 一体机手机码短链的网页中转，与上面两页同样不进一体机运行时根。
+    ['/k/u/:scene', 'UploadSceneEntry'],
+    ['/k/l/:ticketId', 'LoginTicketEntry'],
   ]) {
     const routeIndex = objects.findIndex((route) =>
       directStringProperty(route, 'path') === path &&
@@ -205,6 +208,7 @@ const css = await read('src/index.css')
 const routes = await read('src/routes/index.tsx')
 const mobileQrLogin = await read('src/pages/auth/MobileQrLoginPage.tsx')
 const phoneUpload = await read('src/pages/upload/PhoneUploadPage.tsx')
+const kioskCodeEntry = await read('src/pages/upload/KioskCodeEntryPage.tsx')
 
 assert.match(layout, /\bpresentation\?:\s*KioskPresentation\b/, 'KioskLayout must expose presentation')
 assert.match(layout, /\bviewport\?:\s*KioskViewport\b/, 'KioskLayout must expose viewport')
@@ -282,6 +286,11 @@ assertMobilePageContract(phoneUpload, {
   label: 'PhoneUploadPage',
   stylesheet: './phone-upload-service-desk.css',
   services: ['uploadPhoneSessionFile'],
+})
+assertMobilePageContract(kioskCodeEntry, {
+  label: 'KioskCodeEntryPage',
+  stylesheet: './phone-upload-service-desk.css',
+  services: ['resolveUploadScene', 'isQrLoginTicketId'],
 })
 
 const shellBody = functionBody(root, 'KioskShell')

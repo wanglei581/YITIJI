@@ -1,6 +1,6 @@
 import type { ElementType } from 'react'
 import { formatCount, formatDateTime, formatRelativeTime } from '@ai-job-print/shared'
-import { Building2Icon, FolderIcon, MonitorIcon, PrinterIcon, FileWarningIcon, MessageSquareWarningIcon } from 'lucide-react'
+import { BotIcon, Building2Icon, FolderIcon, MonitorIcon, PrinterIcon, FileWarningIcon, MessageSquareWarningIcon } from 'lucide-react'
 import type { AdminFileRecord } from '../../services/api'
 import type { AdminAlertItem } from '../../services/api/adminOps'
 import type { StockTodo } from './recruitmentStock'
@@ -57,6 +57,10 @@ const ALERT_ROW_ICON: Record<AdminAlertItem['type'], ElementType> = {
   print_failed: PrinterIcon,
   paid_pending_file_unavailable: FileWarningIcon,
   feedback_pending: MessageSquareWarningIcon,
+  print_terminal_quota_high: PrinterIcon,
+  ai_provider_unavailable: BotIcon,
+  ai_consecutive_failures: BotIcon,
+  ai_budget_exhausted: BotIcon,
 }
 
 /**
@@ -75,7 +79,9 @@ export function buildAlertRows(alerts: AdminAlertItem[]): TodoRow[] {
       // 意见反馈不挂在终端上，terminalCode 为空时不能写成「未知终端」
       : alert.type === 'feedback_pending'
         ? `意见反馈 · ${formatRelativeTime(alert.occurredAt)}`
-        : `${alert.terminalCode ?? '未知终端'} · ${formatRelativeTime(alert.occurredAt)}`,
+        : alert.type === 'ai_provider_unavailable' || alert.type === 'ai_consecutive_failures' || alert.type === 'ai_budget_exhausted'
+          ? `AI 服务 · ${formatRelativeTime(alert.occurredAt)}`
+          : `${alert.terminalCode ?? '未知终端'} · ${formatRelativeTime(alert.occurredAt)}`,
     href: alert.type === 'feedback_pending' ? '/member-feedback?category=ai_content' : '/alerts',
     timeTitle: formatDateTime(alert.occurredAt, { fallback: '' })
       ? `发生时间 ${formatDateTime(alert.occurredAt)}`

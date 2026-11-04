@@ -25,6 +25,13 @@ const index = readFileSync(pagePath, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').re
 const drawer = readFileSync(join(root, 'src/routes/orders/OrderDetailDrawer.tsx'), 'utf8')
   .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 if (!index.includes('<OrderDetailDrawer controls={controls}')) fail('orders/index.tsx 必须实际挂载 OrderDetailDrawer')
+if (drawer.includes('onRetry={closeDetail}')) fail('订单详情加载失败的重试不能关掉抽屉')
+if (!drawer.includes('onRetry={retryDetail}')) fail('订单详情加载失败必须按当前订单重新加载')
+const detailHook = readFileSync(join(root, 'src/routes/orders/useOrderDetail.ts'), 'utf8')
+if (!detailHook.includes('retryDetail') || !detailHook.includes('detailIdRef') || !detailHook.includes('adminOrdersReadonlyService.getById(id)')) {
+  fail('重试必须记住当前订单并重新请求这一单的详情')
+}
+pass('订单详情失败时按当前订单重新加载，不关闭抽屉')
 for (const component of ['useOrderDetail', 'orderColumns']) {
   if (!index.includes(`${component}(`) && !index.includes(`<${component} `)) fail(`订单页必须实际调用 ${component}`)
 }

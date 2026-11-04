@@ -9,7 +9,7 @@
 //               异常工作流当前未建设，如实标注。
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { formatDateTime } from '@ai-job-print/shared'
 import { ConsoleTable, Drawer, EmptyState, LoadingState, StatusBadge, type ConsoleColumn } from '@ai-job-print/ui'
 import { printErrorText } from '../../lib/printErrorText'
@@ -172,7 +172,12 @@ export default function PrintScanOpsPage() {
 
 // ─── 任务中心 ─────────────────────────────────────────────────────────────────
 
+function isUnconfirmedPreview(error: unknown): boolean {
+  return error instanceof Error && (error.message.includes('需要连接真实后端') || error.message.includes('当前预览模式'))
+}
+
 function TaskCenter() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [taskType, setTaskType] = useState<PrintScanTaskType>('print')
   const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
@@ -180,6 +185,8 @@ function TaskCenter() {
   const [data, setData] = useState<AdminPrintScanTaskPage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [unconfirmedPreview, setUnconfirmedPreview] = useState(false)
+  const unconfirmed = searchParams.get('unconfirmed') === '1' && taskType === 'print'
   const [detail, setDetail] = useState<AdminPrintScanTaskDetail | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [actionBusy, setActionBusy] = useState(false)
@@ -190,7 +197,7 @@ function TaskCenter() {
   const implemented = TASK_TYPE_TABS.find((t) => t.value === taskType)?.implemented ?? false
 
   // 请求序号防竞态：快速切换类型/筛选时，旧的慢响应不得覆盖新状态。
-  const queryKey = [taskType, status, String(page), String(pageSize)].join('\u0000')
+  const queryKey = [taskType, status, String(page), String(pageSize), unconfirmed ? '1' : ''].join('\u0000')
   const queryKeyRef = useRef(queryKey)
   queryKeyRef.current = queryKey
   const loadSeq = useRef(0)
@@ -199,19 +206,25 @@ function TaskCenter() {
     const seq = ++loadSeq.current
     setLoading(true)
     setError(null)
+    setUnconfirmedPreview(false)
     try {
-      const result = await adminPrintScanService.listTasks({ type: taskType, status: status || undefined, page, pageSize })
+      const result = await adminPrintScanService.listTasks({ type: taskType, status: status || undefined, unconfirmed: unconfirmed ? true : undefined, page, pageSize })
       if (seq !== loadSeq.current || queryKeyRef.current !== requestQueryKey) return 'stale'
       setData(result)
       return 'success'
     } catch (e) {
       if (seq !== loadSeq.current || queryKeyRef.current !== requestQueryKey) return 'stale'
+      if (unconfirmed && isUnconfirmedPreview(e)) {
+        setData(null)
+        setUnconfirmedPreview(true)
+        return 'failed'
+      }
       setError(e instanceof Error ? e.message : '加载失败')
       return 'failed'
     } finally {
       if (seq === loadSeq.current) setLoading(false)
     }
-  }, [taskType, status, page, pageSize, queryKey])
+  }, [taskType, status, page, pageSize, unconfirmed, queryKey])
 
   useEffect(() => {
     void load()
@@ -304,6 +317,13 @@ function TaskCenter() {
               setTaskType(tab.value)
               setStatus('')
               setPage(1)
+              if (tab.value !== 'print' && searchParams.get('unconfirmed')) {
+                setSearchParams((current) => {
+                  const next = new URLSearchParams(current)
+                  next.delete('unconfirmed')
+                  return next
+                }, { replace: true })
+              }
             }}
           />
         ))}
@@ -322,6 +342,22 @@ function TaskCenter() {
               }}
             />
           ))}
+          {taskType === 'print' && (
+            <FilterChip
+              active={unconfirmed}
+              pressed={unconfirmed}
+              label="出纸未确认"
+              onClick={() => {
+                setSearchParams((current) => {
+                  const next = new URLSearchParams(current)
+                  if (unconfirmed) next.delete('unconfirmed')
+                  else next.set('unconfirmed', '1')
+                  return next
+                }, { replace: true })
+                setPage(1)
+              }}
+            />
+          )}
           <button
             type="button"
             onClick={() => void load()}
@@ -347,6 +383,8 @@ function TaskCenter() {
           title="该任务类型尚未上线"
           description="该能力尚未开放，目前没有可查看的真实任务。"
         />
+      ) : unconfirmedPreview ? (
+        <p className="rounded-xl border border-neutral-900/10 bg-surface px-4 py-8 text-center text-sm text-neutral-600">演示模式不显示出纸未确认</p>
       ) : (
         <ConsoleTable items={data?.items ?? []} columns={taskColumns(openDetail, taskType === 'print' ? { busyTaskId: actionBusy ? actionTaskId : null, onRetry: (item) => void applyAction('retry', item) } : null)}
           loading={loading} error={error ? { title: '任务加载失败', message: error, onRetry: () => void load() } : null}

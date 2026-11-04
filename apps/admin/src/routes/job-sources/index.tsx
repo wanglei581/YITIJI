@@ -12,6 +12,8 @@ import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentH
 import { RecruitmentHostingNotice } from '../components/recruitment/RecruitmentHostingNotice'
 import { EmergencyTakedownDialog } from '../components/recruitment/EmergencyTakedownDialog'
 import type { EmergencyTakedownTarget } from '../components/recruitment/emergencyReason'
+import { RECRUITMENT_AUDIT_ACTIONS, RecentEmergencyAuditCard } from '../components/RecentEmergencyAuditCard'
+import { SourceNarrowCards, SourceStatusFilters } from '../components/SourceNarrowCards'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -92,7 +94,12 @@ export default function JobSourcesPage() {
   }, [listQuery, applyPage])
 
   const reload = useCallback(() => {
-    getJobSources(listQuery).then(applyPage).catch(() => setError(true))
+    setError(false)
+    setLoading(true)
+    getJobSources(listQuery)
+      .then(applyPage)
+      .catch(() => setError(true))
+      .finally(() => setLoading(false))
   }, [listQuery, applyPage])
 
   if (loading) {
@@ -101,6 +108,7 @@ export default function JobSourcesPage() {
         <div className="flex h-48 items-center justify-center">
           <LoadingState text="加载中…" className="py-12" />
         </div>
+        <RecentEmergencyAuditCard actions={RECRUITMENT_AUDIT_ACTIONS} />
       </Page>
     )
   }
@@ -111,7 +119,15 @@ export default function JobSourcesPage() {
         <div className="flex h-48 flex-col items-center justify-center gap-3">
           <BriefcaseIcon className="h-10 w-10 text-neutral-200" />
           <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
+          <button
+            type="button"
+            onClick={reload}
+            className="inline-flex h-11 items-center rounded-lg border border-neutral-200 bg-surface px-4 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
+          >
+            重新加载
+          </button>
         </div>
+        <RecentEmergencyAuditCard actions={RECRUITMENT_AUDIT_ACTIONS} />
       </Page>
     )
   }
@@ -181,28 +197,30 @@ export default function JobSourcesPage() {
         </div>
       )}
 
-      {/* 筛选标签 */}
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <div className="flex gap-2">
-          {REVIEW_FILTERS.map((f) => (
-          <button
-            key={f}
-            onClick={() => { setReviewFilter(f); setPage(1) }}
-            className={`rounded-full border px-[13px] py-1.5 text-[12.5px] font-bold transition-colors ${
-              reviewFilter === f ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
-            }`}
-          >
-{f}
-            </button>
-          ))}
-        </div>
-        <div className="relative">
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索岗位、公司..." className="h-8 w-56 rounded-lg border border-neutral-200 bg-surface pl-8 pr-3 text-xs text-neutral-700 placeholder-neutral-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
-          <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
-        </div>
-      </div>
+      <SourceStatusFilters
+        options={REVIEW_FILTERS}
+        value={reviewFilter}
+        onChange={(next) => { setReviewFilter(next as typeof reviewFilter); setPage(1) }}
+        search={search}
+        onSearch={setSearch}
+        searchPlaceholder="搜索岗位、公司..."
+      />
 
-      <Card className="overflow-hidden p-0">
+      <SourceNarrowCards
+        items={sources}
+        emptyTitle={search ? '未找到匹配的岗位' : '该分类暂无岗位数据'}
+        titleOf={(row) => row.title}
+        statusOf={(row) => (
+          <>
+            <StatusBadge dot status={REVIEW_MAP[row.reviewStatus].badge} label={REVIEW_MAP[row.reviewStatus].label} />
+            <StatusBadge dot status={PUBLISH_MAP[row.publishStatus].badge} label={PUBLISH_MAP[row.publishStatus].label} />
+          </>
+        )}
+        onView={setViewing}
+        onTakedown={(row) => setTakedown({ targetType: 'job', targetId: row.id, title: row.title, orgName: row.sourceName })}
+      />
+
+      <Card className="hidden overflow-hidden p-0 md:block">
         <ConsoleTable items={sources} columns={columns}
           empty={{ title: search ? '未找到匹配的岗位' : '该分类暂无岗位数据', description: search ? '请尝试其他关键词' : undefined }}
           page={page} pageSize={pageSize} total={total} onPageChange={setPage}
@@ -212,6 +230,8 @@ export default function JobSourcesPage() {
       <p className="mt-3 text-xs text-neutral-400">
         仅展示第三方平台同步的岗位信息，不参与招聘闭环。紧急下架只能下架、不能恢复，须写明事由，并会通知所属机构。
       </p>
+
+      <RecentEmergencyAuditCard actions={RECRUITMENT_AUDIT_ACTIONS} />
 
       <EmergencyTakedownDialog target={takedown} onClose={() => setTakedown(null)} onDone={reload} />
 

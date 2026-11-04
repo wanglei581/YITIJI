@@ -114,7 +114,7 @@ export class MaterialsController {
   private async resolveRequester(req: ReqLike): Promise<MaterialsRequester> {
     assertMaterialTaskTokenNotInQuery(req.query)
     const member = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
-    if (member) return { kind: 'member', endUserId: member.endUserId }
+    if (member) return { kind: 'member', endUserId: member.endUserId, accessToken: extractMaterialTaskToken(req) }
     return { kind: 'anonymous', accessToken: extractMaterialTaskToken(req) }
   }
 }

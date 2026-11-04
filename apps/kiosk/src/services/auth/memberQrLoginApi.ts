@@ -7,6 +7,9 @@ const LOCAL_AGENT_BASE_URL = configuredLocalAgentBaseUrl || 'http://127.0.0.1:95
 // localApiBridgeToken 配置一致,安装时一起下发。
 const BRIDGE_TOKEN = (import.meta.env['VITE_TERMINAL_AGENT_BRIDGE_TOKEN'] ?? '').trim()
 
+/** 本机程序没连上时扫码登录页上写的话：说清是哪一环，并指出不用扫码的路（手机号登录）。 */
+export const LOCAL_AGENT_UNREACHABLE_MESSAGE = '这台机器的本机程序没连上，扫码登录暂时用不了，请改用手机号登录。'
+
 function requireLocalAgentHeaders(): HeadersInit {
   if (!BRIDGE_TOKEN) {
     throw new MemberApiError(
@@ -60,6 +63,11 @@ async function callEnvelope<T>(
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {
+    // 连不上的是这台机器自己的本机程序（127.0.0.1）时，说法要和云上接口断开不同：那不是「网络」的事，
+    // 让人去查网络没用（10/29 本机走查 I-32）。如实说本机程序没连上，并给不用扫码的出路。
+    if (baseUrl === LOCAL_AGENT_BASE_URL) {
+      throw new MemberApiError('LOCAL_AGENT_UNREACHABLE', LOCAL_AGENT_UNREACHABLE_MESSAGE, 0)
+    }
     throw new MemberApiError('NETWORK_ERROR', '网络连接失败，请稍后重试', 0)
   }
 
@@ -135,10 +143,25 @@ export function confirmQrLogin(
   )
 }
 
+/** 一体机登录票据格式：服务端 randomBytes(24) 的 base64url 为 32 位，这里留出余量；手机码路径只认这个字符集。 */
+const QR_LOGIN_TICKET_PATTERN = /^[A-Za-z0-9_-]{32,96}$/
+
+export function isQrLoginTicketId(value: unknown): value is string {
+  return typeof value === 'string' && QR_LOGIN_TICKET_PATTERN.test(value)
+}
+
+/**
+ * 一体机屏上扫码登录码的地址。
+ * qrUrl 里取得到合格票据：`<公网基址>/k/l/<票据>`。微信「扫普通链接二维码打开小程序」规则生效时扫码直接进小程序；
+ * 没生效或用别的软件扫，打开网页中转页 /k/l/:ticketId，再转到 /member/qr-login?ticketId=…。
+ * 取不到合格票据：照旧把 qrUrl 落到公网基址上。
+ */
 export function buildQrLoginUrl(qrUrl: string): string {
   const configured = (import.meta.env['VITE_QR_LOGIN_PUBLIC_BASE_URL'] ?? '').trim()
   const base = parseQrLoginPublicBase(configured)
   const candidate = new URL(qrUrl, base)
+  const ticketId = candidate.searchParams.get('ticketId')
+  if (isQrLoginTicketId(ticketId)) return new URL(`/k/l/${ticketId}`, base).toString()
   if (candidate.origin === base.origin) return candidate.toString()
   return new URL(`${candidate.pathname}${candidate.search}${candidate.hash}`, base).toString()
 }

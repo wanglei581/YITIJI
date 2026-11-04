@@ -35,7 +35,8 @@ export type PrintScanTaskType =
  *
  * 默认关闭（未登记 = 拒绝）的键不在这里另抄一份，直接用下方从 @ai-job-print/shared 转出的
  * DEFAULT_DENY_CAPABILITY_KEYS：目前是 color_print / duplex_print（该终端真机验过彩色 / 双面
- * 出纸才配成 available）和 signature_stamp（2026-09-28 D3：试点与新机器默认关，逐台开通）。
+ * 出纸才配成 available）、signature_stamp（2026-09-28 D3：试点与新机器默认关，逐台开通）和
+ * scan_device（屏上扫描，2026-11-02：该终端到机器旁验过进纸器、无纸、开盖、打印时扫描、中止恢复才配成 available）。
  * 其余键未登记时由服务端 PRINT_SCAN_CAPABILITY_MODE 决定放行（managed）还是拒绝（strict）。
  */
 export type PrintScanCapabilityKey =
@@ -51,6 +52,7 @@ export type PrintScanCapabilityKey =
   | 'signature_stamp'
   | 'color_print'
   | 'duplex_print'
+  | 'scan_device'
 
 export type PrintScanCapabilityStatus = 'available' | 'testing' | 'maintenance' | 'unsupported' | 'not_verified'
 
@@ -144,6 +146,8 @@ export interface ListPrintScanTasksParams {
   terminalId?: string
   page?: number
   pageSize?: number
+  /** 为真时只查询出纸未确认。演示模式不造这条数据。 */
+  unconfirmed?: boolean
 }
 
 export interface CancelUnpaidPrintTaskInput {
@@ -200,6 +204,7 @@ const httpAdapter: AdminPrintScanServiceInterface = {
     if (params.terminalId) q.set('terminalId', params.terminalId)
     if (params.page) q.set('page', String(params.page))
     if (params.pageSize) q.set('pageSize', String(params.pageSize))
+    if (params.unconfirmed) q.set('unconfirmed', '1')
     return request(`/admin/print-scan/tasks?${q.toString()}`)
   },
   getTaskDetail: (type, taskId) =>
@@ -238,6 +243,7 @@ const MOCK_CAPABILITIES: TerminalCapabilityView[] = [
   // 服务端 listForTerminal 对全部能力键都返回一行；mock 此前漏了这两项，设备能力表比真实环境少两行。
   { capabilityKey: 'color_print', status: 'not_verified', note: null, configured: false, updatedAt: null },
   { capabilityKey: 'duplex_print', status: 'not_verified', note: null, configured: false, updatedAt: null },
+  { capabilityKey: 'scan_device', status: 'not_verified', note: null, configured: false, updatedAt: null },
 ]
 
 const MOCK_PRINT_TASKS: AdminPrintScanTaskItem[] = [
@@ -259,6 +265,9 @@ const MOCK_PRINT_TASKS: AdminPrintScanTaskItem[] = [
 
 const mockAdapter: AdminPrintScanServiceInterface = {
   listTasks: async (params) => {
+    if (params.unconfirmed) {
+      throw new Error('项目交付与服务需要连接真实后端，当前预览模式不可操作。')
+    }
     const implemented = params.type === 'print' || params.type === 'scan' || params.type === 'document_process'
     const items = params.type === 'print' ? MOCK_PRINT_TASKS.filter((t) => !params.status || t.status === params.status) : []
     return {

@@ -17,6 +17,7 @@
 | 当日开发摘要与协作收尾 | [progress/today-claude.md](progress/today-claude.md) |
 | 定位、托管方式、AI 求职操作系统分层、功能边界（能做 / 不能做）、已知缺口 | [product/feature-scope.md](product/feature-scope.md)（§零 定位与分层，§七 缺口） |
 | 谁是运营主体、我们做什么、管理员能做什么 | [product/role-boundary.md](product/role-boundary.md) |
+| 私有化部署（托管 b）怎么设计：四层管控、授权文件、各处显示、签约后的工程 | [product/private-deployment-design.md](product/private-deployment-design.md) |
 | 按谁排序、12 个月长什么 / 不长什么（从属于功能边界与合规） | [product/audience-growth-space.md](product/audience-growth-space.md) |
 | 合规红线、法规与资质总表 | [compliance/](compliance/) 全部；总表在 [compliance-boundary.md](compliance/compliance-boundary.md) §1.2 |
 | 目录职责 | [project-structure.md](project-structure.md) |
@@ -36,6 +37,8 @@
 > 1. 首页、打印、简历三条主路以**触屏版** `design/kiosk-touch-2026-10/` 为准（产品负责人 10/25 拍板「稿子可以，解冻 2.0，按对照表先改首页、打印、简历三条主路」；路由清单见该目录 README）。
 > 2. 其余页面以**青序流光 2.0** `design/kiosk-redesign-2026-08-v2/` 为准（9/29 定稿，冻结门禁 `verify:qingxu-v2-frozen`；2.0 稿文件一个字节不改）。
 > 3. 2.0 没画的页，才看下面说的原稿 `design/kiosk-redesign-2026-08/`。
+>
+> **2026-10-27 起**：产品负责人看过触屏版第 5 版（121 屏，补全了三条主路之外的各区）后定「第 5 版看过了，可以进仓库，然后按包改程序」——一体机**全部页面**以触屏版 `design/kiosk-touch-2026-10/` 为准（见 CLAUDE.md §9）；上面第 2、3 层只用于第 5 版没画到的页。
 >
 > 下面本节的旧段落写于 2.0 之前，读到「原稿是当前上线口径」时按这三层理解。
 

@@ -15,6 +15,7 @@ import { PDFDocument } from 'pdf-lib'
 import { appendAigcPages } from '../../common/pdf/aigc-label'
 import { PrismaService } from '../../prisma/prisma.service'
 import { FilesService } from '../../files/files.service'
+import { isOrderOnlyFile } from '../../files/retention-policy'
 import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../../files/signing'
 import { AuditService } from '../../audit/audit.service'
 import {
@@ -74,7 +75,7 @@ export class AppendedSelfAssessmentService {
     // 2) 读取主简历 PDF（由 PrintConfirmPage 提前验签后传入 fileId）
     const resumeRow = await this.prisma.fileObject.findUnique({
       where: { id: opts.resumeFileId },
-      select: { id: true, filename: true, mimeType: true, endUserId: true, deletedAt: true },
+      select: { id: true, filename: true, mimeType: true, endUserId: true, deletedAt: true, retentionLockedReason: true },
     })
     if (!resumeRow || resumeRow.deletedAt) {
       throw new NotFoundException({
@@ -123,6 +124,8 @@ export class AppendedSelfAssessmentService {
       uploaderId: null,
       endUserId: opts.requester.endUserId,
       createdBy: 'self_assessment_append',
+      // 合出来的 PDF 含整份原简历：原简历只用于这一单（一体机这一单里从手机传来的）时跟着锁，不进「我的文档」。
+      orderOnly: isOrderOnlyFile(resumeRow),
     })
 
     // 7) 审计：本次合并是「打印前的合并动作」，含 taskId / fileId / saPageCount
