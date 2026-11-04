@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { BadRequestException, ValidationPipe } from '@nestjs/common'
 import { HeartbeatDto } from '../src/terminals/dto/heartbeat.dto'
-import { printerQueueHeartbeatData, toAdminPrinterQueue } from '../src/terminals/heartbeat-printer-queue'
+import { isAcceptablePrinterQueueName, printerQueueHeartbeatData, toAdminPrinterQueue } from '../src/terminals/heartbeat-printer-queue'
 
 const root = process.cwd()
 const read = (path: string) => readFileSync(join(root, path), 'utf8')
@@ -156,6 +156,40 @@ async function main() {
     ['unknown field', { printerQueueName: '前台队列', printerHostAddress: '192.168.50.2' }],
   ] as const) {
     await reject({ ...body }, label)
+  }
+
+  // 和终端程序门禁同一张表。长度按 UTF-16 码元：一个 😀 是 2 个码元。
+  const acceptedQueueNames = [
+    'Pantum CM2800ADN Series',
+    'Pantum CM2800ADN Series (副本 1)',
+    '奔图 CM2820 打印机',
+    'Printer v1.2.3',
+    'a'.repeat(128),
+    '😀'.repeat(64),
+  ]
+  const rejectedQueueNames = [
+    '',
+    'a'.repeat(129),
+    '😀'.repeat(65),
+    'bad\nname',
+    'bad\u007fname',
+    'bad\u0085name',
+    'bad\u009fname',
+    '\\\\192.168.1.5\\Pantum',
+    '\\\\PRINTSRV\\Pantum',
+    'http://192.168.1.5:631/ipp/print',
+    'ipp://printer.local/ipp',
+    'Pantum 192.168.1.5',
+    '192.168.001.005',
+  ]
+  for (const name of acceptedQueueNames) {
+    assert.equal(isAcceptablePrinterQueueName(name), true, `function accept ${JSON.stringify(name)}`)
+    const parsed = await accept({ printerQueueName: name }, `pipe accept ${JSON.stringify(name)}`)
+    assert.equal(parsed.printerQueueName, name)
+  }
+  for (const name of rejectedQueueNames) {
+    assert.equal(isAcceptablePrinterQueueName(name), false, `function reject ${JSON.stringify(name)}`)
+    await reject({ printerQueueName: name }, `pipe reject ${JSON.stringify(name)}`)
   }
 
   console.log('PASS terminal printer queue: dual schema, five-column migration, enum heartbeat fields, passthrough only')

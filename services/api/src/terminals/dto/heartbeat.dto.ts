@@ -1,6 +1,25 @@
-import { IsBoolean, IsDateString, IsIn, IsNumber, IsOptional, IsString, Matches, MaxLength, ValidateIf } from 'class-validator'
+import { IsBoolean, IsDateString, IsIn, IsNumber, IsOptional, IsString, Matches, MaxLength, ValidateBy, ValidateIf, type ValidationOptions } from 'class-validator'
 import { Type } from 'class-transformer'
 import { SCAN_DEVICE_HEALTHS } from '../printer-status'
+import { isAcceptablePrinterQueueName } from '../heartbeat-printer-queue'
+
+/** 调 isAcceptablePrinterQueueName。规则和终端程序同一条，改一边要改两边。 */
+function IsAcceptablePrinterQueueName(validationOptions?: ValidationOptions) {
+  return ValidateBy(
+    {
+      name: 'isAcceptablePrinterQueueName',
+      validator: {
+        validate(value: unknown) {
+          return typeof value === 'string' && isAcceptablePrinterQueueName(value)
+        },
+        defaultMessage() {
+          return '打印队列名不符合终端程序的队列名规则'
+        },
+      },
+    },
+    validationOptions,
+  )
+}
 
 const WIRED_NETWORK_STATUSES = ['connected', 'disconnected', 'unknown'] as const
 const PRINTER_NETWORK_STATUSES = ['reachable', 'unreachable', 'not_network_printer', 'unknown'] as const
@@ -119,8 +138,7 @@ export class HeartbeatDto {
 
   @IsString()
   @MaxLength(128)
-  // eslint-disable-next-line no-control-regex -- 刻意拒绝队列名里的控制字符
-  @Matches(/^[^\u0000-\u001f\u007f]+$/)
+  @IsAcceptablePrinterQueueName()
   @ValidateIf((_o, v) => v !== undefined)
   printerQueueName?: string
 
