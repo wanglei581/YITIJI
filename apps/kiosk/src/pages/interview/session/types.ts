@@ -6,6 +6,9 @@ export interface InterviewSessionRouteState {
   interviewerType: string
   position: string
   firstQuestion?: string
+  /** 本机时钟上的截止时刻。离开再进仍用它，不按所选时长重开。 */
+  deadlineAtLocalMs?: number
+  deadlineSource?: 'server' | 'local'
 }
 
 export interface InterviewMessage {

@@ -103,6 +103,10 @@ const executable = (source) => ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
 }).outputText
 try {
+  const timingJs = ts.transpileModule(read('src/pages/interview/session/interviewDeadline.ts'), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+  }).outputText
+  const timing = await import(`data:text/javascript;charset=utf-8,${encodeURIComponent(timingJs)}`)
   const initial = new Function('useState', 'setupDraft', 'DEFAULT_EMPLOYMENT_INDUSTRY', executable(`return [
     ${sourceNode(setupAst, '[industry, setIndustry]')},
     ${sourceNode(setupAst, '[experience, setExperience]')},
@@ -136,12 +140,14 @@ try {
     position, industry, experience, interviewerType, difficulty, duration, resumeFile,
     setError, setCreating, setAiOutage, setAssistantDown, setStartFailed, getToken, createInterview,
     setPendingSession, startInterview, setProbed, patchInterviewWorkbenchSession, onGoStage,
+    openedInterviewDeadline,
   } = context; return ${sourceNode(setupAst, 'handleStart')};`))
   const noop = () => {}
   async function runStart(values) {
     const requests = []
     const errors = []
     const context = {
+      ...timing,
       ...draft, duration: 5, resumeFile: null,
       setError: (value) => errors.push(value), setCreating: noop, setAiOutage: noop, setAssistantDown: noop,
       setStartFailed: noop, getToken: noop, setPendingSession: noop, setProbed: noop,
