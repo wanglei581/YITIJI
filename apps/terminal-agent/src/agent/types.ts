@@ -120,6 +120,8 @@ export interface AgentConfig {
    * 后端 B1 上生产之前不得打开，否则心跳多出的字段会被 forbidNonWhitelisted 拒成 400。
    */
   scanDeviceEnabled?: boolean
+  /** 本机小角度纠偏开关；缺省或无效为 false，心跳不能覆盖。S4a 尚未接线。 */
+  scanAutoDeskewEnabled?: boolean
   /**
    * WIA 扫描仪名称。空字符串表示用第一台扫描仪（由扫描引擎读取），不在这里写死型号。
    */

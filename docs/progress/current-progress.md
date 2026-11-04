@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-11-04：扫描件自动矫正 S4a——纠偏处理器、开关与 Windows 门禁（分支 `claude/scan-deskew-1104`，自 A2 第四轮开出，未接线、未部署）
+
+- 依据：产品负责人 11/04「扫描件预览是歪的，要自动矫正」；排期 `schedule-1104.md` S4 第一步只做 ±5° 小角度纠偏、零新依赖、拿不准一律用原图；规格书 `codex/deskew-spec-out.md` 方案 c（独立受监管 PowerShell 子进程内嵌 C#）。
+- 做了什么（Codex 实现，Claude 收货）：`apps/terminal-agent/src/agent/scan-deskew/` 下纯灰度估角（只吃字节缓冲）、System.Drawing 解码缩图旋转编码、子进程脚本生成、受监管执行器（2,000 ms 硬超时杀整棵进程树、任何异常回原图、输出校验后才采用、日志只记角度与是否纠偏）；本机开关 `scanAutoDeskewEnabled` 缺省 false、只认字面量 true、心跳不能覆盖。阈值集中一处，门禁直接引用。
+- 本批**没接进扫描流程**：WIA 接线是 S4b，面板图片与投递重试记录是 S4c，复印跟 S5。
+- 门禁：新增 `verify:scan-deskew`（10 组，假子进程，不起 PowerShell）接进 ci.yml；新增 Windows 门禁 `verify-scan-deskew-windows.ps1`（Windows PowerShell 5.1，固定种子合成样本：文字页 −5°…+5°、±0.2°、超范围、空白、照片噪声、带框表格、证件底纹、发票样，JPEG/PNG/8 位与 24 位 BMP），接进 `windows-agent-installer.yml` 的 unsigned-msi-candidate 作业。**C# 未在本机编译**（本机无 PowerShell/.NET），以 Windows CI 结果为准；真机耗时、内存、GDI 资源未测。反向检查三项（异常不回原图、开关关仍起进程、日志带路径）都变红。
+
 ## 2026-11-04：屏上扫描 ③ 终端程序第二批 A2 第四轮——收掉复审高优先级问题（分支 `claude/scan-device-a2-1102`，随后并入 main 的提交，未部署）
 
 - 做了：开始在取租约这个第一个异步等待之前就占下这一场的场次号和取消标记；租约回来、建目录前、开扫前都再查。待翻页回报回来后先查取消，取消了不起 10 分钟空闲计时。下一页的租约改到串行队列外面取，回来之后若已经过了绝对截止或已经取消，就不再扫。上传异常不再用租约还在不在推断：用一次 device-report（投递中）按 409 的 `taskStatus` / `fileDelivered` 判定。`completed` 或 `fileDelivered` 为真算已投递并删页；`cancelled` / `expired` / `failed` 且没投出算未投递并删页；仍是 `waiting` 就用同一份 PDF 再投一次，`SCAN_FILE_ALREADY_DELIVERED` 也算已投递；`matched` 且未交出、旧后端没有 `taskStatus`、断网都保持不确定。不确定时每 30 秒再探，到 `hardExpiresAt`（没有就用投递前租约的 `expiresAt`）仍不确定，就按 `SCAN_DEVICE_FAILED` 删页，本机接口仍回「投递结果不确定」。`scanning` 回报被收下时记下 `deviceRound`，投递的 multipart 带上它；没记下就不传这个字段。换了轮次就作废这一场的页和 PDF，不合成到一起。第三轮里用租约推断结果的两则夹具改成看 409 补充，结果断言仍是未投递 / 已投递。

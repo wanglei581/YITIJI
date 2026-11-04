@@ -409,6 +409,8 @@ jobs:
           pnpm run verify:scan-device-engine
           # 屏上扫描接线：假执行器、假后端、假时钟。不起 PowerShell，不碰扫描仪或打印机。
           pnpm run verify:scan-device-runner
+          # S4a: fake child + private temp files; no PowerShell or hardware.
+          pnpm run verify:scan-deskew
           # Linux-safe fault injection only: temp SQLite + loopback HTTP fixture; no Windows printer or external network.
           pnpm run verify:task-reliability
           # 同一任务号按 attempt 重打：临时 SQLite + loopback HTTP + 打印桩，不碰 Windows 打印机。
