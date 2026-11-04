@@ -34,6 +34,9 @@ const CAPABILITY_LABELS: Record<PrintScanCapabilityKey, string> = {
   // 再配成「可用」才对用户放开。配错的代价是用户按彩色付费拿到黑白纸。
   color_print: '彩色打印（需真机验证）',
   duplex_print: '自动双面（需真机验证）',
+  // 未配置 = 拒绝（fail-closed）：这台机器到机器旁验过进纸器多页、无纸、开盖、打印时扫描、中止后恢复，
+  // 再配成「可用」，一体机才出现「在这块屏上开始扫描」；不开时用户只能走面板扫描。
+  scan_device: '屏上扫描（需真机验证）',
 }
 
 function PrinterHeartbeatText({ status }: { status: string | null }) {
@@ -69,7 +72,7 @@ const DEFAULT_DENY_KEYS: readonly PrintScanCapabilityKey[] = DEFAULT_DENY_CAPABI
  * 「当前状态」三态，按服务端真实行为写（TerminalCapabilitiesService.assertUserTaskAllowed）：
  *   已开通 —— 登记为「可用」；
  *   已关闭 —— 登记为其它任何状态，一体机显示管理员写的说明；
- *   未登记 —— 默认关闭的三项（彩色 / 自动双面 / 签名）一律拒绝，一体机显示「暂未开通」；
+ *   未登记 —— 默认关闭的四项（彩色 / 自动双面 / 签名 / 屏上扫描）一律拒绝，一体机显示「暂未开通」；
  *             其余能力由服务器部署设置决定：常规设置（managed）照常放行，严格设置（strict）拒绝。
  *             后台读不到服务器用的是哪种设置，所以两种都写出来，不替它下结论。
  */
