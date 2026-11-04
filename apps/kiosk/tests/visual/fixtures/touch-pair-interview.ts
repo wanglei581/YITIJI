@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test'
 import { kioskAiCapabilitiesResponse } from '../../fixtures/ai-capabilities'
-import { interviewCreated, interviewReport, interviewStarted } from './fusion-w3-states'
+import { interviewReport, interviewReportRich, interviewStarted } from './fusion-w3-states'
 import { loginTo, registerTouchShell, see, spaGo, terminalReady, writeSession } from './touch-pair-shell'
 import { chooseInterviewExperience } from './direction-selection'
 import type { TouchPair } from './touch-pair-types'
@@ -46,6 +46,7 @@ export function interviewPairs(): TouchPair[] {
   const setup = (screen: string, step: 1 | 2 | 3): TouchPair => ({
     item: '面试', screen, state: 'default', route: '/interview?stage=setup',
     seeds: ['openSetup', `可见操作进入第 ${step} 步`], missingReason: null,
+    ...(step === 3 ? { proto: { patch: { fiRole: '前端开发工程师', fiIndName: '制造业', fiExp: '1-3 年' } } } : {}),
     prepare: (page, api) => openSetup(page, api, step),
   })
   return [
@@ -61,7 +62,7 @@ export function interviewPairs(): TouchPair[] {
     },
     {
       item: '面试', screen: 'interview', state: 'ai-down', route: '/interview-service',
-      seeds: ['kioskAiCapabilitiesResponse mock_interview + assistant_chat off'],
+      seeds: ['kioskAiCapabilitiesResponse mock_interview + self_assessment + career_plan off; assistant_chat available'],
       missingReason: null,
       proto: { query: { ai: 'down' } },
       prepare: async (page, api) => {
@@ -70,12 +71,13 @@ export function interviewPairs(): TouchPair[] {
           status: 200,
           json: kioskAiCapabilitiesResponse({
             mock_interview: { status: 'off', reason: 'AI_PAUSED' },
-            assistant_chat: { status: 'off', reason: 'AI_PAUSED' },
+            self_assessment: { status: 'off', reason: 'AI_PAUSED' },
+            career_plan: { status: 'off', reason: 'AI_PAUSED' },
           }),
         })
         await page.goto('/interview-service')
         await see(page, 'text=可以先看面试技巧')
-        await expect(page.locator('[data-qxt-ask="off"]')).toBeVisible()
+        await expect(page.locator('[data-qxt-ask="on"]')).toBeVisible()
       },
     },
     {
@@ -94,14 +96,14 @@ export function interviewPairs(): TouchPair[] {
     setup('iv-3', 3),
     {
       item: '面试', screen: 'iv-3', state: 'start-fail', route: '/interview?stage=setup',
-      seeds: ['openSetup step 3', 'POST mock-interviews → interviewCreated', 'POST start → 503 AI_BUSY'],
+      seeds: ['fresh setup without pendingSession', 'openSetup step 3', 'POST mock-interviews → 500 INTERNAL_ERROR'],
       missingReason: null,
-      proto: { patch: { fiStartFail: 1, fiCreating: 0 } },
+      proto: { patch: { fiStartFail: 1, fiCreating: 0, fiRole: '前端开发工程师', fiIndName: '制造业', fiExp: '1-3 年' } },
       prepare: async (page, api) => {
-        api.respond('POST', '/api/v1/mock-interviews', { status: 200, json: interviewCreated })
-        // fusion-w3 失败用例同一 /start 端点；暂时繁忙不伪装成会话已开始。
-        api.respond('POST', `/api/v1/mock-interviews/${SESSION}/start`, {
-          status: 503, json: { success: false, error: { code: 'AI_BUSY', message: '当前使用的人较多，请稍后再试' } },
+        registerTouchShell(api)
+        await remember(page, { stage: 'setup' })
+        api.respond('POST', '/api/v1/mock-interviews', {
+          status: 500, json: { success: false, error: { code: 'INTERNAL_ERROR', message: '这次没能创建练习，请稍后重试' } },
         })
         await openSetup(page, api, 3)
         await page.getByRole('button', { name: '创建并开始练习', exact: true }).click()
@@ -186,11 +188,11 @@ export function interviewPairs(): TouchPair[] {
     },
     {
       item: '面试', screen: 'iv-report-more', state: 'more', route: '/interview?stage=report',
-      seeds: ['GET report', 'click 预测题、STAR、清单、摘录'],
+      seeds: ['GET interviewReportRich with qaExcerpts; includeAnswersInPrint true', 'click 预测题、STAR、清单、摘录'],
       missingReason: null,
       prepare: async (page, api) => {
         registerTouchShell(api)
-        stubReport(api)
+        stubReport(api, 200, interviewReportRich)
         await remember(page, { stage: 'report', report: { sessionId: SESSION, accessToken: TOKEN } })
         await spaGo(page, '/interview?stage=report')
         await page.getByRole('button', { name: /预测题、STAR、清单、摘录/ }).click()
@@ -221,7 +223,7 @@ export function interviewPairs(): TouchPair[] {
       item: '面试', screen: 'iv-reports', state: 'logged-empty', route: '/interview?stage=reports',
       seeds: ['loginThroughVisibleUi', 'GET /me/mock-interviews items []'],
       missingReason: null,
-      proto: { query: { login: '1' } },
+      proto: { query: { login: '1' }, patch: { fiList: 'empty' } },
       prepare: async (page, api) => {
         registerTouchShell(api)
         api.respond('GET', '/api/v1/me/mock-interviews', {

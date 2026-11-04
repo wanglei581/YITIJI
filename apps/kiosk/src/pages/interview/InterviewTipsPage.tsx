@@ -218,7 +218,7 @@ export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: Interview
           </button>
         ) : null}
         <div className="qxt-iv-sec">
-          <h2 id="iv-tips-checklist">面试前准备清单</h2>
+          <h2 id="iv-tips-checklist">准备清单</h2>
           <span aria-live="polite"> · {checked.size} / {CHECKLIST.length} 已完成</span>
         </div>
         <div className="qxt-iv-ckgrid" role="group" aria-labelledby="iv-tips-checklist">
@@ -252,7 +252,7 @@ export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: Interview
             </div>
             <div className="qxt-iv-col">
               <div className="qxt-iv-colhead">
-                <h2>自我介绍结构建议</h2>
+                <h2>自我介绍怎么说</h2>
               </div>
               {INTRO_LENGTHS.map(([length, points]) => (
                 <div key={length} className="qxt-iv-line"><b>{length}</b><span>{points}</span></div>
