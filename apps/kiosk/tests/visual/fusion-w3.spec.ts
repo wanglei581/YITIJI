@@ -2001,6 +2001,9 @@ test('interview setup per-person quota exhaustion offers the previous step and i
     json: { success: false, error: { code: 'AI_QUOTA_EXHAUSTED', message: '今天的 AI 次数用完了，明天 0 点恢复' } },
   })
   api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', { status: 200, json: { data: { asrEnabled: false, ttsEnabled: false } } })
+  // 用例最后进「面试技巧」，那一页用 useApiReadiness 探 /health（后端可达才放行练习）。不给回应时
+  // 收尾会报未处理请求——请求赶在收尾前发出就红、晚了就绿，是碰运气的，所以这里明确给出。
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
   await page.goto('/interview/setup')
   await page.getByRole('button', { name: '选择行业 (20)' }).click()
   const interviewIndustryDialog = page.getByRole('dialog', { name: '选择面试行业' })

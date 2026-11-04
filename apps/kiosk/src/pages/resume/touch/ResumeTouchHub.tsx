@@ -1,3 +1,5 @@
+import { LICENSE_NO_NEW_TASK_REASON } from '../../../copy/unattendedCopy'
+import { useKioskLicense } from '../../../layouts/KioskLicenseContext'
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QxTouchCallout } from '../../../components/qingxu/touch/QxTouchCallout'
@@ -101,6 +103,7 @@ export function ResumeTouchHub({
   notice: { title: string; detail: string }
   pill: HubPill
 }) {
+  const winding = useKioskLicense().mode === 'winding-down'
   const navigate = useNavigate()
   const contact = useSupportContact()
   const help = contact.servicePhone ? helpNeededLine(contact) : ''
@@ -113,7 +116,7 @@ export function ResumeTouchHub({
   const quick = new Map(spec.quickLinks.map((item) => [item.route, item]))
   const cap = (route: string) => caps.get(route)
   const reasonFor = (item: { kind: HubCapability['kind']; route: string }) =>
-    unavailableReason(item.kind, item.route, availability) ?? (aiPaused && item.kind === 'ai' ? AI_PAUSED_REASON : null)
+    (winding ? LICENSE_NO_NEW_TASK_REASON : null) ?? unavailableReason(item.kind, item.route, availability) ?? (aiPaused && item.kind === 'ai' ? AI_PAUSED_REASON : null)
   const open = (route: string, reason: string | null) => {
     if (!reason) navigate(route)
   }
@@ -303,7 +306,7 @@ export function ResumeTouchHub({
       navCurrent="home"
       backLabel="返回"
       onBack={() => navigate('/')}
-      ask={availability.apiDown
+      ask={winding ? { label: '问小青', disabled: true } : availability.apiDown
         ? { label: '小青也要联网，恢复后再问', disabled: true }
         : { label: '问小青：我该选哪一个？', draft: ASK_DRAFT }}
       primary={availability.apiDown

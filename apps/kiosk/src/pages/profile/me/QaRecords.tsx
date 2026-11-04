@@ -1,3 +1,4 @@
+import { useKioskLicense } from '../../../layouts/KioskLicenseContext'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { MemberQaRecordItem } from '@ai-job-print/shared'
@@ -20,6 +21,7 @@ export function QaRecords({
   onToggle: (key: string) => void
 }) {
   const navigate = useNavigate()
+  const winding = useKioskLicense().mode === 'winding-down'
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -55,7 +57,7 @@ export function QaRecords({
           foot={expired ? <p className="me-reason">已超过保存期限，无法打开</p> : undefined}
           actions={(
             <MeActs>
-              <MeBtn v="pri" disabled={expired || busy} onClick={() => navigate(`/ai/plan?${new URLSearchParams({ sessionId: item.sessionId, artifactId: item.artifactId })}`)}>打开</MeBtn>
+              <MeBtn v="pri" disabled={expired || busy} onClick={() => navigate(`/ai/plan?${new URLSearchParams({ sessionId: item.sessionId, artifactId: item.artifactId })}`, { state: { licenseViewOnly: winding } })}>打开</MeBtn>
               {confirmId === item.id ? <>
                 <MeBtn v="danger" disabled={busy} onClick={() => void remove(item.id)}>{busy ? '正在删除…' : '确认删除'}</MeBtn>
                 <MeBtn v="sec" disabled={busy} onClick={() => setConfirmId(null)}>取消</MeBtn>
