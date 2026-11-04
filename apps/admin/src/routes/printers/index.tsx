@@ -50,13 +50,14 @@ function matchesSearch(printer: AdminPrinterRecord, search: string): boolean {
   return [printer.name, printer.terminalCode, printer.model ?? '', printer.serialNumber ?? ''].some((item) => item.toLowerCase().includes(value))
 }
 
+const loadPrintersWithOutput = () => getPrinters({ includeOutput: true })
+
 export default function PrintersPage() {
   const [filter, setFilter] = useState<string>('全部')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const loadPrinters = () => getPrinters({ includeOutput: true })
-  const { data, status, error, refresh } = useRefreshable(PRINTERS_REFRESH_KEY, loadPrinters, {
+  const { data, status, error, refresh } = useRefreshable(PRINTERS_REFRESH_KEY, loadPrintersWithOutput, {
     intervalMs: 30_000,
     merge: (current, incoming) => {
       const printers = mergeById<AdminPrinterRecord>((item) => item.id)(current?.printers, incoming.printers)
