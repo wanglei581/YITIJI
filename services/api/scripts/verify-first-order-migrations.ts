@@ -53,7 +53,7 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
       serviceEndAt: new Date('2027-01-01T00:00:00Z'), serviceScope: 'Migration only', supportContact: 'Test support',
     } })
     await client.terminal.create({ data: { id: 'migration-terminal', terminalCode: 'MIGRATION-TERMINAL', agentToken: 'migration-only-no-device', deviceFingerprint: 'migration', orgId: sentinel.id } })
-    const heartbeat = await client.terminalHeartbeat.create({ data: {
+    const queueHeartbeat = await client.terminalHeartbeat.create({ data: {
       terminalId: 'migration-terminal',
       printerQueueName: 'Queue-A',
       printerQueuePortKind: 'usb',
@@ -61,13 +61,13 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
       printerQueueRawStatus: '3,0,False,0,0',
       printerQueueSpooler: 'running',
     } })
-    const heartbeatRead = await client.terminalHeartbeat.findUnique({ where: { id: heartbeat.id } })
+    const queueHeartbeatRead = await client.terminalHeartbeat.findUnique({ where: { id: queueHeartbeat.id } })
     if (
-      heartbeatRead?.printerQueueName !== 'Queue-A'
-      || heartbeatRead.printerQueuePortKind !== 'usb'
-      || heartbeatRead.printerQueuePortName !== 'USB001'
-      || heartbeatRead.printerQueueRawStatus !== '3,0,False,0,0'
-      || heartbeatRead.printerQueueSpooler !== 'running'
+      queueHeartbeatRead?.printerQueueName !== 'Queue-A'
+      || queueHeartbeatRead.printerQueuePortKind !== 'usb'
+      || queueHeartbeatRead.printerQueuePortName !== 'USB001'
+      || queueHeartbeatRead.printerQueueRawStatus !== '3,0,False,0,0'
+      || queueHeartbeatRead.printerQueueSpooler !== 'running'
     ) throw new Error(`${kind}: printer queue heartbeat columns were not readable`)
     const deployment = await client.serviceDeployment.create({ data: {
       projectId: project.id, orgId: sentinel.id, terminalId: 'migration-terminal', activeTerminalId: 'migration-terminal', terminalCode: 'MIGRATION-TERMINAL', locationLabel: 'Test',
