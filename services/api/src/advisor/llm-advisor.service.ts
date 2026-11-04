@@ -1,5 +1,6 @@
 import { AiContentBlockedError } from '../ai/llm/llm-guard'
-import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { contentBlockedException } from '../ai/safety/content-blocked'
 import { LlmConfigService } from '../ai/llm/llm-config.service'
 import {
   LLM_BUSY_MESSAGE,
@@ -10,6 +11,7 @@ import {
   llmTimeoutMessage,
 } from '../ai/llm/llm-http'
 import { deepseekThinkingOff } from '../ai/llm/deepseek-thinking'
+import { DEVICE_FAULT_PROMPT_RULE } from '../ai/safety/device-fault'
 import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError, llmEndpointNotAllowedError } from '../ai/llm/llm-failure'
 import { AiEndpointNotAllowedError } from '../common/outbound/ai-endpoint-allowlist'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai/ai-log.service'
@@ -32,12 +34,14 @@ export const ADVISOR_QA_SYSTEM_PROMPT = withAiSafety(
   '\n3. 不替用户做投递或预约决定，不代收简历；岗位申请只能引导用户去来源平台。' +
   '\n4. 没有依据时必须明说「本机没有你所在行业的具体数据，这条算参考」，不要编出处。' +
   '\n5. sourceNote 要如实写清这条结论凭什么：是通行做法，还是基于用户自己说过的话。' +
+  `\n6. ${DEVICE_FAULT_PROMPT_RULE}` +
   '\n只输出 JSON（不要 markdown 代码块）：' +
   '{"answer":"回答正文（200 字以内，口语化，可分点）",' +
   '"evidenceLevel":"E1|E2|E3",' +
   '"sourceNote":"这条的出处与可信度说明（60 字以内）"}' +
   '\nevidenceLevel 口径：E1=依据用户自己说过的话或他的材料；E2=依据本机读到的来源事实；E3=你的判断与建议。' +
   '\n本层没有来源事实输入，所以一般只应输出 E1 或 E3，不要谎报 E2。',
+  { policyVariant: 'text' },
 )
 
 export const ADVISOR_DRAFT_SYSTEM_PROMPT = withAiSafety(
@@ -51,6 +55,7 @@ export const ADVISOR_DRAFT_SYSTEM_PROMPT = withAiSafety(
   '\n5. 语气自然、口语可念，不要书面套话堆砌。' +
   '\n只输出 JSON（不要 markdown 代码块）：' +
   '{"draft":"成稿正文（留空处用 ____）","blanks":["留空的是什么"],"summary":"一句话说明这稿还差什么"}',
+  { policyVariant: 'draft' },
 )
 
 // ============================================================
@@ -147,6 +152,8 @@ export interface AdvisorAnswer {
   /** 出处说明：这条结论凭什么。打印时随条目带上。 */
   sourceNote: string
   disclaimer: string
+  /** true 表示这段回答是设备故障时的安全提示，不是模型生成的。页面上的标由前端写成「安全提示」，后端不出这个标。没有这个字段或为 false 时和原来一样 */
+  fixedNotice?: boolean
 }
 
 export interface AdvisorDraft {
@@ -479,7 +486,7 @@ export class LlmAdvisorService {
         { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: 'advisor_work', forbiddenWords: cfg.forbiddenWords } },
       )
     } catch (error) {
-      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
+      if (error instanceof AiContentBlockedError) throw contentBlockedException(error)
       // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
       if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       if (error instanceof LlmBusyError) {

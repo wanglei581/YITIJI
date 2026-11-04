@@ -189,7 +189,7 @@ export function ResumeSourcePage() {
   const sourceBusy = uploading || phoneBusy || usbBusy
   const [step, setStep] = useState<'where' | 'direction' | 'more'>('where')
   // 简历上传中:禁止进入待机宣传屏(评审 bug #1)
-  useBusyLock(sourceBusy)
+  useBusyLock(uploading || usbBusy)
 
   const toggleDimension = (key: ResumeScoringDimensionKey) => {
     setSelectedDimensions((current) =>

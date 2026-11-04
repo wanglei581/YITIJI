@@ -33,6 +33,11 @@ export interface MemberPrintOrderItem {
   reprintAllowed?: boolean
   /** 剩余自助续打次数（0–2）。没有任务，或没有到机码哈希的现场单，为 null。 */
   reprintRemaining?: number | null
+  /**
+   * 免费单的出纸提示。may_have_printed = 上次结果未确认（含冷却期内）；
+   * partial_output = 上次只出了一部分。付费单与普通失败为 null。
+   */
+  reprintNotice?: 'may_have_printed' | 'partial_output' | null
   // ── C5-4 只读退款/核销字段（会员只读展示；无任何操作入口）：无 Order 一律 null ──
   /** 已退金额累计（分）；未退款为 0，无 Order 为 null。 */
   refundedAmountCents?: number | null
@@ -141,6 +146,8 @@ export interface MemberOrderTimelineItem {
   reprintAllowed: boolean
   /** 剩余自助续打次数（0–2）。没有任务，或没有到机码哈希的现场单，为 null。 */
   reprintRemaining: number | null
+  /** 免费单出纸提示。付费单与普通失败为 null。 */
+  reprintNotice: 'may_have_printed' | 'partial_output' | null
   terminal: MemberOrderTimelineTerminal | null
   claimableHere: boolean
 }

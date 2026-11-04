@@ -40,9 +40,14 @@ import {
 import { createHmac } from 'crypto'
 import { basename, dirname, join, resolve } from 'path'
 import chokidar, { FSWatcher } from 'chokidar'
-import FormData from 'form-data'
 import type { AgentConfig } from './types'
-import { createApiClient, axiosErrorMessage, isUnauthorizedHttpError, NO_RETRY_CONFIG } from './api-client'
+import { createApiClient, axiosErrorMessage, isUnauthorizedHttpError } from './api-client'
+import {
+  buildScanDeliveryForm,
+  classifyScanDeliveryFailure,
+  postScanDeliveryForm,
+  type ScanDeliveryRefusal,
+} from './scan-delivery'
 import { isUnauthorized, markUnauthorized } from './auth-state'
 import {
   fetchScanLease,
@@ -259,12 +264,27 @@ function ensureUnclaimedDir(scanWatchFolder: string): string {
   return dir
 }
 
-function guessMimeType(filename: string): string {
-  const lower = filename.toLowerCase()
-  if (lower.endsWith('.pdf')) return 'application/pdf'
-  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg'
-  if (lower.endsWith('.png')) return 'image/png'
-  return 'application/octet-stream'
+/**
+ * 后端永久拒绝投递时的隔离日志。措辞逐类不同，运维排查才分得清是哪一种原因：
+ * 无等待任务 / 租约失效 / 匹配后任务状态变化 / 内容已投递过 / 内容曾尝试未完成 /
+ * 捕获已过期。归类本身在 scan-delivery.ts，这里只负责面板路线自己的措辞。
+ */
+function describeWatcherRefusal(refusal: ScanDeliveryRefusal, filename: string): string {
+  const masked = maskScanName(filename)
+  switch (refusal) {
+    case 'no_waiting_task':
+      return `scan-watcher: no waiting scan task, moved to _unclaimed — ${masked}`
+    case 'lease_invalid':
+      return `scan-watcher: scan lease invalid or expired; moved to _unclaimed — ${masked}`
+    case 'task_state_changed':
+      return `scan-watcher: scan task state changed after match (no longer valid, will not retry), moved to _unclaimed — ${masked}`
+    case 'file_already_delivered':
+      return `scan-watcher: file content already delivered previously (duplicate retry, likely a lost response), moved to _unclaimed — ${masked}`
+    case 'file_previously_attempted':
+      return `scan-watcher: file content was previously attempted but not completed; refusing cross-session rebind, moved to _unclaimed — ${masked}`
+    case 'file_stale_capture':
+      return `scan-watcher: file capture is stale for current session; refusing cross-session rebind, moved to _unclaimed — ${masked}`
+  }
 }
 
 /**
@@ -948,26 +968,20 @@ export async function processCandidate(
 
     // 3. 构建可信快照时间（传原始 finalSnapshot.mtimeMs，严禁使用 Math.max 夹值伪造时间证据）
     const candidateSnapshotAt = new Date(finalSnapshot.mtimeMs).toISOString()
-    const form = new FormData()
-    form.append('file', verified.bytes, { filename, contentType: guessMimeType(filename) })
-    form.append('scanTaskId', lease.scanTaskId)
-    form.append('deliveryLease', lease.deliveryLease)
-    form.append('candidateSnapshotAt', candidateSnapshotAt)
-    form.append('observedAt', candidateSnapshotAt)
+    // 表单构造、POST 与 NO_RETRY_CONFIG 的理由都在 scan-delivery.ts（面板路线不传 origin）。
+    const form = buildScanDeliveryForm({
+      bytes: verified.bytes,
+      filename,
+      scanTaskId: lease.scanTaskId,
+      deliveryLease: lease.deliveryLease,
+      candidateSnapshotAt,
+    })
 
     try {
-      // NO_RETRY_CONFIG: `form` 是一次性消费的流，axios 拦截器的自动重试会复用
-      // 同一个已耗尽的请求体，导致 Content-Length 与实际重发字节不匹配、服务端
-      // 请求 end 事件永不触发——真实 5xx 场景下会让每次重试都卡满 30s 超时
-      // （3 次共 100+ 秒）。失败已由本函数自身的 sweep 重试机制兜底，禁用
-      // axios 层重试不影响最终投递成功率。
       if (deliverFile) {
         await deliverFile()
       } else {
-        await client.post(`/terminals/${config.terminalId}/scan-sessions/deliver`, form, {
-          headers: form.getHeaders(),
-          ...NO_RETRY_CONFIG,
-        })
+        await postScanDeliveryForm(client, config.terminalId, form)
       }
       globalDirectoryBaseline.remove(filename)
       finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'delete')
@@ -977,89 +991,19 @@ export async function processCandidate(
         warn(`scan-watcher: unauthorized; preserving file for retry after re-bind — ${maskScanName(filename)}`)
         return
       }
-      const code = (e as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
-      if (code === 'NO_WAITING_SCAN_TASK') {
+      // 后端永久拒绝（无等待任务 / 租约失效 / 匹配后任务状态变化 / 内容已投递过 /
+      // 内容曾尝试未完成 / 捕获过期）：这次"匹配"已经失效，立即隔离，绝不重试——重试
+      // 可能把文件挂到后一个用户身上。每一类为什么不能重试，见 scan-delivery.ts 的
+      // classifyScanDeliveryFailure。
+      const failure = classifyScanDeliveryFailure(e)
+      if (failure.kind === 'refused') {
         tryQuarantineKeepingLineage(
           filePath,
           scanWatchFolder,
           filename,
           verified.trustedWindowsCandidate,
           candidateIdentity,
-          `scan-watcher: no waiting scan task, moved to _unclaimed — ${maskScanName(filename)}`,
-        )
-        return
-      }
-      if (code === 'SCAN_LEASE_INVALID' || code === 'SCAN_LEASE_EXPIRED') {
-        tryQuarantineKeepingLineage(
-          filePath,
-          scanWatchFolder,
-          filename,
-          verified.trustedWindowsCandidate,
-          candidateIdentity,
-          `scan-watcher: scan lease invalid or expired; moved to _unclaimed — ${maskScanName(filename)}`,
-        )
-        return
-      }
-
-      // B1-11（Critical code-review 修复 #2）：SCAN_TASK_STATE_CHANGED 说明这份文件在服务端
-      // 确实被匹配、CAS 到过 'matched'，但最终 CAS-to-completed 落空（任务在上传期间被取消或
-      // 状态变化——服务端已经用 systemDelete() 补偿删掉了那次真实上传出的孤儿文件，见
-      // scan-tasks.service.ts deliverScanFile() 的 SCAN_TASK_STATE_CHANGED 分支）。这次"匹配"
-      // 已经明确、永久失效——不是网络抖动，绝不能留给下一轮 sweep 重试：重试时该终端"当前
-      // waiting 任务"完全可能已经变成另一个用户的新会话（原用户的任务已经不在，
-      // 终端已经空出来），继续重试会把这份文件错误地挂到那个新用户身上——跨用户 PII 误挂载。
-      // 必须像 NO_WAITING_SCAN_TASK 一样立即隔离，绝不重试；日志措辞与两个既有 _unclaimed
-      // 归宿（无等待任务 / 重试超时）分别不同，避免运维排查时混淆三种不同的原因。
-      if (code === 'SCAN_TASK_STATE_CHANGED') {
-        tryQuarantineKeepingLineage(
-          filePath,
-          scanWatchFolder,
-          filename,
-          verified.trustedWindowsCandidate,
-          candidateIdentity,
-          `scan-watcher: scan task state changed after match (no longer valid, will not retry), moved to _unclaimed — ${maskScanName(filename)}`,
-        )
-        return
-      }
-
-      // B1-11（点 4 边缘案例修复）：SCAN_FILE_ALREADY_DELIVERED 说明这份文件内容此前已经
-      // 真正投递成功过——最可能的原因是上一次投递其实已经在服务端完成，只是 HTTP 响应在
-      // 回传给本 Agent 的路上丢失，本 Agent 才把它误当成失败留在原地准备重试。继续重试
-      // 没有意义（内容已经交付过），而且和 SCAN_TASK_STATE_CHANGED 一样有跨用户误挂载
-      // 风险（重试会被匹配到该终端当前 waiting 任务，可能已经属于另一个用户）——
-      // 同样必须立即隔离，不重试。
-      if (code === 'SCAN_FILE_ALREADY_DELIVERED') {
-        tryQuarantineKeepingLineage(
-          filePath,
-          scanWatchFolder,
-          filename,
-          verified.trustedWindowsCandidate,
-          candidateIdentity,
-          `scan-watcher: file content already delivered previously (duplicate retry, likely a lost response), moved to _unclaimed — ${maskScanName(filename)}`,
-        )
-        return
-      }
-
-      if (code === 'SCAN_FILE_PREVIOUSLY_ATTEMPTED') {
-        tryQuarantineKeepingLineage(
-          filePath,
-          scanWatchFolder,
-          filename,
-          verified.trustedWindowsCandidate,
-          candidateIdentity,
-          `scan-watcher: file content was previously attempted but not completed; refusing cross-session rebind, moved to _unclaimed — ${maskScanName(filename)}`,
-        )
-        return
-      }
-
-      if (code === 'SCAN_FILE_STALE_CAPTURE') {
-        tryQuarantineKeepingLineage(
-          filePath,
-          scanWatchFolder,
-          filename,
-          verified.trustedWindowsCandidate,
-          candidateIdentity,
-          `scan-watcher: file capture is stale for current session; refusing cross-session rebind, moved to _unclaimed — ${maskScanName(filename)}`,
+          describeWatcherRefusal(failure.refusal, filename),
         )
         return
       }

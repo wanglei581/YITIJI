@@ -5,6 +5,7 @@ const fileUrls = require('../../utils/file-url')
 const auth = require('../../utils/auth')
 const uploadNames = require('../../utils/upload-name')
 const conversion = require('./documents-helpers')
+const shareFriend = require('../../utils/share-friend')
 
 Page({
   data: {
@@ -48,6 +49,7 @@ Page({
 
   onUnload() {
     this._stopConvertCountdown()
+    shareFriend.abandon(this)
   },
 
   _loadConversionCapabilities() {
@@ -96,7 +98,8 @@ Page({
 
   applyFilter(key, source) {
     const all = source || this.data.all
-    this.setData({ filtered: key === 'all' ? all : all.filter((item) => item.type === key) })
+    const list = key === 'all' ? all : all.filter((item) => item.type === key)
+    this.setData({ filtered: shareFriend.stamp(list, this) })
   },
 
   onReachBottom() {
@@ -466,6 +469,10 @@ Page({
           showCancel: false,
         })
       })
+  },
+
+  shareToFriend(e) {
+    shareFriend.onTap(this, e, wx, (fileId) => api.getFilePreviewUrl(fileId))
   },
 
   back() { wx.navigateBack({ delta: 1, fail() { wx.switchTab({ url: '/pages/home/home' }) } }) },
