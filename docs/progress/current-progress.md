@@ -12,6 +12,34 @@
 - 反向检查（改坏后 `git checkout` 恢复，没有提交改坏的状态）：删掉 `leaveScanFlow` 里的撤会话 → `verify:scan-session-truth` 红在「先撤服务端任务」；游客句改回旧句 → 同一门禁红在 11/02 原话；静默期去掉减一 → `verify:scan-quiet-period` 红。恢复后这两条门禁再绿，工作区干净。
 - 图谱：新文件入库后 `pnpm graph` 重出，`pnpm graph:check` 通过（`docs/graph/` 3 个文件有变化）。新文件被 fusion-w2 与 scan-session-truth 钉住；设置页那一组还被 runtime-error-boundary 与 no-raw-error-render 钉住；`useScanResultExits` 还被 print-done-truth 钉住；`useScanSessionCreate` 还被 scan-quiet-period 钉住。这些门禁本轮都已跑过，没有新冒出来还没跑的。
 - 合并注意：origin/main 比本分支基线多 #1538，进度文档顶部多一节小程序签名图。合的时候两节都留，这一节放在上面。
+## 2026-11-04：心跳认打印队列新字段（后端半；分支 `claude/printer-queue-api-1104`；未合并、未部署）
+
+- 做了：终端心跳多收五个可选字段（队列名、端口种类、USB 端口名、驱动五个原值、Windows 打印服务状态）。SQLite 与 PostgreSQL 各加五列，迁移 `20261104150000_add_terminal_heartbeat_printer_queue`。老终端程序不带这五项仍然接受。后台终端详情只读显示「打印队列」；五列都空显示未上报；终端离线不把旧上报当现状。不保存、不显示打印机地址。队列名与终端程序同一条规则、拒绝地址形名字；状态位表按 Windows 的 25 个状态位补全，未识别位不再盖掉已识别的名字。
+- 边界：没改 `apps/terminal-agent/`。后端先认字段。终端程序要等这条上生产才发这些字段，否则多出来的字段会被整条拒绝，终端看起来像离线。
+- 验证：两套空库 `migrate deploy` 都套上了这条迁移；首单迁移升级路径能写入并读回五列。新门禁挂在 `verify:terminal-network-diagnostics` 后面，`verify:ci-gate-coverage` 通过，没有改 workflow。
+
+## 2026-11-04：打印机第 1 步 a+b——工作台口径改字、打印机页加「本系统出纸」（分支 `claude/printer-step1-ab-1104`；未合并、未部署）
+
+- 只改现有页：管理员工作台的打印机那一块，以及设备管理 → 打印机。没有新页面、没有新菜单。终端程序没动。
+- 工作台：没有异常时只写「N 台打印机都在线，没有报告故障。」只要有打印机，下面另起一行小字：USB 连接读不到纸张和碳粉余量，没报警不等于耗材充足。偏少改称「碳粉」，与打印机页列名一致。分组键 `normal` 没改名。
+- 「本系统出纸」复用大屏走查 W-68 的出纸页数：`PRINTED_TASK_WHERE`、`pagesByPrintedTask`（计费页 × 份数），今天按 `PrintTask.completedAt` 的上海自然日（`shanghaiDayStart`）。本月是上海自然月。彩色、双面看这条任务自己的 `paramsJson`。只算从本系统发出、已确认出纸的打印；不含打印机面板复印，也不含打印机自己读 U 盘直接打印。读不到或超出统计上限时不显示成 0。未确认的任务另写「本月另有 N 笔出纸未确认，没算进去」。
+- 统计在新文件 `services/api/src/terminals/admin-printer-output.ts`，一次按终端列表查完。`terminals-admin.service.ts` 一行没改。出纸面数仍有行数上限；未确认笔数按终端 `groupBy` 计数，不再把行取进内存。
+- 返工：`PrismaService` 改为值导入，否则 Nest 启动解析不到 `AdminPrinterOutputService`。门禁核对真实 `TerminalsModule` 登记了出纸服务和打印机控制器；再用应用上下文取出两者确认能解析，直接调 `list('output')` 能统计出纸（没走 HTTP）。`GET /admin/printers` 只有 `?include=output` 才统计并返回 `output` / `outputStatus`；工作台不带这个参数，设备管理 → 打印机才带。打印机页底补上：打印机走 USB 连接时，这几项读不到，会一直显示未上报；没报警不等于耗材充足。
+
+## 2026-11-04：母盘装机清单补一节「打印机本机设置」（只写文档；分支 `claude/printer-install-checklist-1104`；未部署、未上机）
+
+- 只改文档，不改代码、不改生产配置。`docs/device/windows-golden-image-and-install-checklist.md` 增加 G11，B 节加 B4a 指向它；G1 到货登记补打印机一行，并加上「铭牌型号」「固件版本」两列。`docs/device/pantum-cm2820adn.md` §七末尾指向 G11；文末待现场核实清单里与 G11 重复的三项（U 盘直接打印、协议设置里的 SNMP、面板能否自动恢复默认）标「见 G11」。
+- 待现场核实（菜单名或默认值，官网和手册都没写）：SNMP 在网页哪一页、CM2820ADN 有没有 SNMP、只读和读写是否分开；9100 / IPP / WSD / LPR 能不能关，AirPrint 规格页未列；SMB 地址簿的账号和共享名怎么填；面板语言、时间、SNTP、纸盒尺寸与类型的菜单（独立小内网手动对时，网口接了外网才用 SNTP）；「彩粉用尽后继续黑白」的默认值和设置位置；本机有没有打印机自带的 U 盘直接打印、能不能关（关不了则端口锁与「扫描到 U 盘」一起定，本文不定）；复印自动恢复的选项名；信息页和网页「产品信息」上有没有固件版本。
+- 面板扫描到 SMB 要走打印机网口，G8 首装验收的扫描项不接网口过不了。照 A9（收件目录只许 SYSTEM 和管理员写）和 A11（防火墙只放行本机 9527）现在的写法，面板推扫进不来：要另开只对打印机地址放行的 445 入站和一个只能写收件目录的本地账号，怎么开待现场核实，和接网口一起先问产品负责人。
+- **接打印机网口、开 SNMP 之前先问产品负责人。** 团体名、v3 口令、管理员密码只进密码库，不写入文档、仓库、后台或一体机。
+
+## 2026-11-04：简历优化的改写要能在最终稿里逐字找到（只改后端；分支 `claude/optimize-after-match-1104`；未合并、未部署）
+
+- 来由：11/04 测试机一份真实简历走出 8 条优化建议，全部是「只能手改」。一体机只在优化稿的单个字符串字段里用 `includes(after)` 判断能不能换上；提示词没有要求改写逐字落在同一字段，补回和篇幅收口之后也没有再核对。
+- 改法：提示词写明每条 `after` 必须与优化稿某一个字符串字段逐字一致，不得拆到两个字段。最终返回前按同一判据核对。对不上时，仅当全稿只有一处、且只差首尾空白或全半角标点，才把 `after` 改成稿里的原文。多处相似、跨字段拼接保持原样，不改优化稿正文。空 `after` 仍在解析时丢弃。日志只记条数。全部对不上时不再多打一次模型，沿用现有的非法输出重试，仍算同一次扣次。
+- 验证：后端类型检查 0 错；仓库 lint 0 错；优化服务在图谱里列出的门禁通过。新样本覆盖逐字命中、首尾空白、唯一全半角标点、多处相似、跨字段拆分、空 `after`。一体机、小程序、终端程序未改。
+- 没做：这一版还在本分支，没有推送。模型仍可能写出对不上的改写，那些条继续只能手改。
+
 ## 2026-11-02：屏上扫描 ③ 后端第一批 B1（云端会话、能力键、心跳；分支 `claude/scan-device-b1-1102`，从发布候选头 3f19aba9c 切出，已并 origin/main 49ed808b6，未推送、未部署）
 
 - 做了什么：任务包 ③（用户在一体机屏上点「开始扫描」，终端程序服务经 WIA 直接扫描）的云端部分。`ScanTask` 加 8 个会话字段（startMode 默认 panel、deviceSource、deviceColorMode、deviceState、devicePageCount、deviceErrorCode、deviceUpdatedAt、hardExpiresAt），`TerminalHeartbeat` 加 scanDeviceHealth / scanDeviceObservedAt；两套迁移同名 `20261102230000_add_scan_device_session_fields`，`verify-first-order-migrations` 升级清单补了这份（旧行取默认值、新列可读写）。能力键 `scan_device` 进共享契约与后端副本、DEFAULT_DENY（逐台到机器旁验过进纸器、无纸、开盖、打印时扫描、中止恢复才登记，同彩色、双面），后台「设备能力」页键名「屏上扫描（需真机验证）」。
@@ -19,6 +47,7 @@
 - 没做 / 边界：终端程序（A1 底座、A2 接线）、一体机（K1）、小程序都没动；真机验证 V0-3/4/5/11/12 没做，**哪台机器都不许在后台把 scan_device 配成 available**；`packages/shared/src/types/scanTask.ts` 里会话新字段的类型留给 K1；device 会话取消后仍吃 90 秒静默期（任务包 F-5），只有「改用面板扫描」不吃；Playwright 视觉用例没跑（本机没有 Playwright 浏览器）。
 - 超出任务包文字的两处改动（各自单独成提交，不改就红，可单独审、单独撤）：`fusion-w2-print.spec.ts` 的能力假数据补一行 scan_device（`verify:print-color-duplex-capability` 第 I 节要求桩覆盖契约全部能力键）；`verify-scan-input-lockout-telemetry` 的 printer-status 精确键集合加两个键（任务要求公开接口多给两项；仍是精确集合断言，另补三条按名字的不外泄断言，没放宽）。
 - 验证：新门禁 `verify:scan-device-sessions`（进 ci.yml 两处，SQLite 与 PostgreSQL 各跑一遍）；图谱列出的门禁加简报必跑共 114 条，SQLite 口径 85 条 api 门禁加 27 条其它包静态门禁全绿（中途 `verify-recruitment-hosting-gate-declares` 红过一次——新门禁引用了终端管理服务须显式声明托管开关，已补并复跑转绿），PG 作业里同源的 34 条加两条 PG 专用全绿；两套空库 `migrate deploy` 通过且 `migrate diff` 无漂移；15 处反向检查（DEFAULT_DENY、未配置放行、续期封顶、switch 变成取消、origin 校验、PDF 校验、转移表多一条、页数可减、不核终端归属、能力被关仍收、面板 lease 多键、hardExpiresAt 算错、deliver 状态放宽、迁移默认值、公开接口多泄一项）全部变红，恢复后干净。
+
 ## 2026-11-03：一体机扫码上传共用面板取消失败不再清屏（重做旧候选 #1461；分支 `claude/kiosk-upload-cancel-keep-1103`；未合并、未部署）
 
 - 旧候选 #1461（10/14，未进 main）在触屏版上重做：会员确认时后端锁着复制文件，这时点「取消」会回 400 `UPLOAD_SESSION_ACTION_IN_PROGRESS`。共用面板原来吞掉失败并无条件清空，屏上像取消成功，文件随后仍会归档进会员名下。

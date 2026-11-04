@@ -4,13 +4,16 @@ import type { AdminPrinterRecord, AdminTerminalRecord } from '../../services/api
 import { BlockError } from './DashboardWidgets'
 import { printerIssueParts, summarizePrinters } from './printerStatusSummary'
 
+const USB_SUPPLY_NOTE =
+  '纸张和碳粉余量现在读不到：打印机走 USB 连接，缺纸和余量都不会上报，没报警不等于耗材充足；缺纸要等打印失败或现场巡检才知道。'
+
 function supplyLine(printers: AdminPrinterRecord[]): string {
   if (printers.length === 0) return '还没有打印机上报状态。'
   const counts = summarizePrinters(printers)
   const parts = printerIssueParts(counts)
   return parts.length > 0
     ? `${parts.join('，')}。`
-    : `${formatCount(counts.normal)} 台打印机都在线，没有报告故障，也没有报告纸张或墨粉不足。`
+    : `${formatCount(counts.normal)} 台打印机都在线，没有报告故障。`
 }
 
 export function DashboardDeviceStatus({
@@ -57,7 +60,12 @@ export function DashboardDeviceStatus({
         ) : printerError || printers === null ? (
           <BlockError message="这类这次没读到" onRetry={onRetryPrinters} />
         ) : (
-          <p className="text-sm text-neutral-700">{supplyLine(printers)}</p>
+          <>
+            <p className="text-sm text-neutral-700">{supplyLine(printers)}</p>
+            {printers.length > 0 ? (
+              <p className="text-xs leading-relaxed text-neutral-500">{USB_SUPPLY_NOTE}</p>
+            ) : null}
+          </>
         )}
       </div>
     </SectionCard>

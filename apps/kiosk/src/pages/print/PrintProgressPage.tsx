@@ -62,6 +62,7 @@ import {
   reprintHint,
   paymentLead,
   paymentPill,
+  priorOutputTrayLine,
   PRINT_PROGRESS_QUIET_MS,
   progressFailurePresentation,
   progressStatusFingerprint,
@@ -77,6 +78,10 @@ export function PrintProgressPage() {
   // 模块级原句在文件加载时就钉死了，那时服务电话往往还没读到。这里按当前联系方式重拼，读不到号码就不写电话。
   const PRINT_PROGRESS_QUIET_COPY = `这台机器暂时没有回报打印进度，请看出纸口。${printProblemLine(support)}`
   const state = location.state as Record<string, unknown> | null
+  const priorOutputLine = priorOutputTrayLine({
+    mayHavePrinted: state?.mayHavePrinted === true,
+    partialOutput: state?.partialOutput === true,
+  })
   const source = state?.source === 'resume' || state?.source === 'document' ? state.source : undefined
   const uploadPath = printUploadPathForSource(source)
 
@@ -597,6 +602,9 @@ export function PrintProgressPage() {
             <PrintArt name="mfp" />
           </div>
           <div className="pff-out-main">
+            {priorOutputLine ? (
+              <p className="pfp-out-note" data-testid="print-progress-prior-output" role="status">{priorOutputLine}</p>
+            ) : null}
             <div className="pff-out-status">
               {backendStatus === 'printing' && !progressQuiet ? (
                 <span className="pff-pulse"><i /><i /><i />正在出纸</span>
