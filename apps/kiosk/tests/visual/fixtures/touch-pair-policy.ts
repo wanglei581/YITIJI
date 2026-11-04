@@ -22,25 +22,246 @@ function policyItem() {
   }
 }
 
-const Q = (key: string, label: string, sensitive: boolean, options: Array<[string, string]>) => ({
-  key, label, sensitive, options: options.map(([value, text]) => ({ value, label: text })),
-})
+function policyList() {
+  const entries = [
+    ['高校毕业生一次性求职创业补贴申领指引', '毕业学年内符合困难条件的高校毕业生，可按学校通知核对申领材料。', 'graduate', '市公共就业与人才服务中心', '2026-09-18', '2026-09-20T08:00:00.000Z'],
+    ['灵活就业人员社会保险补贴办理说明', '符合条件的灵活就业人员，可查阅社保补贴范围与申报期限。', 'flexible', '东城区就业服务中心', '2026-09-09', '2026-09-13T02:20:00.000Z'],
+    ['返乡人员创业扶持政策申办指南', '返乡创业人员可核对扶持对象、经营要求和当地受理渠道。', 'migrant', '西城区人力资源服务中心', '2026-08-26', '2026-08-29T06:30:00.000Z'],
+    ['创业担保贷款申请材料与受理渠道', '创业人员可查看贷款申请条件、担保要求与经办机构说明。', 'startup', '南城区创业服务中心', '2026-08-12', '2026-08-16T03:15:00.000Z'],
+    ['就业困难人员认定与就业援助说明', '就业困难人员可查阅认定范围、所需材料及就业援助渠道。', 'hardship', '北城区公共就业服务中心', '2026-07-30', '2026-08-02T07:40:00.000Z'],
+    ['高校毕业生基层就业补贴办理指引', '到基层就业的高校毕业生可按当地发布要求核对办理条件。', 'graduate', '高新区人才服务中心', '2026-07-16', '2026-07-21T01:50:00.000Z'],
+    ['职业技能培训补贴申领说明', '参加职业技能培训的人员可查看补贴对象和培训机构要求。', 'general', '市职业技能指导中心', '2026-06-24', '2026-06-28T05:10:00.000Z'],
+    ['失业人员就业服务与培训支持指南', '登记失业人员可核对就业服务、培训支持与受理渠道。', 'hardship', '经开区就业促进中心', '2026-06-08', '2026-06-12T09:25:00.000Z'],
+  ]
+  return entries.map(([title, summary, audience, sourceName, publishedDate, syncTime], index) => ({
+    ...policyItem(), id: `pair-policy-${String(index + 1).padStart(3, '0')}`,
+    title, summary, audience, sourceName, publishedDate, syncTime,
+    content: summary, externalId: `HRSS-${publishedDate}`, externalUrl: `${POLICY_URL}/${index + 1}`,
+  }))
+}
 
+// 问项、选项与两句全文逐字取自服务端 policy-eligibility.types.ts。
 const QUESTIONS = {
-  questionSetVersion: 'policy-eligibility-questions-v1',
-  questions: [
-    Q('employment_status', '现在状态', false, [['seeking_after_leaving', '离职找工作中'], ['fresh_graduate', '应届毕业生'], ['unsure', '不确定']]),
-    Q('household_social', '户籍社保', true, [['local_household', '本市户籍'], ['unsure', '不确定']]),
-    Q('unemployed_duration', '离职多久', false, [['within_1_month', '1 个月内'], ['unsure', '不确定']]),
-    Q('age_range', '年龄段', true, [['age_16_24', '16–24 岁'], ['unsure', '不确定']]),
-    Q('graduation_year', '毕业年份', false, [['current_year', '本年度应届'], ['unsure', '不确定']]),
-    Q('unemployment_registration', '失业登记', true, [['registered', '已办'], ['not_registered', '没办'], ['unsure', '不确定']]),
-    Q('social_insurance_months', '连续缴费', true, [['none', '未缴'], ['unsure', '不确定']]),
-    Q('separation_reason', '离职原因', true, [['voluntary_resignation', '本人主动辞职'], ['unsure', '不确定']]),
-    Q('prior_subsidy', '领过同类补贴', false, [['never_received', '没领过'], ['unsure', '不确定']]),
+  "questionSetVersion": "policy-eligibility-questions-v1",
+  "questions": [
+    {
+      "key": "employment_status",
+      "label": "现在状态",
+      "sensitive": false,
+      "options": [
+        {
+          "value": "seeking_after_leaving",
+          "label": "离职找工作中"
+        },
+        {
+          "value": "employed_switching",
+          "label": "在职想换工作"
+        },
+        {
+          "value": "fresh_graduate",
+          "label": "应届毕业生"
+        },
+        {
+          "value": "starting_business",
+          "label": "想创业 / 已创业"
+        },
+        {
+          "value": "unsure",
+          "label": "不确定"
+        }
+      ]
+    },
+    {
+      "key": "household_social",
+      "label": "户籍社保",
+      "sensitive": true,
+      "options": [
+        {
+          "value": "local_household",
+          "label": "本市户籍"
+        },
+        {
+          "value": "nonlocal_with_local_insurance",
+          "label": "外地 · 本市缴社保"
+        },
+        {
+          "value": "nonlocal_without_insurance",
+          "label": "外地 · 未缴社保"
+        },
+        {
+          "value": "unsure",
+          "label": "不确定"
+        }
+      ]
+    },
+    {
+      "key": "unemployed_duration",
+      "label": "离职多久",
+      "sensitive": false,
+      "options": [
+        {
+          "value": "within_1_month",
+          "label": "1 个月内"
+        },
+        {
+          "value": "months_1_to_6",
+          "label": "1–6 个月"
+        },
+        {
+          "value": "over_6_months",
+          "label": "6 个月以上"
+        },
+        {
+          "value": "never_employed",
+          "label": "没工作过"
+        },
+        {
+          "value": "unsure",
+          "label": "不确定"
+        }
+      ]
+    },
+    {
+      "key": "age_range",
+      "label": "年龄段",
+      "sensitive": true,
+      "options": [
+        {
+          "value": "age_16_24",
+          "label": "16–24 岁"
+        },
+        {
+          "value": "age_25_35",
+          "label": "25–35 岁"
+        },
+        {
+          "value": "age_36_45",
+          "label": "36–45 岁"
+        },
+        {
+          "value": "age_46_plus",
+          "label": "46 岁以上"
+        },
+        {
+          "value": "unsure",
+          "label": "不确定"
+        }
+      ]
+    },
+    {
+      "key": "graduation_year",
+      "label": "毕业年份",
+      "sensitive": false,
+      "options": [
+        {
+          "value": "current_year",
+          "label": "本年度应届"
+        },
+        {
+          "value": "within_2_years",
+          "label": "毕业 2 年内"
+        },
+        {
+          "value": "over_2_years",
+          "label": "毕业超过 2 年"
+        },
+        {
+          "value": "not_applicable",
+          "label": "不适用"
+        },
+        {
+          "value": "unsure",
+          "label": "不确定"
+        }
+      ]
+    },
+    {
+      "key": "unemployment_registration",
+      "label": "失业登记",
+      "sensitive": true,
+      "options": [
+        {
+          "value": "registered",
+          "label": "已办"
+        },
+        {
+          "value": "not_registered",
+          "label": "没办"
+        },
+        {
+          "value": "unsure",
+          "label": "不确定"
+        }
+      ]
+    },
+    {
+      "key": "social_insurance_months",
+      "label": "连续缴费",
+      "sensitive": true,
+      "options": [
+        {
+          "value": "none",
+          "label": "未缴"
+        },
+        {
+          "value": "under_3_months",
+          "label": "不满 3 个月"
+        },
+        {
+          "value": "at_least_3_months",
+          "label": "满 3 个月以上"
+        },
+        {
+          "value": "unsure",
+          "label": "不确定"
+        }
+      ]
+    },
+    {
+      "key": "separation_reason",
+      "label": "离职原因",
+      "sensitive": true,
+      "options": [
+        {
+          "value": "layoff_or_contract_end",
+          "label": "裁员 / 合同到期"
+        },
+        {
+          "value": "voluntary_resignation",
+          "label": "本人主动辞职"
+        },
+        {
+          "value": "other",
+          "label": "其他"
+        },
+        {
+          "value": "unsure",
+          "label": "不确定"
+        }
+      ]
+    },
+    {
+      "key": "prior_subsidy",
+      "label": "领过同类补贴",
+      "sensitive": false,
+      "options": [
+        {
+          "value": "never_received",
+          "label": "没领过"
+        },
+        {
+          "value": "received",
+          "label": "领过"
+        },
+        {
+          "value": "unsure",
+          "label": "不确定"
+        }
+      ]
+    }
   ],
-  privacyNotice: '你填写的答案只用于本次条件比对，不保存、不上传给任何政府或第三方系统。',
-  disclaimer: '本结果是把你填写的信息与已录入的政策条件做机械比对，不是资格认定。',
+  "privacyNotice": "你填写的答案只用于本次条件比对，不保存、不上传给任何政府或第三方系统，结果只在这次办理里展示；任何一项都可以不填，不填的条件会标为「无法判定」。",
+  "disclaimer": "本结果是把你填写的信息与已录入的政策条件做机械比对，不是资格认定。本机不做资格认定、不代办、不收费；能不能办以经办窗口审核为准。"
 }
 
 function probeResult() {
@@ -123,7 +344,7 @@ export function policyPairs(): TouchPair[] {
       missingReason: null,
       prepare: async (page, api) => {
         registerTouchShell(api)
-        await routePolicies(page, [policyItem()])
+        await routePolicies(page, policyList())
         await page.goto('/renshi?tab=policy')
         await see(page, `text=${TITLE}`)
       },
@@ -149,13 +370,11 @@ export function policyPairs(): TouchPair[] {
         registerTouchShell(api)
         await routePolicies(page, [policyItem()])
         await page.goto('/renshi?tab=policy')
-        // 政策库第一条默认自动展开（PolicyPanel：自动展开不算「本人点开」）。直接点标题会把它收起。
-        // 先收起再点开，才是稿上画的本人点开详情态，问小青问句也随之切换。
+        // 列表默认收起；点标题进入这一条独占的详情态。
         const main = page.locator('[data-policy-section="library"] .rq-item-main').filter({ hasText: TITLE })
         await see(page, `text=${TITLE}`)
-        if ((await main.getAttribute('aria-expanded')) === 'true') await main.click()
         await main.click()
-        await expect(main).toHaveAttribute('aria-expanded', 'true')
+        await expect(page.getByRole('heading', { level: 1, name: TITLE, exact: true })).toBeVisible()
         await see(page, 'text=申领方式')
       },
     },
