@@ -2116,6 +2116,17 @@ assert.equal(
   `scan workbench model unit test failed: ${modelTest.stderr || modelTest.stdout}`,
 )
 
+const deviceStateTest = spawnSync(
+  process.execPath,
+  ['--test', resolve(kioskRoot, 'scripts/tests/scan-device-state.test.mjs')],
+  { encoding: 'utf8' },
+)
+assert.equal(
+  deviceStateTest.status,
+  0,
+  `scan device state unit test failed: ${deviceStateTest.stderr || deviceStateTest.stdout}`,
+)
+
 const createReplayTest = spawnSync(
   process.execPath,
   ['--test', resolve(kioskRoot, 'scripts/tests/scan-create-replay.test.mjs')],

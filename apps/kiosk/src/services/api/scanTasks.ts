@@ -135,6 +135,18 @@ export async function createScanSession(
   // body 按白名单重建：调用方传进来的 retryOfScanTaskId 一律不采信，
   // 它只能来自上面那份成对校验过的授权。
   const body: ScanSessionCreateRequest = { scanType: input.scanType, terminalId: input.terminalId }
+  // 屏上扫描才带这三项。面板创建（不带 startMode）的 body 与以前逐字一样，不采信 source / colorMode。
+  if (input.startMode === 'device') {
+    if (input.source !== 'flatbed' && input.source !== 'feeder') {
+      throw new ApiHttpError('SCAN_START_PARAMS_INVALID', '屏上扫描还没选好纸放哪，本次不会建立', 400)
+    }
+    if (input.colorMode !== 'gray' && input.colorMode !== 'color') {
+      throw new ApiHttpError('SCAN_START_PARAMS_INVALID', '屏上扫描还没选好黑白还是彩色，本次不会建立', 400)
+    }
+    body.startMode = 'device'
+    body.source = input.source
+    body.colorMode = input.colorMode
+  }
   const headers: Record<string, string> = {}
   if (paired) {
     body.retryOfScanTaskId = paired.retryOfScanTaskId

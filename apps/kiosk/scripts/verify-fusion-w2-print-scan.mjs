@@ -1135,7 +1135,21 @@ assert.match(
   'how page shows the ready phrase only when the screen method is actually usable',
 )
 const scanSet = read('src/pages/scan/ScanDeviceSettingsPage.tsx')
-assert.doesNotMatch(scanSet, /开始扫描/, 'this batch must not render a start-scan control')
+assert.match(scanSet, /开始扫描/, 'paper settings render the start-scan control')
+assert.match(scanSet, /scan-device-start/, 'the start control has a stable test id')
+assert.match(
+  scanSet,
+  /onClick:\s*\(\)\s*=>\s*beginDeviceScan\(/,
+  'start runs only from the button click',
+)
+assert.doesNotMatch(scanSet, /useScanSessionCreate/, 'device start does not use the panel create hook')
+{
+  const effects = [...scanSet.matchAll(/useEffect\(\(\) => \{([\s\S]*?)\}, \[/g)]
+  assert.ok(effects.length >= 1, 'paper settings keep their mount effect')
+  for (const effect of effects) {
+    assert.doesNotMatch(effect[1], /beginDeviceScan/, 'device start is not called from an effect')
+  }
+}
 assert.doesNotMatch(scanSet, /扫描仪就绪/, 'settings page must not hard-code the ready phrase')
 assert.match(
   scanSet,

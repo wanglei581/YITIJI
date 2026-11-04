@@ -50,6 +50,29 @@ function registerScanDevice(api: ApiRouter, screen: 'available' | 'off'): void {
   })
 }
 
+/** W2 构建带网桥令牌。设备页会去问本机程序；不回应时打印机行改写成「这次没有读到」。 */
+async function routeUsbStatus(page: Page): Promise<void> {
+  await page.route('http://127.0.0.1:9527/local/usb/status', async (route) => {
+    const origin = route.request().headers()['origin'] ?? '*'
+    const headers = {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type, Accept, X-Local-Bridge-Token',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Private-Network': 'true',
+    }
+    if (route.request().method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers })
+      return
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers,
+      body: JSON.stringify({ success: true, data: { present: false, driveLabel: null } }),
+    })
+  })
+}
+
 async function routeProbe(page: Page, status: number, body: unknown): Promise<void> {
   await page.route('http://127.0.0.1:9527/local/scan/**', async (route) => {
     if (route.request().method() === 'OPTIONS') {
@@ -108,6 +131,10 @@ test('screen scan stays off when scan_device is not opened @w2', async ({ page, 
 })
 
 test('a fresh probe lets the screen method through and does not start a scan @w2', async ({ page, api }) => {
+  let creates = 0
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/scan/sessions') creates += 1
+  })
   registerShell(api)
   registerScanDevice(api, 'available')
   await routeProbe(page, 200, probeBody('ready'))
@@ -123,7 +150,8 @@ test('a fresh probe lets the screen method through and does not start a scan @w2
   await expect(page.getByRole('heading', { name: '纸放哪？扫成黑白还是彩色？' })).toBeVisible()
   await expect(page.getByTestId('scan-source-feeder')).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByTestId('scan-color-gray')).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByRole('button', { name: '开始扫描', exact: true })).toHaveCount(0)
+  await expect(page.getByTestId('scan-device-start')).toBeVisible()
+  await expect(page).toHaveURL(/stage=device-settings/)
   await shot(page, 'cs-scan-set')
   await page.getByRole('button', { name: '返回', exact: true }).first().click()
   await page.getByRole('button', { name: '返回', exact: true }).first().click()
@@ -133,6 +161,7 @@ test('a fresh probe lets the screen method through and does not start a scan @w2
   await page.getByRole('button', { name: '下一步', exact: true }).click()
   await expect(page.getByTestId('scan-source-flatbed')).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByTestId('scan-color-color')).toHaveAttribute('aria-pressed', 'true')
+  expect(creates).toBe(0)
 })
 
 for (const [name, status, body, reason] of [
@@ -247,6 +276,7 @@ test('device status shows a fresh scanner row and drops it after one minute @w2'
   await page.clock.install()
   registerShell(api)
   registerScanDevice(api, 'available')
+  await routeUsbStatus(page)
   await routeProbe(page, 200, probeBody('ready'))
   await page.goto('/error-offline')
   const scanner = page.locator('[data-cap="scanner"]')

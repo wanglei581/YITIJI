@@ -70,7 +70,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2009 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2010 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -385,7 +385,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/scripts/</code> — 34 个文件</summary>
+<summary><code>apps/kiosk/scripts/</code> — 35 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -401,6 +401,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/scripts/tests/scan-cleanup-gate.test.mjs` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/scripts/tests/scan-create-replay.test.mjs` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/scripts/tests/scan-delivery-ack.test.mjs` | `verify-scan-session-truth.mjs` |
+| `apps/kiosk/scripts/tests/scan-device-state.test.mjs` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/scripts/tests/scan-rescan-authority.test.mjs` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/scripts/tests/scan-session-revoke.test.mjs` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/scripts/tests/scan-workbench-model.test.mjs` | `verify-scan-session-truth.mjs` |

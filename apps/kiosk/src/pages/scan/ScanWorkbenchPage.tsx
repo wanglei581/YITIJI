@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { peekScanHowContinue } from './scanHowContinue'
+import { ScanDeviceDonePage } from './ScanDeviceDonePage'
+import { ScanDeviceFlowPage } from './ScanDeviceFlowPage'
 import { ScanDeviceSettingsPage } from './ScanDeviceSettingsPage'
 import { ScanHowPage } from './ScanHowPage'
 import { ScanProgressPage } from './ScanProgressPage'
@@ -51,8 +53,9 @@ export function ScanWorkbenchPage() {
       hasResult,
       hasMaterialContext,
       hasHowContinue,
+      hasDeviceFlow: stored?.deviceFlow === true,
     }),
-    [requested, stored?.stage, hasLiveSession, hasResult, hasMaterialContext, hasHowContinue],
+    [requested, stored?.stage, stored?.deviceFlow, hasLiveSession, hasResult, hasMaterialContext, hasHowContinue],
   )
 
   useEffect(() => {
@@ -82,8 +85,12 @@ export function ScanWorkbenchPage() {
         <ScanHowPage onGoStage={go} />
       ) : view === 'device-settings' ? (
         <ScanDeviceSettingsPage onGoStage={go} />
+      ) : (view === 'progress' && stored?.deviceFlow) || view === 'device-more' || view === 'device-make' ? (
+        <ScanDeviceFlowPage onGoStage={go} />
       ) : view === 'progress' ? (
         <ScanProgressPage onGoStage={go} />
+      ) : view === 'result' && stored?.deviceFlow === true && stored.result?.success === true && stored.result.outcome === 'completed' ? (
+        <ScanDeviceDonePage onGoStage={go} />
       ) : view === 'result' ? (
         <ScanResultPage onGoStage={go} />
       ) : (

@@ -1,4 +1,4 @@
-export const SCAN_STAGES = ['start', 'how', 'device-settings', 'settings', 'progress', 'result'] as const
+export const SCAN_STAGES = ['start', 'how', 'device-settings', 'settings', 'progress', 'device-more', 'device-make', 'result'] as const
 
 export type ScanStage = (typeof SCAN_STAGES)[number]
 
@@ -12,12 +12,14 @@ export function isScanStageAuthorized(
   hasLiveSession: boolean,
   hasResult: boolean,
   hasMaterialContext = false,
+  hasDeviceFlow = false,
 ): boolean {
   if (stage === 'start' || stage === 'settings') return true
   if (stage === 'how' || stage === 'device-settings') {
     return hasMaterialContext && !hasLiveSession && !hasResult
   }
   if (stage === 'progress') return hasLiveSession
+  if (stage === 'device-more' || stage === 'device-make') return hasLiveSession && hasDeviceFlow
   if (stage === 'result') return hasResult
   return false
 }
@@ -39,15 +41,24 @@ export function resolveScanView(args: {
    * 有进行中的扫描或结果时，记号也不算数。
    */
   hasHowContinue?: boolean
+  /** 屏上扫描复水。没有这一位时，device-more / device-make 即使写在 URL 里也不挂屏上扫描页。 */
+  hasDeviceFlow?: boolean
 }): ScanStage {
   const intended = args.requested ?? args.storedStage ?? 'start'
   const quiet = !args.hasLiveSession && !args.hasResult
   if (intended === 'how' && quiet && (args.hasMaterialContext === true || args.hasHowContinue === true)) {
     return 'how'
   }
-  if (isScanStageAuthorized(intended, args.hasLiveSession, args.hasResult, args.hasMaterialContext === true)) {
+  if (isScanStageAuthorized(
+    intended,
+    args.hasLiveSession,
+    args.hasResult,
+    args.hasMaterialContext === true,
+    args.hasDeviceFlow === true,
+  )) {
     return intended
   }
   if (intended === 'result' && args.hasLiveSession) return 'progress'
+  if ((intended === 'device-more' || intended === 'device-make') && args.hasLiveSession) return 'progress'
   return 'start'
 }

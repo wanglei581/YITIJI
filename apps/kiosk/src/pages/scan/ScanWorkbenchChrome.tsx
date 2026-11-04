@@ -35,6 +35,11 @@ const SCAN_RAIL_NOW: Record<ScanWorkbenchShellProps['page'], number> = {
   'scan-how': 1,
   'scan-set': 2,
   'scan-off': 1,
+  'scan-run': 3,
+  'scan-more': 3,
+  'scan-make': 3,
+  'scan-done': 4,
+  'scan-unknown': 3,
 }
 
 const SCAN_EYEBROW: Record<ScanWorkbenchShellProps['page'], string> = {
@@ -45,10 +50,20 @@ const SCAN_EYEBROW: Record<ScanWorkbenchShellProps['page'], string> = {
   'scan-how': '屏上扫描',
   'scan-set': '屏上扫描',
   'scan-off': '屏上扫描',
+  'scan-run': '屏上扫描',
+  'scan-more': '屏上扫描',
+  'scan-make': '屏上扫描',
+  'scan-done': '扫描完成',
+  'scan-unknown': '屏上扫描',
 }
 
 /** 底栏「问小青」的本屏问句，逐态照稿 18（label 与带去顾问页的 draft 是同一句）。 */
 function scanAskLabel(page: ScanWorkbenchShellProps['page'], state: ScanWorkbenchState): string {
+  if (page === 'scan-run') return '问小青：一直扫不完怎么办'
+  if (page === 'scan-more') return '问小青：下一页怎么放'
+  if (page === 'scan-make') return '问小青：文件还没出来'
+  if (page === 'scan-done') return '问小青：扫描件怎么用'
+  if (page === 'scan-unknown') return '问小青：这一步还没有结果'
   if (state === 'usb-panel') return '问小青：U 盘扫描怎么走'
   if (state === 'loading' || state === 'blocked' || state === 'unknown') return '问小青：扫描没开放怎么办'
   if (state === 'create-loading') return '问小青：任务还没建好'
@@ -86,6 +101,12 @@ export type ScanDockLeft = {
  */
 export type ScanDock = {
   left?: ScanDockLeft
+  /** 为真时不画底栏左边的返回。进行中的屏上扫描用它，避免误触离开。 */
+  omitLeft?: boolean
+  /** 页面自己画的左槽，例如玻璃台那一屏的停止。 */
+  leftNode?: ReactNode
+  /** 问小青和主按钮之间的次操作，例如停止扫描。 */
+  secondary?: ReactNode
   primary?: QxTouchPrimary
 }
 
@@ -97,6 +118,11 @@ export type ScanWorkbenchPageId =
   | 'scan-how'
   | 'scan-set'
   | 'scan-off'
+  | 'scan-run'
+  | 'scan-more'
+  | 'scan-make'
+  | 'scan-done'
+  | 'scan-unknown'
 
 type ScanWorkbenchShellProps = {
   page: ScanWorkbenchPageId
@@ -111,6 +137,8 @@ type ScanWorkbenchShellProps = {
   /** 不传则用面板四步。传 null 表示这一屏不画路径线（未开通屏）。 */
   bandRail?: { labels: readonly string[]; now: number } | null
   bandBackLabel?: string
+  /** 为假时藏起顶栏返回。屏上扫描进行中默认藏，避免当成停止。 */
+  bandBack?: boolean
   /** 不传则离开整条扫描流程，回到打印扫描。 */
   onBandBack?: () => void
   children: ReactNode
@@ -127,6 +155,7 @@ export function ScanWorkbenchShell({
   bandEyebrow,
   bandRail,
   bandBackLabel,
+  bandBack = true,
   onBandBack,
   children,
 }: {
@@ -145,6 +174,7 @@ export function ScanWorkbenchShell({
   bandEyebrow?: string
   bandRail?: { labels: readonly string[]; now: number } | null
   bandBackLabel?: string
+  bandBack?: boolean
   onBandBack?: () => void
   children: ReactNode
 }) {
@@ -182,6 +212,7 @@ export function ScanWorkbenchShell({
       band={
         <QxTouchBand
           kind="compact"
+          back={bandBack}
           backLabel={bandBackLabel ?? '返回打印扫描'}
           onBack={onBandBack ?? (() => leaveScanFlow('/print-scan'))}
           eyebrow={bandEyebrow ?? SCAN_EYEBROW[page]}
@@ -195,7 +226,7 @@ export function ScanWorkbenchShell({
       dock={
         <QxTouchDock
           back={false}
-          left={
+          left={dock?.omitLeft ? undefined : (dock?.leftNode ?? (
             <button
               type="button"
               className="qxt-btn qxt-btn-sec"
@@ -208,7 +239,8 @@ export function ScanWorkbenchShell({
               <QxTouchIcon name={leftSpec.icon === 'refresh' ? 'refresh' : 'chevL'} size={30} strokeWidth={2.4} />
               {leftSpec.label}
             </button>
-          }
+          ))}
+          secondary={dock?.secondary}
           ask={{
             label: askLabel,
             draft: askDraft,

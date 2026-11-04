@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
+import { useAuth } from '../../auth/useAuth'
 import { useLocalScanProbe } from '../../hooks/useTerminalDeviceStatus'
 import { FeederArt, GlassArt } from './ScanGuideArt'
 import { SCAN_MATERIALS, defaultDeviceChoice, type ScanDeviceChoice, type ScanMaterial } from './scanMaterials'
@@ -8,18 +9,22 @@ import { SCAN_DEVICE_RAIL, ScanWorkbenchShell } from './ScanWorkbenchChrome'
 import { type ScanStage } from './scanWorkbenchModel'
 import { patchScanWorkbenchSession, readScanWorkbenchSession } from './scanWorkbenchSession'
 import { useScanDeviceCapability } from './useScanDeviceCapability'
+import { beginDeviceScan, useScanDeviceStartState } from './useScanDeviceStart'
 import './styles/scan-device-qx.css'
+import './styles/scan-device-flow.css'
 
 function labelOf(material: ScanMaterial): string {
   return SCAN_MATERIALS.find((item) => item.material === material)?.label ?? ''
 }
 
 /**
- * 放纸和颜色。这一批只保存选择并允许返回，不放开始按钮，也不向扫描仪发请求。
+ * 放纸和颜色。点「开始扫描」才建会话，挂载时不发。
  */
 export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => void } = {}) {
   const cap = useScanDeviceCapability()
   const probe = useLocalScanProbe(true)
+  const { getToken } = useAuth()
+  const start = useScanDeviceStartState()
   const session = readScanWorkbenchSession()
   const material = session?.material ?? null
   const [choice, setChoice] = useState<ScanDeviceChoice>(() => (
@@ -56,7 +61,20 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
       bandRail={{ labels: SCAN_DEVICE_RAIL, now: 2 }}
       bandBackLabel="返回"
       onBandBack={() => onGoStage?.('how')}
-      dock={{ left: { label: '返回', onClick: () => onGoStage?.('how') } }}
+      dock={{
+        left: { label: '返回', onClick: () => onGoStage?.('how') },
+        primary: {
+          label: start.phase === 'starting' ? '正在开始' : '开始扫描',
+          testId: 'scan-device-start',
+          disabled: !probe.freshReady || !cap.allowed || start.phase === 'starting' || start.locked,
+          onClick: () => beginDeviceScan({
+            material,
+            choice,
+            memberToken: getToken(),
+            onGoStage: onGoStage ?? (() => undefined),
+          }),
+        },
+      }}
     >
       <div className="cs-set">
       <div className="cs-sec">纸放哪？</div>
@@ -111,6 +129,7 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
         <QxTouchIcon name="help" size={34} strokeWidth={2} />
         <span>多页单面材料用进纸器一次扫完；玻璃台适合证件、书本，一面一面扫</span>
       </div>
+      {start.notice ? <p className="cs-warn" role="status">{start.notice}</p> : null}
       </div>
     </ScanWorkbenchShell>
   )

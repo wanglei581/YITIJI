@@ -111,3 +111,26 @@ test('how and device-settings need this visit’s material, and a login mark onl
     'start',
   )
 })
+
+test('device-more and device-make need a live screen-scan session', () => {
+  assert.equal(model.parseScanStage('device-more'), 'device-more')
+  assert.equal(model.parseScanStage('device-make'), 'device-make')
+  assert.equal(model.isScanStageAuthorized('device-more', true, false, false, false), false)
+  assert.equal(model.isScanStageAuthorized('device-make', false, false, false, true), false)
+  assert.equal(model.isScanStageAuthorized('device-more', true, false, false, true), true)
+  assert.equal(model.isScanStageAuthorized('device-make', true, false, false, true), true)
+  assert.equal(model.isScanStageAuthorized('progress', true, false), true)
+  assert.equal(
+    model.resolveScanView({
+      requested: 'device-more', storedStage: 'progress', hasLiveSession: true, hasResult: false,
+      hasDeviceFlow: true,
+    }),
+    'device-more',
+  )
+  assert.equal(
+    model.resolveScanView({
+      requested: 'device-more', storedStage: 'progress', hasLiveSession: true, hasResult: false,
+    }),
+    'progress',
+  )
+})
