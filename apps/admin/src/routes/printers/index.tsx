@@ -93,7 +93,7 @@ export default function PrintersPage() {
         <div className="ml-auto flex items-center gap-2"><span className="text-[12.5px] text-neutral-500">状态来自终端程序定时上报</span><button type="button" onClick={() => void refresh()} className="inline-flex h-[30px] items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-3 text-xs font-bold text-neutral-700 hover:bg-neutral-50"><RefreshCwIcon className="h-3.5 w-3.5" aria-hidden="true" />刷新</button></div>
       </div>
       <Card className="overflow-hidden p-0"><ConsoleTable items={paged} columns={columns} loading={loading} error={errorMessage ? { title: '打印机数据加载失败', message: errorMessage, onRetry: () => void refresh() } : null} empty={{ title: '暂无打印机', description: search ? `未找到包含"${search}"的打印机` : '当前筛选条件下没有打印机' }} page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1) }} /></Card>
-      <p className="mt-3 text-xs text-neutral-400">设备状态由终端程序定时上报；型号、SN、耗材和纸盒余量未上报时显示为未上报{API_MODE !== 'http' && '（当前为 mock 演示数据）'}</p>
+      <p className="mt-3 text-xs text-neutral-400">设备状态由终端程序定时上报；型号、SN、耗材和纸盒余量未上报时显示为未上报{API_MODE !== 'http' && '（当前为 mock 演示数据）'}。打印机走 USB 连接时，这几项读不到，会一直显示未上报；没报警不等于耗材充足。</p>
       <p className="mt-1 text-xs text-neutral-400">「本系统出纸」只算从本系统发出、已确认出纸的打印，按计费页数 × 份数计面数（双面一张纸算两面）；不含打印机面板复印和打印机自己读 U 盘直接打印。今天、本月按北京时间。</p>
     </>
   )

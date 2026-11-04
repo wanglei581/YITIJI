@@ -222,6 +222,11 @@ check(
   'printer page column 本系统出纸 reads output; null says 暂时读不到, not zero; footer excludes copier panel copies',
 )
 
+check(
+  printers.includes('打印机走 USB 连接时，这几项读不到，会一直显示未上报；没报警不等于耗材充足。'),
+  '打印机页底写明 USB 连接读不到型号、SN、耗材和纸盒余量',
+)
+
 const loginLegal = readFileSync(new URL('../src/routes/login/LegalDocsModal.tsx', import.meta.url), 'utf8')
 check(
   loginLegal.includes("legalDocsService") &&
