@@ -7,7 +7,7 @@ import {
   registerMemberLogin,
 } from './kiosk-p1-evidence-capture-api'
 import { VISIBLE_PDF } from './fusion-w2-binary-route'
-import { PRINT_HANDOFF_KEY, setReactRouterState, W2_FILE, W2_MATERIAL_CHECK, W2_ORDER, W2_PRINT_PARAMS, writePrintHandoff } from './fusion-w2-state'
+import { PRINT_HANDOFF_KEY, W2_FILE, W2_MATERIAL_CHECK, W2_ORDER, W2_PRINT_PARAMS, writePrintHandoff } from './fusion-w2-state'
 
 export const PRINT_CAPS = [
   { capabilityKey: 'document_print', status: 'available', note: null, configured: true, updatedAt: null },
@@ -150,11 +150,16 @@ export async function openConfirm(page: Page, api: ApiRouter, billing: 'free' | 
   await spaGo(page, '/print/confirm', { printContextId: 'p1-evidence-000000001' })
   await see(page, '[data-w2-page="print-confirm"]')
   await expect(page.getByRole('button', { name: free ? '确认并打印' : '去付款', exact: true })).toBeEnabled()
-  await expect(page.locator('body')).not.toContainText(/状态未知|这台机器暂时不能用|安全校验没通过|暂时打不了/)
+  // 设备停用标准句带逗号；收费态正常出现的「这台机器暂时不能用优惠券」不算异常。
+  await expect(page.locator('body')).not.toContainText(/状态未知|这台机器暂时不能用，|安全校验没通过|暂时打不了/)
 }
 
-/** 收银台读的是 pay-status 快照，形状与 qingxu-pair-seeds 里未导出的 openCashier 相同。 */
+/**
+ * 收银台读的是 pay-status 快照，形状与 qingxu-pair-seeds 里未导出的 openCashier 相同。
+ * 正式构建整页打开会换终端票：先在服务台等票落定，再带路由状态软跳进收银台（不再整页刷新）。
+ */
 export async function openCashier(page: Page, api: ApiRouter, kind: 'pending-qr' | 'expired'): Promise<void> {
+  registerTouchShell(api)
   const later = new Date(Date.now() + 10 * 60 * 1000).toISOString()
   const attempt = kind === 'expired'
     ? {
@@ -186,8 +191,10 @@ export async function openCashier(page: Page, api: ApiRouter, kind: 'pending-qr'
       attempt,
     },
   })
-  await page.goto('/print/cashier', { waitUntil: 'domcontentloaded' })
-  await setReactRouterState(page, '/print/cashier', {
+  await page.goto('/print-scan')
+  await see(page, '[data-testid="print-hub-state-default"]')
+  await terminalReady(page)
+  await spaGo(page, '/print/cashier', {
     orderId: W2_ORDER.orderId,
     orderNo: W2_ORDER.orderNo,
     amountCents: W2_ORDER.amountCents,

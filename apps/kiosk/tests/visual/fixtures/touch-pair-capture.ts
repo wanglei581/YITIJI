@@ -1,9 +1,10 @@
 // 稿一屏、运行页一屏、左右并排。文字稿照 11/02 走查：正文、输入框、可见按钮（导航不计，禁用标［禁用］）。
-// 运行页另记可点数、最小字号、最长纯底色空带。截图目录由 TOUCH_PAIRS_OUT 指定，默认在仓库外。
+// 运行页另记可点数、最小字号、最长纯底色空带。截图目录由 TOUCH_PAIRS_OUT 指定，默认在仓库根的 test-results/touch-pairs（已忽略）。
+// TOUCH_PAIRS_ONLY=稿屏__状态,稿屏__状态 只重拍这几对；清单按对合并，不冲掉同一项里没重拍的对。
 import fs from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { expect, type Browser, type BrowserContext, type Page } from '@playwright/test'
 import { installLocalBridge, terminalReady } from './touch-pair-shell'
 import { ApiRouter } from '../../fixtures/api-router'
@@ -11,7 +12,20 @@ import { longestBlankRun } from './blank-run'
 import type { PairStatus, ProtoMeasure, RuntimeMetrics, TouchPair } from './touch-pair-types'
 
 export const PROTO_PORT = 7472
-const DEFAULT_OUT = '/Users/wanglei/.cache/claude-lanes/touch-impl-1025/b10/pairs'
+const DEFAULT_OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../../test-results/touch-pairs')
+// 设备停用标准句是「这台机器暂时不能用，……」（unattendedCopy 标准句 3）。不带逗号会误伤
+// 确认页收费态正常出现的「这台机器暂时不能用优惠券」、到机码页的「这台机器暂时不能用同一个到机码接着打」。
+export const ABNORMAL_TEXT = /状态未知|这台机器暂时不能用，|安全校验没通过|暂时打不了|网络连接失败/
+
+function onlyStems(): Set<string> | null {
+  const raw = process.env.TOUCH_PAIRS_ONLY?.trim()
+  if (!raw) return null
+  return new Set(raw.split(',').map((stem) => stem.trim()).filter(Boolean))
+}
+
+function rowKey(row: Record<string, unknown>): string {
+  return `${String(row.item)}|${String(row.screen)}__${String(row.state)}`
+}
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -206,9 +220,11 @@ export async function captureItem(
   const outRoot = pairsOutDir()
   fs.mkdirSync(outRoot, { recursive: true })
   const rows: Array<Record<string, unknown>> = []
+  const only = onlyStems()
   for (const pair of pairs) {
+    if (only && !only.has(`${pair.screen}__${pair.state}`)) continue
     rows.push(await capturePair(browser, protoOrigin, preview, outRoot, pair))
-    writeManifest(outRoot, preview, rows, pair.item)
+    writeManifest(outRoot, preview, rows, pair.item, only !== null)
   }
   const paired = rows.filter((row) => row.status === 'paired').length
   const missing = rows.filter((row) => row.status === 'runtime-missing').length
@@ -221,21 +237,37 @@ function pairLabel(pairs: TouchPair[]): string {
   return pairs[0]?.item ?? '并排'
 }
 
-function writeManifest(outRoot: string, preview: string, rows: Array<Record<string, unknown>>, item: string): void {
+function writeManifest(
+  outRoot: string,
+  preview: string,
+  rows: Array<Record<string, unknown>>,
+  item: string,
+  partial: boolean,
+): void {
   const file = path.join(outRoot, 'manifest.json')
   let previous: Array<Record<string, unknown>> = []
   if (fs.existsSync(file)) {
     try {
       const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as { pairs?: Array<Record<string, unknown>> }
-      previous = (parsed.pairs ?? []).filter((row) => row.item !== item)
+      previous = parsed.pairs ?? []
     } catch {
       previous = []
     }
   }
+  let pairs: Array<Record<string, unknown>>
+  if (partial) {
+    // 只重拍几对：按对替换，原有顺序不变，新对排在末尾。
+    const fresh = new Map(rows.map((row) => [rowKey(row), row]))
+    pairs = previous.map((row) => fresh.get(rowKey(row)) ?? row)
+    const kept = new Set(previous.map(rowKey))
+    for (const row of rows) if (!kept.has(rowKey(row))) pairs.push(row)
+  } else {
+    pairs = [...previous.filter((row) => row.item !== item), ...rows]
+  }
   fs.writeFileSync(file, JSON.stringify({
     preview,
     proto: `http://127.0.0.1:${PROTO_PORT}`,
-    pairs: [...previous, ...rows],
+    pairs,
   }, null, 2))
 }
 
@@ -276,6 +308,9 @@ async function capturePair(
   // 不设的话 click / waitForURL 会一直等到整项 30 分钟超时，一对卡住后面全丢。
   context.setDefaultTimeout(60_000)
   context.setDefaultNavigationTimeout(60_000)
+  // 稿引谷歌字体；本机连谷歌时快时卡，卡住时稿页 20 秒等不到 load，后面整串配对全丢。
+  // 运行页本来就用系统字体（PingFang SC 等），稿也退回系统字体，两边字形一致、读数可比。
+  await context.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort('blockedbyclient'))
   await installLocalBridge(context)
   try {
     const protoPage = await context.newPage()
@@ -302,7 +337,7 @@ async function capturePair(
       api.assertNoUnhandledRequests()
       const abnormalStates = ['ai-down', 'printer-down', 'expired', 'gone', 'incomplete', 'timeout', 'nofile', 'start-fail']
       if (pair.item !== '状态样式板' && !abnormalStates.includes(pair.state)) {
-        await expect(page.locator('body')).not.toContainText(/状态未知|这台机器暂时不能用|安全校验没通过|暂时打不了|网络连接失败/)
+        await expect(page.locator('body')).not.toContainText(ABNORMAL_TEXT)
       }
       const landed = new URL(page.url())
       const expected = expectedPath(pair.route)
