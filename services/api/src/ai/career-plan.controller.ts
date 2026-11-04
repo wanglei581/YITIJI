@@ -15,6 +15,7 @@ import {
 
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
+  aborted?: boolean
 }
 
 function headerOf(req: ReqLike, name: string): string | null {
@@ -57,7 +58,7 @@ export class CareerPlanController {
 
   async generate(@Param('taskId') taskId: string, @Req() req: ReqLike) {
     const open = await this.jobBoardOpen(req)
-    return this.service.generate(taskId, await this.requesterOf(req), { includeJobFitTitle: open })
+    return this.service.generate(taskId, await this.requesterOf(req), { includeJobFitTitle: open }, req)
   }
 
   @Get(':taskId')

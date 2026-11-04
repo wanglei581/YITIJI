@@ -303,6 +303,18 @@ export class LlmChatService {
   }
 
   /**
+   * 预占之前看一眼：这句话会不会直接回设备故障的固定提示。
+   * 只读会话上「上一轮是不是故障回答」的标记，不改会话、不调模型。
+   */
+  wouldDeviceFault(input: ChatInput, ownerKey = 'anon'): boolean {
+    this.pruneSessions(Date.now())
+    const requestedId = typeof input.sessionId === 'string' ? input.sessionId.trim() : ''
+    const existing = requestedId ? this.sessions.get(requestedId) : undefined
+    const followUp = Boolean(existing && existing.ownerKey === ownerKey && existing.deviceFaultJustAnswered)
+    return isDeviceFaultQuestion(input.message, followUp)
+  }
+
+  /**
    * 读取归属匹配的会话转写。找不到 / 过期 / 越权一律 null。
    * 调用方不得把返回的 content 写入日志或审计 payload。
    */

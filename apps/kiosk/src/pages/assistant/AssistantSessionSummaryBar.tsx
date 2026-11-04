@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { AssistantSessionSummaryResponse } from '@ai-job-print/shared'
 import { summarizeAssistantSession } from '../../services/api'
+import { AI_QUOTA_EXHAUSTED_ASSISTANT_COPY, errorCodeOf } from '../../services/api/userErrorMessage'
 import { advisorDisplayText, advisorErrorMessage, advisorUserReason } from './advisorUserCopy'
 
 interface AssistantSessionSummaryBarProps {
@@ -63,7 +64,9 @@ export function AssistantSessionSummaryBar({
         },
       })
     } catch (err) {
-      setError(advisorErrorMessage(err, '本次要点暂时保存不了，请稍后重试'))
+      setError(errorCodeOf(err) === 'AI_QUOTA_EXHAUSTED'
+        ? AI_QUOTA_EXHAUSTED_ASSISTANT_COPY
+        : advisorErrorMessage(err, '本次要点暂时保存不了，请稍后重试'))
     } finally {
       setBusy(false)
     }

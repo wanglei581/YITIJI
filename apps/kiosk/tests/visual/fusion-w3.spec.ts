@@ -1020,6 +1020,29 @@ test('resume parse AI paused lands on the failure report with non-AI exits and n
   expect(tickets, '只提交一次，且 AI 请求带终端会话票').toEqual([expect.stringMatching(/.+/)])
 })
 
+test('resume parse per-person quota exhaustion keeps the manual print exit @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
+  await page.route('**/api/v1/resume/parse', async (route) => {
+    await route.fulfill({
+      status: 429,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: false, error: { code: 'AI_QUOTA_EXHAUSTED', message: '今天的 AI 次数用完了，明天 0 点恢复' } }),
+    })
+  })
+  await page.goto('/resume/source')
+  await chooseGenericResumeDirection(page)
+  await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  await startResumeDiagnosis(page)
+  await page.waitForURL('/resume/report')
+  await expect(page.getByTestId('resume-report-state-diagnose-failed')).toBeVisible()
+  await expect(page.getByText('今天的 AI 次数用完了，明天 0 点恢复', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('使用的人较多')).toHaveCount(0)
+  await expect(page.getByTestId('resume-report-fail-exits')).toBeVisible()
+  await expect(page.getByRole('button', { name: '重新解析' })).toHaveCount(0)
+  await expect(page.getByTestId('resume-report-primary')).toHaveText('打印我上传的原件')
+})
+
 test('resume parse public quota rejection stays on the parse page when the intent cannot be cleared @w3-kiosk', async ({ page, api }) => {
   const posts: string[] = []
   terminalBaseline(api)
@@ -1681,6 +1704,37 @@ test('assistant: AI budget exhausted locks the composer and offers non-AI entrie
   expect(runtimeErrors).toEqual([])
 })
 
+test('assistant: per-person quota exhaustion stays locked until tomorrow without a retry capsule @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+  await page.route('**/api/v1/assistant/chat', async (route) => {
+    await route.fulfill({
+      status: 429,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: false,
+        error: { code: 'AI_QUOTA_EXHAUSTED', message: '今天的 AI 次数用完了，明天 0 点恢复' },
+      }),
+    })
+  })
+  await page.goto('/assistant')
+  await page.getByLabel('输入咨询问题').fill('我该先打印简历还是先查政策？')
+  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  await expect(page.getByRole('button', { name: /^重新检查/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /重试这一轮/ })).toHaveCount(0)
+  await expect(page.getByText('本轮失败')).toHaveCount(0)
+  await expect(page.getByText('这会儿没有接上')).toHaveCount(0)
+  await expect(page.getByText('当前使用的人较多')).toHaveCount(0)
+  await expect(page.getByText('今天的小青次数用完了，明天 0 点恢复').first()).toBeVisible()
+  await expect(page.getByText('你可以回到首页').first()).toBeVisible()
+  await expect(page.getByRole('navigation', { name: '不依赖 AI 的功能入口' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^打印扫描/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^政策服务/ })).toBeVisible()
+  await expect(page.locator('.assistant-send')).toHaveCount(0)
+  expect(runtimeErrors).toEqual([])
+})
+
 test('assistant refuses to present mock fallback as an AI answer @w3-kiosk', async ({ page, api }) => {
   const runtimeErrors: string[] = []
   page.on('pageerror', (error) => runtimeErrors.push(error.message))
@@ -1933,6 +1987,35 @@ test('assistant voice connecting can cancel and stops a late room response @w3-k
   }
   await expect.poll(() => api.requestCount('POST', '/api/v1/trtc/session/stop')).toBe(1)
   await expect(dialog).toHaveAttribute('data-state', 'voice-gate')
+})
+
+test('interview setup per-person quota exhaustion offers the previous step and interview tips @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/mock-interviews', { status: 200, json: interviewCreated })
+  api.respond('POST', '/api/v1/mock-interviews/interview-w3-public-fixture/start', {
+    status: 429,
+    json: { success: false, error: { code: 'AI_QUOTA_EXHAUSTED', message: '今天的 AI 次数用完了，明天 0 点恢复' } },
+  })
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', { status: 200, json: { data: { asrEnabled: false, ttsEnabled: false } } })
+  await page.goto('/interview/setup')
+  await page.getByRole('button', { name: '选择行业 (20)' }).click()
+  const interviewIndustryDialog = page.getByRole('dialog', { name: '选择面试行业' })
+  await interviewIndustryDialog.getByRole('button', { name: '制造业', exact: true }).click()
+  await interviewIndustryDialog.getByRole('button', { name: '完成' }).click()
+  await chooseInterviewExperience(page)
+  await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
+  await advanceInterviewSetupToStart(page)
+  await page.getByRole('button', { name: '创建并开始练习' }).click()
+  await expect(page.getByText('今天的模拟面试次数用完了，明天 0 点恢复').first()).toBeVisible()
+  await expect(page.getByText('使用的人较多')).toHaveCount(0)
+  await expect(page).toHaveURL(/stage=setup/)
+  await expect(page.getByRole('button', { name: '上一步', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: /先看面试技巧/ }).first()).toBeVisible()
+  await page.getByRole('button', { name: /先看面试技巧/ }).first().click()
+  await expect(page).toHaveURL(/stage=tips/)
+  expect(runtimeErrors).toEqual([])
 })
 
 test('interview setup → text answer → report @w3-kiosk', async ({ page, api }) => {

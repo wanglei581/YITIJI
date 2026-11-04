@@ -33,7 +33,7 @@ import {
   AiContentBlockedError, DEFAULT_FORBIDDEN_WORDS, DEFAULT_ROLE_SCOPE, assertContentAllowed, buildGuardedSystemPrompt,
 } from '../src/ai/llm/llm-guard'
 import { MemberPrivacyService } from '../src/member-privacy/member-privacy.service'
-import { runWithAiQuota } from '../src/ai/quota/run-with-ai-quota'
+import { runWithAiQuota } from '../src/ai/quota/ai-quota-run'
 import { ResumeDraftSourceService } from '../src/ai/resume/resume-draft-source.service'
 import { LlmCareerPlanService } from '../src/ai/resume/llm-career-plan.service'
 import { LlmFairVisitPlanService } from '../src/ai/resume/llm-fair-visit-plan.service'
@@ -814,14 +814,25 @@ async function main(): Promise<void> {
     const memberQuota = {
       async reserve() { return { reservationId: 'r1', source: 'daily' as const, replay: false, day: '2026-10-06' } },
       async release(_id: string, reason: string) { releases.push(reason) },
+      async commit() { return undefined },
     }
-    await runWithAiQuota(memberQuota, { bucket: 'ai_assistant', operationKey: 'gate-block-1', endUserId: 'user-1' }, async () => {
+    await runWithAiQuota({
+      quota: memberQuota as never,
+      bucket: 'ai_assistant',
+      operationKey: 'gate-block-1',
+      endUserId: 'user-1',
+    }, async () => {
       throw new AiContentBlockedError('input', 'assistant_chat', 'A1')
-    }).catch((error: unknown) => { check(error instanceof AiContentBlockedError, '会员次数拦截继续抛出') })
+    }, async () => 'gate-block-1').catch((error: unknown) => { check(error instanceof AiContentBlockedError, '会员次数拦截继续抛出') })
     check(releases[0] === 'content_rejected', `内容拦截归还原因 ${releases[0] ?? ''}`)
-    await runWithAiQuota(memberQuota, { bucket: 'ai_assistant', operationKey: 'gate-error-1', endUserId: 'user-1' }, async () => {
-      throw new Error('provider down')
-    }).catch(() => undefined)
+    await runWithAiQuota({
+      quota: memberQuota as never,
+      bucket: 'ai_assistant',
+      operationKey: 'gate-error-1',
+      endUserId: 'user-1',
+    }, async () => {
+      throw Object.assign(new Error('provider down'), { code: 'AI_PROVIDER_ERROR' })
+    }, async () => 'gate-error-1').catch(() => undefined)
     check(releases[1] === 'provider_error', `其它失败归还原因 ${releases[1] ?? ''}`)
   } finally {
     globalThis.fetch = nativeFetch
