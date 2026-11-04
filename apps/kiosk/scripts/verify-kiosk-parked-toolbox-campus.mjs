@@ -13,6 +13,7 @@ import ts from 'typescript'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
+// services/api/smartCampus*.ts 三个旧文件停放前就没有引用方（旧文件清理 #1550 会删），不算停放源码，不列。
 const PARKED = [
   'src/pages/toolbox/ToolboxZonePage.tsx',
   'src/pages/toolbox/toolbox-zone.css',
@@ -25,9 +26,6 @@ const PARKED = [
   'src/auth/KioskCapabilityGuard.tsx',
   'src/hooks/useToolboxConfig.ts',
   'src/hooks/useSmartCampusConfig.ts',
-  'src/services/api/smartCampus.ts',
-  'src/services/api/smartCampusHttpAdapter.ts',
-  'src/services/api/smartCampusMockAdapter.ts',
   'src/services/api/toolboxLaunchEvents.ts',
   'src/pages/home/components/ToolboxLaunchModals.tsx',
   'src/pages/home/components/kioskAppLaunch.ts',
@@ -46,8 +44,11 @@ function walk(dir) {
 }
 
 function resolveSpecifier(fromFile, specifier) {
-  if (!specifier.startsWith('.')) return null
-  const base = join(dirname(fromFile), specifier)
+  // 一体机配了 @ → src 的别名（vite.config.ts、tsconfig.json），走别名的导入也算。
+  let base
+  if (specifier.startsWith('@/')) base = join(ROOT, 'src', specifier.slice(2))
+  else if (specifier.startsWith('.')) base = join(dirname(fromFile), specifier)
+  else return null
   const candidates = [
     base,
     `${base}.ts`,
