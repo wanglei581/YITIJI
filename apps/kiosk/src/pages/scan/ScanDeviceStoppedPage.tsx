@@ -27,7 +27,10 @@ export function ScanDeviceStoppedPage({ receipt }: { receipt: DeviceStopReceipt 
       <div className="cs-stopped" data-testid="scan-device-stopped">
         <div className="cs-fact big"><span className="ic"><Eraser size={40} strokeWidth={2} aria-hidden /></span><b>已停止扫描{receipt.purged ? '，已扫的页已从这台机器删除。' : ''}</b></div>
         <div className="cs-wait" role="status">
-          {seconds === null ? <b>请稍候再开始新的扫描</b> : <>
+          {seconds === null ? <>
+            <div className="cs-ring is-pending" data-testid="scan-device-quiet-ring"><b>请稍候</b></div>
+            <div className="tx"><b>请稍候再开始新的扫描</b><span>为了不让下一位看到你的材料，过一会儿才能开始新的扫描。</span></div>
+          </> : <>
             <div className="cs-ring" data-testid="scan-device-quiet-seconds"><b>{seconds}<small>秒</small></b></div>
             <div className="tx"><b>{seconds} 秒后才能开始新的扫描</b><span>为了不让下一位看到你的材料，{seconds} 秒后才能开始新的扫描。</span></div>
           </>}

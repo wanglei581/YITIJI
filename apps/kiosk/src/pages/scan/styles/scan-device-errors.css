@@ -12,6 +12,13 @@
   display: grid; place-items: center; overflow: hidden;
 }
 [data-qx-page='scan-workbench'] .cs-why .vis > :is(svg, .pa) { width: 76%; height: auto; }
+/* 忙屏没有服务电话栏，原因卡按稿的 1000×620 比例收住，不吃掉缺栏后的余量。 */
+[data-qx-page='scan-workbench'] [data-testid='scan-device-error-busy'] .cs-why {
+  flex: none; aspect-ratio: 1000 / 620;
+}
+[data-qx-page='scan-workbench'] [data-testid='scan-device-error-busy'] .cs-why .vis .pa svg {
+  width: 100%; height: auto;
+}
 [data-qx-page='scan-workbench'] .cs-why .vis .warn {
   position: absolute; right: 14px; top: 14px; width: 62px; height: 62px; border-radius: 50%;
   background: var(--qxt-clay-ink); color: var(--qx-on-solid); display: grid; place-items: center;
@@ -50,6 +57,7 @@
   width: 480px; height: 480px; border: 26px solid var(--qx-teal); border-radius: 50%; display: grid; place-items: center;
 }
 [data-qx-page='scan-workbench'] .cs-ring b { font: 700 180px/1 var(--qx-sans); font-variant-numeric: tabular-nums; }
+[data-qx-page='scan-workbench'] .cs-ring.is-pending b { font-size: 60px; }
 [data-qx-page='scan-workbench'] .cs-ring small { display: block; margin-top: 18px; font: 400 40px/1 var(--qx-sans); }
 @media (max-width: 760px) {
   [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-why {
@@ -67,6 +75,7 @@
   [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-wait b { font-size: 24px; }
   [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-ring { width: 240px; height: 240px; border-width: 16px; }
   [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-ring b { font-size: 72px; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-ring.is-pending b { font-size: 32px; }
 }
 
 /* 窄屏仍按触控下限排，问句独占一行，避免把主按钮压窄。 */

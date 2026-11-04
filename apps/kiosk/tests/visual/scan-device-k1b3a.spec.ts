@@ -32,6 +32,35 @@ for (const [code, screen, title, primary, ask, count] of faults) {
   })
 }
 
+test('busy illustration fits its frame and reason card matches the other two-option error screens @w2', async ({ page, api }) => {
+  const f = await deviceFixture(page, api)
+  await f.start('busy')
+  const busy = page.getByTestId('scan-device-error-busy')
+  await expect(busy).toBeVisible({ timeout: 15000 })
+  await page.evaluate(() => document.fonts.ready)
+  const frame = await busy.locator('.cs-why .vis').boundingBox()
+  expect(frame).not.toBeNull()
+  for (const art of [busy.locator('.cs-why .vis .pa'), busy.locator('.cs-why .vis .pa svg')]) {
+    const box = await art.boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.width).toBeGreaterThan(0)
+    expect(box!.height).toBeGreaterThan(0)
+    expect(box!.x).toBeGreaterThanOrEqual(frame!.x)
+    expect(box!.y).toBeGreaterThanOrEqual(frame!.y)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(frame!.x + frame!.width)
+    expect(box!.y + box!.height).toBeLessThanOrEqual(frame!.y + frame!.height)
+  }
+  const busyCard = await busy.locator('.cs-why').boundingBox()
+  expect(busyCard).not.toBeNull()
+  // 比较对象是同为两张操作卡的卡纸屏（无纸屏有三张操作卡，原因卡本来就矮一截，不可比）。
+  f.cloud.deviceErrorCode = 'paper_jam'
+  const jam = page.getByTestId('scan-device-error-jam')
+  await expect(jam).toBeVisible({ timeout: 15000 })
+  const jamCard = await jam.locator('.cs-why').boundingBox()
+  expect(jamCard).not.toBeNull()
+  expect(Math.abs(busyCard!.height - jamCard!.height)).toBeLessThanOrEqual(60)
+})
+
 test('noresp without configured phone makes no alert or phone claim @w2', async ({ page, api }) => {
   const f = await deviceFixture(page, api, { noPhone: true })
   await f.start('not_ready')
@@ -114,6 +143,7 @@ for (const fail of ['abort', 'cancel'] as const) {
 
 for (const quiet of [true, false]) for (const purged of [true, false]) {
   test(`stopped quiet=${quiet} purged=${purged} uses only receipt evidence @w2`, async ({ page, api }) => {
+    if (!quiet) await page.emulateMedia({ reducedMotion: 'no-preference' })
     const f = await deviceFixture(page, api, { quiet, purged })
     await f.start()
     await page.getByTestId('scan-device-stop').click()
@@ -134,7 +164,13 @@ for (const quiet of [true, false]) for (const purged of [true, false]) {
       expect(f.calls.filter((r) => r.method === 'DELETE')).toHaveLength(1)
     } else {
       await expect(page.getByTestId('scan-device-quiet-seconds')).toHaveCount(0)
+      const ring = page.getByTestId('scan-device-quiet-ring')
+      await expect(ring).toBeVisible()
+      await expect(ring).toHaveText('请稍候')
+      expect(await ring.evaluate((el) => el.getAnimations({ subtree: true }).length)).toBe(0)
       await expect(page.getByText('请稍候再开始新的扫描', { exact: true })).toBeVisible()
+      await expect(page.getByText('为了不让下一位看到你的材料，过一会儿才能开始新的扫描。', { exact: true })).toBeVisible()
+      await expect(page.locator('.qxt-screen')).not.toContainText(/\d+\s*秒/)
       await expect(page.getByTestId('scan-device-stopped')).not.toContainText(/\d/)
     }
   })
