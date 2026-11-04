@@ -26,6 +26,7 @@ const PARKED = [
   'src/auth/KioskCapabilityGuard.tsx',
   'src/hooks/useToolboxConfig.ts',
   'src/hooks/useSmartCampusConfig.ts',
+  'src/services/api/kioskCapabilityValidation.ts',
   'src/services/api/toolboxLaunchEvents.ts',
   'src/pages/home/components/ToolboxLaunchModals.tsx',
   'src/pages/home/components/kioskAppLaunch.ts',
