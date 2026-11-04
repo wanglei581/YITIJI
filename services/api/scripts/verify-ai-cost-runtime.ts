@@ -182,7 +182,10 @@ export async function voiceUsageRuntimeChecks(pass: Check, fail: Check, aiLog: i
   const log = { record: (entry: { voiceUsage?: { audioSeconds?: number | null; complete: boolean } }) => recorded.push(entry) }
   const controller = new AiController(...(Array.from({ length: AiController.length }, () => ({})) as never[]))
   Object.assign(controller, { asr: fakeAsr, logService: log, audit: { write: async () => undefined }, publicQuota: { consume: async () => ({ keys: ['k'] }), rollback: async () => undefined }, jwt: {}, redis: {}, prisma: {} })
-  const interview = new MockInterviewController({ getSession: async () => ({}) } as never, fakeAsr as never, {} as never, {} as never, {} as never, {} as never, log as never)
+  const interview = new MockInterviewController(
+    { getSession: async () => ({}), assertTranscribeAllowed: async () => undefined } as never,
+    fakeAsr as never, {} as never, {} as never, {} as never, {} as never, log as never,
+  )
   const file = (buffer: Buffer) => ({ buffer }) as Express.Multer.File
   const req = { headers: {} } as never
   const entrances = [

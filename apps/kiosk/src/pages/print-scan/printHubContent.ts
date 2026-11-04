@@ -313,44 +313,86 @@ export function colorDuplexChip(colorOn: boolean, duplexOn: boolean): string {
 // ── 复印说明（/print-scan/feature/copy） ─────────────────────
 // R4（2026-09-29 产品负责人拍板）：复印、身份证复印改用打印机（奔图 CM2800 系列）面板自带功能，
 // 不开发证件拼版；面板复印对用户开放，不经过本机下单，也不进「我的打印订单」。
-// 内容来源：CM2800 系列中文用户指南 V1.4 第 3 节提取稿（p30–33、p45–50、p3）。
+// 11/02 改成图文分步（产品负责人：「补稿可以，照它改」；补稿 docs/design/kiosk-touch-2026-11-copyscan 的
+// cs-copy-guide、cs-copy-guide-more 两屏）：第一视图五步配图，身份证、发票、双面三种原件放第二视图
+// （同一路由 ?view=cases）。
+// 依据：厂家官方中文用户手册 V1.4（PDF 第 23–24、31、33、45–50 页）。玻璃上一律字朝下见第 31 页。
+// 身份证放在玻璃哪里、怎么翻面，手册没写：不画、不写，只指到打印机屏幕上的图示。
 // 按钮名按面板屏幕实际字样写（主屏四个大按钮：复印 / 扫描 / 身份证复印 / 票据复印），
 // 不照抄手册里前后不一的「按 OK 键」「复印开始键」。现场没核实过的，一律写「以打印机屏幕为准」。
 
 /** 打印扫描首页「复印」卡与说明页共用的 key：/print-scan/feature/copy。 */
 export const COPY_GUIDE_KEY = 'copy'
 export const COPY_GUIDE_ROUTE = `/print-scan/feature/${COPY_GUIDE_KEY}`
+/** 第二视图（身份证、发票收据、正反两面都有字）：同一路由，查询串 view=cases。 */
+export const COPY_GUIDE_CASES_VIEW = 'cases'
+export const COPY_GUIDE_CASES_ROUTE = `${COPY_GUIDE_ROUTE}?view=${COPY_GUIDE_CASES_VIEW}`
+
+/** 第 1 步的两种放法：各配一张小图，lead 是字首（加粗）。 */
+export interface CopyGuidePlace {
+  art: 'feeder' | 'glass'
+  lead: string
+  text: string
+}
+
+/** 第 2 步的三种原件各点哪个按钮：lead 是原件（加粗），button 带书名号（加粗）。 */
+export interface CopyGuidePick {
+  lead: string
+  button: string
+}
 
 export interface CopyGuideStep {
   title: string
+  /** 整段正文。配图版第 1、2 步按块排版（places / picks / tip），块按顺序拼起来逐字等于它。 */
   body: string
-  /** 正文里要加粗的片段，便于用户扫一眼找到按钮名。 */
-  emphasis?: readonly string[]
+  places?: readonly CopyGuidePlace[]
+  picks?: readonly CopyGuidePick[]
+  /** 单独成条的一句：第 1 步「进纸器里有纸先扫进纸器」，第 2 步「主页键」。 */
+  tip?: string
+  /** 第 3–5 步右边配的图：设置图标、点一下图标、出纸口。 */
+  art?: 'settings' | 'tap' | 'tray'
 }
+
+const COPY_PLACES: readonly CopyGuidePlace[] = [
+  { art: 'feeder', lead: '多页普通纸：', text: '放进打印机上方的进纸口，字朝上。' },
+  { art: 'glass', lead: '单页、证件、书本：', text: '掀开上盖，字朝下放在玻璃上，对齐左上角，再合上盖。' },
+]
+/** 出自厂家官方手册：进纸器里有纸时，玻璃上的原件不会被复印。免得「先扫」被读成「两处都扫」。 */
+const COPY_FEEDER_FIRST = '进纸器里有纸时先扫进纸器，玻璃上的不会被复印。'
+const COPY_PICKS: readonly CopyGuidePick[] = [
+  { lead: '普通复印', button: '「复印」' },
+  { lead: '复印身份证', button: '「身份证复印」' },
+  { lead: '复印发票、收据', button: '「票据复印」' },
+]
+const COPY_HOME_KEY = '屏幕不在主屏时，先按触摸屏左边的主页键（小房子）。'
 
 export const COPY_GUIDE_STEPS: readonly CopyGuideStep[] = [
   {
     title: '放原件',
-    body: '多页普通纸：放进打印机上方的进纸口，字朝上。单页、证件、书本：掀开上盖，字朝下放在玻璃上，对齐左上角，再合上盖。',
-    emphasis: ['字朝上', '字朝下'],
+    body: `${COPY_PLACES.map((place) => place.lead + place.text).join('')}${COPY_FEEDER_FIRST}`,
+    places: COPY_PLACES,
+    tip: COPY_FEEDER_FIRST,
   },
   {
     title: '在打印机屏幕上选功能',
-    body: '普通复印点「复印」；复印身份证点「身份证复印」；复印发票、收据点「票据复印」。',
-    emphasis: ['「复印」', '「身份证复印」', '「票据复印」'],
+    body: `${COPY_PICKS.map((pick) => `${pick.lead}点${pick.button}`).join('；')}。${COPY_HOME_KEY}`,
+    picks: COPY_PICKS,
+    tip: COPY_HOME_KEY,
   },
   {
     title: '需要时改设置',
     body: '可以改份数、黑白或彩色、单面或双面、放大缩小。每一项在哪里改，以打印机屏幕显示为准；上一位调过的设置可能还在，开始前看一眼。',
+    art: 'settings',
   },
   {
     title: '开始复印',
     body: '点打印机屏幕上的「复印」开始。原件放在玻璃上时，扫描过程中不要掀盖。',
-    emphasis: ['「复印」'],
+    art: 'tap',
   },
   {
     title: '取走复印件和原件',
     body: '复印件从出纸口取。原件还在玻璃上或进纸口里，一起带走。',
+    art: 'tray',
   },
 ]
 
@@ -365,6 +407,8 @@ export interface CopyGuideCase {
   key: 'id-card' | 'receipt' | 'duplex'
   title: string
   body: string
+  /** 卡片里正文下面的一条小提示。 */
+  note: string
   /** 待现场核实的占位项：卡面标出来，免得被当成已确认的步骤。 */
   pending?: boolean
 }
@@ -373,18 +417,21 @@ export const COPY_GUIDE_CASES: readonly CopyGuideCase[] = [
   {
     key: 'id-card',
     title: '身份证',
-    body: `在打印机屏幕上点「身份证复印」。${COPY_ID_CARD_PLACEMENT_PENDING}`,
+    body: '在打印机屏幕上点「身份证复印」，需要时改设置，再点「复印」开始。',
+    note: COPY_ID_CARD_PLACEMENT_PENDING,
     pending: true,
   },
   {
     key: 'receipt',
     title: '发票、收据',
-    body: '在打印机屏幕上点「票据复印」，原件字朝下放在玻璃上、合上盖；摆放位置以打印机屏幕提示为准。',
+    body: '在打印机屏幕上点「票据复印」，原件字朝下放在玻璃上、合上盖，需要时改设置，再点「复印」开始。',
+    note: '摆放位置以打印机屏幕提示为准。',
   },
   {
     key: 'duplex',
     title: '正反两面都有字',
-    body: '第一面印完，原件会从上方出纸口出来。照原样放回进纸口，不翻面、不掉头，再点开始；等太久没放，就只印单面。',
+    body: '用进纸器放原件，选「双面复印」。第一面印完，原件会从进纸器出口出来。照原样放回进纸口，不翻面、不转方向，再按打印机屏幕提示印第二面。',
+    note: '等太久没放，就只印单面。',
   },
 ]
 

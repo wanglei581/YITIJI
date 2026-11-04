@@ -88,9 +88,11 @@ async function loadTerminalAuth({ terminalId, respond }) {
     "from './api/screensaver'": `export function getTerminalId() { return globalThis[${JSON.stringify(idName)}] }\n`,
     "from './api/httpAdapter'": 'export class ApiHttpError extends Error { constructor(code, message, status) { super(message); this.code = code; this.status = status } }\n',
     "from './api/throwHttpError'": 'export async function readHttpError(r) { const b = await r.json().catch(() => ({})); return { code: b?.error?.code ?? "UNKNOWN_ERROR", message: b?.error?.message ?? "" } }\n',
-    "from '../auth/kioskSensitiveSession'": 'export function clearKioskSensitiveSession() {}\nexport function clearKioskSharedDeviceResidue() {}\n',
+    "from '../auth/kioskSensitiveSession'": 'export function clearKioskSensitiveSession() {}\nexport function clearKioskSharedDeviceResidue() {}\nexport function kioskSensitiveSessionScope() { return \'none\' }\n',
   }
   let code = `${transpile('src/services/terminalAuth.ts')}\n// ${seed}\n`.replaceAll('import.meta.env', `globalThis[${JSON.stringify(envName)}]`)
+  if (!code.includes("from './terminalSessionRecovery'")) fail('运行时：terminalAuth.ts 不再引入 terminalSessionRecovery，替身表需要同步（本段无法判定）')
+  code = code.replaceAll("from './terminalSessionRecovery'", `from '${toDataUrl(`${transpile('src/services/terminalSessionRecovery.ts')}\n// ${seed}\n`)}'`)
   for (const [from, stub] of Object.entries(stubs)) {
     if (!code.includes(from)) fail(`运行时：terminalAuth.ts 不再从 ${from.slice(5)} 引入，替身表需要同步（本段无法判定）`)
     code = code.replaceAll(from, `from '${toDataUrl(stub)}'`)

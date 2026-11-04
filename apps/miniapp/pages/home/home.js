@@ -1,8 +1,11 @@
 // pages/home/home.js
 const app = getApp()
+const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const storage = require('../../utils/storage')
 const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
 const pickup = require('./pickup-summary')
+const entryWays = require('../../utils/resume-optimize-entry')
 
 // 首页是 Tab 页，每次切回来都会 onShow：同一个人 30 秒内不重复拉订单。
 const PICKUP_FRESH_MS = 30 * 1000
@@ -39,7 +42,7 @@ Page({
     todayStr: '',
     primaryServices: [
       { title: '简历诊断', icon: 'file-search', tone: 'blue', url: '/pages/resume-diagnose/resume-diagnose' },
-      { title: '简历优化', icon: 'edit', tone: 'violet', url: '/pages/resume-optimize/resume-optimize' },
+      { title: '简历优化', icon: 'edit', tone: 'violet', url: entryWays.OPTIMIZE_URL },
       { title: '模拟面试', icon: 'comment', tone: 'cyan', url: '/pages/interview-entry/interview-entry' },
       // 原「创建材料包」指向 pages/package-create（未实现页面，调 /orders/package 不存在的后端），
       // 会形成死路由。改为已实现的职业规划，四格构成完整 AI 服务集：诊断→优化→面试→规划。
@@ -78,6 +81,7 @@ Page({
 
   onHide() {
     this._guard.deactivate()
+    entryWays.cancelEntry(this, wx)
   },
 
   /**
@@ -133,6 +137,10 @@ Page({
   tapService(e) {
     const url = e.currentTarget.dataset.url
     if (!url) return
+    if (url === entryWays.OPTIMIZE_URL) {
+      entryWays.openEntry(this, { api, auth, storage, wx })
+      return
+    }
     const tabPages = new Set([
       '/pages/home/home',
       '/pages/ai/ai',

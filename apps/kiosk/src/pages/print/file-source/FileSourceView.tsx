@@ -69,6 +69,7 @@ export interface FileSourceViewProps {
   phone: PhoneSessionView
   qrUrl: string | null
   expiresLabel: string
+  waitRemainingSeconds: number | null
   previewOpen: boolean
   previewToken: string | null
   localRejectKind: LocalRejectKind | null
@@ -193,7 +194,7 @@ export function FileSourceView(props: FileSourceViewProps) {
   const {
     screen, pageTitle, pageSubtitle, terminalLabel, status, orderPausedNotice, isResumePrint,
     showFileChannel, showScan, tab, usbMode, usbHold = null, usbSwitchAllowed = true, currentFile, blockedName, blockedMeta,
-    wordHint, conversionReason, usbFiles, usbSelected, usbDriveLabel, formatBytes, phone, qrUrl, expiresLabel,
+    wordHint, conversionReason, usbFiles, usbSelected, usbDriveLabel, formatBytes, phone, qrUrl, expiresLabel, waitRemainingSeconds,
     previewOpen, previewToken, onSelectChannel, onOpenPicker, onRetryLocal, onNext, onExit, onBack,
     onHelp, onScan, onDocuments, onResumes, onPreview, onClosePreview, onReplace, onDelete,
     onUsbSelect, onUsbImport, onUsbRescan, onPhoneRefresh, onPhoneConfirm, onPhoneCancel,
@@ -201,6 +202,18 @@ export function FileSourceView(props: FileSourceViewProps) {
   } = props
   const support = useSupportContact()
   const miniappLine = whenMiniapp(support, '手机小程序里登录后传过的 PDF、图片，登录这台机器后在我的文档里选。')
+
+  const waitCountdown = waitRemainingSeconds === null ? '' : `${Math.floor(waitRemainingSeconds / 60)}:${String(waitRemainingSeconds % 60).padStart(2, '0')}`
+  const phoneWaitNotice = waitRemainingSeconds !== null ? (
+    <>
+      <FileSourceNote>等你传文件期间，这台机器不会自动退出，请不要走开。二维码到期后没有操作，就会自动退出。</FileSourceNote>
+      {waitRemainingSeconds > 0 && waitRemainingSeconds <= 60 && (
+        <div role="status" className="fs-status" data-kind="warn">
+          <div className="fs-status-p">二维码还剩 {waitCountdown}。还在传的话点一下屏幕，到期后可以在这里重新出码。</div>
+        </div>
+      )}
+    </>
+  ) : null
 
   const channelKeys: UploadTab[] = showFileChannel ? ['qr', 'file', 'usb'] : ['qr', 'usb']
   const fromLabel =
@@ -498,16 +511,19 @@ export function FileSourceView(props: FileSourceViewProps) {
     case 'phone-cancel-failed':
     case 'phone-cancelled':
       body = (
-        <PhoneBoard
-          screen={screen}
-          phone={phone}
-          qrUrl={qrUrl}
-          expiresLabel={expiresLabel}
-          channelKeys={channelKeys}
-          usbMode={usbMode}
-          helpText={['phone-status-unknown', 'phone-expired', 'phone-cancel-failed'].includes(screen) ? helpNeededLine(support) : ''}
-          onSelectChannel={onSelectChannel}
-        />
+        <>
+          <PhoneBoard
+            screen={screen}
+            phone={phone}
+            qrUrl={qrUrl}
+            expiresLabel={expiresLabel}
+            channelKeys={channelKeys}
+            usbMode={usbMode}
+            helpText={['phone-status-unknown', 'phone-expired', 'phone-cancel-failed'].includes(screen) ? helpNeededLine(support) : ''}
+            onSelectChannel={onSelectChannel}
+          />
+          {phoneWaitNotice}
+        </>
       )
       break
     case 'usb-unavailable':

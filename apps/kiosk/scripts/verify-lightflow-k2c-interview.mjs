@@ -178,7 +178,7 @@ const setupSurface = `${setup}\n${setupExtras}`
 check(setup.includes('<InterviewSetupResume'), `${pages[0]} — 设置页未挂上拆出的简历来源`)
 for (const token of [
   'kioskUploadFile',
-  'useBusyLock(creating || uploading || printingSheet || qrBusy || usbBusy)',
+  'useBusyLock(creating || uploading || printingSheet || usbBusy)',
   'durationMin: duration',
   'interviewerType,',
   'position: pos',
@@ -192,6 +192,12 @@ for (const token of [
 ]) {
   check(setup.includes(token), `${pages[0]} — Setup 真实链路合同缺失：${token}`)
 }
+const setupLockArg = withoutComments(setup).match(/useBusyLock\(([^)]*)\)/)?.[1] ?? 'qrBusy'
+check(setupLockArg === 'creating || uploading || printingSheet || usbBusy', '面试设置页的清场锁不含扫码面板的忙')
+check(
+  !/\b(?:qrBusy|phoneBusy|sourceBusy|showQr)\b/.test(setupLockArg),
+  '面试设置页的 useBusyLock 实参不得再出现 qrBusy / phoneBusy / sourceBusy / showQr',
+)
 for (const token of [
   'UploadSessionQrPanel',
   'ResumeUsbImportPanel',
