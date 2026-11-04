@@ -155,12 +155,24 @@ function omitPrinterQueueFields(payload: HeartbeatPayload): HeartbeatPayload {
   return next
 }
 
+/**
+ * 队列名按配置原样上报。长度 1–128（按 `name.length`，UTF-16 码元），
+ * 不含 U+0000–U+001F、U+007F–U+009F。
+ * 像地址的不带 `printerQueueName`（契约不上传打印机地址）：以 `\\` 开头的 UNC、
+ * 含 `://`、或含 IPv4 形四段数字。其余四个队列字段照带。
+ * 和后端 `services/api/src/terminals/heartbeat-printer-queue.ts` 同一规则，改一边要改两边。
+ */
+const PRINTER_QUEUE_NAME_IPV4 = /(^|[^0-9])\d{1,3}(\.\d{1,3}){3}([^0-9]|$)/
+
 function printerQueueNameForHeartbeat(name: string): string | undefined {
   if (name.length < 1 || name.length > 128) return undefined
   for (let index = 0; index < name.length; index += 1) {
     const code = name.charCodeAt(index)
     if (code <= 0x1f || (code >= 0x7f && code <= 0x9f)) return undefined
   }
+  if (name.startsWith('\\\\')) return undefined
+  if (name.includes('://')) return undefined
+  if (PRINTER_QUEUE_NAME_IPV4.test(name)) return undefined
   return name
 }
 

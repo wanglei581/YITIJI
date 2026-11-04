@@ -366,12 +366,84 @@ async function verifyHeartbeatAssembly(): Promise<void> {
   }
 }
 
+/** 与后端打印队列名门禁同一张表，一字不差。接受的原样出现，拒绝的不带队列名。 */
+const ACCEPTED_QUEUE_NAMES = [
+  'Pantum CM2800ADN Series',
+  'Pantum CM2800ADN Series (副本 1)',
+  '奔图 CM2820 打印机',
+  'Printer v1.2.3',
+  'a'.repeat(128),
+  '😀'.repeat(64),
+] as const
+
+const REJECTED_QUEUE_NAMES = [
+  '',
+  'a'.repeat(129),
+  '😀'.repeat(65),
+  'bad\nname',
+  'bad\u007fname',
+  'bad\u0085name',
+  'bad\u009fname',
+  '\\\\192.168.1.5\\Pantum',
+  '\\\\PRINTSRV\\Pantum',
+  'http://192.168.1.5:631/ipp/print',
+  'ipp://printer.local/ipp',
+  'Pantum 192.168.1.5',
+  '192.168.001.005',
+] as const
+
+async function verifyQueueNameContract(): Promise<void> {
+  __resetUnauthorizedForTests(true)
+  __resetPrinterQueueFieldRetryForTests()
+  const config: AgentConfig = {
+    apiBaseUrl: 'http://127.0.0.1',
+    terminalCode: 'VERIFY-PRINTER-QUEUE',
+    agentVersion: 'verify-only',
+    terminalId: 'terminal-printer-queue',
+    agentToken: 'test-only-agent-token',
+    printerName: 'Configured Queue',
+  }
+  await withHeartbeatServer(() => ({ status: 200 }), async (baseUrl, requests) => {
+    for (const name of ACCEPTED_QUEUE_NAMES) {
+      const before = requests.length
+      assert.equal(await sendHeartbeat({
+        ...queueProbes(),
+        config: { ...config, apiBaseUrl: baseUrl, printerName: name },
+        now: () => 1_700_000_000_000,
+      }), true, `accepted queue name heartbeat: ${JSON.stringify(name)}`)
+      assert.equal(requests.length, before + 1, `accepted queue name is one request: ${JSON.stringify(name)}`)
+      const body = requests[before]
+      assert.ok(body)
+      assert.equal(body.printerQueueName, name, `accepted queue name is reported as-is: ${JSON.stringify(name)}`)
+    }
+    for (const name of REJECTED_QUEUE_NAMES) {
+      const before = requests.length
+      assert.equal(await sendHeartbeat({
+        ...queueProbes(),
+        config: { ...config, apiBaseUrl: baseUrl, printerName: name },
+        now: () => 1_700_000_000_000,
+      }), true, `rejected queue name heartbeat: ${JSON.stringify(name)}`)
+      assert.equal(requests.length, before + 1, `rejected queue name is one request: ${JSON.stringify(name)}`)
+      const body = requests[before]
+      assert.ok(body)
+      assert.equal(
+        Object.prototype.hasOwnProperty.call(body, 'printerQueueName'),
+        false,
+        `rejected queue name omits printerQueueName: ${JSON.stringify(name)}`,
+      )
+      assert.equal(body.printerQueuePortKind, 'usb', `rejected queue name keeps port kind: ${JSON.stringify(name)}`)
+      assert.equal(body.printerQueueSpooler, 'running', `rejected queue name keeps spooler: ${JSON.stringify(name)}`)
+    }
+  })
+}
+
 async function main(): Promise<void> {
   verifyParse()
   verifyScriptText()
   verifyRawStatus()
   await verifyCollect()
   await verifyHeartbeatAssembly()
+  await verifyQueueNameContract()
   console.log('ALL PASS: printer queue diagnostics stay enum-only and drop raw values that miss the contract')
 }
 
