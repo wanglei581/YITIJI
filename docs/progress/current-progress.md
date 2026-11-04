@@ -1,5 +1,19 @@
 # 当前开发进度
 
+## 2026-11-04：心跳认打印队列新字段（后端半；分支 `claude/printer-queue-api-1104`；未合并、未部署）
+
+- 做了：终端心跳多收五个可选字段（队列名、端口种类、USB 端口名、驱动五个原值、Windows 打印服务状态）。SQLite 与 PostgreSQL 各加五列，迁移 `20261104150000_add_terminal_heartbeat_printer_queue`。老终端程序不带这五项仍然接受。后台终端详情只读显示「打印队列」；五列都空显示未上报；终端离线不把旧上报当现状。不保存、不显示打印机地址。队列名与终端程序同一条规则、拒绝地址形名字；状态位表按 Windows 的 25 个状态位补全，未识别位不再盖掉已识别的名字。
+- 边界：没改 `apps/terminal-agent/`。后端先认字段。终端程序要等这条上生产才发这些字段，否则多出来的字段会被整条拒绝，终端看起来像离线。
+- 验证：两套空库 `migrate deploy` 都套上了这条迁移；首单迁移升级路径能写入并读回五列。新门禁挂在 `verify:terminal-network-diagnostics` 后面，`verify:ci-gate-coverage` 通过，没有改 workflow。
+
+## 2026-11-04：打印机第 1 步 a+b——工作台口径改字、打印机页加「本系统出纸」（分支 `claude/printer-step1-ab-1104`；未合并、未部署）
+
+- 只改现有页：管理员工作台的打印机那一块，以及设备管理 → 打印机。没有新页面、没有新菜单。终端程序没动。
+- 工作台：没有异常时只写「N 台打印机都在线，没有报告故障。」只要有打印机，下面另起一行小字：USB 连接读不到纸张和碳粉余量，没报警不等于耗材充足。偏少改称「碳粉」，与打印机页列名一致。分组键 `normal` 没改名。
+- 「本系统出纸」复用大屏走查 W-68 的出纸页数：`PRINTED_TASK_WHERE`、`pagesByPrintedTask`（计费页 × 份数），今天按 `PrintTask.completedAt` 的上海自然日（`shanghaiDayStart`）。本月是上海自然月。彩色、双面看这条任务自己的 `paramsJson`。只算从本系统发出、已确认出纸的打印；不含打印机面板复印，也不含打印机自己读 U 盘直接打印。读不到或超出统计上限时不显示成 0。未确认的任务另写「本月另有 N 笔出纸未确认，没算进去」。
+- 统计在新文件 `services/api/src/terminals/admin-printer-output.ts`，一次按终端列表查完。`terminals-admin.service.ts` 一行没改。出纸面数仍有行数上限；未确认笔数按终端 `groupBy` 计数，不再把行取进内存。
+- 返工：`PrismaService` 改为值导入，否则 Nest 启动解析不到 `AdminPrinterOutputService`。门禁核对真实 `TerminalsModule` 登记了出纸服务和打印机控制器；再用应用上下文取出两者确认能解析，直接调 `list('output')` 能统计出纸（没走 HTTP）。`GET /admin/printers` 只有 `?include=output` 才统计并返回 `output` / `outputStatus`；工作台不带这个参数，设备管理 → 打印机才带。打印机页底补上：打印机走 USB 连接时，这几项读不到，会一直显示未上报；没报警不等于耗材充足。
+
 ## 2026-11-04：母盘装机清单补一节「打印机本机设置」（只写文档；分支 `claude/printer-install-checklist-1104`；未部署、未上机）
 
 - 只改文档，不改代码、不改生产配置。`docs/device/windows-golden-image-and-install-checklist.md` 增加 G11，B 节加 B4a 指向它；G1 到货登记补打印机一行，并加上「铭牌型号」「固件版本」两列。`docs/device/pantum-cm2820adn.md` §七末尾指向 G11；文末待现场核实清单里与 G11 重复的三项（U 盘直接打印、协议设置里的 SNMP、面板能否自动恢复默认）标「见 G11」。
