@@ -151,7 +151,13 @@ const frozen = {
   // 旧哈希 7f0cacce1e2b505548a4a141e2b63c71517c8ec5fe5d47fc827732a461f3e524。
   // 2026-11-03 重新冻结（B6b-1）：独立等待锁、到期提醒、真实卸载作废。新内容断言在哈希检查之前。
   // 冻结契约不放宽，仍逐字节校验。旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
-  'src/pages/upload/components/UploadSessionQrPanel.tsx': 'e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e',
+  // 2026-11-03 重新冻结（重做旧候选 #1461）：取消失败不再清屏——二维码和已收到的文件留着，屏上沿用打印上传页那句兜底，
+  // 可以重试取消或去确认；取消中三个按钮都禁用。成功才清空，已作废码清二维码并按过期显示。不恢复轮询、不自动接走文件。
+  // 新行为由 verify:resume-phone-upload-ui 的断言钉住。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
+  // 2026-11-04 重新冻结（并入 #1566）：取消失败按 #1566 留屏，触控尺寸、忙碌锁与卸载作废仍按 #1570。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e（#1570）、018fd611a3350ce53fa3b79fceb887c5a5b0d56a2d47f36d418f3b6745b816ca（#1566）。
+  'src/pages/upload/components/UploadSessionQrPanel.tsx': 'f0d8bc199b75c6ad6c12b87d517c81c6bef38baea72099231c8c68569802d60e',
   'src/pages/resume/aiResumeSession.ts': '5d023ee2388ecb12a3ba84a6b2b28c21e54ad65dece16eccc019f9dc43b5b164',
   'src/pages/resume/jobMaterialDraft.ts': '4a2404627c392c55cd39a6f525c522ce27cfec669f91d3b6ad5bb79f0de358ce',
   'src/pages/resume/hooks/useResumeLayout.ts': '2ef1c554e949344ce9d66430c521b986f5419db8627c4fcde1ef78d5927555e7',

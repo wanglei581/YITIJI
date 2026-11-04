@@ -104,9 +104,15 @@ const frozenHashes = new Map([
   // 2026-11-03 重新冻结（B6b-1）：面板在「码有效、文件还没到」时自己持清场锁，到期前 60 秒提醒，
   // 真实卸载作废还没收到文件的上传码；取消请求在途也持锁。新内容断言在本文件哈希检查之前。
   // 冻结契约不放宽，仍逐字节校验。旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
+  // 2026-11-03 重新冻结（重做旧候选 #1461）：取消失败不再清屏——二维码和已收到的文件留着，屏上沿用打印上传页那句兜底，
+  // 可以重试取消或去确认；取消中三个按钮都禁用。成功才清空，已作废码清二维码并按过期显示。不恢复轮询、不自动接走文件。
+  // 新行为由 verify:resume-phone-upload-ui 的断言钉住。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
+  // 2026-11-04 重新冻结（并入 #1566）：取消失败按 #1566 留屏，触控尺寸、忙碌锁与卸载作废仍按 #1570。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e（#1570）、018fd611a3350ce53fa3b79fceb887c5a5b0d56a2d47f36d418f3b6745b816ca（#1566）。
   [
     'src/pages/upload/components/UploadSessionQrPanel.tsx',
-    'e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e',
+    'f0d8bc199b75c6ad6c12b87d517c81c6bef38baea72099231c8c68569802d60e',
   ],
   [
     'src/pages/print/DevSandboxControls.tsx',

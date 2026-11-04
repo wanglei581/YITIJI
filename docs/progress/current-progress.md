@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-11-03：一体机扫码上传共用面板取消失败不再清屏（重做旧候选 #1461；分支 `claude/kiosk-upload-cancel-keep-1103`；未合并、未部署）
+
+- 旧候选 #1461（10/14，未进 main）在触屏版上重做：会员确认时后端锁着复制文件，这时点「取消」会回 400 `UPLOAD_SESSION_ACTION_IN_PROGRESS`。共用面板原来吞掉失败并无条件清空，屏上像取消成功，文件随后仍会归档进会员名下。
+- 改法只在 `UploadSessionQrPanel`，照打印上传页 `useUploadSession`：取消答复回来前刷新、取消、确认都禁用；成功才清空并通知页面；已作废码清二维码、按过期显示；其余失败留下二维码、已收到的文件和状态，兜底句沿用「这次上传没能取消，文件还留着。」。不恢复轮询，不自动接走文件。
+- 验证：一体机 tsc、lint 无 error；冻结哈希三条、`verify:resume-phone-upload-ui`、`verify:public-screen-mask`、`verify:kiosk-unattended-copy`、两份 profile 守卫、仓库完整性，以及进度文档上不依赖数据库的后端文档门禁通过。`verify:ai-usage-retention` 缺隔离库，`verify:free-print-quota` 与 `verify:support-contact` 缺本机 Prisma 客户端，未跑成（与本次改动无关）。浏览器用例已写入，本机未跑浏览器。
+
 ## 2026-11-03：合作机构工作台 AI 服务「重试」浏览器用例修偶发红（只改测试，页面不动；分支 `claude/sleepy-stonebraker-31ae12`）
 
 - **现象：** `kiosk-browser-smoke`「Run Partner data-screen browser E2E」里，`apps/partner/tests/e2e/screen/dashboard-ai.spec.ts`「切片不可用可重试；请求失败也可重试」偶发红在等不到「AI 模拟面试：5 场」。#1558 的 CI 连同自动重试两次都红；那次测的合并提交，合作机构后台代码与 main 70d046f7c 相同，main 上是绿的。本机按 CI 同款构建（React 正式版，产物 `jsxDEV` 为 0）连跑原用例 100 次红 7 次，位置一致。
@@ -21,6 +27,7 @@
 - 新门禁 `verify:scan-device-engine`（47 组，Mac 上跑：假执行器 + 假时钟 + 少量真实子进程），已进 ci.yml；十五处反向检查都变红，其中两处发现门禁盲区（线上字段值、图片摆放尺寸）并已补强。
 - 没做：没接线（`index.ts`、心跳、本机 HTTP、task-runner 都没动，没有调用方）；没加心跳字段；PowerShell 脚本没在 Windows 上实跑过（Mac 只验了参数、协议、映射与脚本静态检查）；`scan_device` 能力键与后端接口不在这一批。
 - 合入前要先做 V0-11：在测试机上用 SYSTEM 身份把 BMP 转 JPEG（WIA ImageProcess 的 Convert 滤镜与 System.Drawing 兜底各一次，量单页大小）；进纸器多页与各 HRESULT（V0-3 / V0-4）也要现场补。下一步 B1 后端，再 A2 终端程序接线。
+
 ## 2026-11-03：小程序 AI 板块第一轮——发给微信好友、今日提醒去 AI 闸门、AI 工具页按四组重排、简历优化与面试记录不再走死路（#1552，分支 `claude/miniapp-batch9-1103`；未合并、未部署，小程序未发布）
 
 - 来由：产品负责人 11/03 原话「剩下的你和codex和grok你们一起做完，Claude额度低，任务codex和grok执行，grok多干活」「小程序AI功能我已经通过备案……可以完整使用AI全部功能和能力……ai功能很重要，要设计好这一板块」，对分组回「按推荐重排」。分工：Grok 实现，Codex 实现两件并复核 Grok 的每一件，Claude 审查后拣入。提审与上线一律是带全部 AI 的完整版，不做也不保留「不含 AI 版」。

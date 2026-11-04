@@ -359,16 +359,23 @@ export function UploadSessionQrPanel({
   const handleCancel = async () => {
     if (!qr || cancelling) return
     setCancelling(true)
+    setError(null)
     try {
       await cancelUploadSession(qr.sessionId, qr.controlToken)
-    } catch {
-      // best-effort only
-    } finally {
-      setCancelling(false)
       setQr(null)
       setStatus(null)
       setError(null)
       onCancelled?.()
+    } catch (err) {
+      const code = apiErrorCode(err)
+      if (code && ALREADY_REVOKED_CODES.has(code)) {
+        setQr(null)
+        setStatus((current) => expiredStatus(qr, current, purpose))
+        return
+      }
+      setError(uploadSessionUserMessage(err, '这次上传没能取消，文件还留着。'))
+    } finally {
+      setCancelling(false)
     }
   }
 
