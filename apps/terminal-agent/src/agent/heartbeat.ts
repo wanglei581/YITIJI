@@ -21,6 +21,7 @@
  */
 
 import os from 'os'
+import axios from 'axios'
 import type {
   AgentConfig,
   HeartbeatPayload,
@@ -31,9 +32,13 @@ import type {
 import { createApiClient, axiosErrorMessage, isUnauthorizedHttpError } from './api-client'
 import { isUnauthorized, markUnauthorized } from './auth-state'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
-import { getPrinterStatus, getDiskFreeGB } from './wmi'
+import { getDiskFreeGB, getPrinterStatusAndRaw } from './wmi'
 import { printerStatusForHeartbeat } from './print-dispatch-gate'
-import { collectNetworkDiagnostics } from './network-diagnostics'
+import { collectNetworkDiagnostics, type NetworkDiagnostics } from './network-diagnostics'
+import {
+  collectPrinterQueueDiagnostics,
+  type PrinterQueueDiagnostics,
+} from './printer-queue-diagnostics'
 import { observeReleasePlan } from './release-observation'
 import { log, warn, err } from '../logger'
 import { AGENT_RUNTIME_VERSION } from '../runtime-version'
@@ -88,6 +93,13 @@ export interface HeartbeatOptions {
   onObservation?: (observation: HeartbeatObservation) => void
   /** Read on every send because heartbeat starts before the scan watcher. */
   getScanInputTelemetry?: () => ScanInputRuntimeTelemetry
+  /** 门禁注入。生产不传，走真实探针。 */
+  readPrinterStatusAndRaw?: typeof getPrinterStatusAndRaw
+  readDiskFreeGB?: () => Promise<number>
+  readNetworkDiagnostics?: (printerName: string) => Promise<NetworkDiagnostics>
+  readPrinterQueueDiagnostics?: (printerName: string) => Promise<PrinterQueueDiagnostics>
+  /** 门禁注入时钟。缺省用 Date.now。 */
+  now?: () => number
 }
 
 export interface HeartbeatObservation {
@@ -105,6 +117,73 @@ function notifyObservation(
   } catch {
     warn('heartbeat: local status observer failed')
   }
+}
+
+const PRINTER_QUEUE_FIELD_KEYS = [
+  'printerQueueName',
+  'printerQueuePortKind',
+  'printerQueuePortName',
+  'printerQueueRawStatus',
+  'printerQueueSpooler',
+] as const
+
+const PRINTER_QUEUE_SUPPRESS_MS = 60 * 60 * 1000
+let printerQueueSuppressedUntil = 0
+let printerQueueUnrecognizedWarnAt = Number.NEGATIVE_INFINITY
+
+/** 门禁在用例之间清掉「一小时内不再带」的记忆。 */
+export function __resetPrinterQueueFieldRetryForTests(): void {
+  printerQueueSuppressedUntil = 0
+  printerQueueUnrecognizedWarnAt = Number.NEGATIVE_INFINITY
+}
+
+function heartbeatNow(options: HeartbeatOptions): number {
+  return options.now?.() ?? Date.now()
+}
+
+function isBadRequestHttpError(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 400
+}
+
+function hasPrinterQueueFields(payload: HeartbeatPayload): boolean {
+  return PRINTER_QUEUE_FIELD_KEYS.some((key) => payload[key] !== undefined)
+}
+
+function omitPrinterQueueFields(payload: HeartbeatPayload): HeartbeatPayload {
+  const next: HeartbeatPayload = { ...payload }
+  for (const key of PRINTER_QUEUE_FIELD_KEYS) delete next[key]
+  return next
+}
+
+function printerQueueNameForHeartbeat(name: string): string | undefined {
+  if (name.length < 1 || name.length > 128) return undefined
+  for (let index = 0; index < name.length; index += 1) {
+    const code = name.charCodeAt(index)
+    if (code <= 0x1f || (code >= 0x7f && code <= 0x9f)) return undefined
+  }
+  return name
+}
+
+function rememberUnrecognizedPrinterQueueFields(nowMs: number): void {
+  printerQueueSuppressedUntil = nowMs + PRINTER_QUEUE_SUPPRESS_MS
+  if (nowMs - printerQueueUnrecognizedWarnAt >= PRINTER_QUEUE_SUPPRESS_MS) {
+    warn('heartbeat: 后端还不认打印队列字段')
+    printerQueueUnrecognizedWarnAt = nowMs
+  }
+}
+
+function attachPrinterQueueFields(
+  payload: HeartbeatPayload,
+  printerName: string,
+  queue: PrinterQueueDiagnostics,
+  rawStatus: string | undefined,
+): void {
+  const name = printerQueueNameForHeartbeat(printerName)
+  if (name) payload.printerQueueName = name
+  payload.printerQueuePortKind = queue.portKind
+  payload.printerQueueSpooler = queue.spooler
+  if (queue.portName) payload.printerQueuePortName = queue.portName
+  if (rawStatus) payload.printerQueueRawStatus = rawStatus
 }
 
 /**
@@ -137,12 +216,21 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
   }
 
   const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
+  const nowMs = heartbeatNow(options)
+  const readPrinter = options.readPrinterStatusAndRaw ?? getPrinterStatusAndRaw
+  const readDisk = options.readDiskFreeGB ?? getDiskFreeGB
+  const readNetwork = options.readNetworkDiagnostics ?? collectNetworkDiagnostics
+  const readQueue = options.readPrinterQueueDiagnostics ?? collectPrinterQueueDiagnostics
 
-  const [queriedPrinterStatus, diskFreeGB, networkDiagnostics] = await Promise.all([
-    getPrinterStatus(config.printerName),
-    getDiskFreeGB(),
-    collectNetworkDiagnostics(config.printerName),
+  // 状态、磁盘、网口三路与打印队列探针同一次 Promise.all。
+  // 队列探针超时 5 秒，不叠在原来的等待后面，心跳等待上限不增加。
+  const [printerReading, diskFreeGB, networkDiagnostics, printerQueue] = await Promise.all([
+    readPrinter(config.printerName),
+    readDisk(),
+    readNetwork(config.printerName),
+    readQueue(config.printerName),
   ])
+  const queriedPrinterStatus = printerReading.status
   const printerStatus = printerStatusForHeartbeat(queriedPrinterStatus)
 
   const payload: HeartbeatPayload = {
@@ -156,6 +244,9 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
     localTaskDatabaseAvailable,
     ...networkDiagnostics,
   }
+  if (nowMs >= printerQueueSuppressedUntil) {
+    attachPrinterQueueFields(payload, config.printerName, printerQueue, printerReading.rawStatus)
+  }
   const scanInputTelemetry = options.getScanInputTelemetry?.()
   if (scanInputTelemetry) {
     payload.scanInputHealth = scanInputTelemetry.health
@@ -164,45 +255,21 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
     payload.scanInputObservedAt = scanInputTelemetry.observedAt
   }
 
-  try {
-    const resp = await client.put<HeartbeatResponse>(
-      `/terminals/${config.terminalId}/heartbeat`,
-      payload,
-    )
-    log(`heartbeat: ✓ acknowledged`)
-    notifyObservation(onObservation, {
-      connected: true,
-      observedAt: payload.reportedAt,
-      printerStatus,
-    })
-
-    if (failureCounter) failureCounter.count = 0
-
-    // Apply server-pushed config overrides (e.g. updated poll intervals)
-    if (resp.data.config && onConfigUpdate) {
-      onConfigUpdate(resp.data.config as Partial<AgentConfig>)
-    }
-
-    // Separate from the mutable `config` response: this only observes a plan
-    // and reports the already-running version. It cannot change runtime state.
-    void observeReleasePlan(config)
-
-    return true
-  } catch (e) {
-    if (isUnauthorizedHttpError(e)) {
+  const finishFailure = (body: HeartbeatPayload, error: unknown): boolean => {
+    if (isUnauthorizedHttpError(error)) {
       markUnauthorized()
       writeStartupDiagnosticSafely('AGENT_UNAUTHORIZED')
       err('heartbeat: ✗ unauthorized — credential revoked/invalid; claim/print stopped (re-bind required)')
       if (failureCounter) failureCounter.count += 1
       notifyObservation(onObservation, {
         connected: false,
-        observedAt: payload.reportedAt,
+        observedAt: body.reportedAt,
         printerStatus,
       })
       return false
     }
 
-    const msg = axiosErrorMessage(e)
+    const msg = axiosErrorMessage(error)
     warn(`heartbeat: ✗ failed — ${msg}`)
 
     if (failureCounter) {
@@ -214,12 +281,47 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
 
     notifyObservation(onObservation, {
       connected: false,
-      observedAt: payload.reportedAt,
+      observedAt: body.reportedAt,
       printerStatus,
     })
-
     return false
   }
+
+  const putOnce = async (body: HeartbeatPayload, allowQueueRetry: boolean): Promise<boolean> => {
+    try {
+      const resp = await client.put<HeartbeatResponse>(
+        `/terminals/${config.terminalId}/heartbeat`,
+        body,
+      )
+      log(`heartbeat: ✓ acknowledged`)
+      notifyObservation(onObservation, {
+        connected: true,
+        observedAt: body.reportedAt,
+        printerStatus,
+      })
+
+      if (failureCounter) failureCounter.count = 0
+
+      // Apply server-pushed config overrides (e.g. updated poll intervals)
+      if (resp.data.config && onConfigUpdate) {
+        onConfigUpdate(resp.data.config as Partial<AgentConfig>)
+      }
+
+      // Separate from the mutable `config` response: this only observes a plan
+      // and reports the already-running version. It cannot change runtime state.
+      void observeReleasePlan(config)
+      return true
+    } catch (error) {
+      // 400 且这次带了打印队列字段：去掉后立刻重发一次。401 和其他错误不走这里。
+      if (allowQueueRetry && isBadRequestHttpError(error) && hasPrinterQueueFields(body)) {
+        rememberUnrecognizedPrinterQueueFields(nowMs)
+        return putOnce(omitPrinterQueueFields(body), false)
+      }
+      return finishFailure(body, error)
+    }
+  }
+
+  return putOnce(payload, true)
 }
 
 /**
