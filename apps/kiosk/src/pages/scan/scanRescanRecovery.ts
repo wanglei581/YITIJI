@@ -195,7 +195,8 @@ export function classifyCreateFailure(error: unknown): CreateFailureVerdict {
       failure: {
         title: '无法确认扫描任务状态',
         description: '网络连接中断，无法确认系统是否收到请求。为避免重复创建，本页不会自动重发 ——'
-          + '要不要再发一次由你按。请检查网络后重试，或者返回扫描首页。',
+          // 本文件被行为测试整份转译加载，不能再引 unattendedCopy。句子与 networkDisconnectLine() 一致。
+          + '要不要再发一次由你按。网络断开时，我们会收到提醒并远程处理。或者返回扫描首页。',
       },
     }
   }

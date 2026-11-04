@@ -30,7 +30,7 @@
  * 上传」），在本模块下会被替换成页面自己的兜底句，helpfulness 有损失。回收方式是把这些
  * 码逐个登记进下面的白名单 —— 这是安全方向上的增量，不是重新放开透传。
  */
-import { helpNeededLine, machineUnusableLine, preferUnattended } from '../../copy/unattendedCopy'
+import { helpNeededLine, machineUnusableLine, networkDisconnectLine, preferUnattended } from '../../copy/unattendedCopy'
 import { ApiHttpError } from './httpAdapter'
 
 /**
@@ -102,7 +102,8 @@ function aiQuotaExhaustedMessage(error: unknown): string {
 }
 
 const SHARED_USER_MESSAGES: Readonly<Record<string, SharedUserMessage>> = {
-  NETWORK_ERROR: '网络连接失败，请检查网络后重试',
+  // 一体机靠 4G，用户查不了线。事实仍说连接失败，后半用无人值守标准句，不叫用户自己查网络。
+  NETWORK_ERROR: () => `网络连接失败。${networkDisconnectLine()}。`,
   // 到机码（取件码）：服务端 message 本就是面向用户的中文，这里给同义的稳定文案，避免落到通用兜底
   PICKUP_CODE_INVALID: '到机码无效或已过期，请核对后重新输入',
   PICKUP_CODE_EXPIRED: '到机码无效或已过期，请核对后重新输入',
