@@ -9,9 +9,7 @@ import { QxTouchTile } from '../../../components/qingxu/touch/QxTouchTile'
 import { hasKioskSensitiveSession } from '../../../auth/kioskSensitiveSession'
 import { homeStandbyNote, publicIdleLogoutLabel, resultIdleLogoutLabel } from '../../../auth/kioskIdleTiming'
 import type { RecruitmentHostingState } from '../../../hooks/useRecruitmentHosting'
-import type { SmartCampusCapabilityState } from '../../../hooks/useSmartCampusConfig'
 import type { TerminalDeviceStatusView } from '../../../hooks/useTerminalDeviceStatus'
-import type { ToolboxCapabilityState } from '../../../hooks/useToolboxConfig'
 import { rememberAssistantDraft } from '../../../services/assistantDraft'
 import { useTerminalKiosk } from '../../../services/api/screensaver'
 import { unitCentsFor, usePrintPriceConfig } from '../../../services/print/priceConfigApi'
@@ -19,7 +17,7 @@ import { printDomainStatus } from '../homeDomainStatus'
 import type { HomeV6ActionId } from '../homeV6Domains'
 import type { HomeJobFairHighlightState } from '../hooks/useHomeJobFairHighlight'
 import type { HomeJobHighlightState } from '../hooks/useHomeJobHighlight'
-import { campusCopy, capabilityMark, greetingWord, jobCopy } from '../homeTouchCopy'
+import { campusCopy, greetingWord, jobCopy } from '../homeTouchCopy'
 import '../styles/home-touch.css'
 import { HomeIdentityActions } from './HomeIdentityActions'
 
@@ -39,8 +37,6 @@ interface HomeTouchViewProps {
   isLoggedIn: boolean
   guestMode: boolean
   device: TerminalDeviceStatusView
-  toolbox: ToolboxCapabilityState
-  campus: SmartCampusCapabilityState
   jobFair: HomeJobFairHighlightState & { retry: () => void }
   jobs: HomeJobHighlightState & { retry: () => void }
   recruitment: RecruitmentHostingState
@@ -59,8 +55,6 @@ export function HomeTouchView({
   isLoggedIn,
   guestMode,
   device,
-  toolbox,
-  campus,
   jobFair,
   jobs,
   recruitment,
@@ -129,15 +123,14 @@ export function HomeTouchView({
   })
   const job = jobCopy(jobs)
   const fair = campusCopy(jobFair)
-  const toolboxReady = toolbox.status === 'ready' && Boolean(toolbox.configVersion) && toolbox.enabled
-  const campusReady = campus.status === 'ready' && Boolean(campus.configVersion) && campus.enabled
   const recruitmentOpen = recruitment.enabled
   const channelsTile = !recruitmentOpen && officialChannelCount > 0
   const greeting = greetingWord(now)
   const standbyNote = homeStandbyNote({ isLoggedIn, guestMode, hasSensitiveSession: hasKioskSensitiveSession() }, publicIdleLogoutLabel())
   const printChip = device.loading ? printStatus.note : device.printerReady ? '先选材料再出纸 · 带走：打印件' : serviceDown ? '服务暂时连不上' : device.printerLabel
   const printNote = device.loading || device.printerReady ? undefined : printStatus.note
-  const tileCount = 2 + (recruitmentOpen ? 2 : channelsTile ? 1 : 0) + (toolboxReady ? 1 : 0) + (campusReady ? 1 : 0)
+  // 百宝箱、智慧校园停放（2026-11-04 产品负责人定），不再计入：小磁贴只剩到机取件、帮助和招聘类或官方渠道。
+  const tileCount = 2 + (recruitmentOpen ? 2 : channelsTile ? 1 : 0)
   const dense = tileCount >= 4
   const boundary = recruitmentOpen
     ? '岗位与招聘会仅展示第三方或官方来源；本终端仅展示与跳转，不代收简历。'
@@ -159,10 +152,10 @@ export function HomeTouchView({
       bodyClassName={['qxt-home', isLoggedIn ? 'qxt-home-on' : '', dense ? 'qxt-home-squeeze' : ''].filter(Boolean).join(' ')}
       dataAttrs={{
         recruitment: recruitmentOpen ? 'open' : 'closed',
-        toolbox: capabilityMark(toolbox.status, toolbox.configVersion, toolboxReady),
-        campus: capabilityMark(campus.status, campus.configVersion, campusReady),
+        // 停放标记给门禁和用例认：首页任何配置下都不摆这两块。
+        toolbox: 'parked',
+        campus: 'parked',
         'official-channels': channelsTile ? 'shown' : undefined,
-        'extra-services': toolboxReady || campusReady ? 'shown' : undefined,
       }}
       band={(
         <>
@@ -241,12 +234,6 @@ export function HomeTouchView({
           <QxTouchTile chevron={false} layout="stack" icon="qr" tone="slate" title="本机构官方渠道" desc={`本机有 ${officialChannelCount} 个渠道，扫码到机构官网`} actionId="official-channels" index={nextTile()} onClick={() => onAction('official-channels')} />
         ) : null}
         <QxTouchTile chevron={false} layout="stack" icon="help" tone="clay" title="帮助" desc="常见问题、服务电话" actionId="help" index={nextTile()} onClick={() => onAction('help')} />
-        {toolboxReady ? (
-          <QxTouchTile chevron={false} layout="stack" icon="layers" title="百宝箱" desc="按本机已上架的扩展服务进入" actionId="toolbox" index={nextTile()} onClick={() => onAction('toolbox')} />
-        ) : null}
-        {campusReady ? (
-          <QxTouchTile chevron={false} layout="stack" icon="landmark" tone="slate" title="智慧校园" desc="按本机开通范围进入校园服务" actionId="smart-campus" index={nextTile()} onClick={() => onAction('smart-campus')} />
-        ) : null}
       </div>
       <div className="qxt-home-id" data-member={isLoggedIn ? 'true' : undefined}>
         <p className="qxt-home-id-note">{isLoggedIn ? standbyNote : <>这台机器上没有待继续的办理 · {standbyNote}</>}</p>
