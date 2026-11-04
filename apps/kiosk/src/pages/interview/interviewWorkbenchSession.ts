@@ -38,6 +38,9 @@ export interface InterviewLiveState {
   messages: InterviewMessage[]
   questionIndex: number
   remainingSec: number
+  /** 本机时钟上的截止时刻。有它时剩余时间从它算，重进不重置。 */
+  deadlineAtLocalMs?: number
+  deadlineSource?: 'server' | 'local'
   omitPrintAnswers: boolean
   /** 本场至少一次非跳过的 answer 接口成功过。缺省当没有。 */
   answersRecorded?: boolean
@@ -125,6 +128,9 @@ function parseLive(raw: unknown): InterviewLiveState | undefined {
     messages,
     questionIndex: typeof raw.questionIndex === 'number' ? raw.questionIndex : 1,
     remainingSec: typeof raw.remainingSec === 'number' ? raw.remainingSec : 0,
+    deadlineAtLocalMs: typeof raw.deadlineAtLocalMs === 'number' && Number.isFinite(raw.deadlineAtLocalMs) && raw.deadlineAtLocalMs > 0
+      ? raw.deadlineAtLocalMs : undefined,
+    deadlineSource: raw.deadlineSource === 'server' || raw.deadlineSource === 'local' ? raw.deadlineSource : undefined,
     omitPrintAnswers: raw.omitPrintAnswers === true,
     answersRecorded: raw.answersRecorded === true,
   }

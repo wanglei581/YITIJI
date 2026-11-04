@@ -47,7 +47,7 @@ const MORE: Entry[] = [
 const PRACTICE_STEPS = [
   ['1 创建配置', '记下岗位、面试官和时长'],
   ['2 逐题作答', '默认文字回答，语音进入后检测'],
-  ['3 生成练习报告', '练完再生成，到点不自动交卷'],
+  ['3 生成练习报告', '时间到就结束，尝试生成练习报告'],
 ] as const
 
 function readinessOf(state: HubAvailability): string {
