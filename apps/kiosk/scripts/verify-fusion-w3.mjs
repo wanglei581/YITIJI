@@ -157,7 +157,14 @@ const frozen = {
   // 旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
   // 2026-11-04 重新冻结（并入 #1566）：取消失败按 #1566 留屏，触控尺寸、忙碌锁与卸载作废仍按 #1570。
   // 冻结契约不放宽，仍逐字节校验。旧哈希 e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e（#1570）、018fd611a3350ce53fa3b79fceb887c5a5b0d56a2d47f36d418f3b6745b816ca（#1566）。
-  'src/pages/upload/components/UploadSessionQrPanel.tsx': 'f0d8bc199b75c6ad6c12b87d517c81c6bef38baea72099231c8c68569802d60e',
+  // 2026-11-03 再次冻结（B6b-1 返工）：同一页切换来源不再作废上传码，切回来继续用同一张；
+  // 离开页面才作废还没收到文件的会话。已卸载的实例不得作废屏上正在显示的那张码。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e。
+  // 2026-11-04 再次冻结（#1570 返工：并入派工窗口的上传码租约修复 a6a7bbfe3，再与 #1566 合写取消处理）：
+  // 同一页切换来源只停放上传码、离开页面才作废，已卸载的实例不作废屏上正显示的码；取消成功才收租约并清空，
+  // 已作废按过期显示，其他失败码和已收到的文件都留着。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 f0d8bc199b75c6ad6c12b87d517c81c6bef38baea72099231c8c68569802d60e（并入 #1566 后）、2109b8ce60b6d58f7f5028435a51ef3544310f2c00549e587bc2688058da91e3（租约修复）。
+  'src/pages/upload/components/UploadSessionQrPanel.tsx': '738d4f455b926a85e51ad56c38fabe339d1def48fd43a12967bf03e03a8ca4ba',
   'src/pages/resume/aiResumeSession.ts': '5d023ee2388ecb12a3ba84a6b2b28c21e54ad65dece16eccc019f9dc43b5b164',
   'src/pages/resume/jobMaterialDraft.ts': '4a2404627c392c55cd39a6f525c522ce27cfec669f91d3b6ad5bb79f0de358ce',
   'src/pages/resume/hooks/useResumeLayout.ts': '2ef1c554e949344ce9d66430c521b986f5419db8627c4fcde1ef78d5927555e7',

@@ -3412,6 +3412,8 @@ test('W-118 resume diagnosis phone entry creates only one upload session @w3-kio
     sessionId: 'w118-resume-upload', status: 'pending', purpose: 'resume_upload', mode: 'temporary',
     file: null, requiresKioskConfirmation: false, expiresAt: '2099-01-01T00:00:00.000Z',
   } } })
+  const sessionPath = '/api/v1/upload-sessions/w118-resume-upload'
+  api.respond('DELETE', sessionPath, { status: 200, json: { success: true, data: { sessionId: 'w118-resume-upload', status: 'cancelled' } } })
   await page.goto('/resume/source')
   await page.getByRole('button', { name: /在手机里/ }).click()
   await expect.poll(() => creates).toBe(1)
@@ -3424,6 +3426,19 @@ test('W-118 resume diagnosis phone entry creates only one upload session @w3-kio
   await expect(page.getByText('请用手机微信或浏览器扫码', { exact: true })).toBeVisible()
   await expect(page.locator('.resume-source-phone-session svg[width="150"]')).toBeVisible()
   expect(creates).toBe(1)
+  // 建码还在途时切走再切回：旧面板不能把屏上这张码作废。
+  expect(api.requestCount('DELETE', sessionPath)).toBe(0)
+  await expect.poll(() => api.requestCount('GET', sessionPath)).toBeGreaterThan(0)
+  const qr = page.locator('.resume-source-phone-session svg[width="150"]')
+  // 码已经显示后再切一次来源：同一页只停放，不另建、也不作废。
+  await page.getByRole('button', { name: /本机文件/ }).click()
+  await expect(qr).toHaveCount(0)
+  await page.evaluate(() => new Promise<void>((resolve) => setTimeout(resolve, 0)))
+  expect(api.requestCount('DELETE', sessionPath)).toBe(0)
+  await page.getByRole('button', { name: /在手机里/ }).click()
+  await expect(qr).toBeVisible()
+  expect(creates).toBe(1)
+  expect(api.requestCount('DELETE', sessionPath)).toBe(0)
 })
 
 /*
