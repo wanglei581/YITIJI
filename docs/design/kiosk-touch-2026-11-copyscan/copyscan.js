@@ -1,5 +1,6 @@
 /* copyscan.js：屏上扫描 14 屏、屏上复印 8 屏、设备状态细分 1 屏，共 23 屏。
    待产品负责人审看的补稿：样式沿用青序流光触屏版（ui.js 部件、状态样式板的写法），定稿目录里的文件一个字节不改。
+   11/04 动画补稿（待产品负责人看，还没改程序）：玻璃台、进纸器各一段「原件怎么放」，选中才播，字幕只用本文件已有原句。
    怎么打开、屏清单、地址参数见 docs/design/kiosk-touch-2026-11-copyscan/README.md。
    类名一律 cs- 开头；状态放在 window.S.cs。地址参数可切换样子：
    ?scanner=stale 扫描仪状态过期、?scandev=off 屏上扫描没开通、?copydev=off 屏上复印没开通、
@@ -351,6 +352,87 @@
 .cs-g-s1.tight .cs-g-list .row{padding:6px 0 8px}
 .cs-g-s1.tight .cs-g-notes{gap:8px}
 .cs-g-s1.tight .cs-g-notes .remind{padding:8px 20px}
+/* 放纸演示（11/04，待产品负责人看）：只加 cs-pl- 开头的类。一轮 7 秒。
+   未播放时的样子就是末帧：玻璃台盖合上、纸在左上角、字朝下；进纸器纸已推进、导板靠拢、字朝上。 */
+.cs-src .vis.cs-pl-on{display:flex;flex-direction:column;align-items:stretch;justify-content:center;padding:8px 12px 6px}
+.cs-src .vis.cs-pl-on .cs-pl{flex:1;min-height:0;width:100%;display:flex;flex-direction:column;align-items:center}
+.cs-src .vis.cs-pl-on .cs-pl-stage{flex:1 1 auto;min-height:0;width:100%;display:grid;place-items:center}
+.cs-src .vis.cs-pl-on .cs-pl-stage svg{width:100%;height:100%;max-width:100%;max-height:100%;min-width:0;min-height:0}
+.cs-g-pick .vis.cs-pl-on{display:grid;place-items:center;padding:0}
+.cs-g-pick .cs-pl,.cs-g-pick .cs-pl-stage{width:100%;height:100%;min-height:0}
+.cs-g-pick .cs-pl-caps{display:none!important}
+.cs-g-pick .cs-pl-stage svg{width:100%;height:100%;min-width:0;min-height:0}
+.cs-pl-caps{flex:none;width:100%;height:36px;position:relative}
+.cs-pl-cap{position:absolute;inset:0;display:grid;place-items:center;padding:0 4px;font-size:22px;font-weight:700;line-height:1.25;color:var(--teal-ink);text-align:center;opacity:0}
+.cs-pl-lid,.cs-pl-sheet,.cs-pl-stack,.cs-pl-gl,.cs-pl-gr{transform-box:fill-box;transform-origin:center}
+.cs-pl-lid{transform-origin:center top;transform:scaleY(1)}
+.cs-pl-g .cs-pl-sheet{opacity:1}
+.cs-pl-g .cs-pl-ink{opacity:0}
+.cs-pl-g .cs-pl-mark{opacity:1}
+.cs-pl-f .cs-pl-stack{opacity:1}
+.cs-pl-f .cs-pl-arrow{opacity:0}
+.cs-pl-g .cs-pl-lid{animation:cs-pl-g-lid 7s linear infinite}
+.cs-pl-g .cs-pl-sheet{animation:cs-pl-g-sheet 7s linear infinite}
+.cs-pl-g .cs-pl-ink{animation:cs-pl-g-ink 7s linear infinite}
+.cs-pl-g .cs-pl-mark{animation:cs-pl-g-mark 7s linear infinite}
+.cs-pl-f .cs-pl-stack{animation:cs-pl-f-stack 7s linear infinite}
+.cs-pl-f .cs-pl-gl{animation:cs-pl-f-gl 7s linear infinite}
+.cs-pl-f .cs-pl-gr{animation:cs-pl-f-gr 7s linear infinite}
+.cs-pl-f .cs-pl-arrow{animation:cs-pl-f-arrow 7s linear infinite}
+.cs-pl-g .cs-pl-c0{animation:cs-pl-g-c0 7s linear infinite}
+.cs-pl-g .cs-pl-c1{animation:cs-pl-g-c1 7s linear infinite}
+.cs-pl-g .cs-pl-c2{animation:cs-pl-g-c2 7s linear infinite}
+.cs-pl-g .cs-pl-c3{animation:cs-pl-g-c3 7s linear infinite}
+.cs-pl-f .cs-pl-c0{animation:cs-pl-f-c0 7s linear infinite}
+.cs-pl-f .cs-pl-c1{animation:cs-pl-f-c1 7s linear infinite}
+.cs-pl-sync{border-radius:6px}
+.cs-pl-sync.cs-pl-g0{animation:cs-pl-h-g0 7s linear infinite}
+.cs-pl-sync.cs-pl-g1{animation:cs-pl-h-g1 7s linear infinite}
+.cs-pl-sync.cs-pl-g2{animation:cs-pl-h-g2 7s linear infinite}
+.cs-pl-sync.cs-pl-g3{animation:cs-pl-h-g3 7s linear infinite}
+.cs-pl-sync.cs-pl-f0{animation:cs-pl-h-f0 7s linear infinite}
+.cs-pl-sync.cs-pl-f1{animation:cs-pl-h-f1 7s linear infinite}
+@keyframes cs-pl-g-lid{0%,8%{transform:scaleY(1)}18%,76%{transform:scaleY(.08)}92%,100%{transform:scaleY(1)}}
+@keyframes cs-pl-g-sheet{
+  0%,5%{transform:translate(0,0) scaleY(1);opacity:1}
+  9%{transform:translate(0,0) scaleY(1);opacity:0}
+  14%{transform:translate(78%,-72%) rotate(-8deg) scaleY(1);opacity:0}
+  22%{transform:translate(78%,-72%) rotate(-8deg) scaleY(1);opacity:1}
+  33%{transform:translate(36%,-6%) rotate(0deg) scaleY(.08);opacity:1}
+  42%{transform:translate(32%,22%) scaleY(1);opacity:1}
+  62%,100%{transform:translate(0,0) scaleY(1);opacity:1}}
+@keyframes cs-pl-g-ink{0%,20%{opacity:0}23%,32%{opacity:1}38%,100%{opacity:0}}
+@keyframes cs-pl-g-mark{0%,48%{opacity:.22}56%{opacity:1}60%{opacity:.22}64%{opacity:1}72%,100%{opacity:1}}
+@keyframes cs-pl-f-stack{
+  0%,4%{transform:translateY(0);opacity:1}
+  8%{transform:translateY(0);opacity:0}
+  12%{transform:translateY(-118%);opacity:0}
+  18%,30%{transform:translateY(-118%);opacity:1}
+  54%,100%{transform:translateY(0);opacity:1}}
+@keyframes cs-pl-f-gl{0%,6%{transform:translateX(0)}14%,52%{transform:translateX(-170%)}74%,100%{transform:translateX(0)}}
+@keyframes cs-pl-f-gr{0%,6%{transform:translateX(0)}14%,52%{transform:translateX(170%)}74%,100%{transform:translateX(0)}}
+@keyframes cs-pl-f-arrow{0%,26%{opacity:0}32%,50%{opacity:1}58%,100%{opacity:0}}
+@keyframes cs-pl-g-c0{0%,8%{opacity:0}12%,20%{opacity:1}24%,100%{opacity:0}}
+@keyframes cs-pl-g-c1{0%,20%{opacity:0}24%,42%{opacity:1}46%,100%{opacity:0}}
+@keyframes cs-pl-g-c2{0%,44%{opacity:0}48%,72%{opacity:1}76%,100%{opacity:0}}
+@keyframes cs-pl-g-c3{0%,74%{opacity:0}78%,96%{opacity:1}100%{opacity:0}}
+@keyframes cs-pl-f-c0{0%,14%{opacity:0}18%,34%{opacity:1}38%,100%{opacity:0}}
+@keyframes cs-pl-f-c1{0%,34%{opacity:0}38%,96%{opacity:1}100%{opacity:0}}
+@keyframes cs-pl-h-g0{0%,8%,24%,100%{background:transparent;color:inherit}12%,20%{background:var(--teal-wash);color:var(--teal-ink)}}
+@keyframes cs-pl-h-g1{0%,20%,46%,100%{background:transparent;color:inherit}24%,42%{background:var(--teal-wash);color:var(--teal-ink)}}
+@keyframes cs-pl-h-g2{0%,44%,76%,100%{background:transparent;color:inherit}48%,72%{background:var(--teal-wash);color:var(--teal-ink)}}
+@keyframes cs-pl-h-g3{0%,74%,100%{background:transparent;color:inherit}78%,96%{background:var(--teal-wash);color:var(--teal-ink)}}
+@keyframes cs-pl-h-f0{0%,14%,38%,100%{background:transparent;color:inherit}18%,34%{background:var(--teal-wash);color:var(--teal-ink)}}
+@keyframes cs-pl-h-f1{0%,34%,100%{background:transparent;color:inherit}38%,96%{background:var(--teal-wash);color:var(--teal-ink)}}
+.static .cs-pl-caps{display:none!important}
+.reduced .stage .cs-pl-caps{height:auto;display:flex;flex-direction:column;gap:2px}
+.reduced .stage .cs-pl-cap{position:static!important;opacity:1!important;animation:none!important;display:block}
+.reduced .stage .cs-pl-sync{animation:none!important;background:transparent!important;color:inherit!important}
+@media (prefers-reduced-motion:reduce){
+  .stage .cs-pl-caps{height:auto;display:flex;flex-direction:column;gap:2px}
+  .stage .cs-pl-cap{position:static!important;opacity:1!important;animation:none!important}
+  .stage .cs-pl-sync{animation:none!important;background:transparent!important;color:inherit!important}
+}
 `;
   document.head.appendChild(css);
 
@@ -448,6 +530,44 @@
       <rect x="20" y="70" width="110" height="18" rx="8" fill="#9aa6a1"/>
       <rect x="30" y="104" width="90" height="6" rx="3" fill="#2ee6a8"/></svg>`;
   }
+  /* 放纸演示：玻璃台、进纸器共用一套，几何沿用上面两张静态插画。
+     字幕只切已有原句，不新造承诺。末帧（不播动画时）= 盖已合上 / 纸已推进且导板靠拢。 */
+  function glassAnim() {
+    return `<svg class="illus" viewBox="0 0 150 150" aria-hidden="true">
+      <rect x="14" y="132" width="122" height="6" rx="3" fill="#aab4af"/>
+      <rect x="8" y="22" width="134" height="108" rx="14" fill="#c9cfcc"/>
+      <rect x="20" y="34" width="110" height="84" rx="8" fill="#eaf2ef" stroke="#9aa6a1" stroke-width="2"/>
+      <g class="cs-pl-sheet">
+        <rect x="30" y="46" width="52" height="64" rx="3" fill="#fff" stroke="#c9d1cd" stroke-width="2"/>
+        <g class="cs-pl-ink"><rect x="38" y="56" width="34" height="5" rx="2" fill="#d9ded9"/><rect x="38" y="68" width="26" height="5" rx="2" fill="#d9ded9"/><rect x="38" y="80" width="34" height="5" rx="2" fill="#d9ded9"/><rect x="38" y="92" width="22" height="5" rx="2" fill="#d9ded9"/></g>
+      </g>
+      <rect class="cs-pl-lid" x="46" y="40" width="80" height="74" rx="8" fill="#b7c0bb" stroke="#8e9994" stroke-width="2"/>
+      <path class="cs-pl-mark" d="M22 62V36h26" fill="none" stroke="#1f9e86" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+  }
+  function feederAnim() {
+    return `<svg class="illus" viewBox="0 0 150 150" aria-hidden="true">
+      <rect x="8" y="82" width="134" height="50" rx="12" fill="#c9cfcc"/>
+      <path d="M26 82 L36 20 H116 L124 82 Z" fill="#dfe5e2" stroke="#9aa6a1" stroke-width="2"/>
+      <g class="cs-pl-stack">
+        <rect x="48" y="36" width="58" height="38" rx="3" fill="#fff" stroke="#c9d1cd" stroke-width="2" transform="rotate(-4 73 55)"/>
+        <rect x="44" y="32" width="58" height="38" rx="3" fill="#fff" stroke="#c9d1cd" stroke-width="2"/>
+        <g class="cs-pl-ink"><rect x="52" y="41" width="34" height="5" rx="2" fill="#d9ded9"/><rect x="52" y="52" width="26" height="5" rx="2" fill="#d9ded9"/></g>
+      </g>
+      <rect class="cs-pl-gl" x="35" y="30" width="9" height="38" rx="3" fill="#8e9994"/>
+      <rect class="cs-pl-gr" x="106" y="30" width="9" height="38" rx="3" fill="#8e9994"/>
+      <path class="cs-pl-arrow" d="M126 22v22M118 36l8 8 8-8" fill="none" stroke="#1f9e86" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="20" y="70" width="110" height="18" rx="8" fill="#9aa6a1"/>
+      <rect x="30" y="104" width="90" height="6" rx="3" fill="#2ee6a8"/>
+    </svg>`;
+  }
+  function placeAnim(kind) {
+    const glass = kind === 'glass';
+    const caps = (glass ? ['掀开上盖', '字朝下放在玻璃上', '对齐左上角', '再合上盖'] : ['字朝上', '放进打印机上方的进纸口，字朝上'])
+      .map((t, i) => `<span class="cs-pl-cap cs-pl-c${i}">${t}</span>`).join('');
+    const label = glass ? '掀开上盖，字朝下放在玻璃上，对齐左上角，再合上盖' : '放进打印机上方的进纸口，字朝上';
+    return `<span class="cs-pl cs-pl-${glass ? 'g' : 'f'}" role="img" aria-label="${label}"><span class="cs-pl-stage">${glass ? glassAnim() : feederAnim()}</span><span class="cs-pl-caps">${caps}</span></span>`;
+  }
   function pageSvg(w, h, k) {
     const p = Math.round(w * 0.09), iw = w - 2 * p, g = Math.max(10, Math.round(w * 0.046));
     const ws = [[1, .84, .94, .7, .9, .6], [.9, .96, .74, 1, .66, .86], [.8, 1, .88, .62, .94, .72]][k % 3];
@@ -510,8 +630,9 @@
     return `<button class="cs-way${o.big ? ' big' : ''}"${attr}${pr}><span class="vis">${o.vis || ''}</span><span class="tx">${chip}<h3>${o.t}</h3><p>${o.d}</p></span>${tail}</button>`;
   }
   function srcCard(k, cur, act) {
-    const g = k === 'glass';
-    return `<button class="cs-src" data-cs="${act}:${k}" aria-pressed="${cur === k}"><span class="vis">${g ? glassSvg(170) : feederSvg(170)}</span><b>${g ? '玻璃台' : '进纸器'}</b><span class="d">${g ? '一次一页，适合证件、书本' : '一叠最多 50 页，只扫单面'}</span><span class="d2">${g ? '字朝下，对齐左上角' : '字朝上'}</span><span class="cs-tick">${icon('check', 26, 3)}</span></button>`;
+    const g = k === 'glass', on = cur === k;
+    const art = on ? placeAnim(g ? 'glass' : 'feeder') : (g ? glassSvg(170) : feederSvg(170));
+    return `<button class="cs-src" data-cs="${act}:${k}" aria-pressed="${on}"><span class="vis${on ? ' cs-pl-on' : ''}">${art}</span><b>${g ? '玻璃台' : '进纸器'}</b><span class="d">${g ? '一次一页，适合证件、书本' : '一叠最多 50 页，只扫单面'}</span><span class="d2">${g ? '字朝下，对齐左上角' : '字朝上'}</span><span class="cs-tick">${icon('check', 26, 3)}</span></button>`;
   }
   function psteps(list) {
     return `<div class="cs-steps">${list.map((s, i) => `<div class="s ${s[3]}"><span class="n">${i + 1}</span><b>${s[0]}</b><em>${s[3] === 'now' ? '<i class="cs-dot"></i>' : ''}${s[1]}</em><small>${s[2]}</small></div>`).join('')}</div>`;
@@ -915,8 +1036,8 @@
       body: `${guideOff()}
         <section class="cs-g-card"><span class="cs-g-n">1</span><div class="cs-g-m"><h2>放原件</h2>
           <div class="cs-g-two">
-            <div class="cs-g-pick"><span class="vis">${feederSvg(104)}</span><p class="cs-g-p"><b>多页普通纸：</b>放进打印机上方的进纸口，字朝上。</p></div>
-            <div class="cs-g-pick"><span class="vis">${glassSvg(104)}</span><p class="cs-g-p"><b>单页、证件、书本：</b>掀开上盖，字朝下放在玻璃上，对齐左上角，再合上盖。</p></div>
+            <div class="cs-g-pick"><span class="vis cs-pl-on">${placeAnim('feeder')}</span><p class="cs-g-p"><b>多页普通纸：</b><span class="cs-pl-sync cs-pl-f1">放进打印机上方的进纸口</span>，<span class="cs-pl-sync cs-pl-f0">字朝上</span>。</p></div>
+            <div class="cs-g-pick"><span class="vis cs-pl-on">${placeAnim('glass')}</span><p class="cs-g-p"><b>单页、证件、书本：</b><span class="cs-pl-sync cs-pl-g0">掀开上盖</span>，<span class="cs-pl-sync cs-pl-g1">字朝下放在玻璃上</span>，<span class="cs-pl-sync cs-pl-g2">对齐左上角</span>，<span class="cs-pl-sync cs-pl-g3">再合上盖</span>。</p></div>
           </div>
           <p class="cs-g-warn">${icon('alert', 28, 2)}<span>进纸器里有纸时先扫进纸器，玻璃上的不会被复印。</span></p></div></section>
         <section class="cs-g-card"><span class="cs-g-n">2</span><div class="cs-g-m"><h2>在打印机屏幕上选功能</h2>
@@ -1121,7 +1242,7 @@
   });
   reg('cs-scan-set', G_SCAN, '放纸与设置', scanSet, {
     does: '放纸与设置：纸放玻璃台还是进纸器、扫成黑白还是彩色，然后开始扫描。',
-    motion: '无。',
+    motion: '选中的那种播「原件怎么放」（一轮 7 秒，循环）；没选中的仍是静态插画。玻璃台：掀开上盖，纸翻面字朝下放上玻璃，滑到左上角（角标闪一下），再合上盖。进纸器：一叠纸字朝上，推进进纸口到底，两侧导板靠拢。字幕只用已有原句。减弱动效时停在末帧，字幕全部展开。这是待产品负责人看的动画补稿，还没改程序。',
     keep: '玻璃台写「一次一页，适合证件、书本」「字朝下，对齐左上角」；进纸器写「一叠最多 50 页，只扫单面」「字朝上」。提示：多页单面材料用进纸器一次扫完；玻璃台适合证件、书本，一面一面扫。默认：证件用玻璃台和彩色，其余用进纸器和黑白，点了就记住。方式上一屏已经选过，这里不再放「改用面板扫描」，要改就点「返回」。扫描仪状态过期或没开通时，「开始扫描」停用，写原因并提示点「返回」改选面板扫描。每屏可点 7 个：2 个放纸 + 2 个颜色 + 底部 3 个。' + NK
   });
   reg('cs-scan-run', G_SCAN, '正在扫描', () => runScreen(false), {
@@ -1187,7 +1308,7 @@
   });
   reg('cs-copy-guide', G_COPY, '怎么在打印机上复印（图文）', copyGuide, {
     does: '定稿「怎么在打印机上复印」（copy 屏）的图文版：五步，每步配图或图标，下面两条提醒。复印不在这块屏上下单，所以没有进度、完成页，也不进「我的打印订单」。',
-    motion: '无。步骤卡是静态的，不是按钮。',
+    motion: '第 1 步「放原件」的两张小图播怎么放（一轮 7 秒，跟放纸设置同一套）：进纸器字朝上推进去、导板靠拢；玻璃台掀盖、字朝下对齐左上角、再合上盖。旁边原句随当前这一步加深，字不改。步骤卡仍不是按钮。减弱动效时停在末帧，原句整句都在。这是待产品负责人看的动画补稿，还没改程序。',
     keep: '标题、副标题和五步的标题与正文照定稿 copy 屏原句，只加两句：第 1 步「进纸器里有纸时先扫进纸器，玻璃上的不会被复印」（后半句出自厂家官方手册，免得「先扫」被读成「两处都扫」），第 2 步「屏幕不在主屏时，先按触摸屏左边的主页键（小房子）」。配图只画手册核实过的：第 1 步进纸器和玻璃两小图；第 2 步打印机面板主屏（触摸屏上一排四个按钮：复印、扫描、身份证复印、票据复印，最下面一条状态栏「就绪」，左边竖排三个实体键，从上到下返回、主页、说明；突出「复印」，身份证复印、票据复印次级突出，主页键描边）；第 3、4 步只用图标（设置、点一下），不画设置屏，不画开始键在屏上哪里；第 5 步用现成的 mfp()。身份证、票据放在玻璃上的位置和翻面手册没写，不画，也不写。状态胶囊「复印在打印机面板上操作」；?printer=down 时多一条「打印机离线时复印可能也用不了，以打印机屏幕为准」（同定稿打印服务台）；?ai=down 时多小青接不上的一句，步骤照样能做。可点只有：第 2 步旁的「这几种原件这样复印」（去 cs-copy-guide-more）和底栏三个。底栏：返回打印扫描去 print，问小青：复印要注意什么，主按钮「去打印文件」去 print-src。法律两句、带走原件加服务电话都在，号码与服务时间从后台读，读不到不显示。一屏放不下的身份证、发票、双面三种原件放第二屏。' + NK
   });
   reg('cs-copy-guide-more', G_COPY, '这几种原件这样复印（图文）', copyGuideMore, {
@@ -1197,7 +1318,7 @@
   });
   reg('cs-copy-set', G_COPY, '复印设置', copySet, {
     does: '放好原件，选份数、颜色、单面还是双面，然后开始复印。',
-    motion: '无。',
+    motion: '同 cs-scan-set：选中的原件位置播怎么放（一轮 7 秒），另一种静态。字幕只用已有原句。减弱动效时停在末帧，字幕全部展开。这是待产品负责人看的动画补稿，还没改程序。',
     keep: '原件：玻璃台 / 进纸器。份数 1–99，−10 / −1 / +1 / +10。颜色黑白 / 彩色；打印成单面 / 双面。地址 ?color=off、?duplex=off（或演示事件）时对应选项灰掉，写「本机暂未开通」。小字「原件几页，扫完才知道；扫完会给你核对」。打印机离线时主按钮写「打印机离线」并停用。每屏可点数多，是因为这里有 4 组设置，和定稿的预览与设置屏同类。' + NK
   });
   reg('cs-copy-scan', G_COPY, '复印第 1 步：正在扫原件', () => runScreen(true), {
