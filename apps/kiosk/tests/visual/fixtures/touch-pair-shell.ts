@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import { expect, type BrowserContext, type Page } from '@playwright/test'
 import type { ApiRouter } from '../../fixtures/api-router'
 import {
   loginThroughVisibleUi,
@@ -30,6 +30,10 @@ export function registerTouchShell(
   },
 ): void {
   registerEvidenceShell(api)
+  // policy-favorite-walk.spec.ts 的正式构建会话应答。
+  for (const action of ['start', 'heartbeat', 'end']) {
+    api.respond('POST', `/api/v1/kiosk/session/${action}`, { status: 200, json: { success: true } })
+  }
   const session = { sessionToken: 'pair-terminal-session-token-0123456789abcd' }
   api.respond('POST', '/api/v1/terminals/session-token', { status: 200, json: session })
   api.respond('POST', '/api/v1/terminals/session-token/refresh', { status: 200, json: session })
@@ -45,6 +49,37 @@ export function registerTouchShell(
     status: 200,
     json: { capabilities: PRINT_CAPS },
   })
+}
+
+/** 正式构建的本机网桥：沿用 policy-favorite-walk / fusion-w3 的 CORS 造法。 */
+export async function installLocalBridge(context: BrowserContext): Promise<void> {
+  const cors = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Private-Network': 'true',
+  }
+  for (const [endpoint, method, json] of [
+    ['terminal-identity', 'GET', { success: true, data: { terminalId: 'KSK-001', terminalCode: 'KSK-001' } }],
+    ['terminal-boot-ticket', 'POST', { data: { bootTicket: 'pairboot-ticket-0123456789abcdef0123456789' } }],
+  ] as const) {
+    await context.route(`http://127.0.0.1:9527/local/${endpoint}`, async (route) => {
+      if (route.request().method() === 'OPTIONS') {
+        await route.fulfill({ status: 204, headers: cors })
+      } else if (route.request().method() === method) {
+        await route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(json) })
+      } else {
+        await route.abort('blockedbyclient')
+      }
+    })
+  }
+}
+
+/** 标题出现不代表换票清场已结束；写业务种子前必须等票落定。 */
+export async function terminalReady(page: Page): Promise<void> {
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('terminal_session_token_v1')))
+    .toBe('pair-terminal-session-token-0123456789abcd')
+  await expect(page.getByText('这台机器的安全校验没通过', { exact: true })).toHaveCount(0)
 }
 
 export async function loginTo(page: Page, api: ApiRouter, returnTo: string): Promise<void> {
@@ -110,10 +145,12 @@ export async function openConfirm(page: Page, api: ApiRouter, billing: 'free' | 
   // 先在服务台等会话落定，再写交接，软跳进核对页。
   await page.goto('/print-scan')
   await see(page, '[data-testid="print-hub-state-default"]')
+  await terminalReady(page)
   await writePrintHandoff(page, { contextId: 'p1-evidence-000000001' })
   await spaGo(page, '/print/confirm', { printContextId: 'p1-evidence-000000001' })
   await see(page, '[data-w2-page="print-confirm"]')
-  await see(page, free ? 'text=确认并打印' : 'text=去付款')
+  await expect(page.getByRole('button', { name: free ? '确认并打印' : '去付款', exact: true })).toBeEnabled()
+  await expect(page.locator('body')).not.toContainText(/状态未知|这台机器暂时不能用|安全校验没通过|暂时打不了/)
 }
 
 /** 收银台读的是 pay-status 快照，形状与 qingxu-pair-seeds 里未导出的 openCashier 相同。 */

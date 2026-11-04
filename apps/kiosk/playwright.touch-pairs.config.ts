@@ -57,7 +57,7 @@ export default defineConfig({
   webServer: {
     // 不设 VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN：那个变量让 isTerminalKiosk() 恒为假，
     // 本机选文件会画出来。一体机身份走 9527 的终端身份和引导票，由 spec 里的路由应答。
-    command: `${refuseBusyPort} && VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true VITE_TERMINAL_ID=KSK-001 VITE_TERMINAL_AGENT_BRIDGE_TOKEN=playwright-local-bridge-token-0123456789abcdef pnpm build && pnpm exec vite preview --host 127.0.0.1 --port ${previewPort} --strictPort`,
+    command: `${refuseBusyPort} && VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true VITE_TERMINAL_ID=KSK-001 VITE_TERMINAL_AGENT_BRIDGE_TOKEN=playwright-local-bridge-token-0123456789abcdef npx vite build && npx vite preview --host 127.0.0.1 --port ${previewPort} --strictPort`,
     url: previewOrigin,
     reuseExistingServer: false,
     timeout: 300_000,

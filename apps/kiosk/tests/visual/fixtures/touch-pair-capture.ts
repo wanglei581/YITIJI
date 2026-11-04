@@ -4,7 +4,8 @@ import fs from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import type { Browser, BrowserContext, Page } from '@playwright/test'
+import { expect, type Browser, type BrowserContext, type Page } from '@playwright/test'
+import { installLocalBridge, terminalReady } from './touch-pair-shell'
 import { ApiRouter } from '../../fixtures/api-router'
 import { longestBlankRun } from './blank-run'
 import type { PairStatus, ProtoMeasure, RuntimeMetrics, TouchPair } from './touch-pair-types'
@@ -275,30 +276,7 @@ async function capturePair(
   // 不设的话 click / waitForURL 会一直等到整项 30 分钟超时，一对卡住后面全丢。
   context.setDefaultTimeout(60_000)
   context.setDefaultNavigationTimeout(60_000)
-  await context.route('http://127.0.0.1:9527/local/terminal-identity', async (route) => {
-    if (route.request().method() !== 'GET') {
-      await route.abort('blockedbyclient')
-      return
-    }
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      headers: { 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ success: true, data: { terminalId: 'KSK-001', terminalCode: 'KSK-001' } }),
-    })
-  })
-  await context.route('http://127.0.0.1:9527/local/terminal-boot-ticket', async (route) => {
-    if (route.request().method() !== 'POST') {
-      await route.abort('blockedbyclient')
-      return
-    }
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      headers: { 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ data: { bootTicket: 'pairboot-ticket-0123456789abcdef0123456789' } }),
-    })
-  })
+  await installLocalBridge(context)
   try {
     const protoPage = await context.newPage()
     const draft = await shootDraft(protoPage, protoOrigin, pair, draftPng)
@@ -319,7 +297,13 @@ async function capturePair(
     try {
       if (!pair.prepare) throw new Error('没有准备函数')
       await pair.prepare(page, api)
+      await terminalReady(page)
       if (pair.ready) await page.locator(pair.ready).first().waitFor({ state: 'visible', timeout: 15_000 })
+      api.assertNoUnhandledRequests()
+      const abnormalStates = ['ai-down', 'printer-down', 'expired', 'gone', 'incomplete', 'timeout', 'nofile', 'start-fail']
+      if (pair.item !== '状态样式板' && !abnormalStates.includes(pair.state)) {
+        await expect(page.locator('body')).not.toContainText(/状态未知|这台机器暂时不能用|安全校验没通过|暂时打不了|网络连接失败/)
+      }
       const landed = new URL(page.url())
       const expected = expectedPath(pair.route)
       if (expected && landed.pathname !== expected) {

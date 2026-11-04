@@ -1,14 +1,10 @@
-import type { Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 import type { ApiRouter } from '../../fixtures/api-router'
-import { W2_FILE, W2_ORDER, W2_PRINT_PARAMS, setReactRouterState, writePrintHandoff } from './fusion-w2-state'
-import {
-  seedPrintDoneCompleted,
-  seedPrintProgress,
-} from './kiosk-p1-evidence-capture-api'
-import { loginTo, openCashier, openConfirm, registerTouchShell, routeVisiblePdf, see, spaGo, stubTakeaway } from './touch-pair-shell'
+import { W2_FILE, W2_ORDER, W2_PRINT_PARAMS, writePrintHandoff } from './fusion-w2-state'
+import { loginTo, openCashier, openConfirm, registerTouchShell, routeVisiblePdf, see, spaGo, stubTakeaway, terminalReady } from './touch-pair-shell'
+import { openConvert } from './touch-pair-convert'
+import { stubResumeUsb } from './touch-pair-resume-seeds'
 import type { TouchPair } from './touch-pair-types'
-
-const PDF_PHASE = '合成各阶段要走上传接口，现成注册器没有一键造出编辑、上传中、合成中、结果、结果未知、冲突、未开通或 U 盘未接线。不许伪造文件已到。'
 
 function shell(api: ApiRouter, printer?: { isOnline: boolean; printerStatus: string }): void {
   registerTouchShell(api, printer)
@@ -154,6 +150,19 @@ function stubPhoneQr(api: ApiRouter): void {
   })
 }
 
+/** print-fulfill-qx 的 flowState；先等正式构建换票，再软跳，避免旧 seedPrintFlow 与清场竞争。 */
+async function openPrintTask(page: Page, api: ApiRouter, status: 'printing' | 'completed'): Promise<void> {
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 200,
+    json: { taskId: W2_ORDER.taskId, status, ...(status === 'printing' ? { progressPercent: 42 } : { completedAt: '2026-07-26T00:00:00.000Z' }) },
+  })
+  await page.goto('/print-scan')
+  await terminalReady(page)
+  await spaGo(page, status === 'printing' ? '/print/progress' : '/print/done', {
+    ...W2_ORDER, file: W2_FILE, params: W2_PRINT_PARAMS, source: 'document',
+  })
+}
+
 const pdfPhases = ['edit', 'uploading', 'composing', 'result', 'unknown', 'conflict', 'closed', 'usb'] as const
 
 export function printPairs(): TouchPair[] {
@@ -222,12 +231,13 @@ export function printPairs(): TouchPair[] {
     },
     {
       item: '打印', screen: 'usb', state: 'usb', route: '/print/upload?source=document&tab=usb',
-      seeds: ['registerTouchShell'],
+      seeds: ['registerTouchShell', 'stubResumeUsb GET status/files（只拍列表）'],
       missingReason: null,
       proto: { patch: { ctx: 'print' } },
       prepare: async (page, api) => {
+        await stubResumeUsb(page)
         await openUpload(page, api, '/print/upload?source=document&tab=usb')
-        throw new Error('预览没有本机 U 盘网桥，到不了根目录文件列表。屏上是读盘失败或未开通，不是稿上的 3 个文件。')
+        await expect(page.getByRole('button', { name: /U盘简历\.pdf/ })).toBeVisible()
       },
     },
     {
@@ -240,6 +250,7 @@ export function printPairs(): TouchPair[] {
         await stubZeroFindingChecks(page)
         await page.goto('/print-scan')
         await see(page, '[data-testid="print-hub-state-default"]')
+        await terminalReady(page)
         await writePrintHandoff(page, { contextId: 'p1-evidence-000000001', materialCheck: null })
         await spaGo(page, '/print/desk?step=check', { printContextId: 'p1-evidence-000000001' })
         await see(page, 'text=没有待决定的片段')
@@ -257,6 +268,7 @@ export function printPairs(): TouchPair[] {
         await routeVisiblePdf(page)
         await page.goto('/print-scan')
         await see(page, '[data-testid="print-hub-state-default"]')
+        await terminalReady(page)
         await writePrintHandoff(page, { contextId: 'p1-evidence-000000001' })
         await spaGo(page, '/print/desk?step=preview', { printContextId: 'p1-evidence-000000001' })
         await see(page, '[data-w2-page="print-preview"][data-qx-state="preview"]')
@@ -292,23 +304,29 @@ export function printPairs(): TouchPair[] {
     },
     {
       item: '打印', screen: 'printing', state: 'default', route: '/print/progress',
-      seeds: ['seedPrintProgress'],
+      seeds: ['openPrintTask printing', 'GET print/jobs printing'],
       missingReason: null,
       prepare: async (page, api) => {
         shell(api)
-        await seedPrintProgress(page, api)
+        await openPrintTask(page, api, 'printing')
         await see(page, '[data-testid="print-fulfill-state-printing"], [data-w2-page="print-progress"]')
       },
     },
     {
       item: '打印', screen: 'printing', state: 'quiet', route: '/print/progress',
-      seeds: [],
-      missingReason: '安静态要等大约 45 秒没有新进度才换说明。seedPrintProgress 固定回报正在打印，不能一键停在这一态。',
+      seeds: ['openPrintTask printing', '相同进度持续 45 秒（真实静默计时器）'],
+      missingReason: null,
       proto: { patch: { fmQuiet: true } },
+      prepare: async (page, api) => {
+        shell(api)
+        await openPrintTask(page, api, 'printing')
+        await page.locator('[data-progress-quiet="true"]').waitFor({ state: 'visible', timeout: 55_000 })
+        await see(page, 'text=这台机器暂时没有回报打印进度')
+      },
     },
     {
       item: '打印', screen: 'unconfirmed', state: 'default', route: '/print/done',
-      seeds: ['GET print/jobs PRINT_JOB_UNCONFIRMED', 'setReactRouterState'],
+      seeds: ['GET print/jobs PRINT_JOB_UNCONFIRMED', 'terminalReady + spaGo + W2_ORDER'],
       missingReason: null,
       prepare: async (page, api) => {
         shell(api)
@@ -322,9 +340,10 @@ export function printPairs(): TouchPair[] {
             failureReasonForUser: '打印作业已提交到打印队列，但未确认完成，请工作人员检查纸张、卡纸和出纸状态',
           },
         })
-        await page.goto('/print/done')
-        await setReactRouterState(page, '/print/done', {
-          taskId: W2_ORDER.taskId,
+        await page.goto('/print-scan')
+        await terminalReady(page)
+        await spaGo(page, '/print/done', {
+          ...W2_ORDER,
           file: W2_FILE,
           params: W2_PRINT_PARAMS,
           source: 'document',
@@ -334,13 +353,13 @@ export function printPairs(): TouchPair[] {
     },
     {
       item: '打印', screen: 'done', state: 'default', route: '/print/done',
-      seeds: ['seedPrintDoneCompleted'],
+      seeds: ['openPrintTask completed', 'GET print/jobs completed'],
       missingReason: null,
       prepare: async (page, api) => {
         shell(api)
         stubTakeaway(api, W2_ORDER.taskId)
-        await seedPrintDoneCompleted(page, api)
-        await see(page, '[data-w2-page="print-done"]')
+        await openPrintTask(page, api, 'completed')
+        await see(page, '[data-testid="print-fulfill-state-completed"]')
       },
     },
     {
@@ -369,12 +388,15 @@ export function printPairs(): TouchPair[] {
               orderNo: 'ORD-RECEIPT',
               terminalId: 'KSK-001',
               amountCents: 100,
+              fileName: W2_FILE.name,
+              billablePages: W2_FILE.pages,
               priceLines: [],
               paymentSessionToken: 'receipt-payment-session',
             }),
           })
         })
         await page.goto('/print/pickup-claim')
+        await terminalReady(page)
         await page.getByLabel('到机码输入框').fill('28491703')
         await see(page, 'text=订单核验成功')
       },
@@ -396,9 +418,12 @@ export function printPairs(): TouchPair[] {
       screen: 'img2pdf',
       state: phase,
       route: '/print-scan/convert',
-      seeds: [],
-      missingReason: PDF_PHASE,
+      seeds: phase === 'uploading' ? [] : phase === 'usb' ? ['openConvert', 'click img2pdf-add-usb'] : ['openConvert', 'UploadSessionQrPanel 手机确认', `images-to-pdf ${phase}`],
+      missingReason: phase === 'uploading'
+        ? 'runtime-missing：ConvertImagesPage.uploading 只由本机 input[type=file] 的 handleFile 设置；正式一体机不渲染该输入框，手机确认只调用 addImage，没有这一整屏上传中状态。'
+        : null,
       proto: { patch: { fsPdf: phase } },
+      prepare: phase === 'uploading' ? undefined : (page, api) => openConvert(page, api, phase),
     })
   }
   return pairs

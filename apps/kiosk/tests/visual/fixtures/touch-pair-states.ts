@@ -1,9 +1,8 @@
-import { diagnosis } from './fusion-w3-states'
-import { W2_FILE, W2_ORDER, W2_PRINT_PARAMS, setReactRouterState } from './fusion-w2-state'
-import { registerTouchShell, see, spaGo, stubTakeaway, writeSession } from './touch-pair-shell'
+import { expect } from '@playwright/test'
+import { resumeReading } from './touch-pair-resume-seeds'
+import { W2_FILE, W2_ORDER, W2_PRINT_PARAMS } from './fusion-w2-state'
+import { registerTouchShell, see, spaGo, stubTakeaway, terminalReady } from './touch-pair-shell'
 import type { TouchPair } from './touch-pair-types'
-
-const RESUME_KEY = 'ai-job-print:current-ai-resume'
 
 export function statePairs(): TouchPair[] {
   return [
@@ -29,9 +28,19 @@ export function statePairs(): TouchPair[] {
       },
     },
     {
-      item: '状态样式板', screen: 'st-error', state: 'upload-failed', route: '/print/upload',
-      seeds: [],
-      missingReason: '稿画的是手机上传过大拒收（phoneUploadModel too-large）。现成注册器没有一键造出这一屏，不许伪造上传失败。',
+      item: '状态样式板', screen: 'st-error', state: 'upload-failed',
+      seeds: ['registerTouchShell', 'qingxu-pair-seeds phone-gen-failed: POST upload-sessions 500'],
+      missingReason: null,
+      // 状态样式板配同类出错：二维码创建失败，不把手机端的 23.6MB 拒收冒充成一体机事实。
+      route: '/print/upload?source=document&tab=qr',
+      prepare: async (page, api) => {
+        registerTouchShell(api)
+        api.respond('POST', '/api/v1/upload-sessions', {
+          status: 500, json: { error: { code: 'UPLOAD_SESSION_FAILED', message: '二维码生成失败' } },
+        })
+        await page.goto('/print/upload?source=document&tab=qr')
+        await expect(page.getByRole('heading', { name: '二维码没出来，文件没传上来', exact: true })).toBeVisible()
+      },
     },
     {
       item: '状态样式板', screen: 'st-unavailable', state: 'resume-health', route: '/resume-service',
@@ -56,7 +65,7 @@ export function statePairs(): TouchPair[] {
     },
     {
       item: '状态样式板', screen: 'st-unconfirmed', state: 'print-job', route: '/print/done',
-      seeds: ['GET print/jobs PRINT_JOB_UNCONFIRMED', 'setReactRouterState'],
+      seeds: ['GET print/jobs PRINT_JOB_UNCONFIRMED', 'terminalReady + spaGo + W2_ORDER'],
       missingReason: null,
       prepare: async (page, api) => {
         registerTouchShell(api)
@@ -70,9 +79,10 @@ export function statePairs(): TouchPair[] {
             failureReasonForUser: '打印作业已提交到打印队列，但未确认完成',
           },
         })
-        await page.goto('/print/done')
-        await setReactRouterState(page, '/print/done', {
-          taskId: W2_ORDER.taskId,
+        await page.goto('/print-scan')
+        await terminalReady(page)
+        await spaGo(page, '/print/done', {
+          ...W2_ORDER,
           file: W2_FILE,
           params: W2_PRINT_PARAMS,
           source: 'document',
@@ -82,27 +92,9 @@ export function statePairs(): TouchPair[] {
     },
     {
       item: '状态样式板', screen: 'st-ai-down', state: 'resume-diagnosis', route: '/resume/report',
-      seeds: ['session current-ai-resume', 'GET record status failed failCode AI_PAUSED'],
+      seeds: ['resumeReading AI_QUOTA_EXHAUSTED', 'USB 原件', 'POST resume/parse 429 → diagnose-failed'],
       missingReason: null,
-      prepare: async (page, api) => {
-        registerTouchShell(api)
-        api.respond('GET', `/api/v1/resume/records/${diagnosis.taskId}`, {
-          status: 200,
-          json: {
-            taskId: diagnosis.taskId,
-            accessToken: diagnosis.accessToken,
-            status: 'failed',
-            failCode: 'AI_PAUSED',
-            failReason: 'AI 暂停，这次没有生成诊断',
-            providerName: 'llm',
-          },
-        })
-        await page.goto('/resume-service', { waitUntil: 'domcontentloaded' })
-        await see(page, 'text=你手上有简历吗？')
-        await writeSession(page, RESUME_KEY, { taskId: diagnosis.taskId, accessToken: diagnosis.accessToken })
-        await spaGo(page, '/resume/report')
-        await see(page, '[data-kiosk-screen="resume-report"]')
-      },
+      prepare: (page, api) => resumeReading(page, api, true, 'AI_QUOTA_EXHAUSTED'),
     },
   ]
 }

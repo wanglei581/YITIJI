@@ -1,5 +1,4 @@
 import type { Page, Route } from '@playwright/test'
-import type { ApiRouter } from '../../fixtures/api-router'
 import { registerTouchShell, see } from './touch-pair-shell'
 import type { TouchPair } from './touch-pair-types'
 
@@ -83,7 +82,8 @@ function probeResult() {
 }
 
 async function routePolicies(page: Page, guides: unknown[]): Promise<void> {
-  await page.route((url) => url.pathname === '/api/v1/policies' || /^\/api\/v1\/policies\/[^/]+$/.test(url.pathname), async (route: Route) => {
+  await page.route((url) => (url.pathname === '/api/v1/policies' || /^\/api\/v1\/policies\/[^/]+$/.test(url.pathname))
+    && !/\/eligibility-(questions|check)$/.test(url.pathname), async (route: Route) => {
     const requestUrl = new URL(route.request().url())
     const detail = requestUrl.pathname.match(/^\/api\/v1\/policies\/([^/]+)$/)
     if (detail && detail[1] !== 'eligibility-questions' && detail[1] !== 'eligibility-check') {
