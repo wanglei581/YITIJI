@@ -7,7 +7,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent } from 'react'
 import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { AI_QUOTA_EXHAUSTED_INTERVIEW_COPY, userMessageOf } from '../../services/api/userErrorMessage'
 import { useNavigate } from 'react-router-dom'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
@@ -26,6 +26,7 @@ import { interviewUserLine } from './interviewMicCopy'
 import {
   AiTaskRegion,
   useAiTask,
+  aiErrorCodeOf,
   aiErrorMessageOf,
   isAiOutage,
   type AiAvailability,
@@ -58,6 +59,12 @@ import './styles/interview-touch-setup.css'
 
 const INTERVIEWER_AI_DRAFT = '我正在选择面试官。请先问我想练什么，再解释各类面试官的侧重点，由我自己选择。'
 const SETUP_AI_DRAFT = '我想开始一场模拟面试。请先问我的目标岗位，再说明岗位、面试官和时长怎么选。不要替我创建练习。'
+
+/** 开场被每人每天的模拟面试次数拦住：页面知道自己是面试，不靠服务端是否带回 bucket。 */
+function interviewStartMessage(err: unknown): string {
+  if (aiErrorCodeOf(err) === 'AI_QUOTA_EXHAUSTED') return AI_QUOTA_EXHAUSTED_INTERVIEW_COPY
+  return aiErrorMessageOf(err, '创建练习失败，请稍后重试')
+}
 
 const INTERVIEWERS: Array<{ key: InterviewerType; label: string; desc: string; mark: string }> = [
   { key: 'hr', label: 'HR 面试', desc: '自我介绍 · 求职动机 · 稳定性 · 薪资沟通', mark: 'HR' },
@@ -263,7 +270,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         setOfferStartWithoutResume(false)
         if (resumeAiConsent.promptIfNeeded(err, Boolean(getToken()), () => { void continueWithResume(started, pos) })) return
       }
-      const message = aiErrorMessageOf(err, '创建练习失败，请稍后重试')
+      const message = interviewStartMessage(err)
       setError(message)
       setStartFailed(true)
       // 服务端 AI 闸门（暂停、额度）拦下的，小青这次也用不了：底栏问小青换停用态。
@@ -327,7 +334,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         return
       }
       if (resumeAiConsent.promptIfNeeded(err, Boolean(getToken()), () => { void continueWithResume(created, pos) })) return
-      const message = aiErrorMessageOf(err, '创建练习失败，请稍后重试')
+      const message = interviewStartMessage(err)
       setError(message)
       setStartFailed(true)
       setAssistantDown(isAiGateDown(err))
