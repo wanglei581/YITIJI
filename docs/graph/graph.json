@@ -14316,7 +14316,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 809,
+      "reachableFileCount": 810,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -17616,7 +17616,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 925
+      "sourceFileCount": 926
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -21999,6 +21999,9 @@
       "apps/kiosk/scripts/verify-file-display-truth.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/print/components/PrintProgressHelp.tsx": [
+      "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
     ],
     "apps/kiosk/src/pages/print/components/PrintProgressMissing.tsx": [
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
@@ -33386,6 +33389,7 @@
           "apps/kiosk/src/pages/print/components/PrintDoneSections.tsx",
           "apps/kiosk/src/pages/print/components/PrintFileDeletionRecords.tsx",
           "apps/kiosk/src/pages/print/components/PrintFileRetentionNotice.tsx",
+          "apps/kiosk/src/pages/print/components/PrintProgressHelp.tsx",
           "apps/kiosk/src/pages/print/components/PrintProgressMissing.tsx",
           "apps/kiosk/src/pages/print/components/printFileRetention.ts",
           "apps/kiosk/src/pages/print/printConfirmModel.ts",

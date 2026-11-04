@@ -165,8 +165,22 @@
 [data-qx-page='diagnosis'] .rrp-result h3 { margin: 0 0 4px; font-size: 22px; }
 [data-qx-page='diagnosis'] .rrp-result p { margin: 0; font-size: 20px; line-height: 1.4; }
 
+[data-qx-page='diagnosis'] .rrp-export-panel[data-exported='0'] {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 120px;
+  padding: 8px 12px;
+}
+[data-qx-page='diagnosis'] .rrp-export-panel[data-exported='0'] .rrp-export { display: flex; flex-wrap: wrap; gap: 10px; }
+[data-qx-page='diagnosis'] .rrp-export-panel[data-exported='0'] .rrp-export button { padding: 0 14px; }
+[data-qx-page='diagnosis'] .rrp-export-panel[data-exported='0'] :is(.rrp-export-reason, .rrp-export-error) { flex-basis: 100%; }
+
 /* 简历对照 / 自我探索 */
 [data-qx-page='diagnosis'] .qxt-links { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+[data-qx-page='diagnosis'] > .qxt-links { order: 6; }
+[data-qx-page='diagnosis'] > #resume-report-why { order: 7; }
 
 [data-qx-page='diagnosis'] .qxt-links button {
   min-height: 64px;
@@ -184,8 +198,11 @@
 [data-qx-page='st-ai-down'] .qxt-howto b { display: block; margin-bottom: 2px; font-size: 24px; }
 [data-qx-page='st-ai-down'] .qxt-sec { font-size: 26px; }
 [data-qx-page='st-ai-down'] .qxt-exit-col { gap: 8px; }
-/* 出路行可点区：整行是一个按钮，不低于 64px（稿 st-ai-down 的 exit 实际约 92px）。 */
-[data-qx-page='st-ai-down'] .qxt-exit-col .qxt-slab { min-height: 88px; }
+[data-qx-page='st-ai-down'] .rrp-exits { background: transparent; border: 0; padding: 0; border-radius: 0; }
+/* 出路行按内容定高，图标保留 96×72；整行可点区不低于 64px。 */
+[data-qx-page='st-ai-down'] .qxt-exit-col .qxt-slab { min-height: 88px; grid-template-columns: 190px minmax(0, 1fr); gap: 30px; padding: 10px 14px; }
+[data-qx-page='st-ai-down'] .qxt-exit-col .qxt-slab h3 { font-size: var(--qxt-fs-slab-row); }
+[data-qx-page='st-ai-down'] .qxt-exit-col .qxt-slab p { font-size: var(--qxt-fs-body); }
 [data-qx-page='st-ai-down'] .qxt-olist { padding: 12px 14px; gap: 4px; }
 [data-qx-page='st-ai-down'] .qxt-olist-t { font-size: 24px; }
 [data-qx-page='st-ai-down'] .qxt-check { min-height: 44px; align-items: center; padding: 0; font-size: 24px; }

@@ -572,7 +572,7 @@ export function PrintCashierPage() {
           <FilePlus2Icon aria-hidden="true" />改参数需重新下单
         </button>
       ) : null}
-      {isOpenUnpaidOrder ? (
+      {isOpenUnpaidOrder || qxState === 'expired' ? (
         <button
           type="button"
           className="qx-btn"
