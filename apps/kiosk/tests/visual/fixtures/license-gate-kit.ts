@@ -14,9 +14,12 @@ export const MINUTE = 60_000
 export const NO_NEW_TASK = '本机暂不开始新的办理'
 /** support-contact 默认应答里的公示号码与服务时间（ApiRouter 默认）。 */
 export const PHONE_SENTENCE = '拨打服务电话 18369161921（工作日 9:00–18:00）'
-/** 首页入口：四张大卡 + 'gov' 配置下的四块磁贴（到机取件、本机构官方渠道、帮助、智慧校园；百宝箱要有已上架的扩展服务才摆）。 */
+/**
+ * 首页入口：四张大卡 + 'gov' 配置下的三块磁贴（到机取件、本机构官方渠道、帮助）。
+ * gov 仍把百宝箱与智慧校园配成开，但 2026-11-04 停放后（#1583）首页不摆这两块。
+ */
 export const HOME_TASKS = ['resume-hub', 'interview-hub', 'print-hub', 'policy-hub'] as const
-export const HOME_TILES = ['pickup-claim', 'official-channels', 'help', 'smart-campus'] as const
+export const HOME_TILES = ['pickup-claim', 'official-channels', 'help'] as const
 
 /** 一张宣传图（秋季招聘会海报）：能真正解码，作待机屏播放的阳性对照。 */
 const AD_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1280" viewBox="0 0 960 1280">'

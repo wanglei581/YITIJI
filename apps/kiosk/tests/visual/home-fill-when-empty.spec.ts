@@ -6,8 +6,9 @@
  * 稿里「已登录」一态永远画着那一条。运行页读到没有可继续的办理、或交接保护把它收起时，让出来的高度没人补，
  * 底部导航上面空出 130–160px。
  *
- * 正式构建 1080×1920，量「最后一块内容的底边到底部导航顶边」的距离，首页五种配置（第三行磁贴 2 / 3 / 4 / 5 / 6 块，
- * ≥ 4 块进压紧版式）：
+ * 正式构建 1080×1920，量「最后一块内容的底边到底部导航顶边」的距离，首页五种配置（第三行磁贴 2 / 3 / 4 / 3 / 4 块，
+ * ≥ 4 块进压紧版式）。2026-11-04 停放后 gov 与 channels 同为 3 块、full 与 hosting 同为 4 块：
+ * 百宝箱与智慧校园即使配成开也不占磁贴。
  *   · 已登录、名下没有可继续的办理：留白 ≤ 105px，且内容不压到导航、不溢出；照同屏未登录态排——大卡不比未登录态（340px）
  *     更高，磁贴少的配置段间距回到 16px；
  *   · 带面板的人，空档过 30 秒面板收起之后：同上；收起前（带面板）也在 0–105px 内，是对照；
@@ -26,9 +27,10 @@ const VARIANTS: HomeVariant[] = ['default', 'channels', 'hosting', 'gov', 'full'
 /**
  * 每种配置首页第三行最终有几块磁贴。磁贴数来自终端配置与官方渠道两个异步读取，量版面之前要先等它到齐：
  * 本组走查配置了 reducedMotion，`data-qx-intro=done` 在挂载那一刻就成立，不代表数据已到。
- * gov 的百宝箱 items 为空，不算上架，所以只有 4 块，恰在压紧门槛上，少任何一个读取都会退回 16px。
+ * gov / full 把百宝箱与智慧校园配成开，2026-11-04 停放后都不占磁贴：gov 与 channels 同为 3 块，
+ * full 与 hosting 同为 4 块，恰在压紧门槛上，少任何一个读取都会退回 16px。
  */
-const EXPECTED_TILES: Record<HomeVariant, number> = { default: 2, channels: 3, hosting: 4, gov: 4, full: 5 }
+const EXPECTED_TILES: Record<HomeVariant, number> = { default: 2, channels: 3, hosting: 4, gov: 3, full: 4 }
 
 /** 一体机设计稿里的版心宽度；页面缩放时按它折算。 */
 const DESIGN_WIDTH = 1080
@@ -89,7 +91,8 @@ async function expectFilledLikeSignedOut(page: Page, label: string, variant: Hom
   await expect(page.locator('.qxt-home-tiles')).toHaveAttribute('data-count', String(EXPECTED_TILES[variant]))
   const layout = await expectFilled(page, label)
   expect(layout.cardHeight, `${label}：大卡 ${layout.cardHeight.toFixed(1)}px，不得比未登录态（${SIGNED_OUT_CARD_PX}px）更高`).toBeLessThanOrEqual(SIGNED_OUT_CARD_PX + 0.5)
-  if (variant === 'default' || variant === 'channels') {
+  // gov 把两项配成开，停放后不占磁贴，版式与 channels 相同，不进压紧。
+  if (variant === 'default' || variant === 'channels' || variant === 'gov') {
     expect(layout.sectionGap, `${label}：段间距要回到未登录态的 ${SIGNED_OUT_SECTION_GAP_PX}px`).toBeCloseTo(SIGNED_OUT_SECTION_GAP_PX, 0)
   } else {
     expect(layout.sectionGap, `${label}：压紧版式的段间距不动，仍是 ${COMPACT_SECTION_GAP_PX}px`).toBeCloseTo(COMPACT_SECTION_GAP_PX, 0)
@@ -118,7 +121,7 @@ for (const variant of VARIANTS) {
     await loginThroughVisibleUi(page, '/', WANG.phone)
     await expect(page.locator('section.continue')).toBeVisible()
     const withPanel = await expectFilled(page, `带「继续办理」面板（${variant}）`)
-    if (variant === 'default' || variant === 'channels') {
+    if (variant === 'default' || variant === 'channels' || variant === 'gov') {
       expect(withPanel.cardHeight, `带面板时大卡仍给面板让位，不超过 ${WITH_PANEL_CARD_PX}px（${variant}）`).toBeLessThanOrEqual(WITH_PANEL_CARD_PX + 0.5)
     }
 

@@ -24,7 +24,8 @@ const W5_ROUTES = [
   '/me/resumes', '/me/print-orders', '/me/documents', '/me/favorites',
   '/me/ai-records', '/me/benefits', '/me/activity', '/me/activity/:id',
   '/me/notifications', '/me/feedback', '/me/settings', '/me/privacy-requests', '/help',
-  '/activities', '/activities/:id', '/toolbox',   '/notifications',
+  // 2026-11-04 产品负责人定停放：/toolbox 收成跳回首页的 splat。
+  '/activities', '/activities/:id', '/toolbox/*', '/notifications',
 ]
 const SELF_ASSESSMENT_V1_ROUTES = [
   '/resume/self-assessment/intro',

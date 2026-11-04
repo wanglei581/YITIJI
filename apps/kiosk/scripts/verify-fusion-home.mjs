@@ -48,14 +48,16 @@ check(
     home.includes('device.printerReady'),
   '设备状态来自共享运行时真值'
 )
+// 2026-11-04 产品负责人定停放：首页不读两项配置；旧动作原地返回。
 check(
-  home.includes('useToolboxCapabilityState()') && home.includes('useSmartCampusCapabilityState()'),
-  '首页读取百宝箱与智慧校园已验证能力状态'
+  !home.includes('useToolboxCapabilityState()') && !home.includes('useSmartCampusCapabilityState()'),
+  '首页不读取百宝箱与智慧校园能力状态（停放）'
 )
 check(
-  home.includes("campus.status === 'ready' && campus.enabled") &&
-    home.includes("toolbox.status === 'ready' && toolbox.enabled"),
-  '未知、加载中或关闭能力点击均 fail-closed'
+  home.includes("actionId === 'smart-campus' || actionId === 'toolbox'") &&
+    !home.includes("campus.status === 'ready' && campus.enabled") &&
+    !home.includes("toolbox.status === 'ready' && toolbox.enabled"),
+  '首页不读两项配置，旧动作原地返回（停放）'
 )
 check(home.includes("navigate('/login', { state: { from: '/' } })"), '登录入口保留安全返回路径')
 check(
@@ -200,9 +202,12 @@ check(
   ['print-hub', 'resume-hub', 'interview-hub', 'jobs-hub'].every((id) => view.includes(`actionId="${id}"`)),
   '青序主服务卡完整映射到真实 action'
 )
+// 2026-11-04 产品负责人定停放：查政策仍在，百宝箱与智慧校园不摆。
 check(
-  ['policy-hub', 'toolbox', 'smart-campus'].every((id) => view.includes(`actionId="${id}"`)),
-  '青序次级服务卡完整映射到真实 action'
+  view.includes('actionId="policy-hub"') &&
+    !view.includes('actionId="toolbox"') &&
+    !view.includes('actionId="smart-campus"'),
+  '青序次级服务卡保留查政策，百宝箱与智慧校园停放不摆入口'
 )
 check(
   view.includes('take="查看政策说明"') && !view.includes('带走：材料清单'),
@@ -212,15 +217,13 @@ check(
   !view.includes('.filter((tile)') && !view.includes('visibleTiles'),
   '主服务卡不靠 visibleTiles 过滤丢入口'
 )
-// 2026-09-28 稿 01：未开通的百宝箱 / 智慧校园不占首页（开通才显示）。
-// 断言从「关闭时仍可见并写原因」改成「确认开通才渲染，未开通不渲染成死按钮」；条数不减。
+// 2026-11-04 产品负责人定停放：任何终端配置下首页都不摆这两块。
 check(
-  view.includes('campusReady ?') && view.includes('actionId="smart-campus"'),
-  '智慧校园确认开通后才渲染，并仍映射真实 action'
-)
-check(
-  view.includes('toolboxReady ?') && view.includes('actionId="toolbox"'),
-  '百宝箱确认开通后才渲染，并仍映射真实 action'
+  viewOnly.includes("toolbox: 'parked'") &&
+    viewOnly.includes("campus: 'parked'") &&
+    !view.includes('campusReady ?') &&
+    !view.includes('toolboxReady ?'),
+  '首页数据属性固定为 parked，不按开通状态渲染两块'
 )
 check(
   view.includes('aria-describedby='),

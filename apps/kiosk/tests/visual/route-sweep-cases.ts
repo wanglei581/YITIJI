@@ -20,7 +20,6 @@ const PARAM_SAMPLES = {
   '/k/l/:ticketId': '/k/l/sweep-not-a-kiosk-ticket',
   '/me/activity/:id': '/me/activity/sweep-record',
   '/activities/:id': '/activities/activity-001',
-  '/smart-campus/service/:key': '/smart-campus/service/campus-card',
   '/print-scan/feature/:key': '/print-scan/feature/id-photo',
   '/jobs/:id': '/jobs/job-001',
   '/jobs/:id/offline': '/jobs/offline-job-001/offline',
@@ -63,7 +62,15 @@ export function paramSampleKeys(): string[] {
   return Object.keys(PARAM_SAMPLES)
 }
 
+// 2026-11-04 产品负责人定停放：splat 不进参数样本表（表只覆盖含 `:` 的模式）。
+// 扫描打开旧链接本身，落地仍由 compatibilityRedirects 记成首页。
+const PARKED_SPLAT_URLS = {
+  '/toolbox/*': '/toolbox',
+  '/smart-campus/*': '/smart-campus',
+} as const satisfies Partial<Record<ProductionRoutePattern, `/${string}`>>
+
 export function resolveSweepUrl(pattern: ProductionRoutePattern): string {
+  if (pattern in PARKED_SPLAT_URLS) return PARKED_SPLAT_URLS[pattern]
   if (!pattern.includes(':')) return pattern
   const sample = PARAM_SAMPLES[pattern as keyof typeof PARAM_SAMPLES]
   if (!sample) {

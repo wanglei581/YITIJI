@@ -198,10 +198,16 @@ function runStaticChecks(): void {
     ],
     'E3. Kiosk 百宝箱只走统一终端配置，畸形/失败一律 fail-closed，且乱序响应不能覆盖',
   )
-  contains(
-    '../../apps/kiosk/src/pages/home/HomePage.tsx',
-    ['toolbox.enabled'],
-    'E3a. Kiosk 首页百宝箱入口仅由 toolbox.enabled 控制显隐',
+  // 2026-11-04 产品负责人定停放：一体机首页不读百宝箱配置、不摆入口。
+  notContainsSource(
+    read('../../apps/kiosk/src/pages/home/HomePage.tsx'),
+    ['useToolboxCapabilityState', 'toolbox.enabled', 'actionId="toolbox"'],
+    'E3a. 一体机首页不读百宝箱配置、不摆入口（停放）',
+  )
+  notContainsSource(
+    read('../../apps/kiosk/src/pages/home/components/HomeTouchView.tsx'),
+    ['useToolboxCapabilityState', 'toolbox.enabled', 'actionId="toolbox"'],
+    'E3a. 一体机首页不摆百宝箱入口（停放）',
   )
   contains(
     '../../apps/kiosk/src/pages/toolbox/ToolboxZonePage.tsx',
