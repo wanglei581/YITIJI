@@ -27,7 +27,8 @@ async function openSetup(page: import('@playwright/test').Page, api: import('../
   await terminalReady(page)
   await see(page, '[data-setup-step="1"]')
   if (step === 1) return
-  await page.getByRole('button', { name: '选择行业 (20)', exact: true }).click()
+  // 按钮可及名是「选择行业 (20) 尚未选择」，照 fusion-w3 用包含匹配。
+  await page.getByRole('button', { name: '选择行业 (20)' }).click()
   const dialog = page.getByRole('dialog', { name: '选择面试行业' })
   await dialog.getByRole('button', { name: '制造业', exact: true }).click()
   await dialog.getByRole('button', { name: '完成', exact: true }).click()

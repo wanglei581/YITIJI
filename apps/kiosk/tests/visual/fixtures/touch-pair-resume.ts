@@ -90,7 +90,7 @@ export function resumePairs(): TouchPair[] {
       prepare: async (page, api) => {
         resumeShell(api)
         await page.goto('/resume/source')
-        await see(page, '.resume-source-phone-session svg')
+        await see(page, '.resume-source-phone-session svg[role="img"]')
         await expect(page.locator('body')).not.toContainText('网络连接失败')
       },
     },
@@ -102,7 +102,7 @@ export function resumePairs(): TouchPair[] {
       prepare: async (page, api) => {
         resumeShell(api)
         await loginTo(page, api, '/resume/source')
-        await see(page, '.resume-source-phone-session svg')
+        await see(page, '.resume-source-phone-session svg[role="img"]')
         await expect(page.locator('body')).not.toContainText('网络连接失败')
       },
     },
@@ -115,7 +115,7 @@ export function resumePairs(): TouchPair[] {
         resumeShell(api)
         await page.goto('/resume/source')
         await page.getByRole('button', { name: /在手机里/ }).click()
-        await see(page, '.resume-source-phone-session svg')
+        await see(page, '.resume-source-phone-session svg[role="img"]')
         await see(page, 'text=请用手机微信或浏览器扫码')
       },
     },

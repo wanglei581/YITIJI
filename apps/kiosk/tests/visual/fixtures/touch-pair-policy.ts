@@ -1,4 +1,4 @@
-import type { Page, Route } from '@playwright/test'
+import { expect, type Page, type Route } from '@playwright/test'
 import { registerTouchShell, see } from './touch-pair-shell'
 import type { TouchPair } from './touch-pair-types'
 
@@ -147,7 +147,13 @@ export function policyPairs(): TouchPair[] {
         registerTouchShell(api)
         await routePolicies(page, [policyItem()])
         await page.goto('/renshi?tab=policy')
-        await page.getByText(TITLE, { exact: true }).click()
+        // 政策库第一条默认自动展开（PolicyPanel：自动展开不算「本人点开」）。直接点标题会把它收起。
+        // 先收起再点开，才是稿上画的本人点开详情态，问小青问句也随之切换。
+        const main = page.locator('[data-policy-section="library"] .rq-item-main').filter({ hasText: TITLE })
+        await see(page, `text=${TITLE}`)
+        if ((await main.getAttribute('aria-expanded')) === 'true') await main.click()
+        await main.click()
+        await expect(main).toHaveAttribute('aria-expanded', 'true')
         await see(page, 'text=申领方式')
       },
     },

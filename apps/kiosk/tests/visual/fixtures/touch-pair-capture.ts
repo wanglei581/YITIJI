@@ -123,10 +123,11 @@ async function dumpText(page: Page, rootSelector: string | null): Promise<string
 
 async function runtimeMetrics(page: Page): Promise<Omit<RuntimeMetrics, 'blankBandPx' | 'blankAtY'>> {
   return page.evaluate(() => {
+    // 只给读屏的视觉隐藏文字（sr-only：1×1 像素、clip 裁掉）不算屏上可见，不计入最小字号和可点数。
     const visible = (node: Element) => {
       const el = node as HTMLElement
       const rect = el.getBoundingClientRect()
-      return rect.width > 0 && rect.height > 0 && !el.closest('[hidden]')
+      return rect.width > 1 && rect.height > 1 && !el.closest('[hidden]')
     }
     const taps = [...document.querySelectorAll('button, a, [role="button"], input')].filter(visible).length
     let minFontPx: number | null = null

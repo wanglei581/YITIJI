@@ -17,7 +17,14 @@ async function openUpload(page: Page, api: ApiRouter, path: string): Promise<voi
 }
 
 /** 材料检查三步都当场完成、隐私扫描 0 命中。页面自己发 POST，不能靠交接里的旧结论冒充。 */
-async function stubZeroFindingChecks(page: Page): Promise<void> {
+// 稿 pii 默认画的是「有 2 处要你拿主意」：第 1 页身份证号、第 2 页手机号，都还没决定。
+// 字段形状照 services/api/materials.ts 的 PiiFindingView；运行页读 piiFindings。
+const PII_FINDINGS = [
+  { id: 'pair-finding-idcard', taskId: 'pair-pii_scan', type: 'id_card', label: '身份证号', pageNumber: 1, snippet: '370202********2316', confidence: 0.93, action: 'pending', createdAt: '2026-07-24T00:00:00.000Z' },
+  { id: 'pair-finding-phone', taskId: 'pair-pii_scan', type: 'phone', label: '手机号', pageNumber: 2, snippet: '138****5621', confidence: 0.91, action: 'pending', createdAt: '2026-07-24T00:00:00.000Z' },
+]
+
+async function stubMaterialChecks(page: Page, piiFindings: unknown[] = []): Promise<void> {
   const now = '2026-07-24T00:00:00.000Z'
   const expiresAt = '2026-07-25T00:00:00.000Z'
   const allowed = new Set(['inspection', 'normalize_a4', 'pii_scan'])
@@ -64,7 +71,7 @@ async function stubZeroFindingChecks(page: Page): Promise<void> {
           expiresAt,
           createdAt: now,
           updatedAt: now,
-          ...(kind === 'pii_scan' ? { piiFindings: [] } : {}),
+          ...(kind === 'pii_scan' ? { piiFindings } : {}),
         },
       }),
     })
@@ -151,14 +158,19 @@ function stubPhoneQr(api: ApiRouter): void {
 }
 
 /** print-fulfill-qx 的 flowState；先等正式构建换票，再软跳，避免旧 seedPrintFlow 与清场竞争。 */
-async function openPrintTask(page: Page, api: ApiRouter, status: 'printing' | 'completed'): Promise<void> {
-  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
-    status: 200,
-    json: { taskId: W2_ORDER.taskId, status, ...(status === 'printing' ? { progressPercent: 42 } : { completedAt: '2026-07-26T00:00:00.000Z' }) },
-  })
+async function openPrintTask(page: Page, api: ApiRouter, status: 'confirming' | 'printing' | 'completed'): Promise<void> {
+  if (status === 'confirming') {
+    // 稿 printing 默认态是「正在确认任务状态」：还没拿到终端处理状态。状态请求挂着不回，停在这一态。
+    api.respondWith('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, () => new Promise(() => undefined))
+  } else {
+    api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+      status: 200,
+      json: { taskId: W2_ORDER.taskId, status, ...(status === 'printing' ? { progressPercent: 42 } : { completedAt: '2026-07-26T00:00:00.000Z' }) },
+    })
+  }
   await page.goto('/print-scan')
   await terminalReady(page)
-  await spaGo(page, status === 'printing' ? '/print/progress' : '/print/done', {
+  await spaGo(page, status === 'completed' ? '/print/done' : '/print/progress', {
     ...W2_ORDER, file: W2_FILE, params: W2_PRINT_PARAMS, source: 'document',
   })
 }
@@ -241,19 +253,21 @@ export function printPairs(): TouchPair[] {
       },
     },
     {
-      item: '打印', screen: 'pii', state: 'no-findings', route: '/print/desk?step=check',
-      seeds: ['stubZeroFindingChecks', 'writePrintHandoff', 'spaGo'],
+      item: '打印', screen: 'pii', state: 'flagged', route: '/print/desk?step=check',
+      seeds: ['stubMaterialChecks 2 处命中（身份证号、手机号，都未决定）', 'writePrintHandoff', 'spaGo'],
       missingReason: null,
       prepare: async (page, api) => {
-        // 先换票，再写入还没检查过的文件，软跳进检查。检查页自己打三步接口，0 命中才是这一屏。
+        // 先换票，再写入还没检查过的文件，软跳进检查。检查页自己打三步接口；稿画的是 2 处待决定。
         shell(api)
-        await stubZeroFindingChecks(page)
+        await stubMaterialChecks(page, PII_FINDINGS)
         await page.goto('/print-scan')
         await see(page, '[data-testid="print-hub-state-default"]')
         await terminalReady(page)
         await writePrintHandoff(page, { contextId: 'p1-evidence-000000001', materialCheck: null })
         await spaGo(page, '/print/desk?step=check', { printContextId: 'p1-evidence-000000001' })
-        await see(page, 'text=没有待决定的片段')
+        // 运行页按类型重新打码（maskSnippet），只认两行页码，不认打码后的字。
+        await see(page, 'text=第 1 页 ·')
+        await see(page, 'text=第 2 页 ·')
       },
     },
     {
@@ -304,12 +318,13 @@ export function printPairs(): TouchPair[] {
     },
     {
       item: '打印', screen: 'printing', state: 'default', route: '/print/progress',
-      seeds: ['openPrintTask printing', 'GET print/jobs printing'],
+      seeds: ['openPrintTask confirming', 'GET print/jobs 挂起（还没拿到终端状态）'],
       missingReason: null,
       prepare: async (page, api) => {
         shell(api)
-        await openPrintTask(page, api, 'printing')
-        await see(page, '[data-testid="print-fulfill-state-printing"], [data-w2-page="print-progress"]')
+        await openPrintTask(page, api, 'confirming')
+        await see(page, '[data-w2-page="print-progress"]')
+        await see(page, 'text=正在确认任务状态')
       },
     },
     {

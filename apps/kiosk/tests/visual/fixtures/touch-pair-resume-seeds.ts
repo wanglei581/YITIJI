@@ -8,7 +8,8 @@ import { registerTouchShell, see, terminalReady } from './touch-pair-shell'
 // 应答与可见操作来源：fusion-w3.spec.ts「USB resume keeps its purpose」及手机确认用例。
 export function stubResumePhone(api: ApiRouter): void {
   const sessionId = 'w118-resume-upload'
-  const expiresAt = '2099-01-01T00:00:00.000Z'
+  // 屏上倒计时按有效期算；写 2099 年会显示成几千万分钟。照现场二维码 10 分钟有效。
+  const expiresAt = new Date(Date.now() + 10 * 60_000).toISOString()
   api.respond('POST', '/api/v1/upload-sessions', { status: 201, json: { success: true, data: {
     sessionId, uploadUrl: '/upload/phone', uploadToken: 'w118-upload', controlToken: 'w118-control', expiresAt,
   } } })
@@ -54,13 +55,16 @@ export async function stubResumeUsb(page: Page): Promise<void> {
     if (request.method() === 'GET' && pathname.endsWith('/status')) {
       data = { present: true, driveLabel: 'TEST-USB' }
     } else if (request.method() === 'GET' && pathname.endsWith('/files')) {
+      // 稿上 U 盘根目录是 3 个文件；只放 1 个会让列表撑不满、量出的空白偏大。只有第一份会被导入。
       data = { present: true, driveLabel: 'TEST-USB', files: [
-        { safeId: 'usb-safe-resume', filename: 'U盘简历.pdf', extension: '.pdf', sizeBytes: 2048 },
+        { safeId: 'usb-safe-resume', filename: 'U盘简历.pdf', extension: '.pdf', sizeBytes: 293_000 },
+        { safeId: 'usb-safe-intern', filename: '实习证明-盖章版.pdf', extension: '.pdf', sizeBytes: 1_258_000 },
+        { safeId: 'usb-safe-photo', filename: '蓝底证件照.jpg', extension: '.jpg', sizeBytes: 430_000 },
       ] }
     } else if (request.method() === 'POST' && pathname.endsWith('/upload')) {
       expect(request.postDataJSON()).toEqual({ safeId: 'usb-safe-resume', purpose: 'resume_upload' })
       data = {
-        fileId: 'file-usb-resume', filename: 'U盘简历.pdf', sizeBytes: 2048,
+        fileId: 'file-usb-resume', filename: 'U盘简历.pdf', sizeBytes: 293_000,
         mimeType: 'application/pdf', sha256: 'c'.repeat(64), fileUrl: '/w3-fixtures/usb-resume.pdf',
         fileUrlExpiresAt: new Date(Date.now() + 300_000).toISOString(),
       }
@@ -89,7 +93,8 @@ export async function resumeDirection(page: Page, api: ApiRouter, more = false):
   await see(page, '[data-resume-step="direction"]')
   if (more) {
     await page.getByRole('button', { name: /^定向诊断/ }).click()
-    await page.getByRole('button', { name: '更多条件（可不填）', exact: true }).click()
+    // 按钮全名是「更多条件（可不填）：经历、场景、专业、学历」，照 fusion-w3 用包含匹配。
+    await page.getByRole('button', { name: '更多条件（可不填）' }).click()
     await see(page, '[data-resume-step="more"]')
   }
 }
@@ -108,7 +113,8 @@ export async function resumeReading(page: Page, api: ApiRouter, down = false, fa
   await startResumeDiagnosis(page)
   if (down) {
     await page.waitForURL('**/resume/report')
-    await expect(page.getByText('这次没诊断出来', { exact: true })).toBeVisible()
+    // 标题和摘要里各有一处「这次没诊断出来」，认标题。
+    await expect(page.getByRole('heading', { name: '这次没诊断出来', exact: true })).toBeVisible()
     await expect(page.locator('[data-qxt-ask="off"]')).toBeVisible()
     await expect(page.getByRole('button', { name: '打印我上传的原件', exact: true })).toBeEnabled()
   } else {

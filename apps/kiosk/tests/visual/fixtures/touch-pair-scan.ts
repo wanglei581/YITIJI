@@ -63,7 +63,7 @@ async function openScanLive(page: import('@playwright/test').Page, api: import('
   await writeScanWorkbenchSession(page, {
     stage, scanType: 'resume', live: {
       scanTaskId, controlToken: 'w2-scan-control',
-      instructions: ['放好原件', '在打印机面板开始扫描'], expiresAt: '2099-01-01T00:00:00.000Z',
+      instructions: ['放好原件', '在打印机面板开始扫描'], expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
     },
   })
   await spaGo(page, `/scan?stage=${stage}`)

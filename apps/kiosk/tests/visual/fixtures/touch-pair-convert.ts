@@ -14,7 +14,8 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
  */
 async function addPhoneImage(page: Page, api: ApiRouter): Promise<void> {
   const sessionId = 'pair-convert-phone'
-  const expiresAt = '2099-01-01T00:00:00.000Z'
+  // 屏上倒计时按有效期算；写 2099 年会显示成几千万分钟。照现场二维码 10 分钟有效。
+  const expiresAt = new Date(Date.now() + 10 * 60_000).toISOString()
   const file = {
     fileId: 'w2-image-001', filename: 'w2-image.png', sizeBytes: 1024,
     mimeType: 'image/png', sha256: 'c'.repeat(64), fileExpiresAt: expiresAt,

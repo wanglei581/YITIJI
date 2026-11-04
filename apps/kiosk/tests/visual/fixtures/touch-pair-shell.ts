@@ -177,6 +177,11 @@ export async function openCashier(page: Page, api: ApiRouter, kind: 'pending-qr'
         expiresAt: later,
       }
   api.respond('GET', '/api/v1/payment/channels', { status: 200, json: { channels: ['wechat'] } })
+  // 付款链路先对账再决定能否放行，应答照 cashier-qx.spec.ts。
+  api.respond('POST', `/api/v1/orders/${W2_ORDER.orderId}/pay/reconcile`, {
+    status: 200,
+    json: { success: true, data: { status: 'pending' } },
+  })
   api.respond('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, {
     status: 200,
     json: {
