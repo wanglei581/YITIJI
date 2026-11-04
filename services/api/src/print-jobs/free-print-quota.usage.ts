@@ -149,7 +149,8 @@ async function loadUsageTasks(
   }
   const inFlight = {
     status: { in: [...FREE_PRINT_IN_FLIGHT_STATUSES] },
-    createdAt: window,
+    // 续打和状态变更会刷新 updatedAt；长期无更新的旧任务不再永久占用额度。
+    OR: [{ createdAt: window }, { updatedAt: window }],
   }
   // 余量与预判都按本机过滤。反向变异：去掉 terminalId，别的机器的用量会算进这台。
   const scope = endUserId

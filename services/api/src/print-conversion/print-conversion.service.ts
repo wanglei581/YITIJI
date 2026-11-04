@@ -152,9 +152,11 @@ export class PrintConversionService {
     }
 
     // completed：重新签发 URL，不重复生成。
+    const output = await this.prisma.fileObject.findUnique({ where: { id: state.fileId! }, select: { filename: true } })
     const printSigned = signFileUrl(state.fileId!, OUTPUT_URL_TTL_MS)
     return {
       fileId: state.fileId!,
+      filename: output?.filename,
       printFileUrl: printSigned.url,
       fileMd5: state.fileMd5!,
       sizeBytes: state.sizeBytes!,
@@ -293,6 +295,7 @@ export class PrintConversionService {
 
     return {
       fileId: uploaded.fileId,
+      filename: uploaded.filename,
       printFileUrl: printSigned.url,
       fileMd5: uploaded.sha256,
       sizeBytes: uploaded.sizeBytes,

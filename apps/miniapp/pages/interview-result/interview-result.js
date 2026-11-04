@@ -31,6 +31,7 @@ Page({
     sessionId:        '',
     accessToken:      '',
     failMsg:          '',
+    failKind:         '', // read | generate
     // done 态
     position:         '',
     interviewerLabel: '',
@@ -59,11 +60,20 @@ Page({
   },
   async _load() {
     const { sessionId, accessToken } = this.data
+    this.setData({ phase: 'loading', failMsg: '', failKind: '' })
     // 先尝试读已生成的报告（回访场景，秒回，避免重复调用 end）
     try {
       const dto = await api.getInterviewReport(sessionId, accessToken)
       if (dto && dto.endedAt && dto.report) { this._render(dto); return }
-    } catch (_) { /* 未结束或 404，继续调用 end 生成 */ }
+      this._fail('复盘读取失败：报告内容不完整，请再试一次', 'read')
+      return
+    } catch (err) {
+      // 只有服务端明确表示尚无报告时才生成；断网和服务错误不能当成「没有报告」。
+      if (!['INTERVIEW_REPORT_NOT_FOUND', 'INTERVIEW_REPORT_NOT_READY'].includes(err && err.code)) {
+        this._fail(`复盘读取失败：${plainAiMessageOf(err, '请稍后再试')}`, 'read')
+        return
+      }
+    }
     // 首次结束：生成报告（约 27 秒）
     try {
       const saved = storage.get(storage.KEYS.INTERVIEW_SESSION) || {}
@@ -73,8 +83,8 @@ Page({
       this._render(dto)
     } catch (err) {
       const code = (err && err.code) || ''
-      if (code === 'INTERVIEW_SESSION_NOT_FOUND') this._fail('面试会话不存在或无权访问')
-      else this._fail(plainAiMessageOf(err, 'AI 报告生成失败，请稍后重试'))
+      if (code === 'INTERVIEW_SESSION_NOT_FOUND') this._fail('面试会话不存在或无权访问', 'generate')
+      else this._fail(`复盘生成失败：${plainAiMessageOf(err, '请稍后再试')}`, 'generate')
     }
   },
   _render(dto) {
@@ -96,7 +106,8 @@ Page({
       omitPrintNote:      dto.includeAnswersInPrint === false,
     })
   },
-  _fail(failMsg) { this.setData({ phase: 'failed', failMsg }) },
+  _fail(failMsg, failKind) { this.setData({ phase: 'failed', failMsg, failKind }) },
+  retryReport() { if (this.data.sessionId) this._load() },
   goBack() { wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } }) },
   async tapPrint() {
     if (this.data.printing) return

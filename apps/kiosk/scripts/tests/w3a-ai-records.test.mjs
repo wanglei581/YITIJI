@@ -176,6 +176,14 @@ test('resume failure reasons preserve user messages and shared rate-limit copy v
   })
   const error = Object.assign(new ApiHttpError('今日次数已用完'), { code: 'AI_PUBLIC_QUOTA_EXCEEDED', status: 429 })
   assert.equal(resumeUserReason(userMessageOf(error, fallback), fallback), '今天的 AI 次数用完了，明天恢复；可以先打印原件。')
+  // 每人每天封顶同样是 429。没登记就会落到「当前使用的人较多」。
+  const perPerson = Object.assign(new ApiHttpError('今天的 AI 次数用完了，明天 0 点恢复'), { code: 'AI_QUOTA_EXHAUSTED', status: 429 })
+  const perPersonLine = userMessageOf(perPerson, fallback)
+  assert.notEqual(perPersonLine, '当前使用的人较多，请稍后再试')
+  assert.match(perPersonLine, /明天 0 点恢复/)
+  assert.equal(resumeUserReason(perPersonLine, fallback), perPersonLine)
+  const resumeBucket = Object.assign(new ApiHttpError('x'), { code: 'AI_QUOTA_EXHAUSTED', status: 429, bucket: 'ai_resume' })
+  assert.match(userMessageOf(resumeBucket, fallback), /简历类/)
 })
 
 test('resume failure reasons fall back exactly for empty, technical or injected text', () => {

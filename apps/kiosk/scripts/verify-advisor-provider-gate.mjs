@@ -89,11 +89,17 @@ must('page', /mode: 'manual'/, 'P25 的降级必须是 manual —— 用户的�
 must('page', /manualPath:/, 'manual 降级必须给出具体的手动路径')
 // 触屏稿：本轮失败 / 不是 AI 回复 / AI 暂停三种版式，正文都落在「这些都不需要 AI · 现在就能做」的四个手动入口上。
 must('page', /\(body === 'notai' \|\| body === 'error' \|\| body === 'locked'\) && \([\s\S]{0,800}?<AdvisorManualEntries \/>/, '降级时必须给出可点的真实入口，而不只是一句安慰话')
-// 稿 xq ai-down 通知条的原话：先说小青没接上，再说下面这些事不用问也能办（改版时被丢过一次，写成「页头说明」的说法并不成立）。
+// 稿 xq ai-down 通知条的原话：普通停用仍说小青没接上。
+// 每人每天次数用完是另一支：通知条改说明天 0 点恢复，不把封顶说成「这会儿没接上」。
 must(
   'page',
-  /body === 'locked' \? \([\s\S]{0,120}?<QxTouchCallout kind="howto" icon="alert">小青这会儿没有接上。下面这些事不用问也能办。<\/QxTouchCallout>/,
-  'AI 暂停时通知条必须是稿上的原话：小青这会儿没有接上。下面这些事不用问也能办。',
+  /body === 'locked' \? \([\s\S]{0,500}?quotaLocked[\s\S]{0,200}?: '小青这会儿没有接上。下面这些事不用问也能办。'/,
+  'AI 暂停（非次数用完）时通知条必须仍是稿上的原话：小青这会儿没有接上。下面这些事不用问也能办。',
+)
+must(
+  'page',
+  /quotaLocked[\s\S]{0,160}?AI_QUOTA_EXHAUSTED_ASSISTANT_COPY/,
+  '小青次数用完时通知条必须改用明天 0 点恢复的句子，不能沿用「这会儿没有接上」',
 )
 // 降级卡里的动作（去打印扫描）旧样式给 56，触屏稿要求可点区不小于 64×64；只在问小青页作用域里抬，ai/ 共享件的默认不动。
 must('touchCss', /\[data-qx-page='assistant'\] \.kassist \.assistant-ai-status \.kiosk-ai-fallback__action \{ min-height: 64px; min-width: 64px; \}/, '降级卡动作的可点区不小于 64×64')

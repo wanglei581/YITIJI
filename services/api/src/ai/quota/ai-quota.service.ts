@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import type { AiQuotaReservation } from '../../generated/prisma/client'
 import type { AiQuotaBucket } from '../../member-benefits/member-benefits.types'
 import { PrismaService, type PrismaTransactionClient } from '../../prisma/prisma.service'
+import { isPostgresBusyError } from '../../common/prisma/postgres-busy'
 import { isSerializationConflict, waitBeforeSerializationRetry } from '../../common/prisma/serialization-conflict'
 import { currentAiRequestContext } from '../usage/ai-usage-context'
 import { activeGrants, AI_QUOTA_BUCKETS, dailyLimit, exhausted, hashQuotaOperation, quotaDay, quotaEnv, quotaResetsAt, RELEASE_REASONS, type ReleaseReason } from './ai-quota.policy'
@@ -22,6 +23,13 @@ export interface QuotaReceipt {
   replay: boolean
   day: string
 }
+
+/**
+ * 未结算预占的清扫窗口。
+ * 合同审查 analyze 整段预算上限是 900 秒（15 分钟）。窗口若同样是 15 分钟，
+ * 长合同还在跑就会被提前归还，所以放到 20 分钟，并且必须长于那段预算。
+ */
+export const AI_QUOTA_STALE_RESERVATION_MS = 20 * 60_000
 
 @Injectable()
 export class AiQuotaService {
@@ -53,7 +61,11 @@ export class AiQuotaService {
         if (existing.endUserId !== endUserId || (!endUserId && existing.terminalId !== terminalId)) {
           throw new ConflictException('AI_QUOTA_OPERATION_OWNER_MISMATCH')
         }
-        if (existing.status === 'reserved' || (existing.status === 'committed' && params.allowCommittedReplay === true && existing.resultRef)) {
+        // 同号仍在生成：不放行。放行会让两个并发请求都去调模型。
+        if (existing.status === 'reserved') {
+          throw new ConflictException({ error: { code: 'AI_QUOTA_OPERATION_IN_PROGRESS', message: '这一步正在生成，请稍等结果' } })
+        }
+        if (existing.status === 'committed' && params.allowCommittedReplay === true && existing.resultRef) {
           return this.receipt(existing, true)
         }
         throw new ConflictException({ error: { code: 'AI_QUOTA_OPERATION_SETTLED', message: '该操作已结算，请使用新的操作号' } })
@@ -134,7 +146,7 @@ export class AiQuotaService {
   async sweepStale(now = new Date()): Promise<{ releasedCount: number; truncated: boolean }> {
     let releasedCount = 0
     for (let batch = 0; batch < 10; batch++) {
-      const rows = await this.prisma.aiQuotaReservation.findMany({ where: { status: 'reserved', reservedAt: { lt: new Date(now.getTime() - 15 * 60_000) } }, take: 500, orderBy: { reservedAt: 'asc' } })
+      const rows = await this.prisma.aiQuotaReservation.findMany({ where: { status: 'reserved', reservedAt: { lt: new Date(now.getTime() - AI_QUOTA_STALE_RESERVATION_MS) } }, take: 500, orderBy: { reservedAt: 'asc' } })
       for (const row of rows) {
         try { await this.release(row.id, 'stale', now); releasedCount++ } catch (error) {
           if (!(error instanceof ConflictException)) throw error
@@ -195,6 +207,7 @@ export class AiQuotaService {
     for (let attempt = 0; ; attempt++) {
       try { return await this.prisma.$transaction(fn, { isolationLevel: 'Serializable', maxWait: 10_000, timeout: 10_000 }) } catch (error) {
         // 唯一冲突（同 operationKey）回滚整个扣次后重试，重新检查归属与重放状态。
+        if (isPostgresBusyError(error)) throw error
         const code = (error as { code?: string }).code
         if (attempt >= 11 || !(isSerializationConflict(error) || code === 'P2002' || /SQLITE_BUSY|database is locked/.test(String(error)))) throw error
         await waitBeforeSerializationRetry(attempt + 1)
