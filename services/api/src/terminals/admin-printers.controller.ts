@@ -1,4 +1,4 @@
-import { Controller, Get, Logger, UseGuards } from '@nestjs/common'
+import { Controller, Get, Logger, Query, UseGuards } from '@nestjs/common'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
@@ -10,8 +10,8 @@ import {
 } from './admin-printer-output'
 
 type AdminPrinterList = {
-  printers: Array<AdminPrinterView & { output: AdminPrinterOutput | null }>
-  outputStatus: 'ok' | 'capped' | 'unavailable'
+  printers: Array<AdminPrinterView & { output?: AdminPrinterOutput | null }>
+  outputStatus?: 'ok' | 'capped' | 'unavailable'
 }
 
 const EMPTY_OUTPUT: AdminPrinterOutput = {
@@ -32,8 +32,9 @@ export class AdminPrintersController {
   ) {}
 
   @Get()
-  async list(): Promise<ApiResponse<AdminPrinterList>> {
+  async list(@Query('include') include?: string): Promise<ApiResponse<AdminPrinterList>> {
     const listed = await this.terminalsService.listPrintersForAdmin()
+    if (include !== 'output') return ApiResponse.ok({ printers: listed.printers })
     try {
       const summary = await this.printerOutput.summarize(listed.printers.map((printer) => printer.terminalId))
       if (summary.status === 'capped') {

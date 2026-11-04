@@ -7,6 +7,7 @@ import type {
   AdminPrinterOutput,
   AdminPrinterRecord,
   AdminPrintersResponse,
+  GetPrintersOptions,
   AdminTerminalRecord,
   AdminTerminalsResponse,
   AdminOrganizationOption,
@@ -655,51 +656,53 @@ export const adminMockAdapter = {
     return { terminalId: terminal.id, terminalCode: terminal.terminalCode, bindCode, expiresAt }
   },
 
-  async getPrinters(): Promise<AdminPrintersResponse> {
+  async getPrinters(options?: GetPrintersOptions): Promise<AdminPrintersResponse> {
     await delay()
+    const includeOutput = options?.includeOutput === true
     const terminals = (await this.getTerminals()).terminals
     const scenario = new URLSearchParams(window.location.search).get('mock:printerStatus')
-    if (scenario === 'empty') return { printers: [], outputStatus: 'ok' }
+    if (scenario === 'empty') return includeOutput ? { printers: [], outputStatus: 'ok' } : { printers: [] }
     // 与线上真实形状一致：终端只报总体状态，纸张只有「偏低 / 空」报警，墨粉没有余量（恒为空）
     const shapes = {
       offline: { status: 'offline', printerStatus: null, paperStatus: null, fault: '打印机状态未上报' },
       low: { status: 'online', printerStatus: 'low_paper', paperStatus: 'low', fault: '纸张或墨粉不足，可打印、需补充' },
       normal: { status: 'online', printerStatus: 'ready', paperStatus: null, fault: null },
     } as const
+    const withOutput = (printer: AdminPrinterRecord, terminalCode: string): AdminPrinterRecord =>
+      includeOutput ? { ...printer, output: mockPrinterOutput(terminalCode) } : printer
     if (scenario === 'offline' || scenario === 'low' || scenario === 'normal') {
       const base = terminals[0]
-      if (base) return { printers: [{
-        id: `printer:${base.terminalCode}`, terminalId: base.id, terminalCode: base.terminalCode,
-        name: `${base.terminalCode} 打印机`, model: null, serialNumber: null,
-        ...shapes[scenario], currentTask: null, tonerLevel: null, paperTrayLevel: null,
-        lastHeartbeatAt: base.lastHeartbeatAt, lastSyncAt: base.lastHeartbeatAt,
-        output: mockPrinterOutput(base.terminalCode),
-      }], outputStatus: 'ok' }
+      if (base) {
+        const printers = [withOutput({
+          id: `printer:${base.terminalCode}`, terminalId: base.id, terminalCode: base.terminalCode,
+          name: `${base.terminalCode} 打印机`, model: null, serialNumber: null,
+          ...shapes[scenario], currentTask: null, tonerLevel: null, paperTrayLevel: null,
+          lastHeartbeatAt: base.lastHeartbeatAt, lastSyncAt: base.lastHeartbeatAt,
+        }, base.terminalCode)]
+        return includeOutput ? { printers, outputStatus: 'ok' } : { printers }
+      }
     }
-    return {
-      outputStatus: 'ok',
-      printers: terminals.map((t): AdminPrinterRecord => {
-        const status = toMockPrinterStatus(t.online, t.printerStatus)
-        return {
-          id: `printer:${t.terminalCode}`,
-          terminalId: t.id,
-          terminalCode: t.terminalCode,
-          name: `${t.terminalCode} 打印机`,
-          model: null,
-          serialNumber: null,
-          status,
-          printerStatus: t.printerStatus,
-          currentTask: null,
-          tonerLevel: null,
-          paperTrayLevel: null,
-          paperStatus: t.printerStatus === 'paper_empty' ? 'empty' : null,
-          fault: toMockPrinterFault(t.online, t.printerStatus),
-          lastHeartbeatAt: t.lastHeartbeatAt,
-          lastSyncAt: t.lastHeartbeatAt,
-          output: mockPrinterOutput(t.terminalCode),
-        }
-      }),
-    }
+    const printers = terminals.map((t): AdminPrinterRecord => {
+      const status = toMockPrinterStatus(t.online, t.printerStatus)
+      return withOutput({
+        id: `printer:${t.terminalCode}`,
+        terminalId: t.id,
+        terminalCode: t.terminalCode,
+        name: `${t.terminalCode} 打印机`,
+        model: null,
+        serialNumber: null,
+        status,
+        printerStatus: t.printerStatus,
+        currentTask: null,
+        tonerLevel: null,
+        paperTrayLevel: null,
+        paperStatus: t.printerStatus === 'paper_empty' ? 'empty' : null,
+        fault: toMockPrinterFault(t.online, t.printerStatus),
+        lastHeartbeatAt: t.lastHeartbeatAt,
+        lastSyncAt: t.lastHeartbeatAt,
+      }, t.terminalCode)
+    })
+    return includeOutput ? { printers, outputStatus: 'ok' } : { printers }
   },
 
   // ── 日志审计(HIGH-5 mock,支持 action/时间筛选 + 分页)───────────────────

@@ -55,7 +55,8 @@ export default function PrintersPage() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const { data, status, error, refresh } = useRefreshable(PRINTERS_REFRESH_KEY, getPrinters, {
+  const loadPrinters = () => getPrinters({ includeOutput: true })
+  const { data, status, error, refresh } = useRefreshable(PRINTERS_REFRESH_KEY, loadPrinters, {
     intervalMs: 30_000,
     merge: (current, incoming) => {
       const printers = mergeById<AdminPrinterRecord>((item) => item.id)(current?.printers, incoming.printers)

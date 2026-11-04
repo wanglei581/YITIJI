@@ -7,6 +7,7 @@ import type {
   AdminSourceListQuery,
   AdminSourcePage,
   AdminPrintersResponse,
+  GetPrintersOptions,
   AdminTerminalsResponse,
   AdminOrgOptionsResponse,
   AssignTerminalOrgResult,
@@ -209,8 +210,8 @@ export const adminHttpAdapter = {
       ttlMinutes ? { ttlMinutes } : {},
     ),
 
-  getPrinters: () =>
-    getData<AdminPrintersResponse>('/admin/printers'),
+  getPrinters: (options?: GetPrintersOptions) =>
+    getData<AdminPrintersResponse>(options?.includeOutput === true ? '/admin/printers?include=output' : '/admin/printers'),
 
   // ── 日志审计(HIGH-5)──────────────────────────────────────────────────────
   getAuditLogs: (query: AuditLogListQuery = {}) =>

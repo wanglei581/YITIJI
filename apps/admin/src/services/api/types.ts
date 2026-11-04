@@ -376,6 +376,11 @@ export interface AdminPrintersResponse {
   outputStatus?: 'ok' | 'capped' | 'unavailable'
 }
 
+/** includeOutput 为真时才请求本系统出纸。不传则响应里没有 output / outputStatus。 */
+export interface GetPrintersOptions {
+  includeOutput?: boolean
+}
+
 // R1: Added sourceOrgId, sourceUrl, description, tags, requirements
 export interface AdminJobSourceRecord {
   id: string

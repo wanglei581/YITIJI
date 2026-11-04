@@ -223,6 +223,12 @@ check(
 )
 
 check(
+  /getPrinters\(\{\s*includeOutput:\s*true\s*\}\)/.test(printers) &&
+    loadersBlock.includes('getPrinters()') &&
+    !loadersBlock.includes('includeOutput'),
+  '打印机页取数带 includeOutput，工作台不带',
+)
+check(
   printers.includes('打印机走 USB 连接时，这几项读不到，会一直显示未上报；没报警不等于耗材充足。'),
   '打印机页底写明 USB 连接读不到型号、SN、耗材和纸盒余量',
 )

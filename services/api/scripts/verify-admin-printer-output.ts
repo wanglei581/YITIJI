@@ -124,13 +124,13 @@ async function assertController(): Promise<void> {
   try {
     const broken = await (await controllerWith(async () => {
       throw new Error('stats down')
-    })).list()
+    })).list('output')
     check('统计抛错时列表仍返回这台打印机', broken.data.printers.length === 1 && broken.data.printers[0]?.name === 'TERM-A 打印机')
     check('统计抛错时 output 为 null', broken.data.printers[0]?.output === null)
     check("统计抛错时 outputStatus 为 unavailable", broken.data.outputStatus === 'unavailable')
     check('统计抛错时打一条 warn', warnings.length === 1)
 
-    const capped = await (await controllerWith(async () => ({ status: 'capped' }))).list()
+    const capped = await (await controllerWith(async () => ({ status: 'capped' }))).list('output')
     check('超上限时列表仍在，output 为 null', capped.data.printers[0]?.output === null && capped.data.printers.length === 1)
     check("超上限时 outputStatus 为 capped", capped.data.outputStatus === 'capped')
 
@@ -139,7 +139,7 @@ async function assertController(): Promise<void> {
       month: { sides: 2, colorSides: 2, duplexSides: 0 },
       monthUnconfirmedTasks: 0,
     }
-    const ok = await (await controllerWith(async () => ({ status: 'ok', byTerminal: new Map([[TERM_A, sample]]) }))).list()
+    const ok = await (await controllerWith(async () => ({ status: 'ok', byTerminal: new Map([[TERM_A, sample]]) }))).list('output')
     check('统计正常时拼上这台的 output', sameOutput(ok.data.printers[0]?.output ?? undefined, sample) && ok.data.outputStatus === 'ok')
   } finally {
     Logger.prototype.warn = original
@@ -368,6 +368,42 @@ async function assertNumbers(prisma: PrismaService): Promise<void> {
   )
 }
 
+function responseHasOutput(data: { printers: Array<object>; outputStatus?: string }): boolean {
+  if ('output' in data || 'outputStatus' in data) return true
+  return data.printers.some((printer) => 'output' in printer)
+}
+
+async function assertInclude(): Promise<void> {
+  let calls = 0
+  const sample: AdminPrinterOutput = {
+    today: { sides: 2, colorSides: 2, duplexSides: 0 },
+    month: { sides: 2, colorSides: 2, duplexSides: 0 },
+    monthUnconfirmedTasks: 0,
+  }
+  const { AdminPrintersController } = await import('../src/terminals/admin-printers.controller')
+  const controller = new AdminPrintersController(
+    { listPrintersForAdmin: async () => ({ printers: [PRINTER] }) } as never,
+    {
+      summarize: async () => {
+        calls += 1
+        return { status: 'ok', byTerminal: new Map([[TERM_A, sample]]) }
+      },
+    } as never,
+  )
+  const plain = await controller.list()
+  check('不带参数时 summarize 一次都没被调', calls === 0)
+  check('不带参数时响应没有 output', !responseHasOutput(plain.data))
+  const asked = await controller.list('output')
+  check('include=output 时 summarize 调一次', calls === 1)
+  check(
+    'include=output 时有 output',
+    asked.data.outputStatus === 'ok' && sameOutput(asked.data.printers[0]?.output ?? undefined, sample),
+  )
+  const beforeGarbage = calls
+  const garbage = await controller.list('garbage')
+  check('include=garbage 当没带', calls === beforeGarbage && !responseHasOutput(garbage.data))
+}
+
 async function main(): Promise<void> {
   console.log('\n=== 管理员打印机本系统出纸 ===')
   check(
@@ -380,6 +416,7 @@ async function main(): Promise<void> {
     shanghaiMonthStart(NOW).toISOString() === '2026-10-31T16:00:00.000Z',
   )
   await assertController()
+  await assertInclude()
   const db = prepareDatabase()
   const prisma = new PrismaService()
   await prisma.onModuleInit()
