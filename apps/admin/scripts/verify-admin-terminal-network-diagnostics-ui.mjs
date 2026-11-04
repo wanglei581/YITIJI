@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createContext, Script } from 'node:vm'
+import ts from 'typescript'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const page = readFileSync(join(root, 'src/routes/terminals/index.tsx'), 'utf8')
@@ -118,3 +120,104 @@ for (const [name, source] of [['terminals page', terminalUi], ['shared vocabular
 assert.match(peripherals, /from '\.\.\/terminals\/terminalStatusViews'/)
 assert.doesNotMatch(peripherals, /SCAN_INPUT_REASON_LABELS\s*[:=]|PRINTER_STATUS_MAP\s*[:=]/)
 console.log('ALL PASS: Admin renders enum-only, read-only terminal network + scan-input diagnostics')
+
+// ─── 打印队列（只读；终端程序问 Windows 的原值）──────────────────────────────
+const queueComponentPath = join(root, 'src/routes/terminals/TerminalPrinterQueue.tsx')
+const queueViewPath = join(root, 'src/routes/terminals/printerQueueView.ts')
+assert.ok(existsSync(queueComponentPath), 'printer queue component is missing')
+assert.ok(existsSync(queueViewPath), 'printer queue view is missing')
+const queueComponent = readFileSync(queueComponentPath, 'utf8')
+const queueView = readFileSync(queueViewPath, 'utf8')
+assert.match(detail, /TerminalPrinterQueue/)
+assert.match(detail, /链路诊断[\s\S]{0,500}TerminalPrinterQueue/)
+assert.match(detail, /online=\{terminal\.online\}/)
+assert.match(queueComponent, /打印队列/)
+assert.match(queueComponent, /终端程序问 Windows 得到的原值，用来分清是打印机、打印队列还是 Windows 打印服务出了问题；后台只看不改。/)
+assert.match(queueComponent, /view\.current \?/)
+assert.match(queueComponent, /离线前最后一次上报/)
+assert.doesNotMatch(queueComponent, /describePrinterQueue\(\s*true/)
+assert.doesNotMatch(`${queueComponent}\n${queueView}`, /密码|SSID|网关|printerHostAddress|ipAddress|agentToken|bindCode|fail-closed|printerStatus|Kiosk|Terminal Agent 心跳上报/)
+assert.doesNotMatch(`${queueComponent}\n${queueView}`, /\b\d{1,3}(?:\.\d{1,3}){3}\b/)
+assert.doesNotMatch(queueComponent, /地址/)
+
+const queueJs = ts.transpileModule(queueView, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  fileName: 'printerQueueView.ts',
+}).outputText
+const queueModule = { exports: {} }
+const queueContext = createContext({
+  module: queueModule,
+  exports: queueModule.exports,
+  require(specifier) {
+    throw new Error(`printerQueueView.ts must not import ${specifier}`)
+  },
+})
+new Script(queueJs, { filename: 'printerQueueView.ts' }).runInContext(queueContext)
+const { describePrinterQueue } = queueModule.exports
+assert.equal(typeof describePrinterQueue, 'function')
+
+const usbRunning = {
+  printerQueueName: '前台',
+  printerQueuePortKind: 'usb',
+  printerQueuePortName: 'USB001',
+  printerQueueRawStatus: '3,0,False,0,0',
+  printerQueueSpooler: 'running',
+}
+const live = describePrinterQueue(true, usbRunning)
+const liveText = `${live.portText}\n${live.spoolerLabel}\n${live.rawText}`
+assert.match(liveText, /USB001（USB 直连）/)
+assert.match(liveText, /正在运行/)
+assert.match(liveText, /空闲/)
+assert.equal(live.spoolerBadge, 'success')
+assert.match(live.rawTitle, /PrinterStatus=3, DetectedErrorState=0, WorkOffline=False, PrinterState=0, ExtendedPrinterStatus=0/)
+
+const stopped = describePrinterQueue(true, {
+  ...usbRunning,
+  printerQueueRawStatus: 'query_failed',
+  printerQueueSpooler: 'stopped',
+})
+assert.match(`${stopped.spoolerLabel}\n${stopped.spoolerDetail}`, /已停止/)
+assert.match(stopped.spoolerDetail, /现场/)
+assert.equal(stopped.spoolerBadge, 'error')
+assert.match(stopped.rawText, /查询打印机失败（Windows 打印服务可能没在运行）/)
+
+const notFound = describePrinterQueue(true, { ...usbRunning, printerQueueRawStatus: 'not_found' })
+assert.match(notFound.rawText, /Windows 里找不到这个打印队列（队列名可能被改过，或驱动没装好）/)
+
+const missing = describePrinterQueue(true, null)
+assert.match(missing.missing, /未上报（终端程序升级到新版本后才上报）/)
+
+const offline = describePrinterQueue(false, usbRunning)
+assert.equal(offline.current, false)
+assert.equal(offline.statusLabel, '终端离线')
+assert.equal(offline.portText, null)
+assert.equal(offline.spoolerLabel, null)
+assert.equal(offline.rawText, null)
+assert.doesNotMatch(offline.statusLabel, /正在运行|USB001/)
+assert.match(offline.historyLabel, /^Windows 打印服务/)
+assert.notEqual(offline.historyLabel, '正在运行')
+
+function withPrinterState(state) {
+  return describePrinterQueue(true, { ...usbRunning, printerQueueRawStatus: `3,0,False,${state},0` })
+}
+assert.match(withPrinterState('4096').rawText, /不可用/)
+assert.match(withPrinterState('2097152').rawText, /内存不足/)
+const printingAndPaper = withPrinterState('1040').rawText
+assert.match(printingAndPaper, /打印中/)
+assert.match(printingAndPaper, /缺纸/)
+const unknownBit = withPrinterState('33554448').rawText
+assert.match(unknownBit, /缺纸/)
+assert.match(unknownBit, /另有未识别位 0x2000000/)
+assert.ok(withPrinterState('0').rawText.split(' · ').includes('队列状态 0'))
+
+assert.equal(notFound.rawSeverity, 'error')
+assert.equal(stopped.rawSeverity, 'warning')
+assert.equal(live.rawSeverity, null)
+assert.equal(offline.rawSeverity, null)
+assert.equal(missing.rawSeverity, null)
+assert.match(
+  queueComponent,
+  /view\.rawSeverity === 'error' \? 'text-error-fg' : view\.rawSeverity === 'warning' \? 'text-warning-fg' : 'text-neutral-700'/,
+)
+
+console.log('ALL PASS: Admin printer queue view is read-only, hides stale reports while offline, and does not show an address')

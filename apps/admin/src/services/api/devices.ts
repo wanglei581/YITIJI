@@ -3,6 +3,7 @@ import { adminMockAdapter } from './adminMockAdapter'
 import { adminHttpAdapter } from './adminHttpAdapter'
 import type {
   AdminPrintersResponse,
+  GetPrintersOptions,
   AdminPrinterRecord,
   AdminTerminalsResponse,
   AdminTerminalRecord,
@@ -68,7 +69,7 @@ export type {
 interface AdminDeviceServiceInterface {
   getDeviceFleetOverview(): Promise<DeviceFleetOverview>
   getTerminals(): Promise<AdminTerminalsResponse>
-  getPrinters(): Promise<AdminPrintersResponse>
+  getPrinters(options?: GetPrintersOptions): Promise<AdminPrintersResponse>
   getOrgOptions(): Promise<AdminOrgOptionsResponse>
   assignTerminalOrg(terminalId: string, orgId: string | null): Promise<AssignTerminalOrgResult>
   updateTerminalProfile(terminalId: string, input: UpdateTerminalProfileInput): Promise<UpdateTerminalProfileResult>
@@ -95,8 +96,8 @@ export const getDeviceFleetOverview = () => adapter.getDeviceFleetOverview()
 /** 拉取终端列表(契约 C1 GET /admin/terminals)。http 走真实后端,mock 返回示例数据。 */
 export const getTerminals = () => adapter.getTerminals()
 
-/** 拉取打印机列表(GET /admin/printers)。由终端心跳聚合,不编造耗材/SN 等未上报字段。 */
-export const getPrinters = () => adapter.getPrinters()
+/** 拉取打印机列表(GET /admin/printers)。由终端心跳聚合,不编造耗材/SN 等未上报字段。只有 includeOutput 才带本系统出纸。 */
+export const getPrinters = (options?: GetPrintersOptions) => adapter.getPrinters(options)
 
 /** 终端机构归属下拉选项(GET /admin/terminals/org-options，仅 enabled 机构)。 */
 export const getOrgOptions = () => adapter.getOrgOptions()
