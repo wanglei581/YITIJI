@@ -64,6 +64,16 @@ interface StoredJobFit {
   job: { id?: string; title: string; company: string | null; sourceName: string | null; sourceUrl: string | null; externalId: string | null }
   payload: JobFitPayload
   providerName: string
+  /** 账本操作号里的目标键。只存哈希或岗位 id，不存用户原文。 */
+  quotaTarget?: string
+}
+
+export function jobFitQuotaTarget(input: { jobId?: string; manualJob?: { title?: string; requirements?: string } }): string | null {
+  if (input.jobId) return `j${input.jobId}`
+  const title = input.manualJob?.title?.trim()
+  if (!title) return null
+  const requirements = input.manualJob?.requirements?.trim() ?? ''
+  return `m${createHash('sha256').update(`${title}\n${requirements}`).digest('hex').slice(0, 16)}`
 }
 
 type JobFitCompletedResponse = {
@@ -178,7 +188,8 @@ export class JobFitService {
 
     const llmResult = await this.llm.analyze(resumeText, jobCtx)
     const payload = llmResult.payload
-    const stored: StoredJobFit = { job: jobInfo, payload, providerName: llmResult.provider }
+    const quotaTarget = jobFitQuotaTarget(input) ?? undefined
+    const stored: StoredJobFit = { job: jobInfo, payload, providerName: llmResult.provider, ...(quotaTarget ? { quotaTarget } : {}) }
     // 派生结果的保留期不能超过其 parse 行；两种 TTL 取更短者。
     const expiresAt = new Date(Math.min(
       parse.expiresAt.getTime(),
@@ -214,6 +225,20 @@ export class JobFitService {
       provider: llmResult.provider,
       tokenUsage: llmResult.tokenUsage,
     }
+  }
+
+  /** 同一目标已有结果时直接读回，不再调模型。目标不同则返回 null，调用方另计一次。 */
+  async matchingStored(taskId: string, requester: JobFitRequester, targetKey: string) {
+    let parse: { endUserId: string | null }
+    try { parse = await this.loadAuthorizedParse(taskId, requester) } catch { return null }
+    const row = await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
+    if (!row?.expiresAt || row.expiresAt.getTime() < Date.now()) return null
+    if (row.endUserId && row.endUserId !== parse.endUserId) return null
+    let stored: StoredJobFit
+    try { stored = JSON.parse(row.payloadJson) as StoredJobFit } catch { return null }
+    const storedKey = stored.quotaTarget ?? (stored.job?.id ? `j${stored.job.id}` : null)
+    if (!storedKey || storedKey !== targetKey) return null
+    return this.toResponse(taskId, stored)
   }
 
   /** 读回最近一次分析（刷新恢复 / 会员回看）。先读存档，再按来源套托管和岗位板块。 */

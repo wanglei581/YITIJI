@@ -1,6 +1,7 @@
-/** Q1: 真数据库账本验证。默认自建 SQLite；--postgres 只接受隔离的本机 PG。
+/** Q1 账本验证。Q2a 改了一处：同号仍为 reserved 时第二个请求 409，不再放行去调模型。
+ * 已提交且 allowCommittedReplay 的重看仍不重复扣。默认自建 SQLite；--postgres 只接受隔离的本机 PG。
  * PG 前置：db:pg:generate + db:pg:deploy；两种库执行完全相同的并发/结算断言。
- * 结果重看用真实 AiResumeResult 做 Q2 接线前的服务契约模拟，不宣称 controller 已接入。
+ * 本脚本只测账本服务。入口是否接入由 verify:ai-quota-coverage 负责。
  */
 import 'reflect-metadata'
 import assert from 'node:assert/strict'
@@ -12,8 +13,10 @@ import { execFileSync } from 'node:child_process'
 import { validate } from 'class-validator'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { PrismaService } from '../src/prisma/prisma.service'
-import { AiQuotaService } from '../src/ai/quota/ai-quota.service'
+import { AiQuotaService, AI_QUOTA_STALE_RESERVATION_MS } from '../src/ai/quota/ai-quota.service'
 import { hashQuotaOperation } from '../src/ai/quota/ai-quota.policy'
+import { quotaReleaseReason, runWithAiQuota } from '../src/ai/quota/ai-quota-run'
+import { CONTRACT_REVIEW_STAGE_MAX_MS } from '../src/contract-review/contract-review-timing'
 import { runWithAiRequestContext, lazyAiRequestContext } from '../src/ai/usage/ai-usage-context'
 import { AdminMemberBenefitsService } from '../src/member-benefits/admin-member-benefits.service'
 import { GrantBenefitDto } from '../src/member-benefits/dto/admin-member-benefits.dto'
@@ -123,18 +126,28 @@ async function main() {
       assert.equal(await prisma.aiQuotaReservation.count({ where: { endUserId: users[12] } }), 1)
       process.env.AI_QUOTA_RESUME_DAILY = '3'
     })
-    await check('同 operationKey 重放不重扣，hash 不信任输入且跨账号不可回放', async () => {
+    await check('同 operationKey 进行中不放行，hash 不信任输入且跨账号不可回放', async () => {
       const key = operation()
       const r = await reserve(users[4], { operationKey: key })
-      const replay = await reserve(users[4], { operationKey: key })
-      assert.equal(replay.replay, true); assert.equal(r.reservationId, replay.reservationId); assert.equal(await used(users[4]), 1)
-      assert.equal((await prisma.aiQuotaReservation.findUniqueOrThrow({ where: { id: r.reservationId } })).operationKey, createHash('sha256').update(`ai_resume:${key}`).digest('hex'))
+      await reject('AI_QUOTA_OPERATION_IN_PROGRESS', () => reserve(users[4], { operationKey: key }), 409)
+      assert.equal(await used(users[4]), 1)
+      const inProgress = await prisma.aiQuotaReservation.findUniqueOrThrow({ where: { id: r.reservationId } })
+      assert.equal(inProgress.status, 'reserved')
+      assert.equal(inProgress.operationKey, createHash('sha256').update(`ai_resume:${key}`).digest('hex'))
       await reject('AI_QUOTA_OPERATION_OWNER_MISMATCH', () => reserve(users[5], { operationKey: key }))
       await reject('AI_QUOTA_OPERATION_INVALID', () => reserve(users[4], { operationKey: '../forged/key' }))
       await reject('AI_QUOTA_OPERATION_INVALID', () => reserve(users[4], { operationKey: 'x'.repeat(201) }))
       const same = operation()
-      const results = await Promise.all(Array.from({ length: 10 }, () => reserve(users[4], { operationKey: same })))
-      assert.equal(new Set(results.map((v) => v.reservationId)).size, 1); assert.equal(await used(users[4]), 2)
+      const results = await Promise.allSettled(Array.from({ length: 10 }, () => reserve(users[4], { operationKey: same })))
+      const won = results.filter((item) => item.status === 'fulfilled')
+      assert.equal(won.length, 1, '十个同号并发只有一个拿到预占')
+      for (const item of results) if (item.status === 'rejected') {
+        const body = item.reason.getResponse?.() as { error?: { code?: string } }
+        assert.equal(body?.error?.code, 'AI_QUOTA_OPERATION_IN_PROGRESS')
+        assert.equal(item.reason.getStatus?.(), 409)
+      }
+      assert.equal(await used(users[4]), 2)
+      assert.equal(await prisma.aiQuotaReservation.count({ where: { endUserId: users[4], operationKey: createHash('sha256').update(`ai_resume:${same}`).digest('hex') } }), 1)
     })
     await check('北京时间跨日重置，23:59 预占归还前一天', async () => {
       const r = await reserve(users[5], { now: beforeMidnight })
@@ -208,9 +221,29 @@ async function main() {
       }
       process.env.AI_QUOTA_RESUME_DAILY = '3'
     })
-    await check('stale 清扫超过十五分钟归还，十五分钟边界仍保留', async () => {
-      const r = await reserve(users[10], { now: new Date(now.getTime() - 15 * 60_000 - 1) })
-      const boundary = await reserve(users[10], { now: new Date(now.getTime() - 15 * 60_000) })
+    await check('模型账户不可用与模型名失效抛出时按 provider_error 归还', async () => {
+      for (const code of ['AI_PROVIDER_ACCOUNT_UNAVAILABLE', 'AI_PROVIDER_MODEL_INVALID']) {
+        const error = Object.assign(new Error(code), { code })
+        assert.equal(quotaReleaseReason(error), 'provider_error')
+        const before = await prisma.aiQuotaReservation.count({ where: { endUserId: users[14], status: 'released' } })
+        await assert.rejects(() => runWithAiQuota({
+          quota, bucket: 'ai_resume', operationKey: operation(), endUserId: users[14],
+        }, async () => { throw error }, async () => 'unused'))
+        const released = await prisma.aiQuotaReservation.findMany({
+          where: { endUserId: users[14], status: 'released' }, orderBy: { reservedAt: 'desc' },
+        })
+        assert.equal(released.length, before + 1)
+        const row = released[0]
+        assert.ok(row)
+        const log = await prisma.auditLog.findFirstOrThrow({ where: { targetId: row.id, action: 'ai_quota.released' } })
+        assert.equal(JSON.parse(log.payloadJson).reason, 'provider_error')
+        assert.equal(await used(users[14], row.day), 0)
+      }
+    })
+    await check('stale 清扫超过窗口归还，窗口边界仍保留', async () => {
+      assert.ok(AI_QUOTA_STALE_RESERVATION_MS > CONTRACT_REVIEW_STAGE_MAX_MS)
+      const r = await reserve(users[10], { now: new Date(now.getTime() - AI_QUOTA_STALE_RESERVATION_MS - 1) })
+      const boundary = await reserve(users[10], { now: new Date(now.getTime() - AI_QUOTA_STALE_RESERVATION_MS) })
       // 排除其他场景的预占，精准收敛此次夹具。
       await prisma.aiQuotaReservation.updateMany({ where: { endUserId: { in: users.filter((id) => id !== users[10]) }, status: 'reserved' }, data: { reservedAt: now } })
       const result = await quota.sweepStale(now); assert.equal(result.releasedCount, 1)
