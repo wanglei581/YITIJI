@@ -3412,6 +3412,8 @@ test('W-118 resume diagnosis phone entry creates only one upload session @w3-kio
     sessionId: 'w118-resume-upload', status: 'pending', purpose: 'resume_upload', mode: 'temporary',
     file: null, requiresKioskConfirmation: false, expiresAt: '2099-01-01T00:00:00.000Z',
   } } })
+  const sessionPath = '/api/v1/upload-sessions/w118-resume-upload'
+  api.respond('DELETE', sessionPath, { status: 200, json: { success: true, data: { sessionId: 'w118-resume-upload', status: 'cancelled' } } })
   await page.goto('/resume/source')
   await page.getByRole('button', { name: /在手机里/ }).click()
   await expect.poll(() => creates).toBe(1)
@@ -3424,6 +3426,19 @@ test('W-118 resume diagnosis phone entry creates only one upload session @w3-kio
   await expect(page.getByText('请用手机微信或浏览器扫码', { exact: true })).toBeVisible()
   await expect(page.locator('.resume-source-phone-session svg[width="150"]')).toBeVisible()
   expect(creates).toBe(1)
+  // 建码还在途时切走再切回：旧面板不能把屏上这张码作废。
+  expect(api.requestCount('DELETE', sessionPath)).toBe(0)
+  await expect.poll(() => api.requestCount('GET', sessionPath)).toBeGreaterThan(0)
+  const qr = page.locator('.resume-source-phone-session svg[width="150"]')
+  // 码已经显示后再切一次来源：同一页只停放，不另建、也不作废。
+  await page.getByRole('button', { name: /本机文件/ }).click()
+  await expect(qr).toHaveCount(0)
+  await page.evaluate(() => new Promise<void>((resolve) => setTimeout(resolve, 0)))
+  expect(api.requestCount('DELETE', sessionPath)).toBe(0)
+  await page.getByRole('button', { name: /在手机里/ }).click()
+  await expect(qr).toBeVisible()
+  expect(creates).toBe(1)
+  expect(api.requestCount('DELETE', sessionPath)).toBe(0)
 })
 
 /*
@@ -3479,6 +3494,76 @@ test('resume source phone confirm sends one request per tap, shows 正在确认�
   expect(confirms, '失败后再确认才发第二次').toBe(2)
   await expect(dock.getByRole('button', { name: '确认使用这份文件' })).toHaveCount(0)
   expect(runtimeErrors).toEqual([])
+})
+
+/*
+ * 扫码上传共用面板：确认把文件复制进会员名下时，取消会撞上 UPLOAD_SESSION_ACTION_IN_PROGRESS。
+ * 答复回来之前刷新、取消、确认都不可点；这次失败不清二维码、不拿掉已收到的文件，屏上是打印上传页那句兜底。
+ * 再点一次取消、服务端成功，才清空。简历来源页把面板里的「确认」收进底栏，面板这颗仍在，用 includeHidden 看禁用。
+ * 失败后底栏确认仍可点，本用例不发确认，也不自动接走文件。
+ */
+test('扫码上传取消撞锁保留二维码和文件，重试成功才清空 @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  const sessionId = 'w3-cancel-keep'
+  const expiresAt = '2099-01-01T00:00:00.000Z'
+  const file = { fileId: 'w3-cancel-file', filename: '待确认简历.pdf', sizeBytes: 2048, mimeType: 'application/pdf', sha256: 'd'.repeat(64) }
+  api.respond('POST', '/api/v1/upload-sessions', { status: 201, json: { success: true, data: {
+    sessionId, uploadUrl: '/upload/phone', uploadToken: 'w3-cancel-up', controlToken: 'w3-cancel-ctl', expiresAt,
+  } } })
+  api.respond('GET', `/api/v1/upload-sessions/${sessionId}`, { status: 200, json: { success: true, data: {
+    sessionId, status: 'uploaded', purpose: 'resume_upload', mode: 'temporary', file,
+    requiresKioskConfirmation: false, expiresAt,
+  } } })
+  let cancels = 0
+  let releaseFirst!: () => void
+  const firstReply = new Promise<void>((resolve) => { releaseFirst = resolve })
+  api.respondWith('DELETE', `/api/v1/upload-sessions/${sessionId}`, async () => {
+    cancels += 1
+    if (cancels === 1) {
+      await firstReply
+      return { status: 400, json: { success: false, error: { code: 'UPLOAD_SESSION_ACTION_IN_PROGRESS', message: '上传会话正在处理中，请稍候' } } }
+    }
+    return { status: 200, json: { success: true, data: { sessionId, status: 'cancelled' } } }
+  })
+
+  await page.goto('/resume/source')
+  await page.getByRole('button', { name: /在手机里/ }).click()
+  const panel = page.locator('.resume-source-phone-session')
+  const qr = panel.locator('svg[width="150"]')
+  const refresh = panel.getByRole('button', { name: '刷新二维码' })
+  const cancel = panel.getByRole('button', { name: '取消', exact: true })
+  // 来源页用 CSS 收起面板里的确认，改由底栏承担；禁用看的是面板这颗按钮本身。
+  const confirm = panel.getByRole('button', { name: '确认使用这份文件', includeHidden: true })
+  const dockConfirm = page.locator('.qxt-dock').getByRole('button', { name: '确认使用这份文件' })
+  await expect(qr).toBeVisible()
+  await expect(panel.getByText('待确认简历.pdf', { exact: false }).first()).toBeVisible()
+  await expect(cancel).toBeEnabled()
+
+  await cancel.click()
+  await expect.poll(() => cancels).toBe(1)
+  await expect(refresh).toBeDisabled()
+  await expect(cancel).toBeDisabled()
+  await expect(confirm).toBeDisabled()
+  await expect(qr).toBeVisible()
+  await expect(panel.getByText('待确认简历.pdf', { exact: false }).first()).toBeVisible()
+  releaseFirst()
+
+  await expect(panel.getByText('这次上传没能取消，文件还留着。', { exact: true })).toBeVisible()
+  await expect(qr).toBeVisible()
+  await expect(panel.getByText('待确认简历.pdf', { exact: false }).first()).toBeVisible()
+  await expect(cancel).toBeEnabled()
+  await expect(confirm).toBeEnabled()
+  await expect(dockConfirm).toBeEnabled()
+  expect(api.requestCount('POST', `/api/v1/upload-sessions/${sessionId}/confirm`)).toBe(0)
+  expect(api.requestCount('POST', '/api/v1/upload-sessions')).toBe(1)
+
+  await cancel.click()
+  await expect.poll(() => cancels).toBe(2)
+  await expect(qr).toHaveCount(0)
+  await expect(panel.getByText('待确认简历.pdf', { exact: false })).toHaveCount(0)
+  await expect(panel.getByText('这次上传没能取消，文件还留着。', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('这次扫码已取消', { exact: true })).toBeVisible()
+  expect(api.requestCount('POST', `/api/v1/upload-sessions/${sessionId}/confirm`)).toBe(0)
 })
 
 /*
