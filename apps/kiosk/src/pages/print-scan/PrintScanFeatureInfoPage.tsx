@@ -460,7 +460,7 @@ export function PrintScanFeatureInfoPage() {
           <div className="fs-facts">
             <div className="fs-fact wide" data-testid="print-hub-fallback">
               <b>没有这项能力说明</b>
-              <span>这个名字不在现有的说明里，本页不编一套步骤。</span>
+              <span>这个名字不在现有的说明里，本页不编一套步骤。多半是旧二维码或旧链接。</span>
             </div>
             <div className="fs-pairgrid">
               <div className="fs-fact">

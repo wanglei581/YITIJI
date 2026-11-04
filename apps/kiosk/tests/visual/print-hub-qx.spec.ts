@@ -390,6 +390,25 @@ test('id-photo feature page is parked and returns to the print hub @w2', async (
   expect(errors).toEqual([])
 })
 
+// 证件照停放前，「已经有证件照文件 → 按普通照片打印」由说明页的替代按钮测；停放后这条路只剩服务台的照片打印卡，
+// 正向流程照样要有人测：点卡进上传页，带上 category=photo。
+test('photo-print tool card still opens the upload page for ordinary photos @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: { capabilities: AVAILABLE },
+  })
+
+  await page.goto('/print-scan')
+  await expect(page.locator('[data-testid="print-hub-state-default"]')).toBeVisible()
+  const photoPrint = page.getByTestId('print-hub-cap-photo-print')
+  await expect(photoPrint).toBeEnabled()
+  await photoPrint.click()
+  await expect(page).toHaveURL(/\/print\/upload\?.*category=photo/)
+  expect(errors).toEqual([])
+})
+
 test('unknown feature key fails closed with recovery actions @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
