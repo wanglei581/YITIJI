@@ -1493,7 +1493,7 @@ test('resume report folds the seven blocks, keeps one page scroller, and keeps t
 
   await expect(page.getByTestId('resume-report-takeaway-title')).toHaveText('带走这份报告')
   const takeawayButtons = page.locator('[data-testid="resume-report-export-actions"] .rrp-export > button')
-  await expect(takeawayButtons).toHaveCount(4)
+  await expect(takeawayButtons).toHaveCount(2) // B10 R-3: was 4; pre-export shows PDF + change list only.
   const takeawayRow = await takeawayButtons.evaluateAll((els) => els.map((el) => {
     const rect = el.getBoundingClientRect()
     return { top: Math.round(rect.top), height: rect.height }

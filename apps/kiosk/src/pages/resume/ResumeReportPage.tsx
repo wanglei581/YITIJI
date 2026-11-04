@@ -279,7 +279,7 @@ export function ResumeReportPage() {
         ? undefined
         : state.aiDown
           ? (printable
-            ? { label: '打印我上传的原件', onClick: () => printUploadedOriginal(), testId: 'resume-report-primary', className: 'qx-btn', noArrow: true }
+            ? { label: '打印我上传的原件', onClick: () => printUploadedOriginal(), testId: 'resume-report-primary', className: 'qx-btn' }
             : { label: '返回简历来源', onClick: () => navigate('/resume/source', { state: sourceState }), testId: 'resume-report-primary', className: 'qx-btn', noArrow: true })
           : { label: '重新解析', onClick: () => handleRetry(), testId: 'resume-report-primary', className: 'qx-btn', noArrow: true }
     const fileLabel = state.file?.name ? `「${state.file.name}」的解析没有完成。` : ''
@@ -304,7 +304,7 @@ export function ResumeReportPage() {
           <div className="qxt-howto" role="status">
             <QxTouchIcon name="alert" size={34} strokeWidth={2} />
             <span>
-              <b>{state.aiDown ? '这次没诊断出来' : '解析中断，中断的只是「读懂它」这一步'}</b>
+              {!state.aiDown ? <b>解析中断，中断的只是「读懂它」这一步</b> : null}
               {encryptedPdf
                 ? `${ENCRYPTED_PDF_BLOCK_COPY}。`
                 : state.aiDown
@@ -314,7 +314,6 @@ export function ResumeReportPage() {
           </div>
           {checkingPassword ? <p className="qxt-fine" role="status">正在确认这份 PDF 能否打开，请稍候。</p> : null}
           {!state.aiDown && !encryptedPdf && !checkingPassword ? <p className="qxt-fine" id="resume-report-why">上一次已明确没解析成功；重新解析会作为新的一次提交。这一屏一条 AI 结论都不给。</p> : null}
-          {state.aiDown ? <p className="qxt-fine" id="resume-report-why">AI 现在停用，再解析一次也不会变好；下面几条不需要 AI，现在就能做。</p> : null}
           {!encryptedPdf && !checkingPassword && <ResumeDiagnosisFailExits file={state.file} fileId={typeof state.fileId === 'string' ? state.fileId : undefined} />}
         </section>
       </ResumeTouchPage>
