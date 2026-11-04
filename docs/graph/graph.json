@@ -4066,13 +4066,34 @@
         "controller": "services/api/src/terminals/admin-printers.controller.ts",
         "handler": "AdminPrintersController.list",
         "method": "GET",
-        "models": [],
+        "models": [
+          "AuditLog",
+          "FileObject",
+          "Order",
+          "OrderItem",
+          "Organization",
+          "PrintTask",
+          "PrintTaskStatusLog",
+          "ScanTask",
+          "ServiceDeployment",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCredential",
+          "TerminalHeartbeat",
+          "TerminalSmartCampusConfig"
+        ],
         "path": "/api/v1/admin/printers",
         "roles": [
           "admin"
         ],
-        "serviceFiles": [],
-        "services": []
+        "serviceFiles": [
+          "services/api/src/terminals/admin-printer-output.ts",
+          "services/api/src/terminals/terminals.service.ts"
+        ],
+        "services": [
+          "AdminPrinterOutputService",
+          "TerminalsService"
+        ]
       },
       {
         "controller": "services/api/src/recruitment-content/admin-recruitment-content.controller.ts",
@@ -13120,7 +13141,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 253,
+      "reachableFileCount": 254,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -13891,7 +13912,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 279
+      "sourceFileCount": 280
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -19026,6 +19047,7 @@
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/print-jobs/self-service-reprint.ts",
+          "services/api/src/terminals/admin-printer-output.ts",
           "services/api/src/terminals/claim-unprintable-file.ts",
           "services/api/src/terminals/print-status-attempt.ts",
           "services/api/src/terminals/terminal-credential-security.service.ts",
@@ -19770,6 +19792,9 @@
     "apps/admin/src/routes/components/BulkPublishButton.tsx": [
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs"
     ],
+    "apps/admin/src/routes/dashboard/DashboardDeviceStatus.tsx": [
+      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
+    ],
     "apps/admin/src/routes/dashboard/DashboardWidgets.tsx": [
       "apps/admin/scripts/verify-console-batch5-copy.mjs"
     ],
@@ -20029,6 +20054,10 @@
     "apps/admin/src/routes/print-scan/index.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
+    "apps/admin/src/routes/printers/PrinterOutputCell.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
     ],
     "apps/admin/src/routes/printers/index.tsx": [
       "apps/admin/scripts/verify-console-plain-copy.mjs",
@@ -24844,6 +24873,7 @@
     "services/api/scripts/support/isolated-verification-database.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-order-filters.ts",
+      "services/api/scripts/verify-admin-printer-output.ts",
       "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-quota.ts",
@@ -28603,6 +28633,7 @@
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-admin-print-outcome.ts",
       "services/api/scripts/verify-admin-print-scan.ts",
+      "services/api/scripts/verify-admin-printer-output.ts",
       "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-advisor-work.ts",
@@ -28990,9 +29021,15 @@
     "services/api/src/terminals/admin-kiosk-job-board.controller.ts": [
       "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
+    "services/api/src/terminals/admin-printer-output.ts": [
+      "services/api/scripts/verify-admin-printer-output.ts"
+    ],
     "services/api/src/terminals/admin-printer-status.ts": [
       "services/api/scripts/verify-queue-dispatch-printer-status.ts",
       "services/api/scripts/verify-terminal-network-diagnostics.ts"
+    ],
+    "services/api/src/terminals/admin-printers.controller.ts": [
+      "services/api/scripts/verify-admin-printer-output.ts"
     ],
     "services/api/src/terminals/admin-terminals.controller.ts": [
       "services/api/scripts/verify-admin-print-scan.ts",
@@ -29137,6 +29174,7 @@
       "services/api/scripts/verify-terminal-bind-code.ts"
     ],
     "services/api/src/terminals/terminals-admin.service.ts": [
+      "services/api/scripts/verify-admin-printer-output.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
@@ -29954,6 +29992,7 @@
           "apps/admin/src/routes/peripherals/index.tsx",
           "apps/admin/src/routes/peripherals/peripheralViews.ts",
           "apps/admin/src/routes/print-scan/index.tsx",
+          "apps/admin/src/routes/printers/PrinterOutputCell.tsx",
           "apps/admin/src/routes/printers/index.tsx",
           "apps/admin/src/routes/screensaver/AssetsTab.tsx",
           "apps/admin/src/routes/screensaver/PlaylistsTab.tsx",
@@ -30242,10 +30281,12 @@
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
           "apps/admin/src/routes/alerts/alertDetailText.ts",
           "apps/admin/src/routes/alerts/index.tsx",
+          "apps/admin/src/routes/dashboard/DashboardDeviceStatus.tsx",
           "apps/admin/src/routes/dashboard/dashboardRows.ts",
           "apps/admin/src/routes/dashboard/printerStatusSummary.ts",
           "apps/admin/src/routes/legal-docs/index.tsx",
           "apps/admin/src/routes/login/LegalDocsModal.tsx",
+          "apps/admin/src/routes/printers/PrinterOutputCell.tsx",
           "apps/admin/src/routes/printers/index.tsx",
           "apps/admin/src/routes/screensaver/PlaylistsTab.tsx",
           "apps/admin/src/routes/screensaver/index.tsx",
@@ -36752,6 +36793,28 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:admin-print-scan"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/admin-printer-output.ts",
+          "services/api/src/terminals/admin-printers.controller.ts",
+          "services/api/src/terminals/terminals-admin.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-admin-printer-output.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:admin-printer-output"
       ],
       "wired": true
     },
