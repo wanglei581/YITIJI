@@ -3,11 +3,12 @@ import { Cron, CronExpression } from '@nestjs/schedule'
 import { RedisService } from '../common/redis/redis.service'
 import { collectDerivedAlerts, type DerivedAlert } from './derived-alerts'
 import { PrismaService } from '../prisma/prisma.service'
+import { SCAN_DEVICE_ISSUE } from './derived-scan-device-alerts'
 
 type PreviousAlert = Pick<DerivedAlert, 'subjectKey' | 'episodeToken' | 'type' | 'severity' | 'title' | 'terminalCode'>
 type AlertCollector = (prisma: PrismaService, now: Date) => Promise<{ alerts: DerivedAlert[]; terminalSubjectKeysInScope?: string[] }>
 
-const TERMINAL_ALERT_TYPES = new Set(['terminal_offline', 'printer_issue'])
+const TERMINAL_ALERT_TYPES = new Set(['terminal_offline', 'printer_issue', SCAN_DEVICE_ISSUE])
 
 const DEFAULT_DEDUPE_TTL_SECONDS = 180 * 24 * 60 * 60
 
@@ -100,13 +101,19 @@ export class AdminAlertPushService {
       for (const alert of current.alerts) {
         await this.pushOnce(alert, 'firing')
       }
-      // 终端类告警从列表里消失有两种原因：真的回到在线 / 打印机恢复，或者这台终端被转成
-      // 计划中、退役、停用、删除而不再考察。后者推「已恢复」会误导人，静默移出即可。
-      // 收集器没给范围（旧桩）时按原逻辑都推。
+      // 列表消失不等于恢复：不再考察的终端静默移出；扫描仪离线、能力不可用或无状态回报也一样。
+      // 旧收集器没给范围时，离线 / 打印机保留原行为；扫描仪必须拿到范围证据。
       const inScope = current.terminalSubjectKeysInScope ? new Set(current.terminalSubjectKeysInScope) : null
       for (const alert of previous) {
         if (currentByKey.has(alert.subjectKey)) continue
-        if (inScope && TERMINAL_ALERT_TYPES.has(alert.type) && !inScope.has(alert.subjectKey)) continue
+        const outOfScope = inScope ? !inScope.has(alert.subjectKey) : alert.type === SCAN_DEVICE_ISSUE
+        if (TERMINAL_ALERT_TYPES.has(alert.type) && outOfScope) {
+          // 只重置扫描仪推送去重，重新纳入且同一故障仍在时可以再提醒；不改告警身份或其它类型。
+          if (alert.type === SCAN_DEVICE_ISSUE) {
+            await this.redis.del(`admin-alert-push:sent:${alert.subjectKey}:${alert.episodeToken}:firing`)
+          }
+          continue
+        }
         await this.pushOnce(alert, 'recovered')
       }
 

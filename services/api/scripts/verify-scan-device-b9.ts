@@ -6,7 +6,7 @@
  *      健康值为 not_found 时，收集与正向查证都有一条扫描仪告警
  *   2. 停用（enabled: false）但其余条件相同，不出告警，正向查证为空
  *   3. 非 active（这里用 maintenance）但其余条件相同，不出告警，正向查证为空
- *   4. terminalSubjectKeysInScope 仍只有离线与打印机，不收扫描仪
+ *   4. terminalSubjectKeysInScope 收有状态回报的在线扫描仪，停用与非 active 仍不收
  *
  * 写库：本脚本在库里造终端 / 能力 / 心跳，结束时清理，所以必须在隔离库上跑
  * （VERIFICATION_DATABASE_TARGET=isolated，库名带 ci/dev/test/verify）。
@@ -73,7 +73,7 @@ async function main(): Promise<void> {
     const maintenance = await makeTerminal('maint', { lifecycleStatus: 'maintenance' })
     const now = new Date()
 
-    const collected = await collectScanDeviceAlerts(prisma, now)
+    const { alerts: collected } = await collectScanDeviceAlerts(prisma, now)
     const forTerminal = (terminalId: string) => collected.filter((alert) => alert.subjectId === terminalId)
     const activeAlerts = forTerminal(active.id)
     assert.equal(activeAlerts.length, 1, '运营中的终端应有一条扫描仪告警')
@@ -101,13 +101,13 @@ async function main(): Promise<void> {
     const scope = new Set(derived.terminalSubjectKeysInScope)
     assert.equal(scope.has(`terminal_offline:${active.id}`), true, '运营中的终端仍在离线考察范围内')
     assert.equal(scope.has(`printer_issue:${active.id}`), true, '运营中的终端仍在打印机考察范围内')
-    assert.equal(scope.has(`scan_device_issue:${active.id}`), false, '扫描仪不放进已恢复推送范围')
+    assert.equal(scope.has(`scan_device_issue:${active.id}`), true, '在线且有状态回报的扫描仪纳入考察范围')
     assert.equal(scope.has(`scan_device_issue:${disabled.id}`), false)
     assert.equal(scope.has(`scan_device_issue:${maintenance.id}`), false)
     assert.equal(scope.has(`terminal_offline:${disabled.id}`), false, '停用终端本来就不在离线考察范围内')
     assert.equal(scope.has(`terminal_offline:${maintenance.id}`), false, '非 active 终端本来就不在离线考察范围内')
 
-    pass('扫描仪告警只算 enabled 且 active 的终端；已恢复推送范围仍只有离线和打印机')
+    pass('扫描仪告警只算 enabled 且 active 的终端；在线且有状态回报才纳入扫描仪考察范围')
     console.log('\nPASS verify-scan-device-b9')
   } finally {
     await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: ids } } }).catch(() => undefined)

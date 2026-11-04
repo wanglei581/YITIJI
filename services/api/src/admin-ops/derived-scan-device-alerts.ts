@@ -44,14 +44,18 @@ function faultDetail(health: ScanDeviceFaultHealth): string {
  * 其余三个条件照旧：scan_device 已开通（available）、最近一条心跳仍在在线窗口内、
  * scanDeviceHealth 为 not_found 或 error。恢复后下一次收集就没有这条，去重键是 type:终端 id。
  * 可以和打印机异常同时存在（subjectKey 不同）。
- * 不放进 terminalSubjectKeysInScope：推送「已恢复」仍只有离线和打印机。
+ * 范围键只收在线且有扫描仪状态回报的终端：列表消失且仍在范围内才有恢复证据。
  */
-export async function collectScanDeviceAlerts(prisma: PrismaService, now: Date): Promise<ScanDeviceAlert[]> {
+export async function collectScanDeviceAlerts(prisma: PrismaService, now: Date): Promise<{
+  alerts: ScanDeviceAlert[]
+  terminalSubjectKeysInScope: string[]
+}> {
+  const terminalSubjectKeysInScope: string[] = []
   const caps = await prisma.terminalCapability.findMany({
     where: { capabilityKey: 'scan_device', status: 'available' },
     select: { terminalId: true },
   })
-  if (caps.length === 0) return []
+  if (caps.length === 0) return { alerts: [], terminalSubjectKeysInScope }
 
   const terminals = await prisma.terminal.findMany({
     where: {
@@ -75,8 +79,10 @@ export async function collectScanDeviceAlerts(prisma: PrismaService, now: Date):
   const faults: Array<{ id: string; terminalCode: string; registeredAt: Date; health: ScanDeviceFaultHealth; seenAt: Date }> = []
   for (const terminal of terminals) {
     const heartbeat = terminal.heartbeats[0]
-    if (!heartbeat || !isFaultHealth(heartbeat.scanDeviceHealth)) continue
+    if (!heartbeat || heartbeat.scanDeviceHealth == null) continue
     if (nowMs - heartbeat.createdAt.getTime() >= TERMINAL_ONLINE_WINDOW_MS) continue
+    terminalSubjectKeysInScope.push(buildSubjectKey(SCAN_DEVICE_ISSUE, terminal.id))
+    if (!isFaultHealth(heartbeat.scanDeviceHealth)) continue
     faults.push({
       id: terminal.id,
       terminalCode: terminal.terminalCode,
@@ -85,7 +91,7 @@ export async function collectScanDeviceAlerts(prisma: PrismaService, now: Date):
       seenAt: heartbeat.createdAt,
     })
   }
-  if (faults.length === 0) return []
+  if (faults.length === 0) return { alerts: [], terminalSubjectKeysInScope }
 
   const grouped = await prisma.terminalHeartbeat.groupBy({
     by: ['terminalId'],
@@ -103,7 +109,7 @@ export async function collectScanDeviceAlerts(prisma: PrismaService, now: Date):
     if (row._max.createdAt) lastClearAt.set(row.terminalId, row._max.createdAt)
   }
 
-  return faults.map((fault) => {
+  const alerts = faults.map((fault) => {
     const subjectKey = buildSubjectKey(SCAN_DEVICE_ISSUE, fault.id)
     const clearAt = lastClearAt.get(fault.id) ?? fault.registeredAt
     return {
@@ -119,6 +125,7 @@ export async function collectScanDeviceAlerts(prisma: PrismaService, now: Date):
       occurredAt: fault.seenAt.toISOString(),
     }
   })
+  return { alerts, terminalSubjectKeysInScope }
 }
 
 /** 正向查证走同一条收集，因此同样只认运营中的终端。 */
@@ -127,6 +134,6 @@ export async function resolveScanDeviceAlert(
   subjectId: string,
   now: Date,
 ): Promise<ScanDeviceAlert | null> {
-  const alerts = await collectScanDeviceAlerts(prisma, now)
+  const { alerts } = await collectScanDeviceAlerts(prisma, now)
   return alerts.find((alert) => alert.subjectId === subjectId) ?? null
 }

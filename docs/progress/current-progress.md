@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-11-04：屏上扫描后端 B10（扫描仪告警移出范围不推「已恢复」；分支 `claude/scan-device-b2-1102`，未部署）
+
+- 起因：Codex 只读复核 B9 报 P1——扫描仪告警推送后，终端停用、非 active、离线或 `scan_device` 关闭，告警从收集结果消失，推送服务会把它推成「已恢复」；重新纳入范围时同一故障回合还会被旧去重键挡住。
+- 改法（Codex 实现，Claude 收货）：`derived-scan-device-alerts.ts` 只把在线、有扫描仪状态回报、能力 available、enabled+active 的终端放进 `terminalSubjectKeysInScope`；`admin-alert-push.service.ts` 把扫描仪告警并入终端类，移出范围静默、不推恢复，并只清掉扫描仪这一回合的 firing 去重键，重新纳入仍故障会再提醒一次。离线、打印机告警行为不变（新增回归用例钉住）。
+- 验证：`verify:alert-push`（新增停用 / 非 active / 离线 / 能力关闭 / 无状态回报不推恢复、真恢复推恢复、再纳入再推）、`verify:scan-device-b9`、`verify:admin-ops`、`verify:scan-device-b4`、`verify:queue-dispatch-printer-status`、api typecheck 与改过文件 lint 均通过（SQLite 隔离库）；PostgreSQL 版交 CI。反向检查三项（去掉范围过滤、只凭消失推恢复、去掉状态非空条件）都变红，恢复后绿。
+
 ## 2026-11-04：屏上扫描后端 B9（扫描仪告警只算仍在运营的终端；分支 `claude/scan-device-b2-1102`，叠在 B8 头 `d09b3f19d` 上，未推送、未部署）
 
 - `collectScanDeviceAlerts` 与 `resolveScanDeviceAlert` 只算 `enabled: true` 且 `lifecycleStatus: 'active'` 的终端。其余三个条件照旧：`scan_device` 为 available、心跳在在线窗口内、健康值为 `not_found` 或 `error`。停用、维护中（以及计划中、调试中、已暂停、已退役）不出这条告警。

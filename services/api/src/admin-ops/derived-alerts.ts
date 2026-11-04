@@ -119,7 +119,7 @@ export interface DerivedAlertCollection {
   /** 触发截断的上限值,便于界面如实说明。 */
   cap: number
   /**
-   * 本次纳入终端类告警考察的主题键(只含正常运营的终端,每台两种类型)。推送据此区分
+   * 本次纳入终端类告警考察的主题键(只含正常运营的终端)。扫描仪还须在线、能力可用且有状态回报。推送据此区分
    * 「真恢复」与「因转为计划中 / 退役 / 停用 / 删除而不再考察」:后者不推「已恢复」。
    */
   terminalSubjectKeysInScope: string[]
@@ -473,7 +473,7 @@ export async function collectDerivedAlerts(
   }
   // 离线 / 打印机一台终端最多一条。扫描仪是另一类，可以和打印机异常同时存在，单独计。
   const terminalAlertCount = alerts.length
-  const scanDeviceAlerts = await collectScanDeviceAlerts(prisma, now)
+  const { alerts: scanDeviceAlerts, terminalSubjectKeysInScope: scanDeviceSubjectKeysInScope } = await collectScanDeviceAlerts(prisma, now)
   alerts.push(...scanDeviceAlerts)
 
   const where = failedTaskWhere(nowMs)
@@ -521,10 +521,10 @@ export async function collectDerivedAlerts(
     ), 0) + (feedbackAlert ? 1 : 0) + alerts.filter((alert) => alert.type === 'print_terminal_quota_high').length + aiAlerts.length + scanDeviceAlerts.length,
     omitted,
     cap: PRINT_FAILED_LIST_CAP,
-    terminalSubjectKeysInScope: terminals.flatMap((t) => [
+    terminalSubjectKeysInScope: [...terminals.flatMap((t) => [
       buildSubjectKey('terminal_offline', t.id),
       buildSubjectKey('printer_issue', t.id),
-    ]),
+    ]), ...scanDeviceSubjectKeysInScope],
   }
 }
 
