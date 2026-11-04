@@ -186,6 +186,16 @@ const MOCK_TERMINAL_PROFILE: Record<string, UpdateTerminalProfileResult> = {
   },
 }
 const MOCK_PLANNED_TERMINALS: PlannedTerminalCreated[] = []
+const MOCK_PRINTER_QUEUE: Record<string, NonNullable<AdminTerminalRecord['printerQueue']> | null> = {
+  'KSK-001': { printerQueueName: '前台', printerQueuePortKind: 'usb', printerQueuePortName: 'USB001', printerQueueRawStatus: '3,0,False,0,0', printerQueueSpooler: 'running' },
+  'KSK-002': { printerQueueName: '就业中心', printerQueuePortKind: 'usb', printerQueuePortName: 'USB002', printerQueueRawStatus: '3,4,False,16,4', printerQueueSpooler: 'running' },
+  'KSK-003': { printerQueueName: '大厅', printerQueuePortKind: 'network', printerQueuePortName: null, printerQueueRawStatus: '2,0,False,0,2', printerQueueSpooler: 'running' },
+  'KSK-004': { printerQueueName: '窗口', printerQueuePortKind: 'usb', printerQueuePortName: 'DOT4_001', printerQueueRawStatus: '3,0,False,0,3', printerQueueSpooler: 'running' },
+  'KSK-007': { printerQueueName: '二楼', printerQueuePortKind: 'usb', printerQueuePortName: 'USB001', printerQueueRawStatus: '3,0,False,0,0', printerQueueSpooler: 'running' },
+  'KSK-008': { printerQueueName: '服务台', printerQueuePortKind: 'usb', printerQueuePortName: 'USB001', printerQueueRawStatus: 'query_failed', printerQueueSpooler: 'stopped' },
+  'KSK-009': null,
+  'KSK-010': { printerQueueName: '南门', printerQueuePortKind: 'unknown', printerQueuePortName: null, printerQueueRawStatus: 'not_found', printerQueueSpooler: 'running' },
+}
 const MOCK_TERMINAL_LIFECYCLE: Record<string, { status: TerminalLifecycleStatus; version: number }> = {}
 const MOCK_TERMINAL_CREDENTIAL_STATE: Record<string, { generation: number; active: boolean }> = {}
 function mockOrgFields(terminalCode: string): { orgId: string | null; orgName: string | null; orgType: string | null } {
@@ -389,8 +399,10 @@ export const adminMockAdapter = {
         ipAddress: null,
         diskFreeGb: null,
         releaseObservation: null,
+        printerQueue: null,
       })), ...base.map((t) => ({
         ...t,
+        printerQueue: MOCK_PRINTER_QUEUE[t.terminalCode] ?? null,
         lifecycleStatus: MOCK_TERMINAL_LIFECYCLE[t.terminalCode]?.status ?? 'active' as const,
         lifecycleVersion: MOCK_TERMINAL_LIFECYCLE[t.terminalCode]?.version ?? 0,
         credentialGeneration: MOCK_TERMINAL_CREDENTIAL_STATE[t.terminalCode]?.generation ?? 1,

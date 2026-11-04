@@ -154,6 +154,14 @@ export interface AdminTerminalRecord {
   printerStatus: TerminalPrinterStatus | string | null
   wiredNetworkStatus: 'connected' | 'disconnected' | 'unknown' | string | null
   printerNetworkStatus: 'reachable' | 'unreachable' | 'not_network_printer' | 'unknown' | string | null
+  /** 终端程序上报的 Windows 打印队列。null 表示这一版终端程序还没报。 */
+  printerQueue?: {
+    printerQueueName: string | null
+    printerQueuePortKind: string | null
+    printerQueuePortName: string | null
+    printerQueueRawStatus: string | null
+    printerQueueSpooler: string | null
+  } | null
   /**
    * 扫描输入闸门的心跳遥测（Agent 上报 → TerminalHeartbeat → AdminTerminalView）。
    *
