@@ -15,12 +15,14 @@ function PhoneQrSlot({
   loading,
   expiresLabel,
   inactive = false,
+  showRefresh,
   onRefresh,
 }: {
   qrUrl: string | null
   loading: boolean
   expiresLabel: string
   inactive?: boolean
+  showRefresh: boolean
   onRefresh: () => void
 }) {
   if (inactive) {
@@ -34,7 +36,7 @@ function PhoneQrSlot({
           {expiresLabel && !expiresLabel.includes('NaN')
             ? `二维码有效期 ${expiresLabel}。单份不超过 10MB。`
             : '二维码有效期从生成时起算，10 分钟。单份不超过 10MB。'}
-          <button type="button" className="fs-qr-refresh" onClick={onRefresh} data-testid="file-source-refresh">刷新二维码</button>
+          {showRefresh ? <button type="button" className="fs-qr-refresh" onClick={onRefresh} data-testid="file-source-refresh">刷新二维码</button> : null}
         </span>
       </div>
     )
@@ -92,6 +94,7 @@ export function PhoneBoard({
       {showQr ? (
         <PhoneQrSlot
           qrUrl={qrUrl}
+          showRefresh={screen === 'phone-ready' || screen === 'phone-waiting' || screen === 'phone-uploading'}
           onRefresh={onPhoneRefresh}
           loading={phone.loading}
           expiresLabel={expiresLabel}

@@ -1369,7 +1369,7 @@ test('unverified terminal disables color and duplex with an honest reason @w2', 
   await colorBtn.focus()
   await expect(colorBtn).toBeFocused()
 
-  const duplexBtn = preview.getByRole('button', { name: '双面（长边）', exact: true })
+  const duplexBtn = preview.getByRole('button', { name: '双面', exact: true })
   await expect(duplexBtn).toHaveAttribute('aria-disabled', 'true')
   await expect(duplexBtn).not.toHaveAttribute('disabled', /.*/)
   await duplexBtn.focus()
@@ -1381,6 +1381,8 @@ test('unverified terminal disables color and duplex with an honest reason @w2', 
   await duplexBtn.click({ force: true })
   await expect(preview.getByRole('button', { name: '黑白', exact: true })).toHaveAttribute('data-selected', 'true')
   await expect(preview.getByRole('button', { name: '单面', exact: true })).toHaveAttribute('data-selected', 'true')
+  await expect(preview.getByRole('button', { name: '长边翻页', exact: true })).toHaveCount(0)
+  await expect(preview.getByRole('button', { name: '短边翻页', exact: true })).toHaveCount(0)
 
   await expectHealthy(page, errors, 'print-preview')
 })
@@ -1406,8 +1408,11 @@ test('terminal verified for color and duplex can actually select them @w2', asyn
   await colorBtn.click()
   await expect(colorBtn).toHaveAttribute('data-selected', 'true')
 
-  const duplexBtn = preview.getByRole('button', { name: '双面（长边）', exact: true })
+  const duplexBtn = preview.getByRole('button', { name: '双面', exact: true })
   await duplexBtn.click()
+  const longEdgeBtn = preview.getByRole('button', { name: '长边翻页', exact: true })
+  await longEdgeBtn.click()
+  await expect(longEdgeBtn).toHaveAttribute('data-selected', 'true')
   await expect(duplexBtn).toHaveAttribute('data-selected', 'true')
 
   await expectHealthy(page, errors, 'print-preview')
