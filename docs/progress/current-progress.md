@@ -7,6 +7,12 @@
 - 验证：后端类型检查 0 错；仓库 lint 0 错；优化服务在图谱里列出的门禁通过。新样本覆盖逐字命中、首尾空白、唯一全半角标点、多处相似、跨字段拆分、空 `after`。一体机、小程序、终端程序未改。
 - 没做：这一版还在本分支，没有推送。模型仍可能写出对不上的改写，那些条继续只能手改。
 
+## 2026-11-04：一体机简历 U 盘导入不再无限等，逐条对照保留带入的条目（分支 `claude/kiosk-resume-fixes-1104`；未推送、未部署）
+
+- 问题 A：浏览器到本机程序的 U 盘上传没有截止时间。`uploadUsbFile` 45 秒后中止（本机程序到后端是 30 秒，这里再留 15 秒）。到点或连接中断不判失败、不自动重发。屏上写「这次导入没有等到结果，请重新选择文件再导一次」，导入状态和忙碌锁释放。打印共用同一函数；未确认时停在已选文件，不走进「这一份没导进来」。
+- 问题 B：对照页同一次进入会把带入的条目和选择清掉。现在先清上一份，再放回 `focusIndex` 和已选。匿名链「手机上传 → 诊断 → 优化建议 → 逐条看」在夹具里没有回到首页（立刻点并停约 4 秒、未保存编辑后进第 2 条、优化页时钟快进 60 秒再点）。清场在控制台记原因码和时刻（idle_timeout、history_fallback、privacy_deadline、explicit_end），不记简历、令牌、文件名。
+- 验证：lint 0 error；一体机 `tsc --noEmit` 通过；新浏览器用例 3 条通过。图谱门禁首轮除 `verify:w3a-ai-records` 外退出码为 0（当时 12 过 3 败，因新文案模块未进单测模拟）；补上真实文案加载后 15 过 0 败。反向检查：去掉截止时间，U 盘用例红在等不到那句；去掉条目放回，「第 2 / 2 条」红。均用 `git checkout` 还原。本机冷构建超过配置里的 180 秒，跑浏览器用例时临时把等待调到 600 秒，仓库里的超时未改。
+
 ## 2026-11-02：屏上扫描 ③ 后端第一批 B1（云端会话、能力键、心跳；分支 `claude/scan-device-b1-1102`，从发布候选头 3f19aba9c 切出，已并 origin/main 49ed808b6，未推送、未部署）
 
 - 做了什么：任务包 ③（用户在一体机屏上点「开始扫描」，终端程序服务经 WIA 直接扫描）的云端部分。`ScanTask` 加 8 个会话字段（startMode 默认 panel、deviceSource、deviceColorMode、deviceState、devicePageCount、deviceErrorCode、deviceUpdatedAt、hardExpiresAt），`TerminalHeartbeat` 加 scanDeviceHealth / scanDeviceObservedAt；两套迁移同名 `20261102230000_add_scan_device_session_fields`，`verify-first-order-migrations` 升级清单补了这份（旧行取默认值、新列可读写）。能力键 `scan_device` 进共享契约与后端副本、DEFAULT_DENY（逐台到机器旁验过进纸器、无纸、开盖、打印时扫描、中止恢复才登记，同彩色、双面），后台「设备能力」页键名「屏上扫描（需真机验证）」。

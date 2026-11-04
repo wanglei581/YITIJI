@@ -227,6 +227,7 @@ test('USB files render as named buttons and retain size, MIME, purpose and busy 
     },
     // W-125：面板先过后台能力闸门；这份单测只管文件列表与导入契约，闸门按已放行处理。
     '../../../hooks/useUsbImportGate': { useUsbImportGate: () => ({ state: 'allowed', note: null, retry: () => {} }) },
+    '../../../copy/usbImportCopy': load('src/copy/usbImportCopy.ts'),
     '../touch/unattendedResumeCopy': { unattendedResumeCopy: (text) => String(text ?? '') },
     '../../../copy/unattendedCopy': load('src/copy/unattendedCopy.ts'),
     '../../../hooks/useSupportContact': { useSupportContact: () => load('src/copy/unattendedCopy.ts').CONSERVATIVE_SUPPORT_CONTACT },
@@ -272,6 +273,7 @@ test('unattended USB panel: a row click only selects, the page-level import butt
       uploadUsbFile: (...args) => { requests.push(args); return upload.promise },
     },
     '../../../hooks/useUsbImportGate': { useUsbImportGate: () => ({ state: 'allowed', note: null, retry: () => {} }) },
+    '../../../copy/usbImportCopy': load('src/copy/usbImportCopy.ts'),
     '../touch/unattendedResumeCopy': { unattendedResumeCopy: (text) => String(text ?? '') },
     '../../../copy/unattendedCopy': load('src/copy/unattendedCopy.ts'),
     '../../../hooks/useSupportContact': { useSupportContact: () => load('src/copy/unattendedCopy.ts').CONSERVATIVE_SUPPORT_CONTACT },
@@ -305,6 +307,7 @@ test('legacy USB panel (interview setup): unconfigured and read-failure sentence
     'lucide-react': { FileTextIcon: 'svg', LoaderIcon: 'svg', RefreshCwIcon: 'svg', UsbIcon: 'svg' },
     '../../../services/files/usbImportApi': usb,
     '../../../hooks/useUsbImportGate': { useUsbImportGate: () => ({ state: 'allowed', note: null, retry: () => {} }) },
+    '../../../copy/usbImportCopy': load('src/copy/usbImportCopy.ts'),
     '../touch/unattendedResumeCopy': { unattendedResumeCopy: (text) => String(text ?? '') },
     '../../../copy/unattendedCopy': copy,
     '../../../hooks/useSupportContact': { useSupportContact: () => contact },
