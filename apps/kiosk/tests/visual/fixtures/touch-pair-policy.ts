@@ -132,6 +132,8 @@ export function policyPairs(): TouchPair[] {
       item: '政策', screen: 'policy-list', state: 'empty', route: '/renshi?tab=policy',
       seeds: ['GET /policies guides []'],
       missingReason: null,
+      // 稿上政策库空态由 fyRead='empty' 切换（fix-policy.js「read-empty」演示事件）。
+      proto: { patch: { fyRead: 'empty' } },
       prepare: async (page, api) => {
         registerTouchShell(api)
         await routePolicies(page, [])
