@@ -4,7 +4,7 @@ import { formatCount, formatDateTime } from '@ai-job-print/shared'
 import { ConsoleTable, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
-import { AlertTriangleIcon, BotIcon, FileWarningIcon, MessageSquareWarningIcon, MonitorOffIcon, PrinterIcon, RefreshCwIcon } from 'lucide-react'
+import { AlertTriangleIcon, BotIcon, FileWarningIcon, MessageSquareWarningIcon, MonitorOffIcon, PrinterIcon, RefreshCwIcon, ScanLineIcon } from 'lucide-react'
 import {
   adminOpsService,
   type AdminAlertItem,
@@ -57,6 +57,11 @@ const TYPE_META: Record<
     icon: BotIcon,
     guidance: '全站今天的 AI 费用已经到上限，AI 功能暂停到明天 0 点。单台终端或单个会员自己的上限不会出现在这里。',
   },
+  scan_device_issue: {
+    label: '扫描仪异常',
+    icon: ScanLineIcon,
+    guidance: '这台终端已开通屏上扫描，最近一次心跳报扫描仪找不到或出错。心跳改报正常后这条告警会自行消失。确认 / 静默只记录处理。',
+  },
 }
 
 const SEVERITY_MAP: Record<string, { badge: 'error' | 'warning'; label: string }> = {
@@ -80,6 +85,7 @@ const TYPE_FILTERS = [
   { label: 'AI 账户不可用', value: 'ai_provider_unavailable' },
   { label: 'AI 连续失败', value: 'ai_consecutive_failures' },
   { label: 'AI 费用上限已用完', value: 'ai_budget_exhausted' },
+  { label: '扫描仪异常', value: 'scan_device_issue' },
 ] as const
 
 const VIEW_TABS: Array<{ label: string; value: AlertListView }> = [
@@ -175,7 +181,7 @@ export default function AlertsPage() {
       ? '该分类当前无告警'
       : '这一栏没有告警'
   const emptyDescription = firingCount === 0
-    ? '所有终端在线、打印机正常、近 24 小时无未处理失败任务、无文件不可用的已支付待打印任务，AI 账户、连续失败和当天全站费用上限也都没有告警'
+    ? '所有终端在线、打印机正常、近 24 小时无未处理失败任务、无文件不可用的已支付待打印任务，已开通屏上扫描的终端没有扫描仪找不到或出错，AI 账户、连续失败和当天全站费用上限也都没有告警'
     : filtered.length === 0 && typeFilter
       ? `「${TYPE_META[typeFilter as AdminAlertItem['type']]?.label ?? typeFilter}」在当前栏无告警；仍有 ${formatCount(firingCount)} 条问题未恢复`
       : `待处理 ${formatCount(openCount)} · 已确认仍在发生 ${formatCount(acknowledgedCount)} · 已静默/关闭仍在发生 ${formatCount(suppressedCount)}。确认不会把设备显示成正常。`
@@ -196,7 +202,7 @@ export default function AlertsPage() {
       }
     >
       <div className="mb-4 rounded-[9px] border border-info/20 bg-info-bg px-4 py-2.5 text-[13px] text-info-fg">
-        告警由实时状态派生：终端离线（心跳超 5 分钟）、打印机异常、近 24 小时打印失败、已支付但打印文件不可用的待打印任务（需人工处置）、AI 账户不可用、AI 连续失败、当天全站 AI 费用用完。确认 / 静默 / 关闭只记录处理，问题仍在时不会显示成已恢复；关闭后可以「重新打开」退回待处理。已退款的订单按订单退款状态退出告警，本页不发起退款，不伪造出纸结果。
+        告警由实时状态派生：终端离线（心跳超 5 分钟）、打印机异常、近 24 小时打印失败、已支付但打印文件不可用的待打印任务（需人工处置）、已开通屏上扫描且心跳在线时扫描仪找不到或出错、AI 账户不可用、AI 连续失败、当天全站 AI 费用用完。确认 / 静默 / 关闭只记录处理，问题仍在时不会显示成已恢复；关闭后可以「重新打开」退回待处理。已退款的订单按订单退款状态退出告警，本页不发起退款，不伪造出纸结果。
       </div>
 
       {truncation && (
