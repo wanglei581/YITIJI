@@ -22,6 +22,20 @@
 - 验证：API typecheck、改过的 8 个 TS 文件 lint、新门禁 79/79 与 55/55、图谱关联的全部可离线门禁（含 verify:resume-optimize 内 #1574 的 6 类样本及两个展开的前置/后置脚本）、根目录仓库完整性/合规文案/日期时间/原始错误上屏检查均通过。verify:resume-report-export 首轮 SQLite P1008 超时，串行重跑通过；verify:ocr-baidu-live 已执行但因无 BAIDU_OCR_API_KEY / BAIDU_OCR_SECRET_KEY 退出 1，未验证真实 OCR。反向检查清空表为 40 PASS/39 FAIL、去掉事实比对前折叠为 75 PASS/4 FAIL，均退出 1；从 /tmp/c3-radical-mut/ 副本恢复后逐字节一致，两条新门禁恢复通过，反向检查前后 git diff --stat 完全一致。
 - 没做：未合并、未部署；未改 apps/**、ci.yml、图谱、生产配置、数据库结构，未新增依赖；未用 F-24 原件与苹果全部字体在真机、真实模型上复测。
 
+## 2026-11-05：终端程序打印队列诊断与显式 A4 合入 main（#1579，分支 `claude/printer-queue-agent-1104`；代码进 main，未打包发布、未装机）
+
+- 做了：心跳增加 5 个只读字段（队列名、端口种类、USB 端口名、Win32_Printer 原值、打印服务状态）。端口地址不上传；队列名像地址就不带。原值与状态共用一次查询，对不上契约就不带。非 Windows 报 unknown。
+- 400 保险：带打印队列字段的心跳回 400 时，去掉字段立即重发一次；只有重发成功才在 1 小时内不再带，重发仍失败则不进入不带。这条警告一小时最多记一次。401 不触发重发。
+- 后端半（#1578）11/05 11:53 已上生产（随 `bfe80722e`，迁移 `20261104150000_add_terminal_heartbeat_printer_queue` 已执行）。终端装上本版之前，后台终端详情的打印队列一栏写「未上报（终端程序升级到新版本后才上报）」。往真机装新版终端程序由产品负责人定。
+- 显式 A4：下发 pdf-to-printer 时 paperSize 固定 A4，不再靠驱动默认纸型。待真机试打，试打前问产品负责人。
+- 版本：升到 0.4.19。按 11/04 与复印扫描线的约定，先进 main 的用 0.4.19；扫描线 #1584 也写了 0.4.19，两边改的是同一批版本文件、改法一样，合并时 git 不报冲突，后合入的要改成 0.4.20。升级测试里的旧版本号与兼容下限不改。
+
+## 2026-11-04：屏上扫描后端 B10（扫描仪告警移出范围不推「已恢复」；分支 `claude/scan-device-b2-1102`，未部署）
+
+- 起因：Codex 只读复核 B9 报 P1——扫描仪告警推送后，终端停用、非 active、离线或 `scan_device` 关闭，告警从收集结果消失，推送服务会把它推成「已恢复」；重新纳入范围时同一故障回合还会被旧去重键挡住。
+- 改法（Codex 实现，Claude 收货）：`derived-scan-device-alerts.ts` 只把在线、有扫描仪状态回报、能力 available、enabled+active 的终端放进 `terminalSubjectKeysInScope`；`admin-alert-push.service.ts` 把扫描仪告警并入终端类，移出范围静默、不推恢复，并只清掉扫描仪这一回合的 firing 去重键，重新纳入仍故障会再提醒一次。离线、打印机告警行为不变（新增回归用例钉住）。
+- 验证：`verify:alert-push`（新增停用 / 非 active / 离线 / 能力关闭 / 无状态回报不推恢复、真恢复推恢复、再纳入再推）、`verify:scan-device-b9`、`verify:admin-ops`、`verify:scan-device-b4`、`verify:queue-dispatch-printer-status`、api typecheck 与改过文件 lint 均通过（SQLite 隔离库）；PostgreSQL 版交 CI。反向检查三项（去掉范围过滤、只凭消失推恢复、去掉状态非空条件）都变红，恢复后绿。
+
 ## 2026-11-05：两个后台 C3 前端两处——机构资料页托管关闭时不显示数据源、0 元单不出退款按钮（未合并、未部署）
 
 - 机构资料页复用托管开关：关闭时不显示「数据源」，机构账号计数照旧；`job_info`、`job_fair`、`external_apply_redirect` 标签加「（暂不开放）」并置灰，与管理员后台同一清单，只改展示。开启时保留原标签、样式和数据源计数；演示资料改用真实模块键名。
@@ -29,13 +43,6 @@
 - 来源：旧 PR #1296（`1be7421a6`）、#1289（`20b84ce00`），对照 main `50070402a` 重做；只取本任务两处，不带入旧批次其他改动。两个用例文件补托管开关两态、0 元以及有实收的普通/待退款场景；管理员按需启用同一条演示订单，默认列表仍为原两单。
 - 验证：两个应用 typecheck、全量 src lint（管理员 5 条、机构 7 条既存警告，零错误）、http 生产构建、四项根门禁及订单只读 UI、后台中文文案、机构刷新与统计门禁通过。图谱列出的隐私文案模块已由中文文案门禁实际调用；反向检查删除 0 元分支、在其中放回按钮均使新断言失败，副本恢复后通过，前后 diff stat 一致。
 - 验证限制与范围：Playwright 只写未跑，交收货方；用例原命令因 `@playwright/test` 类型入口未链接而失败，显式指定已安装包路径后两文件均通过。退款 API 关联门禁已运行但缺少生成的 Prisma client，未进入断言（隔离 SQLite 的 133 条迁移通过）。未改后端、数据库模型、生产配置、密钥、硬件或 `docs/graph/`，未提交、未部署。
-
-
-## 2026-11-04：屏上扫描后端 B10（扫描仪告警移出范围不推「已恢复」；分支 `claude/scan-device-b2-1102`，未部署）
-
-- 起因：Codex 只读复核 B9 报 P1——扫描仪告警推送后，终端停用、非 active、离线或 `scan_device` 关闭，告警从收集结果消失，推送服务会把它推成「已恢复」；重新纳入范围时同一故障回合还会被旧去重键挡住。
-- 改法（Codex 实现，Claude 收货）：`derived-scan-device-alerts.ts` 只把在线、有扫描仪状态回报、能力 available、enabled+active 的终端放进 `terminalSubjectKeysInScope`；`admin-alert-push.service.ts` 把扫描仪告警并入终端类，移出范围静默、不推恢复，并只清掉扫描仪这一回合的 firing 去重键，重新纳入仍故障会再提醒一次。离线、打印机告警行为不变（新增回归用例钉住）。
-- 验证：`verify:alert-push`（新增停用 / 非 active / 离线 / 能力关闭 / 无状态回报不推恢复、真恢复推恢复、再纳入再推）、`verify:scan-device-b9`、`verify:admin-ops`、`verify:scan-device-b4`、`verify:queue-dispatch-printer-status`、api typecheck 与改过文件 lint 均通过（SQLite 隔离库）；PostgreSQL 版交 CI。反向检查三项（去掉范围过滤、只凭消失推恢复、去掉状态非空条件）都变红，恢复后绿。
 
 ## 2026-11-04：屏上扫描后端 B9（扫描仪告警只算仍在运营的终端；分支 `claude/scan-device-b2-1102`，叠在 B8 头 `d09b3f19d` 上，未推送、未部署）
 

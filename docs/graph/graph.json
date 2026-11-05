@@ -24157,6 +24157,7 @@
     "apps/terminal-agent/src/agent/auth-state.ts": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
       "apps/terminal-agent/scripts/verify-print-retry-attempt.ts",
+      "apps/terminal-agent/scripts/verify-printer-queue-diagnostics.ts",
       "apps/terminal-agent/scripts/verify-scan-deletion-audit.ts",
       "apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts",
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
@@ -24191,6 +24192,7 @@
       "apps/terminal-agent/scripts/verify-local-qr-proxy.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
+      "apps/terminal-agent/scripts/verify-printer-queue-diagnostics.ts",
       "apps/terminal-agent/scripts/verify-scan-input-lockout-telemetry.ts"
     ],
     "apps/terminal-agent/src/agent/instance-lock.ts": [
@@ -24228,6 +24230,9 @@
     ],
     "apps/terminal-agent/src/agent/print-task-temp-cleanup.ts": [
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs"
+    ],
+    "apps/terminal-agent/src/agent/printer-queue-diagnostics.ts": [
+      "apps/terminal-agent/scripts/verify-printer-queue-diagnostics.ts"
     ],
     "apps/terminal-agent/src/agent/printer-status-map.ts": [
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts"
@@ -24300,6 +24305,7 @@
       "apps/terminal-agent/scripts/verify-local-qr-proxy.ts",
       "apps/terminal-agent/scripts/verify-print-retry-attempt.ts",
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
+      "apps/terminal-agent/scripts/verify-printer-queue-diagnostics.ts",
       "apps/terminal-agent/scripts/verify-scan-deletion-audit.ts",
       "apps/terminal-agent/scripts/verify-scan-input-health.ts",
       "apps/terminal-agent/scripts/verify-scan-input-lockout-telemetry.ts",
@@ -24311,11 +24317,13 @@
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
-      "apps/terminal-agent/scripts/verify-print-retry-attempt.ts"
+      "apps/terminal-agent/scripts/verify-print-retry-attempt.ts",
+      "apps/terminal-agent/scripts/verify-printer-queue-diagnostics.ts"
     ],
     "apps/terminal-agent/src/agent/wql-literal.ts": [
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
-      "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
+      "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
+      "apps/terminal-agent/scripts/verify-printer-queue-diagnostics.ts"
     ],
     "apps/terminal-agent/src/config.ts": [
       "apps/terminal-agent/scripts/verify-printer-config.mjs"
@@ -35809,6 +35817,29 @@
       "package": "terminal-agent",
       "scriptNames": [
         "terminal-agent::verify:printer-config"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/terminal-agent/src/agent/auth-state.ts",
+          "apps/terminal-agent/src/agent/heartbeat.ts",
+          "apps/terminal-agent/src/agent/printer-queue-diagnostics.ts",
+          "apps/terminal-agent/src/agent/types.ts",
+          "apps/terminal-agent/src/agent/wmi.ts",
+          "apps/terminal-agent/src/agent/wql-literal.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-printer-queue-diagnostics.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:printer-queue-diagnostics"
       ],
       "wired": true
     },
