@@ -5,7 +5,7 @@
  *   A. renshi 目录不得引用 ComingSoon 占位；不得出现硬编码「同步时间：」假时效。
  *   B. 内置指引数据不得携带无证据的 updatedAt；官方入口 URL 必须为 https 且 gov.cn 域。
  *   C. 内置指引（builtin-*）不渲染收藏按钮；库内条目保留收藏能力。
- *   D. 浏览/外部跳转上报必须跳过 builtin-*（服务端仅接受库内已发布条目）。
+ *   D. 活页面不引用内置指引；详情记浏览、不在渲染时记外部跳转（二维码看见不等于扫了）。
  *   E. 人群筛选与后端 POLICY_AUDIENCES 对齐（含 flexible 与 migrant）。
  *   F. 首页政策服务子入口与 Tab 一一对应（社保指南→tab=social），不得回退「补贴指引→tab=social」错位。
  *   G. 无越界承诺文案（代办 / 保证到账 / 免申即享 / 一键投递等）。
@@ -120,10 +120,11 @@ if (policyPanel.includes('toggleFavorite')) {
 }
 
 // D. 活页面只展示接口内容，埋点归属仍为政策；停放指引不进入活路由。
+// 详情只记浏览：原文二维码画在屏上，看见不等于扫了，渲染时不记「打开官方入口」（2026-11-05 实走发现会替用户造足迹）。
 if (!/builtinData|BUILTIN_GUIDES/.test(page + detail + list + home) &&
-  detail.includes("recordBrowse(getToken(), 'policy', id)") && detail.includes('recordExternalJump')) {
-  pass('D. 活页面无内置指引，库内浏览和原文二维码保留上报')
-} else fail('D. 不得恢复内置指引或丢失库内上报')
+  detail.includes("recordBrowse(getToken(), 'policy', id)") && !detail.includes('recordExternalJump')) {
+  pass('D. 活页面无内置指引，库内浏览照常上报，详情不在渲染时记外部跳转')
+} else fail('D. 不得恢复内置指引、丢失库内浏览上报，或在详情渲染时替用户记外部跳转')
 
 // E. 人群枚举对齐
 if (['graduate', 'flexible', 'migrant', 'startup', 'hardship'].every((k) => shared.includes(`'${k}'`))) {
