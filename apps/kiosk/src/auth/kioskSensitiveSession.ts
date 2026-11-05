@@ -4,7 +4,7 @@ import { clearPickupClaimCode, PICKUP_CLAIM_RESUME_KEY } from '../pages/print/pi
 import { clearAiResumeSession } from '../pages/resume/aiResumeSession'
 import { clearAllResumeParseIntents, RESUME_PARSE_INTENT_STORAGE_KEY } from '../services/resumeParseIntent'
 import { clearJobMaterialDraft } from '../pages/resume/jobMaterialDraft'
-import { ASSISTANT_DRAFT_KEY, clearAssistantDraft } from '../services/assistantDraft'
+import { ASSISTANT_DRAFT_KEY, ASSISTANT_POLICY_KEY, clearAssistantDraft, clearAssistantPolicyContext } from '../services/assistantDraft'
 import {
   clearSession as clearSelfAssessmentSession,
   SESSION_STORAGE_KEY as SELF_ASSESSMENT_SESSION_KEY,
@@ -50,6 +50,7 @@ const SENSITIVE_SESSION_STORAGE_KEYS = [
   INTERVIEW_WORKBENCH_SESSION_KEY,
   SCAN_WORKBENCH_SESSION_KEY,
   ASSISTANT_DRAFT_KEY,
+  ASSISTANT_POLICY_KEY,
   AI_DECLARATION_SESSION_KEY,
 ] as const
 
@@ -122,6 +123,7 @@ export function clearKioskSensitiveSession(outgoingMemberToken?: string | null):
   clearSelfAssessmentSession()
   clearInterviewWorkbenchSession()
   clearAssistantDraft()
+  clearAssistantPolicyContext()
   // 顺序不可调换：收尾要读本地登记的 scanTaskId / controlToken，
   // clearScanWorkbenchSession() 一旦先跑，就再也找不到要撤谁。
   beginScanSessionCleanup(outgoingMemberToken ?? null)
