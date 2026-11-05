@@ -90,7 +90,10 @@ export function resolveLandedPath(pattern: ProductionRoutePattern, url: string):
     // 调用方 route-sweep.spec.ts 比的是 `url.pathname`，不含查询串，所以这里剥掉。
     return target.split('?')[0] ?? target
   }
-  return url.split('?')[0] ?? url
+  const pathOnly = url.split('?')[0] ?? url
+  // 只有证件照这一个样本回服务台。同模式的复印等说明仍停在本页。
+  if (pathOnly === '/print-scan/feature/id-photo') return '/print-scan'
+  return pathOnly
 }
 
 export const sweepCases: SweepCase[] = productionRoutePatterns.map((pattern) => {

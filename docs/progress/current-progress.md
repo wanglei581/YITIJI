@@ -1,5 +1,14 @@
 # 当前开发进度
 
+## 2026-11-05：触屏版三项承诺进 main——B9（#1495 随 #1577）、B10（#1585）、B12（#1580）（只改文档；分支 `claude/touch-b9-b10-b12-progress-1105`）
+
+- **#1577 批量**（main + #1511 授权闸门 + #1573 简历 U 盘 + #1495 触屏稿与冻结门禁）：合并提交 4b76ae078（11/05 01:43）。并 main 时补了两处与 #1583 停放的语义冲突：收尾路由登记表认 `/toolbox/*`、`/smart-campus/*`（`windDownRoute` 支持前缀匹配，停放旧链接收尾期间也照常回首页）；首页磁贴期望改为 gov 3 块、full 4 块（`home-fill-when-empty` 与授权闸门夹具去掉智慧校园）。
+- **B10 #1585**（06bce91b5，11/05 03:33）：打印（完成与进度、上传到收银台、图片转 PDF）、简历、面试、政策在 1080×1920 下逐屏逐状态照「青序流光 · 触屏版」稿改到位；只改展示与对应用例，不新增入口、页面、路由、接口、数据模型。改前改后对照 59 对（私有页，链接在 PR 说明里）。扫描 7 对交复印扫描线。顺带修了 fusion-w3 决策页多视口触控尺寸量法的竞态（缩放比与控件尺寸改在同一次轮询里读，门槛 48 不变）。
+- **B12 #1580**（589cd13ec，11/05 05:16）：一体机证件照卡停放。
+- **另案，没做：** 打印服务台两处（打印机离线时复印卡配色像停用、复印 / 到机码说明把「身份证复印」断开）；停用态「问小青」缺灰色麦克风（共享件 QxTouchDock，全站统一一次）；政策详情原文短时页下方留白（已发布政策没有条件 / 材料 / 步骤三段数据，不拉长空卡）。
+- **CI 注意：** kiosk-browser-smoke 在 PR 上用时 88–90 分钟，贴着 90 分钟时限（#1580 超时被掐一次）；授权闸门用例「暂停之后刷新页面，仍是暂停屏」偶发（`license-world.ts` 的 `quiet()` 推进时钟时撞上进暂停清场的整页重载）。两件待产品负责人定是否处理。
+- 没有发布、没有碰生产。
+
 ## 2026-11-04：产品负责人定「先把五项做完整」，各线按新优先级重排（只改文档；分支 `claude/five-items-1104`）
 
 - 原话见 `next-tasks.md` 同日一节。五项：AI 简历优化、AI 模拟面试、打印、扫描、政策；百宝箱、智慧校园一体机端停放（单独一个 PR）。
@@ -38,6 +47,17 @@
 - 面板扫描到 SMB 要走打印机网口，G8 首装验收的扫描项不接网口过不了。照 A9（收件目录只许 SYSTEM 和管理员写）和 A11（防火墙只放行本机 9527）现在的写法，面板推扫进不来：要另开只对打印机地址放行的 445 入站和一个只能写收件目录的本地账号，怎么开待现场核实，和接网口一起先问产品负责人。
 - **接打印机网口、开 SNMP 之前先问产品负责人。** 团体名、v3 口令、管理员密码只进密码库，不写入文档、仓库、后台或一体机。
 
+## 2026-11-04：一体机证件照卡停放（B12；分支 `claude/kiosk-idphoto-park-b12`；未合并、未发布）
+
+- **依据**：产品负责人 2026-10-12 定一体机证件照「尚未开放」卡停放（代码留着、不显示，以后能再打开；电子版证件照放小程序上架后做，只裁切、换底色）。合规线同日同意停放带来的删字。2026-11-04 他同意改功能范围文档那一行和触屏稿里那张磁贴，看过对照图后回「可以，照这个改」。停放是源码保留、入口不显示、地址进不去，不是删除。本条是隐藏页面。
+- **稿**（`docs/design/kiosk-touch-2026-10/`，这次改稿他已同意）：`screens.js`、`screens2.js`、`screens3.js`、`fix-scan.js` 从对照稿原样拷入。`print` 与 `st-loading` 去掉证件照磁贴，其他工具改成两行（上行照片打印、照片合成 PDF、签名，下行我的文档、打印订单各占半行）。`feature-info` 改名「已停放，只留档」。`fix-scan.js` 能力名不认识一态去掉指向证件照的一条。`map.js` 是生成文件，未手改；运行页把 `/print/scan-feature` 回 `/print-scan`。README 在「冻结」前加「证件照停放（2026-11-04 改稿）」，并留下改前哈希。`node apps/kiosk/scripts/verify-kiosk-touch-frozen.mjs --update` 重写 `FROZEN.json`（`frozenAt` 仍是 2026-10-26，`updatedAt` 改为 2026-11-04）。改前哈希：`screens.js` `750fa506dae476bc8cf4e90657ab3bee8db0d0fce57daafd634b644d3759675c`，`screens2.js` `f6c86e8fc0ae2f7c94c929c1de3d6ea832b8fd7381da85f5b0b8ded3af925fee`，`screens3.js` `23ad15bf1b21ffb33fb85ab93a822290ad64f117fa8763aa72162db1aa92795b`，`fix-scan.js` `5eb2c4fee81389dea5291e1b0061442208b98864c8efa1c384f21618461d3881`。
+- **程序**：打印服务台对照稿 `print`、`st-loading`。`ID_PHOTO_ENTRY_PARKED`（`printHubContent.ts`，类型 `boolean`、值为 `true`）挡住证件照卡，不管后台 `id_photo` 怎么配；在线、打印机离线、正在确认本机能力走同一条过滤。条目定义和 `id_photo` 能力键映射留着。重新打开：把常量改为 `false`。其他工具样式在 `print-hub-qx.css` 按稿六列（前几张各占两列，最后两张各占半行）。证件照说明页对照稿 `feature-info`：`/print-scan/feature/id-photo` 在停放时 `<Navigate replace>` 回 `/print-scan`，组件 `IdPhotoParkedScreen` 留在源码里。能力名不认识一态对照稿 `fix-scan.js`：去掉「看证件照说明」和指向证件照的说法，只留复印和回打印扫描。屏上标题仍是「没有这项能力说明」（p39 要求这句同时在 2.0 原型和生产源码里；稿上这一态标题是「没有这份说明」，2.0 原型不改）。路由：`print/scan-feature` 回 `/print-scan`。`KioskRoot` 里 `/print-scan/feature/id-photo` 精确项留着（跳转瞬间仍算触屏路由）；前缀 `/print-scan/feature/` 继续盖住复印和未知能力名。
+- **没改**：首页 `pages/home/serviceGroups.ts`「证件照打印 · 待设备能力开放」灰项没有渲染方（`SERVICE_GROUPS` 只在该文件定义，没有 ts/tsx 引用），按任务不动。帮助中心、隐私文本里证件照作为高敏文件类别的句子不改。`docs/compliance/compliance-boundary.md` 仍写证件照未开放、只按原图当普通照片打印，这句话仍然成立，按任务只改 feature-scope 那一行。开发画廊 `/dev/touch-gallery` 的证件照占位未动（生产重定向到首页）。扫描页、复印页、百宝箱、智慧校园、后端、小程序、终端程序、后台都没动。
+- **功能范围**：`docs/product/feature-scope.md` 证件照行改为一体机停放，状态列「停放」。其余行不动。
+- **门禁真值**（只把「卡在 / 地址进说明页」改成「卡不在 / 地址回打印扫描」，没有删断言、没有放宽）：`verify-fusion-w2-print-scan.mjs` 旧地址目标 `/print-scan/feature/id-photo` → `/print-scan`，并断言停放跳转、`IdPhotoParkedScreen` 仍在、说明页源码没有「看证件照说明」和「证件照这一页写的是尚未开放」。`verify-p39-print-hub-fidelity.mjs` 新增停放常量为 true、其他工具用停放三元挡住 idPhoto、六列栅格、源码没有「看证件照说明」；八张能力定义和顺序仍按原断言。`fusion-baseline-contract.test.mjs` 夹具五处目标改为 `/print-scan`（scan-sign 对 `/print-scan/sign-v2` 的故意不一致没动）。`route-manifest.ts` 旧地址改为 `/print-scan`（注释留下旧目标）。`route-sweep-cases.ts` 只有样本 `/print-scan/feature/id-photo` 落到 `/print-scan`。`fusion-w6-route-cases.ts` 证件照样本与旧地址都落到 `/print-scan`，标记 `print-scan-home`，文案「打印扫描服务」（此前标记说明页、文案「证件照」）。证据目标 68 的活页捕获改为仍在本页的 `/print-scan/feature/copy`，旧地址重定向改为 `/print-scan`。`qingxu-pair-targets.ts` 规范路由改为 `/print-scan`，`feature-id-photo` 对照落到服务台；`feature-not-found` 仍在说明页。`print-hub-qx.spec.ts` 与 `fusion-w2-tools.spec.ts` 默认能力卡 6 → 5，并断言 `print-hub-cap-id-photo` 为 0；未知能力加上那两句不在；旧地址落到服务台。`fusion-w2-scan.spec.ts` 小青不可用时复印说明仍留在说明页，证件照地址单独断言回到服务台。冻结哈希四个稿文件的旧值写在 README；`FROZEN.json` 换成新哈希。
+- **验证**（本机，未发布）：`pnpm lint` 0 error（既有 warning 不在本次文件里）；一体机 `npx tsc --noEmit` 通过；生产构建带 `VITE_API_MODE=http`、`VITE_API_BASE_URL=/api/v1`、`VITE_USE_TRTC_CALL=true` 通过（3168 个模块）。冻结门禁 18 个文件 PASS；p39、fusion W2、fusion W6、fusion baseline、视觉证据清单（77 个主目标）PASS；`fusion-baseline-contract` 10/10；`kiosk-license-gate` 23/23。Playwright `playwright.w2.config.ts` 上 `print-hub-qx.spec.ts` 与 `fusion-w2-tools.spec.ts` 46 passed。图谱点名的进度文档门禁、`verify:print-color-duplex-capability`、`verify:ai-usage-retention`（66/66）、`verify:support-contact`、`verify:free-print-quota`（带 CI 测试用终端密钥才起得来）都通过。
+- **审查补两处**（Claude）：停放后「已经有证件照文件 → 按普通照片打印」这条正向流程只剩服务台的照片打印卡，`print-hub-qx.spec.ts` 补一条用例点它、断言进上传页带 `category=photo`（反向检查：把卡的去向去掉 `category=photo`，用例红在 URL 不匹配）；能力名不认识一态补回运行页原有的「多半是旧二维码或旧链接。」（2.0 稿 10-print-hub 也有这句，稿上没画但不该丢）。服务台四条加新用例共 5 条浏览器用例本机通过。
+- **不发布**。
 
 ## 2026-11-04：简历优化的改写要能在最终稿里逐字找到（只改后端；分支 `claude/optimize-after-match-1104`；未合并、未部署）
 

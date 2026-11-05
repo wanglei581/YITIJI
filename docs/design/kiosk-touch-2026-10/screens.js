@@ -55,7 +55,9 @@
 .d3-print .codeart i{height:34px}
 .d3-print .grid2{flex:1;min-height:0}
 .d3-print .grid2>.task{height:100%}
-.d3-tools{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.d3-tools{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.d3-tools>*{grid-column:span 2}
+.d3-tools>:nth-last-child(-n+2){grid-column:span 3}
 .d3-tools .tile{flex-direction:column;align-items:flex-start;min-height:118px;padding:12px 14px;gap:6px}
 .d3-tools .tile .chev{display:none}
 .d3-tools .tile .ic{width:64px;height:64px;border-radius:18px}
@@ -895,7 +897,7 @@
   });
   add('print', '打印扫描', '打印 · 扫描 · 复印入口', {
     before: 'print',
-    notes: { does: '运行页打印扫描服务台 PrintScanHomePage / QxPrintHubView（/print-scan）。问句用 HUB_ASK：在线「你的文件，现在在哪？」，打印机离线「这台机器出不了纸。」。', motion: '卡片依次浮入。状态只在顶部胶囊说一次。隐私长文默认折叠。', keep: '眉题「打印扫描服务」。正常胶囊「能力与设备状态以办理时确认」。离线胶囊「打印机离线 · 出纸类暂停」（printerLabel + 出纸类暂停）。意图带四步「选文件 → 材料检查 → 预览与参数 → 核对价格」，不标当前步。运行页服务台现在是三步轴，10/26 产品负责人定统一成这四步，改程序时一起改。复印卡名「复印」，说明：在打印机屏幕上点「复印」「身份证复印」或「票据复印」；不经过这台一体机下单，也不进打印订单。到机码右上胶囊「不是取件码」，说明一行「凭码办理，不登录也能核销 · 8 位数字（历史 10 位码也支持）」，带走「订单里的打印件」，右下 8 个空格，不写示例码。离线时打印文件、扫描纸质材料呈浅底虚线，徽标写原因；照片打印同样停。手机扫码上传、U 盘导入仍可进，细行「先传、稍后打印」。复印仍可点，说明「打印机离线时复印可能也用不了，以打印机屏幕为准」。到机码离线说明「这台机器现在出不了纸，核销完也拿不到纸；订单还在，请稍后再来。」底部故障句用标准句。服务电话 183-6916-1921。号码与服务时间从后台读，读不到不显示。不写换一台。彩色、双面写「本机暂未开通」。其他工具 3×2：照片打印去 print-src，照片合成 PDF，证件照去 feature-info，签名默认「本机暂未开通」，我的文档、打印订单登录后查看。反馈留在本屏一层里写，不进入要登录的意见反馈页。S().controlsOn 为真时签名改成可点卡，说明用运行页能力卡「放入本人手写签名」，去 sign；带走句「生成的新 PDF」写在这里，不画上卡。打印机离线时签名仍可点。未开通时灰卡一字不变。' },
+    notes: { does: '运行页打印扫描服务台 PrintScanHomePage / QxPrintHubView（/print-scan）。问句用 HUB_ASK：在线「你的文件，现在在哪？」，打印机离线「这台机器出不了纸。」。', motion: '卡片依次浮入。状态只在顶部胶囊说一次。隐私长文默认折叠。', keep: '眉题「打印扫描服务」。正常胶囊「能力与设备状态以办理时确认」。离线胶囊「打印机离线 · 出纸类暂停」（printerLabel + 出纸类暂停）。意图带四步「选文件 → 材料检查 → 预览与参数 → 核对价格」，不标当前步。运行页服务台现在是三步轴，10/26 产品负责人定统一成这四步，改程序时一起改。复印卡名「复印」，说明：在打印机屏幕上点「复印」「身份证复印」或「票据复印」；不经过这台一体机下单，也不进打印订单。到机码右上胶囊「不是取件码」，说明一行「凭码办理，不登录也能核销 · 8 位数字（历史 10 位码也支持）」，带走「订单里的打印件」，右下 8 个空格，不写示例码。离线时打印文件、扫描纸质材料呈浅底虚线，徽标写原因；照片打印同样停。手机扫码上传、U 盘导入仍可进，细行「先传、稍后打印」。复印仍可点，说明「打印机离线时复印可能也用不了，以打印机屏幕为准」。到机码离线说明「这台机器现在出不了纸，核销完也拿不到纸；订单还在，请稍后再来。」底部故障句用标准句。服务电话 183-6916-1921。号码与服务时间从后台读，读不到不显示。不写换一台。彩色、双面写「本机暂未开通」。其他工具两行：上行照片打印去 print-src、照片合成 PDF、签名默认「本机暂未开通」，下行我的文档、打印订单登录后查看（各占半行）。证件照卡 10/12 产品负责人定停放，11/04 他同意改稿：本屏不再画证件照。反馈留在本屏一层里写，不进入要登录的意见反馈页。S().controlsOn 为真时签名改成可点卡，说明用运行页能力卡「放入本人手写签名」，去 sign；带走句「生成的新 PDF」写在这里，不画上卡。打印机离线时签名仍可点。未开通时灰卡一字不变。' },
     render: () => {
       const off = printerOff();
       const mfp = `<span class="d3-mfpmini">${UI.mfp()}</span>`;
@@ -912,7 +914,6 @@
           <div class="d3-tools">
             ${off ? '<button class="tile off rise" style="--i:5" disabled><span class="ic">' + icon('image', 34, 2) + '</span><span class="tx"><b>照片打印</b><small>打印机离线</small></span></button>' : tile({ i: 5, go: 'print-src', icon: 'image', title: '照片打印', desc: '按照片出纸' })}
             ${tile({ i: 6, go: 'img2pdf', icon: 'layers', title: '照片合成 PDF', desc: '几张照片拼成一个文件' })}
-            ${tile({ i: 7, go: 'feature-info', icon: 'idcard', tone: 'clay', title: '证件照', desc: '本机尚未开放 · 看说明' })}
             ${S().controlsOn ? tile({ i: 8, go: 'sign', icon: 'pen', tone: 'clay', title: '签名', desc: '放入本人手写签名' }) : `<button class="tile off" style="--i:8" disabled><span class="ic">${icon('pen', 34, 2)}</span><span class="tx"><b>签名</b><small>本机暂未开通</small></span></button>`}
             ${tile({ i: 9, go: 'my-docs', icon: 'folder', tone: 'slate', title: '我的文档', desc: '登录后查看' })}
             ${tile({ i: 10, go: 'my-orders', icon: 'receipt', tone: 'slate', title: '打印订单', desc: '登录后查看' })}
@@ -1326,7 +1327,7 @@
     notes: {
       does: '对应 /print-scan/feature/copy。五步和三条原件同时摆出，没有成功页。',
       motion: '无。',
-      keep: '面板按钮名是复印、身份证复印、票据复印。开始是屏幕上的「复印」。双面写放回进纸口、不翻面。身份证怎么放、怎么翻面，屏上只写请看打印机屏幕上的图示。法律两句都在。取回原件用服务电话，不写现场岗位。主按钮「去打印文件」去 print-src。底栏回 print。不读打印机缺纸。小青不可用时五步仍可照做。能力名不认识不画在这里，在证件照屏 fsFeat=unknown。号码与服务时间从后台读，读不到不显示。无操作约 3 分钟清除。'
+      keep: '面板按钮名是复印、身份证复印、票据复印。开始是屏幕上的「复印」。双面写放回进纸口、不翻面。身份证怎么放、怎么翻面，屏上只写请看打印机屏幕上的图示。法律两句都在。取回原件用服务电话，不写现场岗位。主按钮「去打印文件」去 print-src。底栏回 print。不读打印机缺纸。小青不可用时五步仍可照做。能力名不认识不画在这里，在 feature-info 屏的 fsFeat=unknown 一态。号码与服务时间从后台读，读不到不显示。无操作约 3 分钟清除。'
     },
     render: () => window.FS.copy(),
     mount: (el) => window.FS.mount(el)

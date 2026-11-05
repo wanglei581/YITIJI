@@ -55,7 +55,8 @@ test('print hub default state reads capabilities and never claims 设备正常 @
   await page.goto('/print-scan')
   await expect(page.locator('[data-testid="print-hub-state-default"]')).toBeVisible()
   await expect(page.getByText('能力与设备状态以办理时确认')).toBeVisible()
-  await expect(page.locator('[data-testid^="print-hub-cap-"]')).toHaveCount(6)
+  await expect(page.locator('[data-testid^="print-hub-cap-"]')).toHaveCount(5)
+  await expect(page.getByTestId('print-hub-cap-id-photo')).toHaveCount(0)
   await expect(page.getByTestId('print-hub-cap-usb-import')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /打印文件/ })).toBeEnabled()
   await expect(page.getByRole('button', { name: /到机码核销/ })).toBeVisible()
@@ -180,6 +181,7 @@ test('print hub capability-loading fail-closes all eight cards @w2', async ({ pa
   await expect(page.getByRole('button', { name: '问小青：怎么选打印方式？', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /打印文件/ })).toBeDisabled()
   await expect(page.getByRole('button', { name: /到机码核销/ })).toBeEnabled()
+  await expect(page.getByTestId('print-hub-cap-id-photo')).toHaveCount(0)
   await expectNoForgedReady(page)
   expect(errors).toEqual([])
 })
@@ -314,6 +316,7 @@ test('print hub device-off pauses paper paths and keeps software paths @w2', asy
   expect(bottom.footerBottom).toBeLessThanOrEqual(bottom.navTop)
   await expect(page.getByTestId('print-hub-cap-phone-upload')).toBeEnabled()
   await expect(page.getByTestId('print-hub-cap-usb-import')).toBeEnabled()
+  await expect(page.getByTestId('print-hub-cap-id-photo')).toHaveCount(0)
   await expectNoForgedReady(page)
   expect(errors).toEqual([])
 })
@@ -370,7 +373,7 @@ test('print hub printer-status failure stays unknown, never 设备正常 @w2', a
   expect(errors).toEqual([])
 })
 
-test('id-photo feature page is honest and offers real fallbacks @w2', async ({ page, api }) => {
+test('id-photo feature page is parked and returns to the print hub @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
@@ -379,10 +382,29 @@ test('id-photo feature page is honest and offers real fallbacks @w2', async ({ p
   })
 
   await page.goto('/print-scan/feature/id-photo')
-  await expect(page.locator('[data-testid="print-hub-state-feature-id-photo"]')).toBeVisible()
-  await expect(page.getByText('证件照：本机尚未开放')).toBeVisible()
-  await expect(page.getByText('现在不能裁切、换底色或排版，也不会生成证件照成品')).toBeVisible()
-  await page.locator('[data-testid="print-hub-idphoto-fallback"]').click()
+  await expect(page).toHaveURL(/\/print-scan$/)
+  await expect(page.locator('[data-w2-page="print-scan-home"]')).toBeVisible()
+  await expect(page.locator('[data-testid="print-hub-state-feature-id-photo"]')).toHaveCount(0)
+  await expect(page.getByTestId('print-hub-cap-id-photo')).toHaveCount(0)
+  await expect(page.getByText('证件照：本机尚未开放')).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
+// 证件照停放前，「已经有证件照文件 → 按普通照片打印」由说明页的替代按钮测；停放后这条路只剩服务台的照片打印卡，
+// 正向流程照样要有人测：点卡进上传页，带上 category=photo。
+test('photo-print tool card still opens the upload page for ordinary photos @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: { capabilities: AVAILABLE },
+  })
+
+  await page.goto('/print-scan')
+  await expect(page.locator('[data-testid="print-hub-state-default"]')).toBeVisible()
+  const photoPrint = page.getByTestId('print-hub-cap-photo-print')
+  await expect(photoPrint).toBeEnabled()
+  await photoPrint.click()
   await expect(page).toHaveURL(/\/print\/upload\?.*category=photo/)
   expect(errors).toEqual([])
 })
@@ -399,6 +421,10 @@ test('unknown feature key fails closed with recovery actions @w2', async ({ page
   await expect(page.locator('[data-testid="print-hub-state-feature-not-found"]')).toBeVisible()
   await expect(page.getByRole('heading', { name: '这个能力名我不认识' })).toBeVisible()
   await expect(page.getByText('没有这项能力说明')).toBeVisible()
+  await expect(page.getByText('这个名字不在现有的说明里，本页不编一套步骤。')).toBeVisible()
+  await expect(page.getByText('复印的说明在「怎么在打印机上复印」。')).toBeVisible()
+  await expect(page.getByRole('button', { name: '看证件照说明' })).toHaveCount(0)
+  await expect(page.getByText('证件照这一页写的是尚未开放，和两条替代路径')).toHaveCount(0)
   await expect(page.getByTestId('print-hub-primary')).toHaveText('返回打印扫描')
   await expect(page.getByRole('button', { name: '联系工作人员' })).toHaveCount(0)
   await page.getByTestId('print-hub-primary').click()
