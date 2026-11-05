@@ -54,7 +54,8 @@ export function takeAssistantPolicyContext(): AssistantPolicyContext | null {
     sessionStorage.removeItem(ASSISTANT_POLICY_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<AssistantPolicyContext>
-    if (typeof parsed.policyId !== 'string' || !parsed.policyId.trim()) return null
+    if (typeof parsed.policyId !== 'string' || !parsed.policyId.trim() || parsed.policyId.trim().length > 64) return null
+    if (typeof parsed.title !== 'string') return null
     return { policyId: parsed.policyId.trim(), title: typeof parsed.title === 'string' ? parsed.title : '' }
   } catch {
     return null
