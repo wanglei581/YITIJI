@@ -44,9 +44,18 @@ export const END_USE_VISIT_REASON: Record<KioskClearReason, KioskVisitEndReason>
   privacy_fallback: 'privacy_clear',
 }
 
+/**
+ * 只写进本机控制台的清场原因码（kioskClearDiag）。
+ * 不进服务人次契约：人次仍用 END_USE_VISIT_REASON。
+ * privacy_deadline 是守卫的隐私硬截止，调用点仍把人次原因留在 idle_timeout。
+ */
+export type KioskClearDiagReason = 'idle_timeout' | 'history_fallback' | 'privacy_deadline' | 'explicit_end'
+
 export interface KioskEndUseOptions {
   /** 只对 switch_account 有效：登录页顶部那句提示（如「换绑成功，请用新手机号登录」）。 */
   loginHint?: string
+  /** 覆盖控制台原因码。不改变 endUseDestination，也不改变人次 endReason。 */
+  diag?: KioskClearDiagReason
 }
 
 /** 离场后落在哪：换号进登录页（登录后回「我的」），其余一律回首页。 */

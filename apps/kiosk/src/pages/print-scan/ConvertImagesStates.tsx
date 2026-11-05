@@ -4,7 +4,6 @@ import { PhoneArt, UsbArt } from './ToolArt'
 import { PhoneHelpLine } from './phoneHelp'
 import { Fact } from './ConvertImagesPanels'
 import {
-  MAX_IMAGES,
   formatBytes,
   totalBytesOf,
   type ConvertError,
@@ -53,22 +52,24 @@ export function EmptyBody({
             <GoMark />
           </button>
         )}
-        <button type="button" className="fs-act off" disabled data-testid="img2pdf-src-usb" aria-disabled="true">
-          <span className="vis" aria-hidden="true"><UsbArt /></span>
-          <span className="tx">
-            <span className="sx-chip">暂未开通</span>
-            <h3>U 盘导入</h3>
-            <p>从 U 盘加图片，本机暂未开通。</p>
-          </span>
-          <GoMark />
-        </button>
+        <div className="i2p-empty-usb">
+          <button type="button" className="fs-act off" disabled data-testid="img2pdf-src-usb" aria-disabled="true">
+            <span className="vis" aria-hidden="true"><UsbArt /></span>
+            <span className="tx">
+              <span className="sx-chip">暂未开通</span>
+              <h3>U 盘导入</h3>
+              <p>从 U 盘加图片，本机暂未开通。</p>
+            </span>
+            <GoMark />
+          </button>
+          <button type="button" className="fs-row" data-testid="img2pdf-add-usb" onClick={onOpenUsb}>
+            看看 U 盘图片现在能怎么办
+          </button>
+        </div>
       </div>
-      <button type="button" className="fs-row" data-testid="img2pdf-add-usb" onClick={onOpenUsb}>
-        看看 U 盘图片现在能怎么办
-      </button>
       <p className="fine">最多 20 张，单张不超过 10MB，只收 JPG、PNG。</p>
       <p className="fine">
-        合计不超过 40MB，成品不超过 15MB。单张不超过 2500 万像素，合计不超过 2 亿像素。一次最多 {MAX_IMAGES} 张。旋转 90° 当前不可用。
+        合计 ≤40MB · 成品 ≤15MB · 单张 ≤2500万像素 · 合计 ≤2亿像素 · 旋转90°不可用
       </p>
     </>
   )

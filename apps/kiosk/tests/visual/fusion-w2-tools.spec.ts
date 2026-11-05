@@ -79,7 +79,8 @@ test('tool center exposes the miniapp arrival-code claim entry @w2', async ({ pa
   // 2.0 卡面用徽标「不是取件码」区分（稿 10），不再重复长句。
   await expect(entry).toContainText('不是取件码')
   // 它不占「七件事」栅格的格子 —— 标题写着七件事，就必须只有七张能力卡。
-  await expect(page.locator('[data-testid^="print-hub-cap-"]')).toHaveCount(6)
+  await expect(page.locator('[data-testid^="print-hub-cap-"]')).toHaveCount(5)
+  await expect(page.getByTestId('print-hub-cap-id-photo')).toHaveCount(0)
   await entry.click()
 
   await expect(page).toHaveURL(/\/print\/pickup-claim$/)
@@ -93,6 +94,8 @@ test('unknown tool feature key fails closed with a real recovery action @w2', as
 
   await page.goto('/print-scan/feature/not-a-real-feature')
   await expect(page.getByRole('heading', { name: '这个能力名我不认识' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '看证件照说明' })).toHaveCount(0)
+  await expect(page.getByText('证件照这一页写的是尚未开放，和两条替代路径')).toHaveCount(0)
   await expect(page.getByTestId('print-hub-primary')).toHaveText('返回打印扫描')
   await expectHealthy(page, errors, 'print-scan-feature')
 })
@@ -144,7 +147,7 @@ test('conversion page renders a server conversion error without fabricating outp
   const thumbnail = page.getByRole('img', { name: 'w2-image.png 缩略图' })
   await expect(thumbnail).toBeVisible()
   await expect.poll(() => thumbnail.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0)
-  await page.getByRole('button', { name: /合成 1 张为一份 PDF/ }).click()
+  await page.getByRole('button', { name: '合成', exact: true }).click()
   await expect(page.getByText('合成图片尺寸不受支持', { exact: true })).toBeVisible()
   await expect(page.getByText('已生成', { exact: false })).toHaveCount(0)
   await expect(page).toHaveURL(/\/print-scan\/convert$/)
@@ -205,7 +208,7 @@ test('conversion payload order matches the visible list after reorder @w2', asyn
     'data-sent-payload',
     'w2-image-2.png | w2-image-1.png',
   )
-  await page.getByRole('button', { name: /合成 2 张为一份 PDF/ }).click()
+  await page.getByRole('button', { name: '合成', exact: true }).click()
   await expect.poll(() => convertBodies.length).toBe(1)
   expect(convertBodies[0]?.sources?.map((source) => source.fileId)).toEqual(['w2-image-002', 'w2-image-001'])
   await expect(page.getByTestId('img2pdf-band').getByText('PDF 已生成')).toBeVisible()
@@ -258,7 +261,7 @@ test('conversion success stays on the page until the print CTA and does not clai
     buffer: Buffer.from('synthetic-w2-image'),
   })
   await expect(page.getByText('w2-image.png', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: /合成 1 张为一份 PDF/ }).click()
+  await page.getByRole('button', { name: '合成', exact: true }).click()
   await expect(page.getByTestId('img2pdf-band').getByText('PDF 已生成')).toBeVisible()
   await expect(page.getByText('未登录 · 不进我的文档', { exact: true })).toBeVisible()
   await expect(page.getByText('已保存', { exact: false })).toHaveCount(0)
@@ -286,7 +289,7 @@ async function convertOneImageWith(page: Page, api: ApiRouter, data: Record<stri
     buffer: Buffer.from('synthetic-w2-image'),
   })
   await expect(page.getByText('w2-image.png', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: /合成 1 张为一份 PDF/ }).click()
+  await page.getByRole('button', { name: '合成', exact: true }).click()
   await expect(page.getByTestId('img2pdf-band').getByText('PDF 已生成')).toBeVisible()
 }
 
@@ -357,7 +360,7 @@ test('guest login from a finished conversion comes back to convert again, not to
     buffer: Buffer.from('synthetic-w2-image'),
   })
   await expect(page.getByText('w2-image.png', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: /合成 1 张为一份 PDF/ }).click()
+  await page.getByRole('button', { name: '合成', exact: true }).click()
   await expect(page.getByTestId('img2pdf-band').getByText('PDF 已生成')).toBeVisible()
   await expect(page.getByTestId('img2pdf-band')).toContainText('转好之后再登录也存不进去')
   await expect(page.getByTestId('img2pdf-band')).toContainText('不登录也能直接打印这份')
@@ -514,7 +517,7 @@ test('conversion finished and failed states keep blocks apart, uncut and tappabl
 
   await page.goto('/print-scan/convert')
   await addNumberedImages(page, 3)
-  await page.getByRole('button', { name: /合成 3 张为一份 PDF/ }).click()
+  await page.getByRole('button', { name: '合成', exact: true }).click()
   await expect(page.getByText('合成图片尺寸不受支持', { exact: true })).toBeVisible()
   expect(await auditToolLayout(page, CONVERT_LAYOUT_ROOT), '明确失败态的版式').toEqual([])
 
@@ -896,7 +899,7 @@ test('signature compose 429 shows rate-limited and does not silently retry @w2',
 for (const alias of [
   { from: '/print/scan-convert', to: '/print-scan/convert', marker: 'print-scan-convert' },
   { from: '/print/scan-sign', to: '/print-scan/sign', marker: 'print-scan-sign' },
-  { from: '/print/scan-feature', to: '/print-scan/feature/id-photo', marker: 'print-scan-feature' },
+  { from: '/print/scan-feature', to: '/print-scan', marker: 'print-scan-home' },
 ] as const) {
   test(`${alias.from} redirects to ${alias.to} @w2`, async ({ page, api }) => {
     const errors = collectRuntimeErrors(page)

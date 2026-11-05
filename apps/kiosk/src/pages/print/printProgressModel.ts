@@ -93,7 +93,7 @@ export function doneTakeaway(
   if (pages == null || pages < 1) {
     return {
       pagesLabel: '全部纸张',
-      facesLabel: '请在出纸口取走并核对页数',
+      facesLabel: '页数以实际纸张为准',
     }
   }
   const totalPages = pages * copies
@@ -101,8 +101,8 @@ export function doneTakeaway(
   return {
     pagesLabel: copies > 1 ? `全部 ${totalPages} 页（${pages} 页 × ${copies} 份）` : `全部 ${totalPages} 页`,
     facesLabel: sheets
-      ? `共 ${sheets}已全部打印，请在出纸口取走并核对页数`
-      : `共 ${totalPages} 面已全部打印，请在出纸口取走并核对页数`,
+      ? `共 ${sheets}`
+      : `共 ${totalPages} 面`,
   }
 }
 

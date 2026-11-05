@@ -173,6 +173,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:file-retention-ui
           pnpm --filter @ai-job-print/kiosk verify:home-narrow-visual-balance
           pnpm --filter @ai-job-print/kiosk verify:home-toolbox-ui
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-parked-toolbox-campus
           pnpm --filter @ai-job-print/kiosk verify:home-jobs-availability
           pnpm --filter @ai-job-print/kiosk verify:jobfair-checkin
           pnpm --filter @ai-job-print/kiosk verify:jobfair-size
@@ -197,6 +198,9 @@ jobs:
           # 现场无人值守（10/29）：一体机源码里不许教用户去找 / 联系现场工作人员。词表读自 unattendedCopy.ts；
           # 共享模块零容忍，页面目录的存量按待清名单只减不增（触屏版各页面包重写后逐个删条目）。纯读 apps/kiosk/src，不连库、不连网。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-unattended-copy
+          # 贴牌上屏与授权闸门（#1511）：品牌不写死、小程序名不随贴牌换；授权三态判定与复查限频的 node 用例
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-brand-display
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-license-gate
           pnpm --filter @ai-job-print/kiosk verify:runtime-terminal-identity
           pnpm --filter @ai-job-print/kiosk verify:kiosk-field-safety
           pnpm --filter @ai-job-print/kiosk verify:terminal-session-self-heal
@@ -216,6 +220,8 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:screensaver-empty-shell
           pnpm --filter @ai-job-print/kiosk verify:v6-type-floor
           pnpm --filter @ai-job-print/kiosk verify:qingxu-v2-frozen
+          # 触屏版稿（docs/design/kiosk-touch-2026-10）10/26 补稿定稿后冻结：稿文件 sha256 对 FROZEN.json，改稿须产品负责人同意后 --update。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-touch-frozen
           pnpm --filter @ai-job-print/kiosk verify:visual-evidence-manifest
           pnpm --filter @ai-job-print/admin verify:source-publish-actions
           pnpm --filter @ai-job-print/refresh verify:runtime
@@ -758,6 +764,12 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-auth
           pnpm --filter @ai-job-print/api verify:legal-doc-version
           pnpm --filter @ai-job-print/api verify:support-contact
+          # 贴牌第一步：品牌与备案默认值 = 现状、机构覆盖只影响该机构终端、Logo 只收 PNG / WebP（按文件头判、禁 SVG、
+          # 清洗元数据）、一体机 kiosk-profile 只认已验签终端（防枚举）。写隔离库，结束恢复平台设置。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:branding
+          # 授权管理：状态推导（ok / grace / expired / suspended / unlicensed）逐边界、红线（不与岗位 / 投递挂钩）、
+          # 会话签发只拦新会话、绑定台数只管新增、机构后台写操作默认拒（真实路由表派生扫描）、到期告警。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:license
           pnpm --filter @ai-job-print/api verify:member-qr-login
           pnpm --filter @ai-job-print/api verify:member-auth-races
           pnpm --filter @ai-job-print/api verify:member-restore
@@ -1044,6 +1056,8 @@ jobs:
         run: |
           export PATH="$(pg_config --bindir):$PATH"
           pnpm verify:first-order-migrations
+          # 贴牌与授权两份迁移：SQLite 与临时 PostgreSQL 上升级保数据、CHECK 兜底、外键、零漂移
+          pnpm verify:branding-license-migrations
           pnpm verify:first-order-http:postgres
       - name: Migrate deploy on fresh PG
         working-directory: services/api
@@ -1140,6 +1154,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:console-screen-usage
           pnpm --filter @ai-job-print/api verify:ai-user-text-retention
           pnpm --filter @ai-job-print/api verify:policies
+          # 贴牌与授权管理（PostgreSQL 上同样真跑一遍：机构行锁抢最后一个名额、CHECK 与外键、日期比较）。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:branding
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:license
           pnpm --filter @ai-job-print/api verify:kiosk-session
           pnpm --filter @ai-job-print/api verify:policy-eligibility
           # 招聘会列表结构性门禁两个 job 都要跑：筛选下推靠 Prisma where 生成 SQL，
@@ -1293,7 +1310,13 @@ jobs:
     #   66  64  63  63  62  55  50  ← 全部 success；10/10 另有一次 68.5 success、一次撞 70
     # 成功区间 50–68.5，上限 70，余量最少只剩 2%，两次撞线都挡住了发布。
     # 90 让最差成功观测（68.5）留 31% 余量；真的挂死仍会被 90 分钟兜住。
-    timeout-minutes: 90
+    #
+    # 2026-11-05 产品负责人同意，按同一量法把 90 提到 120。11/04 一天本 job（main 与 PR）的时长（分钟）：
+    #   90.3  90.3  90.4 ← cancelled（撞上限：run 41842306887、41883384338、41899185669，都停在路由巡检，前面步骤全过）
+    #   88.8  87.3  87.3  86.3  85.8  85.5  83.1  80.9  77.1  73.7  71.7  69.8  69.4  66.0  64.7 ← 全部 success
+    # 成功区间 64.7–88.8，上限 90，余量最少只剩 1.3%；一天撞线三次，#1580 因此多等两轮。
+    # 120 让最差成功观测（88.8）留 26% 余量；真的挂死仍会被 120 分钟兜住。
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 

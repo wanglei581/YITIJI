@@ -344,6 +344,7 @@ export function ConvertImagesPage() {
       sub={band.sub}
       status={toolBandStatus(status)}
       onBack={() => navigate('/print-scan')}
+      hideDockBack={error?.kind === 'capability'}
       askLabel={convertAskLabel(phase, error)}
       primary={dockSpec.primary}
       overlay={showQr ? (

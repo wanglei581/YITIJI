@@ -100,6 +100,17 @@ export class UpdateOrgDto {
 
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) @MaxLength(50, { each: true })
   enabledModules?: string[]
+
+  // 贴牌：机构自己的品牌覆盖三项，只有管理员能改（机构自己先不开）。省略 = 不改；null 或纯空白 = 清除（回到平台默认）。
+  // 真正的口径（品牌名 1–12 字、字标 1 字、Logo 必须是已上传的）在 branding/org-brand-patch.ts。
+  @IsOptional() @IsString() @MaxLength(200)
+  brandName?: string | null
+
+  @IsOptional() @IsString() @MaxLength(40)
+  brandMark?: string | null
+
+  @IsOptional() @IsString() @MaxLength(64)
+  brandLogoAssetId?: string | null
 }
 
 export class OrgStatusDto {

@@ -44,7 +44,13 @@ const EXPECTED_FILE_INTERCEPTORS = [
   { file: 'src/jobs/admin-fairs.controller.ts', count: 1 },
   { file: 'src/jobs/partner-fairs.controller.ts', count: 1 },
   { file: 'src/jobs/jobs.controller.ts', count: 2 },
+  // 贴牌 Logo 上传（POST /admin/branding/logo，仅管理员）：multer 硬上限 1MB（业务上限 512KB 在 service 里报友好错误）、
+  // fieldNestingDepth: 0；文件类型不看 multer 的 fileFilter / 客户端声明的 mimetype，而是在 service 里按文件头魔数判断
+  // 并解压校验后重编码（见 verify:branding 的 verify-brand-logo-image.ts）。
+  { file: 'src/branding/branding.admin.controller.ts', count: 1 },
 ] as const
+
+const EXPECTED_GLOBAL_FILE_INTERCEPTORS = 13
 
 type FileInterceptorCall = {
   file: string
@@ -193,8 +199,10 @@ async function verifyStaticGuards(): Promise<void> {
     }
   }
 
-  if (calls.length !== 12) {
-    failures.push(`全局 FileInterceptor: 预期 12 处，实际 ${calls.length} 处`)
+  // 13 = 12 处既有入口 + 贴牌 Logo 上传（src/branding/branding.admin.controller.ts）。
+  // 与上面按文件登记的清单是两本独立的账：新增入口两处都要改。
+  if (calls.length !== EXPECTED_GLOBAL_FILE_INTERCEPTORS) {
+    failures.push(`全局 FileInterceptor: 预期 ${EXPECTED_GLOBAL_FILE_INTERCEPTORS} 处，实际 ${calls.length} 处`)
   }
 
   // 代理上传（整 buffer 进内存）的两处入口必须对齐既有的 PROXY_MAX_BYTES，
@@ -213,8 +221,8 @@ async function verifyStaticGuards(): Promise<void> {
   }
 
   assert.deepEqual(failures, [], `静态 multipart 防护契约失败:\n${failures.join('\n')}`)
-  console.log('  PASS 静态核验：12 处 FileInterceptor 均设置 limits.fieldNestingDepth: 0')
-  console.log('  PASS 静态核验：12 处 FileInterceptor 均真正赋值 limits.fileSize（非类型断言）')
+  console.log(`  PASS 静态核验：${calls.length} 处 FileInterceptor 均设置 limits.fieldNestingDepth: 0`)
+  console.log(`  PASS 静态核验：${calls.length} 处 FileInterceptor 均真正赋值 limits.fileSize（非类型断言）`)
   console.log('  PASS 静态核验：files.controller.ts 两处代理上传入口对齐 PROXY_MAX_BYTES')
 }
 
