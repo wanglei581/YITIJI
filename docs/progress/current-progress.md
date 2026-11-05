@@ -56,6 +56,14 @@
 - 图谱挂在 `derived-scan-device-alerts.ts` 上的门禁只有 `verify:scan-device-b9`，SQLite 与临时 PG 都过；同一收集函数的 `verify:scan-device-b4` 两套库也过。`package.json`、`ci.yml`、进度文档还被一批按文件名做字符串引用的门禁列出来，这次只跑了直接守接线的 `verify:ci-gate-coverage` 和改 workflow 必跑的 `verify:repository-integrity`，没有把那几十条再在两套库上各跑一遍。
 - 哪台机器都不许因此把 `scan_device` 配成 available。未推送、未部署。
 
+## 2026-11-05：换模型服务地址必须重填密钥（C3；源 #1374 拆出的安全修复，不含混元；未合并、未部署）
+
+- 问题：管理员把某个功能位的模型换厂商或换地址、却没填新密钥时，原来那家的密钥原样留着，下一次调用就发到新地址。
+- 改法：换了主机、原来存着密钥、这次又没带新密钥，保存回 400「模型服务地址换了，请重新填写这一家的 API Key；原来的密钥不会发给新地址」，配置原样不动、不落盘、不记成功审计。原来没有密钥时照常保存（没有可外发的）；同一主机只改路径或模型保留密钥；显式清空密钥照常保存；只含空白的密钥换主机也拒。存量里解析不了的旧地址按换了主机处理（回 400，不再 500）。继承父键的子功能位第一次单独配置时同样适用。
+- 后台：AI 配置页 API Key 输入框旁加一句「换了模型服务地址或厂商，要重新填写这一家的 API Key」；保存被拒时按服务端原文显示在表单里、不清已填内容，「保存并测试」被拒后不再发测试请求。
+- 门禁：verify-ai-config 补 C3.1–C3.16（含本机假服务数请求）；admin AI 配置页渲染门禁补「被拒显示原文」。反向检查：删掉主机比较、只看厂商不看主机、去掉「原来存着密钥」这个条件，各自让对应用例转红。
+- 本机：API 类型检查、AI 配置相关门禁（含地址白名单 134 条）、admin 类型检查 / lint / 构建 / 文案门禁通过。`verify:llm-connectivity` 真连深度求索、本机功能位未开，main 上同样报 FEATURE_DISABLED，不在 CI 里，与本改动无关。没有新增厂商；未部署。
+
 ## 2026-11-04：屏上扫描后端 B8（已结束任务的回报带上最终状态；分支 `claude/scan-device-b2-1102`，叠在并入 B1 的头 `22e5f2dd1` 上，未推送、未部署）
 
 - device-report 遇到已结束任务时，409 的 `error.details` 带 `taskStatus`（completed / cancelled / expired / failed）和 `fileDelivered`（已挂上 fileId 才是 true）。cancelled 仍是 `SCAN_DEVICE_TASK_CANCELLED`，其余结束仍是 `SCAN_DEVICE_TASK_ENDED`。库里仍是 waiting、但截止时间已过或到了最长时限，taskStatus 记为 expired。投递中仍是 `SCAN_DEVICE_TASK_DELIVERING`，details 只有 `taskStatus: 'matched'`；同状态重发仍成功。别的终端仍是 404 `SCAN_TASK_NOT_FOUND`，不带这些字段。面板任务、已改用面板的任务不带。错误码和原有文案不变。统一错误过滤器只透出这些有界字段，不拷贝 fileId。
