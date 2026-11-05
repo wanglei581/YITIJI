@@ -13,6 +13,15 @@
 - 图谱：新文件入库后 `pnpm graph` 重出，`pnpm graph:check` 通过（`docs/graph/` 3 个文件有变化）。新文件被 fusion-w2 与 scan-session-truth 钉住；设置页那一组还被 runtime-error-boundary 与 no-raw-error-render 钉住；`useScanResultExits` 还被 print-done-truth 钉住；`useScanSessionCreate` 还被 scan-quiet-period 钉住。这些门禁本轮都已跑过，没有新冒出来还没跑的。
 - 合并注意：origin/main 比本分支基线多 #1538，进度文档顶部多一节小程序签名图。合的时候两节都留，这一节放在上面。
 
+## 2026-11-05：PDF 文字层部首字符换回常用字（C3；源 #1402；未合并、未部署）
+
+- 问题：F-24 的苹果 PDF 文字层把常用字存成部首码位，模型写回常用字后被防编造比对误拒；本轮从 main `50070402a` 重做 #1402 的四个代码提交，未带入旧进度文档、图谱和 CI workflow 改动。
+- 改法：通用表只折康熙部首 U+2F00–U+2FD5 和部首补充 U+2E80–U+2EF3 中确定的 314 对（214+100，14 对排除）；先按已知字体的 20 对例外补救，再拼行、整表折叠。单页取字体失败或条目数不齐时该页原样保留；没有例外字的页不再取文字或操作列表。抽取、历史原文、诊断报告及改进建议、模型直接字符和 JSON 转义字符串用同一编码；日志只增加计数或固定拒绝规则名。
+- 与 #1574 衔接：保留提示词、moduleAfter 的首尾空白处理、补回和篇幅收口后的 returnAligned，以及逐字段 includes 判据；在最终核对前同步折叠稿与模块字符串。唯一空白/标点差异仍只规范 after，多处相似和跨字段拼接仍只能手改，不为核对增加模型调用。新门禁另加 4 条部首与最终稿核对的组合断言。
+- 门禁接线：仅改 API package.json 的 verify:resume-extraction 串接，依次追加 verify:resume-radical-fold 与 verify:resume-radical-font-fold；该入口已在 ci.yml 的 SQLite 和 postgres-readiness 中执行。verify-ci-gate-coverage 通过，566/576 条 verify/ui 门禁进入 CI 执行闭包，10 条已有豁免，新门禁均进入闭包。
+- 验证：API typecheck、改过的 8 个 TS 文件 lint、新门禁 79/79 与 55/55、图谱关联的全部可离线门禁（含 verify:resume-optimize 内 #1574 的 6 类样本及两个展开的前置/后置脚本）、根目录仓库完整性/合规文案/日期时间/原始错误上屏检查均通过。verify:resume-report-export 首轮 SQLite P1008 超时，串行重跑通过；verify:ocr-baidu-live 已执行但因无 BAIDU_OCR_API_KEY / BAIDU_OCR_SECRET_KEY 退出 1，未验证真实 OCR。反向检查清空表为 40 PASS/39 FAIL、去掉事实比对前折叠为 75 PASS/4 FAIL，均退出 1；从 /tmp/c3-radical-mut/ 副本恢复后逐字节一致，两条新门禁恢复通过，反向检查前后 git diff --stat 完全一致。
+- 没做：未合并、未部署；未改 apps/**、ci.yml、图谱、生产配置、数据库结构，未新增依赖；未用 F-24 原件与苹果全部字体在真机、真实模型上复测。
+
 ## 2026-11-05：两个后台 C3 前端两处——机构资料页托管关闭时不显示数据源、0 元单不出退款按钮（未合并、未部署）
 
 - 机构资料页复用托管开关：关闭时不显示「数据源」，机构账号计数照旧；`job_info`、`job_fair`、`external_apply_redirect` 标签加「（暂不开放）」并置灰，与管理员后台同一清单，只改展示。开启时保留原标签、样式和数据源计数；演示资料改用真实模块键名。
@@ -20,6 +29,7 @@
 - 来源：旧 PR #1296（`1be7421a6`）、#1289（`20b84ce00`），对照 main `50070402a` 重做；只取本任务两处，不带入旧批次其他改动。两个用例文件补托管开关两态、0 元以及有实收的普通/待退款场景；管理员按需启用同一条演示订单，默认列表仍为原两单。
 - 验证：两个应用 typecheck、全量 src lint（管理员 5 条、机构 7 条既存警告，零错误）、http 生产构建、四项根门禁及订单只读 UI、后台中文文案、机构刷新与统计门禁通过。图谱列出的隐私文案模块已由中文文案门禁实际调用；反向检查删除 0 元分支、在其中放回按钮均使新断言失败，副本恢复后通过，前后 diff stat 一致。
 - 验证限制与范围：Playwright 只写未跑，交收货方；用例原命令因 `@playwright/test` 类型入口未链接而失败，显式指定已安装包路径后两文件均通过。退款 API 关联门禁已运行但缺少生成的 Prisma client，未进入断言（隔离 SQLite 的 133 条迁移通过）。未改后端、数据库模型、生产配置、密钥、硬件或 `docs/graph/`，未提交、未部署。
+
 
 ## 2026-11-04：屏上扫描后端 B10（扫描仪告警移出范围不推「已恢复」；分支 `claude/scan-device-b2-1102`，未部署）
 
