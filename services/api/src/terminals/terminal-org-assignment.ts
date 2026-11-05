@@ -3,6 +3,7 @@ import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.se
 import type { AssignTerminalOrgResult } from './terminals-admin.service'
 import { isParkedTerminalOrgType, orgTypeParkedError } from './terminal-org-parking'
 import { terminalOrgBindingWrite } from './terminal-org-binding'
+import { revokeTerminalCopyAuthorization } from '../copy-jobs/copy-authorization'
 
 export type TerminalOrgAssignmentAudit = (tx: PrismaTransactionClient, result: AssignTerminalOrgResult & {
   deploymentIds: string[]; effectiveAt: string
@@ -51,6 +52,7 @@ export async function assignTerminalOrganization(prisma: PrismaService, terminal
       current.orgBoundAt?.getTime() ?? 0, latest?.endedAt?.getTime() ?? 0))
     await tx.terminal.update({ where: { id: terminal.id }, data: terminalOrgBindingWrite(oldOrgId, orgId, effectiveAt) })
     if (oldOrgId !== orgId) {
+      await revokeTerminalCopyAuthorization(tx, terminal.id)
       await tx.serviceDeployment.updateMany({
         where: { terminalId: terminal.id, endedAt: null },
         data: { endedAt: effectiveAt, activeTerminalId: null },

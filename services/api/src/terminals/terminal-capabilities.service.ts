@@ -25,7 +25,7 @@ import {
   type PrintScanCapabilityStatus,
   type TerminalCapabilityView,
 } from './terminal-capabilities.types'
-import { COPY_ENDED } from '../copy-jobs/copy-job.policy'
+import { revokeTerminalCopyAuthorization } from '../copy-jobs/copy-authorization'
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 
 export interface UpsertCapabilityResult {
@@ -388,8 +388,7 @@ export class TerminalCapabilitiesService {
   /** 与能力写入一起提交；只作废授权，不回退已派发状态，也不阻挡终态回报。 */
   private async revokeCopyAuthorization(tx: PrismaTransactionClient, terminalId: string, key: string) {
     if (!['copy', 'scan_device', 'color_print', 'duplex_print'].includes(key)) return
-    await tx.copyJob.updateMany({ where: { terminalId, state: { notIn: COPY_ENDED } },
-      data: { authorizationVersion: { increment: 1 } } })
+    await revokeTerminalCopyAuthorization(tx, terminalId)
   }
 
   /** DB 中出现枚举外的脏值时按 fail-closed 归入 not_verified，不放大成可用。 */

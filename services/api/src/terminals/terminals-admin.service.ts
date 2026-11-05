@@ -18,6 +18,7 @@ import {
   Optional,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { revokeTerminalCopyAuthorization } from '../copy-jobs/copy-authorization'
 import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import { TerminalToolboxService } from './terminal-toolbox.service'
 import { TerminalAgentService } from './terminals-agent.service'
@@ -439,20 +440,25 @@ export class TerminalAdminService {
     }
 
     const saved = await this.agent.writeWithMacConflictMapping(() =>
-      this.prisma.terminal.update({
-        where: { id: terminal.id },
-        data,
-        select: {
-          id: true,
-          terminalCode: true,
-          displayName: true,
-          macAddress: true,
-          locationLabel: true,
-          areaLabel: true,
-          geoLat: true,
-          geoLng: true,
-          enabled: true,
-        },
+      this.prisma.$transaction(async (tx) => {
+        const saved = await tx.terminal.update({
+          where: { id: terminal.id },
+          data,
+          select: {
+            id: true,
+            terminalCode: true,
+            displayName: true,
+            macAddress: true,
+            locationLabel: true,
+            areaLabel: true,
+            geoLat: true,
+            geoLng: true,
+            enabled: true,
+          },
+        })
+        // 重复停用也撤权：不依赖事务外 enabled 快照，避免并发恢复/再停用漏撤权。
+        if (data.enabled === false) await revokeTerminalCopyAuthorization(tx, terminal.id)
+        return saved
       }),
     ) as {
       id: string
@@ -637,6 +643,7 @@ export class TerminalAdminService {
           error: { code: 'TERMINAL_LIFECYCLE_CONFLICT', message: '终端运维状态已变化，请刷新后重试' },
         })
       }
+      if (lifecycleStatus !== 'active') await revokeTerminalCopyAuthorization(tx, terminal.id)
       // 每次维护轮次切换都撤销未使用绑定码，防止旧 maintenance 轮次的换机码在 ABA 后复活。
       const result: UpdateTerminalLifecycleResult = {
         terminalId: terminal.id,

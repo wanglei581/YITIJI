@@ -8620,7 +8620,6 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FileObject",
           "Order",
           "OrderSubmissionLedger",
@@ -8642,7 +8641,6 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FileObject",
           "Order",
           "OrderSubmissionLedger",
@@ -8664,7 +8662,6 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FileObject",
           "Order",
           "OrderSubmissionLedger",
@@ -8725,7 +8722,6 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FileObject",
           "Order",
           "OrderSubmissionLedger",
@@ -8747,7 +8743,6 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FileObject",
           "Order",
           "OrderSubmissionLedger",
@@ -9590,7 +9585,6 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FileObject",
           "Order",
           "OrderSubmissionLedger",
@@ -9612,7 +9606,6 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FileObject",
           "Order",
           "OrderSubmissionLedger",
@@ -9634,7 +9627,6 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FileObject",
           "Order",
           "OrderSubmissionLedger",
@@ -9655,7 +9647,6 @@
         "handler": "OrderQuoteController.quote",
         "method": "POST",
         "models": [
-          "CopyJob",
           "FileObject",
           "PriceConfig",
           "Terminal",
@@ -11508,7 +11499,6 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
@@ -11530,7 +11520,6 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "CopyJob",
           "DocumentProcessTask",
           "FairMaterialPrintBridge",
           "FileObject",
@@ -11558,7 +11547,6 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FileObject",
           "Order",
           "OrderItem",
@@ -11582,7 +11570,6 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "CopyJob",
           "DocumentProcessTask",
           "FairMaterialPrintBridge",
           "FileObject",
@@ -11610,7 +11597,6 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "CopyJob",
           "DocumentProcessTask",
           "FairMaterialPrintBridge",
           "FileObject",
@@ -11638,7 +11624,6 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "CopyJob",
           "DocumentProcessTask",
           "FairMaterialPrintBridge",
           "FileObject",
@@ -11666,7 +11651,6 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FileObject",
           "Order",
           "OrderItem",
@@ -11706,7 +11690,6 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
@@ -11728,7 +11711,6 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
@@ -12509,7 +12491,6 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
@@ -12532,7 +12513,6 @@
         "method": "DELETE",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
@@ -12555,7 +12535,6 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
@@ -12578,7 +12557,6 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
@@ -12600,7 +12578,6 @@
         "handler": "ScanDeviceController.deviceSettings",
         "method": "POST",
         "models": [
-          "CopyJob",
           "FileObject",
           "ScanTask",
           "Terminal",
@@ -12620,7 +12597,6 @@
         "handler": "ScanDeviceController.switchToPanel",
         "method": "POST",
         "models": [
-          "CopyJob",
           "FileObject",
           "ScanTask",
           "Terminal",
@@ -12650,7 +12626,6 @@
         "handler": "TerminalsController.getTerminalCapabilities",
         "method": "GET",
         "models": [
-          "CopyJob",
           "Terminal",
           "TerminalCapability"
         ],
@@ -12960,7 +12935,6 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
@@ -12994,7 +12968,6 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FileObject",
           "Order",
           "OrderItem",
@@ -13027,7 +13000,6 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "CopyJob",
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
@@ -18439,10 +18411,10 @@
         ],
         "usedBy": [
           "services/api/src/copy-jobs/copy-agent.service.ts",
+          "services/api/src/copy-jobs/copy-authorization.ts",
           "services/api/src/copy-jobs/copy-job-store.service.ts",
           "services/api/src/copy-jobs/copy-jobs.service.ts",
-          "services/api/src/member-privacy/member-closure-retention.ts",
-          "services/api/src/terminals/terminal-capabilities.service.ts"
+          "services/api/src/member-privacy/member-closure-retention.ts"
         ]
       },
       {
@@ -25180,6 +25152,9 @@
       "services/api/scripts/verify-content-pipeline-e2e.ts"
     ],
     "services/api/scripts/support/copy-c1c-verification.ts": [
+      "services/api/scripts/verify-copy-c1b.ts"
+    ],
+    "services/api/scripts/support/copy-c1e-verification.ts": [
       "services/api/scripts/verify-copy-c1b.ts"
     ],
     "services/api/scripts/support/dead-redis-gate-env.ts": [
@@ -39217,6 +39192,7 @@
         "files": [
           ".github/workflows/ci.yml",
           "services/api/scripts/support/copy-c1c-verification.ts",
+          "services/api/scripts/support/copy-c1e-verification.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/app.module.ts",
           "services/api/src/audit/audit.service.ts",

@@ -70,7 +70,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2016 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2017 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2217,7 +2217,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 140 个文件</summary>
+<summary><code>services/api/scripts/</code> — 141 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2268,6 +2268,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/content-pipeline-fixtures.ts` | `verify-content-pipeline-e2e.ts` |
 | `services/api/scripts/support/content-pipeline-harness.ts` | `verify-content-pipeline-e2e.ts` |
 | `services/api/scripts/support/copy-c1c-verification.ts` | `verify-copy-c1b.ts` |
+| `services/api/scripts/support/copy-c1e-verification.ts` | `verify-copy-c1b.ts` |
 | `services/api/scripts/support/dead-redis-gate-env.ts` | `verify-admin-session-revocation.ts`<br/>`verify-error-observability.ts`<br/>`verify-redis-degradation-truth.ts` |
 | `services/api/scripts/support/ephemeral-redis-self-check.ts` | `verify-internal-login-real-redis.ts` |
 | `services/api/scripts/support/ephemeral-redis-server.ts` | `verify-admin-session-revocation.ts`<br/>`verify-internal-login-real-redis.ts` |

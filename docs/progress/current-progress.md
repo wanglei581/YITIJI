@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-11-05：屏上复印 C1e——终端停用 / 维护 / 吊销 / 改绑机构也作废在途复印授权（分支 `claude/copy-c1-1104`，未合并、未部署）
+
+- 起因：C1d 复核报 P1——许可只在 CAS 时判定后，终端 `enabled` / `lifecycleStatus` / `orgId` 的管理写入不递增复印授权版本，可被并发许可绕过。
+- 改法（Codex 实现，Claude 收货）：抽出 `copy-jobs/copy-authorization.ts`（只给本终端未终态复印单授权版本 +1，不改状态），在同一事务里接到会让终端变不可用的写入口：后台资料编辑停用（`terminals-admin.service.ts`）、生命周期切到非 active、应急吊销转 suspended（`terminal-credential-security.service.ts`）、机构绑定 / 解绑 / 改绑（`terminal-org-assignment.ts`，仅机构真的变了）、开发种子覆盖机构归属（抽出 `prisma/seed-terminal.ts`）。新建、激活、恢复 active、心跳转 active 属于变可用，不递增。
+- 验证：新增 `scripts/support/copy-c1e-verification.ts`（19 条，由 `verify:copy-c1b` 调用）：停用、维护、解绑、改绑、吊销、种子覆盖各自「管理先提交 → 许可拒绝」「CAS 先提交 → 终态照收」「撤权异常整体回滚」「无关与恢复写不撤权」。终端管理与打印、扫描、首单相关 49 条门禁（SQLite）过；PostgreSQL 交 CI。
+
 ## 2026-11-05：屏上复印 C1d——收掉 C1c 复核的 3 条 P1（分支 `claude/copy-c1-1104`，未合并、未部署）
 
 - ① 已派发（dispatching / spooled）的单再取打印许可一律拒绝（`COPY_ALREADY_DISPATCHED`），去掉 CAS 后复查能力与状态回退，已派发任务永不退回可取消，真实终态回报照收。② 能力撤销改为版本协议：终端能力服务的写入口（upsert 与 clear）把 `copy`、`scan_device`、`color_print`、`duplex_print` 任一改为非 available 时，在同一事务里给本终端所有未终态 `CopyJob` 的授权版本加一；许可 CAS 钉住首读版本——关能力先提交则拒绝，CAS 先提交则视为关闭前已发的许可。③ 后台订单只读接口对复印行按 `CopyJob.state` 返回真实结果与中文文案，结果未确认带「需人工核查」标记与错误码，「已完成」筛选只含已交给打印机；`Order.taskStatus` 映射不变（注销靠它）。后台页面未改。
