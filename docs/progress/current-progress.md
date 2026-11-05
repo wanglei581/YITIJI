@@ -1,5 +1,18 @@
 # 当前开发进度
 
+## 2026-11-03：一体机扫描页按职责拆开（K1a，只拆不改行为；分支 `claude/scan-k1a-split-1102`，未合并、未部署）
+
+- 为什么：下一步 K1b 要把屏上扫描做进扫描页。`ScanSettingsPage.tsx` 原来 784 行，离 800 行硬线只剩 16 行；`ScanResultPage.tsx` 512 行。本批只拆，让 K1b 能复用建会话、投递确认、重扫授权和出口。基线 `317e54442`。实现提交：`12cc15320`（设置页五个 hook）、`b0d6847e0`（结果页两个 hook、三个组件）、`ec56da22a`（六个门禁改读新文件，断言不删不放宽）、`a1e9ca34c`（游客结果页文案）。
+- 怎么拆：设置页拆成 `useScanSettingsState`、`useScanSessionCreate`、`useScanSettingsDeliveryAck`、`useScanSettingsExpiry`、`useScanSettingsActions`，页面只留装配与渲染（123 行）。投递确认和进度页不同构，没有抽成共用 hook。结果页拆成 `useScanResultRescan`、`useScanResultExits`、`ScanResultFailedView`、`ScanResultPreviewBlock`、`ScanResultExitRow`、`scanResultModel`，页面 122 行。`leaveScanFlow` 仍是先撤会话、再清登记、再 replace 导航。拆完每个文件都不超过 500 行，最长的是 `useScanSessionCreate.ts`（394 行）。
+- 文案（R-03，产品负责人 11/02 拍板，照触屏版补稿 cs-scan-done）：游客成功说明改为「未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。要带走电子版，下次先扫码登录再扫。」再加「用 U 盘带走：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。」不加登录按钮（游客一登录，这次扫描会被清掉）。禁用的「本次不进入我的文档」不动。登录后仍是「前往我的文档」。
+- 没改：路由、阶段机、扫描登记的存储格式、后端、终端程序、共享包、小程序、两个后台。触屏版那四处（U 盘卡「暂未开通」、证件 JPG 的 `role="note"`、游客结果页没有下载码、`SCAN_FILE_TYPE_NOT_ALLOWED` 的说法）没改回去。
+- 本机验证（系统 Chrome；Playwright 自带 Chromium 缓存是空的）：kiosk typecheck 通过；lint 0 error（27 条原有 warning，不在扫描页）。门禁全绿：`verify:fusion-w2`、`verify:scan-session-truth`、`verify:scan-quiet-period`、`verify:print-done-truth`（47 过）、`verify:kiosk-ai-declaration`、`verify:kiosk-runtime-error-boundary`、`verify:kiosk-unattended-copy`、`verify:kiosk-font-subset`（7168 字）、`verify:compliance-copy`（含 `verify:no-raw-error-render`）、图谱多列出的 `verify:fusion-w6`。浏览器：w2 243/243（含 fusion-w2-scan 36）；truth 177 过、1 条红；scan-safety 37 过、1 条红；会话警告 35/35；隐私超时 42/42；w6 里路径含 `/scan` 的 8/8；旅程 F 1/1。
+- 两条红不是这次拆分。`unfinished privacy check keeps the recovery exit` 在 origin/main 副本（`7af05df97`）上同一条同样红：收尾报未登记的 `POST /api/v1/materials/tasks`，屏上的恢复出口本身在。`payment code never renders` 是全套一起跑时，付款失败后界面已经回到「等待扫码」，单独再跑本分支与 origin/main 都过（本分支 1 过 / 2.2 秒，origin/main 1 过 / 2.7 秒）。一体机目录相对基线与 origin/main 没有别的差；origin/main 只多小程序 #1538。
+- 截图在 `~/.cache/claude-lanes/copyscan-1102/code-shots/k1a/`，`main-*` 与 `branch-*` 各 10 张（游客、登录 × 选类型、指引、等待、成功、失败）。文字除游客成功那句外一致。像素：选类型、等待、两种失败、登录成功为 0 差；指引只差倒计时秒数（同一时刻起算，拍摄耗时差几秒）；游客成功那张差在新句子多出来的行。
+- 反向检查（改坏后 `git checkout` 恢复，没有提交改坏的状态）：删掉 `leaveScanFlow` 里的撤会话 → `verify:scan-session-truth` 红在「先撤服务端任务」；游客句改回旧句 → 同一门禁红在 11/02 原话；静默期去掉减一 → `verify:scan-quiet-period` 红。恢复后这两条门禁再绿，工作区干净。
+- 图谱：新文件入库后 `pnpm graph` 重出，`pnpm graph:check` 通过（`docs/graph/` 3 个文件有变化）。新文件被 fusion-w2 与 scan-session-truth 钉住；设置页那一组还被 runtime-error-boundary 与 no-raw-error-render 钉住；`useScanResultExits` 还被 print-done-truth 钉住；`useScanSessionCreate` 还被 scan-quiet-period 钉住。这些门禁本轮都已跑过，没有新冒出来还没跑的。
+- 合并注意：origin/main 比本分支基线多 #1538，进度文档顶部多一节小程序签名图。合的时候两节都留，这一节放在上面。
+
 ## 2026-11-05：终端程序打印队列诊断与显式 A4 合入 main（#1579，分支 `claude/printer-queue-agent-1104`；代码进 main，未打包发布、未装机）
 
 - 做了：心跳增加 5 个只读字段（队列名、端口种类、USB 端口名、Win32_Printer 原值、打印服务状态）。端口地址不上传；队列名像地址就不带。原值与状态共用一次查询，对不上契约就不带。非 Windows 报 unknown。
@@ -198,6 +211,12 @@
 - 改法只在 `UploadSessionQrPanel`，照打印上传页 `useUploadSession`：取消答复回来前刷新、取消、确认都禁用；成功才清空并通知页面；已作废码清二维码、按过期显示；其余失败留下二维码、已收到的文件和状态，兜底句沿用「这次上传没能取消，文件还留着。」。不恢复轮询，不自动接走文件。
 - 验证：一体机 tsc、lint 无 error；冻结哈希三条、`verify:resume-phone-upload-ui`、`verify:public-screen-mask`、`verify:kiosk-unattended-copy`、两份 profile 守卫、仓库完整性，以及进度文档上不依赖数据库的后端文档门禁通过。`verify:ai-usage-retention` 缺隔离库，`verify:free-print-quota` 与 `verify:support-contact` 缺本机 Prisma 客户端，未跑成（与本次改动无关）。浏览器用例已写入，本机未跑浏览器。
 
+## 2026-11-02：两个后台登录页、浏览器标题、态势屏标题读品牌（#1528；#1521 已于 11/05 合入 main，本 PR 基线已改为 main；未合并、未部署）
+
+- 读 #1511 的 `GET /api/v1/public/brand`（不要登录）：两个后台登录页的品牌名与 Logo（Logo 加载失败回退原图标）、浏览器标题「管理员后台 / 合作机构后台 - 品牌名」、管理员态势屏「政务总览」「服务调用」标题。一次页面加载只请求一次；任何失败（旧后端没有这个接口回 404、网络错、字段不合格）静默回退默认「职易达」，不挡登录；演示模式不请求。
+- 不改：登录页版权行「© 2026 职易达」、法务默认、首单月报打印抬头——运营主体仍是我方；月报数据里还没有品牌快照，改成读当前品牌会让历史月报重印成新品牌，留待后端补快照。
+- 验证：两个后台 typecheck / lint / build；compliance-copy 整条链、plain-copy、console-screen-ui、partner-refresh-safe、partner-relative-api-url 门禁；浏览器用例 admin 接口快照包 184、机构接口快照包 176、admin 演示包（登录、全路由、大屏、法务）52、机构演示包（登录、全路由）24 全过。11/05 并入含 #1521 的 main 后复跑：admin 演示 168、admin 快照 184（含读品牌 10）、机构演示 87、机构快照 176（含读品牌 8）全过（演示包数变多是 main 新加的路由巡检）。
+
 ## 2026-11-03：合作机构工作台 AI 服务「重试」浏览器用例修偶发红（只改测试，页面不动；分支 `claude/sleepy-stonebraker-31ae12`）
 
 - **现象：** `kiosk-browser-smoke`「Run Partner data-screen browser E2E」里，`apps/partner/tests/e2e/screen/dashboard-ai.spec.ts`「切片不可用可重试；请求失败也可重试」偶发红在等不到「AI 模拟面试：5 场」。#1558 的 CI 连同自动重试两次都红；那次测的合并提交，合作机构后台代码与 main 70d046f7c 相同，main 上是绿的。本机按 CI 同款构建（React 正式版，产物 `jsxDEV` 为 0）连跑原用例 100 次红 7 次，位置一致。
@@ -248,6 +267,7 @@
 - **验证：** 反向检查 10 种改坏方式全部转红（整段改回旧代码红 21 行；摘要不看字段名、按键名放行、不限长度、不分大小写、编号先于敏感键、不传字段名、前缀放宽、去掉 UUID、抽屉请求编号不脱敏各自转红）。本机演示模式浏览器对比：同一条上传记录，修复前请求编号、文件编号、对象存储校验值三处「已隐藏」，修复后原样显示；登录名是手机号的记录仍「已隐藏」。后台类型检查、代码规范、生产构建，`verify:console-plain-copy`、`verify:admin-partner-contact-phone-ui` 通过。
 - **没改：** 字段名带 credential 的终端凭据编号（`tc_` 开头）仍按敏感键整段隐藏，是既有口径，这次不动。
 
+
 ## 2026-11-02：终端程序 0.4.17 源码并入 main（#1465：出纸拿不准不许续打、队列「正在删除」不当卡纸、补回开机防护；未部署、未发新包）
 
 - 现场事实：KSK-001 自 10/16 经 UU 受控升级装的就是 `0.4.17@0e9e0a5`（安装清单与 CI 制品哈希一致，见当日收口记录）；此前 main 源码停在 0.4.14，「0.4.17 源码没并入主线」一直未关闭——现场跑着一个 main 里没有的版本，从 main 打出的新包会悄悄覆盖掉这些修复。
@@ -297,6 +317,8 @@
 - 同类排查：全仓搜手机号正则，对整个对象逐字符串打码的只有导出这一处和它的门禁扫描。后台审计日志详情（`apps/admin/src/routes/audit/auditPresentation.ts`）也逐字段扫，命中就整段显示「已隐藏」，十六进制编号里的数字串两边是字母，会被误藏；它只影响后台显示、是多藏不是打坏、也没有偶发门禁，这次不改，列为后续。其余命中都是单个字段（文件名、自由文本、表单校验、送模型前的遮盖），不碰编号。
 - 验证：反向检查（先提交再改回）六处全部转红：mapper 回到修复前 →「文件编号必须原样导出」；自由文本也不打码 →「文件名里的手机号照旧打码」；分别去掉 orderNo、以 Id 结尾、id 三条放行 → 订单号、AI 任务编号、文件编号各红一条；门禁扫描不放行编号 → 扫描器原语红。关联门禁在 SQLite 上 9 条、本机 PostgreSQL 16 上后端 7 条全绿；后端类型检查、规范检查、图谱检查通过。
 
+
+
 ## 2026-11-02：一体机复印说明页照补稿改成图文分步（分支 `claude/copy-guide-code-1102`，已并 main 49ed808b6，未 push、未部署）
 
 - 拍板与依据：11/02 产品负责人看了私有页第 5 版复印图文补稿（`docs/design/kiosk-touch-2026-11-copyscan` 的 `cs-copy-guide`、`cs-copy-guide-more` 两屏），原话「补稿可以，照它改」。这是单独一个小改动，基线是触屏版发布候选（#1531，已合 main），只动四个文件：`printHubContent.ts`、`PrintScanFeatureInfoPage.tsx`、`print-hub-qx.css`（只在末尾追加，类名 `.qx-copy-guide-`）、`print-hub-qx.spec.ts`。
@@ -305,6 +327,7 @@
 - 视觉用例：`print-hub-qx.spec.ts` 复印那一条按总指挥许可改成「先点入口再断言三种原件」。testid、5 个 li、身份证 `data-pending`、两条提醒原句一条没删；几何阈值（不滚动、留白 <160、字 ≥20、底栏 ≥56）一个没放宽，两个视图各量一次，另加可点区 ≥48、主按钮 ≥64、图里的字有效字号 ≥20。反向检查（删入口按钮、删一种原件、第二视图返回改回首页）都转红。
 - 验证（生产构建 + preview + 系统 Chrome，本机没有 Playwright 自带 chromium）：并 main 后 `print-hub-qx` 整文件 19/19、小青接不上那两条 2/2，kiosk typecheck、`verify:p39-print-hub-fidelity`、`verify:fusion-w2`、`verify:profile-commercial-first-batch`、`verify:repository-integrity`、图谱检查都过；并 main 前 kiosk 114 条 `verify:*` 扫过，7 条本机缺环境红（`prod-build-config`、`qingxu-proto-geometry`、5 个 probe），干净基线上同样红。
 - 后续：补稿里「打印机离线时复印可能也用不了，以打印机屏幕为准」那一句这次没做（要新读设备状态）；`print-hub-qx.css` 末尾这段复印样式（约 300 行）后面另拆成专页样式文件；Linux CI 的字体栈没在本机跑过（本机用 Qingxu Sans 强制对照，几何一致）。
+
 
 ## 2026-11-02：触屏版发布候选独立复走与第三轮返工（Codex 实现、Claude 审与实跑）
 
@@ -616,6 +639,7 @@
 - 「去掉 PingFang / Hiragino」字体栈复核（模拟 CI 与真机 Windows 的字体栈，集成头 `72dc653ea` 上做，并入 #1517 前）：按每个官方 Playwright 配置各自的构建环境变量各构一份、CSS 里的系统中文字体名改成不存在的名字，落到打包进来的 Qingxu Sans；各套件浏览器用例照跑，与有 PingFang 的构建相比没有新增红（w1 62、w2 201、w3 125、w4 108、w5 84、w6 116、smoke 8、默认配置合集 426、privacy-clear 41；红的只有上面单列的竞态与存量）。358 个状态全量审计（页内量「字内容区超出裁切盒」「元素内容高于盒」「横向超出」，每态一张整页截图）：只在无 PingFang 构建里出现的 21 处——20 处第二包首页副行 `small`（22px 字内容区超出裁切盒 2px）、1 处第三包收银台折叠区 `dt`（1.9px）——逐处放大看，字形都没被切；两种字体下都有的真问题：第五包登录页非空闲态「只管这一次」卡内容 198 > 盒 148（插画被裁，第五包自己的头上就这样）、第三包收银台「本次应付」标签浅字叠在浅底上几乎看不见（第三包自己的头上逐像素相同）；其余 A 类命中是装饰伪元素或读屏隐藏元素。整页留白扫描在两种字体下的 358 张里同样 19 张超线、名单逐条相同，没有字体引起的留白。
 - 没做 / 注意：①剩下 17 处无人值守说法仍在各包名单里（见上），其中第四包 7 处与第六包 2 处是屏上句子，建议各包尽快清；②两个包各自误提交了一个门禁输出日志文件（第三包 `apps/kiosk/gates-a7.txt`、第七包仓库根 `gates-result-merge.txt`，无任何引用），原样保留未删，等总指挥定；③并入 main #1517 后，各包页面里「共享句带叫人找人的话就换成页面固定句」的分支已不再触发，5xx 页面在共享句之后又自己加了一句求助句的地方（第十一包活动物料失败态实测）服务电话会出现两次，未改；④字体栈复核与第一轮浏览器整套跑在并入 #1517 之前的集成头上，并入后只重跑了受影响的套件（见上），没有再重做 358 态审计；⑤`verify:first-order-live`、`verify:first-order-full-app` 两条要起完整服务栈，只驱动后台与合作机构后台、不涉及一体机页面，本机未跑；⑥真机、真实主机 Windows 字体、触屏手势都没验。
 
+
 ## 2026-10-29（二轮）：贴牌与授权管理后端第一步——第二轮审查返工（#1511，未合并、未部署）
 
 - 背景：Codex 第二轮复核仍判「先别合」（四项必须改、四项建议改），逐条对着代码核实后全部属实，已改完；边界不变（贴牌只换展示；授权只按期限与台数；界面不在本 PR）。
@@ -626,7 +650,7 @@
 - 门禁：verify:branding 232、verify:brand-logo-image 178、verify:license 四份 291 / 111 / 134 / 184，SQLite 与临时 PostgreSQL 都过；每处改动做过反向检查（先提交、故意改坏、取红行、复原），本轮 52 处全红；起初没红的一处（验签前计数窗口不清零）补断言后变红，补收失败挡住上传一处起初靠崩溃红，已换成干净的 FAIL 行。
 - 未做 / 注意：共享的 `TerminalScopedThrottle` 按请求头终端号分桶的问题仍只记后续；界面全部不做（一体机对 `currentSessionEndsAt` 的处理在一体机线）；未部署、真机未验。
 
-## 2026-10-29：贴牌与授权管理——两个后台的界面（#1521；#1511 已于 11/05 随 #1577 合入 main，本 PR 已改基到 main；未合并、未部署）
+## 2026-10-29：贴牌与授权管理——两个后台的界面（#1521，11/05 已压缩合并进 main：4f6db6368；未部署）
 
 - 范围：只在现有页面上改，不新建路由页面；接口全部用 #1511 返工后的契约（期限含到期日、periodText、version、理由与审批工单号、Logo 只收 PNG）。贴牌只换展示，授权只按期限与终端台数，与 #1511 同一边界。
 - 管理员「法务文档版本」页加「品牌与备案」卡：品牌名、字标、Logo（PNG，前端先按文件头与大小查，再交服务端）、ICP 与公安联网备案号及查询链接；留空用默认值。一体机已在 #1511 里读这项配置（kiosk-profile 每 3 分钟重取，登录、换人、从待机唤醒时立即重取），保存提示为「一体机最迟约 3 分钟内按这里显示；登录、换人或从待机唤醒时会立即更新」。

@@ -306,7 +306,7 @@ flowchart LR
   app --> job_materials["/job-materials<br/>1 页 · 0 端点"]
   app --> job_sources["/job-sources<br/>1 页 · 19 端点"]
   app --> legal_docs["/legal-docs<br/>1 页 · 2 端点"]
-  app --> login["/login<br/>1 页 · 0 端点"]
+  app --> login["/login<br/>1 页 · 2 端点"]
   app --> member_benefits["/member-benefits<br/>1 页 · 2 端点"]
   app --> member_feedback["/member-feedback<br/>1 页 · 3 端点"]
   app --> member_notifications["/member-notifications<br/>1 页 · 2 端点"]
@@ -347,7 +347,7 @@ flowchart LR
 | `/job-materials` | JobMaterialsPage | `apps/admin/src/routes/job-materials/index.tsx` | 0 | — |
 | `/job-sources` | JobSourcesPage | `apps/admin/src/routes/job-sources/index.tsx` | 19 | — |
 | `/legal-docs` | LegalDocsPage | `apps/admin/src/routes/legal-docs/index.tsx` | 2 | — |
-| `/login` | LoginPage | `apps/admin/src/routes/login/index.tsx` | 0 | 1 |
+| `/login` | LoginPage | `apps/admin/src/routes/login/index.tsx` | 2 | 1 |
 | `/member-benefits` | MemberBenefitsPage | `apps/admin/src/routes/member-benefits/index.tsx` | 2 | — |
 | `/member-feedback` | MemberFeedbackPage | `apps/admin/src/routes/member-feedback/index.tsx` | 3 | — |
 | `/member-notifications` | MemberNotificationsPage | `apps/admin/src/routes/member-notifications/index.tsx` | 2 | — |
@@ -370,7 +370,7 @@ flowchart LR
 | `/users` | UsersPage | `apps/admin/src/routes/users/index.tsx` | 9 | — |
 
 <details>
-<summary>展开：每个路由触达的端点（29 个路由）</summary>
+<summary>展开：每个路由触达的端点（30 个路由）</summary>
 
 **`/`** → `DELETE /files/:param`、`GET /admin/ai/logs`、`GET /admin/ai/usage`、`GET /admin/alerts`、`GET /admin/import-batches`、`GET /admin/jobs/quality-summary`、`GET /admin/orgs/:param/official-channels`、`GET /admin/orgs/:param/verified-official-domains`、`GET /admin/print-tasks`、`GET /admin/system/recruitment-hosting`、`GET /files`、`GET /files/:param/url`、`GET /files/lifecycle-summary`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/feedback/:param/status`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/feedback/:param/contact-phone`、`POST /admin/feedback/:param/replies`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`POST /files/cleanup-expired`、`PUT /admin/orgs/:param/verified-official-domains`
 
@@ -403,6 +403,8 @@ flowchart LR
 **`/job-sources`** → `DELETE /files/:param`、`GET /admin/ai/logs`、`GET /admin/ai/usage`、`GET /admin/import-batches`、`GET /admin/jobs/quality-summary`、`GET /admin/orgs/:param/official-channels`、`GET /admin/orgs/:param/verified-official-domains`、`GET /admin/system/recruitment-hosting`、`GET /files`、`GET /files/:param/url`、`GET /files/lifecycle-summary`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`POST /files/cleanup-expired`、`PUT /admin/orgs/:param/verified-official-domains`
 
 **`/legal-docs`** → `POST /admin/branding/logo`、`PUT /admin/branding`
+
+**`/login`** → `POST /admin/branding/logo`、`PUT /admin/branding`
 
 **`/member-benefits`** → `PATCH /admin/member-benefits/:param/revoke`、`POST /admin/member-benefits`
 

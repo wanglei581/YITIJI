@@ -70,7 +70,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2035 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2046 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -291,11 +291,11 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/printers/PrinterOutputCell.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/printers/index.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-service-desk-dashboard-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `apps/admin/src/routes/privacy-requests/index.tsx` | `verify-console-privacy-copy.mjs`<br/>`verify-user-closure-ui.mjs`<br/>`verify-data-request-ui.mjs` |
-| `apps/admin/src/routes/screen/GovGrid.tsx` | `verify-console-batch5-copy.mjs`<br/>`verify-console-screen-details.mjs`<br/>`verify-console-screen-ui.mjs` |
+| `apps/admin/src/routes/screen/GovGrid.tsx` | `verify-console-batch5-copy.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-console-screen-details.mjs`<br/>`verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/OpsGrid.tsx` | `verify-console-batch5-copy.mjs` |
 | `apps/admin/src/routes/screen/TerminalTwinView.tsx` | `verify-console-batch5-copy.mjs` |
 | `apps/admin/src/routes/screen/UsageHostingOff.tsx` | `verify-console-batch5-copy.mjs`<br/>`verify-console-screen-details.mjs` |
-| `apps/admin/src/routes/screen/UsageView.tsx` | `verify-console-batch6-copy.mjs`<br/>`verify-console-screen-details.mjs`<br/>`verify-console-screen-ui.mjs` |
+| `apps/admin/src/routes/screen/UsageView.tsx` | `verify-console-batch6-copy.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-console-screen-details.mjs`<br/>`verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/aiScreenDisplay.ts` | `verify-console-batch5-copy.mjs` |
 | `apps/admin/src/routes/screen/index.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/metricLabels.ts` | `verify-console-batch5-copy.mjs`<br/>`verify-console-privacy-copy.mjs` |
@@ -431,7 +431,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 603 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 614 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -909,7 +909,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/useSelfAssessmentConsentBundle.ts` | `verify-self-assessment-consent-source.mjs` |
 | `apps/kiosk/src/pages/resume/useSelfAssessmentIdleExit.ts` | `verify-resume-phone-upload-ui.mjs` |
 | `apps/kiosk/src/pages/scan/ScanProgressPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-scan-session-truth.mjs`<br/>`verify-no-raw-error-render.mjs` |
-| `apps/kiosk/src/pages/scan/ScanResultPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-print-done-truth.mjs`<br/>`verify-scan-session-truth.mjs` |
+| `apps/kiosk/src/pages/scan/ScanResultExitRow.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
+| `apps/kiosk/src/pages/scan/ScanResultFailedView.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
+| `apps/kiosk/src/pages/scan/ScanResultPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
+| `apps/kiosk/src/pages/scan/ScanResultPreviewBlock.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/ScanSettingsPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-scan-quiet-period.mjs`<br/>`verify-scan-session-truth.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/scan/ScanSettingsStatusView.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-quiet-period.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/ScanStartPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
@@ -920,6 +923,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/scan/scanDeliveryAck.ts` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/scanOutputFormat.ts` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/scanRescanRecovery.ts` | `verify-scan-quiet-period.mjs`<br/>`verify-scan-session-truth.mjs` |
+| `apps/kiosk/src/pages/scan/scanResultModel.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/scanSessionRevoke.ts` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/scanSettingsModel.ts` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/scanSettingsTeardown.ts` | `verify-scan-session-truth.mjs` |
@@ -927,6 +931,13 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/scan/scanWorkbenchSession.ts` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/styles/scan-fusion.css` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css` | `verify-fusion-w2-print-scan.mjs` |
+| `apps/kiosk/src/pages/scan/useScanResultExits.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-print-done-truth.mjs`<br/>`verify-scan-session-truth.mjs` |
+| `apps/kiosk/src/pages/scan/useScanResultRescan.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
+| `apps/kiosk/src/pages/scan/useScanSessionCreate.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-scan-quiet-period.mjs`<br/>`verify-scan-session-truth.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/kiosk/src/pages/scan/useScanSettingsActions.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-scan-session-truth.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/kiosk/src/pages/scan/useScanSettingsDeliveryAck.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-scan-session-truth.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/kiosk/src/pages/scan/useScanSettingsExpiry.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-scan-session-truth.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/kiosk/src/pages/scan/useScanSettingsState.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-scan-session-truth.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx` | `verify-fusion-w5.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-kiosk-end-use.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-qx-session-lifecycle.mjs`<br/>`verify-scan-session-truth.mjs`<br/>`verify-screensaver-empty-shell.mjs` |
 | `apps/kiosk/src/pages/screensaver/StandbyView.tsx` | `verify-kiosk-brand-display.mjs`<br/>`verify-qx-session-lifecycle.mjs`<br/>`verify-screensaver-empty-shell.mjs` |
 | `apps/kiosk/src/pages/screensaver/screensaver-service-desk.css` | `verify-lightflow-k1-public-entry.mjs` |
@@ -1904,7 +1915,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/shared/src/types/adminUsers.ts` | `verify-admin-users-ui.mjs`<br/>`verify-admin-users.ts` |
 | `packages/shared/src/types/ai.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-job-ai-history-privacy-ui.mjs`<br/>`verify-job-fit-m1-5-ui.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-contract-mirror.mjs`<br/>`verify-job-ai.ts`<br/>`verify-resume-diagnosis-context.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-voice-generate.ts`<br/>`verify-toolbox-ai-skill-intents.ts` |
 | `packages/shared/src/types/audit.ts` | `verify-change-password.ts`<br/>`verify-partner-contact-phone-registration.ts` |
-| `packages/shared/src/types/branding.ts` | `verify-branding.ts` |
+| `packages/shared/src/types/branding.ts` | `verify-console-plain-copy.mjs`<br/>`verify-branding.ts` |
 | `packages/shared/src/types/campusRecruitmentStats.ts` | `verify-campus-recruitment-stats.ts` |
 | `packages/shared/src/types/company.ts` | `verify-companies.ts` |
 | `packages/shared/src/types/complianceCopy.ts` | `verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-legal-retention-copy.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-pii-redaction-contract.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-compliance-copy.mjs`<br/>`verify-ai-safety-aigc.ts` |
