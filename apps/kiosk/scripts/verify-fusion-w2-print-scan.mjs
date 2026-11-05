@@ -531,7 +531,8 @@ assert.match(
   /U 盘图片导入尚未接到转换列表/,
   'USB entry is kept and explained as unwired, not deleted'
 )
-const scanResultPreviewSource = read('src/pages/scan/ScanResultPage.tsx')
+// 2026-11-02 K1a：结果页的预览块拆成了 ScanResultPreviewBlock.tsx（<FileContentPreview> 现在在那里），断言原样不变。
+const scanResultPreviewSource = read('src/pages/scan/ScanResultPreviewBlock.tsx')
 assert.match(
   scanResultPreviewSource,
   /<FileContentPreview[\s\S]*?fileUrl=\{file\.fileUrl\}/,
@@ -1173,7 +1174,17 @@ assert.match(
   }
   assert.deepEqual(hits, [], `kiosk on-screen text must not hard-code the printer brand or model (走查 I-18):\n${hits.join('\n')}`)
 }
-const scanSettings = read('src/pages/scan/ScanSettingsPage.tsx')
+// 2026-11-02 K1a：设置页按职责拆成了五个 hook + 页面，代码行逐字搬运，下面的断言读这几份的拼接，判据一条没减；
+// 不得访问浏览器存储则逐个文件各查一遍。
+const SCAN_SETTINGS_FILES = [
+  'src/pages/scan/useScanSettingsState.ts',
+  'src/pages/scan/useScanSessionCreate.ts',
+  'src/pages/scan/useScanSettingsDeliveryAck.ts',
+  'src/pages/scan/useScanSettingsExpiry.ts',
+  'src/pages/scan/useScanSettingsActions.ts',
+  'src/pages/scan/ScanSettingsPage.tsx',
+]
+const scanSettings = SCAN_SETTINGS_FILES.map(read).join('\n')
 assert.match(scanSettings, /function isScanType\(/, 'scan settings validates direct route state')
 assert.match(
   scanSettings,
@@ -1219,7 +1230,7 @@ for (const marker of [
 ]) {
   assert.match(scanSettings, new RegExp(marker), `scan settings retains ${marker}`)
 }
-assertNoStorageAccess('src/pages/scan/ScanSettingsPage.tsx')
+for (const path of SCAN_SETTINGS_FILES) assertNoStorageAccess(path)
 assert.match(
   scanSettings,
   // 2026-09-13：真地址是 /scan?stage=progress（/scan/progress 只剩兼容重定向）。
@@ -1255,7 +1266,17 @@ assert.match(
   'scan progress recovers completion during cancellation'
 )
 
-const scanResult = read('src/pages/scan/ScanResultPage.tsx')
+// 2026-11-02 K1a：结果页按职责拆成了两个 hook、三个组件和页面，代码行逐字搬运，下面的断言读这几份的拼接，判据一条没减。
+const SCAN_RESULT_FILES = [
+  'src/pages/scan/scanResultModel.ts',
+  'src/pages/scan/useScanResultRescan.ts',
+  'src/pages/scan/useScanResultExits.ts',
+  'src/pages/scan/ScanResultFailedView.tsx',
+  'src/pages/scan/ScanResultPreviewBlock.tsx',
+  'src/pages/scan/ScanResultExitRow.tsx',
+  'src/pages/scan/ScanResultPage.tsx',
+]
+const scanResult = SCAN_RESULT_FILES.map(read).join('\n')
 // 打印出口 2026-09-28 起落在材料检查（商用收口 P0-5）：扫描件是本人原件，生产强制
 // PRINT_REQUIRE_PII_SCAN=true，没做完隐私检查就建单会被拒，所以不再直达 /print/confirm。
 for (const target of ['/me/documents', '/resume/parse']) {
@@ -1450,6 +1471,10 @@ for (const path of [
   'src/pages/scan/ScanProgressPage.tsx',
   'src/pages/scan/ScanSettingsStatusView.tsx',
   'src/pages/scan/ScanResultPage.tsx',
+  // 2026-11-02 K1a：结果页的可见 JSX 拆到了这三个组件里，逐个查，范围和拆分前一样大。
+  'src/pages/scan/ScanResultFailedView.tsx',
+  'src/pages/scan/ScanResultPreviewBlock.tsx',
+  'src/pages/scan/ScanResultExitRow.tsx',
 ]) {
   const code = read(path)
   assert.doesNotMatch(code, /\[\s*['"]任务编号['"]\s*,/, `${path} must not display a task ID row`)
@@ -1535,7 +1560,7 @@ assert.match(aiDownNote, /\/advisor\/availability/, 'AI 状态只认服务端那
 assert.match(aiDownNote, /row\.available === false\) return 'unavailable'/, '只有服务端明说 available:false 才写「接不上」')
 assert.match(aiDownNote, /小青暂时接不上。这一步不用它也能做完，照下面的按钮继续。/, 'AI 状态那一句要说清这一步不靠小青也能做完')
 // 扫描完成后的 AI 简历识别入口与结果页不降级：入口还在、只对简历扫描放行、去的是简历解析页。
-const scanResultPage = read('src/pages/scan/ScanResultPage.tsx')
+const scanResultPage = SCAN_RESULT_FILES.map(read).join('\n')
 assert.match(scanResultPage, /AI 简历识别/, '扫描结果页的「AI 简历识别」入口不许删')
 assert.match(scanResultPage, /const aiEnabled = scanType === 'resume' && Boolean\(file\)/, 'AI 简历识别只对简历扫描且有文件时放行')
 assert.match(scanResultPage, /leaveScanFlow\('\/resume\/parse'/, 'AI 简历识别去的是简历解析页，由那一屏自己按 AI 能力降级')
