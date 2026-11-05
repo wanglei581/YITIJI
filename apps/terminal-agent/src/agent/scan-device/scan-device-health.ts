@@ -285,6 +285,18 @@ export function createScanDeviceHealth(deps: ScanDeviceHealthDeps): ScanDeviceHe
 
 /** 同一设备锁对应唯一 WIA 隔离状态；复印与屏上扫描不能各自遗忘旧进程。 */
 const sharedHealth = new WeakMap<ScanDeviceHealthDeps['lock'], { health: ScanDeviceHealth; deps: ScanDeviceHealthDeps }>()
+
+/** 拿锁后的最后一道 WIA 闸门。探测借用本次锁，不能重新竞争或提前放锁。 */
+export async function scanDeviceStartHealth(health: ScanDeviceHealth, heldLock: DeviceLockHandle): Promise<'ready' | 'busy' | 'not_ready'> {
+  if (health.knownProcessAlive()) return 'busy'
+  if (!health.hasSuspect() && !health.hasForceKilled()) return 'ready'
+  const probed = await health.probe({ heldLock })
+  if (health.hasSuspect()) return 'busy'
+  if (probed.health !== 'ready') return probed.health === 'busy' ? 'busy' : 'not_ready'
+  health.clearForceKilled()
+  return 'ready'
+}
+
 export function sharedScanDeviceHealth(deps: ScanDeviceHealthDeps, bindOwner = false): ScanDeviceHealth {
   let entry = sharedHealth.get(deps.lock)
   if (!entry) {

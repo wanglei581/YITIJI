@@ -21,7 +21,7 @@ import {
   type DeviceReportResult,
   type ScanDeviceReportState,
 } from './scan-device-backend'
-import { sharedScanDeviceHealth, defaultScanProcessAlive, type ScanDeviceClock, type ScanDeviceHealth } from './scan-device-health'
+import { scanDeviceStartHealth, sharedScanDeviceHealth, defaultScanProcessAlive, type ScanDeviceClock, type ScanDeviceHealth } from './scan-device-health'
 import { createScanDeviceHousekeeping, type CleanupMeta } from './scan-device-housekeeping'
 import { scanDeviceReportBridge } from './scan-device-sync'
 import { composeScanPdf } from './scan-pdf-compose'
@@ -644,7 +644,13 @@ export function createScanDeviceRuntime(
           latest.nextAccepted = false
           throw new LocalScanError(409, 'LOCAL_SCAN_BUSY', viewOf(latest), '扫描仪正忙，已扫的页还在。可以再试、点扫完了，或中止')
         }
-        // 租约已经回来。开扫前再看一次绝对截止和取消标记，截止到了就不再扫。
+        const startHealth = await scanDeviceStartHealth(health, lock)
+        if (startHealth !== 'ready') {
+          lock.release()
+          latest.nextAccepted = false
+          throw new LocalScanError(409, 'LOCAL_SCAN_BUSY', viewOf(latest), '扫描仪隔离尚未解除，请确认旧扫描进程退出后重试')
+        }
+        // 租约和健康探测已经回来。开扫前再看一次绝对截止和取消标记。
         if (latest.abortRequested) {
           lock.release()
           latest.nextAccepted = false

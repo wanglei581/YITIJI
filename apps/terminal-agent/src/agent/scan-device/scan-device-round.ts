@@ -11,7 +11,7 @@ import {
 } from '../device-lock'
 import type { DeviceLease, DeviceReportBody } from './scan-device-backend'
 import { isSwitchedToPanelCode } from './scan-device-backend'
-import type { ScanDeviceHealth } from './scan-device-health'
+import { scanDeviceStartHealth, type ScanDeviceHealth } from './scan-device-health'
 import type { CleanupMeta } from './scan-device-housekeeping'
 import type { ScanDeviceDeletionReason, ScanTempPurgeResult } from './scan-temp-dir'
 import { deliverComposedRound } from './scan-device-deliver'
@@ -535,6 +535,17 @@ export function createRoundDriver(host: RoundHost): RoundDriver {
       return viewOf(current)
     }
     const batchPages = current.source === 'feeder' ? current.pageCap : 1
+    const health = await scanDeviceStartHealth(host.health, lock)
+    if (current.abortRequested || current.stopCode || current.generation !== currentGen) {
+      lock.release()
+      if (current.abortRequested) return finishAbort()
+      if (current.stopCode) return finishStop()
+      return viewOf(session())
+    }
+    if (health !== 'ready') {
+      lock.release()
+      return fail(health)
+    }
     host.track(runBatch(lock, batchPages, current.pageCount + 1, currentGen))
     host.note('scanning')
     return viewOf(current)

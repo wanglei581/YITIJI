@@ -8,6 +8,7 @@ import { fixture, base, plain, scan, expectCode, request, JPEG } from './verify-
 import { printChecks } from './verify-copy-print.helper'
 import { isolationChecks } from './verify-copy-isolation.helper'
 import { edgeChecks } from './verify-copy-device-edges.helper'
+import { cleanupWriteChecks } from './verify-copy-cleanup-write.helper'
 
 let passed = 0
 async function check(name: string, fn: () => Promise<void>): Promise<void> {
@@ -137,6 +138,7 @@ async function main(): Promise<void> {
     } finally { await restart.close(); await f.close() }
   })
   await isolationChecks(check)
+  await cleanupWriteChecks(check)
   await edgeChecks(check)
   await printChecks(check)
   console.log(`verify-copy-device: ${passed} checks passed`)

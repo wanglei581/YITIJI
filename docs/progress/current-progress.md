@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-11-05：屏上复印 C2d——收掉 C2c 复审的 2 条 P1（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+
+- ① 复印打印 ledger 清除 `queueCleanupPending` 时一次 rename/fsync 失败不再永久挡住云打印：清理完成写入与新派发保护分开，失败保留隔离与墓碑，按 1/2/4/8/16/30 秒封顶退避重写并记日志；下一轮重新确认执行器已退出、重新清队列再持久化解除隔离，旧单不重派。② 屏上扫描首次扫描（`scan-device-round.ts`）与续页（`scan-device-runner.ts`）都在拿到设备锁之后、启动 WIA 之前统一复查共享健康（`scan-device-health.ts` 新增持锁检查，必要探测复用已持有的锁）；复印侧持锁复查加了等锁交错用例。
+- 验证（Codex 实现，Claude 收货）：新增 8 条用例；`verify:copy-device` 39 项、`verify:scan-device-runner` 22 组、`verify:scan-device-engine` 53 组与打印相关门禁、tsc、lint、repository-integrity 过；反向检查两项变红。
+
 ## 2026-11-05：屏上复印 C2c——收掉 C2 复审的 3 条 P1（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
 
 - ① 打印执行器超时仍在运行时，复用并扩展 `print-dispatch-gate` 保持派发隔离，执行器退出后再清一次该次残留作业才放行下一单；`queueCleanupPending` 写进复印打印 ledger，重启后确认执行器退出、调现有队列清理后才解除，清理失败继续隔离重试。② WIA 未确认退出时把进程交给扫描健康隔离，`finally` 无条件释放全局设备锁，现有云打印照常领取；新的复印扫描被拒并给出可读说明，清场与过期能结束会话，待删材料后台重试。③ 复印与屏上扫描共用同一份 WIA 健康与可疑进程状态（`scan-device-health.ts` 按设备锁共享实例，A2 运行器接入），复印首次扫描、续页、预热重试前都检查，旧进程确认退出并探测成功后才放行。

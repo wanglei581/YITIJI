@@ -36,7 +36,12 @@ export async function printLocalDocument(input: {
     recover ??= retainPrintDispatch(async () => {
       if (!terminal || readerPending) return false
       if (cleanupAgain) await removeOwnJobs()
-      input.queueSettled() // 先耐久解除待清理责任，再放派发。
+      try {
+        input.queueSettled() // 先耐久解除待清理责任，再放派发。
+      } catch (error) {
+        cleanupAgain = true // 写失败后下一轮必须重查执行器、重清队列，不能只重写磁盘。
+        throw error
+      }
       return true
     })
   }

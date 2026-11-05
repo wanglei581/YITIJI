@@ -47,6 +47,7 @@ import { verifyRound2 } from './verify-scan-device-runner-r2'
 import { verifyRound3 } from './verify-scan-device-runner-r3'
 import { verifyRound4 } from './verify-scan-device-runner-r4'
 import { verifyRound6 } from './verify-scan-device-runner-r6'
+import { verifyScanDeviceIsolation } from './verify-scan-device-isolation.helper'
 
 const ALLOWED = 'https://kiosk.example.test'
 const BRIDGE = 'bridge-token-scan-device-verify'
@@ -792,6 +793,7 @@ async function main(): Promise<void> {
     await check('第三轮', () => verifyRound3(path.join(root, 'r3'), db))
     await check('第四轮', () => verifyRound4(path.join(root, 'r4'), db))
     await check('第六轮', () => verifyRound6(path.join(root, 'r6'), db))
+    await check('C2d 共享隔离持锁复查', () => verifyScanDeviceIsolation(path.join(root, 'c2d')))
     console.log(`verify-scan-device-runner: ok（${passed.length} 组）`)
   } finally {
     clearInterval(keepAlive)

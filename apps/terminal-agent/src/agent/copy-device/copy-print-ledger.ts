@@ -32,6 +32,7 @@ export function createCopyPrintLedger(deps: CopyDeps, dirId: (id: string, genera
   const records = new Map<string, CopyPrintRecord>()
   const inflight = new Set<string>()
   let safe = true
+  const cleanupWrites = new Map<string, { attempts: number; nextAt: number }>()
   const cleanupRetries: Array<() => Promise<boolean>> = []
   const key = (id: string, generation: number) => dirId(id, generation)
   const directory = () => createScanTaskDir(COPY_PRINT_LEDGER_DIR, { ...deps.tempHooks, root: deps.root })
@@ -41,8 +42,9 @@ export function createCopyPrintLedger(deps: CopyDeps, dirId: (id: string, genera
     const fd = fs.openSync(dir, 'r')
     try { fs.fsyncSync(fd) } finally { fs.closeSync(fd) }
   }
-  const persist = (record: CopyPrintRecord, first = false): void => {
-    if (!safe) throw new CopyError(503, 'COPY_STORAGE_UNSAFE')
+  const persist = (record: CopyPrintRecord, first = false, cleanupCompletion = false): void => {
+    // 新派发/结果写入仍 fail closed；已存在墓碑的清理完成可在现场重核后单独重试。
+    if (!safe && !cleanupCompletion) throw new CopyError(503, 'COPY_STORAGE_UNSAFE')
     const dir = directory()
     const file = path.join(dir, `${key(record.copyId, record.generation)}.json`)
     const target = first ? file : `${file}.${randomUUID()}.tmp`
@@ -53,8 +55,9 @@ export function createCopyPrintLedger(deps: CopyDeps, dirId: (id: string, genera
       syncDirectory(dir)
       records.set(key(record.copyId, record.generation), record)
     } catch {
-      // 包括已落盘但 fsync 失败：禁止本进程再尝试派发，重启按保守口径恢复。
-      safe = false
+      // 清理完成写失败只保留隔离，下一次重新核验现场后可重写；其它写失败仍禁止新派发。
+      // 即使 rename 已成功而目录 fsync 失败，内存墓碑仍保留 pending，绝不重派旧单。
+      if (!cleanupCompletion) safe = false
       throw new CopyError(503, 'COPY_STORAGE_UNSAFE')
     }
   }
@@ -93,7 +96,21 @@ export function createCopyPrintLedger(deps: CopyDeps, dirId: (id: string, genera
   const get = (id: string, generation: number) => records.get(key(id, generation))
   const queueSettled = (id: string, generation: number): void => {
     const r = get(id, generation)
-    if (r?.queueCleanupPending) persist({ ...r, queueCleanupPending: false })
+    if (!r?.queueCleanupPending) return
+    const entry = key(id, generation)
+    const previous = cleanupWrites.get(entry)
+    if (previous && deps.clock.now() < previous.nextAt) throw new CopyError(503, 'COPY_STORAGE_UNSAFE')
+    try {
+      persist({ ...r, queueCleanupPending: false }, false, true)
+      cleanupWrites.delete(entry)
+      if (previous) warn('copy-print: cleanup completion persisted; print isolation released')
+    } catch (error) {
+      const attempts = Math.min((previous?.attempts ?? 0) + 1, 6)
+      const delay = Math.min(1000 * 2 ** (attempts - 1), 30_000)
+      cleanupWrites.set(entry, { attempts, nextAt: deps.clock.now() + delay })
+      warn(`copy-print: cleanup completion persist failed; print claims blocked; retry in ${delay}ms after executor/queue recheck; check ledger storage if failure persists`)
+      throw error
+    }
   }
   for (const [id, r] of records) if (r.queueCleanupPending) {
     cleanupRetries.push(retainRecoveredCopyPrint(deps, r, `copy_${id}`, () => queueSettled(r.copyId, r.generation)))
