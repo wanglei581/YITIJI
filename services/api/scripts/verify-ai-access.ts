@@ -55,6 +55,7 @@ import { OrderQuoteController } from '../src/payment/order-quote.controller'
 import { PaymentController } from '../src/payment/payment.controller'
 import { PrintConversionController } from '../src/print-conversion/print-conversion.controller'
 import { PrintJobsController } from '../src/print-jobs/print-jobs.controller'
+import { ScanDeviceController } from '../src/scan-tasks/scan-device.controller'
 import { ScanTasksController } from '../src/scan-tasks/scan-tasks.controller'
 import { SyncController } from '../src/sync/sync.controller'
 import { TerminalsController } from '../src/terminals/terminals.controller'
@@ -317,6 +318,8 @@ function coverage(): void {
     [MemberPrintOrdersController as unknown as Ctor, ['create']],
     [PackageOrdersController as unknown as Ctor, ['create']],
     [ScanTasksController as unknown as Ctor, ['create']],
+    // 屏上扫描（device 路线）：回报进度、改用面板、改设置都是「已开始的会话」上的动作，维护期间也要能继续，一个都不许拦。
+    [ScanDeviceController as unknown as Ctor, []],
     [UploadSessionsController as unknown as Ctor, ['create']],
     [PrintConversionController as unknown as Ctor, ['imagesToPdf']],
     [MaterialsController as unknown as Ctor, ['createTask']],

@@ -8,13 +8,14 @@ import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { TerminalsService } from '../terminals/terminals.service'
 import { ScanDeviceReportDto } from './dto/scan-device-report.dto'
+import { ScanDeviceSettingsDto } from './dto/scan-device-settings.dto'
 import { ScanDeviceSessionsService } from './scan-device-sessions.service'
 
 /**
- * 屏上扫描（device 路线）的两个云端写入口。
+ * 屏上扫描（device 路线）的三个云端写入口：终端程序回报进度、用户改用面板扫描、用户改扫描设置。
  *
- * 刻意不带 @MaintenanceBlocked：维护模式只拦「新建」入口（verify-ai-access 钉住），
- * 已经开始的会话必须还能回报进度、还能改用面板扫描，否则用户会卡在半路。
+ * 刻意不带 @MaintenanceBlocked：维护模式只拦「新建」入口（verify-ai-access 钉住，本控制器登记为「没有任何受拦接口」），
+ * 已经开始的会话必须还能回报进度、还能改用面板扫描、还能换来源 / 颜色，否则用户会卡在半路。
  */
 @Controller()
 export class ScanDeviceController {
@@ -44,6 +45,8 @@ export class ScanDeviceController {
       state: dto.state,
       pageCount: dto.pageCount,
       errorCode: dto.errorCode,
+      source: dto.source,
+      colorMode: dto.colorMode,
     })
     return ApiResponse.ok(result)
   }
@@ -62,6 +65,27 @@ export class ScanDeviceController {
   ) {
     const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     const result = await this.device.switchToPanel(id, endUser?.endUserId ?? null, controlToken)
+    return ApiResponse.ok(result)
+  }
+
+  /**
+   * 「改用玻璃台 / 改颜色」：凭控制令牌在同一个会话里原地改来源与颜色（权限检查照 switch-to-panel）。
+   * 只在 ready / error 时允许；不检查也不触发终端静默期，会话、控制令牌、ACK 原样保留。限额同 switch-to-panel。
+   */
+  @Post('scan/sessions/:id/device-settings')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  async deviceSettings(
+    @Param('id') id: string,
+    @Body() dto: ScanDeviceSettingsDto,
+    @Headers('x-scan-session-control') controlToken: string | undefined,
+    @Req() req: Request,
+  ) {
+    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
+    const result = await this.device.updateDeviceSettings(id, endUser?.endUserId ?? null, controlToken, {
+      source: dto.source,
+      colorMode: dto.colorMode,
+    })
     return ApiResponse.ok(result)
   }
 }

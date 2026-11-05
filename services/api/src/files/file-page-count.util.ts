@@ -46,6 +46,38 @@ type ParserOutcome =
   | { kind: 'invalid_document' }
   | { kind: 'parser_unavailable' }
 
+/** 页数从哪来。byte_scan 只在解析器自身不可用时出现，屏上扫描投递不认这个数。 */
+export type ResolvedPdfPageCount =
+  | { status: 'pages'; pages: number; source: 'parser' | 'byte_scan' }
+  | { status: 'unreadable' }
+
+/** 门禁用来模拟解析器故障。生产请求到不了这个开关。 */
+let forcePdfParserUnavailableForTest = false
+
+export function setPdfPageCountParserUnavailableForTest(enabled: boolean): void {
+  forcePdfParserUnavailableForTest = enabled
+}
+
+/**
+ * PDF 页数权威识别，并标明数字是解析器读的还是字节正则凑的。
+ *
+ * - pdf.js 读出页数 → source 为 parser。
+ * - pdf.js 判定文件不可解析（结构损坏 / 加密 / 根本不是 PDF）→ unreadable，**不回落**。
+ * - pdf.js 自身不可用（模块缺失等基础设施问题）→ 回落到 {@link countPdfPages}。
+ *   正则数得出则 source 为 byte_scan；数不出则 unreadable。
+ *
+ * 面板上传和计费仍通过 {@link resolvePdfPageCount} 接受 byte_scan。
+ * 屏上扫描投递只认 source 为 parser 的结果。
+ */
+export async function resolvePdfPageCountDetailed(buffer: Buffer): Promise<ResolvedPdfPageCount> {
+  const outcome = await countPdfPagesByParser(buffer)
+  if (outcome.kind === 'pages') return { status: 'pages', pages: outcome.pages, source: 'parser' }
+  if (outcome.kind === 'invalid_document') return { status: 'unreadable' }
+  const scanned = countPdfPages(buffer)
+  if (scanned === null || scanned <= 0 || scanned > MAX_PLAUSIBLE_PAGES) return { status: 'unreadable' }
+  return { status: 'pages', pages: scanned, source: 'byte_scan' }
+}
+
 /**
  * PDF 页数权威识别。
  *
@@ -56,12 +88,8 @@ type ParserOutcome =
  * @returns 页数；得不到可信结果时返回 null（调用方 fail-closed）。
  */
 export async function resolvePdfPageCount(buffer: Buffer): Promise<number | null> {
-  const outcome = await countPdfPagesByParser(buffer)
-  if (outcome.kind === 'pages') return outcome.pages
-  if (outcome.kind === 'invalid_document') return null
-  const scanned = countPdfPages(buffer)
-  if (scanned === null || scanned <= 0 || scanned > MAX_PLAUSIBLE_PAGES) return null
-  return scanned
+  const resolved = await resolvePdfPageCountDetailed(buffer)
+  return resolved.status === 'pages' ? resolved.pages : null
 }
 
 /** pdf.js 对「这份文件有问题」抛出的异常名；用于与解析器自身故障区分。 */
@@ -80,6 +108,7 @@ const DOCUMENT_LEVEL_PDFJS_ERRORS = new Set([
  * 共用入口自身出错（引擎模块缺失等）抛的不是 pdf.js 文档级异常，落到下面的 parser_unavailable。
  */
 async function countPdfPagesByParser(buffer: Buffer): Promise<ParserOutcome> {
+  if (forcePdfParserUnavailableForTest) return { kind: 'parser_unavailable' }
   let doc: { numPages: number; destroy(): Promise<void> } | undefined
   try {
     doc = await openPdfjsDocument<{ numPages: number; destroy(): Promise<void> }>(
