@@ -128,6 +128,24 @@
 - **改程序时要落实**（稿与运行页不一致时改运行页）：扫描「投递授权」改说「确认能收到扫描件」（运行页 `ScanProgressPage.tsx:375-403`）；官方渠道加「面向对象」字段（约 1–2 人日、约 10 个文件）；登录成功回到进登录前那一页；打印流程各屏的文件名跟所选文件；主路几屏的提示条按钮改成真弹层或本屏状态；其余见各屏说明栏。
 - **怎么核的**：Grok 分 9 区起草、6 路第二轮修整，各区按代码事实对照逐条改；agy 出两份反方（云上各屏 / 私有化版），每条意见对点击结果和源码核过再改，没采纳的写明理由；1080×1920 截图 139 张控制台 0 报错、不溢出、整行空带不超过约 105px；屏上开发用语与拉长空卡检查清零（三条主路定稿屏与状态样式板保持定稿原样）。
 
+## 证件照停放（2026-11-04 改稿）
+
+产品负责人 2026-10-12 定：一体机证件照「尚未开放」卡停放，代码留着、不显示，以后能再打开；电子版证件照放小程序上架后做（只裁切、换底色）。2026-11-04 他同意改功能范围文档那一行，并看过对照图后回「可以，照这个改」。
+
+改了这些屏：
+
+- `print`（`screens.js`）与 `st-loading`（`screens3.js`）：打印入口、正在确认本机能力两屏去掉证件照磁贴。其他工具改成两行：上行照片打印、照片合成 PDF、签名，下行我的文档、打印订单各占半行。
+- `feature-info`（`screens2.js`）：证件照说明屏改名「已停放，只留档」。运行页不显示入口；`/print-scan/feature/id-photo` 和旧地址 `/print/scan-feature` 回打印扫描服务台。本屏只留档，运行页进不去。
+- `fix-scan.js`：能力名不认识一态去掉指向证件照的一条，只留复印和回到打印扫描。
+- 路由对照表 `map.js` 里 `/print/scan-feature → feature-info` 那一行，运行页改为回 `/print-scan`。`map.js` 是生成文件，这次不手改。
+
+这次改稿前的冻结哈希（原因就是上面这次同意）：
+
+- `screens.js` `750fa506dae476bc8cf4e90657ab3bee8db0d0fce57daafd634b644d3759675c`
+- `screens2.js` `f6c86e8fc0ae2f7c94c929c1de3d6ea832b8fd7381da85f5b0b8ded3af925fee`
+- `screens3.js` `23ad15bf1b21ffb33fb85ab93a822290ad64f117fa8763aa72162db1aa92795b`
+- `fix-scan.js` `5eb2c4fee81389dea5291e1b0061442208b98864c8efa1c384f21618461d3881`
+
 ## 冻结
 
 `apps/kiosk/scripts/verify-kiosk-touch-frozen.mjs`（`pnpm --filter @ai-job-print/kiosk verify:kiosk-touch-frozen`，进 CI）逐个比对本目录稿文件与 `FROZEN.json` 里的 sha256，改动、新增、删除都算红；`README.md`、`FROZEN.json` 不在冻结范围。改稿只在产品负责人同意之后：改完在 `apps/kiosk` 下跑 `node scripts/verify-kiosk-touch-frozen.mjs --update` 重写清单，并在 `docs/progress/current-progress.md` 写明谁同意的、改了什么、为什么。

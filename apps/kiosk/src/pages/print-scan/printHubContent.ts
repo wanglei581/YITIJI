@@ -5,6 +5,16 @@
 // 状态机与两轴分治仍沿用已验证实现（探测轴 + MFP 轴），本文件只收文案。
 // ============================================================
 
+/**
+ * 一体机证件照入口停放。2026-10-12 产品负责人拍板：卡不显示、地址进不去，源码留着；
+ * 11/04 同意改稿。类型保持 boolean，避免收窄后停放分支被当成死代码。
+ * 重新打开不能只改本常量，要一起改：① 本常量改为 false；② 删掉 styles/print-hub-qx.css 末尾
+ * 「其他工具六列」那段（按停放后 5 张卡写死，6 张卡时最后一张会被挤到第三行）；
+ * ③ verify-p39-print-hub-fidelity.mjs 里钉住停放的断言改成开放后的真值；
+ * ④ 触屏稿 print、st-loading 两屏的证件照磁贴要恢复（改稿先问产品负责人）。
+ */
+export const ID_PHOTO_ENTRY_PARKED: boolean = true
+
 /** 原型能力卡 data-cap / key，迁移时逐字保留，便于和原型逐卡对照。 */
 export type PrintHubCap = 'doc' | 'phone' | 'usb' | 'scan' | 'photo' | 'idphoto' | 'convert' | 'sign'
 
