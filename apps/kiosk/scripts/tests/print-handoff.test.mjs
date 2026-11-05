@@ -258,7 +258,7 @@ test('U6b 入口策略表：原件去打印台检查，派生产物直达报价�
   for (const origin of ['upload', 'scan_result', 'resume_original', 'image_convert', 'sign_stamp']) {
     assert.deepEqual(printHandoffPolicyFor(origin), { checkPolicy: 'required', entry: 'check' }, origin)
   }
-  for (const origin of ['resume_report', 'resume_optimize', 'resume_generate', 'advisor_artifact', 'job_material', 'job_fit', 'career_plan', 'self_assessment', 'interview_report', 'interview_practice', 'fair_material', 'fair_visit_plan']) {
+  for (const origin of ['resume_report', 'resume_optimize', 'resume_generate', 'advisor_artifact', 'job_material', 'job_fit', 'career_plan', 'self_assessment', 'interview_report', 'interview_practice', 'fair_material', 'fair_visit_plan', 'policy_checklist']) {
     assert.deepEqual(printHandoffPolicyFor(origin), { checkPolicy: 'exempt', entry: 'confirm' }, origin)
   }
   assert.deepEqual(printHandoffPolicyFor('fair_company'), { checkPolicy: 'exempt', entry: 'preview' })
@@ -270,6 +270,24 @@ test('U6b 入口策略表：原件去打印台检查，派生产物直达报价�
   assert.equal(printHandoffEntryPath('confirm'), '/print/confirm')
   const begun = h.beginPrintHandoff({ origin: 'scan_result', file: fileB() }, GUEST, NOW)
   assert.deepEqual(h.printHandoffTarget(begun), { ok: true, path: '/print/desk?step=check', state: { printContextId: begun.context.contextId } })
+})
+
+test('U6c 政策清单直达报价并只保留公开政策编号用于返回，其他来源仍去掉查询串', async () => {
+  const h = await loadHandoff()
+  const begun = h.beginPrintHandoff({ origin: 'policy_checklist', file: fileB(), returnPath: '/renshi?policy=policy-1&token=secret#fragment' }, GUEST, NOW)
+  assert.equal(begun.context.returnPath, '/renshi?policy=policy-1')
+  assert.equal(h.printHandoffTarget(begun).path, '/print/confirm')
+  assert.equal(h.readPrintHandoff(GUEST, NOW + MINUTE).context.returnPath, '/renshi?policy=policy-1')
+  for (const [origin, path, expected] of [
+    ['upload', '/renshi?policy=policy-1&token=secret', '/renshi'],
+    ['policy_checklist', '/resume/report?taskId=task-1', '/resume/report'],
+    ['policy_checklist', '/renshi?token=secret', '/renshi'],
+    ['policy_checklist', '//evil.example/renshi?policy=x', undefined],
+    ['policy_checklist', '/login?policy=x', undefined],
+  ]) {
+    const result = h.beginPrintHandoff({ origin, file: fileB(), returnPath: path }, GUEST, NOW)
+    assert.equal(result.context.returnPath, expected, `${origin} ${path}`)
+  }
 })
 
 async function loadShared() {

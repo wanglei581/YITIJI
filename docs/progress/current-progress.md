@@ -1,5 +1,17 @@
 # 当前开发进度
 
+## 2026-11-05：政策最小闭环（产品负责人点「按方案开工」；分支 `claude/quizzical-gould-71d33b`，未部署）
+
+- 拍板：产品负责人 11/05 说政策「很多地方没法操作」，看过最小闭环方案页（第 2 版）后 12:55 点「按方案开工」。批准：一体机 5 屏加空态、停放 7 处、改触屏稿政策几屏、试点先保持所有终端都显示（不改 `POLICY_SCOPE`，不给政策请求加终端头）。托管 a 不变：政策由运营机构自己审核发布，平台管理员只留紧急下架。
+- 后端：PolicyPost 加「谁可以申请 / 要准备的材料 / 去哪办」三栏（两份 schema + 迁移 `20261105130000_add_policy_post_handling_fields`）；PATCH 可选字段 null 或空白即清空；发布闸门在审核、责任、内容可信之后再查扶持条目三栏必填、原文链接必填，有链接就须 https 且落在机构登记的官方网站域名内（`policy-source-link.ts`，与官方渠道同一份名单）；公开读与机构列表带 `externalUrlVerified`；内容可信与机构类型拒绝文案改人话（「授权核验」，不露字段名、接口和 JSON）。新增 `POST /policies/:id/checklist` 一页 A4 办事清单（页脚「仅供参考，不具证明效力；办理要件和资格以发布机构和经办窗口为准，本机不代办」，同版本复用，打印建单前复查撤下 / 紧急下架 / 改版，新依赖 `qrcode`）；小青带 `policyId` 时服务端每轮现读已发布原文注入，套用 10/8 合规定稿（`policy-constraint.ts` 一字未改）加新讲解约束 `policy-explain-constraint.ts`（讲解深度待合规确认），撤下或读不到回固定话术、不调模型。
+- 两个后台：机构政策表单分三栏（各 2000 字计数）、标题 200 字计数、https 原文链接并提示本机构登记的官方网站、缺项常显原因、发布弹窗常显两项前提且只显示服务端人话；管理员内容可信提示句去掉岗位招聘会、官方域名面板写明政策原文链接也按这份名单核对、政策页最近下架记录按 `targetType=policy` 筛。
+- 一体机：`/policy-service` 六类大卡（真实条数与最近一条，0 条变灰「还没有机构发布」）、最近更新、机构公告（有才出现）、全库 0 条整屏空态；`/renshi?audience=…&page=N` 一页 4 条；`/renshi?policy=id` 详情三块 + 核验通过才出的原文二维码 + 打印办事清单（打印机暂停时改为扫码存手机）+ 问小青这条 + 收藏先登录；各屏照稿带底部导航；`/renshi` 无参数与 `tab=policy|eligibility|social|register` 回政策首页。收藏只存本人账号，未登录点收藏去登录；「我的收藏」每条可取消（64px，失败放回原位并说明）。清单建单被拒时屏上说清原因（`POLICY_CHECKLIST_WITHDRAWN`）。
+- 停放 7 处（源码保留、不注册、不打包，文件头有停放注释，门禁 `verify:kiosk-parked-policy` 守着）：条件核对整块（`EligibilityPanel` / `EligibilityResults` / `eligibilityOutcome` / `renshi-eligibility-qx.css`，连同机构后台「申领条件」按钮与 `EligibilityRulesDrawer` / `EligibilityRuleEditor`）；社保指南、就业登记（`SocialPanel` / `RegisterPanel`）；5 条本机整理的办事指引（`builtinData.ts`）；服务台的浏览记录 / AI 服务记录 / 全部服务卡；未登录本机收藏（`favorites/localFavorites.ts`，只剩清场用两个函数清改版前的旧残留）；页内重复的问小青按钮；被三屏取代的旧面板（`PolicyPanel` / `policyFocus` / `usePolicyFocus` / `renshi-narrow-qx.css`）。没有删任何文件。
+- 改稿：触屏稿 `docs/design/kiosk-touch-2026-10/policy-min.js`（政策三屏与空态，显示范围是所有终端所以不写「本机构」）、`fix-me.js`（我的收藏加取消，方案屏 5），`FROZEN.json` 按 `--update` 重写。
+- 验证：api / kiosk / partner / admin / shared 类型检查与改动文件 eslint；图谱加全文搜得出的后端 99 条与前端 69 条关联门禁本机全过（`verify:member-closure` 按 CI 的真 Redis 开关跑过，`verify:recruitment-p1-schema:postgres-upgrade` 要真 PG 留给 CI）；新门禁 `verify:policy-publish-gates`、`verify:policy-checklist`、`verify:assistant-policy-context`、`verify:kiosk-parked-policy`（5 项反向检查全红）。本机全栈真后端实走 26 张截图：管理员登记官方域名 → 机构三栏发布，链接不在登记域名被拦（人话）→ 改链接发布 → 一体机六类 → 列表 → 详情三块 → 打印确认（试点 0 元）→ 问小青这条 → 小青关掉时其余照常 → 停在确认页时管理员紧急下架，建单被拒 → 首页变空态、详情不能查看 → 未登录点收藏去登录、登录后收藏、「我的收藏」取消。1080×1920 实量：首页、列表、详情、公告不溢出，最小字 20、可点最小边 68、主按钮 88、详情各块间距约 71px。小青那两张用的是本机假模型（只验证服务端注入原文与约束，不代表真实回答）；打印机离线扫码存手机没实走（本机没配 `KIOSK_PUBLIC_BASE_URL`）。
+- 两个接手会话撞车：实现会话交班后同时有两个会话接手（各在一个分支上收了同样五包）。商定由本分支当唯一实现方，另一分支 `claude/policy-min-loop-041394` 不开 PR；它独有的「授权核验」措辞、列表与公告页底部导航、我的收藏改稿已拣入。
+- 仍归产品负责人：定试点机构并开账号；在管理员后台标「内容可信」并登记该机构官方网站域名（可含上级部门网站）；约对接人发 3–5 条真实政策（带官方原文链接、填三栏）；上线时点头。请合规确认：小青讲解深度与「按这条原文解释」措辞；二维码旁「链接发布时已核对属于发布机构登记的官方网站」；清单抬头与页脚是否加「非受理凭证」；10/8 定稿里「看本机构发布的原文」在所有终端显示时的说法；缺展示日期时日期回落到确认发布日。
+
 ## 2026-11-03：一体机扫描页按职责拆开（K1a，只拆不改行为；分支 `claude/scan-k1a-split-1102`，未合并、未部署）
 
 - 为什么：下一步 K1b 要把屏上扫描做进扫描页。`ScanSettingsPage.tsx` 原来 784 行，离 800 行硬线只剩 16 行；`ScanResultPage.tsx` 512 行。本批只拆，让 K1b 能复用建会话、投递确认、重扫授权和出口。基线 `317e54442`。实现提交：`12cc15320`（设置页五个 hook）、`b0d6847e0`（结果页两个 hook、三个组件）、`ec56da22a`（六个门禁改读新文件，断言不删不放宽）、`a1e9ca34c`（游客结果页文案）。
