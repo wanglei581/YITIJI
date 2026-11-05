@@ -39,14 +39,16 @@ export const SCAN_RESULT_PDF_NAME = 'scan.pdf'
 /** 扫描页文件名：page-001.jpg … page-999.jpg。 */
 export const SCAN_PAGE_FILE_PATTERN = /^page-(\d{3})\.jpg$/
 
-/** 删除审计里的原因码。只进本地账本；上报通道要等后端认这些码之后才能放开（B1 / A2）。 */
-export type ScanDeviceDeletionReason =
-  | 'SCAN_DEVICE_DELIVERED'
-  | 'SCAN_DEVICE_FAILED'
-  | 'SCAN_DEVICE_ABORTED'
-  | 'SCAN_DEVICE_SWITCHED_TO_PANEL'
-  | 'SCAN_DEVICE_SESSION_CLEARED'
-  | 'SCAN_DEVICE_STARTUP_RESIDUE'
+/** 删除审计里的原因码。上报白名单与这份列表同源，不要另抄一份。 */
+export const SCAN_DEVICE_DELETION_REASONS = [
+  'SCAN_DEVICE_DELIVERED',
+  'SCAN_DEVICE_FAILED',
+  'SCAN_DEVICE_ABORTED',
+  'SCAN_DEVICE_SWITCHED_TO_PANEL',
+  'SCAN_DEVICE_SESSION_CLEARED',
+  'SCAN_DEVICE_STARTUP_RESIDUE',
+] as const
+export type ScanDeviceDeletionReason = (typeof SCAN_DEVICE_DELETION_REASONS)[number]
 
 export type ScanTempDirErrorCode =
   | 'invalid_task_id'

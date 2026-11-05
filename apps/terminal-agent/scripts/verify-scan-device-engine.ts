@@ -95,6 +95,7 @@ import {
   tmpRoot,
   type Rig,
 } from './verify-scan-device-engine.helper'
+import { runnerChecksR2 } from './verify-scan-device-engine-r2.helper'
 
 // ═════════════════════════════════════════════════════════════════════════
 // 2. 脚本与参数白名单
@@ -744,6 +745,18 @@ async function deliveryChecks(): Promise<void> {
     const names = [...withOrigin.getBuffer().toString('latin1').matchAll(/; name="([^"]+)"/g)].map((m) => m[1])
     assert.deepEqual(names, ['file', 'scanTaskId', 'deliveryLease', 'candidateSnapshotAt', 'observedAt', 'origin'], '传了 origin 才出现，且排在最后')
     assert.match(withOrigin.getBuffer().toString('latin1'), /name="origin"\r\n\r\ndevice\r\n/)
+    const withRound = buildScanDeliveryForm({
+      bytes,
+      filename: 'scan.pdf',
+      scanTaskId: 't',
+      deliveryLease: 'l',
+      candidateSnapshotAt: snapshotAt,
+      origin: 'device',
+      deviceRound: 3,
+    })
+    const roundNames = [...withRound.getBuffer().toString('latin1').matchAll(/; name="([^"]+)"/g)].map((match) => match[1])
+    assert.deepEqual(roundNames, ['file', 'scanTaskId', 'deliveryLease', 'candidateSnapshotAt', 'observedAt', 'origin', 'deviceRound'], 'deviceRound 只在记下轮次时出现，且排在 origin 之后')
+    assert.match(withRound.getBuffer().toString('latin1'), /name="deviceRound"\r\n\r\n3\r\n/)
   })
 
   await step('投递请求：POST 地址、表单请求头、禁用 axios 层重试', async () => {
@@ -847,6 +860,7 @@ async function main(): Promise<void> {
     await protocolChecks()
     await scriptChecks()
     await runnerChecks()
+    await runnerChecksR2()
     await realProcessChecks()
     await tempDirChecks()
     await pdfChecks()
