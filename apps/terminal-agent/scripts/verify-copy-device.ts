@@ -5,6 +5,7 @@ import { startQrLoginLocalServer } from '../src/local-api/qr-login-server'
 import { parseConfigText } from '../src/agent/config-manager'
 import { COPY_DELETION_REASONS } from '../src/agent/copy-device/copy-types'
 import { fixture, base, plain, scan, expectCode, request, JPEG } from './verify-copy-device.helper'
+import { printChecks } from './verify-copy-print.helper'
 import { edgeChecks } from './verify-copy-device-edges.helper'
 
 let passed = 0
@@ -135,6 +136,7 @@ async function main(): Promise<void> {
     } finally { await restart.close(); await f.close() }
   })
   await edgeChecks(check)
+  await printChecks(check)
   console.log(`verify-copy-device: ${passed} checks passed`)
 }
 main().catch((error: unknown) => { console.error(error); process.exitCode = 1 })

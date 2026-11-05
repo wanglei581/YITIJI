@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-11-05：屏上复印 C2b——终端程序本机复印后半段（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+
+- 做了什么（Codex 实现，Claude 收货）：`POST /local/copy/print` 取 `op=print` 许可（颜色、单双面、份数以许可为准，校验终端、代次、授权版本、参数与有效期）→ 驱动调用前持久化派发意图（`%ProgramData%\AIJobPrintAgent\copy-device\print-ledger\<单号与代次派生 SHA-256>.json`，`wx` 创建并 fsync、原子替换，不存扫描内容）→ 经新薄封装 `print-local-document.ts` 复用现有派发准备、`print()`、队列监控与终态清理（`task-runner.ts` 未改；PDF 打印补齐显式 A4）→ 从准备到监控终态持设备锁。同单同代重复请求只返回状态，**驱动最多调用一次**；重启时 `dispatching/spooled` 一律转 `unconfirmed` 并回报，**绝不重派**。结果回报 handed / failed / unconfirmed，固定 `eventId`，最多十次指数退避重试，终态不变。打印终态后撤销预览并以 `COPY_PRINT_TERMINAL` 删页，删除失败后台重试、释放设备锁。状态里不出现张数推断。
+- 验证：`verify:copy-device` 31 项；`verify:scan-device-engine`、`verify:scan-device-runner`、`verify:print-monitor-truth`、`verify:print-truth-hardening`、`verify:print-retry-attempt`、`verify:task-runner-wake`、`verify:print-queue-residue`、`verify:scan-deletion-audit`、`verify:image-scale-truth`、`verify:printer-config`、tsc、lint、repository-integrity 过；反向检查三项（重复打印调第二次驱动、崩溃恢复自动重派、队列异常判成已交给打印机）都变红。
+- 合并时注意：打印机线 #1579 也改了 `print-with-pdf-to-printer.ts`（显式 A4），合并按语义取一份，不两侧都留。
+
 ## 2026-11-05：屏上复印 C2a——终端程序本机复印前半段（分支 `claude/copy-agent-c2-1104`，自 A2 头 23e7076c6 开出，未合并、未部署）
 
 - 做了什么（Codex 实现，Claude 收货）：本机接口 `POST /local/copy/{start,next-page,finish,status,preview,abort,clear}`，复用 loopback、Origin 白名单、桥接令牌与短期桥接会话，公共体 `{copyId,generation,operationId}`、`operationId` 幂等（异参 409）、体积上限 8 KiB；每次扫描、续页、预热重试前在线取 `op=scan` 许可；复用 A2 的 WIA 解析、整页核实、页序、页数与字节上限、PDF 合成、私有目录与删除审计（WIA 默认依赖抽到 `wia-runner-deps.ts`，`wia-runner.ts` 514→448 行）；扫描、探测、打印共用设备锁（等锁上限 30 秒）；复印页放在独立的 `copy-device/<派生标识>/`，**不走上传链路、不上云**；预览返回 JPEG 字节并带 no-store 等三个防缓存头、不返回路径；abort/clear 先撤权再删，删除失败返回 503 与 `purged:false`、后台重试、不占设备锁；七个 `COPY_*` 删除码与后端白名单逐码一致（`COPY_PRINT_TERMINAL` 留给打印）。开关 `copyDeviceEnabled` 缺省关。打印派发与结果回报是 C2b。

@@ -12,7 +12,7 @@ export const COPY_DELETION_REASONS = [
   'COPY_EXPIRED', 'COPY_SCAN_FAILED', 'COPY_STARTUP_RESIDUE',
 ] as const
 export type CopyDeletionReason = (typeof COPY_DELETION_REASONS)[number]
-export type CopyAction = 'start' | 'next-page' | 'finish' | 'status' | 'preview' | 'abort' | 'clear'
+export type CopyAction = 'start' | 'next-page' | 'finish' | 'status' | 'preview' | 'print' | 'abort' | 'clear'
 export interface CopyCommand {
   copyId: string
   generation: number
@@ -43,7 +43,7 @@ export interface CopyPermit {
   terminalId?: string
 }
 export interface CopyView {
-  state: 'starting' | 'scanning' | 'page_ready' | 'composing' | 'scanned' | 'cancelled' | 'cleared' | 'expired' | 'failed'
+  state: 'starting' | 'scanning' | 'page_ready' | 'composing' | 'scanned' | 'cancelled' | 'cleared' | 'expired' | 'failed' | 'printing' | 'dispatching' | 'spooled' | 'handed' | 'unconfirmed'
   generation: number
   pageCount: number
   errorCode: string | null
@@ -75,6 +75,9 @@ export interface CopySession {
   pageCap: number
   cleanupReason?: CopyDeletionReason
   pdfReady?: boolean
+  printRequested?: boolean
+  printDispatched?: boolean
+  printReaderPending?: boolean
 }
 export interface CopyDeps {
   config: AgentConfig
@@ -85,9 +88,18 @@ export interface CopyDeps {
   startScan: typeof startWiaScan
   compose: typeof composeScanPdf
   runProbe: typeof runWiaProbe
-  permit(copyId: string): Promise<CopyPermit>
+  permit(copyId: string, op?: 'scan' | 'print'): Promise<CopyPermit>
+  reportPrint(copyId: string, result: CopyPrintResult): Promise<void>
+  printDependencies?: import('../print-local-document').LocalPrintDependencies
   report(copyId: string, generation: number, pageCount: number): Promise<void>
   processGone(pid?: number): boolean
+}
+export type CopyPrintState = 'handed' | 'failed' | 'unconfirmed'
+export interface CopyPrintResult {
+  generation: number
+  eventId: string
+  state: CopyPrintState
+  errorCode?: string
 }
 export interface CopyRuntime {
   command(action: CopyAction, command: CopyCommand, owner: string): Promise<CopyView | Buffer>

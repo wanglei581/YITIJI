@@ -11,7 +11,7 @@ export interface DeviceServerOptions {
   scanDevice?: ScanDeviceHttpRuntime
   copyDevice?: CopyRuntime
 }
-const ACTIONS = new Set(['start', 'next-page', 'finish', 'status', 'preview', 'abort', 'clear'])
+const ACTIONS = new Set(['start', 'next-page', 'finish', 'status', 'preview', 'print', 'abort', 'clear'])
 const ID = /^[A-Za-z0-9_-]{1,64}$/
 
 async function commandFrom(req: IncomingMessage, action: CopyAction): Promise<CopyCommand> {

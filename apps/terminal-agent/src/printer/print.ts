@@ -34,6 +34,8 @@ const IMAGE_EXTENSIONS_PHASE_NEXT = new Set(['.bmp', '.tiff', '.tif'])
 export interface PrintExecutionOptions {
   /** Stable task id retained in converted image filenames for spooler correlation. */
   correlationId?: string
+  onDispatchStart?: () => void
+  onDispatchSettled?: () => void
 }
 
 /**
@@ -105,7 +107,7 @@ export async function print(
   // ── PDF 路径：Method B 直接打印 ──────────────────────────────────────────
   if (PDF_EXTENSIONS.has(ext)) {
     log(`print [auto]: PDF → Method B  file=${filePath}  printer=${printerName}`)
-    return printWithPdfToPrinter(filePath, printerName, params)
+    return printWithPdfToPrinter(filePath, printerName, params, options)
   }
 
   // ── 图片路径（JPG/PNG）：pdfkit 转换 → Method B ──────────────────────────
@@ -120,7 +122,7 @@ export async function print(
         scale: params?.scale === 'actual' ? 'actual' : 'fit',
         correlationId: options.correlationId,
       })
-      return await printWithPdfToPrinter(tempPdfPath, printerName, params)
+      return await printWithPdfToPrinter(tempPdfPath, printerName, params, options)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       return {

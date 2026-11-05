@@ -2,7 +2,7 @@ import type { AxiosRequestConfig } from 'axios'
 import { createApiClient, NO_RETRY_CONFIG, isUnauthorizedHttpError } from '../api-client'
 import { isUnauthorized, markUnauthorized } from '../auth-state'
 import type { AgentConfig } from '../types'
-import { CopyError, type CopyPermit, type CopySession } from './copy-types'
+import { CopyError, type CopyPermit, type CopySession, type CopyPrintResult } from './copy-types'
 
 export function copyBackend(config: AgentConfig) {
   const client = () => {
@@ -22,7 +22,15 @@ export function copyBackend(config: AgentConfig) {
     }
   }
   return {
-    permit: (id: string) => request<CopyPermit>(() => client().get(`${route(id)}/permit?op=scan`, options)),
+    permit: (id: string, op: 'scan' | 'print' = 'scan') =>
+      request<CopyPermit>(() => client().get(`${route(id)}/permit?op=${op}`, options)),
+    reportPrint: async (id: string, result: CopyPrintResult): Promise<void> => {
+      const view = await request<{ copyId: string; terminalId: string; generation: number; state: string }>(
+        () => client().post(`${route(id)}/result`, result, options),
+      )
+      if (view.copyId !== id || view.terminalId !== config.terminalId || view.generation !== result.generation ||
+        view.state !== result.state) throw new CopyError(503, 'COPY_PRINT_RESULT_UNCONFIRMED')
+    },
     report: async (id: string, generation: number, pageCount: number): Promise<void> => {
       const view = await request<{ copyId: string; terminalId: string; generation: number; pageCount: number; state: string }>(
         () => client().post(`${route(id)}/scan-result`, { generation, pageCount }, options),

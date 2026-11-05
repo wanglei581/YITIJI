@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { createHash, randomUUID } from 'crypto'
 import { createScanTaskDir, getScanDeviceRoot, purgeScanTaskDir, scanPageFileName } from '../scan-device/scan-temp-dir'
+import { COPY_PRINT_LEDGER_DIR } from './copy-print-ledger'
 import { CopyError, type CopyDeletionReason, type CopyDeps, type CopySession } from './copy-types'
 
 export function getCopyDeviceRoot(): string {
@@ -32,13 +33,14 @@ export function createCopyStorage(deps: CopyDeps) {
     create(id: string): string { return createScanTaskDir(id, hooks) },
     purge,
     retry(): void { for (const [id, reason] of pending) purge(id, reason) },
-    sweep(): void {
+    sweep(isPrintRecord: (id: string) => boolean = () => false): void {
       if (!fs.existsSync(deps.root)) return
       // 根目录先经 A2 的真实目录和 ACL 校验，绝不遍历符号链接指向的外部目录。
       const guard = createScanTaskDir(randomUUID(), hooks)
       fs.rmdirSync(guard)
       for (const id of fs.readdirSync(deps.root)) {
-        if (/^[A-Za-z0-9_-]{1,64}$/.test(id)) purge(id, 'COPY_STARTUP_RESIDUE')
+        if (id === COPY_PRINT_LEDGER_DIR) continue // 耐久派发墓碑不随扫描页清场。
+        if (/^[A-Za-z0-9_-]{1,64}$/.test(id)) purge(id, isPrintRecord(id) ? 'COPY_PRINT_TERMINAL' : 'COPY_STARTUP_RESIDUE')
         else {
           // 未知零散项也清掉；先在同一私有根内改为无内容标识的名字，审计不收原文件名。
           const isolated = randomUUID()

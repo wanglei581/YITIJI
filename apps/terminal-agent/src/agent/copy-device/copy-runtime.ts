@@ -6,6 +6,8 @@ import { runWiaProbe } from '../scan-device/wia-probe'
 import { defaultListResidualProcesses, defaultScanProcessAlive } from '../scan-device/scan-device-health'
 import { commandLineIsOurWiaProcess } from '../scan-device/wia-script'
 import { copyBackend } from './copy-backend'
+import { createCopyPrintLedger, printRecordView } from './copy-print-ledger'
+import { createCopyPrint } from './copy-print'
 import { createCopyEngine } from './copy-engine'
 import { copyDirId, createCopyStorage, getCopyDeviceRoot } from './copy-storage'
 import { CopyError, copyView, type CopyAction, type CopyCommand, type CopyDeps,
@@ -27,6 +29,8 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
   }
   const storage = createCopyStorage(deps)
   const engine = createCopyEngine(deps, storage)
+  const ledger = createCopyPrintLedger(deps, copyDirId)
+  const printing = createCopyPrint(deps, storage, ledger)
   const sessions = new Map<string, CopySession>()
   const operations = new Map<string, { fingerprint: string; result: Promise<CopyView> }>()
   let active: CopySession | undefined
@@ -36,6 +40,7 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
   const key = (c: CopyCommand) => `${c.copyId}:${c.generation}`
   const cleanup = (s: CopySession): void => {
     if (s.work || !s.cleanupReason || s.purged === true) return
+    if (s.printReaderPending) { s.purged = false; return }
     if (s.retainedLock) {
       if (!deps.processGone(s.suspectPid)) { s.purged = false; return }
       s.retainedLock.release()
@@ -45,14 +50,14 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
   }
   const revoke = (s: CopySession, reason: CopyDeletionReason, state: CopyView['state']): void => {
     s.revoked = true
-    s.state = state
+    if (!s.printDispatched) s.state = state
     s.cleanupReason ??= reason
     s.handle?.abort()
     cleanup(s)
   }
   const tick = async (): Promise<void> => {
     if (!startupSafe) {
-      try { storage.sweep(); startupSafe = true } catch { /* 隔离复印；其它功能继续运行。 */ }
+      try { storage.sweep(ledger.hasDir); startupSafe = true } catch { /* 隔离复印；其它功能继续运行。 */ }
     }
     for (const s of sessions.values()) {
       if (!s.revoked && deps.clock.now() >= s.expiresAt) revoke(s, 'COPY_EXPIRED', 'expired')
@@ -60,6 +65,7 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
       if (s.revoked) cleanup(s)
     }
     storage.retry()
+    await ledger.retry().catch(() => { /* 耐久回报失败不会改变终态。 */ })
   }
   const launch = (s: CopySession, work: () => Promise<void>): void => {
     s.work = Promise.resolve().then(work).catch((error: unknown) => {
@@ -77,6 +83,7 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
   }
   const mutate = async (action: CopyAction, c: CopyCommand, owner: string): Promise<CopyView> => {
     if (action === 'start') {
+      if (ledger.get(c.copyId, c.generation)) throw new CopyError(409, 'COPY_ALREADY_DISPATCHED')
       if (!c.source || !c.scanColor) throw new CopyError(400, 'COPY_BAD_REQUEST')
       if (sessions.has(key(c))) throw new CopyError(409, 'COPY_STATE_CONFLICT')
       const prior = [...sessions.values()].filter((s) => s.command.copyId === c.copyId)
@@ -101,8 +108,19 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
       return copyView(s)
     }
     const s = requireSession(c, owner)
+    if (action === 'print') {
+      if (s.printRequested || ledger.get(c.copyId, c.generation)) return copyView(s)
+      if (s.revoked || s.state !== 'scanned' || s.work || !s.pdfReady) throw new CopyError(409, 'COPY_STATE_CONFLICT')
+      if (!ledger.isSafe()) throw new CopyError(503, 'COPY_STORAGE_UNSAFE')
+      s.printRequested = true
+      s.state = 'printing'
+      s.expiresAt = deps.clock.now() + COPY_SESSION_TTL_MS
+      launch(s, () => printing.run(s))
+      return copyView(s)
+    }
     if (action === 'abort' || action === 'clear') {
       revoke(s, action === 'abort' ? 'COPY_USER_CANCEL' : 'COPY_SESSION_CLEAR', action === 'abort' ? 'cancelled' : 'cleared')
+      if (s.printRequested && s.work) return { ...copyView(s), purged: false }
       await s.work
       cleanup(s)
       if (!s.purged) throw new CopyError(503, 'COPY_CLEANUP_FAILED', copyView(s))
@@ -126,6 +144,11 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
     await tick()
     if (stopped || config.copyDeviceEnabled !== true) throw new CopyError(403, 'COPY_DISABLED')
     if (!startupSafe) throw new CopyError(503, 'COPY_STORAGE_UNSAFE')
+    const recovered = ledger.get(c.copyId, c.generation)
+    if (recovered && !sessions.has(key(c)) && ['status', 'print', 'clear', 'abort'].includes(action)) {
+      if (recovered.owner !== owner || recovered.terminalId !== config.terminalId) throw new CopyError(404, 'COPY_NOT_FOUND')
+      return { ...printRecordView(recovered), purged: storage.purge(copyDirId(c.copyId, c.generation), 'COPY_PRINT_TERMINAL') }
+    }
     if (action === 'status' || action === 'preview') {
       const s = requireSession(c, owner)
       if (action === 'status') return copyView(s)
@@ -139,6 +162,7 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
     const previous = operations.get(opKey)
     if (previous) {
       if (previous.fingerprint !== fingerprint) throw new CopyError(409, 'COPY_OPERATION_CONFLICT')
+      if (action === 'print') return copyView(requireSession(c, owner))
       return previous.result
     }
     if (operations.size >= 4096) throw new CopyError(503, 'COPY_OPERATION_LIMIT')
@@ -155,7 +179,7 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
   }
   arm()
   return { command, tick,
-    whenIdle: async () => { await Promise.all([...sessions.values()].map((s) => s.work)) },
+    whenIdle: async () => { await Promise.all([...sessions.values()].map((s) => s.work)); await ledger.retry() },
     stop: () => {
       stopped = true
       deps.clock.clearTimeout(timer)
