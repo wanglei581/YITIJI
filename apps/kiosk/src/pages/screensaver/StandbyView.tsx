@@ -1,3 +1,4 @@
+import { kioskBrandMark, useKioskProfile } from '../../services/api/kioskProfile'
 import type { KioskScreensaverItem } from '@ai-job-print/shared'
 import type { StandbyPhase } from './standbyModel'
 
@@ -55,6 +56,7 @@ export function StandbyView({
   onMediaError: () => void
   onWake: () => void
 }) {
+  const brand = useKioskProfile()
   const playing = phase === 'playing' && current && mediaUrl
 
   return (
@@ -63,9 +65,9 @@ export function StandbyView({
       <Flow />
       <header className="sb-topbar">
         <div className="sb-brand">
-          <div className="sb-seal">职</div>
+          <div className="sb-seal">{kioskBrandMark(brand)}</div>
           <div>
-            <div className="sb-name">职易达</div>
+            <div className="sb-name">{brand.brandName}</div>
             <div className="sb-sub">{terminalName}</div>
           </div>
         </div>
@@ -138,7 +140,7 @@ export function StandbyView({
       <button
         className="wake-target"
         type="button"
-        aria-label="轻触屏幕进入职易达首页"
+        aria-label={`轻触屏幕进入${brand.brandName}首页`}
         data-testid="standby-primary"
         onClick={onWake}
       />

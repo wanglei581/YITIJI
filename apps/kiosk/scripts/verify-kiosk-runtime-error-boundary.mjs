@@ -56,8 +56,8 @@ for (const route of routerArray.elements) {
   assert.match(errorElement.getText(routeSource), /<KioskRouteErrorPage\s*\/>/)
 }
 
-// 未注册地址走真实的 * element，并不会产生 useRouteError 的 404 对象。
-// 从生产路由 AST 取路径树和兜底 JSX；只替换视觉组件，保留真实页面判定与 Router。
+// 2026-11-04 产品负责人定停放：/smart-campus/* 与 /toolbox/* 走停放跳转回首页。
+// 未知路由仍走 *。智慧校园深链不再当成未注册，另用一条真不存在的路径测报错页。
 {
   let fallbackElement = null
   const property = (object, name) => object.properties.find((node) => (
@@ -66,21 +66,28 @@ for (const route of routerArray.elements) {
   const routeTree = (array) => array.elements.map((object) => {
     const path = property(object, 'path')?.text
     const children = property(object, 'children')
-    if (path === '*') fallbackElement = property(object, 'element').getText(routeSource)
-    return { path, index: property(object, 'index')?.kind === ts.SyntaxKind.TrueKeyword,
+    const elementNode = property(object, 'element')
+    const element = elementNode ? elementNode.getText(routeSource) : ''
+    if (path === '*') fallbackElement = element
+    return { path, element, index: property(object, 'index')?.kind === ts.SyntaxKind.TrueKeyword,
       ...(children ? { children: routeTree(children) } : {}) }
   })
   const tree = routeTree(routerArray)
   assert.ok(fallbackElement, 'unknown paths must have a fallback inside the runtime root')
-  for (const path of ['/smart-campus/freshman-insights', '/smart-campus/unknown', '/unknown']) {
+  const parkedHome = (route) => /<Navigate\s+to="\/"\s+replace\s*\/>/.test(String(route.element).replace(/\s+/g, ' '))
+  for (const path of ['/smart-campus', '/smart-campus/welcome', '/smart-campus/service/campus-card', '/smart-campus/freshman-insights', '/smart-campus/unknown', '/toolbox', '/toolbox/extra']) {
+    const leaf = matchRoutes(tree, path).at(-1).route
+    const expected = path.startsWith('/toolbox') ? 'toolbox/*' : 'smart-campus/*'
+    assert.equal(leaf.path, expected, `${path} must match the parked redirect`)
+    assert.ok(parkedHome(leaf), `${path} must Navigate to="/" replace (2026-11-04 产品负责人定停放)`)
+  }
+  for (const path of ['/not-a-kiosk-route', '/unknown']) {
     const matches = matchRoutes(tree, path)
     assert.equal(matches.at(-1).route.path, '*', `${path} must match only the unknown-route branch`)
     assert.ok(matches.slice(0, -1).every(({ route }) => route.path === undefined),
       'unknown paths must stay outside visual layouts and capability/hosting gates')
   }
-  for (const path of ['/smart-campus', '/smart-campus/welcome', '/smart-campus/service/luggage', '/jobs']) {
-    assert.notEqual(matchRoutes(tree, path).at(-1).route.path, '*', `${path} must remain registered`)
-  }
+  assert.notEqual(matchRoutes(tree, '/jobs').at(-1).route.path, '*', '/jobs must remain registered')
 
   const dataUrl = (code) => `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`
   const jsxRuntime = import.meta.resolve('react/jsx-runtime')
@@ -117,7 +124,7 @@ for (const route of routerArray.elements) {
     const router = createStaticRouter(handler.dataRoutes, context)
     return renderToStaticMarkup(createElement(StaticRouterProvider, { router, context, hydrate: false }))
   }
-  for (const path of ['/smart-campus/freshman-insights', '/smart-campus/unknown', '/unknown']) {
+  for (const path of ['/not-a-kiosk-route', '/unknown']) {
     const html = await renderRoute(path)
     assert.match(html, />页面不存在<\/h1>/, `${path} must display not-found without a route error`)
     assert.match(html, /当前入口可能已经调整，请返回首页重新选择服务。/)

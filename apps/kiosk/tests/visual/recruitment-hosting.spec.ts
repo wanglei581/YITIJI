@@ -270,11 +270,15 @@ test('an older server without recruitmentHosting falls back to jobBoard, and to 
   // 两个字段都没有（比 3.13 更早的服务端）：按关闭处理，不因为「没说关」就放行。
   const { recruitmentHosting: _hosting, jobBoard: _board, ...neither } = terminalConfigWithHosting(RECRUITMENT_HOSTING_ON)
   api.respond('GET', CONFIG, { status: 200, json: neither })
+  // 2026-11-04 产品负责人定停放：data-toolbox 固定 parked，不再表示配置已读完。等这份配置的响应落地。
+  const configReady = page.waitForResponse((response) => new URL(response.url()).pathname === CONFIG && response.ok())
   await page.goto('/', { waitUntil: 'domcontentloaded' })
+  await configReady
   const home = page.getByTestId('qx-home')
-  // 「关闭」也是没读到配置时的样子：先等这份配置真的读完（百宝箱判定落到 off，不再是 loading），
-  // 再留两帧让同一份配置的托管判定落地，然后才断言仍按关闭处理。
-  await expect(home).toHaveAttribute('data-toolbox', 'off')
+  await expect(home).toHaveAttribute('data-toolbox', 'parked')
+  await expect(home).toHaveAttribute('data-campus', 'parked')
+  await expect(home.locator('[data-action="toolbox"]')).toHaveCount(0)
+  await expect(home.locator('[data-action="smart-campus"]')).toHaveCount(0)
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
   await expect(home).toHaveAttribute('data-recruitment', 'closed')
   await expect(page.locator('[data-action="jobs-hub"]')).toHaveCount(0)

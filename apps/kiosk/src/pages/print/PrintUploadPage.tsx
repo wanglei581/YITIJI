@@ -26,9 +26,11 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/files/filesApi'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { machineCannotPrintLine, preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
+import { USB_IMPORT_UNCONFIRMED_COPY } from '../../copy/usbImportCopy'
 import {
   getUsbStatus,
   isUsbImportConfigured,
+  isUsbUploadUnconfirmed,
   listUsbFiles,
   uploadUsbFile,
   type UsbFileListItem,
@@ -197,6 +199,7 @@ export function PrintUploadPage() {
   const [usbSelected, setUsbSelected] = useState<UsbFileListItem | null>(null)
   const [usbSafeIdExpired, setUsbSafeIdExpired] = useState(false)
   const [usbImportFailed, setUsbImportFailed] = useState(false)
+  const [usbUnconfirmed, setUsbUnconfirmed] = useState(false)
   const [usbAgentOffline, setUsbAgentOffline] = useState(false)
   const [usbReadFailed, setUsbReadFailed] = useState(false)
   const [usbPollKey, setUsbPollKey] = useState(0)
@@ -346,6 +349,8 @@ export function PrintUploadPage() {
     setUsbSelected(picked)
     setUsbSafeIdExpired(false)
     setUsbImportFailed(false)
+    setUsbUnconfirmed(false)
+    setUsbError(null)
   }
 
   const handleUsbImport = async () => {
@@ -353,6 +358,7 @@ export function PrintUploadPage() {
     setUsbUploading(true)
     setUsbError(null)
     setUsbImportFailed(false)
+    setUsbUnconfirmed(false)
     setUsbSafeIdExpired(false)
     try {
       const result = await uploadUsbFile(usbSelected.safeId)
@@ -368,13 +374,21 @@ export function PrintUploadPage() {
       persistFile(nextFile, 'usb')
       setUsbSelected(null)
     } catch (err) {
-      if (isUsbSafeIdExpired(err)) {
+      if (isUsbUploadUnconfirmed(err)) {
+        // 没有 HTTP 答复：不进「这一份没导进来」，也不在这里再传一次。
+        setUsbImportFailed(false)
+        setUsbUnconfirmed(true)
+        setUsbError(USB_IMPORT_UNCONFIRMED_COPY)
+      } else if (isUsbSafeIdExpired(err)) {
+        setUsbUnconfirmed(false)
         setUsbSafeIdExpired(true)
         setUsbImportFailed(false)
+        setUsbError(preferUnattended(userMessageOf(err, 'U 盘文件导入失败，请重试'), `U 盘文件没导入。${printProblemLine()}`))
       } else {
+        setUsbUnconfirmed(false)
         setUsbImportFailed(true)
+        setUsbError(preferUnattended(userMessageOf(err, 'U 盘文件导入失败，请重试'), `U 盘文件没导入。${printProblemLine()}`))
       }
-      setUsbError(preferUnattended(userMessageOf(err, 'U 盘文件导入失败，请重试'), `U 盘文件没导入。${printProblemLine()}`))
     } finally {
       setUsbUploading(false)
     }
@@ -409,6 +423,7 @@ export function PrintUploadPage() {
     setLocalRejectKind(null)
     setUsbSelected(null)
     setUsbImportFailed(false)
+    setUsbUnconfirmed(false)
     setUsbSafeIdExpired(false)
   }
 
@@ -418,6 +433,7 @@ export function PrintUploadPage() {
     setUsbStatus(null)
     setUsbError(null)
     setUsbImportFailed(false)
+    setUsbUnconfirmed(false)
     setUsbSafeIdExpired(false)
     setUsbReadFailed(false)
     setUsbAgentOffline(false)
@@ -482,6 +498,7 @@ export function PrintUploadPage() {
       conversionReason={wordConversionAvailable ? null : 'Word 转换暂未开放，请另存为 PDF 再上传。'}
       usbFiles={usbFiles}
       usbSelected={usbSelected}
+      usbNotice={usbUnconfirmed ? usbError : null}
       usbDriveLabel={usbStatus?.driveLabel ?? null}
       formatBytes={formatBytes}
       phone={phone}

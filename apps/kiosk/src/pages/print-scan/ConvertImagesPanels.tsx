@@ -1,4 +1,5 @@
 import { EyeIcon, InfoIcon } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import type { QxTouchPrimary } from '../../components/qingxu/touch/QxTouchDock'
 import { FsRow } from './FsRow'
@@ -71,8 +72,8 @@ export function UsbBody({ kiosk }: { kiosk: boolean }) {
             {kiosk ? '这台机器没有本机文件框。请回到手机扫码，传 JPG 或 PNG。' : '在这台设备上选图，或回到手机扫码，传 JPG 或 PNG。'}
           </Fact>
           <Fact title="现在能用的">手机扫码上传一张 JPG 或 PNG。传到这台机器之后，才会出现在列表里。</Fact>
-          <Fact title="要拼成一份 PDF">图片得先落到手机或这台机器上，再在这一页上传。拷进来之后，就和别的图片一样：一张一页，顺序你自己排。</Fact>
-          <Fact title="只想把原图打出来">那是打印流程，不是这一页：走「打印扫描」里的 U 盘导入打印。那条路不会回到这个列表，也排不出页序。</Fact>
+          <Fact title="要拼成一份 PDF">先把图片存到手机或本机，再上传；一张图一页，顺序自己排。</Fact>
+          <Fact title="只想把原图打出来">到「打印扫描」用 U 盘导入打印；图片不进此列表，不能在这里排页序。</Fact>
         </div>
         <Fact wide title="还没加进来">U 盘里的图片不会出现在这个列表里。</Fact>
       </div>
@@ -114,6 +115,17 @@ export function ImageList({
   onSelect: (index: number) => void
   onPreview: (index: number) => void
 }) {
+  const rowsRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (selected === null) return
+    const rows = rowsRef.current
+    const row = rows?.children[selected] as HTMLElement | undefined
+    if (!rows || !row) return
+    if (row.offsetTop < rows.scrollTop) rows.scrollTop = row.offsetTop
+    else if (row.offsetTop + row.offsetHeight > rows.scrollTop + rows.clientHeight) {
+      rows.scrollTop = row.offsetTop + row.offsetHeight - rows.clientHeight
+    }
+  }, [selected])
   const names = images.map((img) => img.name)
   const total = totalBytesOf(images)
   return (
@@ -126,6 +138,7 @@ export function ImageList({
       </div>
       <div
         className="i2p-lrows"
+        ref={rowsRef}
         data-testid="img2pdf-scroll"
         tabIndex={0}
         aria-label="待合并图片列表，可上下滚动"
@@ -433,7 +446,7 @@ export function convertDockSpec(props: {
     return {
       rows: (
         <div className="fs-2">
-          <ActionRow title="换一个新标识重新提交" desc="按当前顺序继续" onClick={props.onNewKey} />
+          <ActionRow title="换一个新标识" desc="按当前顺序继续" onClick={props.onNewKey} />
           <ActionRow title="恢复上一次的顺序" desc="按冲突前的顺序放回" onClick={props.onRestoreOrder} />
         </div>
       ),
@@ -442,7 +455,7 @@ export function convertDockSpec(props: {
   if (error?.kind === 'in-progress' || error?.kind === 'result-unknown' || phase === 'rechecking') {
     return {
       primary: primary({
-        label: rechecking ? '正在查询…' : error?.kind === 'result-unknown' ? '用同一个标记查这一次的结果' : '用同一个标记再查一次',
+        label: rechecking ? '正在查询…' : error?.kind === 'result-unknown' ? '用同一标记再查' : '用同一个标记再查一次',
         onClick: props.onRecheck,
         disabled: rechecking,
       }),
@@ -465,7 +478,7 @@ export function convertDockSpec(props: {
   }
   return {
     primary: primary({
-      label: generating ? '正在生成…' : `合成 ${imageCount} 张为一份 PDF`,
+      label: generating ? '正在生成…' : '合成',
       onClick: props.onConvert,
       disabled: generating || uploading || imageCount === 0,
       noArrow: generating,
