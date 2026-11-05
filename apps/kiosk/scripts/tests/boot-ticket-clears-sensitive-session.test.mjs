@@ -20,7 +20,7 @@ const toDataUrl = (code) => `data:text/javascript;base64,${Buffer.from(code).toS
 const transpile = (relativePath) => ts.transpileModule(
   readFileSync(join(root, relativePath), 'utf8'),
   { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }, fileName: relativePath },
-).outputText
+).outputText.replace("from '../pages/copy/copySession'", () => `from '${toDataUrl(transpile('src/pages/copy/copySession.ts'))}'`)
 
 const PRINT_KEY = 'ai-job-print:current-print-material-check'
 const DRAFT_KEY = 'kiosk-assistant-draft'
@@ -271,6 +271,10 @@ export function isScanType(value) {
   const scanSessionCode = `${transpile('src/pages/scan/scanWorkbenchSession.ts')}\n// ${seed}\n`
     .replaceAll("from './scanWorkbench'", `from '${scanTypeStub}'`)
     .replaceAll("from './scanWorkbenchModel'", `from '${scanModelUrl}'`)
+    .replaceAll("from './scanMaterials'", `from '${leaf('src/pages/scan/scanMaterials.ts')}'`)
+  const scanHowContinueCode = transpile('src/pages/scan/scanHowContinue.ts')
+    .replaceAll("from './scanMaterials'", `from '${leaf('src/pages/scan/scanMaterials.ts')}'`)
+    .replaceAll("from './scanWorkbenchSession'", `from '${toDataUrl(scanSessionCode)}'`)
   const interviewCode = `${transpile('src/pages/interview/interviewWorkbenchSession.ts')}\n// ${seed}\n`
     .replaceAll("from './interviewWorkbenchModel'", `from '${interviewModelUrl}'`)
   const assistantDraftCode = transpile('src/services/assistantDraft.ts').replaceAll("from 'react'", `from '${import.meta.resolve('react')}'`)
@@ -299,6 +303,7 @@ export function useState(initial) { return [typeof initial === 'function' ? init
     .replaceAll("from '../pages/resume/selfAssessmentSession'", `from '${toDataUrl(selfAssessmentCode)}'`)
     .replaceAll("from '../pages/interview/interviewWorkbenchSession'", `from '${toDataUrl(interviewCode)}'`)
     .replaceAll("from '../pages/scan/scanWorkbenchSession'", `from '${toDataUrl(scanSessionCode)}'`)
+    .replaceAll("from '../pages/scan/scanHowContinue'", `from '${toDataUrl(scanHowContinueCode)}'`)
     .replaceAll("from '../pages/scan/scanCleanupGate'", `from '${cleanupStub}'`)
     .replaceAll("from '../favorites/localFavorites'", `from '${leaf('src/favorites/localFavorites.ts')}'`)
     .replaceAll("from '../pages/contract-review/contractReviewSession'", `from '${leaf('src/pages/contract-review/contractReviewSession.ts')}'`)
@@ -311,6 +316,7 @@ export function useState(initial) { return [typeof initial === 'function' ? init
     local,
     resumeDraft: await import(resumeDraftUrl),
     draftHooks: await import(draftHooksUrl),
+    copy: await import(toDataUrl(transpile('src/pages/copy/copySession.ts'))),
   }
 }
 
@@ -323,6 +329,21 @@ test('真清场之后 AI 使用声明键也没了', async () => {
 
 test('kioskSensitiveSessionScope：什么都没有是 none', async () => {
   const { sensitive } = await loadSensitive()
+  assert.equal(sensitive.kioskSensitiveSessionScope(), 'none')
+})
+
+test('屏上复印凭证参与残留判断，游客登出同步清令牌且旧响应不能写回', async () => {
+  const { sensitive, copy } = await loadSensitive()
+  copy.clearCopySession()
+  const attempt = copy.beginCopyAttempt('KSK-001')
+  assert.equal(sensitive.kioskSensitiveSessionScope(), 'with-other')
+  assert.equal(sensitive.hasKioskSensitiveSession(), true)
+  const receipt = { copyId: 'guest-copy', terminalId: 'KSK-001', state: 'ready', generation: 1,
+    authorizationVersion: 1, expiresAt: '2099-01-01T00:00:00Z', controlToken: 'copy-only-memory' }
+  assert.equal(copy.acceptCopyReceipt(attempt.epoch, receipt), true)
+  sensitive.clearKioskSensitiveSession(null)
+  assert.equal(copy.readCopySession(), null)
+  assert.equal(copy.acceptCopyReceipt(attempt.epoch, receipt), false)
   assert.equal(sensitive.kioskSensitiveSessionScope(), 'none')
 })
 

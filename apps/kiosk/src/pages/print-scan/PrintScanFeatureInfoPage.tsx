@@ -6,7 +6,7 @@
 //          feature-copy（2.0 稿里没有：R4，2026-09-29 产品负责人拍板复印走打印机面板；
 //                        11/02 起照补稿 docs/design/kiosk-touch-2026-11-copyscan 的 cs-copy-guide、cs-copy-guide-more）
 // 证件照当前只有说明 + 两条真实替代路径，不做排版 / 换底 / 成品生成。
-// 复印只有「怎么在打印机面板上复印」的图文说明（两个视图），不经过本机下单，不宣称复印结果。
+// copy 保留面板图文说明；copy-screen 接 C3a 三屏与建单，不宣称扫描或打印结果。
 // ============================================================
 
 import { Fragment, useId, type ReactNode } from 'react'
@@ -15,6 +15,7 @@ import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { FilesIcon, PointerIcon, PrinterIcon, ShieldIcon, SlidersHorizontalIcon, Undo2Icon } from 'lucide-react'
 import { QxTouchIcon, type QxTouchIconName } from '../../components/qingxu/touch/QxTouchIcon'
 import { ScanPaperArt } from '../scan/ScanPaperArt'
+import { CopyWorkbenchPage } from '../copy/CopyWorkbenchPage'
 import {
   COPY_GUIDE_CASES, COPY_GUIDE_CASES_ROUTE, COPY_GUIDE_CASES_VIEW, COPY_GUIDE_KEY, COPY_GUIDE_LEGAL,
   COPY_GUIDE_ROUTE, COPY_GUIDE_STEPS, HUB_PILL,
@@ -376,6 +377,7 @@ function CopyGuide({ pill }: { pill: ReturnType<typeof toolBandStatus> }) {
 export function PrintScanFeatureInfoPage() {
   const navigate = useNavigate()
   const { key } = useParams<{ key: string }>()
+  if (key === 'copy-screen') return <CopyWorkbenchPage />
   const hubState = featureState(key)
   const found = hubState !== 'feature-not-found'
   const pill = toolBandStatus(HUB_PILL[hubState])

@@ -50,7 +50,6 @@ import { PrintTouchFrame, printAsk } from '../print/PrintTouchFrame'
 import { PRINT_HUB_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
 import {
   COPY_GUIDE_KEY,
-  COPY_GUIDE_ROUTE,
   HUB_ASK,
   HUB_PILL,
   arrivalCodeStateNote,
@@ -456,9 +455,9 @@ export function PrintScanHomePage() {
       setFeedbackOpen(true)
       return
     }
-    // R4（2026-09-29）：复印卡改为可点，进「怎么在打印机面板上复印」说明态。
+    // C3a：先选怎么复印；第一张卡仍进入原来的面板图文指引。
     if (key === COPY_GUIDE_KEY) {
-      navigate(COPY_GUIDE_ROUTE)
+      navigate('/print-scan/feature/copy-screen')
       return
     }
     const link = QUICK_LINKS.find((item) => item.key === key)

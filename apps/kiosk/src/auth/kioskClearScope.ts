@@ -4,6 +4,7 @@ import {
   clearScanWorkbenchSession,
   readScanWorkbenchSession,
 } from '../pages/scan/scanWorkbenchSession'
+import { clearCopySession } from '../pages/copy/copySession'
 
 /**
  * 「本次清场是不是一次空操作」的唯一判定点。
@@ -78,6 +79,7 @@ export function isKioskClearNoOp({
  *   不参与任何业务判断）。
  */
 export function clearGuestScanBeforeMemberLogin(): boolean {
+  clearCopySession()
   let carriedScan = false
   try {
     const session = readScanWorkbenchSession()
