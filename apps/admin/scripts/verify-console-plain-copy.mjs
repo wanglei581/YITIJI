@@ -315,6 +315,9 @@ const ui = {
 }
 function runFile(rel, imports = {}, append = '', globals = {}) {
   const file = join(repoRoot, rel)
+  if (['apps/admin/src/routes/screen/GovGrid.tsx', 'apps/admin/src/routes/screen/UsageView.tsx'].includes(rel)) {
+    imports = { ...imports, '../../services/api/publicBrand': { usePublicBrand: () => ({ brandName: runFile('packages/shared/src/types/branding.ts').DEFAULT_BRAND_NAME }) } }
+  }
   const output = ts.transpileModule(readFileSync(file, 'utf8') + append, {
     fileName: file, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText
