@@ -1,4 +1,5 @@
 import { COMPLIANCE_COPY, type ResumeOptimizeModule } from '@ai-job-print/shared'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../../../copy/unattendedCopy'
 import { detectUnconfirmedTextAdditions } from './facts'
 import { moduleKeyOf, type ResumeDecisionMap, type ResumeModuleDecision, type ResumeSwitchBlock } from './resumeDecisions'
 
@@ -32,6 +33,8 @@ export function OptimizeOverview(props: {
   onCompare: (focusIndex?: number) => void
   onEditor: () => void
   onManual: () => void
+  /** 授权收尾中、从记录页只读打开时，逐条对照与「自己动手改」会开始另一件事，停用。 */
+  newTaskLocked?: boolean
   onReport: () => void
 }) {
   const rows = props.modules.map((module, index) => {
@@ -94,6 +97,7 @@ export function OptimizeOverview(props: {
               <button
                 type="button"
                 className="qxt-open"
+                disabled={props.newTaskLocked === true}
                 onClick={() => props.onCompare(row.index)}
                 aria-label={`第 ${row.index + 1} 条 ${title}，${row.switchable ? `当前${DECISION_LABEL[row.decision]}` : '这一条只能在编辑区里改'}，去逐条对照`}
               >
@@ -107,8 +111,8 @@ export function OptimizeOverview(props: {
         })}
       </ul>
       <div className="qxt-ovx">
-        <button type="button" data-testid="resume-optimize-open-editor" aria-label="编辑简历" onClick={props.onEditor}>编辑简历</button>
-        <button type="button" onClick={props.onManual}>自己动手改</button>
+        <button type="button" data-testid="resume-optimize-open-editor" aria-label="编辑简历" disabled={props.newTaskLocked === true} title={props.newTaskLocked ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={props.onEditor}>编辑简历</button>
+        <button type="button" disabled={props.newTaskLocked === true} onClick={props.onManual}>自己动手改</button>
         <button type="button" onClick={props.onReport}>回诊断报告</button>
       </div>
       <p className="qxt-fine">导出的就是编辑区里的这一份，你还可以再改；导出前要逐项确认事实。PDF 可以进打印确认；Word、TXT、Markdown 先保存到手机。{COMPLIANCE_COPY.KIOSK_RESUME_OPTIMIZE_DISCLAIMER}页面只展示表达调整参考，不承诺提分或招聘结果。</p>

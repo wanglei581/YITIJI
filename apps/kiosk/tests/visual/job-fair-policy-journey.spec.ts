@@ -337,6 +337,8 @@ test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {
     await expect(page.getByText(POLICY_TITLE).first()).toBeVisible({ timeout: 15000 })
     await step(page, s, 'policy-page')
 
+    await page.locator('.rq-item-main').filter({ hasText: POLICY_TITLE }).click()
+
     // 4. 官方入口按钮存在且可点（页上的「扫码打开来源链接」即官方入口）。
     const official = page.getByRole('button', { name: '扫码打开来源链接' })
     await expect(official, '政策页缺少官方入口按钮').toBeVisible()

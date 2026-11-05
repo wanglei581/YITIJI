@@ -19,7 +19,7 @@ export default function CampusWelcomePage() {
       <div className="rt-state">
         <section className="rt-statecard">
           <h2>当前没有独立迎新招聘内容</h2>
-          <p>请返回校园招聘专区查看本校招聘会与来源平台信息；智慧校园迎新服务位于独立专区。</p>
+          <p>请返回校园招聘专区查看本校招聘会与来源平台信息。</p>
           <p className="rt-note">{helpNeededLine()}</p>
         </section>
         <RtFill preset="campus" />

@@ -123,7 +123,7 @@ console.log('\n=== 智慧校园管理员视角文案 ===')
 const adminSmartCampus = readFileSync(join(adminRoot, 'src/routes/smart-campus/index.tsx'), 'utf8')
 for (const phrase of [
   '按终端配置「智慧校园」模块的显示开关。',
-  '保存后一体机首页按开关显示或隐藏「智慧校园」',
+  '2026-11-04 起一体机端停放「智慧校园」：开关照常保存，一体机暂不显示，恢复后按开关生效',
   '学校账号在机构后台只能配置本校终端',
   '迎新内容 / 使用统计',
   '校园大数据',
@@ -315,6 +315,9 @@ const ui = {
 }
 function runFile(rel, imports = {}, append = '', globals = {}) {
   const file = join(repoRoot, rel)
+  if (['apps/admin/src/routes/screen/GovGrid.tsx', 'apps/admin/src/routes/screen/UsageView.tsx'].includes(rel)) {
+    imports = { ...imports, '../../services/api/publicBrand': { usePublicBrand: () => ({ brandName: runFile('packages/shared/src/types/branding.ts').DEFAULT_BRAND_NAME }) } }
+  }
   const output = ts.transpileModule(readFileSync(file, 'utf8') + append, {
     fileName: file, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText
@@ -483,7 +486,13 @@ console.log('\n=== 打印错误原因与服务端告警同一口径 ===')
   if (failures.length === 0) console.log(`  PASS 服务端登记的 ${serverCodes.length} 个错误码后台都有中文原因，且不引用一体机源码`)
 }
 verifyBatch6Copy({ runFile, textOf, shared, ui, fail })
-verifyPrivacyCopy({ runFile, textOf, shared, ui, hooks, common, adminRoot, repoRoot, fail, failures, actions, labels: module.exports })
+function runPrivacyFile(rel, imports, ...rest) {
+  const profileImports = rel === 'apps/partner/src/routes/profile/index.tsx'
+    ? { ...imports, './LicenseSection': {} }
+    : imports
+  return runFile(rel, profileImports, ...rest)
+}
+verifyPrivacyCopy({ runFile: runPrivacyFile, textOf, shared, ui, hooks, common, adminRoot, repoRoot, fail, failures, actions, labels: module.exports })
 verifyBatch5Copy({ runFile, textOf, shared, ui, hooks, adminRoot, repoRoot, fail })
 verifyBatch7Copy({ runFile, repoRoot, fail })
 

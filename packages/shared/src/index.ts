@@ -66,3 +66,6 @@ export {
 } from './types/memberPrivacy'
 export * from './types/copyJob'
 export * from './types/scanDeletionAudit'
+
+export * from './types/branding'
+export * from './types/license'

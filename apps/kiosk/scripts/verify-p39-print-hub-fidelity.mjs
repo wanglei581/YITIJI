@@ -178,6 +178,19 @@ must(/--qx-tap-min/.test(cssSrc), '触控下限走 --qx-tap-min')
 must(/min-height:\s*200px/.test(cssSrc), '能力卡高度远高于 48px')
 must(/TouchToolScreen/.test(featureSrc), '说明页使用触屏壳')
 must(/feature-id-photo/.test(featureSrc) && /feature-not-found/.test(featureSrc), '说明页覆盖两个 feature 态')
+must(
+  /export const ID_PHOTO_ENTRY_PARKED: boolean = true/.test(contentSrc),
+  '证件照入口停放常量为 true（重新打开才改为 false）',
+)
+must(
+  /const toolCaps = \[\s*photo,\s*convert,\s*ID_PHOTO_ENTRY_PARKED \? undefined : idPhoto,\s*sign,\s*\]/.test(viewSrc),
+  '其他工具不渲染证件照卡（停放常量挡住，不管后台能力怎么配）',
+)
+must(
+  /grid-template-columns:\s*repeat\(6,\s*1fr\)/.test(cssSrc) && /:nth-last-child\(-n\+2\)/.test(cssSrc),
+  '其他工具按触屏稿六列：上行三张、下行两张各半行',
+)
+must(!/看证件照说明/.test(featureSrc), '能力名不认识一态没有「看证件照说明」')
 
 console.log('\n[E] 能力真实性')
 const FORBIDDEN_COPY = [

@@ -160,11 +160,15 @@ function assertNoSqliteDrift(db: string, label: string): void {
 //   PlatformSetting —— 平台级公开键值（服务电话、服务时间、小程序是否已发布）。
 //   没有可复用的平台键值表。没有 endUserId，不是会员数据，不进注销删除或置空清单。
 // 117: first-order service project/deployment/incident/event/report; no old model removed.
-// 118（本次，机构 AI 服务计次，+1）：AiServiceFact —— 只存服务类型、服务编号、机构、终端、发生时间，
+// 118（机构 AI 服务计次，+1）：AiServiceFact —— 只存服务类型、服务编号、机构、终端、发生时间，
 //   不含 endUserId，不是会员数据，不进注销删除或置空清单；机构工作台按它显示本机构终端上成功完成的 AI 服务次数。
-// 119：AiSafetyTerm 仅存词库配置，无 endUserId，不进入会员注销清单。
-// 120：CopyJob 为屏上复印履约元数据，关联既有 Order，不保存扫描内容或文件。
-const EXPECTED_MODEL_COUNT = 120
+// 122（主线 121 + 屏上复印 CopyJob）：
+//   AiSafetyTerm —— 仅存词库配置，无 endUserId，不进入会员注销清单（主线）；
+//   BrandLogo —— 贴牌 Logo（只收 PNG，解压校验后重编码），与待机宣传屏素材分表；
+//   License   —— 软件使用授权（只按期限与终端台数，不与岗位 / 招聘会 / 浏览 / 投递挂钩）；
+//   CopyJob   —— 屏上复印履约元数据，关联既有 Order，不保存扫描内容或文件。
+//   122 = 117 + AiServiceFact + AiSafetyTerm + BrandLogo + License + CopyJob。
+const EXPECTED_MODEL_COUNT = 122
 
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)
