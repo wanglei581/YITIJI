@@ -175,6 +175,8 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:home-narrow-visual-balance
           pnpm --filter @ai-job-print/kiosk verify:home-toolbox-ui
           pnpm --filter @ai-job-print/kiosk verify:kiosk-parked-toolbox-campus
+          # 政策最小闭环停放 7 处（2026-11-05）：停放源码仍在、不被值导入、旧 /renshi 链接回政策首页。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-parked-policy
           pnpm --filter @ai-job-print/kiosk verify:home-jobs-availability
           pnpm --filter @ai-job-print/kiosk verify:jobfair-checkin
           pnpm --filter @ai-job-print/kiosk verify:jobfair-size
