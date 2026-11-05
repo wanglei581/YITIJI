@@ -59,6 +59,10 @@ export interface PolicyPostDto {
   /** 来源方原始编号(CLAUDE.md §10 外部ID);来源未提供为 null,不得伪造 */
   externalId: string | null
   publishedDate?: string
+  /** 办事三栏(2026-11-05):谁可以申请 / 要准备的材料 / 去哪办。纯文本、每行一项;未提供时不带该键。 */
+  whoCanApply?: string
+  requiredMaterials?: string
+  whereToApply?: string
   sourceOrgId: string
   sourceName: string
   reviewStatus: string
@@ -123,6 +127,9 @@ interface PrismaPolicyRow {
   externalUrl: string | null
   externalId: string | null
   publishedDate: Date | null
+  whoCanApply: string | null
+  requiredMaterials: string | null
+  whereToApply: string | null
   sourceOrgId: string
   sourceName: string
   reviewStatus: string
@@ -148,6 +155,9 @@ function mapPolicy(p: PrismaPolicyRow): PolicyPostDto {
     externalUrl: p.externalUrl ?? undefined,
     externalId: p.externalId ?? null,
     publishedDate: p.publishedDate ? p.publishedDate.toISOString().slice(0, 10) : undefined,
+    whoCanApply: p.whoCanApply ?? undefined,
+    requiredMaterials: p.requiredMaterials ?? undefined,
+    whereToApply: p.whereToApply ?? undefined,
     sourceOrgId: p.sourceOrgId,
     sourceName: p.sourceName,
     reviewStatus: p.reviewStatus,

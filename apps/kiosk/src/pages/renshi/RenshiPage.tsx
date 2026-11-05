@@ -83,7 +83,7 @@ export function RenshiPage() {
         total += chunk.total
         for (const item of chunk.items) byId.set(item.id, item)
       }
-      return { items: [...byId.values()], total }
+      return { items: [...byId.values()], total, page: 1, pageSize: Math.max(1, byId.size), totalPages: 1 }
     }
     const generation = ++loadGeneration.current
     if (mode !== 'quiet') setPolicyState('loading')
