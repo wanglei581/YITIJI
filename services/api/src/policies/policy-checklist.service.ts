@@ -23,9 +23,10 @@ export class PolicyChecklistService implements OnModuleDestroy {
   }
 
   async generate(policyId: string) {
+    // 办事清单只给扶持条目：公告没有三栏，按编号来也当不在可查看范围。
     const policy = await this.prisma.policyPost.findFirst({
       where: await publicPolicyLookupWhere(this.prisma, {
-        id: policyId, reviewStatus: 'approved', publishStatus: 'published',
+        id: policyId, kind: 'policy_guide', reviewStatus: 'approved', publishStatus: 'published',
       }, { mode: 'all' }),
       include: { org: { select: { verifiedOfficialDomainsJson: true } } },
     })

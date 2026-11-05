@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { getPublishedPolicy, type PublishedPolicyLookup, type PolicyPostView } from '../../services/api/policies'
 import { createPolicyChecklist, type PolicyChecklistFile } from '../../services/api/policyChecklist'
 import { rememberAssistantPolicyQuestion } from '../../services/assistantDraft'
-import { recordBrowse, recordExternalJump } from '../../services/api/activity'
+import { recordBrowse } from '../../services/api/activity'
 import { useAuth } from '../../auth/useAuth'
 import { useFavorites } from '../../favorites/useFavorites'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
@@ -106,11 +106,8 @@ export function PolicyDetail({ id }: { id: string }) {
     return () => { active = false; alive.current = false; invalidate(); window.clearInterval(timer) }
   }, [id, attempt, getToken, withdraw, invalidate])
 
+  // 二维码直接画在详情里，屏上看见不等于扫了：这里不记「打开官方入口」（外部跳转只记本人真点开的入口）。
   const source = policy ? policySourceLink(policy) : null
-  const sourceUrl = source?.kind === 'verified' ? source.url : null
-  useEffect(() => {
-    if (sourceUrl) recordExternalJump(getToken(), 'policy', id, 'external_open')
-  }, [getToken, id, sourceUrl])
 
   async function printChecklist() {
     if (actionLock.current || device.loading || winding || phase !== 'ready') return
@@ -139,6 +136,8 @@ export function PolicyDetail({ id }: { id: string }) {
   }
 
   const ready = phase === 'ready' && policy
+  // 公告没有三栏，也不出办事清单；旧收藏里存的公告编号回公告列表，不套政策详情版式。
+  if (ready && policy.kind === 'notice') return <Navigate to="/renshi?tab=notice" replace />
   const title = ready ? policy.title : phase === 'missing' ? '这条政策已经撤下或不在可查看范围'
     : phase === 'withdrawn' ? '这条政策已经撤下' : phase === 'failed' ? '这次没读到' : '正在读取这条政策'
   const printButton = policyPrintButton({ busy, printerReady: device.printerReady, printerLoading: device.loading, blocked: winding })

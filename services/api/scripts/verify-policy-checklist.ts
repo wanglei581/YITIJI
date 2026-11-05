@@ -156,6 +156,17 @@ async function main() {
       await rejection(() => print.create({ fileUrl: first.data.printFileUrl }), 'POLICY_CHECKLIST_WITHDRAWN', '这条政策已经撤下，清单不能再打印。')
     }
     await rejection(() => svc.generate(`missing_${suffix}`), 'POLICY_NOT_FOUND', undefined, 404)
+    // 公告没有三栏：已发布的公告按编号来要清单，也当不在可查看范围（2026-11-05 实走发现旧收藏可能存着公告编号）。
+    const noticeId = `${policyId}_notice`
+    await prisma.policyPost.create({ data: {
+      id: noticeId, sourceOrgId: orgId, sourceName: '门禁发布机构', kind: 'notice', category: 'notice',
+      title: '门禁公告', reviewStatus: 'approved', publishStatus: 'published', publishConfirmedAt: new Date(),
+    } })
+    try {
+      await rejection(() => svc.generate(noticeId), 'POLICY_NOT_FOUND', undefined, 404)
+    } finally {
+      await prisma.policyPost.deleteMany({ where: { id: noticeId } })
+    }
     await prisma.policyPost.update({ where: { id: policyId }, data: { publishStatus: 'published', reviewStatus: 'approved' } })
     await prisma.recruitmentEmergencyHold.create({ data: {
       targetType: 'policy', targetId: policyId, orgId, reasonCode: 'other', reasonText: '门禁紧急下架', actorId: 'verify',
