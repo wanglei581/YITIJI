@@ -15,6 +15,7 @@
  */
 
 export type FilePurpose =
+  | 'policy_checklist' // 公开政策一页办事清单（服务端生成）
   // ── 既有(BE-1)─────────────────────────────────────────────
   | 'resume_upload'
   | 'resume_scan'

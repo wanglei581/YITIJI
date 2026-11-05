@@ -717,6 +717,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:pdfjs-engine
           pnpm --filter @ai-job-print/api verify:pii-redaction
           pnpm --filter @ai-job-print/api verify:material-task-token-transport
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:policy-checklist
           pnpm --filter @ai-job-print/api verify:job-materials
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-flow
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-real-channels
@@ -1277,6 +1278,7 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:kiosk-anonymous-feedback
           pnpm --filter @ai-job-print/api verify:materials-processing
           pnpm --filter @ai-job-print/api verify:pii-redaction
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:policy-checklist
           pnpm --filter @ai-job-print/api verify:job-materials
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-flow
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-real-channels
