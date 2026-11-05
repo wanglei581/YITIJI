@@ -36,6 +36,14 @@
 - 改法（Codex 实现，Claude 收货）：`derived-scan-device-alerts.ts` 只把在线、有扫描仪状态回报、能力 available、enabled+active 的终端放进 `terminalSubjectKeysInScope`；`admin-alert-push.service.ts` 把扫描仪告警并入终端类，移出范围静默、不推恢复，并只清掉扫描仪这一回合的 firing 去重键，重新纳入仍故障会再提醒一次。离线、打印机告警行为不变（新增回归用例钉住）。
 - 验证：`verify:alert-push`（新增停用 / 非 active / 离线 / 能力关闭 / 无状态回报不推恢复、真恢复推恢复、再纳入再推）、`verify:scan-device-b9`、`verify:admin-ops`、`verify:scan-device-b4`、`verify:queue-dispatch-printer-status`、api typecheck 与改过文件 lint 均通过（SQLite 隔离库）；PostgreSQL 版交 CI。反向检查三项（去掉范围过滤、只凭消失推恢复、去掉状态非空条件）都变红，恢复后绿。
 
+## 2026-11-05：两个后台 C3 前端两处——机构资料页托管关闭时不显示数据源、0 元单不出退款按钮（未合并、未部署）
+
+- 机构资料页复用托管开关：关闭时不显示「数据源」，机构账号计数照旧；`job_info`、`job_fair`、`external_apply_redirect` 标签加「（暂不开放）」并置灰，与管理员后台同一清单，只改展示。开启时保留原标签、样式和数据源计数；演示资料改用真实模块键名。
+- 管理员订单详情先判断 0 元可退订单，只显示中性说明「0 元订单无需退款」，不渲染退款按钮或二次确认；有实收的两种退款文案和交互照旧。既有门禁补单独分支、先后顺序、说明和无按钮断言。
+- 来源：旧 PR #1296（`1be7421a6`）、#1289（`20b84ce00`），对照 main `50070402a` 重做；只取本任务两处，不带入旧批次其他改动。两个用例文件补托管开关两态、0 元以及有实收的普通/待退款场景；管理员按需启用同一条演示订单，默认列表仍为原两单。
+- 验证：两个应用 typecheck、全量 src lint（管理员 5 条、机构 7 条既存警告，零错误）、http 生产构建、四项根门禁及订单只读 UI、后台中文文案、机构刷新与统计门禁通过。图谱列出的隐私文案模块已由中文文案门禁实际调用；反向检查删除 0 元分支、在其中放回按钮均使新断言失败，副本恢复后通过，前后 diff stat 一致。
+- 验证限制与范围：Playwright 只写未跑，交收货方；用例原命令因 `@playwright/test` 类型入口未链接而失败，显式指定已安装包路径后两文件均通过。退款 API 关联门禁已运行但缺少生成的 Prisma client，未进入断言（隔离 SQLite 的 133 条迁移通过）。未改后端、数据库模型、生产配置、密钥、硬件或 `docs/graph/`，未提交、未部署。
+
 ## 2026-11-04：屏上扫描后端 B9（扫描仪告警只算仍在运营的终端；分支 `claude/scan-device-b2-1102`，叠在 B8 头 `d09b3f19d` 上，未推送、未部署）
 
 - `collectScanDeviceAlerts` 与 `resolveScanDeviceAlert` 只算 `enabled: true` 且 `lifecycleStatus: 'active'` 的终端。其余三个条件照旧：`scan_device` 为 available、心跳在在线窗口内、健康值为 `not_found` 或 `error`。停用、维护中（以及计划中、调试中、已暂停、已退役）不出这条告警。
