@@ -127,7 +127,46 @@ namespace ScanDeskew {
             using (Graphics g = Graphics.FromImage(sample)) foreach (Point p in MarkerPoints(sample))
                 g.FillRectangle(Brushes.Magenta, p.X - 3, p.Y - 3, 7, 7);
         }
-        private static void Preserved(Bitmap sample, Bitmap rotated, double angle) {
+        private const int MarkerTolerance = 20;
+        private static Color ExpectedMarker(string format) {
+            // Save(bmp8) applies Gray, then an identity grayscale palette: magenta becomes 105.
+            // Do not derive this expectation from decoded pixels: missing input marks must fail too.
+            int gray = (255 * 114 + 255 * 299) / 1000;
+            return format == "bmp8" ? Color.FromArgb(gray, gray, gray) : Color.Magenta;
+        }
+        private static bool MatchesMarker(Color c, Color expected) {
+            if (expected.R != expected.G) return c.R > 150 && c.B > 150 && c.G < 120;
+            return Math.Abs(c.R - expected.R) <= MarkerTolerance && Math.Abs(c.G - expected.G) <= MarkerTolerance &&
+                Math.Abs(c.B - expected.B) <= MarkerTolerance;
+        }
+        private static string Rgb(Color c) { return c.R + "," + c.G + "," + c.B; }
+        private static void InputMarkers(Bitmap sample, Bitmap decoded, string format) {
+            Require(decoded.Width == sample.Width && decoded.Height == sample.Height, "encoded input dimensions");
+            Color expected = ExpectedMarker(format);
+            foreach (Point p in MarkerPoints(sample)) {
+                Color before = sample.GetPixel(p.X, p.Y), after = decoded.GetPixel(p.X, p.Y);
+                Require(before.ToArgb() == Color.Magenta.ToArgb(), "missing fixture marker before encoding");
+                Require(MatchesMarker(after, expected), "lost encoded input corner/edge marker at " + p);
+                if (format == "bmp8") {
+                    Require(after.ToArgb() == expected.ToArgb(), "bmp8 palette/gray mismatch at " + p);
+                    Console.WriteLine("PROBE marker-input format=" + format + " point=" + p + " sourceRGB=" + Rgb(before) +
+                        " decodedRGB=" + Rgb(after) + " expectedRGB=" + Rgb(expected) + " pixelFormat=" + decoded.PixelFormat +
+                        " palette105RGB=" + Rgb(decoded.Palette.Entries[105]) + " legacyMagentaMatch=" + MatchesMarker(after, Color.Magenta));
+                }
+            }
+        }
+        private static bool FindMarker(Bitmap image, int cx, int cy, Color expected, out Color nearest) {
+            bool found = false; int distance = Int32.MaxValue; nearest = Color.Empty;
+            for (int dy = -4; dy <= 4; dy++) for (int dx = -4; dx <= 4; dx++) {
+                if (cx + dx < 0 || cx + dx >= image.Width || cy + dy < 0 || cy + dy >= image.Height) continue;
+                Color c = image.GetPixel(cx + dx, cy + dy);
+                int d = Math.Abs(c.R - expected.R) + Math.Abs(c.G - expected.G) + Math.Abs(c.B - expected.B);
+                if (d < distance) { distance = d; nearest = c; }
+                if (MatchesMarker(c, expected)) found = true;
+            }
+            return found;
+        }
+        private static void Preserved(Bitmap sample, Bitmap rotated, double angle, string format) {
             double radians = -angle * Math.PI / 180, cos = Math.Cos(radians), sin = Math.Sin(radians);
             Require(rotated.Width == (int)Math.Ceiling(sample.Width * cos + sample.Height * Math.Abs(sin)), "canvas width");
             Require(rotated.Height == (int)Math.Ceiling(sample.Height * cos + sample.Width * Math.Abs(sin)), "canvas height");
@@ -135,20 +174,19 @@ namespace ScanDeskew {
                 double x = p.X - sample.Width / 2.0, y = p.Y - sample.Height / 2.0;
                 int cx = (int)Math.Round(cos * x - sin * y + rotated.Width / 2.0);
                 int cy = (int)Math.Round(sin * x + cos * y + rotated.Height / 2.0);
-                bool found = false;
-                for (int dy = -4; dy <= 4; dy++) for (int dx = -4; dx <= 4; dx++) {
-                    if (cx + dx < 0 || cx + dx >= rotated.Width || cy + dy < 0 || cy + dy >= rotated.Height) continue;
-                    Color c = rotated.GetPixel(cx + dx, cy + dy);
-                    if (c.R > 150 && c.B > 150 && c.G < 120) found = true;
-                }
-                Require(found, "lost original corner/edge marker");
+                Color nearest, expected = ExpectedMarker(format);
+                bool found = FindMarker(rotated, cx, cy, expected, out nearest);
+                if (format == "bmp8" || !found) Console.WriteLine("PROBE marker-output format=" + format + " sourcePoint=" + p +
+                    " targetPoint=" + cx + "," + cy + " expectedRGB=" + Rgb(expected) + " nearestRGB=" + Rgb(nearest) +
+                    " found=" + found + " canvas=" + rotated.Width + "x" + rotated.Height + " pixelFormat=" + rotated.PixelFormat);
+                Require(found, "lost original corner/edge marker at " + p);
             }
         }
-        private static void ImageChecks(Bitmap sample, string output, Estimate result) {
+        private static void ImageChecks(Bitmap sample, string output, Estimate result, string format) {
             Corners(output);
             using (Bitmap rotated = new Bitmap(output)) {
                 Require(rotated.Width >= sample.Width && rotated.Height >= sample.Height, "cropped canvas");
-                Preserved(sample, rotated, result.AngleDeg);
+                Preserved(sample, rotated, result.AngleDeg, format);
                 double scale = Math.Min(1, (double)Limits.LongEdge / Math.Max(rotated.Width, rotated.Height));
                 using (Bitmap small = new Bitmap(rotated, (int)(rotated.Width * scale), (int)(rotated.Height * scale))) {
                     Estimate residual = Estimator.Analyze(Gray(small, small.Width), small.Width, small.Height, small.Width, true);
@@ -162,6 +200,39 @@ namespace ScanDeskew {
             double scale = Math.Min(1, (double)Limits.LongEdge / Math.Max(sample.Width, sample.Height));
             using (Bitmap small = new Bitmap(sample, (int)(sample.Width * scale), (int)(sample.Height * scale)))
                 return Estimator.Analyze(Gray(small, small.Width + 4), small.Width, small.Height, small.Width + 4, true);
+        }
+        private static void MarkerControls(string directory) {
+            sampleErrors = new List<string>();
+            try {
+                using (Bitmap sample = Page("blank")) {
+                    Mark(sample);
+                    string input = Path.Combine(directory, "marker-control.bmp");
+                    Save(sample, input, "bmp8");
+                    using (Bitmap decoded = new Bitmap(input)) {
+                        InputMarkers(sample, decoded, "bmp8");
+                        Color expected = ExpectedMarker("bmp8"), nearest;
+                        Require(!MatchesMarker(expected, Color.Magenta), "legacy checker must reproduce bmp8 false negative");
+                        foreach (Color invalid in new Color[] { Color.White, Color.Black, Color.Magenta, Color.FromArgb(150, 150, 150) })
+                            Require(!MatchesMarker(invalid, expected), "incorrect gray/palette color accepted");
+                        Point[] points = MarkerPoints(sample);
+                        for (int erased = 0; erased < points.Length; erased++) {
+                            using (Bitmap damaged = new Bitmap(sample.Width, sample.Height, PixelFormat.Format24bppRgb)) {
+                                using (Graphics g = Graphics.FromImage(damaged)) {
+                                    g.DrawImage(decoded, new Rectangle(0, 0, decoded.Width, decoded.Height), 0, 0, decoded.Width, decoded.Height, GraphicsUnit.Pixel);
+                                    Point p = points[erased];
+                                    g.FillRectangle(Brushes.White, p.X - 4, p.Y - 4, 9, 9);
+                                }
+                                for (int i = 0; i < points.Length; i++)
+                                    Require(FindMarker(damaged, points[i].X, points[i].Y, expected, out nearest) == (i != erased),
+                                        "erased/retained marker control erased=" + erased + " checked=" + i);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception error) { sampleErrors.Add("gate_exception_" + error.GetType().Name + ":" + error.Message); }
+            if (sampleErrors.Count > 0) failures++;
+            Console.WriteLine((sampleErrors.Count == 0 ? "PASS" : "FAIL") + " marker-controls bmp8 palette/gray and each of 8 erased marks checks=" +
+                (sampleErrors.Count == 0 ? "ok" : String.Join(";", sampleErrors.ToArray())));
         }
         // Same font-free fixture and bilinear inverse rasterization as verify-scan-deskew.ts.
         private static int NumericalPixel(int x, int y, string kind) {
@@ -213,6 +284,7 @@ namespace ScanDeskew {
             string[] formats = new string[] { "png", "jpeg", "bmp8", "bmp24" };
             Dictionary<string, int[]> summary = new Dictionary<string, int[]>();
             Numerical(angles, summary);
+            MarkerControls(directory);
             // Keep the old -4 drawing available as a diagnostic probe, not a positive control.
             try {
                 using (Bitmap page = Page("text")) using (Bitmap legacy = Skew(page, -4, true)) {
@@ -242,6 +314,7 @@ namespace ScanDeskew {
                                 string input = Path.Combine(directory, "input." + (format.StartsWith("bmp") ? "bmp" : format == "jpeg" ? "jpg" : "png"));
                                 string output = Path.Combine(directory, format == "png" ? "output.png" : "output.jpg");
                                 File.Delete(input); File.Delete(output); Save(sample, input, format);
+                                if (IsText(kind)) using (Bitmap decodedInput = new Bitmap(input)) InputMarkers(sample, decodedInput, format);
                                 byte[] original = File.ReadAllBytes(input);
                                 result = ImageProcessor.Process(input, output, true);
                                 result.Detail = "source=" + sample.Width + "x" + sample.Height + " dpi=" + sample.HorizontalResolution + " analysisScale=" +
@@ -250,7 +323,7 @@ namespace ScanDeskew {
                                 if (eligible) Require(result.Corrected, "eligible text fell back");
                                 if (result.Corrected) {
                                     Require(Math.Abs(result.AngleDeg - angle) <= Limits.HalfAgreement, "estimate error / wrong sign");
-                                    ImageChecks(sample, output, result);
+                                    ImageChecks(sample, output, result, format);
                                 } else Require(!File.Exists(output), "fallback left output");
                                 Require(Convert.ToBase64String(original) == Convert.ToBase64String(File.ReadAllBytes(input)), "input modified");
                             }
@@ -280,7 +353,7 @@ namespace ScanDeskew {
                 int[] t = item.Value;
                 Console.WriteLine("SUMMARY " + item.Key + " | " + t[0] + " | " + t[1] + " | " + t[2] + " | " + t[3] + " | " + t[4] + " | " + t[5]);
             }
-            Console.WriteLine("scan-deskew Windows " + (failures == 0 ? "PASS" : "FAIL") + ": failedSamples=" + failures + " samples=s4a-v2 seed=1104");
+            Console.WriteLine("scan-deskew Windows " + (failures == 0 ? "PASS" : "FAIL") + ": failedSamples=" + failures + " samples=s4a-v3 seed=1104");
             if (failures > 0) throw new Exception("scan-deskew synthetic gate: " + failures + " failed samples (all samples completed)");
         }
     }

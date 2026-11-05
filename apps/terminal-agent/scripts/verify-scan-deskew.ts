@@ -253,8 +253,29 @@ async function main() {
     assert.match(tests, /sample.SetResolution\(page.HorizontalResolution, page.VerticalResolution\)/)
     assert.match(tests, /page.Width, page.Height, GraphicsUnit.Pixel/)
     assert.match(tests, /Numerical\(angles, summary\)/, 'Windows reruns the same font-free controls as the TS model')
+    assert.match(tests, /InputMarkers\(sample, decodedInput, format\)/, 'check markers after fixture encoding, before processing')
+    assert.match(tests, /Preserved\(sample, rotated, result.AngleDeg, format\)/, 'use the encoded marker color for every output check')
+    assert.match(tests, /MarkerControls\(directory\)/, 'Windows must reject each erased corner/edge marker')
     assert.doesNotMatch(script, /Write-(Host|Output|Warning|Error)|Start-Transcript/)
     assert.match(fs.readFileSync(path.join(__dirname, '../src/agent/scan-deskew/runner.ts'), 'utf8'), /\['\/PID', String\(pid\), '\/T', '\/F'\]/)
+  })
+  await check('BMP8 marker grayscale model / old false negative / erased and wrong colors reject', () => {
+    const gate = fs.readFileSync(path.join(__dirname, 'verify-scan-deskew-windows.ps1'), 'utf8')
+    const tolerance = Number(gate.match(/const int MarkerTolerance = (\d+);/)?.[1])
+    assert.equal(tolerance, 20)
+    assert.ok(gate.includes('int gray = (255 * 114 + 255 * 299) / 1000;'))
+    assert.ok(gate.includes('format == "bmp8" ? Color.FromArgb(gray, gray, gray) : Color.Magenta'))
+    assert.match(gate, /Math.Abs\(c.R - expected.R\) <= MarkerTolerance && Math.Abs\(c.G - expected.G\) <= MarkerTolerance &&\s*Math.Abs\(c.B - expected.B\) <= MarkerTolerance/)
+    const magenta = [255, 0, 255], gray = Math.trunc((magenta[2] * 114 + magenta[1] * 587 + magenta[0] * 299) / 1000)
+    const decoded = [gray, gray, gray]
+    const legacy = (c: number[]) => c[0] > 150 && c[2] > 150 && c[1] < 120
+    const grayscale = (c: number[]) => c.every((channel) => Math.abs(channel - gray) <= tolerance)
+    assert.equal(gray, 105); assert.equal(legacy(magenta), true); assert.equal(legacy(decoded), false)
+    assert.equal(grayscale(decoded), true)
+    for (const wrong of [[255, 255, 255], [0, 0, 0], magenta, [150, 150, 150]]) assert.equal(grayscale(wrong), false)
+    for (const delta of [-tolerance, tolerance]) assert.equal(grayscale(decoded.map((c) => c + delta)), true)
+    for (const delta of [-tolerance - 1, tolerance + 1]) assert.equal(grayscale(decoded.map((c) => c + delta)), false)
+    console.log(`PROBE BMP8 marker sourceRGB=${magenta} decodedRGB=${decoded} legacyMatch=${legacy(decoded)} grayMatch=${grayscale(decoded)} (color model only; codecs require Windows)`)
   })
   await check('disabled never spawns and preserves original for absent / false / invalid', async () => {
     for (const value of [undefined, false, 'true', 1, null]) {
