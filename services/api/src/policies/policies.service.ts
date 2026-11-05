@@ -13,6 +13,7 @@ import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import type { CreatePolicyPostDto, UpdatePolicyPostDto } from './dto/policy.dto'
 import type { ReviewAction } from '../jobs/dto/review.dto'
 import type { PublishAction } from '../jobs/dto/publish.dto'
+import { checkPolicySourceLink, isPolicySourceLinkVerified, POLICY_PUBLISH_ISSUES } from './policy-source-link'
 import { partnerOrgTypeCan } from '../jobs/partner-capabilities'
 import { assertOrgContentTrustActive, type OrgTrustReader } from '../common/content-trust'
 import {
@@ -56,6 +57,7 @@ export interface PolicyPostDto {
   audience?: string
   category?: string
   externalUrl?: string
+  externalUrlVerified?: boolean
   /** 来源方原始编号(CLAUDE.md §10 外部ID);来源未提供为 null,不得伪造 */
   externalId: string | null
   publishedDate?: string
@@ -141,6 +143,7 @@ interface PrismaPolicyRow {
   publishConfirmedContentVersion: number | null
   syncTime: Date
   updatedAt: Date
+  org?: { verifiedOfficialDomainsJson: string | null }
 }
 
 function mapPolicy(p: PrismaPolicyRow): PolicyPostDto {
@@ -170,6 +173,7 @@ function mapPolicy(p: PrismaPolicyRow): PolicyPostDto {
     syncTime: p.syncTime.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
   }
+  if (p.org) dto.externalUrlVerified = isPolicySourceLinkVerified(p.externalUrl, p.org.verifiedOfficialDomainsJson)
   if (!isRecruitmentContentHostingEnabled() && p.category === RECRUITMENT_POLICY_CATEGORY) {
     dto.hostingStock = true
   }
@@ -204,6 +208,7 @@ export class PoliciesService {
     const [rows, total] = await Promise.all([
       this.prisma.policyPost.findMany({
         where,
+        include: { org: { select: { verifiedOfficialDomainsJson: true } } },
         orderBy: [{ publishedDate: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -224,6 +229,7 @@ export class PoliciesService {
         reviewStatus: 'approved',
         publishStatus: 'published',
       }, scope),
+      include: { org: { select: { verifiedOfficialDomainsJson: true } } },
     })
     if (!row) {
       throw new NotFoundException({ error: { code: 'POLICY_NOT_FOUND', message: `Policy ${id} not found` } })
@@ -260,6 +266,7 @@ export class PoliciesService {
     if (!hasPaging) {
       const rows = await this.prisma.policyPost.findMany({
         where,
+        include: { org: { select: { verifiedOfficialDomainsJson: true } } },
         orderBy: { createdAt: 'desc' },
       })
       return this.withEmergencyHolds(rows.map(mapPolicy), user.orgId)
@@ -268,6 +275,7 @@ export class PoliciesService {
       this.prisma.policyPost.count({ where }),
       this.prisma.policyPost.findMany({
         where,
+        include: { org: { select: { verifiedOfficialDomainsJson: true } } },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -324,6 +332,9 @@ export class PoliciesService {
         category: dto.category ?? null,
         externalUrl: normalizeOptionalHttpUrl(dto.externalUrl, 'externalUrl') ?? null,
         externalId: dto.externalId ?? null,
+        whoCanApply: dto.whoCanApply?.trim() || null,
+        requiredMaterials: dto.requiredMaterials?.trim() || null,
+        whereToApply: dto.whereToApply?.trim() || null,
         publishedDate: dto.publishedDate ? new Date(dto.publishedDate) : null,
       },
     })
@@ -356,13 +367,16 @@ export class PoliciesService {
       data: {
         ...(dto.kind !== undefined ? { kind: dto.kind } : {}),
         ...(dto.title !== undefined ? { title: dto.title } : {}),
-        ...(dto.summary !== undefined ? { summary: dto.summary } : {}),
-        ...(dto.content !== undefined ? { content: dto.content } : {}),
+        ...(dto.summary !== undefined ? { summary: dto.summary?.trim() || null } : {}),
+        ...(dto.content !== undefined ? { content: dto.content?.trim() || null } : {}),
         ...(dto.audience !== undefined ? { audience: dto.audience } : {}),
         ...(dto.category !== undefined ? { category: dto.category } : {}),
-        ...(dto.externalUrl !== undefined ? { externalUrl: normalizeOptionalHttpUrl(dto.externalUrl, 'externalUrl') ?? null } : {}),
-        ...(dto.externalId !== undefined ? { externalId: dto.externalId } : {}),
-        ...(dto.publishedDate !== undefined ? { publishedDate: new Date(dto.publishedDate) } : {}),
+        ...(dto.externalUrl !== undefined ? { externalUrl: normalizeOptionalHttpUrl(dto.externalUrl ?? undefined, 'externalUrl') ?? null } : {}),
+        ...(dto.externalId !== undefined ? { externalId: dto.externalId?.trim() || null } : {}),
+        ...(dto.publishedDate !== undefined ? { publishedDate: dto.publishedDate?.trim() ? new Date(dto.publishedDate) : null } : {}),
+        ...(dto.whoCanApply !== undefined ? { whoCanApply: dto.whoCanApply?.trim() || null } : {}),
+        ...(dto.requiredMaterials !== undefined ? { requiredMaterials: dto.requiredMaterials?.trim() || null } : {}),
+        ...(dto.whereToApply !== undefined ? { whereToApply: dto.whereToApply?.trim() || null } : {}),
         // 状态机:内容修订 → 强制重审(与岗位/招聘会一致)
         reviewStatus: 'pending',
         publishStatus: 'draft',
@@ -567,6 +581,23 @@ export class PoliciesService {
       contentType: '政策内容',
       contentId: id,
     })
+    if (post.kind === 'policy_guide' && ![post.whoCanApply, post.requiredMaterials, post.whereToApply].every((v) => v?.trim())) {
+      throw new BadRequestException({ error: POLICY_PUBLISH_ISSUES.handlingFieldsRequired })
+    }
+    const org = await this.prisma.organization.findUnique({
+      where: { id: post.sourceOrgId },
+      select: { verifiedOfficialDomainsJson: true },
+    })
+    const link = checkPolicySourceLink(post.externalUrl, org?.verifiedOfficialDomainsJson)
+    if (post.kind === 'policy_guide' && link.status === 'missing') {
+      throw new BadRequestException({ error: POLICY_PUBLISH_ISSUES.sourceUrlRequired })
+    }
+    if (link.status === 'no_registered_domains') {
+      throw new BadRequestException({ error: POLICY_PUBLISH_ISSUES.sourceDomainsNotRegistered })
+    }
+    if (link.status === 'not_verified') {
+      throw new BadRequestException({ error: POLICY_PUBLISH_ISSUES.sourceUrlNotVerified })
+    }
     const version = post.contentVersion ?? 1
     const confirmedAt = new Date()
     // 查 hold 和改成 published 在同一个事务里。写完再查一次：
@@ -643,14 +674,14 @@ export class PoliciesService {
    * 改为读 `partner-capabilities.ts` 的 `canManagePolicies`——那份矩阵同时也是
    * `GET /partner/data-sources/capabilities` 的返回内容，Partner 控制台按它决定
    * 「新增政策内容」是否可点。两处各存一份必然漂移（前端放行、后端拒写）。
-   * 错误码与文案保持不变。
+   * 错误码保持不变；拒绝文案列出矩阵允许的四类机构。
    */
   private assertPolicyCapableOrgType(org: { type: string; name: string }): void {
     if (!partnerOrgTypeCan(org.type, 'managePolicies')) {
       throw new BadRequestException({
         error: {
           code: 'ORG_TYPE_NOT_ALLOWED_FOR_POLICY',
-          message: '仅公共就业服务机构与高校就业中心可发布政策内容',
+          message: '仅公共就业服务机构、高校就业中心、零工之家、就业服务站可发布政策内容',
         },
       })
     }

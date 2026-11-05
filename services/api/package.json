@@ -226,6 +226,7 @@
     "verify:partner-org-self": "node -r @swc-node/register scripts/verify-partner-org-self.ts",
     "verify:partner-stats-contract": "node -r @swc-node/register scripts/verify-partner-stats-contract.ts",
     "verify:partner-edit": "node -r @swc-node/register scripts/verify-partner-edit.ts && pnpm verify:partner-fair-subresources",
+    "verify:policy-publish-gates": "node -r @swc-node/register scripts/verify-policy-publish-gates.ts",
     "verify:policies": "node -r @swc-node/register scripts/verify-policies.ts",
     "verify:kiosk-session": "node -r @swc-node/register scripts/verify-kiosk-session.ts",
     "verify:policy-eligibility": "node -r @swc-node/register scripts/verify-policy-eligibility.ts",

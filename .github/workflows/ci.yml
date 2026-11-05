@@ -847,6 +847,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:background-task-safety
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:policy-publish-gates
           pnpm --filter @ai-job-print/api verify:kiosk-session
           pnpm --filter @ai-job-print/api verify:policy-scope
           pnpm --filter @ai-job-print/api verify:policy-eligibility
@@ -1168,6 +1169,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:console-screen-usage
           pnpm --filter @ai-job-print/api verify:ai-user-text-retention
           pnpm --filter @ai-job-print/api verify:policies
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:policy-publish-gates
           # 贴牌与授权管理（PostgreSQL 上同样真跑一遍：机构行锁抢最后一个名额、CHECK 与外键、日期比较）。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:branding
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:license

@@ -89,23 +89,19 @@ export function isContentTrustActive(org: OrgTrustFacts | null): boolean {
  * 运营看到这句话应该不需要再问工程师。
  */
 export function contentTrustDenialMessage(
-  sourceOrgId: string,
+  _sourceOrgId: string,
   org: OrgTrustFacts | null,
   denial: ContentTrustDenial,
+  contentType = '内容',
 ): string {
-  const who = org?.name ? `来源机构「${org.name}」(${sourceOrgId})` : `来源机构 ${sourceOrgId}`
-  const howTo =
-    '请先完成来源授权核验，再由管理员在「管理员后台 → 合作机构」把该机构标记为内容可信' +
-    '(PATCH /api/v1/admin/orgs/:id/content-trust，body: { "status": "active", "reason": "<授权依据>" })，然后重试发布。'
-
+  const who = org?.name ? `机构「${org.name}」` : '本机构'
   if (denial === 'org_missing') {
-    return `${who} 在机构表中不存在，无法核验内容信任状态，按 fail-closed 拒绝发布。${howTo}`
+    return `${who}的发布资格还没有开通：暂时查不到来源机构，无法完成内容核验。请联系平台管理员核对机构信息后再发布。`
   }
   if (denial === 'archived') {
-    return `${who} 已归档(archivedAt=${org?.archivedAt?.toISOString() ?? '非空'})，已归档机构的内容不得发布。如需继续供稿，请先取消归档并重新核验。`
+    return `${who}已归档，暂时不能发布${contentType}。如需继续发布，请联系平台管理员恢复机构并重新完成内容核验。`
   }
-  const current = org?.contentTrustStatus ?? '未标记(null)'
-  return `${who} 未通过内容信任核验：当前 contentTrustStatus=${current}，发布要求 ${CONTENT_TRUST_ACTIVE} 且未归档。${howTo}`
+  return `${who}的发布资格还没有开通：平台管理员还没有完成本机构的内容核验，暂时不能发布${contentType}。请联系平台管理员核验开通后再发布。`
 }
 
 /**
@@ -121,6 +117,8 @@ export async function assertOrgContentTrustActive(
   sourceOrgId: string | null | undefined,
   ctx: { contentType: string; contentId: string },
 ): Promise<void> {
+  const contentType = ({ job: '岗位内容', fair: '招聘会内容', policy: '政策内容', company: '企业资料', offlineAgency: '服务机构信息' } as Record<string, string>)[ctx.contentType]
+    ?? (/^[\u4e00-\u9fff]+$/.test(ctx.contentType) ? ctx.contentType : '内容')
   // 空 sourceOrgId 同样 fail-closed：org 归属未知的内容不该走到有 sourceOrgId 的
   // 发布路径上（Job / JobFair / PolicyPost / CompanyProfile 的 sourceOrgId 都是
   // schema 层 NOT NULL）。真正「本来就没有来源机构」的内容类型，调用方自己判断
@@ -129,7 +127,7 @@ export async function assertOrgContentTrustActive(
     throw new BadRequestException({
       error: {
         code: CONTENT_TRUST_DENIED_CODE,
-        message: `${ctx.contentType} ${ctx.contentId} 没有来源机构(sourceOrgId 为空)，无法核验内容信任状态，按 fail-closed 拒绝发布。`,
+        message: `这条${contentType}没有关联来源机构，暂时不能发布。请联系平台管理员核对机构信息后再发布。`,
       },
     })
   }
@@ -145,7 +143,7 @@ export async function assertOrgContentTrustActive(
   throw new BadRequestException({
     error: {
       code: CONTENT_TRUST_DENIED_CODE,
-      message: contentTrustDenialMessage(sourceOrgId, org, denial),
+      message: contentTrustDenialMessage(sourceOrgId, org, denial, contentType),
       details: {
         sourceOrgId,
         organizationName: org?.name ?? null,
