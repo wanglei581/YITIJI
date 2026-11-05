@@ -459,7 +459,7 @@ model AlertDisposition {
 //   - taskStatus 镜像 PrintTask.status,便于 Admin 后续订单页读取;真相源仍是 PrintTask。
 //     C5 起亦作为 claim/retry/refund 的 CAS 序列点；任何变更 PrintTask.status 的路径必须同事务同步该字段。
 //
-// type:       print | scan | photo | ai(后续预留)
+// type:       print | copy | scan | photo | ai(后续预留)
 // payStatus:  unpaid | paying | paid | refunded | failed | closed
 //   （paying/closed 为 C5-2 线上态：出码中 / 超时关单；线下与免费单仍只走 unpaid→paid→refunded）
 // taskStatus: pending | claimed | printing | completed | failed | cancelled(后续预留)
@@ -471,6 +471,7 @@ model Order {
   printTaskId String?    @unique
   printTask   PrintTask? @relation(fields: [printTaskId], references: [id])
   orderItems  OrderItem[]
+  copyJob     CopyJob?
 
   endUserId  String?
   terminalId String?
@@ -562,6 +563,36 @@ model Order {
   @@index([pickupStatus, pickupCodeExpiresAt])
   @@index([createdAt])
   @@index([channel, createdAt])
+}
+
+// 屏上复印：仅履约元数据，不建立 FileObject / PrintTask，不保存内容或控制令牌。
+// state/source/colorMode/duplex 白名单见共享 copyJob 契约，写入校验由 C1b 接入。
+model CopyJob {
+  id                   String   @id @default(cuid())
+  terminalId           String
+  organizationId       String
+  endUserId            String?
+  state                String   @default("ready")
+  source               String
+  pageCount            Int      @default(0)
+  copies               Int      @default(1)
+  colorMode            String   @default("black_white")
+  duplex               String   @default("simplex")
+  billableSides        Int      @default(0)
+  quoteSnapshot        String?
+  orderId              String?  @unique
+  order                Order?   @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  requestKey           String
+  generation           Int      @default(0)
+  authorizationVersion Int      @default(0)
+  resultCode           String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  expiresAt            DateTime
+
+  @@unique([terminalId, requestKey])
+  @@index([terminalId, state, createdAt])
+  @@index([state, expiresAt])
 }
 
 // 材料包逐行履约快照。金额/页数/参数全部在建单时由服务端计算并固化，

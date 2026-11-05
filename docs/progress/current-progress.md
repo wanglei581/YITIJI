@@ -1,5 +1,32 @@
 # 当前开发进度
 
+## 2026-11-05：屏上复印 C1e——终端停用 / 维护 / 吊销 / 改绑机构也作废在途复印授权（分支 `claude/copy-c1-1104`，未合并、未部署）
+
+- 起因：C1d 复核报 P1——许可只在 CAS 时判定后，终端 `enabled` / `lifecycleStatus` / `orgId` 的管理写入不递增复印授权版本，可被并发许可绕过。
+- 改法（Codex 实现，Claude 收货）：抽出 `copy-jobs/copy-authorization.ts`（只给本终端未终态复印单授权版本 +1，不改状态），在同一事务里接到会让终端变不可用的写入口：后台资料编辑停用（`terminals-admin.service.ts`）、生命周期切到非 active、应急吊销转 suspended（`terminal-credential-security.service.ts`）、机构绑定 / 解绑 / 改绑（`terminal-org-assignment.ts`，仅机构真的变了）、开发种子覆盖机构归属（抽出 `prisma/seed-terminal.ts`）。新建、激活、恢复 active、心跳转 active 属于变可用，不递增。
+- 验证：新增 `scripts/support/copy-c1e-verification.ts`（19 条，由 `verify:copy-c1b` 调用）：停用、维护、解绑、改绑、吊销、种子覆盖各自「管理先提交 → 许可拒绝」「CAS 先提交 → 终态照收」「撤权异常整体回滚」「无关与恢复写不撤权」。终端管理与打印、扫描、首单相关 49 条门禁（SQLite）过；PostgreSQL 交 CI。
+
+## 2026-11-05：屏上复印 C1d——收掉 C1c 复核的 3 条 P1（分支 `claude/copy-c1-1104`，未合并、未部署）
+
+- ① 已派发（dispatching / spooled）的单再取打印许可一律拒绝（`COPY_ALREADY_DISPATCHED`），去掉 CAS 后复查能力与状态回退，已派发任务永不退回可取消，真实终态回报照收。② 能力撤销改为版本协议：终端能力服务的写入口（upsert 与 clear）把 `copy`、`scan_device`、`color_print`、`duplex_print` 任一改为非 available 时，在同一事务里给本终端所有未终态 `CopyJob` 的授权版本加一；许可 CAS 钉住首读版本——关能力先提交则拒绝，CAS 先提交则视为关闭前已发的许可。③ 后台订单只读接口对复印行按 `CopyJob.state` 返回真实结果与中文文案，结果未确认带「需人工核查」标记与错误码，「已完成」筛选只含已交给打印机；`Order.taskStatus` 映射不变（注销靠它）。后台页面未改。
+- 验证（Codex 实现，Claude 收货）：新增 7 条用例过；`verify:copy-c1a`、`verify:copy-c1b`、`verify:member-closure`、`verify:admin-orders-readonly`、`verify:admin-order-filters` 与能力服务图谱关联的 30 余条门禁（SQLite）过；PostgreSQL 交 CI。
+
+## 2026-11-04：屏上复印 C1c——收掉 C1 复审的 3 条 P1（分支 `claude/copy-c1-1104`，未合并、未部署）
+
+- ① 复印终态阻断会员注销：`CopyJob` 照旧记已交给打印机 / 失败 / 结果未确认，`Order` 侧映射为 completed / failed / completed，复用现有订单终态规则（注销服务的终态集合未改）。② 取许可 CAS 后重读要再核状态、代次、授权版本与到期，响应只用成功 CAS 的快照，用户取消后不会拿到有效许可。③ 读能力与 CAS 之间关能力的窗口：CAS 后再查一次能力，已关就撤回（回到 ready/confirmed、授权版本递增）并拒绝；已派发任务的终态回报照收。
+- 验证（Codex 实现，Claude 收货）：新增 6 条并发与注销用例（`scripts/support/copy-c1c-verification.ts`，由 `verify:copy-c1b` 调用）全过；`verify:copy-c1a`、`verify:member-closure`（SQLite、真 Redis、HTTP）过；反向检查三项各自变红。PostgreSQL 交 CI。
+
+## 2026-11-04：屏上复印 C1b——后端接口、终端许可与上限（分支 `claude/copy-c1-1104`，未合并、未部署）
+
+- 做了什么（Codex 实现，Claude 收货）：一体机侧 `POST /copy/jobs`（游客可用、幂等键同参同单、控制令牌只首次返回）、查单、取消、确认（读扫描页数用 `quoteCopy` 报价，事务内建 `type=copy` 订单并走现有免费订单状态机，重复确认同一订单；只有明确 0 元报价才允许履约）；终端程序侧用 Agent 凭证 `GET /terminals/:terminalId/copy/jobs/:id/permit?op=scan|print`（不做签名许可，许可最长 30 秒，未确认 / 过期 / 能力关 / 跨终端不给打印许可）、扫描结果回报（同代同值幂等、旧代次不覆盖、超上限拒绝）、打印结果回报（已交给打印机 / 失败 / 结果未确认，终态不回退）。上限：单次 20 页（复用屏上扫描常量）、99 份（设计稿 cs-copy-set「1–99 份」）；双面 + 多份 + 奇数页默认拒绝（`COPY_ALLOW_ODD_DUPLEX_MULTICOPY` 显式开）。建单、确认、许可、结果都记审计，不记控制令牌与扫描内容。
+- 验证：新门禁 `verify:copy-c1b`（HTTP + 隔离库，接进 CI 的 SQLite 与 PostgreSQL 两组）与 `verify:copy-c1a` 通过；图谱列出的关联门禁 57/58 过，唯一红的冻结门禁 `verify:file-assets-trial-acceptance` 是因为未提交文件，提交后重跑过。反向检查三项（未确认给打印许可、重复确认再建订单、旧代次覆盖页数）都变红。PostgreSQL 交 CI。
+
+## 2026-11-04：屏上复印 C1a——后端数据底座（分支 `claude/copy-c1-1104`，自 #1559 头 44f13e7fe 开出，未合并、未部署）
+
+- 依据：产品负责人 11/04「复印像打印一样生成订单、按页计价；价目只加行、默认 0 元；先只做最小闭环」；规格书 `codex/copy-spec-out.md`、`copy-decisions.md`。
+- 做了什么（Codex 实现，Claude 收货）：新模型 `CopyJob`（两套 schema、同名迁移 `20261104160000_add_copy_job`；`orderId @unique` 关联现有 `Order`，只记页数、份数、颜色、单双面、计费面数、报价快照、状态与代次，**不存图片、PDF、文件名、路径、内容哈希**）；价目两行 `copy_bw_page`、`copy_color_page` 0 分（沿用现有幂等补行，已有配置不覆盖）与报价纯函数（页数 × 份数 × 每面单价，双面不减半，缺价 / 停用 / 异常价不可报价）；`copy` 进默认拒绝与判定函数（要 `copy`、`scan_device`，彩色加 `color_print`，双面加 `duplex_print`）；七个 `COPY_*` 删除审计码进 API、DTO、共享白名单；用户订单列表、时间线、详情服务端过滤复印单，后台订单带「复印」类型、无文件链接；注销保留履约记录并去标识请求键与快照文本。接口与上限是 C1b。
+- 验证：新门禁 `verify:copy-c1a`（接进 CI 的 SQLite 与 PostgreSQL 两组）；SQLite 空库 migrate deploy、schema 无漂移、PG schema 校验与同步检查；价目、彩色双面能力、后台计费、会员订单、时间线（94）、小程序云打印、后台订单只读与筛选、删除审计上报（14 码）、first-order-migrations（SQLite）、注销、扫描任务等关联门禁通过；PostgreSQL 实跑交 CI。反向检查三项（去掉 copy 默认拒绝、用户列表不过滤、缺价按 0）都变红。`verify-member-closure.ts` 原有 26 处 no-explicit-any lint 不是这次带进来的。
+
 ## 2026-11-04：屏上扫描后端 B10（扫描仪告警移出范围不推「已恢复」；分支 `claude/scan-device-b2-1102`，未部署）
 
 - 起因：Codex 只读复核 B9 报 P1——扫描仪告警推送后，终端停用、非 active、离线或 `scan_device` 关闭，告警从收集结果消失，推送服务会把它推成「已恢复」；重新纳入范围时同一故障回合还会被旧去重键挡住。

@@ -28,6 +28,22 @@ export const DEV_PRICE_SEED_FORBIDDEN_IN_PRODUCTION =
 
 export const RESUME_EXPORT_SERVICE_KEY = 'resume_export'
 
+/** 首期复印价目仅加行，明确 0 元；不覆盖任何既有运营配置。 */
+export const COPY_DEFAULT_PRICE_CONFIG = [
+  { serviceKey: 'copy_bw_page', unitCents: 0, unit: 'page', description: '免费试运营：复印 0 元/页' },
+  { serviceKey: 'copy_color_page', unitCents: 0, unit: 'page', description: '免费试运营：复印 0 元/页' },
+] as const
+
+export async function ensureCopyPriceCatalogRows(prisma: PrismaService): Promise<void> {
+  for (const row of COPY_DEFAULT_PRICE_CONFIG) {
+    await prisma.priceConfig.upsert({
+      where: { serviceKey: row.serviceKey },
+      create: { ...row, active: true },
+      update: {},
+    })
+  }
+}
+
 export const DEV_DEFAULT_PRICE_CONFIG = [
   {
     serviceKey: 'print_bw_page',
@@ -106,6 +122,7 @@ export async function ensurePrintPriceCatalogRows(prisma: PrismaService): Promis
 /** 幂等写入开发默认价目（upsert by serviceKey）。仅供 seed / verify 使用。 */
 export async function seedDevDefaultPriceConfig(prisma: PrismaService): Promise<void> {
   assertDevPriceSeedAllowed()
+  await ensureCopyPriceCatalogRows(prisma)
 
   for (const p of DEV_DEFAULT_PRICE_CONFIG) {
     await prisma.priceConfig.upsert({
