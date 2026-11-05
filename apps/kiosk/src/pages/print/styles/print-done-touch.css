@@ -17,6 +17,11 @@
 }
 
 /* ── 打印完成（稿 done） ── */
+[data-qx-page='print-done'] .qxt-body:has(> .pft-done) {
+  padding-top: 16px;
+  padding-bottom: 10px;
+}
+
 [data-qx-page^='print'] .qxt-seal-node {
   flex: none;
   display: grid;
@@ -32,30 +37,32 @@
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
   font-size: 22px;
 }
 
 [data-qx-page='print-done'] .pft-take {
-  flex: 0 0 auto;
+  flex: 1 0 544px;
   display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
   gap: 40px;
-  min-height: 220px;
-  padding: 12px;
+  min-height: 544px;
+  padding: 16px 24px;
   border-radius: 30px;
   background: var(--qxt-card);
   border: 1.5px solid var(--qxt-edge);
 }
 
-[data-qx-page='print-done'] .pft-take .pa svg { width: 200px; height: 200px; }
+[data-qx-page='print-done'] .pft-take .pa svg { width: 230px; height: 270px; }
 
 [data-qx-page='print-done'] .pft-take-tx {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  align-items: flex-start;
   text-align: left;
 }
 
@@ -67,6 +74,12 @@
   font-size: 26px;
   line-height: 1.6;
   color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-done'] .pft-take-tx small {
+  font-size: 20px;
+  line-height: 1.4;
+  color: var(--qxt-ink-3);
 }
 
 [data-qx-page='print-done'] .pft-tray {
@@ -83,7 +96,6 @@
   font-weight: 700;
 }
 
-[data-qx-page='print-done'] .pft-dest,
 [data-qx-page='print-done'] .pft-note {
   margin: 0;
   min-height: 72px;
@@ -108,10 +120,15 @@
 [data-qx-page='print-done'] .pft-tiles .qxt-tile {
   flex-direction: column;
   align-items: flex-start;
-  gap: 12px;
+  gap: 8px;
   min-height: 128px;
-  padding: 14px;
+  padding: 12px;
   text-align: left;
+}
+
+[data-qx-page='print-done'] .pft-tiles .qxt-ic {
+  width: 64px;
+  height: 64px;
 }
 
 [data-qx-page='print-done'] .pft-tiles .qxt-chev {
@@ -120,6 +137,7 @@
 
 [data-qx-page='print-done'] .pft-again {
   height: 80px;
+  min-height: 80px;
   align-self: stretch;
   width: 100%;
 }
@@ -164,9 +182,21 @@
   min-height: 64px;
   display: flex;
   align-items: center;
-  font-size: 22px;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  padding: 8px 0;
+  font-size: 20px;
+  line-height: 1.4;
   font-weight: 700;
   color: var(--qxt-teal-ink);
+  text-align: center;
+  cursor: pointer;
+}
+
+[data-qx-page='print-done'] .pft-record .pft-dest {
+  font-size: 22px;
+  color: var(--qxt-ink);
 }
 
 [data-qx-page='print-done'] .pft-count {
@@ -219,4 +249,18 @@
   line-height: 1.5;
   color: var(--qxt-ink-2);
   text-align: center;
+}
+
+/* 同一排出口共用触屏按钮样式，避免旧反馈按钮撑成 96px。 */
+[data-qx-page='print-unconfirmed'] .pft-unc-action {
+  height: 80px;
+  min-height: 80px;
+  align-self: stretch;
+  font-size: 28px;
+}
+
+@media (max-width: 700px) {
+  [data-qx-page='print-done'] .pft-take { flex-basis: 400px; min-height: 400px; flex-direction: column; gap: 16px; }
+  [data-qx-page='print-done'] .pft-take-tx { align-items: center; text-align: center; }
+  [data-qx-page='print-done'] .pft-take .pa svg { width: 200px; height: 200px; }
 }

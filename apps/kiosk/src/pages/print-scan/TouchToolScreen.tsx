@@ -22,6 +22,7 @@ export function TouchToolScreen({
   status,
   onBack,
   backLabel = '返回打印扫描',
+  hideDockBack = false,
   askLabel,
   left,
   primary,
@@ -35,6 +36,8 @@ export function TouchToolScreen({
   status?: { text: string; tone?: 'ok' | 'warn' | 'unknown' }
   onBack: () => void
   backLabel?: string
+  /** 主按钮已经是返回出口时，省去底栏重复的次按钮；顶栏返回仍保留。 */
+  hideDockBack?: boolean
   askLabel: string
   /** 底栏左键。不传就是「返回打印扫描」（同顶栏返回键）；签名页的出口名随状态变，所以可以换。 */
   left?: { label: string; onClick: () => void; testId?: string }
@@ -69,7 +72,7 @@ export function TouchToolScreen({
       dock={
         <QxTouchDock
           back={false}
-          left={(
+          left={!hideDockBack && (
             <button
               type="button"
               className="qxt-btn qxt-btn-sec"

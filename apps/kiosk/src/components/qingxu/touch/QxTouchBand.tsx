@@ -1,3 +1,4 @@
+import { kioskBrandMark, useKioskProfile } from '../../../services/api/kioskProfile'
 import { Fragment, useId, type ReactNode } from 'react'
 import { QxTouchClock } from './QxTouchClock'
 import { QxTouchIcon } from './QxTouchIcon'
@@ -99,6 +100,7 @@ export function QxTouchBand({
   /** hero 挤版：第三行块数 ≥ 4 时压低意图带。 */
   dense?: boolean
 }) {
+  const brand = useKioskProfile()
   const rawId = useId().replace(/:/g, '')
   const goBack = useQxTouchBack(onBack)
   const placeLabel = place?.trim() ? place.trim() : ''
@@ -125,9 +127,9 @@ export function QxTouchBand({
           </button>
         ) : null}
         <div className="qxt-brand">
-          <div className="qxt-mark">职</div>
+          <div className="qxt-mark">{kioskBrandMark(brand)}</div>
           <div>
-            <b>职易达</b>
+            <b>{brand.brandName}</b>
             {placeLabel ? <small>{placeLabel}</small> : null}
           </div>
         </div>

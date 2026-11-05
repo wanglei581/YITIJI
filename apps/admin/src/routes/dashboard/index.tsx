@@ -29,6 +29,8 @@ import { printerActionHint, printerIssueParts, summarizePrinters } from './print
 import { formatCny } from '../ai-services/aiUsageDisplay'
 import { buildAlertRows } from './dashboardRows'
 import { useIncidentQueue, useReportQueue, useUnconfirmedPrintCount } from '../../components/first-order/useServiceQueues'
+import { useLicenseAttention } from './useLicenseAttention'
+import { licenseTodayRows } from './licenseTodayRows'
 import { incidentTodayRows, reportTodayRows, unconfirmedTodayRows, type TodayRow as ServiceTodayRow } from './todayServiceRows'
 
 /**
@@ -103,6 +105,7 @@ const LOADERS: Record<BlockKey, () => Promise<unknown>> = {
 
 export default function DashboardPage() {
   const hosting = useRecruitmentHosting()
+  const licenses = useLicenseAttention()
   const incidents = useIncidentQueue()
   const reports = useReportQueue()
   const unconfirmedPrints = useUnconfirmedPrintCount()
@@ -163,7 +166,7 @@ export default function DashboardPage() {
   const alerts = hasValue('alerts') ? (entry('alerts').value as AdminAlertsResult) : null
 
   const queueUseful = [incidents.state, reports.state, unconfirmedPrints.state].some((state) => state.status === 'ready' || state.status === 'preview')
-  const loadedAny = ALL_BLOCKS.some((key) => hasValue(key)) || queueUseful
+  const loadedAny = ALL_BLOCKS.some((key) => hasValue(key)) || queueUseful || licenses.state.status !== 'loading'
   const readyPrinters = printers?.filter((printer) => printer.status === 'online').length ?? 0
   const stockKpi = recruitmentStockKpi({
     hostingOpen,
@@ -264,6 +267,7 @@ export default function DashboardPage() {
       })
     }
   }
+  todayRows.push(...licenseTodayRows(licenses.state, licenses.retry))
   todayRows.push(...incidentTodayRows(incidents.state, incidents.retry))
   if (!hold(['terminals'], '离线终端')) {
     const offline = terminals?.filter((terminal) => !terminal.online).length ?? 0

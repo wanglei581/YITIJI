@@ -34,6 +34,8 @@ export type QxTouchPrimary = {
   testId?: string
   /** 追加到主按钮上的类名。 */
   className?: string
+  /** 停用原因。不传时不写 title。 */
+  title?: string
 }
 
 /**
@@ -117,6 +119,7 @@ export function QxTouchDock({
       onClick={primary.onClick}
       disabled={primary.ariaDisabled ? undefined : primary.disabled}
       aria-disabled={primary.ariaDisabled ? true : undefined}
+      title={primary.title}
       data-testid={primary.testId}
     >
       {primary.label}

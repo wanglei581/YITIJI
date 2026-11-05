@@ -369,14 +369,19 @@ export function PrintDonePage() {
     setRetrying(true)
     setRetryError(null)
     try {
-      await retryPrintJob({
+      const retried = await retryPrintJob({
         taskId,
         paymentSessionToken: state.paymentSessionToken,
         token: getToken(),
       })
       navigate('/print/progress', {
         replace: true,
-        state: { ...((location.state ?? {}) as object), taskId },
+        state: {
+          ...((location.state ?? {}) as object),
+          taskId,
+          mayHavePrinted: retried.mayHavePrinted === true,
+          partialOutput: retried.partialOutput === true,
+        },
       })
     } catch (err: unknown) {
       setRetryError(errorCodeOf(err) === 'PRINT_RETRY_AGENT_VERSION'
@@ -446,10 +451,6 @@ export function PrintDonePage() {
   }
 
   if (resultState === 'failed') {
-    const feedbackButton = canReportIssue ? (
-      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeedbackOpen(true)}>反馈问题</button>
-    ) : null
-
     if (isUnconfirmed) {
       const paramLine = params ? jobSubline(file ? { pages: file.pages } : null, params) : null
       return (
@@ -504,8 +505,8 @@ export function PrintDonePage() {
               {paramLine ? <div className="qxt-sum-r"><dt>参数</dt><dd>{paramLine}</dd><span /></div> : null}
             </dl>
             <div className="qxt-exits pft-unc-exits">
-              <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={() => setFeeInfoOpen(true)}>查看订单说明</button>
-              {feedbackButton}
+              <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit pft-unc-action" onClick={() => setFeeInfoOpen(true)}>查看订单说明</button>
+              {canReportIssue ? <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit pft-unc-action" onClick={() => setFeedbackOpen(true)}>反馈问题</button> : null}
               {openContact ? (
                 <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit pft-contact-entry" data-testid="print-contact-entry" onClick={openContact}>{CONTACT_ENTRY_LABEL}</button>
               ) : null}
@@ -536,7 +537,7 @@ export function PrintDonePage() {
     return (
       <PrintDoneFailed
         variant={variant}
-        copy={failureCopy({ variant, money, orderNo: faultOrderNo, canRetry })}
+        copy={failureCopy({ variant, money, orderNo: faultOrderNo, canRetry, pickupSource: state.pickupSource === true })}
         rows={failureSummaryRows({ orderNo: faultOrderNo, file: file ?? null, params: params ?? null, money, reason: failureReason })}
         free={amountCents === 0}
         retry={{ available: canRetry, blockedReason: retryBlockedReason(device), busy: retrying, error: retryError, onRetry: () => { void handleResubmitPrint() } }}
@@ -607,9 +608,8 @@ export function PrintDonePage() {
             <b>从出纸口取走</b>
             <span>
               {idDocument ? '拿走前记得核一下页数，证件原件和复印件一起带走。' : '拿走前记得核一下页数。'}
-              {' '}
-              {takeawayCopy.pagesLabel}{takeawayCopy.facesLabel ? ` · ${takeawayCopy.facesLabel}` : ''}
             </span>
+            <small>{takeawayCopy.pagesLabel}{takeawayCopy.facesLabel ? ` · ${takeawayCopy.facesLabel}` : ''}</small>
           </div>
         </div>
         {idDocument ? (
@@ -618,8 +618,32 @@ export function PrintDonePage() {
         <p className="pft-tray"><PrintIcon name="arrowD" size={72} strokeWidth={2.4} /><span>出纸口在下面</span></p>
 
         {/* 「这一单的记录」只在建单响应确认这一单关联了账号时才成立；没关联（false）或不知道（未知）时只说登录后看你的订单，不多承诺一层。 */}
-        {hasEndUser === false ? <p className="pft-dest" role="status">本次打印未关联账号</p> : null}
-        {hasEndUser === true && miniappPublished ? <p className="pft-dest" role="status">这单在手机『我的 → 打印订单』里能看到</p> : null}
+        {/* 账号去向与本次记录并成一行（稿上箭头下只有一行）；去向是渲染时就定的静态事实，不做 role=status 播报，免得可点的摘要里套播报区。 */}
+        <details className="pft-record">
+          <summary>
+            {hasEndUser === false ? <span className="pft-dest">本次打印未关联账号</span> : null}
+            {hasEndUser === true && miniappPublished ? <span className="pft-dest">这单在手机『我的 → 打印订单』里能看到</span> : null}
+            <span>本次打印记录{displayOrderNo ? ` · 订单 ${displayOrderNo}` : ''}</span>
+          </summary>
+          {displayOrderNo ? (
+            <div className="pff-meta">
+              <span className="pff-chip"><b>订单号</b> {displayOrderNo}</span>
+              <span className="pff-chip"><b>完成</b></span>
+            </div>
+          ) : null}
+          <PrintDoneRecordSection
+            file={file}
+            params={params}
+            retention={{
+              fileRetentionAvailable: verification?.fileRetentionAvailable,
+              fileExpiresAt: verification?.fileExpiresAt,
+              fileRetentionPolicy: verification?.fileRetentionPolicy,
+              fileDeletedAt: verification?.fileDeletedAt,
+              fileDeleteReason: verification?.fileDeleteReason,
+              fileStorageDeletedAt: verification?.fileStorageDeletedAt,
+            }}
+          />
+        </details>
 
         <div className="pft-tiles">
           <button type="button" className="qxt-tile qxt-tile-stack" onClick={() => navigate('/me/print-orders')}>
@@ -657,28 +681,6 @@ export function PrintDonePage() {
           <p className="txt">少了页、印花了、对内容有疑问？{helpNeededLine(support)}。</p>
           <p className="txt">不再点屏幕，60 秒后结束本次使用；点一下屏幕重新计时。{isLoggedIn ? '到点会结束本次使用并退出登录，本机这次的打印预览一并收起。' : '到点会结束本次使用，本机这次的打印预览一并收起。'}</p>
         </div>
-
-        <details className="pft-record">
-          <summary>本次打印记录{displayOrderNo ? ` · 订单 ${displayOrderNo}` : ''}</summary>
-          {displayOrderNo ? (
-            <div className="pff-meta">
-              <span className="pff-chip"><b>订单号</b> {displayOrderNo}</span>
-              <span className="pff-chip"><b>完成</b></span>
-            </div>
-          ) : null}
-          <PrintDoneRecordSection
-            file={file}
-            params={params}
-            retention={{
-              fileRetentionAvailable: verification?.fileRetentionAvailable,
-              fileExpiresAt: verification?.fileExpiresAt,
-              fileRetentionPolicy: verification?.fileRetentionPolicy,
-              fileDeletedAt: verification?.fileDeletedAt,
-              fileDeleteReason: verification?.fileDeleteReason,
-              fileStorageDeletedAt: verification?.fileStorageDeletedAt,
-            }}
-          />
-        </details>
       </div>
       {feedbackDialog}
     </PrintTouchFrame>

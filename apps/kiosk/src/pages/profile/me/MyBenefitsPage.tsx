@@ -1,3 +1,6 @@
+import { useKioskLicense } from '../../../layouts/KioskLicenseContext'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../../copy/unattendedCopy'
+import { LicenseLock } from '../../../layouts/LicenseLock'
 import { useMemberCursorPage } from './useMemberCursorPage'
 import { MemberLoadMore } from './MemberLoadMore'
 // 我的权益 — /me/benefits（本人，只读）。
@@ -111,9 +114,9 @@ export function MyBenefitsPage() {
           {uiState === 'empty' ? (
             <div data-testid="benefits-fallback" className="me-state">
               <MeEmptyPack sentence="还没有权益。没有权益也照常能打印、做简历、查政策。">
-                <MeExitCard art="usb" artWidth={110} title="打印与扫描" desc="没有权益也能办" onClick={() => navigate('/print-scan')} />
-                <MeExitCard art="resume" artWidth={110} title="AI 简历服务" desc="没有权益也能办" onClick={() => navigate('/resume-service')} />
-                <MeExitCard art="checklist" artWidth={100} title="就业政策与补贴指引" desc="说明不等于补贴已发放" onClick={() => navigate('/policy-service')} />
+                <LicenseLock><MeExitCard art="usb" artWidth={110} title="打印与扫描" desc="没有权益也能办" onClick={() => navigate('/print-scan')} /></LicenseLock>
+                <LicenseLock><MeExitCard art="resume" artWidth={110} title="AI 简历服务" desc="没有权益也能办" onClick={() => navigate('/resume-service')} /></LicenseLock>
+                <LicenseLock><MeExitCard art="checklist" artWidth={100} title="就业政策与补贴指引" desc="说明不等于补贴已发放" onClick={() => navigate('/policy-service')} /></LicenseLock>
               </MeEmptyPack>
             </div>
           ) : null}
@@ -140,9 +143,9 @@ export function MyBenefitsPage() {
               </MeRows>
               {items.length < 5 ? (
                 <div className="me-stack">
-                  <MeExitCard art="usb" artWidth={110} title="打印与扫描" desc="没有权益也能办" onClick={() => navigate('/print-scan')} />
-                  <MeExitCard art="resume" artWidth={110} title="AI 简历服务" desc="没有权益也能办" onClick={() => navigate('/resume-service')} />
-                  <MeExitCard art="checklist" artWidth={100} title="就业政策与补贴指引" desc="说明不等于补贴已发放" onClick={() => navigate('/renshi')} />
+                  <LicenseLock><MeExitCard art="usb" artWidth={110} title="打印与扫描" desc="没有权益也能办" onClick={() => navigate('/print-scan')} /></LicenseLock>
+                  <LicenseLock><MeExitCard art="resume" artWidth={110} title="AI 简历服务" desc="没有权益也能办" onClick={() => navigate('/resume-service')} /></LicenseLock>
+                  <LicenseLock><MeExitCard art="checklist" artWidth={100} title="就业政策与补贴指引" desc="说明不等于补贴已发放" onClick={() => navigate('/renshi')} /></LicenseLock>
                 </div>
               ) : (
                 <div className="me-block">
@@ -168,7 +171,7 @@ export function MyBenefitsPage() {
 function BenefitsTabs({ current }: { current: 'benefits' | 'activities' }) {
   const navigate = useNavigate()
   return (
-    <MeSeg
+    <LicenseLock><MeSeg
       label="权益与活动"
       current={current}
       items={[
@@ -176,14 +179,16 @@ function BenefitsTabs({ current }: { current: 'benefits' | 'activities' }) {
         { id: 'activities', label: '可参加的活动', testId: 'tab-activities' },
       ]}
       onPick={(id) => navigate(id === 'benefits' ? '/me/benefits' : '/activities')}
-    />
+    /></LicenseLock>
   )
 }
 
 function ServiceAlt({ title, desc, to }: { title: string; desc: string; to: string }) {
   const navigate = useNavigate()
+  const winding = useKioskLicense().mode === 'winding-down'
+  const locked = winding
   return (
-    <button type="button" className="me-line" onClick={() => navigate(to)}>
+    <button type="button" className="me-line" disabled={locked} title={locked ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={() => navigate(to)}>
       <b>{title}</b>
       <small>{desc}</small>
     </button>
@@ -192,6 +197,7 @@ function ServiceAlt({ title, desc, to }: { title: string; desc: string; to: stri
 
 function BenefitsCta({ uiState, onRetry }: { uiState: BenefitsUiState; onRetry: () => void }) {
   const navigate = useNavigate()
+  const winding = useKioskLicense().mode === 'winding-down'
   if (uiState === 'signed-out') {
     return (
       <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" onClick={() => navigate('/login', { state: { from: '/me/benefits' } })}>
@@ -208,7 +214,7 @@ function BenefitsCta({ uiState, onRetry }: { uiState: BenefitsUiState; onRetry: 
     )
   }
   return (
-    <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" onClick={() => navigate('/activities')}>
+    <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" disabled={winding} title={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={() => navigate('/activities')}>
       看看活动
     </button>
   )
