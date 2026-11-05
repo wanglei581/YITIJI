@@ -258,6 +258,7 @@ const DELIVER_CAS_ACK_EXPIRY_BLOCK = `    const claimed = await this.prisma.scan
         deliveryAckedAt: { not: null },
         expiresAt: { gt: now },
         createdAt: task.createdAt,
+        ...scanDeliverClaimPins(task),
       },`
 
 function assertDeliverCasRepinsAckAndExpiry(apiRoot: string): void {

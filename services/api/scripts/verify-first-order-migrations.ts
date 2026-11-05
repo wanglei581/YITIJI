@@ -9,6 +9,7 @@ const api = resolve(__dirname, '..')
 const prismaCli = join(api, 'node_modules/prisma/build/index.js')
 const migration = '20261022080000_first_order_delivery/migration.sql'
 const scanDeviceMigration = '20261102230000_add_scan_device_session_fields/migration.sql'
+const scanDeviceRoundMigration = '20261103030000_add_scan_device_round/migration.sql'
 const baseline = '07f9046c2'
 
 async function freePort(): Promise<number> {
@@ -47,6 +48,8 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     await client.terminal.create({ data: { id: 'scan-device-legacy-terminal', terminalCode: 'SCAN-DEVICE-LEGACY', agentToken: 'migration-only-no-device-legacy', deviceFingerprint: 'migration' } })
     await client.$executeRawUnsafe(`INSERT INTO "ScanTask" ("id", "terminalId", "scanType", "status", "expiresAt", "updatedAt") VALUES ('${legacyScanId}', 'scan-device-legacy-terminal', 'document', 'completed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', scanDeviceMigration)])
+    // 屏上扫描轮次（20261103030000，排在会话字段之后）。旧行取 0。必须在当前客户端写 ScanTask 之前执行。
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', scanDeviceRoundMigration)])
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261104150000_add_terminal_heartbeat_printer_queue/migration.sql')])
     await client.aiServiceFact.create({ data: { serviceType: 'resume_optimize', serviceKey: 'migration-test', orgId: 'org-snapshot', terminalId: 'terminal-snapshot' } })
     if (await client.aiServiceFact.count() !== 1) throw new Error(`${kind}: fact table unavailable`)
@@ -87,25 +90,29 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     console.log(`PASS ${kind}: upgrade preserves baseline data; five tables usable; active uniqueness and release verified`)
 
     // 屏上扫描会话字段（20261102230000，已在上面的迁移清单里按顺序执行）：升级前的旧行取默认值，新列可写；终端心跳新列可写。
-    const [legacy] = await client.$queryRawUnsafe<Array<Record<string, unknown>>>(`SELECT "startMode", "devicePageCount", "deviceSource", "deviceColorMode", "deviceState", "deviceErrorCode", "deviceUpdatedAt", "hardExpiresAt" FROM "ScanTask" WHERE "id" = '${legacyScanId}'`)
+    const [legacy] = await client.$queryRawUnsafe<Array<Record<string, unknown>>>(`SELECT "startMode", "devicePageCount", "deviceSource", "deviceColorMode", "deviceState", "deviceErrorCode", "deviceUpdatedAt", "hardExpiresAt", "deviceRound" FROM "ScanTask" WHERE "id" = '${legacyScanId}'`)
     if (!legacy || legacy['startMode'] !== 'panel' || Number(legacy['devicePageCount']) !== 0) throw new Error(`${kind}: legacy scan row must default to panel / 0 pages`)
     for (const column of ['deviceSource', 'deviceColorMode', 'deviceState', 'deviceErrorCode', 'deviceUpdatedAt', 'hardExpiresAt']) {
       if (legacy[column] !== null) throw new Error(`${kind}: legacy scan row ${column} must stay NULL`)
     }
+    if (legacy['deviceRound'] === null || legacy['deviceRound'] === undefined || Number(legacy['deviceRound']) !== 0) throw new Error(`${kind}: legacy scan row deviceRound must default to 0`)
     const plainScan = await client.scanTask.create({ data: { terminalId: 'migration-terminal', scanType: 'document', expiresAt: new Date(Date.now() + 600_000) } })
-    if (plainScan.startMode !== 'panel' || plainScan.devicePageCount !== 0 || plainScan.deviceState !== null) throw new Error(`${kind}: new scan row without device fields must default to panel`)
+    if (plainScan.startMode !== 'panel' || plainScan.devicePageCount !== 0 || plainScan.deviceState !== null || plainScan.deviceRound !== 0) throw new Error(`${kind}: new scan row without device fields must default to panel / round 0`)
     await client.scanTask.update({ where: { id: plainScan.id }, data: { status: 'cancelled' } })
     const deviceScan = await client.scanTask.create({ data: {
       terminalId: 'migration-terminal', scanType: 'document', expiresAt: new Date(Date.now() + 600_000),
       startMode: 'device', deviceSource: 'feeder', deviceColorMode: 'gray', deviceState: 'ready', hardExpiresAt: new Date(Date.now() + 1_800_000),
     } })
     const deviceBack = await client.scanTask.findUnique({ where: { id: deviceScan.id } })
-    if (deviceBack?.startMode !== 'device' || deviceBack.deviceSource !== 'feeder' || deviceBack.deviceColorMode !== 'gray' || deviceBack.deviceState !== 'ready' || !deviceBack.hardExpiresAt) throw new Error(`${kind}: device scan columns must be writable and readable`)
+    if (deviceBack?.startMode !== 'device' || deviceBack.deviceSource !== 'feeder' || deviceBack.deviceColorMode !== 'gray' || deviceBack.deviceState !== 'ready' || !deviceBack.hardExpiresAt || deviceBack.deviceRound !== 0) throw new Error(`${kind}: device scan columns must be writable and readable`)
+    const rounded = await client.scanTask.update({ where: { id: deviceScan.id }, data: { deviceRound: { increment: 1 } } })
+    if (rounded.deviceRound !== 1) throw new Error(`${kind}: deviceRound must increment from the default 0`)
     const observedAt = new Date()
     await client.terminalHeartbeat.create({ data: { terminalId: 'migration-terminal', scanDeviceHealth: 'ready', scanDeviceObservedAt: observedAt } })
     const heartbeat = await client.terminalHeartbeat.findFirst({ where: { terminalId: 'migration-terminal' }, orderBy: { createdAt: 'desc' } })
     if (heartbeat?.scanDeviceHealth !== 'ready' || heartbeat.scanDeviceObservedAt?.getTime() !== observedAt.getTime()) throw new Error(`${kind}: heartbeat scan-device columns must round-trip`)
     console.log(`PASS ${kind}: scan device session columns — legacy rows default to panel, device rows and heartbeat health round-trip`)
+    console.log(`PASS ${kind}: scan deviceRound defaults to 0 on legacy and new rows and can increment`)
   } finally { await client.$disconnect() }
 }
 
