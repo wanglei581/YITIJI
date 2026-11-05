@@ -108,7 +108,7 @@ test('create sends real DTO, terminal auth, no member required; secrets never pe
   await expect(page.getByRole('heading', { name: '正在扫原件', exact: true })).toBeVisible()
   await page.reload()
   await expect(page.getByTestId('copy-how')).toBeVisible()
-  expect(f.calls).toHaveLength(1)
+  expect(f.calls.filter((c) => c.path === '/api/v1/copy/jobs')).toHaveLength(1)
 })
 for (const fail of [409, 413] as const) test(`create ${fail} uses off or the standard limit sentence @w2`, async ({ page, api }) => {
   const f = await copyFixture(page, api, { fail })
@@ -158,7 +158,8 @@ for (const mode of ['leave', 'idle', 'logout'] as const) test(`${mode} clears th
   await expect(page.getByTestId('copy-how')).toBeVisible()
   await expect(page.getByTestId('copy-c3b-entry')).toHaveCount(0)
   expect(f.localCalls.filter((action) => action === 'start')).toHaveLength(1)
-  expect(f.calls).toHaveLength(1)
+  expect(f.calls.filter((c) => c.path === '/api/v1/copy/jobs')).toHaveLength(1)
+  await expect.poll(() => f.calls.filter((c) => c.path.endsWith('/cancel')).length).toBe(1)
   expect(await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }))).not.toContain(COPY_CONTROL)
 })
 test('unknown create retries with the same requestKey and settings @w2', async ({ page, api }) => {

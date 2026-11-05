@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
-import { COPY_CONTROL } from './fixtures/copy-c3a'
+import { COPY_CONTROL, COPY_ID } from './fixtures/copy-c3a'
 import { copyDeviceFixture } from './fixtures/copy-c3b1'
 
 const secrets = () => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage }, url: location.href })
@@ -182,4 +182,112 @@ test('scanner retry clears and cancels the old job before a new start; never sil
   expect(creates).toHaveLength(2)
   expect(f.calls.findIndex((c) => c.path.endsWith('/cancel'))).toBeLessThan(
     f.calls.indexOf(creates[1]))
+})
+
+async function startInFlight(page: Page, api: ApiRouter) {
+  const f = await copyDeviceFixture(page, api, { fail: 'clear' })
+  let releaseStart!: () => void
+  const wait = new Promise<void>((resolve) => { releaseStart = resolve })
+  await page.route('http://127.0.0.1:9527/local/copy/start', async (route) => {
+    if (route.request().method() === 'OPTIONS') { await route.fallback(); return }
+    const body = route.request().postDataJSON()
+    f.localCalls.push({ action: 'start', body, headers: route.request().headers() })
+    await wait
+    // 清场会 abort 浏览器请求，但不能撤回 Agent 已收到的 start。迟到回包不得恢复页面。
+    await route.fulfill({ status: 200, headers: { 'Access-Control-Allow-Origin': '*' },
+      json: { success: true, data: { state: 'scanning', generation: 1, pageCount: 0, errorCode: null } },
+    }).catch(() => {})
+  })
+  await f.goto('set')
+  await page.getByTestId('copy-primary').click()
+  await expect.poll(() => f.localCalls.filter((c) => c.action === 'start').length).toBe(1)
+  await expect(page.getByRole('heading', { name: '正在扫原件', exact: true })).toBeVisible()
+  return { ...f, releaseStart }
+}
+for (const mode of ['home', 'idle', 'logout'] as const) test(`C3c start in flight: ${mode} cancels cloud once despite local clear failure @w2`, async ({ page, api }) => {
+  const f = await startInFlight(page, api)
+  try {
+    if (mode === 'idle') await page.clock.fastForward(181_000)
+    else if (mode === 'logout') {
+      await page.clock.runFor(151_000)
+      await page.getByTestId('session-guard-clear').click()
+    } else await page.getByRole('button', { name: '首页', exact: true }).click()
+    await expect(page.getByTestId('copy-c3b-entry')).toHaveCount(0)
+    await expect.poll(() => f.cloudCalls.filter((c) => c.action === 'cancel').length).toBe(1)
+    await expect.poll(() => f.localCalls.filter((c) => c.action === 'clear').length).toBe(1)
+    const cancel = f.cloudCalls.find((c) => c.action === 'cancel')!
+    expect(cancel.body).toEqual({ generation: 1 })
+    expect(cancel.headers['x-copy-control']).toBe(COPY_CONTROL)
+    expect(await page.evaluate(secrets)).not.toContain(COPY_CONTROL)
+  } finally { f.releaseStart() }
+  await page.clock.fastForward(10_000)
+  await expect(page.getByTestId('copy-c3b-entry')).toHaveCount(0)
+  expect(f.cloudCalls.filter((c) => c.action === 'cancel')).toHaveLength(1)
+  expect(f.localCalls.filter((c) => c.action === 'print')).toHaveLength(0)
+})
+test('C3c pending cloud cancel does not block leaving or retain credentials in storage @w2', async ({ page, api }) => {
+  const f = await startInFlight(page, api)
+  let releaseCancel!: () => void
+  const wait = new Promise<void>((resolve) => { releaseCancel = resolve })
+  api.respondWith('POST', `/api/v1/copy/jobs/${COPY_ID}/cancel`, async () => {
+    await wait
+    return { status: 200, json: { success: true, data: f.job({ state: 'cancelled' }) } }
+  })
+  try {
+    await page.getByRole('button', { name: '首页', exact: true }).click()
+    await expect(page).toHaveURL(/\/$/)
+    await expect(page.getByTestId('qx-home')).toBeVisible()
+    await expect.poll(() => f.cloudCalls.filter((c) => c.action === 'cancel').length).toBe(1)
+    await expect.poll(() => f.localCalls.filter((c) => c.action === 'clear').length).toBe(1)
+    expect(await page.evaluate(secrets)).not.toContain(COPY_CONTROL)
+  } finally { releaseCancel(); f.releaseStart() }
+})
+for (const recover of [false, true]) test(`C3c background cancel has at most three attempts; third-attempt recovery=${recover} @w2`, async ({ page, api }) => {
+  const f = await startInFlight(page, api)
+  api.respondWith('POST', `/api/v1/copy/jobs/${COPY_ID}/cancel`, (n) => recover && n === 3
+    ? { status: 200, json: { success: true, data: f.job({ state: 'cancelled' }) } }
+    : { status: 503, json: { success: false, error: { code: 'COPY_UNKNOWN' } } })
+  try {
+    await page.getByRole('button', { name: '首页', exact: true }).click()
+    await expect(page.getByTestId('qx-home')).toBeVisible()
+    await expect.poll(() => f.cloudCalls.filter((c) => c.action === 'cancel').length).toBe(1)
+    for (const [delay, count] of [[1100, 2], [2100, 3]]) {
+      await page.clock.runFor(delay)
+      await expect.poll(() => f.cloudCalls.filter((c) => c.action === 'cancel').length).toBe(count)
+    }
+    await page.clock.runFor(15_000)
+    const cancels = f.cloudCalls.filter((c) => c.action === 'cancel')
+    expect(cancels).toHaveLength(3)
+    for (const cancel of cancels) {
+      expect(cancel.body).toEqual({ generation: 1 })
+      expect(cancel.headers['x-copy-control']).toBe(COPY_CONTROL)
+    }
+    expect(await page.evaluate(secrets)).not.toContain(COPY_CONTROL)
+  } finally { f.releaseStart() }
+})
+test('C3c print already sent with response pending: leaving clears without cloud cancel @w2', async ({ page, api }) => {
+  const f = await copyDeviceFixture(page, api)
+  let releasePrint!: () => void
+  const wait = new Promise<void>((resolve) => { releasePrint = resolve })
+  await page.route('http://127.0.0.1:9527/local/copy/print', async (route) => {
+    if (route.request().method() === 'OPTIONS') { await route.fallback(); return }
+    const body = route.request().postDataJSON()
+    f.localCalls.push({ action: 'print', body, headers: route.request().headers() })
+    await wait
+    await route.fulfill({ status: 200, headers: { 'Access-Control-Allow-Origin': '*' },
+      json: { success: true, data: { state: 'handed', generation: 1, pageCount: 3, errorCode: null } },
+    }).catch(() => {})
+  })
+  try {
+    await f.start(); await f.report('scanned')
+    await page.getByTestId('copy-confirm').click()
+    await expect.poll(() => f.localCalls.filter((c) => c.action === 'print').length).toBe(1)
+    await page.getByRole('button', { name: '首页', exact: true }).click()
+    await expect(page.getByTestId('qx-home')).toBeVisible()
+    await expect.poll(() => f.localCalls.filter((c) => c.action === 'clear').length).toBe(1)
+    await page.clock.fastForward(10_000)
+    expect(f.cloudCalls.some((c) => c.action === 'cancel')).toBe(false)
+    expect(await page.evaluate(secrets)).not.toContain(COPY_CONTROL)
+  } finally { releasePrint() }
+  await expect(page.getByTestId('copy-print-progress')).toHaveCount(0)
 })

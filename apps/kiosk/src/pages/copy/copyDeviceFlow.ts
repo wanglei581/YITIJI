@@ -41,6 +41,7 @@ export class CopyDeviceFlow {
   private printOperationId = crypto.randomUUID()
   private printRequested = false
   private recovering = false
+  private cancellation: Promise<CopyJobView> | null = null
   constructor(readonly session: CopySession) {}
   private live(signal = this.controller.signal) { return !this.disposed && !signal.aborted && current === this }
   private unknown(notice = UNKNOWN) {
@@ -214,7 +215,7 @@ export class CopyDeviceFlow {
     const signal = this.controller.signal
     const [local, cloud] = await Promise.allSettled([
       postLocalCopy('abort', this.session, {}, signal),
-      cancelCopyJob(this.session.copyId, this.session.controlToken!, this.session.generation, signal),
+      this.cancelCloud(),
     ])
     if (!this.live(signal)) return
     if (local.status === 'fulfilled' && local.value.state === 'cancelled' && local.value.purged === true
@@ -231,7 +232,7 @@ export class CopyDeviceFlow {
     const signal = this.controller.signal
     const [local, cloud] = await Promise.allSettled([
       postLocalCopy('clear', this.session, {}, signal),
-      cancelCopyJob(this.session.copyId, this.session.controlToken!, this.session.generation, signal),
+      this.cancelCloud(),
     ])
     if (!this.live(signal)) return false
     if (local.status === 'fulfilled' && local.value.state === 'cleared' && local.value.purged === true
@@ -240,7 +241,24 @@ export class CopyDeviceFlow {
     this.unknown('状态未知。旧扫描件的清理结果还没确认，请不要重扫。')
     return false
   }
+  private cancelCloud(controlToken = this.session.controlToken!): Promise<CopyJobView> {
+    // 停止、重扫和离场共用同一次请求；不受前台中止影响，成功后也不重复撤销。
+    return this.cancellation ??= cancelCopyJob(this.session.copyId, controlToken, this.session.generation)
+      .then((job) => {
+        if (job.state !== 'cancelled' || job.copyId !== this.session.copyId || job.generation !== this.session.generation
+          || job.terminalId !== this.session.input.terminalId) throw new Error('COPY_CANCEL_UNKNOWN')
+        return job
+      }).catch((error) => { this.cancellation = null; throw error })
+  }
+  private async cancelAfterDispose(controlToken: string): Promise<void> {
+    // 仅闭包保留撤销所需凭证，不进存储；最多三次，每次请求另有 API 超时。
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try { await this.cancelCloud(controlToken); return } catch { /* 清场不能等待网络恢复。 */ }
+      if (attempt < 2) await new Promise<void>((resolve) => window.setTimeout(resolve, 1000 * (attempt + 1)))
+    }
+  }
   dispose() {
+    if (this.disposed) return
     this.disposed = true
     this.controller.abort()
     this.preview.clear()
@@ -248,6 +266,8 @@ export class CopyDeviceFlow {
     window.clearTimeout(this.expiry)
     window.clearInterval(this.watchdog)
     void postLocalCopy('clear', this.session).catch(() => {})
+    if (!this.printRequested && this.session.controlToken) void this.cancelAfterDispose(this.session.controlToken)
+    this.session.controlToken = null
   }
 }
 export function ensureCopyDevice(session: CopySession): CopyDeviceFlow | null {

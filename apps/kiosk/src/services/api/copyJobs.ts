@@ -41,7 +41,7 @@ export interface CopyJobView extends CopyJobReceipt, CopySettings {
 }
 
 async function copyRequest<T>(path: string, options: {
-  method: 'GET' | 'POST'; body?: unknown; controlToken?: string; memberToken?: string | null; signal?: AbortSignal
+  method: 'GET' | 'POST'; body?: unknown; controlToken?: string; memberToken?: string | null; signal?: AbortSignal; keepalive?: boolean
 }): Promise<T> {
   const headers = new Headers({ Accept: 'application/json' })
   const terminalId = getTerminalId()
@@ -58,6 +58,7 @@ async function copyRequest<T>(path: string, options: {
   try {
     const response = await terminalProtectedFetch(new URL(`${API_BASE_URL}/copy/jobs${path}`, window.location.origin), {
       method: options.method, headers, cache: 'no-store', credentials: 'include',
+      keepalive: options.keepalive,
       body: options.body ? JSON.stringify(options.body) : undefined,
       signal: controller.signal, staleSignal: controller.signal,
     })
@@ -85,5 +86,5 @@ export function confirmCopyJob(copyId: string, controlToken: string, quoteVersio
   return copyRequest(`/${encodeURIComponent(copyId)}/confirm`, { method: 'POST', controlToken, body: { quoteVersion }, signal })
 }
 export function cancelCopyJob(copyId: string, controlToken: string, generation: number, signal?: AbortSignal): Promise<CopyJobView> {
-  return copyRequest(`/${encodeURIComponent(copyId)}/cancel`, { method: 'POST', controlToken, body: { generation }, signal })
+  return copyRequest(`/${encodeURIComponent(copyId)}/cancel`, { method: 'POST', controlToken, body: { generation }, signal, keepalive: true })
 }

@@ -46,6 +46,7 @@ export async function copyFixture(page: Page, api: ApiRouter, options: {
   api.respond('POST', '/api/v1/copy/jobs', options.fail ? {
     status: options.fail, json: { success: false, error: { code: options.fail === 409 ? 'COPY_CAPABILITY_REVOKED' : 'COPY_LIMIT_EXCEEDED' } },
   } : ok(receipt))
+  api.respond('POST', `/api/v1/copy/jobs/${COPY_ID}/cancel`, ok({ ...receipt, state: 'cancelled' }))
   await page.route('http://127.0.0.1:9527/local/scan/**', async (route) => {
     const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' }
     if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 204, headers }); return }
