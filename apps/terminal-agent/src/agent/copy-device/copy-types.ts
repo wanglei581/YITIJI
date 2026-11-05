@@ -1,4 +1,4 @@
-import type { DeviceLock, DeviceLockHandle } from '../device-lock'
+import type { DeviceLock } from '../device-lock'
 import type { AgentConfig } from '../types'
 import type { ScanDeviceClock } from '../scan-device/scan-device-health'
 import type { ScanTempDirHooks } from '../scan-device/scan-temp-dir'
@@ -47,11 +47,12 @@ export interface CopyView {
   generation: number
   pageCount: number
   errorCode: string | null
+  errorMessage?: string
   purged?: boolean
 }
 export class CopyError extends Error {
   constructor(readonly status: number, readonly code: string, readonly snapshot?: CopyView) {
-    super(code)
+    super(code === 'COPY_PROCESS_STOP_UNCONFIRMED' ? '扫描进程尚未确认退出，请稍后重试；打印仍可使用' : code)
     this.name = 'CopyError'
   }
 }
@@ -69,7 +70,7 @@ export interface CopySession {
   permit?: CopyPermit
   handle?: WiaScanHandle
   work?: Promise<void>
-  retainedLock?: DeviceLockHandle
+  stopUnconfirmed?: boolean
   suspectPid?: number
   byteBudget: number
   pageCap: number
@@ -109,5 +110,6 @@ export interface CopyRuntime {
 }
 export function copyView(s: CopySession): CopyView {
   return { state: s.state, generation: s.command.generation, pageCount: s.pages.length,
-    errorCode: s.errorCode, ...(s.purged !== undefined ? { purged: s.purged } : {}) }
+    errorCode: s.errorCode, ...(s.errorCode === 'COPY_PROCESS_STOP_UNCONFIRMED' ?
+      { errorMessage: new CopyError(503, s.errorCode).message } : {}), ...(s.purged !== undefined ? { purged: s.purged } : {}) }
 }

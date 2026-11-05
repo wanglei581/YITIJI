@@ -1,14 +1,22 @@
 import path from 'path'
-import { DeviceLockTimeoutError } from '../device-lock'
+import { DeviceLockTimeoutError, type DeviceLockHandle } from '../device-lock'
 import { resolveScanDeviceLimits, scanPagesAligned } from '../scan-device/scan-device-types'
 import { scanPageFileName } from '../scan-device/scan-temp-dir'
+import type { ScanDeviceHealth } from '../scan-device/scan-device-health'
 import type { WiaScannedPage } from '../scan-device/wia-runner'
 import { assertCopyPermit } from './copy-backend'
 import { CopyError, type CopyDeps, type CopySession } from './copy-types'
 import type { createCopyStorage } from './copy-storage'
 
-export function createCopyEngine(deps: CopyDeps, storage: ReturnType<typeof createCopyStorage>) {
-  let needsProbe = false
+export function createCopyEngine(deps: CopyDeps, storage: ReturnType<typeof createCopyStorage>, health: ScanDeviceHealth) {
+  const checkHealth = async (lock: DeviceLockHandle): Promise<void> => {
+    if (health.knownProcessAlive()) throw new CopyError(503, 'COPY_PROCESS_STOP_UNCONFIRMED')
+    if (!health.hasSuspect() && !health.hasForceKilled()) return
+    const probed = await health.probe({ heldLock: lock })
+    if (health.hasSuspect()) throw new CopyError(503, 'COPY_PROCESS_STOP_UNCONFIRMED')
+    if (probed.health !== 'ready') throw new CopyError(503, 'COPY_DEVICE_UNAVAILABLE')
+    health.clearForceKilled()
+  }
   const live = (s: CopySession): void => {
     if (s.revoked || deps.clock.now() >= s.expiresAt) throw new CopyError(410, 'COPY_EXPIRED')
     if (deps.config.copyDeviceEnabled !== true) throw new CopyError(403, 'COPY_CAPABILITY_REVOKED')
@@ -57,15 +65,7 @@ export function createCopyEngine(deps: CopyDeps, storage: ReturnType<typeof crea
       s.pageCap = limits.pageCap
       s.byteBudget = limits.byteBudget
       if (s.pages.length >= s.pageCap) throw new CopyError(413, 'too_large')
-      if (needsProbe) {
-        const probe = await deps.runProbe({ deviceName: deps.config.scanDeviceName || undefined })
-        if (probe.stopUnconfirmed) {
-          s.retainedLock = lock
-          s.suspectPid = probe.processId
-        }
-        if (probe.state !== 'ready' || probe.stopUnconfirmed) throw new CopyError(503, 'COPY_DEVICE_UNAVAILABLE')
-        needsProbe = false
-      }
+      await checkHealth(lock)
       live(s)
       // 探测可能耗时，真正起 WIA 前再核验本次短许可。
       assertCopyPermit(permit, s, deps.config, requestedAt, deps.clock.now())
@@ -91,6 +91,8 @@ export function createCopyEngine(deps: CopyDeps, storage: ReturnType<typeof crea
         onPage: accept,
         beforeRetry: async () => {
           live(s)
+          await checkHealth(lock)
+          live(s)
           const retryAt = deps.clock.now()
           const retryPermit = await deps.permit(s.command.copyId)
           live(s)
@@ -102,9 +104,10 @@ export function createCopyEngine(deps: CopyDeps, storage: ReturnType<typeof crea
       if (invalid || s.revoked) s.handle.abort()
       const result = await s.handle.result
       s.handle = undefined
-      if (result.forceKilled) needsProbe = true
+      if (result.forceKilled) health.noteForceKilled()
       if (result.stopUnconfirmed) {
-        s.retainedLock = lock
+        health.noteProcessStop(result)
+        s.stopUnconfirmed = true
         s.suspectPid = result.processId
         throw new CopyError(503, 'COPY_PROCESS_STOP_UNCONFIRMED')
       }
@@ -118,7 +121,7 @@ export function createCopyEngine(deps: CopyDeps, storage: ReturnType<typeof crea
       }
       s.state = 'page_ready'
     } finally {
-      if (s.retainedLock !== lock) lock.release()
+      lock.release()
     }
     // 等用户核对和本机合成均不占扫描仪。进纸器自动收尾，绝不进入 A2 投递。
     if (s.command.source === 'feeder') await finish(s)

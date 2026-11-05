@@ -21,7 +21,7 @@ import {
   type DeviceReportResult,
   type ScanDeviceReportState,
 } from './scan-device-backend'
-import { createScanDeviceHealth, defaultScanProcessAlive, type ScanDeviceClock, type ScanDeviceHealth } from './scan-device-health'
+import { sharedScanDeviceHealth, defaultScanProcessAlive, type ScanDeviceClock, type ScanDeviceHealth } from './scan-device-health'
 import { createScanDeviceHousekeeping, type CleanupMeta } from './scan-device-housekeeping'
 import { scanDeviceReportBridge } from './scan-device-sync'
 import { composeScanPdf } from './scan-pdf-compose'
@@ -141,7 +141,7 @@ export function createScanDeviceRuntime(
   let commandRunning = false
   const abortWaiters: Array<{ resolve: (view: ScanDeviceView) => void; reject: (error: unknown) => void }> = []
 
-  const health: ScanDeviceHealth = createScanDeviceHealth({
+  const health: ScanDeviceHealth = sharedScanDeviceHealth({
     clock: deps.clock,
     lock: deps.lock,
     runProbe: (options) => deps.runProbe(options),
@@ -149,7 +149,7 @@ export function createScanDeviceRuntime(
     getPhase: () => state.session?.phase ?? 'idle',
     isProcessAlive: (pid) => (deps.isProcessAlive ?? defaultScanProcessAlive)(pid),
     ...(deps.listResiduals ? { listResiduals: deps.listResiduals } : {}),
-  })
+  }, true)
 
   let ackedState: ScanDeviceReportState = 'ready'
   let unsynced = false

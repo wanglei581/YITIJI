@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-11-05：屏上复印 C2c——收掉 C2 复审的 3 条 P1（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+
+- ① 打印执行器超时仍在运行时，复用并扩展 `print-dispatch-gate` 保持派发隔离，执行器退出后再清一次该次残留作业才放行下一单；`queueCleanupPending` 写进复印打印 ledger，重启后确认执行器退出、调现有队列清理后才解除，清理失败继续隔离重试。② WIA 未确认退出时把进程交给扫描健康隔离，`finally` 无条件释放全局设备锁，现有云打印照常领取；新的复印扫描被拒并给出可读说明，清场与过期能结束会话，待删材料后台重试。③ 复印与屏上扫描共用同一份 WIA 健康与可疑进程状态（`scan-device-health.ts` 按设备锁共享实例，A2 运行器接入），复印首次扫描、续页、预热重试前都检查，旧进程确认退出并探测成功后才放行。
+- 验证（Codex 实现，Claude 收货）：`verify:copy-device` 36 项（新增五条 C2c 用例含竞态与恢复）、`verify:scan-device-engine`（53 组）、`verify:scan-device-runner`（21 组）与打印相关门禁、tsc、lint 过；反向检查三项都变红。
+
 ## 2026-11-05：屏上复印 C2b——终端程序本机复印后半段（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
 
 - 做了什么（Codex 实现，Claude 收货）：`POST /local/copy/print` 取 `op=print` 许可（颜色、单双面、份数以许可为准，校验终端、代次、授权版本、参数与有效期）→ 驱动调用前持久化派发意图（`%ProgramData%\AIJobPrintAgent\copy-device\print-ledger\<单号与代次派生 SHA-256>.json`，`wx` 创建并 fsync、原子替换，不存扫描内容）→ 经新薄封装 `print-local-document.ts` 复用现有派发准备、`print()`、队列监控与终态清理（`task-runner.ts` 未改；PDF 打印补齐显式 A4）→ 从准备到监控终态持设备锁。同单同代重复请求只返回状态，**驱动最多调用一次**；重启时 `dispatching/spooled` 一律转 `unconfirmed` 并回报，**绝不重派**。结果回报 handed / failed / unconfirmed，固定 `eventId`，最多十次指数退避重试，终态不变。打印终态后撤销预览并以 `COPY_PRINT_TERMINAL` 删页，删除失败后台重试、释放设备锁。状态里不出现张数推断。

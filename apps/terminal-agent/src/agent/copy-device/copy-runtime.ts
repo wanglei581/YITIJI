@@ -3,7 +3,7 @@ import type { AgentConfig } from '../types'
 import { composeScanPdf } from '../scan-device/scan-pdf-compose'
 import { startWiaScan } from '../scan-device/wia-runner'
 import { runWiaProbe } from '../scan-device/wia-probe'
-import { defaultListResidualProcesses, defaultScanProcessAlive } from '../scan-device/scan-device-health'
+import { sharedScanDeviceHealth, defaultListResidualProcesses, defaultScanProcessAlive } from '../scan-device/scan-device-health'
 import { commandLineIsOurWiaProcess } from '../scan-device/wia-script'
 import { copyBackend } from './copy-backend'
 import { createCopyPrintLedger, printRecordView } from './copy-print-ledger'
@@ -28,9 +28,16 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
     }, ...overrides,
   }
   const storage = createCopyStorage(deps)
-  const engine = createCopyEngine(deps, storage)
+  const health = sharedScanDeviceHealth({ clock: deps.clock, lock: deps.lock,
+    runProbe: deps.runProbe, deviceName: () => config.scanDeviceName ?? '', getPhase: () => 'idle',
+    isProcessAlive: (pid) => !deps.processGone(pid),
+    listResiduals: () => deps.processGone() ? { kind: 'ok', processes: [] } : { kind: 'unknown' },
+  })
+  const engine = createCopyEngine(deps, storage, health)
   const ledger = createCopyPrintLedger(deps, copyDirId)
   const printing = createCopyPrint(deps, storage, ledger)
+  const recoveredDirs = new Set<string>()
+  // sweep 会跳过仍在隔离中的复印材料，后续 tick 继续删除。
   const sessions = new Map<string, CopySession>()
   const operations = new Map<string, { fingerprint: string; result: Promise<CopyView> }>()
   let active: CopySession | undefined
@@ -41,10 +48,9 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
   const cleanup = (s: CopySession): void => {
     if (s.work || !s.cleanupReason || s.purged === true) return
     if (s.printReaderPending) { s.purged = false; return }
-    if (s.retainedLock) {
-      if (!deps.processGone(s.suspectPid)) { s.purged = false; return }
-      s.retainedLock.release()
-      s.retainedLock = undefined
+    if (s.stopUnconfirmed) {
+      if ((s.suspectPid === undefined && health.unidentifiedSuspect()) || !deps.processGone(s.suspectPid)) { s.purged = false; return }
+      s.stopUnconfirmed = false
     }
     s.purged = storage.purge(s.dirId, s.cleanupReason)
   }
@@ -57,12 +63,23 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
   }
   const tick = async (): Promise<void> => {
     if (!startupSafe) {
-      try { storage.sweep(ledger.hasDir); startupSafe = true } catch { /* 隔离复印；其它功能继续运行。 */ }
+      try { storage.sweep(ledger.hasDir, (id) => {
+        if (!ledger.pendingDir(id)) return false
+        recoveredDirs.add(id); return true
+      }); startupSafe = true } catch { /* 隔离复印；其它功能继续运行。 */ }
     }
     for (const s of sessions.values()) {
       if (!s.revoked && deps.clock.now() >= s.expiresAt) revoke(s, 'COPY_EXPIRED', 'expired')
       if (!s.revoked && config.copyDeviceEnabled !== true) revoke(s, 'COPY_SESSION_CLEAR', 'cleared')
-      if (s.revoked) cleanup(s)
+      if (s.revoked) {
+        if (s.stopUnconfirmed && deps.processGone(s.suspectPid) && health.hasSuspect()) await health.probe()
+        cleanup(s)
+      }
+    }
+    await ledger.retryCleanup()
+    // 重启时保留的材料在执行器退出、队列清理后再交给同一删除重试。
+    for (const id of recoveredDirs) if (!ledger.pendingDir(id)) {
+      if (storage.purge(id, 'COPY_PRINT_TERMINAL')) recoveredDirs.delete(id)
     }
     storage.retry()
     await ledger.retry().catch(() => { /* 耐久回报失败不会改变终态。 */ })
@@ -123,7 +140,7 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
       if (s.printRequested && s.work) return { ...copyView(s), purged: false }
       await s.work
       cleanup(s)
-      if (!s.purged) throw new CopyError(503, 'COPY_CLEANUP_FAILED', copyView(s))
+      if (!s.purged && !s.stopUnconfirmed) throw new CopyError(503, 'COPY_CLEANUP_FAILED', copyView(s))
       return copyView(s)
     }
     if (s.revoked) throw new CopyError(410, 'COPY_EXPIRED', copyView(s))
@@ -147,7 +164,7 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
     const recovered = ledger.get(c.copyId, c.generation)
     if (recovered && !sessions.has(key(c)) && ['status', 'print', 'clear', 'abort'].includes(action)) {
       if (recovered.owner !== owner || recovered.terminalId !== config.terminalId) throw new CopyError(404, 'COPY_NOT_FOUND')
-      return { ...printRecordView(recovered), purged: storage.purge(copyDirId(c.copyId, c.generation), 'COPY_PRINT_TERMINAL') }
+      return { ...printRecordView(recovered), purged: !recovered.queueCleanupPending && storage.purge(copyDirId(c.copyId, c.generation), 'COPY_PRINT_TERMINAL') }
     }
     if (action === 'status' || action === 'preview') {
       const s = requireSession(c, owner)

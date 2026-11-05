@@ -14,7 +14,8 @@ import { recoveryChecks } from './verify-copy-print-recovery.helper'
 
 export function printFixture(options: { root?: string; stages?: PrintJobMonitorStatus[]; reportFails?: boolean;
   beforeDriver?: () => Promise<void>; driver?: () => Promise<void>; timeoutMs?: number;
-  monitorWait?: () => Promise<void>; zeroDispatch?: boolean } = {}) {
+  monitorWait?: () => Promise<void>; zeroDispatch?: boolean; cleanup?: () => Promise<void>;
+  executorGone?: (id: string) => Promise<boolean>; pause?: () => Promise<void> } = {}) {
   __resetPrintDispatchGateForTests()
   const calls: Array<{ file: string; options?: PrintOptions }> = []
   const results: CopyPrintResult[] = []
@@ -32,8 +33,9 @@ export function printFixture(options: { root?: string; stages?: PrintJobMonitorS
     },
     reportPrint: async (_id, result) => { results.push({ ...result }); if (reportFails) throw new Error('offline') },
     printDependencies: {
-      preflight: async () => 'ok', removeOwnJobs: async () => { order.push('cleanup') },
-      resume: async () => { order.push('resume'); await options.beforeDriver?.() }, pause: async () => { order.push('pause') },
+      executorGone: options.executorGone,
+      preflight: async () => 'ok', removeOwnJobs: async () => { order.push('cleanup'); await options.cleanup?.() },
+      resume: async () => { order.push('resume'); await options.beforeDriver?.() }, pause: async () => { order.push('pause'); await options.pause?.() },
       print: async (file, printerName, params, hooks) => options.zeroDispatch ?
         print('/definitely-missing-copy.pdf', printerName, params) : printWithPdfToPrinter(file, printerName, params, {
         ...hooks, timeoutMs: options.timeoutMs ?? 1000,

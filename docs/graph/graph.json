@@ -23701,14 +23701,19 @@
       "apps/terminal-agent/scripts/verify-copy-device-edges.helper.ts",
       "apps/terminal-agent/scripts/verify-copy-device-network.helper.ts",
       "apps/terminal-agent/scripts/verify-copy-device.ts",
+      "apps/terminal-agent/scripts/verify-copy-isolation.helper.ts",
       "apps/terminal-agent/scripts/verify-copy-print-recovery.helper.ts",
       "apps/terminal-agent/scripts/verify-copy-print.helper.ts"
+    ],
+    "apps/terminal-agent/scripts/verify-copy-isolation.helper.ts": [
+      "apps/terminal-agent/scripts/verify-copy-device.ts"
     ],
     "apps/terminal-agent/scripts/verify-copy-print-recovery.helper.ts": [
       "apps/terminal-agent/scripts/verify-copy-print.helper.ts"
     ],
     "apps/terminal-agent/scripts/verify-copy-print.helper.ts": [
       "apps/terminal-agent/scripts/verify-copy-device.ts",
+      "apps/terminal-agent/scripts/verify-copy-isolation.helper.ts",
       "apps/terminal-agent/scripts/verify-copy-print-recovery.helper.ts"
     ],
     "apps/terminal-agent/scripts/verify-scan-device-engine-r2.helper.ts": [
@@ -23733,6 +23738,7 @@
     "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts": [
       "apps/terminal-agent/scripts/verify-copy-device-edges.helper.ts",
       "apps/terminal-agent/scripts/verify-copy-device.helper.ts",
+      "apps/terminal-agent/scripts/verify-copy-isolation.helper.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner-r4.ts",
@@ -23843,6 +23849,7 @@
     ],
     "apps/terminal-agent/src/agent/print-dispatch-gate.ts": [
       "apps/terminal-agent/scripts/verify-copy-device-network.helper.ts",
+      "apps/terminal-agent/scripts/verify-copy-isolation.helper.ts",
       "apps/terminal-agent/scripts/verify-copy-print.helper.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
@@ -23895,6 +23902,7 @@
       "apps/terminal-agent/scripts/verify-scan-device-runner-r6.ts"
     ],
     "apps/terminal-agent/src/agent/scan-device/scan-device-health.ts": [
+      "apps/terminal-agent/scripts/verify-copy-isolation.helper.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner.ts"
     ],
@@ -34954,6 +34962,7 @@
         "files": [
           "apps/terminal-agent/scripts/verify-copy-device-edges.helper.ts",
           "apps/terminal-agent/scripts/verify-copy-device.helper.ts",
+          "apps/terminal-agent/scripts/verify-copy-isolation.helper.ts",
           "apps/terminal-agent/scripts/verify-copy-print.helper.ts",
           "apps/terminal-agent/src/agent/config-manager.ts",
           "apps/terminal-agent/src/agent/copy-device/copy-types.ts",
@@ -34969,6 +34978,26 @@
         "terminal-agent::verify:copy-device"
       ],
       "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/terminal-agent/scripts/verify-copy-device.helper.ts",
+          "apps/terminal-agent/scripts/verify-copy-print.helper.ts",
+          "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
+          "apps/terminal-agent/src/agent/print-dispatch-gate.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-health.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-copy-isolation.helper.ts",
+      "helper": true,
+      "inCi": false,
+      "package": "apps/terminal-agent",
+      "scriptNames": [],
+      "wired": false
     },
     {
       "asserts": {

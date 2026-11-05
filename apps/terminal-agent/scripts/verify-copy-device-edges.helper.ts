@@ -182,7 +182,7 @@ export async function edgeChecks(check: (name: string, fn: () => Promise<void>) 
       assert.equal(fs.readFileSync(outside).toString(), 'secret')
     } finally { await f.close() }
   })
-  await check('未确认停止保留硬件隔离和待删状态，进程确认退出后放锁并删页', async () => {
+  await check('未确认停止只隔离 WIA 和待删材料，释放打印锁；退出后重试删页', async () => {
     let gone = false
     const f = fixture({ deps: { processGone: () => gone,
       startScan(request) {
@@ -193,7 +193,7 @@ export async function edgeChecks(check: (name: string, fn: () => Promise<void>) 
     try {
       await scan(f)
       assert.equal((await f.view()).purged, false)
-      assert.equal(f.lock.tryAcquire('print-claim'), undefined)
+      const print = f.lock.tryAcquire('print-claim'); assert.ok(print); print.release()
       gone = true; await f.runtime.tick()
       assert.equal((await f.view()).purged, true)
       assert.equal(f.lock.snapshot().heldBy, undefined)

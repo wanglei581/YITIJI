@@ -4,7 +4,7 @@ import type { PrintJobParams } from '../printer/types'
 import { getPrinterPreflight } from './wmi'
 import { monitorPrintJob } from './print-job-monitor'
 import { computeMonitorTimeoutMs } from './print-monitor-timeout'
-import { preparePrinterForDispatch, settlePrinterAfterTerminal, isPrintDispatchBlocked } from './print-dispatch-gate'
+import { preparePrinterForDispatch, settlePrinterAfterTerminal, isPrintDispatchBlocked, retainPrintDispatch } from './print-dispatch-gate'
 import { cleanupStaleOwnPrintJobs, pauseConfiguredPrinterQueue, resumeConfiguredPrinterQueue } from './print-queue-hold'
 import type { CopyPrintState } from './copy-device/copy-types'
 
@@ -15,11 +15,12 @@ export interface LocalPrintDependencies {
   removeOwnJobs?: () => Promise<void>
   resume?: () => Promise<void>
   pause?: () => Promise<void>
+  executorGone?: (correlationId: string) => Promise<boolean>
 }
 export async function printLocalDocument(input: {
   file: string; printerName: string; correlationId: string; pageCount: number
   params: Partial<PrintJobParams>; holdEnabled: boolean
-  beforeDispatch(): void; spooled(): void; readerPending(pending: boolean): void
+  beforeDispatch(): void; spooled(): void; readerPending(pending: boolean): void; queueSettled(): void
 }, deps: LocalPrintDependencies = {}): Promise<{ state: CopyPrintState; errorCode?: string }> {
   const removeOwnJobs = deps.removeOwnJobs ?? (async () => { await cleanupStaleOwnPrintJobs({ printerName: input.printerName }) })
   const resume = deps.resume ?? (async () => { await resumeConfiguredPrinterQueue(input.printerName) })
@@ -27,6 +28,18 @@ export async function printLocalDocument(input: {
   let dispatched = false
   let prepared = false
   let handed = false
+  let terminal = false
+  let readerPending = false
+  let cleanupAgain = false
+  let recover: (() => Promise<boolean>) | undefined
+  const retain = (): void => {
+    recover ??= retainPrintDispatch(async () => {
+      if (!terminal || readerPending) return false
+      if (cleanupAgain) await removeOwnJobs()
+      input.queueSettled() // 先耐久解除待清理责任，再放派发。
+      return true
+    })
+  }
   try {
     if (!input.printerName) return { state: 'failed', errorCode: 'COPY_DEVICE_UNAVAILABLE' }
     if (isPrintDispatchBlocked()) return { state: 'failed', errorCode: 'COPY_DEVICE_UNAVAILABLE' }
@@ -37,11 +50,16 @@ export async function printLocalDocument(input: {
     prepared = true
     // 最后一次检查短许可/撤权，并在驱动调用前落盘意图。此后绝不自动重试驱动。
     input.beforeDispatch()
+    retain()
     dispatched = true
     const result = await (deps.print ?? print)(input.file, input.printerName, input.params, {
       correlationId: input.correlationId,
-      onDispatchStart: () => input.readerPending(true),
-      onDispatchSettled: () => input.readerPending(false),
+      onDispatchStart: () => { readerPending = true; input.readerPending(true) },
+      onDispatchSettled: () => {
+        readerPending = false
+        input.readerPending(false)
+        if (terminal) void recover?.()
+      },
     })
     if (!result.success && result.errorCode !== 'PRINT_TIMEOUT') {
       // 只有驱动入口在派发前明确拒绝的错误，才能断言没有送进队列。
@@ -57,7 +75,12 @@ export async function printLocalDocument(input: {
   } catch {
     return { state: dispatched ? 'unconfirmed' : 'failed', errorCode: dispatched ? 'PRINT_JOB_UNCONFIRMED' : 'COPY_DISPATCH_BLOCKED' }
   } finally {
-    if (prepared) await settlePrinterAfterTerminal({ outcome: handed ? 'completed' : 'failed',
+    const executorWasPending = readerPending
+    const cleaned = !prepared || await settlePrinterAfterTerminal({ outcome: handed ? 'completed' : 'failed',
       pauseAgain: input.holdEnabled, removeOwnJobs, pause })
+    cleanupAgain = executorWasPending || readerPending || !cleaned
+    terminal = true
+    retain()
+    await recover!()
   }
 }

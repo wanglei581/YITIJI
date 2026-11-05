@@ -6,6 +6,7 @@ import { parseConfigText } from '../src/agent/config-manager'
 import { COPY_DELETION_REASONS } from '../src/agent/copy-device/copy-types'
 import { fixture, base, plain, scan, expectCode, request, JPEG } from './verify-copy-device.helper'
 import { printChecks } from './verify-copy-print.helper'
+import { isolationChecks } from './verify-copy-isolation.helper'
 import { edgeChecks } from './verify-copy-device-edges.helper'
 
 let passed = 0
@@ -135,6 +136,7 @@ async function main(): Promise<void> {
       assert.equal(restart.calls.length, 0)
     } finally { await restart.close(); await f.close() }
   })
+  await isolationChecks(check)
   await edgeChecks(check)
   await printChecks(check)
   console.log(`verify-copy-device: ${passed} checks passed`)

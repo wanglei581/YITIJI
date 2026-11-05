@@ -71,6 +71,7 @@ export function createCopyPrint(deps: CopyDeps, storage: ReturnType<typeof creat
           s.state = 'spooled'
         },
         readerPending(pending) { s.printReaderPending = pending },
+        queueSettled() { ledger.queueSettled(s.command.copyId, s.command.generation) },
       }, deps.printDependencies)
       s.state = result.state
       s.errorCode = result.errorCode ?? null

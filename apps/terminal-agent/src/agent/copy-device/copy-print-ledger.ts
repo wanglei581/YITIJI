@@ -3,6 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import { randomUUID } from 'crypto'
 import { createScanTaskDir } from '../scan-device/scan-temp-dir'
+import { retainRecoveredCopyPrint } from './copy-print-recovery'
 import { warn } from '../../logger'
 import { CopyError, type CopyDeps, type CopyPrintState, type CopySession, type CopyView } from './copy-types'
 
@@ -20,6 +21,8 @@ export interface CopyPrintRecord {
   attempts: number
   nextRetryAt: number
   acked: boolean
+  queueCleanupPending?: boolean
+  printerName?: string
 }
 const terminal = (state: string): state is CopyPrintState => ['handed', 'failed', 'unconfirmed'].includes(state)
 export function printRecordView(r: CopyPrintRecord): CopyView {
@@ -29,6 +32,7 @@ export function createCopyPrintLedger(deps: CopyDeps, dirId: (id: string, genera
   const records = new Map<string, CopyPrintRecord>()
   const inflight = new Set<string>()
   let safe = true
+  const cleanupRetries: Array<() => Promise<boolean>> = []
   const key = (id: string, generation: number) => dirId(id, generation)
   const directory = () => createScanTaskDir(COPY_PRINT_LEDGER_DIR, { ...deps.tempHooks, root: deps.root })
   const syncDirectory = (dir: string): void => {
@@ -73,8 +77,12 @@ export function createCopyPrintLedger(deps: CopyDeps, dirId: (id: string, genera
         typeof r.eventId !== 'string' || !/^[a-f0-9-]{36}$/.test(r.eventId) ||
         !Number.isSafeInteger(r.attempts) || r.attempts < 0 || r.attempts > 10 ||
         !Number.isFinite(r.nextRetryAt) || typeof r.acked !== 'boolean' ||
+        (r.queueCleanupPending !== undefined && typeof r.queueCleanupPending !== 'boolean') ||
+        (r.printerName !== undefined && (typeof r.printerName !== 'string' || !r.printerName || r.printerName.length > 512)) ||
         (r.errorCode !== undefined && !/^[A-Za-z0-9_]{1,64}$/.test(r.errorCode)) ||
         name !== `${key(r.copyId, r.generation)}.json`) throw new Error('invalid ledger')
+      // 兼容旧 ledger：未确认/未终态也必须重清；确认完成的旧记录不补打。
+      r.queueCleanupPending ??= !['handed', 'failed'].includes(r.state)
       records.set(key(r.copyId, r.generation), r)
     }
     for (const r of records.values()) {
@@ -83,10 +91,21 @@ export function createCopyPrintLedger(deps: CopyDeps, dirId: (id: string, genera
     }
   } catch { safe = false; warn('copy-print: ledger unavailable; copy dispatch blocked') }
   const get = (id: string, generation: number) => records.get(key(id, generation))
+  const queueSettled = (id: string, generation: number): void => {
+    const r = get(id, generation)
+    if (r?.queueCleanupPending) persist({ ...r, queueCleanupPending: false })
+  }
+  for (const [id, r] of records) if (r.queueCleanupPending) {
+    cleanupRetries.push(retainRecoveredCopyPrint(deps, r, `copy_${id}`, () => queueSettled(r.copyId, r.generation)))
+  }
+  const retryCleanup = async (): Promise<void> => {
+    for (const retry of cleanupRetries) await retry()
+  }
   const begin = (s: CopySession): void => {
     if (get(s.command.copyId, s.command.generation)) throw new CopyError(409, 'COPY_ALREADY_DISPATCHED')
     persist({ version: 1, copyId: s.command.copyId, generation: s.command.generation,
       terminalId: deps.config.terminalId!, owner: s.owner, pageCount: s.pages.length,
+      queueCleanupPending: true, printerName: deps.config.printerName,
       state: 'dispatching', eventId: randomUUID(), attempts: 0, nextRetryAt: 0, acked: false }, true)
   }
   const update = (id: string, generation: number, state: CopyPrintRecord['state'], errorCode?: string): void => {
@@ -109,12 +128,12 @@ export function createCopyPrintLedger(deps: CopyDeps, dirId: (id: string, genera
         try {
           await deps.reportPrint(r.copyId, { generation: r.generation, eventId: r.eventId,
             state: r.state as CopyPrintState, ...(r.errorCode ? { errorCode: r.errorCode } : {}) })
-          persist({ ...attempt, acked: true })
+          persist({ ...records.get(id)!, acked: true })
         } catch {
           if (attempt.attempts >= 10) warn('copy-print: result retry exhausted; operator reconciliation required')
         }
       } finally { inflight.delete(id) }
     }))
   }
-  return { get, begin, update, retry, hasDir: (id: string) => records.has(id), isSafe: () => safe }
+  return { get, begin, update, retry, queueSettled, retryCleanup, pendingDir: (id: string) => records.get(id)?.queueCleanupPending === true, hasDir: (id: string) => records.has(id), isSafe: () => safe }
 }

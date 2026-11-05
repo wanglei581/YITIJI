@@ -81,7 +81,7 @@ export async function handleDeviceRoute(input: {
     } else hooks.sendEnvelope(res, 200, data, origin)
   } catch (error) {
     const failure = error instanceof CopyError ? error : new CopyError(503, 'COPY_DEVICE_UNAVAILABLE')
-    hooks.sendJson(res, failure.status, { code: failure.code, message: failure.code, ...failure.snapshot }, origin)
+    hooks.sendJson(res, failure.status, { code: failure.code, message: failure.message, ...failure.snapshot }, origin)
   }
   return true
 }
