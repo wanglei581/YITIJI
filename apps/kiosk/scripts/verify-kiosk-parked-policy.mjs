@@ -28,6 +28,7 @@ const PARKED = {
     'src/pages/renshi/EligibilityResults.tsx',
     'src/pages/renshi/eligibilityOutcome.ts',
     'src/pages/renshi/renshi-eligibility-qx.css',
+    'src/services/api/policy-eligibility.ts',
     // 社保指南、就业登记两页写死的说明
     'src/pages/renshi/SocialPanel.tsx',
     'src/pages/renshi/RegisterPanel.tsx',
