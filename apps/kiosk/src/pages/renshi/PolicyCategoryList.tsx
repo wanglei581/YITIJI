@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getPublishedPolicies, type PublishedPoliciesResult } from '../../services/api/policies'
-import { POLICY_ASK_LIST, PolicyChecklistSample, PolicyReadState, PolicyTouchLayout } from './PolicyTouchLayout'
-import { POLICY_CATEGORIES, POLICY_PAGE_SIZE, policyPagination, policyRead, type PolicyAudience } from './policyModel'
+import { PolicyChecklistSample, PolicyReadState, PolicyTouchLayout } from './PolicyTouchLayout'
+import { POLICY_ASK_LIST, POLICY_CATEGORIES, POLICY_PAGE_SIZE, policyPagination, policyRead, type PolicyAudience } from './policyModel'
 import { policyPublishedOn } from './policyFacts'
 
 export function PolicyCategoryList({ audience, page }: { audience: PolicyAudience; page: number }) {

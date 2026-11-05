@@ -8,12 +8,8 @@ import { QxTouchArtChecklist } from '../../components/qingxu/touch/QxTouchArt'
 import { useInterviewAiCapabilities } from '../interview/useInterviewAiCapabilities'
 import { useKioskLicense } from '../../layouts/KioskLicenseContext'
 import { IS_MOCK_MODE } from '../../services/api/client'
-import { POLICY_GENERAL_QUESTION, POLICY_SOURCE_QUESTION } from './policyModel'
+import { POLICY_ASK_HOME } from './policyModel'
 import '../service-hubs/policy-touch.css'
-
-/** 底栏问小青：首页与公告问「这些政策怎么看」，类别列表照稿问「政策原文怎么看」。 */
-export const POLICY_ASK_HOME = { label: '问小青：这些政策怎么看？', draft: POLICY_GENERAL_QUESTION }
-export const POLICY_ASK_LIST = { label: '问小青：政策原文怎么看？', draft: POLICY_SOURCE_QUESTION }
 
 export function PolicyTouchLayout({ title, eyebrow, sub, state, children, home = false, compact = false,
   ask = true, askPrompt = POLICY_ASK_HOME, path, pathLabel, primary, alert }: {

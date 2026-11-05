@@ -13,6 +13,9 @@ export const POLICY_PAGE_SIZE = 4
 export const POLICY_MISSING_FIELD = '发布机构没有提供这部分，请以原文为准'
 export const POLICY_GENERAL_QUESTION = '这些政策怎么看？请说明怎样核对发布机构、条件、材料和原文入口，不判断我能不能领。'
 export const POLICY_SOURCE_QUESTION = '政策原文怎么看？请说明原文里一般在哪里写条件、材料和办理地点，不判断我能不能领。'
+/** 底栏问小青：首页与公告问「这些政策怎么看」，类别列表照稿问「政策原文怎么看」。 */
+export const POLICY_ASK_HOME = { label: '问小青：这些政策怎么看？', draft: POLICY_GENERAL_QUESTION }
+export const POLICY_ASK_LIST = { label: '问小青：政策原文怎么看？', draft: POLICY_SOURCE_QUESTION }
 
 export function policyAudience(value: string | null): PolicyAudience | null {
   return POLICY_CATEGORIES.find((category) => category.key === value)?.key ?? null

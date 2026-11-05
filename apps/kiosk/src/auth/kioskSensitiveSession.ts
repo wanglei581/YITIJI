@@ -132,10 +132,10 @@ export function clearKioskSensitiveSession(outgoingMemberToken?: string | null):
 }
 
 /**
- * 公共设备残留：匿名本机收藏写在 localStorage，跨用户、跨刷新都还在。
+ * 公共设备残留：改版前的匿名本机收藏写在 localStorage，跨用户、跨刷新都还在。
+ * 2026-11-05 起未登录不再记本机收藏（localFavorites.ts 停放），这里只负责把旧残留清掉。
  *
- * 只在 logout / 隐私清场里调用。login() 不得调用——登录后要把游客收藏
- * 留给「合并到账号」，清掉就没得合。
+ * 只在 logout / 隐私清场里调用。
  */
 export function clearKioskSharedDeviceResidue(): void {
   clearAllLocalFavorites()

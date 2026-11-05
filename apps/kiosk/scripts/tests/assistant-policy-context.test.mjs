@@ -35,11 +35,11 @@ function fixture() {
   // 清场用真实实现；打印/扫描等不属于本测试的副作用换成空实现。
   const sensitive = load('src/auth/kioskSensitiveSession.ts', name => name === '../services/assistantDraft'
     ? draft : new Proxy({}, { get: () => () => undefined }))
-  const hook = load('src/pages/assistant/AssistantPolicyContext.tsx', name => {
+  // 钩子单独成文件（展示件 AssistantPolicyContext.tsx 只导出组件，免得热更新警告）。
+  const hook = load('src/pages/assistant/useAssistantPolicyContext.ts', name => {
     if (name === 'react') return react
     if (name === '../../services/assistantDraft') return draft
     if (name === '../../auth/kioskSensitiveSession') return sensitive
-    if (name === 'react/jsx-runtime') return {}
     throw new Error(`Unexpected dependency ${name}`)
   })
   return { storage, draft, sensitive, hook, effects, states }
