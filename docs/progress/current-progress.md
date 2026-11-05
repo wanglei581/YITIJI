@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-11-05：屏上复印 C1d——收掉 C1c 复核的 3 条 P1（分支 `claude/copy-c1-1104`，未合并、未部署）
+
+- ① 已派发（dispatching / spooled）的单再取打印许可一律拒绝（`COPY_ALREADY_DISPATCHED`），去掉 CAS 后复查能力与状态回退，已派发任务永不退回可取消，真实终态回报照收。② 能力撤销改为版本协议：终端能力服务的写入口（upsert 与 clear）把 `copy`、`scan_device`、`color_print`、`duplex_print` 任一改为非 available 时，在同一事务里给本终端所有未终态 `CopyJob` 的授权版本加一；许可 CAS 钉住首读版本——关能力先提交则拒绝，CAS 先提交则视为关闭前已发的许可。③ 后台订单只读接口对复印行按 `CopyJob.state` 返回真实结果与中文文案，结果未确认带「需人工核查」标记与错误码，「已完成」筛选只含已交给打印机；`Order.taskStatus` 映射不变（注销靠它）。后台页面未改。
+- 验证（Codex 实现，Claude 收货）：新增 7 条用例过；`verify:copy-c1a`、`verify:copy-c1b`、`verify:member-closure`、`verify:admin-orders-readonly`、`verify:admin-order-filters` 与能力服务图谱关联的 30 余条门禁（SQLite）过；PostgreSQL 交 CI。
+
 ## 2026-11-04：屏上复印 C1c——收掉 C1 复审的 3 条 P1（分支 `claude/copy-c1-1104`，未合并、未部署）
 
 - ① 复印终态阻断会员注销：`CopyJob` 照旧记已交给打印机 / 失败 / 结果未确认，`Order` 侧映射为 completed / failed / completed，复用现有订单终态规则（注销服务的终态集合未改）。② 取许可 CAS 后重读要再核状态、代次、授权版本与到期，响应只用成功 CAS 的快照，用户取消后不会拿到有效许可。③ 读能力与 CAS 之间关能力的窗口：CAS 后再查一次能力，已关就撤回（回到 ready/confirmed、授权版本递增）并拒绝；已派发任务的终态回报照收。

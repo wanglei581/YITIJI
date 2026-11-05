@@ -44,6 +44,7 @@ interface OrderRow {
   refundedAmountCents: number
   createdAt: Date
   updatedAt: Date
+  copyJob: { state: string; resultCode: string | null } | null
   printTask: {
     id: string
     terminalId: string | null
@@ -81,6 +82,12 @@ function deriveAftercare(
   | 'opsAttention'
   | 'opsAttentionCode'
 > {
+  if (row.type === 'copy') {
+    const unconfirmed = row.copyJob?.state === 'unconfirmed'
+    return { printOutcome: null, aftercareStatus: unconfirmed ? 'manual_check_required' : null,
+      refundEligible: false, retryForbidden: true, refundRequired: false,
+      opsAttention: unconfirmed, opsAttentionCode: unconfirmed ? 'copy_result_unconfirmed' : null }
+  }
   const printOutcome = parsePrintOutcome(row.printTask?.printOutcome)
   const unconfirmedFailure =
     row.type === 'print' &&
@@ -180,7 +187,16 @@ export class AdminOrdersReadonlyService {
     const where: Record<string, unknown> = {}
     if (params.type) where['type'] = params.type
     if (params.payStatus) where['payStatus'] = params.payStatus
-    if (params.taskStatus) where['taskStatus'] = params.taskStatus
+    if (params.taskStatus) {
+      // 复印的 completed 仅指 handed；Order 的注销终态映射不能用于后台履约筛选。
+      const copyStates: Record<string, string[]> = { completed: ['handed'], failed: ['failed'],
+        cancelled: ['cancelled'], pending: ['ready', 'scanning', 'scanned', 'confirmed'],
+        printing: ['dispatching', 'spooled'] }
+      where['AND'] = [{ OR: [
+        { type: { not: 'copy' }, taskStatus: params.taskStatus },
+        { type: 'copy', copyJob: { is: { state: { in: copyStates[params.taskStatus] ?? [] } } } },
+      ] }]
+    }
     // channel / pickupStatus：M1/M2。存量 channel 为 null，前端显示「未标注」；
     // 不提供「未标注」筛选值——那等价于 null 查询，语义上是「无法判定」而非一个渠道。
     if (params.channel) where['channel'] = params.channel
@@ -198,6 +214,7 @@ export class AdminOrdersReadonlyService {
           refundReason: ONLINE_PAID_PENDING_REFUND_REASON,
         },
         { payStatus: 'refunding' },
+        { type: 'copy', copyJob: { is: { state: 'unconfirmed' } } },
         ...(unconfirmedIds.length > 0 ? [{ id: { in: unconfirmedIds } }] : []),
       ]
     } else if (params.refundRequired === true) {
@@ -379,12 +396,16 @@ export class AdminOrdersReadonlyService {
       pickupStatus: row.pickupStatus,
       pickupCodeExpiresAt: row.pickupCodeExpiresAt ? row.pickupCodeExpiresAt.toISOString() : null,
       payStatus: row.payStatus,
-      taskStatus: row.taskStatus,
+      taskStatus: row.type === 'copy' ? row.copyJob?.state ?? 'unconfirmed' : row.taskStatus,
+      ...(row.type === 'copy' ? { taskStatusLabel: ({ handed: '已交给打印机', unconfirmed: '结果未确认',
+        failed: '失败', cancelled: '已取消', expired: '已过期', confirmed: '已确认', dispatching: '派发中',
+        spooled: '派发中', ready: '待扫描', scanning: '扫描中', scanned: '待确认' } as Record<string, string>)[row.copyJob?.state ?? 'unconfirmed'] ?? '结果未确认' } : {}),
       printFileName: printSummary.fileName,
       copies: printSummary.copies,
       colorMode: printSummary.colorMode,
       paperSize: printSummary.paperSize,
-      errorCode: row.printTask?.errorCode ?? null,
+      errorCode: row.type === 'copy' ? row.copyJob?.resultCode
+        ?? (row.copyJob?.state === 'unconfirmed' ? 'COPY_RESULT_UNCONFIRMED' : null) : row.printTask?.errorCode ?? null,
       ...deriveAftercare(row, channelAcceptedUnconfirmed),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -417,6 +438,7 @@ function orderSelect() {
     refundedAmountCents: true,
     createdAt: true,
     updatedAt: true,
+    copyJob: { select: { state: true, resultCode: true } },
     printTask: {
       select: {
         id: true,

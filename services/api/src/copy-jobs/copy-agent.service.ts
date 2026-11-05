@@ -17,7 +17,8 @@ export class CopyAgentService {
     if (job.expiresAt.getTime() <= Date.now()) reason = 'COPY_EXPIRED'
     else if (COPY_ENDED.includes(job.state)) reason = 'COPY_STATE_CONFLICT'
     else if (op === 'scan' && !['ready', 'scanning'].includes(job.state)) reason = 'COPY_STATE_CONFLICT'
-    else if (op === 'print' && (!job.orderId || !['confirmed', 'dispatching'].includes(job.state))) {
+    else if (op === 'print' && ['dispatching', 'spooled'].includes(job.state)) reason = 'COPY_ALREADY_DISPATCHED'
+    else if (op === 'print' && (!job.orderId || job.state !== 'confirmed')) {
       reason = 'COPY_NOT_CONFIRMED'
     }
     if (!reason) {
@@ -42,17 +43,9 @@ export class CopyAgentService {
       if (!changed.count) reason = 'COPY_STATE_CONFLICT'
       else {
         const permittedState = op === 'scan' ? 'scanning' : 'dispatching'
-        // CAS 前的能力快照可能已被管理员撤销；复查失败则撤回本次派发并作废授权。
-        try { await this.store.capable(params) } catch (error) {
-          if (!(error instanceof HttpException)) throw error
-          reason = (error.getResponse() as { error: { code: string } }).error.code
-          await this.store.prisma.copyJob.updateMany({ where: { id, terminalId,
-            generation: job.generation, authorizationVersion: job.authorizationVersion, state: permittedState },
-          data: { state: op === 'scan' ? 'ready' : 'confirmed', authorizationVersion: { increment: 1 } } })
-        }
+        // 能力撤销在同一事务递增授权版本；上面的 CAS 是能力授权的唯一判定点，无回退路径。
         const fresh = await this.store.find(id, terminalId)
-        if (!reason && (fresh.state !== permittedState || fresh.generation !== job.generation
-          || fresh.authorizationVersion !== job.authorizationVersion)) reason = 'COPY_STATE_CONFLICT'
+        if (!reason && (fresh.state !== permittedState || fresh.generation !== job.generation)) reason = 'COPY_STATE_CONFLICT'
         if (!reason && fresh.expiresAt.getTime() <= Date.now()) reason = 'COPY_EXPIRED'
         // 响应始终携带成功 CAS 的授权快照，绝不把重读到的撤销版本包装成许可。
         if (!reason) await this.store.record('permit', job, { op })
