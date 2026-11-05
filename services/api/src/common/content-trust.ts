@@ -96,12 +96,12 @@ export function contentTrustDenialMessage(
 ): string {
   const who = org?.name ? `机构「${org.name}」` : '本机构'
   if (denial === 'org_missing') {
-    return `${who}的发布资格还没有开通：暂时查不到来源机构，无法完成内容核验。请联系平台管理员核对机构信息后再发布。`
+    return `${who}的发布资格还没有开通：暂时查不到来源机构，无法完成授权核验。请联系平台管理员核对机构信息后再发布。`
   }
   if (denial === 'archived') {
-    return `${who}已归档，暂时不能发布${contentType}。如需继续发布，请联系平台管理员恢复机构并重新完成内容核验。`
+    return `${who}已归档，暂时不能发布${contentType}。如需继续发布，请联系平台管理员恢复机构并重新完成授权核验。`
   }
-  return `${who}的发布资格还没有开通：平台管理员还没有完成本机构的内容核验，暂时不能发布${contentType}。请联系平台管理员核验开通后再发布。`
+  return `${who}的发布资格还没有开通：平台管理员还没有完成本机构的授权核验，暂时不能发布${contentType}。请联系平台管理员核验开通后再发布。`
 }
 
 /**
