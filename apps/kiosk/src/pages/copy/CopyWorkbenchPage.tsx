@@ -49,11 +49,11 @@ export function CopyWorkbenchPage() {
     })
   }
   const pending = snapshot.phase === 'creating'
-  const rescan = async () => {
+  const rescan = async (source?: 'flatbed') => {
     const settings = snapshot.session?.input
     if (!settings || !await readCopyDeviceFlow()?.clearForRescan()) return
     clearCopySession()
-    pickCopySettings(settings)
+    pickCopySettings({ ...settings, ...(source ? { source } : {}) })
     go('set')
     const outcome = await flow.start(true)
     if (outcome === 'ready') go('scan')

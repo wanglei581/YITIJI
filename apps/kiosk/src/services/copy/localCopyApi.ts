@@ -1,16 +1,20 @@
 // 本机复印协议独立于扫描上传；控制凭证从不发往本机。
 const BASE = (import.meta.env['VITE_TERMINAL_AGENT_LOCAL_URL'] ?? '').trim() || 'http://127.0.0.1:9527'
 const BRIDGE_TOKEN = (import.meta.env['VITE_TERMINAL_AGENT_BRIDGE_TOKEN'] ?? '').trim()
-export type LocalCopyAction = 'start' | 'next-page' | 'finish' | 'status' | 'preview' | 'abort' | 'clear'
+export type LocalCopyAction = 'start' | 'next-page' | 'finish' | 'status' | 'preview' | 'print' | 'abort' | 'clear'
 export interface LocalCopyIdentity { copyId: string; generation: number }
 export interface LocalCopyView {
   state: 'starting' | 'scanning' | 'page_ready' | 'composing' | 'scanned' | 'cancelled' | 'cleared' | 'expired' | 'failed'
+    | 'printing' | 'dispatching' | 'spooled' | 'handed' | 'unconfirmed'
   generation: number
   pageCount: number | null
   errorCode: string | null
   purged?: boolean
 }
-const STATES = ['starting', 'scanning', 'page_ready', 'composing', 'scanned', 'cancelled', 'cleared', 'expired', 'failed']
+const STATES = ['starting', 'scanning', 'page_ready', 'composing', 'scanned', 'cancelled', 'cleared', 'expired', 'failed', 'printing', 'dispatching', 'spooled', 'handed', 'unconfirmed']
+export class LocalCopyError extends Error {
+  constructor(readonly code: string) { super(code) }
+}
 async function request(action: LocalCopyAction, identity: LocalCopyIdentity, extra: object, signal?: AbortSignal): Promise<Response> {
   if (!BRIDGE_TOKEN) throw new Error('COPY_BRIDGE_UNAVAILABLE')
   const controller = new AbortController()
@@ -22,11 +26,14 @@ async function request(action: LocalCopyAction, identity: LocalCopyIdentity, ext
     const response = await fetch(`${BASE}/local/copy/${action}`, {
       method: 'POST', cache: 'no-store', credentials: 'omit', signal: controller.signal,
       headers: { Accept: action === 'preview' ? 'image/jpeg' : 'application/json', 'Content-Type': 'application/json', 'X-Local-Bridge-Token': BRIDGE_TOKEN },
-      body: JSON.stringify({ ...identity, operationId: crypto.randomUUID(), ...extra }),
+      body: JSON.stringify({ copyId: identity.copyId, generation: identity.generation, operationId: crypto.randomUUID(), ...extra }),
     })
     // 读完整个字节体也受同一超时与离页中止约束。
     const bytes = await response.arrayBuffer()
-    if (!response.ok) throw new Error('COPY_LOCAL_UNKNOWN')
+    if (!response.ok) {
+      const payload = JSON.parse(new TextDecoder().decode(bytes)) as { error?: { code?: string } }
+      throw new LocalCopyError(payload.error?.code ?? 'COPY_LOCAL_UNKNOWN')
+    }
     return new Response(bytes, { status: response.status, headers: response.headers })
   } finally {
     window.clearTimeout(timer)
@@ -34,7 +41,7 @@ async function request(action: LocalCopyAction, identity: LocalCopyIdentity, ext
   }
 }
 export async function postLocalCopy(action: Exclude<LocalCopyAction, 'preview'>, identity: LocalCopyIdentity,
-  extra: { source?: 'flatbed' | 'feeder'; scanColor?: 'color' | 'gray' } = {}, signal?: AbortSignal): Promise<LocalCopyView> {
+  extra: { source?: 'flatbed' | 'feeder'; scanColor?: 'color' | 'gray'; operationId?: string } = {}, signal?: AbortSignal): Promise<LocalCopyView> {
   const response = await request(action, identity, extra, signal)
   const payload = await response.json() as { success?: boolean; data?: LocalCopyView }
   const view = payload.data

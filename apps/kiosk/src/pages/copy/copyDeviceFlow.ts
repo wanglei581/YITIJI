@@ -1,9 +1,10 @@
 import { cancelCopyJob, confirmCopyJob, getCopyJob, type CopyJobView } from '../../services/api/copyJobs'
 import { ApiHttpError } from '../../services/api/httpAdapter'
-import { fetchCopyPreview, postLocalCopy, type LocalCopyView } from '../../services/copy/localCopyApi'
+import { fetchCopyPreview, LocalCopyError, postLocalCopy, type LocalCopyView } from '../../services/copy/localCopyApi'
 import { canConfirmCopy, copyPhaseFromLocal, validCopyJob, type CopyDevicePhase } from './copyCheckModel'
 import { CopyPreview } from './copyPreview'
-import { markCopyConfirmed, onCopySessionClear, type CopySession } from './copySession'
+import { copyFault, copyPrintPhase, type CopyPrintStage } from './copyPrintModel'
+import { clearCopySession, markCopyConfirmed, onCopySessionClear, type CopySession } from './copySession'
 
 interface DeviceSnapshot {
   phase: CopyDevicePhase
@@ -12,8 +13,10 @@ interface DeviceSnapshot {
   busy: boolean
   job: CopyJobView | null
   notice: string | null
+  errorCode: string | null
+  printStage: CopyPrintStage
 }
-const initial = (): DeviceSnapshot => ({ phase: 'starting', pages: null, started: false, busy: false, job: null, notice: null })
+const initial = (): DeviceSnapshot => ({ phase: 'starting', pages: null, started: false, busy: false, job: null, notice: null, errorCode: null, printStage: 'received' })
 const UNKNOWN = '状态未知。这一步的结果还没确认，请先停止操作，不要重新开始。'
 let snapshot = initial()
 let current: CopyDeviceFlow | null = null
@@ -22,7 +25,7 @@ export const readCopyDevice = () => snapshot
 export const subscribeCopyDevice = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } }
 const publish = (patch: Partial<DeviceSnapshot>) => { snapshot = { ...snapshot, ...patch }; for (const listener of listeners) listener() }
 
-/** 单会话执行器。React 重挂载不能重复 start；C3b-2 可从这里接 confirmed 和真实 job。 */
+/** 单会话执行器；重挂载、超时及重复确认都不能再次派发。 */
 export class CopyDeviceFlow {
   readonly preview = new CopyPreview()
   private controller = new AbortController()
@@ -35,6 +38,9 @@ export class CopyDeviceFlow {
   private progressAt = Date.now()
   private signature = ''
   private misses = 0
+  private printOperationId = crypto.randomUUID()
+  private printRequested = false
+  private recovering = false
   constructor(readonly session: CopySession) {}
   private live(signal = this.controller.signal) { return !this.disposed && !signal.aborted && current === this }
   private unknown(notice = UNKNOWN) {
@@ -48,24 +54,23 @@ export class CopyDeviceFlow {
         this.controller.abort()
         this.unknown('状态未知。等太久还没收到新的扫描结果，请先停止操作，不要重新开始。')
       }
+      if (this.live() && snapshot.phase === 'printing' && Date.now() - this.progressAt >= 60_000) void this.recoverPrint(this.controller.signal)
     }, 1000)
     await this.command('start')
     if (this.live()) this.schedule()
   }
   private expire() {
     if (!this.live()) return
-    this.controller.abort()
-    this.preview.clear()
-    publish({ phase: 'unknown', job: null, pages: null, busy: false, notice: '这次复印已过期，请返回后重新开始。' })
-    void postLocalCopy('clear', this.session).catch(() => {})
+    clearCopySession()
   }
   private schedule() {
-    if (!this.live() || ['confirmed', 'stopped', 'unknown'].includes(snapshot.phase)) return
+    if (!this.live() || ['done', 'unconfirmed', 'error', 'off', 'stopped', 'unknown'].includes(snapshot.phase)) return
     this.timer = window.setTimeout(() => { void this.poll().finally(() => this.schedule()) }, 3000)
   }
   private async acceptLocal(view: LocalCopyView, signal: AbortSignal) {
     if (!this.live(signal)) return
-    if (view.errorCode || ['cancelled', 'cleared', 'failed', 'expired'].includes(view.state)) { this.unknown(); return }
+    if (view.errorCode || view.state === 'failed') { this.deviceError(view.errorCode); return }
+    if (['cancelled', 'cleared', 'expired'].includes(view.state)) { this.unknown(); return }
     const signature = `${view.state}:${view.pageCount}`
     if (signature !== this.signature) { this.signature = signature; this.progressAt = Date.now() }
     publish({ phase: copyPhaseFromLocal(view.state, this.session.input.source), pages: view.pageCount,
@@ -74,7 +79,7 @@ export class CopyDeviceFlow {
     if (view.state === 'scanned') await this.refreshQuote(signal)
   }
   private async poll() {
-    if (this.polling || snapshot.busy || ['confirmed', 'stopped', 'unknown'].includes(snapshot.phase)) return
+    if (this.polling || snapshot.busy || ['done', 'unconfirmed', 'error', 'off', 'stopped', 'unknown'].includes(snapshot.phase)) return
     this.polling = true
     const revision = this.revision
     const signal = this.controller.signal
@@ -82,13 +87,21 @@ export class CopyDeviceFlow {
       const view = await postLocalCopy('status', this.session, {}, signal)
       if (!this.live(signal) || revision !== this.revision) return
       this.misses = 0
+      if (this.printRequested) { await this.acceptPrint(view, signal); return }
+      if (view.errorCode || view.state === 'failed') { this.deviceError(view.errorCode); return }
       if (snapshot.phase === 'check') {
         if (view.state !== 'scanned' || view.errorCode || view.pageCount !== snapshot.job?.pageCount) this.unknown()
         return
       }
       await this.acceptLocal(view, signal)
-    } catch {
-      if (this.live(signal) && revision === this.revision && ++this.misses >= 2) this.unknown()
+    } catch (error) {
+      if (this.live(signal) && revision === this.revision && !this.printRequested && error instanceof LocalCopyError) {
+        this.deviceError(error.code); return
+      }
+      if (this.live(signal) && revision === this.revision && ++this.misses >= 2) {
+        if (this.printRequested) await this.recoverPrint(signal)
+        else this.unknown()
+      }
     } finally { this.polling = false }
   }
   async command(action: 'start' | 'next-page' | 'finish'): Promise<void> {
@@ -104,7 +117,10 @@ export class CopyDeviceFlow {
       if (!this.live(signal)) return
       publish({ busy: false })
       await this.acceptLocal(view, signal)
-    } catch { if (this.live(signal)) this.unknown() }
+    } catch (error) { if (this.live(signal)) {
+      if (error instanceof LocalCopyError) this.deviceError(error.code)
+      else this.unknown()
+    } }
     finally { if (this.live(signal)) publish({ busy: false }) }
   }
   private async refreshQuote(signal: AbortSignal) {
@@ -130,6 +146,7 @@ export class CopyDeviceFlow {
       this.preview.clear()
       publish({ phase: 'confirmed', job: result, notice: null })
       markCopyConfirmed(result)
+      await this.print()
     } catch (error) {
       if (!this.live(signal)) return
       if (error instanceof ApiHttpError && error.code === 'COPY_QUOTE_CHANGED') {
@@ -143,8 +160,52 @@ export class CopyDeviceFlow {
       } else this.unknown()
     } finally { if (this.live(signal)) publish({ busy: false }) }
   }
+  private deviceError(errorCode: string | null) {
+    this.preview.clear()
+    publish({ phase: !this.printRequested && copyFault(errorCode) === 'off' ? 'off' : 'error', errorCode, busy: false, notice: null })
+  }
+  private async acceptPrint(view: LocalCopyView, signal: AbortSignal) {
+    if (!this.live(signal) || ['done', 'unconfirmed', 'error'].includes(snapshot.phase)) return
+    const phase = view.errorCode && view.state !== 'unconfirmed' ? 'error' : copyPrintPhase(view.state)
+    publish({ phase, printStage: 'handing', busy: false, errorCode: view.errorCode, notice: null })
+    // 本机结果用于屏幕；云端订单仍只接受 GET 的真实回包，不能自己改写成成功。
+    if (phase !== 'printing') {
+      try {
+        const job = await getCopyJob(this.session.copyId, this.session.controlToken!, null, signal)
+        if (this.live(signal) && validCopyJob(job, this.session)) publish({ job })
+      } catch { /* 不改变本机已明确给出的结果。 */ }
+    }
+  }
+  private async recoverPrint(signal: AbortSignal) {
+    if (!this.live(signal) || this.recovering || snapshot.phase !== 'printing') return
+    this.recovering = true
+    try {
+      const job = await getCopyJob(this.session.copyId, this.session.controlToken!, null, signal)
+      if (!this.live(signal) || snapshot.phase !== 'printing') return
+      if (validCopyJob(job, this.session) && ['handed', 'unconfirmed', 'failed'].includes(job.state)) {
+        publish({ job, phase: copyPrintPhase(job.state), busy: false, notice: null })
+        return
+      }
+    } catch { /* 查询仍拿不准，保守结束，不重派。 */ }
+    finally { this.recovering = false }
+    if (this.live(signal) && snapshot.phase === 'printing') publish({ phase: 'unconfirmed', busy: false, notice: null })
+  }
+  async print(): Promise<void> {
+    if (!this.live()) return
+    if (this.printRequested) { await this.poll(); return }
+    if (snapshot.phase !== 'confirmed') return
+    this.printRequested = true
+    this.revision += 1
+    this.progressAt = Date.now()
+    publish({ phase: 'printing', printStage: 'received', busy: false })
+    const signal = this.controller.signal
+    try {
+      const view = await postLocalCopy('print', this.session, { operationId: this.printOperationId }, signal)
+      await this.acceptPrint(view, signal)
+    } catch { if (this.live(signal)) await this.recoverPrint(signal) }
+  }
   async stop(): Promise<void> {
-    if (this.disposed || snapshot.busy || ['confirmed', 'stopped'].includes(snapshot.phase)) return
+    if (this.disposed || this.printRequested || snapshot.busy || ['confirmed', 'stopped'].includes(snapshot.phase)) return
     this.revision += 1
     this.controller.abort()
     this.controller = new AbortController()
@@ -163,7 +224,7 @@ export class CopyDeviceFlow {
     } else this.unknown('状态未知。这次停止的结果还没确认，请不要重新开始。')
   }
   async clearForRescan(): Promise<boolean> {
-    if (!this.live() || snapshot.busy || snapshot.phase !== 'check') return false
+    if (!this.live() || this.printRequested || snapshot.busy || !['check', 'error'].includes(snapshot.phase)) return false
     this.revision += 1
     publish({ busy: true })
     this.preview.clear()

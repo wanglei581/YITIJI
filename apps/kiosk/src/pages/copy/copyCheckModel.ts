@@ -23,6 +23,7 @@ export function canConfirmCopy(job: CopyJobView | null): boolean {
     && q.duplex === job.duplex && q.colorMode === job.colorMode && q.billableSides === job.pageCount * job.copies
 }
 export type CopyDevicePhase = 'starting' | 'scan' | 'more' | 'finishing' | 'check' | 'confirmed' | 'stopped' | 'unknown'
+  | 'printing' | 'done' | 'unconfirmed' | 'error' | 'off'
 export function copyPhaseFromLocal(state: string, source: string): CopyDevicePhase {
   if (state === 'starting') return 'starting'
   if (state === 'scanning') return 'scan'

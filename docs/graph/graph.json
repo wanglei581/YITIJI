@@ -13965,7 +13965,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 868,
+      "reachableFileCount": 872,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15859,13 +15859,16 @@
           "path": "/print-scan/feature/:key",
           "styles": [
             "apps/kiosk/src/pages/copy/copy-device.css",
+            "apps/kiosk/src/pages/copy/copy-print.css",
             "apps/kiosk/src/pages/copy/copy.css",
             "apps/kiosk/src/pages/print-scan/styles/print-hub-qx.css",
             "apps/kiosk/src/pages/print-scan/styles/tool-fs.css",
             "apps/kiosk/src/pages/print-scan/styles/tool-touch.css",
             "apps/kiosk/src/pages/print/art/print-art-tokens.css",
             "apps/kiosk/src/pages/print/art/print-art.css",
+            "apps/kiosk/src/pages/scan/styles/scan-device-errors.css",
             "apps/kiosk/src/pages/scan/styles/scan-device-flow.css",
+            "apps/kiosk/src/pages/scan/styles/scan-device-qx.css",
             "apps/kiosk/src/pages/scan/styles/scan-fs.css",
             "apps/kiosk/src/pages/scan/styles/scan-workbench-compact-qx.css",
             "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css",
@@ -17515,7 +17518,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 970
+      "sourceFileCount": 974
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",

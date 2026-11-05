@@ -3,7 +3,6 @@ import { COPY_CONTROL } from './fixtures/copy-c3a'
 import { copyDeviceFixture } from './fixtures/copy-c3b1'
 
 const secretSnapshot = () => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage }, url: location.href })
-const revoked = () => (window as unknown as { copyRevoked: string[] }).copyRevoked
 
 test('scan follows draft: rail, full-page truth, stop and ask; check follows draft with real bytes @w2', async ({ page, api }) => {
   const f = await copyDeviceFixture(page, api, { duplex: true })
@@ -110,7 +109,7 @@ test('sixty seconds without progress uses unknown, never invented pages or check
   await expect(page.getByTestId('copy-check')).toHaveCount(0)
   await expect(page.getByTestId('scan-device-page-count')).toHaveCount(0)
 })
-test('quote changed rereads, then requires a fresh press; success is an entry with no local print @w2', async ({ page, api }) => {
+test('quote changed rereads, then requires a fresh press; success dispatches print once @w2', async ({ page, api }) => {
   const f = await copyDeviceFixture(page, api, { quoteChanged: true })
   await f.start(); await f.report('scanned')
   await page.getByTestId('copy-confirm').click()
@@ -118,10 +117,10 @@ test('quote changed rereads, then requires a fresh press; success is an entry wi
   expect(f.cloudCalls.filter((c) => c.action === 'quote')).toHaveLength(2)
   expect(f.cloudCalls.filter((c) => c.action === 'confirm')).toHaveLength(1)
   await page.getByTestId('copy-confirm').click()
-  await expect(page.getByTestId('copy-print-entry')).toHaveText('下一步：打印已确认，等待进入打印步骤。')
+  await expect(page.getByRole('heading', { name: '正在打印', exact: true })).toBeVisible()
   expect(f.cloudCalls.filter((c) => c.action === 'confirm').map((c) => c.body)).toEqual([{ quoteVersion: 'a'.repeat(64) }, { quoteVersion: 'b'.repeat(64) }])
-  expect(f.localCalls.some((c) => c.action === 'print')).toBe(false)
-  await expect.poll(() => page.evaluate(revoked).then((urls) => urls.length)).toBeGreaterThanOrEqual(3)
+  expect(f.localCalls.filter((c) => c.action === 'print')).toHaveLength(1)
+  await expect.poll(() => f.revokedUrls.length).toBeGreaterThanOrEqual(3)
 })
 test('paging revokes old URLs; rescan clears the old job before new generation-one creation @w2', async ({ page, api }) => {
   const f = await copyDeviceFixture(page, api, { pages: 5 })
@@ -130,7 +129,7 @@ test('paging revokes old URLs; rescan clears the old job before new generation-o
   const old = await page.locator('.cc-preview img').evaluateAll((nodes) => nodes.map((node) => (node as HTMLImageElement).src))
   await page.getByRole('button', { name: '下一组', exact: true }).click()
   await expect(page.getByText('第 4 页 / 共 5 页', { exact: true })).toBeVisible()
-  expect(await page.evaluate(revoked)).toEqual(expect.arrayContaining(old))
+  await expect.poll(() => f.revokedUrls).toEqual(expect.arrayContaining(old))
   await page.getByRole('button', { name: '重扫', exact: true }).click()
   await expect(page.getByRole('heading', { name: '正在扫原件', exact: true })).toBeVisible()
   expect(f.calls.filter((c) => c.path === '/api/v1/copy/jobs')).toHaveLength(2)
@@ -155,7 +154,7 @@ for (const mode of ['leave', 'leave-fail', 'idle', 'logout', 'ask'] as const) te
     await expect(page.getByTestId('qx-home')).toBeVisible()
   } else if (mode === 'ask') await expect(page).toHaveURL(/\/assistant(?:\?|$)/)
   await expect(page.getByTestId('copy-check')).toHaveCount(0)
-  expect(await page.evaluate(revoked)).toEqual(expect.arrayContaining(old))
+  await expect.poll(() => f.revokedUrls).toEqual(expect.arrayContaining(old))
   await expect.poll(() => f.localCalls.filter((c) => c.action === 'clear').length).toBeGreaterThan(0)
   expect(await page.evaluate(secretSnapshot)).not.toContain(COPY_CONTROL)
   f.releaseClear()

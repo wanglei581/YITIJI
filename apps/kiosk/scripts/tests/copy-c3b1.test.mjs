@@ -10,6 +10,7 @@ const compile = (text) => `data:text/javascript;base64,${Buffer.from(ts.transpil
 }).outputText).toString('base64')}`
 const previewURL = compile(source('copyPreview.ts'))
 const modelURL = compile(source('copyCheckModel.ts'))
+const printURL = compile(source('copyPrintModel.ts'))
 const model = await import(modelURL)
 const { CopyPreview } = await import(previewURL)
 
@@ -92,14 +93,14 @@ globalThis.window = {
   clearInterval: (key) => timers.delete(key),
 }
 globalThis.__copyTestDeps = {
-  ApiHttpError,
+  ApiHttpError, LocalCopyError: class extends Error {}, clearCopySession: () => cleanup(),
   onCopySessionClear: (fn) => { cleanup = fn }, markCopyConfirmed: () => { confirmed = true },
   postLocalCopy: async (action, identity, extra, signal) => {
     calls.push({ action, identity, extra, signal })
     if (action === 'status' && statusWait) return statusWait
     if (failure === action) throw new Error('offline')
     if (action === 'abort' || action === 'clear') return { ...view, state: action === 'abort' ? 'cancelled' : 'cleared', purged: true }
-    return { ...view }
+    return { ...view, ...(action === 'print' ? { state: 'printing' } : {}) }
   },
   fetchCopyPreview: async () => new Blob(['private']),
   getCopyJob: async () => { calls.push({ action: 'quote' }); return job },
@@ -115,6 +116,7 @@ globalThis.__copyTestDeps = {
   },
 }
 const injected = source('copyDeviceFlow.ts').replace(/^import .* from '([^']+)'$/gm, (line, path) => {
+  if (path === './copyPrintModel') return `import { copyFault, copyPrintPhase } from '${printURL}'`
   if (path === './copyPreview') return `import { CopyPreview } from '${previewURL}'`
   if (path === './copyCheckModel') return `import { canConfirmCopy, copyPhaseFromLocal, validCopyJob } from '${modelURL}'`
   // 类型由转译器去掉；运行依赖用受控的真实状态与失败回包代替。
@@ -182,7 +184,7 @@ for (const failed of [null, 'abort', 'cancel']) test(`stop requires both definit
   assert.ok(calls.some((c) => c.action === 'cancel'))
   assert.equal(runtime.readCopyDevice().phase, failed ? 'unknown' : 'stopped')
 })
-test('quote changes reload and require a second explicit confirmation; no local print', async () => {
+test('quote changes reload and require a second explicit confirmation; one local print', async () => {
   const { device } = await check()
   quoteChanged = true
   await device.confirm()
@@ -190,10 +192,10 @@ test('quote changes reload and require a second explicit confirmation; no local 
   assert.match(runtime.readCopyDevice().notice, /报价已更新/)
   assert.equal(confirmed, false)
   await device.confirm()
-  assert.equal(runtime.readCopyDevice().phase, 'confirmed')
+  assert.equal(runtime.readCopyDevice().phase, 'printing')
   assert.equal(confirmed, true)
   assert.deepEqual(calls.filter((c) => c.action === 'confirm').map((c) => c.version), ['a'.repeat(64), 'b'.repeat(64)])
-  assert.equal(calls.some((c) => c.action === 'print'), false)
+  assert.equal(calls.filter((c) => c.action === 'print').length, 1)
 })
 test('a delayed pre-confirm status cannot roll confirmed back to scanned', async () => {
   const { device } = await check()
@@ -202,10 +204,10 @@ test('a delayed pre-confirm status cannot roll confirmed back to scanned', async
   try {
     await tick()
     await device.confirm()
-    assert.equal(runtime.readCopyDevice().phase, 'confirmed')
+    assert.equal(runtime.readCopyDevice().phase, 'printing')
     release({ ...view, state: 'scanned', pageCount: 3 })
     await flush()
-    assert.equal(runtime.readCopyDevice().phase, 'confirmed')
+    assert.equal(runtime.readCopyDevice().phase, 'printing')
   } finally { statusWait = null }
 })
 test('clear aborts requests, destroys previews and schedules local deletion without waiting', async () => {
@@ -224,7 +226,7 @@ test('expiry immediately invalidates the preview and stops outstanding requests'
   const expiry = [...timers.values()].find((t) => t.delay > 3000)
   assert.ok(expiry.delay <= 2_147_483_647, 'browser timeout must not overflow into immediate expiry')
   expiry.fn()
-  assert.equal(runtime.readCopyDevice().phase, 'unknown')
+  assert.equal(runtime.readCopyDeviceFlow(), null)
   assert.equal(runtime.readCopyDevice().job, null)
   assert.ok(calls.find((c) => c.action === 'start').signal.aborted)
   assert.ok(calls.some((c) => c.action === 'clear'))
