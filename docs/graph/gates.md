@@ -70,7 +70,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1998 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1999 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1283,7 +1283,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/terminal-agent/src/</code> — 59 个文件</summary>
+<summary><code>apps/terminal-agent/src/</code> — 60 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1314,6 +1314,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/src/agent/scan-delivery.ts` | `verify-scan-device-engine.ts`<br/>`verify-scan-device-runner-r4.ts` |
 | `apps/terminal-agent/src/agent/scan-deskew/runner.ts` | `verify-scan-deskew.ts` |
 | `apps/terminal-agent/src/agent/scan-deskew/script.ts` | `verify-scan-deskew.ts` |
+| `apps/terminal-agent/src/agent/scan-deskew/thresholds-source.ts` | `verify-scan-deskew.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-device-backend.ts` | `verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner-r4.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-device-runner.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-device-deliver.ts` | `verify-scan-device-runner-r4.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-device-health.ts` | `verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner.ts` |

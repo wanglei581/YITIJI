@@ -9,22 +9,26 @@ using System.Runtime.InteropServices;
 namespace ScanDeskew {
     public static class ImageProcessor {
         public static Estimate Process(string input, string output) {
+            return Process(input, output, false);
+        }
+        public static Estimate Process(string input, string output, bool diagnostics) {
+            Estimate estimate = null;
             try {
                 using (Image source = Image.FromFile(input)) {
                     string extension = Path.GetExtension(input).ToLowerInvariant();
                     Guid format = source.RawFormat.Guid;
                     if (!((extension == ".png" && format == ImageFormat.Png.Guid) ||
                         ((extension == ".jpg" || extension == ".jpeg") && format == ImageFormat.Jpeg.Guid) ||
-                        (extension == ".bmp" && format == ImageFormat.Bmp.Guid))) return new Estimate(false, 0);
+                        (extension == ".bmp" && format == ImageFormat.Bmp.Guid))) return Failure("format");
                     if (source.Width < Limits.MinDimension || source.Height < Limits.MinDimension ||
                         source.Width > Limits.MaxDimension || source.Height > Limits.MaxDimension ||
                         (long)source.Width * source.Height > Limits.MaxPixels)
-                        return new Estimate(false, 0);
+                        return Failure("source_dimensions");
                     foreach (Guid dimension in source.FrameDimensionsList)
-                        if (source.GetFrameCount(new FrameDimension(dimension)) != 1) return new Estimate(false, 0);
+                        if (source.GetFrameCount(new FrameDimension(dimension)) != 1) return Failure("multiple_frames");
                     // Any non-opaque pixel is uncertain; never silently flatten transparency.
                     using (Bitmap original = new Bitmap(source)) {
-                        if (!Opaque(original)) return new Estimate(false, 0);
+                        if (!Opaque(original)) return Failure("transparency");
                         double scale = Math.Min(1, (double)Limits.LongEdge / Math.Max(source.Width, source.Height));
                         using (Bitmap small = new Bitmap((int)(source.Width * scale), (int)(source.Height * scale), PixelFormat.Format24bppRgb)) {
                             using (Graphics g = Graphics.FromImage(small)) {
@@ -32,7 +36,7 @@ namespace ScanDeskew {
                                 g.DrawImage(original, new Rectangle(0, 0, small.Width, small.Height));
                             }
                             byte[] gray = Gray(small);
-                            Estimate estimate = Estimator.Analyze(gray, small.Width, small.Height, small.Width);
+                            estimate = Estimator.Analyze(gray, small.Width, small.Height, small.Width, diagnostics);
                             if (!estimate.Corrected) return estimate;
                             Color background = Background(small);
                             Rotate(original, output, extension == ".png", -estimate.AngleDeg, background, source.HorizontalResolution, source.VerticalResolution);
@@ -46,10 +50,15 @@ namespace ScanDeskew {
                         }
                     }
                 }
-            } catch {
+            } catch (Exception error) {
                 try { File.Delete(output); } catch { }
-                return new Estimate(false, 0);
+                Estimate failed = Failure("image_exception_" + error.GetType().Name);
+                if (diagnostics && estimate != null) failed.Detail = estimate.Detail;
+                return failed;
             }
+        }
+        private static Estimate Failure(string reason) {
+            Estimate result = new Estimate(false, 0); result.Reason = reason; return result;
         }
         private static bool Opaque(Bitmap image) {
             BitmapData data = image.LockBits(new Rectangle(0, 0, image.Width, image.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);

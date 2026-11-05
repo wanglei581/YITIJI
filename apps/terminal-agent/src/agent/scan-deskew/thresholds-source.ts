@@ -22,6 +22,8 @@ namespace ScanDeskew {
     public sealed class Estimate {
         public bool Corrected;
         public double AngleDeg;
+        // Internal diagnostics; Detail is populated only by explicit gate requests.
+        public string Reason = "not_analyzed", Detail = "";
         public Estimate(bool corrected, double angle) { Corrected = corrected; AngleDeg = angle; }
     }
 }

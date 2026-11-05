@@ -23743,6 +23743,9 @@
     "apps/terminal-agent/src/agent/scan-deskew/script.ts": [
       "apps/terminal-agent/scripts/verify-scan-deskew.ts"
     ],
+    "apps/terminal-agent/src/agent/scan-deskew/thresholds-source.ts": [
+      "apps/terminal-agent/scripts/verify-scan-deskew.ts"
+    ],
     "apps/terminal-agent/src/agent/scan-device/scan-device-backend.ts": [
       "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts",
@@ -35027,6 +35030,7 @@
           "apps/terminal-agent/src/agent/config-manager.ts",
           "apps/terminal-agent/src/agent/scan-deskew/runner.ts",
           "apps/terminal-agent/src/agent/scan-deskew/script.ts",
+          "apps/terminal-agent/src/agent/scan-deskew/thresholds-source.ts",
           "apps/terminal-agent/src/index.ts"
         ],
         "missing": []
