@@ -37,7 +37,7 @@ if (process.argv.includes('--update')) {
   const manifest = {
     frozenAt: previous?.frozenAt ?? new Date().toISOString().slice(0, 10),
     updatedAt: new Date().toISOString().slice(0, 10),
-    note: '青序流光 · 触屏版，全页补稿第 5 版定稿（产品负责人 2026-10-27 看过并同意进仓库；第 4 版补稿 2026-10-26 定稿）；2026-11-05 政策最小闭环改政策三屏并加空态（policy-min.js，产品负责人点「按方案开工」）。改稿须产品负责人同意，并在 current-progress.md 写明原因；README.md 不在冻结范围。',
+    note: '青序流光 · 触屏版，全页补稿第 5 版定稿（产品负责人 2026-10-27 看过并同意进仓库；第 4 版补稿 2026-10-26 定稿）；2026-11-05 政策最小闭环改政策三屏并加空态（policy-min.js），「我的 · 收藏」每条加取消（fix-me.js，方案屏 5「沿用 我的 · 收藏（加取消）」），产品负责人点「按方案开工」。改稿须产品负责人同意，并在 current-progress.md 写明原因；README.md 不在冻结范围。',
     files: current,
   }
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)

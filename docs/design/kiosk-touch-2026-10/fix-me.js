@@ -87,6 +87,9 @@
 .fe-split>.fe-hero{flex:1 1 0;min-height:0}
 .fe-pin{flex:0 0 auto}
 .fe-block{display:flex;flex-direction:column;gap:8px;flex:none}
+.fe-fav{flex-direction:row;align-items:center;gap:12px}
+.fe-fav>.fe-open{flex:1 1 auto;min-width:0}
+.fe-fav>.btn{flex:none;height:64px;min-height:64px;width:auto}
 `;
   document.head.appendChild(css);
 
@@ -218,7 +221,7 @@
     'my-docs': [['folder', '看文件名和保存期限', '每份文件写着大小、时间和能保存多久'], ['printer', '选一份去打印', 'PDF、JPG、PNG 可以直接打'], ['clock', '改保存期限', '3 个月或 6 个月，到期后不能恢复']],
     'my-ai': [['sparkle', '打开已经生成的结果', '诊断、优化、生成、规划和模拟面试'], ['clock', '看还在处理或失败的原因', '打不开的会写明为什么'], ['erase', '删掉不需要的记录', '小青作业只能删除']],
     'my-activity': [['book', '看浏览过的政策', '只记你在这台机器上看过的'], ['arrowR', '看打开过的来源', '点一条可以再打开那条政策'], ['clock', '按时间排好', '最近看的在最前面']],
-    'my-fav': [['book', '看收藏的政策', '只收藏政策，方便下次再找'], ['eye', '点一条打开政策', '打开的是这条政策本身'], ['x', '取消收藏在政策页里', '这一页不能取消']],
+    'my-fav': [['book', '看收藏的政策', '只收藏政策，方便下次再找'], ['eye', '点一条打开政策', '打开的是这条政策本身'], ['x', '每一条都能取消收藏', '点右边「取消收藏」；没取消成功会放回原位并写明']],
     'my-benefits': [['check', '看每项现在能不能用', '可用、已用完、已过期、已撤销都会写明'], ['landmark', '看补贴说明', '说明不等于补贴已经发放'], ['printer', '没有权益也能去办事', '打印、简历和政策照样能办']],
     feedback: [['message', '选类型并提交', '设备、打印、文件、建议，或 AI 内容投诉'], ['clock', '看以前的处理进度', '已提交、处理中、已回复、已关闭'], ['pen', '补充回复或关闭工单', '关闭前会再问一次']],
     privacy: [['shield', '撤回 AI 使用授权', '不影响简历、打印、收藏和已保存的文件'], ['clipboard', '看申请记录', '提交之后，进度出现在这一页'], ['file', '导出和注销不在这台机器上', '按《隐私政策》里的联系方式申请']],
@@ -807,9 +810,10 @@
     const pre = shell('my-fav', { eye: '我的 · 收藏', what: '收藏', ask: '问小青：收藏的政策在哪里看？' });
     if (pre) return pre;
     const rows = mode() === 'empty' ? [] : FAVS;
+    // 2026-11-05 政策最小闭环（批准方案「我的 · 收藏（加取消）」）：每条右边一个「取消收藏」。
     const main = rows.length
-      ? `${rowBox(rows.map((r) => btn('fe-line', 'data-go="policy-detail"', `<b>${r.t}</b><small>${r.m}</small>`)).join(''), rows.length, false)}
-        <p class="fine">点一条打开政策。取消收藏在政策页里。离开 3 分钟没操作会自动退出。</p>`
+      ? `${rowBox(rows.map((r) => `<div class="fe-line fe-fav">${btn('fe-open', 'data-go="policy-detail"', `<b>${r.t}</b><small>${r.m}</small>`)}${btn('btn sec sm', 'data-act="toast" data-arg="演示：已取消收藏，这一条从列表里拿掉"', '取消收藏')}</div>`).join(''), rows.length, false)}
+        <p class="fine">点一条打开政策，点右边「取消收藏」可以取消。离开 3 分钟没操作会自动退出。</p>`
       : emptyPack('还没有收藏。收藏只是方便下次再找，不含投递结果。', [
         exitCard('class="fe-tall" data-go="policy"', UI.checklist(160), '查看政策', '看本机构发布的就业政策'),
         exitCard('class="fe-tall" data-go="print"', UI.phone(160), '去打印', '打印和扫描现在就能办'),

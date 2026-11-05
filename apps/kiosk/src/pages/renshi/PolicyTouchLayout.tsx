@@ -12,10 +12,13 @@ import { POLICY_ASK_HOME } from './policyModel'
 import '../service-hubs/policy-touch.css'
 
 export function PolicyTouchLayout({ title, eyebrow, sub, state, children, home = false, compact = false,
-  ask = true, askPrompt = POLICY_ASK_HOME, path, pathLabel, primary, alert }: {
+  ask = true, askPrompt = POLICY_ASK_HOME, path, pathLabel, nav = !compact, primary, alert }: {
   title: string; eyebrow: string; sub?: string; state: string; children: ReactNode
   home?: boolean; compact?: boolean; ask?: boolean; askPrompt?: { label: string; draft: string }
-  path?: readonly string[]; pathLabel?: string; primary?: QxTouchPrimary; alert?: ReactNode
+  path?: readonly string[]; pathLabel?: string
+  /** 底部导航：首页、类别列表、公告照稿都有（policy-min.js nav: 'home'），详情（紧凑顶带）没有。 */
+  nav?: boolean
+  primary?: QxTouchPrimary; alert?: ReactNode
 }) {
   const navigate = useNavigate()
   const capabilities = useInterviewAiCapabilities()
@@ -31,7 +34,7 @@ export function PolicyTouchLayout({ title, eyebrow, sub, state, children, home =
           ? { label: '小青暂时不可用 · 查看政策照常', disabled: true }
           : { label: askPrompt.label, draft: askPrompt.draft, voice: import.meta.env.VITE_USE_TRTC_CALL === 'true' }}
         primary={primary} alert={alert} />}
-      nav={home ? <QxTouchNav onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} /> : undefined}>
+      nav={nav ? <QxTouchNav onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} /> : undefined}>
       <div className="policy-min-body">
         {IS_MOCK_MODE && <p className="policy-min-fine" role="note">演示数据 · 当前为演示模式</p>}
         {children}
