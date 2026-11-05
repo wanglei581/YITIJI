@@ -37,6 +37,8 @@ const SENSITIVE_BY_PURPOSE: Record<FilePurpose, FileSensitiveLevel> = {
   contract_upload: 'highly_sensitive',
   contract_review_report: 'highly_sensitive',
   self_assessment_report: 'sensitive',
+  // 公开政策一页办事清单（服务端生成，只含已发布公共信息）
+  policy_checklist: 'normal',
 }
 
 let nextId = 1
