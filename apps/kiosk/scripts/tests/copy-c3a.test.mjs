@@ -82,7 +82,7 @@ test('limits are definitive rejection; wrong terminal / expired receipts stay un
   assert.equal(state.acceptCopyReceipt(second.epoch, receipt({ expiresAt: '2000-01-01' })), false)
   state.clearCopySession()
 })
-test('all copy modules prohibit persistent browser storage, logs and local hardware commands', () => {
+test('all copy modules prohibit persistent browser storage, logs and direct hardware endpoints', () => {
   const files = readdirSync(base).filter((name) => /\.(tsx?|css)$/.test(name)).map((name) => new URL(name, base))
   files.push(new URL('src/services/api/copyJobs.ts', root))
   for (const file of files) {

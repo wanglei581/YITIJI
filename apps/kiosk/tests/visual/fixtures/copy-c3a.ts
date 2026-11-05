@@ -12,6 +12,16 @@ export async function copyFixture(page: Page, api: ApiRouter, options: {
     status: 200, json: { enabled: false, idleTimeoutSec: 180, items: [] },
   })
   api.respond('GET', '/api/v1/health', ok({ status: 'ok' }))
+  // 离开复印区后的首页面板与问小青能力；形状沿用 privacy-clear-shell 的空响应。
+  api.respond('GET', '/api/v1/jobs', {
+    status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } },
+  })
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200, json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
+  })
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
+    status: 200, json: { asrEnabled: false, ttsEnabled: false },
+  })
   api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', ok({
     printerStatus: options.printer ?? 'ready', isOnline: options.printer !== 'offline', scanInputHealth: 'healthy',
   }))
@@ -42,6 +52,18 @@ export async function copyFixture(page: Page, api: ApiRouter, options: {
     if (!route.request().url().endsWith('/probe')) throw new Error('C3a must not start scanning')
     await route.fulfill({ status: 200, headers, contentType: 'application/json', body: JSON.stringify(ok({ state: options.probe ?? 'ready' }).json) })
   })
+  // C3b 接入后，C3a 仍只核建单；本机操作由 C3b 的夹具和用例细验。
+  const localCalls: string[] = []
+  await page.route('http://127.0.0.1:9527/local/copy/**', async (route) => {
+    const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
+    if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 204, headers }); return }
+    const action = new URL(route.request().url()).pathname.split('/').at(-1)!
+    localCalls.push(action)
+    const body = route.request().postDataJSON()
+    await route.fulfill({ status: 200, headers, contentType: 'application/json', body: JSON.stringify(ok({
+      state: action === 'clear' ? 'cleared' : 'starting', generation: body.generation, pageCount: 0, errorCode: null, purged: true,
+    }).json) })
+  })
   const goto = (stage = '') => page.goto(`/print-scan/feature/copy-screen${stage ? `?stage=${stage}` : ''}`)
-  return { calls, receipt, goto }
+  return { calls, localCalls, receipt, goto }
 }

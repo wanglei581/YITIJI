@@ -105,7 +105,7 @@ test('create sends real DTO, terminal auth, no member required; secrets never pe
   expect(call.headers.authorization).toBeUndefined()
   expect(call.headers['x-copy-control']).toBeUndefined()
   expect(await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage }, url: location.href }))).not.toContain(COPY_CONTROL)
-  await expect(page.getByText('正在扫原件', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: '正在扫原件', exact: true })).toBeVisible()
   await page.reload()
   await expect(page.getByTestId('copy-how')).toBeVisible()
   expect(f.calls).toHaveLength(1)
@@ -128,29 +128,36 @@ test('missing one-time token blocks a second create @w2', async ({ page, api }) 
 })
 for (const mode of ['leave', 'idle', 'logout'] as const) test(`${mode} clears the in-memory session and token @w2`, async ({ page, api }) => {
   // 闲置提醒的计时器在进页面时就建立，登出这一支要在进页面之前装好假时钟，runFor 才推得动它。
-  if (mode === 'logout') await page.clock.install()
+  await page.clock.install()
   const f = await copyFixture(page, api)
   await f.goto('set')
   await page.getByTestId('copy-primary').click()
   await expect(page.getByTestId('copy-c3b-entry')).toBeVisible()
+  await expect.poll(() => f.localCalls.filter((action) => action === 'start').length).toBe(1)
   if (mode === 'idle') {
-    await page.clock.install()
     await page.clock.fastForward(181_000)
+    // 全局 idle 会硬清场：让 rAF / 250ms 兜底执行回首页的整页重载。
+    await page.clock.runFor(1000)
   } else if (mode === 'logout') {
     // 通过真实闲置提醒结束游客使用；全局清令牌行为另由 Node 测试直接验证。
-    // 结束使用后回到首页会拉岗位与招聘会面板，本夹具不关心内容，给空表。
-    api.respondWith('GET', '/api/v1/job-fairs', () => ({ status: 200, json: { success: true, data: { items: [], total: 0 } } }))
-    api.respondWith('GET', '/api/v1/jobs', () => ({ status: 200, json: { success: true, data: { items: [], total: 0 } } }))
     await page.clock.runFor(151_000)
     await page.getByTestId('session-guard-clear').click()
-  } else await page.getByRole('button', { name: '返回', exact: true }).click()
-  await expect(page.getByTestId('copy-c3b-entry')).toHaveCount(0)
-  if (mode !== 'logout') {
-    // 登出这一支在假时钟下回到首页，再进复印区由离开、闲置两支覆盖；它只核会话与令牌已清。
-    await page.goto('/print-scan/feature/copy-screen?stage=scan')
-    await expect(page.getByTestId('copy-how')).toBeVisible()
-    await expect(page.getByTestId('copy-c3b-entry')).toHaveCount(0)
+    await page.clock.runFor(1000)
+  } else {
+    // 真实扫描屏没有「返回」；底部「首页」与 C3b-1 共用先清场再离开的出口。
+    await page.getByRole('button', { name: '首页', exact: true }).click()
   }
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByTestId('session-guard-state-clearing')).toHaveCount(0)
+  await expect(page.getByTestId('qx-home')).toBeVisible()
+  await expect(page.getByTestId('copy-c3b-entry')).toHaveCount(0)
+  await expect.poll(() => f.localCalls.filter((action) => action === 'clear').length).toBeGreaterThan(0)
+  // 硬清场后的直接 goto 不带净化历史标记，会被隐私守卫再次送回首页；走用户入口。
+  await page.locator('[data-action="print-hub"]').click()
+  await page.getByTestId('print-hub-copy-note').click()
+  await expect(page.getByTestId('copy-how')).toBeVisible()
+  await expect(page.getByTestId('copy-c3b-entry')).toHaveCount(0)
+  expect(f.localCalls.filter((action) => action === 'start')).toHaveLength(1)
   expect(f.calls).toHaveLength(1)
   expect(await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }))).not.toContain(COPY_CONTROL)
 })

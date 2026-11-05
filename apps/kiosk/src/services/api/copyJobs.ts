@@ -25,6 +25,20 @@ export interface CopyJobReceipt {
   expiresAt: string
   controlToken?: string
 }
+export interface CopyQuote extends CopySettings {
+  serviceKey: string
+  unitCents: number
+  pageCount: number
+  billableSides: number
+  amountCents: number
+}
+export interface CopyJobView extends CopyJobReceipt, CopySettings {
+  pageCount: number
+  orderId: string | null
+  quote: Omit<CopyQuote, 'source'> | null
+  quoteVersion: string | null
+  quoteError: string | null
+}
 
 async function copyRequest<T>(path: string, options: {
   method: 'GET' | 'POST'; body?: unknown; controlToken?: string; memberToken?: string | null; signal?: AbortSignal
@@ -63,6 +77,13 @@ export function createCopyJob(input: CreateCopyInput, memberToken: string | null
 }
 
 /** C3b 查询同一单的接点。控制凭证只通过请求头传输。 */
-export function getCopyJob(copyId: string, controlToken: string, memberToken: string | null, signal?: AbortSignal): Promise<CopyJobReceipt> {
+export function getCopyJob(copyId: string, controlToken: string, memberToken: string | null, signal?: AbortSignal): Promise<CopyJobView> {
   return copyRequest(`/${encodeURIComponent(copyId)}`, { method: 'GET', controlToken, memberToken, signal })
+}
+
+export function confirmCopyJob(copyId: string, controlToken: string, quoteVersion: string, signal?: AbortSignal): Promise<CopyJobView> {
+  return copyRequest(`/${encodeURIComponent(copyId)}/confirm`, { method: 'POST', controlToken, body: { quoteVersion }, signal })
+}
+export function cancelCopyJob(copyId: string, controlToken: string, generation: number, signal?: AbortSignal): Promise<CopyJobView> {
+  return copyRequest(`/${encodeURIComponent(copyId)}/cancel`, { method: 'POST', controlToken, body: { generation }, signal })
 }

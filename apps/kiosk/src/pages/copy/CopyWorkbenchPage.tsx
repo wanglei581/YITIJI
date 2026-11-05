@@ -6,6 +6,8 @@ import { CopySettingsView } from './CopySettingsView'
 import { CopyWays } from './CopyWays'
 import { allowedCopySettings, clearCopySession, pickCopySettings } from './copySession'
 import { useCopyFlow } from './useCopyFlow'
+import { CopyDeviceView } from './CopyDeviceView'
+import { readCopyDeviceFlow } from './copyDeviceFlow'
 
 /** URL 只表示视图意图；建单和后续扫描从来不因深链或刷新自动执行。 */
 export function CopyWorkbenchPage() {
@@ -47,6 +49,18 @@ export function CopyWorkbenchPage() {
     })
   }
   const pending = snapshot.phase === 'creating'
+  const rescan = async () => {
+    const settings = snapshot.session?.input
+    if (!settings || !await readCopyDeviceFlow()?.clearForRescan()) return
+    clearCopySession()
+    pickCopySettings(settings)
+    go('set')
+    const outcome = await flow.start(true)
+    if (outcome === 'ready') go('scan')
+    if (outcome === 'off') go('off')
+  }
+  if (stage === 'scan' && snapshot.session?.controlToken) return <CopyDeviceView session={snapshot.session}
+    onBack={back} onRescan={rescan} printerReady={flow.printer.printerReady} online={online} />
   return <CopyShell stage={stage} title={title} reason={reason} onBack={back}
     subtitle={stage === 'off' && flow.printer.printerReady ? '面板上的复印、身份证复印、票据复印都能用。' : undefined}
     primary={stage === 'off' ? { label: '怎么在打印机上复印', onClick: guide, testId: 'copy-primary' }
@@ -57,7 +71,6 @@ export function CopyWorkbenchPage() {
       : stage === 'set' ? <CopySettingsView settings={allowedCopySettings(snapshot.settings, options)} color={options.color} duplex={options.duplex}
         locked={Boolean(snapshot.attempt)} notice={snapshot.notice ?? reason} onPick={pickCopySettings} />
         : <div className="cc-next" data-testid="copy-c3b-entry" role="status">
-          {/* C3b 从 readCopySession 接真实会话；本包不调用本机 start，不展示虚构的扫描状态。 */}
           <p>{snapshot.notice ?? '原件几页，扫完才知道；扫完会给你核对'}</p>
         </div>}
   </CopyShell>

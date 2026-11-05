@@ -46,7 +46,6 @@ export function ScanDeviceRunView({
   armed: boolean
   stop: RunStop
 }) {
-  const thirdTitle = pages != null ? `已收到 ${pages} 页` : '正在扫描'
   const waiting = !scannerStarted
   return (
     <ScanWorkbenchShell
@@ -63,6 +62,18 @@ export function ScanDeviceRunView({
         secondary: <ScanDeviceStopButton label="停止扫描" armed={stop.armed} busy={stop.busy} disabled={stop.disabled} onPress={stop.onPress} />,
       }}
     >
+      <ScanDeviceRunContent pages={pages} scannerStarted={scannerStarted} armed={armed} />
+    </ScanWorkbenchShell>
+  )
+}
+
+/** 同一套整页进度与插画，复印只替换末步用途。 */
+export function ScanDeviceRunContent({ pages, scannerStarted, armed, copy = false, preparing = false }: {
+  pages: number | null; scannerStarted: boolean; armed: boolean; copy?: boolean; preparing?: boolean
+}) {
+  const waiting = !scannerStarted
+  const thirdTitle = pages != null ? `已收到 ${pages} 页` : '正在扫描'
+  return (
       <div className="cs-flow cs-run" data-testid="scan-device-run">
         <div className="cs-steps">
           <Step n={1} title="已收到" state="完成" detail="这台机器收到了扫描请求" />
@@ -70,13 +81,13 @@ export function ScanDeviceRunView({
           <Step
             n={3}
             title={waiting ? '正在扫描' : thirdTitle}
-            state={scannerStarted ? '进行中' : '未开始'}
+            state={preparing ? '完成' : scannerStarted ? '进行中' : '未开始'}
             detail={pages != null ? '每扫完一整页才加一' : '先别动原件'}
-            current={scannerStarted}
+            current={scannerStarted && !preparing}
           />
-          <Step n={4} title="生成文件并传回" state="未开始" detail="扫完后合成一个 PDF" />
+          <Step n={4} title={copy ? '整理成预览' : '生成文件并传回'} state={preparing ? '进行中' : '未开始'} current={preparing} detail={copy ? '扫完后准备给你核对' : '扫完后合成一个 PDF'} />
         </div>
-        <div className={`cs-hero${pages == null ? ' none' : ''}`}>
+        <div className={`cs-hero${pages == null ? ' none' : ''}${preparing ? ' preparing' : ''}`}>
           <div className="cs-hrow">
             <div className="cs-reader" aria-hidden="true">
               <ScanSheetArt width={pages == null ? 520 : 440} height={pages == null ? 736 : 622} />
@@ -96,16 +107,15 @@ export function ScanDeviceRunView({
               )}
             </div>
           </div>
-          {pages != null ? <PageThumbs pages={pages} /> : null}
+          {pages != null ? <PageThumbs pages={pages} nextLabel={preparing ? '整理成预览' : '扫描中'} /> : null}
         </div>
         <ScanDeviceArmNote armed={armed} />
         <p className="cs-fine">每扫完一整页才加一；扫描仪不报就不显示页数</p>
       </div>
-    </ScanWorkbenchShell>
   )
 }
 
-function PageThumbs({ pages }: { pages: number }) {
+function PageThumbs({ pages, nextLabel = '扫描中' }: { pages: number; nextLabel?: string }) {
   const shown = Math.min(pages, 5)
   const from = pages - shown
   return (
@@ -116,7 +126,7 @@ function PageThumbs({ pages }: { pages: number }) {
           <i><QxTouchIcon name="check" size={20} strokeWidth={3.4} /></i>
         </span>
       ))}
-      <span className="cs-pg next">扫描中</span>
+      <span className="cs-pg next">{nextLabel}</span>
     </div>
   )
 }

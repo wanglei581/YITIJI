@@ -37,6 +37,11 @@ let snapshot = initial()
 let generation = 0
 let requestAbort: AbortController | null = null
 const listeners = new Set<() => void>()
+const cleanup = new Set<() => void>()
+export function onCopySessionClear(listener: () => void): () => void {
+  cleanup.add(listener)
+  return () => cleanup.delete(listener)
+}
 const publish = (next: Snapshot) => { snapshot = next; for (const listener of listeners) listener() }
 export const readCopySnapshot = () => snapshot
 export const readCopySession = () => snapshot.session
@@ -49,7 +54,13 @@ export function clearCopySession(): void {
   generation += 1
   requestAbort?.abort()
   requestAbort = null
+  for (const release of cleanup) release()
   publish(initial())
+}
+export function markCopyConfirmed(receipt: CopyJobReceipt): void {
+  if (snapshot.session?.copyId !== receipt.copyId || snapshot.session.generation !== receipt.generation) return
+  publish({ ...snapshot, session: { ...snapshot.session, state: 'confirmed',
+    authorizationVersion: receipt.authorizationVersion, expiresAt: receipt.expiresAt } })
 }
 export function pickCopySettings(settings: CopySettings): void {
   if (snapshot.attempt) return

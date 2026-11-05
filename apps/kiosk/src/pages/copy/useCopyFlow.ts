@@ -29,12 +29,14 @@ export function useCopyFlow() {
     const events = ['pointerdown', 'keydown'] as const
     for (const event of events) window.addEventListener(event, touch, true)
     window.addEventListener('pageshow', check)
+    window.addEventListener('pagehide', clearCopySession)
     document.addEventListener('visibilitychange', check)
     const timer = window.setInterval(check, 1000)
     return () => {
       window.clearInterval(timer)
       for (const event of events) window.removeEventListener(event, touch, true)
       window.removeEventListener('pageshow', check)
+      window.removeEventListener('pagehide', clearCopySession)
       document.removeEventListener('visibilitychange', check)
       clearCopySession()
     }
@@ -44,8 +46,10 @@ export function useCopyFlow() {
   const reason = scanReason?.replace(/扫描能力/g, '复印能力').replace(/屏上扫描/g, '屏上复印').replace(/面板扫描/g, '面板复印')
     ?? (printer.printerReady ? null : printer.kind === 'offline' ? '打印机离线' : '打印机状态暂时无法确认，请先用面板复印')
   const denied = caps?.status === 'ok' && !options.screen
-  const start = async (): Promise<'ready' | 'off' | 'stay'> => {
-    if (reason || !navigator.onLine) return denied ? 'off' : 'stay'
+  const start = async (afterClear = false): Promise<'ready' | 'off' | 'stay'> => {
+    // 重扫已取得本机清理和云端取消的确定回包；不被上一轮 probe 的忙快照卡住。
+    const blocked = afterClear ? !options.screen || !printer.printerReady : Boolean(reason)
+    if (blocked || !navigator.onLine) return denied ? 'off' : 'stay'
     if (!readCopySnapshot().attempt) pickCopySettings(allowedCopySettings(readCopySnapshot().settings, options))
     const attempt = beginCopyAttempt(terminalId)
     if (!attempt) return 'stay'
