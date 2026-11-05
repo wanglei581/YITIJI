@@ -24,6 +24,7 @@ import path from 'path'
 import { createHmac } from 'crypto'
 import { spawnSync } from 'child_process'
 import { log, warn } from '../../logger'
+import { COPY_DELETION_REASONS } from '../copy-device/copy-types'
 import {
   beginScanDeletionAudit,
   finishScanDeletionAudit,
@@ -47,6 +48,7 @@ export const SCAN_DEVICE_DELETION_REASONS = [
   'SCAN_DEVICE_SWITCHED_TO_PANEL',
   'SCAN_DEVICE_SESSION_CLEARED',
   'SCAN_DEVICE_STARTUP_RESIDUE',
+  ...COPY_DELETION_REASONS,
 ] as const
 export type ScanDeviceDeletionReason = (typeof SCAN_DEVICE_DELETION_REASONS)[number]
 

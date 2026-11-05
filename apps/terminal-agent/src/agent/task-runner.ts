@@ -763,10 +763,10 @@ async function runClaimCycle(
     return
   }
 
-  const printLock = config.scanDeviceEnabled === true
+  const printLock = (config.scanDeviceEnabled === true || config.copyDeviceEnabled === true)
     ? globalDeviceLock.tryAcquire('print-claim')
     : undefined
-  if (config.scanDeviceEnabled === true && !printLock) {
+  if ((config.scanDeviceEnabled === true || config.copyDeviceEnabled === true) && !printLock) {
     const now = Date.now()
     if (now - lastDeviceLockSkipLogAt >= DEVICE_LOCK_SKIP_LOG_INTERVAL_MS) {
       lastDeviceLockSkipLogAt = now

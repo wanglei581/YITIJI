@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-11-05：屏上复印 C2a——终端程序本机复印前半段（分支 `claude/copy-agent-c2-1104`，自 A2 头 23e7076c6 开出，未合并、未部署）
+
+- 做了什么（Codex 实现，Claude 收货）：本机接口 `POST /local/copy/{start,next-page,finish,status,preview,abort,clear}`，复用 loopback、Origin 白名单、桥接令牌与短期桥接会话，公共体 `{copyId,generation,operationId}`、`operationId` 幂等（异参 409）、体积上限 8 KiB；每次扫描、续页、预热重试前在线取 `op=scan` 许可；复用 A2 的 WIA 解析、整页核实、页序、页数与字节上限、PDF 合成、私有目录与删除审计（WIA 默认依赖抽到 `wia-runner-deps.ts`，`wia-runner.ts` 514→448 行）；扫描、探测、打印共用设备锁（等锁上限 30 秒）；复印页放在独立的 `copy-device/<派生标识>/`，**不走上传链路、不上云**；预览返回 JPEG 字节并带 no-store 等三个防缓存头、不返回路径；abort/clear 先撤权再删，删除失败返回 503 与 `purged:false`、后台重试、不占设备锁；七个 `COPY_*` 删除码与后端白名单逐码一致（`COPY_PRINT_TERMINAL` 留给打印）。开关 `copyDeviceEnabled` 缺省关。打印派发与结果回报是 C2b。
+- 验证：新门禁 `verify:copy-device`（18 项）接进 ci.yml；`verify:scan-device-engine`（53 组）、`verify:scan-device-runner`（21 组）、`verify:scan-deletion-audit`、`verify:usb-import-agent`、`verify:scan-watcher`、tsc、lint、repository-integrity 过；反向检查三项（许可不允许仍开扫、预览缺 no-store、clear 不删页）都变红。
+
 ## 2026-11-04：终端程序 A2 第六轮——收掉第四轮复审的 2 条 P1（分支 `claude/scan-device-a2-1102`，随 0.4.19，未部署）
 
 - ① 后台重投复用过期签名租约（默认 60 秒）：断网一分钟以上恢复、探查确认仍可投递后，带旧签名重投被拒，会删掉本可交付的页。改为探查确认后复用现有取租约路径重取签名，PDF 字节、快照时间、`deviceRound` 不变；`SCAN_LEASE_EXPIRED` 归为不确定、回探查核对；重取失败保持不确定。

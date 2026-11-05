@@ -1,0 +1,165 @@
+import { globalDeviceLock } from '../device-lock'
+import type { AgentConfig } from '../types'
+import { composeScanPdf } from '../scan-device/scan-pdf-compose'
+import { startWiaScan } from '../scan-device/wia-runner'
+import { runWiaProbe } from '../scan-device/wia-probe'
+import { defaultListResidualProcesses, defaultScanProcessAlive } from '../scan-device/scan-device-health'
+import { commandLineIsOurWiaProcess } from '../scan-device/wia-script'
+import { copyBackend } from './copy-backend'
+import { createCopyEngine } from './copy-engine'
+import { copyDirId, createCopyStorage, getCopyDeviceRoot } from './copy-storage'
+import { CopyError, copyView, type CopyAction, type CopyCommand, type CopyDeps,
+  type CopyDeletionReason, type CopyRuntime, type CopySession, type CopyView } from './copy-types'
+
+export const COPY_SESSION_TTL_MS = 180_000
+
+export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDeps> = {}): CopyRuntime {
+  const deps: CopyDeps = {
+    config, clock: { now: Date.now, setTimeout: (cb, ms) => setTimeout(cb, ms),
+      clearTimeout: (h) => clearTimeout(h as NodeJS.Timeout) },
+    lock: globalDeviceLock, root: getCopyDeviceRoot(), tempHooks: {}, startScan: startWiaScan,
+    compose: composeScanPdf, runProbe: runWiaProbe, ...copyBackend(config),
+    processGone: (pid) => {
+      if (pid !== undefined) return !defaultScanProcessAlive(pid)
+      const list = defaultListResidualProcesses()
+      return list.kind === 'ok' && !list.processes.some((p) => commandLineIsOurWiaProcess(p.commandLine))
+    }, ...overrides,
+  }
+  const storage = createCopyStorage(deps)
+  const engine = createCopyEngine(deps, storage)
+  const sessions = new Map<string, CopySession>()
+  const operations = new Map<string, { fingerprint: string; result: Promise<CopyView> }>()
+  let active: CopySession | undefined
+  let stopped = false
+  let startupSafe = false
+  let timer: unknown
+  const key = (c: CopyCommand) => `${c.copyId}:${c.generation}`
+  const cleanup = (s: CopySession): void => {
+    if (s.work || !s.cleanupReason || s.purged === true) return
+    if (s.retainedLock) {
+      if (!deps.processGone(s.suspectPid)) { s.purged = false; return }
+      s.retainedLock.release()
+      s.retainedLock = undefined
+    }
+    s.purged = storage.purge(s.dirId, s.cleanupReason)
+  }
+  const revoke = (s: CopySession, reason: CopyDeletionReason, state: CopyView['state']): void => {
+    s.revoked = true
+    s.state = state
+    s.cleanupReason ??= reason
+    s.handle?.abort()
+    cleanup(s)
+  }
+  const tick = async (): Promise<void> => {
+    if (!startupSafe) {
+      try { storage.sweep(); startupSafe = true } catch { /* 隔离复印；其它功能继续运行。 */ }
+    }
+    for (const s of sessions.values()) {
+      if (!s.revoked && deps.clock.now() >= s.expiresAt) revoke(s, 'COPY_EXPIRED', 'expired')
+      if (!s.revoked && config.copyDeviceEnabled !== true) revoke(s, 'COPY_SESSION_CLEAR', 'cleared')
+      if (s.revoked) cleanup(s)
+    }
+    storage.retry()
+  }
+  const launch = (s: CopySession, work: () => Promise<void>): void => {
+    s.work = Promise.resolve().then(work).catch((error: unknown) => {
+      if (!s.revoked) {
+        s.errorCode = error instanceof CopyError ? error.code : 'unknown'
+        revoke(s, deps.clock.now() >= s.expiresAt ? 'COPY_EXPIRED' : 'COPY_SCAN_FAILED',
+          deps.clock.now() >= s.expiresAt ? 'expired' : 'failed')
+      }
+    }).finally(() => { s.work = undefined; if (s.revoked) cleanup(s) })
+  }
+  const requireSession = (c: CopyCommand, owner: string): CopySession => {
+    const s = sessions.get(key(c))
+    if (!s || s.owner !== owner) throw new CopyError(404, 'COPY_NOT_FOUND')
+    return s
+  }
+  const mutate = async (action: CopyAction, c: CopyCommand, owner: string): Promise<CopyView> => {
+    if (action === 'start') {
+      if (!c.source || !c.scanColor) throw new CopyError(400, 'COPY_BAD_REQUEST')
+      if (sessions.has(key(c))) throw new CopyError(409, 'COPY_STATE_CONFLICT')
+      const prior = [...sessions.values()].filter((s) => s.command.copyId === c.copyId)
+      if (prior.some((s) => s.command.generation >= c.generation || s.owner !== owner)) throw new CopyError(409, 'COPY_STATE_CONFLICT')
+      const old = active && !active.revoked ? active : undefined
+      if (old && (old.command.copyId !== c.copyId || old.owner !== owner)) throw new CopyError(409, 'COPY_STATE_CONFLICT')
+      const s: CopySession = { command: { ...c }, owner, dirId: copyDirId(c.copyId, c.generation), dir: '',
+        state: 'starting', errorCode: null, pages: [], expiresAt: deps.clock.now() + COPY_SESSION_TTL_MS,
+        revoked: false, byteBudget: 0, pageCap: 0 }
+      // 首次异步等待前先占下新代，clear/abort 可立即撤权，不会等旧代删完后迟开扫描。
+      active = s
+      sessions.set(key(c), s)
+      if (old) revoke(old, 'COPY_RESCAN', 'cleared')
+      launch(s, async () => {
+        if (old) {
+          await old.work
+          cleanup(old)
+          if (!old.purged) throw new CopyError(503, 'COPY_CLEANUP_FAILED')
+        }
+        await engine.scan(s)
+      })
+      return copyView(s)
+    }
+    const s = requireSession(c, owner)
+    if (action === 'abort' || action === 'clear') {
+      revoke(s, action === 'abort' ? 'COPY_USER_CANCEL' : 'COPY_SESSION_CLEAR', action === 'abort' ? 'cancelled' : 'cleared')
+      await s.work
+      cleanup(s)
+      if (!s.purged) throw new CopyError(503, 'COPY_CLEANUP_FAILED', copyView(s))
+      return copyView(s)
+    }
+    if (s.revoked) throw new CopyError(410, 'COPY_EXPIRED', copyView(s))
+    if (s.state !== 'page_ready' || s.work) throw new CopyError(409, 'COPY_STATE_CONFLICT')
+    if (action === 'next-page') {
+      if (s.command.source !== 'flatbed' || s.pdfReady) throw new CopyError(409, 'COPY_STATE_CONFLICT')
+      s.expiresAt = deps.clock.now() + COPY_SESSION_TTL_MS
+      s.state = 'starting'
+      launch(s, () => engine.scan(s))
+    } else if (action === 'finish') {
+      s.expiresAt = deps.clock.now() + COPY_SESSION_TTL_MS
+      s.state = 'composing'
+      launch(s, () => engine.finish(s))
+    } else throw new CopyError(400, 'COPY_BAD_REQUEST')
+    return copyView(s)
+  }
+  const command: CopyRuntime['command'] = async (action, c, owner) => {
+    await tick()
+    if (stopped || config.copyDeviceEnabled !== true) throw new CopyError(403, 'COPY_DISABLED')
+    if (!startupSafe) throw new CopyError(503, 'COPY_STORAGE_UNSAFE')
+    if (action === 'status' || action === 'preview') {
+      const s = requireSession(c, owner)
+      if (action === 'status') return copyView(s)
+      if (s.revoked || !['page_ready', 'scanned'].includes(s.state)) throw new CopyError(410, 'COPY_EXPIRED')
+      const bytes = storage.read(s, c.page!)
+      s.expiresAt = deps.clock.now() + COPY_SESSION_TTL_MS
+      return bytes
+    }
+    const opKey = `${owner}:${c.operationId}`
+    const fingerprint = JSON.stringify([action, c.copyId, c.generation, c.source, c.scanColor])
+    const previous = operations.get(opKey)
+    if (previous) {
+      if (previous.fingerprint !== fingerprint) throw new CopyError(409, 'COPY_OPERATION_CONFLICT')
+      return previous.result
+    }
+    if (operations.size >= 4096) throw new CopyError(503, 'COPY_OPERATION_LIMIT')
+    const result = mutate(action, c, owner)
+    operations.set(opKey, { fingerprint, result })
+    return result
+  }
+  void tick()
+  const arm = (): void => {
+    timer = deps.clock.setTimeout(() => {
+      void tick().finally(() => { if (!stopped) arm() })
+    }, 1000)
+    ;(timer as NodeJS.Timeout | undefined)?.unref?.()
+  }
+  arm()
+  return { command, tick,
+    whenIdle: async () => { await Promise.all([...sessions.values()].map((s) => s.work)) },
+    stop: () => {
+      stopped = true
+      deps.clock.clearTimeout(timer)
+      for (const s of sessions.values()) if (!s.revoked) revoke(s, 'COPY_SESSION_CLEAR', 'cleared')
+    },
+  }
+}

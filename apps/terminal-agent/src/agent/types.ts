@@ -120,6 +120,8 @@ export interface AgentConfig {
    * 后端 B1 上生产之前不得打开，否则心跳多出的字段会被 forbidNonWhitelisted 拒成 400。
    */
   scanDeviceEnabled?: boolean
+  /** 屏上复印默认关闭；扫描材料只留本机。 */
+  copyDeviceEnabled?: boolean
   /**
    * WIA 扫描仪名称。空字符串表示用第一台扫描仪（由扫描引擎读取），不在这里写死型号。
    */

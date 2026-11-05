@@ -41,6 +41,7 @@ import { inspectScanInputFolder } from './agent/scan-input/verified-folder'
 import { globalScanDeliveryBarrier } from './agent/scan-candidate-barrier'
 import { isUnauthorized } from './agent/auth-state'
 import { AGENT_RUNTIME_VERSION } from './runtime-version'
+import { copyRuntimeForConfig } from './agent/copy-device/copy-lifecycle'
 import {
   bindScanDevicePrintFinishedProbe,
   scanDeviceRuntimeForConfig,
@@ -103,6 +104,7 @@ program
     let scanDeletionAuditReporterTimer: NodeJS.Timeout | null = null
     let scanWatcherHandle: ReturnType<typeof startScanWatcher> | undefined
     let scanDeviceRuntime: ScanDeviceRuntime | undefined
+    let copyDeviceRuntime: ReturnType<typeof copyRuntimeForConfig>
 
     await runAgentBoot({
       acquireLock: async () => {
@@ -167,15 +169,12 @@ program
         }
 
         scanDeviceRuntime = scanDeviceRuntimeForConfig(config)
-        if (scanDeviceRuntime) {
-          bindScanDevicePrintFinishedProbe(() => {
-            void scanDeviceRuntime?.probe()
-          })
-        }
+        copyDeviceRuntime = copyRuntimeForConfig(config, scanDeviceRuntime)
         try {
       qrLocalServer = startQrLoginLocalServer(config, {
         wakePrintQueue: () => taskRunner?.wake() ?? { accepted: false, coalesced: false },
         scanDevice: scanDeviceRuntime,
+        copyDevice: copyDeviceRuntime,
         getPanelStatus: () => ({
           runtimeVersion: AGENT_RUNTIME_VERSION,
           terminalCode: config.terminalCode,
@@ -265,6 +264,7 @@ program
       log(`Agent: received ${signal}, shutting down...`)
       bindScanDevicePrintFinishedProbe(undefined)
       scanDeviceRuntime?.stop()
+      copyDeviceRuntime?.stop()
       if (heartbeatTimer) clearInterval(heartbeatTimer)
       taskRunner?.stop()
       if (offlineRetryTimer) clearInterval(offlineRetryTimer)
