@@ -11,6 +11,7 @@ import { useKioskLicense } from '../../layouts/KioskLicenseContext'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { QxTouchTile } from '../../components/qingxu/touch/QxTouchTile'
+import { QxTouchIcon, type QxTouchIconName } from '../../components/qingxu/touch/QxTouchIcon'
 import { useInterviewAiCapabilities } from '../interview/useInterviewAiCapabilities'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import { PolicyChecklistSample, PolicyReadState, PolicyTouchLayout } from './PolicyTouchLayout'
@@ -29,8 +30,10 @@ async function readPolicy(id: string): Promise<PublishedPolicyLookup> {
   ]).finally(() => clearTimeout(timer))
 }
 
-function HandlingSection({ title, value }: { title: string; value?: string }) {
-  return <section className="policy-min-section"><h2>{title}</h2>
+/** 稿 policy-min.js 的 dsec：标题前一个图标；「要准备的材料」用方框复选样式（check）。 */
+function HandlingSection({ title, value, icon, check = false }: { title: string; value?: string; icon: QxTouchIconName; check?: boolean }) {
+  return <section className={check ? 'policy-min-section policy-min-check' : 'policy-min-section'}>
+    <h2><QxTouchIcon name={icon} size={30} />{title}</h2>
     <ul>{policyLines(value).map((line, index) => <li key={index}>{line}</li>)}</ul>
   </section>
 }
@@ -144,10 +147,10 @@ export function PolicyDetail({ id }: { id: string }) {
     primary={ready ? { ...printButton, onClick: () => { void printChecklist() }, testId: 'policy-checklist-print' } : undefined}
     alert={winding ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : undefined}>
     {ready ? <>
-      <HandlingSection title="谁可以申请" value={policy.whoCanApply} />
-      <HandlingSection title="要准备的材料" value={policy.requiredMaterials} />
+      <HandlingSection title="谁可以申请" value={policy.whoCanApply} icon="user" />
+      <HandlingSection title="要准备的材料" value={policy.requiredMaterials} icon="clipboard" check />
       <section className="policy-min-section policy-min-source">
-        <div><h2>去哪办、看原文</h2><ul>{policyLines(policy.whereToApply).map((line, index) => <li key={index}>{line}</li>)}</ul></div>
+        <div><h2><QxTouchIcon name="landmark" size={30} />去哪办、看原文</h2><ul>{policyLines(policy.whereToApply).map((line, index) => <li key={index}>{line}</li>)}</ul></div>
         <div className="policy-min-qr">
           {source?.kind === 'verified' ? <><SourceUrlQr value={source.url} size={200} />
             <p>扫码打开原文 · 链接发布时已核对属于发布机构登记的官方网站</p><span>{source.host}</span></>
@@ -167,8 +170,6 @@ export function PolicyDetail({ id }: { id: string }) {
             favorites.toggle({ type: 'policy', id, title: policy.title })
           }} />
       </div>
-      {[policy.whoCanApply, policy.requiredMaterials, policy.whereToApply].join('').length < 300 && !phoneFile && !printFailed &&
-        <PolicyChecklistSample />}
       {printFailed && <section className="policy-min-section" role="alert">
         <p>这次没生成清单，可以再试一次；扫码看原文照常</p>
         <button type="button" className="policy-min-button" disabled={busy || winding} onClick={() => { void printChecklist() }}>重新生成清单</button>

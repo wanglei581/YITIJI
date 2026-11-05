@@ -12,11 +12,11 @@ import { POLICY_ASK_HOME } from './policyModel'
 import '../service-hubs/policy-touch.css'
 
 export function PolicyTouchLayout({ title, eyebrow, sub, state, children, home = false, compact = false,
-  ask = true, askPrompt = POLICY_ASK_HOME, path, pathLabel, nav = !compact, primary, alert }: {
+  ask = true, askPrompt = POLICY_ASK_HOME, path, pathLabel, nav = true, primary, alert }: {
   title: string; eyebrow: string; sub?: string; state: string; children: ReactNode
   home?: boolean; compact?: boolean; ask?: boolean; askPrompt?: { label: string; draft: string }
   path?: readonly string[]; pathLabel?: string
-  /** 底部导航：首页、类别列表、公告照稿都有（policy-min.js nav: 'home'），详情（紧凑顶带）没有。 */
+  /** 底部导航：政策各屏照稿都有（policy-min.js 详情写 nav: null，ui.js 的 nav(null) 画的是没有选中项的导航，不是不画）。 */
   nav?: boolean
   primary?: QxTouchPrimary; alert?: ReactNode
 }) {

@@ -42,7 +42,7 @@
 .qxt-screen[data-qx-page='policy-min'] .qxt-wide { white-space: normal; min-height: 88px; height: auto; padding-block: 18px; }
 /* 短列表、空态的余高交给清单示意，不拉空政策卡。 */
 .qxt-screen[data-qx-page='policy-min'] .policy-min-sample { flex: 1 0 auto; }
-.qxt-screen[data-qx-page='policy-min'] .policy-min-sample .qxt-illus { width: 360px; }
+.qxt-screen[data-qx-page='policy-min'] .policy-min-sample .qxt-illus { width: 300px; }
 .qxt-screen[data-qx-page='policy-min'][data-qxt-state='loading'] .policy-min-sample,
 .qxt-screen[data-qx-page='policy-min'][data-qxt-state='failed'] .policy-min-sample,
 .qxt-screen[data-qx-page='policy-min'][data-qxt-state='missing'] .policy-min-sample,
@@ -53,7 +53,6 @@
 .qxt-screen[data-qx-page='policy-min'][data-qxt-state='withdrawn'] .policy-min-sample > div { flex: none; }
 .qxt-screen[data-qxt-state='empty'] .policy-min-section li { margin-top: 18px; }
 .qxt-screen[data-qxt-state='ready'][data-qx-page='policy-min'] .policy-min-body { justify-content: space-between; }
-.qxt-screen[data-qxt-state='ready'].policy-min-compact .policy-min-body { justify-content: flex-start; }
 .qxt-screen[data-qx-page='policy-min'].policy-min-compact .qxt-band { min-height: 330px; }
 /* 公告沿用旧件，在本屏仍守 20px / 64px。 */
 .qxt-screen[data-qx-page='policy-min'] .rq-item-main { min-height: 88px; }
@@ -78,3 +77,10 @@
   .qxt-screen[data-qx-page='policy-min'] .qxt-dock { padding-inline: 16px; gap: 12px; }
   .qxt-screen[data-qx-page='policy-min'] .qxt-dock .qxt-wide { flex-basis: 100%; }
 }
+
+/* 2026-11-05 照稿（policy-min.js 详情 dsec）：标题 700 29px 带图标；条目 27px 有圆点；「要准备的材料」方框复选样式。 */
+.policy-min-body .policy-min-section h2 { display: flex; align-items: center; gap: 12px; font-size: 29px; font-weight: 700; }
+.policy-min-body .policy-min-section ul { list-style: disc; padding-left: 28px; }
+.policy-min-body .policy-min-section li { font-size: 27px; line-height: 1.6; }
+.policy-min-body .policy-min-check li { list-style: none; position: relative; }
+.policy-min-body .policy-min-check li::before { content: ''; position: absolute; left: -30px; top: 12px; width: 18px; height: 18px; border-radius: 5px; border: 2px solid var(--qxt-ink-3); }
