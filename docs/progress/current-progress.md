@@ -13,6 +13,15 @@
 - 图谱：新文件入库后 `pnpm graph` 重出，`pnpm graph:check` 通过（`docs/graph/` 3 个文件有变化）。新文件被 fusion-w2 与 scan-session-truth 钉住；设置页那一组还被 runtime-error-boundary 与 no-raw-error-render 钉住；`useScanResultExits` 还被 print-done-truth 钉住；`useScanSessionCreate` 还被 scan-quiet-period 钉住。这些门禁本轮都已跑过，没有新冒出来还没跑的。
 - 合并注意：origin/main 比本分支基线多 #1538，进度文档顶部多一节小程序签名图。合的时候两节都留，这一节放在上面。
 
+## 2026-11-05：PDF 文字层部首字符换回常用字（C3；源 #1402；未合并、未部署）
+
+- 问题：F-24 的苹果 PDF 文字层把常用字存成部首码位，模型写回常用字后被防编造比对误拒；本轮从 main `50070402a` 重做 #1402 的四个代码提交，未带入旧进度文档、图谱和 CI workflow 改动。
+- 改法：通用表只折康熙部首 U+2F00–U+2FD5 和部首补充 U+2E80–U+2EF3 中确定的 314 对（214+100，14 对排除）；先按已知字体的 20 对例外补救，再拼行、整表折叠。单页取字体失败或条目数不齐时该页原样保留；没有例外字的页不再取文字或操作列表。抽取、历史原文、诊断报告及改进建议、模型直接字符和 JSON 转义字符串用同一编码；日志只增加计数或固定拒绝规则名。
+- 与 #1574 衔接：保留提示词、moduleAfter 的首尾空白处理、补回和篇幅收口后的 returnAligned，以及逐字段 includes 判据；在最终核对前同步折叠稿与模块字符串。唯一空白/标点差异仍只规范 after，多处相似和跨字段拼接仍只能手改，不为核对增加模型调用。新门禁另加 4 条部首与最终稿核对的组合断言。
+- 门禁接线：仅改 API package.json 的 verify:resume-extraction 串接，依次追加 verify:resume-radical-fold 与 verify:resume-radical-font-fold；该入口已在 ci.yml 的 SQLite 和 postgres-readiness 中执行。verify-ci-gate-coverage 通过，566/576 条 verify/ui 门禁进入 CI 执行闭包，10 条已有豁免，新门禁均进入闭包。
+- 验证：API typecheck、改过的 8 个 TS 文件 lint、新门禁 79/79 与 55/55、图谱关联的全部可离线门禁（含 verify:resume-optimize 内 #1574 的 6 类样本及两个展开的前置/后置脚本）、根目录仓库完整性/合规文案/日期时间/原始错误上屏检查均通过。verify:resume-report-export 首轮 SQLite P1008 超时，串行重跑通过；verify:ocr-baidu-live 已执行但因无 BAIDU_OCR_API_KEY / BAIDU_OCR_SECRET_KEY 退出 1，未验证真实 OCR。反向检查清空表为 40 PASS/39 FAIL、去掉事实比对前折叠为 75 PASS/4 FAIL，均退出 1；从 /tmp/c3-radical-mut/ 副本恢复后逐字节一致，两条新门禁恢复通过，反向检查前后 git diff --stat 完全一致。
+- 没做：未合并、未部署；未改 apps/**、ci.yml、图谱、生产配置、数据库结构，未新增依赖；未用 F-24 原件与苹果全部字体在真机、真实模型上复测。
+
 ## 2026-11-05：换模型服务地址必须重填密钥（C3；源 #1374 拆出的安全修复，不含混元；未合并、未部署）
 
 - 问题：管理员把某个功能位的模型换厂商或换地址、却没填新密钥时，原来那家的密钥原样留着，下一次调用就发到新地址。
@@ -20,6 +29,7 @@
 - 后台：AI 配置页 API Key 输入框旁加一句「换了模型服务地址或厂商，要重新填写这一家的 API Key」；保存被拒时按服务端原文显示在表单里、不清已填内容，「保存并测试」被拒后不再发测试请求。
 - 门禁：verify-ai-config 补 C3.1–C3.16（含本机假服务数请求）；admin AI 配置页渲染门禁补「被拒显示原文」。反向检查：删掉主机比较、只看厂商不看主机、去掉「原来存着密钥」这个条件，各自让对应用例转红。
 - 本机：API 类型检查、AI 配置相关门禁（含地址白名单 134 条）、admin 类型检查 / lint / 构建 / 文案门禁通过。`verify:llm-connectivity` 真连深度求索、本机功能位未开，main 上同样报 FEATURE_DISABLED，不在 CI 里，与本改动无关。没有新增厂商；未部署。
+
 
 ## 2026-11-04：屏上扫描后端 B10（扫描仪告警移出范围不推「已恢复」；分支 `claude/scan-device-b2-1102`，未部署）
 
