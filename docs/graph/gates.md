@@ -70,7 +70,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2027 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2029 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1267,7 +1267,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/terminal-agent/scripts/</code> — 21 个文件</summary>
+<summary><code>apps/terminal-agent/scripts/</code> — 22 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1279,10 +1279,11 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/scripts/verify-copy-cleanup-write.helper.ts` | `verify-copy-device.ts` |
 | `apps/terminal-agent/scripts/verify-copy-device-edges.helper.ts` | `verify-copy-device.ts` |
 | `apps/terminal-agent/scripts/verify-copy-device-network.helper.ts` | `verify-copy-device-edges.helper.ts` |
-| `apps/terminal-agent/scripts/verify-copy-device.helper.ts` | `verify-copy-cleanup-write.helper.ts`<br/>`verify-copy-device-edges.helper.ts`<br/>`verify-copy-device-network.helper.ts`<br/>`verify-copy-device.ts`<br/>`verify-copy-isolation.helper.ts`<br/>`verify-copy-print-recovery.helper.ts`<br/>`verify-copy-print.helper.ts`<br/>`verify-scan-device-isolation.helper.ts` |
+| `apps/terminal-agent/scripts/verify-copy-device.helper.ts` | `verify-copy-cleanup-write.helper.ts`<br/>`verify-copy-device-edges.helper.ts`<br/>`verify-copy-device-network.helper.ts`<br/>`verify-copy-device.ts`<br/>`verify-copy-isolation.helper.ts`<br/>`verify-copy-print-recovery.helper.ts`<br/>`verify-copy-print.helper.ts`<br/>`verify-copy-revocations.helper.ts`<br/>`verify-scan-device-isolation.helper.ts` |
 | `apps/terminal-agent/scripts/verify-copy-isolation.helper.ts` | `verify-copy-device.ts` |
 | `apps/terminal-agent/scripts/verify-copy-print-recovery.helper.ts` | `verify-copy-print.helper.ts` |
 | `apps/terminal-agent/scripts/verify-copy-print.helper.ts` | `verify-copy-cleanup-write.helper.ts`<br/>`verify-copy-device.ts`<br/>`verify-copy-isolation.helper.ts`<br/>`verify-copy-print-recovery.helper.ts` |
+| `apps/terminal-agent/scripts/verify-copy-revocations.helper.ts` | `verify-copy-device.ts` |
 | `apps/terminal-agent/scripts/verify-scan-device-engine-r2.helper.ts` | `verify-scan-device-engine.ts` |
 | `apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts` | `verify-scan-device-engine-r2.helper.ts`<br/>`verify-scan-device-engine.ts` |
 | `apps/terminal-agent/scripts/verify-scan-device-isolation.helper.ts` | `verify-scan-device-runner.ts` |
@@ -1290,13 +1291,13 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts` | `verify-scan-device-runner.ts` |
 | `apps/terminal-agent/scripts/verify-scan-device-runner-r4.ts` | `verify-scan-device-runner.ts` |
 | `apps/terminal-agent/scripts/verify-scan-device-runner-r6.ts` | `verify-scan-device-runner.ts` |
-| `apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts` | `verify-copy-device-edges.helper.ts`<br/>`verify-copy-device.helper.ts`<br/>`verify-copy-isolation.helper.ts`<br/>`verify-scan-device-isolation.helper.ts`<br/>`verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner-r4.ts`<br/>`verify-scan-device-runner-r6.ts`<br/>`verify-scan-device-runner.ts` |
+| `apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts` | `verify-copy-device-edges.helper.ts`<br/>`verify-copy-device.helper.ts`<br/>`verify-copy-isolation.helper.ts`<br/>`verify-copy-revocations.helper.ts`<br/>`verify-scan-device-isolation.helper.ts`<br/>`verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner-r4.ts`<br/>`verify-scan-device-runner-r6.ts`<br/>`verify-scan-device-runner.ts` |
 | `apps/terminal-agent/scripts/verify-windows-service-recovery.mjs` | `verify-agent-unauthorized.mjs` |
 
 </details>
 
 <details>
-<summary><code>apps/terminal-agent/src/</code> — 63 个文件</summary>
+<summary><code>apps/terminal-agent/src/</code> — 64 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1306,9 +1307,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/src/agent/claim-rate-limit.ts` | `verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/config-manager.ts` | `verify-agent-config-resilience.mjs`<br/>`verify-agent-unauthorized.mjs`<br/>`verify-copy-device.ts`<br/>`verify-print-queue-residue.ts`<br/>`verify-printer-config.mjs` |
 | `apps/terminal-agent/src/agent/copy-device/copy-backend.ts` | `verify-copy-device-network.helper.ts`<br/>`verify-copy-print-recovery.helper.ts` |
-| `apps/terminal-agent/src/agent/copy-device/copy-print-ledger.ts` | `verify-copy-print.helper.ts` |
+| `apps/terminal-agent/src/agent/copy-device/copy-print-ledger.ts` | `verify-copy-print.helper.ts`<br/>`verify-copy-revocations.helper.ts` |
+| `apps/terminal-agent/src/agent/copy-device/copy-revocations.ts` | `verify-copy-revocations.helper.ts` |
 | `apps/terminal-agent/src/agent/copy-device/copy-runtime.ts` | `verify-copy-device-edges.helper.ts`<br/>`verify-copy-device.helper.ts`<br/>`verify-copy-print-recovery.helper.ts` |
-| `apps/terminal-agent/src/agent/copy-device/copy-storage.ts` | `verify-copy-device.helper.ts`<br/>`verify-copy-print-recovery.helper.ts`<br/>`verify-copy-print.helper.ts` |
+| `apps/terminal-agent/src/agent/copy-device/copy-storage.ts` | `verify-copy-device.helper.ts`<br/>`verify-copy-print-recovery.helper.ts`<br/>`verify-copy-print.helper.ts`<br/>`verify-copy-revocations.helper.ts` |
 | `apps/terminal-agent/src/agent/copy-device/copy-types.ts` | `verify-copy-device.helper.ts`<br/>`verify-copy-device.ts`<br/>`verify-copy-print.helper.ts` |
 | `apps/terminal-agent/src/agent/db.ts` | `verify-copy-device-network.helper.ts`<br/>`verify-print-retry-attempt.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-scan-device-engine.ts`<br/>`verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner-r4.ts`<br/>`verify-scan-device-runner-r6.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-device-runner.ts`<br/>`verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/dead-letter-operator.ts` | `verify-task-reliability.ts` |
@@ -1332,7 +1334,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/src/agent/scan-delivery.ts` | `verify-scan-device-engine.ts`<br/>`verify-scan-device-runner-r4.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-device-backend.ts` | `verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner-r4.ts`<br/>`verify-scan-device-runner-r6.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-device-runner.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-device-deliver.ts` | `verify-scan-device-runner-r4.ts`<br/>`verify-scan-device-runner-r6.ts` |
-| `apps/terminal-agent/src/agent/scan-device/scan-device-health.ts` | `verify-copy-isolation.helper.ts`<br/>`verify-scan-device-isolation.helper.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner.ts` |
+| `apps/terminal-agent/src/agent/scan-device/scan-device-health.ts` | `verify-copy-isolation.helper.ts`<br/>`verify-copy-revocations.helper.ts`<br/>`verify-scan-device-isolation.helper.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-device-housekeeping.ts` | `verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner-r4.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-device-round.ts` | `verify-scan-device-runner-r6.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-device-runner.ts` | `verify-scan-device-isolation.helper.ts`<br/>`verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner-r4.ts`<br/>`verify-scan-device-runner-r6.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-device-runner.ts` |
@@ -1355,7 +1357,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/src/config.ts` | `verify-printer-config.mjs` |
 | `apps/terminal-agent/src/index.ts` | `verify-agent-config-resilience.mjs`<br/>`verify-agent-profile-guard.mjs`<br/>`verify-agent-unauthorized.mjs`<br/>`verify-print-queue-residue.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-printer-config.mjs`<br/>`verify-scan-device-runner.ts`<br/>`verify-task-reliability.ts` |
 | `apps/terminal-agent/src/local-api/origin-guard.ts` | `verify-local-qr-proxy.ts` |
-| `apps/terminal-agent/src/local-api/qr-login-server.ts` | `verify-copy-device.ts`<br/>`verify-copy-print-recovery.helper.ts`<br/>`verify-local-print-wake.ts`<br/>`verify-local-qr-proxy.ts`<br/>`verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner.ts`<br/>`verify-usb-import-agent.ts` |
+| `apps/terminal-agent/src/local-api/qr-login-server.ts` | `verify-copy-device.ts`<br/>`verify-copy-print-recovery.helper.ts`<br/>`verify-copy-revocations.helper.ts`<br/>`verify-local-print-wake.ts`<br/>`verify-local-qr-proxy.ts`<br/>`verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner.ts`<br/>`verify-usb-import-agent.ts` |
 | `apps/terminal-agent/src/printer/image-to-pdf.ts` | `verify-image-scale-truth.ts`<br/>`verify-print-monitor-truth.ts`<br/>`verify-scan-device-engine.ts` |
 | `apps/terminal-agent/src/printer/print-with-pdf-to-printer.ts` | `verify-copy-print-recovery.helper.ts`<br/>`verify-copy-print.helper.ts`<br/>`verify-print-monitor-truth.ts` |
 | `apps/terminal-agent/src/printer/print.ts` | `verify-copy-print.helper.ts`<br/>`verify-image-scale-truth.ts`<br/>`verify-printer-config.mjs` |

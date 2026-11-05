@@ -8,7 +8,8 @@ import { assertCopyPermit } from './copy-backend'
 import { CopyError, type CopyDeps, type CopySession } from './copy-types'
 import type { createCopyStorage } from './copy-storage'
 
-export function createCopyEngine(deps: CopyDeps, storage: ReturnType<typeof createCopyStorage>, health: ScanDeviceHealth) {
+export function createCopyEngine(deps: CopyDeps, storage: ReturnType<typeof createCopyStorage>, health: ScanDeviceHealth,
+  assertNotRevoked: (s: CopySession) => void) {
   const checkHealth = async (lock: DeviceLockHandle): Promise<void> => {
     if (health.knownProcessAlive()) throw new CopyError(503, 'COPY_PROCESS_STOP_UNCONFIRMED')
     if (!health.hasSuspect() && !health.hasForceKilled()) return
@@ -18,6 +19,7 @@ export function createCopyEngine(deps: CopyDeps, storage: ReturnType<typeof crea
     health.clearForceKilled()
   }
   const live = (s: CopySession): void => {
+    assertNotRevoked(s)
     if (s.revoked || deps.clock.now() >= s.expiresAt) throw new CopyError(410, 'COPY_EXPIRED')
     if (deps.config.copyDeviceEnabled !== true) throw new CopyError(403, 'COPY_CAPABILITY_REVOKED')
   }

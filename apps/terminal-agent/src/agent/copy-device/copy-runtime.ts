@@ -9,6 +9,7 @@ import { copyBackend } from './copy-backend'
 import { createCopyPrintLedger, printRecordView } from './copy-print-ledger'
 import { createCopyPrint } from './copy-print'
 import { createCopyEngine } from './copy-engine'
+import { createCopyRevocations } from './copy-revocations'
 import { copyDirId, createCopyStorage, getCopyDeviceRoot } from './copy-storage'
 import { CopyError, copyView, type CopyAction, type CopyCommand, type CopyDeps,
   type CopyDeletionReason, type CopyRuntime, type CopySession, type CopyView } from './copy-types'
@@ -33,7 +34,10 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
     isProcessAlive: (pid) => !deps.processGone(pid),
     listResiduals: () => deps.processGone() ? { kind: 'ok', processes: [] } : { kind: 'unknown' },
   })
-  const engine = createCopyEngine(deps, storage, health)
+  const revocations = createCopyRevocations(deps, copyDirId)
+  const engine = createCopyEngine(deps, storage, health, (s) => {
+    if (revocations.has(s.command)) throw new CopyError(410, 'COPY_EXPIRED')
+  })
   const ledger = createCopyPrintLedger(deps, copyDirId)
   const printing = createCopyPrint(deps, storage, ledger)
   const recoveredDirs = new Set<string>()
@@ -62,6 +66,7 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
     cleanup(s)
   }
   const tick = async (): Promise<void> => {
+    revocations.prune()
     if (!startupSafe) {
       try { storage.sweep(ledger.hasDir, (id) => {
         if (!ledger.pendingDir(id)) return false
@@ -124,6 +129,14 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
       })
       return copyView(s)
     }
+    if ((action === 'abort' || action === 'clear') && !sessions.has(key(c))) {
+      const purged = storage.purge(copyDirId(c.copyId, c.generation),
+        action === 'abort' ? 'COPY_USER_CANCEL' : 'COPY_SESSION_CLEAR')
+      const view: CopyView = { state: action === 'abort' ? 'cancelled' : 'cleared',
+        generation: c.generation, pageCount: 0, errorCode: null, purged }
+      if (!purged) throw new CopyError(503, 'COPY_CLEANUP_FAILED', view)
+      return view
+    }
     const s = requireSession(c, owner)
     if (action === 'print') {
       if (s.printRequested || ledger.get(c.copyId, c.generation)) return copyView(s)
@@ -157,8 +170,7 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
     } else throw new CopyError(400, 'COPY_BAD_REQUEST')
     return copyView(s)
   }
-  const command: CopyRuntime['command'] = async (action, c, owner) => {
-    await tick()
+  const execute: CopyRuntime['command'] = async (action, c, owner) => {
     if (stopped || config.copyDeviceEnabled !== true) throw new CopyError(403, 'COPY_DISABLED')
     if (!startupSafe) throw new CopyError(503, 'COPY_STORAGE_UNSAFE')
     const recovered = ledger.get(c.copyId, c.generation)
@@ -186,6 +198,30 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
     const result = mutate(action, c, owner)
     operations.set(opKey, { fingerprint, result })
     return result
+  }
+  const command: CopyRuntime['command'] = async (action, c, owner) => {
+    if (stopped || config.copyDeviceEnabled !== true) throw new CopyError(403, 'COPY_DISABLED')
+    const readOnly = action === 'status' || action === 'preview'
+    const previous = readOnly ? undefined : operations.get(`${owner}:${c.operationId}`)
+    const fingerprint = JSON.stringify([action, c.copyId, c.generation, c.source, c.scanColor])
+    if (previous && previous.fingerprint !== fingerprint) throw new CopyError(409, 'COPY_OPERATION_CONFLICT')
+    if (!readOnly && !previous && operations.size >= 4096) throw new CopyError(503, 'COPY_OPERATION_LIMIT')
+    if (action === 'clear' || action === 'abort') {
+      const s = sessions.get(key(c))
+      const recovered = ledger.get(c.copyId, c.generation)
+      if ((s && s.owner !== owner) || (recovered &&
+        (recovered.owner !== owner || recovered.terminalId !== config.terminalId))) throw new CopyError(404, 'COPY_NOT_FOUND')
+      // 必须早于任何 await：即使 start / clear 都卡在 tick，撤销也立即可见。
+      if (s) revoke(s, action === 'abort' ? 'COPY_USER_CANCEL' : 'COPY_SESSION_CLEAR', action === 'abort' ? 'cancelled' : 'cleared')
+      revocations.revoke(c)
+    }
+    const attempt = action === 'start' ? revocations.track(c) : undefined
+    try {
+      if (!previous) attempt?.assertLive()
+      await tick()
+      if (!previous) attempt?.assertLive()
+      return await execute(action, c, owner)
+    } finally { attempt?.release() }
   }
   void tick()
   const arm = (): void => {

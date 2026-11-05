@@ -3,6 +3,7 @@ import path from 'path'
 import { createHash, randomUUID } from 'crypto'
 import { createScanTaskDir, getScanDeviceRoot, purgeScanTaskDir, scanPageFileName } from '../scan-device/scan-temp-dir'
 import { COPY_PRINT_LEDGER_DIR } from './copy-print-ledger'
+import { COPY_REVOCATIONS_DIR } from './copy-revocations'
 import { CopyError, type CopyDeletionReason, type CopyDeps, type CopySession } from './copy-types'
 
 export function getCopyDeviceRoot(): string {
@@ -41,6 +42,7 @@ export function createCopyStorage(deps: CopyDeps) {
       for (const id of fs.readdirSync(deps.root)) {
         if (pendingPrint(id)) continue // 旧执行器还可能读文件，隔离期间延后删除。
         if (id === COPY_PRINT_LEDGER_DIR) continue // 耐久派发墓碑不随扫描页清场。
+        if (id === COPY_REVOCATIONS_DIR) continue // 撤销墓碑由自己的到期清理收束。
         if (/^[A-Za-z0-9_-]{1,64}$/.test(id)) purge(id, isPrintRecord(id) ? 'COPY_PRINT_TERMINAL' : 'COPY_STARTUP_RESIDUE')
         else {
           // 未知零散项也清掉；先在同一私有根内改为无内容标识的名字，审计不收原文件名。

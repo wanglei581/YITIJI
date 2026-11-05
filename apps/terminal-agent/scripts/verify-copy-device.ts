@@ -9,6 +9,7 @@ import { printChecks } from './verify-copy-print.helper'
 import { isolationChecks } from './verify-copy-isolation.helper'
 import { edgeChecks } from './verify-copy-device-edges.helper'
 import { cleanupWriteChecks } from './verify-copy-cleanup-write.helper'
+import { revocationChecks } from './verify-copy-revocations.helper'
 
 let passed = 0
 async function check(name: string, fn: () => Promise<void>): Promise<void> {
@@ -137,6 +138,7 @@ async function main(): Promise<void> {
       assert.equal(restart.calls.length, 0)
     } finally { await restart.close(); await f.close() }
   })
+  await revocationChecks(check)
   await isolationChecks(check)
   await cleanupWriteChecks(check)
   await edgeChecks(check)

@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-11-05：屏上复印 C2e——终端程序拒绝清场后迟到的开始扫描（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+
+- 起因：Codex 复审一体机 C3 时复现——`start` 已到终端程序、停在异步处理时，一体机清场的 `clear` 因本机会话还没建立回 404，随后旧 `start` 建会话并开扫，可能扫到下一位放上的原件。
+- 改法（Codex 实现，Claude 收货）：新增 `copy-device/copy-revocations.ts`，`clear` / `abort` 在第一次等待前按 `copyId + generation` 记撤销标记（内存 + 落盘，180 秒到期、上限 4096 条，跨重启保留），没有会话也回成功与 `purged:true`；`start` 在拿锁后、取许可前后、真正开扫前都查标记，命中就放弃、释放锁、清掉会话材料，同代迟到的 `start` 回 410；新单号与新代次不受影响；撤销写盘失败不报成功、也不放行开扫。
+- 验证：新增 6 条用例；`verify:copy-device` 45 项、`verify:scan-device-engine` 53 组、`verify:scan-device-runner` 22 组、tsc、lint、repository-integrity 过；反向检查（去掉开扫前撤销检查）变红。配套的一体机清场撤销云端授权见 C3c。
+
 ## 2026-11-05：屏上复印 C2d——收掉 C2c 复审的 2 条 P1（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
 
 - ① 复印打印 ledger 清除 `queueCleanupPending` 时一次 rename/fsync 失败不再永久挡住云打印：清理完成写入与新派发保护分开，失败保留隔离与墓碑，按 1/2/4/8/16/30 秒封顶退避重写并记日志；下一轮重新确认执行器已退出、重新清队列再持久化解除隔离，旧单不重派。② 屏上扫描首次扫描（`scan-device-round.ts`）与续页（`scan-device-runner.ts`）都在拿到设备锁之后、启动 WIA 之前统一复查共享健康（`scan-device-health.ts` 新增持锁检查，必要探测复用已持有的锁）；复印侧持锁复查加了等锁交错用例。
