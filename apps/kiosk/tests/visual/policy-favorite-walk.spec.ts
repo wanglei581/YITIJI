@@ -395,15 +395,15 @@ test('填写了发布日期时不用确认发布时间覆盖 @kiosk', async ({ p
   await expect(card).not.toContainText('2026-09-29')
 })
 
-test('不在公告列表里的公告按编号打开，发布时间用确认发布时间 @kiosk', async ({ page }) => {
+test('旧收藏里的公告编号按政策详情打开时回公告列表，不套三块、不出办事清单 @kiosk', async ({ page }) => {
+  // 公告没有三栏，也没有办事清单（2026-11-05 实走发现：原来会落到政策详情版式，三块全写「没有提供」还给打印清单）。
   const state: PolicyRouteState = { broken: false, holdSlow: null, detailLog: [] }
   await routePolicies(page, state)
   await page.goto('/renshi?policy=notice-late')
-  await expect(policyScreen(page)).toHaveAttribute('data-qxt-state', 'ready')
-  await expect(policyHeading(page, '窗口时间调整通知')).toBeVisible()
-  await expect(policyEyebrow(page)).toHaveText('示例人社局发布 · 2026-07-15')
+  await expect(page).toHaveURL(/\/renshi\?tab=notice$/)
   expect(state.detailLog).toEqual(['notice-late'])
-  await expect(page.getByText('就业服务窗口调整通知')).toHaveCount(0)
+  await expect(page.getByTestId('policy-checklist-print')).toHaveCount(0)
+  await expect(page.getByText('谁可以申请')).toHaveCount(0)
 })
 
 test('政策被撤下后点打印办事清单：不生成、不进打印，整页换成已下架，不留旧正文和原文码 @kiosk', async ({ page }) => {
