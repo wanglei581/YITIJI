@@ -426,7 +426,9 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         // 用 blocked 会和底部仍可点的「开始模拟面试」自相矛盾。
         mode: 'result-unavailable',
         reason: say((startFailed ? error : null) ?? '本次没能进入 AI 面试间。') ?? '本次没能进入 AI 面试间。',
-        retryHint: `本次没有进入面试间。可以再点一次「创建并开始练习」；不想等的话，${STILL_AVAILABLE}`,
+        retryHint: pendingSession
+          ? `本次没有进入面试间。可以再点一次「创建并开始练习」；不想等的话，${STILL_AVAILABLE}`
+          : `本次没有进入面试间。可以直接再点一次「创建并开始练习」。${STILL_AVAILABLE}`,
         ...sheetAction,
       }
 
@@ -441,6 +443,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     </InterviewNote>
   ) : null
   const shownError = interviewUserLine(error, contact)
+  const fallbackReason = step === 3 && aiTask.isFailed ? fallback.reason : null
   // 换步后点下去的按钮被卸载，焦点会掉回 body。把焦点放到意图带的标题上，并回到顶。第一次进来不抢焦点。
   const seenStep = useRef<number | null>(null)
   useLayoutEffect(() => {
@@ -499,7 +502,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
           ask={assistantState === 'available'
             ? { label: step === 2 ? '问小青：选哪位面试官' : '问小青：这场练习怎么设', draft: step === 2 ? INTERVIEWER_AI_DRAFT : SETUP_AI_DRAFT }
             : assistantOffAsk(assistantState, '可继续手动设置')}
-          alert={shownError ? <p className="qxt-iv-alert" role="alert" data-testid="interview-setup-error">{shownError}</p> : undefined}
+          alert={shownError && shownError !== fallbackReason ? <p className="qxt-iv-alert" role="alert" data-testid="interview-setup-error">{shownError}</p> : undefined}
           primary={{
             label: step < 3
               ? '下一步'

@@ -407,13 +407,16 @@ test('when 小青 is down every scan and tool screen says so and the manual path
 
   for (const [path, primary] of [
     ['/print-scan/feature/copy', '去打印文件'],
-    ['/print-scan/feature/id-photo', '先用照片打印'],
   ] as const) {
     await page.goto(path)
     await expect(page.getByTestId('ai-down-note'), `${path} 要写小青接不上`).toBeVisible()
     await expect(page.locator('[data-qxt-ask="on"]'), `${path} 底栏问小青还在`).toBeVisible()
     await expect(page.getByRole('button', { name: primary, exact: true }), `${path} 主按钮照常能按`).toBeEnabled()
   }
+  await page.goto('/print-scan/feature/id-photo')
+  await expect(page).toHaveURL(/\/print-scan$/)
+  await expect(page.locator('[data-w2-page="print-scan-home"]')).toBeVisible()
+  await expect(page.locator('[data-testid="print-hub-state-feature-id-photo"]')).toHaveCount(0)
   await page.goto('/print-scan/convert')
   await expect(page.getByTestId('ai-down-note')).toBeVisible()
   await expect(page.locator('[data-qxt-ask="on"]')).toBeVisible()

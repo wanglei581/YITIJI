@@ -288,6 +288,7 @@ const iconUrl = toDataUrl('export const AlertCircleIcon = () => null; export con
 const aiUrl = toDataUrl(`import { jsx } from '${jsxUrl}'; export function PrintAiHelp({label}) { return jsx('button', {children:label}) }`)
 const benefitStub = toDataUrl('export const PRINT_BENEFIT_REDEEM_CTA_LABEL = "使用权益"; export const PRINT_BENEFIT_REDEEM_DISABLED_REASON = "未开放"')
 const partsUrl = transpile(join(kioskRoot, 'src/pages/print/components/PrintConfirmParts.tsx'), {
+  react: import.meta.resolve('react'),
   'react/jsx-runtime': jsxUrl,
   'lucide-react': iconUrl,
   '../../../services/api/benefits': benefitStub,

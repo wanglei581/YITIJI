@@ -520,7 +520,10 @@ export function PrintPreviewPage({
           <div className="pdk-prow qpd-param-card">
             <span>单双面</span>
             <div>
-              <ToggleGroup options={DUPLEX_OPTIONS.map((item) => ({ ...item, disabled: item.value !== 'simplex' && !capability.duplex.allowed }))} value={duplex} onChange={(value) => setDuplex(value as DuplexMode)} disabledReason={duplexReason} describedById="print-duplex-capability-note" />
+              <ToggleGroup options={[{ label: '单面', value: 'simplex' }, { label: '双面', value: 'double', disabled: !capability.duplex.allowed }]} value={duplex === 'simplex' ? 'simplex' : 'double'} onChange={(value) => setDuplex(value === 'simplex' ? 'simplex' : duplex === 'simplex' ? 'duplex_long_edge' : duplex)} disabledReason={duplexReason} describedById="print-duplex-capability-note" />
+              {duplex !== 'simplex' ? (
+                <ToggleGroup options={DUPLEX_OPTIONS.filter((item) => item.value !== 'simplex').map((item) => ({ ...item, label: item.value === 'duplex_long_edge' ? '长边翻页' : '短边翻页', disabled: !capability.duplex.allowed }))} value={duplex} onChange={(value) => setDuplex(value as DuplexMode)} disabledReason={duplexReason} describedById="print-duplex-capability-note" />
+              ) : null}
               <p id="print-duplex-capability-note" className="pdk-why">{capability.duplex.allowed ? (duplex === 'simplex' ? '当前是单面。' : `翻页边：${duplex === 'duplex_long_edge' ? '长边' : '短边'}`) : `双面：${duplexReason}`}</p>
             </div>
           </div>

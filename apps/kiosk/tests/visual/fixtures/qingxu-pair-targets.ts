@@ -105,7 +105,7 @@ const CANONICAL_ROUTE: Record<string, string> = {
   '/print/params': '/print/desk?step=preview',
   '/print/scan-sign': '/print-scan/sign',
   '/print/scan-convert': '/print-scan/convert',
-  '/print/scan-feature': '/print-scan/feature/id-photo',
+  '/print/scan-feature': '/print-scan',
   '/scan/start': '/scan?stage=start',
   '/scan/settings': '/scan?stage=settings',
   '/scan/progress': '/scan?stage=progress',
@@ -583,7 +583,7 @@ function enumerateFile(file: string): RawPair[] {
   }
   if (file.startsWith('10-')) {
     raw = raw.map((pair) => pair.state === 'feature-id-photo' || pair.state === 'feature-not-found'
-      ? { ...pair, screen: 'feature', route: pair.state === 'feature-not-found' ? '/print-scan/feature/missing-key' : '/print-scan/feature/id-photo' }
+      ? { ...pair, screen: 'feature', route: pair.state === 'feature-not-found' ? '/print-scan/feature/missing-key' : '/print-scan' }
       : pair)
   }
 
@@ -729,7 +729,10 @@ function planOf(file: string, screen: string, state: string, siblings: string[])
     if (state === 'completed') return { plan: { kind: 'done' }, reason: null, marker: '[data-w2-page="print-done"]' }
     return { plan: { kind: 'none' }, reason: '打印进度/完成现成种子只有 printing 与 completed', marker: null }
   }
-  if (nn === '10' && (state === 'feature-id-photo' || state === 'feature-not-found')) {
+  if (nn === '10' && state === 'feature-id-photo') {
+    return { plan: { kind: 'w6' }, reason: null, marker: '[data-w2-page="print-scan-home"]' }
+  }
+  if (nn === '10' && state === 'feature-not-found') {
     return { plan: { kind: 'w6' }, reason: null, marker: '[data-w2-page="print-scan-feature"]' }
   }
   if (nn === '18') {
@@ -1061,6 +1064,8 @@ export async function prepareRuntime(page: Page, api: ApiRouter, target: QingxuP
   else await page.goto(url, { waitUntil: 'domcontentloaded' })
   if (target.file.startsWith('10-') && target.state === 'feature-id-photo') {
     await page.goto('/print-scan/feature/id-photo', { waitUntil: 'domcontentloaded' })
+    // 路径必须正好落到 /print-scan。**/print-scan 这种通配会在跳转前的证件照地址上先命中。
+    await page.waitForURL((url) => url.pathname === '/print-scan')
   }
 }
 
