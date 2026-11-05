@@ -52,7 +52,8 @@ export interface CopyView {
 }
 export class CopyError extends Error {
   constructor(readonly status: number, readonly code: string, readonly snapshot?: CopyView) {
-    super(code === 'COPY_PROCESS_STOP_UNCONFIRMED' ? '扫描进程尚未确认退出，请稍后重试；打印仍可使用' : code)
+    super(code === 'COPY_PROCESS_STOP_UNCONFIRMED' ? '扫描进程尚未确认退出，请稍后重试；打印仍可使用' :
+      code === 'COPY_REVOCATION_LIMIT' ? '复印撤销保护记录已满，请稍后再开始复印' : code)
     this.name = 'CopyError'
   }
 }

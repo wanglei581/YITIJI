@@ -213,7 +213,7 @@ export function createCopyRuntime(config: AgentConfig, overrides: Partial<CopyDe
         (recovered.owner !== owner || recovered.terminalId !== config.terminalId))) throw new CopyError(404, 'COPY_NOT_FOUND')
       // 必须早于任何 await：即使 start / clear 都卡在 tick，撤销也立即可见。
       if (s) revoke(s, action === 'abort' ? 'COPY_USER_CANCEL' : 'COPY_SESSION_CLEAR', action === 'abort' ? 'cancelled' : 'cleared')
-      revocations.revoke(c)
+      revocations.revoke(c, Math.max(s?.expiresAt ?? 0, Date.parse(s?.permit?.expiresAt ?? '') || 0))
     }
     const attempt = action === 'start' ? revocations.track(c) : undefined
     try {

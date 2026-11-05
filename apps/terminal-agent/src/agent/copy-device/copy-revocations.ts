@@ -5,11 +5,15 @@ import { createScanTaskDir } from '../scan-device/scan-temp-dir'
 import { CopyError, type CopyCommand, type CopyDeps } from './copy-types'
 
 export const COPY_REVOCATIONS_DIR = 'copy-revocations'
-export const COPY_REVOCATION_TTL_MS = 180_000
+export const COPY_REVOCATION_CLOCK_MARGIN_MS = 5 * 60_000
+// 必须 >= 云端复印单最长寿命（10 分钟，COPY_LIFETIME_MS）+ 时钟误差余量（5 分钟）。
+// 不能沿用本机 180 秒会话 TTL：clear 先到时尚无会话，云端旧单仍可能授权。
+export const COPY_REVOCATION_TTL_MS = 15 * 60_000
 const MAX_RECORDS = 4096
 
 /** 与材料分开保存短期撤销墓碑；重启后也拒绝网络中迟到的旧 start。 */
-export function createCopyRevocations(deps: CopyDeps, key: (id: string, generation: number) => string) {
+export function createCopyRevocations(deps: Pick<CopyDeps, 'clock' | 'root' | 'tempHooks'>,
+  key: (id: string, generation: number) => string) {
   const records = new Map<string, number>()
   const pending = new Map<string, Set<{ revoked: boolean }>>()
   let loaded = true
@@ -61,13 +65,15 @@ export function createCopyRevocations(deps: CopyDeps, key: (id: string, generati
   return {
     prune,
     has,
-    revoke(c: CopyCommand): void {
+    revoke(c: CopyCommand, expiresAt = 0): void {
       const id = key(c.copyId, c.generation)
       // 正在 tick 中的 start 持有独立标记，墓碑到期后也不能复活它。
       for (const attempt of pending.get(id) ?? []) attempt.revoked = true
       prune()
-      if (!records.has(id) && records.size >= MAX_RECORDS) throw new CopyError(503, 'COPY_OPERATION_LIMIT')
-      records.set(id, deps.clock.now() + COPY_REVOCATION_TTL_MS)
+      if (!records.has(id) && records.size >= MAX_RECORDS) throw new CopyError(503, 'COPY_REVOCATION_LIMIT')
+      // 已取得许可或本机会话截止更晚时继续保留；重复撤销也不能缩短已有墓碑。
+      records.set(id, Math.max(records.get(id) ?? 0, deps.clock.now() + COPY_REVOCATION_TTL_MS,
+        Number.isFinite(expiresAt) ? expiresAt + COPY_REVOCATION_CLOCK_MARGIN_MS : 0))
       dirty = true
       persist()
     },
@@ -78,8 +84,11 @@ export function createCopyRevocations(deps: CopyDeps, key: (id: string, generati
       group.add(attempt); pending.set(id, group)
       return {
         assertLive(): void {
+          prune()
           if (attempt.revoked || has(c)) throw new CopyError(410, 'COPY_EXPIRED')
           if (!loaded || dirty) throw new CopyError(503, 'COPY_STORAGE_UNSAFE')
+          // 满额只清理已过期记录，绝不驱逐仍有效的撤销标记来放行新单。
+          if (records.size >= MAX_RECORDS) throw new CopyError(503, 'COPY_REVOCATION_LIMIT')
         },
         release(): void { group.delete(attempt); if (!group.size) pending.delete(id) },
       }

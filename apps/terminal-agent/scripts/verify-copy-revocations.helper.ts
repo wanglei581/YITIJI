@@ -1,14 +1,15 @@
-/** C2e：控制真实运行器的异步边界；WIA / 云端均为替身，不接触硬件。 */
+/** C2e/C2f：控制真实运行器的异步边界；WIA / 云端均为替身，不接触硬件。 */
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { startQrLoginLocalServer } from '../src/local-api/qr-login-server'
 import { sharedScanDeviceHealth } from '../src/agent/scan-device/scan-device-health'
-import { COPY_REVOCATIONS_DIR, COPY_REVOCATION_TTL_MS } from '../src/agent/copy-device/copy-revocations'
+import { COPY_REVOCATIONS_DIR, COPY_REVOCATION_TTL_MS, COPY_REVOCATION_CLOCK_MARGIN_MS,
+  createCopyRevocations } from '../src/agent/copy-device/copy-revocations'
 import { copyDirId } from '../src/agent/copy-device/copy-storage'
 import type { CopyPrintRecord } from '../src/agent/copy-device/copy-print-ledger'
-import { agentConfig } from './verify-scan-device-runner.helper'
+import { agentConfig, createManualClock } from './verify-scan-device-runner.helper'
 import { base, plain, fixture, scan, expectCode, request, flush } from './verify-copy-device.helper'
 
 const deferred = () => {
@@ -182,5 +183,92 @@ export async function revocationChecks(check: (name: string, fn: () => Promise<v
         assert.equal(restarted.calls.length, 0)
       } finally { await restarted.close() }
     } finally { await damaged.close(); fs.rmSync(root, { recursive: true, force: true }) }
+  })
+  await check('C2f 撤销后 180001ms 的迟到 start 仍拒绝；15 分钟下限之后才重新受理', async () => {
+    for (const action of ['clear', 'abort'] as const) {
+      let permits = 0
+      const f = fixture({ deps: { permit: async (id) => { permits++; return f.permit(id) } } })
+      try {
+        await f.runtime.command(action, plain(), 'owner')
+        f.clock.jump(180_001)
+        await expectCode(() => f.runtime.command('start', base, 'owner'), 'COPY_EXPIRED')
+        f.clock.jump(15 * 60_000 - 180_001 - 1)
+        await expectCode(() => f.runtime.command('start', base, 'owner'), 'COPY_EXPIRED')
+        assert.equal(permits, 0); assert.equal(f.calls.length, 0)
+        assert.equal(rows(f.root).length, 1)
+        f.clock.jump(2); await f.runtime.tick()
+        assert.deepEqual(rows(f.root), [])
+        await scan(f)
+        assert.equal(permits, 1); assert.equal(f.calls.length, 1)
+      } finally { await f.close() }
+    }
+    // 后端 copy-job.policy.ts 的云端单寿命为 10 分钟，撤销下限必须再加时钟误差余量。
+    assert.ok(COPY_REVOCATION_CLOCK_MARGIN_MS >= 5 * 60_000)
+    assert.ok(COPY_REVOCATION_TTL_MS >= 10 * 60_000 + COPY_REVOCATION_CLOCK_MARGIN_MS)
+  })
+  await check('C2f 已知到期更晚时保留至 expiresAt + 余量；重复撤销和重启不缩短', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copy-revoked-deadline-'))
+    const clock = createManualClock()
+    const deps = { root, clock, tempHooks: { assertDirectoryAcl() {} } }
+    const expiresAt = clock.now() + 20 * 60_000
+    try {
+      const revocations = createCopyRevocations(deps, copyDirId)
+      revocations.revoke(base, expiresAt)
+      clock.jump(1)
+      revocations.revoke(base, clock.now() + 30_000)
+      assert.deepEqual(rows(root), [[copyDirId(base.copyId, base.generation), expiresAt + COPY_REVOCATION_CLOCK_MARGIN_MS]])
+      const restarted = createCopyRevocations(deps, copyDirId)
+      clock.jump(15 * 60_000)
+      restarted.prune(); assert.equal(restarted.has(base), true)
+      clock.jump(expiresAt + COPY_REVOCATION_CLOCK_MARGIN_MS - clock.now() - 1)
+      restarted.prune(); assert.equal(restarted.has(base), true)
+      clock.jump(2); restarted.prune()
+      assert.equal(restarted.has(base), false); assert.deepEqual(rows(root), [])
+    } finally { fs.rmSync(root, { recursive: true, force: true }) }
+  })
+  await check('C2f 满 4096 条不淘汰未过期墓碑；新 start HTTP 503 且有可读说明', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copy-revoked-full-'))
+    const directory = path.join(root, COPY_REVOCATIONS_DIR)
+    fs.mkdirSync(directory)
+    const unexpired = Array.from({ length: 4096 }, (_, i) =>
+      [copyDirId(`revoked-${i}`, 1), createManualClock().now() + 15 * 60_000])
+    fs.writeFileSync(path.join(directory, 'revoked.json'), JSON.stringify(unexpired))
+    let permits = 0
+    const f = fixture({ root, deps: { permit: async (id) => { permits++; return f.permit(id) } } })
+    const server = startQrLoginLocalServer(f.config, { copyDevice: f.runtime })!
+    await new Promise<void>((resolve) => server.server.once('listening', resolve))
+    try {
+      const start = await request(server.port, '/local/copy/start', base)
+      assert.equal(start.status, 503)
+      assert.equal(start.json().error.code, 'COPY_REVOCATION_LIMIT')
+      const error = JSON.parse(start.bytes.toString()).error as { message: string }
+      assert.match(error.message, /撤销保护记录已满.*稍后/)
+      await expectCode(() => f.runtime.command('clear', plain(), 'owner'), 'COPY_REVOCATION_LIMIT')
+      await expectCode(() => f.runtime.command('start', { ...base, copyId: 'revoked-0' }, 'owner'), 'COPY_EXPIRED')
+      assert.deepEqual(rows(root), unexpired, '满额不得覆盖、驱逐未过期标记')
+      assert.equal(permits, 0); assert.equal(f.calls.length, 0)
+      f.clock.jump(15 * 60_000 + 1)
+      await scan(f)
+      assert.deepEqual(rows(root), [])
+      assert.equal(permits, 1); assert.equal(f.calls.length, 1)
+    } finally { await server.close(); await f.close() }
+  })
+  await check('C2f 上限优先清理已过期墓碑；保留其余 4095 条并接纳新撤销', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copy-revoked-prune-'))
+    const directory = path.join(root, COPY_REVOCATIONS_DIR)
+    fs.mkdirSync(directory)
+    const now = createManualClock().now()
+    const unexpired = Array.from({ length: 4095 }, (_, i) => [copyDirId(`revoked-${i}`, 1), now + 15 * 60_000])
+    fs.writeFileSync(path.join(directory, 'revoked.json'), JSON.stringify([
+      [copyDirId('already-expired', 1), now - 1], ...unexpired,
+    ]))
+    const f = fixture({ root })
+    try {
+      await f.runtime.command('clear', plain(), 'owner')
+      assert.deepEqual(rows(root), [...unexpired, [copyDirId(base.copyId, 1), now + COPY_REVOCATION_TTL_MS]])
+      await expectCode(() => f.runtime.command('start', base, 'owner'), 'COPY_EXPIRED')
+      await expectCode(() => f.runtime.command('start', { ...base, copyId: 'new-copy' }, 'owner'), 'COPY_REVOCATION_LIMIT')
+      assert.equal(f.calls.length, 0)
+    } finally { await f.close() }
   })
 }
