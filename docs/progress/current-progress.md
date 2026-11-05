@@ -12,6 +12,23 @@
 - 改法（Codex 实现，Claude 收货）：共用入口在查询前设 `[Console]::OutputEncoding` 为无 BOM UTF-8，卷标与隐藏文件名两处查询一起生效；其余 U 盘行为不变。`verify:usb-import-agent` 加中文卷标「工作资料」「新加卷」、中文隐藏文件名（单值 / 数组）与编码顺序断言；去掉编码那一行门禁变红，恢复后绿。`verify:local-qr-proxy`、repository-integrity 通过。
 - 旁查同类缺口（本轮不改）：`printer/printer-status.ts`（打印机名可能含中文）、`agent/scan-device/scan-device-health.ts`（命令行可能含中文路径）也没设输出编码；WIA 探测与扫描脚本协议只有 ASCII。
 - 真机未核：装 0.4.19 时按 `~/.cache/claude-lanes/copyscan-1102/acceptance.md` 末尾四处一致（CIM 原值、stdout 字节、`/local/usb/status`、一体机显示）核一次。
+## 2026-11-05：扫描件自动矫正 S4a 第三轮——Windows 门禁对 8 位 BMP 的标记判据（分支 `claude/scan-deskew-1104`，未接线、未部署）
+
+- Windows CI 第二次实跑（run 41965545914）：估角已对（文字页 ±4° 内与输入一致，最差 ±0.1°），风险集（空白、照片、表格、证件、发票）误纠偏 0；只剩 16 个 `bmp8` 文字页报 `lost original corner/edge marker`，同角度 png / jpeg / bmp24 全过。
+- 原因（Codex 查，Claude 收货）：门禁生成 8 位 BMP 时先转灰度，洋红标记变成 (105,105,105)，判据仍要求 R、B > 150，八处标记必然判丢；实现（24 位扩展画布、先填背景再绘制、最终输出 JPEG）无需改。改为按编码后的预期颜色检查（8 位 BMP 三通道 105±20、输入解码处精确 105；其他格式仍判洋红），加像素与调色板诊断和逐个擦除八处标记的反向检查；位置、搜索范围、画布、补边、残余角与 §4 阈值均未放宽。Windows 结果以下一次 CI 为准。
+
+## 2026-11-05：扫描件自动矫正 S4a 第二轮——Windows 合成样本「应纠偏的文字页退回原图」（分支 `claude/scan-deskew-1104`，未接线、未部署）
+
+- Windows CI 第一次实跑（run 41842478826）：C# 在 Windows PowerShell 5.1 下编译通过，±5° 边界样本按规则不纠偏；-4° 文字页退回原图，门禁首个失败即停。
+- 原因（Codex 查，Claude 收货）：合成样本原页设为 300 DPI、新位图未设 DPI 却用 `DrawImageUnscaled` 按物理尺寸绘制，文字缩到约 96/300（约 4 像素），前景比例 0.43% 低于 0.5% 门槛被判拿不准。改样本画法（统一 DPI、按像素源矩形绘制），并修正残余角检查把早退默认 0 当成转正证据的问题；**规格书 §4 阈值一个未动**。
+- 门禁：Windows 门禁改为逐样本打印拒绝原因与数值、全部跑完再汇总判定；加 2 倍分辨率文字页覆盖缩到长边 1,200 的路径。本机 `verify:scan-deskew` 加只在门禁里运行的 TypeScript 数值镜像（常量与 C# 同源），69 个样本：文字 8 应纠 8 实纠、空白 / 密集底纹 / 表格误纠偏 0。Windows 结果以下一次 CI 为准。
+
+## 2026-11-04：扫描件自动矫正 S4a——纠偏处理器、开关与 Windows 门禁（分支 `claude/scan-deskew-1104`，自 A2 第四轮开出，未接线、未部署）
+
+- 依据：产品负责人 11/04「扫描件预览是歪的，要自动矫正」；排期 `schedule-1104.md` S4 第一步只做 ±5° 小角度纠偏、零新依赖、拿不准一律用原图；规格书 `codex/deskew-spec-out.md` 方案 c（独立受监管 PowerShell 子进程内嵌 C#）。
+- 做了什么（Codex 实现，Claude 收货）：`apps/terminal-agent/src/agent/scan-deskew/` 下纯灰度估角（只吃字节缓冲）、System.Drawing 解码缩图旋转编码、子进程脚本生成、受监管执行器（2,000 ms 硬超时杀整棵进程树、任何异常回原图、输出校验后才采用、日志只记角度与是否纠偏）；本机开关 `scanAutoDeskewEnabled` 缺省 false、只认字面量 true、心跳不能覆盖。阈值集中一处，门禁直接引用。
+- 本批**没接进扫描流程**：WIA 接线是 S4b，面板图片与投递重试记录是 S4c，复印跟 S5。
+- 门禁：新增 `verify:scan-deskew`（10 组，假子进程，不起 PowerShell）接进 ci.yml；新增 Windows 门禁 `verify-scan-deskew-windows.ps1`（Windows PowerShell 5.1，固定种子合成样本：文字页 −5°…+5°、±0.2°、超范围、空白、照片噪声、带框表格、证件底纹、发票样，JPEG/PNG/8 位与 24 位 BMP），接进 `windows-agent-installer.yml` 的 unsigned-msi-candidate 作业。**C# 未在本机编译**（本机无 PowerShell/.NET），以 Windows CI 结果为准；真机耗时、内存、GDI 资源未测。反向检查三项（异常不回原图、开关关仍起进程、日志带路径）都变红。
 
 ## 2026-11-04：屏上扫描 ③ 终端程序第二批 A2 第四轮——收掉复审高优先级问题（分支 `claude/scan-device-a2-1102`，随后并入 main 的提交，未部署）
 

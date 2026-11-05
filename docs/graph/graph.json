@@ -20018,6 +20018,7 @@
     ],
     ".github/workflows/windows-agent-installer.yml": [
       "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
+      "apps/terminal-agent/scripts/verify-scan-deskew.ts",
       "scripts/verify-ci-gate-coverage.mjs"
     ],
     "apps/admin/index.html": [
@@ -24107,7 +24108,8 @@
       "apps/terminal-agent/scripts/verify-agent-config-resilience.mjs",
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
-      "apps/terminal-agent/scripts/verify-printer-config.mjs"
+      "apps/terminal-agent/scripts/verify-printer-config.mjs",
+      "apps/terminal-agent/scripts/verify-scan-deskew.ts"
     ],
     "apps/terminal-agent/src/agent/db.ts": [
       "apps/terminal-agent/scripts/verify-print-retry-attempt.ts",
@@ -24195,6 +24197,15 @@
     "apps/terminal-agent/src/agent/scan-delivery.ts": [
       "apps/terminal-agent/scripts/verify-scan-device-engine.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner-r4.ts"
+    ],
+    "apps/terminal-agent/src/agent/scan-deskew/runner.ts": [
+      "apps/terminal-agent/scripts/verify-scan-deskew.ts"
+    ],
+    "apps/terminal-agent/src/agent/scan-deskew/script.ts": [
+      "apps/terminal-agent/scripts/verify-scan-deskew.ts"
+    ],
+    "apps/terminal-agent/src/agent/scan-deskew/thresholds-source.ts": [
+      "apps/terminal-agent/scripts/verify-scan-deskew.ts"
     ],
     "apps/terminal-agent/src/agent/scan-device/scan-device-backend.ts": [
       "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts",
@@ -24329,6 +24340,7 @@
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-printer-config.mjs",
+      "apps/terminal-agent/scripts/verify-scan-deskew.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner.ts",
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
@@ -35730,6 +35742,29 @@
       "package": "terminal-agent",
       "scriptNames": [
         "terminal-agent::verify:scan-deletion-audit"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          ".github/workflows/windows-agent-installer.yml",
+          "apps/terminal-agent/src/agent/config-manager.ts",
+          "apps/terminal-agent/src/agent/scan-deskew/runner.ts",
+          "apps/terminal-agent/src/agent/scan-deskew/script.ts",
+          "apps/terminal-agent/src/agent/scan-deskew/thresholds-source.ts",
+          "apps/terminal-agent/src/index.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-scan-deskew.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:scan-deskew"
       ],
       "wired": true
     },

@@ -61,6 +61,12 @@ jobs:
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
             -ProductVersion "0.4.19"
 
+      - name: Verify scan deskew C# and synthetic images
+        shell: powershell
+        run: |
+          powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File apps/terminal-agent/scripts/verify-scan-deskew-windows.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Exercise EXE install, repair, and uninstall
         shell: powershell
         run: |
