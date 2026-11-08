@@ -99,7 +99,7 @@ async function main() {
     const unused = {} as never
     const readers = [
       ['job_fit', new JobFitService(prisma, unused, unused, unused)],
-      ['career_plan', new CareerPlanService(prisma, unused, unused, unused, unused, unused, unused, unused)],
+      ['career_plan', new CareerPlanService(prisma, unused, unused, unused, unused, unused, unused, unused, { requireActiveConsent: async () => undefined } as never)],
     ] as const
     for (const [kind, reader] of readers) {
       await prisma.aiResumeResult.create({ data: { taskId, kind, endUserId: owner, status: 'completed', provider: 'verify', expiresAt: future,

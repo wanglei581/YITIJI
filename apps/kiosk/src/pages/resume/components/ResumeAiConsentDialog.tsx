@@ -14,7 +14,7 @@ interface ResumeAiConsentDialogProps {
   variant?: 'touch'
 }
 
-/** 简历类 AI（诊断 / 优化 / 生成）首次确认。会员入库，游客只记本机会话。 */
+/** 简历类 AI（诊断 / 优化 / 生成，以及用到简历的版式调整、职业规划、模拟面试）首次确认。会员入库，游客只记本机会话。 */
 export function ResumeAiConsentDialog({
   busy,
   error,
@@ -39,7 +39,7 @@ export function ResumeAiConsentDialog({
           </>
         )}
       >
-        <p>诊断、优化和生成会把你上传或填写的简历内容发送到系统里的 AI 进行分析。</p>
+        <p>简历诊断、优化、生成，以及用到这份简历的版式调整、职业规划和模拟面试，会把你上传或填写的简历内容发送到系统里的 AI 进行分析。</p>
         <p>结果只给你本人看，不会发送给企业或合作机构，也不进入平台候选人简历库。</p>
         <p>{memberLine}</p>
         {error ? <p role="status" aria-live="polite" data-tone="bad">{error}</p> : null}
@@ -58,7 +58,7 @@ export function ResumeAiConsentDialog({
           确认使用简历 AI
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-neutral-600">
-          诊断、优化和生成会把你上传或填写的简历内容发送到系统里的 AI 进行分析。
+          简历诊断、优化、生成，以及用到这份简历的版式调整、职业规划和模拟面试，会把你上传或填写的简历内容发送到系统里的 AI 进行分析。
         </p>
         <p className="mt-2 text-sm leading-relaxed text-neutral-600">
           结果只给你本人看，不会发送给企业或合作机构，也不进入平台候选人简历库。
