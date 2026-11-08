@@ -477,6 +477,20 @@ export function registerAiDeclarationBridge(bridge: AiDeclarationBridge | null):
   aiDeclarationBridge = bridge
 }
 
+/**
+ * 游客用 AI 被要求先登录（401 AI_LOGIN_REQUIRED）时报一声，由启动时登记的观察者转给全局登录提示。
+ * 只报不改：响应原样交还调用方，页面照旧按错误码出字。本文件不 import 提示模块，理由同上。
+ */
+let aiLoginRequiredObserver: (() => void) | null = null
+
+export function registerAiLoginRequiredObserver(observer: (() => void) | null): void {
+  aiLoginRequiredObserver = observer
+}
+
+function reportAiLoginRequired(error: ApiHttpError): void {
+  if (error.status === 401 && error.code === 'AI_LOGIN_REQUIRED') aiLoginRequiredObserver?.()
+}
+
 async function replayDeclaration(
   input: RequestInfo | URL,
   init: RequestInit,
@@ -519,6 +533,7 @@ export async function terminalProtectedFetch(
   if (replay) return replay
   if (response.ok) return response
   const error = await asHttpError(response.clone())
+  reportAiLoginRequired(error)
   // 业务请求 401 只触发一次会话刷新（刷新本身只对网络抖动与 502 / 503 / 504 重试）；其它错误原样交给调用方。
   if (!sessionInvalid(error)) return response
   await retryRefresh()
@@ -568,7 +583,9 @@ export async function terminalAttributedFetch(
   if (!getTerminalId()) {
     const response = await fetch(input, init)
     const replay = await replayDeclaration(input, init, response, declarationRetried, sendAgain)
-    return replay ?? response
+    const settled = replay ?? response
+    if (settled.status === 401) reportAiLoginRequired(await asHttpError(settled.clone()))
+    return settled
   }
   const inflight = state === 'checking' ? refreshInflight : null
   if (inflight) {
@@ -578,7 +595,9 @@ export async function terminalAttributedFetch(
   const replay = await replayDeclaration(input, init, response, declarationRetried, sendAgain)
   if (replay) return replay
   if (response.status !== 401) return response
-  if (!sessionInvalid(await asHttpError(response.clone()))) return response
+  const unauthorized = await asHttpError(response.clone())
+  reportAiLoginRequired(unauthorized)
+  if (!sessionInvalid(unauthorized)) return response
   try {
     await retryRefresh()
   } catch {

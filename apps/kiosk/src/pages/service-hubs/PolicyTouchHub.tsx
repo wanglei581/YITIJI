@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { QxTouchTile } from '../../components/qingxu/touch/QxTouchTile'
 import { getPublishedPolicies, type PublishedPoliciesResult } from '../../services/api/policies'
 import { useAuth } from '../../auth/useAuth'
+import { useOfficialChannels } from '../../hooks/useOfficialChannels'
 import { useKioskLicense } from '../../layouts/KioskLicenseContext'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
@@ -20,6 +21,9 @@ export function PolicyTouchHub() {
   const { isLoggedIn } = useAuth()
   const winding = useKioskLicense().mode === 'winding-down'
   const ai = useInterviewAiCapabilities()
+  // 没有发布的政策时，本机构有官方渠道就给一条去官网 / 公众号看的出路（与首页磁贴同一判据）。我们不代发政策。
+  const channels = useOfficialChannels()
+  const channelCount = channels.status === 'ready' ? channels.items.length : 0
   const [attempt, setAttempt] = useState(0)
   const [data, setData] = useState<HomeData | null>(null)
   const [failed, setFailed] = useState(false)
@@ -58,6 +62,9 @@ export function PolicyTouchHub() {
         <QxTouchTile icon="sparkle" title={ai.state('assistant_chat') === 'available' ? '问小青' : '小青暂时不可用'}
           desc="问通用问题；不解释具体政策，不判断能不能领" off={winding || ai.state('assistant_chat') !== 'available'}
           onClick={() => { rememberAssistantDraft(POLICY_GENERAL_QUESTION); navigate('/assistant') }} />
+        {channelCount > 0 ? (
+          <QxTouchTile icon="qr" title="本机构官方渠道" desc={`本机有 ${channelCount} 个渠道，扫码到机构官网或官方账号`} onClick={() => navigate('/official-channels')} />
+        ) : null}
         <QxTouchTile icon="home" title="回首页办别的事" desc="打印、扫描、改简历、练面试照常" onClick={() => navigate('/')} />
       </div>
     </> : <>

@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { refreshKioskProfile, startKioskProfileKeeper } from '../services/api/kioskProfile'
 import { AiDeclarationHost } from '../ai/AiDeclarationHost'
+import { AiLoginRequiredHost } from '../ai/AiLoginRequiredHost'
 import { KioskPrivacyGuard } from '../auth/KioskPrivacyGuard'
 import { useKioskSessionControl } from '../auth/KioskSessionControlContext'
 import { KioskBusyProvider } from '../contexts/KioskBusyContext'
@@ -75,6 +76,7 @@ export function KioskRuntimeRoot() {
   return (
     <KioskBusyProvider>
       <AiDeclarationHost />
+      <AiLoginRequiredHost />
       <SupportContactGuard />
       <ProfileGuard />
       <KioskLicenseProvider>
