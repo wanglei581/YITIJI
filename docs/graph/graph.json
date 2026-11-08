@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 629,
+    "endpointCount": 630,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -5024,6 +5024,18 @@
         "method": "PUT",
         "models": [],
         "path": "/api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/terminals/admin-terminals.controller.ts",
+        "handler": "AdminTerminalsController.updateDailyFreePrintSides",
+        "method": "PUT",
+        "models": [],
+        "path": "/api/v1/admin/terminals/:terminalId/daily-free-print-sides",
         "roles": [
           "admin"
         ],
@@ -13591,7 +13603,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 272,
+      "reachableFileCount": 276,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -14370,7 +14382,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 299
+      "sourceFileCount": 303
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -20503,12 +20515,16 @@
     "apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
     ],
+    "apps/admin/src/routes/print-scan/FreePrintQuotaCard.tsx": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
     "apps/admin/src/routes/print-scan/PrintRetryButton.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
     ],
     "apps/admin/src/routes/print-scan/index.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
-      "apps/admin/scripts/verify-console-plain-copy.mjs"
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "services/api/scripts/verify-free-print-quota.ts"
     ],
     "apps/admin/src/routes/printers/PrinterOutputCell.tsx": [
       "apps/admin/scripts/verify-console-plain-copy.mjs",
@@ -20613,10 +20629,14 @@
     "apps/admin/src/routes/terminals/TerminalBindCodeDialog.tsx": [
       "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs"
     ],
+    "apps/admin/src/routes/terminals/TerminalDailyFreeSidesSection.tsx": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
     "apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx": [
       "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs",
       "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-terminal-device-config.ts"
     ],
     "apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx": [
@@ -20753,6 +20773,12 @@
     ],
     "apps/admin/src/services/api/files.ts": [
       "apps/admin/scripts/verify-admin-file-lifecycle.mjs"
+    ],
+    "apps/admin/src/services/api/freePrintQuota.ts": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
+    "apps/admin/src/services/api/freePrintQuotaRules.ts": [
+      "services/api/scripts/verify-free-print-quota.ts"
     ],
     "apps/admin/src/services/api/internalAccounts.ts": [
       "apps/admin/scripts/verify-admin-internal-accounts-ui.mjs"
@@ -40575,6 +40601,12 @@
         ],
         "files": [
           ".github/workflows/ci.yml",
+          "apps/admin/src/routes/print-scan/FreePrintQuotaCard.tsx",
+          "apps/admin/src/routes/print-scan/index.tsx",
+          "apps/admin/src/routes/terminals/TerminalDailyFreeSidesSection.tsx",
+          "apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx",
+          "apps/admin/src/services/api/freePrintQuota.ts",
+          "apps/admin/src/services/api/freePrintQuotaRules.ts",
           "docs/progress/current-progress.md",
           "services/api/prisma/migrations/20260724200000_guard_planned_terminal_updates/migration.sql",
           "services/api/prisma/migrations/20260726003000_guard_retired_terminal/migration.sql",
