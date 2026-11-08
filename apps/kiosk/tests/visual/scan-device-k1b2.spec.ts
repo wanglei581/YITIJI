@@ -4,7 +4,7 @@ import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
 import { fillPhoneLogin, memberDocument } from './fixtures/privacy-clear-shell'
 
-const SHOT_DIR = '/Users/wanglei/.cache/claude-lanes/copyscan-1102/code-shots/k1b2'
+const SHOT_DIR = 'test-results/k1b2'
 const TASK = 'k1b2-scan-001'
 const CONTROL = 'k1b2-control'
 const FILE_ID = 'k1b2-file-1'

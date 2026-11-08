@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
 
-const SHOT_DIR = '/Users/wanglei/.cache/claude-lanes/copyscan-1102/code-shots/k1b1v'
+const SHOT_DIR = 'test-results/k1b1v'
 const SCAN_TASK_ID = 'k1b-scan-001'
 const CONTROL_TOKEN = 'k1b-scan-control'
 
