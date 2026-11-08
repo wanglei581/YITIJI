@@ -141,6 +141,9 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, SharedUserMessage>> = {
   PRINT_MEMBER_DAILY_QUOTA_REACHED: (error) => `${quotaLimit(error) ? `你今天已免费打印 ${quotaLimit(error)} 面，达到每日上限` : '你今天的免费打印量已达上限'}，明天 0 点恢复。${helpNeededLine()}。`,
   PRINT_GUEST_ORDER_QUOTA_EXCEEDED: (error) => `免登录每次${quotaLimit(error) ? `最多打印 ${quotaLimit(error)} 面` : '打印面数超过上限'}。`,
   PRINT_JOB_TOO_LARGE: '每单最多打印 100 面，请分几单打印',
+  // 政策办事清单：建单前服务端复查，政策已撤下、被紧急下架或改过版本就拒绝（2026-11-05 政策最小闭环）。
+  // 重试不会成功，所以不说「稍后重试」；回到政策页看现在发布的内容，需要时重新生成清单。
+  POLICY_CHECKLIST_WITHDRAWN: '这条政策已经撤下或刚更新过，这份清单不能再打印，本次没有建单。请回到「查政策」看现在发布的内容。',
   MEMBER_AUTH_REQUIRED: '登录状态已失效，请重新登录后重试',
   MEMBER_MISSING_TOKEN: '登录状态已失效，请重新登录后重试',
   MEMBER_SESSION_EXPIRED: '登录状态已失效，请重新登录后重试',
