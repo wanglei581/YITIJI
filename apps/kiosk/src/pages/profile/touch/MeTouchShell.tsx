@@ -1,3 +1,6 @@
+import { useLocation } from 'react-router-dom'
+import { useKioskLicense } from '../../../layouts/KioskLicenseContext'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../../copy/unattendedCopy'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QxTouchBand } from '../../../components/qingxu/touch/QxTouchBand'
@@ -59,6 +62,8 @@ export function MeTouchShell({
   bodyClassName?: string
 }) {
   const navigate = useNavigate()
+  const winding = useKioskLicense().mode === 'winding-down'
+  const isProfile = useLocation().pathname === '/profile'
   const device = useTerminalDeviceStatus()
   const bandStatus = showPrinter ? printerTouchStatus(device) : toTouchStatus(status)
   const place = getTerminalCode() || undefined
@@ -92,7 +97,7 @@ export function MeTouchShell({
             backDisabled={backDisabled}
             backLabel={backLabel}
             onBack={onBack}
-            ask={ask}
+            ask={winding && ask ? { label: ask.label, disabled: true, testId: ask.testId } : ask}
             primaryNode={primaryNode}
           />
         ) : undefined}
@@ -105,6 +110,7 @@ export function MeTouchShell({
           />
         ) : undefined}
       >
+        {winding && !isProfile ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : null}
         {children}
       </QxTouchScreen>
     </div>

@@ -9,7 +9,7 @@
   text-align: left;
 }
 
-[data-qx-page='optimize'] .qxt-overview { flex: 1 0 auto; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+[data-qx-page='optimize'] .qxt-overview { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; min-width: 0; }
 
 /* 四格统计 */
 [data-qx-page='optimize'] .qxt-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
@@ -60,11 +60,11 @@
 }
 
 /* 每一条 */
-[data-qx-page='optimize'] .qxt-rows { flex: 1 0 auto; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+[data-qx-page='optimize'] .qxt-rows { flex: none; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 
 [data-qx-page='optimize'] .qxt-row {
-  flex: 1 0 auto;
-  min-height: 140px;
+  flex: none;
+  min-height: 172px;
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(240px, 0.9fr) 104px;
   gap: 10px;

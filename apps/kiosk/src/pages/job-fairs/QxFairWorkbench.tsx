@@ -95,6 +95,8 @@ export interface QxFairWorkbenchProps {
   /** 问小青和主按钮之间的次操作。不要再放第二个返回。 */
   secondary?: ReactNode
   primary?: QxTouchPrimary
+  /** 收尾中只读打开旧记录时，问小青会离开本页去开始咨询，停用。 */
+  askHeld?: boolean
   children: ReactNode
 }
 
@@ -108,6 +110,7 @@ export function QxFairWorkbench({
   boundary,
   secondary,
   primary,
+  askHeld = false,
   children,
 }: QxFairWorkbenchProps) {
   const navigate = useNavigate()
@@ -153,7 +156,9 @@ export function QxFairWorkbench({
             back
             backLabel={resolvedBack.label}
             onBack={resolvedBack.onBack}
-            ask={{ label: askLabel, draft: askLabel.replace(/^问小青：?/, '') || '招聘会怎么看', voice: true }}
+            ask={askHeld
+              ? { label: askLabel, disabled: true }
+              : { label: askLabel, draft: askLabel.replace(/^问小青：?/, '') || '招聘会怎么看', voice: true }}
             secondary={secondary}
             primary={primary}
           />

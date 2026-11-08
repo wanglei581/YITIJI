@@ -485,3 +485,22 @@
 :is([data-qx-page='print-src'], [data-qx-page='print-upload'], [data-qx-page='print-usb']) .fs-err .fs-err-help {
   min-height: 80px;
 }
+
+/* 二维码说明中的刷新链接与文件框下方的取消出口。 */
+[data-qx-page='print-upload'] .fs-qr-refresh {
+  min-width: 120px;
+  min-height: 48px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--qxt-teal-ink);
+  font: inherit;
+  text-decoration: underline;
+}
+[data-qx-page='print-upload'] .print-upload-footer { flex: none; }
+[data-qx-page='print-upload'] .print-upload-footer:empty { display: none; }
+[data-qx-page='print-upload'] .print-upload-footer .qx-btn { flex: none; }
+[data-qx-page='print-upload'] .fs-upload-fine { font-size: 20px; color: var(--qxt-ink-3); }
+[data-qx-page='print-upload'] .fs-upload-fine summary { min-height: 48px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+[data-qx-page='print-upload'] .fs-upload-fine:not([open]) > :not(summary) { display: none; }
+[data-qx-page='print-upload'] .fs-upload-fine p { margin: 0; }

@@ -122,6 +122,8 @@ export interface AgentConfig {
   scanDeviceEnabled?: boolean
   /** 屏上复印默认关闭；扫描材料只留本机。 */
   copyDeviceEnabled?: boolean
+  /** 本机小角度纠偏开关；缺省或无效为 false，心跳不能覆盖。S4a 尚未接线。 */
+  scanAutoDeskewEnabled?: boolean
   /**
    * WIA 扫描仪名称。空字符串表示用第一台扫描仪（由扫描引擎读取），不在这里写死型号。
    */
@@ -206,6 +208,17 @@ export interface HeartbeatPayload {
   wiredNetworkStatus?: 'connected' | 'disconnected' | 'unknown'
   /** TCP reachability of a configured Windows network-printer port, when discoverable. */
   printerNetworkStatus?: 'reachable' | 'unreachable' | 'not_network_printer' | 'unknown'
+  /**
+   * 只读打印队列诊断，不含打印机地址、端口号或口令。
+   * 老终端不带这些字段。后端还不认时，终端会去掉后再发一次。
+   */
+  printerQueueName?: string
+  printerQueuePortKind?: 'usb' | 'network' | 'wsd' | 'other' | 'unknown'
+  /** 只在 usb 且端口名匹配 USB### / DOT4_### 时出现。 */
+  printerQueuePortName?: string
+  /** Win32_Printer 五个属性原值，或 not_found / query_failed。不含地址。 */
+  printerQueueRawStatus?: string
+  printerQueueSpooler?: 'running' | 'stopped' | 'other' | 'unknown'
   scanInputHealth?: ScanInputRuntimeHealth
   scanInputAction?: ScanInputRequiredAction
   scanInputReason?: ScanInputLockoutReason | null

@@ -3,6 +3,7 @@ import { userMessageOf } from '../../../services/api/userErrorMessage'
 import { FileTextIcon, LoaderIcon, RefreshCwIcon, UsbIcon } from 'lucide-react'
 import { Button, KioskStatePanel } from '@ai-job-print/ui'
 import { useUsbImportGate, type UsbImportGate } from '../../../hooks/useUsbImportGate'
+import { USB_IMPORT_UNCONFIRMED_COPY } from '../../../copy/usbImportCopy'
 import { unattendedResumeCopy } from '../touch/unattendedResumeCopy'
 import { helpNeededLine } from '../../../copy/unattendedCopy'
 import { useSupportContact } from '../../../hooks/useSupportContact'
@@ -11,6 +12,7 @@ import { useAuth } from '../../../auth/useAuth'
 import {
   getUsbStatus,
   isUsbImportConfigured,
+  isUsbUploadUnconfirmed,
   listUsbFiles,
   uploadUsbFile,
   type UsbFileListItem,
@@ -100,6 +102,8 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
   const [loading, setLoading] = useState(false)
   const [importingId, setImportingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [unconfirmed, setUnconfirmed] = useState(false)
+  const unconfirmedRef = useRef(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const selectedRef = useRef<UsbFileListItem | null>(null)
   const [scanNonce, setScanNonce] = useState(0)
@@ -140,7 +144,7 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
           if (!match) setRedetectNote('U 盘里的文件变了，请重新选一份')
         }
         setFiles(nextFiles)
-        setError(null)
+        if (!unconfirmedRef.current) setError(null)
       } catch (err) {
         if (cancelled) return
         setStatus(null)
@@ -169,8 +173,14 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
     onListed(count)
   }, [onListed, status, files])
 
+  const clearUnconfirmed = () => {
+    unconfirmedRef.current = false
+    setUnconfirmed(false)
+  }
+
   const importFile = async (item: UsbFileListItem) => {
     setImportingId(item.safeId)
+    clearUnconfirmed()
     setError(null)
     try {
       const uploaded = await uploadUsbFile(item.safeId, 'resume_upload', getToken())
@@ -187,6 +197,14 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
       })
     } catch (err) {
       if (!mountedRef.current) return
+      if (isUsbUploadUnconfirmed(err)) {
+        // 不把文件列表清掉，也不再发一次。按钮在 finally 里恢复可点。
+        unconfirmedRef.current = true
+        setUnconfirmed(true)
+        setError(USB_IMPORT_UNCONFIRMED_COPY)
+        return
+      }
+      clearUnconfirmed()
       setError(unattended
         ? unattendedResumeCopy(userMessageOf(err, 'U盘文件导入失败，请重试'))
         : userMessageOf(err, 'U盘文件导入失败，请重试'))
@@ -201,9 +219,9 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
   const selectedItem = unattended && selectedId ? files?.find((item) => item.safeId === selectedId) : undefined
   const runImportRef = useRef<() => void>(() => {})
   runImportRef.current = () => {
-    if (selectedItem && importingId === null && !loading) void importFile(selectedItem)
+    if (selectedItem && importingId === null && (unconfirmedRef.current || !loading)) void importFile(selectedItem)
   }
-  const importing = importingId !== null || (loading && Boolean(selectedId))
+  const importing = importingId !== null || (!unconfirmed && loading && Boolean(selectedId))
   const hasSelection = Boolean(selectedItem)
   useEffect(() => {
     onPickChange?.({ selected: hasSelection, importing, run: () => runImportRef.current() })
@@ -268,6 +286,7 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
       setRedetectNote(!status?.present ? '刚刚重新检测过，还是没有插入 U 盘' : `刚刚重新读过这块 U 盘，根目录里还是这 ${files?.length ?? 0} 个文件`)
       selectedRef.current = null
       setSelectedId(null)
+      clearUnconfirmed()
       setError(null)
       setScanNonce((value) => value + 1)
     }
@@ -285,7 +304,11 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
           </>
         )}
         {redetectNote ? <p className="qxt-usb-redetect" role="status">{redetectNote}</p> : null}
-        {error ? <p className="qxt-usb-error" role="alert"><b>U盘读取失败</b>{error}</p> : null}
+        {error ? (
+          <p className="qxt-usb-error" role="alert" data-testid="resume-usb-import-note">
+            {unconfirmed ? error : <><b>U盘读取失败</b>{error}</>}
+          </p>
+        ) : null}
         {!error && status?.present && files?.length === 0 ? (
           <p className="qxt-usb-empty" role="status"><b>没有可用文件</b>请确认U盘中包含 PDF、JPG 或 PNG 文件。</p>
         ) : null}
@@ -299,7 +322,7 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
                   type="button"
                   disabled={loading || importingId !== null}
                   aria-pressed={selectedId === item.safeId}
-                  onClick={() => { selectedRef.current = item; setSelectedId(item.safeId); setRedetectNote(null) }}
+                  onClick={() => { selectedRef.current = item; setSelectedId(item.safeId); setRedetectNote(null); clearUnconfirmed(); setError(null) }}
                   className="resume-usb-panel__row qxt-usb-row"
                 >
                   <span className="resume-usb-panel__fmt qxt-usb-fmt" data-kind={badge === 'PDF' ? 'pdf' : 'img'}>
@@ -355,7 +378,8 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
         {loading && <LoaderIcon className="h-5 w-5 animate-spin text-primary-600" aria-label="正在读取U盘" />}
       </div>
 
-      {error && <KioskStatePanel compact tone="error" title="U盘读取失败" description={error} />}
+      {error && unconfirmed ? <p className="qxt-usb-error" role="alert" data-testid="resume-usb-import-note">{error}</p> : null}
+      {error && !unconfirmed ? <KioskStatePanel compact tone="error" title="U盘读取失败" description={error} /> : null}
 
       {!error && status?.present && files?.length === 0 && (
         <KioskStatePanel compact tone="empty" title="没有可用文件" description="请确认U盘中包含 PDF、JPG 或 PNG 文件。" />

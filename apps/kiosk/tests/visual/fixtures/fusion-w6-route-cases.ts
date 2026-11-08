@@ -41,7 +41,6 @@ function createRouteCase(definition: W6RouteDefinition): W6RouteCase {
 
 const screen = (name: string) => `[data-kiosk-screen="${name}"]`
 const w2 = (name: string) => `[data-w2-page="${name}"]`
-const w4 = '.w4-page-frame'
 const touch = '[data-qxt-screen]'
 const member = screen('member-list')
 
@@ -119,17 +118,16 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/campus', url: '/campus', marker: touch, featureText: '2026 青岛高校毕业生招聘会' },
   { pattern: '/campus/welcome', url: '/campus/welcome', marker: touch, featureText: '校园招聘迎新指引' },
   { pattern: '/campus/freshman-insights', url: '/campus/freshman-insights', marker: '[data-qxt-screen]:has-text("暂无经核验的校园招聘统计")', featureText: '不会展示示例数据' },
-  { pattern: '/toolbox', url: '/toolbox', marker: screen('toolbox'), featureText: '百宝箱' },
-  { pattern: '/smart-campus', url: '/smart-campus', marker: w4, featureText: '智慧校园' },
-  { pattern: '/smart-campus/welcome', url: '/smart-campus/welcome', marker: w4, featureText: '迎新指引' },
-  { pattern: '/smart-campus/service/:key', url: '/smart-campus/service/campus-card', marker: w4, featureText: '校园卡办理' },
+  // 2026-11-04 产品负责人定停放：旧入口跳回首页，不再打开区页。
+  { pattern: '/toolbox/*', url: '/toolbox', marker: '[data-testid="qx-home"]', featureText: '我是小青', expectedPath: '/' },
+  { pattern: '/smart-campus/*', url: '/smart-campus', marker: '[data-testid="qx-home"]', featureText: '我是小青', expectedPath: '/' },
   { pattern: '/print-scan', url: '/print-scan', marker: w2('print-scan-home'), featureText: '打印扫描服务' },
-  { pattern: '/print-scan/feature/:key', url: '/print-scan/feature/id-photo', marker: w2('print-scan-feature'), featureText: '证件照' },
+  { pattern: '/print-scan/feature/:key', url: '/print-scan/feature/id-photo', expectedPath: '/print-scan', marker: w2('print-scan-home'), featureText: '打印扫描服务' },
   { pattern: '/print-scan/convert', url: '/print-scan/convert', marker: w2('print-scan-convert'), featureText: '图片转 PDF' },
   { pattern: '/print-scan/sign', url: '/print-scan/sign', marker: w2('print-scan-sign'), featureText: '签名' },
   { pattern: '/print/scan-convert', url: '/print/scan-convert', expectedPath: compatibilityRedirects['/print/scan-convert'], marker: w2('print-scan-convert'), featureText: '图片转 PDF' },
   { pattern: '/print/scan-sign', url: '/print/scan-sign', expectedPath: compatibilityRedirects['/print/scan-sign'], marker: w2('print-scan-sign'), featureText: '签名' },
-  { pattern: '/print/scan-feature', url: '/print/scan-feature', expectedPath: compatibilityRedirects['/print/scan-feature'], marker: w2('print-scan-feature'), featureText: '证件照' },
+  { pattern: '/print/scan-feature', url: '/print/scan-feature', expectedPath: compatibilityRedirects['/print/scan-feature'], marker: w2('print-scan-home'), featureText: '打印扫描服务' },
   { pattern: '/print/upload', url: '/print/upload', marker: w2('print-upload'), featureText: '文档打印' },
   { pattern: '/print/desk', url: '/print/desk', marker: 'h2:text-is("这一页没有待处理的文件")', featureText: '这一页没有待处理的文件' },
   { pattern: '/print/material-check', url: '/print/material-check', expectedPath: '/print/desk', marker: 'h2:text-is("这一页没有待处理的文件")', featureText: '这一页没有待处理的文件' },

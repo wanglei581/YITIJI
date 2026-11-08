@@ -55,7 +55,8 @@ assert(!has(all, '报告导出端点上线后开放'), 'placeholder export-unava
 assert(has(files.takeaway, 'aria-disabled'), 'export actions use aria-disabled, not native disabled')
 assert(!/<(button|input)[^>]*\sdisabled(\s|=|>)/.test(`${files.actions}\n${files.takeaway}`), 'export actions must not use native disabled')
 assert(has(files.takeaway, "exportKind === 'change_list' ? '打印修改清单' : '打印这份报告'"), 'print button label follows last export kind')
-assert(has(files.takeaway, '请先导出'), 'print/QR stay gated until a PDF is exported')
+// B10 R-3: old truth was has(files.takeaway, '请先导出'); print/QR now render only after export.
+assert(/\{exported \? <TakeawayButton\s+label=\{exportKind[^]*?testId="resume-report-print"[^]*?\/> : null\}/.test(files.takeaway) && /\{exported \? <TakeawayButton\s+label="生成二维码带走"[^]*?testId="resume-report-qr"[^]*?\/> : null\}/.test(files.takeaway), 'print/QR render only after a PDF is exported')
 assert(has(files.takeaway, 'printFileUrl'), 'print becomes available only after printFileUrl exists')
 assert(has(files.takeaway, "origin: 'resume_report'"), 'print writes the print handoff context (resume_report → confirm) after export')
 assert(has(files.takeaway, 'diagnosis_report'), 'export PDF uses kind=diagnosis_report')

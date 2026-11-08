@@ -115,6 +115,8 @@
   color: var(--qxt-ink-2);
 }
 
+[data-qx-page='resume-src'] .resume-source-phone-session > div:first-child > div:nth-child(2) > div:nth-child(2) > div:first-child > p:nth-child(3) { font-size: 20px; }
+
 [data-qx-page='resume-src'] .resume-source-phone-session > div:first-child > div:nth-child(2) > div:nth-child(2) > div:last-child {
   order: 4;
   display: flex;
@@ -177,17 +179,17 @@
   justify-content: center;
   gap: 16px;
   flex: none;
-  height: 160px;
+  min-height: 88px;
   border-radius: 26px;
   border: 2.5px dashed var(--qxt-edge);
-  background: var(--qxt-well);
+  background: transparent;
   color: var(--qxt-ink-3);
   font-size: 24px;
 }
 
 [data-qx-page='resume-src'] .qxt-drop.qxt-got {
   justify-content: flex-start;
-  padding: 0 22px;
+  padding: 12px 22px;
   border-style: solid;
   background: var(--qxt-card);
   color: var(--qxt-ink);

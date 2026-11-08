@@ -503,10 +503,16 @@ test('home: no tile while the channels request is held, and it appears exactly o
   })
   await recordAppearances(page, '[data-action="official-channels"]')
 
+  const configReady = page.waitForResponse((response) => new URL(response.url()).pathname === CONFIG && response.ok())
   await page.goto('/', { waitUntil: 'domcontentloaded' })
+  await configReady
   const home = page.getByTestId('qx-home')
   await expect(home).toHaveAttribute('data-recruitment', 'closed')
-  await expect(home).toHaveAttribute('data-toolbox', 'off')
+  // 2026-11-04 产品负责人定停放：配置读完后也不摆这两块，属性固定 parked。
+  await expect(home).toHaveAttribute('data-toolbox', 'parked')
+  await expect(home).toHaveAttribute('data-campus', 'parked')
+  await expect(home.locator('[data-action="toolbox"]')).toHaveCount(0)
+  await expect(home.locator('[data-action="smart-campus"]')).toHaveCount(0)
   await page.waitForTimeout(600)
   await expect(home.locator('[data-action="official-channels"]')).toHaveCount(0)
   expect((await gridGeometry(page, '.qxt-home-tiles')).rows.map((row) => row.actions)).toEqual(CLOSED_TILES)

@@ -30,7 +30,10 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
+import { AuditService } from '../src/audit/audit.service'
 import { JobApplicationsService } from '../src/job-applications/job-applications.service'
+import type { PrismaService } from '../src/prisma/prisma.service'
+import { SupportContactService } from '../src/support-contact/support-contact.service'
 import {
   SELF_REPORTED_CHANNEL,
   SELF_REPORTED_STATUS_SOURCE,
@@ -133,9 +136,10 @@ function makeFakePrisma(): PrismaService {
         Object.assign(row, args.data, { updatedAt: new Date() })
         return row
       },
-      async deleteMany(args: { where: Record<string, unknown> }) {
+      async deleteMany(args?: { where?: Record<string, unknown> }) {
+        const where = args?.where ?? {}
         const before = rows.length
-        rows = rows.filter((r) => !matches(r, args.where))
+        rows = rows.filter((r) => !matches(r, where))
         return { count: before - rows.length }
       },
       async groupBy(args: { where: Record<string, unknown> }) {
@@ -623,6 +627,97 @@ function checkSchemasAndExport(): void {
   assert('导出 select 不含 consentId', !/consentId/.test(mapperCode))
 }
 
+// ── ⑬ 页签开关不碰本表、不改 /me/job-applications 权限 ─────────────────────
+
+async function checkSelfNoteTabSwitchLeavesJobApplications(): Promise<void> {
+  console.log('\n[8] 页签开关写入不碰 JobApplication，/me/job-applications 权限不变')
+
+  const sentinel: Row = { id: 'self-note-tab-sentinel', endUserId: 'u-sentinel' }
+  rows.push(sentinel)
+  const before = rows.length
+  const calls = { job: 0 }
+  const settings = new Map<string, string | null>()
+  const audits: Array<{ action: string; targetType: string; targetId: string; payload: unknown }> = []
+  const jobDelegate = makeFakePrisma().jobApplication as unknown as Record<string, unknown>
+  const db = {
+    platformSetting: {
+      async findMany(args: { where: { key: { in: string[] } } }) {
+        return args.where.key.in
+          .filter((key) => settings.has(key))
+          .map((key) => ({ key, value: settings.get(key) ?? null }))
+      },
+      async upsert(args: {
+        where: { key: string }
+        create: { value: string | null }
+        update: { value: string | null }
+      }) {
+        const value = settings.has(args.where.key) ? args.update.value : args.create.value
+        settings.set(args.where.key, value)
+        return { key: args.where.key, value }
+      },
+    },
+    jobApplication: new Proxy(jobDelegate, {
+      get(target, prop, receiver) {
+        const value: unknown = Reflect.get(target, prop, receiver)
+        if (typeof value !== 'function') return value
+        return (...args: unknown[]) => {
+          calls.job += 1
+          return (value as (...inner: unknown[]) => unknown).apply(target, args)
+        }
+      },
+    }),
+    async $transaction<T>(fn: (tx: unknown) => Promise<T>): Promise<T> {
+      return fn(db)
+    },
+  }
+  const audit = {
+    async writeRequired(_tx: unknown, args: { action: string; targetType: string; targetId: string; payload?: unknown }) {
+      audits.push({
+        action: args.action,
+        targetType: args.targetType,
+        targetId: args.targetId,
+        payload: args.payload ?? null,
+      })
+      return 'audit-self-note-tab'
+    },
+  }
+  try {
+    const service = new SupportContactService(
+      db as unknown as PrismaService,
+      audit as unknown as AuditService,
+    )
+    await service.updateAdmin({ selfNoteTab: true }, { userId: 'user-admin', role: 'admin' })
+    assert('写 support.selfNoteTab 前后 JobApplication 行数不变', rows.length === before, `${before} -> ${rows.length}`)
+    assert('哨兵行仍在', rows.includes(sentinel))
+    assert('写 support.selfNoteTab 未调用 jobApplication', calls.job === 0, String(calls.job))
+    assert(
+      '该次审计是页签单列动作，payload 只有布尔前后值',
+      JSON.stringify(audits) === JSON.stringify([{
+        action: 'self_note_tab.update',
+        targetType: 'system',
+        targetId: 'self-note-tab',
+        payload: { before: { selfNoteTab: false }, after: { selfNoteTab: true } },
+      }]),
+    )
+    assert('库存只有字符串 true 才算写入开', settings.get('support.selfNoteTab') === 'true')
+  } finally {
+    const at = rows.lastIndexOf(sentinel)
+    if (at >= 0) rows.splice(at, 1)
+  }
+
+  const ctrl = read('services/api/src/job-applications/job-applications.controller.ts')
+  assert('页签开关不改变 /me/job-applications 前缀', /@Controller\('me\/job-applications'\)/.test(ctrl))
+  assert('页签开关不改变 EndUserAuthGuard', /@UseGuards\(EndUserAuthGuard\)/.test(ctrl))
+  assert('页签开关不给 /me/job-applications 增加 @Roles', !/@Roles\(/.test(ctrl))
+  assert('页签开关不改变列表路由', /@Get\(\)/.test(ctrl))
+  assert('页签开关不改变本人新建路由', /@Post\(\)/.test(ctrl))
+  assert('页签开关不改变本人更新路由', /@Patch\(':id'\)/.test(ctrl))
+  assert('页签开关不改变本人删除路由', /@Delete\(':id'\)/.test(ctrl))
+  const support = read('services/api/src/support-contact/support-contact.service.ts')
+  const supportCode = support.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  assert('页签开关服务源码不引用 jobApplication', !/jobApplication/i.test(supportCode))
+}
+
 // ── main ─────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -635,6 +730,7 @@ async function main(): Promise<void> {
   checkNoStatusLeakIntoOtherTables()
   checkUserFacingCopy()
   checkSchemasAndExport()
+  await checkSelfNoteTabSwitchLeavesJobApplications()
 
   console.log(`\n结果: ${passed} PASS / ${failed} FAIL`)
   if (failed > 0) process.exit(1)
