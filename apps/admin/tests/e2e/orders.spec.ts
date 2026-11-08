@@ -2,6 +2,33 @@ import { expect, test } from '@playwright/test'
 import { openAuthed, settleAdminPage } from './helpers/open'
 
 test.describe('订单管理（mock 口径：有页数单与未记录页数单）', () => {
+  for (const scenario of ['zero', 'paid', 'pending-refund'] as const) {
+    test(`可退订单：${scenario === 'zero' ? '0 元只说明无需退款' : scenario === 'paid' ? '有实收保留全额退款按钮' : '待退款保留发起退款按钮'}`, async ({ page }) => {
+      await page.addInitScript((value) => localStorage.setItem('mock:order-refund', value), scenario)
+      const guards = await openAuthed(page, '/orders')
+      await settleAdminPage(page, guards)
+      await page.getByRole('button', { name: '查看订单 ORD-20261105-7A3C91E204', exact: true }).click()
+      const detail = page.getByRole('dialog', { name: '订单详情 · ORD-20261105-7A3C91E204', exact: true })
+      await expect(detail).toBeVisible()
+      const refundButtons = detail.getByRole('button', { name: /退款/ })
+      if (scenario === 'zero') {
+        await expect(detail.getByText('0 元订单无需退款', { exact: true })).toBeVisible()
+        await expect(refundButtons).toHaveCount(0)
+        await expect(detail.getByPlaceholder('请填写退款原因（必填）')).toHaveCount(0)
+        await expect(detail.getByText('确认全额退款', { exact: true })).toHaveCount(0)
+      } else {
+        await expect(detail.getByText('0 元订单无需退款', { exact: true })).toHaveCount(0)
+        await expect(refundButtons).toHaveCount(1)
+        await expect(detail.getByText(scenario === 'paid' ? '发起全额退款' : '发起退款', { exact: true }).first()).toBeVisible()
+        await detail.getByRole('button', { name: scenario === 'paid' ? '退款' : '发起退款', exact: true }).click()
+        await expect(detail.getByPlaceholder('请填写退款原因（必填）')).toBeVisible()
+        await expect(detail.getByRole('button', { name: scenario === 'paid' ? '确认退款' : '确认发起退款', exact: true })).toBeDisabled()
+        await detail.getByRole('button', { name: '取消', exact: true }).click()
+      }
+      await settleAdminPage(page, guards)
+    })
+  }
+
   test('筛选、打开详情、取消收款与退款入口', async ({ page }) => {
     const guards = await openAuthed(page, '/orders')
     await settleAdminPage(page, guards)

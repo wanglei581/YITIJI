@@ -1,4 +1,4 @@
-// 法务文档版本页「服务联系」卡片用。只被这一页引用。
+// 法务文档版本页「服务联系」和页签开关用。只被这一页引用。
 // API_MODE=http → /admin/support-contact
 // API_MODE=mock → 内存，不假装已经写到后端。
 
@@ -9,6 +9,7 @@ export interface AdminSupportContact {
   servicePhone: string | null
   serviceHours: string | null
   miniappPublished: boolean
+  selfNoteTab: boolean
 }
 
 export interface AdminSupportContactInput {
@@ -55,30 +56,40 @@ async function toApiError(res: Response, fallbackMessage: string): Promise<ApiHt
   return new ApiHttpError(body.error?.code ?? 'SUPPORT_CONTACT_ERROR', message ?? fallbackMessage, res.status)
 }
 
+function asAdminContact(data: Partial<AdminSupportContact> | undefined): AdminSupportContact {
+  return {
+    servicePhone: typeof data?.servicePhone === 'string' ? data.servicePhone : null,
+    serviceHours: typeof data?.serviceHours === 'string' ? data.serviceHours : null,
+    miniappPublished: data?.miniappPublished === true,
+    selfNoteTab: data?.selfNoteTab === true,
+  }
+}
+
+async function httpPut(body: object, fallbackMessage: string): Promise<AdminSupportContact> {
+  const res = await fetch(`${API_BASE_URL}/admin/support-contact`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeader() },
+    body: JSON.stringify(body),
+  })
+  handleAuthFailure(res.status)
+  if (!res.ok) throw await toApiError(res, fallbackMessage)
+  const { data } = (await res.json()) as { data?: Partial<AdminSupportContact> }
+  return asAdminContact(data)
+}
+
 async function httpGet(): Promise<AdminSupportContact> {
   const res = await fetch(`${API_BASE_URL}/admin/support-contact`, { headers: authHeader() })
   handleAuthFailure(res.status)
   if (!res.ok) throw await toApiError(res, '服务联系方式加载失败')
-  const { data } = (await res.json()) as { data: AdminSupportContact }
-  return data
-}
-
-async function httpSave(input: AdminSupportContactInput): Promise<AdminSupportContact> {
-  const res = await fetch(`${API_BASE_URL}/admin/support-contact`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...authHeader() },
-    body: JSON.stringify(input),
-  })
-  handleAuthFailure(res.status)
-  if (!res.ok) throw await toApiError(res, '服务联系方式保存失败')
-  const { data } = (await res.json()) as { data: AdminSupportContact }
-  return data
+  const { data } = (await res.json()) as { data?: Partial<AdminSupportContact> }
+  return asAdminContact(data)
 }
 
 let mockStore: AdminSupportContact = {
   servicePhone: null,
   serviceHours: null,
   miniappPublished: false,
+  selfNoteTab: false,
 }
 
 export const supportContactService = {
@@ -88,8 +99,18 @@ export const supportContactService = {
   },
   async save(input: AdminSupportContactInput): Promise<AdminSupportContact> {
     const next = normalizeSupportContactInput(input)
-    if (API_MODE === 'http') return httpSave(next)
-    mockStore = next
+    if (API_MODE === 'http') return httpPut(next, '服务联系方式保存失败')
+    mockStore = { ...mockStore, ...next }
     return { ...mockStore }
+  },
+  /** 只提交页签开关，不带电话和服务时间，避免把另一张卡片里没保存的草稿写上去。 */
+  async saveSelfNoteTab(enabled: boolean): Promise<boolean> {
+    const selfNoteTab = enabled === true
+    if (API_MODE === 'http') {
+      const saved = await httpPut({ selfNoteTab }, '页签开关保存失败')
+      return saved.selfNoteTab
+    }
+    mockStore = { ...mockStore, selfNoteTab }
+    return mockStore.selfNoteTab
   },
 }
