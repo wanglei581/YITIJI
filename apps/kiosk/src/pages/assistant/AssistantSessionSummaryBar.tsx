@@ -34,8 +34,8 @@ export function AssistantSessionSummaryBar({
     setBusy(true)
     setError(null)
     try {
-      // 2026-11-08 起保存后留在本页显示结果，不再跳 /ai/plan 作业面；
-      // 那条路由只留给「我的 → AI 服务记录」打开旧的小青作业。
+      // 2026-11-08 起保存后留在本页显示结果，不再跳小青作业面；
+      // 作业面那条路由只留给「我的 → AI 服务记录」打开旧的小青作业。
       const saved = await summarizeAssistantSession(sessionId, token)
       setResult(saved)
     } catch (err) {

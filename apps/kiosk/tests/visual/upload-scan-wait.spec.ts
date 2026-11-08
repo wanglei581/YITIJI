@@ -262,7 +262,7 @@ test('打印上传：文件已收到后不再顺延，照常 150 秒预警、180
   expect(state.cancelled.every((entry) => entry.id === 'scan-wait-1')).toBe(true)
 })
 
-// 合规 10/10 的另外五页。purpose 取自各页 UploadSessionQrPanel。
+// 合规 10/10 的另外几页（签名页 11/08 停放后剩四页）。purpose 取自各页 UploadSessionQrPanel。
 // 合同审查路由只在构建时 VITE_ENABLE_CONTRACT_REVIEW=true 才挂上，否则冷开会回首页。
 // 面试设置的旧地址 /interview/setup 会 replace 到 /interview?stage=setup。
 const HELD = [

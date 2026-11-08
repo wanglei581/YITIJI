@@ -310,7 +310,7 @@ test('在线服务 503：白名单离线入口仍可进，其余一律不可点 
   // 旧台有 data-readiness 属性可断言；触屏台没有，改断言顶栏胶囊和屏的状态标记，两者都要说「不可用」。
   expect(hub.pill).toBe('在线服务当前不可用')
   await expect(page.locator('[data-qx-page="recruit"]')).toHaveAttribute('data-qxt-state', 'unavailable')
-  // 要后端的门一律不可点，并说出原因。找全职是信息门，岗位匹配参考和问 AI 顾问走 AI 话术。
+  // 要后端的门一律不可点，并说出原因。找全职是信息门，问 AI 顾问走 AI 话术；岗位匹配参考 11/08 随简历对照停放，不再出现。
   expect(hub.doors.length).toBeGreaterThan(0)
   expect(hub.doors.filter((door) => door.clickable).map((door) => door.title)).toEqual([])
   expect(byTitle(hub.doors, '找全职')).toEqual({
@@ -487,7 +487,7 @@ async function readInterviewHubFit(page: Page): Promise<{ over: number; covered:
   return page.evaluate(() => {
     const hub = document.querySelector('.qxt-ivhub') as HTMLElement
     const covered: string[] = []
-    for (const card of hub.querySelectorAll('.qx-hub-grid > *, .qxt-iv-more, .qx-hub-notice, .qxt-iv-wide')) {
+    for (const card of hub.querySelectorAll('.qx-hub-grid > *, .qx-hub-notice, .qxt-iv-wide')) {
       const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT)
       while (walker.nextNode()) {
         const node = walker.currentNode as Text
@@ -512,7 +512,7 @@ test('练面试服务台：正常、在线服务不可用、检查中三态都�
     const fit = await readInterviewHubFit(page)
     expect(fit.over, `${mode}：服务台比一屏高 ${fit.over}px，会出现滚动`).toBeLessThanOrEqual(1)
     expect(fit.covered, `${mode}：这些字被别的元素压住`).toEqual([])
-    // 磁贴标题 28px（稿 .tile b），「其余四项」里的也一样。放不下就从别处匀高度，不缩字。
+    // 磁贴标题 28px（稿 .tile b）。放不下就从别处匀高度，不缩字。
     const sizes = await page.locator('.qxt-ivhub .qxt-tile h3').evaluateAll((nodes) => nodes.map((n) => getComputedStyle(n).fontSize))
     expect(sizes.length, `${mode}：四张入口磁贴`).toBe(4)
     expect([...new Set(sizes)], `${mode}：磁贴标题字号`).toEqual(['28px'])
@@ -522,8 +522,10 @@ test('练面试服务台：正常、在线服务不可用、检查中三态都�
 test('练面试服务台：只留四格，不再显示其余入口 @kiosk', async ({ page, api }) => {
   registerShell(api, { api: 'ready', printer: { isOnline: true, printerStatus: 'ready' } })
   await page.goto('/interview-service')
-  await expect(page.getByRole('button', { name: /其余/ })).toHaveCount(0)
+  await page.waitForSelector('[data-qx-page="service-hub"]')
+  // 先等四格出来（阳性），再断言「其余」不在，免得页面还没画就空转通过。
   await expect(page.locator('.qxt-ivhub .qxt-tile h3')).toHaveText(['面试技巧', '训练报告', 'AI服务记录', '简历服务'])
+  await expect(page.getByRole('button', { name: /其余/ })).toHaveCount(0)
   const sizes = await page.locator('.qxt-ivhub .qxt-tile h3').evaluateAll((nodes) => nodes.map((n) => getComputedStyle(n).fontSize))
   expect(sizes).toEqual(['28px', '28px', '28px', '28px'])
 })

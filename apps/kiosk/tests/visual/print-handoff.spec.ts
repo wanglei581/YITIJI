@@ -6,7 +6,7 @@
 // 报价确认页信跳转时带的临时状态。临时状态一丢（登录回跳、返回预览、旧地址重定向），
 // 页面就退回会话里那一份 —— 可能是上一位的、或上一次的文件。
 //
-// 这些用例都从**真实来源页**出发（优化稿、求职材料、小青作业、我的文档），
+// 这些用例都从**真实来源页**出发（优化稿、小青作业、我的文档；求职材料页 11/08 停放后，H3 改为按它写入的交接原样注入），
 // 在跳转丢失临时状态的那一步断言：屏幕上和报价请求里都还是这一份，上一份 0 次出现。
 // 旧代码（候选 56bd387f2）上 H1–H6 必须红；H7 是清场的回归保护，旧代码上也是绿的。
 //
@@ -293,14 +293,21 @@ const MATERIAL_FILE = {
 test('H3 F02 a two-page job material on a simplex-only terminal is quoted single-sided without blocking @w2', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerPrintShell(api) // 双面未登记 = 本机暂未开通
-  registerMemberLogin(api)
   await routeFileContent(page, 'jm-p05-001')
-  // 11/08 材料工坊入口停放；保留已有两页材料在确认页的单面报价回归。
   await captureQuoteBodies(page)
-  await seedPrintHandoff(page, { file: {
-    fileId: MATERIAL_FILE.fileId, name: MATERIAL_FILE.filename, pages: MATERIAL_FILE.pageCount,
-    size: '129 KB', mimeType: 'application/pdf', fileUrl: MATERIAL_FILE.printFileUrl,
-  }, printParams: { copies: 1, colorMode: 'black_white', duplex: 'duplex_long', paperSize: 'A4' } })
+  // 求职材料页 11/08 停放：按它 startPrint 写入的交接原样注入（来源 job_material、免检直进确认页、
+  // 不带参数只带「两页以上建议长边双面」），继续钉确认页「建议的双面本机没开 → 按单面报价、不拦截」。
+  await seedPrintHandoff(page, {
+    origin: 'job_material',
+    checkPolicy: 'exempt',
+    materialCheck: null,
+    printParams: null,
+    paramsSuggestion: { duplex: 'duplex_long_edge' },
+    file: {
+      fileId: MATERIAL_FILE.fileId, name: MATERIAL_FILE.filename, pages: MATERIAL_FILE.pageCount,
+      size: '129 KB', mimeType: 'application/pdf', fileUrl: MATERIAL_FILE.printFileUrl,
+    },
+  })
   await page.goto('/print/confirm')
 
   const confirm = page.locator('[data-w2-page="print-confirm"]')

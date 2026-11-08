@@ -1508,8 +1508,7 @@ test('resume report folds the seven blocks, keeps one page scroller, and keeps t
   expect(primary.height).toBeGreaterThanOrEqual(64)
   expect(primary.clipped).toBe(false)
 
-  // 简历对照、自我探索两个入口在报告正文的页尾，各自可点。
-  await page.getByRole('button', { name: '简历对照' }).scrollIntoViewIfNeeded()
+  // 简历对照、自我探索 11/08 停放，报告页尾不再出现这两个入口（上面主按钮已渲染，这里不会空转）。
   await expect(page.getByRole('button', { name: '简历对照' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '自我探索' })).toHaveCount(0)
 
