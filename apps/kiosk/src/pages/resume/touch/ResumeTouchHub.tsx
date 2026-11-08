@@ -51,6 +51,8 @@ const RECORDS = '/me/ai-records'
 
 /** 后台把 AI 暂停时，要 AI 的入口写这一句（稿 resume 的 ?ai=down）。 */
 const AI_PAUSED_REASON = 'AI能力当前不可用'
+/** 首屏三步（与稿 screens.js 简历入口一致）。 */
+const RESUME_HUB_STEPS = ['导入', '出初稿', '确认'] as const
 
 /** 草稿只放问法，不替用户选，也不替用户生成或投递。 */
 const ASK_DRAFT = '我手头有没有简历还没定。请先问我现在最想完成什么，再告诉我该进哪一条。不要替我生成简历，也不要替我投递。'
@@ -192,6 +194,9 @@ export function ResumeTouchHub({
   const diagnoseReason = diagnose ? reasonFor(diagnose) : null
   const generateReason = generate ? reasonFor(generate) : null
   // 因 AI 暂停置灰的大卡改成稿里 ?ai=down 的行式小卡（不画「带走」和箭头），腾出高度给卡下的出路条。
+  // 11/08 首屏用三步说清（导入、出初稿、确认），流程不变只缩短说法；稿 screens.js 同步补了。
+  // 至少一张主卡能用才写：两张都停用（AI 暂停、授权收尾等）或连不上服务时，不介绍一条走不通的路。
+  const showSteps = !availability.apiDown && Boolean((diagnose && !diagnoseReason) || (generate && !generateReason))
   const diagnosePaused = diagnoseReason === AI_PAUSED_REASON
   const generatePaused = generateReason === AI_PAUSED_REASON
   /** 大卡因 AI 暂停置灰时，卡下给一条不用 AI 的出路（稿：有简历先打印原件，没有先填内容导出原样草稿）。 */
@@ -287,6 +292,7 @@ export function ResumeTouchHub({
         : '有就帮你诊断改写，没有就一步步写一份。'}
       status={bandStatus(pill)}
       showRail={false}
+      path={showSteps ? RESUME_HUB_STEPS : undefined}
       seal={availability.apiDown ? null : 'idle'}
       bandKind="std"
       navCurrent="home"
