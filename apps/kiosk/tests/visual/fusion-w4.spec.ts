@@ -549,18 +549,79 @@ test('campus 两个直达容错页诚实返回 @w4', async ({ page, api }) => {
   await verifyPage(page, errors)
 })
 
+// 2026-11-05 政策最小闭环：查政策改成「六类首页 /policy-service → 类别列表 /renshi?audience= →
+// 按编号读的详情 /renshi?policy=」。/renshi 不带参数是旧链接，回政策首页。
+// 与 fusion-w4-api.ts 登记的那一条政策同一份数据（应届高校毕业生，原文链接未核对属于登记官网）。
+const W4_POLICY = {
+  id: 'policy-001',
+  kind: 'policy_guide',
+  title: '高校毕业生就业服务指引',
+  summary: '请通过官方入口查看办理条件。',
+  audience: 'graduate',
+  sourceName: '青岛市人力资源和社会保障局',
+  syncTime: '2026-07-24T08:00:00.000Z',
+  externalUrl: 'https://hrss.example.gov.cn/policy/001',
+}
+/** 停放前常驻政策页的 5 条本机整理办事指引（源码已停放）。停放后哪一屏都不该再出现。 */
+const BUILTIN_GUIDE_TITLES = [
+  '一次性求职创业补贴',
+  '灵活就业社保补贴',
+  '高校毕业生住房 / 安家政策',
+  '职业技能培训 / 技能提升补贴',
+  '创业担保贷款 / 创业补贴',
+] as const
+
+/**
+ * 政策首页按类别各读一次条数（?kind=policy_guide&audience=…&pageSize=1）。ApiRouter 只按路径应答，
+ * 同一份列表会被算进每一类、连公告都算上；glob 路由又连查询串一起比对。这里按路径接住，再按 kind / audience 过滤、按页切。
+ */
+async function routeW4PolicyList(page: Page, items: readonly (typeof W4_POLICY)[], seen: URL[] = []): Promise<void> {
+  await page.route((url) => url.pathname === '/api/v1/policies', async (route) => {
+    const url = new URL(route.request().url())
+    seen.push(url)
+    const kind = url.searchParams.get('kind')
+    const audience = url.searchParams.get('audience')
+    const pageNo = Math.max(1, Number(url.searchParams.get('page')) || 1)
+    const pageSize = Math.max(1, Number(url.searchParams.get('pageSize')) || 200)
+    const hits = items.filter((item) => (!kind || item.kind === kind) && (!audience || item.audience === audience))
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: hits.slice((pageNo - 1) * pageSize, pageNo * pageSize),
+        pagination: { page: pageNo, pageSize, total: hits.length, totalPages: Math.max(1, Math.ceil(hits.length / pageSize)) },
+      }),
+    })
+  })
+}
+
 test('/renshi 官方信息不承诺代办 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
+  await routeW4PolicyList(page, [W4_POLICY])
+  api.respond('GET', '/api/v1/policies/policy-001', { status: 200, json: { success: true, data: W4_POLICY } })
   await page.goto('/renshi')
-  await expect(page.getByText(/以官方发布为准/).first()).toBeVisible()
+  await expect(page).toHaveURL((url) => url.pathname === '/policy-service')
+  await expect(page.getByTestId('policy-touch-hub')).toBeVisible()
+  await expect(page.getByText(/以官方原文为准/).first()).toBeVisible()
+  await expect(page.getByText(/保证到账|免申即享/)).toHaveCount(0)
+  await verifyPage(page, errors)
+
+  await page.goto('/renshi?policy=policy-001')
+  await expect(page.getByRole('heading', { level: 1, name: '高校毕业生就业服务指引' })).toBeVisible()
+  // 每条写明发布机构；机构没填办事三栏就照实写没提供，不从摘要里猜条件；
+  // 原文链接没核对过属于发布机构登记的官方网站，就不给扫码。
+  await expect(page.locator('.qxt-band .qxt-eyebrow')).toContainText('青岛市人力资源和社会保障局发布')
+  await expect(page.getByText('发布机构没有提供这部分，请以原文为准')).toHaveCount(3)
+  await expect(page.getByText('原文链接不在发布机构登记的官方网站内，暂不提供扫码')).toBeVisible()
+  await expect(page.locator('.policy-min-qr svg')).toHaveCount(0)
   await expect(page.getByText(/保证到账|免申即享/)).toHaveCount(0)
   await verifyPage(page, errors)
 })
 
-// 政策库空 ≠ 页面空。内置办事指引常驻 5 条（其中一条 audiences 含 'general'，
-// 任何身份筛选都命中），一旦和库内政策并进同一个列表，政策库为空时页面照样满屏：
-// 运营录完 30 条种子政策，打开页面无法判断自己录的到底进没进去。
-// 这两条断言钉死「两个分区各自成列、政策库有自己的空态」。
+// 政策库空 ≠ 页面空。旧版把 5 条本机整理的办事指引常驻在政策页（其中一条 audiences 含 'general'，
+// 任何身份筛选都命中），政策库为空时页面照样满屏：运营录完 30 条种子政策，打开页面无法判断自己录的到底进没进去。
+// 2026-11-05 起这 5 条指引停放、不再上屏：全库为 0 时整屏换成空态，类别列表照实写 0 条，不拿指引补位。
 test('/renshi 政策库为空时给出明确空态，内置指引不冒充库内政策 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   api.respond('GET', '/api/v1/policies', {
@@ -568,27 +629,52 @@ test('/renshi 政策库为空时给出明确空态，内置指引不冒充库内
     json: { success: true, data: [], pagination: { page: 1, pageSize: 200, total: 0, totalPages: 1 } },
   })
   await page.goto('/renshi')
+  await expect(page).toHaveURL((url) => url.pathname === '/policy-service')
 
-  const library = page.locator('[data-policy-section="library"]')
-  const builtin = page.locator('[data-policy-section="builtin"]')
-  await expect(library).toBeVisible()
-  await expect(library.getByText('政策库暂无内容')).toBeVisible()
-  await expect(library.locator('.k8-policy-list-item')).toHaveCount(0)
-  // 指引本身有真实价值（本机通用办事参考），保留但必须落在自己的分区里。
-  await expect(builtin.locator('.k8-policy-list-item')).toHaveCount(5)
+  const hub = page.getByTestId('policy-touch-hub')
+  await expect(hub).toHaveAttribute('data-qxt-state', 'empty')
+  await expect(page.getByRole('heading', { level: 1, name: '这里还没有发布的政策' })).toBeVisible()
+  await expect(page.getByText('本机不自己编写政策，也不拿别处的内容顶替')).toBeVisible()
+  await expect(hub.locator('[data-testid^="policy-category-"]')).toHaveCount(0)
+  for (const title of BUILTIN_GUIDE_TITLES) await expect(page.getByText(title)).toHaveCount(0)
+  await verifyPage(page, errors)
+
+  await page.goto('/renshi?audience=general')
+  await expect(page.getByRole('heading', { level: 1, name: '0 条政策' })).toBeVisible()
+  await expect(page.getByTestId('renshi-policy-list').locator('[data-policy-id]')).toHaveCount(0)
+  await expect(page.getByText('这个类别还没有机构发布政策。')).toBeVisible()
+  for (const title of BUILTIN_GUIDE_TITLES) await expect(page.getByText(title)).toHaveCount(0)
   await verifyPage(page, errors)
 })
 
-test('/renshi 库内政策与内置指引分区渲染 @w4', async ({ page, api }) => {
-  const errors = runtimeErrors(page); registerW4Api(api) // fixture: 1 条 kind=policy_guide
-  await page.goto('/renshi')
+// 库内政策按适用人群分六类，条数按类别向服务端要 total（不拿取回的一条推断全类条数）；
+// 本机整理的指引已停放，不混进任何一类。
+test('/renshi 库内政策按类别真实条数渲染，不混入内置指引 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page); registerW4Api(api) // fixture: 1 条 kind=policy_guide（应届高校毕业生）
+  const listRequests: URL[] = []
+  await routeW4PolicyList(page, [W4_POLICY], listRequests)
+  await page.goto('/policy-service')
 
-  const library = page.locator('[data-policy-section="library"]')
-  const builtin = page.locator('[data-policy-section="builtin"]')
-  await expect(library.locator('.k8-policy-list-item')).toHaveCount(1)
-  await expect(library.getByText('高校毕业生就业服务指引')).toBeVisible()
-  await expect(library.getByText('政策库暂无内容')).toHaveCount(0)
-  await expect(builtin.locator('.k8-policy-list-item')).toHaveCount(5)
-  await expect(builtin.getByText('高校毕业生就业服务指引')).toHaveCount(0)
+  const graduate = page.getByTestId('policy-category-graduate')
+  await expect(graduate).toContainText('1 条 · 最近：高校毕业生就业服务指引')
+  for (const audience of ['startup', 'flexible', 'hardship', 'migrant', 'general'] as const) {
+    const tile = page.getByTestId(`policy-category-${audience}`)
+    await expect(tile).toContainText('还没有机构发布')
+    await expect(tile).toHaveAttribute('aria-disabled', 'true')
+  }
+  expect(listRequests.some((url) => url.searchParams.get('kind') === 'policy_guide'
+    && url.searchParams.get('audience') === 'graduate' && url.searchParams.get('pageSize') === '1')).toBe(true)
+  // 机构公告只在有公告时出现。
+  await expect(page.getByRole('button', { name: /^机构公告/ })).toHaveCount(0)
+  for (const title of BUILTIN_GUIDE_TITLES) await expect(page.getByText(title)).toHaveCount(0)
+  await verifyPage(page, errors)
+
+  await graduate.click()
+  await expect(page).toHaveURL((url) => url.pathname === '/renshi' && url.searchParams.get('audience') === 'graduate')
+  const list = page.getByTestId('renshi-policy-list')
+  await expect(list.locator('[data-policy-id]')).toHaveCount(1)
+  await expect(list.locator('[data-policy-id="policy-001"]')).toContainText('高校毕业生就业服务指引')
+  await expect(list.locator('[data-policy-id="policy-001"]')).toContainText('青岛市人力资源和社会保障局')
+  for (const title of BUILTIN_GUIDE_TITLES) await expect(page.getByText(title)).toHaveCount(0)
   await verifyPage(page, errors)
 })

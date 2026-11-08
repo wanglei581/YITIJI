@@ -1,3 +1,4 @@
+// 停放（2026-11-05 政策最小闭环）：源码保留、不注册、不打包，旧链接回政策首页
 import { useNavigate } from 'react-router-dom'
 import { PrinterIcon, QrCodeIcon } from 'lucide-react'
 import { isValidSourceUrl } from '../../lib/url'

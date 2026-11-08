@@ -5,7 +5,7 @@ import { getAuditActorLabel, getAuditTargetLabel } from '../../lib/auditActionLa
 import { getUser } from '../../services/auth'
 
 export const RECRUITMENT_AUDIT_ACTIONS = ['recruitment.emergency_takedown', 'recruitment.circuit_break'] as const
-export const POLICY_AUDIT_ACTIONS = ['policy.emergency_takedown'] as const
+export const POLICY_AUDIT_ACTIONS = ['policy.emergency_takedown', 'recruitment.emergency_takedown'] as const
 
 function reasonOf(payloadJson: string): string {
   try {
@@ -18,7 +18,7 @@ function reasonOf(payloadJson: string): string {
 }
 
 /** 招聘紧急下架组与政策信息源底部的只读处置记录。任一动作读失败则整张卡失败。 */
-export function RecentEmergencyAuditCard({ actions }: { actions: readonly string[] }) {
+export function RecentEmergencyAuditCard({ actions, targetType }: { actions: readonly string[]; targetType?: 'policy' }) {
   const [rows, setRows] = useState<AuditLogRecord[] | null>(null)
   const [error, setError] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -30,7 +30,8 @@ export function RecentEmergencyAuditCard({ actions }: { actions: readonly string
     cancelRef.current = () => { cancelled = true }
     setLoading(true)
     setError(false)
-    void Promise.all(actions.map((action) => getAuditLogs({ action, limit: 10, offset: 0 })))
+    // 审计列表支持 targetType；在服务端先筛政策，再取各动作的最近 10 条，避免被其他对象挤掉。
+    void Promise.all(actions.map((action) => getAuditLogs({ action, targetType, limit: 10, offset: 0 })))
       .then((pages) => {
         if (cancelled) return
         const ranked = pages
@@ -48,7 +49,7 @@ export function RecentEmergencyAuditCard({ actions }: { actions: readonly string
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
-  }, [actions])
+  }, [actions, targetType])
 
   useEffect(() => {
     load()

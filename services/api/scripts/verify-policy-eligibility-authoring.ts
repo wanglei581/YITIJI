@@ -21,6 +21,7 @@
  * 运行：pnpm --filter @ai-job-print/api verify:policy-eligibility-authoring
  */
 import 'dotenv/config'
+import { POLICY_PUBLISH_FIXTURE, POLICY_VERIFIED_DOMAINS_FIXTURE } from './support/policy-publish-fixture'
 import { randomUUID } from 'crypto'
 import { readFileSync } from 'fs'
 import { join } from 'path'
@@ -104,8 +105,8 @@ async function main() {
   await prisma.organization.createMany({
     data: [
       // contentTrustStatus='active':发布闸门要求来源机构已通过内容信任核验(见 src/common/content-trust.ts)
-      { id: orgA, name: `录入面机构A_${suffix}`, type: 'public_employment_service', contentTrustStatus: 'active' },
-      { id: orgB, name: `录入面机构B_${suffix}`, type: 'public_employment_service', contentTrustStatus: 'active' },
+      { id: orgA, name: `录入面机构A_${suffix}`, type: 'public_employment_service', contentTrustStatus: 'active', verifiedOfficialDomainsJson: POLICY_VERIFIED_DOMAINS_FIXTURE },
+      { id: orgB, name: `录入面机构B_${suffix}`, type: 'public_employment_service', contentTrustStatus: 'active', verifiedOfficialDomainsJson: POLICY_VERIFIED_DOMAINS_FIXTURE },
     ],
   })
   const partnerARow = await prisma.user.create({
@@ -131,7 +132,7 @@ async function main() {
 
   try {
     const post = await policies.createPartnerPolicy(
-      { kind: 'policy_guide', title: `就业困难人员社保补贴_${suffix}`, audience: 'hardship' },
+      { ...POLICY_PUBLISH_FIXTURE, kind: 'policy_guide', title: `就业困难人员社保补贴_${suffix}`, audience: 'hardship' },
       partnerA,
     )
 
@@ -260,7 +261,7 @@ async function main() {
     {
       // 草稿状态下必须能预览：条件正是在草稿阶段录的，不能要求先过审才能试算
       const draft = await policies.createPartnerPolicy(
-        { kind: 'policy_guide', title: `草稿政策_${suffix}`, audience: 'graduate' },
+        { ...POLICY_PUBLISH_FIXTURE, kind: 'policy_guide', title: `草稿政策_${suffix}`, audience: 'graduate' },
         partnerA,
       )
       await eligibility.replacePartnerRules(draft.id, [rules[0]], partnerA)
