@@ -3,7 +3,7 @@
 ## 2026-11-08：屏上复印后端并 main、计费改口径（PR #1591）
 
 - 依据：产品负责人 11/08 对收口方案回「按推荐执行」。复印按原件页 × 份数计面，双面不减价，出纸成功才算；复印价按机器设、默认等于该机打印单价、试点 0 元（逐机设价是 12/15 起的包）；复印进免费额度、与打印共用；扫描一律免费、只记交付页数；谁都不许把全局价目改成大于 0，也不加新的全局价目行。
-- 并 main：分支 `claude/copy-c1-1104` 并入 main `42e945e76`（冲突只在图谱与进度文档；图谱取 main 后重生成，进度两侧保留），推送前又并入 `1d0c0082b`（#1501，冲突只在图谱）。PR #1591 仍是草稿，未合并、未部署，`copy` 能力照旧默认拒绝。
+- 并 main：分支 `claude/copy-c1-1104` 并入 main `42e945e76`（冲突只在图谱与进度文档；图谱取 main 后重生成，进度两侧保留），推送前又并入 `1d0c0082b`（#1501，冲突只在图谱），补修 CI 时再并入 `382a12669`（#1546，冲突只在进度文档）。PR #1591 仍是草稿，未合并、未部署，`copy` 能力照旧默认拒绝。
 - ① 复印价跟打印价走：从 `PricingService.quotePrint` 抽出 `readPrintUnitPrice`（`payment/pricing.service.ts`，打印行为不变），`quoteCopy` 改调它：黑白取 `print_bw_page`、彩色取 `print_color_page`；缺行或停用 → `COPY_PRICE_UNAVAILABLE`，单价非法 → `COPY_PRICE_INVALID`，与打印同样不可报价。去掉复印独有的 `unit` 校验和 `effectiveFrom` 过滤（打印不读这两样，留着会让两边对不上）。确认时金额不为 0 照旧拒（`COPY_PAID_NOT_SUPPORTED`）：万一打印价不是 0，复印宁可确认不了也不收钱。报价快照里的价目键改记实际取价的打印键。
 - 删了复印价目行：`COPY_DEFAULT_PRICE_CONFIG`、`ensureCopyPriceCatalogRows`（连同后台计费页与开发种子里的调用，这两个文件回到与 main 一致）、`COPY_PRICE_KEYS` / `CopyPriceKey` / `CopyPriceRow`（API 与 `packages/shared` 两份契约同步删）。这些从没进过 main、没上过线，迁移 SQL 里也没有插价目行，不需要数据迁移。没改任何全局价目数值，没加价目行。
 - ② 复印与打印共用免费额度：`print-jobs/free-print-quota.usage.ts` 的用量加上复印。`handed`（出纸成功）按 `billableSides` 计已用，按 `updatedAt` 落北京自然日（对齐打印的 `completedAt`），只看昨天 0 点以后建的单（会员注销清洗会改老单的 `updatedAt`）；`confirmed`（未过期）、`dispatching`、`spooled` 计在途，取当天创建或当天有更新（同打印）；`unconfirmed`、`failed`、`cancelled`、`expired` 与确认前的状态都不计；已确认但过了有效期的单拿不到打印许可，也不计在途。终端按 `terminalId`、会员按 `endUserId`，只算 0 元单（与打印 `isFreeOrder` 同口径，看关联订单）。复印确认（`copy-jobs.service.ts`）在报价、报价版本核对之后，占单建单之前调用 `assertFreePrintQuota`（`requestedSides` = 报价面数，`payableCents` = 报价金额），超额回 429，错误码与打印相同。
