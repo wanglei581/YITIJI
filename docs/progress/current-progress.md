@@ -97,6 +97,15 @@
 - 图谱：新文件入库后 `pnpm graph` 重出，`pnpm graph:check` 通过（`docs/graph/` 3 个文件有变化）。新文件被 fusion-w2 与 scan-session-truth 钉住；设置页那一组还被 runtime-error-boundary 与 no-raw-error-render 钉住；`useScanResultExits` 还被 print-done-truth 钉住；`useScanSessionCreate` 还被 scan-quiet-period 钉住。这些门禁本轮都已跑过，没有新冒出来还没跑的。
 - 合并注意：origin/main 比本分支基线多 #1538，进度文档顶部多一节小程序签名图。合的时候两节都留，这一节放在上面。
 
+## 2026-11-08：屏上复印 C3d / C3e——确认键认打印价目键、超免费额度进额度屏、没开通时复印入口直达面板指引（分支 `claude/copy-kiosk-c3-1105`，叠在 #1606 上，未合并、未部署）
+
+- 起因：后端 #1591 按 11/08 计费口径删掉了复印自己的价目行，复印报价键改成同色打印的 `print_bw_page` / `print_color_page`；一体机 `canConfirmCopy` 原来只认 `copy_*`，确认键会永远不亮。复印与打印共用三条免费额度，确认时超额回 429（与打印同码），原来一体机落到「状态未知」。
+- C3d：确认键改认 `print_*`，旧 `copy_*` 不能确认；确认 429 `PRINT_*_QUOTA_*` 进额度屏，说复印的话（「打印复印」「复印 N 面」，面数只取 `details.limit`，不读服务端文案），写明本次没有建单、没有出纸、原件请带走，附两条额度说明（复印和打印共用免费额度；只算成功出纸的面数）；出路只给回首页，游客单次超限加「去登录」（回到「放好原件，选份数」，要重扫）。**不给「改用面板复印」**：面板复印不经过额度，引导过去等于绕开上限。「去登录」只跳转、由复印页卸载清场——先清场会让复印页「没有会话就去掉 stage」的副作用按新地址把 `?from=` 冲掉。
+- C3e：打印扫描页「复印」只在后台确认 `copy` 与 `scan_device` 都可用时进「怎么复印？」选择屏；没开通、能力还在读或读失败，直达原来的面板复印图文指引（试点期多数机器不开屏上复印，看到的与现在一致）。深链 `copy-screen` 不变。
+- 复印四组 Node 单测原来没有任何 CI 门禁带：新增 kiosk `verify:copy-screen`（56 条）接进 ci.yml。
+- 与稿不同（待产品负责人过目）：额度屏稿上没有，照打印确认页额度提示的做法补，截图 `~/.cache/claude-lanes/copyscan-1102/wt-c3/apps/kiosk/test-results/copy-c3d-quota-*.png`。
+- 验证：kiosk tsc、lint、`verify:copy-screen` 56 条、`scan-session-truth`、`fusion-w2`、`kiosk-touch-frozen`、`qingxu-v2-frozen`、`kiosk-unattended-copy`、`kiosk-ai-declaration`、`device-status-honest`、`kiosk-browser-spec-coverage`、`compliance-copy`、`kiosk-font-subset` 等 20 条；浏览器（沙箱外）复印三组加屏上扫描与 `fusion-w2-scan` 共 153 条过；反向检查：报价键改回 `copy_*`、额度不进额度屏、额度屏仍轮询、面数不校验、额度屏出现面板出路、入口不分流，各自对应的用例都红。
+
 ## 2026-11-05：屏上复印 C3c——清场时撤销未打印单的云端授权（分支 `claude/copy-kiosk-c3-1105`，未合并、未部署）
 
 - 起因：Codex 复审 C3 报 P1——清场只中止浏览器请求、发一次本机 clear（吞失败），不取消未打印的云端单；`start` 已到终端程序时 clear 先到回 404，随后旧 `start` 建会话开扫。
