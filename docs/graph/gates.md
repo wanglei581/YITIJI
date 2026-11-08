@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2077 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2079 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -438,7 +438,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 627 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 629 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -922,6 +922,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/touch/source.css` | `verify-fusion-w3.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/useSelfAssessmentConsentBundle.ts` | `verify-self-assessment-consent-source.mjs` |
 | `apps/kiosk/src/pages/resume/useSelfAssessmentIdleExit.ts` | `verify-resume-phone-upload-ui.mjs` |
+| `apps/kiosk/src/pages/scan/ScanDeviceDonePage.tsx` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/ScanDeviceSettingsPage.tsx` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/scan/ScanHowPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/ScanProgressPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-scan-session-truth.mjs`<br/>`verify-no-raw-error-render.mjs` |
@@ -937,6 +938,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/scan/scanCleanupGate.ts` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/scanCreateReplay.ts` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/scanDeliveryAck.ts` | `verify-scan-session-truth.mjs` |
+| `apps/kiosk/src/pages/scan/scanGuestWays.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/scanHowContinue.ts` | `verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/pages/scan/scanMaterials.ts` | `verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/pages/scan/scanOutputFormat.ts` | `verify-scan-session-truth.mjs` |
