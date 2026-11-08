@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2119 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2121 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -442,7 +442,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 631 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 633 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -846,6 +846,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/components/DiagnosisDirectionForm.tsx` | `verify-fusion-w3.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/OptimizedResumeEditor.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/ResumeDiagnosisFailExits.tsx` | `verify-ai-down-fallbacks.mjs` |
+| `apps/kiosk/src/pages/resume/components/ResumeGenerateReview.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/ResumeLayoutControls.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx` | `verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/ResumeUsbImportPanel.tsx` | `verify-resume-phone-upload-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
@@ -924,6 +925,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/touch/ResumeTouchFrame.tsx` | `verify-job-fit-m1-5-ui.mjs` |
 | `apps/kiosk/src/pages/resume/touch/compare.css` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/touch/direction.css` | `verify-fusion-w3.mjs` |
+| `apps/kiosk/src/pages/resume/touch/edit.css` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/touch/report.css` | `verify-ai-down-fallbacks.mjs`<br/>`verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/touch/source.css` | `verify-fusion-w3.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/useSelfAssessmentConsentBundle.ts` | `verify-self-assessment-consent-source.mjs` |

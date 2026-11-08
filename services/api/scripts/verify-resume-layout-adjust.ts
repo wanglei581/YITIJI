@@ -33,7 +33,7 @@ import { join } from 'path'
 import { validateSync } from 'class-validator'
 import { plainToInstance } from 'class-transformer'
 import { Logger, ValidationPipe } from '@nestjs/common'
-import { LlmResumeOptimizeService } from '../src/ai/resume/llm-resume-optimize.service'
+import { LAYOUT_ADJUST_SYSTEM_PROMPT, LlmResumeOptimizeService } from '../src/ai/resume/llm-resume-optimize.service'
 import { ResumeLayoutAdjustController } from '../src/ai/resume-layout-adjust.controller'
 import { MemberPrivacyService } from '../src/member-privacy/member-privacy.service'
 import { ResumeGenerateExportDto, ResumeLayoutAdjustDto } from '../src/ai/dto/resume-generate.dto'
@@ -292,6 +292,39 @@ async function main(): Promise<void> {
     }
     assertStubHealthy()
     pass('3c. 新增数字 → 拒绝')
+
+    // 14. 只写了公司、没写职务的经历（11/08 包 2 并入 B8 ② 时补）：版式调整照样保留，职务留空，也不许补出职务。
+    if (!LAYOUT_ADJUST_SYSTEM_PROMPT.includes('只有公司没有职务的经历,role 留空字符串,仍保留该条经历,不得编造职务')) {
+      fail('14c. 版式调整提示词必须写明：只有公司没有职务时 role 留空、保留该条、不得编造职务')
+    }
+    pass('14c. 提示词写明空职务留空、保留该条、不得编造')
+    const COMPANY_ONLY_TEXT = `${ORIGINAL_TEXT}\n兼职经历 Bright Print Studio 2023 负责门店资料整理`
+    const companyOnlyResume: GeneratedResume = {
+      ...baseResume,
+      experience: [
+        ...baseResume.experience,
+        { company: 'Bright Print Studio', role: '', period: '2023', description: '负责门店资料整理。' },
+      ],
+    }
+    setResponses([null])
+    const kept = await svc.adjustLayoutDraft({ currentResume: companyOnlyResume, originalText: COMPANY_ONLY_TEXT, action: 'reformat' })
+    assertStubHealthy()
+    const keptRow = kept.resume.experience.find((e) => e.company === 'Bright Print Studio')
+    if (kept.resume.experience.length !== 2 || !keptRow) fail('14a. 只写公司的经历不得被版式调整丢掉')
+    if (keptRow.role !== '') fail(`14a. 空职务应保持为空，实际 ${keptRow.role}`)
+    pass('14a. 只写公司、没写职务的经历 → 保留，职务留空')
+
+    // 求职意向里的岗位名在原文里，事实比对拦不住；要靠按公司名对回原条目那一道。
+    const borrowRole: StubMutate = (resume) => { resume.experience[1] = { ...resume.experience[1], role: '前端开发工程师' } }
+    setResponses([borrowRole, borrowRole])
+    try {
+      await svc.adjustLayoutDraft({ currentResume: companyOnlyResume, originalText: COMPANY_ONLY_TEXT, action: 'reformat' })
+      fail('14b. 给空职务补出职务（借用求职意向的岗位名）应被拒绝')
+    } catch (e) {
+      if (errCode(e) !== 'AI_LAYOUT_ADJUST_INVALID_OUTPUT') fail(`14b. 期望 AI_LAYOUT_ADJUST_INVALID_OUTPUT，实际 ${errCode(e)}`)
+    }
+    assertStubHealthy()
+    pass('14b. 空职务被补成原文别处的岗位名 → 拒绝')
 
     setResponses([null])
     const result = await svc.adjustLayoutDraft({
