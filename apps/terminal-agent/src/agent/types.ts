@@ -206,6 +206,17 @@ export interface HeartbeatPayload {
   wiredNetworkStatus?: 'connected' | 'disconnected' | 'unknown'
   /** TCP reachability of a configured Windows network-printer port, when discoverable. */
   printerNetworkStatus?: 'reachable' | 'unreachable' | 'not_network_printer' | 'unknown'
+  /**
+   * 只读打印队列诊断，不含打印机地址、端口号或口令。
+   * 老终端不带这些字段。后端还不认时，终端会去掉后再发一次。
+   */
+  printerQueueName?: string
+  printerQueuePortKind?: 'usb' | 'network' | 'wsd' | 'other' | 'unknown'
+  /** 只在 usb 且端口名匹配 USB### / DOT4_### 时出现。 */
+  printerQueuePortName?: string
+  /** Win32_Printer 五个属性原值，或 not_found / query_failed。不含地址。 */
+  printerQueueRawStatus?: string
+  printerQueueSpooler?: 'running' | 'stopped' | 'other' | 'unknown'
   scanInputHealth?: ScanInputRuntimeHealth
   scanInputAction?: ScanInputRequiredAction
   scanInputReason?: ScanInputLockoutReason | null

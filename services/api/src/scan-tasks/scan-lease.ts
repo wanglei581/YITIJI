@@ -9,6 +9,11 @@ export interface ScanDeliveryLeasePayload {
   notBeforeEpoch: number
   expiresAtEpoch: number
   nonce: string
+  /**
+   * 屏上扫描当时的 deviceRound。只出现在 device 任务的签名负载里，终端程序改不了。
+   * 面板任务没有这个字段。
+   */
+  deviceRound?: number
 }
 
 export interface ScanDeliveryLeaseResult {
@@ -43,6 +48,7 @@ export function getScanLeaseSecret(): string {
 /**
  * 签发扫描任务投递租约。
  * 绑定 terminalId + scanTaskId + taskCreatedAtEpoch + leaseEpoch + notBeforeEpoch + expiresAtEpoch。
+ * 屏上扫描再绑定 deviceRound。面板任务的负载没有这个字段。
  */
 export function signScanDeliveryLease(payload: ScanDeliveryLeasePayload): string {
   const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url')
@@ -137,6 +143,8 @@ export function buildScanDeliveryLease(args: {
   taskExpiresAt: Date
   now?: Date
   ttlMs?: number
+  /** 只给屏上扫描。放进签名负载。面板不传，签名里就没有这个字段。 */
+  deviceRound?: number
 }): ScanDeliveryLeaseResult {
   const now = args.now ?? new Date()
   const ttlMs = args.ttlMs ?? SCAN_LEASE_DEFAULT_TTL_MS
@@ -150,6 +158,7 @@ export function buildScanDeliveryLease(args: {
     notBeforeEpoch: taskCreatedAtEpoch,
     expiresAtEpoch: expiresAtMs,
     nonce: randomBytes(16).toString('hex'),
+    ...(typeof args.deviceRound === 'number' ? { deviceRound: args.deviceRound } : {}),
   }
 
   return {

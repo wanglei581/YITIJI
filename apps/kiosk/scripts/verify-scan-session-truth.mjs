@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -8,7 +8,21 @@ const kioskRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (relativePath) => readFileSync(resolve(kioskRoot, relativePath), 'utf8')
 
 const scanStart = read('src/pages/scan/ScanStartPage.tsx')
-const scanSettings = read('src/pages/scan/ScanSettingsPage.tsx')
+/* 2026-11-02 K1a 拆分：ScanSettingsPage 顶着 800 行硬线（CLAUDE.md §8），而下一步要往里加屏上扫描，
+ * 所以按职责拆成了 状态 / 创建 / 投递确认 / 到期 / 处理函数 五个 hook，页面只留装配与渲染。
+ * 代码行是逐字搬的（行为一字不变），下面凡是钉「设置页这一整套逻辑」的断言，读的就是这几份的拼接
+ * （顺序 = 状态 → 创建 → 投递确认 → 到期 → 处理函数 → 页面，也就是它们拆分前在原文里的先后），**判据一条没减**；
+ * 要钉哪个文件才有的东西（渲染、本地声明）仍然读那一个文件。以后设置页再拆出新文件，加进下面这张表
+ * （文件路径写成字面量而不是藏进共用模块，是为了项目图谱查得到「这个文件被哪条门禁断言」）。 */
+const SETTINGS_PAGE_FILES = [
+  'src/pages/scan/useScanSettingsState.ts',
+  'src/pages/scan/useScanSessionCreate.ts',
+  'src/pages/scan/useScanSettingsDeliveryAck.ts',
+  'src/pages/scan/useScanSettingsExpiry.ts',
+  'src/pages/scan/useScanSettingsActions.ts',
+  'src/pages/scan/ScanSettingsPage.tsx',
+]
+const scanSettings = SETTINGS_PAGE_FILES.map(read).join('\n')
 /* 2026-09-14 结构收敛：拒绝码表与两屏结论文案、以及「失败码 → 说什么」的纯翻译
  * 搬到了 scanRescanRecovery.ts（ScanSettingsPage 触到 800 行硬线）。搬的是无状态的
  * 那一半，副作用仍在页面里。下面凡是钉这些常量/文案的断言改钉这份源，**判据一个没减**。 */
@@ -173,7 +187,31 @@ assert.doesNotMatch(
 )
 
 const scanProgress = read('src/pages/scan/ScanProgressPage.tsx')
-const scanResult = read('src/pages/scan/ScanResultPage.tsx')
+/* 2026-11-02 K1a 拆分：ScanResultPage 同理按职责拆成 重扫授权 / 出口 两个 hook 和 失败视图 / 预览块 / 去向行
+ * 三个组件，页面只留装配与渲染。代码行逐字搬运，下面的断言读这几份的拼接，判据一条没减。
+ * 顺序 = 类型 → 重扫授权 → 出口 → 视图 → 页面。 */
+const RESULT_PAGE_FILES = [
+  'src/pages/scan/scanResultModel.ts',
+  'src/pages/scan/useScanResultRescan.ts',
+  'src/pages/scan/useScanResultExits.ts',
+  'src/pages/scan/ScanResultFailedView.tsx',
+  'src/pages/scan/ScanResultPreviewBlock.tsx',
+  'src/pages/scan/ScanResultExitRow.tsx',
+  'src/pages/scan/ScanResultPage.tsx',
+]
+const scanResult = RESULT_PAGE_FILES.map(read).join('\n')
+/* 防漏登记：设置页 / 结果页以后再拆出新文件，必须加进上面两张表。否则「不得出现」类的断言
+ * （doesNotMatch、数 navigate / createScanSession / takeScanRescanAuthority 的次数）读不到新文件，
+ * 就等于悄悄放过去。结果页的整屏预览层（ScanResultPreviewViewer）是原来就独立的文件，不在其内。 */
+for (const [label, listed, pattern] of [
+  ['settings', SETTINGS_PAGE_FILES, /^(?:ScanSettingsPage|useScanSettings\w*|useScanSession\w*)\.tsx?$/],
+  ['result', RESULT_PAGE_FILES, /^(?:ScanResult(?!PreviewViewer)\w*|scanResultModel|useScanResult\w*)\.tsx?$/],
+]) {
+  const unlisted = readdirSync(resolve(kioskRoot, 'src/pages/scan'))
+    .filter((name) => pattern.test(name))
+    .filter((name) => !listed.includes(`src/pages/scan/${name}`))
+  assert.deepEqual(unlisted, [], `${label} page split files must all be listed in this gate: ${unlisted.join(', ')}`)
+}
 const scanFormat = read('src/pages/scan/scanOutputFormat.ts')
 
 assert.match(
@@ -229,6 +267,20 @@ assert.match(
   scanResult,
   /未登录扫描件不会进入「我的文档」/,
   'guest scan result must say the file will not enter My Documents',
+)
+/* 产品负责人 2026-11-02 拍板的游客说明（照触屏版补稿 cs-scan-done 的原话，再补一句 U 盘）：
+ * 说清「请在本次操作内完成打印或识别」，带走电子版是「下次先扫码登录再扫」或「用 U 盘」，
+ * U 盘那条这台机器暂未开通所以如实写出来。上面那条只钉开头，这里钉全句 —— 句子被改回走查 I-15 的旧版
+ * （「要留在账号里：先登录，再重新扫一次」，会让人以为现在登录就能存进去），或者悄悄丢掉 U 盘那一句，都要红。 */
+assert.match(
+  scanResult,
+  /未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。要带走电子版，下次先扫码登录再扫。用 U 盘带走：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。/,
+  'guest scan result must carry the 11/02 approved wording incl. the USB line',
+)
+assert.doesNotMatch(
+  scanResult,
+  /要留在账号里|先登录，再重新扫一次/,
+  'guest scan result must not go back to the pre-11/02 sentence that implies logging in now keeps the file',
 )
 assert.match(
   scanResult,

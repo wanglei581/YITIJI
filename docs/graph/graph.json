@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 628,
+    "endpointCount": 629,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -12834,6 +12834,25 @@
       },
       {
         "controller": "services/api/src/scan-tasks/scan-device.controller.ts",
+        "handler": "ScanDeviceController.deviceSettings",
+        "method": "POST",
+        "models": [
+          "FileObject",
+          "ScanTask",
+          "Terminal",
+          "TerminalCapability"
+        ],
+        "path": "/api/v1/scan/sessions/:id/device-settings",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/scan-tasks/scan-device-sessions.service.ts"
+        ],
+        "services": [
+          "ScanDeviceSessionsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/scan-tasks/scan-device.controller.ts",
         "handler": "ScanDeviceController.switchToPanel",
         "method": "POST",
         "models": [
@@ -13536,7 +13555,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 256,
+      "reachableFileCount": 271,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -13922,7 +13941,10 @@
         },
         {
           "component": "LegalDocsPage",
-          "endpoints": [],
+          "endpoints": [
+            "POST /admin/branding/logo",
+            "PUT /admin/branding"
+          ],
           "file": "apps/admin/src/routes/legal-docs/index.tsx",
           "layout": [
             "AdminLayoutWrapper"
@@ -13933,7 +13955,10 @@
         },
         {
           "component": "LoginPage",
-          "endpoints": [],
+          "endpoints": [
+            "POST /admin/branding/logo",
+            "PUT /admin/branding"
+          ],
           "file": "apps/admin/src/routes/login/index.tsx",
           "layout": [],
           "path": "/login",
@@ -14035,6 +14060,7 @@
             "PATCH /admin/orgs/:param/accounts/:param/status",
             "PATCH /admin/orgs/:param/content-trust",
             "PATCH /admin/orgs/:param/status",
+            "POST /admin/branding/logo",
             "POST /admin/orgs",
             "POST /admin/orgs/:param/accounts",
             "POST /admin/orgs/:param/accounts/:param/action-challenges",
@@ -14044,6 +14070,7 @@
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/verify",
             "POST /admin/recruitment-emergency/circuit-break",
             "POST /admin/recruitment-emergency/takedown",
+            "PUT /admin/branding",
             "PUT /admin/orgs/:param/accounts/:param/email",
             "PUT /admin/orgs/:param/verified-official-domains"
           ],
@@ -14307,11 +14334,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 282
+      "sourceFileCount": 298
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 810,
+      "reachableFileCount": 821,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -17611,11 +17638,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 926
+      "sourceFileCount": 937
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 93,
+      "reachableFileCount": 98,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -18130,7 +18157,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 94
+      "sourceFileCount": 99
     }
   },
   "dataModel": {
@@ -19520,7 +19547,7 @@
         "usedBy": []
       },
       {
-        "fieldCount": 30,
+        "fieldCount": 31,
         "name": "ScanTask",
         "relations": [
           "EndUser",
@@ -19668,6 +19695,7 @@
           "services/api/src/activity/activity.controller.ts",
           "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/admin-ops/derived-print-quota-alerts.ts",
+          "services/api/src/admin-ops/derived-scan-device-alerts.ts",
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/ai/usage/ai-usage-context.ts",
@@ -19732,6 +19760,7 @@
           "Terminal"
         ],
         "usedBy": [
+          "services/api/src/admin-ops/derived-scan-device-alerts.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts"
         ]
@@ -19755,6 +19784,7 @@
         ],
         "usedBy": [
           "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/admin-ops/derived-scan-device-alerts.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/first-order/first-order-report-builder.ts",
           "services/api/src/orgs/partner-stats.service.ts",
@@ -20108,6 +20138,9 @@
       "apps/admin/scripts/verify-admin-phone-transfer-ui.mjs",
       "scripts/verify-datetime-honesty.mjs"
     ],
+    "apps/admin/src/routes/ai-config/index.tsx": [
+      "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
+    ],
     "apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx": [
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs"
     ],
@@ -20454,6 +20487,7 @@
     ],
     "apps/admin/src/routes/screen/GovGrid.tsx": [
       "apps/admin/scripts/verify-console-batch5-copy.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/admin/scripts/verify-console-screen-details.mjs",
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
@@ -20469,6 +20503,7 @@
     ],
     "apps/admin/src/routes/screen/UsageView.tsx": [
       "apps/admin/scripts/verify-console-batch6-copy.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/admin/scripts/verify-console-screen-details.mjs",
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
@@ -20653,6 +20688,9 @@
     ],
     "apps/admin/src/services/api/aiAccess.ts": [
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs"
+    ],
+    "apps/admin/src/services/api/aiConfig.ts": [
+      "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
     "apps/admin/src/services/api/aiUsage.ts": [
       "apps/admin/scripts/verify-job-ai-ops-dashboard-ui.mjs"
@@ -23027,9 +23065,20 @@
       "apps/kiosk/scripts/verify-scan-session-truth.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
+    "apps/kiosk/src/pages/scan/ScanResultExitRow.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs"
+    ],
+    "apps/kiosk/src/pages/scan/ScanResultFailedView.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs"
+    ],
     "apps/kiosk/src/pages/scan/ScanResultPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-      "apps/kiosk/scripts/verify-print-done-truth.mjs",
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs"
+    ],
+    "apps/kiosk/src/pages/scan/ScanResultPreviewBlock.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
     "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx": [
@@ -23072,6 +23121,10 @@
       "apps/kiosk/scripts/verify-scan-quiet-period.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
+    "apps/kiosk/src/pages/scan/scanResultModel.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs"
+    ],
     "apps/kiosk/src/pages/scan/scanSessionRevoke.ts": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
@@ -23094,6 +23147,46 @@
     ],
     "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
+    "apps/kiosk/src/pages/scan/useScanResultExits.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-print-done-truth.mjs",
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs"
+    ],
+    "apps/kiosk/src/pages/scan/useScanResultRescan.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs"
+    ],
+    "apps/kiosk/src/pages/scan/useScanSessionCreate.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
+      "apps/kiosk/scripts/verify-scan-quiet-period.mjs",
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
+    ],
+    "apps/kiosk/src/pages/scan/useScanSettingsActions.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
+    ],
+    "apps/kiosk/src/pages/scan/useScanSettingsDeliveryAck.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
+    ],
+    "apps/kiosk/src/pages/scan/useScanSettingsExpiry.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
+    ],
+    "apps/kiosk/src/pages/scan/useScanSettingsState.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
@@ -23903,6 +23996,7 @@
       "apps/admin/scripts/verify-console-privacy-copy.mjs"
     ],
     "apps/partner/src/routes/profile/index.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/admin/scripts/verify-console-privacy-copy.mjs",
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
     ],
@@ -24093,6 +24187,7 @@
     "apps/terminal-agent/src/agent/auth-state.ts": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
       "apps/terminal-agent/scripts/verify-print-retry-attempt.ts",
+      "apps/terminal-agent/scripts/verify-printer-queue-diagnostics.ts",
       "apps/terminal-agent/scripts/verify-scan-deletion-audit.ts",
       "apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner.ts",
@@ -24137,6 +24232,7 @@
       "apps/terminal-agent/scripts/verify-local-qr-proxy.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
+      "apps/terminal-agent/scripts/verify-printer-queue-diagnostics.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner.ts",
       "apps/terminal-agent/scripts/verify-scan-input-lockout-telemetry.ts"
     ],
@@ -24176,6 +24272,9 @@
     ],
     "apps/terminal-agent/src/agent/print-task-temp-cleanup.ts": [
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs"
+    ],
+    "apps/terminal-agent/src/agent/printer-queue-diagnostics.ts": [
+      "apps/terminal-agent/scripts/verify-printer-queue-diagnostics.ts"
     ],
     "apps/terminal-agent/src/agent/printer-status-map.ts": [
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts"
@@ -24312,6 +24411,7 @@
       "apps/terminal-agent/scripts/verify-local-qr-proxy.ts",
       "apps/terminal-agent/scripts/verify-print-retry-attempt.ts",
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
+      "apps/terminal-agent/scripts/verify-printer-queue-diagnostics.ts",
       "apps/terminal-agent/scripts/verify-scan-deletion-audit.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
       "apps/terminal-agent/scripts/verify-scan-input-health.ts",
@@ -24324,11 +24424,13 @@
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
-      "apps/terminal-agent/scripts/verify-print-retry-attempt.ts"
+      "apps/terminal-agent/scripts/verify-print-retry-attempt.ts",
+      "apps/terminal-agent/scripts/verify-printer-queue-diagnostics.ts"
     ],
     "apps/terminal-agent/src/agent/wql-literal.ts": [
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
-      "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
+      "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
+      "apps/terminal-agent/scripts/verify-printer-queue-diagnostics.ts"
     ],
     "apps/terminal-agent/src/config.ts": [
       "apps/terminal-agent/scripts/verify-printer-config.mjs"
@@ -24697,6 +24799,7 @@
       "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "packages/shared/src/types/branding.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "services/api/scripts/verify-branding.ts"
     ],
     "packages/shared/src/types/campusRecruitmentStats.ts": [
@@ -24816,7 +24919,8 @@
     ],
     "packages/shared/src/types/scanTask.ts": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs",
-      "services/api/scripts/verify-contract-review-contract.ts"
+      "services/api/scripts/verify-contract-review-contract.ts",
+      "services/api/scripts/verify-scan-device-settings.ts"
     ],
     "packages/shared/src/types/selfAssessment.ts": [
       "services/api/scripts/verify-compliance.ts"
@@ -25482,7 +25586,14 @@
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
+      "services/api/scripts/verify-scan-device-b4.ts",
+      "services/api/scripts/verify-scan-device-b6.ts",
+      "services/api/scripts/verify-scan-device-b8.ts",
+      "services/api/scripts/verify-scan-device-b9.ts",
+      "services/api/scripts/verify-scan-device-idscan.ts",
+      "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
+      "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions.ts"
@@ -25854,9 +25965,15 @@
       "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
       "services/api/scripts/verify-admin-ops.ts",
+      "services/api/scripts/verify-alert-push.cjs",
       "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-free-print-quota.ts",
-      "services/api/scripts/verify-queue-dispatch-printer-status.ts"
+      "services/api/scripts/verify-queue-dispatch-printer-status.ts",
+      "services/api/scripts/verify-scan-device-b4.ts",
+      "services/api/scripts/verify-scan-device-b9.ts"
+    ],
+    "services/api/src/admin-ops/derived-scan-device-alerts.ts": [
+      "services/api/scripts/verify-scan-device-b9.ts"
     ],
     "services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts": [
       "services/api/scripts/verify-admin-order-filters.ts"
@@ -25959,6 +26076,7 @@
     "services/api/src/ai-access/ai-access.decorator.ts": [
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
+      "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai-access/ai-access.guard.ts": [
@@ -26118,6 +26236,8 @@
       "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-parse-intent-runner.ts",
+      "services/api/scripts/verify-resume-radical-fold.ts",
+      "services/api/scripts/verify-resume-radical-font-fold.ts",
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
@@ -26144,6 +26264,7 @@
       "services/api/scripts/verify-ai-contract-mirror.mjs"
     ],
     "services/api/src/ai/llm/ai-config.controller.ts": [
+      "services/api/scripts/verify-ai-config.ts",
       "services/api/scripts/verify-ai-endpoint-allowlist.ts"
     ],
     "services/api/src/ai/llm/ai-prompt-safety.ts": [
@@ -26160,6 +26281,7 @@
       "services/api/scripts/verify-ai-config.ts"
     ],
     "services/api/src/ai/llm/llm-chat.service.ts": [
+      "services/api/scripts/verify-ai-config.ts",
       "services/api/scripts/verify-ai-content-moderation.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
@@ -26427,7 +26549,9 @@
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
-      "services/api/scripts/verify-resume-optimize.ts"
+      "services/api/scripts/verify-resume-optimize.ts",
+      "services/api/scripts/verify-resume-radical-fold.ts",
+      "services/api/scripts/verify-resume-radical-font-fold.ts"
     ],
     "services/api/src/ai/resume/llm-resume.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
@@ -26508,10 +26632,13 @@
       "services/api/scripts/verify-ocr-baidu-live.ts",
       "services/api/scripts/verify-ocr-baidu.ts",
       "services/api/scripts/verify-pdfjs-engine.ts",
-      "services/api/scripts/verify-resume-extraction.ts"
+      "services/api/scripts/verify-resume-extraction.ts",
+      "services/api/scripts/verify-resume-radical-fold.ts",
+      "services/api/scripts/verify-resume-radical-font-fold.ts"
     ],
     "services/api/src/ai/resume/resume-fact-match.ts": [
-      "services/api/scripts/verify-resume-draft-versions.ts"
+      "services/api/scripts/verify-resume-draft-versions.ts",
+      "services/api/scripts/verify-resume-radical-fold.ts"
     ],
     "services/api/src/ai/resume/resume-pdf.service.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
@@ -26720,6 +26847,7 @@
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-advisor-work.ts",
+      "services/api/scripts/verify-ai-config.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -26820,7 +26948,13 @@
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
+      "services/api/scripts/verify-scan-device-b4.ts",
+      "services/api/scripts/verify-scan-device-b6.ts",
+      "services/api/scripts/verify-scan-device-b8.ts",
+      "services/api/scripts/verify-scan-device-idscan.ts",
+      "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
+      "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-screensaver-content.ts",
       "services/api/scripts/verify-support-contact.ts",
@@ -27062,6 +27196,7 @@
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-admin-orgs.ts",
       "services/api/scripts/verify-admin-users.ts",
+      "services/api/scripts/verify-ai-config.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-bulk-publish.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
@@ -27130,6 +27265,7 @@
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
+      "services/api/scripts/verify-scan-device-b8.ts",
       "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-sessions-http.ts",
@@ -27239,6 +27375,9 @@
     "services/api/src/common/pdf/cjk-font.ts": [
       "services/api/scripts/verify-cjk-font.ts"
     ],
+    "services/api/src/common/pdf/cjk-radical-font-fold.ts": [
+      "services/api/scripts/verify-resume-radical-font-fold.ts"
+    ],
     "services/api/src/common/pdf/pdfjs-document.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
@@ -27248,6 +27387,7 @@
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
+      "services/api/scripts/verify-resume-radical-font-fold.ts",
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
@@ -27357,6 +27497,7 @@
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-parse-quota-once.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
+      "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-sms-budget.ts",
       "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
@@ -27364,6 +27505,10 @@
       "services/api/scripts/verify-upload-scene.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions-member-file.ts"
+    ],
+    "services/api/src/common/text/cjk-radical-fold.ts": [
+      "services/api/scripts/verify-resume-radical-fold.ts",
+      "services/api/scripts/verify-resume-radical-font-fold.ts"
     ],
     "services/api/src/common/throttler/terminal-throttle.ts": [
       "services/api/scripts/verify-ai-throttle-dimension.ts",
@@ -27574,7 +27719,8 @@
       "services/api/scripts/verify-document-page-count.ts",
       "services/api/scripts/verify-file-display-truth.ts",
       "services/api/scripts/verify-pdfjs-engine.ts",
-      "services/api/scripts/verify-print-sign.ts"
+      "services/api/scripts/verify-print-sign.ts",
+      "services/api/scripts/verify-scan-device-idscan.ts"
     ],
     "services/api/src/files/file-validation.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -27583,6 +27729,7 @@
       "services/api/scripts/verify-file-display-truth.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
       "services/api/scripts/verify-member-data-export-files.ts",
+      "services/api/scripts/verify-scan-device-idscan.ts",
       "services/api/scripts/verify-upload-sessions-signature.ts"
     ],
     "services/api/src/files/file.types.ts": [
@@ -27652,7 +27799,13 @@
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
+      "services/api/scripts/verify-scan-device-b4.ts",
+      "services/api/scripts/verify-scan-device-b6.ts",
+      "services/api/scripts/verify-scan-device-b8.ts",
+      "services/api/scripts/verify-scan-device-idscan.ts",
+      "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
+      "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions-member-file.ts",
@@ -27673,6 +27826,7 @@
       "services/api/scripts/verify-print-conversion.ts",
       "services/api/scripts/verify-print-sign.ts",
       "services/api/scripts/verify-resume-generate.ts",
+      "services/api/scripts/verify-scan-device-idscan.ts",
       "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions-signature.ts",
       "services/api/scripts/verify-upload-sessions.ts"
@@ -28246,7 +28400,8 @@
     "services/api/src/materials/pii-scan.util.ts": [
       "services/api/scripts/verify-pdf-cmap.ts",
       "services/api/scripts/verify-pdfjs-engine.ts",
-      "services/api/scripts/verify-pii-redaction.ts"
+      "services/api/scripts/verify-pii-redaction.ts",
+      "services/api/scripts/verify-scan-device-idscan.ts"
     ],
     "services/api/src/materials/print-param-suggestion.rules.ts": [
       "services/api/scripts/verify-print-param-suggestion.ts"
@@ -29111,7 +29266,8 @@
     ],
     "services/api/src/print-jobs/material-check-policy.ts": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "services/api/scripts/verify-derivation-kind.ts"
+      "services/api/scripts/verify-derivation-kind.ts",
+      "services/api/scripts/verify-scan-device-idscan.ts"
     ],
     "services/api/src/print-jobs/page-range.util.ts": [
       "services/api/scripts/verify-pricing.ts"
@@ -29431,7 +29587,14 @@
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
+      "services/api/scripts/verify-scan-device-b4.ts",
+      "services/api/scripts/verify-scan-device-b6.ts",
+      "services/api/scripts/verify-scan-device-b8.ts",
+      "services/api/scripts/verify-scan-device-b9.ts",
+      "services/api/scripts/verify-scan-device-idscan.ts",
+      "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
+      "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-screensaver-content.ts",
       "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
@@ -29524,14 +29687,31 @@
     "services/api/src/scan-tasks/dto/scan-device-report.dto.ts": [
       "services/api/scripts/verify-scan-device-sessions.ts"
     ],
+    "services/api/src/scan-tasks/dto/scan-device-settings.dto.ts": [
+      "services/api/scripts/verify-scan-device-settings.ts"
+    ],
     "services/api/src/scan-tasks/scan-device-protocol.ts": [
-      "services/api/scripts/verify-scan-device-sessions.ts"
+      "services/api/scripts/verify-scan-device-b6.ts",
+      "services/api/scripts/verify-scan-device-lifecycle.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts",
+      "services/api/scripts/verify-scan-device-settings.ts"
     ],
     "services/api/src/scan-tasks/scan-device-sessions.service.ts": [
-      "services/api/scripts/verify-scan-device-sessions.ts"
+      "services/api/scripts/verify-scan-device-b4.ts",
+      "services/api/scripts/verify-scan-device-b6.ts",
+      "services/api/scripts/verify-scan-device-b8.ts",
+      "services/api/scripts/verify-scan-device-idscan.ts",
+      "services/api/scripts/verify-scan-device-lifecycle.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts",
+      "services/api/scripts/verify-scan-device-settings.ts"
     ],
     "services/api/src/scan-tasks/scan-device.controller.ts": [
-      "services/api/scripts/verify-scan-device-sessions.ts"
+      "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-scan-device-sessions.ts",
+      "services/api/scripts/verify-scan-device-settings.ts"
+    ],
+    "services/api/src/scan-tasks/scan-lease.ts": [
+      "services/api/scripts/verify-scan-device-b6.ts"
     ],
     "services/api/src/scan-tasks/scan-task-reaper.task.ts": [
       "services/api/scripts/verify-scan-tasks.ts"
@@ -29541,7 +29721,9 @@
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts",
       "services/api/scripts/verify-scan-deliver-filename.ts",
+      "services/api/scripts/verify-scan-device-b6.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
+      "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-throttle-dimension.ts"
     ],
@@ -29552,7 +29734,13 @@
       "apps/kiosk/scripts/verify-scan-session-truth.mjs",
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-pg-serialization-conflict.ts",
+      "services/api/scripts/verify-scan-device-b4.ts",
+      "services/api/scripts/verify-scan-device-b6.ts",
+      "services/api/scripts/verify-scan-device-b8.ts",
+      "services/api/scripts/verify-scan-device-idscan.ts",
+      "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
+      "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-scan-quiet-period.ts",
       "services/api/scripts/verify-scan-tasks.ts"
     ],
@@ -29656,7 +29844,13 @@
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
+      "services/api/scripts/verify-scan-device-b4.ts",
+      "services/api/scripts/verify-scan-device-b6.ts",
+      "services/api/scripts/verify-scan-device-b8.ts",
+      "services/api/scripts/verify-scan-device-idscan.ts",
+      "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
+      "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-screensaver-content.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
@@ -29734,6 +29928,9 @@
     "services/api/src/terminals/dto/record-toolbox-launch-event.dto.ts": [
       "services/api/scripts/verify-toolbox-launch-events.ts"
     ],
+    "services/api/src/terminals/dto/report-scan-deletion-audit.dto.ts": [
+      "services/api/scripts/verify-scan-deletion-audit-reporting.ts"
+    ],
     "services/api/src/terminals/dto/save-toolbox-config.dto.ts": [
       "services/api/scripts/verify-terminal-device-config.ts"
     ],
@@ -29760,7 +29957,11 @@
     ],
     "services/api/src/terminals/release-observation.service.ts": [
       "services/api/scripts/verify-pg-serialization-conflict.ts",
-      "services/api/scripts/verify-release-observation-contract.mjs"
+      "services/api/scripts/verify-release-observation-contract.mjs",
+      "services/api/scripts/verify-scan-deletion-audit-reporting.ts"
+    ],
+    "services/api/src/terminals/scan-deletion-reason-codes.ts": [
+      "services/api/scripts/verify-scan-deletion-audit-reporting.ts"
     ],
     "services/api/src/terminals/terminal-capabilities.service.ts": [
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
@@ -29787,7 +29988,14 @@
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
+      "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
+      "services/api/scripts/verify-scan-device-b4.ts",
+      "services/api/scripts/verify-scan-device-b6.ts",
+      "services/api/scripts/verify-scan-device-b8.ts",
+      "services/api/scripts/verify-scan-device-idscan.ts",
+      "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
+      "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
@@ -29835,7 +30043,9 @@
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
+      "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
+      "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-terminal-identity.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
@@ -29847,6 +30057,7 @@
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
+      "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
@@ -29943,7 +30154,9 @@
       "services/api/scripts/verify-print-rollout-config.ts",
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
+      "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
+      "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
@@ -30147,6 +30360,7 @@
         "files": [
           "apps/admin/scripts/verify-admin-ai-usage-contract.mjs",
           "apps/admin/scripts/verify-admin-ai-usage-render.mjs",
+          "apps/admin/src/routes/ai-config/index.tsx",
           "apps/admin/src/routes/ai-services/AiOperationCostTable.tsx",
           "apps/admin/src/routes/ai-services/AiUsageBreakdownTable.tsx",
           "apps/admin/src/routes/ai-services/AiUsagePanel.tsx",
@@ -30154,6 +30368,7 @@
           "apps/admin/src/routes/ai-services/aiUsageDisplay.ts",
           "apps/admin/src/routes/ai-services/index.tsx",
           "apps/admin/src/routes/dashboard/index.tsx",
+          "apps/admin/src/services/api/aiConfig.ts",
           "apps/admin/src/services/api/aiUsageDaily.ts",
           "apps/admin/src/services/api/userErrorMessage.ts",
           "packages/shared/src/aiDisplayLabels.ts",
@@ -30691,6 +30906,8 @@
           "apps/admin/src/routes/print-scan/index.tsx",
           "apps/admin/src/routes/printers/PrinterOutputCell.tsx",
           "apps/admin/src/routes/printers/index.tsx",
+          "apps/admin/src/routes/screen/GovGrid.tsx",
+          "apps/admin/src/routes/screen/UsageView.tsx",
           "apps/admin/src/routes/screensaver/AssetsTab.tsx",
           "apps/admin/src/routes/screensaver/PlaylistsTab.tsx",
           "apps/admin/src/routes/screensaver/TerminalsTab.tsx",
@@ -30702,12 +30919,14 @@
           "apps/admin/src/routes/terminals/index.tsx",
           "apps/partner/src/routes/Page.tsx",
           "apps/partner/src/routes/policy/PolicyEmergencyNote.tsx",
+          "apps/partner/src/routes/profile/index.tsx",
           "apps/partner/src/routes/smart-campus/index.tsx",
           "apps/partner/src/routes/terminals/index.tsx",
           "packages/shared/src/aiDisplayLabels.ts",
           "packages/shared/src/formatDateTime.ts",
           "packages/shared/src/formatNumber.ts",
           "packages/shared/src/types/admin.ts",
+          "packages/shared/src/types/branding.ts",
           "packages/ui/package.json",
           "scripts/audit-action-codes.mjs",
           "services/api/src/admin-ops/derived-alerts.ts",
@@ -31783,14 +32002,25 @@
           "apps/kiosk/src/pages/print/styles/print-upload.css",
           "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
           "apps/kiosk/src/pages/scan/ScanProgressPage.tsx",
+          "apps/kiosk/src/pages/scan/ScanResultExitRow.tsx",
+          "apps/kiosk/src/pages/scan/ScanResultFailedView.tsx",
           "apps/kiosk/src/pages/scan/ScanResultPage.tsx",
+          "apps/kiosk/src/pages/scan/ScanResultPreviewBlock.tsx",
           "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx",
           "apps/kiosk/src/pages/scan/ScanSettingsStatusView.tsx",
           "apps/kiosk/src/pages/scan/ScanStartPage.tsx",
           "apps/kiosk/src/pages/scan/ScanWorkbenchChrome.tsx",
           "apps/kiosk/src/pages/scan/ScanWorkbenchPage.tsx",
+          "apps/kiosk/src/pages/scan/scanResultModel.ts",
           "apps/kiosk/src/pages/scan/styles/scan-fusion.css",
           "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css",
+          "apps/kiosk/src/pages/scan/useScanResultExits.ts",
+          "apps/kiosk/src/pages/scan/useScanResultRescan.ts",
+          "apps/kiosk/src/pages/scan/useScanSessionCreate.ts",
+          "apps/kiosk/src/pages/scan/useScanSettingsActions.ts",
+          "apps/kiosk/src/pages/scan/useScanSettingsDeliveryAck.ts",
+          "apps/kiosk/src/pages/scan/useScanSettingsExpiry.ts",
+          "apps/kiosk/src/pages/scan/useScanSettingsState.ts",
           "apps/kiosk/src/pages/upload/components/UploadSessionQrPanel.tsx",
           "apps/kiosk/src/pages/upload/hooks/useUploadSession.ts",
           "apps/kiosk/src/routes/index.tsx"
@@ -32785,6 +33015,11 @@
           "apps/kiosk/src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx",
           "apps/kiosk/src/pages/scan/ScanProgressPage.tsx",
           "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx",
+          "apps/kiosk/src/pages/scan/useScanSessionCreate.ts",
+          "apps/kiosk/src/pages/scan/useScanSettingsActions.ts",
+          "apps/kiosk/src/pages/scan/useScanSettingsDeliveryAck.ts",
+          "apps/kiosk/src/pages/scan/useScanSettingsExpiry.ts",
+          "apps/kiosk/src/pages/scan/useScanSettingsState.ts",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/src/services/api/userErrorMessage.ts"
         ],
@@ -33545,7 +33780,7 @@
           "apps/kiosk/src/pages/print/printHandoff.ts",
           "apps/kiosk/src/pages/print/printProgressModel.ts",
           "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
-          "apps/kiosk/src/pages/scan/ScanResultPage.tsx",
+          "apps/kiosk/src/pages/scan/useScanResultExits.ts",
           "apps/kiosk/tests/visual/fixtures/fusion-w6-route-cases.ts",
           "apps/kiosk/tests/visual/print-done-truth.spec.ts"
         ],
@@ -34560,7 +34795,8 @@
         "files": [
           "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx",
           "apps/kiosk/src/pages/scan/ScanSettingsStatusView.tsx",
-          "apps/kiosk/src/pages/scan/scanRescanRecovery.ts"
+          "apps/kiosk/src/pages/scan/scanRescanRecovery.ts",
+          "apps/kiosk/src/pages/scan/useScanSessionCreate.ts"
         ],
         "missing": []
       },
@@ -34577,7 +34813,8 @@
       "asserts": {
         "absent": [],
         "dirs": [
-          "apps"
+          "apps",
+          "apps/kiosk/src/pages/scan"
         ],
         "files": [
           "apps/kiosk/scripts/tests/scan-cleanup-gate.test.mjs",
@@ -34594,7 +34831,10 @@
           "apps/kiosk/src/auth/kioskSensitiveSession.ts",
           "apps/kiosk/src/pages/print/printHandoffPolicy.ts",
           "apps/kiosk/src/pages/scan/ScanProgressPage.tsx",
+          "apps/kiosk/src/pages/scan/ScanResultExitRow.tsx",
+          "apps/kiosk/src/pages/scan/ScanResultFailedView.tsx",
           "apps/kiosk/src/pages/scan/ScanResultPage.tsx",
+          "apps/kiosk/src/pages/scan/ScanResultPreviewBlock.tsx",
           "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx",
           "apps/kiosk/src/pages/scan/ScanSettingsStatusView.tsx",
           "apps/kiosk/src/pages/scan/ScanStartPage.tsx",
@@ -34605,11 +34845,19 @@
           "apps/kiosk/src/pages/scan/scanDeliveryAck.ts",
           "apps/kiosk/src/pages/scan/scanOutputFormat.ts",
           "apps/kiosk/src/pages/scan/scanRescanRecovery.ts",
+          "apps/kiosk/src/pages/scan/scanResultModel.ts",
           "apps/kiosk/src/pages/scan/scanSessionRevoke.ts",
           "apps/kiosk/src/pages/scan/scanSettingsModel.ts",
           "apps/kiosk/src/pages/scan/scanSettingsTeardown.ts",
           "apps/kiosk/src/pages/scan/scanWorkbenchModel.ts",
           "apps/kiosk/src/pages/scan/scanWorkbenchSession.ts",
+          "apps/kiosk/src/pages/scan/useScanResultExits.ts",
+          "apps/kiosk/src/pages/scan/useScanResultRescan.ts",
+          "apps/kiosk/src/pages/scan/useScanSessionCreate.ts",
+          "apps/kiosk/src/pages/scan/useScanSettingsActions.ts",
+          "apps/kiosk/src/pages/scan/useScanSettingsDeliveryAck.ts",
+          "apps/kiosk/src/pages/scan/useScanSettingsExpiry.ts",
+          "apps/kiosk/src/pages/scan/useScanSettingsState.ts",
           "apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx",
           "apps/kiosk/src/services/api/scanTasks.ts",
           "packages/shared/src/types/scanTask.ts",
@@ -35693,6 +35941,29 @@
       "asserts": {
         "absent": [],
         "dirs": [],
+        "files": [
+          "apps/terminal-agent/src/agent/auth-state.ts",
+          "apps/terminal-agent/src/agent/heartbeat.ts",
+          "apps/terminal-agent/src/agent/printer-queue-diagnostics.ts",
+          "apps/terminal-agent/src/agent/types.ts",
+          "apps/terminal-agent/src/agent/wmi.ts",
+          "apps/terminal-agent/src/agent/wql-literal.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-printer-queue-diagnostics.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:printer-queue-diagnostics"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
         "files": [],
         "missing": []
       },
@@ -36732,6 +37003,11 @@
           "apps/kiosk/src/pages/resume/components/ResumeUsbImportPanel.tsx",
           "apps/kiosk/src/pages/scan/ScanProgressPage.tsx",
           "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx",
+          "apps/kiosk/src/pages/scan/useScanSessionCreate.ts",
+          "apps/kiosk/src/pages/scan/useScanSettingsActions.ts",
+          "apps/kiosk/src/pages/scan/useScanSettingsDeliveryAck.ts",
+          "apps/kiosk/src/pages/scan/useScanSettingsExpiry.ts",
+          "apps/kiosk/src/pages/scan/useScanSettingsState.ts",
           "apps/kiosk/src/services/api/aiHttpAdapter.ts",
           "apps/kiosk/src/services/api/jobMaterials.ts",
           "apps/kiosk/src/services/api/kioskFeedback.ts",
@@ -37911,6 +38187,7 @@
           "services/api/src/payment/payment.controller.ts",
           "services/api/src/print-conversion/print-conversion.controller.ts",
           "services/api/src/print-jobs/print-jobs.controller.ts",
+          "services/api/src/scan-tasks/scan-device.controller.ts",
           "services/api/src/scan-tasks/scan-tasks.controller.ts",
           "services/api/src/sync/sync.controller.ts",
           "services/api/src/terminals/terminals.controller.ts",
@@ -37933,8 +38210,12 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/ai/llm/ai-config.controller.ts",
           "services/api/src/ai/llm/llm-base-url.ts",
-          "services/api/src/ai/llm/llm-config.service.ts"
+          "services/api/src/ai/llm/llm-chat.service.ts",
+          "services/api/src/ai/llm/llm-config.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/decorators/current-user.decorator.ts"
         ],
         "missing": []
       },
@@ -38634,6 +38915,7 @@
         "dirs": [],
         "files": [
           "services/api/src/admin-ops/admin-alert-push.service.ts",
+          "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/common/redis/redis.service.ts"
         ],
         "missing": []
@@ -45498,6 +45780,53 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/ai/interfaces/ai-provider.interface.ts",
+          "services/api/src/ai/resume/llm-resume-optimize.service.ts",
+          "services/api/src/ai/resume/resume-extraction.service.ts",
+          "services/api/src/ai/resume/resume-fact-match.ts",
+          "services/api/src/common/text/cjk-radical-fold.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-resume-radical-fold.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:resume-radical-fold"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "services/api/fixtures"
+        ],
+        "files": [
+          "services/api/src/ai/interfaces/ai-provider.interface.ts",
+          "services/api/src/ai/resume/llm-resume-optimize.service.ts",
+          "services/api/src/ai/resume/resume-extraction.service.ts",
+          "services/api/src/common/pdf/cjk-radical-font-fold.ts",
+          "services/api/src/common/pdf/pdfjs-document.ts",
+          "services/api/src/common/text/cjk-radical-fold.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-resume-radical-font-fold.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:resume-radical-font-fold"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/src/ai/ai.service.ts",
           "services/api/src/ai/interfaces/ai-provider.interface.ts",
           "services/api/src/ai/resume-report-export.controller.ts",
@@ -45582,8 +45911,15 @@
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/dto/report-scan-deletion-audit.dto.ts",
+          "services/api/src/terminals/release-observation.service.ts",
+          "services/api/src/terminals/scan-deletion-reason-codes.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts",
+          "services/api/src/terminals/terminal-session.service.ts",
+          "services/api/src/terminals/terminal-toolbox.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts",
-          "services/api/src/terminals/terminals.controller.ts"
+          "services/api/src/terminals/terminals.controller.ts",
+          "services/api/src/terminals/terminals.service.ts"
         ],
         "missing": []
       },
@@ -45611,6 +45947,165 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:scan-tasks"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/scan-tasks/scan-device-sessions.service.ts",
+          "services/api/src/scan-tasks/scan-tasks.service.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-scan-device-b4.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:scan-device-b4"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/scan-tasks/scan-device-protocol.ts",
+          "services/api/src/scan-tasks/scan-device-sessions.service.ts",
+          "services/api/src/scan-tasks/scan-lease.ts",
+          "services/api/src/scan-tasks/scan-tasks.controller.ts",
+          "services/api/src/scan-tasks/scan-tasks.service.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-scan-device-b6.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:scan-device-b6"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/scan-tasks/scan-device-sessions.service.ts",
+          "services/api/src/scan-tasks/scan-tasks.service.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-scan-device-b8.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:scan-device-b8"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/admin-ops/derived-scan-device-alerts.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-scan-device-b9.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:scan-device-b9"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "services/api/src"
+        ],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/files/file-page-count.util.ts",
+          "services/api/src/files/file-validation.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/files/retention-policy.ts",
+          "services/api/src/materials/pii-scan.util.ts",
+          "services/api/src/print-jobs/material-check-policy.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/scan-tasks/scan-device-sessions.service.ts",
+          "services/api/src/scan-tasks/scan-tasks.service.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-scan-device-idscan.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:scan-device-idscan"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/scan-tasks/scan-device-protocol.ts",
+          "services/api/src/scan-tasks/scan-device-sessions.service.ts",
+          "services/api/src/scan-tasks/scan-tasks.service.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-scan-device-lifecycle.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:scan-device-lifecycle"
       ],
       "wired": true
     },
@@ -45653,6 +46148,40 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:scan-device-sessions"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "packages/shared/src/types/scanTask.ts",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/ai-access/ai-access.decorator.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/scan-tasks/dto/scan-device-settings.dto.ts",
+          "services/api/src/scan-tasks/scan-device-protocol.ts",
+          "services/api/src/scan-tasks/scan-device-sessions.service.ts",
+          "services/api/src/scan-tasks/scan-device.controller.ts",
+          "services/api/src/scan-tasks/scan-tasks.controller.ts",
+          "services/api/src/scan-tasks/scan-tasks.service.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts",
+          "services/api/src/terminals/terminal-session.service.ts",
+          "services/api/src/terminals/terminals.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-scan-device-settings.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:scan-device-settings"
       ],
       "wired": true
     },
@@ -47028,6 +47557,17 @@
         "risk": "medium",
         "scope": "admin",
         "why": "仍被其它文件提及：apps/admin/src/routes/offline-agencies/AgencyForm.tsx、apps/admin/src/routes/offline-agencies/GovernanceDrawer.tsx、apps/admin/src/routes/offline-agencies/JobsDrawer.tsx"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/partners/licenseValidation.test.ts",
+        "kind": "test",
+        "mentions": [
+          "apps/admin/package.json"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",

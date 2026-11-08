@@ -58,6 +58,160 @@
 - 新门禁 `verify:scan-device-runner`（17 组，假执行器、假后端、假时钟），已进 ci.yml。
 - 打印领取：开关打开时，领任务前试拿设备锁（`print-claim`），拿不到就跳过这一轮（日志每分钟最多一条）；拿到后一直持有到本轮 `executeTask` 结束再放，放锁之后才探测扫描仪。没领到任务立即放锁、不探测。开关关着时领取路径不碰这把锁。没改续打、重打判定，也没改 `print-job-monitor.ts`。
 - 没做：没碰真机，没打安装包，没部署。B1 上生产前不得打开 `scanDeviceEnabled`。#1465 去留定下来之前，不往真机发新的终端程序安装包。
+
+## 2026-11-05：产品负责人定四个核心功能的收费口径（合规口径落文；只改文档；分支 `claude/pricing-policy-1105`）
+
+- 原话：产品负责人 11/05 18:21 在设计窗口打字「你们新开一个窗口，根据现有的四个核心功能设置收费模式，在手机小程序上面加入，一体机登录账号进行同步，或者是一体机上面也可以加入对应的功能支付入口，你们看怎么设计吧？」。方案窗口出了私有页（含价格，不进公开仓库），他看完回「按推荐」，又补三句：「没事，我们可以卖给企业，我们也可以设置直接投放，你们继续」「反正这些对应的功能都可以设置价格进行支付」「我的意思是，如果没有企业买，我们可以做成面向用户的付费方式，明白吗？」
+- 按推荐定的 6 件：①四个核心功能是 AI 简历优化、AI 模拟面试、打印、扫描，政策照旧免费；②方向上放开向个人收费，但现在不收，公共就业点位永远不向求职者收，每一处都是默认关的开关，前提办齐才开；③先在小程序收（微信虚拟支付，买 AI 单次服务，一体机登录同一账号后能看到、能用），一体机现场收钱放在后面；④只卖单次服务，不卖次数包；⑤试点前收费代码不动，试点期间递三封咨询函，12/15 以后先做「每台机器设谁付钱」；⑥扫描免费，也做成能设价，默认 0 元。补的三句落成：每台机器设「谁付钱」，有企业或机构买就由他们付、用户免费；没人买就由我们自己投放机器、向用户收费；四个功能都能按机器设价，默认 0 元。
+- 改了哪些旧口径：10/29「收费只有设备款与维保费」补上向个人收费的口径（主收入仍是设备款与年费）；9/30「AI 用完不收费、不做个人付费」在公共就业点位不变，小程序、商业点位和我们自己投放的机器以后可以卖单次服务；9/29「小程序次数包」改为只卖单次服务；10/29「人社第十八条不备案」改为向个人收 AI 费之前重新问一次。不变：公共点位对求职者全免；商业点位四件办齐前由场地方买单（9/29 复审）；小程序首版不出现价格和购买引导（9/30）；不收与岗位、招聘会、浏览、投递、入职挂钩的费用。
+- 写进了：`CLAUDE.md` §1；`docs/product/feature-scope.md` §0.2；`docs/compliance/compliance-boundary.md` §1.1（10/29 一条的②③，9/26 一条加指针）与 §1.2 F（新增 11/05 一条，列前提清单）；`docs/progress/next-tasks.md` 顶部（下一步）。
+- 没改：代码、配置、数据库、生产价目、小程序；没有写任何价格、档位或客户名（只放私有页）。没有停放、隐藏、改名、删除任何东西。
+- **警告：后台打印价目是全局一张表，改成大于 0 会让所有机器（包括公共点位）一起收钱，并跳过免费打印额度（`services/api/src/print-jobs/free-print-quota.decide.ts`：实付大于 0 时直接返回，不查三条免费上限）。第 1 期「每台机器设谁付钱」做完前不许改价。**
+
+## 2026-11-03：一体机扫描页按职责拆开（K1a，只拆不改行为；分支 `claude/scan-k1a-split-1102`，未合并、未部署）
+
+- 为什么：下一步 K1b 要把屏上扫描做进扫描页。`ScanSettingsPage.tsx` 原来 784 行，离 800 行硬线只剩 16 行；`ScanResultPage.tsx` 512 行。本批只拆，让 K1b 能复用建会话、投递确认、重扫授权和出口。基线 `317e54442`。实现提交：`12cc15320`（设置页五个 hook）、`b0d6847e0`（结果页两个 hook、三个组件）、`ec56da22a`（六个门禁改读新文件，断言不删不放宽）、`a1e9ca34c`（游客结果页文案）。
+- 怎么拆：设置页拆成 `useScanSettingsState`、`useScanSessionCreate`、`useScanSettingsDeliveryAck`、`useScanSettingsExpiry`、`useScanSettingsActions`，页面只留装配与渲染（123 行）。投递确认和进度页不同构，没有抽成共用 hook。结果页拆成 `useScanResultRescan`、`useScanResultExits`、`ScanResultFailedView`、`ScanResultPreviewBlock`、`ScanResultExitRow`、`scanResultModel`，页面 122 行。`leaveScanFlow` 仍是先撤会话、再清登记、再 replace 导航。拆完每个文件都不超过 500 行，最长的是 `useScanSessionCreate.ts`（394 行）。
+- 文案（R-03，产品负责人 11/02 拍板，照触屏版补稿 cs-scan-done）：游客成功说明改为「未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。要带走电子版，下次先扫码登录再扫。」再加「用 U 盘带走：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。」不加登录按钮（游客一登录，这次扫描会被清掉）。禁用的「本次不进入我的文档」不动。登录后仍是「前往我的文档」。
+- 没改：路由、阶段机、扫描登记的存储格式、后端、终端程序、共享包、小程序、两个后台。触屏版那四处（U 盘卡「暂未开通」、证件 JPG 的 `role="note"`、游客结果页没有下载码、`SCAN_FILE_TYPE_NOT_ALLOWED` 的说法）没改回去。
+- 本机验证（系统 Chrome；Playwright 自带 Chromium 缓存是空的）：kiosk typecheck 通过；lint 0 error（27 条原有 warning，不在扫描页）。门禁全绿：`verify:fusion-w2`、`verify:scan-session-truth`、`verify:scan-quiet-period`、`verify:print-done-truth`（47 过）、`verify:kiosk-ai-declaration`、`verify:kiosk-runtime-error-boundary`、`verify:kiosk-unattended-copy`、`verify:kiosk-font-subset`（7168 字）、`verify:compliance-copy`（含 `verify:no-raw-error-render`）、图谱多列出的 `verify:fusion-w6`。浏览器：w2 243/243（含 fusion-w2-scan 36）；truth 177 过、1 条红；scan-safety 37 过、1 条红；会话警告 35/35；隐私超时 42/42；w6 里路径含 `/scan` 的 8/8；旅程 F 1/1。
+- 两条红不是这次拆分。`unfinished privacy check keeps the recovery exit` 在 origin/main 副本（`7af05df97`）上同一条同样红：收尾报未登记的 `POST /api/v1/materials/tasks`，屏上的恢复出口本身在。`payment code never renders` 是全套一起跑时，付款失败后界面已经回到「等待扫码」，单独再跑本分支与 origin/main 都过（本分支 1 过 / 2.2 秒，origin/main 1 过 / 2.7 秒）。一体机目录相对基线与 origin/main 没有别的差；origin/main 只多小程序 #1538。
+- 截图在 `~/.cache/claude-lanes/copyscan-1102/code-shots/k1a/`，`main-*` 与 `branch-*` 各 10 张（游客、登录 × 选类型、指引、等待、成功、失败）。文字除游客成功那句外一致。像素：选类型、等待、两种失败、登录成功为 0 差；指引只差倒计时秒数（同一时刻起算，拍摄耗时差几秒）；游客成功那张差在新句子多出来的行。
+- 反向检查（改坏后 `git checkout` 恢复，没有提交改坏的状态）：删掉 `leaveScanFlow` 里的撤会话 → `verify:scan-session-truth` 红在「先撤服务端任务」；游客句改回旧句 → 同一门禁红在 11/02 原话；静默期去掉减一 → `verify:scan-quiet-period` 红。恢复后这两条门禁再绿，工作区干净。
+- 图谱：新文件入库后 `pnpm graph` 重出，`pnpm graph:check` 通过（`docs/graph/` 3 个文件有变化）。新文件被 fusion-w2 与 scan-session-truth 钉住；设置页那一组还被 runtime-error-boundary 与 no-raw-error-render 钉住；`useScanResultExits` 还被 print-done-truth 钉住；`useScanSessionCreate` 还被 scan-quiet-period 钉住。这些门禁本轮都已跑过，没有新冒出来还没跑的。
+- 合并注意：origin/main 比本分支基线多 #1538，进度文档顶部多一节小程序签名图。合的时候两节都留，这一节放在上面。
+
+## 2026-11-05：PDF 文字层部首字符换回常用字（C3；源 #1402；未合并、未部署）
+
+- 问题：F-24 的苹果 PDF 文字层把常用字存成部首码位，模型写回常用字后被防编造比对误拒；本轮从 main `50070402a` 重做 #1402 的四个代码提交，未带入旧进度文档、图谱和 CI workflow 改动。
+- 改法：通用表只折康熙部首 U+2F00–U+2FD5 和部首补充 U+2E80–U+2EF3 中确定的 314 对（214+100，14 对排除）；先按已知字体的 20 对例外补救，再拼行、整表折叠。单页取字体失败或条目数不齐时该页原样保留；没有例外字的页不再取文字或操作列表。抽取、历史原文、诊断报告及改进建议、模型直接字符和 JSON 转义字符串用同一编码；日志只增加计数或固定拒绝规则名。
+- 与 #1574 衔接：保留提示词、moduleAfter 的首尾空白处理、补回和篇幅收口后的 returnAligned，以及逐字段 includes 判据；在最终核对前同步折叠稿与模块字符串。唯一空白/标点差异仍只规范 after，多处相似和跨字段拼接仍只能手改，不为核对增加模型调用。新门禁另加 4 条部首与最终稿核对的组合断言。
+- 门禁接线：仅改 API package.json 的 verify:resume-extraction 串接，依次追加 verify:resume-radical-fold 与 verify:resume-radical-font-fold；该入口已在 ci.yml 的 SQLite 和 postgres-readiness 中执行。verify-ci-gate-coverage 通过，566/576 条 verify/ui 门禁进入 CI 执行闭包，10 条已有豁免，新门禁均进入闭包。
+- 验证：API typecheck、改过的 8 个 TS 文件 lint、新门禁 79/79 与 55/55、图谱关联的全部可离线门禁（含 verify:resume-optimize 内 #1574 的 6 类样本及两个展开的前置/后置脚本）、根目录仓库完整性/合规文案/日期时间/原始错误上屏检查均通过。verify:resume-report-export 首轮 SQLite P1008 超时，串行重跑通过；verify:ocr-baidu-live 已执行但因无 BAIDU_OCR_API_KEY / BAIDU_OCR_SECRET_KEY 退出 1，未验证真实 OCR。反向检查清空表为 40 PASS/39 FAIL、去掉事实比对前折叠为 75 PASS/4 FAIL，均退出 1；从 /tmp/c3-radical-mut/ 副本恢复后逐字节一致，两条新门禁恢复通过，反向检查前后 git diff --stat 完全一致。
+- 没做：未合并、未部署；未改 apps/**、ci.yml、图谱、生产配置、数据库结构，未新增依赖；未用 F-24 原件与苹果全部字体在真机、真实模型上复测。
+
+## 2026-11-05：终端程序打印队列诊断与显式 A4 合入 main（#1579，分支 `claude/printer-queue-agent-1104`；代码进 main，未打包发布、未装机）
+
+- 做了：心跳增加 5 个只读字段（队列名、端口种类、USB 端口名、Win32_Printer 原值、打印服务状态）。端口地址不上传；队列名像地址就不带。原值与状态共用一次查询，对不上契约就不带。非 Windows 报 unknown。
+- 400 保险：带打印队列字段的心跳回 400 时，去掉字段立即重发一次；只有重发成功才在 1 小时内不再带，重发仍失败则不进入不带。这条警告一小时最多记一次。401 不触发重发。
+- 后端半（#1578）11/05 11:53 已上生产（随 `bfe80722e`，迁移 `20261104150000_add_terminal_heartbeat_printer_queue` 已执行）。终端装上本版之前，后台终端详情的打印队列一栏写「未上报（终端程序升级到新版本后才上报）」。往真机装新版终端程序由产品负责人定。
+- 显式 A4：下发 pdf-to-printer 时 paperSize 固定 A4，不再靠驱动默认纸型。待真机试打，试打前问产品负责人。
+- 版本：升到 0.4.19。按 11/04 与复印扫描线的约定，先进 main 的用 0.4.19；扫描线 #1584 也写了 0.4.19，两边改的是同一批版本文件、改法一样，合并时 git 不报冲突，后合入的要改成 0.4.20。升级测试里的旧版本号与兼容下限不改。
+
+## 2026-11-04：屏上扫描后端 B10（扫描仪告警移出范围不推「已恢复」；分支 `claude/scan-device-b2-1102`，未部署）
+
+- 起因：Codex 只读复核 B9 报 P1——扫描仪告警推送后，终端停用、非 active、离线或 `scan_device` 关闭，告警从收集结果消失，推送服务会把它推成「已恢复」；重新纳入范围时同一故障回合还会被旧去重键挡住。
+- 改法（Codex 实现，Claude 收货）：`derived-scan-device-alerts.ts` 只把在线、有扫描仪状态回报、能力 available、enabled+active 的终端放进 `terminalSubjectKeysInScope`；`admin-alert-push.service.ts` 把扫描仪告警并入终端类，移出范围静默、不推恢复，并只清掉扫描仪这一回合的 firing 去重键，重新纳入仍故障会再提醒一次。离线、打印机告警行为不变（新增回归用例钉住）。
+- 验证：`verify:alert-push`（新增停用 / 非 active / 离线 / 能力关闭 / 无状态回报不推恢复、真恢复推恢复、再纳入再推）、`verify:scan-device-b9`、`verify:admin-ops`、`verify:scan-device-b4`、`verify:queue-dispatch-printer-status`、api typecheck 与改过文件 lint 均通过（SQLite 隔离库）；PostgreSQL 版交 CI。反向检查三项（去掉范围过滤、只凭消失推恢复、去掉状态非空条件）都变红，恢复后绿。
+
+## 2026-11-05：两个后台 C3 前端两处——机构资料页托管关闭时不显示数据源、0 元单不出退款按钮（未合并、未部署）
+
+- 机构资料页复用托管开关：关闭时不显示「数据源」，机构账号计数照旧；`job_info`、`job_fair`、`external_apply_redirect` 标签加「（暂不开放）」并置灰，与管理员后台同一清单，只改展示。开启时保留原标签、样式和数据源计数；演示资料改用真实模块键名。
+- 管理员订单详情先判断 0 元可退订单，只显示中性说明「0 元订单无需退款」，不渲染退款按钮或二次确认；有实收的两种退款文案和交互照旧。既有门禁补单独分支、先后顺序、说明和无按钮断言。
+- 来源：旧 PR #1296（`1be7421a6`）、#1289（`20b84ce00`），对照 main `50070402a` 重做；只取本任务两处，不带入旧批次其他改动。两个用例文件补托管开关两态、0 元以及有实收的普通/待退款场景；管理员按需启用同一条演示订单，默认列表仍为原两单。
+- 验证：两个应用 typecheck、全量 src lint（管理员 5 条、机构 7 条既存警告，零错误）、http 生产构建、四项根门禁及订单只读 UI、后台中文文案、机构刷新与统计门禁通过。图谱列出的隐私文案模块已由中文文案门禁实际调用；反向检查删除 0 元分支、在其中放回按钮均使新断言失败，副本恢复后通过，前后 diff stat 一致。
+- 验证限制与范围：Playwright 只写未跑，交收货方；用例原命令因 `@playwright/test` 类型入口未链接而失败，显式指定已安装包路径后两文件均通过。退款 API 关联门禁已运行但缺少生成的 Prisma client，未进入断言（隔离 SQLite 的 133 条迁移通过）。未改后端、数据库模型、生产配置、密钥、硬件或 `docs/graph/`，未提交、未部署。
+
+## 2026-11-04：屏上扫描后端 B9（扫描仪告警只算仍在运营的终端；分支 `claude/scan-device-b2-1102`，叠在 B8 头 `d09b3f19d` 上，未推送、未部署）
+
+- `collectScanDeviceAlerts` 与 `resolveScanDeviceAlert` 只算 `enabled: true` 且 `lifecycleStatus: 'active'` 的终端。其余三个条件照旧：`scan_device` 为 available、心跳在在线窗口内、健康值为 `not_found` 或 `error`。停用、维护中（以及计划中、调试中、已暂停、已退役）不出这条告警。
+- `terminalSubjectKeysInScope` 没有改，推送「已恢复」仍只有离线和打印机，不含扫描仪。
+- 新门禁 `verify:scan-device-b9` 进 `package.json` 与 `ci.yml` 的 SQLite、postgres-readiness 两处。没有新迁移，没改一体机、终端程序、小程序、两个后台。
+- 验证（本机隔离库，`RECRUITMENT_CONTENT_HOSTING_ENABLED=false`，用完进程另记）：api typecheck 与 `eslint src/` 退出码 0；`db:pg:sync:check`「postgres schema 同步校验通过」。SQLite `file:/tmp/verify-b9-sqlite.db` 与临时 PostgreSQL 16（127.0.0.1:57641，时区 UTC，库 `b9_verify`）上 `verify:scan-device-b9` 都打印 `PASS verify-scan-device-b9`。同一套库上 `verify:scan-device-b4` 都打印 `PASS verify-scan-device-b4`。空库 `migrate deploy` 102 条全部应用，`migrate diff`「No difference detected.」。`pnpm graph:check`「PASS docs/graph/ 与当前代码一致」（门禁脚本 615）。`verify:repository-integrity` 三项 OK（5561 个已跟踪文件、6 个 workflow YAML、无超过 1 MB 的已跟踪文件）。`verify:ci-gate-coverage`：555/565 在 CI 执行闭包内，10 条已登记豁免。
+- 反向检查（提交 `76d1b01b7` 之后）：临时去掉 `enabled` 与 `lifecycleStatus` 过滤，SQLite `verify:scan-device-b9` 退出码 1，断言「停用终端不出扫描仪告警」（实际 1，期望 0）。已 `git checkout --` 恢复。
+- 告警页：管理员后台开发模式连临时 SQLite `file:/tmp/b9-admin-verify.db`（不进仓库）。用现成密码登录（`passwordProofState=owner_managed` 的管理员，勾选协议），没有新登录后门。1440×900 三张在 `~/.cache/claude-lanes/copyscan-1102/code-shots/b9/`：`alerts-list.png` 告警列表有「终端 B9-SCAN-01 扫描仪找不到」；`alerts-filter-scan.png` 筛选「扫描仪异常」仍是这一条；`dashboard-alert-row.png` 工作台页头是「处理告警 (1)」，铃铛是 1。控制台没有 error，也没有 pageerror。工作台「今天要处理」不逐条画告警（`buildAlertRows` 的结果只参与条数脚注），扫描仪标题只出现在告警中心。没改两个后台。
+- SQLite `verify:scan-tasks`：1 分钟负载 9.08 时单独串行跑，退出码 0。没设 `POSTGRES_URL`，日志有「SKIPPED real DB (postgres) partial unique index check」。末尾 `PASS scan tasks verification`，接着 `PASS verify-scan-deliver-filename`。80 毫秒内心跳要 tick 两次这条这次过了。没改断言，没改等待窗口。
+- 图谱挂在 `derived-scan-device-alerts.ts` 上的门禁只有 `verify:scan-device-b9`，SQLite 与临时 PG 都过；同一收集函数的 `verify:scan-device-b4` 两套库也过。`package.json`、`ci.yml`、进度文档还被一批按文件名做字符串引用的门禁列出来，这次只跑了直接守接线的 `verify:ci-gate-coverage` 和改 workflow 必跑的 `verify:repository-integrity`，没有把那几十条再在两套库上各跑一遍。
+- 哪台机器都不许因此把 `scan_device` 配成 available。未推送、未部署。
+
+## 2026-11-05：换模型服务地址必须重填密钥（C3；源 #1374 拆出的安全修复，不含混元；未合并、未部署）
+
+- 问题：管理员把某个功能位的模型换厂商或换地址、却没填新密钥时，原来那家的密钥原样留着，下一次调用就发到新地址。
+- 改法：换了主机、原来存着密钥、这次又没带新密钥，保存回 400「模型服务地址换了，请重新填写这一家的 API Key；原来的密钥不会发给新地址」，配置原样不动、不落盘、不记成功审计。原来没有密钥时照常保存（没有可外发的）；同一主机只改路径或模型保留密钥；显式清空密钥照常保存；只含空白的密钥换主机也拒。存量里解析不了的旧地址按换了主机处理（回 400，不再 500）。继承父键的子功能位第一次单独配置时同样适用。
+- 后台：AI 配置页 API Key 输入框旁加一句「换了模型服务地址或厂商，要重新填写这一家的 API Key」；保存被拒时按服务端原文显示在表单里、不清已填内容，「保存并测试」被拒后不再发测试请求。
+- 门禁：verify-ai-config 补 C3.1–C3.16（含本机假服务数请求）；admin AI 配置页渲染门禁补「被拒显示原文」。反向检查：删掉主机比较、只看厂商不看主机、去掉「原来存着密钥」这个条件，各自让对应用例转红。
+- 本机：API 类型检查、AI 配置相关门禁（含地址白名单 134 条）、admin 类型检查 / lint / 构建 / 文案门禁通过。`verify:llm-connectivity` 真连深度求索、本机功能位未开，main 上同样报 FEATURE_DISABLED，不在 CI 里，与本改动无关。没有新增厂商；未部署。
+
+## 2026-11-04：屏上扫描后端 B8（已结束任务的回报带上最终状态；分支 `claude/scan-device-b2-1102`，叠在并入 B1 的头 `22e5f2dd1` 上，未推送、未部署）
+
+- device-report 遇到已结束任务时，409 的 `error.details` 带 `taskStatus`（completed / cancelled / expired / failed）和 `fileDelivered`（已挂上 fileId 才是 true）。cancelled 仍是 `SCAN_DEVICE_TASK_CANCELLED`，其余结束仍是 `SCAN_DEVICE_TASK_ENDED`。库里仍是 waiting、但截止时间已过或到了最长时限，taskStatus 记为 expired。投递中仍是 `SCAN_DEVICE_TASK_DELIVERING`，details 只有 `taskStatus: 'matched'`；同状态重发仍成功。别的终端仍是 404 `SCAN_TASK_NOT_FOUND`，不带这些字段。面板任务、已改用面板的任务不带。错误码和原有文案不变。统一错误过滤器只透出这些有界字段，不拷贝 fileId。
+- 新门禁 `verify:scan-device-b8` 进 `package.json` 与 `ci.yml` 的 SQLite、postgres-readiness 两处。`packages/shared` 的 `ScanTaskStatus` 只补了注释。没有新迁移，没改 `scan-tasks.service.ts`。
+- 验证（本机隔离库，`RECRUITMENT_CONTENT_HOSTING_ENABLED=false`，用完已停）：api typecheck 打印 `services/api typecheck: Done`；`eslint src/` EXIT 0；`db:pg:sync:check`「postgres schema 同步校验通过」。SQLite `file:/tmp/verify-b8-sqlite.db` 找到 130 条迁移，无待执行。临时 PostgreSQL 16.15（127.0.0.1:57511，时区 UTC，库 `b8_verify`）空库 `migrate deploy` 102 条全部应用，`migrate diff`「No difference detected.」。两套库上屏上扫描六条加 b8、静默期、文件留存、派生种类、材料处理都过。`verify:http-exception-filter` 末尾 `ALL PASS`。`verify:recruitment-hosting-gate-declares`「声明 45 个、豁免 34 个、违规 0 个」。`verify:scan-tasks` 在 PostgreSQL 上单独跑，日志没有「SKIPPED real DB」，末尾 `PASS scan tasks verification`，接着 `PASS verify-scan-deliver-filename`。`pnpm graph` 后 `pnpm graph:check`「PASS docs/graph/ 与当前代码一致」（门禁脚本 614；管理员后台源文件数按当前索引从 285 改为 279）。`verify:repository-integrity`：5559 个已跟踪文件无冲突标记、6 个 workflow YAML 语法有效、无超过 1 MB 的已跟踪文件（6 个已登记例外）。
+- 反向检查两处都让 `verify:scan-device-b8` 退出 1：去掉 details 时，已完成且已挂上文件的异常体只有 code 和 message；把别的终端的任务状态带进 404 时，实际体多了 `taskStatus: completed` 与 `fileDelivered: true`。两处都已改回。
+- 没做：一体机、终端程序、小程序、两个后台没动。未推送、未部署。哪台机器都不许因此把 `scan_device` 配成 available。
+
+## 2026-11-04：屏上扫描后端 B2 并入最新 B1（B1 已含 main `3e83449f9`，B1 头 `5612045d6`；分支 `claude/scan-device-b2-1102`，合并前头 `68c030217`，未推送、未部署）
+
+- 按语义合并。main 侧保留：AI 三条派生告警（`ai_provider_unavailable` / `ai_consecutive_failures` / `ai_budget_exhausted`）及 episode、告警页文案与筛选、工作台 Bot 图标和「AI 服务」副标题、终端查询 `enabled: true` 且 `lifecycleStatus: 'active'`、`terminalSubjectKeysInScope` 仍只有离线与打印机。进度文档两侧都留。
+- B4 的 `scan_device_issue` 接到这套结构末尾：类型、ScanLine 图标、筛选「扫描仪异常」、`scanDeviceIssueEpisodeToken`、收集与单条查证。仍只在 `scan_device` 为 available、心跳在在线窗口内、健康值为 `not_found` 或 `error` 时出现；可与打印机告警并存；恢复后下一次收集没有。没有放进 `terminalSubjectKeysInScope`。`firingTotal` 在离线/打印机计数之后再加扫描仪条数。
+- 队列派发夹具补空的 `terminalCapability.findMany`（这组夹具没有开通屏上扫描）。打印机告警断言没改。图谱取 B1 一侧后重跑 `pnpm graph`，`pnpm graph:check` 打印「PASS docs/graph/ 与当前代码一致」。
+- 验证（隔离库，`RECRUITMENT_CONTENT_HOSTING_ENABLED=false`）：api typecheck、`eslint src/`、admin typecheck 均为 EXIT 0。SQLite `file:/tmp/verify-b2merge.db`（Redis `127.0.0.1:57421`）与临时 PostgreSQL 16（127.0.0.1:57423，时区 UTC，库 `b2merge_verify`，Redis `127.0.0.1:57422`）上，`verify:admin-ops`、免费额度、北京时间、屏上扫描六条、静默期、删除审计、`verify:admin-print-scan`、`verify:print-scan-first-release` 都过。`verify:queue-dispatch-printer-status` 补桩前两套都因 `terminalCapability.findMany` 为空而红，补桩后 SQLite 与 PG 都打印 `PASS queue dispatch printer status`。`db:pg:sync:check`「postgres schema 同步校验通过」。`verify:repository-integrity` 三项 OK。
+- `verify:scan-tasks`：PG 整段通过（末尾 `PASS scan tasks verification`，接着 `PASS verify-scan-deliver-filename`）。SQLite 与 PG 并行时曾因反向改写同一源文件误红（CAS 文本当时被改掉）；串行后该断言通过。其后 SQLite 连续三次停在「80 毫秒内心跳要 tick 两次」，得到 1 次。这段断言和 `scan-tasks.service.ts` 与合并前头 `68c030217` 一致，B1 自合并基线起没改这个服务文件。当时本机 loadavg 约 40。不改这条断言。
+- 没做：未推送、未部署。哪台机器都不许因此把 `scan_device` 配成 available。告警页没有在浏览器点过，只被源码门禁覆盖。非运营中终端要不要也停发扫描仪告警，这次没加 lifecycle 过滤。
+
+## 2026-11-03：屏上扫描 ③ 后端 B7（投递核对所附扫描轮次；多页门禁用真多页 PDF；分支 `claude/scan-device-b2-1102`，叠在 B6 头 `ed0460bd9` 上，未推送、未部署）
+
+- Codex 复审 B5+B6 新问题 1、2。device-report 成功响应多带收下之后的 `deviceRound`（与加一轮次同一条规则，不另查库）。deliver 不走 DTO，multipart 逐字段增加可选 `deviceRound`。给了就必须同时等于已验签租约里的轮次和库里当前轮次，否则 409 `SCAN_TASK_STATE_CHANGED`，比对在建文件和抢占之前（`assertScanDeliverAttachedRound`）。没给、null、空串照旧。面板不比。
+- `verify:scan-device-b6` 的进纸器、玻璃台改为 pdf-lib 真的 3 页、2 页 PDF，投递后核对库里的页数和读回文件的页数。状态与轮次断言保留。没有新迁移，没改 workflow，没跑 `verify:repository-integrity`。`scan-tasks.service.ts` 1342 行，只多一次调用。
+- 验证（本机隔离库，`RECRUITMENT_CONTENT_HOSTING_ENABLED=false`，用完已停）：api typecheck、`eslint src/`、`db:pg:sync:check`（「postgres schema 同步校验通过」）过。SQLite 空库 `file:/tmp/verify-b7-sqlite.db`（Redis `127.0.0.1:57280`）`migrate deploy` 129 条全部应用。临时 PostgreSQL 16（127.0.0.1:57281，时区 UTC，库名 `b7_verify`，Redis `127.0.0.1:57282`）空库 `migrate deploy` 101 条全部应用，`migrate diff`「No difference detected.」。两套库上 B6 清单和图谱多列出的门禁都过；`verify:scan-tasks` 在 PostgreSQL 上单独重跑（与 SQLite 并行时反向突变写同一文件撞车），日志没有「SKIPPED real DB」，末尾 `PASS scan tasks verification`。`pnpm graph:check` 通过。反向检查三处（给了轮次但不比对、回报响应不带轮次、多页用例退回单页）都让 `verify:scan-device-b6` 变红，`git checkout --` 恢复后工作区干净。
+- 没做：一体机、终端程序、小程序、两个后台没动。未推送、未部署。哪台机器都不许因此把 `scan_device` 配成 available。终端程序下一轮才会开始带 `deviceRound`；没带的投递仍只核租约轮次。
+
+## 2026-11-03：屏上扫描 ③ 后端 B6（扫描轮次替换 deviceUpdatedAt 钉；取消倒计时不再另查库；分支 `claude/scan-device-b2-1102`，叠在 B5 头 `dec1dfb2e` 上，未推送、未部署）
+
+- Codex 复审 B4 的三条都按协调方的判定改了。`ScanTask` 加 `deviceRound Int @default(0)`（两套 schema）。新迁移 `20261103030000_add_scan_device_round`，两套目录同名，排在 `20261102230000_add_scan_device_session_fields` 之后。`verify-first-order-migrations` 的升级清单补了这一行：升级前的旧行取 0，新行默认 0，可以加一。
+- 轮次只在回报从 `ready` 或 `error` 转到 `scanning` 时加一（`deviceState` 还是空时按 `ready`）。同状态重发、`page_ready` 与 `scanning` 之间翻页、改设置回到 `ready` 都不加。加一写在回报那次条件更新里，where 仍钉读到的 `deviceState`，同一次转移不会被并发回报加两次。
+- current-lease 对 device 任务把当时的 `deviceRound` 放进签名负载（在 nonce 之后；0 也写进去）。响应顶层和 `device` 段不多这个字段。面板任务不传，签名负载没有这个键。投递先比对已验签轮次和库里的 `deviceRound`，不等就 409 `SCAN_TASK_STATE_CHANGED`，不建文件；抢占再钉读到的 `deviceRound`。B4 的 `deviceUpdatedAt` 钉已去掉。面板租约与投递不比轮次。
+- 取消成功后不再为倒计时另查库。这次取消自己的时间写进 `updatedAt`，`quietPeriodEndsAt` 和 `serverNow` 用它和静默期窗口算出。静默期关着时两个时刻仍相同。
+- 门禁 `verify:scan-device-b6` 进 `package.json` 和 `ci.yml` 的 SQLite、postgres-readiness 两处。生命周期门禁里「没读到 `deviceUpdatedAt` 就钉 null」改成「没读到 `deviceRound` 就钉 0」；「钉读到的时间」改成「钉读到的轮次」。时间会被合法的同状态重发改掉，轮次不会。A2b 仍是 409、不建文件、新一轮 delivering 还在。
+- 终端程序没改。这份工作区里的终端程序只把 `deliveryLease` 当整段字符串附上，不解析负载；屏上扫描的投递代码不在 `apps/terminal-agent` 里。
+- 验证（本机隔离库，`RECRUITMENT_CONTENT_HOSTING_ENABLED=false`，独立 Redis `127.0.0.1:57267`，用完已停）：api typecheck、`eslint src/`、`db:pg:sync:check`（「postgres schema 同步校验通过」）过。SQLite 空库 `file:/tmp/verify-b6-sqlite.db` 的 `migrate deploy` 129 条全部应用，含这条新迁移。临时 PostgreSQL 16（127.0.0.1:57269，时区 UTC，库名 `b6_verify`，用完已停）空库 `migrate deploy` 101 条全部应用，`migrate diff` 无差异。`verify:first-order-migrations` 在 SQLite 与它自己的临时库上都打印了 `scan deviceRound defaults to 0 ... can increment`。扫描、文件留存、材料处理相关门禁在两套库上都过；`verify:scan-tasks` 在 PostgreSQL 上没有「SKIPPED real DB」。`verify:repository-integrity` 三项 OK。`pnpm graph:check` 通过。反向检查三处（轮次不进签名负载、投递不比轮次、同状态回报也加轮次）都让 `verify:scan-device-b6` 变红，`git checkout --` 恢复后工作区干净。
+- 没做：一体机、终端程序、小程序、两个后台没动。未推送、未部署。哪台机器都不许因此把 `scan_device` 配成 available。
+
+## 2026-11-03：屏上扫描 ③ 后端 B5（证件 PDF 每页 OCR、页数读不出就拒收；分支 `claude/scan-device-b2-1102`，叠在 B4 头 `dfd2ab8a0` 上，未推送、未部署）
+
+- Codex 复审 B3 第 1–6 条回源码后属实，按协调方定的做法修。第 7 条（本线门禁里 `lease.device` 的整对象精确比对、补 maxPages / maxBytes）没动。
+- 证件 PDF：用途 `id_scan` 时，不论有没有文字层，每一页都走和图片证件相同的 OCR。其它用途仍先试文字层。实际 OCR 页数上限是 max(配置 `PII_SCAN_MAX_OCR_PAGES`, 证件页数上限 4)。配置成 1 时，4 页证件 PDF 仍 4 页都识别；超过 4 页只识别 4 页并标截断。非证件仍按配置截断。
+- 屏上扫描投递的 PDF（证件与非证件）只认解析器读出的页数。解析器不可用、退回字节正则、读不出、小于 1 页，一律 409 `SCAN_DEVICE_PAGE_COUNT_UNREADABLE`，中文「这份扫描件的页数没能读出来，请重新扫描。」任务失败后的 `getStatus` 用同一个码和这一句，不再说成「页数超过上限」。超过上限仍是 `SCAN_DEVICE_TOO_MANY_PAGES`。面板上传和计费仍接受字节正则兜底。
+- 门禁加在现有 `verify:scan-device-idscan`（没有新文件，没改 `ci.yml` / `package.json`）。旧断言里把「读不出页数」说成超限的几条改成新错误码；W3b（面板仍拒证件 PDF）没动。会话、设置、生命周期三条门禁里用来成功投递的占位 `%PDF` 头换成解析器能读的一页 PDF，精确比对的断言没改。
+- 隐私遮挡仍按打印用途抽文字层，没有把 `id_scan` 传进去。证件 PDF 改走 OCR 后没有文字坐标，遮挡结果与图片证件一样是不支持，不把已识别文字当成遮完。
+- 合规：`docs/compliance/compliance-boundary.md` §5.2 同步了「只认解析器页数」和「证件 PDF 每页 OCR、上限至少 4」。
+- 验证（本机隔离库，`RECRUITMENT_CONTENT_HOSTING_ENABLED=false`，独立 Redis `127.0.0.1:56379`）：SQLite `file:./prisma/verify-b5.db` 上 api typecheck、`eslint src/`、扫描与材料 / 个人信息相关门禁、`db:pg:sync:check` 过。三条设备门禁第一次红，是占位 PDF 读不出页数，换夹具后过。临时 PostgreSQL 16（127.0.0.1:55461，时区 UTC，库名 `b5_verify`）上扫描相关门禁再跑过；`verify:scan-tasks` 带 `POSTGRES_URL` 时日志没有「SKIPPED real DB」，末尾 `PASS scan tasks verification`。没有新文件，没跑 `pnpm graph`。没改 workflow，没跑 `verify:repository-integrity`。反向检查四处（证件 PDF 有文字层就跳过 OCR、字节正则计数仍放行、配置 1 页时证件只识别 1 页、读不出页数在 `getStatus` 上说成超限）都让 `verify:scan-device-idscan` 变红，`git checkout --` 恢复后工作区干净。
+- 没做：一体机、终端程序、小程序、两个后台没动。没有新迁移。未推送、未部署。哪台机器都不许因此把 `scan_device` 配成 available。
+
+## 2026-11-03：屏上扫描 ③ 后端 B4（投递防 ABA、回报与设置交错、取消倒计时、页数上限、扫描仪告警、文件体积；分支 `claude/scan-device-b2-1102`，叠在 B3 头 `7935410c1` 上，未推送、未部署）
+
+- 投递防 ABA：device 任务的 `scanDeliverClaimPins` 再钉读到的 `deviceUpdatedAt`（不加列）。出错重扫后旧投递迟到、状态又回到 composing / delivering 时，抢占落空，409 `SCAN_TASK_STATE_CHANGED`，不建文件，任务仍 waiting。正常进纸器与玻璃台投递照常。面板仍只钉 `startMode`。
+- 改设置与回报交错：device-report 体可选 `source`、`colorMode`。给了且与库里 `deviceSource` / `deviceColorMode` 不一致 → 409 `SCAN_DEVICE_SETTINGS_CHANGED`（写进必须停扫清单）。不给照旧。截止时间不变的那种改设置，旧来源回报被拒且不写库。
+- 取消响应多给 `quietPeriodEndsAt`（本终端静默期结束时刻，ISO）和 `serverNow`（ISO）。共享类型 `ScanSessionCancelResponse` 这两个字段可选。取消的其余行为不变。静默期 ≤ 0 时不另查库，两个时刻相等。
+- `GET /scan/sessions/:id` 对 device 任务多给 `deviceMaxPages`（证件 4、其余 20，与租约同源）；面板任务以及已改用面板的任务给 null。共享类型可选。
+- 扫描仪告警：现成通道是心跳现算的派生告警（`derived-alerts.ts`，不写 Alert 行；打印机离线 / 缺纸就是这条）。终端 `scan_device` 为 available、最近心跳仍在 5 分钟在线窗口内、且 `scanDeviceHealth` 为 `not_found` 或 `error` 时，多一条 `scan_device_issue`。去重键 `scan_device_issue:终端 id`，可与 `printer_issue` 并存。心跳改报正常后下一次收集不再出现（没有单独的「已恢复」行）。实现在 `derived-scan-device-alerts.ts`。管理后台类型、筛选和图标是类型集合门禁和告警页 `TYPE_META[type].icon` 所迫的最小配套，文案「扫描仪异常」，没有「找工作人员」。
+- 文件体积：`files.service.ts` 从 1716 行回到 1543 行。屏上扫描放行和上传准备抽到 `files/verified-device-scan-upload.ts`（244 行）。`upload()` 里的 `fileObject.create` 仍留在原处；`uploadVerifiedDeviceScan` 仍是 FilesService 上紧挨 `upload` 的薄方法。`scan-tasks.service.ts` 现为 1335 行（B3 末约 1305；增加的是取消倒计时那个私有方法和注释，页数上限与静默期时刻在 `scan-device-protocol.ts`）。
+- 门禁：`verify:scan-device-b4` 进 `package.json` 与 `ci.yml` 的 SQLite、postgres-readiness 两处。本机隔离库（`RECRUITMENT_CONTENT_HOSTING_ENABLED=false`）SQLite 与临时 PostgreSQL 16（127.0.0.1:55451，时区 UTC，库名 `b4_verify`）上，typecheck、`eslint src/`、扫描相关门禁、`verify:admin-ops`（73/53/50 仍在）、`verify:file-retention`、`verify:derivation-kind`、`db:pg:sync:check` 都过。`verify:scan-tasks` 带 `POSTGRES_URL` 时日志没有「SKIPPED real DB」。`pnpm graph:check` 通过；`verify:repository-integrity` 三项 OK。反向检查五处（去掉 deviceUpdatedAt 钉、回报不比对来源、取消不给 quietPeriodEndsAt、GET 的 deviceMaxPages 改成 null、恢复后仍发告警）都让对应门禁变红，`git checkout --` 恢复后只剩图谱产物。
+- 没做：一体机、终端程序、小程序没动。没有新迁移、没有新列。未推送、未部署。哪台机器都不许因此把 `scan_device` 配成 available。
+
+## 2026-11-03：屏上扫描 ③ 后端 B3（只对屏上扫描放行证件 PDF；分支 `claude/scan-device-b2-1102`，叠在 B2 头 `fafcfdb0d` 上，未推送、未部署）
+
+- 放行只认服务端核实过的会话：`assertScanDeliverOriginAllowed` 在 `startMode=device`、`origin=device`、`deviceState` 为 composing / delivering、`devicePageCount≥1`、文件是 PDF 时签发模块内 Symbol 凭据；面板返回 null。`FilesService.uploadVerifiedDeviceScan` 只认这份凭据，伪造对象退回普通 `upload`。`upload()` 与控制器、DTO 都不接受「跳过校验」或「允许证件 PDF」参数。
+- 上限：证件 4 页 / 10 MiB（10 MiB 即 `PURPOSE_POLICY.id_scan.maxBytes`）；其余屏上扫描 20 页 / 18 MiB（18 MiB 与终端程序 `SCAN_PDF_MAX_BYTES` 一致，见 `apps/terminal-agent/src/agent/scan-device/scan-pdf-compose.ts`）。device-report 的 `pageCount` 超过该类型上限 → 409 `SCAN_DEVICE_TOO_MANY_PAGES`（超过 200 仍是 400 `SCAN_DEVICE_REPORT_INVALID`）。投递时文件服务再按认出的页数和字节数查一遍。超大小落 `SCAN_FILE_TOO_LARGE`（屏上与面板都是；面板其余行为不变），不再落成 `SCAN_UPLOAD_FAILED`。
+- 个人信息检查与留存按用途 `id_scan`，不按 MIME 分叉；证件 PDF 每一页走同一套检查。页数上限 4 ≤ OCR 默认 5 页（`PII_SCAN_OCR_PAGE_LIMIT_DEFAULT`）。留存仍是 `system_short`。
+- current-lease 的 device 段多带 `maxPages`、`maxBytes`。面板租约不多任何字段。`packages/shared` 只在注释里说明（一体机不读租约）。
+- 两处旧门禁对 `lease.device` 的整对象精确相等补上了这两个字段（document 会话为 20 页 / 18 MiB），没有改成子集，也没有动 W3b。
+- 合规：`docs/compliance/compliance-boundary.md` §5.2。新门禁 `verify:scan-device-idscan`，进 `package.json` 与 `ci.yml` 的 SQLite、postgres-readiness 两处。建档对象字面量仍留在 `FilesService.upload`（派生种类门禁只认这一处透传建档点）；屏上扫描已经核实过的校验结果用模块内 WeakMap 交进去，`upload()` 没有外部可传的跳过校验参数。
+- 验证（本机隔离库，`RECRUITMENT_CONTENT_HOSTING_ENABLED=false`）：api typecheck 与 `eslint src/` 都是 0。`verify:scan-device-idscan` 在 SQLite 和临时 PostgreSQL 16（127.0.0.1:55441，时区 UTC）上都过。`verify:scan-tasks` 带 `POSTGRES_URL` 跑完，日志里没有「SKIPPED real DB」，末尾是 `PASS scan tasks verification`。`verify:repository-integrity` 三项 OK；`pnpm graph:check` 通过。反向检查 6 处（不核实 startMode、面板也放行证件 PDF、不查 4 页上限、超大小落回 `SCAN_UPLOAD_FAILED`、证件 PDF 不进个人信息检查、面板租约多字段）都让新门禁变红，`git checkout --` 恢复后干净。`verify:member-closure` 的 HTTP 断言 503≠401（`MEMBER_SESSION_STORE_UNAVAILABLE`）在起点 `fafcfdb0d` 的 `files.service.ts` 上用同一环境复跑同样红，不是这次改动引入的。
+- 没做：一体机、终端程序、小程序、两个后台都没动；没有新迁移。未推送、未部署。
+
+## 2026-11-03：屏上扫描 ③ 后端第二批 B2（删除审计认屏上扫描原因码、原地改扫描设置、GET 补三项与共享契约类型；另含两处 B1 复审修复和 page_ready 续期 10 分钟；分支 `claude/scan-device-b2-1102`，叠在 B1 头 1c72b8f80 上，未推送、未部署）
+
+- 删除审计认屏上扫描的六个原因码：新常量文件 `services/api/src/terminals/scan-deletion-reason-codes.ts` 列出 `UNCLAIMED_TTL_EXPIRED` 加 `SCAN_DEVICE_DELIVERED / FAILED / ABORTED / SWITCHED_TO_PANEL / SESSION_CLEARED / STARTUP_RESIDUE`（逐字对齐终端程序 A1 的 `ScanDeviceDeletionReason`），上报 DTO 的 `@IsIn` 与类型都从它来。`terminal-scan-deletion-audit.service.ts` 不用改（`reasonCode` 本来就是 String 列，同一 eventId 换原因码本来就判 `SCAN_DELETION_AUDIT_EVENT_CONFLICT`）；两套 schema 的注释同步（`pnpm db:pg:sync` 重出），**没加迁移**。终端程序没动：A2 要改的是 `apps/terminal-agent/src/agent/scan-deletion-audit-reporter.ts` 的 `buildPayload`（第 59 行写死 `reasonCode: 'UNCLAIMED_TTL_EXPIRED'`，改成 `event.reasonCode`）和 `apps/terminal-agent/src/agent/types.ts` 的 `ScanDeletionAuditReportPayload.reasonCode`（现在只写 `'UNCLAIMED_TTL_EXPIRED'`，放宽到七个码）；后端先上线，终端程序才能放开上报，否则 400 进死信。
+- 原地改扫描设置（出错屏「改用玻璃台」不吃 90 秒静默期）：新接口 `POST /scan/sessions/:id/device-settings`（控制令牌，权限照 switch-to-panel；限额 30/分钟；不挂维护拦截，`verify-ai-access` 的「只有新建入口受维护拦截」清单登记了 `ScanDeviceController`）。体 `{ source?, colorMode? }`，两个至少给一个。只在 startMode=device、waiting、未过期、没有 fileId、hardExpiresAt 未到、deviceState 为 ready / error、scan_device 仍 available 时改：写 deviceSource / deviceColorMode（没给的保持原值），deviceState 回 ready、清 deviceErrorCode、页数归 0、写 deviceUpdatedAt，expiresAt 续到 min(max(expiresAt, now+10 分钟), hardExpiresAt)；会话、控制令牌、ACK 原样，**不检查也不触发终端静默期**。错误：400 `SCAN_DEVICE_SETTINGS_INVALID`（两个都没给 / 取值非法）、403 `SCAN_TASK_FORBIDDEN`、404 `SCAN_TASK_NOT_FOUND`、409 `SCAN_TASK_NOT_DEVICE`（面板任务、已改用面板的）/ `SCAN_DEVICE_ALREADY_DELIVERED` / `SCAN_TASK_NOT_ACTIVE`（已取消、过期、结束，或已到 hardExpiresAt）/ `SCAN_DEVICE_SETTINGS_LOCKED`（deviceState 是 scanning / page_ready / composing / delivering，以及 aborted）/ `SCAN_DEVICE_CAPABILITY_DISABLED` / `SCAN_DEVICE_STATE_CHANGED`（并发重读 3 轮仍对不上）。幂等：值相同且已是 ready 无错误码 0 页时原样返回，不写库、不续期。并发用条件更新（CAS），把读到的 deviceState / 来源 / 颜色 / expiresAt 一并钉进 where。error → ready 只经这个用户动作发生，不进终端程序回报转移表（回报表没动，回报 error → ready 仍是 409）；改完终端程序下一次回报 scanning 走 ready → scanning，这段写在 `scan-device-protocol.ts` 的转移表注释里。代码放在 B1 的 `scan-device-*.ts` 三个文件里（外加 `dto/scan-device-settings.dto.ts`），switch-to-panel 的权限检查抽成同一个私有方法 `assertControlAccess`（行为与提示语不变），没往 `scan-tasks.service.ts` 里堆。
+- GET 补字段与共享契约：`GET /scan/sessions/:id` 在 B1 的四项之外多返回 `deviceSource`、`deviceColorMode`、`deviceUpdatedAt`（ISO 或 null；面板任务与已改用面板的任务一律 null）。`packages/shared/src/types/scanTask.ts` 导出 `SCAN_START_MODES / SCAN_DEVICE_SOURCES / SCAN_DEVICE_COLOR_MODES / SCAN_DEVICE_STATES / SCAN_DEVICE_ERROR_CODES` 及类型；`ScanSessionCreateRequest` 加可选 `startMode / source / colorMode`；`ScanSessionStatusResponse` 加七项**全部可选**字段（老服务端不带，一体机缺省按面板）；新类型 `ScanSwitchToPanelResponse / ScanDeviceSettingsRequest / ScanDeviceSettingsResponse`；一体机要判的原因码做成常量。后端是 CommonJS，不直接 import 共享包，沿用「共享契约 + 后端副本 + 门禁比对」：`verify:scan-device-settings` 把五个常量数组与后端逐项比对，并且全程用共享常量当期望值去打后端。
+- B1 复审修复（Codex 复审 #1540，协调方回源码核实；各自单独提交）：① 投递流程第 6 步「先标记 matched」的条件更新原来不带扫描方式与设备状态：device 任务的 PDF 通过来源校验之后、抢占之前，用户「改用面板」或终端程序回报 error / aborted，抢占照样成功，已切面板 / 已中止的会话收到设备扫描件。现在 where 末尾展开 `scanDeliverClaimPins(task)`（`scan-device-protocol.ts`）：所有任务钉读到的 startMode，device 任务另钉 deviceState ∈ {composing, delivering} 且 devicePageCount ≥ 1，面板任务不加后两条；条件失效照旧 409 `SCAN_TASK_STATE_CHANGED`。`verify-scan-tasks` 里钉这段 where 逐字文本的常量 `DELIVER_CAS_ACK_EXPIRY_BLOCK` 同步加了这一行（只加严，原来的六个条件一个没少）。② `report` 与 `switchToPanel` 的条件更新 where 加上读到的 `expiresAt`（并发的同状态回报可能把较晚算出的截止时间覆盖回较早值），冲突走现有重读重判，新的 `updateDeviceSettings` 同理。
+- page_ready 续期 10 分钟（补稿 cs-scan-more）：玻璃台「这一页扫好了」屏写「最多 20 页；10 分钟内没操作会自动结束，并删除已扫的页」，原来 device-report 每次只续到 now+3 分钟。现在回报 state=page_ready 时续期窗口用 10 分钟（新常量 `SCAN_DEVICE_PAGE_READY_RENEW_WINDOW_MS`，选窗口的纯函数 `scanDeviceReportRenewWindowMs`），其余 state 仍 3 分钟，都不超过 hardExpiresAt、不缩短已更长的截止时间。
+- 门禁：新 `verify:scan-device-settings`（改设置）与 `verify:scan-device-lifecycle`（投递抢占钉住、截止时间只增不减、page_ready 窗口），各进 `services/api/package.json` 与 `ci.yml` 的 SQLite、postgres-readiness 两处（前缀 `VERIFICATION_DATABASE_TARGET=isolated`）；`verify:scan-deletion-audit-reporting` 只追加不删（七个码各收一次、不认识的码在 DTO 与真路由 400、同一 eventId 换码判冲突）。
+- 没做 / 边界：终端程序（A1 底座、A2 接线）、一体机（K1）、小程序、两个后台都没动；没有新迁移；真机验证 V0-3/4/5/11/12 没做，**哪台机器都不许在后台把 scan_device 配成 available**；`deviceUpdatedAt` 现在也会被用户改设置 / 改用面板写，K1 若拿它判断「终端程序沉默」要知道这一点；Playwright 视觉用例没跑。
+- 超出任务包文字的几处（各自单独成提交或单独成块，可单独审、单独撤）：`verify-ai-access` 清单登记 `ScanDeviceController`；共享契约多导出 `SCAN_TASK_NOT_ACTIVE` 与 `SCAN_DEVICE_NOT_VERIFIED_ON_TERMINAL` 两个原因码常量；两套 schema 里 `ScanTask` device 列注释同步（deviceUpdatedAt 语义）；`verify-scan-tasks` 钉 where 文本的常量加一行；第三个新门禁 `verify-scan-device-lifecycle`（把三处追加修复的用例放进去，没往 1000 多行的 B1 门禁和 700 多行的改设置门禁里堆）。
+- 验证：api typecheck、`eslint src/`（整个 src）、共享包与一体机 typecheck 全绿；`db:pg:sync:check` 通过，临时 PG 上 `prisma migrate diff` 无漂移；SQLite 口径图谱列出的加简报必跑的 57 条 API 门禁、27 条其它包静态门禁全绿（`verify:terminal-device-config` 要 `prisma/dev.db`、`verify:first-order-migrations` 要 `LC_ALL=en_US.UTF-8` 才能在本机起临时库，是本机环境条件，补上后绿）；postgres-readiness 里同源的 20 条（含两个新门禁与 `recruitment-p1-schema:postgres-upgrade`）在本机临时 PostgreSQL 16（UTC）上全绿；`verify:repository-integrity` 三项 OK；反向检查 26 处（第一批 16、追加三项 10）全部变红，恢复后干净。
+
 ## 2026-11-05：触屏版三项承诺进 main——B9（#1495 随 #1577）、B10（#1585）、B12（#1580）（只改文档；分支 `claude/touch-b9-b10-b12-progress-1105`）
 
 - **#1577 批量**（main + #1511 授权闸门 + #1573 简历 U 盘 + #1495 触屏稿与冻结门禁）：合并提交 4b76ae078（11/05 01:43）。并 main 时补了两处与 #1583 停放的语义冲突：收尾路由登记表认 `/toolbox/*`、`/smart-campus/*`（`windDownRoute` 支持前缀匹配，停放旧链接收尾期间也照常回首页）；首页磁贴期望改为 gov 3 块、full 4 块（`home-fill-when-empty` 与授权闸门夹具去掉智慧校园）。
@@ -151,6 +305,12 @@
 - 改法只在 `UploadSessionQrPanel`，照打印上传页 `useUploadSession`：取消答复回来前刷新、取消、确认都禁用；成功才清空并通知页面；已作废码清二维码、按过期显示；其余失败留下二维码、已收到的文件和状态，兜底句沿用「这次上传没能取消，文件还留着。」。不恢复轮询，不自动接走文件。
 - 验证：一体机 tsc、lint 无 error；冻结哈希三条、`verify:resume-phone-upload-ui`、`verify:public-screen-mask`、`verify:kiosk-unattended-copy`、两份 profile 守卫、仓库完整性，以及进度文档上不依赖数据库的后端文档门禁通过。`verify:ai-usage-retention` 缺隔离库，`verify:free-print-quota` 与 `verify:support-contact` 缺本机 Prisma 客户端，未跑成（与本次改动无关）。浏览器用例已写入，本机未跑浏览器。
 
+## 2026-11-02：两个后台登录页、浏览器标题、态势屏标题读品牌（#1528；#1521 已于 11/05 合入 main，本 PR 基线已改为 main；未合并、未部署）
+
+- 读 #1511 的 `GET /api/v1/public/brand`（不要登录）：两个后台登录页的品牌名与 Logo（Logo 加载失败回退原图标）、浏览器标题「管理员后台 / 合作机构后台 - 品牌名」、管理员态势屏「政务总览」「服务调用」标题。一次页面加载只请求一次；任何失败（旧后端没有这个接口回 404、网络错、字段不合格）静默回退默认「职易达」，不挡登录；演示模式不请求。
+- 不改：登录页版权行「© 2026 职易达」、法务默认、首单月报打印抬头——运营主体仍是我方；月报数据里还没有品牌快照，改成读当前品牌会让历史月报重印成新品牌，留待后端补快照。
+- 验证：两个后台 typecheck / lint / build；compliance-copy 整条链、plain-copy、console-screen-ui、partner-refresh-safe、partner-relative-api-url 门禁；浏览器用例 admin 接口快照包 184、机构接口快照包 176、admin 演示包（登录、全路由、大屏、法务）52、机构演示包（登录、全路由）24 全过。11/05 并入含 #1521 的 main 后复跑：admin 演示 168、admin 快照 184（含读品牌 10）、机构演示 87、机构快照 176（含读品牌 8）全过（演示包数变多是 main 新加的路由巡检）。
+
 ## 2026-11-03：合作机构工作台 AI 服务「重试」浏览器用例修偶发红（只改测试，页面不动；分支 `claude/sleepy-stonebraker-31ae12`）
 
 - **现象：** `kiosk-browser-smoke`「Run Partner data-screen browser E2E」里，`apps/partner/tests/e2e/screen/dashboard-ai.spec.ts`「切片不可用可重试；请求失败也可重试」偶发红在等不到「AI 模拟面试：5 场」。#1558 的 CI 连同自动重试两次都红；那次测的合并提交，合作机构后台代码与 main 70d046f7c 相同，main 上是绿的。本机按 CI 同款构建（React 正式版，产物 `jsxDEV` 为 0）连跑原用例 100 次红 7 次，位置一致。
@@ -201,6 +361,7 @@
 - **验证：** 反向检查 10 种改坏方式全部转红（整段改回旧代码红 21 行；摘要不看字段名、按键名放行、不限长度、不分大小写、编号先于敏感键、不传字段名、前缀放宽、去掉 UUID、抽屉请求编号不脱敏各自转红）。本机演示模式浏览器对比：同一条上传记录，修复前请求编号、文件编号、对象存储校验值三处「已隐藏」，修复后原样显示；登录名是手机号的记录仍「已隐藏」。后台类型检查、代码规范、生产构建，`verify:console-plain-copy`、`verify:admin-partner-contact-phone-ui` 通过。
 - **没改：** 字段名带 credential 的终端凭据编号（`tc_` 开头）仍按敏感键整段隐藏，是既有口径，这次不动。
 
+
 ## 2026-11-02：终端程序 0.4.17 源码并入 main（#1465：出纸拿不准不许续打、队列「正在删除」不当卡纸、补回开机防护；未部署、未发新包）
 
 - 现场事实：KSK-001 自 10/16 经 UU 受控升级装的就是 `0.4.17@0e9e0a5`（安装清单与 CI 制品哈希一致，见当日收口记录）；此前 main 源码停在 0.4.14，「0.4.17 源码没并入主线」一直未关闭——现场跑着一个 main 里没有的版本，从 main 打出的新包会悄悄覆盖掉这些修复。
@@ -250,6 +411,8 @@
 - 同类排查：全仓搜手机号正则，对整个对象逐字符串打码的只有导出这一处和它的门禁扫描。后台审计日志详情（`apps/admin/src/routes/audit/auditPresentation.ts`）也逐字段扫，命中就整段显示「已隐藏」，十六进制编号里的数字串两边是字母，会被误藏；它只影响后台显示、是多藏不是打坏、也没有偶发门禁，这次不改，列为后续。其余命中都是单个字段（文件名、自由文本、表单校验、送模型前的遮盖），不碰编号。
 - 验证：反向检查（先提交再改回）六处全部转红：mapper 回到修复前 →「文件编号必须原样导出」；自由文本也不打码 →「文件名里的手机号照旧打码」；分别去掉 orderNo、以 Id 结尾、id 三条放行 → 订单号、AI 任务编号、文件编号各红一条；门禁扫描不放行编号 → 扫描器原语红。关联门禁在 SQLite 上 9 条、本机 PostgreSQL 16 上后端 7 条全绿；后端类型检查、规范检查、图谱检查通过。
 
+
+
 ## 2026-11-02：一体机复印说明页照补稿改成图文分步（分支 `claude/copy-guide-code-1102`，已并 main 49ed808b6，未 push、未部署）
 
 - 拍板与依据：11/02 产品负责人看了私有页第 5 版复印图文补稿（`docs/design/kiosk-touch-2026-11-copyscan` 的 `cs-copy-guide`、`cs-copy-guide-more` 两屏），原话「补稿可以，照它改」。这是单独一个小改动，基线是触屏版发布候选（#1531，已合 main），只动四个文件：`printHubContent.ts`、`PrintScanFeatureInfoPage.tsx`、`print-hub-qx.css`（只在末尾追加，类名 `.qx-copy-guide-`）、`print-hub-qx.spec.ts`。
@@ -258,6 +421,7 @@
 - 视觉用例：`print-hub-qx.spec.ts` 复印那一条按总指挥许可改成「先点入口再断言三种原件」。testid、5 个 li、身份证 `data-pending`、两条提醒原句一条没删；几何阈值（不滚动、留白 <160、字 ≥20、底栏 ≥56）一个没放宽，两个视图各量一次，另加可点区 ≥48、主按钮 ≥64、图里的字有效字号 ≥20。反向检查（删入口按钮、删一种原件、第二视图返回改回首页）都转红。
 - 验证（生产构建 + preview + 系统 Chrome，本机没有 Playwright 自带 chromium）：并 main 后 `print-hub-qx` 整文件 19/19、小青接不上那两条 2/2，kiosk typecheck、`verify:p39-print-hub-fidelity`、`verify:fusion-w2`、`verify:profile-commercial-first-batch`、`verify:repository-integrity`、图谱检查都过；并 main 前 kiosk 114 条 `verify:*` 扫过，7 条本机缺环境红（`prod-build-config`、`qingxu-proto-geometry`、5 个 probe），干净基线上同样红。
 - 后续：补稿里「打印机离线时复印可能也用不了，以打印机屏幕为准」那一句这次没做（要新读设备状态）；`print-hub-qx.css` 末尾这段复印样式（约 300 行）后面另拆成专页样式文件；Linux CI 的字体栈没在本机跑过（本机用 Qingxu Sans 强制对照，几何一致）。
+
 
 ## 2026-11-02：触屏版发布候选独立复走与第三轮返工（Codex 实现、Claude 审与实跑）
 
@@ -569,6 +733,7 @@
 - 「去掉 PingFang / Hiragino」字体栈复核（模拟 CI 与真机 Windows 的字体栈，集成头 `72dc653ea` 上做，并入 #1517 前）：按每个官方 Playwright 配置各自的构建环境变量各构一份、CSS 里的系统中文字体名改成不存在的名字，落到打包进来的 Qingxu Sans；各套件浏览器用例照跑，与有 PingFang 的构建相比没有新增红（w1 62、w2 201、w3 125、w4 108、w5 84、w6 116、smoke 8、默认配置合集 426、privacy-clear 41；红的只有上面单列的竞态与存量）。358 个状态全量审计（页内量「字内容区超出裁切盒」「元素内容高于盒」「横向超出」，每态一张整页截图）：只在无 PingFang 构建里出现的 21 处——20 处第二包首页副行 `small`（22px 字内容区超出裁切盒 2px）、1 处第三包收银台折叠区 `dt`（1.9px）——逐处放大看，字形都没被切；两种字体下都有的真问题：第五包登录页非空闲态「只管这一次」卡内容 198 > 盒 148（插画被裁，第五包自己的头上就这样）、第三包收银台「本次应付」标签浅字叠在浅底上几乎看不见（第三包自己的头上逐像素相同）；其余 A 类命中是装饰伪元素或读屏隐藏元素。整页留白扫描在两种字体下的 358 张里同样 19 张超线、名单逐条相同，没有字体引起的留白。
 - 没做 / 注意：①剩下 17 处无人值守说法仍在各包名单里（见上），其中第四包 7 处与第六包 2 处是屏上句子，建议各包尽快清；②两个包各自误提交了一个门禁输出日志文件（第三包 `apps/kiosk/gates-a7.txt`、第七包仓库根 `gates-result-merge.txt`，无任何引用），原样保留未删，等总指挥定；③并入 main #1517 后，各包页面里「共享句带叫人找人的话就换成页面固定句」的分支已不再触发，5xx 页面在共享句之后又自己加了一句求助句的地方（第十一包活动物料失败态实测）服务电话会出现两次，未改；④字体栈复核与第一轮浏览器整套跑在并入 #1517 之前的集成头上，并入后只重跑了受影响的套件（见上），没有再重做 358 态审计；⑤`verify:first-order-live`、`verify:first-order-full-app` 两条要起完整服务栈，只驱动后台与合作机构后台、不涉及一体机页面，本机未跑；⑥真机、真实主机 Windows 字体、触屏手势都没验。
 
+
 ## 2026-10-29（二轮）：贴牌与授权管理后端第一步——第二轮审查返工（#1511，未合并、未部署）
 
 - 背景：Codex 第二轮复核仍判「先别合」（四项必须改、四项建议改），逐条对着代码核实后全部属实，已改完；边界不变（贴牌只换展示；授权只按期限与台数；界面不在本 PR）。
@@ -578,6 +743,17 @@
 - **其余建议项**：授权期限最长改按日历年（生效日起满 10 个日历年的前一天为止；2 月 29 日起算顺延到 3 月 1 日），不再用 10×366 天近似；kiosk-profile 在验签（查 Redis）之前先按 IP 每分钟总量计数（600 次，容得下一个大厅 20 台终端各自满额），超过后不再验签、落进 IP 桶，Redis 调用数不再增加（计数表有内存上限 5 万个来源，12 万个不同来源的请求也不会无限长、不会每个新来源都扫全表），Redis 故障时前 30 次 503、之后 429；平台品牌设置的写入事务在 PostgreSQL 上先拿事务级咨询锁再读「改前」，六个并发修改的审计连成一条链；Logo 写对象存储后数据库失败时，收不回对象不再吞掉：记 BRAND_LOGO_ORPHAN_OBJECT 日志并写入待清理清单（PlatformSetting `brand.logoPendingCleanup`，最多 200 项），下一次合格上传先补收，清单写不进去仍有日志。
 - 门禁：verify:branding 232、verify:brand-logo-image 178、verify:license 四份 291 / 111 / 134 / 184，SQLite 与临时 PostgreSQL 都过；每处改动做过反向检查（先提交、故意改坏、取红行、复原），本轮 52 处全红；起初没红的一处（验签前计数窗口不清零）补断言后变红，补收失败挡住上传一处起初靠崩溃红，已换成干净的 FAIL 行。
 - 未做 / 注意：共享的 `TerminalScopedThrottle` 按请求头终端号分桶的问题仍只记后续；界面全部不做（一体机对 `currentSessionEndsAt` 的处理在一体机线）；未部署、真机未验。
+
+## 2026-10-29：贴牌与授权管理——两个后台的界面（#1521，11/05 已压缩合并进 main：4f6db6368；未部署）
+
+- 范围：只在现有页面上改，不新建路由页面；接口全部用 #1511 返工后的契约（期限含到期日、periodText、version、理由与审批工单号、Logo 只收 PNG）。贴牌只换展示，授权只按期限与终端台数，与 #1511 同一边界。
+- 管理员「法务文档版本」页加「品牌与备案」卡：品牌名、字标、Logo（PNG，前端先按文件头与大小查，再交服务端）、ICP 与公安联网备案号及查询链接；留空用默认值。一体机已在 #1511 里读这项配置（kiosk-profile 每 3 分钟重取，登录、换人、从待机唤醒时立即重取），保存提示为「一体机最迟约 3 分钟内按这里显示；登录、换人或从待机唤醒时会立即更新」。
+- 管理员机构详情：「机构品牌」一节（只发品牌三项；清 Logo 叫「改用平台 Logo」）；「软件使用授权」一节——授权方式切换（两个方向都填理由，会锁终端时按服务端原文二次确认后带 confirmLockout 重发）、当前状态与后果、已绑定台数、新建 / 更正 / 续期 / 暂停 / 恢复 / 吊销（带 version；暂停吊销填审批工单号并二次确认、确认时仍可返回修改）、版本冲突自动刷新、历史（按状态给按钮，续期只在最后一条）。
+- 管理员终端：改绑或预创建遇到授权台数用完 / 授权不可用，在机构选择框下就地显示服务端原因与「查看该机构的授权」（新标签页）。管理员工作台「今天要处理」加授权已停用 / 宽限期 / 30 天内到期三类行，读失败可重试。
+- 机构后台：机构资料页加本机构授权只读卡（不受管控不显示；只有待生效授权时写「待生效」而非已停用；台数总显示）；工作台加到期提醒（没有宽限期不提宽限期；已录入续期是平静提示、不算待办）；写操作被授权拦截时显示服务端原文、不跳登录页。两处口径集中在 apps/partner/src/routes/profile/licenseCopy.ts。
+- 验证：两个后台 typecheck / lint / build；plain-copy、offline-agencies、partner-refresh-safe、partner-stats-contract 门禁；admin 单测 15 项；浏览器用例 admin 演示包 70、admin 接口快照包 174、机构接口快照包 168、机构演示包 26 全过。agy 两轮反方评审 30 条，核实后采纳 25 条，3 条与代码或后端契约不符未采纳，2 条判为已覆盖。
+- 未做：两个后台登录页、浏览器标题、态势屏标题读品牌在 #1528（叠在本 PR 上）；一体机读取品牌与授权已在 #1511 里做完；未部署、真机未验。
+
 ## 2026-10-29：贴牌与授权管理后端第一步——审查返工（#1511，未合并、未部署）
 
 - 背景：Codex 只读审查 #1511 给出「先别合」（四项必须改、六项建议改），逐条核实后全部属实，已按总指挥拍板的字段改完。边界不变：贴牌只换展示，运营主体、备案、法务、AI 制作方标识、短信不随品牌改；授权只按期限与终端台数，与岗位、招聘会、浏览、投递无关；界面（一体机、两个后台）不在本 PR，两个后台线叠在本分支上做。

@@ -342,4 +342,21 @@ if (
   fail('API-20 admin manual refund button/confirm/no-auto-trigger contract is incomplete')
 }
 
+const payment = readFileSync(join(root, 'src/routes/orders/OrderPaymentActions.tsx'), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+const zeroAt = payment.indexOf('{detail.refundEligible && detail.amountCents === 0 && (')
+const nonzeroAt = payment.indexOf('{detail.refundEligible && detail.amountCents !== 0 && (')
+if (zeroAt < 0 || nonzeroAt < 0 || zeroAt >= nonzeroAt) {
+  fail('0 元可退订单必须单独分支，且排在有实收退款分支之前')
+}
+const zeroBranch = payment.slice(zeroAt, nonzeroAt)
+if (!zeroBranch.includes('0 元订单无需退款') || /<button\b/.test(zeroBranch)) {
+  fail('0 元分支必须显示「0 元订单无需退款」，不得渲染按钮')
+}
+const paidBranch = payment.slice(nonzeroAt)
+if (!paidBranch.includes("detail.refundRequired ? '发起退款' : '发起全额退款'") || !/<button\b/.test(paidBranch)) {
+  fail('有实收的可退订单必须保留原有两种退款文案与按钮')
+}
+pass('0 元可退订单单独说明无需退款，有实收订单保留原退款入口')
+
 console.log('\nALL PASS')

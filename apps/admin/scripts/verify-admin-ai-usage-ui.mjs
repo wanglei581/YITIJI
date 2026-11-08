@@ -144,6 +144,12 @@ function createReactRuntime() {
   let pending = []
   const changed = (prev, next) => !prev || !next || prev.length !== next.length || next.some((v, i) => !Object.is(v, prev[i]))
   const react = {
+    useCallback(callback, deps) {
+      const i = cursor++
+      const prev = slots[i]
+      if (!prev || changed(prev.deps, deps)) slots[i] = { deps, callback }
+      return slots[i].callback
+    },
     useState(initial) {
       const i = cursor++
       if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial
@@ -230,6 +236,66 @@ const act = {
 const iconStub = new Proxy({}, { get: (_, name) => (typeof name === 'string' && name.endsWith('Icon') ? () => null : undefined) })
 const userErrorMessage = load('src/services/api/userErrorMessage.ts', { './client': clientStub('http') })
 const displayModule = load('src/routes/ai-services/aiUsageDisplay.ts', {})
+
+await check('C3 AI配置保存被拒显示服务端原文、保留表单且不继续测试', async () => {
+  const imports = {
+    './client': clientStub('http'),
+    '../auth': { authHeader: () => ({}), redirectToLogin: () => undefined },
+  }
+  const demo = load('src/services/api/aiConfig.ts', { ...imports, './client': clientStub('mock') })
+  const data = await demo.aiConfigApi.get()
+  data.configs.assistant_chat.apiKeyConfigured = true
+  const message = '模型服务地址换了，请重新填写这一家的 API Key；原来的密钥不会发给新地址'
+  for (const action of ['保存配置', '保存并测试连通']) {
+    const calls = []
+    const adapter = load('src/services/api/aiConfig.ts', imports, {
+      fetch: async (url, init) => {
+        calls.push({ url, init })
+        if (init.method === 'GET') return reply(200, data)
+        assert.equal(init.method, 'PUT', '拒绝保存后不能发起测试 POST')
+        return reply(400, { error: { code: 'AI_CONFIG_API_KEY_REQUIRED', message } })
+      },
+    })
+    const runtime = createReactRuntime()
+    const passthrough = ({ children }) => sharedElement('div', { children })
+    const page = load('src/routes/ai-config/index.tsx', {
+      './ai-config.css': {},
+      react: runtime.react,
+      'react/jsx-runtime': runtime.jsxRuntime,
+      '@ai-job-print/ui': { Card: passthrough, Button: (props) => sharedElement('button', props), LoadingState: () => null, ErrorState: passthrough },
+      'lucide-react': iconStub,
+      '../Page': { Page: passthrough },
+      '../../services/api/aiConfig': adapter,
+      '../components/recruitment/useRecruitmentHosting': { useRecruitmentHosting: () => ({ status: 'ready', enabled: false }) },
+      '../../services/api/userErrorMessage': userErrorMessage,
+    }, { Error, setTimeout: () => 0, window: { confirm: () => true } })
+    const view = runtime.mount(page.default)
+    try {
+      let tree = await view.settle()
+      assert.ok(textOf(tree).includes('换了模型服务地址或厂商，要重新填写这一家的 API Key'))
+      const input = (value) => find(tree, (node) => node.type === 'input' && node.props.value === value)[0]
+      input(data.config.baseURL).props.onChange({ target: { value: 'https://dashscope.aliyuncs.com/compatible-mode/v1' } })
+      input(data.config.model).props.onChange({ target: { value: 'verify-edited-model' } })
+      find(tree, (node) => node.type === 'input' && node.props.type === 'password')[0].props.onChange({ target: { value: '   ' } })
+      tree = view.render()
+      await buttons(tree, action)[0].props.onClick()
+      tree = await view.settle()
+      const errors = find(tree, (node) => String(node.props.className).includes('text-error-fg') && textOf(node.children).includes(message))
+      assert.ok(errors.length > 0, `${action}：服务端原文须在表单内以错误样式显示`)
+      assert.ok(input('https://dashscope.aliyuncs.com/compatible-mode/v1'), '保留已填地址')
+      assert.ok(input('verify-edited-model'), '保留已填模型')
+      assert.equal(find(tree, (node) => node.type === 'input' && node.props.type === 'password')[0].props.value, '   ', '不清除已填密钥')
+      assert.equal(buttons(tree, action)[0].props.disabled, false, '失败后表单可继续操作')
+      assert.doesNotMatch(textOf(tree), /✓ 已保存/)
+      const saves = calls.filter((call) => call.init.method === 'PUT')
+      assert.equal(saves.length, 1)
+      assert.equal(saves[0].url, `${API_BASE}/admin/ai-configs/assistant_chat`)
+      assert.equal(JSON.parse(saves[0].init.body).model, 'verify-edited-model')
+      assert.equal(calls.filter((call) => call.init.method === 'POST').length, 0, '保存失败后测试零请求')
+    } finally { view.unmount() }
+  }
+})
+
 const breakdownModule = load('src/routes/ai-services/AiUsageBreakdownTable.tsx', {
   'react/jsx-runtime': sharedJsx,
   './aiUsageDisplay': displayModule,

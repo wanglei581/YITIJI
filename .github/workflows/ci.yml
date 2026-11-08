@@ -436,6 +436,7 @@ jobs:
           # Generates PNG fixtures in a temp dir and measures the produced PDF; no printer, no spooler.
           pnpm run verify:image-scale-truth
           pnpm run verify:network-diagnostics
+          pnpm run verify:printer-queue-diagnostics
           pnpm run verify:local-qr-proxy
           pnpm run verify:usb-import-agent
           # ── 2026-08-16 门禁全量体检补回。三条都只做静态读取 / 注入桩：
@@ -673,6 +674,20 @@ jobs:
           pnpm --filter @ai-job-print/api verify:scan-quiet-period
           # 屏上扫描(device 路线)云端会话:能力准入、状态转移表、续期上限、改用面板扫描不吃静默期、deliver origin、心跳新字段。SQLite 与 PG 两侧各跑一遍。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-sessions
+          # 屏上扫描(device 路线)原地改设置(出错屏「改用玻璃台」):只在 ready/error 允许、不吃静默期、CAS 并发、幂等、GET 多三项、共享契约五个数组与后端逐项一致。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-settings
+          # 屏上扫描证件 PDF:只在服务端核实过的 device 会话放行；页数/大小上限、个人信息检查与留存、租约 maxPages/maxBytes。面板与上传仍只收图片。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-idscan
+          # 屏上扫描(device 路线)会话生命周期:投递抢占钉住 startMode/设备状态(B1 复审修复)、截止时间只增不减、page_ready 回报续 10 分钟(补稿 cs-scan-more)。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-lifecycle
+          # 屏上扫描 B4：取消响应的静默期倒计时、GET 页数上限、扫描仪找不到或出错时的派生告警。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b4
+          # 屏上扫描 B6：投递钉扫描轮次（替换 deviceUpdatedAt），取消倒计时不再另查库。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b6
+          # 屏上扫描 B8：已结束任务的回报在 409 details 里带最终状态，供终端程序判定投递结果。别的终端与面板不带。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b8
+          # 屏上扫描 B9：扫描仪告警只算仍在运营的终端（enabled 且 active）。停用与非 active 不出告警。不放进已恢复推送范围。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b9
           pnpm --filter @ai-job-print/api verify:print-conversion
           # 包 K1：中文字体解析收口 + 探测（缺候选路径即红）
           pnpm --filter @ai-job-print/api verify:cjk-font
@@ -1228,6 +1243,20 @@ jobs:
           pnpm --filter @ai-job-print/api verify:scan-quiet-period
           # 屏上扫描(device 路线)云端会话:能力准入、状态转移表、续期上限、改用面板扫描不吃静默期、deliver origin、心跳新字段。SQLite 与 PG 两侧各跑一遍。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-sessions
+          # 屏上扫描(device 路线)原地改设置(出错屏「改用玻璃台」):只在 ready/error 允许、不吃静默期、CAS 并发、幂等、GET 多三项、共享契约五个数组与后端逐项一致。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-settings
+          # 屏上扫描证件 PDF:只在服务端核实过的 device 会话放行；页数/大小上限、个人信息检查与留存、租约 maxPages/maxBytes。面板与上传仍只收图片。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-idscan
+          # 屏上扫描(device 路线)会话生命周期:投递抢占钉住 startMode/设备状态(B1 复审修复)、截止时间只增不减、page_ready 回报续 10 分钟(补稿 cs-scan-more)。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-lifecycle
+          # 屏上扫描 B4：取消响应的静默期倒计时、GET 页数上限、扫描仪找不到或出错时的派生告警。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b4
+          # 屏上扫描 B6：投递钉扫描轮次（替换 deviceUpdatedAt），取消倒计时不再另查库。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b6
+          # 屏上扫描 B8：已结束任务的回报在 409 details 里带最终状态，供终端程序判定投递结果。别的终端与面板不带。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b8
+          # 屏上扫描 B9：扫描仪告警只算仍在运营的终端（enabled 且 active）。停用与非 active 不出告警。不放进已恢复推送范围。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b9
           pnpm --filter @ai-job-print/api verify:print-conversion
           # 包 K1：中文字体解析收口 + 探测（缺候选路径即红）
           pnpm --filter @ai-job-print/api verify:cjk-font

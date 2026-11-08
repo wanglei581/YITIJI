@@ -105,7 +105,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR
     let code = DEFAULT_ERROR_CODE
     let message: string = DEFAULT_ERROR_MESSAGE
-    let details: string[] | FreePrintQuotaDetails | undefined
+    let details: string[] | FreePrintQuotaDetails | ScanDeviceReportDetails | undefined
     let memberFileRetained = false
     let mismatchTerminal: MismatchTerminal | null | undefined
     let closureOrders: Array<{ orderNo: string; status: string }> | undefined
@@ -133,6 +133,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
             details = (err['details'] as unknown[]).filter((d): d is string => typeof d === 'string')
           } else if (typeof err['code'] === 'string') {
             details = pickFreePrintQuotaDetails(err['code'], err['details'])
+              ?? pickScanDeviceReportDetails(err['code'], err['details'])
           }
           // 只透传这个布尔与下面的下一步标识。其它未知字段（文件名、fileId、对象键）继续丢掉。
           if (err['memberFileRetained'] === true) memberFileRetained = true
@@ -289,6 +290,37 @@ const FREE_PRINT_QUOTA_CODES = new Set([
   'PRINT_GUEST_ORDER_QUOTA_EXCEEDED',
 ])
 const FREE_PRINT_QUOTA_RESET_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/
+
+type ScanDeviceEndedReportDetails = {
+  taskStatus: 'completed' | 'cancelled' | 'expired' | 'failed'
+  fileDelivered: boolean
+}
+type ScanDeviceDeliveringReportDetails = { taskStatus: 'matched' }
+type ScanDeviceReportDetails = ScanDeviceEndedReportDetails | ScanDeviceDeliveringReportDetails
+
+const SCAN_DEVICE_REPORT_ENDED_CODES = new Set(['SCAN_DEVICE_TASK_ENDED', 'SCAN_DEVICE_TASK_CANCELLED'])
+const SCAN_DEVICE_ENDED_TASK_STATUSES = new Set(['completed', 'cancelled', 'expired', 'failed'])
+
+/**
+ * 屏上扫描回报的 409 只透出有界的 taskStatus（投递中再没有别的字段；已结束再加布尔 fileDelivered）。
+ * 不拷贝 fileId 或任何额外键。码不对、状态不在白名单、fileDelivered 不是布尔，整段丢掉。
+ */
+function pickScanDeviceReportDetails(code: string, raw: unknown): ScanDeviceReportDetails | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const row = raw as Record<string, unknown>
+  if (code === 'SCAN_DEVICE_TASK_DELIVERING') {
+    if (row['taskStatus'] !== 'matched') return undefined
+    return { taskStatus: 'matched' }
+  }
+  if (!SCAN_DEVICE_REPORT_ENDED_CODES.has(code)) return undefined
+  const taskStatus = row['taskStatus']
+  if (typeof taskStatus !== 'string' || !SCAN_DEVICE_ENDED_TASK_STATUSES.has(taskStatus)) return undefined
+  if (typeof row['fileDelivered'] !== 'boolean') return undefined
+  return {
+    taskStatus: taskStatus as ScanDeviceEndedReportDetails['taskStatus'],
+    fileDelivered: row['fileDelivered'],
+  }
+}
 
 /** 只放行这三条码的五个有界字段。其它对象形态的 details 继续丢掉。 */
 function pickFreePrintQuotaDetails(code: string, raw: unknown): FreePrintQuotaDetails | undefined {

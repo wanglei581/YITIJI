@@ -51,6 +51,22 @@ test.describe('托管关闭（我们云上默认）', () => {
     await loginWith(page, { 'mock:recruitment-hosting': 'off' })
   })
 
+  test('机构资料：不显示数据源，招聘类模块标暂不开放', async ({ page }) => {
+    const { errors } = collectPageFaults(page)
+    await gotoPartner(page, '/profile', '机构资料')
+    await waitForMockList(page)
+    await expect(page.getByText('数据源', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('机构账号', { exact: true }).locator('..')).toContainText('1 个')
+    for (const label of ['岗位信息', '招聘会', '外部跳转']) {
+      await expect(page.getByText(`${label}（暂不开放）`, { exact: true })).toBeVisible()
+      await expect(page.getByText(`${label}（暂不开放）`, { exact: true })).toHaveClass(/bg-neutral-100/)
+    }
+    for (const label of ['打印扫描', 'AI简历服务', '政策服务']) {
+      await expect(page.getByText(label, { exact: true })).toBeVisible()
+    }
+    await assertPageHonest(page, errors)
+  })
+
   test('侧栏隐藏岗位 / 企业 / 招聘会 / 数据源 / 同步日志，政策归到「内容管理」', async ({ page }) => {
     const { errors } = collectPageFaults(page)
     await gotoPartner(page, '/', '工作台')
@@ -194,6 +210,20 @@ test.describe('托管关闭（我们云上默认）', () => {
 test.describe('托管打开（私有化部署 b）', () => {
   test.beforeEach(async ({ page }) => {
     await loginWith(page, { 'mock:recruitment-hosting': 'on' })
+  })
+
+  test('机构资料：数据源计数照常，招聘类模块保留原标签', async ({ page }) => {
+    const { errors } = collectPageFaults(page)
+    await gotoPartner(page, '/profile', '机构资料')
+    await waitForMockList(page)
+    await expect(page.getByText('数据源', { exact: true }).locator('..')).toContainText('3 个')
+    await expect(page.getByText('机构账号', { exact: true }).locator('..')).toContainText('1 个')
+    for (const label of ['岗位信息', '招聘会', '外部跳转']) {
+      await expect(page.getByText(label, { exact: true })).toBeVisible()
+      await expect(page.getByText(label, { exact: true })).toHaveClass(/bg-primary-50/)
+    }
+    await expect(page.getByText(/（暂不开放）/)).toHaveCount(0)
+    await assertPageHonest(page, errors)
   })
 
   test('侧栏与各招聘页照旧；工作台有岗位类指标、同步记录与平台处置通知', async ({ page }) => {

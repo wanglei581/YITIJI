@@ -26,6 +26,9 @@ const REQUEST_SAFE_STEP_MS = 3_500
 const SESSION_TTL_MS = 30 * MINUTE
 /** 屏上「暂停服务」的如实说法（契约：packages/shared/src/types/branding.ts KIOSK_PAUSED_NOTICE_LINE）。 */
 export const PAUSED_NOTICE_LINE = '这台机器暂时不能用。'
+/** Playwright 在 evaluate 途中页面被导航换掉时的报错（只认这一种，别的错误不吞）。 */
+export const isNavigationDestroyed = (error: unknown): boolean =>
+  /Execution context was destroyed/.test(error instanceof Error ? error.message : String(error))
 
 function json(status: number, body: unknown): Parameters<Route['fulfill']>[0] {
   return { status, contentType: 'application/json', body: JSON.stringify(body) }
@@ -276,13 +279,21 @@ export class LicenseWorld {
       stable = this.inFlight === 0 && this.openRequests().length === 0 ? stable + 1 : 0
       await this.page.waitForTimeout(60)
     }
-    await this.page.evaluate(
-      () => new Promise<void>((resolve) => {
-        const channel = new MessageChannel()
-        channel.port1.onmessage = () => resolve()
-        channel.port2.postMessage(0)
-      }),
-    )
+    try {
+      await this.page.evaluate(
+        () => new Promise<void>((resolve) => {
+          const channel = new MessageChannel()
+          channel.port1.onmessage = () => resolve()
+          channel.port2.postMessage(0)
+        }),
+      )
+    } catch (error) {
+      // 进暂停时的结束使用清场会整页重载：旧文档恰好在这一刻被换掉，evaluate 就拿不到上下文
+      // （CI 上 #1580 第 2 次冒烟「暂停之后刷新页面，仍是暂停屏」这样红过）。只认这一种「被导航销毁」，
+      // 等新文档起来就算静了——新文档没有旧文档排着的任务；别的错误照抛。
+      if (!isNavigationDestroyed(error)) throw error
+      await this.page.waitForLoadState('domcontentloaded')
+    }
   }
 
   /** 失败时附在报错里的现场：开机后各次换票、续期、读 profile 的时刻（分钟）与在途请求。 */

@@ -1,9 +1,13 @@
 import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator'
 import {
+  SCAN_DEVICE_COLOR_MODES,
   SCAN_DEVICE_ERROR_CODES,
   SCAN_DEVICE_MAX_PAGE_COUNT,
+  SCAN_DEVICE_SOURCES,
   SCAN_DEVICE_STATES,
+  type ScanDeviceColorMode,
   type ScanDeviceErrorCode,
+  type ScanDeviceSource,
   type ScanDeviceState,
 } from '../scan-device-protocol'
 
@@ -27,4 +31,14 @@ export class ScanDeviceReportDto {
   @IsOptional()
   @IsIn(SCAN_DEVICE_ERROR_CODES)
   errorCode?: ScanDeviceErrorCode
+
+  /** 这一场实际在用的来源。不给 = 旧终端程序，服务端不比对。 */
+  @IsOptional()
+  @IsIn(SCAN_DEVICE_SOURCES)
+  source?: ScanDeviceSource
+
+  /** 这一场实际在用的颜色。不给 = 旧终端程序，服务端不比对。 */
+  @IsOptional()
+  @IsIn(SCAN_DEVICE_COLOR_MODES)
+  colorMode?: ScanDeviceColorMode
 }
