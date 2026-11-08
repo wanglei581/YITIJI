@@ -4,6 +4,7 @@ import { QxTouchTile } from '../../components/qingxu/touch/QxTouchTile'
 import { getPublishedPolicies, type PublishedPoliciesResult } from '../../services/api/policies'
 import { useAuth } from '../../auth/useAuth'
 import { useKioskLicense } from '../../layouts/KioskLicenseContext'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { useInterviewAiCapabilities } from '../interview/useInterviewAiCapabilities'
 import { PolicyChecklistSample, PolicyReadState, PolicyTouchLayout } from '../renshi/PolicyTouchLayout'
@@ -43,7 +44,8 @@ export function PolicyTouchHub() {
     path={empty ? ['机构在后台发布', '这里按类别列出', '打印清单或扫码看原文'] : undefined}
     pathLabel={empty ? '有政策以后' : undefined} sub={empty
       ? '机构在后台审核发布后，这里按类别列出，每条写清条件、材料和去哪办。' : spec.subtitle}
-    ask={!empty} state={failed ? 'failed' : !data ? 'loading' : empty ? 'empty' : 'ready'}>
+    ask={!empty} state={failed ? 'failed' : !data ? 'loading' : empty ? 'empty' : 'ready'}
+    alert={winding ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : undefined}>
     {!data ? <PolicyReadState failed={failed} retry={() => setAttempt((value) => value + 1)} /> : empty ? <>
       <section className="policy-min-section">
         <h2>政策由谁发布</h2>
@@ -65,13 +67,13 @@ export function PolicyTouchHub() {
           layout="stack" off={winding || category.disabled} index={index} testId={`policy-category-${category.key}`}
           onClick={() => navigate(`/renshi?audience=${category.key}`)} />)}
       </div>
-      {latest && <button type="button" className="policy-min-row" onClick={() => navigate(`/renshi?policy=${encodeURIComponent(latest.id)}`)}>
+      {latest && <button type="button" className="policy-min-row" disabled={winding} onClick={() => navigate(`/renshi?policy=${encodeURIComponent(latest.id)}`)}>
         最近更新 · {latest.title} · {policyPublishedOn(latest) ?? '日期未提供'}
       </button>}
-      {data.notices.total > 0 && <button type="button" className="policy-min-row" onClick={() => navigate('/renshi?tab=notice')}>
+      {data.notices.total > 0 && <button type="button" className="policy-min-row" disabled={winding} onClick={() => navigate('/renshi?tab=notice')}>
         机构公告 · {data.notices.total} 条
       </button>}
-      {isLoggedIn && <button type="button" className="policy-min-row" onClick={() => navigate('/me/favorites?tab=policy')}>政策收藏</button>}
+      {isLoggedIn && <button type="button" className="policy-min-row" disabled={winding} onClick={() => navigate('/me/favorites?tab=policy')}>政策收藏</button>}
       <p className="policy-min-fine">条数从发布数据读；政策由发布机构自行审核发布，以官方原文为准</p>
     </>}
   </PolicyTouchLayout>
