@@ -1,3 +1,5 @@
+// 不验证招聘托管内容：终端管理服务只用于 C1e 的停用 / 维护 / 改绑撤权，按生产配置（托管关闭）跑。
+process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
 import 'reflect-metadata'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
