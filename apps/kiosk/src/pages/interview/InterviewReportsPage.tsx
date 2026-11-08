@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { MemberInterviewItem } from '@ai-job-print/shared'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
-import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
+import { LICENSE_NO_NEW_TASK_REASON, networkDisconnectLine } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
 import { useKioskLicense } from '../../layouts/KioskLicenseContext'
 import { deleteMyInterview, getMyInterviews } from '../../services/api/interview'
@@ -175,7 +175,7 @@ export function InterviewReportsPage({ onGoStage }: { onGoStage?: (stage: Interv
               <b>先看面试技巧</b>
               <small>不依赖这份列表</small>
             </button>
-            <InterviewArt title="暂时无法加载练习报告">请检查网络后重试。没有拿到本人列表时，不显示任何固定历史。重试只回到读取中。</InterviewArt>
+            <InterviewArt title="暂时无法加载练习报告">{`${networkDisconnectLine()}。没有拿到本人列表时，不显示任何固定历史。重试只回到读取中。`}</InterviewArt>
           </>
         ) : items.length === 0 ? (
           <>
