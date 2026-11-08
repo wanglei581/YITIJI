@@ -8,7 +8,7 @@
 .copy-touch .cc-check { flex: 1; min-height: 0; padding: 24px; border-radius: 30px; background: var(--qxt-well); display: flex; flex-direction: column; gap: 14px; }
 .copy-touch .cc-preview { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 24px; }
 .copy-touch .cc-preview figure { margin: 0; min-width: 0; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 14px; }
-.copy-touch .cc-preview img { width: 100%; max-height: 480px; aspect-ratio: 290 / 410; object-fit: contain; background: white; border: 2px solid var(--qxt-edge); border-radius: 14px; box-shadow: 0 10px 20px #0001; }
+.copy-touch .cc-preview img { width: 100%; max-height: 480px; aspect-ratio: 290 / 410; object-fit: contain; background: white; border: 2px solid var(--qxt-edge); border-radius: 14px; box-shadow: 0 10px 20px rgba(0, 0, 0, 0.067); }
 .copy-touch .cc-preview figcaption { font-size: 22px; text-align: center; }
 .copy-touch .cc-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-bottom: 60px; }
 .copy-touch .cc-facts > div { padding: 32px 24px; border: 1px solid var(--qxt-edge); border-radius: 24px; background: var(--qxt-card); font-size: 30px; font-weight: 700; }

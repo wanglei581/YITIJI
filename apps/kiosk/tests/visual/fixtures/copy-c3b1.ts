@@ -3,6 +3,18 @@ import type { ApiRouter } from '../../fixtures/api-router'
 import type { CopyJobView, CopySettings } from '../../../src/services/api/copyJobs'
 import { COPY_CONTROL, COPY_ID, copyFixture } from './copy-c3a'
 
+/**
+ * 闲置到点、退出登录走隐私清场：pushState 到目的地，下一帧整页重载（KioskPrivacyGuard）。
+ * 清场后还要 page.evaluate 读本机存储的用例，必须在触发前挂上这个等待、读之前 await：
+ * 不等就会和重载赛跑，CI 上稳定报「执行上下文被导航销毁」。重载不动本机存储，等它落定再读同样有效。
+ */
+export function armPrivacyReload(page: Page): () => Promise<void> {
+  const loaded = page.waitForEvent('load')
+  // 用例中途已红、页面先关时，不另报一条未处理的拒绝；需要时 await 仍会抛出。
+  loaded.catch(() => {})
+  return async () => { await loaded }
+}
+
 // 独立的合成 JPEG，不含用户材料；所有预览仍经过真实 POST 字节响应。
 const JPEG = Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAQAAwDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD3CiiigD//2Q==', 'base64')
 export async function copyDeviceFixture(page: Page, api: ApiRouter, options: {

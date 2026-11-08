@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test'
 import { expect, test } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { COPY_CONTROL, COPY_ID } from './fixtures/copy-c3a'
-import { copyDeviceFixture } from './fixtures/copy-c3b1'
+import { armPrivacyReload, copyDeviceFixture } from './fixtures/copy-c3b1'
 
 const secrets = () => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage }, url: location.href })
 async function printing(page: Page, api: ApiRouter, options: Parameters<typeof copyDeviceFixture>[2] = {}) {
@@ -111,9 +111,13 @@ for (const [state, label] of [['handed', '拿到了，结束'], ['unconfirmed', 
 }
 for (const mode of ['home', 'idle', 'logout', 'ask'] as const) test(`after dispatch ${mode} clears and never calls cancel/abort @w2`, async ({ page, api }) => {
   const f = await printing(page, api, { clearDelayed: true })
-  if (mode === 'idle') await page.clock.fastForward(181_000)
-  else if (mode === 'logout') {
+  let reloaded: (() => Promise<void>) | undefined
+  if (mode === 'idle') {
+    reloaded = armPrivacyReload(page)
+    await page.clock.fastForward(181_000)
+  } else if (mode === 'logout') {
     await page.clock.runFor(151_000)
+    reloaded = armPrivacyReload(page)
     await page.getByTestId('session-guard-clear').click()
   } else await page.getByRole('button', { name: mode === 'ask' ? '问小青：纸没出来怎么办' : '首页', exact: true }).click()
   await expect(page.getByTestId('copy-print-progress')).toHaveCount(0)
@@ -121,6 +125,7 @@ for (const mode of ['home', 'idle', 'logout', 'ask'] as const) test(`after dispa
   await expect.poll(() => f.revokedUrls).toEqual(expect.arrayContaining(f.preview))
   expect(f.cloudCalls.some((c) => c.action === 'cancel')).toBe(false)
   expect(f.localCalls.some((c) => c.action === 'abort')).toBe(false)
+  await reloaded?.()
   expect(await page.evaluate(secrets)).not.toContain(COPY_CONTROL)
   f.releaseClear()
 })
@@ -207,9 +212,13 @@ async function startInFlight(page: Page, api: ApiRouter) {
 for (const mode of ['home', 'idle', 'logout'] as const) test(`C3c start in flight: ${mode} cancels cloud once despite local clear failure @w2`, async ({ page, api }) => {
   const f = await startInFlight(page, api)
   try {
-    if (mode === 'idle') await page.clock.fastForward(181_000)
-    else if (mode === 'logout') {
+    let reloaded: (() => Promise<void>) | undefined
+    if (mode === 'idle') {
+      reloaded = armPrivacyReload(page)
+      await page.clock.fastForward(181_000)
+    } else if (mode === 'logout') {
       await page.clock.runFor(151_000)
+      reloaded = armPrivacyReload(page)
       await page.getByTestId('session-guard-clear').click()
     } else await page.getByRole('button', { name: '首页', exact: true }).click()
     await expect(page.getByTestId('copy-c3b-entry')).toHaveCount(0)
@@ -218,6 +227,7 @@ for (const mode of ['home', 'idle', 'logout'] as const) test(`C3c start in fligh
     const cancel = f.cloudCalls.find((c) => c.action === 'cancel')!
     expect(cancel.body).toEqual({ generation: 1 })
     expect(cancel.headers['x-copy-control']).toBe(COPY_CONTROL)
+    await reloaded?.()
     expect(await page.evaluate(secrets)).not.toContain(COPY_CONTROL)
   } finally { f.releaseStart() }
   await page.clock.fastForward(10_000)

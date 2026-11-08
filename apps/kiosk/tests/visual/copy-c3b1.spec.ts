@@ -1,6 +1,6 @@
 import { expect, test } from '../fixtures/kiosk-test'
 import { COPY_CONTROL } from './fixtures/copy-c3a'
-import { copyDeviceFixture } from './fixtures/copy-c3b1'
+import { armPrivacyReload, copyDeviceFixture } from './fixtures/copy-c3b1'
 
 const secretSnapshot = () => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage }, url: location.href })
 
@@ -185,9 +185,13 @@ for (const mode of ['leave', 'leave-fail', 'idle', 'logout', 'ask'] as const) te
   await expect(page.locator('.cc-preview img')).toHaveCount(3)
   const old = await page.locator('.cc-preview img').evaluateAll((nodes) => nodes.map((node) => (node as HTMLImageElement).src))
   expect(await page.evaluate(secretSnapshot)).not.toContain(COPY_CONTROL)
-  if (mode === 'idle') await page.clock.fastForward(181_000)
-  else if (mode === 'logout') {
+  let reloaded: (() => Promise<void>) | undefined
+  if (mode === 'idle') {
+    reloaded = armPrivacyReload(page)
+    await page.clock.fastForward(181_000)
+  } else if (mode === 'logout') {
     await page.clock.runFor(151_000)
+    reloaded = armPrivacyReload(page)
     await page.getByTestId('session-guard-clear').click()
   } else await page.getByRole('button', { name: mode === 'ask' ? '问小青：核对什么' : '首页', exact: true }).click()
   if (mode === 'leave' || mode === 'leave-fail') {
@@ -197,6 +201,7 @@ for (const mode of ['leave', 'leave-fail', 'idle', 'logout', 'ask'] as const) te
   await expect(page.getByTestId('copy-check')).toHaveCount(0)
   await expect.poll(() => f.revokedUrls).toEqual(expect.arrayContaining(old))
   await expect.poll(() => f.localCalls.filter((c) => c.action === 'clear').length).toBeGreaterThan(0)
+  await reloaded?.()
   expect(await page.evaluate(secretSnapshot)).not.toContain(COPY_CONTROL)
   f.releaseClear()
 })
