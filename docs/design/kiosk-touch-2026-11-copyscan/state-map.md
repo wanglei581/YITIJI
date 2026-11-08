@@ -1,11 +1,11 @@
 # 对稿清单
 
-屏上扫描（K1b）、屏上复印（C3）的每个运行状态，对到本目录补稿的哪一屏、哪个参数，一致还是有差异。2026-11-08 出，待产品负责人看；只放稿和清单，没改程序。
+屏上扫描（K1b）、屏上复印（C3）的每个运行状态，对到本目录补稿的哪一屏、哪个参数，一致还是有差异。2026-11-08 出；同日产品负责人对末节列的 10 处回了「按推荐」，10 处已定，稿已照改（见末节「11/08 产品负责人定（按推荐）」）。只放稿和清单，没改程序。
 
 - 运行页代码：分支 `claude/copy-kiosk-c3-1105` 头 `02a97c42b`（含屏上扫描 K1b 和屏上复印 C3，叠放 PR #1602、#1607，还没进 main）。下表代码位置相对 `apps/kiosk/src/pages/`，行号逐个实查过。
 - 稿：本目录 `copyscan.js`，屏 ID 以 `cs-` 开头，打开办法见 `README.md`（`index.html?shot=1&参数#屏ID`）。`scan-type`、`scan-guide`、`scan-result` 是定稿 `../kiosk-touch-2026-10/fix-scan.js` 里的面板扫描屏。
 - 对照一栏：「一致」＝屏上的字、出路、按钮、版式对得上；「有差异」写差在哪；**补（11/08）**＝这次照代码事实补的稿；「不补」写原因。
-- 截图在 `~/.cache/claude-lanes/copyscan-1102/code-shots/drafts-quota-1108/`（本机，不进仓库）。
+- 截图在 `~/.cache/claude-lanes/copyscan-1102/code-shots/drafts-quota-1108/`（第一轮）和 `drafts-quota-1108-r2/`（第二轮改过的屏），本机，不进仓库。
 
 ## 每屏都有的差异（下表不再逐行写）
 
@@ -13,7 +13,7 @@
 2. 检查时间：稿胶囊写「扫描仪就绪 · 20 秒前检查」「设备就绪 · 20 秒前检查」；程序固定写「扫描仪就绪 · 刚刚检查」（`scan/scanProbeCopy.ts:7–10`、`copy/CopyShell.tsx:26`）。
 3. 程序屏上扫描各屏的意图带左上角多一个圆形返回键，稿不画。
 4. 「原件怎么放」动画（11/04 补稿，待看）程序没做，玻璃台和进纸器都是静态图。
-5. 状态未知的胶囊：程序是灰色，稿是橙色。
+5. 状态未知的胶囊：程序是灰色，稿是橙色；11/08 定用橙色，扫描、复印各处一致（程序要改）。
 6. 小青接不上：扫描各屏程序和稿同一句；复印外壳里没找到这句（`copy/CopyShell.tsx` 没接，推断复印各屏不显示），稿复印各屏照样显示。
 
 ## 屏上扫描
@@ -37,7 +37,7 @@
 | 放纸设置 · 过期或没开通 | `scan/ScanDeviceSettingsPage.tsx:42–49` | `cs-scan-set?scanner=stale`／`?scandev=off` | 有差异：程序自动退回「怎么扫」；稿留在本屏写原因、开始扫描变灰 |
 | 放纸设置 · 正在开始 | `scan/ScanDeviceSettingsPage.tsx:75–77`；`scan/useScanDeviceStart.ts:77–90` | **`cs-scan-set?start=busy` 补** | 一致 |
 | 放纸设置 · 没建成（服务端明确拒绝） | `scan/useScanDeviceStart.ts:22,88,110`；`scan/ScanDeviceSettingsPage.tsx:147` | **`cs-scan-set?start=rejected` 补** | 一致 |
-| 放纸设置 · 开始前断网 | `scan/useScanDeviceStart.ts:20–21,67–74,106–109,136–144` | **`cs-scan-set?start=offline` 补**；另有 11/04 待看的 `cs-scan-offline?offline=start` | 程序留在本屏，提示行一句，开始扫描灰 60 秒；`cs-scan-offline` 是独立整屏，程序没有——二选一要定 |
+| 放纸设置 · 开始前断网 | `scan/useScanDeviceStart.ts:20–21,67–74,106–109,136–144` | **`cs-scan-set?start=offline` 补** | 一致。11/08 定：用程序现状（留在本屏，提示行一句，开始扫描灰 60 秒），11/04 的独立断网屏不采用、已删 |
 | 放纸设置 · 出错后返回（恢复态） | `scan/ScanDeviceErrorPage.tsx:32–35,41`；`scan/ScanDeviceSettingsPage.tsx:31–37,77–83` | `cs-scan-set` | 有差异：程序这里的「返回」回出错屏，稿回「怎么扫」 |
 | 已交给机器 · 等扫描仪回报开始 | `scan/scanDeviceState.ts:96,181–183`；`scan/ScanDeviceRunView.tsx:49–56,79–107` | **`cs-scan-run?run=waiting` 补** | 一致 |
 | 正在扫描 · 扫描仪不报页数 | `scan/scanDeviceState.ts:99,169`；`scan/ScanDeviceRunView.tsx:54–56,75–113` | `cs-scan-run?pages=none` | 一致 |
@@ -50,10 +50,10 @@
 | 这一页扫好了 · 命令在途 | `scan/ScanDeviceMoreView.tsx:61,75,83`；`scan/useScanDeviceFlow.ts:175–205` | **`cs-scan-more?busy=1` 补** | 一致；回包不明时进 `cs-scan-unknown` |
 | 正在生成文件 · 合成中 | `scan/scanDeviceState.ts:174–176`；`scan/ScanDeviceMakeView.tsx:25–69` | `cs-scan-make` | 一致 |
 | 正在生成文件 · 传回中、不报页数 | `scan/ScanDeviceMakeView.tsx:40–66` | **`cs-scan-make?make=delivering`／`?pages=none` 补** | 一致 |
-| 扫描完成 · 游客 | `ScanWorkbenchPage.tsx:95–96`；`scan/ScanDeviceDonePage.tsx:50–153`；`scan/scanGuestWays.ts:11–24` | `cs-scan-done`（旧两句）；**`cs-scan-done?guest=ways` 补（程序现状）** | 有差异：程序游客段是「带走的办法」三条，稿默认还是旧两句——以哪个为准要定；程序是真实预览加「整屏查看」，稿画分页小图；文件信息程序「PDF · 856 KB · 3 页」，稿「3 页 · 1.1 MB」；原件提醒图标程序是文件、稿是手 |
+| 扫描完成 · 游客 | `ScanWorkbenchPage.tsx:95–96`；`scan/ScanDeviceDonePage.tsx:50–153`；`scan/scanGuestWays.ts:11–24` | `cs-scan-done` | 游客段一致：11/08 定用程序的「带走的办法」三条，替掉稿上旧两句。其余有差异：程序是真实预览加「整屏查看」，稿画分页小图；文件信息程序「PDF · 856 KB · 3 页」，稿「3 页 · 1.1 MB」；原件提醒图标程序是文件、稿是手 |
 | 扫描完成 · 已登录且已存进「我的文档」 | `scan/ScanDeviceDonePage.tsx:32–48,56–58,119,137–143` | `cs-scan-done?login=1`（演示事件切小程序发布与否） | 字一致；稿已存句前有文件夹图标，程序没有 |
 | 扫描完成 · 已登录但还没核对到是本人的 | `scan/ScanDeviceDonePage.tsx:32–48,109,119,137` | **`cs-scan-done?login=1&owned=0` 补** | 一致 |
-| 扫描完成 · 预览打不开 | `scan/ScanDeviceDonePage.tsx:95–101`；`../components/PdfCanvasPreview.tsx:22`；`../components/FileContentPreview.tsx:118–119,207` | **`cs-scan-done?preview=fail` 补**；另有 11/04 待看的 `cs-scan-file-gone?gone=link` | 程序留在完成屏、只换预览区一句，出路照常；`cs-scan-file-gone` 是独立整屏——二选一要定。非 PDF 时程序那句是「这份文件无法在本页内嵌预览；预览失败不代表文件本身有问题，文件状态以页面上的文件卡为准。」 |
+| 扫描完成 · 预览打不开 | `scan/ScanDeviceDonePage.tsx:95–101`；`../components/PdfCanvasPreview.tsx:22`；`../components/FileContentPreview.tsx:118–119,207` | **`cs-scan-done?preview=fail` 补** | 一致：留在完成屏、只换预览区一句，出路照常。11/08 定：用程序现状，11/04 的独立失效屏不采用、已删。非 PDF 时程序那句是「这份文件无法在本页内嵌预览；预览失败不代表文件本身有问题，文件状态以页面上的文件卡为准。」 |
 | 扫描完成 · 整屏查看层 | `scan/ScanDeviceDonePage.tsx:103–105,154–160`；`scan/ScanResultPreviewViewer.tsx:111–238` | 定稿 `scan-result` 的「整屏查看」层 | 不补：查看层定稿已有，补稿完成屏只差一颗「整屏查看」按钮，等游客段口径定了一起改；程序层里的字（「第 N 页 / 共 M 页」「上一页」「下一页」「适应整页」「适应宽度」「关闭预览，回到这一步」）和定稿不同 |
 | 出错 · 进纸器里没有纸 | `scan/scanDeviceState.ts:32`；`scan/scanDeviceErrorCopy.ts:5–10`；`scan/ScanDeviceErrorPage.tsx:41–76` | `cs-scan-err-nopaper` | 字一致；「改用玻璃台」程序原地改玻璃台并立刻重开（稿回 `cs-scan-set`）；「改用面板扫描」把这一场转成面板进 `scan-guide`（稿去 `scan-type`） |
 | 出错 · 卡纸或盖板没合上（卡纸、开盖同一屏） | `scan/scanDeviceState.ts:33`；`scan/scanDeviceErrorCopy.ts:11–16` | `cs-scan-err-jam` | 一致（面板去向同上） |
@@ -63,14 +63,13 @@
 | 出错屏 · 处理中 | `scan/ScanDeviceErrorPage.tsx:44,59–60`；`scan/useScanDeviceFlow.ts:230–242` | **五张出错屏 `?busy=1` 补** | 一致 |
 | 已停止扫描 · 有倒计时 | `scan/ScanDeviceFlowPage.tsx:15`；`scan/ScanDeviceStoppedPage.tsx:16–38`；`scan/scanDeviceStopState.ts:14–31` | `cs-scan-stopped` | 有差异：秒数按服务端时间（稿固定 90）；删页那半句看本机回包才出现 |
 | 已停止扫描 · 没有服务端时间、没确认删页 | `scan/ScanDeviceStoppedPage.tsx:22,30–32` | **`cs-scan-stopped?quiet=none`／`?purged=0` 补** | 一致 |
-| 状态未知 · 结果还没确认 | `scan/scanDeviceState.ts:95,100,132,147,163–168,173,178–184`；`scan/ScanDeviceUnknownView.tsx:15–54`；`scan/scanDeviceRecovery.ts:27–32` | `cs-scan-unknown` | 一致 |
-| 状态未知 · 本机程序连不上（断网时云端连续两次查不到也是这句） | `scan/useScanDeviceFlow.ts:126–129`；`scan/ScanDeviceUnknownView.tsx:15–16` | `cs-scan-unknown?unknown=unreachable`；另有 11/04 待看的 `cs-scan-offline?offline=run`／`make` | 程序没有独立断网屏，也没有「再试一次」，每 3 秒自动重查、恢复后自动换屏；`cs-scan-offline` 的整屏和手动重查程序没有 |
+| 状态未知 · 结果还没确认 | `scan/scanDeviceState.ts:95,100,132,147,163–168,173,178–184`；`scan/ScanDeviceUnknownView.tsx:15–54`；`scan/scanDeviceRecovery.ts:27–32` | `cs-scan-unknown` | 字一致。11/08 定：右栏留白改版——大纸居中、说明放在纸下面、整块拉开，字号句子出路都没变（程序要照改版式） |
+| 状态未知 · 本机程序连不上（断网时云端连续两次查不到也是这句） | `scan/useScanDeviceFlow.ts:126–129`；`scan/ScanDeviceUnknownView.tsx:15–16` | `cs-scan-unknown?unknown=unreachable` | 一致。11/08 定：断网用程序现状（进状态未知、每 3 秒自动重查、恢复后自动换屏），11/04 的独立断网屏不采用、已删 |
 | 状态未知 · 停止没确认 | `scan/useScanDeviceFlow.ts:61–69,82,110,254`；`scan/ScanDeviceStopButton.tsx:33` | `cs-scan-unknown`（演示「停止结果未确认」） | 画面一致；程序拿到停止回执后不再查云端，这一屏不会自己变，稿说明写的是等云端回报 |
-| 中断 · 扫描未完成（云端失败或取消、设备中止、预热、超过大小、投递被拒） | `scan/scanDeviceState.ts:117–159`；`scan/useScanDeviceStart.ts:151–160`；`scan/ScanResultPage.tsx:64–77`；`scan/ScanResultFailedView.tsx:36–109`；`scan/scanDeliveryAck.ts:124–126` | **`cs-scan-failed` 补**（`?reason=stopped`／`warming`／`large`／`ack`） | 程序借的是面板扫描失败屏：眉题「扫描完成」，路径线换成面板四步，「重试扫描（同一份材料）」「重新开始一次扫描」都进面板 `scan-guide`。稿照这个事实画，要不要改成屏上扫描的样子要定 |
-| 中断 · 等待超时（会话过期） | `scan/scanDeviceState.ts:111–116`；`scan/ScanResultFailedView.tsx:41–45,67` | **`cs-scan-failed?fail=expired` 补** | 同上 |
-| 文件失效 · 完成但结果里没有文件 | `scan/scanDeviceState.ts:103–109`；`scan/ScanResultFailedView.tsx:67–72,103` | **`cs-scan-failed?fail=nofile` 补**；另有 11/04 待看的 `cs-scan-file-gone?gone=nofile` | 程序是面板失败屏（没有「返回首页」行，主按钮「重新开始一次扫描」进面板）；`cs-scan-file-gone` 的标题和出路（回首页、再扫一份回「扫什么」）程序没有——二选一要定 |
+| 中断 · 扫描未完成（云端失败或取消、设备中止、预热、超过大小、投递被拒） | `scan/scanDeviceState.ts:117–159`；`scan/useScanDeviceStart.ts:151–160`；`scan/ScanResultPage.tsx:64–77`；`scan/ScanResultFailedView.tsx:36–109`；`scan/scanDeliveryAck.ts:124–126` | **`cs-scan-failed`**（`?reason=stopped`／`warming`／`large`／`ack`）；`?view=now` 是现在程序的样子（待改） | 11/08 定：新稿是屏上扫描自己的结果屏（眉题「屏上扫描」、不画面板四步路径线、「重试扫描（同一份材料）」回 `cs-scan-set`、「重新开始一次扫描」回 `cs-scan-what`），程序要照改；程序现在借面板扫描失败屏（眉题「扫描完成」、面板四步路径线、重试进面板） |
+| 中断 · 等待超时（会话过期） | `scan/scanDeviceState.ts:111–116`；`scan/ScanResultFailedView.tsx:41–45,67` | **`cs-scan-failed?fail=expired`**（`&view=now` 现在程序的样子） | 同上 |
+| 文件失效 · 完成但结果里没有文件 | `scan/scanDeviceState.ts:103–109`；`scan/ScanResultFailedView.tsx:67–72,103` | **`cs-scan-failed?fail=nofile`**（`&view=now` 现在程序的样子） | 11/08 定：用程序现状这一种结果（没有「返回首页」、主按钮「重新开始一次扫描」），版式随新结果屏改；11/04 的独立失效屏不采用、已删 |
 | 失败屏 · 安全重扫凭据失效 | `scan/useScanResultRescan.ts:128–134`；`scan/ScanResultFailedView.tsx:92–99` | **`cs-scan-failed?rescan=lost` 补** | 一致 |
-| 文件失效 · 本页拿不到（原因不明） | 无 | `cs-scan-file-gone`（11/04 待看） | 稿有程序没有：程序没有对应判据 |
 | 小青接不上 | `scan/ScanWorkbenchChrome.tsx:278`；`print-scan/AiDownNote.tsx:7–13` | 各屏 `?ai=down` | 一致；只有 11/04 三张出错补稿写的是「小青也要联网，恢复后再问」 |
 | 离开（导航、问小青、返回） | `scan/ScanWorkbenchChrome.tsx:201–206,218–219,252–256,264–268`；`scan/scanSessionRevoke.ts:187–203` | 各屏底部导航 | 不出屏：直接走，只撤云端任务、清本机登记，已有结果时不撤 |
 | 闲置清场 | `scan/useScanDeviceFlow.ts:71`；`../auth/kioskIdleTiming.ts:6–8`；`../auth/KioskPrivacyGuard.tsx:650–668` | 定稿全局「无操作提醒」（说明栏「演示：无操作提醒」） | 不在扫描页里画；等扫描仪、正在扫描、这一页、生成中、状态未知、出错几屏有忙碌锁，不计时 |
@@ -93,23 +92,23 @@
 | 放好原件 · 正在建单 | `copy/CopyWorkbenchPage.tsx:51,67–68`；`copy/copySession.ts:72–75` | **`cs-copy-set?start=busy` 补** | 有差异：程序还把四组设置锁住，稿只画开始复印变灰 |
 | 放好原件 · 超过这台机器能收的大小 | `copy/useCopyFlow.ts:64`；`copy/copySession.ts:95–101` | **`cs-copy-set?start=limit` 补** | 一致 |
 | 放好原件 · 建单结果没确认 | `copy/useCopyFlow.ts:64`；`copy/copySession.ts:95–101` | **`cs-copy-set?start=unknown` 补** | 有差异：程序把四组设置锁住，开始复印仍可点 |
-| 放好原件 · 建单回包缺凭据 | `copy/copySession.ts:91–92`；`copy/CopyWorkbenchPage.tsx:43–44,73–75` | **`cs-copy-unknown?why=token` 补** | 有差异：程序标题「状态未知」、胶囊却是「扫描仪就绪 · 刚刚检查」、正文一句；稿按「状态未知」画 |
+| 放好原件 · 建单回包缺凭据 | `copy/copySession.ts:91–92`；`copy/CopyWorkbenchPage.tsx:43–44,73–75` | **`cs-copy-unknown?why=token` 补** | 有差异：程序标题「状态未知」、胶囊却是「扫描仪就绪 · 刚刚检查」。11/08 定：胶囊和标题一致写「状态未知」，稿就是这样画的，程序要改 |
 | 放好原件 · 检查中、过期以外的检查结论、打印机读不到、网络断开 | `copy/CopyWorkbenchPage.tsx:42,67–68,72` | **`cs-copy-set?scanner=…`／`?printer=unknown`／`?net=off` 补** | 一致：原因写在设置下面的提示行，开始复印灰 |
 | 放好原件 · 打印机离线 | `copy/CopyWorkbenchPage.tsx:67–68,72` | `cs-copy-set?printer=down` | 有差异：程序提示行只写「打印机离线」；稿写「这台机器暂时打不了，我们已经收到提醒，会尽快处理……」（程序不承诺已收到提醒） |
 | 建单被拒（能力关掉）→ 没开通屏 | `copy/useCopyFlow.ts:63–65`；`copy/CopyWorkbenchPage.tsx:45–49` | `cs-copy-off` | 一致 |
 | 扫原件 · 等扫描仪回报开始 | `copy/CopyDeviceView.tsx:46–48`；`scan/ScanDeviceRunView.tsx:71–113` | **`cs-copy-scan?run=waiting` 补** | 一致 |
 | 扫原件 · 扫描中（有页数、不报页数） | `copy/CopyDeviceView.tsx:42–48,60–61` | `cs-copy-scan`／`?pages=none` | 一致 |
 | 扫原件 · 整理成预览 | `copy/CopyDeviceView.tsx:46–48`；`copy/copyCheckModel.ts:43–48` | **`cs-copy-scan?run=finishing` 补** | 一致（不报页数时大字照程序写「正在扫描」） |
-| 这一页扫好了（玻璃台） | `copy/CopyDeviceView.tsx:41–59`；`copy/copyCheckModel.ts:46` | **`cs-copy-more` 补** | 有差异：程序只有一句「已收到 N 页」和「再扫一页」一张卡；稿照 `cs-scan-more` 补了页小图和「扫完了，整理成预览」卡（和底栏主按钮同一个动作）——这张卡要不要定 |
+| 这一页扫好了（玻璃台） | `copy/CopyDeviceView.tsx:41–59`；`copy/copyCheckModel.ts:46` | **`cs-copy-more` 补** | 一致：一张「再扫一页」卡，主按钮「扫完了」。11/08 定：不加「扫完了，整理成预览」卡；稿多画了已收到的页小图（程序只写「已收到 N 页」） |
 | 这一页扫好了 · 不报页数、命令在途 | `copy/CopyDeviceView.tsx:57–59` | **`cs-copy-more?pages=none`／`?busy=1` 补** | 一致 |
 | 停止 · 点两下 | `copy/CopyDeviceView.tsx:23–27,34–38,44`；`scan/ScanDeviceStopButton.tsx:27` | `cs-copy-scan`「停止复印」 | 一致 |
-| 已停止复印 | `copy/copyDeviceFlow.ts:214–231`；`copy/CopyDeviceView.tsx:40–63` | `cs-scan-stopped`（复印时标题换「已停止复印」） | 有差异：程序没有倒计时也没有原件提醒，正文只一句「已停止复印，已扫的页已从这台机器删除。」，屏上大片空；稿写「90 秒后才能开始新的复印或扫描」——复印取消回包不带静默期，这句程序做不到，要定 |
-| 状态未知 · 结果没确认、等太久没新结果、停止没确认 | `copy/copyDeviceFlow.ts:22,49–51,55–58,231`；`copy/CopyDeviceView.tsx:40–63` | **`cs-copy-unknown`／`?why=wait`／`?why=stop` 补** | 字一致；程序正文只有一句，稿借 `cs-scan-unknown` 的大纸版式；和扫描不同，复印这屏有「返回」 |
+| 已停止复印 | `copy/copyDeviceFlow.ts:214–231`；`copy/CopyDeviceView.tsx:40–63` | `cs-scan-stopped?flow=copy` | 11/08 定：复印没有静默期，稿去掉 90 秒倒计时，补原件提醒「原件还在玻璃上或进纸器里，请带走」，配玻璃台、进纸器示意；程序现在正文只一句「已停止复印，已扫的页已从这台机器删除。」，要补原件提醒 |
+| 状态未知 · 结果没确认、等太久没新结果、停止没确认 | `copy/copyDeviceFlow.ts:22,49–51,55–58,231`；`copy/CopyDeviceView.tsx:40–63` | **`cs-copy-unknown`／`?why=wait`／`?why=stop` 补** | 字一致；程序正文只有一句。11/08 定：和屏上扫描一起改版（大纸居中、说明在下、整块拉开）；复印这屏有「返回」 |
 | 出错 · 缺纸、卡纸或开盖、忙、没响应、超时 | `copy/copyPrintModel.ts:9–16`；`copy/CopyErrorView.tsx:16–51` | `cs-scan-err-nopaper`／`-jam`／`-busy`／`-noresp`、`cs-scan-timeout`（从复印进时换写法） | 有差异：程序复印出错屏都没有「返回」；「打印机正在忙」程序出路是「再试」「改用面板复印」，稿是「再试」「取消」 |
 | 出错 · 处理中 | `copy/CopyErrorView.tsx:31,39` | 五张出错屏 `?busy=1` 补 | 一致（程序复印这几屏没有返回键） |
-| 出错 · 超过这台机器能收的大小 | `copy/copyPrintModel.ts:14`；`copy/CopyErrorView.tsx:26–29,45` | **`cs-copy-err-limit` 补** | 字一致；问小青那句程序借了「扫描仪连不上怎么办」，和这屏不符，要定 |
-| 出错 · 中途没开通（授权失效、单子过期） | `copy/copyPrintModel.ts:15`；`copy/copyDeviceFlow.ts:170–173`；`copy/CopyErrorView.tsx:26–39` | **`cs-copy-err-off` 补** | 字一致；问小青那句同上 |
-| 核对 · 就绪 | `copy/CopyDeviceView.tsx:42–56`；`copy/CopyCheckView.tsx:27–49` | `cs-copy-check` | 有差异：程序没有「发现身份证号等个人信息时，会先问你保留还是遮挡」「扫描件只在这台机器上，打印完就删除」两条，只有「扫描件只在这台机器上处理，不上传」；双面用纸程序按每份取整（3 页 × 2 份 = 4 张，`copy/copyCheckModel.ts:4–6`），稿按总页数算成 3 张 |
+| 出错 · 超过这台机器能收的大小 | `copy/copyPrintModel.ts:14`；`copy/CopyErrorView.tsx:26–29,45` | **`cs-copy-err-limit` 补** | 字一致。11/08 定：问小青改「问小青：原件太多怎么复印」（程序现在借「扫描仪连不上怎么办」，要改） |
+| 出错 · 中途没开通（授权失效、单子过期） | `copy/copyPrintModel.ts:15`；`copy/copyDeviceFlow.ts:170–173`；`copy/CopyErrorView.tsx:26–39` | **`cs-copy-err-off` 补** | 字一致。11/08 定：问小青用复印没开通屏的原句「问小青：面板上怎么复印」（程序要改） |
+| 核对 · 就绪 | `copy/CopyDeviceView.tsx:42–56`；`copy/CopyCheckView.tsx:27–49` | `cs-copy-check` | 用纸一致：11/08 定双面照程序按份取整（3 页双面 × 2 份 = 4 张，`copy/copyCheckModel.ts:4–6`），稿已改。还有差异：程序没有「发现身份证号等个人信息时，会先问你保留还是遮挡」「扫描件只在这台机器上，打印完就删除」两条，只有「扫描件只在这台机器上处理，不上传」 |
 | 核对 · 正在读取预览、预览打不开 | `copy/CopyCheckView.tsx:34` | **`cs-copy-check?preview=loading`／`fail` 补** | 一致 |
 | 核对 · 超过三页按组翻 | `copy/CopyCheckView.tsx:36–40` | **`cs-copy-check?cpages=7` 补** | 有差异：翻组键照定稿打印预览的 `.pager`（`screens.js:1057`），程序是文字键「上一组」「下一组」 |
 | 核对 · 报价已更新、奇数页多份双面没开通、报价暂时无法确认 | `copy/copyDeviceFlow.ts:155–159,165–166`；`copy/copyCheckModel.ts:7–10`；`copy/CopyDeviceView.tsx:55–56` | **`cs-copy-check?quote=changed`／`odd`／`none` 补** | 一致；程序完全拿不到核对数据时正文只剩「报价暂时无法确认」一句（`copy/CopyDeviceView.tsx:56`），稿画的是有核对数据、价格那格读不到的那种 |
@@ -128,7 +127,7 @@
 
 ## 缺稿结论
 
-这次补了 7 张新屏和已有屏的 30 多种样子（参数见 `README.md` 末节），都照运行页原句画；没带新参数时，原来的屏逐像素和 main 一样。
+这次补了 7 张新屏和已有屏的 30 多种样子（参数见 `README.md` 末节），都照运行页原句画；第一轮没带新参数时，原来的屏逐像素和 main 一样；第二轮按 11/08 定案改了的屏见末节。
 
 - 新屏：`cs-copy-quota`（额度用完，三种说法）、`cs-copy-more`、`cs-copy-unknown`、`cs-copy-failed`、`cs-copy-err-limit`、`cs-copy-err-off`、`cs-scan-failed`。
 - 新样子：扫什么一种都没选；怎么扫／怎么复印的检查中与六种检查结论、打印机读不到、网络断开；放纸设置的正在确认、正在开始、没建成、开始前断网；放好原件的正在建单、超过大小、结果没确认；两条流程的等扫描仪、复印整理成预览；这一页的不报页数和命令在途；生成文件的传回中和不报页数；扫描完成的游客三条出路、已登录未核对、预览打不开；出错屏处理中；已停止的没有服务端时间和没确认删页；核对屏的读取中、预览打不开、按组翻、三种报价情况、网络断开。
@@ -138,8 +137,8 @@
 
 ## 稿有、程序没有
 
-1. `cs-scan-offline` 整屏和「再试一次」（11/04 待看）：程序开始前断网留在放纸设置，扫描中和生成时进「状态未知」自动重查。
-2. `cs-scan-file-gone` 整屏（11/04 待看）：程序结果没文件时走面板失败屏，链接打不开时留在完成屏换一句。
+1. 11/04 的 `cs-scan-offline`、`cs-scan-file-gone` 两张整屏：11/08 定用程序现状，不采用，已从稿里删掉。
+2. 新的中断结果屏 `cs-scan-failed`（11/08 定稿）：程序现在落面板失败屏，要照新稿改；现在的样子留在 `?view=now`。
 3. `cs-scan-how?scandev=off` 的样子、`cs-scan-set` 过期或没开通时留在本屏：程序分别换成 `cs-scan-off`、自动退回「怎么扫」。
 4. 胶囊里的「· 20 秒前检查」「过期 · 2 分钟前」：程序固定「刚刚检查」，过期句整句放进胶囊。
 5. 「原件怎么放」动画（11/04 待看）。
@@ -147,17 +146,19 @@
 7. 「改用玻璃台」回放纸设置、「到打印机面板上扫／改用面板扫描」去 `scan-type`：程序分别是原地重开、进 `scan-guide`。
 8. 停止没确认后「等云端回报」：程序拿到停止回执后不再查。
 9. 程序有意删掉的三句：超时「超过 3 分钟没有收到扫描结果」、没响应「我们已经收到提醒，会尽快处理。」、这一页「，并删除已扫的页」；以及打印机离线时的「我们已经收到提醒，会尽快处理」长句。
-10. 复印：「打印机正在出纸」那一段和出纸动画；核对屏「会先问你保留还是遮挡」「打印完就删除」两条；复印停止的 90 秒倒计时和原件提醒；复印出错屏的「返回」；忙屏的「取消」。
+10. 复印：「打印机正在出纸」那一段和出纸动画；核对屏「会先问你保留还是遮挡」「打印完就删除」两条；复印已停止的原件提醒（11/08 定要补）；复印出错屏的「返回」；忙屏的「取消」。
 
-## 要产品负责人定的
+## 11/08 产品负责人定（按推荐）
 
-1. 游客扫描完成：程序的「带走的办法」三条（`cs-scan-done?guest=ways`）还是稿的旧两句。
-2. 屏上扫描中断后落面板失败屏（眉题「扫描完成」、面板四步路径线、重试进面板，`cs-scan-failed`）：照程序，还是改成屏上扫描的样子。
-3. 断网、文件失效：程序现状（`cs-scan-set?start=offline`、`cs-scan-unknown?unknown=unreachable`、`cs-scan-failed?fail=nofile`、`cs-scan-done?preview=fail`）和 11/04 的独立整屏（`cs-scan-offline`、`cs-scan-file-gone`）二选一。
-4. 复印停止：稿的 90 秒倒计时要不要去掉（复印取消回包不带静默期），程序那屏正文只有一句，要补原件提醒。
-5. 复印「这一页扫好了」稿多出来的「扫完了，整理成预览」卡要不要。
-6. 复印「超过大小」「中途没开通」两屏的问小青句（程序借了「扫描仪连不上怎么办」）。
-7. 复印建单回包缺凭据：程序标题「状态未知」、胶囊「扫描仪就绪」自相矛盾。
-8. 复印双面用纸：程序按每份取整（3 页 × 2 份 = 4 张），稿按总页数（3 张）。
-9. 状态未知胶囊：程序灰、稿橙。
-10. 版式留白：`cs-scan-unknown`、`cs-scan-file-gone`、`cs-scan-offline`（11/04）和照它画的 `cs-copy-unknown`，大纸右边一栏只有一两句字，量出来右半边空 500–600px；要不要改版。
+产品负责人 11/08 在协调窗口对上一版末节列的 10 处回了「按推荐」。稿已照改，程序随后照稿改（本 PR 不改程序）。
+
+1. 游客扫描完成：用程序的「带走的办法」三条，作为游客默认样子。稿上：`cs-scan-done` 游客段换成三条，旧两句删掉；第三条后半句「，手机小程序里也能看到」只在小程序发布后出现；`?guest=ways` 参数不再需要，已去掉。
+2. 屏上扫描中断后，改成屏上扫描自己的结果屏。稿上：`cs-scan-failed` 新默认眉题「屏上扫描」，不画面板四步路径线；原因卡写这次的原因和「同一张纸原样再扫，系统可能按重复件拒收（两小时内）。」；出路「重试扫描（同一份材料）」回 `cs-scan-set`、「重新开始一次扫描」回 `cs-scan-what`、「返回首页」；问小青「扫描失败怎么办」，有服务电话行。现在程序的样子留在 `?view=now`，标「现在程序的样子（待改）」。
+3. 断网、文件失效：用程序现状。稿上：11/04 的 `cs-scan-offline`、`cs-scan-file-gone` 不采用，已从 `copyscan.js`、分组和流程里删掉；程序现状对应的 `cs-scan-set?start=offline`、`cs-scan-unknown?unknown=unreachable`、`cs-scan-failed?fail=nofile`、`cs-scan-done?preview=fail` 保留。
+4. 复印停止：去掉 90 秒倒计时（程序没有静默期，画了就是假的），补原件提醒。稿上：`cs-scan-stopped?flow=copy` 只剩「已停止复印，已扫的页已从这台机器删除」、大提醒「原件还在玻璃上或进纸器里，请带走」和玻璃台、进纸器两张现成插画；问小青用复印各屏已有的「怎么复印更合适」。
+5. `cs-copy-more` 删掉「扫完了，整理成预览」卡，底部主按钮「扫完了」保留。稿上：只剩「再扫一页」一张卡，已收到的页小图放大、整块上下拉开。
+6. 问小青句：`cs-copy-err-limit` 改「问小青：原件太多怎么复印」，`cs-copy-err-off` 改「问小青：面板上怎么复印」（沿用复印没开通屏原句）。
+7. 复印建单回包缺凭据：胶囊和标题一致写「状态未知」。稿上本来就这样画（`cs-copy-unknown?why=token`），程序要改。
+8. 双面用纸照程序按份取整：3 页双面 × 2 份 = 4 张。稿上：`cs-copy-check` 改成按每份页数除以二向上取整再乘份数。
+9. 状态未知胶囊用橙色，扫描、复印各处一致。稿上本来就是橙色（`cs-scan-unknown`、`cs-copy-unknown`、`cs-copy-unconfirmed`），程序要改。
+10. 状态未知两屏右栏留白改版：用这个状态已有的说明和出路把内容拉开，不放大字号、不加新信息。稿上：`cs-scan-unknown`、`cs-copy-unknown` 的大纸从左栏改到居中，「状态未知」和那一句放在纸下面，整块上下拉开；句子、字号、底栏出路（停止键、问小青、复印的返回）都没变。
