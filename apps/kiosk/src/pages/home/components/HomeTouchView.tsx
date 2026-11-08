@@ -131,18 +131,19 @@ export function HomeTouchView({
   const job = jobCopy(jobs)
   const fair = campusCopy(jobFair)
   const recruitmentOpen = recruitment.enabled
-  const channelsTile = !recruitmentOpen && officialChannelCount > 0
+  // 2026-11-08 四核心收口：本机构官方渠道从首页磁贴挪进「查政策」页，首页只在底部说明里指过去。
+  const channelsInPolicy = !recruitmentOpen && officialChannelCount > 0
   const greeting = greetingWord(now)
   const standbyNote = homeStandbyNote({ isLoggedIn, guestMode, hasSensitiveSession: hasKioskSensitiveSession() }, publicIdleLogoutLabel())
   const printChip = device.loading ? printStatus.note : device.printerReady ? '先选材料再出纸 · 带走：打印件' : serviceDown ? '服务暂时连不上' : device.printerLabel
   const printNote = device.loading || device.printerReady ? undefined : printStatus.note
-  // 百宝箱、智慧校园停放（2026-11-04 产品负责人定），不再计入：小磁贴只剩到机取件、帮助和招聘类或官方渠道。
-  const tileCount = 2 + (recruitmentOpen ? 2 : channelsTile ? 1 : 0)
+  // 百宝箱、智慧校园停放（2026-11-04 产品负责人定）、官方渠道挪进查政策（11/08），都不再计入：小磁贴只剩到机取件、帮助和招聘类。
+  const tileCount = 2 + (recruitmentOpen ? 2 : 0)
   const dense = tileCount >= 4
   const boundary = recruitmentOpen
     ? '岗位与招聘会仅展示第三方或官方来源；本终端仅展示与跳转，不代收简历。'
-    : channelsTile
-      ? '岗位与招聘会请看本机构官方渠道，本终端不代收简历。'
+    : channelsInPolicy
+      ? '岗位与招聘会请看「查政策」里的本机构官方渠道，本终端不代收简历。'
       : recruitment.status === 'ready'
         ? '本终端未开放岗位与招聘会信息，也不代收简历。'
         : '本终端不代收简历。'
@@ -162,7 +163,6 @@ export function HomeTouchView({
         // 停放标记给门禁和用例认：首页任何配置下都不摆这两块。
         toolbox: 'parked',
         campus: 'parked',
-        'official-channels': channelsTile ? 'shown' : undefined,
       }}
       band={(
         <>
@@ -240,9 +240,6 @@ export function HomeTouchView({
           ) : (
             <QxTouchTile off={winding} reason={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} key={`fair-${jobFair.status}`} chevron={false} layout="stack" icon="book" tone="slate" title="校园招聘" desc={fair.description} badge={fair.badge} actionId="campus-zone" dataAttrs={{ 'home-job-fair-panel': '', 'panel-state': jobFair.status }} index={nextTile()} onClick={() => onAction('campus-zone')} />
           )
-        ) : null}
-        {channelsTile ? (
-          <QxTouchTile off={winding} reason={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} chevron={false} layout="stack" icon="qr" tone="slate" title="本机构官方渠道" desc={`本机有 ${officialChannelCount} 个渠道，扫码到机构官网`} actionId="official-channels" index={nextTile()} onClick={() => onAction('official-channels')} />
         ) : null}
         <QxTouchTile off={winding} reason={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} chevron={false} layout="stack" icon="help" tone="clay" title="帮助" desc="常见问题、服务电话" actionId="help" index={nextTile()} onClick={() => onAction('help')} />
       </div>
