@@ -93,11 +93,13 @@ test('I-08 preview params: only the unavailable options are struck out; the sele
     expect(await strikeThrough(button), `${name} 不能划线`).toBe(false)
     expect(Number(await button.evaluate((el) => getComputedStyle(el).opacity)), `${name} 不能发灰`).toBeGreaterThanOrEqual(0.95)
   }
-  for (const name of ['彩色', '双面（长边）', '双面（短边）']) {
+  for (const name of ['彩色', '双面']) {
     const button = option(page, name)
     await expect(button, `${name} 本机没开通`).toHaveAttribute('aria-disabled', 'true')
     expect(await strikeThrough(button), `${name} 要划线`).toBe(true)
   }
+  await expect(option(page, '长边翻页')).toHaveCount(0)
+  await expect(option(page, '短边翻页')).toHaveCount(0)
   await shot(page, 'i08-preview-unverified')
   expect(errors).toEqual([])
 })
@@ -112,10 +114,10 @@ test('I-08 preview params: with color on and duplex off, only the duplex options
     await expect(button).not.toHaveAttribute('aria-disabled', 'true')
     expect(await strikeThrough(button), `${name} 不能划线`).toBe(false)
   }
-  for (const name of ['双面（长边）', '双面（短边）']) {
-    await expect(option(page, name)).toHaveAttribute('aria-disabled', 'true')
-    expect(await strikeThrough(option(page, name))).toBe(true)
-  }
+  await expect(option(page, '双面')).toHaveAttribute('aria-disabled', 'true')
+  expect(await strikeThrough(option(page, '双面'))).toBe(true)
+  await expect(option(page, '长边翻页')).toHaveCount(0)
+  await expect(option(page, '短边翻页')).toHaveCount(0)
   // 彩色开通了就真能选上。
   await option(page, '彩色').click()
   await expect(option(page, '彩色')).toHaveAttribute('data-selected', 'true')

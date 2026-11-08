@@ -71,6 +71,12 @@ export function assertPublicLlmBaseUrl(raw: string, env: EnvLike = process.env):
   }
 }
 
+/** 无法解析的存量地址没有可信主机名。 */
+export function llmBaseUrlHostname(raw: string): string | null {
+  try { return normalizeLlmHost(new URL(raw.trim()).hostname) || null }
+  catch { return null }
+}
+
 /** URL.hostname 对 IPv6 带方括号（`[::1]`），且可能带 FQDN 末尾点（`localhost.`）。 */
 function normalizeLlmHost(hostname: string): string {
   let host = hostname.trim().toLowerCase()

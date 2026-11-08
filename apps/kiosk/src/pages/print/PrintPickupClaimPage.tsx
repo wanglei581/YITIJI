@@ -95,6 +95,9 @@ interface ClaimPickupResult {
   params?: Partial<PrintJobParams>
   fileName?: string | null
   paymentSessionToken: string
+  /** 续打成功时后端才带。只在严格为 true 时提醒看出纸口。 */
+  mayHavePrinted?: boolean
+  partialOutput?: boolean
 }
 
 type ClaimState = 'idle' | 'loading' | 'success' | 'error'
@@ -122,6 +125,8 @@ async function claimPickup(code: string, staleSignal?: AbortSignal): Promise<Cla
     paymentSessionToken?: string
     taskStatus?: string
     printTaskStatus?: string
+    mayHavePrinted?: unknown
+    partialOutput?: unknown
     error?: { code?: string; message?: string; details?: unknown }
     message?: string | string[]
   }
@@ -150,7 +155,12 @@ async function claimPickup(code: string, staleSignal?: AbortSignal): Promise<Cla
   ) {
     throw new ApiHttpError('CLAIM_RECEIPT_UNKNOWN', '本次到机码校验结果尚未确认', res.status)
   }
-  return body as ClaimPickupResult
+  const claimed = body as ClaimPickupResult
+  return {
+    ...claimed,
+    mayHavePrinted: body.mayHavePrinted === true,
+    partialOutput: body.partialOutput === true,
+  }
 }
 
 // ── 组件 ──────────────────────────────────────────────────────
@@ -384,6 +394,8 @@ export function PrintPickupClaimPage() {
                 orderNo: result.orderNo,
                 amountCents: result.amountCents,
                 paymentSessionToken: result.paymentSessionToken,
+                ...(result.mayHavePrinted === true ? { mayHavePrinted: true } : {}),
+                ...(result.partialOutput === true ? { partialOutput: true } : {}),
               }
             : {
                 orderId: result.orderId,

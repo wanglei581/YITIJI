@@ -181,8 +181,8 @@
 }
 
 [data-qx-page='print-check'] .pdk-find {
-  flex: 1 0 120px;
-  max-height: 210px;
+  flex: 1 0 240px;
+  max-height: none;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -739,3 +739,17 @@
   padding: 0;
   list-style: none;
 }
+
+/* 文件体检与版式评估保持可读，默认合成预检条下面的一行。 */
+[data-qx-page='print-check'] .pdk-assessment { font-size: 20px; color: var(--qxt-ink-2); }
+[data-qx-page='print-check'] .pdk-assessment summary { min-height: 48px; display: flex; align-items: center; cursor: pointer; }
+[data-qx-page='print-check'] .pdk-assessment:not([open]) > :not(summary) { display: none; }
+[data-qx-page='print-check'] .pdk-check[data-qx-state='review']:has(.pdk-finds) .pdk-finds { flex: 1 0 auto; }
+[data-qx-page='print-preview'] .pdk-seg + .pdk-seg { margin-top: 10px; }
+
+[data-qx-page='print-check'] .qxt-body:has(.pdk-finds) { padding-top: 14px; padding-bottom: 10px; }
+[data-qx-page='print-check'] .pdk-decisions-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+[data-qx-page='print-check'] .pdk-decisions-row .qpd-decision-status { margin: 0; padding: 0; background: transparent; }
+[data-qx-page='print-check'] .pdk-finding-guide { font-size: 20px; color: var(--qxt-ink-2); }
+[data-qx-page='print-check'] .pdk-finding-guide summary { min-height: 48px; display: flex; align-items: center; cursor: pointer; }
+[data-qx-page='print-check'] .pdk-finding-guide:not([open]) > :not(summary) { display: none; }

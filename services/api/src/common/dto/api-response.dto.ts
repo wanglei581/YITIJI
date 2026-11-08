@@ -20,13 +20,23 @@ export interface ErrorResponseBody {
   error: {
     code: string
     message: string
-    /** 校验类错误的详细分项,例如 ["items[0].externalId: should not be empty"]。免费打印额度三条码则是有界数字对象。 */
+    /**
+     * 校验类错误的详细分项,例如 ["items[0].externalId: should not be empty"]。
+     * 免费打印额度三条码则是有界数字对象。
+     * 屏上扫描 device-report 的三个 409（已结束 / 已取消 / 投递中）是有界的 taskStatus，
+     * 已结束时再加 fileDelivered；其它对象形态的 details 不透出。
+     */
     details?: string[] | {
       limit: number
       used: number
       remaining: number
       requested: number
       resetAt: string
+    } | {
+      taskStatus: 'completed' | 'cancelled' | 'expired' | 'failed'
+      fileDelivered: boolean
+    } | {
+      taskStatus: 'matched'
     }
     /** 管理员注销阻塞清单，只含订单号与状态。 */
     orders?: Array<{ orderNo: string; status: string }>

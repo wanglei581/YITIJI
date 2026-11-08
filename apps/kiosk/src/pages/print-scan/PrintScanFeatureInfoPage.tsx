@@ -5,19 +5,19 @@
 //   state: feature-id-photo | feature-not-found（稿里有）
 //          feature-copy（2.0 稿里没有：R4，2026-09-29 产品负责人拍板复印走打印机面板；
 //                        11/02 起照补稿 docs/design/kiosk-touch-2026-11-copyscan 的 cs-copy-guide、cs-copy-guide-more）
-// 证件照当前只有说明 + 两条真实替代路径，不做排版 / 换底 / 成品生成。
+// 证件照说明源码留着（停放，见 ID_PHOTO_ENTRY_PARKED）：/print-scan/feature/id-photo 回打印扫描。
 // 复印只有「怎么在打印机面板上复印」的图文说明（两个视图），不经过本机下单，不宣称复印结果。
 // ============================================================
 
 import { Fragment, useId, type ReactNode } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { FilesIcon, PointerIcon, PrinterIcon, ShieldIcon, SlidersHorizontalIcon, Undo2Icon } from 'lucide-react'
 import { QxTouchIcon, type QxTouchIconName } from '../../components/qingxu/touch/QxTouchIcon'
 import { ScanPaperArt } from '../scan/ScanPaperArt'
 import {
   COPY_GUIDE_CASES, COPY_GUIDE_CASES_ROUTE, COPY_GUIDE_CASES_VIEW, COPY_GUIDE_KEY, COPY_GUIDE_LEGAL,
-  COPY_GUIDE_ROUTE, COPY_GUIDE_STEPS, HUB_PILL,
+  COPY_GUIDE_ROUTE, COPY_GUIDE_STEPS, HUB_PILL, ID_PHOTO_ENTRY_PARKED,
   type CopyGuideCase, type CopyGuideStep, type HubFeatureState,
 } from './printHubContent'
 import {
@@ -29,7 +29,6 @@ import {
 import { PhoneHelpLine } from './phoneHelp'
 import { useXiaoqingAvailability } from './useXiaoqingAvailability'
 import { toolBandStatus } from './toolBand'
-import { FsRow } from './FsRow'
 import { DocStackArt, IdCardArt } from './ToolArt'
 import { TouchToolScreen } from './TouchToolScreen'
 import './styles/print-hub-qx.css'
@@ -373,74 +372,9 @@ function CopyGuide({ pill }: { pill: ReturnType<typeof toolBandStatus> }) {
   )
 }
 
-export function PrintScanFeatureInfoPage() {
+/** 停放前的证件照说明。ID_PHOTO_ENTRY_PARKED 为 false 时才会挂上。 */
+function IdPhotoParkedScreen({ pill }: { pill: ReturnType<typeof toolBandStatus> }) {
   const navigate = useNavigate()
-  const { key } = useParams<{ key: string }>()
-  const hubState = featureState(key)
-  const found = hubState !== 'feature-not-found'
-  const pill = toolBandStatus(HUB_PILL[hubState])
-
-  if (!found) {
-    return (
-      <TouchToolScreen
-        eyebrow="打印扫描"
-        title="这个能力名我不认识"
-        sub="地址里的能力名对不上现有说明"
-        status={pill}
-        onBack={() => navigate('/print-scan')}
-        askLabel="问小青：这个功能是什么"
-        primary={{ label: '返回打印扫描', onClick: () => navigate('/print-scan'), testId: 'print-hub-primary' }}
-      >
-        <div
-          className="qx-scroll ph-page sx-page"
-          data-w2-page="print-scan-feature"
-          data-qx-page="print-hub"
-          data-state="feature-not-found"
-          data-testid="print-hub-state-feature-not-found"
-        >
-          <div className="fs-facts">
-            <div className="fs-fact wide" data-testid="print-hub-fallback">
-              <b>没有这项能力说明</b>
-              <span>这个名字不在复印、证件照这些说明里。本页不编一套步骤。多半是旧二维码或旧链接。</span>
-            </div>
-            <div className="fs-pairgrid">
-              <div className="fs-fact">
-                <b>复印</b>
-                <span>复印的说明在「怎么在打印机上复印」。</span>
-              </div>
-              <div className="fs-fact">
-                <b>证件照</b>
-                <span>证件照这一页写的是尚未开放，和两条替代路径。</span>
-              </div>
-              <div className="fs-fact">
-                <b>下一步</b>
-                <span>回到打印扫描，从那里选已经有的功能。</span>
-              </div>
-            </div>
-          </div>
-          <FsRow title="看证件照说明" desc="证件照这一页写的是尚未开放，和两条替代路径" onClick={() => navigate('/print-scan/feature/id-photo')} />
-          <PrintHubRecordNotes
-            links={RECORD_LINKS}
-            onOpen={(linkKey) => {
-              if (linkKey === COPY_GUIDE_KEY) {
-                navigate(COPY_GUIDE_ROUTE)
-                return
-              }
-              const link = RECORD_LINKS.find((item) => item.key === linkKey)
-              if (link) navigate(link.to)
-            }}
-          />
-          <footer className="ph-foot">
-            <PrintHubTruth />
-            <PhoneHelpLine />
-          </footer>
-        </div>
-      </TouchToolScreen>
-    )
-  }
-
-  if (hubState === 'feature-copy') return <CopyGuide pill={pill} />
-
   return (
     <TouchToolScreen
       eyebrow="证件照"
@@ -493,4 +427,73 @@ export function PrintScanFeatureInfoPage() {
       </div>
     </TouchToolScreen>
   )
+}
+
+export function PrintScanFeatureInfoPage() {
+  const navigate = useNavigate()
+  const { key } = useParams<{ key: string }>()
+  if (key === 'id-photo' && ID_PHOTO_ENTRY_PARKED) {
+    return <Navigate to="/print-scan" replace />
+  }
+  const hubState = featureState(key)
+  const found = hubState !== 'feature-not-found'
+  const pill = toolBandStatus(HUB_PILL[hubState])
+
+  if (!found) {
+    return (
+      <TouchToolScreen
+        eyebrow="打印扫描"
+        title="这个能力名我不认识"
+        sub="地址里的能力名对不上现有说明"
+        status={pill}
+        onBack={() => navigate('/print-scan')}
+        askLabel="问小青：这个功能是什么"
+        primary={{ label: '返回打印扫描', onClick: () => navigate('/print-scan'), testId: 'print-hub-primary' }}
+      >
+        <div
+          className="qx-scroll ph-page sx-page"
+          data-w2-page="print-scan-feature"
+          data-qx-page="print-hub"
+          data-state="feature-not-found"
+          data-testid="print-hub-state-feature-not-found"
+        >
+          <div className="fs-facts">
+            <div className="fs-fact wide" data-testid="print-hub-fallback">
+              <b>没有这项能力说明</b>
+              <span>这个名字不在现有的说明里，本页不编一套步骤。多半是旧二维码或旧链接。</span>
+            </div>
+            <div className="fs-pairgrid">
+              <div className="fs-fact">
+                <b>复印</b>
+                <span>复印的说明在「怎么在打印机上复印」。</span>
+              </div>
+              <div className="fs-fact">
+                <b>下一步</b>
+                <span>回到打印扫描，从那里选已经有的功能。</span>
+              </div>
+            </div>
+          </div>
+          <PrintHubRecordNotes
+            links={RECORD_LINKS}
+            onOpen={(linkKey) => {
+              if (linkKey === COPY_GUIDE_KEY) {
+                navigate(COPY_GUIDE_ROUTE)
+                return
+              }
+              const link = RECORD_LINKS.find((item) => item.key === linkKey)
+              if (link) navigate(link.to)
+            }}
+          />
+          <footer className="ph-foot">
+            <PrintHubTruth />
+            <PhoneHelpLine />
+          </footer>
+        </div>
+      </TouchToolScreen>
+    )
+  }
+
+  if (hubState === 'feature-copy') return <CopyGuide pill={pill} />
+
+  return <IdPhotoParkedScreen pill={pill} />
 }

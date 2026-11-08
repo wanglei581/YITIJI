@@ -100,6 +100,12 @@ export function CashierQxView(props: CashierQxViewProps) {
           {copy.chips.map(([tone, text]) => <span key={text} className="cashier-qx-chip" data-tone={tone}>{text}</span>)}
         </div>
       ) : null}
+      {state === 'expired' ? (
+        <dl className="cashier-qx-kv cashier-expired-facts">
+          {copy.rows.map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}
+          <div><dt>金额</dt><dd>沿用本单已建订单，不会重新报价</dd></div>
+        </dl>
+      ) : null}
     </section>
   )
   const pickersEnabled = PICKERS_ENABLED.has(state) && !props.selectionLocked
@@ -125,11 +131,13 @@ export function CashierQxView(props: CashierQxViewProps) {
           <section className="cashier-qx-paywrap">
             <OrderInfo rows={orderRows.core} />
             {stateCardFirst ? stateCard : null}
-            {instrument ? <Instrument {...props} ctx={ctx} /> : <AmountCard {...props} free={free} />}
-            {/* 出码、读付款码时（稿 cashier）：收款码卡后面紧跟次出口，「退出支付」落在码下面、底栏之上；状态说明、金额、侧注再往下排。 */}
-            {stateCardFirst ? null : <>{props.acts}{stateCard}</>}
-            {instrument ? <AmountCard {...props} free={free} /> : null}
-            <SideNote state={state} ctx={ctx} />
+            {state === 'expired' ? null : instrument ? <Instrument {...props} ctx={ctx} /> : <AmountCard {...props} free={free} />}
+            {/* 出码说明已并进码卡，次出口紧跟其后；读付款码仍保留独立状态卡。 */}
+            {stateCardFirst ? null : <>{props.acts}{state === 'pending-qr' ? null : stateCard}</>}
+            {state === 'pending-qr' ? (
+              <details className="cashier-qx-more"><summary>金额与价目明细 ›</summary><AmountCard {...props} free={free} /></details>
+            ) : state !== 'expired' && instrument ? <AmountCard {...props} free={free} /> : null}
+            {state === 'pending-qr' ? <details className="cashier-qx-more"><summary>付款完成后 ›</summary><SideNote state={state} ctx={ctx} /></details> : <SideNote state={state} ctx={ctx} />}
           </section>
         )}
 
@@ -137,7 +145,7 @@ export function CashierQxView(props: CashierQxViewProps) {
 
         {state === 'no-order' ? <Closure state={state} ctx={ctx} /> : (
           <>
-          <OrderMoreInfo rows={orderRows.more} />
+          <OrderMoreInfo rows={orderRows.more}>{state === 'expired' ? <AmountCard {...props} free={free} /> : null}</OrderMoreInfo>
           <details className="cashier-qx-more">
             <summary>{free ? '说明' : '付款说明'} · 接下来怎么办</summary>
             <Closure state={state} ctx={ctx} />
@@ -344,7 +352,7 @@ function OrderInfo({ rows }: { rows: Row[] }) {
 }
 
 /** 首屏没有的订单事实，折叠在页底，不删。 */
-function OrderMoreInfo({ rows }: { rows: Row[] }) {
+function OrderMoreInfo({ rows, children }: { rows: Row[]; children?: ReactNode }) {
   if (rows.length === 0) return null
   return (
     <details className="cashier-qx-more cashier-qx-moreinfo">
@@ -357,6 +365,7 @@ function OrderMoreInfo({ rows }: { rows: Row[] }) {
           </div>
         ))}
       </dl>
+      {children}
     </details>
   )
 }
@@ -365,12 +374,14 @@ function OrderMoreInfo({ rows }: { rows: Row[] }) {
 function Instrument(props: CashierQxViewProps & { ctx: CopyContext }) {
   const { state } = props
   const waiting = state === 'awaiting-code-confirmation' || state === 'pending-verification'
+  const qrCopy = state === 'pending-qr' ? copyFor(state, props.ctx) : null
   return (
     <>
       {waiting ? <ProgressSteps state={state} /> : null}
       <div className={`cashier-qx-instrument${state === 'pending-scan' ? ' cashier-qx-hid' : ''}`} data-live={state === 'pending-qr' || state === 'pending-scan' ? 'true' : undefined}>
         <CashierPaymentPanel
           titleShownByPage
+          qrNotice={qrCopy ? <div className="cashier-qr-notice"><b>{qrCopy.title}</b>{qrCopy.paras.map((para, index) => <p key={index}>{para}</p>)}</div> : undefined}
           terminalTitle={TERMINAL_CARD[state]?.[0]}
           terminalDescription={TERMINAL_CARD[state]?.[1]}
           terminalActionShownByPage={state === 'expired' || state === 'attempt-failed'}

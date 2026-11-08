@@ -124,7 +124,12 @@ export function OrderPaymentActions({ controls }: { controls: OrderDetailControl
               canonical RefundService（POST /admin/orders/:id/refund）。
               待退款信号单走同一入口，文案改成「发起退款」并二次确认；不点确认不会发。
             */}
-            {detail.refundEligible && (
+            {detail.refundEligible && detail.amountCents === 0 && (
+              <p className="mt-6 rounded-[9px] border border-neutral-900/10 bg-neutral-50 px-4 py-3.5 text-[13px] text-neutral-600">
+                0 元订单无需退款
+              </p>
+            )}
+            {detail.refundEligible && detail.amountCents !== 0 && (
               <div className="mt-6 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-3.5">
                 {!refundOpen ? (
                   <div className="flex items-center justify-between">
