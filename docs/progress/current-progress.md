@@ -57,6 +57,73 @@
 - 验证：API typecheck、改过的 8 个 TS 文件 lint、新门禁 79/79 与 55/55、图谱关联的全部可离线门禁（含 verify:resume-optimize 内 #1574 的 6 类样本及两个展开的前置/后置脚本）、根目录仓库完整性/合规文案/日期时间/原始错误上屏检查均通过。verify:resume-report-export 首轮 SQLite P1008 超时，串行重跑通过；verify:ocr-baidu-live 已执行但因无 BAIDU_OCR_API_KEY / BAIDU_OCR_SECRET_KEY 退出 1，未验证真实 OCR。反向检查清空表为 40 PASS/39 FAIL、去掉事实比对前折叠为 75 PASS/4 FAIL，均退出 1；从 /tmp/c3-radical-mut/ 副本恢复后逐字节一致，两条新门禁恢复通过，反向检查前后 git diff --stat 完全一致。
 - 没做：未合并、未部署；未改 apps/**、ci.yml、图谱、生产配置、数据库结构，未新增依赖；未用 F-24 原件与苹果全部字体在真机、真实模型上复测。
 
+## 2026-11-08：终端程序屏上扫描第二批（A2，PR #1584）并 main、版本升 0.4.20
+
+- 做了：分支 `claude/scan-device-a2-1102`（合并前头 `7324d0048`）并入 main `42e945e76`，只做并 main、解冲突、升版本号，不改功能、不加功能。代码冲突两处，都按语义两边保留：① `apps/terminal-agent/src/agent/heartbeat.ts` 的 `HeartbeatOptions` 同时留 A2 的 `getScanDeviceHealth` 与 #1579 的四个探针注入（打印机状态、磁盘、网络、打印队列）和时钟注入；`sendHeartbeat` 里扫描仪两个字段与打印队列字段、400 去掉队列字段重发由 git 自动合好，两边行为都不变。② `.github/workflows/windows-agent-installer.yml` 里 main 这边只有同样的 0.4.19 版本号改动，合完保留 A2 加的纠偏 Windows 门禁步骤（在 EXE 安装测试之前）。图谱取 main 后重新生成，进度文档两侧保留。升完版本、推送前 main 又进了 #1501（`1d0c0082b`，只改两个后台与后端，不碰终端程序），再并一次，冲突只在图谱。
+- 升 0.4.20 的原因：#1579 已用 0.4.19 进 main，A2 也写的 0.4.19，两边改的是同一批版本文件、改法一样，git 不报冲突，但不能同号进 main。照 0.4.19 那次（`41d14d319`）的 12 个文件 20 处改齐；升级测试的旧版本 0.4.10 与历史记录不改，`verify-scan-deskew.ts` 里解析配置用的样例版本号不是当前版本断言，也不改。
+- **代码进 main、未打包、未装机。** 后端第二批 #1559 已在 main、还没上线：给任何终端装这一版之前，必须先发布后端，并由产品负责人当场确认。屏上扫描能力 `scan_device` 仍默认拒绝，逐台开通。
+- 验证（本机 macOS）：终端程序 tsc、eslint（0 错误；3 条警告 main 上同样有）、`package.json` 里全部 37 条 verify（两条 Windows 专用的在非 Windows 上自动跳过）、安装包输入、仓库完整性、图谱 `--check`，以及图谱按改动文件列出的其余 36 条门禁（根目录 3、一体机 18、管理后台 1、UI 1、后端 13）通过。`verify:task-reliability` 在本机高负载（load 30–45）下前两次偶发红（子进程超时、250 毫秒重读窗口），失败子项（实例锁、死信命令行）的代码本次没动，干净 main 同命令通过，合并结果第三次重跑通过。Windows 专用的 .ps1 门禁（纠偏合成样本、安装包生命周期）交 CI。
+
+## 2026-11-04：终端程序 A2 第六轮——收掉第四轮复审的 2 条 P1（分支 `claude/scan-device-a2-1102`，随 0.4.19，未部署）
+
+- ① 后台重投复用过期签名租约（默认 60 秒）：断网一分钟以上恢复、探查确认仍可投递后，带旧签名重投被拒，会删掉本可交付的页。改为探查确认后复用现有取租约路径重取签名，PDF 字节、快照时间、`deviceRound` 不变；`SCAN_LEASE_EXPIRED` 归为不确定、回探查核对；重取失败保持不确定。
+- ② 缺硬截止时清理上限随回报续期（`Math.max`）：改为只认首次投递前租约的截止，普通回报、探查、重取租约都不延长；有 `hardExpiresAt` 时照旧以它为准；到期仍不确定按 `SCAN_DEVICE_FAILED` 删页、本机回 `LOCAL_SCAN_DELIVERY_UNCONFIRMED`。
+- 门禁：新增 `verify-scan-device-runner-r6.ts`（6 组：过期签名同 PDF 重投、过期重投回探查、重取失败保持不确定、持续续期截止不变、100 次续期截止不动、硬截止回归），接进 `verify:scan-device-runner`（21 组）。`verify:scan-device-engine`、`verify:scan-watcher`、`verify:scan-deletion-audit`、`verify:usb-import-agent`、`verify:boot-spool-guard`、tsc、lint、repository-integrity 通过（Codex 实现，Claude 收货）。
+
+## 2026-11-04：终端程序 A2 第五轮——U 盘中文卷标乱码（分支 `claude/scan-device-a2-1102`，随 0.4.19，未部署）
+
+- 现象：11/04 真机「打印 → U 盘导入」选中文件后，文件卡第二行卷标显示乱码。原因：`usb-files.ts` 的 `runPowerShellJson` 没设输出编码，现场 PowerShell 按系统代码页输出，Node 按 UTF-8 解码。
+- 改法（Codex 实现，Claude 收货）：共用入口在查询前设 `[Console]::OutputEncoding` 为无 BOM UTF-8，卷标与隐藏文件名两处查询一起生效；其余 U 盘行为不变。`verify:usb-import-agent` 加中文卷标「工作资料」「新加卷」、中文隐藏文件名（单值 / 数组）与编码顺序断言；去掉编码那一行门禁变红，恢复后绿。`verify:local-qr-proxy`、repository-integrity 通过。
+- 旁查同类缺口（本轮不改）：`printer/printer-status.ts`（打印机名可能含中文）、`agent/scan-device/scan-device-health.ts`（命令行可能含中文路径）也没设输出编码；WIA 探测与扫描脚本协议只有 ASCII。
+- 真机未核：装 0.4.19 时按 `~/.cache/claude-lanes/copyscan-1102/acceptance.md` 末尾四处一致（CIM 原值、stdout 字节、`/local/usb/status`、一体机显示）核一次。
+
+## 2026-11-05：扫描件自动矫正 S4a 第三轮——Windows 门禁对 8 位 BMP 的标记判据（分支 `claude/scan-deskew-1104`，未接线、未部署）
+
+- Windows CI 第二次实跑（run 41965545914）：估角已对（文字页 ±4° 内与输入一致，最差 ±0.1°），风险集（空白、照片、表格、证件、发票）误纠偏 0；只剩 16 个 `bmp8` 文字页报 `lost original corner/edge marker`，同角度 png / jpeg / bmp24 全过。
+- 原因（Codex 查，Claude 收货）：门禁生成 8 位 BMP 时先转灰度，洋红标记变成 (105,105,105)，判据仍要求 R、B > 150，八处标记必然判丢；实现（24 位扩展画布、先填背景再绘制、最终输出 JPEG）无需改。改为按编码后的预期颜色检查（8 位 BMP 三通道 105±20、输入解码处精确 105；其他格式仍判洋红），加像素与调色板诊断和逐个擦除八处标记的反向检查；位置、搜索范围、画布、补边、残余角与 §4 阈值均未放宽。Windows 结果以下一次 CI 为准。
+
+## 2026-11-05：扫描件自动矫正 S4a 第二轮——Windows 合成样本「应纠偏的文字页退回原图」（分支 `claude/scan-deskew-1104`，未接线、未部署）
+
+- Windows CI 第一次实跑（run 41842478826）：C# 在 Windows PowerShell 5.1 下编译通过，±5° 边界样本按规则不纠偏；-4° 文字页退回原图，门禁首个失败即停。
+- 原因（Codex 查，Claude 收货）：合成样本原页设为 300 DPI、新位图未设 DPI 却用 `DrawImageUnscaled` 按物理尺寸绘制，文字缩到约 96/300（约 4 像素），前景比例 0.43% 低于 0.5% 门槛被判拿不准。改样本画法（统一 DPI、按像素源矩形绘制），并修正残余角检查把早退默认 0 当成转正证据的问题；**规格书 §4 阈值一个未动**。
+- 门禁：Windows 门禁改为逐样本打印拒绝原因与数值、全部跑完再汇总判定；加 2 倍分辨率文字页覆盖缩到长边 1,200 的路径。本机 `verify:scan-deskew` 加只在门禁里运行的 TypeScript 数值镜像（常量与 C# 同源），69 个样本：文字 8 应纠 8 实纠、空白 / 密集底纹 / 表格误纠偏 0。Windows 结果以下一次 CI 为准。
+
+## 2026-11-04：扫描件自动矫正 S4a——纠偏处理器、开关与 Windows 门禁（分支 `claude/scan-deskew-1104`，自 A2 第四轮开出，未接线、未部署）
+
+- 依据：产品负责人 11/04「扫描件预览是歪的，要自动矫正」；排期 `schedule-1104.md` S4 第一步只做 ±5° 小角度纠偏、零新依赖、拿不准一律用原图；规格书 `codex/deskew-spec-out.md` 方案 c（独立受监管 PowerShell 子进程内嵌 C#）。
+- 做了什么（Codex 实现，Claude 收货）：`apps/terminal-agent/src/agent/scan-deskew/` 下纯灰度估角（只吃字节缓冲）、System.Drawing 解码缩图旋转编码、子进程脚本生成、受监管执行器（2,000 ms 硬超时杀整棵进程树、任何异常回原图、输出校验后才采用、日志只记角度与是否纠偏）；本机开关 `scanAutoDeskewEnabled` 缺省 false、只认字面量 true、心跳不能覆盖。阈值集中一处，门禁直接引用。
+- 本批**没接进扫描流程**：WIA 接线是 S4b，面板图片与投递重试记录是 S4c，复印跟 S5。
+- 门禁：新增 `verify:scan-deskew`（10 组，假子进程，不起 PowerShell）接进 ci.yml；新增 Windows 门禁 `verify-scan-deskew-windows.ps1`（Windows PowerShell 5.1，固定种子合成样本：文字页 −5°…+5°、±0.2°、超范围、空白、照片噪声、带框表格、证件底纹、发票样，JPEG/PNG/8 位与 24 位 BMP），接进 `windows-agent-installer.yml` 的 unsigned-msi-candidate 作业。**C# 未在本机编译**（本机无 PowerShell/.NET），以 Windows CI 结果为准；真机耗时、内存、GDI 资源未测。反向检查三项（异常不回原图、开关关仍起进程、日志带路径）都变红。
+
+## 2026-11-04：屏上扫描 ③ 终端程序第二批 A2 第四轮——收掉复审高优先级问题（分支 `claude/scan-device-a2-1102`，随后并入 main 的提交，未部署）
+
+- 做了：开始在取租约这个第一个异步等待之前就占下这一场的场次号和取消标记；租约回来、建目录前、开扫前都再查。待翻页回报回来后先查取消，取消了不起 10 分钟空闲计时。下一页的租约改到串行队列外面取，回来之后若已经过了绝对截止或已经取消，就不再扫。上传异常不再用租约还在不在推断：用一次 device-report（投递中）按 409 的 `taskStatus` / `fileDelivered` 判定。`completed` 或 `fileDelivered` 为真算已投递并删页；`cancelled` / `expired` / `failed` 且没投出算未投递并删页；仍是 `waiting` 就用同一份 PDF 再投一次，`SCAN_FILE_ALREADY_DELIVERED` 也算已投递；`matched` 且未交出、旧后端没有 `taskStatus`、断网都保持不确定。不确定时每 30 秒再探，到 `hardExpiresAt`（没有就用投递前租约的 `expiresAt`）仍不确定，就按 `SCAN_DEVICE_FAILED` 删页，本机接口仍回「投递结果不确定」。`scanning` 回报被收下时记下 `deviceRound`，投递的 multipart 带上它；没记下就不传这个字段。换了轮次就作废这一场的页和 PDF，不合成到一起。第三轮里用租约推断结果的两则夹具改成看 409 补充，结果断言仍是未投递 / 已投递。
+- 门禁：`verify:scan-device-runner` 20 组。第四轮用例：`verifyAbortDuringLeaseDoesNotStartScan`、`verifyAbortDuringProbeBeforeDirDoesNotScan`、`verifyAbortAfterPageReadyReportDoesNotArmIdle`、`verifyNextPageLeaseDoesNotBlockIdleCleanup`、`verifyNextPageRechecksDeadlineAfterLease`、`verifyDeliveryProbeMatrix`、`verifyDeliveryIgnoresLeasePresence`、`verifyDeliveryProbeEndedNotDelivered`、`verifyDeliveryProbeWaitingRetriesOnce`、`verifyDeliveryProbeMatchedStaysUncertain`、`verifyDeliveryRecheckUntilHardExpiry`、`verifyDeliveryCarriesDeviceRound`。第三轮 `verifyUncertainUploadDoesNotClaimAbort` 的夹具改了，断言没放宽。
+- 开关：`scanDeviceEnabled` 仍默认关，关着时这些新逻辑不会跑。`scanDeviceReportSettings` 仍默认关。并入 main 之后版本单独从 0.4.18 升到 0.4.19。#1540/#1559 上生产后才合；真机发包先问产品负责人。
+- 没做：没碰真机，没打安装包，没部署。#1465 去留定下来之前，不往真机发新的终端程序安装包。scan-watcher 未改。Windows 进程身份仍未在真机核对。上传以外的丢失响应不是条条都再向后端确认。
+
+## 2026-11-03：屏上扫描 ③ 终端程序第二批 A2 第三轮——收掉复审剩下的问题（分支 `claude/scan-device-a2-1102`，未合并、未部署）
+
+- 做了：Codex 对第二轮的 7 条「部分」和新问题 1–9 都在源码里属实，收成同一套调度，不再逐条打补丁。本机开始、下一页、完成进同一条串行队列；中止不进队列，只置本场取消标记并立即受理，正在跑的步骤在每个异步边界再看这个标记。每一场有场次号。清理重试、空闲计时、回报补发都绑在场次上，场次变了就作废；新一场开始前先撤销旧场次的清理重试和计时。进程是否确认退出只走健康管理器：扫描和探测都把未确认退出和进程号（可以没有）交进去。没有进程号又未确认退出时不删目录、不宣称清理完成，要等下一次探测成功，并且没有本程序拉起的残留 PowerShell/WIA 进程，才解除。投递结果分三态：已确认收下、确认没收下、不确定（上传异常或响应丢失）。不确定时不说已中止，也不说已投递，按租约或回报的 409 原因再定；会话已经投递之后，中止接口返回已投递。回报补发只在确知后端状态时补；补到最后目标仍被拒（转移不合法）就判错删页，不再投递。下一页在已经等锁或正在扫描时直接返回当前状态，不再排第二个。空闲截止从进入待翻页起算，不跟着租约悬挂或等锁失败顺延。换参数时删不掉旧目录，就在响应里给出未删干净并排队重试，不再另有一处把删除失败丢掉。
+- 门禁：`verify:scan-device-runner` 19 组，其中第三轮 12 个用例覆盖上面这些路径。引擎仍是 53 组。卡纸那条断言保持第二轮的写法。
+- 开关：`scanDeviceEnabled` 仍默认关，关着时这些新逻辑不会跑。`scanDeviceReportSettings` 仍默认关。B4 上生产前不得打开该字段开关。版本仍是 0.4.14。
+- 没做：没碰真机，没打安装包，没部署。#1465 去留定下来之前，不往真机发新的终端程序安装包。scan-watcher 未改。
+
+## 2026-11-03：屏上扫描 ③ 终端程序第二批 A2 第二轮——复审返工（分支 `claude/scan-device-a2-1102`，未合并、未部署）
+
+- 做了：按 Codex 复审把 12 条都修了。玻璃台按页序累计，合成前页列表对不上回报页数就判错删页（`SCAN_DEVICE_FAILED`），不合成残缺 PDF。强杀没确认进程退出时返回未确认停止，扫描仪健康态记 `error`，不宣称清理完成，15 秒后重试；下次开始前必须探测成功且确认旧进程不在。扫描和探测在可疑解除前回 busy/error，设备锁照放（打印不经 WIA）。投递的每个异步边界之后再查中止标记和本场代次；中止已受理就不再上传；上传已被后端收下时，中止接口返回 `delivering`（已投递）。WIA 必需属性（3088、6146、4103、6147、6148、6151、6152）设失败或缺失报 `not_ready`；3096、6149、6150 失败只记日志。卡纸不再由运行器逐页删除，页文件留给调用方按 `SCAN_DEVICE_FAILED` 整目录清理。再扫一页等锁超时保留已扫页和 `page_ready`，本机回 409 `LOCAL_SCAN_BUSY`。等锁时中止先置标记立即受理，拿到锁之后、开扫之前再查一次。玻璃台进入 `page_ready` 后 10 分钟空闲计时，每 1 分钟向后端对一次租约，到点或会话没了就删页。回报重试耗尽后，下一拍先按转移表补中间状态，补不上（409 转移不合法）就删页，不投递。清理失败时响应 `purged: false` 并重试，成功是 `purged: true`。租约里的 `maxPages` / `maxBytes` 与本机 `scanDeviceMaxPages` 取更严者，没有就用原来的默认。`source` 和 `colorMode` 只在 `scanDeviceReportSettings` 为 true 时放进 device-report；`SCAN_DEVICE_SETTINGS_CHANGED` 停扫并删页，原因 `SCAN_DEVICE_SESSION_CLEARED`。
+- 门禁：`verify:scan-device-engine` 53 组。卡纸那一处断言改了，删页的责任从运行器移到调用方。旧断言是步骤「扫描：中途卡纸 → 已扫页全部删除并清空，错误码 paper_jam」，`discardedPages === 2`、`pages === []`（「一期不做只交已扫部分」）、磁盘空（「卡纸后磁盘上不能留任何扫描页」）。新断言是「扫描：中途卡纸 → 页文件留给调用方整目录清理，错误码 paper_jam」，`discardedPages === 0`、页序 `[1, 2]`、磁盘仍有 `page-001.jpg` 和 `page-002.jpg`。其余断言没动。`verify:scan-device-runner` 18 组。
+- 开关：`scanDeviceEnabled` 仍默认关，B1 上生产前不得打开。`scanDeviceReportSettings` 默认关。B4 上生产前不得开开关。版本仍是 0.4.14。
+- 没做：没碰真机，没打安装包，没部署。#1465 去留定下来之前，不往真机发新的终端程序安装包。
+
+## 2026-11-02：屏上扫描 ③ 终端程序第二批 A2——接线（分支 `claude/scan-device-a2-1102`，未合并、未部署）
+
+- 做了：在 A1 底座上接配置开关（默认关）、current-lease 核对、调度、本机 HTTP、健康探测、心跳两个字段、删除审计原因码。开关不是 true 时不注册扫描路由、不探测、不清理残留、心跳不带新字段，删除审计仍只上报原来的原因码白名单之外会进死信。
+- 本机接口：`GET /local/scan/probe`，`POST /local/scan/start`、`/next-page`、`/finish`、`/abort`。不加 `GET /local/scan/status`：一体机每 3 秒看云端会话，每条本机命令的响应已经带 state、pageCount、errorCode。
+- 新门禁 `verify:scan-device-runner`（17 组，假执行器、假后端、假时钟），已进 ci.yml。
+- 打印领取：开关打开时，领任务前试拿设备锁（`print-claim`），拿不到就跳过这一轮（日志每分钟最多一条）；拿到后一直持有到本轮 `executeTask` 结束再放，放锁之后才探测扫描仪。没领到任务立即放锁、不探测。开关关着时领取路径不碰这把锁。没改续打、重打判定，也没改 `print-job-monitor.ts`。
+- 没做：没碰真机，没打安装包，没部署。B1 上生产前不得打开 `scanDeviceEnabled`。#1465 去留定下来之前，不往真机发新的终端程序安装包。
+
 ## 2026-11-05：终端程序打印队列诊断与显式 A4 合入 main（#1579，分支 `claude/printer-queue-agent-1104`；代码进 main，未打包发布、未装机）
 
 - 做了：心跳增加 5 个只读字段（队列名、端口种类、USB 端口名、Win32_Printer 原值、打印服务状态）。端口地址不上传；队列名像地址就不带。原值与状态共用一次查询，对不上契约就不带。非 Windows 报 unknown。

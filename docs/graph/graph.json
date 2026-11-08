@@ -20115,6 +20115,7 @@
     ],
     ".github/workflows/windows-agent-installer.yml": [
       "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
+      "apps/terminal-agent/scripts/verify-scan-deskew.ts",
       "scripts/verify-ci-gate-coverage.mjs"
     ],
     "apps/admin/index.html": [
@@ -24268,8 +24269,31 @@
     "apps/terminal-agent/scripts/scan-lease-barrier.helper.ts": [
       "apps/terminal-agent/scripts/verify-scan-watcher.ts"
     ],
-    "apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts": [
+    "apps/terminal-agent/scripts/verify-scan-device-engine-r2.helper.ts": [
       "apps/terminal-agent/scripts/verify-scan-device-engine.ts"
+    ],
+    "apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts": [
+      "apps/terminal-agent/scripts/verify-scan-device-engine-r2.helper.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-engine.ts"
+    ],
+    "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts": [
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts"
+    ],
+    "apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts": [
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts"
+    ],
+    "apps/terminal-agent/scripts/verify-scan-device-runner-r4.ts": [
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts"
+    ],
+    "apps/terminal-agent/scripts/verify-scan-device-runner-r6.ts": [
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts"
+    ],
+    "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts": [
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r4.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r6.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts"
     ],
     "apps/terminal-agent/scripts/verify-windows-service-recovery.mjs": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs"
@@ -24284,6 +24308,7 @@
       "apps/terminal-agent/scripts/verify-printer-queue-diagnostics.ts",
       "apps/terminal-agent/scripts/verify-scan-deletion-audit.ts",
       "apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts",
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
     "apps/terminal-agent/src/agent/boot-print-queue-order.ts": [
@@ -24296,20 +24321,29 @@
       "apps/terminal-agent/scripts/verify-agent-config-resilience.mjs",
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
-      "apps/terminal-agent/scripts/verify-printer-config.mjs"
+      "apps/terminal-agent/scripts/verify-printer-config.mjs",
+      "apps/terminal-agent/scripts/verify-scan-deskew.ts"
     ],
     "apps/terminal-agent/src/agent/db.ts": [
       "apps/terminal-agent/scripts/verify-print-retry-attempt.ts",
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-scan-deletion-audit.ts",
       "apps/terminal-agent/scripts/verify-scan-device-engine.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r4.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r6.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts",
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
     "apps/terminal-agent/src/agent/dead-letter-operator.ts": [
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
     "apps/terminal-agent/src/agent/device-lock.ts": [
-      "apps/terminal-agent/scripts/verify-scan-device-engine.ts"
+      "apps/terminal-agent/scripts/verify-scan-device-engine.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts"
     ],
     "apps/terminal-agent/src/agent/heartbeat.ts": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
@@ -24317,6 +24351,7 @@
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-printer-queue-diagnostics.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts",
       "apps/terminal-agent/scripts/verify-scan-input-lockout-telemetry.ts"
     ],
     "apps/terminal-agent/src/agent/instance-lock.ts": [
@@ -24340,7 +24375,8 @@
     ],
     "apps/terminal-agent/src/agent/print-dispatch-gate.ts": [
       "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
-      "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
+      "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts"
     ],
     "apps/terminal-agent/src/agent/print-job-monitor.ts": [
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
@@ -24372,27 +24408,90 @@
       "apps/terminal-agent/scripts/verify-scan-watcher.ts"
     ],
     "apps/terminal-agent/src/agent/scan-deletion-audit-reporter.ts": [
-      "apps/terminal-agent/scripts/verify-scan-deletion-audit.ts"
+      "apps/terminal-agent/scripts/verify-scan-deletion-audit.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts"
     ],
     "apps/terminal-agent/src/agent/scan-delivery.ts": [
-      "apps/terminal-agent/scripts/verify-scan-device-engine.ts"
+      "apps/terminal-agent/scripts/verify-scan-device-engine.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r4.ts"
+    ],
+    "apps/terminal-agent/src/agent/scan-deskew/runner.ts": [
+      "apps/terminal-agent/scripts/verify-scan-deskew.ts"
+    ],
+    "apps/terminal-agent/src/agent/scan-deskew/script.ts": [
+      "apps/terminal-agent/scripts/verify-scan-deskew.ts"
+    ],
+    "apps/terminal-agent/src/agent/scan-deskew/thresholds-source.ts": [
+      "apps/terminal-agent/scripts/verify-scan-deskew.ts"
+    ],
+    "apps/terminal-agent/src/agent/scan-device/scan-device-backend.ts": [
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r4.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r6.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts"
+    ],
+    "apps/terminal-agent/src/agent/scan-device/scan-device-deliver.ts": [
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r4.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r6.ts"
+    ],
+    "apps/terminal-agent/src/agent/scan-device/scan-device-health.ts": [
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts"
+    ],
+    "apps/terminal-agent/src/agent/scan-device/scan-device-housekeeping.ts": [
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r4.ts"
+    ],
+    "apps/terminal-agent/src/agent/scan-device/scan-device-round.ts": [
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r6.ts"
+    ],
+    "apps/terminal-agent/src/agent/scan-device/scan-device-runner.ts": [
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r4.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r6.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts"
+    ],
+    "apps/terminal-agent/src/agent/scan-device/scan-device-sync.ts": [
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts"
+    ],
+    "apps/terminal-agent/src/agent/scan-device/scan-device-types.ts": [
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r4.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r6.ts"
     ],
     "apps/terminal-agent/src/agent/scan-device/scan-pdf-compose.ts": [
-      "apps/terminal-agent/scripts/verify-scan-device-engine.ts"
+      "apps/terminal-agent/scripts/verify-scan-device-engine.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts"
     ],
     "apps/terminal-agent/src/agent/scan-device/scan-temp-dir.ts": [
       "apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts",
-      "apps/terminal-agent/scripts/verify-scan-device-engine.ts"
+      "apps/terminal-agent/scripts/verify-scan-device-engine.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts"
     ],
     "apps/terminal-agent/src/agent/scan-device/wia-probe.ts": [
-      "apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts"
+      "apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts"
     ],
     "apps/terminal-agent/src/agent/scan-device/wia-runner.ts": [
-      "apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts"
+      "apps/terminal-agent/scripts/verify-scan-device-engine-r2.helper.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts"
     ],
     "apps/terminal-agent/src/agent/scan-device/wia-script.ts": [
+      "apps/terminal-agent/scripts/verify-scan-device-engine-r2.helper.ts",
       "apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts",
-      "apps/terminal-agent/scripts/verify-scan-device-engine.ts"
+      "apps/terminal-agent/scripts/verify-scan-device-engine.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts"
     ],
     "apps/terminal-agent/src/agent/scan-input/verified-folder.ts": [
       "apps/terminal-agent/scripts/verify-scan-input-health.ts"
@@ -24422,6 +24521,7 @@
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-print-truth-hardening.ts",
       "apps/terminal-agent/scripts/verify-printer-config.mjs",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
     "apps/terminal-agent/src/agent/types.ts": [
@@ -24431,6 +24531,7 @@
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-printer-queue-diagnostics.ts",
       "apps/terminal-agent/scripts/verify-scan-deletion-audit.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
       "apps/terminal-agent/scripts/verify-scan-input-health.ts",
       "apps/terminal-agent/scripts/verify-scan-input-lockout-telemetry.ts",
       "apps/terminal-agent/scripts/verify-scan-watcher.ts",
@@ -24459,6 +24560,8 @@
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-printer-config.mjs",
+      "apps/terminal-agent/scripts/verify-scan-deskew.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts",
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
     "apps/terminal-agent/src/local-api/origin-guard.ts": [
@@ -24467,6 +24570,8 @@
     "apps/terminal-agent/src/local-api/qr-login-server.ts": [
       "apps/terminal-agent/scripts/verify-local-print-wake.ts",
       "apps/terminal-agent/scripts/verify-local-qr-proxy.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts",
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts",
       "apps/terminal-agent/scripts/verify-usb-import-agent.ts"
     ],
     "apps/terminal-agent/src/printer/image-to-pdf.ts": [
@@ -36179,6 +36284,47 @@
         "absent": [],
         "dirs": [],
         "files": [
+          ".github/workflows/windows-agent-installer.yml",
+          "apps/terminal-agent/src/agent/config-manager.ts",
+          "apps/terminal-agent/src/agent/scan-deskew/runner.ts",
+          "apps/terminal-agent/src/agent/scan-deskew/script.ts",
+          "apps/terminal-agent/src/agent/scan-deskew/thresholds-source.ts",
+          "apps/terminal-agent/src/index.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-scan-deskew.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:scan-deskew"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts",
+          "apps/terminal-agent/src/agent/scan-device/wia-runner.ts",
+          "apps/terminal-agent/src/agent/scan-device/wia-script.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-scan-device-engine-r2.helper.ts",
+      "helper": true,
+      "inCi": false,
+      "package": "apps/terminal-agent",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/terminal-agent/src/agent/auth-state.ts",
           "apps/terminal-agent/src/agent/scan-device/scan-temp-dir.ts",
           "apps/terminal-agent/src/agent/scan-device/wia-probe.ts",
@@ -36199,6 +36345,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/terminal-agent/scripts/verify-scan-device-engine-r2.helper.ts",
           "apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts",
           "apps/terminal-agent/src/agent/db.ts",
           "apps/terminal-agent/src/agent/device-lock.ts",
@@ -36217,6 +36364,159 @@
       "package": "terminal-agent",
       "scriptNames": [
         "terminal-agent::verify:scan-device-engine"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
+          "apps/terminal-agent/src/agent/db.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-backend.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-housekeeping.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-runner.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-sync.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-types.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-pdf-compose.ts",
+          "apps/terminal-agent/src/agent/scan-device/wia-runner.ts",
+          "apps/terminal-agent/src/local-api/qr-login-server.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts",
+      "helper": true,
+      "inCi": false,
+      "package": "apps/terminal-agent",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
+          "apps/terminal-agent/src/agent/db.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-backend.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-health.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-housekeeping.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-runner.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-types.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-temp-dir.ts",
+          "apps/terminal-agent/src/agent/scan-device/wia-script.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts",
+      "helper": true,
+      "inCi": false,
+      "package": "apps/terminal-agent",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
+          "apps/terminal-agent/src/agent/db.ts",
+          "apps/terminal-agent/src/agent/scan-delivery.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-backend.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-deliver.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-housekeeping.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-runner.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-types.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-scan-device-runner-r4.ts",
+      "helper": true,
+      "inCi": false,
+      "package": "apps/terminal-agent",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
+          "apps/terminal-agent/src/agent/db.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-backend.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-deliver.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-round.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-runner.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-types.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-scan-device-runner-r6.ts",
+      "helper": true,
+      "inCi": false,
+      "package": "apps/terminal-agent",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/terminal-agent/src/agent/db.ts",
+          "apps/terminal-agent/src/agent/device-lock.ts",
+          "apps/terminal-agent/src/agent/print-dispatch-gate.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-backend.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-runner.ts",
+          "apps/terminal-agent/src/agent/scan-device/wia-probe.ts",
+          "apps/terminal-agent/src/agent/scan-device/wia-runner.ts",
+          "apps/terminal-agent/src/agent/scan-device/wia-script.ts",
+          "apps/terminal-agent/src/agent/task-runner.ts",
+          "apps/terminal-agent/src/agent/types.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
+      "helper": true,
+      "inCi": false,
+      "package": "apps/terminal-agent",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts",
+          "apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts",
+          "apps/terminal-agent/scripts/verify-scan-device-runner-r4.ts",
+          "apps/terminal-agent/scripts/verify-scan-device-runner-r6.ts",
+          "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
+          "apps/terminal-agent/src/agent/auth-state.ts",
+          "apps/terminal-agent/src/agent/db.ts",
+          "apps/terminal-agent/src/agent/device-lock.ts",
+          "apps/terminal-agent/src/agent/heartbeat.ts",
+          "apps/terminal-agent/src/agent/scan-deletion-audit-reporter.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-backend.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-health.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-runner.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-pdf-compose.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-temp-dir.ts",
+          "apps/terminal-agent/src/index.ts",
+          "apps/terminal-agent/src/local-api/qr-login-server.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-scan-device-runner.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:scan-device-runner"
       ],
       "wired": true
     },
