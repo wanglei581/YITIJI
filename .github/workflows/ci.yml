@@ -435,6 +435,7 @@ jobs:
           # Generates PNG fixtures in a temp dir and measures the produced PDF; no printer, no spooler.
           pnpm run verify:image-scale-truth
           pnpm run verify:network-diagnostics
+          pnpm run verify:printer-queue-diagnostics
           pnpm run verify:local-qr-proxy
           pnpm run verify:usb-import-agent
           # ── 2026-08-16 门禁全量体检补回。三条都只做静态读取 / 注入桩：
