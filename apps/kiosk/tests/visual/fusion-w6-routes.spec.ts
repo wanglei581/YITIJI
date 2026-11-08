@@ -285,11 +285,19 @@ test('/resume/optimize/compare mobile breakpoint @w6-mobile', async ({ page, api
 })
 
 test('/resume/career-plan mobile breakpoint @w6-mobile', async ({ page, api }) => {
+  // 2026-11-08 四核心收口：职业规划停放，旧链在手机宽度下同样回首页、不出报错页。
+  // 回到的是首页：页眉装饰光晕（.qxt-halo）在手机宽度本来就越出框，是共享件的既有样子（official-channels.spec.ts 同类注释），
+  // 所以这里不逐个量元素，只量回首页、没有横向滚动、没有脚本错误；首页手机版的版面由 qingxu-home.spec.ts 的 390×844 用例守。
   const route = w6KioskCases.find(({ pattern }) => pattern === '/resume/career-plan/*')
-  if (!route) throw new Error('W6 career-plan route case is missing')
+  if (!route?.expectedPath) throw new Error('W6 career-plan route case is missing')
   const errors = collectRuntimeErrors(page)
   registerW6Api(api)
-  await acceptRoute(page, route, errors)
+  await page.goto(route.url, { waitUntil: 'domcontentloaded' })
+  await expect(page).toHaveURL((url) => url.pathname === route.expectedPath)
+  await expect(page.locator(route.marker).first()).toBeVisible()
+  await expect(page.locator('[data-kiosk-screen="route-error"]')).toHaveCount(0)
+  await assertNoHorizontalOverflow(page)
+  expect(errors, '旧链回首页不得产生脚本错误或关键资源失败').toEqual([])
 })
 
 test('/campus/freshman-insights mobile breakpoint @w6-mobile', async ({ page, api }) => {

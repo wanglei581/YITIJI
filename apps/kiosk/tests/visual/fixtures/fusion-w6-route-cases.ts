@@ -102,7 +102,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/me/documents', url: '/me/documents', marker: member, featureText: '登录后看你的文档' },
   { pattern: '/me/favorites', url: '/me/favorites', marker: member, featureText: '登录后看你的收藏' },
   { pattern: '/me/ai-records', url: '/me/ai-records', marker: member, featureText: 'AI 服务记录' },
-  { pattern: '/me/benefits', url: '/me/benefits', marker: member, featureText: '我的权益' },
+  { pattern: '/me/benefits', url: '/me/benefits', marker: member, featureText: '我的 · 权益' },  // 11/08 四核心收口删了「我的权益 / 可参加的活动」切换条（活动停放），改认眉题
   { pattern: '/me/activity', url: '/me/activity', marker: member, featureText: '浏览与跳转记录' },
   { pattern: '/me/activity/:id', url: '/me/activity/w6-record', marker: screen('activity-detail'), featureText: '登录后看你的这条记录' },
   // 证据锚点随稿换字，判据不变：未登录意图带标题仍逐页点名这一页。
