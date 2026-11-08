@@ -11,6 +11,7 @@
 
 import { formatDateTime } from '@ai-job-print/shared'
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Button, Card, ConsoleTable, EmptyState, ErrorState, LoadingState, StatusBadge, type ConsoleColumn } from '@ai-job-print/ui'
 import { DownloadIcon, MonitorIcon, RefreshCwIcon, SearchIcon } from 'lucide-react'
 import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
@@ -83,7 +84,20 @@ function PeriodSelector({ value, onChange }: { value: TerminalOpsPeriod; onChang
   )
 }
 
+const PAGE_TABS = [
+  { key: 'ops', label: '终端运营' },
+  { key: 'delivery', label: '项目与服务' },
+] as const
+
 export default function TerminalsPage() {
+  const [params, setParams] = useSearchParams()
+  const delivery = params.get('tab') === 'delivery'
+  const selectTab = (next: 'ops' | 'delivery') => {
+    const copy = new URLSearchParams(params)
+    if (next === 'delivery') copy.set('tab', 'delivery')
+    else copy.delete('tab')
+    setParams(copy, { replace: true })
+  }
   const [period, setPeriod] = useState<TerminalOpsPeriod>('week')
   const [data, setData] = useState<PartnerTerminalOpsView | null>(null)
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
@@ -152,7 +166,7 @@ export default function TerminalsPage() {
     <Page
       title="终端数据"
       subtitle={withFrontendHint('本机构终端的打印扫描服务、出纸与故障恢复', FRONTEND_HINT.terminals)}
-      actions={(
+      actions={delivery ? undefined : (
         <div className="flex flex-wrap items-center gap-2">
           <PeriodSelector value={period} onChange={setPeriod} />
           <Button size="sm" variant="secondary" onClick={() => setReloadKey((k) => k + 1)}>
@@ -164,7 +178,30 @@ export default function TerminalsPage() {
         </div>
       )}
     >
-      {state === 'loading' && !data ? (
+      <div role="tablist" aria-label="终端数据分页" className="mb-4 flex gap-1 overflow-x-auto border-b-[1.6px] border-neutral-900/[0.06]">
+        {PAGE_TABS.map((tab) => {
+          const selected = tab.key === 'delivery' ? delivery : !delivery
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => selectTab(tab.key)}
+              className={[
+                'relative flex min-h-[44px] shrink-0 items-center whitespace-nowrap px-4 pb-3 pt-2.5 text-sm font-bold transition-colors',
+                selected ? 'text-neutral-900' : 'text-neutral-500 hover:text-neutral-700',
+              ].join(' ')}
+            >
+              {tab.label}
+              {selected && (
+                <span aria-hidden="true" className="absolute inset-x-3 -bottom-[1.6px] h-[3px] rounded-sm bg-primary-600" />
+              )}
+            </button>
+          )
+        })}
+      </div>
+      {delivery ? <FirstOrderPanel /> : state === 'loading' && !data ? (
         <LoadingState className="py-20" />
       ) : state === 'error' ? (
         <ErrorState className="py-20" title="终端数据加载失败" message={errorMessage} onRetry={() => setReloadKey((k) => k + 1)} />
@@ -213,7 +250,30 @@ export default function TerminalsPage() {
               ))}
               <span className="ml-auto text-xs text-neutral-500">点一行查看这台终端的明细</span>
             </div>
-            <ConsoleTable items={rows} columns={columns} empty={{ title: '没有符合条件的终端', description: '换个筛选或关键词试试' }} page={1} pageSize={rows.length || 1} total={rows.length} onPageChange={() => undefined} />
+            {rows.length === 0 ? (
+              <p className="px-4 py-8 text-sm text-neutral-500 md:hidden">没有符合条件的终端</p>
+            ) : (
+              <ul className="divide-y divide-neutral-900/[0.06] md:hidden">
+                {rows.map((row) => {
+                  const run = RUN_STATE_VIEW[runState(row)]
+                  const unrecovered = row.faults.reportedInWindow ? (row.faults.unrecovered ? '未恢复' : '无') : '无法统计'
+                  const offline = row.faults.reportedInWindow ? `${row.faults.offlineCount} 次` : '无法统计'
+                  return (
+                    <li key={row.terminalCode}>
+                      <button type="button" onClick={() => setSelectedCode(row.terminalCode)} className="flex w-full min-h-11 flex-col items-start gap-1 px-4 py-3 text-left">
+                        <span className="font-semibold text-neutral-900">{terminalName(row)}</span>
+                        <span className="text-sm text-neutral-600">{run.label}</span>
+                        <span className="text-sm text-neutral-600">未恢复：{unrecovered}</span>
+                        <span className="text-sm text-neutral-600">离线次数：{offline}</span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+            <div className="hidden md:block">
+              <ConsoleTable items={rows} columns={columns} empty={{ title: '没有符合条件的终端', description: '换个筛选或关键词试试' }} page={1} pageSize={rows.length || 1} total={rows.length} onPageChange={() => undefined} />
+            </div>
           </Card>
 
           <p className="text-xs leading-relaxed text-neutral-500">
@@ -223,14 +283,14 @@ export default function TerminalsPage() {
         </div>
       )}
 
-      <FirstOrderPanel />
-
-      <TerminalOpsDrawer
-        row={selected}
-        windowLabel={data ? windowText(data) : ''}
-        visitRecordingStarted={data?.visitCount.recordingStarted ?? false}
-        onClose={() => setSelectedCode(null)}
-      />
+      {!delivery && (
+        <TerminalOpsDrawer
+          row={selected}
+          windowLabel={data ? windowText(data) : ''}
+          visitRecordingStarted={data?.visitCount.recordingStarted ?? false}
+          onClose={() => setSelectedCode(null)}
+        />
+      )}
     </Page>
   )
 }

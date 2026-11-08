@@ -3,7 +3,7 @@ import vm from 'node:vm'
 import ts from 'typescript'
 
 const layout = readFileSync(new URL('../src/layouts/AdminLayoutWrapper.tsx', import.meta.url), 'utf8')
-const dashboard = ['index.tsx', 'DashboardWidgets.tsx', 'RecentPrintTasks.tsx', 'RecentActivity.tsx', 'dashboardRows.ts', 'DashboardDeviceStatus.tsx'].map((file) => readFileSync(new URL(`../src/routes/dashboard/${file}`, import.meta.url), 'utf8')).join('\n')
+const dashboard = ['index.tsx', 'DashboardWidgets.tsx', 'RecentPrintTasks.tsx', 'RecentActivity.tsx', 'dashboardRows.ts', 'DashboardDeviceStatus.tsx', 'printerStatusSummary.ts'].map((file) => readFileSync(new URL(`../src/routes/dashboard/${file}`, import.meta.url), 'utf8')).join('\n')
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 
 const failures = []
@@ -47,7 +47,9 @@ const realCalls = [
   'getPrinters()',
   'getJobSources()',
   'getFairSources()',
-  'listFiles({ limit: 100 })',
+  'getFileLifecycleSummary()',
+  "memberFeedbackAdminApi.list({ category: 'ai_content' })",
+  "adminPrivacyRequestsService.list({ status: 'pending', limit: 100 })",
   'getAiUsage()',
   'getAuditLogs({ limit: 6, offset: 0 })',
   'adminOpsService.listPrintTasks({ page: 1, pageSize: 5 })',
@@ -62,10 +64,11 @@ check(
     !dashboard.includes('Promise.all([') &&
     loadersBlock.length > 0 &&
     realCalls.every((call) => count(loadersBlock, call) === 1) &&
+    !loadersBlock.includes('listFiles({ limit: 100 })') &&
     dashboard.includes("alertCount = alerts?.firingCount") &&
     dashboard.includes('BlockError') &&
-    dashboard.includes('数据源加载失败'),
-  'OPS-05: nine independent loaders, allSettled per-block degrade, firingCount for 处理告警(N)',
+    dashboard.includes('这类这次没读到'),
+  'OPS-05: independent loaders, allSettled per-block degrade, firingCount for 处理告警(N)',
 )
 
 check(
@@ -73,7 +76,7 @@ check(
     dashboard.includes('title="工作台数据加载失败"') &&
     dashboard.includes('onRetry={loadAll}') &&
     dashboard.includes('打印任务加载失败') &&
-    dashboard.includes('实时告警加载失败'),
+    dashboard.includes('这类这次没读到'),
   'full-page error only when every block failed; each block has its own error + retry',
 )
 
@@ -101,11 +104,63 @@ check(
 )
 
 check(
-  dashboard.includes('if (nums.length === 0) return null') &&
-    dashboard.includes('{toner !== null && (') &&
-    dashboard.includes('{paper !== null && (') &&
-    !/\u6536入|营收|金额|GMV|[¥￥]|人民币/i.test(stripComments(dashboard)),
-  'unknown metrics stay unknown and the dashboard adds no amount or revenue KPI',
+  dashboard.includes('这类这次没读到') &&
+    // 纸张、墨粉只写「不足」，不画百分比（直接查渲染里没有把读数接上 %）
+    !/(tonerLevel|paperTrayLevel|paperLevel|avgLevel)[^\n]{0,60}%/.test(stripComments(dashboard)) &&
+    !dashboard.includes('if (nums.length === 0) return null') &&
+    !/\u6536入|营收|金额|GMV|[¥￥]|人民币/i.test(stripComments(dashboard)) &&
+    dashboard.includes('formatCny(aiUsage.estimatedCostCny)'),
+  'a failed block says it was not read; paper and toner are not drawn as percents; AI cost uses the shared four-decimal formatter',
+)
+
+const printerSummaryOutput = ts.transpileModule(
+  readFileSync(new URL('../src/routes/dashboard/printerStatusSummary.ts', import.meta.url), 'utf8'),
+  { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } },
+).outputText
+const printerSummaryModule = { exports: {} }
+vm.runInNewContext(printerSummaryOutput, {
+  exports: printerSummaryModule.exports,
+  module: printerSummaryModule,
+  require() { throw new Error('printerStatusSummary 不应有运行时依赖') },
+})
+const { summarizePrinters, printerIssueParts, printerActionHint } = printerSummaryModule.exports
+const printerCases = [
+  [{ status: 'error', paperStatus: 'normal', tonerLevel: 80 }, 'needsService'],
+  [{ status: 'online', paperStatus: 'empty', tonerLevel: 80 }, 'needsService'],
+  [{ status: 'offline', paperStatus: 'unknown', tonerLevel: null }, 'offline'],
+  [{ status: 'online', paperStatus: 'low', tonerLevel: null }, 'lowSupply'],
+  // 线上真实形状：正常打印机纸张、墨粉都是空值（驱动没报警），必须判为正常而不是「没上报」
+  [{ status: 'online', paperStatus: null, tonerLevel: null }, 'normal'],
+  [{ status: 'online', paperStatus: 'normal', tonerLevel: 80 }, 'normal'],
+]
+check(printerCases.every(([printer, expected]) => summarizePrinters([printer])[expected] === 1)
+  && printerIssueParts(summarizePrinters(printerCases.map(([printer]) => printer))).length === 3
+  && !Object.prototype.hasOwnProperty.call(summarizePrinters([]), 'missingReading'),
+'printer categories distinguish service, offline, low supply and normal; empty readings are not "unreported"')
+const offlineOnlyHint = printerActionHint(summarizePrinters([{ status: 'offline', paperStatus: null, tonerLevel: null }]))
+check(offlineOnlyHint.includes('电源和网络') && !offlineOnlyHint.includes('补充') && !offlineOnlyHint.includes('现场处理'),
+'offline-only printers get a power / network hint, not a field-service or refill hint')
+
+const deviceStatus = readFileSync(new URL('../src/routes/dashboard/DashboardDeviceStatus.tsx', import.meta.url), 'utf8')
+const printerSummarySource = readFileSync(new URL('../src/routes/dashboard/printerStatusSummary.ts', import.meta.url), 'utf8')
+const supplyNote = '纸张和碳粉余量现在读不到：打印机走 USB 连接，缺纸和余量都不会上报，没报警不等于耗材充足；缺纸要等打印失败或现场巡检才知道。'
+const supplyFn = deviceStatus.slice(
+  deviceStatus.indexOf('function supplyLine'),
+  deviceStatus.indexOf('export function DashboardDeviceStatus'),
+)
+const lowSupplyCopy = printerIssueParts({ needsService: 0, offline: 0, lowSupply: 1, normal: 3 })
+check(
+  !deviceStatus.includes('没有报告纸张或墨粉不足') &&
+    deviceStatus.includes('台打印机都在线，没有报告故障。') &&
+    deviceStatus.includes(supplyNote) &&
+    deviceStatus.includes('text-xs leading-relaxed text-neutral-500') &&
+    /printers\.length > 0/.test(deviceStatus) &&
+    !supplyFn.includes(supplyNote) &&
+    !stripComments(deviceStatus).includes('耗材正常') &&
+    printerSummarySource.includes('不代表耗材充足') &&
+    lowSupplyCopy.length === 1 &&
+    lowSupplyCopy[0] === '纸张或碳粉偏少 1 台（仍可打印）',
+  'USB printers: no-alarm is not "supplies are fine"; the unread-supply note renders whenever printers exist, including when there is an issue',
 )
 
 const expectedAlertCtaClass =
@@ -147,6 +202,41 @@ check(
     !printers.includes('张)') &&
     printers.includes('({Math.round(level)}%)'),
   'OPS-07: paperTrayLevel uses percent like the dashboard, never 张',
+)
+
+const outputCell = readFileSync(new URL('../src/routes/printers/PrinterOutputCell.tsx', import.meta.url), 'utf8')
+const nullAt = outputCell.indexOf('output == null')
+const nullBranch = nullAt >= 0 ? outputCell.slice(nullAt, nullAt + 160) : ''
+check(
+  printers.includes("header: '本系统出纸'") &&
+    printers.indexOf("header: '当前任务'") < printers.indexOf("header: '本系统出纸'") &&
+    printers.includes('<PrinterOutputCell output={p.output}') &&
+    printers.includes('不含打印机面板复印') &&
+    outputCell.includes('暂时读不到') &&
+    outputCell.includes('数据量超出统计上限，没给数') &&
+    outputCell.includes('本月另有') &&
+    outputCell.includes('笔出纸未确认，没算进去') &&
+    outputCell.includes('formatCount') &&
+    nullBranch.includes('暂时读不到') &&
+    !nullBranch.includes('0'),
+  'printer page column 本系统出纸 reads output; null says 暂时读不到, not zero; footer excludes copier panel copies',
+)
+
+check(
+  /getPrinters\(\{\s*includeOutput:\s*true\s*\}\)/.test(printers) &&
+    loadersBlock.includes('getPrinters()') &&
+    !loadersBlock.includes('includeOutput'),
+  '打印机页取数带 includeOutput，工作台不带',
+)
+const printersPageAt = printers.indexOf('export default function PrintersPage')
+const includeOutputAt = printers.search(/getPrinters\(\{\s*includeOutput:\s*true\s*\}\)/)
+check(
+  printersPageAt > 0 && includeOutputAt >= 0 && includeOutputAt < printersPageAt,
+  'getPrinters({ includeOutput: true }) 出现在 export default function PrintersPage 之前（模块级）',
+)
+check(
+  printers.includes('打印机走 USB 连接时，这几项读不到，会一直显示未上报；没报警不等于耗材充足。'),
+  '打印机页底写明 USB 连接读不到型号、SN、耗材和纸盒余量',
 )
 
 const loginLegal = readFileSync(new URL('../src/routes/login/LegalDocsModal.tsx', import.meta.url), 'utf8')
@@ -220,9 +310,10 @@ check(
 
 const paidPendingMeta = block(alertsPage, '  paid_pending_file_unavailable: {', '\n  },')
 // 工作台只扫告警相关代码：审计动作标签里合法地出现 file.get_signed_url。
-const dashboardAlertCode =
-  readFileSync(new URL('../src/routes/dashboard/dashboardRows.ts', import.meta.url), 'utf8') +
-  block(dashboard, '<SectionCard title="实时告警"', '</SectionCard>')
+const dashboardAlertCode = readFileSync(
+  new URL('../src/routes/dashboard/dashboardRows.ts', import.meta.url),
+  'utf8',
+)
 const alertSurfaces = stripComments(alertsPage) + stripComments(dashboardAlertCode) + stripComments(adminOps)
 check(
   dashboardAlertCode.includes('buildAlertRows') &&

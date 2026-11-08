@@ -98,7 +98,8 @@ if (/已进我的文档/.test(convertSrc)) {
 }
 
 const confirmSrc = read(CONFIRM)
-const progressSrc = read(PROGRESS)
+// 轮询参数与三态话术在 printProgressStatus.ts（拆分只搬不改行为），门禁连同页面一起取证。
+const progressSrc = read(PROGRESS) + '\n' + read('src/pages/print/printProgressStatus.ts')
 const localPrintWakeSrc = read(LOCAL_PRINT_WAKE)
 const cashierSrc = read(CASHIER)
 const doneSrc = read(DONE)
@@ -273,11 +274,18 @@ expectMatches(
   /if\s*\(\s*useRealApi\s*\|\|\s*!canSimulate\s*\)\s*return/,
   'PrintProgressPage SIM effect 在 http 无 taskId 时直接返回',
 )
+// 两种「没有任务可看」的出路拆到 PrintProgressMissing（拆分只搬不改行为）：页面只判断走哪一支，文字与出口在组件里。
 expectMatches(
   progressSrc,
-  /if\s*\(\s*isHttpMode\s*&&\s*!taskId\s*\)\s*\{[\s\S]*?打印任务尚未创建[\s\S]*?返回确认页[\s\S]*?\}/,
-  'PrintProgressPage http 无 taskId 时显示错误态而非伪造成功',
+  /if\s*\(\s*isHttpMode\s*&&\s*!taskId\s*\)\s*\{\s*return\s*<PrintProgressMissing\s+variant="not-created"/,
+  'PrintProgressPage http 无 taskId 时显示错误态（PrintProgressMissing not-created）而非伪造成功',
 )
+{
+  const missingSrc = read('src/pages/print/components/PrintProgressMissing.tsx')
+  expectMatches(missingSrc, /打印任务尚未创建/, 'PrintProgressMissing 写明「打印任务尚未创建」')
+  expectMatches(missingSrc, /没有真实 taskId，不能展示打印进度，也不会假装已经出纸/, 'PrintProgressMissing 写明没有真实 taskId、不展示进度')
+  expectMatches(missingSrc, /label:\s*'返回确认页',\s*onClick:\s*\(\)\s*=>\s*navigate\('\/print\/confirm'/, 'PrintProgressMissing 给「返回确认页」出口')
+}
 expectMatches(
   progressSrc,
   /wakeRequestedTaskIdRef\.current\s*!==\s*taskId[\s\S]*?wakeLocalPrintQueue\(\)/,
@@ -553,17 +561,24 @@ if (simSideHonest) {
   pass('SIM 演示说明区四条诚实声明齐全且均在 isSim 真分支')
 }
 
-// 7) 「预计出纸」行、真实常见情况处理区、出纸口隐私提示只能在 !isSim 分支渲染
+// 7) 帮助区搬到页内小组件：同时核对真实页面的受控引用和组件里的真实文案。
+// 不能把组件源码直接拼进页面，否则会失去 !isSim 调用边界的证明。
+const helpCode = stripComments(read('src/pages/print/components/PrintProgressHelp.tsx'))
+const helpComponentIsolated =
+  /import\s*\{\s*PrintProgressHelp\s*\}\s*from\s*'\.\/components\/PrintProgressHelp'/.test(progressCode) &&
+  inNotIsSimBranch(progressCode, '<PrintProgressHelp') &&
+  /payment=\{payment\}/.test(progressCode) &&
+  /payment === 'paid'\s*\?[\s\S]*已支付但打印失败[\s\S]*:\s*<>[\s\S]*打印失败/.test(helpCode)
 const realSideGates = [
   { needle: '预计出纸', label: '「预计出纸」行' },
-  { needle: '常见情况处理', label: '真实常见情况处理区(aria-label/标题)' },
-  { needle: '打印机缺纸 / 卡纸', label: '真实 FAQ「打印机缺纸 / 卡纸」' },
-  { needle: '已支付但打印失败', label: '真实 FAQ「已支付但打印失败」' },
+  { needle: '常见情况处理', label: '真实常见情况处理区(aria-label/标题)', help: true },
+  { needle: '打印机缺纸 / 卡纸', label: '真实 FAQ「打印机缺纸 / 卡纸」', help: true },
+  { needle: '已支付但打印失败', label: '真实 FAQ「已支付但打印失败」', help: true },
   { needle: '请勿离开，打印完成后请及时取走文件', label: '出纸口隐私提示' },
 ]
 let realSideIsolated = true
-for (const { needle, label } of realSideGates) {
-  if (inNotIsSimBranch(progressCode, needle)) {
+for (const { needle, label, help } of realSideGates) {
+  if (help ? helpComponentIsolated && helpCode.includes(needle) : inNotIsSimBranch(progressCode, needle)) {
     pass(`${label}仅在 !isSim 分支渲染`)
   } else {
     realSideIsolated = false
@@ -738,8 +753,20 @@ expectMatches(
 expectMatches(
   progressCode,
   /POLL_FAIL_LIMIT\s*=\s*5/,
-  '进度页轮询连续失败 ≥5 次才判失败',
+  '进度页轮询连续失败 ≥5 次才离开进度页',
 )
+// 2026-10-29（走查 I-30）：连续读不到状态不是打印失败（纸可能已经出来），不再判失败、不闪「打印没有完成」，
+// 而是去完成页的「无法确认」态：那里带订单号，按退避继续查，后端恢复后换成真实结果。
+expectMatches(
+  progressCode,
+  /pollFailsRef\.current\s*>=\s*POLL_FAIL_LIMIT\)\s*\{[^}]*navigate\('\/print\/done'/,
+  '进度页轮询连续失败 ≥5 次转去完成页「无法确认」态',
+)
+if (/pollFailsRef\.current\s*>=\s*POLL_FAIL_LIMIT\)\s*\{[^}]*navigateFail/.test(progressCode)) {
+  fail('进度页读不到状态不得 navigateFail：那会把「读不到」说成「打印没有完成」，让拿着纸的人去重打')
+} else {
+  pass('进度页读不到状态不判失败')
+}
 expectMatches(
   progressCode,
   /暂时无法读取状态/,
@@ -1103,10 +1130,10 @@ if (!/quote\.status === 'ready' && quote\.amountCents === 0[\s\S]{0,40}'确认�
 } else {
   pass('0 元单主按钮是确认并打印')
 }
-if (!confirmCopy.includes("'确认并去付款'")) {
-  fail('有金额的单仍要能「确认并去付款」')
+if (!confirmCopy.includes("'去付款'")) {
+  fail('有金额的单仍要能「去付款」')
 } else {
-  pass('付费单主按钮仍是确认并去付款')
+  pass('付费单主按钮仍是去付款')
 }
 if (!/PRINT_MAX_SIDES_PER_ORDER/.test(confirmCopy) || !/每单最多打印 \$\{PRINT_MAX_SIDES_PER_ORDER\} 面（页数 × 份数），当前/.test(confirmCopy)) {
   fail('确认页必须用共享上限，在报价前提示「每单最多打印 N 面（页数 × 份数），当前 N 面」')

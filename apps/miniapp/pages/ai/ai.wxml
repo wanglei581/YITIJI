@@ -20,15 +20,16 @@
     </view>
 
     <!-- AI 生成标识（强制）。屏幕上统一写「AI 生成，仅供参考」，与一体机同一句。导出的文件不印这句，
-         内含符合国家标准的隐式标识（产品负责人 9/29；律师要求显式标识时只改服务端开关）。 -->
+         内含符合国家标准的隐式标识（产品负责人 9/29；律师要求显式标识时只改服务端开关）。
+         材料模板全程不用模型，这句话不把它说成 AI 生成。 -->
     <view class="as-disc">
       <text class="ficon i-info"></text>
-      <text>AI 生成，仅供参考：小青的回答和下面各项结果都由 AI 生成，可能有错，请核对后再用。</text>
+      <text>{{aiNotice}}</text>
     </view>
     <!-- C1 模型名称与备案号在「AI 服务说明」里公示；C3 投诉入口。两处都放在 AI 功能的入口页上。 -->
     <view class="as-links">
-      <view class="as-link tap" hover-class="tap-press" bindtap="openAiDisclaimer" role="button" aria-label="AI 服务说明，所用模型与备案号">
-        <text>AI 服务说明与备案号</text>
+      <view class="as-link tap" hover-class="tap-press" bindtap="openAiDisclaimer" role="button" aria-label="AI 服务说明，所用模型与备案情况">
+        <text>AI 服务说明与备案情况</text>
         <text class="ficon i-right" aria-hidden="true"></text>
       </view>
       <view class="as-link tap" hover-class="tap-press" bindtap="openAiComplaint" role="button" aria-label="投诉 AI 生成的内容">
@@ -38,9 +39,7 @@
     </view>
 
 
-    <!-- 按处境分组：每组一个标题 + 一句说明，组内是同一处境下的动作。
-         原本是「AI 求职工具」5 个 +「材料与打印」5 个，按技术属性分类；
-         但用户不按技术找东西——他按自己此刻卡在哪里找。 -->
+    <!-- 四组：准备简历、改进材料、练习面试、探索方向。每组一个标题 + 一句说明。 -->
     <block wx:for="{{groups}}" wx:key="key" wx:for-item="g">
       <view class="grp-head">
         <view class="section-t">{{g.title}}</view>
@@ -99,6 +98,23 @@
       <text class="ficon i-history ae-ic"></text>
       <view class="ae-text">查看本人 AI 服务记录</view>
       <view class="ae-sub">从服务端读取诊断、优化和规划记录</view>
+    </view>
+
+    <!-- 我的文档从磁贴组挪到结果区，仍用原来的磁贴。不另做一条同义入口。
+         与上面的记录卡拉开，用全局卡片间距 mt12（12px），与本页小青卡、.card 的下边距一致。 -->
+    <view class="tiles mt12">
+      <view
+        class="tile sheen tap"
+        hover-class="tap-press"
+        bindtap="tapEntry"
+        data-id="{{documents.id}}"
+        role="button"
+        aria-label="{{documents.title}}，{{documents.desc}}"
+      >
+        <view class="t-ic a-{{documents.accent}}"><text class="ficon i-{{documents.icon}}"></text></view>
+        <view class="t-title">{{documents.title}}</view>
+        <view class="t-desc">{{documents.desc}}</view>
+      </view>
     </view>
 
     <view class="compliance-note">

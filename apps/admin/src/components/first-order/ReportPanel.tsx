@@ -65,7 +65,11 @@ export function ReportPanel({ projectId, reports, onChanged, onSaved }: { projec
     {month >= currentMonth() && <p className="text-xs text-neutral-500">本月尚未结束，暂不能生成留存月报。</p>}
     {error && <p role="alert" className="text-sm text-error-fg">{error}</p>}
     {notice && <p role="status" className="text-sm text-success-fg">{notice}</p>}
-    {view && <div className="space-y-3 rounded-lg bg-neutral-50 p-3" data-testid="first-order-report-view">
+    {view && <div className="first-order-report-print space-y-3 rounded-lg bg-neutral-50 p-3" data-testid="first-order-report-view">
+      <div className="no-print flex justify-end">
+        <Button size="sm" variant="outline" type="button" onClick={() => window.print()}>打印</Button>
+      </div>
+      <h5 className="print-only text-lg font-semibold">职易达 · 自然月报</h5>
       <h5 className="font-semibold">{view.snapshot.month} · {view.saved ? '已留存月报' : '临时预览'}</h5>
       <p className="text-xs text-neutral-500">统计于 {formatDateTime(view.snapshot.generatedAt)} · {view.snapshot.complete ? '统计范围完整，仍需核对业务结果' : '存在统计边界或缺失，请查看说明'}</p>
       <dl className="grid gap-3 sm:grid-cols-2">{Object.entries(view.snapshot.metrics).map(([key, metric]) => <div key={key}><dt className="text-xs text-neutral-500">{metricLabels[key as keyof typeof metricLabels]}</dt><dd className="text-sm font-semibold">{metric.state === 'measured' && metric.value !== null ? metric.value : stateLabels[metric.state] || '暂不能统计'}</dd><dd className="text-xs text-neutral-500">{metric.note}</dd></div>)}</dl>

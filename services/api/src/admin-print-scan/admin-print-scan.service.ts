@@ -31,6 +31,7 @@ import {
   throwIfAdminReprintBlocked,
 } from '../print-jobs/paid-reprint-eligibility'
 import { lockPrintTaskRow } from '../terminals/print-status-attempt'
+import { assertUnconfirmedOnlyForPrint, unconfirmedPrintWhere } from './print-scan-unconfirmed-filter'
 import {
   ADMIN_RETRY_STATE_CHANGED_MESSAGE,
   ADMIN_RETRY_TERMINAL_NOT_ACTIVE_MESSAGE,
@@ -89,6 +90,8 @@ export interface ListAdminPrintScanTasksParams {
   terminalId?: string
   page: number
   pageSize: number
+  /** 只看出纸未确认，口径见 print-scan-unconfirmed-filter.ts */
+  unconfirmed?: boolean
 }
 
 interface SafePrintParams {
@@ -150,6 +153,7 @@ export class AdminPrintScanService {
 
   async listTasks(params: ListAdminPrintScanTasksParams): Promise<AdminPrintScanTaskPage> {
     const type = this.asTaskType(params.type)
+    assertUnconfirmedOnlyForPrint(type, params.unconfirmed)
     const implemented = (IMPLEMENTED_PRINT_SCAN_TASK_TYPES as readonly string[]).includes(type)
     const pagination = { page: params.page, pageSize: params.pageSize, total: 0, totalPages: 0 }
 
@@ -193,6 +197,7 @@ export class AdminPrintScanService {
     const where: Record<string, unknown> = {}
     if (params.status) where['status'] = params.status
     if (params.terminalId) where['terminalId'] = params.terminalId
+    if (params.unconfirmed) Object.assign(where, unconfirmedPrintWhere())
 
     const [rows, total] = await Promise.all([
       this.prisma.printTask.findMany({

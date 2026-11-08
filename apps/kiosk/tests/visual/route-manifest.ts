@@ -1,5 +1,7 @@
 export const productionRoutePatterns = [
   '/', '/login', '/member/qr-login', '/upload/phone', '/legal/:doc',
+  // 2026-10-29 一体机手机码短链的网页中转（上传 / 登录），兑换或校验后 replace 到上面两个手机页。
+  '/k/u/:scene', '/k/l/:ticketId',
   '/resume/job-fit', '/resume/job-fit/actions', '/resume/career-plan', '/interview',
   '/interview/setup',
   '/interview/session', '/interview/report', '/interview/tips',
@@ -9,9 +11,10 @@ export const productionRoutePatterns = [
   '/me/activity/:id', '/me/notifications', '/me/feedback', '/me/settings',
   '/me/privacy-requests',
   '/help', '/activities', '/activities/:id', '/renshi', '/campus',
-  '/campus/welcome', '/campus/freshman-insights', '/toolbox', '/smart-campus',
-  '/smart-campus/welcome',
-  '/smart-campus/service/:key', '/print-scan', '/print-scan/feature/:key',
+  '/campus/welcome', '/campus/freshman-insights',
+  // 2026-11-04 产品负责人定停放：百宝箱、智慧校园不再是在用页面，旧链跳回首页。
+  '/toolbox/*', '/smart-campus/*',
+  '/print-scan', '/print-scan/feature/:key',
   '/print-scan/convert', '/print-scan/sign', '/print/scan-convert',
   '/print/scan-sign', '/print/scan-feature', '/print/upload',
   '/print/desk', '/print/material-check', '/print/preview', '/print/params', '/print/confirm',
@@ -44,12 +47,15 @@ export const productionRoutePatterns = [
   '/contract-review/processing',
   '/contract-review/result',
   '/policy-service',
-] as const // 109 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan；2026-09-27 + /official-channels；2026-09-30 停放 smart-campus/freshman-insights)
+  // 触屏版第一包：开发样板（非业务屏）。生产构建不挂载，直接访问回到首页。
+  '/dev/touch-gallery',
+] as const // 110 routes (112 − 2026-11-04 停放百宝箱与智慧校园：去掉 4 条在用页，加上 toolbox/*、smart-campus/* 两条跳转；此前：106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan；2026-09-27 + /official-channels；2026-09-30 停放 smart-campus/freshman-insights；2026-10-29 + /k/u/:scene、/k/l/:ticketId；2026-10-27 + 触屏版开发样板 /dev/touch-gallery)
 
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',
   '/print/scan-sign': '/print-scan/sign',
-  '/print/scan-feature': '/print-scan/feature/id-photo',
+  // 2026-11-04 证件照停放：旧地址回打印扫描。此前目标是 /print-scan/feature/id-photo。
+  '/print/scan-feature': '/print-scan',
   // 2026-08-18：打印参数页下线（控件与预览阶段完全重复且全站零导航），
   // 2026-09-08 起随预览一并进入打印台。
   '/print/params': '/print/desk?step=preview',
@@ -72,4 +78,7 @@ export const compatibilityRedirects = {
   '/scan/result': '/scan?stage=result',
   // 2026-09-27（3.14）：线上招聘平台目录并入本机构官方渠道，两种托管状态都转过去。
   '/jobs/online-platforms': '/official-channels',
+  // 2026-11-04 产品负责人定停放：旧百宝箱、智慧校园链接回首页。
+  '/toolbox/*': '/',
+  '/smart-campus/*': '/',
 } as const

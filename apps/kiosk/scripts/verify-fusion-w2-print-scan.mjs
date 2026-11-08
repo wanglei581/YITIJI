@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
@@ -8,6 +8,30 @@ import ts from 'typescript'
 const kioskRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(join(kioskRoot, path), 'utf8')
 const sha256 = (path) => createHash('sha256').update(read(path)).digest('hex')
+
+// 等手机传文件：面板自己的忙碌锁和页面清场锁分开。码有效、文件还没到才算忙；文件一到就放开。
+assert.match(read('src/pages/upload/components/UploadSessionQrPanel.tsx'), /useBusyLock\(\(active && status\?\.status !== 'uploaded'\) \|\| loading \|\| confirming \|\| cancelling\)/, '面板独立持忙碌锁，文件已到不再顺延')
+assert.match(read('src/pages/print/PrintUploadPage.tsx'), /useBusyLock\([^\n]*phoneSession\.waiting\)/, '打印等待有效会话时持忙碌锁')
+assert.match(read('src/pages/upload/hooks/useUploadSession.ts'), /const waiting = Boolean\(enabled && qr && remainingSeconds > 0 && status\?\.status !== 'uploaded' && status\?\.status !== 'confirmed' && status\?\.status !== 'cancelled' && status\?\.status !== 'expired'\)/, '打印等待锁受真实到期和终态约束')
+const pageClearLocks = [
+  ['src/pages/contract-review/ContractReviewHomePage.tsx', 'useBusyLock(submitting)'],
+  ['src/pages/resume/ResumeSourcePage.tsx', 'useBusyLock(uploading || usbBusy)'],
+  ['src/pages/print-scan/ConvertImagesPage.tsx', 'useBusyLock(uploading || generating || rechecking)'],
+  ['src/pages/interview/InterviewSetupPage.tsx', 'useBusyLock(creating || uploading || printingSheet || usbBusy)'],
+  ['src/pages/print-scan/sign-stamp/useSignStampFlow.ts', 'useBusyLock(busy)'],
+]
+for (const [file, expected] of pageClearLocks) {
+  // 去掉注释后，文件里每一处 useBusyLock 调用都要查：只看第一处的话，再加一把锁就绕过去了。
+  const text = read(file).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const calls = [...text.matchAll(/useBusyLock\(([^\n]*)\)\s*$/gm)].map((match) => `useBusyLock(${match[1]})`)
+  assert.deepEqual(calls, [expected], `${file} 只许有一处清场锁，且不含扫码面板的忙：应为 ${expected}`)
+  assert.doesNotMatch(
+    calls.join('\n'),
+    /\b(?:qrBusy|phoneBusy|sourceBusy|showQr)\b/,
+    `${file} 的 useBusyLock 实参不得再出现 qrBusy / phoneBusy / sourceBusy / showQr`,
+  )
+}
+console.log('PASS 两套上传等待锁及到期边界')
 
 const directRoutes = new Map([
   ['/print-scan', 'PrintScanHomePage'],
@@ -24,7 +48,8 @@ const directRoutes = new Map([
 const redirects = new Map([
   ['/print/scan-convert', '/print-scan/convert'],
   ['/print/scan-sign', '/print-scan/sign'],
-  ['/print/scan-feature', '/print-scan/feature/id-photo'],
+  // 2026-11-04 证件照停放：旧地址回打印扫描服务台。此前目标是 /print-scan/feature/id-photo。
+  ['/print/scan-feature', '/print-scan'],
   // 2026-08-18：打印参数页下线为兼容重定向（控件与预览页完全重复且全站零导航）。
   // 2026-09-08：材料检查 / 预览合并为 /print/desk，旧地址带 ?step= 透传意图。
   ['/print/params', '/print/desk?step=preview'],
@@ -50,9 +75,52 @@ const frozenHashes = new Map([
   // 2026-09-29 重新冻结（W-81）：简历来源页传入 busyWhen="received"，等人扫、还没收到文件时不报忙；
   // 手机已传上或正在确认才报忙。其它调用方不传该参数，仍按会话还在（含等人扫）报忙。卸载仍补报不忙。
   // 旧哈希 1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f。
+  // 2026-10-28 重新冻结（触屏版简历三条主路）：新增三个可选属性 onCancelled / onReceivedChange / confirmRef，
+  // 供简历来源页在自己的版面里画「已取消」说明、文件卡和底栏「确认使用这份文件」；
+  // 不传时行为与此前逐字节同一（取消、确认、报忙、刷新先撤销旧会话、已上传时刷新不可点都不变）。
+  // 冻结契约不放宽，仍逐字节校验；手机上传的既有行为由 verify:resume-phone-upload-ui 的 AST 断言继续钉住。
+  // 旧哈希 9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb。
+  // 2026-10-28 再次重新冻结（简历三条主路返工）：confirmRef 换成 onConfirmReady。原先把确认函数在渲染期写进 ref，
+  // 确认一开始父页不重渲染，页面读到的还是确认前的旧闭包，底栏仍写「确认使用这份文件」、没禁用，双击会把
+  // /confirm 发两遍。现在面板在 effect 里把确认函数交给页面（有文件且不在确认中才交，确认中与卸载交 null），
+  // 页面放进 state，底栏随之写「正在确认…」并禁用；面板里另加不随渲染变的在途标记，同一帧内的两次点击也只发一次。
+  // 仍是可选属性，不传时行为不变。冻结契约不放宽，仍逐字节校验；既有行为由 verify:resume-phone-upload-ui 继续钉住，
+  // 新行为由它新加的几条断言和 W3 的手机确认用例钉住。
+  // 旧哈希 97a46d6d5dc1ef8aaafdc1ff99de267d673bb992bac1de6a7ebfa64be8453c82。
+  // 2026-10-29 重新冻结（一体机手机码改短链）：出码调用换成 buildPhoneUploadQrUrl，import 同步换名；面板其余逐字未动。
+  // 旧哈希 9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb。
+  // 2026-10-29 重新冻结（触屏版集成：并入第一包新头里 #1519 的出码调用换名）：触屏版简历三条主路（上面 10/28 两次）和 #1519
+  // （一体机手机码改短链，上一条）各自改了这个文件，改动互不相交——前者加可选属性与 onConfirmReady，后者只换 import 与一处出码调用；
+  // 合并后的文件就是两者之和，没有别的改动。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 cc895ab96ceea8b511bbbb638c669e38dd0414cb9e8a53636258229806a3b32a（第四包终稿）、1e0e0b9256304a822d4b075394ed3aa855f47689594a391be7fa6d057a3ff56f（#1519）。
+  // 2026-10-29 重新冻结（#1519 留给触屏版第四包的面板接线）：码旁说明、手机传来文件后的来源与提醒三处文案都从
+  // copy/miniappLinkCopy.ts 取（phoneUploadScanHint(contact) 非空串时换掉原句「请用手机微信或浏览器扫码」，空串＝小程序未发布或读不到联系方式，
+  // 保持原句；已收到文件后在文件名下加 uploadedFileSourceLine(文件来源)（读不到来源不写）与 notYourFileHint()）。联系方式用 useSupportContact()。
+  // 只多两行 import、一行 hook、三行取句子、两行 JSX，二维码、轮询、取消、确认、报忙、刷新先撤销旧会话、已上传时刷新不可点都逐字未动。
+  // 冻结契约不放宽，仍逐字节校验；新行为由 scripts/tests/miniapp-link-copy.test.mjs 的接线断言和 fusion-w3 / fusion-w2 的浏览器用例钉住。
+  // 旧哈希 98691610ccd48ff766ff7d28256ed8814afb024ad454305f9de6345c0639db14。
+  // 2026-10-29 重新冻结（触屏版走查 I-14，B 路）：签名图（signature_image）确认后只留系统短期、不进「我的文档」，面板里「会员文件确认后归档」对它不成立；
+  // 只在那一处条件上加 purpose !== 'signature_image'，二维码、轮询、取消、确认、刷新先撤销旧会话等都逐字未动。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 7f0cacce1e2b505548a4a141e2b63c71517c8ec5fe5d47fc827732a461f3e524。
+  // 2026-11-03 重新冻结（B6b-1）：面板在「码有效、文件还没到」时自己持清场锁，到期前 60 秒提醒，
+  // 真实卸载作废还没收到文件的上传码；取消请求在途也持锁。新内容断言在本文件哈希检查之前。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
+  // 2026-11-03 重新冻结（重做旧候选 #1461）：取消失败不再清屏——二维码和已收到的文件留着，屏上沿用打印上传页那句兜底，
+  // 可以重试取消或去确认；取消中三个按钮都禁用。成功才清空，已作废码清二维码并按过期显示。不恢复轮询、不自动接走文件。
+  // 新行为由 verify:resume-phone-upload-ui 的断言钉住。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
+  // 2026-11-04 重新冻结（并入 #1566）：取消失败按 #1566 留屏，触控尺寸、忙碌锁与卸载作废仍按 #1570。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e（#1570）、018fd611a3350ce53fa3b79fceb887c5a5b0d56a2d47f36d418f3b6745b816ca（#1566）。
+  // 2026-11-03 再次冻结（B6b-1 返工）：同一页切换来源不再作废上传码，切回来继续用同一张；
+  // 离开页面才作废还没收到文件的会话。已卸载的实例不得作废屏上正在显示的那张码。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e。
+  // 2026-11-04 再次冻结（#1570 返工：并入派工窗口的上传码租约修复 a6a7bbfe3，再与 #1566 合写取消处理）：
+  // 同一页切换来源只停放上传码、离开页面才作废，已卸载的实例不作废屏上正显示的码；取消成功才收租约并清空，
+  // 已作废按过期显示，其他失败码和已收到的文件都留着。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 f0d8bc199b75c6ad6c12b87d517c81c6bef38baea72099231c8c68569802d60e（并入 #1566 后）、2109b8ce60b6d58f7f5028435a51ef3544310f2c00549e587bc2688058da91e3（租约修复）。
   [
     'src/pages/upload/components/UploadSessionQrPanel.tsx',
-    '9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb',
+    '738d4f455b926a85e51ad56c38fabe339d1def48fd43a12967bf03e03a8ca4ba',
   ],
   [
     'src/pages/print/DevSandboxControls.tsx',
@@ -259,7 +327,7 @@ for (const path of presentationFiles) {
 // 两页的 QX 断言在下方各自的段落里（含 doesNotMatch(/KioskPageFrame/) 防回退），
 // 断言强度只增不减，故这张表连同它的循环一并移除。
 const printScanFeature = read('src/pages/print-scan/PrintScanFeatureInfoPage.tsx')
-assert.match(printScanFeature, /QxPageFrame/, 'feature info page uses Qingxu page frame')
+assert.match(printScanFeature, /TouchToolScreen/, 'feature info page uses the touch screen')
 assert.match(
   printScanFeature,
   /data-w2-page=["']print-scan-feature["']/,
@@ -271,10 +339,18 @@ assert.match(
   'feature info page imports the Qingxu hub stylesheet'
 )
 assert.doesNotMatch(printScanFeature, /KioskPageFrame/, 'feature info page has left the V6 frame')
+assert.match(
+  printScanFeature,
+  /if \(key === 'id-photo' && ID_PHOTO_ENTRY_PARKED\) \{\s*return <Navigate to="\/print-scan" replace \/>/,
+  'parked /print-scan/feature/id-photo returns to /print-scan',
+)
+assert.match(printScanFeature, /function IdPhotoParkedScreen/, 'parked id-photo screen source remains')
+assert.doesNotMatch(printScanFeature, /看证件照说明/, 'unknown capability state does not point at id-photo')
+assert.doesNotMatch(printScanFeature, /证件照这一页写的是尚未开放/, 'unknown capability state has no id-photo fact')
 const printScanHome = read('src/pages/print-scan/PrintScanHomePage.tsx')
 const printScanHomeView = read('src/pages/print-scan/components/QxPrintHubView.tsx')
 const printHubQxCss = read('src/pages/print-scan/styles/print-hub-qx.css')
-assert.match(printScanHome, /QxPageFrame/, 'print-scan hub uses Qingxu page frame')
+assert.match(printScanHome, /PrintTouchFrame/, 'print-scan hub uses the touch screen frame')
 assert.match(
   printScanHome,
   /QxPrintHubView/,
@@ -402,7 +478,7 @@ const convertImages =
   read('src/pages/print-scan/ConvertImagesView.tsx') +
   read('src/pages/print-scan/ConvertImagesPanels.tsx') +
   read('src/pages/print-scan/convert-images-model.ts')
-for (const marker of ['kioskUploadFile', 'convertImagesToPdf', 'UploadSessionQrPanel', 'QxPageFrame']) {
+for (const marker of ['kioskUploadFile', 'convertImagesToPdf', 'UploadSessionQrPanel', 'TouchToolScreen']) {
   assert.match(convertImages, new RegExp(marker), `convert-images retains ${marker}`)
 }
 assert.match(
@@ -455,7 +531,8 @@ assert.match(
   /U 盘图片导入尚未接到转换列表/,
   'USB entry is kept and explained as unwired, not deleted'
 )
-const scanResultPreviewSource = read('src/pages/scan/ScanResultPage.tsx')
+// 2026-11-02 K1a：结果页的预览块拆成了 ScanResultPreviewBlock.tsx（<FileContentPreview> 现在在那里），断言原样不变。
+const scanResultPreviewSource = read('src/pages/scan/ScanResultPreviewBlock.tsx')
 assert.match(
   scanResultPreviewSource,
   /<FileContentPreview[\s\S]*?fileUrl=\{file\.fileUrl\}/,
@@ -476,7 +553,7 @@ assert.doesNotMatch(
   /<img[\s\S]{0,200}stamp\.(fileAccessUrl|fileUrl)/,
   'sign-stamp does not echo the signature/stamp image on the public screen',
 )
-assert.match(signStamp, /QxPageFrame/, 'SignStampPage uses the qingxu page frame')
+assert.match(signStamp, /TouchToolScreen/, 'SignStampPage uses the touch screen')
 assert.doesNotMatch(signStamp, /KioskPageFrame/, 'SignStampPage has left the V6 frame')
 assert.match(
   signStamp,
@@ -527,7 +604,7 @@ assert.match(
 assert.match(printUpload, /data-w2-page=["']print-upload["']/, 'print upload exposes its W2 marker')
 assert.match(printUpload, /w2-print-upload-source-grid/, 'print upload exposes the 2x2 source grid')
 assert.match(printUpload, /print-upload-footer/, 'print upload exposes a semantic footer selector')
-assert.match(printUploadView, /QxPageFrame/, 'print upload uses Qingxu page frame')
+assert.match(printUploadView, /PrintTouchFrame/, 'print upload uses the touch screen frame')
 assert.match(
   read('src/layouts/KioskRoot.tsx'),
   /['"]\/print\/upload['"]/,
@@ -647,7 +724,7 @@ assert.match(
   /data-w2-page=["']print-confirm["']/,
   'src/pages/print/PrintConfirmPage.tsx exposes print-confirm',
 )
-assert.match(printConfirmQx, /QxPageFrame/, 'PrintConfirmPage uses the Qingxu page frame')
+assert.match(printConfirmQx, /PrintTouchFrame/, 'PrintConfirmPage uses the touch screen frame')
 assert.match(printConfirmQx, /qx-btn/, 'PrintConfirmPage uses Qingxu action buttons')
 assert.doesNotMatch(printConfirmQx, /KioskPageFrame/, 'print-confirm has left the V6 frame')
 assert.doesNotMatch(printConfirmQx, /PrintPageFrame/, 'print-confirm has left the V6 print frame')
@@ -756,7 +833,8 @@ assert.match(
 for (const phase of ['failed', 'closed', 'expired', 'refunded']) {
   assert.match(cashierPanel, new RegExp(`["']${phase}["']`), `cashier panel maps ${phase}`)
 }
-const printProgress = read('src/pages/print/PrintProgressPage.tsx')
+// 轮询参数与三态话术在 printProgressStatus.ts（拆分只搬不改行为），门禁连同页面一起取证。
+const printProgress = read('src/pages/print/PrintProgressPage.tsx') + '\n' + read('src/pages/print/printProgressStatus.ts')
 for (const marker of [
   'POLL_INTERVAL_MS = 3000',
   'REAL_POLL_TIMEOUT_MS = 10 \* 60 \* 1000',
@@ -788,8 +866,8 @@ const printDone = read('src/pages/print/PrintDonePage.tsx')
 assert.match(printDone, /已在本机出纸/, 'print done says the paper is already out on this machine')
 assert.doesNotMatch(printDone, /getPayStatus|取件码/, 'print done does not fetch or show a pickup code')
 assert.ok(!/Math\.random|randomUUID/.test(printDone), 'print done never fabricates a pickup code')
-assert.match(printProgress, /QxPageFrame/, 'print progress uses Qingxu page frame')
-assert.match(printDone, /QxPageFrame/, 'print done uses Qingxu page frame')
+assert.match(printProgress, /PrintTouchFrame/, 'print progress uses the touch screen frame')
+assert.match(printDone, /PrintTouchFrame/, 'print done uses the touch screen frame')
 assert.doesNotMatch(printProgress, /KioskPageFrame/, 'print progress has left the V6 frame')
 assert.doesNotMatch(printDone, /KioskPageFrame/, 'print done has left the V6 frame')
 assert.doesNotMatch(printProgress, /PrintPageFrame/, 'print progress has left the V6 print frame')
@@ -862,8 +940,9 @@ for (const marker of [
   // 这条断言保护的实质是「页面必须告诉用户扫码这条路存在」，不是保护某句原文。
   // 2026-09-02 按 11-arrival-code.html 迁移后本页重定位为「输入到机码」页，
   // 扫码降为兜底出口，措辞由「扫描小程序二维码」改为「用机身扫码区」。
-  // 断言随之改指新措辞，强度不变：删掉扫码入口仍然会红。
-  '机身扫码区',
+  // 2026-10-28 触屏版第 5 版（稿 pickup）把入口收成键盘下面的「用扫码枪扫」开关，说明在说明卡里原地展开；
+  // 断言随之改指稿的措辞，强度不变：删掉扫码入口仍然会红。
+  '用扫码枪扫',
   // hid 指引屏的 echo 文案（11-arrival-code.html #hid-echo-code）。
   // 2026-09-07 补了独立 hid 屏之后这句仍必须在源码里，删掉仍然会红。
   '等待扫码输入',
@@ -924,8 +1003,8 @@ assert.match(
 )
 assert.match(pickupClaim, /还是手输吧/, 'hid guidance keeps the draft "type instead" control')
 assert.match(pickupClaim, /扫不出来？求助/, 'hid guidance keeps the draft help control')
-assert.match(pickupClaim, /机身侧面的扫码区/, 'hid guidance names the scanner location on the kiosk body')
-assert.match(pickupClaim, /亮度调高/, 'hid guidance includes the real-machine brightness condition')
+// 2026-10-28：扫码原句只在 PickupHidGuide 里写一份（下方两条断言守着它），页面这边守「确实渲染了这张说明卡」。
+assert.match(pickupClaim, /<PickupHidGuide\b/, 'pickup claim page renders the hid guidance card in place')
 assert.doesNotMatch(
   pickupClaim,
   /扫码器就绪|扫码器在线|扫码器正常/,
@@ -939,7 +1018,7 @@ assert.doesNotMatch(
   'pickup claim CSS must not use margin:-1px sr-only (fusion-w6 left=-1 overflow)'
 )
 const pickupHidGuide = read('src/pages/print/components/PickupHidGuide.tsx')
-assert.match(pickupHidGuide, /请出示手机上的码/, 'hid guide screen keeps the draft headline')
+assert.match(pickupHidGuide, /用扫码枪扫/, 'hid guide keeps the draft headline (稿 pickup 说明卡展开态标题)')
 assert.match(pickupHidGuide, /机身侧面的扫码区/, 'hid guide screen names the body-side scanner')
 assert.match(pickupHidGuide, /亮度调高/, 'hid guide screen includes the real-machine brightness condition')
 assert.doesNotMatch(
@@ -983,13 +1062,13 @@ assert.match(
 )
 assert.match(
   read('src/pages/scan/ScanWorkbenchChrome.tsx'),
-  /QxPageFrame/,
-  'scan chrome wraps QxPageFrame so the four scan routes leave the V6 shell',
+  /QxTouchScreen/,
+  'scan chrome wraps QxTouchScreen so the four scan routes leave the V6 shell',
 )
 assert.match(
   read('src/pages/scan/ScanWorkbenchChrome.tsx'),
-  /QxAppNavbar/,
-  'scan chrome uses the shared Qingxu navbar instead of an inlined copy',
+  /QxTouchNav/,
+  'scan chrome uses the shared touch navbar instead of an inlined copy',
 )
 assert.match(
   read('src/pages/scan/ScanWorkbenchChrome.tsx'),
@@ -1041,7 +1120,71 @@ assert.match(
   /navigate\(["']\/scan\?stage=settings["'][\s\S]*state:\s*\{\s*scanType:\s*selected\s*\}/,
   'scan start carries a validated scan type into settings'
 )
-const scanSettings = read('src/pages/scan/ScanSettingsPage.tsx')
+// 走查 I-16（回归，#1326 改过「不默认选类型」，触屏集成又改回 storedType ?? 'resume'）：
+// 扫描类型一进来不预选。想扫证件或普通文档的人不点类型直接「下一步」，会被悄悄建成简历扫描。
+// 用 AST 钉语义，不钉字面量：`selected` 的初值只能是「本机登记里已有的类型，否则 null」，
+// 主按钮在没选类型时必须是禁用态并说明原因。
+{
+  const startFile = ts.createSourceFile('ScanStartPage.tsx', scanStart, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let selectedInit = null
+  const findSelected = (node) => {
+    if (
+      ts.isVariableDeclaration(node) && ts.isArrayBindingPattern(node.name) && node.initializer &&
+      ts.isCallExpression(node.initializer) && ts.isIdentifier(node.initializer.expression) &&
+      node.initializer.expression.text === 'useState'
+    ) {
+      const first = node.name.elements[0]
+      if (first && ts.isBindingElement(first) && ts.isIdentifier(first.name) && first.name.text === 'selected') {
+        selectedInit = node.initializer.arguments[0] ?? null
+      }
+    }
+    ts.forEachChild(node, findSelected)
+  }
+  findSelected(startFile)
+  assert.ok(selectedInit, 'scan start keeps a `const [selected, ...] = useState(...)` for the scan type')
+  assert.ok(
+    ts.isBinaryExpression(selectedInit) &&
+      selectedInit.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken &&
+      selectedInit.right.kind === ts.SyntaxKind.NullKeyword,
+    'scan start must not pre-select a scan type: the initial value is `storedType ?? null` (走查 I-16 / #1326)',
+  )
+  assert.match(scanStart, /selected === null\s*\?\s*\{[\s\S]{0,400}?disabled:\s*true/, 'scan start disables the primary button until a scan type is chosen')
+  assert.match(scanStart, /先选一种材料/, 'scan start tells the user why the primary button is disabled')
+}
+// 走查 I-18：屏上的字不写死品牌或型号（CLAUDE.md §3：型号走 printerName 配置；换牌子或换型号后那句就错了）。
+// 只看会上屏的字（字符串、模板字符串、JSX 文本），注释不算。
+{
+  const walk = (dir) => readdirSync(join(kioskRoot, dir), { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory() ? walk(join(dir, entry.name)) : /\.(ts|tsx)$/.test(entry.name) ? [join(dir, entry.name)] : [])
+  const hits = []
+  for (const path of walk('src')) {
+    const source = ts.createSourceFile(path, read(path), ts.ScriptTarget.Latest, true, path.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+    const visitBrand = (node) => {
+      const text =
+        ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) ||
+        ts.isTemplateMiddle(node) || ts.isTemplateTail(node) || ts.isJsxText(node)
+          ? node.text
+          : ''
+      if (/奔图|CM28\d0|Pantum/i.test(text)) {
+        hits.push(`${path}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1} ${text.trim().slice(0, 40)}`)
+      }
+      ts.forEachChild(node, visitBrand)
+    }
+    visitBrand(source)
+  }
+  assert.deepEqual(hits, [], `kiosk on-screen text must not hard-code the printer brand or model (走查 I-18):\n${hits.join('\n')}`)
+}
+// 2026-11-02 K1a：设置页按职责拆成了五个 hook + 页面，代码行逐字搬运，下面的断言读这几份的拼接，判据一条没减；
+// 不得访问浏览器存储则逐个文件各查一遍。
+const SCAN_SETTINGS_FILES = [
+  'src/pages/scan/useScanSettingsState.ts',
+  'src/pages/scan/useScanSessionCreate.ts',
+  'src/pages/scan/useScanSettingsDeliveryAck.ts',
+  'src/pages/scan/useScanSettingsExpiry.ts',
+  'src/pages/scan/useScanSettingsActions.ts',
+  'src/pages/scan/ScanSettingsPage.tsx',
+]
+const scanSettings = SCAN_SETTINGS_FILES.map(read).join('\n')
 assert.match(scanSettings, /function isScanType\(/, 'scan settings validates direct route state')
 assert.match(
   scanSettings,
@@ -1087,7 +1230,7 @@ for (const marker of [
 ]) {
   assert.match(scanSettings, new RegExp(marker), `scan settings retains ${marker}`)
 }
-assertNoStorageAccess('src/pages/scan/ScanSettingsPage.tsx')
+for (const path of SCAN_SETTINGS_FILES) assertNoStorageAccess(path)
 assert.match(
   scanSettings,
   // 2026-09-13：真地址是 /scan?stage=progress（/scan/progress 只剩兼容重定向）。
@@ -1123,7 +1266,17 @@ assert.match(
   'scan progress recovers completion during cancellation'
 )
 
-const scanResult = read('src/pages/scan/ScanResultPage.tsx')
+// 2026-11-02 K1a：结果页按职责拆成了两个 hook、三个组件和页面，代码行逐字搬运，下面的断言读这几份的拼接，判据一条没减。
+const SCAN_RESULT_FILES = [
+  'src/pages/scan/scanResultModel.ts',
+  'src/pages/scan/useScanResultRescan.ts',
+  'src/pages/scan/useScanResultExits.ts',
+  'src/pages/scan/ScanResultFailedView.tsx',
+  'src/pages/scan/ScanResultPreviewBlock.tsx',
+  'src/pages/scan/ScanResultExitRow.tsx',
+  'src/pages/scan/ScanResultPage.tsx',
+]
+const scanResult = SCAN_RESULT_FILES.map(read).join('\n')
 // 打印出口 2026-09-28 起落在材料检查（商用收口 P0-5）：扫描件是本人原件，生产强制
 // PRINT_REQUIRE_PII_SCAN=true，没做完隐私检查就建单会被拒，所以不再直达 /print/confirm。
 for (const target of ['/me/documents', '/resume/parse']) {
@@ -1212,6 +1365,9 @@ assert.match(
   /getTerminalId\(\)/,
   'convert must read the kiosk terminal id before calling the API',
 )
+assert.match(convertImages, /let filename: string \| null = converted\.filename \|\| null[\s\S]*?if \(!filename && converted\.savedToDocuments\)[\s\S]*?getMyDocuments/, 'convert prefers the API filename and queries documents only as fallback')
+assert.match(convertImages, /name: resultName \?\? outputFileName\(result\.pages\)/, 'printing uses the same resolved result name')
+assert.match(convertImages, /props\.resultName \?\? outputFileName\(result\.pages\)/, 'result screen uses the same resolved result name')
 assert.match(
   convertImages,
   /这台机器还没完成登记，无法使用格式转换/,
@@ -1222,9 +1378,11 @@ assert.match(
   /terminalId,/,
   'convert request body must include terminalId',
 )
+/* 签名页的终端身份读取在 useSignStampFlow 里（页面本身不再展示终端号，稿 20 的顶栏没有它），
+ * 所以这里读 hook：它仍是 convert 要照抄的参考，发请求前先读本机终端号。 */
 assert.match(
-  signStamp,
-  /getTerminalId\(\)/,
+  read('src/pages/print-scan/sign-stamp/useSignStampFlow.ts'),
+  /const tid = getTerminalId\(\)/,
   'sign-stamp remains the reference deep-link gate that convert must copy',
 )
 
@@ -1313,6 +1471,10 @@ for (const path of [
   'src/pages/scan/ScanProgressPage.tsx',
   'src/pages/scan/ScanSettingsStatusView.tsx',
   'src/pages/scan/ScanResultPage.tsx',
+  // 2026-11-02 K1a：结果页的可见 JSX 拆到了这三个组件里，逐个查，范围和拆分前一样大。
+  'src/pages/scan/ScanResultFailedView.tsx',
+  'src/pages/scan/ScanResultPreviewBlock.tsx',
+  'src/pages/scan/ScanResultExitRow.tsx',
 ]) {
   const code = read(path)
   assert.doesNotMatch(code, /\[\s*['"]任务编号['"]\s*,/, `${path} must not display a task ID row`)
@@ -1325,5 +1487,82 @@ for (const path of [
   }
   checkVisibleIdentity(ast)
 }
+
+/* ── AI 是驱动层：稿上每屏的 AI 元素一个不许少（产品负责人 8/16、10/28） ────────────────
+ *
+ * 触屏版稿 18（扫描四阶段）、稿 20（复印、照片合成、证件照、签名）每一屏底栏都有「问小青」，
+ * 问句是**本屏专属**的（label 与带去顾问页的 draft 是同一句），逐态不同；每屏正文最上面还有一条 AI 状态
+ * （小青接不上时写实话，说明这一步不靠它也能做完）。这些是 AI 与打印扫描功能结合的接口，
+ * 改版时最容易被当成「文案」顺手删掉或合并成一句通用话，所以逐句钉在源码里。
+ * 缺哪一句，门禁就指名哪一句。 */
+const ASK_LABELS = [
+  ['src/pages/scan/ScanWorkbenchChrome.tsx', [
+    '问小青：扫描和复印有什么不同', '问小青：U 盘扫描怎么走', '问小青：扫描没开放怎么办', '问小青：任务还没建好',
+    '问小青：扫描任务没建好', '问小青：扫描过期了怎么办', '问小青：为什么还不能扫', '问小青：面板上怎么扫',
+    '问小青：授权还没好', '问小青：一直等不到怎么办', '问小青：扫描件接下来呢', '问小青：扫描失败怎么办',
+  ]],
+  ['src/pages/print-scan/ConvertImagesPage.tsx', [
+    '问小青：不能转 PDF 怎么办', '问小青：U 盘图片怎么加', '问小青：上传停住了', '问小青：合成要多久',
+    '问小青：合成的 PDF 怎么打印', '问小青：结果还没回来', '问小青：顺序冲突了', '问小青：照片怎么合成 PDF',
+  ]],
+  ['src/pages/print-scan/PrintScanFeatureInfoPage.tsx', [
+    '问小青：复印要注意什么', '问小青：这个功能是什么', '问小青：证件照怎么办',
+  ]],
+  ['src/pages/print-scan/SignStampPage.tsx', [
+    '问小青：签名没开怎么办', '问小青：签名用哪份 PDF', '问小青：签名图是什么', '问小青：签名放在哪一页',
+    '问小青：合成完怎么打印', '问小青：签名结果没回来',
+  ]],
+]
+for (const [path, labels] of ASK_LABELS) {
+  const code = read(path)
+  for (const label of labels) {
+    assert.ok(code.includes(label), `${path} 缺稿上的底栏问句「${label}」：AI 元素一个不许少，也不许并成一句通用话`)
+  }
+}
+// 问小青按钮本身：带麦克风（voice）；带去顾问页的草稿取自 askDraftOf(label)；扫描壳里还要先撤销会话再走（见 scan-session-truth）。
+for (const path of ['src/pages/scan/ScanWorkbenchChrome.tsx', 'src/pages/print-scan/TouchToolScreen.tsx']) {
+  const code = read(path)
+  assert.match(code, /draft: askDraft,[\s\S]{0,120}?voice: true|draft: askDraftOf\(askLabel\), voice: true/, `${path} 的问小青必须带麦克风，draft 取自 askDraftOf(label)，不再与 label 同一句`)
+  assert.match(code, /<AiDownNote \/>/, `${path} 正文最上面必须有 AI 状态（小青接不上时写实话）`)
+}
+/* 带去顾问页的草稿（审查意见 B1）：每句一个 draft。此前 draft 与 label 同一句，用户点过去，顾问页输入框里是
+ * 「问小青：扫描件接下来呢」——把按钮名带进了对话框。其余各包都是 label「问小青：…」+ 一句不带前缀的自然问句。
+ * 真把 askDraftOf 取出来跑一遍：每个 label 的草稿必须非空、不以「问小青」开头、与 label 不同；现场无人值守，草稿里不许出现「工作人员」「联系」。 */
+const askDraftJs = ts.transpileModule(read('src/pages/print-scan/askDraft.ts'), {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+}).outputText
+const { askDraftOf } = await import(`data:text/javascript;base64,${Buffer.from(askDraftJs).toString('base64')}`)
+for (const [path, labels] of ASK_LABELS) {
+  for (const label of labels) {
+    const draft = askDraftOf(label)
+    assert.ok(typeof draft === 'string' && draft.trim().length > 0, `${path}「${label}」的草稿不能为空`)
+    assert.ok(!/^问小青/.test(draft), `${path}「${label}」的草稿不能以「问小青」开头：那是按钮名，不是问句`)
+    assert.notEqual(draft, label, `${path}「${label}」的草稿不能与按钮上的字同一句`)
+    assert.doesNotMatch(draft, /工作人员|联系/, `${path}「${label}」的草稿里不许出现「工作人员」「联系」（现场无人值守）`)
+  }
+}
+/* 类型卡的读屏语义（审查意见 B2）：单选卡 role="radio" 上不许同时写 aria-pressed（非法组合，读屏会把状态混报成
+ * 「已选中并已按下」），也不许用盖住整张卡的 aria-label（读屏只念「选择扫描类型：简历扫描」，听不到说明和
+ * 「支持 AI 简历识别」「敏感文件 · 自动清理」角标）：标题走 aria-labelledby，说明与角标走 aria-describedby。 */
+const scanChromeSource = read('src/pages/scan/ScanWorkbenchChrome.tsx')
+const typeCardsStart = scanChromeSource.indexOf('export function ScanTypeCards')
+assert.ok(typeCardsStart >= 0, 'ScanTypeCards 还在')
+const typeCardsEnd = scanChromeSource.indexOf('\nexport function ', typeCardsStart + 10)
+const typeCardsBlock = scanChromeSource.slice(typeCardsStart, typeCardsEnd < 0 ? undefined : typeCardsEnd)
+assert.match(typeCardsBlock, /role="radio"/, '类型卡是单选')
+assert.doesNotMatch(typeCardsBlock, /aria-pressed=/, '类型卡 role="radio" 上不许同时写 aria-pressed')
+assert.doesNotMatch(typeCardsBlock, /aria-label=\{/, '类型卡不许用 aria-label 盖住整张卡的读屏内容')
+assert.match(typeCardsBlock, /aria-labelledby=/, '类型卡的读屏名取标题（aria-labelledby）')
+assert.match(typeCardsBlock, /aria-describedby=/, '类型卡的说明与角标走 aria-describedby')
+const aiDownProbe = read('src/pages/print-scan/useXiaoqingAvailability.ts')
+const aiDownNote = aiDownProbe + read('src/pages/print-scan/AiDownNote.tsx')
+assert.match(aiDownNote, /\/advisor\/availability/, 'AI 状态只认服务端那个真探测，不靠猜')
+assert.match(aiDownNote, /row\.available === false\) return 'unavailable'/, '只有服务端明说 available:false 才写「接不上」')
+assert.match(aiDownNote, /小青暂时接不上。这一步不用它也能做完，照下面的按钮继续。/, 'AI 状态那一句要说清这一步不靠小青也能做完')
+// 扫描完成后的 AI 简历识别入口与结果页不降级：入口还在、只对简历扫描放行、去的是简历解析页。
+const scanResultPage = SCAN_RESULT_FILES.map(read).join('\n')
+assert.match(scanResultPage, /AI 简历识别/, '扫描结果页的「AI 简历识别」入口不许删')
+assert.match(scanResultPage, /const aiEnabled = scanType === 'resume' && Boolean\(file\)/, 'AI 简历识别只对简历扫描且有文件时放行')
+assert.match(scanResultPage, /leaveScanFlow\('\/resume\/parse'/, 'AI 简历识别去的是简历解析页，由那一屏自己按 AI 能力降级')
 
 console.log('ALL PASS fusion W2 print/scan contract')

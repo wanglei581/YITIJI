@@ -79,11 +79,12 @@ export function EligibilityResults({
       <EligibilityStepBar step={2} />
 
       <div className="k8-elig-headline">
-        <p className="k8-elig-headline-label"><b>本次比对说明</b>按返回内容原样显示</p>
+        <p className="k8-elig-headline-label"><b>本次比对说明</b><span className="k8-elig-chip">仅供对照</span></p>
+        <p className="k8-elig-headline-text">不是资格认定。能不能办，以经办窗口审核为准。</p>
         <p className="k8-elig-headline-text">{headline}</p>
         <p className="k8-elig-headline-meta">
           {/* 证据分级：确定性比对，不标 E3，也不出现「AI 判断」字样 */}
-          <span className="k8-elig-e2">E2 · 按政策原文逐条比对</span>
+          <span className="k8-elig-e2">按政策原文逐条比对</span>
           <span className="k8-elig-chip">共发布 <b>{result.items.length}</b> 条 · 其中 <b>{comparable.length}</b> 条录入了可比对条件</span>
           <span className="k8-elig-chip">你填了 <b>{result.answeredCount} / {questions.questions.length}</b> 项</span>
         </p>
@@ -112,27 +113,30 @@ export function EligibilityResults({
 }
 
 function ResultActions({ host, onRestart }: { host: HTMLElement | null; onRestart: () => void }) {
-  const actions: ReactNode = (
+  const restart: ReactNode = (
+    <button type="button" className="k8-elig-restart" onClick={onRestart}>
+      <RotateCcwIcon className="h-6 w-6" aria-hidden="true" />
+      重新填写并再比对一次
+    </button>
+  )
+  return (
     <>
-      <button type="button" className="k8-elig-restart" onClick={onRestart}>
-        <RotateCcwIcon className="h-6 w-6" aria-hidden="true" />
-        重新填写并再比对一次
-      </button>
-      <button
-        type="button"
-        className="k8-elig-print-blocked"
-        aria-disabled="true"
-        aria-describedby="k8-elig-print-why"
-        onClick={(event) => event.preventDefault()}
-      >
-        <PrinterIcon className="h-6 w-6" aria-hidden="true" />
-        打印核对清单（暂不可用）
-      </button>
-      <p id="k8-elig-print-why" className="why">{PRINT_BLOCKED_WHY}</p>
+      {host ? createPortal(restart, host) : <div className="k8-elig-actionbar">{restart}</div>}
+      <div className="k8-elig-actionbar">
+        <button
+          type="button"
+          className="k8-elig-print-blocked"
+          aria-disabled="true"
+          aria-describedby="k8-elig-print-why"
+          onClick={(event) => event.preventDefault()}
+        >
+          <PrinterIcon className="h-6 w-6" aria-hidden="true" />
+          打印核对清单（暂不可用）
+        </button>
+        <p id="k8-elig-print-why" className="rq-touch-hint why">{PRINT_BLOCKED_WHY}</p>
+      </div>
     </>
   )
-  if (!host) return <div className="k8-elig-actionbar">{actions}</div>
-  return createPortal(actions, host)
 }
 
 function PolicyResultCard({ item }: { item: EligibilityCheckItem }) {

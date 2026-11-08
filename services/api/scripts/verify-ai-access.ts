@@ -55,6 +55,7 @@ import { OrderQuoteController } from '../src/payment/order-quote.controller'
 import { PaymentController } from '../src/payment/payment.controller'
 import { PrintConversionController } from '../src/print-conversion/print-conversion.controller'
 import { PrintJobsController } from '../src/print-jobs/print-jobs.controller'
+import { ScanDeviceController } from '../src/scan-tasks/scan-device.controller'
 import { ScanTasksController } from '../src/scan-tasks/scan-tasks.controller'
 import { SyncController } from '../src/sync/sync.controller'
 import { TerminalsController } from '../src/terminals/terminals.controller'
@@ -212,6 +213,24 @@ async function guardOnRealRoutes(): Promise<void> {
   await through(TerminalsController as unknown as Ctor, 'heartbeat')
   check('guard:无标记路由零配置读取（支付回调、终端心跳）', reads === 0, `读取了 ${reads} 次`)
 
+  // 今日提醒是确定性清单；AI 授权、暂停和额度状态都不该触发 AI 守卫。
+  const daily = DailyBriefController as unknown as Ctor
+  let budgetChecks = 0
+  ;(service as unknown as { budget: { assertWithinBudget: () => Promise<void> } }).budget = {
+    assertWithinBudget: async () => { budgetChecks += 1; throw new Error('AI_BUDGET_EXHAUSTED') },
+  }
+  for (const [label, state] of [
+    ['未同意 AI', { ...OFF, declarationEnforced: true }],
+    ['AI 不可用', { ...OFF, paused: true }],
+    ['AI 额度用完', { ...OFF }],
+  ] as Array<[string, AiAccessConfig]>) {
+    config = state
+    reads = 0
+    check(`guard:今日提醒${label}仍放行且零 AI 配置读取`,
+      (await through(daily, 'create', MEMBER)) === 'PASS' && reads === 0 && budgetChecks === 0,
+      `AI 配置读取 ${reads} 次、额度检查 ${budgetChecks} 次`)
+  }
+
   config = { ...OFF, maintenance: true }
   const blocked: Array<[Ctor, string]> = [
     [PrintJobsController as unknown as Ctor, 'create'],
@@ -281,6 +300,9 @@ function coverage(): void {
       methodMeta(ctor, method, AI_USE_METADATA) === undefined && methodMeta(ctor, method, AI_USE_EXEMPT_METADATA) === undefined)
     check(`coverage:${ctor.name} 每个接口都有 @AiUse 或显式豁免`, missing.length === 0, `缺：${missing.join('、')}`)
   }
+  check('coverage:今日提醒明确豁免 AI 使用',
+    typeof methodMeta(DailyBriefController as unknown as Ctor, 'create', AI_USE_EXEMPT_METADATA) === 'string'
+      && methodMeta(DailyBriefController as unknown as Ctor, 'create', AI_USE_METADATA) === undefined)
   const neverBlocked: Ctor[] = [
     TerminalsController, PaymentController, SyncController, KioskSessionController, HealthController,
     MemberAuthController, LegalController, OrderQuoteController,
@@ -296,6 +318,8 @@ function coverage(): void {
     [MemberPrintOrdersController as unknown as Ctor, ['create']],
     [PackageOrdersController as unknown as Ctor, ['create']],
     [ScanTasksController as unknown as Ctor, ['create']],
+    // 屏上扫描（device 路线）：回报进度、改用面板、改设置都是「已开始的会话」上的动作，维护期间也要能继续，一个都不许拦。
+    [ScanDeviceController as unknown as Ctor, []],
     [UploadSessionsController as unknown as Ctor, ['create']],
     [PrintConversionController as unknown as Ctor, ['imagesToPdf']],
     [MaterialsController as unknown as Ctor, ['createTask']],

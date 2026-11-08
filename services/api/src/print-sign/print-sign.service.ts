@@ -21,6 +21,7 @@ import { countPdfPages } from '../files/file-page-count.util'
 import { sniffDeclaredMimeMismatch } from '../files/content-sniff'
 import { readImageDimensions } from '../print-conversion/image-dimensions.util'
 import type { FileSensitiveLevel } from '../files/file.types'
+import { isOrderOnlyFile } from '../files/retention-policy'
 
 const MAX_DOC_BYTES = 15 * 1024 * 1024
 const MAX_DOC_PAGES = 30
@@ -344,6 +345,8 @@ export class PrintSignService {
       derivationKind: 'signature',
       sourceFileId: args.document.fileId,
       createdBy: endUserId,
+      // 文档只用于这一单时 files.upload 按 sourceFileId 自动跟锁；签名图没有原件号可带，这里显式判。
+      orderOnly: isOrderOnlyFile(stampRecord),
     })
 
     const printSigned = signFileUrl(uploaded.fileId, OUTPUT_URL_TTL_MS)

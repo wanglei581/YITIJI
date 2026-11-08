@@ -13,6 +13,24 @@ const check = (condition, message) => {
 }
 const includes = (path, marker, message) => check(read(path).includes(marker), `${message}: ${marker}`)
 
+// 等手机传文件：两处等待说明和 60 秒提示均须实际在 JSX 中渲染。
+for (const [path, seconds, label] of [
+  ['src/pages/upload/components/UploadSessionQrPanel.tsx', 'remainingSeconds', 'expiresLabel'],
+  ['src/pages/print/file-source/FileSourceView.tsx', 'waitRemainingSeconds', 'waitCountdown'],
+]) {
+  const source = read(path)
+  if (path === 'src/pages/print/file-source/FileSourceView.tsx') {
+    // B10：三段说明收进一行可展开说明，等待锁与到期边界不变。
+    check(source.includes('<details className="fs-upload-fine">')
+      && source.includes('<summary>本机只认收到文件 · 等上传时请勿走开 · 清场与文件留存说明</summary>')
+      && source.includes('等你传文件期间，这台机器不会自动退出，请不要走开。二维码到期后没有操作，就会自动退出。')
+      && source.includes('<FileSourceTruth />'), `${path} 等待与清场说明保留在可展开行`)
+  } else {
+    check(source.includes('>等你传文件期间，这台机器不会自动退出，请不要走开。二维码到期后没有操作，就会自动退出。</'), `${path} 常驻等待说明`)
+  }
+  check(source.includes(`${seconds} > 0 && ${seconds} <= 60 && (`) && /role="status"/.test(source) && source.includes(`二维码还剩 {${label}}。还在传的话点一下屏幕，到期后可以在这里重新出码。`), `${path} 真实倒计时及 60 秒醒目提示`)
+}
+
 function stripCssComments(source) {
   return source.replace(/\/\*[\s\S]*?\*\//g, '')
 }
@@ -112,7 +130,49 @@ const frozen = {
   // 2026-09-29 重新冻结（W-81）：简历来源页传入 busyWhen="received"，等人扫、还没收到文件时不报忙；
   // 手机已传上或正在确认才报忙。其它调用方不传该参数，仍按会话还在（含等人扫）报忙。卸载仍补报不忙。
   // 旧哈希 1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f。
-  'src/pages/upload/components/UploadSessionQrPanel.tsx': '9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb',
+  // 2026-10-28 重新冻结（触屏版简历三条主路）：新增三个可选属性 onCancelled / onReceivedChange / confirmRef，
+  // 供简历来源页在自己的版面里画「已取消」说明、文件卡和底栏「确认使用这份文件」；
+  // 不传时行为与此前逐字节同一（取消、确认、报忙、刷新先撤销旧会话、已上传时刷新不可点都不变）。
+  // 冻结契约不放宽，仍逐字节校验；手机上传的既有行为由 verify:resume-phone-upload-ui 的 AST 断言继续钉住。
+  // 旧哈希 9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb。
+  // 2026-10-28 再次重新冻结（简历三条主路返工）：confirmRef 换成 onConfirmReady。原先把确认函数在渲染期写进 ref，
+  // 确认一开始父页不重渲染，页面读到的还是确认前的旧闭包，底栏仍写「确认使用这份文件」、没禁用，双击会把
+  // /confirm 发两遍。现在面板在 effect 里把确认函数交给页面（有文件且不在确认中才交，确认中与卸载交 null），
+  // 页面放进 state，底栏随之写「正在确认…」并禁用；面板里另加不随渲染变的在途标记，同一帧内的两次点击也只发一次。
+  // 仍是可选属性，不传时行为不变。冻结契约不放宽，仍逐字节校验；既有行为由 verify:resume-phone-upload-ui 继续钉住，
+  // 新行为由它新加的几条断言和 W3 的手机确认用例钉住。
+  // 旧哈希 97a46d6d5dc1ef8aaafdc1ff99de267d673bb992bac1de6a7ebfa64be8453c82。
+  // 2026-10-29 重新冻结（一体机手机码改短链）：出码调用换成 buildPhoneUploadQrUrl，import 同步换名；面板其余逐字未动。
+  // 旧哈希 9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb。
+  // 2026-10-29 重新冻结（触屏版集成：并入第一包新头里 #1519 的出码调用换名）：触屏版简历三条主路（上面 10/28 两次）和 #1519
+  // （一体机手机码改短链，上一条）各自改了这个文件，改动互不相交——前者加可选属性与 onConfirmReady，后者只换 import 与一处出码调用；
+  // 合并后的文件就是两者之和，没有别的改动。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 cc895ab96ceea8b511bbbb638c669e38dd0414cb9e8a53636258229806a3b32a（第四包终稿）、1e0e0b9256304a822d4b075394ed3aa855f47689594a391be7fa6d057a3ff56f（#1519）。
+  // 2026-10-29 重新冻结（#1519 留给触屏版第四包的面板接线）：码旁说明、手机传来文件后的来源与提醒三处文案都从
+  // copy/miniappLinkCopy.ts 取（phoneUploadScanHint(contact) 非空串时换掉原句「请用手机微信或浏览器扫码」，空串＝小程序未发布或读不到联系方式，
+  // 保持原句；已收到文件后在文件名下加 uploadedFileSourceLine(文件来源)（读不到来源不写）与 notYourFileHint()）。联系方式用 useSupportContact()。
+  // 只多两行 import、一行 hook、三行取句子、两行 JSX，二维码、轮询、取消、确认、报忙、刷新先撤销旧会话、已上传时刷新不可点都逐字未动。
+  // 冻结契约不放宽，仍逐字节校验；新行为由 scripts/tests/miniapp-link-copy.test.mjs 的接线断言和 fusion-w3 / fusion-w2 的浏览器用例钉住。
+  // 旧哈希 98691610ccd48ff766ff7d28256ed8814afb024ad454305f9de6345c0639db14。
+  // 2026-10-29 重新冻结（触屏版走查 I-14，B 路）：签名图（signature_image）确认后只留系统短期、不进「我的文档」，面板里「会员文件确认后归档」对它不成立；
+  // 只在那一处条件上加 purpose !== 'signature_image'，二维码、轮询、取消、确认、刷新先撤销旧会话等都逐字未动。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 7f0cacce1e2b505548a4a141e2b63c71517c8ec5fe5d47fc827732a461f3e524。
+  // 2026-11-03 重新冻结（B6b-1）：独立等待锁、到期提醒、真实卸载作废。新内容断言在哈希检查之前。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
+  // 2026-11-03 重新冻结（重做旧候选 #1461）：取消失败不再清屏——二维码和已收到的文件留着，屏上沿用打印上传页那句兜底，
+  // 可以重试取消或去确认；取消中三个按钮都禁用。成功才清空，已作废码清二维码并按过期显示。不恢复轮询、不自动接走文件。
+  // 新行为由 verify:resume-phone-upload-ui 的断言钉住。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
+  // 2026-11-04 重新冻结（并入 #1566）：取消失败按 #1566 留屏，触控尺寸、忙碌锁与卸载作废仍按 #1570。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e（#1570）、018fd611a3350ce53fa3b79fceb887c5a5b0d56a2d47f36d418f3b6745b816ca（#1566）。
+  // 2026-11-03 再次冻结（B6b-1 返工）：同一页切换来源不再作废上传码，切回来继续用同一张；
+  // 离开页面才作废还没收到文件的会话。已卸载的实例不得作废屏上正在显示的那张码。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e。
+  // 2026-11-04 再次冻结（#1570 返工：并入派工窗口的上传码租约修复 a6a7bbfe3，再与 #1566 合写取消处理）：
+  // 同一页切换来源只停放上传码、离开页面才作废，已卸载的实例不作废屏上正显示的码；取消成功才收租约并清空，
+  // 已作废按过期显示，其他失败码和已收到的文件都留着。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 f0d8bc199b75c6ad6c12b87d517c81c6bef38baea72099231c8c68569802d60e（并入 #1566 后）、2109b8ce60b6d58f7f5028435a51ef3544310f2c00549e587bc2688058da91e3（租约修复）。
+  'src/pages/upload/components/UploadSessionQrPanel.tsx': '738d4f455b926a85e51ad56c38fabe339d1def48fd43a12967bf03e03a8ca4ba',
   'src/pages/resume/aiResumeSession.ts': '5d023ee2388ecb12a3ba84a6b2b28c21e54ad65dece16eccc019f9dc43b5b164',
   'src/pages/resume/jobMaterialDraft.ts': '4a2404627c392c55cd39a6f525c522ce27cfec669f91d3b6ad5bb79f0de358ce',
   'src/pages/resume/hooks/useResumeLayout.ts': '2ef1c554e949344ce9d66430c521b986f5419db8627c4fcde1ef78d5927555e7',
@@ -129,7 +189,15 @@ const frozen = {
   // 2026-10-06 重新冻结：live 后若一直没有远端音量也没有字幕，12 秒提示、30 秒结束会话并转文字。
   // 身份、声明、停止与到点降级仍由 assistant-trtc-guard 钉住。冻结仍是逐字节校验，没有删断言。
   // 旧哈希 7f4c697aca220e1c48f3a9df2f450800d0aec72b4c391488fed62caff797d0c6。
-  'src/hooks/useAiAdvisorCallSession.ts': '9843b115f8bec2868e4f5c961ac3a3ab9cd3f5f77b5c2cd623ec3af82a65bfe4',
+  // 2026-10-29 重新冻结：现场无人值守（产品负责人 10/4 定），「当前设备身份不可用」那一句不再叫用户去找现场的人，
+  // 换成 copy/unattendedCopy 的标准句 3（整台机器暂时不能用）。只多一行导入、换一句文案，通话流程没动；
+  // 身份、声明、停止与到点降级仍由 assistant-trtc-guard 钉住。冻结仍是逐字节校验，没有删断言。
+  // 这句也在 verify:kiosk-unattended-copy 的共享模块零容忍范围内，改回旧句会同时红两条。
+  // 触屏版第 5 包 2026-10-28 也独立改过同一句（同样换成 machineUnusableLine()，import 摆的位置不同、多一行注释，
+  // 当时冻结的哈希 59c5d239bb209a5906111fd15e05abb3e49bd2a6c5c1402044f6b378a5607f25）；集成时两边并出重复 import，
+  // 文件整份取 main 的版本（语义逐字相同），所以冻结值就是 main 这一条，第 5 包那条作废。
+  // 旧哈希 9843b115f8bec2868e4f5c961ac3a3ab9cd3f5f77b5c2cd623ec3af82a65bfe4。
+  'src/hooks/useAiAdvisorCallSession.ts': 'ec52fe181cf0cea681a526a844d56a3a8ef5223730f12e5f6fe5f3e62f3ecde4',
 }
 for (const [path, hash] of Object.entries(frozen)) check(sha256(path) === hash, `${path} remains frozen`)
 
@@ -220,18 +288,38 @@ const qxScreens = new Set([
   // 稿 05-ai-cockpit（/assistant），2026-09-24 迁入。
   'src/pages/assistant/AssistantPage.tsx',
 ])
+const touchResume = new Set([
+  'src/pages/resume/ResumeSourcePage.tsx',
+  'src/pages/resume/ResumeParsePage.tsx',
+  'src/pages/resume/ResumeReportPage.tsx',
+  'src/pages/resume/ResumeOptimizePage.tsx',
+])
+const touchResumeScreens = new Set([
+  'src/pages/resume/JobMaterialLibraryPage.tsx',
+  'src/pages/resume/JobFitPage.tsx',
+  'src/pages/resume/CareerPlanPage.tsx',
+  'src/pages/resume/ResumeTemplateLibraryPage.tsx',
+  'src/pages/resume/ResumeGeneratePage.tsx',
+  'src/pages/resume/ResumeGeneratePreviewPage.tsx',
+])
 for (const [path, screen] of screens) {
   const isInterview = path.includes('/interview/')
-  const frame = qxScreens.has(path)
-    ? 'QxPageFrame'
-    : isInterview
-      ? 'InterviewShell'
-      : 'KioskPageFrame'
+  const frame = touchResume.has(path)
+    ? 'ResumeTouchPage'
+    : touchResumeScreens.has(path)
+      ? 'ResumeTouchFrame'
+      : path.endsWith('/AssistantPage.tsx')
+        ? 'PublicTouchFrame'
+        : qxScreens.has(path)
+          ? 'QxPageFrame'
+          : isInterview
+            ? 'InterviewShell'
+            : 'KioskPageFrame'
   includes(path, frame, `${screen} consumes the frozen W1 frame`)
   includes(path, `data-kiosk-screen="${screen}"`, `${screen} exposes its stable landmark`)
 }
-includes('src/pages/interview/InterviewShell.tsx', 'QxPageFrame', 'interview shell uses Qingxu page frame')
-includes('src/pages/interview/InterviewShell.tsx', 'QxAppNavbar', 'interview shell uses shared Qingxu navbar')
+includes('src/pages/interview/InterviewShell.tsx', 'QxTouchScreen', 'interview shell uses Qingxu touch screen')
+includes('src/pages/interview/InterviewShell.tsx', 'QxTouchNav', 'interview shell uses shared Qingxu touch nav')
 includes('src/pages/interview/InterviewWorkbenchPage.tsx', 'readInterviewWorkbenchSession', 'interview workbench rehydrates from sessionStorage')
 includes('src/pages/interview/InterviewWorkbenchPage.tsx', 'replace: true', 'interview stage changes replace history')
 includes('src/pages/interview/InterviewWorkbenchPage.tsx', 'parseInterviewStage', 'interview workbench parses ?stage=')
@@ -254,7 +342,7 @@ check(!read('src/pages/resume/JobFitPage.tsx').includes('KioskFullscreenShell'),
 // /resume/templates 在 KioskRoot 之内，舞台由 KioskRoot 负责，页面不得再挂第二层缩放。
 for (const path of ['src/pages/resume/CareerPlanPage.tsx', 'src/pages/resume/JobFitActionsPage.tsx']) {
   includes(path, '<JobFitStage>', `${path} keeps the fixed 1080x1920 host stage after the Qingxu migration`)
-  includes(path, 'QxPageFrame', `${path} uses the Qingxu page frame`)
+  includes(path, 'ResumeTouchFrame', `${path} uses the touch page frame`)
   check(!/KioskFullscreenShell|KioskPageFrame|job-fit-inkpaper|service-desk/.test(read(path)), `${path} has left the V6/LightFlow chrome`)
 }
 includes('src/pages/resume/JobFitActionsPage.tsx', 'data-kiosk-screen="resume-job-fit-actions"', 'resume-job-fit-actions exposes its stable landmark')
@@ -279,17 +367,19 @@ for (const path of ['src/pages/resume/JobFitPage.tsx', 'src/pages/resume/CareerP
   check(!read(path).includes('standalone'), `${path} does not bypass the fixed stage with a standalone frame`)
 }
 
-// 2026-09-28 稿 21 v2 summary 明确为文件 → 办理摘要 → 可展开的方向设置。
-// 旧双栏 / 0.9 比例是被稿替换的结构；440px 方向区下限与标题不逐字折行不放宽。
+// 触屏版把方向设置收成「诊断方向」一步。来源三列、卡片下限、可改设置在只读维度前面（稿：范围 → 两条路 → 六维只读）、路径标题不折行，按稿保留，不放宽。
+// 样式在 touch/source.css（来源卡）与 touch/direction.css（诊断方向），版面在 touch/ResumeSourceWhere.tsx 与 DiagnosisDirectionForm.tsx。
 const resumeSource = read('src/pages/resume/ResumeSourcePage.tsx')
-const resumeTriageCss = stripCssComments(read('src/pages/resume/resume-triage-qx.css'))
-check(resumeSource.includes('className="qx-rt-split"') && /(?:^|;)\s*display:\s*flex\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-split')), 'resume source uses the design-21 vertical summary stage')
+const resumeSourceCss = stripCssComments(read('src/pages/resume/touch/source.css'))
+const resumeDirectionCss = stripCssComments(read('src/pages/resume/touch/direction.css'))
+const directionForm = read('src/pages/resume/components/DiagnosisDirectionForm.tsx')
+const directionPane = directionForm.slice(directionForm.indexOf('qxt-form-focus'))
+check(/(?:^|;)\s*min-height:\s*148px\s*;?/.test(cssRuleBody(resumeSourceCss, "[data-qx-page='resume-src'] .qxt-src")), 'resume source cards keep a 148px minimum')
 check(!resumeSource.includes('lg:w-[348px]'), 'resume source removes the undersized 348px direction rail')
-check(/(?:^|;)\s*min-width:\s*440px\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-side')), 'resume source direction rail keeps a 440px minimum at 1080')
-check(/flex-direction:\s*column/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-split')), 'resume source keeps file and summary in one vertical column')
-check(resumeSource.indexOf('<ResumeSourceSummary') < resumeSource.indexOf('<DiagnosisDirectionForm'), 'read-only summary precedes editable direction settings')
-check(resumeSource.includes('<details className="qx-rt-settings">'), 'direction settings remain accessible through the design disclosure')
-check(/(?:^|;)\s*white-space:\s*nowrap\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-direction h2')), 'resume direction title cannot wrap character by character')
+check(/grid-template-columns:\s*1fr 1fr 1fr/.test(cssRuleBody(resumeSourceCss, "[data-qx-page='resume-src'] .qxt-srcs")), 'resume source cards stay in three columns')
+check(directionPane.indexOf('className="qxt-modes"') >= 0 && directionPane.indexOf('className="qxt-modes"') < directionPane.indexOf('qxt-see'), 'editable direction settings precede the read-only summary')
+check(directionForm.includes('aria-label="诊断方向设置"'), 'direction settings remain accessible on the direction step')
+check(/(?:^|;)\s*white-space:\s*nowrap\s*;?/.test(cssRuleBody(resumeDirectionCss, "[data-qx-page='resume-direction'] .qxt-intent b")), 'resume direction title cannot wrap character by character')
 for (const route of ['/resume/source', '/resume/parse']) includes('src/layouts/KioskRoot.tsx', `'${route}'`, `${route} is registered as Qingxu-migrated`)
 // 稿 25-material-workshop 迁入青序流光（2026-09-23）：此前这里钉的是「materials 不在本批」，
 // 迁入后改为正向断言——登记进 QX_MIGRATED_ROUTES、舞台由 KioskRoot 缩放、旧 LightFlow 壳全部退出。
@@ -321,7 +411,11 @@ includes('src/pages/interview/InterviewSessionPage.tsx', 'transcribeAnswer(', 'i
 // 下一题请求挪到 interviewTurnActions.ts（会话页 500 行门禁）。断言仍要求真实 answerInterview，并要求会话页还走这条提交。
 includes('src/pages/interview/session/interviewTurnActions.ts', 'answerInterview(', 'interview keeps question progression')
 includes('src/pages/interview/InterviewSessionPage.tsx', 'submitInterviewAnswer(', 'interview page still submits answers through the extracted turn')
-includes('src/pages/resume/ResumeSourcePage.tsx', 'useBusyLock(sourceBusy)', 'upload busy lock remains')
+includes('src/pages/resume/ResumeSourcePage.tsx', 'useBusyLock(uploading || usbBusy)', '简历来源页的清场锁不含扫码面板的忙')
+check(
+  !/\b(?:qrBusy|phoneBusy|sourceBusy|showQr)\b/.test(read('src/pages/resume/ResumeSourcePage.tsx').match(/useBusyLock\(([^)]*)\)/)?.[1] ?? 'qrBusy'),
+  '简历来源页的 useBusyLock 实参不得再出现 qrBusy / phoneBusy / sourceBusy / showQr',
+)
 includes('src/pages/resume/ResumeSourcePage.tsx', "navigate('/resume/parse'", 'source keeps parse handoff')
 includes('src/pages/resume/ResumeParsePage.tsx', 'saveAiResumeSession({ taskId: result.taskId, accessToken: result.accessToken })', 'anonymous session remains minimal')
 includes('src/pages/resume/ResumeReportPage.tsx', 'getResumeRecord(taskId, { token: getToken(), accessToken })', 'report read remains credential gated')
@@ -374,6 +468,21 @@ for (const file of [
   check(!read(file).includes('工作人员'), `${file} does not ask for on-site staff`)
   check(!read(file).includes('服务台'), `${file} does not mention a service desk`)
 }
+// 2026-10-28 触屏版第 5 包：问小青页的「按住说话」与语音通话的错误句都不得叫人去找现场的人（现场没有人）。
+// 求助只给服务电话（标准句，读不到号码就不写）；机器没有终端编号时用标准句 3。清场遮罩那一条在 verify-scan-session-truth。
+for (const file of [
+  'src/pages/assistant/AssistantHoldToTalk.tsx',
+  'src/pages/assistant/AssistantCallPanel.tsx',
+  'src/hooks/useAiAdvisorCallSession.ts',
+]) {
+  check(!read(file).includes('工作人员'), `${file} does not ask for on-site staff`)
+}
+includes('src/hooks/useAiAdvisorCallSession.ts', 'setErrMsg(machineUnusableLine())', 'call without a terminal id uses the unattended standard line')
+includes('src/pages/assistant/AssistantHoldToTalk.tsx', 'micReason(mic, helpLine)', 'hold-to-talk mic reason goes through the page copy with the visible help line')
+check(
+  /if \(mic === 'permission-denied'\) \{[\s\S]{0,160}?helpLine \? `\$\{base\}\$\{helpLine\}` : base/.test(read('src/pages/assistant/AssistantHoldToTalk.tsx')),
+  'permission-denied reason adds only the service-phone line, and only when the number is readable',
+)
 check(!existsSync(join(ROOT, 'src/pages/resume/ResumeExportPage.tsx')), 'AI-07 ResumeExportPage is deleted')
 includes('src/routes/index.tsx', 'path: \'resume/export\'', 'AI-07 keeps /resume/export as a compatibility route')
 includes('src/routes/index.tsx', '<Navigate to="/resume/optimize" replace />', 'AI-07 /resume/export redirects to real optimize export')
@@ -415,9 +524,9 @@ if (existsSync(join(ROOT, 'playwright.w3.config.ts'))) {
   const config = read('playwright.w3.config.ts')
   const spec = read('tests/visual/fusion-w3.spec.ts')
   const selfAssessmentSpec = read('tests/visual/fusion-self-assessment-flow.spec.ts')
-  includes('playwright.w3.config.ts', 'testMatch: /(?:fusion-w3|fusion-self-assessment-flow|w16-ai-declaration)\\.spec\\.ts$/', 'W3 browser config collects W3, the sensitive self-assessment preview, and the W-16 declaration scenario')
+  includes('playwright.w3.config.ts', 'testMatch: /(?:fusion-w3|fusion-self-assessment-flow|w16-ai-declaration|upload-scan-wait|resume-usb-compare-1104)\\.spec\\.ts$/', 'W3 browser config collects W3, the sensitive self-assessment preview, the W-16 declaration scenario, phone-upload wait, and the 1104 resume USB / compare fixes')
   includes('playwright.w3.config.ts', "port 4183 --strictPort", 'W3 browser config owns port 4183')
-  for (const env of ['VITE_API_MODE=http', 'VITE_API_BASE_URL=/api/v1', 'VITE_USE_TRTC_CALL=true', 'VITE_ALLOW_TEXT_ONLY_ASSISTANT=false', 'VITE_TERMINAL_ID=KSK-001', 'VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token']) check(config.includes(env), `W3 browser build pins ${env}`)
+  for (const env of ['VITE_API_MODE=http', 'VITE_API_BASE_URL=/api/v1', 'VITE_USE_TRTC_CALL=true', 'VITE_ALLOW_TEXT_ONLY_ASSISTANT=false', 'VITE_TERMINAL_ID=KSK-001', 'VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token', 'VITE_ENABLE_CONTRACT_REVIEW=true']) check(config.includes(env), `W3 browser build pins ${env}`)
   for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report', 'advisor artifact eight proto states fit the kiosk stage', 'advisor artifact renders covered evidence as a quotation', 'advisor artifact print-unavailable state has no print button', 'advisor artifact print waits for the server receipt', 'advisor artifact no-artifact shows the three jobs and opens AI records', 'advisor artifact expired offers only a redo', 'advisor artifact content state opens my documents']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
   check(selfAssessmentSpec.includes('自评 PDF 在隐私根内预览且不打开新标签页 @w3-kiosk'), 'W3 browser scenario exists: self-assessment PDF stays inside the privacy root')
   for (const forbidden of ['addInitScript', 'localStorage', 'sessionStorage', 'waitForTimeout']) check(!spec.includes(forbidden), `W3 browser spec avoids ${forbidden}`)

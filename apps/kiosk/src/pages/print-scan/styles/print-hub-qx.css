@@ -641,3 +641,326 @@ button.ph-chip { cursor: pointer; }
 .ph-page .ph-notices { width: auto; max-width: 45%; }
 .ph-page .ph-notices > summary { min-height: 48px; flex-direction: row; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 760px) { [data-kiosk-stage-fit='off'] .ph-page .ph-notices { max-width: none; width: 100%; } }
+
+/* ── 复印说明 · 图文分步（/print-scan/feature/copy；?view=cases 是第二视图）────────────
+ * 照补稿 docs/design/kiosk-touch-2026-11-copyscan 的 cs-copy-guide / cs-copy-guide-more（cs-g- 开头的样式）。
+ * 类名一律 .qx-copy-guide- 开头，只管这一页，上面的规则一条不动。颜色走令牌，不写裸色值。
+ * 1080×1920 一屏放下：卡片吃掉剩余高度（flex-grow），不靠定高；放不下（小青接不上多一行提示）时整页滚动。
+ * 要压过 tool-touch.css / tool-fs.css 里写给旧版复印页的规则，所以选择器多挂了几层。 */
+.qxt-screen.scan-touch .ph-page.qx-copy-guide-page[data-state='feature-copy'] {
+  gap: 10px;
+  padding: 0;
+}
+.qx-copy-guide-steps { flex: 1 1 auto; display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.qx-copy-guide-steps > li { flex: 1 1 auto; }
+
+/* 卡片：第 1、2 步各一张；第 3–5 步是同一张卡里的三行（首行带上边框和圆角，末行带下边框和圆角，行间一条分隔线）。 */
+.qx-copy-guide-card,
+.qx-copy-guide-row {
+  display: grid;
+  column-gap: 14px;
+  align-items: start;
+  align-content: center;
+  min-width: 0;
+  background-color: var(--qxt-card);
+  border: 2px solid var(--qxt-edge);
+}
+.qx-copy-guide-card {
+  grid-template-columns: 44px minmax(0, 1fr);
+  margin-bottom: 10px;
+  padding: 14px 22px 16px;
+  border-radius: 28px;
+}
+.qx-copy-guide-row {
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  padding: 12px 22px 14px;
+  border-width: 0 2px;
+}
+.qx-copy-guide-row[data-pos='first'] { border-top-width: 2px; border-radius: 28px 28px 0 0; }
+.qx-copy-guide-row[data-pos='last'] { border-bottom-width: 2px; border-radius: 0 0 28px 28px; }
+.qx-copy-guide-row:not([data-pos='first']) {
+  background-image: linear-gradient(var(--qxt-line), var(--qxt-line));
+  background-repeat: no-repeat;
+  background-position: 22px 0;
+  background-size: calc(100% - 44px) 1.5px;
+}
+.qx-copy-guide-n {
+  width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--qx-deep); color: var(--qxt-cream); font: 700 var(--qxt-fs-askq) / 1 var(--qx-sans);
+}
+.qx-copy-guide-m { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.qx-copy-guide-h {
+  min-height: 44px; margin: 0; display: flex; align-items: center;
+  font: 700 var(--qxt-fs-hub) / 1.25 var(--qx-serif); color: var(--qxt-ink);
+}
+.qx-copy-guide-p {
+  margin: 0;
+  font-size: var(--qxt-fs-askq);
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+  text-wrap: pretty;
+}
+.qx-copy-guide-p b { font-weight: 700; color: var(--qxt-ink); white-space: nowrap; }
+
+/* 第 1 步：进纸器、玻璃两种放法，各一张小图，下面一条提醒。 */
+.qx-copy-guide-two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 2px; }
+.qx-copy-guide-pick { display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 12px; align-items: center; }
+.qx-copy-guide-vis {
+  width: 116px; height: 116px; border-radius: 20px; display: grid; place-items: center; overflow: hidden;
+  background: var(--qxt-well);
+}
+.qx-copy-guide-svg { display: block; width: 100%; height: auto; }
+.qx-copy-guide-svg.qx-copy-guide-flip { width: 496px; max-width: 100%; }
+.qx-copy-guide-warn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 2px 0 0;
+  padding: 9px 16px;
+  border-radius: 16px;
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+  font-size: var(--qxt-fs-askq);
+  font-weight: 600;
+  line-height: 1.45;
+}
+.qx-copy-guide-warn svg { flex: none; }
+
+/* 第 2 步：主页键提示、打印机面板主屏、三行「点哪个」、进第二视图的按钮。 */
+.qx-copy-guide-hint { display: flex; align-items: center; gap: 10px; margin-top: -2px; }
+.qx-copy-guide-hint svg { flex: none; color: var(--qxt-teal-ink); }
+.qx-copy-guide-sp { display: flex; align-items: center; gap: 20px; margin-top: 4px; }
+.qx-copy-guide-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.qx-copy-guide-panel {
+  position: relative;
+  display: flex;
+  flex: none;
+  gap: 12px;
+  width: 520px;
+  height: 212px;
+  padding: 12px;
+  border-radius: 26px;
+  background: var(--qxt-ink);
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--qxt-ink) 85%, var(--qxt-mint)),
+    0 8px 18px color-mix(in srgb, var(--qx-deep) 16%, transparent);
+}
+.qx-copy-guide-panel[data-size='md'] { width: 480px; height: 216px; }
+.qx-copy-guide-keys { flex: none; width: 56px; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+.qx-copy-guide-panel[data-size='md'] .qx-copy-guide-keys { width: 54px; }
+.qx-copy-guide-key {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--qxt-ink) 86%, var(--qxt-mint));
+  color: color-mix(in srgb, var(--qxt-mint) 55%, var(--qxt-cream));
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--qxt-ink) 75%, var(--qxt-mint));
+}
+.qx-copy-guide-key[data-lit='home'] { color: white; box-shadow: inset 0 0 0 2.5px var(--qx-emerald); }
+.qx-copy-guide-scr {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 9px;
+  border-radius: 16px;
+  background: color-mix(in srgb, white 35%, var(--qxt-art-track));
+}
+.qx-copy-guide-btns { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.qx-copy-guide-b {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 11px 2px 6px;
+  border-radius: 12px;
+  background: white;
+  color: var(--qxt-ink-2);
+  text-align: center;
+  box-shadow: inset 0 0 0 1.5px var(--qxt-art-rule);
+}
+.qx-copy-guide-lab { font: 700 var(--qxt-fs-rail) / 1.2 var(--qx-sans); }
+.qx-copy-guide-b[data-tone='on'] {
+  background: var(--qx-teal);
+  color: white;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--qx-emerald) 50%, transparent);
+}
+.qx-copy-guide-b[data-tone='sub'] {
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  box-shadow: inset 0 0 0 2px var(--qx-teal);
+}
+.qx-copy-guide-bar {
+  height: 30px; border-radius: 9px; display: flex; align-items: center; gap: 10px; padding: 0 12px;
+  background: var(--qxt-art-rule); color: var(--qxt-ink-2); font-size: var(--qxt-fs-aux); line-height: 1;
+}
+.qx-copy-guide-bar i { width: 12px; height: 12px; border-radius: 50%; background: var(--qx-teal); }
+.qx-copy-guide-tap {
+  position: absolute;
+  right: -14px;
+  bottom: -24px;
+  color: var(--qx-deep);
+  filter: drop-shadow(0 2px 3px color-mix(in srgb, black 30%, transparent));
+}
+/* 按钮：.qxt-screen button 的重置（0,1,1）比单独的类（0,1,0）重，前面挂上 .qxt-screen 压回来。 */
+.qxt-screen .qx-copy-guide-more {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 80px;
+  padding: 8px 12px 8px 10px;
+  border: 2px solid var(--qx-teal);
+  border-radius: 22px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--qxt-t-press);
+}
+.qxt-screen .qx-copy-guide-more:active { transform: scale(0.985); }
+.qx-copy-guide-more svg { flex: none; }
+.qx-copy-guide-moretx { flex: 1; min-width: 0; }
+.qx-copy-guide-more b { display: block; font-size: var(--qxt-fs-askq); line-height: 1.45; }
+.qx-copy-guide-more small { display: block; font-size: var(--qxt-fs-rail); line-height: 1.45; opacity: 0.85; }
+
+/* 第 3–5 步右边的配图：图标底、出纸口。 */
+.qx-copy-guide-art { align-self: center; display: grid; place-items: center; }
+.qx-copy-guide-well {
+  width: 84px; height: 84px; border-radius: 22px; display: grid; place-items: center;
+  background: var(--qxt-teal-wash); color: var(--qxt-teal-ink);
+}
+.qx-copy-guide-tray { display: block; width: 108px; }
+
+/* 两条提醒（两个视图共用）。tool-fs.css 给 print-hub-copy-legal 写过一条泥色卡片规则，这里按补稿的细条重述。 */
+.qx-copy-guide-notes { flex: none; display: flex; flex-direction: column; gap: 10px; }
+.qxt-screen.scan-touch .qx-copy-guide-notes .qxt-remind {
+  min-height: 0;
+  margin: 0;
+  padding: 14px 22px;
+  border-radius: var(--qxt-r-btn);
+  font-size: var(--qxt-fs-askq);
+  line-height: 1.45;
+}
+.qx-copy-guide-taketx { min-width: 0; }
+.qxt-screen.scan-touch .qx-copy-guide-taketx [data-testid='service-phone-line'] {
+  display: inline; margin: 0; padding: 0; background: none; color: inherit; font: inherit;
+}
+.qxt-screen.scan-touch .qx-copy-guide-notes .qx-copy-guide-big {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin: 0;
+  padding: 22px 28px;
+  border-radius: var(--qxt-r-btn);
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+  font: 700 30px / 1.45 var(--qx-serif);
+}
+.qx-copy-guide-big svg { flex: none; }
+.qx-copy-guide-line { display: block; }
+
+/* 第二视图：身份证、发票收据、正反两面都有字，各一张图、一段话、一条小提示。 */
+.qx-copy-guide-kinds { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; }
+.qx-copy-guide-kind {
+  display: grid;
+  grid-template-columns: 540px minmax(0, 1fr);
+  gap: 26px;
+  align-items: center;
+  padding: 18px 26px 18px 18px;
+  border: 2px solid var(--qxt-edge);
+  border-radius: 28px;
+  background: var(--qxt-card);
+}
+.qx-copy-guide-pic { display: grid; place-items: center; padding: 22px 0; border-radius: 22px; background: var(--qxt-well); }
+.qx-copy-guide-kh { margin: 0 0 8px; font: 700 var(--qxt-fs-slab) / 1.25 var(--qx-serif); color: var(--qxt-ink); }
+.qx-copy-guide-kind .qx-copy-guide-p { font-size: var(--qxt-fs-body); line-height: 1.5; }
+.qx-copy-guide-nw { white-space: nowrap; }
+.qx-copy-guide-pill {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 10px 0 0;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: var(--qxt-fs-askq);
+  font-weight: 600;
+  line-height: 1.45;
+  text-wrap: balance;
+}
+.qx-copy-guide-pill[data-tone='clay'] { background: var(--qxt-clay-wash); color: var(--qxt-clay-ink); }
+.qx-copy-guide-pill svg { flex: none; margin-top: 3px; }
+
+/* 手机宽度（舞台不缩放）：并排的收成单列，面板和图随宽度缩；正文不小于 15px（一体机 20px 的底线只管 1080 舞台）。 */
+@media (max-width: 760px) {
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-steps,
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-steps > li,
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-kinds { flex: none; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-card,
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-row { column-gap: 10px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-card { grid-template-columns: 34px minmax(0, 1fr); padding: 10px 12px 12px; border-radius: 20px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-row { grid-template-columns: 34px minmax(0, 1fr) auto; padding: 10px 12px 12px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-row[data-pos='first'] { border-radius: 20px 20px 0 0; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-row[data-pos='last'] { border-radius: 0 0 20px 20px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-row:not([data-pos='first']) { background-position: 12px 0; background-size: calc(100% - 24px) 1.5px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-n { width: 34px; height: 34px; font-size: 16px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-h { min-height: 34px; font-size: 20px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-p,
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-warn,
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-pill,
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-kind .qx-copy-guide-p,
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qx-copy-guide-notes .qxt-remind { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-two { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-pick { grid-template-columns: 84px minmax(0, 1fr); }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-vis { width: 84px; height: 84px; border-radius: 14px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-sp { flex-direction: column; align-items: stretch; gap: 12px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-panel,
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-panel[data-size='md'] { width: 100%; height: 150px; padding: 8px; gap: 8px; border-radius: 18px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-keys,
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-panel[data-size='md'] .qx-copy-guide-keys { width: 36px; gap: 6px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-key { border-radius: 10px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-key svg { width: 20px; height: 20px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-scr { gap: 6px; padding: 6px; border-radius: 12px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-btns { gap: 5px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-b { gap: 3px; padding: 8px 0 4px; border-radius: 9px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-b > svg:not(.qx-copy-guide-tap) { width: 26px; height: 26px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-lab,
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-bar { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-bar { height: 24px; padding: 0 8px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-tap { right: -6px; bottom: -14px; width: 28px; height: 28px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-more { min-height: 56px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-more b { font-size: 16px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-more small { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-well { width: 52px; height: 52px; border-radius: 14px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-well svg { width: 30px; height: 30px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-tray { width: 64px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-kind { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 10px; border-radius: 20px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-pic { padding: 12px 8px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-svg.qx-copy-guide-flip { width: 100%; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-kh { font-size: 20px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qx-copy-guide-notes .qxt-remind { padding: 10px 12px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qx-copy-guide-notes .qx-copy-guide-big { gap: 12px; padding: 12px 14px; font-size: 18px; }
+  [data-kiosk-stage-fit='off'] .qx-copy-guide-big svg { width: 34px; height: 34px; }
+}
+
+/* 触屏稿 print / st-loading（2026-11-04 证件照停放）：其他工具六列。
+   前几张各占两列，最后两张（我的文档、打印订单）各占半行。
+   选择器压过 touch.css 的三列 .qxt-tools，只管本页。
+   只适用于停放后的 5 张卡；证件照卡重新打开时整段删掉（见 printHubContent.ts 的 ID_PHOTO_ENTRY_PARKED）。 */
+[data-qx-page='print-hub'] .qxt-print-hub .qxt-tools {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+}
+[data-qx-page='print-hub'] .qxt-print-hub .qxt-tools > * {
+  grid-column: span 2;
+}
+[data-qx-page='print-hub'] .qxt-print-hub .qxt-tools > :nth-last-child(-n+2) {
+  grid-column: span 3;
+}

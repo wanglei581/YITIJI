@@ -1,5 +1,7 @@
 // pages/print/print.js
 const { SUPPORT_HINT } = require('../../utils/user-error')
+const api = require('../../utils/api')
+const { resolveSupportView, supportFields, callSupportPhone } = require('../../utils/support-contact')
 const app = getApp()
 
 // 底部「打印」Tab。原「求职」Tab 的位置在无人力资源服务许可证期间让给打印：
@@ -9,6 +11,9 @@ Page({
   data: {
     // 现场无人值守：需要帮助只有服务电话（utils/user-error.js SUPPORT_HINT）
     supportHint: SUPPORT_HINT,
+    supportPhone: '',
+    canCallPhone: false,
+    supportHoursText: '',
     statusBarHeight: 20,
     // 首期真实流程：本人文件 → 选终端 → 到机核验 → 机端支付与打印。
     steps: [
@@ -30,7 +35,22 @@ Page({
 
   onLoad() {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
+    this._loadSupport()
   },
+
+  _loadSupport() {
+    if (this._supportOnce) return
+    this._supportOnce = true
+    if (typeof api.getSupportContact !== 'function') return
+    let pending
+    try { pending = api.getSupportContact() } catch (_) { return }
+    if (!pending || typeof pending.then !== 'function') return
+    pending.then((data) => {
+      this.setData(supportFields(resolveSupportView(data)))
+    }, () => {})
+  },
+
+  callSupport() { callSupportPhone(this.data.supportPhone) },
 
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {

@@ -109,7 +109,16 @@ export default function AccountPage() {
                   onChange={(e) => setConfirmPassword(e.target.value)} required
                 />
               </div>
-              {pwError && <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">{pwError}</p>}
+              {pwError && (
+                <p
+                  role={pwError === '演示模式不执行' ? 'status' : undefined}
+                  className={pwError === '演示模式不执行'
+                    ? 'rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-700'
+                    : 'rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg'}
+                >
+                  {pwError}
+                </p>
+              )}
               <Button type="submit" variant="primary" disabled={submitting}>
                 {submitting ? '提交中…' : '保存新密码'}
               </Button>

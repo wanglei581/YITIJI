@@ -258,6 +258,7 @@ const DELIVER_CAS_ACK_EXPIRY_BLOCK = `    const claimed = await this.prisma.scan
         deliveryAckedAt: { not: null },
         expiresAt: { gt: now },
         createdAt: task.createdAt,
+        ...scanDeliverClaimPins(task),
       },`
 
 function assertDeliverCasRepinsAckAndExpiry(apiRoot: string): void {
@@ -4119,6 +4120,27 @@ async function main(): Promise<void> {
       't_1',
       'resolved terminalId must be the internal id, not the raw terminalCode'
     )
+  }
+
+  {
+    // 使用真实文件校验投递证件 PDF，确保拒绝原因经过扫描会话传给用户。
+    const prisma = new FakePrisma()
+    const files = new FilesService(prisma as never, {} as never, {} as never)
+    const service = wrapServiceForTest(new ScanTasksService(prisma as never, files, passthroughCapabilities))
+    const created = await service.create({ scanType: 'id', terminalId: 't_1' }, null)
+    await expectRejects(
+      () => service.deliverScanFile({
+        terminalId: 't_1', buffer: tinyPdf(), filename: 'id.pdf',
+        mimeType: 'application/pdf', observedAt: new Date().toISOString(),
+      }),
+      BadRequestException,
+      'ID PDF must be rejected by real file validation'
+    )
+    const status = await service.getStatus(created.scanTaskId, null, created.controlToken)
+    assert.equal(status.status, 'failed')
+    assert.equal(status.errorCode, 'SCAN_FILE_TYPE_NOT_ALLOWED')
+    assert.equal(status.errorMessage, '这次扫出来的文件格式不收：证件扫描请在打印机屏幕上选图片格式（JPG）后重扫。')
+    assert.equal(prisma.scanTasksById.get(created.scanTaskId)?.errorCode, 'SCAN_FILE_TYPE_NOT_ALLOWED')
   }
 
   {

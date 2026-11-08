@@ -1,4 +1,6 @@
 import type { Page, Route } from '@playwright/test'
+import { KIOSK_AI_CAPABILITIES_PATH, kioskAiCapabilitiesResponse } from './ai-capabilities'
+import { kioskProfileBody, UNVERIFIED_KIOSK_PROFILE } from './kiosk-profile'
 import { RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from './recruitment-hosting'
 import { SELF_ASSESSMENT_QUESTIONS_PATH, selfAssessmentQuestionsResponse } from './self-assessment-questions'
 
@@ -69,6 +71,10 @@ export class ApiRouter {
       status: 200,
       json: terminalConfigWithHosting(RECRUITMENT_HOSTING_ON, 'api-router-default'),
     })
+    // 练面试服务台、设置页、作答页挂载时各读一次各 AI 能力的配置状态（GET /kiosk/ai/capabilities，不调计费 AI）。
+    // 默认按「全部可用」应答，既有用例不因这条新请求中断，入口也不会被误停；
+    // 要测某项能力关闭 / 降级 / 读不到的用例自行 respond 覆盖（见 ai-capabilities.ts）。
+    this.respond('GET', KIOSK_AI_CAPABILITIES_PATH, { status: 200, json: kioskAiCapabilitiesResponse() })
     // 3.14 本机构官方渠道：首页（「岗位与招聘会」磁贴）与 /official-channels 挂载时各读一次（同一缓存）。
     // 默认按「本终端没有渠道」应答：首页不摆磁贴，既有用例的栅格与文案一概不变；
     // 要看磁贴、渠道卡片或 b 版本「其他来源平台」的用例自行 respond 覆盖。
@@ -81,6 +87,12 @@ export class ApiRouter {
     this.respond('GET', SELF_ASSESSMENT_QUESTIONS_PATH, { status: 200, json: selfAssessmentQuestionsResponse() })
     // W-125：打印上传页与简历来源页挂载时读终端能力。默认空列表 = 没接管，U 盘保持可用。
     this.respond('GET', '/api/v1/terminals/KSK-001/capabilities', { status: 200, json: { capabilities: [] } })
+    // 扫描、复印、照片合成、签名各屏正文最上面读「小青现在能不能用」（GET /advisor/availability）。
+    // 默认按可用应答，所以既有用例里不会出现「小青暂时接不上」那一句；要看它的用例自行 respond available:false。
+    this.respond('GET', '/api/v1/advisor/availability', {
+      status: 200,
+      json: { available: true, providerLabel: null, reason: null, degradedCapabilities: [], disclaimer: '' },
+    })
     // 无人值守服务联系方式。默认给出公示号码与服务时间，两个布尔都是假：
     // 单点位不出现「换一台机器」，小程序未发布不出现「手机上能看到 / 用手机继续」。
     // 要看换机、小程序已发布或 404 的用例自行 respond 覆盖。
@@ -95,6 +107,14 @@ export class ApiRouter {
           miniappPublished: false,
         },
       },
+    })
+    // 一体机贴牌与授权信号：运行时根在每个终端业务页挂载时读一次（之后每 3 分钟续读）。
+    // 默认按「没验过签」应答——接口对没带有效会话票的请求就是这个答案：平台默认品牌，没有授权状态，
+    // acceptsNewSessions 为 true（不知道、不拦）。授权闸门只认 licenseState 非空的答复，所以既有用例的品牌、
+    // 入口与流程一概不变。要看贴牌或授权三态的用例自行 respond / route 覆盖（见 kiosk-license-gate.spec.ts）。
+    this.respond('GET', '/api/v1/public/kiosk-profile', {
+      status: 200,
+      json: kioskProfileBody(UNVERIFIED_KIOSK_PROFILE),
     })
     // 包 N2：/campus/freshman-insights 挂载时读校招聚合。默认空集合，避免冒烟撞 Unhandled API。
     this.respond('GET', '/api/v1/kiosk/campus/recruitment-stats', {

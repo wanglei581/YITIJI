@@ -128,7 +128,7 @@
         </view>
 
         <!-- 服务协议。
-             **《打印服务协议》这个链接必须留在 <label> 之外。** 小程序里 label 包住
+             **《用户服务协议》这个链接必须留在 <label> 之外。** 小程序里 label 包住
              checkbox 时，label 内任意一次点击都会切换那个 checkbox —— 于是"点开协议
              看一眼"会被同时记成"我已阅读并同意"，而这份同意用户从来没做过；更糟的是
              返回本页时它已经勾上了，用户不会知道自己什么时候勾的。
@@ -140,9 +140,9 @@
               <text>我已阅读并同意</text>
             </label>
           </checkbox-group>
-          <text class="link agreement-link" bindtap="viewTerms">《打印服务协议》</text>
+          <text class="link agreement-link" bindtap="viewTerms">《用户服务协议》</text>
         </view>
-        <view class="agreement-hint" wx:if="{{quoteState === 'ready' && !agreedToTerms}}">勾选上面的《打印服务协议》后才能下单。</view>
+        <view class="agreement-hint" wx:if="{{quoteState === 'ready' && !agreedToTerms}}">勾选上面的《用户服务协议》后才能下单。</view>
       </block>
 
       <!-- 底部占位 -->

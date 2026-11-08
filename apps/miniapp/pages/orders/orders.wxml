@@ -97,6 +97,7 @@
           <view class="pk-strip" wx:if="{{item.hasPickupCode}}">
             <view class="pk-label">到机码</view>
             <view class="pk-code">{{item.pickupCode}}</view>
+            <view class="pk-hint" wx:if="{{item.reprintNote}}">{{item.reprintNote}}</view>
             <view class="pk-hint">到一体机前，在「到机码核销」扫码或手输</view>
           </view>
           <view class="oc-foot">
@@ -180,6 +181,7 @@
           <view class="pk-strip" wx:if="{{item.pickup}}">
             <view class="pk-label">到机码</view>
             <view class="pk-code">{{item.pickup}}</view>
+            <view class="pk-hint" wx:if="{{item.reprintNote}}">{{item.reprintNote}}</view>
             <view class="pk-hint">到一体机前，在「到机码核销」扫码或手输</view>
           </view>
           <view class="oc-foot">

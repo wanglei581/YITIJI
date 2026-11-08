@@ -228,9 +228,10 @@ Page({
           const iv = await api.getMyMockInterviews({ pageSize: 50 })
           if (this._stale(gen, keyAtStart)) return
           this._interviews = (iv || []).map(mapInterview)
-        } catch (_) {
+        } catch (err) {
           if (this._stale(gen, keyAtStart)) return
-          this._interviews = []
+          if (err && err.statusCode === 401) throw err
+          throw new Error('模拟面试记录读取失败，请再试一次')
         }
       }
       this._publish()
@@ -240,12 +241,9 @@ Page({
       if (err && err.statusCode === 401) {
         this._clearLoggedOut()
       } else if (append) {
-        this.setData({ loading: false })
-        if (typeof wx.showToast === 'function') {
-          wx.showToast({ title: (err && err.message) || '加载更多失败', icon: 'none' })
-        }
+        this.setData({ loading: false, loadError: '更多记录读取失败，请再试一次' })
       } else {
-        this.setData({ loading: false, loadError: (err && err.message) || '加载记录失败，请稍后重试' })
+        this.setData({ loading: false, loadError: (err && err.message) || '记录读取失败，请再试一次' })
       }
     } finally {
       // 必须在 finally 复位：未登录的提前 return 和失败分支原先都不复位，

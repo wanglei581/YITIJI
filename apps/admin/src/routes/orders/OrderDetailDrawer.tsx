@@ -11,11 +11,11 @@ function Info({ label, value, title }: { label: string; value: string; title?: s
 }
 
 export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls }) {
-  const { detail, detailState, closeDetail } = controls
+  const { detail, detailState, closeDetail, retryDetail } = controls
   return (
     <Drawer open={detailState !== 'idle'} onClose={closeDetail} title={detail ? `订单详情 · ${detail.orderNo}` : '订单详情'} size="md">
       {detailState === 'loading' && <LoadingState className="py-16" />}
-      {detailState === 'error' && <ErrorState className="py-16" onRetry={closeDetail} />}
+      {detailState === 'error' && <ErrorState className="py-16" onRetry={retryDetail} />}
       {detailState === 'ready' && detail && (<>
             <div className="my-4 grid grid-cols-2 gap-x-4 gap-y-3">
               <Info label="订单类型" title={detail.type} value={detail.type === 'print' ? '打印' : detail.type === 'scan' ? '扫描' : '未归类'} />

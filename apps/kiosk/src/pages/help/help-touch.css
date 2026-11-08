@@ -1,0 +1,32 @@
+/* 帮助中心触屏版：分类行、说明底块、问答卡。块的通用样式在 public-touch.css。 */
+
+/* 分类行：六行放进正文，每行 112 高 */
+.qxt-screen[data-qx-page='help'] .hp-cats > .qxp-hit { min-height: 112px; }
+
+/* 说明底块：三步自助、服务电话、备案 */
+.qxt-screen[data-qx-page='help'] .hp-well { display: flex; flex-direction: column; gap: 6px; }
+.qxt-screen[data-qx-page='help'] .hp-ol {
+  margin: 0;
+  padding-left: 28px;
+  list-style: decimal;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.qxt-screen[data-qx-page='help'] .hp-ol li { font-size: var(--qxt-fs-sub); line-height: 1.45; color: var(--qxt-ink-2); }
+.qxt-screen[data-qx-page='help'] .hp-ol b { color: var(--qxt-ink); }
+.qxt-screen[data-qx-page='help'] .hp-filing a { display: inline-flex; align-items: center; min-height: 64px; color: inherit; text-decoration: none; }
+
+/* 问答卡：问字青色、问题加粗、答案接在下面 */
+.qxt-screen[data-qx-page='help'] .hp-qa { gap: 4px; }
+
+/* 旧版「这页写的是什么」：小字，放在各页的插画卡里；分类首页放在「隐私、设备与备案」弹层里 */
+.qxt-screen[data-qx-page='help'] .hp-truth { font-size: var(--qxt-fs-aux); line-height: 1.4; }
+
+/* 吸收余高的插画卡 */
+.qxt-screen[data-qx-page='help'] .hp-sink { flex: 1; min-height: 0; overflow: hidden; }
+.qxt-screen[data-qx-page='help'] .hp-reopen { flex: none; width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .qxt-screen[data-qx-page='help'] * { transition: none; }
+}

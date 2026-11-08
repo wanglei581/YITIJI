@@ -8,6 +8,7 @@
 // 本文件只许 import printMaterialSession 与 printHandoffPolicy（单元测试直接转译它）。
 
 import type { PrintJobParams } from '@ai-job-print/shared'
+import { printProblemLine } from '../../copy/unattendedCopy'
 import type { DocumentProcessTaskView } from '../../services/api/materials'
 import {
   clearPrintMaterialSession,
@@ -30,6 +31,23 @@ import {
 } from './printHandoffPolicy'
 
 export type PrintHandoffContext = PrintMaterialSession
+const WIND_DOWN_HANDOFF_KEY = 'kiosk_print_handoff_service_v1'
+
+/** 只保存随机交接编号和服务名，不复制文件或用户资料。 */
+export function recordPrintHandoffService(result: BeginPrintHandoffResult, service: string | null): void {
+  try {
+    if (result.ok && service) window.sessionStorage.setItem(WIND_DOWN_HANDOFF_KEY, JSON.stringify({ contextId: result.context.contextId, service }))
+    else window.sessionStorage.removeItem(WIND_DOWN_HANDOFF_KEY)
+  } catch { /* storage unavailable: fail closed */ }
+}
+export function readPrintHandoffService(owner: PrintHandoffOwner): string | null {
+  try {
+    const record = JSON.parse(window.sessionStorage.getItem(WIND_DOWN_HANDOFF_KEY) ?? 'null')
+    if (!record || typeof record.service !== 'string' || typeof record.contextId !== 'string') return null
+    const handoff = readPrintHandoff(owner)
+    return handoff.status === 'ok' && handoff.context.contextId === record.contextId ? record.service : null
+  } catch { return null }
+}
 export type { PrintHandoffOwner, PrintHandoffOrigin, PrintHandoffEntry }
 
 /** 创建后 30 分钟封顶，与一体机上传、图片转换的签名链接一致。 */
@@ -305,7 +323,7 @@ export function printHandoffTarget(result: BeginPrintHandoffResult): PrintHandof
 
 export function printHandoffFailureText(reason: PrintHandoffFailure): string {
   return reason === 'storage_unavailable'
-    ? '本机暂时无法保存打印信息，请找现场工作人员。'
+    ? `本机暂时无法保存打印信息。${printProblemLine()}`
     : '这份文件还没准备好打印。请回到上一步重新生成，或重新选择文件。'
 }
 

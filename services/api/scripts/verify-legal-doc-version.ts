@@ -342,7 +342,8 @@ async function main() {
     ) {
       fail('legalConsentVersions 未对接 kiosk/legal 或草拟哨兵')
     }
-    const nav = readFile('apps/admin/src/layouts/AdminLayoutWrapper.tsx')
+    // 2026-10-27 侧栏菜单与标签组搬到 adminNav.ts（「法务文档版本」是「法务与数据权利」下的标签）
+    const nav = readFile('apps/admin/src/layouts/adminNav.ts')
     if (!nav.includes("key: 'legal-docs'") || !nav.includes('法务文档版本')) {
       fail('Admin 侧栏缺少法务文档版本入口')
     }

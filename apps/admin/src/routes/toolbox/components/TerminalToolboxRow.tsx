@@ -92,7 +92,7 @@ export function TerminalToolboxRow({ terminal, onSaved }: { terminal: ToolboxTer
 
       {items.length === 0 ? (
         <div className="mt-4 rounded-xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-6 text-center text-sm text-neutral-500">
-          暂未配置功能项。Kiosk 首页不会展示百宝箱；智慧校园仅在开启且有投放项或子模块时显示。
+          暂未配置功能项。2026-11-04 起一体机端停放百宝箱与智慧校园：配置照常保存，一体机暂不显示。
         </div>
       ) : (
         <div className="mt-4 space-y-3">

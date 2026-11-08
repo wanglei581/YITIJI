@@ -6,6 +6,10 @@ const success = (data: unknown) => ({ success: true, data })
 
 export const W6_MEMBER_TOKEN = 'w6-browser-memory-token'
 
+/** 一体机手机码短链的路由验收样本：场景码 24 位、登录票据 32 位，格式都合规。 */
+export const W6_UPLOAD_SCENE = 'w6SceneToken_0123456789a'
+export const W6_LOGIN_TICKET = 'w6_ticket-0123456789abcdefghijkl'
+
 export const W6_LONG_LEGAL_TEXT =
   '这是用于 W6 路由验收的超长隐私政策段落：终端仅在用户主动发起简历分析、文档打印或扫描时处理完成当次服务所必需的信息，不建立企业可检索的简历库，不向企业转交求职材料，也不在平台内提供投递、筛选、面试邀约或录用管理。匿名文件和高敏材料按服务配置设置短期有效期，公共终端在退出、闲置超时或进入待机后清理会话信息。用户应在打印前复核文件内容、页数和打印参数，在使用 AI 或 OCR 结果前复核姓名、联系方式、经历与其他关键信息；如需查看、删除或调整本人记录，请在登录后使用「我的」相应入口，或联系现场工作人员处理。'
 
@@ -82,6 +86,21 @@ export function registerW6Api(api: ApiRouter): void {
       expiresAt: '2099-01-01T00:00:00.000Z',
     })
   )
+  // /k/l/:ticketId 转到手机确认登录页后读的就是这张票据。
+  get(
+    `/api/v1/member/auth/qr/${W6_LOGIN_TICKET}/status`,
+    success({
+      status: 'pending',
+      deviceLabel: 'W6 验收终端',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    })
+  )
+  // /k/u/:scene 中转页：夹具不替它兑换出真会话，路由验收停在「网络失败 + 重试」一态。
+  // 兑换成功、失效、格式不对各态由 kiosk-code-entry-fusion-w5.spec.ts 单独钉。
+  api.respond('POST', '/api/v1/upload-sessions/scene/resolve', {
+    status: 503,
+    json: { success: false, error: { code: 'SERVICE_UNAVAILABLE', message: 'w6 夹具：兑换暂不可用' } },
+  })
   get('/api/v1/mock-interviews/capabilities/voice', {
     data: { asrEnabled: false, ttsEnabled: false },
   })

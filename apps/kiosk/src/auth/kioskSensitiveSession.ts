@@ -1,4 +1,6 @@
+import { clearResumeGenerateDraft, hasResumeGenerateDraft } from '../pages/resume/resumeGenerateDraft'
 import { clearPrintMaterialSession } from '../pages/print/printMaterialSession'
+import { clearPickupClaimCode, PICKUP_CLAIM_RESUME_KEY } from '../pages/print/pickupClaimResume'
 import { clearAiResumeSession } from '../pages/resume/aiResumeSession'
 import { clearAllResumeParseIntents, RESUME_PARSE_INTENT_STORAGE_KEY } from '../services/resumeParseIntent'
 import { clearJobMaterialDraft } from '../pages/resume/jobMaterialDraft'
@@ -27,15 +29,20 @@ import {
 import { clearAiDeclarationSession } from '../ai/aiDeclarationSession'
 import { AI_DECLARATION_SESSION_KEY } from '../ai/aiDeclarationVersions'
 
+/** 打印材料。范围判断里单独算「只有打印材料」；仍只登记在下面那份键表里。 */
+const PRINT_MATERIAL_SESSION_KEY = 'ai-job-print:current-print-material-check'
+
 /**
- * 清场会真正清掉的 sessionStorage 键。
+ * 清场会真正清掉的 sessionStorage 键。唯一一份键表。
  *
  * 必须与下面 clearKioskSensitiveSession 清理的集合保持一一对应：
  * 新增一处敏感会话就要同时登记到这里，否则 hasKioskSensitiveSession 会漏判，
  * 把「其实有东西要清」误判成空操作。
+ * AI 使用声明也在这份表里，真清场时照清；范围判断另有口径，见 kioskSensitiveSessionScope。
  */
 const SENSITIVE_SESSION_STORAGE_KEYS = [
-  'ai-job-print:current-print-material-check',
+  PRINT_MATERIAL_SESSION_KEY,
+  PICKUP_CLAIM_RESUME_KEY,
   'ai-job-print:current-ai-resume',
   RESUME_PARSE_INTENT_STORAGE_KEY,
   'ai-job-print:job-material-draft:v1',
@@ -45,6 +52,45 @@ const SENSITIVE_SESSION_STORAGE_KEYS = [
   ASSISTANT_DRAFT_KEY,
   AI_DECLARATION_SESSION_KEY,
 ] as const
+
+const clearListeners = new Set<() => void>()
+export function subscribeKioskSensitiveSessionClear(listener: () => void): () => void {
+  clearListeners.add(listener)
+  return () => { clearListeners.delete(listener) }
+}
+
+/** 清场会清掉什么：none 什么都没有；print-only 只有打印材料；with-other 还有别的。读不准按 with-other。 */
+export type KioskClearScope = 'none' | 'print-only' | 'with-other'
+
+/**
+ * 现在清场会清掉什么。和清场用同一份键表。
+ *
+ * AI 使用声明键不算「别的内容」：它是一次点头的记录，不是这个人做出来的东西。
+ * 键仍在清单里，真清场时照清，这里只是不算进 with-other。
+ * 到机认领码、简历生成草稿算这个人正在办的事。
+ * 本机匿名收藏读失败视为没有，与 hasKioskSensitiveSession 同一写法。
+ */
+export function kioskSensitiveSessionScope(): KioskClearScope {
+  if (hasContractReviewSession() || hasResumeGenerateDraft()) return 'with-other'
+  let printMaterial = false
+  try {
+    if (typeof window === 'undefined' || !window.sessionStorage) return 'with-other'
+    for (const key of SENSITIVE_SESSION_STORAGE_KEYS) {
+      if (window.sessionStorage.getItem(key) === null) continue
+      if (key === PRINT_MATERIAL_SESSION_KEY) {
+        printMaterial = true
+        continue
+      }
+      // 一次点头的记录，不算这个人做出来的东西。
+      if (key === AI_DECLARATION_SESSION_KEY) continue
+      return 'with-other'
+    }
+  } catch {
+    return 'with-other'
+  }
+  if (hasLocalFavorites()) return 'with-other'
+  return printMaterial ? 'print-only' : 'none'
+}
 
 /**
  * 清掉本机这一位用户留下的敏感会话。
@@ -68,7 +114,9 @@ export function clearKioskSensitiveSession(outgoingMemberToken?: string | null):
   clearAiDeclarationSession()
   clearContractReviewSession()
   clearPrintMaterialSession()
+  clearPickupClaimCode()
   clearAiResumeSession()
+  clearResumeGenerateDraft()
   clearAllResumeParseIntents()
   clearJobMaterialDraft()
   clearSelfAssessmentSession()
@@ -78,6 +126,7 @@ export function clearKioskSensitiveSession(outgoingMemberToken?: string | null):
   // clearScanWorkbenchSession() 一旦先跑，就再也找不到要撤谁。
   beginScanSessionCleanup(outgoingMemberToken ?? null)
   clearScanWorkbenchSession()
+  clearListeners.forEach((listener) => listener())
 }
 
 /**
@@ -98,7 +147,7 @@ export function clearKioskSharedDeviceResidue(): void {
  * 匿名本机收藏单独探测：读失败视为没有残留（写不进去也就漏不出去）。
  */
 export function hasKioskSensitiveSession(): boolean {
-  if (hasContractReviewSession()) return true
+  if (hasContractReviewSession() || hasResumeGenerateDraft()) return true
   try {
     if (typeof window === 'undefined' || !window.sessionStorage) return true
     if (

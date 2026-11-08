@@ -278,6 +278,30 @@ const MOCK_UNRECORDED_DETAIL: AdminOrderReadonlyDetail = {
   payStatus: 'closed',
 }
 
+/** 按需启用同一条演示订单的退款场景，不改变默认列表和原有收款/退款模拟行为。 */
+function demoRefundDetail(): AdminOrderReadonlyDetail | null {
+  let scenario: string | null = null
+  try { scenario = localStorage.getItem('mock:order-refund') } catch { /* 未启用演示场景 */ }
+  if (!['zero', 'paid', 'pending-refund'].includes(scenario ?? '')) return null
+  const createdAt = '2026-11-05T09:30:00+08:00'
+  return {
+    ...MOCK_DETAIL,
+    id: 'ord_mock_refund',
+    orderNo: 'ORD-20261105-7A3C91E204',
+    amountCents: scenario === 'zero' ? 0 : 100,
+    payStatus: 'paid',
+    taskStatus: 'failed',
+    refundEligible: true,
+    refundRequired: scenario === 'pending-refund',
+    refundReason: scenario === 'pending-refund' ? 'PAID_UNFULFILLED_PENDING_REFUND' : null,
+    printOutcome: 'not_printed',
+    createdAt,
+    updatedAt: '2026-11-05T09:31:00+08:00',
+    print: { ...MOCK_DETAIL.print!, status: 'failed', createdAt, completedAt: null },
+    statusLogs: [{ fromStatus: 'pending', toStatus: 'failed', errorCode: null, createdAt: '2026-11-05T09:31:00+08:00' }],
+  }
+}
+
 /**
  * mock 模式下的可变订单态。
  *
@@ -291,12 +315,16 @@ let mockPaymentSource: AdminOrderMarkPaidSource | null = null
 
 const mockAdapter: AdminOrdersReadonlyService = {
   async list(params) {
+    const refundDetail = demoRefundDetail()
+    const items = [mockDetailState, MOCK_UNRECORDED_DETAIL, ...(refundDetail ? [refundDetail] : [])]
     return {
-      items: [mockDetailState, MOCK_UNRECORDED_DETAIL],
-      pagination: { page: params.page, pageSize: params.pageSize, total: 2, totalPages: 1 },
+      items,
+      pagination: { page: params.page, pageSize: params.pageSize, total: items.length, totalPages: 1 },
     }
   },
   async getById(id) {
+    const refundDetail = demoRefundDetail()
+    if (refundDetail?.id === id) return refundDetail
     return id === MOCK_UNRECORDED_DETAIL.id ? MOCK_UNRECORDED_DETAIL : mockDetailState
   },
   async markPaidOrder(_id, paymentSource) {

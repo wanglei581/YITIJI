@@ -48,6 +48,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     const created = createPrismaClient(url)
     this.client = created.client
     this.dbKind = created.kind
+    for (const warning of created.pgSessionWarnings) {
+      this.logger.warn(warning)
+    }
   }
 
   async onModuleInit(): Promise<void> {
@@ -81,6 +84,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ── Model delegates ────────────────────────────────────────────────────────
+
+  get aiServiceFact() {
+    return this.client.aiServiceFact
+  }
 
   get terminal() {
     return this.client.terminal
@@ -348,6 +355,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.aiUsageMonthlySummary
   }
 
+  get aiSafetyTerm() {
+    return this.client.aiSafetyTerm
+  }
+
   get userAiConsent() {
     return this.client.userAiConsent
   }
@@ -558,6 +569,16 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   get platformSetting() {
     return this.client.platformSetting
+  }
+
+  // ── 贴牌 Logo 与软件使用授权（src/branding、src/licenses）──────────────────
+
+  get brandLogo() {
+    return this.client.brandLogo
+  }
+
+  get license() {
+    return this.client.license
   }
 
   // ── Transaction ────────────────────────────────────────────────────────────

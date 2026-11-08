@@ -17,6 +17,7 @@
 | 当日开发摘要与协作收尾 | [progress/today-claude.md](progress/today-claude.md) |
 | 定位、托管方式、AI 求职操作系统分层、功能边界（能做 / 不能做）、已知缺口 | [product/feature-scope.md](product/feature-scope.md)（§零 定位与分层，§七 缺口） |
 | 谁是运营主体、我们做什么、管理员能做什么 | [product/role-boundary.md](product/role-boundary.md) |
+| 私有化部署（托管 b）怎么设计：四层管控、授权文件、各处显示、签约后的工程 | [product/private-deployment-design.md](product/private-deployment-design.md) |
 | 按谁排序、12 个月长什么 / 不长什么（从属于功能边界与合规） | [product/audience-growth-space.md](product/audience-growth-space.md) |
 | 合规红线、法规与资质总表 | [compliance/](compliance/) 全部；总表在 [compliance-boundary.md](compliance/compliance-boundary.md) §1.2 |
 | 目录职责 | [project-structure.md](project-structure.md) |
@@ -37,6 +38,8 @@
 > 2. 其余页面以**青序流光 2.0** `design/kiosk-redesign-2026-08-v2/` 为准（9/29 定稿，冻结门禁 `verify:qingxu-v2-frozen`；2.0 稿文件一个字节不改）。
 > 3. 2.0 没画的页，才看下面说的原稿 `design/kiosk-redesign-2026-08/`。
 > 4. 复印、扫描的屏上流程（屏上扫描、屏上复印、面板复印图文指引、设备状态）以补稿 `design/kiosk-touch-2026-11-copyscan/` 为准（11/02；面板复印图文指引产品负责人原话「补稿可以，照它改」；屏上扫描随「复印扫描四步走」方案给他看过，实现要偏离稿先问他；补稿的页面加载 `design/kiosk-touch-2026-10/` 的定稿脚本，两个目录要一起在）。
+>
+> **2026-10-27 起**：产品负责人看过触屏版第 5 版（121 屏，补全了三条主路之外的各区）后定「第 5 版看过了，可以进仓库，然后按包改程序」——一体机**全部页面**以触屏版 `design/kiosk-touch-2026-10/` 为准（见 CLAUDE.md §9）；上面第 2、3 层只用于第 5 版没画到的页。
 >
 > 下面本节的旧段落写于 2.0 之前，读到「原稿是当前上线口径」时按这三层理解。
 

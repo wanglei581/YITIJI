@@ -37,12 +37,42 @@ export interface RetentionDecision {
   retentionConsentVersion: string | null
 }
 
+/**
+ * 只用于这一单（2026-11-02 产品负责人拍板）：一体机登录着会员时，从手机传进这一单的文件不存进登录人的账号。
+ * 确认后仍挂在本人名下（后面的诊断、打印按本人校验），但按系统短期保存、锁定，「我的文档」不列；
+ * 由它自动转出来的 PDF（打印前 Word 转 PDF、图片拼 PDF）跟着锁。起因：现场无人值守，上一位没退出时，
+ * 下一位传的身份证、简历会存进上一位的账号。本人从小程序「我的文档」递交的，原件本来就在「我的文档」里。
+ */
+export const UPLOAD_SESSION_ORDER_ONLY_REASON = 'upload_session_order_only'
+
+/** 「我的文档」不列的锁定原因：合同审查会话专用、只用于这一单。 */
+export const MEMBER_DOCUMENT_HIDDEN_LOCK_REASONS: readonly string[] = [
+  'contract_review_session_only',
+  UPLOAD_SESSION_ORDER_ONLY_REASON,
+]
+
+export function isOrderOnlyFile(file: { retentionLockedReason?: string | null }): boolean {
+  return file.retentionLockedReason === UPLOAD_SESSION_ORDER_ONLY_REASON
+}
+
+/**
+ * 由只用于这一单的原件变出来时自动跟锁的派生类型：这一单的打印副本（格式转换、签章、隐私遮挡）。
+ * AI 生成的新成果（ai_generated）不在这里，要不要跟锁另行拍板。FilesService.upload 按 sourceFileId 判。
+ */
+export const ORDER_ONLY_INHERITING_DERIVATIONS: ReadonlySet<string> = new Set([
+  'format_conversion',
+  'signature',
+  'pii_redaction',
+])
+
 export interface RetentionUploadInput {
   purpose: FilePurpose
   sensitiveLevel: FileSensitiveLevel
   ownerType: FileOwnerType | null
   endUserId: string | null
   now?: Date
+  /** 只用于这一单：不走会员 90 天默认，按系统短期保存（见 UPLOAD_SESSION_ORDER_ONLY_REASON）。 */
+  orderOnly?: boolean
 }
 
 export interface RetentionUpdateInput extends RetentionUploadInput {
@@ -65,9 +95,9 @@ export function defaultRetentionForUpload(input: RetentionUploadInput): Retentio
       retentionConsentVersion: null,
     }
   }
-  // 会员账号内简历类文件默认保存 90 天；证件、匿名、系统和机构素材保持短 TTL。
+  // 会员账号内简历类文件默认保存 90 天；证件、匿名、系统和机构素材、只用于这一单的文件保持短 TTL。
   const policy =
-    input.ownerType === 'user' && input.endUserId && MEMBER_DEFAULT_PURPOSES.has(input.purpose)
+    !input.orderOnly && input.ownerType === 'user' && input.endUserId && MEMBER_DEFAULT_PURPOSES.has(input.purpose)
       ? 'months_3'
       : 'system_short'
   return buildDecision({

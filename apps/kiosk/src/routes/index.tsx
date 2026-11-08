@@ -5,6 +5,7 @@ import { KioskRuntimeRoot } from '../layouts/KioskRuntimeRoot'
 import { LoginPage } from '../pages/auth/LoginPage'
 import { MobileQrLoginPage } from '../pages/auth/MobileQrLoginPage'
 import { PhoneUploadPage } from '../pages/upload/PhoneUploadPage'
+import { LoginTicketEntry, UploadSceneEntry } from '../pages/upload/KioskCodeEntryPage'
 import { LegalDocPage } from '../pages/legal/LegalDocPage'
 import { JobFitPage } from '../pages/resume/JobFitPage'
 import { JobFitActionsPage } from '../pages/resume/JobFitActionsPage'
@@ -65,15 +66,7 @@ import { HomePage } from '../pages/home/HomePage'
 import { RenshiPage } from '../pages/renshi/RenshiPage'
 import { CampusPage } from '../pages/campus/CampusPage'
 import { ScreensaverPage } from '../pages/screensaver/ScreensaverPage'
-import { SmartCampusHomePage } from '../pages/smart-campus/SmartCampusHomePage'
-import { SmartCampusGuard } from '../pages/smart-campus/SmartCampusGuard'
-import { SmartCampusWelcomePage } from '../pages/smart-campus/SmartCampusWelcomePage'
-import { SmartCampusServicePage } from '../pages/smart-campus/SmartCampusServicePage'
 import { KioskRouteErrorPage } from '../pages/errors/KioskRouteErrorPage'
-import {
-  SmartCampusCapabilityBoundary,
-  ToolboxCapabilityBoundary,
-} from '../auth/KioskCapabilityGuard'
 import { RecruitmentHostingBoundary } from '../auth/RecruitmentHostingBoundary'
 
 // Gate 0 requires production_default=false. Only an explicit build-time grant
@@ -84,6 +77,9 @@ export const kioskRouter = createBrowserRouter([
   // 只有明确的手机辅助入口豁免 27 寸公共终端运行时超时。
   { path: '/member/qr-login', element: <MobileQrLoginPage />, errorElement: <KioskRouteErrorPage /> },
   { path: '/upload/phone', element: <PhoneUploadPage />, errorElement: <KioskRouteErrorPage /> },
+  // 一体机手机码短链的网页中转（微信规则没生效或用别的软件扫时打开）：兑换或校验后 replace 到上面两页。
+  { path: '/k/u/:scene', element: <UploadSceneEntry />, errorElement: <KioskRouteErrorPage /> },
+  { path: '/k/l/:ticketId', element: <LoginTicketEntry />, errorElement: <KioskRouteErrorPage /> },
   {
     element: <KioskRuntimeRoot />,
     errorElement: <KioskRouteErrorPage />,
@@ -187,21 +183,11 @@ export const kioskRouter = createBrowserRouter([
       { path: 'activities',         element: <BenefitActivitiesPage /> },
       { path: 'activities/:id',     element: <BenefitActivityDetailPage /> },
       { path: 'renshi',            element: <RenshiPage /> },
-      // 百宝箱与智慧校园的根路由、所有深链先经终端配置能力边界；未知、失败和关闭均不挂载业务页。
-      {
-        element: <ToolboxCapabilityBoundary />,
-        children: [
-          { path: 'toolbox', lazy: async () => ({ Component: (await import('../pages/toolbox/ToolboxZonePage')).default }) },
-        ],
-      },
-      {
-        element: <SmartCampusCapabilityBoundary />,
-        children: [
-          { path: 'smart-campus', element: <SmartCampusHomePage /> },
-          { path: 'smart-campus/welcome', element: <SmartCampusGuard module="welcome"><SmartCampusWelcomePage /></SmartCampusGuard> },
-          { path: 'smart-campus/service/:key', element: <SmartCampusGuard><SmartCampusServicePage /></SmartCampusGuard> },
-        ],
-      },
+      // 百宝箱与智慧校园停放（2026-11-04 产品负责人定「先不做……不要显示出来」）：
+      // 页面源码留在 pages/toolbox、pages/smart-campus 与 auth/KioskCapabilityGuard，不注册、不打包；
+      // 旧链接（根路由与全部深链）一律回首页，不落到报错页。恢复办法见 docs/product/feature-scope.md。
+      { path: 'toolbox/*',      element: <Navigate to="/" replace /> },
+      { path: 'smart-campus/*', element: <Navigate to="/" replace /> },
       // 打印扫描服务中心
       { path: 'print-scan',              element: <PrintScanHomePage /> },
       { path: 'print-scan/feature/:key', element: <PrintScanFeatureInfoPage /> },
@@ -209,7 +195,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'print-scan/sign',         element: <SignStampPage /> },
       { path: 'print/scan-convert',      element: <Navigate to="/print-scan/convert" replace /> },
       { path: 'print/scan-sign',         element: <Navigate to="/print-scan/sign" replace /> },
-      { path: 'print/scan-feature',      element: <Navigate to="/print-scan/feature/id-photo" replace /> },
+      { path: 'print/scan-feature',      element: <Navigate to="/print-scan" replace /> },
       // 打印扫描流程（Phase 3）
       { path: 'print/upload',      element: <PrintUploadPage /> },
       { path: 'print/desk',        element: <PrintDeskPage /> },
@@ -307,15 +293,15 @@ export const kioskRouter = createBrowserRouter([
           {
             path: 'jobs-service',
             lazy: async () => {
-              const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
-              return { Component: () => <QxServiceHubPage hub="jobs" /> }
+              const { SocialHubPage } = await import('../pages/recruitment-touch/SocialHubPage')
+              return { Component: SocialHubPage }
             },
           },
           {
             path: 'fairs-service',
             lazy: async () => {
-              const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
-              return { Component: () => <QxServiceHubPage hub="fairs" /> }
+              const { CampusServicePage } = await import('../pages/recruitment-touch/CampusServicePage')
+              return { Component: CampusServicePage }
             },
           },
         ],
@@ -347,9 +333,19 @@ export const kioskRouter = createBrowserRouter([
       {
         path: 'policy-service',
         lazy: async () => {
-          const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
-          return { Component: () => <QxServiceHubPage hub="policy" /> }
+          const { PolicyTouchHub } = await import('../pages/service-hubs/PolicyTouchHub')
+          return { Component: () => <PolicyTouchHub /> }
         },
+      },
+      {
+        path: 'dev/touch-gallery',
+        ...(import.meta.env.DEV
+          ? {
+              lazy: async () => ({
+                Component: (await import('../pages/dev/QxTouchGalleryPage')).QxTouchGalleryPage,
+              }),
+            }
+          : { element: <Navigate to="/" replace /> }),
       },
         ],
       },

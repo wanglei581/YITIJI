@@ -82,7 +82,7 @@ export function assertSourceContract(): void {
   assert(
     'u4. 管理员与机构指标键、行数上限、提供者标签',
     JSON.stringify(ADMIN_USAGE_METRIC_KEYS) === JSON.stringify(['channels', 'visits', 'services', 'outcomes', 'heat7d', 'pulse2h', 'printSteps', 'resumeSteps', 'ai', 'jobs', 'topSources30d', 'content'])
-      && JSON.stringify(PARTNER_USAGE_METRIC_KEYS) === JSON.stringify(['partnerContent', 'partnerDaily', 'partnerTop', 'visits'])
+      && JSON.stringify(PARTNER_USAGE_METRIC_KEYS) === JSON.stringify(['partnerContent', 'partnerDaily', 'partnerTop', 'visits', 'partnerAiServices'])
       && USAGE_EVENT_ROW_CAP === 60_000
       && usageProviderLabel('llm:deepseek') === 'DeepSeek'
       && usageProviderLabel('llm:qwen') === '千问'

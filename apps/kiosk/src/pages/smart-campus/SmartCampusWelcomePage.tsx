@@ -25,7 +25,10 @@ import {
   UserSquareIcon,
   type LucideIcon,
 } from 'lucide-react'
-import { FusionBadge, KioskPageFrame } from '../jobs/components/W4Presentation'
+import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
+import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
+import './smart-campus-touch.css'
 
 // 通用报到流程参考——**不针对任何具体学校**，仅描述高校迎新的普遍环节。
 // 各校实际安排以学校官方通知为准，页面已就此明确标注。
@@ -39,6 +42,9 @@ const FLOW_STEPS = [
 // ⚠️ 原 SERVICE_WINDOWS 硬编码了「行政楼 1F」「东门内 50m」等具体楼栋位置。
 // 这些位置**不来自任何学校**，属编造信息，已于 2026-08-11 删除（CLAUDE.md §9）。
 // 恢复展示的前提：CampusServiceWindow 模型落地 + 学校在 Partner 后台配置 + 审核发布。
+
+/** 常见办事窗口类别（只写类别，不写具体位置；具体名单以学校通知为准）。 */
+const WINDOW_KINDS = ['学院迎新点', '宿舍入住', '校园卡与一卡通', '缴费与体检（以学校名单为准）'] as const
 
 interface PrepEntry {
   icon: LucideIcon
@@ -61,13 +67,28 @@ export function SmartCampusWelcomePage() {
   const navigate = useNavigate()
 
   return (
-    <KioskPageFrame
-      tone="wheat"
-      title="迎新指引"
-      subtitle="通用报到流程参考与入学准备"
-      backLabel="返回智慧校园"
-      onBack={() => navigate('/smart-campus')}
-      badge={<FusionBadge>通用参考</FusionBadge>}
+    <div data-qx-page="campus-welcome" className="sc-touch-fill w4-page-frame">
+    <QxTouchScreen
+      testId="campus-welcome-touch"
+      bodyClassName="qxt-body-scroll"
+      band={(
+        <QxTouchBand
+          seal={null}
+          eyebrow="智慧校园"
+          title="迎新指引"
+          sub="通用报到流程参考与入学准备"
+          back={false}
+          status={{ text: '通用参考', tone: 'unknown' }}
+        />
+      )}
+      dock={(
+        <QxTouchDock
+          onBack={() => navigate('/smart-campus')}
+          backLabel="返回智慧校园"
+          ask={{ label: '问小青：报到要准备什么？', draft: '报到要准备什么？请只做说明，不要代替学校安排。' }}
+          primary={{ label: '校园卡办理指引', onClick: () => navigate('/smart-campus/service/campus-card') }}
+        />
+      )}
     >
         <div className="kproto kproto-teal kproto-content">
           <div className="kproto-auth">
@@ -114,7 +135,7 @@ export function SmartCampusWelcomePage() {
                       <div key={entry.label} className="kproto-tile disabled" aria-disabled="true">
                         <span className="tile-icon"><Icon aria-hidden="true" /></span>
                         <span><b>{entry.label}</b><span>{entry.sub}</span></span>
-                        <span className="ml-auto shrink-0 rounded-full border border-[var(--kp-line)] bg-[var(--kp-paper)] px-3 py-1 text-sm text-[var(--kp-muted)]">即将上线</span>
+                        <span className="sc-soon">即将上线</span>
                       </div>
                     )
                   }
@@ -138,11 +159,16 @@ export function SmartCampusWelcomePage() {
             </div>
             <div className="flex min-h-[120px] flex-col items-center justify-center gap-3 rounded-[14px] border border-dashed border-[var(--kp-line)] bg-[var(--kp-paper)] px-6 py-8 text-center">
               <MapPinIcon className="h-9 w-9 text-[var(--kp-muted)]" aria-hidden="true" />
-              <p className="text-[19px] leading-relaxed text-[var(--kp-muted)]">
-                本机尚未接入学校办事窗口信息<br />
-                <span className="text-[17px]">请以学校迎新指南或官方公众号为准</span>
+              <p className="sc-empty-copy">
+                本机还没有学校办事窗口信息<br />
+                <span>请以学校迎新指南或官方公众号为准</span>
               </p>
             </div>
+            <ul className="sc-window-list" aria-label="常见办事窗口类别">
+              {WINDOW_KINDS.map((kind) => (
+                <li key={kind}>{kind}</li>
+              ))}
+            </ul>
           </section>
 
           <div className="kproto-notice mt-auto">
@@ -150,12 +176,8 @@ export function SmartCampusWelcomePage() {
             <p>报到登记、缴费、宿舍分配等请以学校官方系统为准；本终端仅提供通用信息参考与求职打印服务。</p>
           </div>
 
-          <div className="kproto-actionbar">
-            <button type="button" className="kproto-btn" onClick={() => navigate('/smart-campus')}>返回智慧校园</button>
-            <div className="kproto-spacer" />
-            <button type="button" className="kproto-btn dark" onClick={() => navigate('/smart-campus/service/campus-card')}>校园卡办理指引</button>
-          </div>
         </div>
-    </KioskPageFrame>
+    </QxTouchScreen>
+    </div>
   )
 }

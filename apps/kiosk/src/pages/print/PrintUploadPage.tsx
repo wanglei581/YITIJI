@@ -25,9 +25,12 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/files/filesApi'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { machineCannotPrintLine, preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
+import { USB_IMPORT_UNCONFIRMED_COPY } from '../../copy/usbImportCopy'
 import {
   getUsbStatus,
   isUsbImportConfigured,
+  isUsbUploadUnconfirmed,
   listUsbFiles,
   uploadUsbFile,
   type UsbFileListItem,
@@ -41,6 +44,7 @@ import {
 } from '../../services/api/documentConversion'
 import { useUploadSession, type PhoneUploadedFile } from '../upload/hooks/useUploadSession'
 import { useStartPrintHandoff } from './usePrintHandoff'
+import { usePickPrintDocuments } from './usePickPrintDocuments'
 import {
   clearPrintMaterialSession,
   type PrintFileState,
@@ -123,6 +127,7 @@ export function PrintUploadPage() {
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const { getToken, isLoggedIn } = useAuth()
+  const pickDocuments = usePickPrintDocuments()
   const device = useTerminalDeviceStatus()
   const { capabilities: conversionCapabilities } = useDocumentConversionCapabilities()
   const wordConversionAvailable = conversionCapabilities.wordToPdf
@@ -159,7 +164,7 @@ export function PrintUploadPage() {
         ? '照片打印'
         : '文档打印'
   const pageSubtitle = device.printerNotice
-    ? device.printerNotice
+    ? preferUnattended(device.printerNotice, machineCannotPrintLine())
     : !isDocumentPrint
       ? '从我的简历或上传一份简历进入打印'
       : isTransferMode
@@ -194,6 +199,7 @@ export function PrintUploadPage() {
   const [usbSelected, setUsbSelected] = useState<UsbFileListItem | null>(null)
   const [usbSafeIdExpired, setUsbSafeIdExpired] = useState(false)
   const [usbImportFailed, setUsbImportFailed] = useState(false)
+  const [usbUnconfirmed, setUsbUnconfirmed] = useState(false)
   const [usbAgentOffline, setUsbAgentOffline] = useState(false)
   const [usbReadFailed, setUsbReadFailed] = useState(false)
   const [usbPollKey, setUsbPollKey] = useState(0)
@@ -233,7 +239,7 @@ export function PrintUploadPage() {
           setUsbAgentOffline(false)
           setUsbReadFailed(true)
         }
-        setUsbError(userMessageOf(err, '暂时无法读取 U 盘，请重试或联系工作人员'))
+        setUsbError(preferUnattended(userMessageOf(err, `暂时无法读取 U 盘，请重试。${printProblemLine()}`), `暂时无法读取 U 盘。${printProblemLine()}`))
       }
     }
 
@@ -282,7 +288,7 @@ export function PrintUploadPage() {
     onUploaded: handleQrUploaded,
   })
   const phone = phoneSession.snapshot
-  useBusyLock(uploading || usbUploading || phone.loading || phone.confirming || phone.cancelling)
+  useBusyLock(uploading || usbUploading || phone.loading || phone.confirming || phone.cancelling || phoneSession.waiting)
 
   const uploadLocalFile = useCallback(async (selected: File) => {
     if (isTerminalKiosk()) return
@@ -321,7 +327,7 @@ export function PrintUploadPage() {
     } catch (err) {
       const kind = classifyUploadError(err)
       if (kind !== 'failed') setLocalRejectKind(kind)
-      setUploadError(userMessageOf(err, '上传失败，请重试'))
+      setUploadError(preferUnattended(userMessageOf(err, '上传失败，请重试'), `上传没做成。${printProblemLine()}`))
     } finally {
       setUploading(false)
     }
@@ -343,6 +349,8 @@ export function PrintUploadPage() {
     setUsbSelected(picked)
     setUsbSafeIdExpired(false)
     setUsbImportFailed(false)
+    setUsbUnconfirmed(false)
+    setUsbError(null)
   }
 
   const handleUsbImport = async () => {
@@ -350,6 +358,7 @@ export function PrintUploadPage() {
     setUsbUploading(true)
     setUsbError(null)
     setUsbImportFailed(false)
+    setUsbUnconfirmed(false)
     setUsbSafeIdExpired(false)
     try {
       const result = await uploadUsbFile(usbSelected.safeId)
@@ -365,13 +374,21 @@ export function PrintUploadPage() {
       persistFile(nextFile, 'usb')
       setUsbSelected(null)
     } catch (err) {
-      if (isUsbSafeIdExpired(err)) {
+      if (isUsbUploadUnconfirmed(err)) {
+        // 没有 HTTP 答复：不进「这一份没导进来」，也不在这里再传一次。
+        setUsbImportFailed(false)
+        setUsbUnconfirmed(true)
+        setUsbError(USB_IMPORT_UNCONFIRMED_COPY)
+      } else if (isUsbSafeIdExpired(err)) {
+        setUsbUnconfirmed(false)
         setUsbSafeIdExpired(true)
         setUsbImportFailed(false)
+        setUsbError(preferUnattended(userMessageOf(err, 'U 盘文件导入失败，请重试'), `U 盘文件没导入。${printProblemLine()}`))
       } else {
+        setUsbUnconfirmed(false)
         setUsbImportFailed(true)
+        setUsbError(preferUnattended(userMessageOf(err, 'U 盘文件导入失败，请重试'), `U 盘文件没导入。${printProblemLine()}`))
       }
-      setUsbError(userMessageOf(err, 'U 盘文件导入失败，请重试'))
     } finally {
       setUsbUploading(false)
     }
@@ -406,6 +423,7 @@ export function PrintUploadPage() {
     setLocalRejectKind(null)
     setUsbSelected(null)
     setUsbImportFailed(false)
+    setUsbUnconfirmed(false)
     setUsbSafeIdExpired(false)
   }
 
@@ -415,6 +433,7 @@ export function PrintUploadPage() {
     setUsbStatus(null)
     setUsbError(null)
     setUsbImportFailed(false)
+    setUsbUnconfirmed(false)
     setUsbSafeIdExpired(false)
     setUsbReadFailed(false)
     setUsbAgentOffline(false)
@@ -444,8 +463,6 @@ export function PrintUploadPage() {
     usbReadFailed: Boolean(usbReadFailed && usbError),
   })
 
-  const fromQuery = `${location.pathname}${location.search}`
-
   return (
     <>
     <span
@@ -466,7 +483,7 @@ export function PrintUploadPage() {
       pageSubtitle={pageSubtitle}
       terminalLabel=""
       status={qxStatusFromDevice(device)}
-      orderPausedNotice={device.printerNotice}
+      orderPausedNotice={device.printerNotice ? preferUnattended(device.printerNotice, machineCannotPrintLine()) : device.printerNotice}
       isResumePrint={isResumePrint}
       showFileChannel={showFileChannel}
       showScan={!isResumePrint}
@@ -481,11 +498,13 @@ export function PrintUploadPage() {
       conversionReason={wordConversionAvailable ? null : 'Word 转换暂未开放，请另存为 PDF 再上传。'}
       usbFiles={usbFiles}
       usbSelected={usbSelected}
+      usbNotice={usbUnconfirmed ? usbError : null}
       usbDriveLabel={usbStatus?.driveLabel ?? null}
       formatBytes={formatBytes}
       phone={phone}
       qrUrl={phoneSession.qrUrl}
       expiresLabel={phoneSession.expiresLabel}
+      waitRemainingSeconds={phoneSession.waiting && !phone.pendingName ? phoneSession.remainingSeconds : null}
       previewOpen={previewOpen}
       previewToken={getToken()}
       localRejectKind={localRejectKind}
@@ -515,10 +534,7 @@ export function PrintUploadPage() {
       onExit={() => navigate(exitPath)}
       onHelp={() => navigate('/help')}
       onScan={() => navigate('/scan')}
-      onDocuments={() => {
-        if (isLoggedIn) navigate('/me/documents')
-        else navigate('/login', { state: { from: fromQuery } })
-      }}
+      onDocuments={pickDocuments}
       onResumes={() => {
         if (isLoggedIn) navigate('/me/resumes')
         else navigate('/login', { state: { from: '/print/upload?source=resume' } })

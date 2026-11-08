@@ -71,6 +71,41 @@ for (const value of ['{"password":"embedded-secret","cacheKey":"可见"}', '[{"a
   const safe = auditPresentation.safeAuditText(value)
   if (!safe.includes('已隐藏') || safe.includes('embedded-secret') || safe.includes('详情无法解析')) fail('字符串 JSON 必须递归脱敏且可解析')
 }
+// r3：系统编号整段放行。十六进制里的字母会让碰巧出现的 11 位数字被认成手机号（文件编号约千分之 1.5）。
+// 每个样本先断言确实含手机号形状，这组检查才不会空转；期望值按规格手写。
+const phoneShape = /(?<!\d)(?:\+?86[\s-]*)?1[3-9](?:[\s-]*\d){9}(?!\d)/
+const systemIds = {
+  文件编号: 'a1b2c13912345678d9e8f7a6b5c4d3e2', 对象存储校验值: '"a1b2c13912345678d9e8f7a6b5c4d3e2"',
+  请求编号: 'e4e19078-8771-43ff-8572-f0e59fad5cca', 自我探索任务: 'sa-15158372936c06a1dc950988',
+  终端凭据: 'tc_f9a14241457480d1fdf84cda3f8bfeaa', 打印任务: 'ptask_package_5f9d13898720884d',
+  终端: 't_c13782494742e040', 安装包校验值: 'edcf18fcd49e15761586302b62811d34da52ee3e5a3c443ce61da0aa4e68e474',
+  证书指纹: '0ED09D93D9F6ED809C14768426507EF602D7892A',
+}
+for (const value of Object.values(systemIds)) {
+  if (!phoneShape.test(value)) fail(`编号样本必须含手机号形状才有检验意义：${value}`)
+  if (auditPresentation.safeAuditText(value) !== value) fail(`整段是系统编号或校验值应原样显示：${value}`)
+}
+for (const key of ['fileIdDigest', 'previousHashPrefix', 'deviceFingerprintPrefix']) {
+  if (auditPresentation.sanitizeAuditValue('a13912345678', key) !== 'a13912345678') fail(`服务端 12 位摘要应原样显示：${key}`)
+}
+for (const value of ['a1b2c13912345678d9e8f7a6b5c4d3e', 'A1b2c13912345678d9e8f7a6b5c4d3e2', '文件 a1b2c13912345678d9e8f7a6b5c4d3e2 已清理', 'tel-13912345678', '8613912345678', 'abc13912345678', 'a13912345678']) {
+  if (!phoneShape.test(value) || auditPresentation.safeAuditText(value) !== '已隐藏') fail(`不是整段编号的手机号仍应隐藏：${value}`)
+}
+for (const [key, value] of [['username', '13912345678'], ['username', 'a13912345678'], ['note', 'a13912345678'], ['fileId', '13912345678'], ['requestId', '13912345678'], ['fileId', 'a13912345678'], ['accessToken', systemIds.文件编号]]) {
+  if (auditPresentation.sanitizeAuditValue(value, key) !== '已隐藏') fail(`登录名、自由文本、编号类键名下的手机号及敏感键仍应隐藏：${key}=${value}`)
+}
+// 真实抽屉：只用真实审计写入里出现过的键；终端编号按既有规则显示尾号。
+const idPayload = {
+  fileId: systemIds.文件编号, fileIds: [systemIds.文件编号], objectEtag: systemIds.对象存储校验值, taskId: systemIds.自我探索任务,
+  terminalId: systemIds.终端, packageSha256: systemIds.安装包校验值, signerCertificateThumbprint: systemIds.证书指纹, fileIdDigest: ['17192763454b'],
+}
+const idVisible = textOf(auditDrawer.AuditDetailDrawer({ record: { ...auditRecord, requestId: systemIds.请求编号, payloadJson: JSON.stringify(idPayload) }, onClose: () => {} }))
+for (const value of [systemIds.文件编号, systemIds.对象存储校验值, systemIds.请求编号, systemIds.自我探索任务, systemIds.安装包校验值, systemIds.证书指纹, '17192763454b', '终端（尾号 42e040）']) {
+  if (!idVisible.includes(value)) fail(`抽屉应原样显示系统编号：${value}`)
+}
+if (idVisible.includes('已隐藏')) fail('抽屉里的系统编号不应显示已隐藏')
+const identityVisible = textOf(auditDrawer.AuditDetailDrawer({ record: { ...auditRecord, requestId: '13912345678', payloadJson: JSON.stringify({ username: '13912345678', reason: '用户来电 139-1234-5678 要求核对', note: 'abc13912345678' }) }, onClose: () => {} }))
+if (/1391234|139-1234/.test(identityVisible) || (identityVisible.match(/已隐藏/g) ?? []).length !== 4) fail('抽屉里登录名、原因、说明和请求编号中的手机号须各显示已隐藏')
 for (const payloadJson of ['bad-json', '{"password":"secret-raw"', '{"unknown":"bad-json-secret"', '["unrecognized-private-value"']) {
   const parsed = auditPresentation.parseAuditPayload(payloadJson)
   const visible = textOf(auditDrawer.AuditDetailDrawer({ record: { ...auditRecord, payloadJson }, onClose: () => {} }))
@@ -100,13 +135,15 @@ function findTree(node, predicate) {
   return predicate(node) ? node : findTree(node.props?.children, predicate)
 }
 const privacyStates = ['', '', undefined, [], [], null, 'ready', null, null, false, null]
+// 注销类工单的「去用户管理处理」是站内 Link；文案门禁只看渲染出的文字，替身只渲染子节点（同 verify-console-plain-copy 的做法）。
+const routerStub = { Link: (p) => p.children }
 const privacyPageModule = runFile('apps/admin/src/routes/privacy-requests/index.tsx', {
-  ...common, react: hooks(privacyStates), '../../services/api/adminPrivacyRequests': {},
+  ...common, react: hooks(privacyStates), 'react-router-dom': routerStub, '../../services/api/adminPrivacyRequests': {},
 }, '', browserGlobals)
 const privacyEmptyTree = privacyPageModule.default()
 const privacyPopulatedModule = runFile('apps/admin/src/routes/privacy-requests/index.tsx', {
   ...common, react: hooks(['', '', undefined, [], [{ id: 'ticket', status: 'pending', requestType: 'export', phoneMasked: '138****5678' }], null, 'ready', null, null, false, null]),
-  '../../services/api/adminPrivacyRequests': {},
+  'react-router-dom': routerStub, '../../services/api/adminPrivacyRequests': {},
 }, '', browserGlobals)
 if (!textOf(privacyPopulatedModule.default()).replace(/\s+/g, '').includes('当前页1条')) fail('隐私请求有数据时保留原游标栏')
 if (textOf(privacyEmptyTree).includes('当前页')) fail('隐私请求空列表不得显示游标栏')

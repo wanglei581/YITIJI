@@ -3,9 +3,12 @@ import { Cron, CronExpression } from '@nestjs/schedule'
 import { RedisService } from '../common/redis/redis.service'
 import { collectDerivedAlerts, type DerivedAlert } from './derived-alerts'
 import { PrismaService } from '../prisma/prisma.service'
+import { SCAN_DEVICE_ISSUE } from './derived-scan-device-alerts'
 
 type PreviousAlert = Pick<DerivedAlert, 'subjectKey' | 'episodeToken' | 'type' | 'severity' | 'title' | 'terminalCode'>
-type AlertCollector = (prisma: PrismaService, now: Date) => Promise<{ alerts: DerivedAlert[] }>
+type AlertCollector = (prisma: PrismaService, now: Date) => Promise<{ alerts: DerivedAlert[]; terminalSubjectKeysInScope?: string[] }>
+
+const TERMINAL_ALERT_TYPES = new Set(['terminal_offline', 'printer_issue', SCAN_DEVICE_ISSUE])
 
 const DEFAULT_DEDUPE_TTL_SECONDS = 180 * 24 * 60 * 60
 
@@ -64,7 +67,8 @@ export async function deliverOpsAlert(input: {
 
 /**
  * 企业微信群机器人推送。告警仍由 admin-ops 的派生查询决定，本任务只复用它的节奏。
- * Redis DB 由 REDIS_URL 决定；生产应使用约定的 14 号库。
+ * Redis 库号由 REDIS_URL 决定，与本应用其它 Redis 键同库（部署手册 production-deployment-runbook.md 写的是 /0）；
+ * 本服务的键都带 `admin-alert-push:` 前缀，不需要单独的库。旧注释里「约定的 14 号库」在任何部署文档里都没有出处。
  */
 @Injectable()
 export class AdminAlertPushService {
@@ -97,8 +101,20 @@ export class AdminAlertPushService {
       for (const alert of current.alerts) {
         await this.pushOnce(alert, 'firing')
       }
+      // 列表消失不等于恢复：不再考察的终端静默移出；扫描仪离线、能力不可用或无状态回报也一样。
+      // 旧收集器没给范围时，离线 / 打印机保留原行为；扫描仪必须拿到范围证据。
+      const inScope = current.terminalSubjectKeysInScope ? new Set(current.terminalSubjectKeysInScope) : null
       for (const alert of previous) {
-        if (!currentByKey.has(alert.subjectKey)) await this.pushOnce(alert, 'recovered')
+        if (currentByKey.has(alert.subjectKey)) continue
+        const outOfScope = inScope ? !inScope.has(alert.subjectKey) : alert.type === SCAN_DEVICE_ISSUE
+        if (TERMINAL_ALERT_TYPES.has(alert.type) && outOfScope) {
+          // 只重置扫描仪推送去重，重新纳入且同一故障仍在时可以再提醒；不改告警身份或其它类型。
+          if (alert.type === SCAN_DEVICE_ISSUE) {
+            await this.redis.del(`admin-alert-push:sent:${alert.subjectKey}:${alert.episodeToken}:firing`)
+          }
+          continue
+        }
+        await this.pushOnce(alert, 'recovered')
       }
 
       const next: PreviousAlert[] = current.alerts.map(({ subjectKey, episodeToken, type, severity, title, terminalCode }) => ({

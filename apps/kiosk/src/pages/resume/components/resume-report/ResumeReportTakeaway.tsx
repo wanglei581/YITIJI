@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ResumeReportExportKind, ResumeReportExportResponse } from '@ai-job-print/shared'
 import { FilePreviewDialog } from '../../../../components/FilePreviewDialog'
 import { useCountdown } from '../../../../hooks/useCountdown'
@@ -88,6 +88,8 @@ export function ResumeReportTakeaway(props: {
   taskId?: string
   accessToken?: string
   capture?: ExportCaptureState | null
+  /** 可选。导出成功 / 清掉时通知页面（页面顶栏胶囊据此写「导出已生成」）。 */
+  onExportedChange?: (exported: boolean) => void
 }) {
   const startPrint = useStartPrintHandoff()
   const { getToken } = useAuth()
@@ -123,6 +125,10 @@ export function ResumeReportTakeaway(props: {
   const [exportError, setExportError] = useState<string | null>(
     capture === 'export-failed' ? FIXTURE_EXPORT_ERROR : null,
   )
+
+  const { onExportedChange } = props
+  const hasExport = Boolean(exported)
+  useEffect(() => { onExportedChange?.(hasExport) }, [onExportedChange, hasExport])
 
   if (!props.show) return null
 
@@ -182,14 +188,14 @@ export function ResumeReportTakeaway(props: {
         <div className="rrp-take-h" data-testid="resume-report-takeaway-title">带走这份报告</div>
         <ResumePricingBar pricing={pricing} loading={pricingLoading} blockedReason={blockedReason} />
         <div className="rrp-export">
-          <TakeawayButton
+          {exported ? <TakeawayButton
             label={exportKind === 'change_list' ? '打印修改清单' : '打印这份报告'}
-            hint={printNavigating ? '正在进入打印确认…' : !exported ? '请先导出' : printReady ? null : '链接未就绪'}
+            hint={printNavigating ? '正在进入打印确认…' : printReady ? null : '链接未就绪'}
             blocked={printBlocked}
             describedBy={reasonId}
             testId="resume-report-print"
             onClick={handlePrint}
-          />
+          /> : null}
           <TakeawayButton
             label="导出 PDF"
             hint={exporting && exportKind === 'diagnosis_report' ? '正在生成…' : pricingBlocks ? '暂不可用' : null}
@@ -198,14 +204,14 @@ export function ResumeReportTakeaway(props: {
             testId="resume-report-export-pdf"
             onClick={() => { void runExport('diagnosis_report') }}
           />
-          <TakeawayButton
+          {exported ? <TakeawayButton
             label="生成二维码带走"
-            hint={!exported ? '请先导出' : qrReady ? null : '链接未就绪'}
+            hint={qrReady ? null : '链接未就绪'}
             blocked={qrBlocked}
             describedBy={reasonId}
             testId="resume-report-qr"
             onClick={() => { if (qrReady) setPreviewOpen(true) }}
-          />
+          /> : null}
           <TakeawayButton
             label="导出修改清单"
             hint={exporting && exportKind === 'change_list' ? '正在生成…' : pricingBlocks ? '暂不可用' : null}

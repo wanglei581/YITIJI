@@ -1,3 +1,4 @@
+import { verifyPartnerAiServices } from './console-screen-partner-ai-cases'
 
 import { SCREEN_JUMP_COPY } from '../src/console-screen/console-screen.types'
 import { PartnerUsageController } from '../src/console-screen/console-screen.usage.controller'
@@ -211,6 +212,7 @@ const phase1 = await assertBehaviorPhase1(context)
 const phase2 = await assertBehaviorPhase2(phase1)
 const phase3 = await assertBehaviorPhase3(phase2)
 await assertBehaviorPhase4(phase3)
+await verifyPartnerAiServices(prisma)
 
 }  finally {
     await prisma.onModuleDestroy().catch(() => undefined)

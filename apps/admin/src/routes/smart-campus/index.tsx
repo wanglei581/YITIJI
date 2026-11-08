@@ -136,14 +136,23 @@ export default function SmartCampusPage() {
         <div className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning-bg/70 px-4 py-3">
           <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning-fg" aria-hidden="true" />
           <p className="text-xs leading-relaxed text-warning-fg">
-            管理员按终端配置「智慧校园」模块的显示开关；保存后一体机首页按开关显示或隐藏「智慧校园」。学校账号在机构后台只能配置本校终端。<span className="font-semibold">迎新内容 / 使用统计</span>暂未开放，<span className="font-semibold">校园大数据</span>暂不开放。未开启任何子模块时无法启用。
+            管理员按终端配置「智慧校园」模块的显示开关；2026-11-04 起一体机端停放「智慧校园」：开关照常保存，一体机暂不显示，恢复后按开关生效。学校账号在机构后台只能配置本校终端。<span className="font-semibold">迎新内容 / 使用统计</span>暂未开放，<span className="font-semibold">校园大数据</span>暂不开放。未开启任何子模块时无法启用。
           </p>
         </div>
 
         {loading ? (
           <p className="text-sm text-neutral-400">加载中…</p>
         ) : error ? (
-          <Card className="p-6 text-center text-sm text-neutral-500">{error}</Card>
+          <Card className="p-6 text-center text-sm text-neutral-500">
+            <p>{error}</p>
+            <button
+              type="button"
+              onClick={load}
+              className="mt-3 inline-flex h-11 items-center rounded-lg border border-neutral-200 bg-surface px-4 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
+            >
+              重新加载
+            </button>
+          </Card>
         ) : terminals.length === 0 ? (
           <Card className="p-10 text-center text-sm text-neutral-500">暂无终端</Card>
         ) : (

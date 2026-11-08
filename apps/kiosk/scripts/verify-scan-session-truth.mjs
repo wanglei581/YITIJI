@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -8,7 +8,21 @@ const kioskRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (relativePath) => readFileSync(resolve(kioskRoot, relativePath), 'utf8')
 
 const scanStart = read('src/pages/scan/ScanStartPage.tsx')
-const scanSettings = read('src/pages/scan/ScanSettingsPage.tsx')
+/* 2026-11-02 K1a 拆分：ScanSettingsPage 顶着 800 行硬线（CLAUDE.md §8），而下一步要往里加屏上扫描，
+ * 所以按职责拆成了 状态 / 创建 / 投递确认 / 到期 / 处理函数 五个 hook，页面只留装配与渲染。
+ * 代码行是逐字搬的（行为一字不变），下面凡是钉「设置页这一整套逻辑」的断言，读的就是这几份的拼接
+ * （顺序 = 状态 → 创建 → 投递确认 → 到期 → 处理函数 → 页面，也就是它们拆分前在原文里的先后），**判据一条没减**；
+ * 要钉哪个文件才有的东西（渲染、本地声明）仍然读那一个文件。以后设置页再拆出新文件，加进下面这张表
+ * （文件路径写成字面量而不是藏进共用模块，是为了项目图谱查得到「这个文件被哪条门禁断言」）。 */
+const SETTINGS_PAGE_FILES = [
+  'src/pages/scan/useScanSettingsState.ts',
+  'src/pages/scan/useScanSessionCreate.ts',
+  'src/pages/scan/useScanSettingsDeliveryAck.ts',
+  'src/pages/scan/useScanSettingsExpiry.ts',
+  'src/pages/scan/useScanSettingsActions.ts',
+  'src/pages/scan/ScanSettingsPage.tsx',
+]
+const scanSettings = SETTINGS_PAGE_FILES.map(read).join('\n')
 /* 2026-09-14 结构收敛：拒绝码表与两屏结论文案、以及「失败码 → 说什么」的纯翻译
  * 搬到了 scanRescanRecovery.ts（ScanSettingsPage 触到 800 行硬线）。搬的是无状态的
  * 那一半，副作用仍在页面里。下面凡是钉这些常量/文案的断言改钉这份源，**判据一个没减**。 */
@@ -173,7 +187,31 @@ assert.doesNotMatch(
 )
 
 const scanProgress = read('src/pages/scan/ScanProgressPage.tsx')
-const scanResult = read('src/pages/scan/ScanResultPage.tsx')
+/* 2026-11-02 K1a 拆分：ScanResultPage 同理按职责拆成 重扫授权 / 出口 两个 hook 和 失败视图 / 预览块 / 去向行
+ * 三个组件，页面只留装配与渲染。代码行逐字搬运，下面的断言读这几份的拼接，判据一条没减。
+ * 顺序 = 类型 → 重扫授权 → 出口 → 视图 → 页面。 */
+const RESULT_PAGE_FILES = [
+  'src/pages/scan/scanResultModel.ts',
+  'src/pages/scan/useScanResultRescan.ts',
+  'src/pages/scan/useScanResultExits.ts',
+  'src/pages/scan/ScanResultFailedView.tsx',
+  'src/pages/scan/ScanResultPreviewBlock.tsx',
+  'src/pages/scan/ScanResultExitRow.tsx',
+  'src/pages/scan/ScanResultPage.tsx',
+]
+const scanResult = RESULT_PAGE_FILES.map(read).join('\n')
+/* 防漏登记：设置页 / 结果页以后再拆出新文件，必须加进上面两张表。否则「不得出现」类的断言
+ * （doesNotMatch、数 navigate / createScanSession / takeScanRescanAuthority 的次数）读不到新文件，
+ * 就等于悄悄放过去。结果页的整屏预览层（ScanResultPreviewViewer）是原来就独立的文件，不在其内。 */
+for (const [label, listed, pattern] of [
+  ['settings', SETTINGS_PAGE_FILES, /^(?:ScanSettingsPage|useScanSettings\w*|useScanSession\w*)\.tsx?$/],
+  ['result', RESULT_PAGE_FILES, /^(?:ScanResult(?!PreviewViewer)\w*|scanResultModel|useScanResult\w*)\.tsx?$/],
+]) {
+  const unlisted = readdirSync(resolve(kioskRoot, 'src/pages/scan'))
+    .filter((name) => pattern.test(name))
+    .filter((name) => !listed.includes(`src/pages/scan/${name}`))
+  assert.deepEqual(unlisted, [], `${label} page split files must all be listed in this gate: ${unlisted.join(', ')}`)
+}
 const scanFormat = read('src/pages/scan/scanOutputFormat.ts')
 
 assert.match(
@@ -229,6 +267,20 @@ assert.match(
   scanResult,
   /未登录扫描件不会进入「我的文档」/,
   'guest scan result must say the file will not enter My Documents',
+)
+/* 产品负责人 2026-11-02 拍板的游客说明（照触屏版补稿 cs-scan-done 的原话，再补一句 U 盘）：
+ * 说清「请在本次操作内完成打印或识别」，带走电子版是「下次先扫码登录再扫」或「用 U 盘」，
+ * U 盘那条这台机器暂未开通所以如实写出来。上面那条只钉开头，这里钉全句 —— 句子被改回走查 I-15 的旧版
+ * （「要留在账号里：先登录，再重新扫一次」，会让人以为现在登录就能存进去），或者悄悄丢掉 U 盘那一句，都要红。 */
+assert.match(
+  scanResult,
+  /未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。要带走电子版，下次先扫码登录再扫。用 U 盘带走：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。/,
+  'guest scan result must carry the 11/02 approved wording incl. the USB line',
+)
+assert.doesNotMatch(
+  scanResult,
+  /要留在账号里|先登录，再重新扫一次/,
+  'guest scan result must not go back to the pre-11/02 sentence that implies logging in now keeps the file',
 )
 assert.match(
   scanResult,
@@ -555,6 +607,20 @@ assert.doesNotMatch(
   scanChrome,
   /on(Home|Advisor|Profile)=\{\(\) => navigate\(/,
   '底栏三项一旦改回裸 navigate，这一屏就又会留下孤儿服务端任务',
+)
+/* 底栏左键（「返回」「返回打印扫描」「重新扫描」等页面给的次按钮）：写 leaveTo 的一律走 leaveScanFlow，
+ * 不许在这里自己 navigate。没写 leaveTo 的才是页面自己的动作（如「返回（取消任务）」先撤销再走）。 */
+assert.match(
+  scanChrome,
+  /if \(leftSpec\.leaveTo\) leaveScanFlow\(leftSpec\.leaveTo\)\s*\n\s*else leftSpec\.onClick\?\.\(\)/,
+  '底栏左键的 leaveTo 必须经 leaveScanFlow：撤服务端任务 → 清本机登记 → 走人',
+)
+/* 问小青也是离开整条扫描流程的出口：先记草稿，再 leaveScanFlow，最后返回 false 让底栏不再自己 navigate。
+ * 少了 beforeAsk，底栏默认会「记草稿 + navigate('/assistant')」，服务端任务和本机登记都留在原地。 */
+assert.match(
+  scanChrome,
+  /beforeAsk: \(\) => \{\s*\n\s*rememberAssistantDraft\(askDraft\)\s*\n\s*leaveScanFlow\('\/assistant'\)\s*\n\s*return false\s*\n\s*\},/,
+  '问小青必须走 beforeAsk：记草稿 → leaveScanFlow(\'/assistant\') → return false',
 )
 
 assert.match(
@@ -987,7 +1053,7 @@ assert.equal(
  * 它仍然不是自动降级：按钮由用户按下，文案写明它不是同字节重扫、同一张纸可能被拒收。 */
 assert.match(
   scanSettingsView,
-  /rescanCredentialsLost \|\| rescanRefusedByServer \|\| ackRefused \? \(\s*\n\s*<button[^>]*onClick=\{handlePlainRestart\}>\s*\n\s*重新开始一次扫描/,
+  /rescanCredentialsLost \|\| rescanRefusedByServer \|\| ackRefused\s*\n\s*\? \{ label: '重新开始一次扫描', onClick: handlePlainRestart \}/,
   '三种 fail-closed（本机取不到凭据 / 服务端不认这次重扫 / 服务端不给投递授权）'
     + '都必须给出同一个显式主行动「重新开始一次扫描」：'
     + '少给其中任何一种，那一种就是一条注定失败的死路',
@@ -997,7 +1063,7 @@ assert.match(
  * 推到「重新开始一次扫描」上去，同一张纸随后撞上服务端两小时的同字节去重。 */
 assert.match(
   scanSettingsView,
-  /\) : rescanRetryable \? \(\s*\n\s*<button[^>]*onClick=\{handleRescanRetry\}>\s*\n\s*再试一次安全重扫\s*\n\s*<\/button>\s*\n\s*\) : rescanCredentialsLost \|\| rescanRefusedByServer \|\| ackRefused \? \(/,
+  /: rescanRetryable\s*\n\s*\? \{ label: '再试一次安全重扫', onClick: handleRescanRetry \}\s*\n\s*: rescanCredentialsLost \|\| rescanRefusedByServer \|\| ackRefused\s*\n\s*\? \{ label: '重新开始一次扫描'/,
   '「还能再试一次成对重扫」必须排在三条 fail-closed 的普通重启之前：'
     + '把它排在后面或干脆不给，等于让一次 429 永久烧掉用户那枚一次性授权。\n'
     + '（2026-09-14 起它前面还多一条 awaitingAck 分支 —— 见下面那条专门的断言：'
@@ -1104,7 +1170,7 @@ assert.match(
 )
 assert.match(
   scanResult,
-  /rescanAuthorized \? \([\s\S]{0,400}?重试扫描（同一份材料）[\s\S]{0,400}?onClick=\{handlePlainRestart\}>\s*\n\s*重新开始一次扫描/,
+  /rescanAuthorized\s*\n\s*\? \{ label: '重试扫描（同一份材料）', onClick: handleRetry \}\s*\n\s*: \{ label: '重新开始一次扫描', onClick: handlePlainRestart \}/,
   '两个按钮不是一个按钮两种文案：拿到凭据是安全重扫，拿不到是普通新会话'
     + '（同一张纸会被按重复件拒收）。代价不同，文案必须分开，且各自接自己的处置',
 )
@@ -1191,11 +1257,16 @@ assert.equal(
   '结果页只许有两处 navigate：leaveScanFlow 里那一处（replace），以及 goToSettings 的'
     + '非工作台兜底。多出来的一处就是一个绕开了撤销/清场/replace 的出口',
 )
-for (const destination of ['/print-scan', '/help', '/']) {
+/* 底栏左键「返回打印扫描」写成 `leaveTo: '/print-scan'`，由 ScanWorkbenchChrome 统一转成 leaveScanFlow
+ * （转换那一步在上面 ScanWorkbenchChrome 的断言里单独钉）；「返回首页」整行按钮仍直接调 leaveScanFlow。 */
+for (const [destination, exitForm] of [
+  ['/print-scan', /leaveTo: '\/print-scan'/],
+  ['/', /leaveScanFlow\('\/'\)/],
+]) {
   assert.match(
     scanResult,
-    new RegExp(`leaveScanFlow\\('${destination.replaceAll('/', '\\/')}'\\)`),
-    `结果页落点 ${destination} 的出口必须走 leaveScanFlow`,
+    exitForm,
+    `结果页落点 ${destination} 的出口必须走 leaveScanFlow（经 leaveTo 或直接调）`,
   )
   assert.doesNotMatch(
     scanResult,
@@ -1203,6 +1274,11 @@ for (const destination of ['/print-scan', '/help', '/']) {
     `落点 ${destination} 一旦改回裸 navigate，这一屏又会把上一位的凭证和授权留给下一位`,
   )
 }
+assert.doesNotMatch(
+  scanResult,
+  /leaveScanFlow\('\/help'\)|navigate\('\/help'\)|联系工作人员|找工作人员/,
+  '结果页不再把失败交给现场人员。返回打印扫描和返回首页仍走 leaveScanFlow',
+)
 
 /* ── F. 谁有资格说「服务端已放行」 ─────────────────────────────────────────
  *
@@ -1321,7 +1397,7 @@ assert.match(
 )
 assert.match(
   scanSettingsView,
-  /rescanCredentialsLost \|\| rescanRefusedByServer \|\| ackRefused \? \([\s\S]{0,400}?onClick=\{handlePlainRestart\}>\s*\n\s*重新开始一次扫描/,
+  /rescanCredentialsLost \|\| rescanRefusedByServer \|\| ackRefused\s*\n\s*\? \{ label: '重新开始一次扫描', onClick: handlePlainRestart \}/,
   '三种 fail-closed（本机取不到凭据 / 服务端不认这次重扫 / 服务端不给投递授权）'
     + '都要有同一个能按的主行动；'
     + '其余失败态仍然什么都不许按（本页不自动重发）。\n'
@@ -1680,7 +1756,7 @@ assert.match(
 )
 assert.match(
   scanSettingsView,
-  /\{awaitingAck \? \(\s*\n\s*ackRetryable \? \(/,
+  /const primary: NonNullable<ScanDock\['primary'\]> = awaitingAck\s*\n\s*\? ackRetryable\s*\n\s*\? \{ label: '再确认一次', onClick: handleAckRetry \}/,
   'awaitingAck 必须是 CTA 的第一条分支：这一屏上「再试一次安全重扫」「重新开始一次扫描」'
     + '都是错的主行动 —— 会话已经建成，缺的只是那一次确认，重开一场只会白建一条任务',
 )
@@ -1705,7 +1781,7 @@ assert.match(
 )
 assert.match(
   scanProgress,
-  /subtitle=\{deliveryAcked\s*\n\s*\? '请在打印机面板完成扫描；本页每 3 秒自动检测结果'\s*\n\s*: '还没确认这台机器可以收这一场的文件；确认之前请先别在面板上按开始'\}/,
+  /subtitle=\{deliveryAcked\s*\n\s*\? '请在打印机面板完成扫描；本页每 3 秒自动检测结果'\s*\n\s*: '确认之前，这一页还不能检查文件'\}/,
   '等待页那句副标题必须跟着确认状态改口：没确认时说「请在打印机面板完成扫描」是假话 ——'
     + '服务端此刻不肯把文件投给这一场',
 )
@@ -1754,7 +1830,8 @@ assert.match(
   assert.doesNotMatch(notDurableText, /\*\*/, '纯字符串直接渲染进 <p>：写 markdown 会把星号打在 27 寸公共屏上')
   assert.match(notDurableText, /先别在面板上按开始/, '必须劝阻面板操作：这一刻没有任何会话会认领那份文件')
   assert.match(notDurableText, /撤掉/, '必须说出「那条任务已经撤掉了」，否则用户会以为纸可能被谁悄悄收走')
-  assert.match(notDurableText, /工作人员/, '出路必须可执行：存储坏了用户自己修不了，只能安全返回 + 叫人')
+  assert.match(notDurableText, /请安全返回扫描首页/, '出路必须可执行：存储坏了用户自己修不了，只能安全返回扫描首页')
+  assert.doesNotMatch(notDurableText, /工作人员/, '现场无人值守：这一句不许把人支去现场工作人员')
 }
 /* 这一屏刻意**不给**「重新开始一次扫描」：写不进去是这台机器的存储坏了 / 被禁用 / 写满，
  * 重建一次只会在同一处再失败，还多留一条要撤的服务端任务。给一颗按不出结果的按钮，
@@ -1762,7 +1839,7 @@ assert.match(
 {
   // 取「重新开始一次扫描」那颗按钮的**整个**判定条件再核，不按某一种写法去匹配：
   // 写成 `liveNotDurable || rescanCredentialsLost || ...` 时，按顺序匹配的断言会漏过去。
-  const restartBranch = /\) : ([^?]*?)\? \(\s*\n\s*<button[^\n]*onClick=\{handlePlainRestart\}>\s*\n\s*重新开始一次扫描/
+  const restartBranch = /: ([^?]*?)\n\s*\? \{ label: '重新开始一次扫描', onClick: handlePlainRestart \}/
     .exec(scanSettingsView)?.[1]
   assert.ok(restartBranch, '取不到「重新开始一次扫描」那颗按钮的判定条件，后面的核对无从谈起')
   assert.doesNotMatch(
@@ -1863,6 +1940,19 @@ assert.match(
 for (const leak of [/controlToken/, /scanTaskId/, /identityToken/, /status\.(?:message|detail)/]) {
   assert.doesNotMatch(clearingOverlay, leak, `清场遮罩里不许出现 ${leak} —— 旁边站着的人看的是同一块屏`)
 }
+// F5b. 现场没有人可叫（2026-10-28 触屏版第 5 包）：遮罩里不许再出现「叫 / 找 / 联系工作人员」。
+//      需要帮助只给服务电话——走标准句 helpNeededLine，号码从后台读（useSupportContact），读不到就不写这一行。
+assert.doesNotMatch(clearingOverlay, /工作人员/, '清场遮罩里不许让人去找现场工作人员：现场没有人，求助只给服务电话')
+assert.match(
+  clearingOverlay,
+  /contact\.servicePhone \? helpNeededLine\(contact\) : null/,
+  '清场遮罩的求助句必须走标准句 helpNeededLine，且读不到服务电话号码就不写',
+)
+assert.match(
+  clearingOverlay,
+  /\{helpLine \? <p className="qx-clearing-note" data-testid="session-guard-cleanup-help">\{helpLine\}<\/p> : null\}/,
+  '清场遮罩的求助句只在有号码时才画出来',
+)
 assert.match(
   scanCleanupGate,
   /export type ScanCleanupOutcome = 'none' \| 'unreachable' \| 'server-error' \| 'rejected'/,

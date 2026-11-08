@@ -15,9 +15,16 @@ import {
   PICKUP_CODE_LENGTH,
   PICKUP_CODE_MAX_INPUT_LENGTH,
 } from '@ai-job-print/shared'
+import { helpNeededLine, machineUnusableLine, preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { formatCents } from './cashierStatus'
-import { SHARED_USER_MESSAGE_CODES, errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
+import {
+  PICKUP_CODE_REJECTED_COPY,
+  PICKUP_RESUME_REFUND_PENDING_COPY,
+  SHARED_USER_MESSAGE_CODES,
+  errorCodeOf,
+  userMessageOf,
+} from '../../services/api/userErrorMessage'
 
 /**
  * 认领失败的五种屏。
@@ -36,6 +43,8 @@ export type PickupFailure = 'invalid' | 'locked' | 'network' | 'closed' | 'print
 const INVALID_CODES = new Set([
   'PICKUP_CODE_INVALID',
   'PICKUP_CODE_EXPIRED',
+  // 走错机器与「没有这枚码」同一屏，避免用不同屏头告诉试码的人这枚码是真的。
+  'PICKUP_TERMINAL_MISMATCH',
   'PICKUP_CODE_LENGTH',
   'PICKUP_CODE_PATTERN',
 ])
@@ -55,6 +64,10 @@ export const PICKUP_CLOSED_CODES: ReadonlySet<string> = new Set([
   'FILE_CONTENT_CHANGED',
   'PICKUP_RESUME_LIMIT_REACHED',
   'PICKUP_RESUME_PARTIAL_OUTPUT',
+  // 同码接着打被拒：文件已清理、这台机器的打印程序太旧、付费异常待退回。再输同一个码不会成。
+  'PRINT_RETRY_FILE_UNAVAILABLE',
+  'PRINT_RETRY_AGENT_VERSION',
+  'PICKUP_RESUME_REFUND_PENDING',
 ])
 
 /**
@@ -62,10 +75,10 @@ export const PICKUP_CLOSED_CODES: ReadonlySet<string> = new Set([
  * 不在这里接住就会落到「请重试」——而锁定期内重试只会再被拒。
  * 服务端不回剩余时长，所以不写分钟数。
  */
-export const PICKUP_LOCKED_MESSAGE = '本机输码暂时停用，过一段时间会自动解除；着急请找现场工作人员'
+export const PICKUP_LOCKED_MESSAGE = `本机输码暂时停用，过一段时间会自动解除。${helpNeededLine()}`
 
-const TERMINAL_NOT_READY_MESSAGE = '这台机器暂时不能取件，请找现场工作人员'
-const ORDER_BUSY_MESSAGE = '这笔订单正在处理，请等几秒再输一次；仍不行请找现场工作人员'
+const TERMINAL_NOT_READY_MESSAGE = `这台机器暂时不能取件。${machineUnusableLine()}`
+const ORDER_BUSY_MESSAGE = `这笔订单正在处理，请等几秒再输一次。${helpNeededLine()}`
 
 /** 到机码输入页的续打说明。续打只认出纸失败的那台机器，每单最多 2 次（后端 SELF_SERVICE_REPRINT_LIMIT）。 */
 export const PICKUP_SAME_CODE_RESUME_NOTE =
@@ -80,36 +93,40 @@ export const PICKUP_SAME_CODE_RESUME_NOTE =
  * release / 文件就绪 / 隐私检查 / 能力开关）；门禁从服务端源码抽码，逐个断言这里有。
  */
 export const PICKUP_CLAIM_MESSAGES: Readonly<Record<string, string>> = {
-  PRINT_TERMINAL_QUEUE_HALTED: '这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员',
-  PRINTER_UNAVAILABLE: '这台终端的打印机暂不可用，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员',
-  PICKUP_CODE_INVALID: '到机码无效或已过期，请核对后重新输入',
-  PICKUP_CODE_EXPIRED: '到机码无效或已过期，请核对后重新输入',
+  PRINT_TERMINAL_QUEUE_HALTED: `这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码。${helpNeededLine()}`,
+  PRINTER_UNAVAILABLE: `这台终端的打印机暂不可用，你的到机码没有作废，请稍后再来这台终端输码。${helpNeededLine()}`,
+  PICKUP_CODE_INVALID: PICKUP_CODE_REJECTED_COPY,
+  PICKUP_CODE_EXPIRED: PICKUP_CODE_REJECTED_COPY,
   // 2026-10-06 方案②：同机且任务失败会走续打；别的机器回 PICKUP_CODE_INVALID。
   // 这个码只在同机、任务排队/打印中/已完成且过了 10 分钟回放时出现，原地重输仍是同一个错，
   // 所以不写「再输一次试试」，也不找人；没拿到纸给问小青或隐私政策联系方式（标准句接上服务电话后再换）。
   PICKUP_CODE_ALREADY_USED: '这个到机码已经用过，这单已经交给打印机，不能再次取件。要再打一份，请重新下单；没拿到纸，可以问小青，或查看《隐私政策》里的联系方式。',
-  PICKUP_RESUME_LIMIT_REACHED: '这单已经接着打过 2 次，不能再打了',
-  PICKUP_RESUME_UNCONFIRMED: '这单的出纸结果还没确认，暂时不能接着打，请稍后再试',
+  PICKUP_RESUME_LIMIT_REACHED: '这单已经接着打过 2 次，不能再打了。还要打，请在手机上重新下单',
+  PICKUP_RESUME_UNCONFIRMED: '这单的出纸结果还没确认。请过 5 分钟后回到这台机器，再输一次同一个到机码，按屏幕提示办理；符合条件时可以整份重打。',
   PICKUP_RESUME_PARTIAL_OUTPUT: '这单已经出了一部分纸，不能整单重打',
+  PICKUP_RESUME_REFUND_PENDING: PICKUP_RESUME_REFUND_PENDING_COPY,
+  PRINT_RETRY_FILE_UNAVAILABLE: '这笔订单的文件现在无法用于打印。请在手机上重新上传文件、重新下单。',
+  // 后端那句带版本号，是给维护看的，不上屏。
+  PRINT_RETRY_AGENT_VERSION: '这台机器暂时不能用同一个到机码接着打。还要打，请在手机上重新下单。',
   PICKUP_CODE_UNAVAILABLE: '这个到机码已经不能使用。请在手机小程序「我的 → 打印订单」查看这笔订单，需要的话重新下单',
   ORDER_REFUNDED: '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度',
   ORDER_PAYMENT_UNAVAILABLE: '这笔订单已经不能付款（可能已关闭）。请在手机小程序「我的 → 打印订单」查看，需要的话重新下单',
   PRINT_FILE_EXPIRED: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
   PRINT_FILE_NOT_FOUND: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
   FILE_CONTENT_CHANGED: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
-  PRINT_PII_SCAN_REQUIRED: '这份文件的隐私检查还没完成，暂时不能打印。请过一会儿再输一次，或找现场工作人员',
+  PRINT_PII_SCAN_REQUIRED: `这份文件的隐私检查还没完成，暂时不能打印。请过一会儿再输一次。${helpNeededLine()}`,
   PII_SCAN_STALE: '这份文件在隐私检查后又改过，暂时不能打印。请在手机上重新检查后再来取件',
   PRINT_PII_MANUAL_CONFIRM_REQUIRED: '这份文件的隐私检查没有完整覆盖，需要你本人先在手机上确认文件里没有不想打印的个人信息，确认后再来取件',
   PICKUP_CLAIM_RATE_LIMITED: '输码太频繁了，请等一分钟再输',
   PICKUP_CLAIM_LOCKED: PICKUP_LOCKED_MESSAGE,
-  CAPABILITY_NOT_CONFIGURED: '这台机器暂时不能打印这笔订单，请找现场工作人员',
-  CAPABILITY_UNAVAILABLE: '这台机器暂时不能打印这笔订单，请找现场工作人员',
+  CAPABILITY_NOT_CONFIGURED: `这台机器暂时不能打印这笔订单。${machineUnusableLine()}`,
+  CAPABILITY_UNAVAILABLE: `这台机器暂时不能打印这笔订单。${machineUnusableLine()}`,
   PRINT_TERMINAL_NOT_READY: TERMINAL_NOT_READY_MESSAGE,
   PRINT_TERMINAL_DEGRADED: TERMINAL_NOT_READY_MESSAGE,
   PRINT_TERMINAL_NOT_FOUND: TERMINAL_NOT_READY_MESSAGE,
   TERMINAL_ID_REQUIRED: TERMINAL_NOT_READY_MESSAGE,
   ORDER_NOT_FOUND: '没有找到这笔订单，请核对到机码后重新输入',
-  PICKUP_TERMINAL_MISMATCH: '到机码无效或已过期，请核对后重新输入',
+  PICKUP_TERMINAL_MISMATCH: PICKUP_CODE_REJECTED_COPY,
   PICKUP_NOT_CLAIMED: ORDER_BUSY_MESSAGE,
   ORDER_NOT_PAID: ORDER_BUSY_MESSAGE,
   ORDER_RELEASE_INVALID_STATE: ORDER_BUSY_MESSAGE,
@@ -130,24 +147,27 @@ export function classifyClaimFailure(error: unknown): PickupFailure {
 }
 
 /** 未登记的码走共享码表；共享码表也没有时用这句（它是「还能再试」的那类失败才会落到的）。 */
-export const PICKUP_CLAIM_FALLBACK_MESSAGE = '到机码校验没有完成，请重试或联系现场工作人员'
+export const PICKUP_CLAIM_FALLBACK_MESSAGE = `到机码校验没有完成，请重试。${printProblemLine()}`
 
 /**
- * 认领失败时屏上那一句话。取件页没有会员登录：未登记的 401/403 不能落成共享码表的
- * 「登录状态已失效」，按「本机安全校验」说。
+ * 认领失败时屏上那一句话。未登记的 401/403 不能落成共享码表的「登录状态已失效」，
+ * 按「本机安全校验」说。免费额度三个码不进上面的取件码表：原话在 userErrorMessage，
+ * 出口（去登录 / 回首页）在 pickupQuotaExit，不在这句文案里另写按钮。
  */
 export function pickupClaimMessage(error: unknown): string {
   const code = errorCodeOf(error)
   if (code === 'PRINT_TERMINAL_QUEUE_HALTED' && error instanceof ApiHttpError) {
     const message = error.message
-    if (message.trim() && message.length <= 60 && /[\u4e00-\u9fa5]/.test(message) && !/^(HTTP\s|请求失败（)/.test(message.trim())) return message
+    if (message.trim() && message.length <= 60 && /[\u4e00-\u9fa5]/.test(message) && !/^(HTTP\s|请求失败（)/.test(message.trim())) {
+      return preferUnattended(message, PICKUP_CLAIM_MESSAGES.PRINT_TERMINAL_QUEUE_HALTED)
+    }
   }
   if (code && Object.prototype.hasOwnProperty.call(PICKUP_CLAIM_MESSAGES, code)) {
     return PICKUP_CLAIM_MESSAGES[code] as string
   }
   if (code && SHARED_USER_MESSAGE_CODES.includes(code)) return userMessageOf(error, PICKUP_CLAIM_FALLBACK_MESSAGE)
   if (error instanceof ApiHttpError && (error.status === 401 || error.status === 403)) {
-    return '这台机器的安全校验没通过，请找现场工作人员'
+    return `这台机器的安全校验没通过。${printProblemLine()}`
   }
   return userMessageOf(error, PICKUP_CLAIM_FALLBACK_MESSAGE)
 }
@@ -222,8 +242,8 @@ export function claimSuccessCopy(released: boolean, printTaskStatus?: string | n
   if (printTaskStatus === 'failed' || printTaskStatus === 'cancelled' || printTaskStatus === 'abandoned') {
     return {
       title: '这一单没有打成',
-      line: '这一单没有打成。请联系现场工作人员，不要在出纸口空等。',
-      steps: ['订单已核对', '打印没有完成', '找工作人员处理'],
+      line: `这一单没有打成。不要在出纸口空等。${printProblemLine()}`,
+      steps: ['订单已核对', '打印没有完成', '查看这一单'],
       cta: '查看这一单',
     }
   }

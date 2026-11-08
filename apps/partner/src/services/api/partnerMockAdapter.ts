@@ -191,6 +191,7 @@ let SMART_CAMPUS_TERMINALS: PartnerSmartCampusTerminal[] = [
 function genId(): string { return `mock-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }
 
 export const MOCK_RECRUITMENT_HOSTING_KEY = 'mock:recruitment-hosting'
+export const MOCK_SMART_CAMPUS_KEY = 'mock:can-manage-smart-campus'
 
 /** 'unavailable' 时能力接口直接失败，用来演示「暂时无法确认」 */
 function mockCapabilitiesUnavailable(): boolean {
@@ -207,6 +208,19 @@ function mockRecruitmentHostingEnabled(): boolean {
   } catch {
     return true
   }
+}
+
+function mockCanManageSmartCampus(): boolean {
+  try {
+    return window.localStorage.getItem(MOCK_SMART_CAMPUS_KEY) === 'on'
+  } catch {
+    return false
+  }
+}
+
+/** 演示机构类型与能力接口同一口径。智慧校园打开时按高校就业中心，否则按持证人力资源机构。 */
+export function demoPartnerOrgType(): 'school_employment_center' | 'licensed_hr_agency' {
+  return mockCanManageSmartCampus() ? 'school_employment_center' : 'licensed_hr_agency'
 }
 
 export const partnerMockAdapter = {
@@ -238,7 +252,7 @@ export const partnerMockAdapter = {
     // 演示默认打开（保持既有演示口径）；localStorage['mock:recruitment-hosting']='off' 时按关闭演示。
     const recruitmentHosting = mockRecruitmentHostingEnabled()
     return {
-      orgType: 'licensed_hr_agency',
+      orgType: demoPartnerOrgType(),
       allowedAccessModes: ['api', 'excel', 'csv', 'json', 'webhook', 'manual'],
       allowedSourceKinds: ['hr_company', 'job_platform', 'aggregator', 'manual'],
       defaultSourceKind: 'hr_company',
@@ -246,7 +260,7 @@ export const partnerMockAdapter = {
       canImportJobs: recruitmentHosting,
       canImportFairs: false,
       canManagePolicies: false,
-      canManageSmartCampus: false,
+      canManageSmartCampus: mockCanManageSmartCampus(),
       canManageCompanies: recruitmentHosting,
       companyManageScope: 'unrestricted',
       recruitmentHosting,

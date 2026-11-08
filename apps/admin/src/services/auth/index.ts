@@ -601,6 +601,8 @@ export function logout(): void {
       method: 'POST',
       headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
       credentials: 'include',
+      // 下一行就跳登录页；keepalive 让这次请求在页面卸载后仍能发完
+      keepalive: true,
     }).catch(() => undefined)
   }
   clearAuth()

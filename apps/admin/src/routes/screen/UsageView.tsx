@@ -1,3 +1,4 @@
+import { usePublicBrand } from '../../services/api/publicBrand'
 import { formatDate } from '@ai-job-print/shared'
 import { screenAiProvider } from './aiScreenDisplay'
 import { useCallback, useMemo } from 'react'
@@ -39,7 +40,6 @@ import { UsageAiPanel, UsageAiQualityPanel, UsagePolicyPanel } from './UsageHost
  *     右栏换成 AI 服务 / AI 质量 / 政策服务使用（UsageHostingOff.tsx），「岗位 AI」节点改叫「简历对照」。
  */
 
-const TITLE = '职易达 · 系统使用与服务调用态势'
 const SUBTITLE = '数字孪生 · 服务调用'
 const POLL_SECONDS = 60
 const RANGES: ReadonlyArray<{ key: ScreenUsageRange; label: string }> = [
@@ -92,10 +92,12 @@ function useUsage(range: ScreenUsageRange) {
 }
 
 export function UsageView({ chrome }: { chrome: ScreenChrome }) {
+  const { brandName } = usePublicBrand()
+  const title = `${brandName} · 系统使用与服务调用态势`
   const range = normalizeUsageRange(chrome.params.get('range'))
   const usage = useUsage(range)
   if (!usage.data) {
-    return <TwinShellEmpty chrome={chrome} title={TITLE} subtitle={SUBTITLE} failure={usage.failure} onRetry={() => void usage.refresh()} />
+    return <TwinShellEmpty chrome={chrome} title={title} subtitle={SUBTITLE} failure={usage.failure} onRetry={() => void usage.refresh()} />
   }
   const u = usage.data.metrics
   const rangeText = RANGE_LABEL[usage.data.range]
@@ -117,7 +119,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
   return (
     <TwinShell
       chrome={chrome}
-      title={TITLE}
+      title={title}
       subtitle={`${SUBTITLE} · ${rangeText}`}
       layout="city"
       toolbar={toolbar}

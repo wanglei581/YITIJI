@@ -13,6 +13,7 @@ test.describe('设备 / 终端 / 打印机（mock 口径）', () => {
   test('四个 Tab 可切换，停用终端有二次确认', async ({ page }) => {
     const guards = await openAuthed(page, '/devices')
     await settleAdminPage(page, guards)
+    await expect(page.getByRole('button', { name: '设备总览', exact: true })).toHaveAttribute('aria-pressed', 'true')
 
     for (const tab of ['设备总览', '终端', '打印机', '外设']) {
       await page.getByRole('button', { name: tab, exact: true }).click()

@@ -154,6 +154,14 @@ export interface AdminTerminalRecord {
   printerStatus: TerminalPrinterStatus | string | null
   wiredNetworkStatus: 'connected' | 'disconnected' | 'unknown' | string | null
   printerNetworkStatus: 'reachable' | 'unreachable' | 'not_network_printer' | 'unknown' | string | null
+  /** 终端程序上报的 Windows 打印队列。null 表示这一版终端程序还没报。 */
+  printerQueue?: {
+    printerQueueName: string | null
+    printerQueuePortKind: string | null
+    printerQueuePortName: string | null
+    printerQueueRawStatus: string | null
+    printerQueueSpooler: string | null
+  } | null
   /**
    * 扫描输入闸门的心跳遥测（Agent 上报 → TerminalHeartbeat → AdminTerminalView）。
    *
@@ -339,6 +347,19 @@ export interface TerminalBindCodeCreated {
 export type AdminPrinterStatus = 'online' | 'offline' | 'error'
 export type AdminPaperStatus = 'normal' | 'low' | 'empty' | 'jam' | 'unknown'
 
+export interface AdminPrinterOutputSides {
+  sides: number
+  colorSides: number
+  duplexSides: number
+}
+
+/** 本系统已确认出纸的面数。null 表示这次没读到，不能当成 0。 */
+export interface AdminPrinterOutput {
+  today: AdminPrinterOutputSides
+  month: AdminPrinterOutputSides
+  monthUnconfirmedTasks: number
+}
+
 export interface AdminPrinterRecord {
   id: string
   terminalId: string
@@ -355,10 +376,17 @@ export interface AdminPrinterRecord {
   fault: string | null
   lastHeartbeatAt: string | null
   lastSyncAt: string | null
+  output?: AdminPrinterOutput | null
 }
 
 export interface AdminPrintersResponse {
   printers: AdminPrinterRecord[]
+  outputStatus?: 'ok' | 'capped' | 'unavailable'
+}
+
+/** includeOutput 为真时才请求本系统出纸。不传则响应里没有 output / outputStatus。 */
+export interface GetPrintersOptions {
+  includeOutput?: boolean
 }
 
 // R1: Added sourceOrgId, sourceUrl, description, tags, requirements
@@ -501,6 +529,8 @@ export interface AdminAiUsage {
     completionTokens: number
     totalTokens: number
   }
+  /** 旧版后端没有这个字段（发布时前端可能先到），读取方按「暂无用量数据」处理 */
+  voiceUsageTotals?: { asrSeconds: number; asrCallsWithUsage: number; ttsChars: number; ttsCallsWithUsage: number }
   /** 分能力成本三态。**不是纯 number** —— 见 AiOperationCost。 */
   costByOperation: Record<AiOperation, AiOperationCost>
   alerts: Array<{

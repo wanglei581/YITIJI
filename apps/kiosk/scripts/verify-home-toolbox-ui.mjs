@@ -31,7 +31,7 @@ const fail = (msg) => {
 
 const home = read('src/pages/home/HomePage.tsx')
 const homeDomains = read('src/pages/home/homeV6Domains.ts')
-const homeView = read('src/pages/home/components/QxHomeView.tsx')
+const homeView = read('src/pages/home/components/HomeTouchView.tsx')
 const toolboxPage = read('src/pages/toolbox/ToolboxZonePage.tsx')
 const launchHelpers = read('src/pages/home/components/kioskAppLaunch.ts')
 const toolboxHook = read('src/hooks/useToolboxConfig.ts')
@@ -72,11 +72,20 @@ if (
   fail('B. 青序首页百宝箱必须排在智慧校园前并进入 /toolbox')
 }
 
-// /toolbox 路由已注册
-if (/path:\s*'toolbox'/.test(routes) && /ToolboxZonePage/.test(routes)) {
-  pass('B2. /toolbox 路由已注册到 ToolboxZonePage')
+// B2. 2026-11-04 产品负责人定停放：两条 splat 跳回首页，路由文件不挂区页。
+if (
+  /path:\s*'toolbox\/\*'/.test(routes) &&
+  /path:\s*'smart-campus\/\*'/.test(routes) &&
+  /<Navigate to="\/" replace \/>/.test(routes) &&
+  !/from\s+['"][^'"]*ToolboxZonePage['"]/.test(routes) &&
+  !/from\s+['"][^'"]*SmartCampusHomePage['"]/.test(routes) &&
+  !/from\s+['"][^'"]*KioskCapabilityGuard['"]/.test(routes) &&
+  !/from\s+['"][^'"]*useToolboxConfig['"]/.test(routes) &&
+  !/from\s+['"][^'"]*useSmartCampusConfig['"]/.test(routes)
+) {
+  pass('B2. /toolbox/* 与 /smart-campus/* 停放为跳回首页，不再注册区页（2026-11-04 产品负责人定停放）')
 } else {
-  fail('B2. /toolbox 路由必须注册到 ToolboxZonePage')
+  fail('B2. 百宝箱与智慧校园必须停放为跳回首页的 splat，且路由不 import 停放模块')
 }
 
 // C. /toolbox 保留统一配置读取 + 三种启动方式 + 扫码提示 + 离场确认 + 事件上报
@@ -121,21 +130,21 @@ if (
   fail('C2. 百宝箱外部 H5 必须先展示离场提示，不得点击时直接跳转')
 }
 
-// D. 2026-09-28 稿 01：首页未开通不占位。确认开通才渲染；点击守卫仍在 HomePage（没读到或关闭时 onAction 直接返回）。
+// D. 2026-11-04 产品负责人定停放：首页不调两个能力 hook，不摆两张瓦片，数据属性固定 parked。
 if (
-  home.includes('useSmartCampusCapabilityState()') &&
-  home.includes('useToolboxCapabilityState()') &&
-  home.includes("campus.status === 'ready' && campus.enabled") &&
-  home.includes("toolbox.status === 'ready' && toolbox.enabled") &&
-  homeView.includes('toolboxReady ?') &&
-  homeView.includes('campusReady ?') &&
-  homeView.includes('actionId="toolbox"') &&
-  homeView.includes('actionId="smart-campus"') &&
-  homeView.indexOf('actionId="toolbox"') < homeView.indexOf('actionId="smart-campus"')
+  !home.includes('useSmartCampusCapabilityState()') &&
+  !home.includes('useToolboxCapabilityState()') &&
+  !home.includes("campus.status === 'ready' && campus.enabled") &&
+  !home.includes("toolbox.status === 'ready' && toolbox.enabled") &&
+  !homeView.includes('actionId="toolbox"') &&
+  !homeView.includes('actionId="smart-campus"') &&
+  homeView.includes("toolbox: 'parked'") &&
+  homeView.includes("campus: 'parked'") &&
+  home.includes("actionId === 'smart-campus' || actionId === 'toolbox'")
 ) {
-  pass('D. 青序首页百宝箱/智慧校园确认开通后才渲染，百宝箱仍排在智慧校园前')
+  pass('D. 首页不读百宝箱/智慧校园配置、不摆入口，数据属性为 parked（2026-11-04 产品负责人定停放）')
 } else {
-  fail('D. 青序首页百宝箱/智慧校园必须在确认开通后才渲染，且百宝箱在前')
+  fail('D. 首页必须停放百宝箱/智慧校园：不调能力 hook、不摆瓦片、data 属性为 parked')
 }
 
 // E. 终端底层兼容默认不能成为路由授权；能力边界必须只接受 ready+有效启动项。

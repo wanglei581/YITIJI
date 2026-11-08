@@ -19,7 +19,7 @@ const ENV_KEYS = ['NODE_ENV', 'DATABASE_URL', 'POSTGRES_URL', 'REDIS_URL', 'JWT_
 
 /** Own loopback-only cluster; never accepts or reads an external connection URL. */
 async function startFirstOrderPostgres() {
-  const directory = mkdtempSync('/tmp/fo-pg-')
+  const directory = mkdtempSync('/tmp/verify-fo-pg-')
   const cluster = join(directory, 'data')
   let started = false, stopped = false
   const stop = () => {
@@ -73,7 +73,7 @@ export async function createFirstOrderFixture(options: { mode?: 'sqlite' | 'post
   if (process.env.NODE_ENV === 'production') throw new Error('Refusing first-order fixture in production')
   const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]))
   const directory = mkdtempSync(join(tmpdir(), 'first-order-http-'))
-  const database = join(directory, 'fixture.db')
+  const database = join(directory, 'verify-first-order.db')
   const mode = options.mode ?? 'sqlite'
   const postgres = mode === 'postgres' ? await startFirstOrderPostgres().catch((error: unknown) => { rmSync(directory, { recursive: true, force: true }); throw error }) : undefined
   closeSync(openSync(database, 'a', 0o600))

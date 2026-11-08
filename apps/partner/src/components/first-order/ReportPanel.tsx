@@ -77,8 +77,14 @@ export function ReportPanel({ projectId, reports, onChanged, onSaved }: { projec
     {month >= currentMonth() && <p className="text-xs text-neutral-500">本月尚未结束，暂不能生成留存月报。</p>}
     {error && <p role="alert" className="text-sm text-error-fg">{error}</p>}
     {notice && <p role="status" className="text-sm text-success-fg">{notice}</p>}
-    {view && <div className="space-y-3 rounded-lg bg-neutral-50 p-3" data-testid="first-order-report-view">
-      <h5 className="font-semibold">{view.snapshot.month} · {view.saved ? '已留存月报' : '临时预览'}</h5>
+    {view && <div id="partner-monthly-report" className="space-y-3 rounded-lg bg-neutral-50 p-3" data-testid="first-order-report-view">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="partner-print-only text-xl font-bold">职易达</h1>
+          <h5 className="font-semibold">{view.snapshot.month} · {view.saved ? '已留存月报' : '临时预览'}</h5>
+        </div>
+        <button type="button" className="partner-print-hide inline-flex min-h-11 items-center rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-800" onClick={() => window.print()}>打印</button>
+      </div>
       <p className="text-xs text-neutral-500">统计于 {formatDateTime(view.snapshot.generatedAt)} · {view.snapshot.complete ? '统计范围完整，仍需核对业务结果' : '存在统计边界或缺失，请查看说明'}</p>
       <dl className="grid gap-3 sm:grid-cols-2">{Object.entries(view.snapshot.metrics).map(([key, metric]) => <div key={key}><dt className="text-xs text-neutral-500">{metricLabels[key as keyof typeof metricLabels]}</dt><dd className="text-sm font-semibold">{metric.state === 'measured' && metric.value !== null ? metric.value : stateLabels[metric.state] || '暂不能统计'}</dd><dd className="text-xs text-neutral-500">{metric.note}</dd></div>)}</dl>
       {view.snapshot.limitations.length > 0 && <div><h6 className="text-sm font-semibold">统计说明与缺失</h6><ul className="list-disc space-y-1 pl-4 text-xs text-neutral-600">{view.snapshot.limitations.map((note, index) => <li key={index}>{note}</li>)}</ul></div>}

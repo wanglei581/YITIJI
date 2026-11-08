@@ -31,6 +31,8 @@ import { FileTextIcon, MapIcon, PrinterIcon, SparklesIcon, UsersIcon } from 'luc
 import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { useAuth } from '../../auth/useAuth'
+import { useKioskLicense, useWindDownViewOnly } from '../../layouts/KioskLicenseContext'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import {
   FairVisitPlanApiError,
@@ -41,7 +43,7 @@ import {
 import { getJobFairById } from '../../services/api/jobFairs'
 import { readAiResumeSession } from '../resume/aiResumeSession'
 import { isAiOutage } from '../../ai/aiOutage'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { recruitErrorText } from '../recruitment-touch/recruitErrorText'
 import { QxFairWorkbench } from './QxFairWorkbench'
 import { fairIsCentered } from './fairWorkbenchSpecs'
 import { FairSkeletonList } from './components/FairWorkbenchBits'
@@ -60,6 +62,7 @@ import { useStartPrintHandoff } from '../print/usePrintHandoff'
 interface PageState {
   taskId?: string
   accessToken?: string
+  licenseViewOnly?: boolean
 }
 
 function formatSize(bytes: number): string {
@@ -104,6 +107,10 @@ export function FairVisitPlanPage() {
   const fairId = id ?? ''
   const { getToken } = useAuth()
   const state = (location.state ?? {}) as PageState
+  const windDownViewOnly = useWindDownViewOnly('fair')
+  const licenseFlagViewOnly = useKioskLicense().mode === 'winding-down' && state.licenseViewOnly === true
+  const viewOnly = windDownViewOnly || licenseFlagViewOnly
+  const newTaskTitle = viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined
   const session = useMemo(() => readAiResumeSession(), [])
   const taskId = state.taskId ?? session?.taskId
   const accessToken = state.accessToken ?? session?.accessToken
@@ -160,14 +167,14 @@ export function FairVisitPlanPage() {
         // 原来一律 `.catch(() => undefined)` 吞掉，屏幕上看起来和「没生成过」一模一样。
         const status = err instanceof FairVisitPlanApiError ? err.status : null
         if (status === 404) return
-        setLoadError(userMessageOf(err, '上次的参会准备单没取到，请重新加载'))
+        setLoadError(recruitErrorText(err, '上次的参会准备单没取到，请重新加载'))
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [fairId, taskId, accessToken, getToken, loadRetryKey])
 
   const handleGenerate = async () => {
-    if (!taskId || !fairId) return
+    if (viewOnly || !taskId || !fairId) return
     setGenerating(true)
     setError(null)
     setAiUnavailable(false)
@@ -184,14 +191,14 @@ export function FairVisitPlanPage() {
       // 能力级故障与「这次没成」分开报：前者说清 AI 不可用、浏览与打印不受影响，
       // 后者保留重试。把限流报成「功能不可用」本身就是伪造能力的一种。
       setAiUnavailable(isAiOutage(err))
-      setError(userMessageOf(err, '参会准备单生成失败，请稍后重试'))
+      setError(recruitErrorText(err, '参会准备单生成失败，请稍后重试'))
     } finally {
       setGenerating(false)
     }
   }
 
   const handlePrint = async () => {
-    if (!taskId || !fairId) return
+    if (viewOnly || !taskId || !fairId) return
     setPrinting(true)
     setError(null)
     try {
@@ -211,7 +218,7 @@ export function FairVisitPlanPage() {
         },
       })
     } catch (err) {
-      setError(userMessageOf(err, '打印版生成失败，请稍后重试'))
+      setError(recruitErrorText(err, '打印版生成失败，请稍后重试'))
     } finally {
       setPrinting(false)
     }
@@ -243,7 +250,14 @@ export function FairVisitPlanPage() {
     <>
       <DirStripItem icon={UsersIcon} title="先看参展名单" desc="名单和 AI 清单是两条线，互不影响" onClick={() => navigate(`/job-fairs/${fairId}/companies`)} />
       <DirStripItem icon={MapIcon} tone="slate" title="看展位索引" desc="按展位号先规划自己的顺序" onClick={() => navigate(`/job-fairs/${fairId}/map`)} />
-      <DirStripItem icon={PrinterIcon} tone="wheat" title="打印一份纸质名单" desc="拿在手上逐家勾，比屏幕好用" onClick={() => navigate(`/job-fairs/${fairId}/materials`)} />
+      {viewOnly ? (
+        <button type="button" className="dw-stripitem" disabled title={LICENSE_NO_NEW_TASK_REASON}>
+          <span className="si-ic wheat"><PrinterIcon size={26} aria-hidden /></span>
+          <span className="si-tx"><b>打印一份纸质名单</b><span>拿在手上逐家勾，比屏幕好用</span></span>
+        </button>
+      ) : (
+        <DirStripItem icon={PrinterIcon} tone="wheat" title="打印一份纸质名单" desc="拿在手上逐家勾，比屏幕好用" onClick={() => navigate(`/job-fairs/${fairId}/materials`)} />
+      )}
     </>
   )
   /*
@@ -263,105 +277,43 @@ export function FairVisitPlanPage() {
     ? <DirStrip>{exitItems}</DirStrip>
     : <DirExitList>{exitItems}</DirExitList>
 
-  const ctabar = uiState === 'missing-context'
-    ? (
-      <>
-        <p className="why">没有简历也照样能逛：参展名单、展位索引和物料打印都不需要 AI。</p>
-        <button type="button" className="qx-btn narrow" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}/materials`)}>打印活动资料</button>
-        <button type="button" className="qx-btn narrow" data-variant="primary" onClick={() => navigate('/resume/source?intent=diagnose')}>选择本人简历</button>
-      </>
-    )
+  const planBoundary = uiState === 'missing-context'
+    ? '没有简历也照样能逛：参展名单、展位索引和物料打印都不需要 AI。'
+    : uiState === 'idle' || uiState === 'generating'
+      ? '生成不保证成功；失败会明确说明原因，不会给你一份空清单。'
+      : uiState === 'load-failed'
+        ? '读取上次结果失败不影响重新生成，但会多花一次 AI 额度。'
+        : uiState === 'ai-unavailable'
+          ? 'AI 不可用不影响你逛名单、查展位和打印资料。'
+          : undefined
+  const planSecondary = uiState === 'missing-context'
+    ? <button type="button" className="qxt-btn qxt-btn-sec" disabled={viewOnly} title={newTaskTitle} onClick={() => { if (!viewOnly) navigate(`/job-fairs/${fairId}/materials`) }}>打印活动资料</button>
     : uiState === 'idle'
-      ? (
-        <>
-          {/* 这一态的全部意义就是让生成键够得着。此前它被折进 missing-context，
-              底栏主键是「选择本人简历」—— 简历明明已经确认过了。 */}
-          <p className="why">生成不保证成功；失败会明确说明原因，不会给你一份空清单。</p>
-          <button type="button" className="qx-btn narrow" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}/materials`)}>打印活动资料</button>
-          <span className="qx-ai-declaration-slot">
-            <button
-              type="button"
-              className="qx-btn narrow"
-              data-variant="primary"
-              data-testid="fair-visit-plan-generate"
-              disabled={generating}
-              onClick={() => void handleGenerate()}
-            >
-              <SparklesIcon size={20} aria-hidden />
-              {copy.generate}
-            </button>
-            <AiDeclarationNote />
-          </span>
-        </>
-      )
-    : uiState === 'load-failed'
-      ? (
-        <>
-          <p className="why">读取上次结果失败不影响重新生成，但会多花一次 AI 额度。</p>
-          <button
-            type="button"
-            className="qx-btn narrow"
-            data-variant="ghost"
-            data-testid="fair-visit-plan-reload"
-            onClick={() => setLoadRetryKey((k) => k + 1)}
-          >
-            重新加载
-          </button>
-          <span className="qx-ai-declaration-slot">
-            <button
-              type="button"
-              className="qx-btn narrow"
-              data-variant="primary"
-              data-testid="fair-visit-plan-generate"
-              disabled={generating}
-              onClick={() => void handleGenerate()}
-            >
-              <SparklesIcon size={20} aria-hidden />
-              {copy.generate}
-            </button>
-            <AiDeclarationNote />
-          </span>
-        </>
-      )
-    : uiState === 'generating'
-      ? (
-        <>
-          <p className="why">生成不保证成功；失败会明确说明原因，不会给你一份空清单。</p>
-          <button type="button" className="qx-btn narrow" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}`)}>返回招聘会</button>
-        </>
-      )
+      ? <button type="button" className="qxt-btn qxt-btn-sec" disabled={viewOnly} title={newTaskTitle} onClick={() => { if (!viewOnly) navigate(`/job-fairs/${fairId}/materials`) }}>打印活动资料</button>
+      : uiState === 'load-failed'
+        ? <button type="button" className="qxt-btn qxt-btn-ghost" data-testid="fair-visit-plan-reload" onClick={() => setLoadRetryKey((k) => k + 1)}>重新加载</button>
+        : uiState === 'ai-unavailable'
+          ? <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>看参展名单</button>
+          : uiState === 'failed'
+            ? <button type="button" className="qxt-btn qxt-btn-ghost" disabled={viewOnly} title={newTaskTitle} onClick={() => { if (!viewOnly) navigate('/resume/source?intent=diagnose') }}>换一份简历再试</button>
+            : uiState === 'generating'
+              ? undefined
+              : (
+                <button type="button" className="qxt-btn qxt-btn-sec" disabled={generating || viewOnly} title={newTaskTitle} onClick={() => { if (!viewOnly) void handleGenerate() }}>
+                  {generating ? '正在生成' : '重新生成'}
+                </button>
+              )
+  const planPrimary = uiState === 'missing-context'
+    ? { label: '选择本人简历', onClick: () => navigate('/resume/source?intent=diagnose') }
+    : uiState === 'idle' || uiState === 'load-failed'
+      ? undefined
       : uiState === 'ai-unavailable'
-      ? (
-        <>
-          {/* AI 是加速器不是前置条件：能力不可用时这条出口必须仍然能走到出纸。 */}
-          <p className="why">AI 不可用不影响你逛名单、查展位和打印资料。</p>
-          <button type="button" className="qx-btn narrow" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>看参展名单</button>
-          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(`/job-fairs/${fairId}/materials`)}>
-            <PrinterIcon size={20} aria-hidden />
-            打印活动资料
-          </button>
-        </>
-      )
-      : uiState === 'failed'
-        ? (
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/resume/source?intent=diagnose')}>换一份简历再试</button>
-            <button type="button" className="qx-btn" data-variant="primary" disabled={generating} onClick={() => void handleGenerate()}>
-              {generating ? '正在生成' : '重新生成'}
-            </button>
-          </>
-        )
-        : (
-          <>
-            <button type="button" className="qx-btn narrow" data-variant="ghost" disabled={generating} onClick={() => void handleGenerate()}>
-              {generating ? '正在生成' : '重新生成'}
-            </button>
-            <button type="button" className="qx-btn" data-variant="primary" disabled={printing} onClick={() => void handlePrint()}>
-              <PrinterIcon size={20} aria-hidden />
-              {printing ? copy.printing : copy.print}
-            </button>
-          </>
-        )
+        ? { label: '打印活动资料', onClick: () => navigate(`/job-fairs/${fairId}/materials`) }
+        : uiState === 'failed'
+          ? { label: generating ? '正在生成' : '重新生成', onClick: () => void handleGenerate(), disabled: generating, noArrow: true }
+          : uiState === 'generating'
+            ? undefined
+            : { label: printing ? copy.printing : copy.print, onClick: () => void handlePrint(), disabled: printing }
 
   return (
     <QxFairWorkbench
@@ -372,8 +324,28 @@ export function FairVisitPlanPage() {
       subtitle={plan
         ? `${plan.basedOn?.fairName ?? plan.fair?.title ?? '招聘会'} · ${plan.basedOn?.companyCount ?? 0} 家企业 / ${plan.basedOn?.positionCount ?? 0} 个岗位`
         : copy.subtitleHint}
-      ctabar={ctabar}
+      boundary={planBoundary ? <><span>{planBoundary}</span>{uiState === 'idle' || uiState === 'load-failed' ? <AiDeclarationNote /> : null}</> : undefined}
+      secondary={uiState === 'idle' || uiState === 'load-failed'
+        ? (
+          <>
+            {planSecondary}
+            <button
+              type="button"
+              className="qxt-btn qxt-btn-pri"
+              data-testid="fair-visit-plan-generate"
+              disabled={generating || viewOnly}
+              title={newTaskTitle}
+              onClick={() => { if (!viewOnly) void handleGenerate() }}
+            >
+              {copy.generate}
+            </button>
+          </>
+        )
+        : planSecondary}
+      primary={viewOnly && planPrimary ? { ...planPrimary, disabled: true, title: LICENSE_NO_NEW_TASK_REASON } : planPrimary}
+      askHeld={viewOnly}
     >
+      {viewOnly ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : null}
       {uiState === 'missing-context' ? (
         <>
           <DirNote>

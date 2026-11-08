@@ -40,6 +40,7 @@ import { MemberPrivacyModule } from './member-privacy/member-privacy.module'
 import { RedisModule } from './common/redis/redis.module'
 import { SyncModule } from './sync/sync.module'
 import { TerminalsModule } from './terminals/terminals.module'
+import { FreePrintQuotaModule } from './print-jobs/free-print-quota.module'
 import { PrintJobsModule } from './print-jobs/print-jobs.module'
 import { TrtcModule } from './trtc/trtc.module'
 import { ContentModule } from './content/content.module'
@@ -58,6 +59,8 @@ import { KioskSessionModule } from './kiosk-session/kiosk-session.module'
 import { HelpModule } from './help/help.module'
 import { LegalModule } from './legal/legal.module'
 import { SupportContactModule } from './support-contact/support-contact.module'
+import { BrandingModule } from './branding/branding.module'
+import { LicenseModule } from './licenses/license.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { ActivitiesModule } from './activities/activities.module'
 import { ScreensaverModule } from './screensaver/screensaver.module'
@@ -152,6 +155,7 @@ const redisUrl = process.env['REDIS_URL']
     SyncModule,
     TerminalsModule,
     PrintJobsModule,
+    FreePrintQuotaModule,
     TrtcModule,
     ContentModule,
     SmartCampusModule,
@@ -170,6 +174,9 @@ const redisUrl = process.env['REDIS_URL']
     HelpModule,
     LegalModule,
     SupportContactModule,
+    // 贴牌（品牌与备案、机构覆盖、Logo、kiosk-profile）与软件使用授权（期限 + 台数 + 到期停用）。
+    BrandingModule,
+    LicenseModule,
     NotificationsModule,
     ActivitiesModule,
     ScreensaverModule,

@@ -1,0 +1,121 @@
+/* 政策服务台页内样式。只挂在 .p10-hub 下，不改共享 .qxt-sec。
+   各区按内容高度排（不用 flex 增长、不用定行高的网格），整页由 qxt-body-scroll 滚动，
+   所以「检查中」「不可用」两态里文字不会互相压住。 */
+
+.qxt-screen .qxt-body:has(> .p10-hub) {
+  justify-content: flex-start;
+  padding: 14px 40px 12px;
+}
+
+.qxt-screen:has(.p10-hub) .qxt-flow svg {
+  left: 4%;
+  width: 92%;
+}
+
+.qxt-screen:has(.p10-hub) .qxt-halo {
+  right: 24px;
+  width: 640px;
+}
+
+.p10-hub {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.p10-hub .p10-notice {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 18px 20px;
+  border-radius: 26px;
+  background: var(--qxt-clay-wash, var(--qxt-well));
+  color: var(--qxt-clay-ink, var(--qx-wheat-d));
+}
+
+.p10-hub .p10-notice b,
+.p10-hub .p10-note,
+.p10-hub .p10-sec h2 {
+  font-size: 22px;
+  line-height: 1.45;
+}
+
+.p10-hub .p10-notice-copy {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.p10-hub .p10-notice span {
+  font-size: 20px;
+  line-height: 1.45;
+}
+
+.p10-hub .p10-retry,
+.qxt-screen .p10-retry {
+  flex: none;
+  min-width: 64px;
+  min-height: 64px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--qx-ink);
+  color: var(--qx-paper);
+  font-size: 20px;
+}
+
+.p10-hub .p10-sec {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.p10-hub .p10-sec h2 {
+  margin: 0;
+  font-weight: 700;
+}
+
+.p10-hub .p10-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* 每格外面包了一层 div（带 data-hub-* 标记），同一行两张卡取同高。 */
+.p10-hub .p10-grid > div > .qxt-tile {
+  height: 100%;
+  min-height: 168px;
+}
+
+.p10-hub .p10-entry > .qxt-tile {
+  min-height: 168px;
+}
+
+.p10-hub .p10-notes {
+  display: flex;
+  flex-flow: row wrap;
+  justify-content: center;
+  gap: 0 12px;
+}
+
+.p10-hub .p10-note {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+}
+
+.p10-hub .p10-notice { min-height: 104px; }
+.p10-hub .p10-notice > svg { flex: none; }
+.p10-hub .p10-notice-copy b,
+.p10-hub .p10-notice-copy span { font-size: 25px; line-height: 1.4; font-weight: 600; color: inherit; }
+.p10-hub .p10-sec h2 { font-size: 26px; }
+.p10-hub .p10-note { text-align: center; }
+.p10-hub .qxt-tile.p10-tile { display: flex; width: 100%; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; min-height: 168px; padding: 12px 16px; border: 1.5px solid var(--qxt-line, var(--qx-line)); border-radius: 22px; background: var(--qxt-card, var(--qx-surface)); color: var(--qx-ink); text-align: left; }
+.p10-hub .p10-tile b { font-size: 26px; font-weight: 700; line-height: 1.3; }
+.p10-hub .p10-tile small { font-size: 22px; font-weight: 500; line-height: 1.35; color: var(--qx-ink-2); }
+.p10-hub .p10-tile span { font-size: 22px; font-weight: 700; line-height: 1.35; color: var(--qx-teal-d); }
+.p10-hub .p10-tile.qxt-off { background: var(--qxt-well, var(--qx-paper)); border-style: dashed; }
+.p10-hub .p10-tile:active { transform: scale(.985); }

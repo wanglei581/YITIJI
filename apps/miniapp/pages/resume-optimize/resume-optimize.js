@@ -5,8 +5,10 @@ const normalize = require('../../utils/normalize.js')
 const auth = require('../../utils/auth.js')
 const buildModel = require('../../utils/resume-build-model.js')
 const fileUrls = require('../../utils/file-url.js')
+const shareFriend = require('../../utils/share-friend')
 const draft = require('./draft')
 const factCheck = require('./fact-check')
+const ways = require('../../utils/resume-optimize-entry')
 
 const FORMATS = [
   { key: 'pdf', label: 'PDF', mimeType: 'application/pdf' },
@@ -14,12 +16,12 @@ const FORMATS = [
   { key: 'txt', label: 'TXT', mimeType: 'text/plain' },
   { key: 'md', label: 'Markdown', mimeType: 'text/markdown' },
 ]
-
-/** 优化页接线：导出 / 草稿 / 事实核对。对照只读，编辑区才进草稿与导出。 */
 Page({
   data: {
     statusBarHeight: 20,
+    aiLabelNote: buildModel.RESUME_AI_LABEL_NOTE,
     phase: 'no-task',
+    ways: ways.staticWays(),
     taskId: '',
     needReupload: false,
     failMsg: '',
@@ -32,6 +34,7 @@ Page({
     exporting: false,
     opening: false,
     exportResult: null,
+    exportShare: { phase: 'idle', busy: false, message: '' },
     exportDisabledReason: '',
     pricingStatus: 'loading',
     pricing: { mode: 'unavailable', text: '正在确认能否导出…', disabledReason: '正在确认能否导出，请稍候。' },
@@ -57,7 +60,7 @@ Page({
     this._loadPricing()
     const taskId = options.taskId || ''
     if (!taskId) {
-      this.setData({ phase: 'no-task' })
+      ways.showEntry(this, { api, auth, storage })
       return
     }
     this.setData({
@@ -73,6 +76,7 @@ Page({
     this._gone = true
     this._stopExportCountdown()
     if (this._saver) this._saver.flush()
+    shareFriend.abandon(this) // 迟到的下载回调不再写本页
   },
 
   async _fetch() {
@@ -245,9 +249,9 @@ Page({
     this.setData({ exportDisabled: Boolean(reason), exportDisabledReason: reason })
   },
 
-  goBack() {
-    wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } })
-  },
+  goBack() { ways.goBack(wx) },
+
+  tapWay(e) { ways.openWay(this, e, wx) },
 
   tapRetry() {
     if (this.data.phase !== 'failed' || this.data.needReupload) return
@@ -255,18 +259,13 @@ Page({
     this._fetch()
   },
 
-  tapReupload() {
-    wx.navigateTo({
-      url: '/pages/resume-parse/resume-parse',
-      fail: () => wx.showToast({ title: '页面跳转失败', icon: 'none' }),
-    })
-  },
+  tapReupload() { wx.navigateTo({ url: ways.UPLOAD_URL, fail: () => wx.showToast({ title: '页面跳转失败', icon: 'none' }) }) },
 
   pickFormat(e) {
     if (this.data.exporting) return
     const format = String(e.currentTarget.dataset.format || '')
     if (!FORMATS.some((item) => item.key === format)) return
-    this.setData({ format, exportResult: null })
+    this.setData({ format, exportResult: null, exportShare: shareFriend.viewForFile(this, '') })
   },
 
   exportResume() {
@@ -352,7 +351,7 @@ Page({
     if (this.data.benefitGrantId) payload.benefitGrantId = this.data.benefitGrantId
     payload.factsConfirmedAt = factsConfirmedAt
     this._stopExportCountdown()
-    this.setData({ exporting: true, exportResult: null })
+    this.setData({ exporting: true, exportResult: null, exportShare: shareFriend.viewForFile(this, '') })
     wx.showLoading({ title: '正在生成文件…', mask: true })
     const saved = storage.get(storage.KEYS.RESUME_TASK) || {}
     const accessToken = saved.taskId === this.data.taskId ? (saved.accessToken || '') : ''
@@ -366,7 +365,7 @@ Page({
         result.printFileId = draft.fileIdFromPrintUrl(res.printFileUrl)
         result.pdfUrl = fileUrls.absoluteUrl(res.printFileUrl)
         if (!result.pdfUrl || !result.printFileId) throw new Error('打印用 PDF 副本地址无效')
-        this.setData({ exporting: false, exportResult: result }, () => this._startExportCountdown())
+        this.setData({ exporting: false, exportResult: result, exportShare: shareFriend.viewForFile(this, result.fileId) }, () => this._startExportCountdown())
         if (this.data.pricing.mode === 'charged') this._loadPricing()
         this._loadVersions()
         this._openPdf(result)
@@ -489,10 +488,9 @@ Page({
     this._exportCountdownTimer = setInterval(tick, 1000)
   },
 
-  _stopExportCountdown() {
-    if (this._exportCountdownTimer) clearInterval(this._exportCountdownTimer)
-    this._exportCountdownTimer = null
-  },
+  _stopExportCountdown() { if (this._exportCountdownTimer) clearInterval(this._exportCountdownTimer); this._exportCountdownTimer = null },
+
+  shareToFriend(e) { shareFriend.onTap(this, e, wx, (fileId) => api.getFilePreviewUrl(fileId)) },
 
   viewDocuments() { wx.navigateTo({ url: '/pages/documents/documents' }) },
 })
