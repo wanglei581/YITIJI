@@ -1285,6 +1285,31 @@ test('a BFCache pageshow restore is fail-closed before reuse @privacy-kiosk', as
   expect(storedAfterRestore).toEqual(EMPTY_SENSITIVE_SESSION)
 })
 
+// 自我探索页 2026-11-08 停放，但它的会话键仍登记在清场键表里（kioskSensitiveSession.ts），
+// 打印确认页也读它。这里不进停放页，只钉「残留的这个键会被硬时限清掉」，防止停放期间被当死代码删掉。
+test('self-assessment session leftover is wiped by the hard privacy deadline @privacy-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  await page.goto('/')
+  await page.evaluate(() => {
+    window.sessionStorage.setItem('self_assessment_session_v1', JSON.stringify({
+      answers: { collaboration: { 0: 'A' } },
+      taskId: 'privacy-sa-task',
+      result: { taskId: 'privacy-sa-task', status: 'completed', summary: '上一游客的倾向参考摘要，下一位不该看见' },
+    }))
+  })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page).toHaveURL('http://127.0.0.1:4187/')
+
+  const before = await page.evaluate(() => window.sessionStorage.getItem('self_assessment_session_v1'))
+  expect(before).toContain('privacy-sa-task')
+
+  await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)
+
+  expect(new URL(page.url()).pathname).toBe('/')
+  const after = await page.evaluate(() => window.sessionStorage.getItem('self_assessment_session_v1'))
+  expect(after).toBeNull()
+})
+
 test('guest local favorites are wiped by the hard privacy deadline @privacy-kiosk', async ({ page, api }) => {
   registerKioskShell(api)
   await page.goto('/')

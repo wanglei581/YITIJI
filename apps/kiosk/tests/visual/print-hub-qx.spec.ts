@@ -55,8 +55,10 @@ test('print hub default state reads capabilities and never claims 设备正常 @
   await page.goto('/print-scan')
   await expect(page.locator('[data-testid="print-hub-state-default"]')).toBeVisible()
   await expect(page.getByText('能力与设备状态以办理时确认')).toBeVisible()
-  await expect(page.locator('[data-testid^="print-hub-cap-"]')).toHaveCount(5)
+  await expect(page.locator('[data-testid^="print-hub-cap-"]')).toHaveCount(4)
   await expect(page.getByTestId('print-hub-cap-id-photo')).toHaveCount(0)
+  // 签名盖章 2026-11-08 停放：AVAILABLE 里 signature_stamp 是 available，卡也不出（SIGN_ENTRY_PARKED）。
+  await expect(page.getByTestId('print-hub-cap-sign')).toHaveCount(0)
   await expect(page.getByTestId('print-hub-cap-usb-import')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /打印文件/ })).toBeEnabled()
   await expect(page.getByRole('button', { name: /到机码核销/ })).toBeVisible()
@@ -243,43 +245,8 @@ test('print hub locked state uses admin capability notes @w2', async ({ page, ap
   expect(errors).toEqual([])
 })
 
-// D3（2026-09-28）：签名默认关，管理员逐台配成 available 才开（服务端 DEFAULT_DENY_CAPABILITY_KEYS）。
-// 能力读取成功、但本机没有已配置的 signature_stamp 行时，这张卡必须和管理员配成 not_verified 一样
-// 整卡停用、写明「本机暂未开通」—— 不能让人点进去、传完文件才被服务端拒绝。两种形状都要覆盖：
-//   · 列表里根本没有这一行；
-//   · 真实后端的形状：每个键都下发，没配置过的是 configured=false（listForTerminal）。
-const WITHOUT_SIGNATURE = AVAILABLE.filter((row) => row.capabilityKey !== 'signature_stamp')
-for (const variant of [
-  { name: 'row absent', capabilities: WITHOUT_SIGNATURE },
-  {
-    name: 'row configured=false',
-    capabilities: [
-      ...WITHOUT_SIGNATURE,
-      { capabilityKey: 'signature_stamp', status: 'not_verified', note: null, configured: false, updatedAt: null },
-    ],
-  },
-]) {
-  test(`print hub keeps the signature card closed on a terminal that never enabled it (${variant.name}) @w2`, async ({ page, api }) => {
-    const errors = collectRuntimeErrors(page)
-    registerShell(api)
-    api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
-      status: 200,
-      json: { capabilities: variant.capabilities },
-    })
-
-    await page.goto('/print-scan')
-    const sign = page.getByTestId('print-hub-cap-sign')
-    await expect(sign).toBeDisabled()
-    await expect(sign).toContainText('本机暂未开通')
-    // 停用要真的点不进去，不只是换个样子。
-    await sign.click({ force: true })
-    await expect(page).toHaveURL(/\/print-scan$/)
-    // 阳性对照：读取本身是成功的 —— 同样不经过打印机、已登记可用的格式转换照常可点。
-    await expect(page.getByTestId('print-hub-cap-convert')).toBeEnabled()
-    await expectNoForgedReady(page)
-    expect(errors).toEqual([])
-  })
-}
+// D3（2026-09-28）两条「签名卡在没开通的终端上整卡停用」随签名盖章 2026-11-08 停放删除；
+// 重新打开签名时从 42e945e76 的本文件取回（见 printHubContent.ts 的 SIGN_ENTRY_PARKED）。
 
 test('print hub device-off pauses paper paths and keeps software paths @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
@@ -299,7 +266,6 @@ test('print hub device-off pauses paper paths and keeps software paths @w2', asy
   await expect(page.getByTestId('print-hub-cap-doc-print')).toBeDisabled()
   await expect(page.getByTestId('print-hub-cap-scan')).toBeDisabled()
   await expect(page.getByTestId('print-hub-cap-convert')).toBeEnabled()
-  await expect(page.getByTestId('print-hub-cap-sign')).toBeEnabled()
   await expect(page.getByRole('button', { name: /到机码核销/ })).toBeEnabled()
   await expect(page.getByTestId('print-hub-cap-doc-print')).toContainText('这次出不了纸')
   const bottom = await page.locator('.qxt-body').evaluate((scroller) => {

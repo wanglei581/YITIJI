@@ -34,9 +34,10 @@ export function AssistantSessionSummaryBar({
     setBusy(true)
     setError(null)
     try {
+      // 2026-11-08 起保存后留在本页显示结果，不再跳 /ai/plan 作业面；
+      // 那条路由只留给「我的 → AI 服务记录」打开旧的小青作业。
       const saved = await summarizeAssistantSession(sessionId, token)
       setResult(saved)
-      // 2026-11-08 停放会话后的作业面入口；作业面路由保留给「我的」里打开旧记录。
     } catch (err) {
       setError(errorCodeOf(err) === 'AI_QUOTA_EXHAUSTED'
         ? AI_QUOTA_EXHAUSTED_ASSISTANT_COPY
@@ -67,7 +68,7 @@ export function AssistantSessionSummaryBar({
               : `本次要点已保存。${advisorUserReason(result.printUnavailableReason, '打印稿尚未生成。')}`}
           </p>
           {result.document ? (
-            <button type="button" className="assistant-tool-button" style={{ minHeight: 48 }} onClick={() => navigate('/me/documents')}>去「我的文档」打印</button>
+            <button type="button" className="assistant-tool-button assistant-summary-print" onClick={() => navigate('/me/documents')}>去「我的文档」打印</button>
           ) : null}
           {result.highlights.length > 0 && (
             <ol>

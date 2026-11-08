@@ -177,9 +177,9 @@ export const kioskRouter = createBrowserRouter([
       { path: 'print-scan',              element: <PrintScanHomePage /> },
       { path: 'print-scan/feature/:key', element: <PrintScanFeatureInfoPage /> },
       { path: 'print-scan/convert',      element: <ConvertImagesPage /> },
-      // 2026-11-08 产品负责人定停放；源码在 pages/print-scan，恢复见 feature-scope.md。
       // 2026-11-08 产品负责人定停放权益活动；源码在 pages/activities，恢复见 feature-scope.md。
       { path: 'activities/*', element: <Navigate to="/" replace /> },
+      // 2026-11-08 产品负责人定停放签名盖章；源码在 pages/print-scan，恢复见 feature-scope.md。
       { path: 'print-scan/sign/*', element: <Navigate to="/" replace /> },
       { path: 'print/scan-convert',      element: <Navigate to="/print-scan/convert" replace /> },
       { path: 'print/scan-sign',         element: <Navigate to="/" replace /> },

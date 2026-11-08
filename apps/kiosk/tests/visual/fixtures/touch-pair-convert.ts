@@ -8,7 +8,7 @@ const CONVERT = '/api/v1/print/convert/images-to-pdf'
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
 
 /**
- * 手机确认沿用 fusion-w2-tools「signature step 2」的 UploadSessionQrPanel 应答，
+ * 手机确认沿用 UploadSessionQrPanel 的应答（原出自 fusion-w2-tools「signature step 2」，签名 11/08 停放后该用例已删；扫码上传另由 fusion-w2-print、fusion-w3 覆盖），
  * purpose/按钮读 ConvertImagesView 的现有配置（print_doc）；合成答复沿用同 spec 的 conversion payload order。
  * 不启用桌面本机文件框，不写 React 状态。
  */

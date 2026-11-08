@@ -57,6 +57,8 @@ test('tool center honors terminal capability configuration @w2', async ({ page, 
   await expect(page.getByRole('button', { name: /扫描纸质材料/ })).toBeDisabled()
   await expect(page.getByText('扫描仪正在保养', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /照片合成 PDF/ })).toBeEnabled()
+  // 签名盖章 2026-11-08 停放：后台把 signature_stamp 配成 available 也不出卡（SIGN_ENTRY_PARKED）。
+  await expect(page.getByTestId('print-hub-cap-sign')).toHaveCount(0)
   await expectHealthy(page, errors, 'print-scan-home')
 })
 
@@ -77,8 +79,8 @@ test('tool center exposes the miniapp arrival-code claim entry @w2', async ({ pa
   // 两个码必须在卡面上被区分开，否则用户拿错码白跑一趟。
   // 2.0 卡面用徽标「不是取件码」区分（稿 10），不再重复长句。
   await expect(entry).toContainText('不是取件码')
-  // 它不占「七件事」栅格的格子 —— 标题写着七件事，就必须只有七张能力卡。
-  await expect(page.locator('[data-testid^="print-hub-cap-"]')).toHaveCount(5)
+  // 它不占能力卡的格子。证件照（11/04）、签名（11/08）停放后，能力卡只剩打印文件、扫描、照片打印、照片合成 PDF 四张。
+  await expect(page.locator('[data-testid^="print-hub-cap-"]')).toHaveCount(4)
   await expect(page.getByTestId('print-hub-cap-id-photo')).toHaveCount(0)
   await entry.click()
 

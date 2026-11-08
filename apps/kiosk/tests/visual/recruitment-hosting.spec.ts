@@ -9,7 +9,7 @@
 //   · 关闭时首页和「我的」里看不到任何招聘入口与招聘文案（按钮白名单里的招聘词一个都不该出现）；
 //   · 关闭时直达招聘类地址，落到诚实说明页，不是报错页，也不去请求招聘类接口；
 //   · 配置还没读到时按关闭处理，但只说「正在确认」，不提前下「未开放」的结论；
-//   · 简历对照不再分档（服务端不再返回 fitLevel），关闭时只能手填岗位要求，不能引用系统内岗位（jobId）。
+//   · 简历对照页 2026-11-08 停放（不注册路由），它的托管两态用例随之删掉，恢复时从 42e945e76 取回。
 import { test as unitTest, type Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
@@ -22,7 +22,6 @@ const CONFIG = '/api/v1/terminals/KSK-001/config'
 
 /** 托管关闭时一体机上一个都不该出现的招聘词（CLAUDE.md §2 的按钮白名单 + 首页岗位计数 + 岗位 AI 推荐）。 */
 const RECRUITMENT_COPY = ['找工作', '查看岗位', '去来源平台投递', '扫码投递', '查看招聘会', '扫码预约', 'AI岗位推荐', '个在招'] as const
-/** 简历对照不分档之后，结果页不该出现的档位词。 */
 
 const MEMBER_TOKEN = 'rh-member-token'
 const MEMBER_PHONE = '13800138000'
@@ -637,5 +636,3 @@ test('hosting on: AI records wait for the hosting answer, then list job AI sessi
   expect(api.requestCount('GET', '/api/v1/me/ai-records')).toBe(1)
   expect(api.requestCount('GET', '/api/v1/me/job-ai-sessions')).toBe(1)
 })
-
-// ── 简历对照 ──────────────────────────────────────────────────────────────

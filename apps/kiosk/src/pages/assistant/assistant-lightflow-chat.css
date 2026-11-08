@@ -205,6 +205,14 @@
   background: var(--sd-surface);
 }
 
+/* 保存后的下一步：去「我的文档」打印。多一层选择器，压过 cockpit 里 .assistant-tool-button 的通用底色，高度沿用它的 64px。 */
+.kassist.kassist-lightflow .assistant-summary-result .assistant-summary-print {
+  margin-top: 10px;
+  border-color: transparent;
+  color: var(--qx-emerald);
+  background: var(--qx-deep);
+}
+
 .kassist.kassist-lightflow .assistant-summary-result ol,
 .kassist.kassist-lightflow .assistant-summary-result ul {
   margin: 8px 0 0;
