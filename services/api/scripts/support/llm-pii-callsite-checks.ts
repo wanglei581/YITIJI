@@ -145,6 +145,7 @@ async function mockInterviewChecks(
     { extractResumeText: async () => ({ ok: true, text: RESUME_TEXT }) } as never,
     { write: async () => undefined } as never,
     { record: () => undefined } as never,
+    { requireActiveConsent: async () => undefined } as never,
   )
 
   // 1a. 建会话：摘要落库前就遮盖
