@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`631` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`638` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -73,7 +73,7 @@
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/users` | AdminUsersController.list | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
 | GET | `/api/v1/admin/users/:endUserId` | AdminUsersController.getDetail | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
-| POST | `/api/v1/admin/users/:endUserId/closure` | AdminUsersController.closure | admin | MemberClosureService | AdvisorArtifact<br/>AdvisorPin<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitClaim<br/>BenefitGrant<br/>ContractReviewTask<br/>DocumentProcessTask<br/>EndUser<br/>FairMaterialPrintBridge<br/>FeedbackReply<br/>FeedbackTicket<br/>FileObject<br/>JobAiRecommendation<br/>KioskSession<br/>MemberLegalConsent<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>Order<br/>OrderItem<br/>OrderSubmissionLedger<br/>PaymentAttempt<br/>PiiFinding<br/>PrintTask<br/>PrintTaskStatusLog<br/>RedemptionRecord<br/>Refund<br/>ScanTask<br/>StorageDeletion<br/>UserAiConsent<br/>UserDataRequest<br/>UserNotification |
+| POST | `/api/v1/admin/users/:endUserId/closure` | AdminUsersController.closure | admin | MemberClosureService | AdvisorArtifact<br/>AdvisorPin<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitClaim<br/>BenefitGrant<br/>ContractReviewTask<br/>CopyJob<br/>DocumentProcessTask<br/>EndUser<br/>FairMaterialPrintBridge<br/>FeedbackReply<br/>FeedbackTicket<br/>FileObject<br/>JobAiRecommendation<br/>KioskSession<br/>MemberLegalConsent<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>Order<br/>OrderItem<br/>OrderSubmissionLedger<br/>PaymentAttempt<br/>PiiFinding<br/>PrintTask<br/>PrintTaskStatusLog<br/>RedemptionRecord<br/>Refund<br/>ScanTask<br/>StorageDeletion<br/>UserAiConsent<br/>UserDataRequest<br/>UserNotification |
 | POST | `/api/v1/admin/users/:endUserId/disable` | AdminUsersController.disable | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
 | POST | `/api/v1/admin/users/:endUserId/restore` | AdminUsersController.restore | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
 
@@ -387,6 +387,23 @@
 | POST | `/api/v1/contract-reviews/:id/report/keep` | ContractReviewController.keepReport | — | ContractReviewLifecycleService | ContractReviewTask<br/>FileObject<br/>PrintTask |
 | GET | `/api/v1/contract-reviews/consent-scope` | ContractReviewController.consentScope | — | ContractReviewConsentService | ContractReviewTask<br/>UserAiConsent |
 | DELETE | `/api/v1/contract-reviews/reports/:fileId` | ContractReviewController.abandonReport | — | ContractReviewLifecycleService | ContractReviewTask<br/>FileObject<br/>PrintTask |
+
+## `services/api/src/copy-jobs/copy-agent.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/terminals/:terminalId/copy/jobs/:id/permit` | CopyAgentController.permit | — | CopyAgentService<br/>TerminalsService | AuditLog<br/>CopyJob<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/terminals/:terminalId/copy/jobs/:id/result` | CopyAgentController.result | — | CopyAgentService<br/>TerminalsService | AuditLog<br/>CopyJob<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/terminals/:terminalId/copy/jobs/:id/scan-result` | CopyAgentController.scanResult | — | CopyAgentService<br/>TerminalsService | AuditLog<br/>CopyJob<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+
+## `services/api/src/copy-jobs/copy-jobs.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/copy/jobs` | CopyJobsController.create | — | CopyJobsService | AuditLog<br/>CopyJob<br/>Order<br/>Terminal<br/>TerminalCapability |
+| GET | `/api/v1/copy/jobs/:id` | CopyJobsController.get | — | CopyJobsService | AuditLog<br/>CopyJob<br/>Order<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/copy/jobs/:id/cancel` | CopyJobsController.cancel | — | CopyJobsService | AuditLog<br/>CopyJob<br/>Order<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/copy/jobs/:id/confirm` | CopyJobsController.confirm | — | CopyJobsService | AuditLog<br/>CopyJob<br/>Order<br/>Terminal<br/>TerminalCapability |
 
 ## `services/api/src/device-fleet/device-fleet.controller.ts`
 
@@ -1018,11 +1035,11 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/print/jobs` | PrintJobsController.create | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| POST | `/api/v1/print/jobs` | PrintJobsController.create | — | PrintJobsService | AuditLog<br/>CopyJob<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
 | POST | `/api/v1/print/jobs/:orderId/release` | PrintJobsController.releasePickup | — | PickupOrderService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability |
-| GET | `/api/v1/print/jobs/:taskId` | PrintJobsController.getStatus | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
-| POST | `/api/v1/print/jobs/:taskId/retry` | PrintJobsController.retryPaidFailedJob | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
-| POST | `/api/v1/print/jobs/:taskId/takeaway-url` | PrintJobsController.issueTakeawayUrl | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| GET | `/api/v1/print/jobs/:taskId` | PrintJobsController.getStatus | — | PrintJobsService | AuditLog<br/>CopyJob<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| POST | `/api/v1/print/jobs/:taskId/retry` | PrintJobsController.retryPaidFailedJob | — | PrintJobsService | AuditLog<br/>CopyJob<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| POST | `/api/v1/print/jobs/:taskId/takeaway-url` | PrintJobsController.issueTakeawayUrl | — | PrintJobsService | AuditLog<br/>CopyJob<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
 | POST | `/api/v1/print/jobs/claim-pickup` | PrintJobsController.claimPickup | — | PickupOrderService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability |
 
 ## `services/api/src/print-sign/print-sign.controller.ts`

@@ -8,7 +8,7 @@ export class ReportScanDeletionAuditDto {
   @Matches(HEX_HMAC)
   eventId!: string
 
-  /** 面板扫描过期删除（UNCLAIMED_TTL_EXPIRED）加屏上扫描的六种删除原因，取值表见 scan-deletion-reason-codes.ts。 */
+  /** 面板扫描、屏上扫描与屏上复印的删除原因，取值表见 scan-deletion-reason-codes.ts。 */
   @IsIn(SCAN_DELETION_REASON_CODES)
   reasonCode!: ScanDeletionReasonCode
 

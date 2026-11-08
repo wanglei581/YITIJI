@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
-import { PrismaService } from '../prisma/prisma.service'
+import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import type { BillingPageSource } from '../print-jobs/print-page-count.types'
 import type { PrintPriceConfigView, PrintPriceLine, PrintPriceQuote } from './payment.types'
 import { descriptionContradictsAmount } from './price-description'
@@ -10,6 +10,28 @@ export interface PrintPriceInput {
   billingPageSource: BillingPageSource
   copies: number
   colorMode: 'black_white' | 'color'
+}
+
+export type PrintPriceServiceKey = 'print_bw_page' | 'print_color_page'
+
+export type PrintUnitPrice =
+  | { ok: true; serviceKey: PrintPriceServiceKey; unitCents: number; description: string | null }
+  | { ok: false; code: 'PRICE_CONFIG_UNAVAILABLE' | 'PRICE_CONFIG_INVALID' }
+
+/**
+ * 按颜色读一行打印价目并判有效。打印报价（quotePrint）与屏上复印报价（quoteCopy）都只走这里，
+ * 所以同一颜色的复印单价永远等于打印单价，缺行、停用、单价非法时两边同样不可报价。
+ * 缺行或停用 → PRICE_CONFIG_UNAVAILABLE；单价不是非负整数 → PRICE_CONFIG_INVALID；不读 effectiveFrom。
+ */
+export async function readPrintUnitPrice(
+  db: Pick<PrismaTransactionClient, 'priceConfig'>,
+  colorMode: PrintPriceInput['colorMode'],
+): Promise<PrintUnitPrice> {
+  const serviceKey: PrintPriceServiceKey = colorMode === 'color' ? 'print_color_page' : 'print_bw_page'
+  const config = await db.priceConfig.findUnique({ where: { serviceKey } })
+  if (!config || !config.active) return { ok: false, code: 'PRICE_CONFIG_UNAVAILABLE' }
+  if (!Number.isInteger(config.unitCents) || config.unitCents < 0) return { ok: false, code: 'PRICE_CONFIG_INVALID' }
+  return { ok: true, serviceKey, unitCents: config.unitCents, description: config.description ?? null }
 }
 
 /**
@@ -88,23 +110,19 @@ export class PricingService {
       throw new BadRequestException('PRICE_INVALID_COPIES')
     }
 
-    const serviceKey = colorMode === 'color' ? 'print_color_page' : 'print_bw_page'
-    const config = await this.prisma.priceConfig.findUnique({ where: { serviceKey } })
-    if (!config || !config.active) {
-      throw new BadRequestException('PRICE_CONFIG_UNAVAILABLE')
-    }
-    if (!Number.isInteger(config.unitCents) || config.unitCents < 0) {
-      throw new BadRequestException('PRICE_CONFIG_INVALID')
+    const price = await readPrintUnitPrice(this.prisma, colorMode)
+    if (!price.ok) {
+      throw new BadRequestException(price.code)
     }
 
     const quantity = billablePages * copies
-    const subtotalCents = config.unitCents * quantity
+    const subtotalCents = price.unitCents * quantity
     const line: PrintPriceLine = {
-      serviceKey,
-      unitCents: config.unitCents,
+      serviceKey: price.serviceKey,
+      unitCents: price.unitCents,
       quantity,
       subtotalCents,
-      description: config.description ?? undefined,
+      description: price.description ?? undefined,
     }
 
     return {
