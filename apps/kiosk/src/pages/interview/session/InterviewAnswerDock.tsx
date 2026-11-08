@@ -57,6 +57,9 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
   const pending = phase === 'thinking' || phase === 'finishing' || voice.kind === 'transcribing'
   const task = useAiTask({ availability: 'available', pending, failed: false, hasResult: false })
   const done = phase === 'done_suggest'
+  const outageRow = (finishRecovery === 'outage' || (aiOutage && !finishRecovery)) && !micError
+  // 模型临时报错（不算停用）时没有出路行，只有一句错误；有已保存的回答就也给「带走本场问答」。
+  const takeawayAfterError = !outageRow && Boolean(error) && !micError && answersRecorded && finishRecovery !== 'no-answers'
 
   return (
     <div className="interview-session__answer-dock">
@@ -73,13 +76,14 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
         </div>
       )}
       {error && !micError && <p className="interview-session__error qxt-iv-err" role="alert">{error}</p>}
+      {takeawayAfterError ? <div className="qxt-iv-acts">{transcriptTakeaway}</div> : null}
       {finishRecovery === 'no-answers' && !micError && (
         <div className="qxt-iv-acts" data-testid="interview-finish-recovery">
           <button type="button" className="is-go" disabled={busyTurn} onClick={onContinueAnswering}>继续答题</button>
           <button type="button" disabled={busyTurn} onClick={onLeaveInterview}>离开</button>
         </div>
       )}
-      {(finishRecovery === 'outage' || (aiOutage && !finishRecovery)) && !micError && (
+      {outageRow && (
         <div className="qxt-iv-acts" data-testid="interview-finish-recovery">
           <button type="button" className="is-go" disabled={busyTurn} onClick={onOpenTips}>看面试要点</button>
           {answersRecorded ? <button type="button" disabled={busyTurn} onClick={onRetryReport}>稍后再试生成报告</button> : <button type="button" disabled={busyTurn} onClick={onLeaveInterview}>离开</button>}
