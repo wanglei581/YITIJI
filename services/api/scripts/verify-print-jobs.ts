@@ -1261,7 +1261,7 @@ async function main() {
       async () => printJobs.retryPaidFailedJob(unconfirmedId, { paymentSessionToken: await sessionFor(unconfirmedId) }),
       'PICKUP_RESUME_REFUND_PENDING',
       '8g. 付费单 PRINT_JOB_UNCONFIRMED 不自助重打，标记已付未履约',
-      '这单没有打完，费用会按原路退回，需要帮助请拨打服务电话',
+      '这单没有打完，退款待处理，输码时不会当场退款。请不要再输这个到机码；需要帮助请查看《隐私政策》里的联系方式。',
     )
     const unconfirmedPaid = await prisma.order.findFirst({ where: { printTaskId: unconfirmedId } })
     if (
@@ -1283,7 +1283,7 @@ async function main() {
       async () => printJobs.retryPaidFailedJob(partialId, { paymentSessionToken: await sessionFor(partialId) }),
       'PICKUP_RESUME_REFUND_PENDING',
       '8g2. 付费单只出一部分不自助重打，标记已付未履约',
-      '这单没有打完，费用会按原路退回，需要帮助请拨打服务电话',
+      '这单没有打完，退款待处理，输码时不会当场退款。请不要再输这个到机码；需要帮助请查看《隐私政策》里的联系方式。',
     )
     const partialPaid = await prisma.order.findFirst({ where: { printTaskId: partialId } })
     if (!partialPaid || !isPaidUnfulfilledRefundRequired(partialPaid) || partialPaid.taskStatus !== 'failed') {

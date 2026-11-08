@@ -334,7 +334,9 @@ export function MyAiRecordsPage() {
             const kind = KIND_META[item.kind] ?? { label: 'AI 服务记录', hint: '本人 AI 服务记录' }
             const status = STATUS_META[item.status]
             const openPath = aiRecordPath(item)
-            const openReason = recordUnavailableReason(item)
+            const openReason = ['job_fit', 'career_plan', 'self_assessment'].includes(item.kind)
+              ? '这项服务本机暂未开放，记录可以删除。'
+              : recordUnavailableReason(item)
             const confirming = confirmId === item.id
             const expired = confirmExpired && !confirmId && items[0]?.id === item.id
             const busy = busyId === item.id

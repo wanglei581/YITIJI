@@ -36,6 +36,7 @@ import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
 import { isKioskCompactViewport, useKioskStageFit, usesKioskFluidViewport } from '../../hooks/useKioskStageFit'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { ASKS, type ResumeAsk } from './touch/resumeAsks'
+import { networkDisconnectLine } from '../../copy/unattendedCopy'
 import { unattendedReason } from './touch/unattendedReason'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { readAiResumeSession } from './aiResumeSession'
@@ -240,7 +241,7 @@ export function JobFitPage() {
           return
         }
         setResult(null)
-        setNotice(err instanceof JobFitApiError && err.code === 'JOB_FIT_NOT_FOUND' ? '这份简历还没有可查看的对照结果，原结果可能已过期或删除；可填写要求重新对照。' : '对照结果这次没有读到，请检查网络后重试。')
+        setNotice(err instanceof JobFitApiError && err.code === 'JOB_FIT_NOT_FOUND' ? '这份简历还没有可查看的对照结果，原结果可能已过期或删除；可填写要求重新对照。' : `对照结果这次没有读到。${networkDisconnectLine()}。`)
       })
       .finally(() => {
         if (!cancelled) setLoadingLatest(false)

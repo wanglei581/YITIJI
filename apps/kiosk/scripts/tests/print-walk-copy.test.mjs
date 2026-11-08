@@ -413,9 +413,7 @@ test('W-117：缺纸、异常、离线分别说明，签名提示只在真开通
       assert.equal(/ph-paper/.test(html), label === '打印机缺纸')
       if (label !== '打印机离线') assert.doesNotMatch(html, /离线|无法连接/)
       const signTile = /<button[^>]*data-testid="print-hub-cap-sign"[^>]*>/.exec(html)?.[0] ?? ''
-      assert.ok(signTile)
-      if (actionable) assert.doesNotMatch(signTile, /aria-disabled="true"/)
-      else assert.match(signTile, /aria-disabled="true"/)
+      assert.equal(signTile, '', '11/08 签名入口停放，后台开通也不显示')
     }
   }
 })

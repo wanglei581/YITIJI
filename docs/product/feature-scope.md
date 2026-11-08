@@ -9,6 +9,10 @@
 
 ---
 
+> **2026-11-08 一体机只保留四个核心（产品负责人定）：** 改简历、练面试、打印扫描、查政策。次级入口先收起，覆盖职业规划、自我探索、简历对照、求职材料库、简历模板库、权益活动、签名、本机 AI 专项、岗位咨询主题九类；此次决定优先于下文历史快照中「个人准备类 AI 全部保留」的开放范围。源码原样保留，不注册、不被在用代码值导入、不打包。旧地址 `/resume/career-plan/*`、`/resume/self-assessment/*`、`/resume/job-fit/*`、`/resume/materials/*`、`/resume/templates/*`、`/activities/*`、`/print-scan/sign/*`、`/print/scan-sign`、`/print/scan-sign/*` 回首页。`/ai/plan` 保留给「我的 → AI 服务记录 → 小青作业」打开旧记录，会话保存要点留在本页，已生成文档可去「我的文档」打印。后台仍有 18 个侧栏菜单，「终端应用与展示」改为「待机宣传屏」；宣传屏、百宝箱、智慧校园均不再显示该标签组，旧配置地址仍可直达。
+>
+> **恢复步骤：** 经产品负责人确认后，一起恢复 `routes/index.tsx` 页面值导入与注册、`layouts/licenseWindDownRoutes.ts` 的收尾路由登记、`routes/parkedRoutes.ts` 前缀登记、服务台与流程/「我的」/小青的相关入口；签名须把 `SIGN_ENTRY_PARKED` 改为 false，同步打印台卡片布局和文档签名按钮；恢复咨询主题须调整 `PARKED_CONSULTATION_TASK_IDS`，恢复旧 intent 须调整 `PARKED_ASSISTANT_SKILLS`（11/04 百宝箱 3 个 + 11/08 本机专项 8 个）。重新计算 main.tsx 的值导入可达性，调整 `verify:kiosk-parked-core4` 的 PARKED 清单（本轮新增不可达 61 个文件，含 CSS），与 `verify:kiosk-parked-toolbox-campus`、p39、fusion、服务台、资料库、个人记录、AI 降级等关联门禁及路由/视觉夹具同步，完成类型、lint 和浏览器验收；停放时删掉的页内浏览器用例在 42e945e76 的同名 spec 文件里（career-plan-materials、fusion-self-assessment-flow、resume-decision-identity-fusion-w3、resume-materials-qx-fusion-w3、recruitment-hosting 末段、fusion-w2-tools 签名段、print-hub-qx 签名卡两条、fusion-w3、fusion-w5 等），一并取回。后台菜单恢复另行决定，不能借恢复一体机入口擅自加回标签。已进 main、未上线；官方渠道挪进「查政策」等 #1595 接续，本任务不改政策页。
+
 ## 零、定位与 AI 求职操作系统（2026-09-26）
 
 ### 0.1 一句话
@@ -441,7 +445,7 @@ AI 简历优化属于求职材料工具服务，必须从既有「AI简历服务
 | 4 | 无统一模型网关：生产代码至少 14 处各自请求 chat/completions，密钥与超时各配各的；模型配置是本机 `ai-model-configs.json`，多实例会不一致 | 换模型、审计与备案公示困难 | 3.5b 部分；其余未排期 |
 | 5 | 无输入 / 输出内容安全服务，只有禁用词；对话助手输入未见个人信息遮盖 | 生成式 AI 合规与舆情 | 未排期 |
 | 6 | AI 成本没有金额封顶：日次数配额只覆盖对话、简历解析和岗位 AI，其余是每分钟限流 | 费用失控 | 未排期 |
-| 7 | AI 可见标识：一体机屏显统一用语（集中在 `complianceCopy.ts`，门禁 `verify:kiosk-ai-label-copy`）与 AI 报告 PDF 页眉、GB 45438 隐式标识已并入候选（`8f3e0a69a`）；9/29 产品负责人拍板：导出的简历不印可见 AI 字样（`RESUME_EXPORT_VISIBLE_LABEL` 保持关，隐式标识保留；律师若认为必须显式标识，改走标识办法第九条的用户申请路径）；「服务提供者」写「职易达（统一社会信用代码）」（9/29 拍板，由产品负责人改服务器 .env） | 标识办法 | 3.5c（主体已完成） |
+| 7 | AI 可见标识：一体机屏显统一用语（集中在 `complianceCopy.ts`，门禁 `verify:kiosk-ai-label-copy`）与 AI 报告 PDF 页眉、GB 45438 隐式标识已并入候选（`8f3e0a69a`）；10/6 产品负责人拍板（方案 b）：导出的简历默认印可见标识「含人工智能辅助生成内容」，一体机导出前告知（线上 `RESUME_EXPORT_VISIBLE_LABEL=true`，隐式标识保留；律师若认为必须显式标识，改走标识办法第九条的用户申请路径）；「服务提供者」写「职易达（统一社会信用代码）」（9/29 拍板，由产品负责人改服务器 .env） | 标识办法 | 3.5c（主体已完成） |
 | 8 | Redis 故障时公网 AI 直接 503；对话会话在单进程内存，重启即丢 | 可用性 | 平台可靠性遗留（next-tasks 同名节） |
 | 9 | 三套小青不共享配置与记忆；`digital_human` 功能位仍是 planned | 体验不一致 | 未排期（建议合并配置与记忆，不合并形态） |
 | 10 | 设备能力文案不一致：小程序 U 盘页写彩色与 Word 可打，同仓其他页写暂未开放；证件照、扫描未开通时首页仍有入口 | 伪造能力风险 | 2.7（小程序）；一体机未排期 |

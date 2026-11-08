@@ -1,3 +1,4 @@
+import { isParkedRoute } from '../../../src/routes/parkedRoutes'
 // 青序流光原稿 ↔ 一体机运行页：逐（画面，状态）枚举与造状态。
 //
 // 原稿枚举读每张稿自己的画面表 / 状态表（VIEWS 的 screen:state、SCREENS.states、
@@ -776,7 +777,9 @@ export function buildQingxuPairs(): QingxuPairTarget[] {
       const siblings = byScreen.get(pair.screen) ?? [pair.state]
       const route = routeOf(file, pair)
       const priority = resumePagesPlan(file, pair.screen, pair.state) ?? priorityPlan(file, pair.screen, pair.state) ?? policyPagesPlan(file, pair.screen, pair.state)
-      const decided = priority
+      const decided = route && isParkedRoute(route)
+        ? { plan: { kind: 'none' as const }, reason: '2026-11-08 产品负责人只留四核心；该页面停放，原型只作历史参考。', marker: null }
+        : priority
         ? { plan: priority.plan, reason: priority.reason, marker: priority.marker }
         : planOf(file, pair.screen, pair.state, siblings)
       const runtimeRoute = priority?.runtimePath ?? (decided.plan.kind === 'none' ? route : (

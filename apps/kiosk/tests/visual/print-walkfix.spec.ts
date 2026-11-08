@@ -358,6 +358,10 @@ for (const { kind, testId, label } of FAIL_SCREENS) {
     await expect(page).toHaveURL(/\/legal\/privacy\?/)
     expect(new URL(page.url()).searchParams.get('section')).toBe('联系')
     await expect(page.getByRole('heading', { level: 1 })).toContainText('隐私政策')
+    // 不只带上参数：真的停在「联系我们」那一章。原先由自我探索同意页的用例钉 ?section= 跳章，那页 11/08 停放，改在这里钉。
+    await expect(page.getByTestId('legal-sec-1')).toHaveAttribute('aria-current', 'true')
+    await expect(page.getByTestId('legal-sec-0')).not.toHaveAttribute('aria-current', 'true')
+    await expect(page.locator('.legal-doc-body h3')).toContainText('联系我们')
   })
 
   test(`I-11 ${label} screen: with a service phone the phone is on screen and there is no extra contact entry @w2`, async ({ page, api }) => {

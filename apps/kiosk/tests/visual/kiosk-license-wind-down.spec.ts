@@ -298,30 +298,32 @@ test('收尾中进面试工作台的结果阶段（?stage=report、?stage=report
 
 // ───────────────────────── 从「我的」里打开旧结果：只读 ─────────────────────────
 
-test('收尾中从「我的简历」打开旧诊断报告：报告可看，优化、简历对照、自我探索停用 @license-gate', async ({ page, api }) => {
+test('收尾中从「我的简历」打开旧诊断报告：报告可看，优化停用 @license-gate', async ({ page, api }) => {
+  // 2026-11-08 四核心收口：简历对照、自我探索停放，报告页与「我的简历」不再给这两个入口；这里顺带守住它们不回来。
   const world = await boot(page, api)
   api.respond('GET', '/api/v1/me/resumes', { status: 200, json: { success: true, data: { items: [RESUME_ROW], nextCursor: null, total: 1 } } })
   api.respond('GET', `/api/v1/resume/records/${RESUME_TASK_ID}`, { status: 200, json: RESUME_REPORT_RECORD })
   await signIn(page, api, world)
 
-  // 阳性对照：授权正常时，同一条记录打开的报告，优化入口、简历对照、自我探索都是亮的，没有「只读」说明。
+  // 阳性对照：授权正常时，同一条记录打开的报告，优化入口是亮的，没有「只读」说明。
   await goInApp(page, '/me/resumes')
   await openResumeReport(page)
   await expect(page.getByTestId('resume-report-priorities')).toBeVisible()
   await expect(page.getByTestId('resume-report-primary')).toBeEnabled()
-  await expect(page.getByRole('button', { name: '简历对照', exact: true })).toBeEnabled()
-  await expect(page.getByRole('button', { name: '自我探索', exact: true })).toBeEnabled()
+  for (const name of ['简历对照', '自我探索']) {
+    await expect(page.getByRole('button', { name, exact: true }), `${name}已停放，报告页不给入口`).toHaveCount(0)
+  }
   await expect(page.getByRole('status').filter({ hasText: NO_NEW_TASK })).toHaveCount(0)
 
-  // 收尾在「我的简历」里开始：这一页的列表里，看报告照常，继续优化与简历对照停用。
+  // 收尾在「我的简历」里开始：这一页的列表里，看报告照常，继续优化停用。
   await goInApp(page, '/me/resumes')
   await startWindDown(world)
   await page.locator('[data-record-kind="parse"] .me-open').first().click()
   await expect(page.getByRole('button', { name: /这份简历的诊断报告$/ })).not.toHaveAttribute('aria-disabled', 'true')
   await expect(page.getByRole('button', { name: /优化版（/ })).toHaveAttribute('aria-disabled', 'true')
-  await expect(page.getByRole('button', { name: /简历对照（/ })).toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByRole('button', { name: /简历对照/ }), '简历对照已停放，列表里不给入口').toHaveCount(0)
 
-  // 打开旧报告：不被拦，报告内容可看，只读说明在，优化入口、简历对照、自我探索停用且点不动。
+  // 打开旧报告：不被拦，报告内容可看，只读说明在，优化入口停用且点不动。
   await page.getByRole('button', { name: /这份简历的诊断报告$/ }).click()
   await page.waitForURL((url) => url.pathname === '/resume/report')
   await expect(windDownBlocked(page), '旧报告是结果页，不该被拦').toHaveCount(0)
@@ -331,12 +333,6 @@ test('收尾中从「我的简历」打开旧诊断报告：报告可看，优�
   const optimize = page.getByTestId('resume-report-primary')
   await expect(optimize).toBeDisabled()
   await expect(optimize).toHaveAttribute('title', NO_NEW_TASK)
-  for (const name of ['简历对照', '自我探索']) {
-    const link = page.getByRole('button', { name, exact: true })
-    await expect(link, `${name}：只读时要停用`).toBeDisabled()
-    await expect(link).toHaveAttribute('title', NO_NEW_TASK)
-    await expectTapStays(page, link, name)
-  }
   await expectTapStays(page, optimize, '优化入口')
 })
 

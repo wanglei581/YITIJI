@@ -177,6 +177,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:kiosk-parked-toolbox-campus
           # 政策最小闭环停放 7 处（2026-11-05）：停放源码仍在、不被值导入、旧 /renshi 链接回政策首页。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-parked-policy
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-parked-core4
           pnpm --filter @ai-job-print/kiosk verify:home-jobs-availability
           pnpm --filter @ai-job-print/kiosk verify:jobfair-checkin
           pnpm --filter @ai-job-print/kiosk verify:jobfair-size
@@ -811,6 +812,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:mock-interview-consent
           pnpm --filter @ai-job-print/api verify:resume-ai-consent-wiring
+          pnpm --filter @ai-job-print/api verify:mock-interview-deadline
           pnpm --filter @ai-job-print/api verify:job-fit
           pnpm --filter @ai-job-print/api verify:miniapp-review-backend
           pnpm --filter @ai-job-print/api verify:job-fit-governance
@@ -1224,6 +1226,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:mock-interview-consent
           pnpm --filter @ai-job-print/api verify:resume-ai-consent-wiring
+          pnpm --filter @ai-job-print/api verify:mock-interview-deadline
           pnpm --filter @ai-job-print/api verify:member-account-status
           pnpm --filter @ai-job-print/api verify:member-auth
           pnpm --filter @ai-job-print/api verify:member-restore

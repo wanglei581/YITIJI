@@ -21,10 +21,10 @@ export interface ConsultationTask {
 }
 
 /**
- * 四个咨询主题。`serviceActions` 是**不依赖模型**的真实直达入口 ——
+ * 咨询主题（岗位主题保留定义，当前停放）。`serviceActions` 是**不依赖模型**的真实直达入口 ——
  * 后端没返回 action 时它们照常出现，AI 挂掉时它们也照常可点。
  */
-export const CONSULTATION_TASKS: readonly ConsultationTask[] = [
+const ALL_CONSULTATION_TASKS: readonly ConsultationTask[] = [
   {
     id: 'resume',
     label: '简历与求职材料',
@@ -36,7 +36,6 @@ export const CONSULTATION_TASKS: readonly ConsultationTask[] = [
       { label: 'AI 简历服务', route: '/resume-service' },
       { label: '简历诊断', route: '/resume/source' },
       { label: '打印文件', route: '/print/upload' },
-      { label: '自我探索', route: '/resume/self-assessment/intro' },
     ],
   },
   {
@@ -48,7 +47,7 @@ export const CONSULTATION_TASKS: readonly ConsultationTask[] = [
     questions: ['自我介绍应该怎么准备？', '面试常见问题怎么回答？', '谈薪时应该注意什么？'],
     serviceActions: [
       { label: 'AI 模拟面试', route: '/interview/setup' },
-      { label: '查看岗位信息', route: '/jobs' },
+      { label: '面试技巧', route: '/interview/tips' },
     ],
   },
   {
@@ -77,6 +76,10 @@ export const CONSULTATION_TASKS: readonly ConsultationTask[] = [
     ],
   },
 ]
+
+// 2026-11-08 只留四个核心；恢复时同时恢复路由、入口和停放门禁。
+export const PARKED_CONSULTATION_TASK_IDS = new Set(['jobs'])
+export const CONSULTATION_TASKS = ALL_CONSULTATION_TASKS.filter((task) => !PARKED_CONSULTATION_TASK_IDS.has(task.id))
 
 export type ToolboxAssistantSkill = AssistantSkill
 
@@ -160,7 +163,15 @@ export const TOOLBOX_ASSISTANT_SCENES: Record<ToolboxAssistantSkill, ToolboxAssi
   },
 }
 
+// 11/04 百宝箱三个、11/08 本机 AI 专项八个先后停放；旧 intent 回普通小青。
+export const PARKED_ASSISTANT_SKILLS = new Set<AssistantSkill>([
+  'offer_compare', 'salary_negotiation', 'hr_qa',
+  'self_intro_gen', 'material_checklist', 'jd_analysis', 'interview_questions',
+  'career_explore', 'cover_letter_gen', 'resume_jd_match', 'company_research',
+])
+
 export function normalizeToolboxSkill(value: string | null): ToolboxAssistantSkill | undefined {
+  if (value && PARKED_ASSISTANT_SKILLS.has(value as AssistantSkill)) return undefined
   const valid: ToolboxAssistantSkill[] = [
     'offer_compare', 'salary_negotiation', 'hr_qa',
     'self_intro_gen', 'material_checklist', 'jd_analysis',

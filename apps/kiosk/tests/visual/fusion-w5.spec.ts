@@ -556,55 +556,6 @@ test('activity detail renders an honest missing-record empty state after visible
   pagination.assertNoUnhandledRequests()
 })
 
-test('benefit activity detail keeps the shared shell, real content and return path @w5-kiosk', async ({ page, api }) => {
-  const errors = runtimeErrors(page)
-  registerKioskShell(api)
-  api.respond('GET', '/api/v1/activities', {
-    status: 200,
-    json: { success: true, data: { items: [] } },
-  })
-  api.respond('GET', '/api/v1/activities/w5-benefit-detail', {
-    status: 200,
-    json: {
-      success: true,
-      data: {
-        id: 'w5-benefit-detail',
-        title: 'W5 打印服务体验权益',
-        description: '这是来自真实活动详情接口的验收内容。',
-        rulesText: '每人限领一次；仅用于现场打印服务。',
-        benefitType: 'free_quota',
-        sourceType: 'platform',
-        quantityTotal: 1,
-        stockTotal: 20,
-        stockRemaining: 8,
-        claimLimitPerUser: 1,
-        status: 'published',
-        validFrom: null,
-        validUntil: null,
-        grantValidDays: 30,
-        claimable: true,
-        claimed: false,
-        soldOut: false,
-        ended: false,
-        createdAt: '2026-07-24T00:00:00.000Z',
-        updatedAt: '2026-07-24T00:00:00.000Z',
-      },
-    },
-  })
-
-  await page.goto('/activities/w5-benefit-detail')
-  await expect(page.locator('[data-kiosk-domain="profile"][data-kiosk-screen="activity-detail"]')).toBeVisible()
-  await expect(page.locator('[data-qxt-screen]')).toBeVisible()
-  await expect(page.locator('.qxt-back')).toHaveCount(1)
-  await expect(page.getByRole('heading', { name: 'W5 打印服务体验权益', exact: true })).toBeVisible()
-  await expect(page.getByText('这是来自真实活动详情接口的验收内容。', { exact: true })).toBeVisible()
-  const backButton = page.getByRole('button', { name: /返回活动/ }).first()
-  await expect(backButton).toBeVisible()
-  await expectFusionAcceptance(page, errors)
-  await backButton.click()
-  await expect(page).toHaveURL(/\/activities$/)
-})
-
 test('legal document keeps its standalone theme and scrollable long body @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerKioskShell(api)
@@ -1988,6 +1939,55 @@ test('R-04 documents: photo composite requiring check opens material check @w5-k
   await row.getByRole('button', { name: '打印', exact: true }).click()
   await page.waitForURL(/\/print\/desk\?step=check$/)
   expect((await created).postDataJSON()).toMatchObject({ sourceFileId: 'doc-photo-pdf', kind: 'inspection' })
+})
+
+test('documents: PDF preview uses the same-site content URL and falls back without it @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  const directPdf = '/w5-fixtures/my-doc-direct.pdf'
+  const sameSite = '/api/v1/files/doc-pdf-same/content?expires=1&sig=test'
+  api.respond('GET', '/api/v1/me/documents', memberPage([
+    memberDocument({ id: 'doc-pdf-same', filename: '同站预览.pdf' }),
+    memberDocument({ id: 'doc-pdf-direct', filename: '直链预览.pdf' }),
+  ]))
+  api.respond('GET', '/api/v1/files/doc-pdf-same/preview-url', {
+    status: 200,
+    json: { success: true, data: { fileId: 'doc-pdf-same', url: directPdf, printFileUrl: sameSite, expiresAt: FUTURE, disposition: 'inline' } },
+  })
+  api.respond('GET', '/api/v1/files/doc-pdf-direct/preview-url', {
+    status: 200,
+    json: { success: true, data: { fileId: 'doc-pdf-direct', url: directPdf, expiresAt: FUTURE, disposition: 'inline' } },
+  })
+  const directLinkFetches: string[] = []
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === directPdf) directLinkFetches.push(request.resourceType())
+  })
+  await page.route('**/api/v1/files/doc-pdf-same/content**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+  )
+  await page.route(`**${directPdf}`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+  )
+
+  await loginThroughVisibleUi(page, '/me/documents')
+  const rows = page.getByTestId('member-assets-document')
+  const sameFetch = page.waitForRequest((request) => new URL(request.url()).pathname === '/api/v1/files/doc-pdf-same/content')
+  await openRow(rows.filter({ hasText: '同站预览.pdf' }))
+  await rows.filter({ hasText: '同站预览.pdf' }).getByRole('button', { name: '查看', exact: true }).click()
+  const sameDialog = page.getByRole('dialog', { name: '同站预览.pdf' })
+  await expect(sameDialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', sameSite)
+  await sameFetch
+  expect(directLinkFetches).toEqual([])
+  await sameDialog.getByRole('button', { name: '关闭预览' }).click()
+
+  const directFetch = page.waitForRequest((request) => new URL(request.url()).pathname === directPdf)
+  await openRow(rows.filter({ hasText: '直链预览.pdf' }))
+  await rows.filter({ hasText: '直链预览.pdf' }).getByRole('button', { name: '查看', exact: true }).click()
+  const directDialog = page.getByRole('dialog', { name: '直链预览.pdf' })
+  await expect(directDialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', directPdf)
+  await directFetch
+  expect(errors).toEqual([])
 })
 
 test('documents and orders: error then empty come from the server, never a cached list @w5-kiosk', async ({ page, api }) => {

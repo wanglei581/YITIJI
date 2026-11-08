@@ -90,8 +90,7 @@ interface HubSnapshot {
 async function readHub(page: Page): Promise<HubSnapshot> {
   await page.waitForSelector('[data-qx-page="service-hub"], [data-qx-page="resume"]')
   // 触屏版简历服务台只直接画四块，其余入口收在「其余 N 项」弹层里：先把弹层打开，再把整页（含弹层）的入口一次读全。
-  // 练面试服务台也有一个「其余 4 项」，但它是页内换视图、没有弹层：只在简历服务台点，否则会读到另一个视图、
-  // 并一直等一个不会出现的 [data-qx-page="resume-more"]。
+  // 练面试服务台不再有「其余」视图；简历仅在合同审查开放时才有弹层。
   const resumeHub = (await page.locator('[data-qx-page="resume"]').count()) > 0
   const more = page.getByRole('button', { name: /^其余 \d+ 项/ })
   const sheetOpened = resumeHub && (await more.count()) > 0
@@ -231,9 +230,9 @@ test('resume 的 device-off 只拦简历打印，AI 与浏览类照常可进 @ki
   expect(print.clickable).toBe(false)
   expect(print.reason).toBe('本机设备当前不可用')
 
-  // 其余七张（AI 类与模板目录）不受本机设备影响，必须仍是可点控件。
+  // 其余三张（诊断、生成、优化）不受本机设备影响，必须仍是可点控件。
   const others = hub.cards.filter((card) => card.title !== '简历打印')
-  expect(others).toHaveLength(7)
+  expect(others).toHaveLength(3)
   expect(others.filter((card) => !card.clickable)).toEqual([])
   expect(hub.quick.filter((link) => !link.clickable)).toEqual([])
   expect(hub.goals.filter((goal) => !goal.clickable)).toEqual([])
@@ -252,7 +251,7 @@ test('在线服务 503：白名单离线入口仍可进，其余一律不可点 
   // 旧台有 data-readiness 属性可断言；触屏台没有，改断言顶栏胶囊和屏的状态标记，两者都要说「不可用」。
   expect(hub.pill).toBe('在线服务当前不可用')
   await expect(page.locator('[data-qx-page="recruit"]')).toHaveAttribute('data-qxt-state', 'unavailable')
-  // 要后端的门一律不可点，并说出原因。找全职是信息门，岗位匹配参考和问 AI 顾问走 AI 话术。
+  // 要后端的门一律不可点，并说出原因。找全职是信息门，问 AI 顾问走 AI 话术；岗位匹配参考 11/08 随简历对照停放，不再出现。
   expect(hub.doors.length).toBeGreaterThan(0)
   expect(hub.doors.filter((door) => door.clickable).map((door) => door.title)).toEqual([])
   expect(byTitle(hub.doors, '找全职')).toEqual({
@@ -260,7 +259,7 @@ test('在线服务 503：白名单离线入口仍可进，其余一律不可点 
     clickable: false,
     reason: '在线服务当前不可用',
   })
-  expect(byTitle(hub.doors, '岗位匹配参考').reason).toBe('AI能力当前不可用')
+  expect(hub.doors.some((door) => door.title === '岗位匹配参考')).toBe(false)
   expect(byTitle(hub.doors, '问 AI 顾问').reason).toBe('AI能力当前不可用')
 
   // 跨到校园招聘的那条不在能力门里，后端断开时仍可点，而且真的走到 /fairs-service。
@@ -411,7 +410,7 @@ async function readInterviewHubFit(page: Page): Promise<{ over: number; covered:
   return page.evaluate(() => {
     const hub = document.querySelector('.qxt-ivhub') as HTMLElement
     const covered: string[] = []
-    for (const card of hub.querySelectorAll('.qx-hub-grid > *, .qxt-iv-more, .qx-hub-notice, .qxt-iv-wide')) {
+    for (const card of hub.querySelectorAll('.qx-hub-grid > *, .qx-hub-notice, .qxt-iv-wide')) {
       const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT)
       while (walker.nextNode()) {
         const node = walker.currentNode as Text
@@ -436,25 +435,22 @@ test('练面试服务台：正常、在线服务不可用、检查中三态都�
     const fit = await readInterviewHubFit(page)
     expect(fit.over, `${mode}：服务台比一屏高 ${fit.over}px，会出现滚动`).toBeLessThanOrEqual(1)
     expect(fit.covered, `${mode}：这些字被别的元素压住`).toEqual([])
-    // 磁贴标题 28px（稿 .tile b），「其余四项」里的也一样。放不下就从别处匀高度，不缩字。
+    // 磁贴标题 28px（稿 .tile b）。放不下就从别处匀高度，不缩字。
     const sizes = await page.locator('.qxt-ivhub .qxt-tile h3').evaluateAll((nodes) => nodes.map((n) => getComputedStyle(n).fontSize))
     expect(sizes.length, `${mode}：四张入口磁贴`).toBe(4)
     expect([...new Set(sizes)], `${mode}：磁贴标题字号`).toEqual(['28px'])
   }
 })
 
-test('练面试服务台：切到「其余 4 项」再回来，焦点落在意图带标题上，磁贴标题仍是 28px @kiosk', async ({ page, api }) => {
+test('练面试服务台：只留四格，不再显示其余入口 @kiosk', async ({ page, api }) => {
   registerShell(api, { api: 'ready', printer: { isOnline: true, printerStatus: 'ready' } })
   await page.goto('/interview-service')
   await page.waitForSelector('[data-qx-page="service-hub"]')
-  await page.getByRole('button', { name: /其余 4 项/ }).click()
-  await expect(page.locator('.qxt-band h1')).toBeFocused()
-  await expect(page.locator('.qxt-band h1')).toHaveText('其余四项入口')
-  const more = await page.locator('.qxt-ivhub .qxt-tile h3').evaluateAll((nodes) => nodes.map((n) => getComputedStyle(n).fontSize))
-  expect(more).toEqual(['28px', '28px', '28px', '28px'])
-  await page.getByRole('button', { name: /返回练面试/ }).click()
-  await expect(page.locator('.qxt-band h1')).toBeFocused()
-  await expect(page.locator('.qxt-band h1')).toHaveText('把表达练熟，不替你下结论')
+  // 先等四格出来（阳性），再断言「其余」不在，免得页面还没画就空转通过。
+  await expect(page.locator('.qxt-ivhub .qxt-tile h3')).toHaveText(['面试技巧', '训练报告', 'AI服务记录', '简历服务'])
+  await expect(page.getByRole('button', { name: /其余/ })).toHaveCount(0)
+  const sizes = await page.locator('.qxt-ivhub .qxt-tile h3').evaluateAll((nodes) => nodes.map((n) => getComputedStyle(n).fontSize))
+  expect(sizes).toEqual(['28px', '28px', '28px', '28px'])
 })
 
 test('阳性对照：在线服务就绪时，同一个按钮真的会进入 setup @kiosk', async ({ page, api }) => {
@@ -514,7 +510,7 @@ const withCapabilities = (overrides: Parameters<typeof kioskAiCapabilitiesRespon
 test('练面试服务台：只关模拟面试时，只停「马上练一场」并写原因，其余入口和问小青照常 @kiosk', async ({ page, api }) => {
   const hub = await openInterviewHub(page, api, withCapabilities({ mock_interview: CAPABILITY_OFF }))
   expect(byTitle(hub.cards, '马上练一场')).toEqual({ title: '马上练一场', clickable: false, reason: 'AI能力当前不可用' })
-  for (const title of ['面试技巧', '训练报告', '职业自我探索', '职业规划建议']) {
+  for (const title of ['面试技巧', '训练报告', 'AI服务记录', '简历服务']) {
     expect(byTitle(hub.cards, title).clickable, title).toBe(true)
   }
   await expect(page.getByRole('button', { name: '问小青：先练哪一项？' })).toBeEnabled()
@@ -524,10 +520,10 @@ test('练面试服务台：只关模拟面试时，只停「马上练一场」�
   await expect(page.getByText('管理员已关闭')).toHaveCount(0)
 })
 
-test('练面试服务台：自我探索、职业规划各自关闭时，只停各自那张卡 @kiosk', async ({ page, api }) => {
+test('练面试服务台：自我探索、职业规划入口始终不显示 @kiosk', async ({ page, api }) => {
   const hub = await openInterviewHub(page, api, withCapabilities({ self_assessment: CAPABILITY_OFF, career_plan: CAPABILITY_OFF }))
-  expect(byTitle(hub.cards, '职业自我探索')).toEqual({ title: '职业自我探索', clickable: false, reason: 'AI能力当前不可用' })
-  expect(byTitle(hub.cards, '职业规划建议')).toEqual({ title: '职业规划建议', clickable: false, reason: 'AI能力当前不可用' })
+  expect(hub.cards.some((card) => card.title === '职业自我探索')).toBe(false)
+  expect(hub.cards.some((card) => card.title === '职业规划建议')).toBe(false)
   expect(byTitle(hub.cards, '面试技巧').clickable).toBe(true)
   expect(byTitle(hub.cards, '训练报告').clickable).toBe(true)
   // 模拟面试没关，主卡仍是能点的按钮。
@@ -553,7 +549,7 @@ test('练面试服务台：能力降级（开发 mock）不当成可用，开发
 
 test('练面试服务台：能力状态读不到时按没确认处理，AI 入口与问小青都不放行，不依赖 AI 的照常 @kiosk', async ({ page, api }) => {
   const hub = await openInterviewHub(page, api, { status: 503, json: { success: false, error: { code: 'CAPABILITIES_UNAVAILABLE', message: 'x' } } })
-  for (const title of ['马上练一场', '职业自我探索', '职业规划建议']) {
+  for (const title of ['马上练一场']) {
     expect(byTitle(hub.cards, title), title).toEqual({ title, clickable: false, reason: '暂时无法确认AI能力状态' })
   }
   for (const title of ['面试技巧', '训练报告']) expect(byTitle(hub.cards, title).clickable, title).toBe(true)

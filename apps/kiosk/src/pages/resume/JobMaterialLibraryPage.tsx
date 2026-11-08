@@ -17,6 +17,7 @@ import {
   AlertTriangleIcon, CheckCircle2Icon, ChevronRightIcon, ClockIcon, EyeIcon, FileTextIcon, FolderOpenIcon, InfoIcon, PenLineIcon, PrinterIcon, SparklesIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { inPagePreviewUrl } from '../../components/FileContentPreview'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 
 import { QxTouchSection, QxTouchTile } from './touch/ResumeMaterialsTouch'
@@ -205,7 +206,7 @@ export function JobMaterialLibraryPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [generated, setGenerated] = useState<JobMaterialGenerateResponse | null>(null)
   /** 预览结果绑定到这一次生成返回的对象：改字段 / 重新生成后，旧链接或旧失败都不会挂到新文件卡上。 */
-  const [preview, setPreview] = useState<{ file: JobMaterialGenerateResponse; url?: string; error?: string } | null>(null)
+  const [preview, setPreview] = useState<{ file: JobMaterialGenerateResponse; url?: string; printFileUrl?: string; error?: string } | null>(null)
   const [previewBusy, setPreviewBusy] = useState(false)
 
   useEffect(() => {
@@ -325,7 +326,7 @@ export function JobMaterialLibraryPage() {
     try {
       const res = await fetchAccessUrl(path, token)
       if (!res?.url) throw new Error('preview url missing')
-      setPreview({ file, url: res.url })
+      setPreview({ file, url: res.url, printFileUrl: res.printFileUrl })
     } catch (err) {
       setPreview({ file, error: unattendedReason(userMessageOf(err, '预览链接没能生成，可能已到期或被清理'), '预览链接没能生成，可能已到期或被清理') })
     } finally {
@@ -622,7 +623,17 @@ export function JobMaterialLibraryPage() {
         </section>
       </ResumeTouchFrame>
       {generated && currentPreview?.url ? (
-        <FilePreviewDialog fileUrl={currentPreview.url} fileName={generated.filename} mimeType={generated.mimeType} onClose={() => setPreview(null)} />
+        <FilePreviewDialog
+          fileUrl={inPagePreviewUrl({
+            url: currentPreview.url ?? '',
+            printFileUrl: currentPreview.printFileUrl,
+            fileName: generated.filename,
+            mimeType: generated.mimeType,
+          })}
+          fileName={generated.filename}
+          mimeType={generated.mimeType}
+          onClose={() => setPreview(null)}
+        />
       ) : null}
     </div>
   )

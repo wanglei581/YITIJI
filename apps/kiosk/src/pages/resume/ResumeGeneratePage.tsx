@@ -46,7 +46,7 @@ import { useResumeAiConsent } from './resumeAiConsent'
 import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import { ResumeGenerateAdvisor } from './components/ResumeGenerateQxChrome'
 import { ASKS } from './touch/resumeAsks'
-import { ResumeGenerateReview } from './components/ResumeGenerateReview'
+import { experienceRowsForGenerate, ResumeGenerateReview } from './components/ResumeGenerateReview'
 import { ResumeVoiceInputButton } from './components/ResumeVoiceInputButton'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-generate-qx.css'
@@ -196,7 +196,7 @@ export function ResumeGeneratePage() {
       jobType: intention.jobType.trim() || undefined,
       salary: intention.salary.trim() || undefined,
     },
-    // 只提交填了关键字段的条目(学校/公司+职务/项目名),半空条目不提交
+    // 学校、项目名写了才提交。经历只要写了公司就提交，职务可以空着。
     education: education
       .filter((e) => e.school.trim())
       .map((e) => ({
@@ -206,14 +206,7 @@ export function ResumeGeneratePage() {
         period: e.period?.trim() || undefined,
         description: e.description?.trim() || undefined,
       })),
-    experience: experience
-      .filter((e) => e.company.trim() && e.role.trim())
-      .map((e) => ({
-        company: e.company.trim(),
-        role: e.role.trim(),
-        period: e.period?.trim() || undefined,
-        description: e.description.trim(),
-      })),
+    experience: experienceRowsForGenerate(experience),
     projects: projects
       .filter((p) => p.name.trim())
       .map((p) => ({ name: p.name.trim(), role: p.role?.trim() || undefined, description: p.description.trim() })),
@@ -630,7 +623,7 @@ export function ResumeGeneratePage() {
                   <Field label="公司 / 单位" required>
                     <input className={inputCls} value={e.company} onChange={(ev) => setExperience((list) => list.map((x, idx) => idx === i ? { ...x, company: ev.target.value } : x))} />
                   </Field>
-                  <Field label="职位" required>
+                  <Field label="职位">
                     <input className={inputCls} value={e.role} onChange={(ev) => setExperience((list) => list.map((x, idx) => idx === i ? { ...x, role: ev.target.value } : x))} />
                   </Field>
                   <div className="md:col-span-2">

@@ -10,6 +10,7 @@ import type {
   UpdateTerminalProfileInput,
 } from '../../services/api/devices'
 import { isParkedOrgType } from '../partners/orgTypeOptions'
+import { TerminalDailyFreeSidesSection } from './TerminalDailyFreeSidesSection'
 import { TerminalLifecycleActions } from './TerminalLifecycleActions'
 import { TerminalNetworkDiagnostics } from './TerminalNetworkDiagnostics'
 import { TerminalPrinterQueue } from './TerminalPrinterQueue'
@@ -166,6 +167,8 @@ export function TerminalDetailDrawer({
             </>
           )}
         </Section>
+
+        <TerminalDailyFreeSidesSection terminalId={terminal.id} />
 
         <Section title="所属机构">
           {editingOrg ? (

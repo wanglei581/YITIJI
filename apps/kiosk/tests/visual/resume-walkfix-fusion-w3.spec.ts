@@ -130,9 +130,10 @@ test('小青：用屏上键盘发送后键盘收起，回答与底部导航露�
 })
 
 // ── I-35 ───────────────────────────────────────────────────────────────────
-// 走查实录：后台把「AI 暂停」打开后，简历服务台四个要 AI 的入口照常可点，要点进去才在诊断失败屏知道「AI 服务暂停中」。
+// 走查实录：后台把「AI 暂停」打开后，简历服务台要 AI 的入口照常可点，要点进去才在诊断失败屏知道「AI 服务暂停中」。
 // 判据（稿 resume 的 ?ai=down）：写明哪些要 AI、现在不可用；两张大卡置灰并给不用 AI 的出路
-// （有简历 → 先打印原件；没有 → 先看简历素材库）；职业规划、简历对照同样置灰；求职材料、自我探索不要 AI，照常能点。
+// （有简历 → 先打印原件；没有 → 先填内容、导出原样草稿。稿里写的「先看简历素材库」随四核心收口停放，11/08 改成这条）；
+// 下面四格里只有「AI简历优化」要 AI、同样置灰；简历打印、我的简历、AI服务记录不要 AI，照常能点。
 // 没读到暂停状态（配置里没有 ai 字段）时一概不变，不把「没读到」说成「不可用」。
 test('AI 暂停时简历服务台预告：要 AI 的置灰写原因，给出不用 AI 的出路 @w3-kiosk', async ({ page, api }) => {
   shell(api, { ai: { paused: true } })
@@ -146,20 +147,19 @@ test('AI 暂停时简历服务台预告：要 AI 的置灰写原因，给出不�
     await expect(card).toHaveAttribute('aria-disabled', 'true')
     await expect(card).toContainText('AI能力当前不可用')
   }
-  // 要 AI 的两块磁贴置灰；不要 AI 的两块照常能点
-  for (const title of ['职业规划', '简历对照']) {
-    await expect(page.locator(`[data-hub-title="${title}"]`)).toHaveAttribute('data-hub-reason', 'AI能力当前不可用')
-  }
-  for (const title of ['求职材料', '自我探索']) {
+  // 四格：要 AI 的一格置灰；不要 AI 的三格照常能点
+  await expect(page.locator('[data-hub-title="AI简历优化"]')).toHaveAttribute('data-hub-reason', 'AI能力当前不可用')
+  for (const title of ['简历打印', '我的简历', 'AI服务记录']) {
+    await expect(page.locator(`[data-hub-title="${title}"]`)).toBeVisible()
     await expect(page.locator(`[data-hub-title="${title}"]`)).not.toHaveAttribute('data-hub-reason', /.+/)
   }
   // 两条出路真的能走
   const printOriginal = page.getByRole('button', { name: '可以先打印原件' })
-  const seeTemplates = page.getByRole('button', { name: '可以先看简历素材库' })
+  const fillByHand = page.getByRole('button', { name: '可以先填内容，导出原样草稿' })
   await expect(printOriginal).toBeVisible()
-  await expect(seeTemplates).toBeVisible()
-  await seeTemplates.click()
-  await expect(page).toHaveURL(/\/resume\/templates$/)
+  await expect(fillByHand).toBeVisible()
+  await fillByHand.click()
+  await expect(page).toHaveURL(/\/resume\/generate$/)
   await page.goBack()
   await page.getByRole('button', { name: '可以先打印原件' }).click()
   await expect(page).toHaveURL(/\/print\/upload\?source=resume$/)
@@ -171,7 +171,7 @@ test('AI 没暂停或没读到暂停状态时简历服务台照常，不多出�
   await expect(page.locator('[data-qx-page="resume"]')).toBeVisible()
   await expect(page.locator('.qxt-slab-off')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '可以先打印原件' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '可以先看简历素材库' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '可以先填内容，导出原样草稿' })).toHaveCount(0)
 
   // 配置里压根没有 ai 字段：读不到不等于暂停（重新加载，终端配置的内存缓存随之重来）
   shell(api, {})
@@ -202,6 +202,10 @@ test('预览页与核对弹层把「待本人确认」讲明白，并且只列 A
 
   // 去导出 → 选格式 → 导出这一份：核对弹层里同样讲明白
   await page.getByRole('button', { name: '内容没问题，去导出' }).click()
+  await expect(page.getByTestId('resume-export-aigc-note')).toHaveText('导出的简历每页底部有一行小字：含人工智能辅助生成内容')
+  await page.getByTestId('resume-generate-preview-fmt-md').click()
+  await expect(page.getByTestId('resume-export-aigc-note')).toHaveText('导出的文件末尾有一行：含人工智能辅助生成内容')
+  await page.getByTestId('resume-generate-preview-fmt-pdf').click()
   await page.getByRole('button', { name: '导出这一份' }).click()
   const dialog = page.getByRole('dialog', { name: '导出前核对事实' })
   await expect(dialog).toBeVisible()
@@ -407,6 +411,8 @@ test('导出格式主操作可达且不靠四张大空卡撑长页面 @w3-kiosk'
 test('导出结果的文件与带走操作在首屏，说明可展开 @w3-kiosk', async ({ page, api }, testInfo) => {
   generateShell(api)
   await page.route('**/w3-fixtures/gen-walkfix.pdf', (route) => route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }))
+  // 页内预览有同站 printFileUrl 时改走 /api/v1/files/<id>/content（B8 ①），这条也要登记，否则夹具判未处理。
+  await page.route('**/api/v1/files/gen-file-walkfix-1/content**', (route) => route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }))
   await fillGenerateFormToReview(page)
   await page.getByRole('button', { name: '让 AI 整理成新简历' }).click()
   await page.getByRole('button', { name: '内容没问题，去导出' }).click()

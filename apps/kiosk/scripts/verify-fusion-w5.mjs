@@ -25,14 +25,10 @@ const W5_ROUTES = [
   '/me/ai-records', '/me/benefits', '/me/activity', '/me/activity/:id',
   '/me/notifications', '/me/feedback', '/me/settings', '/me/privacy-requests', '/help',
   // 2026-11-04 产品负责人定停放：/toolbox 收成跳回首页的 splat。
-  '/activities', '/activities/:id', '/toolbox/*', '/notifications',
+  '/activities/*', '/toolbox/*', '/notifications',
 ]
-const SELF_ASSESSMENT_V1_ROUTES = [
-  '/resume/self-assessment/intro',
-  '/resume/self-assessment/questions',
-  '/resume/self-assessment/result',
-  '/resume/self-assessment/history',
-]
+// 11/08 自我探索源码保留，四条页内路由收成回首页的 splat。
+const SELF_ASSESSMENT_V1_ROUTES = ['/resume/self-assessment/*']
 const W5_ROUTES_EXPANDED = [...W5_ROUTES, ...SELF_ASSESSMENT_V1_ROUTES]
 
 const FROZEN = new Map([
