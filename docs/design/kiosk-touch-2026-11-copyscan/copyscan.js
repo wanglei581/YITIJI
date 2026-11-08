@@ -6,6 +6,7 @@
    另给已有屏加了运行页才有的几种样子（地址参数见 README）。字逐字照运行页代码，出处写在各屏说明栏。
    11/08 第二轮：产品负责人对对稿清单的 10 处回「按推荐」，照改（定案逐条见 state-map.md 末节）；
    11/04 的 cs-scan-offline、cs-scan-file-gone 不采用，已删掉，断网和文件失效用程序现状。
+   11/09 第三轮：三屏留白修整（cs-copy-more、cs-scan-failed?fail=nofile、cs-scan-stopped?flow=copy），只改版式、放大主视觉，字和出路不动，其余屏不变。
    怎么打开、屏清单、地址参数见 docs/design/kiosk-touch-2026-11-copyscan/README.md。
    类名一律 cs- 开头；状态放在 window.S.cs。地址参数可切换样子：
    ?scanner=stale 扫描仪状态过期、?scandev=off 屏上扫描没开通、?copydev=off 屏上复印没开通、
@@ -452,22 +453,41 @@
 .cs-q-facts li::before{content:"";position:absolute;left:4px;top:.6em;width:10px;height:10px;border-radius:50%;background:var(--teal-ink)}
 .cs-solo .cs-why{grid-template-columns:minmax(0,1fr);justify-items:center;align-content:center;gap:28px;padding:36px 56px;text-align:center}
 .cs-solo .cs-q-facts{justify-items:center}
-/* 11/08 第二轮：复印「这一页扫好了」只剩一张卡，已收到的页放大、整块上下拉开（不撑空格子） */
-.cs-body.cs-cmore{justify-content:space-evenly}
-.cs-cmore .cs-strip{flex:none}
-.cs-cmore .cs-strip .cs-pg,.cs-cmore .cs-strip .cs-pg>svg:not(.dash){width:300px;height:424px}
+/* 11/08 第二轮：复印「这一页扫好了」只剩一张卡，已收到的页放大、整块上下拉开（不撑空格子）
+   11/09 第三轮：上中下三段各空约 170px。已收到的页那一格改成撑满上部：最后两页画成大页，「下一页」占位改成两页下面的一整条；
+   这一格和「再扫一页」卡按正文 14px 间距排，卡落在底部。只作用于本屏（cs-cmore），cs-scan-more 不受影响。 */
+.cs-cmore .cs-strip{flex:1;min-height:0}
+.cs-cmore .cs-strip .cs-thumbs{flex:0 1 796px;min-height:0;width:100%;display:grid;grid-template:minmax(0,1fr) 120px/repeat(2,minmax(0,1fr));gap:20px 24px;align-items:center;justify-items:center}
+.cs-cmore .cs-strip .cs-thumbs.cs-cm1{grid-template-columns:minmax(0,1fr)}
+.cs-cmore .cs-strip .cs-thumbs.cs-cm0{flex-basis:656px;grid-template:minmax(0,1fr)/minmax(0,1fr)}
+.cs-cmore .cs-strip .cs-pg{width:auto;height:100%;max-height:656px;aspect-ratio:464/656}
+.cs-cmore .cs-strip .cs-pg>svg.illus{width:100%;height:100%}
+.cs-cmore .cs-strip .cs-pg i{width:56px;height:56px;right:-12px;top:-12px}
+.cs-cmore .cs-strip .cs-pg i svg{width:34px;height:34px}
+.cs-cmore .cs-strip .cs-pg.next{grid-column:1/-1;width:100%;height:120px;aspect-ratio:auto;flex-direction:row;gap:14px}
+.cs-cmore .cs-strip .cs-cm0 .cs-pg.next{width:auto;height:100%;aspect-ratio:464/656;flex-direction:column}
+.cs-cmore .cs-strip>svg.illus{flex:1 1 0;min-height:0;width:100%;height:auto}
 /* 11/08 第二轮：状态未知两屏，大纸居中、说明放在纸下面，整块上下拉开；字号不变 */
 .cs-issue .cs-hero.cs-unk{flex-direction:column;align-items:center;justify-content:space-evenly;gap:26px;padding:24px 30px}
 .cs-unk .cs-reader{flex:1 1 0;min-height:0;max-height:906px;width:auto;height:auto;aspect-ratio:520/736;--h:736px}
 .cs-unk-tx{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:860px;text-align:center}
-/* 11/08 第二轮：复印已停止，原件在哪的示意（玻璃台、进纸器两张现成插画） */
-.cs-body.cs-cstopped{justify-content:space-evenly}
-.cs-cstop{display:flex;align-items:center;justify-content:space-evenly;padding:20px 30px;border-radius:30px;background:var(--well)}
-.cs-cstop svg{flex:none}
+/* 11/08 第二轮：复印已停止，原件在哪的示意（玻璃台、进纸器两张现成插画）
+   11/09 第三轮：三块之间和示意卡下面各空约 130px。三块按正文 14px 间距排，示意卡撑满下部；
+   两张插画并排最多只有半屏宽、撑不满，改成上下排（玻璃台在上、进纸器在下，同提醒句的先后），裁掉插画四周的透明边后放大。 */
+.cs-cstop{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;padding:20px 30px;border-radius:30px;background:var(--well)}
+.cs-cstop svg{flex:0 1 45%;min-height:0;width:100%;height:auto}
 /* 11/08 第二轮：屏上扫描中断结果屏底栏左右两颗长按钮，照定稿 fix-scan.js 同类失败屏收紧底栏边距，免得问小青那句被截 */
 .screen:has(.cs-sfail) .dock{padding:16px 28px;gap:12px}
 .screen:has(.cs-sfail) .dock .btn{padding:0 16px}
 .screen:has(.cs-sfail) .dock .btn.pri{min-width:0}
+/* 11/09 第三轮：屏上扫描「已完成 · 结果里没有文件」（?fail=nofile）只有一张出路卡，原因卡被拉高、卡内上下各空约 200px。
+   插画在左、字在右撑不满这么高的卡（左栏最多半屏宽），所以照单栏居中那种，把插画放大到卡里没有大块空白；字号、句子不变。只作用于这一种（cs-sfail 加 cs-solo）。 */
+.cs-sfail.cs-solo .cs-why{grid-template-rows:minmax(0,1fr) auto;gap:24px;padding:28px 56px}
+.cs-sfail.cs-solo .cs-why .vis{width:auto;height:100%;max-height:600px;aspect-ratio:1/1}
+.cs-sfail.cs-solo .cs-why .vis svg.illus{width:90%}
+.cs-sfail.cs-solo .cs-why .vis .warn{right:20px;top:20px;width:76px;height:76px}
+.cs-sfail.cs-solo .cs-why .vis .warn svg{width:42px;height:42px}
+.cs-sfail.cs-solo .cs-why p{text-wrap:balance}
 .cs-gw{margin:0;padding:14px 20px;border-radius:20px;background:var(--clay-wash);color:var(--clay-ink);font-size:23px;font-weight:600;line-height:1.5}
 .cs-gw ol{margin:4px 0 0;padding-left:34px}
 .cs-pv{align-self:center;display:flex;flex-direction:column;align-items:center;gap:14px;max-width:620px;font-size:24px;line-height:1.5;color:var(--ink-2);text-align:center}
@@ -731,6 +751,17 @@
     if (nextLabel) t += `<span class="cs-pg next"><svg class="dash" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><rect x="2" y="2" width="${w - 4}" height="${h - 4}" rx="12" fill="none" stroke="rgba(31,158,134,.55)" stroke-width="3" stroke-dasharray="10 8"/></svg>${big ? icon('plus', 44, 2.4) : ''}<span>${nextLabel}</span></span>`;
     return `<div class="cs-thumbs">${t}</div>`;
   }
+  /* 11/09 第三轮，只给复印「这一页扫好了」用（cs-scan-more 仍用上面的 thumbs）：最后两页画成大页，
+     「下一页」占位是两页下面的一整条；一页都没有时占位画成一页大小。字只有原来的「下一页」。 */
+  function cmoreThumbs(n) {
+    const shown = Math.min(n, 2), from = n - shown, w = shown ? 952 : 464, h = shown ? 120 : 656;
+    let t = '';
+    for (let i = 0; i < shown; i++) t += `<span class="cs-pg">${pageSvg(464, 656, from + i)}<i>${icon('check', 26, 3.4)}</i></span>`;
+    t += `<span class="cs-pg next"><svg class="dash" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><rect x="2" y="2" width="${w - 4}" height="${h - 4}" rx="14" fill="none" stroke="rgba(31,158,134,.55)" stroke-width="3" stroke-dasharray="10 8"/></svg>${icon('plus', 44, 2.4)}<span>下一页</span></span>`;
+    return `<div class="cs-thumbs cs-cm${shown}">${t}</div>`;
+  }
+  /* 11/09 第三轮：插画四周有透明边，放大时只换看的范围（viewBox），画本身不改 */
+  const cropSvg = (svg, vb) => svg.replace('viewBox="0 0 150 150"', `viewBox="${vb}"`);
   function overlay(h, body, acts) {
     return `<div class="overlay"><div class="dialog"><h2>${h}</h2>${body}<div class="cs-ovacts">${acts}</div></div></div>`;
   }
@@ -1042,7 +1073,7 @@
         cls: 'cs-stopped cs-cstopped',
         body: `<div class="cs-fact big"><span class="ic">${icon('erase', 40, 2)}</span><b>已停止复印，已扫的页已从这台机器删除</b></div>
           <div class="cs-remind-big">${icon('hand', 64, 1.8)}<span>原件还在玻璃上或进纸器里，请带走</span></div>
-          <div class="cs-cstop" aria-hidden="true">${glassSvg(420)}${feederSvg(420)}</div>`,
+          <div class="cs-cstop" aria-hidden="true">${cropSvg(glassSvg(420), '4 18 142 124')}${cropSvg(feederSvg(420), '4 16 142 120')}</div>`,
         dock: D({ back: { go: 'print', label: '回打印扫描' }, ask: '问小青：怎么复印更合适', pri: pri('回首页', 'data-go="home"') })
       });
     }
@@ -1110,7 +1141,7 @@
     return shell({
       band: { eyebrow: '屏上扫描', title: kind, sub: '本次没有生成可用的扫描文件', status: { text: nofile ? kind : expired ? '等待超时 · 没有文件' : '扫描未完成', warn: 1 } },
       cls: 'cs-sfail cs-err cs-err' + opts.length + (opts.length === 1 ? ' cs-solo' : ''),
-      body: `<div class="cs-why" role="alert"><span class="vis">${scanPaper(220)}<i class="warn">${icon('alert', 34, 2.4)}</i></span><div><b>${reason}</b><p>${detail}</p></div></div>
+      body: `<div class="cs-why" role="alert"><span class="vis">${nofile ? cropSvg(scanPaper(220), '4 6 142 128') : scanPaper(220)}<i class="warn">${icon('alert', 34, 2.4)}</i></span><div><b>${reason}</b><p>${detail}</p></div></div>
         <div class="cs-ways">${opts.map((x) => wayCard(x)).join('')}</div>
         ${lost ? `<p class="cs-warn">${RESCAN_LOST}</p>` : ''}
         ${remind(HELP)}`,
@@ -1309,7 +1340,7 @@
     return shell({
       band: { eyebrow: '屏上复印', title: '这一页扫好了，还有下一页吗？', status: { text: '这一页已扫好' }, rail: { labels: COPY_RAIL, now: 0 } },
       cls: 'cs-more cs-cmore',
-      body: `<div class="cs-strip">${none ? glassSvg(420) : thumbs(n, '下一页', true)}<p>${none ? '这一页已扫好' : `已收到 ${n} 页`}</p></div>
+      body: `<div class="cs-strip">${none ? cropSvg(glassSvg(420), '2 16 146 128') : cmoreThumbs(n)}<p>${none ? '这一页已扫好' : `已收到 ${n} 页`}</p></div>
         <div class="cs-ways">
           ${wayCard({ cs: 'cmore', dis: busy, t: '再扫一页', d: '先把下一页放上玻璃台，字朝下，对齐左上角', vis: glassSvg(150) })}
         </div>
@@ -1727,7 +1758,7 @@
   reg('cs-scan-stopped', G_SCAN, '已停止', scanStopped, {
     does: '用户确认停止之后：已收到的页从这台机器删除，并锁一段时间不能开始新的扫描。',
     motion: '倒计时数字这里静态画；运行时每秒减一。',
-    keep: '原话：已停止扫描，已扫的页已从这台机器删除；为了不让下一位看到你的材料，90 秒后才能开始新的扫描。选项：回打印扫描 / 回首页。复印中停止（地址 ?flow=copy）见下。 11/08 补（只扫描）：?quiet=none 停止回包没带服务端时间：环里写「请稍候」、「请稍候再开始新的扫描」「为了不让下一位看到你的材料，过一会儿才能开始新的扫描。」、问句「问小青：为什么要等」；?purged=0 本机没确认删页时首格只写「已停止扫描」。11/08 定：复印停止没有静默期，稿去掉 90 秒倒计时，标题「已停止复印」，补原件提醒「原件还在玻璃上或进纸器里，请带走」，下面放玻璃台、进纸器两张现成插画示意原件在哪；问小青用「怎么复印更合适」（复印各屏已有的问句）。' + NK
+    keep: '原话：已停止扫描，已扫的页已从这台机器删除；为了不让下一位看到你的材料，90 秒后才能开始新的扫描。选项：回打印扫描 / 回首页。复印中停止（地址 ?flow=copy）见下。 11/08 补（只扫描）：?quiet=none 停止回包没带服务端时间：环里写「请稍候」、「请稍候再开始新的扫描」「为了不让下一位看到你的材料，过一会儿才能开始新的扫描。」、问句「问小青：为什么要等」；?purged=0 本机没确认删页时首格只写「已停止扫描」。11/08 定：复印停止没有静默期，稿去掉 90 秒倒计时，标题「已停止复印」，补原件提醒「原件还在玻璃上或进纸器里，请带走」，下面放玻璃台、进纸器两张现成插画示意原件在哪；问小青用「怎么复印更合适」（复印各屏已有的问句）。11/09 第三轮：复印停止三块按正文间距排，示意卡撑满下部，两张插画改上下排并放大（并排最多半屏宽，撑不满）。' + NK
   });
   reg('cs-scan-off', G_SCAN, '屏上扫描没开通', scanOff, {
     does: '这台机器还没开通屏上扫描：说清楚，并把面板扫描放成主按钮。',
@@ -1737,7 +1768,7 @@
   reg('cs-scan-failed', G_SCAN, '中断：扫描未完成（11/08 定稿）', scanFailed, {
     does: '屏上扫描中途结束、没有文件时的结果屏：云端失败或取消、设备中止、预热、超过大小、投递被拒（?reason=stopped|warming|large|ack），会话过期（?fail=expired），完成但结果里没有文件（?fail=nofile），安全重扫凭据失效（?rescan=lost）。?view=now 是现在程序的样子（待改）。',
     motion: '无。',
-    keep: '11/08 产品负责人定（按推荐）：改成屏上扫描自己的结果屏，程序随后照这张改。眉题「屏上扫描」，不画面板四步路径线；原因卡写这次的原因（运行页原因句）和「同一张纸原样再扫，系统可能按重复件拒收（两小时内）。」；出路：「重试扫描（同一份材料）」回 cs-scan-set（有安全重扫凭据时才有），「重新开始一次扫描」回 cs-scan-what，「返回首页」（没文件那种没有）；底栏「返回打印扫描」、问小青「扫描失败怎么办」、主按钮有凭据时「重试扫描（同一份材料）」，没有时「重新开始一次扫描」；服务电话行照稿里的写法，运行时从后台读，读不到不显示。凭据失效那段原句照 scan/ScanResultFailedView.tsx 92–99。?view=now：现在程序落的面板失败屏（眉题「扫描完成」、面板四步路径线、重试和重新开始都进面板 scan-guide），留着对照，待改。' + NK
+    keep: '11/08 产品负责人定（按推荐）：改成屏上扫描自己的结果屏，程序随后照这张改。眉题「屏上扫描」，不画面板四步路径线；原因卡写这次的原因（运行页原因句）和「同一张纸原样再扫，系统可能按重复件拒收（两小时内）。」；出路：「重试扫描（同一份材料）」回 cs-scan-set（有安全重扫凭据时才有），「重新开始一次扫描」回 cs-scan-what，「返回首页」（没文件那种没有）；底栏「返回打印扫描」、问小青「扫描失败怎么办」、主按钮有凭据时「重试扫描（同一份材料）」，没有时「重新开始一次扫描」；服务电话行照稿里的写法，运行时从后台读，读不到不显示。凭据失效那段原句照 scan/ScanResultFailedView.tsx 92–99。?view=now：现在程序落的面板失败屏（眉题「扫描完成」、面板四步路径线、重试和重新开始都进面板 scan-guide），留着对照，待改。11/09 第三轮：?fail=nofile 只有一张出路卡，原因卡照单栏居中、插画放大把卡撑满（插画在左、字在右撑不满这么高的卡）。' + NK
   });
 
   reg('cs-copy-how', G_COPY, '怎么复印', copyHow, {
@@ -1798,7 +1829,7 @@
   reg('cs-copy-more', G_COPY, '复印：这一页扫好了', copyMore, {
     does: '复印选玻璃台时，一页扫好后问还有没有下一页（copy/CopyDeviceView.tsx 41–59）。',
     motion: '无。',
-    keep: '胶囊「这一页已扫好」，标题「这一页扫好了，还有下一页吗？」，一张「再扫一页」「先把下一页放上玻璃台，字朝下，对齐左上角」，底栏「停止复印」（点两次）、问小青「一直扫不完怎么办」、主按钮「扫完了」，没有返回——都是运行页原句。11/08 定：不加「扫完了，整理成预览」卡，主按钮「扫完了」保留；已收到的页小图放大、整块上下拉开，不撑空格子。?pages=none 时只写「这一页已扫好」，格子里放玻璃台大图；?busy=1 是命令在途，卡和主按钮全灰。' + NK
+    keep: '胶囊「这一页已扫好」，标题「这一页扫好了，还有下一页吗？」，一张「再扫一页」「先把下一页放上玻璃台，字朝下，对齐左上角」，底栏「停止复印」（点两次）、问小青「一直扫不完怎么办」、主按钮「扫完了」，没有返回——都是运行页原句。11/08 定：不加「扫完了，整理成预览」卡，主按钮「扫完了」保留；已收到的页小图放大、整块上下拉开，不撑空格子。?pages=none 时只写「这一页已扫好」，格子里放玻璃台大图；?busy=1 是命令在途，卡和主按钮全灰。11/09 第三轮：已收到的页那一格撑满上部，最后两页画成大页，「下一页」占位改成两页下面一整条，「再扫一页」卡落到底部。' + NK
   });
   reg('cs-copy-unknown', G_COPY, '复印：状态未知（11/08 定：改版）', copyUnknown, {
     does: '复印中云端和本机的读数接不上、等太久没新结果、停止结果没确认时程序落的屏（copy/CopyDeviceView.tsx 40–63，句子 copy/copyDeviceFlow.ts 22、58、231）。?why=wait|stop|token 切说法（token 是建单回包缺凭据，copy/copySession.ts 92）。',
