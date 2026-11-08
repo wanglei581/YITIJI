@@ -81,7 +81,7 @@ export function createCopyPrintLedger(deps: CopyDeps, dirId: (id: string, genera
         !Number.isSafeInteger(r.attempts) || r.attempts < 0 || r.attempts > 10 ||
         !Number.isFinite(r.nextRetryAt) || typeof r.acked !== 'boolean' ||
         (r.queueCleanupPending !== undefined && typeof r.queueCleanupPending !== 'boolean') ||
-        (r.printerName !== undefined && (typeof r.printerName !== 'string' || !r.printerName || r.printerName.length > 512)) ||
+        (r.printerName !== undefined && (typeof r.printerName !== 'string' || r.printerName === '' || r.printerName.length > 512)) ||
         (r.errorCode !== undefined && !/^[A-Za-z0-9_]{1,64}$/.test(r.errorCode)) ||
         name !== `${key(r.copyId, r.generation)}.json`) throw new Error('invalid ledger')
       // 兼容旧 ledger：未确认/未终态也必须重清；确认完成的旧记录不补打。
