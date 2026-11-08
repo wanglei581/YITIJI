@@ -85,7 +85,7 @@ test('extractDeclaredRedirects reads five literal Navigate redirects from router
         // { path: 'commented', element: <Navigate to="/wrong" replace /> },
         { path: 'print/scan-convert', element: <Navigate to="/print-scan/convert" replace /> },
         { path: 'print/scan-sign', element: <Navigate to='/print-scan/sign' replace /> },
-        { path: 'print/scan-feature', element: <Navigate to="/print-scan/feature/id-photo" replace /> },
+        { path: 'print/scan-feature', element: <Navigate to="/print-scan" replace /> },
         { path: 'resume', element: <Navigate to="/resume/source" replace /> },
         { path: '/resume/upload', element: <Navigate to="/resume/source" replace /> },
         { path: 'ordinary', element: <OrdinaryPage /> },
@@ -98,7 +98,7 @@ test('extractDeclaredRedirects reads five literal Navigate redirects from router
 
   assert.deepEqual(extractDeclaredRedirects(source), {
     '/print/scan-convert': '/print-scan/convert',
-    '/print/scan-feature': '/print-scan/feature/id-photo',
+    '/print/scan-feature': '/print-scan',
     '/print/scan-sign': '/print-scan/sign',
     '/resume': '/resume/source',
     '/resume/upload': '/resume/source',
@@ -121,7 +121,7 @@ test('extractManifestRedirects reads the exported map and exposes target mismatc
       '/resume/upload' : '/resume/source',
       "/print/scan-sign": "/print-scan/sign-v2",
       '/print/scan-convert': '/print-scan/convert',
-      '/print/scan-feature': '/print-scan/feature/id-photo',
+      '/print/scan-feature': '/print-scan',
       '/resume': '/resume/source',
       [dynamicSource]: '/ignored',
     } as const
@@ -129,7 +129,7 @@ test('extractManifestRedirects reads the exported map and exposes target mismatc
   const manifestRedirects = extractManifestRedirects(source)
   const routerRedirects = {
     '/print/scan-convert': '/print-scan/convert',
-    '/print/scan-feature': '/print-scan/feature/id-photo',
+    '/print/scan-feature': '/print-scan',
     '/print/scan-sign': '/print-scan/sign',
     '/resume': '/resume/source',
     '/resume/upload': '/resume/source',
@@ -137,7 +137,7 @@ test('extractManifestRedirects reads the exported map and exposes target mismatc
 
   assert.deepEqual(manifestRedirects, {
     '/print/scan-convert': '/print-scan/convert',
-    '/print/scan-feature': '/print-scan/feature/id-photo',
+    '/print/scan-feature': '/print-scan',
     '/print/scan-sign': '/print-scan/sign-v2',
     '/resume': '/resume/source',
     '/resume/upload': '/resume/source',

@@ -64,11 +64,14 @@ export interface FileSourceViewProps {
   conversionReason: string | null
   usbFiles: UsbFileListItem[] | null
   usbSelected: UsbFileListItem | null
+  /** 上传没有等到结果时停在已选文件屏上的那一句。不改屏幕枚举，成功导入不传。 */
+  usbNotice?: string | null
   usbDriveLabel: string | null
   formatBytes: (bytes: number) => string
   phone: PhoneSessionView
   qrUrl: string | null
   expiresLabel: string
+  waitRemainingSeconds: number | null
   previewOpen: boolean
   previewToken: string | null
   localRejectKind: LocalRejectKind | null
@@ -193,7 +196,7 @@ export function FileSourceView(props: FileSourceViewProps) {
   const {
     screen, pageTitle, pageSubtitle, terminalLabel, status, orderPausedNotice, isResumePrint,
     showFileChannel, showScan, tab, usbMode, usbHold = null, usbSwitchAllowed = true, currentFile, blockedName, blockedMeta,
-    wordHint, conversionReason, usbFiles, usbSelected, usbDriveLabel, formatBytes, phone, qrUrl, expiresLabel,
+    wordHint, conversionReason, usbFiles, usbSelected, usbNotice = null, usbDriveLabel, formatBytes, phone, qrUrl, expiresLabel, waitRemainingSeconds,
     previewOpen, previewToken, onSelectChannel, onOpenPicker, onRetryLocal, onNext, onExit, onBack,
     onHelp, onScan, onDocuments, onResumes, onPreview, onClosePreview, onReplace, onDelete,
     onUsbSelect, onUsbImport, onUsbRescan, onPhoneRefresh, onPhoneConfirm, onPhoneCancel,
@@ -201,6 +204,17 @@ export function FileSourceView(props: FileSourceViewProps) {
   } = props
   const support = useSupportContact()
   const miniappLine = whenMiniapp(support, '手机小程序里登录后传过的 PDF、图片，登录这台机器后在我的文档里选。')
+
+  const waitCountdown = waitRemainingSeconds === null ? '' : `${Math.floor(waitRemainingSeconds / 60)}:${String(waitRemainingSeconds % 60).padStart(2, '0')}`
+  const phoneWaitNotice = waitRemainingSeconds !== null ? (
+    <>
+      {waitRemainingSeconds > 0 && waitRemainingSeconds <= 60 && (
+        <div role="status" className="fs-status" data-kind="warn">
+          <div className="fs-status-p">二维码还剩 {waitCountdown}。还在传的话点一下屏幕，到期后可以在这里重新出码。</div>
+        </div>
+      )}
+    </>
+  ) : null
 
   const channelKeys: UploadTab[] = showFileChannel ? ['qr', 'file', 'usb'] : ['qr', 'usb']
   const fromLabel =
@@ -265,9 +279,7 @@ export function FileSourceView(props: FileSourceViewProps) {
     secondary = ghost('换一种方式', () => onSelectChannel('qr'), 'file-source-switch-source')
   } else if (screen === 'usb-read-failed' || screen === 'usb-unavailable') {
     secondary = ghost('使用帮助', onHelp, 'file-source-help')
-  } else if (screen === 'phone-ready') {
-    secondary = ghost('刷新二维码', onPhoneRefresh, 'file-source-refresh')
-  } else if (screen === 'phone-waiting' || screen === 'phone-uploading' || screen === 'phone-uploaded' || screen === 'phone-confirming') {
+  } else if (screen === 'phone-ready' || screen === 'phone-waiting' || screen === 'phone-uploading' || screen === 'phone-uploaded' || screen === 'phone-confirming') {
     secondary = ghost('取消这次上传', onPhoneCancel, 'file-source-cancel')
   } else if (screen === 'phone-status-unknown' || screen === 'phone-confirm-failed') {
     secondary = ghost('重新出一张码', onPhoneRefresh, 'file-source-refresh')
@@ -498,16 +510,20 @@ export function FileSourceView(props: FileSourceViewProps) {
     case 'phone-cancel-failed':
     case 'phone-cancelled':
       body = (
-        <PhoneBoard
-          screen={screen}
-          phone={phone}
-          qrUrl={qrUrl}
-          expiresLabel={expiresLabel}
-          channelKeys={channelKeys}
-          usbMode={usbMode}
-          helpText={['phone-status-unknown', 'phone-expired', 'phone-cancel-failed'].includes(screen) ? helpNeededLine(support) : ''}
-          onSelectChannel={onSelectChannel}
-        />
+        <>
+          <PhoneBoard
+            screen={screen}
+            phone={phone}
+            qrUrl={qrUrl}
+            expiresLabel={expiresLabel}
+            channelKeys={channelKeys}
+            usbMode={usbMode}
+            helpText={['phone-status-unknown', 'phone-expired', 'phone-cancel-failed'].includes(screen) ? helpNeededLine(support) : ''}
+            onSelectChannel={onSelectChannel}
+            onPhoneRefresh={onPhoneRefresh}
+          />
+          {phoneWaitNotice}
+        </>
       )
       break
     case 'usb-unavailable':
@@ -573,6 +589,7 @@ export function FileSourceView(props: FileSourceViewProps) {
           screen={screen}
           files={usbFiles}
           selected={usbSelected}
+          notice={usbNotice}
           driveLabel={usbDriveLabel}
           formatBytes={formatBytes}
           wordText={conversionReason ?? wordHint}
@@ -643,12 +660,19 @@ export function FileSourceView(props: FileSourceViewProps) {
           </button>
         ) : null}
         {usbHoldActive ? <UsbImportHoldNotice hold={usbHoldActive} /> : body}
-        <FileSourceTruth />
+        {screen.startsWith('phone') && !previewOpen && !errorCopy ? <div className="print-upload-footer" data-testid="file-source-ctabar">{secondary}</div> : null}
+        {screen === 'phone-ready' || screen === 'phone-waiting' || screen === 'phone-uploading' ? (
+          <details className="fs-upload-fine">
+            <summary>本机只认收到文件 · 等上传时请勿走开 · 清场与文件留存说明</summary>
+            <p>本机看不到你扫没扫，只认系统收到文件。等你传文件期间，这台机器不会自动退出，请不要走开。二维码到期后没有操作，就会自动退出。{screen === 'phone-uploading' ? '请保持手机上传页面打开，传完后回来确认文件。' : ''}</p>
+            <FileSourceTruth />
+          </details>
+        ) : <FileSourceTruth />}
         {/* 出错板件里两张出口卡自己吃掉剩下的高度（稿 st-error），不再叠一幅填充小样。 */}
-        {screen === 'source-chooser' || errorCopy ? null : <PrintFillArt name={screen.startsWith('phone') ? 'phone' : screen.startsWith('usb') ? 'usb' : 'scan-paper'} />}
-        <div className="print-upload-footer" data-testid="file-source-ctabar">
+        {screen === 'source-chooser' || screen.startsWith('phone') || errorCopy ? null : <PrintFillArt name={screen.startsWith('phone') ? 'phone' : screen.startsWith('usb') ? 'usb' : 'scan-paper'} />}
+        {!screen.startsWith('phone') ? <div className="print-upload-footer" data-testid="file-source-ctabar">
           {previewOpen || errorCopy ? null : secondary}
-        </div>
+        </div> : null}
         {previewOpen && currentFile ? (
           <PrintFilePreviewModal file={currentFile} token={previewToken} onClose={onClosePreview} />
         ) : null}

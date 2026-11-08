@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { isSerializationConflict } from '../common/prisma/serialization-conflict'
 import { FilesService } from '../files/files.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
+import { SCAN_DEVICE_PAGE_COUNT_UNREADABLE_MESSAGE } from '../files/file-validation'
 import { signFileUrl } from '../files/signing'
 import type { FilePurpose } from '../files/file.types'
 import type { CreateScanTaskDto } from './dto/create-scan-task.dto'
@@ -20,6 +21,19 @@ import {
   verifyScanDeliveryLease,
   type ScanDeliveryLeaseResult,
 } from './scan-lease'
+import {
+  assertScanDeliverAttachedRound,
+  assertScanDeliverOriginAllowed,
+  assertScanDeliverRoundMatches,
+  buildScanDeviceCreateData,
+  isScanDeviceTask,
+  normalizeScanDeliverOrigin,
+  quietPeriodEndsAtIso,
+  resolveScanStartParams,
+  scanDeliverClaimPins,
+  scanDeviceLeaseFields,
+  scanDeviceStatusFields,
+} from './scan-device-protocol'
 
 /**
  * 契约本地副本。
@@ -163,10 +177,43 @@ export const SCAN_TYPE_TO_PURPOSE: Record<ScanType, FilePurpose> = {
 const USER_FACING_SCAN_ERROR: Record<string, string> = {
   SCAN_UPLOAD_FAILED: '扫描文件处理失败，请重新扫描',
   SCAN_FILE_TYPE_NOT_ALLOWED: '这次扫出来的文件格式不收：证件扫描请在打印机屏幕上选图片格式（JPG）后重扫。',
+  // 屏上扫描与面板扫描超大小都落这个码。无人值守口径，不出现「找工作人员」。
+  SCAN_FILE_TOO_LARGE: '这份扫描文件太大，收不了。请少扫几页，分成几次办理。',
+  // 屏上扫描页数超过该类型上限。device-report 直接抛这个码；
+  // 投递时文件服务再核一遍，catch 里原样保留，不落成 SCAN_UPLOAD_FAILED。
+  SCAN_DEVICE_TOO_MANY_PAGES: '页数超过这次扫描的上限。请少扫几页，分成几次办理。',
+  // 屏上扫描投递的 PDF 页数不是可靠解析结果。不要说成「页数超过上限」。
+  SCAN_DEVICE_PAGE_COUNT_UNREADABLE: SCAN_DEVICE_PAGE_COUNT_UNREADABLE_MESSAGE,
   // B1-5：ScanTaskReaperTask 收敛卡在 'matched' 状态太久的任务时写入的 errorCode，
   // 必须在这里登记白名单文案，否则 getStatus() 会把它 fallback 成通用的
   // '扫描处理失败，请重试'，用户看不到"超时未完成"这个更准确的原因。
   SCAN_MATCHED_TIMEOUT: '扫描处理超时未完成',
+}
+
+/**
+ * 投递 catch 只认这四种文件服务错误码。其余（含 SCAN_TASK_STATE_CHANGED、普通 Error）
+ * 仍落 SCAN_UPLOAD_FAILED。按 getResponse() 取码，这样 ConflictException 也看得见。
+ * 页数读不出必须单独保留，不能并进 SCAN_DEVICE_TOO_MANY_PAGES。
+ */
+function scanDeliveredUploadErrorCode(error: unknown): string {
+  const code = nestedExceptionErrorCode(error)
+  if (code === 'FILE_MIME_NOT_ALLOWED') return 'SCAN_FILE_TYPE_NOT_ALLOWED'
+  if (code === 'FILE_TOO_LARGE') return 'SCAN_FILE_TOO_LARGE'
+  if (code === 'SCAN_DEVICE_TOO_MANY_PAGES') return 'SCAN_DEVICE_TOO_MANY_PAGES'
+  if (code === 'SCAN_DEVICE_PAGE_COUNT_UNREADABLE') return 'SCAN_DEVICE_PAGE_COUNT_UNREADABLE'
+  return 'SCAN_UPLOAD_FAILED'
+}
+
+function nestedExceptionErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== 'object' || !('getResponse' in error)) return null
+  const getResponse = (error as { getResponse?: () => unknown }).getResponse
+  if (typeof getResponse !== 'function') return null
+  const response = getResponse.call(error)
+  if (!response || typeof response !== 'object' || !('error' in response)) return null
+  const detail = (response as { error?: unknown }).error
+  if (!detail || typeof detail !== 'object' || !('code' in detail)) return null
+  const code = (detail as { code?: unknown }).code
+  return typeof code === 'string' ? code : null
 }
 
 // 指引单一事实源：Kiosk 只渲染本数组全文，禁止前端再按 index 拼接本地标题。
@@ -214,6 +261,30 @@ export interface ScanTaskStatusResult {
   errorCode: string | null
   errorMessage: string | null
   expiresAt: string
+  /**
+   * 屏上扫描（2026-11-02）：面板任务恒为 startMode:'panel'、deviceState / deviceErrorCode / deviceSource /
+   * deviceColorMode / deviceUpdatedAt:null、devicePageCount:0、deviceMaxPages:null。字段由 scanDeviceStatusFields 产出。
+   * device 任务的 deviceMaxPages 与租约同源：证件 4，其余 20。
+   */
+  startMode: 'panel' | 'device'
+  deviceState: string | null
+  devicePageCount: number
+  deviceErrorCode: string | null
+  deviceSource: string | null
+  deviceColorMode: string | null
+  deviceUpdatedAt: string | null
+  deviceMaxPages: number | null
+}
+
+/**
+ * current-lease 的响应：面板任务就是 ScanDeliveryLeaseResult 本身，不多任何字段。
+ * device 任务多带 startMode 与 device。device 里的 maxPages / maxBytes 按扫描类型取
+ * （证件 4 页 / 10 MiB，其余 20 页 / 18 MiB），一体机不读这份租约。
+ * deviceRound 不放在这层响应里，只放进 deliveryLease 的签名负载。面板任务的签名负载也不多这个字段。
+ */
+export type ScanDeliveryLeaseView = ScanDeliveryLeaseResult & {
+  startMode?: 'device'
+  device?: { source: string | null; colorMode: string | null; maxPages: number; maxBytes: number }
 }
 
 /** ScanTask has distinct active-session and retry-lineage unique constraints. */
@@ -258,7 +329,7 @@ function isScanRetryTransactionConflict(e: unknown): boolean {
  * Buffer 长度不同而抛异常（那样反而会把"长度不同"这个信息通过异常/耗时差异暴露出去，
  * 且会变成未处理异常而不是可控的 403）。
  */
-function timingSafeEqualHex(
+export function timingSafeEqualHex(
   token: string | undefined,
   expectedHash: string | null | undefined
 ): boolean {
@@ -283,6 +354,9 @@ export class ScanTasksService {
     endUserId: string | null,
     retryControlToken?: string
   ): Promise<ScanRetryCreateResult> {
+    // 屏上扫描（device）：字段组合不合法一律 400，先于任何数据库访问。
+    // 不传新字段 = 面板扫描，下面所有 device 分支一行都不执行。
+    const startParams = resolveScanStartParams(dto)
     const terminalRef = dto.terminalId.trim()
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: terminalRef }, { terminalCode: terminalRef }] },
@@ -310,6 +384,10 @@ export class ScanTasksService {
     // Task 10 服务端能力门禁：管理员把该终端 scan 配为非 available 时拒绝创建
     // （未配置行放行，见 TerminalCapabilitiesService.assertUserTaskAllowed）。
     await this.capabilities.assertUserTaskAllowed(terminal.id, 'scan')
+    // 屏上扫描另要 scan_device available（DEFAULT_DENY：未登记 = 拒绝）→ 403 SCAN_DEVICE_NOT_VERIFIED_ON_TERMINAL。
+    if (startParams.startMode === 'device') {
+      await this.capabilities.assertScanDeviceAllowed(terminal.id)
+    }
 
     const retryOfScanTaskId = dto.retryOfScanTaskId?.trim() || undefined
     if (!retryOfScanTaskId && retryControlToken) {
@@ -349,6 +427,9 @@ export class ScanTasksService {
         : randomBytes(24).toString('hex')
     const controlTokenHash = createHash('sha256').update(controlToken).digest('hex')
     const expiresAt = new Date(Date.now() + SCAN_TASK_TTL_MS)
+    // device 会话额外写入的列（含显式 createdAt，保证 hardExpiresAt = createdAt + 30 分钟）；面板会话为空对象。
+    const deviceCreateData =
+      startParams.startMode === 'device' ? buildScanDeviceCreateData(startParams, new Date()) : {}
 
     let task: { id: string }
     try {
@@ -428,6 +509,7 @@ export class ScanTasksService {
             retryOfScanTaskId: retryOfScanTaskId ?? null,
             retryContentHash,
             deliveryAckedAt: null,
+            ...deviceCreateData,
           },
           select: { id: true },
         })
@@ -745,6 +827,7 @@ export class ScanTasksService {
         ? (USER_FACING_SCAN_ERROR[task.errorCode] ?? '扫描处理失败，请重试')
         : null,
       expiresAt: task.expiresAt.toISOString(),
+      ...scanDeviceStatusFields(task),
     }
   }
 
@@ -752,7 +835,7 @@ export class ScanTasksService {
     scanTaskId: string,
     endUserId: string | null,
     controlToken: string | undefined
-  ): Promise<{ scanTaskId: string; status: 'cancelled' }> {
+  ): Promise<{ scanTaskId: string; status: 'cancelled'; quietPeriodEndsAt: string; serverNow: string }> {
     const task = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
     if (!task) {
       throw new NotFoundException({
@@ -794,13 +877,16 @@ export class ScanTasksService {
       task.status === 'matched' && task.lastAttemptHash
         ? new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS)
         : null
+    // 倒计时用这次取消自己写入的时间，不再落库后再查最近一条结束记录。
+    // 那次查询失败会让已经取消成功的请求变成服务端错误，重试又得到 SCAN_TASK_CANCEL_CONFLICT。
+    const cancelledAt = new Date()
     const cancelled = await this.prisma.scanTask.updateMany({
       where: {
         id: scanTaskId,
         status: task.status,
         lastAttemptHash: task.lastAttemptHash,
       },
-      data: { status: 'cancelled', retryAuthorityExpiresAt },
+      data: { status: 'cancelled', retryAuthorityExpiresAt, updatedAt: cancelledAt },
     })
     if (cancelled.count === 0) {
       // 状态在读取之后、CAS 之前发生了变化（多半是并发投递刚好完成），
@@ -818,7 +904,14 @@ export class ScanTasksService {
         },
       })
     }
-    return { scanTaskId, status: 'cancelled' }
+    const quietPeriodMs = scanTerminalQuietPeriodMs()
+    return {
+      scanTaskId,
+      status: 'cancelled',
+      // 静默期从这次写入的 updatedAt 起算。关着时两个时刻相同，不查库。
+      quietPeriodEndsAt: quietPeriodEndsAtIso(quietPeriodMs > 0 ? cancelledAt : null, cancelledAt, quietPeriodMs),
+      serverNow: cancelledAt.toISOString(),
+    }
   }
 
   /**
@@ -867,7 +960,7 @@ export class ScanTasksService {
    * Agent 专用扫描租约签发：校验目标终端当前 waiting 任务，签发短期 deliveryLease。
    * Unacked waiting rows are invisible here until Kiosk POSTs /ack.
    */
-  async getScanDeliveryLease(terminalId: string): Promise<ScanDeliveryLeaseResult> {
+  async getScanDeliveryLease(terminalId: string): Promise<ScanDeliveryLeaseView> {
     const now = new Date()
     const task = await this.prisma.scanTask.findFirst({
       where: {
@@ -882,13 +975,19 @@ export class ScanTasksService {
         error: { code: 'NO_WAITING_SCAN_TASK', message: '没有匹配的等待中扫描任务' },
       })
     }
-    return buildScanDeliveryLease({
-      terminalId,
-      scanTaskId: task.id,
-      taskCreatedAt: task.createdAt,
-      taskExpiresAt: task.expiresAt,
-      now,
-    })
+    return {
+      ...buildScanDeliveryLease({
+        terminalId,
+        scanTaskId: task.id,
+        taskCreatedAt: task.createdAt,
+        taskExpiresAt: task.expiresAt,
+        now,
+        // 轮次放进签名负载。面板不传，签名里就没有这个字段，响应形状也不变。
+        ...(isScanDeviceTask(task) ? { deviceRound: task.deviceRound } : {}),
+      }),
+      // device 任务多带 startMode 与 device 参数；面板任务这里是空对象，响应里不多出任何键。
+      ...scanDeviceLeaseFields(task),
+    }
   }
 
   /**
@@ -905,6 +1004,13 @@ export class ScanTasksService {
     mimeType: string
     candidateSnapshotAt?: unknown
     observedAt?: unknown
+    /** 投递来源：watcher（面板扫描，缺省）/ device（屏上扫描）。原样来自 multipart 字段，未校验。 */
+    origin?: unknown
+    /**
+     * 这份 PDF 产生时的扫描轮次。multipart 原样传入，未校验。
+     * 没给则只比对已验签租约；给了还必须同时等于租约轮次和库里当前轮次。
+     */
+    deviceRound?: unknown
   }): Promise<{ scanTaskId: string; fileId: string }> {
     const now = new Date()
 
@@ -974,6 +1080,21 @@ export class ScanTasksService {
         error: { code: 'SCAN_LEASE_INVALID', message: '扫描租约绑定的任务版本不一致' },
       })
     }
+    // 旧一轮的租约在新一轮已经走到可投递时才到：服务端这次读到的就是新轮次。
+    // 只钉读到的 deviceRound 会把旧 PDF 挂到新一轮，所以先拿已验签负载里的轮次比对。面板不比。
+    assertScanDeliverRoundMatches(task, leasePayload.deviceRound)
+    // 租约对得上仍可能是「旧 PDF 配新取的租约」。终端程序若带上扫描时记下的轮次，
+    // 必须同时等于已验签轮次和库里当前轮次；没带则保持上面那一次比对。拒绝发生在建文件之前。
+    assertScanDeliverAttachedRound(task, leasePayload.deviceRound, args.deviceRound)
+
+    // 3b. 投递来源必须与会话一致：device 会话只收终端程序自己扫的 PDF（origin=device，且已整理好文件），
+    // 面板会话只收 watcher；没带 origin 一律按 watcher（兼容现有终端程序）。
+    // 返回的凭据只在 startMode=device 且上述检查都通过时才有；面板返回 null。
+    // 文件服务只认这个凭据放行证件 PDF，不认请求里的任何字段。
+    const deviceClearance = assertScanDeliverOriginAllowed(task, normalizeScanDeliverOrigin(args.origin), {
+      buffer: args.buffer,
+      mimeType: args.mimeType,
+    })
 
     // 4. 内容级去重防跨用户误挂载。只有创建事务绑定到本任务的精确内容 hash
     // 可以绕过一次；其它内容、其它任务和普通创建都继续执行完整的终端级去重。
@@ -1063,6 +1184,12 @@ export class ScanTasksService {
     // ATOMIC_SCAN_DELIVER_CAS_ACK_EXPIRY: re-pin ACK + expiry (and signed
     // task identity already in where) so mixed/raced state cannot go
     // waiting → matched after ACK/expiry eligibility changed.
+    // 屏上扫描（B1 复审修复，B6 用 deviceRound 替换 B4 的 deviceUpdatedAt 钉）：3b 的来源校验是在读到的快照上判的，
+    // 这里再把读到的 startMode 钉进 where；device 任务另钉 deviceState ∈ composing / delivering、devicePageCount ≥ 1，
+    // 以及读到的 deviceRound（scanDeliverClaimPins）。否则读与这次抢占之间用户「改用面板」或终端程序回报 error / aborted，
+    // 已切面板 / 已中止的会话仍会被挂上设备扫描件；出错重扫回到 composing / delivering 后，上一轮迟到的投递也会挂到新一轮。
+    // 同状态重发不改 deviceRound，不会误拒。面板任务只多一条恒真的 startMode，其余不变。
+    // 条件失效 → count 0 → 下面的 SCAN_TASK_STATE_CHANGED。
     const claimed = await this.prisma.scanTask.updateMany({
       where: {
         id: task.id,
@@ -1071,6 +1198,7 @@ export class ScanTasksService {
         deliveryAckedAt: { not: null },
         expiresAt: { gt: now },
         createdAt: task.createdAt,
+        ...scanDeliverClaimPins(task),
       },
       data: { status: 'matched', matchedFileMtime: observedDate, lastAttemptHash: contentHash },
     })
@@ -1085,14 +1213,17 @@ export class ScanTasksService {
     const heartbeat = this.startMatchedHeartbeat(task.id)
     try {
       const purpose = SCAN_TYPE_TO_PURPOSE[task.scanType as ScanType]
-      const uploaded = await this.files.upload({
+      const uploadArgs = {
         buffer: args.buffer,
         filename: args.filename,
         mimeType: args.mimeType,
         purpose,
-        uploaderId: null,
+        uploaderId: null as string | null,
         endUserId: task.endUserId,
-      })
+      }
+      const uploaded = deviceClearance
+        ? await this.files.uploadVerifiedDeviceScan({ ...uploadArgs, clearance: deviceClearance })
+        : await this.files.upload(uploadArgs)
       const completed = await this.prisma.scanTask.updateMany({
         where: { id: task.id, status: 'matched' },
         data: { status: 'completed', fileId: uploaded.fileId },
@@ -1125,11 +1256,7 @@ export class ScanTasksService {
       }
       return { scanTaskId: task.id, fileId: uploaded.fileId }
     } catch (error) {
-      const response = error instanceof BadRequestException ? error.getResponse() : null
-      const detail = response && typeof response === 'object' && 'error' in response ? response.error : null
-      const errorCode = detail && typeof detail === 'object' && 'code' in detail && detail.code === 'FILE_MIME_NOT_ALLOWED'
-        ? 'SCAN_FILE_TYPE_NOT_ALLOWED'
-        : 'SCAN_UPLOAD_FAILED'
+      const errorCode = scanDeliveredUploadErrorCode(error)
       await this.prisma.scanTask.updateMany({
         where: { id: task.id, status: 'matched' },
         data: {

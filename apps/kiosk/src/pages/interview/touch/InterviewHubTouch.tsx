@@ -1,3 +1,5 @@
+import { LICENSE_NO_NEW_TASK_REASON } from '../../../copy/unattendedCopy'
+import { useKioskLicense } from '../../../layouts/KioskLicenseContext'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QxTouchBand } from '../../../components/qingxu/touch/QxTouchBand'
@@ -70,6 +72,7 @@ export function InterviewHubTouch({
   status: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
   notice: { title: string; detail: string }
 }) {
+  const winding = useKioskLicense().mode === 'winding-down'
   const navigate = useNavigate()
   const capabilities = useInterviewAiCapabilities()
   const [more, setMore] = useState(false)
@@ -77,7 +80,7 @@ export function InterviewHubTouch({
   const seenMore = useRef<boolean | null>(null)
   const goBack = more ? () => setMore(false) : () => navigate('/')
   // 在线服务的原因优先（更具体）；服务可达但这一项 AI 能力没确认可用时，用能力状态的原因。
-  const mainReason = unavailableReason('ai', '/interview/setup', availability) ?? capabilities.reason('mock_interview')
+  const mainReason = (winding ? LICENSE_NO_NEW_TASK_REASON : null) ?? unavailableReason('ai', '/interview/setup', availability) ?? capabilities.reason('mock_interview')
   const assistantState = capabilities.state('assistant_chat')
 
   // 点下去的按钮随视图切换被卸载，焦点会掉回 body。切换后把焦点放到意图带的标题上。
@@ -93,7 +96,7 @@ export function InterviewHubTouch({
   }, [more])
 
   const tiles = (list: Entry[], withTestId: boolean) => list.map((entry, index) => {
-    const reason = unavailableReason(entry.kind, entry.route, availability)
+    const reason = (winding ? LICENSE_NO_NEW_TASK_REASON : null) ?? unavailableReason(entry.kind, entry.route, availability)
       ?? (entry.capability ? capabilities.reason(entry.capability) : null)
     return (
       <QxTouchTile
@@ -138,7 +141,7 @@ export function InterviewHubTouch({
         <QxTouchDock
           onBack={goBack}
           backLabel="返回"
-          ask={assistantState === 'available'
+          ask={winding ? { label: '问小青', disabled: true } : assistantState === 'available'
             ? { label: '问小青：先练哪一项？', draft: ASK_DRAFT }
             : assistantOffAsk(assistantState, '先看面试技巧')}
         />
@@ -183,7 +186,7 @@ export function InterviewHubTouch({
                   <PracticeSteps />
                 </button>
               )}
-              {mainReason ? (
+              {mainReason && !winding ? (
                 <button type="button" className="qxt-iv-out" onClick={() => navigate('/interview/tips')}>
                   可以先看面试技巧
                 </button>

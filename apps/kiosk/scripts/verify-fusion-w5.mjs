@@ -9,6 +9,13 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 const sha256 = (path) => createHash('sha256').update(read(path)).digest('hex')
 
+// 真实卸载作废未收文件的会话，StrictMode 重放和确认过程有守卫。
+for (const path of ['src/pages/upload/components/UploadSessionQrPanel.tsx', 'src/pages/upload/hooks/useUploadSession.ts']) {
+  const source = read(path)
+  assert.match(source, /mountedRef\.current = true[\s\S]*return \(\) => \{[\s\S]*mountedRef\.current = false[\s\S]*queueMicrotask\(\(\) => \{[\s\S]*if \(mountedRef\.current \|\| confirmingRef\.current\) return[\s\S]*if \(!existing \|\| phase === 'uploaded' \|\| phase === 'confirmed' \|\| phase === 'cancelled' \|\| phase === 'expired'\) return[\s\S]*void cancelUploadSession\(existing\.sessionId, existing\.controlToken\)\.catch\(\(\) => undefined\)/, `${path} 卸载静默作废且避开重放与确认`)
+}
+console.log('PASS 两套上传真实卸载静默作废')
+
 const W5_ROUTES = [
   '/member/qr-login', '/upload/phone', '/login', '/legal/:doc',
   // 2026-10-29 一体机手机码短链的网页中转（兑换或校验后 replace 到上面两个手机页）。
@@ -17,7 +24,8 @@ const W5_ROUTES = [
   '/me/resumes', '/me/print-orders', '/me/documents', '/me/favorites',
   '/me/ai-records', '/me/benefits', '/me/activity', '/me/activity/:id',
   '/me/notifications', '/me/feedback', '/me/settings', '/me/privacy-requests', '/help',
-  '/activities', '/activities/:id', '/toolbox',   '/notifications',
+  // 2026-11-04 产品负责人定停放：/toolbox 收成跳回首页的 splat。
+  '/activities', '/activities/:id', '/toolbox/*', '/notifications',
 ]
 const SELF_ASSESSMENT_V1_ROUTES = [
   '/resume/self-assessment/intro',
@@ -117,7 +125,22 @@ const FROZEN = new Map([
   // 2026-10-29 重新冻结（触屏版走查 I-14，B 路）：签名图（signature_image）确认后只留系统短期、不进「我的文档」，面板里「会员文件确认后归档」对它不成立；
   // 只在那一处条件上加 purpose !== 'signature_image'，二维码、轮询、取消、确认、刷新先撤销旧会话等都逐字未动。冻结契约不放宽，仍逐字节校验。
   // 旧哈希 7f0cacce1e2b505548a4a141e2b63c71517c8ec5fe5d47fc827732a461f3e524。
-  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357'],
+  // 2026-11-03 重新冻结（B6b-1）：独立等待锁、到期提醒、真实卸载作废。新内容断言在哈希检查之前。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
+  // 2026-11-03 重新冻结（重做旧候选 #1461）：取消失败不再清屏——二维码和已收到的文件留着，屏上沿用打印上传页那句兜底，
+  // 可以重试取消或去确认；取消中三个按钮都禁用。成功才清空，已作废码清二维码并按过期显示。不恢复轮询、不自动接走文件。
+  // 新行为由 verify:resume-phone-upload-ui 的断言钉住。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
+  // 2026-11-04 重新冻结（并入 #1566）：取消失败按 #1566 留屏，触控尺寸、忙碌锁与卸载作废仍按 #1570。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e（#1570）、018fd611a3350ce53fa3b79fceb887c5a5b0d56a2d47f36d418f3b6745b816ca（#1566）。
+  // 2026-11-03 再次冻结（B6b-1 返工）：同一页切换来源不再作废上传码，切回来继续用同一张；
+  // 离开页面才作废还没收到文件的会话。已卸载的实例不得作废屏上正在显示的那张码。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e。
+  // 2026-11-04 再次冻结（#1570 返工：并入派工窗口的上传码租约修复 a6a7bbfe3，再与 #1566 合写取消处理）：
+  // 同一页切换来源只停放上传码、离开页面才作废，已卸载的实例不作废屏上正显示的码；取消成功才收租约并清空，
+  // 已作废按过期显示，其他失败码和已收到的文件都留着。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 f0d8bc199b75c6ad6c12b87d517c81c6bef38baea72099231c8c68569802d60e（并入 #1566 后）、2109b8ce60b6d58f7f5028435a51ef3544310f2c00549e587bc2688058da91e3（租约修复）。
+  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '738d4f455b926a85e51ad56c38fabe339d1def48fd43a12967bf03e03a8ca4ba'],
 ])
 
 function propertyName(node) {
@@ -463,9 +486,9 @@ assert.doesNotMatch(privacyPageQx, /全部个人数据已删除|账号注销成�
  * 机器状态第 8 项按托管 a 叫「机构官方渠道」。18（SCAN VIA PANEL）归 B 批，不在此列。 */
 const A_BATCH_EYEBROWS = [
   ['src/pages/legal/LegalDocPage.tsx', ["eyebrow: '你和这台机器'", "eyebrow: '你的信息'"]],
-  /* 触屏版（稿 18）：眉题在意图带里，由页面传给 TouchToolScreen；空态标题仍是「图片转 PDF」（h1 锚点与路由巡检按这个名字找）。 */
+  /* B10 照稿：眉题保留「照片合成 PDF」，空态大标题说清要办的事。 */
   ['src/pages/print-scan/ConvertImagesPage.tsx', ['eyebrow="照片合成 PDF"']],
-  ['src/pages/print-scan/convert-images-model.ts', ["title: '图片转 PDF'"]],
+  ['src/pages/print-scan/convert-images-model.ts', ["title: '把图片合成一个 PDF'"]],
   /* 触屏版（稿 20）：眉题在意图带里，由页面传给 TouchToolScreen，每一屏都是「签名」。 */
   ['src/pages/print-scan/SignStampPage.tsx', ['eyebrow="签名"']],
   ['src/pages/resume/SelfAssessmentFlow.tsx', ["SA_EYEBROW = '改简历 · 自我探索'"]],

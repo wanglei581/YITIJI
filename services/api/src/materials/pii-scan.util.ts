@@ -1,9 +1,10 @@
 import mammoth from 'mammoth'
 import { openUnpdfDocument } from '../common/pdf/pdfjs-document'
-import { isSinglePageImage } from '../files/file-page-count.util'
-import type { FilePurpose } from '../files/file.types'
 import type { OcrService } from '../ai/resume/ocr/ocr.service'
 import { openPdfForRender } from '../ai/resume/ocr/pdf-page-renderer'
+import { isSinglePageImage } from '../files/file-page-count.util'
+import type { FilePurpose } from '../files/file.types'
+import { SCAN_DEVICE_ID_MAX_PAGES } from '../files/file-validation'
 import type { PiiFindingAction } from './materials.types'
 
 /** pdfjs TextItem 的最小结构（本地类型，理由同上：不依赖 unpdf 的 types 解析）。 */
@@ -36,11 +37,20 @@ const MAX_SNIPPET_CHARS = 32
 export const HIGH_RISK_PII_PURPOSES: readonly FilePurpose[] = ['resume_upload', 'resume_scan', 'id_scan', 'cover_letter']
 /** 低于此字符数视为"没有可用文字层"，判定为扫描件走 OCR（与 resume-extraction.service.ts 同一阈值概念）。 */
 const MIN_TEXT_CHARS_FOR_BORN_DIGITAL = 30
-/** 扫描版 PDF 最多渲染识别的页数（控费 + 控时延）。 */
-const PII_SCAN_MAX_OCR_PAGES = (() => {
+/**
+ * 扫描版 PDF 默认识别页数。环境变量 PII_SCAN_MAX_OCR_PAGES 可改成 1–10，非法值回落到这里。
+ * 证件（id_scan）的实际上限是 max(配置值, SCAN_DEVICE_ID_MAX_PAGES)。
+ * 配置被调到 1 时，4 页证件 PDF 仍然每一页都识别，不会被截断。
+ */
+export const PII_SCAN_OCR_PAGE_LIMIT_DEFAULT = 5
+
+/** 这次调用时的 OCR 页数上限。证件用途托到屏上扫描页数上限，其它用途只用配置值。 */
+export function piiScanOcrPageLimit(purpose?: string | null): number {
   const n = Number(process.env['PII_SCAN_MAX_OCR_PAGES'])
-  return Number.isInteger(n) && n > 0 && n <= 10 ? n : 5
-})()
+  const configured = Number.isInteger(n) && n > 0 && n <= 10 ? n : PII_SCAN_OCR_PAGE_LIMIT_DEFAULT
+  if (purpose === 'id_scan') return Math.max(configured, SCAN_DEVICE_ID_MAX_PAGES)
+  return configured
+}
 /** OCR 渲染缩放（与 resume-extraction.service.ts 保持一致的清晰度/体积权衡）。 */
 const PII_SCAN_OCR_RENDER_SCALE = 2
 /**
@@ -49,7 +59,7 @@ const PII_SCAN_OCR_RENDER_SCALE = 2
  * unpdf.extractText() 内部对 pdf.numPages 做 Array.from + Promise.all，不设任何上限；
  * 本接口匿名可达，一份体积很小但声明超大页数的恶意 PDF 可借此让服务端做无界 CPU/内存工作。
  * 超过此阈值直接跳过文字层抽取（rawText 保持 ''），自动落入下面已有页数上限
- * （PII_SCAN_MAX_OCR_PAGES）的 OCR 渲染兜底路径。
+ * （piiScanOcrPageLimit）的 OCR 渲染兜底路径。
  */
 const MAX_BORN_DIGITAL_EXTRACT_PAGES = 50
 
@@ -110,8 +120,9 @@ export type PiiFindingWithValue = PiiFindingDraft & { value: string }
 /**
  * 为 pii_scan 提取可用于正则匹配的文本内容。
  *
- * - PDF：优先走 unpdf 文字层（born-digital，零 OCR 成本）；抽不到有效文字（扫描件/图片型 PDF）
- *   才逐页渲染 + OCR。
+ * - PDF：非证件用途优先走 unpdf 文字层（born-digital，零 OCR 成本）；抽不到有效文字
+ *   （扫描件/图片型 PDF）才逐页渲染 + OCR。证件用途（id_scan）不论有没有文字层，
+ *   每一页都渲染后走和图片证件相同的 OCR。
  * - DOCX：走 mammoth 正文提取（与 resume-extraction.service.ts 同一模式）。
  * - 图片：直接 OCR。
  * - 其余格式（含旧版 .doc）：没有任何提取路径，诚实返回 unsupported_format。
@@ -121,15 +132,17 @@ export type PiiFindingWithValue = PiiFindingDraft & { value: string }
  * - outcome: 'degraded' —— 尝试提取但失败（解析异常 / OCR 失败 / 渲染异常）。
  * - outcome: 'unsupported_format' —— 该 MIME 完全没有提取路径。
  *
- * outcome: 'ok' 时额外带 truncated 标记：扫描版 PDF 逐页 OCR 渲染受 PII_SCAN_MAX_OCR_PAGES
+ * outcome: 'ok' 时额外带 truncated 标记：扫描版 PDF 逐页 OCR 渲染受 piiScanOcrPageLimit
  * 页数上限约束，若文档实际页数超过该上限，truncated=true（并附 scannedPages/totalPages），
  * 调用方不得把这种"只看过前 N 页"的结果当作"完整扫描、可放心报告 0 命中"。
+ * 证件 PDF 使用抬高后的上限，但页数仍可能超过它，那时同样标截断。
  * DOCX、单页图片、born-digital 文字层三条路径读的是整份输入，永远 truncated=false。
  */
 export async function extractTextForPiiScan(
   buffer: Buffer,
   mimeType: string,
   ocr: Pick<OcrService, 'recognize'>,
+  purpose?: string | null,
 ): Promise<{
   pages: ExtractedPage[]
   outcome: 'ok' | 'degraded' | 'unsupported_format'
@@ -139,6 +152,8 @@ export async function extractTextForPiiScan(
   totalPages?: number
 }> {
   if (mimeType === 'application/pdf') {
+    // 证件 PDF 不看文字层够不够。一页有字、另一页只有图片时，按整份字数走文字层会漏掉图片页。
+    if (purpose === 'id_scan') return extractIdScanPdfByOcr(buffer, ocr)
     let bornDigitalPages: ExtractedPage[] = []
     let totalPages = 0
     let pdf: PdfDocumentProxy
@@ -167,7 +182,7 @@ export async function extractTextForPiiScan(
       return { pages: bornDigitalPages, outcome: 'ok', truncated: false }
     }
     // 文字层为空/极少 → 扫描件，逐页渲染 + OCR
-    const pagesToRender = Math.min(Math.max(totalPages, 1), PII_SCAN_MAX_OCR_PAGES)
+    const pagesToRender = Math.min(Math.max(totalPages, 1), piiScanOcrPageLimit(purpose))
     const pages: ExtractedPage[] = []
     try {
       const rendered = await openPdfForRender(buffer)
@@ -212,6 +227,51 @@ export async function extractTextForPiiScan(
 
   // 没有任何提取路径的格式（如旧版 .doc）：诚实返回 unsupported_format，不冒充"扫描完成 0 命中"。
   return { pages: [], outcome: 'unsupported_format', truncated: false }
+}
+
+/**
+ * 证件 PDF：每一页都渲染成图片，再交给和图片证件同一个 recognize。
+ * 有文字层也不改走文字层。页数上限见 {@link piiScanOcrPageLimit}。
+ */
+async function extractIdScanPdfByOcr(
+  buffer: Buffer,
+  ocr: Pick<OcrService, 'recognize'>,
+): Promise<{
+  pages: ExtractedPage[]
+  outcome: 'ok' | 'degraded' | 'unsupported_format'
+  truncated: boolean
+  scannedPages?: number
+  totalPages?: number
+}> {
+  const limit = piiScanOcrPageLimit('id_scan')
+  try {
+    const rendered = await openPdfForRender(buffer)
+    try {
+      const totalPages = rendered.totalPages
+      if (!Number.isInteger(totalPages) || totalPages < 1) {
+        return { pages: [], outcome: 'degraded', truncated: false }
+      }
+      const pagesToRender = Math.min(totalPages, limit)
+      const pages: ExtractedPage[] = []
+      for (let pageNo = 1; pageNo <= pagesToRender; pageNo += 1) {
+        const img = await rendered.renderPage(pageNo, PII_SCAN_OCR_RENDER_SCALE)
+        const ocrResult = await ocr.recognize({ buffer: img, mimeType: 'image/png' })
+        if (!ocrResult.ok) return { pages: [], outcome: 'degraded', truncated: false }
+        pages.push({ pageNumber: pageNo, text: ocrResult.text ?? '' })
+      }
+      const truncated = totalPages > pagesToRender
+      return {
+        pages,
+        outcome: 'ok',
+        truncated,
+        ...(truncated ? { scannedPages: pagesToRender, totalPages } : {}),
+      }
+    } finally {
+      await rendered.destroy().catch(() => undefined)
+    }
+  } catch {
+    return { pages: [], outcome: 'degraded', truncated: false }
+  }
 }
 
 /**

@@ -407,13 +407,16 @@ test('when 小青 is down every scan and tool screen says so and the manual path
 
   for (const [path, primary] of [
     ['/print-scan/feature/copy', '去打印文件'],
-    ['/print-scan/feature/id-photo', '先用照片打印'],
   ] as const) {
     await page.goto(path)
     await expect(page.getByTestId('ai-down-note'), `${path} 要写小青接不上`).toBeVisible()
     await expect(page.locator('[data-qxt-ask="on"]'), `${path} 底栏问小青还在`).toBeVisible()
     await expect(page.getByRole('button', { name: primary, exact: true }), `${path} 主按钮照常能按`).toBeEnabled()
   }
+  await page.goto('/print-scan/feature/id-photo')
+  await expect(page).toHaveURL(/\/print-scan$/)
+  await expect(page.locator('[data-w2-page="print-scan-home"]')).toBeVisible()
+  await expect(page.locator('[data-testid="print-hub-state-feature-id-photo"]')).toHaveCount(0)
   await page.goto('/print-scan/convert')
   await expect(page.getByTestId('ai-down-note')).toBeVisible()
   await expect(page.locator('[data-qxt-ask="on"]')).toBeVisible()
@@ -936,9 +939,14 @@ test('successful scan tells a guest the file will not reach 我的文档 @w2', a
   const destination = page.getByRole('button', { name: /本次不进入我的文档/ })
   await expect(destination).toBeVisible()
   await expect(destination).toBeDisabled()
-  // 走查 I-15：不再只说「请在本次操作内完成打印或识别」——补一句实话：要留在账号里，先登录，再重新扫一次（补不进账号，所以说「重新扫一次」）。
+  // 产品负责人 11/02 拍板，照触屏版补稿 cs-scan-done 的原话：说清「请在本次操作内完成打印或识别」，带走电子版的办法是
+  // 「下次先扫码登录再扫」（补不进账号，所以说「下次」），再补一句 U 盘（这台机器暂未开通，如实写）。
+  // 没有登录按钮：游客一登录，这次扫描就会被登录那一步清掉，按钮会让人以为现在登录就能存进去（见下面 /login 出口那条断言）。
   // 游客扫码带走电子版已撤（见下面那条防回退用例），这一屏没有任何下载码入口。
-  await expect(page.getByText('未登录扫描件不会进入「我的文档」。要留在账号里：先登录，再重新扫一次。')).toBeVisible()
+  await expect(page.getByText('未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。要带走电子版，下次先扫码登录再扫。')).toBeVisible()
+  await expect(page.getByText('用 U 盘带走：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。')).toBeVisible()
+  // 旧句子（走查 I-15 那一版）不得再出现。
+  await expect(page.getByText('要留在账号里：先登录，再重新扫一次')).toHaveCount(0)
   await expect(page.locator('[data-testid^="scan-takeaway"]')).toHaveCount(0)
 
   // 旧的不实承诺不得再出现在页面上。
@@ -979,8 +987,10 @@ test(`guest ${scanType} scan result has no download QR and no takeaway entry, on
   await expect(main.locator('svg[shape-rendering="crispEdges"], canvas:not([data-pdf-preview-host] canvas), img[src^="data:image"]')).toHaveCount(0)
   await expect(main.getByText(/扫码带走|下载码|二维码/)).toHaveCount(0)
   await expect(main.locator('[aria-label*="扫码带走"], [aria-label*="下载码"], [aria-label*="二维码"], [aria-description*="扫码带走"], [aria-description*="下载码"], [aria-description*="二维码"]')).toHaveCount(0)
-  // 只留一句实话，和灰着的「本次不进入我的文档」；这一屏没有任何去 /login 的出口。
-  await expect(page.getByText('未登录扫描件不会进入「我的文档」。要留在账号里：先登录，再重新扫一次。')).toBeVisible()
+  // 只留实话（11/02 拍板的新句子，含 U 盘那一句），和灰着的「本次不进入我的文档」；这一屏没有任何去 /login 的出口。
+  await expect(page.getByText('未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。要带走电子版，下次先扫码登录再扫。')).toBeVisible()
+  await expect(page.getByText('用 U 盘带走：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。')).toBeVisible()
+  await expect(page.getByText('要留在账号里：先登录，再重新扫一次')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /本次不进入我的文档/ })).toBeDisabled()
   await expect(page.locator('a[href^="/login"]')).toHaveCount(0)
   await page.screenshot({ path: testInfo.outputPath(`qx-scan-result-guest-${scanType}.png`), fullPage: false })

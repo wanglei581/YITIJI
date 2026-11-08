@@ -2,12 +2,14 @@
 // 纯逻辑在 printHandoff.ts（有单元测试），这里只接上登录态与路由。
 
 import { useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
+import { windDownRoute } from '../../layouts/licenseWindDownRoutes'
 import {
   beginPrintHandoff,
   printHandoffOwnerFor,
   printHandoffTarget,
+  recordPrintHandoffService,
   type BeginPrintHandoffResult,
   type PrintHandoffInput,
   type PrintHandoffOwner,
@@ -26,14 +28,16 @@ export function usePrintHandoffOwner(): PrintHandoffOwner {
  */
 export function useStartPrintHandoff(): (input: PrintHandoffInput) => BeginPrintHandoffResult {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const owner = usePrintHandoffOwner()
   return useCallback(
     (input: PrintHandoffInput) => {
       const result = beginPrintHandoff(input, owner)
+      recordPrintHandoffService(result, windDownRoute(pathname)?.service ?? null)
       const target = printHandoffTarget(result)
       navigate(target.path, { state: target.state })
       return result
     },
-    [navigate, owner],
+    [navigate, owner, pathname],
   )
 }

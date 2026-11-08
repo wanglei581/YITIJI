@@ -19,6 +19,7 @@ import {
   COPY_GUIDE_KEY,
   HUB_ASK,
   HUB_TRUTH,
+  ID_PHOTO_ENTRY_PARKED,
   type HubFeatureState,
   type HubUiState,
   type MfpStatus,
@@ -445,7 +446,13 @@ export function QxPrintHubView({
   const idPhoto = byKey('id-photo')
   const phone = byKey('phone-upload')
   const usb = byKey('usb-import')
-  const toolCaps = [photo, convert, idPhoto, sign].filter((item): item is QxPrintCapabilityView => Boolean(item))
+  // 停放挡住证件照卡，不管后台把 id_photo 配成什么。重新打开见 ID_PHOTO_ENTRY_PARKED。
+  const toolCaps = [
+    photo,
+    convert,
+    ID_PHOTO_ENTRY_PARKED ? undefined : idPhoto,
+    sign,
+  ].filter((item): item is QxPrintCapabilityView => Boolean(item))
   const transferCaps = [phone, usb].filter((item): item is QxPrintCapabilityView => Boolean(item))
   const showLater = transferCaps.some((item) => item.actionable) && (!doc?.actionable || mfp === 'unavailable' || hubState === 'device-off')
   const paperOff = Boolean(printerUnavailable?.label.includes('缺纸'))

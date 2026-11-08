@@ -58,6 +58,12 @@ const PACKET_PAGES = [
   'apps/kiosk/src/pages/print-scan/SignStampPage.tsx',
   'apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx',
   'apps/kiosk/src/pages/scan/ScanProgressPage.tsx',
+  // 2026-11-02 K1a：设置页按职责拆开，创建失败 / 投递确认的错误处置在几个 hook 里，一并查。
+  'apps/kiosk/src/pages/scan/useScanSettingsState.ts',
+  'apps/kiosk/src/pages/scan/useScanSessionCreate.ts',
+  'apps/kiosk/src/pages/scan/useScanSettingsDeliveryAck.ts',
+  'apps/kiosk/src/pages/scan/useScanSettingsExpiry.ts',
+  'apps/kiosk/src/pages/scan/useScanSettingsActions.ts',
   'apps/kiosk/src/pages/scan/ScanSettingsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx',
@@ -166,7 +172,15 @@ if (failures === 0) pass(`本包 ${PACKET_PAGES.length} 个页面/入口不再�
 {
   const confirm = read('apps/kiosk/src/pages/print/PrintConfirmPage.tsx')
   const cashier = read('apps/kiosk/src/pages/print/PrintCashierPage.tsx')
-  const scan = read('apps/kiosk/src/pages/scan/ScanSettingsPage.tsx')
+  // 2026-11-02 K1a：userMessageOf / 下一步文案现在分散在设置页整套文件里，读它们的拼接，判据不变。
+  const scan = [
+    'apps/kiosk/src/pages/scan/useScanSettingsState.ts',
+    'apps/kiosk/src/pages/scan/useScanSessionCreate.ts',
+    'apps/kiosk/src/pages/scan/useScanSettingsDeliveryAck.ts',
+    'apps/kiosk/src/pages/scan/useScanSettingsExpiry.ts',
+    'apps/kiosk/src/pages/scan/useScanSettingsActions.ts',
+    'apps/kiosk/src/pages/scan/ScanSettingsPage.tsx',
+  ].map(read).join('\n')
   const partner = read('apps/partner/src/routes/sources/index.tsx')
   const userMsg = read('apps/kiosk/src/services/api/userErrorMessage.ts')
   if (!confirm.includes('userMessageOf') || !cashier.includes('userMessageOf') || !scan.includes('userMessageOf')) {

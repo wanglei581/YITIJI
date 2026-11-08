@@ -1,3 +1,6 @@
+import { LicenseLock } from '../../layouts/LicenseLock'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
+import { useKioskLicense } from '../../layouts/KioskLicenseContext'
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
@@ -25,6 +28,7 @@ export function ProfilePage() {
 }
 
 function ProfileContent() {
+  const winding = useKioskLicense().mode === 'winding-down'
   const navigate = useNavigate()
   const location = useLocation()
   const { user, isLoggedIn, displayName, getToken } = useAuth()
@@ -104,7 +108,7 @@ function ProfileContent() {
   // 打印台没有交接就落「这一页没有待处理的文件」，按钮带用户去选文件。
   const printFile = (file: { name: string; size: string; pages?: number }) => {
     void file
-    navigate('/print/preview')
+    navigate('/print/preview', { state: { licenseViewOnly: winding } })
   }
 
   const uiState = deriveProfileState({
@@ -156,12 +160,13 @@ function ProfileContent() {
         status={status}
         backLabel="返回首页"
         onBack={() => navigate('/')}
-        ask={signedIn
+        ask={winding ? { label: '问小青', disabled: true } : signedIn
           ? { label: '问小青：我的记录在哪里找？', draft: '我的简历、文档和打印订单在哪里找？离开前应该怎样结束使用？' }
           : { label: '问小青：不登录能办什么？', draft: '不登录能办什么？' }}
         primaryNode={dock}
       >
         <div className="qx-scroll qx-grow me-page">
+          {winding ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : null}
           {uiState === 'signed-out' ? <MeProfileGuest contact={support} /> : null}
 
           {uiState === 'loading' ? <MeProfileLoading /> : null}
@@ -184,13 +189,14 @@ function ProfileContent() {
               />
               {miniappLine ? <p className="me-sync">{miniappLine}</p> : null}
               <ProfileAssetGrid counts={assetOverview.counts} loading={assetOverview.loading} />
-              <ProfileContinueCard task={pendingTask} tasksError={tasksError} empty={uiState === 'empty'} />
-              {uiState === 'empty' ? <EmptyStartRows /> : null}
+              <LicenseLock><ProfileContinueCard task={pendingTask} tasksError={tasksError} empty={uiState === 'empty'} /></LicenseLock>
+              {uiState === 'empty' ? <LicenseLock><EmptyStartRows /></LicenseLock> : null}
               {resumes.length + scans.length + aiRecords.length > 0 ? (
                 <ProfileSessionRecords
                   resumes={resumes}
                   scans={scans}
                   aiRecords={aiRecords}
+                  winding={winding}
                   onPrintFile={printFile}
                   onDeleteResume={(id) => setResumes((prev) => prev.filter((item) => item.id !== id))}
                   onDeleteScan={(id) => setScans((prev) => prev.filter((item) => item.id !== id))}

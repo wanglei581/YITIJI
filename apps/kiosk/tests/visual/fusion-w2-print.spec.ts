@@ -55,6 +55,7 @@ const UNVERIFIED_CAPABILITIES = [
   'signature_stamp',
   'color_print',
   'duplex_print',
+  'scan_device',
 ].map((capabilityKey) => ({
   capabilityKey,
   status: 'not_verified',
@@ -827,6 +828,15 @@ function registerQuote(api: ApiRouter, opts?: { amountCents?: number; billablePa
   })
 }
 
+const decimalAmount = (cents: number): string => (cents / 100).toFixed(2)
+
+async function expectConfirmAmount(page: Page, cents: number): Promise<void> {
+  const amount = page.getByTestId('print-confirm-amount')
+  await expect(amount).toBeVisible()
+  await expect(amount).toHaveText(decimalAmount(cents))
+  await expect(amount.locator('..')).toHaveText(`应付 ${decimalAmount(cents)} 元`)
+}
+
 async function expectHealthy(page: Page, errors: string[], marker?: string): Promise<void> {
   await expect(page.locator('[data-kiosk-presentation="fusion-youth"]').first()).toBeVisible()
   if (marker) await expect(page.locator(`[data-w2-page="${marker}"]`)).toBeVisible()
@@ -1276,7 +1286,8 @@ test('print parameter suggestions are advisory until applied and then flow to co
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerPrice(api)
-  registerQuote(api, { amountCents: 600, billablePages: 6, unitCents: 100 })
+  const quote = { amountCents: 600, billablePages: 6, unitCents: 100 }
+  registerQuote(api, quote)
   api.respond('GET', '/api/v1/materials/tasks/w2-inspection-001/print-param-suggestions', {
     status: 200,
     json: { success: true, data: printParamSuggestions({ copies: 3 }) },
@@ -1285,7 +1296,7 @@ test('print parameter suggestions are advisory until applied and then flow to co
   await binary.install()
   await seedMaterialSession(page)
   // 预览→确认是 SPA 导航。Playwright 在这个窗口里对已拦截 POST 的 postDataJSON()
-  // 为空（页面已按 registerQuote 渲染 ¥6.00，请求确实发出了）。
+  // 为空（页面已按 registerQuote 渲染 6.00 元，请求确实发出了）。
   // page.route + fallback 会把报价挂死；自己 fulfill 也读不到 body。
   // 所以在页面 fetch 出口抓 payload，应答仍只由 registerQuote 提供。
   await page.addInitScript(() => {
@@ -1318,7 +1329,7 @@ test('print parameter suggestions are advisory until applied and then flow to co
   // 确认页摘要用 data-sum-row + <b class="v">，报价金额来自 POST /orders/quote。
   // 预览页才有「3 份」的 dd/strong；不能用它们冒充确认页断言。
   await expect(page.locator('[data-sum-row="打印份数"] .v')).toHaveText('3 份')
-  await expect(page.getByTestId('print-confirm-amount')).toHaveText(/6\.00/)
+  await expectConfirmAmount(page, quote.amountCents)
   await expect.poll(async () => {
     return page.evaluate(() => {
       const bodies = (window as Window & { __w2QuoteBodies?: Array<{ params?: { copies?: number } }> }).__w2QuoteBodies
@@ -1368,7 +1379,7 @@ test('unverified terminal disables color and duplex with an honest reason @w2', 
   await colorBtn.focus()
   await expect(colorBtn).toBeFocused()
 
-  const duplexBtn = preview.getByRole('button', { name: '双面（长边）', exact: true })
+  const duplexBtn = preview.getByRole('button', { name: '双面', exact: true })
   await expect(duplexBtn).toHaveAttribute('aria-disabled', 'true')
   await expect(duplexBtn).not.toHaveAttribute('disabled', /.*/)
   await duplexBtn.focus()
@@ -1380,6 +1391,8 @@ test('unverified terminal disables color and duplex with an honest reason @w2', 
   await duplexBtn.click({ force: true })
   await expect(preview.getByRole('button', { name: '黑白', exact: true })).toHaveAttribute('data-selected', 'true')
   await expect(preview.getByRole('button', { name: '单面', exact: true })).toHaveAttribute('data-selected', 'true')
+  await expect(preview.getByRole('button', { name: '长边翻页', exact: true })).toHaveCount(0)
+  await expect(preview.getByRole('button', { name: '短边翻页', exact: true })).toHaveCount(0)
 
   await expectHealthy(page, errors, 'print-preview')
 })
@@ -1405,8 +1418,11 @@ test('terminal verified for color and duplex can actually select them @w2', asyn
   await colorBtn.click()
   await expect(colorBtn).toHaveAttribute('data-selected', 'true')
 
-  const duplexBtn = preview.getByRole('button', { name: '双面（长边）', exact: true })
+  const duplexBtn = preview.getByRole('button', { name: '双面', exact: true })
   await duplexBtn.click()
+  const longEdgeBtn = preview.getByRole('button', { name: '长边翻页', exact: true })
+  await longEdgeBtn.click()
+  await expect(longEdgeBtn).toHaveAttribute('data-selected', 'true')
   await expect(duplexBtn).toHaveAttribute('data-selected', 'true')
 
   await expectHealthy(page, errors, 'print-preview')
@@ -1578,7 +1594,10 @@ test('cashier renders a pending QR without exposing its session token @w2', asyn
   await page.goto('/print/cashier')
   await setReactRouterState(page, '/print/cashier', cashierState)
   await page.getByRole('button', { name: '手机扫屏幕上的码' }).click()
-  await expect(page.locator('.qx-state-t', { hasText: '请扫码支付' })).toBeVisible()
+  const qrNotice = page.locator('.cashier-qr-notice')
+  await expect(qrNotice).toContainText('请扫码支付')
+  await expect(qrNotice).toBeVisible()
+  await expect(qrNotice).toContainText('请勿切换方式、重复付款或重新下单')
   await expect(page.locator('svg').filter({ has: page.locator('path') })).not.toHaveCount(0)
   await expect(page.getByText(W2_ORDER.paymentSessionToken)).toHaveCount(0)
   // 稿 32-cashier 把出码等待态的主按钮定为「刷新付款结果」（稿内 5 次），
@@ -2151,7 +2170,8 @@ test('benefit card reports 未认领身份 for a guest and never fabricates a di
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerPrice(api)
-  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  const quote = { amountCents: 200, billablePages: 2, unitCents: 100 }
+  registerQuote(api, quote)
   await seedMaterialSession(page)
 
   await page.goto('/print/confirm')
@@ -2160,7 +2180,7 @@ test('benefit card reports 未认领身份 for a guest and never fabricates a di
   // 反向：游客态不得出现核销 CTA，也不得出现任何抵扣结论。
   await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
   await expect(page.getByText('已抵扣')).toHaveCount(0)
-  await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
+  await expectConfirmAmount(page, quote.amountCents)
   await expectHealthy(page, errors, 'print-confirm')
 })
 
@@ -2172,13 +2192,14 @@ test('benefit card survives the AI-down state and stays decoupled from 材料体
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerPrice(api)
-  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  const quote = { amountCents: 200, billablePages: 2, unitCents: 100 }
+  registerQuote(api, quote)
 
   await openWithHandoff(page, '/print/confirm', CONFIRM_HANDOFF)
   // 体检摘要缺席（ai-down），但权益卡与金额都在。
   await expect(page.getByText('隐私检查摘要')).toHaveCount(0)
   await expect(benefitCard(page)).toHaveAttribute('data-benefit-state', 'guest')
-  await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
+  await expectConfirmAmount(page, quote.amountCents)
   await expectHealthy(page, errors, 'print-confirm')
 })
 
@@ -2196,6 +2217,9 @@ test('benefit card reports 价目拉不到 when the quote fails and shows no amo
   await expect(benefitCard(page)).toHaveAttribute('data-benefit-state', 'price_unavailable')
   await expect(page.getByText('本机没能取到现行价目', { exact: true })).toBeVisible()
   // 反向：报价失败时既不显示金额，也不给出任何「有可用 / 已用完」结论。
+  await expect(page.getByTestId('print-confirm-amount')).toHaveCount(0)
+  // 换了「应付 X.XX 元」格式后，屏上任何地方都不许冒出这句或旧的 ¥ 写法（不止 testid 那一处）。
+  await expect(page.getByText('应付 2.00 元', { exact: true })).toHaveCount(0)
   await expect(page.getByText('¥2.00')).toHaveCount(0)
   await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '重新报价' })).toBeVisible()
@@ -2267,7 +2291,8 @@ test('benefit card lists usable grants but keeps redemption disabled and focusab
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerPrice(api)
-  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  const quote = { amountCents: 200, billablePages: 2, unitCents: 100 }
+  registerQuote(api, quote)
   registerMemberLogin(api)
   registerBenefits(api, [
     benefitGrant({ id: 'grant-usable', title: '打印体验券', quantityRemaining: 2, quantityTotal: 3 }),
@@ -2299,8 +2324,9 @@ test('benefit card lists usable grants but keeps redemption disabled and focusab
 
   // 资损防线：不得伪造抵扣，应付金额保持报价原值。
   await expect(page.getByText('已抵扣')).toHaveCount(0)
-  await expect(page.getByText('¥0.00')).toHaveCount(0)
-  await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
+  await expect(page.getByTestId('print-confirm-amount')).not.toHaveText(decimalAmount(0))
+  await expect(page.getByText(`应付 ${decimalAmount(0)} 元`, { exact: true })).toHaveCount(0)
+  await expectConfirmAmount(page, quote.amountCents)
   await expectHealthy(page, errors, 'print-confirm')
 })
 
@@ -2368,6 +2394,7 @@ test('print confirm renders the server quote amount and never a local estimate @
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerPrice(api)
+  const amountCents = W2_ORDER.amountCents
   let quoteBody: { fileUrl?: string; params?: { colorMode?: string; copies?: number } } | null = null
   await page.route('**/api/v1/orders/quote', async (route) => {
     if (route.request().method() !== 'POST') {
@@ -2379,17 +2406,17 @@ test('print confirm renders the server quote amount and never a local estimate @
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        amountCents: 200,
+        amountCents,
         billablePages: 2,
         billingPageSource: 'detected',
-        priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents: 200 }],
+        priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents }],
       }),
     })
   })
   await seedMaterialSession(page)
   await page.goto('/print/confirm')
   await expect(page.locator('[data-testid="print-confirm-state-quoted"]')).toBeVisible()
-  await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
+  await expectConfirmAmount(page, amountCents)
   await expect(page.getByText('¥1.00/页 × 2 页', { exact: true })).toBeVisible()
   expect(quoteBody?.fileUrl).toBe(W2_FILE.fileUrl)
   expect(quoteBody?.params?.colorMode).toBe('black_white')
@@ -2401,7 +2428,8 @@ test('print confirm create-job payload matches the quoted file and params @w2', 
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerPrice(api)
-  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  const quote = { amountCents: 200, billablePages: 2, unitCents: 100 }
+  registerQuote(api, quote)
   let jobBody: { fileUrl?: string; fileName?: string; params?: { colorMode?: string; copies?: number } } | null = null
   await page.route('**/api/v1/print/jobs', async (route) => {
     if (route.request().method() !== 'POST') {
@@ -2431,7 +2459,7 @@ test('print confirm create-job payload matches the quoted file and params @w2', 
   api.respond('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, { status: 200, json: payStatus('unpaid') })
   await seedMaterialSession(page)
   await page.goto('/print/confirm')
-  await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
+  await expectConfirmAmount(page, quote.amountCents)
   await page.getByRole('button', { name: /^(去付款|确认并打印)$/ }).click()
   await page.waitForURL('**/print/cashier')
   expect(jobBody?.fileUrl).toBe(W2_FILE.fileUrl)
@@ -2457,6 +2485,9 @@ test('print confirm fail-closes duplicate query keys and missing file context @w
   await page.goto('/print/confirm')
   await expect(page.locator('[data-testid="print-confirm-state-missing-context"]')).toBeVisible()
   await expect(page.getByText('未找到文件信息')).toBeVisible()
+  await expect(page.getByTestId('print-confirm-amount')).toHaveCount(0)
+  // 换了「应付 X.XX 元」格式后，屏上任何地方都不许冒出这句或旧的 ¥ 写法（不止 testid 那一处）。
+  await expect(page.getByText('应付 2.00 元', { exact: true })).toHaveCount(0)
   await expect(page.getByText('¥2.00')).toHaveCount(0)
   await expectHealthy(page, errors, 'print-confirm')
 })

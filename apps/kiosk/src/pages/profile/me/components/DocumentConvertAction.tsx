@@ -1,3 +1,4 @@
+import { LICENSE_NO_NEW_TASK_REASON } from '../../../../copy/unattendedCopy'
 import { useState } from 'react'
 import { KIcon } from '../../../../components/kiosk-icon'
 import { formatRemainingSeconds, useRemainingSeconds } from '../../../../hooks/useCountdown'
@@ -26,6 +27,7 @@ export function DocumentConvertAction({
   mimeType,
   token,
   busy,
+  winding,
   reprintable,
   onConverted,
   onError,
@@ -38,6 +40,7 @@ export function DocumentConvertAction({
   mimeType: string
   token: string | null
   busy: boolean
+  winding: boolean
   reprintable: boolean
   onConverted: () => void
   onError: (message: string) => void
@@ -53,10 +56,10 @@ export function DocumentConvertAction({
   if (!isWordDocument({ fileName, mimeType })) return null
 
   const available = capabilities.wordToPdf === true
-  const blocked = busy || converting || !available || capabilitiesLoading
+  const blocked = winding || busy || converting || !available || capabilitiesLoading
   const linkExpired = remaining === 0
   const previewBlocked = busy || converting || linkExpired
-  const printBlocked = previewBlocked || !reprintable
+  const printBlocked = winding || previewBlocked || !reprintable
   const unavailableReason = available
     ? null
     : WORD_CONVERSION_UNAVAILABLE_COPY
@@ -65,6 +68,7 @@ export function DocumentConvertAction({
 
   const convert = async () => {
     if (!available || converting || busy) return
+    if (winding) return
     if (!token) {
       onError('请先登录')
       return
@@ -87,10 +91,11 @@ export function DocumentConvertAction({
     <div className="min-w-0">
       <button
         type="button"
+        disabled={winding}
         aria-disabled={blocked || undefined}
         aria-describedby={unavailableReason ? `doc-convert-reason-${fileId}` : undefined}
         onClick={() => void convert()}
-        title={unavailableReason ?? '将 Word 转为 PDF'}
+        title={winding ? LICENSE_NO_NEW_TASK_REASON : unavailableReason ?? '将 Word 转为 PDF'}
         className={['me-ripple me-doc-action', blocked ? 'is-disabled' : ''].join(' ')}
       >
         {converting ? '转换中' : '转 PDF'}
@@ -140,6 +145,7 @@ export function DocumentConvertAction({
             </button>
             <button
               type="button"
+              disabled={winding}
               aria-disabled={printBlocked || undefined}
               aria-describedby={
                 linkExpired
@@ -150,7 +156,7 @@ export function DocumentConvertAction({
               }
               onClick={() => { if (printBlocked) return; onPrint(result.fileId) }}
               title={
-                linkExpired
+                winding ? LICENSE_NO_NEW_TASK_REASON : linkExpired
                   ? CONVERT_LINK_EXPIRED_COPY
                   : reprintable
                     ? '打印这份 PDF'

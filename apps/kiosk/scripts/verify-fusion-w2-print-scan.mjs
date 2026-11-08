@@ -9,6 +9,30 @@ const kioskRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(join(kioskRoot, path), 'utf8')
 const sha256 = (path) => createHash('sha256').update(read(path)).digest('hex')
 
+// 等手机传文件：面板自己的忙碌锁和页面清场锁分开。码有效、文件还没到才算忙；文件一到就放开。
+assert.match(read('src/pages/upload/components/UploadSessionQrPanel.tsx'), /useBusyLock\(\(active && status\?\.status !== 'uploaded'\) \|\| loading \|\| confirming \|\| cancelling\)/, '面板独立持忙碌锁，文件已到不再顺延')
+assert.match(read('src/pages/print/PrintUploadPage.tsx'), /useBusyLock\([^\n]*phoneSession\.waiting\)/, '打印等待有效会话时持忙碌锁')
+assert.match(read('src/pages/upload/hooks/useUploadSession.ts'), /const waiting = Boolean\(enabled && qr && remainingSeconds > 0 && status\?\.status !== 'uploaded' && status\?\.status !== 'confirmed' && status\?\.status !== 'cancelled' && status\?\.status !== 'expired'\)/, '打印等待锁受真实到期和终态约束')
+const pageClearLocks = [
+  ['src/pages/contract-review/ContractReviewHomePage.tsx', 'useBusyLock(submitting)'],
+  ['src/pages/resume/ResumeSourcePage.tsx', 'useBusyLock(uploading || usbBusy)'],
+  ['src/pages/print-scan/ConvertImagesPage.tsx', 'useBusyLock(uploading || generating || rechecking)'],
+  ['src/pages/interview/InterviewSetupPage.tsx', 'useBusyLock(creating || uploading || printingSheet || usbBusy)'],
+  ['src/pages/print-scan/sign-stamp/useSignStampFlow.ts', 'useBusyLock(busy)'],
+]
+for (const [file, expected] of pageClearLocks) {
+  // 去掉注释后，文件里每一处 useBusyLock 调用都要查：只看第一处的话，再加一把锁就绕过去了。
+  const text = read(file).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const calls = [...text.matchAll(/useBusyLock\(([^\n]*)\)\s*$/gm)].map((match) => `useBusyLock(${match[1]})`)
+  assert.deepEqual(calls, [expected], `${file} 只许有一处清场锁，且不含扫码面板的忙：应为 ${expected}`)
+  assert.doesNotMatch(
+    calls.join('\n'),
+    /\b(?:qrBusy|phoneBusy|sourceBusy|showQr)\b/,
+    `${file} 的 useBusyLock 实参不得再出现 qrBusy / phoneBusy / sourceBusy / showQr`,
+  )
+}
+console.log('PASS 两套上传等待锁及到期边界')
+
 const directRoutes = new Map([
   ['/print-scan', 'PrintScanHomePage'],
   ['/print-scan/feature/:key', 'PrintScanFeatureInfoPage'],
@@ -24,7 +48,8 @@ const directRoutes = new Map([
 const redirects = new Map([
   ['/print/scan-convert', '/print-scan/convert'],
   ['/print/scan-sign', '/print-scan/sign'],
-  ['/print/scan-feature', '/print-scan/feature/id-photo'],
+  // 2026-11-04 证件照停放：旧地址回打印扫描服务台。此前目标是 /print-scan/feature/id-photo。
+  ['/print/scan-feature', '/print-scan'],
   // 2026-08-18：打印参数页下线为兼容重定向（控件与预览页完全重复且全站零导航）。
   // 2026-09-08：材料检查 / 预览合并为 /print/desk，旧地址带 ?step= 透传意图。
   ['/print/params', '/print/desk?step=preview'],
@@ -77,9 +102,25 @@ const frozenHashes = new Map([
   // 2026-10-29 重新冻结（触屏版走查 I-14，B 路）：签名图（signature_image）确认后只留系统短期、不进「我的文档」，面板里「会员文件确认后归档」对它不成立；
   // 只在那一处条件上加 purpose !== 'signature_image'，二维码、轮询、取消、确认、刷新先撤销旧会话等都逐字未动。冻结契约不放宽，仍逐字节校验。
   // 旧哈希 7f0cacce1e2b505548a4a141e2b63c71517c8ec5fe5d47fc827732a461f3e524。
+  // 2026-11-03 重新冻结（B6b-1）：面板在「码有效、文件还没到」时自己持清场锁，到期前 60 秒提醒，
+  // 真实卸载作废还没收到文件的上传码；取消请求在途也持锁。新内容断言在本文件哈希检查之前。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
+  // 2026-11-03 重新冻结（重做旧候选 #1461）：取消失败不再清屏——二维码和已收到的文件留着，屏上沿用打印上传页那句兜底，
+  // 可以重试取消或去确认；取消中三个按钮都禁用。成功才清空，已作废码清二维码并按过期显示。不恢复轮询、不自动接走文件。
+  // 新行为由 verify:resume-phone-upload-ui 的断言钉住。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357。
+  // 2026-11-04 重新冻结（并入 #1566）：取消失败按 #1566 留屏，触控尺寸、忙碌锁与卸载作废仍按 #1570。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e（#1570）、018fd611a3350ce53fa3b79fceb887c5a5b0d56a2d47f36d418f3b6745b816ca（#1566）。
+  // 2026-11-03 再次冻结（B6b-1 返工）：同一页切换来源不再作废上传码，切回来继续用同一张；
+  // 离开页面才作废还没收到文件的会话。已卸载的实例不得作废屏上正在显示的那张码。
+  // 冻结契约不放宽，仍逐字节校验。旧哈希 e1c9db76623dc9fb690d4f9d394d4abe2bdf0ab2d4769abf73870d8d78e3c29e。
+  // 2026-11-04 再次冻结（#1570 返工：并入派工窗口的上传码租约修复 a6a7bbfe3，再与 #1566 合写取消处理）：
+  // 同一页切换来源只停放上传码、离开页面才作废，已卸载的实例不作废屏上正显示的码；取消成功才收租约并清空，
+  // 已作废按过期显示，其他失败码和已收到的文件都留着。冻结契约不放宽，仍逐字节校验。
+  // 旧哈希 f0d8bc199b75c6ad6c12b87d517c81c6bef38baea72099231c8c68569802d60e（并入 #1566 后）、2109b8ce60b6d58f7f5028435a51ef3544310f2c00549e587bc2688058da91e3（租约修复）。
   [
     'src/pages/upload/components/UploadSessionQrPanel.tsx',
-    '412de307d662c81adde91f45f2e77357a74f14f69d95abbc3953048bba98f357',
+    '738d4f455b926a85e51ad56c38fabe339d1def48fd43a12967bf03e03a8ca4ba',
   ],
   [
     'src/pages/print/DevSandboxControls.tsx',
@@ -298,6 +339,14 @@ assert.match(
   'feature info page imports the Qingxu hub stylesheet'
 )
 assert.doesNotMatch(printScanFeature, /KioskPageFrame/, 'feature info page has left the V6 frame')
+assert.match(
+  printScanFeature,
+  /if \(key === 'id-photo' && ID_PHOTO_ENTRY_PARKED\) \{\s*return <Navigate to="\/print-scan" replace \/>/,
+  'parked /print-scan/feature/id-photo returns to /print-scan',
+)
+assert.match(printScanFeature, /function IdPhotoParkedScreen/, 'parked id-photo screen source remains')
+assert.doesNotMatch(printScanFeature, /看证件照说明/, 'unknown capability state does not point at id-photo')
+assert.doesNotMatch(printScanFeature, /证件照这一页写的是尚未开放/, 'unknown capability state has no id-photo fact')
 const printScanHome = read('src/pages/print-scan/PrintScanHomePage.tsx')
 const printScanHomeView = read('src/pages/print-scan/components/QxPrintHubView.tsx')
 const printHubQxCss = read('src/pages/print-scan/styles/print-hub-qx.css')
@@ -482,7 +531,8 @@ assert.match(
   /U 盘图片导入尚未接到转换列表/,
   'USB entry is kept and explained as unwired, not deleted'
 )
-const scanResultPreviewSource = read('src/pages/scan/ScanResultPage.tsx')
+// 2026-11-02 K1a：结果页的预览块拆成了 ScanResultPreviewBlock.tsx（<FileContentPreview> 现在在那里），断言原样不变。
+const scanResultPreviewSource = read('src/pages/scan/ScanResultPreviewBlock.tsx')
 assert.match(
   scanResultPreviewSource,
   /<FileContentPreview[\s\S]*?fileUrl=\{file\.fileUrl\}/,
@@ -1124,7 +1174,17 @@ assert.match(
   }
   assert.deepEqual(hits, [], `kiosk on-screen text must not hard-code the printer brand or model (走查 I-18):\n${hits.join('\n')}`)
 }
-const scanSettings = read('src/pages/scan/ScanSettingsPage.tsx')
+// 2026-11-02 K1a：设置页按职责拆成了五个 hook + 页面，代码行逐字搬运，下面的断言读这几份的拼接，判据一条没减；
+// 不得访问浏览器存储则逐个文件各查一遍。
+const SCAN_SETTINGS_FILES = [
+  'src/pages/scan/useScanSettingsState.ts',
+  'src/pages/scan/useScanSessionCreate.ts',
+  'src/pages/scan/useScanSettingsDeliveryAck.ts',
+  'src/pages/scan/useScanSettingsExpiry.ts',
+  'src/pages/scan/useScanSettingsActions.ts',
+  'src/pages/scan/ScanSettingsPage.tsx',
+]
+const scanSettings = SCAN_SETTINGS_FILES.map(read).join('\n')
 assert.match(scanSettings, /function isScanType\(/, 'scan settings validates direct route state')
 assert.match(
   scanSettings,
@@ -1170,7 +1230,7 @@ for (const marker of [
 ]) {
   assert.match(scanSettings, new RegExp(marker), `scan settings retains ${marker}`)
 }
-assertNoStorageAccess('src/pages/scan/ScanSettingsPage.tsx')
+for (const path of SCAN_SETTINGS_FILES) assertNoStorageAccess(path)
 assert.match(
   scanSettings,
   // 2026-09-13：真地址是 /scan?stage=progress（/scan/progress 只剩兼容重定向）。
@@ -1206,7 +1266,17 @@ assert.match(
   'scan progress recovers completion during cancellation'
 )
 
-const scanResult = read('src/pages/scan/ScanResultPage.tsx')
+// 2026-11-02 K1a：结果页按职责拆成了两个 hook、三个组件和页面，代码行逐字搬运，下面的断言读这几份的拼接，判据一条没减。
+const SCAN_RESULT_FILES = [
+  'src/pages/scan/scanResultModel.ts',
+  'src/pages/scan/useScanResultRescan.ts',
+  'src/pages/scan/useScanResultExits.ts',
+  'src/pages/scan/ScanResultFailedView.tsx',
+  'src/pages/scan/ScanResultPreviewBlock.tsx',
+  'src/pages/scan/ScanResultExitRow.tsx',
+  'src/pages/scan/ScanResultPage.tsx',
+]
+const scanResult = SCAN_RESULT_FILES.map(read).join('\n')
 // 打印出口 2026-09-28 起落在材料检查（商用收口 P0-5）：扫描件是本人原件，生产强制
 // PRINT_REQUIRE_PII_SCAN=true，没做完隐私检查就建单会被拒，所以不再直达 /print/confirm。
 for (const target of ['/me/documents', '/resume/parse']) {
@@ -1401,6 +1471,10 @@ for (const path of [
   'src/pages/scan/ScanProgressPage.tsx',
   'src/pages/scan/ScanSettingsStatusView.tsx',
   'src/pages/scan/ScanResultPage.tsx',
+  // 2026-11-02 K1a：结果页的可见 JSX 拆到了这三个组件里，逐个查，范围和拆分前一样大。
+  'src/pages/scan/ScanResultFailedView.tsx',
+  'src/pages/scan/ScanResultPreviewBlock.tsx',
+  'src/pages/scan/ScanResultExitRow.tsx',
 ]) {
   const code = read(path)
   assert.doesNotMatch(code, /\[\s*['"]任务编号['"]\s*,/, `${path} must not display a task ID row`)
@@ -1486,7 +1560,7 @@ assert.match(aiDownNote, /\/advisor\/availability/, 'AI 状态只认服务端那
 assert.match(aiDownNote, /row\.available === false\) return 'unavailable'/, '只有服务端明说 available:false 才写「接不上」')
 assert.match(aiDownNote, /小青暂时接不上。这一步不用它也能做完，照下面的按钮继续。/, 'AI 状态那一句要说清这一步不靠小青也能做完')
 // 扫描完成后的 AI 简历识别入口与结果页不降级：入口还在、只对简历扫描放行、去的是简历解析页。
-const scanResultPage = read('src/pages/scan/ScanResultPage.tsx')
+const scanResultPage = SCAN_RESULT_FILES.map(read).join('\n')
 assert.match(scanResultPage, /AI 简历识别/, '扫描结果页的「AI 简历识别」入口不许删')
 assert.match(scanResultPage, /const aiEnabled = scanType === 'resume' && Boolean\(file\)/, 'AI 简历识别只对简历扫描且有文件时放行')
 assert.match(scanResultPage, /leaveScanFlow\('\/resume\/parse'/, 'AI 简历识别去的是简历解析页，由那一屏自己按 AI 能力降级')

@@ -230,3 +230,9 @@ export function preferUnattended(serverText: string, replacement: string): strin
   if (!trimmed || containsStaffHandoff(trimmed)) return replacement
   return trimmed
 }
+
+export function licenseWindDownLine(minutes: number): string {
+  return `这台机器约 ${minutes} 分钟后暂停使用，请尽快办完手上的事。`
+}
+
+export const LICENSE_NO_NEW_TASK_REASON = '本机暂不开始新的办理'

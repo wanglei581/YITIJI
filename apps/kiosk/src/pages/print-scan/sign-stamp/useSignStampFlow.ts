@@ -90,7 +90,7 @@ export function useSignStampFlow() {
   const [result, setResult] = useState<ComposeResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [showQr, setShowQr] = useState<'document' | 'stamp' | null>(null)
-  const [qrBusy, setQrBusy] = useState(false)
+  const [, setQrBusy] = useState(false)
   const [docStage, setDocStage] = useState<DocStage>('idle')
   const [stampStage, setStampStage] = useState<StampStage>('idle')
   const [docErr, setDocErr] = useState<LiveSnapshot['docErr']>(null)
@@ -111,7 +111,7 @@ export function useSignStampFlow() {
   const [cap, setCap] = useState<CapStatus>('loading')
   const [terminalId, setTerminalId] = useState(() => getTerminalId())
 
-  useBusyLock(busy || qrBusy || showQr !== null)
+  useBusyLock(busy)
 
   useEffect(() => {
     setTerminalId(getTerminalId())
@@ -444,7 +444,6 @@ export function useSignStampFlow() {
     pan: displayLive.pan,
     derived: displayLive.derived,
     showQr,
-    qrBusy,
     docInputRef,
     stampInputRef,
     localDisabled,

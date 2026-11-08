@@ -39,6 +39,7 @@ import {
   SCAN_INPUT_REASONS,
   type HeartbeatDto,
 } from './dto/heartbeat.dto'
+import { printerQueueHeartbeatData } from './heartbeat-printer-queue'
 import type { ClaimTasksDto } from './dto/claim-tasks.dto'
 import type { PatchTaskStatusDto } from './dto/patch-task-status.dto'
 import {
@@ -382,6 +383,7 @@ export class TerminalAgentService implements OnModuleInit {
     this.assertScanInputTelemetry(dto)
     const profilePatch = await this.buildDeviceProfilePatch(dto, terminalId)
     const lastSeenAt = new Date()
+    const scanDeviceObservedAt = this.parseScanDeviceObservedAt(dto, lastSeenAt)
 
     try {
       await this.writeWithMacConflictMapping(() =>
@@ -413,11 +415,15 @@ export class TerminalAgentService implements OnModuleInit {
         printerStatus: dto.printerStatus ?? null,
         wiredNetworkStatus: dto.wiredNetworkStatus ?? null,
         printerNetworkStatus: dto.printerNetworkStatus ?? null,
+        ...printerQueueHeartbeatData(dto),
         localTaskDatabaseAvailable: dto.localTaskDatabaseAvailable ?? null,
         scanInputHealth: dto.scanInputHealth ?? null,
         scanInputAction: dto.scanInputAction ?? null,
         scanInputReason: dto.scanInputReason ?? null,
         scanInputObservedAt: dto.scanInputObservedAt ? new Date(dto.scanInputObservedAt) : null,
+        // 屏上扫描：旧版终端程序不带这两项，照常收下（库里 null）。
+        scanDeviceHealth: dto.scanDeviceHealth ?? null,
+        scanDeviceObservedAt,
         diskFreeGb: dto.diskFreeGB ?? null,
         agentVersion: dto.agentVersion ?? null,
         ipAddress: dto.ipAddress ?? null,
@@ -911,6 +917,27 @@ export class TerminalAgentService implements OnModuleInit {
     })
     if (!latestHeartbeat) return true
     return latestHeartbeat.status !== 'agent_degraded' && latestHeartbeat.localTaskDatabaseAvailable !== false
+  }
+
+  /**
+   * 屏上扫描的探测时刻 → Date。必须带时区：不带时区的字符串在不同时区的服务器上会解析成不同时刻，
+   * 一体机「20 分钟内 ready」的新鲜度判断就不可信。晚于收到时刻的按收到时刻记——一次探测不可能发生在未来，
+   * 否则一个写错的未来时间会让「ready」永远显得是新的。
+   */
+  private parseScanDeviceObservedAt(dto: Pick<HeartbeatDto, 'scanDeviceObservedAt'>, receivedAt: Date): Date | null {
+    const raw = dto.scanDeviceObservedAt
+    if (raw === undefined) return null
+    if (
+      typeof raw !== 'string'
+      || !isISO8601(raw, { strict: true, strictSeparator: true })
+      || !/[zZ]|[+-]\d{2}:\d{2}$/.test(raw)
+    ) {
+      throw new BadRequestException({
+        error: { code: 'SCAN_DEVICE_TELEMETRY_INVALID', message: '扫描仪探测时刻必须是带时区的 ISO 时间' },
+      })
+    }
+    const observedAt = new Date(raw)
+    return observedAt.getTime() > receivedAt.getTime() ? receivedAt : observedAt
   }
 
   private assertScanInputTelemetry(dto: HeartbeatDto): void {
