@@ -18,7 +18,7 @@
 ## 2026-11-08：四核心收口包 2 第三步——B7 模拟面试按 3 / 5 / 8 分钟到点结束（叠在 C2 上；含迁移；未部署）
 
 - 来由：10/10 产品负责人定按 3、5、8 分钟服务端计时硬截止，重进不重置，到点停收音停出题，已提交的回答照常出报告。main 上设置页三档还写「到点不自动交卷」，后端没有截止。内容同 11/04 批次 #1581 的 B7（源分支 `grok/closeout-b7-interview-deadline` 076bec141）。
-- 后端：`MockInterviewSession` 加可空列 `deadlineAt`（迁移 `20261104180000_mock_interview_deadline`，只加列，SQLite 与 PostgreSQL 同步）。截止时刻＝第一题写入时刻＋所选分钟数，定下后不延长、重进不重置；到点后回答（留 3 秒在路宽限）、转写、播报都回 409 `INTERVIEW_DEADLINE_REACHED`，已提交的回答照常出报告。
+- 后端：`MockInterviewSession` 加可空列 `deadlineAt`（迁移 `20261104180000_mock_interview_deadline`，只加列，SQLite 与 PostgreSQL 同步）。截止时刻＝第一题写入时刻＋所选分钟数，定下后不延长、重进不重置；到点后回答（留 3 秒在路宽限）、转写、播报都回 409（到点），已提交的回答照常出报告。
 - 一体机：设置页三档、选面试官副标题、确认时长、入口第 3 步、作答页剩余时间改成「到点自动结束」一类说法；最后一分钟写「还剩 1 分钟或更少。到点会自动结束这一场，没提交的回答不算进报告。」；到点停收音、转去生成报告；报告生成不了时停在「这一场已经结束」，可「再试一次生成报告」。
 - 合并：源分支落后 main 很多。并 main 时 `ci.yml`、API `package.json` 两边门禁都留；`verify-first-order-migrations.ts` 按时间先后留扫描轮次、打印队列、面试截止三段；`mock-interview-charge.ts` 取批次版（「没存题目时先核简历 AI 授权，再按 B7 流程扣次出题」）；再拣批次的门禁修正 221b0ad29。叠到 C2 上时只冲图谱。
 - 本机门禁：27 条过 26（图谱、仓库完整性、CI 门禁覆盖、合规文案、shared / api / 一体机类型检查、pg schema 同步、面试截止、模拟面试、模拟面试授权、次数覆盖、安全词库、简历授权装配、AI 文本留存、送模型打码、招聘 p1 schema、首单迁移 SQLite 与 PostgreSQL、api 与一体机 lint、k2c 面试、fusion-w3、麦克风能力、AI 标识文案、无人值守文案、原始报错不上屏）。红的 `verify:probe-ai-failure-honesty-45` 是本地取证探针，要 3010 端口的专用库，ci.yml 不跑，B7 没改它。
