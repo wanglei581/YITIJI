@@ -623,7 +623,7 @@ export function ResumeGeneratePage() {
                   <Field label="公司 / 单位" required>
                     <input className={inputCls} value={e.company} onChange={(ev) => setExperience((list) => list.map((x, idx) => idx === i ? { ...x, company: ev.target.value } : x))} />
                   </Field>
-                  <Field label="职位" required>
+                  <Field label="职位">
                     <input className={inputCls} value={e.role} onChange={(ev) => setExperience((list) => list.map((x, idx) => idx === i ? { ...x, role: ev.target.value } : x))} />
                   </Field>
                   <div className="md:col-span-2">
