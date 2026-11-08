@@ -1,8 +1,16 @@
-import type { Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 import type { ApiRouter } from '../../fixtures/api-router'
 
 export const COPY_CONTROL = 'c3a-synthetic-control-token'
 export const COPY_ID = 'c3a-copy-job'
+/** 11/08 定：复印这支「状态未知」色调的胶囊用提醒色（橙），和稿一致；读的是真实算出来的颜色，不只看类名。 */
+export async function expectCopyUnknownChip(page: Page, text: string) {
+  const chip = page.locator('.qxt-band .qxt-status')
+  await expect(chip).toHaveText(text)
+  await expect(chip).toHaveClass(/qxt-status-unknown/)
+  await expect(chip).toHaveCSS('background-color', 'rgba(184, 104, 60, 0.25)')
+  await expect(chip.locator('.qxt-dot')).toHaveCSS('background-color', 'rgb(240, 168, 115)')
+}
 export async function copyFixture(page: Page, api: ApiRouter, options: {
   copy?: boolean; scan?: boolean; color?: boolean; duplex?: boolean
   printer?: string; probe?: string; noPhone?: boolean; fail?: 409 | 413; missingToken?: boolean

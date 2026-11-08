@@ -92,6 +92,15 @@ test('known scanner faults are evidence based; unknown never becomes a paper jam
     ['COPY_DEVICE_BUSY', 'busy'], ['timeout', 'timeout'], ['too_large', 'limit'], ['COPY_CAPABILITY_REVOKED', 'off'],
     ['COPY_UNAUTHORIZED', 'off'], ['not_ready', 'noresp'], ['unknown', 'noresp']]) assert.equal(model.copyFault(code), fault)
 })
+test('limit and mid-way-off error screens ask their own question instead of the borrowed scanner one (11/08)', () => {
+  assert.equal(model.copyErrorAsk('limit'), '原件太多怎么复印')
+  assert.equal(model.copyErrorAsk('off'), '面板上怎么复印')
+  // 其余出错屏照旧用自己那套字的问句。
+  for (const fault of ['nopaper', 'jam', 'busy', 'noresp', 'timeout']) assert.equal(model.copyErrorAsk(fault), null)
+  for (const code of ['too_large', 'COPY_LIMIT_EXCEEDED', 'COPY_EXPIRED', 'COPY_CAPABILITY_DISABLED']) {
+    assert.doesNotMatch(model.copyErrorAsk(model.copyFault(code)), /扫描仪/)
+  }
+})
 test('confirm dispatches once; repeated same-operation requests only query status, never send print again', async () => {
   const { device, session } = await printing()
   flow.ensureCopyDevice(session)

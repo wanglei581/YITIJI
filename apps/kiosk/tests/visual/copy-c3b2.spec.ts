@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
-import { COPY_CONTROL, COPY_ID } from './fixtures/copy-c3a'
+import { COPY_CONTROL, COPY_ID, expectCopyUnknownChip } from './fixtures/copy-c3a'
 import { armPrivacyReload, copyDeviceFixture } from './fixtures/copy-c3b1'
 
 const secrets = () => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage }, url: location.href })
@@ -69,6 +69,8 @@ test('unconfirmed leads to cs-copy-unconfirmed with no second print and no repea
   const f = await printing(page, api)
   await f.report('unconfirmed')
   await expect(page.getByRole('heading', { name: '这次没收到打印结果', exact: true })).toBeVisible()
+  // 「结果未确认」同是状态未知的色调，复印这支一并用橙色（稿上这屏的胶囊也是橙色）。
+  await expectCopyUnknownChip(page, '结果未确认')
   for (const text of ['先看出纸口；这次不会自动重打', '先看出纸口是否已有纸张', '没收到打印结果，不能确定纸有没有出来。',
     '这次不会自动重打，先别再点复印', '不猜成功也不猜失败，免得多印。', '这次不会自动重打，也不会重复收费',
     '原件还在玻璃上或进纸器里，请和复印件一起带走']) await expect(page.getByText(text, { exact: true })).toBeVisible()
@@ -157,13 +159,16 @@ test('unconfirmed without configured phone hides its phone card and service hour
   await expect(page.getByRole('button', { name: /拨打服务电话/ })).toHaveCount(0)
   await expect(page.getByText(/服务时间：/)).toHaveCount(0)
 })
-for (const [code, title] of [['feeder_empty', '进纸器里没有纸'], ['paper_jam', '卡纸或盖板没合上'], ['COPY_DEVICE_BUSY', '打印机正在忙'],
-  ['timeout', '等太久没有结果'], ['too_large', '这次超过了这台机器能收的大小'], ['unknown', '扫描仪没有响应'],
-  ['COPY_CAPABILITY_REVOKED', '这台机器暂时只能在打印机面板上复印']] as const) {
+// 问小青一句跟着屏走：超过大小、中途没开通不再借「扫描仪连不上怎么办」（11/08 定）。
+for (const [code, title, ask] of [['feeder_empty', '进纸器里没有纸', '进纸器没纸怎么办'], ['paper_jam', '卡纸或盖板没合上', '卡纸怎么办'],
+  ['COPY_DEVICE_BUSY', '打印机正在忙', '打印机忙要等多久'], ['timeout', '等太久没有结果', '等太久没结果怎么办'],
+  ['too_large', '这次超过了这台机器能收的大小', '原件太多怎么复印'], ['unknown', '扫描仪没有响应', '扫描仪连不上怎么办'],
+  ['COPY_CAPABILITY_REVOKED', '这台机器暂时只能在打印机面板上复印', '面板上怎么复印']] as const) {
   test(`scanner error ${code} uses draft error layout and cannot print @w2`, async ({ page, api }) => {
     const f = await copyDeviceFixture(page, api, { feeder: true })
     await f.start(); await f.report('failed', 0, code)
     await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible()
+    await expect(page.locator('.qxt-dock').getByRole('button', { name: /^问小青：/ })).toHaveText(`问小青：${ask}`)
     expect(f.localCalls.some((c) => c.action === 'print')).toBe(false)
     await expect(page.getByRole('button', { name: /^改用面板复印/ }).first()).toBeVisible()
     await touchFloor(page)

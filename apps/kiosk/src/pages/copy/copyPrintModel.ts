@@ -15,3 +15,7 @@ export function copyFault(code: string | null): 'nopaper' | 'jam' | 'busy' | 'no
   if (['COPY_UNAUTHORIZED', 'COPY_CAPABILITY_REVOKED', 'COPY_CAPABILITY_DISABLED', 'COPY_EXPIRED'].includes(code ?? '')) return 'off'
   return 'noresp'
 }
+/** 超过大小、中途没开通两屏借「没有响应」那套字，问小青不跟着借「扫描仪连不上怎么办」。null 时用那套字自己的问句。 */
+export function copyErrorAsk(fault: ReturnType<typeof copyFault>): string | null {
+  return fault === 'limit' ? '原件太多怎么复印' : fault === 'off' ? '面板上怎么复印' : null
+}

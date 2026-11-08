@@ -61,5 +61,7 @@ export function CopyDeviceView({ session, onBack, onRescan, printerReady, online
             pages={state.pages} scannerStarted={state.started} armed={armed} preparing={state.phase === 'finishing'} /></div> : null}
     {armed && (more || terminal) ? <p className="cc-note">再按一次才会停止，已扫的页会从这台机器删除。</p> : null}
     {state.notice ? <p role="status" className="cc-note">{state.notice}</p> : null}
+    {/* 停下后原件还留在机器上。不画倒计时：复印取消回包不带静默期。 */}
+    {state.phase === 'stopped' ? <p className="cc-result-help">原件还在玻璃上或进纸器里，请带走</p> : null}
   </CopyShell>
 }
