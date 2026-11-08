@@ -13,7 +13,7 @@ import {
   ScanLineIcon,
   Undo2Icon,
 } from 'lucide-react'
-import { printProblemLine } from '../../copy/unattendedCopy'
+import { networkDisconnectLine, printProblemLine } from '../../copy/unattendedCopy'
 import { PAY_CHANNEL_LABEL } from './cashierStatus'
 import type { CashierSnapshot, PaymentMethod } from './CashierPaymentPanel'
 
@@ -182,7 +182,8 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
     case 'channel-failed':
       return {
         kind: 'error', icon: <AlertTriangleIcon aria-hidden="true" />, title: '支付方式加载失败',
-        paras: ['本次没有发起支付。请检查网络后重新读取支付通道。'],
+        // 定字已经以「请稍后再来」收尾。再接「请重新读取支付通道」会叠成两句请；这个动作留在下面的按钮上。
+        paras: [`本次没有发起支付。${networkDisconnectLine()}。`],
         chips: [['bad', '加载失败'], [undefined, '尚未发起支付']],
         rows: [['通道请求', '失败'], ['本机是否发起支付', '否']],
         ask: [<>支付通道<em>没读到</em>。</>, '读不到就不出码。这个状态下本机没有发起任何支付。'],
