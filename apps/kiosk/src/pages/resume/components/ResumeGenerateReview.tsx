@@ -6,7 +6,21 @@ import type {
 import { PenLineIcon } from 'lucide-react'
 import { maskEmail, maskPhone } from '../../../utils/maskPii'
 
-/** 与 ResumeGeneratePage.buildInput 同一条提交规则：半空条目不送出。 */
+/**
+ * 与 ResumeGeneratePage.buildInput 同一条提交规则。
+ * 公司写了就提交，职务可以空着（只写公司的经历不再丢掉）。公司没写的整段不送。
+ */
+export function experienceRowsForGenerate(rows: ResumeGenExperience[]) {
+  return rows
+    .filter((item) => item.company.trim())
+    .map((item) => ({
+      company: item.company.trim(),
+      role: item.role.trim(),
+      period: item.period?.trim() || undefined,
+      description: item.description.trim(),
+    }))
+}
+
 function splitList(text: string, cap: number): string[] {
   return text.split(/[,，、\n]/).map((item) => item.trim()).filter(Boolean).slice(0, cap)
 }
@@ -41,7 +55,7 @@ export function ResumeGenerateReview(props: {
   onEdit: (step: number) => void
 }) {
   const eduKept = props.education.filter((item) => item.school.trim()).length
-  const expKept = props.experience.filter((item) => item.company.trim() && item.role.trim()).length
+  const expKept = experienceRowsForGenerate(props.experience).length
   const projKept = props.projects.filter((item) => item.name.trim()).length
   const eduSkip = props.education.length - eduKept
   const expSkip = props.experience.length - expKept

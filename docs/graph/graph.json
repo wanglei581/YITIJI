@@ -22852,6 +22852,9 @@
     "apps/kiosk/src/pages/resume/components/ResumeDiagnosisFailExits.tsx": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs"
     ],
+    "apps/kiosk/src/pages/resume/components/ResumeGenerateReview.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
     "apps/kiosk/src/pages/resume/components/ResumeLayoutControls.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
@@ -23115,6 +23118,9 @@
     ],
     "apps/kiosk/src/pages/resume/touch/direction.css": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/touch/edit.css": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/touch/report.css": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
@@ -34612,6 +34618,7 @@
           "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
           "apps/kiosk/src/pages/resume/components/DiagnosisDirectionForm.tsx",
           "apps/kiosk/src/pages/resume/components/OptimizedResumeEditor.tsx",
+          "apps/kiosk/src/pages/resume/components/ResumeGenerateReview.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeLayoutControls.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeVoiceInputButton.tsx",
@@ -34643,6 +34650,7 @@
           "apps/kiosk/src/pages/resume/touch/ResumeReadingView.tsx",
           "apps/kiosk/src/pages/resume/touch/ResumeSourceWhere.tsx",
           "apps/kiosk/src/pages/resume/touch/compare.css",
+          "apps/kiosk/src/pages/resume/touch/edit.css",
           "apps/kiosk/src/pages/resume/touch/source.css",
           "apps/kiosk/src/services/api/ai.ts",
           "apps/kiosk/src/services/api/aiHttpAdapter.ts",
