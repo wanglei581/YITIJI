@@ -88,6 +88,7 @@ function makePng(width: number, height: number): Buffer {
 // ── [D2] 派生上传点登记表（规格：每处该是哪一类）────────────────────────────────
 /** 键：源文件 + 所在方法 + 该方法内第几处。值：规格要求的 derivationKind。 */
 const EXPECTED_DERIVED_SITES: Record<string, string> = {
+  'src/policies/policy-checklist.service.ts#findOrGenerate#1': 'ai_generated', // 公开政策办事清单（系统排版）
   'src/print-conversion/print-conversion.service.ts#doConvert#1': 'format_conversion', // 图片 → PDF
   'src/document-conversion/document-conversion.service.ts#convertStoredFile#1': 'format_conversion', // Word → PDF
   'src/print-sign/print-sign.service.ts#doCompose#1': 'signature', // 签名 / 印章合成

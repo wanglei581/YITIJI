@@ -132,6 +132,12 @@ export const SERVICE_HUB_SPECS_COUNTS = {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  writeFileSync(OUT, SERVICE_HUB_SPECS_TEXT)
+  // 11/05 政策最小闭环取代稿 16：重新抽取其余四台时，保留独立维护的政策规格。
+  // 锚点找不到就停止，不能把新政策页覆盖回七张旧卡。
+  const current = readFileSync(OUT, 'utf8')
+  const policyBlock = current.match(/  \/\/ 2026-11-05 政策最小闭环[^\n]*\n  policy: \{[\s\S]*?\n  \},\n(?=\})/)?.[0]
+  if (!policyBlock) throw new Error('找不到 11/05 政策规格，停止抽取，避免恢复旧政策入口')
+  const output = SERVICE_HUB_SPECS_TEXT.replace(/  policy: \{[\s\S]*?\n  \},\n(?=\})/, policyBlock)
+  writeFileSync(OUT, output)
   console.log('written', OUT, '|', JSON.stringify(SERVICE_HUB_SPECS_COUNTS))
 }

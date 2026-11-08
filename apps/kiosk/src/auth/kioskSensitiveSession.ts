@@ -4,7 +4,7 @@ import { clearPickupClaimCode, PICKUP_CLAIM_RESUME_KEY } from '../pages/print/pi
 import { clearAiResumeSession } from '../pages/resume/aiResumeSession'
 import { clearAllResumeParseIntents, RESUME_PARSE_INTENT_STORAGE_KEY } from '../services/resumeParseIntent'
 import { clearJobMaterialDraft } from '../pages/resume/jobMaterialDraft'
-import { ASSISTANT_DRAFT_KEY, clearAssistantDraft } from '../services/assistantDraft'
+import { ASSISTANT_DRAFT_KEY, ASSISTANT_POLICY_KEY, clearAssistantDraft, clearAssistantPolicyContext } from '../services/assistantDraft'
 import {
   clearSession as clearSelfAssessmentSession,
   SESSION_STORAGE_KEY as SELF_ASSESSMENT_SESSION_KEY,
@@ -13,6 +13,7 @@ import {
   clearInterviewWorkbenchSession,
   INTERVIEW_WORKBENCH_SESSION_KEY,
 } from '../pages/interview/interviewWorkbenchSession'
+import { clearScanHowContinue, SCAN_HOW_CONTINUE_KEY } from '../pages/scan/scanHowContinue'
 import {
   clearScanWorkbenchSession,
   SCAN_WORKBENCH_SESSION_KEY,
@@ -27,6 +28,7 @@ import {
   hasContractReviewSession,
 } from '../pages/contract-review/contractReviewSession'
 import { clearAiDeclarationSession } from '../ai/aiDeclarationSession'
+import { clearCopySession, hasCopySession } from '../pages/copy/copySession'
 import { AI_DECLARATION_SESSION_KEY } from '../ai/aiDeclarationVersions'
 
 /** 打印材料。范围判断里单独算「只有打印材料」；仍只登记在下面那份键表里。 */
@@ -49,7 +51,9 @@ const SENSITIVE_SESSION_STORAGE_KEYS = [
   SELF_ASSESSMENT_SESSION_KEY,
   INTERVIEW_WORKBENCH_SESSION_KEY,
   SCAN_WORKBENCH_SESSION_KEY,
+  SCAN_HOW_CONTINUE_KEY,
   ASSISTANT_DRAFT_KEY,
+  ASSISTANT_POLICY_KEY,
   AI_DECLARATION_SESSION_KEY,
 ] as const
 
@@ -71,6 +75,7 @@ export type KioskClearScope = 'none' | 'print-only' | 'with-other'
  * 本机匿名收藏读失败视为没有，与 hasKioskSensitiveSession 同一写法。
  */
 export function kioskSensitiveSessionScope(): KioskClearScope {
+  if (hasCopySession()) return 'with-other'
   if (hasContractReviewSession() || hasResumeGenerateDraft()) return 'with-other'
   let printMaterial = false
   try {
@@ -111,6 +116,7 @@ export function kioskSensitiveSessionScope(): KioskClearScope {
  * 重载会把补偿逻辑连同执行环境一起杀掉，那正是 2026-09-15 那条 P1 的成因。
  */
 export function clearKioskSensitiveSession(outgoingMemberToken?: string | null): void {
+  clearCopySession()
   clearAiDeclarationSession()
   clearContractReviewSession()
   clearPrintMaterialSession()
@@ -122,18 +128,20 @@ export function clearKioskSensitiveSession(outgoingMemberToken?: string | null):
   clearSelfAssessmentSession()
   clearInterviewWorkbenchSession()
   clearAssistantDraft()
+  clearAssistantPolicyContext()
   // 顺序不可调换：收尾要读本地登记的 scanTaskId / controlToken，
   // clearScanWorkbenchSession() 一旦先跑，就再也找不到要撤谁。
   beginScanSessionCleanup(outgoingMemberToken ?? null)
   clearScanWorkbenchSession()
+  clearScanHowContinue()
   clearListeners.forEach((listener) => listener())
 }
 
 /**
- * 公共设备残留：匿名本机收藏写在 localStorage，跨用户、跨刷新都还在。
+ * 公共设备残留：改版前的匿名本机收藏写在 localStorage，跨用户、跨刷新都还在。
+ * 2026-11-05 起未登录不再记本机收藏（localFavorites.ts 停放），这里只负责把旧残留清掉。
  *
- * 只在 logout / 隐私清场里调用。login() 不得调用——登录后要把游客收藏
- * 留给「合并到账号」，清掉就没得合。
+ * 只在 logout / 隐私清场里调用。
  */
 export function clearKioskSharedDeviceResidue(): void {
   clearAllLocalFavorites()
@@ -147,6 +155,7 @@ export function clearKioskSharedDeviceResidue(): void {
  * 匿名本机收藏单独探测：读失败视为没有残留（写不进去也就漏不出去）。
  */
 export function hasKioskSensitiveSession(): boolean {
+  if (hasCopySession()) return true
   if (hasContractReviewSession() || hasResumeGenerateDraft()) return true
   try {
     if (typeof window === 'undefined' || !window.sessionStorage) return true

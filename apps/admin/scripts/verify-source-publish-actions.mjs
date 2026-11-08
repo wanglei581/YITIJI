@@ -345,4 +345,71 @@ if (!mockAdapter.includes('paginateAdminSourceRows') || !policiesAdmin.includes(
 }
 pass('ADM-C15 三个来源页分页控件读服务端 total，mock/http 都按 page/pageSize 分页')
 
+
+// 2026-11-05：政策实际写 recruitment.emergency_takedown，按 targetType 服务端筛选后再取最近 10 次。
+{
+  const cardPath = join(adminRoot, 'src/routes/components/RecentEmergencyAuditCard.tsx')
+  const source = readFileSync(cardPath, 'utf8')
+  const policy = readFileSync(join(adminRoot, 'src/routes/policy-sources/index.tsx'), 'utf8')
+  const ast = ts.createSourceFile('policy.tsx', policy, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let cards = 0
+  const visit = (node) => {
+    if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(ast) === 'RecentEmergencyAuditCard') {
+      cards++
+      assert.ok(node.attributes.properties.some((attr) => ts.isJsxAttribute(attr) && attr.name.getText(ast) === 'targetType' && attr.initializer?.text === 'policy'), '政策页所有状态的审计卡都必须按 policy 筛选')
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(ast)
+  assert.equal(cards, 3, '正常/空态/失败态都保留审计卡')
+  const module = { exports: {} }
+  const queries = []
+  const effects = []
+  const states = []
+  let stateIndex = 0
+  const fixtures = Array.from({ length: 24 }, (_, index) => ({
+    id: `audit-${index}`, targetType: index % 3 === 0 ? 'job' : 'policy',
+    action: index % 2 === 0 ? 'policy.emergency_takedown' : 'recruitment.emergency_takedown',
+    createdAt: new Date(Date.UTC(2026, 10, 5, 0, index)).toISOString(),
+  }))
+  const jsx = (type, props) => ({ type, props })
+  const dependencies = {
+    'react/jsx-runtime': { jsx, jsxs: jsx },
+    react: {
+      useState: (initial) => { const slot = stateIndex++; states[slot] = initial; return [initial, (value) => { states[slot] = value }] },
+      useCallback: (fn) => fn, useEffect: (fn) => effects.push(fn), useRef: (current) => ({ current }),
+    },
+    '@ai-job-print/shared': {}, '../../lib/auditActionLabels': {}, '../../services/auth': {},
+    '../../services/api/audit': {
+      getAuditLogs: async (query) => {
+        queries.push(query)
+        return { items: fixtures.filter((row) => row.action === query.action && (!query.targetType || row.targetType === query.targetType)).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, query.limit) }
+      },
+    },
+  }
+  const output = ts.transpileModule(source, { fileName: 'card.tsx', compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText
+  vm.runInNewContext(output, { module, exports: module.exports, Date, require: (name) => { assert.ok(name in dependencies, `意外依赖 ${name}`); return dependencies[name] } })
+  const { RecentEmergencyAuditCard, POLICY_AUDIT_ACTIONS, RECRUITMENT_AUDIT_ACTIONS } = module.exports
+  assert.ok(POLICY_AUDIT_ACTIONS.includes('policy.emergency_takedown'), '保留历史动作')
+  assert.ok(POLICY_AUDIT_ACTIONS.includes('recruitment.emergency_takedown'), '兼容真实动作')
+  RecentEmergencyAuditCard({ actions: POLICY_AUDIT_ACTIONS, targetType: 'policy' })
+  effects.splice(0).forEach((effect) => effect())
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(queries.length, 2)
+  for (const query of queries) assert.equal(query.targetType, 'policy')
+  assert.equal(states[0].length, 10)
+  assert.ok(states[0].every((row) => row.targetType === 'policy'))
+  assert.ok(states[0].some((row) => row.action === 'policy.emergency_takedown'))
+  assert.ok(states[0].some((row) => row.action === 'recruitment.emergency_takedown'))
+  const expected = fixtures.filter((row) => row.targetType === 'policy').sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, 10)
+  assert.equal(JSON.stringify(states[0].map((row) => row.id)), JSON.stringify(expected.map((row) => row.id)))
+  queries.length = 0
+  stateIndex = 0
+  RecentEmergencyAuditCard({ actions: RECRUITMENT_AUDIT_ACTIONS })
+  effects.splice(0).forEach((effect) => effect())
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.ok(queries.every((query) => query.targetType === undefined), '招聘处置卡保持原筛选范围')
+  pass('政策处置卡兼容新旧动作，服务端筛 policy，跨动作合并最近 10 条；其他卡范围不变')
+}
+
 console.log('\nALL PASS')

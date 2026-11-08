@@ -114,7 +114,8 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/help', url: '/help', marker: screen('help'), featureText: '你想解决' },
   { pattern: '/activities', url: '/activities', marker: screen('activities'), featureText: '权益活动' },
   { pattern: '/activities/:id', url: '/activities/activity-001', marker: screen('activity-detail'), featureText: '返回活动' },
-  { pattern: '/renshi', url: '/renshi', marker: '.w4-policy-page', featureText: '仅信息指引 · 不代办' },
+  // 2026-11-05 政策最小闭环：/renshi 无参数是停放的旧入口，回政策首页（六类）。
+  { pattern: '/renshi', url: '/renshi', expectedPath: '/policy-service', marker: '[data-testid="policy-touch-hub"]', featureText: '查政策' },
   { pattern: '/campus', url: '/campus', marker: touch, featureText: '2026 青岛高校毕业生招聘会' },
   { pattern: '/campus/welcome', url: '/campus/welcome', marker: touch, featureText: '校园招聘迎新指引' },
   { pattern: '/campus/freshman-insights', url: '/campus/freshman-insights', marker: '[data-qxt-screen]:has-text("暂无经核验的校园招聘统计")', featureText: '不会展示示例数据' },
@@ -168,12 +169,12 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   // featureText 顺势从栏目名改钉那五句**合规诚实性声明**——钉合规边界比钉栏目名有判别力：
   // 迁移里最容易丢的就是这几句，钉住它们，漏抄当场变红。
   { pattern: '/resume-service', url: '/resume-service', marker: 'h1:text-is("你手上有简历吗？")', featureText: '系统不代投、不替企业筛选或邀约。' },
-  // 扫描选类型屏（第 9 包按第 5 版稿重排）的屏上功能名是「材料扫描」，原来的「扫描服务」已不在屏上。
-  { pattern: '/scan', url: '/scan', marker: w2('scan-start'), featureText: '材料扫描' },
-  { pattern: '/scan/start', url: '/scan/start', expectedPath: '/scan', marker: w2('scan-start'), featureText: '材料扫描' },
+  // K1b-1：选材料屏标题照稿改成「扫什么？」。打印扫描入口上的「材料扫描」不在这几条里。
+  { pattern: '/scan', url: '/scan', marker: w2('scan-start'), featureText: '扫什么？' },
+  { pattern: '/scan/start', url: '/scan/start', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫什么？' },
   { pattern: '/scan/settings', url: '/scan/settings', expectedPath: '/scan', marker: w2('scan-settings'), featureText: '未创建扫描任务' },
-  { pattern: '/scan/progress', url: '/scan/progress', expectedPath: '/scan', marker: w2('scan-start'), featureText: '材料扫描' },
-  { pattern: '/scan/result', url: '/scan/result', expectedPath: '/scan', marker: w2('scan-start'), featureText: '材料扫描' },
+  { pattern: '/scan/progress', url: '/scan/progress', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫什么？' },
+  { pattern: '/scan/result', url: '/scan/result', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫什么？' },
 
   { pattern: '/jobs', url: '/jobs', marker: touch, featureText: '岗位信息' },
   { pattern: '/jobs-service', url: '/jobs-service', marker: 'h1:text-is("想找哪种工作？")', featureText: '投递在来源平台完成。' },
@@ -207,7 +208,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/contract-review', url: '/contract-review', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
   { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
   { pattern: '/contract-review/result', url: '/contract-review/result', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
-  { pattern: '/policy-service', url: '/policy-service', marker: 'h1:text-is("看来源、查条件、备材料")', featureText: 'AI顾问不替主管部门作资格判断。' },
+  { pattern: '/policy-service', url: '/policy-service', marker: '[data-testid="policy-touch-hub"]', featureText: '查政策' },
   // 开发样板（非业务屏）。W6 浏览器跑的是生产构建，样板页不挂载，地址回到首页。
   { pattern: '/dev/touch-gallery', url: '/dev/touch-gallery', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
 ] as const // 110 routes (109 + 2026-10-27 开发样板 /dev/touch-gallery)

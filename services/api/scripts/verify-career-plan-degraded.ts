@@ -132,8 +132,9 @@ async function main() {
   const stubLlm = { build: () => { throw new Error('本门禁不应触发 LLM') } }
 
   /** 端口缺席（PR #636 未合入 main 时的真实形态）。 */
+  const allowConsent = { requireActiveConsent: async () => undefined } as never
   const svcNoStats = new CareerPlanService(
-    prisma, stubLlm as never, stubExtraction as never, files, pdf, audit, aiLog, degradedPdf,
+    prisma, stubLlm as never, stubExtraction as never, files, pdf, audit, aiLog, degradedPdf, allowConsent,
   )
   /** 端口在场（#636 合入后的形态，用 stub 提前守住版式）。 */
   const makeSvcWithStats = (sufficient: boolean) => {
@@ -141,7 +142,7 @@ async function main() {
       getStats: () => Promise.resolve({ data: statsFixture(sufficient) }),
     }
     return new CareerPlanService(
-      prisma, stubLlm as never, stubExtraction as never, files, pdf, audit, aiLog, degradedPdf, port,
+      prisma, stubLlm as never, stubExtraction as never, files, pdf, audit, aiLog, degradedPdf, allowConsent, port,
     )
   }
 

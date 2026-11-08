@@ -1,0 +1,159 @@
+/* 屏上扫描完成页。文件卡、去向行。进行中的几屏不引用这份。 */
+
+[data-qx-page='scan-workbench'] .cs-file {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px 26px 18px;
+  border-radius: 30px;
+  background: var(--qxt-card);
+  /* 边框用看得见的墨色。--qxt-edge 几乎透明，完成页预览区会量成一整条空白。 */
+  border: 2px solid var(--qxt-ink-3);
+}
+
+[data-qx-page='scan-workbench'] .cs-fhead {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+[data-qx-page='scan-workbench'] .cs-fhead .ft {
+  width: 76px;
+  height: 96px;
+  border-radius: 14px;
+  background: var(--qx-cinnabar-soft);
+  color: var(--qx-cinnabar);
+  display: grid;
+  place-items: center;
+  font: 700 20px var(--qx-sans);
+  flex: none;
+}
+
+[data-qx-page='scan-workbench'] .cs-fhead .tx {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+[data-qx-page='scan-workbench'] .cs-fhead b {
+  font: 700 34px/1.3 var(--qx-sans);
+  word-break: break-all;
+}
+
+[data-qx-page='scan-workbench'] .cs-fhead .meta {
+  font-size: 28px;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .cs-fhead .chips {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 300px;
+}
+
+[data-qx-page='scan-workbench'] .cs-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--qxt-well);
+  color: var(--qxt-ink);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+[data-qx-page='scan-workbench'] .cs-chip.clay {
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+}
+
+[data-qx-page='scan-workbench'] .cs-fpages {
+  flex: 1 1 auto;
+  min-height: 240px;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  padding: 16px;
+  overflow: hidden;
+}
+
+[data-qx-page='scan-workbench'] .cs-fpages .text-xs { font-size: 20px; line-height: 1.45; }
+[data-qx-page='scan-workbench'] .cs-fpages .text-sm { font-size: 22px; }
+
+[data-qx-page='scan-workbench'] .cs-open {
+  align-self: center;
+  min-height: 56px;
+  padding: 0 22px;
+  border-radius: 18px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  color: var(--qxt-ink);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+[data-qx-page='scan-workbench'] .cs-saved {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 20px 26px;
+  border-radius: 26px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+[data-qx-page='scan-workbench'] .cs-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: none;
+}
+
+[data-qx-page='scan-workbench'] .cs-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-height: 104px;
+  padding: 12px 22px 12px 18px;
+  border-radius: 26px;
+  background: var(--qxt-card);
+  border: 2px solid var(--qxt-edge);
+  text-align: left;
+  width: 100%;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .cs-done .cs-row { min-height: 92px; }
+
+[data-qx-page='scan-workbench'] .cs-row .ic {
+  width: 68px;
+  height: 68px;
+  border-radius: 20px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+[data-qx-page='scan-workbench'] .cs-row .tx { flex: 1; min-width: 0; }
+[data-qx-page='scan-workbench'] .cs-row b { display: block; font-size: 28px; line-height: 1.3; }
+[data-qx-page='scan-workbench'] .cs-row small { display: block; font-size: 22px; line-height: 1.4; color: var(--qxt-ink-2); }
+[data-qx-page='scan-workbench'] .cs-row:disabled {
+  background: var(--qxt-well);
+  border-style: dashed;
+}
+[data-qx-page='scan-workbench'] .cs-row:disabled .ic { background: var(--qxt-paper-2); color: var(--qxt-ink-3); }
+[data-qx-page='scan-workbench'] .cs-row:disabled b { color: var(--qxt-ink-2); }
+
+/* 游客三条带走的办法（scanGuestWays）：字号、字重、行距沿用 .cs-warn，只去掉段落外边距；全局重置把列表序号去掉了，这里补回 1. 2. 3.。 */
+[data-qx-page='scan-workbench'] .cs-guest-ways p { margin: 0; }
+[data-qx-page='scan-workbench'] .cs-guest-ways ol { margin: 4px 0 0; padding-left: 1.6em; list-style: decimal; }
+[data-qx-page='scan-workbench'] .cs-guest-ways li + li { margin-top: 2px; }

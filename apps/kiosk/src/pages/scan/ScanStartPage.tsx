@@ -1,21 +1,48 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, type NavigateFunction } from 'react-router-dom'
 import { canCreateFormalPrintScanTask } from '@ai-job-print/shared'
+import { useLocalScanProbe } from '../../hooks/useTerminalDeviceStatus'
 import { FsRow } from '../print-scan/FsRow'
 import { PhoneHelpLine } from '../print-scan/phoneHelp'
 import {
   loadConfiguredCapabilities,
   type ConfiguredCapability,
 } from '../../services/api/printScanCapabilities'
+import { isScanMaterial, panelScanType, type ScanMaterial } from './scanMaterials'
+import { scanReadyChipText } from './scanProbeCopy'
 import {
-  ScanSample,
+  SCAN_DEVICE_RAIL,
   ScanTypeCards,
+  ScanSample,
   ScanWorkbenchShell,
   type ScanDock,
 } from './ScanWorkbenchChrome'
-import { SCAN_TRUTH, SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
+import { type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
 import { patchScanWorkbenchSession, readScanWorkbenchSession } from './scanWorkbenchSession'
+import { useScanDeviceCapability } from './useScanDeviceCapability'
+
+/**
+ * 面板路线真正建会话的那一次跳转。变量名必须是 selected：门禁按这个名字核对带去设置页的类型。
+ * 合同进面板时 selected 已经是 document。
+ */
+export function openPanelScanSettings(
+  navigate: NavigateFunction,
+  onGoStage: ((stage: ScanStage) => void) | undefined,
+  selected: ScanType,
+): void {
+  patchScanWorkbenchSession({
+    stage: 'settings',
+    scanType: selected,
+    live: undefined,
+    result: undefined,
+  })
+  if (onGoStage) {
+    onGoStage('settings')
+    return
+  }
+  navigate('/scan?stage=settings', { state: { scanType: selected } })
+}
 
 /** 能力门禁态：禁止伪装硬件已就绪。 */
 type ScanGate = 'loading' | 'allowed' | 'blocked' | 'unknown'
@@ -37,11 +64,16 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
   const navigate = useNavigate()
   const [params, setSearchParams] = useSearchParams()
   const usbPanel = params.get('mode') === 'usb-panel'
-  const storedType = readScanWorkbenchSession()?.scanType
+  const storedSession = readScanWorkbenchSession()
+  const storedType = storedSession?.material
+    ?? (isScanMaterial(storedSession?.scanType) ? storedSession.scanType : null)
   /* 进来不替人选类型（走查 I-16，回归：#1326 改成不默认选，触屏集成又改回 'resume'）。
    * 想扫证件、普通文档的人不点类型直接「下一步」，会被悄悄建成简历扫描。
    * 只有本机登记里已经有类型（同一场里回到这一屏）时才恢复；verify-fusion-w2-print-scan 钉住这句初值。 */
-  const [selected, setSelected] = useState<ScanType | null>(storedType ?? null)
+  const [selected, setSelected] = useState<ScanMaterial | null>(storedType ?? null)
+  const probe = useLocalScanProbe(false)
+  const deviceCap = useScanDeviceCapability()
+  const readyLabel = scanReadyChipText(probe.freshReady && deviceCap.allowed)
   const [gate, setGate] = useState<ScanGate>('loading')
   const [blockedNote, setBlockedNote] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
@@ -88,13 +120,15 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
           ? { tone: 'bad' as const, label: '扫描能力暂未开放' }
           : gate === 'unknown'
             ? { tone: 'unknown' as const, label: '能力状态暂不可用' }
-            : { tone: 'ok' as const, label: '可创建扫描任务 · 需面板操作' }
+            : readyLabel
+              ? { tone: 'ok' as const, label: readyLabel }
+              : { tone: 'ok' as const, label: '可创建扫描任务 · 需面板操作' }
 
   const subtitle = usbPanel
     ? '这是打印机自己的独立能力，不经过屏幕上的扫描流程'
     : blocked
       ? '当前无法创建扫描任务，请查看说明或改用其他方式'
-      : '请先选择扫描类型；本页尚未创建任务。下一步会真实建立这次扫描'
+      : '请先选择一种材料。本页尚未创建任务。'
 
   const goStart = () => {
     if (onGoStage) {
@@ -120,19 +154,22 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
           }
         : {
             primary: {
-              label: '下一步 · 建立这次扫描',
+              label: '下一步',
               onClick: () => {
+                if (selected === null) return
                 patchScanWorkbenchSession({
-                  stage: 'settings',
-                  scanType: selected,
+                  stage: 'how',
+                  material: selected,
+                  scanType: panelScanType(selected),
+                  deviceChoice: undefined,
                   live: undefined,
                   result: undefined,
                 })
                 if (onGoStage) {
-                  onGoStage('settings')
+                  onGoStage('how')
                   return
                 }
-                navigate('/scan?stage=settings', { state: { scanType: selected } })
+                navigate('/scan?stage=how')
               },
             },
           }
@@ -150,12 +187,14 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
               ? '扫描能力暂未开放'
               : gate === 'unknown'
                 ? '能力状态暂不可用'
-                : '材料扫描'
+                : '扫什么？'
       }
       subtitle={subtitle}
       status={status}
       layout="stack"
       dock={dock}
+      bandEyebrow={usbPanel || blocked ? undefined : '屏上扫描'}
+      bandRail={usbPanel || blocked ? undefined : { labels: SCAN_DEVICE_RAIL, now: 0 }}
     >
       {usbPanel ? (
         <>
@@ -234,37 +273,15 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
             }}
           />
           <div className="fs-grow">
-          <div className="fs-facts">
-            <div className="fs-fact wide">
-              <b>屏幕上没有「开始扫描」</b>
-              <span>只能在打印机屏幕上启动。网页不能远程驱动扫描仪，也没有扫到第几张的进度。</span>
-            </div>
-            <div className="fs-pairgrid">
-              <div className="fs-fact"><b>放好纸</b><span>把原稿放进扫描区。你在打印机上操作。</span></div>
-              <div className="fs-fact"><b>面板上按扫描</b><span>按屏幕上给出的这次说明操作。</span></div>
-            </div>
-            <div className="fs-fact wide"><b>回到这台机器</b><span>文件回来后在这里确认。未登录扫描件不会进入「我的文档」。</span></div>
-            <div className="fs-fact wide">
-              {selected === null ? (
-                <>
-                  <b>还没选材料类型</b>
-                  <span>点上面的一种材料，再点下一步。点类型只是选中，下一步才建立这次扫描。</span>
-                </>
-              ) : (
-                <>
-                  <b>已选「{SCAN_TYPE_LABELS[selected]}」</b>
-                  <span>点类型只是选中。下一步建立这次扫描，并确认这台机器能收到扫描件。</span>
-                </>
-              )}
-            </div>
-          </div>
           <div className="sw-truth" data-disclaimer="true" data-testid="scan-workbench-truth">
-            {SCAN_TRUTH.map((item) => (
-              <div key={item.title}>
-                <b>{item.title}</b>
-                {item.body}
-              </div>
-            ))}
+            <div>
+              <b>这一步</b>
+              只选材料，还没有建立扫描。
+            </div>
+            <div>
+              <b>未登录</b>
+              未登录扫描件不会进入「我的文档」。
+            </div>
           </div>
           </div>
         </>

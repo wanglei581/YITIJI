@@ -56,10 +56,17 @@ assert.doesNotMatch(
   /\/kiosk\/device\/status|fetchScannerStatus|setInterval\s*\(/,
   'scan start must not depend on the nonexistent device-status endpoint or auto retry it',
 )
-assert.match(
+// K1b-1（2026-11-03）：这句话跟着「真的会建会话」的那一下走，不留在选材料屏。
+// 选材料屏不得再出现这句；怎么扫 / 屏上未开通必须仍出现。判据没有删，也没有放宽。
+assert.doesNotMatch(
   scanStart,
   /\u4e0b\u4e00\u6b65\u4f1a\u771f\u5b9e\u5efa\u7acb\u8fd9\u6b21\u626b\u63cf/,
-  'scan start must explain that the next step really creates this scan',
+  'scan start must not claim the next click creates this scan',
+)
+assert.match(
+  read('src/pages/scan/ScanHowPage.tsx'),
+  /\u4e0b\u4e00\u6b65\u4f1a\u771f\u5b9e\u5efa\u7acb\u8fd9\u6b21\u626b\u63cf/,
+  'the screen whose next click creates this scan must still say so',
 )
 assert.match(
   scanStart,
@@ -198,6 +205,8 @@ const RESULT_PAGE_FILES = [
   'src/pages/scan/ScanResultPreviewBlock.tsx',
   'src/pages/scan/ScanResultExitRow.tsx',
   'src/pages/scan/ScanResultPage.tsx',
+  // 2026-11-08：游客三条带走的办法搬进共用的 scanGuestWays（屏上扫描完成屏也用），去向行只管渲染。
+  'src/pages/scan/scanGuestWays.ts',
 ]
 const scanResult = RESULT_PAGE_FILES.map(read).join('\n')
 /* 防漏登记：设置页 / 结果页以后再拆出新文件，必须加进上面两张表。否则「不得出现」类的断言
@@ -268,14 +277,32 @@ assert.match(
   /未登录扫描件不会进入「我的文档」/,
   'guest scan result must say the file will not enter My Documents',
 )
-/* 产品负责人 2026-11-02 拍板的游客说明（照触屏版补稿 cs-scan-done 的原话，再补一句 U 盘）：
- * 说清「请在本次操作内完成打印或识别」，带走电子版是「下次先扫码登录再扫」或「用 U 盘」，
- * U 盘那条这台机器暂未开通所以如实写出来。上面那条只钉开头，这里钉全句 —— 句子被改回走查 I-15 的旧版
- * （「要留在账号里：先登录，再重新扫一次」，会让人以为现在登录就能存进去），或者悄悄丢掉 U 盘那一句，都要红。 */
+/* 游客说明：2026-11-02 产品负责人拍板说清「请在本次操作内完成打印或识别」、带走电子版是「下次先扫码登录再扫」或「用 U 盘」；
+ * 2026-11-08 设计窗口答复游客「扫码带走」不做，改成先一句「不进『我的文档』」再列三条带走的办法（scanGuestWays，
+ * 面板结果页与屏上扫描完成屏共用）。上面那条只钉开头，这里逐条钉全句 —— 句子被改回走查 I-15 的旧版
+ * （「要留在账号里：先登录，再重新扫一次」，会让人以为现在登录就能存进去），或者悄悄丢掉其中一条（U 盘那条这台机器暂未开通，所以如实写），都要红。
+ * 第三条后半句「手机小程序里也能看到」只在小程序已发布时出现（whenMiniapp），没发布不许说。 */
 assert.match(
   scanResult,
-  /未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。要带走电子版，下次先扫码登录再扫。用 U 盘带走：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。/,
-  'guest scan result must carry the 11/02 approved wording incl. the USB line',
+  /SCAN_GUEST_WAYS_LEAD = '未登录扫描件不会进入「我的文档」。带走的办法：'/,
+  'guest scan result leads with the 11/08 sentence before listing the three ways',
+)
+for (const way of [
+  /'当场打印：请在本次操作内完成打印或识别。'/,
+  /'存 U 盘：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。'/,
+  /`存进「我的文档」：下次先扫码登录再扫\$\{whenMiniapp\(contact, '，手机小程序里也能看到'\)\}。`/,
+]) {
+  assert.match(scanResult, way, `guest scan result must list the 11/08 way ${way}`)
+}
+assert.match(
+  read('src/pages/scan/ScanResultExitRow.tsx'),
+  /scanGuestWays\(contact\)/,
+  'the panel result row renders the shared three ways',
+)
+assert.match(
+  read('src/pages/scan/ScanDeviceDonePage.tsx'),
+  /scanGuestWays\(contact\)/,
+  'the on-screen scan done page renders the same three ways for guests',
 )
 assert.doesNotMatch(
   scanResult,
@@ -309,6 +336,19 @@ assert.match(scanFormat, /if \(!mime\) return '未知格式'/, 'missing mime map
 const workbench = read('src/pages/scan/ScanWorkbenchPage.tsx')
 assert.match(workbench, /readScanWorkbenchSession/, 'workbench rehydrates from sessionStorage')
 assert.match(workbench, /replace: true/, 'workbench stage changes replace history')
+/* 2026-11-08 K1b 并 main 后浏览器用例抓到：工作台页订阅登录上下文后，登录、退出、忙碌标记一变
+ * 整页重渲染、重读会话存储，设置页 / 等待页多挂一次，投递确认、轮询、撤销跟着多发。
+ * 登录态只在「怎么扫」那一屏里读（ScanHowPage），工作台页不许再订阅。 */
+assert.doesNotMatch(
+  workbench,
+  /\buseAuth\s*\(/,
+  'scan workbench must not subscribe to the auth context; ScanHowPage reads login state itself',
+)
+assert.match(
+  read('src/pages/scan/ScanHowPage.tsx'),
+  /const \{ isLoggedIn \} = useAuth\(\)/,
+  '「怎么扫」自己读登录态，决定要不要接着用登录续接记号',
+)
 
 /* 2026-09-08 补：三条公共终端约束里，「复水」和「replace」上面已有断言，
  * 但「URL 是意图不是授权」和「离开进度阶段必须停轮询」当时只在代码里，没被钉住。
@@ -592,7 +632,6 @@ assert.match(
   '离开 = 先撤服务端任务，再清本地登记，最后才走人；落点是参数，语义不随落点变',
 )
 for (const [prop, destination] of [
-  ['onBack', '/print-scan'],
   ['onHome', '/'],
   ['onAdvisor', '/assistant'],
   ['onProfile', '/profile'],
@@ -603,6 +642,19 @@ for (const [prop, destination] of [
     `${prop}（落点 ${destination}）必须走 leaveScanFlow，不能自己 navigate`,
   )
 }
+// K1b-1（2026-11-03）：顶栏返回的默认落点仍是离开整条流程。
+// 「怎么扫 / 放纸」可以显式传入 onBandBack，只在这条流程里退一步，不撤会话。
+// 不传 onBandBack 时必须还是 leaveScanFlow('/print-scan')。不许改成自己 navigate。这不是放宽。
+assert.match(
+  scanChrome,
+  /onBack=\{onBandBack \?\? \(\(\) => leaveScanFlow\('\/print-scan'\)\)\}/,
+  '顶栏返回不传 onBandBack 时必须 leaveScanFlow(\'/print-scan\')，不能自己 navigate',
+)
+assert.doesNotMatch(
+  scanChrome,
+  /onBack=\{[^}]*navigate\(/,
+  '顶栏返回不许自己 navigate',
+)
 assert.doesNotMatch(
   scanChrome,
   /on(Home|Advisor|Profile)=\{\(\) => navigate\(/,
@@ -2097,6 +2149,17 @@ assert.equal(
   `scan workbench model unit test failed: ${modelTest.stderr || modelTest.stdout}`,
 )
 
+const deviceStateTest = spawnSync(
+  process.execPath,
+  ['--test', resolve(kioskRoot, 'scripts/tests/scan-device-state.test.mjs')],
+  { encoding: 'utf8' },
+)
+assert.equal(
+  deviceStateTest.status,
+  0,
+  `scan device state unit test failed: ${deviceStateTest.stderr || deviceStateTest.stdout}`,
+)
+
 const createReplayTest = spawnSync(
   process.execPath,
   ['--test', resolve(kioskRoot, 'scripts/tests/scan-create-replay.test.mjs')],
@@ -2158,5 +2221,13 @@ assert.equal(
   0,
   `scan cleanup gate behaviour test failed: ${cleanupGateTest.stderr || cleanupGateTest.stdout}`,
 )
+
+// 五张故障屏、同会话改用与双端停止必须有运行时负向覆盖。
+const deviceRecoveryTest = spawnSync(
+  process.execPath,
+  ['--test', resolve(kioskRoot, 'scripts/tests/scan-device-state.test.mjs'), resolve(kioskRoot, 'scripts/tests/scan-device-recovery.test.mjs')],
+  { encoding: 'utf8' },
+)
+assert.equal(deviceRecoveryTest.status, 0, `scan device recovery behaviour failed: ${deviceRecoveryTest.stderr || deviceRecoveryTest.stdout}`)
 
 console.log('ALL PASS scan session truth contract')

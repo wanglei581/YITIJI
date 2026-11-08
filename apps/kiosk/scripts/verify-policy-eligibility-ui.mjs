@@ -111,15 +111,12 @@ check(
   'A7. 未连接后端时如实说明，不本地伪造问项或结论',
 )
 
-// ── B. 面板真的挂在页面上 ─────────────────────────────────────────────────
-check(
-  /<EligibilityPanel(?:\s[^>]*)?\/>/.test(page) && page.includes("activeTab === 'eligibility'"),
-  'B1. EligibilityPanel 挂在政策服务页（不是死代码）',
-)
-check(
-  shared.includes("'eligibility'") && stripComments(components).includes("key: 'eligibility'"),
-  'B2. 条件核对 Tab 在 TabKey 与 TabBar 中登记（可达）',
-)
+// ── B. 11/05 停放：保留源码真实性检查，活路由不得再挂面板 ────────────
+check(!/import[^\n]*EligibilityPanel/.test(page) && page.includes('<Navigate to="/policy-service" replace />'),
+  'B1. 条件核对源码保留，但活路由不再导入，旧 tab 返回政策首页')
+check(panel.startsWith('// 停放（2026-11-05 政策最小闭环）') && shared.includes("'eligibility'") &&
+  stripComments(components).includes("key: 'eligibility'"),
+  'B2. 停放面板和旧类型/共享件保留，恢复时原有约束仍可验证')
 
 // ── C. 两种「空」必须是两句不同的话（本门禁核心）─────────────────────────
 const require_ = createRequire(import.meta.url)

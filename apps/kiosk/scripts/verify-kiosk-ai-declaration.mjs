@@ -175,7 +175,7 @@ const toDataUrl = (code) => `data:text/javascript;base64,${Buffer.from(code).toS
 const transpile = (relativePath) => ts.transpileModule(
   read(relativePath),
   { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }, fileName: relativePath },
-).outputText
+).outputText.replace("from '../pages/copy/copySession'", () => `from '${toDataUrl(transpile('src/pages/copy/copySession.ts'))}'`)
 
 async function kindTableChecks() {
   const parsed = parseServerAiUse()
@@ -791,9 +791,15 @@ async function loadClearance() {
   const scanModelUrl = leaf('src/pages/scan/scanWorkbenchModel.ts')
   const selfAssessmentCode = `${transpile('src/pages/resume/selfAssessmentSession.ts')}${tag}`
     .replaceAll("from '@ai-job-print/shared'", `from '${questionsStub}'`)
+  const scanMaterialsUrl = toDataUrl(`${transpile('src/pages/scan/scanMaterials.ts')}${tag}`)
   const scanSessionCode = `${transpile('src/pages/scan/scanWorkbenchSession.ts')}${tag}`
     .replaceAll("from './scanWorkbench'", `from '${scanTypeStub}'`)
     .replaceAll("from './scanWorkbenchModel'", `from '${scanModelUrl}'`)
+    .replaceAll("from './scanMaterials'", `from '${scanMaterialsUrl}'`)
+  const scanSessionUrl = toDataUrl(scanSessionCode)
+  const scanHowContinueCode = `${transpile('src/pages/scan/scanHowContinue.ts')}${tag}`
+    .replaceAll("from './scanMaterials'", `from '${scanMaterialsUrl}'`)
+    .replaceAll("from './scanWorkbenchSession'", `from '${scanSessionUrl}'`)
   const interviewCode = `${transpile('src/pages/interview/interviewWorkbenchSession.ts')}${tag}`
     .replaceAll("from './interviewWorkbenchModel'", `from '${interviewModelUrl}'`)
   const assistantDraftCode = transpile('src/services/assistantDraft.ts').replaceAll("from 'react'", `from '${import.meta.resolve('react')}'`)
@@ -815,7 +821,8 @@ async function loadClearance() {
     .replaceAll("from '../pages/resume/jobMaterialDraft'", `from '${leaf('src/pages/resume/jobMaterialDraft.ts')}'`)
     .replaceAll("from '../pages/resume/selfAssessmentSession'", `from '${toDataUrl(selfAssessmentCode)}'`)
     .replaceAll("from '../pages/interview/interviewWorkbenchSession'", `from '${toDataUrl(interviewCode)}'`)
-    .replaceAll("from '../pages/scan/scanWorkbenchSession'", `from '${toDataUrl(scanSessionCode)}'`)
+    .replaceAll("from '../pages/scan/scanWorkbenchSession'", `from '${scanSessionUrl}'`)
+    .replaceAll("from '../pages/scan/scanHowContinue'", `from '${toDataUrl(scanHowContinueCode)}'`)
     .replaceAll("from '../pages/scan/scanCleanupGate'", `from '${cleanupStub}'`)
     .replaceAll("from '../favorites/localFavorites'", `from '${leaf('src/favorites/localFavorites.ts')}'`)
     .replaceAll("from '../pages/contract-review/contractReviewSession'", `from '${leaf('src/pages/contract-review/contractReviewSession.ts')}'`)

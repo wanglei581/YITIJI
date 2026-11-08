@@ -9,7 +9,8 @@
 // ============================================================
 
 import { createHash, randomBytes } from 'crypto'
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common'
+import { AssistantPolicyContextService, appendAssistantPolicyContext, policyUnavailableResult } from './assistant-policy-context'
 import type {
   AssistantAction,
   AssistantIntent,
@@ -70,6 +71,7 @@ interface SessionEntry {
   messages: ChatMessage[]
   updatedAt: number
   ownerKey: string
+  policyId?: string
   /** 上一轮回的是设备故障的固定回答：紧接着的短追问也不送模型。 */
   deviceFaultJustAnswered?: boolean
 }
@@ -273,7 +275,11 @@ export class LlmChatService {
   private readonly logger = new Logger(LlmChatService.name)
   private readonly sessions = new Map<string, SessionEntry>()
 
-  constructor(private readonly config: LlmConfigService) {}
+  constructor(private readonly config: LlmConfigService, @Optional() private readonly policyContext?: AssistantPolicyContextService) {}
+
+  readPolicyContext(policyId: string): Promise<string | null> {
+    return this.policyContext?.read(policyId) ?? Promise.resolve(null)
+  }
 
   private pruneSessions(now: number): void {
     for (const [id, s] of this.sessions) {
@@ -310,7 +316,7 @@ export class LlmChatService {
     this.pruneSessions(Date.now())
     const requestedId = typeof input.sessionId === 'string' ? input.sessionId.trim() : ''
     const existing = requestedId ? this.sessions.get(requestedId) : undefined
-    const followUp = Boolean(existing && existing.ownerKey === ownerKey && existing.deviceFaultJustAnswered)
+    const followUp = Boolean(existing && existing.ownerKey === ownerKey && existing.policyId === input.policyId && existing.deviceFaultJustAnswered)
     return isDeviceFaultQuestion(input.message, followUp)
   }
 
@@ -338,7 +344,10 @@ export class LlmChatService {
      */
     onLlmCall?: AiLlmCallSink,
     ownerKey = 'anon',
+    policyPrompt?: string,
   ): Promise<ChatOutput> {
+    const currentPolicy = policyPrompt ?? (input.policyId === undefined ? undefined : await this.readPolicyContext(input.policyId))
+    if (currentPolicy === null) return policyUnavailableResult()
     const apiKey = this.config.getApiKey('assistant_chat')
     const cfg = this.config.getConfig('assistant_chat')
 
@@ -369,6 +378,12 @@ export class LlmChatService {
       this.sessions.set(sessionId, session)
     }
     const channel = resolveAssistantChannel(input.channel)
+    // 切换/取消政策后不再把上一条政策的对话作为本轮依据。
+    if (session.policyId !== input.policyId) {
+      session.messages = []
+      session.deviceFaultJustAnswered = false
+    }
+    session.policyId = input.policyId
     // 说得很明白是眼前这台出了故障，才不送模型。拿不准的放给模型，由输出侧兜底。
     // 这一问一答不进会话历史：原话没过内容检查，留在历史里下一轮会原样带给模型。
     if (isDeviceFaultQuestion(input.message, session.deviceFaultJustAnswered)) {
@@ -390,7 +405,7 @@ export class LlmChatService {
     const channelConstraint = channel === 'miniapp' ? miniappChannelConstraint() : kioskChannelConstraint()
     const systemPrompt = channelConstraint ? `${guarded}\n\n${channelConstraint}` : guarded
     const payloadMessages: ChatMessage[] = [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: withAiSafety(appendAssistantPolicyContext(systemPrompt, currentPolicy)) },
       ...maskUserTurnsForLlm(session.messages.slice(-MAX_HISTORY)),
     ]
 

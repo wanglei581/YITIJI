@@ -26,7 +26,8 @@ import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
 import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
 import { useVisibleHelpLine } from '../public-touch/publicTouchHooks'
-import { mapTerminalPrinterStatus, normalizePrinterStatusRaw } from '../../hooks/useTerminalDeviceStatus'
+import { mapTerminalPrinterStatus, normalizePrinterStatusRaw, requestLocalScanProbe, useLocalScanProbe } from '../../hooks/useTerminalDeviceStatus'
+import { checkedAgoLabel, scannerStatusLine } from '../scan/scanProbeCopy'
 import { API_BASE_URL, getTerminalId } from '../../services/api'
 import { probeLocalAgent, type LocalAgentStatus } from '../../services/localAgentProbe'
 import './system-state-qx.css'
@@ -265,9 +266,12 @@ export default function ErrorOfflinePage() {
   }, [location.state])
 
   const view: View = checking ? 'checking' : !result ? 'unknown' : result.reachable ? 'partial' : 'offline'
+  const scanProbe = useLocalScanProbe(false)
 
   // counted=false 只给进页那一次自动检测用：它不算「重试」；之后的自动退避、online 重测和手动重新检测都算。
-  const retry = useCallback(async (counted = true) => {
+  // probeScanner：进页和「重新检测」才问扫描仪。自动退避只复测联网和打印机，不把扫描仪读数一直刷成新鲜。
+  const retry = useCallback(async (counted = true, probeScanner = true) => {
+    if (probeScanner) requestLocalScanProbe()
     if (checkingRef.current) return
     checkingRef.current = true
     setChecking(true)
@@ -337,11 +341,13 @@ export default function ErrorOfflinePage() {
   useEffect(() => {
     // 每次检测结束（view 从 checking 回来）都按当前退避重新排下一次；检测进行中不排。
     if (view === 'checking') return
-    const timer = window.setTimeout(() => void retry(), autoDelayMs)
+    const timer = window.setTimeout(() => void retry(true, false), autoDelayMs)
     return () => window.clearTimeout(timer)
   }, [autoDelayMs, retry, view])
 
   const rows = rowsFor(view, result)
+  const rowAgo = checkedAgoLabel(result ? result.at.getTime() : null)
+  const scanner = scannerStatusLine(scanProbe)
   const lastCheck = result ? `最近一次检测：${clock(result.at)}` : ''
   const nextAuto = `约 ${autoDelayMs / 1000} 秒后自动再${view === 'offline' ? '试' : '检测'}`
   const outcome = outcomeOf(rows)
@@ -418,10 +424,26 @@ export default function ErrorOfflinePage() {
               {CAPS.map((cap, index) => (
                 <li key={cap.key} className="qxp-hit of-row" data-cap={cap.key}>
                   <span className="qxp-ic" data-tone={cap.tone} aria-hidden="true"><Glyph name={cap.glyph} size={30} /></span>
-                  <span className="qxp-tx"><b>{cap.name}</b><small>{rows[index].dep}</small></span>
+                  <span className="qxp-tx">
+                    <b>{cap.name}</b>
+                    <small>{rowAgo ? `${rows[index].dep} · ${rowAgo}` : rows[index].dep}</small>
+                  </span>
                   <span className="of-verdict" data-tone={rows[index].verdict[1]}>{rows[index].verdict[0]}</span>
                 </li>
               ))}
+            </ul>
+            <ul className="of-list" data-testid="system-state-scanner" aria-label="扫描仪">
+              <li className={`qxp-hit of-row of-scan${scanner.tone === 'ok' ? '' : ' is-stale'}`} data-cap="scanner">
+                <span className="qxp-ic" data-tone="teal" aria-hidden="true"><Glyph name="scan" size={36} /></span>
+                <span className="qxp-tx">
+                  <b>扫描仪</b>
+                  <small>{scanner.dep}</small>
+                </span>
+                <span className="of-st">
+                  <span className="of-chip" data-tone={scanner.tone}>{scanner.label}</span>
+                  {scanner.ago ? <span className="of-when">{scanner.ago}</span> : null}
+                </span>
+              </li>
             </ul>
             <Card className="of-machine" testId={view === 'offline' ? 'system-state-fallback' : undefined}>
               {lastCheck ? <p className="qxp-note of-last">{lastCheck}</p> : null}

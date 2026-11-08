@@ -14,6 +14,7 @@
  * 运行:pnpm --filter @ai-job-print/api verify:policies
  */
 import 'dotenv/config'
+import { POLICY_PUBLISH_FIXTURE, POLICY_VERIFIED_DOMAINS_FIXTURE } from './support/policy-publish-fixture'
 import { randomUUID } from 'crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -80,8 +81,8 @@ async function main() {
   await prisma.organization.createMany({
     data: [
       // contentTrustStatus='active':发布闸门要求来源机构已通过内容信任核验(见 src/common/content-trust.ts)
-      { id: orgA, name: `政策机构A_${suffix}`, type: 'public_employment_service', contentTrustStatus: 'active' },
-      { id: orgB, name: `政策机构B_${suffix}`, type: 'public_employment_service', contentTrustStatus: 'active' },
+      { id: orgA, name: `政策机构A_${suffix}`, type: 'public_employment_service', contentTrustStatus: 'active', verifiedOfficialDomainsJson: POLICY_VERIFIED_DOMAINS_FIXTURE },
+      { id: orgB, name: `政策机构B_${suffix}`, type: 'public_employment_service', contentTrustStatus: 'active', verifiedOfficialDomainsJson: POLICY_VERIFIED_DOMAINS_FIXTURE },
     ],
   })
   const partnerARow = await prisma.user.create({
@@ -109,7 +110,7 @@ async function main() {
   try {
     // ── 1. 字段约束 ────────────────────────────────────────────────────────
     await expectCode(
-      () => svc.createPartnerPolicy({ kind: 'policy_guide', title: '缺人群' }, partnerA),
+      () => svc.createPartnerPolicy({ ...POLICY_PUBLISH_FIXTURE, kind: 'policy_guide', title: '缺人群' }, partnerA),
       'AUDIENCE_REQUIRED',
       '1a. policy_guide 缺 audience 被拒',
     )
@@ -121,7 +122,7 @@ async function main() {
 
     // ── 2. 创建默认 pending+draft,Kiosk 不可见 ────────────────────────────
     const guide = await svc.createPartnerPolicy(
-      { kind: 'policy_guide', title: `验证扶持_${suffix}`, audience: 'graduate', summary: '验证摘要' },
+      { ...POLICY_PUBLISH_FIXTURE, kind: 'policy_guide', title: `验证扶持_${suffix}`, audience: 'graduate', summary: '验证摘要' },
       partnerA,
     )
     const noticePost = await svc.createPartnerPolicy(

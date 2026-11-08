@@ -1,0 +1,61 @@
+/* C3b-2：只有真实派发阶段，不画逐张出纸动画。 */
+.copy-touch .cc-print { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+.copy-touch .cc-print-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.copy-touch .cc-print-steps > div { min-height: 210px; padding: 22px; display: flex; flex-direction: column; gap: 12px; border: 1.5px solid var(--qxt-edge); border-radius: 26px; background: var(--qxt-card); }
+.copy-touch .cc-print-steps > div > span { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 50%; background: var(--qxt-deep-2); color: var(--qxt-cream); font-size: 28px; }
+.copy-touch .cc-print-steps b { font-size: 30px; line-height: 1.35; }
+.copy-touch .cc-print-steps em { font-style: normal; font-size: 24px; }
+.copy-touch .cc-print-steps .on { background: var(--qxt-teal-wash); color: var(--qxt-teal-ink); }
+.copy-touch .cc-print-steps .now { border-color: var(--qxt-teal-ink); color: var(--qxt-teal-ink); }
+.copy-touch .cc-print-hero { flex: 1; min-height: 360px; display: grid; place-items: center; border-radius: 30px; background: var(--qxt-well); }
+.copy-touch .cc-print-hero .pa { width: min(85%, 720px); }
+.copy-touch .cc-print-hero svg { display: block; width: 100%; height: auto; }
+.copy-touch .cc-original { display: flex; align-items: center; gap: 26px; padding: 28px 36px; border-radius: 30px; background: var(--qxt-clay-wash); color: var(--qxt-clay-ink); font: 700 36px/1.45 var(--qx-serif); }
+.copy-touch .cc-original svg { flex: none; }
+.copy-touch .cc-take { flex: 1; min-height: 360px; display: flex; align-items: center; justify-content: center; gap: 20px; border: 1.5px solid var(--qxt-edge); border-radius: 30px; padding: 24px; background: var(--qxt-card); }
+.copy-touch .cc-take .cc-take-printer { position: relative; width: 64%; }
+.copy-touch .cc-take-printer i { position: absolute; left: 24%; bottom: 9%; width: 52%; height: 20%; border-radius: 6px; background: var(--qxt-card); border: 1px solid var(--qxt-art-edge); transform: rotate(-2deg); }
+.copy-touch .cc-take-printer i:nth-of-type(2) { transform: rotate(1deg); bottom: 10%; }
+.copy-touch .cc-take-printer i:nth-of-type(3) { transform: none; bottom: 11%; }
+.copy-touch .cc-take-printer i::after { content: ""; position: absolute; top: 25%; left: 10%; width: 65%; height: 6%; background: var(--qxt-art-rule); box-shadow: 0 20px 0 var(--qxt-art-rule), 0 40px 0 var(--qxt-art-rule); }
+.copy-touch .cc-take .pa svg { display: block; width: 100%; height: auto; }
+.copy-touch .cc-take-label { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+.copy-touch .cc-take b { font: 700 42px/1.3 var(--qx-serif); }
+.copy-touch .cc-take span { font-size: 26px; line-height: 1.6; }
+.copy-touch .cc-result-help { display: flex; align-items: center; gap: 18px; margin: 0; padding: 22px 28px; border-radius: 26px; background: var(--qxt-teal-wash); color: var(--qxt-teal-ink); font-size: 25px; font-weight: 600; line-height: 1.55; }
+.copy-touch .cc-result-help svg { flex: none; }
+.copy-touch .cc-quota-facts { display: grid; gap: 10px; margin: 20px 0 0; padding: 18px 0 0; list-style: none; border-top: 1.5px solid var(--qxt-edge); }
+.copy-touch .cc-quota-facts li { position: relative; padding-left: 26px; font-size: 24px; line-height: 1.5; color: var(--qxt-ink-2); }
+.copy-touch .cc-quota-solo .cs-why { grid-template-columns: minmax(0, 1fr); justify-items: center; align-content: center; gap: 28px; padding: 36px 56px; text-align: center; }
+.copy-touch .cc-quota-solo .cc-quota-facts { justify-items: center; }
+.copy-touch .cc-quota-facts li::before { content: ''; position: absolute; left: 4px; top: .6em; width: 10px; height: 10px; border-radius: 50%; background: var(--qxt-teal-ink); }
+.copy-touch .cc-result-steps { display: grid; gap: 12px; }
+.copy-touch .cc-result-steps > div { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 24px 26px 24px 88px; min-height: 170px; border: 1.5px solid var(--qxt-edge); border-radius: 26px; background: var(--qxt-well); }
+.copy-touch .cc-result-steps > div > span { position: absolute; left: 24px; top: 24px; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; background: var(--qxt-teal-wash); font-size: 26px; }
+.copy-touch .cc-result-steps b { font-size: 30px; line-height: 1.4; }
+.copy-touch .cc-result-steps small { font-size: 24px; }
+.copy-touch .cc-result-actions { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+.copy-touch .cc-result-actions button { flex: 1; min-height: 220px; display: grid; grid-template-columns: 180px minmax(0, 1fr) 64px; align-items: center; gap: 24px; padding: 18px; border: 1.5px solid var(--qxt-edge); border-radius: 28px; text-align: left; background: var(--qxt-card); font-size: 30px; }
+.copy-touch .cc-result-actions .vis { align-self: stretch; display: grid; place-items: center; border-radius: 22px; background: var(--qxt-well); }
+.copy-touch .cc-result-actions .vis > * { width: 80%; }
+.copy-touch .cc-result-actions button > span:nth-child(2) { display: flex; flex-direction: column; gap: 12px; }
+.copy-touch .cc-result-actions .pa svg { width: 100%; height: auto; }
+.copy-touch .cc-copy-error { flex: 1; min-height: 0; display: flex; }
+.copy-touch .cc-copy-error .cs-why .vis .pa svg { display: block; width: 100%; height: auto; }
+.copy-touch .cc-copy-error .cs-way { font-size: 28px; }
+.copy-touch .cc-phone-shade { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: color-mix(in srgb, var(--qxt-deep-2) 60%, transparent); padding: 24px; }
+.copy-touch .cc-phone-shade section { width: min(100%, 780px); background: var(--qxt-card); border: 2px solid var(--qxt-edge); border-radius: 30px; padding: 40px; font-size: 30px; }
+.copy-touch .cc-phone-shade h2 { font-size: 38px; }
+.copy-touch .cc-phone-shade button { min-height: 64px; font-size: 28px; }
+@media (max-width: 700px) {
+  .copy-touch .cc-print-steps { grid-template-columns: 1fr; }
+  .copy-touch .cc-print-steps > div { min-height: 120px; }
+  .copy-touch :is(.cc-print-steps b, .cc-print-steps em, .cc-print-steps small, .cc-original, .cc-take span, .cc-result-help, .cc-result-steps b, .cc-result-steps small, .cc-result-actions button, .cc-result-actions small) { font-size: 20px; }
+  .copy-touch :is(.cc-original, .cc-take, .cc-result-actions button) { padding: 16px; gap: 16px; }
+  .copy-touch .cc-take { flex-direction: column; }
+  .copy-touch .cc-take .cc-take-printer { width: 90%; }
+  .copy-touch .cc-take b { font-size: 28px; }
+  .copy-touch .cc-result-actions button { grid-template-columns: 64px minmax(0, 1fr) 48px; }
+  .copy-touch .cc-result-steps > div { padding-left: 68px; }
+  .copy-touch .cc-result-steps > div > span { left: 12px; }
+}

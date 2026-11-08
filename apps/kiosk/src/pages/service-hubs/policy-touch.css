@@ -1,121 +1,86 @@
-/* 政策服务台页内样式。只挂在 .p10-hub 下，不改共享 .qxt-sec。
-   各区按内容高度排（不用 flex 增长、不用定行高的网格），整页由 qxt-body-scroll 滚动，
-   所以「检查中」「不可用」两态里文字不会互相压住。 */
-
-.qxt-screen .qxt-body:has(> .p10-hub) {
-  justify-content: flex-start;
-  padding: 14px 40px 12px;
+/* 政策最小闭环：只覆盖本页，颜色、字族与 band/dock/tile 复用触屏共享层。 */
+.qxt-screen[data-qx-page='policy-min'] .qxt-body { padding: 20px 40px; justify-content: flex-start; }
+.policy-min-body { display: flex; flex: 1 0 auto; flex-direction: column; gap: 20px; min-width: 0; width: 100%; }
+.policy-min-body h2 { margin: 0 0 14px; font-size: 30px; line-height: 1.35; }
+.policy-min-body p { margin: 8px 0; font-size: 24px; line-height: 1.6; }
+.policy-min-body ul { margin: 8px 0 0; padding-left: 30px; }
+.policy-min-body li { font-size: 24px; line-height: 1.65; overflow-wrap: anywhere; }
+.policy-min-body li + li { margin-top: 8px; }
+.policy-min-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.qxt-screen .policy-min-categories .qxt-tile { min-height: 260px; padding: 26px; gap: 12px; }
+.qxt-screen .policy-min-categories .qxt-tx b { font-size: 32px; line-height: 1.3; }
+.qxt-screen .policy-min-categories .qxt-tx small { font-size: 22px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.qxt-screen .policy-min-categories .qxt-off { opacity: .58; }
+.qxt-screen .policy-min-row,
+.qxt-screen .policy-min-button { min-width: 64px; min-height: 88px; padding: 18px 24px; border: 1.5px solid var(--qxt-line); border-radius: 22px; background: var(--qxt-card); color: var(--qxt-ink); font-size: 24px; line-height: 1.45; text-align: left; overflow-wrap: anywhere; }
+.qxt-screen .policy-min-button { text-align: center; background: var(--qxt-well); }
+.qxt-screen .policy-min-button:disabled { opacity: .58; cursor: default; }
+.policy-min-section,
+.policy-min-sample { padding: 26px 30px; border: 1.5px solid var(--qxt-line); border-radius: 28px; background: var(--qxt-card); overflow-wrap: anywhere; }
+.policy-min-sample { display: flex; align-items: center; gap: 30px; background: var(--qxt-well); }
+.policy-min-sample > div { flex: 1; min-width: 0; }
+.policy-min-sample .qxt-illus { flex: none; max-width: 42%; height: auto; }
+.policy-min-body .policy-min-fine { font-size: 20px; color: var(--qxt-ink-2); line-height: 1.5; }
+.policy-min-list { display: flex; flex-direction: column; gap: 18px; }
+.qxt-screen .policy-min-card { width: 100%; min-height: 218px; padding: 22px 26px; display: flex; flex-direction: column; gap: 12px; text-align: left; background: var(--qxt-card); border: 1.5px solid var(--qxt-line); border-radius: 26px; }
+.policy-min-card b { font-size: 30px; line-height: 1.4; overflow-wrap: anywhere; }
+.policy-min-summary { font-size: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.policy-min-meta { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; font-size: 20px; color: var(--qxt-ink-2); }
+.policy-min-chip { padding: 3px 10px; border-radius: 12px; background: var(--qxt-well); }
+.policy-min-pagination { display: flex; align-items: center; justify-content: center; gap: 20px; font-size: 22px; }
+.policy-min-source { display: flex; align-items: center; gap: 26px; }
+.policy-min-source > div:first-child { flex: 1; min-width: 0; }
+.policy-min-qr { width: 250px; flex: none; display: flex; align-items: center; flex-direction: column; }
+.policy-min-qr p,
+.policy-min-qr span { font-size: 20px; line-height: 1.45; text-align: center; overflow-wrap: anywhere; }
+.policy-min-phone { display: flex; align-items: center; gap: 26px; }
+.qxt-screen .policy-min-actions .qxt-tile { min-height: 174px; }
+.qxt-screen .policy-min-actions .qxt-tx b { font-size: 28px; }
+.qxt-screen .policy-min-actions .qxt-tx small { font-size: 22px; }
+.qxt-screen[data-qx-page='policy-min'] .qxt-dock { flex-wrap: wrap; }
+.qxt-screen[data-qx-page='policy-min'] .qxt-dock > [role='status'] { flex-basis: 100%; font-size: 20px; margin: 0; }
+.qxt-screen[data-qx-page='policy-min'] .qxt-wide { white-space: normal; min-height: 88px; height: auto; padding-block: 18px; }
+/* 短列表、空态的余高交给清单示意，不拉空政策卡。 */
+.qxt-screen[data-qx-page='policy-min'] .policy-min-sample { flex: 1 0 auto; }
+.qxt-screen[data-qx-page='policy-min'] .policy-min-sample .qxt-illus { width: 300px; }
+.qxt-screen[data-qx-page='policy-min'][data-qxt-state='loading'] .policy-min-sample,
+.qxt-screen[data-qx-page='policy-min'][data-qxt-state='failed'] .policy-min-sample,
+.qxt-screen[data-qx-page='policy-min'][data-qxt-state='missing'] .policy-min-sample,
+.qxt-screen[data-qx-page='policy-min'][data-qxt-state='withdrawn'] .policy-min-sample { flex-direction: column; justify-content: center; }
+.qxt-screen[data-qx-page='policy-min'][data-qxt-state='loading'] .policy-min-sample > div,
+.qxt-screen[data-qx-page='policy-min'][data-qxt-state='failed'] .policy-min-sample > div,
+.qxt-screen[data-qx-page='policy-min'][data-qxt-state='missing'] .policy-min-sample > div,
+.qxt-screen[data-qx-page='policy-min'][data-qxt-state='withdrawn'] .policy-min-sample > div { flex: none; }
+.qxt-screen[data-qxt-state='empty'] .policy-min-section li { margin-top: 18px; }
+.qxt-screen[data-qxt-state='ready'][data-qx-page='policy-min'] .policy-min-body { justify-content: space-between; }
+.qxt-screen[data-qx-page='policy-min'].policy-min-compact .qxt-band { min-height: 330px; }
+/* 公告沿用旧件，在本屏仍守 20px / 64px。 */
+.qxt-screen[data-qx-page='policy-min'] .rq-item-main { min-height: 88px; }
+.qxt-screen[data-qx-page='policy-min'] .rq-note,
+.qxt-screen[data-qx-page='policy-min'] .rq-item-sub,
+.qxt-screen[data-qx-page='policy-min'] .rq-tag,
+.qxt-screen[data-qx-page='policy-min'] .rq-facts dt,
+.qxt-screen[data-qx-page='policy-min'] .rq-facts dd { font-size: 20px; }
+@media (max-width: 767px) {
+  .qxt-screen[data-qx-page='policy-min'] .qxt-band { padding-inline: 20px; min-height: 0; }
+  .qxt-screen[data-qx-page='policy-min'] .qxt-path { flex-wrap: wrap; padding-block: 18px; gap: 10px; }
+  .qxt-screen[data-qx-page='policy-min'] .qxt-body { padding: 16px; }
+  .policy-min-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .qxt-screen .policy-min-categories .qxt-tile { min-height: 160px; }
+  .policy-min-source,
+  .policy-min-phone { flex-direction: column; align-items: stretch; }
+  .policy-min-qr { width: 100%; }
+  .policy-min-sample { gap: 18px; padding: 20px; }
+  .policy-min-sample .qxt-illus { max-width: 32%; }
+  .policy-min-section { padding: 22px; }
+  .policy-min-pagination { gap: 10px; flex-wrap: wrap; }
+  .qxt-screen[data-qx-page='policy-min'] .qxt-dock { padding-inline: 16px; gap: 12px; }
+  .qxt-screen[data-qx-page='policy-min'] .qxt-dock .qxt-wide { flex-basis: 100%; }
 }
 
-.qxt-screen:has(.p10-hub) .qxt-flow svg {
-  left: 4%;
-  width: 92%;
-}
-
-.qxt-screen:has(.p10-hub) .qxt-halo {
-  right: 24px;
-  width: 640px;
-}
-
-.p10-hub {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.p10-hub .p10-notice {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  padding: 18px 20px;
-  border-radius: 26px;
-  background: var(--qxt-clay-wash, var(--qxt-well));
-  color: var(--qxt-clay-ink, var(--qx-wheat-d));
-}
-
-.p10-hub .p10-notice b,
-.p10-hub .p10-note,
-.p10-hub .p10-sec h2 {
-  font-size: 22px;
-  line-height: 1.45;
-}
-
-.p10-hub .p10-notice-copy {
-  display: block;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.p10-hub .p10-notice span {
-  font-size: 20px;
-  line-height: 1.45;
-}
-
-.p10-hub .p10-retry,
-.qxt-screen .p10-retry {
-  flex: none;
-  min-width: 64px;
-  min-height: 64px;
-  padding: 0 22px;
-  border: 0;
-  border-radius: 16px;
-  background: var(--qx-ink);
-  color: var(--qx-paper);
-  font-size: 20px;
-}
-
-.p10-hub .p10-sec {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.p10-hub .p10-sec h2 {
-  margin: 0;
-  font-weight: 700;
-}
-
-.p10-hub .p10-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-/* 每格外面包了一层 div（带 data-hub-* 标记），同一行两张卡取同高。 */
-.p10-hub .p10-grid > div > .qxt-tile {
-  height: 100%;
-  min-height: 168px;
-}
-
-.p10-hub .p10-entry > .qxt-tile {
-  min-height: 168px;
-}
-
-.p10-hub .p10-notes {
-  display: flex;
-  flex-flow: row wrap;
-  justify-content: center;
-  gap: 0 12px;
-}
-
-.p10-hub .p10-note {
-  margin: 0;
-  font-size: 20px;
-  line-height: 1.45;
-  color: var(--qxt-ink-2);
-}
-
-.p10-hub .p10-notice { min-height: 104px; }
-.p10-hub .p10-notice > svg { flex: none; }
-.p10-hub .p10-notice-copy b,
-.p10-hub .p10-notice-copy span { font-size: 25px; line-height: 1.4; font-weight: 600; color: inherit; }
-.p10-hub .p10-sec h2 { font-size: 26px; }
-.p10-hub .p10-note { text-align: center; }
-.p10-hub .qxt-tile.p10-tile { display: flex; width: 100%; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; min-height: 168px; padding: 12px 16px; border: 1.5px solid var(--qxt-line, var(--qx-line)); border-radius: 22px; background: var(--qxt-card, var(--qx-surface)); color: var(--qx-ink); text-align: left; }
-.p10-hub .p10-tile b { font-size: 26px; font-weight: 700; line-height: 1.3; }
-.p10-hub .p10-tile small { font-size: 22px; font-weight: 500; line-height: 1.35; color: var(--qx-ink-2); }
-.p10-hub .p10-tile span { font-size: 22px; font-weight: 700; line-height: 1.35; color: var(--qx-teal-d); }
-.p10-hub .p10-tile.qxt-off { background: var(--qxt-well, var(--qx-paper)); border-style: dashed; }
-.p10-hub .p10-tile:active { transform: scale(.985); }
+/* 2026-11-05 照稿（policy-min.js 详情 dsec）：标题 700 29px 带图标；条目 27px 有圆点；「要准备的材料」方框复选样式。 */
+.policy-min-body .policy-min-section h2 { display: flex; align-items: center; gap: 12px; font-size: 29px; font-weight: 700; }
+.policy-min-body .policy-min-section ul { list-style: disc; padding-left: 28px; }
+.policy-min-body .policy-min-section li { font-size: 27px; line-height: 1.6; }
+.policy-min-body .policy-min-check li { list-style: none; position: relative; }
+.policy-min-body .policy-min-check li::before { content: ''; position: absolute; left: -30px; top: 12px; width: 18px; height: 18px; border-radius: 5px; border: 2px solid var(--qxt-ink-3); }
