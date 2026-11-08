@@ -395,6 +395,7 @@ const TARGET_LABELS: Record<string, string> = {
   kiosk_job_board: '一体机岗位板',
   terminal: '终端',
   print_task: '打印任务',
+  copy_job: '复印任务',
   print_job: '打印任务',
   derived_alert: '告警',
   alert: '告警',
