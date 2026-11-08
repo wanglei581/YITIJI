@@ -42,6 +42,8 @@ export function CopyWorkbenchPage() {
   const reason = !online ? '网络断开时，我们会收到提醒并远程处理' : flow.reason
   const title = stage === 'how' ? '怎么复印？' : stage === 'set' ? '放好原件，选份数'
     : stage === 'off' ? '这台机器暂时只能在打印机面板上复印' : snapshot.session?.controlToken ? '下一步' : '状态未知'
+  // 建单回包缺凭据：这一单能不能继续没法确认，胶囊照实写状态未知，不再说扫描仪就绪。
+  const tokenless = Boolean(snapshot.session && !snapshot.session.controlToken)
   const start = () => {
     void flow.start().then((outcome) => {
       if (outcome === 'ready') go('scan')
@@ -62,6 +64,7 @@ export function CopyWorkbenchPage() {
   if (stage === 'scan' && snapshot.session?.controlToken) return <CopyDeviceView session={snapshot.session}
     onBack={back} onRescan={rescan} printerReady={flow.printer.printerReady} online={online} />
   return <CopyShell stage={stage} title={title} reason={reason} onBack={back}
+    status={tokenless ? '状态未知' : undefined} statusTone={tokenless ? 'unknown' : undefined}
     subtitle={stage === 'off' && flow.printer.printerReady ? '面板上的复印、身份证复印、票据复印都能用。' : undefined}
     primary={stage === 'off' ? { label: '怎么在打印机上复印', onClick: guide, testId: 'copy-primary' }
       : stage === 'set' ? { label: flow.printer.kind === 'offline' ? '打印机离线' : '开始复印', onClick: start, testId: 'copy-primary',

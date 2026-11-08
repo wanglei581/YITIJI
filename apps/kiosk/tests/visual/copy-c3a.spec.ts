@@ -1,5 +1,5 @@
 import { expect, test } from '../fixtures/kiosk-test'
-import { COPY_CONTROL, copyFixture } from './fixtures/copy-c3a'
+import { COPY_CONTROL, copyFixture, expectCopyUnknownChip } from './fixtures/copy-c3a'
 
 const legal = '不得复印伪造的证件、印章、票据。只能复印本人的真实证件和票据。'
 const fine = '原件几页，扫完才知道；扫完会给你核对'
@@ -137,6 +137,8 @@ test('missing one-time token blocks a second create @w2', async ({ page, api }) 
   await page.getByTestId('copy-primary').click()
   await expect(page.getByText(/没能确认复印能否继续/)).toBeVisible()
   await expect(page.getByTestId('copy-primary')).toBeDisabled()
+  // 11/08 定：胶囊和提示一样写「状态未知」、用状态未知的色调，不能再说「扫描仪就绪」。
+  await expectCopyUnknownChip(page, '状态未知')
   expect(f.calls).toHaveLength(1)
 })
 for (const mode of ['leave', 'idle', 'logout'] as const) test(`${mode} clears the in-memory session and token @w2`, async ({ page, api }) => {

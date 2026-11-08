@@ -1,5 +1,5 @@
 import { expect, test } from '../fixtures/kiosk-test'
-import { COPY_CONTROL } from './fixtures/copy-c3a'
+import { COPY_CONTROL, expectCopyUnknownChip } from './fixtures/copy-c3a'
 import { armPrivacyReload, copyDeviceFixture } from './fixtures/copy-c3b1'
 
 const secretSnapshot = () => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage }, url: location.href })
@@ -70,7 +70,16 @@ for (const fail of [undefined, 'abort', 'cancel'] as const) test(`stop is armed 
   expect(f.localCalls.filter((c) => c.action === 'abort')).toHaveLength(1)
   expect(f.cloudCalls.filter((c) => c.action === 'cancel')).toHaveLength(1)
   expect(f.cloudCalls.find((c) => c.action === 'cancel')?.headers['x-copy-control']).toBe(COPY_CONTROL)
-  if (fail) await expect(page.getByText(/已扫的页已从这台机器删除/)).toHaveCount(0)
+  if (fail) {
+    await expect(page.getByText(/已扫的页已从这台机器删除/)).toHaveCount(0)
+    await expectCopyUnknownChip(page, '状态未知')
+  } else {
+    // 11/08 定：停止屏补原件提醒（同额度屏那句）；不画倒计时，复印取消回包不带静默期。
+    await expect(page.getByText('已停止复印，已扫的页已从这台机器删除。', { exact: true })).toBeVisible()
+    await expect(page.locator('.copy-touch .cc-result-help')).toHaveText('原件还在玻璃上或进纸器里，请带走')
+    await expect(page.locator('.copy-touch .cc-result-help')).toBeVisible()
+    await expect(page.locator('.copy-touch').getByText(/秒后|倒计时/)).toHaveCount(0)
+  }
 })
 test('stop arm expires in six seconds @w2', async ({ page, api }) => {
   const f = await copyDeviceFixture(page, api)
@@ -106,6 +115,7 @@ test('sixty seconds without progress uses unknown, never invented pages or check
   await expect(page.getByRole('button', { name: '停止复印', exact: true })).toBeEnabled()
   await page.clock.fastForward(61_000)
   await expect(page.getByRole('heading', { name: '状态未知', exact: true })).toBeVisible()
+  await expectCopyUnknownChip(page, '状态未知')
   await expect(page.getByTestId('copy-check')).toHaveCount(0)
   await expect(page.getByTestId('scan-device-page-count')).toHaveCount(0)
 })
@@ -214,6 +224,7 @@ for (const fail of ['preview', 'clear', 'confirm'] as const) test(`uncertain ${f
   } else {
     await page.getByRole('button', { name: fail === 'clear' ? '重扫' : '开始打印', exact: true }).click()
     await expect(page.getByRole('heading', { name: '状态未知', exact: true })).toBeVisible()
+    await expectCopyUnknownChip(page, '状态未知')
   }
   expect(f.localCalls.some((c) => c.action === 'print')).toBe(false)
   expect(f.calls.filter((c) => c.path === '/api/v1/copy/jobs')).toHaveLength(1)

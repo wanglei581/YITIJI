@@ -6,7 +6,7 @@ import { PhoneHelpLine } from '../print-scan/phoneHelp'
 import { COPY_GUIDE_ROUTE } from '../print-scan/printHubContent'
 import { DEVICE_ERROR_COPY } from '../scan/scanDeviceErrorCopy'
 import { FeederArt, GlassArt } from '../scan/ScanGuideArt'
-import { copyFault } from './copyPrintModel'
+import { copyErrorAsk, copyFault } from './copyPrintModel'
 import { clearCopySession } from './copySession'
 import { CopyShell } from './CopyShell'
 import '../scan/styles/scan-device-qx.css'
@@ -35,7 +35,7 @@ export function CopyErrorView({ errorCode, printing, busy, onRetry }: {
   const art = fault === 'nopaper' ? <FeederArt empty /> : fault === 'jam' ? <FeederArt /> : <PrintArt name="mfp" />
   return <CopyShell stage={fault === 'off' && !printing ? 'off' : 'error'} title={title} status={printing ? '打印失败' : fault === 'limit' ? '超过限制' : fault === 'off' ? '屏上复印未开通' : base.chip}
     statusTone="warn" reason={null} subtitle={printing || fault === 'limit' || fault === 'off' ? undefined : base.sub}
-    onBack={home} hideBack ask={printing ? '取纸或异常怎么办' : base.ask.replace('问小青：', '')}
+    onBack={home} hideBack ask={printing ? '取纸或异常怎么办' : copyErrorAsk(fault) ?? base.ask.replace('问小青：', '')}
     primary={{ label: primary, disabled: busy, onClick: retry ? () => { void onRetry() } : panel }}>
     <div data-qx-page="scan-workbench" className="cc-copy-error">
       <div className={`cs-err cs-err${fault === 'nopaper' && !printing ? 3 : 2}`} role="alert" data-testid="copy-device-error">

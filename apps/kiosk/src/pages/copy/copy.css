@@ -5,6 +5,9 @@
   font-size: 26px;
 }
 .copy-touch .qxt-body { display: flex; flex-direction: column; gap: 14px; }
+/* 复印这支「状态未知」色调的胶囊用提醒色（橙），和稿一致（11/08 定）；扫描那支另有跟进，共用令牌不动。 */
+.qxt-screen.copy-touch .qxt-status-unknown { background: var(--qxt-warn-bg); }
+.qxt-screen.copy-touch .qxt-status-unknown .qxt-dot { background: var(--qxt-warn-dot); box-shadow: 0 0 0 4px var(--qxt-warn-ring); }
 .copy-touch .cc-stack, .copy-touch .cc-settings { display: flex; flex-direction: column; gap: 14px; min-height: 0; flex: 1; }
 .copy-touch .cc-ways { display: flex; flex-direction: column; gap: 14px; flex: 1; min-height: 0; }
 .copy-touch .cc-way {
