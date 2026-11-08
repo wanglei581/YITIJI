@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
 import http from 'node:http'
-import { mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { promisify } from 'node:util'
+import { runInNewContext } from 'node:vm'
+import { ModuleKind, ScriptTarget, transpileModule } from 'typescript'
 import { startQrLoginLocalServer } from '../src/local-api/qr-login-server'
 import { decideUsbImport, resetUsbCapabilityCacheForTest } from '../src/usb/usb-capability'
 import {
@@ -26,7 +31,7 @@ import type { AgentConfig } from '../src/agent/types'
 //
 // Windows CIM/PowerShell 真实可移动磁盘检测（detectRemovableDrive /
 // listHiddenOrSystemNames 的 win32 分支）在 macOS 开发环境无法真实调用，
-// 该部分保持"未验证"，需要 Windows 真机验收覆盖，不在本脚本中伪装通过。
+// 下方只用隔离模块 + UTF-8 stdout 夹具验证脚本和解析；真实系统查询仍需 Windows 真机验收。
 
 const ALLOWED_ORIGIN = 'http://localhost:5173'
 const DENIED_ORIGIN = 'http://evil.example'
@@ -164,6 +169,72 @@ async function callJson<T>(
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
   })
   return { status: response.status, json: (await response.json()) as T }
+}
+
+// ── PowerShell JSON 编码契约（模拟 win32，实际子进程输出 UTF-8 字节） ────────
+
+async function verifyPowerShellUtf8(): Promise<void> {
+  const sourcePath = require.resolve('../src/usb/usb-files')
+  const localRequire = createRequire(sourcePath)
+  const execFileAsync = promisify(execFile)
+  const calls: { file: string; args: string[]; options: object }[] = []
+  let label = ''
+  let hidden: string | string[] = '隐藏资料.pdf'
+  // 仅替换进程启动边界：保留真实 execFile 的 UTF-8 解码和源码里的 JSON.parse。
+  const fixtureExecFile = Object.assign(() => assert.fail('execFile must stay asynchronous'), {
+    [promisify.custom]: async (file: string, args: string[], options: object) => {
+      calls.push({ file, args, options })
+      const payload = args[3].includes('Get-CimInstance')
+        ? { DeviceID: 'E:', VolumeName: label }
+        : hidden
+      const bytes = Buffer.from(JSON.stringify(payload), 'utf8')
+      return execFileAsync(process.execPath, [
+        '-e', `process.stdout.write(Buffer.from('${bytes.toString('hex')}', 'hex'))`,
+      ], options)
+    },
+  })
+  const isolated = { exports: {} }
+  runInNewContext(transpileModule(readFileSync(sourcePath, 'utf8'), {
+    compilerOptions: { module: ModuleKind.CommonJS, target: ScriptTarget.ES2020 },
+  }).outputText, {
+    module: isolated,
+    exports: isolated.exports,
+    require: (id: string) => id === 'child_process' ? { execFile: fixtureExecFile } : localRequire(id),
+    process: { platform: 'win32' },
+    Buffer,
+  }, { filename: sourcePath })
+  const usb = isolated.exports as typeof import('../src/usb/usb-files')
+  const dir = mkdtempSync(join(tmpdir(), 'usb-utf8-verify-'))
+  try {
+    writeFileSync(join(dir, '隐藏资料.pdf'), '%PDF-1.4 hidden')
+    writeFileSync(join(dir, '可见资料.pdf'), '%PDF-1.4 visible')
+    for (const value of ['工作资料', '新加卷']) {
+      label = value
+      usb.resetUsbRegistryForTest()
+      const status = await usb.getUsbStatus()
+      assert.equal(status.present, true)
+      assert.equal(status.driveLabel, value, 'UTF-8 stdout must preserve the Chinese volume label')
+      const listed = await usb.refreshUsbFileList(() => ({ rootPath: dir, label: status.driveLabel }))
+      assert.equal(listed.driveLabel, value)
+      assert.deepEqual(Array.from(listed.files, (file) => file.filename), ['可见资料.pdf'],
+        'Chinese hidden names from UTF-8 stdout must still be filtered (single value and array)')
+      hidden = ['隐藏资料.pdf']
+    }
+    assert.equal(calls.length, 4, 'both drive and hidden-name queries must run for each label')
+    for (const [index, call] of calls.entries()) {
+      assert.equal(call.file, 'powershell')
+      assert.deepEqual(Array.from(call.args.slice(0, 3)), ['-NonInteractive', '-NoProfile', '-Command'])
+      assert.deepEqual(JSON.parse(JSON.stringify(call.options)), { encoding: 'utf-8', timeout: 10_000, windowsHide: true })
+      assert.match(call.args[3], /^\[Console\]::OutputEncoding = New-Object System\.Text\.UTF8Encoding\(\$false\); /,
+        'every USB PowerShell query must set BOM-free UTF-8 output before querying')
+      const query = call.args[3].slice(call.args[3].indexOf('; ') + 2)
+      assert.ok(query.startsWith(index % 2 === 0 ? 'Get-CimInstance ' : 'Get-ChildItem '),
+        'encoding must precede both the volume-label and hidden-name queries')
+    }
+    console.log('PASS USB PowerShell BOM-free UTF-8 before both queries / Chinese labels 工作资料, 新加卷 / Chinese hidden names (single + array)')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 }
 
 // ── Part 1: usb-files.ts 直接单元验证（真实临时目录，不经 HTTP） ────────────
@@ -882,13 +953,14 @@ async function verifyUnconfiguredTokenFailClosed(): Promise<void> {
 
 function verifyPlatformGapDisclosure(): void {
   console.log(
-    'NOTE: detectRemovableDrive()/listHiddenOrSystemNames() Windows CIM/PowerShell 分支未在本脚本中真实调用' +
-      '（当前运行环境非 win32）。真实可移动磁盘检测、Windows 隐藏/系统属性判定，需 Windows 真机验收覆盖，' +
+    'NOTE: detectRemovableDrive()/listHiddenOrSystemNames() 的 Windows CIM/PowerShell 系统查询未真实执行' +
+      '（编码用例使用隔离模块和 UTF-8 stdout 夹具）。真实可移动磁盘检测、Windows 隐藏/系统属性判定，需 Windows 真机验收覆盖，' +
       '不得据本脚本通过就宣称 U 盘导入已完成真机验证。',
   )
 }
 
 async function main(): Promise<void> {
+  await verifyPowerShellUtf8()
   await verifyUsbFilesUnit()
   await verifyLocalHttpRoutes()
   await verifyUsbCapabilityDecisionUnit()

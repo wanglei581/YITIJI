@@ -1,0 +1,422 @@
+/* 屏上扫描：怎么扫、放纸、未开通。颜色只用 --qxt-* / --qx-*。版式照触屏补稿的大卡。 */
+
+[data-qx-page='scan-workbench'] .cs-stack,
+[data-qx-page='scan-workbench'] .cs-set {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+}
+
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .cs-stack,
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .cs-set {
+  flex: 1 1 auto;
+}
+
+[data-qx-page='scan-workbench'] .cs-ways {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+}
+
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .cs-ways {
+  flex: 1 1 auto;
+}
+
+[data-qx-page='scan-workbench'] .cs-way {
+  display: grid;
+  grid-template-columns: 330px minmax(0, 1fr) 64px;
+  gap: 26px;
+  align-items: center;
+  width: 100%;
+  min-height: 220px;
+  padding: 20px 26px 20px 20px;
+  border-radius: 30px;
+  border: 2px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  text-align: left;
+}
+
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .cs-ways > .cs-way {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+[data-qx-page='scan-workbench'] .cs-way .vis {
+  align-self: stretch;
+  min-height: 140px;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+[data-qx-page='scan-workbench'] .cs-way .vis svg,
+[data-qx-page='scan-workbench'] .cs-way .vis .pa {
+  width: 78%;
+  height: auto;
+  max-width: 84%;
+  max-height: 78%;
+}
+
+[data-qx-page='scan-workbench'] .cs-way .vis .pa svg {
+  width: 100%;
+  height: auto;
+  max-height: none;
+}
+
+[data-qx-page='scan-workbench'] .cs-way .tx {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+[data-qx-page='scan-workbench'] .cs-way h3 {
+  margin: 0;
+  font: 700 42px/1.25 var(--qx-serif);
+}
+
+[data-qx-page='scan-workbench'] .cs-way p {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .cs-way .mark,
+[data-qx-page='scan-workbench'] .cs-way .arrow {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+}
+
+[data-qx-page='scan-workbench'] .cs-way .mark {
+  width: 56px;
+  height: 56px;
+  border: 3px solid var(--qxt-edge);
+  color: transparent;
+}
+
+[data-qx-page='scan-workbench'] .cs-way .arrow {
+  background: var(--qx-deep, var(--qxt-deep-2));
+  color: var(--qxt-cream);
+}
+
+[data-qx-page='scan-workbench'] .cs-way[aria-pressed='true'] {
+  background: var(--qxt-teal-wash);
+  border-color: var(--qxt-teal, var(--qxt-mark-b));
+}
+
+[data-qx-page='scan-workbench'] .cs-way[aria-pressed='true'] .mark {
+  background: var(--qxt-teal, var(--qxt-mark-b));
+  border-color: var(--qxt-teal, var(--qxt-mark-b));
+  color: var(--qxt-cream);
+}
+
+[data-qx-page='scan-workbench'] .cs-way[aria-pressed='true'] .vis {
+  background: var(--qxt-card);
+}
+
+[data-qx-page='scan-workbench'] .cs-way[aria-pressed='true'] .sx-chip {
+  background: var(--qxt-teal, var(--qxt-mark-b));
+  color: var(--qxt-cream);
+}
+
+[data-qx-page='scan-workbench'] .cs-way:disabled {
+  background: var(--qxt-well);
+  color: var(--qxt-ink);
+  border-style: dashed;
+  opacity: 1;
+}
+
+[data-qx-page='scan-workbench'] .cs-way:disabled h3 {
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .cs-way:disabled .vis {
+  opacity: 0.55;
+}
+
+[data-qx-page='scan-workbench'] .cs-way:disabled .sx-chip {
+  background: var(--qxt-card);
+}
+
+[data-qx-page='scan-workbench'] .cs-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  min-height: 0;
+}
+
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .cs-set .cs-two {
+  flex: 1 1 auto;
+  min-height: 280px;
+}
+
+[data-qx-page='scan-workbench'] .cs-src {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  min-height: 280px;
+  padding: 16px 18px 18px;
+  border-radius: 28px;
+  border: 2px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  text-align: left;
+}
+
+[data-qx-page='scan-workbench'] .cs-src .vis {
+  align-self: stretch;
+  flex: 1 1 auto;
+  min-height: 180px;
+  margin-bottom: 6px;
+  border-radius: 20px;
+  background: var(--qxt-well);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+[data-qx-page='scan-workbench'] .cs-src .vis svg {
+  width: 86%;
+  height: auto;
+  max-height: 86%;
+}
+
+[data-qx-page='scan-workbench'] .cs-src b {
+  display: block;
+  margin: 0;
+  font: 700 42px/1.25 var(--qx-serif);
+}
+
+[data-qx-page='scan-workbench'] .cs-src .d {
+  display: block;
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.4;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .cs-src .d2 {
+  display: block;
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .cs-src .cs-tick {
+  display: none;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--qxt-teal, var(--qxt-mark-b));
+  color: var(--qxt-cream);
+  place-items: center;
+}
+
+[data-qx-page='scan-workbench'] .cs-src[aria-pressed='true'] {
+  background: var(--qxt-teal-wash);
+  border-color: var(--qxt-teal, var(--qxt-mark-b));
+}
+
+[data-qx-page='scan-workbench'] .cs-src[aria-pressed='true'] .vis {
+  background: var(--qxt-card);
+}
+
+[data-qx-page='scan-workbench'] .cs-src[aria-pressed='true'] .cs-tick {
+  display: grid;
+}
+
+[data-qx-page='scan-workbench'] .cs-sec {
+  margin: 2px 0 0;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+[data-qx-page='scan-workbench'] .cs-seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+[data-qx-page='scan-workbench'] .cs-seg button {
+  min-height: 140px;
+  padding: 16px;
+  border-radius: 26px;
+  border: 2px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font: 700 32px/1.25 var(--qx-serif);
+}
+
+[data-qx-page='scan-workbench'] .cs-seg button small {
+  display: block;
+  margin-top: 6px;
+  font: 500 22px/1.35 var(--qx-sans);
+}
+
+[data-qx-page='scan-workbench'] .cs-seg button[aria-pressed='true'] {
+  background: var(--qx-deep, var(--qxt-deep-2));
+  color: var(--qxt-cream);
+  border-color: var(--qx-deep, var(--qxt-deep-2));
+}
+
+[data-qx-page='scan-workbench'] .cs-howto {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 120px;
+  margin: 0;
+  padding: 20px 28px;
+  border-radius: 26px;
+  background: var(--qxt-well);
+  color: var(--qxt-ink-2);
+  font-size: 28px;
+  line-height: 1.45;
+}
+
+[data-qx-page='scan-workbench'] .cs-howto svg {
+  flex: none;
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page='scan-workbench'] .cs-login {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 100px;
+  padding: 12px 14px 12px 24px;
+  border-radius: 26px;
+  background: var(--qxt-teal-wash);
+}
+
+[data-qx-page='scan-workbench'] .cs-login span {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--qxt-teal-ink);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+[data-qx-page='scan-workbench'] .cs-login .qxt-btn {
+  height: 76px;
+  min-height: 76px;
+  min-width: 176px;
+  padding: 0 24px;
+  border-radius: 22px;
+  font-size: 26px;
+  flex: 0 0 auto;
+}
+
+[data-qx-page='scan-workbench'] .cs-hold {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 80px;
+  margin: 0;
+  padding: 10px 24px;
+  border-radius: 24px;
+  border: 2px dashed var(--qxt-line);
+  background: var(--qxt-well);
+  color: var(--qxt-ink-2);
+  font-size: 23px;
+  line-height: 1.45;
+}
+
+[data-qx-page='scan-workbench'] .cs-hold svg {
+  flex: none;
+  color: var(--qxt-ink-3);
+}
+
+[data-qx-page='scan-workbench'] .cs-remind {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 88px;
+  padding: 14px 22px;
+  border-radius: 24px;
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+}
+
+[data-qx-page='scan-workbench'] .cs-remind:not(:has([data-testid='service-phone-line'])) {
+  display: none;
+}
+
+[data-qx-page='scan-workbench'] .cs-remind svg {
+  flex: none;
+}
+
+[data-qx-page='scan-workbench'] .cs-remind .qxt-fine {
+  margin: 0;
+  color: inherit;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+[data-qx-page='scan-workbench'] .cs-create {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.35;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-way {
+  grid-template-columns: 72px minmax(0, 1fr) 40px;
+  gap: 10px;
+  min-height: 120px;
+  padding: 10px;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-way h3,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-src b {
+  font-size: 20px;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-way p,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-src .d,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-src .d2,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-howto,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-login span,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-hold {
+  font-size: 14px;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-way .vis,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-src .vis {
+  min-height: 72px;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-seg button {
+  min-height: 84px;
+  font-size: 20px;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-src {
+  min-height: 0;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-howto,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-login,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-login .qxt-btn {
+  min-height: 56px;
+  height: auto;
+}

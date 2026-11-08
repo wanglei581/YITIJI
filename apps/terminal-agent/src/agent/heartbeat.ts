@@ -93,6 +93,8 @@ export interface HeartbeatOptions {
   onObservation?: (observation: HeartbeatObservation) => void
   /** Read on every send because heartbeat starts before the scan watcher. */
   getScanInputTelemetry?: () => ScanInputRuntimeTelemetry
+  /** 屏上扫描开关打开时由 index 传入。没有回调就不带扫描仪字段。 */
+  getScanDeviceHealth?: () => { health: HeartbeatPayload['scanDeviceHealth']; observedAt: string }
   /** 门禁注入。生产不传，走真实探针。 */
   readPrinterStatusAndRaw?: typeof getPrinterStatusAndRaw
   readDiskFreeGB?: () => Promise<number>
@@ -277,6 +279,11 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
     payload.scanInputAction = scanInputTelemetry.requiredAction
     payload.scanInputReason = scanInputTelemetry.reason
     payload.scanInputObservedAt = scanInputTelemetry.observedAt
+  }
+  const scanDeviceHealth = options.getScanDeviceHealth?.()
+  if (scanDeviceHealth) {
+    payload.scanDeviceHealth = scanDeviceHealth.health ?? undefined
+    payload.scanDeviceObservedAt = scanDeviceHealth.observedAt
   }
 
   const finishFailure = (body: HeartbeatPayload, error: unknown): boolean => {

@@ -26,6 +26,12 @@ export interface LocalQrClaimResponse {
 export interface LocalApiError {
   code: string
   message: string
+  /** 屏上扫描命令被拒时，带上当时的本机状态，方便一体机显示。其它接口不填。 */
+  state?: string
+  pageCount?: number
+  errorCode?: string | null
+  /** 屏上扫描：这次有没有把已扫页删掉。没尝试清理时不带。 */
+  purged?: boolean
 }
 
 /** Browser-safe identity exposed only through the loopback Origin allowlist. */

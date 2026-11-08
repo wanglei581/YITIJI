@@ -47,9 +47,11 @@ async function loadSessionModule() {
   instanceSeed += 1
   const workbench = toDataUrl(transpile('src/pages/scan/scanWorkbench.ts').replaceAll("'lucide-react'", `'${LUCIDE_STUB}'`))
   const model = toDataUrl(transpile('src/pages/scan/scanWorkbenchModel.ts'))
+  const materials = toDataUrl(transpile('src/pages/scan/scanMaterials.ts'))
   const session = transpile('src/pages/scan/scanWorkbenchSession.ts')
     .replaceAll("'./scanWorkbench'", `'${workbench}'`)
     .replaceAll("'./scanWorkbenchModel'", `'${model}'`)
+    .replaceAll("'./scanMaterials'", `'${materials}'`)
   return import(toDataUrl(`${session}\n// instance ${instanceSeed}\n`))
 }
 

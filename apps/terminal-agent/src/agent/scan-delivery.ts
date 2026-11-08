@@ -34,6 +34,11 @@ export interface ScanDeliveryFormInput {
   candidateSnapshotAt: string
   /** 本批无调用方传入。不传则表单里没有 origin 字段。 */
   origin?: ScanDeliveryOrigin
+  /**
+   * 屏上扫描这份 PDF 所属的轮次。只在调用方记下了 scanning 回报里的 deviceRound 时才传。
+   * 不传则表单里没有这个字段，面板路线与还没记轮次的终端保持原样。
+   */
+  deviceRound?: number
 }
 
 export function guessScanMimeType(filename: string): string {
@@ -56,6 +61,7 @@ export function buildScanDeliveryForm(input: ScanDeliveryFormInput): FormData {
   form.append('candidateSnapshotAt', input.candidateSnapshotAt)
   form.append('observedAt', input.candidateSnapshotAt)
   if (input.origin !== undefined) form.append('origin', input.origin)
+  if (input.deviceRound !== undefined) form.append('deviceRound', String(input.deviceRound))
   return form
 }
 
