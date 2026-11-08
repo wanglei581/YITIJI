@@ -221,6 +221,14 @@
 - 旁查同类缺口（本轮不改）：`printer/printer-status.ts`（打印机名可能含中文）、`agent/scan-device/scan-device-health.ts`（命令行可能含中文路径）也没设输出编码；WIA 探测与扫描脚本协议只有 ASCII。
 - 真机未核：装 0.4.19 时按 `~/.cache/claude-lanes/copyscan-1102/acceptance.md` 末尾四处一致（CIM 原值、stdout 字节、`/local/usb/status`、一体机显示）核一次。
 
+## 2026-11-08：扫描件自动纠偏接进屏上扫描逐页流程（S4b，终端程序 0.4.22，开关 `scanAutoDeskewEnabled` 缺省关；分支 `claude/scan-deskew-s4b-1105`，叠在 #1607 上，未合并、未部署）
+
+- 做了（Codex 11/05 实现，agy 11/08 只读复审无 P0/P1，Claude 收货）：`wia-runner` 在逐页 `SaveJpeg` 处接入纠偏。开关关时生成的 WIA 脚本逐字节同原来，不写 BMP、不起纠偏进程；开关开时存 BMP → 纠偏子进程（2 秒超时杀进程树）→ 校验 JPEG（魔数、大小、SHA256、角度范围），任何失败回原 `SaveJpeg`。中间文件逐页清理，删除失败沿用 A2 的整目录清理重试与审计，无新增原因码。复印扫描（C2 的 copy-engine）不传开关，纠偏只作用于屏上扫描。
+- 并入 C2 时唯一冲突是 `wia-runner.ts` 导入段（C2 把外部依赖拆到 `wia-runner-deps.ts`），按语义合；版本 0.4.21 → 0.4.22，照 0.4.21 那次（`2f0a813d7`）的 12 个文件 20 处。
+- 修 Windows 接线检查：11/08 手动运行 42463532610 红在 `verify:scan-wia-deskew-windows` 自己造的临时目录——GitHub Windows 机器 `os.tmpdir()` 是 8.3 短名（含 `~`），过不了 wia-script 的 PowerShell 路径白名单；改用 `fs.realpathSync.native` 展开成长路径，并断言临时目录能过白名单。生产上扫描目录在 ProgramData 下，不受影响。
+- 门禁：本机契约检查在 `verify:scan-deskew`（13 组，含 WIA 纠偏接线与 S4b 生成脚本/生命周期两项）；Windows 合成 BMP 接线检查 `verify:scan-wia-deskew-windows` 在 windows-agent-installer（12 类场景，本机没有 PowerShell，交 CI）。
+- **代码未进 main、未打包、未装机**。开关缺省关；装机与开纠偏每一步都由产品负责人确认。
+
 ## 2026-11-05：扫描件自动矫正 S4a 第三轮——Windows 门禁对 8 位 BMP 的标记判据（分支 `claude/scan-deskew-1104`，未接线、未部署）
 
 - Windows CI 第二次实跑（run 41965545914）：估角已对（文字页 ±4° 内与输入一致，最差 ±0.1°），风险集（空白、照片、表格、证件、发票）误纠偏 0；只剩 16 个 `bmp8` 文字页报 `lost original corner/edge marker`，同角度 png / jpeg / bmp24 全过。

@@ -26,7 +26,7 @@ _（空）_
 
 ──────────────────────────────────────────────────────────────────────
 
-## 有脚本名但不在 CI 执行闭包里（15）
+## 有脚本名但不在 CI 执行闭包里（16）
 
 这一栏是**尽力而为的推断**，权威是 `verify:ci-gate-coverage` 加
 `scripts/ci-gate-exemptions.json`。已在豁免清单里登记的（需要真实凭证 / 真机 /
@@ -43,6 +43,7 @@ _（空）_
 | `apps/kiosk/scripts/probe-member-session-41.mjs` | `@ai-job-print/kiosk::verify:probe-member-session-41` |
 | `apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts` | `terminal-agent::verify:boot-spool-guard-windows` |
 | `apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts` | `terminal-agent::verify:print-queue-residue-windows` |
+| `apps/terminal-agent/scripts/verify-scan-wia-deskew-windows.ts` | `terminal-agent::verify:scan-wia-deskew-windows` |
 | `scripts/generate-project-graph.mjs` | `ai-job-print-terminal::graph`<br/>`ai-job-print-terminal::graph:check` |
 | `scripts/project-graph-query.mjs` | `ai-job-print-terminal::graph:query` |
 | `scripts/verify-deploy-authorization-gate.mjs` | `ai-job-print-terminal::verify:deploy-authorization-gate` |
@@ -71,7 +72,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2170 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2174 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -145,7 +146,7 @@ node scripts/project-graph-query.mjs file <路径>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `.github/workflows/windows-agent-installer.yml` | `verify-boot-spool-guard.mjs`<br/>`verify-scan-deskew.ts`<br/>`verify-ci-gate-coverage.mjs` |
+| `.github/workflows/windows-agent-installer.yml` | `verify-boot-spool-guard.mjs`<br/>`verify-scan-deskew.ts`<br/>`verify-scan-wia-deskew.ts`<br/>`verify-ci-gate-coverage.mjs` |
 
 </details>
 
@@ -1346,7 +1347,16 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/terminal-agent/scripts/</code> — 22 个文件</summary>
+<summary><code>apps/terminal-agent/package.json/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `apps/terminal-agent/package.json` | `verify-scan-wia-deskew.ts` |
+
+</details>
+
+<details>
+<summary><code>apps/terminal-agent/scripts/</code> — 23 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1371,12 +1381,13 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/scripts/verify-scan-device-runner-r4.ts` | `verify-scan-device-runner.ts` |
 | `apps/terminal-agent/scripts/verify-scan-device-runner-r6.ts` | `verify-scan-device-runner.ts` |
 | `apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts` | `verify-copy-device-edges.helper.ts`<br/>`verify-copy-device.helper.ts`<br/>`verify-copy-isolation.helper.ts`<br/>`verify-copy-revocations.helper.ts`<br/>`verify-scan-device-isolation.helper.ts`<br/>`verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner-r4.ts`<br/>`verify-scan-device-runner-r6.ts`<br/>`verify-scan-device-runner.ts` |
+| `apps/terminal-agent/scripts/verify-scan-wia-deskew.ts` | `verify-scan-deskew.ts` |
 | `apps/terminal-agent/scripts/verify-windows-service-recovery.mjs` | `verify-agent-unauthorized.mjs` |
 
 </details>
 
 <details>
-<summary><code>apps/terminal-agent/src/</code> — 68 个文件</summary>
+<summary><code>apps/terminal-agent/src/</code> — 70 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1415,19 +1426,21 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/src/agent/scan-deskew/runner.ts` | `verify-scan-deskew.ts` |
 | `apps/terminal-agent/src/agent/scan-deskew/script.ts` | `verify-scan-deskew.ts` |
 | `apps/terminal-agent/src/agent/scan-deskew/thresholds-source.ts` | `verify-scan-deskew.ts` |
+| `apps/terminal-agent/src/agent/scan-deskew/wia-integration.ts` | `verify-scan-wia-deskew-windows.ts`<br/>`verify-scan-wia-deskew.ts` |
+| `apps/terminal-agent/src/agent/scan-deskew/wia-page-source.ts` | `verify-scan-wia-deskew.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-device-backend.ts` | `verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner-r4.ts`<br/>`verify-scan-device-runner-r6.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-device-runner.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-device-deliver.ts` | `verify-scan-device-runner-r4.ts`<br/>`verify-scan-device-runner-r6.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-device-health.ts` | `verify-copy-isolation.helper.ts`<br/>`verify-copy-revocations.helper.ts`<br/>`verify-scan-device-isolation.helper.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-device-housekeeping.ts` | `verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner-r4.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-device-round.ts` | `verify-scan-device-runner-r6.ts` |
-| `apps/terminal-agent/src/agent/scan-device/scan-device-runner.ts` | `verify-scan-device-isolation.helper.ts`<br/>`verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner-r4.ts`<br/>`verify-scan-device-runner-r6.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-device-runner.ts` |
+| `apps/terminal-agent/src/agent/scan-device/scan-device-runner.ts` | `verify-scan-device-isolation.helper.ts`<br/>`verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner-r4.ts`<br/>`verify-scan-device-runner-r6.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-device-runner.ts`<br/>`verify-scan-wia-deskew.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-device-sync.ts` | `verify-scan-device-runner-r2.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-device-types.ts` | `verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner-r4.ts`<br/>`verify-scan-device-runner-r6.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-pdf-compose.ts` | `verify-scan-device-engine.ts`<br/>`verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner.ts` |
 | `apps/terminal-agent/src/agent/scan-device/scan-temp-dir.ts` | `verify-scan-device-engine.helper.ts`<br/>`verify-scan-device-engine.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner.ts`<br/>`verify-copy-c1a.ts` |
 | `apps/terminal-agent/src/agent/scan-device/wia-probe.ts` | `verify-scan-device-engine.helper.ts`<br/>`verify-scan-device-runner.helper.ts` |
-| `apps/terminal-agent/src/agent/scan-device/wia-runner.ts` | `verify-copy-device.helper.ts`<br/>`verify-scan-device-engine-r2.helper.ts`<br/>`verify-scan-device-engine.helper.ts`<br/>`verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner.helper.ts` |
-| `apps/terminal-agent/src/agent/scan-device/wia-script.ts` | `verify-scan-device-engine-r2.helper.ts`<br/>`verify-scan-device-engine.helper.ts`<br/>`verify-scan-device-engine.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner.helper.ts` |
+| `apps/terminal-agent/src/agent/scan-device/wia-runner.ts` | `verify-copy-device.helper.ts`<br/>`verify-scan-device-engine-r2.helper.ts`<br/>`verify-scan-device-engine.helper.ts`<br/>`verify-scan-device-runner-r2.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-wia-deskew.ts` |
+| `apps/terminal-agent/src/agent/scan-device/wia-script.ts` | `verify-scan-device-engine-r2.helper.ts`<br/>`verify-scan-device-engine.helper.ts`<br/>`verify-scan-device-engine.ts`<br/>`verify-scan-device-runner-r3.ts`<br/>`verify-scan-device-runner.helper.ts`<br/>`verify-scan-wia-deskew-windows.ts`<br/>`verify-scan-wia-deskew.ts` |
 | `apps/terminal-agent/src/agent/scan-input/verified-folder.ts` | `verify-scan-input-health.ts` |
 | `apps/terminal-agent/src/agent/scan-input/windows-secure-reader.ts` | `verify-scan-input-health.ts` |
 | `apps/terminal-agent/src/agent/scan-watcher.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-print-truth-hardening.ts`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-scan-device-engine.ts`<br/>`verify-scan-watcher.ts` |

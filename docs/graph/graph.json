@@ -20115,6 +20115,7 @@
     ".github/workflows/windows-agent-installer.yml": [
       "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
       "apps/terminal-agent/scripts/verify-scan-deskew.ts",
+      "apps/terminal-agent/scripts/verify-scan-wia-deskew.ts",
       "scripts/verify-ci-gate-coverage.mjs"
     ],
     "apps/admin/index.html": [
@@ -24442,6 +24443,9 @@
     "apps/terminal-agent/installer/provision/daily-reboot.ps1": [
       "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts"
     ],
+    "apps/terminal-agent/package.json": [
+      "apps/terminal-agent/scripts/verify-scan-wia-deskew.ts"
+    ],
     "apps/terminal-agent/scripts/agent-crash-privacy.helper.ts": [
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
@@ -24527,6 +24531,9 @@
       "apps/terminal-agent/scripts/verify-scan-device-runner-r4.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner-r6.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner.ts"
+    ],
+    "apps/terminal-agent/scripts/verify-scan-wia-deskew.ts": [
+      "apps/terminal-agent/scripts/verify-scan-deskew.ts"
     ],
     "apps/terminal-agent/scripts/verify-windows-service-recovery.mjs": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs"
@@ -24693,6 +24700,13 @@
     "apps/terminal-agent/src/agent/scan-deskew/thresholds-source.ts": [
       "apps/terminal-agent/scripts/verify-scan-deskew.ts"
     ],
+    "apps/terminal-agent/src/agent/scan-deskew/wia-integration.ts": [
+      "apps/terminal-agent/scripts/verify-scan-wia-deskew-windows.ts",
+      "apps/terminal-agent/scripts/verify-scan-wia-deskew.ts"
+    ],
+    "apps/terminal-agent/src/agent/scan-deskew/wia-page-source.ts": [
+      "apps/terminal-agent/scripts/verify-scan-wia-deskew.ts"
+    ],
     "apps/terminal-agent/src/agent/scan-device/scan-device-backend.ts": [
       "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts",
@@ -24727,7 +24741,8 @@
       "apps/terminal-agent/scripts/verify-scan-device-runner-r4.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner-r6.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
-      "apps/terminal-agent/scripts/verify-scan-device-runner.ts"
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts",
+      "apps/terminal-agent/scripts/verify-scan-wia-deskew.ts"
     ],
     "apps/terminal-agent/src/agent/scan-device/scan-device-sync.ts": [
       "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts"
@@ -24759,14 +24774,17 @@
       "apps/terminal-agent/scripts/verify-scan-device-engine-r2.helper.ts",
       "apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner-r2.ts",
-      "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts"
+      "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
+      "apps/terminal-agent/scripts/verify-scan-wia-deskew.ts"
     ],
     "apps/terminal-agent/src/agent/scan-device/wia-script.ts": [
       "apps/terminal-agent/scripts/verify-scan-device-engine-r2.helper.ts",
       "apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts",
       "apps/terminal-agent/scripts/verify-scan-device-engine.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts",
-      "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts"
+      "apps/terminal-agent/scripts/verify-scan-device-runner.helper.ts",
+      "apps/terminal-agent/scripts/verify-scan-wia-deskew-windows.ts",
+      "apps/terminal-agent/scripts/verify-scan-wia-deskew.ts"
     ],
     "apps/terminal-agent/src/agent/scan-input/verified-folder.ts": [
       "apps/terminal-agent/scripts/verify-scan-input-health.ts"
@@ -36969,6 +36987,7 @@
         "dirs": [],
         "files": [
           ".github/workflows/windows-agent-installer.yml",
+          "apps/terminal-agent/scripts/verify-scan-wia-deskew.ts",
           "apps/terminal-agent/src/agent/config-manager.ts",
           "apps/terminal-agent/src/agent/scan-deskew/runner.ts",
           "apps/terminal-agent/src/agent/scan-deskew/script.ts",
@@ -37286,6 +37305,47 @@
         "terminal-agent::verify:scan-watcher"
       ],
       "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/terminal-agent/src/agent/scan-deskew/wia-integration.ts",
+          "apps/terminal-agent/src/agent/scan-device/wia-script.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-scan-wia-deskew-windows.ts",
+      "helper": false,
+      "inCi": false,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:scan-wia-deskew-windows"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          ".github/workflows/windows-agent-installer.yml",
+          "apps/terminal-agent/package.json",
+          "apps/terminal-agent/src/agent/scan-deskew/wia-integration.ts",
+          "apps/terminal-agent/src/agent/scan-deskew/wia-page-source.ts",
+          "apps/terminal-agent/src/agent/scan-device/scan-device-runner.ts",
+          "apps/terminal-agent/src/agent/scan-device/wia-runner.ts",
+          "apps/terminal-agent/src/agent/scan-device/wia-script.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-scan-wia-deskew.ts",
+      "helper": true,
+      "inCi": false,
+      "package": "apps/terminal-agent",
+      "scriptNames": [],
+      "wired": false
     },
     {
       "asserts": {

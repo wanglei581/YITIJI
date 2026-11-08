@@ -102,7 +102,7 @@ export function createScanDeviceRuntime(
 ): ScanDeviceRuntime {
   const maxPages = config.scanDeviceMaxPages ?? 20
   const deps: ScanDeviceRuntimeDeps = {
-    startScan: startWiaScan,
+    startScan: (request) => startWiaScan({ ...request, scanAutoDeskewEnabled: config.scanAutoDeskewEnabled === true }),
     runProbe: runWiaProbe,
     compose: composeScanPdf,
     deliver: (input) => deliverScanDevicePdf(config, input),

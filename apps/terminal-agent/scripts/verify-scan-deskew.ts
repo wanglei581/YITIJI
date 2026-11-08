@@ -1,5 +1,6 @@
 /** Linux/Mac safe: real private temp files, fake child/clock, no PowerShell or hardware. */
 import assert from 'node:assert/strict'
+import { verifyWiaDeskew } from './verify-scan-wia-deskew'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -195,6 +196,7 @@ function clearRuns() {
   for (const name of fs.readdirSync(taskDir)) if (name.startsWith('deskew-')) fs.rmSync(path.join(taskDir, name), { recursive: true })
 }
 async function main() {
+  await check('WIA S4b generated-script and lifecycle contracts', verifyWiaDeskew)
   await check('numerical C# mirror / fixed thresholds / exhaustive synthetic matrix', () => {
     const angles = [-limits.MaxAngle, -4, -3, -2, -1, -limits.MinAngle, 0, limits.MinAngle, 1, 2, 3, 4,
       limits.MaxAngle, -limits.MaxAngle - limits.CoarseStep, limits.MaxAngle + limits.CoarseStep, -12, 12]

@@ -15,6 +15,7 @@
  */
 
 import type { ChildProcess } from 'child_process'
+import { prepareWiaDeskew, logWiaDeskewLine } from '../scan-deskew/wia-integration'
 import path from 'path'
 import { log, warn } from '../../logger'
 import {
@@ -186,6 +187,7 @@ export function runJob(spec: JobSpec, deps: WiaRunnerDeps): JobHandle {
 // ── 扫描 ─────────────────────────────────────────────────────────────────
 
 export interface WiaScanRequest {
+  scanAutoDeskewEnabled?: boolean
   deviceName?: string
   source: WiaSource
   color: WiaColor
@@ -277,7 +279,8 @@ export function startWiaScan(request: WiaScanRequest, overrides: Partial<WiaRunn
     },
     { root: deps.root },
   )
-  const args = buildWiaPowerShellArgs(encodeWiaCommand(script))
+  const deskew = prepareWiaDeskew(script, { enabled: request.scanAutoDeskewEnabled, taskDir: outDir, root: deps.root })
+  const args = buildWiaPowerShellArgs(encodeWiaCommand(deskew.script))
 
   const startedAt = deps.clock.now()
   let attempts = 0
@@ -300,6 +303,7 @@ export function startWiaScan(request: WiaScanRequest, overrides: Partial<WiaRunn
         softStop: () => deps.writeCancelFlag(cancelFlag),
         graceMs: request.abortGraceMs ?? WIA_ABORT_GRACE_MS,
         onLine: (line) => {
+          if (request.scanAutoDeskewEnabled === true && logWiaDeskewLine(line)) return
           const parsed = parseWiaLine(line)
           if (!parsed) {
             ignoredLines += 1
@@ -434,7 +438,7 @@ export function startWiaScan(request: WiaScanRequest, overrides: Partial<WiaRunn
         `${finalResult.errorCode ? ` code=${finalResult.errorCode}` : ''}${finalResult.hresult ? ` hresult=${finalResult.hresult}` : ''}`,
     )
     return finalResult
-  })()
+  })().finally(deskew.cleanup)
 
   return {
     abort: () => {
