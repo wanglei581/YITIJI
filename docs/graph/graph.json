@@ -6742,7 +6742,6 @@
           "AuditLog",
           "CopyJob",
           "Order",
-          "PriceConfig",
           "Terminal",
           "TerminalCapability"
         ],
@@ -6763,7 +6762,6 @@
           "AuditLog",
           "CopyJob",
           "Order",
-          "PriceConfig",
           "Terminal",
           "TerminalCapability"
         ],
@@ -6784,7 +6782,6 @@
           "AuditLog",
           "CopyJob",
           "Order",
-          "PriceConfig",
           "Terminal",
           "TerminalCapability"
         ],
@@ -6805,7 +6802,6 @@
           "AuditLog",
           "CopyJob",
           "Order",
-          "PriceConfig",
           "Terminal",
           "TerminalCapability"
         ],
@@ -11811,6 +11807,7 @@
         "method": "POST",
         "models": [
           "AuditLog",
+          "CopyJob",
           "DocumentProcessTask",
           "FairMaterialPrintBridge",
           "FileObject",
@@ -11861,6 +11858,7 @@
         "method": "GET",
         "models": [
           "AuditLog",
+          "CopyJob",
           "DocumentProcessTask",
           "FairMaterialPrintBridge",
           "FileObject",
@@ -11888,6 +11886,7 @@
         "method": "POST",
         "models": [
           "AuditLog",
+          "CopyJob",
           "DocumentProcessTask",
           "FairMaterialPrintBridge",
           "FileObject",
@@ -11915,6 +11914,7 @@
         "method": "POST",
         "models": [
           "AuditLog",
+          "CopyJob",
           "DocumentProcessTask",
           "FairMaterialPrintBridge",
           "FileObject",
@@ -13022,7 +13022,6 @@
           "Order",
           "OrderItem",
           "Organization",
-          "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
@@ -13056,7 +13055,6 @@
           "Order",
           "OrderItem",
           "Organization",
-          "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
@@ -13090,7 +13088,6 @@
           "Order",
           "OrderItem",
           "Organization",
-          "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
@@ -18726,7 +18723,8 @@
           "services/api/src/copy-jobs/copy-authorization.ts",
           "services/api/src/copy-jobs/copy-job-store.service.ts",
           "services/api/src/copy-jobs/copy-jobs.service.ts",
-          "services/api/src/member-privacy/member-closure-retention.ts"
+          "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/print-jobs/free-print-quota.usage.ts"
         ]
       },
       {
@@ -19599,7 +19597,6 @@
         "relations": [],
         "usedBy": [
           "services/api/src/benefit-redemption/resume-export-gate.service.ts",
-          "services/api/src/copy-jobs/copy-job-store.service.ts",
           "services/api/src/payment/admin-billing.service.ts",
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts"
@@ -20223,6 +20220,7 @@
       "scripts/verify-release-bundle.mjs",
       "services/api/scripts/verify-contract-review-preprod-readiness.ts",
       "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
@@ -25666,6 +25664,7 @@
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-copy-c1a.ts",
       "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
@@ -26093,6 +26092,9 @@
       "services/api/scripts/verify-queue-dispatch-printer-status.ts",
       "services/api/scripts/verify-scan-device-b4.ts",
       "services/api/scripts/verify-scan-device-b9.ts"
+    ],
+    "services/api/src/admin-ops/derived-print-quota-alerts.ts": [
+      "services/api/scripts/verify-copy-quota.ts"
     ],
     "services/api/src/admin-ops/derived-scan-device-alerts.ts": [
       "services/api/scripts/verify-scan-device-b9.ts"
@@ -26991,6 +26993,7 @@
       "services/api/scripts/verify-companies.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-cos-files.ts",
       "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-derivation-kind.ts",
@@ -27589,6 +27592,7 @@
       "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
@@ -27801,23 +27805,27 @@
       "services/api/scripts/verify-copy-c1b.ts"
     ],
     "services/api/src/copy-jobs/copy-agent.service.ts": [
-      "services/api/scripts/verify-copy-c1b.ts"
+      "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts"
     ],
     "services/api/src/copy-jobs/copy-job-store.service.ts": [
-      "services/api/scripts/verify-copy-c1b.ts"
+      "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts"
     ],
     "services/api/src/copy-jobs/copy-job.policy.ts": [
       "services/api/scripts/verify-copy-c1b.ts"
     ],
     "services/api/src/copy-jobs/copy-job.types.ts": [
       "services/api/scripts/verify-copy-c1a.ts",
-      "services/api/scripts/verify-copy-c1b.ts"
+      "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts"
     ],
     "services/api/src/copy-jobs/copy-jobs.controller.ts": [
       "services/api/scripts/verify-copy-c1b.ts"
     ],
     "services/api/src/copy-jobs/copy-jobs.service.ts": [
-      "services/api/scripts/verify-copy-c1b.ts"
+      "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts"
     ],
     "services/api/src/device-fleet/device-fleet.controller.ts": [
       "services/api/scripts/verify-device-fleet-overview.ts"
@@ -29063,7 +29071,8 @@
       "services/api/scripts/verify-admin-billing.ts"
     ],
     "services/api/src/payment/admin-billing.service.ts": [
-      "services/api/scripts/verify-admin-billing.ts"
+      "services/api/scripts/verify-admin-billing.ts",
+      "services/api/scripts/verify-copy-quota.ts"
     ],
     "services/api/src/payment/admin-order-actions.controller.ts": [
       "services/api/scripts/verify-api20-manual-refund.ts",
@@ -29080,7 +29089,8 @@
       "services/api/scripts/verify-payment-codepay.ts"
     ],
     "services/api/src/payment/copy-pricing.ts": [
-      "services/api/scripts/verify-copy-c1a.ts"
+      "services/api/scripts/verify-copy-c1a.ts",
+      "services/api/scripts/verify-copy-quota.ts"
     ],
     "services/api/src/payment/dto/admin-billing.dto.ts": [
       "services/api/scripts/verify-admin-billing.ts"
@@ -29229,7 +29239,7 @@
     "services/api/src/payment/price-config.seed.ts": [
       "services/api/scripts/verify-admin-billing.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
-      "services/api/scripts/verify-copy-c1a.ts",
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
@@ -29260,6 +29270,7 @@
       "services/api/scripts/verify-admin-billing.ts",
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
@@ -29411,15 +29422,19 @@
       "services/api/scripts/verify-free-print-quota.ts"
     ],
     "services/api/src/print-jobs/free-print-quota.decide.ts": [
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts"
     ],
     "services/api/src/print-jobs/free-print-quota.policy.ts": [
+      "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts"
     ],
     "services/api/src/print-jobs/free-print-quota.service.ts": [
       "services/api/scripts/verify-free-print-quota.ts"
     ],
     "services/api/src/print-jobs/free-print-quota.usage.ts": [
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-pickup-code-resume.ts"
     ],
@@ -29631,6 +29646,7 @@
       "services/api/scripts/verify-contract-review-http.ts",
       "services/api/scripts/verify-copy-c1a.ts",
       "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-cos-files.ts",
       "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-deploy-data-safety-gate.ts",
@@ -39974,7 +39990,6 @@
           "services/api/src/member-print-orders/member-print-orders.service.ts",
           "services/api/src/member-print-orders/package-order.service.ts",
           "services/api/src/payment/copy-pricing.ts",
-          "services/api/src/payment/price-config.seed.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/terminals/dto/report-scan-deletion-audit.dto.ts",
           "services/api/src/terminals/scan-deletion-reason-codes.ts",
@@ -40014,6 +40029,7 @@
           "services/api/src/copy-jobs/copy-jobs.service.ts",
           "services/api/src/files/file-validation.ts",
           "services/api/src/member-print-orders/member-print-orders.service.ts",
+          "services/api/src/print-jobs/free-print-quota.policy.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/terminals/terminal-credential-security.service.ts",
           "services/api/src/terminals/terminal-identity.guard.ts",
@@ -40029,6 +40045,40 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:copy-c1b"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          ".github/workflows/ci.yml",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/admin-ops/derived-print-quota-alerts.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/copy-jobs/copy-agent.service.ts",
+          "services/api/src/copy-jobs/copy-job-store.service.ts",
+          "services/api/src/copy-jobs/copy-job.types.ts",
+          "services/api/src/copy-jobs/copy-jobs.service.ts",
+          "services/api/src/payment/admin-billing.service.ts",
+          "services/api/src/payment/copy-pricing.ts",
+          "services/api/src/payment/price-config.seed.ts",
+          "services/api/src/payment/pricing.service.ts",
+          "services/api/src/print-jobs/free-print-quota.decide.ts",
+          "services/api/src/print-jobs/free-print-quota.policy.ts",
+          "services/api/src/print-jobs/free-print-quota.usage.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-copy-quota.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:copy-quota"
       ],
       "wired": true
     },
