@@ -7,6 +7,7 @@ import { useSupportContact } from '../../hooks/useSupportContact'
 import { getMyDocuments } from '../../services/api/memberAssets'
 import { SCAN_DEVICE_RAIL, ScanWorkbenchShell } from './ScanWorkbenchChrome'
 import { ScanResultPreviewViewer } from './ScanResultPreviewViewer'
+import { SCAN_GUEST_WAYS_LEAD, scanGuestWays } from './scanGuestWays'
 import { SCAN_MATERIALS } from './scanMaterials'
 import { type ScanStage } from './scanWorkbenchModel'
 import { revokeLiveScanSession } from './scanSessionRevoke'
@@ -14,9 +15,6 @@ import { beginDeviceScanAgain, readScanWorkbenchSession } from './scanWorkbenchS
 import { useScanResultExits } from './useScanResultExits'
 import './styles/scan-device-flow.css'
 import './styles/scan-device-done.css'
-
-/** 与 K1a 结果页游客句逐字相同。登录但还没证明文件归本人时，这句也不出现。 */
-const GUEST_SENTENCE = '未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。要带走电子版，下次先扫码登录再扫。用 U 盘带走：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。'
 
 type Owner = 'guest' | 'checking' | 'owned' | 'unproven'
 
@@ -107,7 +105,17 @@ export function ScanDeviceDonePage({ onGoStage }: { onGoStage?: (stage: ScanStag
           </button>
           <p className="cs-fine">页数和方向请自己核一下</p>
         </div>
-        {owner === 'guest' ? <p className="cs-warn" role="note">{GUEST_SENTENCE}</p> : null}
+        {/* 游客三条带走的办法，与面板结果页同一份（scanGuestWays）。登录但还没证明文件归本人时，这段也不出现。 */}
+        {owner === 'guest' ? (
+          <div className="cs-warn cs-guest-ways" role="note" data-testid="scan-guest-ways">
+            <p>{SCAN_GUEST_WAYS_LEAD}</p>
+            <ol>
+              {scanGuestWays(contact).map((way) => (
+                <li key={way.key} data-guest-way={way.key}>{way.text}</li>
+              ))}
+            </ol>
+          </div>
+        ) : null}
         {saved ? <div className="cs-saved" role="status">{saved}</div> : null}
         <div className="cs-rows">
           <button type="button" className="cs-row" onClick={exits.handlePrint}>

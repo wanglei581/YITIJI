@@ -1329,6 +1329,8 @@ const SCAN_RESULT_FILES = [
   'src/pages/scan/ScanResultPreviewBlock.tsx',
   'src/pages/scan/ScanResultExitRow.tsx',
   'src/pages/scan/ScanResultPage.tsx',
+  // 2026-11-08：游客三条带走的办法在共用的 scanGuestWays（屏上扫描完成屏也用），去向行只管渲染。
+  'src/pages/scan/scanGuestWays.ts',
 ]
 const scanResult = SCAN_RESULT_FILES.map(read).join('\n')
 // 打印出口 2026-09-28 起落在材料检查（商用收口 P0-5）：扫描件是本人原件，生产强制

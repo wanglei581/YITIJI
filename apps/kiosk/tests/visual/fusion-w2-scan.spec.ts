@@ -947,19 +947,56 @@ test('successful scan tells a guest the file will not reach 我的文档 @w2', a
   const destination = page.getByRole('button', { name: /本次不进入我的文档/ })
   await expect(destination).toBeVisible()
   await expect(destination).toBeDisabled()
-  // 产品负责人 11/02 拍板，照触屏版补稿 cs-scan-done 的原话：说清「请在本次操作内完成打印或识别」，带走电子版的办法是
-  // 「下次先扫码登录再扫」（补不进账号，所以说「下次」），再补一句 U 盘（这台机器暂未开通，如实写）。
+  // 设计窗口 11/08 答复：游客「扫码带走」不做（照 10/12 定项）。先一句「不进『我的文档』」，再列三条带走的办法：
+  // 当场打印、存 U 盘（这台机器暂未开通，如实写）、下次先扫码登录再扫（补不进账号，所以说「下次」）。默认夹具小程序没发布，第三条不说手机上能看到。
   // 没有登录按钮：游客一登录，这次扫描就会被登录那一步清掉，按钮会让人以为现在登录就能存进去（见下面 /login 出口那条断言）。
   // 游客扫码带走电子版已撤（见下面那条防回退用例），这一屏没有任何下载码入口。
-  await expect(page.getByText('未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。要带走电子版，下次先扫码登录再扫。')).toBeVisible()
-  await expect(page.getByText('用 U 盘带走：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。')).toBeVisible()
-  // 旧句子（走查 I-15 那一版）不得再出现。
+  await expectGuestWays(page, false)
+  // 11/02 那一版长句与走查 I-15 那一版旧句子都不得再出现。
+  await expect(page.getByText('要带走电子版，下次先扫码登录再扫。')).toHaveCount(0)
   await expect(page.getByText('要留在账号里：先登录，再重新扫一次')).toHaveCount(0)
   await expect(page.locator('[data-testid^="scan-takeaway"]')).toHaveCount(0)
 
   // 旧的不实承诺不得再出现在页面上。
   await expect(page.getByText(/登录后管理文件|登录后可在「我的文档」管理/)).toHaveCount(0)
   // 不能把游客送去登录、好像登录后这份会出现在「我的文档」里：这一屏没有任何去 /login 的出口
+  await expect(page.locator('a[href^="/login"]')).toHaveCount(0)
+  await expectHealthy(page, errors)
+})
+
+/**
+ * 游客三条带走的办法（scanGuestWays）：在灰着的「本次不进入我的文档」里，先一句不进「我的文档」，再按顺序三条。
+ * 第三条后半句「手机小程序里也能看到」只在小程序已发布时出现。
+ */
+async function expectGuestWays(page: Page, miniappPublished: boolean): Promise<void> {
+  const destination = page.getByRole('button', { name: /本次不进入我的文档/ })
+  await expect(destination).toBeDisabled()
+  await expect(destination.getByTestId('scan-guest-ways')).toHaveText('未登录扫描件不会进入「我的文档」。带走的办法：')
+  await expect(destination.locator('[data-guest-way]')).toHaveText([
+    '1. 当场打印：请在本次操作内完成打印或识别。',
+    '2. 存 U 盘：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。',
+    miniappPublished
+      ? '3. 存进「我的文档」：下次先扫码登录再扫，手机小程序里也能看到。'
+      : '3. 存进「我的文档」：下次先扫码登录再扫。',
+  ])
+}
+
+test('guest scan result adds the miniapp half of the third way only when the miniapp is published @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  registerShell(api)
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 200,
+    json: {
+      success: true,
+      data: { servicePhone: '18369161921', serviceHours: '工作日 9:00–18:00', otherOnlineTerminalNearby: false, miniappPublished: true },
+    },
+  })
+  await seedScanResult(page, resultState)
+  await page.goto('/scan?stage=result')
+  await expectPdfCompleted(binary)
+  await expectGuestWays(page, true)
   await expect(page.locator('a[href^="/login"]')).toHaveCount(0)
   await expectHealthy(page, errors)
 })
@@ -995,12 +1032,16 @@ test(`guest ${scanType} scan result has no download QR and no takeaway entry, on
   await expect(main.locator('svg[shape-rendering="crispEdges"], canvas:not([data-pdf-preview-host] canvas), img[src^="data:image"]')).toHaveCount(0)
   await expect(main.getByText(/扫码带走|下载码|二维码/)).toHaveCount(0)
   await expect(main.locator('[aria-label*="扫码带走"], [aria-label*="下载码"], [aria-label*="二维码"], [aria-description*="扫码带走"], [aria-description*="下载码"], [aria-description*="二维码"]')).toHaveCount(0)
-  // 只留实话（11/02 拍板的新句子，含 U 盘那一句），和灰着的「本次不进入我的文档」；这一屏没有任何去 /login 的出口。
-  await expect(page.getByText('未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。要带走电子版，下次先扫码登录再扫。')).toBeVisible()
-  await expect(page.getByText('用 U 盘带走：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。')).toBeVisible()
+  // 只留实话（11/08 三条带走的办法），和灰着的「本次不进入我的文档」；这一屏没有任何去 /login 的出口。
+  await expectGuestWays(page, false)
+  await expect(page.getByText('要带走电子版，下次先扫码登录再扫。')).toHaveCount(0)
   await expect(page.getByText('要留在账号里：先登录，再重新扫一次')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: /本次不进入我的文档/ })).toBeDisabled()
   await expect(page.locator('a[href^="/login"]')).toHaveCount(0)
+  // 三条在 27 寸竖屏上一屏看得全：第三条的底边在底栏之上，不用滚动。
+  const lastWay = await page.locator('[data-guest-way="documents"]').boundingBox()
+  const dock = await page.locator('.qxt-dock').first().boundingBox()
+  expect(lastWay, '第三条要画出来').not.toBeNull()
+  expect(lastWay!.y + lastWay!.height, '三条带走的办法不压在底栏下面').toBeLessThanOrEqual(dock?.y ?? page.viewportSize()!.height)
   await page.screenshot({ path: testInfo.outputPath(`qx-scan-result-guest-${scanType}.png`), fullPage: false })
   await expectHealthy(page, errors)
 })
