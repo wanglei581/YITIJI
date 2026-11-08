@@ -361,6 +361,7 @@ export default function AiConfigPage() {
               placeholder={cfg?.apiKeyConfigured ? '已保存，留空则不修改' : '请输入 API Key'}
               autoComplete="off"
             />
+            <p className="mt-1.5 text-xs text-neutral-500">换了模型服务地址或厂商，要重新填写这一家的 API Key</p>
           </div>
 
           {/* baseURL */}

@@ -216,7 +216,7 @@ export class MaterialsService {
         })
       }
       const extraction = buffer
-        ? await extractTextForPiiScan(buffer, sourceFile.mimeType, this.ocr)
+        ? await extractTextForPiiScan(buffer, sourceFile.mimeType, this.ocr, sourceFile.purpose)
         : { pages: [], outcome: 'degraded' as const, truncated: false as const }
       if (extraction.outcome === 'unsupported_format') {
         await persistScan({ mode: 'unsupported_format', findingCount: 0 })

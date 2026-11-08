@@ -6,6 +6,7 @@
 import {
   ArgumentsHost,
   BadRequestException,
+  ConflictException,
   HttpException,
   HttpStatus,
   NotFoundException,
@@ -242,6 +243,54 @@ function main(): void {
   }))
   assert(serialization.statusCode === 500, '40001 stays a server error')
   assert(serialization.body.error.code === 'INTERNAL_SERVER_ERROR', '40001 is not DB_BUSY')
+
+  const ended = capture(new ConflictException({
+    error: {
+      code: 'SCAN_DEVICE_TASK_ENDED',
+      message: '扫描任务已结束，请停止屏上扫描',
+      details: { taskStatus: 'completed', fileDelivered: true, fileId: 'file_secret_b8' },
+    },
+  }))
+  assert(ended.statusCode === 409, 'ended device report keeps HTTP 409')
+  assert(ended.body.error.code === 'SCAN_DEVICE_TASK_ENDED', 'ended device report keeps its code')
+  assert(
+    JSON.stringify(ended.body.error.details) === JSON.stringify({ taskStatus: 'completed', fileDelivered: true }),
+    'ended device report keeps only taskStatus and fileDelivered',
+  )
+  assert(!JSON.stringify(ended.body).includes('file_secret_b8'), 'ended device report does not echo a file id')
+
+  const delivering = capture(new ConflictException({
+    error: {
+      code: 'SCAN_DEVICE_TASK_DELIVERING',
+      message: '文件正在投递，暂不接受新的屏上扫描回报',
+      details: { taskStatus: 'matched', fileDelivered: true, fileId: 'file_secret_matched' },
+    },
+  }))
+  assert(
+    JSON.stringify(delivering.body.error.details) === JSON.stringify({ taskStatus: 'matched' }),
+    'delivering report keeps only taskStatus matched',
+  )
+  assert(!JSON.stringify(delivering.body).includes('file_secret_matched'), 'delivering report does not echo a file id')
+
+  const foreign = capture(new NotFoundException({
+    error: {
+      code: 'SCAN_TASK_NOT_FOUND',
+      message: '扫描任务不存在',
+      details: { taskStatus: 'completed', fileDelivered: true, fileId: 'file_secret_foreign' },
+    },
+  }))
+  assert(foreign.body.error.details === undefined, 'another terminal 404 does not gain task details')
+  assert(!JSON.stringify(foreign.body).includes('completed'), 'another terminal 404 does not leak taskStatus')
+  assert(!JSON.stringify(foreign.body).includes('file_secret_foreign'), 'another terminal 404 does not leak a file id')
+
+  const badStatus = capture(new ConflictException({
+    error: {
+      code: 'SCAN_DEVICE_TASK_ENDED',
+      message: '扫描任务已结束，请停止屏上扫描',
+      details: { taskStatus: 'waiting', fileDelivered: false },
+    },
+  }))
+  assert(badStatus.body.error.details === undefined, 'taskStatus outside the four end states is dropped')
 
   console.log('\nALL PASS')
 }
