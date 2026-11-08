@@ -1,6 +1,8 @@
 import { QxTouchDock } from '../../../components/qingxu/touch/QxTouchDock'
+import type { InterviewAccess } from '../../../services/api/interview'
 import { InterviewArt } from '../InterviewArt'
 import { InterviewShell } from '../InterviewShell'
+import { InterviewTranscriptTakeaway } from '../InterviewTakeaway'
 
 /**
  * 到点后停住的一屏。没有记下回答，或报告没生成出来。
@@ -8,6 +10,8 @@ import { InterviewShell } from '../InterviewShell'
  */
 export function InterviewTimeUp({
   variant,
+  sessionId,
+  getAccess,
   answersRecorded,
   busy,
   onLeave,
@@ -16,6 +20,8 @@ export function InterviewTimeUp({
   onOpenTips,
 }: {
   variant: 'no-answers' | 'report-failed'
+  sessionId: string
+  getAccess: () => InterviewAccess
   /** 本场亲眼见过非跳过的回答提交成功。没见过就不说「已保存」。 */
   answersRecorded: boolean
   busy?: boolean
@@ -66,6 +72,9 @@ export function InterviewTimeUp({
           <InterviewArt title={noAnswers ? '这一场没有记下回答' : '报告还没生成'}>
             这一场已经结束，不能再补答，也不会把没提交的内容并进报告。到点时还没提交的文字、没录完的语音、没确认的转写，都不算进这一场。
           </InterviewArt>
+          {!noAnswers && answersRecorded ? (
+            <InterviewTranscriptTakeaway look="wide" sessionId={sessionId} getAccess={getAccess} disabled={busy} />
+          ) : null}
           <button type="button" className="qxt-iv-wide" onClick={onOpenTips}>
             <b>查看公开面试技巧</b>
             <small>准备清单与 STAR 方法随时可读，不依赖这场练习。</small>

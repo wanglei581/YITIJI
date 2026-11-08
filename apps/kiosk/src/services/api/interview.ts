@@ -167,6 +167,17 @@ export function printInterviewReport(sessionId: string, access: InterviewAccess)
 }
 
 /**
+ * 本场题目和本人回答（不调模型）。报告生成不了时，用户仍能把自己答过的内容带走。
+ * 服务端要求至少有一条没跳过的回答，否则 400 INTERVIEW_NO_ANSWERS。
+ */
+export function printInterviewTranscript(sessionId: string, access: InterviewAccess): Promise<InterviewPrintResponse> {
+  if (API_MODE !== 'http') {
+    return Promise.reject(new InterviewApiError('MOCK_MODE', '演示模式不生成真实打印文件', 0))
+  }
+  return call<InterviewPrintResponse>(`/mock-interviews/${encodeURIComponent(sessionId)}/transcript/print`, access, { method: 'POST', body: {} })
+}
+
+/**
  * 通用题目与答案单（ai-down 支线）。
  *
  * 这是模拟面试链上**唯一不经过模型**的出纸路径：`/start` 一 503，会话永远停在

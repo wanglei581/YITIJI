@@ -20,6 +20,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useSupportContact } from '../../hooks/useSupportContact'
 import { InterviewAnswerDock } from './session/InterviewAnswerDock'
+import { InterviewTranscriptTakeaway } from './InterviewTakeaway'
 import { InterviewSessionBar } from './session/InterviewSessionBar'
 import { InterviewSessionPanels } from './session/InterviewSessionPanels'
 import { speakInterview } from './session/speakInterview'
@@ -479,6 +480,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         onRetryReport={() => void finish()}
         omitPrintAnswers={omitPrintAnswers}
         onOmitPrintAnswersChange={setOmitPrintAnswers}
+        transcriptTakeaway={<InterviewTranscriptTakeaway look="act" sessionId={state.sessionId} getAccess={() => accessRef.current} disabled={busyTurn} />}
       />
       </InterviewSessionPanels>
     </div>

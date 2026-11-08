@@ -889,8 +889,10 @@ test('resume parse server failure is labelled failed, never as the running step 
   await page.waitForURL('/resume/report')
   await expect(page.getByTestId('resume-report-state-diagnose-failed')).toBeVisible()
   const exits = page.getByTestId('resume-report-fail-exits').locator('.qxt-slab')
-  await expect(exits).toHaveCount(4)
-  for (let index = 0; index < 4; index += 1) await assertTapTargetPointerHit(exits.nth(index))
+  // 夹具默认本机没配官方渠道：只剩打印原件、去打印扫描、查政策三行，不给点进去是空页的「本机构官方渠道」。
+  await expect(exits).toHaveCount(3)
+  await expect(page.getByTestId('resume-report-fail-exits').getByText('本机构官方渠道')).toHaveCount(0)
+  for (let index = 0; index < 3; index += 1) await assertTapTargetPointerHit(exits.nth(index))
   await expect(page.getByTestId('resume-report-fallback')).toBeVisible()
   const retry = page.locator('.qx-btn[data-testid="resume-report-primary"]')
   await expect(retry).toHaveText('重新解析')

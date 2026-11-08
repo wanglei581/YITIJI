@@ -14592,7 +14592,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 852,
+      "reachableFileCount": 854,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -14793,6 +14793,7 @@
             "POST /mock-interviews/:param/answer",
             "POST /mock-interviews/:param/report/print",
             "POST /mock-interviews/:param/start",
+            "POST /mock-interviews/:param/transcript/print",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
@@ -15005,7 +15006,8 @@
             "POST /mock-interviews",
             "POST /mock-interviews/:param/answer",
             "POST /mock-interviews/:param/report/print",
-            "POST /mock-interviews/:param/start"
+            "POST /mock-interviews/:param/start",
+            "POST /mock-interviews/:param/transcript/print"
           ],
           "file": "apps/kiosk/src/pages/interview/InterviewWorkbenchPage.tsx",
           "layout": [
@@ -15908,7 +15910,8 @@
             "POST /mock-interviews",
             "POST /mock-interviews/:param/answer",
             "POST /mock-interviews/:param/report/print",
-            "POST /mock-interviews/:param/start"
+            "POST /mock-interviews/:param/start",
+            "POST /mock-interviews/:param/transcript/print"
           ],
           "file": "apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx",
           "layout": [
@@ -17898,7 +17901,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 980
+      "sourceFileCount": 982
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
