@@ -381,10 +381,6 @@ export function ResumeReportPage() {
               capture={isExportCaptureState(viewState) ? viewState : null}
               onExportedChange={setExportedNow}
             /></LicenseLock> : <ResumeReportTakeaway key={viewState} show taskId={taskId} accessToken={accessToken} capture={isExportCaptureState(viewState) ? viewState : null} onExportedChange={setExportedNow} />}
-            <div className="qxt-links">
-              <button type="button" disabled={viewOnly} title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined} data-route="/resume/job-fit" onClick={() => navigate('/resume/job-fit', { state: { taskId, accessToken } })}>简历对照</button>
-              <button type="button" disabled={viewOnly} title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={() => navigate('/resume/self-assessment/intro')}>自我探索</button>
-            </div>
             <p className="qxt-fine" id="resume-report-why">{why}</p>
           </>
         ) : viewState === 'report-empty' ? (

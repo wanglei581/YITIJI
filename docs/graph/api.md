@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`637` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`638` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -1164,6 +1164,7 @@
 | GET | `/api/v1/admin/terminals/:terminalId/capabilities` | AdminTerminalsController.listCapabilities | admin | — | — |
 | DELETE | `/api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey` | AdminTerminalsController.clearCapability | admin | — | — |
 | PUT | `/api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey` | AdminTerminalsController.updateCapability | admin | — | — |
+| PUT | `/api/v1/admin/terminals/:terminalId/daily-free-print-sides` | AdminTerminalsController.updateDailyFreePrintSides | admin | — | — |
 | POST | `/api/v1/admin/terminals/:terminalId/emergency-revoke` | AdminTerminalsController.emergencyRevoke | admin | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | PATCH | `/api/v1/admin/terminals/:terminalId/lifecycle` | AdminTerminalsController.updateLifecycle | admin | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | PATCH | `/api/v1/admin/terminals/:terminalId/org` | AdminTerminalsController.assignOrg | admin | AuditService<br/>TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |

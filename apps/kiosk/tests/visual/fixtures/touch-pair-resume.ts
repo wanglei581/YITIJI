@@ -109,18 +109,6 @@ export function resumePairs(): TouchPair[] {
       },
     },
     {
-      item: '简历', screen: 'resume-more', state: 'open', route: '/resume-service',
-      seeds: ['registerTouchShell', 'click 其余'],
-      missingReason: null,
-      prepare: async (page, api) => {
-        resumeShell(api)
-        await page.goto('/resume-service')
-        await see(page, '[data-qx-page="resume"][data-readiness="ready"]')
-        await page.getByRole('button', { name: /其余/ }).click()
-        await see(page, 'text=其余简历服务')
-      },
-    },
-    {
       item: '简历', screen: 'resume-src', state: 'default', route: '/resume/source',
       seeds: ['resumeShell', 'stubResumePhone pending'],
       missingReason: null,

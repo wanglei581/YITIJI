@@ -548,14 +548,15 @@ test('社会招聘台：可用的门不带 aria-label（读屏读标题与说明
 // 稿上每屏的 AI 入口、状态、标注一个不少；AI 只解释、不替人投递或预约；AI 不可用时有手动路径或写清原因。
 const AI_BASE_LABEL = 'AI 生成，仅供参考'
 
-test('社会招聘台：两扇 AI 门（岗位匹配参考、问 AI 顾问）在，可用时可点 @w4', async ({ page, api }) => {
+test('社会招聘台：AI 门「问 AI 顾问」在、可用时可点；「岗位匹配参考」随简历对照停放不出门 @w4', async ({ page, api }) => {
+  // 2026-11-08 四核心收口：/resume/job-fit 停放，社会招聘台按停放表滤掉指过去的门（点了也只会回首页）。
+  // 岗位详情页里的「岗位匹配参考」是页内直接出结果、不跳停放页，下面那条用例照旧测它。
   registerW6Api(api)
   await page.goto('/jobs-service')
-  for (const title of ['岗位匹配参考', '问 AI 顾问']) {
-    const door = page.locator(`[data-door-title="${title}"] button`)
-    await expect(door, `${title} 这扇 AI 门在`).toHaveCount(1)
-    await expect(door).not.toHaveAttribute('aria-disabled', 'true')
-  }
+  const door = page.locator('[data-door-title="问 AI 顾问"] button')
+  await expect(door, '问 AI 顾问 这扇 AI 门在').toHaveCount(1)
+  await expect(door).not.toHaveAttribute('aria-disabled', 'true')
+  await expect(page.locator('[data-door-title="岗位匹配参考"]'), '岗位匹配参考 已停放，不出门').toHaveCount(0)
 })
 
 test('岗位列表：「用我的简历智能推荐」带 AI 使用声明，登录前写「要先登录」 @w4', async ({ page, api }) => {

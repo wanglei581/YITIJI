@@ -9,11 +9,19 @@
  * 一体机证件照入口停放。2026-10-12 产品负责人拍板：卡不显示、地址进不去，源码留着；
  * 11/04 同意改稿。类型保持 boolean，避免收窄后停放分支被当成死代码。
  * 重新打开不能只改本常量，要一起改：① 本常量改为 false；② 删掉 styles/print-hub-qx.css 末尾
- * 「其他工具六列」那段（按停放后 5 张卡写死，6 张卡时最后一张会被挤到第三行）；
+ * 「其他工具六列」那段（按停放后 4 张卡写死，恢复入口时须重核布局）；
  * ③ verify-p39-print-hub-fidelity.mjs 里钉住停放的断言改成开放后的真值；
  * ④ 触屏稿 print、st-loading 两屏的证件照磁贴要恢复（改稿先问产品负责人）。
  */
 export const ID_PHOTO_ENTRY_PARKED: boolean = true
+
+/**
+ * 2026-11-08 只留四个核心，签名入口停放。
+ * 重新打开须同时恢复 routes/index.tsx 的签名两条路由、QxPrintHubView 工具卡、
+ * MyDocumentsPage 签名按钮、print-hub-qx.css 卡片布局和 verify:kiosk-parked-core4 清单与相关门禁。
+ * 若连同证件照恢复，亦须按 ID_PHOTO_ENTRY_PARKED 的说明恢复其入口与稿。
+ */
+export const SIGN_ENTRY_PARKED: boolean = true
 
 /** 原型能力卡 data-cap / key，迁移时逐字保留，便于和原型逐卡对照。 */
 export type PrintHubCap = 'doc' | 'phone' | 'usb' | 'scan' | 'photo' | 'idphoto' | 'convert' | 'sign'

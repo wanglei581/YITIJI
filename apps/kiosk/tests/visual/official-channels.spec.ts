@@ -259,12 +259,9 @@ test('org terminal: each channel is a card with its own QR and the exact source 
   await assertNoElementCrossesViewport(page)
   await page.screenshot({ path: test.info().outputPath('official-channels-items-1080x1920.png') })
 
-  // AI 仍是驱动层：不确定先看什么时，直接进 AI 求职方向探索。
-  registerLandingPages(api)
-  await page.getByRole('button', { name: /AI 求职方向探索/ }).click()
-  await page.waitForURL((url) => url.pathname === '/assistant' && url.searchParams.get('intent') === 'career_explore')
-  await expect(page.locator('[data-kiosk-screen="assistant"]')).toBeVisible()
-  await expect.poll(() => api.requestCount('GET', '/api/v1/mock-interviews/capabilities/voice'), '落地页的挂载请求在用例内发完').toBeGreaterThan(0)
+  await page.getByRole('button', { name: '回首页', exact: true }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByTestId('qx-home')).toBeVisible()
   expect(errors).toEqual([])
 })
 

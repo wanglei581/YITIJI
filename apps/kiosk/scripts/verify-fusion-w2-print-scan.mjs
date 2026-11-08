@@ -37,7 +37,6 @@ const directRoutes = new Map([
   ['/print-scan', 'PrintScanHomePage'],
   ['/print-scan/feature/:key', 'PrintScanFeatureInfoPage'],
   ['/print-scan/convert', 'ConvertImagesPage'],
-  ['/print-scan/sign', 'SignStampPage'],
   ['/print/upload', 'PrintUploadPage'],
   ['/print/confirm', 'PrintConfirmPage'],
   ['/print/cashier', 'PrintCashierPage'],
@@ -47,7 +46,9 @@ const directRoutes = new Map([
 ])
 const redirects = new Map([
   ['/print/scan-convert', '/print-scan/convert'],
-  ['/print/scan-sign', '/print-scan/sign'],
+  ['/print-scan/sign/*', '/'],
+  ['/print/scan-sign/*', '/'],
+  ['/print/scan-sign', '/'],
   // 2026-11-04 证件照停放：旧地址回打印扫描服务台。此前目标是 /print-scan/feature/id-photo。
   ['/print/scan-feature', '/print-scan'],
   // 2026-08-18：打印参数页下线为兼容重定向（控件与预览页完全重复且全站零导航）。
@@ -238,7 +239,7 @@ for (const [path, owner] of directRoutes)
   assert.equal(actualRoutes.get(path), owner, `${path} owner`)
 for (const [path, target] of redirects)
   assert.equal(actualRedirects.get(path), target, `${path} redirect`)
-assert.equal(directRoutes.size + redirects.size, 20)
+assert.equal(directRoutes.size + redirects.size, 21)
 assert.equal(actualRoutes.get('/print/desk'), 'PrintDeskPage', '/print/desk owner')
 assert.equal(actualRoutes.get('/scan'), 'ScanWorkbenchPage', '/scan owner')
 assert.match(read('src/pages/scan/ScanWorkbenchPage.tsx'), /readScanWorkbenchSession/)

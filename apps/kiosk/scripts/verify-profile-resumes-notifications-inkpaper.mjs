@@ -62,7 +62,7 @@ expectIncludes(read('src/pages/profile/me/useMemberCursorPage.ts'), 'setItems([]
 expectIncludes(read('src/pages/profile/me/useMemberCursorPage.ts'), 'setPage(null)', '我的简历保留游客态清空总数')
 expectIncludes(resumes, "taskPath('/resume/report', taskId)", '我的简历保留诊断报告跳转')
 expectIncludes(resumes, "taskPath('/resume/optimize', taskId)", '我的简历保留优化页跳转')
-expectIncludes(resumes, 'taskId: item.taskId, resumeName: resumeLabel(item)', '我的简历保留岗位匹配参考跳转')
+expectAbsent(resumes, /openJobFit|<SmallAct label="简历对照"/, '11/08 我的简历不再提供停放的简历对照入口')
 expectIncludes(resumes, "taskPath('/resume/generate/preview', taskId)", '我的简历保留 AI 生成预览跳转')
 // 触屏版第 6 包：只有完成态才可操作由 recordUnavailableReason 统一判定（aiRecordNavigation 里 status !== 'completed' 即不可开），本页不再另写一遍。
 expectIncludes(read('src/pages/profile/me/aiRecordNavigation.ts'), "item.status !== 'completed'", '我的简历保留完成态才可操作（统一判定）')

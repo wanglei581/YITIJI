@@ -224,16 +224,10 @@ test('benefits empty and error states stay honest and read GET /me/benefits @w5-
   await expect(page.getByTestId('benefits-state-empty')).toBeVisible()
   await expect(page.getByRole('heading', { name: '还没有权益' })).toBeVisible()
   await expect(page.getByTestId('benefits-fallback').getByText('还没有权益。没有权益也照常能打印、做简历、查政策。')).toBeVisible()
-  await expect(page.getByRole('button', { name: '看看活动', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '看看活动', exact: true })).toHaveCount(0)
   await expect(page.getByText('立即支付')).toHaveCount(0)
   await expect(page.getByText('核销成功')).toHaveCount(0)
   await expectComplianceCopy(page)
-  api.respond('GET', '/api/v1/activities', {
-    status: 200,
-    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
-  })
-  await page.getByRole('button', { name: '看看活动', exact: true }).click()
-  await expect(page).toHaveURL(/\/activities/)
   expect(errors).toEqual([])
 })
 

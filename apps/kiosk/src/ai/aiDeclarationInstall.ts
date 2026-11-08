@@ -1,9 +1,10 @@
 import { API_BASE_URL } from '../services/api/client'
 import { getTerminalId } from '../services/api/screensaver'
 import { getCachedKioskTerminalConfig, peekCachedKioskTerminalConfig } from '../services/api/terminalConfig'
-import { registerAiDeclarationBridge } from '../services/terminalAuth'
+import { registerAiDeclarationBridge, registerAiLoginRequiredObserver } from '../services/terminalAuth'
 import { configureAiDeclaration, prepareAiDeclaration, recoverAiDeclaration } from './aiDeclarationGate'
 import type { DeclarationScope } from './aiDeclarationVersions'
+import { notifyAiLoginRequired } from './aiLoginRequired'
 
 async function readEnforced(): Promise<boolean | null> {
   try {
@@ -43,3 +44,6 @@ registerAiDeclarationBridge({
   prepare: prepareAiDeclaration,
   recover: recoverAiDeclaration,
 })
+
+// 游客用 AI 被要求先登录：取数层报一声，全局登录提示（AiLoginRequiredHost）给「去登录」。
+registerAiLoginRequiredObserver(notifyAiLoginRequired)

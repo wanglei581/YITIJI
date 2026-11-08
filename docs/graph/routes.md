@@ -19,24 +19,24 @@ flowchart LR
   app["kiosk"]
   app --> _root_["/<br/>1 页 · 36 端点"]
   app --> _["/*<br/>1 页 · 13 端点"]
-  app --> activities["/activities<br/>2 页 · 14 端点"]
-  app --> assistant["/assistant<br/>1 页 · 41 端点"]
+  app --> activities["/activities<br/>1 页 · 0 端点"]
+  app --> assistant["/assistant<br/>1 页 · 42 端点"]
   app --> campus["/campus<br/>1 页 · 36 端点"]
   app --> companies["/companies<br/>2 页 · 18 端点"]
   app --> help["/help<br/>1 页 · 13 端点"]
-  app --> interview["/interview<br/>6 页 · 18 端点"]
+  app --> interview["/interview<br/>6 页 · 19 端点"]
   app --> job_fairs["/job-fairs<br/>9 页 · 36 端点"]
   app --> jobs["/jobs<br/>3 页 · 36 端点"]
   app --> k["/k<br/>2 页 · 13 端点"]
   app --> legal["/legal<br/>1 页 · 36 端点"]
   app --> login["/login<br/>1 页 · 13 端点"]
-  app --> me["/me<br/>11 页 · 29 端点"]
+  app --> me["/me<br/>11 页 · 30 端点"]
   app --> member["/member<br/>1 页 · 13 端点"]
-  app --> print["/print<br/>13 页 · 18 端点"]
-  app --> print_scan["/print-scan<br/>4 页 · 15 端点"]
+  app --> print["/print<br/>14 页 · 18 端点"]
+  app --> print_scan["/print-scan<br/>4 页 · 13 端点"]
   app --> profile["/profile<br/>1 页 · 14 端点"]
   app --> renshi["/renshi<br/>1 页 · 13 端点"]
-  app --> resume["/resume<br/>19 页 · 46 端点"]
+  app --> resume["/resume<br/>15 页 · 37 端点"]
   app --> scan["/scan<br/>5 页 · 13 端点"]
   app --> screensaver["/screensaver<br/>1 页 · 13 端点"]
   app --> smart_campus["/smart-campus<br/>1 页 · 0 端点"]
@@ -48,14 +48,13 @@ flowchart LR
 | --- | --- | --- | --- | --- |
 | `/` | HomePage | `apps/kiosk/src/pages/home/HomePage.tsx` | 36 | 7 |
 | `/*` | KioskRouteErrorPage | `apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx` | 13 | 7 |
-| `/activities` | BenefitActivitiesPage | `apps/kiosk/src/pages/activities/BenefitActivitiesPage.tsx` | 14 | 11 |
-| `/activities/:id` | BenefitActivityDetailPage | `apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx` | 14 | 11 |
-| `/assistant` | AssistantPage | `apps/kiosk/src/pages/assistant/AssistantPage.tsx` | 41 | 13 |
+| `/activities/*` | Navigate | — _(重定向)_ | 0 | — |
+| `/assistant` | AssistantPage | `apps/kiosk/src/pages/assistant/AssistantPage.tsx` | 42 | 13 |
 | `/campus` | CampusPage | `apps/kiosk/src/pages/campus/CampusPage.tsx` | 36 | 8 |
 | `/companies` | CompaniesPage | `apps/kiosk/src/pages/companies/CompaniesPage.tsx` | 18 | 7 |
 | `/companies/:id` | CompanyDetailPage | `apps/kiosk/src/pages/companies/CompanyDetailPage.tsx` | 18 | 7 |
 | `/help` | HelpCenterPage | `apps/kiosk/src/pages/help/HelpCenterPage.tsx` | 13 | 8 |
-| `/interview` | InterviewWorkbenchPage | `apps/kiosk/src/pages/interview/InterviewWorkbenchPage.tsx` | 18 | 20 |
+| `/interview` | InterviewWorkbenchPage | `apps/kiosk/src/pages/interview/InterviewWorkbenchPage.tsx` | 19 | 20 |
 | `/interview/report` | Navigate | — _(重定向)_ | 0 | — |
 | `/interview/reports` | Navigate | — _(重定向)_ | 0 | — |
 | `/interview/session` | Navigate | — _(重定向)_ | 0 | — |
@@ -78,7 +77,7 @@ flowchart LR
 | `/legal/:doc` | LegalDocPage | `apps/kiosk/src/pages/legal/LegalDocPage.tsx` | 36 | 7 |
 | `/login` | LoginPage | `apps/kiosk/src/pages/auth/LoginPage.tsx` | 13 | 8 |
 | `/me/activity` | MyActivityPage | `apps/kiosk/src/pages/profile/me/MyActivityPage.tsx` | 13 | 12 |
-| `/me/ai-records` | MyAiRecordsPage | `apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx` | 26 | 12 |
+| `/me/ai-records` | MyAiRecordsPage | `apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx` | 27 | 12 |
 | `/me/benefits` | MyBenefitsPage | `apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx` | 14 | 11 |
 | `/me/documents` | MyDocumentsPage | `apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx` | 13 | 12 |
 | `/me/favorites` | MyFavoritesPage | `apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx` | 14 | 12 |
@@ -92,7 +91,7 @@ flowchart LR
 | `/print-scan` | PrintScanHomePage | `apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx` | 13 | 15 |
 | `/print-scan/convert` | ConvertImagesPage | `apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx` | 13 | 8 |
 | `/print-scan/feature/:key` | PrintScanFeatureInfoPage | `apps/kiosk/src/pages/print-scan/PrintScanFeatureInfoPage.tsx` | 13 | 22 |
-| `/print-scan/sign` | SignStampPage | `apps/kiosk/src/pages/print-scan/SignStampPage.tsx` | 15 | 8 |
+| `/print-scan/sign/*` | Navigate | — _(重定向)_ | 0 | — |
 | `/print/cashier` | PrintCashierPage | `apps/kiosk/src/pages/print/PrintCashierPage.tsx` | 13 | 13 |
 | `/print/confirm` | PrintConfirmPage | `apps/kiosk/src/pages/print/PrintConfirmPage.tsx` | 18 | 14 |
 | `/print/desk` | PrintDeskPage | `apps/kiosk/src/pages/print/PrintDeskPage.tsx` | 13 | 13 |
@@ -105,27 +104,24 @@ flowchart LR
 | `/print/scan-convert` | Navigate | — _(重定向)_ | 0 | — |
 | `/print/scan-feature` | Navigate | — _(重定向)_ | 0 | — |
 | `/print/scan-sign` | Navigate | — _(重定向)_ | 0 | — |
+| `/print/scan-sign/*` | Navigate | — _(重定向)_ | 0 | — |
 | `/print/upload` | PrintUploadPage | `apps/kiosk/src/pages/print/PrintUploadPage.tsx` | 13 | 14 |
 | `/profile` | ProfilePage | `apps/kiosk/src/pages/profile/ProfilePage.tsx` | 14 | 11 |
 | `/renshi` | RenshiPage | `apps/kiosk/src/pages/renshi/RenshiPage.tsx` | 13 | 9 |
 | `/resume` | Navigate | — _(重定向)_ | 0 | — |
-| `/resume/career-plan` | CareerPlanPage | `apps/kiosk/src/pages/resume/CareerPlanPage.tsx` | 42 | 11 |
+| `/resume/career-plan/*` | Navigate | — _(重定向)_ | 0 | — |
 | `/resume/export` | Navigate | — _(重定向)_ | 0 | — |
 | `/resume/generate` | ResumeGeneratePage | `apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx` | 36 | 10 |
 | `/resume/generate/preview` | ResumeGeneratePreviewPage | `apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx` | 37 | 9 |
-| `/resume/job-fit` | JobFitPage | `apps/kiosk/src/pages/resume/JobFitPage.tsx` | 40 | 10 |
-| `/resume/job-fit/actions` | JobFitActionsPage | `apps/kiosk/src/pages/resume/JobFitActionsPage.tsx` | 40 | 11 |
-| `/resume/materials` | JobMaterialLibraryPage | `apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx` | 13 | 8 |
+| `/resume/job-fit/*` | Navigate | — _(重定向)_ | 0 | — |
+| `/resume/materials/*` | Navigate | — _(重定向)_ | 0 | — |
 | `/resume/optimize` | ResumeOptimizePage | `apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx` | 37 | 10 |
 | `/resume/optimize/compare` | ResumeOptimizeComparePage | `apps/kiosk/src/pages/resume/ResumeOptimizeComparePage.tsx` | 36 | 8 |
 | `/resume/parse` | ResumeParsePage | `apps/kiosk/src/pages/resume/ResumeParsePage.tsx` | 36 | 11 |
 | `/resume/report` | ResumeReportPage | `apps/kiosk/src/pages/resume/ResumeReportPage.tsx` | 37 | 11 |
-| `/resume/self-assessment/history` | SelfAssessmentHistoryPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 16 | 9 |
-| `/resume/self-assessment/intro` | SelfAssessmentIntroPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 16 | 9 |
-| `/resume/self-assessment/questions` | SelfAssessmentQuizPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 16 | 9 |
-| `/resume/self-assessment/result` | SelfAssessmentResultPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 16 | 9 |
+| `/resume/self-assessment/*` | Navigate | — _(重定向)_ | 0 | — |
 | `/resume/source` | ResumeSourcePage | `apps/kiosk/src/pages/resume/ResumeSourcePage.tsx` | 36 | 8 |
-| `/resume/templates` | ResumeTemplateLibraryPage | `apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx` | 13 | 11 |
+| `/resume/templates/*` | Navigate | — _(重定向)_ | 0 | — |
 | `/resume/upload` | Navigate | — _(重定向)_ | 0 | — |
 | `/scan` | ScanWorkbenchPage | `apps/kiosk/src/pages/scan/ScanWorkbenchPage.tsx` | 13 | 16 |
 | `/scan/progress` | Navigate | — _(重定向)_ | 0 | — |
@@ -138,17 +134,13 @@ flowchart LR
 | `/upload/phone` | PhoneUploadPage | `apps/kiosk/src/pages/upload/PhoneUploadPage.tsx` | 10 | 2 |
 
 <details>
-<summary>展开：每个路由触达的端点（69 个路由）</summary>
+<summary>展开：每个路由触达的端点（57 个路由）</summary>
 
 **`/`** → `DELETE /me/job-ai-sessions/:param`、`GET /:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/parse`
 
 **`/*`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 
-**`/activities`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /activities/:param/claim`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
-
-**`/activities/:id`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /activities/:param/claim`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
-
-**`/assistant`** → `DELETE /me/job-ai-sessions/:param`、`DELETE /me/mock-interviews/:param`、`GET /:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /mock-interviews`、`POST /mock-interviews/:param/answer`、`POST /mock-interviews/:param/report/print`、`POST /mock-interviews/:param/start`、`POST /print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/parse`
+**`/assistant`** → `DELETE /me/job-ai-sessions/:param`、`DELETE /me/mock-interviews/:param`、`GET /:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /mock-interviews`、`POST /mock-interviews/:param/answer`、`POST /mock-interviews/:param/report/print`、`POST /mock-interviews/:param/start`、`POST /mock-interviews/:param/transcript/print`、`POST /print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/parse`
 
 **`/campus`** → `DELETE /me/job-ai-sessions/:param`、`GET /:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/parse`
 
@@ -158,7 +150,7 @@ flowchart LR
 
 **`/help`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 
-**`/interview`** → `DELETE /me/mock-interviews/:param`、`GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /mock-interviews`、`POST /mock-interviews/:param/answer`、`POST /mock-interviews/:param/report/print`、`POST /mock-interviews/:param/start`
+**`/interview`** → `DELETE /me/mock-interviews/:param`、`GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /mock-interviews`、`POST /mock-interviews/:param/answer`、`POST /mock-interviews/:param/report/print`、`POST /mock-interviews/:param/start`、`POST /mock-interviews/:param/transcript/print`
 
 **`/job-fairs`** → `DELETE /me/job-ai-sessions/:param`、`GET /:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/parse`
 
@@ -192,7 +184,7 @@ flowchart LR
 
 **`/me/activity`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 
-**`/me/ai-records`** → `DELETE /me/job-ai-sessions/:param`、`DELETE /me/mock-interviews/:param`、`GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /mock-interviews`、`POST /mock-interviews/:param/answer`、`POST /mock-interviews/:param/report/print`、`POST /mock-interviews/:param/start`
+**`/me/ai-records`** → `DELETE /me/job-ai-sessions/:param`、`DELETE /me/mock-interviews/:param`、`GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /mock-interviews`、`POST /mock-interviews/:param/answer`、`POST /mock-interviews/:param/report/print`、`POST /mock-interviews/:param/start`、`POST /mock-interviews/:param/transcript/print`
 
 **`/me/benefits`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /me/favorites`
 
@@ -220,8 +212,6 @@ flowchart LR
 
 **`/print-scan/feature/:key`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 
-**`/print-scan/sign`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /print/sign/compose`、`POST /print/sign/inspect`
-
 **`/print/cashier`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 
 **`/print/confirm`** → `DELETE /contract-reviews/:param`、`DELETE /resume/self-assessment/:param`、`GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /me/favorites`、`POST /resume/self-assessment`、`POST /resume/self-assessment/:param/print`
@@ -240,17 +230,9 @@ flowchart LR
 
 **`/renshi`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 
-**`/resume/career-plan`** → `DELETE /me/job-ai-sessions/:param`、`DELETE /resume/job-fit/consent/:param`、`GET /:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /print`、`POST /resume/career-plan/:param`、`POST /resume/career-plan/:param/print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/job-fit`、`POST /resume/job-fit/:param/print`、`POST /resume/job-fit/consent`、`POST /resume/parse`
-
 **`/resume/generate`** → `DELETE /me/job-ai-sessions/:param`、`GET /:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/parse`
 
 **`/resume/generate/preview`** → `DELETE /me/job-ai-sessions/:param`、`GET /:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /me/favorites`、`POST /print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/parse`
-
-**`/resume/job-fit`** → `DELETE /me/job-ai-sessions/:param`、`DELETE /resume/job-fit/consent/:param`、`GET /:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/job-fit`、`POST /resume/job-fit/:param/print`、`POST /resume/job-fit/consent`、`POST /resume/parse`
-
-**`/resume/job-fit/actions`** → `DELETE /me/job-ai-sessions/:param`、`DELETE /resume/job-fit/consent/:param`、`GET /:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/job-fit`、`POST /resume/job-fit/:param/print`、`POST /resume/job-fit/consent`、`POST /resume/parse`
-
-**`/resume/materials`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 
 **`/resume/optimize`** → `DELETE /me/job-ai-sessions/:param`、`GET /:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /me/favorites`、`POST /print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/parse`
 
@@ -260,17 +242,7 @@ flowchart LR
 
 **`/resume/report`** → `DELETE /me/job-ai-sessions/:param`、`GET /:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /me/favorites`、`POST /print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/parse`
 
-**`/resume/self-assessment/history`** → `DELETE /resume/self-assessment/:param`、`GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /resume/self-assessment`、`POST /resume/self-assessment/:param/print`
-
-**`/resume/self-assessment/intro`** → `DELETE /resume/self-assessment/:param`、`GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /resume/self-assessment`、`POST /resume/self-assessment/:param/print`
-
-**`/resume/self-assessment/questions`** → `DELETE /resume/self-assessment/:param`、`GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /resume/self-assessment`、`POST /resume/self-assessment/:param/print`
-
-**`/resume/self-assessment/result`** → `DELETE /resume/self-assessment/:param`、`GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /resume/self-assessment`、`POST /resume/self-assessment/:param/print`
-
 **`/resume/source`** → `DELETE /me/job-ai-sessions/:param`、`GET /:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/parse`
-
-**`/resume/templates`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 
 **`/scan`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 
