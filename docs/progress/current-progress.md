@@ -1,47 +1,110 @@
 # 当前开发进度
 
-## 2026-11-08：屏上复印终端程序（C2）并入 A2 新头、版本升 0.4.21
+## 2026-11-05：政策最小闭环（产品负责人点「按方案开工」；分支 `claude/quizzical-gould-71d33b`，未部署）
 
-- 做了：分支 `claude/copy-agent-c2-1104`（并前头 `93e2d196f`，原建在 A2 旧头 `23e7076c6` 上）并入 A2 新头 `a2db3fa88`（PR #1584，已并最新 main、版本 0.4.20，还在等 CI、未合入 main），只做并分支、解冲突、升版本号，不改功能、不加功能。屏上复印终端程序 C2a–C2f 的内容不变：本机 `/local/copy/*` 接口；复用 A2 的扫描引擎与设备锁；扫描、打印前各取 `op=scan` / `op=print` 许可；打印至多一次（派发意图先落盘到 `%ProgramData%\AIJobPrintAgent\copy-device\print-ledger\`）；崩溃恢复只转 `unconfirmed`、不重打；清场撤销标记至少保留 15 分钟。开关 `copyDeviceEnabled` 缺省关。
-- 冲突怎么合：① `apps/terminal-agent/src/printer/print-with-pdf-to-printer.ts` git 自动合好、没报冲突，但合完 A4 出现两处——C2b 在 `mapParams` 里按 `params.paperSize` 设 A4，#1579 在 `printOptions` 里展开之后固定 A4。#1579 那处总会覆盖，C2b 那行成了死代码，删掉，A4 只留 #1579 的常量与说明；C2b 为复印加的 `onDispatchStart` / `onDispatchSettled` 钩子与超时计时器清理原样保留。② `.github/workflows/ci.yml`、`apps/terminal-agent/src/agent/config-manager.ts`、`apps/terminal-agent/src/agent/types.ts` 两边在同一处各加一行（复印的 `verify:copy-device` / `copyDeviceEnabled`，纠偏的 `verify:scan-deskew` / `scanAutoDeskewEnabled`），两侧保留。图谱取 A2 那边后重新生成，进度文档两侧保留。
-- 升 0.4.21 的原因：A2 要用 0.4.20 进 main，复印这一版不能同号。照 0.4.20 那次（`63ba07243`）的 12 个文件 20 处改齐；升级测试的旧版本 0.4.10、`verify-scan-deskew.ts` 里解析配置用的 0.4.19 样例不改。
-- **代码未进 main（等 #1584 合入后再并 main、开 PR）、未打包、未装机。** 后端 `copy` 能力默认拒绝，在复印后端 #1591（草稿、未合并）里，逐台开通。给任何终端装这一版之前，必须先发布后端（含 #1591），每一步由产品负责人当场确认。
-- 验证（本机 macOS）：终端程序 tsc（246 个文件，0 错误）、eslint（改动的 39 个代码文件 0 错误；3 条警告是 `src/index.ts` 里用不上的 eslint-disable，A2 头上同样有）；`package.json` 里 38 条 verify 不经 pnpm、逐条直接跑，37 条过（`verify:copy-device` 49 项、`verify:scan-device-engine` 53 组、`verify:scan-device-runner` 22 组、`verify:scan-deskew` 12 组，`verify:task-reliability` 一次过；两条 Windows 专用的在非 Windows 上自动跳过）；安装包输入、仓库完整性、图谱 `--check` 过；图谱按改动文件列出的其余 36 条门禁（根目录 3、一体机 18、管理后台 1、UI 1、后端 13，后端两条用隔离 SQLite）全过。Windows 专用的 .ps1 门禁（安装包生命周期、纠偏合成样本）交安装包工作流。
-- **`verify:printer-config` 红，不是这次合并带来的：** C2c（`3f2a65fa7`）在 `apps/terminal-agent/src/agent/copy-device/copy-print-ledger.ts` 第 84 行校验落盘记录里的打印机名，写成 `!r.printerName || …`，撞上门禁「`src` 里不许出现 `printerName ||` 回退」的正则（这一行是校验、不是回退到默认打印机，但门禁按字面判）。并前的 C2 头 `93e2d196f` 同样红，A2 头 `a2db3fa88` 与 main 都绿。这次范围是不改功能、不改断言，没动；开 PR 前必须先处理（改写这一行或收紧门禁正则，待定），否则 CI 的「Terminal Agent verify suites」会红。
-- Windows 目录残留：C2 没有 Windows 专用用例；`verify:copy-device` 只在 CI 的 ubuntu 作业跑，用例的临时目录都建在系统临时目录、用完删除（一条用例临时把 `PROGRAMDATA` 指向临时目录，结束还原）；安装包工作流装机测试前的几步都不含 C2 的用例，C2 也没改这些步骤。
+- 拍板：产品负责人 11/05 说政策「很多地方没法操作」，看过最小闭环方案页（第 2 版）后 12:55 点「按方案开工」。批准：一体机 5 屏加空态、停放 7 处、改触屏稿政策几屏、试点先保持所有终端都显示（不改 `POLICY_SCOPE`，不给政策请求加终端头）。托管 a 不变：政策由运营机构自己审核发布，平台管理员只留紧急下架。
+- 后端：PolicyPost 加「谁可以申请 / 要准备的材料 / 去哪办」三栏（两份 schema + 迁移 `20261105130000_add_policy_post_handling_fields`）；PATCH 可选字段 null 或空白即清空；发布闸门在审核、责任、内容可信之后再查扶持条目三栏必填、原文链接必填，有链接就须 https 且落在机构登记的官方网站域名内（`policy-source-link.ts`，与官方渠道同一份名单）；公开读与机构列表带 `externalUrlVerified`；内容可信与机构类型拒绝文案改人话（「授权核验」，不露字段名、接口和 JSON）。新增 `POST /policies/:id/checklist` 一页 A4 办事清单（页脚「仅供参考，不具证明效力；办理要件和资格以发布机构和经办窗口为准，本机不代办」，同版本复用，打印建单前复查撤下 / 紧急下架 / 改版，新依赖 `qrcode`）；小青带 `policyId` 时服务端每轮现读已发布原文注入，套用 10/8 合规定稿（`policy-constraint.ts` 一字未改）加新讲解约束 `policy-explain-constraint.ts`（讲解深度待合规确认），撤下或读不到回固定话术、不调模型。
+- 两个后台：机构政策表单分三栏（各 2000 字计数）、标题 200 字计数、https 原文链接并提示本机构登记的官方网站、缺项常显原因、发布弹窗常显两项前提且只显示服务端人话；管理员内容可信提示句去掉岗位招聘会、官方域名面板写明政策原文链接也按这份名单核对、政策页最近下架记录按 `targetType=policy` 筛。
+- 一体机：`/policy-service` 六类大卡（真实条数与最近一条，0 条变灰「还没有机构发布」）、最近更新、机构公告（有才出现）、全库 0 条整屏空态；`/renshi?audience=…&page=N` 一页 4 条；`/renshi?policy=id` 详情三块 + 核验通过才出的原文二维码 + 打印办事清单（打印机暂停时改为扫码存手机）+ 问小青这条 + 收藏先登录；各屏照稿带底部导航；`/renshi` 无参数与 `tab=policy|eligibility|social|register` 回政策首页。收藏只存本人账号，未登录点收藏去登录；「我的收藏」每条可取消（64px，失败放回原位并说明）。清单建单被拒时屏上说清原因（`POLICY_CHECKLIST_WITHDRAWN`）。
+- 停放 7 处（源码保留、不注册、不打包，文件头有停放注释，门禁 `verify:kiosk-parked-policy` 守着）：条件核对整块（`EligibilityPanel` / `EligibilityResults` / `eligibilityOutcome` / `renshi-eligibility-qx.css`，连同机构后台「申领条件」按钮与 `EligibilityRulesDrawer` / `EligibilityRuleEditor`）；社保指南、就业登记（`SocialPanel` / `RegisterPanel`）；5 条本机整理的办事指引（`builtinData.ts`）；服务台的浏览记录 / AI 服务记录 / 全部服务卡；未登录本机收藏（`favorites/localFavorites.ts`，只剩清场用两个函数清改版前的旧残留）；页内重复的问小青按钮；被三屏取代的旧面板（`PolicyPanel` / `policyFocus` / `usePolicyFocus` / `renshi-narrow-qx.css`）。没有删任何文件。
+- 改稿：触屏稿 `docs/design/kiosk-touch-2026-10/policy-min.js`（政策三屏与空态，显示范围是所有终端所以不写「本机构」）、`fix-me.js`（我的收藏加取消，方案屏 5），`FROZEN.json` 按 `--update` 重写。
+- 验证：api / kiosk / partner / admin / shared 类型检查与改动文件 eslint；图谱加全文搜得出的后端 99 条与前端 69 条关联门禁本机全过（`verify:member-closure` 按 CI 的真 Redis 开关跑过，`verify:recruitment-p1-schema:postgres-upgrade` 要真 PG 留给 CI）；新门禁 `verify:policy-publish-gates`、`verify:policy-checklist`、`verify:assistant-policy-context`、`verify:kiosk-parked-policy`（5 项反向检查全红）。本机全栈真后端实走 26 张截图：管理员登记官方域名 → 机构三栏发布，链接不在登记域名被拦（人话）→ 改链接发布 → 一体机六类 → 列表 → 详情三块 → 打印确认（试点 0 元）→ 问小青这条 → 小青关掉时其余照常 → 停在确认页时管理员紧急下架，建单被拒 → 首页变空态、详情不能查看 → 未登录点收藏去登录、登录后收藏、「我的收藏」取消。1080×1920 实量：首页、列表、详情、公告不溢出，最小字 20、可点最小边 68、主按钮 88、详情各块间距约 71px。小青那两张用的是本机假模型（只验证服务端注入原文与约束，不代表真实回答）；打印机离线扫码存手机没实走（本机没配 `KIOSK_PUBLIC_BASE_URL`）。
+- 两个接手会话撞车：实现会话交班后同时有两个会话接手（各在一个分支上收了同样五包）。商定由本分支当唯一实现方，另一分支 `claude/policy-min-loop-041394` 不开 PR；它独有的「授权核验」措辞、列表与公告页底部导航、我的收藏改稿已拣入。
+- 仍归产品负责人：定试点机构并开账号；在管理员后台标「内容可信」并登记该机构官方网站域名（可含上级部门网站）；约对接人发 3–5 条真实政策（带官方原文链接、填三栏）；上线时点头。请合规确认：小青讲解深度与「按这条原文解释」措辞；二维码旁「链接发布时已核对属于发布机构登记的官方网站」；清单抬头与页脚是否加「非受理凭证」；10/8 定稿里「看本机构发布的原文」在所有终端显示时的说法；缺展示日期时日期回落到确认发布日。
+## 2026-11-08：复印、扫描屏上流程补稿进仓库（只放稿；11/02 起草，原先叠在 PR #1495 上，#1495 已于 11/04 进 main）
 
-## 2026-11-05：屏上复印 C2f——撤销标记保留到云端授权一定失效之后（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+- **改了什么**：新目录 `docs/design/kiosk-touch-2026-11-copyscan/`（`index.html` 套用 `kiosk-touch-2026-10/` 定稿骨架、`copyscan.js` 25 屏：屏上扫描 14、屏上复印 8 加面板复印图文指引 2、设备状态 1）；`docs/README.md` 第二节加第 4 条口径。定稿目录 `kiosk-touch-2026-10/` 一个字节没动（`verify:kiosk-touch-frozen` 通过）。
+- **口径**：面板复印图文指引两屏产品负责人 11/02 原话「补稿可以，照它改」（程序见 PR #1545）；屏上扫描、设备状态随「复印扫描四步走」方案给他看过（他定「按推荐四步走」），一体机 `scan/*` 改程序以这套稿为准，偏离先问他；屏上复印是第四步的稿。触屏版总指挥 11/02 定：补稿单独开文档 PR 落真值，`scan/*` 代码 PR 引用它。
+- **没动的**：运行时代码、两套冻结稿、小程序。
+- **11/08 并 main**：包 4（复印扫描走大屏，产品负责人 11/08 对《四核心收口方案》回「按推荐执行」）先把这份稿合进来，屏上扫描页（K1b）、屏上复印页（C3）的代码 PR 都引用它。只有本文件冲突，两侧保留。
 
-- 起因：Codex 复审 C2e + C3c 报 P1——撤销标记 180 秒过期短于云端复印单 10 分钟寿命，一体机后台取消全失败时，过期后迟到的旧 start 仍能拿到云端许可开扫。
-- 改法（Codex 实现，Claude 收货）：保留期取「固定下限 15 分钟（云端寿命 10 分钟 + 时钟余量 5 分钟）」「已知到期时间 + 余量」「已有截止」三者最大；重复撤销与重启不缩短；满 4096 条只淘汰已过期记录，仍满就拒绝新的 start（HTTP 503，提示「复印撤销保护记录已满，请稍后再开始复印」），宁可拒绝也不误放行。
-- 验证：新增 4 条用例；`verify:copy-device` 49 项、`verify:scan-device-engine` 53 组、`verify:scan-device-runner` 22 组、tsc、lint、repository-integrity 过；反向检查（保留期改回 180 秒）变红。
+## 2026-11-08：四核心收口包 2 第一步——B2 简历 AI 授权三处单独合入（拆自 #1581 / #1557；分支 `claude/land-b2-resume-consent-1108`；未部署）
 
-## 2026-11-05：屏上复印 C2e——终端程序拒绝清场后迟到的开始扫描（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+- 来由：产品负责人 11/08 15:07 对《四核心收口方案》回「按推荐执行」。包 2 把 11/04 起和 main 冲突的五项批次 #1581 拆回小 PR、一个一个合，每合一个跑一遍全量 CI；本条是第一个。同日 #1501（求职进度页签管理员开关）CI 三绿后已合入 main（1d0c0082b）。
+- 后端：版式调整、职业规划、带简历的模拟面试，在把简历交给模型之前核「简历 AI 授权」，没同意回 403 `USER_AI_CONSENT_REQUIRED`，不调模型、不扣次数（内容同 #1557，见下文 11/03、11/04 三条）。
+- 一体机：`ResumeAiConsentDialog` 第一句改成小程序那边已过合规的新句「简历诊断、优化、生成，以及用到这份简历的版式调整、职业规划和模拟面试，会把你上传或填写的简历内容发送到系统里的 AI 进行分析。」——后端扩到三处后，旧句只写「诊断、优化和生成」，说明和用途对不上。触屏稿 `fix-resume2.js` 仍是旧句，按代码事实待补稿。
+- 小程序：#1557 里的小程序 8 个文件没有随本条合入（这条线不碰小程序），留在分支 `claude/resume-ai-consent-1103` 给小程序线。小程序里诊断后又撤回授权的会员，在职业规划会收到不带确认框的 403，小程序上线前要补上那部分。
+- 验证：并入最新 main 只冲图谱与进度文档；本机 `graph:check`、仓库完整性、CI 门禁覆盖、合规文案、api 与一体机类型检查和 lint，以及职业规划两条、版式调整、模拟面试两条、简历授权装配、AI 访问、次数覆盖、托管声明、送模型打码、会员资产、AI 文本留存、自我探索授权、合规、终端设备配置、AI 次数、一体机三条（AI 不可用出路、首批商用、打印链接契约）全过。全量以 CI 为准。
 
-- 起因：Codex 复审一体机 C3 时复现——`start` 已到终端程序、停在异步处理时，一体机清场的 `clear` 因本机会话还没建立回 404，随后旧 `start` 建会话并开扫，可能扫到下一位放上的原件。
-- 改法（Codex 实现，Claude 收货）：新增 `copy-device/copy-revocations.ts`，`clear` / `abort` 在第一次等待前按 `copyId + generation` 记撤销标记（内存 + 落盘，180 秒到期、上限 4096 条，跨重启保留），没有会话也回成功与 `purged:true`；`start` 在拿锁后、取许可前后、真正开扫前都查标记，命中就放弃、释放锁、清掉会话材料，同代迟到的 `start` 回 410；新单号与新代次不受影响；撤销写盘失败不报成功、也不放行开扫。
-- 验证：新增 6 条用例；`verify:copy-device` 45 项、`verify:scan-device-engine` 53 组、`verify:scan-device-runner` 22 组、tsc、lint、repository-integrity 过；反向检查（去掉开扫前撤销检查）变红。配套的一体机清场撤销云端授权见 C3c。
+## 2026-11-05：产品负责人定四个核心功能的收费口径（合规口径落文；只改文档；分支 `claude/pricing-policy-1105`）
 
-## 2026-11-05：屏上复印 C2d——收掉 C2c 复审的 2 条 P1（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+- 原话：产品负责人 11/05 18:21 在设计窗口打字「你们新开一个窗口，根据现有的四个核心功能设置收费模式，在手机小程序上面加入，一体机登录账号进行同步，或者是一体机上面也可以加入对应的功能支付入口，你们看怎么设计吧？」。方案窗口出了私有页（含价格，不进公开仓库），他看完回「按推荐」，又补三句：「没事，我们可以卖给企业，我们也可以设置直接投放，你们继续」「反正这些对应的功能都可以设置价格进行支付」「我的意思是，如果没有企业买，我们可以做成面向用户的付费方式，明白吗？」
+- 按推荐定的 6 件：①四个核心功能是 AI 简历优化、AI 模拟面试、打印、扫描，政策照旧免费；②方向上放开向个人收费，但现在不收，公共就业点位永远不向求职者收，每一处都是默认关的开关，前提办齐才开；③先在小程序收（微信虚拟支付，买 AI 单次服务，一体机登录同一账号后能看到、能用），一体机现场收钱放在后面；④只卖单次服务，不卖次数包；⑤试点前收费代码不动，试点期间递三封咨询函，12/15 以后先做「每台机器设谁付钱」；⑥扫描免费，也做成能设价，默认 0 元。补的三句落成：每台机器设「谁付钱」，有企业或机构买就由他们付、用户免费；没人买就由我们自己投放机器、向用户收费；四个功能都能按机器设价，默认 0 元。
+- 改了哪些旧口径：10/29「收费只有设备款与维保费」补上向个人收费的口径（主收入仍是设备款与年费）；9/30「AI 用完不收费、不做个人付费」在公共就业点位不变，小程序、商业点位和我们自己投放的机器以后可以卖单次服务；9/29「小程序次数包」改为只卖单次服务；10/29「人社第十八条不备案」改为向个人收 AI 费之前重新问一次。不变：公共点位对求职者全免；商业点位四件办齐前由场地方买单（9/29 复审）；小程序首版不出现价格和购买引导（9/30）；不收与岗位、招聘会、浏览、投递、入职挂钩的费用。
+- 写进了：`CLAUDE.md` §1；`docs/product/feature-scope.md` §0.2；`docs/compliance/compliance-boundary.md` §1.1（10/29 一条的②③，9/26 一条加指针）与 §1.2 F（新增 11/05 一条，列前提清单）；`docs/progress/next-tasks.md` 顶部（下一步）。
+- 没改：代码、配置、数据库、生产价目、小程序；没有写任何价格、档位或客户名（只放私有页）。没有停放、隐藏、改名、删除任何东西。
+- **警告：后台打印价目是全局一张表，改成大于 0 会让所有机器（包括公共点位）一起收钱，并跳过免费打印额度（`services/api/src/print-jobs/free-print-quota.decide.ts`：实付大于 0 时直接返回，不查三条免费上限）。第 1 期「每台机器设谁付钱」做完前不许改价。**
 
-- ① 复印打印 ledger 清除 `queueCleanupPending` 时一次 rename/fsync 失败不再永久挡住云打印：清理完成写入与新派发保护分开，失败保留隔离与墓碑，按 1/2/4/8/16/30 秒封顶退避重写并记日志；下一轮重新确认执行器已退出、重新清队列再持久化解除隔离，旧单不重派。② 屏上扫描首次扫描（`scan-device-round.ts`）与续页（`scan-device-runner.ts`）都在拿到设备锁之后、启动 WIA 之前统一复查共享健康（`scan-device-health.ts` 新增持锁检查，必要探测复用已持有的锁）；复印侧持锁复查加了等锁交错用例。
-- 验证（Codex 实现，Claude 收货）：新增 8 条用例；`verify:copy-device` 39 项、`verify:scan-device-runner` 22 组、`verify:scan-device-engine` 53 组与打印相关门禁、tsc、lint、repository-integrity 过；反向检查两项变红。
+## 2026-11-08：一体机屏上扫描各屏（K1b）并 main、开 PR
 
-## 2026-11-05：屏上复印 C2c——收掉 C2 复审的 3 条 P1（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+- 内容：分支 `claude/scan-k1b-1102` 上 K1b-1、K1b-2、K1b-3a 三批（细节见下面 11/03、11/04 各条）并入 main，开正式 PR。K1b-1：扫什么、怎么扫、放纸设置（不渲染开始按钮）、屏上未开通四屏，设备状态页扫描仪一行，本机即时探测与能力门槛（`scan_device` 默认拒绝、逐台开通），扫之前登录续接，另有照稿的视觉返工；K1b-2：开始、正在扫描、再扫一页、生成、完成；K1b-3a：五张出错屏（无纸、卡纸或盖板没合上、超时、无响应、打印机正在忙）、已停止屏、同一会话改用玻璃台 / 改用面板、停止倒计时只用服务端时间（`quietPeriodEndsAt` / `serverNow`）、清场证据。设计真值 `docs/design/kiosk-touch-2026-11-copyscan/`（#1546，11/08 已进 main `382a12669`，本 PR 已并入）。
+- 并 main：先并 `42e945e76`，开工期间 main 又进了 #1501、#1546、#1595、#1597，再并 `1d0c0082b`、`382a12669`、`ffdda6fcb`、`14cf20b0f`（后四次只有图谱与本文件冲突；`ffdda6fcb` 那次 `kioskSensitiveSession.ts` 自动合并，main 新加的小青政策上下文清理和 K1b 的续接标记清理都在）。冲突只有三处：`apps/kiosk/src/auth/kioskSensitiveSession.ts` 两侧保留（K1b 在清场里清掉「怎么扫」的登录续接标记，main 在清场完成后通知订阅者，先清再通知）；`docs/graph/*` 取 main 后按合并后的代码重出；本文件两侧保留。另有两处测试侧修正，断言都没动：`boot-ticket-clears-sensitive-session.test.mjs` 的 `loadSensitive` 不认 K1b 加的 `scanHowContinue` 导入，`kioskSensitiveSessionScope` 12 条在 K1b 原头 `736d8ba5d` 上就解析失败（上一次并 main `e0c4ef4c0` 带进来的那段装载），main 上 15/15，照同文件 `loadTerminalAuth` 的写法补替身后 15/15；`scan-device-k1b.spec.ts`、`scan-device-k1b2.spec.ts` 写死的本机截图目录（`/Users/...`）改成 `test-results/` 下的相对目录（同 PR 的 K1b-3a 用例已是这种写法），否则 Linux CI 上建 `/Users` 没有权限，整套 w2 会在加载时报错。
+- `scan_device` 没开通（默认）的机器上用户看到的（实测：w2 构建、系统 Chrome、1080×1920；夹具里能力表只有 `scan`，终端程序是没有 `/local/scan/*` 的旧版，回 404）：打印台「扫描纸质材料」→「扫什么？」（四种材料：简历、证件、普通文档、合同，加 5 格路径线，没有开始按钮）→ 下一步 →「这台机器还不能在屏上开始扫描」：屏上方式置灰、标「这台机器还没开通」，面板方式标「现在可以用」，底栏主按钮「到打印机面板上扫」→ 原来的面板扫描：扫描指引（面板步骤与「我已操作，开始等待」）→ 等待打印机端扫描完成 → 扫描完成（拿去打印、AI 简历识别、重新扫描）。一路没有死路。和 main 比：多了「这台机器还不能在屏上开始扫描」这一屏，建会话从「扫什么」的下一步挪到这一屏的「到打印机面板上扫」。设备状态页对所有机器多一行「扫描仪」，旧版终端程序显示「状态未知 · 这次没有确认到状态」，不说就绪。截图在 `~/.cache/claude-lanes/copyscan-1102/code-shots/k1b-merge-1108/`。
+- 没做（不在这个 PR）：状态未知 / 文件失效 / 断网三张屏（补稿待产品负责人过目）；面板扫描各屏照第 5 版稿的对齐（K1c）。
+- 依赖与合并顺序：#1546（补稿，已进 main）→ 终端程序本机接口 #1584（`/local/scan/*`，未合）→ 本 PR。没逐台开通 `scan_device` 的机器走不到屏上扫描，面板扫描照旧能用；上面说的选材料页、未开通页、设备状态页扫描仪一行对所有机器生效。
+- 验证：本机 kiosk typecheck 通过；lint `0 errors, 29 warnings`（并之前也是 29）；图谱重出后 `--check` 通过；照 CI 环境变量的 `pnpm build:kiosk:production` 通过（`verify:prod-build-config` ALL PASS）。门禁按 `project-graph-query` 逐个文件查出、再全文搜补齐：一体机 37 条 `verify:*`、13 个 node 单测文件（172/172）、两份带覆盖率门槛的契约单测、根目录 `verify:kiosk-font-subset` / `verify:no-raw-error-render` / `verify:compliance-copy` / `verify:repository-integrity`、API 15 条（CI 环境变量、隔离 SQLite）、终端程序 `verify:print-monitor-truth`、冻结门禁 `verify-kiosk-touch-frozen` 与 `verify-qingxu-v2-frozen`，全部通过（`verify:file-assets-trial-acceptance` 第一次只因工作目录里不提交的临时截图配置报未跟踪文件，移开后通过）。浏览器（系统 Chrome，单 worker、按 CI 重试一次；本机同时有别的会话在跑，负载高）：w2 286 passed（含 K1b 三个用例文件、`fusion-w2-scan/print`、打印台 `print-hub-qx`）、scan-safety 38、w3 178、w5 97、w6 120、w1 63、w16 6、路由巡检加 `account-assets-journey` 112，全过；truth、privacy、warning 有扫描相关的红，见下一条；privacy-clear 里 `kiosk-end-use` 在本机时序不稳（合并后两次各有一条 30 秒以上的页面时钟用例两次都红，main 上也有两条红、K1b 原头一次全过，红的不是同一条）。最后一次并 `ffdda6fcb`（#1595）之后复跑：kiosk typecheck、lint（0 error）、39 条相关门禁、node 单测 16 个文件 197/197 全过，浏览器 w2 286 passed、w6 120 passed、scan-safety 38 passed；#1595 改了清场键表，又在最终代码上重跑了 privacy（3 failed / 3 flaky / 40 passed）和 warning（9 failed / 2 flaky / 24 passed），红的仍是下一条那一类（这次机器负载低，比之前少）；其余套件是并 #1546、#1595 之前跑的，这两次合进来的改动没有动 `pages/scan/` 下的文件。
+- **重复请求缺陷已修（K1b 原有；11/08 总指挥要求在本 PR 里修）**：原来 truth / privacy / warning 里扫描相关的一批红，都是投递确认、轮询或撤销比用例预期多发一次（main 上绿、K1b 原头 `736d8ba5d` 上同样红）。原因是 K1b 让 `ScanWorkbenchPage` 订阅了 `useAuth`：登录上下文里的 `ready`、`busy`、`guestMode`、登录态任何一项一变，整页就重渲染、重读会话存储，设置页或等待页会多挂一次。改法：工作台页只看「怎么扫」续接记号有没有，不读登录态；要不要接着用记号仍由 `ScanHowPage` 自己读登录态决定（没登录不消费，没有材料退回选材料），登录回跳回到「怎么扫」照旧；没有吞请求、没有加去重。`verify-scan-session-truth` 加了「工作台页不许调用 `useAuth()`」的断言（反向检查：加回去即红）。修后在最终代码上：truth 175 passed（`scan-session-truth` 42/42）、warning 35 passed、privacy 1 failed / 1 flaky / 44 passed（红的 1775、不稳的 758 在 main 上也红）、privacy-clear 1 failed / 1 flaky / 82 passed、w2 286 passed / 1 flaky（打印用例 `fusion-w2-print` 1712 行，重试后过）；改完完成屏序号样式后，扫描相关 4 个用例文件又跑了一次 69/69（含 K1b 三个用例文件与登录续接）、scan-safety 38 passed（单 worker；双 worker 那次 `/jobs` 页的 HID 突发用例时序红过一次，和扫描页无关）。
+- **游客三条出路（设计窗口 11/08 答复：游客「扫码带走」不做，照 10/12 定项）**：面板扫描结果页 `ScanResultExitRow.tsx` 和屏上扫描完成屏 `ScanDeviceDonePage.tsx` 的游客说明，改成先一句「未登录扫描件不会进入「我的文档」。带走的办法：」，再列三条「当场打印：请在本次操作内完成打印或识别。」「存 U 盘：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。」「存进「我的文档」：下次先扫码登录再扫，手机小程序里也能看到。」，句子放在两处共用的 `scanGuestWays.ts`。第三条后半句「手机小程序里也能看到」只在小程序已发布时出现（`whenMiniapp`，与完成屏「已存进」那句同一做法），没发布就写到「再扫」为止。灰着的「本次不进入我的文档 / 暂不放行」、三个按钮的启用条件、不放登录按钮都没动；简历、证件、普通文档三类在 `fusion-w2-scan.spec.ts` 里都核过，仍断言不出下载码、没有 `scan-takeaway-*` 和 `data-qr-*`、没有去 `/login` 的出口；字号行距照卡片原样，1080×1920 下三条都在底栏之上。截图 `guest-1-panel-result-id.png`、`guest-2-device-done-document.png`。
 
-- ① 打印执行器超时仍在运行时，复用并扩展 `print-dispatch-gate` 保持派发隔离，执行器退出后再清一次该次残留作业才放行下一单；`queueCleanupPending` 写进复印打印 ledger，重启后确认执行器退出、调现有队列清理后才解除，清理失败继续隔离重试。② WIA 未确认退出时把进程交给扫描健康隔离，`finally` 无条件释放全局设备锁，现有云打印照常领取；新的复印扫描被拒并给出可读说明，清场与过期能结束会话，待删材料后台重试。③ 复印与屏上扫描共用同一份 WIA 健康与可疑进程状态（`scan-device-health.ts` 按设备锁共享实例，A2 运行器接入），复印首次扫描、续页、预热重试前都检查，旧进程确认退出并探测成功后才放行。
-- 验证（Codex 实现，Claude 收货）：`verify:copy-device` 36 项（新增五条 C2c 用例含竞态与恢复）、`verify:scan-device-engine`（53 组）、`verify:scan-device-runner`（21 组）与打印相关门禁、tsc、lint 过；反向检查三项都变红。
+## 2026-11-04：一体机屏上扫描 K1b-3a——稿内五张出错屏、停止、同会话改用（分支 `claude/scan-k1b-1102`，未合并、未部署）
 
-## 2026-11-05：屏上复印 C2b——终端程序本机复印后半段（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+- 做了什么（Codex 实现，Claude 收货并在沙箱外跑浏览器）：进纸器无纸、卡纸或盖板没合上、打印机正在忙、扫描仪没有响应、等太久没有结果五张出错屏照稿替换统一失败视图；「改用玻璃台」走后端原地改设置、同一会话；「改用面板扫描」走 switch-to-panel，409 先重读不假装已切换；停止两次确认（6 秒复位），本机 abort 与云端取消都执行、任一不确定落「状态未知」；已停止屏倒计时只用取消回包的 `quietPeriodEndsAt` 与 `serverNow`，没有就只写「请稍候再开始新的扫描」，刷新不重置；「已扫的页已从这台机器删除」只在 `purged === true` 时出现。
+- 稿外（待产品负责人过目）：扫描仪没有响应屏不说「我们已经收到提醒，会尽快处理」（没有告警证据），改放按真实配置的服务电话句；等太久屏不说「超过 3 分钟」，用稿内「这次没有扫出文件。」；已停止屏没有服务端时间时问句为「问小青：为什么要等」。
+- 验证：kiosk tsc、lint（0 error）、`verify:fusion-w2`、`verify:scan-session-truth`、`verify:scan-quiet-period`、`verify:compliance-copy`、`verify-kiosk-unattended-copy`、`verify:no-raw-error-render`、AI 声明、字体子集、19 条状态测试、生产构建通过。浏览器（沙箱外）：K1b-3a 16 条 + K1b-2 6 条全过（首跑夹具 probe 路由同时传 json 与 body 致 16 条红，已改；K1b-2「卡纸落统一失败视图」那条改为断言新的卡纸屏）；`test:browser:w2` 其余 257 条、scan-safety 38 条过；truth 组 print-confirm-price-truth:570 首跑红（未接 materials/tasks 请求，打印用例），单独重跑过。
+- 修正（同日，Codex 实现、Claude 沙箱外复跑）：打印机正在忙屏原因卡不再被拉伸、插画等比完整显示，高度与同为两张操作卡的卡纸屏一致；已停止屏没有服务端时间时保留静态圆环、中间写「请稍候」（不出现数字），下方加稿内说明句去掉数字的写法「为了不让下一位看到你的材料，过一会儿才能开始新的扫描。」（稿外，待过目）。浏览器 K1b-3a 17 条 + K1b-2 6 条全过。
 
-- 做了什么（Codex 实现，Claude 收货）：`POST /local/copy/print` 取 `op=print` 许可（颜色、单双面、份数以许可为准，校验终端、代次、授权版本、参数与有效期）→ 驱动调用前持久化派发意图（`%ProgramData%\AIJobPrintAgent\copy-device\print-ledger\<单号与代次派生 SHA-256>.json`，`wx` 创建并 fsync、原子替换，不存扫描内容）→ 经新薄封装 `print-local-document.ts` 复用现有派发准备、`print()`、队列监控与终态清理（`task-runner.ts` 未改；PDF 打印补齐显式 A4）→ 从准备到监控终态持设备锁。同单同代重复请求只返回状态，**驱动最多调用一次**；重启时 `dispatching/spooled` 一律转 `unconfirmed` 并回报，**绝不重派**。结果回报 handed / failed / unconfirmed，固定 `eventId`，最多十次指数退避重试，终态不变。打印终态后撤销预览并以 `COPY_PRINT_TERMINAL` 删页，删除失败后台重试、释放设备锁。状态里不出现张数推断。
-- 验证：`verify:copy-device` 31 项；`verify:scan-device-engine`、`verify:scan-device-runner`、`verify:print-monitor-truth`、`verify:print-truth-hardening`、`verify:print-retry-attempt`、`verify:task-runner-wake`、`verify:print-queue-residue`、`verify:scan-deletion-audit`、`verify:image-scale-truth`、`verify:printer-config`、tsc、lint、repository-integrity 过；反向检查三项（重复打印调第二次驱动、崩溃恢复自动重派、队列异常判成已交给打印机）都变红。
-- 合并时注意：打印机线 #1579 也改了 `print-with-pdf-to-printer.ts`（显式 A4），合并按语义取一份，不两侧都留。
+## 2026-11-04：一体机屏上扫描 K1b-2（开始、正在扫描、再扫一页、生成文件、完成；分支 `claude/scan-k1b-1102`，未合并、未部署）
 
-## 2026-11-05：屏上复印 C2a——终端程序本机复印前半段（分支 `claude/copy-agent-c2-1104`，自 A2 头 23e7076c6 开出，未合并、未部署）
+- 为什么：K1b-1 把选材料、怎么扫、放纸接到工作台。这一批把放纸页的「开始扫描」接到云端屏上会话和本机程序，并按云端 `deviceState` 走正在扫描、玻璃台再扫一页、生成文件、完成。基线 `e0c4ef4c0`（K1b-1 视觉返工 `134fc9281` 与 K1a 拆分 `d0cb31d0f` 的合并）。任务包要求合并的 K1a 头 `d0cb31d0f` 已经在这个合并里。其后 `origin/claude/scan-k1a-split-1102` 又到了 `8c86f116a`（并入 main `9421d8d30`，含 #1540）。那一版会删掉本分支已有的 B2 门禁和 10 分钟 `page_ready` 续期，并把 w2 标题从「扫什么？」改回去，所以没有再合。没有部署。
+- 做了什么：放纸页「开始扫描」按 `startMode:'device'`、来源、颜色建会话，凭证写入会话存储后再 ACK，然后本机 `POST /local/scan/start`（正文只有 `scanTaskId`，令牌头与 `callLocalAgent` 相同）。云端每 3 秒 GET 一次，屏由云端状态决定。「已收到 N 页」只在 `devicePageCount` 是大于等于 1 的整数时写；不报就只写「正在扫描」。玻璃台 `page_ready` 进再扫一页：再扫一页走本机 next-page，扫完了走 finish；「最多 N 页」读 `deviceMaxPages`，老服务端不带这一项时不编 20 或 50。合成和投递停在生成文件，屏上不自己跳成功，等后端 `completed` 且文件可用才进完成页。完成页沿用 K1a 的出口、预览和 `whenMiniapp`。登录后「这份扫描件已存进「我的文档」」只在 `GET /me/documents` 第一页（pageSize 50）里出现这份 `fileId` 时说，后半句小程序只在 `miniappPublished` 时接上。游客句用 K1a 已改好的那句（含 U 盘说明）。「再扫一份」先撤这场，再回到「扫什么？」。看门狗整页重载后，进行中的屏上会话从会话存储复水到对应屏；URL 里的 stage 不能单独把屏上扫描页挂出来。本机程序连不上或回包拿不准写「状态未知」，不说成功也不说失败。停止扫描点两次：第二次并行本机 abort 和云端取消；两边都确认才落到现有失败视图。删除句只在 abort 回包 `purged === true` 时说。竖屏适配开启时底栏主按钮最小宽度 300px，与稿上的主按钮对齐。面板扫描的建会话、进度、结果没改。
+- 出错先落到现有失败视图。K1b-3 的五张出错屏、改用玻璃台、改用面板、停止后的数字倒计时这批没做。已知故障：`feeder_empty`「进纸器里没有纸。这次先停在这里。」、`paper_jam`「扫描仪报告卡纸。这次先停在这里。」、`cover_open`「扫描仪报告盖板没合上。这次先停在这里。」、`busy`「扫描仪正忙。这次先停在这里。」、`warming_up`「扫描仪还在预热。这次先停在这里。」、`not_ready`「扫描仪还没准备好。这次先停在这里。」、`timeout`「扫描仪超时。这次先停在这里。」、`too_large`「这一次超过了这台机器能收的大小。这次先停在这里。」。云端 `failed`「这次扫描没有完成。」；`cancelled` 与 `aborted`「已停止扫描。这次到这里为止，不会再继续。」；`expired`「等待超时，这次没有拿到文件。」；`completed` 但文件不可用走完成失败。不认识的错误码，以及进纸器上的 `page_ready`，停在「状态未知」。
+- 和稿的差别：再扫一页的空闲说明不写「并删除已扫的页」。停止没有数字倒计时。完成页用真实文件预览和「整屏查看」，不用稿上的示意缩略图；游客句比稿多 K1a 的 U 盘那句。「最多 N 页」跟随后端，浏览器用例里是 20。正在扫描的纸是示意线条。不报页数、登录完成、状态未知没有同名设计稿。状态未知把示意纸拉满内容区（`preserveAspectRatio="none"`），最大空白带 165px。浏览器用例开了 reduced motion，截图里没有扫描线；真机没开这项时会有扫描线。
+- 本机验证：kiosk `tsc --noEmit` 通过；lint `✖ 29 problems (0 errors, 29 warnings)`，其中 `ScanStartPage.tsx:29` 仍是 `openPanelScanSettings` 的 react-refresh 警告，这个函数必须留在该文件里。门禁：`ALL PASS fusion W2 print/scan contract`、`ALL PASS scan session truth contract`、`PASS kiosk scan quiet period verification`、`✓ verify:kiosk-unattended-copy 通过`、`verify:kiosk-font-subset 通过：1000 个源码文件的用字都在子集（7168 字）里，18 条字体声明、18 个文件对得上`、合规文案 `✅ ALL PASS —— 合规文案禁词门禁通过`、日期时间诚实 `ALL PASS`、`PASS: 12 capped API list methods return total or truncated`、`✅ verify:no-raw-error-render  ALL PASS`。图谱点名的其余门禁：`OK: 一体机 AI 使用声明`、`ALL PASS fusion W5 route, boundary, and presentation contract`、`ALL PASS fusion W6 integration contract`、`PASS queue dispatch printer status`、`verify-print-monitor-truth: all assertions passed`。`verify:print-color-duplex-capability` 第一次只设了 `VERIFICATION_DATABASE_TARGET=isolated`，在连库前退出（`DATABASE_URL environment variable is required`）；补上临时 SQLite `/tmp/k1b2-verify.db`（文件名含 verify，未入库）后 `ALL PASS`。单测 `scan-device-state` 与 `scan-workbench-model` 还原后 `# tests 14 / # pass 14 / # fail 0`。`pnpm graph:check`：`PASS docs/graph/ 与当前代码一致`。`pnpm verify:repository-integrity`：`OK: 5590 tracked files contain no unresolved conflict markers`、`OK: 6 workflow YAML files have valid syntax`、`OK: no tracked file exceeds 1 MB (6 registered exceptions)`。
+- 浏览器（系统 Chrome；临时配置在 `~/.cache/claude-lanes/copyscan-1102/grok/pw/` 与 `/tmp`，未提交。先按对应环境构建，Playwright 只起 preview）：K1b-2 新用例 `6 passed (1.4m)`。w2 全套 `258 passed (8.1m)`，含 K1b 与 K1b-2。truth `177 passed (9.4m)`，1 条红：`unfinished privacy check keeps the recovery exit on screen`，收尾报未登记的 `POST /api/v1/materials/tasks`。这条在 K1a 进度里已经记过，origin/main 副本上同一条同样红，本批扫描文件不碰 `materials/tasks`。scan-safety `38 passed (1.7m)`，含 `payment code never renders`。
+- 截图与「稿 | 实现」对比图在 `~/.cache/claude-lanes/copyscan-1102/code-shots/k1b2/`：`cs-scan-run.png`、`cs-scan-run-none.png`、`cs-scan-more.png`、`cs-scan-make.png`、`cs-scan-done.png`、`cs-scan-done-login.png`、`cs-scan-unknown.png`，以及同名 `cmp-*.png`。内容区（深色头下沿到 dock 上沿）最大空白带：正在扫描稿 157px、实现 188px（+31）；不报页数实现 213px（对照正在扫描稿 +56）；再扫一页稿 205px、实现 231px（+26）；生成文件稿 173px、实现 211px（+38）；完成稿 114px、实现 63px；登录完成实现 63px；状态未知实现 165px（对照正在扫描稿 +8）。都没有比稿多出 60px。
+- 反向检查（改坏后从备份还原，没有提交改坏的状态）：`reportedPageCount` 缺省改成回报 1，单测 `# fail 3`；`scanning` 且已有文件就当成完成，`# fail 1`；复水时把 `device-more` / `device-make` 改回面板进度，`# fail 1`。还原后再跑 `# tests 14 / # pass 14 / # fail 0`。
+- 行数：新页面和样式都在 500 行以内（流程样式 491，完成样式 154，最长的新逻辑是 `useScanDeviceFlow.ts` 283 行）。`scanWorkbenchSession.ts` 678 行，改之前就已经超过 500，这次只加了屏上扫描的会话字段和「再扫一份」入口，没有拆。
+- 图谱：新文件先 `git add` 进索引再 `pnpm graph`（图谱只认 `git ls-files`）。`docs/graph/` 4 个文件有变化。kiosk 源文件 935→949，入口可达 833→847，`/scan` 样式数 13→15，被门禁断言的文件 2009→2010。`scan-device-state.test.mjs` 被 scan-session-truth 钉住。放纸页被 fusion-w2 钉住。工作台页、外壳被 fusion-w2 与 scan-session-truth 钉住；会话和阶段机被 scan-session-truth 与 kiosk-ai-declaration 钉住；`scanTasks.ts` 被 scan-session-truth 与 no-raw-error-render 钉住。新的屏上视图、`scanDeviceState.ts`、`localScanApi.ts`、两份样式、浏览器用例本身没有门禁按路径断言。页数、不许提前成功、复水钉在单测里，由 scan-session-truth 拉起来跑。
+- 拿不准：`getMyDocuments` 只看第一页 50 条，文件若不在这页里就不会说「已存进」。进纸器如果真的回报 `page_ready`，这批会停在状态未知，不会进再扫一页。
 
-- 做了什么（Codex 实现，Claude 收货）：本机接口 `POST /local/copy/{start,next-page,finish,status,preview,abort,clear}`，复用 loopback、Origin 白名单、桥接令牌与短期桥接会话，公共体 `{copyId,generation,operationId}`、`operationId` 幂等（异参 409）、体积上限 8 KiB；每次扫描、续页、预热重试前在线取 `op=scan` 许可；复用 A2 的 WIA 解析、整页核实、页序、页数与字节上限、PDF 合成、私有目录与删除审计（WIA 默认依赖抽到 `wia-runner-deps.ts`，`wia-runner.ts` 514→448 行）；扫描、探测、打印共用设备锁（等锁上限 30 秒）；复印页放在独立的 `copy-device/<派生标识>/`，**不走上传链路、不上云**；预览返回 JPEG 字节并带 no-store 等三个防缓存头、不返回路径；abort/clear 先撤权再删，删除失败返回 503 与 `purged:false`、后台重试、不占设备锁；七个 `COPY_*` 删除码与后端白名单逐码一致（`COPY_PRINT_TERMINAL` 留给打印）。开关 `copyDeviceEnabled` 缺省关。打印派发与结果回报是 C2b。
-- 验证：新门禁 `verify:copy-device`（18 项）接进 ci.yml；`verify:scan-device-engine`（53 组）、`verify:scan-device-runner`（21 组）、`verify:scan-deletion-audit`、`verify:usb-import-agent`、`verify:scan-watcher`、tsc、lint、repository-integrity 过；反向检查三项（许可不允许仍开扫、预览缺 no-store、clear 不删页）都变红。
+## 2026-11-03：K1b-1 视觉返工（五屏照触屏补稿做成大卡；分支 `claude/scan-k1b-1102`，未合并、未部署）
+
+- 选材料、怎么扫（含扫描仪忙）、放纸、屏上未开通、设备状态里的扫描仪行改成稿上的插画加大号衬线标题，1080 竖屏内容区最大空白横带不超过稿 60px；探测、登录续接、面板建会话和 `scan` / `scan_device` 两层挡法没改。没有部署。
+
+## 2026-11-03：一体机屏上扫描 K1b-1（选材料、怎么扫、即时探测、扫之前登录、设备状态行；分支 `claude/scan-k1b-1102`，未合并、未部署）
+
+- 为什么：K1b 要把「在这块屏上开始扫描」接进现有材料扫描，本批只做选材料、怎么扫、放纸与颜色、屏上未开通、设备状态里的扫描仪行。基线 `486acbb23`（K1a `4bb0a6dd7` + 并入的后端 B1+B2 `fafcfdb0d`）。实现提交 `e284905dc`。五屏共用工作台路由、扫描登记和本机探测，拆开不能单独通过类型检查，所以实现是一次提交；进度和图谱另一次。
+- 做了什么：选材料页标题改为「扫什么？」，四种材料（含合同）和 5 格路径线。怎么扫看 `scan_device`（没取到按未验证禁用）并且进这一屏时 `GET /local/scan/probe` 即时成功，状态签才写「扫描仪就绪 · 刚刚检查」。不能用时屏上卡灰掉、选中回到面板。游客多「先扫码登录」，登录后只带回材料（不带扫描凭证），并再探测一次；游客升会员仍会清掉进行中的扫描。U 盘说明不可点，写暂未开通。放纸页默认证件=玻璃台+彩色，其余=进纸器+黑白。`scan` 关仍整页挡住；`scan_device` 关只挡屏上方式，面板照旧建会话。设备状态页在原有八项之外加扫描仪一行，每行带「N 秒前检查」；扫描仪用这次本机探测的时间和结果，超过 1 分钟不算就绪。读数在 `useTerminalDeviceStatus` 再导出的探测里，不在页面里另开轮询，也不塞进打印机那路 20 秒心跳。
+- 没做：放纸页不渲染「开始扫描」，也不放占位说明。本批不发起扫描。后端、终端程序、小程序、两个后台没改。触屏版发布候选那四处（U 盘卡「暂未开通」、证件 JPG 的 `role="note"`、游客结果页没有下载码、`SCAN_FILE_TYPE_NOT_ALLOWED` 的说法）没改回去。没有部署。
+- 稿外句子（规格书允许、设计稿没有）：能力还在查「正在检查这台机器能不能在屏上扫描」；能力接口没取到「屏上扫描能力暂时无法确认，请先用面板扫描」；探测进行中「正在检查扫描仪」；连不上「本机程序连不上，扫描仪状态未知，请先用面板扫描」；响应不明或健康值不认识「扫描仪状态未知，请先用面板扫描」；忙「扫描仪正忙，请稍后再试」；没找到「未找到扫描仪，请先用面板扫描」；error「扫描仪状态暂时无法确认，请先用面板扫描」；超过 1 分钟「扫描仪状态超过 1 分钟没更新，先用面板扫描」。放纸页在探测还没完成时状态签写「正在确认扫描仪」。怎么扫在下一步真的会建会话时写「下一步会真实建立这次扫描」（门禁原句，稿上没有）。设备状态扫描仪行不写「扫描仪就绪」，改写「这次读到就绪 / 不算就绪 / 正忙 / 未找到 / 状态未知」和对应的「这次本机探测…」。稿内未开通句仍是「这台机器还没开通屏上扫描」。
+- 本机验证：kiosk typecheck 通过；lint `28 problems (0 errors, 28 warnings)`，其中 `ScanStartPage.tsx:29` 是 `openPanelScanSettings` 的 react-refresh 警告，这个函数必须留在该文件里（门禁按文件匹配建会话导航）。门禁：`ALL PASS fusion W2 print/scan contract`、`ALL PASS scan session truth contract`、`PASS kiosk scan quiet period verification`、`verify:kiosk-unattended-copy 通过`、`verify:kiosk-font-subset 通过：983 个源码文件的用字都在子集（7168 字）里`、合规文案 `ALL PASS`。图谱点名的其余门禁也过：`verify:kiosk-ai-declaration`（`OK: 一体机 AI 使用声明`）、`ALL PASS fusion W5`、`ALL PASS fusion W6`、`PASS Kiosk fusion presentation shell contract`、`verify-runtime-terminal-identity: ok`、`PASS queue dispatch printer status`、`verify-print-monitor-truth: all assertions passed`、`verify:print-color-duplex-capability` 在临时 SQLite（`/tmp`，未入库）上 `ALL PASS`（第一次没设 `DATABASE_URL` 时在连库前退出，补上后整段通过）。`pnpm verify:repository-integrity` 三项 OK。`pnpm graph:check`：`PASS docs/graph/ 与当前代码一致`。
+- 浏览器（系统 Chrome；本机没有 Playwright 自带 Chromium。临时配置在 `~/.cache/claude-lanes/copyscan-1102/grok/pw/`，未提交）：K1b 新用例 9 过。`test:browser` 的 scan-safety 组 `38 passed (1.9m)`，含原先在 main 上会红的 `payment code never renders`。w2 全套一次是 `1 failed` + `251 passed (5.5m)`，唯一失败是 390 宽底注差 0.578px；只改滚动取整和窄屏底注 1px 内边距后，这条单独 `1 passed (14.3s)`，390 扫描四条再跑 `4 passed (22.8s)`。全套 252 条没有在这次修补后再跑一遍。truth 全套第一次 `14 failed` / `164 passed (15.4m)`，14 条都是还在等「下一步就进设置」。辅助函数改完后只跑 `scan-session-truth.spec.ts`：`41 passed` / `1 failed`（迟到撤销那条仍内联旧路径）；改完那条后单独 `1 passed (14.0s)`。没有一份 42 条一次全绿的日志。会话警告 `35 passed (2.1m)`。旅程 F `1 passed (1.1m)`，日志里有一条 `console: Failed to load resource: net::ERR_CONNECTION_REFUSED`，用例本身过了。隐私超时里被改过的那条 `1 passed (22.7s)`。
+- 截图（1080×1920）在 `~/.cache/claude-lanes/copyscan-1102/code-shots/k1b1/`：`cs-scan-what.png`、`cs-scan-how.png`、`cs-scan-how-unavailable.png`（忙；稿目录没有同名不可用图）、`cs-scan-set.png`、`cs-scan-off.png`、`cs-device.png`。和稿的差别：没有打印机插画；选材料首屏不探测，状态是「可创建扫描任务 · 需面板操作」，不是稿上的「扫描仪就绪 · 20 秒前检查」；怎么扫成功时是「刚刚检查」；未开通页的服务电话走现有联系方式（号码不带横杠，并带工作时间）；设备状态页是原「这台机器的八项状态」加一行扫描仪，不是稿上那张六行重做。
+- 反向检查（先提交 `e284905dc`，改坏，`verify:fusion-w2` 变红，再 `git checkout` 恢复，没有提交改坏的状态）：去掉 `if (!ok) return null` → `the ready phrase is produced only when the caller proves this probe succeeded`；去掉「不可用就 `setWay('panel')`」→ `screen method is forced back to the panel when it is not usable`；面板不再走 `openPanelScanSettings` → `panel route still creates through the existing settings handoff`。三条都是 exit 1。恢复后再跑 exit 0，工作区干净。
+- 行数：新页面都在 500 行以内（怎么扫 204、放纸 110、选材料 291）。`scanWorkbenchSession.ts` 629 行、`scan-fs.css` 684 行，改之前就已经超过 500，这次只加了材料字段和窄屏底注，没有拆。
+- 图谱：新文件入库后 `pnpm graph` 重出，`docs/graph/` 4 个文件有变化（kiosk 源文件 918→927，被门禁断言的文件 1972→1977，`/scan` 源文件数 10→11）。`scanProbeCopy.ts`、`ScanHowPage.tsx`、`ScanDeviceSettingsPage.tsx` 被 fusion-w2 钉住；怎么扫还被 scan-session-truth 钉住；`scanMaterials.ts`、`scanHowContinue.ts` 被 kiosk-ai-declaration 钉住。`useScanDeviceCapability.ts`、`localScanApi.ts`、`localScanProbe.ts` 图谱报没有门禁断言它们（探测结果的句子和「只有成功才写就绪」钉在 `scanProbeCopy.ts` 上）。
+
+## 2026-11-03：一体机扫描页按职责拆开（K1a，只拆不改行为；分支 `claude/scan-k1a-split-1102`，未合并、未部署）
+
+- 为什么：下一步 K1b 要把屏上扫描做进扫描页。`ScanSettingsPage.tsx` 原来 784 行，离 800 行硬线只剩 16 行；`ScanResultPage.tsx` 512 行。本批只拆，让 K1b 能复用建会话、投递确认、重扫授权和出口。基线 `317e54442`。实现提交：`12cc15320`（设置页五个 hook）、`b0d6847e0`（结果页两个 hook、三个组件）、`ec56da22a`（六个门禁改读新文件，断言不删不放宽）、`a1e9ca34c`（游客结果页文案）。
+- 怎么拆：设置页拆成 `useScanSettingsState`、`useScanSessionCreate`、`useScanSettingsDeliveryAck`、`useScanSettingsExpiry`、`useScanSettingsActions`，页面只留装配与渲染（123 行）。投递确认和进度页不同构，没有抽成共用 hook。结果页拆成 `useScanResultRescan`、`useScanResultExits`、`ScanResultFailedView`、`ScanResultPreviewBlock`、`ScanResultExitRow`、`scanResultModel`，页面 122 行。`leaveScanFlow` 仍是先撤会话、再清登记、再 replace 导航。拆完每个文件都不超过 500 行，最长的是 `useScanSessionCreate.ts`（394 行）。
+- 文案（R-03，产品负责人 11/02 拍板，照触屏版补稿 cs-scan-done）：游客成功说明改为「未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。要带走电子版，下次先扫码登录再扫。」再加「用 U 盘带走：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。」不加登录按钮（游客一登录，这次扫描会被清掉）。禁用的「本次不进入我的文档」不动。登录后仍是「前往我的文档」。
+- 没改：路由、阶段机、扫描登记的存储格式、后端、终端程序、共享包、小程序、两个后台。触屏版那四处（U 盘卡「暂未开通」、证件 JPG 的 `role="note"`、游客结果页没有下载码、`SCAN_FILE_TYPE_NOT_ALLOWED` 的说法）没改回去。
+- 本机验证（系统 Chrome；Playwright 自带 Chromium 缓存是空的）：kiosk typecheck 通过；lint 0 error（27 条原有 warning，不在扫描页）。门禁全绿：`verify:fusion-w2`、`verify:scan-session-truth`、`verify:scan-quiet-period`、`verify:print-done-truth`（47 过）、`verify:kiosk-ai-declaration`、`verify:kiosk-runtime-error-boundary`、`verify:kiosk-unattended-copy`、`verify:kiosk-font-subset`（7168 字）、`verify:compliance-copy`（含 `verify:no-raw-error-render`）、图谱多列出的 `verify:fusion-w6`。浏览器：w2 243/243（含 fusion-w2-scan 36）；truth 177 过、1 条红；scan-safety 37 过、1 条红；会话警告 35/35；隐私超时 42/42；w6 里路径含 `/scan` 的 8/8；旅程 F 1/1。
+- 两条红不是这次拆分。`unfinished privacy check keeps the recovery exit` 在 origin/main 副本（`7af05df97`）上同一条同样红：收尾报未登记的 `POST /api/v1/materials/tasks`，屏上的恢复出口本身在。`payment code never renders` 是全套一起跑时，付款失败后界面已经回到「等待扫码」，单独再跑本分支与 origin/main 都过（本分支 1 过 / 2.2 秒，origin/main 1 过 / 2.7 秒）。一体机目录相对基线与 origin/main 没有别的差；origin/main 只多小程序 #1538。
+- 截图在 `~/.cache/claude-lanes/copyscan-1102/code-shots/k1a/`，`main-*` 与 `branch-*` 各 10 张（游客、登录 × 选类型、指引、等待、成功、失败）。文字除游客成功那句外一致。像素：选类型、等待、两种失败、登录成功为 0 差；指引只差倒计时秒数（同一时刻起算，拍摄耗时差几秒）；游客成功那张差在新句子多出来的行。
+- 反向检查（改坏后 `git checkout` 恢复，没有提交改坏的状态）：删掉 `leaveScanFlow` 里的撤会话 → `verify:scan-session-truth` 红在「先撤服务端任务」；游客句改回旧句 → 同一门禁红在 11/02 原话；静默期去掉减一 → `verify:scan-quiet-period` 红。恢复后这两条门禁再绿，工作区干净。
+- 图谱：新文件入库后 `pnpm graph` 重出，`pnpm graph:check` 通过（`docs/graph/` 3 个文件有变化）。新文件被 fusion-w2 与 scan-session-truth 钉住；设置页那一组还被 runtime-error-boundary 与 no-raw-error-render 钉住；`useScanResultExits` 还被 print-done-truth 钉住；`useScanSessionCreate` 还被 scan-quiet-period 钉住。这些门禁本轮都已跑过，没有新冒出来还没跑的。
+- 合并注意：origin/main 比本分支基线多 #1538，进度文档顶部多一节小程序签名图。合的时候两节都留，这一节放在上面。
+
+## 2026-11-05：PDF 文字层部首字符换回常用字（C3；源 #1402；未合并、未部署）
+
+- 问题：F-24 的苹果 PDF 文字层把常用字存成部首码位，模型写回常用字后被防编造比对误拒；本轮从 main `50070402a` 重做 #1402 的四个代码提交，未带入旧进度文档、图谱和 CI workflow 改动。
+- 改法：通用表只折康熙部首 U+2F00–U+2FD5 和部首补充 U+2E80–U+2EF3 中确定的 314 对（214+100，14 对排除）；先按已知字体的 20 对例外补救，再拼行、整表折叠。单页取字体失败或条目数不齐时该页原样保留；没有例外字的页不再取文字或操作列表。抽取、历史原文、诊断报告及改进建议、模型直接字符和 JSON 转义字符串用同一编码；日志只增加计数或固定拒绝规则名。
+- 与 #1574 衔接：保留提示词、moduleAfter 的首尾空白处理、补回和篇幅收口后的 returnAligned，以及逐字段 includes 判据；在最终核对前同步折叠稿与模块字符串。唯一空白/标点差异仍只规范 after，多处相似和跨字段拼接仍只能手改，不为核对增加模型调用。新门禁另加 4 条部首与最终稿核对的组合断言。
+- 门禁接线：仅改 API package.json 的 verify:resume-extraction 串接，依次追加 verify:resume-radical-fold 与 verify:resume-radical-font-fold；该入口已在 ci.yml 的 SQLite 和 postgres-readiness 中执行。verify-ci-gate-coverage 通过，566/576 条 verify/ui 门禁进入 CI 执行闭包，10 条已有豁免，新门禁均进入闭包。
+- 验证：API typecheck、改过的 8 个 TS 文件 lint、新门禁 79/79 与 55/55、图谱关联的全部可离线门禁（含 verify:resume-optimize 内 #1574 的 6 类样本及两个展开的前置/后置脚本）、根目录仓库完整性/合规文案/日期时间/原始错误上屏检查均通过。verify:resume-report-export 首轮 SQLite P1008 超时，串行重跑通过；verify:ocr-baidu-live 已执行但因无 BAIDU_OCR_API_KEY / BAIDU_OCR_SECRET_KEY 退出 1，未验证真实 OCR。反向检查清空表为 40 PASS/39 FAIL、去掉事实比对前折叠为 75 PASS/4 FAIL，均退出 1；从 /tmp/c3-radical-mut/ 副本恢复后逐字节一致，两条新门禁恢复通过，反向检查前后 git diff --stat 完全一致。
+- 没做：未合并、未部署；未改 apps/**、ci.yml、图谱、生产配置、数据库结构，未新增依赖；未用 F-24 原件与苹果全部字体在真机、真实模型上复测。
 
 ## 2026-11-08：终端程序屏上扫描第二批（A2，PR #1584）并 main、版本升 0.4.20
 
@@ -49,7 +112,6 @@
 - 升 0.4.20 的原因：#1579 已用 0.4.19 进 main，A2 也写的 0.4.19，两边改的是同一批版本文件、改法一样，git 不报冲突，但不能同号进 main。照 0.4.19 那次（`41d14d319`）的 12 个文件 20 处改齐；升级测试的旧版本 0.4.10 与历史记录不改，`verify-scan-deskew.ts` 里解析配置用的样例版本号不是当前版本断言，也不改。
 - **代码进 main、未打包、未装机。** 后端第二批 #1559 已在 main、还没上线：给任何终端装这一版之前，必须先发布后端，并由产品负责人当场确认。屏上扫描能力 `scan_device` 仍默认拒绝，逐台开通。
 - 验证（本机 macOS）：终端程序 tsc、eslint（0 错误；3 条警告 main 上同样有）、`package.json` 里全部 37 条 verify（两条 Windows 专用的在非 Windows 上自动跳过）、安装包输入、仓库完整性、图谱 `--check`，以及图谱按改动文件列出的其余 36 条门禁（根目录 3、一体机 18、管理后台 1、UI 1、后端 13）通过。`verify:task-reliability` 在本机高负载（load 30–45）下前两次偶发红（子进程超时、250 毫秒重读窗口），失败子项（实例锁、死信命令行）的代码本次没动，干净 main 同命令通过，合并结果第三次重跑通过。Windows 专用的 .ps1 门禁（纠偏合成样本、安装包生命周期）交 CI。
-
 
 ## 2026-11-04：终端程序 A2 第六轮——收掉第四轮复审的 2 条 P1（分支 `claude/scan-device-a2-1102`，随 0.4.19，未部署）
 
@@ -63,6 +125,7 @@
 - 改法（Codex 实现，Claude 收货）：共用入口在查询前设 `[Console]::OutputEncoding` 为无 BOM UTF-8，卷标与隐藏文件名两处查询一起生效；其余 U 盘行为不变。`verify:usb-import-agent` 加中文卷标「工作资料」「新加卷」、中文隐藏文件名（单值 / 数组）与编码顺序断言；去掉编码那一行门禁变红，恢复后绿。`verify:local-qr-proxy`、repository-integrity 通过。
 - 旁查同类缺口（本轮不改）：`printer/printer-status.ts`（打印机名可能含中文）、`agent/scan-device/scan-device-health.ts`（命令行可能含中文路径）也没设输出编码；WIA 探测与扫描脚本协议只有 ASCII。
 - 真机未核：装 0.4.19 时按 `~/.cache/claude-lanes/copyscan-1102/acceptance.md` 末尾四处一致（CIM 原值、stdout 字节、`/local/usb/status`、一体机显示）核一次。
+
 ## 2026-11-05：扫描件自动矫正 S4a 第三轮——Windows 门禁对 8 位 BMP 的标记判据（分支 `claude/scan-deskew-1104`，未接线、未部署）
 
 - Windows CI 第二次实跑（run 41965545914）：估角已对（文字页 ±4° 内与输入一致，最差 ±0.1°），风险集（空白、照片、表格、证件、发票）误纠偏 0；只剩 16 个 `bmp8` 文字页报 `lost original corner/edge marker`，同角度 png / jpeg / bmp24 全过。
@@ -110,57 +173,6 @@
 - 打印领取：开关打开时，领任务前试拿设备锁（`print-claim`），拿不到就跳过这一轮（日志每分钟最多一条）；拿到后一直持有到本轮 `executeTask` 结束再放，放锁之后才探测扫描仪。没领到任务立即放锁、不探测。开关关着时领取路径不碰这把锁。没改续打、重打判定，也没改 `print-job-monitor.ts`。
 - 没做：没碰真机，没打安装包，没部署。B1 上生产前不得打开 `scanDeviceEnabled`。#1465 去留定下来之前，不往真机发新的终端程序安装包。
 
-## 2026-11-05：政策最小闭环（产品负责人点「按方案开工」；分支 `claude/quizzical-gould-71d33b`，未部署）
-
-- 拍板：产品负责人 11/05 说政策「很多地方没法操作」，看过最小闭环方案页（第 2 版）后 12:55 点「按方案开工」。批准：一体机 5 屏加空态、停放 7 处、改触屏稿政策几屏、试点先保持所有终端都显示（不改 `POLICY_SCOPE`，不给政策请求加终端头）。托管 a 不变：政策由运营机构自己审核发布，平台管理员只留紧急下架。
-- 后端：PolicyPost 加「谁可以申请 / 要准备的材料 / 去哪办」三栏（两份 schema + 迁移 `20261105130000_add_policy_post_handling_fields`）；PATCH 可选字段 null 或空白即清空；发布闸门在审核、责任、内容可信之后再查扶持条目三栏必填、原文链接必填，有链接就须 https 且落在机构登记的官方网站域名内（`policy-source-link.ts`，与官方渠道同一份名单）；公开读与机构列表带 `externalUrlVerified`；内容可信与机构类型拒绝文案改人话（「授权核验」，不露字段名、接口和 JSON）。新增 `POST /policies/:id/checklist` 一页 A4 办事清单（页脚「仅供参考，不具证明效力；办理要件和资格以发布机构和经办窗口为准，本机不代办」，同版本复用，打印建单前复查撤下 / 紧急下架 / 改版，新依赖 `qrcode`）；小青带 `policyId` 时服务端每轮现读已发布原文注入，套用 10/8 合规定稿（`policy-constraint.ts` 一字未改）加新讲解约束 `policy-explain-constraint.ts`（讲解深度待合规确认），撤下或读不到回固定话术、不调模型。
-- 两个后台：机构政策表单分三栏（各 2000 字计数）、标题 200 字计数、https 原文链接并提示本机构登记的官方网站、缺项常显原因、发布弹窗常显两项前提且只显示服务端人话；管理员内容可信提示句去掉岗位招聘会、官方域名面板写明政策原文链接也按这份名单核对、政策页最近下架记录按 `targetType=policy` 筛。
-- 一体机：`/policy-service` 六类大卡（真实条数与最近一条，0 条变灰「还没有机构发布」）、最近更新、机构公告（有才出现）、全库 0 条整屏空态；`/renshi?audience=…&page=N` 一页 4 条；`/renshi?policy=id` 详情三块 + 核验通过才出的原文二维码 + 打印办事清单（打印机暂停时改为扫码存手机）+ 问小青这条 + 收藏先登录；各屏照稿带底部导航；`/renshi` 无参数与 `tab=policy|eligibility|social|register` 回政策首页。收藏只存本人账号，未登录点收藏去登录；「我的收藏」每条可取消（64px，失败放回原位并说明）。清单建单被拒时屏上说清原因（`POLICY_CHECKLIST_WITHDRAWN`）。
-- 停放 7 处（源码保留、不注册、不打包，文件头有停放注释，门禁 `verify:kiosk-parked-policy` 守着）：条件核对整块（`EligibilityPanel` / `EligibilityResults` / `eligibilityOutcome` / `renshi-eligibility-qx.css`，连同机构后台「申领条件」按钮与 `EligibilityRulesDrawer` / `EligibilityRuleEditor`）；社保指南、就业登记（`SocialPanel` / `RegisterPanel`）；5 条本机整理的办事指引（`builtinData.ts`）；服务台的浏览记录 / AI 服务记录 / 全部服务卡；未登录本机收藏（`favorites/localFavorites.ts`，只剩清场用两个函数清改版前的旧残留）；页内重复的问小青按钮；被三屏取代的旧面板（`PolicyPanel` / `policyFocus` / `usePolicyFocus` / `renshi-narrow-qx.css`）。没有删任何文件。
-- 改稿：触屏稿 `docs/design/kiosk-touch-2026-10/policy-min.js`（政策三屏与空态，显示范围是所有终端所以不写「本机构」）、`fix-me.js`（我的收藏加取消，方案屏 5），`FROZEN.json` 按 `--update` 重写。
-- 验证：api / kiosk / partner / admin / shared 类型检查与改动文件 eslint；图谱加全文搜得出的后端 99 条与前端 69 条关联门禁本机全过（`verify:member-closure` 按 CI 的真 Redis 开关跑过，`verify:recruitment-p1-schema:postgres-upgrade` 要真 PG 留给 CI）；新门禁 `verify:policy-publish-gates`、`verify:policy-checklist`、`verify:assistant-policy-context`、`verify:kiosk-parked-policy`（5 项反向检查全红）。本机全栈真后端实走 26 张截图：管理员登记官方域名 → 机构三栏发布，链接不在登记域名被拦（人话）→ 改链接发布 → 一体机六类 → 列表 → 详情三块 → 打印确认（试点 0 元）→ 问小青这条 → 小青关掉时其余照常 → 停在确认页时管理员紧急下架，建单被拒 → 首页变空态、详情不能查看 → 未登录点收藏去登录、登录后收藏、「我的收藏」取消。1080×1920 实量：首页、列表、详情、公告不溢出，最小字 20、可点最小边 68、主按钮 88、详情各块间距约 71px。小青那两张用的是本机假模型（只验证服务端注入原文与约束，不代表真实回答）；打印机离线扫码存手机没实走（本机没配 `KIOSK_PUBLIC_BASE_URL`）。
-- 两个接手会话撞车：实现会话交班后同时有两个会话接手（各在一个分支上收了同样五包）。商定由本分支当唯一实现方，另一分支 `claude/policy-min-loop-041394` 不开 PR；它独有的「授权核验」措辞、列表与公告页底部导航、我的收藏改稿已拣入。
-- 仍归产品负责人：定试点机构并开账号；在管理员后台标「内容可信」并登记该机构官方网站域名（可含上级部门网站）；约对接人发 3–5 条真实政策（带官方原文链接、填三栏）；上线时点头。请合规确认：小青讲解深度与「按这条原文解释」措辞；二维码旁「链接发布时已核对属于发布机构登记的官方网站」；清单抬头与页脚是否加「非受理凭证」；10/8 定稿里「看本机构发布的原文」在所有终端显示时的说法；缺展示日期时日期回落到确认发布日。
-
-## 2026-11-08：复印、扫描屏上流程补稿进仓库（只放稿；11/02 起草，原先叠在 PR #1495 上，#1495 已于 11/04 进 main）
-
-- **改了什么**：新目录 `docs/design/kiosk-touch-2026-11-copyscan/`（`index.html` 套用 `kiosk-touch-2026-10/` 定稿骨架、`copyscan.js` 25 屏：屏上扫描 14、屏上复印 8 加面板复印图文指引 2、设备状态 1）；`docs/README.md` 第二节加第 4 条口径。定稿目录 `kiosk-touch-2026-10/` 一个字节没动（`verify:kiosk-touch-frozen` 通过）。
-- **口径**：面板复印图文指引两屏产品负责人 11/02 原话「补稿可以，照它改」（程序见 PR #1545）；屏上扫描、设备状态随「复印扫描四步走」方案给他看过（他定「按推荐四步走」），一体机 `scan/*` 改程序以这套稿为准，偏离先问他；屏上复印是第四步的稿。触屏版总指挥 11/02 定：补稿单独开文档 PR 落真值，`scan/*` 代码 PR 引用它。
-- **没动的**：运行时代码、两套冻结稿、小程序。
-- **11/08 并 main**：包 4（复印扫描走大屏，产品负责人 11/08 对《四核心收口方案》回「按推荐执行」）先把这份稿合进来，屏上扫描页（K1b）、屏上复印页（C3）的代码 PR 都引用它。只有本文件冲突，两侧保留。
-
-
-## 2026-11-05：产品负责人定四个核心功能的收费口径（合规口径落文；只改文档；分支 `claude/pricing-policy-1105`）
-
-- 原话：产品负责人 11/05 18:21 在设计窗口打字「你们新开一个窗口，根据现有的四个核心功能设置收费模式，在手机小程序上面加入，一体机登录账号进行同步，或者是一体机上面也可以加入对应的功能支付入口，你们看怎么设计吧？」。方案窗口出了私有页（含价格，不进公开仓库），他看完回「按推荐」，又补三句：「没事，我们可以卖给企业，我们也可以设置直接投放，你们继续」「反正这些对应的功能都可以设置价格进行支付」「我的意思是，如果没有企业买，我们可以做成面向用户的付费方式，明白吗？」
-- 按推荐定的 6 件：①四个核心功能是 AI 简历优化、AI 模拟面试、打印、扫描，政策照旧免费；②方向上放开向个人收费，但现在不收，公共就业点位永远不向求职者收，每一处都是默认关的开关，前提办齐才开；③先在小程序收（微信虚拟支付，买 AI 单次服务，一体机登录同一账号后能看到、能用），一体机现场收钱放在后面；④只卖单次服务，不卖次数包；⑤试点前收费代码不动，试点期间递三封咨询函，12/15 以后先做「每台机器设谁付钱」；⑥扫描免费，也做成能设价，默认 0 元。补的三句落成：每台机器设「谁付钱」，有企业或机构买就由他们付、用户免费；没人买就由我们自己投放机器、向用户收费；四个功能都能按机器设价，默认 0 元。
-- 改了哪些旧口径：10/29「收费只有设备款与维保费」补上向个人收费的口径（主收入仍是设备款与年费）；9/30「AI 用完不收费、不做个人付费」在公共就业点位不变，小程序、商业点位和我们自己投放的机器以后可以卖单次服务；9/29「小程序次数包」改为只卖单次服务；10/29「人社第十八条不备案」改为向个人收 AI 费之前重新问一次。不变：公共点位对求职者全免；商业点位四件办齐前由场地方买单（9/29 复审）；小程序首版不出现价格和购买引导（9/30）；不收与岗位、招聘会、浏览、投递、入职挂钩的费用。
-- 写进了：`CLAUDE.md` §1；`docs/product/feature-scope.md` §0.2；`docs/compliance/compliance-boundary.md` §1.1（10/29 一条的②③，9/26 一条加指针）与 §1.2 F（新增 11/05 一条，列前提清单）；`docs/progress/next-tasks.md` 顶部（下一步）。
-- 没改：代码、配置、数据库、生产价目、小程序；没有写任何价格、档位或客户名（只放私有页）。没有停放、隐藏、改名、删除任何东西。
-- **警告：后台打印价目是全局一张表，改成大于 0 会让所有机器（包括公共点位）一起收钱，并跳过免费打印额度（`services/api/src/print-jobs/free-print-quota.decide.ts`：实付大于 0 时直接返回，不查三条免费上限）。第 1 期「每台机器设谁付钱」做完前不许改价。**
-
-## 2026-11-03：一体机扫描页按职责拆开（K1a，只拆不改行为；分支 `claude/scan-k1a-split-1102`，未合并、未部署）
-
-- 为什么：下一步 K1b 要把屏上扫描做进扫描页。`ScanSettingsPage.tsx` 原来 784 行，离 800 行硬线只剩 16 行；`ScanResultPage.tsx` 512 行。本批只拆，让 K1b 能复用建会话、投递确认、重扫授权和出口。基线 `317e54442`。实现提交：`12cc15320`（设置页五个 hook）、`b0d6847e0`（结果页两个 hook、三个组件）、`ec56da22a`（六个门禁改读新文件，断言不删不放宽）、`a1e9ca34c`（游客结果页文案）。
-- 怎么拆：设置页拆成 `useScanSettingsState`、`useScanSessionCreate`、`useScanSettingsDeliveryAck`、`useScanSettingsExpiry`、`useScanSettingsActions`，页面只留装配与渲染（123 行）。投递确认和进度页不同构，没有抽成共用 hook。结果页拆成 `useScanResultRescan`、`useScanResultExits`、`ScanResultFailedView`、`ScanResultPreviewBlock`、`ScanResultExitRow`、`scanResultModel`，页面 122 行。`leaveScanFlow` 仍是先撤会话、再清登记、再 replace 导航。拆完每个文件都不超过 500 行，最长的是 `useScanSessionCreate.ts`（394 行）。
-- 文案（R-03，产品负责人 11/02 拍板，照触屏版补稿 cs-scan-done）：游客成功说明改为「未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。要带走电子版，下次先扫码登录再扫。」再加「用 U 盘带走：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。」不加登录按钮（游客一登录，这次扫描会被清掉）。禁用的「本次不进入我的文档」不动。登录后仍是「前往我的文档」。
-- 没改：路由、阶段机、扫描登记的存储格式、后端、终端程序、共享包、小程序、两个后台。触屏版那四处（U 盘卡「暂未开通」、证件 JPG 的 `role="note"`、游客结果页没有下载码、`SCAN_FILE_TYPE_NOT_ALLOWED` 的说法）没改回去。
-- 本机验证（系统 Chrome；Playwright 自带 Chromium 缓存是空的）：kiosk typecheck 通过；lint 0 error（27 条原有 warning，不在扫描页）。门禁全绿：`verify:fusion-w2`、`verify:scan-session-truth`、`verify:scan-quiet-period`、`verify:print-done-truth`（47 过）、`verify:kiosk-ai-declaration`、`verify:kiosk-runtime-error-boundary`、`verify:kiosk-unattended-copy`、`verify:kiosk-font-subset`（7168 字）、`verify:compliance-copy`（含 `verify:no-raw-error-render`）、图谱多列出的 `verify:fusion-w6`。浏览器：w2 243/243（含 fusion-w2-scan 36）；truth 177 过、1 条红；scan-safety 37 过、1 条红；会话警告 35/35；隐私超时 42/42；w6 里路径含 `/scan` 的 8/8；旅程 F 1/1。
-- 两条红不是这次拆分。`unfinished privacy check keeps the recovery exit` 在 origin/main 副本（`7af05df97`）上同一条同样红：收尾报未登记的 `POST /api/v1/materials/tasks`，屏上的恢复出口本身在。`payment code never renders` 是全套一起跑时，付款失败后界面已经回到「等待扫码」，单独再跑本分支与 origin/main 都过（本分支 1 过 / 2.2 秒，origin/main 1 过 / 2.7 秒）。一体机目录相对基线与 origin/main 没有别的差；origin/main 只多小程序 #1538。
-- 截图在 `~/.cache/claude-lanes/copyscan-1102/code-shots/k1a/`，`main-*` 与 `branch-*` 各 10 张（游客、登录 × 选类型、指引、等待、成功、失败）。文字除游客成功那句外一致。像素：选类型、等待、两种失败、登录成功为 0 差；指引只差倒计时秒数（同一时刻起算，拍摄耗时差几秒）；游客成功那张差在新句子多出来的行。
-- 反向检查（改坏后 `git checkout` 恢复，没有提交改坏的状态）：删掉 `leaveScanFlow` 里的撤会话 → `verify:scan-session-truth` 红在「先撤服务端任务」；游客句改回旧句 → 同一门禁红在 11/02 原话；静默期去掉减一 → `verify:scan-quiet-period` 红。恢复后这两条门禁再绿，工作区干净。
-- 图谱：新文件入库后 `pnpm graph` 重出，`pnpm graph:check` 通过（`docs/graph/` 3 个文件有变化）。新文件被 fusion-w2 与 scan-session-truth 钉住；设置页那一组还被 runtime-error-boundary 与 no-raw-error-render 钉住；`useScanResultExits` 还被 print-done-truth 钉住；`useScanSessionCreate` 还被 scan-quiet-period 钉住。这些门禁本轮都已跑过，没有新冒出来还没跑的。
-- 合并注意：origin/main 比本分支基线多 #1538，进度文档顶部多一节小程序签名图。合的时候两节都留，这一节放在上面。
-
-## 2026-11-05：PDF 文字层部首字符换回常用字（C3；源 #1402；未合并、未部署）
-
-- 问题：F-24 的苹果 PDF 文字层把常用字存成部首码位，模型写回常用字后被防编造比对误拒；本轮从 main `50070402a` 重做 #1402 的四个代码提交，未带入旧进度文档、图谱和 CI workflow 改动。
-- 改法：通用表只折康熙部首 U+2F00–U+2FD5 和部首补充 U+2E80–U+2EF3 中确定的 314 对（214+100，14 对排除）；先按已知字体的 20 对例外补救，再拼行、整表折叠。单页取字体失败或条目数不齐时该页原样保留；没有例外字的页不再取文字或操作列表。抽取、历史原文、诊断报告及改进建议、模型直接字符和 JSON 转义字符串用同一编码；日志只增加计数或固定拒绝规则名。
-- 与 #1574 衔接：保留提示词、moduleAfter 的首尾空白处理、补回和篇幅收口后的 returnAligned，以及逐字段 includes 判据；在最终核对前同步折叠稿与模块字符串。唯一空白/标点差异仍只规范 after，多处相似和跨字段拼接仍只能手改，不为核对增加模型调用。新门禁另加 4 条部首与最终稿核对的组合断言。
-- 门禁接线：仅改 API package.json 的 verify:resume-extraction 串接，依次追加 verify:resume-radical-fold 与 verify:resume-radical-font-fold；该入口已在 ci.yml 的 SQLite 和 postgres-readiness 中执行。verify-ci-gate-coverage 通过，566/576 条 verify/ui 门禁进入 CI 执行闭包，10 条已有豁免，新门禁均进入闭包。
-- 验证：API typecheck、改过的 8 个 TS 文件 lint、新门禁 79/79 与 55/55、图谱关联的全部可离线门禁（含 verify:resume-optimize 内 #1574 的 6 类样本及两个展开的前置/后置脚本）、根目录仓库完整性/合规文案/日期时间/原始错误上屏检查均通过。verify:resume-report-export 首轮 SQLite P1008 超时，串行重跑通过；verify:ocr-baidu-live 已执行但因无 BAIDU_OCR_API_KEY / BAIDU_OCR_SECRET_KEY 退出 1，未验证真实 OCR。反向检查清空表为 40 PASS/39 FAIL、去掉事实比对前折叠为 75 PASS/4 FAIL，均退出 1；从 /tmp/c3-radical-mut/ 副本恢复后逐字节一致，两条新门禁恢复通过，反向检查前后 git diff --stat 完全一致。
-- 没做：未合并、未部署；未改 apps/**、ci.yml、图谱、生产配置、数据库结构，未新增依赖；未用 F-24 原件与苹果全部字体在真机、真实模型上复测。
-
 ## 2026-11-05：终端程序打印队列诊断与显式 A4 合入 main（#1579，分支 `claude/printer-queue-agent-1104`；代码进 main，未打包发布、未装机）
 
 - 做了：心跳增加 5 个只读字段（队列名、端口种类、USB 端口名、Win32_Printer 原值、打印服务状态）。端口地址不上传；队列名像地址就不带。原值与状态共用一次查询，对不上契约就不带。非 Windows 报 unknown。
@@ -168,6 +180,50 @@
 - 后端半（#1578）11/05 11:53 已上生产（随 `bfe80722e`，迁移 `20261104150000_add_terminal_heartbeat_printer_queue` 已执行）。终端装上本版之前，后台终端详情的打印队列一栏写「未上报（终端程序升级到新版本后才上报）」。往真机装新版终端程序由产品负责人定。
 - 显式 A4：下发 pdf-to-printer 时 paperSize 固定 A4，不再靠驱动默认纸型。待真机试打，试打前问产品负责人。
 - 版本：升到 0.4.19。按 11/04 与复印扫描线的约定，先进 main 的用 0.4.19；扫描线 #1584 也写了 0.4.19，两边改的是同一批版本文件、改法一样，合并时 git 不报冲突，后合入的要改成 0.4.20。升级测试里的旧版本号与兼容下限不改。
+
+## 2026-11-08：屏上复印后端并 main、计费改口径（PR #1591）
+
+- 依据：产品负责人 11/08 对收口方案回「按推荐执行」。复印按原件页 × 份数计面，双面不减价，出纸成功才算；复印价按机器设、默认等于该机打印单价、试点 0 元（逐机设价是 12/15 起的包）；复印进免费额度、与打印共用；扫描一律免费、只记交付页数；谁都不许把全局价目改成大于 0，也不加新的全局价目行。
+- 并 main：分支 `claude/copy-c1-1104` 并入 main `42e945e76`（冲突只在图谱与进度文档；图谱取 main 后重生成，进度两侧保留），推送前又并入 `1d0c0082b`（#1501，冲突只在图谱），补修 CI 时再并入 `382a12669`（#1546，冲突只在进度文档）。PR #1591 仍是草稿，未合并、未部署，`copy` 能力照旧默认拒绝。
+- ① 复印价跟打印价走：从 `PricingService.quotePrint` 抽出 `readPrintUnitPrice`（`payment/pricing.service.ts`，打印行为不变），`quoteCopy` 改调它：黑白取 `print_bw_page`、彩色取 `print_color_page`；缺行或停用 → `COPY_PRICE_UNAVAILABLE`，单价非法 → `COPY_PRICE_INVALID`，与打印同样不可报价。去掉复印独有的 `unit` 校验和 `effectiveFrom` 过滤（打印不读这两样，留着会让两边对不上）。确认时金额不为 0 照旧拒（`COPY_PAID_NOT_SUPPORTED`）：万一打印价不是 0，复印宁可确认不了也不收钱。报价快照里的价目键改记实际取价的打印键。
+- 删了复印价目行：`COPY_DEFAULT_PRICE_CONFIG`、`ensureCopyPriceCatalogRows`（连同后台计费页与开发种子里的调用，这两个文件回到与 main 一致）、`COPY_PRICE_KEYS` / `CopyPriceKey` / `CopyPriceRow`（API 与 `packages/shared` 两份契约同步删）。这些从没进过 main、没上过线，迁移 SQL 里也没有插价目行，不需要数据迁移。没改任何全局价目数值，没加价目行。
+- ② 复印与打印共用免费额度：`print-jobs/free-print-quota.usage.ts` 的用量加上复印。`handed`（出纸成功）按 `billableSides` 计已用，按 `updatedAt` 落北京自然日（对齐打印的 `completedAt`），只看昨天 0 点以后建的单（会员注销清洗会改老单的 `updatedAt`）；`confirmed`（未过期）、`dispatching`、`spooled` 计在途，取当天创建或当天有更新（同打印）；`unconfirmed`、`failed`、`cancelled`、`expired` 与确认前的状态都不计；已确认但过了有效期的单拿不到打印许可，也不计在途。终端按 `terminalId`、会员按 `endUserId`，只算 0 元单（与打印 `isFreeOrder` 同口径，看关联订单）。复印确认（`copy-jobs.service.ts`）在报价、报价版本核对之后，占单建单之前调用 `assertFreePrintQuota`（`requestedSides` = 报价面数，`payableCents` = 报价金额），超额回 429，错误码与打印相同。
+- ③ 提示语：`assertFreePrintQuota` 加可选 `subject`（缺省 `print`，打印三句一字不变），复印用三句：「今天这台机器的免费打印复印量已用完，明天 0 点恢复。」「你今天已免费打印复印 N 面，达到每日上限，明天 0 点恢复。确有急用，可以拨打屏幕上的服务电话。」「免登录每次最多复印 N 面。用手机号登录后，可以一次复印更多。」（`free-print-quota.policy.ts`）。
+- 连带：一体机读余量（`freePrintQuotaView`）与额度判定用同一个用量函数，自动含复印。管理员终端列表与 80% 告警用的是另一个函数 `todayFreePrintSidesByTerminal`，这次也加上出纸成功的复印面数；告警标题文字没改，仍是「免费打印量」（`verify:free-print-quota` 钉着原句，该门禁这次不改）。
+- ④ 扫描核对（只核对、不改代码）：扫描不建订单、不读价目、不占免费额度（`scan-tasks/` 下没有建单、报价或额度调用）。屏上扫描的页数记两处：终端程序回报的 `ScanTask.devicePageCount`（`scan-device-protocol.ts`，只增不减），和交付时服务端从 PDF 解析的 `FileObject.pageCount`（`FilesService.uploadVerifiedDeviceScan` → `resolveStoredPageCount`，读不出或超上限回 409），由 `ScanTask.fileId` 关联。面板扫描只记 `FileObject.pageCount`（`FilesService.upload` → `recognizeStoredPageCount`：图片记 1、PDF 解析、读不出记空），`devicePageCount` 恒为 0。都已有记录，不用补。
+- 门禁：新增 `verify:copy-quota`（接进 CI 的 SQLite 与 PostgreSQL 两组）：复印单价与同色打印单价在有效、大于 0、停用、单价非法、缺行下都相同（黑白、彩色）；种子与计费页不补复印价目行；handed 计已用，在途另计，未确认/失败/取消/过期/确认前/付费/过期未派发/老单不计；游客每单、机器每天（在途也挡）、会员每天三条对复印生效；复印用满后打印被挡，反过来也是；复印超额用复印的句子，打印句子不变；一体机余量、终端列表与 80% 告警都算进复印。`verify:copy-c1a` 报价用例改取打印行、去掉复印价目行用例；`verify:copy-c1b` 临时价目改设打印两行，并为「99 份 20 页」边界临时放宽游客每单上限与测试终端每天上限（额度判定交新门禁），结束时原样恢复。`verify-free-print-quota.ts` 没改（#1581 在改）。
+- 验证：API 类型检查、改动文件 lint、shared 类型检查过，改过与新增的三个门禁脚本另用临时 tsconfig 做了类型检查。本机 SQLite（照 CI 新建的 `dev.db`）48 条后端门禁全过：`verify:copy-c1a`、`verify:copy-c1b`、`verify:copy-quota`、`verify:free-print-quota`、`verify:member-closure`（照 CI 带真 Redis 前缀），图谱与全文搜出的价目、额度关联门禁（pricing、admin-billing、print-jobs、order、payment-flow、payment-real-channels、pickup-code-resume、pickup-code-share、miniapp-cloud-print-m2、package-order 三条、member-print-order 两条、member-order-timeline、kiosk-cashier-ui、career-plan-degraded、refund 两条、wechat-refund 两条、resume 两条、admin-fairs、print-color-duplex-capability、print-rollout-config），以及经告警、终端列表间接用到用量函数的 admin-ops、alert-push、admin-print-outcome、admin-printer-output、beijing-display-time、legacy-pending-print-task-disposition、license、partner-smart-campus、queue-dispatch-printer-status、scan-device-b4 / b9 / sessions、terminal-credentials / device-config / provisioning、console-screen-snapshot / printed-visits；一体机 `verify:price-single-source`、读进度文档的 15 条门禁、根目录仓库完整性、`verify:ci-gate-coverage`、图谱 `--check` 过。本机临时 PostgreSQL 16：没灌种子的库上三条复印门禁全过；照 CI 灌了种子的库上 `verify:copy-c1a`、`verify:copy-quota` 过，`verify:copy-c1b` 红在 C1e「seed 门禁须使用无 KSK-001 的隔离库」，PR 现头 `78613f804` 的 CI（run 41977630153）也红在这一条，不是本次带来（已在同日补修，见最后一条）。反向检查（先提交，被改文件的副本放在草稿区，改坏前后 `git diff --stat` 一致，用副本盖回）：复印价改回读 `copy_*` 行 → 新门禁红在价目对照「black_white 有效 0 元：打印可报价，复印也必须可报价」；`unconfirmed` 算进已用 → 红在用量断言（已用 9≠4）；去掉确认时的额度检查 → 红在游客每单超额（没有拒绝）；另两项：复印不传 `subject` → 红在提示语（打印句≠复印句），终端列表不算复印 → 红在终端列表面数（0≠4）。
+- 没做 / 要接着做：一体机屏上复印页（`claude/copy-kiosk-c3-1105`）的 `canConfirmCopy`（`apps/kiosk/src/pages/copy/copyCheckModel.ts`）要求报价价目键是 `copy_bw_page` / `copy_color_page`，这次后端改记 `print_bw_page` / `print_color_page`，那条分支要同步改（含其测试夹具），否则确认按钮永远不亮；一体机前端对 `PRINT_*_QUOTA_*` 的对照表（`userMessageOf`）显示的是打印说法，复印页接入时要显示后端返回的复印句子或在对照表里分开。
+- CI 上已有的两处红（PR 现头 `78613f804` 就有，本次没改）：SQLite 作业在「Cross-client deterministic static gates」一步红，admin `verify:console-plain-copy` 报「未登记的审计动作模板」，指 `copy-job-store.service.ts` 的 `` action: `copy.${action}` ``（`scripts/audit-action-codes.mjs` 不认这个模板），所以 SQLite 作业的门禁组（含三条复印门禁）还没在 CI 上跑到；PostgreSQL 作业的 `verify:copy-c1b` 红在上面那条 C1e 种子用例（推上 `4807615bc` 后 CI run 42463585667 的 PostgreSQL 作业 138 条只红这一条，`verify:copy-quota` 过）。两条已在同日补修，见下一条。
+- 同日补修 CI 原有的红：① 复印审计动作由 `` `copy.${action}` `` 模板改成显式字面量常量表 `COPY_AUDIT_ACTIONS`（`copy-job-store.service.ts`，确认处也引用它；写入的动作值不变），六个动作登记进管理端 `apps/admin/src/lib/auditActionLabels.ts`（创建 / 取消 / 确认复印任务、发放复印许可、回报复印扫描页数、回报复印出纸结果），admin `verify:console-plain-copy` 转绿。② 同一步里原先被它挡住的 admin `verify:admin-ai-access-ui` 跟着露出来：C1b 给 `POST /copy/jobs` 挂了维护拦截，后台「全机维护」的说明与确认文字没写复印；`AiAccessSwitchesPanel.tsx` 的 `MAINTENANCE_BLOCKED` 补上「复印任务创建」，门禁对照表同步（十个改十一个），只改说明文字，不动两个后台的菜单与页面结构。③ C1e「seed 覆盖归属」用例不再要求库里没有 KSK-001：`prisma/seed-terminal.ts` 的 `seedKioskTerminal` 加可选终端身份（缺省仍是 KSK-001，demo 种子不变），用例换一个本用例独有、事先不存在的终端跑同一个种子覆盖函数，断言照旧（另钉 demo 种子仍只覆盖 KSK-001），不再删改已灌种子的 KSK-001。验证：照 CI 灌了种子的临时 PostgreSQL 上按 c1a → c1b → copy-quota 复跑全过，KSK-001 原样留着；本机照 ci.yml 跑「Cross-client deterministic static gates」整步 65 条，以及其后的合规文案、mock 契约、导入复核、后端 P0 契约、PG schema 漂移、api 与 admin lint、shared / api / admin 类型检查、仓库完整性、`verify:ci-gate-coverage`，全过（依赖安全门禁要联网，没跑）。反向检查：种子覆盖去掉同事务撤权 → c1b 红在 C1e 用例「scan 许可必须被拒」（true≠false）；登记表漏掉 `copy.permit` → `verify:console-plain-copy` 红在「动作 copy.permit 没有中文名」。
+- 再补（总指挥在 `22fc40737` 补了审计对象名 `copy_job`「复印任务」后，CI 又露出一条）：`verify-copy-c1b.ts` 经 C1e 辅助文件引用 `terminals-admin.service.ts`（托管相关模块），`verify:recruitment-hosting-gate-declares` 要求显式赋值，照其他终端类门禁按生产配置写 `RECRUITMENT_CONTENT_HOSTING_ENABLED=false`（不验证招聘托管内容）；本 PR 其他新增或改过的门禁不引用托管模块，门禁报违规 0。并入 main `ffdda6fcb`（#1595，冲突只在图谱与进度文档）。验证：本机照 ci.yml 跑 build-and-verify，除依赖安全（要联网）、apt 安装、依赖重装、一体机字体子集与终端程序套件外的 31 步全过，其中「Cross-client deterministic static gates」65 条、「Verify suites」358 条全过；PostgreSQL 组在照 CI 灌了种子的临时库上按 CI 顺序跑图谱关联的 108 条（含 copy 三条），全过。
+
+## 2026-11-05：屏上复印 C1e——终端停用 / 维护 / 吊销 / 改绑机构也作废在途复印授权（分支 `claude/copy-c1-1104`，未合并、未部署）
+
+- 起因：C1d 复核报 P1——许可只在 CAS 时判定后，终端 `enabled` / `lifecycleStatus` / `orgId` 的管理写入不递增复印授权版本，可被并发许可绕过。
+- 改法（Codex 实现，Claude 收货）：抽出 `copy-jobs/copy-authorization.ts`（只给本终端未终态复印单授权版本 +1，不改状态），在同一事务里接到会让终端变不可用的写入口：后台资料编辑停用（`terminals-admin.service.ts`）、生命周期切到非 active、应急吊销转 suspended（`terminal-credential-security.service.ts`）、机构绑定 / 解绑 / 改绑（`terminal-org-assignment.ts`，仅机构真的变了）、开发种子覆盖机构归属（抽出 `prisma/seed-terminal.ts`）。新建、激活、恢复 active、心跳转 active 属于变可用，不递增。
+- 验证：新增 `scripts/support/copy-c1e-verification.ts`（19 条，由 `verify:copy-c1b` 调用）：停用、维护、解绑、改绑、吊销、种子覆盖各自「管理先提交 → 许可拒绝」「CAS 先提交 → 终态照收」「撤权异常整体回滚」「无关与恢复写不撤权」。终端管理与打印、扫描、首单相关 49 条门禁（SQLite）过；PostgreSQL 交 CI。
+
+## 2026-11-05：屏上复印 C1d——收掉 C1c 复核的 3 条 P1（分支 `claude/copy-c1-1104`，未合并、未部署）
+
+- ① 已派发（dispatching / spooled）的单再取打印许可一律拒绝（`COPY_ALREADY_DISPATCHED`），去掉 CAS 后复查能力与状态回退，已派发任务永不退回可取消，真实终态回报照收。② 能力撤销改为版本协议：终端能力服务的写入口（upsert 与 clear）把 `copy`、`scan_device`、`color_print`、`duplex_print` 任一改为非 available 时，在同一事务里给本终端所有未终态 `CopyJob` 的授权版本加一；许可 CAS 钉住首读版本——关能力先提交则拒绝，CAS 先提交则视为关闭前已发的许可。③ 后台订单只读接口对复印行按 `CopyJob.state` 返回真实结果与中文文案，结果未确认带「需人工核查」标记与错误码，「已完成」筛选只含已交给打印机；`Order.taskStatus` 映射不变（注销靠它）。后台页面未改。
+- 验证（Codex 实现，Claude 收货）：新增 7 条用例过；`verify:copy-c1a`、`verify:copy-c1b`、`verify:member-closure`、`verify:admin-orders-readonly`、`verify:admin-order-filters` 与能力服务图谱关联的 30 余条门禁（SQLite）过；PostgreSQL 交 CI。
+
+## 2026-11-04：屏上复印 C1c——收掉 C1 复审的 3 条 P1（分支 `claude/copy-c1-1104`，未合并、未部署）
+
+- ① 复印终态阻断会员注销：`CopyJob` 照旧记已交给打印机 / 失败 / 结果未确认，`Order` 侧映射为 completed / failed / completed，复用现有订单终态规则（注销服务的终态集合未改）。② 取许可 CAS 后重读要再核状态、代次、授权版本与到期，响应只用成功 CAS 的快照，用户取消后不会拿到有效许可。③ 读能力与 CAS 之间关能力的窗口：CAS 后再查一次能力，已关就撤回（回到 ready/confirmed、授权版本递增）并拒绝；已派发任务的终态回报照收。
+- 验证（Codex 实现，Claude 收货）：新增 6 条并发与注销用例（`scripts/support/copy-c1c-verification.ts`，由 `verify:copy-c1b` 调用）全过；`verify:copy-c1a`、`verify:member-closure`（SQLite、真 Redis、HTTP）过；反向检查三项各自变红。PostgreSQL 交 CI。
+
+## 2026-11-04：屏上复印 C1b——后端接口、终端许可与上限（分支 `claude/copy-c1-1104`，未合并、未部署）
+
+- 做了什么（Codex 实现，Claude 收货）：一体机侧 `POST /copy/jobs`（游客可用、幂等键同参同单、控制令牌只首次返回）、查单、取消、确认（读扫描页数用 `quoteCopy` 报价，事务内建 `type=copy` 订单并走现有免费订单状态机，重复确认同一订单；只有明确 0 元报价才允许履约）；终端程序侧用 Agent 凭证 `GET /terminals/:terminalId/copy/jobs/:id/permit?op=scan|print`（不做签名许可，许可最长 30 秒，未确认 / 过期 / 能力关 / 跨终端不给打印许可）、扫描结果回报（同代同值幂等、旧代次不覆盖、超上限拒绝）、打印结果回报（已交给打印机 / 失败 / 结果未确认，终态不回退）。上限：单次 20 页（复用屏上扫描常量）、99 份（设计稿 cs-copy-set「1–99 份」）；双面 + 多份 + 奇数页默认拒绝（`COPY_ALLOW_ODD_DUPLEX_MULTICOPY` 显式开）。建单、确认、许可、结果都记审计，不记控制令牌与扫描内容。
+- 验证：新门禁 `verify:copy-c1b`（HTTP + 隔离库，接进 CI 的 SQLite 与 PostgreSQL 两组）与 `verify:copy-c1a` 通过；图谱列出的关联门禁 57/58 过，唯一红的冻结门禁 `verify:file-assets-trial-acceptance` 是因为未提交文件，提交后重跑过。反向检查三项（未确认给打印许可、重复确认再建订单、旧代次覆盖页数）都变红。PostgreSQL 交 CI。
+
+## 2026-11-04：屏上复印 C1a——后端数据底座（分支 `claude/copy-c1-1104`，自 #1559 头 44f13e7fe 开出，未合并、未部署）
+
+- 依据：产品负责人 11/04「复印像打印一样生成订单、按页计价；价目只加行、默认 0 元；先只做最小闭环」；规格书 `codex/copy-spec-out.md`、`copy-decisions.md`。
+- 做了什么（Codex 实现，Claude 收货）：新模型 `CopyJob`（两套 schema、同名迁移 `20261104160000_add_copy_job`；`orderId @unique` 关联现有 `Order`，只记页数、份数、颜色、单双面、计费面数、报价快照、状态与代次，**不存图片、PDF、文件名、路径、内容哈希**）；价目两行 `copy_bw_page`、`copy_color_page` 0 分（沿用现有幂等补行，已有配置不覆盖）与报价纯函数（页数 × 份数 × 每面单价，双面不减半，缺价 / 停用 / 异常价不可报价）；`copy` 进默认拒绝与判定函数（要 `copy`、`scan_device`，彩色加 `color_print`，双面加 `duplex_print`）；七个 `COPY_*` 删除审计码进 API、DTO、共享白名单；用户订单列表、时间线、详情服务端过滤复印单，后台订单带「复印」类型、无文件链接；注销保留履约记录并去标识请求键与快照文本。接口与上限是 C1b。
+- 验证：新门禁 `verify:copy-c1a`（接进 CI 的 SQLite 与 PostgreSQL 两组）；SQLite 空库 migrate deploy、schema 无漂移、PG schema 校验与同步检查；价目、彩色双面能力、后台计费、会员订单、时间线（94）、小程序云打印、后台订单只读与筛选、删除审计上报（14 码）、first-order-migrations（SQLite）、注销、扫描任务等关联门禁通过；PostgreSQL 实跑交 CI。反向检查三项（去掉 copy 默认拒绝、用户列表不过滤、缺价按 0）都变红。`verify-member-closure.ts` 原有 26 处 no-explicit-any lint 不是这次带进来的。
 
 ## 2026-11-04：屏上扫描后端 B10（扫描仪告警移出范围不推「已恢复」；分支 `claude/scan-device-b2-1102`，未部署）
 
@@ -182,6 +238,49 @@
 - 来源：旧 PR #1296（`1be7421a6`）、#1289（`20b84ce00`），对照 main `50070402a` 重做；只取本任务两处，不带入旧批次其他改动。两个用例文件补托管开关两态、0 元以及有实收的普通/待退款场景；管理员按需启用同一条演示订单，默认列表仍为原两单。
 - 验证：两个应用 typecheck、全量 src lint（管理员 5 条、机构 7 条既存警告，零错误）、http 生产构建、四项根门禁及订单只读 UI、后台中文文案、机构刷新与统计门禁通过。图谱列出的隐私文案模块已由中文文案门禁实际调用；反向检查删除 0 元分支、在其中放回按钮均使新断言失败，副本恢复后通过，前后 diff stat 一致。
 - 验证限制与范围：Playwright 只写未跑，交收货方；用例原命令因 `@playwright/test` 类型入口未链接而失败，显式指定已安装包路径后两文件均通过。退款 API 关联门禁已运行但缺少生成的 Prisma client，未进入断言（隔离 SQLite 的 133 条迁移通过）。未改后端、数据库模型、生产配置、密钥、硬件或 `docs/graph/`，未提交、未部署。
+
+## 2026-11-08：屏上复印终端程序（C2）并入 A2 新头、版本升 0.4.21
+
+- 做了：分支 `claude/copy-agent-c2-1104`（并前头 `93e2d196f`，原建在 A2 旧头 `23e7076c6` 上）并入 A2 新头 `a2db3fa88`（PR #1584，已并最新 main、版本 0.4.20，还在等 CI、未合入 main），只做并分支、解冲突、升版本号，不改功能、不加功能。屏上复印终端程序 C2a–C2f 的内容不变：本机 `/local/copy/*` 接口；复用 A2 的扫描引擎与设备锁；扫描、打印前各取 `op=scan` / `op=print` 许可；打印至多一次（派发意图先落盘到 `%ProgramData%\AIJobPrintAgent\copy-device\print-ledger\`）；崩溃恢复只转 `unconfirmed`、不重打；清场撤销标记至少保留 15 分钟。开关 `copyDeviceEnabled` 缺省关。
+- 冲突怎么合：① `apps/terminal-agent/src/printer/print-with-pdf-to-printer.ts` git 自动合好、没报冲突，但合完 A4 出现两处——C2b 在 `mapParams` 里按 `params.paperSize` 设 A4，#1579 在 `printOptions` 里展开之后固定 A4。#1579 那处总会覆盖，C2b 那行成了死代码，删掉，A4 只留 #1579 的常量与说明；C2b 为复印加的 `onDispatchStart` / `onDispatchSettled` 钩子与超时计时器清理原样保留。② `.github/workflows/ci.yml`、`apps/terminal-agent/src/agent/config-manager.ts`、`apps/terminal-agent/src/agent/types.ts` 两边在同一处各加一行（复印的 `verify:copy-device` / `copyDeviceEnabled`，纠偏的 `verify:scan-deskew` / `scanAutoDeskewEnabled`），两侧保留。图谱取 A2 那边后重新生成，进度文档两侧保留。
+- 升 0.4.21 的原因：A2 要用 0.4.20 进 main，复印这一版不能同号。照 0.4.20 那次（`63ba07243`）的 12 个文件 20 处改齐；升级测试的旧版本 0.4.10、`verify-scan-deskew.ts` 里解析配置用的 0.4.19 样例不改。
+- **代码未进 main（等 #1584 合入后再并 main、开 PR）、未打包、未装机。** 后端 `copy` 能力默认拒绝，在复印后端 #1591（草稿、未合并）里，逐台开通。给任何终端装这一版之前，必须先发布后端（含 #1591），每一步由产品负责人当场确认。
+- 验证（本机 macOS）：终端程序 tsc（246 个文件，0 错误）、eslint（改动的 39 个代码文件 0 错误；3 条警告是 `src/index.ts` 里用不上的 eslint-disable，A2 头上同样有）；`package.json` 里 38 条 verify 不经 pnpm、逐条直接跑，37 条过（`verify:copy-device` 49 项、`verify:scan-device-engine` 53 组、`verify:scan-device-runner` 22 组、`verify:scan-deskew` 12 组，`verify:task-reliability` 一次过；两条 Windows 专用的在非 Windows 上自动跳过）；安装包输入、仓库完整性、图谱 `--check` 过；图谱按改动文件列出的其余 36 条门禁（根目录 3、一体机 18、管理后台 1、UI 1、后端 13，后端两条用隔离 SQLite）全过。Windows 专用的 .ps1 门禁（安装包生命周期、纠偏合成样本）交安装包工作流。
+- **`verify:printer-config` 红，不是这次合并带来的：** C2c（`3f2a65fa7`）在 `apps/terminal-agent/src/agent/copy-device/copy-print-ledger.ts` 第 84 行校验落盘记录里的打印机名，写成 `!r.printerName || …`，撞上门禁「`src` 里不许出现 `printerName ||` 回退」的正则（这一行是校验、不是回退到默认打印机，但门禁按字面判）。并前的 C2 头 `93e2d196f` 同样红，A2 头 `a2db3fa88` 与 main 都绿。这次范围是不改功能、不改断言，没动；开 PR 前必须先处理（改写这一行或收紧门禁正则，待定），否则 CI 的「Terminal Agent verify suites」会红。
+- Windows 目录残留：C2 没有 Windows 专用用例；`verify:copy-device` 只在 CI 的 ubuntu 作业跑，用例的临时目录都建在系统临时目录、用完删除（一条用例临时把 `PROGRAMDATA` 指向临时目录，结束还原）；安装包工作流装机测试前的几步都不含 C2 的用例，C2 也没改这些步骤。
+
+## 2026-11-05：屏上复印 C2f——撤销标记保留到云端授权一定失效之后（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+
+- 起因：Codex 复审 C2e + C3c 报 P1——撤销标记 180 秒过期短于云端复印单 10 分钟寿命，一体机后台取消全失败时，过期后迟到的旧 start 仍能拿到云端许可开扫。
+- 改法（Codex 实现，Claude 收货）：保留期取「固定下限 15 分钟（云端寿命 10 分钟 + 时钟余量 5 分钟）」「已知到期时间 + 余量」「已有截止」三者最大；重复撤销与重启不缩短；满 4096 条只淘汰已过期记录，仍满就拒绝新的 start（HTTP 503，提示「复印撤销保护记录已满，请稍后再开始复印」），宁可拒绝也不误放行。
+- 验证：新增 4 条用例；`verify:copy-device` 49 项、`verify:scan-device-engine` 53 组、`verify:scan-device-runner` 22 组、tsc、lint、repository-integrity 过；反向检查（保留期改回 180 秒）变红。
+
+## 2026-11-05：屏上复印 C2e——终端程序拒绝清场后迟到的开始扫描（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+
+- 起因：Codex 复审一体机 C3 时复现——`start` 已到终端程序、停在异步处理时，一体机清场的 `clear` 因本机会话还没建立回 404，随后旧 `start` 建会话并开扫，可能扫到下一位放上的原件。
+- 改法（Codex 实现，Claude 收货）：新增 `copy-device/copy-revocations.ts`，`clear` / `abort` 在第一次等待前按 `copyId + generation` 记撤销标记（内存 + 落盘，180 秒到期、上限 4096 条，跨重启保留），没有会话也回成功与 `purged:true`；`start` 在拿锁后、取许可前后、真正开扫前都查标记，命中就放弃、释放锁、清掉会话材料，同代迟到的 `start` 回 410；新单号与新代次不受影响；撤销写盘失败不报成功、也不放行开扫。
+- 验证：新增 6 条用例；`verify:copy-device` 45 项、`verify:scan-device-engine` 53 组、`verify:scan-device-runner` 22 组、tsc、lint、repository-integrity 过；反向检查（去掉开扫前撤销检查）变红。配套的一体机清场撤销云端授权见 C3c。
+
+## 2026-11-05：屏上复印 C2d——收掉 C2c 复审的 2 条 P1（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+
+- ① 复印打印 ledger 清除 `queueCleanupPending` 时一次 rename/fsync 失败不再永久挡住云打印：清理完成写入与新派发保护分开，失败保留隔离与墓碑，按 1/2/4/8/16/30 秒封顶退避重写并记日志；下一轮重新确认执行器已退出、重新清队列再持久化解除隔离，旧单不重派。② 屏上扫描首次扫描（`scan-device-round.ts`）与续页（`scan-device-runner.ts`）都在拿到设备锁之后、启动 WIA 之前统一复查共享健康（`scan-device-health.ts` 新增持锁检查，必要探测复用已持有的锁）；复印侧持锁复查加了等锁交错用例。
+- 验证（Codex 实现，Claude 收货）：新增 8 条用例；`verify:copy-device` 39 项、`verify:scan-device-runner` 22 组、`verify:scan-device-engine` 53 组与打印相关门禁、tsc、lint、repository-integrity 过；反向检查两项变红。
+
+## 2026-11-05：屏上复印 C2c——收掉 C2 复审的 3 条 P1（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+
+- ① 打印执行器超时仍在运行时，复用并扩展 `print-dispatch-gate` 保持派发隔离，执行器退出后再清一次该次残留作业才放行下一单；`queueCleanupPending` 写进复印打印 ledger，重启后确认执行器退出、调现有队列清理后才解除，清理失败继续隔离重试。② WIA 未确认退出时把进程交给扫描健康隔离，`finally` 无条件释放全局设备锁，现有云打印照常领取；新的复印扫描被拒并给出可读说明，清场与过期能结束会话，待删材料后台重试。③ 复印与屏上扫描共用同一份 WIA 健康与可疑进程状态（`scan-device-health.ts` 按设备锁共享实例，A2 运行器接入），复印首次扫描、续页、预热重试前都检查，旧进程确认退出并探测成功后才放行。
+- 验证（Codex 实现，Claude 收货）：`verify:copy-device` 36 项（新增五条 C2c 用例含竞态与恢复）、`verify:scan-device-engine`（53 组）、`verify:scan-device-runner`（21 组）与打印相关门禁、tsc、lint 过；反向检查三项都变红。
+
+## 2026-11-05：屏上复印 C2b——终端程序本机复印后半段（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+
+- 做了什么（Codex 实现，Claude 收货）：`POST /local/copy/print` 取 `op=print` 许可（颜色、单双面、份数以许可为准，校验终端、代次、授权版本、参数与有效期）→ 驱动调用前持久化派发意图（`%ProgramData%\AIJobPrintAgent\copy-device\print-ledger\<单号与代次派生 SHA-256>.json`，`wx` 创建并 fsync、原子替换，不存扫描内容）→ 经新薄封装 `print-local-document.ts` 复用现有派发准备、`print()`、队列监控与终态清理（`task-runner.ts` 未改；PDF 打印补齐显式 A4）→ 从准备到监控终态持设备锁。同单同代重复请求只返回状态，**驱动最多调用一次**；重启时 `dispatching/spooled` 一律转 `unconfirmed` 并回报，**绝不重派**。结果回报 handed / failed / unconfirmed，固定 `eventId`，最多十次指数退避重试，终态不变。打印终态后撤销预览并以 `COPY_PRINT_TERMINAL` 删页，删除失败后台重试、释放设备锁。状态里不出现张数推断。
+- 验证：`verify:copy-device` 31 项；`verify:scan-device-engine`、`verify:scan-device-runner`、`verify:print-monitor-truth`、`verify:print-truth-hardening`、`verify:print-retry-attempt`、`verify:task-runner-wake`、`verify:print-queue-residue`、`verify:scan-deletion-audit`、`verify:image-scale-truth`、`verify:printer-config`、tsc、lint、repository-integrity 过；反向检查三项（重复打印调第二次驱动、崩溃恢复自动重派、队列异常判成已交给打印机）都变红。
+- 合并时注意：打印机线 #1579 也改了 `print-with-pdf-to-printer.ts`（显式 A4），合并按语义取一份，不两侧都留。
+
+## 2026-11-05：屏上复印 C2a——终端程序本机复印前半段（分支 `claude/copy-agent-c2-1104`，自 A2 头 23e7076c6 开出，未合并、未部署）
+
+- 做了什么（Codex 实现，Claude 收货）：本机接口 `POST /local/copy/{start,next-page,finish,status,preview,abort,clear}`，复用 loopback、Origin 白名单、桥接令牌与短期桥接会话，公共体 `{copyId,generation,operationId}`、`operationId` 幂等（异参 409）、体积上限 8 KiB；每次扫描、续页、预热重试前在线取 `op=scan` 许可；复用 A2 的 WIA 解析、整页核实、页序、页数与字节上限、PDF 合成、私有目录与删除审计（WIA 默认依赖抽到 `wia-runner-deps.ts`，`wia-runner.ts` 514→448 行）；扫描、探测、打印共用设备锁（等锁上限 30 秒）；复印页放在独立的 `copy-device/<派生标识>/`，**不走上传链路、不上云**；预览返回 JPEG 字节并带 no-store 等三个防缓存头、不返回路径；abort/clear 先撤权再删，删除失败返回 503 与 `purged:false`、后台重试、不占设备锁；七个 `COPY_*` 删除码与后端白名单逐码一致（`COPY_PRINT_TERMINAL` 留给打印）。开关 `copyDeviceEnabled` 缺省关。打印派发与结果回报是 C2b。
+- 验证：新门禁 `verify:copy-device`（18 项）接进 ci.yml；`verify:scan-device-engine`（53 组）、`verify:scan-device-runner`（21 组）、`verify:scan-deletion-audit`、`verify:usb-import-agent`、`verify:scan-watcher`、tsc、lint、repository-integrity 过；反向检查三项（许可不允许仍开扫、预览缺 no-store、clear 不删页）都变红。
 
 ## 2026-11-04：屏上扫描后端 B9（扫描仪告警只算仍在运营的终端；分支 `claude/scan-device-b2-1102`，叠在 B8 头 `d09b3f19d` 上，未推送、未部署）
 
@@ -282,7 +381,6 @@
 - 没做 / 边界：终端程序（A1 底座、A2 接线）、一体机（K1）、小程序、两个后台都没动；没有新迁移；真机验证 V0-3/4/5/11/12 没做，**哪台机器都不许在后台把 scan_device 配成 available**；`deviceUpdatedAt` 现在也会被用户改设置 / 改用面板写，K1 若拿它判断「终端程序沉默」要知道这一点；Playwright 视觉用例没跑。
 - 超出任务包文字的几处（各自单独成提交或单独成块，可单独审、单独撤）：`verify-ai-access` 清单登记 `ScanDeviceController`；共享契约多导出 `SCAN_TASK_NOT_ACTIVE` 与 `SCAN_DEVICE_NOT_VERIFIED_ON_TERMINAL` 两个原因码常量；两套 schema 里 `ScanTask` device 列注释同步（deviceUpdatedAt 语义）；`verify-scan-tasks` 钉 where 文本的常量加一行；第三个新门禁 `verify-scan-device-lifecycle`（把三处追加修复的用例放进去，没往 1000 多行的 B1 门禁和 700 多行的改设置门禁里堆）。
 - 验证：api typecheck、`eslint src/`（整个 src）、共享包与一体机 typecheck 全绿；`db:pg:sync:check` 通过，临时 PG 上 `prisma migrate diff` 无漂移；SQLite 口径图谱列出的加简报必跑的 57 条 API 门禁、27 条其它包静态门禁全绿（`verify:terminal-device-config` 要 `prisma/dev.db`、`verify:first-order-migrations` 要 `LC_ALL=en_US.UTF-8` 才能在本机起临时库，是本机环境条件，补上后绿）；postgres-readiness 里同源的 20 条（含两个新门禁与 `recruitment-p1-schema:postgres-upgrade`）在本机临时 PostgreSQL 16（UTC）上全绿；`verify:repository-integrity` 三项 OK；反向检查 26 处（第一批 16、追加三项 10）全部变红，恢复后干净。
-
 ## 2026-11-05：触屏版三项承诺进 main——B9（#1495 随 #1577）、B10（#1585）、B12（#1580）（只改文档；分支 `claude/touch-b9-b10-b12-progress-1105`）
 
 - **#1577 批量**（main + #1511 授权闸门 + #1573 简历 U 盘 + #1495 触屏稿与冻结门禁）：合并提交 4b76ae078（11/05 01:43）。并 main 时补了两处与 #1583 停放的语义冲突：收尾路由登记表认 `/toolbox/*`、`/smart-campus/*`（`windDownRoute` 支持前缀匹配，停放旧链接收尾期间也照常回首页）；首页磁贴期望改为 gov 3 块、full 4 块（`home-fill-when-empty` 与授权闸门夹具去掉智慧校园）。
@@ -381,6 +479,35 @@
 - 读 #1511 的 `GET /api/v1/public/brand`（不要登录）：两个后台登录页的品牌名与 Logo（Logo 加载失败回退原图标）、浏览器标题「管理员后台 / 合作机构后台 - 品牌名」、管理员态势屏「政务总览」「服务调用」标题。一次页面加载只请求一次；任何失败（旧后端没有这个接口回 404、网络错、字段不合格）静默回退默认「职易达」，不挡登录；演示模式不请求。
 - 不改：登录页版权行「© 2026 职易达」、法务默认、首单月报打印抬头——运营主体仍是我方；月报数据里还没有品牌快照，改成读当前品牌会让历史月报重印成新品牌，留待后端补快照。
 - 验证：两个后台 typecheck / lint / build；compliance-copy 整条链、plain-copy、console-screen-ui、partner-refresh-safe、partner-relative-api-url 门禁；浏览器用例 admin 接口快照包 184、机构接口快照包 176、admin 演示包（登录、全路由、大屏、法务）52、机构演示包（登录、全路由）24 全过。11/05 并入含 #1521 的 main 后复跑：admin 演示 168、admin 快照 184（含读品牌 10）、机构演示 87、机构快照 176（含读品牌 8）全过（演示包数变多是 main 新加的路由巡检）。
+## 2026-11-04：简历 AI 授权分支并入当前 main（每人每天次数、内容安全都留着；未推送、未部署）
+
+- 职业规划、简历版式调整、带简历的模拟面试，仍在把简历交给模型之前核「简历 AI 授权」。没同意时返回「请先确认简历 AI 服务授权」，不调模型。游客、只读、打印、不带简历的面试照旧。
+- 这三处授权都排在预占当天次数之前。没同意的不扣次数。每人每天次数、提问和生成的内容检查、政策约束、设备故障的固定回答照旧生效。
+- 职业规划里，招聘内容托管开关和授权检查两处都在。版式调整仍在单独的控制器上。授权服务是必填注入，漏注册时应用起不来。
+
+## 2026-11-03：简历 AI 授权装配门禁登记招聘托管豁免（分支 `claude/resume-ai-consent-1103`，未合并、未部署）
+
+- CI `build-and-verify` 的招聘托管声明门禁红在 `scripts/verify-resume-ai-consent-wiring.ts`：它直接引用 `career-plan.service.ts`，但只核对职业规划、版式调整与模拟面试四处简历 AI 授权服务的必填注入，不调用招聘内容读取或写入。已在 `verify-recruitment-hosting-gate-declares.ts` 的 exemptions 登记。`verify-mock-interview-consent.ts` 与 `verify-resume-layout-adjust.ts` 不引用托管模块，原清单没有违规。
+- 未改业务代码，未删断言，也没有给这条门禁改写托管开关。图谱把这条豁免记成对该装配脚本的断言。
+- 验证：托管声明门禁「声明 43、豁免 35、违规 0」；装配门禁 4 处注入；模拟面试 25 条、授权 6 条；职业规划 23 条、降级 13 条；版式调整 ALL PASS；AI 访问 ALL PASS；自我探索同意 26 通过 / 1 跳过；API 类型检查通过；图谱 `--check` 通过。
+
+## 2026-11-03：简历 AI 授权改为必需注入，并拆出模拟面试授权门禁（分支 `claude/resume-ai-consent-1103`，未合并、未部署）
+
+- 职业规划控制器、职业规划服务、版式调整控制器、模拟面试服务里的授权服务改为和现有简历 AI 控制器一样的必需注入。漏注册时应用启动失败，不再静默放行。岗位要求计数端口仍可选，排在授权服务之后。
+- 直接构造的既有测试显式传入放行替身；专门测授权的仍用真服务。新增 `verify:resume-ai-consent-wiring`，在真实模块装配下证明这四处拿到同一个 `MemberPrivacyService`，且该参数不是可选依赖。
+- `verify-mock-interview.ts` 回到拆出前的 1132 行，原有 25 条正向断言还在。授权用例挪到 `verify-mock-interview-consent.ts`。补上已开始的带简历会话：撤回 `resume_ai` 后，回答出下一题和结束生成报告都返回 403 `USER_AI_CONSENT_REQUIRED`，模型调用、AI 日志和计量不增加，会话仍在进行中；重新同意后能继续并结束。
+- 两条新门禁接进 `services/api/package.json`，并跟在 CI 里两处 `verify:mock-interview` 后面（SQLite 与 PostgreSQL）。
+- 验证：模拟面试 25 条、授权门禁 6 条、职业规划 22 条、版式调整通过、AI 访问通过、注入 4 处、降级出纸 13 条、送模型打码 136 条、自我探索同意 26 通过 / 1 跳过、会员资产与问答记录通过、岗位板块开关通过、API 类型检查通过、一体机声明门禁通过、仓库完整性与图谱检查通过。
+
+## 2026-11-03：简历 AI 授权补到职业规划、版式调整和带简历的模拟面试（分支 `claude/resume-ai-consent-1103`，未合并、未部署）
+
+- 后端：把用户简历内容交给 AI 之前核 `resume_ai`。未同意时与现有简历 AI 端点相同：403，错误码 `USER_AI_CONSENT_REQUIRED`，文案「请先确认简历 AI 服务授权」。游客（`endUserId` 为空）由 `requireActiveConsent` 放行。检查都在调用模型之前。
+- 职业规划：`POST /api/v1/resume/career-plan/:taskId` 在控制器和服务里各查一次（抽简历、调模型之前）。读取已生成结果和打印不查，小程序这两步没有挂简历授权，403 无法恢复。
+- 简历版式调整：`POST /api/v1/resume/records/:taskId/layout-adjust`。这一步总会把简历送进模型。`AiController` 已超过 800 行，端点拆到 `ResumeLayoutAdjustController`，调用服务前检查。
+- 模拟面试：只有简历摘要非空、且马上要出题或写报告时才查。不带简历的面试照常。创建会话只存摘要、不调模型，不查。没有回答就结束、已有报告、提前结束这些不调模型的路径也不查。拒绝时开场失败会把状态滚回已配置。
+- 小程序：按未合并的 #1386 在当前主线上重做，没有合并或摘那个旧分支。职业规划生成标 `resumeAi`，认的就是上面的 403。授权说明沿用 #1386 已过合规的句子。读取和打印职业规划不标。小程序模拟面试仍不传简历。（11/08 补：小程序这部分没有随后端合入 main，留在分支 `claude/resume-ai-consent-1103` 给小程序线；见下文 11/08 条目。）
+- 体量：职业规划服务先拆出打码函数（现 448 行）。版式端点从 `AiController` 拆出（现 810 行，是减不是加）。模拟面试服务 756 行：题目单打印必须留在 `printPracticeSheet` 方法体里，派生上传和降级出纸两道静态门禁按这个方法扫描。
+- 验证：职业规划 22 条、版式调整（含未同意 / 游客 / 已同意 / 撤回）、模拟面试 30 条、派生种类 40 条、降级出纸 13 条、自我探索同意 26 通过 / 1 跳过、官方渠道 212 条、北京时间 29 条、送模型打码 136 条、AI 访问覆盖含新控制器、岗位板块开关、治理匹配 39 条、隔离扫描、审计留存 553 条、类型检查、小程序 verify:static（含接口契约）全部通过。
 
 ## 2026-11-03：合作机构工作台 AI 服务「重试」浏览器用例修偶发红（只改测试，页面不动；分支 `claude/sleepy-stonebraker-31ae12`）
 

@@ -120,6 +120,7 @@ const MAINTENANCE_LABELS = {
   'POST /orders/package': '材料包下单',
   'POST /print/convert/images-to-pdf': '格式转换',
   'POST /print/jobs': '打印任务创建',
+  'POST /copy/jobs': '复印任务创建',
   'POST /scan/sessions': '扫描任务创建',
   'POST /upload-sessions': '上传会话创建',
   'POST /materials/tasks': '打印前材料检查',
@@ -194,7 +195,7 @@ await check('A1 服务端事实：GET/PUT /admin/ai-access 只给 admin；档位
   assert.match(accessServiceSource, /code: 'REASON_REQUIRED'/, '服务端不再校验事由')
 })
 
-await check('A2 服务端事实：维护模式拦截的接口正好是面板列出的十个', () => {
+await check('A2 服务端事实：维护模式拦截的接口正好是面板列出的十一个', () => {
   assert.deepEqual(
     maintenanceBlockedRoutes(),
     Object.keys(MAINTENANCE_LABELS).sort(),

@@ -5,7 +5,7 @@ import { Roles } from '../common/decorators/roles.decorator'
 import { ORDER_PAY_STATUSES } from '../payment/payment.types'
 import { AdminOrdersReadonlyService } from './admin-orders-readonly.service'
 
-const VALID_TYPES = ['print', 'scan', 'photo', 'ai'] as const
+const VALID_TYPES = ['print', 'scan', 'photo', 'ai', 'copy'] as const
 /** 支付状态白名单唯一来源，禁止在此就地再写一份（历史事故见 payment.types.ts 注释）。 */
 const VALID_PAY_STATUS = ORDER_PAY_STATUSES
 const VALID_TASK_STATUS = ['pending', 'claimed', 'printing', 'completed', 'failed', 'cancelled', 'abandoned'] as const
