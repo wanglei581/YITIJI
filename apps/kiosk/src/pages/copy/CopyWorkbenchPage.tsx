@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { networkDisconnectLine } from '../../copy/unattendedCopy'
 import { COPY_GUIDE_ROUTE } from '../print-scan/printHubContent'
 import { CopyShell } from './CopyShell'
 import { CopySettingsView } from './CopySettingsView'
@@ -39,7 +40,8 @@ export function CopyWorkbenchPage() {
     if (stage === 'how') { clearCopySession(); navigate('/print-scan') }
     else { clearCopySession(); go('how') }
   }
-  const reason = !online ? '网络断开时，我们会收到提醒并远程处理' : flow.reason
+  // 断网用无人值守标准句（#1601 起全站统一），不承诺有人远程处理。
+  const reason = !online ? networkDisconnectLine() : flow.reason
   const title = stage === 'how' ? '怎么复印？' : stage === 'set' ? '放好原件，选份数'
     : stage === 'off' ? '这台机器暂时只能在打印机面板上复印' : snapshot.session?.controlToken ? '下一步' : '状态未知'
   // 建单回包缺凭据：这一单能不能继续没法确认，胶囊照实写状态未知，不再说扫描仪就绪。
