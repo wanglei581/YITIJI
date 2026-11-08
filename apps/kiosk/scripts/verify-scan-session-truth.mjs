@@ -316,6 +316,19 @@ assert.match(scanFormat, /if \(!mime\) return '未知格式'/, 'missing mime map
 const workbench = read('src/pages/scan/ScanWorkbenchPage.tsx')
 assert.match(workbench, /readScanWorkbenchSession/, 'workbench rehydrates from sessionStorage')
 assert.match(workbench, /replace: true/, 'workbench stage changes replace history')
+/* 2026-11-08 K1b 并 main 后浏览器用例抓到：工作台页订阅登录上下文后，登录、退出、忙碌标记一变
+ * 整页重渲染、重读会话存储，设置页 / 等待页多挂一次，投递确认、轮询、撤销跟着多发。
+ * 登录态只在「怎么扫」那一屏里读（ScanHowPage），工作台页不许再订阅。 */
+assert.doesNotMatch(
+  workbench,
+  /\buseAuth\s*\(/,
+  'scan workbench must not subscribe to the auth context; ScanHowPage reads login state itself',
+)
+assert.match(
+  read('src/pages/scan/ScanHowPage.tsx'),
+  /const \{ isLoggedIn \} = useAuth\(\)/,
+  '「怎么扫」自己读登录态，决定要不要接着用登录续接记号',
+)
 
 /* 2026-09-08 补：三条公共终端约束里，「复水」和「replace」上面已有断言，
  * 但「URL 是意图不是授权」和「离开进度阶段必须停轮询」当时只在代码里，没被钉住。
