@@ -31,6 +31,7 @@ process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-scan-device-action-secre
 
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
+import { PDFDocument } from 'pdf-lib'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -122,8 +123,12 @@ async function expectHttp(run: () => Promise<unknown>, status: number, code: str
   return assert.fail(`${label}：应当被拒绝（${status} ${code}），实际放行了`)
 }
 
-function uniquePdf(): Buffer {
-  return Buffer.from(`%PDF-1.4\n%${randomBytes(8).toString('hex')}\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n`, 'latin1')
+/** 屏上扫描投递只认解析器读出的页数。占位的 %PDF 头读不出页数，会被拒。每次标题不同，避免按哈希去重撞车。 */
+async function uniquePdf(): Promise<Buffer> {
+  const doc = await PDFDocument.create()
+  doc.addPage([200, 200])
+  doc.setTitle(randomBytes(8).toString('hex'))
+  return Buffer.from(await doc.save())
 }
 
 async function main(): Promise<void> {
@@ -323,7 +328,14 @@ async function main(): Promise<void> {
       const lease = await scanSvc.getScanDeliveryLease(t.id)
       assert.equal(lease.scanTaskId, created.scanTaskId)
       assert.equal(lease.startMode, 'device')
-      assert.deepEqual(lease.device, { source: 'feeder', colorMode: 'gray' })
+      // B3：device 段按扫描类型多带 maxPages / maxBytes。这里仍是整对象精确相等，不是放宽。
+      // 本会话 scanType=document，上限是 20 页 / 18 MiB（与终端程序 SCAN_PDF_MAX_BYTES 一致）。
+      assert.deepEqual(lease.device, {
+        source: 'feeder',
+        colorMode: 'gray',
+        maxPages: 20,
+        maxBytes: 18 * 1024 * 1024,
+      })
       assert.ok(lease.deliveryLease)
       assert.deepEqual(Object.keys(lease).sort(), ['deliveryLease', 'device', 'expiresAt', 'notBefore', 'scanTaskId', 'serverNow', 'startMode'])
       pass('device 任务 ACK 后 current-lease 多带 startMode:device 与 device:{source,colorMode}')
@@ -632,10 +644,10 @@ async function main(): Promise<void> {
       assert.equal(status.devicePageCount, 0)
       assert.equal(status.deviceErrorCode, null)
       await expectHttp(
-        () => scanSvc.deliverScanFile({ terminalId: t.id, scanTaskId: id, deliveryLease: lease.deliveryLease, buffer: uniquePdf(), filename: 'x.pdf', mimeType: 'application/pdf', observedAt: new Date().toISOString(), origin: 'device' }),
+        async () => scanSvc.deliverScanFile({ terminalId: t.id, scanTaskId: id, deliveryLease: lease.deliveryLease, buffer: await uniquePdf(), filename: 'x.pdf', mimeType: 'application/pdf', observedAt: new Date().toISOString(), origin: 'device' }),
         409, 'SCAN_DELIVER_ORIGIN_MISMATCH', '切换后 origin=device 的投递被拒',
       )
-      const delivered = await scanSvc.deliverScanFile({ terminalId: t.id, scanTaskId: id, deliveryLease: lease.deliveryLease, buffer: uniquePdf(), filename: 'panel.pdf', mimeType: 'application/pdf', observedAt: new Date().toISOString() })
+      const delivered = await scanSvc.deliverScanFile({ terminalId: t.id, scanTaskId: id, deliveryLease: lease.deliveryLease, buffer: await uniquePdf(), filename: 'panel.pdf', mimeType: 'application/pdf', observedAt: new Date().toISOString() })
       assert.equal(delivered.scanTaskId, id)
       assert.equal((await rowOf(id)).status, 'completed')
       pass('切换后：不触发静默期、紧接着 ACK 可重放、lease 变面板形状、report 拿 409、watcher（不带 origin）投递成功')
@@ -726,7 +738,7 @@ async function main(): Promise<void> {
         const lease = await scanSvc.getScanDeliveryLease(terminalId)
         assert.equal(lease.scanTaskId, taskId)
         return scanSvc.deliverScanFile({
-          terminalId, scanTaskId: taskId, deliveryLease: lease.deliveryLease, buffer: uniquePdf(),
+          terminalId, scanTaskId: taskId, deliveryLease: lease.deliveryLease, buffer: await uniquePdf(),
           filename: 'scan.pdf', mimeType: 'application/pdf', observedAt: new Date().toISOString(), ...over,
         })
       }
@@ -960,14 +972,14 @@ async function main(): Promise<void> {
       }
       const deliverUrl = `/terminals/${t.id}/scan-sessions/deliver`
       const withoutOrigin = form()
-      withoutOrigin.append('file', new Blob([new Uint8Array(uniquePdf())], { type: 'application/pdf' }), 'scan.pdf')
+      withoutOrigin.append('file', new Blob([new Uint8Array(await uniquePdf())], { type: 'application/pdf' }), 'scan.pdf')
       const mismatch = await call(deliverUrl, { method: 'POST', headers: auth, body: withoutOrigin })
       assert.equal(mismatch.status, 409)
       assert.equal(mismatch.json.error?.code, 'SCAN_DELIVER_ORIGIN_MISMATCH', 'device 会话 multipart 没带 origin → 按 watcher → 409')
       const withOrigin = form()
       withOrigin.append('origin', 'device')
       withOrigin.append('unrelatedField', 'whatever')
-      withOrigin.append('file', new Blob([new Uint8Array(uniquePdf())], { type: 'application/pdf' }), '扫描件.pdf')
+      withOrigin.append('file', new Blob([new Uint8Array(await uniquePdf())], { type: 'application/pdf' }), '扫描件.pdf')
       const delivered = await call(deliverUrl, { method: 'POST', headers: auth, body: withOrigin })
       assert.equal(delivered.status, 201, `multipart 带 origin=device 应投递成功（实际 ${delivered.status} ${JSON.stringify(delivered.json)}）`)
       assert.equal(delivered.json.data?.['scanTaskId'], created.scanTaskId)
@@ -980,7 +992,7 @@ async function main(): Promise<void> {
       panelForm.append('scanTaskId', panel.scanTaskId)
       panelForm.append('deliveryLease', panelLease.deliveryLease)
       panelForm.append('observedAt', new Date().toISOString())
-      panelForm.append('file', new Blob([new Uint8Array(uniquePdf())], { type: 'application/pdf' }), 'panel.pdf')
+      panelForm.append('file', new Blob([new Uint8Array(await uniquePdf())], { type: 'application/pdf' }), 'panel.pdf')
       const panelDelivered = await call(`/terminals/${tp.id}/scan-sessions/deliver`, { method: 'POST', headers: { authorization: `Bearer ${tp.token}` }, body: panelForm })
       assert.equal(panelDelivered.status, 201, '面板 multipart 不带 origin 照常成功')
       pass('multipart deliver 真路由：origin 字段不被全局白名单拦；device 会话没带 origin 409；面板不带 origin 照旧')

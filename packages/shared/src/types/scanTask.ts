@@ -1,4 +1,11 @@
 export type ScanType = 'resume' | 'id' | 'document' | 'contract'
+/**
+ * 扫描任务状态。
+ *
+ * 屏上扫描 device-report（2026-11-04）：任务已结束时，409 的 `error.details.taskStatus`
+ * 取 completed / cancelled / expired / failed 之一，并带 `fileDelivered`（任务已挂上 fileId
+ * 才是 true）。投递中仍是原来的 409，details 只带 `taskStatus: 'matched'`。只属于本终端的任务才带。
+ */
 export type ScanTaskStatus =
   | 'waiting'
   | 'matched'
@@ -16,6 +23,11 @@ export type ScanTaskStatus =
 // **契约源**：下面五个常量数组的后端副本在 services/api/src/scan-tasks/scan-device-protocol.ts
 // （后端是 CommonJS，不直接 import 本包，沿用本仓库「共享契约 + 后端副本 + 门禁比对」的惯例）。
 // 改任何一边都要同时改另一边：门禁 verify:scan-device-settings 把两边逐项比对，不一致就红。
+//
+// current-lease（终端程序取投递租约）对 device 任务的 device 段还会带 maxPages、maxBytes，
+// 按扫描类型从后端常量取：证件 4 页 / 10 MiB，其余 20 页 / 18 MiB（18 MiB 与终端程序
+// apps/terminal-agent/src/agent/scan-device/scan-pdf-compose.ts 的 SCAN_PDF_MAX_BYTES 一致）。
+// 一体机不读这份租约，所以这里不另建响应类型。面板任务的租约响应没有 device 对象，也不多任何字段。
 
 /** 会话怎么开始：panel = 用户在打印机面板扫描（现有行为）；device = 用户在屏上点「开始扫描」。 */
 export const SCAN_START_MODES = ['panel', 'device'] as const
@@ -167,6 +179,11 @@ export const SCAN_DEVICE_ALREADY_DELIVERED = 'SCAN_DEVICE_ALREADY_DELIVERED'
 export const SCAN_TASK_NOT_DEVICE = 'SCAN_TASK_NOT_DEVICE'
 /** 409：读与写之间会话状态又变了（重读重判 3 轮仍对不上），刷新后再试。 */
 export const SCAN_DEVICE_STATE_CHANGED = 'SCAN_DEVICE_STATE_CHANGED'
+/**
+ * 409：终端程序回报的来源或颜色与会话上的设置不一致（用户在回报读到之后改了设置）。
+ * 必须停扫，按新的来源和颜色重新开始。没带 source / colorMode 的旧终端程序不会拿到这个码。
+ */
+export const SCAN_DEVICE_SETTINGS_CHANGED = 'SCAN_DEVICE_SETTINGS_CHANGED'
 /** 409：会话已取消 / 过期 / 结束，或已到续期上限，不能再改设置或改用面板扫描。 */
 export const SCAN_TASK_NOT_ACTIVE = 'SCAN_TASK_NOT_ACTIVE'
 
@@ -218,11 +235,23 @@ export interface ScanSessionStatusResponse {
   deviceColorMode?: ScanDeviceColorMode | null
   /** 最近一次状态变化（ISO 8601）：终端程序回报，或用户改设置 / 改用面板。 */
   deviceUpdatedAt?: string | null
+  /**
+   * 这一场最多扫几页。证件 4，其余 20，与租约 device.maxPages 同源。
+   * 面板任务（含已改用面板的）为 null。可选：老服务端不带，一体机就沿用自己的默认上限。
+   */
+  deviceMaxPages?: number | null
 }
 
 export interface ScanSessionCancelResponse {
   scanTaskId: string
   status: 'cancelled'
+  /**
+   * 本终端静默期结束时间（ISO 8601）。服务端按与下一次建会话同一条规则算。
+   * 静默期关着，或窗口内没有已结束的会话时，等于 serverNow。可选：老服务端不带。
+   */
+  quietPeriodEndsAt?: string
+  /** 服务端当前时间（ISO 8601）。一体机用它和 quietPeriodEndsAt 算倒计时。可选：老服务端不带。 */
+  serverNow?: string
 }
 
 /**

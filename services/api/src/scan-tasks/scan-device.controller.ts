@@ -45,6 +45,8 @@ export class ScanDeviceController {
       state: dto.state,
       pageCount: dto.pageCount,
       errorCode: dto.errorCode,
+      source: dto.source,
+      colorMode: dto.colorMode,
     })
     return ApiResponse.ok(result)
   }

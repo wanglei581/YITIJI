@@ -13,8 +13,9 @@ const W4_ROUTES = [
   '/job-fairs/:id/companies/:companyId', '/job-fairs/:id/map',
   '/job-fairs/:id/materials', '/job-fairs/:id/visit-plan',
   '/job-fairs/:id/stats', '/campus', '/campus/welcome',
-  '/campus/freshman-insights', '/smart-campus', '/smart-campus/welcome',
-  '/smart-campus/service/:key', '/renshi',
+  '/campus/freshman-insights',
+  // 2026-11-04 产品负责人定停放：三条在用页收成一条跳回首页的 splat。
+  '/smart-campus/*', '/renshi',
   '/jobs/online-platforms',
 ]
 
@@ -109,10 +110,11 @@ function interfaceShape(sourceText, interfaceName) {
 
 console.log('\n=== Kiosk Fusion W4 contract ===')
 
-check('exact 24-route ownership', () => {
+check('exact 22-route ownership', () => {
   const owned = collectRoutePaths()
-  assert.equal(owned.length, 24)
-  assert.equal(new Set(owned).size, 24)
+  // 2026-11-04 产品负责人定停放：智慧校园三条在用页收成 /smart-campus/*，24 改为 22。
+  assert.equal(owned.length, 22)
+  assert.equal(new Set(owned).size, 22)
   assert.deepEqual([...owned].sort(), [...W4_ROUTES].sort())
   assert.ok(!owned.includes('/notifications'))
 })

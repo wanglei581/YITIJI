@@ -22,9 +22,15 @@ import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recru
 import { TerminalToolboxService } from './terminal-toolbox.service'
 import { TerminalAgentService } from './terminals-agent.service'
 import { adminPaperStatus, describePrinterFault, normalizeDiskFreeGb, toAdminPrinterStatus } from './admin-printer-status'
+import {
+  PRINTER_QUEUE_HEARTBEAT_SELECT,
+  toAdminPrinterQueue,
+  type AdminPrinterQueueView,
+} from './heartbeat-printer-queue'
 import { PARKED_TERMINAL_ORG_TYPES, isParkedTerminalOrgType, orgTypeParkedError } from './terminal-org-parking'
 import { terminalOrgBindingOnCreate } from './terminal-org-binding'
 import { assignTerminalOrganization, type TerminalOrgAssignmentAudit } from './terminal-org-assignment'
+import { withOrgTerminalQuota } from '../licenses/license-gate'
 import { TERMINAL_ONLINE_WINDOW_MS } from './printer-availability'
 import {
   publicScanDeviceHealth,
@@ -83,6 +89,7 @@ export interface AdminTerminalView {
   printerStatus: string | null
   wiredNetworkStatus: string | null
   printerNetworkStatus: string | null
+  printerQueue: AdminPrinterQueueView | null
   scanInputHealth: string | null
   scanInputAction: string | null
   scanInputReason: string | null
@@ -230,20 +237,22 @@ export class TerminalAdminService {
 
     const placeholder = `${PLANNED_CREDENTIAL_PREFIX}${crypto.randomBytes(32).toString('hex')}`
     try {
-      const terminal = await this.prisma.terminal.create({
-        data: {
-          id: `t_${crypto.randomBytes(8).toString('hex')}`,
-          terminalCode,
-          agentToken: placeholder,
-          credentialGeneration: 0,
-          lifecycleStatus: 'planned',
-          deviceFingerprint: `planned:${crypto.randomBytes(16).toString('hex')}`,
-          displayName: cleanNullable(dto.displayName),
-          locationLabel: cleanNullable(dto.locationLabel),
-          orgId,
-          orgBoundAt: terminalOrgBindingOnCreate(orgId, new Date()),
-        },
-      })
+      const data = {
+        id: `t_${crypto.randomBytes(8).toString('hex')}`,
+        terminalCode,
+        agentToken: placeholder,
+        credentialGeneration: 0,
+        lifecycleStatus: 'planned',
+        deviceFingerprint: `planned:${crypto.randomBytes(16).toString('hex')}`,
+        displayName: cleanNullable(dto.displayName),
+        locationLabel: cleanNullable(dto.locationLabel),
+        orgId,
+        orgBoundAt: terminalOrgBindingOnCreate(orgId, new Date()),
+      }
+      // 预创建时就绑了机构：同样过软件使用授权的台数关（在事务里锁机构、检查、再建）。
+      const terminal = orgId
+        ? await withOrgTerminalQuota(this.prisma, orgId, (tx) => tx.terminal.create({ data }))
+        : await this.prisma.terminal.create({ data })
       return {
         terminalId: terminal.id,
         terminalCode: terminal.terminalCode,
@@ -284,6 +293,7 @@ export class TerminalAdminService {
             printerStatus: true,
             wiredNetworkStatus: true,
             printerNetworkStatus: true,
+            ...PRINTER_QUEUE_HEARTBEAT_SELECT,
             localTaskDatabaseAvailable: true,
             scanInputHealth: true,
             scanInputAction: true,
@@ -344,6 +354,7 @@ export class TerminalAdminService {
         printerStatus: hb?.printerStatus ?? null,
         wiredNetworkStatus: hb?.wiredNetworkStatus ?? null,
         printerNetworkStatus: hb?.printerNetworkStatus ?? null,
+        printerQueue: toAdminPrinterQueue(hb),
         scanInputHealth: hb?.scanInputHealth ?? null,
         scanInputAction: hb?.scanInputAction ?? null,
         scanInputReason: hb?.scanInputReason ?? null,

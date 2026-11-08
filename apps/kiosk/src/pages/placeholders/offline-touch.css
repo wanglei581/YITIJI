@@ -60,3 +60,21 @@
 @media (prefers-reduced-motion: reduce) {
   .qxt-screen[data-qx-page='offline'] * { transition: none; }
 }
+
+/* 收尾拦截屏、暂停屏与机器状态页共用 of-row（min-height 78px）和 of-machine。
+   不去拉高去处卡：余高由 of-machine 里的机器插画吸收。机器状态页行高不变。
+   共用规则把插画限成「不宽过槽」。这两屏的槽往往比插画更高，限宽后上下会空出纯色。
+   这里改成按槽高画、左右裁切，只挂这两屏。 */
+[data-kiosk-screen='license-paused'] .qxt-screen[data-qx-page='offline'] .of-machine,
+[data-kiosk-screen='license-wind-down-blocked'] .qxt-screen[data-qx-page='offline'] .of-machine,
+[data-kiosk-screen='license-paused'] .qxt-screen[data-qx-page='offline'] .of-machine .qxp-artbox,
+[data-kiosk-screen='license-wind-down-blocked'] .qxt-screen[data-qx-page='offline'] .of-machine .qxp-artbox {
+  min-width: 0;
+}
+[data-kiosk-screen='license-paused'] .qxt-screen[data-qx-page='offline'] .of-machine .qxp-artbox > svg,
+[data-kiosk-screen='license-wind-down-blocked'] .qxt-screen[data-qx-page='offline'] .of-machine .qxp-artbox > svg {
+  width: auto;
+  max-width: none;
+  min-width: 0;
+  height: 100%;
+}

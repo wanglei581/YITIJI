@@ -1,4 +1,8 @@
 import { BadRequestException, ConflictException } from '@nestjs/common'
+import {
+  scanDeviceLeaseLimits,
+  scanDeviceTooManyPagesMessage,
+} from '../files/file-validation'
 
 /**
  * 屏上扫描（device 路线）协议：常量、状态转移表、纯校验函数。
@@ -127,11 +131,31 @@ export function canTransitionScanDeviceState(from: ScanDeviceState, to: ScanDevi
 }
 
 /**
+ * 新一轮开始扫描：回报从 ready 或 error 转到 scanning 这一次。
+ * 同状态重发、page_ready ↔ scanning 的翻页都不算。改设置回到 ready 不走这里，下一次开始扫描才加。
+ * deviceState 还是空时与 planScanDeviceReport 一样按 ready 看。
+ */
+export function scanDeviceRoundStarts(from: string | null | undefined, to: string): boolean {
+  const normalized = isScanDeviceState(from) ? from : 'ready'
+  return (normalized === 'ready' || normalized === 'error') && to === 'scanning'
+}
+
+/**
  * 终端程序回报被收下后，按收下的 state 选续期窗口：page_ready 10 分钟（用户要放下一页，补稿 cs-scan-more），
  * 其余 3 分钟。改用面板扫描、改扫描设置各自传 SCAN_DEVICE_SWITCH_RENEW_WINDOW_MS（10 分钟）。
  */
 export function scanDeviceReportRenewWindowMs(state: ScanDeviceState): number {
   return state === 'page_ready' ? SCAN_DEVICE_PAGE_READY_RENEW_WINDOW_MS : SCAN_DEVICE_RENEW_WINDOW_MS
+}
+
+/**
+ * 取消响应里的静默期结束时刻。与 assertTerminalQuietPeriod 同一条规则：
+ * 从最近一条 cancelled / expired 的 updatedAt 起算 quietPeriodMs。
+ * 静默期关着，或窗口内没有已结束的会话时，结束时刻就是 serverNow，一体机倒计时为 0。
+ */
+export function quietPeriodEndsAtIso(endedAt: Date | null, now: Date, quietPeriodMs: number): string {
+  if (quietPeriodMs <= 0 || !endedAt) return now.toISOString()
+  return new Date(endedAt.getTime() + quietPeriodMs).toISOString()
 }
 
 /**
@@ -271,12 +295,14 @@ export function isScanDeviceSettingsEditableState(state: ScanDeviceState): boole
 
 type DeviceFieldsRow = {
   startMode?: string | null
+  scanType?: string | null
   deviceSource?: string | null
   deviceColorMode?: string | null
   deviceState?: string | null
   devicePageCount?: number | null
   deviceErrorCode?: string | null
   deviceUpdatedAt?: Date | null
+  deviceRound?: number | null
 }
 
 export function isScanDeviceTask(task: Pick<DeviceFieldsRow, 'startMode'>): boolean {
@@ -289,10 +315,11 @@ export function isSwitchedToPanel(task: Pick<DeviceFieldsRow, 'startMode' | 'dev
 }
 
 /**
- * GET /scan/sessions/:id 多返回的七项（B1 加前四项，B2 加后三项）。
- * 面板任务（含已改用面板的）一律 startMode:'panel'、其余 null / 0——哪怕库里还留着 device 时期的列值。
+ * GET /scan/sessions/:id 多返回的字段（B1 加前四项，B2 加来源 / 颜色 / deviceUpdatedAt，B4 加 deviceMaxPages）。
+ * 面板任务（含已改用面板的）一律 startMode:'panel'、deviceMaxPages:null、其余 null / 0——哪怕库里还留着 device 时期的列值。
  * deviceSource / deviceColorMode 是用户当前选的来源与颜色（改设置之后读到的就是新值）；
  * deviceUpdatedAt 是最近一次状态变化（ISO 字符串）：终端程序回报，或用户改设置 / 改用面板。
+ * deviceMaxPages 与租约 device.maxPages 同源（证件 4，其余 20）。一体机用它写「最多 N 页」。
  */
 export function scanDeviceStatusFields(task: DeviceFieldsRow): {
   startMode: ScanStartMode
@@ -302,6 +329,7 @@ export function scanDeviceStatusFields(task: DeviceFieldsRow): {
   deviceSource: ScanDeviceSource | null
   deviceColorMode: ScanDeviceColorMode | null
   deviceUpdatedAt: string | null
+  deviceMaxPages: number | null
 } {
   if (!isScanDeviceTask(task)) {
     return {
@@ -312,6 +340,7 @@ export function scanDeviceStatusFields(task: DeviceFieldsRow): {
       deviceSource: null,
       deviceColorMode: null,
       deviceUpdatedAt: null,
+      deviceMaxPages: null,
     }
   }
   return {
@@ -326,20 +355,33 @@ export function scanDeviceStatusFields(task: DeviceFieldsRow): {
       ? (task.deviceColorMode as ScanDeviceColorMode)
       : null,
     deviceUpdatedAt: task.deviceUpdatedAt instanceof Date ? task.deviceUpdatedAt.toISOString() : null,
+    deviceMaxPages: scanDeviceLeaseLimits(task.scanType).maxPages,
   }
 }
 
 /**
  * current-lease 对 device 任务多带的字段。面板任务返回空对象——响应里不多出任何键，
  * 免得现有终端程序解析变化。
+ *
+ * device 段在 source / colorMode 之外还有 maxPages、maxBytes，按扫描类型从
+ * scanDeviceLeaseLimits 取（证件 4 页 / 10 MiB，其余 20 页 / 18 MiB）。一体机不读租约。
  */
-export function scanDeviceLeaseFields(task: DeviceFieldsRow):
-  | { startMode: 'device'; device: { source: string | null; colorMode: string | null } }
+export function scanDeviceLeaseFields(task: DeviceFieldsRow & { scanType?: string | null }):
+  | {
+      startMode: 'device'
+      device: { source: string | null; colorMode: string | null; maxPages: number; maxBytes: number }
+    }
   | Record<string, never> {
   if (!isScanDeviceTask(task)) return {}
+  const limits = scanDeviceLeaseLimits(task.scanType)
   return {
     startMode: 'device',
-    device: { source: task.deviceSource ?? null, colorMode: task.deviceColorMode ?? null },
+    device: {
+      source: task.deviceSource ?? null,
+      colorMode: task.deviceColorMode ?? null,
+      maxPages: limits.maxPages,
+      maxBytes: limits.maxBytes,
+    },
   }
 }
 
@@ -349,6 +391,61 @@ export interface ScanDeviceReportInput {
   state: ScanDeviceState
   pageCount?: number | null
   errorCode?: ScanDeviceErrorCode | null
+  /**
+   * 终端程序这一场实际在用的来源 / 颜色。不给（或缺省 null）= 旧终端程序，不比对、条件更新也不钉。
+   * 给了且与库里的 deviceSource / deviceColorMode 不一致 → 409 SCAN_DEVICE_SETTINGS_CHANGED（必须停扫）。
+   */
+  source?: ScanDeviceSource | null
+  colorMode?: ScanDeviceColorMode | null
+}
+
+/** 回报里带来源 / 颜色时，条件更新要钉住的列。没给的不钉，旧终端程序的 where 与以前一样。 */
+export function scanDeviceReportSettingsPins(reported: {
+  source?: ScanDeviceSource
+  colorMode?: ScanDeviceColorMode
+}): { deviceSource?: ScanDeviceSource; deviceColorMode?: ScanDeviceColorMode } {
+  return {
+    ...(reported.source !== undefined ? { deviceSource: reported.source } : {}),
+    ...(reported.colorMode !== undefined ? { deviceColorMode: reported.colorMode } : {}),
+  }
+}
+
+/**
+ * 从回报体里取出终端程序声明的来源 / 颜色。null / undefined = 没给。
+ * 给了空串或别的取值 → 400 SCAN_DEVICE_REPORT_INVALID，先于任何数据库访问。
+ */
+export function parseScanDeviceReportSettings(input: {
+  source?: unknown
+  colorMode?: unknown
+}): { source?: ScanDeviceSource; colorMode?: ScanDeviceColorMode } {
+  const sourceAbsent = input.source === undefined || input.source === null
+  const colorAbsent = input.colorMode === undefined || input.colorMode === null
+  if (!sourceAbsent && !(SCAN_DEVICE_SOURCES as readonly unknown[]).includes(input.source)) {
+    badReport('source 只能是 flatbed 或 feeder')
+  }
+  if (!colorAbsent && !(SCAN_DEVICE_COLOR_MODES as readonly unknown[]).includes(input.colorMode)) {
+    badReport('colorMode 只能是 gray 或 color')
+  }
+  return {
+    ...(sourceAbsent ? {} : { source: input.source as ScanDeviceSource }),
+    ...(colorAbsent ? {} : { colorMode: input.colorMode as ScanDeviceColorMode }),
+  }
+}
+
+/** 给了来源或颜色、且与这一行不一致：必须停扫，不能把旧一场的回报写进新设置。 */
+export function assertScanDeviceReportSettingsMatch(
+  task: { deviceSource?: string | null; deviceColorMode?: string | null },
+  reported: { source?: ScanDeviceSource; colorMode?: ScanDeviceColorMode },
+): void {
+  if (
+    (reported.source !== undefined && reported.source !== task.deviceSource) ||
+    (reported.colorMode !== undefined && reported.colorMode !== task.deviceColorMode)
+  ) {
+    conflict(
+      'SCAN_DEVICE_SETTINGS_CHANGED',
+      '扫描设置已更改，请停止屏上扫描，按新的来源和颜色重新开始',
+    )
+  }
 }
 
 export interface ScanDeviceReportPlan {
@@ -376,7 +473,7 @@ function conflict(code: string, message: string): never {
  * 那一轮已扫的页在出错时已被终端程序删除，新一轮从 0 页重新数。
  */
 export function planScanDeviceReport(
-  current: { deviceState: string | null; devicePageCount: number },
+  current: { deviceState: string | null; devicePageCount: number; scanType?: string | null },
   input: ScanDeviceReportInput,
 ): ScanDeviceReportPlan {
   const from: ScanDeviceState = isScanDeviceState(current.deviceState) ? current.deviceState : 'ready'
@@ -414,6 +511,13 @@ export function planScanDeviceReport(
     badReport(`state=${to} 至少要已收到 1 页`)
   }
 
+  // 0…200 的整数检查在上面（格式不对是 400）。这里按扫描类型再拦一次：
+  // 证件 4 页，其余 20 页。超过是业务上限，不是报文格式错误，所以 409。
+  const maxPages = scanDeviceLeaseLimits(current.scanType).maxPages
+  if (nextCount > maxPages) {
+    conflict('SCAN_DEVICE_TOO_MANY_PAGES', scanDeviceTooManyPagesMessage(maxPages, nextCount))
+  }
+
   return { deviceState: to, devicePageCount: nextCount, deviceErrorCode: to === 'error' ? errorCode : null }
 }
 
@@ -434,16 +538,22 @@ export function normalizeScanDeliverOrigin(raw: unknown): ScanDeliverOrigin {
 /**
  * 投递时把任务从 waiting 抢占成 matched 的那次条件更新（deliverScanFile 第 6 步）要钉住的扫描方式与设备状态。
  * assertScanDeliverOriginAllowed 是在读到的快照上判的；读与这次抢占之间，用户可能「改用面板」（startMode→panel、
- * deviceState→aborted），终端程序也可能回报 error / aborted。条件更新里没有这几条，已切面板 / 已中止的会话
- * 仍会被挂上设备扫描件。所以：
+ * deviceState→aborted），终端程序也可能回报 error / aborted，或从 error 再开一轮。条件更新里没有这几条，
+ * 已切面板 / 已中止 / 新一轮的会话仍会被挂上上一轮的文件。所以：
  *   - 所有任务都钉读到的 startMode（面板任务恒为 'panel'，是一条恒真条件，行为不变）；
- *   - device 任务再钉 deviceState ∈ composing / delivering 且 devicePageCount ≥ 1（与 assertScanDeliverOriginAllowed 同一组条件）。
- * 面板任务不加后两条：面板路线行为一字不变。条件失效按现有写法回 409 SCAN_TASK_STATE_CHANGED。
+ *   - device 任务再钉 deviceState ∈ composing / delivering 且 devicePageCount ≥ 1（与 assertScanDeliverOriginAllowed 同一组条件）；
+ *   - device 任务再钉读到的 deviceRound（B6，替换 B4 的 deviceUpdatedAt 钉）。轮次只在 ready / error → scanning 时加一，
+ *     同状态重发（例如网络重试再报一次 delivering）不改它，不会误拒正常投递。没读到时按列默认值钉 0。
+ * 只钉读到的轮次挡不住「服务端第一次读到的已经是新一轮」——那一步用已验签租约里的 deviceRound 比对
+ * （assertScanDeliverRoundMatches）。租约仍证明不了所附 PDF 产生于该轮次；终端程序若带上扫描时记下的
+ * 轮次，再由 assertScanDeliverAttachedRound 核。面板任务不加后三条：面板路线行为一字不变。
+ * 条件失效按现有写法回 409 SCAN_TASK_STATE_CHANGED。
  */
-export function scanDeliverClaimPins(task: Pick<DeviceFieldsRow, 'startMode'>): {
+export function scanDeliverClaimPins(task: Pick<DeviceFieldsRow, 'startMode' | 'deviceRound'>): {
   startMode: string
   deviceState?: { in: string[] }
   devicePageCount?: { gte: number }
+  deviceRound?: number
 } {
   const startMode = task.startMode ?? 'panel'
   if (!isScanDeviceTask(task)) return { startMode }
@@ -451,7 +561,57 @@ export function scanDeliverClaimPins(task: Pick<DeviceFieldsRow, 'startMode'>): 
     startMode,
     deviceState: { in: [...SCAN_DEVICE_DELIVERABLE_STATES] },
     devicePageCount: { gte: 1 },
+    deviceRound: typeof task.deviceRound === 'number' ? task.deviceRound : 0,
   }
+}
+
+/**
+ * 屏上扫描投递：已验签租约里的轮次必须等于库里当前的 deviceRound。
+ * 不等（旧一轮的租约迟到，服务端读到的已是新一轮）→ 409 SCAN_TASK_STATE_CHANGED。
+ * 面板任务不比轮次，调用方传入的值一律忽略。
+ */
+export function assertScanDeliverRoundMatches(
+  task: Pick<DeviceFieldsRow, 'startMode' | 'deviceRound'>,
+  leasedRound: unknown,
+): void {
+  if (!isScanDeviceTask(task)) return
+  const current = typeof task.deviceRound === 'number' ? task.deviceRound : 0
+  if (typeof leasedRound !== 'number' || !Number.isInteger(leasedRound) || leasedRound !== current) {
+    conflict('SCAN_TASK_STATE_CHANGED', '扫描任务状态已变化，请重新发起扫描')
+  }
+}
+
+/**
+ * 屏上扫描投递附带的轮次。终端程序在 scanning 回报被收下时记下响应里的 deviceRound，
+ * 投递这份 PDF 时可以把它放进 multipart。签名租约只证明取租约时的轮次，证明不了 PDF 产生于该轮次；
+ * 旧一轮留下的文件配上新取的租约，所带轮次对不上。
+ *
+ * 没给（缺省、null、空串）照旧，只靠上面的租约比对，兼容还没带这个字段的终端程序。
+ * 给了就必须同时等于已验签租约里的轮次和库里当前轮次，否则 409 SCAN_TASK_STATE_CHANGED，且发生在建文件之前。
+ * 面板任务不比，传入的值一律忽略。
+ */
+export function assertScanDeliverAttachedRound(
+  task: Pick<DeviceFieldsRow, 'startMode' | 'deviceRound'>,
+  leasedRound: unknown,
+  attachedRound: unknown,
+): void {
+  if (!isScanDeviceTask(task)) return
+  if (attachedRound === undefined || attachedRound === null || attachedRound === '') return
+  const current = typeof task.deviceRound === 'number' ? task.deviceRound : 0
+  const parsed = parseAttachedDeviceRound(attachedRound)
+  if (parsed === null || parsed !== current || parsed !== leasedRound) {
+    conflict('SCAN_TASK_STATE_CHANGED', '扫描任务状态已变化，请重新发起扫描')
+  }
+}
+
+/** multipart 里的轮次是字符串；直接调 service 时也可能是整数。其余都算给了但对不上。 */
+function parseAttachedDeviceRound(raw: unknown): number | null {
+  if (typeof raw === 'number') return Number.isSafeInteger(raw) ? raw : null
+  if (typeof raw === 'string' && /^(0|[1-9]\d*)$/.test(raw)) {
+    const value = Number(raw)
+    return Number.isSafeInteger(value) ? value : null
+  }
+  return null
 }
 
 export function looksLikePdf(buffer: Buffer): boolean {
@@ -463,21 +623,51 @@ function isPdfMimeType(mimeType: string): boolean {
 }
 
 /**
+ * 屏上扫描投递凭据。只有 assertScanDeliverOriginAllowed 在 device 检查全部通过后签发。
+ * 用模块内的 Symbol 做记号，请求体、DTO、控制器拼不出这个对象。
+ * 面板投递不签发（返回 null）。
+ */
+const VERIFIED_DEVICE_SCAN_DELIVERY = Symbol('verified-device-scan-delivery')
+
+export type VerifiedDeviceScanDelivery = {
+  readonly kind: 'verified-device-scan-delivery'
+  readonly [VERIFIED_DEVICE_SCAN_DELIVERY]: true
+}
+
+export function isVerifiedDeviceScanDelivery(value: unknown): value is VerifiedDeviceScanDelivery {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as { [VERIFIED_DEVICE_SCAN_DELIVERY]?: unknown })[VERIFIED_DEVICE_SCAN_DELIVERY] === true
+  )
+}
+
+function issueVerifiedDeviceScanDelivery(): VerifiedDeviceScanDelivery {
+  return Object.freeze({
+    kind: 'verified-device-scan-delivery' as const,
+    [VERIFIED_DEVICE_SCAN_DELIVERY]: true as const,
+  })
+}
+
+/**
  * 投递来源必须与会话一致：
  *   - device 会话只收 origin=device，且回报状态在 composing / delivering、已收到 ≥ 1 页、文件是 PDF；
  *   - panel 会话（含已「改用面板扫描」的）只收 watcher。
  * 来源错配、状态不对 → 409；device 投递的不是 PDF → 400。
+ *
+ * device 检查全部通过时返回凭据，供文件服务放行证件 PDF。面板检查通过返回 null。
+ * 凭据不能由调用方自己造：没有布尔参数。
  */
 export function assertScanDeliverOriginAllowed(
   task: DeviceFieldsRow,
   origin: ScanDeliverOrigin,
   file: { buffer: Buffer; mimeType: string },
-): void {
+): VerifiedDeviceScanDelivery | null {
   if (!isScanDeviceTask(task)) {
     if (origin !== 'watcher') {
       conflict('SCAN_DELIVER_ORIGIN_MISMATCH', '该扫描会话是面板扫描，只接收面板投递')
     }
-    return
+    return null
   }
   if (origin !== 'device') {
     conflict('SCAN_DELIVER_ORIGIN_MISMATCH', '该扫描会话是屏上扫描，只接收终端程序自己扫描的投递')
@@ -496,4 +686,5 @@ export function assertScanDeliverOriginAllowed(
       error: { code: 'SCAN_DEVICE_FILE_NOT_PDF', message: '屏上扫描只接收 PDF' },
     })
   }
+  return issueVerifiedDeviceScanDelivery()
 }

@@ -9,6 +9,7 @@ import { AdminKioskJobBoardController } from './admin-kiosk-job-board.controller
 import { KioskJobBoardService } from './kiosk-job-board.service'
 import { TerminalAgentService } from './terminals-agent.service'
 import { TerminalAdminService } from './terminals-admin.service'
+import { AdminPrinterOutputService } from './admin-printer-output'
 import { TerminalsService } from './terminals.service'
 import { TerminalToolboxService } from './terminal-toolbox.service'
 import { ToolboxGovernanceService } from './toolbox-governance.service'
@@ -39,6 +40,7 @@ import { AiAccessModule } from '../ai-access/ai-access.module'
     TerminalScanDeletionAuditService,
     ReleaseObservationService,
     TerminalAdminService,
+    AdminPrinterOutputService,
     TerminalsService,
     TerminalToolboxService,
     KioskJobBoardService,

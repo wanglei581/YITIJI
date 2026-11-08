@@ -13,6 +13,7 @@ import { PRINT_TIMEOUT_MS } from '../config'
  *   orientation  → PrintOptions.orientation (portrait/landscape; auto = omit)
  *   scale        → PrintOptions.scale (fit/noscale; actual → noscale)
  *   pageRange    → PrintOptions.pages
+ *   paperSize    → PrintOptions.paperSize（固定 A4，不看 params）
  * Pending Windows true-machine verification:
  *   pagesPerSheet — no direct SumatraPDF support via pdf-to-printer
  *   quality       — needs DEVMODE; no SumatraPDF equivalent
@@ -62,6 +63,9 @@ function mapParams(params: Partial<PrintJobParams>): Partial<PrintOptions> {
   return opts
 }
 
+/** 这台机型只打 A4，CLAUDE.md §3。以前靠驱动默认值。真机试打前先问产品负责人。 */
+const PAPER_SIZE_A4 = 'A4'
+
 export async function printWithPdfToPrinter(
   filePath: string,
   printerName: string,
@@ -87,6 +91,7 @@ export async function printWithPdfToPrinter(
   const printOptions: PrintOptions = {
     printer: printerName,
     ...(params ? mapParams(params) : {}),
+    paperSize: PAPER_SIZE_A4,
   }
 
   try {

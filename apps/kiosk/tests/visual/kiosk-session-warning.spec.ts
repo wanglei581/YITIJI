@@ -151,9 +151,9 @@ test('image-to-pdf editing warns that unsaved work is lost, not the generic clea
   // 「登录状态和这台机器上的这次使用记录将清除」——那句话没提用户会丢掉刚挑的图。
   registerKioskShell(api, { screensaverEnabled: false })
   await page.goto('/print-scan/convert')
-  // 就绪锚点：h1「图片转 PDF」（QxPageFrame，apps/kiosk/src/components/qingxu/QxPageFrame.tsx）。
+  // B10 照稿后的空态大标题是就绪锚点。
   // 标题出现说明这条路由已经挂载、空闲计时已开始；在这之前开始计 3 秒，会把挂载耗时算进去。
-  await expect(page.getByRole('heading', { name: '图片转 PDF', level: 1 })).toBeVisible({ timeout: 5_000 })
+  await expect(page.getByRole('heading', { name: '把图片合成一个 PDF', level: 1 })).toBeVisible({ timeout: 5_000 })
   await expectWarningWithinThreeSeconds(page)
   await expect(page.getByText('未保存的填写、编辑或练习内容会清除', { exact: true })).toBeVisible()
   await expect(page.getByText('登录状态和这台机器上的这次使用记录将清除', { exact: true })).toHaveCount(0)

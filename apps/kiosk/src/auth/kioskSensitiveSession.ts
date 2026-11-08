@@ -55,6 +55,12 @@ const SENSITIVE_SESSION_STORAGE_KEYS = [
   AI_DECLARATION_SESSION_KEY,
 ] as const
 
+const clearListeners = new Set<() => void>()
+export function subscribeKioskSensitiveSessionClear(listener: () => void): () => void {
+  clearListeners.add(listener)
+  return () => { clearListeners.delete(listener) }
+}
+
 /** 清场会清掉什么：none 什么都没有；print-only 只有打印材料；with-other 还有别的。读不准按 with-other。 */
 export type KioskClearScope = 'none' | 'print-only' | 'with-other'
 
@@ -123,6 +129,7 @@ export function clearKioskSensitiveSession(outgoingMemberToken?: string | null):
   beginScanSessionCleanup(outgoingMemberToken ?? null)
   clearScanWorkbenchSession()
   clearScanHowContinue()
+  clearListeners.forEach((listener) => listener())
 }
 
 /**

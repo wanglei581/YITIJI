@@ -17,7 +17,7 @@ import { withAiSafety } from './ai-prompt-safety'
 import { DEFAULT_FORBIDDEN_WORDS, DEFAULT_ROLE_SCOPE, normalizeForbiddenWords } from './llm-guard'
 import { auditTextHash, type AiConfigApiKeyAction, type LlmConfigAuditSnapshot } from './ai-config-audit'
 import { evaluateAiPlatform } from '../../config/ai-platform-config'
-import { assertApprovedLlmBaseUrl } from './llm-base-url'
+import { assertApprovedLlmBaseUrl, llmBaseUrlHostname } from './llm-base-url'
 
 export interface LlmConfig {
   vendor:       LlmVendor
@@ -515,6 +515,7 @@ export class LlmConfigService {
     // 父键上的其它设置悄悄丢掉。写入后本键即固化为独立配置，不再跟随父键。
     const next: PersistedConfig = { ...this.cache[this.resolveFeature(feature)], explicitlyConfigured: true }
     const previousBaseURL = next.baseURL
+    const previousApiKeyEncrypted = next.apiKeyEncrypted
 
     if (patch.vendor && isLlmVendor(patch.vendor) && patch.vendor !== next.vendor) {
       next.vendor = patch.vendor
@@ -547,6 +548,23 @@ export class LlmConfigService {
     // 只在生效地址**变了**时判：白名单收紧前存下的地址不在单内时，管理员仍须能停用该功能、
     // 清掉疑似泄露的密钥、改提示词——这些不会让请求发往新地址；运行时 llmFetchJson 第一行照样拒绝单外地址。
     if (next.baseURL !== previousBaseURL) assertApprovedLlmBaseUrl(next.baseURL, '保存')
+
+    // 旧密钥不会发给新地址：换了主机又没带新密钥、而原来存着密钥时拒绝（原来没有密钥就没有可外发的，照常保存）；
+    // 显式空字符串表示清除密钥，照常保存；只含空白的「密钥」换主机时也拒绝。
+    // 解析不了的存量地址按换主机处理，拒绝时尚未写缓存或落盘。
+    const carriesOldKey = patch.apiKey === undefined && !!previousApiKeyEncrypted
+    const blankNewKey = patch.apiKey !== undefined && patch.apiKey !== '' && !patch.apiKey.trim()
+    if (next.baseURL !== previousBaseURL && (carriesOldKey || blankNewKey)) {
+      const previousHost = llmBaseUrlHostname(previousBaseURL)
+      if (!previousHost || llmBaseUrlHostname(next.baseURL) !== previousHost) {
+        throw new BadRequestException({
+          error: {
+            code: 'AI_CONFIG_API_KEY_REQUIRED',
+            message: '模型服务地址换了，请重新填写这一家的 API Key；原来的密钥不会发给新地址',
+          },
+        })
+      }
+    }
 
     this.cache = { ...this.cache, [feature]: next }
     this.save()
