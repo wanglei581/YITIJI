@@ -43,8 +43,10 @@ import { isUnauthorized, markUnauthorized } from './auth-state'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
 import { print as dispatchPrint } from '../printer/print'
 import { cleanupStaleOwnPrintJobs, pauseConfiguredPrinterQueue, resumeConfiguredPrinterQueue } from './print-queue-hold'
+import { globalDeviceLock } from './device-lock'
 import { claimPrintTasksIfGateOpen, preparePrinterForDispatch, settlePrinterAfterTerminal } from './print-dispatch-gate'
 import { computeMonitorTimeoutMs } from './print-monitor-timeout'
+import { notifyScanDevicePrintFinished } from './scan-device/scan-device-runner'
 
 export { computeMonitorTimeoutMs }
 import { monitorPrintJob } from './print-job-monitor'
@@ -733,11 +735,14 @@ export async function executeTask(
 
 let claimPausedUntil = 0
 let consecutiveClaimRateLimits = 0
+let lastDeviceLockSkipLogAt = 0
+const DEVICE_LOCK_SKIP_LOG_INTERVAL_MS = 60_000
 
 /** Test-only: clear module-level rate-limit state between verification cases. */
 export function __resetClaimRateLimitForTests(): void {
   claimPausedUntil = 0
   consecutiveClaimRateLimits = 0
+  lastDeviceLockSkipLogAt = 0
 }
 
 async function runClaimCycle(
@@ -758,25 +763,45 @@ async function runClaimCycle(
     return
   }
 
-  await claimPrintTasksIfGateOpen(
-    {
-      holdEnabled: config.holdPrinterQueueWhenIdle === true,
-      pause: async () => {
-        await pauseConfiguredPrinterQueue(config.printerName)
+  const printLock = config.scanDeviceEnabled === true
+    ? globalDeviceLock.tryAcquire('print-claim')
+    : undefined
+  if (config.scanDeviceEnabled === true && !printLock) {
+    const now = Date.now()
+    if (now - lastDeviceLockSkipLogAt >= DEVICE_LOCK_SKIP_LOG_INTERVAL_MS) {
+      lastDeviceLockSkipLogAt = now
+      warn('task-runner: device lock busy; claim skipped')
+    }
+    return
+  }
+
+  let executed = false
+  try {
+    await claimPrintTasksIfGateOpen(
+      {
+        holdEnabled: config.holdPrinterQueueWhenIdle === true,
+        pause: async () => {
+          await pauseConfiguredPrinterQueue(config.printerName)
+        },
+        cleanup: async () => {
+          await cleanupStaleOwnPrintJobs({ printerName: config.printerName })
+        },
       },
-      cleanup: async () => {
-        await cleanupStaleOwnPrintJobs({ printerName: config.printerName })
+      async () => {
+        executed = await claimConfiguredPrintTasks(config, db, activeTasks)
       },
-    },
-    () => claimConfiguredPrintTasks(config, db, activeTasks),
-  )
+    )
+  } finally {
+    printLock?.release()
+  }
+  if (executed) notifyScanDevicePrintFinished()
 }
 
 async function claimConfiguredPrintTasks(
   config: AgentConfig,
   db: AgentDatabase,
   activeTasks: Set<string>,
-): Promise<void> {
+): Promise<boolean> {
   const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
 
   let tasks: ClaimTask[]
@@ -806,26 +831,27 @@ async function claimConfiguredPrintTasks(
         `task-runner: claim rate limited (HTTP 429) — pausing claims for ` +
           `${(decision.pauseMs / 1_000).toFixed(1)}s`,
       )
-      return
+      return false
     }
     if (isUnauthorizedHttpError(e)) {
       markUnauthorized()
       writeStartupDiagnosticSafely('AGENT_UNAUTHORIZED')
       err('task-runner: claim unauthorized — credential revoked/invalid; printing stopped')
-      return
+      return false
     }
     if (status !== 404 && status !== 204) {
       warn(`task-runner: claim cycle error — ${axiosErrorMessage(e)}`)
     }
-    return
+    return false
   }
 
-  if (tasks.length === 0) return
+  if (tasks.length === 0) return false
   if (isUnauthorized()) {
     warn('task-runner: credential became unauthorized while claim was in flight; claimed work will not print')
-    return
+    return false
   }
 
+  let executed = false
   for (const task of tasks) {
     if (activeTasks.has(task.taskId)) {
       warn(`task-runner: task ${task.taskId} already active, skipping duplicate claim`)
@@ -841,6 +867,7 @@ async function claimConfiguredPrintTasks(
     log(`task-runner: claimed task ${task.taskId}`)
 
     try {
+      executed = true
       await executeTask(task, config, db)
     } catch (e) {
       err(`task-runner: unhandled error in task ${task.taskId} — ${e instanceof Error ? e.message : String(e)}`)
@@ -848,6 +875,7 @@ async function claimConfiguredPrintTasks(
       activeTasks.delete(task.taskId)
     }
   }
+  return executed
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

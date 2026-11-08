@@ -184,9 +184,9 @@ export class MemberOrderTimelineService {
     const orderBy = [{ createdAt: 'desc' as const }, { id: 'desc' as const }]
     const bucketTask = query.status === 'all' ? {} : taskBucketWhere(query.status)
     const bucketOrder = query.status === 'all' ? {} : orderBucketWhere(query.status)
-    const taskBase = { AND: [{ endUserId, orderId: null }, bucketTask] }
-    const cloudBase = { AND: [{ endUserId, sourceFileId: { not: null }, printTaskId: null }, bucketOrder] }
-    const packageBase = { AND: [{ endUserId, orderItems: { some: {} } }, bucketOrder] }
+    const taskBase = { AND: [{ endUserId, orderId: null, order: { isNot: { type: 'copy' } } }, bucketTask] }
+    const cloudBase = { AND: [{ endUserId, type: { not: 'copy' }, copyJob: { is: null }, sourceFileId: { not: null }, printTaskId: null }, bucketOrder] }
+    const packageBase = { AND: [{ endUserId, type: { not: 'copy' }, copyJob: { is: null }, orderItems: { some: {} } }, bucketOrder] }
 
     const [taskRows, cloudRows, packageRows, taskTotal, cloudTotal, packageTotal] = await Promise.all([
       wants('kiosk_task')

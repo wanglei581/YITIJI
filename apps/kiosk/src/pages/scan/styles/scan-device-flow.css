@@ -1,0 +1,491 @@
+/* 屏上扫描进行中与完成。颜色只用 --qxt-* / --qx-*。版式照触屏补稿 cs-scan-run / more / make / done。 */
+
+[data-qx-page='scan-workbench'] .cs-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+}
+
+[data-kiosk-stage-fit='on'] .qxt-screen.scan-touch .sw-page:has(.cs-flow) {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  gap: 14px;
+  overflow: hidden;
+}
+
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .cs-flow {
+  flex: 1 1 auto;
+}
+
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .cs-hero,
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .cs-strip,
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .cs-merge,
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .cs-file,
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .cs-unknown .cs-hero {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+[data-qx-page='scan-workbench'] .cs-warn {
+  margin: 0;
+  padding: 14px 20px;
+  border-radius: 20px;
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+  font-size: 23px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+[data-qx-page='scan-workbench'] .cs-fine {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.5;
+  color: var(--qxt-ink-3);
+  text-align: center;
+}
+
+[data-qx-page='scan-workbench'] .cs-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  flex: none;
+}
+
+[data-qx-page='scan-workbench'] .cs-steps .s {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 206px;
+  padding: 18px 16px;
+  border-radius: 24px;
+  background: var(--qxt-well);
+}
+
+[data-qx-page='scan-workbench'] .cs-steps .n {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 22px;
+}
+
+[data-qx-page='scan-workbench'] .cs-steps b {
+  font-size: 24px;
+  line-height: 1.3;
+}
+
+[data-qx-page='scan-workbench'] .cs-steps em {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-style: normal;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--qxt-ink-3);
+}
+
+[data-qx-page='scan-workbench'] .cs-steps small {
+  font-size: 20px;
+  line-height: 1.4;
+  color: var(--qxt-ink-3);
+}
+
+[data-qx-page='scan-workbench'] .cs-steps .s.on {
+  background: var(--qxt-teal-wash);
+}
+
+[data-qx-page='scan-workbench'] .cs-steps .s.on .n {
+  background: var(--qx-emerald);
+}
+
+[data-qx-page='scan-workbench'] .cs-steps .s.on em,
+[data-qx-page='scan-workbench'] .cs-steps .s.now em {
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page='scan-workbench'] .cs-steps .s.now {
+  background: var(--qxt-card);
+  border: 2px solid var(--qx-emerald);
+}
+
+[data-qx-page='scan-workbench'] .cs-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--qx-emerald);
+  display: inline-block;
+  flex: none;
+  animation: cs-device-breathe 1.6s ease-in-out infinite alternate;
+}
+
+[data-qx-page='scan-workbench'] .cs-hero,
+[data-qx-page='scan-workbench'] .cs-strip,
+[data-qx-page='scan-workbench'] .cs-merge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: var(--qxt-well);
+  border-radius: 30px;
+  padding: 20px 24px;
+}
+
+[data-qx-page='scan-workbench'] .cs-hrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 44px;
+}
+
+[data-qx-page='scan-workbench'] .cs-reader {
+  position: relative;
+  width: 440px;
+  height: 622px;
+  --h: 622px;
+  border-radius: 18px;
+  background: var(--qxt-card);
+  box-shadow: 0 0 0 1.5px var(--qxt-edge);
+  overflow: hidden;
+  flex: none;
+}
+
+[data-qx-page='scan-workbench'] .cs-hero.none .cs-reader {
+  width: 520px;
+  height: 736px;
+  --h: 736px;
+}
+
+/* 「状态未知」没有设计稿，也没有四段进度。大纸顶满内容区，避免上下空带比正在扫描的稿更宽。
+   .cs-hero.none .cs-reader 把高度钉在 736px，这里必须写得更具体才能盖过它。 */
+[data-qx-page='scan-workbench'] .cs-unknown .cs-hero {
+  justify-content: stretch;
+  align-items: stretch;
+  padding: 16px 28px;
+  min-height: 0;
+}
+
+[data-qx-page='scan-workbench'] .cs-unknown .cs-hrow {
+  flex: 1 1 0;
+  align-items: stretch;
+  min-height: 0;
+  width: 100%;
+}
+
+[data-qx-page='scan-workbench'] .cs-unknown .cs-hero.none .cs-reader {
+  width: 520px;
+  height: 100%;
+  min-height: 0;
+  align-self: stretch;
+}
+
+[data-qx-page='scan-workbench'] .cs-unknown .cs-hero.none .cs-reader svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+[data-qx-page='scan-workbench'] .cs-unknown .cs-side {
+  justify-content: center;
+}
+
+[data-qx-page='scan-workbench'] .cs-reader .scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -90px;
+  height: 90px;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--qx-emerald) 45%, transparent) 70%, var(--qx-emerald));
+  animation: cs-device-sweep 2.4s ease-in-out infinite;
+}
+
+[data-qx-page='scan-workbench'] .cs-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 240px;
+}
+
+[data-qx-page='scan-workbench'] .cs-count {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-qx-page='scan-workbench'] .cs-count b {
+  font: 700 132px/1 var(--qx-sans);
+  color: var(--qx-deep);
+}
+
+[data-qx-page='scan-workbench'] .cs-count span {
+  font-size: 38px;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .cs-cap {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .cs-big {
+  font: 700 52px/1.2 var(--qx-serif, var(--qx-sans));
+  color: var(--qx-deep);
+}
+
+[data-qx-page='scan-workbench'] .cs-spin {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 8px solid var(--qxt-teal-wash);
+  border-top-color: var(--qx-emerald);
+  animation: cs-device-spin 1s linear infinite;
+}
+
+[data-qx-page='scan-workbench'] .cs-thumbs {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+[data-qx-page='scan-workbench'] .cs-pg {
+  position: relative;
+  width: 86px;
+  height: 122px;
+  flex: none;
+}
+
+[data-qx-page='scan-workbench'] .cs-pg > svg {
+  width: 86px;
+  height: 122px;
+}
+
+[data-qx-page='scan-workbench'] .cs-pg i {
+  position: absolute;
+  right: -8px;
+  top: -8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--qx-emerald);
+  color: var(--qx-on-solid);
+  display: grid;
+  place-items: center;
+}
+
+[data-qx-page='scan-workbench'] .cs-pg.next {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--qxt-teal-ink);
+  line-height: 1.3;
+  border-radius: 10px;
+  border: 2px dashed var(--qxt-line);
+}
+
+[data-qx-page='scan-workbench'] .cs-pg.next .cs-plus {
+  font-size: 44px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+[data-qx-page='scan-workbench'] .cs-strip .cs-pg {
+  width: 210px;
+  height: 297px;
+}
+
+[data-qx-page='scan-workbench'] .cs-strip .cs-pg > svg {
+  width: 210px;
+  height: 297px;
+}
+
+[data-qx-page='scan-workbench'] .cs-strip p {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--qxt-ink);
+  line-height: 1.4;
+  text-align: center;
+}
+
+[data-qx-page='scan-workbench'] .cs-strip p small {
+  display: block;
+  font-size: 23px;
+  font-weight: 400;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .cs-more .cs-ways {
+  flex: none;
+}
+
+[data-qx-page='scan-workbench'] .cs-more .cs-way {
+  grid-template-columns: 210px minmax(0, 1fr) 64px;
+  min-height: 236px;
+}
+
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .cs-more .cs-ways > .cs-way {
+  flex: none;
+  min-height: 236px;
+}
+
+[data-qx-page='scan-workbench'] .cs-more .cs-way .vis {
+  min-height: 0;
+}
+
+[data-qx-page='scan-workbench'] .cs-flow .cs-remind,
+[data-qx-page='scan-workbench'] .cs-flow .cs-remind:not(:has([data-testid='service-phone-line'])) {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 88px;
+  margin: 0;
+  padding: 14px 22px;
+  border-radius: 24px;
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+/* 停止按钮在底栏，底栏不在 [data-qx-page] 那一层里面。挂到整屏上，才能盖过按钮重置。 */
+.qxt-screen.scan-touch .qxt-dock .qxt-btn.cs-stop {
+  background: transparent;
+  color: var(--qx-cinnabar);
+  border: 2.5px solid var(--qx-cinnabar);
+}
+
+.qxt-screen.scan-touch .qxt-dock .qxt-btn.cs-stop.armed {
+  background: var(--qx-cinnabar);
+  color: var(--qx-on-solid);
+}
+
+[data-qx-page='scan-workbench'] .stagelist {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: none;
+}
+
+[data-qx-page='scan-workbench'] .stagelist .it {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 104px;
+  padding: 0 22px;
+  border-radius: 24px;
+  background: var(--qxt-well);
+  font-size: 30px;
+  font-weight: 700;
+}
+
+[data-qx-page='scan-workbench'] .stagelist .it.ok {
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page='scan-workbench'] .stagelist .it.now {
+  background: var(--qxt-card);
+  border: 2px solid var(--qx-emerald);
+}
+
+[data-qx-page='scan-workbench'] .stagelist .ico {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--qxt-card);
+}
+
+[data-qx-page='scan-workbench'] .stagelist .it.ok .ico {
+  background: var(--qx-emerald);
+  color: var(--qx-on-solid);
+}
+
+[data-qx-page='scan-workbench'] .stagelist .it.now .ico {
+  background: transparent;
+  border: 4px solid var(--qxt-teal-wash);
+  border-top-color: var(--qx-emerald);
+  animation: cs-device-spin 1s linear infinite;
+}
+
+[data-qx-page='scan-workbench'] .cs-pile {
+  position: relative;
+  width: 520px;
+  height: 500px;
+  flex: none;
+}
+
+[data-qx-page='scan-workbench'] .cs-pile .p1,
+[data-qx-page='scan-workbench'] .cs-pile .p2,
+[data-qx-page='scan-workbench'] .cs-pile .p3 {
+  position: absolute;
+}
+
+[data-qx-page='scan-workbench'] .cs-pile .p1 { left: 0; top: 76px; transform: rotate(-6deg); }
+[data-qx-page='scan-workbench'] .cs-pile .p2 { left: 100px; top: 40px; transform: rotate(-1deg); }
+[data-qx-page='scan-workbench'] .cs-pile .p3 { left: 210px; top: 0; transform: rotate(5deg); }
+
+[data-qx-page='scan-workbench'] .cs-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+[data-qx-page='scan-workbench'] .cs-facts div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 96px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: var(--qxt-card);
+  justify-content: center;
+}
+
+[data-qx-page='scan-workbench'] .cs-facts b { font-size: 28px; line-height: 1.3; }
+[data-qx-page='scan-workbench'] .cs-facts span { font-size: 21px; color: var(--qxt-ink-3); }
+
+@keyframes cs-device-breathe {
+  from { opacity: 0.35; }
+  to { opacity: 1; }
+}
+
+@keyframes cs-device-sweep {
+  from { transform: translateY(0); }
+  to { transform: translateY(calc(var(--h) + 90px)); }
+}
+
+@keyframes cs-device-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-qx-page='scan-workbench'] .cs-reader .scanline,
+  [data-qx-page='scan-workbench'] .cs-spin,
+  [data-qx-page='scan-workbench'] .cs-dot,
+  [data-qx-page='scan-workbench'] .stagelist .it.now .ico {
+    animation: none;
+  }
+
+  [data-qx-page='scan-workbench'] .cs-reader .scanline { display: none; }
+}

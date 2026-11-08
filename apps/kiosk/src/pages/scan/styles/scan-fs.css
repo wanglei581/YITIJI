@@ -24,21 +24,66 @@
 [data-qx-page='scan-workbench'] .fs-types {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
+  min-height: 0;
 }
 
 [data-qx-page='scan-workbench'] .fs-type {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr) 56px;
+  gap: 22px;
+  align-items: center;
   width: 100%;
-  min-height: 96px;
-  padding: 12px 14px;
-  border-radius: 22px;
+  min-height: 168px;
+  padding: 14px 22px 14px 14px;
+  border-radius: 30px;
   background: var(--qxt-card);
-  border: 1.5px solid var(--qxt-edge);
+  border: 2px solid var(--qxt-edge);
   text-align: left;
   color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-type .vis {
+  align-self: stretch;
+  min-height: 0;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+[data-qx-page='scan-workbench'] .fs-type .vis svg,
+[data-qx-page='scan-workbench'] .fs-type .vis .pa {
+  max-height: 86%;
+  max-width: 86%;
+  width: auto;
+  height: auto;
+}
+
+[data-qx-page='scan-workbench'] .fs-type .vis .pa svg {
+  width: 100%;
+  height: auto;
+  max-height: none;
+}
+
+[data-qx-page='scan-workbench'] .fs-type .tx {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+[data-qx-page='scan-workbench'] .fs-type .cs-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 3px solid var(--qxt-edge);
+  display: grid;
+  place-items: center;
+  color: transparent;
+  justify-self: center;
 }
 
 [data-qx-page='scan-workbench'] .fs-type:active {
@@ -46,15 +91,18 @@
 }
 
 [data-qx-page='scan-workbench'] .fs-type b {
-  font-size: 28px;
-  line-height: 1.25;
-  font-weight: 700;
+  font: 700 40px/1.25 var(--qx-serif);
 }
 
 [data-qx-page='scan-workbench'] .fs-type .fs-sub {
-  font-size: 22px;
-  line-height: 1.35;
+  font-size: 25px;
+  line-height: 1.4;
   color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .fs-type .fs-sub + .fs-sub {
+  font-size: 22px;
+  color: var(--qxt-ink-3);
 }
 
 [data-qx-page='scan-workbench'] .sx-chips {
@@ -82,17 +130,46 @@
   color: var(--qxt-clay-ink);
 }
 
-[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'] {
+[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'],
+[data-qx-page='scan-workbench'] .fs-type[aria-pressed='true'] {
   background: var(--qx-deep, var(--qxt-deep-2));
   color: var(--qxt-cream);
   border-color: var(--qx-deep, var(--qxt-deep-2));
 }
 
-[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'] .fs-sub {
+[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'] .vis,
+[data-qx-page='scan-workbench'] .fs-type[aria-pressed='true'] .vis {
+  background: var(--qxt-chip-ghost);
+}
+
+[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'] .cs-mark,
+[data-qx-page='scan-workbench'] .fs-type[aria-pressed='true'] .cs-mark {
+  background: var(--qxt-mark-a);
+  border-color: var(--qxt-mark-a);
+  color: var(--qx-deep, var(--qxt-deep-2));
+}
+
+/* 1080 竖屏：四张材料卡吃掉正文剩余高度，不在底栏上方留空带。窄屏仍按内容高度滚动。 */
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'][data-state='setup'] .fs-types {
+  flex: 1 1 auto;
+}
+
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'][data-state='setup'] .fs-type {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'][data-state='setup'] .fs-grow {
+  flex: none;
+}
+
+[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'] .fs-sub,
+[data-qx-page='scan-workbench'] .fs-type[aria-pressed='true'] .fs-sub {
   color: var(--qxt-mint);
 }
 
-[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'] .sx-chip {
+[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'] .sx-chip,
+[data-qx-page='scan-workbench'] .fs-type[aria-pressed='true'] .sx-chip {
   background: var(--qxt-chip-ghost);
   color: var(--qxt-cream);
 }
@@ -560,6 +637,8 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  /* 滚到整数 scrollTop 的尽头时，底注边框会比重叠的亚像素多出不到 1px。留出这 1px 才能整块进可视区。 */
+  padding-bottom: 1px;
 }
 
 [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-result,
@@ -594,6 +673,34 @@
 
 [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-truth {
   flex: none;
+}
+
+/* 不缩放时正文按自然高度排进 .sw-page 的滚动区。fs-grow 若保持 flex:1 且 min-height:0，
+ * 底注会被挤出滚动高度：390×844 上滚不到整块底注（fusion-w2-scan 的 expectInside）。 */
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .fs-grow {
+  flex: none;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .fs-type {
+  grid-template-columns: 72px minmax(0, 1fr) 40px;
+  gap: 10px;
+  min-height: 112px;
+  padding: 10px 12px 10px 10px;
+  border-radius: 22px;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .fs-type b {
+  font-size: 22px;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .fs-type .fs-sub,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .fs-type .fs-sub + .fs-sub {
+  font-size: 14px;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .fs-type .cs-mark {
+  width: 36px;
+  height: 36px;
 }
 
 [data-kiosk-stage-fit='on'] .qxt-screen.scan-touch .qxt-rail-st {

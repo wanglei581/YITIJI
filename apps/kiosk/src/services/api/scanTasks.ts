@@ -5,6 +5,9 @@ import type {
   ScanSessionCreateRequest,
   ScanSessionCreateResponse,
   ScanSessionStatusResponse,
+  ScanDeviceSettingsRequest,
+  ScanDeviceSettingsResponse,
+  ScanSwitchToPanelResponse,
 } from '@ai-job-print/shared'
 import { SCAN_RETRY_CONTROL_HEADER } from '@ai-job-print/shared'
 import { API_BASE_URL } from './client'
@@ -135,6 +138,18 @@ export async function createScanSession(
   // body 按白名单重建：调用方传进来的 retryOfScanTaskId 一律不采信，
   // 它只能来自上面那份成对校验过的授权。
   const body: ScanSessionCreateRequest = { scanType: input.scanType, terminalId: input.terminalId }
+  // 屏上扫描才带这三项。面板创建（不带 startMode）的 body 与以前逐字一样，不采信 source / colorMode。
+  if (input.startMode === 'device') {
+    if (input.source !== 'flatbed' && input.source !== 'feeder') {
+      throw new ApiHttpError('SCAN_START_PARAMS_INVALID', '屏上扫描还没选好纸放哪，本次不会建立', 400)
+    }
+    if (input.colorMode !== 'gray' && input.colorMode !== 'color') {
+      throw new ApiHttpError('SCAN_START_PARAMS_INVALID', '屏上扫描还没选好黑白还是彩色，本次不会建立', 400)
+    }
+    body.startMode = 'device'
+    body.source = input.source
+    body.colorMode = input.colorMode
+  }
   const headers: Record<string, string> = {}
   if (paired) {
     body.retryOfScanTaskId = paired.retryOfScanTaskId
@@ -226,5 +241,27 @@ export function cancelScanSession(
     method: 'DELETE',
     controlToken,
     token,
+  })
+}
+
+/** 同一场改设置 / 改面板：凭证只走控制头，不取消、不重新创建。 */
+export function updateScanDeviceSettings(
+  scanTaskId: string,
+  controlToken: string,
+  settings: ScanDeviceSettingsRequest,
+  token?: string | null,
+): Promise<ScanDeviceSettingsResponse> {
+  return requestJson(`/scan/sessions/${encodeURIComponent(scanTaskId)}/device-settings`, {
+    method: 'POST', controlToken, token, body: JSON.stringify(settings),
+  })
+}
+
+export function switchScanSessionToPanel(
+  scanTaskId: string,
+  controlToken: string,
+  token?: string | null,
+): Promise<ScanSwitchToPanelResponse> {
+  return requestJson(`/scan/sessions/${encodeURIComponent(scanTaskId)}/switch-to-panel`, {
+    method: 'POST', controlToken, token,
   })
 }

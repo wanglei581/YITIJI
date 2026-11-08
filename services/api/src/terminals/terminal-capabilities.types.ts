@@ -13,7 +13,7 @@
  * 改完搜 git diff 确认两边一致。
  *
  * 未配置行默认放行既有已验证闭环；
- * 例外见下方 DEFAULT_DENY_CAPABILITY_KEYS：color_print / duplex_print / signature_stamp / scan_device 未配置 = 拒绝。
+ * 例外见下方 DEFAULT_DENY_CAPABILITY_KEYS：color_print / duplex_print / signature_stamp / scan_device / copy 未配置 = 拒绝。
  */
 
 export type PrintScanCapabilityKey =
@@ -116,6 +116,7 @@ export const DEFAULT_DENY_CAPABILITY_KEYS: readonly PrintScanCapabilityKey[] = [
   'duplex_print',
   'signature_stamp',
   'scan_device',
+  'copy',
 ] as const
 
 /**
@@ -141,6 +142,7 @@ export function requiredPrintCapabilityKeys(params: {
 export const CAPABILITY_DENIAL_REASON: Partial<Record<PrintScanCapabilityKey, string>> = {
   color_print: '本机彩色打印尚未通过真机验证，暂不能按彩色下单',
   duplex_print: '本机自动双面尚未通过真机验证，暂不能按双面下单',
+  copy: '本机屏上复印尚未通过真机验证，暂不能在屏上开始复印',
   scan_device: '本机屏上扫描尚未通过真机验证，暂不能在屏上开始扫描',
 }
 
@@ -175,4 +177,19 @@ export interface TerminalCapabilityView {
   /** false = 该终端该能力从未被管理员配置过（Kiosk 端按各自的保守默认处理）。 */
   configured: boolean
   updatedAt: string | null
+}
+
+/** 建单与确认共用。显式 available 才放行，不受 managed 模式的兼容默认影响。
+ * 调用方必须传入当前终端新读到的配置；拒绝缺行、未配置视图和重复配置。
+ */
+export function evaluateCopyCapabilities(
+  params: { colorMode: 'black_white' | 'color'; duplex: 'simplex' | 'duplex_long_edge' | 'duplex_short_edge' },
+  rows: readonly { capabilityKey: string; status: string; configured?: boolean }[],
+): { allowed: boolean; deniedKeys: PrintScanCapabilityKey[] } {
+  const required: PrintScanCapabilityKey[] = ['copy', 'scan_device', ...requiredPrintCapabilityKeys(params)]
+  const deniedKeys = required.filter((key) => {
+    const matches = rows.filter((row) => row.capabilityKey === key)
+    return matches.length !== 1 || matches[0].configured === false || matches[0].status !== 'available'
+  })
+  return { allowed: deniedKeys.length === 0, deniedKeys }
 }
