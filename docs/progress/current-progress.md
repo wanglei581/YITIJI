@@ -1,5 +1,62 @@
 # 当前开发进度
 
+## 2026-11-05：政策最小闭环（产品负责人点「按方案开工」；分支 `claude/quizzical-gould-71d33b`，未部署）
+
+- 拍板：产品负责人 11/05 说政策「很多地方没法操作」，看过最小闭环方案页（第 2 版）后 12:55 点「按方案开工」。批准：一体机 5 屏加空态、停放 7 处、改触屏稿政策几屏、试点先保持所有终端都显示（不改 `POLICY_SCOPE`，不给政策请求加终端头）。托管 a 不变：政策由运营机构自己审核发布，平台管理员只留紧急下架。
+- 后端：PolicyPost 加「谁可以申请 / 要准备的材料 / 去哪办」三栏（两份 schema + 迁移 `20261105130000_add_policy_post_handling_fields`）；PATCH 可选字段 null 或空白即清空；发布闸门在审核、责任、内容可信之后再查扶持条目三栏必填、原文链接必填，有链接就须 https 且落在机构登记的官方网站域名内（`policy-source-link.ts`，与官方渠道同一份名单）；公开读与机构列表带 `externalUrlVerified`；内容可信与机构类型拒绝文案改人话（「授权核验」，不露字段名、接口和 JSON）。新增 `POST /policies/:id/checklist` 一页 A4 办事清单（页脚「仅供参考，不具证明效力；办理要件和资格以发布机构和经办窗口为准，本机不代办」，同版本复用，打印建单前复查撤下 / 紧急下架 / 改版，新依赖 `qrcode`）；小青带 `policyId` 时服务端每轮现读已发布原文注入，套用 10/8 合规定稿（`policy-constraint.ts` 一字未改）加新讲解约束 `policy-explain-constraint.ts`（讲解深度待合规确认），撤下或读不到回固定话术、不调模型。
+- 两个后台：机构政策表单分三栏（各 2000 字计数）、标题 200 字计数、https 原文链接并提示本机构登记的官方网站、缺项常显原因、发布弹窗常显两项前提且只显示服务端人话；管理员内容可信提示句去掉岗位招聘会、官方域名面板写明政策原文链接也按这份名单核对、政策页最近下架记录按 `targetType=policy` 筛。
+- 一体机：`/policy-service` 六类大卡（真实条数与最近一条，0 条变灰「还没有机构发布」）、最近更新、机构公告（有才出现）、全库 0 条整屏空态；`/renshi?audience=…&page=N` 一页 4 条；`/renshi?policy=id` 详情三块 + 核验通过才出的原文二维码 + 打印办事清单（打印机暂停时改为扫码存手机）+ 问小青这条 + 收藏先登录；各屏照稿带底部导航；`/renshi` 无参数与 `tab=policy|eligibility|social|register` 回政策首页。收藏只存本人账号，未登录点收藏去登录；「我的收藏」每条可取消（64px，失败放回原位并说明）。清单建单被拒时屏上说清原因（`POLICY_CHECKLIST_WITHDRAWN`）。
+- 停放 7 处（源码保留、不注册、不打包，文件头有停放注释，门禁 `verify:kiosk-parked-policy` 守着）：条件核对整块（`EligibilityPanel` / `EligibilityResults` / `eligibilityOutcome` / `renshi-eligibility-qx.css`，连同机构后台「申领条件」按钮与 `EligibilityRulesDrawer` / `EligibilityRuleEditor`）；社保指南、就业登记（`SocialPanel` / `RegisterPanel`）；5 条本机整理的办事指引（`builtinData.ts`）；服务台的浏览记录 / AI 服务记录 / 全部服务卡；未登录本机收藏（`favorites/localFavorites.ts`，只剩清场用两个函数清改版前的旧残留）；页内重复的问小青按钮；被三屏取代的旧面板（`PolicyPanel` / `policyFocus` / `usePolicyFocus` / `renshi-narrow-qx.css`）。没有删任何文件。
+- 改稿：触屏稿 `docs/design/kiosk-touch-2026-10/policy-min.js`（政策三屏与空态，显示范围是所有终端所以不写「本机构」）、`fix-me.js`（我的收藏加取消，方案屏 5），`FROZEN.json` 按 `--update` 重写。
+- 验证：api / kiosk / partner / admin / shared 类型检查与改动文件 eslint；图谱加全文搜得出的后端 99 条与前端 69 条关联门禁本机全过（`verify:member-closure` 按 CI 的真 Redis 开关跑过，`verify:recruitment-p1-schema:postgres-upgrade` 要真 PG 留给 CI）；新门禁 `verify:policy-publish-gates`、`verify:policy-checklist`、`verify:assistant-policy-context`、`verify:kiosk-parked-policy`（5 项反向检查全红）。本机全栈真后端实走 26 张截图：管理员登记官方域名 → 机构三栏发布，链接不在登记域名被拦（人话）→ 改链接发布 → 一体机六类 → 列表 → 详情三块 → 打印确认（试点 0 元）→ 问小青这条 → 小青关掉时其余照常 → 停在确认页时管理员紧急下架，建单被拒 → 首页变空态、详情不能查看 → 未登录点收藏去登录、登录后收藏、「我的收藏」取消。1080×1920 实量：首页、列表、详情、公告不溢出，最小字 20、可点最小边 68、主按钮 88、详情各块间距约 71px。小青那两张用的是本机假模型（只验证服务端注入原文与约束，不代表真实回答）；打印机离线扫码存手机没实走（本机没配 `KIOSK_PUBLIC_BASE_URL`）。
+- 两个接手会话撞车：实现会话交班后同时有两个会话接手（各在一个分支上收了同样五包）。商定由本分支当唯一实现方，另一分支 `claude/policy-min-loop-041394` 不开 PR；它独有的「授权核验」措辞、列表与公告页底部导航、我的收藏改稿已拣入。
+- 仍归产品负责人：定试点机构并开账号；在管理员后台标「内容可信」并登记该机构官方网站域名（可含上级部门网站）；约对接人发 3–5 条真实政策（带官方原文链接、填三栏）；上线时点头。请合规确认：小青讲解深度与「按这条原文解释」措辞；二维码旁「链接发布时已核对属于发布机构登记的官方网站」；清单抬头与页脚是否加「非受理凭证」；10/8 定稿里「看本机构发布的原文」在所有终端显示时的说法；缺展示日期时日期回落到确认发布日。
+## 2026-11-08：复印、扫描屏上流程补稿进仓库（只放稿；11/02 起草，原先叠在 PR #1495 上，#1495 已于 11/04 进 main）
+
+- **改了什么**：新目录 `docs/design/kiosk-touch-2026-11-copyscan/`（`index.html` 套用 `kiosk-touch-2026-10/` 定稿骨架、`copyscan.js` 25 屏：屏上扫描 14、屏上复印 8 加面板复印图文指引 2、设备状态 1）；`docs/README.md` 第二节加第 4 条口径。定稿目录 `kiosk-touch-2026-10/` 一个字节没动（`verify:kiosk-touch-frozen` 通过）。
+- **口径**：面板复印图文指引两屏产品负责人 11/02 原话「补稿可以，照它改」（程序见 PR #1545）；屏上扫描、设备状态随「复印扫描四步走」方案给他看过（他定「按推荐四步走」），一体机 `scan/*` 改程序以这套稿为准，偏离先问他；屏上复印是第四步的稿。触屏版总指挥 11/02 定：补稿单独开文档 PR 落真值，`scan/*` 代码 PR 引用它。
+- **没动的**：运行时代码、两套冻结稿、小程序。
+- **11/08 并 main**：包 4（复印扫描走大屏，产品负责人 11/08 对《四核心收口方案》回「按推荐执行」）先把这份稿合进来，屏上扫描页（K1b）、屏上复印页（C3）的代码 PR 都引用它。只有本文件冲突，两侧保留。
+
+## 2026-11-08：四核心收口包 2 第一步——B2 简历 AI 授权三处单独合入（拆自 #1581 / #1557；分支 `claude/land-b2-resume-consent-1108`；未部署）
+
+- 来由：产品负责人 11/08 15:07 对《四核心收口方案》回「按推荐执行」。包 2 把 11/04 起和 main 冲突的五项批次 #1581 拆回小 PR、一个一个合，每合一个跑一遍全量 CI；本条是第一个。同日 #1501（求职进度页签管理员开关）CI 三绿后已合入 main（1d0c0082b）。
+- 后端：版式调整、职业规划、带简历的模拟面试，在把简历交给模型之前核「简历 AI 授权」，没同意回 403 `USER_AI_CONSENT_REQUIRED`，不调模型、不扣次数（内容同 #1557，见下文 11/03、11/04 三条）。
+- 一体机：`ResumeAiConsentDialog` 第一句改成小程序那边已过合规的新句「简历诊断、优化、生成，以及用到这份简历的版式调整、职业规划和模拟面试，会把你上传或填写的简历内容发送到系统里的 AI 进行分析。」——后端扩到三处后，旧句只写「诊断、优化和生成」，说明和用途对不上。触屏稿 `fix-resume2.js` 仍是旧句，按代码事实待补稿。
+- 小程序：#1557 里的小程序 8 个文件没有随本条合入（这条线不碰小程序），留在分支 `claude/resume-ai-consent-1103` 给小程序线。小程序里诊断后又撤回授权的会员，在职业规划会收到不带确认框的 403，小程序上线前要补上那部分。
+- 验证：并入最新 main 只冲图谱与进度文档；本机 `graph:check`、仓库完整性、CI 门禁覆盖、合规文案、api 与一体机类型检查和 lint，以及职业规划两条、版式调整、模拟面试两条、简历授权装配、AI 访问、次数覆盖、托管声明、送模型打码、会员资产、AI 文本留存、自我探索授权、合规、终端设备配置、AI 次数、一体机三条（AI 不可用出路、首批商用、打印链接契约）全过。全量以 CI 为准。
+
+## 2026-11-05：产品负责人定四个核心功能的收费口径（合规口径落文；只改文档；分支 `claude/pricing-policy-1105`）
+
+- 原话：产品负责人 11/05 18:21 在设计窗口打字「你们新开一个窗口，根据现有的四个核心功能设置收费模式，在手机小程序上面加入，一体机登录账号进行同步，或者是一体机上面也可以加入对应的功能支付入口，你们看怎么设计吧？」。方案窗口出了私有页（含价格，不进公开仓库），他看完回「按推荐」，又补三句：「没事，我们可以卖给企业，我们也可以设置直接投放，你们继续」「反正这些对应的功能都可以设置价格进行支付」「我的意思是，如果没有企业买，我们可以做成面向用户的付费方式，明白吗？」
+- 按推荐定的 6 件：①四个核心功能是 AI 简历优化、AI 模拟面试、打印、扫描，政策照旧免费；②方向上放开向个人收费，但现在不收，公共就业点位永远不向求职者收，每一处都是默认关的开关，前提办齐才开；③先在小程序收（微信虚拟支付，买 AI 单次服务，一体机登录同一账号后能看到、能用），一体机现场收钱放在后面；④只卖单次服务，不卖次数包；⑤试点前收费代码不动，试点期间递三封咨询函，12/15 以后先做「每台机器设谁付钱」；⑥扫描免费，也做成能设价，默认 0 元。补的三句落成：每台机器设「谁付钱」，有企业或机构买就由他们付、用户免费；没人买就由我们自己投放机器、向用户收费；四个功能都能按机器设价，默认 0 元。
+- 改了哪些旧口径：10/29「收费只有设备款与维保费」补上向个人收费的口径（主收入仍是设备款与年费）；9/30「AI 用完不收费、不做个人付费」在公共就业点位不变，小程序、商业点位和我们自己投放的机器以后可以卖单次服务；9/29「小程序次数包」改为只卖单次服务；10/29「人社第十八条不备案」改为向个人收 AI 费之前重新问一次。不变：公共点位对求职者全免；商业点位四件办齐前由场地方买单（9/29 复审）；小程序首版不出现价格和购买引导（9/30）；不收与岗位、招聘会、浏览、投递、入职挂钩的费用。
+- 写进了：`CLAUDE.md` §1；`docs/product/feature-scope.md` §0.2；`docs/compliance/compliance-boundary.md` §1.1（10/29 一条的②③，9/26 一条加指针）与 §1.2 F（新增 11/05 一条，列前提清单）；`docs/progress/next-tasks.md` 顶部（下一步）。
+- 没改：代码、配置、数据库、生产价目、小程序；没有写任何价格、档位或客户名（只放私有页）。没有停放、隐藏、改名、删除任何东西。
+- **警告：后台打印价目是全局一张表，改成大于 0 会让所有机器（包括公共点位）一起收钱，并跳过免费打印额度（`services/api/src/print-jobs/free-print-quota.decide.ts`：实付大于 0 时直接返回，不查三条免费上限）。第 1 期「每台机器设谁付钱」做完前不许改价。**
+
+## 2026-11-03：一体机扫描页按职责拆开（K1a，只拆不改行为；分支 `claude/scan-k1a-split-1102`，未合并、未部署）
+
+- 为什么：下一步 K1b 要把屏上扫描做进扫描页。`ScanSettingsPage.tsx` 原来 784 行，离 800 行硬线只剩 16 行；`ScanResultPage.tsx` 512 行。本批只拆，让 K1b 能复用建会话、投递确认、重扫授权和出口。基线 `317e54442`。实现提交：`12cc15320`（设置页五个 hook）、`b0d6847e0`（结果页两个 hook、三个组件）、`ec56da22a`（六个门禁改读新文件，断言不删不放宽）、`a1e9ca34c`（游客结果页文案）。
+- 怎么拆：设置页拆成 `useScanSettingsState`、`useScanSessionCreate`、`useScanSettingsDeliveryAck`、`useScanSettingsExpiry`、`useScanSettingsActions`，页面只留装配与渲染（123 行）。投递确认和进度页不同构，没有抽成共用 hook。结果页拆成 `useScanResultRescan`、`useScanResultExits`、`ScanResultFailedView`、`ScanResultPreviewBlock`、`ScanResultExitRow`、`scanResultModel`，页面 122 行。`leaveScanFlow` 仍是先撤会话、再清登记、再 replace 导航。拆完每个文件都不超过 500 行，最长的是 `useScanSessionCreate.ts`（394 行）。
+- 文案（R-03，产品负责人 11/02 拍板，照触屏版补稿 cs-scan-done）：游客成功说明改为「未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。要带走电子版，下次先扫码登录再扫。」再加「用 U 盘带走：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。」不加登录按钮（游客一登录，这次扫描会被清掉）。禁用的「本次不进入我的文档」不动。登录后仍是「前往我的文档」。
+- 没改：路由、阶段机、扫描登记的存储格式、后端、终端程序、共享包、小程序、两个后台。触屏版那四处（U 盘卡「暂未开通」、证件 JPG 的 `role="note"`、游客结果页没有下载码、`SCAN_FILE_TYPE_NOT_ALLOWED` 的说法）没改回去。
+- 本机验证（系统 Chrome；Playwright 自带 Chromium 缓存是空的）：kiosk typecheck 通过；lint 0 error（27 条原有 warning，不在扫描页）。门禁全绿：`verify:fusion-w2`、`verify:scan-session-truth`、`verify:scan-quiet-period`、`verify:print-done-truth`（47 过）、`verify:kiosk-ai-declaration`、`verify:kiosk-runtime-error-boundary`、`verify:kiosk-unattended-copy`、`verify:kiosk-font-subset`（7168 字）、`verify:compliance-copy`（含 `verify:no-raw-error-render`）、图谱多列出的 `verify:fusion-w6`。浏览器：w2 243/243（含 fusion-w2-scan 36）；truth 177 过、1 条红；scan-safety 37 过、1 条红；会话警告 35/35；隐私超时 42/42；w6 里路径含 `/scan` 的 8/8；旅程 F 1/1。
+- 两条红不是这次拆分。`unfinished privacy check keeps the recovery exit` 在 origin/main 副本（`7af05df97`）上同一条同样红：收尾报未登记的 `POST /api/v1/materials/tasks`，屏上的恢复出口本身在。`payment code never renders` 是全套一起跑时，付款失败后界面已经回到「等待扫码」，单独再跑本分支与 origin/main 都过（本分支 1 过 / 2.2 秒，origin/main 1 过 / 2.7 秒）。一体机目录相对基线与 origin/main 没有别的差；origin/main 只多小程序 #1538。
+- 截图在 `~/.cache/claude-lanes/copyscan-1102/code-shots/k1a/`，`main-*` 与 `branch-*` 各 10 张（游客、登录 × 选类型、指引、等待、成功、失败）。文字除游客成功那句外一致。像素：选类型、等待、两种失败、登录成功为 0 差；指引只差倒计时秒数（同一时刻起算，拍摄耗时差几秒）；游客成功那张差在新句子多出来的行。
+- 反向检查（改坏后 `git checkout` 恢复，没有提交改坏的状态）：删掉 `leaveScanFlow` 里的撤会话 → `verify:scan-session-truth` 红在「先撤服务端任务」；游客句改回旧句 → 同一门禁红在 11/02 原话；静默期去掉减一 → `verify:scan-quiet-period` 红。恢复后这两条门禁再绿，工作区干净。
+- 图谱：新文件入库后 `pnpm graph` 重出，`pnpm graph:check` 通过（`docs/graph/` 3 个文件有变化）。新文件被 fusion-w2 与 scan-session-truth 钉住；设置页那一组还被 runtime-error-boundary 与 no-raw-error-render 钉住；`useScanResultExits` 还被 print-done-truth 钉住；`useScanSessionCreate` 还被 scan-quiet-period 钉住。这些门禁本轮都已跑过，没有新冒出来还没跑的。
+- 合并注意：origin/main 比本分支基线多 #1538，进度文档顶部多一节小程序签名图。合的时候两节都留，这一节放在上面。
+
+## 2026-11-05：PDF 文字层部首字符换回常用字（C3；源 #1402；未合并、未部署）
+
+- 问题：F-24 的苹果 PDF 文字层把常用字存成部首码位，模型写回常用字后被防编造比对误拒；本轮从 main `50070402a` 重做 #1402 的四个代码提交，未带入旧进度文档、图谱和 CI workflow 改动。
+- 改法：通用表只折康熙部首 U+2F00–U+2FD5 和部首补充 U+2E80–U+2EF3 中确定的 314 对（214+100，14 对排除）；先按已知字体的 20 对例外补救，再拼行、整表折叠。单页取字体失败或条目数不齐时该页原样保留；没有例外字的页不再取文字或操作列表。抽取、历史原文、诊断报告及改进建议、模型直接字符和 JSON 转义字符串用同一编码；日志只增加计数或固定拒绝规则名。
+- 与 #1574 衔接：保留提示词、moduleAfter 的首尾空白处理、补回和篇幅收口后的 returnAligned，以及逐字段 includes 判据；在最终核对前同步折叠稿与模块字符串。唯一空白/标点差异仍只规范 after，多处相似和跨字段拼接仍只能手改，不为核对增加模型调用。新门禁另加 4 条部首与最终稿核对的组合断言。
+- 门禁接线：仅改 API package.json 的 verify:resume-extraction 串接，依次追加 verify:resume-radical-fold 与 verify:resume-radical-font-fold；该入口已在 ci.yml 的 SQLite 和 postgres-readiness 中执行。verify-ci-gate-coverage 通过，566/576 条 verify/ui 门禁进入 CI 执行闭包，10 条已有豁免，新门禁均进入闭包。
+- 验证：API typecheck、改过的 8 个 TS 文件 lint、新门禁 79/79 与 55/55、图谱关联的全部可离线门禁（含 verify:resume-optimize 内 #1574 的 6 类样本及两个展开的前置/后置脚本）、根目录仓库完整性/合规文案/日期时间/原始错误上屏检查均通过。verify:resume-report-export 首轮 SQLite P1008 超时，串行重跑通过；verify:ocr-baidu-live 已执行但因无 BAIDU_OCR_API_KEY / BAIDU_OCR_SECRET_KEY 退出 1，未验证真实 OCR。反向检查清空表为 40 PASS/39 FAIL、去掉事实比对前折叠为 75 PASS/4 FAIL，均退出 1；从 /tmp/c3-radical-mut/ 副本恢复后逐字节一致，两条新门禁恢复通过，反向检查前后 git diff --stat 完全一致。
+- 没做：未合并、未部署；未改 apps/**、ci.yml、图谱、生产配置、数据库结构，未新增依赖；未用 F-24 原件与苹果全部字体在真机、真实模型上复测。
+
 ## 2026-11-08：终端程序屏上扫描第二批（A2，PR #1584）并 main、版本升 0.4.20
 
 - 做了：分支 `claude/scan-device-a2-1102`（合并前头 `7324d0048`）并入 main `42e945e76`，只做并 main、解冲突、升版本号，不改功能、不加功能。代码冲突两处，都按语义两边保留：① `apps/terminal-agent/src/agent/heartbeat.ts` 的 `HeartbeatOptions` 同时留 A2 的 `getScanDeviceHealth` 与 #1579 的四个探针注入（打印机状态、磁盘、网络、打印队列）和时钟注入；`sendHeartbeat` 里扫描仪两个字段与打印队列字段、400 去掉队列字段重发由 git 自动合好，两边行为都不变。② `.github/workflows/windows-agent-installer.yml` 里 main 这边只有同样的 0.4.19 版本号改动，合完保留 A2 加的纠偏 Windows 门禁步骤（在 EXE 安装测试之前）。图谱取 main 后重新生成，进度文档两侧保留。升完版本、推送前 main 又进了 #1501（`1d0c0082b`，只改两个后台与后端，不碰终端程序），再并一次，冲突只在图谱。
@@ -19,6 +76,7 @@
 - 改法（Codex 实现，Claude 收货）：共用入口在查询前设 `[Console]::OutputEncoding` 为无 BOM UTF-8，卷标与隐藏文件名两处查询一起生效；其余 U 盘行为不变。`verify:usb-import-agent` 加中文卷标「工作资料」「新加卷」、中文隐藏文件名（单值 / 数组）与编码顺序断言；去掉编码那一行门禁变红，恢复后绿。`verify:local-qr-proxy`、repository-integrity 通过。
 - 旁查同类缺口（本轮不改）：`printer/printer-status.ts`（打印机名可能含中文）、`agent/scan-device/scan-device-health.ts`（命令行可能含中文路径）也没设输出编码；WIA 探测与扫描脚本协议只有 ASCII。
 - 真机未核：装 0.4.19 时按 `~/.cache/claude-lanes/copyscan-1102/acceptance.md` 末尾四处一致（CIM 原值、stdout 字节、`/local/usb/status`、一体机显示）核一次。
+
 ## 2026-11-05：扫描件自动矫正 S4a 第三轮——Windows 门禁对 8 位 BMP 的标记判据（分支 `claude/scan-deskew-1104`，未接线、未部署）
 
 - Windows CI 第二次实跑（run 41965545914）：估角已对（文字页 ±4° 内与输入一致，最差 ±0.1°），风险集（空白、照片、表格、证件、发票）误纠偏 0；只剩 16 个 `bmp8` 文字页报 `lost original corner/edge marker`，同角度 png / jpeg / bmp24 全过。
@@ -65,57 +123,6 @@
 - 新门禁 `verify:scan-device-runner`（17 组，假执行器、假后端、假时钟），已进 ci.yml。
 - 打印领取：开关打开时，领任务前试拿设备锁（`print-claim`），拿不到就跳过这一轮（日志每分钟最多一条）；拿到后一直持有到本轮 `executeTask` 结束再放，放锁之后才探测扫描仪。没领到任务立即放锁、不探测。开关关着时领取路径不碰这把锁。没改续打、重打判定，也没改 `print-job-monitor.ts`。
 - 没做：没碰真机，没打安装包，没部署。B1 上生产前不得打开 `scanDeviceEnabled`。#1465 去留定下来之前，不往真机发新的终端程序安装包。
-
-## 2026-11-05：政策最小闭环（产品负责人点「按方案开工」；分支 `claude/quizzical-gould-71d33b`，未部署）
-
-- 拍板：产品负责人 11/05 说政策「很多地方没法操作」，看过最小闭环方案页（第 2 版）后 12:55 点「按方案开工」。批准：一体机 5 屏加空态、停放 7 处、改触屏稿政策几屏、试点先保持所有终端都显示（不改 `POLICY_SCOPE`，不给政策请求加终端头）。托管 a 不变：政策由运营机构自己审核发布，平台管理员只留紧急下架。
-- 后端：PolicyPost 加「谁可以申请 / 要准备的材料 / 去哪办」三栏（两份 schema + 迁移 `20261105130000_add_policy_post_handling_fields`）；PATCH 可选字段 null 或空白即清空；发布闸门在审核、责任、内容可信之后再查扶持条目三栏必填、原文链接必填，有链接就须 https 且落在机构登记的官方网站域名内（`policy-source-link.ts`，与官方渠道同一份名单）；公开读与机构列表带 `externalUrlVerified`；内容可信与机构类型拒绝文案改人话（「授权核验」，不露字段名、接口和 JSON）。新增 `POST /policies/:id/checklist` 一页 A4 办事清单（页脚「仅供参考，不具证明效力；办理要件和资格以发布机构和经办窗口为准，本机不代办」，同版本复用，打印建单前复查撤下 / 紧急下架 / 改版，新依赖 `qrcode`）；小青带 `policyId` 时服务端每轮现读已发布原文注入，套用 10/8 合规定稿（`policy-constraint.ts` 一字未改）加新讲解约束 `policy-explain-constraint.ts`（讲解深度待合规确认），撤下或读不到回固定话术、不调模型。
-- 两个后台：机构政策表单分三栏（各 2000 字计数）、标题 200 字计数、https 原文链接并提示本机构登记的官方网站、缺项常显原因、发布弹窗常显两项前提且只显示服务端人话；管理员内容可信提示句去掉岗位招聘会、官方域名面板写明政策原文链接也按这份名单核对、政策页最近下架记录按 `targetType=policy` 筛。
-- 一体机：`/policy-service` 六类大卡（真实条数与最近一条，0 条变灰「还没有机构发布」）、最近更新、机构公告（有才出现）、全库 0 条整屏空态；`/renshi?audience=…&page=N` 一页 4 条；`/renshi?policy=id` 详情三块 + 核验通过才出的原文二维码 + 打印办事清单（打印机暂停时改为扫码存手机）+ 问小青这条 + 收藏先登录；各屏照稿带底部导航；`/renshi` 无参数与 `tab=policy|eligibility|social|register` 回政策首页。收藏只存本人账号，未登录点收藏去登录；「我的收藏」每条可取消（64px，失败放回原位并说明）。清单建单被拒时屏上说清原因（`POLICY_CHECKLIST_WITHDRAWN`）。
-- 停放 7 处（源码保留、不注册、不打包，文件头有停放注释，门禁 `verify:kiosk-parked-policy` 守着）：条件核对整块（`EligibilityPanel` / `EligibilityResults` / `eligibilityOutcome` / `renshi-eligibility-qx.css`，连同机构后台「申领条件」按钮与 `EligibilityRulesDrawer` / `EligibilityRuleEditor`）；社保指南、就业登记（`SocialPanel` / `RegisterPanel`）；5 条本机整理的办事指引（`builtinData.ts`）；服务台的浏览记录 / AI 服务记录 / 全部服务卡；未登录本机收藏（`favorites/localFavorites.ts`，只剩清场用两个函数清改版前的旧残留）；页内重复的问小青按钮；被三屏取代的旧面板（`PolicyPanel` / `policyFocus` / `usePolicyFocus` / `renshi-narrow-qx.css`）。没有删任何文件。
-- 改稿：触屏稿 `docs/design/kiosk-touch-2026-10/policy-min.js`（政策三屏与空态，显示范围是所有终端所以不写「本机构」）、`fix-me.js`（我的收藏加取消，方案屏 5），`FROZEN.json` 按 `--update` 重写。
-- 验证：api / kiosk / partner / admin / shared 类型检查与改动文件 eslint；图谱加全文搜得出的后端 99 条与前端 69 条关联门禁本机全过（`verify:member-closure` 按 CI 的真 Redis 开关跑过，`verify:recruitment-p1-schema:postgres-upgrade` 要真 PG 留给 CI）；新门禁 `verify:policy-publish-gates`、`verify:policy-checklist`、`verify:assistant-policy-context`、`verify:kiosk-parked-policy`（5 项反向检查全红）。本机全栈真后端实走 26 张截图：管理员登记官方域名 → 机构三栏发布，链接不在登记域名被拦（人话）→ 改链接发布 → 一体机六类 → 列表 → 详情三块 → 打印确认（试点 0 元）→ 问小青这条 → 小青关掉时其余照常 → 停在确认页时管理员紧急下架，建单被拒 → 首页变空态、详情不能查看 → 未登录点收藏去登录、登录后收藏、「我的收藏」取消。1080×1920 实量：首页、列表、详情、公告不溢出，最小字 20、可点最小边 68、主按钮 88、详情各块间距约 71px。小青那两张用的是本机假模型（只验证服务端注入原文与约束，不代表真实回答）；打印机离线扫码存手机没实走（本机没配 `KIOSK_PUBLIC_BASE_URL`）。
-- 两个接手会话撞车：实现会话交班后同时有两个会话接手（各在一个分支上收了同样五包）。商定由本分支当唯一实现方，另一分支 `claude/policy-min-loop-041394` 不开 PR；它独有的「授权核验」措辞、列表与公告页底部导航、我的收藏改稿已拣入。
-- 仍归产品负责人：定试点机构并开账号；在管理员后台标「内容可信」并登记该机构官方网站域名（可含上级部门网站）；约对接人发 3–5 条真实政策（带官方原文链接、填三栏）；上线时点头。请合规确认：小青讲解深度与「按这条原文解释」措辞；二维码旁「链接发布时已核对属于发布机构登记的官方网站」；清单抬头与页脚是否加「非受理凭证」；10/8 定稿里「看本机构发布的原文」在所有终端显示时的说法；缺展示日期时日期回落到确认发布日。
-
-## 2026-11-08：复印、扫描屏上流程补稿进仓库（只放稿；11/02 起草，原先叠在 PR #1495 上，#1495 已于 11/04 进 main）
-
-- **改了什么**：新目录 `docs/design/kiosk-touch-2026-11-copyscan/`（`index.html` 套用 `kiosk-touch-2026-10/` 定稿骨架、`copyscan.js` 25 屏：屏上扫描 14、屏上复印 8 加面板复印图文指引 2、设备状态 1）；`docs/README.md` 第二节加第 4 条口径。定稿目录 `kiosk-touch-2026-10/` 一个字节没动（`verify:kiosk-touch-frozen` 通过）。
-- **口径**：面板复印图文指引两屏产品负责人 11/02 原话「补稿可以，照它改」（程序见 PR #1545）；屏上扫描、设备状态随「复印扫描四步走」方案给他看过（他定「按推荐四步走」），一体机 `scan/*` 改程序以这套稿为准，偏离先问他；屏上复印是第四步的稿。触屏版总指挥 11/02 定：补稿单独开文档 PR 落真值，`scan/*` 代码 PR 引用它。
-- **没动的**：运行时代码、两套冻结稿、小程序。
-- **11/08 并 main**：包 4（复印扫描走大屏，产品负责人 11/08 对《四核心收口方案》回「按推荐执行」）先把这份稿合进来，屏上扫描页（K1b）、屏上复印页（C3）的代码 PR 都引用它。只有本文件冲突，两侧保留。
-
-
-## 2026-11-05：产品负责人定四个核心功能的收费口径（合规口径落文；只改文档；分支 `claude/pricing-policy-1105`）
-
-- 原话：产品负责人 11/05 18:21 在设计窗口打字「你们新开一个窗口，根据现有的四个核心功能设置收费模式，在手机小程序上面加入，一体机登录账号进行同步，或者是一体机上面也可以加入对应的功能支付入口，你们看怎么设计吧？」。方案窗口出了私有页（含价格，不进公开仓库），他看完回「按推荐」，又补三句：「没事，我们可以卖给企业，我们也可以设置直接投放，你们继续」「反正这些对应的功能都可以设置价格进行支付」「我的意思是，如果没有企业买，我们可以做成面向用户的付费方式，明白吗？」
-- 按推荐定的 6 件：①四个核心功能是 AI 简历优化、AI 模拟面试、打印、扫描，政策照旧免费；②方向上放开向个人收费，但现在不收，公共就业点位永远不向求职者收，每一处都是默认关的开关，前提办齐才开；③先在小程序收（微信虚拟支付，买 AI 单次服务，一体机登录同一账号后能看到、能用），一体机现场收钱放在后面；④只卖单次服务，不卖次数包；⑤试点前收费代码不动，试点期间递三封咨询函，12/15 以后先做「每台机器设谁付钱」；⑥扫描免费，也做成能设价，默认 0 元。补的三句落成：每台机器设「谁付钱」，有企业或机构买就由他们付、用户免费；没人买就由我们自己投放机器、向用户收费；四个功能都能按机器设价，默认 0 元。
-- 改了哪些旧口径：10/29「收费只有设备款与维保费」补上向个人收费的口径（主收入仍是设备款与年费）；9/30「AI 用完不收费、不做个人付费」在公共就业点位不变，小程序、商业点位和我们自己投放的机器以后可以卖单次服务；9/29「小程序次数包」改为只卖单次服务；10/29「人社第十八条不备案」改为向个人收 AI 费之前重新问一次。不变：公共点位对求职者全免；商业点位四件办齐前由场地方买单（9/29 复审）；小程序首版不出现价格和购买引导（9/30）；不收与岗位、招聘会、浏览、投递、入职挂钩的费用。
-- 写进了：`CLAUDE.md` §1；`docs/product/feature-scope.md` §0.2；`docs/compliance/compliance-boundary.md` §1.1（10/29 一条的②③，9/26 一条加指针）与 §1.2 F（新增 11/05 一条，列前提清单）；`docs/progress/next-tasks.md` 顶部（下一步）。
-- 没改：代码、配置、数据库、生产价目、小程序；没有写任何价格、档位或客户名（只放私有页）。没有停放、隐藏、改名、删除任何东西。
-- **警告：后台打印价目是全局一张表，改成大于 0 会让所有机器（包括公共点位）一起收钱，并跳过免费打印额度（`services/api/src/print-jobs/free-print-quota.decide.ts`：实付大于 0 时直接返回，不查三条免费上限）。第 1 期「每台机器设谁付钱」做完前不许改价。**
-
-## 2026-11-03：一体机扫描页按职责拆开（K1a，只拆不改行为；分支 `claude/scan-k1a-split-1102`，未合并、未部署）
-
-- 为什么：下一步 K1b 要把屏上扫描做进扫描页。`ScanSettingsPage.tsx` 原来 784 行，离 800 行硬线只剩 16 行；`ScanResultPage.tsx` 512 行。本批只拆，让 K1b 能复用建会话、投递确认、重扫授权和出口。基线 `317e54442`。实现提交：`12cc15320`（设置页五个 hook）、`b0d6847e0`（结果页两个 hook、三个组件）、`ec56da22a`（六个门禁改读新文件，断言不删不放宽）、`a1e9ca34c`（游客结果页文案）。
-- 怎么拆：设置页拆成 `useScanSettingsState`、`useScanSessionCreate`、`useScanSettingsDeliveryAck`、`useScanSettingsExpiry`、`useScanSettingsActions`，页面只留装配与渲染（123 行）。投递确认和进度页不同构，没有抽成共用 hook。结果页拆成 `useScanResultRescan`、`useScanResultExits`、`ScanResultFailedView`、`ScanResultPreviewBlock`、`ScanResultExitRow`、`scanResultModel`，页面 122 行。`leaveScanFlow` 仍是先撤会话、再清登记、再 replace 导航。拆完每个文件都不超过 500 行，最长的是 `useScanSessionCreate.ts`（394 行）。
-- 文案（R-03，产品负责人 11/02 拍板，照触屏版补稿 cs-scan-done）：游客成功说明改为「未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。要带走电子版，下次先扫码登录再扫。」再加「用 U 盘带走：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。」不加登录按钮（游客一登录，这次扫描会被清掉）。禁用的「本次不进入我的文档」不动。登录后仍是「前往我的文档」。
-- 没改：路由、阶段机、扫描登记的存储格式、后端、终端程序、共享包、小程序、两个后台。触屏版那四处（U 盘卡「暂未开通」、证件 JPG 的 `role="note"`、游客结果页没有下载码、`SCAN_FILE_TYPE_NOT_ALLOWED` 的说法）没改回去。
-- 本机验证（系统 Chrome；Playwright 自带 Chromium 缓存是空的）：kiosk typecheck 通过；lint 0 error（27 条原有 warning，不在扫描页）。门禁全绿：`verify:fusion-w2`、`verify:scan-session-truth`、`verify:scan-quiet-period`、`verify:print-done-truth`（47 过）、`verify:kiosk-ai-declaration`、`verify:kiosk-runtime-error-boundary`、`verify:kiosk-unattended-copy`、`verify:kiosk-font-subset`（7168 字）、`verify:compliance-copy`（含 `verify:no-raw-error-render`）、图谱多列出的 `verify:fusion-w6`。浏览器：w2 243/243（含 fusion-w2-scan 36）；truth 177 过、1 条红；scan-safety 37 过、1 条红；会话警告 35/35；隐私超时 42/42；w6 里路径含 `/scan` 的 8/8；旅程 F 1/1。
-- 两条红不是这次拆分。`unfinished privacy check keeps the recovery exit` 在 origin/main 副本（`7af05df97`）上同一条同样红：收尾报未登记的 `POST /api/v1/materials/tasks`，屏上的恢复出口本身在。`payment code never renders` 是全套一起跑时，付款失败后界面已经回到「等待扫码」，单独再跑本分支与 origin/main 都过（本分支 1 过 / 2.2 秒，origin/main 1 过 / 2.7 秒）。一体机目录相对基线与 origin/main 没有别的差；origin/main 只多小程序 #1538。
-- 截图在 `~/.cache/claude-lanes/copyscan-1102/code-shots/k1a/`，`main-*` 与 `branch-*` 各 10 张（游客、登录 × 选类型、指引、等待、成功、失败）。文字除游客成功那句外一致。像素：选类型、等待、两种失败、登录成功为 0 差；指引只差倒计时秒数（同一时刻起算，拍摄耗时差几秒）；游客成功那张差在新句子多出来的行。
-- 反向检查（改坏后 `git checkout` 恢复，没有提交改坏的状态）：删掉 `leaveScanFlow` 里的撤会话 → `verify:scan-session-truth` 红在「先撤服务端任务」；游客句改回旧句 → 同一门禁红在 11/02 原话；静默期去掉减一 → `verify:scan-quiet-period` 红。恢复后这两条门禁再绿，工作区干净。
-- 图谱：新文件入库后 `pnpm graph` 重出，`pnpm graph:check` 通过（`docs/graph/` 3 个文件有变化）。新文件被 fusion-w2 与 scan-session-truth 钉住；设置页那一组还被 runtime-error-boundary 与 no-raw-error-render 钉住；`useScanResultExits` 还被 print-done-truth 钉住；`useScanSessionCreate` 还被 scan-quiet-period 钉住。这些门禁本轮都已跑过，没有新冒出来还没跑的。
-- 合并注意：origin/main 比本分支基线多 #1538，进度文档顶部多一节小程序签名图。合的时候两节都留，这一节放在上面。
-
-## 2026-11-05：PDF 文字层部首字符换回常用字（C3；源 #1402；未合并、未部署）
-
-- 问题：F-24 的苹果 PDF 文字层把常用字存成部首码位，模型写回常用字后被防编造比对误拒；本轮从 main `50070402a` 重做 #1402 的四个代码提交，未带入旧进度文档、图谱和 CI workflow 改动。
-- 改法：通用表只折康熙部首 U+2F00–U+2FD5 和部首补充 U+2E80–U+2EF3 中确定的 314 对（214+100，14 对排除）；先按已知字体的 20 对例外补救，再拼行、整表折叠。单页取字体失败或条目数不齐时该页原样保留；没有例外字的页不再取文字或操作列表。抽取、历史原文、诊断报告及改进建议、模型直接字符和 JSON 转义字符串用同一编码；日志只增加计数或固定拒绝规则名。
-- 与 #1574 衔接：保留提示词、moduleAfter 的首尾空白处理、补回和篇幅收口后的 returnAligned，以及逐字段 includes 判据；在最终核对前同步折叠稿与模块字符串。唯一空白/标点差异仍只规范 after，多处相似和跨字段拼接仍只能手改，不为核对增加模型调用。新门禁另加 4 条部首与最终稿核对的组合断言。
-- 门禁接线：仅改 API package.json 的 verify:resume-extraction 串接，依次追加 verify:resume-radical-fold 与 verify:resume-radical-font-fold；该入口已在 ci.yml 的 SQLite 和 postgres-readiness 中执行。verify-ci-gate-coverage 通过，566/576 条 verify/ui 门禁进入 CI 执行闭包，10 条已有豁免，新门禁均进入闭包。
-- 验证：API typecheck、改过的 8 个 TS 文件 lint、新门禁 79/79 与 55/55、图谱关联的全部可离线门禁（含 verify:resume-optimize 内 #1574 的 6 类样本及两个展开的前置/后置脚本）、根目录仓库完整性/合规文案/日期时间/原始错误上屏检查均通过。verify:resume-report-export 首轮 SQLite P1008 超时，串行重跑通过；verify:ocr-baidu-live 已执行但因无 BAIDU_OCR_API_KEY / BAIDU_OCR_SECRET_KEY 退出 1，未验证真实 OCR。反向检查清空表为 40 PASS/39 FAIL、去掉事实比对前折叠为 75 PASS/4 FAIL，均退出 1；从 /tmp/c3-radical-mut/ 副本恢复后逐字节一致，两条新门禁恢复通过，反向检查前后 git diff --stat 完全一致。
-- 没做：未合并、未部署；未改 apps/**、ci.yml、图谱、生产配置、数据库结构，未新增依赖；未用 F-24 原件与苹果全部字体在真机、真实模型上复测。
 
 ## 2026-11-05：终端程序打印队列诊断与显式 A4 合入 main（#1579，分支 `claude/printer-queue-agent-1104`；代码进 main，未打包发布、未装机）
 
@@ -238,7 +245,6 @@
 - 没做 / 边界：终端程序（A1 底座、A2 接线）、一体机（K1）、小程序、两个后台都没动；没有新迁移；真机验证 V0-3/4/5/11/12 没做，**哪台机器都不许在后台把 scan_device 配成 available**；`deviceUpdatedAt` 现在也会被用户改设置 / 改用面板写，K1 若拿它判断「终端程序沉默」要知道这一点；Playwright 视觉用例没跑。
 - 超出任务包文字的几处（各自单独成提交或单独成块，可单独审、单独撤）：`verify-ai-access` 清单登记 `ScanDeviceController`；共享契约多导出 `SCAN_TASK_NOT_ACTIVE` 与 `SCAN_DEVICE_NOT_VERIFIED_ON_TERMINAL` 两个原因码常量；两套 schema 里 `ScanTask` device 列注释同步（deviceUpdatedAt 语义）；`verify-scan-tasks` 钉 where 文本的常量加一行；第三个新门禁 `verify-scan-device-lifecycle`（把三处追加修复的用例放进去，没往 1000 多行的 B1 门禁和 700 多行的改设置门禁里堆）。
 - 验证：api typecheck、`eslint src/`（整个 src）、共享包与一体机 typecheck 全绿；`db:pg:sync:check` 通过，临时 PG 上 `prisma migrate diff` 无漂移；SQLite 口径图谱列出的加简报必跑的 57 条 API 门禁、27 条其它包静态门禁全绿（`verify:terminal-device-config` 要 `prisma/dev.db`、`verify:first-order-migrations` 要 `LC_ALL=en_US.UTF-8` 才能在本机起临时库，是本机环境条件，补上后绿）；postgres-readiness 里同源的 20 条（含两个新门禁与 `recruitment-p1-schema:postgres-upgrade`）在本机临时 PostgreSQL 16（UTC）上全绿；`verify:repository-integrity` 三项 OK；反向检查 26 处（第一批 16、追加三项 10）全部变红，恢复后干净。
-
 ## 2026-11-05：触屏版三项承诺进 main——B9（#1495 随 #1577）、B10（#1585）、B12（#1580）（只改文档；分支 `claude/touch-b9-b10-b12-progress-1105`）
 
 - **#1577 批量**（main + #1511 授权闸门 + #1573 简历 U 盘 + #1495 触屏稿与冻结门禁）：合并提交 4b76ae078（11/05 01:43）。并 main 时补了两处与 #1583 停放的语义冲突：收尾路由登记表认 `/toolbox/*`、`/smart-campus/*`（`windDownRoute` 支持前缀匹配，停放旧链接收尾期间也照常回首页）；首页磁贴期望改为 gov 3 块、full 4 块（`home-fill-when-empty` 与授权闸门夹具去掉智慧校园）。
@@ -337,6 +343,35 @@
 - 读 #1511 的 `GET /api/v1/public/brand`（不要登录）：两个后台登录页的品牌名与 Logo（Logo 加载失败回退原图标）、浏览器标题「管理员后台 / 合作机构后台 - 品牌名」、管理员态势屏「政务总览」「服务调用」标题。一次页面加载只请求一次；任何失败（旧后端没有这个接口回 404、网络错、字段不合格）静默回退默认「职易达」，不挡登录；演示模式不请求。
 - 不改：登录页版权行「© 2026 职易达」、法务默认、首单月报打印抬头——运营主体仍是我方；月报数据里还没有品牌快照，改成读当前品牌会让历史月报重印成新品牌，留待后端补快照。
 - 验证：两个后台 typecheck / lint / build；compliance-copy 整条链、plain-copy、console-screen-ui、partner-refresh-safe、partner-relative-api-url 门禁；浏览器用例 admin 接口快照包 184、机构接口快照包 176、admin 演示包（登录、全路由、大屏、法务）52、机构演示包（登录、全路由）24 全过。11/05 并入含 #1521 的 main 后复跑：admin 演示 168、admin 快照 184（含读品牌 10）、机构演示 87、机构快照 176（含读品牌 8）全过（演示包数变多是 main 新加的路由巡检）。
+## 2026-11-04：简历 AI 授权分支并入当前 main（每人每天次数、内容安全都留着；未推送、未部署）
+
+- 职业规划、简历版式调整、带简历的模拟面试，仍在把简历交给模型之前核「简历 AI 授权」。没同意时返回「请先确认简历 AI 服务授权」，不调模型。游客、只读、打印、不带简历的面试照旧。
+- 这三处授权都排在预占当天次数之前。没同意的不扣次数。每人每天次数、提问和生成的内容检查、政策约束、设备故障的固定回答照旧生效。
+- 职业规划里，招聘内容托管开关和授权检查两处都在。版式调整仍在单独的控制器上。授权服务是必填注入，漏注册时应用起不来。
+
+## 2026-11-03：简历 AI 授权装配门禁登记招聘托管豁免（分支 `claude/resume-ai-consent-1103`，未合并、未部署）
+
+- CI `build-and-verify` 的招聘托管声明门禁红在 `scripts/verify-resume-ai-consent-wiring.ts`：它直接引用 `career-plan.service.ts`，但只核对职业规划、版式调整与模拟面试四处简历 AI 授权服务的必填注入，不调用招聘内容读取或写入。已在 `verify-recruitment-hosting-gate-declares.ts` 的 exemptions 登记。`verify-mock-interview-consent.ts` 与 `verify-resume-layout-adjust.ts` 不引用托管模块，原清单没有违规。
+- 未改业务代码，未删断言，也没有给这条门禁改写托管开关。图谱把这条豁免记成对该装配脚本的断言。
+- 验证：托管声明门禁「声明 43、豁免 35、违规 0」；装配门禁 4 处注入；模拟面试 25 条、授权 6 条；职业规划 23 条、降级 13 条；版式调整 ALL PASS；AI 访问 ALL PASS；自我探索同意 26 通过 / 1 跳过；API 类型检查通过；图谱 `--check` 通过。
+
+## 2026-11-03：简历 AI 授权改为必需注入，并拆出模拟面试授权门禁（分支 `claude/resume-ai-consent-1103`，未合并、未部署）
+
+- 职业规划控制器、职业规划服务、版式调整控制器、模拟面试服务里的授权服务改为和现有简历 AI 控制器一样的必需注入。漏注册时应用启动失败，不再静默放行。岗位要求计数端口仍可选，排在授权服务之后。
+- 直接构造的既有测试显式传入放行替身；专门测授权的仍用真服务。新增 `verify:resume-ai-consent-wiring`，在真实模块装配下证明这四处拿到同一个 `MemberPrivacyService`，且该参数不是可选依赖。
+- `verify-mock-interview.ts` 回到拆出前的 1132 行，原有 25 条正向断言还在。授权用例挪到 `verify-mock-interview-consent.ts`。补上已开始的带简历会话：撤回 `resume_ai` 后，回答出下一题和结束生成报告都返回 403 `USER_AI_CONSENT_REQUIRED`，模型调用、AI 日志和计量不增加，会话仍在进行中；重新同意后能继续并结束。
+- 两条新门禁接进 `services/api/package.json`，并跟在 CI 里两处 `verify:mock-interview` 后面（SQLite 与 PostgreSQL）。
+- 验证：模拟面试 25 条、授权门禁 6 条、职业规划 22 条、版式调整通过、AI 访问通过、注入 4 处、降级出纸 13 条、送模型打码 136 条、自我探索同意 26 通过 / 1 跳过、会员资产与问答记录通过、岗位板块开关通过、API 类型检查通过、一体机声明门禁通过、仓库完整性与图谱检查通过。
+
+## 2026-11-03：简历 AI 授权补到职业规划、版式调整和带简历的模拟面试（分支 `claude/resume-ai-consent-1103`，未合并、未部署）
+
+- 后端：把用户简历内容交给 AI 之前核 `resume_ai`。未同意时与现有简历 AI 端点相同：403，错误码 `USER_AI_CONSENT_REQUIRED`，文案「请先确认简历 AI 服务授权」。游客（`endUserId` 为空）由 `requireActiveConsent` 放行。检查都在调用模型之前。
+- 职业规划：`POST /api/v1/resume/career-plan/:taskId` 在控制器和服务里各查一次（抽简历、调模型之前）。读取已生成结果和打印不查，小程序这两步没有挂简历授权，403 无法恢复。
+- 简历版式调整：`POST /api/v1/resume/records/:taskId/layout-adjust`。这一步总会把简历送进模型。`AiController` 已超过 800 行，端点拆到 `ResumeLayoutAdjustController`，调用服务前检查。
+- 模拟面试：只有简历摘要非空、且马上要出题或写报告时才查。不带简历的面试照常。创建会话只存摘要、不调模型，不查。没有回答就结束、已有报告、提前结束这些不调模型的路径也不查。拒绝时开场失败会把状态滚回已配置。
+- 小程序：按未合并的 #1386 在当前主线上重做，没有合并或摘那个旧分支。职业规划生成标 `resumeAi`，认的就是上面的 403。授权说明沿用 #1386 已过合规的句子。读取和打印职业规划不标。小程序模拟面试仍不传简历。（11/08 补：小程序这部分没有随后端合入 main，留在分支 `claude/resume-ai-consent-1103` 给小程序线；见下文 11/08 条目。）
+- 体量：职业规划服务先拆出打码函数（现 448 行）。版式端点从 `AiController` 拆出（现 810 行，是减不是加）。模拟面试服务 756 行：题目单打印必须留在 `printPracticeSheet` 方法体里，派生上传和降级出纸两道静态门禁按这个方法扫描。
+- 验证：职业规划 22 条、版式调整（含未同意 / 游客 / 已同意 / 撤回）、模拟面试 30 条、派生种类 40 条、降级出纸 13 条、自我探索同意 26 通过 / 1 跳过、官方渠道 212 条、北京时间 29 条、送模型打码 136 条、AI 访问覆盖含新控制器、岗位板块开关、治理匹配 39 条、隔离扫描、审计留存 553 条、类型检查、小程序 verify:static（含接口契约）全部通过。
 
 ## 2026-11-03：合作机构工作台 AI 服务「重试」浏览器用例修偶发红（只改测试，页面不动；分支 `claude/sleepy-stonebraker-31ae12`）
 

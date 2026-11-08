@@ -1,4 +1,5 @@
 import { Controller, Get, Param, Post, Req } from '@nestjs/common'
+import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
 import { AiUse } from '../ai-access/ai-access.decorator'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
@@ -40,6 +41,7 @@ export class CareerPlanController {
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
     private readonly jobBoard: KioskJobBoardService,
+    private readonly privacy: MemberPrivacyService,
   ) {}
 
   private async jobBoardOpen(req: ReqLike): Promise<boolean> {
@@ -57,8 +59,10 @@ export class CareerPlanController {
   @AiUse('generate')
 
   async generate(@Param('taskId') taskId: string, @Req() req: ReqLike) {
+    const requester = await this.requesterOf(req)
+    await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
     const open = await this.jobBoardOpen(req)
-    return this.service.generate(taskId, await this.requesterOf(req), { includeJobFitTitle: open }, req)
+    return this.service.generate(taskId, requester, { includeJobFitTitle: open }, req)
   }
 
   @Get(':taskId')
