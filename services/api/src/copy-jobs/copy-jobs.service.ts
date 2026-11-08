@@ -6,7 +6,7 @@ import { assertFreePrintQuota } from '../print-jobs/free-print-quota.decide'
 import { PrismaService } from '../prisma/prisma.service'
 import { COPY_COLOR_MODES, COPY_DUPLEX_MODES, COPY_SOURCES, type CreateCopyJobInput } from './copy-job.types'
 import { assertCopyCombination, assertCopyLimits, COPY_LIFETIME_MS, copyError } from './copy-job.policy'
-import { CopyJobStore, copyDigest } from './copy-job-store.service'
+import { COPY_AUDIT_ACTIONS, CopyJobStore, copyDigest } from './copy-job-store.service'
 
 @Injectable()
 export class CopyJobsService {
@@ -106,7 +106,7 @@ export class CopyJobsService {
         .markPaid(order.id, { paymentSource: 'free' })
       const updated = await tx.copyJob.update({ where: { id }, data: { orderId: order.id,
         billableSides: result.quote.billableSides, quoteSnapshot: JSON.stringify(result.quote) } })
-      await this.store.audit.writeRequired(tx, { actorId: null, actorRole: 'system', action: 'copy.confirm',
+      await this.store.audit.writeRequired(tx, { actorId: null, actorRole: 'system', action: COPY_AUDIT_ACTIONS.confirm,
         targetType: 'copy_job', targetId: id, payload: { orderId: order.id, generation: job.generation } })
       return this.store.view(updated, tx)
     })

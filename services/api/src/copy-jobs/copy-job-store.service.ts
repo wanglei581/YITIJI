@@ -12,6 +12,16 @@ export type CopyRow = NonNullable<Awaited<ReturnType<PrismaService['copyJob']['f
 export type CopyDb = Pick<PrismaTransactionClient, 'copyJob' | 'terminal' | 'terminalCapability' | 'priceConfig' | 'order'>
 export const copyDigest = (value: string) => createHash('sha256').update(value).digest('hex')
 
+/** 复印审计动作逐个写成字面量；管理端日志按 auditActionLabels 显示中文名。 */
+export const COPY_AUDIT_ACTIONS = {
+  create: 'copy.create',
+  cancel: 'copy.cancel',
+  confirm: 'copy.confirm',
+  permit: 'copy.permit',
+  scan_result: 'copy.scan_result',
+  print_result: 'copy.print_result',
+} as const
+
 @Injectable()
 export class CopyJobStore {
   constructor(readonly prisma: PrismaService, readonly redis: RedisService, readonly audit: AuditService) {}
@@ -70,8 +80,8 @@ export class CopyJobStore {
     }
   }
 
-  async record(action: string, job: CopyRow, payload: Record<string, unknown> = {}) {
-    await this.audit.write({ actorId: null, actorRole: 'system', action: `copy.${action}`,
+  async record(action: keyof typeof COPY_AUDIT_ACTIONS, job: CopyRow, payload: Record<string, unknown> = {}) {
+    await this.audit.write({ actorId: null, actorRole: 'system', action: COPY_AUDIT_ACTIONS[action],
       targetType: 'copy_job', targetId: job.id,
       payload: { terminalId: job.terminalId, generation: job.generation, ...payload } })
   }

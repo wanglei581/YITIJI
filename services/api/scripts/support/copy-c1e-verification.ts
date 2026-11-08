@@ -9,7 +9,7 @@ import type { CopyPermit } from '../../src/copy-jobs/copy-job.types'
 import { TerminalAdminService } from '../../src/terminals/terminals-admin.service'
 import { TerminalAgentService } from '../../src/terminals/terminals-agent.service'
 import { TerminalCredentialSecurityService } from '../../src/terminals/terminal-credential-security.service'
-import { seedKioskTerminal } from '../../prisma/seed-terminal'
+import { KIOSK_SEED_TERMINAL, seedKioskTerminal } from '../../prisma/seed-terminal'
 
 /** 真实管理服务/事务与 HTTP 许可交错，钉住管理提交和许可 CAS 的先后顺序。 */
 export async function verifyCopyC1e(store: CopyJobStore, jobs: CopyJobsService, agent: CopyAgentService,
@@ -209,8 +209,15 @@ export async function verifyCopyC1e(store: CopyJobStore, jobs: CopyJobsService, 
       }
     })
     await check('C1e seed 覆盖归属先提交拒绝旧许可，CAS 先提交的真实终态照收', async () => {
-      assert.equal(await prisma.terminal.findUnique({ where: { terminalCode: 'KSK-001' } }), null, 'seed 门禁须使用无 KSK-001 的隔离库')
-      const target = await seedKioskTerminal(prisma, original.orgId!)
+      // CI 的 PostgreSQL 组先灌了 demo 种子（含 KSK-001），用例不碰它：被测的种子覆盖函数换一个本用例独有、事先不存在的终端。
+      const tag = randomUUID()
+      const identity = { id: `t_c1e_seed_${tag}`, terminalCode: `KSK-C1E-${tag}`,
+        agentToken: `seed-terminal-token-c1e-${tag}`, deviceFingerprint: `seed-terminal-fingerprint-c1e-${tag}` }
+      assert.equal(KIOSK_SEED_TERMINAL.terminalCode, 'KSK-001', 'demo seed 本身仍只覆盖 KSK-001')
+      assert.equal(await prisma.terminal.findUnique({ where: { terminalCode: identity.terminalCode } }), null,
+        'seed 门禁的目标终端必须事先不存在')
+      const target = await seedKioskTerminal(prisma, original.orgId!, identity)
+      assert.equal(target.id, identity.id)
       const seedOrders: string[] = [], seedJobs: string[] = []
       try {
         for (const capabilityKey of ['copy', 'scan_device']) await prisma.terminalCapability.create({ data: {
@@ -222,7 +229,7 @@ export async function verifyCopyC1e(store: CopyJobStore, jobs: CopyJobsService, 
         let committed = false
         store.capable = async (...args: Parameters<CopyJobStore['capable']>) => {
           const result = await capable(...args)
-          if (!committed) { await seedKioskTerminal(prisma, orgId); committed = true }
+          if (!committed) { await seedKioskTerminal(prisma, orgId, identity); committed = true }
           return result
         }
         try {
@@ -239,7 +246,7 @@ export async function verifyCopyC1e(store: CopyJobStore, jobs: CopyJobsService, 
           (job as { controlToken: string }).controlToken, view.quoteVersion!)
         seedOrders.push(confirmed.orderId!)
         assert.equal((await agent.permit(target.id, job.copyId, 'print')).allowed, true)
-        await seedKioskTerminal(prisma, original.orgId!)
+        await seedKioskTerminal(prisma, original.orgId!, identity)
         assert.equal((await store.find(job.copyId)).state, 'dispatching')
         assert.equal((await agent.result(target.id, job.copyId,
           { generation: job.generation, eventId: randomUUID(), state: 'handed' })).state, 'handed')
