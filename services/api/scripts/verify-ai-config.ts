@@ -15,11 +15,17 @@
  * 运行：pnpm --filter @ai-job-print/api verify:ai-config
  */
 import 'dotenv/config'
-import { mkdtempSync, rmSync, readFileSync } from 'fs'
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs'
+import { strict as assert } from 'node:assert'
+import { createServer } from 'node:http'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { LlmConfigService } from '../src/ai/llm/llm-config.service'
-import { assertPublicLlmBaseUrl, isBlockedLlmHost } from '../src/ai/llm/llm-base-url'
+import { assertPublicLlmBaseUrl, isBlockedLlmHost, llmBaseUrlHostname } from '../src/ai/llm/llm-base-url'
+import { AiConfigController, AiConfigsController } from '../src/ai/llm/ai-config.controller'
+import { LlmChatService } from '../src/ai/llm/llm-chat.service'
+import type { AuditService } from '../src/audit/audit.service'
+import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
 
 // 隔离：临时 SECRET_ENCRYPTION_KEY（≥32）+ 临时 FILE_STORAGE_DIR（配置 JSON 写临时目录，不碰真实 data）。
 // 清掉可能从 .env 带入的默认 LLM key，保证「初始无 key」状态确定。
@@ -42,7 +48,7 @@ function errCode(e: unknown): string | undefined {
   return resp?.error?.code
 }
 
-function main() {
+async function main() {
   console.log('\n=== AI 大模型配置 service 级验证（P1-B④ 守门）===')
   try {
     const svc = new LlmConfigService()
@@ -173,6 +179,7 @@ function main() {
       svc2.getApiKey('resume_diagnosis') === 'sk-other-feature-xyz'
     ) pass('8. 重启（new LlmConfigService）后配置 + 解密 apiKey 持久仍在')
     else fail('8. 重启后持久化异常')
+    await keyReentryChecks(svc)
   } finally {
     rmSync(DATA_DIR, { recursive: true, force: true })
   }
@@ -180,4 +187,155 @@ function main() {
   console.log('\nALL PASS')
 }
 
-main()
+/** 旧密钥不会发给新地址：保存、继承、落盘、审计及本机连通性请求一起验证。 */
+async function keyReentryChecks(svc: LlmConfigService): Promise<void> {
+  const envNames = ['NODE_ENV', 'AI_ENDPOINT_ALLOWLIST', 'AI_ENDPOINT_ALLOWLIST_EXTRA', 'FILE_STORAGE_DIR']
+  const envBefore = envNames.map((name) => process.env[name])
+  let requests = 0
+  let receivedKey: string | undefined
+  let receivedPath: string | undefined
+  let auditWrites = 0
+  let testCalls = 0
+  const server = createServer((req, res) => {
+    requests += 1
+    receivedKey = req.headers.authorization
+    receivedPath = req.url
+    req.resume()
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ choices: [{ message: { content: '你好，我可以帮你整理材料。' } }] }))
+  })
+  const message = '模型服务地址换了，请重新填写这一家的 API Key；原来的密钥不会发给新地址'
+  const rejected = async (
+    action: () => unknown,
+    label: string,
+    config = svc,
+    file = CONFIG_FILE,
+    code = 'AI_CONFIG_API_KEY_REQUIRED',
+  ) => {
+    const before = JSON.stringify(config.getViews())
+    const beforeDisk = readFileSync(file, 'utf8')
+    const beforeAudit = auditWrites
+    const beforeRequests = requests
+    const beforeTests = testCalls
+    await assert.rejects(async () => { await action() }, (error: unknown) => {
+      assert.equal(errCode(error), code, label)
+      assert.equal((error as { getStatus(): number }).getStatus(), 400, label)
+      if (code === 'AI_CONFIG_API_KEY_REQUIRED') {
+        assert.equal((error as { getResponse(): { error: { message: string } } }).getResponse().error.message, message)
+      }
+      return true
+    }, label)
+    assert.equal(JSON.stringify(config.getViews()), before, `${label}：缓存与继承不变`)
+    assert.equal(readFileSync(file, 'utf8'), beforeDisk, `${label}：落盘密文不变`)
+    assert.equal(auditWrites, beforeAudit, `${label}：不写成功审计`)
+    assert.equal(requests, beforeRequests, `${label}：零出站`)
+    assert.equal(testCalls, beforeTests, `${label}：未进入测试`)
+    pass(label)
+  }
+  try {
+    process.env['NODE_ENV'] = 'test'
+    delete process.env['AI_ENDPOINT_ALLOWLIST']
+    delete process.env['AI_ENDPOINT_ALLOWLIST_EXTRA']
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(0, '127.0.0.1', resolve)
+    })
+    const address = server.address()
+    assert.ok(address && typeof address !== 'string')
+    const localBase = `http://127.0.0.1:${address.port}/v1`
+    await rejected(() => svc.update({ vendor: 'qwen' }), 'C3.1 换厂商未填新密钥拒绝且配置不变')
+    await rejected(() => svc.update({ baseURL: localBase }), 'C3.2 只改地址换主机未填新密钥拒绝')
+    await rejected(() => svc.update({ baseURL: localBase, apiKey: '   ' }), 'C3.3 空白密钥不算新密钥')
+    svc.update({ baseURL: 'https://API.DEEPSEEK.COM./custom/v1', model: 'same-host-model' })
+    assert.ok(svc.getApiKey() === SECRET)
+    assert.ok(new LlmConfigService().getApiKey() === SECRET)
+    pass('C3.4 同主机改路径、模型、大小写及末尾点保留密钥（含重启）')
+    assert.equal(llmBaseUrlHostname('http://[::1]:8000/v1'), '::1')
+    assert.equal(llmBaseUrlHostname('not a url'), null)
+    pass('C3.5 IPv6 方括号规范化，坏地址没有可信主机名')
+    svc.update({ apiKey: SECRET }, 'resume_optimize')
+    for (const feature of ['advisor_work', 'job_fit', 'career_plan'] as const) {
+      const parent = svc.getView(feature).inheritedFrom
+      assert.ok(parent, `${feature} 前置：确实继承父键`)
+      assert.ok(svc.getApiKey(feature) === svc.getApiKey(parent))
+      await rejected(() => svc.update({ baseURL: localBase }, feature), `C3.6 ${feature} 首次独立配置换主机须重填密钥`)
+      assert.equal(svc.getView(feature).inheritedFrom, parent)
+    }
+    svc.update({ vendor: 'qwen', apiKey: 'verify-c3-new-key' })
+    assert.equal(svc.getView().vendor, 'qwen')
+    assert.ok(svc.getApiKey() === 'verify-c3-new-key')
+    assert.ok(new LlmConfigService().getApiKey() === 'verify-c3-new-key')
+    pass('C3.7 换主机带新密钥放行，保存与重启使用新密钥')
+    svc.update({ vendor: 'deepseek', apiKey: '' })
+    assert.equal(svc.getApiKey(), null)
+    assert.equal(svc.isReady(), false)
+    pass('C3.8 换主机显式空串允许清除，之后无密钥不可用')
+    svc.update({ baseURL: localBase })
+    assert.equal(svc.getView().baseURL, localBase)
+    assert.equal(svc.getApiKey(), null)
+    pass('C3.9 原来没有密钥时换主机照常保存（没有旧密钥可外发），之后仍无密钥')
+
+    const audit = { write: async () => { auditWrites += 1 } } as unknown as AuditService
+    const chat = new LlmChatService(svc)
+    const realTest = chat.test.bind(chat)
+    chat.test = async (feature) => { testCalls += 1; return realTest(feature) }
+    const legacy = new AiConfigController(svc, chat, audit)
+    const current = new AiConfigsController(svc, chat, audit)
+    const user = { userId: 'verify-admin', role: 'admin' } as AuthedUser
+    const req = { headers: {}, ip: '127.0.0.1' }
+    for (const [name, save, test] of [
+      ['旧接口', (patch: Parameters<LlmConfigService['update']>[0]) => legacy.update(patch, user, req), () => legacy.test({})],
+      ['功能位接口', (patch: Parameters<LlmConfigService['update']>[0]) => current.updateOne('assistant_chat', patch, user, req), () => current.testOne('assistant_chat')],
+    ] as const) {
+      svc.update({ vendor: 'deepseek', baseURL: 'https://api.deepseek.com/v1', apiKey: SECRET, enabled: true })
+      await rejected(async () => { await save({ baseURL: localBase }); await test() }, `C3.10 ${name} 保存被拒后不测试，新地址零请求`)
+      const before = requests
+      await save({ baseURL: localBase, apiKey: 'verify-c3-local-key' })
+      assert.equal((await test()).ok, true)
+      assert.equal(requests, before + 1)
+      assert.ok(receivedKey === 'Bearer verify-c3-local-key')
+      assert.equal(receivedPath, '/v1/chat/completions')
+      pass(`C3.11 ${name} 带新密钥后真实本机服务收到新密钥`)
+      await save({ baseURL: `${localBase}/changed`, model: 'same-host-test' })
+      assert.equal((await test()).ok, true)
+      assert.equal(requests, before + 2)
+      assert.ok(receivedKey === 'Bearer verify-c3-local-key')
+      assert.equal(receivedPath, '/v1/changed/chat/completions')
+      pass(`C3.12 ${name} 同主机改路径保留密钥并可测试`)
+      await save({ vendor: 'qwen', apiKey: '' })
+      assert.equal((await test()).ok, false)
+      assert.equal(requests, before + 2)
+      pass(`C3.13 ${name} 换主机清除密钥后测试零请求`)
+    }
+
+    const badDir = mkdtempSync(join(tmpdir(), 'vac-bad-'))
+    try {
+      svc.update({ apiKey: SECRET })
+      const disk = JSON.parse(readFileSync(CONFIG_FILE, 'utf8')) as Record<string, Record<string, unknown>>
+      disk['assistant_chat'] = { ...disk['assistant_chat'], baseURL: 'not a url' }
+      const badFile = join(badDir, 'ai-model-configs.json')
+      writeFileSync(badFile, JSON.stringify(disk), 'utf8')
+      process.env['FILE_STORAGE_DIR'] = badDir
+      const badSvc = new LlmConfigService()
+      assert.equal(badSvc.getView().baseURL, 'not a url')
+      assert.ok(badSvc.getApiKey() === SECRET)
+      await rejected(() => badSvc.update({ baseURL: localBase }), 'C3.14 存量坏地址换新地址回 400，配置不变', badSvc, badFile)
+      badSvc.update({ baseURL: localBase, apiKey: 'verify-c3-recovery-key' })
+      assert.equal(badSvc.getView().baseURL, localBase)
+      assert.ok(badSvc.getApiKey() === 'verify-c3-recovery-key')
+      pass('C3.15 存量坏地址带新密钥可修复')
+    } finally {
+      process.env['FILE_STORAGE_DIR'] = DATA_DIR
+      rmSync(badDir, { recursive: true, force: true })
+    }
+    await rejected(() => svc.update({ baseURL: 'https://unapproved.example/v1' }), 'C3.16 白名单先拒绝且配置不变', svc, CONFIG_FILE, 'AI_BASE_URL_NOT_ALLOWED')
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
+    envNames.forEach((name, index) => {
+      if (envBefore[index] === undefined) delete process.env[name]
+      else process.env[name] = envBefore[index]
+    })
+  }
+}
+
+void main().catch((error: unknown) => fail(error instanceof Error ? error.message : '验证失败'))

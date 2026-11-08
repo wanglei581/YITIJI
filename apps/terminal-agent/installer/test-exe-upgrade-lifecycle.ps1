@@ -6,7 +6,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $PREDECESSOR_VERSION = "0.4.10"
-$CANDIDATE_VERSION = "0.4.18"
+$CANDIDATE_VERSION = "0.4.19"
 $resolvedPredecessor = (Resolve-Path -LiteralPath $PredecessorExePath).Path
 $resolvedCandidate = (Resolve-Path -LiteralPath $CandidateExePath).Path
 $installRoot = Join-Path $env:ProgramFiles "AIJobPrintAgent"
