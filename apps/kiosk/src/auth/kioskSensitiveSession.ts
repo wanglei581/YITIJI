@@ -13,6 +13,7 @@ import {
   clearInterviewWorkbenchSession,
   INTERVIEW_WORKBENCH_SESSION_KEY,
 } from '../pages/interview/interviewWorkbenchSession'
+import { clearScanHowContinue, SCAN_HOW_CONTINUE_KEY } from '../pages/scan/scanHowContinue'
 import {
   clearScanWorkbenchSession,
   SCAN_WORKBENCH_SESSION_KEY,
@@ -49,6 +50,7 @@ const SENSITIVE_SESSION_STORAGE_KEYS = [
   SELF_ASSESSMENT_SESSION_KEY,
   INTERVIEW_WORKBENCH_SESSION_KEY,
   SCAN_WORKBENCH_SESSION_KEY,
+  SCAN_HOW_CONTINUE_KEY,
   ASSISTANT_DRAFT_KEY,
   ASSISTANT_POLICY_KEY,
   AI_DECLARATION_SESSION_KEY,
@@ -128,6 +130,7 @@ export function clearKioskSensitiveSession(outgoingMemberToken?: string | null):
   // clearScanWorkbenchSession() 一旦先跑，就再也找不到要撤谁。
   beginScanSessionCleanup(outgoingMemberToken ?? null)
   clearScanWorkbenchSession()
+  clearScanHowContinue()
   clearListeners.forEach((listener) => listener())
 }
 

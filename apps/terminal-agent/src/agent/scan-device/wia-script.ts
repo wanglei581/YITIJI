@@ -48,6 +48,20 @@ export const WIA_HRESULT = {
   COVER_OPEN: '0x80210016',
 } as const
 
+/**
+ * 设失败或属性不存在就必须当这次扫描没成功。
+ * 3088 来源，6146/4103 颜色，6147/6148 分辨率，6151/6152 扫描区域。
+ * 3096（进纸器）和 6149/6150（原点）失败只记日志，不在这张表里。
+ */
+export const WIA_REQUIRED_PROPERTY_IDS = [3088, 6146, 4103, 6147, 6148, 6151, 6152] as const
+
+const WIA_REQUIRED_PROPERTY_ID_SET = new Set<number>(WIA_REQUIRED_PROPERTY_IDS)
+
+/** 必需属性里设失败的那些。空数组表示可以按扫描结果本身判断成功与否。 */
+export function requiredWiaPropertiesFailed(setFailed: readonly number[]): number[] {
+  return setFailed.filter((id) => WIA_REQUIRED_PROPERTY_ID_SET.has(id))
+}
+
 /** 规范成 0x + 8 位大写十六进制；不是 HRESULT 形状返回 undefined。 */
 export function normalizeHresult(raw: unknown): string | undefined {
   if (typeof raw !== 'string') return undefined
@@ -397,6 +411,25 @@ export function encodeWiaCommand(script: string): string {
 
 export function buildWiaPowerShellArgs(encodedCommand: string): string[] {
   return ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encodedCommand]
+}
+
+/**
+ * 命令行是不是本程序拉起的 WIA PowerShell。
+ * 只认 powershell + -EncodedCommand，并且解码后的脚本里同时有本脚本的两处固定标记。
+ * 普通 -Command 列举进程不会被算进来。
+ */
+export function commandLineIsOurWiaProcess(commandLine: string): boolean {
+  if (!/powershell(\.exe)?/i.test(commandLine)) return false
+  const match = /-EncodedCommand\s+([A-Za-z0-9+/=]+)/i.exec(commandLine)
+  const encoded = match?.[1]
+  if (!encoded) return false
+  let script: string
+  try {
+    script = Buffer.from(encoded, 'base64').toString('utf16le')
+  } catch {
+    return false
+  }
+  return script.includes("$script:via = 'none'") && script.includes('WIA.DeviceManager')
 }
 
 /** 优先用系统目录下的绝对路径，不依赖服务进程的 PATH；取不到才退回 powershell。 */

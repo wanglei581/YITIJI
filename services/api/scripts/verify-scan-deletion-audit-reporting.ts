@@ -16,6 +16,7 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { ReportScanDeletionAuditDto } from '../src/terminals/dto/report-scan-deletion-audit.dto'
 import { ReleaseObservationService } from '../src/terminals/release-observation.service'
+import { SCAN_DELETION_REASON_CODES as SHARED_REASON_CODES } from '../../../packages/shared/src/types/scanDeletionAudit'
 import { SCAN_DELETION_REASON_CODES } from '../src/terminals/scan-deletion-reason-codes'
 import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
 import { TerminalSessionService } from '../src/terminals/terminal-session.service'
@@ -27,8 +28,8 @@ import { assertIsolatedVerificationDatabase } from './support/isolated-verificat
 
 /**
  * 屏上扫描（2026-11-02）后端第二批：删除审计上报认的原因码。
- * 规格表照任务包写死，不从被测代码里取：面板扫描原有的一个码加屏上扫描的六个码，逐字与终端程序
- * 本地删除账本（apps/terminal-agent 的 ScanDeviceDeletionReason）一致，不多不少。
+ * 规格表照任务包写死，不从被测代码里取：面板扫描原有的一个码、屏上扫描六个码与复印七个码。
+ * 云端和共享契约完全一致；终端 COPY_* 留待终端实现包，既有六码仍必须兼容。
  */
 const SPEC_REASON_CODES = [
   'UNCLAIMED_TTL_EXPIRED',
@@ -38,6 +39,13 @@ const SPEC_REASON_CODES = [
   'SCAN_DEVICE_SWITCHED_TO_PANEL',
   'SCAN_DEVICE_SESSION_CLEARED',
   'SCAN_DEVICE_STARTUP_RESIDUE',
+  'COPY_PRINT_TERMINAL',
+  'COPY_RESCAN',
+  'COPY_USER_CANCEL',
+  'COPY_SESSION_CLEAR',
+  'COPY_EXPIRED',
+  'COPY_SCAN_FAILED',
+  'COPY_STARTUP_RESIDUE',
 ] as const
 /** 不认识的码：未登记的名字、大小写不对、空串、带空白、缺失、类型不对。 */
 const UNKNOWN_REASON_CODES: readonly unknown[] = [
@@ -67,6 +75,7 @@ function responseCode(error: unknown): string | undefined {
 
 async function main(): Promise<void> {
   assertIsolatedVerificationDatabase()
+  assert.deepEqual(SCAN_DELETION_REASON_CODES, SHARED_REASON_CODES, '删除审计 API 与共享全码一致')
 
   const handler = TerminalsController.prototype.reportScanDeletionAudit
   assert.equal(
@@ -219,13 +228,9 @@ async function main(): Promise<void> {
 
     // \u2500\u2500 \u5c4f\u4e0a\u626b\u63cf\uff08\u540e\u7aef\u7b2c\u4e8c\u6279 B2\uff09\uff1a\u539f\u56e0\u7801\u4ece 1 \u4e2a\u6269\u5230 7 \u4e2a \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
     // \u4e0a\u9762\u7684\u65ad\u8a00\u4e00\u6761\u4e0d\u52a8\u3002\u8fd9\u4e00\u6bb5\u53ea\u52a0\uff1a\u4e03\u4e2a\u7801\u5404\u6536\u4e00\u6b21\u3001\u4e0d\u8ba4\u8bc6\u7684\u7801 400\u3001\u540c\u4e00 eventId \u6362\u539f\u56e0\u7801\u5224\u51b2\u7a81\u3002
-    assert.deepEqual(
-      [...SCAN_DELETION_REASON_CODES],
-      [...SPEC_REASON_CODES],
-      '\u540e\u7aef\u8ba4\u7684\u5220\u9664\u539f\u56e0\u7801\u5fc5\u987b\u9010\u5b57\u7b49\u4e8e\u89c4\u683c\u8868\uff1aUNCLAIMED_TTL_EXPIRED \u52a0\u516d\u4e2a SCAN_DEVICE_*\uff0c\u4e0d\u591a\u4e0d\u5c11',
-    )
-    assert.equal(new Set(SCAN_DELETION_REASON_CODES).size, 7, '\u4e03\u4e2a\u7801\u4e92\u4e0d\u76f8\u540c')
-    console.log('  PASS \u5220\u9664\u539f\u56e0\u7801\u5e38\u91cf = \u89c4\u683c\u8868 7 \u4e2a\uff08UNCLAIMED_TTL_EXPIRED + \u516d\u4e2a SCAN_DEVICE_*\uff09')
+    assert.deepEqual([...SCAN_DELETION_REASON_CODES], [...SPEC_REASON_CODES], '后端删除码必须逐项等于规格表')
+    assert.equal(new Set(SCAN_DELETION_REASON_CODES).size, SPEC_REASON_CODES.length, '删除码互不重复')
+    console.log(`  PASS 删除原因码常量 = 规格表 ${SPEC_REASON_CODES.length} 个（面板 + 屏上扫描 + 复印）`)
 
     const deviceEventBase = {
       identifierHash,
@@ -256,7 +261,7 @@ async function main(): Promise<void> {
       rowsBefore + SPEC_REASON_CODES.length,
       '\u4e03\u4e2a\u7801\u5404\u4e00\u884c\uff0c\u91cd\u653e\u4e0d\u591a\u51fa\u884c',
     )
-    console.log('  PASS \u4e03\u4e2a\u539f\u56e0\u7801\u5404\u6536\u4e00\u6b21\uff08\u843d\u5e93\u7801\u5373\u4e0a\u62a5\u7801\uff09\uff0c\u539f\u6837\u91cd\u653e\u5e42\u7b49')
+    console.log(`  PASS ${SPEC_REASON_CODES.length} 个原因码各收一次（落库码即上报码），原样重放幂等`)
 
     // \u5176\u4f59\u72b6\u6001\u673a\u5bf9\u65b0\u7801\u540c\u6837\u6210\u7acb\uff08pending_delete \u2192 delete_failed \u2192 deleted\uff1b\u72b6\u6001\u4e0d\u5f97\u56de\u9000\uff09
     {
@@ -324,7 +329,7 @@ async function main(): Promise<void> {
         `DTO \u5e94\u62d2\u7edd reasonCode=${JSON.stringify(bad)}\uff08\u53d6\u503c\u8303\u56f4\u53ea\u80fd\u662f\u89c4\u683c\u8868\u90a3\u4e03\u4e2a\uff09`,
       )
     }
-    console.log(`  PASS DTO\uff1a\u4e03\u4e2a\u7801\u5408\u6cd5\uff1b${UNKNOWN_REASON_CODES.length} \u79cd\u4e0d\u8ba4\u8bc6\u7684\u7801\uff08FOO\u3001\u5c0f\u5199\u3001\u7a7a\u4e32\u3001\u5e26\u7a7a\u767d\u3001\u7f3a\u5931\u3001\u7c7b\u578b\u4e0d\u5bf9\uff09\u4e00\u5f8b\u62d2\u7edd`)
+    console.log(`  PASS DTO：${SPEC_REASON_CODES.length} 个码合法；${UNKNOWN_REASON_CODES.length} 种未知输入一律拒绝`)
 
     // \u771f\u8def\u7531\uff1a\u5168\u5c40 ValidationPipe \u4e4b\u4e0b\uff0c\u65b0\u7801 200\u3001\u4e0d\u8ba4\u8bc6\u7684\u7801 400\uff08\u8bc1\u660e DTO \u771f\u7684\u6302\u5728\u8fd9\u6761\u8def\u7531\u4e0a\uff09
     {
@@ -386,7 +391,7 @@ async function main(): Promise<void> {
       )
       const wrongToken = await post({ ...deviceEventBase, eventId: eventIdFor('http-token'), reasonCode: 'SCAN_DEVICE_DELIVERED' }, 'Bearer wrong-token')
       assert.equal(wrongToken.status, 401, '\u771f\u8def\u7531\uff1a\u7ec8\u7aef\u4ee4\u724c\u4e0d\u5bf9\u4ecd 401\uff0c\u65b0\u7801\u4e0d\u7ed5\u8fc7\u9274\u6743')
-      console.log('  PASS \u771f\u8def\u7531\uff1a\u4e03\u4e2a\u7801\u5404 200\uff1b\u4e0d\u8ba4\u8bc6\u7684\u7801\u3001\u7f3a\u5931\u3001\u591a\u4f59\u5b57\u6bb5 400 \u4e14\u4e0d\u843d\u5e93\uff1b\u9519\u4ee4\u724c 401')
+    console.log(`  PASS 真路由：${SPEC_REASON_CODES.length} 个码各 200；未知码、缺失、多余字段 400 且不落库；错令牌 401`)
     }
 
     console.log('verify-scan-deletion-audit-reporting: all assertions passed')
