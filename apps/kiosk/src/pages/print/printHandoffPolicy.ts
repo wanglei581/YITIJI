@@ -26,6 +26,7 @@ export type PrintHandoffOrigin =
   | 'fair_material'
   | 'fair_visit_plan'
   | 'fair_company'
+  | 'policy_checklist'
 
 export type PrintHandoffEntry = 'check' | 'preview' | 'confirm'
 
@@ -57,6 +58,8 @@ const POLICY: Record<Exclude<PrintHandoffOrigin, 'my_documents'>, PrintHandoffPo
   fair_visit_plan: EXEMPT_CONFIRM,
   // 企业资料页（托管 a 已关，b 版本保留）历来进参数页：免检查，先看预览再定参数。
   fair_company: { checkPolicy: 'exempt', entry: 'preview' },
+  // 一页办事清单（2026-11-05）：服务端按已发布政策生成的公共信息，不含个人材料，免检查直达确认页。
+  policy_checklist: EXEMPT_CONFIRM,
 }
 
 export function isPrintHandoffOrigin(value: unknown): value is PrintHandoffOrigin {

@@ -3,22 +3,18 @@ import { replaceIfChanged, useInteractionLock, useRefreshable } from '@ai-job-pr
 import { Drawer, LoadingState } from '@ai-job-print/ui'
 import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
 import { FileTextIcon, PlusIcon } from 'lucide-react'
-import EligibilityRulesDrawer from './EligibilityRulesDrawer'
+import { PolicyFormFields } from './PolicyFormFields'
+import { EMPTY_FORM, policyFormBlockReason, policyFormPayload, type PolicyFormState } from './policyFormModel'
 import { PolicyReleaseDialog } from './PolicyReleaseDialog'
 import { PolicyTable } from './PolicyTable'
-import { AUDIENCE_LABELS, CANNOT_CREATE_HINT, CATEGORY_LABELS, RECRUITMENT_POLICY_BLOCKED_REASON } from './policyLabels'
+import { CANNOT_CREATE_HINT, RECRUITMENT_POLICY_BLOCKED_REASON } from './policyLabels'
 import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
 import {
   partnerPoliciesService,
   type PartnerPolicyRecord,
-  type PolicyAudience,
-  type PolicyCategory,
-  type PolicyKind,
-  type SavePolicyInput,
 } from '../../services/api/policies'
 import type { ReviewStatus } from '../../services/api'
 import { useCapability, usePartnerCapabilities } from '../../services/capabilities'
-import { isAbsoluteHttpUrl } from '../../lib/httpUrl'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -30,36 +26,6 @@ const REVIEW_FILTER_MAP: Record<string, ReviewStatus | null> = {
 }
 const FILTER_SELECTED_CLASS = 'border-primary-600 bg-primary-600 text-white'
 const FILTER_IDLE_CLASS = 'border-neutral-200 bg-surface text-neutral-700 hover:border-primary-600/40'
-
-const inputCls =
-  'w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
-
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-medium text-neutral-600">
-        {label}
-        {required && <span className="ml-0.5 text-error-fg">*</span>}
-      </span>
-      {children}
-    </label>
-  )
-}
-
-interface PolicyFormState {
-  kind: PolicyKind
-  title: string
-  summary: string
-  content: string
-  audience: PolicyAudience
-  category: PolicyCategory
-  externalUrl: string
-  publishedDate: string // YYYY-MM-DD
-}
-
-const EMPTY_FORM: PolicyFormState = {
-  kind: 'notice', title: '', summary: '', content: '', audience: 'general', category: 'notice', externalUrl: '', publishedDate: '',
-}
 
 function errMsg(e: unknown): string {
   if (e && typeof e === 'object' && 'message' in e && typeof (e as Error).message === 'string') return (e as Error).message
@@ -92,8 +58,6 @@ export default function PolicyPage() {
   const [confirmDelete, setConfirmDelete] = useState<PartnerPolicyRecord | null>(null)
   /** 发布责任确认弹窗（3.13：政策由本机构自己发布） */
   const [releasing, setReleasing] = useState<PartnerPolicyRecord | null>(null)
-  /** P21 申领条件录入面(只对政策扶持条目开放;公告没有申领条件) */
-  const [rulesFor, setRulesFor] = useState<PartnerPolicyRecord | null>(null)
   const [page, setPage] = useState(1)
   const [reviewFilter, setReviewFilter] = useState('全部')
 
@@ -114,7 +78,7 @@ export default function PolicyPage() {
   )
 
   useInteractionLock(
-    editing !== null || saving || busyId !== null || confirmDelete !== null || confirmUnpublish !== null || rulesFor !== null || releasing !== null,
+    editing !== null || saving || busyId !== null || confirmDelete !== null || confirmUnpublish !== null || releasing !== null,
     [policiesRefreshKey],
     'hard',
   )
@@ -138,37 +102,32 @@ export default function PolicyPage() {
 
   const openEdit = (r: PartnerPolicyRecord) => {
     setForm({
-      kind: (r.kind as PolicyKind) ?? 'notice',
+      kind: r.kind === 'policy_guide' ? 'policy_guide' : 'notice',
       title: r.title,
       summary: r.summary ?? '',
       content: r.content ?? '',
-      audience: (r.audience as PolicyAudience) ?? 'general',
-      category: (r.category as PolicyCategory) ?? 'notice',
+      audience: (r.audience as PolicyFormState['audience']) ?? 'general',
+      category: (r.category as PolicyFormState['category']) ?? 'notice',
       externalUrl: r.externalUrl ?? '',
       publishedDate: r.publishedDate ?? '',
+      externalId: r.externalId ?? '',
+      whoCanApply: r.whoCanApply ?? '',
+      requiredMaterials: r.requiredMaterials ?? '',
+      whereToApply: r.whereToApply ?? '',
     })
     setFormError(null)
     setEditing(r)
   }
 
-  const urlOk = !form.externalUrl.trim() || isAbsoluteHttpUrl(form.externalUrl)
   const editingRecruitmentLocked = editing !== null && editing !== 'new' && editing.category === 'recruitment' && !recruitmentOpen
-  const canSave = form.title.trim().length > 0 && urlOk && !editingRecruitmentLocked
-  const categoryChoices = Object.entries(CATEGORY_LABELS).filter(([key]) => recruitmentOpen || key !== 'recruitment')
+  const formBlockReason = editingRecruitmentLocked ? RECRUITMENT_POLICY_BLOCKED_REASON : policyFormBlockReason(form)
+  const canSave = formBlockReason === null
 
   const save = async () => {
+    if (saving || !canSave) return
     setSaving(true)
     setFormError(null)
-    const payload: SavePolicyInput = {
-      kind: form.kind,
-      title: form.title.trim(),
-      summary: form.summary.trim() || undefined,
-      content: form.content.trim() || undefined,
-      audience: form.kind === 'policy_guide' ? form.audience : undefined,
-      category: form.kind === 'notice' ? form.category : undefined,
-      externalUrl: form.externalUrl.trim() || undefined,
-      publishedDate: form.publishedDate || undefined,
-    }
+    const payload = policyFormPayload(form, editing !== 'new')
     try {
       if (editing === 'new') {
         await partnerPoliciesService.createPolicy(payload)
@@ -309,25 +268,11 @@ export default function PolicyPage() {
 
       <PolicyTable rows={rows} page={page} total={total} onPageChange={setPage} reviewFilter={reviewFilter} canCreate={canCreate} cannotCreateHint={CANNOT_CREATE_HINT}
         recruitmentWriteBlocked={!recruitmentOpen}
-        busyId={busyId} openEdit={openEdit} setRulesFor={setRulesFor} handleApprove={handleApprove} setReleasing={setReleasing} setConfirmUnpublish={setConfirmUnpublish} setConfirmDelete={setConfirmDelete} />
+        busyId={busyId} openEdit={openEdit} handleApprove={handleApprove} setReleasing={setReleasing} setConfirmUnpublish={setConfirmUnpublish} setConfirmDelete={setConfirmDelete} />
 
       <p className="mt-3 text-xs text-neutral-400">
         政策内容只做说明：仅政策说明、材料清单与官方入口；不承诺补贴到账、不代申请。录入后由本机构审核通过、确认发布责任并发布,才会展示（对应一体机首页「查政策」）;平台管理员不审核、不代发,只在违法违规等紧急情况下单向下架。
-        政策扶持条目可另行录入「申领条件」:条件按政策原文逐条录入,一体机据此给出「相符 / 不符 / 无法判定」的机械比对结果,不做资格认定;未录入条件的政策不会出现任何判定结论。
       </p>
-
-      {rulesFor && (
-        <EligibilityRulesDrawer
-          policy={rulesFor}
-          readOnlyReason={rulesFor.category === 'recruitment' && !recruitmentOpen ? RECRUITMENT_POLICY_BLOCKED_REASON : null}
-          onClose={() => setRulesFor(null)}
-          onSaved={() => {
-            setNoticeIsError(false)
-            setNotice('申领条件已保存。该政策已重新进入待审核,审核通过并重新发布前,一体机不会使用这组条件。')
-            void refresh()
-          }}
-        />
-      )}
 
       {/* 新增/编辑抽屉 */}
       <Drawer
@@ -336,11 +281,14 @@ export default function PolicyPage() {
         title={editing === 'new' ? '新增政策内容' : '编辑政策内容'}
         size="md"
         footer={
-          <div className="flex justify-end gap-2">
-            <button onClick={() => setEditing(null)} disabled={saving} className="rounded-lg border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-50">取消</button>
-            <button onClick={save} disabled={saving || !canSave} title={editingRecruitmentLocked ? RECRUITMENT_POLICY_BLOCKED_REASON : undefined} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50">
-              {saving ? '保存中…' : editing === 'new' ? '提交审核' : '保存并重新提审'}
-            </button>
+          <div className="space-y-2">
+            {formBlockReason && !editingRecruitmentLocked && <p role="status" className="text-xs text-error-fg">{formBlockReason}</p>}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setEditing(null)} disabled={saving} className="rounded-lg border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-50">取消</button>
+              <button onClick={save} disabled={saving || !canSave} title={editingRecruitmentLocked ? RECRUITMENT_POLICY_BLOCKED_REASON : undefined} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50">
+                {saving ? '保存中…' : editing === 'new' ? '提交审核' : '保存并重新提审'}
+              </button>
+            </div>
           </div>
         }
       >
@@ -356,49 +304,7 @@ export default function PolicyPage() {
                 : '保存后该内容将重新进入待审核状态,内容版本随之更新;本机构审核通过并确认发布前,终端不展示。'}
             </p>
           )}
-          <Field label="内容类型" required>
-            <select className={inputCls} value={form.kind} onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value as PolicyKind }))}>
-              <option value="notice">{recruitmentOpen ? '政策公告(公告/通知/招募,展示在公告列表)' : '政策公告(公告/通知,展示在公告列表)'}</option>
-              <option value="policy_guide">政策扶持条目(按人群分组展示)</option>
-            </select>
-          </Field>
-          <Field label="标题" required>
-            <input className={inputCls} value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
-          </Field>
-          {form.kind === 'policy_guide' ? (
-            <Field label="适用人群" required>
-              <select className={inputCls} value={form.audience} onChange={(e) => setForm((f) => ({ ...f, audience: e.target.value as PolicyAudience }))}>
-                {Object.entries(AUDIENCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-            </Field>
-          ) : (
-            <Field label="公告标签" required>
-              {editingRecruitmentLocked ? (
-                <p className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700">招募</p>
-              ) : (
-                <select className={inputCls} value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as PolicyCategory }))}>
-                  {categoryChoices.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-              )}
-            </Field>
-          )}
-          <Field label="摘要(一体机列表展示)">
-            <textarea className={`${inputCls} h-16 resize-none`} maxLength={500} value={form.summary} onChange={(e) => setForm((f) => ({ ...f, summary: e.target.value }))} />
-          </Field>
-          <Field label="正文(政策说明/材料清单/办理指引)">
-            <textarea className={`${inputCls} h-32 resize-none`} maxLength={10000} value={form.content} onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))} />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="政策来源 / 办理链接">
-              <input className={inputCls} placeholder="https://…(请填写发布主体或办理渠道链接)" value={form.externalUrl} onChange={(e) => setForm((f) => ({ ...f, externalUrl: e.target.value }))} />
-              {form.externalUrl.trim() && !isAbsoluteHttpUrl(form.externalUrl) && (
-                <p className="mt-1 text-xs text-error-fg">请填写以 http:// 或 https:// 开头的有效链接</p>
-              )}
-            </Field>
-            <Field label="展示日期">
-              <input lang="zh-CN" type="date" className={inputCls} value={form.publishedDate} onChange={(e) => setForm((f) => ({ ...f, publishedDate: e.target.value }))} />
-            </Field>
-          </div>
+          <PolicyFormFields form={form} setForm={setForm} recruitmentOpen={recruitmentOpen} editingRecruitmentLocked={editingRecruitmentLocked} />
           <p className="text-xs text-neutral-400">
             合规提示:内容仅做政策说明与来源链接指引;提交前请核对发布主体和目标域名;请勿出现"补贴必到账""代为申请"等承诺性表述,此类内容审核将不予通过。
           </p>

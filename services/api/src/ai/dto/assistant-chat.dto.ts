@@ -28,6 +28,11 @@ export class AssistantChatRequestDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(64)
+  policyId?: string
+
+  @IsOptional()
+  @IsString()
   @IsIn(ASSISTANT_SKILLS)
   skill?: (typeof ASSISTANT_SKILLS)[number]
 

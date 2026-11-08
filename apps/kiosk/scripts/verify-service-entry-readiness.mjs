@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import ts from 'typescript'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -106,8 +107,6 @@ check(/onClick=\{retryApi\}/.test(hubPage), '服务台保留在线服务重新�
 // 未登记一律按需要后端。下面两族断言分别钉「白名单里有什么」和「默认是拒绝」。
 const OFFLINE_ENTRIES = [
   ['/interview/tips', '面试技巧保留离线阅读入口'],
-  ['/renshi?tab=social', '社保指南保留离线指引入口'],
-  ['/renshi?tab=register', '档案与登记保留离线指引入口'],
 ]
 // 白名单的**代码面**：只看 OFFLINE_CAPABLE_ROUTES 这一个集合字面量，注释里提到的路由不算登记。
 const offlineSetLiteral = codeOf(hubModel).match(/const OFFLINE_CAPABLE_ROUTES = new Set<string>\(\[([\s\S]*?)\]\)/)?.[1] ?? ''
@@ -281,8 +280,8 @@ check(
 {
   const iconed = hubSpecs.match(/icon: '[a-z]+'/g) ?? []
   check(
-    iconed.length === SERVICE_HUB_SPECS_COUNTS_PRELOAD.cards + SERVICE_HUB_SPECS_COUNTS_PRELOAD.quick,
-    `规格表里 36 张卡 + 15 条常用入口各自带稿的 icon 键（实得 ${iconed.length}）`
+    iconed.length === SERVICE_HUB_SPECS_COUNTS_PRELOAD.cards + SERVICE_HUB_SPECS_COUNTS_PRELOAD.quick - 7 - 3 + 1,
+    `其余四台全部卡片及常用入口、政策账号收藏各自带 icon 键（实得 ${iconed.length}）`
   )
 }
 
@@ -447,10 +446,31 @@ check(
 // 漏掉稿里的 quick，15 条通往「我的」台账的入口静默消失过一次。手改 specs、
 // 或改了稿没重跑抽取，在这里当场变红。
 const { SERVICE_HUB_SPECS_TEXT, SERVICE_HUB_SPECS_COUNTS } = SERVICE_HUB_EXTRACT
-check(
-  hubSpecs === SERVICE_HUB_SPECS_TEXT,
-  `serviceHubSpecs.ts 与稿 16-service-hubs.html 逐字节一致（hubs=${SERVICE_HUB_SPECS_COUNTS.hubs} cards=${SERVICE_HUB_SPECS_COUNTS.cards} goals=${SERVICE_HUB_SPECS_COUNTS.goals} quick=${SERVICE_HUB_SPECS_COUNTS.quick}）；不一致请跑 node scripts/extract-service-hub-specs.mjs 而不是手改`
-)
+// 政策取代稿 16；其余四个服务台仍逐字节精确对账，禁止借本包漂移。
+function specData(source) {
+  const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText
+  const module = { exports: {} }
+  new Function('exports', 'module', js)(module.exports, module)
+  return module.exports.SERVICE_HUB_SPECS
+}
+const actualSpecs = specData(hubSpecs)
+for (const key of ['resume', 'jobs', 'fairs', 'interview']) {
+  const pattern = new RegExp(`  ${key}: \\{[\\s\\S]*?\\n  \\},`)
+  const actual = hubSpecs.match(pattern)?.[0]
+  const expected = SERVICE_HUB_SPECS_TEXT.match(pattern)?.[0]
+  check(Boolean(expected) && actual === expected, `${key} 规格与稿 16 逐字节一致`)
+}
+const policyHome = read('src/pages/service-hubs/PolicyTouchHub.tsx')
+check(actualSpecs.policy.title === '你想看哪一类？' && actualSpecs.policy.goals.length === 6 &&
+  actualSpecs.policy.capabilities.length === 0 && actualSpecs.policy.quickLinks.length === 1 &&
+  actualSpecs.policy.quickLinks[0].route === '/me/favorites?tab=policy', '政策规格改为六类、零旧能力卡、仅保留账号收藏')
+check(policyHome.includes('getPublishedPolicies') && policyHome.includes('setFailed(true)') &&
+  policyHome.includes('PolicyReadState') && policyHome.includes('isLoggedIn &&') &&
+  policyHome.includes('data?.latest.total === 0 && data.notices.total === 0'), '政策按真实读取分加载/失败/全库空态，收藏只在登录时显示')
+for (const route of ['/renshi?tab=social', '/renshi?tab=register', '/renshi?tab=eligibility']) {
+  check(!actualSpecs.policy.goals.some((goal) => goal.route === route), `政策规格停放 ${route}`)
+}
+
 
 const printScanHome = read('src/pages/print-scan/PrintScanHomePage.tsx')
 check(printScanHome.includes('loadConfiguredCapabilities'), '打印扫描首页保留能力加载状态')

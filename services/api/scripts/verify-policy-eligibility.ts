@@ -22,6 +22,7 @@
  * 运行：pnpm --filter @ai-job-print/api verify:policy-eligibility
  */
 import 'dotenv/config'
+import { POLICY_PUBLISH_FIXTURE, POLICY_VERIFIED_DOMAINS_FIXTURE } from './support/policy-publish-fixture'
 import { randomUUID } from 'crypto'
 import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
@@ -274,8 +275,8 @@ async function main() {
   await prisma.organization.createMany({
     data: [
       // contentTrustStatus='active':发布闸门要求来源机构已通过内容信任核验(见 src/common/content-trust.ts)
-      { id: orgA, name: `政策机构A_${suffix}`, type: 'public_employment_service', contentTrustStatus: 'active' },
-      { id: orgB, name: `政策机构B_${suffix}`, type: 'public_employment_service', contentTrustStatus: 'active' },
+      { id: orgA, name: `政策机构A_${suffix}`, type: 'public_employment_service', contentTrustStatus: 'active', verifiedOfficialDomainsJson: POLICY_VERIFIED_DOMAINS_FIXTURE },
+      { id: orgB, name: `政策机构B_${suffix}`, type: 'public_employment_service', contentTrustStatus: 'active', verifiedOfficialDomainsJson: POLICY_VERIFIED_DOMAINS_FIXTURE },
     ],
   })
   const partnerARow = await prisma.user.create({
@@ -302,6 +303,7 @@ async function main() {
   try {
     const post = await policies.createPartnerPolicy(
       {
+        ...POLICY_PUBLISH_FIXTURE,
         kind: 'policy_guide',
         title: `一次性求职创业补贴_${suffix}`,
         audience: 'graduate',
@@ -420,7 +422,7 @@ async function main() {
 
     // 没录条件的政策：诚实说「未录入」，不给结论
     const bare = await policies.createPartnerPolicy(
-      { kind: 'policy_guide', title: `无条件条目_${suffix}`, audience: 'graduate' },
+      { ...POLICY_PUBLISH_FIXTURE, kind: 'policy_guide', title: `无条件条目_${suffix}`, audience: 'graduate' },
       partnerA,
     )
     await policies.reviewPolicy(bare.id, 'approve', undefined, partnerA)
@@ -456,7 +458,7 @@ async function main() {
     // 是本能力最危险的一种错法。写入校验拦不住已损坏的存量行，故在读侧兜底。
     {
       const corrupt = await policies.createPartnerPolicy(
-        { kind: 'policy_guide', title: `损坏条件_${suffix}`, audience: 'graduate' },
+        { ...POLICY_PUBLISH_FIXTURE, kind: 'policy_guide', title: `损坏条件_${suffix}`, audience: 'graduate' },
         partnerA,
       )
       await prisma.policyEligibilityRule.create({
@@ -480,7 +482,7 @@ async function main() {
       check(res.items[0].summary.matched === 0, '7w. clauses 损坏绝不产出 matched')
 
       const emptyPolicy = await policies.createPartnerPolicy(
-        { kind: 'policy_guide', title: `空条件_${suffix}`, audience: 'graduate' },
+        { ...POLICY_PUBLISH_FIXTURE, kind: 'policy_guide', title: `空条件_${suffix}`, audience: 'graduate' },
         partnerA,
       )
       await prisma.policyEligibilityRule.create({
