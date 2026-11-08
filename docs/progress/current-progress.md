@@ -1,5 +1,15 @@
 # 当前开发进度
 
+## 2026-11-08：屏上复印终端程序（C2）并入 A2 新头、版本升 0.4.21
+
+- 做了：分支 `claude/copy-agent-c2-1104`（并前头 `93e2d196f`，原建在 A2 旧头 `23e7076c6` 上）并入 A2 新头 `a2db3fa88`（PR #1584，已并最新 main、版本 0.4.20，还在等 CI、未合入 main），只做并分支、解冲突、升版本号，不改功能、不加功能。屏上复印终端程序 C2a–C2f 的内容不变：本机 `/local/copy/*` 接口；复用 A2 的扫描引擎与设备锁；扫描、打印前各取 `op=scan` / `op=print` 许可；打印至多一次（派发意图先落盘到 `%ProgramData%\AIJobPrintAgent\copy-device\print-ledger\`）；崩溃恢复只转 `unconfirmed`、不重打；清场撤销标记至少保留 15 分钟。开关 `copyDeviceEnabled` 缺省关。
+- 冲突怎么合：① `apps/terminal-agent/src/printer/print-with-pdf-to-printer.ts` git 自动合好、没报冲突，但合完 A4 出现两处——C2b 在 `mapParams` 里按 `params.paperSize` 设 A4，#1579 在 `printOptions` 里展开之后固定 A4。#1579 那处总会覆盖，C2b 那行成了死代码，删掉，A4 只留 #1579 的常量与说明；C2b 为复印加的 `onDispatchStart` / `onDispatchSettled` 钩子与超时计时器清理原样保留。② `.github/workflows/ci.yml`、`apps/terminal-agent/src/agent/config-manager.ts`、`apps/terminal-agent/src/agent/types.ts` 两边在同一处各加一行（复印的 `verify:copy-device` / `copyDeviceEnabled`，纠偏的 `verify:scan-deskew` / `scanAutoDeskewEnabled`），两侧保留。图谱取 A2 那边后重新生成，进度文档两侧保留。
+- 升 0.4.21 的原因：A2 要用 0.4.20 进 main，复印这一版不能同号。照 0.4.20 那次（`63ba07243`）的 12 个文件 20 处改齐；升级测试的旧版本 0.4.10、`verify-scan-deskew.ts` 里解析配置用的 0.4.19 样例不改。
+- **代码未进 main（等 #1584 合入后再并 main、开 PR）、未打包、未装机。** 后端 `copy` 能力默认拒绝，在复印后端 #1591（草稿、未合并）里，逐台开通。给任何终端装这一版之前，必须先发布后端（含 #1591），每一步由产品负责人当场确认。
+- 验证（本机 macOS）：终端程序 tsc（246 个文件，0 错误）、eslint（改动的 39 个代码文件 0 错误；3 条警告是 `src/index.ts` 里用不上的 eslint-disable，A2 头上同样有）；`package.json` 里 38 条 verify 不经 pnpm、逐条直接跑，37 条过（`verify:copy-device` 49 项、`verify:scan-device-engine` 53 组、`verify:scan-device-runner` 22 组、`verify:scan-deskew` 12 组，`verify:task-reliability` 一次过；两条 Windows 专用的在非 Windows 上自动跳过）；安装包输入、仓库完整性、图谱 `--check` 过；图谱按改动文件列出的其余 36 条门禁（根目录 3、一体机 18、管理后台 1、UI 1、后端 13，后端两条用隔离 SQLite）全过。Windows 专用的 .ps1 门禁（安装包生命周期、纠偏合成样本）交安装包工作流。
+- **`verify:printer-config` 红，不是这次合并带来的：** C2c（`3f2a65fa7`）在 `apps/terminal-agent/src/agent/copy-device/copy-print-ledger.ts` 第 84 行校验落盘记录里的打印机名，写成 `!r.printerName || …`，撞上门禁「`src` 里不许出现 `printerName ||` 回退」的正则（这一行是校验、不是回退到默认打印机，但门禁按字面判）。并前的 C2 头 `93e2d196f` 同样红，A2 头 `a2db3fa88` 与 main 都绿。这次范围是不改功能、不改断言，没动；开 PR 前必须先处理（改写这一行或收紧门禁正则，待定），否则 CI 的「Terminal Agent verify suites」会红。
+- Windows 目录残留：C2 没有 Windows 专用用例；`verify:copy-device` 只在 CI 的 ubuntu 作业跑，用例的临时目录都建在系统临时目录、用完删除（一条用例临时把 `PROGRAMDATA` 指向临时目录，结束还原）；安装包工作流装机测试前的几步都不含 C2 的用例，C2 也没改这些步骤。
+
 ## 2026-11-05：屏上复印 C2f——撤销标记保留到云端授权一定失效之后（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
 
 - 起因：Codex 复审 C2e + C3c 报 P1——撤销标记 180 秒过期短于云端复印单 10 分钟寿命，一体机后台取消全失败时，过期后迟到的旧 start 仍能拿到云端许可开扫。
