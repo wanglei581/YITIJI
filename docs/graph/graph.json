@@ -14592,7 +14592,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 849,
+      "reachableFileCount": 852,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -17898,7 +17898,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 977
+      "sourceFileCount": 980
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -19375,7 +19375,7 @@
         ]
       },
       {
-        "fieldCount": 21,
+        "fieldCount": 22,
         "name": "MockInterviewSession",
         "relations": [
           "MockInterviewReport",
@@ -21898,6 +21898,9 @@
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
     ],
+    "apps/kiosk/src/pages/interview/session/interviewDeadline.ts": [
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
+    ],
     "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
@@ -21919,6 +21922,9 @@
     ],
     "apps/kiosk/src/pages/interview/styles/interview-shell.css": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
+    ],
+    "apps/kiosk/src/pages/interview/touch/InterviewHubTouch.tsx": [
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
     ],
     "apps/kiosk/src/pages/job-fairs/FairCompaniesPage.tsx": [
@@ -26507,6 +26513,7 @@
     "services/api/src/ai-access/ai-access.guard.ts": [
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai-access/ai-access.module.ts": [
@@ -26518,6 +26525,7 @@
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai/ai-log.service.ts": [
@@ -26535,6 +26543,7 @@
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
       "services/api/scripts/verify-mock-interview-consent.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts"
     ],
@@ -27359,6 +27368,7 @@
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-mock-interview-consent.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-order.ts",
@@ -27720,6 +27730,7 @@
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-pg-lock-timeout-postgres.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
@@ -27754,6 +27765,7 @@
       "services/api/scripts/verify-member-favorites-benefits.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-orders.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
@@ -27943,6 +27955,7 @@
       "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
@@ -29256,12 +29269,14 @@
       "services/api/scripts/verify-job-ai-privacy.ts"
     ],
     "services/api/src/mock-interview/asr/asr.service.ts": [
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/asr/tts.service.ts": [
       "services/api/scripts/verify-ai-cost-runtime.ts",
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/interview-practice-sheet-pdf.service.ts": [
@@ -29286,10 +29301,14 @@
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/interview-transcript-print.service.ts": [
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/mock-interview-charge.ts": [
       "services/api/scripts/verify-ai-quota-coverage.ts"
+    ],
+    "services/api/src/mock-interview/mock-interview-deadline.ts": [
+      "services/api/scripts/verify-mock-interview-deadline.ts"
     ],
     "services/api/src/mock-interview/mock-interview-llm.service.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
@@ -29298,6 +29317,7 @@
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-mock-interview-consent.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/mock-interview.controller.ts": [
@@ -29308,6 +29328,7 @@
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts"
     ],
@@ -29325,6 +29346,7 @@
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-mock-interview-consent.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-resume-ai-consent-wiring.ts"
     ],
@@ -30083,6 +30105,7 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
       "services/api/scripts/verify-mock-interview-consent.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-offline-agencies-contract.ts",
@@ -33971,12 +33994,14 @@
           "apps/kiosk/src/pages/interview/interviewWorkbenchSession.ts",
           "apps/kiosk/src/pages/interview/session/InterviewAnswerDock.tsx",
           "apps/kiosk/src/pages/interview/session/InterviewSessionPanels.tsx",
+          "apps/kiosk/src/pages/interview/session/interviewDeadline.ts",
           "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts",
           "apps/kiosk/src/pages/interview/session/types.ts",
           "apps/kiosk/src/pages/interview/styles/interview-report.css",
           "apps/kiosk/src/pages/interview/styles/interview-responsive.css",
           "apps/kiosk/src/pages/interview/styles/interview-session.css",
           "apps/kiosk/src/pages/interview/styles/interview-shell.css",
+          "apps/kiosk/src/pages/interview/touch/InterviewHubTouch.tsx",
           "packages/shared/src/types/complianceCopy.ts"
         ],
         "missing": []
@@ -43896,6 +43921,38 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:mock-interview-consent"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai-access/ai-access.guard.ts",
+          "services/api/src/ai-access/ai-access.service.ts",
+          "services/api/src/ai/ai-log.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/mock-interview/asr/asr.service.ts",
+          "services/api/src/mock-interview/asr/tts.service.ts",
+          "services/api/src/mock-interview/interview-transcript-print.service.ts",
+          "services/api/src/mock-interview/mock-interview-deadline.ts",
+          "services/api/src/mock-interview/mock-interview-llm.service.ts",
+          "services/api/src/mock-interview/mock-interview.controller.ts",
+          "services/api/src/mock-interview/mock-interview.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-mock-interview-deadline.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:mock-interview-deadline"
       ],
       "wired": true
     },

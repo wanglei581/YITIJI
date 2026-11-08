@@ -11,6 +11,7 @@ import type {
   CreateInterviewInput,
   CreateInterviewResponse,
   InterviewQuestionResponse,
+  InterviewSessionDetail,
   InterviewReportResponse,
   InterviewPracticeSheetResponse,
   InterviewPrintResponse,
@@ -117,7 +118,12 @@ export function startInterview(sessionId: string, access: InterviewAccess): Prom
     mockIdx = 1
     return Promise.resolve({ done: false, question: MOCK_QUESTIONS[0], qType: 'intro', questionIndex: 1, questionTarget: MOCK_QUESTIONS.length })
   }
-  return call<InterviewQuestionResponse>(`/mock-interviews/${encodeURIComponent(sessionId)}/start`, access, { method: 'POST', body: {} })
+  return call<InterviewQuestionResponse>(`/mock-interviews/${encodeURIComponent(sessionId)}/start`, access, { method: 'POST', body: { hardDeadline: true } })
+}
+
+export function getInterviewSession(sessionId: string, access: InterviewAccess): Promise<InterviewSessionDetail> {
+  if (API_MODE !== 'http') return Promise.reject(new InterviewApiError('MOCK_MODE', '演示模式不读取服务端会话', 0))
+  return call<InterviewSessionDetail>(`/mock-interviews/${encodeURIComponent(sessionId)}`, access)
 }
 
 export function answerInterview(

@@ -38,6 +38,7 @@ import { isAiOutage } from '../../ai/aiOutage'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import type { InterviewFinishRecovery } from './session/interviewAnswerRecovery'
 import { finishInterview, submitInterviewAnswer } from './session/interviewTurnActions'
+import { useInterviewDeadlineSeal } from './session/useInterviewDeadlineSeal'
 
 const INTERVIEWER_LABEL: Record<string, string> = {
   hr: 'HR 面试',
@@ -76,8 +77,8 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     Boolean(state?.sessionId && storedLive?.sessionId === state.sessionId && storedLive.answersRecorded),
   )
   const [finishRecovery, setFinishRecovery] = useState<InterviewFinishRecovery | null>(null)
-  const [remainingSec, setRemainingSec] = useState(storedLive?.remainingSec ?? (state?.durationMin ?? 5) * 60)
   const listRef = useRef<HTMLDivElement>(null)
+  const pendingAnswerRef = useRef<Promise<void> | null>(null)
 
   const [asrEnabled, setAsrEnabled] = useState(false)
   // null = 尚未探测完成。不预设 available，避免「语音回答可用」在探测出
@@ -102,15 +103,6 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     voice.kind === 'recording' ||
     voice.kind === 'transcribing',
   )
-
-  useInterviewLivePersist({
-    state,
-    messages,
-    questionIndex,
-    remainingSec,
-    omitPrintAnswers,
-    answersRecorded,
-  })
 
   const access = useMemo(
     () => ({ token: getToken(), accessToken: state?.accessToken ?? null }),
@@ -177,6 +169,22 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     setSpeaking(false)
   }
 
+  const deadline = useInterviewDeadlineSeal({
+    state, live: storedLive, getToken, access, phase, omitPrintAnswers, answersRecorded, onGoStage, navigate,
+    recorderRef, recordTimerRef, recordStartedAtRef, pendingAnswerRef, stopPlayback,
+    setDraft, setVoice, setRecordSec, setPhase, setAssistantDown,
+  })
+  useInterviewLivePersist({
+    state,
+    messages,
+    questionIndex,
+    remainingSec: deadline.remainingSec,
+    deadlineAtLocalMs: deadline.deadlineAtLocalMs,
+    deadlineSource: deadline.deadlineSource,
+    omitPrintAnswers,
+    answersRecorded,
+  })
+
   useEffect(() => {
     questionShownAtRef.current = Date.now()
     if (mode !== 'voice' || !lastInterviewerMsg || !state?.sessionId) return
@@ -201,11 +209,6 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   }, [lastInterviewerMsg, mode, ttsOfficial])
 
   useEffect(() => {
-    const t = setInterval(() => setRemainingSec((s) => (s > 0 ? s - 1 : 0)), 1000)
-    return () => clearInterval(t)
-  }, [])
-
-  useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, phase, voice.kind])
 
@@ -223,6 +226,8 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     )
   }
 
+  if (deadline.timeUpScreen) return deadline.timeUpScreen
+
   const resetVoiceState = () => {
     recorderRef.current?.cancel()
     recorderRef.current = null
@@ -239,6 +244,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   }
 
   const startRecording = async () => {
+    if (deadline.sealedRef.current) return
     // 能力门禁：去掉原生 disabled 后按钮真的可点，守卫必须在 handler 内部。
     if (micCapability !== null && micCapability !== 'available') {
       setMicError(true)
@@ -311,14 +317,21 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   }
 
   const submit = (args: { text: string; skip: boolean; voiceMeta?: { transcript: string; edited: boolean; durationSec: number } }) => {
-    void submitInterviewAnswer({
+    if (deadline.sealedRef.current) return
+    const job = submitInterviewAnswer({
       args, state, access, messages, draft, voiceKind: voice.kind, questionShownAtRef,
+      sealedRef: deadline.sealedRef, sealAtDeadline: deadline.sealAtDeadline,
       setMessages, setDraft, setMode, setVoice, setPhase, setError, setMicError,
       setFinishRecovery, setAnswersRecorded, setQuestionIndex, setAiOutage, setAssistantDown,
+    })
+    pendingAnswerRef.current = job
+    void job.finally(() => {
+      if (pendingAnswerRef.current === job) pendingAnswerRef.current = null
     })
   }
 
   const finish = () => {
+    if (deadline.sealedRef.current) return
     void finishInterview({
       state, access, phase, voiceKind: voice.kind, messages, answersRecorded, omitPrintAnswers,
       onGoStage, navigate, stopPlayback, resetVoiceState,
@@ -338,6 +351,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     : speaking ? '正在提问…'
     : '等待你开始回答'
 
+  const remainingSec = deadline.remainingSec
   const timeUp = remainingSec === 0
   const busyTurn = phase === 'thinking' || phase === 'finishing'
   const voiceLocked = voice.kind === 'requesting_permission' || voice.kind === 'transcribing'
