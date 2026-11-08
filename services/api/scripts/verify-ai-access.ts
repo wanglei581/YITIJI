@@ -32,6 +32,7 @@ import { ROLES_KEY } from '../src/common/decorators/roles.decorator'
 import { memberSessionKey } from '../src/common/guards/end-user-auth.guard'
 import { AdvisorController } from '../src/advisor/advisor.controller'
 import { AiController } from '../src/ai/ai.controller'
+import { ResumeLayoutAdjustController } from '../src/ai/resume-layout-adjust.controller'
 import { CareerPlanController } from '../src/ai/career-plan.controller'
 import { FairVisitPlanController } from '../src/ai/fair-visit-plan.controller'
 import { JobFitController } from '../src/ai/job-fit.controller'
@@ -285,7 +286,7 @@ async function guardOnRealRoutes(): Promise<void> {
 
 function coverage(): void {
   const aiControllers: Ctor[] = [
-    AiController, CareerPlanController, FairVisitPlanController, JobFitController, SelfAssessmentController,
+    AiController, ResumeLayoutAdjustController, CareerPlanController, FairVisitPlanController, JobFitController, SelfAssessmentController,
     ResumeReportExportController, KioskAiCapabilitiesController, AdvisorController, MockInterviewController,
     MemberMockInterviewController, ContractReviewController, JobAiController, MemberJobAiSessionsController,
     MaterialsController, DailyBriefController, TrtcController, JobMaterialsController,

@@ -104,6 +104,7 @@ function makePlan(stored: Stored, anonymous = false) {
     audit as never,
     aiLog as never,
     degradedPdf as never,
+    { requireActiveConsent: async () => undefined } as never,
   )
   const requester = anonymous
     ? { endUserId: null, accessToken: ANON_TOKEN }
