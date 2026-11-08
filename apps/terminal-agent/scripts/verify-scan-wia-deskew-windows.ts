@@ -8,7 +8,10 @@ import { prepareWiaDeskew } from '../src/agent/scan-deskew/wia-integration'
 import { buildWiaScanScript } from '../src/agent/scan-device/wia-script'
 
 assert.equal(process.platform, 'win32', 'Windows-only gate')
-const temporary = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'wia-wiring-')))
+// GitHub Windows 机器的 os.tmpdir() 是 8.3 短名（C:\Users\RUNNER~1\…），`~` 过不了 wia-script 的 PowerShell 路径白名单；
+// realpathSync.native 会展开成长路径（11/08 手动运行 42463532610 就红在这里：参数 outDir 不在白名单内）。
+const temporary = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'wia-wiring-')))
+assert.match(temporary, /^[A-Za-z0-9 _.:\\/()-]{1,200}$/, `临时目录要能过 PowerShell 路径白名单：${temporary}`)
 const programData = path.join(temporary, 'programdata')
 const root = path.join(programData, 'AIJobPrintAgent', 'scan-device')
 const taskDir = path.join(root, 'synthetic')
