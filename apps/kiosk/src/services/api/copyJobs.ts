@@ -62,9 +62,10 @@ async function copyRequest<T>(path: string, options: {
       body: options.body ? JSON.stringify(options.body) : undefined,
       signal: controller.signal, staleSignal: controller.signal,
     })
-    const payload = await response.json() as { success?: boolean; data?: T; error?: { code?: string } }
+    const payload = await response.json() as { success?: boolean; data?: T; error?: { code?: string; details?: unknown } }
     if (!response.ok || payload.success !== true || !payload.data) {
-      throw new ApiHttpError(payload.error?.code ?? 'COPY_UNKNOWN', '', response.status)
+      // details 只给额度超限读面数（details.limit）；服务端 message 不带上屏。
+      throw Object.assign(new ApiHttpError(payload.error?.code ?? 'COPY_UNKNOWN', '', response.status), { details: payload.error?.details })
     }
     return payload.data
   } finally {

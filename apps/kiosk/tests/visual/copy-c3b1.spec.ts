@@ -122,6 +122,47 @@ test('quote changed rereads, then requires a fresh press; success dispatches pri
   expect(f.localCalls.filter((c) => c.action === 'print')).toHaveLength(1)
   await expect.poll(() => f.revokedUrls.length).toBeGreaterThanOrEqual(3)
 })
+for (const [code, limit, reason, login] of [
+  ['PRINT_GUEST_ORDER_QUOTA_EXCEEDED', 20, '免登录每次最多复印 20 面。用手机号登录后，可以一次复印更多。', true],
+  ['PRINT_MEMBER_DAILY_QUOTA_REACHED', 50, '你今天已免费打印复印 50 面，达到每日上限，明天 0 点恢复。', false],
+  ['PRINT_TERMINAL_DAILY_QUOTA_REACHED', 300, '今天这台机器的免费打印复印量已用完，明天 0 点恢复。', false],
+] as const) test(`over the shared free quota (${code}) says copy, never sends to the panel, prints nothing @w2`, async ({ page, api }) => {
+  const f = await copyDeviceFixture(page, api, { quota: { code, limit } })
+  await f.start(); await f.report('scanned')
+  await page.getByTestId('copy-confirm').click()
+  const box = page.getByTestId('copy-quota')
+  await expect(box).toBeVisible()
+  await expect(box.getByText(reason, { exact: true })).toBeVisible()
+  await expect(box).toContainText(login ? '本次没有建单，也没有出纸。登录后要重新放原件、再扫一次。' : '本次没有建单，也没有出纸。')
+  await expect(box).toContainText('原件还在玻璃上或进纸器里，请带走')
+  for (const fact of ['复印和打印共用免费额度', '只算成功出纸的面数，没出纸不算']) await expect(box.getByText(fact, { exact: true })).toBeVisible()
+  await expect(page.getByText('合成的服务端原话，不应上屏')).toHaveCount(0)
+  // 面板复印不经过额度：额度屏不能给面板出路，也不能把问小青问成「面板上怎么复印」。
+  await expect(page.locator('.copy-touch').getByText(/面板/)).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '问小青：免费额度什么时候恢复', exact: true })).toBeVisible()
+  await expect(page.getByTestId('copy-check-facts')).toHaveCount(0)
+  await expect(page.getByTestId('copy-quota-way-home')).toBeVisible()
+  await expect(page.getByTestId('copy-quota-way-login')).toHaveCount(login ? 1 : 0)
+  expect(f.localCalls.filter((c) => c.action === 'print')).toHaveLength(0)
+  expect(f.cloudCalls.filter((c) => c.action === 'confirm')).toHaveLength(1)
+  for (const button of await page.locator('.copy-touch button:enabled').all()) {
+    const bb = await button.boundingBox()
+    expect(bb!.height).toBeGreaterThanOrEqual(48)
+  }
+  await page.screenshot({ path: `test-results/copy-c3d-quota-${login ? 'guest' : code === 'PRINT_MEMBER_DAILY_QUOTA_REACHED' ? 'member' : 'terminal'}.png` })
+  if (login) {
+    await expect(page.getByRole('button', { name: '回首页', exact: true })).toBeVisible()
+    await page.getByTestId('copy-quota-login').click()
+    await expect(page).toHaveURL(/\/login\?from=%2Fprint-scan%2Ffeature%2Fcopy-screen%3Fstage%3Dset$/)
+  } else {
+    await expect(page.getByTestId('copy-quota-login')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '去登录', exact: true })).toHaveCount(0)
+    await page.getByTestId('copy-quota-home').click()
+    await expect(page).toHaveURL(/\/$/)
+  }
+  await expect.poll(() => f.localCalls.filter((c) => c.action === 'clear').length).toBeGreaterThan(0)
+  await expect.poll(() => f.cloudCalls.filter((c) => c.action === 'cancel').length).toBeGreaterThan(0)
+})
 test('paging revokes old URLs; rescan clears the old job before new generation-one creation @w2', async ({ page, api }) => {
   const f = await copyDeviceFixture(page, api, { pages: 5 })
   await f.start(); await f.report('scanned')

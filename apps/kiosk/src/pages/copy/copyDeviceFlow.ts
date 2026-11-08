@@ -1,7 +1,7 @@
 import { cancelCopyJob, confirmCopyJob, getCopyJob, type CopyJobView } from '../../services/api/copyJobs'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { fetchCopyPreview, LocalCopyError, postLocalCopy, type LocalCopyView } from '../../services/copy/localCopyApi'
-import { canConfirmCopy, copyPhaseFromLocal, validCopyJob, type CopyDevicePhase } from './copyCheckModel'
+import { canConfirmCopy, copyPhaseFromLocal, copyQuotaCode, copyQuotaLimit, validCopyJob, type CopyDevicePhase } from './copyCheckModel'
 import { CopyPreview } from './copyPreview'
 import { copyFault, copyPrintPhase, type CopyPrintStage } from './copyPrintModel'
 import { clearCopySession, markCopyConfirmed, onCopySessionClear, type CopySession } from './copySession'
@@ -14,9 +14,11 @@ interface DeviceSnapshot {
   job: CopyJobView | null
   notice: string | null
   errorCode: string | null
+  /** 额度超限时后端 details.limit 给的面数；没有就是 null。 */
+  quotaLimit: number | null
   printStage: CopyPrintStage
 }
-const initial = (): DeviceSnapshot => ({ phase: 'starting', pages: null, started: false, busy: false, job: null, notice: null, errorCode: null, printStage: 'received' })
+const initial = (): DeviceSnapshot => ({ phase: 'starting', pages: null, started: false, busy: false, job: null, notice: null, errorCode: null, quotaLimit: null, printStage: 'received' })
 const UNKNOWN = '状态未知。这一步的结果还没确认，请先停止操作，不要重新开始。'
 let snapshot = initial()
 let current: CopyDeviceFlow | null = null
@@ -65,7 +67,7 @@ export class CopyDeviceFlow {
     clearCopySession()
   }
   private schedule() {
-    if (!this.live() || ['done', 'unconfirmed', 'error', 'off', 'stopped', 'unknown'].includes(snapshot.phase)) return
+    if (!this.live() || ['done', 'unconfirmed', 'error', 'off', 'stopped', 'unknown', 'quota'].includes(snapshot.phase)) return
     this.timer = window.setTimeout(() => { void this.poll().finally(() => this.schedule()) }, 3000)
   }
   private async acceptLocal(view: LocalCopyView, signal: AbortSignal) {
@@ -80,7 +82,7 @@ export class CopyDeviceFlow {
     if (view.state === 'scanned') await this.refreshQuote(signal)
   }
   private async poll() {
-    if (this.polling || snapshot.busy || ['done', 'unconfirmed', 'error', 'off', 'stopped', 'unknown'].includes(snapshot.phase)) return
+    if (this.polling || snapshot.busy || ['done', 'unconfirmed', 'error', 'off', 'stopped', 'unknown', 'quota'].includes(snapshot.phase)) return
     this.polling = true
     const revision = this.revision
     const signal = this.controller.signal
@@ -156,6 +158,10 @@ export class CopyDeviceFlow {
           await this.refreshQuote(signal)
           if (this.live(signal) && snapshot.phase === 'check') publish({ notice: '报价已更新，请重新核对后再开始打印。' })
         } catch { if (this.live(signal)) this.unknown() }
+      } else if (error instanceof ApiHttpError && copyQuotaCode(error.code)) {
+        // 超过免费额度：没有建单、没有出纸，不再轮询；出路只有回首页（游客单次超限加去登录），不引导去面板。
+        this.preview.clear()
+        publish({ phase: 'quota', errorCode: error.code, quotaLimit: copyQuotaLimit(error), notice: null })
       } else if (error instanceof ApiHttpError && ['COPY_PAID_NOT_SUPPORTED', 'COPY_ODD_DUPLEX_MULTICOPY_DISABLED'].includes(error.code ?? '')) {
         publish({ job: { ...job!, quoteError: error.code! }, notice: error.code === 'COPY_PAID_NOT_SUPPORTED' ? '这台机器暂不支持付费复印，请重扫或返回。' : '这次奇数页多份双面暂未开通，请返回修改设置。' })
       } else this.unknown()

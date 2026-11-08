@@ -24,6 +24,11 @@
 .copy-touch .cc-take span { font-size: 26px; line-height: 1.6; }
 .copy-touch .cc-result-help { display: flex; align-items: center; gap: 18px; margin: 0; padding: 22px 28px; border-radius: 26px; background: var(--qxt-teal-wash); color: var(--qxt-teal-ink); font-size: 25px; font-weight: 600; line-height: 1.55; }
 .copy-touch .cc-result-help svg { flex: none; }
+.copy-touch .cc-quota-facts { display: grid; gap: 10px; margin: 20px 0 0; padding: 18px 0 0; list-style: none; border-top: 1.5px solid var(--qxt-edge); }
+.copy-touch .cc-quota-facts li { position: relative; padding-left: 26px; font-size: 24px; line-height: 1.5; color: var(--qxt-ink-2); }
+.copy-touch .cc-quota-solo .cs-why { grid-template-columns: minmax(0, 1fr); justify-items: center; align-content: center; gap: 28px; padding: 36px 56px; text-align: center; }
+.copy-touch .cc-quota-solo .cc-quota-facts { justify-items: center; }
+.copy-touch .cc-quota-facts li::before { content: ''; position: absolute; left: 4px; top: .6em; width: 10px; height: 10px; border-radius: 50%; background: var(--qxt-teal-ink); }
 .copy-touch .cc-result-steps { display: grid; gap: 12px; }
 .copy-touch .cc-result-steps > div { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 24px 26px 24px 88px; min-height: 170px; border: 1.5px solid var(--qxt-edge); border-radius: 26px; background: var(--qxt-well); }
 .copy-touch .cc-result-steps > div > span { position: absolute; left: 24px; top: 24px; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; background: var(--qxt-teal-wash); font-size: 26px; }

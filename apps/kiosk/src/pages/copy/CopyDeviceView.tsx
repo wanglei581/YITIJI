@@ -9,6 +9,7 @@ import { CopyShell } from './CopyShell'
 import { CopyCheckView } from './CopyCheckView'
 import { CopyPrintView } from './CopyPrintView'
 import { CopyErrorView } from './CopyErrorView'
+import { CopyQuotaView } from './CopyQuotaView'
 import '../scan/styles/scan-device-flow.css'
 import './copy-device.css'
 
@@ -27,6 +28,7 @@ export function CopyDeviceView({ session, onBack, onRescan, printerReady, online
   const device = readCopyDeviceFlow()
   if (state.phase === 'printing' || state.phase === 'done' || state.phase === 'unconfirmed') return <CopyPrintView
     phase={state.phase} printStage={state.printStage} onEnd={onBack} />
+  if (state.phase === 'quota') return <CopyQuotaView errorCode={state.errorCode} limit={state.quotaLimit} />
   if (state.phase === 'error' || state.phase === 'off') return <CopyErrorView errorCode={state.errorCode}
     printing={session.state === 'confirmed'} busy={state.busy} onRetry={onRescan} />
   const stop = () => {

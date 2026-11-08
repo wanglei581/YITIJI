@@ -8,6 +8,8 @@ const JPEG = Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDB
 export async function copyDeviceFixture(page: Page, api: ApiRouter, options: {
   pages?: number; copies?: number; duplex?: boolean; feeder?: boolean; color?: boolean; amount?: number; quoteChanged?: boolean
   printState?: string; noPhone?: boolean; statusAfterPrintFails?: boolean
+  /** 确认时回 429 免费额度超限（与打印同码，details 同后端 FreePrintQuotaDetails）。 */
+  quota?: { code: string; limit: number }
   fail?: 'print' | 'abort' | 'cancel' | 'clear' | 'preview' | 'confirm' | 'status'; clearDelayed?: boolean
 } = {}) {
   await page.clock.install()
@@ -41,7 +43,7 @@ export async function copyDeviceFixture(page: Page, api: ApiRouter, options: {
   })
   const job = (patch: Partial<CopyJobView> = {}): CopyJobView => ({
     ...base.receipt, ...settings, copyId, pageCount: pages, state: cloudState, orderId: printed || cloudState === 'confirmed' ? 'synthetic-copy-order' : null,
-    quoteVersion: version, quoteError: null, quote: { serviceKey: settings.colorMode === 'color' ? 'copy_color_page' : 'copy_bw_page', unitCents: options.amount ?? 0,
+    quoteVersion: version, quoteError: null, quote: { serviceKey: settings.colorMode === 'color' ? 'print_color_page' : 'print_bw_page', unitCents: options.amount ?? 0,
       amountCents: (options.amount ?? 0) * pages * settings.copies, pageCount: pages, copies: settings.copies,
       colorMode: settings.colorMode, duplex: settings.duplex, billableSides: pages * settings.copies }, ...patch,
   })
@@ -58,6 +60,11 @@ export async function copyDeviceFixture(page: Page, api: ApiRouter, options: {
       ? { abort: 'connectionrefused' } : ok(job({ state: 'cancelled' })))
     api.respondWith('POST', `/api/v1/copy/jobs/${id}/confirm`, (n) => {
       if (options.fail === 'confirm') return { abort: 'connectionrefused' }
+      if (options.quota) {
+        const { code, limit } = options.quota
+        return { status: 429, json: { success: false, error: { code, message: '合成的服务端原话，不应上屏',
+          details: { limit, used: limit, remaining: 0, requested: pages * settings.copies, resetAt: '2026-11-09T16:00:00.000Z' } } } }
+      }
       if (options.quoteChanged && n === 1) {
         version = 'b'.repeat(64)
         return { status: 409, json: { success: false, error: { code: 'COPY_QUOTE_CHANGED' } } }

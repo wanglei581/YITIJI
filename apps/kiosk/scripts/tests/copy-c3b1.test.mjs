@@ -31,6 +31,28 @@ test('only a real zero quote says free; no quote and nonzero quote cannot confir
     assert.equal(model.canConfirmCopy({ ...job, ...patch }), false)
   }
 })
+test('copy has no price rows of its own: the quote key is the same-colour print key, old copy_* keys never confirm', () => {
+  const job = makeJob()
+  for (const serviceKey of ['copy_bw_page', 'print_color_page', 'scan_page', '']) {
+    assert.equal(model.canConfirmCopy({ ...job, quote: { ...job.quote, serviceKey } }), false, serviceKey)
+  }
+  const color = makeJob({ colorMode: 'color', quote: { ...job.quote, colorMode: 'color', serviceKey: 'print_color_page' } })
+  assert.equal(model.canConfirmCopy(color), true)
+  assert.equal(model.canConfirmCopy({ ...color, quote: { ...color.quote, serviceKey: 'copy_color_page' } }), false)
+  assert.equal(model.canConfirmCopy({ ...color, quote: { ...color.quote, serviceKey: 'print_bw_page' } }), false)
+})
+test('quota codes are recognised by code only and the limit only from a positive integer details.limit', () => {
+  for (const code of ['PRINT_TERMINAL_DAILY_QUOTA_REACHED', 'PRINT_MEMBER_DAILY_QUOTA_REACHED', 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED']) {
+    assert.equal(model.copyQuotaCode(code), code)
+  }
+  for (const code of [null, undefined, '', 'COPY_PAID_NOT_SUPPORTED', 'PRINT_JOB_TOO_LARGE', '今天这台机器的免费打印复印量已用完']) {
+    assert.equal(model.copyQuotaCode(code), null)
+  }
+  assert.equal(model.copyQuotaLimit({ details: { limit: 20 } }), 20)
+  for (const error of [null, {}, { details: null }, { details: { limit: 0 } }, { details: { limit: -3 } }, { details: { limit: 2.5 } }, { details: { limit: '20' } }]) {
+    assert.equal(model.copyQuotaLimit(error), null)
+  }
+})
 test('local states distinguish a complete glass page, feeder auto-finish, composing and uncertainty', () => {
   for (const [state, source, phase] of [['starting', 'flatbed', 'starting'], ['scanning', 'flatbed', 'scan'],
     ['page_ready', 'flatbed', 'more'], ['page_ready', 'feeder', 'finishing'], ['composing', 'feeder', 'finishing'],
@@ -74,7 +96,7 @@ function makeJob(patch = {}) {
     pageCount: 3, copies: 2, source: 'flatbed', colorMode: 'black_white', duplex: 'duplex_long_edge',
     expiresAt: '2099-01-01', orderId: null, quoteVersion: 'a'.repeat(64), quoteError: null,
     quote: { pageCount: 3, copies: 2, colorMode: 'black_white', duplex: 'duplex_long_edge', billableSides: 6,
-      unitCents: 0, amountCents: 0, serviceKey: 'copy_bw_page' }, ...patch }
+      unitCents: 0, amountCents: 0, serviceKey: 'print_bw_page' }, ...patch }
 }
 class ApiHttpError extends Error { constructor(code) { super(code); this.code = code } }
 let cleanup
@@ -83,6 +105,7 @@ let view
 let job
 let failure
 let quoteChanged
+let quotaFailure = null
 let statusWait = null
 let confirmed = false
 const timers = new Map()
@@ -106,6 +129,7 @@ globalThis.__copyTestDeps = {
   getCopyJob: async () => { calls.push({ action: 'quote' }); return job },
   confirmCopyJob: async (_id, _token, version) => {
     calls.push({ action: 'confirm', version })
+    if (quotaFailure) throw Object.assign(new ApiHttpError(quotaFailure.code), { details: quotaFailure.details })
     if (quoteChanged) { quoteChanged = false; job = { ...job, quoteVersion: 'b'.repeat(64) }; throw new ApiHttpError('COPY_QUOTE_CHANGED') }
     return { ...job, state: 'confirmed', orderId: 'order-1' }
   },
@@ -118,7 +142,7 @@ globalThis.__copyTestDeps = {
 const injected = source('copyDeviceFlow.ts').replace(/^import .* from '([^']+)'$/gm, (line, path) => {
   if (path === './copyPrintModel') return `import { copyFault, copyPrintPhase } from '${printURL}'`
   if (path === './copyPreview') return `import { CopyPreview } from '${previewURL}'`
-  if (path === './copyCheckModel') return `import { canConfirmCopy, copyPhaseFromLocal, validCopyJob } from '${modelURL}'`
+  if (path === './copyCheckModel') return `import { canConfirmCopy, copyPhaseFromLocal, copyQuotaCode, copyQuotaLimit, validCopyJob } from '${modelURL}'`
   // 类型由转译器去掉；运行依赖用受控的真实状态与失败回包代替。
   return line.replace(/import \{(.*?)\} from .*/, (_, names) =>
     `const { ${names.replace(/type \w+,?\s*/g, '')} } = globalThis.__copyTestDeps`)
@@ -128,7 +152,7 @@ const flush = async () => { for (let n = 0; n < 15; n++) await Promise.resolve()
 async function start(patch = {}) {
   cleanup?.()
   timers.clear()
-  calls = []; failure = null; quoteChanged = false; confirmed = false
+  calls = []; failure = null; quoteChanged = false; quotaFailure = null; confirmed = false
   job = makeJob(patch)
   view = { state: 'scanning', generation: 1, pageCount: null, errorCode: null }
   const session = { ...job, input: { ...job, requestKey: 'synthetic-request-key' }, controlToken: 'synthetic-secret' }
@@ -197,6 +221,27 @@ test('quote changes reload and require a second explicit confirmation; one local
   assert.deepEqual(calls.filter((c) => c.action === 'confirm').map((c) => c.version), ['a'.repeat(64), 'b'.repeat(64)])
   assert.equal(calls.filter((c) => c.action === 'print').length, 1)
 })
+for (const [code, details, limit] of [['PRINT_GUEST_ORDER_QUOTA_EXCEEDED', { limit: 20 }, 20],
+  ['PRINT_MEMBER_DAILY_QUOTA_REACHED', { limit: 50 }, 50], ['PRINT_TERMINAL_DAILY_QUOTA_REACHED', undefined, null]]) {
+  test(`over the shared free quota (${code}): no order, no print, polling stops`, async () => {
+    const { device } = await check()
+    quotaFailure = { code, details }
+    await device.confirm()
+    const state = runtime.readCopyDevice()
+    assert.equal(state.phase, 'quota')
+    assert.equal(state.errorCode, code)
+    assert.equal(state.quotaLimit, limit)
+    assert.equal(state.busy, false)
+    assert.equal(confirmed, false)
+    assert.equal(calls.filter((c) => c.action === 'print').length, 0)
+    const before = calls.length
+    for (const [key, timer] of [...timers.entries()].filter(([, t]) => t.delay === 3000)) { timers.delete(key); timer.fn() }
+    await flush()
+    assert.equal(calls.filter((c, i) => i >= before && c.action === 'status').length, 0, 'no status polling after quota')
+    await device.confirm()
+    assert.equal(calls.filter((c) => c.action === 'confirm').length, 1, 'quota screen cannot confirm again')
+  })
+}
 test('a delayed pre-confirm status cannot roll confirmed back to scanned', async () => {
   const { device } = await check()
   let release

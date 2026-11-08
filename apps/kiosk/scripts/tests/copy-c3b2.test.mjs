@@ -24,7 +24,7 @@ let local, cloud, calls, fail, pendingPrint
 const makeJob = (patch = {}) => ({ copyId: 'copy-test', terminalId: 'KSK-001', generation: 1, authorizationVersion: 1,
   state: 'scanned', source: 'flatbed', copies: 1, colorMode: 'black_white', duplex: 'simplex', pageCount: 2,
   expiresAt: '2099-01-01', orderId: null, quoteVersion: 'a'.repeat(64), quoteError: null,
-  quote: { serviceKey: 'copy_bw_page', pageCount: 2, copies: 1, colorMode: 'black_white', duplex: 'simplex',
+  quote: { serviceKey: 'print_bw_page', pageCount: 2, copies: 1, colorMode: 'black_white', duplex: 'simplex',
     unitCents: 0, amountCents: 0, billableSides: 2 }, ...patch })
 globalThis.__copyPrintTest = {
   LocalCopyError, ApiHttpError: class extends Error {},

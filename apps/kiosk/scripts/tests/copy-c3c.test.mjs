@@ -30,7 +30,7 @@ let calls = [], local, cloud, startWait, cancelWait, confirmWait, printWait, can
 const job = () => ({ copyId: 'copy-c3c', terminalId: 'KSK-001', generation: 7, authorizationVersion: 3,
   state: 'scanned', source: 'flatbed', copies: 1, colorMode: 'black_white', duplex: 'simplex', pageCount: 2,
   expiresAt: '2099-01-01', orderId: null, quoteVersion: 'a'.repeat(64), quoteError: null,
-  quote: { serviceKey: 'copy_bw_page', pageCount: 2, copies: 1, colorMode: 'black_white', duplex: 'simplex',
+  quote: { serviceKey: 'print_bw_page', pageCount: 2, copies: 1, colorMode: 'black_white', duplex: 'simplex',
     unitCents: 0, amountCents: 0, billableSides: 2 } })
 globalThis.__copyCleanupTest = {
   ...store, LocalCopyError: class extends Error {}, ApiHttpError: class extends Error {},
