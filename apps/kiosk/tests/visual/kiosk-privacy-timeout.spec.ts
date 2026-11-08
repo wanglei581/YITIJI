@@ -2087,7 +2087,10 @@ test('a member login cannot start a scan while the previous one is still being c
   await revoke.received(0)
 
   await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
-  await page.getByRole('button', { name: /下一步/ }).click()
+  await page.getByRole('button', { name: '下一步', exact: true }).click()
+  // K1b-1：下一步只进入怎么扫。默认没有 scan_device，建会话发生在面板这一下。
+  await expect(page.getByRole('heading', { name: '这台机器还不能在屏上开始扫描' })).toBeVisible()
+  await page.getByTestId('scan-way-panel').click()
   await page.waitForURL(/\/scan\?stage=settings/)
 
   /* 服务端的租约取的是这台终端**最早**那条「已确认 + waiting + 未过期」的行。

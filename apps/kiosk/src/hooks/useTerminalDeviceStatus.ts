@@ -405,3 +405,6 @@ export function useTerminalDeviceStatus(enabled = true): TerminalDeviceStatusVie
 
   return useMemo(() => withLiveNotice(view, contact), [view, contact])
 }
+
+export { abortLocalScanProbe, requestLocalScanProbe, useLocalScanProbe } from '../services/scan/localScanProbe'
+export type { LocalScanProbeView } from '../services/scan/localScanProbe'
