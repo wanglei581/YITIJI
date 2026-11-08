@@ -1666,6 +1666,76 @@ test('assistant filters actions and survives service failure @w3-kiosk', async (
   expect(runtimeErrors).toEqual([])
 })
 
+// 2026-11-08：保存要点后不再跳小青作业面，留在本页显示结果，已存进我的文档时给一颗「去『我的文档』打印」。
+test('assistant: saving the highlights stays on the page and offers My Documents for printing @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
+  api.respond('POST', '/api/v1/member/auth/sms-code', { status: 200, json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } } })
+  api.respond('POST', '/api/v1/member/auth/login', { status: 200, json: { success: true, data: { token: 'w3-summary-member', user: { id: 'w3-summary', phoneMasked: '138****8000', nickname: '要点会员' } } } })
+  api.respond('GET', '/api/v1/me/favorites', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+  api.respond('POST', '/api/v1/assistant/chat', { status: 200, json: assistantReply })
+  const summaryPaths: string[] = []
+  await page.route('**/api/v1/assistant/sessions/*/summary', async (route) => {
+    summaryPaths.push(new URL(route.request().url()).pathname)
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        advisorSessionId: 'w3-summary-advisor-session',
+        artifactId: 'w3-summary-artifact',
+        highlights: ['项目经历按背景、任务、行动、结果四步写，每段一个可核对的结果。'],
+        todos: ['把实习里做过的三件事各写成一句'],
+        disclaimer: '内容由本次对话浓缩，请本人核对后使用',
+        savedToDocuments: true,
+        document: {
+          fileId: 'w3-summary-file', filename: '小青本次要点.pdf', mimeType: 'application/pdf', sizeBytes: 48213, pageCount: 1,
+          signedUrl: '/api/v1/files/w3-summary-file/content?sig=w3', expiresAt: '2099-01-01T00:00:00.000Z',
+          printFileUrl: '/api/v1/files/w3-summary-file/content?sig=w3print',
+        },
+      }),
+    })
+  })
+
+  await page.goto(`/login?from=${encodeURIComponent('/assistant')}`)
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
+  for (const digit of '13800138000') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+  await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+  for (const digit of '123456') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === '/assistant')
+
+  await page.getByLabel('输入咨询问题').fill('如何整理项目经历？')
+  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  await expect(page.locator('[data-message-kind="ai"]')).toHaveCount(1)
+  await page.getByRole('button', { name: /保存这次回答的要点/ }).click()
+
+  const result = page.locator('.assistant-summary-result')
+  await expect(result).toContainText('本次要点已保存到我的文档，可打印。')
+  await expect(result).toContainText('项目经历按背景、任务、行动、结果四步写')
+  expect(summaryPaths).toHaveLength(1)
+  // 留在小青页：不再跳作业面。
+  expect(new URL(page.url()).pathname).toBe('/assistant')
+  const toDocs = result.getByRole('button', { name: '去「我的文档」打印' })
+  await expect(toDocs).toBeVisible()
+  const box = await toDocs.boundingBox()
+  expect(box?.height ?? 0, '保存后的下一步按钮 ≥56').toBeGreaterThanOrEqual(56)
+  await page.screenshot({ path: test.info().outputPath('assistant-summary-saved-1080x1920.png') })
+  await assertNoHorizontalOverflow(page)
+  expect(runtimeErrors).toEqual([])
+
+  // 点下去才去「我的文档」：那一页的列表与本用例无关，给空页即可。
+  api.respond('GET', '/api/v1/me/documents', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+  await toDocs.click()
+  await page.waitForURL((url) => url.pathname === '/me/documents')
+})
+
 test('assistant: AI budget exhausted locks the composer and offers non-AI entries instead of a retry @w3-kiosk', async ({ page, api }) => {
   const runtimeErrors: string[] = []
   page.on('pageerror', (error) => runtimeErrors.push(error.message))
