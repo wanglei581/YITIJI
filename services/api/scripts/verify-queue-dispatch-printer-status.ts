@@ -84,6 +84,10 @@ function assertKioskFailClosed(): void {
       /import \{[^}]+\} from '\.\/useSupportContact'\n/,
       'const useSupportContactSnapshot = () => undefined\n',
     )
+    // K1b-1：扫描仪探测从同一 hook 再导出。临时文件只跑 mapTerminalPrinterStatus，
+    // 相对路径在临时目录里解析不到。剥掉再导出，上面的 printerReady 断言不改。
+    .replace(/export \{[^}]+\} from '\.\.\/services\/scan\/localScanProbe'\n/, '')
+    .replace(/export type \{[^}]+\} from '\.\.\/services\/scan\/localScanProbe'\n/, '')
     .replace(/import\.meta\.env/g, '({} as { VITE_PRINTER_NAME?: string })')
   const dir = mkdtempSync(join(tmpdir(), 'kiosk-printer-map-'))
   const file = join(dir, 'map-terminal-printer-status.ts')

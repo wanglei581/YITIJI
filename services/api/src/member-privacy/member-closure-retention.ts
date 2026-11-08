@@ -55,6 +55,14 @@ export async function retainClosureRecords(tx: PrismaTransactionClient, endUserI
     idempotencyKey: null, idempotencyPayloadHash: null,
   } })
   counts.Order = orders.length
+  // 复印履约与订单一同保留；清除可携带身份的请求键/快照文本，账号仅剩既有匿名壳。
+  const copies = await tx.copyJob.findMany({ where: { OR: [{ endUserId }, { orderId: { in: orderIds } }] } })
+  for (const row of copies) await tx.copyJob.update({ where: { id: row.id }, data: {
+    requestKey: randomBytes(32).toString('hex'),
+    quoteSnapshot: row.quoteSnapshot ? scrub(row.quoteSnapshot) : null,
+    resultCode: row.resultCode ? scrub(row.resultCode) : null,
+  } })
+  counts.CopyJob = copies.length
   const tasks = await tx.printTask.findMany({ where: { OR: [{ endUserId }, { orderId: { in: orderIds } },
     { id: { in: orders.flatMap((row) => row.printTaskId ? [row.printTaskId] : []) } }] } })
   for (const row of tasks) await tx.printTask.update({ where: { id: row.id }, data: {

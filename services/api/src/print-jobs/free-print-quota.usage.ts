@@ -55,6 +55,42 @@ const TASK_SELECT = {
 /** 成功出纸才计入 used。反向变异：把 failed 加进这个列表，失败任务也会占额度。 */
 const COUNTED_PAPER_STATUSES: readonly string[] = ['completed']
 
+/**
+ * 屏上复印与打印共用这三条免费额度，按计费面数（billableSides）计。
+ * 出纸成功（handed）才计入 used；unconfirmed、failed、cancelled、expired 与确认前的状态都不计。
+ */
+const COPY_COUNTED_STATES: readonly string[] = ['handed']
+/** 复印在途：已确认、已派发、已进打印队列，还可能出纸。 */
+const COPY_IN_FLIGHT_STATES: readonly string[] = ['confirmed', 'dispatching', 'spooled']
+
+interface CopySlice {
+  terminalId: string
+  endUserId: string | null
+  state: string
+  billableSides: number
+  expiresAt: Date
+  orderId: string | null
+}
+
+const COPY_SELECT = {
+  terminalId: true,
+  endUserId: true,
+  state: true,
+  billableSides: true,
+  expiresAt: true,
+  orderId: true,
+} as const
+
+/** handed 是终态，updatedAt 即出纸回报时刻，对齐打印按 completedAt 落到北京自然日。 */
+function copyHandedWithin(start: Date, end: Date) {
+  return {
+    state: { in: [...COPY_COUNTED_STATES] },
+    updatedAt: { gte: start, lt: end },
+    // 会员注销清洗会改老单的 updatedAt。复印单建好十分钟内必须派发，只看昨天 0 点以后建的单，老单不挤占当天额度。
+    createdAt: { gte: new Date(start.getTime() - 24 * 3600_000) },
+  }
+}
+
 export function reprintRequestedSides(
   item: { billablePages: number; copies: number } | null,
   order: { billablePages: number | null; printParamsJson: string | null } | null,
@@ -67,7 +103,7 @@ export function reprintRequestedSides(
   })
 }
 
-function isFreeOrder(order: OrderSlice | undefined): boolean {
+function isFreeOrder(order: { amountCents: number; discountCents: number } | undefined): boolean {
   if (!order) return true
   return payableCents(order) <= 0
 }
@@ -162,6 +198,49 @@ async function loadUsageTasks(
   })
 }
 
+/** 复印的已用与在途，范围与窗口取法同打印：终端按 terminalId、会员按 endUserId，在途看当天创建或当天有更新。 */
+async function loadUsageCopies(
+  db: FreePrintQuotaDb,
+  terminalId: string,
+  endUserId: string | null,
+  start: Date,
+  end: Date,
+): Promise<CopySlice[]> {
+  // 只有打印表的门禁桩没有复印表，按没有复印处理。
+  if (typeof db.copyJob?.findMany !== 'function') return []
+  const inFlight = {
+    state: { in: [...COPY_IN_FLIGHT_STATES] },
+    OR: [{ createdAt: { gte: start, lt: end } }, { updatedAt: { gte: start, lt: end } }],
+  }
+  const scope = endUserId ? { OR: [{ terminalId }, { endUserId }] } : { terminalId }
+  return db.copyJob.findMany({
+    where: { AND: [scope, { OR: [copyHandedWithin(start, end), inFlight] }] },
+    select: COPY_SELECT,
+  })
+}
+
+/** 只算 0 元单，与打印 isFreeOrder 同口径（看关联订单）。printed = 出纸成功，否则是在途。 */
+async function countableCopies(
+  db: FreePrintQuotaDb,
+  copies: CopySlice[],
+  now: Date,
+): Promise<Array<CopySlice & { printed: boolean }>> {
+  if (copies.length === 0 || typeof db.order?.findMany !== 'function') return []
+  const orderIds = copies.flatMap((job) => (job.orderId ? [job.orderId] : []))
+  const orders = orderIds.length === 0 ? [] : await db.order.findMany({
+    where: { id: { in: orderIds } },
+    select: { id: true, amountCents: true, discountCents: true },
+  })
+  const orderById = new Map(orders.map((order) => [order.id, order]))
+  return copies.flatMap((job) => {
+    if (!isFreeOrder(job.orderId ? orderById.get(job.orderId) : undefined)) return []
+    const printed = COPY_COUNTED_STATES.includes(job.state)
+    // 已确认但过了有效期的单拿不到打印许可，不会再出纸，不占在途；已派发的照打印在途算到当天结束。
+    if (!printed && job.state === 'confirmed' && job.expiresAt.getTime() <= now.getTime()) return []
+    return [{ ...job, printed }]
+  })
+}
+
 export async function loadFreePrintUsage(
   db: FreePrintQuotaDb,
   terminalId: string,
@@ -187,10 +266,21 @@ export async function loadFreePrintUsage(
       if (inFlight) usage.memberInFlight += row.sides
     }
   }
+  const copies = await loadUsageCopies(db, terminalId, endUserId, bounds.start, bounds.end)
+  for (const job of await countableCopies(db, copies, now)) {
+    if (job.terminalId === terminalId) {
+      if (job.printed) usage.terminalUsed += job.billableSides
+      else usage.terminalInFlight += job.billableSides
+    }
+    if (endUserId && job.endUserId === endUserId) {
+      if (job.printed) usage.memberUsed += job.billableSides
+      else usage.memberInFlight += job.billableSides
+    }
+  }
   return usage
 }
 
-/** 管理员终端列表：今天已出纸的免费面数。一次查出再按终端加总。 */
+/** 管理员终端列表与 80% 告警：今天已出纸的免费面数（打印加复印，额度共用）。一次查出再按终端加总。 */
 export async function todayFreePrintSidesByTerminal(
   db: FreePrintQuotaDb,
   terminalIds: string[],
@@ -219,6 +309,15 @@ export async function todayFreePrintSidesByTerminal(
     const row = sides.get(task.id)
     if (!row?.free) continue
     totals.set(task.terminalId, (totals.get(task.terminalId) ?? 0) + row.sides)
+  }
+  const copies = typeof db.copyJob?.findMany === 'function'
+    ? await db.copyJob.findMany({
+        where: { terminalId: { in: terminalIds }, ...copyHandedWithin(bounds.start, bounds.end) },
+        select: COPY_SELECT,
+      })
+    : []
+  for (const job of await countableCopies(db, copies, now)) {
+    if (job.printed) totals.set(job.terminalId, (totals.get(job.terminalId) ?? 0) + job.billableSides)
   }
   return totals
 }
