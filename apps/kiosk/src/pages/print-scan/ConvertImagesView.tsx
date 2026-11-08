@@ -7,7 +7,6 @@ import {
   MAX_OUTPUT_BYTES,
   formatBytes,
   outputFileName,
-  totalBytesOf,
   type ConvertError,
   type ConvertPhase,
   type ConvertPreview,
@@ -225,6 +224,9 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
         <>
           {error ? <ErrorNote error={error} images={images} /> : null}
           <ImageList images={images} selected={selected} onSelect={props.onSelect} onPreview={props.onPreviewInput} />
+          <p className="i2p-output-note" data-testid="img2pdf-output-note">
+            合成之后的 PDF：{outputFileName(images.length)} · {images.length} 页，一张图一页。{retentionLine(loggedIn)}
+          </p>
           <StepRow
             selected={selected}
             count={images.length}
@@ -261,27 +263,14 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
     }
   })()
 
-  const sample = body.art === 'edit' ? (
-    <Sample
-      art="doc"
-      facts={{
-        title: '合成之后的 PDF',
-        lines: [
-          outputFileName(images.length),
-          `${images.length} 页，一张图一页，按 A4 排版`,
-          `合计 ${formatBytes(totalBytesOf(images))}，成品不超过 ${formatBytes(MAX_OUTPUT_BYTES)}`,
-          retentionLine(loggedIn),
-        ],
-      }}
-    />
-  ) : body.art ? <Sample art={body.art} /> : null
+  const sample = body.art && body.art !== 'edit' ? <Sample art={body.art} /> : null
 
   return (
     <div className="i2p-page" data-w2-page="print-scan-convert" data-qx-page="img2pdf" data-state={phase}>
       <div className="i2p-scroll qx-grow">
         {body.main}
-        {props.extraRows}
         {sample}
+        {props.extraRows}
       </div>
 
       {!kiosk && (

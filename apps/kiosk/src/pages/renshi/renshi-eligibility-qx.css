@@ -1,3 +1,4 @@
+/* 停放（2026-11-05 政策最小闭环）：源码保留、不注册、不打包，旧链接回政策首页 */
 /* 政策服务 /renshi · 条件核对（稿 48 ?tab=eligibility）· 青序流光 2.0 最终版。
  * 字阶只用 --qx-fs-*，条件核对各处字号不低于 20（稿 48 注释第 2 条）；原稿壳层的放大档（fit-3/4）不照抄。
  * 从 renshi-policy-fusion.css 拆出（那份已近千行）。verify:policy-eligibility-ui 读本文件：
@@ -154,6 +155,7 @@
 }
 
 .k8-elig-submit,
+.k8-elig-next,
 .k8-elig-restart,
 .k8-elig-print-blocked,
 .k8-elig-notice-retry {
@@ -173,6 +175,7 @@
 }
 
 .k8-elig-submit,
+.k8-elig-next,
 .k8-elig-restart,
 .k8-elig-notice-retry {
   border-color: var(--qx-deep);
@@ -325,3 +328,29 @@
 .k8-elig-cond-basis { color: var(--qx-ink-3); }
 .k8-elig-cond-basis { grid-column: 1 / -1; }
 .k8-elig-cond-k { display: block; margin-bottom: 2px; font-size: var(--qx-fs-aux); font-weight: 700; color: var(--qx-ink-3); }
+
+/* B10：一题一屏，题号只显示，作答仍由服务端字典提供。 */
+[data-qx-page="renshi"] .k8-elig-single { gap: 12px; }
+[data-qx-page="renshi"] .k8-elig-progress { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; flex: none; }
+[data-qx-page="renshi"] .k8-elig-progress b { height: 64px; display: grid; place-items: center; border: 1.5px solid var(--qx-line); border-radius: 16px; background: var(--qxt-well, var(--qx-paper)); color: var(--qx-ink-3); font-size: 22px; }
+[data-qx-page="renshi"] .k8-elig-progress .is-answered { background: var(--qx-teal-soft); color: var(--qx-teal-d); border-color: var(--qx-teal); }
+[data-qx-page="renshi"] .k8-elig-progress [aria-current="step"] { background: var(--qx-deep); color: var(--qx-paper); border-color: var(--qx-deep); }
+[data-qx-page="renshi"] .k8-elig-single .k8-elig-privacy { border: 0; border-radius: 26px; background: var(--qxt-clay-wash, var(--qx-wheat-soft)); color: var(--qxt-clay-ink, var(--qx-wheat-d)); padding: 16px 20px; font-size: 24px; font-weight: 600; line-height: 1.4; }
+[data-qx-page="renshi"] .k8-elig-single .k8-elig-privacy svg { width: 32px; height: 32px; }
+[data-qx-page="renshi"] .k8-elig-single .k8-elig-questions { flex: 1 0 auto; gap: 10px; }
+[data-qx-page="renshi"] .k8-elig-single .k8-elig-opt { flex: 1 0 112px; min-height: 112px; max-height: 200px; width: 100%; justify-content: flex-start; border: 1.5px solid var(--qx-line); border-radius: 18px; padding: 8px 18px; background: var(--qx-surface); font-size: 26px; font-weight: 700; text-align: left; }
+[data-qx-page="renshi"] .k8-elig-single .k8-elig-opt[aria-pressed="true"] { background: var(--qx-teal-soft); border-color: var(--qx-teal); color: var(--qx-teal-d); }
+[data-qx-page="renshi"] .k8-elig-opt:active { transform: scale(.985); }
+[data-qx-page="renshi"] .k8-elig-explain { display: grid; grid-template-columns: 210px 1fr; align-items: center; gap: 16px; padding: 16px; border: 1.5px solid var(--qx-line); border-radius: 24px; background: var(--qx-surface); }
+[data-qx-page="renshi"] .k8-elig-art { height: 250px; display: grid; place-items: center; background: var(--qxt-well, var(--qx-paper)); border-radius: 18px; }
+[data-qx-page="renshi"] .k8-elig-explain b { font-size: 28px; }
+[data-qx-page="renshi"] .k8-elig-explain p { margin: 6px 0 0; font-size: 22px; line-height: 1.4; color: var(--qx-ink-2); }
+[data-qx-page="renshi"] .k8-elig-explain-text { display: block; margin: 0; padding: 18px; font-size: 24px; line-height: 1.4; }
+[data-qx-page="renshi"] .k8-elig-countline { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 8px; text-align: center; }
+[data-qx-page="renshi"] .k8-elig-countline p { margin: 0; font-size: 20px; line-height: 1.4; color: var(--qx-ink-3); font-weight: 500; }
+[data-qx-page="renshi"] .k8-elig-countline b { font-size: 20px; }
+[data-qx-page="renshi"] .k8-elig-single .k8-elig-disclaimer { border: 0; border-radius: 0; padding: 0; background: transparent; font-size: 20px; color: var(--qx-ink-3); text-align: center; }
+@media (max-width: 720px) {
+  [data-qx-page="renshi"] .k8-elig-explain { grid-template-columns: 1fr; }
+  [data-qx-page="renshi"] .k8-elig-art { height: 150px; }
+}

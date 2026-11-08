@@ -294,7 +294,7 @@ export class PackageOrderService {
    */
   async list(endUserId: string, page: MemberPageQuery) {
     await this.expireExpiredForUser(endUserId)
-    const where = { endUserId, orderItems: { some: {} } }
+    const where = { endUserId, type: { not: 'copy' }, copyJob: { is: null }, orderItems: { some: {} } }
     const total = await this.prisma.order.count({ where })
     const rows = await this.prisma.order.findMany({
       where,
@@ -420,7 +420,7 @@ export class PackageOrderService {
 
   private async requireOwned(endUserId: string, orderId: string) {
     const order = await this.prisma.order.findFirst({
-      where: { id: orderId, endUserId, orderItems: { some: {} } },
+      where: { id: orderId, endUserId, type: { not: 'copy' }, copyJob: { is: null }, orderItems: { some: {} } },
       include: { orderItems: { orderBy: { seq: 'asc' } } },
     })
     if (!order) throw new NotFoundException({ error: { code: 'PACKAGE_ORDER_NOT_FOUND', message: '材料包订单不存在' } })

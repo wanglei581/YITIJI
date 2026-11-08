@@ -16,6 +16,7 @@
 
 /** 文件用途。决定默认 sensitiveLevel + 默认 TTL + objectKey 前缀。 */
 export type FilePurpose =
+  | 'policy_checklist' // 公开政策一页办事清单（服务端生成）
   // ── 既有(BE-1)─────────────────────────────────────────────
   | 'resume_upload' // 求职者上传简历(高敏)
   | 'resume_scan' // Kiosk 扫描纸质简历(高敏)

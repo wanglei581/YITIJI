@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
-import { useAuth } from '../../auth/useAuth'
 import { peekScanHowContinue } from './scanHowContinue'
 import { ScanDeviceDonePage } from './ScanDeviceDonePage'
 import { ScanDeviceFlowPage } from './ScanDeviceFlowPage'
@@ -28,11 +27,15 @@ import {
  */
 export function ScanWorkbenchPage() {
   const location = useLocation()
-  const { isLoggedIn } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const requested = parseScanStage(searchParams.get('stage'))
   const stored = readScanWorkbenchSession()
-  const continueMaterial = isLoggedIn ? peekScanHowContinue() : null
+  /* 「怎么扫」登录续接记号：这里只看有没有，不读登录态。
+   * 本页不订阅登录上下文：登录、退出、忙碌标记一变，整页就会重渲染、重读会话存储，
+   * 设置页或等待页会多挂一次，投递确认、轮询、撤销跟着多发。
+   * 记号只够打开「怎么扫」；是不是本人登录回来、要不要接着用它，由 ScanHowPage 自己读登录态决定
+   * （没登录不消费记号，没有材料就退回选材料）。 */
+  const continueMaterial = peekScanHowContinue()
   const locationState = (location.state ?? null) as {
     scanTaskId?: unknown
     controlToken?: unknown

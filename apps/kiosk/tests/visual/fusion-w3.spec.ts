@@ -1493,7 +1493,7 @@ test('resume report folds the seven blocks, keeps one page scroller, and keeps t
 
   await expect(page.getByTestId('resume-report-takeaway-title')).toHaveText('带走这份报告')
   const takeawayButtons = page.locator('[data-testid="resume-report-export-actions"] .rrp-export > button')
-  await expect(takeawayButtons).toHaveCount(4)
+  await expect(takeawayButtons).toHaveCount(2) // B10 R-3: was 4; pre-export shows PDF + change list only.
   const takeawayRow = await takeawayButtons.evaluateAll((els) => els.map((el) => {
     const rect = el.getBoundingClientRect()
     return { top: Math.round(rect.top), height: rect.height }
@@ -1993,12 +1993,17 @@ test('interview setup per-person quota exhaustion offers the previous step and i
   const runtimeErrors: string[] = []
   page.on('pageerror', (error) => runtimeErrors.push(error.message))
   terminalBaseline(api)
+  // 面试设置页会定时探一次服务健康；跑得慢时这次请求落在用例里，没登记就被夹具判成未处理。
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
   api.respond('POST', '/api/v1/mock-interviews', { status: 200, json: interviewCreated })
   api.respond('POST', '/api/v1/mock-interviews/interview-w3-public-fixture/start', {
     status: 429,
     json: { success: false, error: { code: 'AI_QUOTA_EXHAUSTED', message: '今天的 AI 次数用完了，明天 0 点恢复' } },
   })
   api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', { status: 200, json: { data: { asrEnabled: false, ttsEnabled: false } } })
+  // 用例最后进「面试技巧」，那一页用 useApiReadiness 探 /health（后端可达才放行练习）。不给回应时
+  // 收尾会报未处理请求——请求赶在收尾前发出就红、晚了就绿，是碰运气的，所以这里明确给出。
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
   await page.goto('/interview/setup')
   await page.getByRole('button', { name: '选择行业 (20)' }).click()
   const interviewIndustryDialog = page.getByRole('dialog', { name: '选择面试行业' })
@@ -2396,10 +2401,10 @@ test('interview setup failure stays inside the first screen @w3-kiosk', async ({
   await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
   await advanceInterviewSetupToStart(page)
   await page.getByRole('button', { name: '创建并开始练习' }).click()
-  const alert = page.locator('[data-testid="interview-setup-error"]')
-  await expect(alert).toBeVisible()
-  await expect(alert).toBeInViewport()
-  await expect(alert).toContainText('AI 服务暂停中')
+  const fallback = page.locator('section.kiosk-ai-task')
+  await expect(fallback).toContainText('AI 服务暂停中')
+  await expect(fallback.locator('.kiosk-ai-fallback__reason')).toBeInViewport()
+  await expect(page.locator('[data-testid="interview-setup-error"]')).toHaveCount(0)
   // AI_PAUSED 是服务端 AI 闸门：小青这次也用不了，底栏问小青换停用态，设置仍可继续手动改。
   await expect(page.locator('[data-qxt-ask="off"]')).toHaveText('小青暂时不可用，可继续手动设置')
 })
@@ -2951,12 +2956,15 @@ async function captureDecisionViewports(page: Parameters<typeof assertNoHorizont
     }, { message: `${name} ${size.width}x${size.height} 操作条与滚动区` }).toBe('ok')
     await assertNoHorizontalOverflow(page)
     // 横屏电脑改为舞台缩放后，屏上像素要除回 scale；舞台关闭（手机）时 scale 取 1，门槛仍是 48。
-    const scale = await readEnabledStageScale(page)
+    // 缩放比与控件尺寸在同一次轮询里一起读：换视口后舞台缩放可能晚一拍生效，先读的 scale 会和后量的 box
+    // 对不上（实测 88px 按钮量成 88×0.46875=41.25 而 scale 仍读到 1）。门槛不变，真小于 48 时轮询超时照样红。
     for (const target of [page.locator('.qxt-back'), page.locator('.qxt-dock .qx-btn').last()]) {
-      const box = await target.boundingBox()
-      expect(box, '可点区域必须可见').not.toBeNull()
-      expect(box!.height / scale, `${name} ${size.width}x${size.height} 触控高度`).toBeGreaterThanOrEqual(48)
-      expect(box!.width / scale).toBeGreaterThanOrEqual(48)
+      await expect(target, '可点区域必须可见').toBeVisible()
+      await expect.poll(async () => {
+        const box = await target.boundingBox()
+        const scale = await readEnabledStageScale(page)
+        return box ? Math.min(box.height, box.width) / scale : 0
+      }, { message: `${name} ${size.width}x${size.height} 触控高度与宽度` }).toBeGreaterThanOrEqual(48)
     }
     await page.screenshot({ path: test.info().outputPath(`${name}-${size.width}x${size.height}.png`) })
   }

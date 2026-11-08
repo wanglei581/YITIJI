@@ -4,13 +4,20 @@ import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
 import { fillPhoneLogin, memberDocument } from './fixtures/privacy-clear-shell'
 
-const SHOT_DIR = '/Users/wanglei/.cache/claude-lanes/copyscan-1102/code-shots/k1b2'
+const SHOT_DIR = 'test-results/k1b2'
 const TASK = 'k1b2-scan-001'
 const CONTROL = 'k1b2-control'
 const FILE_ID = 'k1b2-file-1'
 const FILE_NAME = 'k1b2-feeder.pdf'
 const BRIDGE = 'w2-synthetic-bridge-token'
-const GUEST = '未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。要带走电子版，下次先扫码登录再扫。用 U 盘带走：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。'
+// 游客三条带走的办法（设计窗口 11/08 答复），与面板结果页同一份（scanGuestWays）。
+// 默认夹具里小程序没发布，第三条不说手机上能看到。
+const GUEST_LEAD = '未登录扫描件不会进入「我的文档」。带走的办法：'
+const GUEST_WAYS = [
+  '当场打印：请在本次操作内完成打印或识别。',
+  '存 U 盘：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。',
+  '存进「我的文档」：下次先扫码登录再扫。',
+]
 
 mkdirSync(SHOT_DIR, { recursive: true })
 
@@ -248,7 +255,9 @@ test('feeder reports pages only from the cloud, reloads, then finishes for a gue
   cloud.withFile = true
   await expect(page.getByTestId('scan-device-done')).toBeVisible({ timeout: 15_000 })
   await expect(page.locator('.cs-fhead b', { hasText: FILE_NAME })).toBeVisible()
-  await expect(page.getByText(GUEST)).toBeVisible()
+  const guestWays = page.getByTestId('scan-guest-ways')
+  await expect(guestWays.getByText(GUEST_LEAD, { exact: true })).toBeVisible()
+  await expect(guestWays.locator('li')).toHaveText(GUEST_WAYS)
   await expect(page.getByText('已存进')).toHaveCount(0)
   await shot(page, 'cs-scan-done')
   await page.getByTestId('scan-device-again').click()
@@ -413,7 +422,8 @@ test('a logged-in owner is told the file is in my documents, including the minia
   await expect(page.getByTestId('scan-device-done')).toBeVisible({ timeout: 15_000 })
   await expect(page.getByText('这份扫描件已存进「我的文档」，手机上打开职易达小程序也能看到')).toBeVisible()
   await expect(page.getByRole('button', { name: /前往我的文档/ })).toBeVisible()
-  await expect(page.getByText(GUEST)).toHaveCount(0)
+  await expect(page.getByTestId('scan-guest-ways')).toHaveCount(0)
+  await expect(page.getByText(GUEST_LEAD)).toHaveCount(0)
   await shot(page, 'cs-scan-done-login')
 })
 

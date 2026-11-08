@@ -170,6 +170,9 @@ export function PrintDoneFailed(props: PrintDoneFailedProps & { expiredLine: str
         </div>
         <TakeawayCard takeaway={takeaway} expiredLine={props.expiredLine} />
         {isLoggedIn ? <OrdersRowLink onOrders={props.onOrders} /> : null}
+        {copy.resumeLine ? (
+          <p className="pft-unc-fine qxt-fine" data-testid="print-fulfill-resume-line" role="status">{copy.resumeLine}</p>
+        ) : null}
         <p className="pft-unc-fine qxt-fine" data-testid="print-fulfill-fallback">{copy.fine}</p>
       </div>
       {props.dialog}

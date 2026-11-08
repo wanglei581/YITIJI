@@ -152,3 +152,8 @@
 }
 [data-qx-page='scan-workbench'] .cs-row:disabled .ic { background: var(--qxt-paper-2); color: var(--qxt-ink-3); }
 [data-qx-page='scan-workbench'] .cs-row:disabled b { color: var(--qxt-ink-2); }
+
+/* 游客三条带走的办法（scanGuestWays）：字号、字重、行距沿用 .cs-warn，只去掉段落外边距；全局重置把列表序号去掉了，这里补回 1. 2. 3.。 */
+[data-qx-page='scan-workbench'] .cs-guest-ways p { margin: 0; }
+[data-qx-page='scan-workbench'] .cs-guest-ways ol { margin: 4px 0 0; padding-left: 1.6em; list-style: decimal; }
+[data-qx-page='scan-workbench'] .cs-guest-ways li + li { margin-top: 2px; }

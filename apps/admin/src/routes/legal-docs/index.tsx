@@ -6,7 +6,9 @@ import { Page } from '../Page'
 import { LegalDocDrawer } from './LegalDocDrawer'
 import { LegalDocViewDrawer } from './LegalDocViewDrawer'
 import { LegalReadinessCard } from './LegalReadinessCard'
+import { SelfNoteTabCard } from './SelfNoteTabCard'
 import { SupportContactCard } from './SupportContactCard'
+import { BrandingCard } from './BrandingCard'
 import { DOC_TYPE_LABELS, DOC_TYPE_ORDER, activateConfirmText, docTypeLabel } from './legalDocMeta'
 import { legalDocsService, type LegalDocVersionView } from '../../services/api/legalDocs'
 import { formatDateTime } from '@ai-job-print/shared'
@@ -107,6 +109,8 @@ export default function LegalDocsPage() {
     >
       {!loading && !error && <LegalReadinessCard rows={allRows} />}
       <SupportContactCard />
+      <SelfNoteTabCard />
+      <BrandingCard />
 
       {/* Tabs */}
       <div className="flex gap-1 overflow-x-auto border-b border-neutral-200">

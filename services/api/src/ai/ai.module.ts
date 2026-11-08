@@ -24,6 +24,7 @@ import { CareerPlanService } from './resume/career-plan.service'
 import { CareerPlanPdfService } from './resume/career-plan-pdf.service'
 import { CareerPlanDegradedPdfService } from './resume/career-plan-degraded-pdf.service'
 import { CareerPlanController } from './career-plan.controller'
+import { ResumeLayoutAdjustController } from './resume-layout-adjust.controller'
 import { LlmSelfAssessmentService } from './resume/llm-self-assessment.service'
 import { SelfAssessmentService } from './resume/self-assessment.service'
 import { SelfAssessmentPdfService } from './resume/self-assessment-pdf.service'
@@ -35,6 +36,7 @@ import { FairVisitPlanService } from './resume/fair-visit-plan.service'
 import { FairVisitPlanPdfService } from './resume/fair-visit-plan-pdf.service'
 import { FairVisitPlanController } from './fair-visit-plan.controller'
 import { LlmChatService } from './llm/llm-chat.service'
+import { AssistantPolicyContextService } from './llm/assistant-policy-context'
 import { AiConfigController, AiConfigsController } from './llm/ai-config.controller'
 import { AiResultCleanupTask } from './ai-result.cleanup.task'
 import { ResumeExtractionService } from './resume/resume-extraction.service'
@@ -68,7 +70,7 @@ import { AiSafetyLexiconService } from './safety/ai-safety-lexicon.service'
   // BenefitRedemptionModule：AI 简历优化端点可选核销会员权益（P1 权益核销 SSOT）。
   // AiAccessModule：自我探索提交 / 打印在接口内按同一 AI 闸门判定（打分不被 AI 闸门拦）
   imports: [AiQuotaModule, AuthModule, FilesModule, AsrModule, BenefitRedemptionModule, MemberPrivacyModule, JobMaterialsModule, TerminalsModule, AiAccessModule],
-  controllers: [AiController, ResumeReportExportController, KioskAiCapabilitiesController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController, SelfAssessmentController, AiSafetyLexiconController],
+  controllers: [AiController, ResumeLayoutAdjustController, ResumeReportExportController, KioskAiCapabilitiesController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController, SelfAssessmentController, AiSafetyLexiconController],
   providers: [
     AiService,
     AiLogService,
@@ -104,6 +106,7 @@ import { AiSafetyLexiconService } from './safety/ai-safety-lexicon.service'
     FairVisitPlanService,
     FairVisitPlanPdfService,
     LlmChatService,
+    AssistantPolicyContextService,
     AiResultCleanupTask,
     // ── Phase 1A 简历文字提取 + OCR 底座 ──
     ResumeExtractionService,

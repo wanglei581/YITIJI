@@ -32,13 +32,14 @@ export const MATERIAL_CHECK_EXEMPT_DERIVATION_KINDS: ReadonlySet<string> = new S
 
 /**
  * 存量派生件（derivationKind 为空）里，能仅凭用途认定是 AI / 系统生成的用途。
- * 这些用途的文件只由服务端生成：三个用途都不在任何用户上传 DTO 的用途白名单里，
+ * 这些用途的文件只由服务端生成：都不在任何用户上传 DTO 的用途白名单里，
  * FilesService.upload 还对前两个直接拒收（FILE_PURPOSE_SERVER_GENERATED_ONLY）。
  */
 export const LEGACY_AI_GENERATED_PURPOSES: ReadonlySet<string> = new Set([
   'contract_review_report',
   'member_data_export',
   'self_assessment_report',
+  'policy_checklist', // 仅含公开政策，系统排版派生件；建单另查撤下与版本。
 ])
 
 const DERIVED_CATEGORIES: ReadonlySet<string> = new Set(['derived', 'optimized'])

@@ -4,7 +4,7 @@ import { clearPickupClaimCode, PICKUP_CLAIM_RESUME_KEY } from '../pages/print/pi
 import { clearAiResumeSession } from '../pages/resume/aiResumeSession'
 import { clearAllResumeParseIntents, RESUME_PARSE_INTENT_STORAGE_KEY } from '../services/resumeParseIntent'
 import { clearJobMaterialDraft } from '../pages/resume/jobMaterialDraft'
-import { ASSISTANT_DRAFT_KEY, clearAssistantDraft } from '../services/assistantDraft'
+import { ASSISTANT_DRAFT_KEY, ASSISTANT_POLICY_KEY, clearAssistantDraft, clearAssistantPolicyContext } from '../services/assistantDraft'
 import {
   clearSession as clearSelfAssessmentSession,
   SESSION_STORAGE_KEY as SELF_ASSESSMENT_SESSION_KEY,
@@ -53,8 +53,15 @@ const SENSITIVE_SESSION_STORAGE_KEYS = [
   SCAN_WORKBENCH_SESSION_KEY,
   SCAN_HOW_CONTINUE_KEY,
   ASSISTANT_DRAFT_KEY,
+  ASSISTANT_POLICY_KEY,
   AI_DECLARATION_SESSION_KEY,
 ] as const
+
+const clearListeners = new Set<() => void>()
+export function subscribeKioskSensitiveSessionClear(listener: () => void): () => void {
+  clearListeners.add(listener)
+  return () => { clearListeners.delete(listener) }
+}
 
 /** 清场会清掉什么：none 什么都没有；print-only 只有打印材料；with-other 还有别的。读不准按 with-other。 */
 export type KioskClearScope = 'none' | 'print-only' | 'with-other'
@@ -121,18 +128,20 @@ export function clearKioskSensitiveSession(outgoingMemberToken?: string | null):
   clearSelfAssessmentSession()
   clearInterviewWorkbenchSession()
   clearAssistantDraft()
+  clearAssistantPolicyContext()
   // 顺序不可调换：收尾要读本地登记的 scanTaskId / controlToken，
   // clearScanWorkbenchSession() 一旦先跑，就再也找不到要撤谁。
   beginScanSessionCleanup(outgoingMemberToken ?? null)
   clearScanWorkbenchSession()
   clearScanHowContinue()
+  clearListeners.forEach((listener) => listener())
 }
 
 /**
- * 公共设备残留：匿名本机收藏写在 localStorage，跨用户、跨刷新都还在。
+ * 公共设备残留：改版前的匿名本机收藏写在 localStorage，跨用户、跨刷新都还在。
+ * 2026-11-05 起未登录不再记本机收藏（localFavorites.ts 停放），这里只负责把旧残留清掉。
  *
- * 只在 logout / 隐私清场里调用。login() 不得调用——登录后要把游客收藏
- * 留给「合并到账号」，清掉就没得合。
+ * 只在 logout / 隐私清场里调用。
  */
 export function clearKioskSharedDeviceResidue(): void {
   clearAllLocalFavorites()

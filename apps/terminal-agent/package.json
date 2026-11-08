@@ -1,6 +1,6 @@
 {
   "name": "terminal-agent",
-  "version": "0.4.18",
+  "version": "0.4.20",
   "private": true,
   "description": "Windows Terminal Agent — Phase 8.1C: DPAPI token encryption / SQLite idempotency / single-instance lock / Windows service / offline PATCH queue",
   "scripts": {
@@ -31,10 +31,13 @@
     "verify:print-scan-agent": "node scripts/verify-print-scan-agent.mjs",
     "verify:scan-watcher": "ts-node scripts/verify-scan-watcher.ts",
     "verify:scan-deletion-audit": "ts-node scripts/verify-scan-deletion-audit.ts",
+    "verify:scan-deskew": "ts-node scripts/verify-scan-deskew.ts",
     "verify:scan-device-engine": "ts-node scripts/verify-scan-device-engine.ts",
+    "verify:scan-device-runner": "ts-node scripts/verify-scan-device-runner.ts",
     "verify:scan-input-health": "ts-node scripts/verify-scan-input-health.ts && pnpm run verify:scan-input-lockout-telemetry",
     "verify:scan-input-lockout-telemetry": "ts-node scripts/verify-scan-input-lockout-telemetry.ts",
     "verify:network-diagnostics": "ts-node scripts/verify-network-diagnostics.ts",
+    "verify:printer-queue-diagnostics": "ts-node scripts/verify-printer-queue-diagnostics.ts",
     "verify:form-data-security": "node scripts/verify-form-data-security.mjs",
     "verify:agent-config-resilience": "node scripts/verify-agent-config-resilience.mjs",
     "verify:windows-service-recovery": "node scripts/verify-windows-service-recovery.mjs",

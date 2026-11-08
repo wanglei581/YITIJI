@@ -38,8 +38,7 @@
 [data-qx-page='resume-edit'] .qxt-paperbox-in :is(input, textarea) { font-size: 22px; line-height: 1.4; min-height: 64px; }
 [data-qx-page='resume-edit'] .qxt-paperbox-in button { min-height: 64px; min-width: 64px; font-size: 20px; }
 
-[data-qx-page='resume-edit'] .qxt-sheetfacts { display: grid; grid-template-columns: 1fr 1fr; grid-auto-flow: row dense; gap: 8px; }
-[data-qx-page='resume-edit'] .qxt-sheetfacts .qxt-wide { grid-column: 1 / -1; }
+[data-qx-page='resume-edit'] .qxt-sheetfacts { display: grid; grid-template-columns: 1fr 1fr; grid-auto-flow: row; gap: 8px; }
 
 [data-qx-page='resume-edit'] .qxt-sheetfacts div {
   min-height: 0;
@@ -65,7 +64,9 @@
   margin: 0;
   min-height: 64px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   padding: 8px 14px;
   border-radius: 18px;
   background: var(--qxt-clay-wash);
@@ -74,6 +75,8 @@
   font-weight: 700;
   line-height: 1.35;
 }
+
+[data-qx-page='resume-edit'] .qxt-warn > span { display: block; font-size: 20px; font-weight: 400; }
 
 [data-qx-page='resume-edit'] .qxt-block { display: flex; flex-direction: column; gap: 8px; }
 [data-qx-page='resume-edit'] .qxt-hint { margin: 0; font-size: 20px; line-height: 1.4; color: var(--qxt-ink-3); }

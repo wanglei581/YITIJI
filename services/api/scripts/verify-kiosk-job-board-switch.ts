@@ -224,6 +224,7 @@ export async function verifyKioskJobBoardSwitch(): Promise<void> {
     { get: async () => null } as never,
     prisma,
     board,
+    { requireActiveConsent: async () => undefined } as never,
   )
   const offlineJobs = new KioskOfflineJobsController({
     findOneJob: async () => { throw new Error('closed offline job must not be read') },

@@ -13,8 +13,9 @@ const W4_ROUTES = [
   '/job-fairs/:id/companies/:companyId', '/job-fairs/:id/map',
   '/job-fairs/:id/materials', '/job-fairs/:id/visit-plan',
   '/job-fairs/:id/stats', '/campus', '/campus/welcome',
-  '/campus/freshman-insights', '/smart-campus', '/smart-campus/welcome',
-  '/smart-campus/service/:key', '/renshi',
+  '/campus/freshman-insights',
+  // 2026-11-04 产品负责人定停放：三条在用页收成一条跳回首页的 splat。
+  '/smart-campus/*', '/renshi',
   '/jobs/online-platforms',
 ]
 
@@ -109,10 +110,11 @@ function interfaceShape(sourceText, interfaceName) {
 
 console.log('\n=== Kiosk Fusion W4 contract ===')
 
-check('exact 24-route ownership', () => {
+check('exact 22-route ownership', () => {
   const owned = collectRoutePaths()
-  assert.equal(owned.length, 24)
-  assert.equal(new Set(owned).size, 24)
+  // 2026-11-04 产品负责人定停放：智慧校园三条在用页收成 /smart-campus/*，24 改为 22。
+  assert.equal(owned.length, 22)
+  assert.equal(new Set(owned).size, 22)
   assert.deepEqual([...owned].sort(), [...W4_ROUTES].sort())
   assert.ok(!owned.includes('/notifications'))
 })
@@ -548,11 +550,14 @@ check('campus AI模拟面试 navigates to /interview/setup, not /assistant', () 
   )
 })
 check('policy builtin records remain server-safe', () => {
-  assert.match(renshi, /if \(isBuiltin\(item\.id\)\) return/)
-  assert.match(renshi, /if \(!isBuiltin\(item\.id\)\) recordExternalJump/)
+  assert.doesNotMatch(renshi, /import[^\n]*builtinData/)
+  assert.match(read('src/pages/renshi/PolicyDetail.tsx'), /recordBrowse\(getToken\(\), 'policy', id\)/)
+  // 二维码画在详情里，屏上看见不算打开官方入口：详情只记浏览，不在渲染时记外部跳转（2026-11-05 实走发现）。
+  assert.doesNotMatch(read('src/pages/renshi/PolicyDetail.tsx'), /recordExternalJump/)
 })
 check('renshi policy workspace uses the touch screen', () => {
-  assert.match(renshi, /QxTouchScreen/)
+  assert.match(read('src/pages/renshi/PolicyTouchLayout.tsx'), /QxTouchScreen/)
+  assert.match(renshi, /PolicyDetail|PolicyCategoryList/)
   assert.doesNotMatch(renshi, /QxPageFrame|KioskPageFrame|KioskPageHeader/)
   assert.match(kioskRoot, /['"]\/renshi['"]/)
 })

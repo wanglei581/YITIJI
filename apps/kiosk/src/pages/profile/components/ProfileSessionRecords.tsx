@@ -1,6 +1,7 @@
 import { FileInputIcon, FileTextIcon, SparklesIcon, type LucideIcon } from 'lucide-react'
 import { formatTime } from '../assets/format'
 import type { AIRecord, ResumeItem, ScanItem } from '../profileTypes'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../../copy/unattendedCopy'
 
 export function PendingTaskBanner({ onContinue }: { onContinue: () => void }) {
   return (
@@ -25,6 +26,7 @@ export function ProfileSessionRecords({
   resumes,
   scans,
   aiRecords,
+  winding,
   onPrintFile,
   onDeleteResume,
   onDeleteScan,
@@ -33,6 +35,7 @@ export function ProfileSessionRecords({
   resumes: ResumeItem[]
   scans: ScanItem[]
   aiRecords: AIRecord[]
+  winding: boolean
   onPrintFile: (file: { name: string; size: string; pages?: number }) => void
   onDeleteResume: (id: string) => void
   onDeleteScan: (id: string) => void
@@ -66,6 +69,7 @@ export function ProfileSessionRecords({
               name={resume.name}
               meta={`简历 · ${resume.size} · ${resume.format} · ${formatTime(resume.savedAt)}`}
               onPrint={() => onPrintFile(resume)}
+              winding={winding}
               onDelete={() => onDeleteResume(resume.id)}
             />
           ))}
@@ -76,6 +80,7 @@ export function ProfileSessionRecords({
               name={scan.name}
               meta={`扫描 · ${scan.pages} 页 · ${scan.size} · ${formatTime(scan.savedAt)}`}
               onPrint={() => onPrintFile(scan)}
+              winding={winding}
               onDelete={() => onDeleteScan(scan.id)}
             />
           ))}
@@ -99,12 +104,14 @@ function SessionRow({
   name,
   meta,
   onPrint,
+  winding = false,
   onDelete,
 }: {
   icon: LucideIcon
   name: string
   meta: string
   onPrint?: () => void
+  winding?: boolean
   onDelete: () => void
 }) {
   return (
@@ -118,7 +125,7 @@ function SessionRow({
       </span>
       <span className="pf-session-actions kp-session-actions">
         {onPrint ? (
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={onPrint}>
+          <button type="button" className="qx-btn" data-variant="ghost" disabled={winding} title={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={onPrint}>
             打印
           </button>
         ) : null}

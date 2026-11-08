@@ -93,7 +93,7 @@ export function doneTakeaway(
   if (pages == null || pages < 1) {
     return {
       pagesLabel: '全部纸张',
-      facesLabel: '请在出纸口取走并核对页数',
+      facesLabel: '页数以实际纸张为准',
     }
   }
   const totalPages = pages * copies
@@ -101,8 +101,8 @@ export function doneTakeaway(
   return {
     pagesLabel: copies > 1 ? `全部 ${totalPages} 页（${pages} 页 × ${copies} 份）` : `全部 ${totalPages} 页`,
     facesLabel: sheets
-      ? `共 ${sheets}已全部打印，请在出纸口取走并核对页数`
-      : `共 ${totalPages} 面已全部打印，请在出纸口取走并核对页数`,
+      ? `共 ${sheets}`
+      : `共 ${totalPages} 面`,
   }
 }
 
@@ -139,6 +139,46 @@ export function outOfPaperPill(money: OutOfPaperMoney): string {
   if (money.fact === 'paid' && money.amountCents != null) return `已付 ${formatCents(money.amountCents)} · 缺纸`
   if (money.fact === 'free') return '免费试运营 · 缺纸'
   return '订单保留 · 缺纸'
+}
+
+/**
+ * 失败 / 卡纸 / 缺纸屏：到机码单且后端还允许续打时加这一句。
+ * 不按价格判断，也不把续打说成一定成功。订单视图若给出剩余次数，剩余为 0 就不再说还能续打。
+ */
+export const SAME_CODE_RESUME_LINE =
+  '没打完？等这台机器能打了，可以回到这里再输一次同一个到机码，按屏幕提示办理。符合条件时会整份重打，每单最多自助续打 2 次；次数用完后，请在手机上重新下单。'
+
+export function sameCodeResumeLine(input: {
+  pickupSource?: boolean
+  canRetry?: boolean
+  reprintAllowed?: boolean | null
+  reprintRemaining?: number | null
+}): string | null {
+  if (input.pickupSource !== true) return null
+  const remainingKnown =
+    typeof input.reprintRemaining === 'number' ||
+    input.reprintAllowed === true ||
+    input.reprintAllowed === false
+  if (remainingKnown) {
+    if (input.reprintAllowed !== true) return null
+    if (typeof input.reprintRemaining !== 'number' || !Number.isInteger(input.reprintRemaining) || input.reprintRemaining <= 0) {
+      return null
+    }
+    return SAME_CODE_RESUME_LINE
+  }
+  return input.canRetry === true ? SAME_CODE_RESUME_LINE : null
+}
+
+/** 续打进了队列，且后端标明上次可能已经出过纸或出过一部分。提醒留意出纸口，不说机器会等着取纸。 */
+export const PRIOR_OUTPUT_TRAY_LINE =
+  '上次可能已经出过纸，请留意出纸口，取走已有的纸，并留意这一次的出纸。'
+
+export function priorOutputTrayLine(flags: {
+  mayHavePrinted?: boolean
+  partialOutput?: boolean
+}): string | null {
+  if (flags.mayHavePrinted === true || flags.partialOutput === true) return PRIOR_OUTPUT_TRAY_LINE
+  return null
 }
 
 /** 卡纸说明的副标题。只有确实收过钱才提已付金额；0 元和金额未知都不说收款。 */

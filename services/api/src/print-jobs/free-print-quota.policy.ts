@@ -42,6 +42,26 @@ export function guestOrderQuotaMessage(limit: number): string {
   return `免登录每次最多打印 ${limit} 面。用手机号登录后，可以一次打更多。`
 }
 
+/** 复印与打印共用这三条免费额度，错误码相同；复印超额时屏上不能只说「打印」。 */
+export type FreePrintQuotaSubject = 'print' | 'copy'
+
+export const COPY_TERMINAL_DAILY_QUOTA_MESSAGE = '今天这台机器的免费打印复印量已用完，明天 0 点恢复。'
+
+export function copyMemberDailyQuotaMessage(limit: number): string {
+  return `你今天已免费打印复印 ${limit} 面，达到每日上限，明天 0 点恢复。确有急用，可以拨打屏幕上的服务电话。`
+}
+
+export function copyGuestOrderQuotaMessage(limit: number): string {
+  return `免登录每次最多复印 ${limit} 面。用手机号登录后，可以一次复印更多。`
+}
+
+/** 缺省 print：打印的三句提示原样不变。 */
+export function freePrintQuotaMessages(subject: FreePrintQuotaSubject = 'print') {
+  return subject === 'copy'
+    ? { terminal: COPY_TERMINAL_DAILY_QUOTA_MESSAGE, member: copyMemberDailyQuotaMessage, guest: copyGuestOrderQuotaMessage }
+    : { terminal: PRINT_TERMINAL_DAILY_QUOTA_MESSAGE, member: memberDailyQuotaMessage, guest: guestOrderQuotaMessage }
+}
+
 /** 在途：仍会出纸、还没成功也还没失败。 */
 export const FREE_PRINT_IN_FLIGHT_STATUSES = ['pending', 'claimed', 'printing'] as const
 

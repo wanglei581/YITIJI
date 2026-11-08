@@ -25,7 +25,8 @@ import {
   type PrintScanCapabilityStatus,
   type TerminalCapabilityView,
 } from './terminal-capabilities.types'
-import { PrismaService } from '../prisma/prisma.service'
+import { revokeTerminalCopyAuthorization } from '../copy-jobs/copy-authorization'
+import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 
 export interface UpsertCapabilityResult {
   terminalCode: string
@@ -163,10 +164,14 @@ export class TerminalCapabilitiesService {
       where: { terminalId_capabilityKey: { terminalId, capabilityKey } },
     })
 
-    const row = await this.prisma.terminalCapability.upsert({
-      where: { terminalId_capabilityKey: { terminalId, capabilityKey } },
-      create: { terminalId, capabilityKey, status, note: trimmedNote, updatedBy },
-      update: { status, note: trimmedNote, updatedBy },
+    const row = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.terminalCapability.upsert({
+        where: { terminalId_capabilityKey: { terminalId, capabilityKey } },
+        create: { terminalId, capabilityKey, status, note: trimmedNote, updatedBy },
+        update: { status, note: trimmedNote, updatedBy },
+      })
+      if (status !== 'available') await this.revokeCopyAuthorization(tx, terminalId, capabilityKey)
+      return updated
     })
 
     return {
@@ -205,8 +210,11 @@ export class TerminalCapabilitiesService {
     if (!existing) {
       return { terminalCode: terminal.terminalCode, capabilityKey: key, cleared: false }
     }
-    const deleted = await this.prisma.terminalCapability.deleteMany({
-      where: { terminalId, capabilityKey: key },
+    const deleted = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.terminalCapability.deleteMany({ where: { terminalId, capabilityKey: key } })
+      // 清除配置同样回到默认拒绝，不能绕过撤权版本协议。
+      if (result.count) await this.revokeCopyAuthorization(tx, terminalId, key)
+      return result
     })
     if (deleted.count === 0) {
       return { terminalCode: terminal.terminalCode, capabilityKey: key, cleared: false }
@@ -375,6 +383,12 @@ export class TerminalCapabilitiesService {
       configured: true,
       note: row.note,
     }
+  }
+
+  /** 与能力写入一起提交；只作废授权，不回退已派发状态，也不阻挡终态回报。 */
+  private async revokeCopyAuthorization(tx: PrismaTransactionClient, terminalId: string, key: string) {
+    if (!['copy', 'scan_device', 'color_print', 'duplex_print'].includes(key)) return
+    await revokeTerminalCopyAuthorization(tx, terminalId)
   }
 
   /** DB 中出现枚举外的脏值时按 fail-closed 归入 not_verified，不放大成可用。 */

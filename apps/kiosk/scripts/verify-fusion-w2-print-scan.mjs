@@ -48,7 +48,8 @@ const directRoutes = new Map([
 const redirects = new Map([
   ['/print/scan-convert', '/print-scan/convert'],
   ['/print/scan-sign', '/print-scan/sign'],
-  ['/print/scan-feature', '/print-scan/feature/id-photo'],
+  // 2026-11-04 证件照停放：旧地址回打印扫描服务台。此前目标是 /print-scan/feature/id-photo。
+  ['/print/scan-feature', '/print-scan'],
   // 2026-08-18：打印参数页下线为兼容重定向（控件与预览页完全重复且全站零导航）。
   // 2026-09-08：材料检查 / 预览合并为 /print/desk，旧地址带 ?step= 透传意图。
   ['/print/params', '/print/desk?step=preview'],
@@ -338,6 +339,14 @@ assert.match(
   'feature info page imports the Qingxu hub stylesheet'
 )
 assert.doesNotMatch(printScanFeature, /KioskPageFrame/, 'feature info page has left the V6 frame')
+assert.match(
+  printScanFeature,
+  /if \(key === 'id-photo' && ID_PHOTO_ENTRY_PARKED\) \{\s*return <Navigate to="\/print-scan" replace \/>/,
+  'parked /print-scan/feature/id-photo returns to /print-scan',
+)
+assert.match(printScanFeature, /function IdPhotoParkedScreen/, 'parked id-photo screen source remains')
+assert.doesNotMatch(printScanFeature, /看证件照说明/, 'unknown capability state does not point at id-photo')
+assert.doesNotMatch(printScanFeature, /证件照这一页写的是尚未开放/, 'unknown capability state has no id-photo fact')
 const printScanHome = read('src/pages/print-scan/PrintScanHomePage.tsx')
 const printScanHomeView = read('src/pages/print-scan/components/QxPrintHubView.tsx')
 const printHubQxCss = read('src/pages/print-scan/styles/print-hub-qx.css')
@@ -1320,6 +1329,8 @@ const SCAN_RESULT_FILES = [
   'src/pages/scan/ScanResultPreviewBlock.tsx',
   'src/pages/scan/ScanResultExitRow.tsx',
   'src/pages/scan/ScanResultPage.tsx',
+  // 2026-11-08：游客三条带走的办法在共用的 scanGuestWays（屏上扫描完成屏也用），去向行只管渲染。
+  'src/pages/scan/scanGuestWays.ts',
 ]
 const scanResult = SCAN_RESULT_FILES.map(read).join('\n')
 // 打印出口 2026-09-28 起落在材料检查（商用收口 P0-5）：扫描件是本人原件，生产强制

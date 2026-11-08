@@ -561,17 +561,24 @@ if (simSideHonest) {
   pass('SIM 演示说明区四条诚实声明齐全且均在 isSim 真分支')
 }
 
-// 7) 「预计出纸」行、真实常见情况处理区、出纸口隐私提示只能在 !isSim 分支渲染
+// 7) 帮助区搬到页内小组件：同时核对真实页面的受控引用和组件里的真实文案。
+// 不能把组件源码直接拼进页面，否则会失去 !isSim 调用边界的证明。
+const helpCode = stripComments(read('src/pages/print/components/PrintProgressHelp.tsx'))
+const helpComponentIsolated =
+  /import\s*\{\s*PrintProgressHelp\s*\}\s*from\s*'\.\/components\/PrintProgressHelp'/.test(progressCode) &&
+  inNotIsSimBranch(progressCode, '<PrintProgressHelp') &&
+  /payment=\{payment\}/.test(progressCode) &&
+  /payment === 'paid'\s*\?[\s\S]*已支付但打印失败[\s\S]*:\s*<>[\s\S]*打印失败/.test(helpCode)
 const realSideGates = [
   { needle: '预计出纸', label: '「预计出纸」行' },
-  { needle: '常见情况处理', label: '真实常见情况处理区(aria-label/标题)' },
-  { needle: '打印机缺纸 / 卡纸', label: '真实 FAQ「打印机缺纸 / 卡纸」' },
-  { needle: '已支付但打印失败', label: '真实 FAQ「已支付但打印失败」' },
+  { needle: '常见情况处理', label: '真实常见情况处理区(aria-label/标题)', help: true },
+  { needle: '打印机缺纸 / 卡纸', label: '真实 FAQ「打印机缺纸 / 卡纸」', help: true },
+  { needle: '已支付但打印失败', label: '真实 FAQ「已支付但打印失败」', help: true },
   { needle: '请勿离开，打印完成后请及时取走文件', label: '出纸口隐私提示' },
 ]
 let realSideIsolated = true
-for (const { needle, label } of realSideGates) {
-  if (inNotIsSimBranch(progressCode, needle)) {
+for (const { needle, label, help } of realSideGates) {
+  if (help ? helpComponentIsolated && helpCode.includes(needle) : inNotIsSimBranch(progressCode, needle)) {
     pass(`${label}仅在 !isSim 分支渲染`)
   } else {
     realSideIsolated = false
@@ -1143,6 +1150,11 @@ if (!userErrorCopy.includes("PRINT_JOB_TOO_LARGE: '每单最多打印 100 面，
   fail('一体机错误码表必须把 PRINT_JOB_TOO_LARGE 说成「每单最多打印 100 面，请分几单打印」')
 } else {
   pass('PRINT_JOB_TOO_LARGE 人话已登记')
+}
+if (!userErrorCopy.includes("POLICY_CHECKLIST_WITHDRAWN: '这条政策已经撤下或刚更新过，这份清单不能再打印，本次没有建单。请回到「查政策」看现在发布的内容。'")) {
+  fail('一体机错误码表必须给 POLICY_CHECKLIST_WITHDRAWN 一句人话（政策撤下或改版后清单建单被拒，不能说「稍后重试」）')
+} else {
+  pass('POLICY_CHECKLIST_WITHDRAWN 人话已登记')
 }
 
 if (!/aria-label=\{label\}/.test(confirmCopy)) {

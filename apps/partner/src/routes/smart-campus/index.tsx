@@ -196,7 +196,7 @@ function TerminalsPanel() {
       ) : null}
       {savedHint && !error ? (
         <div className="rounded-lg border border-success/20 bg-success-bg px-4 py-3 text-sm text-success-fg">
-          已保存，一体机刷新首页或下一轮拉取（约 5 分钟）后生效。
+          已保存。一体机端 2026-11-04 起暂停显示智慧校园，恢复后按这里的开关生效。
         </div>
       ) : null}
       <Card className="overflow-hidden p-0">
@@ -343,7 +343,7 @@ export default function SmartCampusPage() {
                 <StatusBadge dot status="success" label="可配置" />
               </div>
               <p className="mt-1 text-sm leading-6 text-neutral-600">
-                只能配置本校终端；保存后一体机首页按开关显示或隐藏「智慧校园」。迎新内容 / 使用统计暂未开放，校园大数据暂不开放。
+                只能配置本校终端；一体机端 2026-11-04 起暂停显示「智慧校园」，这里的开关先保存，恢复后生效。迎新内容 / 使用统计暂未开放，校园大数据暂不开放。
               </p>
             </div>
           </div>

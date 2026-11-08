@@ -17,6 +17,7 @@ import { createPrismaClient } from '../src/prisma/create-client'
 import { PASSWORD_PROOF_STATE, passwordProofState } from '../src/auth/password-proof-state'
 import * as bcrypt from 'bcryptjs'
 import { assertDemoSeedAllowed } from './seed-guard'
+import { seedKioskTerminal } from './seed-terminal'
 
 assertDemoSeedAllowed(process.env)
 const url = process.env['DATABASE_URL']
@@ -125,17 +126,7 @@ async function main() {
   //
   // Kiosk 前端使用稳定业务码 KSK-001 拉取打印机状态/待机屏配置。
   // Agent 注册后仍可通过 terminalCode upsert 覆盖 token 和指纹;这里不硬编码任何打印机型号。
-  const kioskTerminal = await prisma.terminal.upsert({
-    where: { terminalCode: 'KSK-001' },
-    update: { orgId: uniOrg.id },
-    create: {
-      id: 't_ksk_001',
-      terminalCode: 'KSK-001',
-      agentToken: 'seed-terminal-token-ksk-001',
-      deviceFingerprint: 'seed-terminal-fingerprint-ksk-001',
-      orgId: uniOrg.id,
-    },
-  })
+  const kioskTerminal = await seedKioskTerminal(prisma, uniOrg.id)
   await prisma.terminalHeartbeat.create({
     data: {
       terminalId: kioskTerminal.id,

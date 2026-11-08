@@ -35,6 +35,7 @@ const exemptions: Record<string, string> = {
   "scripts/verify-print-jobs.ts": "验证打印队列、领取与状态回传；终端管理服务只用于设备与打印夹具。",
   "scripts/verify-recruitment-integration-readiness.ts": "JobsService 仅作桩的类型标注，能力响应由桩固定提供，断言导入预检合同与零写入。",
   "scripts/verify-refund-idempotent.ts": "验证打印订单退款幂等，终端管理服务只用于打印夹具。",
+  "scripts/verify-resume-ai-consent-wiring.ts": "只核对职业规划、版式调整与模拟面试四处简历 AI 授权服务的必填注入，不调用招聘内容读取或写入方法。",
   "scripts/verify-resume-draft-versions.ts": "验证本人简历草稿版本与合并元数据，不含系统岗位匹配存档。",
   "scripts/verify-resume-export-draft-source.ts": "验证本人原始填写简历的导出来源与留存，资产服务不读取系统岗位报告。",
   "scripts/verify-resume-export-formats.ts": "独立关闭复跑已通过，验证本人简历格式与导出对账，夹具不包含系统岗位匹配报告。",

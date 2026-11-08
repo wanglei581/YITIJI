@@ -41,6 +41,11 @@ import { inspectScanInputFolder } from './agent/scan-input/verified-folder'
 import { globalScanDeliveryBarrier } from './agent/scan-candidate-barrier'
 import { isUnauthorized } from './agent/auth-state'
 import { AGENT_RUNTIME_VERSION } from './runtime-version'
+import {
+  bindScanDevicePrintFinishedProbe,
+  scanDeviceRuntimeForConfig,
+  type ScanDeviceRuntime,
+} from './agent/scan-device/scan-device-runner'
 
 const program = new Command()
 
@@ -97,6 +102,7 @@ program
     let offlineRetryTimer: NodeJS.Timeout | null = null
     let scanDeletionAuditReporterTimer: NodeJS.Timeout | null = null
     let scanWatcherHandle: ReturnType<typeof startScanWatcher> | undefined
+    let scanDeviceRuntime: ScanDeviceRuntime | undefined
 
     await runAgentBoot({
       acquireLock: async () => {
@@ -160,9 +166,16 @@ program
           noteStartupPrintQueueFailure(startupQueueFailure)
         }
 
+        scanDeviceRuntime = scanDeviceRuntimeForConfig(config)
+        if (scanDeviceRuntime) {
+          bindScanDevicePrintFinishedProbe(() => {
+            void scanDeviceRuntime?.probe()
+          })
+        }
         try {
       qrLocalServer = startQrLoginLocalServer(config, {
         wakePrintQueue: () => taskRunner?.wake() ?? { accepted: false, coalesced: false },
+        scanDevice: scanDeviceRuntime,
         getPanelStatus: () => ({
           runtimeVersion: AGENT_RUNTIME_VERSION,
           terminalCode: config.terminalCode,
@@ -192,6 +205,9 @@ program
       config,
       localTaskDatabaseAvailable,
       getScanInputTelemetry: () => globalScanDeliveryBarrier.getTelemetry(),
+      ...(scanDeviceRuntime
+        ? { getScanDeviceHealth: () => scanDeviceRuntime!.health() }
+        : {}),
       onConfigUpdate: (patch) => {
         // AGT-06：服务端下发的轮询间隔此前只写进 config 对象，两个 setInterval 仍按旧值跑。
         // 变化时重建定时器，让后台调整真正生效。
@@ -247,6 +263,8 @@ program
       if (shuttingDown) return
       shuttingDown = true
       log(`Agent: received ${signal}, shutting down...`)
+      bindScanDevicePrintFinishedProbe(undefined)
+      scanDeviceRuntime?.stop()
       if (heartbeatTimer) clearInterval(heartbeatTimer)
       taskRunner?.stop()
       if (offlineRetryTimer) clearInterval(offlineRetryTimer)

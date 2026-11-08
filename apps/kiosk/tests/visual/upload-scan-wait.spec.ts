@@ -5,6 +5,8 @@ import { allowLocalBootTicket, loginThroughVisibleUi, registerPrivacyShell } fro
 
 // playwright.w3.config.ts 已接入 testMatch 和 @w3-kiosk；仅用页面时钟，不改隐私时限。
 const NOTICE = '等你传文件期间，这台机器不会自动退出，请不要走开。二维码到期后没有操作，就会自动退出。'
+const PRINT_NOTICE = `本机看不到你扫没扫，只认系统收到文件。${NOTICE}`
+const PRINT_WAIT_SUMMARY = '本机只认收到文件 · 等上传时请勿走开 · 清场与文件留存说明'
 const CASES = [
   { label: '简历来源', path: '/resume/source', purpose: 'resume_upload', qr: '.resume-source-phone-session svg[width="150"]', renew: '刷新二维码', leave: '上一步' },
   { label: '打印上传', path: '/print/upload?source=document&tab=qr', purpose: 'print_doc', qr: '[data-testid="file-source-qr"] svg', renew: '重新出一张码', leave: '上一步' },
@@ -23,6 +25,13 @@ type ScanOpen = {
   signature?: boolean
   /** 覆盖默认的「简历来源页点手机扫码」。不传时，只有 resume_upload 会点那一下。 */
   open?: (page: Page) => Promise<void>
+}
+
+async function openPrintWaitDetails(page: Page) {
+  const summary = page.getByText(PRINT_WAIT_SUMMARY, { exact: true })
+  await expect(summary).toBeVisible()
+  await summary.click()
+  await expect(page.getByText(PRINT_NOTICE, { exact: true })).toBeVisible()
 }
 
 async function openWaiting(page: Page, api: ApiRouter, item: ScanOpen) {
@@ -96,7 +105,8 @@ async function openWaiting(page: Page, api: ApiRouter, item: ScanOpen) {
   if (item.open) await item.open(page)
   // 触屏版来源卡的可读名是「在手机里」加一行说明，按开头匹配。
   else if (item.path.startsWith('/resume/source')) await page.getByRole('button', { name: /^在手机里/ }).click()
-  await expect(page.getByText(NOTICE, { exact: true })).toBeVisible()
+  if (item.path.split('?')[0] === '/print/upload') await openPrintWaitDetails(page)
+  else await expect(page.getByText(NOTICE, { exact: true })).toBeVisible()
   await expect(page.locator(item.qr)).toBeVisible()
   await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000)
   return { cancelled, creates: () => creates, phone }
@@ -190,6 +200,10 @@ for (const item of CASES) {
     await expect(page).toHaveURL(/\/$/)
     await expect(page.locator('[data-screen="session-guard"]')).toHaveCount(0)
     await expect(page.locator(item.qr)).toHaveCount(0)
+    if (item.path.split('?')[0] === '/print/upload') {
+      await expect(page.getByText(PRINT_NOTICE, { exact: true })).toHaveCount(0)
+      await expect(page.getByText(PRINT_WAIT_SUMMARY, { exact: true })).toHaveCount(0)
+    }
   })
 
   test(`${item.label}：等待中离页只作废一次旧会话 @w3-kiosk`, async ({ page, api }) => {
@@ -199,6 +213,10 @@ for (const item of CASES) {
     // 简历来源页头尾各有一个「上一步」，点第一个即可离页。
     await page.getByRole('button', { name: item.leave, exact: true }).first().click()
     await expect(page).not.toHaveURL((url) => url.pathname === item.path.split('?')[0])
+    if (item.path.split('?')[0] === '/print/upload') {
+      await expect(page.getByText(PRINT_NOTICE, { exact: true })).toHaveCount(0)
+      await expect(page.getByText(PRINT_WAIT_SUMMARY, { exact: true })).toHaveCount(0)
+    }
     await expect.poll(() => state.cancelled.length).toBe(1)
     await page.clock.runFor(5_000)
     expect(state.cancelled).toEqual([{ id: 'scan-wait-1', control: 'control-scan-wait-1' }])
@@ -212,7 +230,8 @@ for (const item of CASES) {
     const renew = page.getByRole('button', { name: item.renew, exact: true })
     await expect(renew).toBeVisible()
     await renew.click()
-    await expect(page.getByText(NOTICE, { exact: true })).toBeVisible()
+    if (item.path.split('?')[0] === '/print/upload') await openPrintWaitDetails(page)
+    else await expect(page.getByText(NOTICE, { exact: true })).toBeVisible()
     await expect(page.locator(item.qr)).toBeVisible()
     expect(state.creates()).toBe(2)
     expect(state.cancelled).toHaveLength(1)
@@ -229,7 +248,8 @@ test('打印上传：文件已收到后不再顺延，照常 150 秒预警、180
   await page.clock.runFor(10_000)
   await expect(page.getByText('手机传来的文件.pdf', { exact: false }).first()).toBeVisible()
   // 收到文件后常驻说明和忙碌锁一起撤掉：屏上不再说「不会自动退出」。
-  await expect(page.getByText(NOTICE, { exact: true })).toHaveCount(0)
+  await expect(page.getByText(PRINT_NOTICE, { exact: true })).toHaveCount(0)
+  await expect(page.getByText(PRINT_WAIT_SUMMARY, { exact: true })).toHaveCount(0)
   await expect(page.locator('[data-screen="session-guard"]')).toHaveCount(0)
   // 轮询几秒内就读到「已收到」，无操作计时从那一刻起算：130 秒时还没预警，再过 30 秒已在预警，再过 40 秒已清场。
   await page.clock.runFor(130_000)
