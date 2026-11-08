@@ -4,7 +4,7 @@ import { SupportContactService } from './support-contact.service'
 
 /**
  * GET /api/v1/public/support-contact?terminalId=
- * 不登录。一体机与小程序读取服务电话、服务时间，以及两条提示是否该出现。
+ * 不登录。一体机与小程序读取服务电话、服务时间、两条提示是否该出现，以及页签开关 selfNoteTab。
  * 节流与 GET /api/v1/kiosk/ai/capabilities 相同。不写审计。
  */
 @Controller('public')

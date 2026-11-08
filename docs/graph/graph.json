@@ -13555,7 +13555,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 271,
+      "reachableFileCount": 272,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -14334,11 +14334,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 298
+      "sourceFileCount": 299
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 760,
+      "reachableFileCount": 761,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -17230,7 +17230,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 937
+      "sourceFileCount": 938
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -19882,12 +19882,16 @@
     "apps/admin/src/routes/legal-docs/LegalDocPreview.tsx": [
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
+    "apps/admin/src/routes/legal-docs/SelfNoteTabCard.tsx": [
+      "services/api/scripts/verify-support-contact.ts"
+    ],
     "apps/admin/src/routes/legal-docs/SupportContactCard.tsx": [
       "services/api/scripts/verify-support-contact.ts"
     ],
     "apps/admin/src/routes/legal-docs/index.tsx": [
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
-      "services/api/scripts/verify-legal-doc-version.ts"
+      "services/api/scripts/verify-legal-doc-version.ts",
+      "services/api/scripts/verify-support-contact.ts"
     ],
     "apps/admin/src/routes/legal-docs/legalDocRender.ts": [
       "services/api/scripts/verify-legal-doc-version.ts"
@@ -20773,14 +20777,20 @@
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
     "apps/kiosk/src/pages/activities/BenefitActivitiesPage.tsx": [
-      "apps/kiosk/scripts/verify-fusion-w5.mjs"
+      "apps/kiosk/scripts/verify-fusion-w5.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
     ],
     "apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
+    "apps/kiosk/src/pages/activities/activities-batch8.css": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
     "apps/kiosk/src/pages/activities/activities-detail-inkpaper.css": [
-      "apps/kiosk/scripts/verify-fusion-w5.mjs"
+      "apps/kiosk/scripts/verify-fusion-w5.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
     ],
     "apps/kiosk/src/pages/ai-plan/AdvisorArtifactPanels.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
@@ -20807,6 +20817,7 @@
     ],
     "apps/kiosk/src/pages/assistant/AdvisorTools.tsx": [
       "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
     ],
     "apps/kiosk/src/pages/assistant/AssistantCallPanel.tsx": [
@@ -20835,6 +20846,9 @@
     "apps/kiosk/src/pages/assistant/AssistantSessionSummaryBar.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
+    "apps/kiosk/src/pages/assistant/AssistantSheets.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
     "apps/kiosk/src/pages/assistant/AssistantTaskPicker.tsx": [
       "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
@@ -20847,6 +20861,7 @@
       "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
     ],
     "apps/kiosk/src/pages/assistant/advisorUserCopy.ts": [
@@ -21434,6 +21449,7 @@
     "apps/kiosk/src/pages/print-scan/SignStampPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
@@ -21457,9 +21473,37 @@
     "apps/kiosk/src/pages/print-scan/printHubContent.ts": [
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs"
     ],
+    "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampBits.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampGateView.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPickView.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPreview.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampStatus.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampWorkbench.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/sign-stamp/constants.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/sign-stamp/signStampCopy.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/sign-stamp/signStampModel.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
     "apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-      "apps/kiosk/scripts/verify-fusion-w5.mjs"
+      "apps/kiosk/scripts/verify-fusion-w5.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
     ],
     "apps/kiosk/src/pages/print-scan/styles/convert-images-qx.css": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
@@ -21473,6 +21517,9 @@
     ],
     "apps/kiosk/src/pages/print-scan/styles/print-scan-uplift.css": [
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/styles/sign-stamp-qx.css": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
     ],
     "apps/kiosk/src/pages/print-scan/useXiaoqingAvailability.ts": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
@@ -22251,6 +22298,7 @@
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-w3a-ai-records.mjs"
@@ -22261,6 +22309,7 @@
     "apps/kiosk/src/pages/resume/JobFitActionsPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs"
     ],
     "apps/kiosk/src/pages/resume/JobFitPage.tsx": [
@@ -22269,6 +22318,7 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
@@ -22277,6 +22327,7 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -22342,6 +22393,7 @@
     "apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "scripts/verify-no-raw-error-render.mjs"
@@ -22353,6 +22405,7 @@
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
       "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
       "apps/kiosk/scripts/verify-w3a-ai-records.mjs",
@@ -22389,11 +22442,22 @@
     ],
     "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanGenerateKey.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanSection.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanSelfAssessmentExcluded.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/career-plan/careerPlanGenerateCopy.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareBatchBar.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
@@ -22489,12 +22553,22 @@
     "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx": [
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
+    "apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentConsentKit.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentQxKit.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
     "apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
+    "apps/kiosk/src/pages/resume/hooks/useRouteIdentityGuard.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
     "apps/kiosk/src/pages/resume/job-fit-qx.css": [
-      "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
+      "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
     ],
     "apps/kiosk/src/pages/resume/jobFit-inkpaper.css": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
@@ -22502,17 +22576,21 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/src/pages/resume/jobFit/AnonymousJobFitConsentCard.tsx": [
-      "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
+      "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
     ],
     "apps/kiosk/src/pages/resume/jobFit/AnonymousJobFitConsentDialog.tsx": [
-      "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
+      "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
     ],
     "apps/kiosk/src/pages/resume/jobFit/DecisionSummaryBar.tsx": [
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/src/pages/resume/jobFit/FitSkillMap.tsx": [
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/src/pages/resume/jobFit/GapActionCards.tsx": [
@@ -22520,17 +22598,23 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/src/pages/resume/jobFit/JobFitQxStates.tsx": [
-      "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
+      "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
     ],
     "apps/kiosk/src/pages/resume/jobFit/MemberJobFitConsentCard.tsx": [
-      "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
+      "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
     ],
     "apps/kiosk/src/pages/resume/jobFit/ResumeRewriteCard.tsx": [
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/src/pages/resume/jobFit/jobFitQxKit.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/jobFit/jobFitResultSpec.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
     ],
     "apps/kiosk/src/pages/resume/jobMaterialDraft.ts": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
@@ -22541,6 +22625,7 @@
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
     ],
     "apps/kiosk/src/pages/resume/resume-decision-qx.css": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
     ],
     "apps/kiosk/src/pages/resume/resume-diagnosis-lightflow.css": [
@@ -22556,6 +22641,7 @@
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
     ],
     "apps/kiosk/src/pages/resume/resume-materials-qx.css": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
     ],
     "apps/kiosk/src/pages/resume/resume-optimize-qx.css": [
@@ -22573,6 +22659,9 @@
     "apps/kiosk/src/pages/resume/resume-report-qx.css": [
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
+    "apps/kiosk/src/pages/resume/resume-templates-qx.css": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
     "apps/kiosk/src/pages/resume/resume-triage-panels-qx.css": [
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
     ],
@@ -22585,8 +22674,15 @@
     "apps/kiosk/src/pages/resume/self-assessment-lightflow.css": [
       "services/api/scripts/verify-compliance.ts"
     ],
+    "apps/kiosk/src/pages/resume/self-assessment-qx.css": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
     "apps/kiosk/src/pages/resume/selfAssessmentConsent.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/selfAssessmentInterpretation.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
     ],
     "apps/kiosk/src/pages/resume/selfAssessmentSession.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
@@ -22614,6 +22710,9 @@
     "apps/kiosk/src/pages/resume/touch/OptimizeExportView.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
+    "apps/kiosk/src/pages/resume/touch/ResumeMaterialsTouch.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
     "apps/kiosk/src/pages/resume/touch/ResumeReadingView.tsx": [
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
@@ -22625,10 +22724,14 @@
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/touch/ResumeStates.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
     ],
     "apps/kiosk/src/pages/resume/touch/ResumeTouchFrame.tsx": [
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/touch/SaResultParts.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
     ],
     "apps/kiosk/src/pages/resume/touch/compare.css": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
@@ -22640,14 +22743,34 @@
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
+    "apps/kiosk/src/pages/resume/touch/resume-fit.css": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/touch/resume-materials-touch.css": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/touch/resume-sa.css": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/touch/resume-states.css": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/touch/resume-templates.css": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/touch/saActItems.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+    ],
     "apps/kiosk/src/pages/resume/touch/source.css": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/useSelfAssessmentConsentBundle.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
     ],
     "apps/kiosk/src/pages/resume/useSelfAssessmentIdleExit.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
     ],
     "apps/kiosk/src/pages/scan/ScanProgressPage.tsx": [
@@ -22940,6 +23063,7 @@
       "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs",
       "apps/kiosk/scripts/verify-jobfair-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs",
@@ -22957,6 +23081,9 @@
       "apps/kiosk/scripts/verify-smart-campus-ui.mjs",
       "apps/kiosk/scripts/verify-visual-evidence-manifest.mjs",
       "scripts/project-graph/frontend.mjs"
+    ],
+    "apps/kiosk/src/routes/parkedRoutes.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
     ],
     "apps/kiosk/src/services/api/activity.ts": [
       "apps/kiosk/scripts/verify-jobfair-checkin.mjs",
@@ -22986,6 +23113,7 @@
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
     ],
     "apps/kiosk/src/services/api/benefitActivities.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
     ],
     "apps/kiosk/src/services/api/campusRecruitmentStats.ts": [
@@ -22995,6 +23123,7 @@
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
     ],
     "apps/kiosk/src/services/api/client.ts": [
@@ -23063,6 +23192,7 @@
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
@@ -23127,6 +23257,7 @@
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
     "apps/kiosk/src/services/api/printSign.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
@@ -26372,6 +26503,7 @@
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
+      "services/api/scripts/verify-job-application-track.ts",
       "services/api/scripts/verify-job-fit.ts",
       "services/api/scripts/verify-job-materials.ts",
       "services/api/scripts/verify-job-review.ts",
@@ -29359,6 +29491,7 @@
       "services/api/scripts/verify-support-contact.ts"
     ],
     "services/api/src/support-contact/support-contact.service.ts": [
+      "services/api/scripts/verify-job-application-track.ts",
       "services/api/scripts/verify-support-contact.ts"
     ],
     "services/api/src/sync/dto/webhook-payload.dto.ts": [
@@ -32433,6 +32566,88 @@
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
         "@ai-job-print/kiosk::verify:kiosk-frontend-debt"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/src/pages/activities/BenefitActivitiesPage.tsx",
+          "apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx",
+          "apps/kiosk/src/pages/activities/activities-batch8.css",
+          "apps/kiosk/src/pages/activities/activities-detail-inkpaper.css",
+          "apps/kiosk/src/pages/assistant/AdvisorTools.tsx",
+          "apps/kiosk/src/pages/assistant/AssistantSheets.tsx",
+          "apps/kiosk/src/pages/assistant/advisorScenes.ts",
+          "apps/kiosk/src/pages/print-scan/SignStampPage.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampBits.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampGateView.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPickView.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPreview.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampStatus.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampWorkbench.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/constants.ts",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/signStampCopy.ts",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/signStampModel.ts",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts",
+          "apps/kiosk/src/pages/print-scan/styles/sign-stamp-qx.css",
+          "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
+          "apps/kiosk/src/pages/resume/JobFitActionsPage.tsx",
+          "apps/kiosk/src/pages/resume/JobFitPage.tsx",
+          "apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx",
+          "apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx",
+          "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
+          "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx",
+          "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanGenerateKey.tsx",
+          "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanSection.tsx",
+          "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanSelfAssessmentExcluded.tsx",
+          "apps/kiosk/src/pages/resume/components/career-plan/careerPlanGenerateCopy.ts",
+          "apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentConsentKit.tsx",
+          "apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentQxKit.tsx",
+          "apps/kiosk/src/pages/resume/hooks/useRouteIdentityGuard.ts",
+          "apps/kiosk/src/pages/resume/job-fit-qx.css",
+          "apps/kiosk/src/pages/resume/jobFit/AnonymousJobFitConsentCard.tsx",
+          "apps/kiosk/src/pages/resume/jobFit/AnonymousJobFitConsentDialog.tsx",
+          "apps/kiosk/src/pages/resume/jobFit/DecisionSummaryBar.tsx",
+          "apps/kiosk/src/pages/resume/jobFit/FitSkillMap.tsx",
+          "apps/kiosk/src/pages/resume/jobFit/JobFitQxStates.tsx",
+          "apps/kiosk/src/pages/resume/jobFit/MemberJobFitConsentCard.tsx",
+          "apps/kiosk/src/pages/resume/jobFit/jobFitQxKit.tsx",
+          "apps/kiosk/src/pages/resume/jobFit/jobFitResultSpec.ts",
+          "apps/kiosk/src/pages/resume/resume-decision-qx.css",
+          "apps/kiosk/src/pages/resume/resume-materials-qx.css",
+          "apps/kiosk/src/pages/resume/resume-templates-qx.css",
+          "apps/kiosk/src/pages/resume/self-assessment-qx.css",
+          "apps/kiosk/src/pages/resume/selfAssessmentConsent.ts",
+          "apps/kiosk/src/pages/resume/selfAssessmentInterpretation.ts",
+          "apps/kiosk/src/pages/resume/touch/ResumeMaterialsTouch.tsx",
+          "apps/kiosk/src/pages/resume/touch/ResumeStates.tsx",
+          "apps/kiosk/src/pages/resume/touch/SaResultParts.tsx",
+          "apps/kiosk/src/pages/resume/touch/resume-fit.css",
+          "apps/kiosk/src/pages/resume/touch/resume-materials-touch.css",
+          "apps/kiosk/src/pages/resume/touch/resume-sa.css",
+          "apps/kiosk/src/pages/resume/touch/resume-states.css",
+          "apps/kiosk/src/pages/resume/touch/resume-templates.css",
+          "apps/kiosk/src/pages/resume/touch/saActItems.ts",
+          "apps/kiosk/src/pages/resume/useSelfAssessmentConsentBundle.ts",
+          "apps/kiosk/src/pages/resume/useSelfAssessmentIdleExit.ts",
+          "apps/kiosk/src/routes/index.tsx",
+          "apps/kiosk/src/routes/parkedRoutes.ts",
+          "apps/kiosk/src/services/api/benefitActivities.ts",
+          "apps/kiosk/src/services/api/careerPlan.ts",
+          "apps/kiosk/src/services/api/jobFit.ts",
+          "apps/kiosk/src/services/api/printSign.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:kiosk-parked-core4"
       ],
       "wired": true
     },
@@ -40485,6 +40700,7 @@
           "services/api/prisma/postgres/schema.prisma",
           "services/api/prisma/schema.prisma",
           "services/api/src/app.module.ts",
+          "services/api/src/audit/audit.service.ts",
           "services/api/src/job-applications/dto/create-job-application.dto.ts",
           "services/api/src/job-applications/dto/update-job-application.dto.ts",
           "services/api/src/job-applications/job-application.types.ts",
@@ -40493,7 +40709,8 @@
           "services/api/src/job-applications/job-applications.service.ts",
           "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
-          "services/api/src/prisma/prisma.service.ts"
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/support-contact/support-contact.service.ts"
         ],
         "missing": []
       },
@@ -45743,7 +45960,9 @@
           "services"
         ],
         "files": [
+          "apps/admin/src/routes/legal-docs/SelfNoteTabCard.tsx",
           "apps/admin/src/routes/legal-docs/SupportContactCard.tsx",
+          "apps/admin/src/routes/legal-docs/index.tsx",
           "docs/progress/current-progress.md",
           "services/api/prisma/schema.prisma",
           "services/api/src/audit/audit.service.ts",
@@ -47058,6 +47277,7 @@
         "kind": "component",
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w5.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "docs/design/kiosk-proto-2026-07-migration-matrix.md",
           "docs/design/kiosk-touch-2026-10/map.js",
           "docs/design/kiosk-v6-migration-matrix.md",
@@ -47067,7 +47287,7 @@
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -47075,6 +47295,7 @@
         "kind": "component",
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w5.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "docs/design/kiosk-proto-2026-07-migration-matrix.md",
           "docs/design/kiosk-redesign-2026-08-v2/31-benefits.html",
           "docs/design/kiosk-touch-2026-10/map.js",
@@ -47091,19 +47312,20 @@
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、scripts/verify-no-raw-error-render.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、scripts/verify-no-raw-error-render.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/activities/activities-batch8.css",
         "kind": "style",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/src/pages/activities/BenefitActivitiesPage.tsx",
           "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -47111,13 +47333,14 @@
         "kind": "style",
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w5.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx",
           "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md",
           "docs/superpowers/plans/2026-07-26-qingxu-lightflow-kiosk87-shell-closure.md"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -47125,11 +47348,12 @@
         "kind": "component",
         "mentions": [
           "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-advisor-provider-gate.mjs、apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-advisor-provider-gate.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -47746,6 +47970,7 @@
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
           "apps/kiosk/scripts/verify-fusion-w5.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
           "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
           "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
@@ -47767,94 +47992,109 @@
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs、apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs、apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampBits.tsx",
         "kind": "component",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "docs/progress/current-progress.md"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampGateView.tsx",
         "kind": "component",
-        "mentions": [],
-        "risk": "low",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+        ],
+        "risk": "high",
         "scope": "kiosk",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPickView.tsx",
         "kind": "component",
-        "mentions": [],
-        "risk": "low",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+        ],
+        "risk": "high",
         "scope": "kiosk",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPreview.tsx",
         "kind": "component",
-        "mentions": [],
-        "risk": "low",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+        ],
+        "risk": "high",
         "scope": "kiosk",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampStatus.tsx",
         "kind": "component",
-        "mentions": [],
-        "risk": "low",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+        ],
+        "risk": "high",
         "scope": "kiosk",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampWorkbench.tsx",
         "kind": "component",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "docs/reviews/kiosk-runtime-engineering-words-2026-09-28.md"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/reviews/kiosk-runtime-engineering-words-2026-09-28.md"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/print-scan/sign-stamp/constants.ts",
         "kind": "component",
-        "mentions": [],
-        "risk": "low",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+        ],
+        "risk": "high",
         "scope": "kiosk",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/print-scan/sign-stamp/signStampCopy.ts",
         "kind": "component",
-        "mentions": [],
-        "risk": "low",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
+        ],
+        "risk": "high",
         "scope": "kiosk",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/print-scan/sign-stamp/signStampModel.ts",
         "kind": "component",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/tests/w1-a-build-mode.test.mjs"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仍被其它文件提及：apps/kiosk/tests/w1-a-build-mode.test.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -47863,12 +48103,13 @@
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
           "apps/kiosk/scripts/verify-fusion-w5.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "docs/progress/current-progress.md",
           "docs/reviews/print-handoff-unification-2026-09-28.md"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs、apps/kiosk/scripts/verify-fusion-w5.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs、apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -47910,12 +48151,13 @@
         "file": "apps/kiosk/src/pages/print-scan/styles/sign-stamp-qx.css",
         "kind": "style",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/src/pages/print-scan/SignStampPage.tsx",
           "docs/progress/current-progress.md"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -48342,6 +48584,7 @@
           "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
           "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
           "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs",
           "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
           "apps/kiosk/scripts/verify-w3a-ai-records.mjs",
@@ -48376,6 +48619,7 @@
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w3.mjs",
           "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
           "docs/design/kiosk-touch-2026-10/map.js",
           "docs/design/kiosk-v6-migration-matrix.md",
@@ -48385,7 +48629,7 @@
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs、apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs、apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -48398,6 +48642,7 @@
           "apps/kiosk/scripts/verify-fusion-w3.mjs",
           "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
           "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
           "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
           "apps/kiosk/src/pages/jobs/components/JobAiResultPanel.tsx",
@@ -48434,6 +48679,7 @@
           "apps/kiosk/scripts/verify-fusion-w3.mjs",
           "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
           "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
           "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
           "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -48466,6 +48712,7 @@
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w3.mjs",
           "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
           "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
           "docs/design/kiosk-ai-os-v3-2026-08/33-resume-templates.html",
@@ -48483,7 +48730,7 @@
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs、apps/kiosk/scripts/verify-job-material-library-ui.mjs、apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs、apps/kiosk/scripts/verify-job-material-library-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -48496,6 +48743,7 @@
           "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
           "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
           "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-kiosk-unattended-copy.mjs",
           "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
           "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
@@ -48544,22 +48792,24 @@
         "kind": "component",
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w3.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs、apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanGenerateKey.tsx",
         "kind": "component",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "docs/progress/current-progress.md"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -48567,6 +48817,7 @@
         "kind": "component",
         "mentions": [
           "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs",
           "docs/progress/current-progress.md",
           "docs/reviews/2026-09-26-ai-label-copy-prompt-audit.md",
@@ -48574,65 +48825,70 @@
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs、apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanSelfAssessmentExcluded.tsx",
         "kind": "component",
         "mentions": [
-          "apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs"
+          "apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/components/career-plan/careerPlanGenerateCopy.ts",
         "kind": "component",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "docs/progress/current-progress.md"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentConsentKit.tsx",
         "kind": "component",
         "mentions": [
-          "apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs"
+          "apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentQxKit.tsx",
         "kind": "component",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
           "apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentConsentKit.tsx",
           "docs/progress/current-progress.md"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/hooks/useRouteIdentityGuard.ts",
         "kind": "component",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "docs/progress/current-progress.md",
           "docs/progress/next-tasks.md"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md、docs/progress/next-tasks.md"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -48649,6 +48905,7 @@
         "kind": "style",
         "mentions": [
           "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs",
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
           "apps/kiosk/src/pages/resume/JobFitActionsPage.tsx",
@@ -48660,7 +48917,7 @@
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -48691,11 +48948,12 @@
         "kind": "component",
         "mentions": [
           "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -48703,11 +48961,12 @@
         "kind": "component",
         "mentions": [
           "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -48715,13 +48974,14 @@
         "kind": "component",
         "mentions": [
           "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
           "docs/reviews/2026-09-26-ai-label-copy-prompt-audit.md",
           "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -48729,13 +48989,14 @@
         "kind": "component",
         "mentions": [
           "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
           "apps/kiosk/src/pages/jobs/components/JobAiResultPanel.tsx",
           "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -48755,11 +49016,12 @@
         "file": "apps/kiosk/src/pages/resume/jobFit/JobFitQxStates.tsx",
         "kind": "component",
         "mentions": [
-          "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
+          "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -48767,12 +49029,13 @@
         "kind": "component",
         "mentions": [
           "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "docs/reviews/ai-capability-wiring-matrix-2026-08-16.md",
           "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -48792,24 +49055,26 @@
         "file": "apps/kiosk/src/pages/resume/jobFit/jobFitQxKit.tsx",
         "kind": "component",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs",
           "docs/progress/current-progress.md",
           "docs/reviews/2026-09-26-ai-label-copy-prompt-audit.md"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/jobFit/jobFitResultSpec.ts",
         "kind": "component",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "docs/reviews/2026-09-26-ai-label-copy-prompt-audit.md"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/reviews/2026-09-26-ai-label-copy-prompt-audit.md"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -48828,6 +49093,7 @@
         "file": "apps/kiosk/src/pages/resume/resume-decision-qx.css",
         "kind": "style",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs",
           "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
@@ -48839,7 +49105,7 @@
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-k2a-career.mjs、apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-lightflow-k2a-career.mjs、apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -48908,6 +49174,7 @@
         "file": "apps/kiosk/src/pages/resume/resume-materials-qx.css",
         "kind": "style",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
           "apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx",
           "apps/kiosk/src/pages/resume/touch/resume-materials-touch.css",
@@ -48917,18 +49184,19 @@
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/resume-templates-qx.css",
         "kind": "style",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仍被其它文件提及：apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -48947,12 +49215,13 @@
         "file": "apps/kiosk/src/pages/resume/self-assessment-qx.css",
         "kind": "style",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentQxKit.tsx",
           "docs/progress/current-progress.md"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -48960,24 +49229,26 @@
         "kind": "component",
         "mentions": [
           "apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
           "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
           "apps/kiosk/src/pages/resume/selfAssessmentSession.ts"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs、apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/selfAssessmentInterpretation.ts",
         "kind": "component",
         "mentions": [
-          "apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs"
+          "apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -49051,131 +49322,142 @@
         "file": "apps/kiosk/src/pages/resume/touch/ResumeMaterialsTouch.tsx",
         "kind": "component",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "docs/progress/current-progress.md"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/touch/ResumeStates.tsx",
         "kind": "component",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs",
           "apps/kiosk/src/pages/resume/touch/resume-states.css",
           "docs/progress/current-progress.md"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/touch/SaResultParts.tsx",
         "kind": "component",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "docs/progress/current-progress.md"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/touch/resume-fit.css",
         "kind": "style",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/src/pages/resume/JobFitActionsPage.tsx",
           "apps/kiosk/src/pages/resume/jobFit/DecisionSummaryBar.tsx",
           "apps/kiosk/src/pages/resume/jobFit/FitSkillMap.tsx",
           "docs/progress/current-progress.md"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/touch/resume-materials-touch.css",
         "kind": "style",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx",
           "docs/progress/current-progress.md"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/touch/resume-sa.css",
         "kind": "style",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/src/pages/resume/touch/SaResultParts.tsx",
           "docs/progress/current-progress.md"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/touch/resume-states.css",
         "kind": "style",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/src/pages/resume/touch/ResumeStates.tsx",
           "docs/progress/current-progress.md"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/touch/resume-templates.css",
         "kind": "style",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx",
           "docs/progress/current-progress.md"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/touch/saActItems.ts",
         "kind": "component",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "docs/progress/current-progress.md"
         ],
-        "risk": "medium",
+        "risk": "high",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/useSelfAssessmentConsentBundle.ts",
         "kind": "component",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/useSelfAssessmentIdleExit.ts",
         "kind": "component",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
           "docs/design/kiosk-touch-2026-10/screens2.js"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -49354,12 +49636,13 @@
         "file": "apps/kiosk/src/services/api/benefitActivities.ts",
         "kind": "component",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-member-session-closure.mjs",
           "docs/superpowers/plans/2026-06-18-benefit-activities-mvp-implementation.md"
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-member-session-closure.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-member-session-closure.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -49369,6 +49652,7 @@
           "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
           "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
           "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-member-session-closure.mjs",
           "docs/progress/project-full-audit-and-august-launch-plan-2026-06-14.md"
         ],
@@ -49385,6 +49669,7 @@
           "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
           "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
           "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-member-session-closure.mjs",
           "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
           "docs/progress/project-full-audit-and-august-launch-plan-2026-06-14.md",
@@ -49414,6 +49699,7 @@
         "file": "apps/kiosk/src/services/api/printSign.ts",
         "kind": "component",
         "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
           "docs/superpowers/plans/2026-07-12-sign-stamp-implementation.md",
           "docs/superpowers/specs/2026-07-12-sign-stamp-design.md",
@@ -49421,7 +49707,7 @@
         ],
         "risk": "high",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs、scripts/verify-no-raw-error-render.mjs"
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs、scripts/verify-no-raw-error-render.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
