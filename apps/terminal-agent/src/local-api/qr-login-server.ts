@@ -31,7 +31,7 @@ import type {
   BackendQrCreateResult,
 } from './wire'
 import { createLocalBridgeSessionStore, type LocalBridgeSessionStore } from './bridge-session'
-import { handleScanDeviceRoute, type ScanDeviceHttpRuntime } from './scan-device-routes'
+import { handleDeviceRoute, type DeviceServerOptions } from './copy-device-routes'
 
 const DEFAULT_LOCAL_API_PORT = 9527
 const LOCAL_HOST = '127.0.0.1'
@@ -52,11 +52,9 @@ export interface LocalQrServerHandle {
   close: () => Promise<void>
 }
 
-export interface LocalQrServerOptions {
+export interface LocalQrServerOptions extends DeviceServerOptions {
   wakePrintQueue?: () => { accepted: boolean; coalesced: boolean }
   getPanelStatus?: () => LocalAgentPanelStatus
-  /** 只有屏上扫描开关打开时才传入。缺省时 /local/scan/* 仍走原来的 404。 */
-  scanDevice?: ScanDeviceHttpRuntime
 }
 
 export function startQrLoginLocalServer(
@@ -218,7 +216,8 @@ async function handleRequest(input: {
     return
   }
 
-  if (req.method === 'OPTIONS') {
+  if (req.method === 'OPTIONS' && !(url.pathname.startsWith('/local/copy/') &&
+    (config.copyDeviceEnabled !== true || !options.copyDevice))) {
     sendEmpty(res, 204, origin)
     return
   }
@@ -251,19 +250,8 @@ async function handleRequest(input: {
     return
   }
 
-  if (isScanRoute && options.scanDevice) {
-    await handleScanDeviceRoute({
-      req,
-      res,
-      origin,
-      url,
-      bridgeToken,
-      bridgeSessions,
-      runtime: options.scanDevice,
-      hooks: { sendJson, sendEnvelope },
-    })
-    return
-  }
+  if (await handleDeviceRoute({ req, res, origin, url, bridgeToken, bridgeSessions,
+    config, options, hooks: { sendJson, sendEnvelope } })) return
 
   if (isUsbRoute) {
     await handleUsbRoute(req, res, origin, url, client, bridgeToken, bridgeSessions, config)

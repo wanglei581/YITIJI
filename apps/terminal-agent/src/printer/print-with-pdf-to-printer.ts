@@ -106,12 +106,18 @@ export async function printWithPdfToPrinter(
     const timeoutMs = dependencies.timeoutMs ?? PRINT_TIMEOUT_MS
 
     // SumatraPDF exits after spooling (not after physical print). Guard against driver hangs.
-    await Promise.race([
-      dispatch(filePath, printOptions),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('PRINT_TIMEOUT')), timeoutMs),
-      ),
-    ])
+    let timer: ReturnType<typeof setTimeout> | undefined
+    dependencies.onDispatchStart?.()
+    const reader = Promise.resolve().then(() => dispatch!(filePath, printOptions))
+      .finally(() => dependencies.onDispatchSettled?.())
+    try {
+      await Promise.race([
+        reader,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('PRINT_TIMEOUT')), timeoutMs)
+        }),
+      ])
+    } finally { if (timer) clearTimeout(timer) }
 
     return {
       success: true, method, printer: printerName, file: filePath,
@@ -138,4 +144,6 @@ export async function printWithPdfToPrinter(
 export interface PrintCommandDependencies {
   dispatch?: (file: string, options?: PrintOptions) => Promise<void>
   timeoutMs?: number
+  onDispatchStart?: () => void
+  onDispatchSettled?: () => void
 }

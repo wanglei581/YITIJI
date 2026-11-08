@@ -14,105 +14,34 @@
  * 日志只写计数、错误码、HRESULT 和毫秒数，不写路径、不写文件名。
  */
 
-import { execFile, spawn, type ChildProcess, type SpawnOptions } from 'child_process'
-import fs from 'fs'
+import type { ChildProcess } from 'child_process'
 import path from 'path'
 import { log, warn } from '../../logger'
 import {
   LineBuffer,
   SCAN_MAX_PAGES_DEFAULT,
   WIA_HRESULT,
-  WiaParamError,
   buildWiaPowerShellArgs,
   buildWiaScanScript,
   encodeWiaCommand,
   mapWiaHresult,
   parseWiaLine,
   requiredWiaPropertiesFailed,
-  resolvePowerShellPath,
   type ScanDeviceErrorCode,
   type WiaColor,
   type WiaLine,
   type WiaSource,
 } from './wia-script'
-import { getScanDeviceRoot, scanCancelFlagPath } from './scan-temp-dir'
+import { scanCancelFlagPath } from './scan-temp-dir'
+import { createDefaultWiaRunnerDeps, type WiaRunnerDeps } from './wia-runner-deps'
+export { createDefaultWiaRunnerDeps, buildTaskkillArgs } from './wia-runner-deps'
+export type { WiaRunnerDeps, RunnerClock } from './wia-runner-deps'
 
 export const WIA_ABORT_GRACE_MS = 45_000
 export const WIA_FORCE_KILL_WAIT_MS = 10_000
 export const WIA_WARMING_UP_RETRY_DELAY_MS = 10_000
 export const WIA_IDLE_TIMEOUT_MS = 120_000
 export const WIA_TOTAL_TIMEOUT_MS = 12 * 60_000
-
-// ── 可注入的外部依赖 ──────────────────────────────────────────────────────
-
-export interface RunnerClock {
-  now(): number
-  setTimeout(callback: () => void, ms: number): unknown
-  clearTimeout(handle: unknown): void
-}
-
-export interface WiaRunnerDeps {
-  spawnProcess(command: string, args: string[], options: SpawnOptions): ChildProcess
-  /**
-   * 强杀进程树。返回 false，或抛错，表示没确认杀成。
-   * 不返回值（void）视为已发出强杀，接着等进程自己退出。
-   */
-  killProcessTree(pid: number): Promise<unknown>
-  clock: RunnerClock
-  writeCancelFlag(filePath: string): void
-  removeFile(filePath: string): void
-  /** 只认普通文件（lstat，不跟随符号链接）。不存在或不是普通文件返回 undefined。 */
-  statFile(filePath: string): { size: number } | undefined
-  powershellPath: string
-  /** 私有临时根目录。 */
-  root: string
-}
-
-export function buildTaskkillArgs(pid: number): string[] {
-  if (!Number.isSafeInteger(pid) || pid <= 0) throw new WiaParamError('pid')
-  return ['/PID', String(pid), '/T', '/F']
-}
-
-function defaultKillProcessTree(pid: number): Promise<void> {
-  return new Promise((resolve) => {
-    if (process.platform === 'win32') {
-      const systemRoot = process.env['SystemRoot'] ?? process.env['SYSTEMROOT']
-      const taskkill = systemRoot ? path.win32.join(systemRoot, 'System32', 'taskkill.exe') : 'taskkill'
-      execFile(taskkill, buildTaskkillArgs(pid), { windowsHide: true, timeout: 15_000 }, () => resolve())
-      return
-    }
-    try {
-      process.kill(pid, 'SIGKILL')
-    } catch {
-      // 进程已经不在了
-    }
-    resolve()
-  })
-}
-
-export function createDefaultWiaRunnerDeps(): WiaRunnerDeps {
-  return {
-    spawnProcess: (command, args, options) => spawn(command, args, options),
-    killProcessTree: defaultKillProcessTree,
-    clock: {
-      now: () => Date.now(),
-      setTimeout: (callback, ms) => setTimeout(callback, ms),
-      clearTimeout: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
-    },
-    writeCancelFlag: (filePath) => fs.writeFileSync(filePath, '1', { flag: 'w' }),
-    removeFile: (filePath) => fs.rmSync(filePath, { force: true }),
-    statFile: (filePath) => {
-      try {
-        const meta = fs.lstatSync(filePath)
-        return meta.isFile() ? { size: meta.size } : undefined
-      } catch {
-        return undefined
-      }
-    },
-    powershellPath: resolvePowerShellPath(),
-    root: getScanDeviceRoot(),
-  }
-}
 
 // ── 通用：起进程并盯住它 ───────────────────────────────────────────────────
 
@@ -275,6 +204,8 @@ export interface WiaScanRequest {
    * 调用方可以返回 Promise；本运行器不等待它（不能让网络回报堵住 stdout）。
    */
   onPage?: (page: WiaScannedPage) => void | Promise<void>
+  /** 自动预热重试也会再次动作硬件，调用方可在这里重取在线许可；拒绝则不起第二进程。 */
+  beforeRetry?: () => Promise<void>
 }
 
 export interface WiaScannedPage {
@@ -491,7 +422,10 @@ export function startWiaScan(request: WiaScanRequest, overrides: Partial<WiaRunn
       log('wia-runner: scanner is warming up; retrying once after delay')
       await sleep(WIA_WARMING_UP_RETRY_DELAY_MS)
       wakeSleeper = undefined
-      if (!abortRequested) outcome = await attempt()
+      if (!abortRequested) {
+        await request.beforeRetry?.()
+        if (!abortRequested) outcome = await attempt()
+      }
     }
     const finalResult = finalize(outcome)
     log(
