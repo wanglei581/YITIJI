@@ -51,6 +51,7 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     // 屏上扫描轮次（20261103030000，排在会话字段之后）。旧行取 0。必须在当前客户端写 ScanTask 之前执行。
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', scanDeviceRoundMigration)])
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261104150000_add_terminal_heartbeat_printer_queue/migration.sql')])
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261104160000_add_copy_job/migration.sql')])
     await client.aiServiceFact.create({ data: { serviceType: 'resume_optimize', serviceKey: 'migration-test', orgId: 'org-snapshot', terminalId: 'terminal-snapshot' } })
     if (await client.aiServiceFact.count() !== 1) throw new Error(`${kind}: fact table unavailable`)
     const sentinel = await client.organization.findUnique({ where: { id: 'first-order-migration-sentinel' }, select: { id: true } })
@@ -78,6 +79,15 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
       || queueHeartbeatRead.printerQueueRawStatus !== '3,0,False,0,0'
       || queueHeartbeatRead.printerQueueSpooler !== 'running'
     ) throw new Error(`${kind}: printer queue heartbeat columns were not readable`)
+    const copyOrder = await client.order.create({ data: { orderNo: 'migration-copy-order', type: 'copy' } })
+    const copy = await client.copyJob.create({ data: { terminalId: 'migration-terminal', organizationId: sentinel.id,
+      source: 'flatbed', requestKey: 'migration-copy-key', orderId: copyOrder.id, expiresAt: new Date() } })
+    if (copy.state !== 'ready' || copy.pageCount !== 0 || copy.generation !== 0 || copy.authorizationVersion !== 0) {
+      throw new Error(`${kind}: CopyJob defaults unavailable after upgrade`)
+    }
+    const linked = await client.order.findUnique({ where: { id: copyOrder.id }, include: { copyJob: true } })
+    if (linked?.copyJob?.id !== copy.id) throw new Error(`${kind}: CopyJob order relation unavailable`)
+    console.log(`PASS ${kind}: CopyJob usable after baseline upgrade; order relation and defaults verified`)
     const deployment = await client.serviceDeployment.create({ data: {
       projectId: project.id, orgId: sentinel.id, terminalId: 'migration-terminal', activeTerminalId: 'migration-terminal', terminalCode: 'MIGRATION-TERMINAL', locationLabel: 'Test',
     } })
@@ -127,6 +137,7 @@ async function main() {
     const database = join(directory, 'verify-first-order-migrations.db')
     closeSync(openSync(database, 'a', 0o600))
     await verify('sqlite', directory, `file:${database}`)
+    if (process.argv.includes('--sqlite-only')) return
     const port = await freePort()
     execFileSync('initdb', ['-D', pgData, '-A', 'trust', '-U', 'first_order_verify', '--no-locale'], { timeout: 30_000, stdio: 'pipe' })
     startAttempted = true

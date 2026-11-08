@@ -692,6 +692,10 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b8
           # 屏上扫描 B9：扫描仪告警只算仍在运营的终端（enabled 且 active）。停用与非 active 不出告警。不放进已恢复推送范围。SQLite 与 PG 两侧各跑一遍。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b9
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:copy-c1a
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:copy-c1b
+          # 屏上复印计费口径（11/08）：复印单价取同色打印价、与打印共用三条免费额度（出纸成功才算）、超额用复印的提示。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:copy-quota
           pnpm --filter @ai-job-print/api verify:print-conversion
           # 包 K1：中文字体解析收口 + 探测（缺候选路径即红）
           pnpm --filter @ai-job-print/api verify:cjk-font
@@ -1268,6 +1272,10 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b8
           # 屏上扫描 B9：扫描仪告警只算仍在运营的终端（enabled 且 active）。停用与非 active 不出告警。不放进已恢复推送范围。SQLite 与 PG 两侧各跑一遍。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-device-b9
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:copy-c1a
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:copy-c1b
+          # 屏上复印计费口径（11/08）：复印单价取同色打印价、与打印共用三条免费额度（出纸成功才算）、超额用复印的提示。SQLite 与 PG 两侧各跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:copy-quota
           pnpm --filter @ai-job-print/api verify:print-conversion
           # 包 K1：中文字体解析收口 + 探测（缺候选路径即红）
           pnpm --filter @ai-job-print/api verify:cjk-font

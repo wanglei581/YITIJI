@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 630,
+    "endpointCount": 637,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -5733,6 +5733,7 @@
           "BenefitClaim",
           "BenefitGrant",
           "ContractReviewTask",
+          "CopyJob",
           "DocumentProcessTask",
           "EndUser",
           "FairMaterialPrintBridge",
@@ -6733,6 +6734,86 @@
         ],
         "services": [
           "ContractReviewLifecycleService"
+        ]
+      },
+      {
+        "controller": "services/api/src/copy-jobs/copy-jobs.controller.ts",
+        "handler": "CopyJobsController.create",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "CopyJob",
+          "Order",
+          "Terminal",
+          "TerminalCapability"
+        ],
+        "path": "/api/v1/copy/jobs",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/copy-jobs/copy-jobs.service.ts"
+        ],
+        "services": [
+          "CopyJobsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/copy-jobs/copy-jobs.controller.ts",
+        "handler": "CopyJobsController.get",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "CopyJob",
+          "Order",
+          "Terminal",
+          "TerminalCapability"
+        ],
+        "path": "/api/v1/copy/jobs/:id",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/copy-jobs/copy-jobs.service.ts"
+        ],
+        "services": [
+          "CopyJobsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/copy-jobs/copy-jobs.controller.ts",
+        "handler": "CopyJobsController.cancel",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "CopyJob",
+          "Order",
+          "Terminal",
+          "TerminalCapability"
+        ],
+        "path": "/api/v1/copy/jobs/:id/cancel",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/copy-jobs/copy-jobs.service.ts"
+        ],
+        "services": [
+          "CopyJobsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/copy-jobs/copy-jobs.controller.ts",
+        "handler": "CopyJobsController.confirm",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "CopyJob",
+          "Order",
+          "Terminal",
+          "TerminalCapability"
+        ],
+        "path": "/api/v1/copy/jobs/:id/confirm",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/copy-jobs/copy-jobs.service.ts"
+        ],
+        "services": [
+          "CopyJobsService"
         ]
       },
       {
@@ -11772,6 +11853,7 @@
         "method": "POST",
         "models": [
           "AuditLog",
+          "CopyJob",
           "DocumentProcessTask",
           "FairMaterialPrintBridge",
           "FileObject",
@@ -11822,6 +11904,7 @@
         "method": "GET",
         "models": [
           "AuditLog",
+          "CopyJob",
           "DocumentProcessTask",
           "FairMaterialPrintBridge",
           "FileObject",
@@ -11849,6 +11932,7 @@
         "method": "POST",
         "models": [
           "AuditLog",
+          "CopyJob",
           "DocumentProcessTask",
           "FairMaterialPrintBridge",
           "FileObject",
@@ -11876,6 +11960,7 @@
         "method": "POST",
         "models": [
           "AuditLog",
+          "CopyJob",
           "DocumentProcessTask",
           "FairMaterialPrintBridge",
           "FileObject",
@@ -12981,6 +13066,105 @@
           "services/api/src/terminals/terminals.service.ts"
         ],
         "services": [
+          "TerminalsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/copy-jobs/copy-agent.controller.ts",
+        "handler": "CopyAgentController.permit",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "CopyJob",
+          "FileObject",
+          "Order",
+          "OrderItem",
+          "Organization",
+          "PrintTask",
+          "PrintTaskStatusLog",
+          "ScanTask",
+          "ServiceDeployment",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCapability",
+          "TerminalCredential",
+          "TerminalHeartbeat",
+          "TerminalSmartCampusConfig"
+        ],
+        "path": "/api/v1/terminals/:terminalId/copy/jobs/:id/permit",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/copy-jobs/copy-agent.service.ts",
+          "services/api/src/terminals/terminals.service.ts"
+        ],
+        "services": [
+          "CopyAgentService",
+          "TerminalsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/copy-jobs/copy-agent.controller.ts",
+        "handler": "CopyAgentController.result",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "CopyJob",
+          "FileObject",
+          "Order",
+          "OrderItem",
+          "Organization",
+          "PrintTask",
+          "PrintTaskStatusLog",
+          "ScanTask",
+          "ServiceDeployment",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCapability",
+          "TerminalCredential",
+          "TerminalHeartbeat",
+          "TerminalSmartCampusConfig"
+        ],
+        "path": "/api/v1/terminals/:terminalId/copy/jobs/:id/result",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/copy-jobs/copy-agent.service.ts",
+          "services/api/src/terminals/terminals.service.ts"
+        ],
+        "services": [
+          "CopyAgentService",
+          "TerminalsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/copy-jobs/copy-agent.controller.ts",
+        "handler": "CopyAgentController.scanResult",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "CopyJob",
+          "FileObject",
+          "Order",
+          "OrderItem",
+          "Organization",
+          "PrintTask",
+          "PrintTaskStatusLog",
+          "ScanTask",
+          "ServiceDeployment",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCapability",
+          "TerminalCredential",
+          "TerminalHeartbeat",
+          "TerminalSmartCampusConfig"
+        ],
+        "path": "/api/v1/terminals/:terminalId/copy/jobs/:id/scan-result",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/copy-jobs/copy-agent.service.ts",
+          "services/api/src/terminals/terminals.service.ts"
+        ],
+        "services": [
+          "CopyAgentService",
           "TerminalsService"
         ]
       },
@@ -18223,7 +18407,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 121,
+    "modelCount": 122,
     "models": [
       {
         "fieldCount": 7,
@@ -18588,6 +18772,21 @@
           "services/api/src/contract-review/contract-review.service.ts",
           "services/api/src/member-privacy/member-closure-files.ts",
           "services/api/src/member-privacy/member-privacy.service.ts"
+        ]
+      },
+      {
+        "fieldCount": 21,
+        "name": "CopyJob",
+        "relations": [
+          "Order"
+        ],
+        "usedBy": [
+          "services/api/src/copy-jobs/copy-agent.service.ts",
+          "services/api/src/copy-jobs/copy-authorization.ts",
+          "services/api/src/copy-jobs/copy-job-store.service.ts",
+          "services/api/src/copy-jobs/copy-jobs.service.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/print-jobs/free-print-quota.usage.ts"
         ]
       },
       {
@@ -19245,9 +19444,10 @@
         ]
       },
       {
-        "fieldCount": 42,
+        "fieldCount": 43,
         "name": "Order",
         "relations": [
+          "CopyJob",
           "OrderItem",
           "PaymentAttempt",
           "PrintTask",
@@ -19259,6 +19459,8 @@
           "services/api/src/assistant/daily-brief.service.ts",
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
           "services/api/src/console-screen/console-screen.usage.queries.ts",
+          "services/api/src/copy-jobs/copy-agent.service.ts",
+          "services/api/src/copy-jobs/copy-jobs.service.ts",
           "services/api/src/member-print-orders/member-order-claim-here.service.ts",
           "services/api/src/member-print-orders/member-order-timeline.service.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
@@ -19772,6 +19974,7 @@
           "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/console-screen/console-screen.visits.ts",
           "services/api/src/content/content.service.ts",
+          "services/api/src/copy-jobs/copy-job-store.service.ts",
           "services/api/src/device-fleet/device-fleet.service.ts",
           "services/api/src/first-order/first-order-incidents.service.ts",
           "services/api/src/first-order/first-order-projects.service.ts",
@@ -19828,6 +20031,7 @@
         "usedBy": [
           "services/api/src/admin-ops/derived-scan-device-alerts.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
+          "services/api/src/copy-jobs/copy-job-store.service.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts"
         ]
       },
@@ -20081,6 +20285,8 @@
       "scripts/verify-ci-main-runs-complete.mjs",
       "scripts/verify-release-bundle.mjs",
       "services/api/scripts/verify-contract-review-preprod-readiness.ts",
+      "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
@@ -24474,7 +24680,8 @@
       "apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts",
       "apps/terminal-agent/scripts/verify-scan-device-engine.ts",
       "apps/terminal-agent/scripts/verify-scan-device-runner-r3.ts",
-      "apps/terminal-agent/scripts/verify-scan-device-runner.ts"
+      "apps/terminal-agent/scripts/verify-scan-device-runner.ts",
+      "services/api/scripts/verify-copy-c1a.ts"
     ],
     "apps/terminal-agent/src/agent/scan-device/wia-probe.ts": [
       "apps/terminal-agent/scripts/verify-scan-device-engine.helper.ts",
@@ -24945,6 +25152,9 @@
     "packages/shared/src/types/contractReview.ts": [
       "services/api/scripts/verify-contract-review-contract.ts"
     ],
+    "packages/shared/src/types/copyJob.ts": [
+      "services/api/scripts/verify-copy-c1a.ts"
+    ],
     "packages/shared/src/types/device.ts": [
       "services/api/scripts/verify-terminal-device-config.ts"
     ],
@@ -25032,11 +25242,16 @@
     ],
     "packages/shared/src/types/printScanCapability.ts": [
       "services/api/scripts/verify-admin-print-scan.ts",
+      "services/api/scripts/verify-copy-c1a.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-scan-device-sessions.ts"
     ],
     "packages/shared/src/types/printSign.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
+    ],
+    "packages/shared/src/types/scanDeletionAudit.ts": [
+      "services/api/scripts/verify-copy-c1a.ts",
+      "services/api/scripts/verify-scan-deletion-audit-reporting.ts"
     ],
     "packages/shared/src/types/scanTask.ts": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs",
@@ -25361,6 +25576,7 @@
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
       "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-branding-license-migrations.ts",
+      "services/api/scripts/verify-copy-c1a.ts",
       "services/api/scripts/verify-db-load-indexes.ts",
       "services/api/scripts/verify-first-order-migrations.ts",
       "services/api/scripts/verify-job-ai.ts",
@@ -25391,6 +25607,7 @@
       "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-branding-license-migrations.ts",
+      "services/api/scripts/verify-copy-c1a.ts",
       "services/api/scripts/verify-db-load-indexes.ts",
       "services/api/scripts/verify-first-order-migrations.ts",
       "services/api/scripts/verify-free-print-quota.ts",
@@ -25619,6 +25836,12 @@
     "services/api/scripts/support/content-pipeline-harness.ts": [
       "services/api/scripts/verify-content-pipeline-e2e.ts"
     ],
+    "services/api/scripts/support/copy-c1c-verification.ts": [
+      "services/api/scripts/verify-copy-c1b.ts"
+    ],
+    "services/api/scripts/support/copy-c1e-verification.ts": [
+      "services/api/scripts/verify-copy-c1b.ts"
+    ],
     "services/api/scripts/support/dead-redis-gate-env.ts": [
       "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-error-observability.ts",
@@ -25666,6 +25889,9 @@
       "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
+      "services/api/scripts/verify-copy-c1a.ts",
+      "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
@@ -26106,6 +26332,9 @@
       "services/api/scripts/verify-scan-device-b4.ts",
       "services/api/scripts/verify-scan-device-b9.ts"
     ],
+    "services/api/src/admin-ops/derived-print-quota-alerts.ts": [
+      "services/api/scripts/verify-copy-quota.ts"
+    ],
     "services/api/src/admin-ops/derived-scan-device-alerts.ts": [
       "services/api/scripts/verify-scan-device-b9.ts"
     ],
@@ -26118,6 +26347,7 @@
       "services/api/scripts/verify-admin-pending-dispose.ts",
       "services/api/scripts/verify-admin-print-outcome.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
+      "services/api/scripts/verify-copy-c1a.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-payment-flow.ts"
     ],
@@ -26952,6 +27182,7 @@
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-contract-review-http.ts",
+      "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
@@ -27027,6 +27258,8 @@
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-companies.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
+      "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-cos-files.ts",
       "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-derivation-kind.ts",
@@ -27412,6 +27645,7 @@
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-contract-review-http.ts",
+      "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-error-observability.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-http-exception-filter.ts",
@@ -27630,6 +27864,8 @@
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-change-password.ts",
+      "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
@@ -27838,6 +28074,32 @@
     "services/api/src/contract-review/dto/contract-review.dto.ts": [
       "services/api/scripts/verify-contract-review-http.ts"
     ],
+    "services/api/src/copy-jobs/copy-agent.controller.ts": [
+      "services/api/scripts/verify-copy-c1b.ts"
+    ],
+    "services/api/src/copy-jobs/copy-agent.service.ts": [
+      "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts"
+    ],
+    "services/api/src/copy-jobs/copy-job-store.service.ts": [
+      "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts"
+    ],
+    "services/api/src/copy-jobs/copy-job.policy.ts": [
+      "services/api/scripts/verify-copy-c1b.ts"
+    ],
+    "services/api/src/copy-jobs/copy-job.types.ts": [
+      "services/api/scripts/verify-copy-c1a.ts",
+      "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts"
+    ],
+    "services/api/src/copy-jobs/copy-jobs.controller.ts": [
+      "services/api/scripts/verify-copy-c1b.ts"
+    ],
+    "services/api/src/copy-jobs/copy-jobs.service.ts": [
+      "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts"
+    ],
     "services/api/src/device-fleet/device-fleet.controller.ts": [
       "services/api/scripts/verify-device-fleet-overview.ts"
     ],
@@ -27898,6 +28160,7 @@
     ],
     "services/api/src/files/file-validation.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-cos-storage.ts",
       "services/api/scripts/verify-document-conversion.ts",
       "services/api/scripts/verify-file-display-truth.ts",
@@ -28775,6 +29038,7 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
     ],
     "services/api/src/member-print-orders/member-order-timeline.service.ts": [
+      "services/api/scripts/verify-copy-c1a.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
@@ -28786,6 +29050,7 @@
     "services/api/src/member-print-orders/member-print-order-create.service.ts": [
       "apps/miniapp/scripts/verify-package-chain.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
+      "services/api/scripts/verify-copy-c1a.ts",
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
@@ -28807,6 +29072,8 @@
       "services/api/scripts/verify-pickup-code-share.ts"
     ],
     "services/api/src/member-print-orders/member-print-orders.service.ts": [
+      "services/api/scripts/verify-copy-c1a.ts",
+      "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
@@ -28823,6 +29090,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts"
     ],
     "services/api/src/member-print-orders/package-order.service.ts": [
+      "services/api/scripts/verify-copy-c1a.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
@@ -29096,7 +29364,8 @@
       "services/api/scripts/verify-admin-billing.ts"
     ],
     "services/api/src/payment/admin-billing.service.ts": [
-      "services/api/scripts/verify-admin-billing.ts"
+      "services/api/scripts/verify-admin-billing.ts",
+      "services/api/scripts/verify-copy-quota.ts"
     ],
     "services/api/src/payment/admin-order-actions.controller.ts": [
       "services/api/scripts/verify-api20-manual-refund.ts",
@@ -29111,6 +29380,10 @@
     ],
     "services/api/src/payment/code-payment-convergence.task.ts": [
       "services/api/scripts/verify-payment-codepay.ts"
+    ],
+    "services/api/src/payment/copy-pricing.ts": [
+      "services/api/scripts/verify-copy-c1a.ts",
+      "services/api/scripts/verify-copy-quota.ts"
     ],
     "services/api/src/payment/dto/admin-billing.dto.ts": [
       "services/api/scripts/verify-admin-billing.ts"
@@ -29260,6 +29533,7 @@
     "services/api/src/payment/price-config.seed.ts": [
       "services/api/scripts/verify-admin-billing.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
@@ -29290,6 +29564,7 @@
       "services/api/scripts/verify-admin-billing.ts",
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
@@ -29456,15 +29731,19 @@
       "services/api/scripts/verify-free-print-quota.ts"
     ],
     "services/api/src/print-jobs/free-print-quota.decide.ts": [
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts"
     ],
     "services/api/src/print-jobs/free-print-quota.policy.ts": [
+      "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts"
     ],
     "services/api/src/print-jobs/free-print-quota.service.ts": [
       "services/api/scripts/verify-free-print-quota.ts"
     ],
     "services/api/src/print-jobs/free-print-quota.usage.ts": [
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-pickup-code-resume.ts"
     ],
@@ -29679,6 +29958,9 @@
       "services/api/scripts/verify-content-pipeline-e2e.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-contract-review-http.ts",
+      "services/api/scripts/verify-copy-c1a.ts",
+      "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-cos-files.ts",
       "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-deploy-data-safety-gate.ts",
@@ -30143,6 +30425,7 @@
       "services/api/scripts/verify-toolbox-launch-events.ts"
     ],
     "services/api/src/terminals/dto/report-scan-deletion-audit.dto.ts": [
+      "services/api/scripts/verify-copy-c1a.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts"
     ],
     "services/api/src/terminals/dto/save-toolbox-config.dto.ts": [
@@ -30175,6 +30458,7 @@
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts"
     ],
     "services/api/src/terminals/scan-deletion-reason-codes.ts": [
+      "services/api/scripts/verify-copy-c1a.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts"
     ],
     "services/api/src/terminals/terminal-capabilities.service.ts": [
@@ -30182,6 +30466,7 @@
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
+      "services/api/scripts/verify-copy-c1a.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
@@ -30217,6 +30502,7 @@
     ],
     "services/api/src/terminals/terminal-capabilities.types.ts": [
       "services/api/scripts/verify-admin-print-scan.ts",
+      "services/api/scripts/verify-copy-c1a.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-scan-device-sessions.ts"
     ],
@@ -30224,6 +30510,7 @@
       "services/api/scripts/verify-terminal-device-config.ts"
     ],
     "services/api/src/terminals/terminal-credential-security.service.ts": [
+      "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-device-config.ts"
     ],
@@ -30231,6 +30518,7 @@
       "services/api/scripts/verify-terminal-network-diagnostics.ts"
     ],
     "services/api/src/terminals/terminal-identity.guard.ts": [
+      "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-session.ts",
       "services/api/scripts/verify-member-closure.ts",
@@ -30250,6 +30538,7 @@
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-branding.ts",
+      "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-license-state.ts",
       "services/api/scripts/verify-member-closure.ts",
@@ -30314,6 +30603,7 @@
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-background-task-safety.ts",
+      "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
@@ -30359,6 +30649,7 @@
     ],
     "services/api/src/terminals/terminals.service.ts": [
       "services/api/scripts/verify-admin-printer-output.ts",
+      "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
@@ -40278,6 +40569,120 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [
+          "services/api/prisma/migrations",
+          "services/api/prisma/postgres/migrations"
+        ],
+        "files": [
+          "apps/terminal-agent/src/agent/scan-device/scan-temp-dir.ts",
+          "packages/shared/src/types/copyJob.ts",
+          "packages/shared/src/types/printScanCapability.ts",
+          "packages/shared/src/types/scanDeletionAudit.ts",
+          "services/api/prisma/postgres/schema.prisma",
+          "services/api/prisma/schema.prisma",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
+          "services/api/src/copy-jobs/copy-job.types.ts",
+          "services/api/src/member-print-orders/member-order-timeline.service.ts",
+          "services/api/src/member-print-orders/member-print-order-create.service.ts",
+          "services/api/src/member-print-orders/member-print-orders.service.ts",
+          "services/api/src/member-print-orders/package-order.service.ts",
+          "services/api/src/payment/copy-pricing.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/dto/report-scan-deletion-audit.dto.ts",
+          "services/api/src/terminals/scan-deletion-reason-codes.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts",
+          "services/api/src/terminals/terminal-capabilities.types.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-copy-c1a.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:copy-c1a"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          ".github/workflows/ci.yml",
+          "services/api/scripts/support/copy-c1c-verification.ts",
+          "services/api/scripts/support/copy-c1e-verification.ts",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/app.module.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/copy-jobs/copy-agent.controller.ts",
+          "services/api/src/copy-jobs/copy-agent.service.ts",
+          "services/api/src/copy-jobs/copy-job-store.service.ts",
+          "services/api/src/copy-jobs/copy-job.policy.ts",
+          "services/api/src/copy-jobs/copy-job.types.ts",
+          "services/api/src/copy-jobs/copy-jobs.controller.ts",
+          "services/api/src/copy-jobs/copy-jobs.service.ts",
+          "services/api/src/files/file-validation.ts",
+          "services/api/src/member-print-orders/member-print-orders.service.ts",
+          "services/api/src/print-jobs/free-print-quota.policy.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/terminal-credential-security.service.ts",
+          "services/api/src/terminals/terminal-identity.guard.ts",
+          "services/api/src/terminals/terminal-session.service.ts",
+          "services/api/src/terminals/terminals-agent.service.ts",
+          "services/api/src/terminals/terminals.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-copy-c1b.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:copy-c1b"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          ".github/workflows/ci.yml",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/admin-ops/derived-print-quota-alerts.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/copy-jobs/copy-agent.service.ts",
+          "services/api/src/copy-jobs/copy-job-store.service.ts",
+          "services/api/src/copy-jobs/copy-job.types.ts",
+          "services/api/src/copy-jobs/copy-jobs.service.ts",
+          "services/api/src/payment/admin-billing.service.ts",
+          "services/api/src/payment/copy-pricing.ts",
+          "services/api/src/payment/price-config.seed.ts",
+          "services/api/src/payment/pricing.service.ts",
+          "services/api/src/print-jobs/free-print-quota.decide.ts",
+          "services/api/src/print-jobs/free-print-quota.policy.ts",
+          "services/api/src/print-jobs/free-print-quota.usage.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-copy-quota.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:copy-quota"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [],
         "files": [
           "services/api/src/audit/audit.service.ts",
@@ -46327,6 +46732,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "packages/shared/src/types/scanDeletionAudit.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/prisma/prisma.service.ts",
