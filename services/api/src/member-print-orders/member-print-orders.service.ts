@@ -192,7 +192,7 @@ export class MemberPrintOrdersService {
     endUserId: string,
     page: MemberPageQuery,
   ): Promise<{ items: MemberPrintOrderItem[]; nextCursor: string | null; total: number }> {
-    const where = { endUserId }
+    const where = { endUserId, order: { isNot: { type: 'copy' } } }
     const total = await this.prisma.printTask.count({ where })
     // select 显式收口：只取安全列，连 fileUrl / fileMd5 都不从 DB 读出，杜绝误透传。
     const rows = await this.prisma.printTask.findMany({
@@ -287,6 +287,7 @@ export class MemberPrintOrdersService {
       where: {
         endUserId,
         status: { in: [...ACTIVE_PRINT_STATUSES] },
+        order: { isNot: { type: 'copy' } },
         OR: [
           { order: { is: null } },
           { order: { is: { payStatus: { notIn: NON_RESUMABLE_PAYMENT_STATUSES } } } },
