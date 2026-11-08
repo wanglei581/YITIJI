@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { AuditService } from '../audit/audit.service'
 import { OrderStatusService } from '../payment/order-status.service'
+import { assertFreePrintQuota } from '../print-jobs/free-print-quota.decide'
 import { PrismaService } from '../prisma/prisma.service'
 import { COPY_COLOR_MODES, COPY_DUPLEX_MODES, COPY_SOURCES, type CreateCopyJobInput } from './copy-job.types'
 import { assertCopyCombination, assertCopyLimits, COPY_LIFETIME_MS, copyError } from './copy-job.policy'
@@ -83,6 +84,9 @@ export class CopyJobsService {
         copyError(409, 'COPY_QUOTE_CHANGED', { quote: result.quote,
           quoteVersion: copyDigest(JSON.stringify(result.quote)) })
       }
+      // 复印与打印共用三条免费额度，占单建单前判；超额与打印同一 429 错误码，提示语换成复印的说法。
+      await assertFreePrintQuota(tx, { terminalId: job.terminalId, endUserId: job.endUserId,
+        requestedSides: result.quote.billableSides, payableCents: result.quote.amountCents, subject: 'copy' })
       const claimed = await tx.copyJob.updateMany({ where: { id, state: 'scanned', orderId: null,
         generation: job.generation, pageCount: job.pageCount, expiresAt: { gt: new Date() } },
       data: { state: 'confirmed', authorizationVersion: { increment: 1 } } })

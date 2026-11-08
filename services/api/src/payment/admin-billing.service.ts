@@ -16,7 +16,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { AuditService } from '../audit/audit.service'
 import { PrismaService } from '../prisma/prisma.service'
 import type { AdminUpdatePriceConfigDto } from './dto/admin-billing.dto'
-import { ensureCopyPriceCatalogRows, ensurePrintPriceCatalogRows, ensureResumeExportPriceConfig } from './price-config.seed'
+import { ensurePrintPriceCatalogRows, ensureResumeExportPriceConfig } from './price-config.seed'
 import { descriptionContradictsAmount, statedYuanIn } from './price-description'
 
 export interface AdminPriceConfigItem {
@@ -41,7 +41,6 @@ export class AdminBillingService {
     await ensureResumeExportPriceConfig(this.prisma)
     // 新库缺打印两档时补「停用、未定价」目录行，运营才能在计费页设价（W-02）；已有行一律不动。
     await ensurePrintPriceCatalogRows(this.prisma)
-    await ensureCopyPriceCatalogRows(this.prisma)
     const rows = await this.prisma.priceConfig.findMany({ orderBy: { serviceKey: 'asc' } })
     return {
       items: rows.map((r) => ({

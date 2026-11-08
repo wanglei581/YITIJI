@@ -11,8 +11,8 @@ export const COPY_COLOR_MODES = ['black_white', 'color'] as const
 export type CopyColorMode = (typeof COPY_COLOR_MODES)[number]
 export const COPY_DUPLEX_MODES = ['simplex', 'duplex_long_edge', 'duplex_short_edge'] as const
 export type CopyDuplex = (typeof COPY_DUPLEX_MODES)[number]
-export const COPY_PRICE_KEYS = ['copy_bw_page', 'copy_color_page'] as const
-export type CopyPriceKey = (typeof COPY_PRICE_KEYS)[number]
+/** 逐机复印价落地前没有复印价目行，复印单价取同色打印价目行；报价快照记实际取价的打印价目键。 */
+export type CopyQuoteServiceKey = 'print_bw_page' | 'print_color_page'
 
 export interface CopyPriceInput {
   pageCount: number
@@ -21,16 +21,9 @@ export interface CopyPriceInput {
   duplex: CopyDuplex
 }
 
-export interface CopyPriceRow {
-  serviceKey: string
-  active: boolean
-  unit: string
-  unitCents: number
-}
-
 /** quoteSnapshot 序列化后的白名单内容；无文件与内容标识。 */
 export interface CopyPriceQuote {
-  serviceKey: CopyPriceKey
+  serviceKey: CopyQuoteServiceKey
   unitCents: number
   pageCount: number
   copies: number

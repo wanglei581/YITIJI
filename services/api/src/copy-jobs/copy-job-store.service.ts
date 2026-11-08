@@ -47,9 +47,8 @@ export class CopyJobStore {
   }
 
   async quote(job: CopyRow, db: CopyDb = this.prisma) {
-    const rows = await db.priceConfig.findMany({ where: { effectiveFrom: { lte: new Date() } } })
     return quoteCopy({ ...job, colorMode: job.colorMode as CopyPriceInput['colorMode'],
-      duplex: job.duplex as CopyPriceInput['duplex'] }, rows)
+      duplex: job.duplex as CopyPriceInput['duplex'] }, db)
   }
 
   async view(job: CopyRow, db: CopyDb = this.prisma): Promise<CopyJobView> {

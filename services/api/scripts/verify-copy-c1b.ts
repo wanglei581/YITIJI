@@ -23,6 +23,7 @@ import { COPY_MAX_PAGES } from '../src/copy-jobs/copy-job.policy'
 import { COPY_MAX_COPIES, type CopyJobView, type CopyPermit } from '../src/copy-jobs/copy-job.types'
 import { SCAN_DEVICE_OTHER_MAX_PAGES } from '../src/files/file-validation'
 import { MemberPrintOrdersService } from '../src/member-print-orders/member-print-orders.service'
+import { KEY_GUEST_PER_ORDER_SIDES } from '../src/print-jobs/free-print-quota.policy'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { verifyCopyC1c } from './support/copy-c1c-verification'
 import { verifyCopyC1e } from './support/copy-c1e-verification'
@@ -45,8 +46,11 @@ async function main() {
     agent: new TerminalAgentService(prisma, audit, credentials),
   }) as TerminalsService
   const store = new CopyJobStore(prisma, redis, audit), jobs = new CopyJobsService(store), agent = new CopyAgentService(store)
-  const priceKeys = ['copy_bw_page', 'copy_color_page']
+  // 复印单价取同色打印价目行（11/08），本门禁把两行临时设成 0 元，结束时原样恢复。
+  const priceKeys = ['print_bw_page', 'print_color_page']
   const priorPrices = await prisma.priceConfig.findMany({ where: { serviceKey: { in: priceKeys } } })
+  // 复印与打印共用免费额度；本门禁要走 99 份 20 页的边界，临时放宽游客每单上限，额度判定另有 verify:copy-quota。
+  const priorGuestLimit = await prisma.platformSetting.findUnique({ where: { key: KEY_GUEST_PER_ORDER_SIDES } })
   let app: Awaited<ReturnType<typeof NestFactory.create>> | undefined
   const oddSetting = process.env['COPY_ALLOW_ODD_DUPLEX_MULTICOPY']
   delete process.env['COPY_ALLOW_ODD_DUPLEX_MULTICOPY']
@@ -54,12 +58,15 @@ async function main() {
     await prisma.organization.create({ data: { id: orgId, name: '隔离复印验证', type: 'test' } })
     await prisma.endUser.create({ data: { id: userId, phoneHash: userId, phoneEnc: userId, enabled: true, status: 'active' } })
     for (let i = 0; i < 2; i++) {
-      await prisma.terminal.create({ data: { id: tids[i], terminalCode: tids[i], agentToken: agentTokens[i], deviceFingerprint: tids[i], orgId } })
+      await prisma.terminal.create({ data: { id: tids[i], terminalCode: tids[i], agentToken: agentTokens[i], deviceFingerprint: tids[i], orgId,
+        dailyFreePrintSides: 10_000 } })
       await prisma.terminalCredential.create({ data: { id: randomUUID(), terminalId: tids[i], generation: 0,
         tokenHash: copyDigest(agentTokens[i]), issueSource: 'test', expiresAt: new Date(Date.now() + 300_000) } })
     }
     for (const serviceKey of priceKeys) await prisma.priceConfig.upsert({ where: { serviceKey },
       create: { serviceKey, unitCents: 0, unit: 'page' }, update: { unitCents: 0, unit: 'page', active: true, effectiveFrom: new Date(0) } })
+    await prisma.platformSetting.upsert({ where: { key: KEY_GUEST_PER_ORDER_SIDES },
+      create: { key: KEY_GUEST_PER_ORDER_SIDES, value: '10000' }, update: { value: '10000' } })
     const screenTokens: string[] = []
     for (let i = 0; i < 2; i++) {
       const ticket = await sessions.createBootTicket(tids[i], `Bearer ${agentTokens[i]}`)
@@ -166,11 +173,11 @@ async function main() {
     }
     const confirm = (j: View, expected = 200) => request('POST', `/copy/jobs/${j.copyId}/confirm`, { quoteVersion: j.quoteVersion }, 0, j.controlToken, expected)
     const missing = await scannedJob()
-    await prisma.priceConfig.update({ where: { serviceKey: 'copy_bw_page' }, data: { active: false } })
+    await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { active: false } })
     assert.equal(await confirm(missing, 409), 'COPY_PRICE_UNAVAILABLE')
-    await prisma.priceConfig.update({ where: { serviceKey: 'copy_bw_page' }, data: { active: true, unitCents: 1 } })
+    await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { active: true, unitCents: 1 } })
     assert.equal(await confirm(missing, 409), 'COPY_PAID_NOT_SUPPORTED')
-    await prisma.priceConfig.update({ where: { serviceKey: 'copy_bw_page' }, data: { unitCents: 0 } })
+    await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: 0 } })
     await confirm({ ...missing, quoteVersion: '0'.repeat(64) }, 409)
     const odd = await scannedJob({ copies: 2, duplex: 'duplex_long_edge' }, 3)
     assert.equal(await confirm(odd, 409), 'COPY_ODD_DUPLEX_MULTICOPY_DISABLED')
@@ -245,6 +252,8 @@ async function main() {
     await prisma.endUser.delete({ where: { id: userId } })
     await prisma.priceConfig.deleteMany({ where: { serviceKey: { in: priceKeys } } })
     for (const row of priorPrices) await prisma.priceConfig.create({ data: row })
+    await prisma.platformSetting.deleteMany({ where: { key: KEY_GUEST_PER_ORDER_SIDES } })
+    if (priorGuestLimit) await prisma.platformSetting.create({ data: priorGuestLimit })
     if (app) await app.close()
     await prisma.onModuleDestroy()
   }

@@ -5,9 +5,8 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { plainToInstance } from 'class-transformer'
 import { validate } from 'class-validator'
-import { PrismaService } from '../src/prisma/prisma.service'
+import { PrismaService, type PrismaTransactionClient } from '../src/prisma/prisma.service'
 import { quoteCopy } from '../src/payment/copy-pricing'
-import { ensureCopyPriceCatalogRows } from '../src/payment/price-config.seed'
 import * as apiCopy from '../src/copy-jobs/copy-job.types'
 import * as sharedCopy from '../../../packages/shared/src/types/copyJob'
 import * as apiCapability from '../src/terminals/terminal-capabilities.types'
@@ -57,32 +56,38 @@ function verifyModel() {
   pass('CopyJob 双 schema 字段白名单、无文件字段、唯一关联及共享契约')
 }
 
-function verifyQuote() {
-  const rows: apiCopy.CopyPriceRow[] = [
-    { serviceKey: 'copy_bw_page', active: true, unit: 'page', unitCents: 0 },
-    { serviceKey: 'copy_color_page', active: true, unit: 'page', unitCents: 7 },
+type PriceRow = { serviceKey: string; active: boolean; unit: string; unitCents: number }
+/** 只有 findUnique 的价目桩：复印没有自己的价目行，取同色打印行（11/08）。 */
+const prices = (rows: PriceRow[]) => ({ priceConfig: { findUnique: async ({ where }: { where: { serviceKey: string } }) =>
+  rows.find((row) => row.serviceKey === where.serviceKey) ?? null } }) as unknown as Pick<PrismaTransactionClient, 'priceConfig'>
+
+async function verifyQuote() {
+  const rows: PriceRow[] = [
+    { serviceKey: 'print_bw_page', active: true, unit: 'page', unitCents: 0 },
+    { serviceKey: 'print_color_page', active: true, unit: 'page', unitCents: 7 },
   ]
   const input: apiCopy.CopyPriceInput = { pageCount: 3, copies: 2, colorMode: 'black_white', duplex: 'simplex' }
-  const free = quoteCopy(input, rows)
+  const free = await quoteCopy(input, prices(rows))
   assert.ok(free.quotable)
   assert.equal(free.quote.amountCents, 0)
   assert.equal(free.quote.billableSides, 6)
+  assert.equal(free.quote.serviceKey, 'print_bw_page')
   for (const duplex of apiCopy.COPY_DUPLEX_MODES) {
-    const result = quoteCopy({ ...input, colorMode: 'color', duplex }, rows)
+    const result = await quoteCopy({ ...input, colorMode: 'color', duplex }, prices(rows))
     assert.ok(result.quotable)
     assert.equal(result.quote.amountCents, 42, '颜色、份数和双面不减半')
     assert.equal(result.quote.billableSides, 6)
   }
-  assert.deepEqual(quoteCopy(input, []), { quotable: false, code: 'COPY_PRICE_UNAVAILABLE' })
-  assert.equal(quoteCopy(input, [{ ...rows[0], active: false }]).quotable, false)
-  assert.equal(quoteCopy(input, [rows[1]]).quotable, false, '不能把另一种颜色价当缺价兜底')
+  assert.deepEqual(await quoteCopy(input, prices([])), { quotable: false, code: 'COPY_PRICE_UNAVAILABLE' })
+  assert.equal((await quoteCopy(input, prices([{ ...rows[0], active: false }]))).quotable, false)
+  assert.equal((await quoteCopy(input, prices([rows[1]]))).quotable, false, '不能把另一种颜色价当缺价兜底')
   for (const unitCents of [-1, 0.5, NaN, Infinity]) {
-    assert.equal(quoteCopy(input, [{ ...rows[0], unitCents }]).quotable, false)
+    assert.equal((await quoteCopy(input, prices([{ ...rows[0], unitCents }]))).quotable, false)
   }
   for (const patch of [{ pageCount: 0 }, { copies: 0 }, { copies: 1.5 }, { pageCount: Number.MAX_SAFE_INTEGER }]) {
-    assert.equal(quoteCopy({ ...input, ...patch }, rows).quotable, false)
+    assert.equal((await quoteCopy({ ...input, ...patch }, prices(rows))).quotable, false)
   }
-  pass('报价：0 元、颜色、份数、双面不减半、缺失/停用/异常价拒绝')
+  pass('报价：取同色打印价目行，0 元、颜色、份数、双面不减半、缺失/停用/异常价拒绝')
 }
 
 async function verifyCapabilities(prisma: PrismaService, terminalId: string) {
@@ -197,23 +202,12 @@ async function verifyOrders(prisma: PrismaService, suffix: string) {
 async function main() {
   assertIsolatedVerificationDatabase()
   verifyModel()
-  verifyQuote()
+  await verifyQuote()
   await verifyDeletion()
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const suffix = randomUUID()
   try {
-    await ensureCopyPriceCatalogRows(prisma)
-    const rows = await prisma.priceConfig.findMany({ where: { serviceKey: { in: [...apiCopy.COPY_PRICE_KEYS] } }, orderBy: { serviceKey: 'asc' } })
-    assert.equal(rows.length, 2)
-    assert.ok(rows.every((r) => r.unitCents === 0 && r.active && r.unit === 'page' && r.description === '免费试运营：复印 0 元/页'))
-    await prisma.priceConfig.update({ where: { serviceKey: 'copy_bw_page' }, data: { unitCents: 12, active: false } })
-    await ensureCopyPriceCatalogRows(prisma)
-    const kept = await prisma.priceConfig.findUniqueOrThrow({ where: { serviceKey: 'copy_bw_page' } })
-    assert.equal(kept.unitCents, 12)
-    assert.equal(kept.active, false, '补行绝不覆盖运营价/停用')
-    await prisma.priceConfig.update({ where: { serviceKey: 'copy_bw_page' }, data: { unitCents: 0, active: true } })
-    pass('两行复印价目 0 元，幂等补行不覆盖已有配置')
     await verifyCapabilities(prisma, suffix)
     await verifyOrders(prisma, suffix)
   } finally { await prisma.onModuleDestroy() }
