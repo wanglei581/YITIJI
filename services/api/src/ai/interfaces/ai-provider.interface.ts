@@ -446,6 +446,7 @@ export interface AssistantAction {
 export interface ChatInput {
   message: string
   sessionId?: string
+  policyId?: string
   skill?: AssistantSkill
   /** 缺省 kiosk。miniapp 只返回已注册页面的 actions。 */
   channel?: 'kiosk' | 'miniapp'

@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`629` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`630` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -164,8 +164,8 @@
 | PUT | `/api/v1/admin/ai-config` | AiConfigController.update | admin | LlmConfigService | — |
 | GET | `/api/v1/admin/ai-config/:featureKey` | AiConfigController.getOne | admin | LlmConfigService | — |
 | PUT | `/api/v1/admin/ai-config/:featureKey` | AiConfigController.updateOne | admin | LlmConfigService | — |
-| POST | `/api/v1/admin/ai-config/:featureKey/test` | AiConfigController.testOne | admin | LlmChatService<br/>LlmConfigService | AiServiceLog |
-| POST | `/api/v1/admin/ai-config/test` | AiConfigController.test | admin | LlmChatService<br/>LlmConfigService | AiServiceLog |
+| POST | `/api/v1/admin/ai-config/:featureKey/test` | AiConfigController.testOne | admin | LlmChatService<br/>LlmConfigService | AiServiceLog<br/>PolicyPost |
+| POST | `/api/v1/admin/ai-config/test` | AiConfigController.test | admin | LlmChatService<br/>LlmConfigService | AiServiceLog<br/>PolicyPost |
 
 ## `services/api/src/ai/resume-report-export.controller.ts`
 
@@ -981,6 +981,12 @@
 | GET | `/api/v1/policies/:id` | PoliciesController.getPublishedPolicy | — | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentEmergencyHold |
 | POST | `/api/v1/policies/eligibility-check` | PoliciesController.checkEligibility | — | PolicyEligibilityService | AuditLog<br/>PolicyEligibilityRule<br/>PolicyPost |
 | GET | `/api/v1/policies/eligibility-questions` | PoliciesController.getEligibilityQuestions | — | PolicyEligibilityService | AuditLog<br/>PolicyEligibilityRule<br/>PolicyPost |
+
+## `services/api/src/policies/policy-checklist.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/policies/:id/checklist` | PolicyChecklistController.generate | — | PolicyChecklistService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PolicyPost<br/>PrintTask |
 
 ## `services/api/src/print-conversion/print-conversion.controller.ts`
 
