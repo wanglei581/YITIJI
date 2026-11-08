@@ -1,4 +1,6 @@
 import { FolderIcon, PrinterIcon, SparklesIcon } from 'lucide-react'
+import { useSupportContactSnapshot } from '../../hooks/useSupportContact'
+import { SCAN_GUEST_WAYS_LEAD, scanGuestWays } from './scanGuestWays'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import type { ScannedFile } from './scanResultModel'
 
@@ -7,11 +9,11 @@ import type { ScannedFile } from './scanResultModel'
  *
  * 2026-11-02 K1a 从 `ScanResultPage.tsx` 整段搬来（理由：页面 512 行，往里再加屏上扫描的结果之前先按职责拆开）。
  * **只搬不改**：三个按钮的启用条件与 DOM 都是拆分前的原文；点击后怎么离开由 `useScanResultExits` 负责。
- * 唯一的文案改动是游客那句说明（产品负责人 2026-11-02 拍板，照触屏版补稿 cs-scan-done 的原话）：
- * 走查 I-15 那一版会让人以为现在登录就能把这份存进账号，现在改成说清「请在本次操作内完成打印或识别」，
- * 带走电子版的办法是「下次先扫码登录再扫」或「用 U 盘」（那条这台机器暂未开通，所以如实写出来）。
+ * 唯一的文案改动是游客那段说明：2026-11-02 改成说清「请在本次操作内完成打印或识别」；
+ * 2026-11-08 设计窗口答复游客「扫码带走」不做，改成先一句「不进『我的文档』」，再列三条带走的办法
+ * （当场打印 / 存 U 盘 / 下次先登录再扫），句子在 scanGuestWays，屏上扫描完成屏共用。每条一行小字，字号行距照这张卡原样。
  * **不放登录按钮**：游客一登录，这次扫描就会被登录那一步清掉，按钮同样会让人以为现在登录就能存进去；
- * 「先登录」是放在扫之前的「怎么扫」那一屏的事，不在这里。那颗灰着的出口保持原样。
+ * 「先登录」是放在扫之前的「怎么扫」那一屏的事，不在这里。那颗灰着的出口和三个按钮的启用条件保持原样。
  */
 export function ScanResultExitRow({
   file,
@@ -32,6 +34,8 @@ export function ScanResultExitRow({
   handlePrint: () => void
   handleDocuments: () => void
 }) {
+  // 只读本会话已有的服务联系方式（运行时根负责去读），游客页面自己不新发请求。
+  const contact = useSupportContactSnapshot()
   return (
     <div className="sw-actrow" data-testid="scan-workbench-exits">
       <button
@@ -72,11 +76,16 @@ export function ScanResultExitRow({
             {isLoggedIn ? '前往我的文档' : '本次不进入我的文档'}
             {isLoggedIn ? null : <span className="sw-offtag">暂不放行</span>}
           </span>
-          <small>
-            {isLoggedIn
-              ? '在「我的文档」查看与管理本次扫描件'
-              : '未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。要带走电子版，下次先扫码登录再扫。用 U 盘带走：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。'}
-          </small>
+          {isLoggedIn ? (
+            <small>在「我的文档」查看与管理本次扫描件</small>
+          ) : (
+            <>
+              <small data-testid="scan-guest-ways">{SCAN_GUEST_WAYS_LEAD}</small>
+              {scanGuestWays(contact).map((way, index) => (
+                <small key={way.key} data-guest-way={way.key}>{`${index + 1}. ${way.text}`}</small>
+              ))}
+            </>
+          )}
         </span>
       </button>
     </div>

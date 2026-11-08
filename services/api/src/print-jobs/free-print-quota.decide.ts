@@ -3,15 +3,14 @@ import {
   PRINT_GUEST_ORDER_QUOTA_EXCEEDED,
   PRINT_MEMBER_DAILY_QUOTA_REACHED,
   PRINT_TERMINAL_DAILY_QUOTA_REACHED,
-  PRINT_TERMINAL_DAILY_QUOTA_MESSAGE,
   beijingDayBounds,
+  freePrintQuotaMessages,
   freePrintQuotaNow,
-  guestOrderQuotaMessage,
-  memberDailyQuotaMessage,
   remainingSides,
   terminalDailyLimit,
   throwFreePrintQuota,
   type FreePrintQuotaConfig,
+  type FreePrintQuotaSubject,
 } from './free-print-quota.policy'
 import { loadFreePrintUsage, type FreePrintQuotaDb } from './free-print-quota.usage'
 
@@ -30,6 +29,8 @@ export async function assertFreePrintQuota(
     requestedSides: number
     payableCents: number
     now?: Date
+    /** 复印传 copy：同一份额度、同样的错误码，只换提示语。 */
+    subject?: FreePrintQuotaSubject
   },
 ): Promise<void> {
   // 实付大于 0 不受这三条约束。反向变异：删掉这一行，付费单也会被拒。
@@ -44,8 +45,9 @@ export async function assertFreePrintQuota(
   })
   const usage = await loadFreePrintUsage(db, input.terminalId, input.endUserId, now)
   const terminalLimit = terminalDailyLimit(terminal?.dailyFreePrintSides, config.terminalDailySides)
+  const messages = freePrintQuotaMessages(input.subject)
   if (!input.endUserId && input.requestedSides > config.guestPerOrderSides) {
-    throwFreePrintQuota(PRINT_GUEST_ORDER_QUOTA_EXCEEDED, guestOrderQuotaMessage(config.guestPerOrderSides), {
+    throwFreePrintQuota(PRINT_GUEST_ORDER_QUOTA_EXCEEDED, messages.guest(config.guestPerOrderSides), {
       limit: config.guestPerOrderSides,
       used: 0,
       remaining: config.guestPerOrderSides,
@@ -54,7 +56,7 @@ export async function assertFreePrintQuota(
     })
   }
   if (usage.terminalUsed + usage.terminalInFlight + input.requestedSides > terminalLimit) {
-    throwFreePrintQuota(PRINT_TERMINAL_DAILY_QUOTA_REACHED, PRINT_TERMINAL_DAILY_QUOTA_MESSAGE, {
+    throwFreePrintQuota(PRINT_TERMINAL_DAILY_QUOTA_REACHED, messages.terminal, {
       limit: terminalLimit,
       used: usage.terminalUsed,
       remaining: remainingSides(terminalLimit, usage.terminalUsed, usage.terminalInFlight),
@@ -63,7 +65,7 @@ export async function assertFreePrintQuota(
     })
   }
   if (input.endUserId && usage.memberUsed + usage.memberInFlight + input.requestedSides > config.memberDailySides) {
-    throwFreePrintQuota(PRINT_MEMBER_DAILY_QUOTA_REACHED, memberDailyQuotaMessage(config.memberDailySides), {
+    throwFreePrintQuota(PRINT_MEMBER_DAILY_QUOTA_REACHED, messages.member(config.memberDailySides), {
       limit: config.memberDailySides,
       used: usage.memberUsed,
       remaining: remainingSides(config.memberDailySides, usage.memberUsed, usage.memberInFlight),

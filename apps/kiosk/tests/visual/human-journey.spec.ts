@@ -651,11 +651,11 @@ test.describe('真人走查（模拟数据）', () => {
       await expect(page.getByTestId(`scan-workbench-type-${type}`), `${type} 进来不该是选中态`).toHaveAttribute('aria-checked', 'false')
     }
     await expect(page.getByRole('button', { name: '先选一种材料', exact: true })).toBeDisabled()
-    await expect(page.getByRole('button', { name: /下一步 · 建立这次扫描/ })).toHaveCount(0)
-    // 点「普通文档扫描」：上面注册的建会话回包就是 document 类型。
+    await expect(page.getByRole('button', { name: '下一步', exact: true })).toHaveCount(0)
+    // 点「普通文档」：上面注册的建会话回包就是 document 类型。下一步先到怎么扫，默认未开通屏上扫描，随后的前进按钮才建会话。
     await page.getByTestId('scan-workbench-type-document').click()
     await expect(page.getByTestId('scan-workbench-type-document')).toHaveAttribute('aria-checked', 'true')
-    await expect(page.getByRole('button', { name: /下一步 · 建立这次扫描/ })).toBeEnabled()
+    await expect(page.getByRole('button', { name: '下一步', exact: true })).toBeEnabled()
     await step(page, s, 'F-scan-type-picked')
 
     const BACK =/^(首页|AI ?顾问|我的)$|^问小青|返回|退出|上一步|更换|删除|重试|取消|问工作人员|再扫/

@@ -13,9 +13,9 @@ import { useAuth } from '../../auth/useAuth'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { revokeLiveScanSession } from './scanSessionRevoke'
 import { clearScanWorkbenchSession } from './scanWorkbenchSession'
+import { MaterialThumb } from './ScanGuideArt'
+import { SCAN_MATERIALS, type ScanMaterial } from './scanMaterials'
 import {
-  SCAN_TYPE_OPTIONS,
-  type ScanType,
   type ScanWorkbenchState,
 } from './scanWorkbench'
 import '../print-scan/styles/tool-touch.css'
@@ -25,12 +25,21 @@ import './styles/scan-workbench-compact-qx.css'
 import './styles/scan-fs.css'
 
 const SCAN_RAIL = ['选类型', '扫描指引', '等回传', '扫描完成'] as const
+export const SCAN_DEVICE_RAIL = ['扫什么', '怎么扫', '放纸设置', '扫描', '拿走文件'] as const
 
 const SCAN_RAIL_NOW: Record<ScanWorkbenchShellProps['page'], number> = {
   'scan-start': 0,
   'scan-settings': 1,
   'scan-progress': 2,
   'scan-result': 3,
+  'scan-how': 1,
+  'scan-set': 2,
+  'scan-off': 1,
+  'scan-run': 3,
+  'scan-more': 3,
+  'scan-make': 3,
+  'scan-done': 4,
+  'scan-unknown': 3,
 }
 
 const SCAN_EYEBROW: Record<ScanWorkbenchShellProps['page'], string> = {
@@ -38,10 +47,23 @@ const SCAN_EYEBROW: Record<ScanWorkbenchShellProps['page'], string> = {
   'scan-settings': '扫描指引',
   'scan-progress': '等回传',
   'scan-result': '扫描完成',
+  'scan-how': '屏上扫描',
+  'scan-set': '屏上扫描',
+  'scan-off': '屏上扫描',
+  'scan-run': '屏上扫描',
+  'scan-more': '屏上扫描',
+  'scan-make': '屏上扫描',
+  'scan-done': '扫描完成',
+  'scan-unknown': '屏上扫描',
 }
 
 /** 底栏「问小青」的本屏问句，逐态照稿 18（label 与带去顾问页的 draft 是同一句）。 */
 function scanAskLabel(page: ScanWorkbenchShellProps['page'], state: ScanWorkbenchState): string {
+  if (page === 'scan-run') return '问小青：一直扫不完怎么办'
+  if (page === 'scan-more') return '问小青：下一页怎么放'
+  if (page === 'scan-make') return '问小青：文件还没出来'
+  if (page === 'scan-done') return '问小青：扫描件怎么用'
+  if (page === 'scan-unknown') return '问小青：这一步还没有结果'
   if (state === 'usb-panel') return '问小青：U 盘扫描怎么走'
   if (state === 'loading' || state === 'blocked' || state === 'unknown') return '问小青：扫描没开放怎么办'
   if (state === 'create-loading') return '问小青：任务还没建好'
@@ -49,7 +71,9 @@ function scanAskLabel(page: ScanWorkbenchShellProps['page'], state: ScanWorkbenc
   if (state === 'expired') return '问小青：扫描过期了怎么办'
   if (state === 'awaiting-ack') return page === 'scan-progress' ? '问小青：授权还没好' : '问小青：为什么还不能扫'
   if (state === 'failed' || state === 'completed-no-file' || state === 'wait-timeout') return '问小青：扫描失败怎么办'
-  if (page === 'scan-settings') return '问小青：面板上怎么扫'
+  if (page === 'scan-how') return '问小青：两种扫法怎么选'
+  if (page === 'scan-set') return '问小青：纸怎么放'
+  if (page === 'scan-off' || page === 'scan-settings') return '问小青：面板上怎么扫'
   if (page === 'scan-progress') return '问小青：一直等不到怎么办'
   if (page === 'scan-result') return '问小青：扫描件接下来呢'
   return '问小青：扫描和复印有什么不同'
@@ -76,18 +100,49 @@ export type ScanDockLeft = {
  * 主按钮不传就不画（等回传那一屏的「取消扫描」「立即检查」放在正文里，稿就是这么排的）。
  */
 export type ScanDock = {
+  /** 扫描故障 / 停止屏的稿内专用问句。 */
+  askLabel?: string
   left?: ScanDockLeft
+  /** 为真时不画底栏左边的返回。进行中的屏上扫描用它，避免误触离开。 */
+  omitLeft?: boolean
+  /** 页面自己画的左槽，例如玻璃台那一屏的停止。 */
+  leftNode?: ReactNode
+  /** 问小青和主按钮之间的次操作，例如停止扫描。 */
+  secondary?: ReactNode
   primary?: QxTouchPrimary
 }
 
+export type ScanWorkbenchPageId =
+  | 'scan-start'
+  | 'scan-settings'
+  | 'scan-progress'
+  | 'scan-result'
+  | 'scan-how'
+  | 'scan-set'
+  | 'scan-off'
+  | 'scan-run'
+  | 'scan-more'
+  | 'scan-make'
+  | 'scan-done'
+  | 'scan-unknown'
+
 type ScanWorkbenchShellProps = {
-  page: 'scan-start' | 'scan-settings' | 'scan-progress' | 'scan-result'
+  page: ScanWorkbenchPageId
   state: ScanWorkbenchState
   title: string
   subtitle: ReactNode
   status: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
   dock?: ScanDock
   layout?: 'stack' | 'spread'
+  /** 不传则用这一页的默认眉题。 */
+  bandEyebrow?: string
+  /** 不传则用面板四步。传 null 表示这一屏不画路径线（未开通屏）。 */
+  bandRail?: { labels: readonly string[]; now: number } | null
+  bandBackLabel?: string
+  /** 为假时藏起顶栏返回。屏上扫描进行中默认藏，避免当成停止。 */
+  bandBack?: boolean
+  /** 不传则离开整条扫描流程，回到打印扫描。 */
+  onBandBack?: () => void
   children: ReactNode
 }
 
@@ -99,9 +154,14 @@ export function ScanWorkbenchShell({
   status,
   dock,
   layout = 'stack',
+  bandEyebrow,
+  bandRail,
+  bandBackLabel,
+  bandBack = true,
+  onBandBack,
   children,
 }: {
-  page: 'scan-start' | 'scan-settings' | 'scan-progress' | 'scan-result'
+  page: ScanWorkbenchPageId
   state: ScanWorkbenchState
   title: string
   subtitle: ReactNode
@@ -113,11 +173,17 @@ export function ScanWorkbenchShell({
    * 不在正文底下留一整片空白，也不靠拉伸说明卡去填高度。
    */
   layout?: 'stack' | 'spread'
+  bandEyebrow?: string
+  bandRail?: { labels: readonly string[]; now: number } | null
+  bandBackLabel?: string
+  bandBack?: boolean
+  onBandBack?: () => void
   children: ReactNode
 }) {
   const navigate = useNavigate()
   const { getToken } = useAuth()
-  const askLabel = scanAskLabel(page, state)
+  const askLabel = dock?.askLabel ?? scanAskLabel(page, state)
+  const rail = bandRail === null ? undefined : (bandRail ?? { labels: SCAN_RAIL, now: SCAN_RAIL_NOW[page] })
   /* 带去顾问页的草稿：不带按钮上的「问小青：」前缀，是一句自然问句（B1）。 */
   const askDraft = askDraftOf(askLabel)
   /**
@@ -148,20 +214,21 @@ export function ScanWorkbenchShell({
       band={
         <QxTouchBand
           kind="compact"
-          backLabel="返回打印扫描"
-          onBack={() => leaveScanFlow('/print-scan')}
-          eyebrow={SCAN_EYEBROW[page]}
+          back={bandBack}
+          backLabel={bandBackLabel ?? '返回打印扫描'}
+          onBack={onBandBack ?? (() => leaveScanFlow('/print-scan'))}
+          eyebrow={bandEyebrow ?? SCAN_EYEBROW[page]}
           title={title}
           sub={subtitle}
           seal={null}
           status={{ text: status.label, tone: bandTone(status.tone) }}
-          rail={{ labels: SCAN_RAIL, now: SCAN_RAIL_NOW[page] }}
+          rail={rail}
         />
       }
       dock={
         <QxTouchDock
           back={false}
-          left={
+          left={dock?.omitLeft ? undefined : (dock?.leftNode ?? (
             <button
               type="button"
               className="qxt-btn qxt-btn-sec"
@@ -174,7 +241,8 @@ export function ScanWorkbenchShell({
               <QxTouchIcon name={leftSpec.icon === 'refresh' ? 'refresh' : 'chevL'} size={30} strokeWidth={2.4} />
               {leftSpec.label}
             </button>
-          }
+          ))}
+          secondary={dock?.secondary}
           ask={{
             label: askLabel,
             draft: askDraft,
@@ -218,36 +286,39 @@ export function ScanTypeCards({
   selected,
   onPick,
 }: {
-  /** null = 还没选（扫描类型进来不预选，走查 I-16）。 */
-  selected: ScanType | null
-  onPick: (type: ScanType) => void
+  /** null = 还没选（进来不预选，走查 I-16）。 */
+  selected: ScanMaterial | null
+  onPick: (material: ScanMaterial) => void
 }) {
   return (
-    <div className="fs-types" role="radiogroup" aria-label="扫描类型">
-      {SCAN_TYPE_OPTIONS.map((option) => {
-        const on = selected === option.type
-        const base = `scan-type-${option.type}`
-        /* 单选卡的读屏名只取标题；说明与角标进 aria-describedby，读屏能听到「支持 AI 简历识别」「敏感文件 · 自动清理」。
+    <div className="fs-types" role="radiogroup" aria-label="扫什么">
+      {SCAN_MATERIALS.map((option) => {
+        const on = selected === option.material
+        const base = `scan-type-${option.material}`
+        /* 单选卡的读屏名只取标题；说明与角标进 aria-describedby。
            不再同时写 aria-pressed（radio 上是非法组合）和盖住整张卡的 aria-label（B2）。 */
         return (
           <button
-            key={option.type}
+            key={option.material}
             type="button"
             className="fs-type"
             role="radio"
             aria-checked={on}
             aria-labelledby={`${base}-title`}
-            aria-describedby={`${base}-desc ${base}-chips`}
-            data-testid={`scan-workbench-type-${option.type}`}
-            onClick={() => onPick(option.type)}
+            aria-describedby={`${base}-desc ${base}-more`}
+            data-testid={`scan-workbench-type-${option.material}`}
+            onClick={() => onPick(option.material)}
           >
-            <b id={`${base}-title`}>{option.label}</b>
-            <span id={`${base}-desc`} className="fs-sub">{option.description}</span>
-            <span id={`${base}-chips`} className="sx-chips">
-              {option.chips.map((chip) => (
-                <span key={chip.label} className={`sx-chip${chip.tone === 'warn' ? ' is-warn' : ''}`}>{chip.label}</span>
-              ))}
+            <span className="vis" aria-hidden="true"><MaterialThumb material={option.material} /></span>
+            <span className="tx">
+              <b id={`${base}-title`}>{option.label}</b>
+              <span id={`${base}-desc`} className="fs-sub">{option.desc}</span>
+              <span id={`${base}-more`} className="fs-sub">
+                {option.more}
+                {option.chip ? <span className="sx-chips"><span className="sx-chip is-warn">{option.chip}</span></span> : null}
+              </span>
             </span>
+            <span className="cs-mark" aria-hidden="true"><QxTouchIcon name="check" size={30} strokeWidth={3} /></span>
           </button>
         )
       })}

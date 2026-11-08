@@ -424,7 +424,7 @@ export async function runnerChecks(): Promise<void> {
     assert.equal((await flatHandle.result).errorCode, 'unknown', '玻璃台没有进纸器，无纸码不能当 feeder_empty')
   })
 
-  await step('扫描：中途卡纸 → 已扫页全部删除并清空，错误码 paper_jam', async () => {
+  await step('扫描：中途卡纸 → 页文件留给调用方整目录清理，错误码 paper_jam', async () => {
     const rig = makeRig()
     const handle = startWiaScan(feederRequest(rig), rig.deps)
     rig.children[0].send(`${pageLine(rig, 1)}\n${pageLine(rig, 2)}\n${failedLine('wia_error', WIA_HRESULT.PAPER_JAM, 2)}\n`)
@@ -432,9 +432,9 @@ export async function runnerChecks(): Promise<void> {
     const result = await handle.result
     assert.equal(result.ok, false)
     assert.equal(result.errorCode, 'paper_jam')
-    assert.equal(result.discardedPages, 2)
-    assert.deepEqual(result.pages, [], '一期不做只交已扫部分')
-    assert.deepEqual(fs.readdirSync(rig.taskDir), [], '卡纸后磁盘上不能留任何扫描页')
+    assert.equal(result.discardedPages, 0)
+    assert.deepEqual(result.pages.map((page) => page.index), [1, 2])
+    assert.deepEqual(fs.readdirSync(rig.taskDir).filter((name) => name.endsWith('.jpg')).sort(), ['page-001.jpg', 'page-002.jpg'])
   })
 
   await step('扫描：其余 HRESULT 与失败阶段逐个映射', async () => {

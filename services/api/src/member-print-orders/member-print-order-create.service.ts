@@ -345,7 +345,7 @@ export class MemberPrintOrderCreateService {
     await this.expirePendingForUser(endUserId)
     const rows = await this.prisma.order.findMany({
       // 已释放订单由既有 PrintTask 列表展示；这里仅返回尚未产生任务的 Order-only，避免重复。
-      where: { endUserId, sourceFileId: { not: null }, printTaskId: null },
+      where: { endUserId, type: { not: 'copy' }, copyJob: { is: null }, sourceFileId: { not: null }, printTaskId: null },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: 50,
     })
@@ -428,7 +428,7 @@ export class MemberPrintOrderCreateService {
   }
 
   private async requireOwned(endUserId: string, orderId: string) {
-    const order = await this.prisma.order.findFirst({ where: { id: orderId, endUserId, sourceFileId: { not: null } } })
+    const order = await this.prisma.order.findFirst({ where: { id: orderId, endUserId, type: { not: 'copy' }, copyJob: { is: null }, sourceFileId: { not: null } } })
     if (!order) throw new NotFoundException({ error: { code: 'PRINT_ORDER_NOT_FOUND', message: '打印订单不存在' } })
     return order
   }

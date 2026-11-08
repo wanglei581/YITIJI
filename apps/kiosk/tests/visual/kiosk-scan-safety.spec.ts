@@ -970,9 +970,11 @@ test('leaving the scan flow drops the rescan authority @scan-safety', async ({ p
   // 页内回退保留同一个 document，授权还在不在内存里，这一次创建请求会如实说出来。
   await page.goBack()
   await page.waitForURL(/\/scan/)
-  await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: '扫什么？' })).toBeVisible()
   await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
-  await page.getByRole('button', { name: /下一步/ }).click()
+  await page.getByRole('button', { name: '下一步', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '这台机器还不能在屏上开始扫描' })).toBeVisible()
+  await page.getByTestId('scan-way-panel').click()
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
 
   expect(server.creates).toHaveLength(1)
@@ -1007,9 +1009,11 @@ test('the result page own exit drops the rescan authority too @scan-safety', asy
   // 必须页内回退：整页加载会把模块内存连授权一起抹掉，那样这条用例无论代码对不对都绿。
   await page.goBack()
   await page.waitForURL(/\/scan/)
-  await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: '扫什么？' })).toBeVisible()
   await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
-  await page.getByRole('button', { name: /下一步/ }).click()
+  await page.getByRole('button', { name: '下一步', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '这台机器还不能在屏上开始扫描' })).toBeVisible()
+  await page.getByTestId('scan-way-panel').click()
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
 
   expect(server.creates).toHaveLength(1)
@@ -1690,7 +1694,7 @@ async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void
  */
 async function settleOnScanStart(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/scan\?stage=start$/)
-  await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: '扫什么？' })).toBeVisible()
 }
 
 /** 打印台材料检查与 AI 解析页挂载时会真的问服务端，别让它们撞成未注册请求。 */
@@ -1758,7 +1762,7 @@ for (const exit of COMPLETED_EXITS) {
      * 页面此刻只能靠存储复水，而存储已经在 ① 里被证明是空的。
      * 「页内重新进入」的那一半正是 ① 那条断言（下一位进 /scan 读的就是它）。 */
     await page.goto('/scan')
-    await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
+    await expect(page.getByRole('heading', { name: '扫什么？' })).toBeVisible()
     await expect(page.getByText(SAME_SHEET_FILE.filename, { exact: false })).toHaveCount(0)
     // 稿的四段进度在每一屏都写着「扫描完成」。这里要钉的是结果页标题不在，不是进度名。
     await expect(page.getByRole('heading', { name: '扫描完成', exact: true })).toHaveCount(0)
@@ -1778,7 +1782,9 @@ for (const exit of COMPLETED_EXITS) {
 
     // ③ 下一次创建不许带上一位的重扫血缘。
     await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
-    await page.getByRole('button', { name: /下一步/ }).click()
+    await page.getByRole('button', { name: '下一步', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '这台机器还不能在屏上开始扫描' })).toBeVisible()
+  await page.getByTestId('scan-way-panel').click()
     await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
     expect(server.creates).toHaveLength(1)
     expect(server.creates[0]!.body.retryOfScanTaskId).toBeUndefined()
@@ -1943,7 +1949,7 @@ test('a later member cannot reopen the previous guest scan @scan-safety', async 
   const afterLogin = await page.evaluate((key) => window.sessionStorage.getItem(key), SCAN_SESSION_KEY)
   expect(afterLogin).toBeNull()
   // ② 落在选类型那一屏，看不到上一位的结果与文件。
-  await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: '扫什么？' })).toBeVisible()
   await expect(page.getByText(SAME_SHEET_FILE.filename, { exact: false })).toHaveCount(0)
   // 稿的四段进度在选类型屏也写着「扫描完成」。钉结果页标题，进度名可以留着。
   await expect(page.getByRole('heading', { name: '扫描完成', exact: true })).toHaveCount(0)
@@ -1972,7 +1978,9 @@ test('a later member cannot reopen the previous guest scan @scan-safety', async 
 
   // ⑥ 这位会员自己开的那一场不许继承上一位的重扫血缘。
   await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
-  await page.getByRole('button', { name: /下一步/ }).click()
+  await page.getByRole('button', { name: '下一步', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '这台机器还不能在屏上开始扫描' })).toBeVisible()
+  await page.getByTestId('scan-way-panel').click()
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
   expect(server.creates).toHaveLength(1)
   expect(server.creates[0]!.body.retryOfScanTaskId).toBeUndefined()
@@ -2336,11 +2344,13 @@ test('leaving after an interrupted create never resurrects the rescan authority 
 
   // 用户走了。代次推进，寄存格和槽位一起被扔掉 —— 下一位绝不能继承这枚授权。
   await page.getByRole('button', { name: '安全返回扫描首页', exact: true }).click()
-  await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: '扫什么？' })).toBeVisible()
 
   // 下一位在这台机器上从头选类型开一场：必须是干净的普通创建，一个字节的血缘都不许带。
   await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
-  await page.getByRole('button', { name: /下一步/ }).click()
+  await page.getByRole('button', { name: '下一步', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '这台机器还不能在屏上开始扫描' })).toBeVisible()
+  await page.getByTestId('scan-way-panel').click()
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
   expect(server.creates).toHaveLength(2)
   expect(server.creates[1]!.body.retryOfScanTaskId).toBeUndefined()
