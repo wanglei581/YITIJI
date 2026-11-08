@@ -86,6 +86,7 @@ const WORD = [
 
 /** 各 purpose 的 MIME 白名单 + 大小上限(字节)。 */
 export const PURPOSE_POLICY: Record<FilePurpose, { mimes: string[]; maxBytes: number }> = {
+  policy_checklist: { mimes: ['application/pdf'], maxBytes: 5 * MB },
   // 直接进打印流程 → 仅 Agent 能真正出纸的格式
   print_doc: { mimes: [...PRINTABLE, ...WORD], maxBytes: 20 * MB },
   // 求职者敏感文档(给 AI 解析 / 展示)
@@ -156,6 +157,7 @@ export function canActorUseUploadPurpose(
 
 /** 默认敏感等级(显式传入可覆盖)。 */
 export const DEFAULT_SENSITIVE_BY_PURPOSE: Record<FilePurpose, FileSensitiveLevel> = {
+  policy_checklist: 'normal',
   resume_upload: 'highly_sensitive',
   resume_scan: 'highly_sensitive',
   id_scan: 'highly_sensitive',

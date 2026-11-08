@@ -239,3 +239,21 @@
   [data-kiosk-stage-fit='off'] .qx-me-assets .qx-me-tabbar[data-n='5'] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   [data-kiosk-stage-fit='off'] .qx-me-assets .me-payment-grid { grid-template-columns: 1fr; }
 }
+
+/* 我的收藏：每条右边一颗「取消收藏」（2026-11-05 政策最小闭环）。整条左侧仍是打开详情的大按钮。 */
+[data-qx-page="me"] .me-line.me-fav-line {
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+}
+
+[data-qx-page="me"] .me-fav-line > .me-open {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+[data-qx-page="me"] .me-fav-line > .me-fav-remove {
+  flex: 0 0 auto;
+  min-height: 64px;
+  min-width: 168px;
+}

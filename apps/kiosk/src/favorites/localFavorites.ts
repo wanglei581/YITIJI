@@ -1,3 +1,6 @@
+// 停放（2026-11-05 政策最小闭环）：未登录的本机收藏改成「先登录再收藏」，本文件源码保留、不注册、不打包。
+// 唯一例外：auth/kioskSensitiveSession.ts 只用 hasLocalFavorites / clearAllLocalFavorites
+// 清掉改版前留在本机的旧收藏（公共设备隐私清场），不再有任何写入。
 // ============================================================
 // localFavorites — 匿名/未登录态的收藏（纯本机 localStorage，C-2D 扩展到三类）
 //
