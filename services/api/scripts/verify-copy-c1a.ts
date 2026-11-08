@@ -116,7 +116,11 @@ async function verifyDeletion() {
   assert.deepEqual(SCAN_DELETION_REASON_CODES, sharedReasons)
   assert.deepEqual(SCAN_DELETION_REASON_CODES.filter((code) => code.startsWith('COPY_')), copyCodes)
   const terminal = read('apps/terminal-agent/src/agent/scan-device/scan-temp-dir.ts')
-  const legacyCodes = [...terminal.matchAll(/\| '(SCAN_DEVICE_[A-Z_]+)'/g)].map((m) => m[1])
+  // 终端程序 A2（#1584）把删除码从联合类型改成常量数组 SCAN_DEVICE_DELETION_REASONS；两种写法都认，
+  // 只取声明那一段里的字面量，不扫全文件（文件里别处也会引用这些码）。
+  const declaration = terminal.match(/export const SCAN_DEVICE_DELETION_REASONS = \[([\s\S]*?)\] as const/)?.[1]
+    ?? terminal.match(/export type ScanDeviceDeletionReason =((?:\s*\| '[A-Z_]+')+)/)?.[1] ?? ''
+  const legacyCodes = [...new Set([...declaration.matchAll(/'(SCAN_DEVICE_[A-Z_]+)'/g)].map((m) => m[1]))]
   assert.equal(legacyCodes.length, 6, '保留终端已支持的六个屏上扫描删除码')
   for (const code of legacyCodes) assert.ok((SCAN_DELETION_REASON_CODES as readonly string[]).includes(code))
   for (const reasonCode of [...copyCodes, 'COPY_UNKNOWN', 'copy_expired']) {
