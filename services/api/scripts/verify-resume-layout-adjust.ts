@@ -33,7 +33,9 @@ import { join } from 'path'
 import { validateSync } from 'class-validator'
 import { plainToInstance } from 'class-transformer'
 import { Logger, ValidationPipe } from '@nestjs/common'
-import { LlmResumeOptimizeService } from '../src/ai/resume/llm-resume-optimize.service'
+import { LAYOUT_ADJUST_SYSTEM_PROMPT, LlmResumeOptimizeService } from '../src/ai/resume/llm-resume-optimize.service'
+import { ResumeLayoutAdjustController } from '../src/ai/resume-layout-adjust.controller'
+import { MemberPrivacyService } from '../src/member-privacy/member-privacy.service'
 import { ResumeGenerateExportDto, ResumeLayoutAdjustDto } from '../src/ai/dto/resume-generate.dto'
 import { ResumePdfService } from '../src/ai/resume/resume-pdf.service'
 import { extractPdfText, openUnpdfDocument } from '../src/common/pdf/pdfjs-document'
@@ -291,6 +293,39 @@ async function main(): Promise<void> {
     assertStubHealthy()
     pass('3c. 新增数字 → 拒绝')
 
+    // 14. 只写了公司、没写职务的经历（11/08 包 2 并入 B8 ② 时补）：版式调整照样保留，职务留空，也不许补出职务。
+    if (!LAYOUT_ADJUST_SYSTEM_PROMPT.includes('只有公司没有职务的经历,role 留空字符串,仍保留该条经历,不得编造职务')) {
+      fail('14c. 版式调整提示词必须写明：只有公司没有职务时 role 留空、保留该条、不得编造职务')
+    }
+    pass('14c. 提示词写明空职务留空、保留该条、不得编造')
+    const COMPANY_ONLY_TEXT = `${ORIGINAL_TEXT}\n兼职经历 Bright Print Studio 2023 负责门店资料整理`
+    const companyOnlyResume: GeneratedResume = {
+      ...baseResume,
+      experience: [
+        ...baseResume.experience,
+        { company: 'Bright Print Studio', role: '', period: '2023', description: '负责门店资料整理。' },
+      ],
+    }
+    setResponses([null])
+    const kept = await svc.adjustLayoutDraft({ currentResume: companyOnlyResume, originalText: COMPANY_ONLY_TEXT, action: 'reformat' })
+    assertStubHealthy()
+    const keptRow = kept.resume.experience.find((e) => e.company === 'Bright Print Studio')
+    if (kept.resume.experience.length !== 2 || !keptRow) fail('14a. 只写公司的经历不得被版式调整丢掉')
+    if (keptRow.role !== '') fail(`14a. 空职务应保持为空，实际 ${keptRow.role}`)
+    pass('14a. 只写公司、没写职务的经历 → 保留，职务留空')
+
+    // 求职意向里的岗位名在原文里，事实比对拦不住；要靠按公司名对回原条目那一道。
+    const borrowRole: StubMutate = (resume) => { resume.experience[1] = { ...resume.experience[1], role: '前端开发工程师' } }
+    setResponses([borrowRole, borrowRole])
+    try {
+      await svc.adjustLayoutDraft({ currentResume: companyOnlyResume, originalText: COMPANY_ONLY_TEXT, action: 'reformat' })
+      fail('14b. 给空职务补出职务（借用求职意向的岗位名）应被拒绝')
+    } catch (e) {
+      if (errCode(e) !== 'AI_LAYOUT_ADJUST_INVALID_OUTPUT') fail(`14b. 期望 AI_LAYOUT_ADJUST_INVALID_OUTPUT，实际 ${errCode(e)}`)
+    }
+    assertStubHealthy()
+    pass('14b. 空职务被补成原文别处的岗位名 → 拒绝')
+
     setResponses([null])
     const result = await svc.adjustLayoutDraft({
       currentResume: baseResume,
@@ -331,6 +366,113 @@ async function main(): Promise<void> {
     if (!aiServiceSource.includes('resumeExtraction.extractResumeText')) fail('7. layout-adjust 必须重新提取原文')
     if (!aiServiceSource.includes('AI_RESUME_SOURCE_UNAVAILABLE')) fail('7. 提取失败必须硬失败并返回明确错误码')
     pass('7. AiService layout-adjust 重新提取原文，提取失败不 fallback currentResume')
+
+    // 11. 登录会员把简历交给版式调整前必须有 resume_ai。检查在 AiService 之前。
+    {
+      type ConsentRow = {
+        id: string
+        endUserId: string
+        scope: string
+        consentVersion: string
+        grantedAt: Date
+        revokedAt: Date | null
+        terminalId: string | null
+      }
+      const rows: ConsentRow[] = []
+      let seq = 0
+      const memory = {
+        userAiConsent: {
+          findFirst: async (args: { where: { endUserId: string; scope: string } }) => {
+            const matched = rows.filter((row) => row.endUserId === args.where.endUserId && row.scope === args.where.scope)
+            matched.sort((a, b) => b.grantedAt.getTime() - a.grantedAt.getTime() || (a.id < b.id ? 1 : -1))
+            return matched[0] ?? null
+          },
+          create: async (args: { data: { endUserId: string; scope: string; consentVersion: string; terminalId: string | null } }) => {
+            const row: ConsentRow = {
+              id: `c${++seq}`,
+              grantedAt: new Date(),
+              revokedAt: null,
+              terminalId: args.data.terminalId,
+              endUserId: args.data.endUserId,
+              scope: args.data.scope,
+              consentVersion: args.data.consentVersion,
+            }
+            rows.push(row)
+            return row
+          },
+          updateMany: async (args: { where: { endUserId: string; scope: string; revokedAt: null }; data: { revokedAt: Date } }) => {
+            let count = 0
+            for (const row of rows) {
+              if (row.endUserId === args.where.endUserId && row.scope === args.where.scope && row.revokedAt == null) {
+                row.revokedAt = args.data.revokedAt
+                count += 1
+              }
+            }
+            return { count }
+          },
+        },
+      }
+      const privacy = new MemberPrivacyService(memory as never)
+      let aiCalls = 0
+      const ai = {
+        adjustResumeLayout: async () => {
+          aiCalls += 1
+          return { resume: baseResume, warnings: [] as string[] }
+        },
+      }
+      const controller = new ResumeLayoutAdjustController(
+        ai as never, { write: async () => undefined } as never, {} as never, {} as never, {} as never, privacy,
+      )
+      const memberId = 'layout-member'
+      const asMember = async () => ({ endUserId: memberId, accessToken: null as string | null })
+      const asGuest = async () => ({ endUserId: null as string | null, accessToken: 'tok' })
+      const bind = (fn: typeof asMember) => {
+        ;(controller as unknown as { resolveAiResultRequester: typeof asMember }).resolveAiResultRequester = fn
+      }
+      const dto = { resume: baseResume, action: 'condense' as const }
+      const req = { headers: {} }
+      const shape = (e: unknown) => {
+        const ex = e as { getStatus?: () => number; getResponse?: () => { error?: { code?: string; message?: string } } }
+        const body = ex.getResponse?.()
+        return { status: ex.getStatus?.() ?? 0, code: body?.error?.code, message: body?.error?.message }
+      }
+      bind(asMember)
+      try {
+        await controller.adjustResumeLayout('task-layout', dto, req)
+        fail('11. 未同意不应调整版式')
+      } catch (e) {
+        const info = shape(e)
+        if (info.status !== 403 || info.code !== 'USER_AI_CONSENT_REQUIRED' || info.message !== '请先确认简历 AI 服务授权') {
+          fail(`11. 拒绝形态不符: ${JSON.stringify(info)}`)
+        }
+      }
+      if (aiCalls !== 0) fail('11. 未同意时调用了版式调整')
+      pass('11. 未同意 resume_ai → 403，且未调用版式调整')
+
+      bind(asGuest)
+      await controller.adjustResumeLayout('task-layout', dto, req)
+      if (aiCalls !== 1) fail('11g. 游客应放行并调用版式调整')
+      pass('11g. 游客不拦截')
+
+      bind(asMember)
+      await privacy.grantConsent(memberId, 'resume_ai', null)
+      await controller.adjustResumeLayout('task-layout', dto, req)
+      if (aiCalls !== 2) fail('12. 已同意应调用版式调整')
+      pass('12. 已同意 resume_ai → 照常调整版式')
+
+      await privacy.revokeConsent(memberId, 'resume_ai')
+      try {
+        await controller.adjustResumeLayout('task-layout', dto, req)
+        fail('13. 撤回后不应再调整')
+      } catch (e) {
+        const info = shape(e)
+        if (info.status !== 403 || info.code !== 'USER_AI_CONSENT_REQUIRED' || info.message !== '请先确认简历 AI 服务授权') {
+          fail(`13. 撤回后拒绝形态不符: ${JSON.stringify(info)}`)
+        }
+      }
+      if (aiCalls !== 2) fail('13. 撤回后仍调用了版式调整')
+      pass('13. 同意后撤回 → 再次拒绝且未调用版式调整')
+    }
 
     console.log('\n=== ALL PASS ===')
   } finally {

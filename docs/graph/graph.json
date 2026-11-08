@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 630,
+    "endpointCount": 631,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -5034,6 +5034,18 @@
       },
       {
         "controller": "services/api/src/terminals/admin-terminals.controller.ts",
+        "handler": "AdminTerminalsController.updateDailyFreePrintSides",
+        "method": "PUT",
+        "models": [],
+        "path": "/api/v1/admin/terminals/:terminalId/daily-free-print-sides",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/terminals/admin-terminals.controller.ts",
         "handler": "AdminTerminalsController.emergencyRevoke",
         "method": "POST",
         "models": [
@@ -9321,13 +9333,15 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews",
         "roles": [],
@@ -9348,13 +9362,15 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews",
         "roles": [],
@@ -9375,13 +9391,15 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id",
         "roles": [],
@@ -9402,13 +9420,15 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id",
         "roles": [],
@@ -9429,13 +9449,15 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/answer",
         "roles": [],
@@ -9456,13 +9478,15 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/end",
         "roles": [],
@@ -9483,13 +9507,15 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/practice-sheet",
         "roles": [],
@@ -9510,13 +9536,15 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/report",
         "roles": [],
@@ -9537,13 +9565,15 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/report/print",
         "roles": [],
@@ -9564,13 +9594,15 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/start",
         "roles": [],
@@ -9591,13 +9623,15 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/transcribe",
         "roles": [],
@@ -9644,13 +9678,15 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/turns/:idx/audio",
         "roles": [],
@@ -12036,11 +12072,13 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewSession",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "UserAiConsent"
         ],
         "path": "/api/v1/resume/career-plan/:taskId",
         "roles": [],
@@ -12062,19 +12100,23 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewSession",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "UserAiConsent"
         ],
         "path": "/api/v1/resume/career-plan/:taskId",
         "roles": [],
         "serviceFiles": [
-          "services/api/src/ai/resume/career-plan.service.ts"
+          "services/api/src/ai/resume/career-plan.service.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts"
         ],
         "services": [
-          "CareerPlanService"
+          "CareerPlanService",
+          "MemberPrivacyService"
         ]
       },
       {
@@ -12088,11 +12130,13 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewSession",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "UserAiConsent"
         ],
         "path": "/api/v1/resume/career-plan/:taskId/print",
         "roles": [],
@@ -12523,8 +12567,8 @@
         ]
       },
       {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.adjustResumeLayout",
+        "controller": "services/api/src/ai/resume-layout-adjust.controller.ts",
+        "handler": "ResumeLayoutAdjustController.adjustResumeLayout",
         "method": "POST",
         "models": [
           "AiQuotaDaily",
@@ -12533,22 +12577,26 @@
           "AiServiceLog",
           "AuditLog",
           "BenefitGrant",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "UserAiConsent"
         ],
         "path": "/api/v1/resume/records/:taskId/layout-adjust",
         "roles": [],
         "serviceFiles": [
           "services/api/src/ai/ai.service.ts",
-          "services/api/src/audit/audit.service.ts"
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts"
         ],
         "services": [
           "AiService",
-          "AuditService"
+          "AuditService",
+          "MemberPrivacyService"
         ]
       },
       {
@@ -13577,7 +13625,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 272,
+      "reachableFileCount": 276,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -14356,11 +14404,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 299
+      "sourceFileCount": 303
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 758,
+      "reachableFileCount": 765,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -14500,6 +14548,7 @@
             "POST /mock-interviews/:param/answer",
             "POST /mock-interviews/:param/report/print",
             "POST /mock-interviews/:param/start",
+            "POST /mock-interviews/:param/transcript/print",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
@@ -14712,7 +14761,8 @@
             "POST /mock-interviews",
             "POST /mock-interviews/:param/answer",
             "POST /mock-interviews/:param/report/print",
-            "POST /mock-interviews/:param/start"
+            "POST /mock-interviews/:param/start",
+            "POST /mock-interviews/:param/transcript/print"
           ],
           "file": "apps/kiosk/src/pages/interview/InterviewWorkbenchPage.tsx",
           "layout": [
@@ -15615,7 +15665,8 @@
             "POST /mock-interviews",
             "POST /mock-interviews/:param/answer",
             "POST /mock-interviews/:param/report/print",
-            "POST /mock-interviews/:param/start"
+            "POST /mock-interviews/:param/start",
+            "POST /mock-interviews/:param/transcript/print"
           ],
           "file": "apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx",
           "layout": [
@@ -17252,7 +17303,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 947
+      "sourceFileCount": 954
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -18714,7 +18765,7 @@
         ]
       },
       {
-        "fieldCount": 21,
+        "fieldCount": 22,
         "name": "MockInterviewSession",
         "relations": [
           "MockInterviewReport",
@@ -20093,12 +20144,16 @@
     "apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
     ],
+    "apps/admin/src/routes/print-scan/FreePrintQuotaCard.tsx": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
     "apps/admin/src/routes/print-scan/PrintRetryButton.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
     ],
     "apps/admin/src/routes/print-scan/index.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
-      "apps/admin/scripts/verify-console-plain-copy.mjs"
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "services/api/scripts/verify-free-print-quota.ts"
     ],
     "apps/admin/src/routes/printers/PrinterOutputCell.tsx": [
       "apps/admin/scripts/verify-console-plain-copy.mjs",
@@ -20203,10 +20258,14 @@
     "apps/admin/src/routes/terminals/TerminalBindCodeDialog.tsx": [
       "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs"
     ],
+    "apps/admin/src/routes/terminals/TerminalDailyFreeSidesSection.tsx": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
     "apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx": [
       "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs",
       "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-terminal-device-config.ts"
     ],
     "apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx": [
@@ -20343,6 +20402,12 @@
     ],
     "apps/admin/src/services/api/files.ts": [
       "apps/admin/scripts/verify-admin-file-lifecycle.mjs"
+    ],
+    "apps/admin/src/services/api/freePrintQuota.ts": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
+    "apps/admin/src/services/api/freePrintQuotaRules.ts": [
+      "services/api/scripts/verify-free-print-quota.ts"
     ],
     "apps/admin/src/services/api/internalAccounts.ts": [
       "apps/admin/scripts/verify-admin-internal-accounts-ui.mjs"
@@ -20655,6 +20720,7 @@
       "apps/kiosk/scripts/verify-kiosk-session-reporting.mjs"
     ],
     "apps/kiosk/src/components/FileContentPreview.tsx": [
+      "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
@@ -21220,6 +21286,9 @@
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
     ],
+    "apps/kiosk/src/pages/interview/session/interviewDeadline.ts": [
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
+    ],
     "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
@@ -21241,6 +21310,9 @@
     ],
     "apps/kiosk/src/pages/interview/styles/interview-shell.css": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
+    ],
+    "apps/kiosk/src/pages/interview/touch/InterviewHubTouch.tsx": [
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
     ],
     "apps/kiosk/src/pages/job-fairs/FairCompaniesPage.tsx": [
@@ -22496,6 +22568,9 @@
     "apps/kiosk/src/pages/resume/components/ResumeDiagnosisFailExits.tsx": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs"
     ],
+    "apps/kiosk/src/pages/resume/components/ResumeGenerateReview.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
     "apps/kiosk/src/pages/resume/components/ResumeLayoutControls.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
@@ -22572,6 +22647,9 @@
     "apps/kiosk/src/pages/resume/components/resume-deliver/ResumePricingBar.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeVersionsPanel.tsx": [
+      "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs"
+    ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/constants.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
@@ -22622,6 +22700,7 @@
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentConsentKit.tsx": [
@@ -22809,6 +22888,9 @@
     ],
     "apps/kiosk/src/pages/resume/touch/direction.css": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/touch/edit.css": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/touch/report.css": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
@@ -23218,6 +23300,7 @@
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
     ],
     "apps/kiosk/src/services/api/documentConversion.ts": [
+      "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
     "apps/kiosk/src/services/api/fairVisitPlan.ts": [
@@ -25578,6 +25661,9 @@
     "services/api/scripts/verify-refund-idempotent.ts": [
       "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
+    "services/api/scripts/verify-resume-ai-consent-wiring.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
     "services/api/scripts/verify-resume-draft-versions.ts": [
       "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
@@ -25794,6 +25880,7 @@
     "services/api/src/ai-access/ai-access.guard.ts": [
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai-access/ai-access.module.ts": [
@@ -25805,6 +25892,7 @@
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai/ai-log.service.ts": [
@@ -25821,6 +25909,8 @@
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
+      "services/api/scripts/verify-mock-interview-consent.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts"
     ],
@@ -25910,7 +26000,8 @@
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-career-plan.ts",
-      "services/api/scripts/verify-kiosk-job-board-switch.ts"
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
+      "services/api/scripts/verify-resume-ai-consent-wiring.ts"
     ],
     "services/api/src/ai/dto/assistant-chat.dto.ts": [
       "services/api/scripts/verify-assistant-policy-context.ts",
@@ -26106,6 +26197,12 @@
     "services/api/src/ai/redis-inflight-lock.ts": [
       "services/api/scripts/verify-resume-optimize.ts"
     ],
+    "services/api/src/ai/resume-layout-adjust.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-quota-coverage.ts",
+      "services/api/scripts/verify-resume-ai-consent-wiring.ts",
+      "services/api/scripts/verify-resume-layout-adjust.ts"
+    ],
     "services/api/src/ai/resume-parse-intent-runner.service.ts": [
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
@@ -26171,7 +26268,8 @@
       "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-compliance.ts",
       "services/api/scripts/verify-member-qa-records.ts",
-      "services/api/scripts/verify-official-channels.ts"
+      "services/api/scripts/verify-official-channels.ts",
+      "services/api/scripts/verify-resume-ai-consent-wiring.ts"
     ],
     "services/api/src/ai/resume/diagnosis-report-pdf.service.ts": [
       "services/api/scripts/verify-beijing-display-time.ts",
@@ -26475,7 +26573,8 @@
       "apps/admin/scripts/verify-admin-ai-usage-contract.mjs",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
-      "services/api/scripts/verify-ai-usage-coverage.ts"
+      "services/api/scripts/verify-ai-usage-coverage.ts",
+      "services/api/scripts/verify-mock-interview-consent.ts"
     ],
     "services/api/src/ai/usage/ai-pricing.ts": [
       "services/api/scripts/verify-ai-usage-budget.ts",
@@ -26498,7 +26597,8 @@
     "services/api/src/ai/usage/ai-usage-meter.ts": [
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
-      "services/api/scripts/verify-ai-usage-coverage.ts"
+      "services/api/scripts/verify-ai-usage-coverage.ts",
+      "services/api/scripts/verify-mock-interview-consent.ts"
     ],
     "services/api/src/ai/usage/ai-usage-retention.ts": [
       "services/api/scripts/verify-ai-usage-retention.ts",
@@ -26531,6 +26631,7 @@
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
+      "services/api/scripts/verify-resume-ai-consent-wiring.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-upload-sessions-http.ts"
@@ -26630,6 +26731,8 @@
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
+      "services/api/scripts/verify-mock-interview-consent.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-order.ts",
@@ -26990,6 +27093,7 @@
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-pg-lock-timeout-postgres.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
@@ -27024,6 +27128,7 @@
       "services/api/scripts/verify-member-favorites-benefits.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-orders.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
@@ -27211,6 +27316,7 @@
       "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
@@ -28473,14 +28579,18 @@
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
+      "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
       "services/api/scripts/verify-member-data-request-state-machine.ts",
       "services/api/scripts/verify-member-data-request-truth.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
+      "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-pg-lock-timeout-postgres.ts",
       "services/api/scripts/verify-pg-serialization-conflict.ts",
+      "services/api/scripts/verify-resume-ai-consent-wiring.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
+      "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-report-export.ts"
     ],
@@ -28488,17 +28598,20 @@
       "services/api/scripts/verify-job-ai-privacy.ts"
     ],
     "services/api/src/mock-interview/asr/asr.service.ts": [
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/asr/tts.service.ts": [
       "services/api/scripts/verify-ai-cost-runtime.ts",
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/interview-practice-sheet-pdf.service.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/interview-practice-sheet.ts": [
@@ -28510,13 +28623,21 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
       "services/api/scripts/verify-cjk-font.ts",
+      "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/interview-transcript-pdf.service.ts": [
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/interview-transcript-print.service.ts": [
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts"
+    ],
+    "services/api/src/mock-interview/mock-interview-charge.ts": [
+      "services/api/scripts/verify-ai-quota-coverage.ts"
+    ],
+    "services/api/src/mock-interview/mock-interview-deadline.ts": [
+      "services/api/scripts/verify-mock-interview-deadline.ts"
     ],
     "services/api/src/mock-interview/mock-interview-llm.service.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
@@ -28524,6 +28645,8 @@
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
+      "services/api/scripts/verify-mock-interview-consent.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/mock-interview.controller.ts": [
@@ -28534,6 +28657,7 @@
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts"
     ],
@@ -28550,7 +28674,10 @@
       "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-member-data-retention.ts",
-      "services/api/scripts/verify-mock-interview.ts"
+      "services/api/scripts/verify-mock-interview-consent.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
+      "services/api/scripts/verify-mock-interview.ts",
+      "services/api/scripts/verify-resume-ai-consent-wiring.ts"
     ],
     "services/api/src/notifications/notifications.controller.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs"
@@ -29292,6 +29419,8 @@
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
+      "services/api/scripts/verify-mock-interview-consent.ts",
+      "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-offline-agencies-contract.ts",
@@ -31220,6 +31349,7 @@
           "apps"
         ],
         "files": [
+          "apps/kiosk/src/components/FileContentPreview.tsx",
           "apps/kiosk/src/pages/interview/InterviewReportPage.tsx",
           "apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx",
           "apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx",
@@ -31229,6 +31359,8 @@
           "apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx",
           "apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx",
           "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeVersionsPanel.tsx",
+          "apps/kiosk/src/services/api/documentConversion.ts",
           "packages/shared/src/types/ai.ts",
           "packages/shared/src/types/fairDto.ts",
           "packages/shared/src/types/file.ts",
@@ -33248,12 +33380,14 @@
           "apps/kiosk/src/pages/interview/interviewWorkbenchSession.ts",
           "apps/kiosk/src/pages/interview/session/InterviewAnswerDock.tsx",
           "apps/kiosk/src/pages/interview/session/InterviewSessionPanels.tsx",
+          "apps/kiosk/src/pages/interview/session/interviewDeadline.ts",
           "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts",
           "apps/kiosk/src/pages/interview/session/types.ts",
           "apps/kiosk/src/pages/interview/styles/interview-report.css",
           "apps/kiosk/src/pages/interview/styles/interview-responsive.css",
           "apps/kiosk/src/pages/interview/styles/interview-session.css",
           "apps/kiosk/src/pages/interview/styles/interview-shell.css",
+          "apps/kiosk/src/pages/interview/touch/InterviewHubTouch.tsx",
           "packages/shared/src/types/complianceCopy.ts"
         ],
         "missing": []
@@ -34490,6 +34624,7 @@
           "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
           "apps/kiosk/src/pages/resume/components/DiagnosisDirectionForm.tsx",
           "apps/kiosk/src/pages/resume/components/OptimizedResumeEditor.tsx",
+          "apps/kiosk/src/pages/resume/components/ResumeGenerateReview.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeLayoutControls.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeVoiceInputButton.tsx",
@@ -34515,12 +34650,14 @@
           "apps/kiosk/src/pages/resume/components/resume-deliver/useOptimizeLoad.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/useResumeExportPricing.ts",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportBody.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx",
           "apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts",
           "apps/kiosk/src/pages/resume/touch/OptimizeEditView.tsx",
           "apps/kiosk/src/pages/resume/touch/OptimizeExportView.tsx",
           "apps/kiosk/src/pages/resume/touch/ResumeReadingView.tsx",
           "apps/kiosk/src/pages/resume/touch/ResumeSourceWhere.tsx",
           "apps/kiosk/src/pages/resume/touch/compare.css",
+          "apps/kiosk/src/pages/resume/touch/edit.css",
           "apps/kiosk/src/pages/resume/touch/source.css",
           "apps/kiosk/src/services/api/ai.ts",
           "apps/kiosk/src/services/api/aiHttpAdapter.ts",
@@ -37868,6 +38005,7 @@
           "services/api/src/ai/fair-visit-plan.controller.ts",
           "services/api/src/ai/job-fit.controller.ts",
           "services/api/src/ai/kiosk-ai-capabilities.controller.ts",
+          "services/api/src/ai/resume-layout-adjust.controller.ts",
           "services/api/src/ai/resume-report-export.controller.ts",
           "services/api/src/ai/self-assessment.controller.ts",
           "services/api/src/app.module.ts",
@@ -38199,6 +38337,7 @@
           "services/api/src/ai/quota/ai-quota-run.ts",
           "services/api/src/ai/quota/ai-quota.policy.ts",
           "services/api/src/ai/quota/ai-quota.service.ts",
+          "services/api/src/ai/resume-layout-adjust.controller.ts",
           "services/api/src/ai/resume/career-plan.service.ts",
           "services/api/src/ai/resume/fair-visit-plan.service.ts",
           "services/api/src/ai/resume/job-fit.service.ts",
@@ -38223,6 +38362,7 @@
           "services/api/src/materials/materials.controller.ts",
           "services/api/src/materials/materials.service.ts",
           "services/api/src/member-privacy/member-privacy.service.ts",
+          "services/api/src/mock-interview/mock-interview-charge.ts",
           "services/api/src/mock-interview/mock-interview.controller.ts",
           "services/api/src/mock-interview/mock-interview.service.ts",
           "services/api/src/prisma/prisma.service.ts",
@@ -39278,6 +39418,7 @@
           "services/api/src/ai/resume/llm-career-plan.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/member-assets/member-assets.service.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
         "missing": []
@@ -40534,6 +40675,12 @@
         ],
         "files": [
           ".github/workflows/ci.yml",
+          "apps/admin/src/routes/print-scan/FreePrintQuotaCard.tsx",
+          "apps/admin/src/routes/print-scan/index.tsx",
+          "apps/admin/src/routes/terminals/TerminalDailyFreeSidesSection.tsx",
+          "apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx",
+          "apps/admin/src/services/api/freePrintQuota.ts",
+          "apps/admin/src/services/api/freePrintQuotaRules.ts",
           "docs/progress/current-progress.md",
           "services/api/prisma/migrations/20260724200000_guard_planned_terminal_updates/migration.sql",
           "services/api/prisma/migrations/20260726003000_guard_retired_terminal/migration.sql",
@@ -42831,6 +42978,65 @@
         "dirs": [],
         "files": [
           "services/api/src/ai/ai-log.service.ts",
+          "services/api/src/ai/usage/ai-budget.service.ts",
+          "services/api/src/ai/usage/ai-usage-meter.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts",
+          "services/api/src/mock-interview/interview-practice-sheet-pdf.service.ts",
+          "services/api/src/mock-interview/interview-report-pdf.service.ts",
+          "services/api/src/mock-interview/mock-interview-llm.service.ts",
+          "services/api/src/mock-interview/mock-interview.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-mock-interview-consent.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:mock-interview-consent"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai-access/ai-access.guard.ts",
+          "services/api/src/ai-access/ai-access.service.ts",
+          "services/api/src/ai/ai-log.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/mock-interview/asr/asr.service.ts",
+          "services/api/src/mock-interview/asr/tts.service.ts",
+          "services/api/src/mock-interview/interview-transcript-print.service.ts",
+          "services/api/src/mock-interview/mock-interview-deadline.ts",
+          "services/api/src/mock-interview/mock-interview-llm.service.ts",
+          "services/api/src/mock-interview/mock-interview.controller.ts",
+          "services/api/src/mock-interview/mock-interview.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-mock-interview-deadline.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:mock-interview-deadline"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/ai-log.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/pdf/pdfjs-document.ts",
           "services/api/src/mock-interview/asr/asr.service.ts",
@@ -44800,6 +45006,7 @@
           "services/api/scripts/verify-print-jobs.ts",
           "services/api/scripts/verify-recruitment-integration-readiness.ts",
           "services/api/scripts/verify-refund-idempotent.ts",
+          "services/api/scripts/verify-resume-ai-consent-wiring.ts",
           "services/api/scripts/verify-resume-draft-versions.ts",
           "services/api/scripts/verify-resume-export-draft-source.ts",
           "services/api/scripts/verify-resume-export-formats.ts",
@@ -45173,6 +45380,29 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/ai/career-plan.controller.ts",
+          "services/api/src/ai/resume-layout-adjust.controller.ts",
+          "services/api/src/ai/resume/career-plan.service.ts",
+          "services/api/src/app.module.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts",
+          "services/api/src/mock-interview/mock-interview.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-resume-ai-consent-wiring.ts",
+      "helper": true,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:resume-ai-consent-wiring"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "packages/shared/src/types/ai.ts",
           "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/dto/resume-parse.dto.ts",
@@ -45380,9 +45610,11 @@
           "services/api/src/ai/ai.service.ts",
           "services/api/src/ai/dto/resume-generate.dto.ts",
           "services/api/src/ai/interfaces/ai-provider.interface.ts",
+          "services/api/src/ai/resume-layout-adjust.controller.ts",
           "services/api/src/ai/resume/llm-resume-optimize.service.ts",
           "services/api/src/ai/resume/resume-pdf.service.ts",
-          "services/api/src/common/pdf/pdfjs-document.ts"
+          "services/api/src/common/pdf/pdfjs-document.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts"
         ],
         "missing": []
       },

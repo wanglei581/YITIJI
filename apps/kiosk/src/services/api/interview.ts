@@ -11,6 +11,7 @@ import type {
   CreateInterviewInput,
   CreateInterviewResponse,
   InterviewQuestionResponse,
+  InterviewSessionDetail,
   InterviewReportResponse,
   InterviewPracticeSheetResponse,
   InterviewPrintResponse,
@@ -117,7 +118,12 @@ export function startInterview(sessionId: string, access: InterviewAccess): Prom
     mockIdx = 1
     return Promise.resolve({ done: false, question: MOCK_QUESTIONS[0], qType: 'intro', questionIndex: 1, questionTarget: MOCK_QUESTIONS.length })
   }
-  return call<InterviewQuestionResponse>(`/mock-interviews/${encodeURIComponent(sessionId)}/start`, access, { method: 'POST', body: {} })
+  return call<InterviewQuestionResponse>(`/mock-interviews/${encodeURIComponent(sessionId)}/start`, access, { method: 'POST', body: { hardDeadline: true } })
+}
+
+export function getInterviewSession(sessionId: string, access: InterviewAccess): Promise<InterviewSessionDetail> {
+  if (API_MODE !== 'http') return Promise.reject(new InterviewApiError('MOCK_MODE', '演示模式不读取服务端会话', 0))
+  return call<InterviewSessionDetail>(`/mock-interviews/${encodeURIComponent(sessionId)}`, access)
 }
 
 export function answerInterview(
@@ -158,6 +164,17 @@ export function printInterviewReport(sessionId: string, access: InterviewAccess)
     return Promise.reject(new InterviewApiError('MOCK_MODE', '演示模式不生成真实打印文件', 0))
   }
   return call<InterviewPrintResponse>(`/mock-interviews/${encodeURIComponent(sessionId)}/report/print`, access, { method: 'POST', body: {} })
+}
+
+/**
+ * 本场题目和本人回答（不调模型）。报告生成不了时，用户仍能把自己答过的内容带走。
+ * 服务端要求至少有一条没跳过的回答，否则 400 INTERVIEW_NO_ANSWERS。
+ */
+export function printInterviewTranscript(sessionId: string, access: InterviewAccess): Promise<InterviewPrintResponse> {
+  if (API_MODE !== 'http') {
+    return Promise.reject(new InterviewApiError('MOCK_MODE', '演示模式不生成真实打印文件', 0))
+  }
+  return call<InterviewPrintResponse>(`/mock-interviews/${encodeURIComponent(sessionId)}/transcript/print`, access, { method: 'POST', body: {} })
 }
 
 /**

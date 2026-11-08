@@ -31,6 +31,7 @@ import { AiService } from '../src/ai/ai.service'
 import { AiPublicQuotaService } from '../src/ai/ai-public-quota.service'
 import { CareerPlanController } from '../src/ai/career-plan.controller'
 import { CareerPlanService } from '../src/ai/resume/career-plan.service'
+import { ResumeLayoutAdjustController } from '../src/ai/resume-layout-adjust.controller'
 import { FairVisitPlanController } from '../src/ai/fair-visit-plan.controller'
 import { FairVisitPlanService } from '../src/ai/resume/fair-visit-plan.service'
 import { JobFitController } from '../src/ai/job-fit.controller'
@@ -59,6 +60,7 @@ import { MaterialsController } from '../src/materials/materials.controller'
 import { MaterialsService } from '../src/materials/materials.service'
 import { MemberPrivacyService } from '../src/member-privacy/member-privacy.service'
 import { MemberMockInterviewController, MockInterviewController } from '../src/mock-interview/mock-interview.controller'
+import { executeInterviewStart } from '../src/mock-interview/mock-interview-charge'
 import { MockInterviewService } from '../src/mock-interview/mock-interview.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { SelfAssessmentService } from '../src/ai/resume/self-assessment.service'
@@ -98,7 +100,7 @@ function via(proto: Proto, method: string): Via { return { proto, method } }
 const REGISTRY: Entry[] = [
   { controller: AiController, method: 'submitResumeParse', status: 'wired', via: via(AiService.prototype, 'submitResumeParse') },
   { controller: AiController, method: 'getResumeOptimize', status: 'wired', via: via(AiService.prototype, 'getResumeOptimize') },
-  { controller: AiController, method: 'adjustResumeLayout', status: 'wired', via: via(AiService.prototype, 'adjustResumeLayout') },
+  { controller: ResumeLayoutAdjustController, method: 'adjustResumeLayout', status: 'wired', via: via(AiService.prototype, 'adjustResumeLayout') },
   { controller: AiController, method: 'submitResumeGenerate', status: 'wired', via: via(AiService.prototype, 'submitResumeGenerate') },
   { controller: CareerPlanController, method: 'generate', status: 'wired', via: via(CareerPlanService.prototype, 'generate') },
   { controller: FairVisitPlanController, method: 'generate', status: 'wired', via: via(FairVisitPlanService.prototype, 'generate') },
@@ -133,7 +135,7 @@ const REGISTRY: Entry[] = [
 ]
 
 const SCANNED: Ctor[] = [
-  AiController, CareerPlanController, FairVisitPlanController, JobFitController, AdvisorController,
+  AiController, ResumeLayoutAdjustController, CareerPlanController, FairVisitPlanController, JobFitController, AdvisorController,
   ContractReviewController, MaterialsController, DailyBriefController, TrtcController,
   JobAiController, MemberJobAiSessionsController, MockInterviewController, MemberMockInterviewController,
 ]
@@ -291,6 +293,11 @@ function assertChargeGuards(): void {
   earlier('简历解析', bodyOf(AiController.prototype.submitResumeParse), 'requireActiveConsent', 'this.aiService.submitResumeParse')
   earlier('简历优化', bodyOf(AiController.prototype.getResumeOptimize), 'requireActiveConsent', 'this.aiService.getResumeOptimize')
   earlier('简历生成', bodyOf(AiController.prototype.submitResumeGenerate), 'requireActiveConsent', 'this.aiService.submitResumeGenerate')
+  earlier('简历版式', bodyOf(ResumeLayoutAdjustController.prototype.adjustResumeLayout), 'requireActiveConsent', 'this.aiService.adjustResumeLayout')
+  earlier('职业规划', bodyOf(CareerPlanController.prototype.generate), 'requireActiveConsent', 'this.service.generate')
+  earlier('职业规划服务', bodyOf(CareerPlanService.prototype.generate), 'requireActiveConsent', 'runWithAiQuota')
+  // B7 把开场改成 `const opened = stored ?? await runCharge(...)`，锚点跟着改；「授权先于扣次」不变。
+  earlier('模拟面试开场', bodyOf(executeInterviewStart), 'requireResumeConsent', 'await runCharge(')
   earlier('岗位推荐', bodyOf(JobAiService.prototype.recommendations), 'assertResumeAiConsent', 'this.chargeAssistant')
   earlier('岗位解读', bodyOf(JobAiService.prototype.explainJob), 'requireActiveConsent', 'this.chargeAssistant')
   earlier('岗位对照', bodyOf(GovernedJobFitService.prototype.analyzeForJobFit), 'authorizeForAnalysis', 'runWithAiQuota')
@@ -463,7 +470,10 @@ async function main() {
       undefined, undefined, undefined, quota,
     )
     const careerLlm = { async build() { model.career += 1; return { summary: '吴景行可以继续做窗口服务', currentSnapshot: [{ point: '有窗口经验', evidence: '市南就业窗口' }], directions: [{ title: '窗口主管', why: '已经熟悉材料', firstStep: '整理一套清单' }], skillPlan: [{ skill: '材料核验', action: '把缺件写成表', timeframe: '1-3 个月' }], actionChecklist: ['本周整理清单'] } } }
-    const career = new CareerPlanService(dbPrisma, careerLlm as never, extraction as never, {} as never, {} as never, audit, quiet as never, {} as never, undefined, quota)
+    const career = new CareerPlanService(
+      dbPrisma, careerLlm as never, extraction as never, {} as never, {} as never, audit, quiet as never, {} as never,
+      { requireActiveConsent: async () => undefined } as never, undefined, quota,
+    )
     const fairLlm = { async build() { model.fair += 1; return { mode: 'preparation' as const, summary: '郑安然参会前先把简历印好', fairHighlights: ['市南专场'], priorityCompanies: [], preparationChecklist: ['印两份简历'], questionsToAsk: ['材料要带哪些'], onsiteTips: ['先看窗口名单'] } } }
     const fairPlan = new FairVisitPlanService(dbPrisma, fairLlm as never, extraction as never, {} as never, {} as never, audit, quiet as never, quota)
     const jobFitLlm = { async analyze() { model.jobFit += 1; return { provider: 'llm', payload: { summary: '陈予安的窗口经历和前台岗位大体对得上', matchPoints: [{ point: '做过窗口', evidence: '市南就业窗口' }], gapPoints: [{ gap: '材料话术还不固定', suggestion: '写成一张清单' }], targetedSuggestions: ['写清到岗时间'] } } } }
@@ -1036,7 +1046,7 @@ async function main() {
     const interview = new MockInterviewService(
       dbPrisma, interviewLlm as never, {} as never, {} as never, {} as never,
       extraction as never, { write: async () => undefined } as never, quiet as never,
-      undefined, quota,
+      { requireActiveConsent: async () => undefined } as never, undefined, quota,
     )
     const interviewDto = {
       interviewerType: 'hr', industry: '公共就业', position: '窗口服务', experience: 'y1_3', difficulty: 'standard', durationMin: 5,

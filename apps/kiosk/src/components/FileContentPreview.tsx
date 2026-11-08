@@ -55,6 +55,19 @@ function resolvePreviewKind(
   return 'unsupported'
 }
 
+/** 交给页内预览的地址：会按 PDF 画（页面自己取字节）且有同站地址时用同站地址；图片、Word、或没有同站地址时用原地址。 */
+export function inPagePreviewUrl(file: {
+  url: string
+  printFileUrl?: string | null
+  fileName: string
+  mimeType?: string | null
+  format?: string | null
+}): string {
+  return file.printFileUrl && resolvePreviewKind(file.url, file.fileName, file.mimeType, file.format) === 'pdf'
+    ? file.printFileUrl
+    : file.url
+}
+
 function parsePdfOpenParams(params: string | null | undefined): { page?: number; fit?: PdfCanvasFit } {
   if (!params) return {}
   const query = new URLSearchParams(params)
@@ -102,7 +115,7 @@ export function FileContentPreview({
     setConversionError(null)
     void convertDocumentToPdf(fileId, token)
       .then((result) => {
-        if (active) setConvertedUrl(result.signedUrl)
+        if (active) setConvertedUrl(result.printFileUrl || result.signedUrl)
       })
       .catch((error: unknown) => {
         if (active) setConversionError(userMessageOf(error, 'Word 转 PDF 失败，请稍后重试或改传 PDF 文件'))

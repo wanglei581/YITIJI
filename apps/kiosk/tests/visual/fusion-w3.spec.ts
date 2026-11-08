@@ -387,6 +387,10 @@ test('optimized resume previews inline without opening a new tab @w3-kiosk', asy
   await page.route('**/w3-fixtures/optimized-resume.pdf', (route) =>
     route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
   )
+  // 导出后的页内预览取同站地址（F-20），不是下载直链。
+  await page.route('**/api/v1/files/optimized-file-w3/content**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+  )
   terminalBaseline(api)
   api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [] } })
   api.respond('GET', '/api/v1/resume/export/pricing', {
@@ -418,6 +422,10 @@ test('optimized resume previews inline without opening a new tab @w3-kiosk', asy
   await page.getByRole('button', { name: '去导出', exact: true }).click()
   await page.getByRole('checkbox', { name: /测试大学/ }).click()
   await page.getByRole('button', { name: '确认导出' }).click()
+  await expect(page.getByTestId('resume-export-aigc-note')).toHaveText('导出的简历每页底部有一行小字：含人工智能辅助生成内容')
+  await page.getByRole('group', { name: '导出格式' }).getByRole('button', { name: /^TXT/ }).click()
+  await expect(page.getByTestId('resume-export-aigc-note')).toHaveText('导出的文件末尾有一行：含人工智能辅助生成内容')
+  await page.getByRole('group', { name: '导出格式' }).getByRole('button', { name: /^PDF/ }).click()
   await page.getByRole('button', { name: '导出', exact: true }).click()
   await expect(page.getByRole('button', { name: '扫码带走' })).toBeVisible()
   const pageCount = page.context().pages().length
@@ -427,7 +435,7 @@ test('optimized resume previews inline without opening a new tab @w3-kiosk', asy
     await page.getByRole('button', { name: '扫码带走' }).click()
   }
   await expect(dialog).toBeVisible()
-  await expect(dialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', '/w3-fixtures/optimized-resume.pdf')
+  await expect(dialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', '/api/v1/files/optimized-file-w3/content?expires=1&sig=test')
   await expect(dialog.getByText('手机扫码保存')).toBeVisible()
   expect(page.context().pages()).toHaveLength(pageCount)
   await page.getByRole('button', { name: '关闭文件预览' }).click()
@@ -879,8 +887,10 @@ test('resume parse server failure is labelled failed, never as the running step 
   await page.waitForURL('/resume/report')
   await expect(page.getByTestId('resume-report-state-diagnose-failed')).toBeVisible()
   const exits = page.getByTestId('resume-report-fail-exits').locator('.qxt-slab')
-  await expect(exits).toHaveCount(4)
-  for (let index = 0; index < 4; index += 1) await assertTapTargetPointerHit(exits.nth(index))
+  // 夹具默认本机没配官方渠道：只剩打印原件、去打印扫描、查政策三行，不给点进去是空页的「本机构官方渠道」。
+  await expect(exits).toHaveCount(3)
+  await expect(page.getByTestId('resume-report-fail-exits').getByText('本机构官方渠道')).toHaveCount(0)
+  for (let index = 0; index < 3; index += 1) await assertTapTargetPointerHit(exits.nth(index))
   await expect(page.getByTestId('resume-report-fallback')).toBeVisible()
   const retry = page.locator('.qx-btn[data-testid="resume-report-primary"]')
   await expect(retry).toHaveText('重新解析')
@@ -1650,7 +1660,7 @@ test('assistant filters actions and survives service failure @w3-kiosk', async (
   // 稿 05 的 reply-error 标题；断网时说的是断网，不笼统说「AI 暂不可用」
   // （「AI 服务暂不可用」留给服务器只回了工程串的情况，见下面的用户话用例）。
   await expect(page.getByText('请求失败，没有回答', { exact: true })).toBeVisible()
-  await expect(page.getByText('网络连接失败，请检查网络后重试', { exact: true })).toBeVisible()
+  await expect(page.getByText('网络连接失败。网络断开时，这台机器暂时办不了需要联网的事，请稍后再来。', { exact: true })).toBeVisible()
 
   // 失败停在 failed，且降级是 ① manual —— 功能不消失，四条不依赖 AI 的真实入口在。
   await expect(page.locator('.assistant-ai-status')).toHaveAttribute('data-aitask', 'failed')
