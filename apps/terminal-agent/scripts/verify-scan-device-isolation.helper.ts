@@ -77,7 +77,9 @@ export async function verifyScanDeviceIsolation(root: string): Promise<void> {
     } finally { a.scanner.release(); a.runtime.stop(); await f.close() }
   }
   for (const action of ['first', 'next'] as const) {
-    const f = fixture()
+    // 共享健康状态由复印运行时先建，下面这次调用只是取回同一份；旧进程在不在看夹具的 processGone。
+    // 必须注入「仍在」：不注入就去查本机真实的 978 号进程，Mac 上碰巧存在、CI 的 Linux 上常不存在，结果随机器变。
+    const f = fixture({ deps: { processGone: () => false } })
     const health = sharedScanDeviceHealth({ clock: f.clock, lock: f.lock, deviceName: () => '', getPhase: () => 'idle',
       runProbe: async () => probeResult('ready'), isProcessAlive: () => true })
     try {
