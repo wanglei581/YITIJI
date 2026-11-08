@@ -181,7 +181,10 @@ const frozen = {
   // 属本批次「跨页上下文：要么消费，要么别传」清理的一部分；
   // 由 verify:kiosk-frontend-debt ② 反向钉死「不得再传 / 不得再声明」。
   // 旧哈希 f3139d5375df69db492fc9428a3b4d99cc2ab389c081b50093418f71d3d0f369。
-  'src/pages/interview/session/types.ts': '76a8a9770e1132b416b74586039e07e4410fa4cf97ac2e7ad4ec1c56bf5d1374',
+  // 2026-11-04 重新冻结（B7）：路由状态增加本机截止时刻与来源，离开再进不重置计时。
+  // 原有字段与语音状态保留。冻结仍是逐字节校验，没有删断言。
+  // 旧哈希 76a8a9770e1132b416b74586039e07e4410fa4cf97ac2e7ad4ec1c56bf5d1374。
+  'src/pages/interview/session/types.ts': '1a60a061cdd607399403d5f15dda7622763edab1f2a8ffe6c57926e9031bf01a',
   // 2026-09-29 重新冻结（W-16）：语音会话在写成「正在连接」之前先完成使用声明。
   // 未同意就不发创建请求，也不把画面停在连接中。停止接口仍是 keepalive fetch。
   // 旧哈希 365da6215997c51c4f8d4a2f41ca623302431fefe2e463864c42c06c760c3a29。
