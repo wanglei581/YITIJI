@@ -122,6 +122,7 @@ export const LAYOUT_ADJUST_SYSTEM_PROMPT = withAiSafety([
   '4. 不得增加 education/experience/projects/skills/certificates 条目数量;信息不足时保留原字段或精简描述。',
   '5. action=condense 时压缩 summary/description 字数,保留原数字;action=reformat 时按排版参数调整措辞密度。',
   '6. 不得输出任何录用、投递、面试邀约、Offer 或通过率类承诺。',
+  '7. 只有公司没有职务的经历,role 留空字符串,仍保留该条经历,不得编造职务。',
 ].join('\n'))
 
 export const LAYOUT_ADJUST_RETRY_HINT = withAiSafety(
@@ -358,7 +359,9 @@ export class LlmResumeOptimizeService {
       if (result) {
         // 条目数量上限校验用的是原始 currentResume（未遮盖，长度不受遮盖影响）；
         // 这里只还原文本内容，basic 身份字段另以服务端权威值兜底。
-        return restoreLayoutAdjustResult(result, maskedTriple.restore, input.currentResume)
+        const restored = restoreLayoutAdjustResult(result, maskedTriple.restore, input.currentResume)
+        // 还原后才能按公司名对回原条目：原条目没写职务，输出也不许补出职务。
+        if (!addsRoleToCompanyOnlyExperience(restored.resume, input.currentResume)) return restored
       }
       this.logger.warn(`resume layout adjust: invalid output (attempt ${attempt}/2)`)
     }
@@ -688,7 +691,8 @@ export class LlmResumeOptimizeService {
     for (const item of asArray(r['experience'], currentResume.experience.length)) {
       const company = strOf(item, 'company', 100)
       const role = strOf(item, 'role', 60)
-      if (!company || !role) continue
+      // 只写了公司、没写职务的经历照样保留，职务留空（不得编造）。fact('') 恒为 true。
+      if (!company) continue
       const period = strOf(item, 'period', 40)
       if (!fact(company) || !fact(role) || !fact(period)) return null
       const description = clean(item['description'], MAX_DESC_CHARS)
@@ -762,6 +766,18 @@ function buildLayoutHint(layout?: ResumeLayoutSettings): string {
 }
 
 type RestoreFn = (value: string) => string
+
+/**
+ * 版式调整不许给「只写了公司、没写职务」的经历补出职务。
+ * 事实比对只认原文里有没有这个词，原文别处出现过的岗位名（如求职意向）会漏过，所以按公司名对回原条目再查一次。
+ */
+export function addsRoleToCompanyOnlyExperience(output: GeneratedResume, current: GeneratedResume): boolean {
+  return output.experience.some((item) => {
+    if (!item.role?.trim()) return false
+    const source = current.experience.find((e) => e.company.trim() === item.company.trim())
+    return Boolean(source) && !source!.role?.trim()
+  })
+}
 
 function restoreLayoutAdjustResult(
   result: LayoutAdjustResult,
