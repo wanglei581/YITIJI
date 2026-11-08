@@ -14592,7 +14592,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 796,
+      "reachableFileCount": 817,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -14600,6 +14600,7 @@
           "component": "HomePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -14619,6 +14620,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -14654,6 +14657,7 @@
         {
           "component": "KioskRouteErrorPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -14662,6 +14666,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -14700,6 +14706,7 @@
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
             "DELETE /me/mock-interviews/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -14719,6 +14726,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -14766,6 +14775,7 @@
           "component": "CampusPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -14785,6 +14795,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -14822,6 +14834,7 @@
         {
           "component": "CompaniesPage",
           "endpoints": [
+            "GET /:param",
             "GET /companies",
             "GET /companies/:param",
             "GET /companies/:param/jobs",
@@ -14835,6 +14848,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -14860,6 +14875,7 @@
         {
           "component": "CompanyDetailPage",
           "endpoints": [
+            "GET /:param",
             "GET /companies",
             "GET /companies/:param",
             "GET /companies/:param/jobs",
@@ -14873,6 +14889,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -14898,6 +14916,7 @@
         {
           "component": "HelpCenterPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -14906,6 +14925,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -14932,6 +14953,7 @@
           "component": "InterviewWorkbenchPage",
           "endpoints": [
             "DELETE /me/mock-interviews/:param",
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -14940,6 +14962,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /mock-interviews",
@@ -15043,6 +15067,7 @@
           "component": "JobFairsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15062,6 +15087,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -15100,6 +15127,7 @@
           "component": "JobFairDetailPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15119,6 +15147,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -15157,6 +15187,7 @@
           "component": "FairCompaniesPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15176,6 +15207,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -15214,6 +15247,7 @@
           "component": "FairCompanyDetailPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15233,6 +15267,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -15270,6 +15306,7 @@
           "component": "FairMapPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15289,6 +15326,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -15327,6 +15366,7 @@
           "component": "FairMaterialsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15346,6 +15386,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -15384,6 +15426,7 @@
           "component": "FairStatsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15403,6 +15446,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -15440,6 +15485,7 @@
         {
           "component": "FairVisitPlanPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -15448,6 +15494,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /print"
@@ -15476,6 +15524,7 @@
           "component": "JobFairCheckinPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15495,6 +15544,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -15533,6 +15584,7 @@
           "component": "JobsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15552,6 +15604,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -15589,6 +15643,7 @@
           "component": "JobDetailPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15608,6 +15663,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -15657,6 +15714,7 @@
         {
           "component": "LoginTicketEntry",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -15665,6 +15723,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -15680,6 +15740,7 @@
         {
           "component": "UploadSceneEntry",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -15688,6 +15749,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -15704,6 +15767,7 @@
           "component": "LegalDocPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15723,6 +15787,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -15757,6 +15823,7 @@
         {
           "component": "LoginPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -15765,6 +15832,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -15789,6 +15858,7 @@
         {
           "component": "MyActivityPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -15797,6 +15867,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -15829,6 +15901,7 @@
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
             "DELETE /me/mock-interviews/:param",
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -15839,6 +15912,8 @@
             "GET /job-fairs/:param/zones",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -15879,6 +15954,7 @@
         {
           "component": "MyBenefitsPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -15887,6 +15963,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /me/favorites"
@@ -15917,6 +15995,7 @@
         {
           "component": "MyDocumentsPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -15925,6 +16004,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -15955,6 +16036,7 @@
         {
           "component": "MyFavoritesPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -15963,6 +16045,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /me/favorites"
@@ -15994,6 +16078,7 @@
         {
           "component": "MyFeedbackPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16002,6 +16087,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /me/feedback"
@@ -16032,6 +16119,7 @@
         {
           "component": "MyNotificationsPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16041,6 +16129,8 @@
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
             "PATCH /me/notifications/read-all",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -16071,6 +16161,7 @@
         {
           "component": "MyPrintOrdersPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16079,6 +16170,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -16109,6 +16202,7 @@
         {
           "component": "MyPrivacyRequestsPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16117,6 +16211,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -16146,6 +16242,7 @@
         {
           "component": "MyResumesPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16154,6 +16251,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -16185,6 +16284,7 @@
           "component": "MySettingsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16195,6 +16295,8 @@
             "GET /job-fairs/:param/zones",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -16228,6 +16330,7 @@
         {
           "component": "MobileQrLoginPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16236,6 +16339,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -16251,6 +16356,7 @@
         {
           "component": "PrintScanHomePage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16259,6 +16365,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -16291,6 +16399,7 @@
         {
           "component": "ConvertImagesPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16299,6 +16408,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -16324,6 +16435,7 @@
         {
           "component": "PrintScanFeatureInfoPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16332,6 +16444,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -16343,11 +16457,23 @@
           ],
           "path": "/print-scan/feature/:key",
           "styles": [
+            "apps/kiosk/src/pages/copy/copy-device.css",
+            "apps/kiosk/src/pages/copy/copy-print.css",
+            "apps/kiosk/src/pages/copy/copy.css",
             "apps/kiosk/src/pages/print-scan/styles/print-hub-qx.css",
             "apps/kiosk/src/pages/print-scan/styles/tool-fs.css",
             "apps/kiosk/src/pages/print-scan/styles/tool-touch.css",
             "apps/kiosk/src/pages/print/art/print-art-tokens.css",
             "apps/kiosk/src/pages/print/art/print-art.css",
+            "apps/kiosk/src/pages/scan/styles/scan-device-errors.css",
+            "apps/kiosk/src/pages/scan/styles/scan-device-flow.css",
+            "apps/kiosk/src/pages/scan/styles/scan-device-qx.css",
+            "apps/kiosk/src/pages/scan/styles/scan-fs.css",
+            "apps/kiosk/src/pages/scan/styles/scan-workbench-compact-qx.css",
+            "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
@@ -16372,6 +16498,7 @@
         {
           "component": "PrintCashierPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16380,6 +16507,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -16412,6 +16541,7 @@
           "endpoints": [
             "DELETE /contract-reviews/:param",
             "DELETE /resume/self-assessment/:param",
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16420,6 +16550,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /me/favorites",
@@ -16454,6 +16586,7 @@
         {
           "component": "PrintDeskPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16462,6 +16595,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -16492,6 +16627,7 @@
         {
           "component": "PrintDonePage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16500,6 +16636,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -16558,6 +16696,7 @@
         {
           "component": "PrintPickupClaimPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16566,6 +16705,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -16610,6 +16751,7 @@
         {
           "component": "PrintProgressPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16618,6 +16760,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -16701,6 +16845,7 @@
         {
           "component": "PrintUploadPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16709,6 +16854,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -16740,6 +16887,7 @@
         {
           "component": "ProfilePage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16748,6 +16896,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /me/favorites"
@@ -16778,6 +16928,7 @@
         {
           "component": "RenshiPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16786,6 +16937,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -16851,6 +17004,7 @@
           "component": "ResumeGeneratePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -16870,6 +17024,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -16909,6 +17065,7 @@
           "component": "ResumeGeneratePreviewPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -16928,6 +17085,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -16992,6 +17151,7 @@
           "component": "ResumeOptimizePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -17011,6 +17171,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -17051,6 +17213,7 @@
           "component": "ResumeOptimizeComparePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -17070,6 +17233,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -17107,6 +17272,7 @@
           "component": "ResumeParsePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -17126,6 +17292,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -17166,6 +17334,7 @@
           "component": "ResumeReportPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -17185,6 +17354,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -17238,6 +17409,7 @@
           "component": "ResumeSourcePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /:param",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -17257,6 +17429,8 @@
             "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -17319,6 +17493,7 @@
         {
           "component": "ScanWorkbenchPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -17327,6 +17502,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -17412,6 +17589,7 @@
         {
           "component": "ScreensaverPage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -17420,6 +17598,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -17493,7 +17673,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 985
+      "sourceFileCount": 1006
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -21352,6 +21532,9 @@
     ],
     "apps/kiosk/src/pages/contract-review/contractReviewSession.ts": [
       "apps/kiosk/scripts/verify-contract-review-session.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
+    "apps/kiosk/src/pages/copy/copySession.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
     "apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx": [
@@ -33109,6 +33292,7 @@
           "apps/kiosk/src/pages/contract-review/ContractReviewHomePage.tsx",
           "apps/kiosk/src/pages/contract-review/ContractReviewProcessingPage.tsx",
           "apps/kiosk/src/pages/contract-review/contractReviewSession.ts",
+          "apps/kiosk/src/pages/copy/copySession.ts",
           "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
           "apps/kiosk/src/pages/interview/interviewWorkbenchModel.ts",
           "apps/kiosk/src/pages/interview/interviewWorkbenchSession.ts",

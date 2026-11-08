@@ -175,7 +175,7 @@ const toDataUrl = (code) => `data:text/javascript;base64,${Buffer.from(code).toS
 const transpile = (relativePath) => ts.transpileModule(
   read(relativePath),
   { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }, fileName: relativePath },
-).outputText
+).outputText.replace("from '../pages/copy/copySession'", () => `from '${toDataUrl(transpile('src/pages/copy/copySession.ts'))}'`)
 
 async function kindTableChecks() {
   const parsed = parseServerAiUse()

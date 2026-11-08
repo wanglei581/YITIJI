@@ -49,6 +49,7 @@ import {
 import { KioskFeedbackDialog } from '../../components/KioskFeedbackDialog'
 import { helpNeededLine, machineCannotPrintLine, preferUnattended } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
+import { copyOptions } from '../copy/copySession'
 import { PrintTouchFrame, printAsk } from '../print/PrintTouchFrame'
 import { PRINT_HUB_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
 import {
@@ -461,9 +462,10 @@ export function PrintScanHomePage() {
       setFeedbackOpen(true)
       return
     }
-    // R4（2026-09-29）：复印卡改为可点，进「怎么在打印机面板上复印」说明态。
+    // C3a：屏上复印开通了才先选怎么复印（第一张卡仍是面板图文指引）；
+    // 没开通、能力还在读或读失败，都直接去面板图文指引，不先停在只有一张卡能点的选择屏。
     if (key === COPY_GUIDE_KEY) {
-      navigate(COPY_GUIDE_ROUTE)
+      navigate(capabilityLoad.status === 'ok' && copyOptions(capabilityLoad.map).screen ? '/print-scan/feature/copy-screen' : COPY_GUIDE_ROUTE)
       return
     }
     const link = QUICK_LINKS.find((item) => item.key === key)

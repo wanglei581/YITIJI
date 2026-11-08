@@ -220,6 +220,9 @@ jobs:
           # 法务文档页按章节标题打开。只读源码，不连库、不连网。
           pnpm --filter @ai-job-print/kiosk verify:self-assessment-consent-source
           pnpm --filter @ai-job-print/kiosk verify:scan-session-truth
+          # 屏上复印（C3）：确认键认打印价目键、超免费额度进额度屏、清场撤销云端单、本机预览与打印至多一次。
+          # 只编译 apps/kiosk/src/pages/copy 源码跑 node:test，不连库、不起浏览器。
+          pnpm --filter @ai-job-print/kiosk verify:copy-screen
           pnpm --filter @ai-job-print/kiosk verify:scan-quiet-period
           pnpm --filter @ai-job-print/kiosk verify:screensaver-empty-shell
           pnpm --filter @ai-job-print/kiosk verify:v6-type-floor

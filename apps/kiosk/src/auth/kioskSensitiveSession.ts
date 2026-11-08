@@ -28,6 +28,7 @@ import {
   hasContractReviewSession,
 } from '../pages/contract-review/contractReviewSession'
 import { clearAiDeclarationSession } from '../ai/aiDeclarationSession'
+import { clearCopySession, hasCopySession } from '../pages/copy/copySession'
 import { AI_DECLARATION_SESSION_KEY } from '../ai/aiDeclarationVersions'
 
 /** 打印材料。范围判断里单独算「只有打印材料」；仍只登记在下面那份键表里。 */
@@ -74,6 +75,7 @@ export type KioskClearScope = 'none' | 'print-only' | 'with-other'
  * 本机匿名收藏读失败视为没有，与 hasKioskSensitiveSession 同一写法。
  */
 export function kioskSensitiveSessionScope(): KioskClearScope {
+  if (hasCopySession()) return 'with-other'
   if (hasContractReviewSession() || hasResumeGenerateDraft()) return 'with-other'
   let printMaterial = false
   try {
@@ -114,6 +116,7 @@ export function kioskSensitiveSessionScope(): KioskClearScope {
  * 重载会把补偿逻辑连同执行环境一起杀掉，那正是 2026-09-15 那条 P1 的成因。
  */
 export function clearKioskSensitiveSession(outgoingMemberToken?: string | null): void {
+  clearCopySession()
   clearAiDeclarationSession()
   clearContractReviewSession()
   clearPrintMaterialSession()
@@ -152,6 +155,7 @@ export function clearKioskSharedDeviceResidue(): void {
  * 匿名本机收藏单独探测：读失败视为没有残留（写不进去也就漏不出去）。
  */
 export function hasKioskSensitiveSession(): boolean {
+  if (hasCopySession()) return true
   if (hasContractReviewSession() || hasResumeGenerateDraft()) return true
   try {
     if (typeof window === 'undefined' || !window.sessionStorage) return true
