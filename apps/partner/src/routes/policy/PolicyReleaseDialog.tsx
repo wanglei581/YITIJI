@@ -3,13 +3,14 @@ import { Button } from '@ai-job-print/ui'
 import { ApiHttpError } from '../../services/api/client'
 import { partnerPoliciesService, type PartnerPolicyRecord } from '../../services/api/policies'
 
-/** 服务端的中文原因（如未通过审核、未确认责任、内容可信未生效、已被紧急下架）原样给出；英文状态串一律换成兜底句。 */
+/** 只使用政策服务从 error.message 解析出的原因，缺失时不展示技术信息。 */
 function errMsg(e: unknown): string {
   if (e instanceof ApiHttpError) {
     const message = e.message.trim()
-    if (message && !/^[A-Za-z0-9_\s-]+$/.test(message)) return message
+    // 只放行服务端写的中文原因；纯英文技术串（如政策被并发删掉时的「Policy xx not found」）换成兜底句。
+    if (message && /[\u4e00-\u9fff]/.test(message)) return message
   }
-  return '发布没有成功，内容状态未改变，请稍后重试'
+  return '这次没发布成功，请稍后再试；多次失败请联系平台管理员'
 }
 
 /**
@@ -52,7 +53,7 @@ export function PolicyReleaseDialog({
     try {
       const updated = await partnerPoliciesService.releasePolicy(policy.id, { responsibilityAcknowledged: acknowledged })
       if (updated.publishStatus !== 'published') {
-        setError(`服务端返回的发布状态是「${updated.publishStatus}」，不是「已发布」。请刷新列表核对这条政策的实际状态。`)
+        setError('这次没发布成功，请稍后再试；多次失败请联系平台管理员')
         return
       }
       onReleased(updated)
@@ -83,6 +84,17 @@ export function PolicyReleaseDialog({
         <p className="mt-3 text-xs leading-relaxed text-neutral-600">
           发布后展示这一版本（对应一体机首页「查政策」），并标注由{publisher}发布。平台不审核、不代发政策，只在违法违规等紧急情况下单向下架。之后如需修改，保存修改会生成新的内容版本并自动撤下、回到待审核，须重新审核通过并确认发布后才会再展示。
         </p>
+
+        <ul aria-label="发布前提" className="mt-3 space-y-1 text-xs text-neutral-600">
+          <li>{policy.kind === 'policy_guide'
+            ? [policy.whoCanApply, policy.requiredMaterials, policy.whereToApply].every((value) => value?.trim())
+              ? '谁可以申请、要准备的材料、去哪办：已填齐'
+              : '谁可以申请、要准备的材料、去哪办：未填齐，发布时会被拦下'
+            : '政策公告无需填写谁可以申请、要准备的材料、去哪办'}</li>
+          <li>{policy.externalUrl?.trim()
+            ? policy.externalUrlVerified === true ? '原文链接已通过官方网站核对' : '原文链接还没通过官方网站核对，发布时会被拦下'
+            : policy.kind === 'policy_guide' ? '原文链接未填写，发布时会被拦下' : '原文链接未填写（政策公告可选）'}</li>
+        </ul>
 
         <label className="mt-4 flex items-start gap-2.5 rounded-lg border border-primary-200 bg-primary-50/40 px-3 py-3 text-sm text-neutral-800">
           <input
