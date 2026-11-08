@@ -65,8 +65,8 @@ test('resume row label tells copies apart by time and never shows the internal t
   assert.equal(nav.resumeLabel({ ...first, createdAt: 'bad' }), '上传诊断简历')
 })
 
-test('six result types carry the selected task; expired/failed/processing cannot open', () => {
-  for (const kind of ['parse', 'optimize', 'generate', 'job_fit', 'career_plan', 'self_assessment']) {
+test('three active result types carry the selected task; expired/failed/processing cannot open', () => {
+  for (const kind of ['parse', 'optimize', 'generate']) {
     const item = { kind, taskId: 'A/&?', status: 'completed', expiresAt: '2099-01-01' }
     assert.equal(new URL(nav.aiRecordPath(item), 'http://test').searchParams.get('taskId'), item.taskId)
     if (kind === 'optimize') assert.equal(new URL(nav.aiRecordPath(item), 'http://test').searchParams.get('saved'), '1')
@@ -74,6 +74,12 @@ test('six result types carry the selected task; expired/failed/processing cannot
       assert.equal(nav.aiRecordPath({ ...item, ...patch }), null)
       assert.ok(nav.recordUnavailableReason({ ...item, ...patch }))
     }
+  }
+})
+
+test('parked result types have no open action even when completed and unexpired', () => {
+  for (const kind of ['job_fit', 'career_plan', 'self_assessment']) {
+    assert.equal(nav.aiRecordPath({ kind, taskId: 'old-record', status: 'completed', expiresAt: '2099-01-01' }), null)
   }
 })
 

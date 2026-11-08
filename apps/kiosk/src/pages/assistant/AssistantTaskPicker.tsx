@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import { KIcon } from '../../components/kiosk-icon'
 import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
-import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { ArtBox, Card, Hit, Note } from '../public-touch/PublicBlocks'
 import { IllusChecklist, IllusReport, IllusResume, IllusStack } from '../public-touch/PublicIllus'
 import { CONSULTATION_TASKS, type ConsultationTask, type ToolboxAssistantScene } from './advisorScenes'
@@ -26,12 +25,9 @@ interface Props {
   questions: readonly string[]
   loading: boolean
   aiLocked: boolean
-  /** 本机 AI 专项这一行的第二行字：8 项，还没问过时写「首轮提问后确认可用性」。 */
-  toolsLine: string
   onSelect: (id: ConsultationTask['id']) => void
   onClear: () => void
   onQuestion: (question: string) => void
-  onOpenTools: () => void
   onOpenManual: () => void
   onOpenActs: () => void
   onComplaint: () => void
@@ -39,12 +35,12 @@ interface Props {
 
 /**
  * 触屏稿 xq 的三种待问形态：
- * 默认是「本机 AI 专项」一行 + 四张主题卡 + 两个按钮；选了主题是说明条 + 三张问题卡（点一下就发给小青）+ 三个按钮；
+ * 默认是咨询主题卡 + 两个按钮；选了主题是说明条 + 三张问题卡（点一下就发给小青）+ 三个按钮；
  * 专项场景是说明条 + 两张说明卡 + 三个按钮。已经问过之后由页面的对话区接手，不在这里。
  */
 export function AssistantTaskPicker({
-  selectedTask, scene, welcome, questions, loading, aiLocked, toolsLine,
-  onSelect, onClear, onQuestion, onOpenTools, onOpenManual, onOpenActs, onComplaint,
+  selectedTask, scene, welcome, questions, loading, aiLocked,
+  onSelect, onClear, onQuestion, onOpenManual, onOpenActs, onComplaint,
 }: Props) {
   const complaint = (
     <button type="button" className="assistant-complaint" onClick={onComplaint}>
@@ -71,7 +67,7 @@ export function AssistantTaskPicker({
         ) : null}
         <div className="assistant-task-actions" data-cols="3">
           <button type="button" className="assistant-complaint" onClick={onClear}>
-            <strong>重新选择主题</strong><small>回到四个咨询主题</small>
+            <strong>重新选择主题</strong><small>回到咨询主题</small>
           </button>
           {manual}
           {complaint}
@@ -106,7 +102,7 @@ export function AssistantTaskPicker({
             <strong>这一主题还能去哪</strong><small>打印、政策等入口</small>
           </button>
           <button type="button" className="assistant-complaint" onClick={onClear}>
-            <strong>换一个主题</strong><small>回到四个咨询主题</small>
+            <strong>换一个主题</strong><small>回到咨询主题</small>
           </button>
           {complaint}
         </div>
@@ -116,14 +112,6 @@ export function AssistantTaskPicker({
 
   return (
     <section className="assistant-task-picker" data-mode="grid" aria-label="咨询主题">
-      <Hit
-        className="assistant-tools-open"
-        icon={<QxTouchIcon name="sparkle" size={32} />}
-        title="本机 AI 专项"
-        sub={toolsLine}
-        chevron
-        onClick={onOpenTools}
-      />
       <div className="assistant-task-grid">
         {CONSULTATION_TASKS.map((task) => (
           <button type="button" className="assistant-task" key={task.id} onClick={() => onSelect(task.id)}>

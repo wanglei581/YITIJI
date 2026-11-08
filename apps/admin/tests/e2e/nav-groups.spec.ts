@@ -8,7 +8,7 @@ const MENUS = [
   { label: '设备管理', href: '/devices' },
   { label: '打印扫描运维', href: '/print-scan' },
   { label: '告警与反馈', href: '/alerts' },
-  { label: '终端应用与展示', href: '/screensaver' },
+  { label: '待机宣传屏', href: '/screensaver' },
   { label: '求职材料库', href: '/job-materials' },
   { label: 'AI服务', href: '/ai-services' },
   { label: '订单与计费', href: '/orders' },
@@ -29,14 +29,6 @@ const TAB_GROUPS = [
       { path: '/alerts', label: '告警中心' },
       { path: '/member-feedback', label: '意见反馈' },
       { path: '/member-notifications', label: '消息通知' },
-    ],
-  },
-  {
-    menu: '终端应用与展示',
-    tabs: [
-      { path: '/screensaver', label: '宣传屏' },
-      { path: '/toolbox', label: '百宝箱' },
-      { path: '/smart-campus', label: '智慧校园' },
     ],
   },
   {
@@ -152,4 +144,19 @@ test('390 宽下标签条不撑出页面横向滚动', async ({ page }) => {
   })
   expect(fit.pageFits).toBe(true)
   expect(fit.mainFits).toBe(true)
+})
+
+
+test('待机宣传屏与旧配置页不显示标签条', async ({ page }) => {
+  for (const path of ['/screensaver', '/toolbox', '/smart-campus']) {
+    const guards = await openAuthed(page, path)
+    await settleAdminPage(page, guards)
+    for (const group of TAB_GROUPS) {
+      await expect(page.getByRole('navigation', { name: group.menu })).toHaveCount(0)
+    }
+    await expect(page.getByRole('navigation', { name: '终端应用与展示' })).toHaveCount(0)
+    const menu = page.getByRole('link', { name: '待机宣传屏', exact: true })
+    if (path === '/screensaver') await expect(menu).toHaveAttribute('aria-current', 'page')
+    else await expect(menu).not.toHaveAttribute('aria-current', 'page')
+  }
 })

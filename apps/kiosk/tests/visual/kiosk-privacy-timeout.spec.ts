@@ -2,7 +2,6 @@ import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
 import { installScanRevokeProbe, waitForAckConsumed } from '../fixtures/scan-revoke-probe'
-import { CURRENT_SELF_ASSESSMENT_CONSENT_VERSION } from '../fixtures/self-assessment-questions'
 
 const MEMBER_TOKEN = 'privacy-member-memory-token'
 const MEMBER_PHONE = '13800138000'
@@ -1286,40 +1285,29 @@ test('a BFCache pageshow restore is fail-closed before reuse @privacy-kiosk', as
   expect(storedAfterRestore).toEqual(EMPTY_SENSITIVE_SESSION)
 })
 
-test('self-assessment leftover is wiped by the hard privacy deadline @privacy-kiosk', async ({ page, api }) => {
+// 自我探索页 2026-11-08 停放，但它的会话键仍登记在清场键表里（kioskSensitiveSession.ts），
+// 打印确认页也读它。这里不进停放页，只钉「残留的这个键会被硬时限清掉」，防止停放期间被当死代码删掉。
+test('self-assessment session leftover is wiped by the hard privacy deadline @privacy-kiosk', async ({ page, api }) => {
   registerKioskShell(api)
-  const summary = '上一游客的倾向参考摘要，下一位不该看见'
-  const session = {
-    answers: { collaboration: { 0: 'A' } },
-    consent: { nonSensitive: true, sensitive: false },
-    consentVersion: CURRENT_SELF_ASSESSMENT_CONSENT_VERSION,
-    taskId: 'privacy-sa-task',
-    result: {
-      taskId: 'privacy-sa-task',
-      status: 'completed',
-      dimensions: [
-        { key: 'collaboration', label: '协作偏好', strength: 4, note: '隐私回归解读', evidenceQuestionIdx: [0] },
-      ],
-      summary,
-      providerName: 'mock-llm',
-      expiresAt: '2099-01-01T00:00:00.000Z',
-    },
-  }
-
   await page.goto('/')
-  await page.evaluate(({ key, value }) => {
-    sessionStorage.setItem(key, JSON.stringify(value))
-  }, { key: 'self_assessment_session_v1', value: session })
-  await page.goto('/resume/self-assessment/result')
-  await expect(page.locator('[data-kiosk-screen="resume-self-assessment-result"]')).toBeVisible()
-  await expect(page.getByText(summary, { exact: false })).toBeVisible()
+  await page.evaluate(() => {
+    window.sessionStorage.setItem('self_assessment_session_v1', JSON.stringify({
+      answers: { collaboration: { 0: 'A' } },
+      taskId: 'privacy-sa-task',
+      result: { taskId: 'privacy-sa-task', status: 'completed', summary: '上一游客的倾向参考摘要，下一位不该看见' },
+    }))
+  })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page).toHaveURL('http://127.0.0.1:4187/')
+
+  const before = await page.evaluate(() => window.sessionStorage.getItem('self_assessment_session_v1'))
+  expect(before).toContain('privacy-sa-task')
 
   await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)
 
   expect(new URL(page.url()).pathname).toBe('/')
-  const leftover = await page.evaluate(() => sessionStorage.getItem('self_assessment_session_v1'))
-  expect(leftover).toBeNull()
-  await expect(page.getByText(summary, { exact: false })).toHaveCount(0)
+  const after = await page.evaluate(() => window.sessionStorage.getItem('self_assessment_session_v1'))
+  expect(after).toBeNull()
 })
 
 test('guest local favorites are wiped by the hard privacy deadline @privacy-kiosk', async ({ page, api }) => {
@@ -1376,13 +1364,6 @@ test('signed-in rebind overlay hides the OTP on the public screen @privacy-kiosk
   await expect(otp).toHaveValue('654321')
   await expect(page.locator('input[type="password"]')).toHaveCount(1)
   await expect(page.getByText('654321', { exact: true })).toHaveCount(0)
-})
-
-test('sign-stamp page does not echo the stamp image @privacy-kiosk', async ({ page, api }) => {
-  registerKioskShell(api)
-  await page.goto('/print-scan/sign')
-  await expect(page.locator('[data-w2-page="print-scan-sign"]')).toBeVisible()
-  await expect(page.locator('img[src*="stamp"], img[alt*="印章"], img[alt*="签名"]')).toHaveCount(0)
 })
 
 test('mobile QR login is exempt from the kiosk hard privacy deadline @privacy-mobile', async ({ page, api }) => {

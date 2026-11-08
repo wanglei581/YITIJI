@@ -6,7 +6,7 @@
 // 报价确认页信跳转时带的临时状态。临时状态一丢（登录回跳、返回预览、旧地址重定向），
 // 页面就退回会话里那一份 —— 可能是上一位的、或上一次的文件。
 //
-// 这些用例都从**真实来源页**出发（优化稿、求职材料、小青作业、我的文档），
+// 这些用例都从**真实来源页**出发（优化稿、小青作业、我的文档；求职材料页 11/08 停放后，H3 改为按它写入的交接原样注入），
 // 在跳转丢失临时状态的那一步断言：屏幕上和报价请求里都还是这一份，上一份 0 次出现。
 // 旧代码（候选 56bd387f2）上 H1–H6 必须红；H7 是清场的回归保护，旧代码上也是绿的。
 //
@@ -282,14 +282,6 @@ test('H2 back to preview keeps this file instead of rehydrating a stale one @w2'
 
 // ── H3 F02：带进来的双面本机没开通，报价页不拦截 ─────────────────────────────
 
-const MATERIAL_TEMPLATE = {
-  id: 'campus-cover-letter', type: 'cover_letter', title: '校招自荐信', description: '适合应届生在校招现场生成一页自荐材料。',
-  tags: ['校招'], status: 'published', recommendedFor: '应届毕业生', outputFilename: '校招自荐信.pdf',
-  fields: [
-    { key: 'applicantName', label: '姓名', required: true, maxLength: 40, placeholder: '例：王同学' },
-    { key: 'targetRole', label: '目标岗位', required: true, maxLength: 60, placeholder: '例：前端开发工程师' },
-  ],
-}
 const MATERIAL_FILE = {
   templateId: 'campus-cover-letter', templateTitle: '校招自荐信', documentType: 'cover_letter', fileId: 'jm-p05-001',
   filename: '校招自荐信-交接验收.pdf', mimeType: 'application/pdf', sizeBytes: 132096, pageCount: 2,
@@ -301,20 +293,22 @@ const MATERIAL_FILE = {
 test('H3 F02 a two-page job material on a simplex-only terminal is quoted single-sided without blocking @w2', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerPrintShell(api) // 双面未登记 = 本机暂未开通
-  registerMemberLogin(api)
   await routeFileContent(page, 'jm-p05-001')
-  api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [MATERIAL_TEMPLATE] } })
-  api.respond('POST', '/api/v1/job-materials/generate', { status: 200, json: { success: true, data: MATERIAL_FILE } })
   await captureQuoteBodies(page)
-
-  await page.goto(`/login?from=${encodeURIComponent('/resume/materials')}`)
-  await loginOnCurrentPage(page, '/resume/materials')
-  await page.locator('#material-field-applicantName').fill('王同学')
-  await page.locator('#material-field-targetRole').fill('用户运营专员')
-  await page.locator('.qxt-dock').getByRole('button', { name: '生成可打印版', exact: true }).click()
-  await expect(page.getByTestId('material-workshop-file')).toHaveAttribute('data-print-ready', '1')
-  await page.locator('.qxt-dock').getByRole('button', { name: '打印材料', exact: true }).click()
-  await page.waitForURL((url) => url.pathname === '/print/confirm')
+  // 求职材料页 11/08 停放：按它 startPrint 写入的交接原样注入（来源 job_material、免检直进确认页、
+  // 不带参数只带「两页以上建议长边双面」），继续钉确认页「建议的双面本机没开 → 按单面报价、不拦截」。
+  await seedPrintHandoff(page, {
+    origin: 'job_material',
+    checkPolicy: 'exempt',
+    materialCheck: null,
+    printParams: null,
+    paramsSuggestion: { duplex: 'duplex_long_edge' },
+    file: {
+      fileId: MATERIAL_FILE.fileId, name: MATERIAL_FILE.filename, pages: MATERIAL_FILE.pageCount,
+      size: '129 KB', mimeType: 'application/pdf', fileUrl: MATERIAL_FILE.printFileUrl,
+    },
+  })
+  await page.goto('/print/confirm')
 
   const confirm = page.locator('[data-w2-page="print-confirm"]')
   await expect(page.locator('.print-file-name')).toHaveText(MATERIAL_FILE.filename)

@@ -107,8 +107,8 @@ function collectCssSelectors(source) {
 const routes = [
   '/resume', '/resume/upload', '/resume/source', '/resume/generate',
   '/resume/generate/preview', '/resume/parse', '/resume/report',
-  '/resume/optimize', '/resume/export', '/resume/templates',
-  '/resume/materials', '/resume/job-fit', '/resume/career-plan',
+  '/resume/optimize', '/resume/export', '/resume/templates/*',
+  '/resume/materials/*', '/resume/job-fit/*', '/resume/career-plan/*',
   '/assistant', '/interview', '/interview/setup', '/interview/session',
   '/interview/report', '/interview/tips', '/interview/reports',
 ]
@@ -442,7 +442,8 @@ includes('src/layouts/KioskRoot.tsx', "'/ai/plan'", 'advisor artifact route is r
 check(!read('src/pages/ai-plan/AiPlanPage.tsx').includes('KioskPageFrame'), 'ai-plan has left the V6 frame')
 check(!read('src/pages/ai-plan/AiPlanPage.tsx').includes('DEFAULT_PLAN'), 'ai-plan no longer ships a hardcoded plan')
 check(!read('src/pages/ai-plan/AiPlanPage.tsx').includes('prototype-v1.css'), 'ai-plan has left prototype-v1')
-includes('src/pages/assistant/AssistantSessionSummaryBar.tsx', 'navigate(`/ai/plan?', 'saving session highlights navigates to the advisor artifact page')
+check(!read('src/pages/assistant/AssistantSessionSummaryBar.tsx').includes('/ai/plan'), 'saving highlights stays on the result block; old artifact route retained')
+includes('src/pages/assistant/AssistantSessionSummaryBar.tsx', "navigate('/me/documents')", 'saved document can open My Documents')
 includes('src/pages/ai-plan/AdvisorArtifactPanels.tsx', 'data-testid="advisor-artifact-quote"', 'covered evidence is rendered as a quotation landmark')
 includes('src/pages/ai-plan/AdvisorArtifactPanels.tsx', '<blockquote className="aa-quote"', 'covered evidence uses a blockquote, not an AI voice')
 includes('src/pages/ai-plan/AiPlanPage.tsx', 'printAdvisorArtifact', 'artifact page prints through the existing print endpoint')
@@ -531,7 +532,7 @@ if (existsSync(join(ROOT, 'playwright.w3.config.ts'))) {
   includes('playwright.w3.config.ts', "port 4183 --strictPort", 'W3 browser config owns port 4183')
   for (const env of ['VITE_API_MODE=http', 'VITE_API_BASE_URL=/api/v1', 'VITE_USE_TRTC_CALL=true', 'VITE_ALLOW_TEXT_ONLY_ASSISTANT=false', 'VITE_TERMINAL_ID=KSK-001', 'VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token', 'VITE_ENABLE_CONTRACT_REVIEW=true']) check(config.includes(env), `W3 browser build pins ${env}`)
   for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report', 'advisor artifact eight proto states fit the kiosk stage', 'advisor artifact renders covered evidence as a quotation', 'advisor artifact print-unavailable state has no print button', 'advisor artifact print waits for the server receipt', 'advisor artifact no-artifact shows the three jobs and opens AI records', 'advisor artifact expired offers only a redo', 'advisor artifact content state opens my documents']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
-  check(selfAssessmentSpec.includes('自评 PDF 在隐私根内预览且不打开新标签页 @w3-kiosk'), 'W3 browser scenario exists: self-assessment PDF stays inside the privacy root')
+  check(selfAssessmentSpec.includes('旧地址回首页 @w3-kiosk'), 'W3 browser scenario asserts parked self-assessment redirects home')
   for (const forbidden of ['addInitScript', 'localStorage', 'sessionStorage', 'waitForTimeout']) check(!spec.includes(forbidden), `W3 browser spec avoids ${forbidden}`)
 }
 

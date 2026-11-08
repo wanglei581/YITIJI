@@ -80,17 +80,6 @@ export function interviewPairs(): TouchPair[] {
         await expect(page.locator('[data-qxt-ask="on"]')).toBeVisible()
       },
     },
-    {
-      item: '面试', screen: 'interview-more', state: 'open', route: '/interview-service',
-      seeds: ['registerTouchShell', 'click 其余 4 项'],
-      missingReason: null,
-      prepare: async (page, api) => {
-        registerTouchShell(api)
-        await page.goto('/interview-service')
-        await page.getByRole('button', { name: /其余 4 项/ }).click()
-        await see(page, 'text=返回练面试')
-      },
-    },
     setup('iv-1', 1),
     setup('iv-2', 2),
     setup('iv-3', 3),

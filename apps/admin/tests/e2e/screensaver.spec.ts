@@ -7,7 +7,7 @@ test.describe('宣传屏（mock 口径）', () => {
   test('三个 Tab 可切换；删除素材有二次确认', async ({ page }) => {
     const guards = await openAuthed(page, '/screensaver')
     await settleAdminPage(page, guards)
-    await expect(page.getByRole('heading', { name: '宣传屏' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '待机宣传屏' })).toBeVisible()
     await expect(page.getByText('状态获取失败')).toHaveCount(0)
     await expect(page.getByText(/AI 文生图海报：二期能力，暂未启用/)).toBeVisible()
 

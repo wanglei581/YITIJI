@@ -416,6 +416,13 @@ test('路由登记覆盖路由表且收尾判定保持服务边界', async () =>
   const registered = routes.WIND_DOWN_ROUTES.map((route) => route.path)
   assert.equal(new Set(registered).size, registered.length)
   assert.deepEqual([...declared].sort(), registered.sort())
+  // 11/08 停放地址及深链按首页放行，不能在跳回首页之前被办理页收尾闸门挡住。
+  for (const prefix of ['/resume/career-plan', '/resume/self-assessment', '/resume/job-fit', '/resume/materials', '/resume/templates', '/activities', '/print-scan/sign', '/print/scan-sign']) {
+    for (const path of [prefix, `${prefix}/old-result`]) {
+      assert.equal(routes.windDownRoute(path)?.service, 'public', path)
+      assert.equal(routes.windDownAllows(path, 'mine'), true, path)
+    }
+  }
   assert.equal(routes.windDownAllows('/login', 'mine'), true)
   assert.equal(routes.windDownAllows('/resume/report', 'mine'), true)
   assert.equal(routes.windDownAllows('/resume/source', 'resume'), true)
@@ -497,11 +504,11 @@ test('按服务只读、交接来源及重定向分类', async () => {
   assert.equal(routes.windDownAllows('/resume/source', 'convert', '', 'convert'), false)
   for (const path of ['/interview/report', '/interview/reports']) assert.equal(routes.windDownAllows(path, 'mine'), true)
   for (const path of ['/interview/setup', '/interview/session', '/interview/tips']) assert.equal(routes.windDownAllows(path, 'mine'), false)
-  for (const [path, service] of [['/print/scan-convert', 'convert'], ['/print/scan-sign', 'sign'], ['/print/material-check', 'print'], ['/print/preview', 'print'], ['/print/params', 'print'], ['/resume', 'resume'], ['/resume/upload', 'resume'], ['/resume/export', 'resume'], ['/scan/start', 'scan'], ['/scan/settings', 'scan'], ['/scan/progress', 'scan'], ['/scan/result', 'scan']]) {
+  for (const [path, service] of [['/print/scan-convert', 'convert'], ['/print/material-check', 'print'], ['/print/preview', 'print'], ['/print/params', 'print'], ['/resume', 'resume'], ['/resume/upload', 'resume'], ['/resume/export', 'resume'], ['/scan/start', 'scan'], ['/scan/settings', 'scan'], ['/scan/progress', 'scan'], ['/scan/result', 'scan']]) {
     assert.equal(routes.windDownRoute(path).service, service, path)
     assert.equal(routes.windDownRoute(path).kind, 'work', path)
   }
-  for (const path of ['/print/scan-feature', '/jobs/online-platforms']) assert.equal(routes.windDownRoute(path).kind, 'always', path)
+  for (const path of ['/print/scan-feature', '/jobs/online-platforms', '/print/scan-sign']) assert.equal(routes.windDownRoute(path).kind, 'always', path)
   // 停放的百宝箱、智慧校园（#1583）：根路由与深链都按首页算，收尾期间也放行回首页；不误吞同前缀的别的路径。
   for (const path of ['/toolbox', '/toolbox/resume-tools', '/smart-campus', '/smart-campus/welcome', '/smart-campus/service/library']) {
     assert.equal(routes.windDownRoute(path).kind, 'always', path)

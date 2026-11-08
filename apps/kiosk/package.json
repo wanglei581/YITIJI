@@ -94,6 +94,7 @@
     "verify:home-toolbox-ui": "node scripts/verify-home-toolbox-ui.mjs",
     "verify:kiosk-parked-toolbox-campus": "node scripts/verify-kiosk-parked-toolbox-campus.mjs",
     "verify:kiosk-parked-policy": "node scripts/verify-kiosk-parked-policy.mjs",
+    "verify:kiosk-parked-core4": "node scripts/verify-kiosk-parked-core4.mjs",
     "verify:home-jobs-availability": "node scripts/verify-home-jobs-availability.mjs",
     "verify:resume-phone-upload-ui": "node scripts/verify-resume-phone-upload-ui.mjs && node --test scripts/tests/phone-upload-signature.test.mjs",
     "verify:job-material-library-ui": "node scripts/verify-job-material-library-ui.mjs",

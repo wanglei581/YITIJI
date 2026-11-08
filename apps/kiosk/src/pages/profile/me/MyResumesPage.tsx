@@ -64,10 +64,6 @@ export function MyResumesPage() {
 
   const openReport = (taskId: string) => navigate(taskPath('/resume/report', taskId), { state: { taskId, licenseViewOnly: winding } })
   const openOptimize = (taskId: string, saved: boolean) => navigate(`${taskPath('/resume/optimize', taskId)}${saved ? '&saved=1' : ''}`, { state: { taskId, licenseViewOnly: winding } })
-  const openJobFit = (item: MemberResumeItem) => {
-    if (winding || item.kind !== 'parse' || !isActionable(item)) return
-    navigate(`/resume/job-fit?${new URLSearchParams({ taskId: item.taskId, resumeName: resumeLabel(item) })}`)
-  }
   const remove = async () => {
     if (!confirmDelete || !token || confirmDelete.ownerToken !== token || deleting) return
     setDeleting(true)
@@ -133,12 +129,10 @@ export function MyResumesPage() {
                     <>
                       <SmallAct label="查看报告" disabled={!actionable} reason={disabledReason} aria={`查看 ${taskLabel} 这份简历的诊断报告`} onClick={() => openReport(item.taskId)} primary />
                       <SmallAct label={item.optimized ? '查看优化版' : '继续优化'} disabled={!actionable || (winding && !item.optimized)} reason={winding && !item.optimized ? LICENSE_NO_NEW_TASK_REASON : disabledReason} aria={`${item.optimized ? '查看' : '继续生成'} ${taskLabel} 这份简历的优化版`} onClick={() => openOptimize(item.taskId, item.optimized)} />
-                      <SmallAct label="简历对照" disabled={!actionable || winding} reason={winding ? LICENSE_NO_NEW_TASK_REASON : disabledReason} aria="用这份简历做简历对照" onClick={() => openJobFit(item)} />
                     </>
                   ) : (
                     <>
                       <SmallAct label="查看并打印" disabled={!actionable} reason={disabledReason} aria={`查看并打印 ${taskLabel} 这份 AI 生成简历`} onClick={() => openGenerate(item.taskId)} primary />
-                      <SmallAct label="简历对照" disabled reason="生成简历请先导出再上传诊断" aria="用这份简历做简历对照" onClick={() => {}} />
                     </>
                   )}
                   {confirming ? null : (
@@ -148,7 +142,6 @@ export function MyResumesPage() {
               )}
               extra={(
                 <>
-                  {!isParse ? <MeP tone="reason">生成简历暂不能直接对照；请先导出，再上传诊断。</MeP> : null}
                   {!actionable ? <MeP tone="reason">{isParse ? '报告与优化：' : ''}{disabledReason}</MeP> : null}
                   {confirming && confirmDelete ? (
                     <div role="group" aria-labelledby="resume-delete-title" className="me-confirm">

@@ -13,7 +13,7 @@ assert.match(read('src/pages/profile/me/MemberLoadMore.tsx'), /<MeBtn[^>]*classN
 assert.match(read('src/pages/profile/touch/me-touch.css'), /\.me-btn\s*\{[^}]*min-height:\s*var\(--qxt-tap\)/)
 assert.match(read('src/pages/profile/me/MyDocumentsPage.tsx'), /items.length === 0 && !pagination.nextCursor/)
 assert.match(read('src/pages/profile/me/MyResumesPage.tsx'), /confirmDelete.ownerToken === token/)
-assert.match(read('src/pages/profile/me/MyResumesPage.tsx'), /taskId: item.taskId, resumeName: resumeLabel\(item\)/)
+assert.doesNotMatch(read('src/pages/profile/me/MyResumesPage.tsx'), /openJobFit|<SmallAct label="简历对照"/, '11/08 我的简历不再提供简历对照入口')
 assert.match(read('src/pages/profile/me/MyResumesPage.tsx'), /await deleteMyResume\(token, confirmDelete.id\)/)
 assert.match(read('src/pages/profile/me/MyResumesPage.tsx'), /clearResumeReferences\(confirmDelete.taskId\)/)
 assert.match(read('src/pages/profile/me/QaRecords.tsx'), /sessionId: item.sessionId, artifactId: item.artifactId/)

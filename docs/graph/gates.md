@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2122 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2154 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -442,7 +442,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 634 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 665 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -508,9 +508,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/lib/regions.ts` | `verify-jobfair-ui.mjs` |
 | `apps/kiosk/src/lib/url.ts` | `verify-jobfair-ui.mjs` |
 | `apps/kiosk/src/main.tsx` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
-| `apps/kiosk/src/pages/activities/BenefitActivitiesPage.tsx` | `verify-fusion-w5.mjs` |
-| `apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx` | `verify-fusion-w5.mjs`<br/>`verify-no-raw-error-render.mjs` |
-| `apps/kiosk/src/pages/activities/activities-detail-inkpaper.css` | `verify-fusion-w5.mjs` |
+| `apps/kiosk/src/pages/activities/BenefitActivitiesPage.tsx` | `verify-fusion-w5.mjs`<br/>`verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx` | `verify-fusion-w5.mjs`<br/>`verify-kiosk-parked-core4.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/kiosk/src/pages/activities/activities-batch8.css` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/activities/activities-detail-inkpaper.css` | `verify-fusion-w5.mjs`<br/>`verify-kiosk-parked-core4.mjs` |
 | `apps/kiosk/src/pages/ai-plan/AdvisorArtifactPanels.tsx` | `verify-fusion-w3.mjs` |
 | `apps/kiosk/src/pages/ai-plan/AdvisorTakeaway.tsx` | `verify-fusion-w3.mjs` |
 | `apps/kiosk/src/pages/ai-plan/AiPlanPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-public-screen-mask.mjs` |
@@ -518,14 +519,15 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/ai-plan/styles/advisor-artifact-qx.css` | `verify-fusion-w3.mjs` |
 | `apps/kiosk/src/pages/assistant/AdvisorCockpit.tsx` | `verify-kiosk-ai-label-copy.mjs` |
 | `apps/kiosk/src/pages/assistant/AdvisorConversation.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
-| `apps/kiosk/src/pages/assistant/AdvisorTools.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
+| `apps/kiosk/src/pages/assistant/AdvisorTools.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-kiosk-parked-core4.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
 | `apps/kiosk/src/pages/assistant/AssistantCallPanel.tsx` | `verify-assistant-trtc-guard.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-ai-label-copy.mjs` |
 | `apps/kiosk/src/pages/assistant/AssistantHoldToTalk.tsx` | `verify-fusion-w3.mjs`<br/>`verify-kiosk-field-safety.mjs`<br/>`verify-assistant-voice.ts` |
 | `apps/kiosk/src/pages/assistant/AssistantPage.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-assistant-trtc-guard.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs`<br/>`verify-profile-feedback-inkpaper.mjs`<br/>`verify-assistant-voice.ts`<br/>`verify-toolbox-ai-skill-intents.ts` |
 | `apps/kiosk/src/pages/assistant/AssistantSessionSummaryBar.tsx` | `verify-fusion-w3.mjs` |
+| `apps/kiosk/src/pages/assistant/AssistantSheets.tsx` | `verify-kiosk-parked-core4.mjs` |
 | `apps/kiosk/src/pages/assistant/AssistantTaskPicker.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
 | `apps/kiosk/src/pages/assistant/advisorProvider.ts` | `verify-advisor-provider-gate.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
-| `apps/kiosk/src/pages/assistant/advisorScenes.ts` | `verify-advisor-provider-gate.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
+| `apps/kiosk/src/pages/assistant/advisorScenes.ts` | `verify-advisor-provider-gate.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-kiosk-parked-core4.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
 | `apps/kiosk/src/pages/assistant/advisorUserCopy.ts` | `verify-advisor-provider-gate.mjs`<br/>`verify-public-screen-mask.mjs` |
 | `apps/kiosk/src/pages/assistant/assistant-advisor.css` | `verify-kiosk-visual-unity.mjs` |
 | `apps/kiosk/src/pages/assistant/assistant-qingxu-call.css` | `verify-assistant-trtc-guard.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
@@ -653,17 +655,27 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/print-scan/ConvertImagesView.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-print-confirm-honest.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
 | `apps/kiosk/src/pages/print-scan/PrintScanFeatureInfoPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-p39-print-hub-fidelity.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
 | `apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx` | `verify-device-status-honest.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-feedback-entry.mjs`<br/>`verify-p39-print-hub-fidelity.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-service-entry-readiness.mjs`<br/>`verify-print-color-duplex-capability.ts` |
-| `apps/kiosk/src/pages/print-scan/SignStampPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/kiosk/src/pages/print-scan/SignStampPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-kiosk-parked-core4.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/print-scan/TouchToolScreen.tsx` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/print-scan/askDraft.ts` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/print-scan/components/QxPrintHubView.tsx` | `verify-device-status-honest.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-p39-print-hub-fidelity.mjs` |
 | `apps/kiosk/src/pages/print-scan/convert-images-model.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w5.mjs` |
 | `apps/kiosk/src/pages/print-scan/printHubContent.ts` | `verify-p39-print-hub-fidelity.mjs` |
-| `apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w5.mjs` |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/SignStampBits.tsx` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/SignStampGateView.tsx` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPickView.tsx` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPreview.tsx` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/SignStampStatus.tsx` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/SignStampWorkbench.tsx` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/constants.ts` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/signStampCopy.ts` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/signStampModel.ts` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-kiosk-parked-core4.mjs` |
 | `apps/kiosk/src/pages/print-scan/styles/convert-images-qx.css` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/print-scan/styles/print-hub-qx.css` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-p39-print-hub-fidelity.mjs` |
 | `apps/kiosk/src/pages/print-scan/styles/print-scan-fusion.css` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/print-scan/styles/print-scan-uplift.css` | `verify-kiosk-visual-unity.mjs` |
+| `apps/kiosk/src/pages/print-scan/styles/sign-stamp-qx.css` | `verify-kiosk-parked-core4.mjs` |
 | `apps/kiosk/src/pages/print-scan/useXiaoqingAvailability.ts` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/print/CashierPaymentPanel.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-input-safety.mjs`<br/>`verify-payment-codepay.ts` |
 | `apps/kiosk/src/pages/print/DevSandboxControls.tsx` | `verify-fusion-w2-print-scan.mjs` |
@@ -828,11 +840,11 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/renshi/renshi-touch.css` | `verify-fusion-w5.mjs` |
 | `apps/kiosk/src/pages/renshi/shared.ts` | `verify-policy-eligibility-ui.mjs`<br/>`verify-renshi-policy-ui.mjs` |
 | `apps/kiosk/src/pages/renshi/usePolicyFocus.ts` | `verify-kiosk-parked-policy.mjs`<br/>`verify-renshi-policy-ui.mjs` |
-| `apps/kiosk/src/pages/resume/CareerPlanPage.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2a-career.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-w3a-ai-records.mjs` |
+| `apps/kiosk/src/pages/resume/CareerPlanPage.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-kiosk-parked-core4.mjs`<br/>`verify-lightflow-k2a-career.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-w3a-ai-records.mjs` |
 | `apps/kiosk/src/pages/resume/GeneratePreviewChrome.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
-| `apps/kiosk/src/pages/resume/JobFitActionsPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs` |
-| `apps/kiosk/src/pages/resume/JobFitPage.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-fusion-shell.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
-| `apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/kiosk/src/pages/resume/JobFitActionsPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-parked-core4.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs` |
+| `apps/kiosk/src/pages/resume/JobFitPage.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-fusion-shell.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-parked-core4.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
+| `apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-kiosk-parked-core4.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/ResumeOptimizeComparePage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
@@ -840,8 +852,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/ResumeParsePage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/ResumeReportPage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/ResumeSourcePage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-public-screen-mask.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-word-conversion-ui.mjs` |
-| `apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-no-raw-error-render.mjs` |
-| `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-self-assessment-consent-source.mjs`<br/>`verify-w3a-ai-records.mjs`<br/>`verify-compliance.ts` |
+| `apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-kiosk-parked-core4.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-kiosk-parked-core4.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-self-assessment-consent-source.mjs`<br/>`verify-w3a-ai-records.mjs`<br/>`verify-compliance.ts` |
 | `apps/kiosk/src/pages/resume/aiResumeSession.ts` | `verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/pages/resume/components/DiagnosisDirectionForm.tsx` | `verify-fusion-w3.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/OptimizedResumeEditor.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
@@ -851,8 +863,11 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx` | `verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/ResumeUsbImportPanel.tsx` | `verify-resume-phone-upload-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/resume/components/ResumeVoiceInputButton.tsx` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
-| `apps/kiosk/src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2a-career.mjs` |
-| `apps/kiosk/src/pages/resume/components/career-plan/CareerPlanSection.tsx` | `verify-kiosk-ai-label-copy.mjs`<br/>`verify-lightflow-k2a-career.mjs` |
+| `apps/kiosk/src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx` | `verify-fusion-w3.mjs`<br/>`verify-kiosk-parked-core4.mjs`<br/>`verify-lightflow-k2a-career.mjs` |
+| `apps/kiosk/src/pages/resume/components/career-plan/CareerPlanGenerateKey.tsx` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/resume/components/career-plan/CareerPlanSection.tsx` | `verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-parked-core4.mjs`<br/>`verify-lightflow-k2a-career.mjs` |
+| `apps/kiosk/src/pages/resume/components/career-plan/CareerPlanSelfAssessmentExcluded.tsx` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/resume/components/career-plan/careerPlanGenerateCopy.ts` | `verify-kiosk-parked-core4.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareBatchBar.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareCard.tsx` | `verify-kiosk-ai-label-copy.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareCustomEditor.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
@@ -882,36 +897,43 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportExits.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportStates.tsx` | `verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx` | `verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-report-qx.mjs` |
+| `apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentConsentKit.tsx` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentQxKit.tsx` | `verify-kiosk-parked-core4.mjs` |
 | `apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts` | `verify-fusion-w3.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
-| `apps/kiosk/src/pages/resume/job-fit-qx.css` | `verify-job-fit-m1-5-ui.mjs` |
+| `apps/kiosk/src/pages/resume/hooks/useRouteIdentityGuard.ts` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/resume/job-fit-qx.css` | `verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-parked-core4.mjs` |
 | `apps/kiosk/src/pages/resume/jobFit-inkpaper.css` | `verify-fusion-w3.mjs`<br/>`verify-job-fit-m1-5-ui.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
-| `apps/kiosk/src/pages/resume/jobFit/AnonymousJobFitConsentCard.tsx` | `verify-job-fit-m1-5-ui.mjs` |
-| `apps/kiosk/src/pages/resume/jobFit/AnonymousJobFitConsentDialog.tsx` | `verify-job-fit-m1-5-ui.mjs` |
-| `apps/kiosk/src/pages/resume/jobFit/DecisionSummaryBar.tsx` | `verify-job-fit-m1-5-ui.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
-| `apps/kiosk/src/pages/resume/jobFit/FitSkillMap.tsx` | `verify-job-fit-m1-5-ui.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
+| `apps/kiosk/src/pages/resume/jobFit/AnonymousJobFitConsentCard.tsx` | `verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/resume/jobFit/AnonymousJobFitConsentDialog.tsx` | `verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/resume/jobFit/DecisionSummaryBar.tsx` | `verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-parked-core4.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
+| `apps/kiosk/src/pages/resume/jobFit/FitSkillMap.tsx` | `verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-parked-core4.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
 | `apps/kiosk/src/pages/resume/jobFit/GapActionCards.tsx` | `verify-job-fit-m1-5-ui.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
-| `apps/kiosk/src/pages/resume/jobFit/JobFitQxStates.tsx` | `verify-job-fit-m1-5-ui.mjs` |
-| `apps/kiosk/src/pages/resume/jobFit/MemberJobFitConsentCard.tsx` | `verify-job-fit-m1-5-ui.mjs` |
+| `apps/kiosk/src/pages/resume/jobFit/JobFitQxStates.tsx` | `verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/resume/jobFit/MemberJobFitConsentCard.tsx` | `verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-parked-core4.mjs` |
 | `apps/kiosk/src/pages/resume/jobFit/ResumeRewriteCard.tsx` | `verify-job-fit-m1-5-ui.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
-| `apps/kiosk/src/pages/resume/jobFit/jobFitQxKit.tsx` | `verify-lightflow-k2a-career.mjs` |
+| `apps/kiosk/src/pages/resume/jobFit/jobFitQxKit.tsx` | `verify-kiosk-parked-core4.mjs`<br/>`verify-lightflow-k2a-career.mjs` |
+| `apps/kiosk/src/pages/resume/jobFit/jobFitResultSpec.ts` | `verify-kiosk-parked-core4.mjs` |
 | `apps/kiosk/src/pages/resume/jobMaterialDraft.ts` | `verify-fusion-w3.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/pages/resume/resume-authoring-lightflow.css` | `verify-lightflow-k2b-ai-resume.mjs` |
-| `apps/kiosk/src/pages/resume/resume-decision-qx.css` | `verify-lightflow-k2a-career.mjs` |
+| `apps/kiosk/src/pages/resume/resume-decision-qx.css` | `verify-kiosk-parked-core4.mjs`<br/>`verify-lightflow-k2a-career.mjs` |
 | `apps/kiosk/src/pages/resume/resume-diagnosis-lightflow.css` | `verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/resume-fusion-youth.css` | `verify-fusion-w3.mjs` |
 | `apps/kiosk/src/pages/resume/resume-generate-qx.css` | `verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/resume-library-lightflow.css` | `verify-lightflow-k2b-ai-resume.mjs` |
-| `apps/kiosk/src/pages/resume/resume-materials-qx.css` | `verify-lightflow-k2b-ai-resume.mjs` |
+| `apps/kiosk/src/pages/resume/resume-materials-qx.css` | `verify-kiosk-parked-core4.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/resume-optimize-qx.css` | `verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/resume-r1-qx2.css` | `verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/resume-report-fixture.ts` | `verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/resume-report-model.ts` | `verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/resume-report-qx.css` | `verify-resume-report-qx.mjs` |
+| `apps/kiosk/src/pages/resume/resume-templates-qx.css` | `verify-kiosk-parked-core4.mjs` |
 | `apps/kiosk/src/pages/resume/resume-triage-panels-qx.css` | `verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/resume-triage-qx.css` | `verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/resumeGenerateDraft.ts` | `verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/pages/resume/self-assessment-lightflow.css` | `verify-compliance.ts` |
-| `apps/kiosk/src/pages/resume/selfAssessmentConsent.ts` | `verify-self-assessment-consent-source.mjs` |
+| `apps/kiosk/src/pages/resume/self-assessment-qx.css` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/resume/selfAssessmentConsent.ts` | `verify-kiosk-parked-core4.mjs`<br/>`verify-self-assessment-consent-source.mjs` |
+| `apps/kiosk/src/pages/resume/selfAssessmentInterpretation.ts` | `verify-kiosk-parked-core4.mjs` |
 | `apps/kiosk/src/pages/resume/selfAssessmentSession.ts` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-self-assessment-consent-source.mjs` |
 | `apps/kiosk/src/pages/resume/styles/resume-fusion-authoring.css` | `verify-fusion-w3.mjs` |
 | `apps/kiosk/src/pages/resume/styles/resume-fusion-common.css` | `verify-fusion-w3.mjs` |
@@ -920,17 +942,25 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/styles/resume-fusion-library.css` | `verify-fusion-w3.mjs` |
 | `apps/kiosk/src/pages/resume/touch/OptimizeEditView.tsx` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/touch/OptimizeExportView.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
+| `apps/kiosk/src/pages/resume/touch/ResumeMaterialsTouch.tsx` | `verify-kiosk-parked-core4.mjs` |
 | `apps/kiosk/src/pages/resume/touch/ResumeReadingView.tsx` | `verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/touch/ResumeSourceWhere.tsx` | `verify-public-screen-mask.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-word-conversion-ui.mjs` |
-| `apps/kiosk/src/pages/resume/touch/ResumeStates.tsx` | `verify-lightflow-k2a-career.mjs` |
+| `apps/kiosk/src/pages/resume/touch/ResumeStates.tsx` | `verify-kiosk-parked-core4.mjs`<br/>`verify-lightflow-k2a-career.mjs` |
 | `apps/kiosk/src/pages/resume/touch/ResumeTouchFrame.tsx` | `verify-job-fit-m1-5-ui.mjs` |
+| `apps/kiosk/src/pages/resume/touch/SaResultParts.tsx` | `verify-kiosk-parked-core4.mjs` |
 | `apps/kiosk/src/pages/resume/touch/compare.css` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/touch/direction.css` | `verify-fusion-w3.mjs` |
 | `apps/kiosk/src/pages/resume/touch/edit.css` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/touch/report.css` | `verify-ai-down-fallbacks.mjs`<br/>`verify-resume-report-qx.mjs` |
+| `apps/kiosk/src/pages/resume/touch/resume-fit.css` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/resume/touch/resume-materials-touch.css` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/resume/touch/resume-sa.css` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/resume/touch/resume-states.css` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/resume/touch/resume-templates.css` | `verify-kiosk-parked-core4.mjs` |
+| `apps/kiosk/src/pages/resume/touch/saActItems.ts` | `verify-kiosk-parked-core4.mjs` |
 | `apps/kiosk/src/pages/resume/touch/source.css` | `verify-fusion-w3.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
-| `apps/kiosk/src/pages/resume/useSelfAssessmentConsentBundle.ts` | `verify-self-assessment-consent-source.mjs` |
-| `apps/kiosk/src/pages/resume/useSelfAssessmentIdleExit.ts` | `verify-resume-phone-upload-ui.mjs` |
+| `apps/kiosk/src/pages/resume/useSelfAssessmentConsentBundle.ts` | `verify-kiosk-parked-core4.mjs`<br/>`verify-self-assessment-consent-source.mjs` |
+| `apps/kiosk/src/pages/resume/useSelfAssessmentIdleExit.ts` | `verify-kiosk-parked-core4.mjs`<br/>`verify-resume-phone-upload-ui.mjs` |
 | `apps/kiosk/src/pages/scan/ScanDeviceDonePage.tsx` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/ScanDeviceSettingsPage.tsx` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/scan/ScanHowPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
@@ -1002,15 +1032,16 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/upload/kiosk-code-entry.css` | `verify-lightflow-k1-public-entry.mjs` |
 | `apps/kiosk/src/pages/upload/phone-upload-service-desk.css` | `verify-fusion-w5.mjs`<br/>`verify-lightflow-k1-public-entry.mjs` |
 | `apps/kiosk/src/pages/upload/phoneUploadModel.ts` | `verify-resume-phone-upload-ui.mjs` |
-| `apps/kiosk/src/routes/index.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-fusion-baseline.mjs`<br/>`verify-fusion-shell.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-fusion-w4.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-home-toolbox-ui.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-jobfair-checkin.mjs`<br/>`verify-jobfair-commercial-closure.mjs`<br/>`verify-jobfair-ui.mjs`<br/>`verify-kiosk-end-use.mjs`<br/>`verify-kiosk-parked-toolbox-campus.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-print-parameter-capability.mjs`<br/>`verify-profile-activity-inkpaper.mjs`<br/>`verify-profile-ai-records-inkpaper.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-profile-print-orders-inkpaper.mjs`<br/>`verify-qr-login-ui.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-smart-campus-ui.mjs`<br/>`verify-visual-evidence-manifest.mjs`<br/>`frontend.mjs` |
+| `apps/kiosk/src/routes/index.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-fusion-baseline.mjs`<br/>`verify-fusion-shell.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-fusion-w4.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-home-toolbox-ui.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-jobfair-checkin.mjs`<br/>`verify-jobfair-commercial-closure.mjs`<br/>`verify-jobfair-ui.mjs`<br/>`verify-kiosk-end-use.mjs`<br/>`verify-kiosk-parked-core4.mjs`<br/>`verify-kiosk-parked-toolbox-campus.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-print-parameter-capability.mjs`<br/>`verify-profile-activity-inkpaper.mjs`<br/>`verify-profile-ai-records-inkpaper.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-profile-print-orders-inkpaper.mjs`<br/>`verify-qr-login-ui.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-smart-campus-ui.mjs`<br/>`verify-visual-evidence-manifest.mjs`<br/>`frontend.mjs` |
+| `apps/kiosk/src/routes/parkedRoutes.ts` | `verify-kiosk-parked-core4.mjs` |
 | `apps/kiosk/src/services/api/activity.ts` | `verify-jobfair-checkin.mjs`<br/>`verify-member-session-closure.mjs`<br/>`verify-profile-activity-inkpaper.mjs`<br/>`verify-activity-logs.ts` |
 | `apps/kiosk/src/services/api/advisor.ts` | `verify-ai-requests-terminal-session.mjs` |
 | `apps/kiosk/src/services/api/ai.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/services/api/aiHttpAdapter.ts` | `verify-ai-requests-terminal-session.mjs`<br/>`verify-member-session-closure.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-export-facts-contract.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-llm-timeout-concurrency.ts` |
 | `apps/kiosk/src/services/api/aiMockAdapter.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-toolbox-ai-skill-intents.ts` |
-| `apps/kiosk/src/services/api/benefitActivities.ts` | `verify-member-session-closure.mjs` |
+| `apps/kiosk/src/services/api/benefitActivities.ts` | `verify-kiosk-parked-core4.mjs`<br/>`verify-member-session-closure.mjs` |
 | `apps/kiosk/src/services/api/campusRecruitmentStats.ts` | `verify-campus-recruitment-stats.ts` |
-| `apps/kiosk/src/services/api/careerPlan.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-ai-requests-terminal-session.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-member-session-closure.mjs` |
+| `apps/kiosk/src/services/api/careerPlan.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-ai-requests-terminal-session.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-parked-core4.mjs`<br/>`verify-member-session-closure.mjs` |
 | `apps/kiosk/src/services/api/client.ts` | `verify-production-real-services.mjs`<br/>`verify-deploy-gates-in-sync.mjs` |
 | `apps/kiosk/src/services/api/companies.ts` | `verify-companies.ts` |
 | `apps/kiosk/src/services/api/contractReview.ts` | `verify-ai-requests-terminal-session.mjs`<br/>`verify-contract-review-report-print.mjs`<br/>`verify-contract-review-session.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs`<br/>`verify-member-session-closure.mjs` |
@@ -1025,7 +1056,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/services/api/jobAiHttpAdapter.ts` | `verify-ai-requests-terminal-session.mjs`<br/>`verify-job-ai-history-privacy-ui.mjs`<br/>`verify-job-ai-ui.mjs` |
 | `apps/kiosk/src/services/api/jobApplications.ts` | `verify-job-application-track.ts` |
 | `apps/kiosk/src/services/api/jobFairs.ts` | `verify-profile-commercial-first-batch.mjs` |
-| `apps/kiosk/src/services/api/jobFit.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-ai-requests-terminal-session.mjs`<br/>`verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-member-session-closure.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
+| `apps/kiosk/src/services/api/jobFit.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-ai-requests-terminal-session.mjs`<br/>`verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-parked-core4.mjs`<br/>`verify-member-session-closure.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
 | `apps/kiosk/src/services/api/jobHttpAdapter.ts` | `verify-job-info-ui.mjs` |
 | `apps/kiosk/src/services/api/jobMaterials.ts` | `verify-job-material-library-ui.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/services/api/kioskCapabilityValidation.ts` | `verify-home-toolbox-ui.mjs`<br/>`verify-kiosk-parked-toolbox-campus.mjs` |
@@ -1043,7 +1074,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/services/api/policy-eligibility.ts` | `verify-kiosk-parked-policy.mjs`<br/>`verify-policy-eligibility-ui.mjs` |
 | `apps/kiosk/src/services/api/printConversion.ts` | `verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/services/api/printScanCapabilities.ts` | `verify-prod-build-config.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-service-entry-readiness.mjs` |
-| `apps/kiosk/src/services/api/printSign.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/kiosk/src/services/api/printSign.ts` | `verify-kiosk-parked-core4.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/services/api/scanTasks.ts` | `verify-scan-session-truth.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/services/api/screensaver.ts` | `verify-kiosk-field-safety.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-print-scan-first-release.ts` |
 | `apps/kiosk/src/services/api/selfAssessment.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-ai-requests-terminal-session.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-self-assessment-consent-source.mjs`<br/>`verify-compliance.ts` |
@@ -1810,6 +1841,15 @@ node scripts/project-graph-query.mjs file <路径>
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `docs/operations/recruitment-wave2-readonly-planning-runbook.md` | `verify-recruitment-wave2-full-inventory.ts` |
+
+</details>
+
+<details>
+<summary><code>docs/product/feature-scope.md/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `docs/product/feature-scope.md` | `verify-fusion-baseline.mjs` |
 
 </details>
 

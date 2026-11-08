@@ -113,10 +113,10 @@ assert(has(files.css, '#resume-report-why'), 'bottom actions fill the row after 
 assert(has(files.css, "flex: 1.35 1 0"), 'primary action stays wider than the ghost action')
 // 2026-10-28 触屏版（稿 diagnosis）：两个入口改成页尾两颗并排按钮「简历对照 / 自我探索」，写在报告页里；
 // 「先改这几处」不再折叠，常驻在报告正文里（稿的左右两栏）。
-assert(has(files.page, "navigate('/resume/job-fit'") && has(files.page, '>简历对照<'), 'job-fit entry stays on the report')
-assert(has(files.page, '>自我探索<'), 'self-assessment entry stays on the report')
+assert(!has(files.page, "navigate('/resume/job-fit'") && !has(files.page, '>简历对照<'), 'parked job-fit entry is absent from report')
+assert(!has(files.page, '>自我探索<'), 'parked self-assessment entry is absent from report')
 assert(has(files.body, 'data-testid="resume-report-priorities"'), 'priorities stay in the report body')
-assert(has(files.page, "navigate('/resume/self-assessment/intro')"), 'self-assessment stays on the intro route')
+assert(!has(files.page, "navigate('/resume/self-assessment/intro')"), 'report does not navigate to parked self-assessment')
 const r1 = read('src/pages/resume/resume-r1-qx2.css')
 assert(has(r1, '.rrp-zone .rrp-scroll { max-height: none; overflow: visible; }'), 'report zones grow with content instead of an inner scroller')
 assert(!has(r1, 'max-height: 440px'), 'report zone no longer caps the list at 440px')
