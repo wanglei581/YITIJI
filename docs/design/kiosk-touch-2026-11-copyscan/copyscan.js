@@ -1,6 +1,9 @@
-/* copyscan.js：屏上扫描 14 屏、屏上复印 8 屏、设备状态细分 1 屏，共 23 屏。
+/* copyscan.js：屏上扫描 18 屏、屏上复印 16 屏（含面板复印图文指引 2 屏）、设备状态细分 1 屏，共 35 屏。
    待产品负责人审看的补稿：样式沿用青序流光触屏版（ui.js 部件、状态样式板的写法），定稿目录里的文件一个字节不改。
    11/04 动画补稿（待产品负责人看，还没改程序）：玻璃台、进纸器各一段「原件怎么放」，选中才播，字幕只用本文件已有原句。
+   11/08 补稿（待产品负责人看，不改程序）：复印「免费额度用完」cs-copy-quota，以及对稿清单（同目录 state-map.md）查出的缺稿：
+   屏上扫描 cs-scan-failed，屏上复印 cs-copy-more、cs-copy-unknown、cs-copy-failed、cs-copy-err-limit、cs-copy-err-off，
+   另给已有屏加了运行页才有的几种样子（地址参数见 README）。字逐字照运行页代码，出处写在各屏说明栏。
    怎么打开、屏清单、地址参数见 docs/design/kiosk-touch-2026-11-copyscan/README.md。
    类名一律 cs- 开头；状态放在 window.S.cs。地址参数可切换样子：
    ?scanner=stale 扫描仪状态过期、?scandev=off 屏上扫描没开通、?copydev=off 屏上复印没开通、
@@ -443,6 +446,27 @@
   .stage .cs-pl-cap{position:static!important;opacity:1!important;animation:none!important}
   .stage .cs-pl-sync{animation:none!important;background:transparent!important;color:inherit!important}
 }
+/* 11/08 补稿（待产品负责人看）：额度屏与对稿清单补的几种样子。只加 cs-q- / cs-solo / cs-cmore / cs-gw / cs-pv / cs-cpg / cs-pending 开头的类，前面的类一个不改。
+   两条额度说明的点列照运行页 copy/copy-print.css 27–31；单栏居中照同文件 cc-quota-solo（29–30）。 */
+.cs-q-facts{display:grid;gap:10px;margin:20px 0 0;padding:18px 0 0;list-style:none;border-top:1.5px solid var(--edge)}
+.cs-q-facts li{position:relative;padding-left:26px;font-size:24px;line-height:1.5;color:var(--ink-2)}
+.cs-q-facts li::before{content:"";position:absolute;left:4px;top:.6em;width:10px;height:10px;border-radius:50%;background:var(--teal-ink)}
+.cs-solo .cs-why{grid-template-columns:minmax(0,1fr);justify-items:center;align-content:center;gap:28px;padding:36px 56px;text-align:center}
+.cs-solo .cs-q-facts{justify-items:center}
+.cs-cmore .cs-strip .cs-pg,.cs-cmore .cs-strip .cs-pg>svg:not(.dash){width:250px;height:354px}
+.cs-gw{margin:0;padding:14px 20px;border-radius:20px;background:var(--clay-wash);color:var(--clay-ink);font-size:23px;font-weight:600;line-height:1.5}
+.cs-gw ol{margin:4px 0 0;padding-left:34px}
+.cs-pv{align-self:center;display:flex;flex-direction:column;align-items:center;gap:14px;max-width:620px;font-size:24px;line-height:1.5;color:var(--ink-2);text-align:center}
+.cs-pv svg{color:var(--ink-3)}
+.cs-cpg{flex:none}
+.cs-ring.cs-pending b{font-size:60px}
+/* 屏上扫描中断结果屏：照运行页 scan/styles/scan-fs.css 228–252，说明格按内容定高，多出来的高度给扫描小样，不撑空格 */
+.body.fs-fill.cs-fsfail .fs-facts{flex:none;grid-auto-rows:auto}
+.cs-fsfail .cs-sample{flex:1 1 0;min-height:160px;display:flex;align-items:center;justify-content:center;padding:16px 20px;border-radius:22px;background:var(--well);overflow:hidden}
+.cs-fsfail .cs-sample svg{height:100%;width:auto;max-width:100%;max-height:100%}
+/* 预览打不开：照运行页完成屏预览区那张白纸（文件图标、文件名、一句话） */
+.cs-pvsheet{align-self:stretch;width:560px;max-width:100%;justify-content:center;padding:28px 36px;border-radius:14px;background:#fff;box-shadow:0 6px 18px rgba(11,36,30,.10)}
+.cs-pvsheet b{font-size:26px;color:var(--ink);word-break:break-all}
 `;
   document.head.appendChild(css);
 
@@ -481,6 +505,19 @@
         gone: ['nofile', 'link'].includes(q.get('gone')) ? q.get('gone') : 'unavailable',
         offlineStage: ['start', 'make'].includes(q.get('offline')) ? q.get('offline') : 'run', netChecking: false
       };
+      /* 11/08 补的几种样子：值都是字符串，演示事件用 set:键=值 改，空串是默认样子 */
+      const pick = (k, list) => (list.includes(q.get(k)) ? q.get(k) : '');
+      Object.assign(s.cs, {
+        matNone: q.get('mat') === 'none' ? '1' : '',
+        probe: pick('scanner', Object.keys(PROBE)),
+        quota: pick('quota', ['member', 'terminal']) || 'guest', limit: pick('limit', ['none']),
+        run: pick('run', ['waiting', 'finishing']), start: pick('start', ['busy', 'rejected', 'offline', 'limit', 'unknown']),
+        make: pick('make', ['delivering']), guest: pick('guest', ['ways']), owned: pick('owned', ['0']),
+        preview: pick('preview', ['loading', 'fail']), cpg: pick('cpages', ['7']), quote: pick('quote', ['changed', 'odd', 'none']),
+        net: pick('net', ['off']), pstate: pick('printer', ['unknown']), quiet: pick('quiet', ['none']), purged: pick('purged', ['0']),
+        busy: pick('busy', ['1']), why: pick('why', ['wait', 'stop', 'token']),
+        fail: pick('fail', ['expired', 'nofile']), reason: pick('reason', ['stopped', 'warming', 'large', 'ack']), rescan: pick('rescan', ['lost'])
+      });
     }
     if (!window.__csClear && typeof window.doClear === 'function') {
       window.__csClear = true;
@@ -495,29 +532,53 @@
   const printerOff = () => S().printer === 'down';
 
   /* 扫描仪、复印的可用性：状态过期或没开通时，屏上方式灰掉并给出路 */
+  /* 11/08：运行页其余几种检查结论（?scanner=…），句子逐字照 scan/scanProbeCopy.ts 66–80；复印把「扫描能力 / 屏上扫描 / 面板扫描」
+     换成「复印能力 / 屏上复印 / 面板复印」，照 copy/useCopyFlow.ts 46。网络断开句照 copy/unattendedCopy.ts 176（标准句）。 */
+  const PROBE = {
+    capcheck: '正在检查这台机器能不能在屏上扫描',
+    capfail: '屏上扫描能力暂时无法确认，请先用面板扫描',
+    checking: '正在检查扫描仪',
+    unreachable: '本机程序连不上，扫描仪状态未知，请先用面板扫描',
+    unknown: '扫描仪状态未知，请先用面板扫描',
+    busy: '扫描仪正忙，请稍后再试',
+    notfound: '未找到扫描仪，请先用面板扫描',
+    error: '扫描仪状态暂时无法确认，请先用面板扫描'
+  };
+  const asCopy = (t) => t.replace(/扫描能力/g, '复印能力').replace(/屏上扫描/g, '屏上复印').replace(/面板扫描/g, '面板复印');
+  const NET = '网络断开时，我们会收到提醒并远程处理';
+  const PRINTER_UNKNOWN = '打印机状态暂时无法确认，请先用面板复印';
+  const probing = (c) => c.probe === 'capcheck' || c.probe === 'checking';
   function scanBlock() {
     const c = st();
     if (c.scandev === 'off') return '这台机器还没开通屏上扫描';
     if (c.scanner === 'stale') return '扫描仪状态 2 分钟没更新，先用面板扫描';
+    if (c.probe) return PROBE[c.probe];
     return '';
   }
   function copyBlock() {
     const c = st();
+    if (c.net) return NET;
     if (c.copydev === 'off') return '这台机器暂时只能在打印机面板上复印';
     if (c.scanner === 'stale') return '扫描仪状态 2 分钟没更新，先用面板复印';
+    if (c.probe) return asCopy(PROBE[c.probe]);
+    if (c.pstate) return PRINTER_UNKNOWN;
     return '';
   }
   function scanChip() {
     const c = st();
     if (c.scandev === 'off') return { text: '屏上扫描未开通', warn: 1 };
     if (c.scanner === 'stale') return { text: '扫描仪状态过期 · 2 分钟前', warn: 1 };
+    if (c.probe) return { text: PROBE[c.probe], warn: 1 };
     return { text: '扫描仪就绪 · 20 秒前检查' };
   }
   function copyChip() {
     const c = st();
+    if (c.net) return { text: NET, warn: 1 };
     if (printerOff()) return { text: '打印机离线', warn: 1 };
     if (c.copydev === 'off') return { text: '屏上复印未开通', warn: 1 };
     if (c.scanner === 'stale') return { text: '扫描仪状态过期 · 2 分钟前', warn: 1 };
+    if (c.probe) return { text: asCopy(PROBE[c.probe]), warn: 1 };
+    if (c.pstate) return { text: PRINTER_UNKNOWN, warn: 1 };
     return { text: '设备就绪 · 20 秒前检查' };
   }
 
@@ -674,8 +735,9 @@
     return shell({
       band: { eyebrow: '屏上扫描', title: '扫什么？', status: scanChip(), rail: { labels: SCAN_RAIL, now: 0 } },
       cls: 'cs-what',
-      body: `<div class="cs-types" role="group" aria-label="扫什么">${Object.keys(MATS).map((k) => typeCard(k, c.mat === k)).join('')}</div>`,
-      dock: D({ back: { go: 'print' }, ask: '问小青：扫描和复印有什么不同', pri: pri('下一步', 'data-cs="what-next"') })
+      body: `<div class="cs-types" role="group" aria-label="扫什么">${Object.keys(MATS).map((k) => typeCard(k, !c.matNone && c.mat === k)).join('')}</div>`,
+      /* ?mat=none：运行页一种都没选时主按钮写「先选一种材料」、灰、无箭头（scan/ScanStartPage.tsx 261–287） */
+      dock: D({ back: { go: 'print' }, ask: '问小青：扫描和复印有什么不同', pri: c.matNone ? pri('先选一种材料', '', { dis: 1, noArrow: 1 }) : pri('下一步', 'data-cs="what-next"') })
     });
   }
   /* 2 怎么扫：只问方式，二选一 */
@@ -690,12 +752,35 @@
         </div>
         ${S().logged ? '' : `<div class="cs-login"><span>想带走电子版？先扫码登录（微信一扫，不用短信），扫完会存进<span style="white-space:nowrap">「我的文档」</span></span><button class="btn pri" data-go="login">先登录</button></div>`}
         <div class="cs-hold" role="note">${icon('usb', 32, 2)}<span>用 U 盘：在打印机面板上选「扫描到 U 盘」——这台机器暂未开通</span></div>`,
-      dock: D({ back: { go: 'cs-scan-what' }, ask: '问小青：两种扫法怎么选', pri: pri('下一步', 'data-cs="how-next"') })
+      /* 检查中（?scanner=capcheck|checking）主按钮照 scan/ScanHowPage.tsx 145–147：「正在检查扫描仪」、灰、无箭头 */
+      dock: D({ back: { go: 'cs-scan-what' }, ask: '问小青：两种扫法怎么选', pri: probing(c) ? pri('正在检查扫描仪', '', { dis: 1, noArrow: 1 }) : pri('下一步', 'data-cs="how-next"') })
     });
   }
   /* 3 放纸与设置（上一屏已经选过方式，要改就点「返回」，这里不再放「改用面板扫描」） */
   function scanSet() {
     const c = st(), blocked = scanBlock(), m = MATS[c.mat], src = srcOf(c), ink = inkOf(c);
+    /* 11/08：运行页这一屏的几种样子（scan/ScanDeviceSettingsPage.tsx 60–80、147；scan/useScanDeviceStart.ts 20–21）：
+       ?scanner=checking 胶囊「正在确认扫描仪」、开始灰；?start=busy「正在开始」；?start=rejected / offline 在提示行写两句之一 */
+    const checking = probing(c);
+    const START = { rejected: '这一次没有建成扫描。可以再点一次开始。', offline: '状态未知。这一次没能确认有没有建成扫描，请先返回，过一会儿再试。不要再点开始。' };
+    const startNote = START[c.start] ? `<p class="cs-warn">${START[c.start]}</p>` : '';
+    const startPri = c.start === 'busy' ? pri('正在开始', '', { dis: 1 }) : pri('开始扫描', 'data-cs="set-start"', { dis: !!blocked || c.start === 'offline' });
+    if (checking || c.start) {
+      return shell({
+        band: { eyebrow: '屏上扫描 · ' + m.label, title: '纸放哪？扫成黑白还是彩色？', status: checking ? { text: '正在确认扫描仪', warn: 1 } : scanChip(), rail: { labels: SCAN_RAIL, now: 2 } },
+        cls: 'cs-set',
+        body: `<div class="sec-t">纸放哪？</div>
+          <div class="cs-two">${srcCard('glass', src, 'src')}${srcCard('feeder', src, 'src')}</div>
+          <div class="sec-t">黑白还是彩色？</div>
+          <div class="seg tall cs-seg">
+            <button data-cs="ink:bw" aria-pressed="${ink === 'bw'}">黑白<small>文字材料</small></button>
+            <button data-cs="ink:color" aria-pressed="${ink === 'color'}">彩色<small>带照片、带颜色的材料</small></button>
+          </div>
+          ${howto('多页单面材料用进纸器一次扫完；玻璃台适合证件、书本，一面一面扫')}
+          ${startNote}`,
+        dock: D({ back: { go: 'cs-scan-how' }, ask: '问小青：纸怎么放', pri: checking ? pri('开始扫描', '', { dis: 1 }) : startPri })
+      });
+    }
     return shell({
       band: { eyebrow: '屏上扫描 · ' + m.label, title: '纸放哪？扫成黑白还是彩色？', status: scanChip(), rail: { labels: SCAN_RAIL, now: 2 } },
       cls: 'cs-set',
@@ -712,7 +797,35 @@
     });
   }
   /* 3 正在扫描（屏上复印的第 1 步同一个样子：copy 为真时换标题和路径线） */
+  /* 11/08：运行页还有两种样子（scan/ScanDeviceRunView.tsx 49–56、71–113；copy/CopyDeviceView.tsx 46–48）：
+     ?run=waiting 已交给机器、等扫描仪回报开始；?run=finishing 复印扫完、整理成预览（扫描这一步在 cs-scan-make） */
+  function runWait(copy) {
+    const c = st(), fin = copy && c.run === 'finishing', none = c.pages === 'none', n = c.rec == null ? 2 : c.rec;
+    const t3 = fin && !none ? '已收到 ' + n + ' 页' : '正在扫描';
+    const steps = fin
+      ? [['已收到', '完成', '这台机器收到了扫描请求', 'on'], ['扫描仪已开始', '完成', '扫描仪回报已经开始扫', 'on'], [t3, '完成', none ? '先别动原件' : '每扫完一整页才加一', 'on'], ['整理成预览', '进行中', '扫完后准备给你核对', 'now']]
+      : [['已收到', '完成', '这台机器收到了扫描请求', 'on'], ['扫描仪已开始', '未开始', '扫描仪回报已经开始扫', ''], ['正在扫描', '未开始', '先别动原件', ''], copy ? ['整理成预览', '未开始', '扫完后准备给你核对', ''] : ['生成文件并传回', '未开始', '扫完后合成一个 PDF', '']];
+    const big = !fin || none;
+    const band = fin
+      ? { eyebrow: '屏上复印', title: '正在扫原件', sub: '扫完后准备给你核对', status: { text: '整理成预览' }, rail: { labels: COPY_RAIL, now: 0 } }
+      : copy
+        ? { eyebrow: '屏上复印', title: '正在扫原件', sub: '还在等扫描仪回报已经开始。先别动原件。', status: { text: '等待扫描仪', warn: 1 }, rail: { labels: COPY_RAIL, now: 0 } }
+        : { eyebrow: '屏上扫描', title: '已把扫描请求交给这台机器', sub: '还在等扫描仪回报已经开始。先别动原件。', status: { text: '等待扫描仪', warn: 1 }, rail: { labels: SCAN_RAIL, now: 3 } };
+    return shell({
+      band, cls: 'cs-run',
+      body: `${psteps(steps)}
+        <div class="cs-hero${big ? ' none' : ''}"><div class="cs-hrow">
+          <div class="cs-reader" aria-hidden="true">${pageSvg(big ? 520 : 440, big ? 736 : 622, 0)}${fin ? '' : '<span class="scanline"></span>'}</div>
+          <div class="cs-side">
+            ${big ? `<div class="cs-spin" aria-hidden="true"></div><b class="cs-big">${fin ? '正在扫描' : '等待扫描仪'}</b>`
+              : `<div class="cs-count"><b>${n}</b><span>页</span></div><p class="cs-cap">已收到</p>`}
+          </div></div>${big ? '' : thumbs(n, '整理成预览')}</div>
+        ${armNote()}<p class="cs-fine">每扫完一整页才加一；扫描仪不报就不显示页数</p>`,
+      dock: dock({ back: false, ask: '问小青：一直扫不完怎么办', mid: stopBtn(copy ? '停止复印' : '停止扫描') })
+    });
+  }
   function runScreen(copy) {
+    if (st().run === 'waiting' || (copy && st().run === 'finishing')) return runWait(copy);
     const c = st(), none = c.pages === 'none', n = c.rec == null ? 2 : c.rec;
     const third = none ? ['正在扫描', '进行中', '先别动原件'] : ['已收到 ' + n + ' 页', '进行中', '每扫完一整页才加一'];
     const last = copy ? ['整理成预览', '未开始', '扫完后准备给你核对'] : ['生成文件并传回', '未开始', '扫完后合成一个 PDF'];
@@ -735,6 +848,22 @@
   /* 4 这一页扫好了（只在玻璃台方式） */
   function scanMore() {
     const c = st(), n = c.rec == null ? 2 : c.rec, full = n >= 20;
+    /* 11/08：?pages=none 扫描仪不报页数或上限、?busy=1 命令在途（scan/ScanDeviceMoreView.tsx 32–36、64–96）。
+       不报页数时程序那一格只有一句「这一页已扫好」，稿放玻璃台大图把格子占住，字不加。 */
+    if (c.pages === 'none' || c.busy) {
+      const none = c.pages === 'none', busy = !!c.busy;
+      return shell({
+        band: { eyebrow: '屏上扫描 · 玻璃台', title: '这一页扫好了，还有下一页吗？', status: { text: none ? '这一页已扫好' : '已收到 ' + n + ' 页' }, rail: { labels: SCAN_RAIL, now: 3 } },
+        cls: 'cs-more',
+        body: `<div class="cs-strip">${none ? glassSvg(300) : thumbs(n, '下一页', true)}<p>${none ? '这一页已扫好' : `已收到 ${n} 页<small>最多 20 页</small>`}</p></div>
+          <div class="cs-ways">
+            ${wayCard({ cs: 'more', dis: full || busy, t: '再扫一页', d: full ? '已经到 20 页，不能再加了' : '先把下一页放上玻璃台，字朝下，对齐左上角', vis: glassSvg(150) })}
+            ${wayCard({ cs: 'finish', dis: busy, t: '扫完了，生成文件', d: none ? '把已经扫到的页合成一个 PDF' : '把已收到的 ' + n + ' 页合成一个 PDF', vis: stack(120, 3, '') })}
+          </div>
+          ${armNote()}${remind(none ? '10 分钟内没操作会自动结束' : '最多 20 页；10 分钟内没操作会自动结束', 'clock')}`,
+        dock: D({ left: stopBtn('停止扫描', true), ask: '问小青：下一页怎么放', pri: pri('扫完了', 'data-cs="finish"', { dis: busy }) })
+      });
+    }
     return shell({
       band: { eyebrow: '屏上扫描 · 玻璃台', title: '这一页扫好了，还有下一页吗？', status: { text: '已收到 ' + n + ' 页' }, rail: { labels: SCAN_RAIL, now: 3 } },
       cls: 'cs-more',
@@ -750,13 +879,15 @@
   /* 5 正在生成文件 */
   function scanMake() {
     const c = st(), n = c.rec == null ? 3 : c.rec;
+    /* 11/08：?make=delivering 正在传回、?pages=none 不报页数（scan/ScanDeviceMakeView.tsx 40–66） */
+    const del = c.make === 'delivering', none = c.pages === 'none';
     return shell({
       band: { eyebrow: '屏上扫描', title: '正在生成文件', sub: '扫描仪已经扫完，正在把页面合成一个文件。', status: { text: '正在生成文件' }, rail: { labels: SCAN_RAIL, now: 3 } },
       cls: 'cs-make',
       body: `<div class="stagelist">
-          <div class="it ok"><span class="ico">${icon('check', 24, 3)}</span>扫描仪已扫完 · 共收到 ${n} 页</div>
-          <div class="it now"><span class="ico"></span>生成一个 PDF</div>
-          <div class="it"><span class="ico"></span>传回这台机器</div>
+          <div class="it ok"><span class="ico">${icon('check', 24, 3)}</span>${none ? '扫描仪已扫完' : `扫描仪已扫完 · 共收到 ${n} 页`}</div>
+          <div class="it ${del ? 'ok' : 'now'}"><span class="ico">${del ? icon('check', 24, 3) : ''}</span>生成一个 PDF</div>
+          <div class="it${del ? ' now' : ''}"><span class="ico"></span>传回这台机器</div>
         </div>
         <div class="cs-merge">
           <div class="cs-pile" aria-hidden="true">
@@ -764,7 +895,7 @@
             <span style="position:absolute;left:100px;top:40px;transform:rotate(-1deg)">${pageSvg(300, 424, 2)}</span>
             <span style="position:absolute;left:210px;top:0;transform:rotate(5deg)">${pageSvg(300, 424, 0)}</span>
           </div>
-          <div class="cs-facts"><div><b>${n} 页</b><span>刚收到的</span></div><div><b>1 个 PDF</b><span>合成后的文件</span></div><div><b>这台机器</b><span>文件先放在这里</span></div></div>
+          <div class="cs-facts"><div><b>${none ? '还没回报' : n + ' 页'}</b><span>刚收到的</span></div><div><b>1 个 PDF</b><span>合成后的文件</span></div><div><b>这台机器</b><span>文件先放在这里</span></div></div>
         </div>
         ${armNote()}<p class="cs-fine">文件传回来之前，请先别离开。</p>`,
       dock: dock({ back: false, ask: '问小青：文件还没出来', mid: stopBtn('停止') })
@@ -778,20 +909,24 @@
     const ai = isResume
       ? rowBtn('data-go="reading"', 'sparkle', 'AI 简历识别', '识别扫描件内容，进入简历诊断与优化')
       : `<button class="cs-row" disabled><span class="ic">${icon('sparkle', 36, 2)}</span><span class="tx"><b>AI 简历识别</b><small>AI 简历识别只对简历扫描开放；这次扫的是「${m.label}」。</small></span></button>`;
+    /* 11/08 运行页才有的三种样子：?guest=ways 游客三条出路（scan/scanGuestWays.ts 11–24，第三条后半句只在小程序已发布时出现）；
+       ?login=1&owned=0 已登录但「我的文档」里还没核对到这份（scan/ScanDeviceDonePage.tsx 32–48）；?preview=fail 预览打不开（components/PdfCanvasPreview.tsx 22） */
+    const owned = !c.owned;
+    const ways = `<div class="cs-gw">未登录扫描件不会进入「我的文档」。带走的办法：<ol><li>当场打印：请在本次操作内完成打印或识别。</li><li>存 U 盘：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。</li><li>存进「我的文档」：下次先扫码登录再扫${c.mini ? '，手机小程序里也能看到' : ''}。</li></ol></div>`;
     const note = logged
-      ? `<div class="cs-saved">${icon('folder', 40, 2)}<span>这份扫描件已存进「我的文档」${c.mini ? '，手机上打开职易达小程序也能看到' : ''}</span></div>`
-      : '<p class="cs-warn">未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。<br>要带走电子版，下次先扫码登录再扫。</p>';
+      ? (owned ? `<div class="cs-saved">${icon('folder', 40, 2)}<span>这份扫描件已存进「我的文档」${c.mini ? '，手机上打开职易达小程序也能看到' : ''}</span></div>` : '')
+      : (c.guest ? ways : '<p class="cs-warn">未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别。<br>要带走电子版，下次先扫码登录再扫。</p>');
     return shell({
       band: { eyebrow: '扫描完成', title: '扫描完成，文件已传回', sub: '先核对文件，再选下一步。', status: { text: '文件已传回' }, rail: { labels: SCAN_RAIL, now: 4 } },
       cls: 'cs-done',
       body: `<div class="cs-file"><div class="cs-fhead"><span class="ft">PDF</span><div class="tx"><b>${fileName(c)}</b><span class="meta">${n} 页 · ${fileSize(c)}</span></div><span class="chips"><span class="chip">${m.label}</span>${id ? '<span class="chip clay">敏感文件 · 自动清理</span>' : ''}</span></div>
-          <div class="cs-fpages">${pgs}</div>
+          <div class="cs-fpages">${c.preview === 'fail' ? `<div class="cs-pv cs-pvsheet">${icon('file', 72, 1.6)}<b>${fileName(c)}</b><span>预览没能生成，打印仍按原文件。</span></div>` : pgs}</div>
           <p class="cs-fine">页数和方向请自己核一下</p></div>
         ${note}
         <div class="cs-rows">
           ${rowBtn('data-go="pii"', 'printer', '拿去打印', '先检查文件和个人信息，再打印')}
           ${ai}
-          ${logged ? rowBtn('data-go="my-docs"', 'folder', '前往我的文档', '在「我的文档」里看和管理这份扫描件') : ''}
+          ${logged && owned ? rowBtn('data-go="my-docs"', 'folder', '前往我的文档', '在「我的文档」里看和管理这份扫描件') : ''}
           ${rowBtn('data-cs="again"', 'refresh', '再扫一份', '回到第一步，重新选材料')}
         </div>
         ${remind('原件还在玻璃台或进纸器里，请取走', 'hand')}`,
@@ -804,13 +939,17 @@
   const retry = (copy) => (copy ? 'retry-copy' : 'retry');
   function errScreen(o) {
     const c = st(), copy = c.flow === 'copy', opts = o.opts(copy);
+    /* 11/08：?busy=1 重试、改用玻璃台或改用面板还在途：卡片、返回、主按钮全灰，字不变（scan/ScanDeviceErrorPage.tsx 44、59–60） */
+    const busy = !!c.busy;
     return shell({
       band: { eyebrow: copy ? '屏上复印' : '屏上扫描', title: o.title, sub: o.sub, status: { text: o.chip, warn: 1 } },
       cls: 'cs-err cs-err' + opts.length,
       body: `<div class="cs-why"><span class="vis">${o.art}<i class="warn">${icon('alert', 34, 2.4)}</i></span><div><b>${o.reason[0]}</b><p>${o.reason[1]}</p></div></div>
-        <div class="cs-ways">${opts.map(wayCard).join('')}</div>
+        <div class="cs-ways">${opts.map((x) => wayCard(busy ? Object.assign({}, x, { dis: 1 }) : x)).join('')}</div>
         ${remind(HELP)}`,
-      dock: D({ back: { go: o.back || (copy ? 'cs-copy-set' : 'cs-scan-set') }, ask: o.ask, pri: o.pri(copy) })
+      dock: busy
+        ? D({ left: `<button class="btn sec" disabled>${icon('chevL', 30, 2.4)}返回</button>`, ask: o.ask, pri: o.pri(copy).replace('class="btn pri"', 'class="btn pri" disabled') })
+        : D({ back: { go: o.back || (copy ? 'cs-copy-set' : 'cs-scan-set') }, ask: o.ask, pri: o.pri(copy) })
     });
   }
   const E = {
@@ -917,6 +1056,19 @@
   /* 12 已停止 */
   function scanStopped() {
     const c = st(), copy = c.flow === 'copy';
+    /* 11/08（只扫描）：?quiet=none 停止回包没带服务端时间、?purged=0 本机回包没说已删页（scan/ScanDeviceStoppedPage.tsx 16–38） */
+    if (!copy && (c.quiet || c.purged)) {
+      const quiet = !c.quiet;
+      return shell({
+        band: { eyebrow: '屏上扫描', title: '已停止扫描', sub: '这次到这里为止，不会再继续。', status: { text: '已停止', warn: 1 } },
+        cls: 'cs-stopped',
+        body: `<div class="cs-fact big"><span class="ic">${icon('erase', 40, 2)}</span><b>${c.purged ? '已停止扫描' : '已停止扫描，已扫的页已从这台机器删除'}</b></div>
+          <div class="cs-wait"><div class="cs-ring${quiet ? '' : ' cs-pending'}">${ring(1, 480, 26)}<b>${quiet ? '90<small>秒</small>' : '请稍候'}</b></div>
+            <div class="tx">${quiet ? '<b>90 秒后才能开始新的扫描</b><span>为了不让下一位看到你的材料，90 秒后才能开始新的扫描。</span>' : '<b>请稍候再开始新的扫描</b><span>为了不让下一位看到你的材料，过一会儿才能开始新的扫描。</span>'}</div></div>
+          <div class="cs-fact"><span class="ic">${icon('hand', 36, 2)}</span><b>原件还在玻璃台或进纸器里，请取走</b></div>`,
+        dock: D({ back: { go: 'print', label: '回打印扫描' }, ask: quiet ? '问小青：为什么要等 90 秒' : '问小青：为什么要等', pri: pri('回首页', 'data-go="home"') })
+      });
+    }
     return shell({
       band: { eyebrow: copy ? '屏上复印' : '屏上扫描', title: copy ? '已停止复印' : '已停止扫描', sub: '这次到这里为止，不会再继续。', status: { text: '已停止', warn: 1 } },
       cls: 'cs-stopped',
@@ -940,6 +1092,38 @@
       dock: D({ back: { go: 'print' }, ask: '问小青：面板上怎么扫', pri: pri('到打印机面板上扫', 'data-cs="panel"') })
     });
   }
+  /* 11/08 补稿：屏上扫描中断后的结果屏。程序借的是面板扫描的失败屏（scan/ScanResultFailedView.tsx 36–109，原因句 scan/scanDeviceState.ts
+     111–159、scan/scanDeliveryAck.ts 124–126），所以这里照定稿 fix-scan.js scanFail 的 fs- 版式画、字换成运行页原句：
+     眉题「扫描完成」、面板四步路径线停在「扫描完成」。?fail=expired|nofile；?reason=stopped|warming|large|ack；?rescan=lost。 */
+  const FAIL_REASON = {
+    '': '这次扫描没有完成。',
+    stopped: '已停止扫描。这次到这里为止，不会再继续。',
+    warming: '扫描仪还在预热。这次先停在这里。',
+    large: '这一次超过了这台机器能收的大小。这次先停在这里。',
+    ack: '系统没有确认这一场能收到扫描件（已过期、被取消或已经结束），本机已经把它撤掉。面板上扫出来的文件不会交到这一场，你手上的纸也不会被谁收走。要继续请重新开始一次扫描。'
+  };
+  function scanFailed() {
+    const c = st(), nofile = c.fail === 'nofile', expired = c.fail === 'expired', lost = !!c.rescan, auth = !nofile && !lost;
+    const kind = nofile ? '已完成 · 结果里没有文件' : expired ? '等待超时' : '扫描未完成';
+    const fact = (t, d, wide) => `<div class="fs-fact${wide ? ' wide' : ''}"><b>${t}</b>${d}</div>`;
+    const first = nofile
+      ? fact('系统说已完成，但这次结果里没有可用文件', '<span>系统确认<b>这次扫描已经完成</b>，可是同一份结果里<b>没有带可用的文件信息</b>（结果里允许不带文件，这不是出错）。</span><span>这份文件此刻还在不在系统里，<b>本机没有依据判断</b>。页面不替系统说它还在，不说它已被删掉，也不承诺能找回来。这次扫描到此结束。</span>', 1)
+      : fact(expired ? '等待超时，这次没有拿到文件' : '这次没扫成的原因', `<span>${expired ? '等待超时，这次没有拿到文件。' : FAIL_REASON[c.reason]}</span>`, 1);
+    const rowGo = (go, t, d) => `<button class="fs-row" data-go="${go}"><span><b>${t}</b><small>${d}</small></span><span class="go">${icon('chevR', 28, 2.2)}</span></button>`;
+    const ai = S().ai === 'down' ? '<p class="fs-help">小青暂时接不上。这一步不用它也能做完，照下面的按钮继续。</p>' : '';
+    return band({ back: true, seal: null, kind: 'compact', eyebrow: '扫描完成', title: kind, sub: '本次没有生成可用的扫描文件', status: { text: nofile ? kind : expired ? '等待超时 · 没有文件' : '扫描未完成', warn: 1 }, rail: { labels: ['选类型', '扫描指引', '等回传', '扫描完成'], now: 3 } })
+      + `<main class="body fs-fill cs-fsfail"><div class="fs-grow">${ai}<div class="fs-facts">${first}
+          ${fact('同一张纸', '<span>同一张纸原样再扫，系统可能按重复件拒收（两小时内）。</span>', 1)}
+          ${fact('重试扫描（同一份材料）', `<span>${auth ? '这一次会带上上一场的凭据去申请安全重扫放行：系统认了，同一份材料照原样再扫一遍就行；不认会在下一页当场说明，不会悄悄按普通重扫处理。' : '本机没有可用的安全重扫凭据。这里不写成已经放行。'}</span>`)}
+          ${fact('重新开始一次扫描', '<span>这是一次普通新会话，不是免查重的重扫。不自动重扫。</span>')}</div>
+          ${lost ? '<p class="fs-warn"><b>刚才那份安全重扫凭据已经用不了了</b>（超过 15 分钟，或者中间清过场 / 换过人）。本页<b>没有</b>替你改成普通重扫 —— 同一张纸如果走普通扫描，系统会按重复件拒收，你会在机器前白等到这次扫描过期。要继续，请自己按右下角<b>「重新开始一次扫描」</b>，并且换一份材料。</p>' : ''}
+          <p class="fs-help">${HELP}</p>
+          <div class="cs-sample" aria-hidden="true">${scanPaper(300)}</div></div>
+        ${nofile ? '' : rowGo('home', '返回首页', '结束这次等待')}
+        ${auth ? rowGo('scan-guide', '重新开始一次扫描', '回选类型，不带安全重扫凭据') : ''}</main>`
+      + dock({ back: false, left: `<button class="btn sec" data-go="print">${icon('chevL', 30, 2.4)}返回打印扫描</button>`, ask: '问小青：扫描失败怎么办', pri: { label: auth ? '重试扫描（同一份材料）' : '重新开始一次扫描', go: 'scan-guide' } })
+      + nav(null);
+  }
 
   /* ═════════ 屏上复印 ═════════ */
   /* 14 怎么复印 */
@@ -961,6 +1145,12 @@
     const c = st(), off = printerOff(), n = c.copies, colorOff = c.color === 'off', dupOff = c.duplex === 'off';
     const cink = colorOff ? 'bw' : c.cink, dup = dupOff ? 'single' : c.dup;
     const off2 = (label) => `<button disabled>${label}<small>本机暂未开通</small></button>`;
+    /* 11/08：运行页设置下面的提示行（copy/CopyWorkbenchPage.tsx 42、64–72；copy/copySession.ts 95–101）：
+       ?start=busy 正在建单（开始灰）、?start=limit 超过这台机器能收的大小、?start=unknown 结果没确认；
+       ?scanner=capcheck…error、?printer=unknown、?net=off 时把原因写在这里，开始复印变灰。?scanner=stale 照旧只改胶囊。 */
+    const CSTART = { limit: '这一次超过了这台机器能收的大小。这次先停在这里。', unknown: '状态未知。这一步的结果还没确认，请先用面板复印。不要更改设置后重新开始。' };
+    const why = c.copydev === 'off' || off || c.scanner === 'stale' ? '' : copyBlock();
+    const setNote = CSTART[c.start] || why, setDis = !!why || c.start === 'busy';
     return shell({
       band: { eyebrow: '屏上复印', title: '放好原件，选份数', status: copyChip(), rail: { labels: COPY_RAIL, now: 0 } },
       cls: 'cs-cset',
@@ -972,24 +1162,33 @@
           <div class="prow"><span>单双面</span><div class="seg cs-seg"><button data-cs="dup:single" aria-pressed="${dup === 'single'}">单面</button>${dupOff ? off2('双面') : `<button data-cs="dup:double" aria-pressed="${dup === 'double'}">双面</button>`}</div></div>
         </div>
         <p class="cs-fine">原件几页，扫完才知道；扫完会给你核对</p>
-        ${off ? `<p class="cs-warn">${MACHINE}</p>` : ''}`,
-      dock: D({ back: { go: 'cs-copy-how' }, ask: '问小青：份数怎么选', pri: pri(off ? '打印机离线' : '开始复印', 'data-cs="copy-start"', { dis: off }) })
+        ${off ? `<p class="cs-warn">${MACHINE}</p>` : ''}${setNote ? `<p class="cs-warn">${setNote}</p>` : ''}`,
+      dock: D({ back: { go: 'cs-copy-how' }, ask: '问小青：份数怎么选', pri: pri(off ? '打印机离线' : '开始复印', 'data-cs="copy-start"', { dis: off || setDis }) })
     });
   }
   /* 17 核对复印 */
   function copyCheck() {
-    const c = st(), off = printerOff(), p = c.cpages || 3, n = c.copies, total = p * n, shown = Math.min(p, 3);
+    const c = st(), off = printerOff(), p = c.cpg ? +c.cpg : (c.cpages || 3), n = c.copies, total = p * n, shown = Math.min(p, 3);
     const dup = c.duplex === 'off' ? 'single' : c.dup, cink = c.color === 'off' ? 'bw' : c.cink;
     const sheets = dup === 'double' ? Math.ceil(total / 2) : total;
+    /* 11/08：运行页核对屏的几种样子（copy/CopyCheckView.tsx 27–49；copy/copyDeviceFlow.ts 159、166；copy/CopyDeviceView.tsx 52–53）：
+       ?preview=loading|fail、?cpages=7 超过三页按组翻（翻组键照定稿 screens.js 1057 打印预览的 .pager）、
+       ?quote=changed|odd|none、?net=off 主按钮「网络已断开」。付费那一种不画（价格不进仓库）。 */
+    const PV = { loading: '正在读取本机预览', fail: '预览暂时无法确认，请重扫或返回。' };
+    const QN = { changed: '报价已更新，请重新核对后再开始打印。', odd: '这次奇数页多份双面暂未开通，请返回修改设置。' };
+    const prow = PV[c.preview] ? `<div class="cs-pv">${c.preview === 'loading' ? '<div class="cs-spin" aria-hidden="true"></div>' : icon('image', 72, 1.6)}<span>${PV[c.preview]}</span></div>`
+      : `<div class="cs-prow">${Array.from({ length: shown }, (_, i) => `<div class="pgc">${pageSvg(290, 410, i)}第 ${i + 1} 页 / 共 ${p} 页</div>`).join('')}</div>`;
+    const pager = p > 3 ? `<div class="pager cs-cpg"><button aria-label="上一组" disabled>${icon('chevL', 30, 2.4)}</button><span>1–3 / ${p}</span><button aria-label="下一组">${icon('chevR', 30, 2.4)}</button></div>` : '';
+    const dis = off || !!c.net || !!PV[c.preview] || c.quote === 'odd' || c.quote === 'none';
     return shell({
       band: { eyebrow: '屏上复印', title: '核对一下，再开始打印', status: { text: '原件已扫完，等你核对' }, rail: { labels: COPY_RAIL, now: 1 } },
       cls: 'cs-check',
-      body: `<div class="cs-pages"><div class="cs-prow">${Array.from({ length: shown }, (_, i) => `<div class="pgc">${pageSvg(290, 410, i)}第 ${i + 1} 页 / 共 ${p} 页</div>`).join('')}</div>
-          <div class="cs-pfacts"><div>原件 ${p} 页 × ${n} 份 = ${total} 页</div><div>${dup === 'double' ? '双面打印，用' : '单面打印，用'} ${sheets} 张纸</div><div>${cink === 'bw' ? '黑白' : '彩色'}</div><div>本机构免费</div></div></div>
+      body: `<div class="cs-pages">${prow}${pager}
+          <div class="cs-pfacts"><div>原件 ${p} 页 × ${n} 份 = ${total} 页</div><div>${dup === 'double' ? '双面打印，用' : '单面打印，用'} ${sheets} 张纸</div><div>${cink === 'bw' ? '黑白' : '彩色'}</div><div>${c.quote === 'none' ? '报价暂时无法确认' : '本机构免费'}</div></div></div>
         ${howto('发现身份证号等个人信息时，会先问你保留还是遮挡', 'shield')}
         ${howto('扫描件只在这台机器上，打印完就删除', 'lock')}
-        ${off ? `<p class="cs-warn">${MACHINE}</p>` : ''}`,
-      dock: D({ left: `<button class="btn sec" data-cs="rescan">${icon('refresh', 28, 2)}重扫</button>`, ask: '问小青：核对什么', pri: pri(off ? '打印机离线' : '开始打印', 'data-cs="copy-print"', { dis: off }) })
+        ${off ? `<p class="cs-warn">${MACHINE}</p>` : ''}${QN[c.quote] ? `<p class="cs-warn">${QN[c.quote]}</p>` : ''}`,
+      dock: D({ left: `<button class="btn sec" data-cs="rescan">${icon('refresh', 28, 2)}重扫</button>`, ask: '问小青：核对什么', pri: pri(off ? '打印机离线' : c.net ? '网络已断开' : '开始打印', 'data-cs="copy-print"', { dis }) })
     });
   }
   /* 18 复印 · 正在打印 */
@@ -1055,6 +1254,90 @@
       dock: D({ back: { go: 'cs-copy-how' }, ask: '问小青：面板上怎么复印', pri: pri('怎么在打印机上复印', 'data-go="cs-copy-guide"') })
     });
   }
+
+  /* ═════════ 11/08 补稿：屏上复印运行页有、稿上没画的几屏（待产品负责人看，不改程序） ═════════ */
+  /* 免费额度用完：确认时超额（copy/CopyQuotaView.tsx、copy/copyQuotaCopy.ts）。字逐字照 copyQuotaText，面数是示意值。
+     不给「改用面板复印」：面板复印不经过额度，引导过去等于绕开上限（CopyQuotaView.tsx 14–15）。 */
+  const QUOTA = {
+    guest: { title: '这次超过了免登录的复印面数', chip: '超过免登录上限', login: true, n: 20,
+      reason: (n) => `免登录每次${n ? `最多复印 ${n} 面` : '复印的面数有上限'}。用手机号登录后，可以一次复印更多。` },
+    member: { title: '你今天的免费额度已用完', chip: '今天的额度已用完', login: false, n: 50,
+      reason: (n) => `${n ? `你今天已免费打印复印 ${n} 面，达到每日上限` : '你今天的免费打印复印量已达上限'}，明天 0 点恢复。` },
+    terminal: { title: '这台机器今天的免费额度已用完', chip: '今天的额度已用完', login: false, n: 0,
+      reason: () => '今天这台机器的免费打印复印量已用完，明天 0 点恢复。' }
+  };
+  const QUOTA_FACTS = ['复印和打印共用免费额度', '只算成功出纸的面数，没出纸不算'];
+  const takeAll = (t) => `<div class="cs-help">${icon('hand', 34, 2)}<span>${t}</span></div>`;
+  function copyQuota() {
+    const c = st(), t = QUOTA[c.quota], n = c.limit ? null : t.n;
+    const phoneArt = UI.phone(120).replace(/<text[^>]*>上传<\/text>/, '');
+    const ways = (t.login ? wayCard({ go: 'login', t: '去登录', d: '用手机号登录后，一次可以复印更多；要重新放原件、再扫一次', vis: phoneArt }) : '')
+      + wayCard({ go: 'home', t: '回首页', d: '先去办别的事', vis: stack(110, 2, '') });
+    return shell({
+      band: { eyebrow: '屏上复印', title: t.title, status: { text: t.chip, warn: 1 } },
+      cls: 'cs-err cs-err2 cs-quota' + (t.login ? '' : ' cs-solo'),
+      body: `<div class="cs-why" role="alert"><span class="vis">${mfp()}<i class="warn">${icon('alert', 34, 2.4)}</i></span>
+          <div><b>${t.reason(n)}</b><p>本次没有建单，也没有出纸。${t.login ? '登录后要重新放原件、再扫一次。' : ''}</p>
+          <ul class="cs-q-facts">${QUOTA_FACTS.map((f) => `<li>${f}</li>`).join('')}</ul></div></div>
+        <div class="cs-ways">${ways}</div>
+        ${takeAll('原件还在玻璃上或进纸器里，请带走')}
+        ${remind(HELP)}`,
+      dock: D({ left: t.login ? '<button class="btn sec" data-go="home">回首页</button>' : '', ask: '问小青：免费额度什么时候恢复', pri: t.login ? pri('去登录', 'data-go="login"') : pri('回首页', 'data-go="home"') })
+    });
+  }
+  /* 复印·这一页扫好了（玻璃台）：copy/CopyDeviceView.tsx 41–59。程序这一屏只有一句「已收到 N 页」和一张「再扫一页」，
+     稿照 cs-scan-more 的两卡版式补「扫完了，整理成预览」卡（字取本稿已有的「整理成预览」「扫完后准备给你核对」），待定。 */
+  function copyMore() {
+    const c = st(), none = c.pages === 'none', n = c.rec == null ? 2 : c.rec, busy = !!c.busy;
+    return shell({
+      band: { eyebrow: '屏上复印', title: '这一页扫好了，还有下一页吗？', status: { text: '这一页已扫好' }, rail: { labels: COPY_RAIL, now: 0 } },
+      cls: 'cs-more cs-cmore',
+      body: `<div class="cs-strip">${none ? glassSvg(340) : thumbs(n, '下一页', true)}<p>${none ? '这一页已扫好' : `已收到 ${n} 页`}</p></div>
+        <div class="cs-ways">
+          ${wayCard({ cs: 'cmore', dis: busy, t: '再扫一页', d: '先把下一页放上玻璃台，字朝下，对齐左上角', vis: glassSvg(150) })}
+          ${wayCard({ cs: 'cfinish', dis: busy, t: '扫完了，整理成预览', d: '扫完后准备给你核对', vis: stack(120, 3, '') })}
+        </div>
+        ${armNote()}`,
+      dock: D({ left: stopBtn('停止复印'), ask: '问小青：一直扫不完怎么办', pri: pri('扫完了', 'data-cs="cfinish"', { dis: busy }) })
+    });
+  }
+  /* 复印·状态未知：copy/CopyDeviceView.tsx 40–63 + copy/copyDeviceFlow.ts 22、58、231。程序正文只有一句提示，稿借 cs-scan-unknown 的大纸版式。
+     ?why=wait 等太久、?why=stop 停止没确认、?why=token 建单回包缺凭据（copy/copySession.ts 92；这一种没有停止键） */
+  const CUNK = {
+    '': '状态未知。这一步的结果还没确认，请先停止操作，不要重新开始。',
+    wait: '状态未知。等太久还没收到新的扫描结果，请先停止操作，不要重新开始。',
+    stop: '状态未知。这次停止的结果还没确认，请不要重新开始。',
+    token: '状态未知。这一次没能确认复印能否继续，请先用面板复印。不要再点开始。'
+  };
+  function copyUnknown() {
+    const c = st();
+    return shell({
+      band: { eyebrow: '屏上复印', title: '状态未知', status: { text: '状态未知', warn: 1 }, rail: { labels: COPY_RAIL, now: 0 } },
+      cls: 'cs-issue cs-cunknown',
+      body: issuePaper('状态未知', CUNK[c.why]) + armNote(),
+      dock: dock({ left: `<button class="btn sec" data-go="cs-copy-how">${icon('chevL', 30, 2.4)}返回</button>`, ask: '问小青：一直扫不完怎么办', mid: c.why === 'token' ? '' : stopBtn('停止复印') })
+    });
+  }
+  /* 复印的三种出错（copy/CopyErrorView.tsx）：打印失败、超过这台机器能收的大小、中途没开通。程序这三屏都没有「返回」。
+     短句的两屏用额度屏的单栏居中，免得右半边一大片空。 */
+  function copyErr(o) {
+    return shell({
+      band: { eyebrow: o.eyebrow || '屏上复印', title: o.title, status: { text: o.chip, warn: 1 } },
+      cls: 'cs-err cs-err2' + (o.solo ? ' cs-solo' : ''),
+      body: `<div class="cs-why" role="alert"><span class="vis">${mfp()}<i class="warn">${icon('alert', 34, 2.4)}</i></span><div><b>${o.reason}</b></div></div>
+        <div class="cs-ways">${o.opts.map((x) => wayCard(x)).join('')}</div>
+        ${o.take ? takeAll('原件还在玻璃上或进纸器里，请和复印件一起带走') : ''}
+        ${remind(HELP)}`,
+      dock: D({ left: '', ask: o.ask, pri: pri(o.pri, `data-cs="${o.cs}"`) })
+    });
+  }
+  const homeOpt = { go: 'home', t: '回首页', d: '先去办别的事', vis: stack(110, 2, '') };
+  const copyFailed = () => copyErr({ title: '打印失败', chip: '打印失败', reason: '看打印机屏幕上的提示。这次不会自动重打，也不会重复收费。',
+    opts: [panelOpt(true), homeOpt], take: 1, ask: '问小青：取纸或异常怎么办', pri: '改用面板复印', cs: 'panel-copy' });
+  const copyErrLimit = () => copyErr({ title: '这次超过了这台机器能收的大小', chip: '超过限制', reason: '减少原件页数后再试。', solo: 1,
+    opts: [{ cs: 'restart-copy', t: '减少页数再试', d: '减少原件页数后再试', vis: glassSvg(150) }, panelOpt(true)], ask: '问小青：扫描仪连不上怎么办', pri: '减少页数再试', cs: 'restart-copy' });
+  const copyErrOff = () => copyErr({ eyebrow: '复印', title: '这台机器暂时只能在打印机面板上复印', chip: '屏上复印未开通', reason: '这次不能继续屏上复印，请改用面板复印。', solo: 1,
+    opts: [panelOpt(true), homeOpt], ask: '问小青：扫描仪连不上怎么办', pri: '改用面板复印', cs: 'panel-copy' });
 
   /* ═════════ 面板复印图文引导 ═════════ */
   /* 定稿「复印」说明屏（kiosk-touch-2026-10/fix-scan.js 的 copyPage）的图文版：五步的标题和正文照定稿原句，只加协调方给的两句。
@@ -1193,7 +1476,9 @@
   function act(k) {
     const c = st(), a = k.split(':')[0], v = k.split(':')[1];
     switch (a) {
-      case 'mat': c.mat = v; return refresh();
+      case 'mat': c.mat = v; c.matNone = ''; return refresh();
+      case 'cmore': c.run = ''; return go('cs-copy-scan');
+      case 'cfinish': c.run = 'finishing'; return go('cs-copy-scan');
       case 'way': c.way = v; return refresh();
       case 'what-next': return go('cs-scan-how');
       case 'how-next': { if (!scanBlock() && c.way === 'screen') { c.flow = 'scan'; return go('cs-scan-set'); } return toPanel(false); }
@@ -1201,7 +1486,7 @@
       case 'panel-copy': return toPanel(true);
       case 'src': c.src = v; return refresh();
       case 'ink': c.ink = v; return refresh();
-      case 'set-start': c.flow = 'scan'; c.rec = srcOf(c) === 'glass' ? 0 : 2; return go('cs-scan-run');
+      case 'set-start': c.flow = 'scan'; c.rec = srcOf(c) === 'glass' ? 0 : 2; c.run = ''; c.start = ''; return go('cs-scan-run');
       case 'more': return go('cs-scan-run');
       case 'finish': return go('cs-scan-make');
       case 'retry': return go('cs-scan-run');
@@ -1226,7 +1511,7 @@
       case 'cink': c.cink = v; return refresh();
       case 'dup': c.dup = v; return refresh();
       case 'copy-screen': c.flow = 'copy'; return go('cs-copy-set');
-      case 'copy-start': case 'rescan': c.flow = 'copy'; c.rec = c.orig === 'glass' ? 0 : 2; c.cpages = 3; return go('cs-copy-scan');
+      case 'copy-start': case 'rescan': c.flow = 'copy'; c.rec = c.orig === 'glass' ? 0 : 2; c.cpages = 3; c.run = ''; c.start = ''; return go('cs-copy-scan');
       case 'copy-print': c.pstage = 3; return go('cs-copy-print');
       case 'tel': c.tel = true; return refresh();
       case 'telclose': c.tel = false; return refresh();
@@ -1237,7 +1522,15 @@
   const ERRS = { nopaper: 'cs-scan-err-nopaper', jam: 'cs-scan-err-jam', busy: 'cs-scan-err-busy', noresp: 'cs-scan-err-noresp', timeout: 'cs-scan-timeout' };
   function onDemo(id, ev) {
     const c = st();
+    /* 11/08：通用写法「set:键=值,键=值>屏」——改状态（值留空就是回到默认样子），带 >屏 就跳过去，不带就原地刷新 */
+    if (ev.indexOf('set:') === 0) {
+      const [pairs, to] = ev.slice(4).split('>');
+      pairs.split(',').forEach((kv) => { const i = kv.indexOf('='); c[kv.slice(0, i)] = kv.slice(i + 1); });
+      c.stopArm = false;
+      return to ? go(to) : refresh();
+    }
     if (ERRS[ev]) return go(ERRS[ev]);
+    if (ev === 'quota') return go('cs-copy-quota');
     switch (ev) {
       case 'unknown': case 'unreachable':
         c.unknownTone = ev === 'unreachable' ? 'unreachable' : 'unconfirmed'; c.unknownStop = ''; return go('cs-scan-unknown');
@@ -1294,8 +1587,48 @@
     'cs-copy-print': [{ label: '演示：正在交给打印机（还没出纸）', ev: 'stage2' }, { label: '演示：打印机正在出纸', ev: 'stage3' }, { label: '演示：已交给打印机', ev: 'handed' }, { label: '演示：这次没收到打印结果', ev: 'noresult' }],
     'cs-device': [{ label: '演示：扫描仪状态过期', ev: 'stale' }, { label: '演示：恢复正常', ev: 'ok' }]
   };
+  /* 11/08 补的演示事件：都用 set: 写法；先列各屏的，再统一拼到已有列表后面 */
+  const D2 = (label, ev) => ({ label, ev });
+  const probeDemos = (copy) => [
+    D2('演示：正在检查能不能屏上' + (copy ? '复印' : '扫描'), 'set:probe=capcheck'), D2('演示：正在检查扫描仪', 'set:probe=checking'),
+    D2('演示：能力读不到', 'set:probe=capfail'), D2('演示：本机程序连不上', 'set:probe=unreachable'), D2('演示：扫描仪状态未知', 'set:probe=unknown'),
+    D2('演示：扫描仪正忙', 'set:probe=busy'), D2('演示：未找到扫描仪', 'set:probe=notfound'), D2('演示：扫描仪出错', 'set:probe=error'), D2('演示：检查结论恢复', 'set:probe=')
+  ];
+  const busyDemos = [D2('演示：处理中（全灰）', 'set:busy=1'), D2('演示：处理完', 'set:busy=')];
+  const more = {
+    'cs-scan-what': [D2('演示：一种都没选', 'set:matNone=1'), D2('演示：已选材料', 'set:matNone=')],
+    'cs-scan-how': probeDemos(false),
+    'cs-scan-set': [D2('演示：正在确认扫描仪', 'set:probe=checking'), D2('演示：正在开始', 'set:start=busy'), D2('演示：没建成（可再点开始）', 'set:start=rejected'),
+      D2('演示：开始前断网（运行页现状：留在本屏）', 'set:start=offline'), D2('演示：回到默认', 'set:probe=,start=')],
+    'cs-scan-run': [D2('演示：已交给机器，等扫描仪', 'set:run=waiting'), D2('演示：扫描仪已开始', 'set:run=')],
+    'cs-scan-more': [D2('演示：不报页数或上限', 'set:pages=none'), D2('演示：报页数', 'set:pages=known')].concat(busyDemos),
+    'cs-scan-make': [D2('演示：正在传回', 'set:make=delivering'), D2('演示：正在合成', 'set:make='), D2('演示：不报页数', 'set:pages=none'), D2('演示：报页数', 'set:pages=known'),
+      D2('演示：云端失败或取消（运行页结果屏）', 'set:fail=,reason=>cs-scan-failed')],
+    'cs-scan-done': [D2('演示：游客三条出路（运行页现状）', 'set:guest=ways'), D2('演示：游客旧两句', 'set:guest='), D2('演示：已登录但还没核对到本人', 'set:owned=0'),
+      D2('演示：已登录且已存进', 'set:owned='), D2('演示：预览打不开', 'set:preview=fail'), D2('演示：预览正常', 'set:preview=')],
+    'cs-scan-stopped': [D2('演示：没有服务端时间', 'set:quiet=none'), D2('演示：本机没确认删页', 'set:purged=0'), D2('演示：回到默认', 'set:quiet=,purged=')],
+    'cs-scan-failed': [D2('演示：扫描未完成', 'set:fail=,reason='), D2('演示：云端已取消或设备中止', 'set:fail=,reason=stopped'), D2('演示：扫描仪还在预热', 'set:fail=,reason=warming'),
+      D2('演示：超过这台机器能收的大小', 'set:fail=,reason=large'), D2('演示：投递没被确认', 'set:fail=,reason=ack'), D2('演示：等待超时（会话过期）', 'set:fail=expired'),
+      D2('演示：完成但结果里没有文件', 'set:fail=nofile'), D2('演示：安全重扫凭据失效', 'set:rescan=lost'), D2('演示：凭据还在', 'set:rescan=')],
+    'cs-copy-how': probeDemos(true).concat([D2('演示：打印机状态读不到', 'set:pstate=unknown'), D2('演示：网络断开', 'set:net=off'), D2('演示：网络、打印机恢复', 'set:pstate=,net=')]),
+    'cs-copy-set': [D2('演示：正在建单', 'set:start=busy'), D2('演示：超过这台机器能收的大小', 'set:start=limit'), D2('演示：建单结果没确认', 'set:start=unknown'),
+      D2('演示：网络断开', 'set:net=off'), D2('演示：本机程序连不上', 'set:probe=unreachable'), D2('演示：回到默认', 'set:start=,net=,probe=')],
+    'cs-copy-scan': [D2('演示：已交给机器，等扫描仪', 'set:run=waiting'), D2('演示：扫描仪已开始', 'set:run='), D2('演示：整理成预览', 'set:run=finishing'),
+      D2('演示：这一页扫好了（玻璃台）', 'set:run=>cs-copy-more'), D2('演示：等太久没有新结果', 'set:why=wait>cs-copy-unknown'), D2('演示：超过这台机器能收的大小', 'set:busy=>cs-copy-err-limit'), D2('演示：中途没开通', 'set:busy=>cs-copy-err-off')],
+    'cs-copy-more': [D2('演示：不报页数', 'set:pages=none'), D2('演示：报页数', 'set:pages=known')].concat(busyDemos),
+    'cs-copy-check': [D2('演示：超过免费额度', 'quota'), D2('演示：正在读取预览', 'set:preview=loading'), D2('演示：预览打不开', 'set:preview=fail'), D2('演示：原件 7 页（按组翻）', 'set:cpg=7'),
+      D2('演示：报价已更新', 'set:quote=changed'), D2('演示：奇数页多份双面未开通', 'set:quote=odd'), D2('演示：报价暂时无法确认', 'set:quote=none'), D2('演示：网络断开', 'set:net=off'),
+      D2('演示：结果没确认（状态未知）', 'set:why=>cs-copy-unknown'), D2('演示：回到默认', 'set:preview=,cpg=,quote=,net=')],
+    'cs-copy-print': [D2('演示：打印失败', 'set:busy=>cs-copy-failed')],
+    'cs-copy-unknown': [D2('演示：这一步结果没确认', 'set:why='), D2('演示：等太久没有新结果', 'set:why=wait'), D2('演示：停止结果没确认', 'set:why=stop'), D2('演示：建单回包缺凭据（没有停止键）', 'set:why=token'),
+      D2('演示：停止已确认', 'set:why=>cs-scan-stopped')],
+    'cs-copy-quota': [D2('演示：游客单次超限', 'set:quota=guest'), D2('演示：本人今天用完', 'set:quota=member'), D2('演示：整机今天用完', 'set:quota=terminal'),
+      D2('演示：后台没给面数', 'set:limit=none'), D2('演示：后台给了面数', 'set:limit=')]
+  };
+  Object.keys(more).forEach((k) => { demos[k] = (demos[k] || []).concat(more[k]); });
+  ['cs-scan-err-nopaper', 'cs-scan-err-jam', 'cs-scan-err-busy', 'cs-scan-err-noresp', 'cs-scan-timeout'].forEach((k) => { demos[k] = (demos[k] || []).concat(busyDemos); });
   /* 打开某一屏时，记下它属于扫描还是复印，出错屏照这个换写法 */
-  const FLOW = (id) => (/^cs-copy-/.test(id) ? 'copy' : (/^cs-scan-(what|how|set|run|more|make|done|off|unknown|file-gone|offline)$/.test(id) ? 'scan' : ''));
+  const FLOW = (id) => (/^cs-copy-/.test(id) ? 'copy' : (/^cs-scan-(what|how|set|run|more|make|done|off|unknown|file-gone|offline|failed)$/.test(id) ? 'scan' : ''));
   function mount(el) {
     const c = st(), id = el.dataset.id;
     if (FLOW(id)) c.flow = FLOW(id);
@@ -1322,62 +1655,62 @@
   reg('cs-scan-what', G_SCAN, '扫什么', scanWhat, {
     does: '屏上扫描的第一问，只问「扫什么？」：简历 / 证件 / 普通文档 / 合同，四选一，点「下一步」去「怎么扫」。',
     motion: '无。选中只变深色并打勾。',
-    keep: '样子照定稿面板扫描的选类型屏（scan-type）：整行类型卡，选中是深色；每张多一张「扫的是什么」的小样，下面两行字都是已有说法（简历可做 AI 简历识别、证件正反面各扫一次、多页放进纸器、扫成一个 PDF）。证件带「敏感文件 · 自动清理」。状态是扫描仪状态，两个样子（?scanner=stale、?scandev=off）在下一屏「怎么扫」里体现。合同在面板扫描里按普通文档处理。每屏可点 7 个：4 个材料 + 底部 3 个。可用地址 #cs-scan-what 直接打开，?mat=resume|id|doc|contract 预选材料。' + NK
+    keep: '样子照定稿面板扫描的选类型屏（scan-type）：整行类型卡，选中是深色；每张多一张「扫的是什么」的小样，下面两行字都是已有说法（简历可做 AI 简历识别、证件正反面各扫一次、多页放进纸器、扫成一个 PDF）。证件带「敏感文件 · 自动清理」。状态是扫描仪状态，两个样子（?scanner=stale、?scandev=off）在下一屏「怎么扫」里体现。合同在面板扫描里按普通文档处理。每屏可点 7 个：4 个材料 + 底部 3 个。可用地址 #cs-scan-what 直接打开，?mat=resume|id|doc|contract 预选材料。 11/08 补：?mat=none 是程序一种都没选时的样子，主按钮「先选一种材料」灰、无箭头（scan/ScanStartPage.tsx 261–287）。程序这屏还多副题「请先选择一种材料。本页尚未创建任务。」、U 盘灰行和两格说明，胶囊写「可创建扫描任务 · 需面板操作」，见对稿清单。' + NK
   });
   reg('cs-scan-how', G_SCAN, '怎么扫', scanHow, {
     does: '屏上扫描的第二问，只问「怎么扫？」：在这块屏上开始 / 到打印机面板上扫。选好点「下一步」，返回回「扫什么」。',
     motion: '无。选中只改边框和打勾。',
-    keep: '状态「扫描仪就绪 · 20 秒前检查」。「在这块屏上开始扫描」标「推荐」。两个样子：地址 ?scanner=stale（或演示事件）时屏上方式灰掉，写「扫描仪状态 2 分钟没更新，先用面板扫描」；?scandev=off 时写「这台机器还没开通屏上扫描」。选面板扫描，「下一步」带着上一屏选的材料去定稿现有的面板扫描选类型屏（scan-type）。底部两行：没登录的人多一行「想带走电子版？先扫码登录（微信一扫，不用短信），扫完会存进「我的文档」」加「先登录」按钮，去定稿现有的登录屏（login），登录成功回到这一屏；跟说明栏「已登录」开关走，登录后这行不显示。另一行灰掉、不能点：用 U 盘（在打印机面板上选「扫描到 U 盘」）——这台机器暂未开通，真机试通之前照实写暂未开通。不做「扫码带走电子版」：屏上的码会被旁人拍走。每屏可点 5 个：2 个方式 + 底部 3 个（没登录再加「先登录」共 6 个）。' + NK
+    keep: '状态「扫描仪就绪 · 20 秒前检查」。「在这块屏上开始扫描」标「推荐」。两个样子：地址 ?scanner=stale（或演示事件）时屏上方式灰掉，写「扫描仪状态 2 分钟没更新，先用面板扫描」；?scandev=off 时写「这台机器还没开通屏上扫描」。选面板扫描，「下一步」带着上一屏选的材料去定稿现有的面板扫描选类型屏（scan-type）。底部两行：没登录的人多一行「想带走电子版？先扫码登录（微信一扫，不用短信），扫完会存进「我的文档」」加「先登录」按钮，去定稿现有的登录屏（login），登录成功回到这一屏；跟说明栏「已登录」开关走，登录后这行不显示。另一行灰掉、不能点：用 U 盘（在打印机面板上选「扫描到 U 盘」）——这台机器暂未开通，真机试通之前照实写暂未开通。不做「扫码带走电子版」：屏上的码会被旁人拍走。每屏可点 5 个：2 个方式 + 底部 3 个（没登录再加「先登录」共 6 个）。 11/08 补：?scanner=capcheck|checking|capfail|unreachable|unknown|busy|notfound|error 是程序其余几种检查结论，胶囊和屏上卡写同一句（scan/scanProbeCopy.ts 66–80）；检查中主按钮「正在检查扫描仪」、灰、无箭头。程序改选面板后卡下还有一句「下一步会真实建立这次扫描」，稿没画。' + NK
   });
   reg('cs-scan-set', G_SCAN, '放纸与设置', scanSet, {
     does: '放纸与设置：纸放玻璃台还是进纸器、扫成黑白还是彩色，然后开始扫描。',
     motion: '选中的那种播「原件怎么放」（一轮 7 秒，循环）；没选中的仍是静态插画。玻璃台：掀开上盖，纸翻面字朝下放上玻璃，滑到左上角（角标闪一下），再合上盖。进纸器：一叠纸字朝上，推进进纸口到底，两侧导板靠拢。字幕只用已有原句。减弱动效时停在末帧，字幕全部展开。这是待产品负责人看的动画补稿，还没改程序。',
-    keep: '玻璃台写「一次一页，适合证件、书本」「字朝下，对齐左上角」；进纸器写「一叠最多 50 页，只扫单面」「字朝上」。提示：多页单面材料用进纸器一次扫完；玻璃台适合证件、书本，一面一面扫。默认：证件用玻璃台和彩色，其余用进纸器和黑白，点了就记住。方式上一屏已经选过，这里不再放「改用面板扫描」，要改就点「返回」。扫描仪状态过期或没开通时，「开始扫描」停用，写原因并提示点「返回」改选面板扫描。每屏可点 7 个：2 个放纸 + 2 个颜色 + 底部 3 个。' + NK
+    keep: '玻璃台写「一次一页，适合证件、书本」「字朝下，对齐左上角」；进纸器写「一叠最多 50 页，只扫单面」「字朝上」。提示：多页单面材料用进纸器一次扫完；玻璃台适合证件、书本，一面一面扫。默认：证件用玻璃台和彩色，其余用进纸器和黑白，点了就记住。方式上一屏已经选过，这里不再放「改用面板扫描」，要改就点「返回」。扫描仪状态过期或没开通时，「开始扫描」停用，写原因并提示点「返回」改选面板扫描。每屏可点 7 个：2 个放纸 + 2 个颜色 + 底部 3 个。 11/08 补：?scanner=checking 胶囊「正在确认扫描仪」、开始灰；?start=busy 主按钮「正在开始」；?start=rejected 提示行「这一次没有建成扫描。可以再点一次开始。」；?start=offline 提示行「状态未知。这一次没能确认有没有建成扫描，请先返回，过一会儿再试。不要再点开始。」、开始灰 60 秒——这是程序断网的现状（留在本屏），和 11/04 待看的独立断网屏 cs-scan-offline 二选一，请定。' + NK
   });
   reg('cs-scan-run', G_SCAN, '正在扫描', () => runScreen(false), {
     does: '扫描进行中。四段进度：已收到 → 扫描仪已开始 → 已收到 N 页 → 生成文件并传回，第三段进行中。',
     motion: '只有纸上的扫描光带和第三段的小圆点在动，别的都静止。可一键减弱动效。',
-    keep: '页数写「已收到 N 页」，不写「已扫」；小字「每扫完一整页才加一；扫描仪不报就不显示页数」。地址 ?pages=none（或演示事件）是扫描仪不回报页数：只写「正在扫描」，不编数字和百分比。「停止扫描」要点两次：第一次变成「再点一次确认停止」并提示已收到的页会删除，6 秒不点自动取消。出错屏、这一页扫好了、扫完了都从说明栏下面的演示事件打开，也可以直接用地址 #cs-scan-err-nopaper 等打开。' + NK
+    keep: '页数写「已收到 N 页」，不写「已扫」；小字「每扫完一整页才加一；扫描仪不报就不显示页数」。地址 ?pages=none（或演示事件）是扫描仪不回报页数：只写「正在扫描」，不编数字和百分比。「停止扫描」要点两次：第一次变成「再点一次确认停止」并提示已收到的页会删除，6 秒不点自动取消。出错屏、这一页扫好了、扫完了都从说明栏下面的演示事件打开，也可以直接用地址 #cs-scan-err-nopaper 等打开。 11/08 补：?run=waiting 是开始后、扫描仪还没回报开始的样子：标题「已把扫描请求交给这台机器」、胶囊「等待扫描仪」（scan/ScanDeviceRunView.tsx 49–56）。' + NK
   });
   reg('cs-scan-more', G_SCAN, '这一页扫好了', scanMore, {
     does: '只在玻璃台方式出现：一页扫好后问还有没有下一页。',
     motion: '无。',
-    keep: '状态「已收到 N 页」。「再扫一页」要先把下一页放上玻璃台；「扫完了，生成文件」去生成。提醒：最多 20 页；10 分钟内没有操作会自动结束，并删除已扫的页。到 20 页时「再扫一页」停用。底部左边是「停止扫描」，也要点两次。' + NK
+    keep: '状态「已收到 N 页」。「再扫一页」要先把下一页放上玻璃台；「扫完了，生成文件」去生成。提醒：最多 20 页；10 分钟内没有操作会自动结束，并删除已扫的页。到 20 页时「再扫一页」停用。底部左边是「停止扫描」，也要点两次。 11/08 补：?pages=none 不报页数或上限：胶囊和格子写「这一页已扫好」，提醒只剩「10 分钟内没操作会自动结束」；?busy=1 命令在途全灰。程序提醒没有「，并删除已扫的页」，见对稿清单。' + NK
   });
   reg('cs-scan-make', G_SCAN, '正在生成文件', scanMake, {
     does: '扫描仪扫完后，把页面合成一个 PDF 并传回这台机器。',
     motion: '只有「生成一个 PDF」前的小圈在转。',
-    keep: '三步：扫描仪已扫完（共收到 N 页，打勾）→ 生成一个 PDF（进行中）→ 传回这台机器。可「停止」，要点两次。文件传回靠演示事件「文件传回来了」去 cs-scan-done，屏上不自己跳成功。' + NK
+    keep: '三步：扫描仪已扫完（共收到 N 页，打勾）→ 生成一个 PDF（进行中）→ 传回这台机器。可「停止」，要点两次。文件传回靠演示事件「文件传回来了」去 cs-scan-done，屏上不自己跳成功。 11/08 补：?make=delivering「生成一个 PDF」打勾、「传回这台机器」进行中；?pages=none 首行「扫描仪已扫完」、事实格「还没回报」。' + NK
   });
   reg('cs-scan-done', G_SCAN, '扫描完成', scanDone, {
     does: '扫描完成，文件已传回。核对后选下一步：拿去打印 / AI 简历识别（只简历）/ 前往我的文档（登录后）/ 再扫一份。分登录后、没登录两个样子，用说明栏「已登录」切换。',
     motion: '无。',
-    keep: '「扫描完成，文件已传回」只在这一屏写。文件卡写文件名、页数、大小，下面是每一页的小图，小字「页数和方向请自己核一下」。拿去打印去定稿现有的材料检查屏 pii；AI 简历识别只有扫的是简历才能点，去 reading，其他材料灰掉并写「AI 简历识别只对简历扫描开放」。登录后：文件卡下一句醒目的「这份扫描件已存进「我的文档」，手机上打开职易达小程序也能看到」，去向多一项「前往我的文档」；后半句「手机上打开职易达小程序也能看到」属于「手机上能看到」类句子，小程序正式发布前由开关收起，只显示前半句，演示事件可切换这两种；这条「后半句要等小程序发布后才显示」的小注写在说明栏，不写在屏上。没登录：不进「我的文档」，原句「未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别」，再加「要带走电子版，下次先扫码登录再扫」。不做「扫码带走电子版」，屏上不画二维码（屏上的码会被旁人拍走）。原件提醒：原件还在玻璃台或进纸器里，请取走。小程序一律写「职易达」。' + NK
+    keep: '「扫描完成，文件已传回」只在这一屏写。文件卡写文件名、页数、大小，下面是每一页的小图，小字「页数和方向请自己核一下」。拿去打印去定稿现有的材料检查屏 pii；AI 简历识别只有扫的是简历才能点，去 reading，其他材料灰掉并写「AI 简历识别只对简历扫描开放」。登录后：文件卡下一句醒目的「这份扫描件已存进「我的文档」，手机上打开职易达小程序也能看到」，去向多一项「前往我的文档」；后半句「手机上打开职易达小程序也能看到」属于「手机上能看到」类句子，小程序正式发布前由开关收起，只显示前半句，演示事件可切换这两种；这条「后半句要等小程序发布后才显示」的小注写在说明栏，不写在屏上。没登录：不进「我的文档」，原句「未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别」，再加「要带走电子版，下次先扫码登录再扫」。不做「扫码带走电子版」，屏上不画二维码（屏上的码会被旁人拍走）。原件提醒：原件还在玻璃台或进纸器里，请取走。小程序一律写「职易达」。 11/08 补：?guest=ways 是程序现在的游客段（未登录扫描件不会进入「我的文档」。带走的办法：三条，scan/scanGuestWays.ts 11–24，第三条后半句只在小程序已发布时出现）；?login=1&owned=0 已登录但还没核对到是本人的文件：不说已存、不给「前往我的文档」、也不出游客段；?preview=fail 预览区写「预览没能生成，打印仍按原文件。」，其余出路照常。程序还有「整屏查看」按钮和查看层（定稿 scan-result 有同样的查看层），这屏没画。' + NK
   });
   reg('cs-scan-err-nopaper', G_SCAN, '出错：进纸器里没有纸', errOf('nopaper'), {
     does: '扫描仪回报进纸器里没有纸。照状态样式板的版式。',
     motion: '无。',
-    keep: '选项：放好纸再试 / 改用玻璃台 / 改用面板扫描，再加服务电话句。出错屏按刚才走的是扫描还是复印换写法：复印时「再试」回复印第 1 步，「改用面板」去定稿现有的面板复印屏 copy。' + NK
+    keep: '选项：放好纸再试 / 改用玻璃台 / 改用面板扫描，再加服务电话句。出错屏按刚才走的是扫描还是复印换写法：复印时「再试」回复印第 1 步，「改用面板」去定稿现有的面板复印屏 copy。 11/08 补：?busy=1 是重试、改用玻璃台或改用面板还在途：卡片、返回、主按钮全灰，字不变。' + NK
   });
   reg('cs-scan-err-jam', G_SCAN, '出错：卡纸或盖板没合上', errOf('jam'), {
     does: '扫描仪回报卡纸或盖板没合上。',
     motion: '无。',
-    keep: '原话：扫描仪报告：卡纸或盖板没合上；合上盖板、取出卡住的纸后再试。选项：处理好了，再试 / 改用面板扫描，再加服务电话句。' + NK
+    keep: '原话：扫描仪报告：卡纸或盖板没合上；合上盖板、取出卡住的纸后再试。选项：处理好了，再试 / 改用面板扫描，再加服务电话句。 11/08 补：?busy=1 是重试、改用玻璃台或改用面板还在途：卡片、返回、主按钮全灰，字不变。' + NK
   });
   reg('cs-scan-err-busy', G_SCAN, '出错：打印机正在忙', errOf('busy'), {
     does: '打印机正在打印，或有人在打印机屏幕上操作，扫描仪暂时用不了。',
     motion: '无。',
-    keep: '原话：打印机正在打印，或有人在打印机屏幕上操作；等它空下来再点「再试」。选项：再试 / 取消（取消回打印扫描）。这是等一等就好的情况，不放服务电话句。' + NK
+    keep: '原话：打印机正在打印，或有人在打印机屏幕上操作；等它空下来再点「再试」。选项：再试 / 取消（取消回打印扫描）。这是等一等就好的情况，不放服务电话句。 11/08 补：?busy=1 是重试、改用玻璃台或改用面板还在途：卡片、返回、主按钮全灰，字不变。' + NK
   });
   reg('cs-scan-err-noresp', G_SCAN, '出错：扫描仪没有响应', errOf('noresp'), {
     does: '这台机器暂时连不上扫描仪。',
     motion: '无。',
-    keep: '原话：这台机器暂时连不上扫描仪，我们已经收到提醒，会尽快处理。选项：改用面板扫描 / 回首页，再加服务电话句。' + NK
+    keep: '原话：这台机器暂时连不上扫描仪，我们已经收到提醒，会尽快处理。选项：改用面板扫描 / 回首页，再加服务电话句。 11/08 补：?busy=1 是重试、改用玻璃台或改用面板还在途：卡片、返回、主按钮全灰，字不变。' + NK
   });
   reg('cs-scan-timeout', G_SCAN, '出错：等太久没有结果', errOf('timeout'), {
     does: '等了超过 3 分钟没有收到扫描结果。',
     motion: '无。',
-    keep: '原话：超过 3 分钟没有收到扫描结果，这次不会自动重扫。选项：重新开始 / 改用面板扫描。不自己重扫，也不判成功。' + NK
+    keep: '原话：超过 3 分钟没有收到扫描结果，这次不会自动重扫。选项：重新开始 / 改用面板扫描。不自己重扫，也不判成功。 11/08 补：?busy=1 是重试、改用玻璃台或改用面板还在途：卡片、返回、主按钮全灰，字不变。' + NK
   });
   reg('cs-scan-unknown', G_SCAN, '状态未知（11/04 待审）', scanUnknown, {
     does: '照 c26661cd0:ScanDeviceUnknownView.tsx 15–17/20–40 补现有运行页：两种说法，停止扫描，没有返回或重新开始按钮。?unknown=unreachable 切本机程序连不上；默认结果还没确认。路径停在扫描，不点亮拿走文件。',
@@ -1397,18 +1730,23 @@
   reg('cs-scan-stopped', G_SCAN, '已停止', scanStopped, {
     does: '用户确认停止之后：已收到的页从这台机器删除，并锁一段时间不能开始新的扫描。',
     motion: '倒计时数字这里静态画；运行时每秒减一。',
-    keep: '原话：已停止扫描，已扫的页已从这台机器删除；为了不让下一位看到你的材料，90 秒后才能开始新的扫描。选项：回打印扫描 / 回首页。复印中停止时标题换成「已停止复印」。' + NK
+    keep: '原话：已停止扫描，已扫的页已从这台机器删除；为了不让下一位看到你的材料，90 秒后才能开始新的扫描。选项：回打印扫描 / 回首页。复印中停止时标题换成「已停止复印」。 11/08 补（只扫描）：?quiet=none 停止回包没带服务端时间：环里写「请稍候」、「请稍候再开始新的扫描」「为了不让下一位看到你的材料，过一会儿才能开始新的扫描。」、问句「问小青：为什么要等」；?purged=0 本机没确认删页时首格只写「已停止扫描」。程序复印停止没有倒计时，见对稿清单。' + NK
   });
   reg('cs-scan-off', G_SCAN, '屏上扫描没开通', scanOff, {
     does: '这台机器还没开通屏上扫描：说清楚，并把面板扫描放成主按钮。',
     motion: '无。',
     keep: '主按钮「到打印机面板上扫」去定稿现有的面板扫描选类型屏。屏上方式灰掉、写「这台机器还没开通」，不装成可点。可用地址 #cs-scan-off 直接打开。' + NK
   });
+  reg('cs-scan-failed', G_SCAN, '中断：扫描未完成（11/08 待看）', scanFailed, {
+    does: '屏上扫描中途结束、没有文件时程序落的结果屏：云端失败或取消、设备中止、预热、超过大小、投递没被确认（?reason=stopped|warming|large|ack），会话过期（?fail=expired），完成但结果里没有文件（?fail=nofile）。',
+    motion: '无。',
+    keep: '照运行页代码事实补：程序在这一步借的是面板扫描的失败屏（scan/ScanResultFailedView.tsx 36–109），所以版式照定稿 fix-scan.js 的 scanFail（fs- 部件），字全是运行页原句；原因句 scan/scanDeviceState.ts 111–159、scan/scanDeliveryAck.ts 124–126。和屏上扫描其余几屏不一样的地方要请产品负责人定：眉题写「扫描完成」，路径线从屏上五步换成面板四步、停在「扫描完成」；「重试扫描（同一份材料）」「重新开始一次扫描」都进面板扫描指引（定稿 scan-guide），不回「扫什么」。主按钮：有安全重扫凭据时「重试扫描（同一份材料）」并多一行「重新开始一次扫描」；完成但没文件、或凭据失效（?rescan=lost，整段原句照 ScanResultFailedView.tsx 92–99）时主按钮是「重新开始一次扫描」。没文件那种没有「返回首页」行。程序第一格下面还有一张扫描小样图（ScanSample），稿没画。服务电话照稿里的写法，运行时从后台读，读不到不显示。' + NK
+  });
 
   reg('cs-copy-how', G_COPY, '怎么复印', copyHow, {
     does: '复印的第一问：在打印机面板上快速复印，还是在这块屏上复印。两条路点了就走。',
     motion: '无。',
-    keep: '第一条「在打印机面板上快速复印」标「最快」，写「身份证复印、票据复印也在面板上」，点了去本目录的图文版 cs-copy-guide（定稿 copy 屏的图文版）。第二条「在这块屏上复印」标「可先看效果」，写「先看扫描效果再打印，能改份数，彩色原件也能印成黑白；比面板慢；扫描件只在这台机器上处理，不上传」。没有「推荐」字样。底部边界句：不得复印伪造的证件、印章、票据，只能复印本人的真实证件和票据。屏上复印没开通、扫描仪状态过期、打印机离线时第二条灰掉并写原因。' + NK
+    keep: '第一条「在打印机面板上快速复印」标「最快」，写「身份证复印、票据复印也在面板上」，点了去本目录的图文版 cs-copy-guide（定稿 copy 屏的图文版）。第二条「在这块屏上复印」标「可先看效果」，写「先看扫描效果再打印，能改份数，彩色原件也能印成黑白；比面板慢；扫描件只在这台机器上处理，不上传」。没有「推荐」字样。底部边界句：不得复印伪造的证件、印章、票据，只能复印本人的真实证件和票据。屏上复印没开通、扫描仪状态过期、打印机离线时第二条灰掉并写原因。 11/08 补：?scanner=…（同「怎么扫」八种，字换成复印）、?printer=unknown「打印机状态暂时无法确认，请先用面板复印」、?net=off「网络断开时，我们会收到提醒并远程处理」（copy/useCopyFlow.ts 45–47、CopyWorkbenchPage.tsx 42），胶囊和屏上卡写同一句、屏上卡灰。' + NK
   });
   reg('cs-copy-guide', G_COPY, '怎么在打印机上复印（图文）', copyGuide, {
     does: '定稿「怎么在打印机上复印」（copy 屏）的图文版：五步，每步配图或图标，下面两条提醒。复印不在这块屏上下单，所以没有进度、完成页，也不进「我的打印订单」。',
@@ -1423,22 +1761,22 @@
   reg('cs-copy-set', G_COPY, '复印设置', copySet, {
     does: '放好原件，选份数、颜色、单面还是双面，然后开始复印。',
     motion: '同 cs-scan-set：选中的原件位置播怎么放（一轮 7 秒），另一种静态。字幕只用已有原句。减弱动效时停在末帧，字幕全部展开。这是待产品负责人看的动画补稿，还没改程序。',
-    keep: '原件：玻璃台 / 进纸器。份数 1–99，−10 / −1 / +1 / +10。颜色黑白 / 彩色；打印成单面 / 双面。地址 ?color=off、?duplex=off（或演示事件）时对应选项灰掉，写「本机暂未开通」。小字「原件几页，扫完才知道；扫完会给你核对」。打印机离线时主按钮写「打印机离线」并停用。每屏可点数多，是因为这里有 4 组设置，和定稿的预览与设置屏同类。' + NK
+    keep: '原件：玻璃台 / 进纸器。份数 1–99，−10 / −1 / +1 / +10。颜色黑白 / 彩色；打印成单面 / 双面。地址 ?color=off、?duplex=off（或演示事件）时对应选项灰掉，写「本机暂未开通」。小字「原件几页，扫完才知道；扫完会给你核对」。打印机离线时主按钮写「打印机离线」并停用。每屏可点数多，是因为这里有 4 组设置，和定稿的预览与设置屏同类。 11/08 补：?start=busy 正在建单（开始灰；程序还把四组设置锁住，稿只画主按钮）、?start=limit「这一次超过了这台机器能收的大小。这次先停在这里。」、?start=unknown「状态未知。这一步的结果还没确认，请先用面板复印。不要更改设置后重新开始。」（程序把四组设置锁住）；?net=off、?scanner=capcheck…error、?printer=unknown 时原因写在提示行、开始复印灰。' + NK
   });
   reg('cs-copy-scan', G_COPY, '复印第 1 步：正在扫原件', () => runScreen(true), {
     does: '复印第 1 步：扫原件。样子同「正在扫描」，标题和路径线换成复印。',
     motion: '同 cs-scan-run：只有扫描光带和小圆点在动。',
-    keep: '路径线：扫原件 → 核对 → 打印 → 取走，当前在第 1 步。页数写「已收到 N 页」，扫描仪不报就不显示。「停止复印」要点两次。原件扫完靠演示事件去核对；出错屏同扫描，按复印换写法。' + NK
+    keep: '路径线：扫原件 → 核对 → 打印 → 取走，当前在第 1 步。页数写「已收到 N 页」，扫描仪不报就不显示。「停止复印」要点两次。原件扫完靠演示事件去核对；出错屏同扫描，按复印换写法。 11/08 补：?run=waiting 胶囊「等待扫描仪」、副题「还在等扫描仪回报已经开始。先别动原件。」；?run=finishing 胶囊「整理成预览」、副题「扫完后准备给你核对」、第 4 段进行中（copy/CopyDeviceView.tsx 46–48）；不报页数时大字照程序写「正在扫描」。' + NK
   });
   reg('cs-copy-check', G_COPY, '核对复印', copyCheck, {
     does: '复印第 2 步：核对页面和数量，再开始打印。',
     motion: '无。',
-    keep: '事实格：原件 N 页 × 份数 = 总页数；单面或双面用几张纸；黑白或彩色；本机构免费。小字：发现身份证号等个人信息时，会先问你保留还是遮挡；扫描件只在这台机器上，打印完就删除。「重扫」回第 1 步。双面用纸张数按总页数除以二向上取整，改程序时要和真实打印任务的算法对一下。' + NK
+    keep: '事实格：原件 N 页 × 份数 = 总页数；单面或双面用几张纸；黑白或彩色；本机构免费。小字：发现身份证号等个人信息时，会先问你保留还是遮挡；扫描件只在这台机器上，打印完就删除。「重扫」回第 1 步。双面用纸张数按总页数除以二向上取整，改程序时要和真实打印任务的算法对一下。 11/08 补：演示事件「演示：超过免费额度」去 cs-copy-quota；?preview=loading「正在读取本机预览」、?preview=fail「预览暂时无法确认，请重扫或返回。」（这两种开始打印灰）；?cpages=7 超过三页按组翻（翻组键照定稿打印预览 .pager，程序是文字键「上一组」「下一组」）；?quote=changed「报价已更新，请重新核对后再开始打印。」、?quote=odd「这次奇数页多份双面暂未开通，请返回修改设置。」（开始灰）、?quote=none 价格格写「报价暂时无法确认」（开始灰）；?net=off 主按钮「网络已断开」。程序这屏没有「发现身份证号…保留还是遮挡」「打印完就删除」两条，只有「扫描件只在这台机器上处理，不上传」；双面用纸程序按每份向上取整（3 页 × 2 份 = 4 张），见对稿清单。付费那一种不画（价格不进仓库）。' + NK
   });
   reg('cs-copy-print', G_COPY, '复印第 3 步：正在打印', copyPrint, {
     does: '复印第 3 步：打印。四段：已收到 → 正在交给打印机 → 打印机正在出纸 → 已交给打印机。',
     motion: '出纸动画只在第三段「打印机正在出纸」：纸一张一张从出纸口落进托盘，每张 760 毫秒，错开出来；运行时张数跟打印机回报走。第二段不出纸、不动。',
-    keep: '小字「出了几张，以出纸口为准」。系统不知道用户是否拿到纸，所以不写「已出纸」「复印完成」。演示事件：正在交给打印机 / 打印机正在出纸 / 已交给打印机（去完成）/ 这次没收到打印结果（去未确认）。' + NK
+    keep: '小字「出了几张，以出纸口为准」。系统不知道用户是否拿到纸，所以不写「已出纸」「复印完成」。演示事件：正在交给打印机 / 打印机正在出纸 / 已交给打印机（去完成）/ 这次没收到打印结果（去未确认）。 11/08 补：演示事件「演示：打印失败」去 cs-copy-failed。程序没有「打印机正在出纸」这一段（没有证据就不说正在出纸），只有三段：已收到 → 正在交给打印机 → 已交给打印机，见对稿清单。' + NK
   });
   reg('cs-copy-done', G_COPY, '复印第 4 步：取走', copyDone, {
     does: '复印第 4 步：到出纸口取走复印件，别落下原件。',
@@ -1455,6 +1793,36 @@
     motion: '无。',
     keep: '大卡和主按钮「怎么在打印机上复印」都去本目录的图文版 cs-copy-guide。屏上方式灰掉、写「这台机器还没开通」。可用地址 #cs-copy-off 直接打开。' + NK
   });
+  reg('cs-copy-quota', G_COPY, '复印：免费额度用完（11/08 待看）', copyQuota, {
+    does: '核对屏点「开始打印」时超过免费额度：没有建单、没有出纸。三种说法用地址 ?quota=guest|member|terminal 切换（缺省 guest），说明栏演示事件也能切；?limit=none 是后台没给面数时的说法。从 cs-copy-check 的演示事件「演示：超过免费额度」进来。',
+    motion: '无。',
+    keep: '字逐字照 copy/copyQuotaCopy.ts（copyQuotaText），面数是示意值：游客 20 面、本人 50 面，和运行页截图一致。游客单次超限（PRINT_GUEST_ORDER_QUOTA_EXCEEDED）两条出路「去登录」「回首页」，底栏「回首页」「问小青：免费额度什么时候恢复」「去登录」；登录后回到「放好原件，选份数」，要重新放原件、再扫一次（COPY_LOGIN_PATH）。本人每日（PRINT_MEMBER_DAILY_QUOTA_REACHED）、整机每日（PRINT_TERMINAL_DAILY_QUOTA_REACHED）只有「回首页」一条出路，原因卡单栏居中竖排（照 copy-print.css 的 cc-quota-solo），底栏只有问小青和「回首页」。两条额度说明：复印和打印共用免费额度；只算成功出纸的面数，没出纸不算（COPY_QUOTA_FACTS）。不给「改用面板复印」：面板复印不经过额度，会绕开上限（CopyQuotaView.tsx 14–15）。原件提醒用 cs-copy-done 的绿条，句子照运行页「原件还在玻璃上或进纸器里，请带走」；服务电话照稿里的写法，运行时从后台读，读不到不显示。离开即清场（撤销云端单、删本机扫描页），屏上不写。定稿和本目录搜过「额度」「免登录」「每日上限」「0 点恢复」，没有同类屏，这是新屏。' + NK
+  });
+  reg('cs-copy-more', G_COPY, '复印：这一页扫好了（11/08 待看）', copyMore, {
+    does: '复印选玻璃台时，一页扫好后问还有没有下一页。程序有这一屏（copy/CopyDeviceView.tsx 41–59），稿原来没画。',
+    motion: '无。',
+    keep: '胶囊「这一页已扫好」，标题「这一页扫好了，还有下一页吗？」，「再扫一页」「先把下一页放上玻璃台，字朝下，对齐左上角」，底栏「停止复印」（点两次）、问小青「一直扫不完怎么办」、主按钮「扫完了」，没有返回——都是运行页原句。程序这一屏只有一句「已收到 N 页」和一张「再扫一页」卡；稿照 cs-scan-more 的版式放已收到的页小图，并补了一张「扫完了，整理成预览」卡（字取本稿已有的「整理成预览」「扫完后准备给你核对」，和底栏主按钮同一个动作）——这张卡程序没有，要不要请产品负责人定。?pages=none 时只写「这一页已扫好」，格子里放玻璃台大图；?busy=1 是命令在途，卡和主按钮全灰。' + NK
+  });
+  reg('cs-copy-unknown', G_COPY, '复印：状态未知（11/08 待看）', copyUnknown, {
+    does: '复印中云端和本机的读数接不上、等太久没新结果、停止结果没确认时程序落的屏（copy/CopyDeviceView.tsx 40–63，句子 copy/copyDeviceFlow.ts 22、58、231）。?why=wait|stop|token 切三种说法（token 是建单回包缺凭据，copy/copySession.ts 92）。',
+    motion: '纸页静止。',
+    keep: '程序正文只有一句提示、其余是空的；稿借 cs-scan-unknown 的大纸版式把这句放大，字不改。和屏上扫描的状态未知不同：复印这屏有「返回」（回「怎么复印？」并清场），有「停止复印」（点两次；缺凭据那种没有停止键）。程序胶囊是灰色的「状态未知」，稿照本目录写法用橙色。缺凭据那种程序标题写「状态未知」、胶囊却写「扫描仪就绪 · 刚刚检查」，稿按「状态未知」画，这处请改程序或定口径。' + NK
+  });
+  reg('cs-copy-failed', G_COPY, '复印：打印失败（11/08 待看）', copyFailed, {
+    does: '复印交给打印机后打印失败（copy/CopyErrorView.tsx，printing 为真）。',
+    motion: '无。',
+    keep: '标题、胶囊「打印失败」，原因「看打印机屏幕上的提示。这次不会自动重打，也不会重复收费。」，出路「改用面板复印」「回首页」，原件提醒「原件还在玻璃上或进纸器里，请和复印件一起带走」，服务电话行；底栏问小青「取纸或异常怎么办」、主按钮「改用面板复印」，没有返回——都照运行页。不重打、不重复收费是程序行为（同一次只派发一次）。' + NK
+  });
+  reg('cs-copy-err-limit', G_COPY, '复印：超过这台机器能收的大小（11/08 待看）', copyErrLimit, {
+    does: '扫原件时超过这台机器能收的大小（错误码 too_large / COPY_LIMIT_EXCEEDED，copy/copyPrintModel.ts 14）。',
+    motion: '无。',
+    keep: '标题「这次超过了这台机器能收的大小」、胶囊「超过限制」、原因「减少原件页数后再试。」，出路「减少页数再试」「改用面板复印」，主按钮「减少页数再试」（回放好原件那一步重来），没有返回——照 copy/CopyErrorView.tsx 26–51。原因只有一句，稿用额度屏的单栏居中，免得右半边一大片空。问小青那句程序借的是「扫描仪没有响应」那屏的「扫描仪连不上怎么办」，和这一屏不符，稿照写，请定。' + NK
+  });
+  reg('cs-copy-err-off', G_COPY, '复印：中途没开通（11/08 待看）', copyErrOff, {
+    does: '扫到一半屏上复印被关掉、授权失效或单子过期（COPY_UNAUTHORIZED / REVOKED / DISABLED / EXPIRED，copy/copyPrintModel.ts 15）。',
+    motion: '无。',
+    keep: '眉题「复印」、标题「这台机器暂时只能在打印机面板上复印」、胶囊「屏上复印未开通」、原因「这次不能继续屏上复印，请改用面板复印。」，出路「改用面板复印」「回首页」，主按钮「改用面板复印」——照 copy/CopyErrorView.tsx 26–51。和开始前就没开通的 cs-copy-off 不是一屏：这里是出错版式、没有返回。问小青那句程序同样借了「扫描仪连不上怎么办」，请定。' + NK
+  });
 
   reg('cs-device', G_DEV, '设备状态（细分）', device, {
     does: '设备状态细分：终端程序、打印机、扫描仪、面板扫描接收，每一项都写检查时间。',
@@ -1466,8 +1834,8 @@
   [G_SCAN, G_COPY, G_DEV].forEach((g) => { if (window.SCREEN_GROUPS.indexOf(g) < 0) window.SCREEN_GROUPS.push(g); });
   window.FLOWS.push(
     { n: '屏上扫描（新）', ids: ['print', 'cs-scan-what', 'cs-scan-how', 'cs-scan-set', 'cs-scan-run', 'cs-scan-more', 'cs-scan-make', 'cs-scan-done', 'pii'] },
-    { n: '屏上扫描出错（新）', ids: ['cs-scan-run', 'cs-scan-err-nopaper', 'cs-scan-err-jam', 'cs-scan-err-busy', 'cs-scan-err-noresp', 'cs-scan-timeout', 'cs-scan-unknown', 'cs-scan-file-gone', 'cs-scan-offline', 'cs-scan-stopped', 'cs-scan-off'] },
-    { n: '屏上复印（新）', ids: ['print', 'cs-copy-how', 'cs-copy-set', 'cs-copy-scan', 'cs-copy-check', 'cs-copy-print', 'cs-copy-done', 'cs-copy-unconfirmed', 'cs-copy-off'] },
+    { n: '屏上扫描出错（新）', ids: ['cs-scan-run', 'cs-scan-err-nopaper', 'cs-scan-err-jam', 'cs-scan-err-busy', 'cs-scan-err-noresp', 'cs-scan-timeout', 'cs-scan-unknown', 'cs-scan-file-gone', 'cs-scan-offline', 'cs-scan-stopped', 'cs-scan-failed', 'cs-scan-off'] },
+    { n: '屏上复印（新）', ids: ['print', 'cs-copy-how', 'cs-copy-set', 'cs-copy-scan', 'cs-copy-more', 'cs-copy-check', 'cs-copy-quota', 'cs-copy-print', 'cs-copy-done', 'cs-copy-unconfirmed', 'cs-copy-failed', 'cs-copy-unknown', 'cs-copy-err-limit', 'cs-copy-err-off', 'cs-copy-off'] },
     { n: '面板复印图文指引（新）', ids: ['print', 'cs-copy-how', 'cs-copy-guide', 'cs-copy-guide-more', 'print-src'] },
     { n: '设备状态（新）', ids: ['offline', 'cs-device'] }
   );
