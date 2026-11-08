@@ -2,7 +2,7 @@ import type { ServiceHubKey, ServiceHubSpec } from './serviceHubModel'
 
 /**
  * 五份规格**机械抽自** docs/design/kiosk-redesign-2026-08-v2/16-service-hubs.html（2.0 稿）的 `const H`。
- * 抽取脚本：apps/kiosk/scripts/extract-service-hub-specs.mjs。稿改了重跑它，别手改本文件。
+ * 抽取脚本：apps/kiosk/scripts/extract-service-hub-specs.mjs。其余四份稿改了重跑它；政策规格按 2026-11-05 契约维护。
  *
  * 手抄是漏掉诚实性声明最常见的来源——这批迁移里已经因为手抄漏过多次。
  * 一次历史教训写在这里：2026-09-10 的那版抽取**漏了稿里的 `quick`**（每个 hub 3 条
@@ -136,35 +136,28 @@ export const SERVICE_HUB_SPECS: Record<ServiceHubKey, ServiceHubSpec> = {
     noteTitle: '不排名，不预测录用',
     note: '报告仅供本人练习参考，不对外共享。',
   },
+  // 2026-11-05 政策最小闭环取代稿 16 的政策规格；其余四份规格仍按原稿逐字对账。
   policy: {
-    eyebrow: '政策服务',
-    title: '看来源、查条件、备材料',
-    subtitle: '就业政策、社保与档案登记以来源内容为准；AI顾问只做通用说明。',
+    eyebrow: '查政策 · 由各发布机构自行审核发布',
+    title: '你想看哪一类？',
+    subtitle: '每条都写了条件、材料和去哪办，可以打印成一页清单。',
     goals: [
-      { label: '找就业政策', route: '/renshi?tab=policy' },
-      { label: '核对申领条件', route: '/renshi?tab=eligibility' },
-      { label: '查社保材料', route: '/renshi?tab=social' },
-      { label: '看登记档案', route: '/renshi?tab=register' },
+      { label: '应届高校毕业生', route: '/renshi?audience=graduate' },
+      { label: '创业扶持', route: '/renshi?audience=startup' },
+      { label: '灵活就业人员', route: '/renshi?audience=flexible' },
+      { label: '困难群体就业援助', route: '/renshi?audience=hardship' },
+      { label: '返乡务工人员', route: '/renshi?audience=migrant' },
+      { label: '通用', route: '/renshi?audience=general' },
     ],
-    sectionTitle: '政策与办事指引',
-    sectionHint: '七个入口，来源与条件分开看',
-    capabilities: [
-      { title: '就业政策', description: '查看就业、创业与灵活就业政策', badge: '来源内容', route: '/renshi?tab=policy', kind: 'info', icon: 'file' },
-      { title: '社保指南', description: '查看参保流程与材料说明', badge: '确定性内容', route: '/renshi?tab=social', kind: 'info', icon: 'shield' },
-      { title: '档案与登记', description: '查看托管、登记和证明材料', badge: '确定性内容', route: '/renshi?tab=register', kind: 'info', icon: 'file' },
-      { title: '条件核对', description: '按 9 项真实问项机械比对，不作资格认定', badge: '确定性规则', route: '/renshi?tab=eligibility', kind: 'info', icon: 'brief' },
-      { title: '政策公告', description: '查看发布方公告、来源与发布日期', badge: '来源内容', route: '/renshi?tab=notice', kind: 'info', icon: 'file' },
-      { title: '打开AI顾问', description: '咨询通用政策说明并核对来源', badge: 'AI · 需核实', route: '/assistant', kind: 'ai', icon: 'bot' },
-      { title: '政策收藏', description: '查看本人收藏的政策内容', badge: '本人记录', route: '/me/favorites?tab=policy', kind: 'info', icon: 'user' },
-    ],
+    sectionTitle: '选类别',
+    sectionHint: '条数与最近标题从发布数据读取',
+    capabilities: [],
     quickLinks: [
-      { title: '浏览记录', description: '查看最近浏览的政策', route: '/me/activity', kind: 'account', icon: 'user' },
-      { title: 'AI服务记录', description: '本人AI服务记录，不含顾问问答', route: '/me/ai-records', kind: 'account', icon: 'bot' },
-      { title: '全部服务', description: '返回服务目录', route: '/', kind: 'info', icon: 'external' },
+      { title: '政策收藏', description: '登录后查看本人账号收藏', route: '/me/favorites?tab=policy', kind: 'account', icon: 'user' },
     ],
-    truthTitle: '政策内容以来源发布为准。',
-    truth: 'AI顾问不替主管部门作资格判断。',
-    noteTitle: '不承诺办理或资格结果',
-    note: '资格核对使用确定性规则，最终以官方审核为准。',
+    truthTitle: '政策由发布机构自行审核发布。',
+    truth: '以官方原文为准。',
+    noteTitle: '可以打印一页办事清单',
+    note: '不判断能不能领。',
   },
 }

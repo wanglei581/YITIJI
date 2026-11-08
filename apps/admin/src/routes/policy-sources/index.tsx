@@ -100,7 +100,7 @@ export default function PolicySourcesPage() {
         <div className="flex h-48 items-center justify-center">
           <LoadingState text="加载中…" className="py-12" />
         </div>
-        <RecentEmergencyAuditCard actions={POLICY_AUDIT_ACTIONS} />
+        <RecentEmergencyAuditCard actions={POLICY_AUDIT_ACTIONS} targetType="policy" />
       </Page>
     )
   }
@@ -119,7 +119,7 @@ export default function PolicySourcesPage() {
             重新加载
           </button>
         </div>
-        <RecentEmergencyAuditCard actions={POLICY_AUDIT_ACTIONS} />
+        <RecentEmergencyAuditCard actions={POLICY_AUDIT_ACTIONS} targetType="policy" />
       </Page>
     )
   }
@@ -187,7 +187,7 @@ export default function PolicySourcesPage() {
         「查看申领条件」为只读复核:条件由来源机构在合作机构后台录入,本页不改条件。
       </p>
 
-      <RecentEmergencyAuditCard actions={POLICY_AUDIT_ACTIONS} />
+      <RecentEmergencyAuditCard actions={POLICY_AUDIT_ACTIONS} targetType="policy" />
 
       <EmergencyTakedownDialog target={takedown} onClose={() => setTakedown(null)} onDone={reload} />
 

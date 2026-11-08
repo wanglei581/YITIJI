@@ -181,7 +181,7 @@ export function OrgContentTrustPanel({ orgId, onChanged }: { orgId: string; onCh
             ) : (
               <strong className="text-warning-fg">不允许发布</strong>
             )}
-            。本操作只决定「能不能发」,不会自动上架或下架任何已有内容。
+            。标记后该机构才能在机构后台自行发布政策与政策公告；平台管理员只保留紧急下架。本操作只决定「能不能发」,不会自动上架或下架任何已有内容。
           </p>
 
           <div className="space-y-1.5">

@@ -35,6 +35,7 @@ import { FairVisitPlanService } from './resume/fair-visit-plan.service'
 import { FairVisitPlanPdfService } from './resume/fair-visit-plan-pdf.service'
 import { FairVisitPlanController } from './fair-visit-plan.controller'
 import { LlmChatService } from './llm/llm-chat.service'
+import { AssistantPolicyContextService } from './llm/assistant-policy-context'
 import { AiConfigController, AiConfigsController } from './llm/ai-config.controller'
 import { AiResultCleanupTask } from './ai-result.cleanup.task'
 import { ResumeExtractionService } from './resume/resume-extraction.service'
@@ -104,6 +105,7 @@ import { AiSafetyLexiconService } from './safety/ai-safety-lexicon.service'
     FairVisitPlanService,
     FairVisitPlanPdfService,
     LlmChatService,
+    AssistantPolicyContextService,
     AiResultCleanupTask,
     // ── Phase 1A 简历文字提取 + OCR 底座 ──
     ResumeExtractionService,

@@ -145,10 +145,10 @@ test('例行续期后两分钟到期，暂停复查距续期至少五分钟 @lic
 // 服务台与打印台的入口停用，要在「收尾开始那一刻就站在这一项服务里」的前提下测：
 // 运行时根只拦「收尾开始之后进入另一项服务的办理页」（licenseWindDownRoutes.ts），
 // 站在别处再进来看到的是拦截屏而不是服务台（见 kiosk-license-wind-down.spec.ts）。所以每个服务台各开一条，从它自己开机。
+// 查政策首页 2026-11-05 改成六类大卡（PolicyTouchHub），版面和要读的接口都不一样，单独一条，在这组后面。
 const HUBS = [
   { name: '简历台', path: '/resume-service', root: '[data-qx-page="resume"]' },
   { name: '练面试', path: '/interview-service', root: '[data-qx-page="interview"]' },
-  { name: '查政策', path: '/policy-service', root: '[data-qx-page="service-hub"]' },
 ] as const
 
 for (const { name, path, root } of HUBS) {
@@ -182,6 +182,69 @@ for (const { name, path, root } of HUBS) {
     await expect(page.locator(other.root), `${other.path}：被拦的服务台不该渲染`).toHaveCount(0)
   })
 }
+
+// 查政策首页挂载时读八次 GET /policies：六类各读条数（kind=policy_guide&audience=…&pageSize=1），再读最近一条与公告条数。
+// ApiRouter 只按路径应答，同一份答复会被算进每一类、连公告都算上；glob 路由又连查询串一起比对。
+// 所以按路径接住、再按 kind / audience 过滤（同 fusion-w4、政策旅程的写法）。
+// 六类各有一条已发布政策：正常时六张大卡都能点，收尾后它们停用只可能是因为收尾，不是因为这一类没有数据。
+const POLICY_FEED: Array<{ id: string; kind: string; audience?: string; title: string; sourceName: string; publishedDate: string; syncTime: string }> = [
+  { id: 'qd-policy-graduate', kind: 'policy_guide', audience: 'graduate', title: '2026 届高校毕业生就业见习补贴申领说明', sourceName: '青岛市人力资源和社会保障局', publishedDate: '2026-10-28', syncTime: '2026-10-28T01:20:00.000Z' },
+  { id: 'qd-policy-startup', kind: 'policy_guide', audience: 'startup', title: '创业担保贷款贴息申请指引', sourceName: '青岛市就业服务中心', publishedDate: '2026-10-21', syncTime: '2026-10-21T06:45:00.000Z' },
+  { id: 'qd-policy-flexible', kind: 'policy_guide', audience: 'flexible', title: '灵活就业人员社会保险补贴申领办法', sourceName: '青岛市人力资源和社会保障局', publishedDate: '2026-10-16', syncTime: '2026-10-16T03:10:00.000Z' },
+  { id: 'qd-policy-hardship', kind: 'policy_guide', audience: 'hardship', title: '就业困难人员公益性岗位安置办理说明', sourceName: '市北区人力资源和社会保障局', publishedDate: '2026-10-09', syncTime: '2026-10-09T08:30:00.000Z' },
+  { id: 'qd-policy-migrant', kind: 'policy_guide', audience: 'migrant', title: '返乡入乡创业一次性补贴申领指引', sourceName: '即墨区就业服务中心', publishedDate: '2026-09-26', syncTime: '2026-09-26T02:55:00.000Z' },
+  { id: 'qd-policy-general', kind: 'policy_guide', audience: 'general', title: '职业技能等级认定补贴申领流程', sourceName: '青岛市职业技能鉴定中心', publishedDate: '2026-09-18', syncTime: '2026-09-18T07:05:00.000Z' },
+  { id: 'qd-notice-autumn', kind: 'notice', title: '2026 年秋季就业服务月活动安排', sourceName: '青岛市就业服务中心', publishedDate: '2026-10-30', syncTime: '2026-10-30T02:05:00.000Z' },
+]
+
+test('授权失效：查政策首页（收尾开始时就在这一页）的六类入口停用，问小青停用 @license-gate', async ({ page, api }) => {
+  await page.route((url) => url.pathname === '/api/v1/policies', async (route) => {
+    const params = new URL(route.request().url()).searchParams
+    const kind = params.get('kind')
+    const audience = params.get('audience')
+    const pageSize = Math.max(1, Number(params.get('pageSize')) || 200)
+    const hits = POLICY_FEED.filter((item) => (!kind || item.kind === kind) && (!audience || item.audience === audience))
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: hits.slice(0, pageSize),
+        pagination: { page: 1, pageSize, total: hits.length, totalPages: Math.max(1, Math.ceil(hits.length / pageSize)) },
+      }),
+    })
+  })
+  const world = await boot(page, api, { path: '/policy-service' })
+  const hub = page.getByTestId('policy-touch-hub')
+  const categories = hub.locator('[data-testid^="policy-category-"]')
+  const live = hub.locator('[data-testid^="policy-category-"]:not([aria-disabled="true"])')
+
+  // 阳性对照：授权正常时，政策首页读到了六类，六张大卡都能点，问小青也是亮的。
+  await expect(hub, '/policy-service：政策首页要在屏上、读到政策').toHaveAttribute('data-qxt-state', 'ready')
+  await expect(live, '/policy-service：正常时六类都能点').toHaveCount(6)
+  await expect(page.locator('.qxt-askq[data-qxt-ask="on"]'), '/policy-service：正常时问小青是亮的').toHaveCount(1)
+
+  world.lapse(12 * MINUTE)
+  await world.advance(3.5 * MINUTE)
+
+  // 收尾是在这一页开始的：它还留在屏上（没被拦），六类大卡全部停用，点了不跳。
+  await expect(windDownBlocked(page), '/policy-service：收尾开始时就站在这一页，不该被拦').toHaveCount(0)
+  await expect(categories, '/policy-service：六类大卡还在屏上').toHaveCount(6)
+  await expect(live, '/policy-service：不能有还能点的类别').toHaveCount(0)
+  await expectTapStays(page, categories.first(), '/policy-service 第一类')
+  // 问小青停用：底栏换成停用态，并写明查看政策照常。
+  await expect(page.locator('.qxt-askq[data-qxt-ask="off"]'), '/policy-service：问小青停用').toHaveText('小青暂时不可用 · 查看政策照常')
+  await expect(page.locator('.qxt-askq[data-qxt-ask="on"]')).toHaveCount(0)
+  // 原因写明：和首页、简历台、练面试、政策详情同一句「本机暂不开始新的办理」（底栏）。
+  await expect(page.getByText(NO_NEW_TASK).filter({ visible: true }).first(), '/policy-service：写明停用原因').toBeVisible()
+  // 「最近更新」「机构公告」两行和六类大卡一起锁上，不能从旁路点进去。
+  await expect(page.locator('.policy-min-row:not([disabled])'), '/policy-service：最近更新等入口一起停用').toHaveCount(0)
+
+  // 收尾中进另一个服务台：整屏换成拦截屏，目标服务台不渲染。
+  await goInApp(page, '/resume-service')
+  await expect(windDownBlocked(page), '/policy-service 里进 /resume-service：要出拦截屏').toBeVisible()
+  await expect(page.locator('[data-qx-page="resume"]'), '/resume-service：被拦的服务台不该渲染').toHaveCount(0)
+})
 
 test('授权失效：打印台（收尾开始时就在这一页）整块入口停用并写明原因，问小青停用 @license-gate', async ({ page, api }) => {
   const world = await boot(page, api, { path: '/print-scan' })

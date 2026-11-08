@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 629,
+    "endpointCount": 630,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -461,7 +461,8 @@
         "handler": "AiConfigController.testOne",
         "method": "POST",
         "models": [
-          "AiServiceLog"
+          "AiServiceLog",
+          "PolicyPost"
         ],
         "path": "/api/v1/admin/ai-config/:featureKey/test",
         "roles": [
@@ -481,7 +482,8 @@
         "handler": "AiConfigController.test",
         "method": "POST",
         "models": [
-          "AiServiceLog"
+          "AiServiceLog",
+          "PolicyPost"
         ],
         "path": "/api/v1/admin/ai-config/test",
         "roles": [
@@ -11635,6 +11637,26 @@
         ]
       },
       {
+        "controller": "services/api/src/policies/policy-checklist.controller.ts",
+        "handler": "PolicyChecklistController.generate",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "PolicyPost",
+          "PrintTask"
+        ],
+        "path": "/api/v1/policies/:id/checklist",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/policies/policy-checklist.service.ts"
+        ],
+        "services": [
+          "PolicyChecklistService"
+        ]
+      },
+      {
         "controller": "services/api/src/policies/policies.controller.ts",
         "handler": "PoliciesController.checkEligibility",
         "method": "POST",
@@ -14338,7 +14360,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 821,
+      "reachableFileCount": 818,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -16610,10 +16632,10 @@
           ],
           "path": "/renshi",
           "styles": [
-            "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css",
-            "apps/kiosk/src/pages/renshi/renshi-narrow-qx.css",
             "apps/kiosk/src/pages/renshi/renshi-policy-fusion.css",
             "apps/kiosk/src/pages/renshi/renshi-touch.css",
+            "apps/kiosk/src/pages/service-hubs/policy-touch.css",
+            "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
@@ -17638,7 +17660,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 937
+      "sourceFileCount": 946
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -17842,6 +17864,7 @@
         {
           "component": "PolicyPage",
           "endpoints": [
+            "DELETE /partner/official-channels/:param",
             "DELETE /partner/policies/:param",
             "GET /partner/data-sources",
             "GET /partner/data-sources/capabilities",
@@ -17849,6 +17872,7 @@
             "GET /partner/fairs",
             "GET /partner/jobs",
             "GET /partner/jobs/quality-summary",
+            "GET /partner/official-channels",
             "GET /partner/policies/:param/eligibility-rules",
             "GET /partner/smart-campus/terminals",
             "GET /partner/sync-logs",
@@ -17860,6 +17884,7 @@
             "PATCH /partner/fairs/:param/publish",
             "PATCH /partner/jobs/:param",
             "PATCH /partner/jobs/:param/publish",
+            "PATCH /partner/official-channels/:param",
             "PATCH /partner/policies/:param",
             "PATCH /partner/policies/:param/publish",
             "PATCH /partner/policies/:param/release",
@@ -17869,6 +17894,7 @@
             "POST /partner/excel/:param/confirm",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
+            "POST /partner/official-channels",
             "POST /partner/policies",
             "POST /partner/policies/:param/eligibility-preview",
             "PUT /partner/policies/:param/eligibility-rules",
@@ -18157,7 +18183,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 99
+      "sourceFileCount": 101
     }
   },
   "dataModel": {
@@ -18812,6 +18838,7 @@
           "services/api/src/member-privacy/member-data-export-reconciler.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
           "services/api/src/payment/pickup-validity.ts",
+          "services/api/src/policies/policy-checklist.service.ts",
           "services/api/src/print-conversion/print-conversion.service.ts",
           "services/api/src/print-jobs/paid-reprint-eligibility.ts",
           "services/api/src/print-jobs/pickup-code-resume.ts",
@@ -19368,7 +19395,7 @@
         ]
       },
       {
-        "fieldCount": 26,
+        "fieldCount": 29,
         "name": "PolicyPost",
         "relations": [
           "Organization",
@@ -19376,6 +19403,7 @@
         ],
         "usedBy": [
           "services/api/src/activity/activity.service.ts",
+          "services/api/src/ai/llm/assistant-policy-context.ts",
           "services/api/src/assistant/daily-brief.service.ts",
           "services/api/src/bulk-publish/bulk-publish.service.ts",
           "services/api/src/community/community.service.ts",
@@ -19385,6 +19413,8 @@
           "services/api/src/member-favorites/member-favorites.service.ts",
           "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/policies/policies.service.ts",
+          "services/api/src/policies/policy-checklist-metadata.ts",
+          "services/api/src/policies/policy-checklist.service.ts",
           "services/api/src/policies/policy-eligibility.service.ts",
           "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
         ]
@@ -20023,6 +20053,7 @@
       "services/api/scripts/verify-job-data-quality.ts",
       "services/api/scripts/verify-job-info-ai-real-acceptance.ts",
       "services/api/scripts/verify-partner-excel-template.ts",
+      "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts"
@@ -20206,6 +20237,9 @@
     ],
     "apps/admin/src/routes/components/BulkPublishButton.tsx": [
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs"
+    ],
+    "apps/admin/src/routes/components/RecentEmergencyAuditCard.tsx": [
+      "apps/admin/scripts/verify-source-publish-actions.mjs"
     ],
     "apps/admin/src/routes/dashboard/DashboardDeviceStatus.tsx": [
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
@@ -21014,6 +21048,7 @@
       "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
       "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
@@ -21094,7 +21129,8 @@
       "apps/kiosk/scripts/verify-resume-decisions.mjs"
     ],
     "apps/kiosk/src/favorites/localFavorites.ts": [
-      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs"
     ],
     "apps/kiosk/src/hooks/useAiAdvisorCallSession.ts": [
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
@@ -22611,30 +22647,52 @@
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
     "apps/kiosk/src/pages/renshi/EligibilityPanel.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
     ],
     "apps/kiosk/src/pages/renshi/EligibilityResults.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
     ],
     "apps/kiosk/src/pages/renshi/NoticePanel.tsx": [
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
+    "apps/kiosk/src/pages/renshi/PolicyCategoryList.tsx": [
+      "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/renshi/PolicyDetail.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w4.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+      "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/renshi/PolicyNotices.tsx": [
+      "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+    ],
     "apps/kiosk/src/pages/renshi/PolicyPanel.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+      "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/renshi/PolicyTouchLayout.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
     "apps/kiosk/src/pages/renshi/RegisterPanel.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
     "apps/kiosk/src/pages/renshi/RenshiPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs",
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs",
       "services/api/scripts/verify-activity-logs.ts"
     ],
     "apps/kiosk/src/pages/renshi/SocialPanel.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
     "apps/kiosk/src/pages/renshi/builtinData.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
     "apps/kiosk/src/pages/renshi/components.tsx": [
@@ -22642,10 +22700,22 @@
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
     "apps/kiosk/src/pages/renshi/eligibilityOutcome.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
     ],
+    "apps/kiosk/src/pages/renshi/policyFocus.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs"
+    ],
+    "apps/kiosk/src/pages/renshi/policyModel.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+      "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+    ],
     "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css": [
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/renshi/renshi-narrow-qx.css": [
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs"
     ],
     "apps/kiosk/src/pages/renshi/renshi-touch.css": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
@@ -22655,6 +22725,7 @@
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
     "apps/kiosk/src/pages/renshi/usePolicyFocus.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/CareerPlanPage.tsx": [
@@ -23212,6 +23283,11 @@
     "apps/kiosk/src/pages/screensaver/standbyModel.ts": [
       "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs"
     ],
+    "apps/kiosk/src/pages/service-hubs/PolicyTouchHub.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+      "apps/kiosk/scripts/verify-renshi-policy-ui.mjs",
+      "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
+    ],
     "apps/kiosk/src/pages/service-hubs/QxServiceHubPage.tsx": [
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs",
@@ -23227,6 +23303,7 @@
     "apps/kiosk/src/pages/service-hubs/serviceHubSpecs.ts": [
       "apps/kiosk/scripts/extract-service-hub-specs.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
     "apps/kiosk/src/pages/service-hubs/styles/service-hub-qx.css": [
@@ -23529,6 +23606,7 @@
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
     ],
     "apps/kiosk/src/services/api/policy-eligibility.ts": [
+      "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
     ],
     "apps/kiosk/src/services/api/printConversion.ts": [
@@ -24798,6 +24876,9 @@
       "services/api/scripts/verify-resume-voice-generate.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
     ],
+    "packages/shared/src/types/assistant-chat-request.ts": [
+      "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
+    ],
     "packages/shared/src/types/audit.ts": [
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts"
@@ -25545,6 +25626,7 @@
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-assistant-device-fault-intercept.ts",
+      "services/api/scripts/verify-assistant-policy-context.ts",
       "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
@@ -25581,6 +25663,8 @@
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pii-manual-confirm.ts",
+      "services/api/scripts/verify-policy-checklist.ts",
+      "services/api/scripts/verify-policy-publish-gates.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-recruitment-emergency-scope.ts",
@@ -25649,6 +25733,13 @@
     "services/api/scripts/support/png-fixtures.ts": [
       "services/api/scripts/verify-brand-logo-image.ts",
       "services/api/scripts/verify-branding.ts"
+    ],
+    "services/api/scripts/support/policy-publish-fixture.ts": [
+      "services/api/scripts/verify-content-trust-publish-gate.ts",
+      "services/api/scripts/verify-policies.ts",
+      "services/api/scripts/verify-policy-eligibility-authoring.ts",
+      "services/api/scripts/verify-policy-eligibility.ts",
+      "services/api/scripts/verify-policy-publish-gates.ts"
     ],
     "services/api/scripts/support/recruitment-wave2-full-inventory.ts": [
       "services/api/scripts/verify-recruitment-wave2-full-inventory.ts"
@@ -26166,6 +26257,7 @@
     "services/api/src/ai/ai.module.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-assess-isolation.ts",
+      "services/api/scripts/verify-assistant-policy-context.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-governed-job-fit.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
@@ -26180,6 +26272,7 @@
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
+      "services/api/scripts/verify-assistant-policy-context.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
@@ -26203,6 +26296,7 @@
       "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/ai/dto/assistant-chat.dto.ts": [
+      "services/api/scripts/verify-assistant-policy-context.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
     ],
@@ -26230,6 +26324,7 @@
       "services/api/scripts/verify-ai-contract-mirror.mjs",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-assistant-policy-context.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-resume-diagnosis-context.ts",
@@ -26278,6 +26373,9 @@
     "services/api/src/ai/llm/assistant-channel.ts": [
       "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
+    "services/api/src/ai/llm/assistant-policy-context.ts": [
+      "services/api/scripts/verify-assistant-policy-context.ts"
+    ],
     "services/api/src/ai/llm/deepseek-thinking.ts": [
       "services/api/scripts/verify-llm-thinking-off.ts"
     ],
@@ -26294,6 +26392,7 @@
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-assistant-device-fault-intercept.ts",
       "services/api/scripts/verify-assistant-device-fault.ts",
+      "services/api/scripts/verify-assistant-policy-context.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
@@ -26308,6 +26407,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-assess-isolation.ts",
+      "services/api/scripts/verify-assistant-policy-context.ts",
       "services/api/scripts/verify-kiosk-ai-capabilities.ts",
       "services/api/scripts/verify-llm-connectivity.ts",
       "services/api/scripts/verify-llm-thinking-off.ts",
@@ -26715,7 +26815,8 @@
     ],
     "services/api/src/ai/safety/block-log.ts": [
       "services/api/scripts/verify-ai-safety-lexicon.ts",
-      "services/api/scripts/verify-assistant-device-fault-intercept.ts"
+      "services/api/scripts/verify-assistant-device-fault-intercept.ts",
+      "services/api/scripts/verify-assistant-policy-context.ts"
     ],
     "services/api/src/ai/safety/content-blocked.ts": [
       "services/api/scripts/verify-ai-safety-lexicon.ts"
@@ -26734,7 +26835,11 @@
       "services/api/scripts/verify-ai-safety-lexicon.ts"
     ],
     "services/api/src/ai/safety/policy-constraint.ts": [
-      "services/api/scripts/verify-ai-safety-lexicon.ts"
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
+      "services/api/scripts/verify-assistant-policy-context.ts"
+    ],
+    "services/api/src/ai/safety/policy-explain-constraint.ts": [
+      "services/api/scripts/verify-assistant-policy-context.ts"
     ],
     "services/api/src/ai/safety/refusal.ts": [
       "services/api/scripts/verify-ai-safety-lexicon.ts"
@@ -26770,7 +26875,8 @@
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-assistant-device-fault-intercept.ts",
-      "services/api/scripts/verify-assistant-device-fault.ts"
+      "services/api/scripts/verify-assistant-device-fault.ts",
+      "services/api/scripts/verify-assistant-policy-context.ts"
     ],
     "services/api/src/ai/usage/ai-usage-meter.ts": [
       "services/api/scripts/verify-admin-ops.ts",
@@ -26930,8 +27036,10 @@
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-policies.ts",
+      "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts",
+      "services/api/scripts/verify-policy-publish-gates.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-public-fair-demo-guard.ts",
@@ -27152,7 +27260,8 @@
       "services/api/scripts/verify-file-internal-auth.ts"
     ],
     "services/api/src/common/content-trust.ts": [
-      "services/api/scripts/verify-content-trust-publish-gate.ts"
+      "services/api/scripts/verify-content-trust-publish-gate.ts",
+      "services/api/scripts/verify-policy-publish-gates.ts"
     ],
     "services/api/src/common/crypto/email-identity.ts": [
       "services/api/scripts/verify-partner-email-login-alias.ts"
@@ -27227,6 +27336,7 @@
       "services/api/scripts/verify-policies.ts",
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts",
+      "services/api/scripts/verify-policy-publish-gates.ts",
       "services/api/scripts/verify-publish-expiry-completeness.ts",
       "services/api/scripts/verify-recruitment-emergency-scope.ts"
     ],
@@ -27390,6 +27500,7 @@
       "services/api/scripts/verify-pdf-cmap.ts",
       "services/api/scripts/verify-pdfjs-engine.ts",
       "services/api/scripts/verify-pii-redaction.ts",
+      "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-radical-font-fold.ts",
@@ -27713,9 +27824,15 @@
       "services/api/scripts/verify-cos-files.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ],
+    "services/api/src/files/dto/create-upload-intent.dto.ts": [
+      "services/api/scripts/verify-policy-checklist.ts"
+    ],
     "services/api/src/files/dto/kiosk-upload-options.dto.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-print-sign.ts"
+    ],
+    "services/api/src/files/dto/upload-options.dto.ts": [
+      "services/api/scripts/verify-policy-checklist.ts"
     ],
     "services/api/src/files/file-content-integrity.ts": [
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs"
@@ -27791,6 +27908,7 @@
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-pii-redaction.ts",
+      "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-public-fair-demo-guard.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
@@ -27852,6 +27970,7 @@
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pii-redaction.ts",
+      "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-print-conversion.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
@@ -28988,6 +29107,7 @@
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
+      "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-redemption-audit.ts",
       "services/api/scripts/verify-refund-convergence.ts",
@@ -29121,6 +29241,7 @@
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
+      "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-pricing.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -29180,7 +29301,8 @@
     ],
     "services/api/src/policies/dto/policy.dto.ts": [
       "services/api/scripts/verify-policies.ts",
-      "services/api/scripts/verify-policy-eligibility.ts"
+      "services/api/scripts/verify-policy-eligibility.ts",
+      "services/api/scripts/verify-policy-publish-gates.ts"
     ],
     "services/api/src/policies/policies.controller.ts": [
       "services/api/scripts/verify-license-state.ts",
@@ -29198,7 +29320,17 @@
       "services/api/scripts/verify-policies.ts",
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts",
+      "services/api/scripts/verify-policy-publish-gates.ts",
       "services/api/scripts/verify-publish-expiry-completeness.ts"
+    ],
+    "services/api/src/policies/policy-checklist-pdf.ts": [
+      "services/api/scripts/verify-policy-checklist.ts"
+    ],
+    "services/api/src/policies/policy-checklist.controller.ts": [
+      "services/api/scripts/verify-policy-checklist.ts"
+    ],
+    "services/api/src/policies/policy-checklist.service.ts": [
+      "services/api/scripts/verify-policy-checklist.ts"
     ],
     "services/api/src/policies/policy-eligibility.engine.ts": [
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
@@ -29218,6 +29350,9 @@
     ],
     "services/api/src/policies/policy-scope.service.ts": [
       "services/api/scripts/verify-policy-scope.ts"
+    ],
+    "services/api/src/policies/policy-source-link.ts": [
+      "services/api/scripts/verify-policy-publish-gates.ts"
     ],
     "services/api/src/print-conversion/print-conversion.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
@@ -29272,6 +29407,7 @@
     "services/api/src/print-jobs/material-check-policy.ts": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-derivation-kind.ts",
+      "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-scan-device-idscan.ts"
     ],
     "services/api/src/print-jobs/page-range.util.ts": [
@@ -29308,7 +29444,8 @@
     "services/api/src/print-jobs/pii-scan-gate.ts": [
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
       "services/api/scripts/verify-derivation-kind.ts",
-      "services/api/scripts/verify-pii-manual-confirm.ts"
+      "services/api/scripts/verify-pii-manual-confirm.ts",
+      "services/api/scripts/verify-policy-checklist.ts"
     ],
     "services/api/src/print-jobs/print-jobs.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
@@ -29341,6 +29478,7 @@
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
+      "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-param-suggestion.ts",
@@ -29370,6 +29508,7 @@
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
+      "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
@@ -29459,6 +29598,7 @@
       "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
       "services/api/scripts/verify-assistant-device-fault-intercept.ts",
+      "services/api/scripts/verify-assistant-policy-context.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-audit-logs.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
@@ -29562,8 +29702,10 @@
       "services/api/scripts/verify-pii-manual-confirm.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-policies.ts",
+      "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts",
+      "services/api/scripts/verify-policy-publish-gates.ts",
       "services/api/scripts/verify-pricing.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -29835,6 +29977,7 @@
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pii-redaction.ts",
+      "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-public-fair-demo-guard.ts",
       "services/api/scripts/verify-recruitment-hosting-default-off.ts",
@@ -29990,6 +30133,7 @@
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
+      "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
@@ -31231,6 +31375,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/src/routes/components/RecentEmergencyAuditCard.tsx",
           "apps/admin/src/routes/fair-sources/FairSourceReviewActions.tsx",
           "apps/admin/src/routes/fair-sources/index.tsx",
           "apps/admin/src/routes/import-batches/index.tsx",
@@ -32161,6 +32306,8 @@
           "apps/kiosk/src/pages/recruitment-touch/RtRibbon.tsx",
           "apps/kiosk/src/pages/recruitment-touch/SocialHubPage.tsx",
           "apps/kiosk/src/pages/recruitment-touch/recruitErrorText.ts",
+          "apps/kiosk/src/pages/renshi/PolicyDetail.tsx",
+          "apps/kiosk/src/pages/renshi/PolicyTouchLayout.tsx",
           "apps/kiosk/src/pages/renshi/RenshiPage.tsx",
           "apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx",
           "apps/kiosk/src/pages/smart-campus/SmartCampusHomePage.tsx",
@@ -32948,6 +33095,42 @@
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
         "@ai-job-print/kiosk::verify:kiosk-frontend-debt"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/src/auth/kioskSensitiveSession.ts",
+          "apps/kiosk/src/favorites/localFavorites.ts",
+          "apps/kiosk/src/pages/renshi/EligibilityPanel.tsx",
+          "apps/kiosk/src/pages/renshi/EligibilityResults.tsx",
+          "apps/kiosk/src/pages/renshi/PolicyDetail.tsx",
+          "apps/kiosk/src/pages/renshi/PolicyPanel.tsx",
+          "apps/kiosk/src/pages/renshi/RegisterPanel.tsx",
+          "apps/kiosk/src/pages/renshi/RenshiPage.tsx",
+          "apps/kiosk/src/pages/renshi/SocialPanel.tsx",
+          "apps/kiosk/src/pages/renshi/builtinData.ts",
+          "apps/kiosk/src/pages/renshi/eligibilityOutcome.ts",
+          "apps/kiosk/src/pages/renshi/policyFocus.tsx",
+          "apps/kiosk/src/pages/renshi/policyModel.ts",
+          "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css",
+          "apps/kiosk/src/pages/renshi/renshi-narrow-qx.css",
+          "apps/kiosk/src/pages/renshi/usePolicyFocus.ts",
+          "apps/kiosk/src/pages/service-hubs/PolicyTouchHub.tsx",
+          "apps/kiosk/src/pages/service-hubs/serviceHubSpecs.ts",
+          "apps/kiosk/src/services/api/policy-eligibility.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:kiosk-parked-policy"
       ],
       "wired": true
     },
@@ -34537,14 +34720,20 @@
         "files": [
           "apps/kiosk/src/pages/home/serviceGroups.ts",
           "apps/kiosk/src/pages/renshi/NoticePanel.tsx",
+          "apps/kiosk/src/pages/renshi/PolicyCategoryList.tsx",
+          "apps/kiosk/src/pages/renshi/PolicyDetail.tsx",
+          "apps/kiosk/src/pages/renshi/PolicyNotices.tsx",
           "apps/kiosk/src/pages/renshi/PolicyPanel.tsx",
+          "apps/kiosk/src/pages/renshi/PolicyTouchLayout.tsx",
           "apps/kiosk/src/pages/renshi/RegisterPanel.tsx",
           "apps/kiosk/src/pages/renshi/RenshiPage.tsx",
           "apps/kiosk/src/pages/renshi/SocialPanel.tsx",
           "apps/kiosk/src/pages/renshi/builtinData.ts",
           "apps/kiosk/src/pages/renshi/components.tsx",
+          "apps/kiosk/src/pages/renshi/policyModel.ts",
           "apps/kiosk/src/pages/renshi/shared.ts",
-          "apps/kiosk/src/pages/renshi/usePolicyFocus.ts"
+          "apps/kiosk/src/pages/renshi/usePolicyFocus.ts",
+          "apps/kiosk/src/pages/service-hubs/PolicyTouchHub.tsx"
         ],
         "missing": []
       },
@@ -34944,6 +35133,7 @@
           "apps/kiosk/src/pages/recruitment-touch/RecruitDoors.tsx",
           "apps/kiosk/src/pages/recruitment-touch/SocialHubPage.tsx",
           "apps/kiosk/src/pages/recruitment-touch/useRecruitmentAvailability.ts",
+          "apps/kiosk/src/pages/service-hubs/PolicyTouchHub.tsx",
           "apps/kiosk/src/pages/service-hubs/QxServiceHubPage.tsx",
           "apps/kiosk/src/pages/service-hubs/serviceHubModel.ts",
           "apps/kiosk/src/pages/service-hubs/serviceHubSpecs.ts",
@@ -35428,7 +35618,9 @@
           "apps/partner/src/routes/sync-logs/index.tsx",
           "apps/partner/src/routes/terminals/index.tsx"
         ],
-        "missing": []
+        "missing": [
+          "services/api/policies.ts"
+        ]
       },
       "file": "apps/partner/scripts/verify-partner-refresh-safe.mjs",
       "helper": false,
@@ -39066,6 +39258,36 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/ai/ai.module.ts",
+          "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/dto/assistant-chat.dto.ts",
+          "services/api/src/ai/interfaces/ai-provider.interface.ts",
+          "services/api/src/ai/llm/assistant-policy-context.ts",
+          "services/api/src/ai/llm/llm-chat.service.ts",
+          "services/api/src/ai/llm/llm-config.service.ts",
+          "services/api/src/ai/safety/block-log.ts",
+          "services/api/src/ai/safety/policy-constraint.ts",
+          "services/api/src/ai/safety/policy-explain-constraint.ts",
+          "services/api/src/ai/usage/ai-usage-context.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-assistant-policy-context.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:assistant-policy-context"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/ai.service.ts",
           "services/api/src/ai/dto/assistant-chat.dto.ts",
@@ -39824,6 +40046,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/policy-publish-fixture.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/bulk-publish/bulk-publish.service.ts",
           "services/api/src/common/content-trust.ts",
@@ -44251,6 +44474,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/policy-publish-fixture.ts",
           "services/api/src/activity/activity.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/decorators/current-user.decorator.ts",
@@ -44276,6 +44500,43 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [],
+        "files": [
+          ".github/workflows/ci.yml",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/pdf/pdfjs-document.ts",
+          "services/api/src/files/dto/create-upload-intent.dto.ts",
+          "services/api/src/files/dto/upload-options.dto.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/files/signing.ts",
+          "services/api/src/payment/order-status.service.ts",
+          "services/api/src/payment/pricing.service.ts",
+          "services/api/src/policies/policy-checklist-pdf.ts",
+          "services/api/src/policies/policy-checklist.controller.ts",
+          "services/api/src/policies/policy-checklist.service.ts",
+          "services/api/src/print-jobs/material-check-policy.ts",
+          "services/api/src/print-jobs/pii-scan-gate.ts",
+          "services/api/src/print-jobs/print-jobs.service.ts",
+          "services/api/src/print-jobs/print-page-count.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-policy-checklist.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:policy-checklist"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [
           "apps/partner/src"
         ],
@@ -44283,6 +44544,7 @@
           ".github/workflows/ci.yml",
           "scripts/verify-ci-gate-coverage.mjs",
           "services/api/package.json",
+          "services/api/scripts/support/policy-publish-fixture.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/decorators/current-user.decorator.ts",
           "services/api/src/policies/policies.service.ts",
@@ -44313,6 +44575,7 @@
         "files": [
           "services/api/prisma/postgres/schema.prisma",
           "services/api/prisma/schema.prisma",
+          "services/api/scripts/support/policy-publish-fixture.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/decorators/current-user.decorator.ts",
           "services/api/src/policies/dto/policy.dto.ts",
@@ -44330,6 +44593,32 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:policy-eligibility"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/policy-publish-fixture.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/content-trust.ts",
+          "services/api/src/common/decorators/current-user.decorator.ts",
+          "services/api/src/policies/dto/policy.dto.ts",
+          "services/api/src/policies/policies.service.ts",
+          "services/api/src/policies/policy-source-link.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-policy-publish-gates.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:policy-publish-gates"
       ],
       "wired": true
     },
@@ -46759,6 +47048,7 @@
           "docs/progress/current-progress.md",
           "docs/progress/next-tasks.md",
           "packages/shared/src/types/ai.ts",
+          "packages/shared/src/types/assistant-chat-request.ts",
           "packages/shared/src/types/toolboxMicroApp.ts",
           "services/api/package.json",
           "services/api/src/ai/dto/assistant-chat.dto.ts",
@@ -48823,6 +49113,164 @@
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/renshi/EligibilityPanel.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+          "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs",
+          "docs/progress/next-tasks.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/renshi/EligibilityResults.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+          "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs",
+          "docs/progress/next-tasks.md",
+          "docs/reviews/kiosk-runtime-engineering-words-2026-09-28.md",
+          "docs/reviews/partner-capability-inventory-2026-09-02.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/renshi/PolicyPanel.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+          "apps/kiosk/scripts/verify-renshi-policy-ui.mjs",
+          "docs/reviews/fake-capability-audit-2026-08.md",
+          "docs/reviews/kiosk-control-integrity-audit-2026-08-16.md",
+          "docs/reviews/launch-audit-2026-09-05.md",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w4.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/renshi/RegisterPanel.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+          "apps/kiosk/scripts/verify-renshi-policy-ui.mjs",
+          "docs/reviews/kiosk-control-integrity-audit-2026-08-16.md",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w4.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/renshi/SocialPanel.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+          "apps/kiosk/scripts/verify-renshi-policy-ui.mjs",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w4.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/renshi/builtinData.ts",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+          "apps/kiosk/scripts/verify-renshi-policy-ui.mjs",
+          "docs/design/kiosk-redesign-2026-08-v2/48-policy-workspace.html",
+          "docs/design/kiosk-redesign-2026-08-v2/policy-workspace.js",
+          "docs/design/kiosk-redesign-2026-08/48-policy-workspace.html",
+          "docs/design/kiosk-redesign-2026-08/policy-workspace.js",
+          "docs/progress/current-progress.md",
+          "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w4.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/renshi/eligibilityOutcome.ts",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+          "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs",
+          "apps/kiosk/src/pages/renshi/EligibilityPanel.tsx",
+          "docs/design/kiosk-redesign-2026-08-v2/48-policy-workspace.html",
+          "docs/design/kiosk-redesign-2026-08-v2/policy-workspace.js",
+          "docs/design/kiosk-redesign-2026-08/48-policy-workspace.html",
+          "docs/design/kiosk-redesign-2026-08/policy-workspace.js",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/renshi/policyFocus.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+          "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs",
+          "apps/kiosk/src/pages/renshi/renshi-narrow-qx.css",
+          "apps/kiosk/src/pages/renshi/renshi-policy-fusion.css",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/renshi/renshi-narrow-qx.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/renshi/usePolicyFocus.ts",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+          "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/careerPlan-lightflow.css",
         "kind": "style",
         "mentions": [
@@ -49230,6 +49678,19 @@
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/services/api/policy-eligibility.ts",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+          "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/services/api/smartCampus.ts",
         "kind": "component",
         "mentions": [],
@@ -49308,6 +49769,34 @@
         "risk": "high",
         "scope": "kiosk",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-fusion-w3.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
+      },
+      {
+        "detail": "不在 apps/partner/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/partner/src/routes/policy/EligibilityRuleEditor.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/src/routes/policy-sources/EligibilityRulesDrawer.tsx",
+          "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+          "apps/partner/scripts/verify-partner-refresh-safe.mjs",
+          "services/api/scripts/verify-policy-eligibility-authoring.ts"
+        ],
+        "risk": "high",
+        "scope": "partner",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/partner/scripts/verify-partner-refresh-safe.mjs、services/api/scripts/verify-policy-eligibility-authoring.ts"
+      },
+      {
+        "detail": "不在 apps/partner/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/partner/src/routes/policy/EligibilityRulesDrawer.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+          "apps/partner/scripts/verify-partner-refresh-safe.mjs",
+          "docs/acceptance/miniapp-onsite-minimum-production-content-2026-09-02.md",
+          "services/api/scripts/verify-policy-eligibility-authoring.ts"
+        ],
+        "risk": "high",
+        "scope": "partner",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/partner/scripts/verify-partner-refresh-safe.mjs、services/api/scripts/verify-policy-eligibility-authoring.ts"
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",

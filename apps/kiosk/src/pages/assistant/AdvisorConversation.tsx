@@ -112,9 +112,12 @@ export function ChatBubble({ msg, keptQuestion }: { msg: Message; keptQuestion?:
          */
         <div className="assistant-message-bubble assistant-message-bubble--not-ai" role="status">
           <strong>这一轮没有 AI 回答</strong>
-          <p>这次没有取得模型写出的回答，已为你保留问题{keptQuestion ? `：${advisorDisplayText(keptQuestion)}` : '。'}</p>
+          {/* 政策撤下或读不到：服务端固定话术，没送模型，也没有替用户保留问题。 */}
+          {msg.providerLabel === 'fixed:policy-unavailable'
+            ? <p>{advisorDisplayText(msg.text)}</p>
+            : <p>这次没有取得模型写出的回答，已为你保留问题{keptQuestion ? `：${advisorDisplayText(keptQuestion)}` : '。'}</p>}
           <dl className="assistant-provenance">
-            <div><dt>回答来源</dt><dd>未确认是 AI 回答</dd></div>
+            <div><dt>回答来源</dt><dd>{msg.providerLabel === 'fixed:policy-unavailable' ? '政策状态提示 · 非 AI 生成' : '未确认是 AI 回答'}</dd></div>
           </dl>
         </div>
       ) : (

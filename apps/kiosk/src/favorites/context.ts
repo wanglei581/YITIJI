@@ -4,12 +4,9 @@ import type { FavoriteTargetType } from '@ai-job-print/shared'
 /**
  * 收藏上下文（Phase C-2C job → C-2D 扩展到 岗位/招聘会/政策 三类）。
  *
- * 登录态门控：
- * - 登录会员：收藏的 SSOT 为服务端 /me/favorites，toggle 写后端。
- * - 未登录 / 匿名：保留本机 localStorage 收藏体验，toggle 写本机，并提示「登录后可同步到账号」。
- *
- * 「合并到账号」：登录后由用户显式触发 mergeLocalToAccount（幂等：服务端 upsert 去重，
- * 不覆盖服务端已有收藏；合并成功的本机记录被清除，失败的保留）。
+ * 收藏只存进本人账号（2026-11-05 政策最小闭环）：
+ * - 登录会员：收藏以服务端 /me/favorites 为准，toggle 写后端。
+ * - 未登录：不记本机收藏（localFavorites.ts 停放），toggle 直接去登录，登录后回到原页。
  *
  * 合规：收藏只记录「浏览 / 收藏」行为，绝不记录投递结果 / 候选人数据，不形成招聘闭环。
  * 此文件只导出类型与 Context 对象（满足 react-refresh/only-export-components）。
@@ -27,16 +24,14 @@ export interface FavoritesContextValue {
   isFavorite: (type: FavoriteTargetType, id: string) => boolean
   /** 某类已收藏 id 集合（响应式；列表过滤/计数用）。 */
   idsOf: (type: FavoriteTargetType) => Set<string>
-  /** 切换收藏（登录→后端，匿名→本机 + 同步提示）。 */
+  /** 切换收藏（登录→后端；未登录→去登录页，登录后回到原页）。 */
   toggle: (item: FavoriteToggleItem) => void
+  /** 取消一条收藏（「我的收藏」用）：成功 true；失败已回滚，返回 false 由页面说明。 */
+  unfavorite: (type: FavoriteTargetType, id: string) => Promise<boolean>
   /** 登录态首次拉取服务端收藏是否进行中。 */
   loading: boolean
-  /** 当前收藏来源：登录会员=server，匿名=local。 */
+  /** 登录会员=server；未登录=local（只表示没登录，本机不再记收藏）。 */
   source: 'local' | 'server'
-  /** 本机待合并收藏数（登录态下提示「合并到账号」用；匿名恒为 0）。 */
-  localPendingCount: number
-  /** 显式把本机收藏合并到账号（幂等去重，不覆盖服务端收藏）。返回成功合并条数。 */
-  mergeLocalToAccount: () => Promise<{ merged: number; failed: number }>
 }
 
 export const FavoritesContext = createContext<FavoritesContextValue | null>(null)

@@ -5,6 +5,7 @@ import { AiUsageAccumulator, aiLogFieldsFromUsageReport, type AiLlmCallSink, typ
 import { currentAiRequestContext } from '../usage/ai-usage-context'
 import { quotaSequence, runWithAiQuota, type QuotaAbortRequest, type ReleaseReason } from './ai-quota-run'
 import type { AiQuotaService } from './ai-quota.service'
+import { policyUnavailableResult } from '../llm/assistant-policy-context'
 
 /** 小青一轮文字的计次。从 AiService 拆出，避免服务文件继续加长。 */
 export interface AssistantChargeRunInput<T> {
@@ -22,7 +23,8 @@ export interface AssistantChatDeps {
     getConfig(feature: 'assistant_chat'): { vendor: string }
   }
   llmChat: {
-    chat(input: ChatInput, onLlmCall?: AiLlmCallSink, ownerKey?: string): Promise<ChatOutput>
+    chat(input: ChatInput, onLlmCall?: AiLlmCallSink, ownerKey?: string, policyPrompt?: string): Promise<ChatOutput>
+    readPolicyContext?(policyId: string): Promise<string | null>
     /** 真实对话服务才有。覆盖率桩没有这个方法时，设备故障仍走对话内部的固定回答。 */
     wouldDeviceFault?(input: ChatInput, ownerKey?: string): boolean
   }
@@ -73,7 +75,7 @@ export function assistantTurnReleaseReason(value: { fixedNotice?: boolean }): Re
  * 一轮小青文字。操作号只在这里签发，不读客户端传来的会话号或消息号。
  * 回答写入会话之后才把会话号交给结算。
  */
-export function chargeAssistantChat(
+export async function chargeAssistantChat(
   deps: AssistantChatDeps,
   input: ChatInput,
   ownerKey: string,
@@ -81,16 +83,21 @@ export function chargeAssistantChat(
   req: QuotaAbortRequest | undefined,
   runCharge: <T>(input: AssistantChargeRunInput<T>) => Promise<T>,
 ): Promise<AssistantChatResult> {
+  // 控制器的访问/登录与公网配额闸门仍在本层之前；不可见政策不预占会员次数，也不调回落模型。
+  const policyPrompt = input.policyId === undefined
+    ? undefined
+    : await deps.llmChat.readPolicyContext?.(input.policyId) ?? null
+  if (policyPrompt === null) return policyUnavailableResult()
   // 设备故障固定回答不调模型，不预占。公网次数仍由对话里的退次标记退回。
   if (deps.llmConfig.isReady('assistant_chat') && deps.llmChat.wouldDeviceFault?.(input, ownerKey)) {
-    return completeAssistantTurn(deps, input, ownerKey, endUserId)
+    return completeAssistantTurn(deps, input, ownerKey, endUserId, policyPrompt)
   }
   return runCharge({
     endUserId,
     operationKey: `assistant-chat:${quotaSequence()}`,
     req,
     failureOf: assistantTurnReleaseReason,
-    work: () => completeAssistantTurn(deps, input, ownerKey, endUserId),
+    work: () => completeAssistantTurn(deps, input, ownerKey, endUserId, policyPrompt),
     saveResult: async (value) => assistantResultRef(value.sessionId),
   })
 }
@@ -100,6 +107,7 @@ async function completeAssistantTurn(
   input: ChatInput,
   ownerKey: string,
   endUserId: string | null,
+  policyPrompt?: string,
 ): Promise<AssistantChatResult> {
   const t0 = Date.now()
   const useLlm = deps.llmConfig.isReady('assistant_chat')
@@ -107,7 +115,7 @@ async function completeAssistantTurn(
   const usage = new AiUsageAccumulator()
   try {
     const result = useLlm
-      ? await deps.llmChat.chat(input, usage.add, ownerKey)
+      ? await deps.llmChat.chat(input, usage.add, ownerKey, policyPrompt)
       : await deps.provider.chatAssistant({
           ...input,
           sessionId: input.sessionId ?? randomBytes(16).toString('hex'),
