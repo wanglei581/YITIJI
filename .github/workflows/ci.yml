@@ -419,6 +419,8 @@ jobs:
           pnpm run verify:scan-device-engine
           # 屏上扫描接线（含 r6 签名续取与固定投递截止）：假执行器、假后端、假时钟。不起 PowerShell，不碰扫描仪或打印机。
           pnpm run verify:scan-device-runner
+          # 本机复印：假 WIA、假后端、私有临时目录；无 Windows 硬件操作。
+          pnpm run verify:copy-device
           # S4a: fake child + private temp files; no PowerShell or hardware.
           pnpm run verify:scan-deskew
           # Linux-safe fault injection only: temp SQLite + loopback HTTP fixture; no Windows printer or external network.

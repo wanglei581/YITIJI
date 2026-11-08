@@ -169,6 +169,7 @@ function validateConfigShape(config: AgentConfig): AgentConfig {
       'holdPrinterQueueWhenIdle',
     ),
     scanDeviceEnabled: requireOptionalBoolean(config.scanDeviceEnabled, 'scanDeviceEnabled'),
+    copyDeviceEnabled: requireOptionalBoolean(config.copyDeviceEnabled, 'copyDeviceEnabled'),
     scanAutoDeskewEnabled: config.scanAutoDeskewEnabled === true,
     scanDeviceName: requireOptionalString(config.scanDeviceName, 'scanDeviceName') ?? '',
     scanDeviceMaxPages: requireScanDeviceMaxPages(config.scanDeviceMaxPages),

@@ -302,6 +302,49 @@
 - 验证：两个应用 typecheck、全量 src lint（管理员 5 条、机构 7 条既存警告，零错误）、http 生产构建、四项根门禁及订单只读 UI、后台中文文案、机构刷新与统计门禁通过。图谱列出的隐私文案模块已由中文文案门禁实际调用；反向检查删除 0 元分支、在其中放回按钮均使新断言失败，副本恢复后通过，前后 diff stat 一致。
 - 验证限制与范围：Playwright 只写未跑，交收货方；用例原命令因 `@playwright/test` 类型入口未链接而失败，显式指定已安装包路径后两文件均通过。退款 API 关联门禁已运行但缺少生成的 Prisma client，未进入断言（隔离 SQLite 的 133 条迁移通过）。未改后端、数据库模型、生产配置、密钥、硬件或 `docs/graph/`，未提交、未部署。
 
+## 2026-11-08：屏上复印终端程序（C2）并入 A2 新头、版本升 0.4.21
+
+- 做了：分支 `claude/copy-agent-c2-1104`（并前头 `93e2d196f`，原建在 A2 旧头 `23e7076c6` 上）并入 A2 新头 `a2db3fa88`（PR #1584，已并最新 main、版本 0.4.20，还在等 CI、未合入 main），只做并分支、解冲突、升版本号，不改功能、不加功能。屏上复印终端程序 C2a–C2f 的内容不变：本机 `/local/copy/*` 接口；复用 A2 的扫描引擎与设备锁；扫描、打印前各取 `op=scan` / `op=print` 许可；打印至多一次（派发意图先落盘到 `%ProgramData%\AIJobPrintAgent\copy-device\print-ledger\`）；崩溃恢复只转 `unconfirmed`、不重打；清场撤销标记至少保留 15 分钟。开关 `copyDeviceEnabled` 缺省关。
+- 冲突怎么合：① `apps/terminal-agent/src/printer/print-with-pdf-to-printer.ts` git 自动合好、没报冲突，但合完 A4 出现两处——C2b 在 `mapParams` 里按 `params.paperSize` 设 A4，#1579 在 `printOptions` 里展开之后固定 A4。#1579 那处总会覆盖，C2b 那行成了死代码，删掉，A4 只留 #1579 的常量与说明；C2b 为复印加的 `onDispatchStart` / `onDispatchSettled` 钩子与超时计时器清理原样保留。② `.github/workflows/ci.yml`、`apps/terminal-agent/src/agent/config-manager.ts`、`apps/terminal-agent/src/agent/types.ts` 两边在同一处各加一行（复印的 `verify:copy-device` / `copyDeviceEnabled`，纠偏的 `verify:scan-deskew` / `scanAutoDeskewEnabled`），两侧保留。图谱取 A2 那边后重新生成，进度文档两侧保留。
+- 升 0.4.21 的原因：A2 要用 0.4.20 进 main，复印这一版不能同号。照 0.4.20 那次（`63ba07243`）的 12 个文件 20 处改齐；升级测试的旧版本 0.4.10、`verify-scan-deskew.ts` 里解析配置用的 0.4.19 样例不改。
+- **代码未进 main（等 #1584 合入后再并 main、开 PR）、未打包、未装机。** 后端 `copy` 能力默认拒绝，在复印后端 #1591（草稿、未合并）里，逐台开通。给任何终端装这一版之前，必须先发布后端（含 #1591），每一步由产品负责人当场确认。
+- 验证（本机 macOS）：终端程序 tsc（246 个文件，0 错误）、eslint（改动的 39 个代码文件 0 错误；3 条警告是 `src/index.ts` 里用不上的 eslint-disable，A2 头上同样有）；`package.json` 里 38 条 verify 不经 pnpm、逐条直接跑，37 条过（`verify:copy-device` 49 项、`verify:scan-device-engine` 53 组、`verify:scan-device-runner` 22 组、`verify:scan-deskew` 12 组，`verify:task-reliability` 一次过；两条 Windows 专用的在非 Windows 上自动跳过）；安装包输入、仓库完整性、图谱 `--check` 过；图谱按改动文件列出的其余 36 条门禁（根目录 3、一体机 18、管理后台 1、UI 1、后端 13，后端两条用隔离 SQLite）全过。Windows 专用的 .ps1 门禁（安装包生命周期、纠偏合成样本）交安装包工作流。
+- **`verify:printer-config` 红，不是这次合并带来的：** C2c（`3f2a65fa7`）在 `apps/terminal-agent/src/agent/copy-device/copy-print-ledger.ts` 第 84 行校验落盘记录里的打印机名，写成 `!r.printerName || …`，撞上门禁「`src` 里不许出现 `printerName ||` 回退」的正则（这一行是校验、不是回退到默认打印机，但门禁按字面判）。并前的 C2 头 `93e2d196f` 同样红，A2 头 `a2db3fa88` 与 main 都绿。这次范围是不改功能、不改断言，没动；开 PR 前必须先处理（改写这一行或收紧门禁正则，待定），否则 CI 的「Terminal Agent verify suites」会红。
+- Windows 目录残留：C2 没有 Windows 专用用例；`verify:copy-device` 只在 CI 的 ubuntu 作业跑，用例的临时目录都建在系统临时目录、用完删除（一条用例临时把 `PROGRAMDATA` 指向临时目录，结束还原）；安装包工作流装机测试前的几步都不含 C2 的用例，C2 也没改这些步骤。
+
+## 2026-11-05：屏上复印 C2f——撤销标记保留到云端授权一定失效之后（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+
+- 起因：Codex 复审 C2e + C3c 报 P1——撤销标记 180 秒过期短于云端复印单 10 分钟寿命，一体机后台取消全失败时，过期后迟到的旧 start 仍能拿到云端许可开扫。
+- 改法（Codex 实现，Claude 收货）：保留期取「固定下限 15 分钟（云端寿命 10 分钟 + 时钟余量 5 分钟）」「已知到期时间 + 余量」「已有截止」三者最大；重复撤销与重启不缩短；满 4096 条只淘汰已过期记录，仍满就拒绝新的 start（HTTP 503，提示「复印撤销保护记录已满，请稍后再开始复印」），宁可拒绝也不误放行。
+- 验证：新增 4 条用例；`verify:copy-device` 49 项、`verify:scan-device-engine` 53 组、`verify:scan-device-runner` 22 组、tsc、lint、repository-integrity 过；反向检查（保留期改回 180 秒）变红。
+
+## 2026-11-05：屏上复印 C2e——终端程序拒绝清场后迟到的开始扫描（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+
+- 起因：Codex 复审一体机 C3 时复现——`start` 已到终端程序、停在异步处理时，一体机清场的 `clear` 因本机会话还没建立回 404，随后旧 `start` 建会话并开扫，可能扫到下一位放上的原件。
+- 改法（Codex 实现，Claude 收货）：新增 `copy-device/copy-revocations.ts`，`clear` / `abort` 在第一次等待前按 `copyId + generation` 记撤销标记（内存 + 落盘，180 秒到期、上限 4096 条，跨重启保留），没有会话也回成功与 `purged:true`；`start` 在拿锁后、取许可前后、真正开扫前都查标记，命中就放弃、释放锁、清掉会话材料，同代迟到的 `start` 回 410；新单号与新代次不受影响；撤销写盘失败不报成功、也不放行开扫。
+- 验证：新增 6 条用例；`verify:copy-device` 45 项、`verify:scan-device-engine` 53 组、`verify:scan-device-runner` 22 组、tsc、lint、repository-integrity 过；反向检查（去掉开扫前撤销检查）变红。配套的一体机清场撤销云端授权见 C3c。
+
+## 2026-11-05：屏上复印 C2d——收掉 C2c 复审的 2 条 P1（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+
+- ① 复印打印 ledger 清除 `queueCleanupPending` 时一次 rename/fsync 失败不再永久挡住云打印：清理完成写入与新派发保护分开，失败保留隔离与墓碑，按 1/2/4/8/16/30 秒封顶退避重写并记日志；下一轮重新确认执行器已退出、重新清队列再持久化解除隔离，旧单不重派。② 屏上扫描首次扫描（`scan-device-round.ts`）与续页（`scan-device-runner.ts`）都在拿到设备锁之后、启动 WIA 之前统一复查共享健康（`scan-device-health.ts` 新增持锁检查，必要探测复用已持有的锁）；复印侧持锁复查加了等锁交错用例。
+- 验证（Codex 实现，Claude 收货）：新增 8 条用例；`verify:copy-device` 39 项、`verify:scan-device-runner` 22 组、`verify:scan-device-engine` 53 组与打印相关门禁、tsc、lint、repository-integrity 过；反向检查两项变红。
+
+## 2026-11-05：屏上复印 C2c——收掉 C2 复审的 3 条 P1（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+
+- ① 打印执行器超时仍在运行时，复用并扩展 `print-dispatch-gate` 保持派发隔离，执行器退出后再清一次该次残留作业才放行下一单；`queueCleanupPending` 写进复印打印 ledger，重启后确认执行器退出、调现有队列清理后才解除，清理失败继续隔离重试。② WIA 未确认退出时把进程交给扫描健康隔离，`finally` 无条件释放全局设备锁，现有云打印照常领取；新的复印扫描被拒并给出可读说明，清场与过期能结束会话，待删材料后台重试。③ 复印与屏上扫描共用同一份 WIA 健康与可疑进程状态（`scan-device-health.ts` 按设备锁共享实例，A2 运行器接入），复印首次扫描、续页、预热重试前都检查，旧进程确认退出并探测成功后才放行。
+- 验证（Codex 实现，Claude 收货）：`verify:copy-device` 36 项（新增五条 C2c 用例含竞态与恢复）、`verify:scan-device-engine`（53 组）、`verify:scan-device-runner`（21 组）与打印相关门禁、tsc、lint 过；反向检查三项都变红。
+
+## 2026-11-05：屏上复印 C2b——终端程序本机复印后半段（分支 `claude/copy-agent-c2-1104`，未合并、未部署）
+
+- 做了什么（Codex 实现，Claude 收货）：`POST /local/copy/print` 取 `op=print` 许可（颜色、单双面、份数以许可为准，校验终端、代次、授权版本、参数与有效期）→ 驱动调用前持久化派发意图（`%ProgramData%\AIJobPrintAgent\copy-device\print-ledger\<单号与代次派生 SHA-256>.json`，`wx` 创建并 fsync、原子替换，不存扫描内容）→ 经新薄封装 `print-local-document.ts` 复用现有派发准备、`print()`、队列监控与终态清理（`task-runner.ts` 未改；PDF 打印补齐显式 A4）→ 从准备到监控终态持设备锁。同单同代重复请求只返回状态，**驱动最多调用一次**；重启时 `dispatching/spooled` 一律转 `unconfirmed` 并回报，**绝不重派**。结果回报 handed / failed / unconfirmed，固定 `eventId`，最多十次指数退避重试，终态不变。打印终态后撤销预览并以 `COPY_PRINT_TERMINAL` 删页，删除失败后台重试、释放设备锁。状态里不出现张数推断。
+- 验证：`verify:copy-device` 31 项；`verify:scan-device-engine`、`verify:scan-device-runner`、`verify:print-monitor-truth`、`verify:print-truth-hardening`、`verify:print-retry-attempt`、`verify:task-runner-wake`、`verify:print-queue-residue`、`verify:scan-deletion-audit`、`verify:image-scale-truth`、`verify:printer-config`、tsc、lint、repository-integrity 过；反向检查三项（重复打印调第二次驱动、崩溃恢复自动重派、队列异常判成已交给打印机）都变红。
+- 合并时注意：打印机线 #1579 也改了 `print-with-pdf-to-printer.ts`（显式 A4），合并按语义取一份，不两侧都留。
+
+## 2026-11-05：屏上复印 C2a——终端程序本机复印前半段（分支 `claude/copy-agent-c2-1104`，自 A2 头 23e7076c6 开出，未合并、未部署）
+
+- 做了什么（Codex 实现，Claude 收货）：本机接口 `POST /local/copy/{start,next-page,finish,status,preview,abort,clear}`，复用 loopback、Origin 白名单、桥接令牌与短期桥接会话，公共体 `{copyId,generation,operationId}`、`operationId` 幂等（异参 409）、体积上限 8 KiB；每次扫描、续页、预热重试前在线取 `op=scan` 许可；复用 A2 的 WIA 解析、整页核实、页序、页数与字节上限、PDF 合成、私有目录与删除审计（WIA 默认依赖抽到 `wia-runner-deps.ts`，`wia-runner.ts` 514→448 行）；扫描、探测、打印共用设备锁（等锁上限 30 秒）；复印页放在独立的 `copy-device/<派生标识>/`，**不走上传链路、不上云**；预览返回 JPEG 字节并带 no-store 等三个防缓存头、不返回路径；abort/clear 先撤权再删，删除失败返回 503 与 `purged:false`、后台重试、不占设备锁；七个 `COPY_*` 删除码与后端白名单逐码一致（`COPY_PRINT_TERMINAL` 留给打印）。开关 `copyDeviceEnabled` 缺省关。打印派发与结果回报是 C2b。
+- 验证：新门禁 `verify:copy-device`（18 项）接进 ci.yml；`verify:scan-device-engine`（53 组）、`verify:scan-device-runner`（21 组）、`verify:scan-deletion-audit`、`verify:usb-import-agent`、`verify:scan-watcher`、tsc、lint、repository-integrity 过；反向检查三项（许可不允许仍开扫、预览缺 no-store、clear 不删页）都变红。
+
 ## 2026-11-04：屏上扫描后端 B9（扫描仪告警只算仍在运营的终端；分支 `claude/scan-device-b2-1102`，叠在 B8 头 `d09b3f19d` 上，未推送、未部署）
 
 - `collectScanDeviceAlerts` 与 `resolveScanDeviceAlert` 只算 `enabled: true` 且 `lifecycleStatus: 'active'` 的终端。其余三个条件照旧：`scan_device` 为 available、心跳在在线窗口内、健康值为 `not_found` 或 `error`。停用、维护中（以及计划中、调试中、已暂停、已退役）不出这条告警。

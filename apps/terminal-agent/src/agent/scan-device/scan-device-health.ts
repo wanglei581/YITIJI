@@ -54,7 +54,7 @@ export interface ScanDeviceHealthDeps {
 }
 
 export interface ScanDeviceHealth {
-  probe(options?: { periodic?: boolean }): Promise<ScanDeviceHealthSnapshot>
+  probe(options?: { periodic?: boolean; heldLock?: DeviceLockHandle }): Promise<ScanDeviceHealthSnapshot>
   arm(): void
   stop(): void
   snapshot(): ScanDeviceHealthSnapshot
@@ -194,7 +194,7 @@ export function createScanDeviceHealth(deps: ScanDeviceHealthDeps): ScanDeviceHe
     forceKilled = false
   }
 
-  const probe = async (options?: { periodic?: boolean }): Promise<ScanDeviceHealthSnapshot> => {
+  const probe = async (options?: { periodic?: boolean; heldLock?: DeviceLockHandle }): Promise<ScanDeviceHealthSnapshot> => {
     const phase = deps.getPhase()
     if (
       options?.periodic &&
@@ -209,7 +209,7 @@ export function createScanDeviceHealth(deps: ScanDeviceHealthDeps): ScanDeviceHe
     }
     let handle: DeviceLockHandle | undefined
     try {
-      handle = deps.lock.tryAcquire('scan-probe')
+      handle = options?.heldLock ?? deps.lock.tryAcquire('scan-probe')
     } catch {
       handle = undefined
     }
@@ -234,11 +234,13 @@ export function createScanDeviceHealth(deps: ScanDeviceHealthDeps): ScanDeviceHe
     } catch {
       return record('error')
     } finally {
-      handle.release()
+      if (!options?.heldLock) handle.release()
     }
   }
 
   const arm = (): void => {
+    stopped = false
+    if (timer !== undefined) deps.clock.clearTimeout(timer)
     const kick = (): void => {
       if (stopped) return
       void probe({ periodic: true }).finally(() => {
@@ -279,4 +281,28 @@ export function createScanDeviceHealth(deps: ScanDeviceHealthDeps): ScanDeviceHe
       unidentified = false
     },
   }
+}
+
+/** 同一设备锁对应唯一 WIA 隔离状态；复印与屏上扫描不能各自遗忘旧进程。 */
+const sharedHealth = new WeakMap<ScanDeviceHealthDeps['lock'], { health: ScanDeviceHealth; deps: ScanDeviceHealthDeps }>()
+
+/** 拿锁后的最后一道 WIA 闸门。探测借用本次锁，不能重新竞争或提前放锁。 */
+export async function scanDeviceStartHealth(health: ScanDeviceHealth, heldLock: DeviceLockHandle): Promise<'ready' | 'busy' | 'not_ready'> {
+  if (health.knownProcessAlive()) return 'busy'
+  if (!health.hasSuspect() && !health.hasForceKilled()) return 'ready'
+  const probed = await health.probe({ heldLock })
+  if (health.hasSuspect()) return 'busy'
+  if (probed.health !== 'ready') return probed.health === 'busy' ? 'busy' : 'not_ready'
+  health.clearForceKilled()
+  return 'ready'
+}
+
+export function sharedScanDeviceHealth(deps: ScanDeviceHealthDeps, bindOwner = false): ScanDeviceHealth {
+  let entry = sharedHealth.get(deps.lock)
+  if (!entry) {
+    const sharedDeps = { ...deps }
+    entry = { health: createScanDeviceHealth(sharedDeps), deps: sharedDeps }
+    sharedHealth.set(deps.lock, entry)
+  } else if (bindOwner) Object.assign(entry.deps, { listResiduals: undefined }, deps)
+  return entry.health
 }
