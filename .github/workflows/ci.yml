@@ -164,6 +164,7 @@ jobs:
           # 三条主链的 ai-down 出路（#—— AI 是加速器不是前置条件）。纯文本读取
           # apps/kiosk + packages/shared + services/api/src 源码做交叉断言，
           # 不 import 任何后端模块、不碰 Prisma、不连 DB，故留在这一步。
+          node --test apps/kiosk/scripts/tests/assistant-policy-context.test.mjs
           pnpm --filter @ai-job-print/kiosk verify:ai-down-fallbacks
           # ── 2026-08-16 门禁全量体检补回：以下门禁此前写在 package.json 里
           #    但没有任何 CI job 执行它们。全部只读取仓库源码/文档文本，
@@ -174,6 +175,8 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:home-narrow-visual-balance
           pnpm --filter @ai-job-print/kiosk verify:home-toolbox-ui
           pnpm --filter @ai-job-print/kiosk verify:kiosk-parked-toolbox-campus
+          # 政策最小闭环停放 7 处（2026-11-05）：停放源码仍在、不被值导入、旧 /renshi 链接回政策首页。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-parked-policy
           pnpm --filter @ai-job-print/kiosk verify:home-jobs-availability
           pnpm --filter @ai-job-print/kiosk verify:jobfair-checkin
           pnpm --filter @ai-job-print/kiosk verify:jobfair-size
@@ -511,6 +514,7 @@ jobs:
           # 报 Cannot find module '../generated/prisma/client'。
           pnpm --filter @ai-job-print/api verify:assistant-provider-label
           # 真机实操 F-04（2026-10-10）：小青文字、语音、作业面三处提示词里都带着「不教人拆机」那一句约束。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:assistant-policy-context
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:assistant-device-fault
           pnpm --filter @ai-job-print/api verify:llm-input-pii-mask
           pnpm --filter @ai-job-print/api verify:ai-feature-keys
@@ -718,6 +722,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:pdfjs-engine
           pnpm --filter @ai-job-print/api verify:pii-redaction
           pnpm --filter @ai-job-print/api verify:material-task-token-transport
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:policy-checklist
           pnpm --filter @ai-job-print/api verify:job-materials
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-flow
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-real-channels
@@ -850,6 +855,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:background-task-safety
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:policy-publish-gates
           pnpm --filter @ai-job-print/api verify:kiosk-session
           pnpm --filter @ai-job-print/api verify:policy-scope
           pnpm --filter @ai-job-print/api verify:policy-eligibility
@@ -1171,6 +1177,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:console-screen-usage
           pnpm --filter @ai-job-print/api verify:ai-user-text-retention
           pnpm --filter @ai-job-print/api verify:policies
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:policy-publish-gates
           # 贴牌与授权管理（PostgreSQL 上同样真跑一遍：机构行锁抢最后一个名额、CHECK 与外键、日期比较）。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:branding
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:license
@@ -1280,6 +1287,7 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:kiosk-anonymous-feedback
           pnpm --filter @ai-job-print/api verify:materials-processing
           pnpm --filter @ai-job-print/api verify:pii-redaction
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:policy-checklist
           pnpm --filter @ai-job-print/api verify:job-materials
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-flow
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-real-channels

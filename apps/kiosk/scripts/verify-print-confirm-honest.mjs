@@ -1151,6 +1151,11 @@ if (!userErrorCopy.includes("PRINT_JOB_TOO_LARGE: '每单最多打印 100 面，
 } else {
   pass('PRINT_JOB_TOO_LARGE 人话已登记')
 }
+if (!userErrorCopy.includes("POLICY_CHECKLIST_WITHDRAWN: '这条政策已经撤下或刚更新过，这份清单不能再打印，本次没有建单。请回到「查政策」看现在发布的内容。'")) {
+  fail('一体机错误码表必须给 POLICY_CHECKLIST_WITHDRAWN 一句人话（政策撤下或改版后清单建单被拒，不能说「稍后重试」）')
+} else {
+  pass('POLICY_CHECKLIST_WITHDRAWN 人话已登记')
+}
 
 if (!/aria-label=\{label\}/.test(confirmCopy)) {
   fail('主按钮读屏必须念看得见的那句字')
