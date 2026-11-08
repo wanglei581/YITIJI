@@ -141,6 +141,8 @@ export function useInterviewDeadlineSeal(args: {
   const timeUpScreen = timeUpStop && args.state?.sessionId ? (
     <InterviewTimeUp
       variant={timeUpStop}
+      sessionId={args.state.sessionId}
+      getAccess={() => ({ token: getTokenRef.current(), accessToken: args.state?.accessToken ?? null })}
       answersRecorded={args.answersRecorded}
       busy={reportBusy}
       onLeave={() => args.navigate('/interview-service')}

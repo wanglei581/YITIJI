@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { AiTaskRegion, useAiTask } from '../../../ai'
 import { AiDeclarationNote } from '../../../ai/AiDeclarationNote'
 import { InterviewNote } from '../interviewQxParts'
@@ -36,6 +37,8 @@ interface InterviewAnswerDockProps {
   onRetryReport: () => void
   omitPrintAnswers: boolean
   onOmitPrintAnswersChange: (value: boolean) => void
+  /** 报告生成不了时「带走本场问答」。只在见过回答提交成功时显示。 */
+  transcriptTakeaway?: ReactNode
 }
 
 /**
@@ -48,7 +51,7 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
     draft, voiceAvailable, micBlockedReason, onRecheckMic, onDraftChange, onReviewChange,
     onRetryVoice, onUseText, onUseVoice, onSkip,
     onFinish, finishRecovery, onContinueAnswering, onLeaveInterview,
-    onOpenTips, onRetryReport, omitPrintAnswers, onOmitPrintAnswersChange,
+    onOpenTips, onRetryReport, omitPrintAnswers, onOmitPrintAnswersChange, transcriptTakeaway,
   } = props
   const turnBusy = phase === 'thinking' || phase === 'finishing'
   const pending = phase === 'thinking' || phase === 'finishing' || voice.kind === 'transcribing'
@@ -80,6 +83,7 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
         <div className="qxt-iv-acts" data-testid="interview-finish-recovery">
           <button type="button" className="is-go" disabled={busyTurn} onClick={onOpenTips}>看面试要点</button>
           {answersRecorded ? <button type="button" disabled={busyTurn} onClick={onRetryReport}>稍后再试生成报告</button> : <button type="button" disabled={busyTurn} onClick={onLeaveInterview}>离开</button>}
+          {answersRecorded ? transcriptTakeaway : null}
         </div>
       )}
 
