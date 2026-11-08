@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2103 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2112 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -394,7 +394,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/scripts/</code> — 34 个文件</summary>
+<summary><code>apps/kiosk/scripts/</code> — 36 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -410,6 +410,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/scripts/tests/scan-cleanup-gate.test.mjs` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/scripts/tests/scan-create-replay.test.mjs` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/scripts/tests/scan-delivery-ack.test.mjs` | `verify-scan-session-truth.mjs` |
+| `apps/kiosk/scripts/tests/scan-device-recovery.test.mjs` | `verify-scan-session-truth.mjs` |
+| `apps/kiosk/scripts/tests/scan-device-state.test.mjs` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/scripts/tests/scan-rescan-authority.test.mjs` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/scripts/tests/scan-session-revoke.test.mjs` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/scripts/tests/scan-workbench-model.test.mjs` | `verify-scan-session-truth.mjs` |
@@ -436,7 +438,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 622 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 629 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -920,6 +922,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/touch/source.css` | `verify-fusion-w3.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/useSelfAssessmentConsentBundle.ts` | `verify-self-assessment-consent-source.mjs` |
 | `apps/kiosk/src/pages/resume/useSelfAssessmentIdleExit.ts` | `verify-resume-phone-upload-ui.mjs` |
+| `apps/kiosk/src/pages/scan/ScanDeviceDonePage.tsx` | `verify-scan-session-truth.mjs` |
+| `apps/kiosk/src/pages/scan/ScanDeviceSettingsPage.tsx` | `verify-fusion-w2-print-scan.mjs` |
+| `apps/kiosk/src/pages/scan/ScanHowPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/ScanProgressPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-scan-session-truth.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/scan/ScanResultExitRow.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/ScanResultFailedView.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
@@ -933,7 +938,11 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/scan/scanCleanupGate.ts` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/scanCreateReplay.ts` | `verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/scanDeliveryAck.ts` | `verify-scan-session-truth.mjs` |
+| `apps/kiosk/src/pages/scan/scanGuestWays.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
+| `apps/kiosk/src/pages/scan/scanHowContinue.ts` | `verify-kiosk-ai-declaration.mjs` |
+| `apps/kiosk/src/pages/scan/scanMaterials.ts` | `verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/pages/scan/scanOutputFormat.ts` | `verify-scan-session-truth.mjs` |
+| `apps/kiosk/src/pages/scan/scanProbeCopy.ts` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/scan/scanRescanRecovery.ts` | `verify-scan-quiet-period.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/scanResultModel.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/scanSessionRevoke.ts` | `verify-scan-session-truth.mjs` |

@@ -1,4 +1,5 @@
 import type { ScanRescanAuthorization } from '@ai-job-print/shared'
+import { isScanMaterial, parseDeviceChoice, type ScanDeviceChoice, type ScanMaterial } from './scanMaterials'
 import { isScanType, type ScanType } from './scanWorkbench'
 import { parseScanStage, type ScanStage } from './scanWorkbenchModel'
 
@@ -354,6 +355,20 @@ export function beginPlainScanRestart(args: { scanType: ScanType; extras?: ScanR
   })
 }
 
+/** 屏上「再扫一份」回到选材料。不进面板设置。调用方先撤销；结果还在时撤销是空操作。 */
+export function beginDeviceScanAgain(): void {
+  patchScanWorkbenchSession({
+    stage: 'start',
+    scanType: undefined,
+    material: undefined,
+    deviceChoice: undefined,
+    extras: undefined,
+    live: undefined,
+    result: undefined,
+    rescanIntent: undefined,
+  })
+}
+
 /**
  * 「本页带着安全重扫意图进来，凭据却已经不在内存里」——设置页据此 fail-closed。
  *
@@ -413,6 +428,10 @@ export interface ScanRetryExtras {
 export interface ScanWorkbenchSession {
   stage: ScanStage
   scanType?: ScanType
+  /** 屏上「扫什么」选中的材料。合同在这里保留；面板路线另用 scanType=document。 */
+  material?: ScanMaterial
+  /** 放纸与颜色。只在用户选过之后才有；没有就按材料用默认值。 */
+  deviceChoice?: ScanDeviceChoice
   extras?: ScanRetryExtras
   live?: ScanLiveState
   result?: ScanResultSnapshot
@@ -430,6 +449,14 @@ export interface ScanWorkbenchSession {
    * 过期标记锁死。
    */
   rescanIntent?: boolean
+  /** 这一场走屏上扫描。只认 true。伪造 URL 没有它时不许挂屏上那几屏。 */
+  deviceFlow?: boolean
+  deviceAcked?: boolean
+  /** 本机 start 发出之前就写下。整页重载后靠它不再发第二次 start。 */
+  deviceStartAttempted?: boolean
+  deviceStartConfirmed?: boolean
+  deviceLocalUncertain?: 'unreachable' | 'unknown'
+  deviceUncertainCommand?: 'start' | 'next' | 'finish' | 'stop'
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -508,12 +535,27 @@ export function readScanWorkbenchSession(): ScanWorkbenchSession | null {
     return {
       stage,
       scanType: isScanType(parsed.scanType) ? parsed.scanType : undefined,
+      material: isScanMaterial(parsed.material) ? parsed.material : undefined,
+      deviceChoice: parseDeviceChoice(parsed.deviceChoice),
       extras: parseExtras(parsed.extras),
       live: parseLive(parsed.live),
       result: parseResult(parsed.result),
       // 只认真正的 true：存储里任何别的值（字符串 'false'、1、被人手改过的字节）
       // 都不足以把一场扫描锁进 fail-closed。
       rescanIntent: parsed.rescanIntent === true ? true : undefined,
+      deviceFlow: parsed.deviceFlow === true ? true : undefined,
+      deviceAcked: parsed.deviceAcked === true ? true : undefined,
+      deviceStartAttempted: parsed.deviceStartAttempted === true ? true : undefined,
+      deviceStartConfirmed: parsed.deviceStartConfirmed === true ? true : undefined,
+      deviceLocalUncertain: parsed.deviceLocalUncertain === 'unreachable' || parsed.deviceLocalUncertain === 'unknown'
+        ? parsed.deviceLocalUncertain
+        : undefined,
+      deviceUncertainCommand: parsed.deviceUncertainCommand === 'start'
+        || parsed.deviceUncertainCommand === 'next'
+        || parsed.deviceUncertainCommand === 'finish'
+        || parsed.deviceUncertainCommand === 'stop'
+        ? parsed.deviceUncertainCommand
+        : undefined,
     }
   } catch {
     return null
@@ -539,6 +581,8 @@ export function patchScanWorkbenchSession(
   const next: ScanWorkbenchSession = {
     stage: patch.stage ?? current.stage,
     scanType: 'scanType' in patch ? patch.scanType : current.scanType,
+    material: 'material' in patch ? patch.material : current.material,
+    deviceChoice: 'deviceChoice' in patch ? patch.deviceChoice : current.deviceChoice,
     extras: 'extras' in patch ? patch.extras : current.extras,
     live: 'live' in patch ? patch.live : current.live,
     result: 'result' in patch ? patch.result : current.result,
@@ -551,6 +595,20 @@ export function patchScanWorkbenchSession(
       : lifecycleEnding
         ? undefined
         : current.rescanIntent,
+    deviceFlow: lifecycleEnding ? undefined : ('deviceFlow' in patch ? patch.deviceFlow : current.deviceFlow),
+    deviceAcked: lifecycleEnding ? undefined : ('deviceAcked' in patch ? patch.deviceAcked : current.deviceAcked),
+    deviceStartAttempted: lifecycleEnding
+      ? undefined
+      : ('deviceStartAttempted' in patch ? patch.deviceStartAttempted : current.deviceStartAttempted),
+    deviceStartConfirmed: lifecycleEnding
+      ? undefined
+      : ('deviceStartConfirmed' in patch ? patch.deviceStartConfirmed : current.deviceStartConfirmed),
+    deviceLocalUncertain: lifecycleEnding
+      ? undefined
+      : ('deviceLocalUncertain' in patch ? patch.deviceLocalUncertain : current.deviceLocalUncertain),
+    deviceUncertainCommand: lifecycleEnding
+      ? undefined
+      : ('deviceUncertainCommand' in patch ? patch.deviceUncertainCommand : current.deviceUncertainCommand),
   }
   saveScanWorkbenchSession(next)
   return next
