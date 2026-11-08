@@ -20,6 +20,7 @@ import {
   HUB_ASK,
   HUB_TRUTH,
   ID_PHOTO_ENTRY_PARKED,
+  SIGN_ENTRY_PARKED,
   type HubFeatureState,
   type HubUiState,
   type MfpStatus,
@@ -451,7 +452,7 @@ export function QxPrintHubView({
     photo,
     convert,
     ID_PHOTO_ENTRY_PARKED ? undefined : idPhoto,
-    sign,
+    SIGN_ENTRY_PARKED ? undefined : sign,
   ].filter((item): item is QxPrintCapabilityView => Boolean(item))
   const transferCaps = [phone, usb].filter((item): item is QxPrintCapabilityView => Boolean(item))
   const showLater = transferCaps.some((item) => item.actionable) && (!doc?.actionable || mfp === 'unavailable' || hubState === 'device-off')

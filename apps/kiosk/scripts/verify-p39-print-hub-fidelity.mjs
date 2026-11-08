@@ -183,14 +183,16 @@ must(
   '证件照入口停放常量为 true（重新打开才改为 false）',
 )
 must(
-  /const toolCaps = \[\s*photo,\s*convert,\s*ID_PHOTO_ENTRY_PARKED \? undefined : idPhoto,\s*sign,\s*\]/.test(viewSrc),
+  /const toolCaps = \[\s*photo,\s*convert,\s*ID_PHOTO_ENTRY_PARKED \? undefined : idPhoto,\s*SIGN_ENTRY_PARKED \? undefined : sign,\s*\]/.test(viewSrc),
   '其他工具不渲染证件照卡（停放常量挡住，不管后台能力怎么配）',
 )
 must(
-  /grid-template-columns:\s*repeat\(6,\s*1fr\)/.test(cssSrc) && /:nth-last-child\(-n\+2\)/.test(cssSrc),
-  '其他工具按触屏稿六列：上行三张、下行两张各半行',
+  /grid-template-columns:\s*repeat\(6,\s*1fr\)/.test(cssSrc) && /grid-column:\s*span 3/.test(cssSrc),
+  '其他工具六列：四张卡各占三列，两行两列',
 )
 must(!/看证件照说明/.test(featureSrc), '能力名不认识一态没有「看证件照说明」')
+
+must(/export const SIGN_ENTRY_PARKED: boolean = true/.test(contentSrc), '签名入口停放常量为 true')
 
 console.log('\n[E] 能力真实性')
 const FORBIDDEN_COPY = [

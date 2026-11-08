@@ -11,8 +11,8 @@ const read = (path) => readFileSync(join(kioskRoot, path), 'utf8')
 const W3_ROUTES = [
   '/resume', '/resume/upload', '/resume/source', '/resume/generate',
   '/resume/generate/preview', '/resume/parse', '/resume/report',
-  '/resume/optimize', '/resume/export', '/resume/templates',
-  '/resume/materials', '/resume/job-fit', '/resume/career-plan',
+  '/resume/optimize', '/resume/export', '/resume/templates/*',
+  '/resume/materials/*', '/resume/job-fit/*', '/resume/career-plan/*',
   '/assistant', '/interview', '/interview/setup', '/interview/session',
   '/interview/report', '/interview/tips', '/interview/reports',
 ]
@@ -67,7 +67,7 @@ test('W3 owns exactly 20 normalized route patterns', () => {
   assert.equal(W3_ROUTES.length, 20)
   assert.equal(new Set(W3_ROUTES).size, 20)
   const manifest = read('tests/visual/route-manifest.ts')
-  for (const route of W3_ROUTES) assert.match(manifest, new RegExp(`['\"]${route.replaceAll('/', '\\/')}['\"]`))
+  for (const route of W3_ROUTES) assert.ok(manifest.includes(`'${route}'`) || manifest.includes(JSON.stringify(route)), `manifest retains ${route}`)
 })
 
 test('resume aliases stay redirects and prototype 73 stays a sub-state', () => {

@@ -279,7 +279,7 @@ if (contract && routeManifest) {
   check('all targets are reachable through route dispositions', () => {
     const referenced = new Set(routeEvidenceDispositions.flatMap(({ targetIds }) => targetIds))
     // 2026-11-04 产品负责人定停放：这四个目标留在目录里，运行时旧链跳回首页，不得再被在用路由认领。
-    const parkedHistorical = ['51', '52', '76', '76A']
+    const parkedHistorical = ['24', '29', '30', '55', '56', '67', '72', '51', '52', '76', '76A']
     for (const targetId of parkedHistorical) {
       assert.ok(visualEvidenceTargets.some((target) => target.targetId === targetId), `parked target ${targetId} must stay in the catalog`)
       assert.ok(!referenced.has(targetId), `parked target ${targetId} must not be claimed by a live route`)

@@ -1,3 +1,4 @@
+import { isParkedRoute } from '../../../routes/parkedRoutes'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../../copy/unattendedCopy'
 import { useKioskLicense } from '../../../layouts/KioskLicenseContext'
 import { useState, type ReactNode } from 'react'
@@ -44,11 +45,6 @@ const ICONS: Record<HubIconKey, QxTouchIconName> = {
 const DIAGNOSE = '/resume/source?intent=diagnose'
 const OPTIMIZE = '/resume/source?intent=optimize'
 const GENERATE = '/resume/generate'
-const MATERIALS = '/resume/materials'
-const CAREER = '/resume/career-plan'
-const SELF = '/resume/self-assessment/intro'
-const FIT = '/resume/job-fit'
-const TEMPLATES = '/resume/templates'
 const PRINT = '/print/upload?source=resume'
 const MINE = '/me/resumes'
 const RECORDS = '/me/ai-records'
@@ -72,17 +68,15 @@ function readinessOf(state: HubAvailability): 'unavailable' | 'degraded' | 'chec
   return 'ready'
 }
 
-/** 单项能力的图标：稿里「简历素材库」用版式图标，「自我探索」用罗盘，其余按规格键。 */
+/** 单项能力沿用规格图标。 */
 function iconFor(item: HubCapability): QxTouchIconName {
-  if (item.route === TEMPLATES) return 'layout'
-  if (item.route === SELF) return 'compass'
   return ICONS[item.icon]
 }
 
 /**
  * 简历服务台触屏版（稿 resume / resume-more / st-unavailable）。
  * 岗位、招聘会、面试、政策四个服务台仍走 QxServiceHubPage 原来的旧返回，不经过这里。
- * 「有，帮我改一改」与「其余」里的 AI简历诊断是同一条路由，走查钩子只挂在后者上，不重复计数。
+ * AI简历诊断的走查钩子挂在第一张大卡上，不重复计数。
  */
 export function ResumeTouchHub({
   spec,
@@ -112,8 +106,8 @@ export function ResumeTouchHub({
   // 只认明确读到 paused === true：没读到、读失败都当没暂停，不把「没读到」说成「不可用」。
   const aiPaused = useKioskAiPause() === 'paused'
   const readiness = readinessOf(availability)
-  const caps = new Map(spec.capabilities.map((item) => [item.route, item]))
-  const quick = new Map(spec.quickLinks.map((item) => [item.route, item]))
+  const caps = new Map(spec.capabilities.filter((item) => !isParkedRoute(item.route)).map((item) => [item.route, item]))
+  const quick = new Map(spec.quickLinks.filter((item) => !isParkedRoute(item.route)).map((item) => [item.route, item]))
   const cap = (route: string) => caps.get(route)
   const reasonFor = (item: { kind: HubCapability['kind']; route: string }) =>
     (winding ? LICENSE_NO_NEW_TASK_REASON : null) ?? unavailableReason(item.kind, item.route, availability) ?? (aiPaused && item.kind === 'ai' ? AI_PAUSED_REASON : null)
@@ -140,16 +134,7 @@ export function ResumeTouchHub({
   }
 
   /** 其余项：规格里没摆在首屏的几项，加上默认关的合同审查。 */
-  const sheetItems = ([
-    { item: cap(DIAGNOSE), kind: 'card' },
-    { item: cap(OPTIMIZE), kind: 'card' },
-    { item: cap(TEMPLATES), kind: 'card' },
-    { item: cap(PRINT), kind: 'card' },
-    { item: quick.get(MINE) as HubCapability | undefined, kind: 'quick' },
-    { item: quick.get(RECORDS) as HubCapability | undefined, kind: 'quick' },
-    { item: contract ?? undefined, kind: 'card' },
-  ] as Array<{ item: HubCapability | undefined; kind: 'card' | 'quick' }>)
-    .filter((entry): entry is { item: HubCapability; kind: 'card' | 'quick' } => Boolean(entry.item))
+  const sheetItems: Array<{ item: HubCapability; kind: 'card' | 'quick' }> = contract ? [{ item: contract, kind: 'card' }] : []
 
   const sheetRow = ({ item, kind }: { item: HubCapability; kind: 'card' | 'quick' }) => {
     const reason = reasonFor(item)
@@ -186,15 +171,15 @@ export function ResumeTouchHub({
 
   const unavailableBody = (
     <QxTouchStateUnavailable
-      primaryTitle={spec.sectionTitle}
+      primaryTitle="简历能力"
       primaryHint="要联网的先停"
-      primary={spec.capabilities.map((item) => {
+      primary={[...caps.values()].map((item) => {
         const reason = reasonFor(item)
         return { icon: iconFor(item), title: item.title, desc: reason ?? item.description, tone: tone(item), off: Boolean(reason), hub: { kind: 'card' as const, title: item.title, reason } }
       })}
       secondaryTitle="常用入口"
       secondaryHint="同样要联网"
-      secondary={spec.quickLinks.map((item) => {
+      secondary={[...quick.values()].map((item) => {
         const reason = reasonFor(item)
         return { icon: iconFor(item as HubCapability), title: item.title, desc: reason ?? item.description, tone: tone(item as HubCapability), off: Boolean(reason), hub: { kind: 'quick' as const, title: item.title, reason } }
       })}
@@ -209,16 +194,16 @@ export function ResumeTouchHub({
   // 因 AI 暂停置灰的大卡改成稿里 ?ai=down 的行式小卡（不画「带走」和箭头），腾出高度给卡下的出路条。
   const diagnosePaused = diagnoseReason === AI_PAUSED_REASON
   const generatePaused = generateReason === AI_PAUSED_REASON
-  /** 大卡因 AI 暂停置灰时，卡下给一条不用 AI 的出路（稿：有简历先打印原件，没有先看素材库）。 */
+  /** 大卡因 AI 暂停置灰时，卡下给一条不用 AI 的出路（稿：有简历先打印原件，没有先填内容导出原样草稿）。 */
   const exitLink = (label: string, route: string) => (
     <button type="button" className="qxt-hub-out" onClick={() => navigate(route)}>{label}</button>
   )
   /** 有出路条就把它和大卡并成一组；没有就原样，正常态的版面一点不动。 */
   const withExit = (slab: ReactNode, exit: ReactNode) => (exit ? <div className="qxt-hub-pair">{slab}{exit}</div> : slab)
-  const materials = cap(MATERIALS)
-  const career = cap(CAREER)
-  const fit = cap(FIT)
-  const self = quick.get(SELF) as HubCapability | undefined
+  const optimize = cap(OPTIMIZE)
+  const print = cap(PRINT)
+  const mine = quick.get(MINE) as HubCapability | undefined
+  const records = quick.get(RECORDS) as HubCapability | undefined
   const showNotice = readiness !== 'ready' && !availability.apiDown
 
   const normalBody = (
@@ -251,6 +236,7 @@ export function ResumeTouchHub({
           off={Boolean(diagnoseReason)}
           lock={diagnoseReason ?? undefined}
           onClick={() => open(DIAGNOSE, diagnoseReason)}
+          hub={{ kind: 'card', title: diagnose.title, reason: diagnoseReason }}
           index={0}
         />,
         diagnosePaused ? exitLink('可以先打印原件', PRINT) : null,
@@ -271,21 +257,21 @@ export function ResumeTouchHub({
           hub={{ kind: 'card', title: generate.title, reason: generateReason }}
           index={1}
         />,
-        generatePaused ? exitLink('可以先看简历素材库', TEMPLATES) : null,
+        generatePaused ? exitLink('可以先填内容，导出原样草稿', GENERATE) : null,
       ) : null}
       <div className="qxt-hub-group">
         <div className="qxt-sec qxt-rise" style={{ ['--i' as string]: 3 }}>
           也可以直接用<small>不用先诊断</small>
-          <button type="button" className="qxt-hub-more" onClick={() => setMoreOpen(true)}>
+          {sheetItems.length > 0 ? <button type="button" className="qxt-hub-more" onClick={() => setMoreOpen(true)}>
             其余 {sheetItems.length} 项
             <QxTouchIcon name="chevR" size={24} strokeWidth={2.4} />
-          </button>
+          </button> : null}
         </div>
         <div className="qxt-grid2">
-          {materials ? tile(materials, 'card', 4) : null}
-          {career ? tile(career, 'card', 5) : null}
-          {self ? tile(self, 'quick', 6) : null}
-          {fit ? tile(fit, 'card', 7) : null}
+          {optimize ? tile(optimize, 'card', 4) : null}
+          {print ? tile(print, 'card', 5) : null}
+          {mine ? tile(mine, 'quick', 6) : null}
+          {records ? tile(records, 'quick', 7) : null}
         </div>
       </div>
       <QxTouchCallout kind="fine">{spec.truthTitle}{spec.truth}{spec.note}</QxTouchCallout>

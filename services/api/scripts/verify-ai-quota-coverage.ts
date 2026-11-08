@@ -296,7 +296,8 @@ function assertChargeGuards(): void {
   earlier('简历版式', bodyOf(ResumeLayoutAdjustController.prototype.adjustResumeLayout), 'requireActiveConsent', 'this.aiService.adjustResumeLayout')
   earlier('职业规划', bodyOf(CareerPlanController.prototype.generate), 'requireActiveConsent', 'this.service.generate')
   earlier('职业规划服务', bodyOf(CareerPlanService.prototype.generate), 'requireActiveConsent', 'runWithAiQuota')
-  earlier('模拟面试开场', bodyOf(executeInterviewStart), 'requireResumeConsent', 'return runCharge(')
+  // B7 把开场改成 `const opened = stored ?? await runCharge(...)`，锚点跟着改；「授权先于扣次」不变。
+  earlier('模拟面试开场', bodyOf(executeInterviewStart), 'requireResumeConsent', 'await runCharge(')
   earlier('岗位推荐', bodyOf(JobAiService.prototype.recommendations), 'assertResumeAiConsent', 'this.chargeAssistant')
   earlier('岗位解读', bodyOf(JobAiService.prototype.explainJob), 'requireActiveConsent', 'this.chargeAssistant')
   earlier('岗位对照', bodyOf(GovernedJobFitService.prototype.analyzeForJobFit), 'authorizeForAnalysis', 'runWithAiQuota')

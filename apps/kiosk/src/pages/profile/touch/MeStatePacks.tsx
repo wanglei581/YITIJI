@@ -166,9 +166,6 @@ export function MeLoginGate({ page, printPick = false, boundary = false }: {
         ) : null}
         <LicenseLock><MeExitCard art="usb" artWidth={120} title="打印扫描" desc="不登录也能打印、扫描" onClick={() => navigate('/print-scan')} /></LicenseLock>
         <LicenseLock><MeExitCard art="checklist" artWidth={108} title="查政策" desc="看本机构发布的就业政策" testId="member-records-guest-policy" onClick={() => navigate('/policy-service')} /></LicenseLock>
-        {page === 'my-benefits' ? (
-          <LicenseLock><MeExitCard art="stack" artWidth={108} title="先看看有哪些活动" desc="活动列表现在就能看" onClick={() => navigate('/activities')} /></LicenseLock>
-        ) : null}
       </div>
       {boundary ? <GuestBoundary /> : null}
       <MeIdleHelp docs={docs} />

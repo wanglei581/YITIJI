@@ -107,8 +107,8 @@ function collectCssSelectors(source) {
 const routes = [
   '/resume', '/resume/upload', '/resume/source', '/resume/generate',
   '/resume/generate/preview', '/resume/parse', '/resume/report',
-  '/resume/optimize', '/resume/export', '/resume/templates',
-  '/resume/materials', '/resume/job-fit', '/resume/career-plan',
+  '/resume/optimize', '/resume/export', '/resume/templates/*',
+  '/resume/materials/*', '/resume/job-fit/*', '/resume/career-plan/*',
   '/assistant', '/interview', '/interview/setup', '/interview/session',
   '/interview/report', '/interview/tips', '/interview/reports',
 ]
@@ -181,7 +181,10 @@ const frozen = {
   // 属本批次「跨页上下文：要么消费，要么别传」清理的一部分；
   // 由 verify:kiosk-frontend-debt ② 反向钉死「不得再传 / 不得再声明」。
   // 旧哈希 f3139d5375df69db492fc9428a3b4d99cc2ab389c081b50093418f71d3d0f369。
-  'src/pages/interview/session/types.ts': '76a8a9770e1132b416b74586039e07e4410fa4cf97ac2e7ad4ec1c56bf5d1374',
+  // 2026-11-04 重新冻结（B7）：路由状态增加本机截止时刻与来源，离开再进不重置计时。
+  // 原有字段与语音状态保留。冻结仍是逐字节校验，没有删断言。
+  // 旧哈希 76a8a9770e1132b416b74586039e07e4410fa4cf97ac2e7ad4ec1c56bf5d1374。
+  'src/pages/interview/session/types.ts': '1a60a061cdd607399403d5f15dda7622763edab1f2a8ffe6c57926e9031bf01a',
   // 2026-09-29 重新冻结（W-16）：语音会话在写成「正在连接」之前先完成使用声明。
   // 未同意就不发创建请求，也不把画面停在连接中。停止接口仍是 keepalive fetch。
   // 旧哈希 365da6215997c51c4f8d4a2f41ca623302431fefe2e463864c42c06c760c3a29。
@@ -439,7 +442,8 @@ includes('src/layouts/KioskRoot.tsx', "'/ai/plan'", 'advisor artifact route is r
 check(!read('src/pages/ai-plan/AiPlanPage.tsx').includes('KioskPageFrame'), 'ai-plan has left the V6 frame')
 check(!read('src/pages/ai-plan/AiPlanPage.tsx').includes('DEFAULT_PLAN'), 'ai-plan no longer ships a hardcoded plan')
 check(!read('src/pages/ai-plan/AiPlanPage.tsx').includes('prototype-v1.css'), 'ai-plan has left prototype-v1')
-includes('src/pages/assistant/AssistantSessionSummaryBar.tsx', 'navigate(`/ai/plan?', 'saving session highlights navigates to the advisor artifact page')
+check(!read('src/pages/assistant/AssistantSessionSummaryBar.tsx').includes('/ai/plan'), 'saving highlights stays on the result block; old artifact route retained')
+includes('src/pages/assistant/AssistantSessionSummaryBar.tsx', "navigate('/me/documents')", 'saved document can open My Documents')
 includes('src/pages/ai-plan/AdvisorArtifactPanels.tsx', 'data-testid="advisor-artifact-quote"', 'covered evidence is rendered as a quotation landmark')
 includes('src/pages/ai-plan/AdvisorArtifactPanels.tsx', '<blockquote className="aa-quote"', 'covered evidence uses a blockquote, not an AI voice')
 includes('src/pages/ai-plan/AiPlanPage.tsx', 'printAdvisorArtifact', 'artifact page prints through the existing print endpoint')
@@ -528,7 +532,7 @@ if (existsSync(join(ROOT, 'playwright.w3.config.ts'))) {
   includes('playwright.w3.config.ts', "port 4183 --strictPort", 'W3 browser config owns port 4183')
   for (const env of ['VITE_API_MODE=http', 'VITE_API_BASE_URL=/api/v1', 'VITE_USE_TRTC_CALL=true', 'VITE_ALLOW_TEXT_ONLY_ASSISTANT=false', 'VITE_TERMINAL_ID=KSK-001', 'VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token', 'VITE_ENABLE_CONTRACT_REVIEW=true']) check(config.includes(env), `W3 browser build pins ${env}`)
   for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report', 'advisor artifact eight proto states fit the kiosk stage', 'advisor artifact renders covered evidence as a quotation', 'advisor artifact print-unavailable state has no print button', 'advisor artifact print waits for the server receipt', 'advisor artifact no-artifact shows the three jobs and opens AI records', 'advisor artifact expired offers only a redo', 'advisor artifact content state opens my documents']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
-  check(selfAssessmentSpec.includes('自评 PDF 在隐私根内预览且不打开新标签页 @w3-kiosk'), 'W3 browser scenario exists: self-assessment PDF stays inside the privacy root')
+  check(selfAssessmentSpec.includes('旧地址回首页 @w3-kiosk'), 'W3 browser scenario asserts parked self-assessment redirects home')
   for (const forbidden of ['addInitScript', 'localStorage', 'sessionStorage', 'waitForTimeout']) check(!spec.includes(forbidden), `W3 browser spec avoids ${forbidden}`)
 }
 

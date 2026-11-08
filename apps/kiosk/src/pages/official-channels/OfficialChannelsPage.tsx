@@ -194,7 +194,7 @@ export function OfficialChannelsPage() {
     <QxTouchDock
       onBack={home}
       ask={{ label: '问小青：这个码怎么用', draft: CHANNEL_ASK_DRAFT, voice: true }}
-      primary={{ label: 'AI 求职方向探索', onClick: () => navigate('/assistant?intent=career_explore') }}
+      primary={{ label: '回首页', onClick: home }}
     />
   ) : (
     <QxTouchDock onBack={home} primary={{ label: '回首页', onClick: home }} />

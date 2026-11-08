@@ -42,6 +42,7 @@ import {
   readInterviewWorkbenchSession,
 } from './interviewWorkbenchSession'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
+import { useInterviewTakeaway } from './useInterviewTakeaway'
 import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
 import './styles/interview-qx2.css'
@@ -105,6 +106,7 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
   const overviewRef = useRef<HTMLHeadingElement>(null)
   const contact = useSupportContact()
   const shownPrintError = interviewUserLine(printError, contact)
+  const phoneSave = useInterviewTakeaway('interview_report')
 
   useBusyLock(printing)
 
@@ -342,6 +344,18 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
                 <b>预测题、STAR、清单、摘录</b>
                 <small>{printNote}</small>
               </button>
+              <button
+                type="button"
+                className="qxt-iv-wide"
+                data-testid="interview-report-phone-save"
+                disabled={viewOnly || printing || phoneSave.busy}
+                onClick={() => void phoneSave.open(() => printInterviewReport(data.sessionId, { token: getToken(), accessToken: state.accessToken }), '报告文件没有生成，请稍后再试')}
+              >
+                <b>{phoneSave.busy ? '正在生成报告文件…' : '扫码存到手机'}</b>
+                <small>生成这份报告的 PDF，用本人手机扫码保存；预览里也可以直接去打印。</small>
+              </button>
+              {phoneSave.error ? <p className="qxt-iv-err" role="alert">{phoneSave.error}</p> : null}
+              {phoneSave.dialog}
               <div className="qxt-iv-acts">
                 <button type="button" onClick={goReports}>查看历史报告</button>
                 <button type="button" onClick={goSetup} disabled={viewOnly} title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined}>重新练习</button>

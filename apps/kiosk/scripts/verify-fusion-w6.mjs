@@ -188,8 +188,8 @@ const WAVE_ROUTES = new Map([
   ['W0', []],
   ['W1', ['/']],
   ['W2', [
-    '/print-scan', '/print-scan/feature/:key', '/print-scan/convert', '/print-scan/sign',
-    '/print/scan-convert', '/print/scan-sign', '/print/scan-feature', '/print/upload',
+    '/print-scan', '/print-scan/feature/:key', '/print-scan/convert', '/print-scan/sign/*',
+    '/print/scan-sign/*', '/print/scan-convert', '/print/scan-sign', '/print/scan-feature', '/print/upload',
     '/print/desk', '/print/material-check', '/print/preview', '/print/params', '/print/confirm',
     '/print/cashier', '/print/progress', '/print/done', '/print/pickup-claim', '/scan', '/scan/start', '/scan/settings',
     '/scan/progress', '/scan/result',
@@ -198,9 +198,8 @@ const WAVE_ROUTES = new Map([
     '/resume', '/resume/upload', '/resume/source', '/resume/generate',
     '/resume/generate/preview', '/resume/parse', '/resume/report', '/resume/optimize',
     '/resume/optimize/compare',
-    '/resume/export', '/resume/templates', '/resume/materials', '/resume/job-fit',
-    '/resume/job-fit/actions',
-    '/resume/career-plan', '/assistant', '/interview', '/interview/setup', '/interview/session',
+    '/resume/export', '/resume/templates/*', '/resume/materials/*', '/resume/job-fit/*',
+    '/resume/career-plan/*', '/assistant', '/interview', '/interview/setup', '/interview/session',
     '/interview/report', '/interview/tips', '/interview/reports',
     '/ai/plan', '/session-resume', '/resume-service', '/interview-service',
   ]],
@@ -224,12 +223,9 @@ const WAVE_ROUTES = new Map([
     '/me/activity/:id', '/me/notifications', '/me/feedback', '/me/settings',
     '/me/privacy-requests', '/help',
     // 2026-11-04 产品负责人定停放：/toolbox 收成跳回首页的 splat。
-    '/activities', '/activities/:id', '/toolbox/*', '/notifications',
+    '/activities/*', '/toolbox/*', '/notifications',
     // v1: 自我探索 · 倾向参考四步路由（PR ③）
-    '/resume/self-assessment/intro',
-    '/resume/self-assessment/questions',
-    '/resume/self-assessment/result',
-    '/resume/self-assessment/history',
+    '/resume/self-assessment/*',
     // PR #499 合同审查
     '/contract-review',
     '/contract-review/processing',
@@ -321,8 +317,8 @@ check('mobile routes', () => {
   }
   assert.ok(!manifest.paths.includes('/login/mobile'), 'obsolete /login/mobile alias must not be introduced')
   const expectedFullScreen = [
-    '/login', '/member/qr-login', '/upload/phone', '/k/u/:scene', '/k/l/:ticketId', '/legal/:doc', '/resume/job-fit',
-    '/resume/career-plan', '/interview/setup', '/interview/session', '/interview/report',
+    '/login', '/member/qr-login', '/upload/phone', '/k/u/:scene', '/k/l/:ticketId', '/legal/:doc', '/resume/job-fit/*',
+    '/resume/career-plan/*', '/interview/setup', '/interview/session', '/interview/report',
     '/interview/tips', '/interview/reports', '/screensaver', '/session-timeout', '/error-offline',
   ]
   for (const path of expectedFullScreen) {
@@ -565,7 +561,7 @@ check('W6 browser collection contract', () => {
   assert.match(spec, /for \(const route of w6MobileCases\)/, 'mobile tests must only collect w6MobileCases')
   assert.match(config, /name: 'kiosk-1080x1920', grep: \/@w6-kiosk\$\//, 'kiosk project must own only @w6-kiosk tests')
   assert.match(config, /name: 'mobile-390x844', grep: \/@w6-mobile\$\//, 'mobile project must own only @w6-mobile tests')
-  assert.match(routes, /pattern: '\/resume\/career-plan'[\s\S]*featureText: '求职方案'/, 'career-plan W6 路由面必须断言求职方案')
+  assert.match(routes, /pattern: '\/resume\/career-plan\/\*'[^\n]*expectedPath: '\/'/, 'career-plan 旧链回首页')
   assert.match(spec, /\/resume\/career-plan mobile breakpoint @w6-mobile/, 'career-plan 必须有 390×844 断点')
   assert.match(spec, /旧链接 \/toolbox、\/smart-campus、\/smart-campus\/welcome、\/smart-campus\/service\/campus-card 都回到首页 @w6-kiosk/, '2026-11-04 产品负责人定停放：旧链接必须断言回到首页')
 })

@@ -222,7 +222,10 @@ await runGroup('migration matrix route mappings', async (fail) => {
   const matrix = await readRequired(matrixPath, fail)
   if (routes === null || matrix === null) return
 
-  const missingRoutes = routes.filter((routePath) => !matrix.includes(`\`${routePath}\``))
+  // 11/08 新停放地址以正式范围文档登记；冻结设计矩阵不改，其他路由照旧逐条核对。
+  const core4Routes = new Set(['/resume/job-fit/*', '/resume/career-plan/*', '/resume/self-assessment/*', '/resume/templates/*', '/resume/materials/*', '/activities/*', '/print-scan/sign/*', '/print/scan-sign/*'])
+  const scope = await readRequired(resolve(repoRoot, 'docs/product/feature-scope.md'), fail)
+  const missingRoutes = routes.filter((routePath) => !(core4Routes.has(routePath) ? scope?.includes(`\`${routePath}\``) : matrix.includes(`\`${routePath}\``)))
   if (missingRoutes.length > 0) {
     fail(`${displayPath(matrixPath)}: missing backtick mappings for ${missingRoutes.join(', ')}`)
   }

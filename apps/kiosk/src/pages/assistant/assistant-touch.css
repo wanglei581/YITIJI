@@ -58,7 +58,7 @@
 /* 本机 AI 专项这一行 */
 .qxt-screen[data-qx-page='assistant'] .assistant-tools-open { min-height: 94px; }
 
-/* 四张主题卡：2×2，余高平分 */
+/* 主题卡两列，余高平分 */
 .qxt-screen[data-qx-page='assistant'] .kassist.kassist-qingxu .assistant-task-grid {
   flex: 1;
   min-height: 0;
@@ -68,6 +68,14 @@
   gap: 12px;
   padding: 0;
 }
+/* 2026-11-08「岗位与选择」停放后只剩三张：落单的最后一张占满一行、左文右图，不留半行空白。 */
+.qxt-screen[data-qx-page='assistant'] .kassist.kassist-qingxu .assistant-task-grid > .assistant-task:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: stretch;
+}
+.qxt-screen[data-qx-page='assistant'] .kassist.kassist-qingxu .assistant-task-grid > .assistant-task:last-child:nth-child(odd) .assistant-task-top { flex: 1 1 0; min-width: 0; }
+.qxt-screen[data-qx-page='assistant'] .kassist.kassist-qingxu .assistant-task-grid > .assistant-task:last-child:nth-child(odd) .assistant-task-art { flex: 0 0 38%; }
 .qxt-screen[data-qx-page='assistant'] .kassist .assistant-task {
   min-height: 0;
   display: flex;

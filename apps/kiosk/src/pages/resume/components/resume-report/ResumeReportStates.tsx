@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { RESUME_SCORING_DIMENSIONS } from '@ai-job-print/shared'
 import { QxTouchIcon, type QxTouchIconName } from '../../../../components/qingxu/touch/QxTouchIcon'
+import { useOfficialChannels } from '../../../../hooks/useOfficialChannels'
 import type { ExportCaptureState, ReportViewState } from '../../resume-report-model'
 import { ExitRow, ManualChecks } from './ResumeReportExits'
 
@@ -78,6 +79,10 @@ const COPY: Record<StateView, { h: string; p: string; exits: Exit[] }> = {
 export function ResumeReportStates({ viewState }: { viewState: StateView }) {
   const navigate = useNavigate()
   const copy = COPY[viewState]
+  // 本机构官方渠道一行只在本机真有渠道时出现（与首页磁贴同一判据）：没配渠道的点位点进去是空页。
+  const channels = useOfficialChannels()
+  const hasChannels = channels.status === 'ready' && channels.items.length > 0
+  const exits = copy.exits.filter((exit) => exit.to !== '/official-channels' || hasChannels)
   return (
     <>
       <div className="qxt-howto qxt-rise" role="status" data-testid="resume-report-state-note">
@@ -86,7 +91,7 @@ export function ResumeReportStates({ viewState }: { viewState: StateView }) {
       </div>
       <div className="qxt-sec">接下来可以做的<small>这些都不依赖本页这份报告</small></div>
       <div className="qxt-exit-col rrp-exits" data-testid="resume-report-exits">
-        {copy.exits.map((exit, i) => (
+        {exits.map((exit, i) => (
           <ExitRow key={exit.testid} icon={exit.icon} title={exit.title} desc={exit.desc} take={exit.take} testId={exit.testid} route={exit.to} index={i} onClick={() => navigate(exit.to)} />
         ))}
       </div>
@@ -98,7 +103,7 @@ export function ResumeReportStates({ viewState }: { viewState: StateView }) {
           </div>
         </section>
       ) : null}
-      <ManualChecks delay={copy.exits.length + 2} />
+      <ManualChecks delay={exits.length + 2} />
     </>
   )
 }

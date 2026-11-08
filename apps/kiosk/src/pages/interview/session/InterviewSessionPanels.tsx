@@ -4,6 +4,7 @@ import { InterviewArtMark } from '../InterviewArt'
 import { InterviewNote, InterviewStatus } from '../interviewQxParts'
 import type { InterviewMessage, InterviewSessionPhase, InterviewVoiceState } from './types'
 import { formatInterviewClock } from './types'
+import { INTERVIEW_DEADLINE_WARN_SEC } from './interviewDeadline'
 
 type PillTone = 'gray' | 'blue' | 'red' | 'green'
 
@@ -63,6 +64,7 @@ export function InterviewSessionPanels({
     .filter((message) => message.role === 'interviewer')
     .slice(-2, -1)[0]?.content
 
+  const deadlineWarn = remainingSec >= 1 && remainingSec <= INTERVIEW_DEADLINE_WARN_SEC && phase !== 'finishing'
   const micTone = micStatusTone === 'green' ? 'ok' : micStatusTone === 'red' ? 'off' : undefined
   const recent = messages
     .map((message, index) => ({ message, index }))
@@ -86,11 +88,11 @@ export function InterviewSessionPanels({
         items={[
           { k: '麦克风', v: micStatusLabel, tone: micTone },
           { k: '语音播报', v: ttsLabel, tone: ttsOfficial ? 'ok' : undefined },
-          { k: '剩余时间', v: formatInterviewClock(remainingSec), tone: timeUp ? 'off' : 'ok' },
+          { k: '剩余时间', v: formatInterviewClock(remainingSec), tone: deadlineWarn || timeUp ? 'off' : 'ok' },
         ]}
       />
-      {timeUp && phase !== 'finishing' ? (
-        <p className="qxt-iv-sec" role="status">练习时长已到，回答完当前问题后点「结束本场练习」。</p>
+      {deadlineWarn ? (
+        <p className="qxt-iv-sec" role="status" data-testid="interview-deadline-warning">还剩 1 分钟或更少。到点会自动结束这一场，没提交的回答不算进报告。</p>
       ) : null}
       {voiceHint ? <p className="qxt-iv-sec" role="status">{voiceHint}</p> : null}
       {phase === 'done_suggest' ? <p className="qxt-iv-sec">本场问题已问完，可以结束并生成报告</p> : null}
