@@ -11,6 +11,7 @@
 // ============================================================
 
 import { useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { InterviewPrintResponse } from '@ai-job-print/shared'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -70,7 +71,7 @@ export function useInterviewTakeaway(origin: TakeawayOrigin) {
     if (last) void open(last.generate, last.fallback)
   }
 
-  const dialog = file ? (
+  const preview = file ? (
     <FilePreviewDialog
       fileUrl={file.printFileUrl ?? file.signedUrl}
       fileName={file.filename}
@@ -84,6 +85,9 @@ export function useInterviewTakeaway(origin: TakeawayOrigin) {
       onClose={() => setFile(null)}
     />
   ) : null
+  // 挂到舞台容器上（仍随舞台缩放），不留在面试页里：面试页的按钮样式（作答区按钮、button.w-12）会把弹窗的关闭键和主按钮改走样。
+  const host = typeof document !== 'undefined' ? document.querySelector('.kiosk-stage') : null
+  const dialog = preview && host ? createPortal(preview, host) : preview
 
   return { open, busy, error: interviewUserLine(error, contact), dialog }
 }
