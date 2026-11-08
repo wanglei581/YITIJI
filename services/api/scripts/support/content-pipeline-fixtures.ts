@@ -6,6 +6,7 @@
  * 且会写进共享 dev.db。本验证要的是「本次运行独有、跑完删干净」的夹具,
  * 所有 id 都带 run 后缀,cleanup 按前缀删,不依赖 seed 是否跑过。
  */
+import { POLICY_PUBLISH_FIXTURE, POLICY_VERIFIED_DOMAINS_FIXTURE } from './policy-publish-fixture'
 import type { PrismaService } from '../../src/prisma/prisma.service'
 import { encryptSecret } from '../../src/common/crypto/secret-cipher'
 import { hashPassword, FIXTURE_PREFIX } from './content-pipeline-harness'
@@ -28,6 +29,8 @@ export interface Fixtures {
   webhookSecret: string
 }
 
+export { POLICY_PUBLISH_FIXTURE }
+
 const PASSWORD = 'Verify-Cpe2e-2026!'
 
 export async function createFixtures(prisma: PrismaService, run: string): Promise<Fixtures> {
@@ -48,6 +51,7 @@ export async function createFixtures(prisma: PrismaService, run: string): Promis
       // 注意:这里直接写 active 是**夹具**,不是被验对象。
       // 「运营怎么把机构标成可信」由 PATCH /admin/orgs/:id/content-trust 单独验(见 §5)。
       contentTrustStatus: 'active',
+      verifiedOfficialDomainsJson: POLICY_VERIFIED_DOMAINS_FIXTURE,
       contentTrustReason: 'E2E 夹具:模拟已完成授权核验的机构',
     },
   })

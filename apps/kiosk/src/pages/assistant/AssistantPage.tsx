@@ -6,8 +6,8 @@ import { AI_LABEL_COPY } from '@ai-job-print/shared'
 import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
-import { Hit, K } from '../public-touch/PublicBlocks'
-import { IllusChecklist, IllusReport, IllusResume } from '../public-touch/PublicIllus'
+import { Hit } from '../public-touch/PublicBlocks'
+import { IllusReport } from '../public-touch/PublicIllus'
 import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
 import { useVisibleHelpLine } from '../public-touch/publicTouchHooks'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -27,7 +27,6 @@ import type { AiAvailability, AiTaskFallback } from '../../ai'
 import { AdvisorCockpit } from './AdvisorCockpit'
 import {
   AdvisorManualEntries,
-  AdvisorThinking,
   ChatBubble,
   ReplyBounds,
   type Message,
@@ -47,6 +46,9 @@ import {
 } from './advisorScenes'
 import { isRecruitmentRoute, useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useAssistantDraftHandoff } from '../../services/assistantDraft'
+import { AssistantPolicyMarker } from './AssistantPolicyContext'
+import { useAssistantPolicyContext } from './useAssistantPolicyContext'
+import { AssistantTurnActions, AssistantWaitingCards } from './AssistantTurnPanels'
 import { AssistantTaskPicker } from './AssistantTaskPicker'
 import { advisorDisplayText, advisorErrorMessage, advisorUserReason } from './advisorUserCopy'
 import { AI_CONTENT_COMPLAINT_ROUTE } from '../profile/me/feedback/aiComplaint'
@@ -131,6 +133,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const [input, setInput] = useState('')
   const [sheet, setSheet] = useState<AssistantSheetKind | null>(null)
   useAssistantDraftHandoff(setInput, ASSISTANT_USER_MESSAGE_MAX_LENGTH)
+  const [policyContext, clearPolicyContext] = useAssistantPolicyContext()
   const [loading, setLoading] = useState(false)
   const [declaring, setDeclaring] = useState(false)
   const quickQuestions = selectedTask?.questions ?? GENERAL_QUESTIONS
@@ -270,6 +273,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     try {
       const response = await chatWithAssistant({
         message: assistantRequestMessage,
+        policyId: policyContext?.policyId,
         sessionId: requestSessionId,
         skill: toolboxSkill,
         context: toolboxSkill
@@ -285,6 +289,12 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       if (cancelledRef.current) return
       if (requestTokenRef.current !== requestToken || sessionIdRef.current !== requestSessionId) return
       sessionIdRef.current = response.sessionId
+      if (response.providerLabel === 'fixed:policy-unavailable' && response.aiGenerated === false) {
+        setMessages(current => [...current, {
+          id: `policy-unavailable-${Date.now()}`, role: 'assistant', kind: 'not-ai', text: response.reply, providerLabel: response.providerLabel,
+        }])
+        return
+      }
       if (!isAiGeneratedReply(response)) {
         setAiAvailability('unavailable')
         // 输入条随即锁上，虚拟键盘也一并收起 —— 留着一个按不出结果的发送键更糟。
@@ -347,7 +357,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     } finally {
       if (!cancelledRef.current && requestTokenRef.current === requestToken) setLoading(false)
     }
-  }, [aiAvailability, getToken, loading, selectedTask, toolboxSkill])
+  }, [aiAvailability, getToken, loading, policyContext, selectedTask, toolboxSkill])
 
   const handleSend = useCallback(() => { void sendMessage(input) }, [input, sendMessage])
   // 用屏上键盘的「发送」把话真的发出去之后收起键盘：回答和底部导航要露出来，不能被键盘和它外面的遮罩压着（走查 I-03）。
@@ -531,33 +541,11 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   ) : showComposer ? undefined : <QxTouchDock />
 
   const turnRow = (
-    <div className="assistant-task-actions" data-cols="3" role="group" aria-label="这一轮之后可以做什么">
-      {body === 'reply' ? (
-        <>
-          <AssistantSessionSummaryBar
-            sessionId={sessionIdRef.current}
-            canSave={messages.some((message) => message.kind === 'ai') && !loading && !aiLocked}
-            loggedIn={isLoggedIn}
-            token={getToken()}
-          />
-          <button type="button" className="assistant-direct-question assistant-turn-action" onClick={askAgain}>
-            <strong>再问一句</strong>
-          </button>
-        </>
-      ) : (
-        <>
-          <button type="button" className="assistant-direct-question assistant-turn-action" data-primary="true" onClick={retryLastTurn}>
-            <strong>重试这一轮</strong>
-          </button>
-          <button type="button" className="assistant-direct-question assistant-turn-action" onClick={resetConversation}>
-            <strong>换个问题</strong>
-          </button>
-        </>
-      )}
-      <button type="button" className="assistant-complaint" onClick={complaint}>
-        <strong>投诉 AI 内容</strong>
-      </button>
-    </div>
+    <AssistantTurnActions body={body} onAsk={askAgain} onRetry={retryLastTurn} onReset={resetConversation} onComplaint={complaint}
+      summary={<AssistantSessionSummaryBar sessionId={sessionIdRef.current}
+        canSave={messages.some((message) => message.kind === 'ai') && !loading && !aiLocked}
+        loggedIn={isLoggedIn} token={getToken()} />}
+    />
   )
 
   const transcript = (
@@ -619,25 +607,10 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
               {body === 'reply' ? null : transcript}
 
               {body === 'submitting' && (
-                <div className="qxp-pair assistant-wait-pair">
-                  <div className="qxp-card assistant-wait-card">
-                    {/* 请求真的在飞（loading）才画等待说明；任务区的四态照旧挂在下面，只读不画。 */}
-                    <AdvisorThinking />
-                    <AiTaskRegion
-                      task={advisorTask}
-                      label="AI 顾问回答"
-                      className="assistant-ai-status"
-                      idle={null}
-                      fallback={advisorFallback}
-                    />
-                    <div className="qxp-artbox" aria-hidden="true"><IllusResume w={200} annot /></div>
-                  </div>
-                  <div className="qxp-card assistant-wait-card">
-                    <K as="h3">不由 AI 决定</K>
-                    <p className="qxp-note">身份、付款、打印、政策资格和录用结果都不由这一轮回答决定。</p>
-                    <div className="qxp-artbox" aria-hidden="true"><IllusChecklist w={200} /></div>
-                  </div>
-                </div>
+                <AssistantWaitingCards status={
+                  <AiTaskRegion task={advisorTask} label="AI 顾问回答" className="assistant-ai-status"
+                    idle={null} fallback={advisorFallback} />
+                } />
               )}
 
               {body !== 'submitting' && (
@@ -699,6 +672,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           )}
         </div>
 
+        <AssistantPolicyMarker context={policyContext} onClear={() => { clearPolicyContext(); resetConversation() }} />
         {showComposer && (
         <section className="assistant-composer" aria-labelledby="assistant-composer-label">
           <label id="assistant-composer-label" htmlFor="assistant-question" className="kassist-sr-only">向 AI 顾问描述你的问题</label>
