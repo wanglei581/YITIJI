@@ -46,10 +46,12 @@ import {
 import { KioskFeedbackDialog } from '../../components/KioskFeedbackDialog'
 import { helpNeededLine, machineCannotPrintLine, preferUnattended } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
+import { copyOptions } from '../copy/copySession'
 import { PrintTouchFrame, printAsk } from '../print/PrintTouchFrame'
 import { PRINT_HUB_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
 import {
   COPY_GUIDE_KEY,
+  COPY_GUIDE_ROUTE,
   HUB_ASK,
   HUB_PILL,
   arrivalCodeStateNote,
@@ -455,9 +457,10 @@ export function PrintScanHomePage() {
       setFeedbackOpen(true)
       return
     }
-    // C3a：先选怎么复印；第一张卡仍进入原来的面板图文指引。
+    // C3a：屏上复印开通了才先选怎么复印（第一张卡仍是面板图文指引）；
+    // 没开通、能力还在读或读失败，都直接去面板图文指引，不先停在只有一张卡能点的选择屏。
     if (key === COPY_GUIDE_KEY) {
-      navigate('/print-scan/feature/copy-screen')
+      navigate(capabilityLoad.status === 'ok' && copyOptions(capabilityLoad.map).screen ? '/print-scan/feature/copy-screen' : COPY_GUIDE_ROUTE)
       return
     }
     const link = QUICK_LINKS.find((item) => item.key === key)

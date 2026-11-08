@@ -44,12 +44,25 @@ for (const [stage, title, count] of [
 
 test('hub enters how; first card retains the existing illustrated panel guide @w2', async ({ page, api }) => {
   await copyFixture(page, api)
+  // 入口按后台能力分流：能力读完之前点「复印」会按没开通去面板指引，所以先等能力回包。
+  const caps = page.waitForResponse((response) => response.url().includes('/terminals/KSK-001/capabilities'))
   await page.goto('/print-scan')
+  await caps
   await page.getByTestId('print-hub-copy-note').click()
   await expect(page).toHaveURL(/\/print-scan\/feature\/copy-screen$/)
   await page.locator('.cc-way').first().click()
   await expect(page).toHaveURL(/\/print-scan\/feature\/copy$/)
   await expect(page.getByTestId('print-hub-copy-steps')).toBeVisible()
+})
+for (const closed of ['copy', 'scan', 'error'] as const) test(`hub goes straight to the panel guide when screen copy is not open (${closed}) @w2`, async ({ page, api }) => {
+  const f = await copyFixture(page, api, closed === 'error' ? {} : { [closed]: false })
+  if (closed === 'error') await api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', { status: 503, json: { success: false } })
+  await page.goto('/print-scan')
+  await page.getByTestId('print-hub-copy-note').click()
+  await expect(page).toHaveURL(/\/print-scan\/feature\/copy$/)
+  await expect(page.getByTestId('print-hub-copy-steps')).toBeVisible()
+  await expect(page.getByTestId('copy-how')).toHaveCount(0)
+  expect(f.calls).toHaveLength(0)
 })
 for (const button of ['card', 'primary']) test(`off ${button} opens the panel guide @w2`, async ({ page, api }) => {
   const f = await copyFixture(page, api)
