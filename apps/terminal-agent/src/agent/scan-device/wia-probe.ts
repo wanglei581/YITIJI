@@ -16,6 +16,9 @@ export interface WiaProbeResult {
   state: 'ready' | 'busy' | 'not_found' | 'error'
   hresult?: string
   forceKilled: boolean
+  /** 强杀没确认进程退出。调用方交给健康管理器，不在这里另作处理。 */
+  stopUnconfirmed: boolean
+  processId?: number
   elapsedMs: number
 }
 
@@ -43,7 +46,12 @@ export async function runWiaProbe(
     deps,
   )
   const exit = await job.done
-  const base = { forceKilled: exit.forceKilled, elapsedMs: deps.clock.now() - startedAt }
+  const base = {
+    forceKilled: exit.forceKilled,
+    stopUnconfirmed: exit.stopUnconfirmed,
+    elapsedMs: deps.clock.now() - startedAt,
+    ...(exit.processId !== undefined ? { processId: exit.processId } : {}),
+  }
   let probe: WiaProbeResult
   if (exit.timedOut || exit.spawnFailed || !final) {
     probe = { state: 'error', ...base }
