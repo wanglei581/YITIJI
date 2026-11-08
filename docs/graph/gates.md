@@ -70,7 +70,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2057 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2061 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -186,7 +186,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 180 个文件</summary>
+<summary><code>apps/admin/src/</code> — 184 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -288,8 +288,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/policy-sources/index.tsx` | `verify-source-publish-actions.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/print-scan/CapabilityCenter.tsx` | `verify-admin-print-scan-ui.mjs`<br/>`verify-print-color-duplex-capability.ts`<br/>`verify-scan-device-sessions.ts` |
 | `apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx` | `verify-admin-print-scan-ui.mjs` |
+| `apps/admin/src/routes/print-scan/FreePrintQuotaCard.tsx` | `verify-free-print-quota.ts` |
 | `apps/admin/src/routes/print-scan/PrintRetryButton.tsx` | `verify-admin-print-scan-ui.mjs` |
-| `apps/admin/src/routes/print-scan/index.tsx` | `verify-admin-print-scan-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
+| `apps/admin/src/routes/print-scan/index.tsx` | `verify-admin-print-scan-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-free-print-quota.ts` |
 | `apps/admin/src/routes/printers/PrinterOutputCell.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/printers/index.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-service-desk-dashboard-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `apps/admin/src/routes/privacy-requests/index.tsx` | `verify-console-privacy-copy.mjs`<br/>`verify-user-closure-ui.mjs`<br/>`verify-data-request-ui.mjs` |
@@ -317,7 +318,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/terminals/CreatePlannedTerminalDialog.tsx` | `verify-admin-terminal-bind-code-ui.mjs` |
 | `apps/admin/src/routes/terminals/ReleaseObservationPanel.tsx` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/terminals/TerminalBindCodeDialog.tsx` | `verify-admin-terminal-bind-code-ui.mjs` |
-| `apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-terminal-device-config.ts` |
+| `apps/admin/src/routes/terminals/TerminalDailyFreeSidesSection.tsx` | `verify-free-print-quota.ts` |
+| `apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-free-print-quota.ts`<br/>`verify-terminal-device-config.ts` |
 | `apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/terminals/TerminalNetworkDiagnostics.tsx` | `verify-admin-terminal-network-diagnostics-ui.mjs` |
 | `apps/admin/src/routes/terminals/TerminalPrinterQueue.tsx` | `verify-admin-terminal-network-diagnostics-ui.mjs` |
@@ -355,6 +357,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/services/api/consoleScreen.ts` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/services/api/devices.ts` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-admin-terminal-bind-code-ui.mjs` |
 | `apps/admin/src/services/api/files.ts` | `verify-admin-file-lifecycle.mjs` |
+| `apps/admin/src/services/api/freePrintQuota.ts` | `verify-free-print-quota.ts` |
+| `apps/admin/src/services/api/freePrintQuotaRules.ts` | `verify-free-print-quota.ts` |
 | `apps/admin/src/services/api/internalAccounts.ts` | `verify-admin-internal-accounts-ui.mjs` |
 | `apps/admin/src/services/api/jobMaterials.ts` | `verify-admin-job-materials-ui.mjs` |
 | `apps/admin/src/services/api/offlineAgenciesAdmin.ts` | `verify-admin-offline-agencies-ui.mjs`<br/>`verify-backend-p0-contracts.mjs` |

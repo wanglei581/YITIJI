@@ -39,7 +39,7 @@ export const PICKUP_RESUME_PARTIAL_OUTPUT = 'PICKUP_RESUME_PARTIAL_OUTPUT'
 export const PICKUP_RESUME_PARTIAL_OUTPUT_MESSAGE = REPRINT_BLOCKED_MESSAGE.partial_output
 
 export const PICKUP_RESUME_REFUND_PENDING = 'PICKUP_RESUME_REFUND_PENDING'
-export const PICKUP_RESUME_REFUND_PENDING_MESSAGE = '这单没有打完，费用会按原路退回，需要帮助请拨打服务电话'
+export const PICKUP_RESUME_REFUND_PENDING_MESSAGE = '这单没有打完，退款待处理，输码时不会当场退款。请不要再输这个到机码；需要帮助请查看《隐私政策》里的联系方式。'
 
 /** 订单视图给前端的提示。付费单这两种状态不提示续打。 */
 export type ReprintNotice = 'may_have_printed' | 'partial_output' | null
