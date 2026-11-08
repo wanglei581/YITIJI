@@ -1,3 +1,4 @@
+import { isParkedRoute } from '../../routes/parkedRoutes'
 // 稿 05 青序流光 2.0；状态只由真实请求、草稿与语音相位派生。
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -70,10 +71,8 @@ const ALLOWED_ROUTE_PREFIXES = [
   '/resume', '/resume-service',
   '/print', '/print-scan',
   '/scan',
-  '/jobs', '/job-fairs', '/fairs-service', '/jobs-service',
   '/interview', '/interview-service',
   '/renshi', '/policy-service',
-  '/companies',
 ] as const
 
 function isAllowedRoute(route: string): boolean {
@@ -87,7 +86,7 @@ const WELCOME: Message = {
   id: 'welcome',
   role: 'assistant',
   kind: 'system',
-  text: '您好！我是小青，可以帮您梳理简历、面试、岗位选择和入职准备。请问今天想先解决什么问题？',
+  text: '您好！我是小青，可以帮您梳理简历、准备面试，也能说说打印扫描和政策怎么办。请问今天想先解决什么问题？',
 }
 
 export function AssistantPage() {
@@ -303,7 +302,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       }
 
       setAiAvailability('available')
-      const safeActions = response.actions?.filter((action) => isAllowedRoute(action.route))
+      const safeActions = response.actions?.filter((action) => isAllowedRoute(action.route) && !isParkedRoute(action.route))
       setMessages((current) => [
         ...current,
         {
@@ -399,7 +398,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   })
   const cockpitCopy = COCKPIT_COPY[cockpitState]
 
-  const degradedReason = aiLocked ? '这些专项需要 AI 作答，恢复后可重新选择。' : '刚才这一轮没有连上 AI 顾问。'
   const advisorFallback: AiTaskFallback = useMemo(() => ({
     mode: 'manual',
     reason: aiAvailability === 'unavailable'
@@ -503,9 +501,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   useEffect(() => { if (!showComposer) setKeyboardOpen(false) }, [showComposer])
   const showConversation = body !== 'picker' || messages.some((message) => message.id.startsWith('voice-'))
   const draftLength = input.trim().length
-  const toolsLine = aiLocked
-    ? 'AI 专项暂停 · 恢复后可重新选择'
-    : aiAvailability === 'available' ? '8 项 · 本轮已确认可用' : '8 项 · 首轮提问后确认可用性'
   const phoneLine = useVisibleHelpLine()
   const askQuestion = (question: string) => {
     if (loading || aiLocked) return
@@ -518,7 +513,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     <AssistantSheets
       sheet={sheet}
       onClose={() => setSheet(null)}
-      tools={{ degraded: aiLocked, degradedReason, availability: aiAvailability, activeSkill: toolboxSkill }}
       goActions={goActions}
     />
   ) : undefined
@@ -606,9 +600,9 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           {body === 'picker' && (
             <AssistantTaskPicker
               selectedTask={selectedTask} scene={toolboxScene} welcome={welcomeMessage.text} questions={quickQuestions}
-              loading={loading} aiLocked={aiLocked} toolsLine={toolsLine}
+              loading={loading} aiLocked={aiLocked}
               onSelect={setSelectedTaskId} onClear={clearTask} onQuestion={askQuestion}
-              onOpenTools={() => setSheet('tools')} onOpenManual={() => setSheet('manual')}
+              onOpenManual={() => setSheet('manual')}
               onOpenActs={openActs} onComplaint={complaint}
             />
           )}
@@ -682,7 +676,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
                           ? AI_QUOTA_EXHAUSTED_ASSISTANT_COPY
                           : '小青这会儿没有接上。下面这些事不用问也能办。'}
                       </QxTouchCallout>
-                      <Hit className="assistant-tools-open" icon={<QxTouchIcon name="sparkle" size={32} />} title="本机 AI 专项" sub={toolsLine} chevron onClick={() => setSheet('tools')} />
                     </>
                   ) : null}
                   <p className="assistant-exits-title">这些都不需要 AI · 现在就能做</p>

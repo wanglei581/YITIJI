@@ -291,10 +291,10 @@ assertNotIncludes(filePreview, '请重新上传文件', 'preview failure no long
 // 在按钮内被拆成两行。去掉动作条里那个，剩下两个按钮就够宽了。
 {
   const jobFitEntries = (report.match(/navigate\('\/resume\/job-fit'/g) ?? []).length
-  if (jobFitEntries !== 1) {
-    throw new Error(`report page must expose exactly one 岗位匹配 entry, found ${jobFitEntries}`)
+  if (jobFitEntries !== 0) {
+    throw new Error(`report page must not expose parked 岗位匹配 entry, found ${jobFitEntries}`)
   }
-  console.log('PASS report page exposes a single job-fit entry (no same-screen duplicate)')
+  console.log('PASS 11/08 report page does not expose parked job-fit entry')
 }
 
 // ── R9 文案写支持 DOC，accept 里没有 DOC ──────────────────────────────────

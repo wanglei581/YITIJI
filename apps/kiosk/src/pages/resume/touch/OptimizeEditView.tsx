@@ -33,7 +33,7 @@ export function OptimizeEditView(props: {
   templatesError: boolean
   selectedTemplateId: string
   onTemplateChange: (id: string) => void
-  onTemplates: () => void
+  onTemplates?: () => void
   loading: boolean
   exporting: boolean
   aiUnavailable: boolean
@@ -91,7 +91,7 @@ export function OptimizeEditView(props: {
               {tpl.title}
             </button>
           ))}
-          <button type="button" className="qxt-outlink" onClick={props.onTemplates}>去素材库看更多模板</button>
+          {props.onTemplates ? <button type="button" className="qxt-outlink" onClick={props.onTemplates}>去素材库看更多模板</button> : null}
           <p className="qxt-hint">换模板出新稿，不保留原件版式；PDF 导出按所选模板自动填充版式；Word/TXT/Markdown 保持内容格式导出。</p>
         </div>
         <ResumeLayoutControls variant="touch" layout={layout} onChange={props.onLayoutChange} disabled={exporting} only={['accent']} />

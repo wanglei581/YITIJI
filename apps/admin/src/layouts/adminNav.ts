@@ -34,8 +34,9 @@ export const PATH_TO_KEY: Record<string, string> = {
   '/member-feedback': 'alerts',
   '/member-notifications': 'alerts',
   '/screensaver': 'screensaver',
-  '/toolbox': 'screensaver',
-  '/smart-campus': 'screensaver',
+  // 直达旧配置页不误亮「待机宣传屏」；这两个 key 不在侧栏。
+  '/toolbox': 'toolbox',
+  '/smart-campus': 'smart-campus',
   '/job-materials': 'job-materials',
   '/ai-services': 'ai-services',
   '/ai-config': 'ai-services',
@@ -94,7 +95,7 @@ export interface ConsoleTabGroup {
   tabs: ConsoleTab[]
 }
 
-/** 八个标签组。第一个标签是该菜单的默认地址。 */
+/** 七个标签组。第一个标签是该菜单的默认地址。 */
 export const TAB_GROUPS: ConsoleTabGroup[] = [
   {
     key: 'alerts',
@@ -103,15 +104,6 @@ export const TAB_GROUPS: ConsoleTabGroup[] = [
       { path: '/alerts', label: '告警中心' },
       { path: '/member-feedback', label: '意见反馈' },
       { path: '/member-notifications', label: '消息通知' },
-    ],
-  },
-  {
-    key: 'screensaver',
-    label: '终端应用与展示',
-    tabs: [
-      { path: '/screensaver', label: '宣传屏' },
-      { path: '/toolbox', label: '百宝箱' },
-      { path: '/smart-campus', label: '智慧校园' },
     ],
   },
   {
@@ -183,7 +175,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'devices', label: '设备管理', icon: MonitorIcon, group: '客户与设备', href: KEY_TO_PATH.devices },
   { key: 'print-scan', label: '打印扫描运维', icon: PrinterIcon, group: '客户与设备', href: KEY_TO_PATH['print-scan'] },
   { key: 'alerts', label: '告警与反馈', icon: AlertTriangleIcon, group: '客户与设备', href: KEY_TO_PATH.alerts },
-  { key: 'screensaver', label: '终端应用与展示', icon: MonitorPlayIcon, group: '终端与 AI', href: KEY_TO_PATH.screensaver },
+  { key: 'screensaver', label: '待机宣传屏', icon: MonitorPlayIcon, group: '终端与 AI', href: KEY_TO_PATH.screensaver },
   { key: 'job-materials', label: '求职材料库', icon: FileTextIcon, group: '终端与 AI', href: KEY_TO_PATH['job-materials'] },
   { key: 'ai-services', label: 'AI服务', icon: BotIcon, group: '终端与 AI', href: KEY_TO_PATH['ai-services'] },
   { key: 'orders', label: '订单与计费', icon: WalletIcon, group: '费用与权益', href: KEY_TO_PATH.orders },

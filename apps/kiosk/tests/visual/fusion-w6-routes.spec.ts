@@ -285,7 +285,7 @@ test('/resume/optimize/compare mobile breakpoint @w6-mobile', async ({ page, api
 })
 
 test('/resume/career-plan mobile breakpoint @w6-mobile', async ({ page, api }) => {
-  const route = w6KioskCases.find(({ pattern }) => pattern === '/resume/career-plan')
+  const route = w6KioskCases.find(({ pattern }) => pattern === '/resume/career-plan/*')
   if (!route) throw new Error('W6 career-plan route case is missing')
   const errors = collectRuntimeErrors(page)
   registerW6Api(api)

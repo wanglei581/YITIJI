@@ -23,7 +23,6 @@ const CONFIG = '/api/v1/terminals/KSK-001/config'
 /** 托管关闭时一体机上一个都不该出现的招聘词（CLAUDE.md §2 的按钮白名单 + 首页岗位计数 + 岗位 AI 推荐）。 */
 const RECRUITMENT_COPY = ['找工作', '查看岗位', '去来源平台投递', '扫码投递', '查看招聘会', '扫码预约', 'AI岗位推荐', '个在招'] as const
 /** 简历对照不分档之后，结果页不该出现的档位词。 */
-const GRADE_COPY = ['准备程度', '较高', '中等', '偏低', '岗位决策参考', '匹配参考：', '三档'] as const
 
 const MEMBER_TOKEN = 'rh-member-token'
 const MEMBER_PHONE = '13800138000'
@@ -372,7 +371,7 @@ test('hosting off: every direct recruitment URL lands on the honest state, never
 
   // 说明页里的去处都是本机照常开放的服务，没有一条指向招聘类路由。
   const routes = await page.locator('[data-kiosk-screen="recruitment-hosting"] [data-route]').evaluateAll((rows) => rows.map((row) => row.getAttribute('data-route')))
-  expect(routes).toEqual(['/resume-service', '/resume/job-fit', '/interview-service', '/print-scan', '/policy-service'])
+  expect(routes).toEqual(['/resume-service', '/interview-service', '/print-scan', '/policy-service'])
   await page.screenshot({ path: test.info().outputPath('direct-url-hosting-off-1080x1920.png') })
   await page.getByRole('button', { name: '返回首页' }).last().click()
   await expect(page.getByTestId('qx-home')).toHaveAttribute('data-recruitment', 'closed')
@@ -640,143 +639,3 @@ test('hosting on: AI records wait for the hosting answer, then list job AI sessi
 })
 
 // ── 简历对照 ──────────────────────────────────────────────────────────────
-
-const JOB_FIT_TASK = 't-rh'
-
-test('job fit shows no grade even when an old server still sends fitLevel @w1-kiosk', async ({ page, api }) => {
-  const errors = collectRuntimeErrors(page)
-  registerShell(api, RECRUITMENT_HOSTING_OFF)
-  api.respond('GET', `/api/v1/resume/job-fit/${JOB_FIT_TASK}`, {
-    status: 200,
-    json: {
-      taskId: JOB_FIT_TASK,
-      status: 'completed',
-      // 旧服务端留下的档位字段：3.14 起服务端不再返回，页面也一律不显示。
-      fitLevel: 'reference_high',
-      summary: '简历里写到了活动组织与表格整理，还没有写到数据分析工具。',
-      job: { title: '行政专员' },
-      matchPoints: [{ requirement: '活动组织', point: '组织过校园招聘宣讲', evidence: '负责 3 场宣讲会现场协调' }],
-      gapPoints: [{ requirement: '数据工具', gap: '没有写到 Excel 数据整理', suggestion: '补一条用表格汇总报名数据的经历' }],
-      targetedSuggestions: ['把「协助行政」改写成具体做过的三件事'],
-    },
-  })
-
-  await page.goto(`/resume/job-fit?taskId=${JOB_FIT_TASK}`, { waitUntil: 'domcontentloaded' })
-  const screen = page.locator('[data-kiosk-screen="resume-job-fit"]')
-  await expect(screen).toHaveAttribute('data-state', 'result')
-  const summary = page.locator('.jfq-summary')
-  await expect(summary.locator('.jfq-summary-eyebrow')).toContainText('简历对照 ·')
-  await expect(summary.locator('[data-aigc-mark="true"]')).toBeVisible()
-  await expect(page.locator('[data-aigc-mark="true"]'), 'AIGC 标识每页恰好一次').toHaveCount(1)
-  const text = await page.locator('body').innerText()
-  for (const word of GRADE_COPY) expect(text, `结果页不得出现档位词「${word}」`).not.toContain(word)
-  // 不分档之后结果就是稿 46 的两栏：已写到的（带原文依据）与还没体现的；怎么补留在行动清单页。
-  await expect(page.getByRole('region', { name: '简历里已经写到的要求' })).toContainText('负责 3 场宣讲会现场协调')
-  await expect(page.getByRole('region', { name: '简历里还没体现的要求' })).toContainText('没有写到 Excel 数据整理')
-  await expect(page.getByText('补一条用表格汇总报名数据的经历')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: /查看岗位/ })).toHaveCount(0)
-  await expect(page.getByText('查看行动清单')).toBeVisible()
-  await page.screenshot({ path: test.info().outputPath('job-fit-result-1080x1920.png') })
-  expect(errors).toEqual([])
-})
-
-test('hosting off: job fit keeps only the manual path and never sends a jobId @w1-kiosk', async ({ page, api }) => {
-  const recruitmentHits = trackRecruitmentRequests(page)
-  registerShell(api, RECRUITMENT_HOSTING_OFF)
-  api.respond('GET', `/api/v1/resume/job-fit/${JOB_FIT_TASK}`, { status: 404, json: { error: { code: 'JOB_FIT_NOT_FOUND', message: '尚未对照' } } })
-  let analyzeBody: Record<string, unknown> | null = null
-  api.respondWith('POST', '/api/v1/resume/job-fit', async () => ({
-    status: 200,
-    json: {
-      taskId: JOB_FIT_TASK,
-      status: 'completed',
-      summary: '按你填的要求对照完成。',
-      job: { title: '行政专员' },
-      matchPoints: [],
-      gapPoints: [],
-      targetedSuggestions: [],
-    },
-  }))
-  page.on('request', (request) => {
-    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/resume/job-fit') {
-      analyzeBody = request.postDataJSON() as Record<string, unknown>
-    }
-  })
-
-  await page.goto(`/resume/job-fit?taskId=${JOB_FIT_TASK}`, { waitUntil: 'domcontentloaded' })
-  const screen = page.locator('[data-kiosk-screen="resume-job-fit"]')
-  await expect(screen).toHaveAttribute('data-state', 'pick')
-  await expect(page.getByText('填一份岗位要求', { exact: true })).toBeVisible()
-  await expect(page.getByText('从已发布岗位中选择')).toHaveCount(0)
-  await expect(page.getByRole('textbox', { name: '搜索岗位名称或公司' })).toHaveCount(0)
-  await expect(page.getByText('看来源岗位要求')).toHaveCount(0)
-
-  await page.getByRole('textbox', { name: '目标岗位名称' }).fill('行政专员')
-  await page.getByRole('textbox', { name: '岗位 JD 或任职要求' }).fill('熟练使用 Excel，能组织会务')
-  await page.getByRole('button', { name: '继续并确认授权' }).click()
-  await expect(screen).toHaveAttribute('data-state', 'result')
-  expect(analyzeBody).toEqual({ taskId: JOB_FIT_TASK, manualJob: { title: '行政专员', requirements: '熟练使用 Excel，能组织会务' } })
-  expect(recruitmentHits, '托管关闭时简历对照不请求岗位列表').toEqual([])
-})
-
-const PICK_JOB = { id: 'job-rh', title: '前端开发工程师', company: '示例来源企业', sourceName: '来源平台', externalId: 'X-RH' }
-
-test('hosting on: switching job fit to manual entry drops the picked job from the checklist @w1-kiosk', async ({ page, api }) => {
-  registerShell(api, RECRUITMENT_HOSTING_ON)
-  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [PICK_JOB], pagination: { page: 1, pageSize: 8, total: 1, totalPages: 1 } } })
-  api.respond('GET', `/api/v1/resume/job-fit/${JOB_FIT_TASK}`, { status: 404, json: { error: { code: 'JOB_FIT_NOT_FOUND', message: '尚未对照' } } })
-
-  await page.goto(`/resume/job-fit?taskId=${JOB_FIT_TASK}`, { waitUntil: 'domcontentloaded' })
-  await expect(page.locator('[data-kiosk-screen="resume-job-fit"]')).toHaveAttribute('data-state', 'pick')
-  const targetSlot = page.locator('.jfq-slot').filter({ hasText: '目标岗位' }).locator('b')
-  const targetCheck = page.locator('.jfq-check').filter({ hasText: '目标岗位' })
-  await expect(targetSlot).toHaveText('尚未选择')
-
-  await page.getByRole('button', { name: /^前端开发工程师，/ }).click()
-  await expect(targetSlot).toHaveText('前端开发工程师')
-  await expect(targetCheck).toHaveAttribute('data-tone', 'ok')
-
-  // 切到手填、名称还空着：「开始比对」只认手填，检查单也不能再拿刚才点过的岗位充数。
-  await page.getByRole('button', { name: /手填目标岗位/ }).click()
-  await expect(page.getByRole('textbox', { name: '目标岗位名称' })).toBeVisible()
-  await expect(targetSlot).toHaveText('尚未选择')
-  await expect(targetCheck).toHaveAttribute('data-tone', 'wait')
-  await expect(targetCheck.locator('.jfq-chip')).toHaveText('待选择')
-
-  // 阳性对照：手填名称之后检查单跟着变。
-  await page.getByRole('textbox', { name: '目标岗位名称' }).fill('行政专员')
-  await expect(targetSlot).toHaveText('行政专员')
-  await expect(targetCheck).toHaveAttribute('data-tone', 'ok')
-})
-
-test('job fit actions: the source-platform delivery sentence only exists when hosting is on @w1-kiosk', async ({ page, api }) => {
-  const ACTIONS_TASK = 't-rh-actions'
-  api.respond('GET', `/api/v1/resume/job-fit/${ACTIONS_TASK}`, {
-    status: 200,
-    json: {
-      taskId: ACTIONS_TASK,
-      status: 'completed',
-      summary: '简历里写到了活动组织与表格整理，还没有写到数据分析工具。',
-      job: { id: 'job-rh', title: '行政专员', company: '示例来源企业', sourceName: '来源平台', externalId: 'X-RH' },
-      matchPoints: [{ requirement: '活动组织', point: '组织过校园招聘宣讲', evidence: '负责 3 场宣讲会现场协调' }],
-      gapPoints: [{ requirement: '数据工具', gap: '没有写到 Excel 数据整理', suggestion: '补一条用表格汇总报名数据的经历' }],
-      targetedSuggestions: ['把「协助行政」改写成具体做过的三件事'],
-    },
-  })
-  const open = async (hosting: typeof RECRUITMENT_HOSTING_ON | typeof RECRUITMENT_HOSTING_OFF) => {
-    registerShell(api, hosting)
-    await page.goto(`/resume/job-fit/actions?taskId=${ACTIONS_TASK}`, { waitUntil: 'domcontentloaded' })
-    await expect(page.locator('[data-kiosk-screen="resume-job-fit-actions"]')).toHaveAttribute('data-state', 'ready')
-    return page.locator('body').innerText()
-  }
-
-  // 托管关（我们云上）：整屏没有「来源平台」，也没有「投递请前往…」；「本平台不提供投递功能」照写。
-  const off = await open(RECRUITMENT_HOSTING_OFF)
-  expect(off, '托管关闭时行动清单不写来源平台').not.toContain('来源平台')
-  expect(off, '托管关闭时行动清单不写投递去向').not.toContain('投递请前往')
-  expect(off).toContain('本平台不提供投递功能')
-
-  // 阳性对照：托管打开（私有化部署）时原句仍在，说明上面的「没有」是条件生效，不是句子整个丢了。
-  const on = await open(RECRUITMENT_HOSTING_ON)
-  expect(on, '托管打开时保留投递去向句').toContain('投递请前往岗位来源平台')
-})

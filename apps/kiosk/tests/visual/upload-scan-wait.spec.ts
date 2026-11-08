@@ -298,17 +298,6 @@ const HELD = [
     confirm: '确认加入待合并列表',
     open: async (page: Page) => { await page.getByTestId('img2pdf-add-phone').click() },
   },
-  {
-    label: '签名',
-    path: '/print-scan/sign',
-    pathname: '/print-scan/sign',
-    purpose: 'print_doc',
-    qr: 'svg[width="150"]',
-    confirm: '确认使用该文档',
-    login: true,
-    signature: true,
-    open: async (page: Page) => { await page.getByTestId('sign-stamp-pick-doc-phone').click() },
-  },
 ] as const
 
 function stillOnHeld(url: URL, item: typeof HELD[number]) {

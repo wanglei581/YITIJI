@@ -64,9 +64,9 @@ assertNotContains(
   [/title:\s*'简历素材库'[^}]*disabled:\s*true/s, /title:\s*'求职材料'[^}]*disabled:\s*true/s],
   'Homepage job material tiles are no longer disabled',
 )
-assertContains('src/routes/index.tsx', 'JobMaterialLibraryPage', 'Kiosk routes job material library as a standalone page')
-assertContains('src/routes/index.tsx', /path:\s*'resume\/templates'[\s\S]*?<ResumeTemplateLibraryPage \/>/, 'Kiosk keeps /resume/templates mapped to resume template library')
-assertContains('src/routes/index.tsx', "path: 'resume/materials'", 'Kiosk exposes standalone /resume/materials route')
+assertNotContains('src/routes/index.tsx', ['import { JobMaterialLibraryPage }', 'import { ResumeTemplateLibraryPage }'], 'Parked material/template pages have no value imports in router')
+assertContains('src/routes/index.tsx', /path:\s*'resume\/templates\/\*'[^\n]*<Navigate to="\/" replace \/>/, 'Parked template route replaces to home')
+assertContains('src/routes/index.tsx', /path:\s*'resume\/materials\/\*'[^\n]*<Navigate to="\/" replace \/>/, 'Parked material route replaces to home')
 assertContains('src/pages/resume/ResumeTemplateLibraryPage.tsx', 'aria-label="简历模板"', 'Resume template page landmark is labeled 简历模板')
 assertContains('src/pages/resume/ResumeTemplateLibraryPage.tsx', 'eyebrow="改简历 · 模板"', 'Resume template page eyebrow names the draft zone')
 assertContains('src/pages/resume/ResumeTemplateLibraryPage.tsx', "navigate('/resume/materials'", 'Legacy ?tab=materials URL redirects to job material library')

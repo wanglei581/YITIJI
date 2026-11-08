@@ -1,3 +1,4 @@
+import { isParkedRoute } from '../../routes/parkedRoutes'
 import { useNavigate } from 'react-router-dom'
 import { RecruitDoors, type RecruitDoor } from './RecruitDoors'
 import { RtFrame } from './RtFrame'
@@ -43,7 +44,7 @@ export function SocialHubPage() {
       stateId={apiStatus}
     >
       <div className="rt-hub" data-hub-device-probe="off">
-        <RecruitDoors doors={DOORS} availability={availability} />
+        <RecruitDoors doors={DOORS.filter((entry) => !isParkedRoute(entry.route))} availability={availability} />
         <p className="rt-hint">
           实习、校招岗位在『
           <button type="button" onClick={() => navigate('/fairs-service')}>校园招聘</button>
@@ -56,7 +57,7 @@ export function SocialHubPage() {
           <p>不做企业筛选、面试邀约或Offer管理。</p>
         </div>
         <p className="rt-note">更多去处</p>
-        <RecruitDoors doors={MORE} availability={availability} layout="more" />
+        <RecruitDoors doors={MORE.filter((entry) => !isParkedRoute(entry.route))} availability={availability} layout="more" />
       </div>
     </RtFrame>
   )

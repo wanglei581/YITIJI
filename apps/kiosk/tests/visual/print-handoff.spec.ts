@@ -282,14 +282,6 @@ test('H2 back to preview keeps this file instead of rehydrating a stale one @w2'
 
 // ── H3 F02：带进来的双面本机没开通，报价页不拦截 ─────────────────────────────
 
-const MATERIAL_TEMPLATE = {
-  id: 'campus-cover-letter', type: 'cover_letter', title: '校招自荐信', description: '适合应届生在校招现场生成一页自荐材料。',
-  tags: ['校招'], status: 'published', recommendedFor: '应届毕业生', outputFilename: '校招自荐信.pdf',
-  fields: [
-    { key: 'applicantName', label: '姓名', required: true, maxLength: 40, placeholder: '例：王同学' },
-    { key: 'targetRole', label: '目标岗位', required: true, maxLength: 60, placeholder: '例：前端开发工程师' },
-  ],
-}
 const MATERIAL_FILE = {
   templateId: 'campus-cover-letter', templateTitle: '校招自荐信', documentType: 'cover_letter', fileId: 'jm-p05-001',
   filename: '校招自荐信-交接验收.pdf', mimeType: 'application/pdf', sizeBytes: 132096, pageCount: 2,
@@ -303,18 +295,13 @@ test('H3 F02 a two-page job material on a simplex-only terminal is quoted single
   registerPrintShell(api) // 双面未登记 = 本机暂未开通
   registerMemberLogin(api)
   await routeFileContent(page, 'jm-p05-001')
-  api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [MATERIAL_TEMPLATE] } })
-  api.respond('POST', '/api/v1/job-materials/generate', { status: 200, json: { success: true, data: MATERIAL_FILE } })
+  // 11/08 材料工坊入口停放；保留已有两页材料在确认页的单面报价回归。
   await captureQuoteBodies(page)
-
-  await page.goto(`/login?from=${encodeURIComponent('/resume/materials')}`)
-  await loginOnCurrentPage(page, '/resume/materials')
-  await page.locator('#material-field-applicantName').fill('王同学')
-  await page.locator('#material-field-targetRole').fill('用户运营专员')
-  await page.locator('.qxt-dock').getByRole('button', { name: '生成可打印版', exact: true }).click()
-  await expect(page.getByTestId('material-workshop-file')).toHaveAttribute('data-print-ready', '1')
-  await page.locator('.qxt-dock').getByRole('button', { name: '打印材料', exact: true }).click()
-  await page.waitForURL((url) => url.pathname === '/print/confirm')
+  await seedPrintHandoff(page, { file: {
+    fileId: MATERIAL_FILE.fileId, name: MATERIAL_FILE.filename, pages: MATERIAL_FILE.pageCount,
+    size: '129 KB', mimeType: 'application/pdf', fileUrl: MATERIAL_FILE.printFileUrl,
+  }, printParams: { copies: 1, colorMode: 'black_white', duplex: 'duplex_long', paperSize: 'A4' } })
+  await page.goto('/print/confirm')
 
   const confirm = page.locator('[data-w2-page="print-confirm"]')
   await expect(page.locator('.print-file-name')).toHaveText(MATERIAL_FILE.filename)

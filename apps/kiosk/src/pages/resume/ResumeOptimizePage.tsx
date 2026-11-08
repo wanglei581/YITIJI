@@ -494,7 +494,6 @@ export function ResumeOptimizePage() {
             templatesError={templatesError}
             selectedTemplateId={selectedTemplateId}
             onTemplateChange={(id) => { if (!viewOnly) handleTemplateChange(id) }}
-            onTemplates={() => { if (!viewOnly) requestLeave(() => navigate('/resume/templates')) }}
             loading={loading}
             exporting={viewOnly || exporting}
             adjusting={adjusting}

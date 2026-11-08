@@ -80,10 +80,9 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/k/u/:scene', url: `/k/u/${W6_UPLOAD_SCENE}`, marker: screen('upload-scene-entry'), featureText: '网络连接失败，请稍后重试' },
   { pattern: '/k/l/:ticketId', url: `/k/l/${W6_LOGIN_TICKET}`, expectedPath: '/member/qr-login', marker: screen('member-qr-login'), featureText: '手机确认登录' },
   { pattern: '/legal/:doc', url: '/legal/privacy', marker: screen('legal-doc'), featureText: '隐私政策', longText: W6_LONG_LEGAL_TEXT, landmark: 'none' },
-  { pattern: '/resume/job-fit', url: '/resume/job-fit', marker: screen('resume-job-fit'), featureText: '岗位匹配', requiresFusionRoot: false },
+  { pattern: '/resume/job-fit/*', url: '/resume/job-fit', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
   // S2-2 拆页。无 taskId 直达时停在前置缺失态，文案即断言锚点。
-  { pattern: '/resume/job-fit/actions', url: '/resume/job-fit/actions', marker: screen('resume-job-fit-actions'), featureText: '请先完成一次岗位匹配参考', requiresFusionRoot: false },
-  { pattern: '/resume/career-plan', url: '/resume/career-plan', marker: screen('resume-career-plan'), featureText: '求职方案', requiresFusionRoot: false },
+  { pattern: '/resume/career-plan/*', url: '/resume/career-plan', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
   { pattern: '/interview', url: '/interview', marker: screen('interview-setup'), featureText: '模拟面试' },
   { pattern: '/interview/setup', url: '/interview/setup', expectedPath: '/interview', marker: screen('interview-setup'), featureText: '模拟面试' },
   { pattern: '/interview/session', url: '/interview/session', expectedPath: '/interview', marker: screen('interview-session'), featureText: '这场练习已过期，需要重新开始' },
@@ -112,8 +111,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/me/settings', url: '/me/settings', marker: screen('member-settings'), featureText: '账号设置' },
   { pattern: '/me/privacy-requests', url: '/me/privacy-requests', marker: screen('member-privacy-requests'), featureText: '隐私与数据请求' },
   { pattern: '/help', url: '/help', marker: screen('help'), featureText: '你想解决' },
-  { pattern: '/activities', url: '/activities', marker: screen('activities'), featureText: '权益活动' },
-  { pattern: '/activities/:id', url: '/activities/activity-001', marker: screen('activity-detail'), featureText: '返回活动' },
+  { pattern: '/activities/*', url: '/activities', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
   { pattern: '/renshi', url: '/renshi', marker: '.w4-policy-page', featureText: '仅信息指引 · 不代办' },
   { pattern: '/campus', url: '/campus', marker: touch, featureText: '2026 青岛高校毕业生招聘会' },
   { pattern: '/campus/welcome', url: '/campus/welcome', marker: touch, featureText: '校园招聘迎新指引' },
@@ -124,9 +122,10 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/print-scan', url: '/print-scan', marker: w2('print-scan-home'), featureText: '打印扫描服务' },
   { pattern: '/print-scan/feature/:key', url: '/print-scan/feature/id-photo', expectedPath: '/print-scan', marker: w2('print-scan-home'), featureText: '打印扫描服务' },
   { pattern: '/print-scan/convert', url: '/print-scan/convert', marker: w2('print-scan-convert'), featureText: '图片转 PDF' },
-  { pattern: '/print-scan/sign', url: '/print-scan/sign', marker: w2('print-scan-sign'), featureText: '签名' },
+  { pattern: '/print-scan/sign/*', url: '/print-scan/sign', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
   { pattern: '/print/scan-convert', url: '/print/scan-convert', expectedPath: compatibilityRedirects['/print/scan-convert'], marker: w2('print-scan-convert'), featureText: '图片转 PDF' },
-  { pattern: '/print/scan-sign', url: '/print/scan-sign', expectedPath: compatibilityRedirects['/print/scan-sign'], marker: w2('print-scan-sign'), featureText: '签名' },
+  { pattern: '/print/scan-sign/*', url: '/print/scan-sign/deep', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
+  { pattern: '/print/scan-sign', url: '/print/scan-sign', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
   { pattern: '/print/scan-feature', url: '/print/scan-feature', expectedPath: compatibilityRedirects['/print/scan-feature'], marker: w2('print-scan-home'), featureText: '打印扫描服务' },
   { pattern: '/print/upload', url: '/print/upload', marker: w2('print-upload'), featureText: '文档打印' },
   { pattern: '/print/desk', url: '/print/desk', marker: 'h2:text-is("这一页没有待处理的文件")', featureText: '这一页没有待处理的文件' },
@@ -162,8 +161,8 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/optimize', url: '/resume/optimize', marker: screen('resume-optimize'), featureText: '请先上传简历完成诊断' },
   { pattern: '/resume/optimize/compare', url: '/resume/optimize/compare', marker: screen('resume-optimize-compare'), featureText: '第 1 / 2 条', seed: seedResumeCompare },
   { pattern: '/resume/export', url: '/resume/export', expectedPath: compatibilityRedirects['/resume/export'], marker: screen('resume-optimize'), featureText: '请先上传简历完成诊断' },
-  { pattern: '/resume/templates', url: '/resume/templates', marker: screen('resume-templates'), featureText: '简历模板' },
-  { pattern: '/resume/materials', url: '/resume/materials', marker: screen('resume-materials'), featureText: '求职材料' },
+  { pattern: '/resume/templates/*', url: '/resume/templates', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
+  { pattern: '/resume/materials/*', url: '/resume/materials', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
   // 五个服务台迁入青序流光（稿 16）后，栏目名「AI简历服务」等降为 eyebrow，h1 换成稿里的主标题。
   // featureText 顺势从栏目名改钉那五句**合规诚实性声明**——钉合规边界比钉栏目名有判别力：
   // 迁移里最容易丢的就是这几句，钉住它们，漏抄当场变红。
@@ -198,10 +197,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/job-fairs/:id/materials', url: '/job-fairs/fair-001/materials', marker: touch, featureText: '下载链接临时有效' },
   { pattern: '/job-fairs/:id/visit-plan', url: '/job-fairs/fair-001/visit-plan', marker: touch, featureText: 'AI参会准备单' },
   { pattern: '/job-fairs/:id/stats', url: '/job-fairs/fair-001/stats', marker: touch, featureText: '真实数据正在接入' },
-  { pattern: '/resume/self-assessment/intro', url: '/resume/self-assessment/intro', marker: screen('resume-self-assessment-intro'), featureText: '自我探索', requiresFusionRoot: false },
-  { pattern: '/resume/self-assessment/questions', url: '/resume/self-assessment/questions', marker: screen('resume-self-assessment-quiz'), featureText: '作答', requiresFusionRoot: false },
-  { pattern: '/resume/self-assessment/result', url: '/resume/self-assessment/result', marker: screen('resume-self-assessment-result'), featureText: '倾向参考', requiresFusionRoot: false },
-  { pattern: '/resume/self-assessment/history', url: '/resume/self-assessment/history', marker: screen('resume-self-assessment-history'), featureText: '历史', requiresFusionRoot: false },
+  { pattern: '/resume/self-assessment/*', url: '/resume/self-assessment', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
   { pattern: '/interview-service', url: '/interview-service', marker: 'h1:text-is("把表达练熟，不替你下结论")', featureText: '不进行录用判断，不向企业推荐候选人。' },
   // 合同审查 production_default=false；默认构建直接访问也必须安全回首页。
   { pattern: '/contract-review', url: '/contract-review', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
@@ -225,7 +221,7 @@ export const w6MobileCases = w6RouteCases.filter(({ viewport }) => viewport === 
  * 服务域，第一跳就掉回旧的深藏青壳 —— 首页承诺的观感当场被推翻。断言分两个方向：
  * 表内路由必须真的挂上 V6 壳且顶栏是浅色纸面，表外路由不得被误伤染成 V6。
  */
-export const V6_SHELL_ROUTE_PATTERNS = new Set<ProductionRoutePattern>([
+export const V6_SHELL_ROUTE_PATTERNS = new Set<string>([
   /* 2026-09-08 移出 '/' 与 '/print-scan'：两条已迁入青序流光，运行时不再挂 V6 壳
    * （KioskRoot 的 `isV6Route` 带 `!isQxRoute`，且两条已从 `V6_SHELL_ROUTES` 移出）。
    * 契约一字未改——表内仍要求真的挂上 V6 壳、表外仍要求不得被误伤染成 V6；

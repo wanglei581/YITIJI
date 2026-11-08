@@ -1,3 +1,4 @@
+import { isParkedRoute } from '../../routes/parkedRoutes'
 import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangleIcon,
@@ -195,7 +196,12 @@ function noticeCopy(state: HubAvailability): { title: string; detail: string } {
  */
 export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
   const navigate = useNavigate()
-  const spec = SERVICE_HUB_SPECS[hub]
+  const sourceSpec = SERVICE_HUB_SPECS[hub]
+  const spec = {
+    ...sourceSpec,
+    capabilities: sourceSpec.capabilities.filter((item) => !isParkedRoute(item.route)),
+    quickLinks: sourceSpec.quickLinks.filter((item) => !isParkedRoute(item.route)),
+  }
   const { status: apiStatus, retry: retryApi } = useApiReadiness()
 
   // 只有真有设备能力的服务台才探测本机设备。

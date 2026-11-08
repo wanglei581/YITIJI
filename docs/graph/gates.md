@@ -70,7 +70,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2050 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2051 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1764,6 +1764,15 @@ node scripts/project-graph-query.mjs file <路径>
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `docs/operations/recruitment-wave2-readonly-planning-runbook.md` | `verify-recruitment-wave2-full-inventory.ts` |
+
+</details>
+
+<details>
+<summary><code>docs/product/feature-scope.md/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `docs/product/feature-scope.md` | `verify-fusion-baseline.mjs` |
 
 </details>
 

@@ -12,7 +12,7 @@ import type { BenefitStatus, BenefitType, MemberBenefitItem } from '@ai-job-prin
 import { getMyBenefits } from '../../../services/api/memberFavorites'
 import { useAuth } from '../../../auth/useAuth'
 import { formatTime } from '../assets/format'
-import { MeRows, MeSeg, MeStatic } from '../touch/MeKit'
+import { MeRows, MeStatic } from '../touch/MeKit'
 import { MeEmptyPack, MeErrorPack, MeExitCard, MeLoadingPack, MeLoginGate } from '../touch/MeStatePacks'
 import { MeTouchShell, type MeBandStatus } from '../touch/MeTouchShell'
 import './styles/benefits-qx.css'
@@ -103,7 +103,6 @@ export function MyBenefitsPage() {
         primaryNode={<BenefitsCta uiState={uiState} onRetry={() => setReloadKey((key) => key + 1)} />}
       >
         <div className="qx-scroll qx-grow bf-page me-page">
-          <BenefitsTabs current="benefits" />
           {uiState === 'signed-out' ? <MeLoginGate page="my-benefits" /> : null}
           {uiState === 'loading' ? <MeLoadingPack rows={6} /> : null}
           {uiState === 'error' ? (
@@ -168,21 +167,6 @@ export function MyBenefitsPage() {
   )
 }
 
-function BenefitsTabs({ current }: { current: 'benefits' | 'activities' }) {
-  const navigate = useNavigate()
-  return (
-    <LicenseLock><MeSeg
-      label="权益与活动"
-      current={current}
-      items={[
-        { id: 'benefits', label: '我的权益', testId: 'tab-benefits' },
-        { id: 'activities', label: '可参加的活动', testId: 'tab-activities' },
-      ]}
-      onPick={(id) => navigate(id === 'benefits' ? '/me/benefits' : '/activities')}
-    /></LicenseLock>
-  )
-}
-
 function ServiceAlt({ title, desc, to }: { title: string; desc: string; to: string }) {
   const navigate = useNavigate()
   const winding = useKioskLicense().mode === 'winding-down'
@@ -197,7 +181,6 @@ function ServiceAlt({ title, desc, to }: { title: string; desc: string; to: stri
 
 function BenefitsCta({ uiState, onRetry }: { uiState: BenefitsUiState; onRetry: () => void }) {
   const navigate = useNavigate()
-  const winding = useKioskLicense().mode === 'winding-down'
   if (uiState === 'signed-out') {
     return (
       <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" onClick={() => navigate('/login', { state: { from: '/me/benefits' } })}>
@@ -213,9 +196,5 @@ function BenefitsCta({ uiState, onRetry }: { uiState: BenefitsUiState; onRetry: 
       </button>
     )
   }
-  return (
-    <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" disabled={winding} title={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={() => navigate('/activities')}>
-      看看活动
-    </button>
-  )
+  return null
 }

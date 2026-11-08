@@ -13,7 +13,6 @@ export function recordUnavailableReason(item: Pick<MemberAiRecordItem, 'status' 
 export function aiRecordPath(item: MemberAiRecordItem): string | null {
   const paths = {
     parse: '/resume/report', optimize: '/resume/optimize', generate: '/resume/generate/preview',
-    job_fit: '/resume/job-fit', career_plan: '/resume/career-plan', self_assessment: '/resume/self-assessment/result',
   }
   if (recordUnavailableReason(item) || !(item.kind in paths)) return null
   return `${paths[item.kind as keyof typeof paths]}?taskId=${encodeURIComponent(item.taskId)}${item.kind === 'optimize' ? '&saved=1' : ''}`

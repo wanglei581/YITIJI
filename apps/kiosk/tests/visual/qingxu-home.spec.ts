@@ -617,3 +617,18 @@ test('home tiles: every sub-line keeps its font content area inside its own clip
   expect(sublines, '四块磁贴都有说明行').toBeGreaterThanOrEqual(4)
   expect(await findClippedText(page), '首页磁贴的字不得被 overflow:hidden 贴着裁').toEqual([])
 })
+
+// 2026-11-08：本轮八个旧地址及各自深链均 replace 回首页。
+for (const prefix of [
+  '/resume/career-plan', '/resume/self-assessment', '/resume/job-fit', '/resume/materials',
+  '/resume/templates', '/activities', '/print-scan/sign', '/print/scan-sign',
+]) {
+  for (const suffix of ['', '/saved-record?old=1#detail']) {
+    test(`四核心收口旧链 ${prefix}${suffix} 回首页 @w1-kiosk`, async ({ page, api }) => {
+      registerHomeApi(api)
+      await page.goto(`${prefix}${suffix}`)
+      await expect(page).toHaveURL(/\/$/)
+      await expect(page.getByTestId('qx-home')).toBeVisible()
+    })
+  }
+}

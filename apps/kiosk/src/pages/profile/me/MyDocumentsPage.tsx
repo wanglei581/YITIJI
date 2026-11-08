@@ -1,3 +1,4 @@
+import { SIGN_ENTRY_PARKED } from '../../print-scan/printHubContent'
 import { useKioskLicense } from '../../../layouts/KioskLicenseContext'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../../copy/unattendedCopy'
 import { LicenseLock } from '../../../layouts/LicenseLock'
@@ -421,7 +422,7 @@ export function MyDocumentsPage() {
                         修改保存期限
                       </MeBtn>
                     ) : null}
-                    {doc.mimeType === 'application/pdf' && SIGNABLE_PURPOSES.has(doc.purpose) ? (
+                    {!SIGN_ENTRY_PARKED && doc.mimeType === 'application/pdf' && SIGNABLE_PURPOSES.has(doc.purpose) ? (
                       <MeBtn v="sec" disabled={winding || isAnyPending || signCapability !== 'ready'} title={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={() => void signStamp(doc)}>
                         {signCapability === 'loading' ? '签名 · 检查中' : signCapability === 'error' ? '签名 · 服务状态无法确认' : signCapability === 'closed' ? '签名 · 本机暂未开通' : signingId === doc.id ? '准备中' : '签名'}
                       </MeBtn>

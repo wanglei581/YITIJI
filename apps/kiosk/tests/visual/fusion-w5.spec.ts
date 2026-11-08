@@ -556,55 +556,6 @@ test('activity detail renders an honest missing-record empty state after visible
   pagination.assertNoUnhandledRequests()
 })
 
-test('benefit activity detail keeps the shared shell, real content and return path @w5-kiosk', async ({ page, api }) => {
-  const errors = runtimeErrors(page)
-  registerKioskShell(api)
-  api.respond('GET', '/api/v1/activities', {
-    status: 200,
-    json: { success: true, data: { items: [] } },
-  })
-  api.respond('GET', '/api/v1/activities/w5-benefit-detail', {
-    status: 200,
-    json: {
-      success: true,
-      data: {
-        id: 'w5-benefit-detail',
-        title: 'W5 打印服务体验权益',
-        description: '这是来自真实活动详情接口的验收内容。',
-        rulesText: '每人限领一次；仅用于现场打印服务。',
-        benefitType: 'free_quota',
-        sourceType: 'platform',
-        quantityTotal: 1,
-        stockTotal: 20,
-        stockRemaining: 8,
-        claimLimitPerUser: 1,
-        status: 'published',
-        validFrom: null,
-        validUntil: null,
-        grantValidDays: 30,
-        claimable: true,
-        claimed: false,
-        soldOut: false,
-        ended: false,
-        createdAt: '2026-07-24T00:00:00.000Z',
-        updatedAt: '2026-07-24T00:00:00.000Z',
-      },
-    },
-  })
-
-  await page.goto('/activities/w5-benefit-detail')
-  await expect(page.locator('[data-kiosk-domain="profile"][data-kiosk-screen="activity-detail"]')).toBeVisible()
-  await expect(page.locator('[data-qxt-screen]')).toBeVisible()
-  await expect(page.locator('.qxt-back')).toHaveCount(1)
-  await expect(page.getByRole('heading', { name: 'W5 打印服务体验权益', exact: true })).toBeVisible()
-  await expect(page.getByText('这是来自真实活动详情接口的验收内容。', { exact: true })).toBeVisible()
-  const backButton = page.getByRole('button', { name: /返回活动/ }).first()
-  await expect(backButton).toBeVisible()
-  await expectFusionAcceptance(page, errors)
-  await backButton.click()
-  await expect(page).toHaveURL(/\/activities$/)
-})
-
 test('legal document keeps its standalone theme and scrollable long body @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerKioskShell(api)

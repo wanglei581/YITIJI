@@ -7,9 +7,6 @@ import { MobileQrLoginPage } from '../pages/auth/MobileQrLoginPage'
 import { PhoneUploadPage } from '../pages/upload/PhoneUploadPage'
 import { LoginTicketEntry, UploadSceneEntry } from '../pages/upload/KioskCodeEntryPage'
 import { LegalDocPage } from '../pages/legal/LegalDocPage'
-import { JobFitPage } from '../pages/resume/JobFitPage'
-import { JobFitActionsPage } from '../pages/resume/JobFitActionsPage'
-import { CareerPlanPage } from '../pages/resume/CareerPlanPage'
 import { InterviewWorkbenchPage } from '../pages/interview/InterviewWorkbenchPage'
 import { AssistantPage } from '../pages/assistant/AssistantPage'
 import { JobFairsPage } from '../pages/job-fairs/JobFairsPage'
@@ -46,22 +43,16 @@ import { MyPrivacyRequestsPage } from '../pages/profile/me/MyPrivacyRequestsPage
 import { MyNotificationsPage } from '../pages/profile/me/MyNotificationsPage'
 import { MyFeedbackPage } from '../pages/profile/me/MyFeedbackPage'
 import { HelpCenterPage } from '../pages/help/HelpCenterPage'
-import { BenefitActivitiesPage } from '../pages/activities/BenefitActivitiesPage'
-import { BenefitActivityDetailPage } from '../pages/activities/BenefitActivityDetailPage'
 import { PrintScanHomePage } from '../pages/print-scan/PrintScanHomePage'
 import { PrintScanFeatureInfoPage } from '../pages/print-scan/PrintScanFeatureInfoPage'
 import { ConvertImagesPage } from '../pages/print-scan/ConvertImagesPage'
-import { SignStampPage } from '../pages/print-scan/SignStampPage'
 import { ResumeSourcePage } from '../pages/resume/ResumeSourcePage'
-import { SelfAssessmentIntroPage, SelfAssessmentQuizPage, SelfAssessmentResultPage, SelfAssessmentHistoryPage } from '../pages/resume/SelfAssessmentFlow'
 import { ResumeGeneratePage } from '../pages/resume/ResumeGeneratePage'
 import { ResumeGeneratePreviewPage } from '../pages/resume/ResumeGeneratePreviewPage'
 import { ResumeParsePage } from '../pages/resume/ResumeParsePage'
 import { ResumeReportPage } from '../pages/resume/ResumeReportPage'
 import { ResumeOptimizePage } from '../pages/resume/ResumeOptimizePage'
 import { ResumeOptimizeComparePage } from '../pages/resume/ResumeOptimizeComparePage'
-import { ResumeTemplateLibraryPage } from '../pages/resume/ResumeTemplateLibraryPage'
-import { JobMaterialLibraryPage } from '../pages/resume/JobMaterialLibraryPage'
 import { HomePage } from '../pages/home/HomePage'
 import { RenshiPage } from '../pages/renshi/RenshiPage'
 import { CampusPage } from '../pages/campus/CampusPage'
@@ -88,18 +79,14 @@ export const kioskRouter = createBrowserRouter([
         element: <Outlet />,
         errorElement: <KioskRouteErrorPage />,
         children: [
+      // 2026-11-08 产品负责人定只留四个核心；源码在 pages/resume，恢复见 feature-scope.md。
+      { path: '/resume/job-fit/*', element: <Navigate to="/" replace /> },
+      { path: '/resume/career-plan/*', element: <Navigate to="/" replace /> },
+      { path: '/resume/self-assessment/*', element: <Navigate to="/" replace /> },
       // 全屏终端路由：进入安全根，但不嵌套 KioskRoot 的视觉壳。
       { path: '/login', element: <LoginPage />, errorElement: <KioskRouteErrorPage /> },
       // 法律文档可从已登录终端会话进入，不能成为暂停硬隐私截止的逃逸路由。
       { path: '/legal/:doc', element: <LegalDocPage />, errorElement: <KioskRouteErrorPage /> },
-      { path: '/resume/job-fit', element: <JobFitPage />, errorElement: <KioskRouteErrorPage /> },
-      // S2-2 拆页：比对页做「差在哪」，本页做「怎么办」（矩阵 §3.5）。
-      { path: '/resume/job-fit/actions', element: <JobFitActionsPage />, errorElement: <KioskRouteErrorPage /> },
-      { path: '/resume/career-plan', element: <CareerPlanPage />, errorElement: <KioskRouteErrorPage /> },
-      { path: '/resume/self-assessment/intro', element: <SelfAssessmentIntroPage />, errorElement: <KioskRouteErrorPage /> },
-      { path: '/resume/self-assessment/questions', element: <SelfAssessmentQuizPage />, errorElement: <KioskRouteErrorPage /> },
-      { path: '/resume/self-assessment/result', element: <SelfAssessmentResultPage />, errorElement: <KioskRouteErrorPage /> },
-      { path: '/resume/self-assessment/history', element: <SelfAssessmentHistoryPage />, errorElement: <KioskRouteErrorPage /> },
       // 2026-09-08 下线：青序流光 29-interview-training 把设置 / 作答 / 报告 / 技巧 / 记录
       // 画成同一工作台的阶段。旧地址可能被收藏夹 / 二维码 / 外部链接引用，保留 replace 重定向。
       // `?stage=` 是意图不是授权：没有会话落到 session 仍由阶段页空态拦下。
@@ -180,8 +167,6 @@ export const kioskRouter = createBrowserRouter([
       // 帮助中心（静态 FAQ；仅描述已上线能力）
       { path: 'help',              element: <HelpCenterPage /> },
       // 权益活动中心（活动领取后生成 BenefitGrant，进入 /me/benefits；不含支付/套餐购买/招聘会凭证）
-      { path: 'activities',         element: <BenefitActivitiesPage /> },
-      { path: 'activities/:id',     element: <BenefitActivityDetailPage /> },
       { path: 'renshi',            element: <RenshiPage /> },
       // 百宝箱与智慧校园停放（2026-11-04 产品负责人定「先不做……不要显示出来」）：
       // 页面源码留在 pages/toolbox、pages/smart-campus 与 auth/KioskCapabilityGuard，不注册、不打包；
@@ -192,9 +177,13 @@ export const kioskRouter = createBrowserRouter([
       { path: 'print-scan',              element: <PrintScanHomePage /> },
       { path: 'print-scan/feature/:key', element: <PrintScanFeatureInfoPage /> },
       { path: 'print-scan/convert',      element: <ConvertImagesPage /> },
-      { path: 'print-scan/sign',         element: <SignStampPage /> },
+      // 2026-11-08 产品负责人定停放；源码在 pages/print-scan，恢复见 feature-scope.md。
+      // 2026-11-08 产品负责人定停放权益活动；源码在 pages/activities，恢复见 feature-scope.md。
+      { path: 'activities/*', element: <Navigate to="/" replace /> },
+      { path: 'print-scan/sign/*', element: <Navigate to="/" replace /> },
       { path: 'print/scan-convert',      element: <Navigate to="/print-scan/convert" replace /> },
-      { path: 'print/scan-sign',         element: <Navigate to="/print-scan/sign" replace /> },
+      { path: 'print/scan-sign',         element: <Navigate to="/" replace /> },
+      { path: 'print/scan-sign/*', element: <Navigate to="/" replace /> },
       { path: 'print/scan-feature',      element: <Navigate to="/print-scan" replace /> },
       // 打印扫描流程（Phase 3）
       { path: 'print/upload',      element: <PrintUploadPage /> },
@@ -228,8 +217,10 @@ export const kioskRouter = createBrowserRouter([
       { path: 'resume/optimize/compare', element: <ResumeOptimizeComparePage /> },
       // AI-07：孤儿占位页下线。真实导出在 /resume/optimize；保留兼容重定向，106 路由基线不变。
       { path: 'resume/export',     element: <Navigate to="/resume/optimize" replace /> },
-      { path: 'resume/templates',  element: <ResumeTemplateLibraryPage /> },
-      { path: 'resume/materials',   element: <JobMaterialLibraryPage /> },
+      // 2026-11-08 产品负责人定停放；源码在 pages/resume，恢复见 feature-scope.md。
+      { path: 'resume/templates/*', element: <Navigate to="/" replace /> },
+      // 2026-11-08 产品负责人定停放；源码在 pages/resume，恢复见 feature-scope.md。
+      { path: 'resume/materials/*', element: <Navigate to="/" replace /> },
       // 扫描流程（Phase 3）
       { path: 'scan', element: <ScanWorkbenchPage /> },
       // 2026-09-08 下线：青序流光 18-scan-workbench 把选类型 / 建会话 / 等待回传 / 结果
