@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException } from '@nestjs/common'
 import type { AuditService } from '../audit/audit.service'
 import type { PrismaService } from '../prisma/prisma.service'
 import { materialCheckRequired, PII_SCAN_REQUIRED_PURPOSES } from './material-check-policy'
+import { assertPolicyChecklistPrintable } from '../policies/policy-checklist-metadata'
 
 // 原导出名保留：scripts/support/ai-artifact-print-pii-gate.ts 等从这里取。
 export { PII_SCAN_REQUIRED_PURPOSES }
@@ -43,9 +44,10 @@ type PiiGateArgs = {
 export async function assertPiiScanned(args: PiiGateArgs): Promise<void> {
   const file = await args.prisma.fileObject.findUnique({
     where: { id: args.fileId },
-    select: { purpose: true, assetCategory: true, derivationKind: true, sha256: true },
+    select: { purpose: true, assetCategory: true, derivationKind: true, sha256: true, createdBy: true },
   })
   if (!file) return
+  await assertPolicyChecklistPrintable(args.prisma, file)
   if (!materialCheckRequired(file)) return
 
   // 以最晚的一条完成检查为准（重扫可能查出更多内容，旧结论不继承）；

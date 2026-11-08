@@ -1,3 +1,4 @@
+// 停放（2026-11-05 政策最小闭环）：源码保留、不注册、不打包，旧链接回政策首页
 import { REGISTER_ITEMS } from './builtinData'
 
 export function RegisterPanel() {

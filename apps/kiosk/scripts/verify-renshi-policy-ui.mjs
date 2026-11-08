@@ -5,7 +5,7 @@
  *   A. renshi 目录不得引用 ComingSoon 占位；不得出现硬编码「同步时间：」假时效。
  *   B. 内置指引数据不得携带无证据的 updatedAt；官方入口 URL 必须为 https 且 gov.cn 域。
  *   C. 内置指引（builtin-*）不渲染收藏按钮；库内条目保留收藏能力。
- *   D. 浏览/外部跳转上报必须跳过 builtin-*（服务端仅接受库内已发布条目）。
+ *   D. 活页面不引用内置指引；详情记浏览、不在渲染时记外部跳转（二维码看见不等于扫了）。
  *   E. 人群筛选与后端 POLICY_AUDIENCES 对齐（含 flexible 与 migrant）。
  *   F. 首页政策服务子入口与 Tab 一一对应（社保指南→tab=social），不得回退「补贴指引→tab=social」错位。
  *   G. 无越界承诺文案（代办 / 保证到账 / 免申即享 / 一键投递等）。
@@ -26,6 +26,12 @@ const pass = (msg) => console.log(`  PASS ${msg}`)
 const fail = (msg) => { console.error(`  FAIL ${msg}`); failed++ }
 
 const page = read('src/pages/renshi/RenshiPage.tsx')
+const detail = read('src/pages/renshi/PolicyDetail.tsx')
+const list = read('src/pages/renshi/PolicyCategoryList.tsx')
+const notices = read('src/pages/renshi/PolicyNotices.tsx')
+const home = read('src/pages/service-hubs/PolicyTouchHub.tsx')
+const model = read('src/pages/renshi/policyModel.ts')
+const layout = read('src/pages/renshi/PolicyTouchLayout.tsx')
 const focusHook = read('src/pages/renshi/usePolicyFocus.ts')
 const shared = read('src/pages/renshi/shared.ts')
 const builtinData = read('src/pages/renshi/builtinData.ts')
@@ -38,6 +44,8 @@ const homeServiceGroups = read('src/pages/home/serviceGroups.ts')
 const packageJson = read('package.json')
 
 const allRenshi = page + shared + builtinData + policyPanel + socialPanel + registerPanel + noticePanel + components
+const liveRenshi = page + detail + list + notices + home + model + layout
+
 
 console.log('\n=== 政策服务页真实性契约验证 ===')
 
@@ -73,7 +81,7 @@ if (adminReviewSources.length === 0) {
   fail(`A3. 政策由机构自己审核并发布，源码不得出现「管理员审核」：${adminReviewSources.map(({ path }) => path).join('、')}`)
 }
 const institutionReviewCopies = [
-  ['RenshiPage.tsx', page, '公告由发布机构自己审核并发布，正文与来源链接原样呈现。'],
+  ['PolicyNotices.tsx', notices, '公告由发布机构自己审核并发布，正文与来源链接原样呈现。'],
   ['NoticePanel.tsx', noticePanel, '公告由发布机构自己审核并发布，目前一条都没有。这是内容进度，不是读取失败；读取失败会另有一屏说明。'],
   ['NoticePanel.tsx', noticePanel, '机构发布 · 机构自己审核'],
   ['PolicyPanel.tsx', policyPanel, '这里只展示发布机构自己审核并发布的政策。下方「通用办事指引」是本机整理的参考，不属于政策库。'],
@@ -111,12 +119,12 @@ if (policyPanel.includes('toggleFavorite')) {
   fail('C2. 库内条目收藏能力不得移除')
 }
 
-// D. builtin 埋点跳过
-if (page.includes("startsWith('builtin-')") && page.includes('if (isBuiltin(item.id)) return') && page.includes('recordBrowse') && page.includes('recordExternalJump')) {
-  pass('D. 浏览/跳转上报跳过 builtin，库内条目保留上报')
-} else {
-  fail('D. 浏览/跳转上报必须跳过 builtin 且保留库内上报')
-}
+// D. 活页面只展示接口内容，埋点归属仍为政策；停放指引不进入活路由。
+// 详情只记浏览：原文二维码画在屏上，看见不等于扫了，渲染时不记「打开官方入口」（2026-11-05 实走发现会替用户造足迹）。
+if (!/builtinData|BUILTIN_GUIDES/.test(page + detail + list + home) &&
+  detail.includes("recordBrowse(getToken(), 'policy', id)") && !detail.includes('recordExternalJump')) {
+  pass('D. 活页面无内置指引，库内浏览照常上报，详情不在渲染时记外部跳转')
+} else fail('D. 不得恢复内置指引、丢失库内浏览上报，或在详情渲染时替用户记外部跳转')
 
 // E. 人群枚举对齐
 if (['graduate', 'flexible', 'migrant', 'startup', 'hardship'].every((k) => shared.includes(`'${k}'`))) {
@@ -149,8 +157,8 @@ function hasUnsafeServiceClaim(text) {
   }
   return false
 }
-const unsafe = unsafePatterns.filter((pattern) => pattern.test(allRenshi)).map((pattern) => pattern.source)
-if (hasUnsafeServiceClaim(allRenshi)) unsafe.push('未被否定的代办/代申请')
+const unsafe = unsafePatterns.filter((pattern) => pattern.test(allRenshi + liveRenshi)).map((pattern) => pattern.source)
+if (hasUnsafeServiceClaim(allRenshi + liveRenshi)) unsafe.push('未被否定的代办/代申请')
 if (unsafe.length === 0) {
   pass('G. 无越界承诺文案（代办/保证到账/免申即享/一键投递等）')
 } else {
@@ -194,7 +202,7 @@ function mergesBuiltinWithLibrary(sourceText) {
   visit(source)
   return offenders
 }
-const mergeOffenders = mergesBuiltinWithLibrary(page)
+const mergeOffenders = mergesBuiltinWithLibrary(page + list + home)
 if (mergeOffenders.length === 0) {
   pass('J1. 内置办事指引未与政策库条目合并成同一个列表')
 } else {
@@ -230,7 +238,8 @@ if (packageJson.includes('"verify:renshi-policy-ui"')) {
 // I. 通用上传页不能伪装成系统已内置的材料、表单或指引单。
 const fakePrintAssets = ['失业登记申请表', '就业登记申请表', '社保查询操作指引', '创业担保贷款材料清单']
 const misleadingPrintLabels = ['常用材料打印包', '打印材料清单', '打印申请材料', '打印申请表']
-const hasPageClaim = /\b(?:pages?|pageCount)\s*[:=]/.test(allRenshi) || /(?:共|合计)\s*\d+\s*页/.test(allRenshi)
+const parkedPrintSources = shared + builtinData + policyPanel + socialPanel + registerPanel + noticePanel + components
+const hasPageClaim = /\b(?:pages?|pageCount)\s*[:=]/.test(parkedPrintSources) || /(?:共|合计)\s*\d+\s*页/.test(parkedPrintSources)
 if (fakePrintAssets.every((name) => !allRenshi.includes(name)) && !hasPageClaim) {
   pass('I1. 无虚构的具名打印资产或页数')
 } else {
@@ -244,66 +253,20 @@ const honestUploadButtonGlobal = new RegExp(honestUploadButtonPattern.source, 'g
 const countHonestUploadButtons = (source) => [...stripNonVisibleComments(source).matchAll(honestUploadButtonGlobal)].length
 const countUploadRoutes = (source) => (stripNonVisibleComments(source).match(/navigate\('\/print\/upload'\)/g) ?? []).length
 const socialEntryLabels = [...builtinData.matchAll(/entryLabel:\s*'([^']+)'/g)].map((match) => match[1])
-const policyHonest = countHonestUploadButtons(policyPanel)
-const registerRoutes = countUploadRoutes(registerPanel)
-const socialRoutes = countUploadRoutes(socialPanel)
-// 稿 48 最终版（9/29）的诚实入口还在：内置指引展开条、社保指南、就业登记、死路屏仍直接去上传页。
-// W-90：政策库条目和公告在点「上传自备材料打印」之前要先按条确认还在，不能带着已撤下的条目进上传页。
-const noticeHonest = countHonestUploadButtons(noticePanel)
-const noticeRoutes = countUploadRoutes(noticePanel)
-const deadEndHonest = countHonestUploadButtons(components)
-const deadEndRoutes = countUploadRoutes(components)
-const socialStripped = stripNonVisibleComments(socialPanel)
-const pageHonest = countHonestUploadButtons(page)
-const pageRoutes = countUploadRoutes(page)
-const uploadRouteCount = (allRenshi.match(/navigate\('\/print\/upload'\)/g) ?? []).length
-const policyGuarded = (policyPanel.match(/onClick=\{\(\) => onUpload\(item\.id\)\}/g) ?? []).length
-const noticeGuarded = (noticePanel.match(/onClick=\{\(\) => onUpload\(notice\.id\)\}/g) ?? []).length
-const pageGuarded = (page.match(/onClick=\{\(\) => uploadOwn\(uploadTarget\)\}/g) ?? []).length
-const between = (source, start, end) => {
-  const from = source.indexOf(start)
-  const to = source.indexOf(end, from + start.length)
-  return from >= 0 && to > from ? source.slice(from, to) : ''
-}
-const uploadBody = between(page, 'async function uploadOwn', 'async function openPublishedSource')
-const sourceBody = between(page, 'async function openPublishedSource', 'const handlePolicyItemOpened')
-const confirmBeforeNavigate = uploadBody.indexOf('guard.confirm(') >= 0
-  && uploadBody.indexOf("navigate('/print/upload')") > uploadBody.indexOf('guard.confirm(')
-const confirmBeforeQr = sourceBody.indexOf('guard.confirm(') >= 0
-  && sourceBody.indexOf('setQrEntry(') > sourceBody.indexOf('guard.confirm(')
-const barWhys = [
-  '政策与指引只做说明；需要纸质件请上传你自己的材料。',
-  '社保材料请自行准备，本机只负责打印。',
-  '把清单里需要复印的材料上传，本机可直接出纸。',
-  '公告本身不提供下载；如需打印你自己带来的材料，可在这里上传。',
-]
-const honestPanelEntries =
-  policyHonest === 1 &&
-  policyGuarded === 1 &&
-  registerRoutes === 0 &&
-  socialRoutes === 1 &&
-  socialUploadButtonPattern.test(socialStripped) &&
-  pageHonest === 2 &&
-  pageRoutes === 3 &&
-  pageGuarded === 2 &&
-  barWhys.every((text) => page.includes(text)) &&
-  socialEntryLabels.length > 0 &&
-  socialEntryLabels.every((label) => label.includes('扫码') || label === '上传自备材料打印') &&
-  noticeHonest === 0 &&
-  noticeRoutes === 0 &&
-  noticeGuarded === 1 &&
-  deadEndHonest === 1 &&
-  deadEndRoutes === 1 &&
-  uploadRouteCount === 6 &&
-  confirmBeforeNavigate &&
-  confirmBeforeQr &&
-  focusHook.includes('这条政策已经撤下，不再提供来源入口') &&
-  page.includes('data-testid="renshi-policy-action"')
-if (misleadingPrintLabels.every((label) => !allRenshi.includes(label)) && honestPanelEntries) {
-  pass('I2. 保留的通用打印入口明确要求用户上传自备材料，政策与公告打开前先确认还在')
-} else {
-  fail(`I2. /print/upload 入口必须使用「上传自备材料打印」等诚实文案，且政策/公告先确认再进入（政策展开 ${policyHonest}/预检 ${policyGuarded}，底栏诚实 ${pageHonest}/预检 ${pageGuarded}，登记路由 ${registerRoutes}，社保路由 ${socialRoutes}，公告展开 ${noticeHonest}/${noticeRoutes}/预检 ${noticeGuarded}，死路屏 ${deadEndHonest}/${deadEndRoutes}，合计 ${uploadRouteCount}，上传预检 ${confirmBeforeNavigate}，来源预检 ${confirmBeforeQr}）`)
-}
+// 停放源码的打印诚实性继续保留；活详情按服务端清单接口，不再冒充通用上传。
+const parkedHonest = countHonestUploadButtons(policyPanel) === 1 && countUploadRoutes(registerPanel) === 0 &&
+  countUploadRoutes(socialPanel) === 1 && socialUploadButtonPattern.test(stripNonVisibleComments(socialPanel)) &&
+  socialEntryLabels.length > 0 && socialEntryLabels.every((label) => label.includes('扫码') || label === '上传自备材料打印')
+const liveChecklist = !detail.includes('/print/upload') && detail.includes('createPolicyChecklist(id)') &&
+  detail.includes("origin: 'policy_checklist'") && detail.includes('pages: result.file.pageCount') &&
+  detail.includes('fileUrl: result.file.printFileUrl') && detail.includes('size: policyFileSize(result.file.sizeBytes)')
+const noticeGuarded = noticePanel.includes('onClick={() => onUpload(notice.id)}') &&
+  notices.includes("confirm(id).then((policy) => { if (policy) navigate('/print/upload')") &&
+  notices.includes('confirm(notice.id).then') && notices.includes("source.kind !== 'verified'")
+if (misleadingPrintLabels.every((label) => !allRenshi.includes(label)) && parkedHonest && liveChecklist && noticeGuarded &&
+  countHonestUploadButtons(components) === 1 && countUploadRoutes(components) === 1) {
+  pass('I2. 停放源码仍守诚实上传；活详情打印真实服务端清单；公告上传/扫码前按条复查')
+} else fail('I2. 清单与自备上传不得混淆，公告动作前必须按条确认')
 const miswiredUploadFixture = `<button onClick={() => navigate('/print/upload')}>直接打印{/* 上传自备材料打印 */}</button>`
 if (!hasHonestUploadButton(miswiredUploadFixture)) {
   pass('I3. 路由与诚实文案绑定在同一按钮内')
@@ -311,43 +274,29 @@ if (!hasHonestUploadButton(miswiredUploadFixture)) {
   fail('I3. 注释或相邻文案不得掩盖错误的 /print/upload 按钮标签')
 }
 
-// ── L. 无人值守：政策紧急下架后页面自己撤掉；问小青的问句不承诺政策解读 ─────────────────────────
-// 现场没有人盯着屏：已打开的列表与详情不能一直挂着已下架的旧正文，也不能等用户点来源码才发现 404。
-// L1 刷新间隔是写了理由的常量，量级在 10–60 秒（太短打服务端，太长等于没刷）。
-// L2 本人点开的那一条被下架 → 整页换成「这条政策已下架」，出路是回政策列表；自动展开的第一条只从列表摘掉。
-// L3 问小青的问句：详情带这一条的标题，并写明小青不解释政策原文、不判断能否办理（没有这项能力就不承诺）。
-const refreshMs = Number(page.match(/const POLICY_REFRESH_MS = ([\d_]+)/)?.[1]?.replace(/_/g, '') ?? '0')
-if (
-  refreshMs >= 10_000 && refreshMs <= 60_000 &&
-  /\/\/[^\n]*无人值守[^\n]*\n\s*const POLICY_REFRESH_MS/.test(page) &&
-  /window\.setInterval\([\s\S]{0,60}refresh\(\)[\s\S]{0,12}POLICY_REFRESH_MS\)/.test(page)
-) {
-  pass('L1. 政策列表定时重读，间隔是带理由的常量')
-} else {
-  fail('L1. RenshiPage 必须有带「无人值守」理由说明的 POLICY_REFRESH_MS（10–60 秒），并用 setInterval 定时重读')
-}
-if (
-  page.includes("if (now.userOpened) setWithdrawnDetail(id)") &&
-  page.includes("POLICY_CHECK_TIMEOUT_MS") &&
-  page.includes('title="这条政策已下架"') &&
-  page.includes('backToPolicyList') &&
-  policyPanel.includes('const userOpened = openId !== null && (touched || openId === focusHit)')
-) {
-  pass('L2. 本人点开的政策被下架整页换成已下架并可回列表，自动展开的第一条只摘掉')
-} else {
-  fail('L2. 被下架的详情必须整页换成「这条政策已下架」+ 回政策列表；自动展开的第一条不能整页替换')
-}
-const boundary = '小青还不能解释政策原文，也不判断能否办理'
-if (
-  page.includes(`${boundary}。\``) &&
-  policyPanel.includes(boundary) &&
-  /policy: '[^']*不要解释政策原文，也不要判断能否办理。'/.test(page) &&
-  !/帮我看懂政策|替我判断|帮你查了/.test(page + policyPanel)
-) {
-  pass('L3. 政策问小青的问句守住「不解释原文、不判断能否办理」，不声称已有政策解读能力')
-} else {
-  fail('L3. 政策问小青的问句必须写明小青不解释政策原文、不判断能否办理，且不得声称已有解读能力')
-}
+// ── L. 无人值守复查与 11/05 政策解读交接 ──────────────────
+const refreshMs = Number(detail.match(/const POLICY_REFRESH_MS = ([\d_]+)/)?.[1]?.replace(/_/g, '') ?? '0')
+if (refreshMs >= 10_000 && refreshMs <= 60_000 && detail.includes('window.setInterval') &&
+  detail.includes('getPublishedPolicy(id)') && detail.includes('POLICY_CHECK_TIMEOUT_MS')) {
+  pass('L1. 详情按编号现读，30 秒复查、8 秒超时；超时不冒充撤下')
+} else fail('L1. 活详情必须限时按条复查')
+if (detail.includes("setPhase('withdrawn')") && detail.includes('setPhoneFile(null)') &&
+  detail.includes('这条政策已下架') && detail.includes('返回政策首页') &&
+  !/withdrawnIds/.test(page + detail + list)) {
+  pass('L2. 撤下清正文与二维码；不缓存撤下编号，再发布可按接口重读')
+} else fail('L2. 撤下详情必须关闭旧内容，不得永久过滤重发编号')
+if (detail.includes('rememberAssistantPolicyQuestion({ id, title: policy.title })') &&
+  detail.includes('按这条原文解释，不判断能不能领') && detail.includes("ai.state('assistant_chat') !== 'available'") &&
+  detail.includes('条件、材料、打印、扫码照常') && !/policyId|rememberAssistantPolicyQuestion/.test(layout)) {
+  pass('L3. 详情按编号交给小青，AI 不可用不影响其他操作；列表/首页只问通用问题')
+} else fail('L3. 问小青必须按能力门控，详情带编号，通用问题不带编号')
+if (home.includes('data?.latest.total === 0 && data.notices.total === 0') && home.includes('这里还没有发布的政策') &&
+  home.includes('本机不自己编写政策，也不拿别处的内容顶替') &&
+  list.includes('pageSize: POLICY_PAGE_SIZE') && model.includes('POLICY_PAGE_SIZE = 4') &&
+  detail.includes('policyLines(policy.whereToApply)') && detail.includes('value={policy.whoCanApply}') &&
+  detail.includes('value={policy.requiredMaterials}')) {
+  pass('M. 全库真空态、服务端四条分页、三栏按机构字段呈现')
+} else fail('M. 最小闭环不得拿内置数据、前端大列表或原文猜测替代')
 
 console.log('')
 if (failed > 0) {

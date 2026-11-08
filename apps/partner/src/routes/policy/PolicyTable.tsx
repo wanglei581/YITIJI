@@ -1,6 +1,6 @@
 import { Fragment } from 'react'
 import { Card, ConsoleTable, StatusBadge } from '@ai-job-print/ui'
-import { ClipboardListIcon, PencilIcon, Trash2Icon } from 'lucide-react'
+import { PencilIcon, Trash2Icon } from 'lucide-react'
 import { isPolicyEmergencyHeld, type PartnerPolicyRecord } from '../../services/api/policies'
 import type { ReviewStatus } from '../../services/api'
 import { RejectReason } from '../../components/RejectReason'
@@ -36,7 +36,6 @@ interface Props {
   recruitmentWriteBlocked: boolean
   busyId: string | null
   openEdit: (row: PartnerPolicyRecord) => void
-  setRulesFor: (row: PartnerPolicyRecord) => void
   handleApprove: (row: PartnerPolicyRecord) => Promise<void>
   setReleasing: (row: PartnerPolicyRecord) => void
   setConfirmUnpublish: (row: PartnerPolicyRecord) => void
@@ -54,7 +53,6 @@ export function PolicyTable({
   recruitmentWriteBlocked,
   busyId,
   openEdit,
-  setRulesFor,
   handleApprove,
   setReleasing,
   setConfirmUnpublish,
@@ -122,6 +120,11 @@ export function PolicyTable({
                         : ''}
                     </p>
                   )}
+                  {r.kind === 'policy_guide' && (
+                    <p className="mt-1 text-xs text-neutral-500">
+                      原文链接：{!r.externalUrl?.trim() ? '未填写' : r.externalUrlVerified === true ? '已核验' : '未核验'}
+                    </p>
+                  )}
                   <RejectReason
                     reviewStatus={r.reviewStatus as ReviewStatus}
                     reason={r.rejectReason}
@@ -161,16 +164,7 @@ export function PolicyTable({
                         <PencilIcon className="h-3.5 w-3.5" />
                       </button>
                     )}
-                    {!held && r.kind === 'policy_guide' && (
-                      <button
-                        onClick={() => setRulesFor(r)}
-                        title="录入可机械比对的申领条件"
-                        className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
-                      >
-                        <ClipboardListIcon className="h-3.5 w-3.5" />
-                        申领条件
-                      </button>
-                    )}
+                    {/* 停放（2026-11-05 政策最小闭环）：条件核对整块停放，源码保留 */}
                     {!held && (r.reviewStatus === 'pending' || r.reviewStatus === 'reviewing') && (
                       <button
                         type="button"
