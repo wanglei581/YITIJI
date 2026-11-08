@@ -43,6 +43,15 @@ export class CreatePolicyPostDto {
   @IsOptional() @IsString() @MaxLength(10000)
   content?: string
 
+  @IsOptional() @IsString() @MaxLength(2000)
+  whoCanApply?: string
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  requiredMaterials?: string
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  whereToApply?: string
+
   @IsOptional() @IsIn([...POLICY_AUDIENCES])
   audience?: string
 
@@ -70,10 +79,19 @@ export class UpdatePolicyPostDto {
   title?: string
 
   @IsOptional() @IsString() @MaxLength(500)
-  summary?: string
+  summary?: string | null
 
   @IsOptional() @IsString() @MaxLength(10000)
-  content?: string
+  content?: string | null
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  whoCanApply?: string | null
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  requiredMaterials?: string | null
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  whereToApply?: string | null
 
   @IsOptional() @IsIn([...POLICY_AUDIENCES])
   audience?: string
@@ -82,15 +100,17 @@ export class UpdatePolicyPostDto {
   category?: string
 
   @IsOptional()
-  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? null : value))
   @IsUrl({ protocols: ['http', 'https'], require_protocol: true }) @MaxLength(500)
-  externalUrl?: string
+  externalUrl?: string | null
 
   @IsOptional() @IsString() @MaxLength(120)
-  externalId?: string
+  externalId?: string | null
 
-  @IsOptional() @IsISO8601()
-  publishedDate?: string
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? null : value))
+  @IsISO8601()
+  publishedDate?: string | null
 }
 
 // ── P21 政策条件核对（S3-2）────────────────────────────────────────────────

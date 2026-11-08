@@ -102,6 +102,9 @@ function main(): void {
   console.log('\n=== 百宝箱 AI skill intent 接线门禁 ===')
 
   const sharedAiTypes = mustExist(sharedAiTypesPath, '共享 AI 类型存在')
+    // 请求类型按规模约束拆出；仍检查真实导出接线，全部技能与请求字段断言原样保留。
+    + mustExist(join(repoRoot, 'packages/shared/src/types/assistant-chat-request.ts'), '共享助手请求类型存在')
+  mustContain(sharedAiTypes, ["export type { AssistantChatRequest } from './assistant-chat-request'"], '共享 AI 类型仍导出拆出的请求契约')
   const apiAiInterface = mustExist(apiAiInterfacePath, 'API AI provider 接口存在')
   const assistantDto = mustExist(assistantDtoPath, '助手聊天 DTO 存在')
   const llmChat = mustExist(llmChatPath, 'LLM chat 服务存在')
