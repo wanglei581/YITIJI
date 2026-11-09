@@ -1,5 +1,7 @@
 import type { Page } from '@playwright/test'
+import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
+import { fillPhoneLogin } from './fixtures/privacy-clear-shell'
 import { CONTROL, TASK, STOP_KEY, deviceFixture, expectScanUnknownChip } from './fixtures/scan-device-k1b3a'
 
 const faults = [
@@ -178,15 +180,20 @@ for (const quiet of [true, false]) for (const purged of [true, false]) {
   })
 }
 
-/* ── 11/09：屏上扫描中断后的结果屏（稿 cs-scan-failed，11/08 产品负责人定第 2 条） ─────────────────
- * 屏上扫描来的结果换成屏上扫描自己的结果屏：眉题「屏上扫描」、不画面板四步路径线、原因卡加同一张纸那句、
- * 出路「重新开始一次扫描」回选材料、「返回首页」。屏上扫描建会话带不了安全重扫授权（服务端对 startMode=device
- * 带 retryOfScanTaskId 一律 400），所以这一屏不出「重试扫描（同一份材料）」，按稿上拿不到凭据的排法。
+/* ── 11/09：屏上扫描中断后的结果屏（稿 cs-scan-failed，11/08 产品负责人定第 2 条；11/09 再定四项） ───────────
+ * 屏上扫描来的结果换成屏上扫描自己的结果屏：眉题「屏上扫描」、不画面板四步路径线、原因卡单栏居中。
+ * 11/09 定：出路「照原设置再扫一次」（回放纸设置，材料和放纸设置照上一场预填，按「开始扫描」才建普通新会话，不带重扫头）
+ * 和「返回首页」，没有文件那种只留前一张；删掉「同一张纸原样再扫…（两小时内）」「这是一次普通新会话，不是免查重的重扫…」
+ * 两句（屏上扫描每次拼出的 PDF 字节都不同，服务端同字节去重拦不到）。
  * 面板扫描的失败屏不变，见 fusion-w2-scan.spec.ts「failed scan retry strips control fields」。 */
-const SAME_PAPER = '同一张纸原样再扫，系统可能按重复件拒收（两小时内）。'
+const AGAIN = '照原设置再扫一次'
+const AGAIN_DETAIL = '把原件重新放好，可以照原设置再扫一次。'
+const AGAIN_WAY = '回到放纸设置，材料和设置照上次填好'
 const NO_FILE_DETAIL = '同一份结果里没有带可用的文件信息（结果里允许不带文件，这不是出错）。这份文件此刻还在不在系统里，本机没有依据判断。这次扫描到此结束。'
 const ACK_REASON = '系统没有确认这一场能收到扫描件（已过期、被取消或已经结束），本机已经把它撤掉。面板上扫出来的文件不会交到这一场，你手上的纸也不会被谁收走。要继续请重新开始一次扫描。'
-type DeviceCloud = Awaited<ReturnType<typeof deviceFixture>>['cloud']
+const SCAN_KEY = 'ai-job-print:current-scan-workbench'
+type DeviceKit = Awaited<ReturnType<typeof deviceFixture>>
+type DeviceCloud = DeviceKit['cloud']
 
 async function expectDeviceFailed(page: Page, o: { title: string; chip: string; reason: string; detail?: string; cards?: string[] }): Promise<void> {
   const view = page.getByTestId('scan-device-failed')
@@ -199,13 +206,15 @@ async function expectDeviceFailed(page: Page, o: { title: string; chip: string; 
   await expect(band.locator('.qxt-rail')).toHaveCount(0)
   await expect(band.locator('.qxt-back')).toHaveCount(0)
   await expect(view.locator('.cs-why b')).toHaveText(o.reason)
-  await expect(view.locator('.cs-why p')).toHaveText(o.detail ?? SAME_PAPER)
-  await expect(view.locator('.cs-way h3')).toHaveText(o.cards ?? ['重新开始一次扫描', '返回首页'])
-  await expect(page.locator('.qxt-screen').getByText(/同一份材料/)).toHaveCount(0)
+  await expect(view.locator('.cs-why p')).toHaveText(o.detail ?? AGAIN_DETAIL)
+  await expect(view.locator('.cs-way h3')).toHaveText(o.cards ?? [AGAIN, '返回首页'])
+  await expect(view.getByTestId('scan-device-failed-again').locator('p')).toHaveText(AGAIN_WAY)
+  // 删掉的两句和「同一份材料」这一屏一个字都不出（原因句里「重新开始一次扫描」是投递被拒那句原文，不在此列）。
+  await expect(page.locator('.qxt-screen').getByText(/同一份材料|同一张纸|重复件|免查重/)).toHaveCount(0)
   await expect(page.getByText('这次没扫成的原因', { exact: true })).toHaveCount(0)
   await expect(page.locator('.qxt-dock').getByRole('button', { name: '返回打印扫描', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '问小青：扫描失败怎么办', exact: true })).toBeVisible()
-  await expect(page.getByTestId('scan-device-failed-primary')).toHaveText('重新开始一次扫描')
+  await expect(page.getByTestId('scan-device-failed-primary')).toHaveText(AGAIN)
   await expect(view.getByTestId('service-phone-line')).toBeVisible()
   // 原因卡单栏居中（照第三轮 nofile 排法）：插画在字上面、水平居中、撑住卡，卡顶卡底都不留大块空白。
   const card = await view.locator('.cs-why').boundingBox()
@@ -217,6 +226,48 @@ async function expectDeviceFailed(page: Page, o: { title: string; chip: string; 
   expect(art!.y - card!.y).toBeLessThanOrEqual(80)
   expect(card!.y + card!.height - (detail!.y + detail!.height)).toBeLessThanOrEqual(80)
   expect(art!.height).toBeGreaterThanOrEqual(card!.height * 0.4)
+}
+
+/**
+ * 「照原设置再扫一次」之后：落在放纸设置，材料和放纸设置照上一场；登记里只剩这几样界面选项，
+ * 没有上一场的任务编号、控制凭证、结果、屏上扫描标记、重扫意图，也还没建新会话。
+ */
+async function expectPrefilled(page: Page, f: DeviceKit, source: 'flatbed' | 'feeder', color: 'gray' | 'color'): Promise<void> {
+  await expect(page).toHaveURL(/stage=device-settings/)
+  await expect(page.locator('[data-w2-page="scan-set"]')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '纸放哪？扫成黑白还是彩色？', exact: true })).toBeVisible()
+  await expect(page.locator('.qxt-band .qxt-eyebrow')).toHaveText('屏上扫描 · 普通文档')
+  await expect(page.getByTestId(`scan-source-${source}`)).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByTestId(`scan-color-${color}`)).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByTestId('scan-device-start')).toBeEnabled()
+  const raw = await page.evaluate((key) => sessionStorage.getItem(key) ?? '', SCAN_KEY)
+  expect(JSON.parse(raw)).toEqual({ stage: 'device-settings', scanType: 'document', material: 'document', deviceChoice: { source, colorMode: color } })
+  expect(raw).not.toContain(TASK)
+  expect(raw).not.toContain(CONTROL)
+  expect(f.posts('/scan/sessions')).toHaveLength(1)
+}
+
+/** 走到放纸设置（普通文档），按参数改纸放哪和颜色，再按开始。 */
+async function startWith(page: Page, source: 'flatbed' | 'feeder', color: 'gray' | 'color'): Promise<void> {
+  await page.getByTestId(`scan-source-${source}`).click()
+  await page.getByTestId(`scan-color-${color}`).click()
+  await page.getByTestId('scan-device-start').click()
+  await expect(page.getByRole('heading', { name: '正在扫描', exact: true })).toBeVisible({ timeout: 15000 })
+}
+
+/** 选普通文档、走到「怎么扫？」。 */
+async function openHow(page: Page): Promise<void> {
+  await page.goto('/scan?stage=start')
+  await page.getByTestId('scan-workbench-type-document').click()
+  await page.getByRole('button', { name: '下一步', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '怎么扫？' })).toBeVisible()
+}
+
+/** 清场后会落到首页：首页面板与问小青能力读这几条；形状同 copy-c3a 夹具的空响应。 */
+function registerHome(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
+  api.respond('GET', '/api/v1/job-fairs', { status: 200, json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } } })
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', { status: 200, json: { asrEnabled: false, ttsEnabled: false } })
 }
 
 const failedCases: readonly [string, (cloud: DeviceCloud) => void, string, string, string][] = [
@@ -236,26 +287,47 @@ for (const [name, apply, title, chip, reason] of failedCases) {
   })
 }
 
-test('completed without a file keeps one way and a single-column reason card @w2', async ({ page, api }) => {
+test('again with the same settings lands on paper settings prefilled and creates a plain session only on start @w2', async ({ page, api }) => {
+  const f = await deviceFixture(page, api)
+  await openHow(page)
+  await page.getByRole('button', { name: '下一步', exact: true }).click()
+  await startWith(page, 'flatbed', 'color')
+  f.cloud.status = 'failed'
+  await expectDeviceFailed(page, { title: '扫描未完成', chip: '扫描未完成', reason: '这次扫描没有完成。' })
+  await page.getByTestId('scan-device-failed-again').click()
+  await expectPrefilled(page, f, 'flatbed', 'color')
+  // 不重载、直接按开始：内存里要是还挂着上一场的重扫授权，这一次就会带出去，下面的断言要能看见。
+  f.cloud.status = 'waiting'
+  await page.getByTestId('scan-device-start').click()
+  await expect(page.getByRole('heading', { name: '正在扫描', exact: true })).toBeVisible({ timeout: 15000 })
+  const creates = f.posts('/scan/sessions')
+  expect(creates).toHaveLength(2)
+  // 普通创建：和第一次逐字一样（类型、终端、屏上扫描三项），不带 retryOfScanTaskId，也没有重扫凭证头。
+  expect(creates[1].body).toEqual(creates[0].body)
+  expect(creates[1].body).toMatchObject({ scanType: 'document', startMode: 'device', source: 'flatbed', colorMode: 'color' })
+  expect(creates[1].body).not.toHaveProperty('retryOfScanTaskId')
+  for (const request of creates) expect(request.headers['x-scan-retry-control']).toBeUndefined()
+})
+
+test('completed without a file keeps one way, and the dock button goes back to paper settings too @w2', async ({ page, api }) => {
   const f = await deviceFixture(page, api)
   await f.start()
   f.cloud.status = 'completed'
   await expectDeviceFailed(page, {
     title: '已完成 · 结果里没有文件', chip: '已完成 · 结果里没有文件',
-    reason: '系统说已完成，但这次结果里没有可用文件', detail: NO_FILE_DETAIL, cards: ['重新开始一次扫描'],
+    reason: '系统说已完成，但这次结果里没有可用文件', detail: NO_FILE_DETAIL, cards: [AGAIN],
   })
   await expect(page.getByTestId('scan-device-failed')).toHaveClass(/cs-solo/)
   await expect(page.getByTestId('scan-device-failed-home')).toHaveCount(0)
   await page.screenshot({ path: 'test-results/align-1109-scan-failed-nofile.png' })
+  await page.getByTestId('scan-device-failed-primary').click()
+  await expectPrefilled(page, f, 'feeder', 'gray')
 })
 
 test('a refused delivery ack lands on the on-screen result screen with the ack reason @w2', async ({ page, api }) => {
   const f = await deviceFixture(page, api)
   api.respond('POST', `/api/v1/scan/sessions/${TASK}/ack`, { status: 404, json: { success: false, error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' } } })
-  await page.goto('/scan?stage=start')
-  await page.getByTestId('scan-workbench-type-document').click()
-  await page.getByRole('button', { name: '下一步', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '怎么扫？' })).toBeVisible()
+  await openHow(page)
   await page.getByRole('button', { name: '下一步', exact: true }).click()
   await page.getByTestId('scan-device-start').click()
   await expectDeviceFailed(page, { title: '扫描未完成', chip: '扫描未完成', reason: ACK_REASON })
@@ -263,7 +335,7 @@ test('a refused delivery ack lands on the on-screen result screen with the ack r
   await page.screenshot({ path: 'test-results/align-1109-scan-failed-ack.png' })
 })
 
-test('on-screen failure survives a watchdog reload and restarts at material choice, never on the panel @w2', async ({ page, api }) => {
+test('on-screen failure survives a watchdog reload and goes back to paper settings, never on the panel @w2', async ({ page, api }) => {
   const f = await deviceFixture(page, api)
   await f.start()
   f.cloud.status = 'failed'
@@ -272,27 +344,76 @@ test('on-screen failure survives a watchdog reload and restarts at material choi
   await page.reload()
   await expectDeviceFailed(page, { title: '扫描未完成', chip: '扫描未完成', reason: '这次扫描没有完成。' })
   await page.getByTestId('scan-device-failed-primary').click()
-  await expect(page).toHaveURL(/stage=start/)
-  await expect(page.getByTestId('scan-workbench-type-document')).toHaveAttribute('aria-checked', 'false')
+  await expectPrefilled(page, f, 'feeder', 'gray')
   await expect(page.locator('[data-w2-page="scan-settings"]')).toHaveCount(0)
-  const stored = await page.evaluate(() => JSON.parse(sessionStorage.getItem('ai-job-print:current-scan-workbench') ?? '{}'))
-  expect(stored).toMatchObject({ stage: 'start' })
-  for (const key of ['live', 'result', 'deviceFlow', 'material', 'rescanIntent']) expect(stored[key]).toBeUndefined()
-  expect(f.posts('/scan/sessions')).toHaveLength(1)
+  // 和别的本机登记一样：在放纸设置上再整页重载一次，预填照旧在，仍然不建会话。
+  await page.reload()
+  await expectPrefilled(page, f, 'feeder', 'gray')
 })
 
 test('on-screen failure home card leaves the scan flow and clears the record @w2', async ({ page, api }) => {
   const f = await deviceFixture(page, api)
-  // 落到首页后首页面板与问小青能力会读这几条；形状同 copy-c3a 夹具的空响应。
-  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
-  api.respond('GET', '/api/v1/job-fairs', { status: 200, json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } } })
-  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', { status: 200, json: { asrEnabled: false, ttsEnabled: false } })
+  registerHome(api)
   await f.start()
   f.cloud.status = 'expired'
   await page.getByTestId('scan-device-failed-home').click()
   await expect(page).toHaveURL(/\/$/)
-  expect(await page.evaluate(() => sessionStorage.getItem('ai-job-print:current-scan-workbench'))).toBeNull()
+  expect(await page.evaluate((key) => sessionStorage.getItem(key), SCAN_KEY)).toBeNull()
   expect(f.posts('/scan/sessions')).toHaveLength(1)
+})
+
+/* 预填和别的本机登记同在一份记录里：游客闲置到点清场、登录用户在会话提醒里结束使用，都连预填一起清掉。
+ * 清场后整页重载落回首页；同一页签再用地址进扫描会被隐私守卫当成旧历史再清一次，所以这里只核登记本身。 */
+async function expectPrefillCleared(page: Page, f: DeviceKit): Promise<void> {
+  await expect(page).toHaveURL(/\/$/)
+  await expect.poll(() => page.evaluate((key) => sessionStorage.getItem(key), SCAN_KEY)).toBeNull()
+  await expect(page.locator('[data-w2-page="scan-set"]')).toHaveCount(0)
+  expect(f.posts('/scan/sessions')).toHaveLength(1)
+}
+
+test('a guest idle timeout clears the prefill with the rest of the scan record @w2', async ({ page, api }) => {
+  await page.clock.install()
+  const f = await deviceFixture(page, api)
+  registerHome(api)
+  await f.start()
+  f.cloud.status = 'failed'
+  await expectDeviceFailed(page, { title: '扫描未完成', chip: '扫描未完成', reason: '这次扫描没有完成。' })
+  await page.getByTestId('scan-device-failed-primary').click()
+  await expectPrefilled(page, f, 'feeder', 'gray')
+  const reloaded = page.waitForEvent('load')
+  await page.clock.fastForward(181_000)
+  await reloaded
+  await expectPrefillCleared(page, f)
+})
+
+test('a member who ends use from the session reminder loses the prefill too @w2', async ({ page, api }) => {
+  await page.clock.install()
+  const f = await deviceFixture(page, api)
+  registerHome(api)
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
+  api.respond('POST', '/api/v1/member/auth/sms-code', { status: 200, json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } } })
+  api.respond('POST', '/api/v1/member/auth/login', {
+    status: 200, json: { success: true, data: { token: 'k1b3a-member-token', user: { id: 'member-k1b3a', phoneMasked: '138****8000', nickname: '屏上扫描' } } },
+  })
+  api.respond('GET', '/api/v1/me/favorites', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+  api.respond('POST', '/api/v1/member/auth/logout', { status: 200, json: { success: true, data: { loggedOut: true } } })
+  await openHow(page)
+  await page.getByTestId('scan-how-login').click()
+  await fillPhoneLogin(page, '13800138000')
+  await expect(page.getByRole('heading', { name: '怎么扫？' })).toBeVisible()
+  await page.getByRole('button', { name: '下一步', exact: true }).click()
+  await startWith(page, 'flatbed', 'gray')
+  f.cloud.status = 'expired'
+  await expectDeviceFailed(page, { title: '等待超时', chip: '等待超时 · 没有文件', reason: '等待超时，这次没有拿到文件。' })
+  await page.getByTestId('scan-device-failed-again').click()
+  await expectPrefilled(page, f, 'flatbed', 'gray')
+  expect(f.posts('/scan/sessions')[0].headers.authorization).toBe('Bearer k1b3a-member-token')
+  await page.clock.runFor(151_000)
+  const reloaded = page.waitForEvent('load')
+  await page.getByTestId('session-guard-clear').click()
+  await reloaded
+  await expectPrefillCleared(page, f)
 })
 
 /* 胶囊橙色只认屏上扫描那几屏：「扫什么」等面板也走的屏上，状态未知色调照旧是灰的。 */

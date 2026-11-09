@@ -39,8 +39,8 @@
   background: var(--qxt-clay-wash); color: var(--qxt-clay-ink); font-size: 27px; line-height: 1.55; font-weight: 700;
 }
 /* 屏上扫描中断结果屏（稿 cs-scan-failed）沿用上面的原因卡与出路卡。原因卡照 11/09 第三轮 ?fail=nofile 的排法：
-   单栏居中，插画放大把卡撑满；字号、句子不变。稿默认是左图右字，但稿默认有三张出路卡，程序这一屏最多两张
-  （没有「重试扫描（同一份材料）」），原因卡高出一截，左图右字会在右栏留下超过 240px 的空白。 */
+   单栏居中，插画放大把卡撑满；字号、句子不变。这一屏最多两张出路卡（照原设置再扫一次、返回首页），原因卡高出一截，
+   左图右字会在右栏留下超过 240px 的空白。11/09 产品负责人定：版式照程序，稿 cs-scan-failed 各样子跟着改。 */
 [data-qx-page='scan-workbench'] .cs-sfail .cs-why {
   grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; justify-items: center; align-content: center;
   gap: 24px; padding: 28px 56px; text-align: center;

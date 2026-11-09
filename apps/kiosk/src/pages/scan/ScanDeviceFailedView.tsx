@@ -8,27 +8,27 @@ import { ScanPaperArt } from './ScanPaperArt'
 import { ScanWorkbenchShell } from './ScanWorkbenchChrome'
 import { revokeLiveScanSession } from './scanSessionRevoke'
 import { type ScanStage } from './scanWorkbenchModel'
-import { beginDeviceScanAgain, type ScanOutcome } from './scanWorkbenchSession'
+import { beginDeviceScanSameSettings, type ScanOutcome } from './scanWorkbenchSession'
 import './styles/scan-device-qx.css'
 import './styles/scan-device-errors.css'
 
-const SAME_PAPER = '同一张纸原样再扫，系统可能按重复件拒收（两小时内）。'
+const AGAIN = '照原设置再扫一次'
+const AGAIN_DETAIL = '把原件重新放好，可以照原设置再扫一次。'
+const AGAIN_WAY = '回到放纸设置，材料和设置照上次填好'
 const NO_FILE_DETAIL = '同一份结果里没有带可用的文件信息（结果里允许不带文件，这不是出错）。'
   + '这份文件此刻还在不在系统里，本机没有依据判断。这次扫描到此结束。'
 
 /**
- * 屏上扫描中断后的结果屏（稿 cs-scan-failed，11/08 产品负责人定第 2 条）。原因卡一律照 11/09 第三轮
- * ?fail=nofile 的单栏居中排：这一屏最多两张出路卡，比稿默认少一张，左图右字会在卡里留出大块空白（scan-device-errors.css）。
- * 面板扫描的失败屏（ScanResultFailedView）一个字不动；走哪一屏由 ScanResultPage 按本机登记的 deviceFlow 分。
+ * 屏上扫描中断后的结果屏（稿 cs-scan-failed，11/08 产品负责人定第 2 条）。面板扫描的失败屏（ScanResultFailedView）
+ * 一个字不动；走哪一屏由 ScanResultPage 按本机登记的 deviceFlow 分。
  *
- * ## 为什么没有「重试扫描（同一份材料）」
- *
- * 稿上这颗按钮回放纸设置（cs-scan-set），意思是带着上一场的安全重扫授权再扫一遍。屏上扫描做不到：
- * 服务端 `resolveScanStartParams` 对 startMode=device 带 retryOfScanTaskId 一律 400
- * `SCAN_DEVICE_RETRY_UNSUPPORTED`（services/api/src/scan-tasks/scan-device-protocol.ts），
- * 本机 `useScanDeviceStart` 建会话也不带那一对重扫头。回放纸设置只能建一场普通新会话，
- * 写成「同一份材料」就是假话。所以照稿上拿不到凭据时的排法：重新开始一次扫描、返回首页，
- * 主按钮是「重新开始一次扫描」；同一张纸可能被按重复件拒收这句照写，让人自己换材料或改用面板。
+ * 11/09 产品负责人定（四项按推荐）：
+ * - 出路「照原设置再扫一次」（主）和「返回首页」，没有文件那种只留前一张：回放纸设置，材料和放纸设置照上一场预填，
+ *   按「开始扫描」才建一场普通新会话（beginDeviceScanSameSettings）。屏上扫描建会话带不了重扫授权
+ *   （服务端对 startMode=device 带 retryOfScanTaskId 一律 400），所以不写「同一份材料」。
+ * - 删掉原因卡「同一张纸原样再扫…（两小时内）」和出路卡「这是一次普通新会话，不是免查重的重扫…」：屏上扫描每次拼出的
+ *   PDF 字节都不同（终端程序 pdfkit 默认写 CreationDate），服务端同字节去重拦不到，那两句说的事不会发生。
+ * - 原因卡单栏居中、大插画在上（scan-device-errors.css），稿跟着程序补。
  */
 export function ScanDeviceFailedView({
   outcome,
@@ -48,11 +48,10 @@ export function ScanDeviceFailedView({
   const reason = isNoFile
     ? '系统说已完成，但这次结果里没有可用文件'
     : isExpired ? '等待超时，这次没有拿到文件。' : shownReason ?? '这次扫描没有完成。'
-  /** 稿里的 again：清掉这一场回「扫什么」，不预选材料，是一场普通新会话（同完成屏「再扫一份」）。 */
+  /** 这一场照「再扫一份」那样结束（先撤销，结果还在时是空操作），再带着上一场的材料和放纸设置回放纸设置。 */
   const again = (): void => {
     revokeLiveScanSession(getToken())
-    beginDeviceScanAgain()
-    onGoStage?.('start')
+    onGoStage?.(beginDeviceScanSameSettings())
   }
   const card = (label: string, detail: string, art: ReactNode, onClick: () => void, testId: string) => (
     <button type="button" key={label} className="cs-way" data-testid={testId} onClick={onClick}>
@@ -75,7 +74,7 @@ export function ScanDeviceFailedView({
       dock={{
         askLabel: '问小青：扫描失败怎么办',
         left: { label: '返回打印扫描', leaveTo: '/print-scan' },
-        primary: { label: '重新开始一次扫描', onClick: again, testId: 'scan-device-failed-primary' },
+        primary: { label: AGAIN, onClick: again, testId: 'scan-device-failed-primary' },
       }}
     >
       <div className={`cs-sfail cs-err cs-err${ways}${ways === 1 ? ' cs-solo' : ''}`} data-testid="scan-device-failed">
@@ -84,10 +83,10 @@ export function ScanDeviceFailedView({
             <ScanPaperArt />
             <i className="warn"><QxTouchIcon name="alert" size={34} strokeWidth={2.4} /></i>
           </span>
-          <div><b>{reason}</b><p>{isNoFile ? NO_FILE_DETAIL : SAME_PAPER}</p></div>
+          <div><b>{reason}</b><p>{isNoFile ? NO_FILE_DETAIL : AGAIN_DETAIL}</p></div>
         </div>
         <div className="cs-ways">
-          {card('重新开始一次扫描', '这是一次普通新会话，不是免查重的重扫。不自动重扫。', <ScanPaperArt />, again, 'scan-device-failed-again')}
+          {card(AGAIN, AGAIN_WAY, <ScanPaperArt />, again, 'scan-device-failed-again')}
           {isNoFile ? null : card('返回首页', '结束这次等待', <DocStackArt />, () => leaveScanFlow('/'), 'scan-device-failed-home')}
         </div>
         <PhoneHelpLine />
