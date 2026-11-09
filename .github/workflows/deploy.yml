@@ -147,6 +147,13 @@ jobs:
             cleanup_control_plane_helper() {
               rm -f -- "$CONTROL_PLANE_HELPER"
               rm -f -- /tmp/release.bundle
+              # 拉取途中被信号打断时，在跑的那一组拉取进程一起收掉，日志一并删。
+              if [ -n "${FETCH_PID:-}" ]; then
+                kill -KILL -- "-$FETCH_PID" 2>/dev/null || true
+              fi
+              if [ -n "${FETCH_LOG:-}" ]; then
+                rm -f -- "$FETCH_LOG"
+              fi
             }
             on_control_plane_signal() {
               trap '' HUP INT TERM PIPE
@@ -211,24 +218,42 @@ jobs:
               # TODO(根治): 改由 CI 产出制品经国内端点（阿里云 OSS / Codeup 镜像）
               # 下发，生产机不再直连 github.com。跨境直连是这里的结构性瓶颈。
               if [ "$FETCH_OK" != "1" ]; then
+                # 拉取不加 --foreground：timeout 自己开一个进程组（组号就是它的 PID），超时信号发给整组，
+                # git 和它经 ssh 起的子进程一起收；timeout 退出后再对整组补一次 KILL，清掉不理 TERM 的残留。
+                # 输出先写日志文件、结束后再回显：就算还有漏网进程，也拿不到 SSH 会话的 stdout/stderr。
+                # 2026-11-09 run 42578558995：带 --foreground 时只杀了 git，两个孤儿 ssh 占着会话输出，
+                # 脚本早已退出，「Deploy via SSH」却一直显示在跑，最后只能手动取消。
+                FETCH_LOG="$(mktemp /tmp/deploy-fetch-XXXXXXXX.log)"
                 for ATTEMPT in 1 2; do
                   echo "fetch exact CI SHA attempt $ATTEMPT/2"
                   FETCH_STARTED_AT="$(date +%s)"
                   # HTTP/1.1 可规避部分代理的 HTTP/2 长连接中断。
                   # 目标 SHA 必须可从 origin/main 到达。
-                  if timeout --foreground --kill-after=10s 600s \
-                    git -c http.version=HTTP/1.1 fetch --no-tags --depth=1 origin "$EXPECTED_SHA"; then
+                  timeout --kill-after=10s 600s \
+                    git -c http.version=HTTP/1.1 fetch --no-tags --depth=1 origin "$EXPECTED_SHA" \
+                    </dev/null >"$FETCH_LOG" 2>&1 &
+                  FETCH_PID=$!
+                  FETCH_RC=0
+                  wait "$FETCH_PID" || FETCH_RC=$?
+                  kill -KILL -- "-$FETCH_PID" 2>/dev/null || true
+                  FETCH_PID=''
+                  cat "$FETCH_LOG" >&2
+                  if [ "$FETCH_RC" = "0" ]; then
                     echo "fetch 成功，耗时 $(( $(date +%s) - FETCH_STARTED_AT ))s"
                     FETCH_OK=1
                     break
                   fi
                   # 记录实际耗时：贴住 600s 说明是超时，远小于 600s 说明是真的断连。
-                  # 这两种情况的修法不同，下次失败时不必再靠猜。
-                  echo "fetch 失败，耗时 $(( $(date +%s) - FETCH_STARTED_AT ))s（预算 600s）"
+                  # 这两种情况的修法不同，下次失败时不必再靠猜。退出码 124、137 是超时被杀。
+                  echo "fetch 失败，退出码 ${FETCH_RC}，耗时 $(( $(date +%s) - FETCH_STARTED_AT ))s（预算 600s）"
                   sleep "$((ATTEMPT * 5))"
                 done
+                rm -f -- "$FETCH_LOG"
               fi
-              test "$FETCH_OK" = "1"
+              if [ "$FETCH_OK" != "1" ]; then
+                echo "BOS 和 GitHub 都没拿到目标提交 ${EXPECTED_SHA}，发布中止，线上未改动" >&2
+                exit 1
+              fi
               # 只部署 CI 已验证的精确 SHA；即使 main 在此期间继续前进（文档/其他合并），
               # 也不 ff 到新 tip，避免发布未经该次 CI 验证的提交。
               git cat-file -e "$EXPECTED_SHA^{commit}"

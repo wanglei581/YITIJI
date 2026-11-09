@@ -33,6 +33,7 @@
     "verify:server-maintenance-workflows": "node scripts/verify-server-maintenance-workflows.mjs",
     "verify:legal-docs-preflight": "node scripts/verify-legal-docs-preflight.mjs",
     "verify:release-bundle": "node scripts/verify-release-bundle.mjs",
+    "verify:deploy-fetch-cleanup": "node scripts/verify-deploy-fetch-cleanup.mjs",
     "verify:prod-readonly-probe": "node scripts/verify-prod-readonly-probe.mjs",
     "verify:deploy-authorization-gate": "node scripts/verify-deploy-authorization-gate.mjs",
     "verify:dependency-security": "node scripts/verify-dependency-security.mjs",
