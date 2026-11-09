@@ -147,6 +147,8 @@ test('AI 暂停时简历服务台预告：要 AI 的置灰写原因，给出不�
     await expect(card).toHaveAttribute('aria-disabled', 'true')
     await expect(card).toContainText('AI能力当前不可用')
   }
+  // 两张主卡都停用时，意图带下不写「导入 → 出初稿 → 确认」三步（不介绍走不通的路）
+  await expect(page.locator('.qxt-band .qxt-path')).toHaveCount(0)
   // 四格：要 AI 的一格置灰；不要 AI 的三格照常能点
   await expect(page.locator('[data-hub-title="AI简历优化"]')).toHaveAttribute('data-hub-reason', 'AI能力当前不可用')
   for (const title of ['简历打印', '我的简历', 'AI服务记录']) {
@@ -172,6 +174,11 @@ test('AI 没暂停或没读到暂停状态时简历服务台照常，不多出�
   await expect(page.locator('.qxt-slab-off')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '可以先打印原件' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '可以先填内容，导出原样草稿' })).toHaveCount(0)
+  // 11/08 首屏三步（与触屏稿 screens.js 一致）：意图带下「一共 3 步 · 导入 → 出初稿 → 确认」
+  const steps = page.locator('.qxt-band .qxt-path')
+  await expect(steps).toHaveCount(1)
+  await expect(steps.locator('.qxt-path-k')).toHaveText('一共 3 步')
+  await expect(steps.locator('.qxt-path-pl')).toHaveText(['1导入', '2出初稿', '3确认'])
 
   // 配置里压根没有 ai 字段：读不到不等于暂停（重新加载，终端配置的内存缓存随之重来）
   shell(api, {})

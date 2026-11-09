@@ -117,7 +117,7 @@ export async function routeMembers(page: Page, api: ApiRouter): Promise<MeCall[]
 
 export type HomeVariant = 'default' | 'channels' | 'hosting' | 'gov' | 'full'
 
-/** 本机构官方渠道（3.14）：有渠道时首页第三行多一块「本机构官方渠道」。 */
+/** 本机构官方渠道（3.14）：机构终端配的渠道。2026-11-08 起渠道入口在「查政策」页，首页第三行不多摆。 */
 const OFFICIAL_CHANNELS = [
   { name: '就业指导中心微信公众号', url: 'https://mp.example.edu.cn/official', displayOrder: 1, organizationName: '青岛示例大学就业指导中心' },
   { name: '青岛示例大学就业信息网', url: 'https://career.example.edu.cn/jobs?from=kiosk', displayOrder: 2, organizationName: '青岛示例大学就业指导中心' },
@@ -125,7 +125,7 @@ const OFFICIAL_CHANNELS = [
 
 /**
  * 首页第三行的磁贴数跟着终端配置走，≥ 4 块时首页进「压紧」版式（大卡矮一些）：
- *   default 2 块（到机取件、帮助）；channels 3 块（+ 本机构官方渠道）；
+ *   default 与 channels 都是 2 块（到机取件、帮助；官方渠道 11/08 挪进查政策页）；
  *   hosting 4 块（托管打开：+ 社会招聘、校园招聘）。gov / full 仍会把百宝箱与智慧校园配成开，
  *   但 2026-11-04 停放后首页不摆这两块，块数与 channels / hosting 相同。
  * 要在登录之前调用（终端配置在首页挂载时读）。

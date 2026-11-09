@@ -1,6 +1,6 @@
 {
   "name": "terminal-agent",
-  "version": "0.4.21",
+  "version": "0.4.22",
   "private": true,
   "description": "Windows Terminal Agent — Phase 8.1C: DPAPI token encryption / SQLite idempotency / single-instance lock / Windows service / offline PATCH queue",
   "scripts": {
@@ -32,6 +32,7 @@
     "verify:scan-watcher": "ts-node scripts/verify-scan-watcher.ts",
     "verify:scan-deletion-audit": "ts-node scripts/verify-scan-deletion-audit.ts",
     "verify:scan-deskew": "ts-node scripts/verify-scan-deskew.ts",
+    "verify:scan-wia-deskew-windows": "ts-node scripts/verify-scan-wia-deskew-windows.ts",
     "verify:scan-device-engine": "ts-node scripts/verify-scan-device-engine.ts",
     "verify:scan-device-runner": "ts-node scripts/verify-scan-device-runner.ts",
     "verify:copy-device": "ts-node scripts/verify-copy-device.ts",
