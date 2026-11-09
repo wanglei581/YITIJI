@@ -485,13 +485,13 @@
 .screen:has(.cs-sfail) .dock .btn.pri{min-width:0}
 /* 11/09 第三轮：屏上扫描「已完成 · 结果里没有文件」（?fail=nofile）只有一张出路卡，原因卡被拉高、卡内上下各空约 200px。
    插画在左、字在右撑不满这么高的卡（左栏最多半屏宽），所以照单栏居中那种，把插画放大到卡里没有大块空白；字号、句子不变。
-   11/09 第四轮：照程序（scan/styles/scan-device-errors.css 的 .cs-sfail），两张出路卡的样子也用这种单栏居中、大插画在上，不再只认 cs-solo。 */
+   11/09 第四轮：照程序（scan/styles/scan-device-errors.css 的 .cs-sfail），两张出路卡的样子也用这种单栏居中、大插画在上，不再只认 cs-solo；原因句也均衡断行（「…这次先停在这里。」不再把「里。」单独甩到下一行）。 */
 .cs-sfail .cs-why{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;justify-items:center;align-content:center;gap:24px;padding:28px 56px;text-align:center}
 .cs-sfail .cs-why .vis{width:auto;height:100%;max-height:600px;aspect-ratio:1/1}
 .cs-sfail .cs-why .vis svg.illus{width:90%}
 .cs-sfail .cs-why .vis .warn{right:20px;top:20px;width:76px;height:76px}
 .cs-sfail .cs-why .vis .warn svg{width:42px;height:42px}
-.cs-sfail .cs-why p{text-wrap:balance}
+.cs-sfail .cs-why b,.cs-sfail .cs-why p{text-wrap:balance}
 .cs-gw{margin:0;padding:14px 20px;border-radius:20px;background:var(--clay-wash);color:var(--clay-ink);font-size:23px;font-weight:600;line-height:1.5}
 .cs-gw ol{margin:4px 0 0;padding-left:34px}
 .cs-pv{align-self:center;display:flex;flex-direction:column;align-items:center;gap:14px;max-width:620px;font-size:24px;line-height:1.5;color:var(--ink-2);text-align:center}
@@ -1114,7 +1114,7 @@
     });
   }
   /* 屏上扫描中断后的结果屏。原因句 scan/scanDeviceState.ts 111–159、scan/scanDeliveryAck.ts 124–126。?fail=expired|nofile；?reason=stopped|warming|large|ack。
-     11/08 定：屏上扫描自己的结果屏。11/09 定（四项按推荐）：稿跟程序（scan/ScanDeviceFailedView.tsx、scan/styles/scan-device-errors.css 41–52）——
+     11/08 定：屏上扫描自己的结果屏。11/09 定（四项按推荐）：稿跟程序（scan/ScanDeviceFailedView.tsx、scan/styles/scan-device-errors.css 41–53）——
      原因卡单栏居中、大插画在上；出路「照原设置再扫一次」（回 cs-scan-set，材料和放纸设置照上次填好，按开始才建普通新会话）和「返回首页」，
      没有文件那种只留前一张；删掉「同一张纸原样再扫，系统可能按重复件拒收（两小时内）。」「这是一次普通新会话，不是免查重的重扫。不自动重扫。」
      （屏上扫描每次拼出的 PDF 字节都不同，同字节去重拦不到）。屏上扫描没有重扫凭据，?rescan=lost 去掉；?view=now（11/08 程序借的面板失败屏）程序已改，去掉。 */

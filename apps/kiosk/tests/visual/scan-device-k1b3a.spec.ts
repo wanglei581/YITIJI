@@ -296,6 +296,7 @@ test('again with the same settings lands on paper settings prefilled and creates
   await expectDeviceFailed(page, { title: '扫描未完成', chip: '扫描未完成', reason: '这次扫描没有完成。' })
   await page.getByTestId('scan-device-failed-again').click()
   await expectPrefilled(page, f, 'flatbed', 'color')
+  await page.screenshot({ path: 'test-results/align-1109-r2-same-settings.png' })
   // 不重载、直接按开始：内存里要是还挂着上一场的重扫授权，这一次就会带出去，下面的断言要能看见。
   f.cloud.status = 'waiting'
   await page.getByTestId('scan-device-start').click()
