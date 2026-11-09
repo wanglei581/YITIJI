@@ -321,7 +321,7 @@
 
   add('resume', '改简历', '简历入口', {
     before: 'resume',
-    notes: { does: '运行页 /resume-service，QxServiceHubPage hub=resume。正常态两张主卡：有简历去 /resume/source（本稿 resume-src，data-arg=diagnose），没有去 /resume/generate（本稿 scratch）。?ai=down 只停 kind===ai 的入口。', motion: '两张主卡依次浮入；按下缩小。停用的卡按下不动。机构开通时「其余」从本屏底部滑出，不另开一页。', keep: '屏上问题用第 3 版「你手上有简历吗？」，副题「有就帮你诊断改写，没有就一步步写一份。」。运行页标题「把简历这件事，做得更清楚」、副题「从来源选择、诊断优化到生成、材料与打印，按你的目标进入对应步骤。」写在规格 serviceHubSpecs.ts，不画在意图带上。底栏中间一项是「AI 顾问」。页脚三句是规格原文 truthTitle / truth / note，排成一行到两行。顶栏胶囊是就绪句「能力与设备状态以办理时确认为准」，不报打印机。合同风险提示不在 serviceHubSpecs.ts：运行页 QxServiceHubPage 在开关 VITE_ENABLE_CONTRACT_REVIEW==="true" 时另加一张，默认关。本稿用 S().controlsOn（?ctrl=1）表示这个开关打开。未打开时「其余 6 项」仍去 resume-more，常用四卡不动。打开后按钮写成「其余 7 项」，在本屏展开原来的 6 项，再加「AI签约风险提示」：说明「上传劳动合同、实习协议或 Offer，核查试用期、薪酬、竞业等条款风险」，徽标「AI · 仅供参考」，去 contract。?ai=down 时这一项和其他 kind ai 一样停用，文案「AI能力当前不可用」，不消失。要 AI 的项（kind ai）：两张主卡（AI简历诊断、从零生成简历）、职业规划、简历对照，以及展开里的 AI简历诊断、AI简历优化、AI签约风险提示。不要 AI、?ai=down 仍可点：求职材料（info）、自我探索（info）、简历素材库（info）、简历打印（device）、我的简历（account）、AI服务记录（account，名字带 AI 但 kind 不是 ai）。两张主卡停用时的出路：有简历「可以先打印原件」去 print；没有简历「可以先看简历素材库」去 templates。后端整站不可用是 st-unavailable，不是这一变体。四张常用卡同一路由不在展开里再列。自我探索卡上写规格句「完成职业倾向参考」。' },
+    notes: { does: '运行页 /resume-service，QxServiceHubPage hub=resume。正常态两张主卡：有简历去 /resume/source（本稿 resume-src，data-arg=diagnose），没有去 /resume/generate（本稿 scratch）。?ai=down 只停 kind===ai 的入口。11/08 起横带下写三步「导入 → 出初稿 → 确认」（产品负责人同意的同类产品借鉴项，流程不变只缩短说法）；AI 停用、两张主卡都停用或连不上服务时不写。', motion: '两张主卡依次浮入；按下缩小。停用的卡按下不动。机构开通时「其余」从本屏底部滑出，不另开一页。', keep: '屏上问题用第 3 版「你手上有简历吗？」，副题「有就帮你诊断改写，没有就一步步写一份。」。运行页标题「把简历这件事，做得更清楚」、副题「从来源选择、诊断优化到生成、材料与打印，按你的目标进入对应步骤。」写在规格 serviceHubSpecs.ts，不画在意图带上。底栏中间一项是「AI 顾问」。页脚三句是规格原文 truthTitle / truth / note，排成一行到两行。顶栏胶囊是就绪句「能力与设备状态以办理时确认为准」，不报打印机。合同风险提示不在 serviceHubSpecs.ts：运行页 QxServiceHubPage 在开关 VITE_ENABLE_CONTRACT_REVIEW==="true" 时另加一张，默认关。本稿用 S().controlsOn（?ctrl=1）表示这个开关打开。未打开时「其余 6 项」仍去 resume-more，常用四卡不动。打开后按钮写成「其余 7 项」，在本屏展开原来的 6 项，再加「AI签约风险提示」：说明「上传劳动合同、实习协议或 Offer，核查试用期、薪酬、竞业等条款风险」，徽标「AI · 仅供参考」，去 contract。?ai=down 时这一项和其他 kind ai 一样停用，文案「AI能力当前不可用」，不消失。要 AI 的项（kind ai）：两张主卡（AI简历诊断、从零生成简历）、职业规划、简历对照，以及展开里的 AI简历诊断、AI简历优化、AI签约风险提示。不要 AI、?ai=down 仍可点：求职材料（info）、自我探索（info）、简历素材库（info）、简历打印（device）、我的简历（account）、AI服务记录（account，名字带 AI 但 kind 不是 ai）。两张主卡停用时的出路：有简历「可以先打印原件」去 print；没有简历「可以先看简历素材库」去 templates。后端整站不可用是 st-unavailable，不是这一变体。四张常用卡同一路由不在展开里再列。自我探索卡上写规格句「完成职业倾向参考」。' },
     render: () => {
       const down = aiOff();
       const mains = down
@@ -332,7 +332,7 @@
       const career = down ? deadTile({ i: 5, icon: 'map', title: '职业规划' }) : tile({ i: 5, go: 'career', icon: 'map', title: '职业规划', desc: '带走下一步可以做的事' });
       const fit = down ? deadTile({ i: 7, icon: 'target', title: '简历对照' }) : tile({ i: 7, go: 'jobfit', icon: 'target', title: '简历对照', desc: '填一份岗位要求，AI 对照你的简历' });
       return F({
-        band: { eyebrow: 'AI简历服务', title: '你手上有简历吗？', sub: '有就帮你诊断改写，没有就一步步写一份。', seal: 'idle', place: ' ', status: { text: '能力与设备状态以办理时确认为准' } },
+        band: { eyebrow: 'AI简历服务', title: '你手上有简历吗？', sub: '有就帮你诊断改写，没有就一步步写一份。', seal: 'idle', place: ' ', path: down ? undefined : ['导入', '出初稿', '确认'], status: { text: '能力与设备状态以办理时确认为准' } },
         cls: 'tight d4-hub',
         body: `${mains}
           <div class="fgroup"><div class="sec-t rise" style="--i:3">也可以直接用<small>不用先诊断</small>${S().controlsOn ? `<button class="more" data-fm="hubmore">其余 7 项 ${icon('chevR', 24, 2.4)}</button>` : `<button class="more" data-go="resume-more">其余 6 项 ${icon('chevR', 24, 2.4)}</button>`}</div>
