@@ -4,6 +4,7 @@ import { QxTouchTile } from '../../components/qingxu/touch/QxTouchTile'
 import { getPublishedPolicies, type PublishedPoliciesResult } from '../../services/api/policies'
 import { useAuth } from '../../auth/useAuth'
 import { useOfficialChannels } from '../../hooks/useOfficialChannels'
+import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useKioskLicense } from '../../layouts/KioskLicenseContext'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
@@ -21,9 +22,11 @@ export function PolicyTouchHub() {
   const { isLoggedIn } = useAuth()
   const winding = useKioskLicense().mode === 'winding-down'
   const ai = useInterviewAiCapabilities()
-  // 没有发布的政策时，本机构有官方渠道就给一条去官网 / 公众号看的出路（与首页磁贴同一判据）。我们不代发政策。
+  // 2026-11-08 四核心收口：本机构官方渠道从首页磁贴挪到这里。条件与首页原来一致：没开招聘托管、终端绑定的机构配了渠道；
+  // 渠道请求没回来或失败时不出这一行，不先占位再消失。全页只有这一个入口：#1604 在空态加的那一格已并进这一行。
+  const recruitment = useRecruitmentHosting()
   const channels = useOfficialChannels()
-  const channelCount = channels.status === 'ready' ? channels.items.length : 0
+  const channelCount = recruitment.status === 'ready' && !recruitment.enabled && channels.status === 'ready' ? channels.items.length : 0
   const [attempt, setAttempt] = useState(0)
   const [data, setData] = useState<HomeData | null>(null)
   const [failed, setFailed] = useState(false)
@@ -43,6 +46,8 @@ export function PolicyTouchHub() {
   const empty = data?.latest.total === 0 && data.notices.total === 0
   const latest = data?.latest.items[0]
   const spec = SERVICE_HUB_SPECS.policy
+  const channelsRow = channelCount > 0 ? <button type="button" className="policy-min-row" data-testid="policy-official-channels" disabled={winding}
+    onClick={() => navigate('/official-channels')}>本机构官方渠道 · {channelCount} 个 · 扫码到官网或官方账号</button> : null
   return <PolicyTouchLayout home title={empty ? '这里还没有发布的政策' : spec.title}
     eyebrow={empty ? '查政策' : spec.eyebrow}
     path={empty ? ['机构在后台发布', '这里按类别列出', '打印清单或扫码看原文'] : undefined}
@@ -50,7 +55,10 @@ export function PolicyTouchHub() {
       ? '机构在后台审核发布后，这里按类别列出，每条写清条件、材料和去哪办。' : spec.subtitle}
     ask={!empty} state={failed ? 'failed' : !data ? 'loading' : empty ? 'empty' : 'ready'}
     alert={winding ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : undefined}>
-    {!data ? <PolicyReadState failed={failed} retry={() => setAttempt((value) => value + 1)} /> : empty ? <>
+    {!data ? <>
+      <PolicyReadState failed={failed} retry={() => setAttempt((value) => value + 1)} />
+      {failed && channelsRow}
+    </> : empty ? <>
       <section className="policy-min-section">
         <h2>政策由谁发布</h2>
         <ul><li>政策由发布机构在机构后台自己审核、发布，并对内容负责</li>
@@ -62,11 +70,9 @@ export function PolicyTouchHub() {
         <QxTouchTile icon="sparkle" title={ai.state('assistant_chat') === 'available' ? '问小青' : '小青暂时不可用'}
           desc="问通用问题；不解释具体政策，不判断能不能领" off={winding || ai.state('assistant_chat') !== 'available'}
           onClick={() => { rememberAssistantDraft(POLICY_GENERAL_QUESTION); navigate('/assistant') }} />
-        {channelCount > 0 ? (
-          <QxTouchTile icon="qr" title="本机构官方渠道" desc={`本机有 ${channelCount} 个渠道，扫码到机构官网或官方账号`} onClick={() => navigate('/official-channels')} />
-        ) : null}
         <QxTouchTile icon="home" title="回首页办别的事" desc="打印、扫描、改简历、练面试照常" onClick={() => navigate('/')} />
       </div>
+      {channelsRow}
     </> : <>
       <div className="policy-min-grid policy-min-categories" data-testid="policy-categories">
         {policyCategorySummaries(data.categories).map((category, index) => <QxTouchTile key={category.key} icon={category.icon}
@@ -80,6 +86,7 @@ export function PolicyTouchHub() {
       {data.notices.total > 0 && <button type="button" className="policy-min-row" disabled={winding} onClick={() => navigate('/renshi?tab=notice')}>
         机构公告 · {data.notices.total} 条
       </button>}
+      {channelsRow}
       {isLoggedIn && <button type="button" className="policy-min-row" disabled={winding} onClick={() => navigate('/me/favorites?tab=policy')}>政策收藏</button>}
       <p className="policy-min-fine">条数从发布数据读；政策由发布机构自行审核发布，以官方原文为准</p>
     </>}

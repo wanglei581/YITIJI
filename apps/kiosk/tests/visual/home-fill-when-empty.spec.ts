@@ -30,7 +30,8 @@ const VARIANTS: HomeVariant[] = ['default', 'channels', 'hosting', 'gov', 'full'
  * gov / full 把百宝箱与智慧校园配成开，2026-11-04 停放后都不占磁贴：gov 与 channels 同为 3 块，
  * full 与 hosting 同为 4 块，恰在压紧门槛上，少任何一个读取都会退回 16px。
  */
-const EXPECTED_TILES: Record<HomeVariant, number> = { default: 2, channels: 3, hosting: 4, gov: 3, full: 4 }
+// channels / gov：本机构官方渠道 2026-11-08 挪进「查政策」页，首页第三行与 default 一样是 2 块。
+const EXPECTED_TILES: Record<HomeVariant, number> = { default: 2, channels: 2, hosting: 4, gov: 2, full: 4 }
 
 /** 一体机设计稿里的版心宽度；页面缩放时按它折算。 */
 const DESIGN_WIDTH = 1080
