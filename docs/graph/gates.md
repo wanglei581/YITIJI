@@ -26,7 +26,7 @@ _（空）_
 
 ──────────────────────────────────────────────────────────────────────
 
-## 有脚本名但不在 CI 执行闭包里（17）
+## 有脚本名但不在 CI 执行闭包里（16）
 
 这一栏是**尽力而为的推断**，权威是 `verify:ci-gate-coverage` 加
 `scripts/ci-gate-exemptions.json`。已在豁免清单里登记的（需要真实凭证 / 真机 /
@@ -42,7 +42,6 @@ _（空）_
 | `apps/kiosk/scripts/probe-file-closure-43.mjs` | `@ai-job-print/kiosk::verify:probe-file-closure-43` |
 | `apps/kiosk/scripts/probe-member-session-41.mjs` | `@ai-job-print/kiosk::verify:probe-member-session-41` |
 | `apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts` | `terminal-agent::verify:boot-spool-guard-windows` |
-| `apps/terminal-agent/scripts/verify-print-completion-evidence.ts` | `terminal-agent::verify:print-completion-evidence` |
 | `apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts` | `terminal-agent::verify:print-queue-residue-windows` |
 | `apps/terminal-agent/scripts/verify-scan-wia-deskew-windows.ts` | `terminal-agent::verify:scan-wia-deskew-windows` |
 | `scripts/generate-project-graph.mjs` | `ai-job-print-terminal::graph`<br/>`ai-job-print-terminal::graph:check` |

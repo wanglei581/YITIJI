@@ -36853,7 +36853,7 @@
       },
       "file": "apps/terminal-agent/scripts/verify-print-completion-evidence.ts",
       "helper": true,
-      "inCi": false,
+      "inCi": true,
       "package": "terminal-agent",
       "scriptNames": [
         "terminal-agent::verify:print-completion-evidence"
