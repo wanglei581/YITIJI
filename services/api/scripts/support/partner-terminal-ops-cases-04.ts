@@ -18,7 +18,7 @@ export const ROW_FAULT_KEYS = [...TOTAL_FAULT_KEYS, 'unrecovered', 'reportedInWi
 export const TERMINAL_OPS_KEY_PATHS = new Set<string>([
   'period', 'timezone', 'window', 'window.from', 'window.to', 'generatedAt', 'minSample',
   'terminals',
-  ...['terminalCode', 'displayName', 'locationLabel', 'online', 'lastHeartbeatAt', 'visitCount', 'serviceCount', 'output', 'faults']
+  ...['terminalCode', 'displayName', 'locationLabel', 'online', 'lastHeartbeatAt', 'visitCount', 'serviceCount', 'output', 'faults', 'printerStatus', 'openAlertCount']
     .map((key) => `terminals[].${key}`),
   ...OUTPUT_KEYS.map((key) => `terminals[].output.${key}`),
   ...ROW_FAULT_KEYS.map((key) => `terminals[].faults.${key}`),

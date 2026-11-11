@@ -4,7 +4,7 @@ import { formatCount, formatDateTime } from '@ai-job-print/shared'
 import { ConsoleTable, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
-import { AlertTriangleIcon, BotIcon, FileWarningIcon, MessageSquareWarningIcon, MonitorOffIcon, PrinterIcon, RefreshCwIcon, ScanLineIcon } from 'lucide-react'
+import { AlertTriangleIcon, BotIcon, Building2Icon, FileWarningIcon, MessageSquareWarningIcon, MonitorOffIcon, PrinterIcon, RefreshCwIcon, ScanLineIcon } from 'lucide-react'
 import {
   adminOpsService,
   type AdminAlertItem,
@@ -62,6 +62,11 @@ const TYPE_META: Record<
     icon: ScanLineIcon,
     guidance: '这台终端已开通屏上扫描，最近一次心跳报扫描仪找不到或出错。心跳改报正常后这条告警会自行消失。确认 / 静默只记录处理。',
   },
+  partner_incident: {
+    label: '机构报障',
+    icon: Building2Icon,
+    guidance: '机构在后台提交的报障还没关闭。请在机构详情里查看这台终端的报障，处理完后这条告警会消失。',
+  },
 }
 
 const SEVERITY_MAP: Record<string, { badge: 'error' | 'warning'; label: string }> = {
@@ -86,6 +91,7 @@ const TYPE_FILTERS = [
   { label: 'AI 连续失败', value: 'ai_consecutive_failures' },
   { label: 'AI 费用上限已用完', value: 'ai_budget_exhausted' },
   { label: '扫描仪异常', value: 'scan_device_issue' },
+  { label: '机构报障', value: 'partner_incident' },
 ] as const
 
 const VIEW_TABS: Array<{ label: string; value: AlertListView }> = [

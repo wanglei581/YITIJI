@@ -1,7 +1,6 @@
 import { formatDateTime, type FirstOrderProject, type FirstOrderTerminal } from '@ai-job-print/shared'
 import { StatusBadge } from '@ai-job-print/ui'
-
-const printerLabels: Record<string, string> = { ready: '就绪', idle: '空闲', online: '已连接', printing: '打印中', busy: '忙碌', offline: '离线', paper_out: '缺纸', paper_jam: '卡纸', error: '故障', unknown: '暂不能确认' }
+import { printerStatusLabel } from '../../lib/printerStatusLabel'
 
 export function ProjectDetails({ project, terminals }: { project: FirstOrderProject; terminals: FirstOrderTerminal[] }) {
   const now = Date.now()
@@ -19,7 +18,7 @@ export function ProjectDetails({ project, terminals }: { project: FirstOrderProj
       return <div key={deployment.id} className="space-y-1 rounded-lg bg-neutral-50 p-3 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold">{deployment.terminalCode} · {deployment.locationLabel}</p><StatusBadge label={deployment.endedAt ? '本次部署已结束' : terminal?.online ? '主机在线' : terminal ? '主机未在线' : '当前设备归属待核对'} status={deployment.endedAt ? 'default' : terminal?.online ? 'success' : 'warning'} /></div>
         <p className="text-xs text-neutral-500">部署登记：{formatDateTime(deployment.startedAt)}{deployment.endedAt ? `，结束：${formatDateTime(deployment.endedAt)}` : ''}</p>
-        {!deployment.endedAt && terminal && <p className="text-xs text-neutral-500">打印机：{terminal.online && terminal.printerStatus ? printerLabels[terminal.printerStatus] ?? '暂不能识别，请现场核对' : '当前不能确认'} · 最后心跳：{terminal.lastHeartbeatAt ? formatDateTime(terminal.lastHeartbeatAt) : '尚未上报'}</p>}
+        {!deployment.endedAt && terminal && <p className="text-xs text-neutral-500">打印机：{terminal.online && terminal.printerStatus ? printerStatusLabel(terminal.printerStatus) : '当前不能确认'} · 最后心跳：{terminal.lastHeartbeatAt ? formatDateTime(terminal.lastHeartbeatAt) : '尚未上报'}</p>}
       </div>
     })}</div>
     <p className="text-xs leading-relaxed text-neutral-500">主机在线不代表打印或扫描已经成功。安装能力和耗材以现场核验为准，未接入的遥测不估算；报障、维修与换机由平台负责，机构负责提供现场情况并核对结果。</p>

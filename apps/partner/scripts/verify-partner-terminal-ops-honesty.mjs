@@ -36,9 +36,11 @@ function load(rel, requireMap) {
 
 const csv = load('src/lib/csv.ts', {})
 const shared = load('../../packages/shared/src/formatDateTime.ts', {})
+const printerStatus = load('src/lib/printerStatusLabel.ts', {})
 const fmt = load('src/routes/terminals/terminalOpsFormat.ts', {
   '../../lib/csv': csv,
   '@ai-job-print/shared': shared,
+  '../../lib/printerStatusLabel': printerStatus,
 })
 
 const zeroFaults = { offlineCount: 0, offlineMinutes: 0, printerFaultCount: 0, printerFaultMinutes: 0, recoveredCount: 0, avgRecoveryMinutes: null, longestMinutes: null }

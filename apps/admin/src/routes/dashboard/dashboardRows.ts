@@ -62,6 +62,7 @@ const ALERT_ROW_ICON: Record<AdminAlertItem['type'], ElementType> = {
   ai_consecutive_failures: BotIcon,
   ai_budget_exhausted: BotIcon,
   scan_device_issue: ScanLineIcon,
+  partner_incident: Building2Icon,
 }
 
 /**

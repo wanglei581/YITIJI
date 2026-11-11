@@ -36,6 +36,14 @@ export const PARTNER_WRITE_EXEMPTIONS: readonly PartnerWriteExemption[] = [
     reason: '机构资料（联系方式）要能在授权失效时维护，续约联络用',
   },
   {
+    method: 'PUT', path: '/partner/device-alert-notify', handler: 'PartnerDeviceAlertNotifyController.save', kind: 'maintain',
+    reason: '设备告警通知地址：现场无人值守时要能改通知去向，授权失效也不能卡住',
+  },
+  {
+    method: 'POST', path: '/partner/device-alert-notify/test', handler: 'PartnerDeviceAlertNotifyController.test', kind: 'maintain',
+    reason: '发送一条设备告警测试消息，确认群里还能收到',
+  },
+  {
     method: 'POST', path: '/partner/first-order/incidents', handler: 'PartnerFirstOrderIncidentsController.create', kind: 'maintain',
     reason: '现场报障：设备出了问题要能报，不能被授权状态卡住',
   },

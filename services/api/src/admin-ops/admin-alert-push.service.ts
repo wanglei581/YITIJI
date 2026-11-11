@@ -4,8 +4,11 @@ import { RedisService } from '../common/redis/redis.service'
 import { collectDerivedAlerts, type DerivedAlert } from './derived-alerts'
 import { PrismaService } from '../prisma/prisma.service'
 import { SCAN_DEVICE_ISSUE } from './derived-scan-device-alerts'
+import { anyOrgDeviceAlertWebhook, pushOrgDeviceAlerts } from './org-device-alert-push'
 
-type PreviousAlert = Pick<DerivedAlert, 'subjectKey' | 'episodeToken' | 'type' | 'severity' | 'title' | 'terminalCode'>
+type PreviousAlert = Pick<DerivedAlert, 'subjectKey' | 'episodeToken' | 'type' | 'severity' | 'title' | 'terminalCode'> & {
+  occurredAt?: string
+}
 type AlertCollector = (prisma: PrismaService, now: Date) => Promise<{ alerts: DerivedAlert[]; terminalSubjectKeysInScope?: string[] }>
 
 const TERMINAL_ALERT_TYPES = new Set(['terminal_offline', 'printer_issue', SCAN_DEVICE_ISSUE])
@@ -91,7 +94,7 @@ export class AdminAlertPushService {
 
   @Cron(CronExpression.EVERY_MINUTE, { name: 'admin-alert-push' })
   async pushDerivedAlerts(): Promise<void> {
-    if (!this.webhook) return
+    if (!this.webhook && !(await anyOrgDeviceAlertWebhook(this.prisma))) return
     try {
       const now = new Date()
       const current = await this.collectAlerts(this.prisma, now)
@@ -117,8 +120,19 @@ export class AdminAlertPushService {
         await this.pushOnce(alert, 'recovered')
       }
 
-      const next: PreviousAlert[] = current.alerts.map(({ subjectKey, episodeToken, type, severity, title, terminalCode }) => ({
-        subjectKey, episodeToken, type, severity, title, terminalCode,
+      await pushOrgDeviceAlerts({
+        prisma: this.prisma,
+        redis: this.redis,
+        fetchImpl: this.fetchImpl,
+        current: current.alerts,
+        previous,
+        inScope,
+        logger: this.logger,
+        dedupeTtlSeconds: this.dedupeTtlSeconds,
+      })
+
+      const next: PreviousAlert[] = current.alerts.map(({ subjectKey, episodeToken, type, severity, title, terminalCode, occurredAt }) => ({
+        subjectKey, episodeToken, type, severity, title, terminalCode, occurredAt,
       }))
       await this.redis.set(this.snapshotKey, JSON.stringify(next), this.dedupeTtlSeconds)
     } catch (error) {

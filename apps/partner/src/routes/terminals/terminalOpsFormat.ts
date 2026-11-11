@@ -2,6 +2,7 @@
 
 import { formatCount, formatDate, formatDateTime, formatRelativeTime } from '@ai-job-print/shared'
 import { buildCsv } from '../../lib/csv'
+import { printerStatusLabel, printerStatusSummary } from '../../lib/printerStatusLabel'
 import type {
   PartnerTerminalOpsView,
   TerminalOpsFaultTotals,
@@ -13,6 +14,8 @@ import type {
 const UNAVAILABLE_COPY: Record<string, string> = {
   ai_calls_not_attributed_to_terminal: 'AI 调用记录还没有标明是哪台终端发起的，暂不能按本机构终端统计；本页不拿全平台的数字代替。',
 }
+
+export { printerStatusSummary }
 
 export function unavailableReason(item: TerminalOpsUnavailable): string {
   return UNAVAILABLE_COPY[item.reason] ?? '暂不能统计。'
@@ -104,7 +107,7 @@ export const METRIC_NOTES = {
 
 export function buildTerminalOpsCsv(data: PartnerTerminalOpsView): string {
   const header = [
-    '终端编号', '终端名称', '摆放位置', '当前状态', '最后心跳（北京时间）',
+    '终端编号', '终端名称', '摆放位置', '当前状态', '打印机状态', '当前未恢复告警', '最后心跳（北京时间）',
     '服务人次', '打印扫描服务次数（按任务计）', '出纸成功', '已结束打印任务', '出纸成功率', '未确认出纸',
     '离线次数', '离线时长（分钟）', '打印机故障次数', '打印机故障时长（分钟）',
     '已恢复次数', '平均恢复（分钟）', '最长一次（分钟）', '截至昨天未恢复', '统计期内有上报',
@@ -119,6 +122,8 @@ export function buildTerminalOpsCsv(data: PartnerTerminalOpsView): string {
     terminalName(row),
     row.locationLabel ?? '',
     RUN_STATE_VIEW[runState(row)].label,
+    printerStatusLabel(row.printerStatus),
+    row.openAlertCount ?? 0,
     shanghaiDateTime(row.lastHeartbeatAt),
     data.visitCount.recordingStarted ? csvCount(row.visitCount) : VISIT_NOT_STARTED,
     csvCount(row.serviceCount),
@@ -132,6 +137,7 @@ export function buildTerminalOpsCsv(data: PartnerTerminalOpsView): string {
   const totals = data.totals
   const totalRow = [
     '合计', `${totals.terminalCount} 台`, '', `在线 ${totals.onlineTerminals} 台`, '',
+    data.terminals.reduce((sum, row) => sum + (row.openAlertCount ?? 0), 0), '',
     data.visitCount.recordingStarted ? csvCount(totals.visitCount) : VISIT_NOT_STARTED, csvCount(totals.serviceCount), csvCount(totals.output.printed), csvCount(totals.output.settled),
     csvRate(totals.output), csvCount(totals.output.unconfirmed),
     ...faultCells(totals.faults, totalsFaultsReported(data), `${totals.unrecoveredTerminals} 台`),
