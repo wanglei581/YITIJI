@@ -293,10 +293,50 @@ if (failed) process.exit(1)
       return true
     })
   }
+  // 保存并发布：审核或发布被拒时内容已经保存，服务端正常返回 { policy, stopped }（放在报错里的编号会被服务端错误过滤器丢掉）。
+  // 适配层要把它变成带政策编号的错误：弹窗显示原因，页面记下编号，改完再点时改的是同一条、不再新建。
+  class StoppedAwareError extends Error {
+    constructor(code, message, status, details = {}) { super(message); this.code = code; this.status = status; this.details = details }
+  }
+  let okBody
+  let okSent
+  const okModule = { exports: {} }
+  vm.runInNewContext(output, {
+    module: okModule, exports: okModule.exports, URLSearchParams,
+    require: (name) => name === './client'
+      ? { API_MODE: 'http', API_BASE_URL: '/api/v1', ApiHttpError: StoppedAwareError }
+      : { authHeader: () => ({}), redirectToLogin: () => {} },
+    fetch: async (url, init) => {
+      okSent = { url: String(url), method: init.method, body: JSON.parse(init.body) }
+      return { ok: true, status: 201, statusText: 'Created', json: async () => okBody }
+    },
+  })
+  const okApi = okModule.exports.partnerPoliciesService
+  okBody = { policy: { id: 'p-1', publishStatus: 'published' }, stopped: null }
+  const finished = await okApi.saveAndPublish(model.policyFormPayload(guide, false), { responsibilityAcknowledged: true })
+  assert.equal(finished.id, 'p-1')
+  assert.equal(finished.publishStatus, 'published')
+  assert.equal(okSent.method, 'POST')
+  assert.match(okSent.url, /\/partner\/policies\/release-with-save$/)
+  assert.equal(okSent.body.responsibilityAcknowledged, true)
+  okBody = {
+    policy: { id: 'p-2', reviewStatus: 'approved', publishStatus: 'draft' },
+    stopped: { at: 'publish', code: 'POLICY_SOURCE_URL_NOT_VERIFIED', message: '内容已保存并通过审核，停在发布。原文链接不在本机构登记的官方网站内。' },
+  }
+  await assert.rejects(okApi.saveAndPublish(model.policyFormPayload(guide, true), { responsibilityAcknowledged: true, id: 'p-2' }), (error) => {
+    assert.equal(error.code, 'POLICY_SOURCE_URL_NOT_VERIFIED')
+    assert.equal(error.details.policyId, 'p-2', '停下时要把已保存的编号交给页面')
+    assert.equal(error.details.stoppedAt, 'publish')
+    assert.match(error.message, /^内容已保存并通过审核，停在发布。/)
+    return true
+  })
+  assert.match(okSent.url, /\/partner\/policies\/p-2\/release-with-save$/)
+  assert.match(page, /onStopped=\{oneStep \? \(policyId\) => \{ setDraftId\(policyId\)/, '页面收到编号后记成这一条的草稿编号')
+
   responseBody = {}
   await assert.rejects(api.updatePolicy('1', model.policyFormPayload(empty, true)))
   for (const key of keys) assert.equal(sent[key], null, `PATCH 实际 JSON 中 ${key} 为 null`)
-  console.log('PASS 政策三栏/默认扶持条目/http 不拦保存/标题边界、新建省略与编辑清空、条件入口停放、分步按钮仍在、发布人话错误与真实 PATCH JSON')
+  console.log('PASS 政策三栏/默认扶持条目/http 不拦保存/标题边界、新建省略与编辑清空、条件入口停放、分步按钮仍在、保存并发布中途停下带回编号、发布人话错误与真实 PATCH JSON')
 }
 
 console.log('verify:partner-refresh-safe passed')

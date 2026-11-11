@@ -287,12 +287,26 @@ const httpAdapter: PartnerPoliciesServiceInterface = {
   releasePolicy: (id, input) =>
     req<PartnerPolicyRecord>('PATCH', `/partner/policies/${id}/release`, { responsibilityAcknowledged: input.responsibilityAcknowledged }, true),
   previewDraftCheck: (input) => req('POST', '/partner/policies/draft-check', input, true),
-  saveAndPublish: (input, options) => req(
-    'POST',
-    options.id ? `/partner/policies/${options.id}/release-with-save` : '/partner/policies/release-with-save',
-    { ...input, responsibilityAcknowledged: options.responsibilityAcknowledged },
-    true,
-  ),
+  saveAndPublish: async (input, options) => {
+    const outcome = await req<{
+      policy: PartnerPolicyRecord
+      stopped: { at: string; code: string; message: string } | null
+    }>(
+      'POST',
+      options.id ? `/partner/policies/${options.id}/release-with-save` : '/partner/policies/release-with-save',
+      { ...input, responsibilityAcknowledged: options.responsibilityAcknowledged },
+      true,
+    )
+    // 审核或发布被拒时，内容已经保存，服务端照常返回这条政策和原因（不是报错）。
+    // 这里转成带政策编号的错误交给弹窗：弹窗显示原因，页面记下编号，改完再点时改的是同一条。
+    if (outcome.stopped) {
+      throw new ApiHttpError(outcome.stopped.code, outcome.stopped.message, 200, {
+        policyId: outcome.policy.id,
+        stoppedAt: outcome.stopped.at,
+      })
+    }
+    return outcome.policy
+  },
   getEligibilityQuestions: () => req<PolicyEligibilityQuestionSet>('GET', '/policies/eligibility-questions'),
   getEligibilityRules: (policyId) =>
     req<PolicyEligibilityRuleRecord[]>('GET', `/partner/policies/${policyId}/eligibility-rules`),

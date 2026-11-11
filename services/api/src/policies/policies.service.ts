@@ -14,7 +14,13 @@ import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import type { CreatePolicyPostDto, PolicyDraftCheckDto, UpdatePolicyPostDto } from './dto/policy.dto'
 import type { ReviewAction } from '../jobs/dto/review.dto'
 import type { PublishAction } from '../jobs/dto/publish.dto'
-import { checkPolicySourceLink, isPolicySourceLinkVerified, policyDraftPublishWarning, POLICY_PUBLISH_ISSUES } from './policy-source-link'
+import {
+  checkPolicySourceLink,
+  isPolicySourceLinkVerified,
+  policyDraftPublishWarning,
+  policySourceLinkRejection,
+  POLICY_PUBLISH_ISSUES,
+} from './policy-source-link'
 import { assessPolicyChecklistFit } from './policy-checklist-layout'
 
 import { partnerOrgTypeCan } from '../jobs/partner-capabilities'
@@ -628,7 +634,7 @@ export class PoliciesService {
       throw new BadRequestException({ error: POLICY_PUBLISH_ISSUES.sourceDomainsNotRegistered })
     }
     if (link.status === 'not_verified') {
-      throw new BadRequestException({ error: POLICY_PUBLISH_ISSUES.sourceUrlNotVerified })
+      throw new BadRequestException({ error: policySourceLinkRejection(link) })
     }
     const version = post.contentVersion ?? 1
     const confirmedAt = new Date()

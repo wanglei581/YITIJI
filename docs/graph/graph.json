@@ -26141,6 +26141,9 @@
       "services/api/scripts/verify-brand-logo-image.ts",
       "services/api/scripts/verify-branding.ts"
     ],
+    "services/api/scripts/support/policy-one-step-http-cases.ts": [
+      "services/api/scripts/verify-content-pipeline-e2e.ts"
+    ],
     "services/api/scripts/support/policy-publish-fixture.ts": [
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-policies.ts",
@@ -40912,6 +40915,7 @@
         "files": [
           "services/api/scripts/support/content-pipeline-fixtures.ts",
           "services/api/scripts/support/content-pipeline-harness.ts",
+          "services/api/scripts/support/policy-one-step-http-cases.ts",
           "services/api/src/common/crypto/secret-cipher.ts",
           "services/api/src/common/guards/end-user-auth.guard.ts",
           "services/api/src/job-sync/job-sync.service.ts",
