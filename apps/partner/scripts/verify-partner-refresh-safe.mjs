@@ -185,11 +185,12 @@ if (failed) process.exit(1)
   const fields = load('routes/policy/PolicyFormFields.tsx', {
     'react/jsx-runtime': { jsx, jsxs: jsx }, react,
     '../../services/api/officialChannels': {},
+    '../../services/api/policies': { partnerPoliciesService: { previewDraftCheck: async () => ({ publishWarning: null, checklistReady: true, columns: [] }) } },
     '../../lib/httpUrl': load('lib/httpUrl.ts'),
     './policyLabels': load('routes/policy/policyLabels.ts', { '@ai-job-print/shared': { PARTNER_TYPE_LABELS: {} } }),
     './policyFormModel': model,
   })
-  const empty = { ...model.EMPTY_FORM, title: '政策公告' }
+  const empty = { ...model.EMPTY_FORM, title: '政策扶持条目' }
   const keys = ['summary', 'content', 'externalUrl', 'externalId', 'publishedDate', 'whoCanApply', 'requiredMaterials', 'whereToApply']
   for (const key of keys) {
     const form = { ...empty, [key]: '  ' }
@@ -197,7 +198,9 @@ if (failed) process.exit(1)
     assert.equal(JSON.parse(JSON.stringify(model.policyFormPayload(form, true)))[key], null, `编辑清空 ${key} 必须发送 null`)
     assert.equal(model.policyFormPayload({ ...form, [key]: ' 原文 ' }, true)[key], '原文')
   }
-  assert.equal(model.policyFormBlockReason(empty), null, '公告允许无链接和三栏')
+  assert.equal(model.EMPTY_FORM.kind, 'policy_guide', '新增默认是政策扶持条目')
+  const notice = { ...model.EMPTY_FORM, kind: 'notice', title: '政策公告' }
+  assert.equal(model.policyFormBlockReason(notice), null, '公告允许无链接和三栏')
   const guide = { ...empty, kind: 'policy_guide', externalUrl: 'https://official.example/policy', whoCanApply: '原文条件', requiredMaterials: '原文材料', whereToApply: '原文窗口' }
   assert.equal(model.policyFormBlockReason(guide), null, '前端不按域名名单拒绝，名单判据在服务端')
   for (const key of ['whoCanApply', 'requiredMaterials', 'whereToApply']) {
@@ -205,7 +208,8 @@ if (failed) process.exit(1)
     assert.match(model.policyFormBlockReason({ ...guide, [key]: '字'.repeat(2001) }), /2000/)
   }
   assert.match(model.policyFormBlockReason({ ...guide, externalUrl: '' }), /原文链接/)
-  for (const externalUrl of ['http://official.example/p', 'javascript:alert(1)', '/policy', 'https://']) {
+  assert.equal(model.policyFormBlockReason({ ...guide, externalUrl: 'http://official.example/p' }), null, 'http 不拦保存草稿')
+  for (const externalUrl of ['javascript:alert(1)', '/policy', 'https://']) {
     assert.match(model.policyFormBlockReason({ ...guide, externalUrl }), /https/)
   }
   assert.equal(model.policyFormBlockReason({ ...guide, title: '字'.repeat(200) }), null)
@@ -219,7 +223,11 @@ if (failed) process.exit(1)
   const guideNodes = render(guide)
   assert.equal(guideNodes.filter((node) => node.type === 'textarea' && node.props.maxLength === 2000 && node.props.required).length, 3)
   assert.equal(guideNodes.filter((node) => node.type === 'input' && node.props.maxLength === 200).length, 1)
-  assert.equal(render(empty).filter((node) => node.type === 'textarea' && node.props.maxLength === 2000).length, 0)
+  assert.equal(render(notice).filter((node) => node.type === 'textarea' && node.props.maxLength === 2000).length, 0)
+  const fieldsSource = readPolicy('routes/policy/PolicyFormFields.tsx')
+  assert.equal(model.CHECKLIST_OVERFLOW_HINT, '清单上印不下，超出的部分要扫码看原文')
+  assert.ok(fieldsSource.includes('CHECKLIST_OVERFLOW_HINT'))
+  assert.ok(fieldsSource.includes('previewDraftCheck'))
   const page = readPolicy('routes/policy/index.tsx')
   const table = readPolicy('routes/policy/PolicyTable.tsx')
   assert.doesNotMatch(page, /import\s+EligibilityRulesDrawer|<EligibilityRulesDrawer|setRulesFor/)
@@ -228,6 +236,9 @@ if (failed) process.exit(1)
   assert.ok(readPolicy('routes/policy/EligibilityRulesDrawer.tsx').includes('EligibilityRulesDrawer'))
   assert.ok(readPolicy('routes/policy/EligibilityRuleEditor.tsx').length > 0)
   assert.match(page, /disabled=\{saving \|\| !canSave\}/)
+  assert.match(page, /保存并发布/)
+  assert.match(table, />\s*审核通过\s*</)
+  assert.match(table, />\s*发布\s*</)
   assert.match(page, /formBlockReason && !editingRecruitmentLocked && <p role="status"/)
   class ApiHttpError extends Error {
     constructor(codeOrMessage, message) { super(message ?? codeOrMessage) }
@@ -285,7 +296,7 @@ if (failed) process.exit(1)
   responseBody = {}
   await assert.rejects(api.updatePolicy('1', model.policyFormPayload(empty, true)))
   for (const key of keys) assert.equal(sent[key], null, `PATCH 实际 JSON 中 ${key} 为 null`)
-  console.log('PASS 政策三栏/HTTPS/标题边界、新建省略与编辑清空、条件入口停放、发布人话错误与真实 PATCH JSON')
+  console.log('PASS 政策三栏/默认扶持条目/http 不拦保存/标题边界、新建省略与编辑清空、条件入口停放、分步按钮仍在、发布人话错误与真实 PATCH JSON')
 }
 
 console.log('verify:partner-refresh-safe passed')

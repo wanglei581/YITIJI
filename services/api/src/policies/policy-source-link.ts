@@ -37,6 +37,27 @@ export function isPolicySourceLinkVerified(
   return checkPolicySourceLink(externalUrl, verifiedOfficialDomainsJson).status === 'verified'
 }
 
+/**
+ * 保存草稿不拦截，但把发布闸门会用的同一句原因提前说出来。
+ * 返回 null 表示按当前登记域名，这条链接不会在发布时被拒。
+ */
+export function policyDraftPublishWarning(
+  kind: string | null | undefined,
+  externalUrl: string | null | undefined,
+  verifiedOfficialDomainsJson: string | null | undefined,
+): string | null {
+  const link = checkPolicySourceLink(externalUrl, verifiedOfficialDomainsJson)
+  if (link.status === 'verified') return null
+  if (link.status === 'missing') {
+    if (kind === 'policy_guide') return `发布时会被拒，原因是：${POLICY_PUBLISH_ISSUES.sourceUrlRequired.message}`
+    return null
+  }
+  if (link.status === 'no_registered_domains') {
+    return `发布时会被拒，原因是：${POLICY_PUBLISH_ISSUES.sourceDomainsNotRegistered.message}`
+  }
+  return `发布时会被拒，原因是：${POLICY_PUBLISH_ISSUES.sourceUrlNotVerified.message}`
+}
+
 /** 发布闸门的错误码与对外文案（机构对接人看得懂的话，不露接口路径、字段名和 JSON）。 */
 export const POLICY_PUBLISH_ISSUES = {
   handlingFieldsRequired: {

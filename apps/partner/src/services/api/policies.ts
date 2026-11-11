@@ -55,6 +55,8 @@ export interface PartnerPolicyRecord {
   emergencyReasonCode?: string | null
   emergencyReasonText?: string | null
   emergencyTakedownAt?: string | null
+  /** 只在保存草稿的响应里出现：发布时会被拒的原因。公开读取不会带这个字段。 */
+  publishWarning?: string | null
 }
 
 /** 平台紧急下架（P-01）。只认服务端给的标记，本机构自己下架不算。 */
@@ -221,6 +223,8 @@ export interface PartnerPoliciesServiceInterface {
    * 不是 true 一律 400 POLICY_RESPONSIBILITY_ACK_REQUIRED，前端不替用户默认勾上。
    */
   releasePolicy(id: string, input: { responsibilityAcknowledged: boolean }): Promise<PartnerPolicyRecord>
+  previewDraftCheck(input: { kind: PolicyKind; externalUrl?: string; whoCanApply?: string; requiredMaterials?: string; whereToApply?: string }): Promise<{ publishWarning: string | null; checklistReady: boolean; columns: Array<{ key: string; truncated: boolean }> }>
+  saveAndPublish(input: SavePolicyInput, options: { responsibilityAcknowledged: boolean; id?: string }): Promise<PartnerPolicyRecord>
   /** 问项字典（服务端下发，前端不得硬编码） */
   getEligibilityQuestions(): Promise<PolicyEligibilityQuestionSet>
   getEligibilityRules(policyId: string): Promise<PolicyEligibilityRuleRecord[]>
@@ -246,17 +250,19 @@ async function req<T>(method: string, path: string, body?: unknown, messageOnly 
   if (!res.ok) {
     let code = `HTTP_${res.status}`
     let message = messageOnly ? '' : res.statusText
+    let details: Record<string, unknown> = {}
     try {
       const data = (await res.json()) as { error?: { code?: string; message?: string }; message?: string | string[] }
+      if (data.error && typeof data.error === 'object') details = data.error
       if (data.error?.code) code = data.error.code
       if (typeof data.error?.message === 'string') message = data.error.message
       else if (!messageOnly && Array.isArray(data.message) && data.message.length > 0) message = data.message.join('；')
     } catch { /* keep defaults */ }
     if (res.status === 401) {
       redirectToLogin()
-      throw new ApiHttpError(code || 'AUTH_REQUIRED', messageOnly ? message : '登录已过期', res.status)
+      throw new ApiHttpError(code || 'AUTH_REQUIRED', messageOnly ? message : '登录已过期', res.status, details)
     }
-    throw new ApiHttpError(code, message, res.status)
+    throw new ApiHttpError(code, message, res.status, details)
   }
   return res.json() as Promise<T>
 }
@@ -280,6 +286,13 @@ const httpAdapter: PartnerPoliciesServiceInterface = {
   approvePolicy: (id) => req<PartnerPolicyRecord>('PATCH', `/partner/policies/${id}/review`, { action: 'approve' }),
   releasePolicy: (id, input) =>
     req<PartnerPolicyRecord>('PATCH', `/partner/policies/${id}/release`, { responsibilityAcknowledged: input.responsibilityAcknowledged }, true),
+  previewDraftCheck: (input) => req('POST', '/partner/policies/draft-check', input, true),
+  saveAndPublish: (input, options) => req(
+    'POST',
+    options.id ? `/partner/policies/${options.id}/release-with-save` : '/partner/policies/release-with-save',
+    { ...input, responsibilityAcknowledged: options.responsibilityAcknowledged },
+    true,
+  ),
   getEligibilityQuestions: () => req<PolicyEligibilityQuestionSet>('GET', '/policies/eligibility-questions'),
   getEligibilityRules: (policyId) =>
     req<PolicyEligibilityRuleRecord[]>('GET', `/partner/policies/${policyId}/eligibility-rules`),
@@ -447,6 +460,19 @@ const mockAdapter: PartnerPoliciesServiceInterface = {
     hit.publishConfirmedContentVersion = hit.contentVersion ?? 1
     hit.updatedAt = now()
     return { ...hit }
+  },
+  async previewDraftCheck() {
+    return { publishWarning: null, checklistReady: false, columns: [] }
+  },
+  async saveAndPublish(input, options) {
+    if (options.responsibilityAcknowledged !== true) {
+      throw new ApiHttpError('POLICY_RESPONSIBILITY_ACK_REQUIRED', '发布前必须确认对本条政策内容负责', 400)
+    }
+    const saved = options.id
+      ? await mockAdapter.updatePolicy(options.id, input)
+      : await mockAdapter.createPolicy(input)
+    const approved = await mockAdapter.approvePolicy(saved.id)
+    return mockAdapter.releasePolicy(approved.id, { responsibilityAcknowledged: true })
   },
 
   // ── 申领条件在演示模式下**不提供**，而不是给一份假的 ────────────────────

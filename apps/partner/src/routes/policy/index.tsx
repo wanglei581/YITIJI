@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { replaceIfChanged, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Drawer, LoadingState } from '@ai-job-print/ui'
 import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
 import { FileTextIcon, PlusIcon } from 'lucide-react'
 import { PolicyFormFields } from './PolicyFormFields'
-import { EMPTY_FORM, policyFormBlockReason, policyFormPayload, type PolicyFormState } from './policyFormModel'
+import { EMPTY_FORM, policyFormBlockReason, policyFormPayload, type PolicyFormChecks, type PolicyFormState } from './policyFormModel'
 import { PolicyReleaseDialog } from './PolicyReleaseDialog'
 import { PolicyTable } from './PolicyTable'
 import { CANNOT_CREATE_HINT, RECRUITMENT_POLICY_BLOCKED_REASON } from './policyLabels'
@@ -52,7 +52,11 @@ export default function PolicyPage() {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [noticeIsError, setNoticeIsError] = useState(false)
+  const [noticeTone, setNoticeTone] = useState<'success' | 'warning' | 'error'>('success')
+  /** 保存并发布中途停下时，下一次改这一条，不再新建。 */
+  const [draftId, setDraftId] = useState<string | null>(null)
+  const [checks, setChecks] = useState<PolicyFormChecks>({ publishWarning: null, linkChecked: false, overflow: {} })
+  const [oneStep, setOneStep] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [confirmUnpublish, setConfirmUnpublish] = useState<PartnerPolicyRecord | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<PartnerPolicyRecord | null>(null)
@@ -94,9 +98,13 @@ export default function PolicyPage() {
   const loading = status === 'idle' || (status === 'loading' && rows.length === 0)
   const error = status === 'error' && rows.length === 0
 
+  const onChecks = useCallback((next: PolicyFormChecks) => setChecks(next), [])
+
   const openNew = () => {
     setForm(EMPTY_FORM)
     setFormError(null)
+    setDraftId(null)
+    setChecks({ publishWarning: null, linkChecked: false, overflow: {} })
     setEditing('new')
   }
 
@@ -116,6 +124,8 @@ export default function PolicyPage() {
       whereToApply: r.whereToApply ?? '',
     })
     setFormError(null)
+    setDraftId(r.id)
+    setChecks({ publishWarning: null, linkChecked: false, overflow: {} })
     setEditing(r)
   }
 
@@ -127,20 +137,20 @@ export default function PolicyPage() {
     if (saving || !canSave) return
     setSaving(true)
     setFormError(null)
-    const payload = policyFormPayload(form, editing !== 'new')
+    const targetId = draftId ?? (editing && editing !== 'new' ? editing.id : null)
+    const payload = policyFormPayload(form, targetId !== null)
     try {
-      if (editing === 'new') {
-        await partnerPoliciesService.createPolicy(payload)
-        setNoticeIsError(false)
-        setNotice('政策内容已保存为待审核;本机构审核通过并确认发布后,终端才会展示。')
-      } else if (editing) {
-        const updated = await partnerPoliciesService.updatePolicy(editing.id, payload)
-        setNoticeIsError(false)
-        setNotice(
-          `修改已保存${typeof updated.contentVersion === 'number' ? `,内容版本更新为 v${updated.contentVersion}` : ''}。`
-          + '该内容已回到待审核,本机构重新审核通过并确认发布前,终端不展示。',
-        )
-      }
+      const updated = targetId
+        ? await partnerPoliciesService.updatePolicy(targetId, payload)
+        : await partnerPoliciesService.createPolicy(payload)
+      const warning = updated.publishWarning
+      const base = targetId
+        ? `修改已保存${typeof updated.contentVersion === 'number' ? `,内容版本更新为 v${updated.contentVersion}` : ''}。`
+          + '该内容已回到待审核,本机构重新审核通过并确认发布前,终端不展示。'
+        : '政策内容已保存为待审核;本机构审核通过并确认发布后,终端才会展示。'
+      setNoticeTone(warning ? 'warning' : 'success')
+      setNotice(warning ? `${base}${warning}` : base)
+      setDraftId(null)
       setEditing(null)
       void refresh()
     } catch (e) {
@@ -150,15 +160,48 @@ export default function PolicyPage() {
     }
   }
 
+  const savedId = () => draftId ?? (editing && editing !== 'new' ? editing.id : undefined)
+
+  const openOneStep = () => {
+    if (saving || !canSave || !editing) return
+    setOneStep(true)
+    setReleasing({
+      id: savedId() ?? 'pending',
+      kind: form.kind,
+      title: form.title.trim(),
+      summary: form.summary,
+      whoCanApply: form.whoCanApply,
+      requiredMaterials: form.requiredMaterials,
+      whereToApply: form.whereToApply,
+      externalUrl: form.externalUrl.trim(),
+      sourceOrgId: editing !== 'new' ? editing.sourceOrgId : '',
+      sourceName: editing !== 'new' ? editing.sourceName : '本机构',
+      reviewStatus: 'pending',
+      publishStatus: 'draft',
+      rejectReason: null,
+      syncTime: '',
+      updatedAt: '',
+      contentVersion: editing !== 'new' ? editing.contentVersion : undefined,
+    })
+  }
+
+  const submitOneStep = (acknowledged: boolean) => {
+    const id = savedId()
+    return partnerPoliciesService.saveAndPublish(policyFormPayload(form, Boolean(id)), {
+      responsibilityAcknowledged: acknowledged,
+      ...(id ? { id } : {}),
+    })
+  }
+
   const handleApprove = async (row: PartnerPolicyRecord) => {
     setBusyId(row.id)
     try {
       await partnerPoliciesService.approvePolicy(row.id)
-      setNoticeIsError(false)
+      setNoticeTone('success')
       setNotice(`「${row.title}」已审核通过。发布前还需确认发布责任,点「发布」完成。`)
       void refresh()
     } catch (e) {
-      setNoticeIsError(true)
+      setNoticeTone('error')
       setNotice(errMsg(e))
     } finally {
       setBusyId(null)
@@ -170,11 +213,11 @@ export default function PolicyPage() {
     setConfirmUnpublish(null)
     try {
       await partnerPoliciesService.unpublishPolicy(row.id)
-      setNoticeIsError(false)
+      setNoticeTone('success')
       setNotice('政策内容已下架，终端将不再展示。')
       void refresh()
     } catch (e) {
-      setNoticeIsError(true)
+      setNoticeTone('error')
       setNotice(errMsg(e))
     } finally {
       setBusyId(null)
@@ -186,11 +229,11 @@ export default function PolicyPage() {
     setConfirmDelete(null)
     try {
       await partnerPoliciesService.deletePolicy(row.id)
-      setNoticeIsError(false)
+      setNoticeTone('success')
       setNotice('政策内容已删除')
       void refresh()
     } catch (e) {
-      setNoticeIsError(true)
+      setNoticeTone('error')
       setNotice(errMsg(e))
     } finally {
       setBusyId(null)
@@ -241,9 +284,11 @@ export default function PolicyPage() {
     >
       {notice && (
         <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
-          noticeIsError
+          noticeTone === 'error'
             ? 'border-error/30 bg-error-bg text-error-fg'
-            : 'border-success/30 bg-success-bg text-success-fg'
+            : noticeTone === 'warning'
+              ? 'border-warning/30 bg-warning-bg text-warning-fg'
+              : 'border-success/30 bg-success-bg text-success-fg'
         }`}>
           {notice}
         </div>
@@ -271,7 +316,7 @@ export default function PolicyPage() {
         busyId={busyId} openEdit={openEdit} handleApprove={handleApprove} setReleasing={setReleasing} setConfirmUnpublish={setConfirmUnpublish} setConfirmDelete={setConfirmDelete} />
 
       <p className="mt-3 text-xs text-neutral-400">
-        政策内容只做说明：仅政策说明、材料清单与官方入口；不承诺补贴到账、不代申请。录入后由本机构审核通过、确认发布责任并发布,才会展示（对应一体机首页「查政策」）;平台管理员不审核、不代发,只在违法违规等紧急情况下单向下架。
+        政策内容只做说明：仅政策说明、材料清单与官方入口；不承诺补贴到账、不代申请。录入后由本机构审核通过、确认发布责任并发布,才会展示（对应一体机首页「查政策」）。也可以点「保存并发布」，勾选确认后由本机构一次完成。平台管理员不审核、不代发,只在违法违规等紧急情况下单向下架。
       </p>
 
       {/* 新增/编辑抽屉 */}
@@ -283,10 +328,13 @@ export default function PolicyPage() {
         footer={
           <div className="space-y-2">
             {formBlockReason && !editingRecruitmentLocked && <p role="status" className="text-xs text-error-fg">{formBlockReason}</p>}
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
               <button onClick={() => setEditing(null)} disabled={saving} className="rounded-lg border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-50">取消</button>
-              <button onClick={save} disabled={saving || !canSave} title={editingRecruitmentLocked ? RECRUITMENT_POLICY_BLOCKED_REASON : undefined} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50">
+              <button onClick={save} disabled={saving || !canSave} title={editingRecruitmentLocked ? RECRUITMENT_POLICY_BLOCKED_REASON : undefined} className="rounded-lg border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50">
                 {saving ? '保存中…' : editing === 'new' ? '提交审核' : '保存并重新提审'}
+              </button>
+              <button onClick={openOneStep} disabled={saving || !canSave} title={editingRecruitmentLocked ? RECRUITMENT_POLICY_BLOCKED_REASON : undefined} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50">
+                保存并发布
               </button>
             </div>
           </div>
@@ -304,7 +352,7 @@ export default function PolicyPage() {
                 : '保存后该内容将重新进入待审核状态,内容版本随之更新;本机构审核通过并确认发布前,终端不展示。'}
             </p>
           )}
-          <PolicyFormFields form={form} setForm={setForm} recruitmentOpen={recruitmentOpen} editingRecruitmentLocked={editingRecruitmentLocked} />
+          <PolicyFormFields form={form} setForm={setForm} recruitmentOpen={recruitmentOpen} editingRecruitmentLocked={editingRecruitmentLocked} active={editing !== null} onChecks={onChecks} />
           <p className="text-xs text-neutral-400">
             合规提示:内容仅做政策说明与来源链接指引;提交前请核对发布主体和目标域名;请勿出现"补贴必到账""代为申请"等承诺性表述,此类内容审核将不予通过。
           </p>
@@ -313,15 +361,32 @@ export default function PolicyPage() {
 
       <PolicyReleaseDialog
         policy={releasing}
-        onClose={() => setReleasing(null)}
+        onClose={() => { setReleasing(null); setOneStep(false) }}
+        submit={oneStep ? submitOneStep : undefined}
+        heading={oneStep ? '保存并发布' : undefined}
+        confirmLabel={oneStep ? '确认保存并发布' : undefined}
+        versionLabel={oneStep ? '保存后的这一版' : undefined}
+        linkNote={oneStep ? (
+          !checks.linkChecked ? '正在核对原文链接…'
+            : checks.publishWarning ? checks.publishWarning
+              : form.externalUrl.trim() ? '原文链接已通过官方网站核对'
+                : form.kind === 'policy_guide' ? '原文链接未填写，发布时会被拦下' : '原文链接未填写（政策公告可选）'
+        ) : undefined}
+        onStopped={oneStep ? (policyId) => { setDraftId(policyId); void refresh() } : undefined}
         onReleased={(updated) => {
+          const finishedOneStep = oneStep
           setReleasing(null)
-          setNoticeIsError(false)
-          setNotice(
-            `「${updated.title}」已发布`
-            + (typeof updated.publishConfirmedContentVersion === 'number' ? `(v${updated.publishConfirmedContentVersion})` : '')
-            + ',发布责任确认已记录。',
-          )
+          setOneStep(false)
+          setNoticeTone('success')
+          setNotice(finishedOneStep
+            ? `「${updated.title}」已保存并发布，发布责任确认已记录。`
+            : `「${updated.title}」已发布`
+              + (typeof updated.publishConfirmedContentVersion === 'number' ? `(v${updated.publishConfirmedContentVersion})` : '')
+              + ',发布责任确认已记录。')
+          if (finishedOneStep) {
+            setDraftId(null)
+            setEditing(null)
+          }
           void refresh()
         }}
       />
