@@ -27,6 +27,7 @@ export const SCAN_INPUT_HEALTHS = ['healthy', 'locked_out', 'unknown'] as const
 export const SCAN_INPUT_ACTIONS = ['none', 'restart_required'] as const
 export const PRINTER_QUEUE_PORT_KINDS = ['usb', 'network', 'wsd', 'other', 'unknown'] as const
 export const PRINTER_QUEUE_SPOOLERS = ['running', 'stopped', 'other', 'unknown'] as const
+export const PRINT_COMPLETION_EVIDENCE = ['available', 'unavailable'] as const
 export const SCAN_INPUT_REASONS = [
   'not_configured',
   'reparse_point_unverifiable',
@@ -175,4 +176,12 @@ export class HeartbeatDto {
   @MaxLength(64)
   @ValidateIf((_object, value) => value !== undefined)
   scanDeviceObservedAt?: string
+
+  /**
+   * 打印完成判据。available：PrintService/Operational 已启用。unavailable：没启用或启用失败。
+   * 旧版终端程序不带这一项，照常收下，库里记 null，不能当成可用。
+   */
+  @IsIn(PRINT_COMPLETION_EVIDENCE)
+  @ValidateIf((_object, value) => value !== undefined)
+  printCompletionEvidence?: (typeof PRINT_COMPLETION_EVIDENCE)[number]
 }

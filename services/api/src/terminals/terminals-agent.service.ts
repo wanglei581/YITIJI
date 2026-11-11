@@ -433,6 +433,8 @@ export class TerminalAgentService implements OnModuleInit {
         // 屏上扫描：旧版终端程序不带这两项，照常收下（库里 null）。
         scanDeviceHealth: dto.scanDeviceHealth ?? null,
         scanDeviceObservedAt,
+        // 旧版终端程序不带这项。不带就记 null，不能当成打印完成判据可用。
+        printCompletionEvidence: dto.printCompletionEvidence ?? null,
         diskFreeGb: dto.diskFreeGB ?? null,
         agentVersion: dto.agentVersion ?? null,
         ipAddress: dto.ipAddress ?? null,

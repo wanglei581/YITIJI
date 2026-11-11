@@ -15,6 +15,7 @@ import {
 import { ESCAPE_WQL_LITERAL_FUNCTION, escapeWqlLiteral } from '../src/agent/wql-literal'
 import { printWithPdfToPrinter } from '../src/printer/print-with-pdf-to-printer'
 import { buildImageTempPdfFileName } from '../src/printer/image-to-pdf'
+import { verifyPrintCompletionEvidence } from './verify-print-completion-evidence'
 
 interface Scenario {
   name: string
@@ -174,6 +175,7 @@ async function runScenario(scenario: Scenario): Promise<void> {
 async function main(): Promise<void> {
   const failures: string[] = []
 
+  verifyPrintCompletionEvidence({ liveProbe: false })
   verifyPrintServiceCompletionScriptContract()
 
   const imageTaskId = 'ptask_kiosk_0123456789abcdef'
