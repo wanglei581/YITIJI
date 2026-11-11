@@ -25995,7 +25995,8 @@
       "services/api/scripts/verify-content-pipeline-e2e.ts"
     ],
     "services/api/scripts/support/content-pipeline-harness.ts": [
-      "services/api/scripts/verify-content-pipeline-e2e.ts"
+      "services/api/scripts/verify-content-pipeline-e2e.ts",
+      "services/api/scripts/verify-print-reliability-http.ts"
     ],
     "services/api/scripts/support/copy-c1c-verification.ts": [
       "services/api/scripts/verify-copy-c1b.ts"
@@ -28461,6 +28462,7 @@
       "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-print-conversion.ts",
       "services/api/scripts/verify-print-jobs.ts",
+      "services/api/scripts/verify-print-reliability-http.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-print-sign.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
@@ -29700,6 +29702,7 @@
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-queue-timeout.ts",
+      "services/api/scripts/verify-print-reliability-http.ts",
       "services/api/scripts/verify-refund-real-channels.ts"
     ],
     "services/api/src/payment/pickup-expiry-refund.service.ts": [
@@ -30014,6 +30017,7 @@
       "services/api/scripts/verify-print-param-suggestion.ts",
       "services/api/scripts/verify-print-parameter-capability.ts",
       "services/api/scripts/verify-print-queue-timeout.ts",
+      "services/api/scripts/verify-print-reliability-http.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
@@ -30057,7 +30061,8 @@
       "services/api/scripts/verify-print-queue-timeout.ts"
     ],
     "services/api/src/print-jobs/print-queue-timeout.ts": [
-      "services/api/scripts/verify-print-queue-timeout.ts"
+      "services/api/scripts/verify-print-queue-timeout.ts",
+      "services/api/scripts/verify-print-reliability-http.ts"
     ],
     "services/api/src/print-jobs/self-service-reprint.ts": [
       "services/api/scripts/verify-pickup-code-resume.ts"
@@ -30253,6 +30258,7 @@
       "services/api/scripts/verify-print-completion-evidence.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-queue-timeout.ts",
+      "services/api/scripts/verify-print-reliability-http.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-public-fair-demo-guard.ts",
       "services/api/scripts/verify-publish-expiry-completeness.ts",
@@ -45871,7 +45877,7 @@
       },
       "file": "services/api/scripts/verify-print-completion-evidence.ts",
       "helper": false,
-      "inCi": false,
+      "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:print-completion-evidence"
@@ -46026,10 +46032,33 @@
       },
       "file": "services/api/scripts/verify-print-queue-timeout.ts",
       "helper": false,
-      "inCi": false,
+      "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:print-queue-timeout"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/content-pipeline-harness.ts",
+          "services/api/src/files/signing.ts",
+          "services/api/src/payment/pending-refund-signal.ts",
+          "services/api/src/print-jobs/print-jobs.service.ts",
+          "services/api/src/print-jobs/print-queue-timeout.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-print-reliability-http.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:print-reliability-http"
       ],
       "wired": true
     },
