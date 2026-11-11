@@ -440,6 +440,8 @@ jobs:
           pnpm run verify:task-runner-wake
           # Injected platform/clock/WMI/dispatch seams only; never invokes a real spooler or printer.
           pnpm run verify:print-monitor-truth
+          # 打印完成判据：启动自检状态机、两份安装脚本必须启用日志并在失败时停住（Windows 只读核对在安装包工作流里跑）。
+          pnpm run verify:print-completion-evidence
           # 解析 Get-PrintJob 输出并按本进程 SID 筛选。不建打印机。
           pnpm run verify:print-queue-residue
           # Generates PNG fixtures in a temp dir and measures the produced PDF; no printer, no spooler.
