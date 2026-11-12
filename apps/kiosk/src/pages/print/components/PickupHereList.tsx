@@ -1,27 +1,29 @@
 import type { PickupHereRow } from '../pickupHereOrders'
 import type { PickupHereListStatus } from '../usePickupHereList'
 
-/** 登录后、输码格上面：本人在这台机器上还没取的手机单，点一下领取。没有单就不占地方。 */
+/** 登录后：本人在这台机器上还没取的手机单，点一下领取。没有单、还在读，都不占地方。 */
 export function PickupHereList({
   status,
   rows,
   busy,
   onClaim,
+  onReload,
 }: {
   status: PickupHereListStatus
   rows: readonly PickupHereRow[]
   busy: boolean
   onClaim: (orderId: string) => void
+  onReload: () => void
 }) {
-  if (status === 'off') return null
-  if (status === 'loading') {
-    return <p className="pcp-here-note" data-testid="pickup-here-loading">正在读取你在这台机器上还没取的单。</p>
-  }
+  if (status === 'off' || status === 'loading') return null
   if (status === 'error') {
     return (
-      <p className="pcp-here-note" role="status" data-testid="pickup-here-error">
-        暂时列不出你的单，可以在下面输到机码。
-      </p>
+      <div className="pcp-here-error" role="status" data-testid="pickup-here-error">
+        <p className="pcp-here-note">暂时列不出你的单，可以在下面输到机码。</p>
+        <button type="button" className="qx-btn pcp-here-reload" data-testid="pickup-here-reload" onClick={onReload}>
+          重新读取
+        </button>
+      </div>
     )
   }
   if (rows.length === 0) return null
@@ -38,7 +40,10 @@ export function PickupHereList({
               data-testid="pickup-here-claim"
               onClick={() => onClaim(row.orderId)}
             >
-              <span className="pcp-here-name">{row.label}</span>
+              <span className="pcp-here-name">
+                {row.label}
+                {row.detail ? <span className="pcp-here-meta">{row.detail}</span> : null}
+              </span>
               <span className="pcp-here-act">在本机领取</span>
             </button>
           </li>

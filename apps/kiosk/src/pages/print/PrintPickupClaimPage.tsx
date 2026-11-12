@@ -56,7 +56,7 @@ import { loginPathForPrintStep } from '../../auth/returnPath'
 import { useAuth } from '../../auth/useAuth'
 import { claimHereOrder } from '../../services/api/pickupHereOrdersApi'
 import { errorCodeOf } from '../../services/api/userErrorMessage'
-import { maskPickupFileName, pickupHereMismatchMessage } from './pickupHereOrders'
+import { maskPickupFileName, pickupHereClaimDropsRow, pickupHereMismatchMessage, pickupHereNetworkLine, pickupHereRecoverableLine } from './pickupHereOrders'
 import { classifyClaimFailure, claimSuccessCopy, claimSuccessDestination, failureScreen, pickupCells, pickupClaimMessage } from './pickupClaimModel'
 import type { PickupFailure, PickupScreen } from './pickupClaimModel'
 import { pickupQuotaExit, type PickupQuotaExit } from './pickupQuotaExit'
@@ -188,8 +188,14 @@ export function PrintPickupClaimPage() {
   const [state, setState] = useState<ClaimState>('idle')
   const [result, setResult] = useState<ClaimPickupResult | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
-  // 失败屏的种类与被拒的那串码（仅供重试用，不回显）。只在本组件内存里：离页 / 清场卸载即丢。
-  const [failure, setFailure] = useState<{ kind: PickupFailure; code: string; quotaExit: PickupQuotaExit | null } | null>(null)
+  // 失败屏的种类、来源和被拒的那串码或订单（仅供重试用，不回显）。只在本组件内存里：离页 / 清场卸载即丢。
+  const [failure, setFailure] = useState<{
+    kind: PickupFailure
+    source: 'code' | 'here'
+    code: string
+    orderId: string | null
+    quotaExit: PickupQuotaExit | null
+  } | null>(null)
   // true = 显示 10 格与历史码字母键盘（稿 alphaKb）；受理正则同时接受 8 位新码与 10 位历史码，
   // 这个开关不参与任何格式判定，也不影响提交。
   const [legacyMode, setLegacyMode] = useState(false)
@@ -236,6 +242,8 @@ export function PrintPickupClaimPage() {
       if (staleSignal?.aborted) return 'aborted'
       setResult(data)
       setState('success')
+      // 手输的可能正是列表里那一单。成功后重读，不在这里放锁：再取一单走 handleReset。
+      here.reload()
       return 'ok'
     } catch (err) {
       if (staleSignal?.aborted) return 'aborted'
@@ -243,10 +251,10 @@ export function PrintPickupClaimPage() {
       // 一律清空输入框：重试用 failure.code；保留原码时扫码枪再扫会接在后面，拼出错码计入锁定。
       setCode('')
       const kind = classifyClaimFailure(err)
-      setFailure({ kind, code: submittedCode, quotaExit: pickupQuotaExit(errorCodeOf(err)) })
+      setFailure({ kind, source: 'code', code: submittedCode, orderId: null, quotaExit: pickupQuotaExit(errorCodeOf(err)) })
       // 文案按取件场景逐码登记（pickupClaimModel）；已用过 / 已退款这类终态码不许说「重试」。
       // 额度被拒的原话在 userErrorMessage，经 pickupClaimMessage 落到屏上。
-      setErrorMsg(pickupClaimMessage(err))
+      setErrorMsg(pickupClaimMessage(err, supportContact))
       setState('error')
       setTimeout(() => inputRef.current?.focus(), 80)
       return 'fail'
@@ -269,17 +277,24 @@ export function PrintPickupClaimPage() {
       if (staleSignal?.aborted) return
       setResult({ ...data, fileName: maskPickupFileName(data.fileName) })
       setState('success')
+      here.removeRow(orderId)
     } catch (err) {
       if (staleSignal?.aborted) return
       claimLockRef.current = false
-      if (errorCodeOf(err) === 'PICKUP_TERMINAL_MISMATCH') {
+      const code = errorCodeOf(err)
+      const kind = code === 'PICKUP_TERMINAL_MISMATCH' ? 'other' : classifyClaimFailure(err)
+      if (pickupHereClaimDropsRow(kind, code)) here.removeRow(orderId)
+      const recoverable = pickupHereRecoverableLine(code)
+      if (code === 'PICKUP_TERMINAL_MISMATCH') {
         const message = err instanceof ApiHttpError ? err.message : ''
-        setFailure({ kind: 'other', code: '', quotaExit: null })
+        setFailure({ kind: 'other', source: 'here', code: '', orderId, quotaExit: null })
         setErrorMsg(pickupHereMismatchMessage(message))
       } else {
-        setFailure({ kind: classifyClaimFailure(err), code: '', quotaExit: pickupQuotaExit(errorCodeOf(err)) })
-        setErrorMsg(pickupClaimMessage(err))
+        setFailure({ kind, source: 'here', code: '', orderId, quotaExit: pickupQuotaExit(code) })
+        setErrorMsg(kind === 'network' ? pickupHereNetworkLine() : (recoverable ?? pickupClaimMessage(err, supportContact)))
       }
+      // 扫码枪那一屏没有失败面板，重试按钮画不出来。点单失败回到手输屏，失败说明在列表上面。
+      setGuide('keypad')
       setState('error')
     }
   }
@@ -338,12 +353,18 @@ export function PrintPickupClaimPage() {
     claimLockRef.current = false
     setGuide('keypad')
     setLegacyMode(false)
+    here.reload()
     setTimeout(() => inputRef.current?.focus(), 80)
   }
 
-  // 网络失败或打印机暂不可用可「重试校验」：原码重发不会重复认领或重复出纸。
+  // 网络失败或打印机暂不可用可「重试校验」。输码重发原码；点单重发同一笔 claim-here。
   const handleRetry = () => {
-    if (failure) void handleClaim(failure.code)
+    if (!failure) return
+    if (failure.source === 'here' && failure.orderId) {
+      void handleClaimHere(failure.orderId)
+      return
+    }
+    void handleClaim(failure.code)
   }
 
   // 已经登录仍撞上游客额度：再去登录不会换成另一张单，改给回首页。
@@ -615,6 +636,7 @@ export function PrintPickupClaimPage() {
       rows={here.rows}
       busy={loading}
       onClaim={(orderId) => { void handleClaimHere(orderId) }}
+      onReload={() => here.reload()}
     />
   ) : null
 
@@ -639,6 +661,7 @@ export function PrintPickupClaimPage() {
       onHelp={goHelp}
       onHome={() => navigate('/')}
       onLogin={goLogin}
+      retryAs={failure.source === 'here' ? 'order' : 'code'}
     />
   ) : null
 
@@ -654,9 +677,10 @@ export function PrintPickupClaimPage() {
         data-claim-state={state}
         data-testid="arrival-code-state-hid"
       >
-        {hereList}
+        {failure ? null : hereList}
         {codeBoxes}
         {hint}
+        {failure ? hereList : null}
         {keypad}
         {modeRow}
         {legacyNote}
@@ -676,9 +700,10 @@ export function PrintPickupClaimPage() {
       data-claim-failure={failure?.kind}
       data-testid={`arrival-code-state-${screen}`}
     >
-      {hereList}
+      {failure ? null : hereList}
       {codeBoxes}
       {failurePanel}
+      {failure ? hereList : null}
       {hint}
       {keypad}
       {showKeypad ? modeRow : null}

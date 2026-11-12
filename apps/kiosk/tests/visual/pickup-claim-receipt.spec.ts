@@ -1,3 +1,5 @@
+import type { Page, Route } from '@playwright/test'
+import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 
 for (const scenario of [
@@ -231,4 +233,383 @@ test('pickup idle names two codes and the same-code resume @w2', async ({ page, 
   await expect(page.getByText('取件凭证码')).toHaveCount(0)
   await expect(page.getByText('出示给工作人员')).toHaveCount(0)
   await expect(page.getByText('出示给现场工作人员')).toHaveCount(0)
+})
+
+// ── 登录后点单领取。令牌只在内存里，用例走屏幕键盘登录，不写 sessionStorage。──
+
+const HERE_MEMBER_TOKEN = 'here-member-token'
+const HERE_WHEN = '2026-11-12T06:20:00.000Z'
+const UNAVAILABLE_OFF = '这个到机码已经不能使用。请在手机上「我的 → 打印订单」查看这笔订单，需要的话重新下单'
+const UNAVAILABLE_ON = '这个到机码已经不能使用。请在手机小程序「我的 → 打印订单」查看这笔订单，需要的话重新下单'
+
+function registerPickupShell(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', {
+    status: 200, json: { enabled: false, idleTimeoutSec: 180, items: [] },
+  })
+  api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
+    status: 200, json: { printerStatus: 'ready', paperLevel: 'sufficient', isOnline: true },
+  })
+}
+
+function registerMemberLogin(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
+  api.respond('POST', '/api/v1/member/auth/sms-code', {
+    status: 200,
+    json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } },
+  })
+  api.respond('POST', '/api/v1/member/auth/login', {
+    status: 200,
+    json: {
+      success: true,
+      data: { token: HERE_MEMBER_TOKEN, user: { id: 'member-here', phoneMasked: '138****8000', nickname: '取件会员' } },
+    },
+  })
+  api.respond('GET', '/api/v1/me/pending-tasks', { status: 200, json: { success: true, data: [] } })
+  api.respond('GET', '/api/v1/me/favorites', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+}
+
+async function loginThroughVisibleUi(page: Page): Promise<void> {
+  await page.goto('/login?from=%2Fprint%2Fpickup-claim')
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
+  for (const digit of '13800138000') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+  await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+  for (const digit of '123456') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === '/print/pickup-claim')
+}
+
+function hereItem(orderId: string, title: string, claimableHere = true) {
+  return {
+    kind: 'cloud_single',
+    orderId,
+    title,
+    itemCount: 1,
+    claimableHere,
+    createdAt: HERE_WHEN,
+    billablePages: 2,
+  }
+}
+
+function timelineJson(items: unknown[], nextCursor: string | null) {
+  return { success: true, data: { items, nextCursor, total: items.length } }
+}
+
+function claimHereOk(orderId: string) {
+  return {
+    released: true,
+    taskId: `task-${orderId}`,
+    orderId,
+    orderNo: `NO-${orderId}`,
+    terminalId: 'KSK-001',
+    taskStatus: 'claimed',
+    printTaskStatus: 'pending',
+    amountCents: 0,
+    fileName: '简历.pdf',
+    paymentSessionToken: 'here-pay',
+  }
+}
+
+async function fulfillJson(route: Route, status: number, body: unknown): Promise<void> {
+  await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
+}
+
+async function prepareLoggedInPickup(page: Page, api: ApiRouter): Promise<void> {
+  registerPickupShell(api)
+  registerMemberLogin(api)
+}
+
+test('logged-in pickup lists this machine, claims once, and hides the loading line @w2', async ({ page, api }) => {
+  test.setTimeout(60_000)
+  await prepareLoggedInPickup(page, api)
+  let timelineHits = 0
+  let releaseTimeline: (() => void) | undefined
+  const held = new Promise<void>((resolve) => { releaseTimeline = resolve })
+  const claimIds: string[] = []
+  await page.route('**/api/v1/me/print-orders/timeline**', async (route) => {
+    timelineHits += 1
+    if (timelineHits === 1) await held
+    await fulfillJson(route, 200, timelineJson([hereItem('ord-1', '简历.pdf')], null))
+  })
+  await page.route('**/api/v1/me/print-orders/*/claim-here', async (route) => {
+    claimIds.push(new URL(route.request().url()).pathname.split('/').at(-2) ?? '')
+    expect(route.request().headers().authorization).toBe(`Bearer ${HERE_MEMBER_TOKEN}`)
+    await fulfillJson(route, 200, claimHereOk('ord-1'))
+  })
+  await loginThroughVisibleUi(page)
+  await expect.poll(() => timelineHits).toBe(1)
+  await expect(page.getByTestId('pickup-here-loading')).toHaveCount(0)
+  await expect(page.getByText('正在读取你在这台机器上还没取的单。')).toHaveCount(0)
+  releaseTimeline?.()
+  const row = page.getByTestId('pickup-here-claim')
+  await expect(row).toBeVisible()
+  await expect(row).toContainText('简***.pdf')
+  await expect(row).toContainText('11月12日 14:20')
+  await expect(row).toContainText('2 页')
+  await row.click()
+  await expect(page.getByText('已进入打印队列', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('pickup-here-claim')).toHaveCount(0)
+  expect(claimIds).toEqual(['ord-1'])
+})
+
+test('logged-in pickup double click sends claim-here once @w2', async ({ page, api }) => {
+  test.setTimeout(60_000)
+  await prepareLoggedInPickup(page, api)
+  let claims = 0
+  let releaseClaim: (() => void) | undefined
+  const held = new Promise<void>((resolve) => { releaseClaim = resolve })
+  await page.route('**/api/v1/me/print-orders/timeline**', async (route) => {
+    await fulfillJson(route, 200, timelineJson([hereItem('ord-lock', '简历.pdf')], null))
+  })
+  await page.route('**/api/v1/me/print-orders/*/claim-here', async (route) => {
+    claims += 1
+    await held
+    await fulfillJson(route, 200, claimHereOk('ord-lock'))
+  })
+  try {
+    await loginThroughVisibleUi(page)
+    await expect(page.getByTestId('pickup-here-claim')).toBeVisible()
+    await page.evaluate(() => {
+      const button = document.querySelector('[data-testid="pickup-here-claim"]')
+      if (!(button instanceof HTMLButtonElement)) throw new Error('没有领取按钮')
+      const fire = () => button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      fire()
+      fire()
+    })
+    await expect.poll(() => claims, { timeout: 2_000 }).toBe(1)
+    await page.waitForTimeout(250)
+    expect(claims).toBe(1)
+  } finally {
+    releaseClaim?.()
+  }
+  await expect(page.getByText('已进入打印队列', { exact: true })).toBeVisible()
+})
+
+for (const failure of [
+  { name: 'network', status: 503, body: { error: { code: 'UNKNOWN_ERROR', message: '服务器错误' } }, alert: '' },
+  { name: 'printer', status: 400, body: { error: { code: 'PRINTER_UNAVAILABLE', message: '这台终端的打印机暂不可用，你的到机码没有作废，请稍后再来这台终端输码' } }, alert: '没有作废' },
+]) {
+  test(`logged-in pickup ${failure.name} retry repeats the same claim-here @w2`, async ({ page, api }) => {
+    test.setTimeout(60_000)
+    await prepareLoggedInPickup(page, api)
+    const orderIds: string[] = []
+    await page.route('**/api/v1/me/print-orders/timeline**', async (route) => {
+      await fulfillJson(route, 200, timelineJson([hereItem('ord-retry', '简历.pdf')], null))
+    })
+    await page.route('**/api/v1/me/print-orders/*/claim-here', async (route) => {
+      orderIds.push(new URL(route.request().url()).pathname.split('/').at(-2) ?? '')
+      if (orderIds.length === 1) {
+        await fulfillJson(route, failure.status, failure.body)
+        return
+      }
+      await fulfillJson(route, 200, claimHereOk('ord-retry'))
+    })
+    await loginThroughVisibleUi(page)
+    await page.getByTestId('pickup-here-claim').click()
+    if (failure.name === 'network') {
+      const block = page.locator('.pcp-block')
+      await expect(block).toContainText('同一笔订单再领一次')
+      await expect(block).not.toContainText('输码')
+      await expect(block).not.toContainText('同一串码')
+    } else {
+      const alert = page.getByRole('alert')
+      await expect(alert).toContainText(failure.alert)
+      await expect(alert).not.toContainText('输码')
+    }
+    const order = await page.evaluate(() => {
+      const explanation = document.querySelector('[role="alert"]')
+      const list = document.querySelector('[data-testid="pickup-here-list"]')
+      if (!explanation || !list) return 'missing'
+      return (explanation.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 ? 'alert-first' : 'list-first'
+    })
+    expect(order).toBe('alert-first')
+    await page.getByRole('button', { name: '重试校验' }).click()
+    await expect(page.getByText('已进入打印队列', { exact: true })).toBeVisible()
+    expect(orderIds).toEqual(['ord-retry', 'ord-retry'])
+  })
+}
+
+test('logged-in pickup reload after a failed read shows the list @w2', async ({ page, api }) => {
+  test.setTimeout(60_000)
+  await prepareLoggedInPickup(page, api)
+  let timelineHits = 0
+  await page.route('**/api/v1/me/print-orders/timeline**', async (route) => {
+    timelineHits += 1
+    if (timelineHits === 1) {
+      await fulfillJson(route, 500, { success: false })
+      return
+    }
+    await fulfillJson(route, 200, timelineJson([hereItem('ord-back', '简历.pdf')], null))
+  })
+  await loginThroughVisibleUi(page)
+  await expect(page.getByTestId('pickup-here-error')).toBeVisible()
+  await expect(page.getByTestId('pickup-here-list')).toHaveCount(0)
+  await page.getByTestId('pickup-here-reload').click()
+  await expect(page.getByTestId('pickup-here-claim')).toContainText('简***.pdf')
+  expect(timelineHits).toBe(2)
+})
+
+test('logged-in pickup drops a closed order and keeps the other without another read @w2', async ({ page, api }) => {
+  test.setTimeout(60_000)
+  await prepareLoggedInPickup(page, api)
+  let timelineHits = 0
+  await page.route('**/api/v1/me/print-orders/timeline**', async (route) => {
+    timelineHits += 1
+    await fulfillJson(route, 200, timelineJson([
+      hereItem('ord-used', '简历.pdf'),
+      hereItem('ord-keep', '获奖.pdf'),
+    ], null))
+  })
+  await page.route('**/api/v1/me/print-orders/*/claim-here', async (route) => {
+    await fulfillJson(route, 409, { error: { code: 'PICKUP_CODE_ALREADY_USED', message: 'used' } })
+  })
+  await loginThroughVisibleUi(page)
+  await expect(page.getByTestId('pickup-here-claim')).toHaveCount(2)
+  await page.getByTestId('pickup-here-claim').first().click()
+  await expect(page.getByRole('alert')).toBeVisible()
+  await expect(page.getByTestId('pickup-here-claim')).toHaveCount(1)
+  await expect(page.getByTestId('pickup-here-claim')).toContainText('获***.pdf')
+  await expect(page.getByTestId('pickup-here-claim')).not.toContainText('简***.pdf')
+  expect(timelineHits).toBe(1)
+})
+
+test('logged-in pickup follows nextCursor onto the second page @w2', async ({ page, api }) => {
+  test.setTimeout(60_000)
+  await prepareLoggedInPickup(page, api)
+  const cursors: Array<string | null> = []
+  await page.route('**/api/v1/me/print-orders/timeline**', async (route) => {
+    const cursor = new URL(route.request().url()).searchParams.get('cursor')
+    cursors.push(cursor)
+    if (!cursor) {
+      const others = Array.from({ length: 50 }, (_, index) => hereItem(`other-${index}`, `别的${index}.pdf`, false))
+      await fulfillJson(route, 200, timelineJson(others, 'page-2'))
+      return
+    }
+    await fulfillJson(route, 200, timelineJson([hereItem('ord-page2', '第二页.pdf')], null))
+  })
+  await loginThroughVisibleUi(page)
+  await expect(page.getByTestId('pickup-here-claim')).toContainText('第***.pdf')
+  await expect(page.getByTestId('pickup-here-claim')).toContainText('11月12日 14:20')
+  expect(cursors).toEqual([null, 'page-2'])
+})
+
+test('logged-in pickup treats a later page failure as a failed read and stops after four pages @w2', async ({ page, api }) => {
+  test.setTimeout(60_000)
+  await prepareLoggedInPickup(page, api)
+  let mode: 'fail-page' | 'cap' = 'fail-page'
+  let hits = 0
+  await page.route('**/api/v1/me/print-orders/timeline**', async (route) => {
+    hits += 1
+    const cursor = new URL(route.request().url()).searchParams.get('cursor')
+    if (mode === 'fail-page') {
+      if (!cursor) {
+        await fulfillJson(route, 200, timelineJson([hereItem('ord-partial', '首页单.pdf')], 'page-2'))
+        return
+      }
+      await fulfillJson(route, 500, { success: false })
+      return
+    }
+    if (hits < 4) {
+      await fulfillJson(route, 200, timelineJson([hereItem(`skip-${hits}`, `跳过${hits}.pdf`, false)], `page-${hits + 1}`))
+      return
+    }
+    if (hits === 4) {
+      await fulfillJson(route, 200, timelineJson([hereItem('skip-4', '跳过4.pdf', false)], 'page-5'))
+      return
+    }
+    await fulfillJson(route, 200, timelineJson([hereItem('ord-late', '末页简历.pdf')], null))
+  })
+  await loginThroughVisibleUi(page)
+  await expect(page.getByTestId('pickup-here-error')).toBeVisible()
+  await expect(page.getByText('首***.pdf')).toHaveCount(0)
+  expect(hits).toBe(2)
+  mode = 'cap'
+  hits = 0
+  await page.getByTestId('pickup-here-reload').click()
+  await expect.poll(() => hits).toBe(4)
+  await page.waitForTimeout(250)
+  expect(hits).toBe(4)
+  await expect(page.getByTestId('pickup-here-list')).toHaveCount(0)
+  await expect(page.getByText('末***.pdf')).toHaveCount(0)
+})
+
+test('logged-in pickup can claim a typed code after taking another order @w2', async ({ page, api }) => {
+  test.setTimeout(60_000)
+  await prepareLoggedInPickup(page, api)
+  let timelineHits = 0
+  let codeClaims = 0
+  await page.route('**/api/v1/me/print-orders/timeline**', async (route) => {
+    timelineHits += 1
+    const items = timelineHits === 1
+      ? [hereItem('ord-first', '简历.pdf')]
+      : [hereItem('ord-next', '获奖.pdf')]
+    await fulfillJson(route, 200, timelineJson(items, null))
+  })
+  await page.route('**/api/v1/me/print-orders/*/claim-here', async (route) => {
+    await fulfillJson(route, 200, claimHereOk('ord-first'))
+  })
+  await page.route('**/api/v1/print/jobs/claim-pickup', async (route) => {
+    codeClaims += 1
+    await fulfillJson(route, 200, {
+      released: true,
+      taskId: 'task-code',
+      orderId: 'ord-code',
+      orderNo: 'NO-CODE',
+      terminalId: 'KSK-001',
+      taskStatus: 'claimed',
+      printTaskStatus: 'pending',
+      amountCents: 0,
+      fileName: '简历.pdf',
+    })
+  })
+  await loginThroughVisibleUi(page)
+  await page.getByTestId('pickup-here-claim').click()
+  await expect(page.getByText('已进入打印队列', { exact: true })).toBeVisible()
+  expect(timelineHits).toBe(1)
+  await page.getByRole('button', { name: '重新输入', exact: true }).click()
+  await expect(page.getByTestId('pickup-here-claim')).toContainText('获***.pdf')
+  expect(timelineHits).toBe(2)
+  await page.getByLabel('到机码输入框').fill('28491703')
+  await expect(page.getByText('已进入打印队列', { exact: true })).toBeVisible()
+  expect(codeClaims).toBe(1)
+  await expect.poll(() => timelineHits).toBe(3)
+})
+
+test('pickup unavailable sentence stays off the miniapp name while unpublished @w2', async ({ page, api }) => {
+  registerPickupShell(api)
+  await page.route('**/api/v1/print/jobs/claim-pickup', async (route) => {
+    await fulfillJson(route, 400, { error: { code: 'PICKUP_CODE_UNAVAILABLE', message: 'server' } })
+  })
+  await page.goto('/print/pickup-claim')
+  await expect(page.locator('.pcp-fine')).not.toContainText('小程序')
+  await page.getByLabel('到机码输入框').fill('28491703')
+  await expect(page.getByRole('alert')).toContainText(UNAVAILABLE_OFF)
+  await expect(page.getByRole('alert')).not.toContainText('小程序')
+})
+
+test('pickup unavailable sentence names the miniapp when it is published @w2', async ({ page, api }) => {
+  registerPickupShell(api)
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        servicePhone: '18369161921',
+        serviceHours: '工作日 9:00–18:00',
+        otherOnlineTerminalNearby: false,
+        miniappPublished: true,
+      },
+    },
+  })
+  await page.route('**/api/v1/print/jobs/claim-pickup', async (route) => {
+    await fulfillJson(route, 400, { error: { code: 'PICKUP_CODE_UNAVAILABLE', message: 'server' } })
+  })
+  await page.goto('/print/pickup-claim')
+  await expect(page.locator('.pcp-fine')).toContainText('在职易达小程序下的单')
+  await page.getByLabel('到机码输入框').fill('28491703')
+  await expect(page.getByRole('alert')).toContainText(UNAVAILABLE_ON)
 })

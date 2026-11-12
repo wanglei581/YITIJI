@@ -138,10 +138,40 @@ test('来源与提醒两句同样不含无人值守禁用说法，也不写价�
   }
 })
 
+test('取件失败屏三句：关着或读不到只说在手机上，开着点名小程序', () => {
+  const lines = [
+    ['pickupCodeUnavailableLine',
+      '这个到机码已经不能使用。请在手机上「我的 → 打印订单」查看这笔订单，需要的话重新下单',
+      '这个到机码已经不能使用。请在手机小程序「我的 → 打印订单」查看这笔订单，需要的话重新下单'],
+    ['pickupOrderRefundedLine',
+      '本单已退款，不再出纸。款项按原路退回，可在手机上「我的 → 打印订单」查看退款进度',
+      '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度'],
+    ['pickupOrderPaymentUnavailableLine',
+      '这笔订单已经不能付款（可能已关闭）。请在手机上「我的 → 打印订单」查看，需要的话重新下单',
+      '这笔订单已经不能付款（可能已关闭）。请在手机小程序「我的 → 打印订单」查看，需要的话重新下单'],
+  ]
+  for (const [name, off, on] of lines) {
+    assert.equal(copy[name](unpublished), off, `${name} 未发布`)
+    assert.equal(copy[name](null), off, `${name} null`)
+    assert.equal(copy[name](undefined), off, `${name} undefined`)
+    assert.equal(copy[name](), off, `${name} 省略参数`)
+    assert.equal(copy[name](published), on, `${name} 已发布`)
+    assert.equal(on.includes('小程序'), true, `${name} 开着要点名小程序`)
+    assert.equal(off.includes('小程序'), false, `${name} 关着不点名小程序`)
+    for (const sentence of [off, on]) {
+      for (const phrase of unattended.UNATTENDED_FORBIDDEN_PHRASES) {
+        assert.ok(!sentence.includes(phrase), `${name}「${sentence}」含禁用说法「${phrase}」`)
+      }
+      assert.equal(unattended.containsStaffHandoff(sentence), false, name)
+      assert.doesNotMatch(sentence, /工作人员|服务台|到店|值守|现场处理/, name)
+    }
+  }
+})
+
 test('是否已发布只经 whenMiniapp 判断，本文件不发请求', () => {
   const source = readFileSync(sourcePath, 'utf8')
   const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
-  assert.equal((code.match(/\bwhenMiniapp\(/g) ?? []).length, 7, '扫码说明和取件句子都要经 whenMiniapp')
+  assert.equal((code.match(/\bwhenMiniapp\(/g) ?? []).length, 10, '扫码说明、取件句子和失败屏三句都要经 whenMiniapp')
   assert.doesNotMatch(code, /miniappPublished|resolveSupportContact|peekSupportContact/, '不要绕开 whenMiniapp 自己读发布字段')
   assert.doesNotMatch(code, /\bfetch\(|services\//, '本文件不发请求、不引接口模块')
   const imports = [...code.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1])

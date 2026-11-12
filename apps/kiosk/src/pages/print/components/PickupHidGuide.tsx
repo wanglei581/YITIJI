@@ -338,6 +338,7 @@ export function PickupFailurePanel({
   onHelp,
   onHome,
   onLogin,
+  retryAs = 'code',
 }: {
   failure: PickupFailure
   message: string
@@ -348,6 +349,8 @@ export function PickupFailurePanel({
   onHelp: () => void
   onHome: () => void
   onLogin?: () => void
+  /** 点单领取失败时重试的是同一笔订单，不是同一串到机码。 */
+  retryAs?: 'code' | 'order'
 }) {
   if (quotaExit === 'login' || quotaExit === 'wait') {
     return (
@@ -391,7 +394,7 @@ export function PickupFailurePanel({
           {locked ? (
             <>这是为了防止有人在公共机器上反复试码。停用<b>过一段时间会自动解除</b>，你的码不会因为停用而作废，到时候再输就行。{helpNeededLine()}</>
           ) : (
-            <>可以用<b>同一串码重试校验</b>，系统会按这台机器核对已认领状态，不会因此重复出纸。如果仍拿不到结果，{printProblemLine()}</>
+            <>可以用<b>{retryAs === 'order' ? '同一笔订单再领一次' : '同一串码重试校验'}</b>，系统会按这台机器核对已认领状态，不会因此重复出纸。如果仍拿不到结果，{printProblemLine()}</>
           )}
         </p>
         <div className="pcp-actions">

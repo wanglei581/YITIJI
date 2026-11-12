@@ -6,8 +6,10 @@
  * 不要写死，也不要拿一体机当前的品牌名去拼小程序的名字。
  *
  * 扫码说明和取件入口里提到小程序的句子，只在小程序已发布时给出，是否已发布只经 `whenMiniapp` 判断，
- * 本文件不自己读字段。小程序未发布、显式传 null，或省略参数而会话缓存里还没有联系方式时，都返回空串；
- * 调用方拿到空串就保持原来的说法。本文件不发请求。
+ * 本文件不自己读字段。那些句子在小程序未发布、显式传 null，或省略参数而会话缓存里还没有联系方式时，
+ * 都返回空串；调用方拿到空串就保持原来的说法。
+ * 取件失败屏的三句不一样：开关关着或读不到时也要有一句，只是不点名小程序，改说「在手机上」。
+ * 本文件不发请求。
  *
  * 句子里不许出现 `UNATTENDED_FORBIDDEN_PHRASES` 里的说法，也不写价格、购买与岗位、招聘会、企业，
  * 由 scripts/tests/miniapp-link-copy.test.mjs 转译本文件逐条钉住。
@@ -81,4 +83,27 @@ export function pickupLookBackTitle(contact?: PublicSupportContact | null): stri
 /** 扫码枪说明前面那半句。未发布时为空串，后面怎么扫的原句照旧。 */
 export function pickupScanMiniappLead(contact?: PublicSupportContact | null): string {
   return whenMiniapp(contact, `打开${MINIAPP_DISPLAY_NAME}小程序里的到机码页面，`)
+}
+
+/**
+ * 取件失败屏：订单已经不能再领。开着时点名小程序；关着或读不到时只说在手机上。
+ * 不返回空串——失败屏必须有下一句，调用方不再另备一句。
+ */
+const PICKUP_UNAVAILABLE_ON = '这个到机码已经不能使用。请在手机小程序「我的 → 打印订单」查看这笔订单，需要的话重新下单'
+const PICKUP_UNAVAILABLE_OFF = '这个到机码已经不能使用。请在手机上「我的 → 打印订单」查看这笔订单，需要的话重新下单'
+const PICKUP_REFUNDED_ON = '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度'
+const PICKUP_REFUNDED_OFF = '本单已退款，不再出纸。款项按原路退回，可在手机上「我的 → 打印订单」查看退款进度'
+const PICKUP_PAYMENT_ON = '这笔订单已经不能付款（可能已关闭）。请在手机小程序「我的 → 打印订单」查看，需要的话重新下单'
+const PICKUP_PAYMENT_OFF = '这笔订单已经不能付款（可能已关闭）。请在手机上「我的 → 打印订单」查看，需要的话重新下单'
+
+export function pickupCodeUnavailableLine(contact?: PublicSupportContact | null): string {
+  return whenMiniapp(contact, PICKUP_UNAVAILABLE_ON) || PICKUP_UNAVAILABLE_OFF
+}
+
+export function pickupOrderRefundedLine(contact?: PublicSupportContact | null): string {
+  return whenMiniapp(contact, PICKUP_REFUNDED_ON) || PICKUP_REFUNDED_OFF
+}
+
+export function pickupOrderPaymentUnavailableLine(contact?: PublicSupportContact | null): string {
+  return whenMiniapp(contact, PICKUP_PAYMENT_ON) || PICKUP_PAYMENT_OFF
 }

@@ -270,8 +270,12 @@ async function main(): Promise<void> {
     ) {
       fail(`走错机器应是 404/PICKUP_CODE_OTHER_TERMINAL，实际 ${JSON.stringify(wrongTerminal)}`)
     }
-    if (!unknownCode.thrown || unknownCode.status !== 404 || unknownCode.code !== 'PICKUP_CODE_INVALID') {
-      fail(`不存在的码仍应是 404/PICKUP_CODE_INVALID，实际 ${JSON.stringify(unknownCode)}`)
+    if (
+      !unknownCode.thrown || unknownCode.status !== 404
+      || unknownCode.code !== 'PICKUP_CODE_INVALID'
+      || unknownCode.message !== '到机码无效或已过期'
+    ) {
+      fail(`不存在的码仍应是 404/PICKUP_CODE_INVALID/到机码无效或已过期，实际 ${JSON.stringify(unknownCode)}`)
     }
     pass('走错机器说明去另一台；不存在的码仍说无效')
 
