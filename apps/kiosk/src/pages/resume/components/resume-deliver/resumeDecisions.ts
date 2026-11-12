@@ -189,10 +189,18 @@ function isSameTextEntry(module: ResumeOptimizeModule): boolean {
 }
 
 /**
+ * 不用用户做任何事的条目：K 类保持原文说明条，或改写与原文去掉首尾空白后相同。
+ * 总览、对照页和批量都用这一个判断，不另写一套。
+ */
+export function isNoActionModule(module: ResumeOptimizeModule): boolean {
+  return module.after.trim() === KEEP_ORIGINAL_NOTE || isSameTextEntry(module)
+}
+
+/**
  * 对照页带回的选择里，哪些要真正去改编辑区。
  * 默认选择按基准稿分类：B、C 是保留原文，所以带回「用改写」一定算变更。
  * 默认已经是用改写、但改写仍不在当前稿里时也要带上，避免被当成已经应用。
- * 保持原文说明条（K）没有可换的改写，带回哪一边都不算变更。
+ * 无需操作的条目（K 类说明条、同文条目）没有可换的改写，带回哪一边都不算变更。
  */
 export function compareDecisionChanges(
   resume: GeneratedResume,
@@ -207,7 +215,7 @@ export function compareDecisionChanges(
     const next = incoming[key]
     if (!next) return
     const state = moduleBaseState(base, module)
-    if (state.kind === 'K') return
+    if (isNoActionModule(module)) return
     const now = current[key] ?? state.defaultDecision
     if (now !== next) {
       changes.push([key, next])

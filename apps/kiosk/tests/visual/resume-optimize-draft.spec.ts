@@ -535,3 +535,153 @@ test('删掉一条经历后没删的那条仍在导出里 @kiosk', async ({ page
   expect(companies).toContain(SHORT_COMPANY)
   expect(companies).not.toContain(LONG_COMPANY)
 })
+
+const KEEP_MANUAL_TASK_ID = 'optimize-keep-manual-2099'
+const KEEP_MANUAL_ACCESS_TOKEN = 'optimize-keep-manual-access-token'
+const KEEP_NOTE = '这一段没有改动，保留原文'
+const KEEP_SENTENCE = '2019年9月至2023年6月就读于山东财经大学新闻学本科。'
+const SAME_SENTENCE = '协助整理学院公众号的选题目录和排版稿。'
+const MANUAL_SENTENCE = '参与迎新志愿服务，协助新生报到和答疑。'
+const MANUAL_AFTER = '在迎新志愿服务中协助新生完成报到和答疑。'
+const SWITCH_SITE = '维护学院官网的栏目内容和活动通知。'
+const SWITCH_SITE_AFTER = '把学院官网的栏目内容和活动通知写得更清楚。'
+const SWITCH_FAIR = '整理招聘会的签到表和展位资料。'
+const SWITCH_FAIR_AFTER = '把招聘会的签到表和展位资料按场次归档。'
+const MANUAL_NOTE_NOT_FOUND = '这条改写没有原样写进优化稿，这里没法切换；要用哪一版，请在编辑区里对照着改。'
+const LONG_SUMMARY = '本人在校期间持续整理新闻稿件与活动记录。'.repeat(35)
+const LONG_DESCRIPTION = '完成一门课程的采访作业。'.repeat(100)
+
+function keepManualResume() {
+  return {
+    basic: { name: '周启明', phone: '13800000000', city: '青岛' },
+    intention: { position: '新闻编辑', city: '青岛' },
+    summary: LONG_SUMMARY,
+    education: [{
+      school: KEEP_SENTENCE,
+      major: '新闻学',
+      degree: '本科',
+      period: '2019-2023',
+      description: LONG_DESCRIPTION,
+    }],
+    experience: [
+      { company: '学院学生会', role: '干事', period: '2021-2022', description: MANUAL_SENTENCE },
+      { company: '学院新媒体中心', role: '编辑', period: '2022-2023', description: SAME_SENTENCE },
+      { company: '学院官网工作室', role: '编辑', period: '2023-2024', description: SWITCH_SITE },
+    ],
+    projects: [
+      { name: '迎新志愿服务', role: '志愿者', description: MANUAL_SENTENCE },
+      { name: '春季招聘会', role: '资料员', description: SWITCH_FAIR },
+    ],
+    skills: ['新闻写作'],
+    certificates: [] as string[],
+  }
+}
+
+async function openKeepManualOptimize(page: Page, api: Parameters<typeof registerW6Api>[0]): Promise<void> {
+  registerOptimizeShell(api)
+  api.respond('GET', `/api/v1/resume/records/${KEEP_MANUAL_TASK_ID}/optimize`, {
+    status: 200,
+    json: {
+      taskId: KEEP_MANUAL_TASK_ID,
+      status: 'completed',
+      providerName: 'llm',
+      optimizedResume: keepManualResume(),
+      modules: [
+        { title: '教育经历（保持原文）', before: KEEP_SENTENCE, after: KEEP_NOTE },
+        { title: '公众号选题', before: SAME_SENTENCE, after: SAME_SENTENCE },
+        { title: '迎新志愿服务', before: MANUAL_SENTENCE, after: MANUAL_AFTER },
+        { title: '学院官网', before: SWITCH_SITE, after: SWITCH_SITE_AFTER },
+        { title: '招聘会资料', before: SWITCH_FAIR, after: SWITCH_FAIR_AFTER },
+      ],
+    },
+  })
+  await page.addInitScript(({ taskId, accessToken }) => {
+    window.sessionStorage.setItem('ai-job-print:current-ai-resume', JSON.stringify({ taskId, accessToken }))
+  }, { taskId: KEEP_MANUAL_TASK_ID, accessToken: KEEP_MANUAL_ACCESS_TOKEN })
+  await page.goto('/resume/optimize')
+  await expect(page.getByTestId('resume-optimize-overview')).toBeVisible()
+}
+
+test.describe('保持原文无需操作，换不上的去编辑区，长简介不再被截断', () => {
+  test('总览把保持原文和同文标成无需操作，换不上的一点就停在那一栏 @kiosk', async ({ page, api }) => {
+    expect(LONG_SUMMARY.length).toBe(700)
+    expect(LONG_DESCRIPTION.length).toBe(1200)
+    await openKeepManualOptimize(page, api)
+    const list = page.getByTestId('resume-optimize-list')
+    const rows = list.locator('li')
+    const counts = page.getByTestId('resume-optimize-counts')
+    await expect(rows).toHaveCount(5)
+    const untouched = rows.filter({ hasText: '无需操作' })
+    await expect(untouched).toHaveCount(2)
+    await expect(untouched.getByText('这一段保持原文。')).toHaveCount(2)
+    await expect(untouched.getByRole('button', { name: '打开' })).toHaveCount(0)
+    await expect(untouched.getByText('这一条只能在编辑区里改。')).toHaveCount(0)
+    await expect(counts.locator('[data-d="optimized"] b')).toHaveText('0 / 2')
+    await expect(counts.locator('[data-d="original"] b')).toHaveText('2')
+    await expect(counts.locator('[data-d="manual"] b')).toHaveText('1')
+
+    // 总览原文行会去掉句末句号，再接说明；按标题定位这一条。
+    const manualRow = rows.filter({ hasText: '迎新志愿服务' })
+    const goEdit = manualRow.getByRole('button', { name: '去编辑区改这一条', exact: true })
+    await goEdit.scrollIntoViewIfNeeded()
+    await goEdit.click()
+    const field = page.locator('[data-entry-field="experience-0-description"]')
+    await expect(field).toBeFocused()
+    await expect(field).toHaveValue(MANUAL_SENTENCE)
+    const selected = await field.evaluate((element) => {
+      const input = element as HTMLTextAreaElement
+      return input.value.slice(input.selectionStart ?? 0, input.selectionEnd ?? 0)
+    })
+    expect(selected).toBe(MANUAL_SENTENCE)
+
+    const summary = page.getByRole('textbox', { name: '个人简介' })
+    await expect(summary).toHaveValue(LONG_SUMMARY)
+    await summary.fill(`${LONG_SUMMARY}补`)
+    await expect(summary).toHaveValue(`${LONG_SUMMARY}补`)
+    const description = page.getByRole('textbox', { name: '第 1 条教育的描述' })
+    await expect(description).toHaveValue(LONG_DESCRIPTION)
+    await description.fill(`${LONG_DESCRIPTION}补`)
+    await expect(description).toHaveValue(`${LONG_DESCRIPTION}补`)
+  })
+
+  test('对照页跳过无需操作条目，换不上的不被批量设成用改写 @kiosk', async ({ page, api }) => {
+    await openKeepManualOptimize(page, api)
+    const manualRow = page.getByTestId('resume-optimize-list').locator('li').filter({ hasText: '迎新志愿服务' })
+    await manualRow.locator('button', { hasText: '打开' }).click()
+    await expect(page.getByText('第 1 / 3 条 · 迎新志愿服务')).toBeVisible()
+    await expect(page.getByText('无需操作')).toHaveCount(0)
+    await expect(page.getByText(KEEP_SENTENCE)).toHaveCount(0)
+    await expect(page.getByText(SAME_SENTENCE)).toHaveCount(0)
+    await expect(page.getByText('这一段保持原文。')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '用改写', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '保留原文', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '自己写', exact: true })).toHaveCount(0)
+    await expect(page.getByTestId('compare-manual')).toContainText('只能手改')
+    await expect(page.getByTestId('compare-manual')).toContainText(MANUAL_NOTE_NOT_FOUND)
+    await expect(page.getByRole('button', { name: '去编辑区改这一条', exact: true })).toBeVisible()
+    await expect(page.getByText('跳过有待确认事实、只能手改的那几条')).toBeVisible()
+    await expect(page.getByRole('button', { name: '下一条', exact: true })).toBeEnabled()
+
+    await page.getByRole('button', { name: '下一条', exact: true }).click()
+    await expect(page.getByText('第 2 / 3 条 · 学院官网')).toBeVisible()
+    await expect(page.getByText(SWITCH_SITE).first()).toBeVisible()
+    await expect(page.getByText('无需操作')).toHaveCount(0)
+    await page.getByRole('button', { name: '保留原文', exact: true }).click()
+    await page.getByRole('button', { name: '下一条', exact: true }).click()
+    await expect(page.getByText('第 3 / 3 条 · 招聘会资料')).toBeVisible()
+    await expect(page.getByText(SWITCH_FAIR).first()).toBeVisible()
+    await expect(page.getByText(KEEP_SENTENCE)).toHaveCount(0)
+    await expect(page.getByText(SAME_SENTENCE)).toHaveCount(0)
+    await expect(page.getByText('无需操作')).toHaveCount(0)
+
+    await page.getByRole('button', { name: /可采纳的全部采纳/ }).click()
+    await page.locator('.qxt-back').click()
+    await expect(page.getByRole('dialog', { name: '对照页有 2 条裁决' })).toBeVisible()
+    await page.getByRole('button', { name: '暂不应用' }).click()
+    await page.locator('.qxt-back').click()
+    const backRow = page.getByTestId('resume-optimize-list').locator('li').filter({ hasText: '迎新志愿服务' })
+    await expect(backRow.getByRole('button', { name: '去编辑区改这一条', exact: true })).toBeVisible()
+    await expect(backRow.getByRole('button', { name: '用改写', exact: true })).toHaveCount(0)
+    await expect(page.getByText('没能自动放进稿里')).toHaveCount(0)
+  })
+})

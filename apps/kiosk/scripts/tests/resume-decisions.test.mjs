@@ -26,11 +26,14 @@ const module = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-delive
 const {
   isModuleSwitchable, moduleSwitchBlock, moduleBaseState, moduleKeyOf, defaultModuleDecision,
   toggleModuleDecision, applyDecisionChanges, applyResumeDecisionsWithStatus, compareDecisionChanges,
+  isNoActionModule,
 } = module.exports
 const compareModule = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-compare/resumeCompareModel.ts'))
 const factsModule = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-deliver/facts.ts'))
-const { buildCompareItems, adoptEligible } = compareModule.exports
+const titlesModule = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-deliver/resumeEntryTitles.ts'))
+const { buildCompareItems, adoptEligible, visibleCompareIndices, focusToVisiblePosition } = compareModule.exports
 const { detectUnconfirmedTextAdditions } = factsModule.exports
+const { findResumeOriginalField, RESUME_EDIT_LIMITS } = titlesModule.exports
 
 const makeResume = (text) => ({
   basic: { name: '求职者', phone: '', city: '' }, intention: { position: '', city: '' }, summary: text,
@@ -236,17 +239,20 @@ function fieldText(resume, index) {
   return resume.summary
 }
 
-test('样本 1：对照页带回 7 条用改写，6 条 B 换上，被截的第 3 条失败，带新增事实的第 2 条不动', () => {
+test('样本 1：对照页带回的用改写里，同文的第 3 条不产生变更也不失败，6 条 B 换上，第 2 条不动', () => {
   const { resume, modules, sentences, afters } = sampleOne()
   assert.deepEqual(modules.map((item) => moduleBaseState(resume, item).kind), ['B', 'C', 'D', 'B', 'B', 'B', 'B', 'B'])
+  // 第 3 条句子里没有「原文」二字，改写与原文逐字相同，虽按基准稿是 D，但是无需操作。
+  assert.equal(isNoActionModule(modules[2]), true)
   const incoming = {}
   modules.forEach((item, index) => {
     if (index === 1) return
     incoming[moduleKeyOf(item, index)] = 'optimized'
   })
   const changes = compareDecisionChanges(resume, modules, {}, incoming, resume)
+  assert.equal(changes.some(([key]) => key === moduleKeyOf(modules[2], 2)), false)
   const applied = applyDecisionChanges(resume, modules, {}, changes, resume)
-  assert.deepEqual(applied.failures, [{ key: moduleKeyOf(modules[2], 2), reason: 'not-found' }])
+  assert.deepEqual(applied.failures, [])
   for (const index of [0, 3, 4, 5, 6, 7]) {
     const text = fieldText(applied.resume, index)
     assert.equal(text.includes(afters[index]), true, `第 ${index + 1} 条应换上改写`)
@@ -451,8 +457,10 @@ test('K 类从对照页带回用改写或保留原文都不产生变更也不失
   const bKey = moduleKeyOf(bItem, 1)
   assert.equal(moduleBaseState(base, kItem).kind, 'K')
   assert.equal(moduleBaseState(base, bItem).kind, 'B')
-  const picked = adoptEligible(buildCompareItems(modules), {}, {})
-  assert.equal(picked.next[kKey], 'optimized')
+  const picked = adoptEligible(buildCompareItems(modules), {}, {}, base)
+  assert.equal(picked.next[kKey], undefined)
+  assert.equal(picked.adopted, 1)
+  assert.equal(picked.skipped, 0)
   assert.equal(picked.next[bKey], 'optimized')
   const changes = compareDecisionChanges(base, modules, {}, picked.next, base)
   assert.equal(changes.some(([key]) => key === kKey), false)
@@ -471,15 +479,16 @@ test('K 类从对照页带回用改写或保留原文都不产生变更也不失
   assert.equal(kept.resume.summary.includes(note), false)
 })
 
-test('样本 1：对照页不确认时采纳 7 条，应用后 6 条 B 换上，第 3 条失败，第 2 条不动', () => {
+test('样本 1：对照页不确认时采纳 6 条、只跳过待确认的第 2 条，同文的第 3 条不写选择，应用后 6 条 B 换上', () => {
   const { resume, modules, sentences, afters } = sampleOne()
-  const picked = adoptEligible(buildCompareItems(modules), {}, {})
-  assert.equal(picked.adopted, 7)
+  const picked = adoptEligible(buildCompareItems(modules), {}, {}, resume)
+  assert.equal(picked.adopted, 6)
   assert.equal(picked.skipped, 1)
   assert.notEqual(picked.next[moduleKeyOf(modules[1], 1)], 'optimized')
+  assert.equal(picked.next[moduleKeyOf(modules[2], 2)], undefined)
   const changes = compareDecisionChanges(resume, modules, {}, picked.next, resume)
   const applied = applyDecisionChanges(resume, modules, {}, changes, resume)
-  assert.deepEqual(applied.failures, [{ key: moduleKeyOf(modules[2], 2), reason: 'not-found' }])
+  assert.deepEqual(applied.failures, [])
   for (const index of [0, 3, 4, 5, 6, 7]) {
     const text = fieldText(applied.resume, index)
     assert.equal(text.includes(afters[index]), true, `第 ${index + 1} 条应换上改写`)
@@ -490,20 +499,22 @@ test('样本 1：对照页不确认时采纳 7 条，应用后 6 条 B 换上，
   assert.equal(applied.resume.experience[2].description, '无关经历，不对应任何一条建议。')
 })
 
-test('样本 1：对照页确认第 2 条全部新增事实后 8 条都入选，第 2 条换上，失败仍只有第 3 条', () => {
+test('样本 1：对照页确认第 2 条全部新增事实后采纳 7 条，同文的第 3 条仍不写选择，第 2 条换上', () => {
   const { resume, modules, sentences, afters } = sampleOne()
   const second = modules[1]
   const secondKey = moduleKeyOf(second, 1)
   const additions = detectUnconfirmedTextAdditions(second.after, second.before)
-  const picked = adoptEligible(buildCompareItems(modules), { [secondKey]: additions }, {})
-  assert.equal(picked.adopted, 8)
+  const picked = adoptEligible(buildCompareItems(modules), { [secondKey]: additions }, {}, resume)
+  assert.equal(picked.adopted, 7)
   assert.equal(picked.skipped, 0)
   modules.forEach((item, index) => {
-    assert.equal(picked.next[moduleKeyOf(item, index)], 'optimized')
+    const key = moduleKeyOf(item, index)
+    if (index === 2) assert.equal(picked.next[key], undefined)
+    else assert.equal(picked.next[key], 'optimized')
   })
   const changes = compareDecisionChanges(resume, modules, {}, picked.next, resume)
   const applied = applyDecisionChanges(resume, modules, {}, changes, resume)
-  assert.deepEqual(applied.failures, [{ key: moduleKeyOf(modules[2], 2), reason: 'not-found' }])
+  assert.deepEqual(applied.failures, [])
   const secondText = fieldText(applied.resume, 1)
   assert.equal(secondText.includes(afters[1]), true)
   assert.equal(secondText.includes(sentences[1].trim()), false)
@@ -605,4 +616,106 @@ test('F7：前一条换上后把后一条原句吃掉时，后一条不换、也
   assert.equal(applied.resume.summary.includes(before2), true)
   assert.equal(applied.decisions[moduleKeyOf(modules[0], 0)], 'optimized')
   assert.notEqual(applied.decisions[moduleKeyOf(modules[1], 1)], 'optimized')
+})
+
+test('K 类和同文条目是无需操作，其余不是', () => {
+  const note = '这一段没有改动，保留原文'
+  assert.equal(isNoActionModule(moduleOf('教育经历原文这一句。', note, '教育')), true)
+  assert.equal(isNoActionModule(moduleOf('', note, '空原文')), true)
+  assert.equal(isNoActionModule(moduleOf('完成门店日结并核对收银。', '完成门店日结并核对收银。', '同文')), true)
+  assert.equal(isNoActionModule(moduleOf('  完成门店日结并核对收银。  ', '完成门店日结并核对收银。', '只差空白')), true)
+  assert.equal(isNoActionModule(moduleOf('\n完成门店日结并核对收银。\n', '完成门店日结并核对收银。', '只差换行')), true)
+  assert.equal(isNoActionModule(moduleOf('原来的话', '更好的话', '改写')), false)
+  assert.equal(isNoActionModule(moduleOf('原来的话', '', '空改写')), false)
+  assert.equal(isNoActionModule(moduleOf('原来的话', '原来的话。', '多了句号')), false)
+  const base = makeResume('原来的话')
+  assert.equal(moduleBaseState(base, moduleOf('原来的话', '更好的话')).kind, 'B')
+  assert.equal(isNoActionModule(moduleOf('原来的话', '更好的话')), false)
+})
+
+test('去编辑区改这一条：同一句出现多处停在第一栏，没有就返回空', () => {
+  const sentence = '维护学院官网的栏目内容和活动通知。'
+  const resume = {
+    ...makeResume('简介里没有这句'),
+    education: [{ school: '山东财经大学', major: '新闻学', description: '课程作业另写。' }],
+    experience: [job(sentence), job(`前缀${sentence}后缀`)],
+    projects: [{ name: '迎新', role: '', description: sentence }],
+    skills: [sentence],
+  }
+  assert.deepEqual(findResumeOriginalField(resume, sentence), { fieldId: 'experience-0-description', start: 0 })
+  assert.deepEqual(findResumeOriginalField(resume, `  ${sentence}  `), { fieldId: 'experience-0-description', start: 0 })
+  assert.deepEqual(findResumeOriginalField(resume, '没有这句'), { fieldId: 'summary', start: 3 })
+  assert.equal(findResumeOriginalField(resume, '稿里根本没有的句子'), null)
+  assert.equal(findResumeOriginalField(resume, '   '), null)
+  assert.equal(findResumeOriginalField(resume, ''), null)
+})
+
+test('对照页逐条序号跳过无需操作条目，focusIndex 按原序号映射', () => {
+  const keep = moduleOf('教育经历原文这一句。', '这一段没有改动，保留原文', '教育')
+  const same = moduleOf('协助整理学院公众号的选题目录和排版稿。', '  协助整理学院公众号的选题目录和排版稿。\n', '公众号')
+  const manual = moduleOf('参与迎新志愿服务，协助新生报到和答疑。', '在迎新志愿服务中协助新生完成报到和答疑。', '迎新')
+  const first = moduleOf('维护学院官网的栏目内容和活动通知。', '把学院官网的栏目内容和活动通知写得更清楚。', '官网')
+  const second = moduleOf('整理招聘会的签到表和展位资料。', '把招聘会的签到表和展位资料按场次归档。', '招聘会')
+  const modules = [keep, same, manual, first, second]
+  assert.deepEqual(visibleCompareIndices(modules), [2, 3, 4])
+  assert.equal(focusToVisiblePosition(modules, 0), 0)
+  assert.equal(focusToVisiblePosition(modules, 1), 0)
+  assert.equal(focusToVisiblePosition(modules, 2), 0)
+  assert.equal(focusToVisiblePosition(modules, 3), 1)
+  assert.equal(focusToVisiblePosition(modules, 4), 2)
+  assert.equal(focusToVisiblePosition(modules, 9), 2)
+  assert.equal(focusToVisiblePosition([], 0), 0)
+})
+
+test('可采纳的全部采纳跳过换不上的条目，skipped 把它们计进去，不为无需操作写选择', () => {
+  const keep = moduleOf('教育经历原文这一句。', '这一段没有改动，保留原文', '教育')
+  const same = moduleOf('协助整理学院公众号的选题目录和排版稿。', '协助整理学院公众号的选题目录和排版稿。', '公众号')
+  const manualBefore = '参与迎新志愿服务，协助新生报到和答疑。'
+  const manual = moduleOf(manualBefore, '在迎新志愿服务中协助新生完成报到和答疑。', '迎新')
+  const first = moduleOf('维护学院官网的栏目内容和活动通知。', '把学院官网的栏目内容和活动通知写得更清楚。', '官网')
+  const second = moduleOf('整理招聘会的签到表和展位资料。', '把招聘会的签到表和展位资料按场次归档。', '招聘会')
+  const modules = [keep, same, manual, first, second]
+  const base = {
+    ...makeResume(`${keep.before}\n${same.before}\n${first.before}`),
+    experience: [job(manualBefore), job(second.before)],
+    projects: [{ name: '迎新', role: '', description: manualBefore }],
+  }
+  assert.equal(moduleBaseState(base, manual).kind, 'D')
+  assert.equal(moduleBaseState(base, first).kind, 'B')
+  assert.equal(moduleBaseState(base, second).kind, 'B')
+  const visible = buildCompareItems(modules).filter((item) => !isNoActionModule(item))
+  assert.deepEqual(visible.map((item) => item.sourceIndex), [2, 3, 4])
+  const picked = adoptEligible(visible, {}, {}, base)
+  assert.equal(picked.adopted, 2)
+  assert.equal(picked.skipped, 1)
+  assert.equal(picked.next[moduleKeyOf(manual, 2)], undefined)
+  assert.equal(picked.next[moduleKeyOf(first, 3)], 'optimized')
+  assert.equal(picked.next[moduleKeyOf(second, 4)], 'optimized')
+  assert.equal(picked.next[moduleKeyOf(keep, 0)], undefined)
+  assert.equal(picked.next[moduleKeyOf(same, 1)], undefined)
+  const all = adoptEligible(buildCompareItems(modules), {}, {}, base)
+  assert.equal(all.adopted, 2)
+  assert.equal(all.skipped, 1)
+  assert.equal(all.next[moduleKeyOf(keep, 0)], undefined)
+  assert.equal(all.next[moduleKeyOf(same, 1)], undefined)
+})
+
+test('编辑区简介和描述上限与导出稿相同，输入时不再截成 600 或 1000', () => {
+  const limits = readFileSync(join(kioskRoot, '../../services/api/src/ai/resume/resume-doc-limits.ts'), 'utf8')
+  const summary = Number(limits.match(/summary:\s*(\d+)/)?.[1])
+  const description = Number(limits.match(/description:\s*(\d+)/)?.[1])
+  assert.equal(summary, 24000)
+  assert.equal(description, 24000)
+  assert.equal(RESUME_EDIT_LIMITS.summary, summary)
+  assert.equal(RESUME_EDIT_LIMITS.description, description)
+  for (const rel of [
+    'src/pages/resume/components/OptimizedResumeEditor.tsx',
+    'src/pages/resume/components/resume-deliver/GenerateResumeEditor.tsx',
+  ]) {
+    const source = readFileSync(join(kioskRoot, rel), 'utf8')
+    assert.equal(/slice\(\s*0\s*,\s*600\s*\)/.test(source), false, `${rel} 仍在把简介截成 600`)
+    assert.equal(/slice\(\s*0\s*,\s*1000\s*\)/.test(source), false, `${rel} 仍在把描述截成 1000`)
+    assert.equal(source.includes('maxLength={RESUME_EDIT_LIMITS.summary}'), true, rel)
+    assert.equal(source.includes('maxLength={RESUME_EDIT_LIMITS.description}'), true, rel)
+  }
 })

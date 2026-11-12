@@ -32,7 +32,7 @@
 import 'dotenv/config'
 import { createServer, type RequestListener } from 'http'
 import { installResumeOptimizeFetchStub } from './support/resume-optimize-fetch-stub'
-import { verifyOptimizeAfterMatch, verifyOptimizeSameTextEntries, verifyOptimizeSkillKept, verifyOptimizeSummaryLimit } from './support/resume-optimize-after-match'
+import { verifyOptimizeAfterMatch, verifyOptimizeEntryCountsKept, verifyOptimizeLongCertificateKept, verifyOptimizeSameTextEntries, verifyOptimizeSkillKept, verifyOptimizeSummaryLimit } from './support/resume-optimize-after-match'
 import { verifyOriginalContent } from './support/resume-optimize-original-content'
 import { verifyOptimizeExportContract } from './support/resume-optimize-export-contract'
 import type { AddressInfo } from 'net'
@@ -363,6 +363,8 @@ async function main(): Promise<void> {
   await verifyOptimizeSummaryLimit()
   await verifyOptimizeSameTextEntries()
   await verifyOptimizeSkillKept()
+  await verifyOptimizeLongCertificateKept()
+  await verifyOptimizeEntryCountsKept()
   await verifyOriginalContent()
   await verifyOptimizeExportContract()
   await verifyRedisInflightLock()

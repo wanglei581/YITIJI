@@ -1,6 +1,6 @@
 import { useKioskLicense, useWindDownViewOnly } from '../../layouts/KioskLicenseContext'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { type GeneratedResume, type ResumeExportFormat } from '@ai-job-print/shared'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
@@ -51,13 +51,14 @@ import {
   parseDecisionMap,
   toggleModuleDecision,
   isModuleSwitchable,
+  isNoActionModule,
   moduleSwitchBlock,
   type ResumeDecisionFailure,
   type ResumeModuleDecision,
 } from './components/resume-deliver/resumeDecisions'
 import { CompareDecisionsApplyDialog } from './components/resume-deliver/CompareDecisionsApplyDialog'
 import { useCompareDecisionsReturn } from './components/resume-deliver/useCompareDecisionsReturn'
-import { focusResumeTitleIssue, resumeTitleIssues } from './components/resume-deliver/resumeEntryTitles'
+import { focusResumeOriginalField, focusResumeTitleIssue, resumeTitleIssues } from './components/resume-deliver/resumeEntryTitles'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-optimize-qx.css'
 import './touch/optimize.css'
@@ -112,6 +113,14 @@ export function ResumeOptimizePage() {
   const [baseResume, setBaseResume] = useState<GeneratedResume | null>(null)
   /** 核对事实的时刻与当时那份稿的指纹；稿一改指纹对不上，就得重新核对。 */
   const [factsConfirmed, setFactsConfirmed] = useState<{ at: string; sig: string } | null>(null)
+  const editOriginalRef = useRef<string | null>(typeof state?.editOriginal === 'string' ? state.editOriginal : null)
+  const [editFocusNonce, setEditFocusNonce] = useState(0)
+  const openEditorAtOriginal = (original: string) => {
+    if (viewOnly) return
+    editOriginalRef.current = original
+    setEditFocusNonce((n) => n + 1)
+    setWorkView('editor')
+  }
 
   useBusyLock(exporting || printNavigating || Boolean(adjusting))
   const syntheticReady = query.capture || query.debug
@@ -221,6 +230,7 @@ export function ResumeOptimizePage() {
   const handleBatch = (next: ResumeModuleDecision) => {
     if (viewOnly || !optimizedResume) return
     const changes = modules.flatMap((module, index): Array<[string, ResumeModuleDecision]> => {
+      if (isNoActionModule(module)) return []
       if (!isModuleSwitchable(baseResume, module, decisions[moduleKeyOf(module, index)])) return []
       return [[moduleKeyOf(module, index), next]]
     })
@@ -339,6 +349,15 @@ export function ResumeOptimizePage() {
   // 稿：总览、编辑、导出是同一页的三屏，用按钮切换。没有可对照的条目时直接进编辑区。
   const showOverview = workView === 'overview' && modules.length > 0
   const pane: OptimizePane = view !== 'ready' ? 'overview' : workView === 'export' ? 'export' : showOverview ? 'overview' : 'editor'
+  useEffect(() => {
+    if (pane !== 'editor' || !resume || editOriginalRef.current == null) return
+    const text = editOriginalRef.current
+    const handle = window.requestAnimationFrame(() => {
+      focusResumeOriginalField(resume, text)
+      editOriginalRef.current = null
+    })
+    return () => window.cancelAnimationFrame(handle)
+  }, [pane, resume, editFocusNonce])
   const qxPage = pane === 'export' ? 'resume-export' : pane === 'editor' ? 'resume-edit' : 'optimize'
   const leaveDirty = draft.unsaved || (isDirty && !exported && !token)
   const askFor = (label: string, text: string) => ({
@@ -475,11 +494,17 @@ export function ResumeOptimizePage() {
             synthetic={resolved.synthetic}
             disabled={viewOnly || loading || exporting || Boolean(adjusting)}
             clearedChoices={clearedChoices}
-            onClear={() => setClearedChoices(new Set(modules.map(moduleKeyOf)))}
+            onClear={() => setClearedChoices(new Set(modules.flatMap((module, index) => {
+              if (isNoActionModule(module)) return []
+              const key = moduleKeyOf(module, index)
+              if (!isModuleSwitchable(baseResume, module, decisions[key])) return []
+              return [key]
+            })))}
             decisionIssues={decisionIssues}
             onDecisionChange={handleDecisionChange}
             onBatch={handleBatch}
             onCompare={openCompare}
+            onGoEdit={(index) => openEditorAtOriginal(modules[index]?.before ?? '')}
             onEditor={() => { if (!viewOnly) setWorkView('editor') }}
             onManual={() => { if (!viewOnly) requestLeave(() => navigate('/resume/generate')) }}
             newTaskLocked={viewOnly}

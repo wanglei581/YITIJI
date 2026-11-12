@@ -1,11 +1,11 @@
 import { COMPLIANCE_COPY, type ResumeOptimizeModule } from '@ai-job-print/shared'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../../../copy/unattendedCopy'
 import { detectUnconfirmedTextAdditions } from './facts'
-import { moduleKeyOf, type ResumeDecisionMap, type ResumeModuleDecision, type ResumeSwitchBlock } from './resumeDecisions'
+import { isNoActionModule, moduleKeyOf, type ResumeDecisionMap, type ResumeModuleDecision, type ResumeSwitchBlock } from './resumeDecisions'
 
 const DECISION_LABEL: Record<ResumeModuleDecision, string> = { optimized: '用改写', original: '保留原文' }
-/** 切换不了的条目直接说原因；不画开关，免得点了才说换不了、还把原因推给用户。 */
-const MANUAL_NOTE: Record<ResumeSwitchBlock, string> = {
+/** 切换不了的条目直接说原因；不画开关，免得点了才说换不了、还把原因推给用户。对照页换不上的那一条用同一句。 */
+export const MANUAL_NOTE: Record<ResumeSwitchBlock, string> = {
   'not-found': '这条改写没有原样写进优化稿，这里没法切换；要用哪一版，请在编辑区里对照着改。',
   'original-empty': '这条是新加的一句，原文里没有对应的句子，这里没法切换；不要的话，请在编辑区里删掉。',
 }
@@ -17,6 +17,7 @@ const MANUAL_NOTE: Record<ResumeSwitchBlock, string> = {
  * 「待确认事实」只比对数字和职责词，不是通用事实校验。
  *
  * 切换靠在优化稿里找改写的原句；找不到（或原文为空）的条目记为「只能手改」：不画开关、不进用改写 / 保留原文的计数和批量。
+ * 保持原文说明条和同文条目是「无需操作」：不进这三格，也不进批量。
  * 一条可切换的都没有时（例如演示模式的建议句），计数只剩「只能手改」和「待确认事实」，批量按钮不画。
  */
 export function OptimizeOverview(props: {
@@ -33,6 +34,8 @@ export function OptimizeOverview(props: {
   onClear: () => void
   decisionIssues: Record<string, string>
   onCompare: (focusIndex?: number) => void
+  /** 换不上的那一条：打开编辑区并停在这句原文所在的栏。停用条件与「编辑简历」相同。 */
+  onGoEdit: (index: number) => void
   onEditor: () => void
   onManual: () => void
   /** 授权收尾中、从记录页只读打开时，逐条对照与「自己动手改」会开始另一件事，停用。 */
@@ -42,16 +45,22 @@ export function OptimizeOverview(props: {
   const rows = props.modules.map((module, index) => {
     const key = moduleKeyOf(module, index)
     const decision: ResumeModuleDecision = props.decisions[key] ?? props.defaultDecisions[key]
-    const block = props.switchBlocks[key] ?? null
-    return { key, module, index, decision, block, switchable: block === null, additions: detectUnconfirmedTextAdditions(module.after, module.before) }
+    const noAction = isNoActionModule(module)
+    const block = noAction ? null : (props.switchBlocks[key] ?? null)
+    return {
+      key, module, index, decision, block, noAction,
+      switchable: !noAction && block === null,
+      manual: !noAction && block !== null,
+      additions: detectUnconfirmedTextAdditions(module.after, module.before),
+    }
   })
-  const total = rows.length
   const switchableRows = rows.filter((row) => row.switchable)
   const optimizedCount = switchableRows.filter((row) => !props.clearedChoices.has(row.key) && row.decision === 'optimized').length
   const originalCount = switchableRows.filter((row) => !props.clearedChoices.has(row.key) && row.decision === 'original').length
-  const manualCount = total - switchableRows.length
+  const manualCount = rows.filter((row) => row.manual).length
   const factCount = rows.filter((row) => row.additions.length > 0).length
   const canSwitch = switchableRows.length > 0
+  const showDraftHint = canSwitch || manualCount > 0
 
   return (
     <div className="qxt-overview" data-testid="resume-optimize-overview">
@@ -75,37 +84,46 @@ export function OptimizeOverview(props: {
           </button>
         </div>
       ) : null}
-      <p className="qxt-draft" role="note">
-        {props.clearedChoices.size > 0 ? '选择标记已清空，编辑区已有内容保留；可以重新选择。' : canSwitch
-          ? '上面的选择已经写进编辑区里的这一份：选了「保留原文」的几条，用你原来的句子'
-          : '上面这几条都没法在这里切换，要用哪一版，请在编辑区里对照着改'}
-      </p>
+      {showDraftHint ? (
+        <p className="qxt-draft" role="note">
+          {props.clearedChoices.size > 0 ? '选择标记已清空，编辑区已有内容保留；可以重新选择。' : canSwitch
+            ? '上面的选择已经写进编辑区里的这一份：选了「保留原文」的几条，用你原来的句子'
+            : '上面这几条都没法在这里切换，要用哪一版，请在编辑区里对照着改'}
+        </p>
+      ) : null}
       <ul className="qxt-rows" data-testid="resume-optimize-list">
         {rows.map((row) => {
           const title = row.module.title || `第 ${row.index + 1} 条`
-          const snippet = row.module.before.replace(/\s+/g, ' ').trim()
+          const snippet = row.module.before.replace(/\s+/g, ' ').trim().replace(/。+$/u, '')
+          const originalLine = row.noAction
+            ? (snippet ? `原文：${snippet}。这一段保持原文。` : '原文：这一段保持原文。')
+            : `原文：${snippet || '这一条没有留下原句。'}${row.manual ? ' 这一条只能在编辑区里改。' : ''}${row.additions.length > 0 ? ` 待确认：${row.additions.join('、')}` : ''}`
           return (
-            <li key={row.key} className="qxt-row" data-decision={row.switchable ? row.decision : 'manual'} data-pending={row.additions.length}>
+            <li key={row.key} className={row.noAction ? 'qxt-row qxt-keeprow' : 'qxt-row'} data-decision={row.noAction ? 'keep' : row.switchable ? row.decision : 'manual'} data-pending={row.additions.length}>
               <div className="qxt-rowtx">
                 <b>{title}</b>
-                <small>原文：{snippet || '这一条没有留下原句。'}{row.block ? ' 这一条只能在编辑区里改。' : ''}{row.additions.length > 0 ? ` 待确认：${row.additions.join('、')}` : ''}</small>
+                <small>{originalLine}</small>
               </div>
-              {row.switchable ? (
+              {row.noAction ? <span className="qxt-keep">无需操作</span> : row.switchable ? (
                 <div className="qxt-segsel" role="group" aria-label={`第 ${row.index + 1} 条用哪一版`}>
                   <button type="button" aria-pressed={!props.clearedChoices.has(row.key) && row.decision === 'optimized'} disabled={props.disabled} onClick={() => props.onDecisionChange(row.key, 'optimized')}>用改写</button>
                   <button type="button" aria-pressed={!props.clearedChoices.has(row.key) && row.decision === 'original'} disabled={props.disabled} onClick={() => props.onDecisionChange(row.key, 'original')}>保留原文</button>
                 </div>
-              ) : <span className="qxt-hand">只能手改</span>}
-              <button
-                type="button"
-                className="qxt-open"
-                disabled={props.newTaskLocked === true}
-                onClick={() => props.onCompare(row.index)}
-                aria-label={`第 ${row.index + 1} 条 ${title}，${row.switchable ? `当前${DECISION_LABEL[row.decision]}` : '这一条只能在编辑区里改'}，去逐条对照`}
-              >
-                打开
-              </button>
-              {row.block
+              ) : (
+                <button type="button" className="qxt-hand qxt-goedit" disabled={props.newTaskLocked === true} title={props.newTaskLocked ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={() => props.onGoEdit(row.index)}>去编辑区改这一条</button>
+              )}
+              {row.noAction ? <span /> : (
+                <button
+                  type="button"
+                  className="qxt-open"
+                  disabled={props.newTaskLocked === true}
+                  onClick={() => props.onCompare(row.index)}
+                  aria-label={`第 ${row.index + 1} 条 ${title}，${row.switchable ? `当前${DECISION_LABEL[row.decision]}` : '这一条只能在编辑区里改'}，去逐条对照`}
+                >
+                  打开
+                </button>
+              )}
+              {row.manual && row.block
                 ? <p className="qxt-rowstatus" data-testid="resume-optimize-row-manual" role="status">{MANUAL_NOTE[row.block]}</p>
                 : props.decisionIssues[row.key] && <p className="qxt-rowstatus" role="status">{props.decisionIssues[row.key]}</p>}
             </li>

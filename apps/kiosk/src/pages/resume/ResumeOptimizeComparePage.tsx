@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import type { ResumeOptimizeModule } from '@ai-job-print/shared'
+import type { GeneratedResume, ResumeOptimizeModule } from '@ai-job-print/shared'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { resumeUserReason } from './resumeUserCopy'
 import { ResumeTouchPage } from './touch/ResumeTouchPage'
+import { useKioskLicense, useWindDownViewOnly } from '../../layouts/KioskLicenseContext'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { useAuth } from '../../auth/useAuth'
 import { aiErrorMessageOf, isAiOutage, useAiTask } from '../../ai'
 import { AI_QUOTA_EXHAUSTED_RESUME_COPY } from '../../services/api/userErrorMessage'
@@ -11,14 +13,20 @@ import { getResumeOptimize } from '../../services/api'
 import { readAiResumeSession } from './aiResumeSession'
 import { ResumeCompareBatchBar } from './components/resume-compare/ResumeCompareBatchBar'
 import { ResumeCompareCard } from './components/resume-compare/ResumeCompareCard'
+import { ResumeCompareManual } from './components/resume-compare/ResumeCompareManual'
 import { ResumeCompareCustomEditor } from './components/resume-compare/ResumeCompareCustomEditor'
 import { ResumeCompareDraft } from './components/resume-compare/ResumeCompareDraft'
 import { ResumeCompareState } from './components/resume-compare/ResumeCompareState'
 import { OptimizeEmptyState } from './components/resume-deliver/OptimizeEmptyState'
+import { MANUAL_NOTE } from './components/resume-deliver/OptimizeOverview'
+import { isNoActionModule, moduleSwitchBlock } from './components/resume-deliver/resumeDecisions'
 import {
   adoptEligible,
   decisionStats,
+  decisionsWithoutNoAction,
   buildCompareItems,
+  focusToVisiblePosition,
+  isManualCompareItem,
   keepUndecided,
   moduleKeyOf,
   initialDecisionsFrom,
@@ -50,6 +58,7 @@ export function ResumeOptimizeComparePage() {
     ?? (usingSessionTask ? session?.accessToken : undefined)
 
   const [modules, setModules] = useState<ResumeOptimizeModule[]>([])
+  const [baseResume, setBaseResume] = useState<GeneratedResume | null>(null)
   const [loadedTaskId, setLoadedTaskId] = useState<string | null>(null)
   const [providerName, setProviderName] = useState<string | null>(null)
   const [loading, setLoading] = useState(Boolean(taskId))
@@ -68,6 +77,9 @@ export function ResumeOptimizeComparePage() {
   const [customByModule, setCustomByModule] = useState<Record<string, string>>({})
   const [batchNote, setBatchNote] = useState<string | null>(null)
   const [writeOpen, setWriteOpen] = useState(false)
+  const windDownViewOnly = useWindDownViewOnly('resume')
+  const licenseFlagViewOnly = useKioskLicense().mode === 'winding-down' && state?.licenseViewOnly === true
+  const viewOnly = windDownViewOnly || licenseFlagViewOnly
 
   useEffect(() => {
     if (!taskId) {
@@ -79,6 +91,7 @@ export function ResumeOptimizeComparePage() {
     const keepEntrySelection = appliedEntryRef.current === entryToken
     setLoading(true)
     setModules([])
+    setBaseResume(null)
     setLoadedTaskId(null)
     setProviderName(null)
     setOutage(null)
@@ -95,10 +108,12 @@ export function ResumeOptimizeComparePage() {
       setCurrentIndex(focus > 0 ? focus : 0)
       setDecisions(initialDecisionsFrom(state))
     }
-    appliedEntryRef.current = entryToken
+    // 引用要等这一次读取真正返回再记下。请求还在飞时 effect 重放，仍按第一次进入处理，
+    // 否则焦点还停在原序号，过滤掉无需操作条目后会停错条。
     getResumeOptimize(taskId, { token: getToken(), accessToken }, existingOnly)
       .then((response) => {
         if (cancelled) return
+        appliedEntryRef.current = entryToken
         setProviderName(response.providerName ?? null)
         if (response.status !== 'completed') {
           if (isAiOutage({ code: response.failCode })) {
@@ -109,13 +124,16 @@ export function ResumeOptimizeComparePage() {
           return
         }
         const nextModules = response.modules ?? []
+        setBaseResume(response.optimizedResume ?? null)
         setModules(nextModules)
         setLoadedTaskId(taskId)
-        setCurrentIndex((index) => Math.min(index, Math.max(0, nextModules.length - 1)))
+        const rawFocus = typeof state?.focusIndex === 'number' ? Math.floor(state.focusIndex) : 0
+        if (!keepEntrySelection) setCurrentIndex(focusToVisiblePosition(nextModules, rawFocus > 0 ? rawFocus : 0))
         if (nextModules.length === 0) setFailure('这次没有生成逐条改写候选。')
       })
       .catch((error: unknown) => {
         if (cancelled) return
+        appliedEntryRef.current = entryToken
         if (isAiOutage(error)) {
           setOutage(aiErrorMessageOf(error, 'AI 服务当前不可用'))
         } else {
@@ -129,7 +147,7 @@ export function ResumeOptimizeComparePage() {
   }, [taskId, accessToken, getToken, retryNonce, existingOnly, state])
 
   const items = useMemo(
-    () => loadedTaskId === taskId ? buildCompareItems(modules) : [],
+    () => (loadedTaskId === taskId ? buildCompareItems(modules).filter((item) => !isNoActionModule(item)) : []),
     [loadedTaskId, modules, taskId],
   )
   const stats = decisionStats(items, decisions)
@@ -138,11 +156,21 @@ export function ResumeOptimizeComparePage() {
   }, [items.length, currentIndex])
   useEffect(() => { setWriteOpen(false) }, [currentIndex])
   const current = items[currentIndex]
-  const keyAt = (index: number) => moduleKeyOf(items[index], index)
+  const keyAt = (index: number) => moduleKeyOf(items[index], items[index]?.sourceIndex ?? index)
   const isDemoResult = providerName === 'mock'
+  const currentDecision = current ? decisions[keyAt(currentIndex)] : undefined
+  const moduleDecision = currentDecision === 'original' || currentDecision === 'optimized' ? currentDecision : undefined
+  const manual = Boolean(current && isManualCompareItem(current, moduleDecision, baseResume))
+  const manualBlock = manual && current ? moduleSwitchBlock(baseResume, current, moduleDecision) : null
 
-  const backToOptimize = () => navigate(OPTIMIZE_ROUTE, {
-    state: taskId ? { taskId, accessToken, decisions, ...(existingOnly ? { existingOnly: true } : {}) } : undefined,
+  const backToOptimize = (editOriginal?: string) => navigate(OPTIMIZE_ROUTE, {
+    state: taskId ? {
+      taskId,
+      accessToken,
+      decisions: decisionsWithoutNoAction(modules, decisions),
+      ...(existingOnly ? { existingOnly: true } : {}),
+      ...(editOriginal ? { editOriginal } : {}),
+    } : undefined,
   })
   const retry = () => {
     setLoadedTaskId(null)
@@ -164,7 +192,8 @@ export function ResumeOptimizeComparePage() {
   }
 
   const next = () => {
-    if (!current || !decisions[keyAt(currentIndex)]) return
+    if (!current) return
+    if (!manual && !decisions[keyAt(currentIndex)]) return
     if (currentIndex < items.length - 1) setCurrentIndex((index) => index + 1)
     else backToOptimize()
   }
@@ -182,8 +211,8 @@ export function ResumeOptimizeComparePage() {
   const decided = Boolean(current && decisions[keyAt(currentIndex)])
   const lastItem = Boolean(current && currentIndex >= items.length - 1)
   const dockPrimary = current
-    ? { label: lastItem ? '去编辑' : '下一条', onClick: next, disabled: !decided, className: 'qx-btn', noArrow: true }
-    : { label: '返回优化页', onClick: backToOptimize, className: 'qx-btn', noArrow: true }
+    ? { label: lastItem ? '去编辑' : '下一条', onClick: next, disabled: manual ? false : !decided, className: 'qx-btn', noArrow: true }
+    : { label: '返回优化页', onClick: () => backToOptimize(), className: 'qx-btn', noArrow: true }
   const aiTask = useAiTask({ availability: outage ? 'unavailable' : loadedTaskId ? 'available' : 'unknown', pending: false, failed: Boolean(failure), hasResult: Boolean(current) })
   const pageTitle = current ? `第 ${currentIndex + 1} / ${items.length} 条 · ${current.title}` : '逐条选择改法'
 
@@ -194,7 +223,7 @@ export function ResumeOptimizeComparePage() {
       subtitle="选择还没写进简历，在『编辑』里生效"
       status={pageStatus}
       railNow={3}
-      back={{ label: '返回', onBack: backToOptimize }}
+      back={{ label: '返回', onBack: () => backToOptimize() }}
       ask={outage ? { label: '小青暂时不可用，先手动编辑', disabled: true } : { label: '问小青：这句还能怎么改 →', draft: '我想把简历中的一句经历换个改法。请先让我提供原句，只整理真实内容，不添加数字或成果。' }}
       primary={dockPrimary}
       bodyClassName="qxt-body-scroll"
@@ -207,7 +236,7 @@ export function ResumeOptimizeComparePage() {
           <ResumeCompareState title="正在读取逐条改写" description="读取尚未完成，现在不展示候选内容。" busy />
         ) : outage ? (
           <>
-            <ResumeCompareState title="AI 改写当前不可用" description={`${outage}。原文和优化页的手动编辑不受影响，本页不用通用建议冒充结果。`} actionLabel="返回优化页" onAction={backToOptimize} />
+            <ResumeCompareState title="AI 改写当前不可用" description={`${outage}。原文和优化页的手动编辑不受影响，本页不用通用建议冒充结果。`} actionLabel="返回优化页" onAction={() => backToOptimize()} />
             {fallbackExits}
           </>
         ) : failure || !current ? (
@@ -225,7 +254,8 @@ export function ResumeOptimizeComparePage() {
               confirmed={confirmedByModule[keyAt(currentIndex)] ?? []}
               customText={customByModule[keyAt(currentIndex)] ?? ''}
               isDemoResult={isDemoResult}
-              onExit={backToOptimize}
+              onExit={() => backToOptimize()}
+              hideFacts={manual}
               onConfirm={(addition, checked) => setConfirmedByModule((previous) => {
                 const key = keyAt(currentIndex)
                 const nextConfirmed = new Set(previous[key] ?? [])
@@ -253,12 +283,12 @@ export function ResumeOptimizeComparePage() {
               </div>
               <ResumeCompareBatchBar
                 onAdoptEligible={() => {
-                  const result = adoptEligible(items, confirmedByModule, decisions)
+                  const result = adoptEligible(items, confirmedByModule, decisions, baseResume)
                   setDecisions(result.next)
                   setBatchNote(`已采纳 ${result.adopted} 条；跳过 ${result.skipped} 条 —— 那几条的改写里有原文没有的事实，要逐项确认后才能采纳。批量动作不会绕过这道拦截。`)
                 }}
                 onKeepUndecided={() => {
-                  const result = keepUndecided(items, decisions)
+                  const result = keepUndecided(items, decisions, baseResume)
                   setDecisions(result.next)
                   setBatchNote(`已把 ${result.count} 条还没决定的记为「保留原文」。选择可以反复改，随时逐条回去重选。`)
                 }}
@@ -273,11 +303,21 @@ export function ResumeOptimizeComparePage() {
                 </>
               )}
             />
+            {manual ? (
+              <ResumeCompareManual
+                note={MANUAL_NOTE[manualBlock ?? 'not-found']}
+                disabled={viewOnly}
+                title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined}
+                onEdit={() => { if (!viewOnly && current) backToOptimize(current.before) }}
+              />
+            ) : (
             <div className="qxt-dec" role="group" aria-label="这一条用哪一版">
               <button type="button" aria-pressed={decisions[keyAt(currentIndex)] === 'optimized'} onClick={() => choose('optimized')} disabled={currentUnconfirmed}>用改写</button>
               <button type="button" aria-pressed={decisions[keyAt(currentIndex)] === 'original'} onClick={() => choose('original')}>保留原文</button>
               <button type="button" aria-pressed={writeOpen || decisions[keyAt(currentIndex)] === 'custom'} onClick={() => setWriteOpen(true)}>自己写</button>
             </div>
+            )}
+            {manual ? null : (
             <ResumeCompareCustomEditor
               decision={decisions[keyAt(currentIndex)]}
               value={customByModule[keyAt(currentIndex)] ?? ''}
@@ -291,6 +331,7 @@ export function ResumeOptimizeComparePage() {
                 setDecisions((previous) => ({ ...previous, [key]: 'custom' }))
               }}
             />
+            )}
             <ResumeCompareDraft
               items={items}
               decisions={decisions}

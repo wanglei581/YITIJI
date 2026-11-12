@@ -39,7 +39,7 @@ import {
   restoreGeneratedResume, restoreOptimizeResult,
 } from './resume-optimize-coverage'
 import { alignOptimizeModuleAfter } from './resume-optimize-after-align'
-import { fitResumeToDocLimits } from './resume-doc-limits'
+import { RESUME_DOC_LIMITS, fitResumeToDocLimits } from './resume-doc-limits'
 
 // ============================================================
 // LlmResumeOptimizeService — 阶段2B 真实简历优化(单轮、结构化 JSON,OpenAI 兼容)
@@ -556,7 +556,7 @@ export class LlmResumeOptimizeService {
 
     // 列表段:事实串(学校/公司/项目名/证书)必须在原文;任何一条不在 → 整体非法
     const education: GeneratedResume['education'] = []
-    for (const item of asArray(r['education'], 6)) {
+    for (const item of asArray(r['education'], RESUME_DOC_LIMITS.education)) {
       const school = strOf(item, 'school', 100)
       const major = strOf(item, 'major', 60)
       const degree = strOf(item, 'degree', 20)
@@ -578,7 +578,7 @@ export class LlmResumeOptimizeService {
     }
 
     const experience: GeneratedResume['experience'] = []
-    for (const item of asArray(r['experience'], 8)) {
+    for (const item of asArray(r['experience'], RESUME_DOC_LIMITS.experience)) {
       const company = strOf(item, 'company', 100)
       const role = strOf(item, 'role', 60)
       if (!inText(company)) return reject('experience_company')
@@ -589,7 +589,7 @@ export class LlmResumeOptimizeService {
     }
 
     const projects: GeneratedResume['projects'] = []
-    for (const item of asArray(r['projects'], 6)) {
+    for (const item of asArray(r['projects'], RESUME_DOC_LIMITS.projects)) {
       const projectName = strOf(item, 'name', 100)
       if (!inText(projectName)) return reject('project_name')
       const description = clean(item['description'], MAX_OPTIMIZE_DESC_CHARS)
@@ -599,7 +599,7 @@ export class LlmResumeOptimizeService {
     }
 
     const skills: string[] = []
-    for (const skill of asStrArray(r['skills'], 20)) {
+    for (const skill of asStrArray(r['skills'], RESUME_DOC_LIMITS.skills)) {
       const cleaned = skill.trim()
       if (!cleaned) continue
       // 不再截到 40 字。超长交给出口的 fitResumeToDocLimits，按分隔符拆开，一个字不丢。
@@ -611,9 +611,15 @@ export class LlmResumeOptimizeService {
     }
 
     const certificates: string[] = []
-    for (const cert of asStrArray(r['certificates'], 15)) {
-      const trimmed = cert.trim().slice(0, 60)
+    // 不对证书先截再查原文：前 60 字是原文前缀也会放行，等于静默截断。
+    // 超长交给出口的 fitResumeToDocLimits，单条 200。
+    for (const cert of asStrArray(r['certificates'], RESUME_DOC_LIMITS.certificates)) {
+      const trimmed = cert.trim()
       if (!trimmed) continue
+      if (containsForbiddenWord(trimmed, blocked)) {
+        cleanRule = 'guard_term'
+        return reject('guard_term')
+      }
       if (!inText(trimmed)) return reject('certificate') // 证书是高风险编造点:不在原文即整体非法
       certificates.push(trimmed)
     }

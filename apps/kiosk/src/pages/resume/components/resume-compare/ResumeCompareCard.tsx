@@ -21,6 +21,8 @@ export function ResumeCompareCard(props: {
   onPrevious?: () => void
   /** 顶上一行与左右两栏之间要放的东西（统计、批量、提示）。 */
   intro?: ReactNode
+  /** 换不上的条目不画新增事实勾选。 */
+  hideFacts?: boolean
 }) {
   const confirmed = new Set(props.confirmed)
   const shown = props.decision === 'custom' && props.customText ? props.customText : props.item.after
@@ -58,6 +60,7 @@ export function ResumeCompareCard(props: {
         </section>
       </div>
       <p className="qxt-metrics">字数 {props.item.before.length} → {shown.length} · 删除 {deleted} 字 · 新增 {added} 字</p>
+      {props.hideFacts ? null : (
       <section className="qxt-facts" data-has-additions={additions.length > 0 ? 'true' : 'false'} aria-label="新增事实核对">
         {additions.length === 0 ? (
           <p>机械对照未发现改写中新增的数字或职责词。这不代表已校验，仍需你核对全文。</p>
@@ -73,6 +76,7 @@ export function ResumeCompareCard(props: {
           </>
         )}
       </section>
+      )}
     </>
   )
 }

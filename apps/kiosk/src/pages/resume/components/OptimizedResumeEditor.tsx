@@ -5,7 +5,7 @@ import { Card } from '@ai-job-print/ui'
 import type { GeneratedResume, ResumeLayoutSettings } from '@ai-job-print/shared'
 import { MaskedContactLine } from '../../../components/MaskedContactLine'
 import { DeleteEntryButton, EntryDeleteDialog } from './resume-deliver/ResumeFactConfirmDialog'
-import { resumeTitleIssues } from './resume-deliver/resumeEntryTitles'
+import { RESUME_EDIT_LIMITS, resumeTitleIssues } from './resume-deliver/resumeEntryTitles'
 
 type OptimizedResumeEditorProps = {
   resume: GeneratedResume
@@ -110,10 +110,13 @@ export function OptimizedResumeEditor({
             <SectionTitle title="个人简介" />
             <textarea
               className={`${taCls} min-h-24 resize-y`}
+              aria-label="个人简介"
+              data-entry-field="summary"
+              maxLength={RESUME_EDIT_LIMITS.summary}
               value={resume.summary}
               placeholder="(空)"
               onFocus={scrollFieldIntoView}
-              onChange={(e) => onChange({ ...resume, summary: e.target.value.slice(0, 600) })}
+              onChange={(e) => onChange({ ...resume, summary: e.target.value })}
             />
           </div>
 
@@ -154,12 +157,14 @@ export function OptimizedResumeEditor({
                       <textarea
                         className={`${taCls} mt-1.5 min-h-20 resize-y`}
                         aria-label={`第 ${i + 1} 条教育的描述`}
+                        data-entry-field={`education-${i}-description`}
+                        maxLength={RESUME_EDIT_LIMITS.description}
                         value={e.description ?? ''}
                         placeholder="(无描述)"
                         onFocus={scrollFieldIntoView}
                         onChange={(ev) => onChange({
                           ...resume,
-                          education: resume.education.map((row, idx) => idx === i ? { ...row, description: ev.target.value.slice(0, 1000) } : row),
+                          education: resume.education.map((row, idx) => idx === i ? { ...row, description: ev.target.value } : row),
                         })}
                       />
                       <DeleteEntryButton label={`删掉这一条，第 ${i + 1} 条教育`} onClick={() => setPendingDelete({ section: 'education', index: i })} />
@@ -205,11 +210,13 @@ export function OptimizedResumeEditor({
                       <textarea
                         className={`${taCls} mt-1.5 min-h-24 resize-y`}
                         aria-label={`第 ${i + 1} 条经历的描述`}
+                        data-entry-field={`experience-${i}-description`}
+                        maxLength={RESUME_EDIT_LIMITS.description}
                         value={e.description}
                         onFocus={scrollFieldIntoView}
                         onChange={(ev) => onChange({
                           ...resume,
-                          experience: resume.experience.map((row, idx) => idx === i ? { ...row, description: ev.target.value.slice(0, 1000) } : row),
+                          experience: resume.experience.map((row, idx) => idx === i ? { ...row, description: ev.target.value } : row),
                         })}
                       />
                       <DeleteEntryButton label={`删掉这一条，第 ${i + 1} 条经历`} onClick={() => setPendingDelete({ section: 'experience', index: i })} />
@@ -230,11 +237,13 @@ export function OptimizedResumeEditor({
                     <textarea
                       className={`${taCls} mt-1.5 min-h-24 resize-y`}
                       aria-label={`第 ${i + 1} 条项目的描述`}
+                      data-entry-field={`projects-${i}-description`}
+                      maxLength={RESUME_EDIT_LIMITS.description}
                       value={p.description}
                       onFocus={scrollFieldIntoView}
                       onChange={(ev) => onChange({
                         ...resume,
-                        projects: resume.projects.map((row, idx) => idx === i ? { ...row, description: ev.target.value.slice(0, 1000) } : row),
+                        projects: resume.projects.map((row, idx) => idx === i ? { ...row, description: ev.target.value } : row),
                       })}
                     />
                   </div>
@@ -248,7 +257,7 @@ export function OptimizedResumeEditor({
               <SectionTitle title="技能" />
               <div className="flex flex-wrap gap-2">
                 {resume.skills.map((s, i) => (
-                  <span key={i} className="rounded-lg bg-primary-50 px-2.5 py-1 text-sm text-primary-700">{s}</span>
+                  <span key={i} className="rounded-lg bg-primary-50 px-2.5 py-1 text-sm text-primary-700" data-entry-field={`skill-${i}`}>{s}</span>
                 ))}
               </div>
             </div>

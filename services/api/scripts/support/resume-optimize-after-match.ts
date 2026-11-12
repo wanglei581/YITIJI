@@ -395,11 +395,113 @@ export async function verifyOptimizeSkillKept(): Promise<void> {
   pass('优化稿技能 60 字完整保留，没有截在 40 字')
 }
 
+/** 原文里有的 70 字证书必须整段留下。先截成 60 再查原文会只留下前缀。 */
+export async function verifyOptimizeLongCertificateKept(): Promise<void> {
+  console.log('\n=== 优化稿证书超过 60 字时完整保留 ===')
+  const certificate = '持普通话水平测试二级甲等证书'.repeat(5)
+  if (certificate.length !== 70) fail(`证书夹具应为 70 字，实际 ${certificate.length}`)
+  const original = [SAME_TEXT_NAME, certificate, '做过茶饮门店。'].join('\n')
+  const result = await runOptimize(original, JSON.stringify({
+    resume: { ...sameTextResume('做过茶饮门店。'), certificates: [certificate] },
+    modules: [],
+  }), [])
+  const kept = result.optimizedResume.certificates[0] ?? ''
+  if (kept !== certificate || kept.length !== 70) {
+    fail(`优化稿证书应完整保留 70 字，实际 ${kept.length} 字`)
+  }
+  pass('原文里有的 70 字证书完整保留，没有截在 60 字')
+}
+
+const ENTRY_MARKS = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸', '子', '丑', '寅', '卯'] as const
+
+/**
+ * 原文 10 段经历、14 段项目时，模型只交回前 8 段和前 6 段，其余按原文补回。
+ * 14 段项目超过导出上限 12，多出来的两段并进最后一条描述，句子仍在。
+ * 技能、证书整段非空就不补单行，所以模型必须交回全部 25 项和 18 个，解析上限不能再把它们切掉。
+ */
+export async function verifyOptimizeEntryCountsKept(): Promise<void> {
+  console.log('\n=== 优化稿经历、项目、技能、证书条数不丢原文 ===')
+  const experiences = ENTRY_MARKS.slice(0, 10).map((mark, index) => {
+    const company = `青州${mark}厂有限公司`
+    const month = String(index + 1).padStart(2, '0')
+    return {
+      company,
+      line: `${company} 2018.${month} - 2018.12`,
+      original: `维护${mark}号车间的设备台账。`,
+      rewrite: `改写${mark}号车间的设备台账。`,
+    }
+  })
+  const projects = ENTRY_MARKS.map((mark, index) => {
+    const name = `青州${mark}项`
+    const year = 2020 + index
+    return {
+      name,
+      line: `${name} ${year}.03 - ${year}.06`,
+      original: `整理${mark}号同学的投稿说明。`,
+      rewrite: `改写${mark}号同学的投稿说明。`,
+    }
+  })
+  const skills = Array.from({ length: 25 }, (_, index) => `技能条目${String(index + 1).padStart(2, '0')}`)
+  const certificates = Array.from({ length: 18 }, (_, index) => `资格证书${String(index + 1).padStart(2, '0')}`)
+  const original = [
+    '周启明',
+    '工作经历',
+    ...experiences.flatMap((item) => [item.line, item.original]),
+    '项目经历',
+    ...projects.flatMap((item) => [item.line, item.original]),
+    '技能',
+    ...skills,
+    '证书',
+    ...certificates,
+  ].join('\n')
+  const result = await runOptimize(original, JSON.stringify({
+    resume: {
+      basic: { name: '周启明', phone: '', email: '', city: '' },
+      intention: { position: '', city: '' },
+      summary: '做过校园媒体。',
+      education: [],
+      experience: experiences.slice(0, 8).map((item) => ({
+        company: item.company, role: '', period: '', description: item.rewrite,
+      })),
+      projects: projects.slice(0, 6).map((item) => ({
+        name: item.name, role: '', description: item.rewrite,
+      })),
+      skills,
+      certificates,
+    },
+    modules: [],
+  }), [])
+  const resume = result.optimizedResume
+  if (resume.experience.length !== 10) fail(`经历应为 10 条，实际 ${resume.experience.length}`)
+  experiences.forEach((item, index) => {
+    const text = `${resume.experience[index]?.company ?? ''}\n${resume.experience[index]?.description ?? ''}`
+    const expected = index < 8 ? item.rewrite : item.original
+    if (!text.includes(item.company) || !text.includes(expected)) {
+      fail(`第 ${index + 1} 段经历应保留「${expected}」，实际 ${text}`)
+    }
+  })
+  if (resume.projects.length !== 12) fail(`项目超过导出上限后应为 12 条，实际 ${resume.projects.length}`)
+  const projectText = JSON.stringify(resume.projects)
+  projects.forEach((item, index) => {
+    const expected = index < 6 ? item.rewrite : item.original
+    if (!projectText.includes(expected)) fail(`第 ${index + 1} 段项目的「${expected}」不在优化稿里`)
+  })
+  if (resume.skills.length !== skills.length || skills.some((skill, index) => resume.skills[index] !== skill)) {
+    fail(`技能应为原文 25 项，实际 ${resume.skills.length} 项`)
+  }
+  if (resume.certificates.length !== certificates.length || certificates.some((cert, index) => resume.certificates[index] !== cert)) {
+    fail(`证书应为原文 18 个，实际 ${resume.certificates.length} 个`)
+  }
+  pass('10 段经历、14 段项目的句子都在，25 项技能和 18 个证书逐条保留')
+}
+
 if (process.argv[1]?.endsWith('resume-optimize-after-match.ts')) {
   verifyOptimizeAfterMatch()
     .then(() => verifyOptimizeSummaryLimit())
     .then(() => verifyOptimizeSameTextEntries())
     .then(() => verifyOptimizeSkillKept())
+    .then(() => verifyOptimizeLongCertificateKept())
+    .then(() => verifyOptimizeEntryCountsKept())
     .catch((error: unknown) => {
       console.error(error instanceof Error ? error.message : error)
       process.exit(1)

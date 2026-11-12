@@ -200,3 +200,37 @@
   [data-kiosk-stage-fit='off'] [data-qx-page='optimize'] .qxt-ovx { grid-template-columns: 1fr; }
   [data-kiosk-stage-fit='off'] [data-qx-page='optimize'] .qxt-row { grid-template-columns: 1fr; }
 }
+
+/* 11/12 补稿：无需操作、去编辑区改这一条。只加新规则，不改上面已有的行和标签。 */
+[data-qx-page='optimize'] .qxt-keep {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border-radius: 18px;
+  background: var(--qxt-card);
+  border: 1.5px dashed var(--qxt-edge);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--qxt-ink-3);
+}
+
+[data-qx-page='optimize'] .qxt-row.qxt-keeprow {
+  min-height: 128px;
+  background: var(--qxt-well);
+}
+
+[data-qx-page='optimize'] .qxt-hand.qxt-goedit {
+  cursor: pointer;
+  width: 100%;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  border: 1.5px solid var(--qxt-teal-ink);
+  line-height: 1.2;
+  text-align: center;
+}
+
+[data-qx-page='optimize'] .qxt-goedit:disabled {
+  opacity: 0.42;
+}
