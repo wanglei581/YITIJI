@@ -489,7 +489,7 @@ Page({
   },
 
   // 只在真正离开本页时作废在途的报价。**不在 onHide 作废**：建单成功后本页会
-  // redirectTo 到取件页，而报价链断在半路只会让金额停在「正在核定」——
+  // reLaunch 到取件页，而报价链断在半路只会让金额停在「正在核定」——
   // 切后台对一次报价来说不是安全边界（金额是本人自己的），换人才是，那条由
   // _resolveAccount 的 setIdentity 管。
   onUnload() {
@@ -866,7 +866,7 @@ Page({
       if (!orderId) throw new Error('服务端未返回订单号')
       // 走到这里账号仍是发起时那位（含"JWT 刚好在途中自然过期"这一种）。
       // 从这一行起，这张订单在服务端已经存在：本页永远不许再 POST 第二次。
-      // 锁必须在 redirectTo **之前**设 —— 跳转失败（或同步抛）时页面还留在这里，
+      // 锁必须在跳转 **之前**设 —— 跳转失败（或同步抛）时页面还留在这里，
       // 不设锁的话用户只会以为没下成，然后再点一次，于是多出一张订单和一笔钱。
       this._createdOrderId = orderId
       attempt.settled = true
@@ -895,7 +895,12 @@ Page({
       }
       // 只把 orderId 交给下一页。到机码 / 金额 / 有效期 / 订单号 / 任务状态一律由
       // print-pickup 自己带登录态向 GET /me/print-orders/:orderId 取（requireOwned 归属校验）。
-      wx.redirectTo({
+      //
+      // 用 reLaunch 而不是 redirectTo（2026-10-16 真机验收）：订单建成之后，「上传参数 → 选终端 →
+      // 确认」这几页不能再留在栈里。redirectTo 只换掉本页，安卓返回键、iOS 右滑一下就回到
+      // 「选终端」，再走一遍就是第二张单。reLaunch 只重建页面栈，登录态、本机存储都不受影响；
+      // 成功才清恢复记录、失败就锁页面的两条回调与原来一致。
+      wx.reLaunch({
         url: '/pages/print-pickup/print-pickup?orderId=' + encodeURIComponent(orderId),
         // **确实跳走了才清恢复记录。** 拿到 200 就清的话，跳转失败会把唯一能找回
         // 这张订单的线索一起丢掉，而页面还留在原地 —— 用户只会再点一次。
@@ -921,7 +926,7 @@ Page({
         return
       }
       this._releaseLoading(attempt)
-      // 订单已经建成、只是后续动作抛错（例如 redirectTo 同步抛）：
+      // 订单已经建成、只是后续动作抛错（例如跳转同步抛）：
       // 不能当成"下单失败"让用户重来 —— 重来就是第二张订单。
       if (this._createdOrderId) { this._lockAfterCreated(this._createdOrderId); return }
       // 这一次确实没建成（网络失败 / 服务端拒绝）：解开尝试锁，让用户可以重试。
