@@ -32,7 +32,7 @@
 import 'dotenv/config'
 import { createServer, type RequestListener } from 'http'
 import { installResumeOptimizeFetchStub } from './support/resume-optimize-fetch-stub'
-import { verifyOptimizeAfterMatch } from './support/resume-optimize-after-match'
+import { verifyOptimizeAfterMatch, verifyOptimizeSummaryLimit } from './support/resume-optimize-after-match'
 import { verifyOriginalContent } from './support/resume-optimize-original-content'
 import { verifyOptimizeExportContract } from './support/resume-optimize-export-contract'
 import type { AddressInfo } from 'net'
@@ -360,6 +360,7 @@ function buildFixtureOptimize(fixture: ResumeFixture): string {
 async function main(): Promise<void> {
   console.log('\n=== 阶段2B AI 简历优化真实化验证 ===')
   await verifyOptimizeAfterMatch()
+  await verifyOptimizeSummaryLimit()
   await verifyOriginalContent()
   await verifyOptimizeExportContract()
   await verifyRedisInflightLock()
