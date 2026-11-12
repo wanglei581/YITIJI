@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`638` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`644` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -50,6 +50,17 @@
 | GET | `/api/v1/admin/alerts` | AdminOpsController.listAlerts | admin | AdminOpsService | AlertDisposition<br/>FeedbackTicket<br/>PrintTask<br/>Terminal<br/>TerminalHeartbeat |
 | POST | `/api/v1/admin/alerts/disposition` | AdminOpsController.disposeAlert | admin | AdminAlertActionsService | AlertDisposition<br/>AuditLog<br/>FeedbackTicket<br/>PrintTask<br/>Terminal<br/>TerminalHeartbeat<br/>User |
 | GET | `/api/v1/admin/print-tasks` | AdminOpsController.listPrintTasks | admin | AdminOpsService | AlertDisposition<br/>FeedbackTicket<br/>PrintTask<br/>Terminal<br/>TerminalHeartbeat |
+
+## `services/api/src/admin-ops/org-device-alert-notify.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/orgs/:id/device-alert-notify` | SaveDeviceAlertWebhookDto.view | partner | OrgDeviceAlertWebhookService | AuditLog<br/>Organization |
+| PUT | `/api/v1/admin/orgs/:id/device-alert-notify` | SaveDeviceAlertWebhookDto.save | partner | OrgDeviceAlertWebhookService | AuditLog<br/>Organization |
+| POST | `/api/v1/admin/orgs/:id/device-alert-notify/test` | SaveDeviceAlertWebhookDto.test | partner | OrgDeviceAlertWebhookService | AuditLog<br/>Organization |
+| GET | `/api/v1/partner/device-alert-notify` | SaveDeviceAlertWebhookDto.view | partner | OrgDeviceAlertWebhookService | AuditLog<br/>Organization |
+| PUT | `/api/v1/partner/device-alert-notify` | SaveDeviceAlertWebhookDto.save | partner | OrgDeviceAlertWebhookService | AuditLog<br/>Organization |
+| POST | `/api/v1/partner/device-alert-notify/test` | SaveDeviceAlertWebhookDto.test | partner | OrgDeviceAlertWebhookService | AuditLog<br/>Organization |
 
 ## `services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts`
 
