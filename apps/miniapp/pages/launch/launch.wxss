@@ -56,7 +56,7 @@ page { height: 100%; background: var(--teal-soft); }
 }
 .lg-sheet-back {
   border-color: var(--line);
-  transform: rotate(4deg) translate(34rpx, 6rpx);
+  transform: rotate(4deg) translate(6%, 1%);
   animation: lg-print-back 1s cubic-bezier(.16, .84, .3, 1) .05s both;
 }
 .lg-sheet-front {
@@ -74,14 +74,15 @@ page { height: 100%; background: var(--teal-soft); }
 .lg-w60 { width: 60%; }
 .lg-para { margin-top: 40rpx; }
 
-/* 打开页面时纸从出纸口里出来一次；起点整张藏在卡片后面 */
+/* 打开页面时纸从出纸口里出来一次；起点整张藏在卡片后面。
+   位移写成纸自身尺寸的百分比，不在 transform / @keyframes 里写 rpx（本小程序别处没有这种写法的先例） */
 @keyframes lg-print {
-  from { transform: translateY(470rpx); }
+  from { transform: translateY(80%); }
   to   { transform: translateY(0); }
 }
 @keyframes lg-print-back {
-  from { transform: rotate(4deg) translate(34rpx, 520rpx); }
-  to   { transform: rotate(4deg) translate(34rpx, 6rpx); }
+  from { transform: rotate(4deg) translate(6%, 84%); }
+  to   { transform: rotate(4deg) translate(6%, 1%); }
 }
 
 /* ── 下半：登录卡片 ───────────────────────────────────────── */
