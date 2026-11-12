@@ -13,7 +13,7 @@ import { parseVerifiedDomains } from '../official-channels/verified-domains'
 export type PolicySourceLinkCheck =
   | { status: 'missing' }
   | { status: 'no_registered_domains' }
-  | { status: 'not_verified' }
+  | { status: 'not_verified'; httpOnly: boolean }
   | { status: 'verified'; url: string; host: string }
 
 /** 判定一条政策的原文链接是否在机构登记的官方网站内。只认 https、不带账号的地址。 */
@@ -26,7 +26,11 @@ export function checkPolicySourceLink(
   const domains = parseVerifiedDomains(verifiedOfficialDomainsJson).map((item) => item.domain)
   if (domains.length === 0) return { status: 'no_registered_domains' }
   const url = verifiedHttpsUrl(raw, domains)
-  if (!url) return { status: 'not_verified' }
+  if (!url) {
+    // 只差在开头是 http://（换成 https:// 就能通过）时单独标出来，好把被拒的原因说准。
+    const httpOnly = /^http:\/\//i.test(raw) && verifiedHttpsUrl(raw.replace(/^http:/i, 'https:'), domains) !== null
+    return { status: 'not_verified', httpOnly }
+  }
   return { status: 'verified', url: url.toString(), host: url.hostname }
 }
 
@@ -35,6 +39,37 @@ export function isPolicySourceLinkVerified(
   verifiedOfficialDomainsJson: string | null | undefined,
 ): boolean {
   return checkPolicySourceLink(externalUrl, verifiedOfficialDomainsJson).status === 'verified'
+}
+
+/**
+ * 链接没通过核对时对外说哪一句。发布闸门和保存时的提前提示共用，两处是同一句话。
+ * 网站已登记、只是开头写成 http:// 的，说「要以 https:// 开头」，不让人去登记一个已经登记过的网站。
+ */
+export function policySourceLinkRejection(
+  link: Extract<PolicySourceLinkCheck, { status: 'not_verified' }>,
+): { code: string; message: string } {
+  return link.httpOnly ? POLICY_PUBLISH_ISSUES.sourceUrlNotHttps : POLICY_PUBLISH_ISSUES.sourceUrlNotVerified
+}
+
+/**
+ * 保存草稿不拦截，但把发布闸门会用的同一句原因提前说出来。
+ * 返回 null 表示按当前登记域名，这条链接不会在发布时被拒。
+ */
+export function policyDraftPublishWarning(
+  kind: string | null | undefined,
+  externalUrl: string | null | undefined,
+  verifiedOfficialDomainsJson: string | null | undefined,
+): string | null {
+  const link = checkPolicySourceLink(externalUrl, verifiedOfficialDomainsJson)
+  if (link.status === 'verified') return null
+  if (link.status === 'missing') {
+    if (kind === 'policy_guide') return `发布时会被拒，原因是：${POLICY_PUBLISH_ISSUES.sourceUrlRequired.message}`
+    return null
+  }
+  if (link.status === 'no_registered_domains') {
+    return `发布时会被拒，原因是：${POLICY_PUBLISH_ISSUES.sourceDomainsNotRegistered.message}`
+  }
+  return `发布时会被拒，原因是：${policySourceLinkRejection(link).message}`
 }
 
 /** 发布闸门的错误码与对外文案（机构对接人看得懂的话，不露接口路径、字段名和 JSON）。 */
@@ -55,5 +90,10 @@ export const POLICY_PUBLISH_ISSUES = {
     code: 'POLICY_SOURCE_URL_NOT_VERIFIED',
     message:
       '原文链接不在本机构登记的官方网站内。请改用登记网站上的原文地址；原文在上级部门网站的，请联系平台管理员把该网站登记为本机构认可的官方网站。',
+  },
+  // 错误码与上一条相同（都是链接没通过核对），只是把原因说准。
+  sourceUrlNotHttps: {
+    code: 'POLICY_SOURCE_URL_NOT_VERIFIED',
+    message: '原文链接要以 https:// 开头。请把地址开头的 http:// 改成 https:// 再试；改完网页打不开的，请联系平台管理员。',
   },
 } as const
