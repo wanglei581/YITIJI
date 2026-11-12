@@ -346,6 +346,7 @@ const ACTION_LABELS: Record<string, string> = {
   'self_note_tab.update': '修改一体机求职进度页签开关',
   'print_free_quota.update': '修改免费打印额度',
   'terminal.daily_free_print_sides.update': '修改终端每日免费打印上限',
+  'terminal.home_free_badge.update': '修改终端首页「免费使用」显示',
   'copy.cancel': '取消复印任务',
   'copy.confirm': '确认复印任务',
   'copy.create': '创建复印任务',

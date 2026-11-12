@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 649,
+    "endpointCount": 650,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -5155,6 +5155,18 @@
         "services": [
           "TerminalsService"
         ]
+      },
+      {
+        "controller": "services/api/src/terminals/admin-terminals.controller.ts",
+        "handler": "AdminTerminalsController.updateHomeFreeBadge",
+        "method": "PUT",
+        "models": [],
+        "path": "/api/v1/admin/terminals/:terminalId/home-free-badge",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/terminals/admin-kiosk-job-board.controller.ts",
@@ -13999,7 +14011,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 281,
+      "reachableFileCount": 283,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -14781,7 +14793,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 308
+      "sourceFileCount": 310
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -17866,7 +17878,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1006
+      "sourceFileCount": 1007
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -19942,7 +19954,7 @@
         ]
       },
       {
-        "fieldCount": 31,
+        "fieldCount": 32,
         "name": "Terminal",
         "relations": [
           "ActiveReleaseObservationAssignment",
@@ -26286,6 +26298,7 @@
       "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-device-settings.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions.ts"
@@ -27731,6 +27744,7 @@
       "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
@@ -28044,6 +28058,7 @@
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-scan-device-b8.ts",
       "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-sessions-http.ts",
       "services/api/scripts/verify-upload-sessions-member-file.ts",
@@ -28095,7 +28110,8 @@
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts",
-      "services/api/scripts/verify-support-contact.ts"
+      "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts"
     ],
     "services/api/src/common/guards/member-closure-receipt.guard.ts": [
       "services/api/scripts/verify-member-account-status.ts"
@@ -28121,7 +28137,8 @@
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
-      "services/api/scripts/verify-support-contact.ts"
+      "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts"
     ],
     "services/api/src/common/health.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
@@ -28283,6 +28300,7 @@
       "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-sms-budget.ts",
       "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-scene.ts",
@@ -30512,6 +30530,7 @@
       "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-terminal-test-print-seed-guard.ts",
       "services/api/scripts/verify-toolbox-review-workflow.ts",
@@ -30817,6 +30836,7 @@
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-provisioning.ts"
     ],
     "services/api/src/terminals/admin-toolbox.controller.ts": [
@@ -30875,7 +30895,8 @@
     "services/api/src/terminals/release-observation.service.ts": [
       "services/api/scripts/verify-pg-serialization-conflict.ts",
       "services/api/scripts/verify-release-observation-contract.mjs",
-      "services/api/scripts/verify-scan-deletion-audit-reporting.ts"
+      "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts"
     ],
     "services/api/src/terminals/scan-deletion-reason-codes.ts": [
       "services/api/scripts/verify-copy-c1a.ts",
@@ -30917,6 +30938,7 @@
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
@@ -30945,6 +30967,7 @@
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-scan-tasks.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-identity.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
@@ -30970,6 +30993,7 @@
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-device-settings.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-identity.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
@@ -30984,6 +31008,7 @@
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-terminal-test-print-seed-guard.ts",
       "services/api/scripts/verify-toolbox-launch-events.ts",
@@ -31014,6 +31039,7 @@
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-network-diagnostics.ts",
       "services/api/scripts/verify-terminal-printer-queue.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
@@ -31048,6 +31074,7 @@
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-network-diagnostics.ts",
       "services/api/scripts/verify-terminal-printer-queue.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
@@ -31061,6 +31088,7 @@
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-identity.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-throttle-dimension.ts",
@@ -31089,6 +31117,7 @@
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-terminal-test-print-seed-guard.ts"
     ],
@@ -48416,6 +48445,40 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/admin-terminals.controller.ts",
+          "services/api/src/terminals/release-observation.service.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts",
+          "services/api/src/terminals/terminal-identity.guard.ts",
+          "services/api/src/terminals/terminal-session.service.ts",
+          "services/api/src/terminals/terminal-toolbox.service.ts",
+          "services/api/src/terminals/terminals-admin.service.ts",
+          "services/api/src/terminals/terminals-agent.service.ts",
+          "services/api/src/terminals/terminals.controller.ts",
+          "services/api/src/terminals/terminals.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-terminal-home-free-badge.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:terminal-home-free-badge"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/src/print-jobs/print-jobs.controller.ts",
           "services/api/src/terminals/terminal-identity.guard.ts",
           "services/api/src/terminals/terminal-session.service.ts",
@@ -49557,6 +49620,17 @@
         "risk": "medium",
         "scope": "kiosk",
         "why": "仅被文档提及：docs/progress/archive/2026-06-20-current-progress-pre-normalization.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/hooks/useKioskHomeFreeBadge.ts",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/tests/home-free-badge.test.mjs"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/home-free-badge.test.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

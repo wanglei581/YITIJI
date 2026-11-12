@@ -88,6 +88,11 @@ export interface KioskTerminalConfig {
   recruitmentHosting?: RecruitmentHostingPublicConfig
   ai?: { loginGate: 'off' | 'before_export' | 'before_generate'; declarationEnforced: boolean; paused: boolean }
   maintenance?: boolean
+  /**
+   * 本机是否允许首页显示「免费使用」。
+   * 旧数据或旧接口没有这一项时，一体机按关处理，不当成开。
+   */
+  homeFreeBadge?: boolean
   configVersion: string
   refreshIntervalMs: number
   serverTime: string

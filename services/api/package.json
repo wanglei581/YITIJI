@@ -102,6 +102,7 @@
     "verify:internal-accounts:postgres": "node -r @swc-node/register scripts/verify-internal-accounts-postgres.ts",
     "verify:print-jobs": "node -r @swc-node/register scripts/verify-print-jobs.ts && pnpm run verify:pickup-code-share && pnpm run verify:pickup-code-resume",
     "verify:free-print-quota": "node -r @swc-node/register scripts/verify-free-print-quota.ts",
+    "verify:terminal-home-free-badge": "node -r @swc-node/register scripts/verify-terminal-home-free-badge.ts",
     "verify:print-queue-timeout": "node -r @swc-node/register scripts/verify-print-queue-timeout.ts",
     "verify:print-completion-evidence": "node -r @swc-node/register scripts/verify-print-completion-evidence.ts",
     "verify:print-reliability-http": "node -r @swc-node/register scripts/verify-print-reliability-http.ts",

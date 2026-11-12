@@ -193,6 +193,8 @@ export interface AdminTerminalRecord {
     observedAt: string | null
     state: 'draft' | 'paused' | 'expired' | 'not_seen' | 'unverified' | 'current' | 'mismatch' | 'stale'
   } | null
+  /** 一体机首页是否允许显示「免费使用」。缺省时抽屉按关显示。 */
+  homeFreeBadge?: boolean
 }
 
 export interface CreatePlannedTerminalInput {

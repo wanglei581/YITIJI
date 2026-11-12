@@ -11,6 +11,7 @@ import type {
 } from '../../services/api/devices'
 import { isParkedOrgType } from '../partners/orgTypeOptions'
 import { TerminalDailyFreeSidesSection } from './TerminalDailyFreeSidesSection'
+import { TerminalHomeFreeBadgeSection } from './TerminalHomeFreeBadgeSection'
 import { TerminalLifecycleActions } from './TerminalLifecycleActions'
 import { TerminalNetworkDiagnostics } from './TerminalNetworkDiagnostics'
 import { TerminalPrinterQueue } from './TerminalPrinterQueue'
@@ -170,6 +171,7 @@ export function TerminalDetailDrawer({
         </Section>
 
         <TerminalDailyFreeSidesSection terminalId={terminal.id} />
+        <TerminalHomeFreeBadgeSection terminalId={terminal.id} enabled={terminal.homeFreeBadge === true} />
 
         <Section title="所属机构">
           {editingOrg ? (

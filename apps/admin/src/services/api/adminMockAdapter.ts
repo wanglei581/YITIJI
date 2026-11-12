@@ -402,8 +402,10 @@ export const adminMockAdapter = {
         diskFreeGb: null,
         releaseObservation: null,
         printerQueue: null,
+        homeFreeBadge: true,
       })), ...base.map((t) => ({
         ...t,
+        homeFreeBadge: true,
         printerQueue: MOCK_PRINTER_QUEUE[t.terminalCode] ?? null,
         lifecycleStatus: MOCK_TERMINAL_LIFECYCLE[t.terminalCode]?.status ?? 'active' as const,
         lifecycleVersion: MOCK_TERMINAL_LIFECYCLE[t.terminalCode]?.version ?? 0,

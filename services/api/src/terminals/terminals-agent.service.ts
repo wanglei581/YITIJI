@@ -904,7 +904,7 @@ export class TerminalAgentService implements OnModuleInit {
   findTerminalByRef(terminalRef: string) {
     return this.prisma.terminal.findFirst({
       where: this.terminalRefWhere(terminalRef),
-      select: { id: true, terminalCode: true, enabled: true, lastSeenAt: true },
+      select: { id: true, terminalCode: true, enabled: true, lastSeenAt: true, homeFreeBadge: true },
     })
   }
 

@@ -36,7 +36,8 @@ import { CreateTerminalBindCodeDto } from './dto/create-terminal-bind-code.dto'
 import { CreatePlannedTerminalDto } from './dto/create-planned-terminal.dto'
 import { UpdateTerminalCapabilityDto } from './dto/update-terminal-capability.dto'
 import { UpdateTerminalDailyFreeSidesDto } from './dto/update-terminal-daily-free-sides.dto'
-import { TerminalCapabilitiesService } from './terminal-capabilities.service'
+import { UpdateTerminalHomeFreeBadgeDto } from './dto/update-terminal-home-free-badge.dto'
+import { TerminalCapabilitiesService, TERMINAL_HOME_FREE_BADGE_AUDIT_ACTION } from './terminal-capabilities.service'
 import { AUDIT_TERMINAL_DAILY_FREE_SIDES } from '../print-jobs/free-print-quota.policy'
 import { UpdateTerminalLifecycleDto } from './dto/update-terminal-lifecycle.dto'
 import { EmergencyRevokeTerminalCredentialsDto } from './dto/emergency-revoke-terminal-credentials.dto'
@@ -357,6 +358,34 @@ export class AdminTerminalsController {
       requestId: req.requestId ?? null,
     })
     return ApiResponse.ok({ terminalCode: saved.terminalCode, dailyFreePrintSides: saved.dailyFreePrintSides })
+  }
+
+  // PUT /api/v1/admin/terminals/:terminalId/home-free-badge
+  // 只改首页「免费使用」开关。不改价目，也不改每日免费面数。
+  @Put(':terminalId/home-free-badge')
+  async updateHomeFreeBadge(
+    @Param('terminalId') terminalId: string,
+    @Body() dto: UpdateTerminalHomeFreeBadgeDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ): Promise<ApiResponse<{ terminalCode: string; enabled: boolean }>> {
+    const saved = await this.capabilities.setHomeFreeBadge(terminalId, dto.enabled)
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: TERMINAL_HOME_FREE_BADGE_AUDIT_ACTION,
+      targetType: 'terminal',
+      targetId: saved.terminalCode,
+      payload: {
+        terminalCode: saved.terminalCode,
+        previous: saved.previous,
+        next: saved.next,
+      },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
+    return ApiResponse.ok({ terminalCode: saved.terminalCode, enabled: saved.next })
   }
 }
 

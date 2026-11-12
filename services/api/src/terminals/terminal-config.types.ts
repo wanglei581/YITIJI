@@ -41,6 +41,8 @@ export interface KioskTerminalConfigView {
   recruitmentHosting: RecruitmentHostingPublicView
   ai: { loginGate: 'off' | 'before_export' | 'before_generate'; declarationEnforced: boolean; paused: boolean }
   maintenance: boolean
+  /** 本机是否允许首页显示「免费使用」。未登记的终端按关。 */
+  homeFreeBadge: boolean
   configVersion: string
   refreshIntervalMs: number
   serverTime: string

@@ -103,6 +103,8 @@ export interface AdminTerminalView {
   releaseObservation: AdminReleaseObservationView | null
   /** 今天（北京日）已出纸成功的免费面数。不含在途。 */
   todayFreePrintSides: number
+  /** 一体机首页是否允许显示「免费使用」。默认开。价目不是 0 时一体机仍不显示。 */
+  homeFreeBadge: boolean
 }
 
 export interface AdminOrganizationOption {
@@ -373,6 +375,7 @@ export class TerminalAdminService {
           ? this.releases.toAdminObservation(releaseTarget)
           : null,
         todayFreePrintSides: todayFreePrintSides.get(t.id) ?? 0,
+        homeFreeBadge: t.homeFreeBadge,
       }
     })
 
@@ -740,12 +743,14 @@ export class TerminalAdminService {
       },
       ai: { loginGate: ai.loginGate, declarationEnforced: ai.declarationEnforced, paused: ai.paused },
       maintenance: ai.maintenance,
+      homeFreeBadge: terminal?.homeFreeBadge === true,
       configVersion: [
         terminal?.lastSeenAt.toISOString() ?? 'unregistered',
         smartCampusConfig?.updatedAt.toISOString() ?? 'smart-campus:none',
         toolboxConfig.version,
         jobBoard.version,
         JSON.stringify(ai),
+        `home-free-badge:${terminal?.homeFreeBadge === true ? 'on' : 'off'}`,
       ].join('|'),
       refreshIntervalMs: CONFIG_REFRESH_INTERVAL_MS,
       serverTime,

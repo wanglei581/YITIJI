@@ -165,6 +165,8 @@ jobs:
           # apps/kiosk + packages/shared + services/api/src 源码做交叉断言，
           # 不 import 任何后端模块、不碰 Prisma、不连 DB，故留在这一步。
           node --test apps/kiosk/scripts/tests/assistant-policy-context.test.mjs
+          # 首页「免费使用」是否该显示：开关、价目读失败、单价不是 0，都要判成不显示。
+          node --test apps/kiosk/scripts/tests/home-free-badge.test.mjs
           pnpm --filter @ai-job-print/kiosk verify:ai-down-fallbacks
           # ── 2026-08-16 门禁全量体检补回：以下门禁此前写在 package.json 里
           #    但没有任何 CI job 执行它们。全部只读取仓库源码/文档文本，
@@ -652,6 +654,8 @@ jobs:
           INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:free-print-quota
+          # 一体机首页「免费使用」按机器开关：默认开，管理员改开关写审计，一体机配置带上该字段且 configVersion 跟着变。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:terminal-home-free-badge
           # 排队打印单的时效（超时判失败、过期单领不走）与心跳里的打印完成判据。
           # 前两条直接调服务方法、各自建临时库；第三条起真服务走 HTTP（入参校验、鉴权、
           # 真实的重新提交路径）——心跳多一个服务端不认识的字段会被整条拒收，只有这样测得出。
