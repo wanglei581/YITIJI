@@ -7,6 +7,9 @@
    11/08 第二轮：产品负责人对对稿清单的 10 处回「按推荐」，照改（定案逐条见 state-map.md 末节）；
    11/04 的 cs-scan-offline、cs-scan-file-gone 不采用，已删掉，断网和文件失效用程序现状。
    11/09 第三轮：三屏留白修整（cs-copy-more、cs-scan-failed?fail=nofile、cs-scan-stopped?flow=copy），只改版式、放大主视觉，字和出路不动，其余屏不变。
+   11/09 第四轮：产品负责人 11/09 定四项（按推荐），稿跟程序改：cs-scan-failed 各样子原因卡单栏居中、大插画在上，出路「照原设置再扫一次」
+   （回 cs-scan-set，材料和放纸设置照上次）和「返回首页」，删「同一张纸原样再扫…」「这是一次普通新会话…」两句，去掉 ?rescan=lost、?view=now；
+   cs-copy-set?start=unknown 胶囊写「状态未知」。其余屏不变。
    怎么打开、屏清单、地址参数见 docs/design/kiosk-touch-2026-11-copyscan/README.md。
    类名一律 cs- 开头；状态放在 window.S.cs。地址参数可切换样子：
    ?scanner=stale 扫描仪状态过期、?scandev=off 屏上扫描没开通、?copydev=off 屏上复印没开通、
@@ -481,23 +484,20 @@
 .screen:has(.cs-sfail) .dock .btn{padding:0 16px}
 .screen:has(.cs-sfail) .dock .btn.pri{min-width:0}
 /* 11/09 第三轮：屏上扫描「已完成 · 结果里没有文件」（?fail=nofile）只有一张出路卡，原因卡被拉高、卡内上下各空约 200px。
-   插画在左、字在右撑不满这么高的卡（左栏最多半屏宽），所以照单栏居中那种，把插画放大到卡里没有大块空白；字号、句子不变。只作用于这一种（cs-sfail 加 cs-solo）。 */
-.cs-sfail.cs-solo .cs-why{grid-template-rows:minmax(0,1fr) auto;gap:24px;padding:28px 56px}
-.cs-sfail.cs-solo .cs-why .vis{width:auto;height:100%;max-height:600px;aspect-ratio:1/1}
-.cs-sfail.cs-solo .cs-why .vis svg.illus{width:90%}
-.cs-sfail.cs-solo .cs-why .vis .warn{right:20px;top:20px;width:76px;height:76px}
-.cs-sfail.cs-solo .cs-why .vis .warn svg{width:42px;height:42px}
-.cs-sfail.cs-solo .cs-why p{text-wrap:balance}
+   插画在左、字在右撑不满这么高的卡（左栏最多半屏宽），所以照单栏居中那种，把插画放大到卡里没有大块空白；字号、句子不变。
+   11/09 第四轮：照程序（scan/styles/scan-device-errors.css 的 .cs-sfail），两张出路卡的样子也用这种单栏居中、大插画在上，不再只认 cs-solo；原因句也均衡断行（「…这次先停在这里。」不再把「里。」单独甩到下一行）。 */
+.cs-sfail .cs-why{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;justify-items:center;align-content:center;gap:24px;padding:28px 56px;text-align:center}
+.cs-sfail .cs-why .vis{width:auto;height:100%;max-height:600px;aspect-ratio:1/1}
+.cs-sfail .cs-why .vis svg.illus{width:90%}
+.cs-sfail .cs-why .vis .warn{right:20px;top:20px;width:76px;height:76px}
+.cs-sfail .cs-why .vis .warn svg{width:42px;height:42px}
+.cs-sfail .cs-why b,.cs-sfail .cs-why p{text-wrap:balance}
 .cs-gw{margin:0;padding:14px 20px;border-radius:20px;background:var(--clay-wash);color:var(--clay-ink);font-size:23px;font-weight:600;line-height:1.5}
 .cs-gw ol{margin:4px 0 0;padding-left:34px}
 .cs-pv{align-self:center;display:flex;flex-direction:column;align-items:center;gap:14px;max-width:620px;font-size:24px;line-height:1.5;color:var(--ink-2);text-align:center}
 .cs-pv svg{color:var(--ink-3)}
 .cs-cpg{flex:none}
 .cs-ring.cs-pending b{font-size:60px}
-/* 屏上扫描中断结果屏：照运行页 scan/styles/scan-fs.css 228–252，说明格按内容定高，多出来的高度给扫描小样，不撑空格 */
-.body.fs-fill.cs-fsfail .fs-facts{flex:none;grid-auto-rows:auto}
-.cs-fsfail .cs-sample{flex:1 1 0;min-height:160px;display:flex;align-items:center;justify-content:center;padding:16px 20px;border-radius:22px;background:var(--well);overflow:hidden}
-.cs-fsfail .cs-sample svg{height:100%;width:auto;max-width:100%;max-height:100%}
 /* 预览打不开：照运行页完成屏预览区那张白纸（文件图标、文件名、一句话） */
 .cs-pvsheet{align-self:stretch;width:560px;max-width:100%;justify-content:center;padding:28px 36px;border-radius:14px;background:#fff;box-shadow:0 6px 18px rgba(11,36,30,.10)}
 .cs-pvsheet b{font-size:26px;color:var(--ink);word-break:break-all}
@@ -544,11 +544,11 @@
         probe: pick('scanner', Object.keys(PROBE)),
         quota: pick('quota', ['member', 'terminal']) || 'guest', limit: pick('limit', ['none']),
         run: pick('run', ['waiting', 'finishing']), start: pick('start', ['busy', 'rejected', 'offline', 'limit', 'unknown']),
-        make: pick('make', ['delivering']), owned: pick('owned', ['0']), view: pick('view', ['now']),
+        make: pick('make', ['delivering']), owned: pick('owned', ['0']),
         preview: pick('preview', ['loading', 'fail']), cpg: pick('cpages', ['7']), quote: pick('quote', ['changed', 'odd', 'none']),
         net: pick('net', ['off']), pstate: pick('printer', ['unknown']), quiet: pick('quiet', ['none']), purged: pick('purged', ['0']),
         busy: pick('busy', ['1']), why: pick('why', ['wait', 'stop', 'token']),
-        fail: pick('fail', ['expired', 'nofile']), reason: pick('reason', ['stopped', 'warming', 'large', 'ack']), rescan: pick('rescan', ['lost'])
+        fail: pick('fail', ['expired', 'nofile']), reason: pick('reason', ['stopped', 'warming', 'large', 'ack'])
       });
     }
     if (!window.__csClear && typeof window.doClear === 'function') {
@@ -1113,10 +1113,11 @@
       dock: D({ back: { go: 'print' }, ask: '问小青：面板上怎么扫', pri: pri('到打印机面板上扫', 'data-cs="panel"') })
     });
   }
-  /* 屏上扫描中断后的结果屏。原因句 scan/scanDeviceState.ts 111–159、scan/scanDeliveryAck.ts 124–126。
-     ?fail=expired|nofile；?reason=stopped|warming|large|ack；?rescan=lost。
-     11/08 定：新默认是屏上扫描自己的结果屏（scanFailed，程序随后照它改）；?view=now 是现在程序借的面板失败屏（scanFailedNow，
-     scan/ScanResultFailedView.tsx 36–109，照定稿 fix-scan.js scanFail 的 fs- 版式），留着对照，待改。 */
+  /* 屏上扫描中断后的结果屏。原因句 scan/scanDeviceState.ts 111–159、scan/scanDeliveryAck.ts 124–126。?fail=expired|nofile；?reason=stopped|warming|large|ack。
+     11/08 定：屏上扫描自己的结果屏。11/09 定（四项按推荐）：稿跟程序（scan/ScanDeviceFailedView.tsx、scan/styles/scan-device-errors.css 41–53）——
+     原因卡单栏居中、大插画在上；出路「照原设置再扫一次」（回 cs-scan-set，材料和放纸设置照上次填好，按开始才建普通新会话）和「返回首页」，
+     没有文件那种只留前一张；删掉「同一张纸原样再扫，系统可能按重复件拒收（两小时内）。」「这是一次普通新会话，不是免查重的重扫。不自动重扫。」
+     （屏上扫描每次拼出的 PDF 字节都不同，同字节去重拦不到）。屏上扫描没有重扫凭据，?rescan=lost 去掉；?view=now（11/08 程序借的面板失败屏）程序已改，去掉。 */
   const FAIL_REASON = {
     '': '这次扫描没有完成。',
     stopped: '已停止扫描。这次到这里为止，不会再继续。',
@@ -1124,53 +1125,24 @@
     large: '这一次超过了这台机器能收的大小。这次先停在这里。',
     ack: '系统没有确认这一场能收到扫描件（已过期、被取消或已经结束），本机已经把它撤掉。面板上扫出来的文件不会交到这一场，你手上的纸也不会被谁收走。要继续请重新开始一次扫描。'
   };
-  const RESCAN_LOST = '<b>刚才那份安全重扫凭据已经用不了了</b>（超过 15 分钟，或者中间清过场 / 换过人）。本页<b>没有</b>替你改成普通重扫 —— 同一张纸如果走普通扫描，系统会按重复件拒收，你会在机器前白等到这次扫描过期。要继续，请自己按右下角<b>「重新开始一次扫描」</b>，并且换一份材料。';
-  const RESCAN_AUTH = '这一次会带上上一场的凭据去申请安全重扫放行：系统认了，同一份材料照原样再扫一遍就行；不认会在下一页当场说明，不会悄悄按普通重扫处理。';
+  const AGAIN = '照原设置再扫一次';
   function scanFailed() {
-    const c = st();
-    if (c.view === 'now') return scanFailedNow();
-    const nofile = c.fail === 'nofile', expired = c.fail === 'expired', lost = !!c.rescan, auth = !nofile && !lost;
+    const c = st(), nofile = c.fail === 'nofile', expired = c.fail === 'expired';
     const kind = nofile ? '已完成 · 结果里没有文件' : expired ? '等待超时' : '扫描未完成';
     const reason = nofile ? '系统说已完成，但这次结果里没有可用文件' : expired ? '等待超时，这次没有拿到文件。' : FAIL_REASON[c.reason];
     const detail = nofile
       ? '同一份结果里没有带可用的文件信息（结果里允许不带文件，这不是出错）。这份文件此刻还在不在系统里，本机没有依据判断。这次扫描到此结束。'
-      : '同一张纸原样再扫，系统可能按重复件拒收（两小时内）。';
-    const opts = (auth ? [{ go: 'cs-scan-set', t: '重试扫描（同一份材料）', d: RESCAN_AUTH, vis: glassSvg(150) }] : [])
-      .concat([{ cs: 'again', t: '重新开始一次扫描', d: '这是一次普通新会话，不是免查重的重扫。不自动重扫。', vis: scanPaper(150) }])
+      : '把原件重新放好，可以照原设置再扫一次。';
+    const opts = [{ cs: 'same', t: AGAIN, d: '回到放纸设置，材料和设置照上次填好', vis: scanPaper(150) }]
       .concat(nofile ? [] : [{ go: 'home', t: '返回首页', d: '结束这次等待', vis: stack(110, 2, '') }]);
     return shell({
       band: { eyebrow: '屏上扫描', title: kind, sub: '本次没有生成可用的扫描文件', status: { text: nofile ? kind : expired ? '等待超时 · 没有文件' : '扫描未完成', warn: 1 } },
       cls: 'cs-sfail cs-err cs-err' + opts.length + (opts.length === 1 ? ' cs-solo' : ''),
-      body: `<div class="cs-why" role="alert"><span class="vis">${nofile ? cropSvg(scanPaper(220), '4 6 142 128') : scanPaper(220)}<i class="warn">${icon('alert', 34, 2.4)}</i></span><div><b>${reason}</b><p>${detail}</p></div></div>
+      body: `<div class="cs-why" role="alert"><span class="vis">${cropSvg(scanPaper(220), '4 6 142 128')}<i class="warn">${icon('alert', 34, 2.4)}</i></span><div><b>${reason}</b><p>${detail}</p></div></div>
         <div class="cs-ways">${opts.map((x) => wayCard(x)).join('')}</div>
-        ${lost ? `<p class="cs-warn">${RESCAN_LOST}</p>` : ''}
         ${remind(HELP)}`,
-      dock: D({ left: `<button class="btn sec" data-go="print">${icon('chevL', 30, 2.4)}返回打印扫描</button>`, ask: '问小青：扫描失败怎么办',
-        pri: auth ? pri('重试扫描（同一份材料）', 'data-go="cs-scan-set"') : pri('重新开始一次扫描', 'data-cs="again"') })
+      dock: D({ left: `<button class="btn sec" data-go="print">${icon('chevL', 30, 2.4)}返回打印扫描</button>`, ask: '问小青：扫描失败怎么办', pri: pri(AGAIN, 'data-cs="same"') })
     });
-  }
-  /* 现在程序的样子（待改）：面板扫描失败屏，眉题「扫描完成」、面板四步路径线，重试和重新开始都进面板 scan-guide */
-  function scanFailedNow() {
-    const c = st(), nofile = c.fail === 'nofile', expired = c.fail === 'expired', lost = !!c.rescan, auth = !nofile && !lost;
-    const kind = nofile ? '已完成 · 结果里没有文件' : expired ? '等待超时' : '扫描未完成';
-    const fact = (t, d, wide) => `<div class="fs-fact${wide ? ' wide' : ''}"><b>${t}</b>${d}</div>`;
-    const first = nofile
-      ? fact('系统说已完成，但这次结果里没有可用文件', '<span>系统确认<b>这次扫描已经完成</b>，可是同一份结果里<b>没有带可用的文件信息</b>（结果里允许不带文件，这不是出错）。</span><span>这份文件此刻还在不在系统里，<b>本机没有依据判断</b>。页面不替系统说它还在，不说它已被删掉，也不承诺能找回来。这次扫描到此结束。</span>', 1)
-      : fact(expired ? '等待超时，这次没有拿到文件' : '这次没扫成的原因', `<span>${expired ? '等待超时，这次没有拿到文件。' : FAIL_REASON[c.reason]}</span>`, 1);
-    const rowGo = (go, t, d) => `<button class="fs-row" data-go="${go}"><span><b>${t}</b><small>${d}</small></span><span class="go">${icon('chevR', 28, 2.2)}</span></button>`;
-    const ai = S().ai === 'down' ? '<p class="fs-help">小青暂时接不上。这一步不用它也能做完，照下面的按钮继续。</p>' : '';
-    return band({ back: true, seal: null, kind: 'compact', eyebrow: '扫描完成', title: kind, sub: '本次没有生成可用的扫描文件', status: { text: nofile ? kind : expired ? '等待超时 · 没有文件' : '扫描未完成', warn: 1 }, rail: { labels: ['选类型', '扫描指引', '等回传', '扫描完成'], now: 3 } })
-      + `<main class="body fs-fill cs-fsfail"><div class="fs-grow">${ai}<div class="fs-facts">${first}
-          ${fact('同一张纸', '<span>同一张纸原样再扫，系统可能按重复件拒收（两小时内）。</span>', 1)}
-          ${fact('重试扫描（同一份材料）', `<span>${auth ? RESCAN_AUTH : '本机没有可用的安全重扫凭据。这里不写成已经放行。'}</span>`)}
-          ${fact('重新开始一次扫描', '<span>这是一次普通新会话，不是免查重的重扫。不自动重扫。</span>')}</div>
-          ${lost ? `<p class="fs-warn">${RESCAN_LOST}</p>` : ''}
-          <p class="fs-help">${HELP}</p>
-          <div class="cs-sample" aria-hidden="true">${scanPaper(300)}</div></div>
-        ${nofile ? '' : rowGo('home', '返回首页', '结束这次等待')}
-        ${auth ? rowGo('scan-guide', '重新开始一次扫描', '回选类型，不带安全重扫凭据') : ''}</main>`
-      + dock({ back: false, left: `<button class="btn sec" data-go="print">${icon('chevL', 30, 2.4)}返回打印扫描</button>`, ask: '问小青：扫描失败怎么办', pri: { label: auth ? '重试扫描（同一份材料）' : '重新开始一次扫描', go: 'scan-guide' } })
-      + nav(null);
   }
 
   /* ═════════ 屏上复印 ═════════ */
@@ -1199,8 +1171,10 @@
     const CSTART = { limit: '这一次超过了这台机器能收的大小。这次先停在这里。', unknown: '状态未知。这一步的结果还没确认，请先用面板复印。不要更改设置后重新开始。' };
     const why = c.copydev === 'off' || off || c.scanner === 'stale' ? '' : copyBlock();
     const setNote = CSTART[c.start] || why, setDis = !!why || c.start === 'busy';
+    /* 11/09 定：建单结果没确认时胶囊照程序写「状态未知」、状态未知色调（copy/CopyWorkbenchPage.tsx 49–51、72），不再说设备就绪 */
+    const chip = c.start === 'unknown' ? { text: '状态未知', warn: 1 } : copyChip();
     return shell({
-      band: { eyebrow: '屏上复印', title: '放好原件，选份数', status: copyChip(), rail: { labels: COPY_RAIL, now: 0 } },
+      band: { eyebrow: '屏上复印', title: '放好原件，选份数', status: chip, rail: { labels: COPY_RAIL, now: 0 } },
       cls: 'cs-cset',
       body: `<div class="sec-t">原件放哪？</div>
         <div class="cs-two">${srcCard('glass', c.orig, 'corig')}${srcCard('feeder', c.orig, 'corig')}</div>
@@ -1543,6 +1517,7 @@
       case 'restart': return go('cs-scan-what');
       case 'restart-copy': return go('cs-copy-set');
       case 'again': c.rec = null; return go('cs-scan-what');
+      case 'same': c.flow = 'scan'; c.rec = null; c.start = ''; return go('cs-scan-set'); // 11/09：照原设置再扫一次，材料和放纸设置照上次
       case 'unknown-stop': {
         if (c.unknownStop) return;
         if (!c.stopArm) { c.stopArm = true; return refresh(); }
@@ -1615,9 +1590,9 @@
     'cs-scan-set': [{ label: '演示：扫描仪状态过期', ev: 'stale' }, { label: '演示：没开通屏上扫描', ev: 'scandev-off' }, { label: '演示：恢复正常', ev: 'ok' }, ],
     'cs-scan-run': [{ label: '演示：扫描仪不回报页数', ev: 'nopages' }, { label: '演示：页数恢复', ev: 'pages' }, { label: '演示：这一页扫好了（玻璃台）', ev: 'pagedone' }, { label: '演示：整叠扫完了（进纸器）', ev: 'alldone' }, { label: '演示：这一步结果未确认', ev: 'unknown' }, { label: '演示：扫描中断网（进状态未知）', ev: 'set:unknownTone=unreachable,unknownStop=>cs-scan-unknown' }].concat(demoErrs),
     'cs-scan-more': [{ label: '演示：等太久没操作', ev: 'timeout' }],
-    'cs-scan-make': [{ label: '演示：文件传回来了', ev: 'made' }, { label: '演示：生成文件时断网（进状态未知）', ev: 'set:unknownTone=unreachable,unknownStop=>cs-scan-unknown' }, { label: '演示：完成但结果里没有文件', ev: 'set:fail=nofile,reason=,rescan=,view=>cs-scan-failed' }],
+    'cs-scan-make': [{ label: '演示：文件传回来了', ev: 'made' }, { label: '演示：生成文件时断网（进状态未知）', ev: 'set:unknownTone=unreachable,unknownStop=>cs-scan-unknown' }, { label: '演示：完成但结果里没有文件', ev: 'set:fail=nofile,reason=>cs-scan-failed' }],
     'cs-scan-done': [{ label: '演示：小程序还没发布（收起「手机上也能看到」）', ev: 'mini-off' }, { label: '演示：小程序已发布', ev: 'mini-on' }],
-    'cs-scan-unknown': [{ label: '演示：这一步结果未确认', ev: 'unknown' }, { label: '演示：本机程序连不上', ev: 'unreachable' }, { label: '演示：停止结果未确认（停止不可再点）', ev: 'stop-unconfirmed' }, { label: '演示：云端确认正在扫描', ev: 'cloud-run' }, { label: '演示：云端确认正在生成', ev: 'cloud-make' }, { label: '演示：云端确认完成且文件可用', ev: 'cloud-done' }, { label: '演示：云端完成但结果里没有文件', ev: 'set:fail=nofile,reason=,rescan=,view=>cs-scan-failed' }],
+    'cs-scan-unknown': [{ label: '演示：这一步结果未确认', ev: 'unknown' }, { label: '演示：本机程序连不上', ev: 'unreachable' }, { label: '演示：停止结果未确认（停止不可再点）', ev: 'stop-unconfirmed' }, { label: '演示：云端确认正在扫描', ev: 'cloud-run' }, { label: '演示：云端确认正在生成', ev: 'cloud-make' }, { label: '演示：云端确认完成且文件可用', ev: 'cloud-done' }, { label: '演示：云端完成但结果里没有文件', ev: 'set:fail=nofile,reason=>cs-scan-failed' }],
     'cs-copy-how': [{ label: '演示：没开通屏上复印', ev: 'copydev-off' }, { label: '演示：扫描仪状态过期', ev: 'stale' }, { label: '演示：恢复正常', ev: 'ok' }],
     'cs-copy-set': [{ label: '演示：彩色没开通', ev: 'coloroff' }, { label: '演示：双面没开通', ev: 'duplexoff' }, { label: '演示：都恢复', ev: 'allon' }],
     'cs-copy-scan': [{ label: '演示：原件扫完了', ev: 'copy-scanned' }, { label: '演示：扫描仪不回报页数', ev: 'nopages' }, { label: '演示：页数恢复', ev: 'pages' }].concat(demoErrs),
@@ -1640,14 +1615,13 @@
     'cs-scan-run': [D2('演示：已交给机器，等扫描仪', 'set:run=waiting'), D2('演示：扫描仪已开始', 'set:run=')],
     'cs-scan-more': [D2('演示：不报页数或上限', 'set:pages=none'), D2('演示：报页数', 'set:pages=known')].concat(busyDemos),
     'cs-scan-make': [D2('演示：正在传回', 'set:make=delivering'), D2('演示：正在合成', 'set:make='), D2('演示：不报页数', 'set:pages=none'), D2('演示：报页数', 'set:pages=known'),
-      D2('演示：云端失败或取消（结果屏）', 'set:fail=,reason=,rescan=,view=>cs-scan-failed')],
+      D2('演示：云端失败或取消（结果屏）', 'set:fail=,reason=>cs-scan-failed')],
     'cs-scan-done': [D2('演示：已登录但还没核对到本人', 'set:owned=0'),
       D2('演示：已登录且已存进', 'set:owned='), D2('演示：预览打不开', 'set:preview=fail'), D2('演示：预览正常', 'set:preview=')],
     'cs-scan-stopped': [D2('演示：没有服务端时间', 'set:quiet=none'), D2('演示：本机没确认删页', 'set:purged=0'), D2('演示：回到默认', 'set:quiet=,purged=')],
     'cs-scan-failed': [D2('演示：扫描未完成', 'set:fail=,reason='), D2('演示：云端已取消或设备中止', 'set:fail=,reason=stopped'), D2('演示：扫描仪还在预热', 'set:fail=,reason=warming'),
       D2('演示：超过这台机器能收的大小', 'set:fail=,reason=large'), D2('演示：投递没被确认', 'set:fail=,reason=ack'), D2('演示：等待超时（会话过期）', 'set:fail=expired'),
-      D2('演示：完成但结果里没有文件', 'set:fail=nofile'), D2('演示：安全重扫凭据失效', 'set:rescan=lost'), D2('演示：凭据还在', 'set:rescan='),
-      D2('演示：现在程序的样子（待改）', 'set:view=now'), D2('演示：新稿（11/08 定）', 'set:view=')],
+      D2('演示：完成但结果里没有文件', 'set:fail=nofile')],
     'cs-copy-how': probeDemos(true).concat([D2('演示：打印机状态读不到', 'set:pstate=unknown'), D2('演示：网络断开', 'set:net=off'), D2('演示：网络、打印机恢复', 'set:pstate=,net=')]),
     'cs-copy-set': [D2('演示：正在建单', 'set:start=busy'), D2('演示：超过这台机器能收的大小', 'set:start=limit'), D2('演示：建单结果没确认', 'set:start=unknown'),
       D2('演示：网络断开', 'set:net=off'), D2('演示：本机程序连不上', 'set:probe=unreachable'), D2('演示：回到默认', 'set:start=,net=,probe=')],
@@ -1765,10 +1739,10 @@
     motion: '无。',
     keep: '主按钮「到打印机面板上扫」去定稿现有的面板扫描选类型屏。屏上方式灰掉、写「这台机器还没开通」，不装成可点。可用地址 #cs-scan-off 直接打开。' + NK
   });
-  reg('cs-scan-failed', G_SCAN, '中断：扫描未完成（11/08 定稿）', scanFailed, {
-    does: '屏上扫描中途结束、没有文件时的结果屏：云端失败或取消、设备中止、预热、超过大小、投递被拒（?reason=stopped|warming|large|ack），会话过期（?fail=expired），完成但结果里没有文件（?fail=nofile），安全重扫凭据失效（?rescan=lost）。?view=now 是现在程序的样子（待改）。',
+  reg('cs-scan-failed', G_SCAN, '中断：扫描未完成（11/09 定：照程序）', scanFailed, {
+    does: '屏上扫描中途结束、没有文件时的结果屏（scan/ScanDeviceFailedView.tsx）：云端失败或取消、设备中止、预热、超过大小、投递被拒（?reason=stopped|warming|large|ack），会话过期（?fail=expired），完成但结果里没有文件（?fail=nofile）。',
     motion: '无。',
-    keep: '11/08 产品负责人定（按推荐）：改成屏上扫描自己的结果屏，程序随后照这张改。眉题「屏上扫描」，不画面板四步路径线；原因卡写这次的原因（运行页原因句）和「同一张纸原样再扫，系统可能按重复件拒收（两小时内）。」；出路：「重试扫描（同一份材料）」回 cs-scan-set（有安全重扫凭据时才有），「重新开始一次扫描」回 cs-scan-what，「返回首页」（没文件那种没有）；底栏「返回打印扫描」、问小青「扫描失败怎么办」、主按钮有凭据时「重试扫描（同一份材料）」，没有时「重新开始一次扫描」；服务电话行照稿里的写法，运行时从后台读，读不到不显示。凭据失效那段原句照 scan/ScanResultFailedView.tsx 92–99。?view=now：现在程序落的面板失败屏（眉题「扫描完成」、面板四步路径线、重试和重新开始都进面板 scan-guide），留着对照，待改。11/09 第三轮：?fail=nofile 只有一张出路卡，原因卡照单栏居中、插画放大把卡撑满（插画在左、字在右撑不满这么高的卡）。' + NK
+    keep: '11/08 产品负责人定（按推荐）：改成屏上扫描自己的结果屏。眉题「屏上扫描」，不画面板四步路径线；原因卡写这次的原因（运行页原因句）；底栏「返回打印扫描」、问小青「扫描失败怎么办」；服务电话行照稿里的写法，运行时从后台读，读不到不显示。11/09 产品负责人定（四项按推荐），稿跟程序：原因卡单栏居中、大插画在上（第三轮 ?fail=nofile 的排法，几种样子都这样排）；原因卡下一句「把原件重新放好，可以照原设置再扫一次。」（没有文件那种照旧是「同一份结果里没有带可用的文件信息…」那句）；出路「照原设置再扫一次」「回到放纸设置，材料和设置照上次填好」回 cs-scan-set（材料、纸放哪、黑白还是彩色照上一场，按开始扫描才建一场普通新会话），「返回首页」「结束这次等待」（没文件那种没有）；主按钮「照原设置再扫一次」。删掉「同一张纸原样再扫，系统可能按重复件拒收（两小时内）。」和「这是一次普通新会话，不是免查重的重扫。不自动重扫。」：屏上扫描每次拼出的 PDF 字节都不同（终端程序 pdfkit 默认写 CreationDate），服务端同字节去重拦不到。屏上扫描建会话带不了重扫凭据（服务端对屏上扫描带重扫编号一律 400），所以没有「重试扫描（同一份材料）」，?rescan=lost 去掉；?view=now（11/08 程序借的面板失败屏）程序已改成这一屏，去掉。面板扫描的失败屏仍是定稿 scan-result，不动。' + NK
   });
 
   reg('cs-copy-how', G_COPY, '怎么复印', copyHow, {
@@ -1789,7 +1763,7 @@
   reg('cs-copy-set', G_COPY, '复印设置', copySet, {
     does: '放好原件，选份数、颜色、单面还是双面，然后开始复印。',
     motion: '同 cs-scan-set：选中的原件位置播怎么放（一轮 7 秒），另一种静态。字幕只用已有原句。减弱动效时停在末帧，字幕全部展开。这是待产品负责人看的动画补稿，还没改程序。',
-    keep: '原件：玻璃台 / 进纸器。份数 1–99，−10 / −1 / +1 / +10。颜色黑白 / 彩色；打印成单面 / 双面。地址 ?color=off、?duplex=off（或演示事件）时对应选项灰掉，写「本机暂未开通」。小字「原件几页，扫完才知道；扫完会给你核对」。打印机离线时主按钮写「打印机离线」并停用。每屏可点数多，是因为这里有 4 组设置，和定稿的预览与设置屏同类。 11/08 补：?start=busy 正在建单（开始灰；程序还把四组设置锁住，稿只画主按钮）、?start=limit「这一次超过了这台机器能收的大小。这次先停在这里。」、?start=unknown「状态未知。这一步的结果还没确认，请先用面板复印。不要更改设置后重新开始。」（程序把四组设置锁住）；?net=off、?scanner=capcheck…error、?printer=unknown 时原因写在提示行、开始复印灰。' + NK
+    keep: '原件：玻璃台 / 进纸器。份数 1–99，−10 / −1 / +1 / +10。颜色黑白 / 彩色；打印成单面 / 双面。地址 ?color=off、?duplex=off（或演示事件）时对应选项灰掉，写「本机暂未开通」。小字「原件几页，扫完才知道；扫完会给你核对」。打印机离线时主按钮写「打印机离线」并停用。每屏可点数多，是因为这里有 4 组设置，和定稿的预览与设置屏同类。 11/08 补：?start=busy 正在建单（开始灰；程序还把四组设置锁住，稿只画主按钮）、?start=limit「这一次超过了这台机器能收的大小。这次先停在这里。」、?start=unknown「状态未知。这一步的结果还没确认，请先用面板复印。不要更改设置后重新开始。」（程序把四组设置锁住）；?net=off、?scanner=capcheck…error、?printer=unknown 时原因写在提示行、开始复印灰。11/09 定：?start=unknown 胶囊照程序写「状态未知」（状态未知色调），不再画「设备就绪 · 20 秒前检查」。' + NK
   });
   reg('cs-copy-scan', G_COPY, '复印第 1 步：正在扫原件', () => runScreen(true), {
     does: '复印第 1 步：扫原件。样子同「正在扫描」，标题和路径线换成复印。',

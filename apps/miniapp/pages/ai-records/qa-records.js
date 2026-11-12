@@ -53,6 +53,14 @@ function numericCount(item) {
   return Number.isInteger(n) && n >= 0 ? n : null
 }
 
+/** 问答要点的到期日。空值、空串、非法日期返回空串，不把 null 当成 1970。 */
+function expiryDay(iso) {
+  if (iso === null || iso === undefined || iso === '') return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getMonth() + 1}月${d.getDate()}日`
+}
+
 function detailLabel(item, lines) {
   if (lines.length) {
     const preview = lines.slice(0, 2).map((line) => (line.length > 36 ? `${line.slice(0, 36)}…` : line)).join('；')
@@ -60,8 +68,8 @@ function detailLabel(item, lines) {
   }
   const count = numericCount(item)
   if (count != null) return `${count} 条要点`
-  const day = dayLabel(item && item.expiresAt)
-  if (item && item.expiresAt && day !== '日期未知') return `保存至 ${day}`
+  const until = expiryDay(item && item.expiresAt)
+  if (until) return `保存至 ${until}`
   return '问答要点'
 }
 

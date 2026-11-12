@@ -15,7 +15,7 @@ Page({
     canCallPhone: false,
     supportHoursText: '',
     statusBarHeight: 20,
-    // 首期真实流程：本人文件 → 选终端 → 到机核验 → 机端支付与打印。
+    // 首期真实流程：本人文件 → 选终端 → 到机取件 → 机端支付与打印。
     steps: [
       { n: '1', label: '选择文件' },
       { n: '2', label: '选终端' },

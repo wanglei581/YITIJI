@@ -10,6 +10,7 @@ const shareFriend = require('../../utils/share-friend')
 const draft = require('./draft')
 const factCheck = require('./fact-check')
 const ways = require('../../utils/resume-optimize-entry')
+const failureCopy = require('./failure-copy')
 
 const FORMATS = [
   { key: 'pdf', label: 'PDF', mimeType: 'application/pdf' },
@@ -92,9 +93,8 @@ Page({
         return
       }
       if (opt.isFailed) {
-        const msg = opt.failReason || '优化生成失败'
-        const needReupload = /简历原文|清理|重新上传/.test(msg)
-        this._fail(msg, needReupload)
+        const view = failureCopy.optimizeFailureView(opt.failCode, opt.failReason)
+        this._fail(view.failMsg, view.needReupload)
         return
       }
       if (!opt.isCompleted) {
@@ -115,16 +115,8 @@ Page({
         this._loadVersions()
       })
     } catch (err) {
-      const code = (err && err.code) || ''
-      if (code === 'AI_TASK_NOT_FOUND') {
-        this._fail('优化记录不存在或无权访问', false)
-      } else if (code === 'AI_PROVIDER_NOT_CONFIGURED') {
-        this._fail('AI 优化模型尚未配置，请联系管理员', false)
-      } else if (code === 'AI_OPTIMIZE_INVALID_OUTPUT' || code === 'AI_OPTIMIZE_UNAVAILABLE') {
-        this._fail('AI 优化服务暂时不可用，请稍后重试', false)
-      } else {
-        this._fail((err && err.message) || '加载失败，请返回重试', false)
-      }
+      const view = failureCopy.optimizeFailureView((err && err.code) || '', err && err.message)
+      this._fail(view.failMsg, view.needReupload)
     }
   },
 
@@ -221,7 +213,8 @@ Page({
       .then(async (raw) => {
         const pricing = normalize.resumeExportPricing(raw, loggedIn)
         let benefitGrantId = ''
-        if (pricing.mode === 'charged' && loggedIn && pricing.available > 0) {
+        // 金额不是大于 0 的整数时不查权益，避免页面写出「权益」。能不能导出仍看归一化结果。
+        if (normalize.exportUnitPriceKnown(pricing) && pricing.mode === 'charged' && loggedIn && pricing.available > 0) {
           const benefits = await api.getMyBenefits({ pageSize: 50 })
           benefitGrantId = normalize.resumeExportBenefitId(benefits)
           if (!benefitGrantId) pricing.disabledReason = '服务端显示有可用次数，但未找到可核销权益，请刷新后重试。'
@@ -231,10 +224,10 @@ Page({
       })
       .catch((err) => {
         if (this._gone || seq !== this._pricingSeq) return
-        const reason = (err && err.message) || '暂时无法确认能否导出'
+        const copy = normalize.exportPricingFailureCopy(err)
         this.setData({
           pricingStatus: 'failed',
-          pricing: { mode: 'unavailable', text: reason, disabledReason: `${reason}，当前不能导出。` },
+          pricing: { mode: 'unavailable', text: copy.text, disabledReason: copy.disabledReason },
           benefitGrantId: '',
         }, () => this._syncExportAvailability())
       })
@@ -246,6 +239,7 @@ Page({
     else if (!this.data.opt || !this.data.opt.hasOptimizedResume) reason = '服务端没有返回结构化优化稿，暂时不能生成文件。'
     else if (this.data.pricingStatus !== 'ready') reason = this.data.pricing.disabledReason || '正在确认能否导出，请稍候。'
     else if (this.data.pricing.disabledReason) reason = this.data.pricing.disabledReason
+    else if (!normalize.exportUnitPriceKnown(this.data.pricing)) reason = ''
     else if (this.data.pricing.mode === 'charged' && !this.data.benefitGrantId) reason = '未取得可核销权益，当前不能导出。'
     else if (this.data.factsBlockedReason) reason = this.data.factsBlockedReason
     this.setData({ exportDisabled: Boolean(reason), exportDisabledReason: reason })
