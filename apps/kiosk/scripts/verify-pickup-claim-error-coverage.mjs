@@ -388,29 +388,25 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
     else pass(`${code}：closed，给出回手机的下一步，不写版本号`)
   }
 
+  const rejectedSentence = '到机码不对或已过期，或者这单是在别的机器上下的。请核对号码，或到下单时选的那台机器取件；还是不行的，请在手机上查看这笔订单，需要的话重新下单。'
   const rejected = userMessages.PICKUP_CODE_REJECTED_COPY
   const onlyRecheck = '到机码无效或已过期，请核对后重新输入'
+  if (rejected !== rejectedSentence) fail(`无效码定稿被改了一个字：${rejected}`)
+  else if (!rejected.includes('别的机器') || !rejected.includes('下单时选的那台机器')) fail('新句子没有同时说明可能是在别的机器下的单')
+  else pass('新句子同时说清可能是在别的机器下的单')
   for (const code of ['PICKUP_CODE_INVALID', 'PICKUP_CODE_EXPIRED', 'PICKUP_TERMINAL_MISMATCH']) {
     const err = new ApiHttpError(code, '到机码已过期，请在小程序重新下单', 404)
     const said = model.pickupClaimMessage(err)
-    if (said !== rejected) fail(`${code} 被本地码表盖成了别的句子：${said}`)
+    if (said !== rejectedSentence) fail(`${code} 被本地码表盖成了别的句子：${said}`)
     else if (said === onlyRecheck || said === `${onlyRecheck}。`) fail(`${code} 只剩「请核对后重新输入」，没有下一步`)
     else if (!/请在手机上查看这笔订单/.test(said) || !/重新下单/.test(said)) fail(`${code} 没有回手机查看或重新下单`)
+    else if (!said.includes('别的机器') || !said.includes('下单时选的那台机器')) fail(`${code} 没有说明可能是在别的机器下的单`)
     else if (model.classifyClaimFailure(err) !== 'invalid') fail(`${code} 应与无效码同一屏，实际 ${model.classifyClaimFailure(err)}`)
-    else pass(`${code}：同一句防试探，并给出回手机的下一步`)
+    else pass(`${code}：三个码同一句，并给出回手机的下一步`)
   }
-  if (userMessages.userMessageOf(new ApiHttpError('PICKUP_CODE_EXPIRED', '到机码已过期，请在小程序重新下单', 404), '兜底') !== rejected) {
+  if (userMessages.userMessageOf(new ApiHttpError('PICKUP_CODE_EXPIRED', '到机码已过期，请在小程序重新下单', 404), '兜底') !== rejectedSentence) {
     fail('共享码表的过期句和取件码表不一致')
   } else pass('过期码：共享码表与取件码表同一句，不再被短句盖住')
-
-  const otherTerminalSentence = '这单是在别的机器上下的，请到下单时选的那台机器取件'
-  const otherErr = new ApiHttpError('PICKUP_CODE_OTHER_TERMINAL', 'server says', 404)
-  const otherSaid = model.pickupClaimMessage(otherErr)
-  if (otherSaid !== otherTerminalSentence) fail(`走错机器的取件文案不是定稿：${otherSaid}`)
-  else if (model.classifyClaimFailure(otherErr) !== 'other') fail(`走错机器应归 other，实际 ${model.classifyClaimFailure(otherErr)}`)
-  else if (userMessages.userMessageOf(otherErr, '兜底') !== otherTerminalSentence) fail('共享码表的走错机器文案和取件码表不一致')
-  else if (otherSaid === rejected) fail('走错机器被并进了「到机码无效」那句')
-  else pass('PICKUP_CODE_OTHER_TERMINAL：单独一句，归 other，不和无效码同一屏')
 
   // 当天额度沿用批次上的共享短句：不进到机码表，认领页与确认页同一句，次要按钮是「输另一个到机码」。
   for (const [code, expected] of [

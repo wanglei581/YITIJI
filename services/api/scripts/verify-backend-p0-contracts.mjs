@@ -334,24 +334,13 @@ check(
   '小程序同时认 10 位存量码和 8 位新码（#724 已进 main；本 PR 不再要求锁死单 10 位）',
 )
 
-// ── 到机码拒绝（码不存在 / 走错机器）────────────────────────────────────
-// 码不存在仍是 CLAIM_REJECTION。走错机器改回 PICKUP_CODE_OTHER_TERMINAL，
-// 但必须先 noteClaimFailure(..., 'terminal_mismatch')，和无效码一样记一次失败。
-const OTHER_TERMINAL_MESSAGE = '这单是在别的机器上下的，请到下单时选的那台机器取件'
+// ── 预言机合并（方案 A）──────────────────────────────────────────────────
+// claim 路径上「码不存在」与「码存在但不属于本终端」必须走同一个拒绝对象。
 check(
   pickupOrderSrc.includes('private static readonly CLAIM_REJECTION') &&
-    /if \(!order\) \{[\s\S]{0,500}?throw new NotFoundException\(PickupOrderService\.CLAIM_REJECTION\)/.test(pickupOrderSrc),
-  '码不存在仍抛 CLAIM_REJECTION',
-)
-check(
-  /if \(order\.terminalId !== terminal\.id\) \{[\s\S]{0,400}?noteClaimFailure\(terminal\.id, 'terminal_mismatch', order\.id\)[\s\S]{0,200}?throw new NotFoundException\(PickupOrderService\.OTHER_TERMINAL_REJECTION\)/.test(pickupOrderSrc) &&
-    pickupOrderSrc.includes("code: 'PICKUP_CODE_OTHER_TERMINAL'") &&
-    pickupOrderSrc.includes(`message: '${OTHER_TERMINAL_MESSAGE}'`),
-  'claim() 走错机器先记一次失败，再回 PICKUP_CODE_OTHER_TERMINAL 和指定文案',
-)
-check(
-  /async settleClaim[\s\S]{0,500}?if \(order\.terminalId !== terminal\.id\) throw new NotFoundException\(PickupOrderService\.CLAIM_REJECTION\)/.test(pickupOrderSrc),
-  'settleClaim 跨终端兜底仍是 CLAIM_REJECTION',
+    /if \(!order\) \{[\s\S]{0,500}?throw new NotFoundException\(PickupOrderService\.CLAIM_REJECTION\)/.test(pickupOrderSrc) &&
+    /order\.terminalId !== terminal\.id[\s\S]{0,500}?throw new NotFoundException\(PickupOrderService\.CLAIM_REJECTION\)/.test(pickupOrderSrc),
+  'claim 的两条失败路径共用同一个 CLAIM_REJECTION 响应（不泄露「这枚码是否存在」）',
 )
 check(
   !/if \(order\.terminalId !== terminal\.id\) \{[\s\S]{0,200}?PICKUP_TERMINAL_MISMATCH/.test(pickupOrderSrc),

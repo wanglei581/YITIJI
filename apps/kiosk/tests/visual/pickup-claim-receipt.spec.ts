@@ -190,14 +190,14 @@ for (const code of ['PICKUP_CODE_INVALID', 'PICKUP_CODE_EXPIRED', 'PICKUP_TERMIN
     await page.goto('/print/pickup-claim')
     await page.getByLabel('到机码输入框').fill('28491703')
     await expect(page.getByTestId('arrival-code-state-invalid-or-expired')).toBeVisible()
-    await expect(page.getByRole('alert')).toContainText('到机码无效或已过期，请核对后重新输入。核对后还是不行的，请在手机上查看这笔订单，需要的话重新下单。')
+    await expect(page.getByRole('alert')).toContainText('到机码不对或已过期')
     await expect(page.getByRole('alert')).toContainText('不提示具体原因')
     await expect(page.getByRole('alert')).not.toContainText('请在小程序重新下单')
     await expect(page.getByTestId('arrival-code-primary')).toHaveText('清除，重新输入')
   })
 }
 
-test('pickup PICKUP_CODE_OTHER_TERMINAL names the other machine @w2', async ({ page, api }) => {
+test('pickup PICKUP_CODE_INVALID says the code may be for another machine @w2', async ({ page, api }) => {
   api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', { status: 200, json: { enabled: false, idleTimeoutSec: 180, items: [] } })
   api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', { status: 200, json: { printerStatus: 'ready', isOnline: true, paperLevel: 'sufficient' } })
   await page.route('**/api/v1/print/jobs/claim-pickup', async route => {
@@ -206,19 +206,16 @@ test('pickup PICKUP_CODE_OTHER_TERMINAL names the other machine @w2', async ({ p
       contentType: 'application/json',
       body: JSON.stringify({
         error: {
-          code: 'PICKUP_CODE_OTHER_TERMINAL',
-          message: '这单是在别的机器上下的，请到下单时选的那台机器取件',
+          code: 'PICKUP_CODE_INVALID',
+          message: '到机码无效或已过期',
         },
       }),
     })
   })
   await page.goto('/print/pickup-claim')
   await page.getByLabel('到机码输入框').fill('28491703')
-  await expect(page.getByTestId('arrival-code-state-failed')).toBeVisible()
-  await expect(page.getByRole('alert')).toContainText('这单是在别的机器上下的，请到下单时选的那台机器取件')
-  await expect(page.getByRole('alert')).not.toContainText('不提示具体原因')
-  await expect(page.getByRole('alert')).not.toContainText('到机码无效或已过期')
-  await expect(page.getByTestId('arrival-code-state-invalid-or-expired')).toHaveCount(0)
+  await expect(page.getByTestId('arrival-code-state-invalid-or-expired')).toBeVisible()
+  await expect(page.getByRole('alert')).toContainText('到机码不对或已过期，或者这单是在别的机器上下的。请核对号码，或到下单时选的那台机器取件；还是不行的，请在手机上查看这笔订单，需要的话重新下单。')
   await expect(page.getByTestId('arrival-code-primary')).toHaveText('清除，重新输入')
 })
 

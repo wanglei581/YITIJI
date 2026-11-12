@@ -76,16 +76,11 @@ function quotaLimit(error: unknown): number | undefined {
 }
 
 /**
- * 不存在、已过期共用这一句，不分开说。
+ * 不存在、已过期、不属于这台机器三种情况共用，不分开说。
  * 后半句是 2026-10-12 合规定的下一步：核对后还是不行，回手机看订单。
- * 走错机器不在这句里：那一句是 PICKUP_CODE_OTHER_TERMINAL，要告诉人去下单时选的那台机器。
  */
 export const PICKUP_CODE_REJECTED_COPY =
-  '到机码无效或已过期，请核对后重新输入。核对后还是不行的，请在手机上查看这笔订单，需要的话重新下单。'
-
-/** 到机码入口：码是对的，但这单不是在这台机器下的。与服务端 message 同一句。 */
-export const PICKUP_CODE_OTHER_TERMINAL_COPY =
-  '这单是在别的机器上下的，请到下单时选的那台机器取件'
+  '到机码不对或已过期，或者这单是在别的机器上下的。请核对号码，或到下单时选的那台机器取件；还是不行的，请在手机上查看这笔订单，需要的话重新下单。'
 
 /**
  * 付费异常单的退款还没办完。不写「已退款」，也不承诺费用会按原路退回：
@@ -127,7 +122,6 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, SharedUserMessage>> = {
   // 过期与无效共用一句，避免本地短句盖住「请在小程序重新下单」却不告诉人下一步。
   PICKUP_CODE_INVALID: PICKUP_CODE_REJECTED_COPY,
   PICKUP_CODE_EXPIRED: PICKUP_CODE_REJECTED_COPY,
-  PICKUP_CODE_OTHER_TERMINAL: PICKUP_CODE_OTHER_TERMINAL_COPY,
   PICKUP_RESUME_REFUND_PENDING: PICKUP_RESUME_REFUND_PENDING_COPY,
   PICKUP_CODE_UNAVAILABLE: () => `这个到机码对应的文件暂时不可用。${helpNeededLine()}。`,
   // 2026-09-07 产品裁决「退款则不出文件」：服务端在任何状态写入前拦下，这里给同义稳定文案。
