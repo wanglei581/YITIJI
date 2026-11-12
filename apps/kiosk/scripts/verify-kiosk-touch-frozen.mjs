@@ -37,7 +37,7 @@ if (process.argv.includes('--update')) {
   const manifest = {
     frozenAt: previous?.frozenAt ?? new Date().toISOString().slice(0, 10),
     updatedAt: new Date().toISOString().slice(0, 10),
-    note: '青序流光 · 触屏版，全页补稿第 5 版定稿（产品负责人 2026-10-27 看过并同意进仓库；第 4 版补稿 2026-10-26 定稿）；2026-11-05 政策最小闭环改政策三屏并加空态（policy-min.js），「我的 · 收藏」每条加取消（fix-me.js，方案屏 5「沿用 我的 · 收藏（加取消）」），产品负责人点「按方案开工」；2026-11-12 加动效第 1 版、省步版、首页「免费使用」（motion-1112.js、fast-1112.js、free-1112.js、xq-figure.webp，index.html 多加载三个脚本），产品负责人对四件回「都照推荐」；同日页内「减弱动效」开关放首页底部（reduce-toggle-1112.js），他选「放首页底部」。改稿须产品负责人同意，并在 current-progress.md 写明原因；README.md 不在冻结范围。',
+    note: '青序流光 · 触屏版，全页补稿第 5 版定稿（产品负责人 2026-10-27 看过并同意进仓库；第 4 版补稿 2026-10-26 定稿）；2026-11-05 政策最小闭环改政策三屏并加空态（policy-min.js），「我的 · 收藏」每条加取消（fix-me.js，方案屏 5「沿用 我的 · 收藏（加取消）」），产品负责人点「按方案开工」；2026-11-12 加动效第 1 版、省步版、首页「免费使用」（motion-1112.js、fast-1112.js、free-1112.js、xq-figure.webp，index.html 多加载三个脚本），产品负责人对四件回「都照推荐」；同日页内「减弱动效」开关放首页底部（reduce-toggle-1112.js），他选「放首页底部」；同日第二批补稿整批进仓库（fix-flow-1111.js、fix-ivscan-1111.js、fix-resume-1111.js，他回「整批进仓库」；进仓库前改两处示例字，screens4.js 导出页示例文件名统一为新媒体运营）。改稿须产品负责人同意，并在 current-progress.md 写明原因；README.md 不在冻结范围。',
     files: current,
   }
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
