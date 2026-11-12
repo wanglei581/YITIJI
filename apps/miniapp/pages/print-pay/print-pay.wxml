@@ -12,7 +12,7 @@
     <view class="line done"></view>
     <view class="st done"><text class="n"><text class="ficon i-check"></text></text><text class="nl">选终端</text></view>
     <view class="line done"></view>
-    <view class="st on"><text class="n">3</text><text class="nl">到机码</text></view>
+    <view class="st on"><text class="n">3</text><text class="nl">到机核验</text></view>
     <view class="line"></view>
     <view class="st"><text class="n">4</text><text class="nl">{{quoteState === 'ready' && !isFreeOrder ? '机端支付' : (isFreeOrder ? '现场打印' : '到机完成')}}</text></view>
   </view>
