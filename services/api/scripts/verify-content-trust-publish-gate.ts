@@ -376,6 +376,18 @@ const PUBLISH_PATH_INVENTORY: { file: string; method: string; gated: boolean; no
   { file: 'jobs/jobs-admin.service.ts', method: 'publishJobSource', gated: true, note: 'Job → 来源机构 sourceOrgId' },
   { file: 'jobs/jobs-admin.service.ts', method: 'publishFairSource', gated: true, note: 'JobFair → 来源机构 sourceOrgId' },
   { file: 'policies/policies.service.ts', method: 'publishPolicy', gated: true, note: 'PolicyPost → 来源机构 sourceOrgId' },
+  {
+    file: 'policies/policy-save-and-publish.ts', method: 'saveAndPublishPartnerPolicy', gated: false,
+    note: '机构一次走完保存、审核通过、发布。不自己写 published，信任闸门在被调用的 publishPolicy 里',
+  },
+  {
+    file: 'upload-sessions/upload-session-member-bind.ts', method: 'publishConfirmed', gated: false,
+    note: '手机上传确认后把文件交给会员本人，不是政策或招聘内容发布',
+  },
+  {
+    file: 'admin-internal-accounts/internal-account-session.ts', method: 'publishInternalSessionState', gated: false,
+    note: '把登录会话状态写入缓存，不是内容发布',
+  },
   { file: 'companies/companies.service.ts', method: 'adminPublish', gated: true, note: 'CompanyProfile → 来源机构 sourceOrgId' },
   { file: 'jobs/fair-material.service.ts', method: 'publishMaterial', gated: true, note: 'FairMaterial → 所属招聘会的来源机构' },
   { file: 'offline-agencies/offline-agencies.service.ts', method: 'adminPublish', gated: true, note: 'OfflineAgency:sourceOrgId 非空时受闸门约束' },
@@ -427,10 +439,10 @@ function walk(dir: string, out: string[] = []): string[] {
   return out
 }
 
-/** 抽取文件里所有 async 方法名(顶层缩进的类方法即可,足够覆盖 service 写法)。 */
+/** 抽取 async 方法名：类方法，以及文件顶层的 `export async function`。 */
 function asyncMethodNames(code: string): string[] {
   const names: string[] = []
-  const re = /^\s*(?:private\s+|public\s+|protected\s+|static\s+)*async\s+([A-Za-z_$][\w$]*)\s*\(/gm
+  const re = /^\s*(?:export\s+)?(?:private\s+|public\s+|protected\s+|static\s+)*async\s+(?:function\s+)?([A-Za-z_$][\w$]*)\s*\(/gm
   let m: RegExpExecArray | null
   while ((m = re.exec(code)) !== null) names.push(m[1]!)
   return names

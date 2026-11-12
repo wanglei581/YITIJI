@@ -5,15 +5,24 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import type { Prisma } from '../generated/prisma/client'
 import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
-import type { CreatePolicyPostDto, UpdatePolicyPostDto } from './dto/policy.dto'
+import type { CreatePolicyPostDto, PolicyDraftCheckDto, UpdatePolicyPostDto } from './dto/policy.dto'
 import type { ReviewAction } from '../jobs/dto/review.dto'
 import type { PublishAction } from '../jobs/dto/publish.dto'
-import { checkPolicySourceLink, isPolicySourceLinkVerified, POLICY_PUBLISH_ISSUES } from './policy-source-link'
+import {
+  checkPolicySourceLink,
+  isPolicySourceLinkVerified,
+  policyDraftPublishWarning,
+  policySourceLinkRejection,
+  POLICY_PUBLISH_ISSUES,
+} from './policy-source-link'
+import { assessPolicyChecklistFit } from './policy-checklist-layout'
+
 import { partnerOrgTypeCan } from '../jobs/partner-capabilities'
 import { assertOrgContentTrustActive, type OrgTrustReader } from '../common/content-trust'
 import {
@@ -315,7 +324,7 @@ export class PoliciesService {
     })
   }
 
-  async createPartnerPolicy(dto: CreatePolicyPostDto, user: AuthedUser): Promise<PolicyPostDto> {
+  async createPartnerPolicy(dto: CreatePolicyPostDto, user: AuthedUser): Promise<PolicyPostDto & { publishWarning: string | null }> {
     const org = await this.assertPartnerOrg(user)
     this.assertPolicyCapableOrgType(org)
     this.assertKindFields(dto.kind, dto.audience, dto.category)
@@ -347,10 +356,13 @@ export class PoliciesService {
       payload: { kind: dto.kind, title: dto.title },
     })
     this.logger.log(`createPartnerPolicy: id=${created.id} orgId=${org.id}`)
-    return mapPolicy(created)
+    return {
+      ...mapPolicy(created),
+      publishWarning: await this.draftSourceWarning(org.id, created.kind, created.externalUrl),
+    }
   }
 
-  async updatePartnerPolicy(id: string, dto: UpdatePolicyPostDto, user: AuthedUser): Promise<PolicyPostDto> {
+  async updatePartnerPolicy(id: string, dto: UpdatePolicyPostDto, user: AuthedUser): Promise<PolicyPostDto & { publishWarning: string | null }> {
     const org = await this.assertPartnerOrg(user)
     const post = await this.prisma.policyPost.findUnique({ where: { id } })
     if (!post || post.sourceOrgId !== org.id) {
@@ -398,7 +410,33 @@ export class PoliciesService {
       targetId: id,
       payload: { changedFields, fromReviewStatus: post.reviewStatus, fromPublishStatus: post.publishStatus },
     })
-    return mapPolicy(updated)
+    return {
+      ...mapPolicy(updated),
+      publishWarning: await this.draftSourceWarning(org.id, updated.kind, updated.externalUrl),
+    }
+  }
+
+  /**
+   * 录入时预估：不落库、不写审计。
+   * 链接警告与发布闸门同一句原因；清单哪一栏印不下与 PDF 排版同一个函数。
+   */
+  async previewPolicyDraft(user: AuthedUser, dto: PolicyDraftCheckDto): Promise<{
+    publishWarning: string | null
+    checklistReady: boolean
+    columns: Array<{ key: string; truncated: boolean }>
+  }> {
+    const org = await this.assertPartnerOrg(user)
+    const publishWarning = policyDraftPublishWarning(dto.kind, dto.externalUrl, org.verifiedOfficialDomainsJson)
+    if (dto.kind !== 'policy_guide') return { publishWarning, checklistReady: true, columns: [] }
+    try {
+      const fit = await assessPolicyChecklistFit(dto)
+      return { publishWarning, checklistReady: true, columns: fit.columns }
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        return { publishWarning, checklistReady: false, columns: [] }
+      }
+      throw error
+    }
   }
 
   async unpublishPartnerPolicy(id: string, user: AuthedUser): Promise<PolicyPostDto> {
@@ -596,7 +634,7 @@ export class PoliciesService {
       throw new BadRequestException({ error: POLICY_PUBLISH_ISSUES.sourceDomainsNotRegistered })
     }
     if (link.status === 'not_verified') {
-      throw new BadRequestException({ error: POLICY_PUBLISH_ISSUES.sourceUrlNotVerified })
+      throw new BadRequestException({ error: policySourceLinkRejection(link) })
     }
     const version = post.contentVersion ?? 1
     const confirmedAt = new Date()
@@ -644,6 +682,14 @@ export class PoliciesService {
   }
 
   // ── 内部 helpers ────────────────────────────────────────────────────────────
+
+  private async draftSourceWarning(orgId: string, kind: string, externalUrl: string | null): Promise<string | null> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { verifiedOfficialDomainsJson: true },
+    })
+    return policyDraftPublishWarning(kind, externalUrl, org?.verifiedOfficialDomainsJson)
+  }
 
   private async assertPartnerOrg(user: AuthedUser) {
     if (user.role !== 'partner' || !user.orgId) {

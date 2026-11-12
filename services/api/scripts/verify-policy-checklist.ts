@@ -17,6 +17,7 @@ import { extractPdfText, openPdfjsDocument } from '../src/common/pdf/pdfjs-docum
 import { PolicyChecklistService, checklistFilename, publicPhoneUrl } from '../src/policies/policy-checklist.service'
 import { PolicyChecklistController } from '../src/policies/policy-checklist.controller'
 import { CHECKLIST_EMPTY, CHECKLIST_FOOTER, CHECKLIST_TRUNCATED, renderPolicyChecklist } from '../src/policies/policy-checklist-pdf'
+import { assessPolicyChecklistFit } from '../src/policies/policy-checklist-layout'
 import { materialCheckRequired, LEGACY_AI_GENERATED_PURPOSES } from '../src/print-jobs/material-check-policy'
 import { assertPiiScanned } from '../src/print-jobs/pii-scan-gate'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
@@ -195,6 +196,59 @@ async function main() {
         assert.ok(result.text.includes(CHECKLIST_FOOTER)); assert.ok(result.text.includes('发布机构没有提供可核对的原文链接'))
       })
     }
+    const shortWho = '只需一行'
+    const shortWhere = '窗口一处'
+    const lineOf = (index: number) => `材料第${index}行`
+    const materialsOf = (count: number) => Array.from({ length: count }, (_, index) => lineOf(index)).join('\n')
+    let fitLo = 1
+    let fitHi = 80
+    while (fitLo < fitHi) {
+      const mid = Math.ceil((fitLo + fitHi) / 2)
+      const fit = await assessPolicyChecklistFit({ whoCanApply: shortWho, requiredMaterials: materialsOf(mid), whereToApply: shortWhere })
+      if (fit.columns.every((column) => !column.truncated)) fitLo = mid
+      else fitHi = mid - 1
+    }
+    const plain = (value: string) => value.replace(/\s/gu, '')
+    const drawColumns = async (count: number) => {
+      const requiredMaterials = materialsOf(count)
+      const rendered = await renderPolicyChecklist({
+        ...policy, whoCanApply: shortWho, requiredMaterials, whereToApply: shortWhere,
+      })
+      return { requiredMaterials, rendered, text: (await inspectPdf(rendered.buffer)).text }
+    }
+    const unevenCount = Math.max(2, fitLo - 1)
+    const uneven = await drawColumns(unevenCount)
+    const unevenFit = await assessPolicyChecklistFit({ whoCanApply: shortWho, requiredMaterials: materialsOf(1), whereToApply: materialsOf(unevenCount) })
+    check('长短不同的三栏在一页内印全，不出现扫码截断', () => {
+      assert.ok(fitLo >= 8, `一页至少应容下 8 行材料，实际 ${fitLo}`)
+      assert.ok(unevenFit.columns.every((column) => !column.truncated))
+      assert.equal(uneven.rendered.pageCount, 1)
+      assert.ok(!uneven.text.includes(plain(CHECKLIST_TRUNCATED)))
+      assert.ok(uneven.text.includes(plain(shortWho)))
+      assert.ok(uneven.text.includes(plain(shortWhere)))
+      assert.ok(uneven.text.includes(plain(lineOf(unevenCount - 1))))
+    })
+    const exact = await drawColumns(fitLo)
+    const exactFit = await assessPolicyChecklistFit({ whoCanApply: shortWho, requiredMaterials: materialsOf(fitLo), whereToApply: shortWhere })
+    check('刚好一页：三栏都不截，末行仍在', () => {
+      assert.ok(exactFit.columns.every((column) => !column.truncated))
+      assert.equal(exact.rendered.pageCount, 1)
+      assert.ok(!exact.text.includes(plain(CHECKLIST_TRUNCATED)))
+      assert.ok(exact.text.includes(plain(lineOf(0))))
+      assert.ok(exact.text.includes(plain(lineOf(fitLo - 1))))
+    })
+    const over = await drawColumns(fitLo + 1)
+    const overFit = await assessPolicyChecklistFit({ whoCanApply: shortWho, requiredMaterials: materialsOf(fitLo + 1), whereToApply: shortWhere })
+    check('超过一页才截，只截超出的那一栏，并保留扫码提示', () => {
+      assert.equal(overFit.columns.find((column) => column.key === 'requiredMaterials')?.truncated, true)
+      assert.equal(overFit.columns.find((column) => column.key === 'whoCanApply')?.truncated, false)
+      assert.equal(overFit.columns.find((column) => column.key === 'whereToApply')?.truncated, false)
+      assert.equal(over.rendered.pageCount, 1)
+      assert.ok(over.text.includes(plain(CHECKLIST_TRUNCATED)))
+      assert.ok(over.text.includes(plain(shortWho)))
+      assert.ok(over.text.includes(plain(shortWhere)))
+      assert.ok(!over.text.includes(plain(lineOf(fitLo))))
+    })
     const emptyDomains = await renderPolicyChecklist({ ...policy, publishedDate: null,
       org: { verifiedOfficialDomainsJson: null } })
     const emptyResult = await inspectPdf(emptyDomains.buffer)

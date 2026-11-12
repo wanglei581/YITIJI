@@ -74,11 +74,30 @@ test('提交政策遇到授权停用显示原文且不跳登录', async ({ page 
   await page.route('**/api/v1/partner/policies**', (route) => route.request().method() === 'POST'
     ? route.fulfill({ status: 403, ...reply({ error: { code: 'ORG_LICENSE_INACTIVE', message: inactiveMessage } }) })
     : route.fulfill(reply({ data: [], pagination: { total: 0, page: 1, pageSize: 20, totalPages: 0 } })))
+  // 上面那条 `policies**` 只认列表地址本身，认不到下一级路径；保存前预估和保存并发布要单独拦。
+  await page.route('**/api/v1/partner/policies/draft-check', (route) => route.fulfill(reply({ publishWarning: null, checklistReady: false, columns: [] })))
+  await page.route('**/api/v1/partner/policies/release-with-save', (route) => route.fulfill({ status: 403, ...reply({ error: { code: 'ORG_LICENSE_INACTIVE', message: inactiveMessage } }) }))
   await open(page, '/policy')
   await page.getByRole('button', { name: '新增政策内容' }).click()
-  await page.getByLabel('标题').fill('就业服务公告')
-  await page.getByRole('button', { name: '提交审核' }).click()
+  // 2026-11-11 起新增默认是「政策扶持条目」：三栏和原文链接填齐才能提交。
+  await expect(page.getByRole('combobox', { name: /内容类型/ })).toHaveValue('policy_guide')
+  const submit = page.getByRole('button', { name: '提交审核' })
+  await page.getByLabel('标题').fill('高校毕业生求职补贴')
+  await expect(submit).toBeDisabled()
+  for (const name of ['谁可以申请', '要准备的材料', '去哪办']) {
+    await page.getByRole('textbox', { name: new RegExp(`^${name}`) }).fill('按原文填写')
+  }
+  await page.getByRole('textbox', { name: /^原文链接/ }).fill('https://rsj.example.gov.cn/policy/1')
+  await submit.click()
   await expect(page.getByText(inactiveMessage, { exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/\/policy$/)
+
+  // 「保存并发布」遇到同一种拒绝：原因显示在确认弹窗里，同样不跳登录。
+  await page.getByRole('button', { name: '保存并发布' }).click()
+  const release = page.getByRole('dialog', { name: '保存并发布' })
+  await release.getByRole('checkbox').check()
+  await release.getByRole('button', { name: '确认保存并发布' }).click()
+  await expect(release.getByText(inactiveMessage, { exact: true })).toBeVisible()
   await expect(page).toHaveURL(/\/policy$/)
 })
 

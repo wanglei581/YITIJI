@@ -415,13 +415,13 @@ flowchart LR
 ```mermaid
 flowchart LR
   app["partner"]
-  app --> _root_["/<br/>1 页 · 32 端点"]
+  app --> _root_["/<br/>1 页 · 33 端点"]
   app --> account["/account<br/>1 页 · 21 端点"]
   app --> companies["/companies<br/>1 页 · 21 端点"]
   app --> fairs["/fairs<br/>1 页 · 21 端点"]
   app --> jobs["/jobs<br/>1 页 · 21 端点"]
   app --> login["/login<br/>1 页 · 0 端点"]
-  app --> policy["/policy<br/>1 页 · 35 端点"]
+  app --> policy["/policy<br/>1 页 · 36 端点"]
   app --> profile["/profile<br/>1 页 · 26 端点"]
   app --> screen["/screen<br/>2 页 · 21 端点"]
   app --> smart_campus["/smart-campus<br/>1 页 · 21 端点"]
@@ -433,13 +433,13 @@ flowchart LR
 
 | 路由 | 页面组件 | 页面文件 | 端点数 | 样式 |
 | --- | --- | --- | --- | --- |
-| `/` | DashboardPage | `apps/partner/src/routes/dashboard/index.tsx` | 32 | — |
+| `/` | DashboardPage | `apps/partner/src/routes/dashboard/index.tsx` | 33 | — |
 | `/account` | AccountPage | `apps/partner/src/routes/account/index.tsx` | 21 | — |
 | `/companies` | RecruitmentHostingGate | `apps/partner/src/routes/RecruitmentHostingGate.tsx` | 21 | — |
 | `/fairs` | RecruitmentHostingGate | `apps/partner/src/routes/RecruitmentHostingGate.tsx` | 21 | — |
 | `/jobs` | RecruitmentHostingGate | `apps/partner/src/routes/RecruitmentHostingGate.tsx` | 21 | — |
 | `/login` | LoginPage | `apps/partner/src/routes/login/index.tsx` | 0 | 1 |
-| `/policy` | PolicyPage | `apps/partner/src/routes/policy/index.tsx` | 35 | — |
+| `/policy` | PolicyPage | `apps/partner/src/routes/policy/index.tsx` | 36 | — |
 | `/profile` | ProfilePage | `apps/partner/src/routes/profile/index.tsx` | 26 | — |
 | `/screen` | ScreenPage | `apps/partner/src/routes/screen/index.tsx` | 21 | — |
 | `/screen/:tab` | ScreenPage | `apps/partner/src/routes/screen/index.tsx` | 21 | — |
@@ -452,7 +452,7 @@ flowchart LR
 <details>
 <summary>展开：每个路由触达的端点（14 个路由）</summary>
 
-**`/`** → `DELETE /partner/policies/:param`、`GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/policies/:param/eligibility-rules`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`GET /policies/eligibility-questions`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`PATCH /partner/policies/:param`、`PATCH /partner/policies/:param/publish`、`PATCH /partner/policies/:param/release`、`PATCH /partner/policies/:param/review`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`POST /partner/policies`、`POST /partner/policies/:param/eligibility-preview`、`PUT /partner/policies/:param/eligibility-rules`、`PUT /partner/profile`、`PUT /partner/smart-campus/terminals/:param/config`
+**`/`** → `DELETE /partner/policies/:param`、`GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/policies/:param/eligibility-rules`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`GET /policies/eligibility-questions`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`PATCH /partner/policies/:param`、`PATCH /partner/policies/:param/publish`、`PATCH /partner/policies/:param/release`、`PATCH /partner/policies/:param/review`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`POST /partner/policies`、`POST /partner/policies/:param/eligibility-preview`、`POST /partner/policies/draft-check`、`PUT /partner/policies/:param/eligibility-rules`、`PUT /partner/profile`、`PUT /partner/smart-campus/terminals/:param/config`
 
 **`/account`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
 
@@ -462,7 +462,7 @@ flowchart LR
 
 **`/jobs`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
 
-**`/policy`** → `DELETE /partner/official-channels/:param`、`DELETE /partner/policies/:param`、`GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/official-channels`、`GET /partner/policies/:param/eligibility-rules`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`GET /policies/eligibility-questions`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`PATCH /partner/official-channels/:param`、`PATCH /partner/policies/:param`、`PATCH /partner/policies/:param/publish`、`PATCH /partner/policies/:param/release`、`PATCH /partner/policies/:param/review`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`POST /partner/official-channels`、`POST /partner/policies`、`POST /partner/policies/:param/eligibility-preview`、`PUT /partner/policies/:param/eligibility-rules`、`PUT /partner/smart-campus/terminals/:param/config`
+**`/policy`** → `DELETE /partner/official-channels/:param`、`DELETE /partner/policies/:param`、`GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/official-channels`、`GET /partner/policies/:param/eligibility-rules`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`GET /policies/eligibility-questions`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`PATCH /partner/official-channels/:param`、`PATCH /partner/policies/:param`、`PATCH /partner/policies/:param/publish`、`PATCH /partner/policies/:param/release`、`PATCH /partner/policies/:param/review`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`POST /partner/official-channels`、`POST /partner/policies`、`POST /partner/policies/:param/eligibility-preview`、`POST /partner/policies/draft-check`、`PUT /partner/policies/:param/eligibility-rules`、`PUT /partner/smart-campus/terminals/:param/config`
 
 **`/profile`** → `DELETE /partner/official-channels/:param`、`GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/official-channels`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`PATCH /partner/official-channels/:param`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`POST /partner/official-channels`、`PUT /partner/profile`、`PUT /partner/smart-campus/terminals/:param/config`
 
