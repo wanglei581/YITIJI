@@ -5,11 +5,15 @@
 // 但 `timeout --foreground` 只杀了 git，它经 ssh 起的子进程还活着、占着会话的 stdout/stderr，
 // 「Deploy via SSH」一直显示在跑，最后手动取消（不取消要挂满 45 分钟的 command_timeout）。
 //
-// 本门禁从 deploy.yml 原样取出拉取段，换上假 git 真跑（只把 600 秒换成 1 秒、重试间隔换成 0）。
+// 本门禁从 deploy.yml 原样取出拉取段，换上假 git 真跑（只把 600 秒换成 2 秒、重试间隔换成 0）。
 // 假 git 会留下三种进程：像 ssh 的普通子进程、不理 TERM 的子进程、逃出进程组还占着输出的进程。
 // 要求：拉取段按时结束、会话不被占住；前两种进程被清掉；git 的输出照样回显；临时日志删掉；
 // 拉取途中脚本收到 TERM 时，清理函数把在跑的那一组拉取进程一起收掉。
 // 再对拉取段做三处反向改动（加回 --foreground、去掉输出重定向、去掉整组 KILL），每一处都必须被演练抓到。
+//
+// 时序：机器忙时假 git 可能还没起好子进程就到点了（11/12 本机实测 1 秒预算五次红一次，红的那次
+// 是「只登记到 1 个、没有一个活着」）。所以先跑成功路径预热假 git，超时预算给 2 秒，逃出进程组的
+// 进程用 bash 的 `set -m` 就地生成；每类进程至少登记到 1 个，登记到的必须全部被清掉。
 //
 // 只用 node 内置模块（CI 在 pnpm install 之前跑）。需要 GNU coreutils 的 timeout 和 mktemp（服务器与 CI 都是）。
 
@@ -62,16 +66,19 @@ if (!/timeout \(GNU coreutils\)/.test(tools.stdout) || !/mktemp \(GNU coreutils\
 const work = mkdtempSync(join(tmpdir(), 'deploy-fetch-drill-'))
 const bin = join(work, 'bin')
 mkdirSync(bin)
-writeFileSync(join(bin, 'git'), `#!/usr/bin/env bash
+writeFileSync(join(bin, 'git'), `#!/bin/bash
 # 假 git：ok 模式马上成功；hang 模式留下三种进程后自己卡住，等 timeout 来收。
 echo "fake-git: $*" >&2
 if [ "$FAKE_GIT_MODE" = ok ]; then echo 'fake-git: fetched'; exit 0; fi
-sleep 30 &
+set -m
+sleep 60 &
+echo "escaped $!" >> "$DRILL_PIDS"
+set +m
+sleep 60 &
 echo "plain $!" >> "$DRILL_PIDS"
-( trap '' TERM; exec sleep 30 ) &
+( trap '' TERM; exec sleep 60 ) &
 echo "stubborn $!" >> "$DRILL_PIDS"
-"$NODE_BIN" -e 'const c = require("child_process").spawn("sleep", ["30"], { detached: true, stdio: "inherit" }); require("fs").appendFileSync(process.env.DRILL_PIDS, "escaped " + c.pid + "\\n"); c.unref()'
-exec sleep 30
+exec sleep 60
 `, { mode: 0o755 })
 
 const allPids = new Set()
@@ -105,18 +112,19 @@ async function allDead(pids) {
   return false
 }
 const leftLogs = () => readdirSync(work).filter((name) => name.startsWith('deploy-fetch-'))
-const drill = (text, budget = '1s') => swap(swap(swap(text,
+const drill = (text, budget = '2s') => swap(swap(swap(text,
   'timeout --kill-after=10s 600s', `timeout --kill-after=1s ${budget}`),
   'sleep "$((ATTEMPT * 5))"', 'sleep 0'),
   'mktemp /tmp/deploy-fetch-', `mktemp ${work}/deploy-fetch-`)
-const drillEnv = (mode, pids) => ({ ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_GIT_MODE: mode, DRILL_PIDS: pids, NODE_BIN: process.execPath })
+const drillEnv = (mode, pids) => ({ ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_GIT_MODE: mode, DRILL_PIDS: pids })
 
 async function runFetch(name, text, mode) {
   const pidsFile = join(work, `${name}.pids`)
   const script = join(work, `${name}.sh`)
   writeFileSync(script, `set -euo pipefail\nEXPECTED_SHA=${SHA}\nFETCH_OK=0\n${text}\necho "FETCH_OK=$FETCH_OK"\n`)
   const started = Date.now()
-  const result = spawnSync('bash', [script], { encoding: 'utf8', timeout: 8000, env: drillEnv(mode, pidsFile) })
+  // 正常两次各 2 秒；会话被占住时要等到这个上限才返回，所以假 git 留下的进程都睡 60 秒。
+  const result = spawnSync('bash', [script], { encoding: 'utf8', timeout: 12000, env: drillEnv(mode, pidsFile) })
   const seconds = (Date.now() - started) / 1000
   const pids = readPids(pidsFile)
   const of = (kind) => pids.filter((entry) => entry.kind === kind).map((entry) => entry.pid)
@@ -124,8 +132,10 @@ async function runFetch(name, text, mode) {
   const problems = []
   if (result.error || result.status !== 0) problems.push(`拉取段没有按时结束（会话被占住）：status=${result.status} error=${result.error?.code ?? '-'} 用时 ${seconds}s`)
   if (mode === 'hang') {
-    if (of('plain').length !== 2 || !(await allDead(of('plain')))) problems.push('像 ssh 的普通子进程没有随整组被收掉')
-    if (of('stubborn').length !== 2 || !(await allDead(of('stubborn')))) problems.push('不理 TERM 的子进程没有被整组 KILL 收掉')
+    for (const [kind, message] of [['plain', '像 ssh 的普通子进程没有随整组被收掉'], ['stubborn', '不理 TERM 的子进程没有被整组 KILL 收掉']]) {
+      const recorded = of(kind)
+      if (recorded.length < 1 || !(await allDead(recorded))) problems.push(`${message}（登记 ${recorded.length} 个，仍活着：${recorded.filter(alive).join(',') || '无'}）`)
+    }
     if ((out.match(/fetch 失败，退出码 124/g) ?? []).length !== 2 || !out.includes('FETCH_OK=0')) problems.push('两次超时没有按退出码 124 记失败')
   } else if (!out.includes('fake-git: fetched') || !out.includes('fetch 成功') || !out.includes('FETCH_OK=1')) {
     problems.push('成功路径没有回显 git 输出或没有记成功')
@@ -137,11 +147,12 @@ async function runFetch(name, text, mode) {
 
 let exitCode = 1
 try {
-  console.log('二、演练（假 git，超时 1 秒）')
+  console.log('二、演练（假 git，超时 2 秒）')
+  // 先走成功路径：顺带把假 git 预热一遍（新写出的脚本第一次执行可能慢），预算放宽，不测超时。
+  const ok = await runFetch('ok', drill(fetchBlock, '30s'), 'ok')
+  check('成功：回显 git 输出并记成功', ok.length === 0, ok.join('；'))
   const hang = await runFetch('hang', drill(fetchBlock), 'hang')
   check('超时：按时结束，普通与不理 TERM 的子进程都被收掉，输出照样回显，日志删掉', hang.length === 0, hang.join('；'))
-  const ok = await runFetch('ok', drill(fetchBlock), 'ok')
-  check('成功：回显 git 输出并记成功', ok.length === 0, ok.join('；'))
 
   // 拉取途中脚本收到 TERM：清理函数要把在跑的拉取组一起收掉，并以 143 退出。
   const pidsFile = join(work, 'signal.pids')
@@ -154,7 +165,7 @@ try {
   child.stdout.on('data', (chunk) => { output += chunk })
   child.stderr.on('data', (chunk) => { output += chunk })
   const closed = new Promise((resolve) => child.on('close', (code, signal) => resolve({ code, signal })))
-  for (let waited = 0; waited < 5000 && !readPids(pidsFile).some((entry) => entry.kind === 'escaped'); waited += 50) await sleep(50)
+  for (let waited = 0; waited < 10000 && !readPids(pidsFile).some((entry) => entry.kind === 'stubborn'); waited += 50) await sleep(50)
   await sleep(200)
   child.kill('SIGTERM')
   const ended = await Promise.race([closed, sleep(5000).then(() => null)])
@@ -167,7 +178,7 @@ try {
   console.log('三、反向改动必须被演练抓到')
   const drilled = drill(fetchBlock)
   const mutations = [
-    ['加回 --foreground', swap(drilled, 'timeout --kill-after=1s 1s', 'timeout --foreground --kill-after=1s 1s')],
+    ['加回 --foreground', swap(drilled, 'timeout --kill-after=1s 2s', 'timeout --foreground --kill-after=1s 2s')],
     ['去掉输出重定向', swap(drilled, '</dev/null >"$FETCH_LOG" 2>&1 &', '&')],
     ['去掉整组 KILL', swap(drilled, 'kill -KILL -- "-$FETCH_PID" 2>/dev/null || true\n', '')],
   ]
