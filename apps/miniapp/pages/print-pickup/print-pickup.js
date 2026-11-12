@@ -6,8 +6,9 @@
 // 此前本页从 URL 读 pickupCode / expiresAt / amountCents / taskStatus / orderNo
 // 做首屏渲染与失败兜底。到机码是去一体机取件的凭证：它进了 URL，一条构造出来的链接、
 // 或一张转发出去的卡片，就能在别人手机上渲染出一张带码的取件页 —— 而金额与有效期
-// 同样是本人订单状态，不该由调用方"告诉"本页。现在只收 orderId，其余一律向服务端取。
-// 与材料包的 package-code 同一口径。
+// 同样是本人订单状态，不该由调用方"告诉"本页。到机码、金额、有效期仍只向服务端取。
+// 建单回包里的免费额度说明不是凭证：下单页 reLaunch 时用 URL 带 remainingSides、
+// requestedSides、resetsAt。没有这三项就不显示。与材料包的 package-code 同一口径。
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
@@ -21,6 +22,43 @@ const pickupSupport = require('./pickup-support')
 
 const POLL_INTERVAL_MS = 3000
 const TERMINAL_STATES = new Set(['completed', 'failed', 'expired', 'cancelled', 'abandoned'])
+
+// resetsAt 换成这台手机的本地时间。次日 0 点写成「明天 0 点」，其余写日期或钟点。
+function quotaResetPhrase(resetsAt) {
+  const d = new Date(resetsAt)
+  if (Number.isNaN(d.getTime())) return ''
+  const now = new Date()
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startThat = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const dayDiff = Math.round((startThat.getTime() - startToday.getTime()) / 86400000)
+  const h = d.getHours()
+  const m = d.getMinutes()
+  if (dayDiff === 1 && h === 0 && m === 0) return '明天 0 点'
+  const clock = m === 0 ? (h + ' 点') : (h + ' 点 ' + String(m).padStart(2, '0') + ' 分')
+  if (dayDiff === 1) return '明天 ' + clock
+  if (dayDiff === 0) return '今天 ' + clock
+  return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + clock
+}
+
+function readQueryNumber(value) {
+  if (value === undefined || value === null || value === '') return null
+  let text = String(value)
+  try { text = decodeURIComponent(text) } catch (e) { /* 已是明文 */ }
+  const n = Number(text)
+  return Number.isInteger(n) && n >= 0 ? n : null
+}
+
+function quotaNoticeFromQuery(q) {
+  if (!q) return ''
+  const remaining = readQueryNumber(q.remainingSides)
+  const requested = readQueryNumber(q.requestedSides)
+  if (remaining === null || requested === null || !q.resetsAt) return ''
+  let resetsAt = String(q.resetsAt)
+  try { resetsAt = decodeURIComponent(resetsAt) } catch (e) { /* 已是明文 */ }
+  const when = quotaResetPhrase(resetsAt)
+  if (!when) return ''
+  return '今天还能免费打印 ' + remaining + ' 面，这单 ' + requested + ' 面，' + when + '后可以到机取件'
+}
 
 /**
  * 屏幕上那张码还能被信任多久（毫秒）。
@@ -96,11 +134,12 @@ Page({
     // 分享给代取人时写在图上的网点名，只取服务端订单详情里的 share.outletName。
     outlet: '',
     reissuing: false,
+    quotaNotice: '',
   },
 
   onLoad(opts) {
     const q = opts || {}
-    // 只认 orderId；source 只是返回路径提示，不是凭证也不是状态。
+    // 只认 orderId 与额度说明；source 只是返回路径提示，不是凭证也不是状态。
     const orderId = q.orderId ? decodeURIComponent(q.orderId) : ''
     const windowInfo = typeof wx.getWindowInfo === 'function' ? wx.getWindowInfo() : { windowWidth: 375 }
     const qrSizePx = Math.round(Math.max(188, Math.min(232, windowInfo.windowWidth * 0.56)))
@@ -121,6 +160,7 @@ Page({
       statusBarHeight: app.globalData.statusBarHeight || 20,
       orderId,
       fromOrders: q.source === 'orders',
+      quotaNotice: quotaNoticeFromQuery(q),
       qrSizePx,
       qrStatus: 'loading',
       state: orderId ? 'loading' : 'error',

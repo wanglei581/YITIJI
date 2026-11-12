@@ -498,3 +498,102 @@ test('L5 换了账号：不替新账号自动核上一位选的文件，页面�
   assert.equal(page.data.quoteRecover, 'login')
   assert.match(page.data.quoteError, /不是同一个/)
 })
+
+function nextLocalMidnightIso() {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString()
+}
+
+async function submitPay(createResult) {
+  const session = { user: { id: 'A' } }
+  const auth = {
+    isLoggedIn: () => !!session.user,
+    getUser: () => session.user,
+    canSilentResignin: () => false,
+    sessionGeneration: () => 0,
+    isSameSession: (value) => value === 0,
+  }
+  const modals = []
+  const relaunch = []
+  const backs = []
+  const idemPort = {
+    ...idem,
+    findRecord: () => null,
+    ensureKey: () => Promise.resolve({ key: 'quota-key' }),
+    markSubmitted: () => true,
+    rememberOrderId: () => ({ orderId: 'ord-q' }),
+    clearRecord: () => true,
+  }
+  const api = {
+    getMyDocuments: () => Promise.resolve({ items: [] }),
+    quoteMyPrintOrder: () => Promise.resolve({ amountCents: 0, billablePages: 2 }),
+    createCloudPrintOrder: () => createResult(),
+  }
+  const wx = {
+    navigateTo() {}, redirectTo() {}, switchTab() {}, showToast() {}, showLoading() {}, hideLoading() {},
+    reLaunch(o) { relaunch.push(o && o.url) },
+    showModal(o) { modals.push(o) },
+    navigateBack(o) { backs.push(o || {}) },
+  }
+  const page = instantiate(loadPageDefinition('pages/print-pay/print-pay.js', {
+    wx, modules: { api, auth, 'print-order-idempotency': idemPort },
+  }))
+  page.onLoad({ ...PAY_OPTS })
+  page.onShow()
+  await flush()
+  page.continueFlow()
+  await flush()
+  await flush()
+  return { modals, relaunch, backs }
+}
+
+function openPickup(query) {
+  const auth = { isLoggedIn: () => true, getUser: () => ({ id: 'A' }), canSilentResignin: () => false }
+  const api = { getCloudPrintOrder: () => new Promise(() => {}) }
+  const wx = { getWindowInfo: () => ({ windowWidth: 375 }), navigateTo() {}, navigateBack() {}, showModal() {}, showToast() {} }
+  const page = instantiate(loadPageDefinition('pages/print-pickup/print-pickup.js', { wx, modules: { auth, api } }))
+  page.onLoad(query)
+  return page
+}
+
+test('建单回包带 freeQuotaNotice：取件页显示今天还能免费打几面；不带则不显示', async () => {
+  const resetsAt = nextLocalMidnightIso()
+  const withNotice = await submitPay(() => Promise.resolve({
+    id: 'ord-q',
+    amountCents: 0,
+    freeQuotaNotice: { remainingSides: 4, requestedSides: 6, resetsAt },
+  }))
+  assert.equal(withNotice.relaunch.length, 1)
+  assert.match(withNotice.relaunch[0], /^\/pages\/print-pickup\/print-pickup\?orderId=ord-q&/)
+  assert.match(withNotice.relaunch[0], /remainingSides=4/)
+  assert.match(withNotice.relaunch[0], /requestedSides=6/)
+  assert.ok(!withNotice.relaunch[0].includes('pickupCode='))
+  const page = openPickup({
+    orderId: 'ord-q',
+    remainingSides: '4',
+    requestedSides: '6',
+    resetsAt,
+  })
+  assert.equal(page.data.quotaNotice, '今天还能免费打印 4 面，这单 6 面，明天 0 点后可以到机取件')
+
+  const plain = await submitPay(() => Promise.resolve({ id: 'ord-plain', amountCents: 0 }))
+  assert.equal(plain.relaunch[0], '/pages/print-pickup/print-pickup?orderId=ord-plain')
+  const quiet = openPickup({ orderId: 'ord-plain' })
+  assert.equal(quiet.data.quotaNotice, '')
+})
+
+test('建单 400 PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES：原话显示，并能回去改份数', async () => {
+  const sentence = '这单 12 面，超过每天免费 10 面的上限，请减少份数或分开下单'
+  const { modals, relaunch, backs } = await submitPay(() => Promise.reject(Object.assign(new Error(''), {
+    code: 'PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES',
+    serverMessage: sentence,
+    statusCode: 400,
+  })))
+  assert.equal(relaunch.length, 0, '没建成单，不去取件页')
+  assert.equal(modals.length, 1)
+  assert.equal(modals[0].content, sentence)
+  assert.doesNotMatch(modals[0].content, /请稍后重试/)
+  assert.equal(modals[0].confirmText, '去改份数')
+  modals[0].success({ confirm: true })
+  assert.equal(backs.length, 1)
+})

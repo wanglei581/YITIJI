@@ -33,6 +33,27 @@ function amountTextOf(amountCents) {
   return amountCents === 0 ? '免费' : '¥' + formatYuan(amountCents)
 }
 
+// 建单回包多出来的额度说明。三项都齐才带去取件页；没有这个字段时返回空串，URL 与原来一样。
+function quotaNoticeQuery(order) {
+  const notice = order && order.freeQuotaNotice
+  if (!notice || typeof notice !== 'object') return ''
+  const remaining = Number(notice.remainingSides)
+  const requested = Number(notice.requestedSides)
+  const resetsAt = typeof notice.resetsAt === 'string' ? notice.resetsAt : ''
+  if (!Number.isInteger(remaining) || remaining < 0 || !Number.isInteger(requested) || requested < 0 || !resetsAt) return ''
+  return '&remainingSides=' + encodeURIComponent(String(remaining))
+    + '&requestedSides=' + encodeURIComponent(String(requested))
+    + '&resetsAt=' + encodeURIComponent(resetsAt)
+}
+
+// 超每日免费面数时，原文在 serverMessage（request.js 没把它放进 err.message）。
+function dailyFreeSidesMessage(err) {
+  if (!err || err.code !== 'PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES') return ''
+  const server = typeof err.serverMessage === 'string' ? err.serverMessage.trim() : ''
+  const shown = typeof err.message === 'string' ? err.message.trim() : ''
+  return server || shown
+}
+
 /**
  * 服务端这张订单是不是**已经走到头**了 —— 返回一句给用户看的原因，不是终态返回 `''`。
  *
@@ -903,13 +924,14 @@ Page({
       }
       // 只把 orderId 交给下一页。到机码 / 金额 / 有效期 / 订单号 / 任务状态一律由
       // print-pickup 自己带登录态向 GET /me/print-orders/:orderId 取（requireOwned 归属校验）。
+      // 额度说明不是凭证：回包有 freeQuotaNotice 时把三项带过去，没有就不带。
       //
       // 用 reLaunch 而不是 redirectTo（2026-10-16 真机验收）：订单建成之后，「上传参数 → 选终端 →
       // 确认」这几页不能再留在栈里。redirectTo 只换掉本页，安卓返回键、iOS 右滑一下就回到
       // 「选终端」，再走一遍就是第二张单。reLaunch 只重建页面栈，登录态、本机存储都不受影响；
       // 成功才清恢复记录、失败就锁页面的两条回调与原来一致。
       wx.reLaunch({
-        url: '/pages/print-pickup/print-pickup?orderId=' + encodeURIComponent(orderId),
+        url: '/pages/print-pickup/print-pickup?orderId=' + encodeURIComponent(orderId) + quotaNoticeQuery(order),
         // **确实跳走了才清恢复记录。** 拿到 200 就清的话，跳转失败会把唯一能找回
         // 这张订单的线索一起丢掉，而页面还留在原地 —— 用户只会再点一次。
         //
@@ -968,6 +990,20 @@ Page({
         }
         // `in_progress`：那次提交正在服务端跑，现在换键就是第二张订单。一个字节都不动。
         wx.showModal({ title: shown.title, content: shown.text, showCancel: false })
+        return
+      }
+      // 单笔面数超过每日免费上限。request.js 只在 user-error 登记过的码上保留原文，
+      // 这个码的原话在 serverMessage 上（user-error.js 由另一包改，这里不登记）。
+      // 不能盖成「请稍后重试」：用户要能回去改份数。
+      const dailyCap = dailyFreeSidesMessage(err)
+      if (dailyCap) {
+        wx.showModal({
+          title: '这单面数超了',
+          content: dailyCap,
+          confirmText: '去改份数',
+          showCancel: false,
+          success: () => { wx.navigateBack({ fail() {} }) },
+        })
         return
       }
       wx.showModal({ title: '提交失败', content: (err && err.message) || '请稍后重试', showCancel: false })

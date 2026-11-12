@@ -68,6 +68,8 @@
       </view>
     </view>
 
+    <text class="ph-hint" wx:if="{{quotaNotice}}">{{quotaNotice}}</text>
+
     <view class="steps-card" wx:if="{{statusKey === 'pending'}}">
       <view class="step-item">
         <view class="step-num">1</view>
