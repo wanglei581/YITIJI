@@ -178,6 +178,8 @@ export interface AdminTerminalRecord {
   scanInputAction?: 'none' | 'restart_required' | string | null
   scanInputReason?: string | null
   scanInputObservedAt?: string | null
+  /** 打印完成判据。缺省或 null 表示还没上报，不能显示成可用。 */
+  printCompletionEvidence?: 'available' | 'unavailable' | null
   agentVersion: string | null
   ipAddress: string | null
   diskFreeGb: number | null

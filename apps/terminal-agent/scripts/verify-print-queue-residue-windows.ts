@@ -33,6 +33,7 @@ import {
   type PrintQueueCommandStep,
 } from '../src/agent/print-queue-hold'
 import { mapWin32PrinterPreflight, mapWin32PrinterQuery, queryWin32PrinterLine } from '../src/agent/wmi'
+import { verifyPrintCompletionEvidence } from './verify-print-completion-evidence'
 
 const PRINTER_A = 'AIJobResidueA'
 const PRINTER_B = 'AIJobResidueB'
@@ -606,6 +607,7 @@ async function main(): Promise<void> {
     console.log('verify-print-queue-residue-windows: skipped (not win32)')
     return
   }
+  verifyPrintCompletionEvidence({ liveProbe: true })
   let scenarioError: unknown
   try {
     await runScenario()

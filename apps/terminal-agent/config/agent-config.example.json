@@ -5,7 +5,7 @@
   "adminSecret": "change-me-before-deploy",
   "printerName": "",
   "scanWatchFolder": "",
-  "agentVersion": "0.4.22",
+  "agentVersion": "0.4.23",
   "holdPrinterQueueWhenIdle": false,
   "scanDeviceEnabled": false,
   "scanDeviceName": "",

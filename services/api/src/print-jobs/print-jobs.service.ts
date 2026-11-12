@@ -21,6 +21,7 @@ import {
   throwIfMemberReprintBlocked,
 } from './paid-reprint-eligibility'
 import { payableCents, markPaidUnfulfilledRefundRequired } from '../payment/pending-refund-signal'
+import { clearQueueTimeoutRefundMark } from './print-queue-timeout'
 import { assertFreePrintQuota } from './free-print-quota.decide'
 import { reprintRequestedSides } from './free-print-quota.usage'
 import { lockPrintTaskRow } from '../terminals/print-status-attempt'
@@ -136,6 +137,7 @@ const USER_FAILURE_REASONS: Record<string, string> = {
   PRINTER_ERROR:          '打印机可能卡纸或发生设备故障，请联系工作人员处理',
   PRINT_JOB_UNCONFIRMED:  '打印作业未确认完成，请工作人员检查出纸状态',
   PRINT_TIMEOUT:          '打印超时，请稍后重试',
+  PRINT_QUEUE_TIMEOUT:    '这单等了太久没有打印，没有出纸，可以重新提交打印。',
   PRINT_COMMAND_FAILED:   '打印执行失败，请稍后重试或联系工作人员',
   UNSUPPORTED_FILE_TYPE:  '该文件格式暂不支持打印，请上传 PDF 或图片',
   FILE_NOT_FOUND:         '打印文件已失效，请返回重新上传',
@@ -869,6 +871,7 @@ export class PrintJobsService {
       await tx.printTaskStatusLog.create({
         data: { taskId: task.id, fromStatus: 'failed', toStatus: 'pending', errorCode: KIOSK_RETRY_LOG_CODE },
       })
+      await clearQueueTimeoutRefundMark(tx, order.id, liveTask?.errorCode)
       return { kind: 'resumed' as const, notice: liveDecision.action === 'reprint' ? liveDecision.notice : null }
     })
     if (outcome.kind === 'refund') throwSelfServiceAnomalyHalt('refund')

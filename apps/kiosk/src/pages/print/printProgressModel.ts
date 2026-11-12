@@ -238,6 +238,7 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
   PRINTER_ERROR: `打印机可能卡纸或发生设备故障，当前暂时无法继续使用。${printProblemLine()}`,
   PRINT_JOB_UNCONFIRMED: `打印作业已提交到打印队列，但未确认完成。请先看纸张、卡纸和出纸口。${printProblemLine()}`,
   PRINT_TIMEOUT: '打印超时，请稍后重试',
+  PRINT_QUEUE_TIMEOUT: '这单等了太久没有打印，没有出纸，可以重新提交打印。',
   PRINT_COMMAND_FAILED: `打印执行失败，请稍后重试。${printProblemLine()}`,
   UNSUPPORTED_FILE_TYPE: '该文件格式暂不支持打印，请上传 PDF 或 JPG / PNG',
   FILE_NOT_FOUND: '打印文件已失效，请返回重新上传',
@@ -245,6 +246,21 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
 
 export function errorCodeToMessage(code?: string): string | undefined {
   return code ? ERROR_CODE_MESSAGES[code] : undefined
+}
+
+/**
+ * 进度页和失败页要显示对照表里的句子。
+ * 排队超时这一条优先用对照表，不用接口带回的 failureReasonForUser。
+ * 其它错误码仍先用接口文案，对照表只在接口没给句子时补上。
+ */
+export function screenFailureReason(input: {
+  errorCode?: string | null
+  failureReasonForUser?: string | null
+}): string | undefined {
+  if (input.errorCode === 'PRINT_QUEUE_TIMEOUT') return ERROR_CODE_MESSAGES.PRINT_QUEUE_TIMEOUT
+  const fromApi = input.failureReasonForUser?.trim()
+  if (fromApi) return fromApi
+  return input.errorCode ? ERROR_CODE_MESSAGES[input.errorCode] : undefined
 }
 
 export const stepIndex = (key: Step) => STEPS.findIndex((s) => s.key === key)

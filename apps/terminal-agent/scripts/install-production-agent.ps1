@@ -80,7 +80,7 @@ param(
   [int]$HeartbeatIntervalMs = 30000,
 
   [Parameter(Mandatory = $false)]
-  [string]$AgentVersion = "0.4.22-production",
+  [string]$AgentVersion = "0.4.23-production",
 
   [Parameter(Mandatory = $false)]
   [string]$InstalledAgentRoot,
@@ -156,6 +156,34 @@ function Fail([string]$Message) {
   Write-Host "[FAIL] $Message" -ForegroundColor Red
   exit 1
 }
+
+# print-service-operational-log-begin
+function Enable-PrintServiceOperationalLog {
+  $logName = "Microsoft-Windows-PrintService/Operational"
+  Write-Host "==> Enabling print completion event log" -ForegroundColor Cyan
+  $previousNative = $PSNativeCommandUseErrorActionPreference
+  $PSNativeCommandUseErrorActionPreference = $false
+  try {
+    & wevtutil.exe sl $logName /e:true
+    $enableExit = $LASTEXITCODE
+    if ($enableExit -ne 0) {
+      Fail "没能启用打印完成事件日志 ${logName}（wevtutil sl 退出码 $enableExit）。安装停在这里，没有静默跳过。不启用的话，打成功的单会被记成结果未确认。"
+    }
+    $listed = & wevtutil.exe gl $logName 2>&1
+    $listExit = $LASTEXITCODE
+    $listedText = $listed | Out-String
+    if ($listExit -ne 0) {
+      Fail "没能核对打印完成事件日志 ${logName}（wevtutil gl 退出码 $listExit）。输出：$listedText"
+    }
+    if ($listedText -notmatch '(?m)^\s*enabled:\s*true\s*$') {
+      Fail "打印完成事件日志 ${logName} 仍未启用。wevtutil gl 输出：$listedText"
+    }
+  } finally {
+    $PSNativeCommandUseErrorActionPreference = $previousNative
+  }
+  Write-Host "[OK] Print completion event log is enabled: $logName" -ForegroundColor Green
+}
+# print-service-operational-log-end
 
 function Set-EdgeKioskPolicies([string[]]$Origins, [switch]$Remove, [switch]$KeepFileDialogs) {
   if ($Remove) {
@@ -1074,6 +1102,8 @@ if ($dailyRebootMode -eq "off") {
 }
 Write-Host (Get-DailyRebootStatusLine)
 # daily-reboot-install-end
+
+Enable-PrintServiceOperationalLog
 
 if (-not $SkipHeartbeatVerify) {
   Write-Step "Verifying remote heartbeat"
