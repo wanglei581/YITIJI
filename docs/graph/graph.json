@@ -51548,6 +51548,7 @@
         "mentions": [
           "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
           "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs",
+          "docs/design/kiosk-touch-2026-10/fix-resume-1111.js",
           "docs/progress/current-progress.md",
           "docs/reviews/2026-09-26-ai-label-copy-prompt-audit.md"
         ],
