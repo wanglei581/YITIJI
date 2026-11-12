@@ -172,9 +172,106 @@ export async function verifyOptimizeAfterMatch(): Promise<void> {
   }
 }
 
-if (process.argv[1]?.endsWith('resume-optimize-after-match.ts')) {
-  verifyOptimizeAfterMatch().catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : error)
-    process.exit(1)
+/**
+ * 优化这条路：模型把简介写成 300 字以上时，返回稿里的简介必须整段留下。
+ * 排版调整仍按 300 字截，这条用来钉住两条路没有被一起改掉。
+ */
+export async function verifyOptimizeSummaryLimit(): Promise<void> {
+  console.log('\n=== 优化稿简介超过 300 字时完整保留；排版调整仍截断 ===')
+  const sentence = '熟悉门店日常运营并保持货架整洁。'
+  const longSummary = sentence.repeat(20)
+  if (longSummary.length <= 300) fail(`夹具简介应超过 300 字，实际 ${longSummary.length}`)
+  const original = ['陈敬之', '门店运营', '临安青禾茶饮店', '独立完成门店日结核对。', longSummary].join('\n')
+  const optimizePayload = JSON.stringify({
+    resume: {
+      basic: { name: '陈敬之', phone: '', email: '', city: '' },
+      intention: { position: '门店运营', city: '' },
+      summary: `  ${longSummary}\n`,
+      education: [],
+      experience: [{ company: '临安青禾茶饮店', role: '店员', period: '2019.08-2022.03', description: '独立完成门店日结核对。' }],
+      projects: [],
+      skills: [],
+      certificates: [],
+    },
+    modules: [{ title: '日结', before: '独立完成门店日结核对。', after: '独立完成门店日结核对。' }],
   })
+  const currentResume = {
+    basic: { name: '陈敬之' },
+    intention: { position: '门店运营' },
+    summary: '短简介',
+    education: [],
+    experience: [],
+    projects: [],
+    skills: [],
+    certificates: [],
+  }
+  const layoutPayload = JSON.stringify({
+    resume: {
+      ...currentResume,
+      summary: longSummary,
+    },
+    warnings: [],
+  })
+
+  const originalFetch = globalThis.fetch
+  const run = async (content: string, callsExpected: number, use: (svc: LlmResumeOptimizeService) => Promise<void>) => {
+    let calls = 0
+    globalThis.fetch = async () => {
+      calls += 1
+      return new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+    const svc = new LlmResumeOptimizeService({
+      getApiKey: () => 'stub-key',
+      getConfig: () => ({
+        enabled: true, vendor: 'deepseek', model: 'stub',
+        baseURL: 'https://api.deepseek.com/v1', forbiddenWords: [],
+      }),
+    } as never)
+    try {
+      await use(svc)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+    if (calls !== callsExpected) fail(`模型调用次数应为 ${callsExpected}，实际 ${calls}`)
+  }
+
+  Logger.overrideLogger({ log: () => undefined, error: () => undefined, warn: () => undefined, debug: () => undefined, verbose: () => undefined, fatal: () => undefined })
+  try {
+    await run(optimizePayload, 1, async (svc) => {
+      const report = { sections: [], suggestions: [] } as ResumeReport
+      const result = await svc.optimize(original, report)
+      if (result.optimizedResume.summary !== longSummary) {
+        fail(`优化稿简介应完整保留 ${longSummary.length} 字，实际 ${result.optimizedResume.summary.length} 字`)
+      }
+    })
+    pass(`优化稿简介 ${longSummary.length} 字完整保留，没有截在 300 字`)
+
+    await run(layoutPayload, 1, async (svc) => {
+      const result = await svc.adjustLayoutDraft({
+        currentResume: currentResume as never,
+        originalText: original,
+        action: 'reformat',
+      })
+      const kept = longSummary.slice(0, 300)
+      if (result.resume.summary !== kept) {
+        fail(`排版调整简介仍应截成前 300 字，实际 ${result.resume.summary.length} 字`)
+      }
+    })
+    pass('排版调整简介仍截在 300 字')
+  } finally {
+    globalThis.fetch = originalFetch
+    Logger.overrideLogger(new ConsoleLogger())
+  }
+}
+
+if (process.argv[1]?.endsWith('resume-optimize-after-match.ts')) {
+  verifyOptimizeAfterMatch()
+    .then(() => verifyOptimizeSummaryLimit())
+    .catch((error: unknown) => {
+      console.error(error instanceof Error ? error.message : error)
+      process.exit(1)
+    })
 }

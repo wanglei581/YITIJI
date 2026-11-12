@@ -6,13 +6,27 @@ import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 
 const kioskRoot = join(dirname(fileURLToPath(import.meta.url)), '../..')
-const source = readFileSync(join(kioskRoot, 'src/pages/resume/components/resume-deliver/resumeDecisions.ts'), 'utf8')
-const output = ts.transpileModule(source, {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-}).outputText
-const module = { exports: {} }
-new Function('exports', 'module', output)(module.exports, module)
-const { isModuleSwitchable, moduleSwitchBlock, toggleModuleDecision, applyDecisionChanges, applyResumeDecisionsWithStatus, compareDecisionChanges } = module.exports
+const cache = new Map()
+const loadTs = (absPath) => {
+  if (cache.has(absPath)) return cache.get(absPath)
+  const output = ts.transpileModule(readFileSync(absPath, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText
+  const loaded = { exports: {} }
+  cache.set(absPath, loaded)
+  const dir = dirname(absPath)
+  const localRequire = (id) => {
+    if (!id.startsWith('.')) throw new Error(`unexpected require ${id}`)
+    return loadTs(join(dir, id.endsWith('.ts') ? id : `${id}.ts`)).exports
+  }
+  new Function('exports', 'module', 'require', output)(loaded.exports, loaded, localRequire)
+  return loaded
+}
+const module = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-deliver/resumeDecisions.ts'))
+const {
+  isModuleSwitchable, moduleSwitchBlock, moduleBaseState, moduleKeyOf, toggleModuleDecision,
+  applyDecisionChanges, applyResumeDecisionsWithStatus, compareDecisionChanges,
+} = module.exports
 
 const makeResume = (text) => ({
   basic: { name: '求职者', phone: '', city: '' }, intention: { position: '', city: '' }, summary: text,
@@ -120,9 +134,24 @@ test('找不到改写优先于原文为空：两种都算只能手改，原因�
   assert.equal(moduleSwitchBlock(null, moduleOf('', '')), null)
 })
 
-test('选了用改写但改写不在稿里时不标记已应用，正文不变', () => {
+test('原文在稿里唯一时选用改写会换上并记为已应用', () => {
   const item = moduleOf('带领班组完成设备调试', '写清本人承担的环节与实际结果')
   const resume = makeResume('带领班组完成设备调试')
+  assert.equal(moduleBaseState(resume, item).kind, 'B')
+  const sameChoice = toggleModuleDecision(resume, item, 'optimized', 'optimized', resume)
+  assert.equal(sameChoice.applied, true)
+  assert.equal(sameChoice.reason, undefined)
+  assert.equal(sameChoice.resume.summary, item.after)
+  const applied = applyDecisionChanges(resume, [item], {}, [['m0:经历', 'optimized']], resume)
+  assert.equal(applied.resume.summary, item.after)
+  assert.equal(applied.decisions['m0:经历'], 'optimized')
+  assert.deepEqual(applied.failures, [])
+})
+
+test('原文和改写都不在稿里时选用改写不应用，正文不变，原因 not-found', () => {
+  const item = moduleOf('带领班组完成设备调试', '写清本人承担的环节与实际结果')
+  const resume = makeResume('稿里是另一句话')
+  assert.equal(moduleBaseState(resume, item).kind, 'D')
   const sameChoice = toggleModuleDecision(resume, item, 'optimized', 'optimized', resume)
   assert.equal(sameChoice.applied, false)
   assert.equal(sameChoice.reason, 'not-found')
@@ -160,4 +189,187 @@ test('编辑区改过、但改写在基准稿里的条目仍报 edited，不报 
   const base = makeResume('更好的话')
   const result = toggleModuleDecision(makeResume('用户自己改过'), item, 'optimized', 'original', base)
   assert.deepEqual([result.applied, result.reason], [false, 'edited'])
+})
+
+const job = (description) => ({ company: '示例公司', role: '职员', period: '2020-2021', description })
+
+function sampleOne() {
+  const sentences = [
+    '个人优势第一句原文。',
+    '个人优势第二句原文。',
+    '个人优势第三句被截掉的后半。',
+    '项目描述第四条原文。',
+    '经历第五条原文。',
+    '经历第六条原文。',
+    '经历第七条原文。',
+    '经历第八条原文。',
+  ]
+  const afters = sentences.map((sentence, index) => (
+    index === 1 ? '个人优势第二句由我主导推进。' : sentence.replace('原文', '改写')
+  ))
+  const resume = {
+    ...makeResume(`${sentences[0]}\n${sentences[1]}`),
+    experience: [
+      job(sentences[4]),
+      job(sentences[5]),
+      job('无关经历，不对应任何一条建议。'),
+      job(sentences[6]),
+      job(sentences[7]),
+    ],
+    projects: [{ name: '示例项目', role: '', description: sentences[3] }],
+  }
+  const modules = sentences.map((before, index) => moduleOf(before, afters[index], `第${index + 1}条`))
+  return { resume, modules, sentences, afters }
+}
+
+function fieldText(resume, index) {
+  if (index === 0 || index === 1) return resume.summary
+  if (index === 3) return resume.projects[0].description
+  if (index === 4) return resume.experience[0].description
+  if (index === 5) return resume.experience[1].description
+  if (index === 6) return resume.experience[3].description
+  if (index === 7) return resume.experience[4].description
+  return resume.summary
+}
+
+test('样本 1：对照页带回 7 条用改写，6 条 B 换上，被截的第 3 条失败，带新增事实的第 2 条不动', () => {
+  const { resume, modules, sentences, afters } = sampleOne()
+  assert.deepEqual(modules.map((item) => moduleBaseState(resume, item).kind), ['B', 'C', 'D', 'B', 'B', 'B', 'B', 'B'])
+  const incoming = {}
+  modules.forEach((item, index) => {
+    if (index === 1) return
+    incoming[moduleKeyOf(item, index)] = 'optimized'
+  })
+  const changes = compareDecisionChanges(resume, modules, {}, incoming, resume)
+  const applied = applyDecisionChanges(resume, modules, {}, changes, resume)
+  assert.deepEqual(applied.failures, [{ key: moduleKeyOf(modules[2], 2), reason: 'not-found' }])
+  for (const index of [0, 3, 4, 5, 6, 7]) {
+    const text = fieldText(applied.resume, index)
+    assert.equal(text.includes(afters[index]), true, `第 ${index + 1} 条应换上改写`)
+    assert.equal(text.includes(sentences[index]), false, `第 ${index + 1} 条不应再留原文`)
+  }
+  assert.equal(applied.resume.summary.includes(sentences[1]), true)
+  assert.equal(applied.resume.summary.includes(afters[1]), false)
+  assert.equal(applied.resume.experience[2].description, '无关经历，不对应任何一条建议。')
+  assert.equal(applied.decisions[moduleKeyOf(modules[1], 1)], undefined)
+})
+
+test('样本 1：第 2 条经对照页确认后换上，能切换；换回原文后又不能切换', () => {
+  const { resume, modules } = sampleOne()
+  const item = modules[1]
+  const key = moduleKeyOf(item, 1)
+  assert.equal(moduleSwitchBlock(resume, item), 'not-found')
+  assert.equal(isModuleSwitchable(resume, item), false)
+  const changes = compareDecisionChanges(resume, modules, {}, { [key]: 'optimized' }, resume)
+  const applied = applyDecisionChanges(resume, modules, {}, changes, resume)
+  assert.deepEqual(applied.failures, [])
+  assert.equal(applied.resume.summary.includes(item.after), true)
+  assert.equal(applied.resume.summary.includes(item.before.trim()), false)
+  assert.equal(applied.decisions[key], 'optimized')
+  assert.equal(moduleSwitchBlock(resume, item, applied.decisions[key]), null)
+  assert.equal(isModuleSwitchable(resume, item, 'optimized'), true)
+  const reverted = toggleModuleDecision(applied.resume, item, 'optimized', 'original', resume)
+  assert.equal(reverted.applied, true)
+  assert.equal(reverted.resume.summary.includes(item.before.trim()), true)
+  assert.equal(reverted.resume.summary.includes(item.after), false)
+  assert.equal(moduleSwitchBlock(resume, item, 'original'), 'not-found')
+  assert.equal(isModuleSwitchable(resume, item, 'original'), false)
+})
+
+test('同一句原文出现两次归 D 类，不换任何一处', () => {
+  const sentence = '完成门店日结并核对收银。'
+  const item = moduleOf(sentence, '改写后的日结句子。')
+  const base = {
+    ...makeResume(''),
+    experience: [job(sentence), job(sentence)],
+  }
+  assert.equal(moduleBaseState(base, item).kind, 'D')
+  assert.equal(moduleSwitchBlock(base, item), 'not-found')
+  const result = toggleModuleDecision(base, item, 'original', 'optimized', base)
+  assert.equal(result.applied, false)
+  assert.equal(result.reason, 'not-found')
+  assert.equal(result.resume.experience[0].description, sentence)
+  assert.equal(result.resume.experience[1].description, sentence)
+})
+
+test('基准稿里唯一、编辑区又粘了一份时选用改写报 edited，正文不变', () => {
+  const sentence = '完成门店日结并核对收银。'
+  const item = moduleOf(sentence, '改写后的日结句子。')
+  const base = makeResume(sentence)
+  const edited = makeResume(`${sentence}\n${sentence}`)
+  assert.equal(moduleBaseState(base, item).kind, 'B')
+  const result = toggleModuleDecision(edited, item, 'original', 'optimized', base)
+  assert.equal(result.applied, false)
+  assert.equal(result.reason, 'edited')
+  assert.equal(result.resume.summary, edited.summary)
+})
+
+test('K 类任何选择都不会把原文换成保持原文的说明句', () => {
+  const before = '教育经历原文这一句。'
+  const note = '这一段没有改动，保留原文'
+  const item = moduleOf(before, note, '教育（保持原文）')
+  const base = makeResume(`前缀${before}后缀`)
+  assert.equal(moduleBaseState(base, item).kind, 'K')
+  assert.equal(moduleSwitchBlock(base, item), 'not-found')
+  for (const current of ['optimized', 'original']) {
+    for (const next of ['optimized', 'original']) {
+      const result = toggleModuleDecision(base, item, current, next, base)
+      assert.equal(result.resume.summary, base.summary)
+      assert.equal(result.resume.summary.includes(note), false)
+    }
+  }
+  const applied = applyDecisionChanges(base, [item], {}, [[moduleKeyOf(item, 0), 'optimized']], base)
+  assert.equal(applied.resume.summary, base.summary)
+  assert.equal(applied.decisions[moduleKeyOf(item, 0)], undefined)
+})
+
+test('B 类来回切换三次正文都对，before 带首尾空白同样成立', () => {
+  for (const before of ['原来的话', '  原来的话\n', '\n原来的话  ']) {
+    const item = moduleOf(before, '更好的话')
+    const base = makeResume(before.trim())
+    const first = toggleModuleDecision(base, item, 'original', 'optimized', base)
+    assert.equal(first.applied, true)
+    assert.equal(first.resume.summary, '更好的话')
+    const second = toggleModuleDecision(first.resume, item, 'optimized', 'original', base)
+    assert.equal(second.applied, true)
+    assert.equal(second.resume.summary, before.trim())
+    const third = toggleModuleDecision(second.resume, item, 'original', 'optimized', base)
+    assert.equal(third.applied, true)
+    assert.equal(third.resume.summary, '更好的话')
+  }
+})
+
+test('默认选择：A 用改写，B 和 C 保留原文，D 和 K 仍是用改写', () => {
+  const plain = moduleOf('原来的话', '更好的话')
+  const withDuty = moduleOf('原来的话', '更好的话由我主导')
+  const absent = moduleOf('不在稿里的原文', '也不在稿里的改写')
+  const note = moduleOf('原来的话', '这一段没有改动，保留原文')
+  const baseOriginal = makeResume('原来的话')
+  const baseRewrite = makeResume('更好的话')
+  assert.equal(moduleBaseState(baseRewrite, plain).kind, 'A')
+  assert.equal(moduleBaseState(baseRewrite, plain).defaultDecision, 'optimized')
+  assert.equal(moduleBaseState(baseOriginal, plain).kind, 'B')
+  assert.equal(moduleBaseState(baseOriginal, plain).defaultDecision, 'original')
+  assert.equal(moduleBaseState(baseOriginal, withDuty).kind, 'C')
+  assert.equal(moduleBaseState(baseOriginal, withDuty).defaultDecision, 'original')
+  assert.equal(moduleBaseState(baseOriginal, absent).kind, 'D')
+  assert.equal(moduleBaseState(baseOriginal, absent).defaultDecision, 'optimized')
+  assert.equal(moduleBaseState(baseOriginal, note).kind, 'K')
+  assert.equal(moduleBaseState(baseOriginal, note).defaultDecision, 'optimized')
+  assert.equal(moduleBaseState(null, plain).defaultDecision, 'optimized')
+})
+
+test('B 类选了保留原文且 before 带首尾空白时，导出组装不报失败，结果仍是原文', () => {
+  const before = ' \n原来的话\n '
+  const item = moduleOf(before, '更好的话', '一')
+  const resume = makeResume(before.trim())
+  const kept = applyResumeDecisionsWithStatus(resume, [item], { 'm0:一': 'original' })
+  assert.deepEqual(kept.failures, [])
+  assert.equal(kept.resume.summary, before.trim())
+  const unselected = applyResumeDecisionsWithStatus(resume, [item], {})
+  assert.deepEqual(unselected.failures, [])
+  assert.equal(unselected.resume.summary, before.trim())
+  const rewritten = applyResumeDecisionsWithStatus(makeResume('更好的话'), [item], { 'm0:一': 'optimized' })
+  assert.deepEqual(rewritten.failures, [])
+  assert.equal(rewritten.resume.summary, '更好的话')
 })

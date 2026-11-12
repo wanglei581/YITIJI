@@ -46,6 +46,7 @@ import {
   applyDecisionChanges,
   applyResumeDecisions,
   applyResumeDecisionsWithStatus,
+  defaultModuleDecision,
   moduleKeyOf,
   parseDecisionMap,
   toggleModuleDecision,
@@ -202,7 +203,7 @@ export function ResumeOptimizePage() {
     if (viewOnly) return
     const index = modules.findIndex((item, i) => moduleKeyOf(item, i) === key)
     if (index < 0 || !optimizedResume) return
-    const result = toggleModuleDecision(optimizedResume, modules[index], decisions[key] ?? 'optimized', next, baseResume)
+    const result = toggleModuleDecision(optimizedResume, modules[index], decisions[key] ?? defaultModuleDecision(baseResume, modules[index]), next, baseResume)
     if (!result.applied) {
       setDecisionFailures(result.reason ? [{ key, reason: result.reason }] : [], next)
       return
@@ -217,7 +218,7 @@ export function ResumeOptimizePage() {
   const handleBatch = (next: ResumeModuleDecision) => {
     if (viewOnly || !optimizedResume) return
     const changes = modules.flatMap((module, index): Array<[string, ResumeModuleDecision]> => {
-      if (!isModuleSwitchable(baseResume, module)) return []
+      if (!isModuleSwitchable(baseResume, module, decisions[moduleKeyOf(module, index)])) return []
       return [[moduleKeyOf(module, index), next]]
     })
     const applied = applyDecisionChanges(optimizedResume, modules, decisions, changes, baseResume)
@@ -239,7 +240,7 @@ export function ResumeOptimizePage() {
     }))
   }
   const compareReturn = useCompareDecisionsReturn({
-    state, modules, optimizedResume, decisions, ready: editorOpen,
+    state, modules, optimizedResume, baseResume, decisions, ready: editorOpen,
     apply: (changes) => {
       if (!optimizedResume) return
       const next = applyDecisionChanges(optimizedResume, modules, decisions, changes, baseResume)
@@ -466,7 +467,8 @@ export function ResumeOptimizePage() {
           <OptimizeOverview
             modules={modules}
             decisions={decisions}
-            switchBlocks={Object.fromEntries(modules.map((module, index) => [moduleKeyOf(module, index), moduleSwitchBlock(baseResume, module)]))}
+            defaultDecisions={Object.fromEntries(modules.map((module, index) => [moduleKeyOf(module, index), defaultModuleDecision(baseResume, module)]))}
+            switchBlocks={Object.fromEntries(modules.map((module, index) => [moduleKeyOf(module, index), moduleSwitchBlock(baseResume, module, decisions[moduleKeyOf(module, index)])]))}
             synthetic={resolved.synthetic}
             disabled={viewOnly || loading || exporting || Boolean(adjusting)}
             clearedChoices={clearedChoices}

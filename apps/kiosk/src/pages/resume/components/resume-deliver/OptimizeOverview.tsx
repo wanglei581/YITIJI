@@ -22,6 +22,8 @@ const MANUAL_NOTE: Record<ResumeSwitchBlock, string> = {
 export function OptimizeOverview(props: {
   modules: ResumeOptimizeModule[]
   decisions: ResumeDecisionMap
+  /** 基准稿上每条的默认选择。还没点过的条目用它，不再一律当成用改写。 */
+  defaultDecisions: Record<string, ResumeModuleDecision>
   switchBlocks: Record<string, ResumeSwitchBlock | null>
   synthetic: boolean
   disabled: boolean
@@ -39,7 +41,7 @@ export function OptimizeOverview(props: {
 }) {
   const rows = props.modules.map((module, index) => {
     const key = moduleKeyOf(module, index)
-    const decision: ResumeModuleDecision = props.decisions[key] ?? 'optimized'
+    const decision: ResumeModuleDecision = props.decisions[key] ?? props.defaultDecisions[key]
     const block = props.switchBlocks[key] ?? null
     return { key, module, index, decision, block, switchable: block === null, additions: detectUnconfirmedTextAdditions(module.after, module.before) }
   })
