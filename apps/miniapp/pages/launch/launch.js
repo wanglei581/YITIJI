@@ -3,6 +3,20 @@ const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 
+// 2026-11-12 提审被驳回：登录页和弹窗不能出现「微信」字样。服务端 WX_* 几条原话带「微信」，
+// 这里换成不带的说法；兜底再过一遍，任何带「微信」的失败提示都换成本处的通用句。
+const LOGIN_FAIL_COPY = {
+  WX_CONFIG_MISSING: '手机号快捷登录暂不可用，请使用短信验证码登录',
+  WX_CODE_INVALID: '登录凭证无效或已过期，请重试',
+  WX_CODE2SESSION_FAILED: '登录服务异常，请稍后再试',
+  WX_TOKEN_FAILED: '登录服务暂不可用，请稍后再试',
+}
+function loginFailText(err, fallback) {
+  const code = err && err.code
+  const text = (code && LOGIN_FAIL_COPY[code]) || (err && err.message) || fallback
+  return /微信/.test(text) ? fallback : text
+}
+
 // 只允许回到已经明确需要登录的现有页面，禁止把任意 query 当成跳转地址。
 // 「我的权益」「合同审查」两页已停放（首发按非招聘类目提审，compliance-boundary.md §1.1），
 // 从这里摘掉；恢复页面时一并加回（合同审查 6 个端点全部要会员身份，未登录整条链 404）。
@@ -87,7 +101,7 @@ Page({
     this._clearCountDown()
   },
 
-  // ── 微信一键登录 ──────────────────────────────────────────────────
+  // ── 手机号快捷登录 ──────────────────────────────────────────────────
 
   onGetPhoneNumber(e) {
     if (this.data.legalBlocked) { this._explainLegalBlocked(); return }
@@ -117,7 +131,7 @@ Page({
       .catch(err => {
         wx.hideLoading()
         if (this._handleLoginError(err)) return
-        wx.showToast({ title: (err && err.message) || '微信登录失败，请用短信验证码', icon: 'none' })
+        wx.showToast({ title: loginFailText(err, '登录没有成功，可以改用短信验证码'), icon: 'none' })
         setTimeout(() => this.setData({ showSms: true }), 1200)
       })
   },
@@ -215,7 +229,7 @@ Page({
         wx.hideLoading()
         this.setData({ submitting: false, code: '', otp: ['','','','','',''] })
         if (this._handleLoginError(err)) return
-        wx.showToast({ title: (err && err.message) || '登录失败，请重试', icon: 'none' })
+        wx.showToast({ title: loginFailText(err, '登录失败，请重试'), icon: 'none' })
       })
   },
 

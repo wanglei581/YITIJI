@@ -315,6 +315,7 @@ const ACTION_LABELS: Record<string, string> = {
   'organization.update': '机构资料更新（历史记录）',
   'organization.content_trust': '机构内容可信核验',
   'organization.verified_domains_replace': '更新机构已核验域名',
+  'organization.device_alert_webhook': '更新机构设备告警通知',
   'org.update': '机构资料更新（管理员）',
   'org.self_profile_update': '机构自助资料更新',
   'official_channel.create': '新增官方渠道',
