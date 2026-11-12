@@ -4,6 +4,7 @@ const storage = require('../../utils/storage.js')
 const normalize = require('../../utils/normalize.js')
 const auth = require('../../utils/auth.js')
 const buildModel = require('../../utils/resume-build-model.js')
+const docLimits = require('../../utils/resume-doc-limits.js')
 const fileUrls = require('../../utils/file-url.js')
 const shareFriend = require('../../utils/share-friend')
 const draft = require('./draft')
@@ -53,6 +54,7 @@ Page({
     factPanel: factCheck.closedPanel(),
     factsBlockedReason: '',
     LEN: buildModel.LEN,
+    DOC_LEN: docLimits.RESUME_DOC_LIMITS,
   },
 
   onLoad(options) {
