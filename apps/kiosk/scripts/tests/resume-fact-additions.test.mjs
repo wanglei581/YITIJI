@@ -148,6 +148,132 @@ test('本人自己新写的数不算 AI 新增', () => {
   assert.equal(hits.some((text) => text.includes('2')), false)
 })
 
+test('一侧超过 10 个字还没遇到标点时加省略号', () => {
+  const hits = findFactAdditions(
+    '甲乙丙丁戊己庚辛壬癸子丑寅卯 88 辰巳午未申酉戌亥甲乙丙。',
+    '',
+  )
+  assert.deepEqual(hits, [{ key: 'num:88', text: '…己庚辛壬癸子丑寅卯 88 辰巳午未申酉戌亥甲…' }])
+})
+
+test('相邻的职责词和中文数字合成同一个片段，仍返回两项', () => {
+  const hits = findFactAdditions('带领十人团队', '')
+  assert.equal(hits.length, 2)
+  assert.deepEqual(hits.map((item) => item.key), ['duty:带领', 'num:10'])
+  assert.equal(hits[0].text, hits[1].text)
+  assert.equal(hits[0].text, '带领十人团队')
+  const shown = facts.detectUnconfirmedTextAdditions('带领十人团队', '')
+  assert.deepEqual(shown, ['带领十人团队'])
+})
+
+test('夹在两条事实中间的负责不再只剩两个字', () => {
+  const hits = findFactAdditions('上周店长主导夜班负责三家门店。', '')
+  assert.equal(hits.some((item) => item.text === '负责'), false)
+  const row = hits.find((item) => item.key === 'duty:负责')
+  assert.ok(row)
+  assert.equal(row.text.includes('主导'), true)
+  assert.equal(row.text.includes('负责'), true)
+  assert.equal(row.text.includes('三'), true)
+  assert.equal(hits.every((item) => item.text === row.text), true)
+})
+
+test('纯数字子串：周更 20 篇对原文 2020年要报', () => {
+  const hits = findFactAdditions('周更 20 篇。', '2020年入学。')
+  assert.deepEqual(hits.map((item) => item.key), ['num:20'])
+  assert.equal(hits[0].text, '周更 20 篇')
+})
+
+test('一个月要报，一个一份一种一名一位仍不报', () => {
+  const month = findFactAdditions('干了一个月。', '')
+  assert.equal(month.some((item) => item.key === 'num:1' && item.text.includes('一个月')), true)
+  assert.deepEqual(findFactAdditions('完成一个作品和一份总结', ''), [])
+  assert.deepEqual(findFactAdditions('找到一名同学和一位老师', ''), [])
+  assert.deepEqual(findFactAdditions('准备一种材料', ''), [])
+})
+
+test('专业第一和全系第二要报，第一次第一步第一阶段第一年不报', () => {
+  assert.equal(findFactAdditions('专业第一', '').some((item) => item.key === 'num:1'), true)
+  assert.equal(findFactAdditions('全系第二。', '').some((item) => item.key === 'num:2'), true)
+  assert.deepEqual(findFactAdditions('第一次参加。', ''), [])
+  assert.deepEqual(findFactAdditions('第一步就停下。', ''), [])
+  assert.deepEqual(findFactAdditions('第一阶段完成。', ''), [])
+  assert.deepEqual(findFactAdditions('第一年没有排名。', ''), [])
+  assert.deepEqual(findFactAdditions('第一时间赶到。', ''), [])
+})
+
+test('长整数按字符串比，0.0001 不等于 0', () => {
+  const left = '110101199001011234'
+  const right = '110101199001011235'
+  const hits = findFactAdditions(`证件 ${left}`, `证件 ${right}`)
+  assert.deepEqual(hits.map((item) => item.key), [`num:${left}`])
+  assert.deepEqual(findFactAdditions('误差 0.0001', '误差 0').map((item) => item.key), ['num:0.0001'])
+  assert.deepEqual(findFactAdditions('0.000100', '0.0001'), [])
+})
+
+test('300万等于三百万，两千五百万等于 25000000', () => {
+  assert.deepEqual(findFactAdditions('今年 300万。', '今年三百万。'), [])
+  assert.deepEqual(findFactAdditions('1.5万', '15000'), [])
+  assert.deepEqual(findFactAdditions('两千五百万', '25000000'), [])
+  assert.deepEqual(findFactAdditions('三亿五千万', '350000000'), [])
+  assert.deepEqual(findFactAdditions('一万零五', '10005'), [])
+  assert.deepEqual(keysOf('300万', '300'), ['num:3000000'])
+})
+
+function resumeFields({ summary = '', education = '', experience = '', project = '', skills = [] }) {
+  return {
+    basic: { name: '周晴', phone: '', city: '青岛' },
+    intention: { position: '运营', city: '青岛' },
+    summary,
+    education: [{ school: '青岛大学', major: '新闻', degree: '本科', period: '2020-2024', description: education }],
+    experience: [{ company: '学生会', role: '干事', period: '2023-2025', description: experience }],
+    projects: [{ name: '项目', role: '成员', description: project }],
+    skills,
+    certificates: [],
+  }
+}
+
+test('教育里本人写的 2 不豁免经历里 AI 的 2', () => {
+  const input = resumeFields({ education: '完成本科学业。', experience: '负责排版。' })
+  const generated = resumeFields({ education: '完成本科学业。', experience: '负责排版，周更 2 篇。' })
+  const edited = resumeFields({ education: '读了 2 年。', experience: '负责排版，周更 2 篇。' })
+  const userAdditions = detectUserResumeEdits(generated, edited)
+  assert.equal(userAdditions.some((token) => token.includes('education[0].description') && token.includes('num:2')), true)
+  const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
+  assert.equal(hits.some((text) => text.includes('周更')), true)
+  assert.equal(hits.some((text) => text.includes('读了')), false)
+})
+
+test('项目里本人写的 2 不算 AI 新增', () => {
+  const input = resumeFields({ experience: '负责排版。', project: '参与一个活动。' })
+  const generated = resumeFields({ experience: '负责排版，周更 2 篇。', project: '参与一个活动。' })
+  const edited = resumeFields({ experience: '负责排版，周更 2 篇。', project: '主持 2 个项目。' })
+  const userAdditions = detectUserResumeEdits(generated, edited)
+  const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
+  assert.equal(hits.some((text) => text.includes('主持')), false)
+  assert.equal(hits.some((text) => text.includes('周更')), true)
+})
+
+test('同一字段里本人在 AI 的数旁边再写一个数，AI 那个仍要确认', () => {
+  const generated = resumeWith('负责学院公众号的选题、撰写和排版，周更 2 篇。')
+  const edited = resumeWith('负责学院公众号的选题、撰写和排版，周更 2 篇，另记 3 项。')
+  const userAdditions = detectUserResumeEdits(generated, edited)
+  assert.equal(userAdditions.some((token) => token.includes('num:3')), true)
+  assert.equal(userAdditions.some((token) => token.includes('num:2')), false)
+  const hits = detectGeneratedUnconfirmedAdditions(edited, generated, originalInput, userAdditions)
+  assert.equal(hits.some((text) => text.includes('2')), true)
+  assert.equal(hits.some((text) => text.includes('3')), false)
+})
+
+test('技能里本人把数字敲回去不算 AI 新增', () => {
+  const generated = resumeWith('负责学院公众号的选题、撰写和排版。', ['熟练使用 5 种工具'])
+  const cleared = resumeWith('负责学院公众号的选题、撰写和排版。', ['熟练使用工具'])
+  const retyped = resumeWith('负责学院公众号的选题、撰写和排版。', ['熟练使用 5 种工具'])
+  const userAdditions = detectUserResumeEdits(cleared, retyped)
+  assert.equal(userAdditions.some((token) => token.startsWith('field:skills[0]') && token.includes('num:5')), true)
+  const hits = detectGeneratedUnconfirmedAdditions(retyped, generated, originalInput, userAdditions)
+  assert.equal(hits.some((text) => text.includes('5')), false)
+})
+
 test('技能里 AI 新写的数字也要确认', () => {
   const modules = [{
     title: '经历',

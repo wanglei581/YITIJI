@@ -54,14 +54,43 @@ function collectBeforeText(
   return JSON.stringify(originalInput)
 }
 
-function factFieldTexts(resume: GeneratedResume): string[] {
-  return [
-    resume.summary,
-    ...resume.education.map((item) => item.description ?? ''),
-    ...resume.experience.map((item) => item.description),
-    ...resume.projects.map((item) => item.description),
-    ...resume.skills,
+/** 路径与后端 additions.path 一致：summary、experience[0].description、skills[2]。 */
+function factFields(resume: GeneratedResume): Array<{ path: string; text: string }> {
+  const fields: Array<{ path: string; text: string }> = [
+    { path: 'summary', text: resume.summary ?? '' },
   ]
+  resume.education.forEach((item, index) => {
+    fields.push({ path: `education[${index}].description`, text: item.description ?? '' })
+  })
+  resume.experience.forEach((item, index) => {
+    fields.push({ path: `experience[${index}].description`, text: item.description ?? '' })
+  })
+  resume.projects.forEach((item, index) => {
+    fields.push({ path: `projects[${index}].description`, text: item.description ?? '' })
+  })
+  resume.skills.forEach((item, index) => {
+    fields.push({ path: `skills[${index}]`, text: item ?? '' })
+  })
+  return fields
+}
+
+function factFieldTexts(resume: GeneratedResume): string[] {
+  return factFields(resume).map((field) => field.text)
+}
+
+/** 编辑发生时记下的本人新增：field:路径 + tab + key。页面原样累积这串字，比较时不再从片段反解。 */
+function userEditToken(path: string, key: string): string {
+  return `field:${path}\t${key}`
+}
+
+function parseUserEditToken(token: string): { path: string; key: string } | null {
+  if (!token.startsWith('field:')) return null
+  const tab = token.indexOf('\t')
+  if (tab <= 'field:'.length) return null
+  const path = token.slice('field:'.length, tab)
+  const key = token.slice(tab + 1)
+  if (!path || !key) return null
+  return { path, key }
 }
 
 /** 机械对照：after 里有、before/原文里没有的数字与职责词。技能栏里新写的数也要本人确认。 */
@@ -80,18 +109,17 @@ export function detectUnconfirmedAdditions(
   return hits
 }
 
-function keysIn(texts: string[], beforeText: string): Set<string> {
+function keysInField(text: string, beforeText: string): Set<string> {
   const keys = new Set<string>()
-  for (const text of texts) {
-    for (const item of findFactAdditions(text, beforeText)) keys.add(item.key)
-  }
+  for (const item of findFactAdditions(text, beforeText)) keys.add(item.key)
   return keys
 }
 
 /**
- * 仍留在当前稿里、且生成稿里就有的新增事实。
- * 是不是同一处，按 key 比：本人只改了数字旁边的字，片段会变，数字本身还是要确认。
- * 本人后来自己写进去的数，用当时记下的片段还原 key，不再算成 AI 新增。
+ * 仍留在当前稿里、且生成稿同一字段里就有的新增事实。
+ * 是不是同一处，按「字段路径 + key」比：只在同一字段里豁免。
+ * 本人后来自己写进去的数，用编辑当时记下的 key，不再从片段反解。
+ * 返回给人看的片段，同一片段只留一行。
  */
 export function detectGeneratedUnconfirmedAdditions(
   resume: GeneratedResume,
@@ -100,24 +128,43 @@ export function detectGeneratedUnconfirmedAdditions(
   userAdditions: string[] = [],
 ): string[] {
   const beforeText = collectBeforeText(undefined, input)
-  const generatedKeys = keysIn(factFieldTexts(generated), beforeText)
-  const userKeys = keysIn(userAdditions, '')
+  const generatedKeys = new Map<string, Set<string>>()
+  for (const field of factFields(generated)) {
+    generatedKeys.set(field.path, keysInField(field.text, beforeText))
+  }
+  const userKeys = new Map<string, Set<string>>()
+  for (const token of userAdditions) {
+    const parsed = parseUserEditToken(token)
+    if (!parsed) continue
+    const set = userKeys.get(parsed.path) ?? new Set<string>()
+    set.add(parsed.key)
+    userKeys.set(parsed.path, set)
+  }
   const hits: string[] = []
-  for (const text of factFieldTexts(resume)) {
-    for (const item of findFactAdditions(text, beforeText)) {
-      if (!generatedKeys.has(item.key) || userKeys.has(item.key)) continue
+  for (const field of factFields(resume)) {
+    const fromGenerated = generatedKeys.get(field.path) ?? new Set<string>()
+    const fromUser = userKeys.get(field.path) ?? new Set<string>()
+    for (const item of findFactAdditions(field.text, beforeText)) {
+      if (!fromGenerated.has(item.key) || fromUser.has(item.key)) continue
       if (!hits.includes(item.text)) hits.push(item.text)
     }
   }
   return hits
 }
 
-/** 记录预览中每个描述字段由本人新增的事实。和上一稿比的是 key，返回的仍是片段。 */
+/** 记录预览中每个字段由本人新增的事实。编辑发生时就记下路径和 key，技能也算。 */
 export function detectUserResumeEdits(before: GeneratedResume, after: GeneratedResume): string[] {
-  const texts = (resume: GeneratedResume) => [resume.summary,
-    ...resume.education.map((item) => item.description ?? ''),
-    ...resume.experience.map((item) => item.description),
-    ...resume.projects.map((item) => item.description)]
-  const oldTexts = texts(before)
-  return texts(after).flatMap((text, index) => detectUnconfirmedTextAdditions(text, oldTexts[index] ?? ''))
+  const oldByPath = new Map(factFields(before).map((field) => [field.path, field.text]))
+  const tokens: string[] = []
+  const seen = new Set<string>()
+  for (const field of factFields(after)) {
+    const old = oldByPath.get(field.path) ?? ''
+    for (const item of findFactAdditions(field.text, old)) {
+      const token = userEditToken(field.path, item.key)
+      if (seen.has(token)) continue
+      seen.add(token)
+      tokens.push(token)
+    }
+  }
+  return tokens
 }

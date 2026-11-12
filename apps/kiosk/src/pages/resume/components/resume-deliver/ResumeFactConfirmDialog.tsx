@@ -108,7 +108,7 @@ export function ResumeFactConfirmDialog(props: {
 
   return (
     <div className="qx-rd-overlay" role="dialog" aria-modal="true" aria-labelledby="resume-fact-title">
-      <div className="qx-rd-dialog">
+      <div className="qx-rd-dialog qx-rd-fact-dialog">
         <h2 id="resume-fact-title">导出前核对事实</h2>
         <p>
           请逐项勾选「已核对」。未全勾不能出文件。系统不会替你确认学校、公司、时间段、证书或电话。

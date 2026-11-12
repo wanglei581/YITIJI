@@ -593,3 +593,90 @@ test.describe('新增事实也要逐项勾选才能导出', () => {
     await expect(page.getByRole('button', { name: '导出', exact: true })).toBeVisible()
   })
 })
+
+const FACT_MARKS = ['甲', '乙', '丙', '丁', '戊', '己'] as const
+
+/** 6 所学校、6 段经历、3 张证书、1 个电话，再加上摘要里两句新增事实，核对框正好 30 行。 */
+function thirtyFactResume() {
+  return {
+    basic: { name: '标题样本', phone: '13800001111', city: '青岛' },
+    intention: { position: '门店运营', city: '青岛' },
+    summary: '甲组 21 项。乙组 22 项。',
+    education: FACT_MARKS.map((mark, index) => ({
+      school: `青岛学校${mark}`,
+      major: '工商管理',
+      degree: '本科',
+      period: `${2010 + index}-${2014 + index}`,
+    })),
+    experience: FACT_MARKS.map((mark, index) => ({
+      company: `青序门店${mark}`,
+      role: '店员',
+      period: `${2016 + index}-${2017 + index}`,
+      description: '按班次完成交接。',
+    })),
+    projects: [{ name: '门店陈列项目', role: '执行', period: '2023', description: '按店里的陈列标准摆货。' }],
+    skills: ['沟通'],
+    certificates: ['英语四级', '计算机一级', '驾驶证'],
+  }
+}
+
+async function stageScaleOf(page: Page): Promise<number> {
+  const transform = await page.locator('.kiosk-stage').evaluate((element) => getComputedStyle(element).transform)
+  return transform === 'none' ? 1 : Number(transform.match(/^matrix\(([^,]+)/)?.[1] ?? 1)
+}
+
+/** 确认导出的外框必须整颗落在视口里。1080 舞台换算后不超过 1920；手机再用真实视口高度卡住。 */
+async function expectConfirmStaysInView(page: Page, dialog: Locator): Promise<void> {
+  const scale = await stageScaleOf(page)
+  const box = await dialog.getByRole('button', { name: '确认导出' }).boundingBox()
+  expect(box).not.toBeNull()
+  const top = box!.y / scale
+  const bottom = (box!.y + box!.height) / scale
+  const viewport = page.viewportSize()
+  expect(viewport).not.toBeNull()
+  const viewBottom = viewport!.height / scale
+  expect(top).toBeGreaterThanOrEqual(0)
+  expect(bottom).toBeLessThanOrEqual(1920)
+  expect(bottom).toBeLessThanOrEqual(viewBottom)
+}
+
+async function checkEveryFactRow(page: Page): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: '导出前核对事实' })
+  await expect(dialog).toBeVisible()
+  const boxes = dialog.getByRole('checkbox')
+  await expect(boxes).toHaveCount(30)
+  const confirm = dialog.getByRole('button', { name: '确认导出' })
+  const scale = await stageScaleOf(page)
+  for (let i = 0; i < 30; i += 1) {
+    const box = boxes.nth(i)
+    await box.scrollIntoViewIfNeeded()
+    const row = await box.locator('xpath=ancestor::label[1]').boundingBox()
+    expect(row).not.toBeNull()
+    expect(row!.height / scale).toBeGreaterThanOrEqual(56)
+    await expectConfirmStaysInView(page, dialog)
+    await expect(confirm).toHaveAttribute('aria-disabled', 'true')
+    await box.click()
+  }
+  await expectConfirmStaysInView(page, dialog)
+  await expect(confirm).not.toHaveAttribute('aria-disabled', 'true')
+  await confirm.click()
+  await expect(dialog).toHaveCount(0)
+}
+
+async function openThirtyFactOptimize(page: Page, api: Parameters<typeof registerW6Api>[0], taskId: string): Promise<void> {
+  registerOptimizeShell(api)
+  api.respond('GET', `/api/v1/resume/records/${taskId}/optimize`, {
+    status: 200,
+    json: { taskId, status: 'completed', providerName: 'llm', modules: [], optimizedResume: thirtyFactResume() },
+  })
+  await page.goto(`/resume/optimize?taskId=${encodeURIComponent(taskId)}`)
+  await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toBeVisible()
+  await page.getByRole('button', { name: '去导出', exact: true }).click()
+}
+
+for (const projectTag of ['@kiosk', '@mobile'] as const) {
+  test(`优化页 30 行核对事实都能点到，确认导出始终在视口内 ${projectTag}`, async ({ page, api }) => {
+    await openThirtyFactOptimize(page, api, `r2b-opt-30-${projectTag.slice(1)}`)
+    await checkEveryFactRow(page)
+  })
+}

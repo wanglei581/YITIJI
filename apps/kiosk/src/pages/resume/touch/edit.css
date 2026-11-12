@@ -330,12 +330,40 @@
 [data-qx-page='resume-export'] .qxt-fine { margin: 0; font-size: 20px; line-height: 1.5; color: var(--qxt-ink-3); text-align: center; }
 
 /* ── 导出前核对事实（弹层，在页面外层，自带范围标记） ── */
+/* 行再多也只滚勾选清单。标题、待本人确认和底部按钮留在屏内。上下各留 40px，和左右 max-width 的空一样。 */
+.qxt-screen .qxt-dialog:has([data-qx-page='resume-fact']) {
+  max-height: calc(100% - 80px);
+  overflow: hidden;
+  align-items: stretch;
+  min-height: 0;
+}
+.qxt-screen .qxt-dialog:has([data-qx-page='resume-fact']) > h2,
+.qxt-screen .qxt-dialog:has([data-qx-page='resume-fact']) > .qxt-dialog-btns {
+  flex: none;
+}
+.qxt-screen .qxt-dialog:has([data-qx-page='resume-fact']) > [data-qx-page='resume-fact'] {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
 [data-qx-page='resume-fact'] { display: flex; flex-direction: column; gap: 14px; text-align: left; min-width: 0; width: 100%; }
 .qxt-screen .qxt-dialog:has([data-qx-page='resume-fact']) h2 { align-self: flex-start; text-align: left; }
 [data-qx-page='resume-fact'] p { margin: 0; font-size: 22px; line-height: 1.45; color: var(--qxt-ink-2); }
 [data-qx-page='resume-fact'] .qxt-pending { font-size: 24px; font-weight: 700; color: var(--qxt-clay-ink); }
 [data-qx-page='resume-fact'] .qxt-pending .qxt-pending-why { display: block; margin-top: 4px; font-size: 22px; font-weight: 500; line-height: 1.45; }
-[data-qx-page='resume-fact'] .qxt-factlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+[data-qx-page='resume-fact'] .qxt-pending { overflow-wrap: anywhere; }
+[data-qx-page='resume-fact'] > :not(.qxt-factlist) { flex: none; }
+[data-qx-page='resume-fact'] .qxt-factlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
 
 [data-qx-page='resume-fact'] .qxt-factrow {
   position: relative;
@@ -384,6 +412,19 @@
 [data-qx-page='resume-fact'] .qxt-why-not { color: var(--qx-cinnabar); font-weight: 700; }
 
 @media (max-width: 640px) {
+  /* 窄屏共用弹层的内边距会把标题和按钮挤出 844。只收这一只核对框，外沿 40px 不动，行高仍是 72。 */
+  [data-kiosk-stage-fit='off'] .qxt-dialog:has([data-qx-page='resume-fact']) {
+    padding: 16px 20px 14px;
+    gap: 8px;
+  }
+  [data-kiosk-stage-fit='off'] .qxt-dialog:has([data-qx-page='resume-fact']) > [data-qx-page='resume-fact'] {
+    gap: 8px;
+  }
+  /* 共用弹层正文仍是 25px。窄屏上说明和待确认会把按钮顶出 844，只收这一只框的字。勾选行仍是 72。 */
+  [data-kiosk-stage-fit='off'] .qxt-dialog:has([data-qx-page='resume-fact']) p {
+    font-size: 16px;
+    line-height: 1.35;
+  }
   [data-kiosk-stage-fit='off'] [data-qx-page='resume-edit'] { overflow-y: auto; }
   [data-kiosk-stage-fit='off'] [data-qx-page='resume-edit'] .qxt-edit { display: block; }
   [data-kiosk-stage-fit='off'] [data-qx-page='resume-edit'] .qxt-paperbox-in,

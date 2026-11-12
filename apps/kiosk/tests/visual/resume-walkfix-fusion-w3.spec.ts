@@ -203,7 +203,7 @@ test('预览页与核对弹层把「待本人确认」讲明白，并且只列 A
   await expect(banner).toBeVisible()
   // 只列新写进去的两个数；用户自己写的「负责」不算。R2（11/13）起列的是带上下文的片段，
   // 照定稿 screens4.js 导出核对「待本人确认：周更 2 篇」，不再是光秃秃的数。
-  await expect(banner).toContainText('待本人确认：分拣约 1500 件、控制在 0.5% 以内')
+  await expect(banner).toContainText('待本人确认：日均分拣约 1500 件、错分率控制在 0.5% 以内')
   await expect(banner).not.toContainText('负责')
   await expect(banner).toContainText('AI 整理时新写进了这几处，你原来的内容里没有')
   await expect(banner).toContainText('不是，就改掉或删掉再导出')
@@ -218,7 +218,7 @@ test('预览页与核对弹层把「待本人确认」讲明白，并且只列 A
   const dialog = page.getByRole('dialog', { name: '导出前核对事实' })
   await expect(dialog).toBeVisible()
   const note = dialog.locator('.qx-rd-pending')
-  await expect(note).toContainText('待本人确认：分拣约 1500 件、控制在 0.5% 以内')
+  await expect(note).toContainText('待本人确认：日均分拣约 1500 件、错分率控制在 0.5% 以内')
   await expect(note).not.toContainText('负责')
   await expect(note).toContainText('AI 整理时新写进了这几处，你原来的内容里没有')
 })
@@ -229,7 +229,7 @@ test('本人预览时填写的数字和职责词不归给 AI @w3-kiosk', async (
   await page.getByRole('button', { name: /让 AI 整理成新简历/ }).click()
   const description = page.getByRole('textbox', { name: '工作经历描述 1' })
   // 先确认橙条确实在（AI 写的 1500、0.5%），否则后面「整条不出现」会在橙条压根没渲染时空过。
-  await expect(page.locator('.qx-rd-pending')).toContainText('待本人确认：分拣约 1500 件、控制在 0.5% 以内')
+  await expect(page.locator('.qx-rd-pending')).toContainText('待本人确认：日均分拣约 1500 件、错分率控制在 0.5% 以内')
   await description.fill('本人主导 2800 件，差错率 0.8%')
   // 本人把描述整段换掉后：AI 写的 1500、0.5% 已不在稿里，本人的 2800、0.8%、主导又不归给 AI，橙条整条不该渲染。
   // 不能写成 expect(banner).not.toContainText(...)：Playwright 对「找不到元素」的否定文本断言判失败（Received: <element(s) not found>）。
@@ -244,7 +244,7 @@ test('本人把 AI 写过的数字敲回去，不再算 AI 新加的 @w3-kiosk',
   await fillGenerateFormToReview(page)
   await page.getByRole('button', { name: /让 AI 整理成新简历/ }).click()
   const banner = page.locator('.qx-rd-pending')
-  await expect(banner).toContainText('待本人确认：分拣约 1500 件、控制在 0.5% 以内')
+  await expect(banner).toContainText('待本人确认：日均分拣约 1500 件、错分率控制在 0.5% 以内')
   const description = page.getByRole('textbox', { name: '工作经历描述 1' })
   await description.fill('')
   await expect(banner).toHaveCount(0)

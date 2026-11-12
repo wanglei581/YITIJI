@@ -123,10 +123,10 @@ function collectFactAdditions(resume: GeneratedResume, originalText: string): Ar
     fields.push({ path: `education[${index}].description`, text: item.description ?? '' })
   })
   resume.experience.forEach((item, index) => {
-    fields.push({ path: `experience[${index}].description`, text: item.description })
+    fields.push({ path: `experience[${index}].description`, text: item.description ?? '' })
   })
   resume.projects.forEach((item, index) => {
-    fields.push({ path: `projects[${index}].description`, text: item.description })
+    fields.push({ path: `projects[${index}].description`, text: item.description ?? '' })
   })
   resume.skills.forEach((item, index) => {
     fields.push({ path: `skills[${index}]`, text: item })

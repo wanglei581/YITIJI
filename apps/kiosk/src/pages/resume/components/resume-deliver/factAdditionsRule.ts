@@ -10,7 +10,7 @@
 export interface FactAddition {
   /** 同一事实的规范化记号。数字按值，职责词按词。例如 num:20、pct:20、duty:牵头。 */
   key: string
-  /** 给人看的片段：命中处左右各最多 4 个字，遇到标点或换行就停。 */
+  /** 给人看的片段：从命中处向两侧扩到标点、换行或文本两端，每侧最多 10 个字。到了 10 个字还没遇到标点，那一侧加「…」。 */
   text: string
 }
 
@@ -101,7 +101,7 @@ const MEASURES = [
   '百',
 ]
 
-/** 「一个」「一份」太常见，几乎不是事实。种、名、位同样放过。 */
+/** 「一个」「一份」太常见，几乎不是事实。种、名、位同样放过。「个月」不在这里，按量词算。 */
 const YI_SKIP = ['个', '份', '种', '名', '位']
 
 const SINGLE_DIGITS = '一二两三四五六七八九十'
@@ -176,14 +176,39 @@ function toHalfWidth(input: string): string {
   return out
 }
 
-/** 2.50 与 2.5 相同，05 与 5 相同。整数不带小数点。 */
+/**
+ * 2.50 与 2.5 相同，05 与 5 相同。整数不带小数点。
+ * 按十进制字符串比，不用 Number：18 位证件号不能被吃掉末位，0.0001 也不能变成 0。
+ */
 function canonicalNumber(body: string): string | null {
   if (!/^\d+(?:\.\d+)?$/.test(body)) return null
-  const value = Number(body)
-  if (!Number.isFinite(value)) return null
-  const rendered = value.toString()
-  if (rendered.indexOf('e') === -1 && rendered.indexOf('E') === -1) return rendered
-  return value.toFixed(8).replace(/0+$/, '').replace(/\.$/, '')
+  const dot = body.indexOf('.')
+  let intPart = dot === -1 ? body : body.slice(0, dot)
+  let frac = dot === -1 ? '' : body.slice(dot + 1)
+  intPart = intPart.replace(/^0+/, '')
+  if (intPart === '') intPart = '0'
+  frac = frac.replace(/0+$/, '')
+  if (frac === '') return intPart
+  return `${intPart}.${frac}`
+}
+
+/** 十进制字符串乘 10^places。1.5 乘 10000 得到 15000，不经过 Number。 */
+function shiftDecimal(canonical: string, places: number): string {
+  const dot = canonical.indexOf('.')
+  const intPart = dot === -1 ? canonical : canonical.slice(0, dot)
+  const frac = dot === -1 ? '' : canonical.slice(dot + 1)
+  if (places >= frac.length) {
+    const body = (intPart + frac).replace(/^0+/, '')
+    if (body === '') return '0'
+    return body + '0'.repeat(places - frac.length)
+  }
+  const all = intPart + frac
+  const point = all.length - (frac.length - places)
+  let nextInt = all.slice(0, point).replace(/^0+/, '')
+  if (nextInt === '') nextInt = '0'
+  const nextFrac = all.slice(point).replace(/0+$/, '')
+  if (nextFrac === '') return nextInt
+  return `${nextInt}.${nextFrac}`
 }
 
 function startsWithWord(text: string, index: number, words: readonly string[]): string | null {
@@ -200,7 +225,8 @@ function readCnRun(text: string, index: number): { raw: string; end: number } | 
   return { raw: text.slice(index, end), end }
 }
 
-function parseChinese(raw: string): number | null {
+/** 中文数字折成十进制字符串。万先收进本组，亿再把本组乘一亿，避免「一万亿」收成一万。 */
+function parseChinese(raw: string): string | null {
   let hasUnit = false
   for (let i = 0; i < raw.length; i += 1) {
     const ch = raw.charAt(i)
@@ -214,28 +240,42 @@ function parseChinese(raw: string): number | null {
       if (digit === null) return null
       digits += String(digit)
     }
-    return Number(digits)
+    return canonicalNumber(digits)
   }
-  let result = 0
-  let section = 0
-  let number = 0
+  let result = 0n
+  let group = 0n
+  let section = 0n
+  let number = 0n
+  let pending = false
   for (let i = 0; i < raw.length; i += 1) {
     const ch = raw.charAt(i)
     const digit = cnDigit(ch)
     const small = cnSmall(ch)
-    const big = cnBig(ch)
-    if (digit !== null) number = digit
-    else if (small !== null) {
-      section += (number || 1) * small
-      number = 0
-    } else if (big !== null) {
-      section = (section + number) * big
-      result += section
-      section = 0
-      number = 0
+    if (digit !== null) {
+      number = BigInt(digit)
+      pending = true
+    } else if (small !== null) {
+      section += (pending ? number : 1n) * BigInt(small)
+      number = 0n
+      pending = false
+    } else if (ch === '万') {
+      const current = section + (pending ? number : 0n)
+      group += (current === 0n ? 1n : current) * 10000n
+      section = 0n
+      number = 0n
+      pending = false
+    } else if (ch === '亿') {
+      const current = group + section + (pending ? number : 0n)
+      result += (current === 0n ? 1n : current) * 100000000n
+      group = 0n
+      section = 0n
+      number = 0n
+      pending = false
+    } else {
+      return null
     }
   }
-  return result + section + number
+  return (result + group + section + (pending ? number : 0n)).toString()
 }
 
 function matchArabic(
@@ -249,9 +289,17 @@ function matchArabic(
   const raw = matched[0]
   const percent = /[%％]$/.test(raw)
   const body = toHalfWidth(raw).replace(/[%％]/g, '').replace(/[ \t\u3000,，]/g, '')
-  const canonical = canonicalNumber(body)
+  let canonical = canonicalNumber(body)
   if (canonical === null) return null
-  return { end: index + raw.length, canonical, percent }
+  let end = index + raw.length
+  if (!percent) {
+    const unit = text.charAt(end)
+    if (unit === '万' || unit === '亿') {
+      canonical = shiftDecimal(canonical, unit === '万' ? 4 : 8)
+      end += 1
+    }
+  }
+  return { end, canonical, percent }
 }
 
 /** 百分之后面允许单个汉字，不要求再跟量词。 */
@@ -262,9 +310,7 @@ function matchBareChinese(text: string, index: number): { end: number; canonical
     const ch = run.raw
     if (cnDigit(ch) === null && ch !== '十') return null
   }
-  const value = parseChinese(run.raw)
-  if (value === null || !Number.isFinite(value)) return null
-  const canonical = canonicalNumber(String(value))
+  const canonical = parseChinese(run.raw)
   if (canonical === null) return null
   return { end: run.end, canonical }
 }
@@ -284,17 +330,25 @@ function matchPercent(text: string, index: number): RawHit | null {
   return { start: index, end: found.end, key: `pct:${found.canonical}`, kind: 'num', word: '' }
 }
 
-/** 「第」+ 数 + 名/等 是排名事实。单字「一」在这里也要算，用来认「第一名」。 */
-function matchRank(text: string, index: number): RawHit | null {
+/**
+ * 「第」+ 数，后面是「名 / 等」，或紧跟标点、换行、文本结尾，都是排名。
+ * 「第一次」「第一年」后面还跟着别的字，不算排名，并把「第」和数字一起吞掉，避免再报成「一次」「一年」。
+ * 单字「一」在这里也要算，用来认「第一名」。
+ */
+function matchRank(text: string, index: number): RawHit | { skipEnd: number } | null {
   if (text.charAt(index) !== '第') return null
   const cursor = index + 1
   const arabic = matchArabic(text, cursor, false)
   const chinese = arabic ? null : matchBareChinese(text, cursor)
   const found = arabic ?? chinese
   if (!found) return null
-  const suffix = text.charAt(found.end)
-  if (suffix !== '名' && suffix !== '等') return null
-  return { start: index, end: found.end + 1, key: `num:${found.canonical}`, kind: 'num', word: '' }
+  const next = found.end < text.length ? text.charAt(found.end) : ''
+  const boundary = next === '' || next === '\n' || next === '\r' || STOPS.indexOf(next) !== -1
+  if (next === '名' || next === '等' || boundary) {
+    const end = next === '名' || next === '等' ? found.end + 1 : found.end
+    return { start: index, end, key: `num:${found.canonical}`, kind: 'num', word: '' }
+  }
+  return { skipEnd: found.end }
 }
 
 function matchChinese(text: string, index: number): RawHit | null {
@@ -302,14 +356,13 @@ function matchChinese(text: string, index: number): RawHit | null {
   if (!run) return null
   if (run.raw.length === 1) {
     if (SINGLE_DIGITS.indexOf(run.raw) === -1) return null
-    if (run.raw === '一' && startsWithWord(text, run.end, YI_SKIP)) return null
+    const month = run.raw === '一' && text.startsWith('个月', run.end)
+    if (!month && run.raw === '一' && startsWithWord(text, run.end, YI_SKIP)) return null
     const rank = text.startsWith('等', run.end)
     const measure = startsWithWord(text, run.end, MEASURES)
     if (!rank && !measure) return null
   }
-  const value = parseChinese(run.raw)
-  if (value === null || !Number.isFinite(value)) return null
-  const canonical = canonicalNumber(String(value))
+  const canonical = parseChinese(run.raw)
   if (canonical === null) return null
   return { start: index, end: run.end, key: `num:${canonical}`, kind: 'num', word: '' }
 }
@@ -347,6 +400,10 @@ function scan(text: string): RawHit[] {
     }
     const rank = matchRank(text, index)
     if (rank) {
+      if ('skipEnd' in rank) {
+        index = rank.skipEnd
+        continue
+      }
       hits.push(rank)
       index = rank.end
       continue
@@ -380,30 +437,52 @@ function scan(text: string): RawHit[] {
   return hits
 }
 
-function snippet(text: string, start: number, end: number, blocked: Array<[number, number]>): string {
-  // 旁边如果还有另一条事实，窗口停在它的边界上。否则「带领」会把紧挨着的「十」吞进同一片段，数字就丢了。
-  const blockedAt = (index: number) => blocked.some(([from, to]) => index >= from && index < to)
+const SNIPPET_SIDE = 10
+
+function isStop(ch: string): boolean {
+  return ch === '\n' || ch === '\r' || STOPS.indexOf(ch) !== -1
+}
+
+function expandWindow(text: string, start: number, end: number): {
+  left: number
+  right: number
+  ellipsisLeft: boolean
+  ellipsisRight: boolean
+} {
   let left = start
   let taken = 0
-  while (left > 0 && taken < 4) {
-    const prev = left - 1
-    const ch = text.charAt(prev)
-    if (ch === '\n' || ch === '\r' || STOPS.indexOf(ch) !== -1 || blockedAt(prev)) break
+  while (left > 0 && taken < SNIPPET_SIDE) {
+    const ch = text.charAt(left - 1)
+    if (isStop(ch)) break
     left -= 1
     taken += 1
   }
+  const ellipsisLeft = taken === SNIPPET_SIDE && left > 0 && !isStop(text.charAt(left - 1))
   let right = end
   taken = 0
-  while (right < text.length && taken < 4) {
+  while (right < text.length && taken < SNIPPET_SIDE) {
     const ch = text.charAt(right)
-    if (ch === '\n' || ch === '\r' || STOPS.indexOf(ch) !== -1 || blockedAt(right)) break
+    if (isStop(ch)) break
     right += 1
     taken += 1
   }
-  const core = text.slice(start, end)
-  const clipped = text.slice(left, right).trim()
-  if (clipped.indexOf(core) === -1) return core
-  return clipped
+  const ellipsisRight = taken === SNIPPET_SIDE && right < text.length && !isStop(text.charAt(right))
+  return { left, right, ellipsisLeft, ellipsisRight }
+}
+
+function renderWindow(
+  text: string,
+  left: number,
+  right: number,
+  ellipsisLeft: boolean,
+  ellipsisRight: boolean,
+  core: string,
+): string {
+  let body = text.slice(left, right).trim()
+  if (body.indexOf(core) === -1) body = core
+  if (ellipsisLeft) body = `…${body}`
+  if (ellipsisRight) body = `${body}…`
+  return body
 }
 
 export function findFactAdditions(afterText: string, beforeText: string): FactAddition[] {
@@ -423,18 +502,66 @@ export function findFactAdditions(afterText: string, beforeText: string): FactAd
     }
     fresh.push(hit)
   }
-  const seen = new Set<string>()
-  const additions: FactAddition[] = []
+  fresh.sort((a, b) => a.start - b.start || a.end - b.end)
+  interface Windowed {
+    hit: RawHit
+    left: number
+    right: number
+    ellipsisLeft: boolean
+    ellipsisRight: boolean
+  }
+  const windowed: Windowed[] = []
   for (let i = 0; i < fresh.length; i += 1) {
     const hit = fresh[i]
-    const blocked: Array<[number, number]> = []
-    for (let j = 0; j < fresh.length; j += 1) {
-      if (j !== i) blocked.push([fresh[j].start, fresh[j].end])
+    windowed.push({ hit, ...expandWindow(afterText, hit.start, hit.end) })
+  }
+  const groups: Windowed[][] = []
+  for (let i = 0; i < windowed.length; i += 1) {
+    const item = windowed[i]
+    const last = groups.length > 0 ? groups[groups.length - 1] : null
+    if (!last) {
+      groups.push([item])
+      continue
     }
-    const text = snippet(afterText, hit.start, hit.end, blocked)
-    if (seen.has(text)) continue
-    seen.add(text)
-    additions.push({ key: hit.key, text })
+    let clusterRight = last[0].right
+    for (let j = 1; j < last.length; j += 1) {
+      if (last[j].right > clusterRight) clusterRight = last[j].right
+    }
+    if (item.left <= clusterRight) last.push(item)
+    else groups.push([item])
+  }
+  const seen = new Set<string>()
+  const additions: FactAddition[] = []
+  for (let g = 0; g < groups.length; g += 1) {
+    const group = groups[g]
+    let left = group[0].left
+    let right = group[0].right
+    let ellipsisLeft = group[0].ellipsisLeft
+    let ellipsisRight = group[0].ellipsisRight
+    for (let i = 1; i < group.length; i += 1) {
+      const item = group[i]
+      if (item.left < left) {
+        left = item.left
+        ellipsisLeft = item.ellipsisLeft
+      } else if (item.left === left) {
+        ellipsisLeft = ellipsisLeft || item.ellipsisLeft
+      }
+      if (item.right > right) {
+        right = item.right
+        ellipsisRight = item.ellipsisRight
+      } else if (item.right === right) {
+        ellipsisRight = ellipsisRight || item.ellipsisRight
+      }
+    }
+    for (let i = 0; i < group.length; i += 1) {
+      const hit = group[i].hit
+      const core = afterText.slice(hit.start, hit.end)
+      const text = renderWindow(afterText, left, right, ellipsisLeft, ellipsisRight, core)
+      const id = `${hit.key}\n${text}`
+      if (seen.has(id)) continue
+      seen.add(id)
+      additions.push({ key: hit.key, text })
+    }
   }
   return additions
 }

@@ -1,4 +1,4 @@
-import type { Page, Request } from '@playwright/test'
+import type { Locator, Page, Request } from '@playwright/test'
 import { expect, test } from '../fixtures/kiosk-test'
 import { registerW4Api } from '../fixtures/fusion-w4-api'
 
@@ -172,7 +172,7 @@ test('逐条对照要求新增事实确认并回传裁决 @kiosk', async ({ page
   const useRewrite = page.getByRole('button', { name: '用改写' })
   await expect(useRewrite).toBeDisabled()
   // R2（11/13）起新增事实显示带上下文的片段（定稿 screens.js 对照页「周更 2 篇是我的真实信息」）
-  await expect(page.getByText('完成 5000 条记录', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('完成 5000 条记录校验', { exact: true }).first()).toBeVisible()
   // 第 1 条有待确认的新增事实：两张文字卡随内容高。
   await expectCompareCardsHugTheirContent(page, '第 1 条（有待确认事实）')
   await page.getByRole('checkbox', { name: /5000/ }).check()
@@ -607,3 +607,99 @@ test('导出失败后可见重新导出与换个格式并保留内容 @kiosk', a
   await page.getByRole('button', { name: '返回预览' }).click()
   await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toHaveValue('原公司')
 })
+
+const PREVIEW_FACT_MARKS = ['甲', '乙', '丙', '丁', '戊', '己'] as const
+
+/** 与优化页同一套 30 行：学校、公司、时间段、证书、电话，外加两句新增事实。 */
+function thirtyFactGenerateResume() {
+  return {
+    basic: { name: '标题样本', phone: '13800001111', city: '青岛' },
+    intention: { position: '门店运营', city: '青岛' },
+    summary: '甲组 21 项。乙组 22 项。',
+    education: PREVIEW_FACT_MARKS.map((mark, index) => ({
+      school: `青岛学校${mark}`,
+      major: '工商管理',
+      degree: '本科',
+      period: `${2010 + index}-${2014 + index}`,
+      description: '完成本科学业。',
+    })),
+    experience: PREVIEW_FACT_MARKS.map((mark, index) => ({
+      company: `青序门店${mark}`,
+      role: '店员',
+      period: `${2016 + index}-${2017 + index}`,
+      description: '按班次完成交接。',
+    })),
+    projects: [{ name: '门店陈列项目', role: '执行', description: '按店里的陈列标准摆货。' }],
+    skills: ['沟通'],
+    certificates: ['英语四级', '计算机一级', '驾驶证'],
+  }
+}
+
+async function expectGenerateConfirmInView(page: Page, dialog: Locator): Promise<void> {
+  const scale = await stageScaleOf(page)
+  const box = await dialog.getByRole('button', { name: '确认导出' }).boundingBox()
+  expect(box).not.toBeNull()
+  const top = box!.y / scale
+  const bottom = (box!.y + box!.height) / scale
+  const viewport = page.viewportSize()
+  expect(viewport).not.toBeNull()
+  expect(top).toBeGreaterThanOrEqual(0)
+  expect(bottom).toBeLessThanOrEqual(1920)
+  expect(bottom).toBeLessThanOrEqual(viewport!.height / scale)
+}
+
+for (const projectTag of ['@kiosk', '@mobile'] as const) {
+  test(`生成预览页 30 行核对事实都能点到，确认导出始终在视口内 ${projectTag}`, async ({ page, api }) => {
+    const taskId = `r2b-gen-30-${projectTag.slice(1)}`
+    registerGeneratePreviewBaseline(api)
+    api.respond('GET', `/api/v1/resume/generate/${taskId}`, {
+      status: 200,
+      json: {
+        taskId,
+        status: 'completed',
+        providerName: 'deepseek',
+        resume: thirtyFactGenerateResume(),
+        missingHints: [],
+      },
+    })
+    api.respond('POST', '/api/v1/resume/generate/export', {
+      status: 200,
+      json: {
+        fileId: 'gen-export-30',
+        filename: 'AI简历_标题样本.pdf',
+        sizeBytes: 4096,
+        pageCount: 1,
+        signedUrl: '/e2e-fixtures/generated-resume-30.pdf',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+        printFileUrl: '/api/v1/files/gen-export-30/content?expires=1&sig=test',
+      },
+    })
+    await page.route('**/api/v1/files/gen-export-30/content**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n' }),
+    )
+    await page.goto(`/resume/generate/preview?taskId=${encodeURIComponent(taskId)}`)
+    await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toBeVisible()
+    await page.getByTestId('resume-generate-preview-cta-export').click()
+    await page.getByTestId('resume-generate-preview-cta-confirm-export').click()
+    const dialog = page.getByRole('dialog', { name: '导出前核对事实' })
+    await expect(dialog).toBeVisible()
+    const boxes = dialog.getByRole('checkbox')
+    await expect(boxes).toHaveCount(30)
+    const confirm = dialog.getByRole('button', { name: '确认导出' })
+    const scale = await stageScaleOf(page)
+    for (let i = 0; i < 30; i += 1) {
+      const box = boxes.nth(i)
+      await box.scrollIntoViewIfNeeded()
+      const row = await box.locator('xpath=ancestor::label[1]').boundingBox()
+      expect(row).not.toBeNull()
+      expect(row!.height / scale).toBeGreaterThanOrEqual(56)
+      await expectGenerateConfirmInView(page, dialog)
+      await expect(confirm).toHaveAttribute('aria-disabled', 'true')
+      await box.click()
+    }
+    await expectGenerateConfirmInView(page, dialog)
+    await expect(confirm).not.toHaveAttribute('aria-disabled', 'true')
+    await confirm.click()
+    await expect(dialog).toHaveCount(0)
+  })
+}
