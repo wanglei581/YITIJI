@@ -370,8 +370,9 @@ async function assertPush(prisma: PrismaService): Promise<void> {
   assert.equal(calls.length, before + 2, '平台同样不发已恢复，机构只发了正在发生')
 
   // 打印失败类（含打印可靠性那一包的「排队超时未领取」）只进平台总通知，不进机构群。
+  // 主题编号故意用甲机构终端的编号 t1：要靠类型白名单拦住，不能只靠「按任务编号查不到终端」。
   const queueTimeout = {
-    id: 'print_failed:task-q1', subjectKey: 'print_failed:task-q1', subjectId: 'task-q1', episodeToken: 'ep-q1',
+    id: 'print_failed:t1', subjectKey: 'print_failed:t1', subjectId: 't1', episodeToken: 'ep-q1',
     type: 'print_failed' as const, severity: 'error' as const, title: '打印任务失败：排队超时未领取',
     detail: '任务 task-q1 · 终端 K-01 · 错误码 PRINT_QUEUE_TIMEOUT', terminalCode: 'K-01', occurredAt: '2026-11-11T03:00:00.000Z',
   }
