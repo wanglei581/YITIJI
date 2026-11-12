@@ -1,7 +1,8 @@
 import { createHmac } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import type { Browser, BrowserContext, Locator, Page, Request } from '@playwright/test'
 import {
@@ -27,9 +28,12 @@ export {
 export const KIOSK_ORIGIN = process.env.INTERACTION_KIOSK_ORIGIN ?? 'http://127.0.0.1:5273'
 export const API_ORIGIN = process.env.INTERACTION_API_ORIGIN ?? 'http://127.0.0.1:3010'
 export const FIXTURE_PDF = process.env.SWEEP_PDF ?? '/tmp/sweep-fixtures/valid-2p.pdf'
-export const EVIDENCE_ROOT = join(
-  fileURLToPath(new URL('../../../../docs/reviews/interaction-sweep-2026-09-08/ai-resume/', import.meta.url)),
-)
+const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url))
+/** 证据目录。默认落在已被 gitignore 的 test-results/，不再改写 9 月历史走查记录。 */
+const evidenceFromEnv = process.env.INTERACTION_EVIDENCE_DIR
+export const EVIDENCE_ROOT = evidenceFromEnv
+  ? (isAbsolute(evidenceFromEnv) ? evidenceFromEnv : resolve(REPO_ROOT, evidenceFromEnv))
+  : join(REPO_ROOT, 'test-results/kiosk-interaction/evidence/ai-resume')
 
 /** 禁词清单的正则形式；走查请用 scanForbidden / scanForbiddenCopy（先剥白名单）。 */
 export const FORBIDDEN_APPLY = new RegExp(COMPLIANCE_FORBIDDEN_PHRASES.join('|'))
@@ -40,8 +44,10 @@ export const ALLOWED_APPLY = new RegExp(
 )
 export const PRODUCTION_HOST = /zyidai\.cn|120\.48\.13\.190/i
 export const MEMBER_PHONE = '13800000000'
-const SMS_LOG = '/tmp/sweep-api.log'
-const SMS_PEPPER = 'dev-secret-encryption-key-replace-in-prod-min-32-chars'
+const SMS_LOG = process.env.SWEEP_API_LOG ?? '/tmp/sweep-api.log'
+/** 与启动脚本写入 API 的占位 pepper 相同。不读本机 .env，也不使用真实密钥。 */
+const SMS_PEPPER = process.env.INTERACTION_SMS_PEPPER ?? 'dev-secret-encryption-key-replace-in-prod-min-32-chars'
+const SAMPLE_PERSON_NAME = '林晓舟'
 
 export type FourObs = {
   urlChanged: boolean
@@ -216,7 +222,8 @@ export async function shot(page: Page, journey: string, step: string): Promise<s
   const path = join(dir, file)
   if (page.isClosed()) return `${journey}/page-closed.png`
   await page.screenshot({ path, fullPage: true }).catch(() => undefined)
-  return `docs/reviews/interaction-sweep-2026-09-08/ai-resume/${journey}/${file}`
+  const fromRepo = relative(REPO_ROOT, path)
+  return fromRepo.startsWith('..') ? relative(EVIDENCE_ROOT, path) : fromRepo
 }
 
 export async function observeAfter(
@@ -417,10 +424,10 @@ export async function operateControl(
       if (control.disabled) return
       await control.locator.scrollIntoViewIfNeeded().catch(() => undefined)
       if (kind === 'fill') {
-        const sample = /电话|手机|phone/i.test(control.text) ? MEMBER_PHONE
-          : /邮箱|email/i.test(control.text) ? 'test@example.com'
-            : /姓名|name/i.test(control.text) ? '测试用户'
-              : '这是交互走查填写的中文内容'
+        const sample = /电话|手机|phone/i.test(control.text) ? '13900001234'
+          : /邮箱|email/i.test(control.text) ? 'linxiaozhou.example@example.com'
+            : /姓名|name/i.test(control.text) ? SAMPLE_PERSON_NAME
+              : '在青岚市北区晨配服务站做过夜班分拣，核对运单并协助装车。'
         await control.locator.fill(sample)
         return
       }
@@ -458,7 +465,7 @@ export async function gotoHome(page: Page): Promise<void> {
     await waitReady(page)
     return
   }
-  const homeTab = page.locator('.ui-kiosk-nav__item[aria-label="首页"]')
+  const homeTab = page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '首页', exact: true })
   if (current && current !== 'blank' && await homeTab.count()) {
     await homeTab.click()
     await page.waitForURL((url) => url.pathname === '/', { timeout: 15_000 })
@@ -478,22 +485,32 @@ export async function clickNamed(page: Page, name: string | RegExp): Promise<Loc
 }
 
 export async function clickMeTab(page: Page): Promise<void> {
-  const tab = page.locator('.ui-kiosk-nav__item[aria-label="我的"]')
+  const tab = page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '我的', exact: true })
   if (await tab.count()) {
     await tab.click()
   } else {
-    const nav = page.getByRole('button', { name: /^我的$/ })
     const loggedIn = page.getByRole('button', { name: /进入我的/ })
+    const nav = page.getByRole('button', { name: '我的', exact: true })
     if (await loggedIn.count()) await loggedIn.first().click()
     else if (await nav.count()) await nav.last().click()
-    else throw new Error('找不到「我的」入口（底栏或顶栏）')
+    else throw new Error('找不到「我的」入口（主导航）')
   }
   await page.waitForURL((url) => url.pathname === '/profile' || url.pathname.startsWith('/me/'), { timeout: 15_000 })
   await waitReady(page)
 }
 
+const PROFILE_ASSET_TESTID: Record<string, string> = {
+  '我的简历': 'profile-asset-resumes',
+  '我的文档': 'profile-asset-documents',
+  'AI服务记录': 'profile-asset-ai',
+  'AI 服务记录': 'profile-asset-ai',
+}
+
 export async function clickProfileEntry(page: Page, label: string, path: string): Promise<void> {
-  const entry = page.locator('button.kp-entry', { hasText: label }).first()
+  const testId = PROFILE_ASSET_TESTID[label]
+  const entry = testId
+    ? page.getByTestId(testId)
+    : page.getByRole('button', { name: label }).first()
   await entry.scrollIntoViewIfNeeded()
   await entry.click()
   await page.waitForURL((url) => url.pathname === path, { timeout: 15_000 })
@@ -516,7 +533,7 @@ export async function fillDiagnosisDirection(page: Page, journey: string, collec
     page, journey, step: 'fill-target-job', control: '目标岗位', selectorHint: 'input[placeholder*=前端工程师]',
     kind: 'fill', collectors,
     act: async () => {
-      await page.getByPlaceholder(/前端工程师|财务助理/).fill('前端工程师')
+      await page.getByRole('textbox', { name: /^目标岗位/ }).fill('仓储管理员')
     },
   })
   await recordStep({
@@ -526,15 +543,15 @@ export async function fillDiagnosisDirection(page: Page, journey: string, collec
       await page.getByRole('button', { name: '选择行业方向' }).click()
     },
   })
-  const industryButtons = page.locator('[role="dialog"] button, .ui-kiosk-modal button')
-  const industryCount = await industryButtons.count()
-  if (industryCount >= 3) {
+  const industryDialog = page.getByRole('dialog', { name: /选择行业门类/ })
+  const industryOptions = industryDialog.getByRole('button').filter({ hasNotText: /完成|清空|关闭/ })
+  if (await industryOptions.count() >= 2) {
     await recordStep({
-      page, journey, step: 'pick-industry-second', control: '行业第二项', selectorHint: 'industry-option-1',
+      page, journey, step: 'pick-industry-second', control: '行业第二项', selectorHint: 'dialog:选择行业门类 >> button',
       kind: 'click', collectors,
       act: async () => {
-        // index 0 is often 暂不指定
-        await industryButtons.nth(1).click()
+        // 第一项通常是「暂不指定」
+        await industryOptions.nth(1).click()
       },
     })
   }
@@ -584,16 +601,34 @@ export async function uploadResumePdf(page: Page, journey: string, collectors: R
   })
 }
 
-export async function confirmAiConsent(page: Page, journey: string, collectors: ReturnType<typeof attachCollectors>): Promise<void> {
+export async function confirmAiConsent(
+  page: Page,
+  journey: string,
+  collectors: ReturnType<typeof attachCollectors>,
+  until?: Locator,
+): Promise<void> {
   const dialog = page.getByRole('dialog', { name: /确认使用简历 AI/ })
-  if (await dialog.count() === 0) return
+  const landmark = until ?? page.locator('[data-kiosk-screen="resume-report"]')
+  const dialogWait = dialog.waitFor({ state: 'visible', timeout: 20_000 }).then(() => 'dialog' as const).catch(() => 'absent' as const)
+  const landmarkWait = landmark.waitFor({ state: 'visible', timeout: 20_000 }).then(() => 'ready' as const).catch(() => 'absent' as const)
+  const winner = await Promise.race([dialogWait, landmarkWait])
+  if (winner !== 'dialog' && !(await dialog.isVisible().catch(() => false))) return
   await recordStep({
     page, journey, step: 'consent-confirm', control: '同意并继续', selectorHint: 'dialog:确认使用简历 AI >> 同意并继续',
     kind: 'click', collectors,
     act: async () => {
       await page.getByRole('button', { name: '同意并继续' }).click()
+      await dialog.waitFor({ state: 'hidden', timeout: 20_000 })
     },
   })
+}
+
+/** 优化页就绪：总览主按钮、编辑区或导出钮至少出现一个。同意弹层早退时屏幕节点还在，但高度为 0。 */
+export async function waitForOptimizeReady(page: Page): Promise<void> {
+  const ready = page.getByRole('button', { name: '逐条看（从第 1 条）' })
+    .or(page.getByRole('button', { name: '编辑简历', exact: true }))
+    .or(page.getByRole('button', { name: '去导出', exact: true }))
+  await ready.first().waitFor({ state: 'visible', timeout: 30_000 })
 }
 
 export async function waitReport(page: Page): Promise<void> {
@@ -609,9 +644,17 @@ export async function waitReport(page: Page): Promise<void> {
     .waitFor({ timeout: 20_000 })
 }
 
-export async function confirmFactsIfOpen(page: Page, journey: string, collectors: ReturnType<typeof attachCollectors>): Promise<void> {
+export async function confirmFactsIfOpen(
+  page: Page,
+  journey: string,
+  collectors: ReturnType<typeof attachCollectors>,
+  options?: { wait?: boolean },
+): Promise<void> {
   const dialog = page.getByRole('dialog', { name: /导出前核对事实/ })
-  if (await dialog.count() === 0) return
+  if (options?.wait) {
+    const shown = await dialog.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true).catch(() => false)
+    if (!shown) return
+  } else if (await dialog.count() === 0) return
   const boxes = dialog.locator('input[type="checkbox"]')
   const total = await boxes.count()
   for (let i = 0; i < total; i += 1) {
@@ -633,16 +676,10 @@ export async function confirmFactsIfOpen(page: Page, journey: string, collectors
 }
 
 export async function closePreviewIfOpen(page: Page): Promise<void> {
-  const labeled = page.getByRole('button', { name: /关闭文件预览|关闭/ })
-  if (await labeled.count()) {
-    await labeled.first().click().catch(() => undefined)
-    await page.waitForTimeout(300)
-  }
   const previewClose = page.getByRole('button', { name: '关闭文件预览' })
-  if (await previewClose.count()) {
-    await previewClose.click().catch(() => undefined)
-    await page.waitForTimeout(300)
-  }
+  if (!(await previewClose.count())) return
+  await previewClose.first().click().catch(() => undefined)
+  await previewClose.first().waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => undefined)
 }
 
 function readSmsFromLog(): string | null {
@@ -652,10 +689,16 @@ function readSmsFromLog(): string | null {
   return matches.length ? matches[matches.length - 1][1] : null
 }
 
+function redisCliArgs(): string[] {
+  const raw = process.env.INTERACTION_REDIS_URL ?? 'redis://127.0.0.1:6379'
+  const url = new URL(raw)
+  return ['-h', url.hostname || '127.0.0.1', '-p', url.port || '6379']
+}
+
 function readSmsFromRedis(phone: string): string | null {
   try {
     const hash = createHmac('sha256', SMS_PEPPER).update(phone).digest('hex')
-    const value = execFileSync('redis-cli', ['GET', `member:sms:code:${hash}`], { encoding: 'utf8' }).trim()
+    const value = execFileSync('redis-cli', [...redisCliArgs(), 'GET', `member:sms:code:${hash}`], { encoding: 'utf8' }).trim()
     return /^\d{6}$/.test(value) ? value : null
   } catch {
     return null
@@ -718,7 +761,7 @@ export async function loginMemberViaSms(
     act: async () => {
       await page.getByRole('button', { name: '收起键盘', exact: true }).click()
       await page.getByRole('button', { name: '确认登录', exact: true }).click()
-      await page.waitForTimeout(1200)
+      await page.waitForURL((url) => url.pathname !== '/login', { timeout: 20_000 })
     },
   })
   return { stub: null, codeSource: source }

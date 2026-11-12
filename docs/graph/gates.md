@@ -72,7 +72,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2192 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2193 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1118,11 +1118,12 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/tests/</code> — 14 个文件</summary>
+<summary><code>apps/kiosk/tests/</code> — 15 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `apps/kiosk/tests/fixtures/fusion-w4-api.ts` | `verify-fusion-w4.mjs` |
+| `apps/kiosk/tests/interaction/ai-resume-journey.spec.ts` | `run-interaction-journey.mjs` |
 | `apps/kiosk/tests/visual/fixtures/fusion-w6-api.ts` | `verify-fusion-w4.mjs`<br/>`verify-fusion-w6.mjs` |
 | `apps/kiosk/tests/visual/fixtures/fusion-w6-route-cases.ts` | `verify-fusion-shell.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-print-done-truth.mjs` |
 | `apps/kiosk/tests/visual/fixtures/kiosk-p1-visual-evidence-targets.ts` | `verify-visual-evidence-manifest.mjs` |

@@ -24215,6 +24215,9 @@
     "apps/kiosk/tests/fixtures/fusion-w4-api.ts": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs"
     ],
+    "apps/kiosk/tests/interaction/ai-resume-journey.spec.ts": [
+      "apps/kiosk/scripts/run-interaction-journey.mjs"
+    ],
     "apps/kiosk/tests/visual/fixtures/fusion-w6-api.ts": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-fusion-w6.mjs"
@@ -32342,6 +32345,24 @@
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
         "@ai-job-print/kiosk::verify:probe-member-session-41"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/tests/interaction/ai-resume-journey.spec.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/run-interaction-journey.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::test:browser:interaction-resume"
       ],
       "wired": true
     },
@@ -51067,6 +51088,7 @@
           "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs",
           "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
           "apps/kiosk/scripts/verify-w3a-ai-records.mjs",
+          "apps/kiosk/tests/interaction/ai-resume-journey.spec.ts",
           "docs/acceptance/self-assessment-acceptance-package.md",
           "docs/design/kiosk-proto-2026-07-migration-matrix.md",
           "docs/design/kiosk-touch-2026-10/map.js",
