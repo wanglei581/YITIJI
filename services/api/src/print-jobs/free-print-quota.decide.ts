@@ -97,10 +97,8 @@ export async function previewFreePrintOrderQuota(
   },
   options?: { rejectOverCap?: boolean },
 ): Promise<FreeQuotaNotice | null> {
-  // 实付大于 0 不预判。换行返回，避免和 assertFreePrintQuota 的单行早退写成同一串。
-  if (input.payableCents > 0) {
-    return null
-  }
+  // 实付大于 0 不预判，与 assertFreePrintQuota 同口径。
+  if (input.payableCents > 0) return null
   if (!Number.isInteger(input.requestedSides) || input.requestedSides <= 0) return null
   const now = input.now ?? freePrintQuotaNow()
   const bounds = beijingDayBounds(now)

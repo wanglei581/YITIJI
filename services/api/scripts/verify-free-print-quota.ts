@@ -117,6 +117,15 @@ function read(path: string): string {
   return readFileSync(path, 'utf8')
 }
 
+/** 取 `export [async] function <name>(` 起、到下一个顶层 export 之前的源码；找不到就失败。 */
+function exportedFunctionBody(src: string, name: string): string {
+  const start = src.search(new RegExp(`^export (?:async )?function ${name}\\b`, 'm'))
+  assert.ok(start >= 0, `找不到函数 ${name}`)
+  const rest = src.slice(start + 1)
+  const next = rest.search(/^export /m)
+  return next >= 0 ? src.slice(start, start + 1 + next) : src.slice(start)
+}
+
 function assertStatic(): void {
   const policy = read(join(API_ROOT, 'src/print-jobs/free-print-quota.policy.ts'))
   const usage = read(join(API_ROOT, 'src/print-jobs/free-print-quota.usage.ts'))
@@ -151,8 +160,9 @@ function assertStatic(): void {
   assert.ok(/每台每天 300 面/.test(progress) && /每天 50 面/.test(progress) && /每单 20 面/.test(progress) && /80%/.test(progress))
   assert.ok(progress.includes('全部可配'))
   assert.ok(usage.includes('terminalInFlight'))
-  assert.ok(decide.includes('if (input.payableCents > 0) return'))
-  assert.equal((decide.match(/if \(input\.payableCents > 0\) return/g) ?? []).length, 1)
+  // 实付大于 0 的早退要各在各的函数体里找：整文件 includes 会被另一个函数里的同一串蒙过去。
+  assert.ok(exportedFunctionBody(decide, 'assertFreePrintQuota').includes('if (input.payableCents > 0) return'))
+  assert.ok(exportedFunctionBody(decide, 'previewFreePrintOrderQuota').includes('if (input.payableCents > 0) return'))
   assert.ok(policy.includes('PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES'))
   assert.ok(policy.includes('超过每天免费 ${limit} 面的上限，请减少份数或分开下单'))
   assert.ok(decide.includes('previewFreePrintOrderQuota'))
