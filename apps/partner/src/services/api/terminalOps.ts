@@ -54,6 +54,10 @@ export interface TerminalOpsRow {
   serviceCount: number | null
   output: TerminalOpsOutput
   faults: TerminalOpsFaults
+  /** 最近一次上报的打印机状态。空表示还没上报。 */
+  printerStatus: string | null
+  /** 当前未恢复的设备告警条数。 */
+  openAlertCount: number
 }
 
 export interface TerminalOpsUnavailable {
@@ -127,18 +131,21 @@ function buildDemoTerminalOps(period: TerminalOpsPeriod): PartnerTerminalOpsView
       online: true, lastHeartbeatAt: to, visitCount: 54, serviceCount: 86,
       output: { printed: null, settled: 63, successRate: null, unconfirmed: null },
       faults: faults({ offlineCount: 1, offlineMinutes: 12, recoveredCount: 1, avgRecoveryMinutes: 12, longestMinutes: 12 }),
+      printerStatus: 'low_paper', openAlertCount: 1,
     },
     {
       terminalCode: 'DEMO-002', displayName: '演示终端 · 就业服务大厅', locationLabel: '演示位置 B',
       online: false, lastHeartbeatAt: '2026-05-26T05:40:00.000Z', visitCount: null, serviceCount: null,
       output: { printed: null, settled: null, successRate: null, unconfirmed: null },
       faults: faults({ offlineCount: 2, offlineMinutes: 175, printerFaultCount: 1, printerFaultMinutes: 18, recoveredCount: 2, avgRecoveryMinutes: 16.5, longestMinutes: 135, unrecovered: true }),
+      printerStatus: 'paper_empty', openAlertCount: 1,
     },
     {
       terminalCode: 'DEMO-003', displayName: '演示终端 · 未上线', locationLabel: null,
       online: false, lastHeartbeatAt: null, visitCount: 0, serviceCount: 0,
       output: { printed: 0, settled: 0, successRate: null, unconfirmed: 0 },
       faults: faults({ reportedInWindow: false }),
+      printerStatus: null, openAlertCount: 1,
     },
   ]
   return {

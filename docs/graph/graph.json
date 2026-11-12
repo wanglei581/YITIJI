@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 643,
+    "endpointCount": 649,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -3758,6 +3758,63 @@
         ],
         "services": [
           "AdminOrgContentTrustService"
+        ]
+      },
+      {
+        "controller": "services/api/src/admin-ops/org-device-alert-notify.controller.ts",
+        "handler": "SaveDeviceAlertWebhookDto.view",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "Organization"
+        ],
+        "path": "/api/v1/admin/orgs/:id/device-alert-notify",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-ops/org-device-alert-webhook.service.ts"
+        ],
+        "services": [
+          "OrgDeviceAlertWebhookService"
+        ]
+      },
+      {
+        "controller": "services/api/src/admin-ops/org-device-alert-notify.controller.ts",
+        "handler": "SaveDeviceAlertWebhookDto.save",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "Organization"
+        ],
+        "path": "/api/v1/admin/orgs/:id/device-alert-notify",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-ops/org-device-alert-webhook.service.ts"
+        ],
+        "services": [
+          "OrgDeviceAlertWebhookService"
+        ]
+      },
+      {
+        "controller": "services/api/src/admin-ops/org-device-alert-notify.controller.ts",
+        "handler": "SaveDeviceAlertWebhookDto.test",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "Organization"
+        ],
+        "path": "/api/v1/admin/orgs/:id/device-alert-notify/test",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-ops/org-device-alert-webhook.service.ts"
+        ],
+        "services": [
+          "OrgDeviceAlertWebhookService"
         ]
       },
       {
@@ -10385,6 +10442,63 @@
         ]
       },
       {
+        "controller": "services/api/src/admin-ops/org-device-alert-notify.controller.ts",
+        "handler": "SaveDeviceAlertWebhookDto.view",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "Organization"
+        ],
+        "path": "/api/v1/partner/device-alert-notify",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-ops/org-device-alert-webhook.service.ts"
+        ],
+        "services": [
+          "OrgDeviceAlertWebhookService"
+        ]
+      },
+      {
+        "controller": "services/api/src/admin-ops/org-device-alert-notify.controller.ts",
+        "handler": "SaveDeviceAlertWebhookDto.save",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "Organization"
+        ],
+        "path": "/api/v1/partner/device-alert-notify",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-ops/org-device-alert-webhook.service.ts"
+        ],
+        "services": [
+          "OrgDeviceAlertWebhookService"
+        ]
+      },
+      {
+        "controller": "services/api/src/admin-ops/org-device-alert-notify.controller.ts",
+        "handler": "SaveDeviceAlertWebhookDto.test",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "Organization"
+        ],
+        "path": "/api/v1/partner/device-alert-notify/test",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-ops/org-device-alert-webhook.service.ts"
+        ],
+        "services": [
+          "OrgDeviceAlertWebhookService"
+        ]
+      },
+      {
         "controller": "services/api/src/jobs/jobs.controller.ts",
         "handler": "JobsController.cancelExcelImport",
         "method": "DELETE",
@@ -11648,6 +11762,7 @@
           "ScanTask",
           "SyncLog",
           "Terminal",
+          "TerminalCapability",
           "TerminalHeartbeat"
         ],
         "path": "/api/v1/partner/stats",
@@ -11704,6 +11819,7 @@
           "ScanTask",
           "SyncLog",
           "Terminal",
+          "TerminalCapability",
           "TerminalHeartbeat"
         ],
         "path": "/api/v1/partner/terminal-operations",
@@ -13883,7 +13999,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 279,
+      "reachableFileCount": 281,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -14376,6 +14492,7 @@
             "GET /admin/orgs",
             "GET /admin/orgs/:param",
             "GET /admin/orgs/:param/content-trust",
+            "GET /admin/orgs/:param/device-alert-notify",
             "GET /admin/orgs/:param/official-channels",
             "GET /admin/orgs/:param/verified-official-domains",
             "GET /admin/system/recruitment-hosting",
@@ -14396,10 +14513,12 @@
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new",
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/start",
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/verify",
+            "POST /admin/orgs/:param/device-alert-notify/test",
             "POST /admin/recruitment-emergency/circuit-break",
             "POST /admin/recruitment-emergency/takedown",
             "PUT /admin/branding",
             "PUT /admin/orgs/:param/accounts/:param/email",
+            "PUT /admin/orgs/:param/device-alert-notify",
             "PUT /admin/orgs/:param/verified-official-domains"
           ],
           "file": "apps/admin/src/routes/partners/index.tsx",
@@ -14662,7 +14781,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 306
+      "sourceFileCount": 308
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -17751,7 +17870,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 98,
+      "reachableFileCount": 101,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -18003,6 +18122,7 @@
             "DELETE /partner/official-channels/:param",
             "GET /partner/data-sources",
             "GET /partner/data-sources/capabilities",
+            "GET /partner/device-alert-notify",
             "GET /partner/excel/mapping-rule",
             "GET /partner/fairs",
             "GET /partner/jobs",
@@ -18020,10 +18140,12 @@
             "PATCH /partner/official-channels/:param",
             "POST /partner/data-sources",
             "POST /partner/data-sources/:param/rotate-credential",
+            "POST /partner/device-alert-notify/test",
             "POST /partner/excel/:param/confirm",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
             "POST /partner/official-channels",
+            "PUT /partner/device-alert-notify",
             "PUT /partner/profile",
             "PUT /partner/smart-campus/terminals/:param/config"
           ],
@@ -18272,7 +18394,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 101
+      "sourceFileCount": 104
     }
   },
   "dataModel": {
@@ -19391,7 +19513,7 @@
         ]
       },
       {
-        "fieldCount": 34,
+        "fieldCount": 35,
         "name": "Organization",
         "relations": [
           "CompanyProfile",
@@ -19409,6 +19531,7 @@
           "User"
         ],
         "usedBy": [
+          "services/api/src/admin-ops/org-device-alert-webhook.service.ts",
           "services/api/src/ai/usage/ai-usage-summary.ts",
           "services/api/src/auth/auth.service.ts",
           "services/api/src/auth/partner-account-action.service.ts",
@@ -19907,6 +20030,7 @@
           "services/api/src/admin-ops/derived-scan-device-alerts.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/copy-jobs/copy-job-store.service.ts",
+          "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts"
         ]
       },
@@ -24337,6 +24461,11 @@
       "apps/partner/scripts/verify-partner-stats-contract.mjs",
       "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
     ],
+    "apps/partner/src/lib/printerStatusLabel.ts": [
+      "apps/admin/scripts/verify-console-batch6-copy.mjs",
+      "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs",
+      "services/api/scripts/verify-org-device-alert.ts"
+    ],
     "apps/partner/src/routes/Page.tsx": [
       "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/admin/scripts/verify-console-screen-details.mjs",
@@ -26044,6 +26173,7 @@
     ],
     "services/api/scripts/support/content-pipeline-harness.ts": [
       "services/api/scripts/verify-content-pipeline-e2e.ts",
+      "services/api/scripts/verify-org-device-alert-http.ts",
       "services/api/scripts/verify-print-reliability-http.ts"
     ],
     "services/api/scripts/support/copy-c1c-verification.ts": [
@@ -26525,7 +26655,8 @@
       "services/api/scripts/verify-admin-ops.ts"
     ],
     "services/api/src/admin-ops/admin-alert-push.service.ts": [
-      "services/api/scripts/verify-alert-push.cjs"
+      "services/api/scripts/verify-alert-push.cjs",
+      "services/api/scripts/verify-org-device-alert.ts"
     ],
     "services/api/src/admin-ops/admin-ops.controller.ts": [
       "services/api/scripts/verify-admin-ops.ts"
@@ -26546,15 +26677,31 @@
       "services/api/scripts/verify-alert-push.cjs",
       "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-org-device-alert.ts",
       "services/api/scripts/verify-queue-dispatch-printer-status.ts",
       "services/api/scripts/verify-scan-device-b4.ts",
       "services/api/scripts/verify-scan-device-b9.ts"
+    ],
+    "services/api/src/admin-ops/derived-partner-incidents.ts": [
+      "services/api/scripts/verify-org-device-alert.ts"
     ],
     "services/api/src/admin-ops/derived-print-quota-alerts.ts": [
       "services/api/scripts/verify-copy-quota.ts"
     ],
     "services/api/src/admin-ops/derived-scan-device-alerts.ts": [
       "services/api/scripts/verify-scan-device-b9.ts"
+    ],
+    "services/api/src/admin-ops/device-alert-webhook.ts": [
+      "services/api/scripts/verify-org-device-alert-http.ts",
+      "services/api/scripts/verify-org-device-alert.ts"
+    ],
+    "services/api/src/admin-ops/org-device-alert-push.ts": [
+      "services/api/scripts/verify-org-device-alert-http.ts",
+      "services/api/scripts/verify-org-device-alert.ts"
+    ],
+    "services/api/src/admin-ops/org-device-alert-webhook.service.ts": [
+      "services/api/scripts/verify-org-device-alert-http.ts",
+      "services/api/scripts/verify-org-device-alert.ts"
     ],
     "services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts": [
       "services/api/scripts/verify-admin-order-filters.ts"
@@ -27524,6 +27671,7 @@
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-order.ts",
+      "services/api/scripts/verify-org-device-alert.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
@@ -27807,6 +27955,7 @@
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-llm-thinking-live-gate.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
+      "services/api/scripts/verify-org-device-alert.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-partner-source-capabilities.ts",
       "services/api/scripts/verify-recruitment-emergency-scope.ts",
@@ -27836,6 +27985,7 @@
       "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-member-data-export-files.ts",
       "services/api/scripts/verify-official-channels.ts",
+      "services/api/scripts/verify-org-device-alert.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-partner-edit.ts",
       "services/api/scripts/verify-partner-email-login-alias.ts",
@@ -28110,6 +28260,7 @@
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-mock-interview-deadline.ts",
+      "services/api/scripts/verify-org-device-alert.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
@@ -29598,6 +29749,9 @@
     "services/api/src/orgs/partner-stats.service.ts": [
       "services/api/scripts/verify-partner-stats-contract.ts"
     ],
+    "services/api/src/orgs/partner-terminal-ops.ts": [
+      "services/api/scripts/verify-org-device-alert.ts"
+    ],
     "services/api/src/payment/admin-billing.controller.ts": [
       "services/api/scripts/verify-admin-billing.ts"
     ],
@@ -30286,6 +30440,8 @@
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-offline-agencies-contract.ts",
       "services/api/scripts/verify-order.ts",
+      "services/api/scripts/verify-org-device-alert-http.ts",
+      "services/api/scripts/verify-org-device-alert.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
@@ -31607,6 +31763,7 @@
           "apps/admin/src/routes/ai-services/aiUsageDisplay.ts",
           "apps/admin/src/routes/screen/UsageView.tsx",
           "apps/partner/src/lib/csv.ts",
+          "apps/partner/src/lib/printerStatusLabel.ts",
           "apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx",
           "apps/partner/src/routes/terminals/terminalOpsFormat.ts",
           "packages/shared/src/formatDateTime.ts",
@@ -36430,6 +36587,7 @@
         "dirs": [],
         "files": [
           "apps/partner/src/lib/csv.ts",
+          "apps/partner/src/lib/printerStatusLabel.ts",
           "apps/partner/src/routes/terminals/TerminalOpsCards.tsx",
           "apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx",
           "apps/partner/src/routes/terminals/index.tsx",
@@ -44737,6 +44895,58 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:order"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/content-pipeline-harness.ts",
+          "services/api/src/admin-ops/device-alert-webhook.ts",
+          "services/api/src/admin-ops/org-device-alert-push.ts",
+          "services/api/src/admin-ops/org-device-alert-webhook.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-org-device-alert-http.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:org-device-alert-http"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/partner/src/lib/printerStatusLabel.ts",
+          "services/api/src/admin-ops/admin-alert-push.service.ts",
+          "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/admin-ops/derived-partner-incidents.ts",
+          "services/api/src/admin-ops/device-alert-webhook.ts",
+          "services/api/src/admin-ops/org-device-alert-push.ts",
+          "services/api/src/admin-ops/org-device-alert-webhook.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/crypto/secret-cipher.ts",
+          "services/api/src/common/decorators/current-user.decorator.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/orgs/partner-terminal-ops.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-org-device-alert.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:org-device-alert"
       ],
       "wired": true
     },

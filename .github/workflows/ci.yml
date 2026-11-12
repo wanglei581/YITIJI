@@ -475,7 +475,10 @@ jobs:
 
       - name: Verify alert push runtime gate
         working-directory: services/api
-        run: pnpm verify:alert-push
+        run: |
+          pnpm verify:alert-push
+          pnpm verify:org-device-alert
+          pnpm verify:org-device-alert-http
 
       - name: Recruitment P1 read-only preflight contract
         working-directory: services/api

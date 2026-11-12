@@ -768,6 +768,9 @@ model Organization {
   /// 软件使用授权方式：none = 不管控（默认，现有点位一律照旧）；required = 须有生效授权，
   /// 否则本机构一体机不再签发新会话、机构后台写操作被拒（src/licenses）。库里 CHECK 只允许这两个值。
   licenseMode String @default("none")
+  /// 本机构设备告警的群机器人地址，AES-256-GCM 密文。空 = 未配置：不推送、也不报错。
+  /// 明文只在发送前解密，接口与审计只给打码后的地址和主机名。
+  deviceAlertWebhookEnc String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

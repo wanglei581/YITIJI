@@ -102,7 +102,11 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     await client.$executeRawUnsafe(`INSERT INTO "Terminal" ("id", "terminalCode", "agentToken", "deviceFingerprint", "lastSeenAt", "orgId") VALUES ('bl-sentinel-terminal', 'BL-SENTINEL', 'migration-only-no-device', 'migration', ${stamp}, 'bl-sentinel-org')`)
     run(['migrate', 'deploy', '--config', stages.mine])
 
-    const org = await client.organization.findUnique({ where: { id: 'bl-sentinel-org' } })
+    // 本 PR 之后的迁移还会给机构表加列（如 20261111140000 的设备告警通知地址），这一段的库里还没有那些列。
+    // 不带 select 的读写会把新列也写进语句，库里没有就报「no such column」——删机构那一条甚至会因此「被拒」而误判外键生效。
+    // 所以这里读写机构一律带 select，只碰本 PR 加的列。
+    const ORG_COLUMNS_OF_THIS_PR = { id: true, licenseMode: true, brandName: true, brandMark: true, brandLogoAssetId: true } as const
+    const org = await client.organization.findUnique({ where: { id: 'bl-sentinel-org' }, select: ORG_COLUMNS_OF_THIS_PR })
     check('升级不丢数据：哨兵机构与终端还在', !!org && (await client.terminal.count({ where: { id: 'bl-sentinel-terminal', orgId: 'bl-sentinel-org' } })) === 1)
     check('已有机构 licenseMode 落在 none（不影响任何现有点位）', org?.licenseMode === 'none')
     check('已有机构的品牌覆盖三项都是 null', org?.brandName === null && org?.brandMark === null && org?.brandLogoAssetId === null)
@@ -124,10 +128,10 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     for (const [label, over] of bad) {
       check(`CHECK 兜底挡住：${label}`, await rejects(() => client.license.create({ data: { ...valid, contractNo: `HT-BAD-${label}`, ...over } as never })))
     }
-    check('CHECK 兜底挡住：licenseMode 非法值', await rejects(() => client.organization.update({ where: { id: 'bl-sentinel-org' }, data: { licenseMode: 'weird' } })))
-    await client.organization.update({ where: { id: 'bl-sentinel-org' }, data: { licenseMode: 'required' } })
-    check('licenseMode 可以改成 required', (await client.organization.findUniqueOrThrow({ where: { id: 'bl-sentinel-org' } })).licenseMode === 'required')
-    check('外键 Restrict：有授权的机构删不掉', await rejects(() => client.organization.delete({ where: { id: 'bl-sentinel-org' } })))
+    check('CHECK 兜底挡住：licenseMode 非法值', await rejects(() => client.organization.update({ where: { id: 'bl-sentinel-org' }, data: { licenseMode: 'weird' }, select: { id: true } })))
+    await client.organization.update({ where: { id: 'bl-sentinel-org' }, data: { licenseMode: 'required' }, select: { id: true } })
+    check('licenseMode 可以改成 required', (await client.organization.findUniqueOrThrow({ where: { id: 'bl-sentinel-org' }, select: { licenseMode: true } })).licenseMode === 'required')
+    check('外键 Restrict：有授权的机构删不掉', await rejects(() => client.organization.delete({ where: { id: 'bl-sentinel-org' }, select: { id: true } })))
     check('被拒的坏数据一条都没写进去', (await client.license.count()) === 1)
     await client.license.delete({ where: { id: license.id } })
 

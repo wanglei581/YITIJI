@@ -10,7 +10,7 @@ ER 图人是读不了的。全量关系见下方表格和 `graph.json`。
 ```mermaid
 flowchart TD
   EndUser["EndUser<br/><small>34 字段</small>"]
-  Organization["Organization<br/><small>34 字段</small>"]
+  Organization["Organization<br/><small>35 字段</small>"]
   Terminal["Terminal<br/><small>31 字段</small>"]
   FileObject["FileObject<br/><small>50 字段</small>"]
   Job["Job<br/><small>47 字段</small>"]
@@ -133,7 +133,7 @@ flowchart TD
 | **Order** | 43 | CopyJob、OrderItem、PaymentAttempt、PrintTask、Refund | 35 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>… |
 | **OrderItem** | 15 | Order | 11 个文件<br/>`console-screen/console-screen.printed-pages.ts`<br/>`member-print-orders/package-order-fulfillment.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>… |
 | **OrderSubmissionLedger** | 11 | — | 2 个文件<br/>`member-print-orders/order-submission-ledger.ts`<br/>`member-privacy/member-closure-retention.ts` |
-| **Organization** | 34 | CompanyProfile、Job、JobDataQualitySnapshot、JobFair、JobSource、License、OfflineAgencyProfile、OnlinePlatformDirectory、PolicyPost、QualificationRecord、ServiceProject、Terminal、User | 28 个文件<br/>`ai/usage/ai-usage-summary.ts`<br/>`auth/auth.service.ts`<br/>`auth/partner-account-action.service.ts`<br/>… |
+| **Organization** | 35 | CompanyProfile、Job、JobDataQualitySnapshot、JobFair、JobSource、License、OfflineAgencyProfile、OnlinePlatformDirectory、PolicyPost、QualificationRecord、ServiceProject、Terminal、User | 29 个文件<br/>`admin-ops/org-device-alert-webhook.service.ts`<br/>`ai/usage/ai-usage-summary.ts`<br/>`auth/auth.service.ts`<br/>… |
 | **PartnerOrgNotice** | 8 | — | 2 个文件<br/>`policies/policies.service.ts`<br/>`recruitment-hosting/recruitment-emergency.service.ts` |
 | **PaymentAttempt** | 13 | Order | 5 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>`payment/online-payment.service.ts`<br/>… |
 | **PiiFinding** | 11 | DocumentProcessTask | 2 个文件<br/>`materials/materials.service.ts`<br/>`member-privacy/member-closure.service.ts` |
@@ -163,7 +163,7 @@ flowchart TD
 | **SystemBroadcast** | 9 | BroadcastReadState | 3 个文件<br/>`assistant/daily-brief.service.ts`<br/>`community/community.service.ts`<br/>`member-notifications/member-notifications.service.ts` |
 | **Terminal** | 31 | ActiveReleaseObservationAssignment、AgentReleaseTarget、Organization、PrintTask、ScanTask、ServiceDeployment、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit | 49 个文件<br/>`activity/activity.controller.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-ops/derived-print-quota-alerts.ts`<br/>… |
 | **TerminalBindCode** | 10 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
-| **TerminalCapability** | 9 | Terminal | 4 个文件<br/>`admin-ops/derived-scan-device-alerts.ts`<br/>`console-screen/console-screen.twin.ts`<br/>`copy-jobs/copy-job-store.service.ts`<br/>… |
+| **TerminalCapability** | 9 | Terminal | 5 个文件<br/>`admin-ops/derived-scan-device-alerts.ts`<br/>`console-screen/console-screen.twin.ts`<br/>`copy-jobs/copy-job-store.service.ts`<br/>… |
 | **TerminalCredential** | 9 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
 | **TerminalHeartbeat** | 24 | Terminal | 9 个文件<br/>`admin-ops/derived-alerts.ts`<br/>`admin-ops/derived-scan-device-alerts.ts`<br/>`console-screen/console-screen.twin.ts`<br/>… |
 | **TerminalReleaseObservation** | 10 | AgentReleaseTarget | 1 个文件<br/>`terminals/release-observation.service.ts` |
