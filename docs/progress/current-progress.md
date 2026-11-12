@@ -6,11 +6,11 @@
 - 建单写库前只读预判，与取件 `assertFreePrintQuota` 同一份配置、同一个面数算法（计费页数 × 份数）。只判实付 0 元的单，不扣额度。扣额度仍在取件放行事务里。取件被拒时订单保持待领取、明天还能领，这条没改。
 - 单笔面数大于生效上限（会员每日上限和该机每日上限里更小的那个，含机器覆盖）时拒绝：400，错误码 `PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES`。文案按更紧的那个上限和份数分四句。本机上限更紧且份数大于 1：「这台机器每天最多免费打印 N 面，这单 M 面。可以换一台机器下单，或减少份数。」本机更紧且份数为 1：「这台机器每天最多免费打印 N 面，这单 M 面，可以换一台机器下单。」每人上限更紧或相等且份数大于 1：「这单 M 面，超过每人每天免费 N 面的上限，请减少份数后再下单。」每人更紧或相等且份数为 1：「这份文件 M 面，超过每人每天免费 N 面的上限，暂时不能免费打印。」材料包传整单份数。
 - 不超上限、但今天剩余不够：照常建单。创建回包可带 `freeQuotaNotice`：`{ remainingSides, requestedSides, resetsAt }`，`resetsAt` 是次日北京 0 点的 ISO 时间。幂等回放只在订单仍待领取、没过期、没取消、没放行、且订单上有机器号时才带；已放行、已打印完成、已取消、已过期，或没有机器号，都不带。没有机器号时也不查用量。今天够用时不带这个字段。
-- 材料包下单、取件写库前、放行事务三处都按这单还没打完的各项合计判。第一次放行时就是整包合计。放行后后续各项由 advance 连续派发，不再判额度：整包合计准入，放行后连续履约。单文件单仍按本单面数。取件被拒时订单保持待领取、明天还能领。
+- 材料包下单、取件写库前、放行事务三处都按这单还没打完的各项合计判。第一次放行时就是整包合计。放行后后续各项由 advance 连续派发，不再判额度：整包合计准入，放行后连续履约。单文件单仍按本单面数。取件被拒时订单保持待领取、明天还能领。材料包放行后，还没打的项一直计入当天占用，直到打出或订单取消、过期。已经建了任务的项只按任务算，不重复计。当前项打印失败、还能等同码续打时，后面没派发的项继续占用。关单同样释放。advance 仍不看取消、过期和关单：用量不再计入之后，若当前项已经在打并随后完成，后面几项仍可能被派发。
 - 零元单建单后仍立刻记为免费已付。到机码仍从 `paidAt` 起 7 天，源文件延长到同一截止。这条只加了断言，没改行为。材料包零元单同一条。
 - 小程序错误文案白名单还没登记这个新码。接口会原样返回上面的中文，页面在包 3（AI 与错误文案）登记前仍用兜底句。
 - 已知限制：管理员把每天上限调低之后，已经建好、面数超过新上限的老单，回放时不带提示（`rejectOverCap: false` 返回空），到机取件仍会被拒。这次不改。
-- 验证（本机 CST +0800 与 TZ=UTC 各一遍，全部通过；未部署）：在 services/api 用 `pnpm run -s` 跑了 typecheck、verify:free-print-quota、verify:miniapp-cloud-print-m2、verify:package-order-fulfillment、verify:copy-quota、verify:copy-c1b、verify:print-jobs（这条里接着跑了 verify:pickup-code-share 和 verify:pickup-code-resume）、verify:member-print-orders、verify:http-exception-filter、verify:backend-p0-contracts。另在 apps/miniapp 跑了 `node scripts/verify-miniapp-api-contract.mjs`。写库用 prisma/verify-p4-quota-1112.db 的隔离副本，没有改线上配置。
+- 验证（2026-11-12，本机时区与 TZ=UTC 各一遍；未部署）：在 services/api 用 `pnpm run -s`，`VERIFICATION_DATABASE_TARGET=isolated`，`DATABASE_URL=file:/tmp/verify-p4-quota-round3.db`，Redis `redis://127.0.0.1:6379/12`。两遍都通过：typecheck、verify:free-print-quota、verify:miniapp-cloud-print-m2、verify:package-order-fulfillment、verify:print-jobs（这条里接着跑了 verify:pickup-code-share 和 verify:pickup-code-resume）、verify:member-print-orders、verify:copy-quota、verify:copy-c1b、verify:backend-p0-contracts、verify:package-order-idempotency、verify:member-order-timeline。本机 verify:print-jobs 第一次因临时库还没有表失败，建表后重跑通过，不是额度逻辑失败。材料包和单文件云打印的完成态回放这轮都单独跑到：订单已打印完成，但取件被改回待领取、任务指针清空时，同键回放不带 freeQuotaNotice；再把任务状态改回待放行，同一条回放会带。小程序页面消费新错误码和 freeQuotaNotice 这轮没改，也没跑小程序契约。没有改线上配置。
 
 ## 2026-11-12：一体机简历优化修「采纳了改写却换不上」——稿里还是原文时按本人选择换成改写；优化稿简介不再截在 300 字（PR #1617，未部署）
 

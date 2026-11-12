@@ -81,17 +81,21 @@ export async function assertFreePrintQuota(
 
 /**
  * 幂等回放是否还要附 freeQuotaNotice。
- * 只有仍待领取、没过期、没取消、没放行，并且订单上有机器号时才算。
+ * 只有仍待领取、没过期、没取消、没放行、没打印完成，并且订单上有机器号时才算。
  * 没有机器号时调用方不得拿空串去查机器和用量。
  * 已放行、已打印完成、已取消、已过期都不附。
+ * 完成态单独看 taskStatus：即使取件状态被改回待领取、任务指针已空，打完的单也不附。
  */
 export function replayAttachesFreeQuotaNotice(order: {
   terminalId: string | null
   pickupStatus: string
   printTaskId: string | null
   pickupCodeExpiresAt: Date | null
+  taskStatus?: string | null
 }): boolean {
   if (!order.terminalId) return false
+  // 已打印完成不是待领取。反向变异：删掉这一行，完成态会被当成待领取并带上 freeQuotaNotice。
+  if (order.taskStatus === 'completed') return false
   if (order.pickupStatus !== 'pending') return false
   if (order.printTaskId) return false
   if (order.pickupCodeExpiresAt && order.pickupCodeExpiresAt.getTime() <= Date.now()) return false

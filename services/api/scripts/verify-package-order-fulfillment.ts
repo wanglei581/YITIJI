@@ -25,7 +25,12 @@ import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
 import { setPrintScanCapabilityModeForTest, TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
 import { signFileUrl } from '../src/files/signing'
-import { setFreePrintQuotaClock } from '../src/print-jobs/free-print-quota.policy'
+import {
+  PRINT_MEMBER_DAILY_QUOTA_REACHED,
+  PRINT_TERMINAL_DAILY_QUOTA_REACHED,
+  setFreePrintQuotaClock,
+} from '../src/print-jobs/free-print-quota.policy'
+import { loadFreePrintUsage, type FreePrintUsage } from '../src/print-jobs/free-print-quota.usage'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { buildRealPdf } from './support/minimal-pdf'
 
@@ -169,7 +174,7 @@ async function main(): Promise<void> {
   const fileIds = [0, 1, 2].map((seq) => `file_package_${seq}_${suffix}`)
   const storageKeys: string[] = []
 
-  async function seedFile(fileId: string, seq: number, pageCount = 2): Promise<void> {
+  async function seedFile(fileId: string, seq: number, pageCount = 2, ownerId = userId): Promise<void> {
     const storageKey = `verify/package-order/${fileId}.pdf`
     const pdf = buildRealPdf(pageCount)
     await storage.putObject(storageKey, pdf, 'application/pdf', LOCAL_BUCKET_SENTINEL)
@@ -184,9 +189,9 @@ async function main(): Promise<void> {
         mimeType: 'application/pdf',
         sizeBytes: pdf.length,
         sha256: createHash('sha256').update(pdf).digest('hex'),
-        endUserId: userId,
+        endUserId: ownerId,
         ownerType: 'user',
-        ownerId: userId,
+        ownerId,
         purpose: 'print_doc',
         status: 'active',
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
@@ -195,7 +200,7 @@ async function main(): Promise<void> {
     const task = await prisma.documentProcessTask.create({
       data: {
         kind: 'pii_scan', status: 'completed', requesterMode: 'member', sourceFileId: fileId,
-        endUserId: userId, expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        endUserId: ownerId, expiresAt: new Date(Date.now() + 60 * 60 * 1000),
         paramsJson: JSON.stringify({ sourceSha256: createHash('sha256').update(pdf).digest('hex') }),
       },
     })
@@ -566,8 +571,8 @@ async function main(): Promise<void> {
 
       if (!noticed.pickupCode) fail('带提示的材料包必须有到机码')
       const deniedPickup = await captureQuotaError(() => pickup.claim(noticed.pickupCode!, terminalId))
-      if (deniedPickup.status !== 429 || !deniedPickup.code) {
-        fail(`今天额度不够时材料包取件必须 429，实际 ${JSON.stringify(deniedPickup)}`)
+      if (deniedPickup.status !== 429 || deniedPickup.code !== PRINT_MEMBER_DAILY_QUOTA_REACHED) {
+        fail(`今天额度不够时材料包取件必须 429 ${PRINT_MEMBER_DAILY_QUOTA_REACHED}，实际 ${JSON.stringify(deniedPickup)}`)
       }
       const deniedRow = await prisma.order.findUnique({
         where: { id: noticed.orderId },
@@ -609,12 +614,203 @@ async function main(): Promise<void> {
       if (!done || done.taskStatus !== 'completed' || done.orderItems.some((item) => item.status !== 'completed')) {
         fail(`额度够时整包各项都要打完，实际 ${JSON.stringify(done?.orderItems.map((item) => ({ seq: item.seq, status: item.status })))}`)
       }
+      const doneTaskIds = done.orderItems.flatMap((item) => (item.printTaskId ? [item.printTaskId] : []))
+      await prisma.printTask.updateMany({
+        where: { id: { in: doneTaskIds } },
+        data: { status: 'completed', completedAt: quotaNow, errorCode: null },
+      })
+      // 完成态夹具必须和「已放行未完成」区分开：取件改回待领取、任务指针清空，只留 taskStatus=completed。
+      // 若完成态被当成待领取，下面第一条会带上提示。随后把 taskStatus 改回待放行，同键回放必须带提示，证明上一条不是靠取件状态顺便通过。
+      await prisma.order.update({
+        where: { id: noticed.orderId },
+        data: { taskStatus: 'completed', pickupStatus: 'pending', printTaskId: null },
+      })
       const replayDone = await packages.create(userId, packageDto, noticeKey)
       if ('freeQuotaNotice' in replayDone) fail('材料包打印完成后的同键回放不得带 freeQuotaNotice')
-      pass('额度够时材料包整包各项都能打完；放行后和打印完成后回放都不带提示')
+      await prisma.order.update({
+        where: { id: noticed.orderId },
+        data: { taskStatus: 'pending_release' },
+      })
+      const replayRewound = await packages.create(userId, packageDto, noticeKey)
+      if (!replayRewound.freeQuotaNotice || replayRewound.freeQuotaNotice.requestedSides !== 40 || replayRewound.freeQuotaNotice.remainingSides !== 10) {
+        fail(`完成态若被当成待领取，同键回放必须带 freeQuotaNotice（剩余 10、请求 40），实际 ${JSON.stringify(replayRewound.freeQuotaNotice ?? null)}`)
+      }
+      pass('额度够时材料包整包各项都能打完；打印完成后回放不带提示，改回待放行后同一条回放会带')
       } finally {
         setFreePrintQuotaClock(null)
       }
+
+      // 时钟已还原：下面新建的任务落在真实的今天，和用量统计的北京自然日对齐。单价仍是 0。
+      const occupancyText = (usage: FreePrintUsage) =>
+        `${usage.terminalUsed},${usage.terminalInFlight},${usage.memberUsed},${usage.memberInFlight}`
+      const occupancyTotal = (usage: FreePrintUsage) =>
+        usage.terminalUsed + usage.terminalInFlight + usage.memberUsed + usage.memberInFlight
+
+      async function bootHold(label: string, dailyFreePrintSides: number | null): Promise<{ ownerId: string; termId: string }> {
+        const ownerId = `eu_hold_${label}_${suffix}`
+        const termId = `terminal_hold_${label}_${suffix}`
+        await prisma.endUser.create({ data: { id: ownerId, phoneHash: `hash-${ownerId}`, phoneEnc: `enc-${ownerId}` } })
+        await prisma.terminal.create({
+          data: {
+            id: termId,
+            terminalCode: `HOLD-${label}-${suffix}`,
+            agentToken: `token-${termId}`,
+            deviceFingerprint: `fp-${termId}`,
+            displayName: '额度占用验证终端',
+            locationLabel: '验证点',
+            dailyFreePrintSides,
+          },
+        })
+        await prisma.terminalCapability.create({ data: { terminalId: termId, capabilityKey: 'document_print', status: 'available' } })
+        await prisma.terminalHeartbeat.create({ data: { terminalId: termId, status: 'online', localTaskDatabaseAvailable: true } })
+        return { ownerId, termId }
+      }
+
+      async function claimFresh(termId: string, code: string) {
+        await prisma.terminalHeartbeat.create({ data: { terminalId: termId, status: 'online', localTaskDatabaseAvailable: true } })
+        return pickup.claim(code, termId)
+      }
+
+      function taskIdOf(view: { taskId?: string | null }, label: string): string {
+        if (!view.taskId) fail(`${label}: 放行必须返回打印任务`)
+        return view.taskId
+      }
+
+      async function releaseHeldPackage(ownerId: string, termId: string): Promise<string> {
+        const fileA = `file_hold_${ownerId}_a`
+        const fileB = `file_hold_${ownerId}_b`
+        await seedFile(fileA, 0, 20, ownerId)
+        await seedFile(fileB, 1, 20, ownerId)
+        const created = await packages.create(ownerId, {
+          terminalId: termId,
+          files: [{ fileId: fileA }, { fileId: fileB }],
+          params: { copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+        }, randomUUID())
+        if (!created.pickupCode) fail(`${ownerId}: 20+20 材料包必须有到机码`)
+        const released = await claimFresh(termId, created.pickupCode)
+        taskIdOf(released, ownerId)
+        const items = await prisma.orderItem.findMany({ where: { orderId: created.orderId }, orderBy: { seq: 'asc' } })
+        if (!items[0]?.printTaskId || items[1]?.printTaskId || items[1]?.status !== 'pending') {
+          fail(`${ownerId}: 放行后只有第一项有任务，第二项必须还没派发，实际 ${JSON.stringify(items.map((item) => ({ seq: item.seq, status: item.status, task: item.printTaskId })))}`)
+        }
+        return created.orderId
+      }
+
+      async function placeSingle(ownerId: string, termId: string, pages: number): Promise<{ orderId: string; pickupCode: string }> {
+        const fileId = `file_hold_${ownerId}_${pages}_${randomUUID().slice(0, 8)}`
+        await seedFile(fileId, pages, pages, ownerId)
+        const created = await packages.create(ownerId, {
+          terminalId: termId,
+          files: [{ fileId }],
+          params: { copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+        }, randomUUID())
+        if (!created.pickupCode) fail(`${ownerId}: ${pages} 面单必须有到机码`)
+        return { orderId: created.orderId, pickupCode: created.pickupCode }
+      }
+
+      const cross = await bootHold('cross', null)
+      const crossUsage = await loadFreePrintUsage(prisma, cross.termId, cross.ownerId, new Date())
+      await releaseHeldPackage(cross.ownerId, cross.termId)
+      const crossHeld = await loadFreePrintUsage(prisma, cross.termId, cross.ownerId, new Date())
+      if (occupancyText(crossUsage) !== '0,0,0,0' || occupancyText(crossHeld) !== '0,40,0,40') {
+        fail(`20+20 放行后应只多出在途 40 面，放行前 ${occupancyText(crossUsage)}，放行后 ${occupancyText(crossHeld)}`)
+      }
+      const thirty = await placeSingle(cross.ownerId, cross.termId, 30)
+      const deniedThirty = await captureQuotaError(() => claimFresh(cross.termId, thirty.pickupCode))
+      if (deniedThirty.status !== 429 || deniedThirty.code !== PRINT_MEMBER_DAILY_QUOTA_REACHED) {
+        fail(`同一会员再领 30 面必须 429 ${PRINT_MEMBER_DAILY_QUOTA_REACHED}，实际 ${JSON.stringify(deniedThirty)}`)
+      }
+      const deniedThirtyRow = await prisma.order.findUnique({ where: { id: thirty.orderId }, select: { pickupStatus: true, printTaskId: true } })
+      if (deniedThirtyRow?.pickupStatus !== 'pending' || deniedThirtyRow.printTaskId) {
+        fail(`30 面被拒后必须仍待领取，实际 ${JSON.stringify(deniedThirtyRow)}`)
+      }
+      const ten = await placeSingle(cross.ownerId, cross.termId, 10)
+      const releasedTen = await claimFresh(cross.termId, ten.pickupCode)
+      const tenTaskId = taskIdOf(releasedTen, '10 面')
+      const tenRow = await prisma.order.findUnique({ where: { id: ten.orderId }, select: { pickupStatus: true, printTaskId: true } })
+      if (tenRow?.pickupStatus !== 'used' || tenRow.printTaskId !== tenTaskId) fail('同一会员再领 10 面必须放行')
+      pass('交叉插单：20+20 放行后，同一会员 30 面 429 会员日额度，10 面放行')
+
+      const machine = await bootHold('machine', 50)
+      await releaseHeldPackage(machine.ownerId, machine.termId)
+      const otherId = `eu_hold_other_${suffix}`
+      await prisma.endUser.create({ data: { id: otherId, phoneHash: `hash-${otherId}`, phoneEnc: `enc-${otherId}` } })
+      const otherThirty = await placeSingle(otherId, machine.termId, 30)
+      const deniedMachine = await captureQuotaError(() => claimFresh(machine.termId, otherThirty.pickupCode))
+      if (deniedMachine.status !== 429 || deniedMachine.code !== PRINT_TERMINAL_DAILY_QUOTA_REACHED) {
+        fail(`另一会员在同一台再领 30 面必须 429 ${PRINT_TERMINAL_DAILY_QUOTA_REACHED}，实际 ${JSON.stringify(deniedMachine)}`)
+      }
+      const otherTen = await placeSingle(otherId, machine.termId, 10)
+      taskIdOf(await claimFresh(machine.termId, otherTen.pickupCode), '本机 10 面')
+      pass('本机维度：另一会员在同一台上领 30 面 429 本机日额度，10 面放行')
+
+      const once = await bootHold('once', null)
+      const onceOrderId = await releaseHeldPackage(once.ownerId, once.termId)
+      const beforeDispatch = await loadFreePrintUsage(prisma, once.termId, once.ownerId, new Date())
+      const onceTaskId = (await prisma.order.findUnique({ where: { id: onceOrderId }, select: { printTaskId: true } }))?.printTaskId
+      if (!onceTaskId) fail('不重复计用例必须已经有第一项任务')
+      const onceAuth = `Bearer token-${once.termId}`
+      const onceClaim = await agent.claimTasks(once.termId, { maxTasks: 1 }, onceAuth)
+      if (onceClaim[0]?.taskId !== onceTaskId) fail('不重复计用例必须领到第一项')
+      await agent.patchTaskStatus(onceTaskId, { status: 'completed' }, onceAuth, once.termId)
+      const onceItems = await prisma.orderItem.findMany({ where: { orderId: onceOrderId }, orderBy: { seq: 'asc' } })
+      if (onceItems[0]?.status !== 'completed' || !onceItems[1]?.printTaskId) fail('第二项必须已经派发')
+      const afterDispatch = await loadFreePrintUsage(prisma, once.termId, once.ownerId, new Date())
+      if (
+        occupancyTotal(beforeDispatch) !== occupancyTotal(afterDispatch)
+        || occupancyText(beforeDispatch) !== '0,40,0,40'
+        || occupancyText(afterDispatch) !== '20,20,20,20'
+      ) {
+        fail(`第二项派发后占用总数必须不变，之前 ${occupancyText(beforeDispatch)}，之后 ${occupancyText(afterDispatch)}`)
+      }
+      pass('第二项派发后不再按剩余项重复计，占用总数不变')
+
+      const cancelHold = await bootHold('cancel', null)
+      const cancelOrderId = await releaseHeldPackage(cancelHold.ownerId, cancelHold.termId)
+      const cancelThirty = await placeSingle(cancelHold.ownerId, cancelHold.termId, 30)
+      const deniedCancel = await captureQuotaError(() => claimFresh(cancelHold.termId, cancelThirty.pickupCode))
+      if (deniedCancel.status !== 429 || deniedCancel.code !== PRINT_MEMBER_DAILY_QUOTA_REACHED) {
+        fail(`取消前 30 面必须先被会员日额度拒绝，实际 ${JSON.stringify(deniedCancel)}`)
+      }
+      await prisma.order.update({
+        where: { id: cancelOrderId },
+        data: { pickupStatus: 'cancelled', taskStatus: 'cancelled' },
+      })
+      const afterCancel = await loadFreePrintUsage(prisma, cancelHold.termId, cancelHold.ownerId, new Date())
+      if (occupancyText(afterCancel) !== '0,20,0,20') {
+        fail(`取消后只剩第一项任务的 20 面，实际 ${occupancyText(afterCancel)}`)
+      }
+      taskIdOf(await claimFresh(cancelHold.termId, cancelThirty.pickupCode), '取消后 30 面')
+      pass('材料包取消后，还没建任务的项不再占用，同一会员 30 面可以放行')
+
+      const expireHold = await bootHold('expire', null)
+      const expireOrderId = await releaseHeldPackage(expireHold.ownerId, expireHold.termId)
+      await prisma.order.update({
+        where: { id: expireOrderId },
+        data: { pickupCodeExpiresAt: new Date(Date.now() - 1000) },
+      })
+      const afterExpire = await loadFreePrintUsage(prisma, expireHold.termId, expireHold.ownerId, new Date())
+      if (occupancyText(afterExpire) !== '0,20,0,20') {
+        fail(`到机码过期后只剩第一项任务的 20 面，实际 ${occupancyText(afterExpire)}`)
+      }
+      const expireThirty = await placeSingle(expireHold.ownerId, expireHold.termId, 30)
+      taskIdOf(await claimFresh(expireHold.termId, expireThirty.pickupCode), '过期后 30 面')
+      pass('到机码过期后，还没建任务的项不再占用，同一会员 30 面可以放行')
+
+      const failedHold = await bootHold('failed', null)
+      const failedOrderId = await releaseHeldPackage(failedHold.ownerId, failedHold.termId)
+      const failedTaskId = (await prisma.order.findUnique({ where: { id: failedOrderId }, select: { printTaskId: true } }))?.printTaskId
+      if (!failedTaskId) fail('失败后续打用例必须已经有第一项任务')
+      const failedAuth = `Bearer token-${failedHold.termId}`
+      const failedClaim = await agent.claimTasks(failedHold.termId, { maxTasks: 1 }, failedAuth)
+      if (failedClaim[0]?.taskId !== failedTaskId) fail('失败后续打用例必须领到第一项')
+      await agent.patchTaskStatus(failedTaskId, { status: 'failed' }, failedAuth, failedHold.termId)
+      const failedItems = await prisma.orderItem.findMany({ where: { orderId: failedOrderId }, orderBy: { seq: 'asc' } })
+      const failedUsage = await loadFreePrintUsage(prisma, failedHold.termId, failedHold.ownerId, new Date())
+      if (failedItems[0]?.status !== 'failed' || failedItems[1]?.printTaskId || failedItems[1]?.status !== 'pending' || occupancyText(failedUsage) !== '0,20,0,20') {
+        fail(`当前项失败后剩余项仍应占用 20 面，实际 ${occupancyText(failedUsage)}，行 ${JSON.stringify(failedItems.map((item) => ({ seq: item.seq, status: item.status, task: item.printTaskId })))}`)
+      }
+      pass('当前项打印失败、还能等同码续打时，还没派发的项仍占用')
     } finally {
       await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: originalBwUnit } })
     }

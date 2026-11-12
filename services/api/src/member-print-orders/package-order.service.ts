@@ -297,6 +297,7 @@ export class PackageOrderService {
    * 与 toView 的两点差异，都是有意的：
    *   1. **不签发 paymentSessionToken**。那是「到机器前要付款」这一步才需要的凭证，
    *      由 detail 现取；列表一次返回 N 个付款令牌只会放大暴露面，没有对应收益。
+   *      详情也一样：有机器号才签发，没有机器号时省略该字段，不是必有字段。
    *   2. **不返回逐文件明细**（items）。列表只回条目数，明细进详情页拿。
    *
    * 到机码照常返回：找回它正是本端点存在的理由，且判据与 detail 完全一致
@@ -462,7 +463,7 @@ export class PackageOrderService {
     pickupCode: string | null,
     reprint: Pick<ArrivalReprintFields, 'reprintAllowed' | 'reprintRemaining' | 'reprintNotice'> = { reprintAllowed: false, reprintRemaining: null, reprintNotice: null },
   ) {
-    // 没有机器号签不出付款令牌，这种回放省略该字段。
+    // 没有机器号签不出付款令牌。回包省略 paymentSessionToken，不要把它写成必有字段。
     const paymentSessionToken = order.terminalId
       ? createPaymentSessionToken({
           orderId: order.id,

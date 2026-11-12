@@ -1109,13 +1109,27 @@ async function main(): Promise<void> {
       )
       if ('freeQuotaNotice' in replayReleased) fail('放行后的同键回放不得带 freeQuotaNotice')
       await prisma.printTask.update({ where: { id: releaseTaskId }, data: { status: 'completed', completedAt: quotaNow, errorCode: null } })
-      await prisma.order.update({ where: { id: noticed.id }, data: { taskStatus: 'completed' } })
+      // 完成态夹具和「已放行未完成」区分开：取件改回待领取、任务指针清空，只留 taskStatus=completed。
+      // 若完成态被当成待领取，这条回放会带提示。随后改回待放行，同键回放必须带提示。
+      await prisma.order.update({
+        where: { id: noticed.id },
+        data: { taskStatus: 'completed', pickupStatus: 'pending', printTaskId: null },
+      })
       const replayDone = await memberOrders.create(
         userId,
         { fileId: file20, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' },
         noticeKey,
       )
       if ('freeQuotaNotice' in replayDone) fail('打印完成后的同键回放不得带 freeQuotaNotice')
+      await prisma.order.update({ where: { id: noticed.id }, data: { taskStatus: 'pending_release' } })
+      const replayRewound = await memberOrders.create(
+        userId,
+        { fileId: file20, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+        noticeKey,
+      )
+      if (!replayRewound.freeQuotaNotice || replayRewound.freeQuotaNotice.requestedSides !== 20 || replayRewound.freeQuotaNotice.remainingSides !== 0) {
+        fail(`完成态若被当成待领取，同键回放必须带 freeQuotaNotice（剩余 0、请求 20），实际 ${JSON.stringify(replayRewound.freeQuotaNotice ?? null)}`)
+      }
 
       const cancelKey = randomUUID()
       const cancelOrder = await memberOrders.create(
@@ -1149,7 +1163,7 @@ async function main(): Promise<void> {
         expireKey,
       )
       if ('freeQuotaNotice' in replayExpired) fail('过期后的同键回放不得带 freeQuotaNotice')
-      pass('同键回放：放行后、打印完成、取消、过期都不带 freeQuotaNotice')
+      pass('同键回放：放行后、打印完成、取消、过期都不带 freeQuotaNotice；完成态改回待放行后会带')
       } finally {
         setFreePrintQuotaClock(null)
       }
