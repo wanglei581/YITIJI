@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 638,
+    "endpointCount": 649,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -3761,6 +3761,63 @@
         ]
       },
       {
+        "controller": "services/api/src/admin-ops/org-device-alert-notify.controller.ts",
+        "handler": "SaveDeviceAlertWebhookDto.view",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "Organization"
+        ],
+        "path": "/api/v1/admin/orgs/:id/device-alert-notify",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-ops/org-device-alert-webhook.service.ts"
+        ],
+        "services": [
+          "OrgDeviceAlertWebhookService"
+        ]
+      },
+      {
+        "controller": "services/api/src/admin-ops/org-device-alert-notify.controller.ts",
+        "handler": "SaveDeviceAlertWebhookDto.save",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "Organization"
+        ],
+        "path": "/api/v1/admin/orgs/:id/device-alert-notify",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-ops/org-device-alert-webhook.service.ts"
+        ],
+        "services": [
+          "OrgDeviceAlertWebhookService"
+        ]
+      },
+      {
+        "controller": "services/api/src/admin-ops/org-device-alert-notify.controller.ts",
+        "handler": "SaveDeviceAlertWebhookDto.test",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "Organization"
+        ],
+        "path": "/api/v1/admin/orgs/:id/device-alert-notify/test",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-ops/org-device-alert-webhook.service.ts"
+        ],
+        "services": [
+          "OrgDeviceAlertWebhookService"
+        ]
+      },
+      {
         "controller": "services/api/src/official-channels/official-channels.controller.ts",
         "handler": "OfficialChannelsController.listForAdmin",
         "method": "GET",
@@ -4206,6 +4263,30 @@
         "method": "POST",
         "models": [],
         "path": "/api/v1/admin/print-jobs/:id/verify-outcome",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/print-jobs/print-queue-timeout.controller.ts",
+        "handler": "AdminPrintQueueTimeoutController.get",
+        "method": "GET",
+        "models": [],
+        "path": "/api/v1/admin/print-queue-timeout",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/print-jobs/print-queue-timeout.controller.ts",
+        "handler": "AdminPrintQueueTimeoutController.update",
+        "method": "PUT",
+        "models": [],
+        "path": "/api/v1/admin/print-queue-timeout",
         "roles": [
           "admin"
         ],
@@ -10361,6 +10442,63 @@
         ]
       },
       {
+        "controller": "services/api/src/admin-ops/org-device-alert-notify.controller.ts",
+        "handler": "SaveDeviceAlertWebhookDto.view",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "Organization"
+        ],
+        "path": "/api/v1/partner/device-alert-notify",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-ops/org-device-alert-webhook.service.ts"
+        ],
+        "services": [
+          "OrgDeviceAlertWebhookService"
+        ]
+      },
+      {
+        "controller": "services/api/src/admin-ops/org-device-alert-notify.controller.ts",
+        "handler": "SaveDeviceAlertWebhookDto.save",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "Organization"
+        ],
+        "path": "/api/v1/partner/device-alert-notify",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-ops/org-device-alert-webhook.service.ts"
+        ],
+        "services": [
+          "OrgDeviceAlertWebhookService"
+        ]
+      },
+      {
+        "controller": "services/api/src/admin-ops/org-device-alert-notify.controller.ts",
+        "handler": "SaveDeviceAlertWebhookDto.test",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "Organization"
+        ],
+        "path": "/api/v1/partner/device-alert-notify/test",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-ops/org-device-alert-webhook.service.ts"
+        ],
+        "services": [
+          "OrgDeviceAlertWebhookService"
+        ]
+      },
+      {
         "controller": "services/api/src/jobs/jobs.controller.ts",
         "handler": "JobsController.cancelExcelImport",
         "method": "DELETE",
@@ -11350,6 +11488,18 @@
       },
       {
         "controller": "services/api/src/policies/policies.controller.ts",
+        "handler": "PoliciesController.releaseExistingWithSave",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/partner/policies/:id/release-with-save",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/policies/policies.controller.ts",
         "handler": "PoliciesController.reviewPartnerPolicy",
         "method": "PATCH",
         "models": [
@@ -11369,6 +11519,40 @@
         "services": [
           "PoliciesService"
         ]
+      },
+      {
+        "controller": "services/api/src/policies/policies.controller.ts",
+        "handler": "PoliciesController.previewPolicyDraft",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "Organization",
+          "PartnerOrgNotice",
+          "PolicyPost",
+          "RecruitmentEmergencyHold"
+        ],
+        "path": "/api/v1/partner/policies/draft-check",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/policies/policies.service.ts"
+        ],
+        "services": [
+          "PoliciesService"
+        ]
+      },
+      {
+        "controller": "services/api/src/policies/policies.controller.ts",
+        "handler": "PoliciesController.releaseWithSave",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/partner/policies/release-with-save",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/orgs/partner-org.controller.ts",
@@ -11578,6 +11762,7 @@
           "ScanTask",
           "SyncLog",
           "Terminal",
+          "TerminalCapability",
           "TerminalHeartbeat"
         ],
         "path": "/api/v1/partner/stats",
@@ -11634,6 +11819,7 @@
           "ScanTask",
           "SyncLog",
           "Terminal",
+          "TerminalCapability",
           "TerminalHeartbeat"
         ],
         "path": "/api/v1/partner/terminal-operations",
@@ -11871,6 +12057,7 @@
           "FileObject",
           "Order",
           "OrderItem",
+          "PlatformSetting",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -11922,6 +12109,7 @@
           "FileObject",
           "Order",
           "OrderItem",
+          "PlatformSetting",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -11950,6 +12138,7 @@
           "FileObject",
           "Order",
           "OrderItem",
+          "PlatformSetting",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -11978,6 +12167,7 @@
           "FileObject",
           "Order",
           "OrderItem",
+          "PlatformSetting",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -13809,7 +13999,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 276,
+      "reachableFileCount": 281,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -14302,6 +14492,7 @@
             "GET /admin/orgs",
             "GET /admin/orgs/:param",
             "GET /admin/orgs/:param/content-trust",
+            "GET /admin/orgs/:param/device-alert-notify",
             "GET /admin/orgs/:param/official-channels",
             "GET /admin/orgs/:param/verified-official-domains",
             "GET /admin/system/recruitment-hosting",
@@ -14322,10 +14513,12 @@
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new",
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/start",
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/verify",
+            "POST /admin/orgs/:param/device-alert-notify/test",
             "POST /admin/recruitment-emergency/circuit-break",
             "POST /admin/recruitment-emergency/takedown",
             "PUT /admin/branding",
             "PUT /admin/orgs/:param/accounts/:param/email",
+            "PUT /admin/orgs/:param/device-alert-notify",
             "PUT /admin/orgs/:param/verified-official-domains"
           ],
           "file": "apps/admin/src/routes/partners/index.tsx",
@@ -14588,7 +14781,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 303
+      "sourceFileCount": 308
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -17677,7 +17870,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 98,
+      "reachableFileCount": 101,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -17713,6 +17906,7 @@
             "POST /partner/jobs/import",
             "POST /partner/policies",
             "POST /partner/policies/:param/eligibility-preview",
+            "POST /partner/policies/draft-check",
             "PUT /partner/policies/:param/eligibility-rules",
             "PUT /partner/profile",
             "PUT /partner/smart-campus/terminals/:param/config"
@@ -17910,6 +18104,7 @@
             "POST /partner/official-channels",
             "POST /partner/policies",
             "POST /partner/policies/:param/eligibility-preview",
+            "POST /partner/policies/draft-check",
             "PUT /partner/policies/:param/eligibility-rules",
             "PUT /partner/smart-campus/terminals/:param/config"
           ],
@@ -17927,6 +18122,7 @@
             "DELETE /partner/official-channels/:param",
             "GET /partner/data-sources",
             "GET /partner/data-sources/capabilities",
+            "GET /partner/device-alert-notify",
             "GET /partner/excel/mapping-rule",
             "GET /partner/fairs",
             "GET /partner/jobs",
@@ -17944,10 +18140,12 @@
             "PATCH /partner/official-channels/:param",
             "POST /partner/data-sources",
             "POST /partner/data-sources/:param/rotate-credential",
+            "POST /partner/device-alert-notify/test",
             "POST /partner/excel/:param/confirm",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
             "POST /partner/official-channels",
+            "PUT /partner/device-alert-notify",
             "PUT /partner/profile",
             "PUT /partner/smart-campus/terminals/:param/config"
           ],
@@ -18196,7 +18394,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 101
+      "sourceFileCount": 104
     }
   },
   "dataModel": {
@@ -18451,6 +18649,7 @@
           "services/api/src/payment/refund-amount-hold.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
+          "services/api/src/print-jobs/print-queue-timeout.ts",
           "services/api/src/terminals/claim-unprintable-file.ts",
           "services/api/src/terminals/terminals-admin.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts",
@@ -19279,6 +19478,7 @@
           "services/api/src/print-jobs/pickup-code-resume.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
+          "services/api/src/print-jobs/print-queue-timeout.ts",
           "services/api/src/terminals/claim-unprintable-file.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
         ]
@@ -19299,6 +19499,7 @@
           "services/api/src/print-jobs/pickup-code-resume.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
+          "services/api/src/print-jobs/print-queue-timeout.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
         ]
       },
@@ -19312,7 +19513,7 @@
         ]
       },
       {
-        "fieldCount": 34,
+        "fieldCount": 35,
         "name": "Organization",
         "relations": [
           "CompanyProfile",
@@ -19330,6 +19531,7 @@
           "User"
         ],
         "usedBy": [
+          "services/api/src/admin-ops/org-device-alert-webhook.service.ts",
           "services/api/src/ai/usage/ai-usage-summary.ts",
           "services/api/src/auth/auth.service.ts",
           "services/api/src/auth/partner-account-action.service.ts",
@@ -19412,6 +19614,7 @@
           "services/api/src/branding/brand-logo.service.ts",
           "services/api/src/branding/branding.service.ts",
           "services/api/src/print-jobs/free-print-quota.config.ts",
+          "services/api/src/print-jobs/print-queue-timeout.ts",
           "services/api/src/support-contact/support-contact.service.ts"
         ]
       },
@@ -19511,6 +19714,7 @@
           "services/api/src/print-jobs/pickup-code-resume.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
+          "services/api/src/print-jobs/print-queue-timeout.ts",
           "services/api/src/print-jobs/self-service-reprint.ts",
           "services/api/src/terminals/admin-printer-output.ts",
           "services/api/src/terminals/claim-unprintable-file.ts",
@@ -19538,6 +19742,7 @@
           "services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts",
           "services/api/src/print-jobs/pickup-code-resume.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
+          "services/api/src/print-jobs/print-queue-timeout.ts",
           "services/api/src/print-jobs/self-service-reprint.ts",
           "services/api/src/terminals/print-status-attempt.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
@@ -19825,6 +20030,7 @@
           "services/api/src/admin-ops/derived-scan-device-alerts.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/copy-jobs/copy-job-store.service.ts",
+          "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts"
         ]
       },
@@ -19840,7 +20046,7 @@
         ]
       },
       {
-        "fieldCount": 23,
+        "fieldCount": 24,
         "name": "TerminalHeartbeat",
         "relations": [
           "Terminal"
@@ -20547,7 +20753,8 @@
     "apps/admin/src/routes/print-scan/index.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs",
-      "services/api/scripts/verify-free-print-quota.ts"
+      "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-print-queue-timeout.ts"
     ],
     "apps/admin/src/routes/printers/PrinterOutputCell.tsx": [
       "apps/admin/scripts/verify-console-plain-copy.mjs",
@@ -20660,6 +20867,7 @@
       "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs",
       "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-print-completion-evidence.ts",
       "services/api/scripts/verify-terminal-device-config.ts"
     ],
     "apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx": [
@@ -20679,6 +20887,9 @@
       "scripts/verify-datetime-honesty.mjs",
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-terminal-device-config.ts"
+    ],
+    "apps/admin/src/routes/terminals/printCompletionEvidence.ts": [
+      "services/api/scripts/verify-print-completion-evidence.ts"
     ],
     "apps/admin/src/routes/terminals/printerQueueView.ts": [
       "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs"
@@ -22087,6 +22298,7 @@
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-print-queue-timeout.ts",
       "services/api/scripts/verify-wave3-print-aftercare.ts"
     ],
     "apps/kiosk/src/pages/print/PrintMaterialCheckPage.tsx": [
@@ -22124,6 +22336,7 @@
       "apps/kiosk/scripts/verify-print-done-truth.mjs",
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
+      "services/api/scripts/verify-print-queue-timeout.ts",
       "services/api/scripts/verify-wave3-print-aftercare.ts"
     ],
     "apps/kiosk/src/pages/print/PrintPrototypeLayout.tsx": [
@@ -22267,7 +22480,9 @@
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs"
     ],
     "apps/kiosk/src/pages/print/printProgressModel.ts": [
-      "apps/kiosk/scripts/verify-print-done-truth.mjs"
+      "apps/kiosk/scripts/verify-print-done-truth.mjs",
+      "apps/kiosk/scripts/verify-print-queue-timeout-copy.cjs",
+      "services/api/scripts/verify-print-queue-timeout.ts"
     ],
     "apps/kiosk/src/pages/print/printProgressStatus.ts": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
@@ -24246,6 +24461,11 @@
       "apps/partner/scripts/verify-partner-stats-contract.mjs",
       "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
     ],
+    "apps/partner/src/lib/printerStatusLabel.ts": [
+      "apps/admin/scripts/verify-console-batch6-copy.mjs",
+      "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs",
+      "services/api/scripts/verify-org-device-alert.ts"
+    ],
     "apps/partner/src/routes/Page.tsx": [
       "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/admin/scripts/verify-console-screen-details.mjs",
@@ -24458,6 +24678,7 @@
     "apps/terminal-agent/scripts/install-production-agent.ps1": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
       "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
+      "apps/terminal-agent/scripts/verify-print-completion-evidence.ts",
       "services/api/scripts/verify-terminal-bind-code.ts"
     ],
     "apps/terminal-agent/scripts/scan-lease-barrier.helper.ts": [
@@ -24497,6 +24718,10 @@
     ],
     "apps/terminal-agent/scripts/verify-copy-revocations.helper.ts": [
       "apps/terminal-agent/scripts/verify-copy-device.ts"
+    ],
+    "apps/terminal-agent/scripts/verify-print-completion-evidence.ts": [
+      "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
+      "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts"
     ],
     "apps/terminal-agent/scripts/verify-scan-device-engine-r2.helper.ts": [
       "apps/terminal-agent/scripts/verify-scan-device-engine.ts"
@@ -24620,6 +24845,7 @@
     "apps/terminal-agent/src/agent/heartbeat.ts": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
       "apps/terminal-agent/scripts/verify-local-qr-proxy.ts",
+      "apps/terminal-agent/scripts/verify-print-completion-evidence.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-printer-queue-diagnostics.ts",
@@ -24663,6 +24889,9 @@
     "apps/terminal-agent/src/agent/print-queue-hold.ts": [
       "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
+    ],
+    "apps/terminal-agent/src/agent/print-service-log.ts": [
+      "apps/terminal-agent/scripts/verify-print-completion-evidence.ts"
     ],
     "apps/terminal-agent/src/agent/print-task-temp-cleanup.ts": [
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs"
@@ -24852,6 +25081,7 @@
       "apps/terminal-agent/scripts/verify-agent-config-resilience.mjs",
       "apps/terminal-agent/scripts/verify-agent-profile-guard.mjs",
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
+      "apps/terminal-agent/scripts/verify-print-completion-evidence.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-printer-config.mjs",
@@ -25539,6 +25769,7 @@
       "services/api/scripts/verify-pdf-cmap.ts"
     ],
     "services/api/package.json": [
+      "apps/kiosk/scripts/verify-print-queue-timeout-copy.cjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
@@ -25596,10 +25827,14 @@
       "services/api/scripts/verify-partner-account-action-schema.ts"
     ],
     "services/api/prisma/migrations/20260724200000_guard_planned_terminal_updates/migration.sql": [
-      "services/api/scripts/verify-free-print-quota.ts"
+      "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-print-completion-evidence.ts",
+      "services/api/scripts/verify-print-queue-timeout.ts"
     ],
     "services/api/prisma/migrations/20260726003000_guard_retired_terminal/migration.sql": [
-      "services/api/scripts/verify-free-print-quota.ts"
+      "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-print-completion-evidence.ts",
+      "services/api/scripts/verify-print-queue-timeout.ts"
     ],
     "services/api/prisma/migrations/20260901090000_add_agent_release_observation/migration.sql": [
       "services/api/scripts/verify-release-observation-contract.mjs"
@@ -25615,6 +25850,9 @@
     ],
     "services/api/prisma/migrations/20261104150000_add_terminal_heartbeat_printer_queue/migration.sql": [
       "services/api/scripts/verify-terminal-printer-queue.ts"
+    ],
+    "services/api/prisma/migrations/20261111120000_add_terminal_heartbeat_print_completion/migration.sql": [
+      "services/api/scripts/verify-print-completion-evidence.ts"
     ],
     "services/api/prisma/postgres/migrations/20260701123000_add_toolbox_launch_events/migration.sql": [
       "services/api/scripts/verify-toolbox-launch-events.ts"
@@ -25667,6 +25905,9 @@
     ],
     "services/api/prisma/postgres/migrations/20261104150000_add_terminal_heartbeat_printer_queue/migration.sql": [
       "services/api/scripts/verify-terminal-printer-queue.ts"
+    ],
+    "services/api/prisma/postgres/migrations/20261111120000_add_terminal_heartbeat_print_completion/migration.sql": [
+      "services/api/scripts/verify-print-completion-evidence.ts"
     ],
     "services/api/prisma/postgres/schema.prisma": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -25931,7 +26172,9 @@
       "services/api/scripts/verify-content-pipeline-e2e.ts"
     ],
     "services/api/scripts/support/content-pipeline-harness.ts": [
-      "services/api/scripts/verify-content-pipeline-e2e.ts"
+      "services/api/scripts/verify-content-pipeline-e2e.ts",
+      "services/api/scripts/verify-org-device-alert-http.ts",
+      "services/api/scripts/verify-print-reliability-http.ts"
     ],
     "services/api/scripts/support/copy-c1c-verification.ts": [
       "services/api/scripts/verify-copy-c1b.ts"
@@ -26024,7 +26267,9 @@
       "services/api/scripts/verify-pii-manual-confirm.ts",
       "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-policy-publish-gates.ts",
+      "services/api/scripts/verify-print-completion-evidence.ts",
       "services/api/scripts/verify-print-jobs.ts",
+      "services/api/scripts/verify-print-queue-timeout.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-recruitment-emergency-scope.ts",
       "services/api/scripts/verify-recruitment-hosting-default-off.ts",
@@ -26092,6 +26337,9 @@
     "services/api/scripts/support/png-fixtures.ts": [
       "services/api/scripts/verify-brand-logo-image.ts",
       "services/api/scripts/verify-branding.ts"
+    ],
+    "services/api/scripts/support/policy-one-step-http-cases.ts": [
+      "services/api/scripts/verify-content-pipeline-e2e.ts"
     ],
     "services/api/scripts/support/policy-publish-fixture.ts": [
       "services/api/scripts/verify-content-trust-publish-gate.ts",
@@ -26287,6 +26535,9 @@
     "services/api/scripts/verify-policy-scope.ts": [
       "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
+    "services/api/scripts/verify-print-completion-evidence.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
     "services/api/scripts/verify-print-jobs.ts": [
       "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
@@ -26404,7 +26655,8 @@
       "services/api/scripts/verify-admin-ops.ts"
     ],
     "services/api/src/admin-ops/admin-alert-push.service.ts": [
-      "services/api/scripts/verify-alert-push.cjs"
+      "services/api/scripts/verify-alert-push.cjs",
+      "services/api/scripts/verify-org-device-alert.ts"
     ],
     "services/api/src/admin-ops/admin-ops.controller.ts": [
       "services/api/scripts/verify-admin-ops.ts"
@@ -26425,15 +26677,31 @@
       "services/api/scripts/verify-alert-push.cjs",
       "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-org-device-alert.ts",
       "services/api/scripts/verify-queue-dispatch-printer-status.ts",
       "services/api/scripts/verify-scan-device-b4.ts",
       "services/api/scripts/verify-scan-device-b9.ts"
+    ],
+    "services/api/src/admin-ops/derived-partner-incidents.ts": [
+      "services/api/scripts/verify-org-device-alert.ts"
     ],
     "services/api/src/admin-ops/derived-print-quota-alerts.ts": [
       "services/api/scripts/verify-copy-quota.ts"
     ],
     "services/api/src/admin-ops/derived-scan-device-alerts.ts": [
       "services/api/scripts/verify-scan-device-b9.ts"
+    ],
+    "services/api/src/admin-ops/device-alert-webhook.ts": [
+      "services/api/scripts/verify-org-device-alert-http.ts",
+      "services/api/scripts/verify-org-device-alert.ts"
+    ],
+    "services/api/src/admin-ops/org-device-alert-push.ts": [
+      "services/api/scripts/verify-org-device-alert-http.ts",
+      "services/api/scripts/verify-org-device-alert.ts"
+    ],
+    "services/api/src/admin-ops/org-device-alert-webhook.service.ts": [
+      "services/api/scripts/verify-org-device-alert-http.ts",
+      "services/api/scripts/verify-org-device-alert.ts"
     ],
     "services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts": [
       "services/api/scripts/verify-admin-order-filters.ts"
@@ -26456,6 +26724,7 @@
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-print-jobs.ts",
+      "services/api/scripts/verify-print-queue-timeout.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-refund-idempotent.ts"
     ],
@@ -27402,6 +27671,7 @@
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-order.ts",
+      "services/api/scripts/verify-org-device-alert.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
@@ -27426,7 +27696,9 @@
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts",
       "services/api/scripts/verify-policy-publish-gates.ts",
+      "services/api/scripts/verify-print-completion-evidence.ts",
       "services/api/scripts/verify-print-jobs.ts",
+      "services/api/scripts/verify-print-queue-timeout.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-public-fair-demo-guard.ts",
       "services/api/scripts/verify-publish-expiry-completeness.ts",
@@ -27683,6 +27955,7 @@
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-llm-thinking-live-gate.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
+      "services/api/scripts/verify-org-device-alert.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-partner-source-capabilities.ts",
       "services/api/scripts/verify-recruitment-emergency-scope.ts",
@@ -27712,6 +27985,7 @@
       "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-member-data-export-files.ts",
       "services/api/scripts/verify-official-channels.ts",
+      "services/api/scripts/verify-org-device-alert.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-partner-edit.ts",
       "services/api/scripts/verify-partner-email-login-alias.ts",
@@ -27986,6 +28260,7 @@
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-mock-interview-deadline.ts",
+      "services/api/scripts/verify-org-device-alert.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
@@ -28392,6 +28667,7 @@
       "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-print-conversion.ts",
       "services/api/scripts/verify-print-jobs.ts",
+      "services/api/scripts/verify-print-reliability-http.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-print-sign.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
@@ -29473,6 +29749,9 @@
     "services/api/src/orgs/partner-stats.service.ts": [
       "services/api/scripts/verify-partner-stats-contract.ts"
     ],
+    "services/api/src/orgs/partner-terminal-ops.ts": [
+      "services/api/scripts/verify-org-device-alert.ts"
+    ],
     "services/api/src/payment/admin-billing.controller.ts": [
       "services/api/scripts/verify-admin-billing.ts"
     ],
@@ -29630,6 +29909,8 @@
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-print-jobs.ts",
+      "services/api/scripts/verify-print-queue-timeout.ts",
+      "services/api/scripts/verify-print-reliability-http.ts",
       "services/api/scripts/verify-refund-real-channels.ts"
     ],
     "services/api/src/payment/pickup-expiry-refund.service.ts": [
@@ -29775,6 +30056,9 @@
       "services/api/scripts/verify-policy-publish-gates.ts",
       "services/api/scripts/verify-publish-expiry-completeness.ts"
     ],
+    "services/api/src/policies/policy-checklist-layout.ts": [
+      "services/api/scripts/verify-policy-checklist.ts"
+    ],
     "services/api/src/policies/policy-checklist-pdf.ts": [
       "services/api/scripts/verify-policy-checklist.ts"
     ],
@@ -29799,6 +30083,9 @@
     ],
     "services/api/src/policies/policy-public-visibility.ts": [
       "services/api/scripts/verify-policy-scope.ts"
+    ],
+    "services/api/src/policies/policy-save-and-publish.ts": [
+      "services/api/scripts/verify-policy-publish-gates.ts"
     ],
     "services/api/src/policies/policy-scope.service.ts": [
       "services/api/scripts/verify-policy-scope.ts"
@@ -29858,7 +30145,8 @@
     "services/api/src/print-jobs/free-print-quota.usage.ts": [
       "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts",
-      "services/api/scripts/verify-pickup-code-resume.ts"
+      "services/api/scripts/verify-pickup-code-resume.ts",
+      "services/api/scripts/verify-print-queue-timeout.ts"
     ],
     "services/api/src/print-jobs/material-check-policy.ts": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
@@ -29882,6 +30170,9 @@
     ],
     "services/api/src/print-jobs/pickup-claim-rate-limit.ts": [
       "services/api/scripts/verify-pickup-code-share.ts"
+    ],
+    "services/api/src/print-jobs/pickup-code-resume.ts": [
+      "services/api/scripts/verify-print-queue-timeout.ts"
     ],
     "services/api/src/print-jobs/pickup-order.service.ts": [
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
@@ -29939,6 +30230,8 @@
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-param-suggestion.ts",
       "services/api/scripts/verify-print-parameter-capability.ts",
+      "services/api/scripts/verify-print-queue-timeout.ts",
+      "services/api/scripts/verify-print-reliability-http.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
@@ -29977,6 +30270,13 @@
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pricing.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
+    ],
+    "services/api/src/print-jobs/print-queue-timeout.controller.ts": [
+      "services/api/scripts/verify-print-queue-timeout.ts"
+    ],
+    "services/api/src/print-jobs/print-queue-timeout.ts": [
+      "services/api/scripts/verify-print-queue-timeout.ts",
+      "services/api/scripts/verify-print-reliability-http.ts"
     ],
     "services/api/src/print-jobs/self-service-reprint.ts": [
       "services/api/scripts/verify-pickup-code-resume.ts"
@@ -30140,6 +30440,8 @@
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-offline-agencies-contract.ts",
       "services/api/scripts/verify-order.ts",
+      "services/api/scripts/verify-org-device-alert-http.ts",
+      "services/api/scripts/verify-org-device-alert.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
@@ -30169,7 +30471,10 @@
       "services/api/scripts/verify-policy-publish-gates.ts",
       "services/api/scripts/verify-pricing.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
+      "services/api/scripts/verify-print-completion-evidence.ts",
       "services/api/scripts/verify-print-jobs.ts",
+      "services/api/scripts/verify-print-queue-timeout.ts",
+      "services/api/scripts/verify-print-reliability-http.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-public-fair-demo-guard.ts",
       "services/api/scripts/verify-publish-expiry-completeness.ts",
@@ -30529,6 +30834,7 @@
       "services/api/scripts/verify-terminal-bind-code.ts"
     ],
     "services/api/src/terminals/dto/heartbeat.dto.ts": [
+      "services/api/scripts/verify-print-completion-evidence.ts",
       "services/api/scripts/verify-queue-dispatch-printer-status.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
@@ -30699,6 +31005,7 @@
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-partner-smart-campus.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-print-completion-evidence.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-rollout-config.ts",
       "services/api/scripts/verify-print-scan-first-release.ts",
@@ -30728,7 +31035,9 @@
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pg-lock-timeout-postgres.ts",
+      "services/api/scripts/verify-print-completion-evidence.ts",
       "services/api/scripts/verify-print-jobs.ts",
+      "services/api/scripts/verify-print-queue-timeout.ts",
       "services/api/scripts/verify-print-rollout-config.ts",
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-queue-dispatch-printer-status.ts",
@@ -31454,6 +31763,7 @@
           "apps/admin/src/routes/ai-services/aiUsageDisplay.ts",
           "apps/admin/src/routes/screen/UsageView.tsx",
           "apps/partner/src/lib/csv.ts",
+          "apps/partner/src/lib/printerStatusLabel.ts",
           "apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx",
           "apps/partner/src/routes/terminals/terminalOpsFormat.ts",
           "packages/shared/src/formatDateTime.ts",
@@ -34619,6 +34929,23 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/src/pages/print/printProgressModel.ts",
+          "services/api/package.json"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-print-queue-timeout-copy.cjs",
+      "helper": true,
+      "inCi": false,
+      "package": "apps/kiosk",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/kiosk/src/hooks/useAiAdvisorCallSession.ts",
           "apps/kiosk/src/pages/home/hooks/useHomeDeviceStatus.ts",
           "apps/kiosk/src/services/api/printScanCapabilities.ts",
@@ -36260,6 +36587,7 @@
         "dirs": [],
         "files": [
           "apps/partner/src/lib/csv.ts",
+          "apps/partner/src/lib/printerStatusLabel.ts",
           "apps/partner/src/routes/terminals/TerminalOpsCards.tsx",
           "apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx",
           "apps/partner/src/routes/terminals/index.tsx",
@@ -36734,7 +37062,29 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/terminal-agent/scripts/install-production-agent.ps1",
+          "apps/terminal-agent/src/agent/heartbeat.ts",
+          "apps/terminal-agent/src/agent/print-service-log.ts",
+          "apps/terminal-agent/src/index.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-print-completion-evidence.ts",
+      "helper": true,
+      "inCi": true,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:print-completion-evidence"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/kiosk/src/hooks/useTerminalDeviceStatus.ts",
+          "apps/terminal-agent/scripts/verify-print-completion-evidence.ts",
           "apps/terminal-agent/src/agent/printer-status-map.ts",
           "apps/terminal-agent/src/agent/task-runner.ts",
           "apps/terminal-agent/src/agent/wmi.ts",
@@ -36760,6 +37110,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/terminal-agent/scripts/verify-print-completion-evidence.ts",
           "apps/terminal-agent/src/agent/print-dispatch-gate.ts",
           "apps/terminal-agent/src/agent/print-queue-hold.ts",
           "apps/terminal-agent/src/agent/wmi.ts"
@@ -40858,6 +41209,7 @@
         "files": [
           "services/api/scripts/support/content-pipeline-fixtures.ts",
           "services/api/scripts/support/content-pipeline-harness.ts",
+          "services/api/scripts/support/policy-one-step-http-cases.ts",
           "services/api/src/common/crypto/secret-cipher.ts",
           "services/api/src/common/guards/end-user-auth.guard.ts",
           "services/api/src/job-sync/job-sync.service.ts",
@@ -44551,6 +44903,58 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/content-pipeline-harness.ts",
+          "services/api/src/admin-ops/device-alert-webhook.ts",
+          "services/api/src/admin-ops/org-device-alert-push.ts",
+          "services/api/src/admin-ops/org-device-alert-webhook.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-org-device-alert-http.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:org-device-alert-http"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/partner/src/lib/printerStatusLabel.ts",
+          "services/api/src/admin-ops/admin-alert-push.service.ts",
+          "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/admin-ops/derived-partner-incidents.ts",
+          "services/api/src/admin-ops/device-alert-webhook.ts",
+          "services/api/src/admin-ops/org-device-alert-push.ts",
+          "services/api/src/admin-ops/org-device-alert-webhook.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/crypto/secret-cipher.ts",
+          "services/api/src/common/decorators/current-user.decorator.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/orgs/partner-terminal-ops.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-org-device-alert.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:org-device-alert"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "packages/shared/src/types/partner.ts",
           "services/api/src/jobs/partner-capabilities.ts",
           "services/api/src/orgs/admin-orgs.service.ts",
@@ -45524,6 +45928,7 @@
           "services/api/src/files/signing.ts",
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/pricing.service.ts",
+          "services/api/src/policies/policy-checklist-layout.ts",
           "services/api/src/policies/policy-checklist-pdf.ts",
           "services/api/src/policies/policy-checklist.controller.ts",
           "services/api/src/policies/policy-checklist.service.ts",
@@ -45620,6 +46025,7 @@
           "services/api/src/common/decorators/current-user.decorator.ts",
           "services/api/src/policies/dto/policy.dto.ts",
           "services/api/src/policies/policies.service.ts",
+          "services/api/src/policies/policy-save-and-publish.ts",
           "services/api/src/policies/policy-source-link.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
@@ -45717,6 +46123,37 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:print-color-duplex-capability"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "services"
+        ],
+        "files": [
+          "apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx",
+          "apps/admin/src/routes/terminals/printCompletionEvidence.ts",
+          "services/api/prisma/migrations/20260724200000_guard_planned_terminal_updates/migration.sql",
+          "services/api/prisma/migrations/20260726003000_guard_retired_terminal/migration.sql",
+          "services/api/prisma/migrations/20261111120000_add_terminal_heartbeat_print_completion/migration.sql",
+          "services/api/prisma/postgres/migrations/20261111120000_add_terminal_heartbeat_print_completion/migration.sql",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/dto/heartbeat.dto.ts",
+          "services/api/src/terminals/terminals-admin.service.ts",
+          "services/api/src/terminals/terminals-agent.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-print-completion-evidence.ts",
+      "helper": true,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:print-completion-evidence"
       ],
       "wired": true
     },
@@ -45836,6 +46273,65 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:print-parameter-capability"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "services"
+        ],
+        "files": [
+          "apps/admin/src/routes/print-scan/index.tsx",
+          "apps/kiosk/src/pages/print/PrintDonePage.tsx",
+          "apps/kiosk/src/pages/print/PrintProgressPage.tsx",
+          "apps/kiosk/src/pages/print/printProgressModel.ts",
+          "services/api/prisma/migrations/20260724200000_guard_planned_terminal_updates/migration.sql",
+          "services/api/prisma/migrations/20260726003000_guard_retired_terminal/migration.sql",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/admin-print-scan/admin-print-scan.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/payment/pending-refund-signal.ts",
+          "services/api/src/print-jobs/free-print-quota.usage.ts",
+          "services/api/src/print-jobs/pickup-code-resume.ts",
+          "services/api/src/print-jobs/print-jobs.service.ts",
+          "services/api/src/print-jobs/print-queue-timeout.controller.ts",
+          "services/api/src/print-jobs/print-queue-timeout.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/terminals-agent.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-print-queue-timeout.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:print-queue-timeout"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/content-pipeline-harness.ts",
+          "services/api/src/files/signing.ts",
+          "services/api/src/payment/pending-refund-signal.ts",
+          "services/api/src/print-jobs/print-jobs.service.ts",
+          "services/api/src/print-jobs/print-queue-timeout.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-print-reliability-http.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:print-reliability-http"
       ],
       "wired": true
     },
@@ -46304,6 +46800,7 @@
           "services/api/scripts/verify-policy-eligibility-authoring.ts",
           "services/api/scripts/verify-policy-eligibility.ts",
           "services/api/scripts/verify-policy-scope.ts",
+          "services/api/scripts/verify-print-completion-evidence.ts",
           "services/api/scripts/verify-print-jobs.ts",
           "services/api/scripts/verify-recruitment-integration-readiness.ts",
           "services/api/scripts/verify-refund-idempotent.ts",

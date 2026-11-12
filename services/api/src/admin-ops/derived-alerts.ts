@@ -6,6 +6,7 @@ import { TERMINAL_ONLINE_WINDOW_MS } from '../terminals/printer-availability'
 import { collectPrintQuotaAlerts, resolvePrintQuotaAlert } from './derived-print-quota-alerts'
 import { collectAiDerivedAlerts, resolveAiDerivedAlert } from './derived-ai-alerts'
 import { collectScanDeviceAlerts, resolveScanDeviceAlert } from './derived-scan-device-alerts'
+import { collectPartnerIncidents, resolvePartnerIncident } from './derived-partner-incidents'
 import {
   buildSubjectKey,
   offlineEpisodeToken,
@@ -320,6 +321,7 @@ const PRINT_FAILED_ALERT_REASONS: Record<string, string> = {
   PRINT_JOB_UNCONFIRMED: '出纸未确认',
   PARTIAL_OUTPUT: '只打出了一部分',
   PRINT_TIMEOUT: '打印超时',
+  PRINT_QUEUE_TIMEOUT: '排队超时未领取',
   PRINT_COMMAND_FAILED: '打印命令执行失败',
   UNSUPPORTED_FILE_TYPE: '文件格式不支持',
   FILE_NOT_FOUND: '打印文件已失效',
@@ -510,6 +512,8 @@ export async function collectDerivedAlerts(
   // AI 三条与上面的计数同一口径：每条都进列表，也加进 firingTotal，没有单独的截断。
   const aiAlerts = await collectAiDerivedAlerts(prisma, now)
   alerts.push(...aiAlerts)
+  const partnerIncidents = await collectPartnerIncidents(prisma, now)
+  alerts.push(...partnerIncidents)
 
   alerts.sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1))
   // count() 与 findMany 之间可能有新失败写入,omitted 用 max(0,…) 兜底,不出现负数。
@@ -518,7 +522,7 @@ export async function collectDerivedAlerts(
     alerts,
     firingTotal: terminalAlertCount + Math.max(failedTotal, failedTasks.length) + unavailableTasks.reduce((count, task) => (
       count + (buildPaidPendingFileUnavailableAlert(task, nowMs) ? 1 : 0)
-    ), 0) + (feedbackAlert ? 1 : 0) + alerts.filter((alert) => alert.type === 'print_terminal_quota_high').length + aiAlerts.length + scanDeviceAlerts.length,
+    ), 0) + (feedbackAlert ? 1 : 0) + alerts.filter((alert) => alert.type === 'print_terminal_quota_high').length + aiAlerts.length + scanDeviceAlerts.length + partnerIncidents.length,
     omitted,
     cap: PRINT_FAILED_LIST_CAP,
     terminalSubjectKeysInScope: [...terminals.flatMap((t) => [
@@ -575,6 +579,10 @@ export async function resolveDerivedAlert(
 
   if (type === 'scan_device_issue') {
     return resolveScanDeviceAlert(prisma, subjectId, now)
+  }
+
+  if (type === 'partner_incident') {
+    return resolvePartnerIncident(prisma, subjectId, now)
   }
 
   const terminal = (await prisma.terminal.findUnique({

@@ -41,6 +41,7 @@ import { RedisModule } from './common/redis/redis.module'
 import { SyncModule } from './sync/sync.module'
 import { TerminalsModule } from './terminals/terminals.module'
 import { FreePrintQuotaModule } from './print-jobs/free-print-quota.module'
+import { PrintQueueTimeoutModule } from './print-jobs/print-queue-timeout.module'
 import { PrintJobsModule } from './print-jobs/print-jobs.module'
 import { TrtcModule } from './trtc/trtc.module'
 import { ContentModule } from './content/content.module'
@@ -158,6 +159,7 @@ const redisUrl = process.env['REDIS_URL']
     TerminalsModule,
     PrintJobsModule,
     FreePrintQuotaModule,
+    PrintQueueTimeoutModule,
     TrtcModule,
     ContentModule,
     SmartCampusModule,

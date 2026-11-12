@@ -51,6 +51,7 @@ import {
   startHarness, type HarnessEnv, type Client, type HttpResult,
 } from './support/content-pipeline-harness'
 import { POLICY_PUBLISH_FIXTURE, createFixtures, cleanupFixtures, type Fixtures } from './support/content-pipeline-fixtures'
+import { runPolicyOneStepHttpCases } from './support/policy-one-step-http-cases'
 
 const PORT = Number(process.env['CONTENT_PIPELINE_E2E_PORT'] ?? 3211)
 
@@ -542,6 +543,8 @@ async function main(): Promise<void> {
       const list = unwrap(pub) ?? []
       assert('政策｜一体机前台可见', list.some((p) => p.id === policyId), `/policies 未返回 ${policyId}`)
     }
+    step('政策 / 保存并发布与保存前预估 —— 走真实 HTTP')
+    await runPolicyOneStepHttpCases(h, { partner: partnerToken, admin: adminToken })
 
     // ── §4 闸门:该拦的必须拦住 ────────────────────────────────────────────
     section('§4 发布闸门 —— 该拦的必须拦住')

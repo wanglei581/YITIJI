@@ -392,6 +392,149 @@ async function legalVersionsStrictOnlyInRelease(opts) {
   assert.equal(out4.value.privacyVersion, '2026-10-pilot-1')
 }
 
+function publishedLegal(call) {
+  reply(call, 200, { success: true, data: { version: '2026-10-pilot-1', content: 'x' } })
+}
+
+/**
+ * 职业规划会把简历原文交给模型。门面必须带 resumeAi，请求层才会在
+ * 403 USER_AI_CONSENT_REQUIRED 时弹出简历 AI 授权，而不是把 403 直接交给页面。
+ */
+async function careerPlanRequestsResumeAi(opts) {
+  const ctx = memberWithAge(opts)
+  const seen = []
+  const orig = ctx.net.request
+  ctx.net.request = (path, options) => {
+    seen.push({ path, resumeAi: options && options.resumeAi })
+    return orig(path, options)
+  }
+  const api = ctx.load('api')
+  const pending = settle(api.generateCareerPlan('task-9', 'resume-token'), 2000)
+  await flush()
+  assert.equal(seen[0] && seen[0].path, '/resume/career-plan/task-9')
+  assert.equal(seen[0] && seen[0].resumeAi, true)
+  const call = ctx.aiCalls().find((c) => String(c.url).includes('/resume/career-plan/task-9'))
+  assert.ok(call, '职业规划请求已发出')
+  assert.equal(call.method, 'POST')
+  assert.equal(header(call, 'x-resume-access-token'), 'resume-token')
+  reply(call, 403, CONSENT_403)
+  await flush()
+  assert.equal(ctx.wx.calls.modal.length, 1, '没授权过的人要先看到简历 AI 授权框')
+  assert.match(ctx.wx.calls.modal[0].title, /简历 AI/)
+  answer(ctx.wx.calls.modal[0], false)
+  const result = await pending
+  assert.equal(result.ok, false)
+  assert.equal(result.error.code, 'AI_RESUME_NOT_CONSENTED')
+}
+
+/** 报价带上第 4 参里的终端；彩色 / 双面时服务端必填。没给终端时 body 保持旧形状。 */
+async function quoteSendsTerminalId() {
+  const ctx = createRuntime()
+  const api = ctx.load('api')
+  const quoted = settle(api.quoteMyPrintOrder('file-1', { copies: 1, color: true }, 'signed://preset', { terminalId: ' term-9 ' }))
+  await flush()
+  const call = ctx.wx.calls.request.find((c) => String(c.url).endsWith('/orders/quote'))
+  assert.ok(call, '预设文件地址时直接报价，不再换 preview-url')
+  assert.equal(ctx.wx.calls.request.some((c) => String(c.url).includes('/preview-url')), false)
+  assert.equal(call.method, 'POST')
+  assert.equal(call.data.fileUrl, 'signed://preset')
+  assert.equal(call.data.terminalId, 'term-9')
+  assert.equal(call.data.params.copies, 1)
+  reply(call, 200, { success: true, data: { amountCents: 100, billablePages: 1 } })
+  assert.equal((await quoted).ok, true)
+
+  const plain = settle(api.quoteMyPrintOrder('file-2', { copies: 1 }, 'signed://plain'))
+  await flush()
+  const again = ctx.wx.calls.request.filter((c) => String(c.url).endsWith('/orders/quote')).pop()
+  assert.ok(again)
+  assert.equal(again.data.fileUrl, 'signed://plain')
+  assert.equal('terminalId' in again.data, false, '没给终端时不额外带字段')
+  reply(again, 200, { success: true, data: { amountCents: 0, billablePages: 1 } })
+  assert.equal((await plain).ok, true)
+}
+
+/** GET /terminals/:terminalId/capabilities，不鉴权；空编号不发请求。 */
+async function terminalCapabilitiesPath() {
+  const ctx = createRuntime()
+  const api = ctx.load('api')
+  const missing = await settle(api.getTerminalCapabilities('  '))
+  assert.equal(missing.ok, false)
+  assert.match(missing.error.message, /缺少终端/)
+  assert.equal(ctx.wx.calls.request.length, 0)
+
+  const pending = settle(api.getTerminalCapabilities('shop/1'))
+  await flush()
+  const call = ctx.wx.calls.request[0]
+  assert.ok(call)
+  assert.equal(call.method, 'GET')
+  assert.ok(String(call.url).endsWith('/terminals/shop%2F1/capabilities'), call.url)
+  assert.equal(header(call, 'Authorization'), undefined)
+  reply(call, 200, { success: true, data: { capabilities: [] } })
+  assert.equal((await pending).ok, true)
+}
+
+/** 短信登录和微信一键登录都用请求头申请同设备恢复凭证，不放进 body。 */
+async function loginsAskKeepSignedIn() {
+  const ctx = createRuntime()
+  const api = ctx.load('api')
+  const sms = settle(api.loginBySms('13800138000', '246810', 'dev-1'), 2000)
+  await flush()
+  const legal = ctx.wx.calls.request.filter((c) => String(c.url).includes('/kiosk/legal/'))
+  assert.equal(legal.length, 2)
+  legal.forEach(publishedLegal)
+  await flush()
+  const smsCall = ctx.wx.calls.request.find((c) => String(c.url).endsWith('/member/auth/login'))
+  assert.ok(smsCall)
+  assert.equal(smsCall.method, 'POST')
+  assert.equal(header(smsCall, 'x-member-keep-signed-in'), '1')
+  assert.equal(smsCall.data.phone, '13800138000')
+  assert.equal(smsCall.data.deviceId, 'dev-1')
+  assert.equal('x-member-keep-signed-in' in smsCall.data, false)
+  reply(smsCall, 200, { success: true, data: { token: 't', user: { id: 'u' } } })
+  assert.equal((await sms).ok, true)
+
+  const phone = settle(api.loginByPhone('phone-code'), 2000)
+  await flush()
+  assert.equal(ctx.wx.calls.login.length, 1)
+  const moreLegal = ctx.wx.calls.request.filter((c) => String(c.url).includes('/kiosk/legal/')).slice(2)
+  assert.equal(moreLegal.length, 2)
+  moreLegal.forEach(publishedLegal)
+  ctx.wx.calls.login[0].success({ code: 'js-code' })
+  await flush()
+  const wxCall = ctx.wx.calls.request.find((c) => String(c.url).endsWith('/member/auth/wx-login'))
+  assert.ok(wxCall)
+  assert.equal(wxCall.method, 'POST')
+  assert.equal(header(wxCall, 'x-member-keep-signed-in'), '1')
+  assert.equal(wxCall.data.code, 'js-code')
+  assert.equal(wxCall.data.phoneCode, 'phone-code')
+  assert.equal('x-member-keep-signed-in' in wxCall.data, false)
+  reply(wxCall, 200, { success: true, data: { token: 't2', user: { id: 'u2' } } })
+  assert.equal((await phone).ok, true)
+}
+
+/** 退出时作废恢复凭证：POST /member/auth/restore/revoke，不带访问令牌。 */
+async function revokeRestorePostsToken() {
+  const ctx = createRuntime()
+  const api = ctx.load('api')
+  const empty = await settle(api.revokeRestore(''))
+  assert.equal(empty.ok, true)
+  assert.equal(empty.value && empty.value.revoked, false)
+  assert.equal(ctx.wx.calls.request.length, 0, '没有凭证就不发请求')
+
+  const pending = settle(api.revokeRestore('tok-1'))
+  await flush()
+  const call = ctx.wx.calls.request[0]
+  assert.ok(call)
+  assert.equal(call.method, 'POST')
+  assert.ok(String(call.url).endsWith('/member/auth/restore/revoke'), call.url)
+  assert.equal(call.data && call.data.restoreToken, 'tok-1')
+  assert.equal(header(call, 'Authorization'), undefined)
+  reply(call, 200, { success: true, data: { revoked: true } })
+  const result = await pending
+  assert.equal(result.ok, true)
+  assert.equal(result.value.revoked, true)
+}
+
 /** api 门面：小青带 channel=miniapp（C12），并走 AI 前置；法务门面方法并进了 api。 */
 async function assistantChatSendsMiniappChannel(opts) {
   const ctx = createRuntime(opts)
@@ -503,6 +646,11 @@ async function resumeAiConcurrentSharesOnePrompt(opts) {
 }
 
 const SCENARIOS = {
+  careerPlanRequestsResumeAi,
+  quoteSendsTerminalId,
+  terminalCapabilitiesPath,
+  loginsAskKeepSignedIn,
+  revokeRestorePostsToken,
   resumeAiConsentRecoversOnce,
   resumeAiDeclineStopsHere,
   consent403OutsideResumePassesThrough,

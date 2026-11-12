@@ -95,6 +95,8 @@ export interface AdminTerminalView {
   scanInputAction: string | null
   scanInputReason: string | null
   scanInputObservedAt: string | null
+  /** available / unavailable；null 表示这一版终端程序还没报，不能当成可用。 */
+  printCompletionEvidence: 'available' | 'unavailable' | null
   agentVersion: string | null
   ipAddress: string | null
   diskFreeGb: number | null
@@ -300,6 +302,7 @@ export class TerminalAdminService {
             scanInputAction: true,
             scanInputReason: true,
             scanInputObservedAt: true,
+            printCompletionEvidence: true,
             agentVersion: true,
             ipAddress: true,
             diskFreeGb: true,
@@ -360,6 +363,9 @@ export class TerminalAdminService {
         scanInputAction: hb?.scanInputAction ?? null,
         scanInputReason: hb?.scanInputReason ?? null,
         scanInputObservedAt: hb?.scanInputObservedAt?.toISOString() ?? null,
+        printCompletionEvidence: hb?.printCompletionEvidence === 'available' || hb?.printCompletionEvidence === 'unavailable'
+          ? hb.printCompletionEvidence
+          : null,
         agentVersion: hb?.agentVersion ?? null,
         ipAddress: hb?.ipAddress ?? null,
         diskFreeGb: normalizeDiskFreeGb(hb?.diskFreeGb),

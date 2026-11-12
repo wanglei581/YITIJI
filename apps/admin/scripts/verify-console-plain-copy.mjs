@@ -421,7 +421,7 @@ const reconciliationText = cleanText('本地对账', billing.ReconciliationSecti
 if (!reconciliationText.includes('渠道账单仍需使用真实商户账单另行核对。')) fail('本地对账必须说明真实渠道账单另行核对')
 const print = runFile('apps/admin/src/routes/print-scan/index.tsx', {
   ...common, react: hooks([]), 'react-router-dom': { Link: (p) => p.children }, '../../lib/printErrorText': errors,
-  './CapabilityCenter': {}, './CloseUnpaidPrintTaskForm': {}, './FreePrintQuotaCard': { FreePrintQuotaCard: () => null }, '../../services/api/printScan': {}, './PrintRetryButton': { PrintRetryButton: () => null },
+  './CapabilityCenter': {}, './CloseUnpaidPrintTaskForm': {}, './FreePrintQuotaCard': { FreePrintQuotaCard: () => null }, './PrintQueueTimeoutCard': { PrintQueueTimeoutCard: () => null }, '../../services/api/printScan': {}, './PrintRetryButton': { PrintRetryButton: () => null },
 }, '\nexport { taskColumns, TaskDetailBody, CommercialControls }\n')
 for (const code of ['PRINTER_ERROR', 'PRINT_JOB_UNCONFIRMED', 'PAPER_EMPTY', 'printer_jam', 'PARTIAL_OUTPUT', 'UNKNOWN_PRINT_CODE']) {
   const item = { type: 'print', status: 'failed', ownerType: 'member', errorCode: code, taskId: 'ptask_test', fileName: '测试.pdf', statusLogs: [{ errorCode: code, fromStatus: 'printing', toStatus: 'failed' }], closeUnpaidEligible: false }
@@ -488,7 +488,7 @@ console.log('\n=== 打印错误原因与服务端告警同一口径 ===')
 verifyBatch6Copy({ runFile, textOf, shared, ui, fail })
 function runPrivacyFile(rel, imports, ...rest) {
   const profileImports = rel === 'apps/partner/src/routes/profile/index.tsx'
-    ? { ...imports, './LicenseSection': {} }
+    ? { ...imports, './LicenseSection': {}, './DeviceAlertNotifySection': { DeviceAlertNotifySection: () => null } }
     : imports
   return runFile(rel, profileImports, ...rest)
 }

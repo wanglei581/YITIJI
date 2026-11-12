@@ -31,7 +31,7 @@ import { failureCopy, failureSummaryRows, feeInfoCopy, paymentRow, retryBlockedR
 import { CONTACT_ENTRY_LABEL, PRIVACY_CONTACT_ROUTE, needsContactEntry } from './components/printContactEntry'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { PrintDoneRecordSection } from './components/PrintDoneSections'
-import { doneTakeaway, jobSubline, outOfPaperMoneyOf, paymentFactOf, publicOrderNo, reprintHint, type OutOfPaperMoney } from './printProgressModel'
+import { doneTakeaway, jobSubline, outOfPaperMoneyOf, paymentFactOf, publicOrderNo, reprintHint, screenFailureReason, type OutOfPaperMoney } from './printProgressModel'
 import './styles/print-fulfill-qx.css'
 import './styles/print-done-touch.css'
 
@@ -121,7 +121,7 @@ function interpretStatus(taskId: string, result: PrintJobStatusResult): { kind: 
       value: {
         taskId,
         result: 'failed',
-        failureReason: result.failureReasonForUser ?? '',
+        failureReason: screenFailureReason(result) ?? '',
         errorCode: result.errorCode,
         ...fileRetentionFromStatus(result),
       },

@@ -40,6 +40,7 @@ import { registerDeadLetterCommands } from './agent/dead-letter-operator'
 import { inspectScanInputFolder } from './agent/scan-input/verified-folder'
 import { globalScanDeliveryBarrier } from './agent/scan-candidate-barrier'
 import { isUnauthorized } from './agent/auth-state'
+import { checkPrintCompletionEvidenceAtStartup } from './agent/print-service-log'
 import { AGENT_RUNTIME_VERSION } from './runtime-version'
 import { copyRuntimeForConfig } from './agent/copy-device/copy-lifecycle'
 import {
@@ -157,6 +158,7 @@ program
         }
       },
       beforeClaim: async () => {
+        checkPrintCompletionEvidenceAtStartup()
         try {
           cleanupKnownLegacyResidue()
         } catch {

@@ -1,8 +1,9 @@
 import { useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
 import { partnerOfficialChannelsService } from '../../services/api/officialChannels'
+import { partnerPoliciesService } from '../../services/api/policies'
 import { isAbsoluteHttpUrl } from '../../lib/httpUrl'
 import { AUDIENCE_LABELS, CATEGORY_LABELS } from './policyLabels'
-import { HANDLING_FIELDS, type PolicyFormState } from './policyFormModel'
+import { CHECKLIST_OVERFLOW_HINT, HANDLING_FIELDS, type PolicyFormChecks, type PolicyFormState } from './policyFormModel'
 
 const inputCls =
   'w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
@@ -18,11 +19,14 @@ function Field({ label, required, children }: { label: string; required?: boolea
   )
 }
 
-export function PolicyFormFields({ form, setForm, recruitmentOpen, editingRecruitmentLocked }: {
+export function PolicyFormFields({ form, setForm, recruitmentOpen, editingRecruitmentLocked, active = true, onChecks }: {
   form: PolicyFormState
   setForm: Dispatch<SetStateAction<PolicyFormState>>
   recruitmentOpen: boolean
   editingRecruitmentLocked: boolean
+  /** 抽屉关上时不请求预估。 */
+  active?: boolean
+  onChecks?: (checks: PolicyFormChecks) => void
 }) {
   const [domains, setDomains] = useState<string[] | null>(null)
   const [domainState, setDomainState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -37,9 +41,52 @@ export function PolicyFormFields({ form, setForm, recruitmentOpen, editingRecrui
     return () => { cancelled = true }
   }, [])
 
+  const [publishWarning, setPublishWarning] = useState<string | null>(null)
+  const [linkChecked, setLinkChecked] = useState(false)
+  const [overflow, setOverflow] = useState<PolicyFormChecks['overflow']>({})
+  useEffect(() => {
+    if (!active) return undefined
+    let cancelled = false
+    const timer = setTimeout(() => {
+      void partnerPoliciesService.previewDraftCheck({
+        kind: form.kind,
+        externalUrl: form.externalUrl.trim(),
+        whoCanApply: form.whoCanApply,
+        requiredMaterials: form.requiredMaterials,
+        whereToApply: form.whereToApply,
+      }).then((result) => {
+        if (cancelled) return
+        setPublishWarning(result.publishWarning)
+        setLinkChecked(true)
+        const next: PolicyFormChecks['overflow'] = {}
+        if (result.checklistReady) {
+          for (const column of result.columns) {
+            if (column.key === 'whoCanApply' || column.key === 'requiredMaterials' || column.key === 'whereToApply') {
+              next[column.key] = column.truncated
+            }
+          }
+        }
+        setOverflow(next)
+      }).catch(() => {
+        if (!cancelled) {
+          setPublishWarning(null)
+          setLinkChecked(false)
+          setOverflow({})
+        }
+      })
+    }, 400)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [active, form.kind, form.externalUrl, form.whoCanApply, form.requiredMaterials, form.whereToApply])
+  useEffect(() => {
+    onChecks?.({ publishWarning, linkChecked, overflow })
+  }, [onChecks, publishWarning, linkChecked, overflow])
+
   const change = (key: keyof PolicyFormState, value: string) => setForm((previous) => ({ ...previous, [key]: value }))
   const categoryChoices = Object.entries(CATEGORY_LABELS).filter(([key]) => recruitmentOpen || key !== 'recruitment')
-  const urlError = form.externalUrl.trim() && (!isAbsoluteHttpUrl(form.externalUrl) || new URL(form.externalUrl.trim()).protocol !== 'https:')
+  const urlInvalid = Boolean(form.externalUrl.trim() && !isAbsoluteHttpUrl(form.externalUrl))
   return (
     <>
       <Field label="内容类型" required>
@@ -74,6 +121,9 @@ export function PolicyFormFields({ form, setForm, recruitmentOpen, editingRecrui
         <Field key={key} label={label} required>
           <textarea className={`${inputCls} h-24 resize-y`} required maxLength={2000} value={form[key]} onChange={(e) => change(key, e.target.value)} />
           <span className="mt-1 block text-xs text-neutral-500">每行写一项，照原文写，不写承诺性的话</span>
+          {overflow[key] && (
+            <span role="status" className="mt-1 block text-xs text-warning-fg">{CHECKLIST_OVERFLOW_HINT}</span>
+          )}
           <span className="mt-1 block text-right text-xs text-neutral-400">{form[key].length}/2000 字</span>
         </Field>
       ))}
@@ -88,7 +138,8 @@ export function PolicyFormFields({ form, setForm, recruitmentOpen, editingRecrui
               : domains?.length ? `须是本机构登记的官方网站上的地址：${domains.join('、')}`
                 : '本机构还没有登记官方网站，发布前请联系平台管理员登记'}
         </span>
-        {urlError && <span className="mt-1 block text-xs text-error-fg">请填写以 https:// 开头的有效原文链接</span>}
+        {urlInvalid && <span className="mt-1 block text-xs text-error-fg">请填写以 https:// 开头的有效原文链接</span>}
+        {publishWarning && <span role="status" className="mt-1 block text-xs text-warning-fg">{publishWarning}</span>}
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="外部编号（可选）">

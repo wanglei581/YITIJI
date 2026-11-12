@@ -3,10 +3,11 @@ import PDFDocument from 'pdfkit'
 import QRCode from 'qrcode'
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../common/pdf/cjk-font'
 import { checkPolicySourceLink } from './policy-source-link'
+import { layoutChecklistColumns } from './policy-checklist-layout'
+
+export { CHECKLIST_EMPTY, CHECKLIST_TRUNCATED } from './policy-checklist-layout'
 
 export const CHECKLIST_FOOTER = '仅供参考，不具证明效力；办理要件和资格以发布机构和经办窗口为准，本机不代办'
-export const CHECKLIST_EMPTY = '发布机构没有提供这部分，请以原文为准'
-export const CHECKLIST_TRUNCATED = '（内容较长，完整内容请扫码看原文或到经办窗口咨询）'
 
 export interface ChecklistPdfInput {
   title: string
@@ -20,7 +21,7 @@ export interface ChecklistPdfInput {
   org: { verifiedOfficialDomainsJson: string | null }
 }
 
-/** 固定区域排版，正文按实际字体量高截断，绝不靠缩小整页或自动换页。 */
+/** 页眉、二维码和页脚固定；三栏按内容分高度，整页放不下才截断。绝不自动换页。 */
 export async function renderPolicyChecklist(policy: ChecklistPdfInput, now = new Date()) {
   const doc = new PDFDocument({ size: 'A4', margin: 42, bufferPages: true,
     info: { Title: '政策办事清单', CreationDate: now } })
@@ -37,41 +38,21 @@ export async function renderPolicyChecklist(policy: ChecklistPdfInput, now = new
     doc.on('error', reject)
   })
   const width = 511
-  const draw = (text: string, y: number, height: number, size = 11, x = 42, w = width, suffix = '…') => {
+  const draw = (text: string, y: number, height: number, size = 11, x = 42, w = width) => {
     doc.fontSize(size).fillColor('#17212b')
-    doc.text(fit(text, height, w, suffix), x, y, { width: w, height, lineGap: 3 })
+    doc.text(text, x, y, { width: w, height, lineGap: 3 })
   }
-  const fit = (text: string, height: number, w: number, suffix: string): string => {
-    const options = { width: w, lineGap: 3 }
-    // 先限制输入规模，再量高；超长无换行字符串也不会挤进页脚。
-    const chars = Array.from(text)
-    if (chars.length <= 6000 && doc.heightOfString(text, options) <= height) return text
-    let lo = 0; let hi = Math.min(chars.length, 6000)
-    while (lo < hi) {
-      const mid = Math.ceil((lo + hi) / 2)
-      if (doc.heightOfString(chars.slice(0, mid).join('') + suffix, options) <= height) lo = mid
-      else hi = mid - 1
-    }
-    return chars.slice(0, lo).join('') + suffix
-  }
+  const columns = layoutChecklistColumns(doc, policy)
   draw('政策办事清单', 42, 38, 21)
   draw(policy.title, 82, 52, 16)
   draw(`发布机构：${policy.sourceName}`, 142, 32, 10)
   const date = policy.publishedDate ?? policy.publishConfirmedAt
   draw(`发布日期：${date ? chinaDate(date) : '发布机构没有提供'}`, 177, 20, 10)
-  const sections = [
-    ['谁可以申请', policy.whoCanApply],
-    ['要准备的材料', policy.requiredMaterials],
-    ['去哪办', policy.whereToApply],
-  ] as const
-  sections.forEach(([title, content], i) => {
-    const y = 213 + i * 133
-    doc.moveTo(42, y - 5).lineTo(553, y - 5).lineWidth(0.5).strokeColor('#c6ced5').stroke()
-    draw(title, y, 28, 13)
-    const entries = content?.split(/\r\n|\r|\n/u).map((line) => line.trim()).filter(Boolean)
-    draw(entries?.length ? entries.map((line) => `• ${line}`).join('\n') : CHECKLIST_EMPTY,
-      y + 32, 90, 11, 42, width, CHECKLIST_TRUNCATED)
-  })
+  for (const column of columns) {
+    doc.moveTo(42, column.y - 6).lineTo(553, column.y - 6).lineWidth(0.5).strokeColor('#c6ced5').stroke()
+    draw(column.title, column.y, column.titleHeight, 13)
+    draw(column.text, column.y + column.titleHeight + 4, column.contentHeight + 1, 11)
+  }
   const source = checkPolicySourceLink(policy.externalUrl, policy.org.verifiedOfficialDomainsJson)
   if (source.status === 'verified') {
     const qr = await QRCode.toBuffer(source.url, { type: 'png', errorCorrectionLevel: 'M', margin: 4, width: 400 })

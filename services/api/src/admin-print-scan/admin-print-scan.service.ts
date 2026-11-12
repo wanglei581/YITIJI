@@ -18,6 +18,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
+import { clearQueueTimeoutRefundMark } from '../print-jobs/print-queue-timeout'
 import {
   ADMIN_UNPARSED_FILE_CODE,
   ADMIN_UNPARSED_FILE_MESSAGE,
@@ -613,6 +614,7 @@ export class AdminPrintScanService {
       await tx.printTaskStatusLog.create({
         data: { taskId, fromStatus: 'failed', toStatus: 'pending', errorCode: 'admin_retry' },
       })
+      if (order) await clearQueueTimeoutRefundMark(tx, order.id, liveTask?.errorCode)
       if (actor && this.audit) await this.audit.writeRequired(tx, {
         actorId: actor.actorId,
         actorRole: actor.actorRole,

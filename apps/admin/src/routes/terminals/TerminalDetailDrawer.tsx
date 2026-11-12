@@ -14,6 +14,7 @@ import { TerminalDailyFreeSidesSection } from './TerminalDailyFreeSidesSection'
 import { TerminalLifecycleActions } from './TerminalLifecycleActions'
 import { TerminalNetworkDiagnostics } from './TerminalNetworkDiagnostics'
 import { TerminalPrinterQueue } from './TerminalPrinterQueue'
+import { printCompletionEvidenceLabel } from './printCompletionEvidence'
 import { fmtDisk, lifecycleView, printerStatusView, scanInputView } from './terminalStatusViews'
 
 type Notice = { type: 'success' | 'error'; text: string }
@@ -197,6 +198,7 @@ export function TerminalDetailDrawer({
         <Section title="运行与网络">
           <DetailRow label="最近心跳"><span title={terminal.lastHeartbeatAt ? formatDateTime(terminal.lastHeartbeatAt) : undefined}>{terminal.lastHeartbeatAt ? formatRelativeTime(terminal.lastHeartbeatAt) : '从未连接'}</span></DetailRow>
           <DetailRow label="终端程序版本"><span className="font-mono text-xs">{terminal.agentVersion ?? '未上报'}</span></DetailRow>
+          <DetailRow label="打印完成判据">{printCompletionEvidenceLabel(terminal.printCompletionEvidence)}</DetailRow>
           <DetailRow label="IP 地址"><span className="font-mono text-xs">{terminal.ipAddress ?? '未上报'}</span></DetailRow>
           <DetailRow label="磁盘可用">{fmtDisk(terminal.diskFreeGb)}</DetailRow>
           <div><p className="mb-1 text-xs text-neutral-500">链路诊断</p><TerminalNetworkDiagnostics online={terminal.online} wiredNetworkStatus={terminal.wiredNetworkStatus} printerNetworkStatus={terminal.printerNetworkStatus} /></div>

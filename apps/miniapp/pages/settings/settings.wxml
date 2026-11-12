@@ -60,7 +60,7 @@
       <view class="set-item tap" hover-class="tap-press" bindtap="toAbout">
         <view class="set-ic a-plum"><text class="ficon i-info"></text></view>
         <view class="set-t">关于我们</view>
-        <view class="set-v">v1.0.2</view>
+        <view class="set-v">v1.0.3</view>
         <text class="ficon i-right set-go"></text>
       </view>
     </view>

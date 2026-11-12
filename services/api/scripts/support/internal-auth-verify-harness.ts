@@ -300,9 +300,10 @@ export type IsolatedVerificationDatabase = {
  * 「The column `xxx` does not exist」。所以这里直接**应用真实的迁移文件**，不在上面的建表语句里再抄一份列定义：
  *   20261028230000_organization_branding  Organization.brandName / brandMark / brandLogoAssetId + BrandLogo 表
  *   20261028230100_license                Organization.licenseMode + License 表
+ *   20261111140000_add_org_device_alert_webhook  Organization.deviceAlertWebhookEnc（机构设备告警通知地址密文）
  * 以后再给这三张表加列，要么在下面追加迁移名，要么改上面的建表语句；漏了的话 assertHarnessTablesMatchSchema 会直接点名缺哪几列。
  */
-const HARNESS_EXTRA_MIGRATIONS = ['20261028230000_organization_branding', '20261028230100_license'] as const
+const HARNESS_EXTRA_MIGRATIONS = ['20261028230000_organization_branding', '20261028230100_license', '20261111140000_add_org_device_alert_webhook'] as const
 const API_ROOT = resolve(__dirname, '../..')
 const HARNESS_TABLES = ['Organization', 'User', 'AuditLog'] as const
 const PRISMA_SCALARS = new Set(['String', 'Int', 'BigInt', 'Float', 'Decimal', 'Boolean', 'DateTime', 'Json', 'Bytes'])
