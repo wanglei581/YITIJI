@@ -761,7 +761,7 @@ if (
 else bad('文档上传与服务端计价闭环', '缺少真实上传、PII 确认、Order-only 建单，或仍由小程序提交金额/页数')
 
 if (
-  apiJs.includes('quoteMyPrintOrder(fileId, params, presetFileUrl)') &&
+  /quoteMyPrintOrder\(\s*fileId\s*,\s*params\s*,\s*presetFileUrl\s*,\s*[^)]+\)/.test(apiJs) &&
   apiJs.includes("/preview-url`") &&
   apiJs.includes("request('/orders/quote'") &&
   printUploadJs.includes('api.quoteMyPrintOrder') &&

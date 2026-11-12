@@ -4,7 +4,7 @@
 // 切换后端时:只改 utils/config.js 的 baseUrl / USE_MOCK,页面代码零改动。
 
 const config = require('./config');
-const { request, uploadFile, restoreSession } = require('./request');
+const { request, uploadFile } = require('./request');
 const mock = require('./mock-data');
 const N = require('./normalize');
 const uploadNames = require('./upload-name');
@@ -406,16 +406,6 @@ const api = {
       return Promise.reject(e);
     }
     return request('/member/me', { method: 'GET', needAuth: true });
-  },
-
-  /**
-   * 把「过期但可恢复」的会话恢复回来（FLOW1b，见 utils/request.js restoreSession）。
-   * 返回 { state: 'ok' | 'need_login' | 'recoverable' }；页面经 utils/page-guard.ensureMember 调用。
-   * 真正的恢复在 request.js，本包不改那个文件；这里只转发。
-   */
-  restoreSession() {
-    if (config.USE_MOCK) return Promise.resolve({ state: 'need_login' });
-    return restoreSession();
   },
 
   logout() {
@@ -1064,12 +1054,9 @@ const api = {
    * 注意这里不放宽任何访问策略：presetFileUrl 只能来自服务端刚刚下发的响应，
    * 前端不构造、不缓存、不复用。
    */
-  quoteMyPrintOrder(fileId, params, presetFileUrl) {
+  quoteMyPrintOrder(fileId, params, presetFileUrl, options) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印报价'));
-    // 第 4 个实参是 { terminalId }（03439f5ca）。形参表不能再写一个名字：
-    // verify-miniapp-static 按整段 quoteMyPrintOrder(fileId, params, presetFileUrl) 锁定，
-    // 多写形参会把「打印参数页服务端精确报价」打红。调用方多传的实参仍在 arguments[3]。
-    const options = arguments[3];
+    // options = { terminalId }（03439f5ca）：彩色、双面要按这台终端登记的能力报价，服务端此时要求带上终端。
     const terminalId = options && String(options.terminalId || '').trim();
     const quoteWith = (fileUrl) => request('/orders/quote', {
       method: 'POST',
