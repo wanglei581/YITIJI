@@ -1,16 +1,20 @@
+import { BadRequestException } from '@nestjs/common'
 import { readFreePrintQuotaConfig } from './free-print-quota.config'
 import {
   PRINT_GUEST_ORDER_QUOTA_EXCEEDED,
   PRINT_MEMBER_DAILY_QUOTA_REACHED,
+  PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES,
   PRINT_TERMINAL_DAILY_QUOTA_REACHED,
   beijingDayBounds,
   freePrintQuotaMessages,
   freePrintQuotaNow,
+  orderExceedsDailyFreeSidesMessage,
   remainingSides,
   terminalDailyLimit,
   throwFreePrintQuota,
   type FreePrintQuotaConfig,
   type FreePrintQuotaSubject,
+  type FreeQuotaNotice,
 } from './free-print-quota.policy'
 import { loadFreePrintUsage, type FreePrintQuotaDb } from './free-print-quota.usage'
 
@@ -73,6 +77,73 @@ export async function assertFreePrintQuota(
       resetAt: bounds.resetAt,
     })
   }
+}
+
+/**
+ * 小程序建单前只读预判。配置、用量和「实付大于 0 不看额度」与 assertFreePrintQuota 相同，不扣额度。
+ * 单笔大于会员每天上限或本机每天上限（含机器覆盖，取更紧的那个）时，建单抛 400。
+ * 回放传 rejectOverCap: false：已落库的单不因后来调低上限再被拒，也不附「明天可取」。
+ * 没超上限但今天剩余不够：返回 freeQuotaNotice。够用返回 null，回包不带该字段。
+ * 取件被拒仍走 assertFreePrintQuota 的 429，订单保持待领取。
+ */
+export async function previewFreePrintOrderQuota(
+  db: FreePrintQuotaDb,
+  input: {
+    terminalId: string
+    endUserId: string | null
+    requestedSides: number
+    payableCents: number
+    now?: Date
+  },
+  options?: { rejectOverCap?: boolean },
+): Promise<FreeQuotaNotice | null> {
+  // 实付大于 0 不预判。换行返回，避免和 assertFreePrintQuota 的单行早退写成同一串。
+  if (input.payableCents > 0) {
+    return null
+  }
+  if (!Number.isInteger(input.requestedSides) || input.requestedSides <= 0) return null
+  const now = input.now ?? freePrintQuotaNow()
+  const bounds = beijingDayBounds(now)
+  const config = await readFreePrintQuotaConfig(db)
+  const terminal = await db.terminal.findUnique({
+    where: { id: input.terminalId },
+    select: { dailyFreePrintSides: true },
+  })
+  const terminalLimit = terminalDailyLimit(terminal?.dailyFreePrintSides, config.terminalDailySides)
+  const effectiveLimit = input.endUserId
+    ? Math.min(config.memberDailySides, terminalLimit)
+    : terminalLimit
+  if (input.requestedSides > effectiveLimit) {
+    if (options?.rejectOverCap === false) return null
+    throw new BadRequestException({
+      error: {
+        code: PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES,
+        message: orderExceedsDailyFreeSidesMessage(input.requestedSides, effectiveLimit),
+      },
+    })
+  }
+  const usage = await loadFreePrintUsage(db, input.terminalId, input.endUserId, now)
+  const terminalRemaining = remainingSides(terminalLimit, usage.terminalUsed, usage.terminalInFlight)
+  const remaining = input.endUserId
+    ? Math.min(terminalRemaining, remainingSides(config.memberDailySides, usage.memberUsed, usage.memberInFlight))
+    : terminalRemaining
+  if (input.requestedSides > remaining) {
+    return {
+      remainingSides: remaining,
+      requestedSides: input.requestedSides,
+      resetsAt: bounds.resetAt,
+    }
+  }
+  return null
+}
+
+/** notice 为 null 时原样返回，键不存在。不要写成 freeQuotaNotice: null。 */
+export function withFreeQuotaNotice<T extends object>(
+  view: T,
+  notice: FreeQuotaNotice | null,
+): T & { freeQuotaNotice?: FreeQuotaNotice } {
+  if (notice === null) return view
+  return { ...view, freeQuotaNotice: notice }
 }
 
 export async function freePrintQuotaView(

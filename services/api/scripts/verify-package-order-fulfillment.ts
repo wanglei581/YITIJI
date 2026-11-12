@@ -25,6 +25,7 @@ import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
 import { setPrintScanCapabilityModeForTest, TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
 import { signFileUrl } from '../src/files/signing'
+import { beijingDayBounds } from '../src/print-jobs/free-print-quota.policy'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { buildRealPdf } from './support/minimal-pdf'
 
@@ -82,6 +83,21 @@ function packageQuoteParams(copies = 1) {
     quality: 'standard' as const,
     scale: 'fit' as const,
     pagesPerSheet: 1 as const,
+  }
+}
+
+async function captureQuotaError(
+  action: () => Promise<unknown>,
+): Promise<{ status: number | null; code: string | null; message: string | null }> {
+  try {
+    await action()
+    return { status: null, code: null, message: null }
+  } catch (error) {
+    const ex = error as { getStatus?: () => number; getResponse?: () => unknown }
+    const status = typeof ex.getStatus === 'function' ? ex.getStatus() : null
+    const body = typeof ex.getResponse === 'function' ? ex.getResponse() : null
+    const err = (body as { error?: { code?: string; message?: string } } | null)?.error
+    return { status, code: err?.code ?? null, message: err?.message ?? null }
   }
 }
 
@@ -407,6 +423,85 @@ async function main(): Promise<void> {
       101,
       '材料包合计 101 面建单拒绝',
     )
+
+    // 免费额度按材料包各项合计预判。单价临时改 0，测完还原，后面的付费篡改用例仍走正价。
+    const bwPrice = await prisma.priceConfig.findUniqueOrThrow({ where: { serviceKey: 'print_bw_page' } })
+    const originalBwUnit = bwPrice.unitCents
+    try {
+      await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: 0 } })
+      await prisma.terminalHeartbeat.create({ data: { terminalId, status: 'online', localTaskDatabaseAvailable: true } })
+      const file30a = `file_package_q30a_${suffix}`
+      const file30b = `file_package_q30b_${suffix}`
+      await seedFile(file30a, 20, 30)
+      await seedFile(file30b, 21, 30)
+      const ordersBeforeCap = await prisma.order.count({ where: { endUserId: userId } })
+      const overPackage = await captureQuotaError(() => packages.create(userId, {
+        terminalId,
+        files: [{ fileId: file30a }, { fileId: file30b }],
+        params: { copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+      }, randomUUID()))
+      const overMessage = '这单 60 面，超过每天免费 50 面的上限，请减少份数或分开下单'
+      if (overPackage.status !== 400 || overPackage.code !== 'PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES' || overPackage.message !== overMessage) {
+        fail(`材料包 30+30 应 400 且文案为「${overMessage}」，实际 ${JSON.stringify(overPackage)}`)
+      }
+      if (await prisma.order.count({ where: { endUserId: userId } }) !== ordersBeforeCap) fail('材料包合计超限不得落单')
+      pass('材料包按各项合计：30+30 超过每天 50 面，拒绝且不落单')
+
+      const usedAt = new Date()
+      const usedTaskId = `ptask_package_used_${suffix}`
+      await prisma.printTask.create({
+        data: {
+          id: usedTaskId,
+          terminalId,
+          endUserId: userId,
+          fileUrl: 'https://files.invalid/package-quota',
+          fileMd5: createHash('sha256').update(usedTaskId).digest('hex'),
+          paramsJson: JSON.stringify({ copies: 1 }),
+          status: 'completed',
+          completedAt: usedAt,
+          errorCode: null,
+        },
+      })
+      await prisma.order.create({
+        data: {
+          orderNo: `ORD-PKG-USED-${suffix}`,
+          terminalId,
+          endUserId: userId,
+          printTaskId: usedTaskId,
+          amountCents: 0,
+          discountCents: 0,
+          payStatus: 'paid',
+          paymentSource: 'free',
+          paidAt: usedAt,
+          billablePages: 20,
+          printParamsJson: JSON.stringify({ copies: 1 }),
+          taskStatus: 'completed',
+          channel: 'miniapp_cloud',
+          pickupStatus: 'used',
+        },
+      })
+      const file20a = `file_package_q20a_${suffix}`
+      const file20b = `file_package_q20b_${suffix}`
+      await seedFile(file20a, 22, 20)
+      await seedFile(file20b, 23, 20)
+      const noticed = await packages.create(userId, {
+        terminalId,
+        files: [{ fileId: file20a }, { fileId: file20b }],
+        params: { copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+      }, randomUUID())
+      const expectedReset = beijingDayBounds(new Date()).resetAt
+      if (
+        !noticed.freeQuotaNotice
+        || noticed.freeQuotaNotice.remainingSides !== 30
+        || noticed.freeQuotaNotice.requestedSides !== 40
+        || noticed.freeQuotaNotice.resetsAt !== expectedReset
+      ) {
+        fail(`材料包合计 40 面、今天剩 30 面应带 freeQuotaNotice，实际 ${JSON.stringify(noticed.freeQuotaNotice ?? null)}，期望 resetsAt ${expectedReset}`)
+      }
+      pass('材料包按合计：不超上限但今天剩余不够，仍建单并带 freeQuotaNotice')
+    } finally {
+      await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: originalBwUnit } })
+    }
 
     // 直传完成后内容被换掉：放行仍要拒绝。代理上传没有直传基线，完整性校验会直接返回，测不到这一条。
     await prisma.terminalHeartbeat.create({ data: { terminalId, status: 'online', localTaskDatabaseAvailable: true } })

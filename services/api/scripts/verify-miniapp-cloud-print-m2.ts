@@ -32,6 +32,7 @@ import { StorageService } from '../src/storage/storage.service'
 import { MaterialsService } from '../src/materials/materials.service'
 import { setPrintScanCapabilityModeForTest, TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
 import { signFileUrl } from '../src/files/signing'
+import { beijingDayBounds } from '../src/print-jobs/free-print-quota.policy'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { buildRealPdf } from './support/minimal-pdf'
 
@@ -882,6 +883,148 @@ async function main(): Promise<void> {
       fail('付款后源文件有效期必须覆盖到机码截止，避免码还在、文件已清理')
     }
     pass('对外有效期 == 落库有效期；付款后到机码从 paidAt 起 7 天，源文件延长到同一截止')
+
+    // 免费单：零元建单后立刻 markPaid('free')，到机码同样从 paidAt 起 7 天，短 TTL 源文件被延长到同一截止。
+    // 同时预判免费额度（只读，不扣）。测完把单价和机器覆盖还原，后面的付费 100 面仍须通过。
+    const bwPrice = await prisma.priceConfig.findUniqueOrThrow({ where: { serviceKey: 'print_bw_page' } })
+    const originalBwUnit = bwPrice.unitCents
+    try {
+      await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: 0 } })
+      await prisma.terminalHeartbeat.create({
+        data: { terminalId, status: 'online', localTaskDatabaseAvailable: true, createdAt: new Date() },
+      })
+      const freeFileId = `file_m2_free7_${suffix}`
+      await seedFile(freeFileId, '免费七日', 'keep', 60 * 60 * 1000, 1)
+      const freeCreated = await memberOrders.create(
+        userId,
+        { fileId: freeFileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+        randomUUID(),
+      )
+      if ('freeQuotaNotice' in freeCreated) fail('今天额度够的免费单不得带 freeQuotaNotice')
+      const freeRow = await prisma.order.findUniqueOrThrow({ where: { id: freeCreated.id } })
+      if (freeRow.payStatus !== 'paid' || freeRow.paymentSource !== 'free' || !freeRow.paidAt || !freeRow.pickupCodeExpiresAt) {
+        fail(`零元单必须立刻记为免费已付并写下到机码截止：${JSON.stringify({ payStatus: freeRow.payStatus, paymentSource: freeRow.paymentSource })}`)
+      }
+      const freeAnchored = freeRow.pickupCodeExpiresAt.getTime() - freeRow.paidAt.getTime()
+      if (Math.abs(freeAnchored - sevenDaysMs) > 5_000) {
+        fail(`零元单到机码必须从 paidAt 起 7 天，实际偏差 ${freeAnchored - sevenDaysMs}ms`)
+      }
+      const freeFile = await prisma.fileObject.findUniqueOrThrow({ where: { id: freeFileId } })
+      if (!freeFile.expiresAt || freeFile.expiresAt.getTime() + 1_000 < freeRow.pickupCodeExpiresAt.getTime()) {
+        fail('零元单付款后源文件有效期不得早于到机码截止')
+      }
+      pass('零元单到机码从 paidAt 起 7 天，源文件延长到同一截止；额度够时不带 freeQuotaNotice')
+
+      const file51 = `file_m2_p51_${suffix}`
+      await seedFile(file51, '五十一页', 'keep', 30 * 60 * 60 * 1000, 51)
+      const ordersBeforeCap = await prisma.order.count({ where: { endUserId: userId } })
+      const memberOver = '这单 51 面，超过每天免费 50 面的上限，请减少份数或分开下单'
+      const denied51 = await captureHttpError(() => memberOrders.create(
+        userId,
+        { fileId: file51, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+        randomUUID(),
+      ))
+      if (denied51.status !== 400 || denied51.code !== 'PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES' || denied51.message !== memberOver) {
+        fail(`51 面应 400 且文案逐字为「${memberOver}」，实际 ${JSON.stringify(denied51)}`)
+      }
+      const denied51Again = await captureHttpError(() => memberOrders.create(
+        userId,
+        { fileId: file51, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+        randomUUID(),
+      ))
+      if (denied51Again.status !== 400 || denied51Again.code !== 'PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES') {
+        fail(`超限重试仍须拒绝（租约已释放），实际 ${JSON.stringify(denied51Again)}`)
+      }
+      if (await prisma.order.count({ where: { endUserId: userId } }) !== ordersBeforeCap) fail('单笔超过每天上限不得落单')
+      pass('单笔 51 面超过会员每天 50 面：拒绝、不落单、重试仍拒绝')
+
+      await prisma.terminal.update({ where: { id: terminalId }, data: { dailyFreePrintSides: 10 } })
+      const file11 = `file_m2_p11_${suffix}`
+      await seedFile(file11, '十一页', 'keep', 30 * 60 * 60 * 1000, 11)
+      const machineOver = '这单 11 面，超过每天免费 10 面的上限，请减少份数或分开下单'
+      const denied11 = await captureHttpError(() => memberOrders.create(
+        userId,
+        { fileId: file11, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+        randomUUID(),
+      ))
+      if (denied11.status !== 400 || denied11.code !== 'PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES' || denied11.message !== machineOver) {
+        fail(`机器覆盖 10 面时 11 面的上限必须取 10，实际 ${JSON.stringify(denied11)}`)
+      }
+      await prisma.terminal.update({ where: { id: terminalId }, data: { dailyFreePrintSides: null } })
+      pass('单笔超过本机每天上限时，文案里的上限取更紧的机器覆盖')
+
+      const usedAt = new Date()
+      const usedTaskId = `ptask_m2_used_${suffix}`
+      await prisma.printTask.create({
+        data: {
+          id: usedTaskId,
+          terminalId,
+          endUserId: userId,
+          fileUrl: 'https://files.invalid/m2-quota',
+          fileMd5: createHash('sha256').update(usedTaskId).digest('hex'),
+          paramsJson: JSON.stringify({ copies: 1 }),
+          status: 'completed',
+          completedAt: usedAt,
+          errorCode: null,
+        },
+      })
+      await prisma.order.create({
+        data: {
+          orderNo: `ORD-M2-USED-${suffix}`,
+          terminalId,
+          endUserId: userId,
+          printTaskId: usedTaskId,
+          amountCents: 0,
+          discountCents: 0,
+          payStatus: 'paid',
+          paymentSource: 'free',
+          paidAt: usedAt,
+          billablePages: 40,
+          printParamsJson: JSON.stringify({ copies: 1 }),
+          taskStatus: 'completed',
+          channel: 'miniapp_cloud',
+          pickupStatus: 'used',
+        },
+      })
+      const file20 = `file_m2_p20_${suffix}`
+      await seedFile(file20, '二十页', 'keep', 30 * 60 * 60 * 1000, 20)
+      const noticed = await memberOrders.create(
+        userId,
+        { fileId: file20, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+        randomUUID(),
+      )
+      const expectedReset = beijingDayBounds(new Date()).resetAt
+      if (
+        !noticed.freeQuotaNotice
+        || noticed.freeQuotaNotice.remainingSides !== 10
+        || noticed.freeQuotaNotice.requestedSides !== 20
+        || noticed.freeQuotaNotice.resetsAt !== expectedReset
+      ) {
+        fail(`今天剩 10 面、这单 20 面应带 freeQuotaNotice，实际 ${JSON.stringify(noticed.freeQuotaNotice ?? null)}，期望 resetsAt ${expectedReset}`)
+      }
+      const noticedAgain = await memberOrders.create(
+        userId,
+        { fileId: file20, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+        randomUUID(),
+      )
+      if (noticedAgain.freeQuotaNotice?.remainingSides !== 10 || noticedAgain.freeQuotaNotice.requestedSides !== 20) {
+        fail(`预判不得扣额度，第二张剩余仍是 10，实际 ${JSON.stringify(noticedAgain.freeQuotaNotice ?? null)}`)
+      }
+      pass('今天剩余不够仍建单，并带 freeQuotaNotice；再下一张剩余不变')
+
+      const file10 = `file_m2_p10_${suffix}`
+      await seedFile(file10, '十页', 'keep', 30 * 60 * 60 * 1000, 10)
+      const exact = await memberOrders.create(
+        userId,
+        { fileId: file10, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+        randomUUID(),
+      )
+      if ('freeQuotaNotice' in exact) fail('请求面数等于今天剩余时不得带 freeQuotaNotice')
+      pass('请求面数等于今天剩余时不带 freeQuotaNotice')
+    } finally {
+      await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: originalBwUnit } })
+      await prisma.terminal.update({ where: { id: terminalId }, data: { dailyFreePrintSides: null } })
+    }
 
     // ── 按终端失败锁定 ────────────────────────────────────────────────────
     redis.reset()

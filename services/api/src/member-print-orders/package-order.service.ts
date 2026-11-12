@@ -5,6 +5,7 @@ import { encryptSecret } from '../common/crypto/secret-cipher'
 import { hashPickupCode, randomPickupCode } from '../common/pickup-code'
 import { signFileUrl } from '../files/signing'
 import { aggregatePrintPriceQuotes, OrderQuoteService, priceChanged } from '../payment/order-quote.service'
+import { payableCents } from '../payment/pending-refund-signal'
 import type { PrintPriceQuote } from '../payment/payment.types'
 import { createPaymentSessionToken } from '../payment/payment-session-token'
 import {
@@ -26,7 +27,8 @@ import {
   releaseOrderSubmissionLease,
 } from './order-submission-ledger'
 import { assertPiiScanned } from '../print-jobs/pii-scan-gate'
-import { assertPrintOrderSides } from '../print-jobs/verified-print-parameters'
+import { previewFreePrintOrderQuota, withFreeQuotaNotice } from '../print-jobs/free-print-quota.decide'
+import { assertPrintOrderSides, printOrderSideCount } from '../print-jobs/verified-print-parameters'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 
 const PICKUP_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -181,6 +183,13 @@ export class PackageOrderService {
       }
       throw priceChanged(priced)
     }
+    const requestedSides = printOrderSideCount(items.map((item) => ({ billablePages: item.billablePages, copies: params.copies })))
+    const freeQuotaNotice = await previewFreePrintOrderQuota(this.prisma, {
+      terminalId: terminal.id,
+      endUserId,
+      requestedSides,
+      payableCents: payableCents({ amountCents, discountCents: 0 }),
+    })
     const code = randomPickupCode()
     let order
     try {
@@ -258,7 +267,7 @@ export class PackageOrderService {
       payload: { terminalId: terminal.id, itemCount: order.orderItems.length, amountCents },
     })
     const createdView = await arrivalViewForOrder(this.prisma, settled)
-    return this.toView(settled, createdView.pickupCode ?? code, createdView)
+    return withFreeQuotaNotice(this.toView(settled, createdView.pickupCode ?? code, createdView), freeQuotaNotice)
     } finally {
       if (!completed) {
         await releaseOrderSubmissionLease(this.prisma, { endUserId, idempotencyKey: key, leaseToken })
@@ -349,7 +358,13 @@ export class PackageOrderService {
       order = await this.requireOwned(endUserId, row.id)
     }
     const arrival = await arrivalViewForOrder(this.prisma, order)
-    return this.toView(order, arrival.pickupCode, arrival)
+    const freeQuotaNotice = await previewFreePrintOrderQuota(this.prisma, {
+      terminalId: order.terminalId ?? '',
+      endUserId,
+      requestedSides: printOrderSideCount(order.orderItems),
+      payableCents: payableCents(order),
+    }, { rejectOverCap: false })
+    return withFreeQuotaNotice(this.toView(order, arrival.pickupCode, arrival), freeQuotaNotice)
   }
 
   /**

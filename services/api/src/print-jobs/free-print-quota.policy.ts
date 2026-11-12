@@ -25,12 +25,26 @@ export const AUDIT_TERMINAL_DAILY_FREE_SIDES = 'terminal.daily_free_print_sides.
 export const PRINT_TERMINAL_DAILY_QUOTA_REACHED = 'PRINT_TERMINAL_DAILY_QUOTA_REACHED'
 export const PRINT_MEMBER_DAILY_QUOTA_REACHED = 'PRINT_MEMBER_DAILY_QUOTA_REACHED'
 export const PRINT_GUEST_ORDER_QUOTA_EXCEEDED = 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED'
+/** 小程序建单：单笔面数大于每天免费上限。400，不扣额度；取件仍用上面三条 429。 */
+export const PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES = 'PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES'
 
 export const FREE_PRINT_QUOTA_ERROR_CODES = [
   PRINT_TERMINAL_DAILY_QUOTA_REACHED,
   PRINT_MEMBER_DAILY_QUOTA_REACHED,
   PRINT_GUEST_ORDER_QUOTA_EXCEEDED,
+  PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES,
 ] as const
+
+export function orderExceedsDailyFreeSidesMessage(requestedSides: number, limit: number): string {
+  return `这单 ${requestedSides} 面，超过每天免费 ${limit} 面的上限，请减少份数或分开下单`
+}
+
+/** 今天剩余不够、但仍允许建单时附在创建回包上。够用时不带这个字段。 */
+export interface FreeQuotaNotice {
+  remainingSides: number
+  requestedSides: number
+  resetsAt: string
+}
 
 export const PRINT_TERMINAL_DAILY_QUOTA_MESSAGE = '今天这台机器的免费打印量已用完，明天 0 点恢复。'
 

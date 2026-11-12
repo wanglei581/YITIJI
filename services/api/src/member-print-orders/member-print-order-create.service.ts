@@ -8,6 +8,7 @@ import { hashPickupCode, randomPickupCode } from '../common/pickup-code'
 import { arrivalViewForOrder, arrivalViewsForOrders, type ArrivalReprintFields } from '../print-jobs/self-service-reprint'
 import { signFileUrl } from '../files/signing'
 import { OrderQuoteService, priceChanged } from '../payment/order-quote.service'
+import { payableCents } from '../payment/pending-refund-signal'
 import {
   CLAIMED_UNPAID_LEASE_EXPIRE_DATA,
   claimedUnpaidExpiredLeaseWhere,
@@ -21,6 +22,8 @@ import type { PrintJobParamsDto } from '../print-jobs/dto/create-print-job.dto'
 import type { CancelMemberPrintOrderDto } from './dto/cancel-member-print-order.dto'
 import type { CreateMemberPrintOrderDto } from './dto/create-member-print-order.dto'
 import { assertPiiScanned } from '../print-jobs/pii-scan-gate'
+import { previewFreePrintOrderQuota, withFreeQuotaNotice } from '../print-jobs/free-print-quota.decide'
+import { printOrderSideCount } from '../print-jobs/verified-print-parameters'
 import {
   acquireOrderSubmissionLease,
   completeOrderSubmission,
@@ -265,6 +268,12 @@ export class MemberPrintOrderCreateService {
     if (dto.quotedAmountCents !== undefined && dto.quotedAmountCents !== quote.amountCents) {
       throw priceChanged(quote)
     }
+    const freeQuotaNotice = await previewFreePrintOrderQuota(this.prisma, {
+      terminalId: terminal.id,
+      endUserId,
+      requestedSides: quote.billablePages * dto.copies,
+      payableCents: payableCents({ amountCents: quote.amountCents, discountCents: 0 }),
+    })
     let order
     try {
       order = await this.prisma.$transaction(async (tx) => {
@@ -333,7 +342,7 @@ export class MemberPrintOrderCreateService {
       payload: { terminalId: terminal.id, fileId: file.id, amountCents: quote.amountCents, billablePages: quote.billablePages },
     })
     const arrival = await arrivalViewForOrder(this.prisma, settled)
-    return this.toView(settled, arrival.pickupCode ?? code, terminal, arrival)
+    return withFreeQuotaNotice(this.toView(settled, arrival.pickupCode ?? code, terminal, arrival), freeQuotaNotice)
     } finally {
       if (!completed) {
         await releaseOrderSubmissionLease(this.prisma, { endUserId, idempotencyKey: key, leaseToken })
@@ -460,7 +469,13 @@ export class MemberPrintOrderCreateService {
         })
       : null
     const arrival = await arrivalViewForOrder(this.prisma, order)
-    return this.toView(order, arrival.pickupCode, terminal ?? undefined, arrival)
+    const freeQuotaNotice = await previewFreePrintOrderQuota(this.prisma, {
+      terminalId: order.terminalId ?? '',
+      endUserId,
+      requestedSides: printOrderSideCount([], { billablePages: order.billablePages, printParamsJson: order.printParamsJson }),
+      payableCents: payableCents(order),
+    }, { rejectOverCap: false })
+    return withFreeQuotaNotice(this.toView(order, arrival.pickupCode, terminal ?? undefined, arrival), freeQuotaNotice)
   }
 
   private async expireIfNeeded(order: Awaited<ReturnType<MemberPrintOrderCreateService['requireOwned']>>) {
