@@ -12,6 +12,7 @@ import {
 import { isPrintableFileRecord } from './print-page-count.service'
 import { lockPrintTaskRow } from '../terminals/print-status-attempt'
 import { payableCents, markPaidUnfulfilledRefundRequired } from '../payment/pending-refund-signal'
+import { clearQueueTimeoutRefundMark } from './print-queue-timeout'
 import { assertFreePrintQuota } from './free-print-quota.decide'
 import { reprintRequestedSides } from './free-print-quota.usage'
 import {
@@ -184,6 +185,7 @@ export async function resumeReleasedFailure(
     await tx.printTaskStatusLog.create({
       data: { taskId: task.id, fromStatus: 'failed', toStatus: 'pending', errorCode: PICKUP_CODE_RESUME },
     })
+    await clearQueueTimeoutRefundMark(tx, order.id, liveTask.errorCode)
     return { kind: 'resumed' as const, notice }
   })
 

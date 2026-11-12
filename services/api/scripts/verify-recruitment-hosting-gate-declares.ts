@@ -32,6 +32,7 @@ const exemptions: Record<string, string> = {
   "scripts/verify-policy-eligibility-authoring.ts": "验证普通政策申领条件编辑与预览，有条件条目阳性断言，不用 recruitment 政策。",
   "scripts/verify-policy-eligibility.ts": "核对非 recruitment 类政策的申领条件规则与隐私，不验证招聘托管内容。",
   "scripts/verify-policy-scope.ts": "验证政策机构范围、DI 元数据和缓存键；普通政策过滤不受招聘托管影响。",
+  "scripts/verify-print-completion-evidence.ts": "验证心跳里的打印完成判据写入最新心跳、并在后台终端列表回显；终端管理服务只用来读终端列表的这一列，不断言招聘托管配置。",
   "scripts/verify-print-jobs.ts": "验证打印队列、领取与状态回传；终端管理服务只用于设备与打印夹具。",
   "scripts/verify-recruitment-integration-readiness.ts": "JobsService 仅作桩的类型标注，能力响应由桩固定提供，断言导入预检合同与零写入。",
   "scripts/verify-refund-idempotent.ts": "验证打印订单退款幂等，终端管理服务只用于打印夹具。",

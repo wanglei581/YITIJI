@@ -18,6 +18,7 @@ import { FilterChip } from '../components/FilterChip'
 import { PrinterIcon, RefreshCwIcon, SlidersHorizontalIcon, WalletIcon } from 'lucide-react'
 import { CapabilityCenter } from './CapabilityCenter'
 import { FreePrintQuotaCard } from './FreePrintQuotaCard'
+import { PrintQueueTimeoutCard } from './PrintQueueTimeoutCard'
 import { CloseUnpaidPrintTaskForm } from './CloseUnpaidPrintTaskForm'
 import { PrintRetryButton } from './PrintRetryButton'
 import {
@@ -571,6 +572,7 @@ function CommercialControls() {
   return (
     <div className="space-y-3">
       <FreePrintQuotaCard />
+      <PrintQueueTimeoutCard />
       <div className="grid gap-3 md:grid-cols-3">
         {cards.map((card) => (
           <div key={card.title} className="rounded-xl border border-neutral-900/10 bg-surface p-4">

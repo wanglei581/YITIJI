@@ -120,7 +120,7 @@ async function main() {
     pass(`任务失败 ${calls} 次，定时器仍在跑，日志只有类型与错误码`)
   }
 
-  console.log('\n[3] 真实 TerminalAgentService：回收定时器遇到 P2028 不让进程退出')
+  console.log('\n[3] 真实 TerminalAgentService：回收与排队超时两个定时器遇到 P2028 不让进程退出')
   {
     const captured: Array<() => void> = []
     const realSetInterval = global.setInterval
@@ -131,10 +131,11 @@ async function main() {
     const warns: string[] = []
     const svc = Object.create(TerminalAgentService.prototype) as TerminalAgentService & Record<string, unknown>
     svc['logger'] = { warn: (line: string) => warns.push(line), log: () => undefined, error: () => undefined }
+    const startFailure = () => Object.assign(new Error('Transaction API error: Unable to start a transaction in the given time. 13800138000'), { code: 'P2028' })
     svc['prisma'] = {
-      $transaction: async () => {
-        throw Object.assign(new Error('Transaction API error: Unable to start a transaction in the given time. 13800138000'), { code: 'P2028' })
-      },
+      $transaction: async () => { throw startFailure() },
+      // 排队超时的清扫先查候选任务，同样让它连不上库。
+      printTask: { findMany: async () => { throw startFailure() } },
     }
     const prevSeed = process.env['ENABLE_TEST_PRINT_TASK_SEED']
     delete process.env['ENABLE_TEST_PRINT_TASK_SEED']
@@ -144,15 +145,16 @@ async function main() {
       ;(global as { setInterval: unknown }).setInterval = realSetInterval
       if (prevSeed !== undefined) process.env['ENABLE_TEST_PRINT_TASK_SEED'] = prevSeed
     }
-    assert.equal(captured.length, 1, '应装上一个回收定时器')
-    captured[0]!()
-    captured[0]!()
+    assert.equal(captured.length, 2, '应装上两个定时器：回收过期领取、清扫排队超时')
+    for (const tick of captured) { tick(); tick() }
     await sleep(30)
-    assert.equal(warns.length, 2, `两次失败应各记一行 warn，实际 ${warns.length}`)
-    assert.ok(warns.every((line) => line.startsWith('RESET_EXPIRED_CLAIMS_FAILED') && line.includes('code=P2028')), warns.join(' | '))
+    assert.equal(warns.length, 4, `两个定时器各失败两次，应各记一行 warn，实际 ${warns.length}`)
+    assert.equal(warns.filter((line) => line.startsWith('RESET_EXPIRED_CLAIMS_FAILED')).length, 2, warns.join(' | '))
+    assert.equal(warns.filter((line) => line.startsWith('EXPIRE_PRINT_QUEUE_FAILED')).length, 2, warns.join(' | '))
+    assert.ok(warns.every((line) => line.includes('code=P2028')), warns.join(' | '))
     assert.ok(warns.every((line) => !line.includes('13800138000')), '日志不得带 message 原文')
     assert.equal(unhandled.length, 0, `不得产生未处理拒绝，实际 ${unhandled.length}`)
-    pass('P2028 只记一行 warn，进程与定时器都还在')
+    pass('两个定时器遇到 P2028 都只记一行 warn，进程与定时器都还在')
   }
 
   process.off('unhandledRejection', counter)

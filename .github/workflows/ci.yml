@@ -440,6 +440,8 @@ jobs:
           pnpm run verify:task-runner-wake
           # Injected platform/clock/WMI/dispatch seams only; never invokes a real spooler or printer.
           pnpm run verify:print-monitor-truth
+          # 打印完成判据：启动自检状态机、两份安装脚本必须启用日志并在失败时停住（Windows 只读核对在安装包工作流里跑）。
+          pnpm run verify:print-completion-evidence
           # 解析 Get-PrintJob 输出并按本进程 SID 筛选。不建打印机。
           pnpm run verify:print-queue-residue
           # Generates PNG fixtures in a temp dir and measures the produced PDF; no printer, no spooler.
@@ -650,6 +652,12 @@ jobs:
           INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:free-print-quota
+          # 排队打印单的时效（超时判失败、过期单领不走）与心跳里的打印完成判据。
+          # 前两条直接调服务方法、各自建临时库；第三条起真服务走 HTTP（入参校验、鉴权、
+          # 真实的重新提交路径）——心跳多一个服务端不认识的字段会被整条拒收，只有这样测得出。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-queue-timeout
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-completion-evidence
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-reliability-http
           pnpm --filter @ai-job-print/api verify:print-parameter-capability
           # 彩色/双面按终端能力开放（fail-closed）：未登记的终端必须拒绝，
           # 且彩色订单必须按彩色价目计价 —— 误放的代价是用户按彩色付费拿到黑白纸。
@@ -1260,6 +1268,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
           # 会员重提与管理员重试同时打同一单：统一锁序后不得 40P01，也不得两边都成功。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-retry-lock:postgres
+          # 排队超时的清扫与领单时间上限在 PostgreSQL 上同样成立（线上每 30 秒清扫一次）。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-reliability-http
           pnpm --filter @ai-job-print/api verify:terminal-bind-code
           pnpm --filter @ai-job-print/api verify:terminal-credentials
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-deletion-audit-reporting

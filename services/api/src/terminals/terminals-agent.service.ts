@@ -29,6 +29,12 @@ import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
 import { isPrintableFileRecord } from '../print-jobs/print-page-count.service'
 import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from '../payment/pending-refund-signal'
+import {
+  claimableFreshnessFilter,
+  expireQueuedPrintTasks,
+  printQueueClaimableSinceCutoff,
+  readPrintQueueTimeoutMinutes,
+} from '../print-jobs/print-queue-timeout'
 import { parkOnePaidOrder, parkPaidOrdersWithUnprintableFiles } from './claim-unprintable-file'
 import { PackageOrderFulfillmentService } from '../member-print-orders/package-order-fulfillment.service'
 import { ContractReportPrintLifecycleService } from '../files/contract-report-print-lifecycle.service'
@@ -250,6 +256,9 @@ export class TerminalAgentService implements OnModuleInit {
     scheduleBackground(() => this.resetExpiredClaims(), 30_000, (error) => {
       this.logger.warn(`RESET_EXPIRED_CLAIMS_FAILED ${describeBackgroundError(error)}`)
     })
+    scheduleBackground(() => expireQueuedPrintTasks(this.prisma), 30_000, (error) => {
+      this.logger.warn(`EXPIRE_PRINT_QUEUE_FAILED ${describeBackgroundError(error)}`)
+    })
   }
 
   // ── 1. Register ──────────────────────────────────────────────────────────────
@@ -424,6 +433,8 @@ export class TerminalAgentService implements OnModuleInit {
         // 屏上扫描：旧版终端程序不带这两项，照常收下（库里 null）。
         scanDeviceHealth: dto.scanDeviceHealth ?? null,
         scanDeviceObservedAt,
+        // 旧版终端程序不带这项。不带就记 null，不能当成打印完成判据可用。
+        printCompletionEvidence: dto.printCompletionEvidence ?? null,
         diskFreeGb: dto.diskFreeGB ?? null,
         agentVersion: dto.agentVersion ?? null,
         ipAddress: dto.ipAddress ?? null,
@@ -454,6 +465,7 @@ export class TerminalAgentService implements OnModuleInit {
 
     const now = new Date()
     const claimExpiry = new Date(now.getTime() + 5 * 60 * 1000)
+    const claimableSince = printQueueClaimableSinceCutoff(now, await readPrintQueueTimeoutMinutes(this.prisma))
     const limit = Math.min(dto.maxTasks, 1) // Phase 8.2A: max 1 per cycle
 
     const claimedPayloads: Array<Omit<ClaimTaskResponse, 'attempt'>> = []
@@ -498,6 +510,7 @@ export class TerminalAgentService implements OnModuleInit {
           },
         },
       ],
+      AND: [claimableFreshnessFilter(claimableSince)],
     }
 
     for (let i = 0; i < limit; i++) {
@@ -543,7 +556,7 @@ export class TerminalAgentService implements OnModuleInit {
 
           const claimedAt = new Date()
           const claimedTask = await tx.printTask.updateMany({
-            where: { id: task.id, status: 'pending', terminalId },
+            where: { id: task.id, status: 'pending', terminalId, ...claimableFreshnessFilter(claimableSince) },
             data: { status: 'claimed', claimedAt, claimExpiry },
           })
           if (claimedTask.count !== 1) throw new PrintTaskClaimRaceError()

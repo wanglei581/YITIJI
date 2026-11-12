@@ -54,6 +54,8 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261104150000_add_terminal_heartbeat_printer_queue/migration.sql')])
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261104160000_add_copy_job/migration.sql')])
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', interviewDeadlineMigration)])
+    // 心跳的打印完成判据列（20261111120000）。必须在当前客户端写 TerminalHeartbeat 之前执行。
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261111120000_add_terminal_heartbeat_print_completion/migration.sql')])
     await client.aiServiceFact.create({ data: { serviceType: 'resume_optimize', serviceKey: 'migration-test', orgId: 'org-snapshot', terminalId: 'terminal-snapshot' } })
     if (await client.aiServiceFact.count() !== 1) throw new Error(`${kind}: fact table unavailable`)
     const sentinel = await client.organization.findUnique({ where: { id: 'first-order-migration-sentinel' }, select: { id: true } })
@@ -124,6 +126,12 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     const heartbeat = await client.terminalHeartbeat.findFirst({ where: { terminalId: 'migration-terminal' }, orderBy: { createdAt: 'desc' } })
     if (heartbeat?.scanDeviceHealth !== 'ready' || heartbeat.scanDeviceObservedAt?.getTime() !== observedAt.getTime()) throw new Error(`${kind}: heartbeat scan-device columns must round-trip`)
     console.log(`PASS ${kind}: scan device session columns — legacy rows default to panel, device rows and heartbeat health round-trip`)
+    // 打印完成判据：老终端程序不带这一项，库里是 null；带了就原样存取。
+    if (queueHeartbeatRead?.printCompletionEvidence !== null) throw new Error(`${kind}: heartbeat without print completion evidence must stay null`)
+    const evidenceHeartbeat = await client.terminalHeartbeat.create({ data: { terminalId: 'migration-terminal', printCompletionEvidence: 'unavailable' } })
+    const evidenceRead = await client.terminalHeartbeat.findUnique({ where: { id: evidenceHeartbeat.id } })
+    if (evidenceRead?.printCompletionEvidence !== 'unavailable') throw new Error(`${kind}: heartbeat print completion evidence must round-trip`)
+    console.log(`PASS ${kind}: heartbeat print completion evidence — absent stays null, reported value round-trips`)
     console.log(`PASS ${kind}: scan deviceRound defaults to 0 on legacy and new rows and can increment`)
 
     const deadlineAt = new Date('2026-11-04T12:00:00.000Z')
