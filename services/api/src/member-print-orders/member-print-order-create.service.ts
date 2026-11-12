@@ -554,6 +554,9 @@ export class MemberPrintOrderCreateService {
       paperSize: typeof params.paperSize === 'string' ? params.paperSize : null,
       priceLines: lines,
       payStatus: order.payStatus,
+      // 取消放行要和 cancel() 同一条件。这两个字段本来就在订单行上，列表和详情此前没下发。
+      paymentSource: order.paymentSource ?? null,
+      paidAt: order.paidAt ? order.paidAt.toISOString() : null,
       taskStatus: order.taskStatus,
       pickupStatus: order.pickupStatus,
       pickupCode: code,

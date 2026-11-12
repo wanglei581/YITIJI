@@ -667,7 +667,7 @@ const pickupQr = read('utils/pickup-qrcode.js')
 if (
   pickupWxml.includes('type="2d"') &&
   pickupWxml.includes('请将此二维码对准一体机扫码器') &&
-  // 术语随终端对齐为「到机码」（kiosk 入口名为「到机码核销 · 不是取件码」）。
+  // 术语随终端对齐为「到机码」。取件这一步的名字跟一体机首页磁贴「到机取件」。
   // 这里只是定位锚点；真正守能力的是下面的 createPickupQrMatrix / PICKUP_CODE_RE /
   // 不得出现 scanTerminal / 不得调 `/pickup` 四条，未做任何放宽。
   pickupWxml.includes('二维码只包含本订单的到机码') &&
@@ -735,17 +735,18 @@ const ARRIVAL_CODE_FILES = [
   'pages/store-select/store-select.wxml', 'pages/home/home.wxml',
 ]
 const staleCodeName = ARRIVAL_CODE_FILES.filter((f) => read(f).includes('取件码'))
-// 跨端指引必须指到终端上真实存在的标签：Kiosk /print-scan 的卡片标题是「到机码核销」
-// （apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx）。指引写别的名字，
-// 用户到了机器前就找不到那个按钮。
-// 只钉「必须出现终端真实卡片标题」，不钉整句话——否则指引连字都不能加。
+// 跨端指引必须指到一体机首页上真实存在的磁贴：title="到机取件"
+// （apps/kiosk/src/pages/home/components/HomeTouchView.tsx）。指引写别的名字，
+// 用户到了机器前就找不到那个入口。
+// 只钉「必须出现首页磁贴名」，不钉整句话——否则指引连字都不能加。
+// 打印扫描页里的旧卡片名「到机码核销」不再作为小程序指引的锚点。
 const arrivalGuideOk =
-  pickupWxml.includes('在终端') && pickupWxml.includes('「到机码核销」') &&
-  read('pages/orders/orders.wxml').includes('到机码核销')
+  pickupWxml.includes('在终端') && pickupWxml.includes('「到机取件」') &&
+  read('pages/orders/orders.wxml').includes('到机取件')
 if (!staleCodeName.length && arrivalGuideOk) ok('到机码与取件凭证码不混名，且跨端指引对得上终端标签')
 else bad('到机码命名一致性', staleCodeName.length
   ? `仍把到机码叫「取件码」：${staleCodeName.join(',')}`
-  : '指向终端的指引未使用终端现有卡片标题「到机码核销」')
+  : '指向终端的指引未使用首页磁贴名「到机取件」')
 
 const printUploadJs = read('pages/print-upload/print-upload.js')
 const printUploadWxml = read('pages/print-upload/print-upload.wxml')
@@ -823,95 +824,116 @@ else bad('打印参数页服务端精确报价', '必须先取本人 printFileUr
   }
 }
 
-// 报价参数与下单参数必须锁在一起。
+// 报价与下单共用 print-params 的规范化结果，避免展示和实付分叉。
 //
-// print-upload 的 verifiedPrintParams()（报价用）和 print-pay 的
-// createCloudPrintOrder()（下单用）各自硬编码了 colorMode / duplex。
-// 今天两边都是 black_white / simplex，与 print-upload 页上「彩色与双面本期不可选」
-// 的锁定一致，所以没有问题。
+// 上传页保持基线 black_white / simplex。到店页先选终端、再取能力，
+// 只有 available 才允许 color / duplex_long_edge，未知值与 short_edge 拒绝。
+// 这些分支的行为由 print-capabilities.test.mjs 覆盖；helper 的 normalize
+// 写法不在这里钉死（局部变量名、排版都可以变）。
 //
-// 但这是个潜伏陷阱：哪天驱动侧彩色通过真机验收、有人在 print-upload 解锁了选项，
-// 却忘了改 print-pay 的硬编码，用户就会看到「彩色·双面」而实际下单黑白单面——
-// 展示与实付不一致。那是钱和纸的事，不是文案问题。
-//
-// 所以这里把两处钉在一起：值必须逐字相等，改一边不改另一边即转红。
+// 支付页去掉 ORDER_COLOR_MODE / ORDER_DUPLEX 和本地 quoteParams，
+// 改为 const printParams = require('../../utils/print-params')：
+// normalize 的结果写入 data 的 copiesLabel / colorMode / duplex，
+// _orderPayload 只读 data 上的这三个字段，
+// _loadQuote 先 payload = this._orderPayload()，再
+// api.quoteMyPrintOrder(fileId, printParams.quoteParams(payload), undefined, {terminalId: payload.terminalId})，
+// 彩色/双面标签来自 printParams.labels。模板仍绑定 colorLabel / duplexLabel。
+// 不得再按 q.color==='color' 或 q.duplex==='double' 猜测。
 {
-  const grab = (src, label) => {
-    const color = /colorMode:\s*'([a-z_]+)'/.exec(src)
-    const duplex = /duplex:\s*'([a-z]+)'/.exec(src)
-    return { label, color: color && color[1], duplex: duplex && duplex[1] }
+  const barePay = stripComments(printPayJs)
+  const payloadBody = methodBody(barePay, '_orderPayload')
+  const loadQuoteBody = methodBody(barePay, '_loadQuote')
+  const importsHelper = /const\s+printParams\s*=\s*require\(\s*['"]\.\.\/\.\.\/utils\/print-params['"]\s*\)/.test(barePay)
+  const callsNormalize = /printParams\.normalize\s*\(/.test(barePay)
+  const droppedLegacy = !/\bORDER_COLOR_MODE\b/.test(barePay)
+    && !/\bORDER_DUPLEX\b/.test(barePay)
+    && !/function\s+quoteParams\s*\(/.test(barePay)
+  const usesDataField = (body, field) => {
+    if (!body) return false
+    if (new RegExp('(?:^|[^A-Za-z0-9_])data\\.' + field + '(?![A-Za-z0-9_])').test(body)) return true
+    const declRe = /\{([^}]*)\}\s*=\s*(?:this\.)?data\b/g
+    let decl
+    while ((decl = declRe.exec(body))) {
+      if (decl[1].split(',').some((part) => part.trim().split(':')[0].trim() === field)) return true
+    }
+    return false
   }
-  const quote = grab(printUploadJs, 'print-upload/verifiedPrintParams')
-  // print-pay 把两个值收成了模块常量，报价与建单都引用它 —— 页内分叉在结构上已经不可能。
-  // 所以这里读常量声明，并额外钉住"两条链都只许引用常量、不许再写死第二份字面量"，
-  // 否则本断言会退化成"只要文件里有过这个字符串就算数"。
-  const order = {
-    label: 'print-pay/ORDER_COLOR_MODE+ORDER_DUPLEX',
-    color: (/const ORDER_COLOR_MODE = '([a-z_]+)'/.exec(printPayJs) || [])[1],
-    duplex: (/const ORDER_DUPLEX = '([a-z]+)'/.exec(printPayJs) || [])[1],
-  }
-  {
-    const bare = stripComments(printPayJs)
-    const payloadBody = methodBody(bare, '_orderPayload')
-    const quoteBody = bare.slice(bare.indexOf('function quoteParams('), bare.indexOf('function colorLabelOf('))
-    const usesConst = (body) => body.includes('colorMode: ORDER_COLOR_MODE') && body.includes('duplex: ORDER_DUPLEX')
-    if (!usesConst(payloadBody)) bad('建单参数同源', '_orderPayload 没有引用 ORDER_COLOR_MODE / ORDER_DUPLEX')
-    else if (!usesConst(quoteBody)) bad('报价参数同源', 'quoteParams 没有引用 ORDER_COLOR_MODE / ORDER_DUPLEX')
-    else if (/colorMode: '[a-z_]+'/.test(bare)) bad('建单参数同源', 'print-pay 又出现写死的 colorMode 字面量，页内会再分叉')
-    else ok('print-pay 报价与建单共用同两个常量，页内不可能分叉')
-  }
-  if (!quote.color || !quote.duplex || !order.color || !order.duplex) {
-    bad('报价与下单打印参数一致', '取不到 colorMode / duplex 字面量——抽取失效，不要当作通过')
-  } else if (quote.color !== order.color || quote.duplex !== order.duplex) {
-    bad('报价与下单打印参数一致',
-      `报价用 ${quote.color}/${quote.duplex}，下单用 ${order.color}/${order.duplex}——` +
-      '用户看到的和实际下单的不是一回事，必须两处同改')
-  } else {
-    ok(`报价与下单打印参数一致（${quote.color} / ${quote.duplex}）`)
-  }
-}
-
-// MP-07：支付页不得按 query 渲染彩色/双面。标签必须跟建单字面量走。
-{
-  const guessesQuery = /q\.color\s*===\s*'color'/.test(printPayJs)
-    || /q\.duplex\s*===\s*'double'/.test(printPayJs)
-  const labelsFromCreate = /const ORDER_COLOR_MODE = 'black_white'/.test(printPayJs)
-    && /const ORDER_DUPLEX = 'simplex'/.test(printPayJs)
-    && /colorLabel: colorLabelOf\(ORDER_COLOR_MODE\)/.test(printPayJs)
-    && /duplexLabel: duplexLabelOf\(ORDER_DUPLEX\)/.test(printPayJs)
-    && printPayJs.includes('colorLabel')
-    && printPayJs.includes('duplexLabel')
-    && printPayWxml.includes('{{colorLabel}}')
+  const payloadUsesData = !!payloadBody
+    && usesDataField(payloadBody, 'copiesLabel')
+    && usesDataField(payloadBody, 'colorMode')
+    && usesDataField(payloadBody, 'duplex')
+    && !/colorMode\s*:\s*'[a-z_]+'/.test(payloadBody)
+    && !/duplex\s*:\s*'[a-z_]+'/.test(payloadBody)
+  const quotesFromPayload = !!loadQuoteBody
+    && /payload\s*=\s*this\._orderPayload\(\)/.test(loadQuoteBody)
+    && /api\.quoteMyPrintOrder\(\s*[^,]+,\s*printParams\.quoteParams\(\s*payload\s*\)\s*,\s*undefined\s*,\s*\{\s*terminalId\s*:\s*payload\.terminalId\s*,?\s*\}\s*\)/.test(loadQuoteBody)
+  const labelsFromHelper = /printParams\.labels\s*\(/.test(barePay)
+    && /\bcolorLabel\b/.test(barePay)
+    && /\bduplexLabel\b/.test(barePay)
+  const templateKeepsLabels = printPayWxml.includes('{{colorLabel}}')
     && printPayWxml.includes('{{duplexLabel}}')
-  if (guessesQuery) {
-    bad('支付页打印标签不从 query 猜测', 'print-pay 仍按 query 渲染彩色/双面，会与建单 black_white/simplex 分叉')
-  } else if (!labelsFromCreate) {
-    bad('支付页打印标签与建单参数同源', '标签必须来自建单真实参数（colorLabel/duplexLabel），且建单仍是 black_white/simplex')
+  const guessesQuery = /q\.color\s*===\s*'color'/.test(barePay)
+    || /q\.duplex\s*===\s*'double'/.test(barePay)
+  const collectLiterals = (src, re) => {
+    const values = []
+    let match
+    while ((match = re.exec(src))) values.push(match[1])
+    return values
+  }
+  const uploadBare = (stripComments(printUploadJs).match(/function verifiedPrintParams\([^)]*\)\s*\{[\s\S]*?\n\}/) || [''])[0]
+  const uploadColors = collectLiterals(uploadBare, /colorMode\s*:\s*'([a-z_]+)'/g)
+  const uploadDuplexes = collectLiterals(uploadBare, /duplex\s*:\s*'([a-z_]+)'/g)
+  const uploadBaseline = uploadColors.length > 0
+    && uploadDuplexes.length > 0
+    && uploadColors.every((value) => value === 'black_white')
+    && uploadDuplexes.every((value) => value === 'simplex')
+
+  if (!importsHelper || !callsNormalize || !droppedLegacy) {
+    bad('支付页打印参数走 print-params', 'print-pay 必须 const printParams = require(\'../../utils/print-params\')，调用 printParams.normalize，并删除 ORDER_COLOR_MODE / ORDER_DUPLEX 与本地 function quoteParams')
+  } else if (!payloadUsesData) {
+    bad('建单参数同源', '_orderPayload 必须使用 data 上已规范化的 copiesLabel / colorMode / duplex，不得再写死字面量')
+  } else if (!quotesFromPayload) {
+    bad('报价参数同源', '_loadQuote 必须先 payload=this._orderPayload()，再以 printParams.quoteParams(payload) 报价并传入 terminalId')
+  } else if (!labelsFromHelper || !templateKeepsLabels) {
+    bad('支付页打印标签与建单参数同源', '标签必须来自 printParams.labels，模板仍绑定 colorLabel / duplexLabel')
+  } else if (guessesQuery) {
+    bad('支付页打印标签不从 query 猜测', 'print-pay 不得再按 q.color===color / q.duplex===double 猜测彩色或双面')
+  } else if (!uploadBaseline) {
+    bad('上传页打印参数保持基线', 'print-upload 的 colorMode / duplex 字面量必须仍全部是 black_white / simplex')
   } else {
-    ok('支付页彩色/双面标签与建单参数同源')
+    ok('支付页报价、建单与标签共用 print-params 规范化结果，上传页保持黑白单面基线')
   }
 }
 
-// MP-05：云打印 unpaid+pending 可取消；材料包取消端点仍 knownMissing，页面不得调用。
+// MP-05：云打印可取消的条件与服务端 cancel() 一致（unpaid、免费已入账、关单未收款，且 pending、无打印任务）。
+// 材料包取消端点仍 knownMissing，页面不得调用。
 {
   const listWired = ordersJs.includes('api.cancelCloudPrintOrder')
     && ordersJs.includes("payStatus === 'unpaid'")
     && ordersJs.includes("pickupStatus === 'pending'")
+    && ordersJs.includes("paymentSource === 'free'")
+    && ordersJs.includes("payStatus === 'closed'")
+    && ordersJs.includes('确定取消这张免费订单？')
     && ordersJs.includes('toUiItem(raw)')
     && ordersWxml.includes('取消订单')
     && ordersWxml.includes('item.canCancel')
   const detailWired = orderDetailJs.includes('api.cancelCloudPrintOrder')
     && orderDetailJs.includes("payStatus === 'unpaid'")
     && orderDetailJs.includes("pickupStatus === 'pending'")
+    && orderDetailJs.includes("paymentSource === 'free'")
+    && orderDetailJs.includes("payStatus === 'closed'")
+    && orderDetailJs.includes('确定取消这张免费订单？')
     && orderDetailJs.includes('toDetail(raw)')
     && orderDetailWxml.includes('取消订单')
     && orderDetailWxml.includes('detail.canCancel')
+    && orderDetailWxml.includes('这单有问题，去反馈')
+    && orderDetailJs.includes('/pages/feedback/feedback?')
   const packageLeftClosed = !ordersJs.includes('cancelPackageOrder')
     && !orderDetailJs.includes('cancelPackageOrder')
   if (listWired && detailWired && packageLeftClosed) {
-    ok('云打印未付款待到机订单可取消，材料包取消未接线')
+    ok('云打印未付款、免费未取、关单未收款可取消，材料包取消未接线')
   } else {
-    bad('云打印未付款订单取消入口',
+    bad('云打印订单取消入口',
       `list=${listWired} detail=${detailWired} packageClosed=${packageLeftClosed}`)
   }
 }
@@ -948,7 +970,9 @@ else bad('打印参数页服务端精确报价', '必须先取本人 printFileUr
   else bad('打印 printFileUrl 旁路受控', offenders.join('；'))
 }
 
-const quoteRefreshMatch = printUploadJs.match(/_refreshQuote\(delay = 0\) \{([\s\S]*?)\n  \},\n\n  pickColor/)
+// 2026-10-17 FLOW1a：打印参数页不再有 pickColor（颜色、单双面、份数挪到选终端页），
+// 截取到 _refreshQuote 之后的下一个方法为止；下面三项先后顺序与旧回包保护的断言不变。
+const quoteRefreshMatch = printUploadJs.match(/_refreshQuote\(delay = 0\) \{([\s\S]*?)\n  \},\n\n(?:  \/\/[^\n]*\n)*  [A-Za-z_$][\w$]*\(/)
 const quoteRefreshBody = quoteRefreshMatch ? quoteRefreshMatch[1] : ''
 const quoteSeqIndex = quoteRefreshBody.indexOf('const seq = ++this._quoteSeq')
 const quoteLoadingIndex = quoteRefreshBody.indexOf("priceStatus: 'loading'")
@@ -962,11 +986,14 @@ if (
 else bad('打印报价竞态保护', '递增请求序号和 loading 状态必须发生在防抖等待之前，旧请求不得回写 ready')
 
 if (
-  printUploadJs.includes('amountCents=${encodeURIComponent(amountCents)}') &&
+  !/print-store\?[^`]*\b(?:amountCents|total)=/.test(printUploadJs) &&
   // 2026-09-30：价目为 0 时不出现钱的字眼，付费分支改挂在「已报出大于 0 的金额」下（free-pilot-copy.test.mjs）
-  printUploadWxml.includes("amountCents > 0 ? '精确报价' : (priceStatus === 'ready' ? '免费试运营'") &&
-  printStoreJs.includes('isFreeOrder: hasAmount && amountCents === 0') &&
-  printStoreWxml.includes("q.total && !isFreeOrder ? '机端支付' : (isFreeOrder ? '现场打印'") &&
+  // 2026-10-17 FLOW1a：第 1 步只按 1 份黑白单面核定，付费分支改叫「1 份黑白参考价」；免费分支不变
+  printUploadWxml.includes("amountCents > 0 ? '1 份黑白参考价' : (priceStatus === 'ready' ? '免费试运营'") &&
+  printStoreJs.includes('const isFreeOrder = amountCents === 0') &&
+  printStoreWxml.includes("quoteState === 'ready' && !isFreeOrder") &&
+  printStoreWxml.includes('机端支付') && printStoreWxml.includes('现场打印') &&
+  !/q\.(?:amountCents|total)\b/.test(printStoreJs + printStoreWxml) &&
   // 2026-09-15（第二轮）：支付页的免费判定同样改为**只**来自服务端。
   // 此前这里要求 print-store 把 amountCents 透传进 print-pay 的 URL，而它与文件名
   // 走的是同一条 URL —— 求职材料的文件名里常写着本人姓名，金额是本人订单状态，
@@ -978,7 +1005,7 @@ if (
   printPayJs.includes("'files[0].price': total") &&
   // 负面锚：这四项一个都不许再进 print-store → print-pay 的 URL。
   !/print-pay\?[^`'"]*\b(?:amountCents|total|name|pickupCode|expiresAt)=/.test(printStoreJs) &&
-  printPayWxml.includes('免费试运营：到机核验后直接进入打印队列') &&
+  printPayWxml.includes('免费试运营：到机取件后直接进入打印队列') &&
   pickupJs.includes("key: 'awaiting_release'") &&
   pickupJs.includes('parseAmountCents(order.amountCents) === 0') &&
   pickupWxml.includes('核销后直接进入打印队列') &&
@@ -1597,7 +1624,9 @@ const PACKAGE_CHAIN_PAGES = [
   const createIdx = flow.indexOf('api.createCloudPrintOrder(')
   const chain = createIdx >= 0 ? flow.slice(createIdx) : ''
   const lockIdx = chain.indexOf('this._createdOrderId = orderId')
-  const redirectIdx = chain.indexOf('wx.redirectTo(')
+  // 进取件页的跳转 2026-10-16 起是 wx.reLaunch（下单后清掉下单流程页，见 print-pay.js 注释）。
+  // 下面三条要求不变：先锁 orderId 再跳；跳转失败有兜底；地址只带 orderId。
+  const redirectIdx = chain.indexOf('wx.reLaunch(')
   // R5：判据不再是"回调时再读一次身份"。同一个人的 30 分钟 JWT 在 POST 在途期间到点，
   // getToken() 会先 clearSession()，回调读到的身份是 `''` —— 逐字比对会把它判成换人，
   // 于是订单已经在服务端建出来了，页面却不锁 orderId、还把按钮解开。再点一次就是
@@ -1615,8 +1644,8 @@ const PACKAGE_CHAIN_PAGES = [
   }
   const guardIdx = chain.indexOf('this._createAttempt !== attempt')
   if (!(guardIdx > 0 && lockIdx > guardIdx)) misses.push('建单成功回调没有先判这次尝试还属不属于当前账号，再锁 orderId')
-  if (!(lockIdx > 0 && redirectIdx > lockIdx)) misses.push('orderId 必须在 redirectTo 之前锁住（跳转失败时页面还留在这里）')
-  if (!/fail: \(\) => this\._lockAfterCreated\(orderId\)/.test(printPayJs)) misses.push('redirectTo 没有失败兜底')
+  if (!(lockIdx > 0 && redirectIdx > lockIdx)) misses.push('orderId 必须在进取件页的跳转（reLaunch）之前锁住（跳转失败时页面还留在这里）')
+  if (!/fail: \(\) => this\._lockAfterCreated\(orderId\)/.test(printPayJs)) misses.push('进取件页的跳转没有失败兜底')
   if (!/if \(this\._createdOrderId\) \{ this\._lockAfterCreated\(this\._createdOrderId\); return \}/.test(printPayJs)) {
     misses.push('已建过单仍可能再 POST 一次（服务端虽会按幂等键回放，页面也不该让用户白点）')
   }
@@ -1661,11 +1690,11 @@ const PACKAGE_CHAIN_PAGES = [
   if (!printPayJs.includes("wx.navigateTo({ url: '/pages/orders/orders'")) misses.push('锁定后没有给出找回订单的出口')
   // print-pay → print-pickup 只带 orderId。
   //
-  // 取的是 `wx.redirectTo(...)` 的**整个实参段**，不是 `/print-pickup\?[^`'"]*/`。
+  // 取的是 `wx.reLaunch(...)` 的**整个实参段**，不是 `/print-pickup\?[^`'"]*/`。
   // 那条正则在第一个引号处就停 —— 本页的地址是 `'…?orderId=' + encodeURIComponent(id)`
   // 拼出来的，它只看得到 `orderId=`，后面再 `+ '&pickupCode=' + code` 一个字都抓不到。
   // 也就是说这条「凭证不进 URL」的断言，对本页真正的写法从来没有约束力。
-  const navArgs = callArgs(payBare, 'wx.redirectTo(')
+  const navArgs = callArgs(payBare, 'wx.reLaunch(')
   if (!navArgs.includes('print-pickup')) misses.push('找不到 print-pay 进取件页的跳转')
   else {
     for (const field of ['pickupCode', 'expiresAt', 'amountCents', 'taskStatus', 'orderNo', 'name', 'store']) {
