@@ -672,3 +672,12 @@ test('建单 400 PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES：原话显示，并能回
   modals[0].success({ confirm: true })
   assert.equal(backs.length, 1)
 })
+
+test('我的文档格式块：四个字母的扩展名（DOCX 等）缩一档字号、去字距，不顶边', () => {
+  const wxml = stripComments(read('pages/documents/documents.wxml'))
+  assert.match(wxml, /class="doc-ic ic-\{\{item\.kind\}\} \{\{item\.ext\.length >= 4 \? 'ic-long' : ''\}\}"/)
+  const wxss = read('pages/documents/documents.wxss')
+  const rule = (wxss.match(/\.doc-ic\.ic-long\s*\{([^}]*)\}/) || [])[1] || ''
+  assert.match(rule, /font-size:\s*var\(--fs-xs\)/, '四字母格式块要用小一档的字号刻度')
+  assert.match(rule, /letter-spacing:\s*0/, '四字母格式块不留字距')
+})

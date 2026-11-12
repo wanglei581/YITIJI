@@ -83,7 +83,7 @@
              不在右侧常驻一列挤压文件名（FLOW1a）。扩展名只在格式块里出现，
              「.pdf」不会被拆到下一行；完整原名在「⋯」菜单顶部。发给微信好友留在底行。 -->
         <view class="doc-row">
-          <view class="doc-ic ic-{{item.kind}}">{{item.ext}}</view>
+          <view class="doc-ic ic-{{item.kind}} {{item.ext.length >= 4 ? 'ic-long' : ''}}">{{item.ext}}</view>
           <view class="doc-body">
             <view class="doc-name">{{item.baseName}}</view>
             <view class="doc-meta">

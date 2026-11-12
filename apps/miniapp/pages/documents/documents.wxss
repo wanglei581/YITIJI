@@ -36,11 +36,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22rpx;
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 1rpx;
   color: #fff;
 }
+/* 四个字母的扩展名（DOCX、XLSX 等）在 72rpx 的格式块里会顶边：字号降一档、去掉字距（产品负责人 11/12 看图后要求）。 */
+.doc-ic.ic-long { font-size: var(--fs-xs); letter-spacing: 0; }
 .doc-ic.ic-pdf  { background: #d9534f; }
 .doc-ic.ic-img  { background: #3fa46a; }
 .doc-ic.ic-doc  { background: #3f68b0; }
