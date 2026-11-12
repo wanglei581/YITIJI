@@ -144,6 +144,23 @@ Page({
       })
       return
     }
+    // Word 服务端算不出页数，进打印页会停在「重新核定」。先转成 PDF，再打那份 PDF。
+    if (item.isWord) {
+      if (!this.data.wordConversionAvailable) {
+        this.convertDoc({ currentTarget: { dataset: { id: item.id } } })
+        return
+      }
+      wx.showModal({
+        title: '先转成 PDF',
+        content: 'Word 文件要先转成 PDF 才能打印',
+        confirmText: '转成 PDF',
+        cancelText: '取消',
+        success: (res) => {
+          if (res.confirm) this.convertDoc({ currentTarget: { dataset: { id: item.id } } })
+        },
+      })
+      return
+    }
     wx.navigateTo({
       url: `/pages/print-upload/print-upload?fileId=${encodeURIComponent(item.id)}&name=${encodeURIComponent(item.name)}&pages=${item.pages}`,
     })
@@ -434,7 +451,7 @@ Page({
     wx.chooseMessageFile({
       count: 1,
       type: 'file',
-      extension: ['pdf', 'jpg', 'jpeg', 'png'],
+      extension: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
       success: (res) => {
         const file = (res.tempFiles || [])[0]
         if (!file || !file.path) return

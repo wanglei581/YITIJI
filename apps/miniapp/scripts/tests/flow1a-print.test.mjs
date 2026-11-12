@@ -105,15 +105,17 @@ test('displayNameParts：只在 1–5 位字母数字扩展名、点不在开头
 
 // ── 我的文档：点整行看原文，「打印」走打印，菜单统一叫法、顶部给完整原名 ─────
 
-function documentsUi(all) {
-  const calls = { nav: [], sheet: [], fetch: [] }
+function documentsUi(all, extraApi = {}) {
+  const calls = { nav: [], sheet: [], fetch: [], modal: [], converted: [] }
   const api = {
     getMyDocuments: () => Promise.resolve([]),
     getDocumentConversionCapabilities: () => Promise.resolve({ wordToPdf: false }),
     getFilePreviewUrl: (id) => { calls.fetch.push(id); return new Promise(() => {}) },
+    convertDocumentToPdf: (id) => { calls.converted.push(id); return new Promise(() => {}) },
+    ...extraApi,
   }
   const auth = { isLoggedIn: () => true, getUser: () => ({ id: 'member-1' }) }
-  const wx = { redirectTo() {}, switchTab() {}, navigateTo: (o) => calls.nav.push(o.url), showModal() {}, showToast() {}, showLoading() {}, hideLoading() {}, showActionSheet: (o) => calls.sheet.push(o) }
+  const wx = { redirectTo() {}, switchTab() {}, navigateTo: (o) => calls.nav.push(o.url), showModal: (o) => calls.modal.push(o), showToast() {}, showLoading() {}, hideLoading() {}, showActionSheet: (o) => calls.sheet.push(o) }
   const page = instantiate(loadPageDefinition('pages/documents/documents.js', { wx, modules: { api, auth } }))
   page.data.all = all
   return { page, calls }
@@ -143,6 +145,41 @@ test('我的文档：「打印」才进打印；「⋯」菜单叫「打印」�
   assert.ok(!sheet.itemList.includes('发起打印') && !sheet.itemList.includes('重新打印'))
 })
 
+test('Word 点打印不进打印流程：说明要先转成 PDF，确认后才转换', () => {
+  const word = { id: 'f-word', name: '简历.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', isWord: true, reprintable: true, pages: 0 }
+  const { page, calls } = documentsUi([word])
+  page.setData({ wordConversionAvailable: true })
+  page.reprintDoc(row('f-word'))
+  assert.equal(calls.nav.length, 0, 'Word 不导航到 print-upload')
+  assert.equal(calls.converted.length, 0, '没点确认不转换')
+  assert.equal(calls.modal.length, 1)
+  assert.equal(calls.modal[0].content, 'Word 文件要先转成 PDF 才能打印')
+  assert.equal(calls.modal[0].confirmText, '转成 PDF')
+  calls.modal[0].success({ confirm: true })
+  assert.deepEqual(calls.converted, ['f-word'])
+  assert.equal(calls.nav.length, 0)
+})
+
+test('Word 转换不可用时点打印：用现有说明，不进打印、不调转换', () => {
+  const word = { id: 'f-word', name: '简历.doc', isWord: true, reprintable: true, pages: 0 }
+  const { page, calls } = documentsUi([word])
+  page.setData({ wordConversionAvailable: false })
+  page.reprintDoc(row('f-word'))
+  assert.equal(calls.nav.length, 0)
+  assert.equal(calls.converted.length, 0)
+  assert.equal(calls.modal[0].content, 'Word 转换暂未开放，请另存为 PDF 上传')
+  assert.equal(calls.modal[0].confirmText, '知道了')
+})
+
+test('聊天选文件收下 doc、docx，上传后仍走先转 PDF 再打印', () => {
+  const src = read('pages/documents/documents.js')
+  const listed = src.match(/extension:\s*\[([^\]]+)\]/)
+  assert.ok(listed)
+  assert.match(listed[1], /'doc'/)
+  assert.match(listed[1], /'docx'/)
+  assert.match(listed[1], /'pdf'/)
+})
+
 test('我的文档模板：行内「打印」走 reprintDoc；点整行打开原文；没有「重新打印」字样', () => {
   const wxml = stripComments(read('pages/documents/documents.wxml'))
   assert.match(wxml, /bindtap="openDoc"/)
@@ -155,10 +192,10 @@ test('我的文档模板：行内「打印」走 reprintDoc；点整行打开原
 
 function uploadUi({ name = 'ZYD-20261016-BIZ-COLOR-D93A.pdf', user = { id: 'A' } } = {}) {
   const state = { gen: 7, user }
-  const calls = { nav: [], open: [], preview: [], modal: [], fetch: [] }
+  const calls = { nav: [], open: [], preview: [], modal: [], fetch: [], quotes: [] }
   const api = {
     createPrintPiiScan: () => Promise.resolve({ id: 'scan-1', piiFindings: [] }),
-    quoteMyPrintOrder: () => Promise.resolve({ amountCents: 0, billablePages: 1 }),
+    quoteMyPrintOrder: (...args) => { calls.quotes.push(args); return Promise.resolve({ amountCents: 0, billablePages: 1 }) },
     getFilePreviewUrl: (id) => { calls.fetch.push(id); return Promise.resolve({ url: '/api/v1/files/' + id + '/content?sig=x' }) },
   }
   const forbidden = (fn) => () => { throw new Error(`print-upload 不该调 auth.${fn}（过期时会顺手清会话）`) }
@@ -185,6 +222,18 @@ test('确认文件页：没有颜色、单双面、份数控件；标题「确�
   assert.match(wxml, /<view class="fc-name">\{\{fileBase\}\}<\/view>/, '文件卡标题只放主名，扩展名在 fc-tag')
   assert.doesNotMatch(wxml, /可以提交打印订单/, '提交在第 3 步')
   assert.doesNotMatch(read('pages/print-upload/print-upload.js'), /\/pages\/print-preview\//)
+})
+
+test('确认文件页带进 Word：不核定页数，说明先转 PDF，并能回到我的文档', async () => {
+  const { page, calls } = uploadUi({ name: '简历.docx' })
+  await flush()
+  assert.equal(calls.quotes.length, 0, 'Word 不能停在重新核定')
+  assert.equal(page.data.wordFile, true)
+  assert.equal(page.data.priceStatus, 'idle')
+  assert.equal(calls.modal[0].content, 'Word 文件要先转成 PDF 才能打印')
+  page.toStore()
+  assert.match(calls.nav[0].url, /\/pages\/documents\/documents$/)
+  assert.ok(!calls.nav.some((item) => String(item.url).includes('print-store')))
 })
 
 test('确认文件页：默认带黑白、单面、1 份去第 2 步，并挂上草稿回传通道', async () => {

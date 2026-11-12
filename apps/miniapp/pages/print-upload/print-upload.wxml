@@ -34,7 +34,14 @@
 
   <!-- 颜色、单双面、份数都挪到第 2 步，选定终端、知道它开放什么之后统一设置（FLOW1a）。
        这里只留页数核定失败时的说明和重试；核定中、已核定都写在上面文件卡里，不再另起一块明细。 -->
-  <view wx:if="{{hasFile && priceStatus === 'unavailable'}}" class="card flat bill rise-d3">
+  <view wx:if="{{wordFile}}" class="card flat bill rise-d3">
+    <view class="bl-fail">
+      <view class="bl-fail-t">Word 文件要先转成 PDF 才能打印</view>
+      <view class="btn ghost bl-retry" bindtap="toDocuments">回到我的文档</view>
+    </view>
+  </view>
+
+  <view wx:elif="{{hasFile && priceStatus === 'unavailable'}}" class="card flat bill rise-d3">
     <view class="bl-fail">
       <view class="bl-fail-t"><text class="ficon i-warning"></text><text>暂时无法核定页数</text></view>
       <view class="bl-fail-s">{{priceError || '服务端暂时无法核定页数'}}</view>
@@ -72,6 +79,6 @@
     <text wx:if="{{priceStatus === 'ready'}}" class="ab-amt">{{priceStatus === 'ready' && amountCents > 0 ? '¥' + total : '免费'}}</text>
     <text wx:elif="{{hasFile}}" class="ab-amt pending">—</text>
   </view>
-  <view class="btn primary lg {{priceStatus !== 'ready' || !hasFile || privacyStatus !== 'ready' ? 'disabled' : ''}}" bindtap="toStore">{{!hasFile ? '请先选择文件' : (privacyStatus !== 'ready' ? '请完成隐私检查' : '选终端和参数')}}</view>
+  <view class="btn primary lg {{!wordFile && (priceStatus !== 'ready' || !hasFile || privacyStatus !== 'ready') ? 'disabled' : ''}}" bindtap="toStore">{{wordFile ? '回到我的文档' : (!hasFile ? '请先选择文件' : (privacyStatus !== 'ready' ? '请完成隐私检查' : '选终端和参数'))}}</view>
 </view>
 </view>

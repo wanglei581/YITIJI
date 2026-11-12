@@ -6,7 +6,12 @@ const printParams = require('../../utils/print-params')
 const storage = require('../../utils/storage')
 const uploadNames = require('../../utils/upload-name')
 
-// 后端 print_doc 只收 PDF/JPG/PNG，扩展名足以判型，不必为一个徽章多打一次网络请求。
+// 扩展名足以判型，不必为一个徽章多打一次网络请求。Word 算不出页数，不能停在核定。
+function isWordFileName(name) {
+  const extension = (String(name || '').toLowerCase().match(/\.([^.]+)$/) || [])[1] || ''
+  return extension === 'doc' || extension === 'docx'
+}
+
 function extLabelOf(name) {
   const clean = String(name || '').split('?')[0].trim()
   const dot = clean.lastIndexOf('.')
@@ -50,6 +55,8 @@ Page({
     fileExt: 'FILE',
     fileId: '',
     hasFile: false,
+    // 别的入口带进 Word：不核定页数，说明要先转 PDF，并给回到我的文档的出路。
+    wordFile: false,
     hasPageCount: false,
     // 第 1 步只按 1 份黑白单面向服务端核定页数（门禁基线）；份数、颜色、单双面都在第 2 步按终端能力设置。
     copies: 1,
@@ -84,10 +91,26 @@ Page({
       // 服务端在生成响应里已经把 URL 给过一次，这里直接用，不再换第二次。
       // 普通本人文件不带这个参数，走原路径，行为完全不变。
       this._printFileUrl = o.printFileUrl ? decodeURIComponent(o.printFileUrl) : ''
+      const wordName = (o.name && this.data.file && this.data.file.name) || ''
+      if (isWordFileName(wordName)) {
+        this.setData({ fileId: o.fileId, hasFile: true, wordFile: true, priceStatus: 'idle' })
+        wx.showModal({
+          title: '先转成 PDF',
+          content: 'Word 文件要先转成 PDF 才能打印',
+          confirmText: '回到文档',
+          showCancel: false,
+          success: (res) => { if (res.confirm) this.toDocuments() },
+        })
+        return
+      }
       this.setData({ fileId: o.fileId, hasFile: true })
       this._runPrivacyScan(o.fileId)
       this._refreshQuote()
     }
+  },
+
+  toDocuments() {
+    wx.navigateTo({ url: '/pages/documents/documents' })
   },
 
   onUnload() {
@@ -266,6 +289,7 @@ Page({
   // 带回去（FLOW1a P1：此前只带份数，返回再进时彩色、双面被重置成黑白单面）。
   // 带回去的只是用户意图：第 2 步照样按终端能力重算、重新核价，quoteKey 对得上才放行。
   toStore() {
+    if (this.data.wordFile) { this.toDocuments(); return }
     if (!this._passPrintGate()) return
     const { file, fileId } = this.data
     const d = this._usableDraft()
