@@ -12,8 +12,9 @@ const HERE = path.dirname(fileURLToPath(import.meta.url))
 const MINIAPP = path.resolve(HERE, '../..')
 const REPO = path.resolve(MINIAPP, '../..')
 const requireMiniapp = createRequire(path.join(MINIAPP, 'utils', 'entry.js'))
-const { RESUME_DOC_LIMITS, LIST_BOX_LIMITS } = requireMiniapp('../utils/resume-doc-limits.js')
-const { parseList } = requireMiniapp('../utils/resume-build-model.js')
+const { RESUME_DOC_LIMITS, LIST_BOX_LIMITS, exportListErrors } = requireMiniapp('../utils/resume-doc-limits.js')
+const { parseList, buildExportPayload } = requireMiniapp('../utils/resume-build-model.js')
+const draft = requireMiniapp('../pages/resume-optimize/draft.js')
 
 const BACKEND_LIMITS = path.join(REPO, 'services/api/src/ai/resume/resume-doc-limits.ts')
 const LIMITS_JS = path.join(MINIAPP, 'utils/resume-doc-limits.js')
@@ -400,4 +401,310 @@ test('30 条技能拼起来超过 800 字，改一个字后编辑区仍是全部
   const body = bodies[0]
   assert.equal(body.skills.length, 30)
   for (let i = 0; i < 30; i += 1) assert.equal(String(body.skills[i]), editedSkills[i])
+})
+
+// 62 个短技能词，写法照样稿 _prep/r3-skills-63.js。中间只有空格，没有换行、逗号、顿号、分号。
+const SHORT_SKILLS = [
+  '公众号运营', '视频号运营', '小红书运营', '抖音运营', '微博运营', '社群运营', '企业微信私域', '会员运营',
+  '内容策划', '选题策划', '文案撰写', '新闻稿撰写', '短视频脚本', '直播策划', '直播中控', '直播复盘',
+  '活动策划', '活动执行', '节日营销', '新品上市推广', '达人合作', 'KOC 招募', '探店笔记', '品牌联名',
+  '用户调研', '用户画像分析', '数据分析', 'Excel 数据透视表', 'VLOOKUP 函数', '周报月报', '竞品分析', '舆情监测',
+  '差评处理', '危机公关', '秀米排版', '135 编辑器', '剪映剪辑', 'Premiere 基础', 'Photoshop 基础', 'Canva 可画',
+  '稿定设计', '手机摄影', '视频拍摄', '收音与布光', '巨量引擎投放', '腾讯广告投放', '小红书聚光投放', '千川投放',
+  'SEO 基础', '预算编制', '供应商管理', '跨部门沟通', '项目排期', '新人带教', '门店培训', '外卖平台运营',
+  '美团点评运营', '团购套餐设计', '优惠券策略', '会员等级设计', 'AIGC 写作辅助', '提示词编写',
+]
+const EXTRA_SKILL = '门店日常复盘'
+// 整句超过单条上限。中间只有空格和句号，没有换行、逗号、顿号、分号，拆编辑区文本时不会被拆成两条。
+const LONG_SKILL = '熟悉小红书 抖音 视频号三个平台的推荐逻辑和流量规则 能根据后台的曝光 点击 完播 互动和转化数据判断一条内容的问题出在选题 标题 封面还是发布时间 并在下一次发布前做出对应调整。做过从零起号到稳定日更的完整过程 知道冷启动阶段怎么选题 怎么借势热点 怎么用评论区维护早期用户 也知道账号进入瓶颈期以后怎么通过栏目化和系列化把内容做深 让老粉丝愿意持续看下去。平时也会把评论区里反复出现的问题记下来 反推下一期选题 让内容和用户的真实疑问对得上。'
+
+function countSentence(kind, count) {
+  const cap = kind === '技能' ? RESUME_DOC_LIMITS.skills : RESUME_DOC_LIMITS.certificates
+  return `${kind}最多 ${cap} 项，当前 ${count} 项`
+}
+
+function lengthSentence(kind, text) {
+  const cap = kind === '技能' ? RESUME_DOC_LIMITS.skill : RESUME_DOC_LIMITS.certificate
+  return `${kind}「${String(text).slice(0, 10)}…」超过 ${cap} 字`
+}
+
+function baseResume(extra) {
+  return Object.assign({
+    basic: { name: '林知夏', phone: '13800138000', email: 'linzhixia@example.com', city: '杭州' },
+    intention: { position: '用户运营', city: '杭州', jobType: '全职', salary: '面议' },
+    summary: '过去两年在社区团购团队做用户运营，能独立跟一场活动从方案到复盘。',
+    education: [],
+    experience: [],
+    projects: [],
+    skills: ['活动策划', '用户访谈'],
+    certificates: ['大学英语六级'],
+  }, extra || {})
+}
+
+test('63 条技能只报条数，满额且每条正好到单条上限时不报错', () => {
+  const skills = SHORT_SKILLS.concat([EXTRA_SKILL])
+  assert.equal(SHORT_SKILLS.length, 62)
+  assert.equal(skills.length, 63)
+  for (const skill of skills) {
+    assert.equal(skill.includes('测试'), false)
+    assert.equal(/[\n,，、;；]/.test(skill), false)
+    assert.ok(skill.length <= RESUME_DOC_LIMITS.skill, skill)
+  }
+  const onlyCount = exportListErrors({ skills, certificates: ['大学英语六级'] })
+  assert.equal(onlyCount.length, 1)
+  assert.equal(onlyCount[0], countSentence('技能', 63))
+
+  const skillOk = fill([
+    '能独立完成一场社区市集从邀约和现场执行到次日复盘并把到场人数和复购来源写成下一班可以接手的记录。',
+  ], RESUME_DOC_LIMITS.skill)
+  const certOk = fill([
+    '大学英语六级通过。备考时按听力和阅读分周练习。作文先列三个能从实习里举出来的例子再写。',
+  ], RESUME_DOC_LIMITS.certificate)
+  assert.equal(skillOk.length, RESUME_DOC_LIMITS.skill)
+  assert.equal(certOk.length, RESUME_DOC_LIMITS.certificate)
+  assert.equal(/[\n,，、;；]/.test(skillOk), false)
+  assert.equal(/[\n,，、;；]/.test(certOk), false)
+  const fullSkills = []
+  const fullCerts = []
+  for (let i = 0; i < RESUME_DOC_LIMITS.skills; i += 1) fullSkills.push(skillOk)
+  for (let i = 0; i < RESUME_DOC_LIMITS.certificates; i += 1) fullCerts.push(certOk)
+  assert.deepEqual(exportListErrors({ skills: fullSkills, certificates: fullCerts }), [])
+})
+
+test('一条超长技能和一条超长证书各报一句，四种同时出现时按条数再逐条的顺序', () => {
+  const skillLong = `${fill(['能把一场社区试吃会从邀约做到次日复盘并写成可以交接的记录。'], RESUME_DOC_LIMITS.skill)}。`
+  const certLong = `${fill(['教师资格证面试试讲用过一节社区团购的用户承接课。'], RESUME_DOC_LIMITS.certificate)}。`
+  assert.equal(skillLong.length, RESUME_DOC_LIMITS.skill + 1)
+  assert.equal(certLong.length, RESUME_DOC_LIMITS.certificate + 1)
+  const pair = exportListErrors({
+    skills: ['活动策划', skillLong],
+    certificates: ['大学英语六级', certLong],
+  })
+  assert.deepEqual(pair, [lengthSentence('技能', skillLong), lengthSentence('证书', certLong)])
+  assert.equal(pair[0].includes(`${skillLong.slice(0, 10)}…`), true)
+  assert.equal(pair[1].includes(`${certLong.slice(0, 10)}…`), true)
+
+  const skills = SHORT_SKILLS.concat([skillLong])
+  const certificates = []
+  for (let i = 0; i < RESUME_DOC_LIMITS.certificates; i += 1) certificates.push('大学英语六级')
+  certificates.push(certLong)
+  assert.equal(skills.length, 63)
+  assert.equal(certificates.length, RESUME_DOC_LIMITS.certificates + 1)
+  assert.deepEqual(exportListErrors({ skills, certificates }), [
+    countSentence('技能', skills.length),
+    lengthSentence('技能', skillLong),
+    countSentence('证书', certificates.length),
+    lengthSentence('证书', certLong),
+  ])
+})
+
+test('空串和空白由请求体滤掉；顿号逗号拆开后的条数就是函数看到的条数', () => {
+  const rawSkills = ['活动策划', '   ', '', '用户访谈']
+  const filtered = buildExportPayload(baseResume({
+    skills: rawSkills,
+    certificates: ['  ', '', '大学英语六级'],
+  }), { format: 'pdf', taskId: 'task-blank' })
+  assert.equal(rawSkills.length, 4)
+  assert.equal(filtered.skills.length, 2)
+  assert.equal(filtered.skills[0], '活动策划')
+  assert.equal(filtered.skills[1], '用户访谈')
+  assert.equal(filtered.certificates.length, 1)
+  assert.deepEqual(exportListErrors(filtered), [])
+
+  const names = SHORT_SKILLS.concat([EXTRA_SKILL])
+  const editor = draft.resumeToEditor(baseResume({ skills: [], certificates: ['大学英语六级'] }))
+  editor.skillsText = `${names.join('、').replace('活动策划', '活动策划，用户访谈')}\n   \n，`
+  editor.certsText = '大学英语六级'
+  const parsed = parseList(editor.skillsText)
+  const resume = draft.editorToResume(editor)
+  const payload = buildExportPayload(resume, { format: 'pdf', taskId: 'task-split' })
+  assert.ok(parsed.length > names.length)
+  assert.equal(payload.skills.length, parsed.length)
+  assert.equal(payload.skills.length, names.length + 1)
+  const errors = exportListErrors(payload)
+  assert.equal(errors.length, 1)
+  assert.equal(errors[0], countSentence('技能', payload.skills.length))
+
+  const kept = buildExportPayload(baseResume({
+    skills: ['活动策划、用户访谈'],
+    certificates: ['大学英语六级'],
+  }), { format: 'pdf', taskId: 'task-kept' })
+  assert.equal(kept.skills.length, 1)
+  assert.equal(kept.skills[0], '活动策划、用户访谈')
+  assert.deepEqual(exportListErrors(kept), [])
+})
+
+function loadOptimize(resume, wx) {
+  return instantiate(loadPageDefinition('pages/resume-optimize/resume-optimize.js', {
+    wx,
+    globals: {
+      getApp: () => ({ globalData: { statusBarHeight: 47 } }),
+    },
+    modules: {
+      auth: { isLoggedIn: () => true, getUser: () => ({ id: 'u1', nickname: '林知夏' }) },
+      storage: {
+        KEYS: { RESUME_TASK: 'zyd_resume_task' },
+        get() { return {} },
+      },
+      api: {
+        getResumeOptimize: () => Promise.resolve({
+          taskId: 'task-export-limit',
+          status: 'completed',
+          modules: [],
+          optimizedResume: resume,
+        }),
+        getResumeExportPricing: () => Promise.resolve({ mode: 'free', unitCents: 0 }),
+        getResumeDraft: () => Promise.resolve({}),
+        putResumeDraft: () => Promise.resolve({ updatedAt: '2026-11-13T08:00:00.000Z' }),
+        getResumeVersions: () => Promise.resolve({ items: [], latestVersion: null }),
+        factCheckResume: () => Promise.resolve({ originalAvailable: true, items: [] }),
+        exportGeneratedResume: (payload) => {
+          wx._bodies.push(payload)
+          return Promise.resolve({
+            fileId: 'file-limit',
+            filename: '林知夏-用户运营.pdf',
+            printFileUrl: '/api/v1/files/file-print/content?sig=1',
+            sizeBytes: 20480,
+            pageCount: 2,
+            expiresAt: '2026-12-31T00:00:00.000Z',
+          })
+        },
+      },
+    },
+  }))
+}
+
+function limitWx() {
+  const modals = []
+  const scrolls = []
+  const queries = []
+  const wx = {
+    navigateTo() {},
+    navigateBack() {},
+    switchTab() {},
+    showToast() {},
+    showLoading() {},
+    hideLoading() {},
+    downloadFile() {},
+    openDocument() {},
+    getStorageSync() { return '' },
+    setStorageSync() {},
+    removeStorageSync() {},
+    showModal(opt) {
+      modals.push(opt)
+      if (typeof opt.success === 'function') opt.success({ confirm: true, cancel: false })
+    },
+    pageScrollTo(opt) { scrolls.push(opt) },
+    createSelectorQuery() {
+      const q = {
+        select(sel) {
+          queries.push(sel)
+          return q
+        },
+        selectViewport() { return q },
+        boundingClientRect() { return q },
+        scrollOffset() { return q },
+        exec(cb) { cb([{ top: 640 }, { scrollTop: 180 }]) },
+      }
+      return q
+    },
+    _bodies: [],
+    _modals: modals,
+    _scrolls: scrolls,
+    _queries: queries,
+  }
+  return wx
+}
+
+test('63 条技能里有一条超长时先弹明哪两条，删到 60 条后再进入核对', async () => {
+  assert.ok(LONG_SKILL.length > RESUME_DOC_LIMITS.skill)
+  assert.equal(/[\n,，、;；]/.test(LONG_SKILL), false)
+  const skills = SHORT_SKILLS.concat([LONG_SKILL])
+  assert.equal(skills.length, 63)
+  const wx = limitWx()
+  const page = loadOptimize(baseResume({ skills, certificates: ['大学英语六级'] }), wx)
+
+  page.onLoad({ taskId: 'task-export-limit' })
+  await flush()
+  await flush()
+  assert.equal(page.data.exportDisabled, false, page.data.exportDisabledReason)
+  assert.equal(page.data.factPanel.open, false)
+
+  page.exportResume()
+  assert.equal(wx._modals.length, 1)
+  assert.equal(wx._modals[0].title, '暂时不能导出')
+  assert.equal(wx._modals[0].showCancel, false)
+  assert.equal(wx._modals[0].content, [
+    countSentence('技能', 63),
+    lengthSentence('技能', LONG_SKILL),
+  ].join('；\n'))
+  assert.equal(page.data.factPanel.open, false)
+  assert.equal(page.data.exporting, false)
+  assert.equal(wx._bodies.length, 0)
+  assert.equal(wx._queries.length, 1)
+  assert.equal(wx._queries[0], '#edit-lists')
+  assert.equal(wx._scrolls.length, 1)
+  const inset = 47 + 44
+  assert.equal(wx._scrolls[0].scrollTop, 180 + 640 - inset)
+  assert.equal(wx._scrolls[0].selector, undefined)
+
+  const kept = SHORT_SKILLS.slice(0, RESUME_DOC_LIMITS.skills)
+  assert.equal(kept.length, RESUME_DOC_LIMITS.skills)
+  page.onDraftInput({
+    currentTarget: { dataset: { section: 'skillsText', key: 'skillsText', index: -1 } },
+    detail: { value: kept.join('\n') },
+  })
+  page.exportResume()
+  await flush()
+  await flush()
+  assert.equal(wx._modals.length, 1)
+  assert.equal(page.data.factPanel.canConfirm, true, page.data.factPanel.error || '事实核对没有打开')
+  assert.equal(wx._bodies.length, 0)
+  assert.equal(wx._scrolls.length, 1)
+})
+
+test('技能里夹着顿号时按请求体条数放行，不按编辑区文本重拆', async () => {
+  const skills = SHORT_SKILLS.slice(0, 59).concat(['公众号运营、视频号运营'])
+  assert.equal(skills.length, 60)
+  const wx = limitWx()
+  const page = loadOptimize(baseResume({ skills, certificates: ['大学英语六级'] }), wx)
+  page.onLoad({ taskId: 'task-export-limit' })
+  await flush()
+  await flush()
+  assert.equal(page.data.exportDisabled, false, page.data.exportDisabledReason)
+  const payload = buildExportPayload(page._resume, { format: page.data.format, taskId: page.data.taskId })
+  const fromEditor = parseList(page.data.editor.skillsText)
+  assert.equal(payload.skills.length, 60)
+  assert.equal(fromEditor.length, 61)
+  assert.notEqual(payload.skills.length, fromEditor.length)
+
+  page.exportResume()
+  await flush()
+  await flush()
+  assert.equal(wx._modals.length, 0)
+  assert.equal(page.data.factPanel.canConfirm, true, page.data.factPanel.error || '事实核对没有打开')
+  assert.equal(wx._bodies.length, 0)
+  assert.equal(wx._scrolls.length, 0)
+})
+
+test('已经核对过时超限仍先弹窗，不直接导出', async () => {
+  const skills = SHORT_SKILLS.concat([LONG_SKILL])
+  const wx = limitWx()
+  const page = loadOptimize(baseResume({ skills, certificates: ['大学英语六级'] }), wx)
+  page.onLoad({ taskId: 'task-export-limit' })
+  await flush()
+  await flush()
+  assert.equal(page.data.exportDisabled, false, page.data.exportDisabledReason)
+  page._factsConfirmedAt = '2026-11-13T01:02:03.000Z'
+  page._factsNeedRecheck = false
+  page.exportResume()
+  assert.equal(wx._modals.length, 1)
+  assert.equal(wx._modals[0].title, '暂时不能导出')
+  assert.equal(wx._modals[0].content, [
+    countSentence('技能', 63),
+    lengthSentence('技能', LONG_SKILL),
+  ].join('；\n'))
+  assert.equal(page.data.factPanel.open, false)
+  assert.equal(wx._bodies.length, 0)
+  assert.equal(page.data.exporting, false)
 })

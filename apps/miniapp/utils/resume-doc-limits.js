@@ -30,7 +30,64 @@ const LIST_BOX_LIMITS = {
   certsText: joinedListLimit(RESUME_DOC_LIMITS.certificates, RESUME_DOC_LIMITS.certificate),
 }
 
+/**
+ * 导出前查技能、证书有没有超出简历文档容量。返回错误句数组，空数组表示没超。
+ *
+ * 不用 utils/resume-build-model.js 的 validate()、LEN、MAX_SKILLS、MAX_CERTIFICATES。
+ * 那一份是「AI 生成简历」录入上限，和导出接口按 RESUME_DOC_LIMITS 校验的条数、单条字数不是同一份。
+ * 入参是 buildExportPayload 已经拆好并滤掉空串的请求体，这里只看 skills、certificates 两个数组，
+ * 不再对编辑区文本重拆：编辑区用顿号、逗号拼起来的一条，和请求体里已经分开的数组，条数可能不同。
+ */
+function exportListErrors(payload) {
+  const errors = []
+  const body = payload || {}
+  const skills = Array.isArray(body.skills) ? body.skills : []
+  const certificates = Array.isArray(body.certificates) ? body.certificates : []
+  if (skills.length > RESUME_DOC_LIMITS.skills) {
+    errors.push(`技能最多 ${RESUME_DOC_LIMITS.skills} 项，当前 ${skills.length} 项`)
+  }
+  skills.forEach((item) => {
+    const text = item == null ? '' : String(item)
+    if (text.length > RESUME_DOC_LIMITS.skill) {
+      errors.push(`技能「${text.slice(0, 10)}…」超过 ${RESUME_DOC_LIMITS.skill} 字`)
+    }
+  })
+  if (certificates.length > RESUME_DOC_LIMITS.certificates) {
+    errors.push(`证书最多 ${RESUME_DOC_LIMITS.certificates} 项，当前 ${certificates.length} 项`)
+  }
+  certificates.forEach((item) => {
+    const text = item == null ? '' : String(item)
+    if (text.length > RESUME_DOC_LIMITS.certificate) {
+      errors.push(`证书「${text.slice(0, 10)}…」超过 ${RESUME_DOC_LIMITS.certificate} 字`)
+    }
+  })
+  return errors
+}
+
+// 自定义顶栏会压住技能卡标题。pageScrollTo 的 offsetTop 从基础库 2.23.1 才有；
+// project.config.json、文档和提审记录里没找到本项目的最低基础库，不能假定都支持。
+// 先量 #edit-lists 相对视口的位置，加上已经滚过的距离，再减去状态栏和导航栏。
+// 取不到高度时用 app.js 里 globalData 的初值：状态栏 20、导航栏 44。
+function scrollSkillsCardIntoView(wx, getApp) {
+  const running = typeof getApp === 'function' ? getApp() : null
+  const gd = (running && running.globalData) || {}
+  const inset = (gd.statusBarHeight || 20) + (gd.navBarHeight || 44)
+  const query = wx.createSelectorQuery()
+  query.select('#edit-lists').boundingClientRect()
+  query.selectViewport().scrollOffset()
+  query.exec((res) => {
+    const rect = (res && res[0]) || {}
+    const view = (res && res[1]) || {}
+    const top = typeof rect.top === 'number' ? rect.top : 0
+    const scrolled = typeof view.scrollTop === 'number' ? view.scrollTop : 0
+    const next = scrolled + top - inset
+    wx.pageScrollTo({ scrollTop: next > 0 ? next : 0, duration: 300 })
+  })
+}
+
 module.exports = {
   RESUME_DOC_LIMITS,
   LIST_BOX_LIMITS,
+  exportListErrors,
+  scrollSkillsCardIntoView,
 }

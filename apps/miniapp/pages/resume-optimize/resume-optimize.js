@@ -285,6 +285,14 @@ Page({
       })
       return
     }
+    const listErrors = docLimits.exportListErrors(buildModel.buildExportPayload(resume, { format: this.data.format, taskId: this.data.taskId }))
+    if (listErrors.length) {
+      wx.showModal({
+        title: '暂时不能导出', content: listErrors.join('；\n'), showCancel: false,
+        success: () => docLimits.scrollSkillsCardIntoView(wx, getApp),
+      })
+      return
+    }
     if (this._factsConfirmedAt && !this._factsNeedRecheck) {
       this._doExport(this._factsConfirmedAt)
       return
