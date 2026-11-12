@@ -78,4 +78,25 @@ function capabilityError(raw, normalized) {
   return ''
 }
 
-module.exports = { normalize, quoteParams, labels, capabilityError, allowedCapabilities }
+// 展示用：把服务端订单里的打印参数原样翻成一行中文，给取件页、订单列表、订单详情共用。
+// 和 labels() 不同，这里不校验、不抛错：短边照实写「短边翻页」；服务端没记录（null）的项
+// 就不写，绝不回落成「单面」或「黑白」——那等于替用户编一个没核实过的参数。
+const DUPLEX_DISPLAY = {
+  simplex: '单面',
+  duplex_long_edge: '双面（长边翻页）',
+  duplex_short_edge: '双面（短边翻页）',
+}
+
+function displaySpec(raw) {
+  const o = raw && typeof raw === 'object' ? raw : {}
+  const parts = []
+  if (typeof o.paperSize === 'string' && o.paperSize) parts.push(o.paperSize.toUpperCase())
+  if (o.colorMode === 'color') parts.push('彩色')
+  else if (o.colorMode === 'black_white') parts.push('黑白')
+  if (DUPLEX_DISPLAY[o.duplex]) parts.push(DUPLEX_DISPLAY[o.duplex])
+  if (Number.isInteger(o.copies) && o.copies > 0) parts.push(`${o.copies} 份`)
+  if (Number.isInteger(o.billablePages) && o.billablePages > 0) parts.push(`共 ${o.billablePages} 页`)
+  return parts.join(' · ')
+}
+
+module.exports = { normalize, quoteParams, labels, capabilityError, allowedCapabilities, displaySpec }
