@@ -117,6 +117,15 @@ test('点单失败的可恢复说法不叫人输码', () => {
   assert.equal(here.pickupHereRecoverableLine('NETWORK_ERROR'), null)
   assert.doesNotMatch(here.pickupHereNetworkLine(), /输码|到机码/)
   assert.match(here.pickupHereNetworkLine(), /请重试/)
+  const notReady = here.pickupHereRecoverableLine('PRINT_TERMINAL_NOT_READY')
+  assert.match(notReady, /这台机器暂时不能取件/)
+  assert.equal(notReady.split('这台机器暂时不能取件').length - 1, 1)
+  assert.match(notReady, /请稍后再来/)
+  assert.doesNotMatch(notReady, /不能用/)
+  assert.doesNotMatch(notReady, /输码|到机码/)
+  assert.equal(here.pickupHereClaimDropsRow('other', 'PRINT_TERMINAL_NOT_READY'), false)
+  assert.equal(here.PICKUP_HERE_RESUME_NOTE, '打印中断时，回手机上查看这笔订单')
+  assert.doesNotMatch(here.PICKUP_HERE_RESUME_NOTE, /到机码/)
 })
 
 test('点领取时服务端说不在这台机器：用服务端那句，空句或叫人找工作人员时用无人值守替身', () => {

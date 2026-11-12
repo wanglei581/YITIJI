@@ -19,7 +19,7 @@ export function PickupHereList({
   if (status === 'error') {
     return (
       <div className="pcp-here-error" role="status" data-testid="pickup-here-error">
-        <p className="pcp-here-note">暂时列不出你的单，可以在下面输到机码。</p>
+        <p className="pcp-here-note">暂时列不出你的单，可以在上面输到机码。</p>
         <button type="button" className="qx-btn pcp-here-reload" data-testid="pickup-here-reload" onClick={onReload}>
           重新读取
         </button>

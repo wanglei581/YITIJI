@@ -171,6 +171,7 @@ async function claimPickup(code: string, staleSignal?: AbortSignal): Promise<Cla
 
 // ── 组件 ──────────────────────────────────────────────────────
 const PICKUP_RAIL = ['输到机码', '核对订单', '取件'] as const
+const PICKUP_HERE_RAIL = ['选中这一单', '核对订单', '取件'] as const
 
 export function PrintPickupClaimPage() {
   const navigate = useNavigate()
@@ -196,6 +197,8 @@ export function PrintPickupClaimPage() {
     orderId: string | null
     quotaExit: PickupQuotaExit | null
   } | null>(null)
+  // 成功页按领取来源换说法。只在成功屏读取；离页卸载即丢。
+  const [successVia, setSuccessVia] = useState<'code' | 'here' | null>(null)
   // true = 显示 10 格与历史码字母键盘（稿 alphaKb）；受理正则同时接受 8 位新码与 10 位历史码，
   // 这个开关不参与任何格式判定，也不影响提交。
   const [legacyMode, setLegacyMode] = useState(false)
@@ -241,6 +244,7 @@ export function PrintPickupClaimPage() {
       const data = await claimPickup(submittedCode, staleSignal)
       if (staleSignal?.aborted) return 'aborted'
       setResult(data)
+      setSuccessVia('code')
       setState('success')
       // 手输的可能正是列表里那一单。成功后重读，不在这里放锁：再取一单走 handleReset。
       here.reload()
@@ -276,6 +280,7 @@ export function PrintPickupClaimPage() {
       const data = await claimHereOrder(orderId, token, staleSignal)
       if (staleSignal?.aborted) return
       setResult({ ...data, fileName: maskPickupFileName(data.fileName) })
+      setSuccessVia('here')
       setState('success')
       here.removeRow(orderId)
     } catch (err) {
@@ -293,7 +298,7 @@ export function PrintPickupClaimPage() {
         setFailure({ kind, source: 'here', code: '', orderId, quotaExit: pickupQuotaExit(code) })
         setErrorMsg(kind === 'network' ? pickupHereNetworkLine() : (recoverable ?? pickupClaimMessage(err, supportContact)))
       }
-      // 扫码枪那一屏没有失败面板，重试按钮画不出来。点单失败回到手输屏，失败说明在列表上面。
+      // 扫码枪那一屏没有失败面板，重试按钮画不出来。点单失败回到手输屏，失败说明仍排在列表前面。
       setGuide('keypad')
       setState('error')
     }
@@ -350,6 +355,7 @@ export function PrintPickupClaimPage() {
     setResult(null)
     setErrorMsg('')
     setFailure(null)
+    setSuccessVia(null)
     claimLockRef.current = false
     setGuide('keypad')
     setLegacyMode(false)
@@ -384,15 +390,17 @@ export function PrintPickupClaimPage() {
     : successCopyRaw
 
   // 青序壳：输入态标题按新码 / 历史码切换；认领成功改看订单状态。返回键按稿，终态不放。
+  // 点单成功才换眉题和进度第一步。校验中和输码成功仍写到机码。
+  const claimedByOrder = screen === 'success' && successVia === 'here'
   const frame = (body: ReactNode, primaryNode?: ReactNode, subtitle?: ReactNode) => (
     <PrintTouchFrame
       page={screen === 'success' ? 'print-pickup-ok' : 'print-pickup'}
       legacyBody={false}
-      eyebrow="到机码核销"
+      eyebrow={claimedByOrder ? '本机领取' : '到机码核销'}
       kind="compact"
       seal={null}
       railNow={screen === 'success' ? 1 : 0}
-      railLabels={PICKUP_RAIL}
+      railLabels={claimedByOrder ? PICKUP_HERE_RAIL : PICKUP_RAIL}
       back={screen === 'success'
         ? { label: '重新输入', onBack: handleReset }
         : { label: '返回', onBack: () => navigate('/print-scan') }}
@@ -437,6 +445,7 @@ export function PrintPickupClaimPage() {
           fileName={result.fileName}
           amountCents={result.amountCents}
           privacyNote={<>办完离开或闲置超时后，会<b>清除本机登录态和临时信息</b>，下一个人无法查看。订单与文件按系统留存期限管理。</>}
+          claimVia={claimedByOrder ? 'order' : 'code'}
         />
       </div>,
       <button
@@ -667,21 +676,23 @@ export function PrintPickupClaimPage() {
 
   const legacyNote = legacyMode && showKeypad ? <PickupLegacyNote /> : null
 
+  // 登录后列表画在键盘后面。读完才出现时，不插到码格前面，避免把正在用的键盘顶下去。
+  const loggedInClass = isLoggedIn ? 'pickup-claim-logged-in' : ''
+
   // hid 指引（稿 pickup 点「用扫码枪扫」）：未扫码即可达，不报扫码硬件状态；与手输同在一屏。
   if (guide === 'hid' && !quotaExit) {
     return frame(
       <div
-        className="qx-scroll pickup-claim-page pickup-claim-hid"
+        className={['qx-scroll pickup-claim-page pickup-claim-hid', loggedInClass].filter(Boolean).join(' ')}
         data-w2-page="pickup-claim"
         data-claim-guide="hid"
         data-claim-state={state}
         data-testid="arrival-code-state-hid"
       >
-        {failure ? null : hereList}
         {codeBoxes}
         {hint}
-        {failure ? hereList : null}
         {keypad}
+        {hereList}
         {modeRow}
         {legacyNote}
         {fine}
@@ -693,19 +704,18 @@ export function PrintPickupClaimPage() {
 
   return frame(
     <div
-      className="qx-scroll pickup-claim-page"
+      className={['qx-scroll pickup-claim-page', loggedInClass].filter(Boolean).join(' ')}
       data-w2-page="pickup-claim"
       data-claim-guide="keypad"
       data-claim-state={state}
       data-claim-failure={failure?.kind}
       data-testid={`arrival-code-state-${screen}`}
     >
-      {failure ? null : hereList}
       {codeBoxes}
       {failurePanel}
-      {failure ? hereList : null}
       {hint}
       {keypad}
+      {hereList}
       {showKeypad ? modeRow : null}
       {legacyNote}
       {fine}

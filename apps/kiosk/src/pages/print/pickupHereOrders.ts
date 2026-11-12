@@ -88,13 +88,24 @@ export function pickupHereClaimDropsRow(kind: string, code: string | null | unde
   return code === 'PICKUP_TERMINAL_MISMATCH' || code === 'PRINT_ORDER_NOT_FOUND'
 }
 
-/** 点单时打印机暂不可用。不说「输码」：人没有输码。 */
+/**
+ * 点单领取成功后，打印中断了该怎么说。
+ * claim-here 再次调用会进 settleClaim：任务已失败且仍可续打时，同一单会被拉回待打印。
+ * 本页列表只收 claimableHere，条件是还没派发（没有 printTaskId）。打起来之后这一单不再出现，点不到。
+ * 所以不写「回到这一页点同一单」。
+ */
+export const PICKUP_HERE_RESUME_NOTE = '打印中断时，回手机上查看这笔订单'
+
+/** 点单时机器或打印机暂不可用。不说「输码」：人没有输码。同一句只说一次，并给出稍后再来。 */
 export function pickupHereRecoverableLine(code: string | null | undefined): string | null {
   if (code === 'PRINT_TERMINAL_QUEUE_HALTED') {
     return `这台终端暂停接打印单，这单还在，没有作废，请稍后再来这台终端领取。${helpNeededLine()}`
   }
   if (code === 'PRINTER_UNAVAILABLE') {
     return `这台终端的打印机暂不可用，这单还在，没有作废，请稍后再来这台终端领取。${helpNeededLine()}`
+  }
+  if (code === 'PRINT_TERMINAL_NOT_READY') {
+    return `这台机器暂时不能取件，这单还在，请稍后再来这台终端领取。${helpNeededLine()}`
   }
   return null
 }

@@ -439,6 +439,9 @@ export function PickupFailurePanel({
     )
   }
 
+  // 点单来的「其他」失败（机器暂时不能取件等）不是输错码。主按钮重试同一笔，次按钮回到输码。
+  const retryThisOrder = retryAs === 'order' && failure !== 'printer' && failure !== 'invalid'
+
   return (
     <>
       <div id="pcp-error-msg" className="pcp-strip pcp-strip--error pcp-enter" role="alert">
@@ -451,11 +454,16 @@ export function PickupFailurePanel({
         </span>
       </div>
       <div className="pcp-actions">
-        <button type="button" className="qx-btn pcp-act pcp-act--go" data-testid="arrival-code-primary" onClick={failure === 'printer' ? onRetry : onReset}>
-          {failure === 'printer' ? '重试校验' : '清除，重新输入'}
+        <button
+          type="button"
+          className="qx-btn pcp-act pcp-act--go"
+          data-testid="arrival-code-primary"
+          onClick={retryThisOrder || failure === 'printer' ? onRetry : onReset}
+        >
+          {retryThisOrder ? '重试这一单' : failure === 'printer' ? '重试校验' : '清除，重新输入'}
         </button>
-        <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onHelp}>
-          {failure === 'invalid' ? '查看取码说明 / 使用帮助' : '使用帮助'}
+        <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={retryThisOrder ? onReset : onHelp}>
+          {retryThisOrder ? '改为输到机码' : failure === 'invalid' ? '查看取码说明 / 使用帮助' : '使用帮助'}
         </button>
       </div>
     </>

@@ -610,3 +610,192 @@ test('pickup unavailable sentence names the miniapp when it is published @w2', a
   await page.getByLabel('到机码输入框').fill('28491703')
   await expect(page.getByRole('alert')).toContainText(UNAVAILABLE_ON)
 })
+
+type AnchorBox = { x: number; y: number; width: number; height: number }
+
+/** 量码格和键盘前先把正文滚回顶，避免「看得见」把目标滚进视口后把坐标比歪。 */
+async function pickupAnchorBoxes(page: Page): Promise<{ code: AnchorBox; keypad: AnchorBox }> {
+  return page.evaluate(() => {
+    const scroller = document.querySelector('.qxt-body')
+    if (scroller instanceof HTMLElement) scroller.scrollTop = 0
+    const read = (selector: string): AnchorBox | null => {
+      const el = document.querySelector(selector)
+      if (!el) return null
+      const rect = el.getBoundingClientRect()
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+    }
+    const code = read('.pcp-input-wrap')
+    const keypad = read('.pcp-keypad-card')
+    if (!code || !keypad) throw new Error('码格或键盘还没画出来')
+    return { code, keypad }
+  })
+}
+
+function expectSameBox(actual: AnchorBox, expected: AnchorBox): void {
+  for (const key of ['x', 'y', 'width', 'height'] as const) {
+    expect(Math.abs(actual[key] - expected[key]), key).toBeLessThanOrEqual(1)
+  }
+}
+
+test('logged-in pickup list arrives under the keypad without moving it @w2', async ({ page, api }) => {
+  test.setTimeout(90_000)
+  await prepareLoggedInPickup(page, api)
+  let timelineHits = 0
+  let releaseTimeline: (() => void) | undefined
+  const held = new Promise<void>((resolve) => { releaseTimeline = resolve })
+  await page.route('**/api/v1/me/print-orders/timeline**', async (route) => {
+    timelineHits += 1
+    if (timelineHits === 1) await held
+    await fulfillJson(route, 200, timelineJson([hereItem('ord-late', '简历.pdf')], null))
+  })
+  await loginThroughVisibleUi(page)
+  await expect.poll(() => timelineHits).toBe(1)
+  await expect(page.getByTestId('pickup-here-list')).toHaveCount(0)
+  const keypadBefore = await pickupAnchorBoxes(page)
+  await page.getByRole('button', { name: '用扫码枪扫', exact: true }).click()
+  await expect(page.getByTestId('arrival-code-state-hid')).toBeVisible()
+  const hidBefore = await pickupAnchorBoxes(page)
+  releaseTimeline?.()
+  await expect.poll(() => page.evaluate(() => document.querySelector('[data-testid="pickup-here-list"]') !== null)).toBe(true)
+  const hidAfter = await pickupAnchorBoxes(page)
+  expectSameBox(hidAfter.code, hidBefore.code)
+  expectSameBox(hidAfter.keypad, hidBefore.keypad)
+  const hidLayout = await page.evaluate(() => {
+    const scroller = document.querySelector('.qxt-body')
+    if (scroller instanceof HTMLElement) scroller.scrollTop = 0
+    const list = document.querySelector('[data-testid="pickup-here-list"]')
+    const keypad = document.querySelector('.pcp-keypad-card')
+    if (!list || !keypad || !(scroller instanceof HTMLElement)) return null
+    const claim = list.querySelector('.pcp-here-go')
+    const claimBox = claim?.getBoundingClientRect()
+    const view = scroller.getBoundingClientRect()
+    return {
+      followsKeypad: (keypad.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+      gap: list.getBoundingClientRect().top - keypad.getBoundingClientRect().bottom,
+      overflowX: scroller.scrollWidth - scroller.clientWidth,
+      overflowY: scroller.scrollHeight - scroller.clientHeight,
+      claimHeight: claimBox?.height ?? 0,
+      claimInside: claimBox ? claimBox.top >= view.top - 1 && claimBox.bottom <= view.bottom + 1 : false,
+    }
+  })
+  expect(hidLayout).not.toBeNull()
+  expect(hidLayout?.followsKeypad).toBe(true)
+  expect(hidLayout?.gap ?? 999).toBeGreaterThanOrEqual(0)
+  expect(hidLayout?.gap ?? 999).toBeLessThanOrEqual(40)
+  expect(hidLayout?.overflowX ?? 999).toBeLessThanOrEqual(1)
+  // 扫码枪说明更高。领取按钮必须落在视口里；折叠的「两种码的区别」可以略超出，不能整屏被撑飞。
+  expect(hidLayout?.overflowY ?? 999).toBeLessThanOrEqual(160)
+  expect(hidLayout?.claimHeight ?? 0).toBeGreaterThanOrEqual(56)
+  expect(hidLayout?.claimInside).toBe(true)
+  await page.getByRole('button', { name: '还是手输吧', exact: true }).click()
+  await expect(page.getByTestId('arrival-code-state-idle')).toBeVisible()
+  const keypadAfter = await pickupAnchorBoxes(page)
+  expectSameBox(keypadAfter.code, keypadBefore.code)
+  expectSameBox(keypadAfter.keypad, keypadBefore.keypad)
+  const keypadLayout = await page.evaluate(() => {
+    const scroller = document.querySelector('.qxt-body')
+    if (scroller instanceof HTMLElement) scroller.scrollTop = 0
+    const list = document.querySelector('[data-testid="pickup-here-list"]')
+    const claim = list?.querySelector('.pcp-here-go')
+    if (!list || !claim || !(scroller instanceof HTMLElement)) return null
+    const claimBox = claim.getBoundingClientRect()
+    const view = scroller.getBoundingClientRect()
+    return {
+      overflowX: scroller.scrollWidth - scroller.clientWidth,
+      overflowY: scroller.scrollHeight - scroller.clientHeight,
+      claimInside: claimBox.top >= view.top - 1 && claimBox.bottom <= view.bottom + 1,
+    }
+  })
+  expect(keypadLayout?.overflowX ?? 999).toBeLessThanOrEqual(1)
+  expect(keypadLayout?.overflowY ?? 999).toBeLessThanOrEqual(160)
+  expect(keypadLayout?.claimInside).toBe(true)
+})
+
+test('typed pickup success keeps the arrival-code wording @w2', async ({ page, api }) => {
+  registerPickupShell(api)
+  await page.route('**/api/v1/print/jobs/claim-pickup', async (route) => {
+    await fulfillJson(route, 200, {
+      released: true,
+      taskId: 'task-code',
+      orderId: 'ord-code',
+      orderNo: 'NO-CODE',
+      terminalId: 'KSK-001',
+      taskStatus: 'claimed',
+      printTaskStatus: 'pending',
+      amountCents: 0,
+      fileName: '简历.pdf',
+    })
+  })
+  await page.goto('/print/pickup-claim')
+  await page.getByLabel('到机码输入框').fill('28491703')
+  await expect(page.getByText('已进入打印队列', { exact: true })).toBeVisible()
+  await expect(page.getByRole('list', { name: '办理步骤' })).toContainText('✓ 输到机码')
+  await expect(page.locator('.qxt-eyebrow')).toHaveText('到机码核销')
+  await expect(page.getByTestId('pickup-ok-resume')).toContainText('同一个到机码可以接着打')
+  await expect(page.getByTestId('pickup-ok-resume')).toContainText('再输一次同一个到机码')
+  await expect(page.getByRole('list', { name: '办理步骤' })).not.toContainText('选中这一单')
+})
+
+test('logged-in pickup success uses the order wording @w2', async ({ page, api }) => {
+  test.setTimeout(60_000)
+  await prepareLoggedInPickup(page, api)
+  await page.route('**/api/v1/me/print-orders/timeline**', async (route) => {
+    await fulfillJson(route, 200, timelineJson([hereItem('ord-ok', '简历.pdf')], null))
+  })
+  await page.route('**/api/v1/me/print-orders/*/claim-here', async (route) => {
+    await fulfillJson(route, 200, claimHereOk('ord-ok'))
+  })
+  await loginThroughVisibleUi(page)
+  await page.getByTestId('pickup-here-claim').click()
+  await expect(page.getByText('已进入打印队列', { exact: true })).toBeVisible()
+  await expect(page.getByRole('list', { name: '办理步骤' })).toContainText('✓ 选中这一单')
+  await expect(page.locator('.qxt-eyebrow')).toHaveText('本机领取')
+  await expect(page.locator('.qxt-eyebrow')).not.toContainText('到机码')
+  const resume = page.getByTestId('pickup-ok-resume')
+  await expect(resume).toHaveText('打印中断时，回手机上查看这笔订单')
+  await expect(resume).not.toContainText('到机码')
+})
+
+test('logged-in pickup terminal not ready retries this order @w2', async ({ page, api }) => {
+  test.setTimeout(60_000)
+  await prepareLoggedInPickup(page, api)
+  const orderIds: string[] = []
+  await page.route('**/api/v1/me/print-orders/timeline**', async (route) => {
+    await fulfillJson(route, 200, timelineJson([hereItem('ord-ready', '简历.pdf')], null))
+  })
+  await page.route('**/api/v1/me/print-orders/*/claim-here', async (route) => {
+    orderIds.push(new URL(route.request().url()).pathname.split('/').at(-2) ?? '')
+    if (orderIds.length < 3) {
+      await fulfillJson(route, 400, { error: { code: 'PRINT_TERMINAL_NOT_READY', message: '本机终端当前不能接收打印订单' } })
+      return
+    }
+    await fulfillJson(route, 200, claimHereOk('ord-ready'))
+  })
+  await loginThroughVisibleUi(page)
+  await page.getByTestId('pickup-here-claim').click()
+  const alert = page.getByRole('alert')
+  await expect(alert).toContainText('这台机器暂时不能取件')
+  await expect(alert).toContainText('请稍后再来')
+  await expect(alert).not.toContainText('这台机器暂时不能用')
+  await expect.poll(async () => {
+    const text = await alert.innerText()
+    return text.split('这台机器暂时不能取件').length - 1
+  }).toBe(1)
+  await expect(page.getByTestId('arrival-code-primary')).toHaveText('重试这一单')
+  await expect(page.getByRole('button', { name: '改为输到机码', exact: true })).toBeVisible()
+  const order = await page.evaluate(() => {
+    const explanation = document.querySelector('[role="alert"]')
+    const list = document.querySelector('[data-testid="pickup-here-list"]')
+    if (!explanation || !list) return 'missing'
+    return (explanation.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 ? 'alert-first' : 'list-first'
+  })
+  expect(order).toBe('alert-first')
+  await page.getByRole('button', { name: '改为输到机码', exact: true }).click()
+  await expect(page.getByTestId('arrival-code-state-idle')).toBeVisible()
+  expect(orderIds).toEqual(['ord-ready'])
+  await page.getByTestId('pickup-here-claim').click()
+  await expect(page.getByTestId('arrival-code-primary')).toHaveText('重试这一单')
+  await page.getByTestId('arrival-code-primary').click()
+  await expect(page.getByText('已进入打印队列', { exact: true })).toBeVisible()
+  expect(orderIds).toEqual(['ord-ready', 'ord-ready', 'ord-ready'])
+})
