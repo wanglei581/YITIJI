@@ -8,11 +8,16 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { flush, instantiate, loadPageDefinition } from './page-sandbox.mjs'
 
 const MINIAPP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (rel) => fs.readFileSync(path.join(MINIAPP, rel), 'utf8')
+const require = createRequire(import.meta.url)
+const idem = require('../../utils/print-order-idempotency.js')
+/** 改动的那一种失败：断言没满足时 node:assert 抛的是 ERR_ASSERTION，不是把代码改崩。 */
+const assertionFailed = (err) => err && err.code === 'ERR_ASSERTION'
 const stripComments = (src) => src.replace(/<!--[\s\S]*?-->/g, '')
 const TAP = { type: 'tap', timeStamp: 1, currentTarget: { dataset: {} }, target: { dataset: {} }, detail: { x: 1, y: 1 } }
 
@@ -356,4 +361,91 @@ test('确认提交页：第 3 步叫「确认提交」；免费时不再单列�
   for (const rel of ['pages/print-upload/print-upload.wxml', 'pages/print-store/print-store.wxml', 'pages/print-pay/print-pay.wxml']) {
     assert.match(read(rel), /<text class="nl">终端和参数<\/text>/, rel)
   }
+})
+
+// ── 确认页从登录页回来只核价一次（078e2a206 的 8 行；不搬 flow1b-login.test.mjs）──
+
+function payPage({ source } = {}) {
+  const session = { user: null }
+  const auth = {
+    isLoggedIn: () => !!session.user,
+    getUser: () => session.user,
+    canSilentResignin: () => false,
+    sessionGeneration: () => 0,
+    isSameSession: (value) => value === 0,
+  }
+  const quotes = []
+  const created = []
+  const api = {
+    getMyDocuments: () => Promise.resolve({ items: [] }),
+    quoteMyPrintOrder: (...args) => { quotes.push(args); return Promise.resolve({ amountCents: 0, billablePages: 2 }) },
+    createCloudPrintOrder: (...args) => { created.push(args); return Promise.reject(new Error('本测试不该建单')) },
+  }
+  const idemPort = { ...idem, findRecord: () => null, ensureKey: () => Promise.resolve({ key: 'one-stable-key' }), markSubmitted: () => true, rememberOrderId: () => ({ orderId: 'po-7f3a' }), clearRecord: () => true }
+  const nav = []
+  const wx = { navigateTo: (o) => nav.push(o.url), redirectTo() {}, reLaunch() {}, showToast() {}, showModal() {}, showLoading() {}, hideLoading() {}, navigateBack() {}, switchTab() {} }
+  const page = instantiate(loadPageDefinition('pages/print-pay/print-pay.js', {
+    wx, source, modules: { api, auth, 'print-order-idempotency': idemPort },
+  }))
+  return { page, session, quotes, created, nav }
+}
+
+const PAY_OPTS = {
+  fileId: 'f-5c2e', storeId: 'KSK-001', store: encodeURIComponent('市人才市场一楼自助服务点'),
+  copies: '2', colorMode: 'black_white', duplex: 'simplex',
+}
+
+async function returnFromLoginScenario(source) {
+  const { page, session, quotes, created, nav } = payPage({ source })
+  page.onLoad({ ...PAY_OPTS })
+  page.onShow()
+  await flush()
+  assert.equal(page.data.quoteRecover, 'login', '没登录：停在「去登录」')
+  assert.equal(quotes.length, 0, '没登录不核价')
+  const chosen = JSON.stringify({ q: page.data.q, colorMode: page.data.colorMode, duplex: page.data.duplex, copiesLabel: page.data.copiesLabel })
+
+  page.toLogin()
+  assert.deepEqual(nav, ['/pages/launch/launch'])
+  page.onHide && page.onHide()
+  page.onShow()
+  await flush()
+  assert.equal(quotes.length, 0, '从登录页回来仍未登录：不核价、不循环')
+
+  session.user = { id: 'A' }
+  page.onShow()
+  await flush()
+  assert.equal(quotes.length, 1, '登录回来：重新核价一次')
+  assert.equal(page.data.quoteState, 'ready')
+  assert.equal(page.data.fee.total, '免费')
+  page.onShow()
+  page.onShow()
+  await flush()
+  assert.equal(quotes.length, 1, '再切前后台也不重复核价')
+  assert.equal(created.length, 0, '不建单')
+  assert.equal(JSON.stringify({ q: page.data.q, colorMode: page.data.colorMode, duplex: page.data.duplex, copiesLabel: page.data.copiesLabel }), chosen, '已选参数不丢')
+}
+
+test('L5 确认页：因为没登录停在「去登录」，回来已登录只核价一次；仍未登录不核价；不建单、参数不丢', () => returnFromLoginScenario())
+
+test('反向变异：回前台只要登录着就核价（不认「因为没登录才停下」）→ 上一条必须判红', async () => {
+  let src = read('pages/print-pay/print-pay.js')
+  const anchor = 'if (this._quoteNeedsLogin && auth.isLoggedIn()) this._loadQuote()'
+  assert.ok(src.includes(anchor))
+  src = src.split(anchor).join('if (auth.isLoggedIn()) this._loadQuote()')
+  await assert.rejects(returnFromLoginScenario(src), assertionFailed)
+})
+
+test('L5 换了账号：不替新账号自动核上一位选的文件，页面照旧请他返回重新选择', async () => {
+  const { page, session, quotes } = payPage()
+  session.user = { id: 'A' }
+  page.onLoad({ ...PAY_OPTS })
+  page.onShow()
+  await flush()
+  assert.equal(quotes.length, 1, 'A 打开时照常核价')
+  session.user = { id: 'B' }
+  page.onShow()
+  await flush()
+  assert.equal(quotes.length, 1, '换成 B：不自动核价')
+  assert.equal(page.data.quoteRecover, 'login')
+  assert.match(page.data.quoteError, /不是同一个/)
 })
