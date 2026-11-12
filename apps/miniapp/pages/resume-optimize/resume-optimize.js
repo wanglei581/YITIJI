@@ -55,7 +55,7 @@ Page({
     factPanel: factCheck.closedPanel(),
     factsBlockedReason: '',
     LEN: buildModel.LEN,
-    DOC_LEN: docLimits.RESUME_DOC_LIMITS,
+    DOC_LEN: Object.assign({}, docLimits.RESUME_DOC_LIMITS, docLimits.LIST_BOX_LIMITS),
   },
 
   onLoad(options) {
