@@ -28,7 +28,7 @@ const MONEY = /报价|单价|金额|核价|计价|计费|价格|价目|应付|�
 const PAID_GUARD = {
   'pages/print-upload/print-upload.wxml': "priceStatus === 'ready' && amountCents > 0",
   'pages/print-preview/print-preview.wxml': 'hasQuote && !isFree',
-  'pages/print-store/print-store.wxml': 'q.total && !isFreeOrder',
+  'pages/print-store/print-store.wxml': "quoteState === 'ready' && !isFreeOrder",
   'pages/print-pay/print-pay.wxml': "quoteState === 'ready' && !isFreeOrder",
   'pages/package-create/package-create.wxml': null,
   'pages/package-confirm/package-confirm.wxml': "quoteState === 'ready' && !quoteFree",
@@ -226,9 +226,9 @@ const JS_ALLOW = {
   'pages/print-pickup/pickup-state.js': ['等待现场支付', '完成现场支付'],
   'pages/print-pickup/print-pickup.js': [],
   // 待现场支付：amountCents 不是 0 的分支；待付款：0 元单建单即记已付，走不到；'¥'：formatPrice 0 元走「免费」；
-  // 取消弹窗：canCancel 只给 unpaid + pending 的云打印单，0 元单是已付
+  // 「未付款」只出现在 payStatus === 'unpaid' 的取消确认句。免费单另写「免费订单」，不含付款、退款。
   'pages/orders/orders.js': ['待现场支付', '待付款', '¥', '确定取消这张未付款订单'],
-  // 同上三条理由：awaiting_payment 只在金额不是 0 时出现；fmtPrice 0 元走「免费」；取消只给 unpaid 的单
+  // 同上：awaiting_payment 只在金额不是 0 时出现；fmtPrice 0 元走「免费」；未付款确认句只给 unpaid
   'pages/order-detail/order-detail.js': ['待现场支付', '¥', '确定取消这张未付款订单'],
   // 两句都只在 pricing.mode === 'charged'（服务端说导出要收费）时出现
   'pages/resume-diagnose/resume-diagnose.js': ['未找到可核销权益', '未取得可核销权益'],
@@ -318,16 +318,21 @@ test('判据自检：guard 真分支放行，假分支、正文、换了条件�
   assert.equal(insidePaidBranch(e4, e4.indexOf("'—'"), g), false)
 })
 
-test('打印参数页：没选文件时底栏只剩「请先选择文件」按钮', () => {
+test('打印参数页：执行完整底栏按钮表达式，没文件、普通文件、Word 各是对应的字', () => {
   const src = read('pages/print-upload/print-upload.wxml')
   const bar = src.slice(src.indexOf('<view class="actionbar">'))
   const label = bar.match(/class="ab-label">\{\{([\s\S]*?)\}\}</)[1]
   const dashIf = bar.match(/wx:(?:if|elif)="\{\{([^}]*)\}\}" class="ab-amt pending"/)[1]
+  const button = bar.match(/bindtap="toStore">\{\{([\s\S]*?)\}\}<\/view>/)
+  assert.ok(button, '底栏按钮文字必须是一整段可执行表达式')
   const run = (expr, data) => new Function(...Object.keys(data), `return (${expr})`)(...Object.values(data))
   const idle = { priceStatus: 'idle', amountCents: null, hasFile: false }
   assert.equal(run(label, idle), '')
   assert.equal(Boolean(run(dashIf, idle)), false)
-  assert.match(bar, /\{\{!hasFile \? '请先选择文件'/)
+  const text = (data) => run(button[1], data)
+  assert.equal(text({ wordFile: false, hasFile: false, privacyStatus: 'idle', priceStatus: 'idle' }), '请先选择文件')
+  assert.equal(text({ wordFile: false, hasFile: true, privacyStatus: 'ready', priceStatus: 'ready' }), '选终端和参数')
+  assert.equal(text({ wordFile: true, hasFile: true, privacyStatus: 'ready', priceStatus: 'ready' }), '回到我的文档')
 })
 
 test('材料包状态：0 元订单各状态都不提付款，大于 0 的原样说付款', () => {

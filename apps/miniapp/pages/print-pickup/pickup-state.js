@@ -8,6 +8,7 @@ const {
   splitDetailPhone,
   reprintNoteText,
 } = require('../../utils/support-contact')
+const printParams = require('../../utils/print-params')
 
 function parseAmountCents(value) {
   if (value === undefined || value === null || value === '') return null
@@ -87,12 +88,62 @@ function resolveOrderState(order, support) {
   return { key: 'pending', title: '等待终端扫码', detail: '将二维码对准一体机扫码器，或手动输入到机码。', showQr: true }
 }
 
+// 底部主按钮：只有真的打印完成才写「完成」。码还没用、还在排队或打印时写「返回首页」——
+// 写「完成」会让人以为这一单已经结束，其实还要走到一体机前扫码。
+function bottomActionLabel(statusKey) {
+  return statusKey === 'completed' ? '完成' : '返回首页'
+}
+
+// 文件名要能让人认出是哪一份：选错文件的两份往往只差中间一段（BIZ-COLOR / BIZ-PAPER），
+// 所以常见长度一律全量显示，靠换行放下；只有超过 60 个字的才截，保留开头和扩展名。
+function shortName(name, max) {
+  const text = String(name || '').trim()
+  const limit = max || 60
+  if (text.length <= limit) return text
+  const tail = Math.min(15, Math.floor(limit / 3))
+  return `${text.slice(0, limit - tail - 1)}…${text.slice(text.length - tail)}`
+}
+
+/** 取件页信息卡：文件、终端、规格。全部来自服务端订单详情；缺的项就不显示。 */
+function orderSummary(order) {
+  const o = order || {}
+  const store = [o.terminalName, o.locationLabel]
+    .map((part) => (typeof part === 'string' ? part.trim() : ''))
+    .filter(Boolean)
+    .filter((part, index, list) => list.indexOf(part) === index)
+    .join(' · ')
+  return { fileName: shortName(o.fileName), store, spec: printParams.displaySpec(o) }
+}
+
+// 下单流程里的页：取件页返回时跳过它们。下单已经完成，退回「选终端」只会让人再下一单。
+const ORDER_FLOW_ROUTES = [
+  'pages/print-upload/print-upload',
+  'pages/print-store/print-store',
+  'pages/print-pay/print-pay',
+  'pages/print-preview/print-preview',
+]
+
+/**
+ * 取件页返回要退几页。routes 是页面栈的 route 列表，最后一项是取件页自己。
+ * 返回 0 表示栈里没有下单流程以外的页，应当回首页。
+ */
+function backDeltaPastOrderFlow(routes) {
+  const list = Array.isArray(routes) ? routes : []
+  let delta = 1
+  for (let i = list.length - 2; i >= 0; i -= 1) {
+    if (ORDER_FLOW_ROUTES.indexOf(list[i]) < 0) break
+    delta += 1
+  }
+  return delta < list.length ? delta : 0
+}
+
 function paintOrder(order, support, codeRaw, codeText, hasCode) {
   const view = support && typeof support === 'object' ? support : resolveSupportView(null)
   const status = resolveOrderState(order, view)
   const fields = supportFields(view)
   const show = !!(status.showQr && hasCode)
   const split = splitDetailPhone(status.detail, fields.canCallPhone ? fields.supportPhone : '')
+  const summary = orderSummary(order)
   return Object.assign({
     statusKey: status.key,
     statusTitle: status.title,
@@ -103,7 +154,20 @@ function paintOrder(order, support, codeRaw, codeText, hasCode) {
     showQr: show,
     codeRaw: show ? codeRaw : '',
     code: show ? codeText : '',
+    doneLabel: bottomActionLabel(status.key),
+    fileName: summary.fileName,
+    store: summary.store,
+    spec: summary.spec,
   }, fields)
 }
 
-module.exports = { parseAmountCents, formatCode, formatCountdown, resolveOrderState, paintOrder }
+module.exports = {
+  parseAmountCents,
+  formatCode,
+  formatCountdown,
+  resolveOrderState,
+  paintOrder,
+  bottomActionLabel,
+  orderSummary,
+  backDeltaPastOrderFlow,
+}
