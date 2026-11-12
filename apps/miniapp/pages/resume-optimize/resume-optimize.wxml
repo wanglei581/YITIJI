@@ -39,9 +39,6 @@
     <view wx:if="{{needReupload}}" class="fail-hint">
       AI 已按隐私策略清理简历原文，无法重新生成。请重新上传简历后再试。
     </view>
-    <view wx:if="{{!needReupload}}" class="fail-hint">
-      AI 生成内容未通过真实性校验。你可以手动重试，再次生成仍可能失败。
-    </view>
     <view wx:if="{{needReupload}}" class="btn primary tap fail-btn" bindtap="tapReupload">重新上传简历</view>
     <view wx:if="{{!needReupload}}" class="btn ghost tap fail-btn" bindtap="tapRetry">重试</view>
     <view class="btn ghost tap fail-btn-sm" bindtap="goBack">返回</view>
