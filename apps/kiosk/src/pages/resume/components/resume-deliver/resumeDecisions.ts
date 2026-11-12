@@ -152,9 +152,20 @@ export function isModuleSwitchable(
 }
 
 /**
+ * 同文条目：不是保持原文说明条，且改写去掉首尾空白后与原文相同。
+ * 这种条目改写已经就是原文，切换不得增删任何空白。
+ */
+function isSameTextEntry(module: ResumeOptimizeModule): boolean {
+  const after = module.after.trim()
+  if (!after || after === KEEP_ORIGINAL_NOTE) return false
+  return after === module.before.trim()
+}
+
+/**
  * 对照页带回的选择里，哪些要真正去改编辑区。
  * 默认选择按基准稿分类：B、C 是保留原文，所以带回「用改写」一定算变更。
  * 默认已经是用改写、但改写仍不在当前稿里时也要带上，避免被当成已经应用。
+ * 保持原文说明条（K）没有可换的改写，带回哪一边都不算变更。
  */
 export function compareDecisionChanges(
   resume: GeneratedResume,
@@ -168,7 +179,9 @@ export function compareDecisionChanges(
     const key = moduleKeyOf(module, index)
     const next = incoming[key]
     if (!next) return
-    const now = current[key] ?? moduleBaseState(base, module).defaultDecision
+    const state = moduleBaseState(base, module)
+    if (state.kind === 'K') return
+    const now = current[key] ?? state.defaultDecision
     if (now !== next) {
       changes.push([key, next])
       return
@@ -211,6 +224,10 @@ export function toggleModuleDecision(
       return { resume, applied: true }
     }
     return { resume, applied: false, reason: moduleSwitchBlock(base, module) ?? 'not-found' }
+  }
+  // 编辑区里还有这句原文时，用改写和保留原文都已经对齐，不走替换（from === to 会被记成未应用）。
+  if (isSameTextEntry(module) && resumeContainsText(resume, module.before.trim())) {
+    return { resume, applied: true }
   }
   if (state.kind === 'B' || state.kind === 'C') {
     if (current === next && (next === 'original' || resumeContainsText(resume, module.after))) {
@@ -264,12 +281,21 @@ export function applyResumeDecisionsWithStatus(
   let current = resume
   const failures: ResumeDecisionFailure[] = []
   modules.forEach((module, index) => {
-    if (decisions[moduleKeyOf(module, index)] !== 'original') return
+    const key = moduleKeyOf(module, index)
+    if (decisions[key] !== 'original') return
+    if (isSameTextEntry(module)) {
+      const original = module.before.trim()
+      if (original && !resumeContainsText(current, original)) failures.push({
+        key,
+        reason: module.after ? 'edited' : 'original-empty',
+      })
+      return
+    }
     const result = replaceResumeTextWithStatus(current, module.after, module.before)
     current = result.resume
     const original = module.before.trim()
     if (!result.applied && original && !resumeContainsText(current, original)) failures.push({
-      key: moduleKeyOf(module, index),
+      key,
       reason: module.after ? 'edited' : 'original-empty',
     })
   })

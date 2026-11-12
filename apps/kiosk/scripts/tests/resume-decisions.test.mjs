@@ -27,6 +27,10 @@ const {
   isModuleSwitchable, moduleSwitchBlock, moduleBaseState, moduleKeyOf, toggleModuleDecision,
   applyDecisionChanges, applyResumeDecisionsWithStatus, compareDecisionChanges,
 } = module.exports
+const compareModule = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-compare/resumeCompareModel.ts'))
+const factsModule = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-deliver/facts.ts'))
+const { buildCompareItems, adoptEligible } = compareModule.exports
+const { detectUnconfirmedTextAdditions } = factsModule.exports
 
 const makeResume = (text) => ({
   basic: { name: '求职者', phone: '', city: '' }, intention: { position: '', city: '' }, summary: text,
@@ -372,4 +376,141 @@ test('B 类选了保留原文且 before 带首尾空白时，导出组装不报�
   const rewritten = applyResumeDecisionsWithStatus(makeResume('更好的话'), [item], { 'm0:一': 'optimized' })
   assert.deepEqual(rewritten.failures, [])
   assert.equal(rewritten.resume.summary, '更好的话')
+})
+
+function assertSameTextStays(before, after, draftText) {
+  const item = moduleOf(before, after, '同文')
+  const base = makeResume(draftText)
+  const key = moduleKeyOf(item, 0)
+  assert.equal(moduleBaseState(base, item).kind, 'A')
+  assert.equal(moduleBaseState(base, item).defaultDecision, 'optimized')
+  assert.equal(isModuleSwitchable(base, item), true)
+  let resume = base
+  let decision = 'original'
+  for (const next of ['optimized', 'original', 'optimized']) {
+    const result = toggleModuleDecision(resume, item, decision, next, base)
+    assert.equal(result.applied, true)
+    assert.equal(result.reason, undefined)
+    assert.equal(result.resume.summary, draftText)
+    resume = result.resume
+    decision = next
+  }
+  for (const [current, next] of [['optimized', 'original'], ['original', 'optimized']]) {
+    const applied = applyDecisionChanges(base, [item], { [key]: current }, [[key, next]], base)
+    assert.deepEqual(applied.failures, [])
+    assert.equal(applied.resume.summary, draftText)
+    assert.equal(applied.decisions[key], next)
+  }
+  const brought = compareDecisionChanges(base, [item], {}, { [key]: 'original' }, base)
+  const broughtApplied = applyDecisionChanges(base, [item], {}, brought, base)
+  assert.deepEqual(broughtApplied.failures, [])
+  assert.equal(broughtApplied.resume.summary, draftText)
+  const exported = applyResumeDecisionsWithStatus(base, [item], { [key]: 'original' })
+  assert.deepEqual(exported.failures, [])
+  assert.equal(exported.resume.summary, draftText)
+}
+
+test('S 类改写与原文逐字相同：来回切换、批量、对照页带回和导出组装都不改字也不失败', () => {
+  const sentence = '完成门店日结并核对收银。'
+  assertSameTextStays(sentence, sentence, sentence)
+})
+
+test('S 类只差首尾空白：来回切换、批量、对照页带回和导出组装都不增减空白', () => {
+  const sentence = '完成门店日结并核对收银。'
+  assertSameTextStays(`  ${sentence}  `, sentence, sentence)
+  assertSameTextStays(`\n${sentence}\n`, sentence, sentence)
+})
+
+test('S 类原文已从编辑区删掉后再切换不算成功，正文不变', () => {
+  const sentence = '完成门店日结并核对收银。'
+  const removed = makeResume('本人删掉了这句')
+  for (const before of [sentence, `  ${sentence}  `, `\n${sentence}\n`]) {
+    const item = moduleOf(before, sentence, '同文')
+    const base = makeResume(sentence)
+    for (const [current, next] of [['optimized', 'original'], ['original', 'optimized']]) {
+      const blocked = toggleModuleDecision(removed, item, current, next, base)
+      assert.equal(blocked.applied, false)
+      assert.equal(blocked.resume.summary, removed.summary)
+    }
+    const exported = applyResumeDecisionsWithStatus(removed, [item], { [moduleKeyOf(item, 0)]: 'original' })
+    assert.deepEqual(exported.failures, [{ key: moduleKeyOf(item, 0), reason: 'edited' }])
+    assert.equal(exported.resume.summary, removed.summary)
+  }
+})
+
+test('K 类从对照页带回用改写或保留原文都不产生变更也不失败', () => {
+  const note = '这一段没有改动，保留原文'
+  const kBefore = '教育经历原文这一句。'
+  const bBefore = '带领班组完成设备调试'
+  const bAfter = '写清本人承担的环节与实际结果'
+  const kItem = moduleOf(kBefore, note, '教育')
+  const bItem = moduleOf(bBefore, bAfter, '经历')
+  const modules = [kItem, bItem]
+  const base = makeResume(`${kBefore}\n${bBefore}`)
+  const kKey = moduleKeyOf(kItem, 0)
+  const bKey = moduleKeyOf(bItem, 1)
+  assert.equal(moduleBaseState(base, kItem).kind, 'K')
+  assert.equal(moduleBaseState(base, bItem).kind, 'B')
+  const picked = adoptEligible(buildCompareItems(modules), {}, {})
+  assert.equal(picked.next[kKey], 'optimized')
+  assert.equal(picked.next[bKey], 'optimized')
+  const changes = compareDecisionChanges(base, modules, {}, picked.next, base)
+  assert.equal(changes.some(([key]) => key === kKey), false)
+  assert.deepEqual(changes, [[bKey, 'optimized']])
+  const applied = applyDecisionChanges(base, modules, {}, changes, base)
+  assert.deepEqual(applied.failures, [])
+  assert.equal(applied.resume.summary.includes(kBefore), true)
+  assert.equal(applied.resume.summary.includes(note), false)
+  assert.equal(applied.resume.summary.includes(bAfter), true)
+  assert.equal(applied.resume.summary.includes(bBefore), false)
+  const keptChanges = compareDecisionChanges(base, modules, {}, { [kKey]: 'original' }, base)
+  assert.deepEqual(keptChanges, [])
+  const kept = applyDecisionChanges(base, modules, {}, keptChanges, base)
+  assert.deepEqual(kept.failures, [])
+  assert.equal(kept.resume.summary, base.summary)
+  assert.equal(kept.resume.summary.includes(note), false)
+})
+
+test('样本 1：对照页不确认时采纳 7 条，应用后 6 条 B 换上，第 3 条失败，第 2 条不动', () => {
+  const { resume, modules, sentences, afters } = sampleOne()
+  const picked = adoptEligible(buildCompareItems(modules), {}, {})
+  assert.equal(picked.adopted, 7)
+  assert.equal(picked.skipped, 1)
+  assert.notEqual(picked.next[moduleKeyOf(modules[1], 1)], 'optimized')
+  const changes = compareDecisionChanges(resume, modules, {}, picked.next, resume)
+  const applied = applyDecisionChanges(resume, modules, {}, changes, resume)
+  assert.deepEqual(applied.failures, [{ key: moduleKeyOf(modules[2], 2), reason: 'not-found' }])
+  for (const index of [0, 3, 4, 5, 6, 7]) {
+    const text = fieldText(applied.resume, index)
+    assert.equal(text.includes(afters[index]), true, `第 ${index + 1} 条应换上改写`)
+    assert.equal(text.includes(sentences[index].trim()), false, `第 ${index + 1} 条不应再留原文`)
+  }
+  assert.equal(applied.resume.summary.includes(sentences[1]), true)
+  assert.equal(applied.resume.summary.includes(afters[1]), false)
+  assert.equal(applied.resume.experience[2].description, '无关经历，不对应任何一条建议。')
+})
+
+test('样本 1：对照页确认第 2 条全部新增事实后 8 条都入选，第 2 条换上，失败仍只有第 3 条', () => {
+  const { resume, modules, sentences, afters } = sampleOne()
+  const second = modules[1]
+  const secondKey = moduleKeyOf(second, 1)
+  const additions = detectUnconfirmedTextAdditions(second.after, second.before)
+  const picked = adoptEligible(buildCompareItems(modules), { [secondKey]: additions }, {})
+  assert.equal(picked.adopted, 8)
+  assert.equal(picked.skipped, 0)
+  modules.forEach((item, index) => {
+    assert.equal(picked.next[moduleKeyOf(item, index)], 'optimized')
+  })
+  const changes = compareDecisionChanges(resume, modules, {}, picked.next, resume)
+  const applied = applyDecisionChanges(resume, modules, {}, changes, resume)
+  assert.deepEqual(applied.failures, [{ key: moduleKeyOf(modules[2], 2), reason: 'not-found' }])
+  const secondText = fieldText(applied.resume, 1)
+  assert.equal(secondText.includes(afters[1]), true)
+  assert.equal(secondText.includes(sentences[1].trim()), false)
+  for (const index of [0, 3, 4, 5, 6, 7]) {
+    const text = fieldText(applied.resume, index)
+    assert.equal(text.includes(afters[index]), true, `第 ${index + 1} 条应换上改写`)
+    assert.equal(text.includes(sentences[index].trim()), false, `第 ${index + 1} 条不应再留原文`)
+  }
+  assert.equal(applied.resume.experience[2].description, '无关经历，不对应任何一条建议。')
 })
