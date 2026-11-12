@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 
@@ -14,7 +15,18 @@ const transpiled = ts.transpileModule(src, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText
 const runtimeModule = { exports: {} }
-new Function('exports', 'module', transpiled)(runtimeModule.exports, runtimeModule)
+const decisionDir = dirname(fileURLToPath(new URL('../src/pages/resume/components/resume-deliver/resumeDecisions.ts', import.meta.url)))
+const localRequire = (id) => {
+  if (!id.startsWith('.')) throw new Error(`unexpected require ${id}`)
+  const abs = join(decisionDir, id.endsWith('.ts') ? id : `${id}.ts`)
+  const nested = ts.transpileModule(readFileSync(abs, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText
+  const nestedModule = { exports: {} }
+  new Function('exports', 'module', 'require', nested)(nestedModule.exports, nestedModule, localRequire)
+  return nestedModule.exports
+}
+new Function('exports', 'module', 'require', transpiled)(runtimeModule.exports, runtimeModule, localRequire)
 const { replaceResumeText } = runtimeModule.exports
 
 const sample = {

@@ -72,6 +72,7 @@ const OPTIMIZE_TEMPERATURE = 0.3
  * 必须是遮盖引擎不会改写、且不可能出现在简历正文里的串。
  */
 const MASK_SPLIT = '\n<<<PII_MASK_SPLIT>>>\n'
+/** 只用于排版调整。优化稿简介不再按它截断，超长由 fitResumeToDocLimits 收到 24000。 */
 const MAX_SUMMARY_CHARS = 300
 const MAX_DESC_CHARS = 600
 const MAX_OPTIMIZE_DESC_CHARS = 2000
@@ -518,8 +519,14 @@ export class LlmResumeOptimizeService {
     const basicRaw = (r['basic'] ?? {}) as Record<string, unknown>
     const intentionRaw = (r['intention'] ?? {}) as Record<string, unknown>
 
-    const summary = clean(r['summary'], MAX_SUMMARY_CHARS)
-    if (summary === null) return reject(cleanRule)
+    // 优化这条路不按 300 字截简介：模型原文可能就在第 300 字之后，截掉后对照页的原文对不上。
+    // 仍去首尾空白、仍查拦截词。24000 字的字段上限在 preserveOriginalEntries 末尾收口。
+    const summarySource = r['summary']
+    const summary = typeof summarySource === 'string' ? summarySource.trim() : ''
+    if (summary && containsForbiddenWord(summary, blocked)) {
+      cleanRule = 'guard_term'
+      return reject('guard_term')
+    }
 
     // basic:姓名/电话/邮箱必须出现在原文(电话邮箱被改一个数字都不行),否则置空
     const nameRaw = typeof basicRaw['name'] === 'string' ? basicRaw['name'].trim().slice(0, 50) : ''

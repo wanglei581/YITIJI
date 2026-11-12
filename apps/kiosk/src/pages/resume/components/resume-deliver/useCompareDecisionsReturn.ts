@@ -16,6 +16,8 @@ export function useCompareDecisionsReturn(opts: {
   state: Record<string, unknown> | null
   modules: ResumeOptimizeModule[]
   optimizedResume: GeneratedResume | null
+  /** 加载时的优化稿。默认选择按它分类，不能拿编辑区代替。 */
+  baseResume?: GeneratedResume | null
   decisions: ResumeDecisionMap
   ready: boolean
   apply: (changes: Array<[string, ResumeModuleDecision]>) => void
@@ -24,7 +26,7 @@ export function useCompareDecisionsReturn(opts: {
   confirm: () => void
   dismiss: () => void
 } {
-  const { state, modules, optimizedResume, decisions, ready, apply } = opts
+  const { state, modules, optimizedResume, baseResume, decisions, ready, apply } = opts
   const promptedRef = useRef(false)
   const applyRef = useRef(apply)
   applyRef.current = apply
@@ -43,10 +45,10 @@ export function useCompareDecisionsReturn(opts: {
       promptedRef.current = true
       return
     }
-    const changes = compareDecisionChanges(optimizedResume, modules, decisions, incoming)
+    const changes = compareDecisionChanges(optimizedResume, modules, decisions, incoming, baseResume)
     promptedRef.current = true
     setPending({ count, customCount, changes })
-  }, [state, ready, optimizedResume, modules, decisions])
+  }, [state, ready, optimizedResume, baseResume, modules, decisions])
 
   const confirm = useCallback(() => {
     if (!pending) return
