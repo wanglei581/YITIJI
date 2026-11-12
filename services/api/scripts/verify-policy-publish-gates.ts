@@ -2,11 +2,12 @@
 import 'dotenv/config'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { BadRequestException, ValidationPipe } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, NotFoundException, ValidationPipe } from '@nestjs/common'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { PoliciesService, type PolicyPostDto } from '../src/policies/policies.service'
-import { CreatePolicyPostDto, UpdatePolicyPostDto } from '../src/policies/dto/policy.dto'
+import { CreatePolicyPostDto, PolicyDraftCheckDto, SaveAndPublishPolicyDto, UpdatePolicyPostDto } from '../src/policies/dto/policy.dto'
+import { saveAndPublishPartnerPolicy } from '../src/policies/policy-save-and-publish'
 import { assertOrgContentTrustActive, type OrgTrustReader } from '../src/common/content-trust'
 import { POLICY_PUBLISH_ISSUES } from '../src/policies/policy-source-link'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
@@ -42,7 +43,9 @@ async function main() {
   const svc = new PoliciesService(prisma, new AuditService(prisma))
   const suffix = randomUUID()
   const orgId = `policy_gate_org_${suffix}`
+  const otherOrgId = `policy_gate_org_b_${suffix}`
   const userId = `policy_gate_user_${suffix}`
+  const otherUserId = `policy_gate_user_b_${suffix}`
   const user: AuthedUser = { userId, role: 'partner', orgId }
   const publish = (id: string) => svc.publishPolicy(id, 'publish', user, { responsibilityAcknowledged: true })
   const guideInput = { kind: 'policy_guide', title: '门禁验证政策', audience: 'graduate', ...POLICY_PUBLISH_FIXTURE }
@@ -151,13 +154,23 @@ async function main() {
     await prisma.organization.update({ where: { id: orgId }, data: { verifiedOfficialDomainsJson: POLICY_VERIFIED_DOMAINS_FIXTURE } })
     pass('无域名有链接拦截；无链接公告无需域名可发布且核验标记 false')
 
-    for (const externalUrl of ['https://other.gov.cn/policy/1', 'http://example.gov.cn/policy/1']) {
+    // 同一个错误码，原因分开说：网站没登记说「不在登记的官方网站内」；
+    // 网站已登记、只是开头写成 http:// 说「要以 https:// 开头」；两样都不对时先说网站。
+    assert.notEqual(POLICY_PUBLISH_ISSUES.sourceUrlNotHttps.message, POLICY_PUBLISH_ISSUES.sourceUrlNotVerified.message)
+    assert.equal(POLICY_PUBLISH_ISSUES.sourceUrlNotHttps.code, 'POLICY_SOURCE_URL_NOT_VERIFIED')
+    assert.match(POLICY_PUBLISH_ISSUES.sourceUrlNotHttps.message, /https:\/\/ 开头/)
+    assert.doesNotMatch(POLICY_PUBLISH_ISSUES.sourceUrlNotHttps.message, /登记/)
+    for (const [externalUrl, expected] of [
+      ['https://other.gov.cn/policy/1', POLICY_PUBLISH_ISSUES.sourceUrlNotVerified.message],
+      ['http://other.gov.cn/policy/1', POLICY_PUBLISH_ISSUES.sourceUrlNotVerified.message],
+      ['http://example.gov.cn/policy/1', POLICY_PUBLISH_ISSUES.sourceUrlNotHttps.message],
+    ] as const) {
       for (const kind of ['policy_guide', 'notice']) {
         const post = await create({ kind, category: 'notice', externalUrl })
-        await denied(() => publish(post.id), 'POLICY_SOURCE_URL_NOT_VERIFIED', POLICY_PUBLISH_ISSUES.sourceUrlNotVerified.message)
+        await denied(() => publish(post.id), 'POLICY_SOURCE_URL_NOT_VERIFIED', expected)
       }
     }
-    pass('政策/公告外站或 http 均被 POLICY_SOURCE_URL_NOT_VERIFIED 拦截')
+    pass('政策/公告外站或 http 均被 POLICY_SOURCE_URL_NOT_VERIFIED 拦截；http 的原因单独说准')
 
     // 前置闸门的顺序：审核 → 责任 → 信任 → 三栏 → 链接。
     await prisma.organization.update({ where: { id: orgId }, data: { contentTrustStatus: null } })
@@ -200,12 +213,172 @@ async function main() {
     const afterRemoval: PolicyPostDto = await assertVerified(valid.id, false)
     assert.equal(afterRemoval.publishStatus, 'published', '域名变化只改变核验标记，不改可见性')
     pass('满足契约可发布；三栏原样读出；管理员移除域名后公开/机构读取即时变 false')
+
+    await prisma.organization.update({ where: { id: orgId }, data: {
+      verifiedOfficialDomainsJson: POLICY_VERIFIED_DOMAINS_FIXTURE, contentTrustStatus: 'active', archivedAt: null,
+    } })
+    const warningPrefix = '发布时会被拒，原因是：'
+    const httpDraft = await svc.createPartnerPolicy(await input(CreatePolicyPostDto, { ...guideInput, externalUrl: 'http://example.gov.cn/policy/1', title: 'http 草稿' }), user)
+    assert.match(httpDraft.publishWarning ?? '', new RegExp(`^${warningPrefix}`))
+    assert.equal(httpDraft.publishWarning, `${warningPrefix}${POLICY_PUBLISH_ISSUES.sourceUrlNotHttps.message}`, '登记网站上的 http 链接：原因是没用 https，不是网站不对')
+    assert.equal(httpDraft.reviewStatus, 'pending')
+    assert.equal(httpDraft.publishStatus, 'draft')
+    const goodDraft = await svc.createPartnerPolicy(await input(CreatePolicyPostDto, { ...guideInput, title: '链接可用' }), user)
+    assert.equal(goodDraft.publishWarning, null)
+    const wrongHost = await svc.updatePartnerPolicy(goodDraft.id, await input(UpdatePolicyPostDto, { externalUrl: 'https://other.gov.cn/policy/1' }), user)
+    assert.equal(wrongHost.publishWarning, `${warningPrefix}${POLICY_PUBLISH_ISSUES.sourceUrlNotVerified.message}`, '外站链接：原因是不在登记的官方网站内')
+    assert.equal(wrongHost.publishStatus, 'draft')
+    const noticeBare = await svc.createPartnerPolicy(await input(CreatePolicyPostDto, { kind: 'notice', category: 'notice', title: '无链接公告' }), user)
+    assert.equal(noticeBare.publishWarning, null)
+    const noticeHttp = await svc.createPartnerPolicy(await input(CreatePolicyPostDto, { kind: 'notice', category: 'notice', title: 'http 公告', externalUrl: 'http://example.gov.cn/policy/1' }), user)
+    assert.match(noticeHttp.publishWarning ?? '', new RegExp(`^${warningPrefix}`))
+    const preview = await svc.previewPolicyDraft(user, await input(PolicyDraftCheckDto, { kind: 'notice', externalUrl: 'http://example.gov.cn/p' }))
+    assert.equal(preview.checklistReady, true)
+    assert.deepEqual(preview.columns, [])
+    assert.equal(preview.publishWarning, noticeHttp.publishWarning)
+    const publicDetail = await svc.getPublishedPolicyById(valid.id)
+    assert.equal('publishWarning' in publicDetail.data, false)
+    const editable = await input(SaveAndPublishPolicyDto, {
+      ...guideInput, title: '可清空再发', summary: null, content: null, externalId: null, publishedDate: null, responsibilityAcknowledged: true,
+    })
+    assert.equal(editable.summary, null)
+    assert.equal(editable.responsibilityAcknowledged, true)
+    await assert.rejects(() => input(SaveAndPublishPolicyDto, { ...guideInput, responsibilityAcknowledged: false }), BadRequestException)
+    pass('保存草稿提前提示发布会被拒的原因，不拦保存；公开读取不带这条提示')
+
+    async function policyActions(id: string) {
+      const logs = await prisma.auditLog.findMany({ where: { targetType: 'policy', targetId: id }, orderBy: { createdAt: 'asc' } })
+      return logs.map((log) => log.action)
+    }
+    const beforeCount = await prisma.policyPost.count({ where: { sourceOrgId: orgId } })
+    const acknowledgedDto = await input(SaveAndPublishPolicyDto, { ...guideInput, responsibilityAcknowledged: true })
+    await denied(
+      () => saveAndPublishPartnerPolicy(svc, user, acknowledgedDto, { responsibilityAcknowledged: false }),
+      'POLICY_RESPONSIBILITY_ACK_REQUIRED',
+      '发布前必须确认对本条政策内容负责',
+    )
+    assert.equal(await prisma.policyPost.count({ where: { sourceOrgId: orgId } }), beforeCount)
+    const admin: AuthedUser = { userId: `policy_gate_admin_${suffix}`, role: 'admin' }
+    await assert.rejects(
+      () => saveAndPublishPartnerPolicy(svc, admin, acknowledgedDto, { responsibilityAcknowledged: true }),
+      (e: unknown) => {
+        assert(e instanceof ForbiddenException)
+        const error = (e.getResponse() as { error: { code: string; message: string } }).error
+        assert.equal(error.code, 'ADMIN_POLICY_PUBLISH_DISABLED')
+        assert.match(error.message, /管理员/)
+        return true
+      },
+    )
+    assert.equal(await prisma.policyPost.count({ where: { sourceOrgId: orgId } }), beforeCount)
+    pass('没勾选责任、管理员代发都不落库')
+
+    const releasedOutcome = await saveAndPublishPartnerPolicy(svc, user, await input(SaveAndPublishPolicyDto, { ...guideInput, title: '一次发布', responsibilityAcknowledged: true }), { responsibilityAcknowledged: true })
+    assert.equal(releasedOutcome.stopped, null)
+    const released = releasedOutcome.policy
+    assert.equal(released.publishStatus, 'published')
+    assert.equal('publishWarning' in released, false)
+    assert.deepEqual(await policyActions(released.id), ['policy.create', 'policy.review', 'policy.publish'])
+    const revisedOutcome = await saveAndPublishPartnerPolicy(svc, user, await input(SaveAndPublishPolicyDto, { ...guideInput, title: '改完一次发布', responsibilityAcknowledged: true }), { id: goodDraft.id, responsibilityAcknowledged: true })
+    assert.equal(revisedOutcome.stopped, null)
+    const revised = revisedOutcome.policy
+    assert.equal(revised.id, goodDraft.id)
+    assert.equal(revised.publishStatus, 'published')
+    assert.deepEqual(await policyActions(goodDraft.id), ['policy.create', 'policy.partner_update', 'policy.partner_update', 'policy.review', 'policy.publish'])
+    pass('保存并发布一次走完，新建和编辑都留下三步审计')
+
+    await prisma.organization.create({ data: {
+      id: otherOrgId, name: '另一家验证机构', type: 'public_employment_service', contentTrustStatus: 'active',
+      verifiedOfficialDomainsJson: POLICY_VERIFIED_DOMAINS_FIXTURE,
+    } })
+    await prisma.user.create({ data: { id: otherUserId, username: otherUserId, passwordHash: 'fixture', name: '别人', role: 'partner', orgId: otherOrgId } })
+    const owned = await svc.createPartnerPolicy(await input(CreatePolicyPostDto, { ...guideInput, title: '只属于这家' }), user)
+    const foreignDto = await input(SaveAndPublishPolicyDto, { ...guideInput, title: '别人来改', responsibilityAcknowledged: true })
+    await assert.rejects(
+      () => saveAndPublishPartnerPolicy(svc, { userId: otherUserId, role: 'partner', orgId: otherOrgId }, foreignDto, { id: owned.id, responsibilityAcknowledged: true }),
+      (e: unknown) => {
+        assert(e instanceof NotFoundException)
+        const error = (e.getResponse() as { error: { code: string; message: string; stoppedAt: string; policyId?: string } }).error
+        assert.equal(error.code, 'POLICY_NOT_FOUND')
+        assert.equal(error.policyId, undefined)
+        assert.equal(error.message, '这条政策已经不在了，请刷新列表后再操作')
+        return true
+      },
+    )
+    const ownedRow = await prisma.policyPost.findUniqueOrThrow({ where: { id: owned.id } })
+    assert.equal(ownedRow.reviewStatus, 'pending')
+    assert.equal(ownedRow.publishStatus, 'draft')
+    pass('别的机构不能代为保存并发布，原记录停在保存前')
+
+    // 审核或发布被拒时内容已经保存：不抛错，返回这条政策和「停在哪一步、为什么」。
+    // （全局错误过滤器只放行错误码和一句话，编号放在报错里带不到页面。）
+    async function stoppedAtPublish(extra: object, code: string, reason: RegExp) {
+      const outcome = await saveAndPublishPartnerPolicy(svc, user, await input(SaveAndPublishPolicyDto, { ...guideInput, ...extra, responsibilityAcknowledged: true }), { responsibilityAcknowledged: true })
+      assert.ok(outcome.stopped, '这一步应该停在发布')
+      assert.equal(outcome.stopped.code, code)
+      assert.equal(outcome.stopped.at, 'publish')
+      assert.match(outcome.stopped.message, /^内容已保存并通过审核，停在发布。/)
+      assert.match(outcome.stopped.message, reason)
+      assert.equal(outcome.policy.reviewStatus, 'approved', '交回去的是审核通过后的样子')
+      assert.equal(outcome.policy.publishStatus, 'draft')
+      assert.equal('publishWarning' in outcome.policy, false)
+      const row = await prisma.policyPost.findUniqueOrThrow({ where: { id: outcome.policy.id } })
+      assert.equal(row.reviewStatus, 'approved')
+      assert.equal(row.publishStatus, 'draft')
+      const actions = await policyActions(outcome.policy.id)
+      assert.deepEqual(actions, ['policy.create', 'policy.review'])
+      assert.ok(!actions.includes('policy.publish'))
+      return outcome.policy.id
+    }
+    await stoppedAtPublish({ externalUrl: 'http://example.gov.cn/policy/1', title: 'http 停在发布' }, 'POLICY_SOURCE_URL_NOT_VERIFIED', /原文链接要以 https:\/\/ 开头/)
+    const haltedId = await stoppedAtPublish({ externalUrl: 'https://other.gov.cn/policy/1', title: '外站停在发布' }, 'POLICY_SOURCE_URL_NOT_VERIFIED', /原文链接不在本机构登记的官方网站内/)
+    // 改好链接后拿着交回来的编号再点一次：改的是同一条，不会多出第二条。
+    const countBeforeRetry = await prisma.policyPost.count({ where: { sourceOrgId: orgId } })
+    const retried = await saveAndPublishPartnerPolicy(svc, user, await input(SaveAndPublishPolicyDto, { ...guideInput, title: '外站停在发布', responsibilityAcknowledged: true }), { id: haltedId, responsibilityAcknowledged: true })
+    assert.equal(retried.stopped, null)
+    assert.equal(retried.policy.id, haltedId)
+    assert.equal(retried.policy.publishStatus, 'published')
+    assert.equal(await prisma.policyPost.count({ where: { sourceOrgId: orgId } }), countBeforeRetry, '重试不新建')
+    assert.deepEqual(await policyActions(haltedId), ['policy.create', 'policy.review', 'policy.partner_update', 'policy.review', 'policy.publish'])
+    await prisma.organization.update({ where: { id: orgId }, data: { verifiedOfficialDomainsJson: '[]' } })
+    await stoppedAtPublish({ title: '没登记域名' }, 'POLICY_SOURCE_DOMAINS_NOT_REGISTERED', /还没有登记官方网站/)
+    await prisma.organization.update({ where: { id: orgId }, data: { verifiedOfficialDomainsJson: POLICY_VERIFIED_DOMAINS_FIXTURE, contentTrustStatus: null } })
+    await stoppedAtPublish({ title: '机构未核验' }, 'ORG_CONTENT_TRUST_REQUIRED', /平台管理员/)
+    await prisma.organization.update({ where: { id: orgId }, data: { contentTrustStatus: 'active', archivedAt: null } })
+    pass('发布被拒就停在发布：前面的保存和审核留下，原因用中文说明；拿交回的编号重试改的是同一条')
+
+    // 停在审核：真实数据里只有存量招募类公告会走到（保存放行、审核被拒），这里用替身把这一支钉住。
+    const reviewCalls: string[] = []
+    const stoppedAtReviewService = {
+      createPartnerPolicy: async () => { reviewCalls.push('save'); return { id: 'stub_policy_review_stop' } },
+      reviewPolicy: async () => {
+        reviewCalls.push('review')
+        throw new BadRequestException({ error: { code: 'RECRUITMENT_CONTENT_DISABLED', message: '本平台未开放招聘类内容' } })
+      },
+      publishPolicy: async () => { reviewCalls.push('publish'); throw new Error('审核没过，不应该走到发布') },
+    } as unknown as PoliciesService
+    const reviewOutcome = await saveAndPublishPartnerPolicy(stoppedAtReviewService, user, acknowledgedDto, { responsibilityAcknowledged: true })
+    assert.deepEqual(reviewOutcome.stopped, {
+      at: 'review', code: 'RECRUITMENT_CONTENT_DISABLED', message: '内容已保存，停在审核。本平台未开放招聘类内容',
+    })
+    assert.equal(reviewOutcome.policy.id, 'stub_policy_review_stop')
+    assert.deepEqual(reviewCalls, ['save', 'review'])
+    // 不是业务拒绝的错误（例如数据库出错）不能被说成「停在某一步」，照常抛出。
+    const brokenService = {
+      createPartnerPolicy: async () => ({ id: 'stub_policy_broken' }),
+      reviewPolicy: async () => { throw new Error('database is locked') },
+    } as unknown as PoliciesService
+    await assert.rejects(
+      () => saveAndPublishPartnerPolicy(brokenService, user, acknowledgedDto, { responsibilityAcknowledged: true }),
+      (e: unknown) => e instanceof Error && e.message === 'database is locked',
+    )
+    pass('审核被拒就停在审核：不再往下发布，带回已保存的编号；系统错误不冒充业务拒绝')
+
     console.log(`ALL PASS (${passed} groups)`)
   } finally {
-    await prisma.policyPost.deleteMany({ where: { sourceOrgId: orgId } })
-    await prisma.auditLog.deleteMany({ where: { actorId: userId } })
-    await prisma.user.deleteMany({ where: { id: userId } })
-    await prisma.organization.deleteMany({ where: { id: orgId } })
+    await prisma.policyPost.deleteMany({ where: { sourceOrgId: { in: [orgId, otherOrgId] } } })
+    await prisma.auditLog.deleteMany({ where: { actorId: { in: [userId, otherUserId] } } })
+    await prisma.user.deleteMany({ where: { id: { in: [userId, otherUserId] } } })
+    await prisma.organization.deleteMany({ where: { id: { in: [orgId, otherOrgId] } } })
     await prisma.onModuleDestroy()
   }
 }

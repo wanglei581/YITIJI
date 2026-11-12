@@ -320,6 +320,7 @@ const PRINT_FAILED_ALERT_REASONS: Record<string, string> = {
   PRINT_JOB_UNCONFIRMED: '出纸未确认',
   PARTIAL_OUTPUT: '只打出了一部分',
   PRINT_TIMEOUT: '打印超时',
+  PRINT_QUEUE_TIMEOUT: '排队超时未领取',
   PRINT_COMMAND_FAILED: '打印命令执行失败',
   UNSUPPORTED_FILE_TYPE: '文件格式不支持',
   FILE_NOT_FOUND: '打印文件已失效',

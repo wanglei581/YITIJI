@@ -41,6 +41,7 @@ import {
 } from './printer-queue-diagnostics'
 import { observeReleasePlan } from './release-observation'
 import { log, warn, err } from '../logger'
+import { printCompletionHeartbeatField } from './print-service-log'
 import { AGENT_RUNTIME_VERSION } from '../runtime-version'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -285,6 +286,7 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
     payload.scanDeviceHealth = scanDeviceHealth.health ?? undefined
     payload.scanDeviceObservedAt = scanDeviceHealth.observedAt
   }
+  Object.assign(payload, printCompletionHeartbeatField())
 
   const finishFailure = (body: HeartbeatPayload, error: unknown): boolean => {
     if (isUnauthorizedHttpError(error)) {

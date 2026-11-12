@@ -16,8 +16,10 @@ export interface PolicyFormState {
   whereToApply: string
 }
 
+export const CHECKLIST_OVERFLOW_HINT = '清单上印不下，超出的部分要扫码看原文'
+
 export const EMPTY_FORM: PolicyFormState = {
-  kind: 'notice', title: '', summary: '', content: '', audience: 'general', category: 'notice',
+  kind: 'policy_guide', title: '', summary: '', content: '', audience: 'general', category: 'notice',
   externalUrl: '', externalId: '', publishedDate: '', whoCanApply: '', requiredMaterials: '', whereToApply: '',
 }
 
@@ -26,6 +28,12 @@ export const HANDLING_FIELDS = [
   ['requiredMaterials', '要准备的材料'],
   ['whereToApply', '去哪办'],
 ] as const
+
+export interface PolicyFormChecks {
+  publishWarning: string | null
+  linkChecked: boolean
+  overflow: Partial<Record<(typeof HANDLING_FIELDS)[number][0], boolean>>
+}
 
 export function policyFormBlockReason(form: PolicyFormState): string | null {
   if (form.kind === 'policy_guide') {
@@ -36,7 +44,8 @@ export function policyFormBlockReason(form: PolicyFormState): string | null {
   }
   if (!form.title.trim()) return '请填写标题'
   if (form.title.length > 200) return '标题不能超过 200 字'
-  if (form.externalUrl.trim() && (!isAbsoluteHttpUrl(form.externalUrl) || new URL(form.externalUrl.trim()).protocol !== 'https:')) {
+  // http 或域名不对都不拦保存。发布时仍会拒，原因由服务端按同一闸门写出来。
+  if (form.externalUrl.trim() && !isAbsoluteHttpUrl(form.externalUrl)) {
     return '请填写以 https:// 开头的有效原文链接'
   }
   return null

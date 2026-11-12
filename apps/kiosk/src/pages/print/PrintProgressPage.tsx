@@ -49,7 +49,6 @@ import {
   FAIL_REASONS,
   STEPS,
   backendStatusToStep,
-  errorCodeToMessage,
   expectedSheets,
   jobSubline,
   pagesPerCopy,
@@ -62,6 +61,7 @@ import {
   PRINT_PROGRESS_QUIET_MS,
   progressFailurePresentation,
   progressStatusFingerprint,
+  screenFailureReason,
   stepIndex,
   tlItemClass,
   type Step,
@@ -229,7 +229,7 @@ export function PrintProgressPage() {
         if (result.status === 'failed') {
           stopped = true
           navigateFail(preferUnattended(
-            result.failureReasonForUser ?? errorCodeToMessage(result.errorCode) ?? FAIL_REASONS[0],
+            screenFailureReason(result) ?? FAIL_REASONS[0],
             printProblemLine(),
           ))
           return

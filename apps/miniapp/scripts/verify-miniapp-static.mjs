@@ -385,8 +385,20 @@ const loginPageOk = PAGE_PATHS.includes('pages/launch/launch') &&
   PAGE_PATHS.includes('pages/privacy/privacy')
 if (loginPageOk) ok('登录/协议/隐私页已注册')
 else bad('登录/协议/隐私页已注册', 'app.json 缺少页面')
-if (loginWxml.includes('open-type="getPhoneNumber"') && loginWxml.includes('短信验证码')) ok('登录页含微信一键登录与短信降级')
-else bad('登录页含微信一键登录与短信降级', '缺少 open-type 或短信入口')
+if (loginWxml.includes('open-type="getPhoneNumber"') && loginWxml.includes('短信验证码')) ok('登录页含手机号快捷登录与短信降级')
+else bad('登录页含手机号快捷登录与短信降级', '缺少 open-type 或短信入口')
+// 2026-11-12 提审被微信驳回：登录页和弹窗（调手机号快速验证组件的前置页面）不能出现「微信」字样、
+// 像微信标志的图标（原来按钮上的对话气泡 i-comment）。去登录的三个入口按钮说法跟登录页一致。
+{
+  const shown = loginWxml.replace(/<!--[\s\S]*?-->/g, '')
+  const entries = [['pages/me/me.wxml', '我的'], ['pages/orders/orders.wxml', '订单'], ['pages/resumes/resumes.wxml', '我的简历']]
+  const entryHits = entries.filter(([rel]) => read(rel).replace(/<!--[\s\S]*?-->/g, '').includes('微信一键登录')).map(([, n]) => n)
+  if (shown.includes('微信')) bad('登录页不出现「微信」字样', 'launch.wxml 去掉注释后仍含「微信」')
+  else if (shown.includes('i-comment')) bad('登录页不出现「微信」字样', 'launch.wxml 仍有对话气泡图标 i-comment')
+  else if (!shown.includes('手机号快捷登录')) bad('登录页不出现「微信」字样', 'launch.wxml 没有「手机号快捷登录」按钮字')
+  else if (entryHits.length) bad('登录页不出现「微信」字样', `入口按钮仍写「微信一键登录」：${entryHits.join('、')}`)
+  else ok('登录页不出现「微信」字样（按钮叫手机号快捷登录、无气泡图标，三个入口一致）')
+}
 if (loginWxml.includes('已阅读并同意') && loginWxml.includes('《用户服务协议》') && loginWxml.includes('《隐私政策》')) ok('登录页含协议勾选')
 else bad('登录页含协议勾选', '缺少同意文案')
 if (
@@ -761,7 +773,7 @@ if (
 else bad('文档上传与服务端计价闭环', '缺少真实上传、PII 确认、Order-only 建单，或仍由小程序提交金额/页数')
 
 if (
-  apiJs.includes('quoteMyPrintOrder(fileId, params, presetFileUrl)') &&
+  /quoteMyPrintOrder\(\s*fileId\s*,\s*params\s*,\s*presetFileUrl\s*,\s*[^)]+\)/.test(apiJs) &&
   apiJs.includes("/preview-url`") &&
   apiJs.includes("request('/orders/quote'") &&
   printUploadJs.includes('api.quoteMyPrintOrder') &&

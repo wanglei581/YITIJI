@@ -226,6 +226,12 @@ export interface HeartbeatPayload {
   /** 屏上扫描开关打开时才带。后端 B1 上生产前打开开关会因多余字段被拒。 */
   scanDeviceHealth?: ScanDeviceHealthState
   scanDeviceObservedAt?: string
+  /**
+   * 打印完成判据。启动自检之后才带。
+   * available：PrintService/Operational 已启用。unavailable：没启用或启用失败。
+   * 自检前不带，避免把「还没看」说成可用。
+   */
+  printCompletionEvidence?: 'available' | 'unavailable'
 }
 
 export interface HeartbeatResponse {
