@@ -22,11 +22,11 @@
       <view class="lb-d">不登录也可以看使用帮助和打印指引，也可以扫一体机屏幕上的码，把文件传到一体机打印。</view>
     </view>
 
-    <!-- ① 微信一键登录（默认） -->
+    <!-- ① 手机号快捷登录（默认）。2026-11-12 提审驳回整改：登录页不出现腾讯官方的字样和标志，门禁见 verify-miniapp-static.mjs。 -->
     <block wx:if="{{!showSms}}">
       <button class="btn wx block launch-btn-wx tap" hover-class="tap-press"
         open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber" disabled="{{!agreed || legalBlocked}}">
-        <text class="ficon i-comment launch-wx-icon"></text>微信一键登录
+        手机号快捷登录
       </button>
       <view class="launch-alt tap" hover-class="tap-press" bindtap="tapSmsLogin">
         使用短信验证码登录
@@ -70,9 +70,9 @@
         {{submitting ? '登录中' : '确认登录'}}
       </button>
 
-      <!-- 返回微信登录 -->
+      <!-- 返回手机号快捷登录 -->
       <view class="launch-alt tap" hover-class="tap-press" bindtap="tapBackToWx">
-        <text class="ficon i-right launch-back-icon"></text>返回微信一键登录
+        <text class="ficon i-right launch-back-icon"></text>返回手机号快捷登录
       </view>
     </block>
 
