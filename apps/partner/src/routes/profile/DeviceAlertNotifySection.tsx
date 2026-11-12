@@ -24,15 +24,16 @@ export function DeviceAlertNotifySection() {
     return () => { cancelled = true }
   }, [])
 
-  async function save() {
+  // 清除只走「清除通知地址」按钮：保存成功后输入框会清空，空着再点保存不能悄悄关掉通知。
+  async function save(nextUrl: string) {
     setSaving(true)
     setError(null)
     setNotice(null)
     try {
-      const next = await saveDeviceAlertNotify(url)
+      const next = await saveDeviceAlertNotify(nextUrl)
       setView(next)
       setUrl('')
-      setNotice(next.configured ? '通知地址已保存' : '已清除通知地址')
+      setNotice(next.configured ? '通知地址已保存。可以发一条测试消息确认群里收得到。' : '已清除通知地址。设备出问题时不再发到群里。')
     } catch (err) {
       setError(err instanceof Error ? err.message : '通知地址没有保存')
     } finally {
@@ -61,6 +62,7 @@ export function DeviceAlertNotifySection() {
         本机构终端缺纸、离线、卡纸或打印机故障时，发一条消息到这个群。恢复后再发一条。消息里只有终端名称、位置和设备问题，不含使用者个人信息。
         只接受以 https 开头的企业微信、钉钉或飞书群机器人地址。
       </p>
+      <p className="mt-1 text-xs leading-relaxed text-neutral-500">钉钉、飞书的机器人如果设了关键词，请用「设备告警」：每条消息都以「【设备告警】」开头。不要开启加签或签名校验：本系统发消息不带签名，开了会发不出去。</p>
       {demo && <p className="mt-3 text-sm text-warning-fg">当前是本地演示，不能保存或发送通知。</p>}
       {!demo && view && (
         <p className="mt-3 break-all text-sm text-neutral-700">
@@ -83,12 +85,17 @@ export function DeviceAlertNotifySection() {
       {error && <p className="mt-2 text-sm text-error-fg" role="alert">{error}</p>}
       {notice && <p className="mt-2 text-sm text-success-fg" role="status">{notice}</p>}
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => void save()} disabled={demo || saving || testing}>
+        <Button size="sm" onClick={() => void save(url)} disabled={demo || saving || testing || !url.trim()}>
           {saving ? '正在保存' : '保存'}
         </Button>
         <Button size="sm" variant="secondary" onClick={() => void sendTest()} disabled={demo || saving || testing || !view?.configured}>
           {testing ? '正在发送' : '发一条测试消息'}
         </Button>
+        {view?.configured && (
+          <Button size="sm" variant="secondary" onClick={() => void save('')} disabled={demo || saving || testing}>
+            清除通知地址
+          </Button>
+        )}
       </div>
     </Card>
   )

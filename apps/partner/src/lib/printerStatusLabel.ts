@@ -27,7 +27,12 @@ export function printerStatusLabel(status: string | null | undefined): string {
   return LABELS[status] ?? '暂不能识别，请现场核对'
 }
 
-export function printerStatusSummary(status: string | null | undefined, openAlertCount: number): string {
+/** 离线时最后一次上报的状态已经过时，不拿它当现在的状态。 */
+export function printerStatusText(status: string | null | undefined, online: boolean): string {
+  return online ? printerStatusLabel(status) : '当前不能确认'
+}
+
+export function printerStatusSummary(status: string | null | undefined, openAlertCount: number, online: boolean): string {
   const count = Number.isFinite(openAlertCount) ? openAlertCount : 0
-  return `${printerStatusLabel(status)}，未恢复 ${count} 条`
+  return `${printerStatusText(status, online)}，未恢复 ${count} 条`
 }

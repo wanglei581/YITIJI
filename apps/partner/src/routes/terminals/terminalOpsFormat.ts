@@ -2,7 +2,7 @@
 
 import { formatCount, formatDate, formatDateTime, formatRelativeTime } from '@ai-job-print/shared'
 import { buildCsv } from '../../lib/csv'
-import { printerStatusLabel, printerStatusSummary } from '../../lib/printerStatusLabel'
+import { printerStatusSummary, printerStatusText } from '../../lib/printerStatusLabel'
 import type {
   PartnerTerminalOpsView,
   TerminalOpsFaultTotals,
@@ -122,7 +122,7 @@ export function buildTerminalOpsCsv(data: PartnerTerminalOpsView): string {
     terminalName(row),
     row.locationLabel ?? '',
     RUN_STATE_VIEW[runState(row)].label,
-    printerStatusLabel(row.printerStatus),
+    printerStatusText(row.printerStatus, row.online),
     row.openAlertCount ?? 0,
     shanghaiDateTime(row.lastHeartbeatAt),
     data.visitCount.recordingStarted ? csvCount(row.visitCount) : VISIT_NOT_STARTED,

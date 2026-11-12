@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process'
 import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { printerStatusLabel } from '../../../apps/partner/src/lib/printerStatusLabel'
+import { printerStatusLabel, printerStatusSummary } from '../../../apps/partner/src/lib/printerStatusLabel'
 import { AdminAlertPushService } from '../src/admin-ops/admin-alert-push.service'
 import { collectDerivedAlerts, resolveDerivedAlert } from '../src/admin-ops/derived-alerts'
 import {
@@ -146,6 +146,8 @@ function assertLabels(): void {
   assert.equal(printerStatusLabel(null), '尚未上报')
   assert.equal(printerStatusLabel('made_up'), '暂不能识别，请现场核对')
   assert.equal(printerStatusLabel('queue_cleanup_failed').includes('Agent'), false)
+  assert.equal(printerStatusSummary('low_paper', 1, true), '纸张或墨粉不足，未恢复 1 条')
+  assert.equal(printerStatusSummary('ready', 1, false), '当前不能确认，未恢复 1 条', '离线时不能拿最后一次上报的「就绪」当现在')
   assert.equal(countOpenDeviceAlerts({ enabled: false, lifecycleStatus: 'active', online: false, printerStatus: 'error', scanDeviceFault: true }), 0)
   assert.equal(countOpenDeviceAlerts({ enabled: true, lifecycleStatus: 'planned', online: false, printerStatus: null, scanDeviceFault: false }), 0)
   assert.equal(countOpenDeviceAlerts({ enabled: true, lifecycleStatus: 'active', online: false, printerStatus: 'error', scanDeviceFault: true }), 1)
@@ -366,6 +368,49 @@ async function assertPush(prisma: PrismaService): Promise<void> {
   await scopeService.pushDerivedAlerts()
   assert.equal(orgCalls().length, 3, '离开考察范围不再发已恢复')
   assert.equal(calls.length, before + 2, '平台同样不发已恢复，机构只发了正在发生')
+
+  // 打印失败类（含打印可靠性那一包的「排队超时未领取」）只进平台总通知，不进机构群。
+  const queueTimeout = {
+    id: 'print_failed:task-q1', subjectKey: 'print_failed:task-q1', subjectId: 'task-q1', episodeToken: 'ep-q1',
+    type: 'print_failed' as const, severity: 'error' as const, title: '打印任务失败：排队超时未领取',
+    detail: '任务 task-q1 · 终端 K-01 · 错误码 PRINT_QUEUE_TIMEOUT', terminalCode: 'K-01', occurredAt: '2026-11-11T03:00:00.000Z',
+  }
+  const failedService = new AdminAlertPushService(prisma, new RedisService(new MemRedis() as never), async () => ({
+    alerts: [queueTimeout], terminalSubjectKeysInScope: ['terminal_offline:t1', 'printer_issue:t1'],
+  }), fetchImpl)
+  const beforeFailed = calls.length
+  const orgBeforeFailed = orgCalls().length
+  await failedService.pushDerivedAlerts()
+  assert.equal(orgCalls().length, orgBeforeFailed, '打印失败（含排队超时未领取）不能推到机构群')
+  assert.equal(calls.length, beforeFailed + 1, '打印失败照旧只推平台总地址')
+
+  // 机构群发不出去：不抛错、平台照发、快照照写（下一轮才能判恢复），日志不带密钥。
+  const brokenRedis = new MemRedis()
+  const brokenCalls: string[] = []
+  const brokenFetch: typeof fetch = async (url) => {
+    brokenCalls.push(String(url))
+    if (String(url) === URL_A) throw new Error(`connect ECONNREFUSED ${String(url)}`)
+    return { ok: true, status: 200, json: async () => ({ errcode: 0 }) } as Response
+  }
+  const brokenService = new AdminAlertPushService(prisma, new RedisService(brokenRedis as never), async () => ({
+    alerts: [terminalAlert('ep-broken')], terminalSubjectKeysInScope: ['terminal_offline:t1'],
+  }), brokenFetch)
+  const logged: string[] = []
+  const write = process.stdout.write.bind(process.stdout)
+  const writeErr = process.stderr.write.bind(process.stderr)
+  process.stdout.write = ((chunk: unknown) => { logged.push(String(chunk)); return true }) as typeof process.stdout.write
+  process.stderr.write = ((chunk: unknown) => { logged.push(String(chunk)); return true }) as typeof process.stderr.write
+  try {
+    await brokenService.pushDerivedAlerts()
+  } finally {
+    process.stdout.write = write
+    process.stderr.write = writeErr
+  }
+  assert.deepEqual([...brokenCalls].sort(), [PLATFORM, URL_A].sort(), '机构群失败不能挡住平台总通知')
+  assert.equal(brokenRedis.values.has('admin-alert-push:previous'), true, '机构群发送失败也要写快照')
+  assert.equal([...brokenRedis.keys].some((key) => key.startsWith('admin-alert-push:org:')), false, '发送失败要删去重标记，下一轮可以再试')
+  assert.equal(logged.join('').includes('ORG_ALERT_PUSH_FAILED'), true, '机构群发送失败要留一行日志')
+  assert.equal(logged.join('').includes(KEY_A), false, '日志里出现了机器人密钥')
 }
 
 main().catch((error) => {

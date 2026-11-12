@@ -68,11 +68,6 @@
       "reason": "上线前清单 §4.4 收藏与浏览跳转记录取证，并钉住 CLAUDE.md §10 合规红线（日志表不得有结果类字段、跳转 action 只能是 external_* 打开语义）。需要真实后端 + 岗位/招聘会种子数据，CI 内无此前置。合规红线的静态部分未来可拆成纯源码门禁进 CI，届时应把这条豁免缩小到只剩运行期部分。"
     },
     {
-      "gate": "@ai-job-print/api::verify:org-device-alert",
-      "category": "pending-ci-wiring",
-      "reason": "机构设备告警通知的本地门禁已用临时 SQLite 跑通。本任务包禁止改 .github/workflows，所以还没接到 SQLite 与 postgres-readiness。允许改 CI 时，应紧挨 verify:alert-push 挂上 pnpm --filter @ai-job-print/api verify:org-device-alert。"
-    },
-    {
       "gate": "@ai-job-print/kiosk::verify:probe-ai-failure-honesty-45",
       "category": "running-server",
       "reason": "上线前清单 §4.5 外部服务失败诚实性取证。必须在两种后端配置下各跑一次才有意义（provider 失败时三条断言必须 PASS，provider 可用时必须 FAIL），CI 单一配置下跑它只会得到一半结论，反而制造「已覆盖」的错觉。"
