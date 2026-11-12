@@ -534,10 +534,11 @@ test('空串和空白由请求体滤掉；顿号逗号拆开后的条数就是�
   assert.deepEqual(exportListErrors(kept), [])
 })
 
-function loadOptimize(resume, wx) {
+function loadOptimize(resume, wx, extra) {
+  const more = extra || {}
   return instantiate(loadPageDefinition('pages/resume-optimize/resume-optimize.js', {
     wx,
-    globals: {
+    globals: more.globals || {
       getApp: () => ({ globalData: { statusBarHeight: 47 } }),
     },
     modules: {
@@ -569,12 +570,14 @@ function loadOptimize(resume, wx) {
             expiresAt: '2026-12-31T00:00:00.000Z',
           })
         },
+        ...(more.api || {}),
       },
     },
   }))
 }
 
-function limitWx() {
+function limitWx(options) {
+  const opt = options || {}
   const modals = []
   const scrolls = []
   const queries = []
@@ -590,11 +593,15 @@ function limitWx() {
     getStorageSync() { return '' },
     setStorageSync() {},
     removeStorageSync() {},
-    showModal(opt) {
-      modals.push(opt)
-      if (typeof opt.success === 'function') opt.success({ confirm: true, cancel: false })
+    showModal(modal) {
+      modals.push(modal)
+      const done = () => {
+        if (typeof modal.success === 'function') modal.success({ confirm: true, cancel: false })
+      }
+      if (opt.deferModal) setTimeout(done, 0)
+      else done()
     },
-    pageScrollTo(opt) { scrolls.push(opt) },
+    pageScrollTo(scroll) { scrolls.push(scroll) },
     createSelectorQuery() {
       const q = {
         select(sel) {
@@ -604,7 +611,10 @@ function limitWx() {
         selectViewport() { return q },
         boundingClientRect() { return q },
         scrollOffset() { return q },
-        exec(cb) { cb([{ top: 640 }, { scrollTop: 180 }]) },
+        exec(cb) {
+          if (opt.missingLists) cb([null, { scrollTop: 180 }])
+          else cb([{ top: 640 }, { scrollTop: 180 }])
+        },
       }
       return q
     },
@@ -705,6 +715,143 @@ test('已经核对过时超限仍先弹窗，不直接导出', async () => {
     lengthSentence('技能', LONG_SKILL),
   ].join('；\n'))
   assert.equal(page.data.factPanel.open, false)
+  assert.equal(wx._bodies.length, 0)
+  assert.equal(page.data.exporting, false)
+})
+
+function overLimitResume() {
+  return baseResume({
+    skills: SHORT_SKILLS.concat([LONG_SKILL]),
+    certificates: ['大学英语六级'],
+  })
+}
+
+test('核对面板删掉电话后，顿号被拆开的技能按真正发出的请求体拦住', async () => {
+  const skills = SHORT_SKILLS.slice(0, 59).concat(['公众号运营、视频号运营'])
+  assert.equal(skills.length, 60)
+  for (const skill of skills) assert.equal(skill.includes('测试'), false)
+  const wx = limitWx()
+  const page = loadOptimize(baseResume({ skills, certificates: ['大学英语六级'] }), wx, {
+    api: {
+      factCheckResume: () => Promise.resolve({
+        originalAvailable: true,
+        items: [{ path: 'basic.phone', kind: 'phone', value: '13800138000', foundInOriginal: false }],
+      }),
+    },
+  })
+  page.onLoad({ taskId: 'task-export-limit' })
+  await flush()
+  await flush()
+  assert.equal(page.data.exportDisabled, false, page.data.exportDisabledReason)
+  const before = buildExportPayload(page._resume, { format: page.data.format, taskId: page.data.taskId })
+  assert.equal(before.skills.length, 60)
+  assert.equal(parseList(page.data.editor.skillsText).length, 61)
+
+  page.exportResume()
+  await flush()
+  await flush()
+  assert.equal(wx._modals.length, 0)
+  assert.equal(page.data.factPanel.open, true)
+  assert.equal(page.data.factPanel.canConfirm, true, page.data.factPanel.error || '事实核对没有打开')
+  const phone = page.data.factPanel.items.find((item) => item.path === 'basic.phone')
+  assert.ok(phone, '核对面板里没有电话')
+  page.removeFact({ currentTarget: { dataset: { factKey: phone.key } } })
+  assert.equal(page.data.editor.basic.phone, '')
+  assert.equal(page._resume.skills.length, 61)
+  assert.equal(page.data.exporting, false)
+
+  page.confirmFacts()
+  assert.equal(wx._modals.length, 1)
+  assert.equal(wx._modals[0].title, '暂时不能导出')
+  assert.equal(wx._modals[0].showCancel, false)
+  assert.equal(wx._modals[0].content, countSentence('技能', 61))
+  assert.equal(wx._bodies.length, 0)
+  assert.equal(page.data.exporting, false)
+  await flush()
+  assert.equal(wx._bodies.length, 0)
+  assert.equal(page.data.exporting, false)
+})
+
+test('超限弹窗关掉之后才滚动到技能卡', async () => {
+  const wx = limitWx({ deferModal: true })
+  const page = loadOptimize(overLimitResume(), wx)
+  page.onLoad({ taskId: 'task-export-limit' })
+  await flush()
+  await flush()
+  assert.equal(page.data.exportDisabled, false, page.data.exportDisabledReason)
+  page.exportResume()
+  assert.equal(wx._modals.length, 1)
+  assert.equal(wx._modals[0].title, '暂时不能导出')
+  assert.equal(wx._scrolls.length, 0)
+  await flush()
+  assert.equal(wx._scrolls.length, 1)
+  assert.equal(wx._scrolls[0].scrollTop, 180 + 640 - (47 + 44))
+  assert.equal(wx._bodies.length, 0)
+  assert.equal(page.data.exporting, false)
+})
+
+test('状态栏 47、导航栏 40 时滚到已滚距离加节点 top 再减 87', async () => {
+  const wx = limitWx()
+  const page = loadOptimize(overLimitResume(), wx, {
+    globals: {
+      getApp: () => ({ globalData: { statusBarHeight: 47, navBarHeight: 40 } }),
+    },
+  })
+  page.onLoad({ taskId: 'task-export-limit' })
+  await flush()
+  await flush()
+  assert.equal(page.data.exportDisabled, false, page.data.exportDisabledReason)
+  page.exportResume()
+  assert.equal(wx._scrolls.length, 1)
+  assert.equal(wx._scrolls[0].scrollTop, 180 + 640 - 87)
+  assert.equal(wx._bodies.length, 0)
+})
+
+test('查不到技能卡节点时不调用 pageScrollTo', async () => {
+  const wx = limitWx({ missingLists: true })
+  const page = loadOptimize(overLimitResume(), wx)
+  page.onLoad({ taskId: 'task-export-limit' })
+  await flush()
+  await flush()
+  assert.equal(page.data.exportDisabled, false, page.data.exportDisabledReason)
+  page.exportResume()
+  assert.equal(wx._modals.length, 1)
+  assert.equal(wx._queries.includes('#edit-lists'), true)
+  assert.equal(wx._scrolls.length, 0)
+  assert.equal(wx._bodies.length, 0)
+  assert.equal(page.data.exporting, false)
+})
+
+test('超长技能的第 10 个字是表情时，提示按完整字符截取', async () => {
+  const head = '能独立跟完社区活动'
+  const emoji = '🙂'
+  assert.equal(Array.from(head).length, 9)
+  assert.equal(emoji.length, 2)
+  const tail = fill([
+    '并把到场人数和复购来源写成下一班同事可以接手的记录。',
+  ], 220)
+  const skill = `${head}${emoji}${tail}`
+  assert.equal(skill.includes('测试'), false)
+  assert.ok(skill.length > RESUME_DOC_LIMITS.skill)
+  assert.equal(Array.from(skill)[9], emoji)
+  const preview = Array.from(skill).slice(0, 10).join('')
+  assert.equal(preview, `${head}${emoji}`)
+  assert.notEqual(skill.slice(0, 10), preview)
+  assert.equal(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(preview), false)
+
+  const wx = limitWx()
+  const page = loadOptimize(baseResume({ skills: [skill], certificates: ['大学英语六级'] }), wx)
+  page.onLoad({ taskId: 'task-export-limit' })
+  await flush()
+  await flush()
+  assert.equal(page.data.exportDisabled, false, page.data.exportDisabledReason)
+  page.exportResume()
+  assert.equal(wx._modals.length, 1)
+  assert.equal(wx._modals[0].title, '暂时不能导出')
+  assert.equal(wx._modals[0].showCancel, false)
+  assert.equal(wx._modals[0].content, `技能「${preview}…」超过 ${RESUME_DOC_LIMITS.skill} 字`)
+  assert.equal(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(wx._modals[0].content), false)
+  assert.notEqual(wx._modals[0].content, lengthSentence('技能', skill))
   assert.equal(wx._bodies.length, 0)
   assert.equal(page.data.exporting, false)
 })

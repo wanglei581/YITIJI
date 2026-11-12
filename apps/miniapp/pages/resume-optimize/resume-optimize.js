@@ -285,14 +285,7 @@ Page({
       })
       return
     }
-    const listErrors = docLimits.exportListErrors(buildModel.buildExportPayload(resume, { format: this.data.format, taskId: this.data.taskId }))
-    if (listErrors.length) {
-      wx.showModal({
-        title: '暂时不能导出', content: listErrors.join('；\n'), showCancel: false,
-        success: () => docLimits.scrollSkillsCardIntoView(wx, getApp),
-      })
-      return
-    }
+    if (docLimits.stopIfListsOverLimit(buildModel.buildExportPayload(resume, { format: this.data.format, taskId: this.data.taskId }), { wx, getApp })) return
     if (this._factsConfirmedAt && !this._factsNeedRecheck) {
       this._doExport(this._factsConfirmedAt)
       return
@@ -354,6 +347,7 @@ Page({
     const payload = buildModel.buildExportPayload(resume, { format, taskId: this.data.taskId })
     if (this.data.benefitGrantId) payload.benefitGrantId = this.data.benefitGrantId
     payload.factsConfirmedAt = factsConfirmedAt
+    if (docLimits.stopIfListsOverLimit(payload, { wx, getApp })) return
     this._stopExportCountdown()
     this.setData({ exporting: true, exportResult: null, exportShare: shareFriend.viewForFile(this, '') })
     wx.showLoading({ title: '正在生成文件…', mask: true })
