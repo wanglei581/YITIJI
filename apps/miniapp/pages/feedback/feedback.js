@@ -53,12 +53,9 @@ function readOrderNo(options) {
   return orderNo.trim().slice(0, 64)
 }
 
-// 订单号预填只是定位这张单，不算用户写的问题。整段被改掉之后，按用户实际写下的算。
-function writtenProblem(content, prefill) {
-  const text = String(content || '')
-  const prefix = String(prefill || '')
-  const own = prefix && text.startsWith(prefix) ? text.slice(prefix.length) : text
-  return own.trim()
+// 订单号只定位这一单，不放进输入框，也不计入 10 字。提交时再按这个前缀拼回正文。
+function orderProblemPrefix(orderNo) {
+  return orderNo ? `订单 ${orderNo} 有问题：` : ''
 }
 
 function toView(item) {
@@ -86,7 +83,7 @@ Page({
     category: 'general',
     title: '',
     content: '',
-    contentPrefill: '',
+    orderNo: '',
     contentLen: 0,
     contactPhone: '',
     aiReplyDays: AI_COMPLAINT_REPLY_DAYS,
@@ -103,23 +100,15 @@ Page({
   onLoad(options) {
     const preset = options && CAT_LABEL[options.category] ? options.category : ''
     const orderNo = readOrderNo(options)
-    const fromOrder = orderNo
-      ? {
-          category: 'print',
-          title: (`订单 ${orderNo}`).slice(0, 80),
-          content: `订单 ${orderNo} 有问题：`,
-        }
-      : null
-    const content = fromOrder ? fromOrder.content : this.data.content
-    const contentPrefill = fromOrder ? fromOrder.content : ''
-    const contentLen = writtenProblem(content, contentPrefill).length
+    const content = orderNo ? '' : this.data.content
+    const contentLen = String(content || '').trim().length
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
       aiReplyDays: AI_COMPLAINT_REPLY_DAYS,
-      category: (fromOrder && fromOrder.category) || preset || this.data.category,
-      title: fromOrder ? fromOrder.title : this.data.title,
+      category: orderNo ? 'print' : (preset || this.data.category),
+      title: orderNo ? (`订单 ${orderNo}`).slice(0, 80) : this.data.title,
       content,
-      contentPrefill,
+      orderNo,
       contentLen,
       canSubmit: contentLen >= 10,
     })
@@ -164,7 +153,7 @@ Page({
 
   onContent(e) {
     const content = String(e.detail.value || '').slice(0, 500)
-    const contentLen = writtenProblem(content, this.data.contentPrefill).length
+    const contentLen = content.trim().length
     this.setData({ content, contentLen, canSubmit: contentLen >= 10 })
   },
 
@@ -172,8 +161,9 @@ Page({
 
   submit() {
     if (this.data.submitting) return
-    const content = this.data.content.trim()
-    const own = writtenProblem(this.data.content, this.data.contentPrefill)
+    const own = this.data.content.trim()
+    // 输入框只计用户写的问题。拼上订单前缀后，整段仍不得超过服务端 500 字。
+    const content = `${orderProblemPrefix(this.data.orderNo)}${own}`
     if (own.length < 10 || content.length > 500) {
       wx.showToast({ title: own.length < 10 ? '请写一下遇到的问题' : '内容不能超过 500 字', icon: 'none' })
       return
@@ -190,7 +180,7 @@ Page({
     this.setData({ submitting: true })
     api.createFeedback(body)
       .then(() => {
-        this.setData({ submitting: false, title: '', content: '', contentPrefill: '', contentLen: 0, contactPhone: '', canSubmit: false })
+        this.setData({ submitting: false, title: '', content: '', orderNo: '', contentLen: 0, contactPhone: '', canSubmit: false })
         wx.showToast({ title: '反馈已送出', icon: 'success' })
         this.loadList()
       })

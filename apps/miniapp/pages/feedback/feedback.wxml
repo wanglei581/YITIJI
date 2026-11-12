@@ -33,8 +33,8 @@
         <view class="field-label">标题（选填）</view>
         <input class="fb-input" value="{{title}}" maxlength="80" placeholder="如：打印预览显示不完整" bindinput="onTitle" />
         <view class="field-label">反馈内容</view>
+        <view class="fb-note" wx:if="{{orderNo}}">这单：订单 {{orderNo}}</view>
         <textarea class="fb-area" value="{{content}}" maxlength="500" placeholder="{{category === 'ai_content' ? '哪个 AI 功能、什么时间、哪段内容有问题（10–500 字）' : '请说明遇到的情况、发生页面或希望改进的地方（10–500 字）'}}" bindinput="onContent" />
-        <view class="fb-note" wx:if="{{contentPrefill}}">订单号已写在开头，这段不计入字数。请写一下遇到的问题。</view>
         <view class="fb-count {{contentLen < 10 ? 'short' : ''}}">{{contentLen}} / 500</view>
         <view class="field-label">联系电话（选填）</view>
         <input class="fb-input" type="number" value="{{contactPhone}}" maxlength="11" placeholder="便于必要时联系确认" bindinput="onPhone" />

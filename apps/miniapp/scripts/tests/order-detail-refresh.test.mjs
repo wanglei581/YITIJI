@@ -351,7 +351,7 @@ test('未付款待取件仍可取消，确认句仍是未付款；已取、已�
   assert.doesNotMatch(closed.modals[0].content, /付款|退款/)
 })
 
-test('订单详情去反馈带上订单号；反馈页预填打印分类和订单号', async () => {
+test('订单详情去反馈带上订单号；反馈页显示订单号，不放进输入框', async () => {
   const { page, requests, nav } = detailWith(FREE_PENDING)
   requests[0].resolve(FREE_PENDING); await flush()
   page.toFeedback()
@@ -367,9 +367,18 @@ test('订单详情去反馈带上订单号；反馈页预填打印分类和订�
   }))
   feedback.onLoad({ category: 'print', orderNo: 'NO-FREE' })
   assert.equal(feedback.data.category, 'print')
-  assert.match(feedback.data.content, /NO-FREE/)
+  assert.equal(feedback.data.content, '')
+  assert.match(feedback.data.orderNo, /NO-FREE/)
   assert.match(feedback.data.title, /NO-FREE/)
+  assert.equal(feedback.data.title, '订单 NO-FREE')
   assert.doesNotMatch(feedback.data.content, /付款|退款/)
+  assert.doesNotMatch(feedback.data.orderNo, /付款|退款/)
+  const wxml = readFileSync(new URL('../../pages/feedback/feedback.wxml', import.meta.url), 'utf8')
+  const noteAt = wxml.indexOf('<view class="fb-note" wx:if="{{orderNo}}">这单：订单 {{orderNo}}</view>')
+  const areaAt = wxml.indexOf('<textarea class="fb-area"')
+  assert.ok(noteAt >= 0, '只读说明用 fb-note 写出这单和订单号')
+  assert.ok(areaAt > noteAt, '订单号说明在输入框上方')
+  assert.doesNotMatch(wxml, /contentPrefill|订单号已写在开头/)
 })
 
 test('订单列表：免费待取单能取消，确认后用回包刷新这一行', async () => {
@@ -480,7 +489,7 @@ test('列表页和详情页的取消放行与服务端 cancel() 同一组输入�
   assert.equal(detailCan(historical), false)
 })
 
-test('订单反馈：预填订单号不计入 10 字，没写问题不能提交', async () => {
+test('订单反馈：订单号不在输入框里，不满 10 字不能提交', async () => {
   const toasts = []
   const sent = []
   const auth = { isLoggedIn: () => true }
@@ -496,31 +505,41 @@ test('订单反馈：预填订单号不计入 10 字，没写问题不能提交'
   }))
   const orderNo = 'ZYD202611120001'
   feedback.onLoad({ category: 'print', orderNo })
-  const prefill = feedback.data.content
-  assert.match(prefill, new RegExp(orderNo))
-  assert.ok(prefill.length >= 10, '预填本身已经超过 10 字')
+  const prefix = `订单 ${orderNo} 有问题：`
+  assert.match(prefix, new RegExp(orderNo))
+  assert.match(feedback.data.orderNo, new RegExp(orderNo))
+  assert.equal(feedback.data.content, '')
+  assert.ok(prefix.length >= 10, '订单号说明本身已经超过 10 字')
   assert.equal(feedback.data.contentLen, 0)
   assert.equal(feedback.data.canSubmit, false)
   feedback.submit()
   assert.equal(sent.length, 0)
   assert.equal(toasts[0].title, '请写一下遇到的问题')
 
-  feedback.onContent({ detail: { value: `${prefill}缺纸` } })
+  const nine = '一二三四五六七八九'
+  assert.equal(nine.length, 9)
+  feedback.onContent({ detail: { value: nine } })
+  assert.equal(feedback.data.contentLen, nine.length)
   assert.equal(feedback.data.canSubmit, false)
   feedback.submit()
   assert.equal(sent.length, 0)
 
-  feedback.onContent({ detail: { value: '打印机没有出纸请看一下' } })
+  const ten = '一二三四五六七八九十'
+  assert.equal(ten.length, 10)
+  feedback.onContent({ detail: { value: ten } })
+  assert.equal(feedback.data.contentLen, ten.length)
   assert.equal(feedback.data.canSubmit, true)
 
   const own = '到机后没有出纸，屏幕停在取件'
   assert.ok(own.length >= 10)
-  feedback.onContent({ detail: { value: prefill + own } })
+  feedback.onContent({ detail: { value: own } })
   assert.equal(feedback.data.contentLen, own.length)
   assert.equal(feedback.data.canSubmit, true)
   feedback.submit()
   await flush()
   assert.equal(sent.length, 1)
-  assert.equal(sent[0].content, prefill + own)
+  assert.equal(sent[0].content, prefix + own)
+  assert.match(sent[0].content, new RegExp(orderNo))
   assert.equal(sent[0].category, 'print')
+  assert.equal(sent[0].title, `订单 ${orderNo}`)
 })
