@@ -353,3 +353,45 @@ test('现场无人值守：模板用到的 supportHint 在页面 data 里真有�
     assert.equal(def.data.supportHint, SUPPORT_HINT, rel)
   }
 })
+
+// 诊断页、优化页把 utils/normalize.js resumeExportPricing 的 text / disabledReason 原样显示。
+// 含钱、含权益的句子只许出现在服务端 mode=charged 且 unitCents>0 的分支；
+// mode=free 只说「当前免费」。mode 缺失或 unavailable 不能改口叫免费
+// （normalize.js 自己的注释：未知收费状态不许回落成免费）。
+// unavailable 的兜底句仍含「价目」，因为 scripts/verify-miniapp-static.mjs 逐字钉着这句，
+// 而那个门禁文件不在本包可改范围内。
+test('简历导出价目：免费不说钱，大于 0 才说单价和权益', () => {
+  const requireMiniapp = createRequire(path.join(MINIAPP, 'utils', 'entry.js'))
+  const N = requireMiniapp('../utils/normalize.js')
+  const free = N.resumeExportPricing({ mode: 'free', unitCents: 0 }, true)
+  assert.equal(free.text, '当前免费')
+  assert.equal(free.disabledReason, '')
+  assert.doesNotMatch(`${free.text}${free.disabledReason}`, MONEY)
+
+  const unknownMode = N.resumeExportPricing({}, true)
+  const unavailable = N.resumeExportPricing({ mode: 'unavailable' }, false)
+  for (const row of [unknownMode, unavailable]) {
+    assert.notEqual(row.mode, 'free')
+    assert.notEqual(row.text, '当前免费')
+    assert.equal(row.text, '简历导出当前不可用（价目已停用，不是免费）')
+  }
+
+  const notQuoted = N.resumeExportPricing({ mode: 'charged', unitCents: 0 }, true)
+  assert.equal(notQuoted.mode, 'charged')
+  assert.doesNotMatch(`${notQuoted.text}${notQuoted.disabledReason}`, MONEY)
+  assert.notEqual(notQuoted.text, '当前免费')
+
+  const charged = N.resumeExportPricing({ mode: 'charged', unitCents: 100, benefit: { available: 2 } }, true)
+  assert.ok(charged.unitCents > 0)
+  assert.match(charged.text, /单价/)
+  assert.match(charged.text, /可用权益 2 次/)
+  assert.match(charged.text, /¥1\.00/)
+  const loggedOut = N.resumeExportPricing({ mode: 'charged', unitCents: 100 }, false)
+  assert.match(loggedOut.text, /单价/)
+  assert.match(loggedOut.text, /登录后查看可用权益/)
+  assert.match(loggedOut.disabledReason, /核销 1 次可用权益/)
+
+  for (const rel of ['pages/resume-diagnose/resume-diagnose.wxml', 'pages/resume-optimize/resume-optimize.wxml']) {
+    assert.match(read(rel), /\{\{pricing\.text\}\}/, `${rel} 显示价目那一句`)
+  }
+})

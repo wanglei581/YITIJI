@@ -41,6 +41,17 @@ const UNKNOWN_CAUSE = {
   anonFailed: '服务端说这次解析没有完成，但这台手机没有拿到读取凭证，不能把它当成可以查看的结果。请用同一次重查，不要开始新的解析。',
 }
 
+/**
+ * 登录后用会员身份解析游客文件：服务端 FILE_NOT_FOUND，或原文里写了找不到。
+ * 没登录时的同名 404 仍走原来的重试（同一解析标识），不在这里拦截。
+ */
+function fileMissingOf(err, loggedIn) {
+  if (!loggedIn || !err) return false
+  if (err.code === 'FILE_NOT_FOUND') return true
+  const msg = typeof err.message === 'string' ? err.message : ''
+  return msg.indexOf('找不到文件') >= 0 || msg.indexOf('文件不存在') >= 0
+}
+
 function parseJsonOption(value, fallback) {
   if (!value) return fallback
   try {
@@ -81,6 +92,8 @@ Page({
     // 本次内容预检在调用模型之前拒绝：释放匹配标识后只引导重新上传
     fileChanged: false,
     fileChangedBlocked: false,
+    // 游客身份传的文件，登录后解析会判成不是本人的：重试同一份没有用
+    fileMissing: false,
     conflict: '',
     // 没有编号但已登录:这一次若已完成会进「我的 - AI 服务记录」,可去那里核对。
     canCheckRecords: false,
@@ -485,6 +498,7 @@ Page({
       terminalTitle: extra.terminalTitle || '',
       fileChanged: false,
       fileChangedBlocked: false,
+      fileMissing: false,
       conflict: extra.conflict || '',
       canCheckRecords: !taskId && auth.isLoggedIn(),
     })
@@ -495,9 +509,10 @@ Page({
     if (this._elapsedTimer) clearInterval(this._elapsedTimer)
     if (this._pollTimer) clearTimeout(this._pollTimer)
     const note = extra || {}
+    const missing = fileMissingOf(err, auth.isLoggedIn())
     this.setData({
       phase: 'failed',
-      failMsg: note.message || (err && err.message) || '解析失败,请稍后重试',
+      failMsg: note.message || (err && err.message) || (missing ? '这份简历文件已经对不上当前账号，请重新选择文件。' : '') || '解析失败,请稍后重试',
       quotaReleased: note.quotaReleased === true,
       quotaReleaseBlocked: note.quotaReleaseBlocked === true,
       terminalCharge: false,
@@ -505,6 +520,7 @@ Page({
       terminalTitle: '',
       fileChanged: note.fileChanged === true,
       fileChangedBlocked: note.fileChangedBlocked === true,
+      fileMissing: missing && note.fileChanged !== true,
       conflict: '',
     })
   },
@@ -515,6 +531,7 @@ Page({
   },
 
   retry() {
+    if (this.data.fileMissing) return
     if (this.data.quotaReleaseBlocked || this.data.fileChanged || this.data.fileChangedBlocked || this.data.terminalCharge || this.data.terminalBlocked || this.data.conflict) return
     if (this.data.phase === 'missing') {
       wx.redirectTo({ url: '/pages/resume-upload/resume-upload' })
@@ -687,7 +704,7 @@ Page({
       phase: 'parsing', failMsg: '', elapsed: 0, done: false,
       unknownCause: '', pendingTaskId: '', recheck: 'idle', canCheckRecords: false,
       intentReplay: false, quotaReleased: false, quotaReleaseBlocked: false,
-      terminalCharge: false, terminalBlocked: false, fileChanged: false, fileChangedBlocked: false, conflict: '',
+      terminalCharge: false, terminalBlocked: false, fileChanged: false, fileChangedBlocked: false, fileMissing: false, conflict: '',
     })
     this._stopped = false
     this._startElapsed()

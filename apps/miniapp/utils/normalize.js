@@ -663,6 +663,7 @@ function resumeOptimize(raw) {
     isCompleted: raw.status === 'completed',
     isFailed: raw.status === 'failed',
     failReason: raw.failReason || '',
+    failCode: typeof raw.failCode === 'string' ? raw.failCode : '',
     providerName: raw.providerName || '',
     isMockProvider: raw.providerName === 'mock',
     modules,
@@ -894,6 +895,16 @@ function resumeExportPricing(raw, loggedIn) {
 
   if (mode === 'free') return { mode, unitCents: 0, available: null, text: '当前免费', disabledReason: '' };
   if (mode === 'charged') {
+    const priceKnown = Number.isSafeInteger(unitCents) && unitCents > 0;
+    if (!priceKnown) {
+      return {
+        mode,
+        unitCents: Number.isFinite(unitCents) ? unitCents : 0,
+        available: null,
+        text: '导出还不能开始，服务端没有给出可扣减的次数',
+        disabledReason: '导出还不能开始，服务端没有给出可扣减的次数。',
+      };
+    }
     const price = formatCents(unitCents);
     if (!loggedIn) {
       return {

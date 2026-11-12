@@ -1,5 +1,7 @@
 const app = getApp()
 const api = require('../../utils/api')
+const auth = require('../../utils/auth')
+const aiAccess = require('../../utils/ai-access')
 
 const BASE_RESUME_EXT = ['pdf']
 const WORD_RESUME_EXT = ['doc', 'docx']
@@ -85,8 +87,16 @@ Page({
       })
   },
 
+  /** 线上用 AI 要先登录。没登录时选文件之前就问，登录页登完会回到这一页。 */
+  _ensureLogin() {
+    if (auth.isLoggedIn()) return true
+    aiAccess.promptLogin()
+    return false
+  },
+
   // 上传来源
   tapUploadFile() {
+    if (!this._ensureLogin()) return
     const resumeExt = this.data.wordConversionAvailable
       ? BASE_RESUME_EXT.concat(WORD_RESUME_EXT)
       : BASE_RESUME_EXT
@@ -111,6 +121,7 @@ Page({
     })
   },
   tapCamera() {
+    if (!this._ensureLogin()) return
     wx.chooseMedia({
       count: 1,
       mediaType: ['image'],

@@ -2,8 +2,8 @@
  * 「简历 AI 授权」管到哪几项（第八次，依据合规意见 2026-10-10）：页面这一层的真跑测试。
  * 请求层那一半（403 → 确认框 → 写账号 → 重发）在 ai-access.test.mjs，这里只看页面拿到结果以后：
  *
- *   - 职业规划页：点「暂不使用」后留在原页、说明内容没有发给 AI，不自己再发、不自己再问；
- *     他自己再点一次才重新走。
+ *   - 职业规划页：点「暂不使用」后停在「没有授权，职业规划不会把简历发给 AI」，
+ *     不自己再发；「重新授权」不同意也不发，「返回」离开。
  *   - 模拟面试入口页：小程序上的模拟面试不带简历（不传 resumeFileId），所以这一项在小程序上
  *     不会被这项授权拦。以后谁要让它带简历，要先把「被拒后退回不带简历」接上，这条才许改。
  *   - 隐私页「简历 AI 授权」：弹窗两句是合规逐字定的；那一行的状态小字（已授权、还没有授权）
@@ -68,19 +68,35 @@ async function careerPlanDeclineStaysOnPage({ source } = {}) {
   assert.equal(generates.length, 1)
   generates[0].reject(declined())
   await flush()
-  assert.equal(page.data.phase, 'failed', '留在原页的说明态，不是空白也不是转圈')
-  assert.match(page.data.failMsg, /没有同意使用简历 AI/)
-  assert.match(page.data.failMsg, /没有发给 AI/)
+  assert.equal(page.data.phase, 'consent-needed', '停在说清楚的状态，不是失败后的重新生成')
+  assert.equal(page.data.failMsg, '没有授权，职业规划不会把简历发给 AI')
   assert.equal(page.data.needReupload, false, '不是简历的问题，不让他去重新上传')
   assert.equal(page.data.plan, null, '没有任何规划内容')
   assert.equal(generates.length, 1, '页面不自己再发（不反复弹）')
   assert.equal(wx.calls.nav.length, 0, '不跳走')
-  assert.equal(wx.calls.modal.length, 0, '页面自己不另弹框')
+  assert.equal(wx.calls.modal.length, 0, '拒绝本身不再弹框')
+  const wxml = read('pages/career-plan/career-plan.wxml')
+  const consentBlock = wxml.slice(wxml.indexOf("phase === 'consent-needed'"), wxml.indexOf("phase === 'failed'"))
+  assert.match(consentBlock, /bindtap="tapReauthorize"/)
+  assert.match(consentBlock, /重新授权/)
+  assert.match(consentBlock, /bindtap="goBack"/)
+  assert.match(consentBlock, />返回</)
+  assert.equal(consentBlock.includes('tapGenerate'), false, '这一态的按钮不接回生成')
 
-  // 他自己再点一次，才重新走一遍（这一次会再被问）。
-  page.tapGenerate()
-  assert.equal(generates.length, 2)
-  assert.equal(page.data.phase, 'running')
+  await flush()
+  assert.equal(generates.length, 1, '停住之后也不自动再调 generateCareerPlan')
+
+  const prevWx = globalThis.wx
+  globalThis.wx = wx
+  page.tapReauthorize()
+  await flush()
+  assert.equal(wx.calls.modal.length, 1, '重新授权才再问一次')
+  wx.calls.modal[0].success({ confirm: false })
+  await flush()
+  if (prevWx === undefined) delete globalThis.wx
+  else globalThis.wx = prevWx
+  assert.equal(generates.length, 1, '重新授权时不同意，不再调 generateCareerPlan')
+  assert.equal(page.data.phase, 'consent-needed')
   page.onUnload()
 }
 
@@ -201,11 +217,11 @@ function mutated(rel, from, to) {
 
 const MUTATIONS = [
   ['职业规划被拒后自己再发', 'careerPlanDeclineStaysOnPage',
-    mutated(CAREER_PLAN, "        this._fail((err && err.message) || '生成失败,请稍后重试')", '        this.setData({ phase: \'ready\' }); this.tapGenerate()')],
+    mutated(CAREER_PLAN, '    this._consentBlocked()', "    this.setData({ phase: 'ready' }); this.tapGenerate()")],
   ['职业规划被拒后让人重新上传', 'careerPlanDeclineStaysOnPage',
-    mutated(CAREER_PLAN, "        this._fail((err && err.message) || '生成失败,请稍后重试')", "        this._fail((err && err.message) || '生成失败,请稍后重试', true)")],
+    mutated(CAREER_PLAN, '      needReupload: false,\n      plan: null,', '      needReupload: true,\n      plan: null,')],
   ['职业规划被拒后不说原因', 'careerPlanDeclineStaysOnPage',
-    mutated(CAREER_PLAN, "        this._fail((err && err.message) || '生成失败,请稍后重试')", "        this._fail('生成失败,请稍后重试')")],
+    mutated(CAREER_PLAN, "failMsg: '没有授权，职业规划不会把简历发给 AI',", "failMsg: '生成失败,请稍后重试',")],
   ['模拟面试偷偷带上简历', 'interviewEntrySendsNoResume',
     mutated(INTERVIEW_ENTRY, '        durationMin: this.data.activeDuration,', "        durationMin: this.data.activeDuration,\n        resumeFileId: 'f1',")],
   ['撤回弹窗退回旧句', 'privacyResumeRowAndDialogs',

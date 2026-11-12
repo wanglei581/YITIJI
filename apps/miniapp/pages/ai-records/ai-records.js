@@ -25,6 +25,19 @@ const STATUS_LABEL = {
   processing: '处理中',
 }
 
+/** 有 expiresAt 才写到期日。模拟面试列表不带这个字段，不能替它编一天。 */
+function viewUntil(iso) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric',
+  }).formatToParts(d)
+  const month = (parts.find((p) => p.type === 'month') || {}).value
+  const day = (parts.find((p) => p.type === 'day') || {}).value
+  if (!month || !day) return ''
+  return `${month} 月 ${day} 日前可查看`
+}
+
 function dayLabel(iso) {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '日期未知'
@@ -58,6 +71,7 @@ function mapRecord(item) {
     day: dayLabel(item.createdAt),
     time: timeLabel(item.createdAt),
     createdAt: item.createdAt || '',
+    viewUntil: viewUntil(item.expiresAt),
     status,
     statusLabel: STATUS_LABEL[status] || status || '状态未知',
     icon: meta.icon,
@@ -80,6 +94,7 @@ function mapInterview(item) {
     day: dayLabel(item.createdAt),
     time: timeLabel(item.createdAt),
     createdAt: item.createdAt || '',
+    viewUntil: viewUntil(item.expiresAt),
     status: item.hasReport ? 'completed' : 'failed',
     statusLabel: item.hasReport ? '已完成' : '无报告',
     icon: 'i-form',

@@ -9,12 +9,15 @@ const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const N = require('../../utils/normalize')
 const storage = require('../../utils/storage')
+const { SHARED_USER_MESSAGES } = require('../../utils/user-error')
 
 // 没有 AI 解读时说清为什么、要不要再试（后端 #1112 的 aiUnavailableReason）。
 // 闸门类重试没用，不提示重试；声明 / 登录缺失要先补再重新作答。
+// AI_QUOTA_EXHAUSTED 是当天次数用完、明天恢复，不能说成「没有开放」。
 const AI_GATE_REASONS = ['AI_PAUSED', 'AI_BUDGET_EXHAUSTED', 'AI_BUDGET_UNAVAILABLE', 'AI_PROVIDER_NOT_CONFIGURED', 'AI_ACCESS_CHECK_FAILED']
 function aiReasonText(code) {
   if (!code) return 'AI 解读服务本次不可用，五段文字解读没有生成。'
+  if (code === 'AI_QUOTA_EXHAUSTED') return SHARED_USER_MESSAGES.AI_QUOTA_EXHAUSTED
   if (AI_GATE_REASONS.indexOf(code) >= 0) return 'AI 解读当前没有开放，这次只有五维强度，重新作答也不会有文字解读。'
   if (code === 'AI_DECLARATION_REQUIRED') return '还没有完成年满 14 周岁声明，所以没有 AI 解读。完成声明后重新作答，可以看到 AI 解读。'
   if (code === 'AI_LOGIN_REQUIRED') return '按规定登录后才能生成 AI 解读。登录后重新作答，可以看到 AI 解读。'

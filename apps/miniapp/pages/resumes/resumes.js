@@ -3,6 +3,19 @@ const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 
+/** 列表项上的到期日。按北京时间，避免门禁在 UTC 下差一天。没有字段就不编一个日期。 */
+function viewUntil(iso) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric',
+  }).formatToParts(d)
+  const month = (parts.find((p) => p.type === 'month') || {}).value
+  const day = (parts.find((p) => p.type === 'day') || {}).value
+  if (!month || !day) return ''
+  return `${month} 月 ${day} 日前可查看`
+}
+
 function relDate(iso) {
   try {
     const d = new Date(iso)
@@ -39,9 +52,13 @@ function mapResume(item, index) {
   } else if (item.status === 'pending' || item.status === 'processing') {
     tag = '处理中'; tagTone = 'wheat'
   }
+  const kind = item.kind === 'generate' ? 'generate' : (item.kind === 'parse' ? 'parse' : '')
   return {
     id: item.id,
     taskId: item.taskId,
+    kind,
+    canOpen: kind === 'parse' || kind === 'generate',
+    viewUntil: viewUntil(item.expiresAt),
     name,
     mimeType: typeof item.mimeType === 'string' ? item.mimeType : '',
     fileLabel: typeof item.mimeType === 'string' && item.mimeType
@@ -159,7 +176,15 @@ Page({
 
   openResume(e) {
     const taskId = e.currentTarget.dataset.taskId
-    if (taskId) wx.navigateTo({ url: `/pages/resume-diagnose/resume-diagnose?taskId=${encodeURIComponent(taskId)}` })
+    const kind = e.currentTarget.dataset.kind
+    if (!taskId) return
+    if (kind === 'generate') {
+      wx.navigateTo({ url: `/pages/resume-build/resume-build?taskId=${encodeURIComponent(taskId)}` })
+      return
+    }
+    if (kind === 'parse') {
+      wx.navigateTo({ url: `/pages/resume-diagnose/resume-diagnose?taskId=${encodeURIComponent(taskId)}` })
+    }
   },
 
   optimize(e) {

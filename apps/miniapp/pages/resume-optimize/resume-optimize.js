@@ -9,6 +9,7 @@ const shareFriend = require('../../utils/share-friend')
 const draft = require('./draft')
 const factCheck = require('./fact-check')
 const ways = require('../../utils/resume-optimize-entry')
+const { SUPPORT_HINT } = require('../../utils/user-error')
 
 const FORMATS = [
   { key: 'pdf', label: 'PDF', mimeType: 'application/pdf' },
@@ -92,7 +93,7 @@ Page({
       if (opt.isFailed) {
         const msg = opt.failReason || '优化生成失败'
         const needReupload = /简历原文|清理|重新上传/.test(msg)
-        this._fail(msg, needReupload)
+        this._fail(msg, needReupload, opt.failCode === 'AI_OPTIMIZE_INVALID_OUTPUT')
         return
       }
       if (!opt.isCompleted) {
@@ -104,6 +105,7 @@ Page({
       this._editor = draft.resumeToEditor(this._resume)
       this.setData({
         phase: 'done',
+        factBlocked: false,
         opt,
         isMock: opt.isMockProvider,
         editor: this._editor,
@@ -117,17 +119,19 @@ Page({
       if (code === 'AI_TASK_NOT_FOUND') {
         this._fail('优化记录不存在或无权访问', false)
       } else if (code === 'AI_PROVIDER_NOT_CONFIGURED') {
-        this._fail('AI 优化模型尚未配置，请联系管理员', false)
-      } else if (code === 'AI_OPTIMIZE_INVALID_OUTPUT' || code === 'AI_OPTIMIZE_UNAVAILABLE') {
-        this._fail('AI 优化服务暂时不可用，请稍后重试', false)
+        this._fail(`AI 优化暂时用不了，可以先手动修改简历。${SUPPORT_HINT}`, false)
+      } else if (code === 'AI_OPTIMIZE_INVALID_OUTPUT') {
+        this._fail((err && err.message) || 'AI 优化服务暂时不可用，请稍后重试', false, true)
+      } else if (code === 'AI_OPTIMIZE_UNAVAILABLE') {
+        this._fail((err && err.message) || 'AI 优化服务暂时不可用，请稍后重试', false, false)
       } else {
         this._fail((err && err.message) || '加载失败，请返回重试', false)
       }
     }
   },
 
-  _fail(failMsg, needReupload) {
-    this.setData({ phase: 'failed', failMsg, needReupload }, () => this._syncExportAvailability())
+  _fail(failMsg, needReupload, factBlocked) {
+    this.setData({ phase: 'failed', failMsg, needReupload, factBlocked: !!factBlocked }, () => this._syncExportAvailability())
   },
 
   _bootDraft() {
