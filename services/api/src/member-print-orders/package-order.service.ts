@@ -27,7 +27,7 @@ import {
   releaseOrderSubmissionLease,
 } from './order-submission-ledger'
 import { assertPiiScanned } from '../print-jobs/pii-scan-gate'
-import { previewFreePrintOrderQuota, withFreeQuotaNotice } from '../print-jobs/free-print-quota.decide'
+import { previewFreePrintOrderQuota, replayAttachesFreeQuotaNotice, withFreeQuotaNotice } from '../print-jobs/free-print-quota.decide'
 import { assertPrintOrderSides, printOrderSideCount } from '../print-jobs/verified-print-parameters'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 
@@ -189,6 +189,7 @@ export class PackageOrderService {
       endUserId,
       requestedSides,
       payableCents: payableCents({ amountCents, discountCents: 0 }),
+      copies: params.copies,
     })
     const code = randomPickupCode()
     let order
@@ -358,12 +359,16 @@ export class PackageOrderService {
       order = await this.requireOwned(endUserId, row.id)
     }
     const arrival = await arrivalViewForOrder(this.prisma, order)
-    const freeQuotaNotice = await previewFreePrintOrderQuota(this.prisma, {
-      terminalId: order.terminalId ?? '',
-      endUserId,
-      requestedSides: printOrderSideCount(order.orderItems),
-      payableCents: payableCents(order),
-    }, { rejectOverCap: false })
+    // 没有机器号、或已不是待领取（放行、完成、取消、过期）时不算 notice，也不查用量。
+    const freeQuotaNotice = order.terminalId && replayAttachesFreeQuotaNotice(order)
+      ? await previewFreePrintOrderQuota(this.prisma, {
+          terminalId: order.terminalId,
+          endUserId,
+          requestedSides: printOrderSideCount(order.orderItems),
+          payableCents: payableCents(order),
+          copies: order.orderItems[0]?.copies ?? 1,
+        }, { rejectOverCap: false })
+      : null
     return withFreeQuotaNotice(this.toView(order, arrival.pickupCode, arrival), freeQuotaNotice)
   }
 
@@ -457,6 +462,16 @@ export class PackageOrderService {
     pickupCode: string | null,
     reprint: Pick<ArrivalReprintFields, 'reprintAllowed' | 'reprintRemaining' | 'reprintNotice'> = { reprintAllowed: false, reprintRemaining: null, reprintNotice: null },
   ) {
+    // 没有机器号签不出付款令牌，这种回放省略该字段。
+    const paymentSessionToken = order.terminalId
+      ? createPaymentSessionToken({
+          orderId: order.id,
+          orderNo: order.orderNo,
+          terminalId: order.terminalId,
+          amountCents: order.amountCents,
+          printTaskId: order.printTaskId,
+        })
+      : null
     return {
       orderId: order.id,
       orderNo: order.orderNo,
@@ -466,13 +481,7 @@ export class PackageOrderService {
       payStatus: order.payStatus,
       taskStatus: order.taskStatus,
       amountCents: order.amountCents,
-      paymentSessionToken: createPaymentSessionToken({
-        orderId: order.id,
-        orderNo: order.orderNo,
-        terminalId: order.terminalId,
-        amountCents: order.amountCents,
-        printTaskId: order.printTaskId,
-      }),
+      ...(paymentSessionToken ? { paymentSessionToken } : {}),
       items: order.orderItems.map((item) => ({
         seq: item.seq,
         fileId: item.fileId,

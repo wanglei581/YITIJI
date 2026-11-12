@@ -22,8 +22,8 @@ import type { PrintJobParamsDto } from '../print-jobs/dto/create-print-job.dto'
 import type { CancelMemberPrintOrderDto } from './dto/cancel-member-print-order.dto'
 import type { CreateMemberPrintOrderDto } from './dto/create-member-print-order.dto'
 import { assertPiiScanned } from '../print-jobs/pii-scan-gate'
-import { previewFreePrintOrderQuota, withFreeQuotaNotice } from '../print-jobs/free-print-quota.decide'
-import { printOrderSideCount } from '../print-jobs/verified-print-parameters'
+import { previewFreePrintOrderQuota, replayAttachesFreeQuotaNotice, withFreeQuotaNotice } from '../print-jobs/free-print-quota.decide'
+import { copiesFromPrintParamsJson, printOrderSideCount } from '../print-jobs/verified-print-parameters'
 import {
   acquireOrderSubmissionLease,
   completeOrderSubmission,
@@ -273,6 +273,7 @@ export class MemberPrintOrderCreateService {
       endUserId,
       requestedSides: quote.billablePages * dto.copies,
       payableCents: payableCents({ amountCents: quote.amountCents, discountCents: 0 }),
+      copies: dto.copies,
     })
     let order
     try {
@@ -469,12 +470,16 @@ export class MemberPrintOrderCreateService {
         })
       : null
     const arrival = await arrivalViewForOrder(this.prisma, order)
-    const freeQuotaNotice = await previewFreePrintOrderQuota(this.prisma, {
-      terminalId: order.terminalId ?? '',
-      endUserId,
-      requestedSides: printOrderSideCount([], { billablePages: order.billablePages, printParamsJson: order.printParamsJson }),
-      payableCents: payableCents(order),
-    }, { rejectOverCap: false })
+    // 没有机器号、或已不是待领取（放行、完成、取消、过期）时不算 notice，也不查用量。
+    const freeQuotaNotice = order.terminalId && replayAttachesFreeQuotaNotice(order)
+      ? await previewFreePrintOrderQuota(this.prisma, {
+          terminalId: order.terminalId,
+          endUserId,
+          requestedSides: printOrderSideCount([], { billablePages: order.billablePages, printParamsJson: order.printParamsJson }),
+          payableCents: payableCents(order),
+          copies: copiesFromPrintParamsJson(order.printParamsJson),
+        }, { rejectOverCap: false })
+      : null
     return withFreeQuotaNotice(this.toView(order, arrival.pickupCode, terminal ?? undefined, arrival), freeQuotaNotice)
   }
 

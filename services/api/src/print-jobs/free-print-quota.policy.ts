@@ -35,8 +35,27 @@ export const FREE_PRINT_QUOTA_ERROR_CODES = [
   PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES,
 ] as const
 
-export function orderExceedsDailyFreeSidesMessage(requestedSides: number, limit: number): string {
-  return `这单 ${requestedSides} 面，超过每天免费 ${limit} 面的上限，请减少份数或分开下单`
+/**
+ * 超上限的一句。本机上限更紧时告诉用户可以换机器；每人上限更紧或相等时说的是本人额度。
+ * 份数为 1 时不说「减少份数」：减不了，当天分开下单也领不出。
+ */
+export function orderExceedsDailyFreeSidesMessage(input: {
+  requestedSides: number
+  memberLimit: number
+  terminalLimit: number
+  copies: number
+}): string {
+  const { requestedSides, memberLimit, terminalLimit, copies } = input
+  if (terminalLimit < memberLimit) {
+    if (copies > 1) {
+      return `这台机器每天最多免费打印 ${terminalLimit} 面，这单 ${requestedSides} 面。可以换一台机器下单，或减少份数。`
+    }
+    return `这台机器每天最多免费打印 ${terminalLimit} 面，这单 ${requestedSides} 面，可以换一台机器下单。`
+  }
+  if (copies > 1) {
+    return `这单 ${requestedSides} 面，超过每人每天免费 ${memberLimit} 面的上限，请减少份数后再下单。`
+  }
+  return `这份文件 ${requestedSides} 面，超过每人每天免费 ${memberLimit} 面的上限，暂时不能免费打印。`
 }
 
 /** 今天剩余不够、但仍允许建单时附在创建回包上。够用时不带这个字段。 */

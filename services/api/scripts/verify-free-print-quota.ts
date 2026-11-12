@@ -117,15 +117,6 @@ function read(path: string): string {
   return readFileSync(path, 'utf8')
 }
 
-/** 取 `export [async] function <name>(` 起、到下一个顶层 export 之前的源码；找不到就失败。 */
-function exportedFunctionBody(src: string, name: string): string {
-  const start = src.search(new RegExp(`^export (?:async )?function ${name}\\b`, 'm'))
-  assert.ok(start >= 0, `找不到函数 ${name}`)
-  const rest = src.slice(start + 1)
-  const next = rest.search(/^export /m)
-  return next >= 0 ? src.slice(start, start + 1 + next) : src.slice(start)
-}
-
 function assertStatic(): void {
   const policy = read(join(API_ROOT, 'src/print-jobs/free-print-quota.policy.ts'))
   const usage = read(join(API_ROOT, 'src/print-jobs/free-print-quota.usage.ts'))
@@ -161,13 +152,14 @@ function assertStatic(): void {
   assert.ok(progress.includes('全部可配'))
   assert.ok(usage.includes('terminalInFlight'))
   // 实付大于 0 的早退要各在各的函数体里找：整文件 includes 会被另一个函数里的同一串蒙过去。
-  assert.ok(exportedFunctionBody(decide, 'assertFreePrintQuota').includes('if (input.payableCents > 0) return'))
-  assert.ok(exportedFunctionBody(decide, 'previewFreePrintOrderQuota').includes('if (input.payableCents > 0) return'))
+  assert.ok(functionSource(decide, 'assertFreePrintQuota').includes('if (input.payableCents > 0) return'))
+  assert.ok(functionSource(decide, 'previewFreePrintOrderQuota').includes('if (input.payableCents > 0) return'))
   assert.ok(policy.includes('PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES'))
-  assert.ok(policy.includes('超过每天免费 ${limit} 面的上限，请减少份数或分开下单'))
+  assert.ok(policy.includes('这台机器每天最多免费打印 ${terminalLimit} 面，这单 ${requestedSides} 面。可以换一台机器下单，或减少份数。'))
+  assert.ok(policy.includes('这台机器每天最多免费打印 ${terminalLimit} 面，这单 ${requestedSides} 面，可以换一台机器下单。'))
+  assert.ok(policy.includes('这单 ${requestedSides} 面，超过每人每天免费 ${memberLimit} 面的上限，请减少份数后再下单。'))
+  assert.ok(policy.includes('这份文件 ${requestedSides} 面，超过每人每天免费 ${memberLimit} 面的上限，暂时不能免费打印。'))
   assert.ok(decide.includes('previewFreePrintOrderQuota'))
-  const quotaFilter = read(join(API_ROOT, 'src/common/filters/http-exception.filter.ts'))
-  assert.ok(quotaFilter.includes('PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES'))
   const memberCreate = read(join(API_ROOT, 'src/member-print-orders/member-print-order-create.service.ts'))
   const packageCreate = read(join(API_ROOT, 'src/member-print-orders/package-order.service.ts'))
   assert.ok(memberCreate.includes('previewFreePrintOrderQuota'))

@@ -284,12 +284,11 @@ interface FreePrintQuotaDetails {
   resetAt: string
 }
 
+/** 只控制三条 429 的 details 放行，不是错误码登记簿。下单超上限是 400，不进这里。 */
 const FREE_PRINT_QUOTA_CODES = new Set([
   'PRINT_TERMINAL_DAILY_QUOTA_REACHED',
   'PRINT_MEMBER_DAILY_QUOTA_REACHED',
   'PRINT_GUEST_ORDER_QUOTA_EXCEEDED',
-  // 下单 400 不带 details。放进集合只是登记；没有 details 时下面直接丢掉。
-  'PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES',
 ])
 const FREE_PRINT_QUOTA_RESET_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/
 
@@ -324,7 +323,7 @@ function pickScanDeviceReportDetails(code: string, raw: unknown): ScanDeviceRepo
   }
 }
 
-/** 429 三条放行五个有界字段。下单 400 登记在同一集合，没有 details 时不透出。其它对象形态的 details 继续丢掉。 */
+/** 只放行三条 429 的五个有界字段。下单超上限是 400，不在这个集合里，不透出 details。其它对象形态的 details 继续丢掉。 */
 function pickFreePrintQuotaDetails(code: string, raw: unknown): FreePrintQuotaDetails | undefined {
   if (!FREE_PRINT_QUOTA_CODES.has(code) || !raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
   const row = raw as Record<string, unknown>

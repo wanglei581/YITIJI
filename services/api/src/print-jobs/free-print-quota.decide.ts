@@ -80,9 +80,29 @@ export async function assertFreePrintQuota(
 }
 
 /**
+ * 幂等回放是否还要附 freeQuotaNotice。
+ * 只有仍待领取、没过期、没取消、没放行，并且订单上有机器号时才算。
+ * 没有机器号时调用方不得拿空串去查机器和用量。
+ * 已放行、已打印完成、已取消、已过期都不附。
+ */
+export function replayAttachesFreeQuotaNotice(order: {
+  terminalId: string | null
+  pickupStatus: string
+  printTaskId: string | null
+  pickupCodeExpiresAt: Date | null
+}): boolean {
+  if (!order.terminalId) return false
+  if (order.pickupStatus !== 'pending') return false
+  if (order.printTaskId) return false
+  if (order.pickupCodeExpiresAt && order.pickupCodeExpiresAt.getTime() <= Date.now()) return false
+  return true
+}
+
+/**
  * 小程序建单前只读预判。配置、用量和「实付大于 0 不看额度」与 assertFreePrintQuota 相同，不扣额度。
- * 单笔大于会员每天上限或本机每天上限（含机器覆盖，取更紧的那个）时，建单抛 400。
- * 回放传 rejectOverCap: false：已落库的单不因后来调低上限再被拒，也不附「明天可取」。
+ * 只给会员建单用：endUserId 是会员 id。游客每单上限由取件时的 assertFreePrintQuota 判，这里不看。
+ * 单笔大于会员每天上限或本机每天上限（含机器覆盖，取更紧的那个）时，建单抛 400。文案按哪一个更紧、份数是不是 1 分四句。
+ * 回放传 rejectOverCap: false：已落库的单不因后来调低上限再被拒，也不附提示。
  * 没超上限但今天剩余不够：返回 freeQuotaNotice。够用返回 null，回包不带该字段。
  * 取件被拒仍走 assertFreePrintQuota 的 429，订单保持待领取。
  */
@@ -90,9 +110,10 @@ export async function previewFreePrintOrderQuota(
   db: FreePrintQuotaDb,
   input: {
     terminalId: string
-    endUserId: string | null
+    endUserId: string
     requestedSides: number
     payableCents: number
+    copies: number
     now?: Date
   },
   options?: { rejectOverCap?: boolean },
@@ -108,23 +129,27 @@ export async function previewFreePrintOrderQuota(
     select: { dailyFreePrintSides: true },
   })
   const terminalLimit = terminalDailyLimit(terminal?.dailyFreePrintSides, config.terminalDailySides)
-  const effectiveLimit = input.endUserId
-    ? Math.min(config.memberDailySides, terminalLimit)
-    : terminalLimit
+  const memberLimit = config.memberDailySides
+  const effectiveLimit = Math.min(memberLimit, terminalLimit)
   if (input.requestedSides > effectiveLimit) {
     if (options?.rejectOverCap === false) return null
     throw new BadRequestException({
       error: {
         code: PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES,
-        message: orderExceedsDailyFreeSidesMessage(input.requestedSides, effectiveLimit),
+        message: orderExceedsDailyFreeSidesMessage({
+          requestedSides: input.requestedSides,
+          memberLimit,
+          terminalLimit,
+          copies: input.copies,
+        }),
       },
     })
   }
   const usage = await loadFreePrintUsage(db, input.terminalId, input.endUserId, now)
-  const terminalRemaining = remainingSides(terminalLimit, usage.terminalUsed, usage.terminalInFlight)
-  const remaining = input.endUserId
-    ? Math.min(terminalRemaining, remainingSides(config.memberDailySides, usage.memberUsed, usage.memberInFlight))
-    : terminalRemaining
+  const remaining = Math.min(
+    remainingSides(terminalLimit, usage.terminalUsed, usage.terminalInFlight),
+    remainingSides(memberLimit, usage.memberUsed, usage.memberInFlight),
+  )
   if (input.requestedSides > remaining) {
     return {
       remainingSides: remaining,
