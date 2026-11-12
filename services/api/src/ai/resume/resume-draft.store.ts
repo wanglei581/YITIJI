@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException, ServiceUnavailableException } f
 import type { PrismaService } from '../../prisma/prisma.service'
 import type { GeneratedResume, OptimizeResumeOutput, ParseResumeOutput, ResumeLayoutSettings } from '../interfaces/ai-provider.interface'
 import type { ResumeExtractionService } from './resume-extraction.service'
+import { findFactAdditions } from './resume-fact-additions-rule'
 import { matchResumeFacts, type ResumeFactMatch } from './resume-fact-match'
 
 /** 与 AiService.AiResultRequester 结构相同，不回引 ai.service 以免循环依赖。 */
@@ -50,6 +51,7 @@ export interface ResumeFactCheckView {
   taskId: string
   originalAvailable: true
   items: ResumeFactMatch[]
+  additions: Array<{ text: string; path: string }>
 }
 
 interface DraftStoreDeps {
@@ -110,6 +112,35 @@ export function parseConfirmedPayload(raw: string): ResumeConfirmedSnapshot | nu
   } catch {
     return null
   }
+}
+
+/** 优化稿文本字段相对原文全文的新增数字和职责词。同一 path 下片段相同只留一项。 */
+function collectFactAdditions(resume: GeneratedResume, originalText: string): Array<{ text: string; path: string }> {
+  const fields: Array<{ path: string; text: string }> = [
+    { path: 'summary', text: resume.summary ?? '' },
+  ]
+  resume.education.forEach((item, index) => {
+    fields.push({ path: `education[${index}].description`, text: item.description ?? '' })
+  })
+  resume.experience.forEach((item, index) => {
+    fields.push({ path: `experience[${index}].description`, text: item.description })
+  })
+  resume.projects.forEach((item, index) => {
+    fields.push({ path: `projects[${index}].description`, text: item.description })
+  })
+  resume.skills.forEach((item, index) => {
+    fields.push({ path: `skills[${index}]`, text: item })
+  })
+  const additions: Array<{ text: string; path: string }> = []
+  for (const field of fields) {
+    const seen = new Set<string>()
+    for (const item of findFactAdditions(field.text, originalText)) {
+      if (seen.has(item.text)) continue
+      seen.add(item.text)
+      additions.push({ text: item.text, path: field.path })
+    }
+  }
+  return additions
 }
 
 function sanitizeDecisions(input: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
@@ -223,6 +254,7 @@ export class ResumeDraftStore {
       taskId,
       originalAvailable: true,
       items: matchResumeFacts(resume, extraction.text),
+      additions: collectFactAdditions(resume, extraction.text),
     }
   }
 

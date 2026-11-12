@@ -80,6 +80,7 @@ const ORIGINAL_TEXT = [
   '青岛理工学院 软件工程 本科 2020-2024',
   '青序科技 前端实习生 2023.07-2023.12',
   '大学英语四级',
+  '负责日常排班。',
 ].join('\n')
 
 const ORIGINAL_RESUME: GeneratedResume = {
@@ -310,6 +311,33 @@ async function main(): Promise<void> {
       fail('5b. 端点应对原文学校报真')
     }
     pass('5b. fact-check 端点对编造项报假')
+
+    const additionResume: GeneratedResume = {
+      ...ORIGINAL_RESUME,
+      summary: '牵头完成新生手册。',
+      experience: [{
+        company: '青序科技',
+        role: '前端实习生',
+        period: '2023.07-2023.12',
+        description: '参与页面开发，负责接口联调，周更 2 篇，覆盖 2024 届同学。',
+      }],
+      skills: ['React', '熟练使用 5 种工具'],
+    }
+    await ai.saveResumeDraft(taskA, { resume: additionResume }, member(userA))
+    const additionChecked = await ai.factCheckResume(taskA, member(userA))
+    if (JSON.stringify(additionChecked.items) !== JSON.stringify(matchResumeFacts(additionResume, ORIGINAL_TEXT))) {
+      fail('5c. items 必须与 matchResumeFacts 逐项相同')
+    }
+    const week = additionChecked.additions.find((item) => item.path === 'experience[0].description' && item.text === '周更 2 篇')
+    if (!week) fail(`5c. 经历里的新增数字应为片段「周更 2 篇」，实际 ${JSON.stringify(additionChecked.additions)}`)
+    const lead = additionChecked.additions.find((item) => item.path === 'summary' && item.text.includes('牵头'))
+    if (!lead) fail(`5c. 摘要里的职责词牵头应出现，实际 ${JSON.stringify(additionChecked.additions)}`)
+    const skill = additionChecked.additions.find((item) => item.path === 'skills[1]' && item.text.includes('5'))
+    if (!skill) fail(`5c. 技能里的新增数字应带 path skills[1]，实际 ${JSON.stringify(additionChecked.additions)}`)
+    if (additionChecked.additions.some((item) => item.text.includes('2024') || item.text.includes('负责'))) {
+      fail(`5c. 原文已有的 2024 和负责不应出现，实际 ${JSON.stringify(additionChecked.additions)}`)
+    }
+    pass('5c. fact-check 的 additions 带上新增事实，原文已有的不出现，items 不变')
 
     const resumes = await assets.listResumes(userA, { cursor: null, pageSize: 20 })
     const parseRow = resumes.items.find((row) => row.taskId === taskA)

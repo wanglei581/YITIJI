@@ -1,4 +1,5 @@
 import type { GeneratedResume, ResumeGenerateInput, ResumeOptimizeModule } from '@ai-job-print/shared'
+import { findFactAdditions } from './factAdditionsRule'
 
 export type FactKind = 'school' | 'company' | 'period' | 'certificate' | 'phone'
 
@@ -35,17 +36,11 @@ export function extractConfirmableFacts(resume: GeneratedResume): ConfirmableFac
  */
 export const UNCONFIRMED_WHY = 'AI 整理时新写进了这几处，你原来的内容里没有。请核对是不是你的实际情况；不是，就改掉或删掉再导出。'
 
-const DIGIT_RE = /\d+(?:\.\d+)?%?/g
-const DUTY_WORDS = ['主导', '负责', '带领', '季度之星'] as const
-
-/** 逐条对照共用的机械规则：after 有、before 无的数字与职责词。 */
+/** 逐条对照共用的机械规则：after 有、before 无的数字与职责词。返回给人看的片段。 */
 export function detectUnconfirmedTextAdditions(afterText: string, beforeText: string): string[] {
   const hits: string[] = []
-  for (const token of afterText.match(DIGIT_RE) ?? []) {
-    if (token && !beforeText.includes(token) && !hits.includes(token)) hits.push(token)
-  }
-  for (const word of DUTY_WORDS) {
-    if (afterText.includes(word) && !beforeText.includes(word) && !hits.includes(word)) hits.push(word)
+  for (const item of findFactAdditions(afterText, beforeText)) {
+    if (!hits.includes(item.text)) hits.push(item.text)
   }
   return hits
 }
@@ -59,21 +54,25 @@ function collectBeforeText(
   return JSON.stringify(originalInput)
 }
 
-/** 机械对照：after 里有、before/原文里没有的数字与职责词。不是「已校验」。 */
+function factFieldTexts(resume: GeneratedResume): string[] {
+  return [
+    resume.summary,
+    ...resume.education.map((item) => item.description ?? ''),
+    ...resume.experience.map((item) => item.description),
+    ...resume.projects.map((item) => item.description),
+    ...resume.skills,
+  ]
+}
+
+/** 机械对照：after 里有、before/原文里没有的数字与职责词。技能栏里新写的数也要本人确认。 */
 export function detectUnconfirmedAdditions(
   resume: GeneratedResume,
   modules?: ResumeOptimizeModule[],
   originalInput?: ResumeGenerateInput,
 ): string[] {
   const beforeText = collectBeforeText(modules, originalInput)
-  const afterParts = [
-    resume.summary,
-    ...resume.education.map((item) => item.description ?? ''),
-    ...resume.experience.map((item) => item.description),
-    ...resume.projects.map((item) => item.description),
-  ]
   const hits: string[] = []
-  for (const text of afterParts) {
+  for (const text of factFieldTexts(resume)) {
     for (const addition of detectUnconfirmedTextAdditions(text, beforeText)) {
       if (!hits.includes(addition)) hits.push(addition)
     }
@@ -81,18 +80,39 @@ export function detectUnconfirmedAdditions(
   return hits
 }
 
-/** 保留仍存在于生成稿的候选词；预览时本人后来加入的词不属于 AI 新增。 */
+function keysIn(texts: string[], beforeText: string): Set<string> {
+  const keys = new Set<string>()
+  for (const text of texts) {
+    for (const item of findFactAdditions(text, beforeText)) keys.add(item.key)
+  }
+  return keys
+}
+
+/**
+ * 仍留在当前稿里、且生成稿里就有的新增事实。
+ * 是不是同一处，按 key 比：本人只改了数字旁边的字，片段会变，数字本身还是要确认。
+ * 本人后来自己写进去的数，用当时记下的片段还原 key，不再算成 AI 新增。
+ */
 export function detectGeneratedUnconfirmedAdditions(
   resume: GeneratedResume,
   generated: GeneratedResume,
   input?: ResumeGenerateInput,
   userAdditions: string[] = [],
 ): string[] {
-  const generatedAdditions = detectUnconfirmedAdditions(generated, undefined, input)
-  return detectUnconfirmedAdditions(resume, undefined, input).filter((word) => generatedAdditions.includes(word) && !userAdditions.includes(word))
+  const beforeText = collectBeforeText(undefined, input)
+  const generatedKeys = keysIn(factFieldTexts(generated), beforeText)
+  const userKeys = keysIn(userAdditions, '')
+  const hits: string[] = []
+  for (const text of factFieldTexts(resume)) {
+    for (const item of findFactAdditions(text, beforeText)) {
+      if (!generatedKeys.has(item.key) || userKeys.has(item.key)) continue
+      if (!hits.includes(item.text)) hits.push(item.text)
+    }
+  }
+  return hits
 }
 
-/** 记录预览中每个描述字段由本人新增的候选词。 */
+/** 记录预览中每个描述字段由本人新增的事实。和上一稿比的是 key，返回的仍是片段。 */
 export function detectUserResumeEdits(before: GeneratedResume, after: GeneratedResume): string[] {
   const texts = (resume: GeneratedResume) => [resume.summary,
     ...resume.education.map((item) => item.description ?? ''),

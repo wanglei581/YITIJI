@@ -535,3 +535,61 @@ test('删掉一条经历后没删的那条仍在导出里 @kiosk', async ({ page
   expect(companies).toContain(SHORT_COMPANY)
   expect(companies).not.toContain(LONG_COMPANY)
 })
+
+test.describe('新增事实也要逐项勾选才能导出', () => {
+  test('优化页核对弹层里「周更 2 篇」是一条勾选项，没勾完不能确认导出 @kiosk', async ({ page, api }) => {
+    const taskId = 'r2-fact-additions-2099'
+    registerOptimizeShell(api)
+    api.respond('GET', `/api/v1/resume/records/${taskId}/optimize`, {
+      status: 200,
+      json: {
+        taskId,
+        status: 'completed',
+        providerName: 'llm',
+        modules: [],
+        optimizedResume: {
+          basic: { name: '周晴', phone: '13800001111', city: '青岛' },
+          intention: { position: '新媒体运营', city: '青岛' },
+          summary: '学院公众号的选题和排版都是我在学生会做的。',
+          education: [{ school: '青岛大学', major: '新闻学', degree: '本科', period: '2021-2025' }],
+          experience: [{
+            company: '青岛大学学生会',
+            role: '宣传部干事',
+            period: '2023-2025',
+            description: '负责学院公众号的选题、撰写和排版，周更 2 篇。',
+          }],
+          projects: [],
+          skills: ['公众号排版'],
+          certificates: [],
+        },
+      },
+    })
+    await page.goto(`/resume/optimize?taskId=${encodeURIComponent(taskId)}`)
+    await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toHaveValue('青岛大学学生会')
+    await page.getByRole('button', { name: '去导出', exact: true }).click()
+
+    const dialog = page.getByRole('dialog', { name: '导出前核对事实' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByText('这份稿里没有可勾选的学校 / 公司 / 时间段 / 证书 / 电话。')).toHaveCount(0)
+    const addition = dialog.locator('label.qxt-factrow', { hasText: '周更 2 篇' })
+    await expect(addition).toBeVisible()
+    await expect(addition.locator('b')).toHaveCount(0)
+    await expect(addition.locator('em')).toHaveText('已核对')
+    const confirm = dialog.getByRole('button', { name: '确认导出' })
+    await expect(confirm).toHaveAttribute('aria-disabled', 'true')
+
+    const boxes = dialog.getByRole('checkbox')
+    const count = await boxes.count()
+    expect(count).toBeGreaterThan(1)
+    for (let i = 0; i < count; i += 1) {
+      const name = await boxes.nth(i).evaluate((node) => (node.closest('label')?.textContent ?? ''))
+      if (!name.includes('周更 2 篇')) await boxes.nth(i).click()
+    }
+    await expect(confirm).toHaveAttribute('aria-disabled', 'true')
+    await dialog.getByRole('checkbox', { name: /周更 2 篇/ }).click()
+    await expect(confirm).not.toHaveAttribute('aria-disabled', 'true')
+    await confirm.click()
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '导出', exact: true })).toBeVisible()
+  })
+})
