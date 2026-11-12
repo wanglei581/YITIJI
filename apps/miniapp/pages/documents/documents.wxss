@@ -16,19 +16,22 @@
   font-size: 27rpx; font-weight: 600;
 }
 
+/* 行：左右留 32rpx，格式块不再贴卡片边；格式块与主名顶部对齐，不再垂直居中到整行（FLOW1a 实图 01）。 */
 .doc-item {
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-  padding: 24rpx 0;
+  padding: 24rpx 32rpx;
   border-bottom: 1rpx solid var(--line-faint);
 }
 .doc-item:last-child { border-bottom: none; }
+.doc-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 20rpx;
+}
 
 .doc-ic {
   flex-shrink: 0;
-  width: 84rpx;
-  height: 84rpx;
+  width: 72rpx;
+  height: 72rpx;
   border-radius: var(--r);
   display: flex;
   align-items: center;
@@ -45,13 +48,18 @@
 .doc-ic.ic-ai   { background: var(--plum-deep); }
 
 .doc-body { flex: 1; min-width: 0; }
+/* 主名最多两行：单行省略时几份同前缀的文件（…-OFFLINE-D93A / …-COLOR-D93A）看不出区别。 */
 .doc-name {
   font-size: 28rpx;
   font-weight: 600;
   color: var(--ink);
+  line-height: 1.4;
+  overflow-wrap: break-word;
+  word-break: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .doc-meta {
   margin-top: 8rpx;
@@ -74,10 +82,14 @@
   font-size: 21rpx;
   font-weight: 600;
 }
+/* ⋯ 的点击盒实打实 96rpx × 96rpx（48px，CLAUDE.md §9）。负边距只把它挪进行的上、右内边距里，
+   在排版里只占 72rpx 宽，少挤主名；点击盒本身不缩。底行操作离它至少 20rpx（见 .doc-item .doc-actions），
+   两块点击区不重叠。 */
 .doc-more {
   flex-shrink: 0;
-  width: 64rpx;
-  height: 64rpx;
+  width: 96rpx;
+  height: 96rpx;
+  margin: -12rpx -24rpx 0 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -97,9 +109,8 @@
 .es-d { margin-top: 8rpx; font-size: 24rpx; color: var(--muted); }
 
 /* 保存期限行。放在 meta 行之下而不是挤进去：到期日期是"什么时候没"，
-   保留档位是"按哪条规则保存"，两件事混在一行读不出区别。 */
-.doc-retention { display: flex; align-items: center; gap: 12rpx; margin-top: 10rpx; flex-wrap: wrap; }
-.doc-retention-hint { font-size: var(--fs-xs); color: var(--faint); line-height: 1.5; }
+   保留档位是"按哪条规则保存"，两件事混在一行读不出区别。档位与「不可延长」合成这一行小字。 */
+.doc-retention { margin-top: 6rpx; font-size: var(--fs-xs); color: var(--muted); line-height: 1.5; }
 
 /* 分页提示。没有它，上拉加载对用户是不可见的静默行为 */
 .load-hint { padding: 24rpx 0 8rpx; text-align: center; font-size: var(--fs-xs); color: var(--faint); }
@@ -107,14 +118,20 @@
 .doc-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12rpx;
+  gap: 16rpx;
   margin-top: 12rpx;
 }
+/* 列表行的操作在独立底行靠右，不占主名的宽度。margin-top 20rpx 大于下面伪元素向上扩的 18rpx，
+   胶囊的点击区不会伸进上面「⋯」的 96rpx 点击盒。 */
+.doc-item .doc-actions { justify-content: flex-end; margin-top: 20rpx; }
+/* 视觉是紧凑胶囊（60rpx 高）；伪元素把点击区上下各扩 18rpx、左右各扩 8rpx，
+   实际点击区 96rpx 高（48px，CLAUDE.md §9），相邻两个胶囊（间距 16rpx）的点击区刚好相接、不重叠。 */
 .doc-action {
+  position: relative;
   flex-shrink: 0;
-  min-width: 96rpx;
-  min-height: 96rpx;
-  padding: 0 24rpx;
+  min-width: 112rpx;
+  min-height: 60rpx;
+  padding: 0 28rpx;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -124,6 +141,18 @@
   color: var(--ink-soft);
   font-size: var(--fs-sm);
   font-weight: 600;
+}
+.doc-action::after {
+  content: '';
+  position: absolute;
+  left: -8rpx;
+  right: -8rpx;
+  top: -18rpx;
+  bottom: -18rpx;
+}
+.doc-action.primary {
+  border-color: var(--teal);
+  color: var(--teal);
 }
 .doc-action.is-disabled {
   color: var(--ghost);

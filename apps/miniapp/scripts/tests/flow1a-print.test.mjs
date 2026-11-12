@@ -248,12 +248,18 @@ test('聊天上传 Word：转换能力不可用被拒时说明另存 PDF，不�
   assert.equal(pdf.calls.modal[0].content, '网络异常，请稍后重试')
 })
 
-test('我的文档模板：行内「打印」走 reprintDoc；点整行打开原文；没有「重新打印」字样', () => {
+test('我的文档模板：标题只放主名；行内「打印」走 reprintDoc；点整行打开原文；没有「重新打印」字样；⋯ 有无障碍名称；发给微信好友仍在', () => {
   const wxml = stripComments(read('pages/documents/documents.wxml'))
   assert.match(wxml, /bindtap="openDoc"/)
+  assert.match(wxml, /<view class="doc-name">\{\{item\.baseName\}\}<\/view>/)
   assert.match(wxml, /catchtap="reprintDoc"[\s\S]*?>打印<\/view>/)
   assert.doesNotMatch(wxml, />\s*(?:重新打印|发起打印)\s*</, '按钮不再叫「重新打印」「发起打印」')
+  assert.match(wxml, /catchtap="more"[^>]*aria-role="button" aria-label="更多操作"/)
   assert.match(wxml, /发给微信好友/)
+  const css = read('pages/documents/documents.wxss')
+  assert.match(css, /\.doc-more \{[^}]*width: 96rpx;[^}]*height: 96rpx;/, '⋯ 的真实点击盒 96rpx 见方')
+  assert.match(css, /\.doc-action::after \{[^}]*top: -18rpx;[^}]*bottom: -18rpx;/, '胶囊点击区上下各扩 18rpx，合计 96rpx')
+  assert.match(css, /\.doc-item \.doc-actions \{[^}]*margin-top: 20rpx;/, '底行离 ⋯ 至少 20rpx，点击区不重叠')
 })
 
 // ── 确认文件页（print-upload）：不再设参数；直接开原文；草稿按发起跳转时的会话与会员归属 ──
