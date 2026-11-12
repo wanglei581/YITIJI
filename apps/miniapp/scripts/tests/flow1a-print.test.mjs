@@ -10,7 +10,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
-import { flush, instantiate, loadPageDefinition } from './page-sandbox.mjs'
+import { deferred, flush, instantiate, loadPageDefinition } from './page-sandbox.mjs'
 
 const MINIAPP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (rel) => fs.readFileSync(path.join(MINIAPP, rel), 'utf8')
@@ -171,13 +171,81 @@ test('Word 转换不可用时点打印：用现有说明，不进打印、不调
   assert.equal(calls.modal[0].confirmText, '知道了')
 })
 
-test('聊天选文件收下 doc、docx，上传后仍走先转 PDF 再打印', () => {
-  const src = read('pages/documents/documents.js')
-  const listed = src.match(/extension:\s*\[([^\]]+)\]/)
-  assert.ok(listed)
-  assert.match(listed[1], /'doc'/)
-  assert.match(listed[1], /'docx'/)
-  assert.match(listed[1], /'pdf'/)
+function chatUploadPage() {
+  const calls = { sheet: [], modal: [], uploaded: [], converted: [], toast: [] }
+  const picker = { current: null }
+  const api = {
+    getMyDocuments: () => Promise.resolve([]),
+    getDocumentConversionCapabilities: () => Promise.resolve({ wordToPdf: false }),
+    uploadPrintFile(filePath, name) {
+      const pending = deferred()
+      calls.uploaded.push({ filePath, name, resolve: pending.resolve, reject: pending.reject })
+      return pending.promise
+    },
+    convertDocumentToPdf(id) { calls.converted.push(id); return new Promise(() => {}) },
+  }
+  const auth = { isLoggedIn: () => true, getUser: () => ({ id: 'member-1' }) }
+  const wx = {
+    redirectTo() {}, switchTab() {}, navigateTo() {}, navigateBack() {},
+    showModal: (o) => { calls.modal.push(o) },
+    showToast: (o) => { calls.toast.push(o) },
+    showLoading() {}, hideLoading() {},
+    showActionSheet: (o) => { calls.sheet.push(o) },
+    chooseMessageFile: (o) => { picker.current = o },
+  }
+  const page = instantiate(loadPageDefinition('pages/documents/documents.js', { wx, modules: { api, auth } }))
+  return { page, calls, picker }
+}
+
+function pickChatFile(page, calls, picker, name) {
+  page.upload()
+  assert.equal(calls.sheet.length, 1)
+  calls.sheet[0].success({ tapIndex: 1 })
+  assert.ok(picker.current, '从微信聊天选文件要打开选择器')
+  const ext = name.split('.').pop()
+  picker.current.success({ tempFiles: [{ path: `wxfile://tmp.${ext}`, name }] })
+}
+
+test('聊天选 doc、docx：真的去上传，成功后进入转成 PDF 的说明', async () => {
+  for (const name of ['简历.doc', '简历.docx']) {
+    const { page, calls, picker } = chatUploadPage()
+    page.setData({ wordConversionAvailable: true })
+    pickChatFile(page, calls, picker, name)
+    // 选择器参数来自页面沙箱，数组原型和本进程不同，先抄进本进程再比内容和顺序。
+    assert.deepEqual(Array.from(picker.current.extension), ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'])
+    await flush()
+    assert.equal(calls.uploaded.length, 1, name)
+    assert.equal(calls.uploaded[0].name, name)
+    calls.uploaded[0].resolve({ fileId: `up-${name}`, filename: name })
+    await flush()
+    assert.equal(calls.modal.length, 1, name)
+    assert.equal(calls.modal[0].content, 'Word 文件要先转成 PDF 才能打印')
+    assert.equal(calls.modal[0].confirmText, '转成 PDF')
+    assert.equal(calls.converted.length, 0, '没点确认不转换')
+    calls.modal[0].success({ confirm: true })
+    assert.deepEqual(calls.converted, [`up-${name}`])
+  }
+})
+
+test('聊天上传 Word：转换能力不可用被拒时说明另存 PDF，不用「上传失败」', async () => {
+  const { page, calls, picker } = chatUploadPage()
+  pickChatFile(page, calls, picker, '简历.docx')
+  await flush()
+  calls.uploaded[0].reject({ code: 'FILE_MIME_NOT_ALLOWED', message: '该文件用途不支持此文件类型' })
+  await flush()
+  assert.equal(calls.converted.length, 0)
+  assert.equal(calls.toast.length, 0)
+  assert.equal(calls.modal.length, 1)
+  assert.notEqual(calls.modal[0].title, '上传失败')
+  assert.equal(calls.modal[0].content, '这类文件暂时传不了，可以先在电脑或手机上另存为 PDF 再传')
+
+  const pdf = chatUploadPage()
+  pickChatFile(pdf.page, pdf.calls, pdf.picker, '简历.pdf')
+  await flush()
+  pdf.calls.uploaded[0].reject({ message: '网络异常，请稍后重试' })
+  await flush()
+  assert.equal(pdf.calls.modal[0].title, '上传失败')
+  assert.equal(pdf.calls.modal[0].content, '网络异常，请稍后重试')
 })
 
 test('我的文档模板：行内「打印」走 reprintDoc；点整行打开原文；没有「重新打印」字样', () => {

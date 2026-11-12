@@ -1,6 +1,5 @@
 .page-wrap { min-height: 100vh; background: var(--paper); }
-/* 终端列表沿用全局卡片的左右 16px，不再贴屏幕边（FLOW1a 实图 05） */
-.store-list { display: flex; flex-direction: column; gap: 16rpx; margin: 0 16px; }
+.store-list { display: flex; flex-direction: column; gap: 16rpx; }
 .store-card { padding: 28rpx; background: var(--surface); border-radius: var(--r-lg); border: 2rpx solid var(--line-soft); }
 .store-card.selected { border-color: var(--teal); background: var(--teal-wash); }
 .sc-top { display: flex; align-items: center; justify-content: space-between; }

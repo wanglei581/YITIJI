@@ -1,6 +1,6 @@
 /* pages/print-upload/print-upload.wxss  打印参数 */
 .page-wrap { min-height: 100vh; background: var(--paper); }
-/* actionbar 里是 .btn.lg（60px），app.wxss 的 has-bar 只预留 80px，会压住最后一块内容 */
+/* actionbar 里是 .btn.lg（60px），app.wxss 的 has-bar 只预留 80px，会压住合规说明 */
 .content.has-bar { padding-bottom: calc(112px + var(--sab)); }
 
 /* ── 文件卡 ─────────────────────────────────────────────────── */
@@ -10,7 +10,7 @@
   display: flex; align-items: center; justify-content: center; }
 .fc-ic .ficon { width: 44rpx; height: 44rpx; }
 .fc-main { flex: 1; min-width: 0; }
-.fc-name { font-size: 30rpx; font-weight: 600; color: var(--ink); overflow-wrap: break-word; word-break: normal; }
+.fc-name { font-size: 30rpx; font-weight: 600; color: var(--ink); word-break: break-all; }
 .fc-meta { display: flex; align-items: center; gap: 12rpx; margin-top: 8rpx; }
 .fc-tag { flex-shrink: 0; font-size: 20rpx; font-weight: 700; letter-spacing: .5rpx;
   color: var(--teal-deep); background: var(--teal-wash); border-radius: var(--r-xs); padding: 4rpx 12rpx; }

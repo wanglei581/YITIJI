@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import vm from 'node:vm'
 import { deferred, flush, instantiate, loadPageDefinition } from './page-sandbox.mjs'
 
 const pendingOrder = {
@@ -397,4 +399,128 @@ test('订单列表：免费待取单能取消，确认后用回包刷新这一�
   const next = page.data.orders.find((item) => item.id === 'order-free')
   assert.equal(next.canCancel, false)
   assert.equal(next.statusLabel, '已取消')
+})
+
+function extractFunction(rel, name) {
+  const src = readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8')
+  const start = src.indexOf(`function ${name}(`)
+  assert.ok(start >= 0, `${rel} 里要有 ${name}`)
+  let depth = 0
+  let end = -1
+  for (let i = src.indexOf('{', start); i < src.length; i += 1) {
+    const ch = src[i]
+    if (ch === '{') depth += 1
+    else if (ch === '}') {
+      depth -= 1
+      if (depth === 0) { end = i; break }
+    }
+  }
+  assert.ok(end > start, `${rel} 的 ${name} 没有成对括号`)
+  return vm.runInNewContext(`${src.slice(start, end + 1)}\n${name}`)
+}
+
+// 照抄 member-print-order-create.service.ts cancel()（约 383–387 行）的放行条件。
+// 能取消：没有打印任务、取件仍是 pending，并且是未付款、免费已入账，或关单但从未收款。
+function serverCanCancel(order) {
+  const freeOrder = order.amountCents === 0 && order.payStatus === 'paid' && order.paymentSource === 'free'
+  const closedUnpaid = order.payStatus === 'closed' && !order.paidAt
+  if (order.printTaskId || order.pickupStatus !== 'pending' || (order.payStatus !== 'unpaid' && !freeOrder && !closedUnpaid)) {
+    return false
+  }
+  return true
+}
+
+test('列表页和详情页的取消放行与服务端 cancel() 同一组输入结论一致', () => {
+  const listCan = extractFunction('pages/orders/orders.js', 'canCancelCloudOrder')
+  const detailCan = extractFunction('pages/order-detail/order-detail.js', 'canCancelCloudOrder')
+  const listSrc = readFileSync(new URL('../../pages/orders/orders.js', import.meta.url), 'utf8')
+  const detailSrc = readFileSync(new URL('../../pages/order-detail/order-detail.js', import.meta.url), 'utf8')
+  assert.match(listSrc, /canCancel:\s*canCancelCloudOrder\(item\)/)
+  assert.match(detailSrc, /canCancel:\s*canCancelCloudOrder\(raw\)/)
+
+  const printTaskIds = [null, 'task-1']
+  const pickupStatuses = ['pending', 'claimed', 'cancelled', 'expired']
+  const amounts = [0, 100]
+  const payStatuses = ['unpaid', 'paid', 'closed', 'paying']
+  const sources = [null, 'free', 'offline']
+  const paidAts = [null, '2026-11-01T00:00:00.000Z']
+  let n = 0
+  for (const printTaskId of printTaskIds) {
+    for (const pickupStatus of pickupStatuses) {
+      for (const amountCents of amounts) {
+        for (const payStatus of payStatuses) {
+          for (const paymentSource of sources) {
+            for (const paidAt of paidAts) {
+              const input = { printTaskId, pickupStatus, amountCents, payStatus, paymentSource, paidAt }
+              const server = serverCanCancel(input)
+              assert.equal(listCan(input), server, `列表 ${JSON.stringify(input)}`)
+              assert.equal(detailCan(input), server, `详情 ${JSON.stringify(input)}`)
+              n += 1
+            }
+          }
+        }
+      }
+    }
+  }
+  assert.equal(n, 384)
+
+  // 列表把云订单和历史 PrintTask 拼在一起。PrintTask 行带 status，云订单视图不返回 status。
+  // 服务端 cancel() 只接收 Order，不看 status。小程序用 status 排除这些历史行。
+  const historical = {
+    printTaskId: null,
+    pickupStatus: 'pending',
+    amountCents: 0,
+    payStatus: 'paid',
+    paymentSource: 'free',
+    paidAt: '2026-11-01T00:00:00.000Z',
+    status: 'completed',
+  }
+  assert.equal(serverCanCancel(historical), true)
+  assert.equal(listCan(historical), false)
+  assert.equal(detailCan(historical), false)
+})
+
+test('订单反馈：预填订单号不计入 10 字，没写问题不能提交', async () => {
+  const toasts = []
+  const sent = []
+  const auth = { isLoggedIn: () => true }
+  const feedback = instantiate(loadPageDefinition('pages/feedback/feedback.js', {
+    wx: { showToast(o) { toasts.push(o) }, navigateTo() {}, navigateBack() {}, switchTab() {} },
+    modules: {
+      auth,
+      api: {
+        getMyFeedback: () => Promise.resolve([]),
+        createFeedback(body) { sent.push(body); return Promise.resolve({ id: 'fb-1' }) },
+      },
+    },
+  }))
+  const orderNo = 'ZYD202611120001'
+  feedback.onLoad({ category: 'print', orderNo })
+  const prefill = feedback.data.content
+  assert.match(prefill, new RegExp(orderNo))
+  assert.ok(prefill.length >= 10, '预填本身已经超过 10 字')
+  assert.equal(feedback.data.contentLen, 0)
+  assert.equal(feedback.data.canSubmit, false)
+  feedback.submit()
+  assert.equal(sent.length, 0)
+  assert.equal(toasts[0].title, '请写一下遇到的问题')
+
+  feedback.onContent({ detail: { value: `${prefill}缺纸` } })
+  assert.equal(feedback.data.canSubmit, false)
+  feedback.submit()
+  assert.equal(sent.length, 0)
+
+  feedback.onContent({ detail: { value: '打印机没有出纸请看一下' } })
+  assert.equal(feedback.data.canSubmit, true)
+
+  const own = '到机后没有出纸，屏幕停在取件'
+  assert.ok(own.length >= 10)
+  feedback.onContent({ detail: { value: prefill + own } })
+  assert.equal(feedback.data.contentLen, own.length)
+  assert.equal(feedback.data.canSubmit, true)
+  feedback.submit()
+  await flush()
+  assert.equal(sent.length, 1)
+  assert.equal(sent[0].content, prefill + own)
+  assert.equal(sent[0].category, 'print')
 })

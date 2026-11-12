@@ -7,6 +7,10 @@ const uploadNames = require('../../utils/upload-name')
 const conversion = require('./documents-helpers')
 const shareFriend = require('../../utils/share-friend')
 
+// 打印上传白名单收 doc/docx，但转换能力关掉时服务端按 FILE_MIME_NOT_ALLOWED 拒收
+// （file-validation.ts 在 print_doc + Word 且转换不可用时）。这句给用户一条能做的出路。
+const WORD_UPLOAD_UNAVAILABLE_COPY = '这类文件暂时传不了，可以先在电脑或手机上另存为 PDF 再传'
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -462,19 +466,69 @@ Page({
     })
   },
 
+  _stageUploadedWord(fileId, displayName) {
+    if (!fileId || this.data.all.some((entry) => entry.id === fileId && entry.isWord)) return
+    const item = {
+      id: fileId,
+      name: displayName,
+      filename: displayName,
+      isWord: true,
+      reprintable: true,
+      pages: 0,
+    }
+    const all = [item, ...this.data.all.filter((entry) => entry.id !== fileId)]
+    this.setData({ all })
+    this.applyFilter(this.data.activeFilter, all)
+  },
+
+  // 上传已经成功。Word 不能直接进打印，说明和「转成 PDF」与列表里点打印是同一条。
+  _promptUploadedWord(fileId, displayName) {
+    const open = () => {
+      this._stageUploadedWord(fileId, displayName)
+      this.convertDoc({ currentTarget: { dataset: { id: fileId } } })
+    }
+    if (!this.data.wordConversionAvailable) {
+      open()
+      return
+    }
+    wx.showModal({
+      title: '先转成 PDF',
+      content: 'Word 文件要先转成 PDF 才能打印',
+      confirmText: '转成 PDF',
+      cancelText: '取消',
+      success: (res) => { if (res.confirm) open() },
+    })
+  },
+
   _doUpload(filePath, displayName) {
+    const wordUpload = conversion.isWordDocument({ filename: displayName })
     this.setData({ uploading: true })
     wx.showLoading({ title: '正在上传…', mask: true })
     api.uploadPrintFile(filePath, displayName)
-      .then(() => {
+      .then((res) => {
         wx.hideLoading()
         this.setData({ uploading: false })
+        const fileId = res && typeof res.fileId === 'string' ? res.fileId : ''
+        if (wordUpload && fileId) {
+          this.loadDocuments()
+          this._promptUploadedWord(fileId, displayName)
+          return
+        }
         wx.showToast({ title: '文件已上传', icon: 'success' })
         this.loadDocuments()
       })
       .catch((err) => {
         wx.hideLoading()
         this.setData({ uploading: false })
+        if (wordUpload && err && err.code === 'FILE_MIME_NOT_ALLOWED') {
+          wx.showModal({
+            title: '暂时传不了',
+            content: WORD_UPLOAD_UNAVAILABLE_COPY,
+            showCancel: false,
+            confirmText: '知道了',
+          })
+          return
+        }
         wx.showModal({
           title: '上传失败',
           content: (err && err.message) || '网络异常，请稍后重试',

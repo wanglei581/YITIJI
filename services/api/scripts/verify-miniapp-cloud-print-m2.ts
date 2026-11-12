@@ -650,6 +650,55 @@ async function main(): Promise<void> {
     if (closedCancelled.pickupStatus !== 'cancelled') fail('closed pending 被拒后必须仍可取消')
     pass('closed pending 认领不改 claimed，仍可取消')
 
+    {
+      const viewPair = async (id: string) => {
+        const detail = await memberOrders.detail(userId, id)
+        const listed = (await memberOrders.listCloud(userId)).find((row) => row.id === id)
+        if (!listed) fail(`云订单 ${id} 不在列表里`)
+        return { detail, listed }
+      }
+      const assertPay = (
+        views: { detail: { payStatus: string; paymentSource: string | null; paidAt: string | null; amountCents: number }; listed: { payStatus: string; paymentSource: string | null; paidAt: string | null; amountCents: number } },
+        expected: { payStatus: string; paymentSource: string | null; paidAt: 'set' | null; amountCents?: number },
+        label: string,
+      ) => {
+        for (const view of [views.detail, views.listed]) {
+          assert.equal(view.payStatus, expected.payStatus, `${label} payStatus`)
+          assert.equal(view.paymentSource, expected.paymentSource, `${label} paymentSource`)
+          if (expected.paidAt === null) assert.equal(view.paidAt, null, `${label} paidAt`)
+          else {
+            assert.equal(typeof view.paidAt, 'string', `${label} paidAt`)
+            assert.equal(Number.isNaN(Date.parse(view.paidAt ?? '')), false, `${label} paidAt 不是时间`)
+          }
+          if (expected.amountCents !== undefined) assert.equal(view.amountCents, expected.amountCents, `${label} amountCents`)
+        }
+        assert.equal(views.detail.paymentSource, views.listed.paymentSource, `${label} 列表与详情 paymentSource 不一致`)
+        assert.equal(views.detail.paidAt, views.listed.paidAt, `${label} 列表与详情 paidAt 不一致`)
+      }
+      const draft = { fileId, terminalId, copies: 1 as const, colorMode: 'black_white' as const, duplex: 'simplex' as const }
+      const unpaid = await memberOrders.create(userId, draft, randomUUID())
+      assertPay(await viewPair(unpaid.id), { payStatus: 'unpaid', paymentSource: null, paidAt: null }, '未付款')
+
+      await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: 0 } })
+      try {
+        const free = await memberOrders.create(userId, draft, randomUUID())
+        assertPay(await viewPair(free.id), { payStatus: 'paid', paymentSource: 'free', paidAt: 'set', amountCents: 0 }, '免费已入账')
+        await memberOrders.cancel(userId, free.id, { reason: 'view probe free' })
+      } finally {
+        await seedDevDefaultPriceConfig(prisma)
+      }
+
+      const closed = await memberOrders.create(userId, draft, randomUUID())
+      await prisma.order.update({
+        where: { id: closed.id },
+        data: { payStatus: 'closed', paidAt: null, paymentSource: null },
+      })
+      assertPay(await viewPair(closed.id), { payStatus: 'closed', paymentSource: null, paidAt: null }, '关单未收款')
+      await memberOrders.cancel(userId, closed.id, { reason: 'view probe closed' })
+      await memberOrders.cancel(userId, unpaid.id, { reason: 'view probe unpaid' })
+      pass('云订单列表与详情：免费已入账、未付款、关单未收款都带回 paymentSource 与 paidAt')
+    }
+
     // ── 预言机合并 ────────────────────────────────────────────────────────
     // 「码有效但不在这台机器」与「码根本不存在」必须**完全无法区分**。
     // 判据刻意不是「有没有抛错」（两者本来就都抛），而是逐字段比对真实响应：

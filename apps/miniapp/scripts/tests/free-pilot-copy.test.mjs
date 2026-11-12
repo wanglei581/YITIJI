@@ -258,17 +258,21 @@ test('判据自检：guard 真分支放行，假分支、正文、换了条件�
   assert.equal(insidePaidBranch(e4, e4.indexOf("'—'"), g), false)
 })
 
-test('打印参数页：没选文件时底栏只剩「请先选择文件」按钮', () => {
+test('打印参数页：执行完整底栏按钮表达式，没文件、普通文件、Word 各是对应的字', () => {
   const src = read('pages/print-upload/print-upload.wxml')
   const bar = src.slice(src.indexOf('<view class="actionbar">'))
   const label = bar.match(/class="ab-label">\{\{([\s\S]*?)\}\}</)[1]
   const dashIf = bar.match(/wx:(?:if|elif)="\{\{([^}]*)\}\}" class="ab-amt pending"/)[1]
+  const button = bar.match(/bindtap="toStore">\{\{([\s\S]*?)\}\}<\/view>/)
+  assert.ok(button, '底栏按钮文字必须是一整段可执行表达式')
   const run = (expr, data) => new Function(...Object.keys(data), `return (${expr})`)(...Object.values(data))
   const idle = { priceStatus: 'idle', amountCents: null, hasFile: false }
   assert.equal(run(label, idle), '')
   assert.equal(Boolean(run(dashIf, idle)), false)
-  // Word 文件走「回到我的文档」，没有文件时仍是「请先选择文件」（包在 wordFile 分支后面）。
-  assert.match(bar, /!hasFile \? '请先选择文件'/)
+  const text = (data) => run(button[1], data)
+  assert.equal(text({ wordFile: false, hasFile: false, privacyStatus: 'idle', priceStatus: 'idle' }), '请先选择文件')
+  assert.equal(text({ wordFile: false, hasFile: true, privacyStatus: 'ready', priceStatus: 'ready' }), '选终端和参数')
+  assert.equal(text({ wordFile: true, hasFile: true, privacyStatus: 'ready', priceStatus: 'ready' }), '回到我的文档')
 })
 
 test('材料包状态：0 元订单各状态都不提付款，大于 0 的原样说付款', () => {

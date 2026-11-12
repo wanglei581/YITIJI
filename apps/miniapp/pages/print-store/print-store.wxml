@@ -80,7 +80,7 @@
   </block>
 
   <view class="section-t rise-d4">订单摘要</view>
-  <view class="card flat card-inner summary rise-d4">
+  <view class="card flat summary rise-d4">
     <view class="summary-row"><text>文件</text><text>{{fileName || '未提供文件'}}</text></view>
     <view class="summary-row"><text>参数</text><text>{{colorLabel}} · A4 · {{duplexLabel}} · ×{{copies}}份</text></view>
     <view class="summary-row total">

@@ -53,6 +53,14 @@ function readOrderNo(options) {
   return orderNo.trim().slice(0, 64)
 }
 
+// 订单号预填只是定位这张单，不算用户写的问题。整段被改掉之后，按用户实际写下的算。
+function writtenProblem(content, prefill) {
+  const text = String(content || '')
+  const prefix = String(prefill || '')
+  const own = prefix && text.startsWith(prefix) ? text.slice(prefix.length) : text
+  return own.trim()
+}
+
 function toView(item) {
   const st = item.status
   return Object.assign({
@@ -78,6 +86,7 @@ Page({
     category: 'general',
     title: '',
     content: '',
+    contentPrefill: '',
     contentLen: 0,
     contactPhone: '',
     aiReplyDays: AI_COMPLAINT_REPLY_DAYS,
@@ -102,14 +111,17 @@ Page({
         }
       : null
     const content = fromOrder ? fromOrder.content : this.data.content
+    const contentPrefill = fromOrder ? fromOrder.content : ''
+    const contentLen = writtenProblem(content, contentPrefill).length
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
       aiReplyDays: AI_COMPLAINT_REPLY_DAYS,
       category: (fromOrder && fromOrder.category) || preset || this.data.category,
       title: fromOrder ? fromOrder.title : this.data.title,
       content,
-      contentLen: content.length,
-      canSubmit: content.trim().length >= 10,
+      contentPrefill,
+      contentLen,
+      canSubmit: contentLen >= 10,
     })
   },
 
@@ -152,7 +164,8 @@ Page({
 
   onContent(e) {
     const content = String(e.detail.value || '').slice(0, 500)
-    this.setData({ content, contentLen: content.length, canSubmit: content.trim().length >= 10 })
+    const contentLen = writtenProblem(content, this.data.contentPrefill).length
+    this.setData({ content, contentLen, canSubmit: contentLen >= 10 })
   },
 
   onPhone(e) { this.setData({ contactPhone: e.detail.value || '' }) },
@@ -160,8 +173,9 @@ Page({
   submit() {
     if (this.data.submitting) return
     const content = this.data.content.trim()
-    if (content.length < 10 || content.length > 500) {
-      wx.showToast({ title: content.length < 10 ? '请至少填写 10 个字' : '内容不能超过 500 字', icon: 'none' })
+    const own = writtenProblem(this.data.content, this.data.contentPrefill)
+    if (own.length < 10 || content.length > 500) {
+      wx.showToast({ title: own.length < 10 ? '请写一下遇到的问题' : '内容不能超过 500 字', icon: 'none' })
       return
     }
     const phone = this.data.contactPhone.trim()
@@ -176,7 +190,7 @@ Page({
     this.setData({ submitting: true })
     api.createFeedback(body)
       .then(() => {
-        this.setData({ submitting: false, title: '', content: '', contentLen: 0, contactPhone: '', canSubmit: false })
+        this.setData({ submitting: false, title: '', content: '', contentPrefill: '', contentLen: 0, contactPhone: '', canSubmit: false })
         wx.showToast({ title: '反馈已送出', icon: 'success' })
         this.loadList()
       })
