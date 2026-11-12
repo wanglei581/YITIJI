@@ -20,7 +20,12 @@ import {
 } from '../../services/api/devices'
 import { CreatePlannedTerminalDialog } from './CreatePlannedTerminalDialog'
 import { TerminalBindCodeDialog } from './TerminalBindCodeDialog'
-import { applyHomeFreeBadgePatch, forgetMatchedHomeFreeBadgePatch } from './homeFreeBadgePatch'
+import {
+  applyHomeFreeBadgePatch,
+  dropHomeFreeBadgePatchAfterList,
+  nextHomeFreeBadgeClock,
+  type HomeFreeBadgePatchEntry,
+} from './homeFreeBadgePatch'
 import { TerminalDetailDrawer } from './TerminalDetailDrawer'
 import { ReleaseObservationPanel } from './ReleaseObservationPanel'
 import { lifecycleView } from './terminalStatusViews'
@@ -63,13 +68,19 @@ export default function TerminalsPage() {
     credentialGeneration?: number
     hasActiveCredential?: boolean
   }>>({})
-  const [homeFreeBadgePatch, setHomeFreeBadgePatch] = useState<Record<string, boolean>>({})
+  const [homeFreeBadgePatch, setHomeFreeBadgePatch] = useState<Record<string, HomeFreeBadgePatchEntry>>({})
 
-  const { data: terminalData, status, refresh } = useRefreshable(TERMINALS_REFRESH_KEY, getTerminals, {
+  const { data: terminalData, status, refresh } = useRefreshable(TERMINALS_REFRESH_KEY, async () => {
+    // 序号在请求发出时拿走。保存成功若晚于这一下，回来的仍是旧列表，不能拿它冲掉补丁。
+    const listIssuedAt = nextHomeFreeBadgeClock()
+    const result = await getTerminals()
+    return { terminals: result.terminals, listIssuedAt }
+  }, {
     intervalMs: 30_000,
     merge: (current, incoming) => {
       const terminals = mergeById<AdminTerminalRecord>((item) => item.id)(current?.terminals, incoming.terminals)
-      return current && terminals === current.terminals ? current : { terminals }
+      if (current && terminals === current.terminals && current.listIssuedAt === incoming.listIssuedAt) return current
+      return { terminals, listIssuedAt: incoming.listIssuedAt }
     },
     failPolicy: 'keep-last',
   })
@@ -79,6 +90,10 @@ export default function TerminalsPage() {
     [TERMINALS_REFRESH_KEY],
     'hard',
   )
+
+  const effectiveHomeFreeBadgePatch = terminalData
+    ? dropHomeFreeBadgePatchAfterList(homeFreeBadgePatch, terminalData.terminals, terminalData.listIssuedAt)
+    : homeFreeBadgePatch
 
   const terminals = useMemo(
     () => applyHomeFreeBadgePatch((terminalData?.terminals ?? []).map((terminal) => {
@@ -94,8 +109,8 @@ export default function TerminalsPage() {
           ...(lifecyclePatch.hasActiveCredential === undefined ? {} : { hasActiveCredential: lifecyclePatch.hasActiveCredential }),
         } : {}),
       }
-    }), homeFreeBadgePatch),
-    [homeFreeBadgePatch, localLifecyclePatch, localOrgPatch, localProfilePatch, terminalData?.terminals],
+    }), effectiveHomeFreeBadgePatch),
+    [effectiveHomeFreeBadgePatch, localLifecyclePatch, localOrgPatch, localProfilePatch, terminalData?.terminals],
   )
   const selected = terminals.find((terminal) => terminal.id === selectedId) ?? null
   const loading = status === 'loading' && terminals.length === 0
@@ -122,12 +137,12 @@ export default function TerminalsPage() {
   }, [terminalData])
 
   useEffect(() => {
-    if (!terminalData) return
-    setHomeFreeBadgePatch((current) => forgetMatchedHomeFreeBadgePatch(current, terminalData.terminals))
-  }, [terminalData])
+    if (effectiveHomeFreeBadgePatch !== homeFreeBadgePatch) setHomeFreeBadgePatch(effectiveHomeFreeBadgePatch)
+  }, [effectiveHomeFreeBadgePatch, homeFreeBadgePatch])
 
   function handleHomeFreeBadgeSaved(terminalId: string, enabled: boolean) {
-    setHomeFreeBadgePatch((current) => ({ ...current, [terminalId]: enabled }))
+    const savedAt = nextHomeFreeBadgeClock()
+    setHomeFreeBadgePatch((current) => ({ ...current, [terminalId]: { enabled, savedAt } }))
   }
 
   function openBindCodeModal(terminal: AdminTerminalRecord) {
@@ -270,7 +285,7 @@ export default function TerminalsPage() {
       <p className="mt-3 text-xs text-neutral-500">终端在线状态、链路诊断、打印机状态、扫描输入、版本、IP、磁盘均来自终端程序（Terminal Agent）的定时上报；链路诊断不展示 WiFi 名称、密码、网关或打印机地址{API_MODE !== 'http' && '（当前为 mock 演示数据，归属变更不写数据库）'}</p>
       <p className="mt-1 text-xs text-neutral-500">「扫描输入」锁死后只能到现场重启终端程序恢复，后台不提供远程解除；显示「未上报」表示这台终端还没报这一组字段，不等于正常。</p>
       <p className="mt-1 text-xs text-neutral-500">「所属机构」决定该终端归属；学校账号在合作机构后台只能配置归属本校的智慧校园开关。绑定/解绑仅管理员可操作，变更写入审计日志。</p>
-      <TerminalDetailDrawer terminal={selected} organizations={orgOptions} orgLoadError={orgLoadError} orgLicenseError={orgLicenseError} notice={notice} editingOrg={selected ? editingId === selected.id : false} editOrgValue={editValue} savingOrg={saving} profileEditing={selected ? profileEditingId === selected.id : false} profileDraft={profileDraft} profileSaving={profileSaving} statusSaving={selected ? statusSavingId === selected.id : false} lifecycleSaving={selected ? lifecycleSavingId === selected.id : false} onClose={closeDetail} onOpenBindCode={openBindCodeModal} onStartProfileEdit={startProfileEdit} onCancelProfileEdit={cancelProfileEdit} onSaveProfile={(terminal) => void saveProfile(terminal)} onProfileDraftChange={(patch) => setProfileDraft((current) => ({ ...current, ...patch }))} onStartOrgEdit={startOrgEdit} onCancelOrgEdit={cancelOrgEdit} onSaveOrg={(terminal) => void saveOrg(terminal)} onOrgChange={(value) => { setEditValue(value); setOrgLicenseError(null) }} onToggleStatus={(terminal) => void toggleStatus(terminal)} onLifecycleBusy={(busy) => setLifecycleSavingId(busy && selected ? selected.id : null)} onLifecycleUpdated={(result) => { if (selected) handleLifecycleUpdated(selected, result) }} onLifecycleConflict={() => { void refresh().catch(() => undefined) }} onNotice={setNotice} onHomeFreeBadgeSaved={handleHomeFreeBadgeSaved} />
+      <TerminalDetailDrawer terminal={selected} organizations={orgOptions} orgLoadError={orgLoadError} orgLicenseError={orgLicenseError} notice={notice} editingOrg={selected ? editingId === selected.id : false} editOrgValue={editValue} savingOrg={saving} profileEditing={selected ? profileEditingId === selected.id : false} profileDraft={profileDraft} profileSaving={profileSaving} statusSaving={selected ? statusSavingId === selected.id : false} lifecycleSaving={selected ? lifecycleSavingId === selected.id : false} onClose={closeDetail} onOpenBindCode={openBindCodeModal} onStartProfileEdit={startProfileEdit} onCancelProfileEdit={cancelProfileEdit} onSaveProfile={(terminal) => void saveProfile(terminal)} onProfileDraftChange={(patch) => setProfileDraft((current) => ({ ...current, ...patch }))} onStartOrgEdit={startOrgEdit} onCancelOrgEdit={cancelOrgEdit} onSaveOrg={(terminal) => void saveOrg(terminal)} onOrgChange={(value) => { setEditValue(value); setOrgLicenseError(null) }} onToggleStatus={(terminal) => void toggleStatus(terminal)} onLifecycleBusy={(busy) => setLifecycleSavingId(busy && selected ? selected.id : null)} onLifecycleUpdated={(result) => { if (selected) handleLifecycleUpdated(selected, result) }} onLifecycleConflict={() => { void refresh().catch(() => undefined) }} onNotice={setNotice} serverListIssuedAt={terminalData?.listIssuedAt ?? 0} onHomeFreeBadgeSaved={handleHomeFreeBadgeSaved} />
       {bindCodeTerminal && <TerminalBindCodeDialog terminal={bindCodeTerminal} onClose={() => setBindCodeTerminal(null)} onNotice={setNotice} />}
       {creatingPlannedTerminal && <CreatePlannedTerminalDialog organizations={orgOptions} onClose={() => setCreatingPlannedTerminal(false)} onCreated={(code) => { setCreatingPlannedTerminal(false); setNotice({ type: 'success', text: `已预创建设备 ${code}；请在设备列表中生成一次性绑定码完成安装。` }); void refresh() }} onError={(message) => setNotice({ type: 'error', text: message })} />}
     </>

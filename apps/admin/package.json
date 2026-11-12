@@ -27,6 +27,7 @@
     "verify:admin-offline-agencies-ui": "node scripts/verify-admin-offline-agencies-ui.mjs",
     "verify:toolbox-review-ui": "node scripts/verify-toolbox-review-ui.mjs",
     "verify:admin-terminal-bind-code-ui": "node scripts/verify-admin-terminal-bind-code-ui.mjs",
+    "verify:admin-home-free-badge-ui": "node --test scripts/tests/home-free-badge-section.test.mjs",
     "verify:admin-billing-ui": "node scripts/verify-admin-billing-ui.mjs",
     "verify:admin-account-settings-ui": "node scripts/verify-admin-account-settings-ui.mjs",
     "verify:admin-login-second-factor": "node scripts/verify-admin-login-second-factor.mjs",

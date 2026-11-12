@@ -2,18 +2,21 @@
 //
 // 价目在这里单独读（fetchPrintPriceConfig），不改 usePrintPriceConfig：
 // 打印页等调用方仍只在挂载时读一次。
-// 配置和价目按同一个 REFRESH_MS 一起重读。任一次失败都丢掉上一轮，
-// 不能沿用上一次的 0 元，否则收费之后首页仍会算出该显示。
+// 新一轮先不显示。价目或配置只要有一边已经能判定不该显示，立刻发布不显示；
+// 只有这一轮两边都回来、并且都满足，才发布显示。30 秒没回齐按失败，
+// 之后才到的成功也不再显示。终端号变了立刻不显示并重读；不是当前终端的结果丢掉。
 
+import type { PrintPriceConfigView } from '@ai-job-print/shared'
+import { subscribeTerminalIdentity } from '../services/api/screensaver'
 import {
   getCachedKioskTerminalConfig,
   getTerminalId,
   peekCachedKioskTerminalConfig,
 } from '../services/api/terminalConfig'
 import { fetchPrintPriceConfig, unitCentsFor, type PriceConfigState } from '../services/print/priceConfigApi'
-import type { PrintPriceConfigView } from '@ai-job-print/shared'
 
 export const REFRESH_MS = 5 * 60 * 1000
+export const HOME_FREE_BADGE_ROUND_TIMEOUT_MS = 30 * 1000
 
 export interface KioskHomeFreeBadgeInput {
   config: unknown
@@ -35,21 +38,23 @@ export interface KioskHomeFreeBadgePollingOverrides {
   peekConfig?: (terminalId: string, maxAgeMs: number) => unknown
   loadConfig?: (terminalId: string) => Promise<unknown>
   loadPrice?: () => Promise<PrintPriceConfigView>
+  subscribeIdentity?: (listener: () => void) => () => void
 }
 
-interface Snapshot {
-  config: unknown
-  priceStatus: PriceConfigState['status']
-  priceConfig: PrintPriceConfigView | null
+function configAllows(config: unknown): boolean {
+  return typeof config === 'object' && config !== null && (config as { homeFreeBadge?: unknown }).homeFreeBadge === true
 }
 
-function visibleOf(snapshot: Snapshot): boolean {
-  return kioskHomeFreeBadgeVisible({
-    config: snapshot.config,
-    priceStatus: snapshot.priceStatus,
-    bwCents: unitCentsFor(snapshot.priceConfig, 'black_white'),
-    colorCents: unitCentsFor(snapshot.priceConfig, 'color'),
-  })
+function priceAllows(priceConfig: PrintPriceConfigView): boolean {
+  return unitCentsFor(priceConfig, 'black_white') === 0 && unitCentsFor(priceConfig, 'color') === 0
+}
+
+function settle<T>(load: () => Promise<T> | T): Promise<T> {
+  try {
+    return Promise.resolve(load())
+  } catch (error) {
+    return Promise.reject(error)
+  }
 }
 
 /**
@@ -64,54 +69,118 @@ export function startKioskHomeFreeBadgePolling(
   const peek = overrides.peekConfig ?? peekCachedKioskTerminalConfig
   const loadConfig = overrides.loadConfig ?? ((terminalId: string) => getCachedKioskTerminalConfig(terminalId))
   const loadPrice = overrides.loadPrice ?? fetchPrintPriceConfig
+  const subscribeIdentity = overrides.subscribeIdentity ?? subscribeTerminalIdentity
+  // 缓存配置不能拿来维持「免费」。签名留着，是为了调用方仍可注入，但这里不读它。
+  void peek
 
   let stopped = false
   let round = 0
-  const initialId = getId()
-  let snapshot: Snapshot = {
-    config: initialId ? peek(initialId, REFRESH_MS) : null,
-    priceStatus: 'loading',
-    priceConfig: null,
+  let watchedId = getId()
+  let roundTimer: ReturnType<typeof setTimeout> | null = null
+
+  const publish = (visible: boolean) => {
+    if (stopped) return
+    onVisible(visible)
   }
 
-  const publish = () => {
-    onVisible(visibleOf(snapshot))
+  const clearRoundTimer = () => {
+    if (roundTimer !== null) {
+      clearTimeout(roundTimer)
+      roundTimer = null
+    }
   }
 
   const load = () => {
+    if (stopped) return
     const ticket = ++round
+    clearRoundTimer()
     const terminalId = getId()
-    if (!terminalId) {
-      snapshot = { config: null, priceStatus: 'error', priceConfig: null }
-      publish()
-      return
-    }
-    const configTask = Promise.resolve()
-      .then(() => loadConfig(terminalId))
-      .then((config) => ({ ok: true as const, config }))
-      .catch(() => ({ ok: false as const }))
-    const priceTask = Promise.resolve()
-      .then(() => loadPrice())
-      .then((priceConfig) => ({ ok: true as const, priceConfig }))
-      .catch(() => ({ ok: false as const }))
-    void Promise.all([configTask, priceTask]).then(([configResult, priceResult]) => {
-      if (stopped || ticket !== round) return
-      // 失败写成读不到，不用上一轮的配置或 0 元价目。
-      snapshot = {
-        config: configResult.ok ? configResult.config : null,
-        priceStatus: priceResult.ok ? 'ready' : 'error',
-        priceConfig: priceResult.ok ? priceResult.priceConfig : null,
+    watchedId = terminalId
+    // 新一轮还没回齐，不能沿用上一轮的「显示」。
+    publish(false)
+    if (!terminalId) return
+
+    const still = () => !stopped && ticket === round && getId() === terminalId
+    let configReady = false
+    let priceReady = false
+    let configOn = false
+    let priceFree = false
+    let failed = false
+
+    const publishShowIfBoth = () => {
+      if (!still() || failed) return
+      if (configReady && priceReady && configOn && priceFree) {
+        clearRoundTimer()
+        publish(true)
       }
-      publish()
-    })
+    }
+
+    roundTimer = setTimeout(() => {
+      if (!still() || (configReady && priceReady)) return
+      failed = true
+      publish(false)
+    }, HOME_FREE_BADGE_ROUND_TIMEOUT_MS)
+
+    // 这一轮一开始就发出请求。同步抛错也进同一条失败路径，不让收费机器多显示一会儿。
+    void settle(() => loadConfig(terminalId))
+      .then((config) => {
+        if (!still() || failed) return
+        configReady = true
+        configOn = configAllows(config)
+        if (!configOn) {
+          failed = true
+          clearRoundTimer()
+          publish(false)
+          return
+        }
+        publishShowIfBoth()
+      })
+      .catch(() => {
+        if (!still()) return
+        failed = true
+        configReady = true
+        clearRoundTimer()
+        publish(false)
+      })
+
+    void settle(loadPrice)
+      .then((priceConfig) => {
+        if (!still() || failed) return
+        priceReady = true
+        priceFree = priceAllows(priceConfig)
+        if (!priceFree) {
+          failed = true
+          clearRoundTimer()
+          publish(false)
+          return
+        }
+        publishShowIfBoth()
+      })
+      .catch(() => {
+        if (!still()) return
+        failed = true
+        priceReady = true
+        clearRoundTimer()
+        publish(false)
+      })
   }
 
-  publish()
+  const unsubscribe = subscribeIdentity(() => {
+    if (stopped) return
+    const next = getId()
+    if (next === watchedId) return
+    watchedId = next
+    publish(false)
+    load()
+  })
+
   load()
   const timer = setInterval(load, REFRESH_MS)
   return () => {
     stopped = true
     round += 1
+    clearRoundTimer()
     clearInterval(timer)
+    unsubscribe()
   }
 }

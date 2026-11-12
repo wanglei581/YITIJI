@@ -167,6 +167,8 @@ jobs:
           node --test apps/kiosk/scripts/tests/assistant-policy-context.test.mjs
           # 首页「免费使用」是否该显示：开关、价目读失败、单价不是 0，都要判成不显示。
           node --test apps/kiosk/scripts/tests/home-free-badge.test.mjs
+          # 后台同一开关：换终端不卡住保存中，保存之后取回的列表以服务器为准。
+          pnpm --filter @ai-job-print/admin verify:admin-home-free-badge-ui
           pnpm --filter @ai-job-print/kiosk verify:ai-down-fallbacks
           # ── 2026-08-16 门禁全量体检补回：以下门禁此前写在 package.json 里
           #    但没有任何 CI job 执行它们。全部只读取仓库源码/文档文本，

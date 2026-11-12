@@ -1,49 +1,68 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { saveTerminalHomeFreeBadge } from '../../services/api/homeFreeBadge'
 
 export function TerminalHomeFreeBadgeSection({
   terminalId,
   enabled,
+  listIssuedAt = 0,
   onSaved,
 }: {
   terminalId: string
   enabled: boolean
-  onSaved: (enabled: boolean) => void
+  /** 这份终端列表是何时发出的。序号变了，开关改跟这一份（已按空值当关归一）。 */
+  listIssuedAt?: number
+  onSaved: (terminalId: string, enabled: boolean) => void
 }) {
   const [on, setOn] = useState(enabled)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [seenTerminalId, setSeenTerminalId] = useState(terminalId)
+  const [seenListIssuedAt, setSeenListIssuedAt] = useState(listIssuedAt)
+  const requestSeq = useRef(0)
   const terminalIdRef = useRef(terminalId)
   terminalIdRef.current = terminalId
 
-  useEffect(() => {
-    setOn(enabled)
-  }, [terminalId, enabled])
-
-  useEffect(() => {
+  // 换终端时整组回到这台的初始状态，并作废还在飞的请求号。
+  // 只比终端号认不出「回到刚才那台」：旧请求的成功不能改现在屏幕上的开关。
+  if (seenTerminalId !== terminalId) {
+    setSeenTerminalId(terminalId)
+    setSaving(false)
     setError(null)
     setNotice(null)
-  }, [terminalId])
+    setOn(enabled)
+    requestSeq.current += 1
+  }
+
+  // 列表请求序号变了，说明父级已经换上新的一份。开关跟这份，不跟更早的补丁。
+  if (seenListIssuedAt !== listIssuedAt) {
+    setSeenListIssuedAt(listIssuedAt)
+    setOn(enabled)
+    if (enabled !== on) {
+      setNotice(null)
+      setError(null)
+    }
+  }
 
   const onToggle = async () => {
     const requestTerminalId = terminalId
+    const requestId = ++requestSeq.current
     const next = !on
     setSaving(true)
     setError(null)
     setNotice(null)
     try {
       const saved = await saveTerminalHomeFreeBadge(requestTerminalId, next)
-      // 先写回列表，再决定要不要改当前这台的开关。换了终端也不能把结果写到新的那台上。
-      onSaved(saved.enabled)
-      if (terminalIdRef.current !== requestTerminalId) return
+      // 先写回那台自己的列表补丁。当前屏幕只接受「还是这台，且仍是最新一次」的结果。
+      onSaved(requestTerminalId, saved.enabled)
+      if (terminalIdRef.current !== requestTerminalId || requestId !== requestSeq.current) return
       setOn(saved.enabled)
       setNotice('已保存，并记入审计。')
     } catch (reason) {
-      if (terminalIdRef.current !== requestTerminalId) return
-      setError((reason as Error).message)
+      if (terminalIdRef.current !== requestTerminalId || requestId !== requestSeq.current) return
+      setError(reason instanceof Error ? reason.message : '首页「免费使用」开关保存失败')
     } finally {
-      if (terminalIdRef.current === requestTerminalId) setSaving(false)
+      if (terminalIdRef.current === requestTerminalId && requestId === requestSeq.current) setSaving(false)
     }
   }
 
