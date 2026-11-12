@@ -31,6 +31,10 @@ export interface PackageOrderView {
   payStatus: OrderPayStatus
   taskStatus: string
   amountCents: number
-  paymentSessionToken: string
+  /**
+   * 到机器前付款用的会话令牌。有机器号时签发。
+   * 没有机器号时省略，不是必有字段。
+   */
+  paymentSessionToken?: string
   items: PackageOrderItem[]
 }
