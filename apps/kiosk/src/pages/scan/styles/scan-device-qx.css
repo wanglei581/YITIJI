@@ -1,5 +1,16 @@
 /* 屏上扫描：怎么扫、放纸、未开通。颜色只用 --qxt-* / --qx-*。版式照触屏补稿的大卡。 */
 
+/* 11/08 产品负责人定第 9 条（稿 cs-scan-unknown，r24–r27）：屏上扫描各屏「状态未知」胶囊用提醒色（橙），
+   和复印（copy.css 里 .copy-touch 那两行）同一做法。只认屏上扫描这几屏：面板扫描几屏、打印扫描各工具屏
+   也挂 scan-touch，不跟着变；共用令牌不动。 */
+.qxt-screen.scan-touch:has(.sw-page:is([data-w2-page='scan-how'], [data-w2-page='scan-set'], [data-w2-page='scan-off'], [data-w2-page='scan-run'], [data-w2-page='scan-more'], [data-w2-page='scan-make'], [data-w2-page='scan-done'], [data-w2-page='scan-unknown'])) .qxt-status-unknown {
+  background: var(--qxt-warn-bg);
+}
+.qxt-screen.scan-touch:has(.sw-page:is([data-w2-page='scan-how'], [data-w2-page='scan-set'], [data-w2-page='scan-off'], [data-w2-page='scan-run'], [data-w2-page='scan-more'], [data-w2-page='scan-make'], [data-w2-page='scan-done'], [data-w2-page='scan-unknown'])) .qxt-status-unknown .qxt-dot {
+  background: var(--qxt-warn-dot);
+  box-shadow: 0 0 0 4px var(--qxt-warn-ring);
+}
+
 [data-qx-page='scan-workbench'] .cs-stack,
 [data-qx-page='scan-workbench'] .cs-set {
   display: flex;

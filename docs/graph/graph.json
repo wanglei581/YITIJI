@@ -14785,7 +14785,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 817,
+      "reachableFileCount": 819,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -17866,7 +17866,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1006
+      "sourceFileCount": 1008
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -29432,6 +29432,7 @@
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-copy-c1a.ts",
       "services/api/scripts/verify-derivation-kind.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
@@ -29471,6 +29472,7 @@
     ],
     "services/api/src/member-print-orders/package-order.service.ts": [
       "services/api/scripts/verify-copy-c1a.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
@@ -30137,7 +30139,9 @@
     "services/api/src/print-jobs/free-print-quota.policy.ts": [
       "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-copy-quota.ts",
-      "services/api/scripts/verify-free-print-quota.ts"
+      "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
+      "services/api/scripts/verify-package-order-fulfillment.ts"
     ],
     "services/api/src/print-jobs/free-print-quota.service.ts": [
       "services/api/scripts/verify-free-print-quota.ts"
@@ -30145,6 +30149,7 @@
     "services/api/src/print-jobs/free-print-quota.usage.ts": [
       "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-print-queue-timeout.ts"
     ],
@@ -42357,6 +42362,8 @@
           "services/api/src/common/pickup-code.ts",
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/files/signing.ts",
+          "services/api/src/member-print-orders/member-print-order-create.service.ts",
+          "services/api/src/member-print-orders/package-order.service.ts",
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts",
@@ -44559,6 +44566,7 @@
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts",
           "services/api/src/print-jobs/dto/claim-pickup.dto.ts",
+          "services/api/src/print-jobs/free-print-quota.policy.ts",
           "services/api/src/print-jobs/pickup-claim-lockout.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.controller.ts",
@@ -44988,6 +44996,8 @@
           "services/api/src/payment/payment-session-token.ts",
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts",
+          "services/api/src/print-jobs/free-print-quota.policy.ts",
+          "services/api/src/print-jobs/free-print-quota.usage.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-page-count.service.ts",
           "services/api/src/prisma/prisma.service.ts",

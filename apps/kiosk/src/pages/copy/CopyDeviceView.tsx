@@ -10,6 +10,7 @@ import { CopyCheckView } from './CopyCheckView'
 import { CopyPrintView } from './CopyPrintView'
 import { CopyErrorView } from './CopyErrorView'
 import { CopyQuotaView } from './CopyQuotaView'
+import { CopyStoppedView } from './CopyStoppedView'
 import '../scan/styles/scan-device-flow.css'
 import './copy-device.css'
 
@@ -31,16 +32,18 @@ export function CopyDeviceView({ session, onBack, onRescan, printerReady, online
   if (state.phase === 'quota') return <CopyQuotaView errorCode={state.errorCode} limit={state.quotaLimit} />
   if (state.phase === 'error' || state.phase === 'off') return <CopyErrorView errorCode={state.errorCode}
     printing={session.state === 'confirmed'} busy={state.busy} onRetry={onRescan} />
+  // 两边都确认停下、本机也删了扫描页才进这一屏（copyDeviceFlow.stop）；版式照稿单独成文件。
+  if (state.phase === 'stopped') return <CopyStoppedView />
   const stop = () => {
     if (!armed) { setArmed(true); return }
     setArmed(false)
     void device?.stop()
   }
   const check = state.phase === 'check'
-  const terminal = state.phase === 'stopped' || state.phase === 'unknown'
+  const terminal = state.phase === 'unknown'
   const more = state.phase === 'more'
   const title = check ? '核对一下，再开始打印' : state.phase === 'unknown' ? '状态未知'
-    : state.phase === 'stopped' ? '已停止复印' : more ? '这一页扫好了，还有下一页吗？' : '正在扫原件'
+    : more ? '这一页扫好了，还有下一页吗？' : '正在扫原件'
   const stopping = <ScanDeviceStopButton label="停止复印" armed={armed} busy={state.busy} onPress={stop} />
   return <CopyShell stage={check ? 'check' : 'scan'} title={title} reason={null}
     statusTone={state.phase === 'unknown' ? 'unknown' : state.phase === 'starting' ? 'warn' : 'ok'}
@@ -48,7 +51,7 @@ export function CopyDeviceView({ session, onBack, onRescan, printerReady, online
     subtitle={terminal || check || more ? undefined : state.phase === 'finishing' ? '扫完后准备给你核对' : state.started ? '先别动原件，扫描仪正在工作。' : '还在等扫描仪回报已经开始。先别动原件。'}
     onBack={onBack} hideBack={!terminal && !check}
     left={check ? <button type="button" className="qxt-btn qxt-btn-sec" disabled={state.busy} onClick={() => { void onRescan() }}>重扫</button> : undefined}
-    secondary={!check && state.phase !== 'stopped' ? stopping : undefined}
+    secondary={!check ? stopping : undefined}
     primary={check ? { label: !online ? '网络已断开' : printerReady ? '开始打印' : '打印机离线', testId: 'copy-confirm',
       disabled: !device || state.busy || !previewReady || !printerReady || !online || !canConfirmCopy(state.job), onClick: () => { void device?.confirm() } }
       : more ? { label: '扫完了', disabled: state.busy, onClick: () => { void device?.command('finish') } } : undefined}>
@@ -61,7 +64,5 @@ export function CopyDeviceView({ session, onBack, onRescan, printerReady, online
             pages={state.pages} scannerStarted={state.started} armed={armed} preparing={state.phase === 'finishing'} /></div> : null}
     {armed && (more || terminal) ? <p className="cc-note">再按一次才会停止，已扫的页会从这台机器删除。</p> : null}
     {state.notice ? <p role="status" className="cc-note">{state.notice}</p> : null}
-    {/* 停下后原件还留在机器上。不画倒计时：复印取消回包不带静默期。 */}
-    {state.phase === 'stopped' ? <p className="cc-result-help">原件还在玻璃上或进纸器里，请带走</p> : null}
   </CopyShell>
 }
