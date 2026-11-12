@@ -402,17 +402,19 @@ export function PrintPickupClaimPage() {
       railNow={screen === 'success' ? 1 : 0}
       railLabels={claimedByOrder ? PICKUP_HERE_RAIL : PICKUP_RAIL}
       back={screen === 'success'
-        ? { label: '重新输入', onBack: handleReset }
+        ? { label: claimedByOrder ? '返回取件' : '重新输入', onBack: handleReset }
         : { label: '返回', onBack: () => navigate('/print-scan') }}
       title={successCopy?.title ?? (screen === 'legacy' ? '输入历史码' : '输入你的到机码')}
       subtitle={subtitle}
       // 胶囊只标页面用途，不表示任何设备状态，所以 tone 保持 unknown。
-      status={{ tone: 'unknown', label: '到机码验证' }}
+      status={{ tone: 'unknown', label: claimedByOrder ? '本机领取' : '到机码验证' }}
       terminalLabel="就业服务大厅"
-      ask={printAsk(
-        screen === 'success' ? '问小青：码在哪' : '问小青：到机码怎么找 →',
-        '手机打印订单里的到机码在哪里找？8 位新码和 10 位历史码怎么输入？',
-      )}
+      ask={claimedByOrder
+        ? printAsk('问小青：取纸或异常怎么办', '打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。')
+        : printAsk(
+          screen === 'success' ? '问小青：码在哪' : '问小青：到机码怎么找 →',
+          '手机打印订单里的到机码在哪里找？8 位新码和 10 位历史码怎么输入？',
+        )}
       primaryNode={primaryNode}
       navbar={
         <QxAppNavbar

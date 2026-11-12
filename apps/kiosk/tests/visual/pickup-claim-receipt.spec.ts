@@ -567,7 +567,7 @@ test('logged-in pickup can claim a typed code after taking another order @w2', a
   await page.getByTestId('pickup-here-claim').click()
   await expect(page.getByText('已进入打印队列', { exact: true })).toBeVisible()
   expect(timelineHits).toBe(1)
-  await page.getByRole('button', { name: '重新输入', exact: true }).click()
+  await page.getByRole('button', { name: '返回取件', exact: true }).click()
   await expect(page.getByTestId('pickup-here-claim')).toContainText('获***.pdf')
   expect(timelineHits).toBe(2)
   await page.getByLabel('到机码输入框').fill('28491703')
@@ -734,6 +734,9 @@ test('typed pickup success keeps the arrival-code wording @w2', async ({ page, a
   await expect(page.getByTestId('pickup-ok-resume')).toContainText('同一个到机码可以接着打')
   await expect(page.getByTestId('pickup-ok-resume')).toContainText('再输一次同一个到机码')
   await expect(page.getByRole('list', { name: '办理步骤' })).not.toContainText('选中这一单')
+  await expect(page.locator('.qxt-band .qxt-status')).toHaveText('到机码验证')
+  await expect(page.getByRole('button', { name: '重新输入', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '问小青：码在哪', exact: true })).toBeVisible()
 })
 
 test('logged-in pickup success uses the order wording @w2', async ({ page, api }) => {
@@ -754,6 +757,25 @@ test('logged-in pickup success uses the order wording @w2', async ({ page, api }
   const resume = page.getByTestId('pickup-ok-resume')
   await expect(resume).toHaveText('打印中断时，回手机上查看这笔订单')
   await expect(resume).not.toContainText('到机码')
+  const capsule = page.locator('.qxt-band .qxt-status')
+  const back = page.getByRole('button', { name: '返回取件', exact: true })
+  const ask = page.getByRole('button', { name: '问小青：取纸或异常怎么办', exact: true })
+  await expect(capsule).toHaveText('本机领取')
+  await expect(capsule).toHaveClass(/qxt-status-unknown/)
+  await expect(back).toBeVisible()
+  await expect(ask).toBeVisible()
+  for (const spot of [capsule, back, ask]) {
+    await expect(spot).not.toContainText('到机码')
+    await expect(spot).not.toContainText('码在哪')
+    await expect(spot).not.toContainText('重新输入')
+  }
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
+    status: 200,
+    json: { data: { asrEnabled: false, ttsEnabled: false } },
+  })
+  await ask.click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  await expect(page.getByLabel('输入咨询问题')).toHaveValue('打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。')
 })
 
 test('logged-in pickup terminal not ready retries this order @w2', async ({ page, api }) => {
