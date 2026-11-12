@@ -174,10 +174,10 @@ export async function verifyOptimizeAfterMatch(): Promise<void> {
 
 /**
  * 优化这条路：模型把简介写成 300 字以上时，返回稿里的简介必须整段留下。
- * 排版调整仍按 300 字截，这条用来钉住两条路没有被一起改掉。
+ * 2026-11-12 起排版调整也不再把简介截在 300 字，320 字必须整段留下。
  */
 export async function verifyOptimizeSummaryLimit(): Promise<void> {
-  console.log('\n=== 优化稿简介超过 300 字时完整保留；排版调整仍截断 ===')
+  console.log('\n=== 优化稿与排版调整的简介超过 300 字时都完整保留 ===')
   const sentence = '熟悉门店日常运营并保持货架整洁。'
   const longSummary = sentence.repeat(20)
   if (longSummary.length <= 300) fail(`夹具简介应超过 300 字，实际 ${longSummary.length}`)
@@ -255,21 +255,151 @@ export async function verifyOptimizeSummaryLimit(): Promise<void> {
         originalText: original,
         action: 'reformat',
       })
-      const kept = longSummary.slice(0, 300)
-      if (result.resume.summary !== kept) {
-        fail(`排版调整简介仍应截成前 300 字，实际 ${result.resume.summary.length} 字`)
+      if (result.resume.summary !== longSummary || result.resume.summary.length !== 320) {
+        fail(`排版调整简介应整段保留 320 字，实际 ${result.resume.summary.length} 字`)
       }
     })
-    pass('排版调整简介仍截在 300 字')
+    pass('排版调整简介 320 字完整保留（2026-11-12 起不再截在 300 字）')
   } finally {
     globalThis.fetch = originalFetch
     Logger.overrideLogger(new ConsoleLogger())
   }
 }
 
+const SAME_TEXT_NAME = '陈敬之'
+const SAME_NORMAL_BEFORE = '负责门店公众号的选题和排版。'
+const SAME_NORMAL_AFTER = '负责门店公众号的选题、排版和推送。'
+const SAME_EXACT = '协助组织迎新志愿服务。'
+const SAME_SPACED = '整理活动签到表和物资。'
+
+function sameTextResume(summary: string, skills: string[] = []): Record<string, unknown> {
+  return {
+    basic: { name: SAME_TEXT_NAME, phone: '', email: '', city: '' },
+    intention: { position: '门店运营', city: '' },
+    summary,
+    education: [],
+    experience: [],
+    projects: [],
+    skills,
+    certificates: [],
+  }
+}
+
+async function runOptimize(
+  original: string,
+  content: string,
+  logs: string[],
+): Promise<Awaited<ReturnType<LlmResumeOptimizeService['optimize']>>> {
+  const originalFetch = globalThis.fetch
+  Logger.overrideLogger({
+    log: (message: unknown) => { logs.push(String(message)) },
+    error: () => undefined,
+    warn: (message: unknown) => { logs.push(String(message)) },
+    debug: () => undefined,
+    verbose: () => undefined,
+    fatal: () => undefined,
+  })
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    choices: [{ message: { content } }],
+  }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  try {
+    const svc = new LlmResumeOptimizeService({
+      getApiKey: () => 'stub-key',
+      getConfig: () => ({
+        enabled: true, vendor: 'deepseek', model: 'stub',
+        baseURL: 'https://api.deepseek.com/v1', forbiddenWords: [],
+      }),
+    } as never)
+    return await svc.optimize(original, { sections: [], suggestions: [] } as ResumeReport)
+  } finally {
+    globalThis.fetch = originalFetch
+    Logger.overrideLogger(new ConsoleLogger())
+  }
+}
+
+/**
+ * 同文条目在对齐之后丢掉：改写与原文逐字相同、只差首尾空白的都不返回。
+ * 稿子本身不因多了这两条而改字。对齐把句号折回原文之后才相同的，另测一条。
+ */
+export async function verifyOptimizeSameTextEntries(): Promise<void> {
+  console.log('\n=== 同文条目不返回，优化稿一字不改 ===')
+  const original = [SAME_TEXT_NAME, SAME_NORMAL_BEFORE, SAME_EXACT, SAME_SPACED].join('\n')
+  const summary = `${SAME_NORMAL_AFTER}${SAME_EXACT}${SAME_SPACED}`
+  const resume = sameTextResume(summary)
+  const normalModule = { title: '选题改写', before: SAME_NORMAL_BEFORE, after: SAME_NORMAL_AFTER }
+  const withSame = JSON.stringify({
+    resume,
+    modules: [
+      normalModule,
+      { title: '逐字相同', before: SAME_EXACT, after: SAME_EXACT },
+      { title: '只差空白', before: SAME_SPACED, after: `  ${SAME_SPACED}\n` },
+    ],
+  })
+  const withoutSame = JSON.stringify({ resume, modules: [normalModule] })
+  const logs: string[] = []
+  const kept = await runOptimize(original, withSame, logs)
+  const plain = await runOptimize(original, withoutSame, [])
+  if (kept.modules.length !== 1 || kept.modules[0]?.before !== SAME_NORMAL_BEFORE || kept.modules[0]?.after !== SAME_NORMAL_AFTER) {
+    fail(`同文条目应只留下正常改写，实际 ${kept.modules.map((item) => item.title).join('、') || '空'}`)
+  }
+  if (JSON.stringify(kept.optimizedResume) !== JSON.stringify(plain.optimizedResume)) {
+    fail('去掉同文条目后，优化稿必须与从不返回这两条时逐字相同')
+  }
+  const logged = logs.join('\n')
+  if (!logged.includes('sameText=2')) fail(`日志应记下 sameText=2，实际 ${logged}`)
+  for (const sentence of [SAME_NORMAL_BEFORE, SAME_NORMAL_AFTER, SAME_EXACT, SAME_SPACED]) {
+    if (logged.includes(sentence)) fail('同文计数日志不得记下正文')
+  }
+  pass('逐字相同和只差首尾空白的条目被去掉，优化稿不变，日志只有 sameText=2')
+
+  const punctBefore = SAME_SPACED
+  const punctSummary = `${SAME_NORMAL_AFTER}${punctBefore}`
+  const punctResume = sameTextResume(punctSummary)
+  const punctLogs: string[] = []
+  const aligned = await runOptimize(original, JSON.stringify({
+    resume: punctResume,
+    modules: [
+      normalModule,
+      { title: '只差句号', before: punctBefore, after: punctBefore.replace('。', '.') },
+    ],
+  }), punctLogs)
+  const alignedPlain = await runOptimize(original, JSON.stringify({
+    resume: punctResume,
+    modules: [normalModule],
+  }), [])
+  if (aligned.modules.length !== 1 || aligned.modules[0]?.after !== SAME_NORMAL_AFTER) {
+    fail(`对齐后才相同的条目仍被返回：${aligned.modules.map((item) => item.title).join('、')}`)
+  }
+  if (JSON.stringify(aligned.optimizedResume) !== JSON.stringify(alignedPlain.optimizedResume)) {
+    fail('对齐后丢掉的同文条目不得改动优化稿')
+  }
+  const punctLogged = punctLogs.join('\n')
+  if (!punctLogged.includes('sameText=1')) fail(`对齐后同文应记 sameText=1，实际 ${punctLogged}`)
+  if (punctLogged.includes(punctBefore) || punctLogged.includes(SAME_NORMAL_AFTER)) fail('对齐同文的日志不得记下正文')
+  pass('对齐把句号折回原文之后，同文条目同样不返回')
+}
+
+/** 优化这条路的技能不再截在 40 字。60 字整段留下，不按句号拆开。 */
+export async function verifyOptimizeSkillKept(): Promise<void> {
+  console.log('\n=== 优化稿技能超过 40 字时完整保留 ===')
+  const skill = '熟悉门店的收银对账。'.repeat(6)
+  if (skill.length !== 60) fail(`技能夹具应为 60 字，实际 ${skill.length}`)
+  const original = [SAME_TEXT_NAME, skill, '做过茶饮门店。'].join('\n')
+  const result = await runOptimize(original, JSON.stringify({
+    resume: sameTextResume('做过茶饮门店。', [skill]),
+    modules: [],
+  }), [])
+  if (result.optimizedResume.skills[0] !== skill || result.optimizedResume.skills[0]?.length !== 60) {
+    fail(`优化稿技能应完整保留 60 字，实际 ${result.optimizedResume.skills[0]?.length ?? 0} 字`)
+  }
+  pass('优化稿技能 60 字完整保留，没有截在 40 字')
+}
+
 if (process.argv[1]?.endsWith('resume-optimize-after-match.ts')) {
   verifyOptimizeAfterMatch()
     .then(() => verifyOptimizeSummaryLimit())
+    .then(() => verifyOptimizeSameTextEntries())
+    .then(() => verifyOptimizeSkillKept())
     .catch((error: unknown) => {
       console.error(error instanceof Error ? error.message : error)
       process.exit(1)

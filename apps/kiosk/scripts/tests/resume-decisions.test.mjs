@@ -24,8 +24,8 @@ const loadTs = (absPath) => {
 }
 const module = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-deliver/resumeDecisions.ts'))
 const {
-  isModuleSwitchable, moduleSwitchBlock, moduleBaseState, moduleKeyOf, toggleModuleDecision,
-  applyDecisionChanges, applyResumeDecisionsWithStatus, compareDecisionChanges,
+  isModuleSwitchable, moduleSwitchBlock, moduleBaseState, moduleKeyOf, defaultModuleDecision,
+  toggleModuleDecision, applyDecisionChanges, applyResumeDecisionsWithStatus, compareDecisionChanges,
 } = module.exports
 const compareModule = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-compare/resumeCompareModel.ts'))
 const factsModule = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-deliver/facts.ts'))
@@ -513,4 +513,96 @@ test('样本 1：对照页确认第 2 条全部新增事实后 8 条都入选，
     assert.equal(text.includes(sentences[index].trim()), false, `第 ${index + 1} 条不应再留原文`)
   }
   assert.equal(applied.resume.experience[2].description, '无关经历，不对应任何一条建议。')
+})
+
+const F7_BEFORE_1 = '负责学院公众号的选题和排版。'
+const F7_AFTER_1 = '负责学院公众号的选题和排版，协助组织迎新志愿服务。'
+const F7_BEFORE_2 = '协助组织迎新志愿服务。'
+const F7_AFTER_2 = '协助完成迎新志愿服务的签到。'
+const F7_BASE_TEXT = `${F7_BEFORE_1}${F7_BEFORE_2}`
+const F7_BOTH_TEXT = `${F7_AFTER_1}${F7_AFTER_2}`
+
+function f7Modules() {
+  return [moduleOf(F7_BEFORE_1, F7_AFTER_1, '公众号'), moduleOf(F7_BEFORE_2, F7_AFTER_2, '迎新')]
+}
+
+function f7Changes(modules, next) {
+  return modules.map((item, index) => [moduleKeyOf(item, index), next])
+}
+
+function toggleInOrder(resume, modules, decisions, base, order, next) {
+  let currentResume = resume
+  let currentDecisions = { ...decisions }
+  const failures = []
+  for (const index of order) {
+    const item = modules[index]
+    const key = moduleKeyOf(item, index)
+    const current = currentDecisions[key] ?? defaultModuleDecision(base, item)
+    const result = toggleModuleDecision(currentResume, item, current, next, base, {
+      modules, decisions: currentDecisions, index,
+    })
+    currentResume = result.resume
+    if (result.applied) currentDecisions = { ...currentDecisions, [key]: next }
+    else if (result.reason) failures.push({ key, reason: result.reason })
+  }
+  return { resume: currentResume, decisions: currentDecisions, failures }
+}
+
+test('F7：前一条改写含有后一条原句时，两条都换在自己原来的位置', () => {
+  assert.equal(F7_AFTER_1.includes(F7_BEFORE_2), true)
+  const modules = f7Modules()
+  const base = makeResume(F7_BASE_TEXT)
+  assert.equal(moduleBaseState(base, modules[0]).kind, 'B')
+  assert.equal(moduleBaseState(base, modules[1]).kind, 'B')
+  const batched = applyDecisionChanges(base, modules, {}, f7Changes(modules, 'optimized'), base)
+  assert.deepEqual(batched.failures, [])
+  assert.equal(batched.resume.summary, F7_BOTH_TEXT)
+  for (const order of [[0, 1], [1, 0]]) {
+    const stepped = toggleInOrder(base, modules, {}, base, order, 'optimized')
+    assert.deepEqual(stepped.failures, [], `顺序 ${order.join('→')} 不应失败`)
+    assert.equal(stepped.resume.summary, F7_BOTH_TEXT, `顺序 ${order.join('→')} 应与批量相同`)
+    const back = toggleInOrder(stepped.resume, modules, stepped.decisions, base, order, 'original')
+    assert.deepEqual(back.failures, [], `切回顺序 ${order.join('→')} 不应失败`)
+    assert.equal(back.resume.summary, F7_BASE_TEXT)
+  }
+  const batchedBack = applyDecisionChanges(
+    batched.resume, modules, batched.decisions, f7Changes(modules, 'original'), base,
+  )
+  assert.deepEqual(batchedBack.failures, [])
+  assert.equal(batchedBack.resume.summary, F7_BASE_TEXT)
+})
+
+test('F7：编辑区另有一处相同原句、且不在任何条目占着的文字里时不换', () => {
+  const modules = f7Modules()
+  const base = makeResume(F7_BASE_TEXT)
+  const edited = makeResume(`${F7_BASE_TEXT}${F7_BEFORE_2}`)
+  const result = toggleModuleDecision(edited, modules[1], 'original', 'optimized', base, {
+    modules, decisions: {}, index: 1,
+  })
+  assert.equal(result.applied, false)
+  assert.equal(result.reason, 'edited')
+  assert.equal(result.resume.summary, edited.summary)
+  const batched = applyDecisionChanges(edited, modules, {}, [[moduleKeyOf(modules[1], 1), 'optimized']], base)
+  assert.deepEqual(batched.failures, [{ key: moduleKeyOf(modules[1], 1), reason: 'edited' }])
+  assert.equal(batched.resume.summary, edited.summary)
+})
+
+test('F7：前一条换上后把后一条原句吃掉时，后一条不换、也不改前一条的改写', () => {
+  const before1 = '负责活动物料清点，并完成签到统计。'
+  const after1 = '已完成活动物料清点，并完成签到统计。'
+  const before2 = '并完成签到统计。'
+  const after2 = '签到统计已核对。'
+  assert.equal(before1.includes(before2), true)
+  assert.equal(after1.includes(before2), true)
+  const modules = [moduleOf(before1, after1, '物料'), moduleOf(before2, after2, '签到')]
+  const base = makeResume(before1)
+  assert.equal(moduleBaseState(base, modules[0]).kind, 'B')
+  assert.equal(moduleBaseState(base, modules[1]).kind, 'B')
+  const applied = applyDecisionChanges(base, modules, {}, f7Changes(modules, 'optimized'), base)
+  assert.deepEqual(applied.failures, [{ key: moduleKeyOf(modules[1], 1), reason: 'edited' }])
+  assert.equal(applied.resume.summary, after1)
+  assert.equal(applied.resume.summary.includes(after2), false)
+  assert.equal(applied.resume.summary.includes(before2), true)
+  assert.equal(applied.decisions[moduleKeyOf(modules[0], 0)], 'optimized')
+  assert.notEqual(applied.decisions[moduleKeyOf(modules[1], 1)], 'optimized')
 })

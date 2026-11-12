@@ -181,6 +181,69 @@ async function main(): Promise<void> {
     pass('3. 润色命中拦截词 → 丢弃润色,回退用户原文')
   }
 
+  // ── F3. 2026-11-12：生成不再把简介、描述、技能截成半句 ────────────────
+  {
+    const sentence = '熟悉门店日常运营并保持货架整洁。'
+    const summary320 = sentence.repeat(20)
+    const desc700 = '负责门店货架整理与收银交接。'.repeat(50)
+    const skill60 = '熟悉门店的收银对账。'.repeat(6)
+    if (summary320.length !== 320 || desc700.length !== 700 || skill60.length !== 60) {
+      fail(`F3 生成夹具长度不对 ${summary320.length}/${desc700.length}/${skill60.length}`)
+    }
+    const longInput: ResumeGenerateInput = {
+      ...INPUT,
+      selfIntro: '短简介',
+      experience: [{ company: '临安青禾茶饮店', role: '店员', description: '负责门店货架整理。' }],
+      skills: ['收银'],
+    }
+    setResponses([{ status: 200, content: JSON.stringify({
+      summary: summary320,
+      educationDesc: [''],
+      experienceDesc: [desc700],
+      projectDesc: [''],
+      skillsPolished: [skill60],
+    }) }])
+    const polished = await genSvc.generate(longInput)
+    if (polished.summary !== summary320) fail(`F3. 润色简介应完整保留 320 字，实际 ${polished.summary.length}`)
+    if (polished.experience[0].description !== desc700) fail(`F3. 润色描述应完整保留 700 字，实际 ${polished.experience[0].description.length}`)
+    if (polished.skills[0] !== skill60) fail(`F3. 润色技能应完整保留 60 字，实际 ${polished.skills[0]?.length ?? 0}`)
+    pass('F3. 生成润色：简介 320 字、描述 700 字、技能 60 字完整保留')
+
+    const fallbackInput: ResumeGenerateInput = {
+      ...longInput,
+      selfIntro: summary320,
+      experience: [{ company: '临安青禾茶饮店', role: '店员', description: desc700 }],
+      skills: [skill60],
+    }
+    setResponses([{ status: 200, content: JSON.stringify({
+      summary: '',
+      educationDesc: [''],
+      experienceDesc: [''],
+      projectDesc: [''],
+      skillsPolished: [''],
+    }) }])
+    const fallback = await genSvc.generate(fallbackInput)
+    if (fallback.summary !== summary320) fail(`F3. 本人简介被截断，实际 ${fallback.summary.length} 字`)
+    if (fallback.experience[0].description !== desc700) fail(`F3. 本人描述被截断，实际 ${fallback.experience[0].description.length} 字`)
+    if (fallback.skills[0] !== skill60) fail(`F3. 本人技能被截断，实际 ${fallback.skills[0]?.length ?? 0} 字`)
+    pass('F3. 生成原文回退：简介 320 字、描述 700 字、技能 60 字完整保留')
+
+    const note = '（内容过长，后面的部分请以原件为准）'
+    setResponses([{ status: 200, content: JSON.stringify({
+      summary: '',
+      educationDesc: [''],
+      experienceDesc: ['整'.repeat(24001)],
+      projectDesc: [''],
+      skillsPolished: ['收银'],
+    }) }])
+    const clipped = await genSvc.generate(longInput)
+    const got = clipped.experience[0].description
+    if (got.length !== 24000 || !got.endsWith(note) || !got.startsWith('整')) {
+      fail(`F3. 生成描述超过 24000 应截到 24000 并带说明，实际 ${got.length} 字`)
+    }
+    pass('F3. 生成单字段超过 24000 仍按 fitResumeToDocLimits 截断并写明内容过长')
+  }
+
   // ── 3b. 职务可不填（10/6）：照样生成、职务保持为空、润色不许补出职务 ────────────
   {
     const { plainToInstance } = await import('class-transformer')

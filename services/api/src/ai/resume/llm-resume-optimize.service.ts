@@ -39,6 +39,7 @@ import {
   restoreGeneratedResume, restoreOptimizeResult,
 } from './resume-optimize-coverage'
 import { alignOptimizeModuleAfter } from './resume-optimize-after-align'
+import { fitResumeToDocLimits } from './resume-doc-limits'
 
 // ============================================================
 // LlmResumeOptimizeService — 阶段2B 真实简历优化(单轮、结构化 JSON,OpenAI 兼容)
@@ -72,11 +73,9 @@ const OPTIMIZE_TEMPERATURE = 0.3
  * 必须是遮盖引擎不会改写、且不可能出现在简历正文里的串。
  */
 const MASK_SPLIT = '\n<<<PII_MASK_SPLIT>>>\n'
-/** 只用于排版调整。优化稿简介不再按它截断，超长由 fitResumeToDocLimits 收到 24000。 */
-const MAX_SUMMARY_CHARS = 300
-const MAX_DESC_CHARS = 600
 const MAX_OPTIMIZE_DESC_CHARS = 2000
-const MAX_SKILL_CHARS = 40
+/** 覆盖补回条目的固定说明句。同文过滤不得把它当成「改写等于原文」丢掉。 */
+const KEEP_ORIGINAL_NOTE = '这一段没有改动，保留原文'
 const MAX_MODULES = 8
 const MAX_MODULE_TEXT_CHARS = 600
 const MAX_WARNING_CHARS = 120
@@ -362,7 +361,9 @@ export class LlmResumeOptimizeService {
         // 这里只还原文本内容，basic 身份字段另以服务端权威值兜底。
         const restored = restoreLayoutAdjustResult(result, maskedTriple.restore, input.currentResume)
         // 还原后才能按公司名对回原条目：原条目没写职务，输出也不许补出职务。
-        if (!addsRoleToCompanyOnlyExperience(restored.resume, input.currentResume)) return restored
+        if (!addsRoleToCompanyOnlyExperience(restored.resume, input.currentResume)) {
+          return { ...restored, resume: fitResumeToDocLimits(restored.resume) }
+        }
       }
       this.logger.warn(`resume layout adjust: invalid output (attempt ${attempt}/2)`)
     }
@@ -379,12 +380,20 @@ export class LlmResumeOptimizeService {
    */
   private returnAligned(result: OptimizeResult): OptimizeResult {
     // 补回的旧摘录和模型改写使用同一编码，再交给 #1574 逐字段核对；不放宽匹配。
+    // 对齐可能把只差标点的改写改成稿里的原句，所以同文条目要在对齐之后再丢掉。
     const aligned = alignOptimizeModuleAfter(foldCjkRadicalStrings(result))
+    let sameText = 0
+    const modules = aligned.result.modules.filter((module) => {
+      const after = module.after.trim()
+      if (!after || after !== module.before.trim() || after === KEEP_ORIGINAL_NOTE) return true
+      sameText += 1
+      return false
+    })
     const { total, verbatim, normalized, unmatched } = aligned.stats
     this.logger.log(
-      `resume optimize: after-match total=${total} pass=${verbatim + normalized} verbatim=${verbatim} normalized=${normalized} unmatched=${unmatched}`,
+      `resume optimize: after-match total=${total} pass=${verbatim + normalized} verbatim=${verbatim} normalized=${normalized} unmatched=${unmatched} sameText=${sameText}`,
     )
-    return aligned.result
+    return { ...aligned.result, modules }
   }
 
   // ── OpenAI 兼容 Chat Completions(出错不记正文:输入含简历原文)────────────
@@ -591,9 +600,14 @@ export class LlmResumeOptimizeService {
 
     const skills: string[] = []
     for (const skill of asStrArray(r['skills'], 20)) {
-      const cleaned = clean(skill, MAX_SKILL_CHARS)
-      if (cleaned === null) return reject(cleanRule)
-      if (cleaned) skills.push(cleaned)
+      const cleaned = skill.trim()
+      if (!cleaned) continue
+      // 不再截到 40 字。超长交给出口的 fitResumeToDocLimits，按分隔符拆开，一个字不丢。
+      if (containsForbiddenWord(cleaned, blocked)) {
+        cleanRule = 'guard_term'
+        return reject('guard_term')
+      }
+      skills.push(cleaned)
     }
 
     const certificates: string[] = []
@@ -659,9 +673,11 @@ export class LlmResumeOptimizeService {
       return true
     }
     const blocked = [...OPTIMIZE_GUARD_TERMS, ...forbiddenWords]
-    const clean = (value: unknown, maxLen: number): string | null => {
+    // 简介、描述、技能、证书不再先截再查。maxLen 只留给警告这种短提示。
+    const clean = (value: unknown, maxLen?: number): string | null => {
       if (typeof value !== 'string') return ''
-      const text = value.trim().slice(0, maxLen)
+      const trimmed = value.trim()
+      const text = maxLen === undefined ? trimmed : trimmed.slice(0, maxLen)
       if (text && containsForbiddenWord(text, blocked)) return null
       if (text && !hasNoNewNumbers(text)) return null
       return text
@@ -670,7 +686,7 @@ export class LlmResumeOptimizeService {
 
     const basicRaw = (r['basic'] ?? {}) as Record<string, unknown>
     const intentionRaw = (r['intention'] ?? {}) as Record<string, unknown>
-    const summary = clean(r['summary'], MAX_SUMMARY_CHARS)
+    const summary = clean(r['summary'])
     if (summary === null) return null
 
     const name = strOf(basicRaw, 'name', 50)
@@ -689,7 +705,7 @@ export class LlmResumeOptimizeService {
       const degree = strOf(item, 'degree', 20)
       const period = strOf(item, 'period', 40)
       if (!fact(school) || !fact(major) || !fact(degree) || !fact(period)) return null
-      const description = clean(item['description'], MAX_DESC_CHARS)
+      const description = clean(item['description'])
       if (description === null) return null
       education.push({ school, major: major || undefined, degree: degree || undefined, period: period || undefined, description: description || undefined })
     }
@@ -702,7 +718,7 @@ export class LlmResumeOptimizeService {
       if (!company) continue
       const period = strOf(item, 'period', 40)
       if (!fact(company) || !fact(role) || !fact(period)) return null
-      const description = clean(item['description'], MAX_DESC_CHARS)
+      const description = clean(item['description'])
       if (description === null) return null
       experience.push({ company, role, period: period || undefined, description })
     }
@@ -713,21 +729,21 @@ export class LlmResumeOptimizeService {
       if (!name) continue
       const role = strOf(item, 'role', 60)
       if (!fact(name) || !fact(role)) return null
-      const description = clean(item['description'], MAX_DESC_CHARS)
+      const description = clean(item['description'])
       if (description === null) return null
       projects.push({ name, role: role || undefined, description })
     }
 
     const skills: string[] = []
     for (const skill of asStrArray(r['skills'], currentResume.skills.length)) {
-      const cleaned = clean(skill, MAX_SKILL_CHARS)
+      const cleaned = clean(skill)
       if (cleaned === null || !fact(cleaned)) return null
       if (cleaned) skills.push(cleaned)
     }
 
     const certificates: string[] = []
     for (const cert of asStrArray(r['certificates'], currentResume.certificates.length)) {
-      const cleaned = clean(cert, 60)
+      const cleaned = clean(cert)
       if (cleaned === null || !fact(cleaned)) return null
       if (cleaned) certificates.push(cleaned)
     }

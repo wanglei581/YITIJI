@@ -203,7 +203,10 @@ export function ResumeOptimizePage() {
     if (viewOnly) return
     const index = modules.findIndex((item, i) => moduleKeyOf(item, i) === key)
     if (index < 0 || !optimizedResume) return
-    const result = toggleModuleDecision(optimizedResume, modules[index], decisions[key] ?? defaultModuleDecision(baseResume, modules[index]), next, baseResume)
+    const result = toggleModuleDecision(
+      optimizedResume, modules[index], decisions[key] ?? defaultModuleDecision(baseResume, modules[index]), next, baseResume,
+      { modules, decisions, index },
+    )
     if (!result.applied) {
       setDecisionFailures(result.reason ? [{ key, reason: result.reason }] : [], next)
       return
