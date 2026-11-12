@@ -48,12 +48,17 @@ Page({
     catch (err) { this._paramsError = err.message; this.setData({ loading: false, loadError: err.message }); return }
     const text = printParams.labels(normalized)
     const gd = getApp().globalData || {}
+    // 上次在本页选过的终端（打印参数页按 fileId 与会员带回来）。只当初值：终端列表回来后不在列表里就丢弃，
+    // 在列表里也照样重读能力、重新核价（FLOW1a P1）。
+    const lastTerminal = decodeParam(q.terminalId)
     this.setData({
       statusBarHeight: gd.statusBarHeight || 20,
       fileId: typeof q.fileId === 'string' ? q.fileId : '',
       fileName: decodeParam(q.name),
       copies: normalized.copies, colorMode: normalized.colorMode, duplex: normalized.duplex,
       colorLabel: text.colorLabel, duplexLabel: text.duplexLabel,
+      picked: lastTerminal.length <= 64 ? lastTerminal : '',
+      capState: lastTerminal && lastTerminal.length <= 64 ? 'loading' : 'idle',
     })
     this._loadTerminals(false)
   },
@@ -115,7 +120,33 @@ Page({
     this.setData(Object.assign({ picked: id }, clearedQuote('pending'), {
       capState: 'loading', capColor: false, capDuplex: false, capError: '',
     }))
+    this._reportDraft()
     this._loadCapabilities(id)
+  },
+
+  // 份数和颜色、单双面一样在本页设置（FLOW1a：参数统一在选定终端之后）。1 和 99 是边界，越界不生效。
+  minusCopies() {
+    if (this._paramsError || !this._active || this.data.copies <= 1) return
+    this._setIntent({ copies: this.data.copies - 1 })
+  },
+
+  plusCopies() {
+    if (this._paramsError || !this._active || this.data.copies >= 99) return
+    this._setIntent({ copies: this.data.copies + 1 })
+  },
+
+  // 每次选终端、改参数都报回打印参数页：返回再进时由它带回来，不再被重置成黑白单面（FLOW1a P1）。
+  // 只走 EventChannel，在两个页面实例之间传，不写 storage / globalData；没有 opener 时什么也不做。
+  _reportDraft() {
+    const channel = typeof this.getOpenerEventChannel === 'function' ? this.getOpenerEventChannel() : null
+    if (!channel || typeof channel.emit !== 'function') return
+    channel.emit('printDraft', {
+      fileId: this.data.fileId,
+      copies: this.data.copies,
+      colorMode: this.data.colorMode,
+      duplex: this.data.duplex,
+      terminalId: this.data.picked || '',
+    })
   },
 
   setParam(e) {
@@ -154,6 +185,7 @@ Page({
       copies: normalized.copies, colorMode: normalized.colorMode, duplex: normalized.duplex,
       colorLabel: text.colorLabel, duplexLabel: text.duplexLabel, capError,
     }))
+    this._reportDraft()
     if (!capError && this.data.picked && this.data.capState !== 'loading') this._requestQuote(this.data.picked, normalized)
   },
 

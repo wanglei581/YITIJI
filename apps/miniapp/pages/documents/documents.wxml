@@ -30,7 +30,7 @@
       <!-- 不写「N 个文件」当总数：filtered.length 只是已载入数，还有下一页时说成总数
            就是把「不显示文件」包装成「只有这么多」。 -->
       <text class="section-t lt-title">最近{{nextCursor ? '' : ' · ' + filtered.length + ' 个文件'}}</text>
-      <view class="lt-action tap" hover-class="tap-press" bindtap="loadDocuments"
+      <view class="lt-action tap" hover-class="tap-press" bindtap="reloadDocuments"
             role="button" aria-label="重新加载文档列表">刷新</view>
     </view>
 
@@ -52,7 +52,7 @@
           hover-class="tap-press"
           aria-disabled="{{convertExpired || convertingId || previewing || !convertResult.reprintable}}"
           catchtap="reprintConvertedPdf"
-        >重新打印</view>
+        >打印</view>
       </view>
       <view wx:if="{{convertExpired}}" class="doc-hint">链接已过期，请在列表里重新打开</view>
       <view wx:if="{{!convertResult.reprintable}}" class="doc-hint">该报告仅可查看，不可打印</view>
@@ -66,7 +66,7 @@
       <view class="empty-slot">
         <view class="es-t">加载失败</view>
         <view class="es-d">{{loadError}}</view>
-        <view class="btn ghost" bindtap="loadDocuments">重试</view>
+        <view class="btn ghost" bindtap="reloadDocuments">重试</view>
       </view>
     </view>
 
@@ -109,7 +109,7 @@
               aria-disabled="{{!item.reprintable}}"
               catchtap="reprintDoc"
               data-id="{{item.id}}"
-            >重新打印</view>
+            >打印</view>
             <view
               class="doc-action {{item.friendBusy ? 'is-disabled' : ''}}"
               hover-class="tap-press"
