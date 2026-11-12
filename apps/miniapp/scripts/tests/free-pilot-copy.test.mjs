@@ -148,7 +148,67 @@ function wxmlViolations(rel) {
     last = m.index + m[0].length
   }
   checkText(src.slice(last), last)
+  // 简历导出的动态字段（pricing.text 等）不是字面量，原条件扫不到。
+  // 名单来自 EXPORT_PRICE_DISPLAY 的字符串条目，不改 PAID_GUARD / JS_ALLOW / MONEY_VAR_NAMES。
+  const registered = exportPricePaths(rel)
+  for (const found of textNodePaths(src)) {
+    if (!isExportPriceBinding(found.path)) continue
+    if (!registered.includes(found.path)) {
+      out.push(`${rel}:${lineOf(src, found.index)} 动态显示字段未登记进 EXPORT_PRICE_DISPLAY：${found.path}`)
+    }
+  }
   return out
+}
+
+function isExportPriceBinding(path) {
+  return path === 'exportDisabledReason' || path.startsWith('pricing.')
+}
+
+/** 标签正文里的 {{a.b}}。属性里的条件不算给用户看的句子。 */
+function textNodePaths(src) {
+  const out = []
+  const re = />([^<]*)</g
+  let m
+  while ((m = re.exec(src))) {
+    const chunk = m[1]
+    const base = m.index + 1
+    const exprRe = /\{\{\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*\}\}/g
+    let e
+    while ((e = exprRe.exec(chunk))) out.push({ path: e[1], index: base + e.index })
+  }
+  return out
+}
+
+function exportPricePaths(rel) {
+  const entry = EXPORT_PRICE_DISPLAY[rel]
+  if (!entry) return []
+  const paths = []
+  for (const value of Object.values(entry)) {
+    if (typeof value === 'string' && /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(value)) paths.push(value)
+  }
+  return paths
+}
+
+function readDataPath(data, path) {
+  let cur = data
+  for (const key of path.split('.')) {
+    if (cur == null || typeof cur !== 'object') return undefined
+    cur = cur[key]
+  }
+  return cur
+}
+
+function shownExportText(rel, page) {
+  const src = read(rel).replace(/<!--[\s\S]*?-->/g, (hit) => hit.replace(/[^\n]/g, ' '))
+  const parts = []
+  for (const found of textNodePaths(src)) {
+    if (!isExportPriceBinding(found.path)) continue
+    const value = readDataPath(page.data, found.path)
+    if (typeof value === 'string') parts.push(value)
+  }
+  const entry = EXPORT_PRICE_DISPLAY[rel]
+  if (entry) parts.push(...entry.buttons)
+  return parts.join('\n')
 }
 
 // JS 里允许的含钱字面量：每一条都只在服务端报出大于 0 的金额、或价目真的变了时才出现。
@@ -400,6 +460,7 @@ test('简历导出价目：免费不说钱，大于 0 才说单价和权益', ()
 })
 
 // 诊断页、优化页最终显示的价目字段。新增登记，不改上面 PAID_GUARD / JS_ALLOW 的写法。
+// 字符串条目接进 wxmlViolations：模板正文里新增的 pricing.* / exportDisabledReason 也要在这里。
 // 钱字眼只许出现在服务端报出大于 0 的金额之后；免费、未知、停用连这些字段一起扫。
 const EXPORT_PRICE_DISPLAY = {
   'pages/resume-diagnose/resume-diagnose.wxml': {
@@ -521,8 +582,9 @@ test('简历导出九种输入：说法、导出门与页面最终显示', async
 
   for (const [rel, entry] of Object.entries(EXPORT_PRICE_DISPLAY)) {
     const wxml = read(rel)
-    assert.match(wxml, /\{\{pricing\.text\}\}/, `${rel} 的 text 绑定`)
-    assert.match(wxml, /\{\{exportDisabledReason\}\}/, `${rel} 的 disabledReason 绑定`)
+    for (const path of exportPricePaths(rel)) {
+      assert.ok(wxml.includes(`{{${path}}}`), `${rel} 登记的动态字段 ${path} 要出现在模板正文`)
+    }
     for (const label of entry.buttons) assert.ok(wxml.includes(label), `${rel} 按钮「${label}」`)
   }
 
@@ -582,7 +644,7 @@ test('简历导出九种输入：说法、导出门与页面最终显示', async
         const reason = row.in.disabledReason == null ? pausedReason : row.in.disabledReason
         assert.equal(page.data.pricing.disabledReason, reason, `${rel} ${row.name} 页面 pricing.disabledReason`)
         assert.equal(page.data.exportDisabledReason, reason, `${rel} ${row.name} 页面最终 disabledReason`)
-        const shown = [page.data.pricing.text, page.data.exportDisabledReason, entry.buttons.join('\n')].join('\n')
+        const shown = shownExportText(rel, page)
         if (row.quiet) {
           assert.doesNotMatch(shown, forbidden, `${rel} ${row.name} 页面不出现钱、权益、价目、管理员`)
           if (row.hide) assert.equal(shown.includes(row.hide), false, `${rel} ${row.name} 页面不显示后台 label`)
@@ -591,6 +653,101 @@ test('简历导出九种输入：说法、导出门与页面最终显示', async
           assert.match(page.data.pricing.text, /¥/)
           assert.match(shown, /权益/)
         }
+      }
+    }
+  } finally {
+    if (prevWx === undefined) delete globalThis.wx
+    else globalThis.wx = prevWx
+  }
+})
+
+test('简历导出：金额不是大于 0 时，无匹配权益、权益失败、价目失败都不显示钱', async () => {
+  const forbidden = /权益|单价|元|¥|￥|价目/
+  const quietRaw = { mode: 'charged', unitCents: 0, benefit: { available: 2 } }
+  const cases = [
+    {
+      name: '无匹配权益',
+      raw: quietRaw,
+      pricing: () => Promise.resolve(quietRaw),
+      benefits: () => Promise.resolve([{ id: 'nope', benefitType: 'manual_note', status: 'active', quantityRemaining: 3 }]),
+      text: '可以导出。',
+      reason: '',
+    },
+    {
+      name: '权益请求失败',
+      raw: quietRaw,
+      pricing: () => Promise.resolve(quietRaw),
+      benefits: () => Promise.reject(new Error('加载权益失败，单价 ¥1.00 元，请看价目')),
+      text: '可以导出。',
+      reason: '',
+    },
+    {
+      name: '价目请求失败',
+      raw: null,
+      pricing: () => Promise.reject(new Error('价目读取失败，权益单价 ¥1.00 元')),
+      benefits: () => Promise.resolve([]),
+      text: '暂时无法确认能否导出',
+      reason: '暂时无法确认能否导出，当前不能导出。',
+    },
+  ]
+  const { flush, instantiate, loadPageDefinition } = await import('./page-sandbox.mjs')
+  const wx = {
+    getStorageSync: () => '',
+    setStorageSync() {},
+    removeStorageSync() {},
+    showToast() {},
+    showLoading() {},
+    hideLoading() {},
+    showModal() {},
+    navigateTo() {},
+    redirectTo() {},
+    navigateBack() {},
+    switchTab() {},
+    downloadFile() {},
+    openDocument() {},
+  }
+  const prevWx = globalThis.wx
+  globalThis.wx = wx
+  try {
+    for (const [rel, entry] of Object.entries(EXPORT_PRICE_DISPLAY)) {
+      for (const row of cases) {
+        const api = {
+          getResumeExportPricing: row.pricing,
+          getMyBenefits: row.benefits,
+          getResumeRecord: () => Promise.resolve({
+            status: 'completed',
+            taskId: 'task-1',
+            fileId: 'file-1',
+            report: { sections: [{ key: 'structure', label: '结构', score: 3, maxScore: 5 }] },
+          }),
+          getResumeOptimize: () => Promise.resolve({
+            taskId: 'task-1',
+            status: 'completed',
+            optimizedResume: { basic: { name: '甲' } },
+            modules: [],
+          }),
+          getResumeDraft: () => Promise.resolve(null),
+          getResumeVersions: () => Promise.resolve({ items: [] }),
+        }
+        const auth = {
+          isLoggedIn: () => true,
+          getUser: () => ({ id: 'member-1' }),
+          getToken: () => 'tok',
+        }
+        const page = instantiate(loadPageDefinition(entry.js, { wx, modules: { api, auth } }))
+        page.onLoad({ taskId: 'task-1' })
+        await flush()
+        await flush()
+        await flush()
+        await flush()
+        assert.equal(entry.done(page), true, `${rel} ${row.name} 要进到能看见导出区的完成态`)
+        assert.equal(page.data.pricing.text, row.text, `${rel} ${row.name} text`)
+        assert.equal(page.data.pricing.disabledReason, row.reason, `${rel} ${row.name} pricing.disabledReason`)
+        assert.equal(page.data.exportDisabledReason, row.reason, `${rel} ${row.name} 页面最终 disabledReason`)
+        assert.equal(page.data.exportDisabled, row.reason !== '', `${rel} ${row.name} 能不能导出`)
+        if (row.raw) assert.equal(row.reason === '', baselineCanExport(row.raw, true), `${rel} ${row.name} 导出门与基线一致`)
+        const shown = shownExportText(rel, page)
+        assert.doesNotMatch(shown, forbidden, `${rel} ${row.name} 页面不出现权益、单价、元、价目`)
       }
     }
   } finally {

@@ -888,6 +888,21 @@ const { SUPPORT_HINT } = require('./user-error');
 const EXPORT_PAUSED_TEXT = '简历导出暂时用不了。';
 /** 收费模式但金额不是大于 0 的整数。只改说法，导出门与基线一致，不编原因。 */
 const EXPORT_UNCONFIRMED_TEXT = '导出暂时还不能开始。';
+const EXPORT_PRICE_UNREADABLE_TEXT = '暂时无法确认能否导出';
+const EXPORT_PRICE_WORD = /权益|单价|元|¥|￥|价目/;
+
+/** 服务端金额是大于 0 的整数时，页面才可以提单价和权益。 */
+function exportUnitPriceKnown(pricing) {
+  const cents = Number(pricing && pricing.unitCents);
+  return Number.isSafeInteger(cents) && cents > 0;
+}
+
+/** 价目接口失败时不把原文贴上页面：原文可能带单价、权益或价目。 */
+function exportPricingFailureCopy(err) {
+  const raw = err && typeof err.message === 'string' ? err.message.trim() : '';
+  const text = raw && !EXPORT_PRICE_WORD.test(raw) ? raw : EXPORT_PRICE_UNREADABLE_TEXT;
+  return { text, disabledReason: `${text}，当前不能导出。` };
+}
 
 /** mode 缺失或异常时按 unavailable，不能把未知收费状态回落成免费。 */
 function resumeExportPricing(raw, loggedIn) {
@@ -985,6 +1000,8 @@ module.exports = {
   resumeExportResult,
   resumeExportBenefitId,
   resumeExportPricing,
+  exportUnitPriceKnown,
+  exportPricingFailureCopy,
   formatFileSize,
   scaleLabel,
   fairCompanyLike,

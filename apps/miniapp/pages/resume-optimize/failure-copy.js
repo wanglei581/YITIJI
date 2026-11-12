@@ -11,18 +11,18 @@ const OPTIMIZE_FAIL_BY_CODE = {
   AI_TASK_NOT_FOUND: '优化记录不存在或无权访问',
 }
 
-/** 请求抛错和 HTTP 200 且 status:failed 走同一张码表。 */
+/** 请求抛错和 HTTP 200 且 status:failed 走同一张码表。未知码不把让人去找人的原话贴出来。 */
 function optimizeFailureView(code, failReason) {
   if (code && Object.prototype.hasOwnProperty.call(OPTIMIZE_FAIL_BY_CODE, code)) {
     return { failMsg: OPTIMIZE_FAIL_BY_CODE[code], needReupload: false }
   }
   const reason = typeof failReason === 'string' ? failReason.trim() : ''
   const needReupload = /简历原文|清理|重新上传/.test(reason)
-  const unsafe = !reason || /管理员|真实性校验/.test(reason)
-  const failMsg = !unsafe
-    ? reason
-    : (needReupload ? '请重新上传简历后再试。' : (reason ? '优化生成失败，请稍后重试。' : '加载失败，请返回重试'))
-  return { failMsg, needReupload }
+  const unsafe = !reason || /管理员|真实性校验|工作人员|现场人员|店员|值守人员|服务台|到店/.test(reason)
+  const fallback = needReupload
+    ? '请重新上传简历后再试。'
+    : (reason ? '优化生成失败，请稍后重试。' : '加载失败，请返回重试。')
+  return { failMsg: unsafe ? `${fallback}${SUPPORT_HINT}` : reason, needReupload }
 }
 
 module.exports = { optimizeFailureView }

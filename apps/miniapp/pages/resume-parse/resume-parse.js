@@ -510,19 +510,30 @@ Page({
     if (this._pollTimer) clearTimeout(this._pollTimer)
     const note = extra || {}
     const missing = fileMissingOf(err, auth.isLoggedIn())
-    const fileMissing = missing && note.fileChanged !== true
-    // 登录后这份游客文件已经对不上账号，原样重试被关掉。旧解析标识还留着的话，
-    // 下一份新文件会撞上 INTENT_CONFLICT，解析走不下去。只清这一条。
-    if (fileMissing && this._intent && this._submitIdentity) {
-      const intent = this._intent
-      const ownerId = this._submitIdentity.ownerId
-      this._intent = ''
-      this._intentPayload = null
-      intentStore.clear(intent, ownerId)
+    if (missing && note.fileChanged !== true && this._intent && this._submitIdentity) {
+      this._dropIntent().then((ok) => { if (!this._stopped) this._applyFail(err, note, missing, !ok) })
+      return
     }
+    this._applyFail(err, note, missing, false)
+  },
+
+  _dropIntent() {
+    const intent = this._intent
+    const identity = this._submitIdentity
+    if (!intent || !identity) return Promise.resolve(true)
+    return intentStore.clear(intent, identity.ownerId).then((cleared) => {
+      const ok = !!(cleared && (cleared.ok === true || cleared.code === 'INTENT_NOT_FOUND'))
+      if (ok && this._intent === intent) { this._intent = ''; this._intentPayload = null }
+      return ok
+    }, () => false)
+  },
+
+  _applyFail(err, note, missing, stuck) {
+    const blocked = '没能清掉上一次的记录，请再点一次重新选择'
+    const ordinary = note.message || (err && err.message) || (missing ? '这份简历文件已经对不上当前账号，请重新选择文件。' : '') || '解析失败,请稍后重试'
     this.setData({
       phase: 'failed',
-      failMsg: note.message || (err && err.message) || (missing ? '这份简历文件已经对不上当前账号，请重新选择文件。' : '') || '解析失败,请稍后重试',
+      failMsg: stuck ? blocked : ordinary,
       quotaReleased: note.quotaReleased === true,
       quotaReleaseBlocked: note.quotaReleaseBlocked === true,
       terminalCharge: false,
@@ -770,7 +781,12 @@ Page({
   },
 
   toUpload() {
-    wx.redirectTo({ url: '/pages/resume-upload/resume-upload' })
+    if (!(this.data.fileMissing && this._intent)) return wx.redirectTo({ url: '/pages/resume-upload/resume-upload' })
+    this._dropIntent().then((ok) => {
+      if (this._stopped) return
+      if (ok) return wx.redirectTo({ url: '/pages/resume-upload/resume-upload' })
+      this.setData({ phase: 'failed', failMsg: '没能清掉上一次的记录，请再点一次重新选择', fileMissing: true })
+    })
   },
 
   back() {

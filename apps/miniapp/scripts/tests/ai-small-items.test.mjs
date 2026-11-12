@@ -236,6 +236,23 @@ test('优化失败：200 失败回包和请求抛错按同一错误码说，不�
   )))
   assert.equal(thrown.data.failMsg, failedBody.data.failMsg, '模型没配的两种回包是同一句')
 
+  const unavailableCode = await open('opt-unavail', () => Promise.reject(Object.assign(
+    new Error('AI 优化服务暂时不可用，请稍后重试'),
+    { code: 'AI_OPTIMIZE_UNAVAILABLE' },
+  )))
+  assert.equal(unavailableCode.data.failMsg, 'AI 优化服务暂时不可用，请稍后重试。')
+  assert.match(unavailableCode.data.failMsg, /暂时不可用/)
+  assert.doesNotMatch(unavailableCode.data.failMsg, /真实性校验/)
+
+  const unknownCode = await open('opt-unknown', () => Promise.resolve({
+    taskId: 'opt-unknown',
+    status: 'failed',
+    failCode: 'SOME_NEW_CODE',
+    failReason: '请找工作人员，或联系管理员',
+  }))
+  assert.match(unknownCode.data.failMsg, /服务电话/)
+  assert.doesNotMatch(unknownCode.data.failMsg, /工作人员|管理员/)
+
   const reupload = await open('opt-5', () => Promise.resolve({
     taskId: 'opt-5',
     status: 'failed',
@@ -423,6 +440,50 @@ test('登录后重新选择文件再上传：新文件继续解析，不撞旧�
   assert.equal(parse2.data.fileMissing, false)
   assert.equal(parse2.data.done, true)
   assert.equal(parse2.data.atext, '解析完成')
+})
+
+test('重新选择文件时清不掉旧解析标识：停在当前页，不进新文件上传', async () => {
+  const wx = createWx()
+  const storageMod = requireMiniapp('../utils/storage.js')
+  const key = storageMod.KEYS.RESUME_PARSE_INTENT
+  let intentWrites = 0
+  const realSet = wx.setStorageSync
+  wx.setStorageSync = (k, value) => {
+    if (k === key) {
+      intentWrites += 1
+      if (intentWrites > 1) throw new Error('disk')
+    }
+    realSet(k, value)
+  }
+  const missing = new Error('文件不存在或已被清理')
+  missing.statusCode = 404
+  missing.code = 'FILE_NOT_FOUND'
+  let uploads = 0
+  const api = {
+    parseResume: () => Promise.reject(missing),
+    uploadResumeFile: () => { uploads += 1; return Promise.resolve({ fileId: 'new-file' }) },
+  }
+  const page = makePage('pages/resume-parse/resume-parse.js', { wx, auth: createAuth('member-1'), api })
+  page.onLoad({ fileId: 'guest-file', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  await flush()
+  await flush()
+  assert.equal(page.data.phase, 'failed')
+  assert.equal(page.data.fileMissing, true)
+  assert.equal(page.data.failMsg, '没能清掉上一次的记录，请再点一次重新选择')
+  const kept = wx.getStorageSync(key)
+  assert.equal(Array.isArray(kept) && kept.length === 1, true, '旧解析标识还在')
+  page.toUpload()
+  await flush()
+  assert.equal(wx.calls.redirect.length, 0, '清不掉就不进上传页')
+  assert.equal(uploads, 0)
+  assert.equal(page.data.failMsg, '没能清掉上一次的记录，请再点一次重新选择')
+  wx.setStorageSync = realSet
+  page.toUpload()
+  await flush()
+  await flush()
+  assert.equal(wx.calls.redirect[0], '/pages/resume-upload/resume-upload')
+  assert.equal(uploads, 0, '离开本页这一步还不上传新文件')
 })
 
 test('超过每天免费面数：本机和个人、一份和多份都原样显示', () => {
