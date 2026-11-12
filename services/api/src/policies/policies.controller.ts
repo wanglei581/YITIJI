@@ -9,11 +9,14 @@ import { PoliciesService } from './policies.service'
 import { PolicyEligibilityService } from './policy-eligibility.service'
 import {
   CreatePolicyPostDto,
+  PolicyDraftCheckDto,
   PolicyEligibilityCheckDto,
   PolicyEligibilityPreviewDto,
   ReplacePolicyEligibilityRulesDto,
+  SaveAndPublishPolicyDto,
   UpdatePolicyPostDto,
 } from './dto/policy.dto'
+import { saveAndPublishPartnerPolicy } from './policy-save-and-publish'
 import { POLICY_RULE_MANUAL_MODE, type PolicyRuleMatchMode } from './policy-eligibility.types'
 import { ReviewActionDto } from '../jobs/dto/review.dto'
 import { PartnerUnpublishActionDto } from '../jobs/dto/publish.dto'
@@ -31,6 +34,9 @@ import { PolicyScopeService, resolvePolicyScope } from './policy-scope.service'
  *   Partner(Bearer + partner,本机构):
  *     GET    /partner/policies
  *     POST   /partner/policies                    新增(默认 pending+draft)
+ *     POST   /partner/policies/draft-check        保存前预估链接与清单（不落库）
+ *     POST   /partner/policies/release-with-save  保存、审核通过并发布（一次请求）
+ *     POST   /partner/policies/:id/release-with-save  编辑后同样一次走完
  *     PATCH  /partner/policies/:id                编辑(强制回 pending+draft 重审)
  *     GET    /partner/policies/:id/eligibility-rules
  *     PUT    /partner/policies/:id/eligibility-rules  整组替换(强制回 pending+draft)
@@ -181,6 +187,32 @@ export class PoliciesController {
   @Roles('partner')
   createPartnerPolicy(@Body() dto: CreatePolicyPostDto, @CurrentUser() user: AuthedUser) {
     return this.policies.createPartnerPolicy(dto, user)
+  }
+
+  @Post('partner/policies/draft-check')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  previewPolicyDraft(@Body() dto: PolicyDraftCheckDto, @CurrentUser() user: AuthedUser) {
+    return this.policies.previewPolicyDraft(user, dto)
+  }
+
+  @Post('partner/policies/release-with-save')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  releaseWithSave(@Body() dto: SaveAndPublishPolicyDto, @CurrentUser() user: AuthedUser) {
+    return saveAndPublishPartnerPolicy(this.policies, user, dto, {
+      responsibilityAcknowledged: dto.responsibilityAcknowledged,
+    })
+  }
+
+  @Post('partner/policies/:id/release-with-save')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  releaseExistingWithSave(@Param('id') id: string, @Body() dto: SaveAndPublishPolicyDto, @CurrentUser() user: AuthedUser) {
+    return saveAndPublishPartnerPolicy(this.policies, user, dto, {
+      id,
+      responsibilityAcknowledged: dto.responsibilityAcknowledged,
+    })
   }
 
   @Patch('partner/policies/:id')

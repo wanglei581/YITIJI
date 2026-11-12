@@ -72,7 +72,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2189 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2192 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2360,7 +2360,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 147 个文件</summary>
+<summary><code>services/api/scripts/</code> — 148 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2429,6 +2429,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/partner-terminal-ops-cases.ts` | `verify-partner-stats-contract.ts` |
 | `services/api/scripts/support/payment-callback-race-cases.ts` | `verify-payment-flow.ts` |
 | `services/api/scripts/support/png-fixtures.ts` | `verify-brand-logo-image.ts`<br/>`verify-branding.ts` |
+| `services/api/scripts/support/policy-one-step-http-cases.ts` | `verify-content-pipeline-e2e.ts` |
 | `services/api/scripts/support/policy-publish-fixture.ts` | `verify-content-trust-publish-gate.ts`<br/>`verify-policies.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-policy-publish-gates.ts` |
 | `services/api/scripts/support/recruitment-wave2-full-inventory.ts` | `verify-recruitment-wave2-full-inventory.ts` |
 | `services/api/scripts/support/recruitment-wave2-public-snapshot.ts` | `verify-recruitment-wave2-full-inventory.ts` |
@@ -2515,7 +2516,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 691 个文件</summary>
+<summary><code>services/api/src/</code> — 693 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -3062,6 +3063,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/policies/policies.controller.ts` | `verify-license-state.ts`<br/>`verify-policies.ts`<br/>`verify-policy-scope.ts` |
 | `services/api/src/policies/policies.module.ts` | `verify-policy-scope.ts` |
 | `services/api/src/policies/policies.service.ts` | `verify-assess-isolation.ts`<br/>`verify-bulk-publish.ts`<br/>`verify-content-trust-publish-gate.ts`<br/>`verify-license-state.ts`<br/>`verify-policies.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-policy-publish-gates.ts`<br/>`verify-publish-expiry-completeness.ts` |
+| `services/api/src/policies/policy-checklist-layout.ts` | `verify-policy-checklist.ts` |
 | `services/api/src/policies/policy-checklist-pdf.ts` | `verify-policy-checklist.ts` |
 | `services/api/src/policies/policy-checklist.controller.ts` | `verify-policy-checklist.ts` |
 | `services/api/src/policies/policy-checklist.service.ts` | `verify-policy-checklist.ts` |
@@ -3069,6 +3071,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/policies/policy-eligibility.service.ts` | `verify-policies.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-policy-eligibility.ts` |
 | `services/api/src/policies/policy-eligibility.types.ts` | `verify-policy-eligibility-authoring.ts`<br/>`verify-policy-eligibility.ts` |
 | `services/api/src/policies/policy-public-visibility.ts` | `verify-policy-scope.ts` |
+| `services/api/src/policies/policy-save-and-publish.ts` | `verify-policy-publish-gates.ts` |
 | `services/api/src/policies/policy-scope.service.ts` | `verify-policy-scope.ts` |
 | `services/api/src/policies/policy-source-link.ts` | `verify-policy-publish-gates.ts` |
 | `services/api/src/print-conversion/print-conversion.controller.ts` | `verify-ai-access.ts`<br/>`verify-print-conversion.ts` |

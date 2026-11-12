@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`646` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`649` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -1009,7 +1009,10 @@
 | PUT | `/api/v1/partner/policies/:id/eligibility-rules` | PoliciesController.replacePartnerEligibilityRules | partner | PolicyEligibilityService | AuditLog<br/>PolicyEligibilityRule<br/>PolicyPost |
 | PATCH | `/api/v1/partner/policies/:id/publish` | PoliciesController.unpublishPartnerPolicy | partner | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentEmergencyHold |
 | PATCH | `/api/v1/partner/policies/:id/release` | PoliciesController.releasePartnerPolicy | partner | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentEmergencyHold |
+| POST | `/api/v1/partner/policies/:id/release-with-save` | PoliciesController.releaseExistingWithSave | partner | — | — |
 | PATCH | `/api/v1/partner/policies/:id/review` | PoliciesController.reviewPartnerPolicy | partner | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentEmergencyHold |
+| POST | `/api/v1/partner/policies/draft-check` | PoliciesController.previewPolicyDraft | partner | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentEmergencyHold |
+| POST | `/api/v1/partner/policies/release-with-save` | PoliciesController.releaseWithSave | partner | — | — |
 | GET | `/api/v1/policies` | PoliciesController.getPolicies | — | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentEmergencyHold |
 | GET | `/api/v1/policies/:id` | PoliciesController.getPublishedPolicy | — | PoliciesService | AuditLog<br/>Organization<br/>PartnerOrgNotice<br/>PolicyPost<br/>RecruitmentEmergencyHold |
 | POST | `/api/v1/policies/eligibility-check` | PoliciesController.checkEligibility | — | PolicyEligibilityService | AuditLog<br/>PolicyEligibilityRule<br/>PolicyPost |

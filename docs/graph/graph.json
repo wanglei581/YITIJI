@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 646,
+    "endpointCount": 649,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -11488,6 +11488,18 @@
       },
       {
         "controller": "services/api/src/policies/policies.controller.ts",
+        "handler": "PoliciesController.releaseExistingWithSave",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/partner/policies/:id/release-with-save",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/policies/policies.controller.ts",
         "handler": "PoliciesController.reviewPartnerPolicy",
         "method": "PATCH",
         "models": [
@@ -11507,6 +11519,40 @@
         "services": [
           "PoliciesService"
         ]
+      },
+      {
+        "controller": "services/api/src/policies/policies.controller.ts",
+        "handler": "PoliciesController.previewPolicyDraft",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "Organization",
+          "PartnerOrgNotice",
+          "PolicyPost",
+          "RecruitmentEmergencyHold"
+        ],
+        "path": "/api/v1/partner/policies/draft-check",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/policies/policies.service.ts"
+        ],
+        "services": [
+          "PoliciesService"
+        ]
+      },
+      {
+        "controller": "services/api/src/policies/policies.controller.ts",
+        "handler": "PoliciesController.releaseWithSave",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/partner/policies/release-with-save",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/orgs/partner-org.controller.ts",
@@ -17860,6 +17906,7 @@
             "POST /partner/jobs/import",
             "POST /partner/policies",
             "POST /partner/policies/:param/eligibility-preview",
+            "POST /partner/policies/draft-check",
             "PUT /partner/policies/:param/eligibility-rules",
             "PUT /partner/profile",
             "PUT /partner/smart-campus/terminals/:param/config"
@@ -18057,6 +18104,7 @@
             "POST /partner/official-channels",
             "POST /partner/policies",
             "POST /partner/policies/:param/eligibility-preview",
+            "POST /partner/policies/draft-check",
             "PUT /partner/policies/:param/eligibility-rules",
             "PUT /partner/smart-campus/terminals/:param/config"
           ],
@@ -26290,6 +26338,9 @@
       "services/api/scripts/verify-brand-logo-image.ts",
       "services/api/scripts/verify-branding.ts"
     ],
+    "services/api/scripts/support/policy-one-step-http-cases.ts": [
+      "services/api/scripts/verify-content-pipeline-e2e.ts"
+    ],
     "services/api/scripts/support/policy-publish-fixture.ts": [
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-policies.ts",
@@ -30005,6 +30056,9 @@
       "services/api/scripts/verify-policy-publish-gates.ts",
       "services/api/scripts/verify-publish-expiry-completeness.ts"
     ],
+    "services/api/src/policies/policy-checklist-layout.ts": [
+      "services/api/scripts/verify-policy-checklist.ts"
+    ],
     "services/api/src/policies/policy-checklist-pdf.ts": [
       "services/api/scripts/verify-policy-checklist.ts"
     ],
@@ -30029,6 +30083,9 @@
     ],
     "services/api/src/policies/policy-public-visibility.ts": [
       "services/api/scripts/verify-policy-scope.ts"
+    ],
+    "services/api/src/policies/policy-save-and-publish.ts": [
+      "services/api/scripts/verify-policy-publish-gates.ts"
     ],
     "services/api/src/policies/policy-scope.service.ts": [
       "services/api/scripts/verify-policy-scope.ts"
@@ -41152,6 +41209,7 @@
         "files": [
           "services/api/scripts/support/content-pipeline-fixtures.ts",
           "services/api/scripts/support/content-pipeline-harness.ts",
+          "services/api/scripts/support/policy-one-step-http-cases.ts",
           "services/api/src/common/crypto/secret-cipher.ts",
           "services/api/src/common/guards/end-user-auth.guard.ts",
           "services/api/src/job-sync/job-sync.service.ts",
@@ -45870,6 +45928,7 @@
           "services/api/src/files/signing.ts",
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/pricing.service.ts",
+          "services/api/src/policies/policy-checklist-layout.ts",
           "services/api/src/policies/policy-checklist-pdf.ts",
           "services/api/src/policies/policy-checklist.controller.ts",
           "services/api/src/policies/policy-checklist.service.ts",
@@ -45966,6 +46025,7 @@
           "services/api/src/common/decorators/current-user.decorator.ts",
           "services/api/src/policies/dto/policy.dto.ts",
           "services/api/src/policies/policies.service.ts",
+          "services/api/src/policies/policy-save-and-publish.ts",
           "services/api/src/policies/policy-source-link.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
