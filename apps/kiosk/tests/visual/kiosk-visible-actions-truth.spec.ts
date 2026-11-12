@@ -171,7 +171,8 @@ test('逐条对照要求新增事实确认并回传裁决 @kiosk', async ({ page
 
   const useRewrite = page.getByRole('button', { name: '用改写' })
   await expect(useRewrite).toBeDisabled()
-  await expect(page.getByText('5000', { exact: true }).first()).toBeVisible()
+  // R2（11/13）起新增事实显示带上下文的片段（定稿 screens.js 对照页「周更 2 篇是我的真实信息」）
+  await expect(page.getByText('完成 5000 条记录', { exact: true }).first()).toBeVisible()
   // 第 1 条有待确认的新增事实：两张文字卡随内容高。
   await expectCompareCardsHugTheirContent(page, '第 1 条（有待确认事实）')
   await page.getByRole('checkbox', { name: /5000/ }).check()
