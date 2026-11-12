@@ -510,6 +510,16 @@ Page({
     if (this._pollTimer) clearTimeout(this._pollTimer)
     const note = extra || {}
     const missing = fileMissingOf(err, auth.isLoggedIn())
+    const fileMissing = missing && note.fileChanged !== true
+    // 登录后这份游客文件已经对不上账号，原样重试被关掉。旧解析标识还留着的话，
+    // 下一份新文件会撞上 INTENT_CONFLICT，解析走不下去。只清这一条。
+    if (fileMissing && this._intent && this._submitIdentity) {
+      const intent = this._intent
+      const ownerId = this._submitIdentity.ownerId
+      this._intent = ''
+      this._intentPayload = null
+      intentStore.clear(intent, ownerId)
+    }
     this.setData({
       phase: 'failed',
       failMsg: note.message || (err && err.message) || (missing ? '这份简历文件已经对不上当前账号，请重新选择文件。' : '') || '解析失败,请稍后重试',

@@ -639,7 +639,7 @@ const normalizeJs = read('utils/normalize.js')
 const pricingCopyOk =
   normalizeJs.includes("text: '当前免费', disabledReason: ''") &&
   normalizeJs.includes('可用权益 ${count} 次') &&
-  normalizeJs.includes('简历导出当前不可用（价目已停用，不是免费）')
+  normalizeJs.includes('简历导出暂时用不了。')
 const unavailableFailClosed = [resumeDiagnoseJs, resumeOptimizeJs].every((source) =>
   source.includes("pricing: { mode: 'unavailable'") &&
   source.includes('else if (this.data.pricing.disabledReason) reason = this.data.pricing.disabledReason') &&

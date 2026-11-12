@@ -1,17 +1,19 @@
 /**
  * 包 3 的页面行为：没登录不选文件、游客文件找不到后改重新选择、
- * 我的简历按 kind 跳转、优化失败只在事实核查码上说真实性校验、
+ * 我的简历按 kind 跳转、优化失败两种回包按错误码说、
  * AI 结果的保存期限。由 verify:page-lifecycle 拉起。
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { flush, instantiate, loadPageDefinition } from './page-sandbox.mjs'
 
 const MINIAPP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (rel) => fs.readFileSync(path.join(MINIAPP, rel), 'utf8')
+const requireMiniapp = createRequire(path.join(MINIAPP, 'utils', 'entry.js'))
 
 let ACTIVE_WX = null
 Object.defineProperty(globalThis, 'wx', { get: () => ACTIVE_WX, configurable: true })
@@ -153,8 +155,8 @@ test('我的简历：解析进诊断，生成进生成结果', async () => {
     auth: createAuth('member-1'),
     api: {
       getMyResumes: () => Promise.resolve([
-        { id: 'p1', taskId: 'task-parse', kind: 'parse', status: 'completed', createdAt: '2026-03-01T00:00:00+08:00', expiresAt: '2026-03-02T00:00:00+08:00' },
-        { id: 'g1', taskId: 'task-gen', kind: 'generate', status: 'completed', createdAt: '2026-03-01T00:00:00+08:00', expiresAt: '2026-03-01T00:00:00+08:00' },
+        { id: 'p1', taskId: 'task-parse', kind: 'parse', status: 'completed', createdAt: '2026-03-01T12:00:00.000Z', expiresAt: '2026-03-02T12:00:00.000Z' },
+        { id: 'g1', taskId: 'task-gen', kind: 'generate', status: 'completed', createdAt: '2026-03-01T12:00:00.000Z', expiresAt: '2026-03-01T12:00:00.000Z' },
       ]),
     },
   })
@@ -175,63 +177,78 @@ test('我的简历：解析进诊断，生成进生成结果', async () => {
   assert.doesNotMatch(wxml, /点击简历可查看诊断报告/)
 })
 
-test('优化失败：只有事实核查码才说真实性校验；模型没配不找管理员', async () => {
+test('优化失败：200 失败回包和请求抛错按同一错误码说，不把非法输出当成事实核查', async () => {
+  const { SUPPORT_HINT } = requireMiniapp('../utils/user-error.js')
+  const unavailable = `AI 优化暂时用不了。${SUPPORT_HINT}`
+  const invalid = 'AI 优化没有生成可用结果，请稍后重试。'
   const baseApi = {
     getResumeExportPricing: () => Promise.resolve({ mode: 'free', unitCents: 0 }),
     getMyBenefits: () => Promise.resolve([]),
   }
-  const wx = createWx()
-  const fact = makePage('pages/resume-optimize/resume-optimize.js', {
-    wx,
-    auth: createAuth('member-1'),
-    api: Object.assign({}, baseApi, {
-      getResumeOptimize: () => Promise.resolve({
-        taskId: 'opt-1',
-        status: 'failed',
-        failCode: 'AI_OPTIMIZE_INVALID_OUTPUT',
-        failReason: '优化结果包含无法从原文确认的信息，系统已拦截，请重新生成或检查原文',
-      }),
-    }),
-  })
-  fact.onLoad({ taskId: 'opt-1' })
-  await flush()
-  await flush()
-  assert.equal(fact.data.factBlocked, true)
-  assert.match(fact.data.failMsg, /无法从原文确认/)
-  assert.doesNotMatch(fact.data.failMsg, /真实性校验/)
+  async function open(taskId, getResumeOptimize) {
+    const page = makePage('pages/resume-optimize/resume-optimize.js', {
+      wx: createWx(),
+      auth: createAuth('member-1'),
+      api: Object.assign({}, baseApi, { getResumeOptimize }),
+    })
+    page.onLoad({ taskId })
+    await flush()
+    await flush()
+    return page
+  }
 
-  const other = makePage('pages/resume-optimize/resume-optimize.js', {
-    wx: createWx(),
-    auth: createAuth('member-1'),
-    api: Object.assign({}, baseApi, {
-      getResumeOptimize: () => Promise.reject(Object.assign(new Error('AI 优化服务暂时不可用，请稍后重试'), { code: 'AI_OPTIMIZE_UNAVAILABLE' })),
-    }),
-  })
-  other.onLoad({ taskId: 'opt-2' })
-  await flush()
-  await flush()
-  assert.equal(other.data.factBlocked, false)
-  assert.match(other.data.failMsg, /暂时不可用/)
-  assert.doesNotMatch(other.data.failMsg, /真实性校验/)
+  const factLike = await open('opt-1', () => Promise.resolve({
+    taskId: 'opt-1',
+    status: 'failed',
+    failCode: 'AI_OPTIMIZE_INVALID_OUTPUT',
+    failReason: '优化结果包含无法从原文确认的信息，系统已拦截，请重新生成或检查原文',
+  }))
+  assert.equal(factLike.data.phase, 'failed')
+  assert.equal(factLike.data.failMsg, invalid)
+  assert.equal(factLike.data.factBlocked, undefined)
+  assert.doesNotMatch(factLike.data.failMsg, /真实性校验|无法从原文确认/)
 
-  const unconfigured = makePage('pages/resume-optimize/resume-optimize.js', {
-    wx: createWx(),
-    auth: createAuth('member-1'),
-    api: Object.assign({}, baseApi, {
-      getResumeOptimize: () => Promise.reject(Object.assign(new Error('AI_PROVIDER_NOT_CONFIGURED'), { code: 'AI_PROVIDER_NOT_CONFIGURED' })),
-    }),
-  })
-  unconfigured.onLoad({ taskId: 'opt-3' })
-  await flush()
-  await flush()
-  assert.match(unconfigured.data.failMsg, /AI 优化暂时用不了，可以先手动修改简历。/)
-  assert.match(unconfigured.data.failMsg, /服务电话/)
-  assert.doesNotMatch(unconfigured.data.failMsg, /管理员/)
-  assert.equal(unconfigured.data.factBlocked, false)
+  const notJson = await open('opt-json', () => Promise.resolve({
+    taskId: 'opt-json',
+    status: 'failed',
+    failCode: 'AI_OPTIMIZE_INVALID_OUTPUT',
+    failReason: '不是合法 JSON',
+  }))
+  assert.equal(notJson.data.failMsg, invalid, '非法 JSON 与事实不符是同一个码，不说真实性校验')
+  assert.doesNotMatch(notJson.data.failMsg, /真实性校验|不是合法 JSON/)
+
+  const thrownInvalid = await open('opt-throw', () => Promise.reject(Object.assign(new Error('不是合法 JSON'), { code: 'AI_OPTIMIZE_INVALID_OUTPUT' })))
+  assert.equal(thrownInvalid.data.failMsg, notJson.data.failMsg, '抛错和 200 失败回包是同一句')
+
+  const failedBody = await open('opt-3', () => Promise.resolve({
+    taskId: 'opt-3',
+    status: 'failed',
+    failCode: 'AI_PROVIDER_NOT_CONFIGURED',
+    failReason: 'AI 简历优化模型尚未配置，请联系管理员后重试',
+  }))
+  assert.equal(failedBody.data.failMsg, unavailable)
+  assert.match(failedBody.data.failMsg, /服务电话/)
+  assert.doesNotMatch(failedBody.data.failMsg, /管理员|手动修改/)
+
+  const thrown = await open('opt-4', () => Promise.reject(Object.assign(
+    new Error('AI 简历优化模型尚未配置或未启用，请联系管理员'),
+    { code: 'AI_PROVIDER_NOT_CONFIGURED' },
+  )))
+  assert.equal(thrown.data.failMsg, failedBody.data.failMsg, '模型没配的两种回包是同一句')
+
+  const reupload = await open('opt-5', () => Promise.resolve({
+    taskId: 'opt-5',
+    status: 'failed',
+    failReason: '简历原文已清理，请重新上传',
+  }))
+  assert.equal(reupload.data.needReupload, true)
+  assert.match(reupload.data.failMsg, /重新上传/)
 
   const wxml = read('pages/resume-optimize/resume-optimize.wxml')
-  assert.match(wxml, /wx:if="\{\{factBlocked\}\}"[\s\S]{0,80}真实性校验/)
-  assert.equal(/wx:if="\{\{!needReupload\}\}"[\s\S]{0,40}真实性校验/.test(wxml), false)
+  assert.doesNotMatch(wxml, /真实性校验/)
+  assert.doesNotMatch(wxml, /手动修改/)
+  assert.match(wxml, /bindtap="tapRetry">重试/)
+  assert.match(wxml, /bindtap="goBack">返回/)
 })
 
 test('AI 服务记录：有到期日的逐条写，面试记录不编日期，列表说明保存多久', async () => {
@@ -241,7 +258,7 @@ test('AI 服务记录：有到期日的逐条写，面试记录不编日期，�
     auth: createAuth('member-1'),
     api: {
       getMyAiRecords: () => Promise.resolve([
-        { id: 'r1', taskId: 't1', kind: 'parse', status: 'completed', createdAt: '2026-03-01T01:00:00+08:00', expiresAt: '2026-03-02T00:00:00+08:00' },
+        { id: 'r1', taskId: 't1', kind: 'parse', status: 'completed', createdAt: '2026-03-01T12:00:00.000Z', expiresAt: '2026-03-02T12:00:00.000Z' },
       ]),
       getMyMockInterviews: () => Promise.resolve([
         { sessionId: 's1', position: '行政助理', hasReport: true, createdAt: '2026-03-01T02:00:00+08:00' },
@@ -277,4 +294,151 @@ test('自我探索：次数用完说明天 0 点恢复', () => {
   })
   assert.equal(view.aiReasonText, '今天的 AI 次数用完了，明天 0 点恢复。')
   assert.doesNotMatch(view.aiReasonText, /购买|套餐|权益|没有开放/)
+})
+
+test('到期日空值、空串、非法日期不显示 1970，问答要点走同一条', async () => {
+  const qa = requireMiniapp('../pages/ai-records/qa-records.js')
+  const samples = [
+    { id: 'n', expiresAt: null, viewUntil: '' },
+    { id: 'e', expiresAt: '', viewUntil: '' },
+    { id: 'u', viewUntil: '' },
+    { id: 'b', expiresAt: 'not-a-date', viewUntil: '' },
+    { id: 'ok', expiresAt: '2026-04-02T12:00:00.000Z', viewUntil: '4 月 2 日前可查看' },
+  ]
+  const page = makePage('pages/resumes/resumes.js', {
+    wx: createWx(),
+    auth: createAuth('member-1'),
+    api: {
+      getMyResumes: () => Promise.resolve(samples.map((row) => ({
+        id: row.id,
+        taskId: `task-${row.id}`,
+        kind: 'parse',
+        status: 'completed',
+        createdAt: '2026-04-01T12:00:00.000Z',
+        expiresAt: row.expiresAt,
+      }))),
+    },
+  })
+  page.onShow()
+  await flush()
+  await flush()
+  for (const row of samples) {
+    const item = page.data.resumes.find((entry) => entry.id === row.id)
+    assert.ok(item, row.id)
+    assert.equal(item.viewUntil, row.viewUntil, `我的简历 ${row.id}`)
+  }
+
+  const records = makePage('pages/ai-records/ai-records.js', {
+    wx: createWx(),
+    auth: createAuth('member-1'),
+    api: {
+      getMyAiRecords: () => Promise.resolve(samples.map((row) => ({
+        id: row.id,
+        taskId: `task-${row.id}`,
+        kind: 'parse',
+        status: 'completed',
+        createdAt: '2026-04-01T12:00:00.000Z',
+        expiresAt: row.expiresAt,
+      }))),
+      getMyMockInterviews: () => Promise.resolve([]),
+    },
+  })
+  records.onShow()
+  await flush()
+  await flush()
+  const listed = []
+  for (const group of records.data.groups) for (const item of group.items) listed.push(item)
+  for (const row of samples) {
+    const item = listed.find((entry) => entry.id === row.id)
+    assert.ok(item, `AI 记录 ${row.id}`)
+    assert.equal(item.viewUntil, row.viewUntil, `AI 记录 ${row.id}`)
+  }
+
+  for (const row of samples) {
+    const mapped = qa.mapQaRecord({
+      id: `q-${row.id}`,
+      createdAt: '2026-04-01T12:00:00.000Z',
+      expiresAt: row.expiresAt,
+    })
+    assert.equal(mapped.day, '4月1日', '创建日仍按原分组，不因到期空值改掉')
+    if (row.viewUntil) assert.equal(mapped.statusLabel, '保存至 4月2日')
+    else assert.equal(mapped.statusLabel, '问答要点', `问答要点 ${row.id} 不编 1970`)
+  }
+})
+
+test('登录后重新选择文件再上传：新文件继续解析，不撞旧解析标识', async () => {
+  const wx = createWx()
+  const headersSeen = []
+  const missing = new Error('文件不存在或已被清理')
+  missing.statusCode = 404
+  missing.code = 'FILE_NOT_FOUND'
+  let uploads = 0
+  const api = {
+    parseResume: (payload, headers) => {
+      headersSeen.push({ fileId: payload.fileId, intent: headers['x-resume-parse-intent'] })
+      if (payload.fileId === 'guest-file') return Promise.reject(missing)
+      return Promise.resolve({
+        taskId: 'task-new',
+        status: 'completed',
+        accessToken: 'tok',
+        fileId: payload.fileId,
+      })
+    },
+    uploadResumeFile: () => {
+      uploads += 1
+      return Promise.resolve({ fileId: 'new-file', filename: 'b.pdf' })
+    },
+    getDocumentConversionCapabilities: () => Promise.resolve({ wordToPdf: false }),
+  }
+  const auth = createAuth('member-1')
+  const parse1 = makePage('pages/resume-parse/resume-parse.js', { wx, auth, api })
+  parse1.onLoad({ fileId: 'guest-file', fileName: 'a.pdf', fileFormat: 'pdf' })
+  await flush()
+  await flush()
+  await flush()
+  assert.equal(parse1.data.fileMissing, true)
+  assert.equal(headersSeen.length, 1)
+  parse1.toUpload()
+  assert.equal(wx.calls.redirect[0], '/pages/resume-upload/resume-upload')
+
+  const upload = makePage('pages/resume-upload/resume-upload.js', { wx, auth, api })
+  upload.onLoad()
+  upload._upload('/tmp/b.pdf', 'b.pdf', 'resume_upload')
+  await flush()
+  await flush()
+  assert.equal(uploads, 1)
+  const nextUrl = wx.calls.nav[wx.calls.nav.length - 1]
+  assert.match(nextUrl, /fileId=new-file/)
+
+  const parse2 = makePage('pages/resume-parse/resume-parse.js', { wx, auth, api })
+  parse2.onLoad({ fileId: 'new-file', fileName: 'b.pdf', fileFormat: 'pdf' })
+  await flush()
+  await flush()
+  await flush()
+  await flush()
+  assert.equal(headersSeen.length, 2, '新文件发出了另一次解析')
+  assert.notEqual(headersSeen[1].intent, headersSeen[0].intent, '不沿用旧解析标识')
+  assert.equal(headersSeen[1].fileId, 'new-file')
+  assert.equal(parse2.data.conflict, '')
+  assert.equal(parse2.data.fileMissing, false)
+  assert.equal(parse2.data.done, true)
+  assert.equal(parse2.data.atext, '解析完成')
+})
+
+test('超过每天免费面数：本机和个人、一份和多份都原样显示', () => {
+  const { userMessageOf } = requireMiniapp('../utils/user-error.js')
+  const sentences = [
+    '这台终端今天还只能再打 1 份，这一份已经超过本机上限。',
+    '这台终端今天还只能再打 2 份，这一单 4 份已经超过本机上限。',
+    '你今天还只能再打 1 份，这一份已经超过个人上限。',
+    '你今天还只能再打 3 份，这一单 5 份已经超过个人上限。',
+  ]
+  for (const sentence of sentences) {
+    const shown = userMessageOf({
+      code: 'PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES',
+      message: sentence,
+      statusCode: 400,
+    }, '兜底')
+    assert.equal(shown, sentence)
+  }
 })

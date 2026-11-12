@@ -207,6 +207,64 @@ const SCENARIOS = { careerPlanDeclineStaysOnPage, interviewEntrySendsNoResume, p
 
 for (const [name, run] of Object.entries(SCENARIOS)) test(name, () => run())
 
+test('重新授权成功后只生成一次', async () => {
+  const generates = []
+  let grants = 0
+  const wx = { calls: { modal: [], nav: [] } }
+  wx.showModal = (o) => wx.calls.modal.push(o)
+  wx.showToast = () => {}
+  wx.navigateTo = (o) => wx.calls.nav.push(o && o.url)
+  wx.redirectTo = wx.navigateTo
+  wx.navigateBack = () => wx.calls.nav.push('back')
+  wx.switchTab = wx.navigateTo
+  const api = {
+    getCareerPlan: () => Promise.reject(Object.assign(new Error('没有记录'), { statusCode: 404, code: 'CAREER_PLAN_NOT_FOUND' })),
+    generateCareerPlan: () => {
+      generates.push(generates.length + 1)
+      if (generates.length === 1) return Promise.reject(declined())
+      return Promise.resolve({ status: 'completed', summary: '先看行政方向', taskId: 'cp-1' })
+    },
+    grantAiConsent: (scope) => {
+      grants += 1
+      assert.equal(scope, 'resume_ai')
+      return Promise.resolve({})
+    },
+  }
+  const def = loadPageDefinition(CAREER_PLAN, {
+    wx,
+    modules: {
+      api,
+      auth: { isLoggedIn: () => true },
+      storage: { KEYS: { RESUME_TASK: 'RESUME_TASK' }, get: () => ({ taskId: 't1', accessToken: '', fileName: '简历.pdf' }), set: () => true },
+    },
+  })
+  const page = instantiate(def)
+  page.onLoad({})
+  await flush()
+  assert.equal(page.data.phase, 'ready')
+  page.tapGenerate()
+  await flush()
+  assert.equal(generates.length, 1)
+  assert.equal(page.data.phase, 'consent-needed')
+
+  const prevWx = globalThis.wx
+  globalThis.wx = wx
+  page.tapReauthorize()
+  assert.equal(wx.calls.modal.length, 1)
+  wx.calls.modal[0].success({ confirm: true })
+  if (prevWx === undefined) delete globalThis.wx
+  else globalThis.wx = prevWx
+  await flush()
+  await flush()
+  assert.equal(grants, 1, '同意后写入一次授权')
+  assert.equal(generates.length, 2, '重新授权成功后恰好再生成一次')
+  assert.equal(page.data.phase, 'done')
+  assert.equal(page.data.plan && page.data.plan.summary, '先看行政方向')
+  await flush()
+  assert.equal(generates.length, 2, '完成之后不再自动生成')
+  page.onUnload()
+})
+
 // ── 反向变异 ────────────────────────────────────────────────────────────
 
 function mutated(rel, from, to) {

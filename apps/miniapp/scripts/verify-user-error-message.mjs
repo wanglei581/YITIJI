@@ -133,7 +133,10 @@ console.log('打印额度：有面数的原话原样，会员那句不提手机�
   const cases = [
     ['PRINT_TERMINAL_DAILY_QUOTA_REACHED', '今天这台机器的免费打印量已用完，明天 0 点恢复。', '今天这台机器的免费打印量已用完，明天 0 点恢复。'],
     ['PRINT_GUEST_ORDER_QUOTA_EXCEEDED', '免登录每次最多打印 20 面。用手机号登录后，可以一次打更多。', '免登录每次最多打印 20 面。用手机号登录后，可以一次打更多。'],
-    ['PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES', '这单 30 面，超过每天免费 20 面的上限，请减少份数或分开下单', '这单 30 面，超过每天免费 20 面的上限，请减少份数或分开下单'],
+    ['PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES', '这台终端今天还只能再打 1 份，这一份已经超过本机上限。', '这台终端今天还只能再打 1 份，这一份已经超过本机上限。'],
+    ['PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES', '这台终端今天还只能再打 2 份，这一单 4 份已经超过本机上限。', '这台终端今天还只能再打 2 份，这一单 4 份已经超过本机上限。'],
+    ['PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES', '你今天还只能再打 1 份，这一份已经超过个人上限。', '你今天还只能再打 1 份，这一份已经超过个人上限。'],
+    ['PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES', '你今天还只能再打 3 份，这一单 5 份已经超过个人上限。', '你今天还只能再打 3 份，这一单 5 份已经超过个人上限。'],
   ]
   for (const [code, serverMessage, shown] of cases) {
     const e = await errorOf(400, { success: false, error: { code, message: serverMessage } })

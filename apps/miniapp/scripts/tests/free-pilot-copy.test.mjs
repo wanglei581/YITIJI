@@ -357,12 +357,11 @@ test('现场无人值守：模板用到的 supportHint 在页面 data 里真有�
 // 诊断页、优化页把 utils/normalize.js resumeExportPricing 的 text / disabledReason 原样显示。
 // 含钱、含权益的句子只许出现在服务端 mode=charged 且 unitCents>0 的分支；
 // mode=free 只说「当前免费」。mode 缺失或 unavailable 不能改口叫免费
-// （normalize.js 自己的注释：未知收费状态不许回落成免费）。
-// unavailable 的兜底句仍含「价目」，因为 scripts/verify-miniapp-static.mjs 逐字钉着这句，
-// 而那个门禁文件不在本包可改范围内。
+// （normalize.js 自己的注释：未知收费状态不许回落成免费），也不说价目、不找管理员。
 test('简历导出价目：免费不说钱，大于 0 才说单价和权益', () => {
   const requireMiniapp = createRequire(path.join(MINIAPP, 'utils', 'entry.js'))
   const N = requireMiniapp('../utils/normalize.js')
+  const { SUPPORT_HINT } = requireMiniapp('../utils/user-error.js')
   const free = N.resumeExportPricing({ mode: 'free', unitCents: 0 }, true)
   assert.equal(free.text, '当前免费')
   assert.equal(free.disabledReason, '')
@@ -373,11 +372,15 @@ test('简历导出价目：免费不说钱，大于 0 才说单价和权益', ()
   for (const row of [unknownMode, unavailable]) {
     assert.notEqual(row.mode, 'free')
     assert.notEqual(row.text, '当前免费')
-    assert.equal(row.text, '简历导出当前不可用（价目已停用，不是免费）')
+    assert.equal(row.text, '简历导出暂时用不了。')
+    assert.equal(row.disabledReason, `简历导出暂时用不了。${SUPPORT_HINT}`)
+    assert.doesNotMatch(`${row.text}${row.disabledReason}`, /价目|管理员|免费|¥|元|单价|权益/)
   }
 
   const notQuoted = N.resumeExportPricing({ mode: 'charged', unitCents: 0 }, true)
   assert.equal(notQuoted.mode, 'charged')
+  assert.equal(notQuoted.text, '导出暂时还不能开始。')
+  assert.equal(notQuoted.disabledReason, '导出暂时还不能开始。')
   assert.doesNotMatch(`${notQuoted.text}${notQuoted.disabledReason}`, MONEY)
   assert.notEqual(notQuoted.text, '当前免费')
 
@@ -393,5 +396,205 @@ test('简历导出价目：免费不说钱，大于 0 才说单价和权益', ()
 
   for (const rel of ['pages/resume-diagnose/resume-diagnose.wxml', 'pages/resume-optimize/resume-optimize.wxml']) {
     assert.match(read(rel), /\{\{pricing\.text\}\}/, `${rel} 显示价目那一句`)
+  }
+})
+
+// 诊断页、优化页最终显示的价目字段。新增登记，不改上面 PAID_GUARD / JS_ALLOW 的写法。
+// 钱字眼只许出现在服务端报出大于 0 的金额之后；免费、未知、停用连这些字段一起扫。
+const EXPORT_PRICE_DISPLAY = {
+  'pages/resume-diagnose/resume-diagnose.wxml': {
+    js: 'pages/resume-diagnose/resume-diagnose.js',
+    text: 'pricing.text',
+    disabledReason: 'exportDisabledReason',
+    buttons: ['导出诊断报告 PDF', '导出修改清单'],
+    done(page) { return page.data.status === 'done' },
+  },
+  'pages/resume-optimize/resume-optimize.wxml': {
+    js: 'pages/resume-optimize/resume-optimize.js',
+    text: 'pricing.text',
+    disabledReason: 'exportDisabledReason',
+    buttons: ['生成并打开文件', '正在生成…'],
+    done(page) { return page.data.phase === 'done' },
+  },
+}
+
+/** 基线 4d04e87f8 的导出门：只看 disabledReason 空不空，不看后来改过的句子。 */
+function baselineCanExport(raw, loggedIn) {
+  const source = raw && typeof raw === 'object' ? raw : {}
+  const mode = ['free', 'charged', 'unavailable'].includes(source.mode) ? source.mode : 'unavailable'
+  const benefit = source.benefit && typeof source.benefit === 'object' ? source.benefit : null
+  const available = benefit && Number.isSafeInteger(Number(benefit.available)) ? Math.max(0, Number(benefit.available)) : null
+  if (mode === 'free') return true
+  if (mode === 'charged') {
+    if (!loggedIn) return false
+    const count = available == null ? 0 : available
+    return count > 0
+  }
+  return false
+}
+
+const EXPORT_PRICE_NINE = [
+  {
+    name: '免费',
+    raw: { mode: 'free', unitCents: 0 },
+    quiet: true,
+    in: { text: '当前免费', disabledReason: '' },
+    out: { text: '当前免费', disabledReason: '' },
+  },
+  {
+    name: '未知',
+    raw: {},
+    quiet: true,
+    in: { text: '简历导出暂时用不了。', disabledReason: null },
+    out: { text: '简历导出暂时用不了。', disabledReason: null },
+  },
+  {
+    name: '停用',
+    raw: { mode: 'unavailable' },
+    quiet: true,
+    in: { text: '简历导出暂时用不了。', disabledReason: null },
+    out: { text: '简历导出暂时用不了。', disabledReason: null },
+  },
+  {
+    name: '带服务端 label',
+    raw: { mode: 'unavailable', label: '后台价目：单价 ¥1.00 / 次，1 元' },
+    quiet: true,
+    hide: '后台价目',
+    in: { text: '简历导出暂时用不了。', disabledReason: null },
+    out: { text: '简历导出暂时用不了。', disabledReason: null },
+  },
+  {
+    name: '金额 0',
+    raw: { mode: 'charged', unitCents: 0, benefit: { available: 2 } },
+    quiet: true,
+    in: { text: '可以导出。', disabledReason: '' },
+    out: { text: '导出暂时还不能开始。', disabledReason: '导出暂时还不能开始。' },
+  },
+  {
+    name: '负数',
+    raw: { mode: 'charged', unitCents: -100, benefit: { available: 2 } },
+    quiet: true,
+    in: { text: '可以导出。', disabledReason: '' },
+    out: { text: '导出暂时还不能开始。', disabledReason: '导出暂时还不能开始。' },
+  },
+  {
+    name: '缺失',
+    raw: { mode: 'charged', benefit: { available: 2 } },
+    quiet: true,
+    in: { text: '可以导出。', disabledReason: '' },
+    out: { text: '导出暂时还不能开始。', disabledReason: '导出暂时还不能开始。' },
+  },
+  {
+    name: '非数字',
+    raw: { mode: 'charged', unitCents: 'abc', benefit: { available: 2 } },
+    quiet: true,
+    in: { text: '可以导出。', disabledReason: '' },
+    out: { text: '导出暂时还不能开始。', disabledReason: '导出暂时还不能开始。' },
+  },
+  {
+    name: '正数',
+    raw: { mode: 'charged', unitCents: 100, benefit: { available: 2 } },
+    quiet: false,
+    in: { text: '单价 ¥1.00 / 次 · 可用权益 2 次', disabledReason: '' },
+    out: { text: '单价 ¥1.00 / 次，登录后查看可用权益', disabledReason: '收费导出需登录会员账号，并核销 1 次可用权益。' },
+  },
+]
+
+test('简历导出九种输入：说法、导出门与页面最终显示', async () => {
+  const requireMiniapp = createRequire(path.join(MINIAPP, 'utils', 'entry.js'))
+  const N = requireMiniapp('../utils/normalize.js')
+  const { SUPPORT_HINT } = requireMiniapp('../utils/user-error.js')
+  const pausedReason = `简历导出暂时用不了。${SUPPORT_HINT}`
+  const forbidden = /¥|元|单价|权益|价目|管理员/
+  for (const row of EXPORT_PRICE_NINE) {
+    for (const loggedIn of [true, false]) {
+      const got = N.resumeExportPricing(row.raw, loggedIn)
+      const expect = loggedIn ? row.in : row.out
+      const reason = expect.disabledReason == null ? pausedReason : expect.disabledReason
+      assert.equal(got.text, expect.text, `${row.name} loggedIn=${loggedIn} text`)
+      assert.equal(got.disabledReason, reason, `${row.name} loggedIn=${loggedIn} disabledReason`)
+      assert.equal(got.disabledReason === '', baselineCanExport(row.raw, loggedIn), `${row.name} 能不能导出须与基线 4d04e87f8 一致`)
+      if (row.hide) assert.equal(`${got.text}${got.disabledReason}`.includes(row.hide), false, `${row.name} 不显示后台 label`)
+      if (row.quiet) assert.doesNotMatch(`${got.text}${got.disabledReason}`, forbidden, row.name)
+    }
+  }
+
+  for (const [rel, entry] of Object.entries(EXPORT_PRICE_DISPLAY)) {
+    const wxml = read(rel)
+    assert.match(wxml, /\{\{pricing\.text\}\}/, `${rel} 的 text 绑定`)
+    assert.match(wxml, /\{\{exportDisabledReason\}\}/, `${rel} 的 disabledReason 绑定`)
+    for (const label of entry.buttons) assert.ok(wxml.includes(label), `${rel} 按钮「${label}」`)
+  }
+
+  const { flush, instantiate, loadPageDefinition } = await import('./page-sandbox.mjs')
+  const wx = {
+    getStorageSync: () => '',
+    setStorageSync() {},
+    removeStorageSync() {},
+    showToast() {},
+    showLoading() {},
+    hideLoading() {},
+    showModal() {},
+    navigateTo() {},
+    redirectTo() {},
+    navigateBack() {},
+    switchTab() {},
+    downloadFile() {},
+    openDocument() {},
+  }
+  const benefit = [{ id: 'grant-1', benefitType: 'free_quota', status: 'active', quantityRemaining: 2 }]
+  const prevWx = globalThis.wx
+  globalThis.wx = wx
+  try {
+    for (const [rel, entry] of Object.entries(EXPORT_PRICE_DISPLAY)) {
+      for (const row of EXPORT_PRICE_NINE) {
+        const api = {
+          getResumeExportPricing: () => Promise.resolve(row.raw),
+          getMyBenefits: () => Promise.resolve(benefit),
+          getResumeRecord: () => Promise.resolve({
+            status: 'completed',
+            taskId: 'task-1',
+            fileId: 'file-1',
+            report: { sections: [{ key: 'structure', label: '结构', score: 3, maxScore: 5 }] },
+          }),
+          getResumeOptimize: () => Promise.resolve({
+            taskId: 'task-1',
+            status: 'completed',
+            optimizedResume: { basic: { name: '甲' } },
+            modules: [],
+          }),
+          getResumeDraft: () => Promise.resolve(null),
+          getResumeVersions: () => Promise.resolve({ items: [] }),
+        }
+        const auth = {
+          isLoggedIn: () => true,
+          getUser: () => ({ id: 'member-1' }),
+          getToken: () => 'tok',
+        }
+        const page = instantiate(loadPageDefinition(entry.js, { wx, modules: { api, auth } }))
+        page.onLoad({ taskId: 'task-1' })
+        await flush()
+        await flush()
+        await flush()
+        await flush()
+        assert.equal(entry.done(page), true, `${rel} ${row.name} 要进到能看见导出区的完成态`)
+        assert.equal(page.data.pricing.text, row.in.text, `${rel} ${row.name} 页面 text`)
+        const reason = row.in.disabledReason == null ? pausedReason : row.in.disabledReason
+        assert.equal(page.data.pricing.disabledReason, reason, `${rel} ${row.name} 页面 pricing.disabledReason`)
+        assert.equal(page.data.exportDisabledReason, reason, `${rel} ${row.name} 页面最终 disabledReason`)
+        const shown = [page.data.pricing.text, page.data.exportDisabledReason, entry.buttons.join('\n')].join('\n')
+        if (row.quiet) {
+          assert.doesNotMatch(shown, forbidden, `${rel} ${row.name} 页面不出现钱、权益、价目、管理员`)
+          if (row.hide) assert.equal(shown.includes(row.hide), false, `${rel} ${row.name} 页面不显示后台 label`)
+        } else {
+          assert.match(page.data.pricing.text, /单价/)
+          assert.match(page.data.pricing.text, /¥/)
+          assert.match(shown, /权益/)
+        }
+      }
+    }
+  } finally {
+    if (prevWx === undefined) delete globalThis.wx
+    else globalThis.wx = prevWx
   }
 })

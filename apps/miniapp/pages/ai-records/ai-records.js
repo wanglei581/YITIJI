@@ -25,17 +25,12 @@ const STATUS_LABEL = {
   processing: '处理中',
 }
 
-/** 有 expiresAt 才写到期日。模拟面试列表不带这个字段，不能替它编一天。 */
+/** 有到期时间才写月日。空值、空串、非法日期都不编一天。月日取法同 documents-helpers formatTime。 */
 function viewUntil(iso) {
+  if (iso === null || iso === undefined || iso === '') return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric',
-  }).formatToParts(d)
-  const month = (parts.find((p) => p.type === 'month') || {}).value
-  const day = (parts.find((p) => p.type === 'day') || {}).value
-  if (!month || !day) return ''
-  return `${month} 月 ${day} 日前可查看`
+  return `${d.getMonth() + 1} 月 ${d.getDate()} 日前可查看`
 }
 
 function dayLabel(iso) {
