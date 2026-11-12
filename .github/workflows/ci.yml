@@ -41,7 +41,10 @@ concurrency:
 
 jobs:
   build-and-verify:
-    runs-on: ubuntu-latest
+    # 11/12 起 GitHub 的 ubuntu-latest 换成 26.04；Playwright 1.55.1 在 26.04 上装不了 chromium
+    #（kiosk-browser-smoke「Install Playwright Chromium」报 does not support chromium on ubuntu26.04-x64），
+    # 四个作业一起钉回此前一直验证通过的 24.04。升级 Playwright 并验过之后再改回 ubuntu-latest。
+    runs-on: ubuntu-24.04
     # 2026-09-29：Verify suites 已 321 条，#1122 真 Redis 登录门禁每次多等限流窗口，30 分钟被强制取消（run 36577612869）。
     timeout-minutes: 45
     services:
@@ -1029,7 +1032,10 @@ jobs:
   # 全新 PG 空库:schema 同步校验 → migrate deploy → seed → 核心 verify。
   # 未通过此 job 不得宣称生产数据库已支持 PostgreSQL。
   postgres-readiness:
-    runs-on: ubuntu-latest
+    # 11/12 起 GitHub 的 ubuntu-latest 换成 26.04；Playwright 1.55.1 在 26.04 上装不了 chromium
+    #（kiosk-browser-smoke「Install Playwright Chromium」报 does not support chromium on ubuntu26.04-x64），
+    # 四个作业一起钉回此前一直验证通过的 24.04。升级 Playwright 并验过之后再改回 ubuntu-latest。
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
       postgres:
@@ -1356,7 +1362,10 @@ jobs:
           CI_SERIAL_COMMANDS
 
   kiosk-browser-smoke:
-    runs-on: ubuntu-latest
+    # 11/12 起 GitHub 的 ubuntu-latest 换成 26.04；Playwright 1.55.1 在 26.04 上装不了 chromium
+    #（kiosk-browser-smoke「Install Playwright Chromium」报 does not support chromium on ubuntu26.04-x64），
+    # 四个作业一起钉回此前一直验证通过的 24.04。升级 Playwright 并验过之后再改回 ubuntu-latest。
+    runs-on: ubuntu-24.04
     # 本 job 现在同时跑 kiosk 多套 + admin + partner 三家浏览器用例，取较大的上限。
     #
     # 2026-09-09 实测把 45 提到 70：45 的余量只剩 13%，已经在制造假失败。
@@ -1561,7 +1570,10 @@ jobs:
     # BOS failure must not prevent Deploy from receiving a successful CI workflow_run.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [build-and-verify, postgres-readiness, kiosk-browser-smoke]
-    runs-on: ubuntu-latest
+    # 11/12 起 GitHub 的 ubuntu-latest 换成 26.04；Playwright 1.55.1 在 26.04 上装不了 chromium
+    #（kiosk-browser-smoke「Install Playwright Chromium」报 does not support chromium on ubuntu26.04-x64），
+    # 四个作业一起钉回此前一直验证通过的 24.04。升级 Playwright 并验过之后再改回 ubuntu-latest。
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
