@@ -366,6 +366,15 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
     fail('共享码表的过期句和取件码表不一致')
   } else pass('过期码：共享码表与取件码表同一句，不再被短句盖住')
 
+  const otherTerminalSentence = '这单是在别的机器上下的，请到下单时选的那台机器取件'
+  const otherErr = new ApiHttpError('PICKUP_CODE_OTHER_TERMINAL', 'server says', 404)
+  const otherSaid = model.pickupClaimMessage(otherErr)
+  if (otherSaid !== otherTerminalSentence) fail(`走错机器的取件文案不是定稿：${otherSaid}`)
+  else if (model.classifyClaimFailure(otherErr) !== 'other') fail(`走错机器应归 other，实际 ${model.classifyClaimFailure(otherErr)}`)
+  else if (userMessages.userMessageOf(otherErr, '兜底') !== otherTerminalSentence) fail('共享码表的走错机器文案和取件码表不一致')
+  else if (otherSaid === rejected) fail('走错机器被并进了「到机码无效」那句')
+  else pass('PICKUP_CODE_OTHER_TERMINAL：单独一句，归 other，不和无效码同一屏')
+
   // 当天额度沿用批次上的共享短句：不进到机码表，认领页与确认页同一句，次要按钮是「输另一个到机码」。
   for (const [code, expected] of [
     ['PRINT_TERMINAL_DAILY_QUOTA_REACHED', '这台机器今天的免费打印量已用完，明天 0 点恢复'],

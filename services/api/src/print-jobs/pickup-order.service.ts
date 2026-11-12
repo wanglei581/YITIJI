@@ -61,17 +61,24 @@ export class PickupOrderService {
   ) {}
 
   /**
-   * 「码无效」与「码有效但不属于本终端」返回**完全相同**的响应。
+   * 「码不存在」仍回 `PICKUP_CODE_INVALID`。
+   * 「码是对的，但不是在这台机器下的单」回 `PICKUP_CODE_OTHER_TERMINAL`，
+   * 站在机器前的人要知道该去下单时选的那一台。
    *
-   * 合并前这是一个预言机：404 `PICKUP_CODE_INVALID` 与 403 `PICKUP_TERMINAL_MISMATCH`
-   * 让攻击者不必待在正确终端就能筛出「哪些码是真的」，把枚举成本按终端数除了一遍。
-   * 合并后，攻击者从响应里得不到任何关于码是否存在的信息。
-   *
-   * 运营侧不会因此变瞎：真实的区分仍然写进服务端（审计 + 日志），只是不回给客户端。
-   * 见 `rejectClaimAsInvalid` 里的审计写入。
+   * 两条都是 404，并且都先走 `noteClaimFailure` 记一次失败（与无效码同一套锁定），
+   * 不能拿「走错机器」这句来试码。码不存在不写审计；走错机器写审计。
+   * `settleClaim` 里那行兜底仍回 `CLAIM_REJECTION`：调用方应已拦过跨终端。
+   * 会员按订单领取（claim-here）是另一条路，终端不对时仍如实回 409，不进这套计数。
    */
   private static readonly CLAIM_REJECTION = {
     error: { code: 'PICKUP_CODE_INVALID', message: '到机码无效或已过期' },
+  } as const
+
+  private static readonly OTHER_TERMINAL_REJECTION = {
+    error: {
+      code: 'PICKUP_CODE_OTHER_TERMINAL',
+      message: '这单是在别的机器上下的，请到下单时选的那台机器取件',
+    },
   } as const
 
   async claim(codeInput: string, terminalRef: string | undefined, source?: string) {
@@ -106,7 +113,7 @@ export class PickupOrderService {
       // 码真实存在但绑在别的终端：这是运营真正需要区分的场景（用户走错机器），
       // 也是攻击者「猜中了一枚真码」的场景 —— 两者都值得留痕，且发生率天然很低。
       await this.noteClaimFailure(terminal.id, 'terminal_mismatch', order.id)
-      throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
+      throw new NotFoundException(PickupOrderService.OTHER_TERMINAL_REJECTION)
     }
     return this.settleClaim(order, terminal, 'pickup_code')
   }
@@ -371,9 +378,8 @@ export class PickupOrderService {
   /**
    * 认领失败的统一处置：计数 + （必要时）留痕。
    *
-   * 客户端拿到的响应对两种 reason 完全一致；区分只存在于服务端。
-   * 现场排障口径：工作人员遇到「码打不进去」时，让运维按 terminalId 查
-   * 审计动作 `print_order.pickup_claim_rejected` ——
+   * 两种 reason 都记一次失败。客户端文案现在分开：走错机器说明去另一台，码不存在仍说无效。
+   * 现场排障仍按 terminalId 查审计动作 `print_order.pickup_claim_rejected` ——
    * 有 `terminal_mismatch` 记录 = 用户走错机器（payload 里有 orderId，
    * 能直接查到该单绑的是哪台）；没有记录 = 码本身不存在（输错或已换单）。
    */

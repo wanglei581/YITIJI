@@ -263,11 +263,17 @@ async function main(): Promise<void> {
 
     const wrongTerminal = await capture(() => pickup.claim(created.pickupCode!, otherTerminalId, 'cross-src'))
     const unknownCode = await capture(() => pickup.claim('00000000', otherTerminalId, 'cross-src'))
-    if (!wrongTerminal.thrown || !unknownCode.thrown || JSON.stringify(wrongTerminal) !== JSON.stringify(unknownCode)) {
-      fail(`跨网点/终端必须与不存在的码同一响应。错终端 ${JSON.stringify(wrongTerminal)} 未知 ${JSON.stringify(unknownCode)}`)
+    if (
+      !wrongTerminal.thrown || wrongTerminal.status !== 404
+      || wrongTerminal.code !== 'PICKUP_CODE_OTHER_TERMINAL'
+      || wrongTerminal.message !== '这单是在别的机器上下的，请到下单时选的那台机器取件'
+    ) {
+      fail(`走错机器应是 404/PICKUP_CODE_OTHER_TERMINAL，实际 ${JSON.stringify(wrongTerminal)}`)
     }
-    if (wrongTerminal.code !== 'PICKUP_CODE_INVALID') fail(`跨终端应是 PICKUP_CODE_INVALID，实际 ${wrongTerminal.code}`)
-    pass('跨网点/终端与未知码返回同一拒绝，不泄露码是否存在')
+    if (!unknownCode.thrown || unknownCode.status !== 404 || unknownCode.code !== 'PICKUP_CODE_INVALID') {
+      fail(`不存在的码仍应是 404/PICKUP_CODE_INVALID，实际 ${JSON.stringify(unknownCode)}`)
+    }
+    pass('走错机器说明去另一台；不存在的码仍说无效')
 
     redis.reset()
     await orderStatus.markPaid(created.id, { paymentSource: 'offline', operatorId: 'verify-f02' })
@@ -407,8 +413,12 @@ async function main(): Promise<void> {
       fail('同机重试不得建任务、出纸或改订单状态')
     }
     const otherTerminalReplay = await capture(() => pickup.claim(reissued.pickupCode!, otherTerminalId, 'owner-other'))
-    if (!otherTerminalReplay.thrown || otherTerminalReplay.code !== 'PICKUP_CODE_INVALID') {
-      fail(`其它终端再输已核销码必须拒绝，实际 ${JSON.stringify(otherTerminalReplay)}`)
+    if (
+      !otherTerminalReplay.thrown || otherTerminalReplay.status !== 404
+      || otherTerminalReplay.code !== 'PICKUP_CODE_OTHER_TERMINAL'
+      || otherTerminalReplay.message !== '这单是在别的机器上下的，请到下单时选的那台机器取件'
+    ) {
+      fail(`其它终端再输已核销码必须说明去下单那台，实际 ${JSON.stringify(otherTerminalReplay)}`)
     }
     await prisma.printTask.update({
       where: { id: released.taskId! },
@@ -463,6 +473,32 @@ async function main(): Promise<void> {
     const otherOpen = await capture(() => pickup.claim('10000098', terminalId, 'lock-src'))
     if (otherOpen.code === 'PICKUP_CLAIM_LOCKED') fail('锁定不得蔓延到其它终端')
     pass('多次输错仍按终端锁定，其它终端不受影响')
+
+    // 走错机器和无效码一样计入失败：第 10 次仍回走错机器（锁在下一次入口才生效），第 11 次锁定该终端。
+    redis.reset()
+    const mismatchOrder = await memberOrders.create(
+      userId,
+      { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+      randomUUID(),
+    )
+    for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD; i += 1) {
+      const attempt = await capture(() => pickup.claim(mismatchOrder.pickupCode!, otherTerminalId, `mismatch-lock-${i}`))
+      if (attempt.code !== 'PICKUP_CODE_OTHER_TERMINAL') {
+        fail(`第 ${i + 1} 次走错机器仍应回 PICKUP_CODE_OTHER_TERMINAL，实际 ${JSON.stringify(attempt)}`)
+      }
+    }
+    const mismatchLocked = await capture(() => pickup.claim('40000001', otherTerminalId, 'mismatch-lock-probe'))
+    if (mismatchLocked.code !== 'PICKUP_CLAIM_LOCKED') {
+      fail(`走错机器满 ${PICKUP_LOCKOUT_FAILURE_THRESHOLD} 次后必须锁定该终端，实际 ${JSON.stringify(mismatchLocked)}`)
+    }
+    const homeStillOpen = await capture(() => pickup.claim('40000002', terminalId, 'mismatch-lock-home'))
+    if (homeStillOpen.code === 'PICKUP_CLAIM_LOCKED') fail('走错机器的锁定不得蔓延到下单那台')
+    const mismatchRow = await prisma.order.findUniqueOrThrow({ where: { id: mismatchOrder.id } })
+    if (mismatchRow.terminalId !== terminalId || mismatchRow.pickupStatus !== 'pending' || mismatchRow.printTaskId) {
+      fail('走错机器不得改订单或建任务')
+    }
+    redis.reset()
+    pass('走错机器与无效码一样计入失败；满 10 次后下一次锁定该终端')
 
     // 1.8 P-2：成功认领只给本机失败计数「抵一次」，且只在本次把 pending 变成 claimed 的那一次。
     // 已认领的活租约可以同码幂等重领；整个清零时，一张自己的未付单（试点 0 元、建单无上限）

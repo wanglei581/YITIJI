@@ -650,26 +650,23 @@ async function main(): Promise<void> {
     if (closedCancelled.pickupStatus !== 'cancelled') fail('closed pending 被拒后必须仍可取消')
     pass('closed pending 认领不改 claimed，仍可取消')
 
-    // ── 预言机合并 ────────────────────────────────────────────────────────
-    // 「码有效但不在这台机器」与「码根本不存在」必须**完全无法区分**。
-    // 判据刻意不是「有没有抛错」（两者本来就都抛），而是逐字段比对真实响应：
-    // HTTP 状态码、错误码、错误文案三者全等，才算不泄露「这枚码是否存在」。
+    // 走错机器要告诉人去下单那台；码不存在仍说无效。两条都是 404，失败计数在 share 脚本里另验。
     const mismatchShape = await captureHttpError(() => pickup.claim(created.pickupCode, otherTerminalId))
     const unknownShape = await captureHttpError(() => pickup.claim('00000000', otherTerminalId))
     if (mismatchShape.thrown === false || unknownShape.thrown === false) {
       fail('错终端 / 不存在的码都必须被拒绝')
     }
-    if (JSON.stringify(mismatchShape) !== JSON.stringify(unknownShape)) {
-      fail(
-        '预言机未合并：「真码 + 错终端」与「不存在的码」响应不一致，攻击者据此可筛出真码。\n' +
-          `  真码错终端: ${JSON.stringify(mismatchShape)}\n` +
-          `  不存在的码: ${JSON.stringify(unknownShape)}`,
-      )
+    if (
+      mismatchShape.status !== 404
+      || mismatchShape.code !== 'PICKUP_CODE_OTHER_TERMINAL'
+      || mismatchShape.message !== '这单是在别的机器上下的，请到下单时选的那台机器取件'
+    ) {
+      fail(`走错机器应为 404/PICKUP_CODE_OTHER_TERMINAL，实际 ${JSON.stringify(mismatchShape)}`)
     }
-    if (mismatchShape.status !== 404 || mismatchShape.code !== 'PICKUP_CODE_INVALID') {
-      fail(`合并后的拒绝响应应为 404/PICKUP_CODE_INVALID，实际 ${JSON.stringify(mismatchShape)}`)
+    if (unknownShape.status !== 404 || unknownShape.code !== 'PICKUP_CODE_INVALID') {
+      fail(`不存在的码仍应为 404/PICKUP_CODE_INVALID，实际 ${JSON.stringify(unknownShape)}`)
     }
-    pass(`错终端与不存在的码返回完全相同的响应 ${JSON.stringify(mismatchShape)}（预言机已合并）`)
+    pass('走错机器说明去下单那台；不存在的码仍说无效')
 
     // 运营侧不能因为合并而变瞎：真码走错机器仍必须在服务端留痕，且带得出 orderId；
     // 而「码不存在」不留痕（否则枚举流量会被放大成审计写入）。

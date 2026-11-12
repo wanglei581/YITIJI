@@ -7,7 +7,9 @@ import {
   QrCodeIcon,
   WifiOffIcon,
 } from 'lucide-react'
-import { helpNeededLine, peekSupportContact, printProblemLine } from '../../../copy/unattendedCopy'
+import { pickupCodeFindLead, pickupLookBackTitle, pickupScanMiniappLead } from '../../../copy/miniappLinkCopy'
+import { helpNeededLine, printProblemLine } from '../../../copy/unattendedCopy'
+import { useSupportContactSnapshot } from '../../../hooks/useSupportContact'
 import {
   PICKUP_CODE_LENGTH,
   PICKUP_CODE_MAX_INPUT_LENGTH,
@@ -25,6 +27,7 @@ import type { PickupQuotaExit } from '../pickupQuotaExit'
 
 /** 稿 11 各屏页头的说明句。页头标题全程是「输入你的到机码」，变化的只有这一句。 */
 export function PickupSubtitle({ screen }: { screen: PickupScreen }) {
+  const findLead = pickupCodeFindLead(useSupportContactSnapshot())
   switch (screen) {
     case 'legacy':
       return <>输入早前订单中的 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位到机码</b>。核对订单、完成后续步骤，领取打印件。</>
@@ -43,8 +46,8 @@ export function PickupSubtitle({ screen }: { screen: PickupScreen }) {
     case 'success':
       return <>校验通过，<b>打印订单已认领</b>。</>
     default:
-      return peekSupportContact().miniappPublished
-        ? <>打开手机小程序<b>「我的 → 打印订单」</b>，找到 {PICKUP_CODE_LENGTH} 位到机码。核对订单后，领取打印件。</>
+      return findLead
+        ? <>{findLead}，找到 {PICKUP_CODE_LENGTH} 位到机码。核对订单后，领取打印件。</>
         : <>输入 {PICKUP_CODE_LENGTH} 位到机码。核对订单后，领取打印件。</>
   }
 }
@@ -123,12 +126,13 @@ export function PickupHidGuide({
   errorMsg: string
   actions: ReactNode
 }) {
+  const scanLead = pickupScanMiniappLead(useSupportContactSnapshot())
   return (
     <PickupHintCard
       art="scan"
       title="用扫码枪扫"
       descId="pcp-hid-hint"
-      desc={<>{peekSupportContact().miniappPublished ? '打开小程序里的到机码页面，' : ''}{HID_LINE}</>}
+      desc={<>{scanLead}{HID_LINE}</>}
     >
       {echo}
       {errorMsg ? (
@@ -293,13 +297,14 @@ export function PickupLegacyNote() {
 
 /** 稿 outs()：码找不到时的另外三条路，不是把同一条路再讲一遍。 */
 export function PickupOutsStrip({ onHid, onHelp }: { onHid: () => void; onHelp: () => void }) {
+  const lookBack = pickupLookBackTitle(useSupportContactSnapshot())
   return (
     <div className="qx-card pcp-help">
       <p className="pch-title">码找不到了？</p>
       <ul className="pch-steps pch-outs">
-        {peekSupportContact().miniappPublished ? (
+        {lookBack ? (
           <li>
-            <b>回手机小程序看</b>
+            <b>{lookBack}</b>
             <span>「我的 → 打印订单」</span>
           </li>
         ) : null}
@@ -438,7 +443,7 @@ export function PickupFailurePanel({
         <span>
           {message}
           {failure === 'invalid' ? (
-            <small>不存在、已过期或不属于这台机器的码，都会显示这一句——不提示具体原因，是为了防止有人试探别人的码。</small>
+            <small>不存在或已过期的码显示这一句，不提示具体原因，是为了防止有人试探别人的码。</small>
           ) : null}
         </span>
       </div>

@@ -46,16 +46,22 @@ import './styles/print-pickup-touch.css'
 import { PickupHidGuide, PickupThreeCodeCard } from './components/PickupHidGuide'
 // 上一行的导入形状被 verify:fusion-w2 逐字钉住，稿 11 其余展示件另起一行导入。
 import { PickupCodeBoxes, PickupFailurePanel, PickupHintCard, PickupKeypadCard, PickupLegacyNote, PickupOutsStrip, PickupScanKinds } from './components/PickupHidGuide'
+import { PickupHereList } from './components/PickupHereList'
 import { PickupOkBody } from './components/PickupOkBody'
 import { PrintFillArt } from './art/PrintFillArt'
-import { helpNeededLine, peekSupportContact } from '../../copy/unattendedCopy'
+import { pickupClaimMiniappClause } from '../../copy/miniappLinkCopy'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContactSnapshot } from '../../hooks/useSupportContact'
 import { loginPathForPrintStep } from '../../auth/returnPath'
 import { useAuth } from '../../auth/useAuth'
+import { claimHereOrder } from '../../services/api/pickupHereOrdersApi'
 import { errorCodeOf } from '../../services/api/userErrorMessage'
+import { maskPickupFileName, pickupHereMismatchMessage } from './pickupHereOrders'
 import { classifyClaimFailure, claimSuccessCopy, claimSuccessDestination, failureScreen, pickupCells, pickupClaimMessage } from './pickupClaimModel'
 import type { PickupFailure, PickupScreen } from './pickupClaimModel'
 import { pickupQuotaExit, type PickupQuotaExit } from './pickupQuotaExit'
 import { clearPickupClaimCode, readPickupClaimCode, rememberPickupClaimCode } from './pickupClaimResume'
+import { usePickupHereList } from './usePickupHereList'
 
 // ── 到机码工具 ────────────────────────────────────────────────
 // 可键入字符 = 新码(纯数字) ∪ 存量码(31 字符集) 的并集，由 shared 常量反推，不手写。
@@ -168,7 +174,9 @@ const PICKUP_RAIL = ['输到机码', '核对订单', '取件'] as const
 
 export function PrintPickupClaimPage() {
   const navigate = useNavigate()
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, getToken } = useAuth()
+  const supportContact = useSupportContactSnapshot()
+  const here = usePickupHereList(isLoggedIn ? getToken() : null)
   const inputRef = useRef<HTMLInputElement>(null)
   const claimLockRef = useRef(false)
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -242,6 +250,37 @@ export function PrintPickupClaimPage() {
       setState('error')
       setTimeout(() => inputRef.current?.focus(), 80)
       return 'fail'
+    }
+  }
+
+  // 登录后点自己的单，不输码。和输码共用同一把锁，避免两路同时认领。
+  const handleClaimHere = async (orderId: string): Promise<void> => {
+    cancelSettle()
+    const token = getToken()
+    if (!token || claimLockRef.current) return
+    if (!here.rows.some((row) => row.orderId === orderId)) return
+    claimLockRef.current = true
+    setState('loading')
+    setErrorMsg('')
+    setFailure(null)
+    const staleSignal = pageAliveRef.current?.signal
+    try {
+      const data = await claimHereOrder(orderId, token, staleSignal)
+      if (staleSignal?.aborted) return
+      setResult({ ...data, fileName: maskPickupFileName(data.fileName) })
+      setState('success')
+    } catch (err) {
+      if (staleSignal?.aborted) return
+      claimLockRef.current = false
+      if (errorCodeOf(err) === 'PICKUP_TERMINAL_MISMATCH') {
+        const message = err instanceof ApiHttpError ? err.message : ''
+        setFailure({ kind: 'other', code: '', quotaExit: null })
+        setErrorMsg(pickupHereMismatchMessage(message))
+      } else {
+        setFailure({ kind: classifyClaimFailure(err), code: '', quotaExit: pickupQuotaExit(errorCodeOf(err)) })
+        setErrorMsg(pickupClaimMessage(err))
+      }
+      setState('error')
     }
   }
 
@@ -563,12 +602,21 @@ export function PrintPickupClaimPage() {
     </button>
   ) : undefined
 
+  const claimClause = pickupClaimMiniappClause(supportContact)
   const fine = (
     <p className="pcp-fine">
       这一步不收钱 · 输错可以改，不作废
-      {peekSupportContact().miniappPublished ? '。在手机小程序下的单，到这里输到机码取件；没付款的在这台机器上付' : ''}
+      {claimClause ? `。${claimClause}；没付款的在这台机器上付` : ''}
     </p>
   )
+  const hereList = isLoggedIn ? (
+    <PickupHereList
+      status={here.status}
+      rows={here.rows}
+      busy={loading}
+      onClaim={(orderId) => { void handleClaimHere(orderId) }}
+    />
+  ) : null
 
   const fold = (
     <details className="pcp-more">
@@ -606,6 +654,7 @@ export function PrintPickupClaimPage() {
         data-claim-state={state}
         data-testid="arrival-code-state-hid"
       >
+        {hereList}
         {codeBoxes}
         {hint}
         {keypad}
@@ -627,6 +676,7 @@ export function PrintPickupClaimPage() {
       data-claim-failure={failure?.kind}
       data-testid={`arrival-code-state-${screen}`}
     >
+      {hereList}
       {codeBoxes}
       {failurePanel}
       {hint}

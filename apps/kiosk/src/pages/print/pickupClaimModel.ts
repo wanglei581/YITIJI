@@ -28,7 +28,7 @@ import {
 
 /**
  * 认领失败的五种屏。
- * - invalid：码不存在 / 已过期 / 不属于本机 —— 服务端对这几种故意回同一句，页面也不区分。
+ * - invalid：码不存在 / 已过期 / 格式不对。走错机器是另一句（PICKUP_CODE_OTHER_TERMINAL），归 other，不和无效码同一屏。
  * - locked：服务端按终端维度的失败锁定（PICKUP_CLAIM_LOCKED），锁定期内任何码都不再核对。
  * - network：网络/服务异常或缺少可信回执；是否已认领未知。认领对同一终端幂等，可以原码重查。
  * - closed：这枚码在服务端已经是终态（已用过、已退款、文件失效、订单不能再付款），
@@ -43,7 +43,7 @@ export type PickupFailure = 'invalid' | 'locked' | 'network' | 'closed' | 'print
 const INVALID_CODES = new Set([
   'PICKUP_CODE_INVALID',
   'PICKUP_CODE_EXPIRED',
-  // 走错机器与「没有这枚码」同一屏，避免用不同屏头告诉试码的人这枚码是真的。
+  // claim-here 以外若仍带回这个旧码，保持和无效码同一屏。到机码入口走错机器用的是 PICKUP_CODE_OTHER_TERMINAL。
   'PICKUP_TERMINAL_MISMATCH',
   'PICKUP_CODE_LENGTH',
   'PICKUP_CODE_PATTERN',
@@ -97,7 +97,8 @@ export const PICKUP_CLAIM_MESSAGES: Readonly<Record<string, string>> = {
   PRINTER_UNAVAILABLE: `这台终端的打印机暂不可用，你的到机码没有作废，请稍后再来这台终端输码。${helpNeededLine()}`,
   PICKUP_CODE_INVALID: PICKUP_CODE_REJECTED_COPY,
   PICKUP_CODE_EXPIRED: PICKUP_CODE_REJECTED_COPY,
-  // 2026-10-06 方案②：同机且任务失败会走续打；别的机器回 PICKUP_CODE_INVALID。
+  PICKUP_CODE_OTHER_TERMINAL: '这单是在别的机器上下的，请到下单时选的那台机器取件',
+  // 2026-10-06 方案②：同机且任务失败会走续打。别的机器在进续打之前就回 PICKUP_CODE_OTHER_TERMINAL。
   // 这个码只在同机、任务排队/打印中/已完成且过了 10 分钟回放时出现，原地重输仍是同一个错，
   // 所以不写「再输一次试试」，也不找人；没拿到纸给问小青或隐私政策联系方式（标准句接上服务电话后再换）。
   PICKUP_CODE_ALREADY_USED: '这个到机码已经用过，这单已经交给打印机，不能再次取件。要再打一份，请重新下单；没拿到纸，可以问小青，或查看《隐私政策》里的联系方式。',

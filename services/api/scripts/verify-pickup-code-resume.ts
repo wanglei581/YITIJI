@@ -437,8 +437,13 @@ async function main(): Promise<void> {
     await failTask(wrongRelease.taskId, wrongTerminalOrder.id)
     const otherTerminal = await capture(() => pickup.claim(wrongCode, otherTerminalId, source()))
     const wrongTask = await prisma.printTask.findUniqueOrThrow({ where: { id: wrongRelease.taskId } })
-    if (otherTerminal.status !== 404 || otherTerminal.code !== 'PICKUP_CODE_INVALID' || wrongTask.status !== 'failed') {
-      fail(`别的终端必须 404，实际 ${JSON.stringify(otherTerminal)} status=${wrongTask.status}`)
+    if (
+      otherTerminal.status !== 404
+      || otherTerminal.code !== 'PICKUP_CODE_OTHER_TERMINAL'
+      || otherTerminal.message !== '这单是在别的机器上下的，请到下单时选的那台机器取件'
+      || wrongTask.status !== 'failed'
+    ) {
+      fail(`别的终端必须 404 并说明去下单那台，实际 ${JSON.stringify(otherTerminal)} status=${wrongTask.status}`)
     }
     await prisma.printTask.update({
       where: { id: wrongRelease.taskId },

@@ -195,6 +195,31 @@ for (const code of ['PICKUP_CODE_INVALID', 'PICKUP_CODE_EXPIRED', 'PICKUP_TERMIN
   })
 }
 
+test('pickup PICKUP_CODE_OTHER_TERMINAL names the other machine @w2', async ({ page, api }) => {
+  api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', { status: 200, json: { enabled: false, idleTimeoutSec: 180, items: [] } })
+  api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', { status: 200, json: { printerStatus: 'ready', isOnline: true, paperLevel: 'sufficient' } })
+  await page.route('**/api/v1/print/jobs/claim-pickup', async route => {
+    await route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        error: {
+          code: 'PICKUP_CODE_OTHER_TERMINAL',
+          message: '这单是在别的机器上下的，请到下单时选的那台机器取件',
+        },
+      }),
+    })
+  })
+  await page.goto('/print/pickup-claim')
+  await page.getByLabel('到机码输入框').fill('28491703')
+  await expect(page.getByTestId('arrival-code-state-failed')).toBeVisible()
+  await expect(page.getByRole('alert')).toContainText('这单是在别的机器上下的，请到下单时选的那台机器取件')
+  await expect(page.getByRole('alert')).not.toContainText('不提示具体原因')
+  await expect(page.getByRole('alert')).not.toContainText('到机码无效或已过期')
+  await expect(page.getByTestId('arrival-code-state-invalid-or-expired')).toHaveCount(0)
+  await expect(page.getByTestId('arrival-code-primary')).toHaveText('清除，重新输入')
+})
+
 test('pickup idle names two codes and the same-code resume @w2', async ({ page, api }) => {
   api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', { status: 200, json: { enabled: false, idleTimeoutSec: 180, items: [] } })
   api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', { status: 200, json: { printerStatus: 'ready', isOnline: true, paperLevel: 'sufficient' } })

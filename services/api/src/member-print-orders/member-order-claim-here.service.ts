@@ -4,8 +4,9 @@
  * 为什么是新文件：它只做「按 orderId + 本人找单」与「终端不一致时怎么答」这两件与到机码入口不同的事，
  * 找到单之后一律交给 PickupOrderService.settleClaim —— 退款、过期、已用与同机回放、文件就绪、
  * 能力、认领、付款/放行全部复用，不在这里复制一份判定（两份必漂移）。
- * 放进 pickup-order.service.ts 会把会员鉴权与「码入口防枚举」两种口径混进同一个文件，
- * 且那边的终端不一致必须对外说「码无效」，这里必须说实话，二者不能共用一段代码。
+ * 放进 pickup-order.service.ts 会把会员鉴权与到机码入口两种口径混进同一个文件。
+ * 到机码入口走错机器回 404 `PICKUP_CODE_OTHER_TERMINAL`，并且记一次输错；
+ * 这里本人已经登录，终端不对就如实回 409，不记入猜码锁定。二者不能共用一段代码。
  */
 import { ConflictException, HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common'
 import { RedisService } from '../common/redis/redis.service'

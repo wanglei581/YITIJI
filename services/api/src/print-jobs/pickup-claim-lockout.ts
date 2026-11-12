@@ -71,6 +71,7 @@ export async function isPickupClaimLocked(redis: RedisService, terminalId: strin
 
 /**
  * 记一次**认领失败**（码不存在 / 码存在但不属于本终端）。
+ * 两种失败的客户端文案可以不同，计数仍各记一次。
  * 达到阈值时置锁并返回 true。
  *
  * 只统计能用于枚举的失败。「码已过期」「码当前不可用」这类

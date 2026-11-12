@@ -285,6 +285,17 @@
 .pch-outs b { font-size: 19px; font-weight: 700; color: var(--qx-ink); }
 .pch-outs span { font-size: 17px; color: var(--qx-ink-2); }
 
+/* 登录后、输码格上面：本人在这台机器上还没取的单。复用 qx-card / qx-btn，不另起一套。 */
+.pcp-here-note { margin: 0; font-size: 18px; line-height: 1.5; color: var(--qx-ink-2); }
+.qx-card.pcp-here { display: flex; flex-direction: column; gap: 12px; padding: 18px 22px; }
+.pcp-here ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.qx-btn.pcp-here-go {
+  min-height: 56px; width: 100%; justify-content: space-between; gap: 12px;
+  padding: 12px 18px; text-align: left; font-size: 20px;
+}
+.pcp-here-name { min-width: 0; overflow-wrap: anywhere; font-weight: 700; }
+.pcp-here-act { flex: none; font-size: 18px; font-weight: 600; }
+
 /* ── hid 屏里的错误位 ─────────────────────────────────────── */
 .pcp-error {
   padding: 16px 20px; border-radius: 14px; border: 1px solid var(--qx-cinnabar); background: var(--qx-cinnabar-soft);
