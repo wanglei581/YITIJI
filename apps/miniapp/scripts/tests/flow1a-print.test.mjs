@@ -470,10 +470,11 @@ test('07 原场景：选好彩色、长边双面、2 份 → 返回确认文件�
 
 // ── 确认提交页（print-pay）模板 ───────────────────────────────────────────
 
-test('确认提交页：第 3 步叫「确认提交」；免费时不再单列只写「免费」的那块', () => {
+test('确认提交页：第 3 步叫「确认提交」；主按钮是蓝色 primary，不用微信绿；免费时不再单列只写「免费」的那块', () => {
   const wxml = stripComments(read('pages/print-pay/print-pay.wxml'))
   assert.match(wxml, /<view class="st on"><text class="n">3<\/text><text class="nl">确认提交<\/text><\/view>/)
-  assert.match(wxml, /bindtap="continueFlow"/)
+  assert.match(wxml, /<view class="btn primary lg [^"]*" bindtap="continueFlow">/)
+  assert.doesNotMatch(wxml, /class="btn wx/)
   assert.match(wxml, /<view wx:if="\{\{quoteState !== 'ready' \|\| !isFreeOrder\}\}" class="card flat fee rise-d4">/)
   for (const rel of ['pages/print-upload/print-upload.wxml', 'pages/print-store/print-store.wxml', 'pages/print-pay/print-pay.wxml']) {
     assert.match(read(rel), /<text class="nl">终端和参数<\/text>/, rel)

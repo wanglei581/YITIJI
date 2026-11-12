@@ -94,6 +94,7 @@
   <!-- 订单建成后按钮永久变灰。服务端现在按 (endUserId, idempotency-key) 回放，
        再点一次不会多出一张单；但页面仍必须变灰 —— 让一个已经下过单的人反复点
        「提交」本身就是在骗他，而且那次回放对他毫无意义。 -->
-  <view class="btn wx lg {{submitting || createdLocked || quoteState !== 'ready' ? 'disabled' : ''}}" bindtap="continueFlow">{{createdLocked ? '订单已创建' : (submitting ? '正在提交…' : (priceConfirmLabel || '提交并生成到机码'))}}</view>
+  <!-- 这里没有微信支付（付费也是到机再付），主按钮与整条链一样用蓝色 primary，不用微信绿（FLOW1a 实图 06） -->
+  <view class="btn primary lg {{submitting || createdLocked || quoteState !== 'ready' ? 'disabled' : ''}}" bindtap="continueFlow">{{createdLocked ? '订单已创建' : (submitting ? '正在提交…' : (priceConfirmLabel || '提交并生成到机码'))}}</view>
 </view>
 </view>
