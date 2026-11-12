@@ -18,6 +18,7 @@
  * 排除在"门禁脚本"之外，所以本文件不会被 verify-ci-gate-coverage 当成
  * "写完没接线的门禁"。它由 `verify:page-lifecycle` 拉起，并串在 verify:static 里进 CI。
  */
+import './print-capabilities.test.mjs'
 import test, { mock } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
@@ -1923,7 +1924,11 @@ test('R4-4 同一个人建单成功：锁照常生效，再点一次不得发第
 test('R4-7 print-store 进支付页只带 fileId/storeId/store/copies，敏感项一个都不带', async () => {
   const auth = createAuth('A')
   const wx = createWx()
-  const api = { getPublicTerminals: () => Promise.resolve([{ id: 'term-1', displayName: '一号店', isOnline: true }]) }
+  const api = {
+    getPublicTerminals: () => Promise.resolve([{ id: 'term-1', displayName: '一号店', isOnline: true }]),
+    getTerminalCapabilities: () => Promise.resolve({ capabilities: [] }),
+    quoteMyPrintOrder: () => Promise.resolve({ amountCents: 150, billablePages: 3 }),
+  }
   const page = makePage('pages/print-store/print-store.js', { auth, api, wx })
   page.onLoad({ fileId: 'f-1', copies: '2', name: '张三的简历.pdf', total: '1.50', amountCents: '150', pages: '3' })
   await flush()

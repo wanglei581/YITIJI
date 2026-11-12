@@ -157,8 +157,8 @@ Page({
     // 注意：本函数必须紧跟 _refreshQuote 之后（verify-miniapp-static 的报价竞态门禁按此定位）。
     if (e.currentTarget.dataset.v !== 'bw') {
       wx.showModal({
-        title: '彩色打印暂不可选',
-        content: '门店一体机硬件支持彩色，但驱动侧的彩色参数尚未完成 Windows 真机出纸验收。在验收通过前放开，可能出现选了彩色、实际却出黑白的情况，所以本期只开放黑白。',
+        title: '彩色打印',
+        content: '选择终端后，可根据该终端开放的能力设置彩色或双面。',
         showCancel: false,
         confirmText: '知道了',
       })
@@ -170,8 +170,8 @@ Page({
   pickDuplex(e) {
     if (e.currentTarget.dataset.v !== 'single') {
       wx.showModal({
-        title: '双面打印暂不可选',
-        content: '一体机支持自动双面，但双面参数要经打印驱动 DEVMODE 下发，尚未完成真机验收。在验收通过前放开，可能出现选了双面却打成单面的情况，所以本期只开放单面。',
+        title: '双面打印',
+        content: '选择终端后，可根据该终端开放的能力设置彩色或双面。',
         showCancel: false,
         confirmText: '知道了',
       })
@@ -253,9 +253,9 @@ Page({
 
   toStore() {
     if (!this._passPrintGate()) return
-    const { color, duplex, copies, total, amountCents, file, fileId } = this.data
+    const { copies, file, fileId } = this.data
     wx.navigateTo({
-      url: `/pages/print-store/print-store?fileId=${encodeURIComponent(fileId)}&color=${color}&duplex=${duplex}&copies=${copies}&total=${total}&amountCents=${encodeURIComponent(amountCents)}&pages=${file.pages}&name=${encodeURIComponent(file.name)}`,
+      url: `/pages/print-store/print-store?fileId=${encodeURIComponent(fileId)}&copies=${copies}&name=${encodeURIComponent(file.name)}`,
     })
   },
 
