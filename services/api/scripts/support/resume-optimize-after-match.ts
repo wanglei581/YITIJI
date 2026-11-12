@@ -377,6 +377,43 @@ export async function verifyOptimizeSameTextEntries(): Promise<void> {
   if (!punctLogged.includes('sameText=1')) fail(`对齐后同文应记 sameText=1，实际 ${punctLogged}`)
   if (punctLogged.includes(punctBefore) || punctLogged.includes(SAME_NORMAL_AFTER)) fail('对齐同文的日志不得记下正文')
   pass('对齐把句号折回原文之后，同文条目同样不返回')
+
+  // 只差首尾空白，但带空白的 after 已经是稿里某个字段的子串：对齐走逐字命中，原样留下 after，不会把空白收成 before。
+  // 这时仍须按去掉首尾空白后与原文相同来丢掉。改成比原始字符串 module.after !== module.before 会把这一条留下。
+  const paddedAfter = `  ${SAME_SPACED}\n`
+  const hostSummary = `${SAME_NORMAL_AFTER}活动之后仍要${paddedAfter}请本人核对。`
+  if (!hostSummary.includes(paddedAfter)) fail('夹具应让带首尾空白的 after 整段出现在简介里')
+  if (paddedAfter.trim() !== SAME_SPACED || paddedAfter === SAME_SPACED) fail('这条夹具必须只差首尾空白')
+  const untouchedResume = sameTextResume(hostSummary)
+  const spacedLogs: string[] = []
+  const spaced = await runOptimize([SAME_TEXT_NAME, SAME_NORMAL_BEFORE, SAME_SPACED].join('\n'), JSON.stringify({
+    resume: untouchedResume,
+    modules: [
+      normalModule,
+      { title: '只差空白未对齐', before: SAME_SPACED, after: paddedAfter },
+    ],
+  }), spacedLogs)
+  const spacedPlain = await runOptimize([SAME_TEXT_NAME, SAME_NORMAL_BEFORE, SAME_SPACED].join('\n'), JSON.stringify({
+    resume: untouchedResume,
+    modules: [normalModule],
+  }), [])
+  if (spaced.modules.some((item) => item.title === '只差空白未对齐' || item.after === paddedAfter)) {
+    fail(`对齐没有收掉首尾空白时，同文条目仍应丢掉，实际 ${spaced.modules.map((item) => item.title).join('、')}`)
+  }
+  if (spaced.modules.length !== 1 || spaced.modules[0]?.after !== SAME_NORMAL_AFTER) {
+    fail(`应只留下正常改写，实际 ${spaced.modules.map((item) => `${item.title}:${item.after}`).join('、') || '空'}`)
+  }
+  if (JSON.stringify(spaced.optimizedResume) !== JSON.stringify(spacedPlain.optimizedResume)) {
+    fail('丢掉这条同文时不得改优化稿')
+  }
+  const spacedSummary = spaced.optimizedResume.summary
+  if (!spacedSummary.includes(paddedAfter)) {
+    fail(`稿里那处带首尾空白的原文应原样留下，说明对齐没有改写 after，实际简介：${JSON.stringify(spacedSummary)}`)
+  }
+  const spacedLogged = spacedLogs.join('\n')
+  if (!spacedLogged.includes('sameText=1')) fail(`只差空白且对齐未处理应记 sameText=1，实际 ${spacedLogged}`)
+  if (spacedLogged.includes(SAME_SPACED) || spacedLogged.includes(paddedAfter.trim())) fail('这条同文的日志不得记下正文')
+  pass('只差首尾空白、对齐不处理的条目仍不返回，优化稿不变')
 }
 
 /** 优化这条路的技能不再截在 40 字。60 字整段留下，不按句号拆开。 */

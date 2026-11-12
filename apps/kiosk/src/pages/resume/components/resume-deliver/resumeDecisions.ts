@@ -70,17 +70,21 @@ function resumeContainsText(resume: unknown, text: string): boolean {
 
 interface TextSpot { path: string; start: number }
 
-/** 全部字符串字段里的不重叠出现位置。path 与 replaceAt 同一套。 */
+/**
+ * 全部字符串字段里的出现位置。path 与 replaceAt 同一套。
+ * 逐字前进：互相重叠的两处都要数到（「ABA」在「ABABA」里是两处）。
+ * 从上一处末尾接着找会把这两处并成一处，恰好一处的判断就会放行不该换的位置。
+ */
 function findTextSpots(resume: unknown, text: string, path = ''): TextSpot[] {
   if (!text) return []
   if (typeof resume === 'string') {
     const spots: TextSpot[] = []
     let from = 0
-    while (from < resume.length) {
+    while (from <= resume.length - text.length) {
       const index = resume.indexOf(text, from)
       if (index < 0) break
       spots.push({ path, start: index })
-      from = index + text.length
+      from = index + 1
     }
     return spots
   }
@@ -91,7 +95,7 @@ function findTextSpots(resume: unknown, text: string, path = ''): TextSpot[] {
   return []
 }
 
-/** 全部字符串字段里，不重叠出现次数的合计。 */
+/** 全部字符串字段里的出现次数合计，重叠的每处都算。 */
 function countTextOccurrences(resume: unknown, text: string): number {
   return findTextSpots(resume, text).length
 }
@@ -351,6 +355,15 @@ export function toggleModuleDecision(
   }
   const block = moduleSwitchBlock(base, module)
   if (block) return { resume, applied: false, reason: block }
+  // A 类改写已经在基准稿里；没有基准稿时分不出类（unloaded）。
+  // 这两类换回原文，有上下文时与 B、C 同一套：含重叠的位置表里，剔除别的条目占着的文字，恰好一处才换。
+  // 不传上下文的旧调用仍走下面的整份稿第一处，生产调用点都已传上下文。
+  if (context && next === 'original' && (state.kind === 'A' || state.kind === 'unloaded')) {
+    const spots = freeSpots(resume, module.after, context, base)
+    if (spots.length !== 1) return { resume, applied: false, reason: 'edited' }
+    const replaced = replaceAt(resume, spots[0].path, spots[0].start, module.after, module.before)
+    return replaced ? { resume: replaced, applied: true } : { resume, applied: false, reason: 'edited' }
+  }
   const from = next === 'original' ? module.after : module.before
   const to = next === 'original' ? module.before : module.after
   const result = replaceResumeTextWithStatus(resume, from, to)

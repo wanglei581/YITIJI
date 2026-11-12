@@ -719,3 +719,155 @@ test('编辑区简介和描述上限与导出稿相同，输入时不再截成 6
     assert.equal(source.includes('maxLength={RESUME_EDIT_LIMITS.description}'), true, rel)
   }
 })
+
+test('选保留原文的条目占着它的原句，另一条从改写换回原文时只换自己那一处', () => {
+  // 第 j 条（下标 0）选择保留原文，原句里逐字含有第 i 条（下标 1）的改写。
+  // 稿里因此有两处改写：嵌在第 j 条原句里的那处在前，第 i 条自己的那处在后。
+  // 保留原文必须占住原句，嵌在里面的那处才被剔除，只剩第 i 条自己那一处可换。
+  // 不占的话两处都可换，恰好一处不成立，整段保持不动；按第一处换则会改到第 j 条的原句里。
+  const afterI = '核对每周的活动通知。'
+  const beforeI = '整理每周的活动通知。'
+  const beforeJ = `在宣传栏张贴${afterI}`
+  const afterJ = '在宣传栏张贴每周的活动安排。'
+  const itemJ = moduleOf(beforeJ, afterJ, '宣传栏')
+  const itemI = moduleOf(beforeI, afterI, '活动通知')
+  const modules = [itemJ, itemI]
+  const base = makeResume(beforeI)
+  const current = makeResume(`${beforeJ}${afterI}`)
+  assert.equal(beforeJ.includes(afterI), true)
+  assert.equal(moduleBaseState(base, itemI).kind, 'B')
+  assert.equal(current.summary.indexOf(afterI), beforeJ.indexOf(afterI))
+  assert.notEqual(current.summary.indexOf(afterI), beforeJ.length)
+  assert.equal(current.summary.indexOf(afterI, beforeJ.indexOf(afterI) + 1), beforeJ.length)
+  const result = toggleModuleDecision(current, itemI, 'optimized', 'original', base, {
+    modules,
+    decisions: { [moduleKeyOf(itemJ, 0)]: 'original', [moduleKeyOf(itemI, 1)]: 'optimized' },
+    index: 1,
+  })
+  assert.equal(result.applied, true)
+  assert.equal(result.reason, undefined)
+  assert.equal(result.resume.summary, `${beforeJ}${beforeI}`)
+})
+
+test('A 类换回原文只换自己那一处，自己那处被改掉后不再动别人占着的改写', () => {
+  // 第 i 条是 A 类：改写已经在基准稿里，而且出现两处。
+  // 一处嵌在第 j 条占着的改写里（在前），一处是第 i 条自己的位置（在后）。
+  // 有上下文时只换自己那一处。自己那一处被本人改掉后，只剩别人占着的那处，报 edited，正文不动。
+  const afterI = '维护学院官网的栏目和活动通知。'
+  const beforeI = '更新学院官网的栏目和活动通知。'
+  const afterJ = `在新媒体中心${afterI}`
+  const beforeJ = '在新媒体中心更新网页。'
+  const itemJ = moduleOf(beforeJ, afterJ, '新媒体')
+  const itemI = moduleOf(beforeI, afterI, '官网')
+  const modules = [itemJ, itemI]
+  const field = `${afterJ}${afterI}`
+  const base = makeResume(field)
+  assert.equal(afterJ.includes(afterI), true)
+  assert.equal(moduleBaseState(base, itemI).kind, 'A')
+  assert.equal(field.indexOf(afterI), '在新媒体中心'.length)
+  assert.equal(field.lastIndexOf(afterI), afterJ.length)
+  const context = {
+    modules,
+    decisions: {
+      [moduleKeyOf(itemJ, 0)]: 'optimized',
+      [moduleKeyOf(itemI, 1)]: 'optimized',
+    },
+    index: 1,
+  }
+  const restored = toggleModuleDecision(base, itemI, 'optimized', 'original', base, context)
+  assert.equal(restored.applied, true)
+  assert.equal(restored.reason, undefined)
+  assert.equal(restored.resume.summary, `${afterJ}${beforeI}`)
+  const edited = makeResume(afterJ)
+  const blocked = toggleModuleDecision(edited, itemI, 'optimized', 'original', base, context)
+  assert.equal(blocked.applied, false)
+  assert.equal(blocked.reason, 'edited')
+  assert.equal(blocked.resume.summary, afterJ)
+})
+
+test('目标文字重叠出现两次时不算恰好一处，正文不动', () => {
+  // 「ABA」在「ABABA」里从第 0 字和第 2 字各出现一次，两处互相重叠。
+  // 从上一处末尾接着找只会数到第 0 字，误当成恰好一处，把开头三个字换成改写。
+  const needle = 'ABA'
+  const item = moduleOf(needle, '已改写')
+  const base = makeResume(`前缀${needle}后缀`)
+  const edited = makeResume('ABABA')
+  assert.equal(moduleBaseState(base, item).kind, 'B')
+  const result = toggleModuleDecision(edited, item, 'original', 'optimized', base, {
+    modules: [item], decisions: {}, index: 0,
+  })
+  assert.equal(result.applied, false)
+  assert.equal(result.reason, 'edited')
+  assert.equal(result.resume.summary, 'ABABA')
+})
+
+test('前一条整句包住后一条原句、改写又不再含这句时，后一条换不上且不改前一条的改写', () => {
+  // 第 1 条原句是「A，B。」，整句包住第 2 条原句「B。」。
+  // 包住较短原句时第 1 条仍可换；换成不含「B。」的改写后，第 2 条的原句已经不在稿里。
+  // 必须报 edited、正文保持第 1 条的改写，不能到那句改写里面去找地方换。
+  const before1 = '核对门店日结，并登记晚班台账。'
+  const before2 = '并登记晚班台账。'
+  const after1 = '门店日结已核对完毕。'
+  const after2 = '晚班台账已登记。'
+  assert.equal(before1.includes(before2), true)
+  assert.equal(after1.includes(before2), false)
+  const modules = [moduleOf(before1, after1, '日结'), moduleOf(before2, after2, '台账')]
+  const base = makeResume(before1)
+  assert.equal(moduleBaseState(base, modules[0]).kind, 'B')
+  assert.equal(moduleBaseState(base, modules[1]).kind, 'B')
+  const first = toggleModuleDecision(base, modules[0], 'original', 'optimized', base, {
+    modules, decisions: {}, index: 0,
+  })
+  assert.equal(first.applied, true)
+  assert.equal(first.resume.summary, after1)
+  const second = toggleModuleDecision(first.resume, modules[1], 'original', 'optimized', base, {
+    modules,
+    decisions: { [moduleKeyOf(modules[0], 0)]: 'optimized' },
+    index: 1,
+  })
+  assert.equal(second.applied, false)
+  assert.equal(second.reason, 'edited')
+  assert.equal(second.resume.summary, after1)
+  assert.equal(second.resume.summary.includes(after2), false)
+})
+
+test('没有基准稿时换回原文不按第一处猜，多处报 edited；不传上下文仍换第一处', () => {
+  // 没有基准稿分不出这一条占哪一段。两处都没人占时不能挑前面那处。
+  // 旧调用不传上下文，仍按整份稿的第一处换，生产调用点都已传上下文。
+  const item = moduleOf('原来的话', '更好的话')
+  const resume = makeResume('更好的话，更好的话')
+  assert.equal(moduleBaseState(null, item).kind, 'unloaded')
+  const blocked = toggleModuleDecision(resume, item, 'optimized', 'original', null, {
+    modules: [item], decisions: {}, index: 0,
+  })
+  assert.equal(blocked.applied, false)
+  assert.equal(blocked.reason, 'edited')
+  assert.equal(blocked.resume.summary, '更好的话，更好的话')
+  const legacy = toggleModuleDecision(resume, item, 'optimized', 'original')
+  assert.equal(legacy.applied, true)
+  assert.equal(legacy.resume.summary, '原来的话，更好的话')
+})
+
+test('没有基准稿时换回原文也避开别的条目占着的文字，只换自己那一处', () => {
+  // 与 A 类同一布局，只是没有基准稿：前面那处在第 j 条占着的改写里，后面那处才是第 i 条自己的。
+  // 剔除之后恰好剩一处，就换这一处，不因为没有基准稿去改第 j 条。
+  const afterI = '维护学院官网的栏目和活动通知。'
+  const beforeI = '更新学院官网的栏目和活动通知。'
+  const afterJ = `在新媒体中心${afterI}`
+  const itemJ = moduleOf('在新媒体中心更新网页。', afterJ, '新媒体')
+  const itemI = moduleOf(beforeI, afterI, '官网')
+  const modules = [itemJ, itemI]
+  const field = `${afterJ}${afterI}`
+  const resume = makeResume(field)
+  assert.equal(moduleBaseState(null, itemI).kind, 'unloaded')
+  const result = toggleModuleDecision(resume, itemI, 'optimized', 'original', null, {
+    modules,
+    decisions: {
+      [moduleKeyOf(itemJ, 0)]: 'optimized',
+      [moduleKeyOf(itemI, 1)]: 'optimized',
+    },
+    index: 1,
+  })
+  assert.equal(result.applied, true)
+  assert.equal(result.resume.summary, `${afterJ}${beforeI}`)
+})

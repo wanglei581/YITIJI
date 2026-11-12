@@ -685,3 +685,68 @@ test.describe('保持原文无需操作，换不上的去编辑区，长简介�
     await expect(page.getByText('没能自动放进稿里')).toHaveCount(0)
   })
 })
+
+const NESTED_TASK_ID = 'optimize-nested-rewrite-2099'
+const NESTED_ACCESS_TOKEN = 'optimize-nested-rewrite-access-token'
+const NESTED_BEFORE_1 = '负责学院公众号的选题和排版。'
+const NESTED_AFTER_1 = '负责学院公众号的选题和排版，协助组织迎新志愿服务的签到。'
+const NESTED_BEFORE_2 = '协助组织迎新志愿服务的签到。'
+const NESTED_AFTER_2 = '把迎新志愿服务的签到表核对清楚。'
+
+function nestedRewriteResume() {
+  return {
+    basic: { name: '周启明', phone: '13800000000', city: '青岛' },
+    intention: { position: '新闻编辑', city: '青岛' },
+    summary: '在校期间整理新闻稿件与活动记录。',
+    education: [],
+    experience: [
+      { company: '学院新媒体中心', role: '编辑', period: '2022-2023', description: NESTED_BEFORE_1 },
+      { company: '学院青年志愿者协会', role: '干事', period: '2021-2022', description: NESTED_BEFORE_2 },
+    ],
+    projects: [],
+    skills: ['新闻写作'],
+    certificates: [] as string[],
+  }
+}
+
+test.describe('前一条改写含后一条原句时，两条各换在自己的位置', () => {
+  test('总览先点第 1 条用改写再点第 2 条，编辑区各换各的，全部保留原文回到原稿 @kiosk', async ({ page, api }) => {
+    // 第 1 条改写逐字含第 2 条原句。先换第 1 条后，这句原句会出现两处：
+    // 一处在第 1 条已经换上的改写里，一处仍是第 2 条自己的描述。
+    // 单条切换必须带上其他条目占着的文字，才会只换第 2 条那一栏；不带就会因两处不确定而停住。
+    expect(NESTED_AFTER_1.includes(NESTED_BEFORE_2)).toBe(true)
+    expect(NESTED_BEFORE_1.includes(NESTED_BEFORE_2)).toBe(false)
+    registerOptimizeShell(api)
+    api.respond('GET', `/api/v1/resume/records/${NESTED_TASK_ID}/optimize`, {
+      status: 200,
+      json: {
+        taskId: NESTED_TASK_ID,
+        status: 'completed',
+        providerName: 'llm',
+        optimizedResume: nestedRewriteResume(),
+        modules: [
+          { title: '公众号选题', before: NESTED_BEFORE_1, after: NESTED_AFTER_1 },
+          { title: '迎新签到', before: NESTED_BEFORE_2, after: NESTED_AFTER_2 },
+        ],
+      },
+    })
+    await page.addInitScript(({ taskId, accessToken }) => {
+      window.sessionStorage.setItem('ai-job-print:current-ai-resume', JSON.stringify({ taskId, accessToken }))
+    }, { taskId: NESTED_TASK_ID, accessToken: NESTED_ACCESS_TOKEN })
+    await page.goto('/resume/optimize')
+    await expect(page.getByTestId('resume-optimize-overview')).toBeVisible()
+    const list = page.getByTestId('resume-optimize-list')
+    const first = list.locator('li').filter({ hasText: '公众号选题' })
+    const second = list.locator('li').filter({ hasText: '迎新签到' })
+    await first.getByRole('button', { name: '用改写', exact: true }).click()
+    await second.getByRole('button', { name: '用改写', exact: true }).click()
+    await page.getByTestId('resume-optimize-open-editor').click()
+    await expect(page.getByRole('textbox', { name: '第 1 条经历的描述' })).toHaveValue(NESTED_AFTER_1)
+    await expect(page.getByRole('textbox', { name: '第 2 条经历的描述' })).toHaveValue(NESTED_AFTER_2)
+    await page.locator('.qxt-back').click()
+    await page.getByTestId('resume-optimize-batch').getByRole('button', { name: /全部保留原文/ }).click()
+    await page.getByTestId('resume-optimize-open-editor').click()
+    await expect(page.getByRole('textbox', { name: '第 1 条经历的描述' })).toHaveValue(NESTED_BEFORE_1)
+    await expect(page.getByRole('textbox', { name: '第 2 条经历的描述' })).toHaveValue(NESTED_BEFORE_2)
+  })
+})
