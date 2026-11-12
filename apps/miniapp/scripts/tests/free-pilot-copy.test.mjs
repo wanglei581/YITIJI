@@ -166,9 +166,9 @@ const JS_ALLOW = {
   'pages/print-pickup/pickup-state.js': ['等待现场支付', '完成现场支付'],
   'pages/print-pickup/print-pickup.js': [],
   // 待现场支付：amountCents 不是 0 的分支；待付款：0 元单建单即记已付，走不到；'¥'：formatPrice 0 元走「免费」；
-  // 取消弹窗：canCancel 只给 unpaid + pending 的云打印单，0 元单是已付
+  // 「未付款」只出现在 payStatus === 'unpaid' 的取消确认句。免费单另写「免费订单」，不含付款、退款。
   'pages/orders/orders.js': ['待现场支付', '待付款', '¥', '确定取消这张未付款订单'],
-  // 同上三条理由：awaiting_payment 只在金额不是 0 时出现；fmtPrice 0 元走「免费」；取消只给 unpaid 的单
+  // 同上：awaiting_payment 只在金额不是 0 时出现；fmtPrice 0 元走「免费」；未付款确认句只给 unpaid
   'pages/order-detail/order-detail.js': ['待现场支付', '¥', '确定取消这张未付款订单'],
   // 两句都只在 pricing.mode === 'charged'（服务端说导出要收费）时出现
   'pages/resume-diagnose/resume-diagnose.js': ['未找到可核销权益', '未取得可核销权益'],
@@ -267,7 +267,8 @@ test('打印参数页：没选文件时底栏只剩「请先选择文件」按�
   const idle = { priceStatus: 'idle', amountCents: null, hasFile: false }
   assert.equal(run(label, idle), '')
   assert.equal(Boolean(run(dashIf, idle)), false)
-  assert.match(bar, /\{\{!hasFile \? '请先选择文件'/)
+  // Word 文件走「回到我的文档」，没有文件时仍是「请先选择文件」（包在 wordFile 分支后面）。
+  assert.match(bar, /!hasFile \? '请先选择文件'/)
 })
 
 test('材料包状态：0 元订单各状态都不提付款，大于 0 的原样说付款', () => {

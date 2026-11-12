@@ -905,26 +905,35 @@ else bad('打印参数页服务端精确报价', '必须先取本人 printFileUr
   }
 }
 
-// MP-05：云打印 unpaid+pending 可取消；材料包取消端点仍 knownMissing，页面不得调用。
+// MP-05：云打印可取消的条件与服务端 cancel() 一致（unpaid、免费已入账、关单未收款，且 pending、无打印任务）。
+// 材料包取消端点仍 knownMissing，页面不得调用。
 {
   const listWired = ordersJs.includes('api.cancelCloudPrintOrder')
     && ordersJs.includes("payStatus === 'unpaid'")
     && ordersJs.includes("pickupStatus === 'pending'")
+    && ordersJs.includes("paymentSource === 'free'")
+    && ordersJs.includes("payStatus === 'closed'")
+    && ordersJs.includes('确定取消这张免费订单？')
     && ordersJs.includes('toUiItem(raw)')
     && ordersWxml.includes('取消订单')
     && ordersWxml.includes('item.canCancel')
   const detailWired = orderDetailJs.includes('api.cancelCloudPrintOrder')
     && orderDetailJs.includes("payStatus === 'unpaid'")
     && orderDetailJs.includes("pickupStatus === 'pending'")
+    && orderDetailJs.includes("paymentSource === 'free'")
+    && orderDetailJs.includes("payStatus === 'closed'")
+    && orderDetailJs.includes('确定取消这张免费订单？')
     && orderDetailJs.includes('toDetail(raw)')
     && orderDetailWxml.includes('取消订单')
     && orderDetailWxml.includes('detail.canCancel')
+    && orderDetailWxml.includes('这单有问题，去反馈')
+    && orderDetailJs.includes('/pages/feedback/feedback?')
   const packageLeftClosed = !ordersJs.includes('cancelPackageOrder')
     && !orderDetailJs.includes('cancelPackageOrder')
   if (listWired && detailWired && packageLeftClosed) {
-    ok('云打印未付款待到机订单可取消，材料包取消未接线')
+    ok('云打印未付款、免费未取、关单未收款可取消，材料包取消未接线')
   } else {
-    bad('云打印未付款订单取消入口',
+    bad('云打印订单取消入口',
       `list=${listWired} detail=${detailWired} packageClosed=${packageLeftClosed}`)
   }
 }

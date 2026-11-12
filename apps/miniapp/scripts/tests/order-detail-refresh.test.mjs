@@ -272,4 +272,129 @@ test('notice template uses quiet refresh while the error card retains full retry
   const template = readFileSync(new URL('../../pages/order-detail/order-detail.wxml', import.meta.url), 'utf8')
   assert.match(template, /wx:if="\{\{refreshNotice\}\}" bindtap="refreshDetail"/)
   assert.match(template, /wx:elif="\{\{error\}\}" bindtap="retry"/)
+  assert.match(template, /这单有问题，去反馈/)
+  assert.match(template, /bindtap="toFeedback"/)
+})
+
+const FREE_PENDING = {
+  id: 'order-free', orderNo: 'NO-FREE', payStatus: 'paid', paymentSource: 'free',
+  amountCents: 0, paidAt: '2026-11-01T00:00:00.000Z', pickupStatus: 'pending',
+  printTaskId: null, pickupCode: '12345678', fileName: 'free.pdf', taskStatus: 'pending_release',
+}
+
+function detailWith(raw, extraWx) {
+  const requests = []
+  const modals = []
+  const nav = []
+  const cancels = []
+  const auth = { isLoggedIn: () => true, getUser: () => ({ id: 'A' }) }
+  const api = {
+    getCloudPrintOrder() { const d = deferred(); requests.push(d); return d.promise },
+    cancelCloudPrintOrder(id) { cancels.push(id); return Promise.resolve({ ...raw, pickupStatus: 'cancelled', taskStatus: 'cancelled', pickupCode: null }) },
+  }
+  const wx = Object.assign({
+    showModal(opts) { modals.push(opts) },
+    navigateTo(opts) { nav.push(opts && opts.url) },
+    navigateBack() {},
+  }, extraWx)
+  const page = instantiate(loadPageDefinition('pages/order-detail/order-detail.js', { wx, modules: { auth, api } }))
+  page.onLoad({ orderId: raw.id })
+  page.onShow()
+  return { page, requests, modals, nav, cancels }
+}
+
+test('免费且还没取的单能取消；确认句不写付款或退款；确认后刷新', async () => {
+  const { page, requests, modals, cancels } = detailWith(FREE_PENDING)
+  requests[0].resolve(FREE_PENDING); await flush()
+  assert.equal(page.data.detail.canCancel, true)
+  page.cancelOrder()
+  assert.equal(modals.length, 1)
+  assert.match(modals[0].content, /确定取消这张免费订单/)
+  assert.doesNotMatch(modals[0].content, /付款|退款/)
+  modals[0].success({ confirm: true })
+  await flush()
+  assert.deepEqual(cancels, ['order-free'])
+  assert.equal(page.data.detail.canCancel, false, '取消回包落地后按钮收起')
+})
+
+test('未付款待取件仍可取消，确认句仍是未付款；已取、已有任务、非免费已付、已收款的关单不能取消', async () => {
+  const unpaid = { ...FREE_PENDING, id: 'order-unpaid', payStatus: 'unpaid', paymentSource: null, paidAt: null, amountCents: 100 }
+  const open = detailWith(unpaid)
+  open.requests[0].resolve(unpaid); await flush()
+  assert.equal(open.page.data.detail.canCancel, true)
+  open.page.cancelOrder()
+  assert.match(open.modals[0].content, /确定取消这张未付款订单/)
+
+  const blocked = [
+    { ...FREE_PENDING, pickupStatus: 'claimed' },
+    { ...FREE_PENDING, printTaskId: 'task-1' },
+    { ...FREE_PENDING, payStatus: 'paid', paymentSource: 'offline', amountCents: 0 },
+    { ...FREE_PENDING, payStatus: 'paid', paymentSource: 'free', amountCents: 100 },
+    { ...FREE_PENDING, payStatus: 'closed', paidAt: '2026-11-01T00:00:00.000Z', paymentSource: 'offline', amountCents: 100 },
+    { ...FREE_PENDING, status: 'completed', payStatus: 'paid' },
+  ]
+  for (const raw of blocked) {
+    const box = detailWith(raw)
+    box.requests[0].resolve(raw); await flush()
+    assert.equal(box.page.data.detail.canCancel, false, JSON.stringify({
+      pay: raw.payStatus, source: raw.paymentSource, pickup: raw.pickupStatus, task: raw.printTaskId, status: raw.status,
+    }))
+  }
+
+  const closedUnpaid = { ...FREE_PENDING, payStatus: 'closed', paidAt: null, paymentSource: null, amountCents: 100 }
+  const closed = detailWith(closedUnpaid)
+  closed.requests[0].resolve(closedUnpaid); await flush()
+  assert.equal(closed.page.data.detail.canCancel, true, '关单但从未收款、还没取，可以取消')
+  closed.page.cancelOrder()
+  assert.doesNotMatch(closed.modals[0].content, /付款|退款/)
+})
+
+test('订单详情去反馈带上订单号；反馈页预填打印分类和订单号', async () => {
+  const { page, requests, nav } = detailWith(FREE_PENDING)
+  requests[0].resolve(FREE_PENDING); await flush()
+  page.toFeedback()
+  assert.equal(nav.length, 1)
+  assert.match(nav[0], /\/pages\/feedback\/feedback\?/)
+  assert.match(nav[0], /category=print/)
+  assert.match(nav[0], /orderNo=NO-FREE/)
+
+  const auth = { isLoggedIn: () => true }
+  const feedback = instantiate(loadPageDefinition('pages/feedback/feedback.js', {
+    wx: { showToast() {}, navigateTo() {}, navigateBack() {}, switchTab() {} },
+    modules: { auth, api: { getMyFeedback: () => Promise.resolve([]) } },
+  }))
+  feedback.onLoad({ category: 'print', orderNo: 'NO-FREE' })
+  assert.equal(feedback.data.category, 'print')
+  assert.match(feedback.data.content, /NO-FREE/)
+  assert.match(feedback.data.title, /NO-FREE/)
+  assert.doesNotMatch(feedback.data.content, /付款|退款/)
+})
+
+test('订单列表：免费待取单能取消，确认后用回包刷新这一行', async () => {
+  const modals = []
+  const cancels = []
+  const auth = { isLoggedIn: () => true, getUser: () => ({ id: 'A' }) }
+  const refreshed = { ...FREE_PENDING, pickupStatus: 'cancelled', taskStatus: 'cancelled', pickupCode: null }
+  const api = {
+    getMyCloudPrintOrders: () => Promise.resolve([FREE_PENDING]),
+    getMyPrintOrders: () => Promise.resolve([]),
+    getPackageOrders: () => Promise.resolve({ items: [], total: 0 }),
+    cancelCloudPrintOrder(id) { cancels.push(id); return Promise.resolve(refreshed) },
+  }
+  const wx = { showModal(opts) { modals.push(opts) }, stopPullDownRefresh() {}, navigateTo() {}, navigateBack() {}, switchTab() {} }
+  const page = instantiate(loadPageDefinition('pages/orders/orders.js', { wx, modules: { auth, api } }))
+  page.onLoad(); page.onShow(); await flush()
+  const row = page.data.filtered.find((item) => item.id === 'order-free')
+  assert.equal(row.canCancel, true)
+  page.cancelOrder({ currentTarget: { dataset: { id: 'order-free' } } })
+  assert.match(modals[0].content, /免费订单/)
+  assert.doesNotMatch(modals[0].content, /付款|退款/)
+  modals[0].success({ confirm: false })
+  assert.equal(cancels.length, 0, '再想想不取消')
+  modals[0].success({ confirm: true })
+  await flush()
+  assert.deepEqual(cancels, ['order-free'])
+  const next = page.data.orders.find((item) => item.id === 'order-free')
+  assert.equal(next.canCancel, false)
+  assert.equal(next.statusLabel, '已取消')
 })

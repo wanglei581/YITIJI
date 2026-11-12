@@ -45,6 +45,14 @@ function mapReplies(replies) {
   }))
 }
 
+function readOrderNo(options) {
+  const raw = options && options.orderNo ? String(options.orderNo) : ''
+  if (!raw) return ''
+  let orderNo = raw
+  try { orderNo = decodeURIComponent(raw) } catch (e) { orderNo = raw }
+  return orderNo.trim().slice(0, 64)
+}
+
 function toView(item) {
   const st = item.status
   return Object.assign({
@@ -85,10 +93,23 @@ Page({
 
   onLoad(options) {
     const preset = options && CAT_LABEL[options.category] ? options.category : ''
+    const orderNo = readOrderNo(options)
+    const fromOrder = orderNo
+      ? {
+          category: 'print',
+          title: (`订单 ${orderNo}`).slice(0, 80),
+          content: `订单 ${orderNo} 有问题：`,
+        }
+      : null
+    const content = fromOrder ? fromOrder.content : this.data.content
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
       aiReplyDays: AI_COMPLAINT_REPLY_DAYS,
-      category: preset || this.data.category,
+      category: (fromOrder && fromOrder.category) || preset || this.data.category,
+      title: fromOrder ? fromOrder.title : this.data.title,
+      content,
+      contentLen: content.length,
+      canSubmit: content.trim().length >= 10,
     })
   },
 

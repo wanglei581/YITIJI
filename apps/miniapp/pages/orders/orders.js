@@ -70,11 +70,22 @@ function formatPrice(cents) {
   return '¥' + (amountCents / 100).toFixed(2)
 }
 
-// MP-05：仅云打印 Order-only，且拍板第 5 条 unpaid + pending。材料包没有取消端点，不放该按钮。
+// 与服务端 cancel() 同一条件：还没产生打印任务、取件仍是 pending，
+// 并且是未付款、免费已入账（amountCents 0 + paid + paymentSource free）、或关单但从未收款。
+// 材料包没有取消端点，不放该按钮（PrintTask 行带 status，这里直接排除）。
 function canCancelCloudOrder(item) {
-  return !item.status
-    && item.payStatus === 'unpaid'
-    && item.pickupStatus === 'pending'
+  if (!item || item.status || item.printTaskId) return false
+  const freeOrder = item.amountCents === 0 && item.payStatus === 'paid' && item.paymentSource === 'free'
+  const closedUnpaid = item.payStatus === 'closed' && !item.paidAt
+  return item.pickupStatus === 'pending' && (item.payStatus === 'unpaid' || freeOrder || closedUnpaid)
+}
+
+// 免费单的确认句不写付款、退款。未付款仍用原来那句。关单未收款不提付款。
+function cancelConfirmContent(item) {
+  const freeOrder = item.amountCents === 0 && item.payStatus === 'paid' && item.paymentSource === 'free'
+  if (freeOrder) return '取消后到机码立即失效，且不能恢复。确定取消这张免费订单？'
+  if (item.payStatus === 'unpaid') return '取消后到机码立即失效，且不能恢复。确定取消这张未付款订单？'
+  return '取消后到机码立即失效，且不能恢复。确定取消这张订单？'
 }
 
 // 出纸 / 领取的那台机器。后端 9/29 契约给打印历史行补 terminal { displayName, locationLabel }；
@@ -144,6 +155,8 @@ function toUiItem(item) {
     expiresAt:   item.pickupCodeExpiresAt || item.expiresAt || item.pickupExpiresAt || '',
     taskStatus:  effectiveStatus,
     payStatus:   item.payStatus || '',
+    paymentSource: item.paymentSource || '',
+    paidAt:      item.paidAt || null,
     pickupStatus: item.pickupStatus || '',
     canCancel:   canCancelCloudOrder(item),
     cancelling:  false,
@@ -478,7 +491,7 @@ Page({
     if (!item || !item.canCancel || item.cancelling) return
     wx.showModal({
       title: '取消订单',
-      content: '取消后到机码立即失效，且不能恢复。确定取消这张未付款订单？',
+      content: cancelConfirmContent(item),
       confirmText: '确认取消',
       cancelText: '再想想',
       confirmColor: '#b5643c',
