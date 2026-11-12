@@ -645,6 +645,12 @@ async function main(): Promise<void> {
         `${usage.terminalUsed},${usage.terminalInFlight},${usage.memberUsed},${usage.memberInFlight}`
       const occupancyTotal = (usage: FreePrintUsage) =>
         usage.terminalUsed + usage.terminalInFlight + usage.memberUsed + usage.memberInFlight
+      // 后面几条互相独立。一条失败先记下来，继续跑，最后一起抛。反向检查才能分别打到后面的断言。
+      const holdFailures: string[] = []
+      const holdFail = (message: string): void => {
+        holdFailures.push(message)
+        console.error(`  FAIL ${message}`)
+      }
 
       async function bootHold(label: string, dailyFreePrintSides: number | null): Promise<{ ownerId: string; termId: string }> {
         const ownerId = `eu_hold_${label}_${suffix}`
@@ -708,29 +714,38 @@ async function main(): Promise<void> {
         return { orderId: created.orderId, pickupCode: created.pickupCode }
       }
 
+      async function expectReleased(termId: string, orderId: string, code: string, label: string): Promise<void> {
+        const result = await captureQuotaError(() => claimFresh(termId, code))
+        if (result.status !== null) {
+          holdFail(`${label}必须放行，实际 ${JSON.stringify(result)}`)
+          return
+        }
+        const row = await prisma.order.findUnique({ where: { id: orderId }, select: { pickupStatus: true, printTaskId: true } })
+        if (row?.pickupStatus !== 'used' || !row.printTaskId) holdFail(`${label}必须已核销并挂上任务，实际 ${JSON.stringify(row)}`)
+      }
+
+      const crossAt = holdFailures.length
       const cross = await bootHold('cross', null)
       const crossUsage = await loadFreePrintUsage(prisma, cross.termId, cross.ownerId, new Date())
       await releaseHeldPackage(cross.ownerId, cross.termId)
       const crossHeld = await loadFreePrintUsage(prisma, cross.termId, cross.ownerId, new Date())
       if (occupancyText(crossUsage) !== '0,0,0,0' || occupancyText(crossHeld) !== '0,40,0,40') {
-        fail(`20+20 放行后应只多出在途 40 面，放行前 ${occupancyText(crossUsage)}，放行后 ${occupancyText(crossHeld)}`)
+        holdFail(`20+20 放行后应只多出在途 40 面，放行前 ${occupancyText(crossUsage)}，放行后 ${occupancyText(crossHeld)}`)
       }
       const thirty = await placeSingle(cross.ownerId, cross.termId, 30)
       const deniedThirty = await captureQuotaError(() => claimFresh(cross.termId, thirty.pickupCode))
       if (deniedThirty.status !== 429 || deniedThirty.code !== PRINT_MEMBER_DAILY_QUOTA_REACHED) {
-        fail(`同一会员再领 30 面必须 429 ${PRINT_MEMBER_DAILY_QUOTA_REACHED}，实际 ${JSON.stringify(deniedThirty)}`)
+        holdFail(`同一会员再领 30 面必须 429 ${PRINT_MEMBER_DAILY_QUOTA_REACHED}，实际 ${JSON.stringify(deniedThirty)}`)
       }
       const deniedThirtyRow = await prisma.order.findUnique({ where: { id: thirty.orderId }, select: { pickupStatus: true, printTaskId: true } })
       if (deniedThirtyRow?.pickupStatus !== 'pending' || deniedThirtyRow.printTaskId) {
-        fail(`30 面被拒后必须仍待领取，实际 ${JSON.stringify(deniedThirtyRow)}`)
+        holdFail(`30 面被拒后必须仍待领取，实际 ${JSON.stringify(deniedThirtyRow)}`)
       }
       const ten = await placeSingle(cross.ownerId, cross.termId, 10)
-      const releasedTen = await claimFresh(cross.termId, ten.pickupCode)
-      const tenTaskId = taskIdOf(releasedTen, '10 面')
-      const tenRow = await prisma.order.findUnique({ where: { id: ten.orderId }, select: { pickupStatus: true, printTaskId: true } })
-      if (tenRow?.pickupStatus !== 'used' || tenRow.printTaskId !== tenTaskId) fail('同一会员再领 10 面必须放行')
-      pass('交叉插单：20+20 放行后，同一会员 30 面 429 会员日额度，10 面放行')
+      await expectReleased(cross.termId, ten.orderId, ten.pickupCode, '同一会员再领 10 面')
+      if (holdFailures.length === crossAt) pass('交叉插单：20+20 放行后，同一会员 30 面 429 会员日额度，10 面放行')
 
+      const machineAt = holdFailures.length
       const machine = await bootHold('machine', 50)
       await releaseHeldPackage(machine.ownerId, machine.termId)
       const otherId = `eu_hold_other_${suffix}`
@@ -738,39 +753,45 @@ async function main(): Promise<void> {
       const otherThirty = await placeSingle(otherId, machine.termId, 30)
       const deniedMachine = await captureQuotaError(() => claimFresh(machine.termId, otherThirty.pickupCode))
       if (deniedMachine.status !== 429 || deniedMachine.code !== PRINT_TERMINAL_DAILY_QUOTA_REACHED) {
-        fail(`另一会员在同一台再领 30 面必须 429 ${PRINT_TERMINAL_DAILY_QUOTA_REACHED}，实际 ${JSON.stringify(deniedMachine)}`)
+        holdFail(`另一会员在同一台再领 30 面必须 429 ${PRINT_TERMINAL_DAILY_QUOTA_REACHED}，实际 ${JSON.stringify(deniedMachine)}`)
       }
       const otherTen = await placeSingle(otherId, machine.termId, 10)
-      taskIdOf(await claimFresh(machine.termId, otherTen.pickupCode), '本机 10 面')
-      pass('本机维度：另一会员在同一台上领 30 面 429 本机日额度，10 面放行')
+      await expectReleased(machine.termId, otherTen.orderId, otherTen.pickupCode, '本机 10 面')
+      if (holdFailures.length === machineAt) pass('本机维度：另一会员在同一台上领 30 面 429 本机日额度，10 面放行')
 
+      const onceAt = holdFailures.length
       const once = await bootHold('once', null)
       const onceOrderId = await releaseHeldPackage(once.ownerId, once.termId)
       const beforeDispatch = await loadFreePrintUsage(prisma, once.termId, once.ownerId, new Date())
       const onceTaskId = (await prisma.order.findUnique({ where: { id: onceOrderId }, select: { printTaskId: true } }))?.printTaskId
-      if (!onceTaskId) fail('不重复计用例必须已经有第一项任务')
-      const onceAuth = `Bearer token-${once.termId}`
-      const onceClaim = await agent.claimTasks(once.termId, { maxTasks: 1 }, onceAuth)
-      if (onceClaim[0]?.taskId !== onceTaskId) fail('不重复计用例必须领到第一项')
-      await agent.patchTaskStatus(onceTaskId, { status: 'completed' }, onceAuth, once.termId)
-      const onceItems = await prisma.orderItem.findMany({ where: { orderId: onceOrderId }, orderBy: { seq: 'asc' } })
-      if (onceItems[0]?.status !== 'completed' || !onceItems[1]?.printTaskId) fail('第二项必须已经派发')
-      const afterDispatch = await loadFreePrintUsage(prisma, once.termId, once.ownerId, new Date())
-      if (
-        occupancyTotal(beforeDispatch) !== occupancyTotal(afterDispatch)
-        || occupancyText(beforeDispatch) !== '0,40,0,40'
-        || occupancyText(afterDispatch) !== '20,20,20,20'
-      ) {
-        fail(`第二项派发后占用总数必须不变，之前 ${occupancyText(beforeDispatch)}，之后 ${occupancyText(afterDispatch)}`)
+      if (!onceTaskId) holdFail('不重复计用例必须已经有第一项任务')
+      else {
+        const onceAuth = `Bearer token-${once.termId}`
+        const onceClaim = await agent.claimTasks(once.termId, { maxTasks: 1 }, onceAuth)
+        if (onceClaim[0]?.taskId !== onceTaskId) holdFail('不重复计用例必须领到第一项')
+        else {
+          await agent.patchTaskStatus(onceTaskId, { status: 'completed' }, onceAuth, once.termId)
+          const onceItems = await prisma.orderItem.findMany({ where: { orderId: onceOrderId }, orderBy: { seq: 'asc' } })
+          if (onceItems[0]?.status !== 'completed' || !onceItems[1]?.printTaskId) holdFail('第二项必须已经派发')
+          const afterDispatch = await loadFreePrintUsage(prisma, once.termId, once.ownerId, new Date())
+          if (
+            occupancyTotal(beforeDispatch) !== occupancyTotal(afterDispatch)
+            || occupancyText(beforeDispatch) !== '0,40,0,40'
+            || occupancyText(afterDispatch) !== '20,20,20,20'
+          ) {
+            holdFail(`第二项派发后占用总数必须不变，之前 ${occupancyText(beforeDispatch)}，之后 ${occupancyText(afterDispatch)}`)
+          }
+        }
       }
-      pass('第二项派发后不再按剩余项重复计，占用总数不变')
+      if (holdFailures.length === onceAt) pass('第二项派发后不再按剩余项重复计，占用总数不变')
 
+      const cancelAt = holdFailures.length
       const cancelHold = await bootHold('cancel', null)
       const cancelOrderId = await releaseHeldPackage(cancelHold.ownerId, cancelHold.termId)
       const cancelThirty = await placeSingle(cancelHold.ownerId, cancelHold.termId, 30)
       const deniedCancel = await captureQuotaError(() => claimFresh(cancelHold.termId, cancelThirty.pickupCode))
       if (deniedCancel.status !== 429 || deniedCancel.code !== PRINT_MEMBER_DAILY_QUOTA_REACHED) {
-        fail(`取消前 30 面必须先被会员日额度拒绝，实际 ${JSON.stringify(deniedCancel)}`)
+        holdFail(`取消前 30 面必须先被会员日额度拒绝，实际 ${JSON.stringify(deniedCancel)}`)
       }
       await prisma.order.update({
         where: { id: cancelOrderId },
@@ -778,11 +799,12 @@ async function main(): Promise<void> {
       })
       const afterCancel = await loadFreePrintUsage(prisma, cancelHold.termId, cancelHold.ownerId, new Date())
       if (occupancyText(afterCancel) !== '0,20,0,20') {
-        fail(`取消后只剩第一项任务的 20 面，实际 ${occupancyText(afterCancel)}`)
+        holdFail(`取消后只剩第一项任务的 20 面，实际 ${occupancyText(afterCancel)}`)
       }
-      taskIdOf(await claimFresh(cancelHold.termId, cancelThirty.pickupCode), '取消后 30 面')
-      pass('材料包取消后，还没建任务的项不再占用，同一会员 30 面可以放行')
+      await expectReleased(cancelHold.termId, cancelThirty.orderId, cancelThirty.pickupCode, '取消后 30 面')
+      if (holdFailures.length === cancelAt) pass('材料包取消后，还没建任务的项不再占用，同一会员 30 面可以放行')
 
+      const expireAt = holdFailures.length
       const expireHold = await bootHold('expire', null)
       const expireOrderId = await releaseHeldPackage(expireHold.ownerId, expireHold.termId)
       await prisma.order.update({
@@ -791,26 +813,32 @@ async function main(): Promise<void> {
       })
       const afterExpire = await loadFreePrintUsage(prisma, expireHold.termId, expireHold.ownerId, new Date())
       if (occupancyText(afterExpire) !== '0,20,0,20') {
-        fail(`到机码过期后只剩第一项任务的 20 面，实际 ${occupancyText(afterExpire)}`)
+        holdFail(`到机码过期后只剩第一项任务的 20 面，实际 ${occupancyText(afterExpire)}`)
       }
       const expireThirty = await placeSingle(expireHold.ownerId, expireHold.termId, 30)
-      taskIdOf(await claimFresh(expireHold.termId, expireThirty.pickupCode), '过期后 30 面')
-      pass('到机码过期后，还没建任务的项不再占用，同一会员 30 面可以放行')
+      await expectReleased(expireHold.termId, expireThirty.orderId, expireThirty.pickupCode, '过期后 30 面')
+      if (holdFailures.length === expireAt) pass('到机码过期后，还没建任务的项不再占用，同一会员 30 面可以放行')
 
+      const failedAt = holdFailures.length
       const failedHold = await bootHold('failed', null)
       const failedOrderId = await releaseHeldPackage(failedHold.ownerId, failedHold.termId)
       const failedTaskId = (await prisma.order.findUnique({ where: { id: failedOrderId }, select: { printTaskId: true } }))?.printTaskId
-      if (!failedTaskId) fail('失败后续打用例必须已经有第一项任务')
-      const failedAuth = `Bearer token-${failedHold.termId}`
-      const failedClaim = await agent.claimTasks(failedHold.termId, { maxTasks: 1 }, failedAuth)
-      if (failedClaim[0]?.taskId !== failedTaskId) fail('失败后续打用例必须领到第一项')
-      await agent.patchTaskStatus(failedTaskId, { status: 'failed' }, failedAuth, failedHold.termId)
-      const failedItems = await prisma.orderItem.findMany({ where: { orderId: failedOrderId }, orderBy: { seq: 'asc' } })
-      const failedUsage = await loadFreePrintUsage(prisma, failedHold.termId, failedHold.ownerId, new Date())
-      if (failedItems[0]?.status !== 'failed' || failedItems[1]?.printTaskId || failedItems[1]?.status !== 'pending' || occupancyText(failedUsage) !== '0,20,0,20') {
-        fail(`当前项失败后剩余项仍应占用 20 面，实际 ${occupancyText(failedUsage)}，行 ${JSON.stringify(failedItems.map((item) => ({ seq: item.seq, status: item.status, task: item.printTaskId })))}`)
+      if (!failedTaskId) holdFail('失败后续打用例必须已经有第一项任务')
+      else {
+        const failedAuth = `Bearer token-${failedHold.termId}`
+        const failedClaim = await agent.claimTasks(failedHold.termId, { maxTasks: 1 }, failedAuth)
+        if (failedClaim[0]?.taskId !== failedTaskId) holdFail('失败后续打用例必须领到第一项')
+        else {
+          await agent.patchTaskStatus(failedTaskId, { status: 'failed' }, failedAuth, failedHold.termId)
+          const failedItems = await prisma.orderItem.findMany({ where: { orderId: failedOrderId }, orderBy: { seq: 'asc' } })
+          const failedUsage = await loadFreePrintUsage(prisma, failedHold.termId, failedHold.ownerId, new Date())
+          if (failedItems[0]?.status !== 'failed' || failedItems[1]?.printTaskId || failedItems[1]?.status !== 'pending' || occupancyText(failedUsage) !== '0,20,0,20') {
+            holdFail(`当前项失败后剩余项仍应占用 20 面，实际 ${occupancyText(failedUsage)}，行 ${JSON.stringify(failedItems.map((item) => ({ seq: item.seq, status: item.status, task: item.printTaskId })))}`)
+          }
+        }
       }
-      pass('当前项打印失败、还能等同码续打时，还没派发的项仍占用')
+      if (holdFailures.length === failedAt) pass('当前项打印失败、还能等同码续打时，还没派发的项仍占用')
+      if (holdFailures.length > 0) fail(holdFailures.join('\n'))
     } finally {
       await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: originalBwUnit } })
     }
