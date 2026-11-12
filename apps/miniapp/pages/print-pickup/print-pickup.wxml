@@ -75,7 +75,7 @@
       </view>
       <view class="step-item">
         <view class="step-num">2</view>
-        <text class="step-text">在终端首页选择「到机码核销」，扫码或输入本页的码</text>
+        <text class="step-text">在终端首页选择「到机取件」，扫码或输入本页的码</text>
       </view>
       <view class="step-item">
         <view class="step-num">3</view>

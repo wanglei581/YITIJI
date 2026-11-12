@@ -69,10 +69,12 @@ function capabilityError(raw, normalized) {
     return '短边翻页未开放，请改回单面或更换终端'
   }
   const allowed = allowedCapabilities(raw)
-  const blocked = []
-  if (colorMode === 'color' && !allowed.color) blocked.push('彩色')
-  if (duplex === 'duplex_long_edge' && !allowed.duplex) blocked.push('双面（长边翻页）')
-  if (blocked.length) return '该终端未开放' + blocked.join('、') + '，请改回黑白单面，或更换终端'
+  const colorBlocked = colorMode === 'color' && !allowed.color
+  const duplexBlocked = duplex === 'duplex_long_edge' && !allowed.duplex
+  const wayOut = '请换一台机器，或改成黑白、单面'
+  if (colorBlocked && duplexBlocked) return '这台机器还没开通彩色打印，也还没开通自动双面。' + wayOut
+  if (colorBlocked) return '这台机器还没开通彩色打印。' + wayOut
+  if (duplexBlocked) return '这台机器还没开通自动双面。' + wayOut
   if (colorMode !== 'black_white' && colorMode !== 'color') return '颜色无法识别，请改回黑白或更换终端'
   if (duplex !== 'simplex' && duplex !== 'duplex_long_edge') return '双面方式无法识别，请改回单面或更换终端'
   return ''

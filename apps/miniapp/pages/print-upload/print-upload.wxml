@@ -8,7 +8,7 @@
 
 <view class="content has-bar">
   <!-- 步骤条文案与 print-store / print-pay 保持同一套，避免同一笔订单在相邻两页读到不同流程。
-       第 2 步在终端选定后统一设置颜色、单双面、份数；第 3 步还在手机上确认提交，到机核验是第 4 步的事（FLOW1a）。 -->
+       第 2 步在终端选定后统一设置颜色、单双面、份数；第 3 步还在手机上确认提交，到机取件是第 4 步的事（FLOW1a）。 -->
   <view class="steps rise-d1">
     <view class="st on"><text class="n">1</text><text class="nl">选择文件</text></view>
     <view class="line"></view>

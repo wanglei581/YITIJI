@@ -1,6 +1,9 @@
 // Execute the real pages with controlled network timing; no device or production acceptance implied.
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { deferred, flush, instantiate, loadPageDefinition } from './page-sandbox.mjs'
 const require = createRequire(import.meta.url)
@@ -53,6 +56,28 @@ test('capability flags require boolean true, unique rows and available status', 
   }
   assert.ok(params.capabilityError(null, advanced))
   assert.equal(params.capabilityError(null, {}), '')
+})
+
+test('彩色或双面未开通：说这台机器还没开通，并给出换机器或改黑白单面', () => {
+  const none = { capabilities: [] }
+  const wayOut = '请换一台机器，或改成黑白、单面'
+  assert.equal(
+    params.capabilityError(none, { copies: 1, colorMode: 'color', duplex: 'simplex' }),
+    '这台机器还没开通彩色打印。' + wayOut,
+  )
+  assert.equal(
+    params.capabilityError(none, { copies: 1, colorMode: 'black_white', duplex: 'duplex_long_edge' }),
+    '这台机器还没开通自动双面。' + wayOut,
+  )
+  const both = params.capabilityError(none, advanced)
+  assert.match(both, /这台机器还没开通彩色打印/)
+  assert.match(both, /还没开通自动双面/)
+  assert.match(both, /换一台机器，或改成黑白、单面/)
+  assert.doesNotMatch(both, /真机|尚未验收|未开放/)
+  const hint = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '../../pages/print-store/print-store.wxml'), 'utf8')
+  assert.match(hint, /这台机器还没开通彩色打印/)
+  assert.match(hint, /这台机器还没开通自动双面/)
+  assert.doesNotMatch(hint, /暂未开放彩色|暂未开放双面|真机上验过/)
 })
 
 test('parameter canonicalization rejects unknown values and unopened short edge', () => {

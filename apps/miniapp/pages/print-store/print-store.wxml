@@ -20,9 +20,9 @@
   <!-- 三档照旧按实时核价分支（没核价时不说免费），每档缩成一行（FLOW1a，agy 1131 Q4 + 用户裁定） -->
   <view class="notice info rise-d2">
     <text class="ficon i-location n-ic"></text>
-    <text wx:if="{{quoteState === 'ready' && !isFreeOrder}}">{{quoteState === 'ready' && !isFreeOrder ? '到机核验后现场支付并打印' : ''}}</text>
-    <text wx:elif="{{quoteState === 'ready' && isFreeOrder}}">本单免费：到机核验后直接进入打印队列</text>
-    <text wx:else>请选择在线终端，到机核验后打印</text>
+    <text wx:if="{{quoteState === 'ready' && !isFreeOrder}}">{{quoteState === 'ready' && !isFreeOrder ? '到机取件后现场支付并打印' : ''}}</text>
+    <text wx:elif="{{quoteState === 'ready' && isFreeOrder}}">本单免费：到机取件后直接进入打印队列</text>
+    <text wx:else>请选择在线终端，到机取件后打印</text>
   </view>
 
   <view class="store-list rise-d3">
@@ -75,7 +75,7 @@
       <view wx:if="{{capError}}" class="param-hint">{{capError}}</view>
       <view wx:elif="{{capState==='loading'}}" class="param-hint">正在读取可选参数</view>
       <view wx:elif="{{capState==='fail'}}" class="param-hint">高级参数暂不可选；黑白单面仍需核定</view>
-      <view wx:elif="{{capState==='ready' && (!capColor || !capDuplex)}}" class="param-hint">{{!capColor && !capDuplex ? '本终端暂未开放彩色和双面' : (!capColor ? '本终端暂未开放彩色' : '本终端暂未开放双面')}}</view>
+      <view wx:elif="{{capState==='ready' && (!capColor || !capDuplex)}}" class="param-hint">{{!capColor && !capDuplex ? '这台机器还没开通彩色打印，也还没开通自动双面' : (!capColor ? '这台机器还没开通彩色打印' : '这台机器还没开通自动双面')}}</view>
     </view>
   </block>
 

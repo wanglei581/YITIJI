@@ -667,7 +667,7 @@ const pickupQr = read('utils/pickup-qrcode.js')
 if (
   pickupWxml.includes('type="2d"') &&
   pickupWxml.includes('请将此二维码对准一体机扫码器') &&
-  // 术语随终端对齐为「到机码」（kiosk 入口名为「到机码核销 · 不是取件码」）。
+  // 术语随终端对齐为「到机码」。取件这一步的名字跟一体机首页磁贴「到机取件」。
   // 这里只是定位锚点；真正守能力的是下面的 createPickupQrMatrix / PICKUP_CODE_RE /
   // 不得出现 scanTerminal / 不得调 `/pickup` 四条，未做任何放宽。
   pickupWxml.includes('二维码只包含本订单的到机码') &&
@@ -735,17 +735,18 @@ const ARRIVAL_CODE_FILES = [
   'pages/store-select/store-select.wxml', 'pages/home/home.wxml',
 ]
 const staleCodeName = ARRIVAL_CODE_FILES.filter((f) => read(f).includes('取件码'))
-// 跨端指引必须指到终端上真实存在的标签：Kiosk /print-scan 的卡片标题是「到机码核销」
-// （apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx）。指引写别的名字，
-// 用户到了机器前就找不到那个按钮。
-// 只钉「必须出现终端真实卡片标题」，不钉整句话——否则指引连字都不能加。
+// 跨端指引必须指到一体机首页上真实存在的磁贴：title="到机取件"
+// （apps/kiosk/src/pages/home/components/HomeTouchView.tsx）。指引写别的名字，
+// 用户到了机器前就找不到那个入口。
+// 只钉「必须出现首页磁贴名」，不钉整句话——否则指引连字都不能加。
+// 打印扫描页里的旧卡片名「到机码核销」不再作为小程序指引的锚点。
 const arrivalGuideOk =
-  pickupWxml.includes('在终端') && pickupWxml.includes('「到机码核销」') &&
-  read('pages/orders/orders.wxml').includes('到机码核销')
+  pickupWxml.includes('在终端') && pickupWxml.includes('「到机取件」') &&
+  read('pages/orders/orders.wxml').includes('到机取件')
 if (!staleCodeName.length && arrivalGuideOk) ok('到机码与取件凭证码不混名，且跨端指引对得上终端标签')
 else bad('到机码命名一致性', staleCodeName.length
   ? `仍把到机码叫「取件码」：${staleCodeName.join(',')}`
-  : '指向终端的指引未使用终端现有卡片标题「到机码核销」')
+  : '指向终端的指引未使用首页磁贴名「到机取件」')
 
 const printUploadJs = read('pages/print-upload/print-upload.js')
 const printUploadWxml = read('pages/print-upload/print-upload.wxml')
@@ -995,7 +996,7 @@ if (
   printPayJs.includes("'files[0].price': total") &&
   // 负面锚：这四项一个都不许再进 print-store → print-pay 的 URL。
   !/print-pay\?[^`'"]*\b(?:amountCents|total|name|pickupCode|expiresAt)=/.test(printStoreJs) &&
-  printPayWxml.includes('免费试运营：到机核验后直接进入打印队列') &&
+  printPayWxml.includes('免费试运营：到机取件后直接进入打印队列') &&
   pickupJs.includes("key: 'awaiting_release'") &&
   pickupJs.includes('parseAmountCents(order.amountCents) === 0') &&
   pickupWxml.includes('核销后直接进入打印队列') &&

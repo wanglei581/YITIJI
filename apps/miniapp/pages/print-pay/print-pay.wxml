@@ -12,7 +12,7 @@
     <view class="line done"></view>
     <view class="st done"><text class="n"><text class="ficon i-check"></text></text><text class="nl">终端和参数</text></view>
     <view class="line done"></view>
-    <!-- 这一步还在手机上确认提交，到机码要提交后才生成；到机核验属于第 4 步（FLOW1a 实图 06） -->
+    <!-- 这一步还在手机上确认提交，到机码要提交后才生成；到机取件属于第 4 步（FLOW1a 实图 06） -->
     <view class="st on"><text class="n">3</text><text class="nl">确认提交</text></view>
     <view class="line"></view>
     <view class="st"><text class="n">4</text><text class="nl">{{quoteState === 'ready' && !isFreeOrder ? '机端支付' : (isFreeOrder ? '现场打印' : '到机完成')}}</text></view>
@@ -23,7 +23,7 @@
     <view class="sm-ic a-teal"><text class="ficon i-location"></text></view>
     <view class="sm-main">
       <view class="sm-name">{{storeName || '未选择终端'}}</view>
-      <view class="sm-sub">{{quoteState === 'ready' && !isFreeOrder ? '到机核验后再进入现场支付与打印' : (isFreeOrder ? '免费试运营：到机核验后直接进入打印队列' : '到机核验后进入打印')}}</view>
+      <view class="sm-sub">{{quoteState === 'ready' && !isFreeOrder ? '到机取件后再进入现场支付与打印' : (isFreeOrder ? '免费试运营：到机取件后直接进入打印队列' : '到机取件后进入打印')}}</view>
     </view>
   </view>
 
