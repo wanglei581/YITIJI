@@ -20,6 +20,7 @@ import {
 } from '../../services/api/devices'
 import { CreatePlannedTerminalDialog } from './CreatePlannedTerminalDialog'
 import { TerminalBindCodeDialog } from './TerminalBindCodeDialog'
+import { applyHomeFreeBadgePatch, forgetMatchedHomeFreeBadgePatch } from './homeFreeBadgePatch'
 import { TerminalDetailDrawer } from './TerminalDetailDrawer'
 import { ReleaseObservationPanel } from './ReleaseObservationPanel'
 import { lifecycleView } from './terminalStatusViews'
@@ -62,6 +63,7 @@ export default function TerminalsPage() {
     credentialGeneration?: number
     hasActiveCredential?: boolean
   }>>({})
+  const [homeFreeBadgePatch, setHomeFreeBadgePatch] = useState<Record<string, boolean>>({})
 
   const { data: terminalData, status, refresh } = useRefreshable(TERMINALS_REFRESH_KEY, getTerminals, {
     intervalMs: 30_000,
@@ -79,7 +81,7 @@ export default function TerminalsPage() {
   )
 
   const terminals = useMemo(
-    () => (terminalData?.terminals ?? []).map((terminal) => {
+    () => applyHomeFreeBadgePatch((terminalData?.terminals ?? []).map((terminal) => {
       const lifecyclePatch = localLifecyclePatch[terminal.id]
       return {
         ...terminal,
@@ -92,8 +94,8 @@ export default function TerminalsPage() {
           ...(lifecyclePatch.hasActiveCredential === undefined ? {} : { hasActiveCredential: lifecyclePatch.hasActiveCredential }),
         } : {}),
       }
-    }),
-    [localLifecyclePatch, localOrgPatch, localProfilePatch, terminalData?.terminals],
+    }), homeFreeBadgePatch),
+    [homeFreeBadgePatch, localLifecyclePatch, localOrgPatch, localProfilePatch, terminalData?.terminals],
   )
   const selected = terminals.find((terminal) => terminal.id === selectedId) ?? null
   const loading = status === 'loading' && terminals.length === 0
@@ -118,6 +120,15 @@ export default function TerminalsPage() {
       return changed ? next : current
     })
   }, [terminalData])
+
+  useEffect(() => {
+    if (!terminalData) return
+    setHomeFreeBadgePatch((current) => forgetMatchedHomeFreeBadgePatch(current, terminalData.terminals))
+  }, [terminalData])
+
+  function handleHomeFreeBadgeSaved(terminalId: string, enabled: boolean) {
+    setHomeFreeBadgePatch((current) => ({ ...current, [terminalId]: enabled }))
+  }
 
   function openBindCodeModal(terminal: AdminTerminalRecord) {
     const canCreate = terminal.lifecycleStatus === 'planned' || terminal.lifecycleStatus === 'maintenance'
@@ -259,7 +270,7 @@ export default function TerminalsPage() {
       <p className="mt-3 text-xs text-neutral-500">终端在线状态、链路诊断、打印机状态、扫描输入、版本、IP、磁盘均来自终端程序（Terminal Agent）的定时上报；链路诊断不展示 WiFi 名称、密码、网关或打印机地址{API_MODE !== 'http' && '（当前为 mock 演示数据，归属变更不写数据库）'}</p>
       <p className="mt-1 text-xs text-neutral-500">「扫描输入」锁死后只能到现场重启终端程序恢复，后台不提供远程解除；显示「未上报」表示这台终端还没报这一组字段，不等于正常。</p>
       <p className="mt-1 text-xs text-neutral-500">「所属机构」决定该终端归属；学校账号在合作机构后台只能配置归属本校的智慧校园开关。绑定/解绑仅管理员可操作，变更写入审计日志。</p>
-      <TerminalDetailDrawer terminal={selected} organizations={orgOptions} orgLoadError={orgLoadError} orgLicenseError={orgLicenseError} notice={notice} editingOrg={selected ? editingId === selected.id : false} editOrgValue={editValue} savingOrg={saving} profileEditing={selected ? profileEditingId === selected.id : false} profileDraft={profileDraft} profileSaving={profileSaving} statusSaving={selected ? statusSavingId === selected.id : false} lifecycleSaving={selected ? lifecycleSavingId === selected.id : false} onClose={closeDetail} onOpenBindCode={openBindCodeModal} onStartProfileEdit={startProfileEdit} onCancelProfileEdit={cancelProfileEdit} onSaveProfile={(terminal) => void saveProfile(terminal)} onProfileDraftChange={(patch) => setProfileDraft((current) => ({ ...current, ...patch }))} onStartOrgEdit={startOrgEdit} onCancelOrgEdit={cancelOrgEdit} onSaveOrg={(terminal) => void saveOrg(terminal)} onOrgChange={(value) => { setEditValue(value); setOrgLicenseError(null) }} onToggleStatus={(terminal) => void toggleStatus(terminal)} onLifecycleBusy={(busy) => setLifecycleSavingId(busy && selected ? selected.id : null)} onLifecycleUpdated={(result) => { if (selected) handleLifecycleUpdated(selected, result) }} onLifecycleConflict={() => { void refresh().catch(() => undefined) }} onNotice={setNotice} />
+      <TerminalDetailDrawer terminal={selected} organizations={orgOptions} orgLoadError={orgLoadError} orgLicenseError={orgLicenseError} notice={notice} editingOrg={selected ? editingId === selected.id : false} editOrgValue={editValue} savingOrg={saving} profileEditing={selected ? profileEditingId === selected.id : false} profileDraft={profileDraft} profileSaving={profileSaving} statusSaving={selected ? statusSavingId === selected.id : false} lifecycleSaving={selected ? lifecycleSavingId === selected.id : false} onClose={closeDetail} onOpenBindCode={openBindCodeModal} onStartProfileEdit={startProfileEdit} onCancelProfileEdit={cancelProfileEdit} onSaveProfile={(terminal) => void saveProfile(terminal)} onProfileDraftChange={(patch) => setProfileDraft((current) => ({ ...current, ...patch }))} onStartOrgEdit={startOrgEdit} onCancelOrgEdit={cancelOrgEdit} onSaveOrg={(terminal) => void saveOrg(terminal)} onOrgChange={(value) => { setEditValue(value); setOrgLicenseError(null) }} onToggleStatus={(terminal) => void toggleStatus(terminal)} onLifecycleBusy={(busy) => setLifecycleSavingId(busy && selected ? selected.id : null)} onLifecycleUpdated={(result) => { if (selected) handleLifecycleUpdated(selected, result) }} onLifecycleConflict={() => { void refresh().catch(() => undefined) }} onNotice={setNotice} onHomeFreeBadgeSaved={handleHomeFreeBadgeSaved} />
       {bindCodeTerminal && <TerminalBindCodeDialog terminal={bindCodeTerminal} onClose={() => setBindCodeTerminal(null)} onNotice={setNotice} />}
       {creatingPlannedTerminal && <CreatePlannedTerminalDialog organizations={orgOptions} onClose={() => setCreatingPlannedTerminal(false)} onCreated={(code) => { setCreatingPlannedTerminal(false); setNotice({ type: 'success', text: `已预创建设备 ${code}；请在设备列表中生成一次性绑定码完成安装。` }); void refresh() }} onError={(message) => setNotice({ type: 'error', text: message })} />}
     </>

@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-11-12：一体机首页「免费使用」第 1 段返工——失败弹回、抽屉重开是新值、价目按时重读（未合并）
+
+- 后台开关只在保存成功后改成服务端返回的值。失败（演示数据、网络、登录失效）停在点之前的位置，错误照旧显示，保存中按钮照旧停用。
+- 保存成功后把返回值写回终端列表（这一栏没有单独的读取接口，不照每日免费面数自己再请求）。关抽屉再开、列表刷新到相同值之后，显示的都是新值。
+- 一体机 `useKioskHomeFreeBadge` 按同一个 `REFRESH_MS` 重读配置和价目。价目在读取函数里单独取（`fetchPrintPriceConfig`），`usePrintPriceConfig` 对打印页等调用方仍只在挂载时读一次。重读失败当作读不到，不沿用上一轮的 0 元。
+- 没改：后端、迁移、设计稿、首页画面、小程序、价目与收费逻辑。首页仍不画「免费使用」。
+
 ## 2026-11-12：一体机首页「免费使用」按机器开关——后端、管理员后台、一体机读配置（第 1 段；首页显示等补稿，未合并）
 
 - 做了什么：终端增加 `homeFreeBadge`（默认开）。管理员在现有终端详情抽屉里用开关改它，接口 `PUT /api/v1/admin/terminals/:terminalId/home-free-badge`，只许管理员，写入审计 `terminal.home_free_badge.update`（previous / next）。终端列表带上这个字段。一体机 `GET /terminals/:terminalId/config` 返回该字段，并写进 `configVersion`。一体机 `useKioskHomeFreeBadge` 算出「该显示」。

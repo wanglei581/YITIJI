@@ -50,7 +50,7 @@ test.describe('设备 / 终端 / 打印机（mock 口径）', () => {
     await expect(page.getByText('未上报').first()).toBeVisible()
   })
 
-  test('终端详情可以切换首页免费使用，演示数据不写入服务器', async ({ page }) => {
+  test('终端详情点首页免费使用失败后开关仍是原来的开，并显示没有写入服务器', async ({ page }) => {
     const guards = await openAuthed(page, '/devices')
     await settleAdminPage(page, guards)
     await page.getByRole('button', { name: '终端', exact: true }).click()
@@ -64,7 +64,10 @@ test.describe('设备 / 终端 / 打印机（mock 口径）', () => {
     const toggle = drawer.getByRole('switch', { name: '首页显示『免费使用』' })
     await expect(toggle).toHaveAttribute('aria-checked', 'true')
     await toggle.click()
-    await expect(toggle).toHaveAttribute('aria-checked', 'false')
+    // 演示包在保存函数里直接拒绝，请求发不出去。失败后必须停在点之前的「开」，
+    // 否则管理员会以为已经关掉，再点一次发出去的是反方向。
     await expect(drawer.getByText('当前是演示数据，没有写入服务器')).toBeVisible()
+    await expect(toggle).toHaveAttribute('aria-checked', 'true')
+    await expect(toggle).toHaveText('开')
   })
 })

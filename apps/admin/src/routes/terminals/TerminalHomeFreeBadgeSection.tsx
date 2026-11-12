@@ -1,38 +1,49 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { saveTerminalHomeFreeBadge } from '../../services/api/homeFreeBadge'
 
 export function TerminalHomeFreeBadgeSection({
   terminalId,
   enabled,
+  onSaved,
 }: {
   terminalId: string
   enabled: boolean
+  onSaved: (enabled: boolean) => void
 }) {
   const [on, setOn] = useState(enabled)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const terminalIdRef = useRef(terminalId)
+  terminalIdRef.current = terminalId
 
   useEffect(() => {
     setOn(enabled)
-    setError(null)
-    setNotice(null)
   }, [terminalId, enabled])
 
+  useEffect(() => {
+    setError(null)
+    setNotice(null)
+  }, [terminalId])
+
   const onToggle = async () => {
+    const requestTerminalId = terminalId
     const next = !on
     setSaving(true)
     setError(null)
     setNotice(null)
-    setOn(next)
     try {
-      const saved = await saveTerminalHomeFreeBadge(terminalId, next)
+      const saved = await saveTerminalHomeFreeBadge(requestTerminalId, next)
+      // 先写回列表，再决定要不要改当前这台的开关。换了终端也不能把结果写到新的那台上。
+      onSaved(saved.enabled)
+      if (terminalIdRef.current !== requestTerminalId) return
       setOn(saved.enabled)
       setNotice('已保存，并记入审计。')
     } catch (reason) {
+      if (terminalIdRef.current !== requestTerminalId) return
       setError((reason as Error).message)
     } finally {
-      setSaving(false)
+      if (terminalIdRef.current === requestTerminalId) setSaving(false)
     }
   }
 

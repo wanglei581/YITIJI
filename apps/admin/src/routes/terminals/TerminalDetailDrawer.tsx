@@ -91,6 +91,7 @@ export interface TerminalDetailDrawerProps {
   onLifecycleUpdated: (result: UpdateTerminalLifecycleResult | EmergencyRevokeTerminalResult) => void
   onLifecycleConflict: () => void
   onNotice: (notice: Notice | null) => void
+  onHomeFreeBadgeSaved: (terminalId: string, enabled: boolean) => void
 }
 
 export function TerminalDetailDrawer({
@@ -122,6 +123,7 @@ export function TerminalDetailDrawer({
   onLifecycleUpdated,
   onLifecycleConflict,
   onNotice,
+  onHomeFreeBadgeSaved,
 }: TerminalDetailDrawerProps) {
   if (!terminal) return <Drawer open={false} onClose={onClose} title="终端详情"><div /></Drawer>
 
@@ -171,7 +173,7 @@ export function TerminalDetailDrawer({
         </Section>
 
         <TerminalDailyFreeSidesSection terminalId={terminal.id} />
-        <TerminalHomeFreeBadgeSection terminalId={terminal.id} enabled={terminal.homeFreeBadge === true} />
+        <TerminalHomeFreeBadgeSection terminalId={terminal.id} enabled={terminal.homeFreeBadge === true} onSaved={(enabled) => onHomeFreeBadgeSaved(terminal.id, enabled)} />
 
         <Section title="所属机构">
           {editingOrg ? (

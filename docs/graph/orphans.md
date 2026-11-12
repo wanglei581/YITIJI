@@ -41,7 +41,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | 风险 | 含义 | 数量 |
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
-| **high** | 仍被 CI / 门禁 / 包脚本引用 | 175 |
+| **high** | 仍被 CI / 门禁 / 包脚本引用 | 176 |
 | **medium** | 只被文档或其它文件提及 | 30 |
 | **low** | 全仓零提及 | 95 |
 
@@ -232,9 +232,9 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## high — 仍被 CI / 门禁 / 包脚本引用（175）
+## high — 仍被 CI / 门禁 / 包脚本引用（176）
 
-### 页面/组件（110）
+### 页面/组件（111）
 
 | 路径 | 判定依据 |
 | --- | --- |
@@ -260,6 +260,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/auth/KioskCapabilityGuard.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-home-toolbox-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs |
 | `apps/kiosk/src/components/ComingSoonNotice.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w4.mjs |
 | `apps/kiosk/src/components/KioskDeviceStatusPills.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-device-status-honest.mjs |
+| `apps/kiosk/src/hooks/kioskHomeFreeBadgeReader.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/home-free-badge.test.mjs |
 | `apps/kiosk/src/hooks/useKioskHomeFreeBadge.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/home-free-badge.test.mjs |
 | `apps/kiosk/src/hooks/useSmartCampusConfig.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs、services/api/scripts/verify-terminal-device-config.ts |
 | `apps/kiosk/src/hooks/useToolboxConfig.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-home-toolbox-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs、services/api/scripts/verify-terminal-device-config.ts |
