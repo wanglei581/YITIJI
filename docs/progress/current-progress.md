@@ -10,6 +10,8 @@
 - 零元单建单后仍立刻记为免费已付。到机码仍从 `paidAt` 起 7 天，源文件延长到同一截止。这条只加了断言，没改行为。材料包零元单同一条。
 - 小程序错误文案白名单还没登记这个新码。接口会原样返回上面的中文，页面在包 3（AI 与错误文案）登记前仍用兜底句。
 - 已知限制：管理员把每天上限调低之后，已经建好、面数超过新上限的老单，回放时不带提示（`rejectOverCap: false` 返回空），到机取件仍会被拒。这次不改。
+- 收货复核（2026-11-12，Codex 三轮只读复核）：第三轮后仍有三处未改，记作已知限制——①材料包正在出纸时到机码恰好过期，剩余项不再占用，同一会员此刻再放行别的单可能超出当天上限（只在过期前几分钟放行才会碰到）；②昨天建的任务跨日还没打完时不计入今天在途；③同一会员在两台机器上同时放行，会员维度没有跨机器的共同锁。②③是原有额度逻辑的限制，不是这次引入的。
+- 收货验证：本会话按 origin/main 1e37737e7 重建验证库后，图谱列出的 44 条后端门禁本机时区与 TZ=UTC 各一遍全过，另跑小程序 verify:package-chain、一体机 verify:pickup-claim-error-coverage 两遍全过；收货方自做反向检查 3 条（不计剩余项、失败待续打不占用、本机维度不计剩余项）都被 verify:package-order-fulfillment 抓到。
 - 验证（2026-11-12，本机时区与 TZ=UTC 各一遍；未部署）：在 services/api 用 `pnpm run -s`，`VERIFICATION_DATABASE_TARGET=isolated`，`DATABASE_URL=file:/tmp/verify-p4-quota-round3.db`，Redis `redis://127.0.0.1:6379/12`。两遍都通过：typecheck、verify:free-print-quota、verify:miniapp-cloud-print-m2、verify:package-order-fulfillment、verify:print-jobs（这条里接着跑了 verify:pickup-code-share 和 verify:pickup-code-resume）、verify:member-print-orders、verify:copy-quota、verify:copy-c1b、verify:backend-p0-contracts、verify:package-order-idempotency、verify:member-order-timeline。本机 verify:print-jobs 第一次因临时库还没有表失败，建表后重跑通过，不是额度逻辑失败。材料包和单文件云打印的完成态回放这轮都单独跑到：订单已打印完成，但取件被改回待领取、任务指针清空时，同键回放不带 freeQuotaNotice；再把任务状态改回待放行，同一条回放会带。小程序页面消费新错误码和 freeQuotaNotice 这轮没改，也没跑小程序契约。没有改线上配置。
 
 ## 2026-11-12：一体机简历优化修「采纳了改写却换不上」——稿里还是原文时按本人选择换成改写；优化稿简介不再截在 300 字（PR #1617，未部署）
