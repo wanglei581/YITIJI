@@ -1,6 +1,6 @@
 {
   "frozenAt": "2026-10-26",
-  "updatedAt": "2026-11-08",
+  "updatedAt": "2026-11-12",
   "note": "青序流光 · 触屏版，全页补稿第 5 版定稿（产品负责人 2026-10-27 看过并同意进仓库；第 4 版补稿 2026-10-26 定稿）；2026-11-05 政策最小闭环改政策三屏并加空态（policy-min.js），「我的 · 收藏」每条加取消（fix-me.js，方案屏 5「沿用 我的 · 收藏（加取消）」），产品负责人点「按方案开工」。改稿须产品负责人同意，并在 current-progress.md 写明原因；README.md 不在冻结范围。",
   "files": {
     "app.js": "34dd3a5fe3fb2311e9a23e5a120f1289cfd4360ec44b08da31a72e177bf5779e",
@@ -13,8 +13,9 @@
     "fix-policy.js": "a62435697054e4c14191cbf76757a064b4ef61762dfc2a1fb00a64c9dbc3ff1f",
     "fix-public.js": "565096d0285127f349cafd3f36a16b544c412a05f0b7eb8da4a18ccbbeb0ba65",
     "fix-resume2.js": "5e847ba4de75a399f104f5eb1c51f435ee3753fe01e7c501609a26816920bebc",
+    "fix-resume3.js": "d2544d8d443f2905eeffc7c1db2aaf0f760000eaf910d883f2aab5f3c1a9ac91",
     "fix-scan.js": "058ce31c8b47bec503fc75f9e9b35b40849bc73d93d44835619e1d9af66323cb",
-    "index.html": "883c16e2d23531aad38b25a467b28d84bb1da4037205c098ef3a5c202e8062f2",
+    "index.html": "63580614fc0ecad1bc602dd0e4fa6eb42b5aba05202b965977ab8d618f20a078",
     "map.js": "2a15f0cecd7c1cc70767797af98c4b6c56ad7188e8c2dca8083e1de3c4ff93da",
     "policy-min.js": "2301b81bb62fa775cf8e1065151ca81082e6c14234c1db1690ca28cd3005f4cb",
     "screens.js": "f1f594690d947f57008a10ad4432c8d236754018b1e903147ad314b4c87feece",
