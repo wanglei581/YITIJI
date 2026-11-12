@@ -29995,6 +29995,7 @@
     "services/api/src/print-jobs/free-print-quota.usage.ts": [
       "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-print-queue-timeout.ts"
     ],
@@ -44786,6 +44787,7 @@
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts",
           "services/api/src/print-jobs/free-print-quota.policy.ts",
+          "services/api/src/print-jobs/free-print-quota.usage.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-page-count.service.ts",
           "services/api/src/prisma/prisma.service.ts",
