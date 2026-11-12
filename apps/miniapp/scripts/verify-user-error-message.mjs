@@ -115,6 +115,45 @@ for (const [code, required] of [
   assert(e.message === 'AI 服务暂时不可用，本次没有生成结果；打印等其他功能照常', 'AI 未配置时如实提示没有生成结果，不出现付费或开通引导')
 }
 
+console.log('AI 次数：明天 0 点恢复，不引导付费')
+{
+  const sentence = '今天的 AI 次数用完了，明天 0 点恢复。'
+  for (const message of ['AI_QUOTA_EXHAUSTED', SERVER_GENERIC_MESSAGE, sentence]) {
+    const e = await errorOf(429, { success: false, error: { code: 'AI_QUOTA_EXHAUSTED', message } })
+    assert(e.message === sentence, `AI_QUOTA_EXHAUSTED 最终显示恢复时间（实际「${e.message}」）`)
+    assert(!/价格|购买|充值|套餐|开通|续费|权益|核销/.test(e.message || ''), 'AI 次数用完不引导付费')
+  }
+  const { plainAiMessageOf } = requireMiniapp('./user-error.js')
+  const plain = plainAiMessageOf({ code: 'AI_QUOTA_EXHAUSTED', message: 'AI_QUOTA_EXHAUSTED' }, '兜底')
+  assert(plain === sentence, `模拟面试和小青走 plainAiMessageOf 也是这句（实际「${plain}」）`)
+}
+
+console.log('打印额度：有面数的原话原样，会员那句不提手机屏幕')
+{
+  const cases = [
+    ['PRINT_TERMINAL_DAILY_QUOTA_REACHED', '今天这台机器的免费打印量已用完，明天 0 点恢复。', '今天这台机器的免费打印量已用完，明天 0 点恢复。'],
+    ['PRINT_GUEST_ORDER_QUOTA_EXCEEDED', '免登录每次最多打印 20 面。用手机号登录后，可以一次打更多。', '免登录每次最多打印 20 面。用手机号登录后，可以一次打更多。'],
+    ['PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES', '这台终端今天还只能再打 1 份，这一份已经超过本机上限。', '这台终端今天还只能再打 1 份，这一份已经超过本机上限。'],
+    ['PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES', '这台终端今天还只能再打 2 份，这一单 4 份已经超过本机上限。', '这台终端今天还只能再打 2 份，这一单 4 份已经超过本机上限。'],
+    ['PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES', '你今天还只能再打 1 份，这一份已经超过个人上限。', '你今天还只能再打 1 份，这一份已经超过个人上限。'],
+    ['PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES', '你今天还只能再打 3 份，这一单 5 份已经超过个人上限。', '你今天还只能再打 3 份，这一单 5 份已经超过个人上限。'],
+  ]
+  for (const [code, serverMessage, shown] of cases) {
+    const e = await errorOf(400, { success: false, error: { code, message: serverMessage } })
+    assert(e.message === shown, `${code} 最终显示「${shown}」（实际「${e.message || '(空)'}」）`)
+  }
+  const memberServer = '你今天已免费打印 50 面，达到每日上限，明天 0 点恢复。确有急用，可以拨打屏幕上的服务电话。'
+  const memberShown = '你今天已免费打印 50 面，达到每日上限，明天 0 点恢复。需要帮助可拨打服务电话，号码在首页底部「经营者信息」里。'
+  const member = await errorOf(400, { success: false, error: { code: 'PRINT_MEMBER_DAILY_QUOTA_REACHED', message: memberServer } })
+  assert(member.message === memberShown, `PRINT_MEMBER_DAILY_QUOTA_REACHED 去掉一体机屏幕那半句（实际「${member.message || '(空)'}」）`)
+  assert(!/屏幕上的服务电话/.test(member.message || ''), '会员额度不再说屏幕上的服务电话')
+  assert(/50 面/.test(member.message || ''), '会员额度保留具体面数')
+  const copyServer = '你今天已免费打印复印 50 面，达到每日上限，明天 0 点恢复。确有急用，可以拨打屏幕上的服务电话。'
+  const copy = await errorOf(400, { success: false, error: { code: 'PRINT_MEMBER_DAILY_QUOTA_REACHED', message: copyServer } })
+  assert(copy.message.startsWith('你今天已免费打印复印 50 面，达到每日上限，明天 0 点恢复。'), `复印同一码也去掉屏幕那半句（实际「${copy.message}」）`)
+  assert(!/屏幕上的服务电话/.test(copy.message || ''), '复印额度不再说屏幕上的服务电话')
+}
+
 // G. 登录失败必须说得出原因
 //
 // 2026-09-08 回归：本模块首版把登录链路的码一并挡在 fail-closed 之外，用户在
