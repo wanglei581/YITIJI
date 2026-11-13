@@ -5,7 +5,8 @@
  * 数字按完整数值比较，不按子串：原文有「2020」不能放过改写里的「20」或「202」。
  * 带百分号和不带百分号是两个事实。中文数字先折成数值，再和阿拉伯数字放在同一套记号里比。
  * 最后一个大单位（百、千、万、亿）后面只跟一个数字、中间没有「零」、这个数字自己也没有单位时，
- * 这个数字取下一级单位：一万二 = 12000，三千五 = 3500，两百五 = 250，1万2 = 12000。
+ * 这个数字取下一级单位：一万二 = 12000，三千五 = 3500，两百五 = 250，1万2 = 12000，3千5 = 3500。
+ * 数字后面已经没有任何字符时同样按省略单位读。空字符串不是单位。
  * 「一万零二」有零，仍是 10002；「一万二千」末位自己带千，仍是 12000。
  * 职责词长的先占住区间，「独立负责」不再另报里面的「负责」。
  */
@@ -305,15 +306,25 @@ function parseChinese(raw: string): string | null {
   return (result + group + section + tail).toString()
 }
 
-/** 「1万2」里万后面那一个数字。后面还有数字或单位时不吞，留给下一次匹配。 */
+/** 「1万2」里单位后面那一个数字。后面还有数字或单位时不吞，留给下一次匹配。 */
 function omittedArabicTail(text: string, index: number, places: number): { end: number; value: string } | null {
   if (places < 1) return null
   const ch = text.charAt(index)
   if (!isDigitChar(ch)) return null
   const next = text.charAt(index + 1)
   if (isDigitChar(next)) return null
-  if ('万亿千百十.．%％'.indexOf(next) !== -1) return null
+  // 文本在这里结束时 charAt 得到空字符串。indexOf('') 是 0，不能当成后面还有单位。
+  if (next !== '' && '万亿千百十.．%％'.indexOf(next) !== -1) return null
   return { end: index + 1, value: shiftDecimal(toHalfWidth(ch), places - 1) }
+}
+
+/** 阿拉伯数字紧跟着的中文单位。0 表示这里不是单位，空字符串也不是。 */
+function arabicUnitPlaces(ch: string): number {
+  if (ch === '百') return 2
+  if (ch === '千') return 3
+  if (ch === '万') return 4
+  if (ch === '亿') return 8
+  return 0
 }
 
 function matchArabic(
@@ -331,11 +342,17 @@ function matchArabic(
   if (canonical === null) return null
   let end = index + raw.length
   if (!percent) {
-    const unit = text.charAt(end)
-    if (unit === '万' || unit === '亿') {
-      const places = unit === '万' ? 4 : 8
-      canonical = shiftDecimal(canonical, places)
+    const unitPlaces = arabicUnitPlaces(text.charAt(end))
+    if (unitPlaces > 0) {
+      canonical = shiftDecimal(canonical, unitPlaces)
       end += 1
+      let places = unitPlaces
+      const bigger = arabicUnitPlaces(text.charAt(end))
+      if (bigger > unitPlaces && !canonical.includes('.')) {
+        canonical = shiftDecimal(canonical, bigger)
+        end += 1
+        places = bigger
+      }
       const tail = omittedArabicTail(text, end, places)
       if (tail && !canonical.includes('.') && !tail.value.includes('.')) {
         canonical = (BigInt(canonical) + BigInt(tail.value)).toString()

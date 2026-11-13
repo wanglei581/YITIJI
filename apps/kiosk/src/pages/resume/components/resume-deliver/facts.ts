@@ -57,9 +57,9 @@ function collectBeforeText(
 /**
  * 描述要多像才在「公司/学校/项目名 + 职务/专业/角色」对不上之后认成同一条。
  * 字二元组 Dice：2 × 重合组数 / 两组总数，空格不参与。
- * 「负责日常工作」和「负责日常运营」约 0.60，只是套话像，配上会把另一条里 AI 的数字豁免掉。
- * 同一条只改几个字（「周更 2 篇」改成「每周更新 2 篇」）约 0.86。
- * 0.72 落在这两类中间。低于它就不配，这条里的数字一律待确认。
+ * 「负责日常工作」和「负责日常运营」实算 0.60，只是套话像，配上会把另一条里 AI 的数字豁免掉。
+ * 「周更 2 篇」和「每周更新 2 篇」实算 0.50，改几个字也可能只有一半像。
+ * 0.72 高于这两类。低于它就不配，这条里的数字一律待确认。
  */
 const DESCRIPTION_MATCH_MIN = 0.72
 
@@ -124,9 +124,33 @@ function nameKey(entry: EntryRef): string | null {
   return `${name}\u0001${normalizeLabel(entry.role)}`
 }
 
-function entryPath(section: EntrySection, entry: EntryRef): string {
+/**
+ * 没有 id、名称键又不止一条时，在名称键后加上同名第几段。
+ * 只数会走名称路径的条目，这样本人改的那一段不会把另一段的豁免带走。
+ */
+function sameNameOrdinals(entries: EntryRef[]): Array<number | null> {
+  const counts = new Map<string, number>()
+  for (const entry of entries) {
+    if (stableId(entry.source)) continue
+    const key = nameKey(entry)
+    if (!key) continue
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  const seen = new Map<string, number>()
+  return entries.map((entry) => {
+    if (stableId(entry.source)) return null
+    const key = nameKey(entry)
+    if (!key || (counts.get(key) ?? 0) < 2) return null
+    const next = (seen.get(key) ?? 0) + 1
+    seen.set(key, next)
+    return next
+  })
+}
+
+function entryPath(section: EntrySection, entry: EntryRef, sameNameOrdinal: number | null): string {
   const id = stableId(entry.source)
-  const body = id ? `id:${id}` : `name:${nameKey(entry) ?? ''}`
+  const suffix = sameNameOrdinal === null ? '' : `:同名${sameNameOrdinal}`
+  const body = id ? `id:${id}` : `name:${nameKey(entry) ?? ''}${suffix}`
   return `${section}:${body}.description`.replace(/\t/g, ' ')
 }
 
@@ -249,8 +273,10 @@ interface AlignedField {
 }
 
 function alignSection(section: EntrySection, current: GeneratedResume, previous: GeneratedResume): AlignedField[] {
-  return pairEntries(sectionRefs(section, current), sectionRefs(section, previous)).map((pair) => ({
-    path: entryPath(section, pair.current),
+  const currentRefs = sectionRefs(section, current)
+  const ordinals = sameNameOrdinals(currentRefs)
+  return pairEntries(currentRefs, sectionRefs(section, previous)).map((pair, index) => ({
+    path: entryPath(section, pair.current, ordinals[index] ?? null),
     currentText: pair.current.description,
     previousText: pair.previous?.description ?? '',
     matched: pair.previous !== null,
@@ -321,8 +347,10 @@ function userKeyMap(userAdditions: string[]): Map<string, Set<string>> {
 /**
  * 仍留在当前稿里、且能对上生成稿同一条的新增事实。
  * 经历、教育、项目先按条目对齐，再按「这条的身份 + key」豁免，不按下标。
+ * 同名同职务又没有 id 时，身份带上同名第几段，只豁免本人改的那一段。
  * 配不上的条目里，相对原文多出来的数字和职责词一律待确认。
- * 技能按值集合比：本人版里多出来的整条值算本人写的；两边都有的值仍按 key 豁免。
+ * 技能里的数字，只有本人写进去、而且 AI 版技能里没有，才免确认。
+ * 这一项别的字改过、数字仍是 AI 版技能里的，照样待确认。
  * 返回给人看的片段，同一片段只留一行。
  */
 export function detectGeneratedUnconfirmedAdditions(
@@ -355,16 +383,27 @@ export function detectGeneratedUnconfirmedAdditions(
       consider(field.path, field.currentText, field.previousText, field.matched)
     }
   }
-  const generatedSkills = new Set(generated.skills)
+  const generatedSkillKeys = new Set<string>()
+  for (const skill of generated.skills) {
+    for (const key of keysInField(skill ?? '', beforeText)) generatedSkillKeys.add(key)
+  }
+  const generatedSkillTexts = new Set(generated.skills)
   for (const skill of resume.skills) {
     const text = skill ?? ''
-    if (!generatedSkills.has(text)) continue
-    consider(skillPath(text), text, text, true)
+    if (generatedSkillTexts.has(text)) {
+      consider(skillPath(text), text, text, true)
+      continue
+    }
+    const fromUser = userKeys.get(skillPath(text)) ?? new Set<string>()
+    for (const item of findFactAdditions(text, beforeText)) {
+      if (!generatedSkillKeys.has(item.key) || fromUser.has(item.key)) continue
+      push(item.text)
+    }
   }
   return hits
 }
 
-/** 记录预览中本人新增的事实。按对齐后的条目记路径和 key，不按下标；技能只记本人版多出来的值。 */
+/** 记录预览中本人新增的事实。按对齐后的条目记路径和 key，不按下标。技能里 AI 版已经有的数字不记成本人写的。 */
 export function detectUserResumeEdits(before: GeneratedResume, after: GeneratedResume): string[] {
   const tokens: string[] = []
   const seen = new Set<string>()
@@ -381,11 +420,18 @@ export function detectUserResumeEdits(before: GeneratedResume, after: GeneratedR
       for (const item of findFactAdditions(field.currentText, field.previousText)) push(field.path, item.key)
     }
   }
+  const beforeSkillKeys = new Set<string>()
+  for (const skill of before.skills) {
+    for (const key of keysInField(skill ?? '', '')) beforeSkillKeys.add(key)
+  }
   const beforeSkills = new Set(before.skills)
   for (const skill of after.skills) {
     const text = skill ?? ''
     if (beforeSkills.has(text)) continue
-    for (const item of findFactAdditions(text, '')) push(skillPath(text), item.key)
+    for (const item of findFactAdditions(text, '')) {
+      if (beforeSkillKeys.has(item.key)) continue
+      push(skillPath(text), item.key)
+    }
   }
   return tokens
 }

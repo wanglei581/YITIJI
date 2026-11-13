@@ -398,4 +398,78 @@ test('口语省略位按下一单位读，一万零二仍是 10002', () => {
   assert.deepEqual(findFactAdditions('月薪 1万2。', '月薪 12000。'), [])
   assert.deepEqual(findFactAdditions('月薪一万零二。', '月薪 10002。'), [])
   assert.deepEqual(keysOf('一万二', '10002'), ['num:12000'])
+  assert.deepEqual(findFactAdditions('月薪1万2', '月薪12000'), [])
+  assert.deepEqual(findFactAdditions('预算3千5', '预算3500'), [])
+  assert.deepEqual(keysOf('3千5', ''), ['num:3500'])
+  assert.deepEqual(keysOf('到账1万2', '账上有 10000 和 2'), ['num:12000'])
+  assert.deepEqual(findFactAdditions('到账1万2', '账上有 12000'), [])
+})
+
+const sharedShelf = '完成门店陈列、补货、闭店卫生和每日台账交接。'
+
+test('同名同职务两段里，本人在第 1 段加的同一个数不豁免第 2 段', () => {
+  const company = { company: '青岛海边书店', role: '店员', period: '2019-2021' }
+  const plain = { ...company, description: sharedShelf }
+  const aiLine = { ...company, description: `${sharedShelf.slice(0, -1)}，周更 2 篇。` }
+  const userLine = { ...company, description: `${sharedShelf.slice(0, -1)}，另记 2 项。` }
+  const input = shellResume([plain, plain])
+  const generated = shellResume([plain, aiLine])
+  const edited = shellResume([userLine, aiLine])
+  const userAdditions = detectUserResumeEdits(generated, edited)
+  assert.equal(userAdditions.some((token) => token.includes('同名1') && token.includes('num:2')), true)
+  assert.equal(userAdditions.some((token) => token.includes('同名2') && token.includes('num:2')), false)
+  const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
+  assert.equal(hits.some((text) => text.includes('周更') && text.includes('2')), true)
+  assert.equal(hits.some((text) => text.includes('另记')), false)
+})
+
+test('同名同职务两段里，本人在第 1 段加的同一个职责词不豁免第 2 段', () => {
+  const company = { company: '青岛海边书店', role: '店员', period: '2019-2021' }
+  const plain = { ...company, description: sharedShelf }
+  const aiLine = { ...company, description: `${sharedShelf.slice(0, -1)}，并牵头夜班交接。` }
+  const userLine = { ...company, description: `牵头${sharedShelf}` }
+  const input = shellResume([plain, plain])
+  const generated = shellResume([plain, aiLine])
+  const edited = shellResume([userLine, aiLine])
+  const userAdditions = detectUserResumeEdits(generated, edited)
+  assert.equal(userAdditions.some((token) => token.includes('同名1') && token.includes('duty:牵头')), true)
+  assert.equal(userAdditions.some((token) => token.includes('同名2') && token.includes('duty:牵头')), false)
+  const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
+  assert.equal(hits.some((text) => text.includes('夜班') && text.includes('牵头')), true)
+  assert.equal(hits.some((text) => text.startsWith('牵头完成')), false)
+})
+
+test('技能里只改数字旁边的字，AI 写的数字仍待确认；本人新写的数免确认', () => {
+  const input = shellResume([frontExp], ['沟通协调'])
+  const generated = shellResume([frontExp], ['Excel 数据透视（3 年）'])
+  const edited = shellResume([frontExp], ['Excel 数据透视熟练（3 年）', '叉车证 2 年'])
+  const userAdditions = detectUserResumeEdits(generated, edited)
+  assert.equal(userAdditions.some((token) => token.includes('num:3')), false)
+  assert.equal(userAdditions.some((token) => token.includes('num:2')), true)
+  const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
+  assert.equal(hits.some((text) => text.includes('3')), true)
+  assert.equal(hits.some((text) => text.includes('2')), false)
+})
+
+test('套话相似度低于 0.72 时不把另一段配上来，AI 的数字仍待确认', () => {
+  // 「负责日常工作，整理货架和台账。」对「负责日常运营，整理货架和台账，周更 2 篇。」实算 Dice 0.6061。
+  // 夜班那句对第二句只有 0.1364。门槛降到 0.5 会配上前一句，把 2 豁免掉。
+  const plain = '负责日常工作，整理货架和台账。'
+  const near = '负责日常运营，整理货架和台账，周更 2 篇。'
+  const far = '在夜班仓库独立核对入库清单，把差异写成周更 2 篇汇报。'
+  const input = shellResume([
+    { company: '海风便利', role: '店员', period: '2019-2021', description: plain },
+    { company: '山海超市', role: '理货', period: '2018-2020', description: '在夜班仓库独立核对入库清单，把差异写成汇报。' },
+  ])
+  const generated = shellResume([
+    { company: '海风便利', role: '店员', period: '2019-2021', description: plain },
+    { company: '山海超市', role: '理货', period: '2018-2020', description: far },
+  ])
+  const edited = shellResume([
+    { company: '东岸分拣点', role: '分拣', period: '2019-2021', description: near },
+    { company: '西街花店', role: '店员', period: '2017-2018', description: '接待订花顾客并按花材颜色分区摆放。' },
+  ])
+  const userAdditions = detectUserResumeEdits(generated, edited)
+  const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
+  assert.equal(hits.some((text) => text.includes('周更') && text.includes('2')), true)
 })
