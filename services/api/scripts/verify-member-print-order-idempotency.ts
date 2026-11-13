@@ -25,6 +25,7 @@ import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { isLiveKioskPickupLease, isPickupWindowClosed, OrderStatusService } from '../src/payment/order-status.service'
 import { paymentSessionTtlMs } from '../src/payment/payment-session-token'
 import { PricingService } from '../src/payment/pricing.service'
+import { adoptDevPrintSeedPrices } from '../src/payment/effective-user-prices'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { PickupOrderService } from '../src/print-jobs/pickup-order.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
@@ -360,6 +361,7 @@ async function main(): Promise<void> {
       data: { terminalId, capabilityKey: 'document_print', status: 'available' },
     })
     await seedDevDefaultPriceConfig(prisma)
+    await adoptDevPrintSeedPrices(prisma, terminalId)
     await seedFile(fileA, userA, 'A简历')
     await seedFile(fileB, userB, 'B简历')
     pass('隔离库与双用户夹具已建立')

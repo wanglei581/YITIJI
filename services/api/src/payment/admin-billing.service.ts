@@ -8,9 +8,9 @@
  *   删除会破坏历史订单 itemsJson 的可解释性 —— 停用用 active=false）。例外：列表时补齐缺失的
  *   固定目录行（resume_export 启用 0 元；打印两档停用未定价），只补不改。
  * - 改价审计 `price.updated` 必须带 old/new 快照（对账与追责依据）；无变化的空 patch 拒绝。
- * - 改价即时生效（PricingService 每次报价实时读库，W-A 后前端展示价同源），无缓存一致性问题。
- * - 停用某项后对应报价 fail-closed（PRICE_CONFIG_UNAVAILABLE，绝不默认 0 元）——这是有意的
- *   管理动作语义；「整机免费模式」是政企 E1 的独立配置形态，不要用停用价目冒充。
+ * - 11/13 起打印用户实付不读这两行，改读每台机器的生效价。这里的打印价只是全站参考价。
+ *   resume_export 仍走本表，并继续给导出权益核销用。
+ * - 停用 resume_export 仍会让导出报价失败关闭。停用打印两行不再改变用户实付。
  */
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
@@ -18,6 +18,14 @@ import { PrismaService } from '../prisma/prisma.service'
 import type { AdminUpdatePriceConfigDto } from './dto/admin-billing.dto'
 import { ensurePrintPriceCatalogRows, ensureResumeExportPriceConfig } from './price-config.seed'
 import { descriptionContradictsAmount, statedYuanIn } from './price-description'
+import { PERSONAL_CHARGE_SETTING_KEY } from './terminal-charge.contract'
+import {
+  PERSONAL_CHARGE_DISABLE_AUDIT_ACTION,
+  PERSONAL_CHARGE_ENABLE_AUDIT_ACTION,
+  listPersonalChargeOverview,
+  writePersonalChargeEnabled,
+  type PersonalChargeOverview,
+} from './terminal-charge-settings'
 
 export interface AdminPriceConfigItem {
   serviceKey: string
@@ -181,5 +189,28 @@ export class AdminBillingService {
       effectiveFrom: updated.effectiveFrom.toISOString(),
       updatedAt: updated.updatedAt.toISOString(),
     }
+  }
+
+  /** 向个人收费总开关，以及打开后会开始收费的机器。 */
+  getPersonalCharge(): Promise<PersonalChargeOverview> {
+    return listPersonalChargeOverview(this.prisma)
+  }
+
+  async setPersonalCharge(
+    enabled: boolean,
+    confirm: boolean | undefined,
+    operatorId: string,
+  ): Promise<PersonalChargeOverview & { previous: boolean }> {
+    const { previous, next } = await writePersonalChargeEnabled(this.prisma, enabled, confirm, operatorId)
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'system',
+      action: next ? PERSONAL_CHARGE_ENABLE_AUDIT_ACTION : PERSONAL_CHARGE_DISABLE_AUDIT_ACTION,
+      targetType: 'platform_setting',
+      targetId: PERSONAL_CHARGE_SETTING_KEY,
+      payload: { operatorId, previous, next },
+    })
+    const overview = await listPersonalChargeOverview(this.prisma)
+    return { ...overview, previous }
   }
 }

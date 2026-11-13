@@ -56,38 +56,74 @@ function verifyModel() {
   pass('CopyJob 双 schema 字段白名单、无文件字段、唯一关联及共享契约')
 }
 
-type PriceRow = { serviceKey: string; active: boolean; unit: string; unitCents: number }
-/** 只有 findUnique 的价目桩：复印没有自己的价目行，取同色打印行（11/08）。 */
-const prices = (rows: PriceRow[]) => ({ priceConfig: { findUnique: async ({ where }: { where: { serviceKey: string } }) =>
-  rows.find((row) => row.serviceKey === where.serviceKey) ?? null } }) as unknown as Pick<PrismaTransactionClient, 'priceConfig'>
+const QUOTE_TERMINAL = 'copy-c1a-quote'
+
+/**
+ * 复印报价只读本机生效价。桩提供总开关和这台终端的配置价，不再读 PriceConfig。
+ * 没有价目行 = 0。向用户收费时非法单价不可报价。不带终端一律 0（到机补价由 P2 做）。
+ */
+function quoteDb(fixture: {
+  found?: boolean
+  personalChargeEnabled?: boolean
+  userChargeMode?: 'user_pays' | 'org_pays'
+  prices?: Partial<Record<'print_bw_page' | 'print_color_page', number>>
+}): Pick<PrismaTransactionClient, 'terminal' | 'platformSetting'> {
+  const found = fixture.found !== false
+  const enabled = fixture.personalChargeEnabled !== false
+  return {
+    platformSetting: {
+      findUnique: async () => (enabled ? { value: 'true' } : null),
+    },
+    terminal: {
+      findUnique: async (args: { where: { id?: string; terminalCode?: string } }) => {
+        const ref = args.where.id ?? args.where.terminalCode
+        if (!found || ref !== QUOTE_TERMINAL) return null
+        const prices = fixture.prices ?? {}
+        return {
+          id: QUOTE_TERMINAL,
+          userChargeMode: fixture.userChargeMode ?? 'user_pays',
+          org: null,
+          servicePrices: Object.entries(prices).map(([serviceKey, unitCents]) => ({ serviceKey, unitCents })),
+        }
+      },
+    },
+  } as unknown as Pick<PrismaTransactionClient, 'terminal' | 'platformSetting'>
+}
 
 async function verifyQuote() {
-  const rows: PriceRow[] = [
-    { serviceKey: 'print_bw_page', active: true, unit: 'page', unitCents: 0 },
-    { serviceKey: 'print_color_page', active: true, unit: 'page', unitCents: 7 },
-  ]
-  const input: apiCopy.CopyPriceInput = { pageCount: 3, copies: 2, colorMode: 'black_white', duplex: 'simplex' }
-  const free = await quoteCopy(input, prices(rows))
+  const paying = quoteDb({ prices: { print_bw_page: 0, print_color_page: 7 } })
+  const input: apiCopy.CopyPriceInput & { terminalId?: string } = {
+    pageCount: 3, copies: 2, colorMode: 'black_white', duplex: 'simplex', terminalId: QUOTE_TERMINAL,
+  }
+  const free = await quoteCopy(input, paying)
   assert.ok(free.quotable)
   assert.equal(free.quote.amountCents, 0)
   assert.equal(free.quote.billableSides, 6)
   assert.equal(free.quote.serviceKey, 'print_bw_page')
   for (const duplex of apiCopy.COPY_DUPLEX_MODES) {
-    const result = await quoteCopy({ ...input, colorMode: 'color', duplex }, prices(rows))
+    const result = await quoteCopy({ ...input, colorMode: 'color', duplex }, paying)
     assert.ok(result.quotable)
     assert.equal(result.quote.amountCents, 42, '颜色、份数和双面不减半')
     assert.equal(result.quote.billableSides, 6)
   }
-  assert.deepEqual(await quoteCopy(input, prices([])), { quotable: false, code: 'COPY_PRICE_UNAVAILABLE' })
-  assert.equal((await quoteCopy(input, prices([{ ...rows[0], active: false }]))).quotable, false)
-  assert.equal((await quoteCopy(input, prices([rows[1]]))).quotable, false, '不能把另一种颜色价当缺价兜底')
+  const noTerminal = await quoteCopy({ ...input, terminalId: undefined }, paying)
+  assert.ok(noTerminal.quotable)
+  assert.equal(noTerminal.quote.amountCents, 0, '不带终端一律 0，到机补价由 P2 做')
+  const missingBw = await quoteCopy(input, quoteDb({ prices: { print_color_page: 7 } }))
+  assert.ok(missingBw.quotable)
+  assert.equal(missingBw.quote.amountCents, 0, '缺本机黑白价 = 0，不用彩色价兜底')
+  const onlyOther = await quoteCopy({ ...input, colorMode: 'color' }, quoteDb({ prices: { print_bw_page: 0 } }))
+  assert.ok(onlyOther.quotable)
+  assert.equal(onlyOther.quote.amountCents, 0, '不能把另一种颜色价当缺价兜底')
   for (const unitCents of [-1, 0.5, NaN, Infinity]) {
-    assert.equal((await quoteCopy(input, prices([{ ...rows[0], unitCents }]))).quotable, false)
+    const bad = await quoteCopy(input, quoteDb({ prices: { print_bw_page: unitCents } }))
+    assert.equal(bad.quotable, false)
+    if (!bad.quotable) assert.equal(bad.code, 'COPY_PRICE_INVALID')
   }
   for (const patch of [{ pageCount: 0 }, { copies: 0 }, { copies: 1.5 }, { pageCount: Number.MAX_SAFE_INTEGER }]) {
-    assert.equal((await quoteCopy({ ...input, ...patch }, prices(rows))).quotable, false)
+    assert.equal((await quoteCopy({ ...input, ...patch }, paying)).quotable, false)
   }
-  pass('报价：取同色打印价目行，0 元、颜色、份数、双面不减半、缺失/停用/异常价拒绝')
+  pass('报价：取本机同色打印生效价，0 元、颜色、份数、双面不减半；缺行与不带终端按 0；异常价拒绝')
 }
 
 async function verifyCapabilities(prisma: PrismaService, terminalId: string) {

@@ -40,6 +40,7 @@ import {
   setPrintScanCapabilityModeForTest,
 } from '../src/terminals/terminal-capabilities.service'
 import { PricingService } from '../src/payment/pricing.service'
+import { adoptDevPrintSeedPrices } from '../src/payment/effective-user-prices'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { PRINT_UNIT_PRICE_CENTS } from '../src/print-jobs/print-pricing'
 import * as apiContract from '../src/terminals/terminal-capabilities.types'
@@ -265,18 +266,21 @@ async function main(): Promise<void> {
 
     console.log('\n-- F/G. 计价：彩色按彩色价，双面不改价 --')
     await seedDevDefaultPriceConfig(prisma)
+    await adoptDevPrintSeedPrices(prisma, terminalId)
 
     const bwQuote = await pricing.quotePrint({
       billablePages: 4,
       billingPageSource: 'pdf_lightweight_scan',
       copies: 1,
       colorMode: 'black_white',
+      terminalId,
     })
     const colorQuote = await pricing.quotePrint({
       billablePages: 4,
       billingPageSource: 'pdf_lightweight_scan',
       copies: 1,
       colorMode: 'color',
+      terminalId,
     })
 
     const expectedBw = PRINT_UNIT_PRICE_CENTS.black_white * 4

@@ -1,7 +1,7 @@
 // 打印单价常量（**仅开发 seed 源**）。
 //
-// 运行期价目真相源是数据库 `PriceConfig`；Kiosk 展示/确认价走 `POST /orders/quote`。
-// 本常量只供 `price-config.seed` 写入本地 / 临时库的开发默认价，非正式对外价。
+// 11/13 起用户实付不读这里，也不读 PriceConfig 的打印单价，只读每台机器的生效价。
+// 本常量只供 `price-config.seed` 写入本地 / 临时库的开发参考价，非正式对外价。
 // 生产写入见 `docs/operations/price-config-production.md`。
 
 type ColorMode = 'black_white' | 'color'

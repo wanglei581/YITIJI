@@ -43,6 +43,7 @@ import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { createPaymentSessionToken } from '../src/payment/payment-session-token'
 import { PricingService } from '../src/payment/pricing.service'
+import { adoptDevPrintSeedPrices, setTerminalUserPrintPrices } from '../src/payment/effective-user-prices'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { SandboxPaymentProvider } from '../src/payment/providers/sandbox-payment.provider'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
@@ -160,7 +161,8 @@ async function main(): Promise<void> {
     await prisma.terminal.create({
       data: { id: terminalId, terminalCode: `KSK-CASH-${suffix}`, agentToken, deviceFingerprint: 'verify-cashier' },
     })
-    await seedDevDefaultPriceConfig(prisma) // print_bw_page=20, print_color_page=50
+    await seedDevDefaultPriceConfig(prisma) // print_bw_page=20, print_color_page=50（全站参考价）
+    await adoptDevPrintSeedPrices(prisma, terminalId)
     await heartbeatOnline()
     pass('测试夹具已创建（终端 online + 价目 seed）')
 
@@ -233,6 +235,7 @@ async function main(): Promise<void> {
       create: { serviceKey: 'print_bw_page', unitCents: 0, unit: 'page', active: true, description: 'verify 免费' },
       update: { unitCents: 0, active: true },
     })
+    await setTerminalUserPrintPrices(prisma, terminalId, { print_bw_page: 0 })
     const free = await printJobs.create(
       { fileUrl: await seedPdf('free', 1), fileMd5: 'sha256-cash-free', fileName: '免费打印.pdf', params: { copies: 1, colorMode: 'black_white' } },
       { terminalId },
@@ -249,6 +252,7 @@ async function main(): Promise<void> {
       where: { serviceKey: 'print_bw_page' },
       data: { unitCents: 20, active: true, description: '黑白打印' },
     })
+    await adoptDevPrintSeedPrices(prisma, terminalId)
 
     // ── (6) 未支付单在任何环境变量下都不可 claim（开关已删除）───────────────
     // 这里原本断言「flag 关时未支付单可 claim」，即把资损路径写成期望行为。
@@ -282,11 +286,13 @@ async function main(): Promise<void> {
     const ordersBeforeQuote = await prisma.order.count({ where: { terminalId } })
     const quoteAll = await orderQuote.quote({
       fileUrl: quoteFileUrl,
+      terminalId,
       params: { copies: 1, colorMode: 'black_white', duplex: 'simplex', paperSize: 'A4', orientation: 'auto', quality: 'standard', scale: 'fit', pagesPerSheet: 1 },
     })
     assert(quoteAll.amountCents === 1000 && quoteAll.billablePages === 50, `8a. 50 页全文报价 1000 分（实际 ${quoteAll.amountCents}/${quoteAll.billablePages}）`)
     const quoteRange = await orderQuote.quote({
       fileUrl: quoteFileUrl,
+      terminalId,
       params: { copies: 1, colorMode: 'black_white', duplex: 'simplex', paperSize: 'A4', orientation: 'auto', quality: 'standard', scale: 'fit', pagesPerSheet: 1, pageRange: '1-2' },
     })
     assert(quoteRange.amountCents === 40 && quoteRange.billablePages === 2, `8b. 50 页打 1-2 报价 40 分而非 1000（实际 ${quoteRange.amountCents}/${quoteRange.billablePages}）`)

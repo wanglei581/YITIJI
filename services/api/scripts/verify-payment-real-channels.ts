@@ -35,6 +35,7 @@ import { OrderStatusService } from '../src/payment/order-status.service'
 import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory'
 import { buildPaymentCallbackPath } from '../src/payment/payment-provider.types'
 import { PricingService } from '../src/payment/pricing.service'
+import { adoptDevPrintSeedPrices } from '../src/payment/effective-user-prices'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import {
   AlipayProvider,
@@ -471,6 +472,7 @@ async function main(): Promise<void> {
       `Bearer ${agentToken}`,
     )
     await seedDevDefaultPriceConfig(prisma)
+    await adoptDevPrintSeedPrices(prisma, terminalId)
     pass('test fixtures created (terminal online + price config)')
 
     // ── (1) 多通道注册表 & 出码 ────────────────────────────────────────────

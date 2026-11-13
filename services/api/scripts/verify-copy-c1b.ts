@@ -25,6 +25,7 @@ import { COPY_MAX_PAGES } from '../src/copy-jobs/copy-job.policy'
 import { COPY_MAX_COPIES, type CopyJobView, type CopyPermit } from '../src/copy-jobs/copy-job.types'
 import { SCAN_DEVICE_OTHER_MAX_PAGES } from '../src/files/file-validation'
 import { MemberPrintOrdersService } from '../src/member-print-orders/member-print-orders.service'
+import { setTerminalUserPrintPrices } from '../src/payment/effective-user-prices'
 import { KEY_GUEST_PER_ORDER_SIDES } from '../src/print-jobs/free-print-quota.policy'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { verifyCopyC1c } from './support/copy-c1c-verification'
@@ -48,7 +49,7 @@ async function main() {
     agent: new TerminalAgentService(prisma, audit, credentials),
   }) as TerminalsService
   const store = new CopyJobStore(prisma, redis, audit), jobs = new CopyJobsService(store), agent = new CopyAgentService(store)
-  // 复印单价取同色打印价目行（11/08），本门禁把两行临时设成 0 元，结束时原样恢复。
+  // 复印单价取本机同色打印生效价。全站价目仍临时归零并在结束时恢复；用户实付不读它。
   const priceKeys = ['print_bw_page', 'print_color_page']
   const priorPrices = await prisma.priceConfig.findMany({ where: { serviceKey: { in: priceKeys } } })
   // 复印与打印共用免费额度；本门禁要走 99 份 20 页的边界，临时放宽游客每单上限，额度判定另有 verify:copy-quota。
@@ -175,11 +176,12 @@ async function main() {
     }
     const confirm = (j: View, expected = 200) => request('POST', `/copy/jobs/${j.copyId}/confirm`, { quoteVersion: j.quoteVersion }, 0, j.controlToken, expected)
     const missing = await scannedJob()
-    await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { active: false } })
-    assert.equal(await confirm(missing, 409), 'COPY_PRICE_UNAVAILABLE')
-    await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { active: true, unitCents: 1 } })
+    // 非法单价先于「非 0 拒绝」和报价版本核对。超过上限不可报价。
+    await setTerminalUserPrintPrices(prisma, tids[0], { print_bw_page: 100001 })
+    assert.equal(await confirm(missing, 409), 'COPY_PRICE_INVALID')
+    await setTerminalUserPrintPrices(prisma, tids[0], { print_bw_page: 1 })
     assert.equal(await confirm(missing, 409), 'COPY_PAID_NOT_SUPPORTED')
-    await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: 0 } })
+    await setTerminalUserPrintPrices(prisma, tids[0], { print_bw_page: 0 })
     await confirm({ ...missing, quoteVersion: '0'.repeat(64) }, 409)
     const odd = await scannedJob({ copies: 2, duplex: 'duplex_long_edge' }, 3)
     assert.equal(await confirm(odd, 409), 'COPY_ODD_DUPLEX_MULTICOPY_DISABLED')
@@ -213,7 +215,7 @@ async function main() {
       await request('POST', '/copy/jobs', { ...input, requestKey: randomUUID(), colorMode: 'color', duplex: 'duplex_long_edge' }, 0, undefined, 409)
       await cap(key, 'available')
     }
-    pass('确认：缺价/非零价/旧报价/份数页数越限拒绝；双面多份奇数页默认拒绝及开关；99份20页边界')
+    pass('确认：非法单价/非零价/旧报价/份数页数越限拒绝；双面多份奇数页默认拒绝及开关；99份20页边界')
     const cancelled = await create()
     for (let i = 0; i < 2; i++) await request('POST', `/copy/jobs/${cancelled.copyId}/cancel`, { generation: 1 }, 0, cancelled.controlToken)
     assert.equal((await request<CopyPermit>('GET', pp(cancelled.copyId, 'scan'))).allowed, false)

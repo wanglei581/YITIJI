@@ -1,5 +1,6 @@
 import type { KioskSmartCampusConfig } from './smartCampus'
 import type { KioskAppItem } from './kioskApp'
+import type { TerminalPricingView } from './terminalCharge'
 
 export type DeviceStatus = 'online' | 'offline' | 'error' | 'maintenance' | 'idle' | 'busy'
 
@@ -93,6 +94,11 @@ export interface KioskTerminalConfig {
    * 旧数据或旧接口没有这一项时，一体机按关处理，不当成开。
    */
   homeFreeBadge?: boolean
+  /**
+   * 本机生效价。旧接口没有这一项时，一体机按读不齐处理，不显示「免费使用」，
+   * 打印眉题走原来的失败退路。
+   */
+  pricing?: TerminalPricingView
   configVersion: string
   refreshIntervalMs: number
   serverTime: string

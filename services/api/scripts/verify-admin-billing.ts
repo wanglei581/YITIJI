@@ -3,10 +3,10 @@
  *
  * 直接调用生产 service/controller（不走 HTTP），断言全表：
  * - 管理端列表：含 inactive 项 + 完整字段（unitCents/unit/active/description/时间戳）。
- * - 改价（唯一合法路径）：即时生效（PricingService 报价随之变化，无缓存漂移）+
- *   审计 `price.updated` 带 old/new 快照与 operatorId，恰 1 条。
- * - 启停：active=false → 对应报价 fail-closed（PRICE_CONFIG_UNAVAILABLE，绝不默认 0 元）；
- *   恢复后报价复原。
+ * - 改价（唯一合法路径）：写入 PriceConfig + 审计 `price.updated` 带 old/new 快照与 operatorId，恰 1 条。
+ *   11/13 起全站打印价不再决定用户实付：不带终端的报价保持 0，本机报价保持本机价。
+ * - 启停：active=false 不再让报价失败。不带终端仍是 0；本机仍按本机价。
+ *   恢复后全站行回到原单价。
  * - fail-closed：空 patch / 无实际变化 / 未知 serviceKey 拒绝且零审计；
  *   DTO 层拒绝非整数、负数、超上限单价（ValidationPipe 语义用 class-validator 直接断言）。
  * - 权限口径（源码级断言）：controller 挂 JwtAuthGuard + RolesGuard + @Roles('admin')；
@@ -21,6 +21,8 @@ import { join } from 'path'
 import { AuditService } from '../src/audit/audit.service'
 import { AdminBillingService } from '../src/payment/admin-billing.service'
 import { AdminUpdatePriceConfigDto } from '../src/payment/dto/admin-billing.dto'
+import { setTerminalUserPrintPrices } from '../src/payment/effective-user-prices'
+import { PERSONAL_CHARGE_SETTING_KEY } from '../src/payment/terminal-charge.contract'
 import { PricingService } from '../src/payment/pricing.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { PrismaService } from '../src/prisma/prisma.service'
@@ -58,6 +60,8 @@ async function main(): Promise<void> {
   const billing = new AdminBillingService(prisma, audit)
   const pricing = new PricingService(prisma)
   const operatorId = `admin_verify_${randomUUID().slice(0, 8)}`
+  const quoteTerminalId = `t_admin_bill_${randomUUID().slice(0, 8)}`
+  const priorSwitch = await prisma.platformSetting.findUnique({ where: { key: PERSONAL_CHARGE_SETTING_KEY } })
 
   const auditCount = () =>
     prisma.auditLog.count({ where: { action: 'price.updated', payloadJson: { contains: operatorId } } })
@@ -81,21 +85,37 @@ async function main(): Promise<void> {
       fail(`admin list mismatch: ${JSON.stringify(bw)}`)
     }
 
-    // (2) 改价：即时生效 + 审计 old/new 快照恰 1 条
+    // (2) 改价写入全站参考价并记审计。用户实付不跟这行：不带终端是 0，本机保持改价前的本机价。
     const oldBw = bw.unitCents
     const newBw = oldBw + 5
+    await prisma.terminal.create({
+      data: {
+        id: quoteTerminalId,
+        terminalCode: quoteTerminalId,
+        agentToken: quoteTerminalId,
+        deviceFingerprint: quoteTerminalId,
+      },
+    })
+    await setTerminalUserPrintPrices(prisma, quoteTerminalId, { print_bw_page: oldBw })
     const updated = await billing.updatePriceConfig('print_bw_page', { unitCents: newBw }, operatorId)
     if (updated.unitCents !== newBw) fail('update did not apply')
-    const quote = await pricing.quotePrint({
+    const away = await pricing.quotePrint({
       billablePages: 2,
       billingPageSource: 'pdf_lightweight_scan',
       copies: 1,
       colorMode: 'black_white',
     })
-    if (quote.amountCents === newBw * 2 && quote.lines[0]?.unitCents === newBw) {
-      pass(`改价即时生效：报价随 PriceConfig 变化（${oldBw}→${newBw} 分）`)
+    const here = await pricing.quotePrint({
+      billablePages: 2,
+      billingPageSource: 'pdf_lightweight_scan',
+      copies: 1,
+      colorMode: 'black_white',
+      terminalId: quoteTerminalId,
+    })
+    if (away.amountCents === 0 && here.amountCents === oldBw * 2 && here.lines[0]?.unitCents === oldBw) {
+      pass(`全站价 ${oldBw}→${newBw} 分不影响用户实付：不带终端为 0，本机仍是 ${oldBw} 分`)
     } else {
-      fail(`quote not reflecting new price: ${JSON.stringify(quote)}`)
+      fail(`quote followed site price: away=${JSON.stringify(away)} here=${JSON.stringify(here)}`)
     }
     const auditRow = await prisma.auditLog.findFirst({
       where: { action: 'price.updated', targetId: 'print_bw_page', payloadJson: { contains: operatorId } },
@@ -113,22 +133,31 @@ async function main(): Promise<void> {
       fail(`price.updated audit mismatch: ${auditRow?.payloadJson}`)
     }
 
-    // (3) 停用：报价 fail-closed；恢复后复原
+    // (3) 停用全站行不再让报价失败。不带终端仍是 0；本机仍按本机价。恢复后全站行回到原单价。
     await billing.updatePriceConfig('print_bw_page', { active: false }, operatorId)
-    await expectCode('停用后对应报价 fail-closed（绝不默认 0 元）', 'PRICE_CONFIG_UNAVAILABLE', () =>
-      pricing.quotePrint({ billablePages: 1, billingPageSource: 'pdf_lightweight_scan', copies: 1, colorMode: 'black_white' }),
-    )
+    const stoppedAway = await pricing.quotePrint({
+      billablePages: 1, billingPageSource: 'pdf_lightweight_scan', copies: 1, colorMode: 'black_white',
+    })
+    const stoppedHere = await pricing.quotePrint({
+      billablePages: 1, billingPageSource: 'pdf_lightweight_scan', copies: 1, colorMode: 'black_white',
+      terminalId: quoteTerminalId,
+    })
+    if (stoppedAway.amountCents !== 0 || stoppedHere.amountCents !== oldBw) {
+      fail(`停用全站价不应改用户实付: away=${JSON.stringify(stoppedAway)} here=${JSON.stringify(stoppedHere)}`)
+    }
+    pass('停用全站黑白价：不带终端仍是 0，本机仍按本机价，不再抛 PRICE_CONFIG_UNAVAILABLE')
     await billing.updatePriceConfig('print_bw_page', { active: true, unitCents: oldBw }, operatorId)
-    const restored = await pricing.quotePrint({
+    const restoredRow = await prisma.priceConfig.findUniqueOrThrow({ where: { serviceKey: 'print_bw_page' } })
+    const restoredAway = await pricing.quotePrint({
       billablePages: 1,
       billingPageSource: 'pdf_lightweight_scan',
       copies: 1,
       colorMode: 'black_white',
     })
-    if (restored.amountCents === oldBw && (await auditCount()) === 3) {
-      pass('恢复启用 + 复原单价：报价复原，启停/复原各留审计（累计 3 条）')
+    if (restoredRow.unitCents === oldBw && restoredRow.active && restoredAway.amountCents === 0 && (await auditCount()) === 3) {
+      pass('恢复启用 + 复原单价：全站行回到原值，不带终端的报价仍是 0，启停/复原各留审计（累计 3 条）')
     } else {
-      fail(`restore failed: ${JSON.stringify(restored)}, audits=${await auditCount()}`)
+      fail(`restore failed: row=${JSON.stringify(restoredRow)} away=${JSON.stringify(restoredAway)} audits=${await auditCount()}`)
     }
 
     // (4) fail-closed：空 patch / 无变化 / 未知 serviceKey，且零新增审计
@@ -337,7 +366,9 @@ async function main(): Promise<void> {
       const PRINT_KEYS = ['print_bw_page', 'print_color_page']
       await prisma.priceConfig.deleteMany({ where: { serviceKey: { in: PRINT_KEYS } } })
       const bwQuote = () => pricing.quotePrint({ billablePages: 1, billingPageSource: 'pdf_lightweight_scan', copies: 1, colorMode: 'black_white' })
-      await expectCode('新库缺打印价目：报价失败关闭（不是 0 元放行）', 'PRICE_CONFIG_UNAVAILABLE', bwQuote)
+      const missingQuote = await bwQuote()
+      if (missingQuote.amountCents === 0) pass('新库缺打印价目：不带终端的报价是 0，不再失败关闭')
+      else fail(`缺价目仍向无终端报价收费: ${JSON.stringify(missingQuote)}`)
       const listed = await billing.listPriceConfig()
       const rows = listed.items.filter((i) => PRINT_KEYS.includes(i.serviceKey))
       if (rows.length === 2 && rows.every((r) => r.active === false && r.unitCents === 0 && r.unit === 'page' && (r.description ?? '').includes('未定价'))) {
@@ -345,7 +376,9 @@ async function main(): Promise<void> {
       } else {
         fail(`缺行补齐不对: ${JSON.stringify(rows)}`)
       }
-      await expectCode('补出的目录行仍停用：报价照旧失败关闭', 'PRICE_CONFIG_UNAVAILABLE', bwQuote)
+      const catalogQuote = await bwQuote()
+      if (catalogQuote.amountCents === 0) pass('补出的目录行仍停用：不带终端的报价仍是 0')
+      else fail(`停用目录行改变了无终端报价: ${JSON.stringify(catalogQuote)}`)
       await expectCode('试点设 0 元并启用：不勾确认被拒', 'ZERO_PRICE_CONFIRMATION_REQUIRED',
         () => billing.updatePriceConfig('print_bw_page', { active: true }, operatorId))
       await billing.updatePriceConfig('print_bw_page', { active: true, confirmZeroPrice: true, description: '试点免费：黑白打印 0 元/页' }, operatorId)
@@ -362,6 +395,16 @@ async function main(): Promise<void> {
     console.log(`\n  ✅ verify:admin-billing 全部通过（${passCount} checks）\n`)
   } finally {
     await seedDevDefaultPriceConfig(prisma) // 复位开发默认价
+    await prisma.terminalServicePrice.deleteMany({ where: { terminalId: quoteTerminalId } }).catch(() => undefined)
+    await prisma.terminal.deleteMany({ where: { id: quoteTerminalId } }).catch(() => undefined)
+    if (priorSwitch) {
+      await prisma.platformSetting.update({
+        where: { key: PERSONAL_CHARGE_SETTING_KEY },
+        data: { value: priorSwitch.value },
+      }).catch(() => undefined)
+    } else {
+      await prisma.platformSetting.deleteMany({ where: { key: PERSONAL_CHARGE_SETTING_KEY } }).catch(() => undefined)
+    }
     await prisma.auditLog.deleteMany({ where: { action: 'price.updated', payloadJson: { contains: operatorId } } })
     await prisma.onModuleDestroy()
   }

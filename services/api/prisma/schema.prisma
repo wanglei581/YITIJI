@@ -49,10 +49,14 @@ model Terminal {
   /// 计划中 / 已退役触发器不拦这一列：前者只拦 agentToken、lifecycleStatus、credentialGeneration，
   /// 后者只在身份列变化时拦截。
   dailyFreePrintSides Int?
-  /// 一体机首页是否允许显示「免费使用」。默认开。首页还要价目读到且黑白、彩色都是 0 才显示。
+  /// 一体机首页是否允许显示「免费使用」。默认开。五个生效价没有全部是 0 时一体机仍不显示。
   homeFreeBadge Boolean @default(true)
+  /// 谁付钱。org_pays：机构或我方承担，用户免费。user_pays：向用户收费。
+  /// 公共就业点位即使写成 user_pays，生效价仍是 0。
+  userChargeMode String @default("org_pays")
 
   heartbeats   TerminalHeartbeat[]
+  servicePrices TerminalServicePrice[]
   printTasks   PrintTask[]
   bindCodes    TerminalBindCode[]
   credentials  TerminalCredential[]
@@ -66,6 +70,20 @@ model Terminal {
   @@index([orgId])
   @@index([enabled])
   @@index([lifecycleStatus])
+}
+
+/// 每台机器、每个服务一行价。没有行 = 0。金额是整数分。
+/// 这是配置价，用户实际付多少还要看公共点位、总开关和谁付钱。
+model TerminalServicePrice {
+  id               String   @id @default(cuid())
+  terminalId       String
+  terminal         Terminal @relation(fields: [terminalId], references: [id], onDelete: Cascade)
+  serviceKey       String
+  unitCents        Int      @default(0)
+  updatedAt        DateTime @updatedAt
+  updatedByAdminId String?
+
+  @@unique([terminalId, serviceKey])
 }
 
 // ── TerminalCredential ───────────────────────────────────────────────────────

@@ -14,7 +14,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { AdminBillingService } from './admin-billing.service'
 import { ReconciliationService } from './reconciliation.service'
-import { AdminReconciliationQueryDto, AdminUpdatePriceConfigDto } from './dto/admin-billing.dto'
+import { AdminReconciliationQueryDto, AdminUpdatePriceConfigDto, UpdatePersonalChargeDto } from './dto/admin-billing.dto'
 
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -42,5 +42,18 @@ export class AdminBillingController {
   @Get('admin/billing/reconciliation')
   async reconcile(@Query() query: AdminReconciliationQueryDto) {
     return this.reconciliation.report({ from: query.from, to: query.to, nowMs: Date.now() })
+  }
+
+  @Get('admin/billing/personal-charge')
+  getPersonalCharge() {
+    return this.billing.getPersonalCharge()
+  }
+
+  @Put('admin/billing/personal-charge')
+  setPersonalCharge(
+    @Body() body: UpdatePersonalChargeDto,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    return this.billing.setPersonalCharge(body.enabled, body.confirm, user.userId)
   }
 }

@@ -18,6 +18,12 @@ import {
   Optional,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import {
+  TERMINAL_CHARGE_SERVICE_KEYS,
+  type EffectiveUserPrices,
+  type TerminalChargeServiceKey,
+} from '../payment/terminal-charge.contract'
+import { decideEffectiveUserPrices, getEffectiveUserPrices, readPersonalChargeEnabled, toPricingView } from '../payment/effective-user-prices'
 import { revokeTerminalCopyAuthorization } from '../copy-jobs/copy-authorization'
 import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import { TerminalToolboxService } from './terminal-toolbox.service'
@@ -103,8 +109,10 @@ export interface AdminTerminalView {
   releaseObservation: AdminReleaseObservationView | null
   /** 今天（北京日）已出纸成功的免费面数。不含在途。 */
   todayFreePrintSides: number
-  /** 一体机首页是否允许显示「免费使用」。默认开。价目不是 0 时一体机仍不显示。 */
+  /** 一体机首页是否允许显示「免费使用」。默认开。五个生效价没有全部是 0 时一体机仍不显示。 */
   homeFreeBadge: boolean
+  /** 本机谁付钱、配置价和现在实际向用户收的价。 */
+  charge: EffectiveUserPrices
 }
 
 export interface AdminOrganizationOption {
@@ -190,6 +198,29 @@ export interface AdminPrinterView {
   fault: string | null
   lastHeartbeatAt: string | null
   lastSyncAt: string | null
+}
+
+function chargeForTerminal(
+  terminal: {
+    userChargeMode: string
+    org: { type: string } | null
+    servicePrices: Array<{ serviceKey: string; unitCents: number }>
+  },
+  personalChargeEnabled: boolean,
+): EffectiveUserPrices {
+  const configuredCents: Partial<Record<TerminalChargeServiceKey, number>> = {}
+  for (const row of terminal.servicePrices) {
+    if ((TERMINAL_CHARGE_SERVICE_KEYS as readonly string[]).includes(row.serviceKey)) {
+      configuredCents[row.serviceKey as TerminalChargeServiceKey] = row.unitCents
+    }
+  }
+  return decideEffectiveUserPrices({
+    terminalFound: true,
+    orgType: terminal.org?.type ?? null,
+    userChargeMode: terminal.userChargeMode,
+    personalChargeEnabled,
+    configuredCents,
+  })
 }
 
 // ── Service ────────────────────────────────────────────────────────────────────
@@ -318,10 +349,12 @@ export class TerminalAdminService {
             plan: { include: { artifact: true } },
           },
         },
+        servicePrices: { select: { serviceKey: true, unitCents: true } },
       },
     })
 
     const todayFreePrintSides = await todayFreePrintSidesByTerminal(this.prisma, rows.map((row) => row.id))
+    const personalChargeEnabled = await readPersonalChargeEnabled(this.prisma)
 
     const terminals: AdminTerminalView[] = rows.map((t: (typeof rows)[number]) => {
       const hb = t.heartbeats[0]
@@ -376,6 +409,7 @@ export class TerminalAdminService {
           : null,
         todayFreePrintSides: todayFreePrintSides.get(t.id) ?? 0,
         homeFreeBadge: t.homeFreeBadge,
+        charge: chargeForTerminal(t, personalChargeEnabled),
       }
     })
 
@@ -710,6 +744,7 @@ export class TerminalAdminService {
     const ai = this.aiAccess ? await this.aiAccess.getConfig() : {
       loginGate: 'off' as const, declarationEnforced: false, paused: false, maintenance: false,
     }
+    const pricing = toPricingView(await getEffectiveUserPrices(this.prisma, terminal?.id ?? null))
 
     return {
       smartCampus: {
@@ -744,6 +779,7 @@ export class TerminalAdminService {
       ai: { loginGate: ai.loginGate, declarationEnforced: ai.declarationEnforced, paused: ai.paused },
       maintenance: ai.maintenance,
       homeFreeBadge: terminal?.homeFreeBadge === true,
+      pricing,
       configVersion: [
         terminal?.lastSeenAt.toISOString() ?? 'unregistered',
         smartCampusConfig?.updatedAt.toISOString() ?? 'smart-campus:none',
@@ -751,6 +787,7 @@ export class TerminalAdminService {
         jobBoard.version,
         JSON.stringify(ai),
         `home-free-badge:${terminal?.homeFreeBadge === true ? 'on' : 'off'}`,
+        `pricing:${pricing.userChargeMode}:${pricing.personalChargeEnabled ? 'on' : 'off'}:${pricing.isPublicSite ? 'public' : 'other'}:${JSON.stringify(pricing.effective)}`,
       ].join('|'),
       refreshIntervalMs: CONFIG_REFRESH_INTERVAL_MS,
       serverTime,

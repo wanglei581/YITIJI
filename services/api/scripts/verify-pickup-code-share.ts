@@ -40,8 +40,10 @@ import { PICKUP_VALIDITY_FROM_PAYMENT_MS } from '../src/payment/pickup-validity'
 import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory'
+import { adoptDevPrintSeedPrices } from '../src/payment/effective-user-prices'
 import { PricingService } from '../src/payment/pricing.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
+import { PERSONAL_CHARGE_SETTING_KEY } from '../src/payment/terminal-charge.contract'
 import { RefundService } from '../src/payment/refund.service'
 import { PICKUP_LOCKOUT_FAILURE_THRESHOLD } from '../src/print-jobs/pickup-claim-lockout'
 import { PICKUP_CLAIM_SOURCE_RATE_LIMIT } from '../src/print-jobs/pickup-claim-rate-limit'
@@ -199,6 +201,7 @@ async function main(): Promise<void> {
     })
   }
 
+  const priorSwitch = await prisma.platformSetting.findUnique({ where: { key: PERSONAL_CHARGE_SETTING_KEY } })
   try {
     setPrintScanCapabilityModeForTest('strict')
     await prisma.endUser.create({ data: { id: userId, phoneHash: `hash-${userId}`, phoneEnc: `enc-${userId}` } })
@@ -206,6 +209,8 @@ async function main(): Promise<void> {
     await seedTerminal(terminalId, `F02-${suffix}`, '青序验证大厅')
     await seedTerminal(otherTerminalId, `F02B-${suffix}`, '另一网点')
     await seedDevDefaultPriceConfig(prisma)
+    // 用户实付看本机生效价。不写这一笔，云打印报价是 0，建单即免费已付，后面的 markPaid 会报 ORDER_ALREADY_PAID。
+    await adoptDevPrintSeedPrices(prisma, terminalId)
     const pdf = buildRealPdf(2)
     await storage.putObject(storageKey, pdf, 'application/pdf', LOCAL_BUCKET_SENTINEL)
     const sha = createHash('sha256').update(pdf).digest('hex')
@@ -818,6 +823,15 @@ async function main(): Promise<void> {
     await prisma.terminal.deleteMany({ where: { id: { in: [terminalId, otherTerminalId] } } }).catch(() => undefined)
     await prisma.endUser.deleteMany({ where: { id: { in: [userId, otherUserId] } } }).catch(() => undefined)
     for (const key of storageKeys) await storage.deleteObject(key, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
+    if (priorSwitch) {
+      await prisma.platformSetting.upsert({
+        where: { key: PERSONAL_CHARGE_SETTING_KEY },
+        create: { key: PERSONAL_CHARGE_SETTING_KEY, value: priorSwitch.value },
+        update: { value: priorSwitch.value },
+      })
+    } else {
+      await prisma.platformSetting.deleteMany({ where: { key: PERSONAL_CHARGE_SETTING_KEY } })
+    }
     await prisma.onModuleDestroy()
   }
 }

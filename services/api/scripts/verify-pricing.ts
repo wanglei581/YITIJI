@@ -1,16 +1,18 @@
 /**
- * PricingService + PriceConfig 价目 SSOT verification.
+ * PricingService + PriceConfig 价目 verification.
  *
  * 直接调用生产 service（不走 HTTP）：
  * - 开发默认价 seed 幂等写入 PriceConfig，且与 PRINT_UNIT_PRICE_CENTS 不漂移。
- * - quotePrint 依据 PriceConfig 计算 amountCents（整数分），不信任前端金额。
- * - 无 active 价目 / 非法页数或份数 → fail-closed（抛错，绝不默认 0 元）。
- *
- * 注：这是 Task 5 的直接断言；报价接入建单落库（Order.amountCents）在 Task 6，故 verify:order 仍 RED。
+ * - 带终端的 quotePrint 按本机生效价计算 amountCents（整数分），不信任前端金额。
+ * - 不带终端一律 0 元（到机补价由 P2 做）。全站价停用或缺失不再让报价失败。
+ * - 非法页数或份数仍 fail-closed。
  */
 import 'dotenv/config'
+import { randomUUID } from 'crypto'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { PricingService } from '../src/payment/pricing.service'
+import { adoptDevPrintSeedPrices } from '../src/payment/effective-user-prices'
+import { PERSONAL_CHARGE_SETTING_KEY } from '../src/payment/terminal-charge.contract'
 import { seedDevDefaultPriceConfig, DEV_PRICE_SEED_FORBIDDEN_IN_PRODUCTION } from '../src/payment/price-config.seed'
 import { countPagesInRange } from '../src/print-jobs/page-range.util'
 import { PRINT_UNIT_PRICE_CENTS } from '../src/print-jobs/print-pricing'
@@ -104,10 +106,23 @@ async function main(): Promise<void> {
     }
   }
 
+  const quoteTerminalId = `t_pricing_${randomUUID()}`
+  const priorSwitch = await prisma.platformSetting.findUnique({ where: { key: PERSONAL_CHARGE_SETTING_KEY } })
+
   async function cleanup(): Promise<void> {
+    await prisma.terminalServicePrice.deleteMany({ where: { terminalId: quoteTerminalId } })
+    await prisma.terminal.deleteMany({ where: { id: quoteTerminalId } })
     await prisma.priceConfig.deleteMany({
       where: { serviceKey: { in: ['print_bw_page', 'print_color_page'] } },
     })
+    if (priorSwitch) {
+      await prisma.platformSetting.update({
+        where: { key: PERSONAL_CHARGE_SETTING_KEY },
+        data: { value: priorSwitch.value },
+      })
+    } else {
+      await prisma.platformSetting.deleteMany({ where: { key: PERSONAL_CHARGE_SETTING_KEY } })
+    }
   }
 
   try {
@@ -131,12 +146,24 @@ async function main(): Promise<void> {
       fail(`price drift: bw=${bw?.unitCents} vs ${PRINT_UNIT_PRICE_CENTS.black_white}, color=${color?.unitCents} vs ${PRINT_UNIT_PRICE_CENTS.color}`)
     }
 
+    // 本机按开发种子价向用户收费。全站 PriceConfig 不再决定这三笔报价。
+    await prisma.terminal.create({
+      data: {
+        id: quoteTerminalId,
+        terminalCode: quoteTerminalId,
+        agentToken: quoteTerminalId,
+        deviceFingerprint: quoteTerminalId,
+      },
+    })
+    await adoptDevPrintSeedPrices(prisma, quoteTerminalId)
+
     // 3) 报价（彩色 3 页 × 2 份）= 50 × 3 × 2 = 300 分
     const q1 = await pricing.quotePrint({
       billablePages: 3,
       billingPageSource: 'pdf_lightweight_scan',
       copies: 2,
       colorMode: 'color',
+      terminalId: quoteTerminalId,
     })
     if (
       q1.amountCents === 300 &&
@@ -159,6 +186,7 @@ async function main(): Promise<void> {
       billingPageSource: 'image_single_page',
       copies: 1,
       colorMode: 'black_white',
+      terminalId: quoteTerminalId,
     })
     if (q2.amountCents === 100 && q2.lines[0]?.serviceKey === 'print_bw_page' && q2.billingPageSource === 'image_single_page') {
       pass('quotePrint bw 5 pages × 1 copy = 100 cents; billingPageSource passthrough')
@@ -174,6 +202,7 @@ async function main(): Promise<void> {
       billingPageSource: 'pdf_lightweight_scan',
       copies: 1,
       colorMode: 'black_white',
+      terminalId: quoteTerminalId,
     })
     if (q3.amountCents === 40 && q3.billablePages === 2) {
       pass('pages 1-2 of a 50-page document quote 40 cents, not 1000 (no overcharge)')
@@ -189,17 +218,36 @@ async function main(): Promise<void> {
       pricing.quotePrint({ billablePages: 2, billingPageSource: 'pdf_lightweight_scan', copies: 0, colorMode: 'color' }),
     )
 
-    // 6) fail-closed：价目被停用
+    // 6) 全站彩色价停用：不带终端仍是 0，不抛错；本机仍按自己的彩色生效价。
     await prisma.priceConfig.update({ where: { serviceKey: 'print_color_page' }, data: { active: false } })
-    await assertThrows('quotePrint fail-closed when PriceConfig inactive (never defaults to 0)', () =>
-      pricing.quotePrint({ billablePages: 1, billingPageSource: 'pdf_lightweight_scan', copies: 1, colorMode: 'color' }),
-    )
+    const inactiveAway = await pricing.quotePrint({
+      billablePages: 1, billingPageSource: 'pdf_lightweight_scan', copies: 1, colorMode: 'color',
+    })
+    if (inactiveAway.amountCents === 0) {
+      pass('不带终端时，全站彩色价停用后报价仍是 0，不再因缺价目失败')
+    } else {
+      fail(`inactive site price should not charge a phoneless quote: ${JSON.stringify(inactiveAway)}`)
+    }
+    const inactiveHere = await pricing.quotePrint({
+      billablePages: 1, billingPageSource: 'pdf_lightweight_scan', copies: 1, colorMode: 'color',
+      terminalId: quoteTerminalId,
+    })
+    if (inactiveHere.amountCents === PRINT_UNIT_PRICE_CENTS.color) {
+      pass('全站彩色价停用后，本机仍按自己的彩色生效价报价')
+    } else {
+      fail(`terminal color quote should ignore inactive PriceConfig: ${JSON.stringify(inactiveHere)}`)
+    }
 
-    // 7) fail-closed：价目缺失（删空后彩色报价必抛）
-    await cleanup()
-    await assertThrows('quotePrint fail-closed when PriceConfig missing', () =>
-      pricing.quotePrint({ billablePages: 1, billingPageSource: 'pdf_lightweight_scan', copies: 1, colorMode: 'color' }),
-    )
+    // 7) 全站价目缺失：不带终端仍是 0。到机补价由 P2 做。
+    await prisma.priceConfig.deleteMany({ where: { serviceKey: { in: ['print_bw_page', 'print_color_page'] } } })
+    const missingAway = await pricing.quotePrint({
+      billablePages: 1, billingPageSource: 'pdf_lightweight_scan', copies: 1, colorMode: 'color',
+    })
+    if (missingAway.amountCents === 0) {
+      pass('全站价目缺失时，不带终端的报价是 0，不再失败关闭')
+    } else {
+      fail(`missing PriceConfig should not charge a phoneless quote: ${JSON.stringify(missingAway)}`)
+    }
 
     // 8) W-A：公开价目视图（Kiosk 预览/确认页展示价唯一来源）
     await seedDevDefaultPriceConfig(prisma)

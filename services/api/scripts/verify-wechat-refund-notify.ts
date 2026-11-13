@@ -38,6 +38,8 @@ import {
 } from '../src/payment/providers/wechat-pay.provider'
 import { PricingService } from '../src/payment/pricing.service'
 import { RefundService } from '../src/payment/refund.service'
+import { adoptDevPrintSeedPrices } from '../src/payment/effective-user-prices'
+import { PERSONAL_CHARGE_SETTING_KEY } from '../src/payment/terminal-charge.contract'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
@@ -128,6 +130,7 @@ async function main(): Promise<void> {
 
   const prisma = new PrismaService()
   await prisma.onModuleInit()
+  const priorSwitch = await prisma.platformSetting.findUnique({ where: { key: PERSONAL_CHARGE_SETTING_KEY } })
   const audit = new AuditService(prisma)
   const storage = new StorageService()
   const pageCount = new PrintPageCountService(prisma, storage)
@@ -177,6 +180,7 @@ async function main(): Promise<void> {
     orderId: string; orderNo: string; refundNo: string; taskId: string; amountCents: number
   }> {
     await seedDevDefaultPriceConfig(prisma)
+    await adoptDevPrintSeedPrices(prisma, terminalId)
     const created = await printJobs.create(
       { fileUrl: await seedPdf(label), fileMd5: `sha256-wxrn-${label}`, fileName: `${label}.pdf`, params: PRINT_PARAMS },
       { endUserId: null, terminalId },
@@ -444,6 +448,15 @@ async function main(): Promise<void> {
     console.log(`\n  ✅ verify:wechat-refund-notify 全部通过（${passCount} checks）\n`)
   } finally {
     await cleanup()
+    if (priorSwitch) {
+      await prisma.platformSetting.upsert({
+        where: { key: PERSONAL_CHARGE_SETTING_KEY },
+        create: { key: PERSONAL_CHARGE_SETTING_KEY, value: priorSwitch.value },
+        update: { value: priorSwitch.value },
+      })
+    } else {
+      await prisma.platformSetting.deleteMany({ where: { key: PERSONAL_CHARGE_SETTING_KEY } })
+    }
     await prisma.onModuleDestroy()
   }
 }

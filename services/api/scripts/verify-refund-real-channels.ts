@@ -38,6 +38,7 @@ import { buildPaymentCallbackPath } from '../src/payment/payment-provider.types'
 import { PricingService } from '../src/payment/pricing.service'
 import { ONLINE_PAID_PENDING_REFUND_REASON } from '../src/payment/pending-refund-signal'
 import { RefundService } from '../src/payment/refund.service'
+import { adoptDevPrintSeedPrices } from '../src/payment/effective-user-prices'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { AlipayProvider, alipayTimestamp, buildAlipaySignBase } from '../src/payment/providers/alipay.provider'
 import {
@@ -380,6 +381,7 @@ async function main(): Promise<void> {
       data: { id: terminalId, terminalCode: `KSK-REFUNDREAL-${suffix}`, agentToken: `agt_${suffix}`, deviceFingerprint: 'verify-refundreal' },
     })
     await seedDevDefaultPriceConfig(prisma)
+    await adoptDevPrintSeedPrices(prisma, terminalId)
     pass('test fixtures created')
 
     // ── (W1) wechat 同步退款成功 ─────────────────────────────────────────

@@ -42,6 +42,8 @@ import { ValidationPipe } from '@nestjs/common'
 import { AdminRefundDto } from '../src/payment/dto/order-action.dto'
 import { AdminPrintScanService } from '../src/admin-print-scan/admin-print-scan.service'
 import { PricingService } from '../src/payment/pricing.service'
+import { adoptDevPrintSeedPrices } from '../src/payment/effective-user-prices'
+import { PERSONAL_CHARGE_SETTING_KEY } from '../src/payment/terminal-charge.contract'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { SandboxPaymentProvider } from '../src/payment/providers/sandbox-payment.provider'
 import { createPaymentSessionToken } from '../src/payment/payment-session-token'
@@ -192,11 +194,13 @@ async function main(): Promise<void> {
     await prisma.priceConfig.deleteMany({ where: { serviceKey: { in: ['print_bw_page', 'print_color_page'] } } })
   }
 
+  const priorSwitch = await prisma.platformSetting.findUnique({ where: { key: PERSONAL_CHARGE_SETTING_KEY } })
   try {
     await cleanup()
     await prisma.terminal.create({ data: { id: terminalId, terminalCode: `KSK-RFD-${suffix}`, agentToken, deviceFingerprint: 'verify-refund' } })
     await prisma.endUser.create({ data: { id: endUserId, phoneHash: `hash_${suffix}`, phoneEnc: `enc_${suffix}` } })
     await seedDevDefaultPriceConfig(prisma)
+    await adoptDevPrintSeedPrices(prisma, terminalId)
     pass('测试夹具已创建')
 
     // ── (1) 全额 sandbox 退款 paid → refunding → refunded ──────────────────
@@ -454,6 +458,15 @@ async function main(): Promise<void> {
     console.log(`\n  ✅ verify:refund-idempotent 全部通过（${passed} checks）`)
   } finally {
     await cleanup()
+    if (priorSwitch) {
+      await prisma.platformSetting.upsert({
+        where: { key: PERSONAL_CHARGE_SETTING_KEY },
+        create: { key: PERSONAL_CHARGE_SETTING_KEY, value: priorSwitch.value },
+        update: { value: priorSwitch.value },
+      })
+    } else {
+      await prisma.platformSetting.deleteMany({ where: { key: PERSONAL_CHARGE_SETTING_KEY } })
+    }
     await prisma.onModuleDestroy?.()
   }
 }

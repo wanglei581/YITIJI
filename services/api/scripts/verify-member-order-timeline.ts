@@ -64,9 +64,11 @@ import {
   type MemberOrderTimelineStatusFilter,
 } from '../src/member-print-orders/member-print-orders.types'
 import { PackageOrderService } from '../src/member-print-orders/package-order.service'
+import { adoptDevPrintSeedPrices } from '../src/payment/effective-user-prices'
 import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
+import { PERSONAL_CHARGE_SETTING_KEY } from '../src/payment/terminal-charge.contract'
 import { PricingService } from '../src/payment/pricing.service'
 import { PICKUP_RELEASED_REPLAY_MS, PickupOrderService } from '../src/print-jobs/pickup-order.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
@@ -312,6 +314,7 @@ async function main(): Promise<void> {
   assertIsolatedVerificationDatabase()
   const prisma = new PrismaService()
   await prisma.onModuleInit()
+  const priorSwitch = await prisma.platformSetting.findUnique({ where: { key: PERSONAL_CHARGE_SETTING_KEY } })
   try {
     await prisma.order.findFirst({ select: { id: true } })
   } catch {
@@ -419,6 +422,9 @@ async function main(): Promise<void> {
     await seedTerminal(T, '青序一号大厅', '一楼东侧')
     await seedTerminal(T2, '青序二号大厅', '三楼')
     await seedDevDefaultPriceConfig(prisma)
+    // 用户实付看本机生效价。不写这一笔，云打印报价是 0，建单即免费已付，后面的 markPaid 会报 ORDER_ALREADY_PAID。
+    await adoptDevPrintSeedPrices(prisma, T)
+    await adoptDevPrintSeedPrices(prisma, T2)
     const fA = await seedFile(U, 'a')
     const fB = await seedFile(U, 'b')
     const fO = await seedFile(O, 'o')
@@ -737,6 +743,15 @@ async function main(): Promise<void> {
     console.log(`\nALL PASS (${passed})`)
   } finally {
     setPrintScanCapabilityModeForTest(null)
+    if (priorSwitch) {
+      await prisma.platformSetting.upsert({
+        where: { key: PERSONAL_CHARGE_SETTING_KEY },
+        create: { key: PERSONAL_CHARGE_SETTING_KEY, value: priorSwitch.value },
+        update: { value: priorSwitch.value },
+      }).catch(() => undefined)
+    } else {
+      await prisma.platformSetting.deleteMany({ where: { key: PERSONAL_CHARGE_SETTING_KEY } }).catch(() => undefined)
+    }
     await prisma.onModuleDestroy()
     for (const key of storageKeys) {
       try { rmSync(path.join(process.env.FILE_STORAGE_DIR!, key), { force: true }) } catch { /* ignore */ }

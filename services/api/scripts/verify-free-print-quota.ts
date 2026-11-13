@@ -37,6 +37,7 @@ import { hashPickupCode } from '../src/common/pickup-code'
 import { encryptPhone, hashPhone } from '../src/common/crypto/phone-identity'
 import { encryptSecret } from '../src/common/crypto/secret-cipher'
 import { signFileUrl } from '../src/files/signing'
+import { setTerminalUserPrintPrices } from '../src/payment/effective-user-prices'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
@@ -663,10 +664,13 @@ async function main(): Promise<void> {
     await prisma.terminal.update({ where: { id: SHIBEI }, data: { dailyFreePrintSides: 2 } })
     await seedPaper({ terminalId: SHIBEI, sides: 2, completedAt: minutesAgo(20) })
     await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: 20 } })
+    // 市北机构类型是 public_service，不是公共就业三类。这一单按本机黑白生效价收 20 分。
+    await setTerminalUserPrintPrices(prisma, SHIBEI, { print_bw_page: 20 })
     const paid = await createJob(SHIBEI, 1)
     assert.equal(paid.status, 201, JSON.stringify(paid.json))
     assert.equal((paid.json as { amountCents?: number }).amountCents, 20)
     await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: 0 } })
+    await setTerminalUserPrintPrices(prisma, SHIBEI, { print_bw_page: 0 })
     console.log('PASS 实付大于 0 不受免费额度限制')
 
     async function claim(terminalId: string, code: string) {

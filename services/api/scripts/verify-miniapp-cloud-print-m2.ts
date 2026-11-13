@@ -21,6 +21,7 @@ import { AdminOrdersReadonlyService } from '../src/admin-orders-readonly/admin-o
 import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
+import { adoptDevPrintSeedPrices, setTerminalUserPrintPrices } from '../src/payment/effective-user-prices'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { MemberOrderClaimHereService } from '../src/member-print-orders/member-order-claim-here.service'
 import { PickupOrderService } from '../src/print-jobs/pickup-order.service'
@@ -448,6 +449,8 @@ async function main(): Promise<void> {
     const history = new MemberPrintOrdersService(prisma)
     const admin = new AdminOrdersReadonlyService(prisma)
     await seedTerminal(chainTerminalId, `M2-C-${suffix}`)
+    // 跨端这一台也按开发种子价向用户收费。否则报价是 0，建单时已经记成免费已付，认领会直接放行。
+    await adoptDevPrintSeedPrices(prisma, chainTerminalId)
     const pdf = buildRealPdf(2)
     const uploaded = await files.upload({
       buffer: pdf, filename: '跨端打印验证.pdf', mimeType: 'application/pdf',
@@ -558,6 +561,7 @@ async function main(): Promise<void> {
     await seedTerminal(terminalId, `M2-${suffix}`)
     await seedTerminal(otherTerminalId, `M2-O-${suffix}`)
     await seedDevDefaultPriceConfig(prisma)
+    await adoptDevPrintSeedPrices(prisma, terminalId)
     await seedFile(fileId, '两页简历', 'keep')
     await seedFile(pendingPiiFileId, '未确认隐私', 'pending')
     pass('隔离数据库、在线终端、真实两页 PDF、价目与隐私夹具已建立')
@@ -681,12 +685,14 @@ async function main(): Promise<void> {
       assertPay(await viewPair(unpaid.id), { payStatus: 'unpaid', paymentSource: null, paidAt: null }, '未付款')
 
       await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: 0 } })
+      await setTerminalUserPrintPrices(prisma, terminalId, { print_bw_page: 0 })
       try {
         const free = await memberOrders.create(userId, draft, randomUUID())
         assertPay(await viewPair(free.id), { payStatus: 'paid', paymentSource: 'free', paidAt: 'set', amountCents: 0 }, '免费已入账')
         await memberOrders.cancel(userId, free.id, { reason: 'view probe free' })
       } finally {
         await seedDevDefaultPriceConfig(prisma)
+        await adoptDevPrintSeedPrices(prisma, terminalId)
       }
 
       const closed = await memberOrders.create(userId, draft, randomUUID())
@@ -939,6 +945,7 @@ async function main(): Promise<void> {
     const originalBwUnit = bwPrice.unitCents
     try {
       await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: 0 } })
+      await setTerminalUserPrintPrices(prisma, terminalId, { print_bw_page: 0 })
       await prisma.terminalHeartbeat.create({
         data: { terminalId, status: 'online', localTaskDatabaseAvailable: true, createdAt: new Date() },
       })
@@ -1218,6 +1225,7 @@ async function main(): Promise<void> {
       }
     } finally {
       await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: originalBwUnit } })
+      await setTerminalUserPrintPrices(prisma, terminalId, { print_bw_page: originalBwUnit })
       await prisma.terminal.update({ where: { id: terminalId }, data: { dailyFreePrintSides: null } })
     }
 

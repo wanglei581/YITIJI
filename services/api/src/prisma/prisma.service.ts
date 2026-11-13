@@ -93,6 +93,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.terminal
   }
 
+  get terminalServicePrice() {
+    return this.client.terminalServicePrice
+  }
+
   get printTask() {
     return this.client.printTask
   }

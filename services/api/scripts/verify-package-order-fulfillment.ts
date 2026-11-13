@@ -16,6 +16,7 @@ import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { verifyPaymentSessionToken } from '../src/payment/payment-session-token'
 import { PricingService } from '../src/payment/pricing.service'
+import { adoptDevPrintSeedPrices, setTerminalUserPrintPrices } from '../src/payment/effective-user-prices'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { FilesService } from '../src/files/files.service'
 import { PickupOrderService } from '../src/print-jobs/pickup-order.service'
@@ -223,6 +224,7 @@ async function main(): Promise<void> {
     await prisma.terminalHeartbeat.create({ data: { terminalId, status: 'online', localTaskDatabaseAvailable: true } })
     await prisma.terminalCapability.create({ data: { terminalId, capabilityKey: 'document_print', status: 'available' } })
     await seedDevDefaultPriceConfig(prisma)
+    await adoptDevPrintSeedPrices(prisma, terminalId)
     await Promise.all(fileIds.map((fileId, seq) => seedFile(fileId, seq)))
 
     await prisma.documentProcessTask.updateMany({
@@ -434,6 +436,7 @@ async function main(): Promise<void> {
     const originalBwUnit = bwPrice.unitCents
     try {
       await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: 0 } })
+      await setTerminalUserPrintPrices(prisma, terminalId, { print_bw_page: 0 })
       await prisma.terminalHeartbeat.create({ data: { terminalId, status: 'online', localTaskDatabaseAvailable: true } })
       const file30a = `file_package_q30a_${suffix}`
       const file30b = `file_package_q30b_${suffix}`
@@ -841,6 +844,7 @@ async function main(): Promise<void> {
       if (holdFailures.length > 0) fail(holdFailures.join('\n'))
     } finally {
       await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: originalBwUnit } })
+      await setTerminalUserPrintPrices(prisma, terminalId, { print_bw_page: originalBwUnit })
     }
 
     // 直传完成后内容被换掉：放行仍要拒绝。代理上传没有直传基线，完整性校验会直接返回，测不到这一条。

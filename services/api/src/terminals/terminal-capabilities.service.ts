@@ -27,6 +27,12 @@ import {
 } from './terminal-capabilities.types'
 import { revokeTerminalCopyAuthorization } from '../copy-jobs/copy-authorization'
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
+import {
+  getTerminalChargeSettings,
+  saveTerminalChargeSettings,
+  type TerminalChargeSettingsView,
+} from '../payment/terminal-charge-settings'
+import type { UpdateTerminalChargeSettingsDto } from './dto/update-terminal-charge-settings.dto'
 
 /** 管理员改某台机器首页「免费使用」开关。变量名含 ACTION，审计门禁才会收进动作全集。 */
 export const TERMINAL_HOME_FREE_BADGE_AUDIT_ACTION = 'terminal.home_free_badge.update'
@@ -158,6 +164,18 @@ export class TerminalCapabilitiesService {
       data: { homeFreeBadge: enabled },
     })
     return { terminalCode: terminal.terminalCode, previous: terminal.homeFreeBadge, next: enabled }
+  }
+
+  getChargeSettings(terminalId: string): Promise<TerminalChargeSettingsView> {
+    return getTerminalChargeSettings(this.prisma, terminalId)
+  }
+
+  saveChargeSettings(
+    terminalId: string,
+    body: UpdateTerminalChargeSettingsDto,
+    adminId: string,
+  ): Promise<{ previous: TerminalChargeSettingsView; next: TerminalChargeSettingsView }> {
+    return saveTerminalChargeSettings(this.prisma, terminalId, body, adminId)
   }
 
   async upsert(

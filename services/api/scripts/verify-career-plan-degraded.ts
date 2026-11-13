@@ -44,6 +44,7 @@ import { PrintPageCountService } from '../src/print-jobs/print-page-count.servic
 import { PricingService } from '../src/payment/pricing.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
+import { adoptDevPrintSeedPrices } from '../src/payment/effective-user-prices'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { openUnpdfDocument } from '../src/common/pdf/pdfjs-document'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
@@ -202,6 +203,7 @@ async function main() {
         agentToken: `vcpd-agent-token-${suffix}`, deviceFingerprint: `fp-${suffix}`,
       },
     })
+    await adoptDevPrintSeedPrices(prisma, terminalId)
     await prisma.aiResumeResult.createMany({ data: allTasks.map(parseRow) })
 
     // 库里存着 LLM 写下的解读（AI 正常时留下的）——降级纸绝不能把它印出来。

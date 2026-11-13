@@ -16,6 +16,7 @@ import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory
 import type { AdminMarkPaidDto, AdminRefundDto } from '../src/payment/dto/order-action.dto'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
+import { adoptDevPrintSeedPrices, setTerminalUserPrintPrices } from '../src/payment/effective-user-prices'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
@@ -147,8 +148,9 @@ async function main(): Promise<void> {
         nickname: '订单验证会员',
       },
     })
-    // 开发默认价目 seed（create() 会经 PricingService 读取 PriceConfig；未 seed 则 fail-closed）。
+    // 开发默认参考价写入全站表。用户实付改认本机种子价，否则建单会变成 0 元免费单。
     await seedDevDefaultPriceConfig(prisma)
+    await adoptDevPrintSeedPrices(prisma, terminalId)
     pass('test fixtures created')
 
     const anonymousPrint = await printJobs.create(
@@ -547,6 +549,7 @@ async function main(): Promise<void> {
     // 不 mock page counter、不加测试后门、不信任前端 pages；用后还原价目。
     await p0aGuard('free order (amountCents=0) settled paid+free with paidAt and no pickup code', async () => {
       await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: 0 } })
+      await setTerminalUserPrintPrices(prisma, terminalId, { print_bw_page: 0 })
       try {
         const freePrint = await printJobs.create(
           {
@@ -570,6 +573,7 @@ async function main(): Promise<void> {
         )
       } finally {
         await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: PRINT_UNIT_PRICE_CENTS.black_white } })
+        await adoptDevPrintSeedPrices(prisma, terminalId)
       }
     })
 

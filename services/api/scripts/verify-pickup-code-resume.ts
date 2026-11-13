@@ -43,8 +43,10 @@ import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory'
 import { createPaymentSessionToken } from '../src/payment/payment-session-token'
+import { adoptDevPrintSeedPrices } from '../src/payment/effective-user-prices'
 import { PricingService } from '../src/payment/pricing.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
+import { PERSONAL_CHARGE_SETTING_KEY } from '../src/payment/terminal-charge.contract'
 import { isPaidUnfulfilledRefundRequired } from '../src/payment/pending-refund-signal'
 import { PickupExpiryRefundService } from '../src/payment/pickup-expiry-refund.service'
 import { RefundService } from '../src/payment/refund.service'
@@ -279,12 +281,15 @@ async function main(): Promise<void> {
     })
   }
 
+  const priorSwitch = await prisma.platformSetting.findUnique({ where: { key: PERSONAL_CHARGE_SETTING_KEY } })
   try {
     setPrintScanCapabilityModeForTest('strict')
     await prisma.endUser.create({ data: { id: userId, phoneHash: `hash-${userId}`, phoneEnc: `enc-${userId}` } })
     await seedTerminal(terminalId, `BJ-${suffix}`, '青序滨江服务厅', '滨江路 18 号')
     await seedTerminal(otherTerminalId, `CX-${suffix}`, '青序城西服务点', '城西银泰旁')
     await seedDevDefaultPriceConfig(prisma)
+    // 未付款认领不得放行，所以这台必须先按开发种子价收费。免费续打用例在付款后再把金额改成 0。
+    await adoptDevPrintSeedPrices(prisma, terminalId)
     const resumeFile = await seedFile('resume')
     const extraFile = await seedFile('letter')
     const packageFile = await seedFile('pack')
@@ -916,6 +921,15 @@ async function main(): Promise<void> {
     await prisma.terminal.deleteMany({ where: { id: { in: [terminalId, otherTerminalId] } } }).catch(() => undefined)
     await prisma.endUser.deleteMany({ where: { id: userId } }).catch(() => undefined)
     for (const key of storageKeys) await storage.deleteObject(key, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
+    if (priorSwitch) {
+      await prisma.platformSetting.upsert({
+        where: { key: PERSONAL_CHARGE_SETTING_KEY },
+        create: { key: PERSONAL_CHARGE_SETTING_KEY, value: priorSwitch.value },
+        update: { value: priorSwitch.value },
+      }).catch(() => undefined)
+    } else {
+      await prisma.platformSetting.deleteMany({ where: { key: PERSONAL_CHARGE_SETTING_KEY } }).catch(() => undefined)
+    }
     await prisma.onModuleDestroy().catch(() => undefined)
   }
 }

@@ -25,6 +25,7 @@ import { PackageOrdersController } from '../src/member-print-orders/package-orde
 import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
+import { adoptDevPrintSeedPrices, setTerminalUserPrintPrices } from '../src/payment/effective-user-prices'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { PrismaService } from '../src/prisma/prisma.service'
@@ -237,6 +238,7 @@ async function main(): Promise<void> {
       data: { terminalId, capabilityKey: 'document_print', status: 'available' },
     })
     await seedDevDefaultPriceConfig(prisma)
+    await adoptDevPrintSeedPrices(prisma, terminalId)
     for (const [fileId, ownerId, label] of [
       [fileA1, userA, 'A简历'],
       [fileA2, userA, 'A附件'],
@@ -454,7 +456,10 @@ async function main(): Promise<void> {
       ])
       return JSON.stringify({ orders, items, tasks, attempts, audits, ledgers })
     }
-    const setBw = (unitCents: number) => prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents } })
+    const setBw = async (unitCents: number) => {
+      await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents } })
+      await setTerminalUserPrintPrices(prisma, terminalId, { print_bw_page: unitCents })
+    }
     const seedBw = await prisma.priceConfig.findUniqueOrThrow({ where: { serviceKey: 'print_bw_page' } })
     if (seedBw.unitCents !== 20) fail(`夹具黑白单价应为 20 分，实际 ${seedBw.unitCents}`)
     const packageLine = (unitCents: number) => `line=print_bw_page:${unitCents}:2:${unitCents * 2}`

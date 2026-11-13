@@ -3,6 +3,7 @@ import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.se
 import type { BillingPageSource } from '../print-jobs/print-page-count.types'
 import type { PrintPriceConfigView, PrintPriceLine, PrintPriceQuote } from './payment.types'
 import { descriptionContradictsAmount } from './price-description'
+import { assertUserPaysUnit, getEffectiveUserPrices } from './effective-user-prices'
 
 /** 报价输入：后端识别页数（来自 PrintPageCountService）+ 打印参数。 */
 export interface PrintPriceInput {
@@ -10,6 +11,11 @@ export interface PrintPriceInput {
   billingPageSource: BillingPageSource
   copies: number
   colorMode: 'black_white' | 'color'
+  /**
+   * 有终端时按该机 print_bw_page / print_color_page 的生效价。
+   * 不传（手机先下单、到机取件）本包一律 0 元。到机补价由 P2 做。
+   */
+  terminalId?: string | null
 }
 
 export type PrintPriceServiceKey = 'print_bw_page' | 'print_color_page'
@@ -19,8 +25,7 @@ export type PrintUnitPrice =
   | { ok: false; code: 'PRICE_CONFIG_UNAVAILABLE' | 'PRICE_CONFIG_INVALID' }
 
 /**
- * 按颜色读一行打印价目并判有效。打印报价（quotePrint）与屏上复印报价（quoteCopy）都只走这里，
- * 所以同一颜色的复印单价永远等于打印单价，缺行、停用、单价非法时两边同样不可报价。
+ * 按颜色读全站 PriceConfig 的描述。11/13 起用户实付不读这里的单价。
  * 缺行或停用 → PRICE_CONFIG_UNAVAILABLE；单价不是非负整数 → PRICE_CONFIG_INVALID；不读 effectiveFrom。
  */
 export async function readPrintUnitPrice(
@@ -35,18 +40,16 @@ export async function readPrintUnitPrice(
 }
 
 /**
- * P0a 打印报价（支付域，无 live 网关）。
- *
- * 价目真相源是数据库 `PriceConfig`（开发默认价由 price-config.seed 幂等写入）。
- * amountCents = 单价(PriceConfig) × billablePages × copies，整数「分」。
+ * 打印报价。用户实付单价只来自 getEffectiveUserPrices（每台机器的生效价）。
+ * 全站 PriceConfig 的打印两行不再决定用户付多少钱，只在描述不矛盾时附在报价上。
+ * amountCents = 本机生效单价 × billablePages × copies，整数「分」。
  *
  * 硬约束：
- * - **绝不信任前端金额**：金额只由本 service 依据 PriceConfig 计算。
- * - **fail-closed**：无 active 价目 / 价目异常 / 非法页数或份数 → 抛错拒绝，**绝不默认 0 元**。
- * - 本批按内容页计价，duplex / pagesPerSheet 不影响单价（见 price-config.seed 说明）。
- * - **不读 `effectiveFrom`**：该列当前无调度语义；改价靠直接改 `unitCents`/`active`。
- *
- * 注：本 service 只计算报价，不落库、不改 Order 状态机、不接建单（接线留 Task 6）。
+ * - **绝不信任前端金额**。
+ * - 没传终端：一律 0 元（到机补价由 P2 做），不查终端表。
+ * - 向用户收费且配置价不是 0 到上限的整数 → PRICE_CONFIG_INVALID，不按 0 放行。
+ * - 非法页数或份数仍拒绝。缺 PriceConfig 不再让报价失败。
+ * - 本批按内容页计价，duplex / pagesPerSheet 不影响单价。
  */
 @Injectable()
 export class PricingService {
@@ -55,7 +58,7 @@ export class PricingService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * 公开只读价目视图（W-A 价格真相源统一）：Kiosk 预览/确认页展示价的唯一来源。
+   * 公开只读价目视图。这是全站参考价，用户实付按每台机器（见 getEffectiveUserPrices）。
    * 只回 active 项的安全字段（serviceKey/unitCents/unit/description），无任何敏感信息。
    * `billingEnabled` 为政企 E1「整机免费模式」预留位（当前恒 true；免费模式落地时改由配置驱动）。
    * fail-closed：无任何 active 价目时抛错 —— 前端据此显示「价格暂不可用」，绝不回退硬编码价。
@@ -110,19 +113,18 @@ export class PricingService {
       throw new BadRequestException('PRICE_INVALID_COPIES')
     }
 
-    const price = await readPrintUnitPrice(this.prisma, colorMode)
-    if (!price.ok) {
-      throw new BadRequestException(price.code)
-    }
+    const serviceKey: PrintPriceServiceKey = colorMode === 'color' ? 'print_color_page' : 'print_bw_page'
+    const unitCents = await this.resolveEffectivePrintUnit(input.terminalId, serviceKey)
+    const description = await this.referenceDescription(colorMode, unitCents)
 
     const quantity = billablePages * copies
-    const subtotalCents = price.unitCents * quantity
+    const subtotalCents = unitCents * quantity
     const line: PrintPriceLine = {
-      serviceKey: price.serviceKey,
-      unitCents: price.unitCents,
+      serviceKey,
+      unitCents,
       quantity,
       subtotalCents,
-      description: price.description ?? undefined,
+      description: description ?? undefined,
     }
 
     return {
@@ -131,5 +133,37 @@ export class PricingService {
       billingPageSource,
       lines: [line],
     }
+  }
+
+  /**
+   * 没传终端时不查终端表，直接 0。到机补价由 P2 做。
+   * 有终端时只认生效价；向用户收费且配置价非法则拒绝。
+   */
+  private async resolveEffectivePrintUnit(
+    terminalId: string | null | undefined,
+    serviceKey: PrintPriceServiceKey,
+  ): Promise<number> {
+    if (!terminalId?.trim()) return 0
+    const prices = await getEffectiveUserPrices(this.prisma, terminalId)
+    const row = prices.prices[serviceKey]
+    try {
+      assertUserPaysUnit(row)
+    } catch (error) {
+      if (error instanceof Error && error.message === 'PRICE_CONFIG_INVALID') {
+        throw new BadRequestException('PRICE_CONFIG_INVALID')
+      }
+      throw error
+    }
+    return row.effectiveCents
+  }
+
+  /** 全站参考价的描述。与本机生效单价矛盾、或缺行时不附上，金额不受影响。 */
+  private async referenceDescription(
+    colorMode: PrintPriceInput['colorMode'],
+    effectiveUnitCents: number,
+  ): Promise<string | null> {
+    const listed = await readPrintUnitPrice(this.prisma, colorMode)
+    if (!listed.ok || descriptionContradictsAmount(listed.description, effectiveUnitCents)) return null
+    return listed.description
   }
 }

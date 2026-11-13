@@ -2,7 +2,7 @@
 //
 // 端点（全局前缀 /api/v1）：
 //   GET  /payment/channels        当前启用的支付通道（无密钥信息；Kiosk 渲染通道选择用）
-//   GET  /print/price-config      公开只读价目（W-A；Kiosk 展示价唯一来源，匿名可读）
+//   GET  /print/price-config      公开只读价目（全站参考价，用户实付按每台机器；小程序仍读它）
 //   POST /orders/:id/pay          出码（建/复用支付尝试，返回屏上动态码内容；body 可选 channel）
 //   GET  /orders/:id/pay-status   Kiosk 轮询支付状态（含惰性过期/关单）
 //   POST /orders/:id/pay/reconcile  主动查单兜底（回调丢失时按渠道账本核实；同幂等入账路径）
@@ -52,9 +52,9 @@ export class PaymentController {
     return { channels: this.onlinePayment.availableChannels() }
   }
 
-  // GET /api/v1/print/price-config — 公开只读价目（W-A 价格真相源统一）。
-  // Kiosk 预览/确认页展示价的唯一来源（匿名可读，只含安全展示字段，无任何密钥/成本信息）；
-  // 无 active 价目时 fail-closed 抛错，前端显示「价格暂不可用」，绝不回退硬编码价。
+  // GET /api/v1/print/price-config — 公开只读价目。这是全站参考价，用户实付按每台机器。
+  // 小程序仍读这个接口，返回结构不变。一体机展示价改读本机配置里的 pricing。
+  // 无 active 价目时仍抛错，前端显示「价格暂不可用」，绝不回退硬编码价。
   @Get('print/price-config')
   async getPrintPriceConfig() {
     return this.pricing.listActivePriceConfig()
