@@ -306,6 +306,66 @@ if (deployWorkflow.includes(staticRoot) && precheckScript.includes(staticRoot)) 
   fail('deploy-precheck.sh 必须使用 deploy.yml 里的 STATIC_BACKUP_ROOT 默认路径')
 }
 
+// 七、招聘锁：我方发布流程把部署归属固定写成我方云（合规边界 §1.1 2026-10-12）。
+// 不改上面各节。固定值不是 env.KEY !== 'true'，不能并进 REQUIRED_PRODUCTION_GATES。
+{
+  const OWNERSHIP_TS = 'services/api/src/recruitment-hosting/deployment-ownership.ts'
+  const ownershipPath = join(repoRoot, OWNERSHIP_TS)
+  if (!existsSync(ownershipPath)) {
+    fail(`部署归属文件不存在：${OWNERSHIP_TS}`)
+  } else {
+    const ownershipSrc = readFileSync(ownershipPath, 'utf8')
+    const fixedMatch = deploySource.match(/FIXED_PRODUCTION_VALUES=\(([\s\S]*?)\)/)
+    if (!fixedMatch) {
+      fail(`${DEPLOY_SH} 里没找到 FIXED_PRODUCTION_VALUES=( ... )`)
+    } else {
+      const pairs = fixedMatch[1]
+        .split('\n')
+        .map((line) => line.replace(/#.*$/, '').trim())
+        .filter(Boolean)
+      if (pairs.length === 1 && pairs[0] === 'DEPLOYMENT_OWNERSHIP=vendor_cloud') {
+        pass('FIXED_PRODUCTION_VALUES 恰好是 DEPLOYMENT_OWNERSHIP=vendor_cloud')
+      } else {
+        fail(
+          `FIXED_PRODUCTION_VALUES 必须恰好是 DEPLOYMENT_OWNERSHIP=vendor_cloud，实际：${pairs.join(' | ') || '空'}`,
+        )
+      }
+      const vendorMatch = ownershipSrc.match(/VENDOR_CLOUD_OWNERSHIP\s*=\s*'([^']+)'/)
+      const fixedValue = pairs[0]?.slice(pairs[0].indexOf('=') + 1)
+      if (vendorMatch && fixedValue === vendorMatch[1]) {
+        pass('固定值等于 deployment-ownership.ts 的 VENDOR_CLOUD_OWNERSHIP')
+      } else {
+        fail('FIXED_PRODUCTION_VALUES 的值必须等于 VENDOR_CLOUD_OWNERSHIP')
+      }
+    }
+    if (deploySource.includes('--force-value "$(IFS=,; echo "${FIXED_PRODUCTION_VALUES[*]}")"')) {
+      pass('3c 预检带 --force-value 并引用 FIXED_PRODUCTION_VALUES')
+    } else {
+      fail('3c 预检必须带 --force-value 并引用 FIXED_PRODUCTION_VALUES')
+    }
+    if (/print key "=" value/.test(deploySource)) {
+      pass('3b 把固定归属写成 KEY=VALUE')
+    } else {
+      fail('3b 必须在 KEY=true 循环之外把固定值写成 print key "=" value')
+    }
+    const restartAt = deploySource.lastIndexOf('pm2 restart "$PM2_NAME" --update-env')
+    const beforeRestart = restartAt < 0 ? '' : deploySource.slice(0, restartAt)
+    if (/^export "\$\{FIXED_PRODUCTION_VALUES\[@\]\}"$/m.test(beforeRestart)) {
+      pass('PM2 重启前 export FIXED_PRODUCTION_VALUES')
+    } else {
+      fail('步骤 7 必须在最后一次 pm2 restart 前 export "${FIXED_PRODUCTION_VALUES[@]}"')
+    }
+    if (
+      deploySource.includes('services/api/src/recruitment-hosting/deployment-ownership.ts') &&
+      /for FIXED_PAIR in "\$\{FIXED_PRODUCTION_VALUES\[@\]\}"/.test(deploySource)
+    ) {
+      pass('0a 核对目标提交含部署归属文件且认识每个固定键名')
+    } else {
+      fail('0a 必须另起循环：目标提交要有 deployment-ownership.ts，且其中出现每个固定键名')
+    }
+  }
+}
+
 // ── 前端版的同一形态：部署脚本传 VITE_API_MODE=http，前端必须在没传时炸掉 ──────
 //
 // admin / partner / kiosk 的 `API_MODE` 都是「只有精确等于 'http' 才走真接口，

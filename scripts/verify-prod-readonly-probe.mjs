@@ -52,6 +52,7 @@ for (const needle of [
   '/api/v1/health',
   '/api/v1/jobs',
   '/api/v1/job-fairs',
+  '/api/v1/job-fairs/00000000000000000000000000000000',
   '/api/v1/policies',
   '/api/v1/companies',
   '/api/v1/kiosk/offline-agencies',
@@ -266,6 +267,14 @@ function handle(req, res) {
     send(res, 200, fairsPayload(mutation))
     return
   }
+  if (req.method === 'GET' && path === '/api/v1/job-fairs/00000000000000000000000000000000') {
+    if (mutation === 'hosting_open') {
+      send(res, 200, { success: true, data: null })
+      return
+    }
+    send(res, 403, { error: { code: 'RECRUITMENT_HOSTING_DISABLED', message: '招聘内容托管已关闭' } })
+    return
+  }
   if (req.method === 'GET' && path === '/api/v1/policies') {
     send(res, 200, policiesPayload(mutation))
     return
@@ -460,6 +469,15 @@ try {
   if (seenPaths.includes('/api/v1/kiosk/legal/ai_disclaimer')) pass('实际请求了 /api/v1/kiosk/legal/ai_disclaimer')
   else fail('未请求 /api/v1/kiosk/legal/ai_disclaimer')
 
+  const hostingLine = expectLine(
+    happyTable.stdout,
+    '/api/v1/job-fairs/00000000000000000000000000000000',
+    'PASS',
+    '不存在的招聘会 403 且托管关闭',
+  )
+  if (hostingLine.includes('RECRUITMENT_HOSTING_DISABLED')) pass('招聘会探针说明是托管关闭')
+  else fail(`招聘会探针通过说明必须含 RECRUITMENT_HOSTING_DISABLED: ${hostingLine.trim() || '(该行未出现)'}`)
+
   const happyJson = await runProbe(port, ['--json'])
   expectExit(happyJson, 0, '合规桩 --json')
   let report
@@ -475,6 +493,18 @@ try {
     if (report.expectSha === 'deadbeef') pass('--json 含 expectSha')
     else fail('--json 缺少 expectSha')
   }
+
+  console.log('\n=== 变异：招聘内容托管在生产上是开的 ===')
+  mutation = 'hosting_open'
+  const hostingOpen = await runProbe(port)
+  expectExit(hostingOpen, 1, '招聘会详情 200（托管开）')
+  const openLine = lineOf(hostingOpen.stdout, '/api/v1/job-fairs/00000000000000000000000000000000')
+  if (openLine.includes('招聘内容托管在生产上是开的（招聘锁没生效）') && /\sFAIL\s/.test(openLine)) {
+    pass('200 被判失败：招聘内容托管在生产上是开的（招聘锁没生效）')
+  } else {
+    fail(`200 必须判失败并写出招聘锁没生效: ${openLine.trim() || '(该行未出现)'}`)
+  }
+  mutation = 'ok'
 
   console.log('\n=== 变异：/health degraded 非空 ===')
   mutation = 'degraded'
