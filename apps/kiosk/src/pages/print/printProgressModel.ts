@@ -250,14 +250,19 @@ export function errorCodeToMessage(code?: string): string | undefined {
 
 /**
  * 进度页和失败页要显示对照表里的句子。
- * 排队超时这一条优先用对照表，不用接口带回的 failureReasonForUser。
+ * 排队超时、离线、缺纸、卡纸优先用对照表（具体原因加下一步），不用接口带回的 failureReasonForUser。
+ * 接口那三句若仍写着找人，无人值守会整句换成下一步，屏幕上看不出是哪一种故障。
  * 其它错误码仍先用接口文案，对照表只在接口没给句子时补上。
  */
+const SCREEN_REASON_CODES = new Set(['PRINT_QUEUE_TIMEOUT', 'PRINTER_OFFLINE', 'PAPER_EMPTY', 'PRINTER_ERROR'])
+
 export function screenFailureReason(input: {
   errorCode?: string | null
   failureReasonForUser?: string | null
 }): string | undefined {
-  if (input.errorCode === 'PRINT_QUEUE_TIMEOUT') return ERROR_CODE_MESSAGES.PRINT_QUEUE_TIMEOUT
+  if (input.errorCode && SCREEN_REASON_CODES.has(input.errorCode)) {
+    return ERROR_CODE_MESSAGES[input.errorCode]
+  }
   const fromApi = input.failureReasonForUser?.trim()
   if (fromApi) return fromApi
   return input.errorCode ? ERROR_CODE_MESSAGES[input.errorCode] : undefined
