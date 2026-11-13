@@ -44,6 +44,14 @@ const hints = [
   ['phoneUploadScanHint', UPLOAD_HINT],
   ['qrLoginScanHint', LOGIN_HINT],
 ]
+const gated = [
+  ...hints,
+  ['pickupEntryMiniappLine', '在职易达小程序下了单，来这里取'],
+  ['pickupCodeFindLead', '打开职易达小程序「我的 → 打印订单」'],
+  ['pickupClaimMiniappClause', '在职易达小程序下的单，到这里输到机码取件'],
+  ['pickupLookBackTitle', '回职易达小程序看'],
+  ['pickupScanMiniappLead', '打开职易达小程序里的到机码页面，'],
+]
 
 test('小程序的名字是常量「职易达」', () => {
   assert.equal(copy.MINIAPP_DISPLAY_NAME, '职易达')
@@ -57,8 +65,8 @@ test('手机侧页头品牌与小程序同名，不随一体机贴牌换；中�
   assert.match(code, /\{PLATFORM_BRAND_NAME\}/)
 })
 
-test('小程序未发布、null、省略参数（会话缓存为空）、字段缺失或非布尔：两句都是空串', () => {
-  for (const [name] of hints) {
+test('小程序未发布、null、省略参数（会话缓存为空）、字段缺失或非布尔：扫码说明和取件句子都是空串', () => {
+  for (const [name] of gated) {
     assert.equal(copy[name](unpublished), '', `${name} 未发布`)
     assert.equal(copy[name](null), '', `${name} null`)
     assert.equal(copy[name](undefined), '', `${name} undefined`)
@@ -69,16 +77,16 @@ test('小程序未发布、null、省略参数（会话缓存为空）、字段�
 })
 
 test('小程序已发布：给出原句，句中的小程序名来自常量', () => {
-  for (const [name, sentence] of hints) {
+  for (const [name, sentence] of gated) {
     const line = copy[name](published)
     assert.equal(line, sentence, name)
     assert.ok(line.includes(`${copy.MINIAPP_DISPLAY_NAME}小程序`), `${name} 要带小程序名`)
   }
 })
 
-test('两句都不含无人值守禁用说法，也不写价格、购买、岗位、招聘会、企业', () => {
+test('扫码说明和取件句子都不含无人值守禁用说法，也不写价格、购买、岗位、招聘会、企业', () => {
   assert.ok(unattended.UNATTENDED_FORBIDDEN_PHRASES.length > 0, '禁用词表不能是空的')
-  for (const [name] of hints) {
+  for (const [name] of gated) {
     // 查的是源码真正给出的句子，不是本文件里抄的那份。
     const sentence = copy[name](published)
     assert.ok(sentence.length > 0, `${name} 已发布时应有句子`)
@@ -130,10 +138,40 @@ test('来源与提醒两句同样不含无人值守禁用说法，也不写价�
   }
 })
 
+test('取件失败屏三句：关着或读不到只说在手机上，开着点名小程序', () => {
+  const lines = [
+    ['pickupCodeUnavailableLine',
+      '这个到机码已经不能使用。请在手机上「我的 → 打印订单」查看这笔订单，需要的话重新下单',
+      '这个到机码已经不能使用。请在手机小程序「我的 → 打印订单」查看这笔订单，需要的话重新下单'],
+    ['pickupOrderRefundedLine',
+      '本单已退款，不再出纸。款项按原路退回，可在手机上「我的 → 打印订单」查看退款进度',
+      '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度'],
+    ['pickupOrderPaymentUnavailableLine',
+      '这笔订单已经不能付款（可能已关闭）。请在手机上「我的 → 打印订单」查看，需要的话重新下单',
+      '这笔订单已经不能付款（可能已关闭）。请在手机小程序「我的 → 打印订单」查看，需要的话重新下单'],
+  ]
+  for (const [name, off, on] of lines) {
+    assert.equal(copy[name](unpublished), off, `${name} 未发布`)
+    assert.equal(copy[name](null), off, `${name} null`)
+    assert.equal(copy[name](undefined), off, `${name} undefined`)
+    assert.equal(copy[name](), off, `${name} 省略参数`)
+    assert.equal(copy[name](published), on, `${name} 已发布`)
+    assert.equal(on.includes('小程序'), true, `${name} 开着要点名小程序`)
+    assert.equal(off.includes('小程序'), false, `${name} 关着不点名小程序`)
+    for (const sentence of [off, on]) {
+      for (const phrase of unattended.UNATTENDED_FORBIDDEN_PHRASES) {
+        assert.ok(!sentence.includes(phrase), `${name}「${sentence}」含禁用说法「${phrase}」`)
+      }
+      assert.equal(unattended.containsStaffHandoff(sentence), false, name)
+      assert.doesNotMatch(sentence, /工作人员|服务台|到店|值守|现场处理/, name)
+    }
+  }
+})
+
 test('是否已发布只经 whenMiniapp 判断，本文件不发请求', () => {
   const source = readFileSync(sourcePath, 'utf8')
   const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
-  assert.equal((code.match(/\bwhenMiniapp\(/g) ?? []).length, 2, '两句都要经 whenMiniapp')
+  assert.equal((code.match(/\bwhenMiniapp\(/g) ?? []).length, 10, '扫码说明、取件句子和失败屏三句都要经 whenMiniapp')
   assert.doesNotMatch(code, /miniappPublished|resolveSupportContact|peekSupportContact/, '不要绕开 whenMiniapp 自己读发布字段')
   assert.doesNotMatch(code, /\bfetch\(|services\//, '本文件不发请求、不引接口模块')
   const imports = [...code.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1])
@@ -179,6 +217,30 @@ test('接线：扫码登录面板（第五包）第 2 步取 qrLoginScanHint、�
   assert.match(login, /const supportContact = useSupportContact\(\)/)
   assert.match(login, /\{qrLoginScanHint\(supportContact\) \|\| '用手机相机或微信扫左边的二维码，在手机上完成手机号验证并确认。'\}/)
   assert.doesNotMatch(login, /职易达小程序/, '面板不手写小程序名')
+})
+
+test('接线：到机取件入口在小程序已发布时才提小程序，未发布保持原句，入口不藏', () => {
+  const home = readCode('src/pages/home/components/HomeTouchView.tsx')
+  assert.match(home, /pickupEntryMiniappLine\(contact\) \|\| '手机上下了单，来这里取'/)
+  assert.match(home, /title="到机取件"/)
+  const hub = readCode('src/pages/print-scan/components/QxPrintHubView.tsx')
+  assert.match(hub, /pickupEntryMiniappLine\(supportContact\)/)
+  assert.match(hub, /凭码办理，不登录也能核销 · 8 位数字（历史 10 位码也支持）/)
+  assert.match(hub, /arrivalCode\.stateNote/)
+  const claim = readCode('src/pages/print/PrintPickupClaimPage.tsx')
+  assert.match(claim, /pickupClaimMiniappClause\(supportContact\)/)
+  assert.doesNotMatch(claim, /peekSupportContact\(\)/)
+  const guide = readCode('src/pages/print/components/PickupHidGuide.tsx')
+  assert.match(guide, /pickupCodeFindLead\(useSupportContactSnapshot\(\)\)/)
+  assert.match(guide, /pickupScanMiniappLead\(useSupportContactSnapshot\(\)\)/)
+  assert.match(guide, /pickupLookBackTitle\(useSupportContactSnapshot\(\)\)/)
+  assert.doesNotMatch(guide, /peekSupportContact\(\)|miniappPublished/)
+  const login = readCode('src/pages/auth/LoginPage.tsx')
+  assert.match(login, /entry\.id === 'code' \? \(pickupEntryMiniappLine\(supportContact\) \|\| entry\.desc\) : entry\.desc/)
+  const resume = readCode('src/pages/session-resume/SessionResumePage.tsx')
+  assert.match(resume, /pickupLine \|\| '手机上已经下过的单，凭码继续'/)
+  const resumeView = readCode('src/pages/session-resume/SessionResumeView.tsx')
+  assert.match(resumeView, /item\.id === 'code' && pickupLine \? pickupLine : item\.sub/)
 })
 
 test('接线：手机上传页、手机确认登录页页头品牌从 PLATFORM_BRAND_NAME 取，不写字面量', () => {
