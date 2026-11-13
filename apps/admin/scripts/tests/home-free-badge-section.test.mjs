@@ -355,9 +355,13 @@ function mountTerminalPage() {
     if (name === '../../services/api/homeFreeBadge') {
       return { saveTerminalHomeFreeBadge: (terminalId, enabled) => saveImpl(terminalId, enabled) }
     }
+    if (name === '../../services/api/terminalCharge') {
+      return { chargeSummary: (view) => view }
+    }
     if (name === '../partners/orgTypeOptions') return { isParkedOrgType: () => false }
     const files = {
       './homeFreeBadgePatch': 'src/routes/terminals/homeFreeBadgePatch.ts',
+      './chargeSettingsPatch': 'src/routes/terminals/chargeSettingsPatch.ts',
       './TerminalDetailDrawer': 'src/routes/terminals/TerminalDetailDrawer.tsx',
       './TerminalHomeFreeBadgeSection': 'src/routes/terminals/TerminalHomeFreeBadgeSection.tsx',
       './terminalStatusViews': 'src/routes/terminals/terminalStatusViews.ts',
@@ -366,6 +370,7 @@ function mountTerminalPage() {
     if (files[name]) return loadCached(files[name])
     const stubs = {
       './TerminalDailyFreeSidesSection': 'TerminalDailyFreeSidesSection',
+      './TerminalChargeSettingsSection': 'TerminalChargeSettingsSection',
       './TerminalLifecycleActions': 'TerminalLifecycleActions',
       './TerminalNetworkDiagnostics': 'TerminalNetworkDiagnostics',
       './TerminalPrinterQueue': 'TerminalPrinterQueue',

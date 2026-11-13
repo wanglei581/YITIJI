@@ -32,6 +32,12 @@ import type {
   ReleaseObservationPlansResponse,
   UpdateReleaseObservationPlanInput,
 } from './types'
+import {
+  demoChargeSummary,
+  demoChargeTerminals,
+  rememberDemoTerminal,
+  seedDemoChargeTerminals,
+} from './terminalChargeDemo'
 import { ApiHttpError } from './client'
 import type { ReviewAction } from './review-types'
 import type { PublishAction } from './review-types'
@@ -374,7 +380,7 @@ export const adminMockAdapter = {
       { id: 't9',  terminalCode: 'KSK-009', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-03-01T08:00:00.000Z', lastSeenAt: min(300), online: false, lastHeartbeatAt: null,     printerStatus: null,          wiredNetworkStatus: null,           printerNetworkStatus: null,                  agentVersion: null,     ipAddress: null,          diskFreeGb: null },
       { id: 't10', terminalCode: 'KSK-010', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-03-10T08:00:00.000Z', lastSeenAt: min(10),  online: false, lastHeartbeatAt: min(10),  printerStatus: 'not_found',   wiredNetworkStatus: 'disconnected', printerNetworkStatus: 'unreachable',         agentVersion: 'v1.2.3', ipAddress: '10.20.0.20',  diskFreeGb: 78.2 },
     ]
-    return {
+    const response: AdminTerminalsResponse = {
       terminals: [...MOCK_PLANNED_TERMINALS.map((t) => ({
         id: t.terminalId,
         terminalCode: t.terminalCode,
@@ -427,8 +433,52 @@ export const adminMockAdapter = {
               state: 'current' as const,
             }
           : null,
+      })), ...demoChargeTerminals().map((extra) => ({
+        id: extra.id,
+        terminalCode: extra.terminalCode,
+        displayName: extra.displayName,
+        macAddress: null,
+        locationLabel: extra.locationLabel,
+        enabled: true,
+        lifecycleStatus: 'active' as const,
+        lifecycleVersion: 1,
+        credentialGeneration: 1,
+        hasActiveCredential: true,
+        orgId: extra.orgId,
+        orgName: extra.orgName,
+        orgType: extra.orgType,
+        registeredAt: '2026-11-01T00:00:00.000Z',
+        lastSeenAt: new Date().toISOString(),
+        online: true,
+        lastHeartbeatAt: new Date().toISOString(),
+        agentStatus: 'online',
+        localTaskDatabaseAvailable: true,
+        printerStatus: 'ok',
+        wiredNetworkStatus: 'connected',
+        printerNetworkStatus: 'reachable',
+        agentVersion: null,
+        ipAddress: null,
+        diskFreeGb: null,
+        releaseObservation: null,
+        printerQueue: null,
+        homeFreeBadge: false,
       }))],
     }
+    seedDemoChargeTerminals()
+    for (const terminal of response.terminals) {
+      rememberDemoTerminal({
+        id: terminal.id,
+        terminalCode: terminal.terminalCode,
+        displayName: terminal.displayName,
+        locationLabel: terminal.locationLabel,
+        orgBound: Boolean(terminal.orgId),
+        isPublicSite: terminal.orgType === 'public_employment_service'
+          || terminal.orgType === 'gig_worker_home'
+          || terminal.orgType === 'employment_service_station',
+      })
+      terminal.charge = demoChargeSummary(terminal.id)
+    }
+    return response
   },
 
   async createPlannedTerminal(input: CreatePlannedTerminalInput): Promise<PlannedTerminalCreated> {

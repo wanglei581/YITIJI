@@ -11,8 +11,10 @@ import type {
 } from '../../services/api/devices'
 import { isParkedOrgType } from '../partners/orgTypeOptions'
 import { homeFreeBadgeOn } from './homeFreeBadgePatch'
+import { TerminalChargeSettingsSection } from './TerminalChargeSettingsSection'
 import { TerminalDailyFreeSidesSection } from './TerminalDailyFreeSidesSection'
 import { TerminalHomeFreeBadgeSection } from './TerminalHomeFreeBadgeSection'
+import type { TerminalChargeSettingsView } from '../../services/api/terminalCharge'
 import { TerminalLifecycleActions } from './TerminalLifecycleActions'
 import { TerminalNetworkDiagnostics } from './TerminalNetworkDiagnostics'
 import { TerminalPrinterQueue } from './TerminalPrinterQueue'
@@ -95,6 +97,7 @@ export interface TerminalDetailDrawerProps {
   /** 当前终端列表请求的发出序号。抽屉里的开关用它辨认「这是保存之后才取回的」。 */
   serverListIssuedAt: number
   onHomeFreeBadgeSaved: (terminalId: string, enabled: boolean) => void
+  onChargeSaved: (terminalId: string, view: TerminalChargeSettingsView) => void
 }
 
 export function TerminalDetailDrawer({
@@ -128,6 +131,7 @@ export function TerminalDetailDrawer({
   onNotice,
   serverListIssuedAt,
   onHomeFreeBadgeSaved,
+  onChargeSaved,
 }: TerminalDetailDrawerProps) {
   if (!terminal) return <Drawer open={false} onClose={onClose} title="终端详情"><div /></Drawer>
 
@@ -178,6 +182,7 @@ export function TerminalDetailDrawer({
 
         <TerminalDailyFreeSidesSection terminalId={terminal.id} />
         <TerminalHomeFreeBadgeSection terminalId={terminal.id} enabled={homeFreeBadgeOn(terminal.homeFreeBadge)} listIssuedAt={serverListIssuedAt} onSaved={(savedTerminalId, enabled) => onHomeFreeBadgeSaved(savedTerminalId, enabled)} />
+        <TerminalChargeSettingsSection terminalId={terminal.id} onSaved={onChargeSaved} />
 
         <Section title="所属机构">
           {editingOrg ? (
