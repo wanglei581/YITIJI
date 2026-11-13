@@ -28,6 +28,9 @@ import { countKioskVisitsByTerminal, hasKioskVisitsForOrg } from '../kiosk-sessi
 import {
   HeartbeatFolder,
   assembleTerminalOperations,
+  countOpenDeviceAlerts,
+  isOnlineAt,
+  isOpenScanDeviceFault,
   summarizeOutput,
   terminalOpsEffectiveFrom,
   terminalOpsHeartbeatSeedRange,
@@ -233,13 +236,18 @@ export class PartnerStatsService {
     const terminals = await this.prisma.terminal.findMany({
       where: { orgId: scopedOrgId },
       orderBy: { terminalCode: 'asc' },
-      select: { id: true, terminalCode: true, displayName: true, locationLabel: true, orgBoundAt: true },
+      select: { id: true, terminalCode: true, displayName: true, locationLabel: true, orgBoundAt: true, enabled: true, lifecycleStatus: true },
     })
     if (terminals.length === 0) {
       return assembleTerminalOperations({ period, from, to, now, rows: [], visitRecordingStarted: false })
     }
 
     const ids = terminals.map((terminal) => terminal.id)
+    const scanCaps = await this.prisma.terminalCapability.findMany({
+      where: { terminalId: { in: ids }, capabilityKey: 'scan_device', status: 'available' },
+      select: { terminalId: true },
+    })
+    const scanAvailable = new Set(scanCaps.map((cap) => cap.terminalId))
     const since = (orgBoundAt: Date | null) => terminalOpsEffectiveFrom(from, orgBoundAt)
     const [printCreated, scanCreated, settled, visits, visitRecordingStarted] = await Promise.all([
       this.prisma.printTask.groupBy({
@@ -294,18 +302,29 @@ export class PartnerStatsService {
       )
       const [folder, currentHeartbeat] = await Promise.all([
         this.foldHeartbeats(terminal.id, from, terminal.orgBoundAt, to),
-        this.prisma.terminalHeartbeat.findFirst({ where: { terminalId: terminal.id, createdAt: { lte: now } }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
+        this.prisma.terminalHeartbeat.findFirst({ where: { terminalId: terminal.id, createdAt: { lte: now } }, orderBy: { createdAt: 'desc' }, select: { createdAt: true, printerStatus: true, scanDeviceHealth: true } }),
       ])
+      const lastHeartbeatAt = currentHeartbeat?.createdAt ?? null
+      const online = isOnlineAt(lastHeartbeatAt, now)
+      const printerStatus = currentHeartbeat?.printerStatus ?? null
       rows.push({
         terminalCode: terminal.terminalCode,
         displayName: terminal.displayName,
         locationLabel: terminal.locationLabel,
-        lastHeartbeatAt: currentHeartbeat?.createdAt ?? null,
+        lastHeartbeatAt,
         visitCount: visits.get(terminal.id) ?? 0,
         serviceCount: printCount + scanCount,
         output,
         segments: folder.finish(),
         reportedInWindow: folder.reportedInWindow,
+        printerStatus,
+        openAlertCount: countOpenDeviceAlerts({
+          enabled: terminal.enabled,
+          lifecycleStatus: terminal.lifecycleStatus,
+          online,
+          printerStatus,
+          scanDeviceFault: isOpenScanDeviceFault(online, scanAvailable.has(terminal.id), currentHeartbeat?.scanDeviceHealth ?? null),
+        }),
       })
     }
     return assembleTerminalOperations({ period, from, to, now, rows, visitRecordingStarted })

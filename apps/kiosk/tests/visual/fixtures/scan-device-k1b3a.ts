@@ -6,6 +6,15 @@ export const TASK = 'k1b3a-same-session'
 export const CONTROL = 'k1b3a-control'
 export const STOP_KEY = 'ai-job-print:scan-device-stop-receipt'
 const BRIDGE = 'w2-synthetic-bridge-token'
+
+/** 11/08 定第 9 条：屏上扫描的「状态未知」胶囊和复印一样用提醒色（橙）；读真实算出来的颜色，不只看类名。 */
+export async function expectScanUnknownChip(page: Page): Promise<void> {
+  const chip = page.locator('.qxt-band .qxt-status')
+  await expect(chip).toHaveText('状态未知')
+  await expect(chip).toHaveClass(/qxt-status-unknown/)
+  await expect(chip).toHaveCSS('background-color', 'rgba(184, 104, 60, 0.25)')
+  await expect(chip.locator('.qxt-dot')).toHaveCSS('background-color', 'rgb(240, 168, 115)')
+}
 function registerShell(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', {
     status: 200,

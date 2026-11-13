@@ -3,6 +3,7 @@ import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
 import { fillPhoneLogin, memberDocument } from './fixtures/privacy-clear-shell'
+import { expectScanUnknownChip } from './fixtures/scan-device-k1b3a'
 
 const SHOT_DIR = 'test-results/k1b2'
 const TASK = 'k1b2-scan-001'
@@ -322,6 +323,7 @@ test('an unreachable local program stays unknown and does not claim success or f
   await expect(page.getByTestId('scan-device-unknown')).toBeVisible({ timeout: 15_000 })
   await expect(page.getByRole('heading', { name: '状态未知' })).toBeVisible()
   await expect(page.getByText('本机程序连不上。这一步还没有结果。').first()).toBeVisible()
+  await expectScanUnknownChip(page)
   await expect(page.getByRole('heading', { name: '扫描完成，文件已传回' })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: '扫描未完成' })).toHaveCount(0)
   await shot(page, 'cs-scan-unknown')

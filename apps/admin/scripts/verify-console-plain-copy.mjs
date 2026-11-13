@@ -488,7 +488,7 @@ console.log('\n=== 打印错误原因与服务端告警同一口径 ===')
 verifyBatch6Copy({ runFile, textOf, shared, ui, fail })
 function runPrivacyFile(rel, imports, ...rest) {
   const profileImports = rel === 'apps/partner/src/routes/profile/index.tsx'
-    ? { ...imports, './LicenseSection': {} }
+    ? { ...imports, './LicenseSection': {}, './DeviceAlertNotifySection': { DeviceAlertNotifySection: () => null } }
     : imports
   return runFile(rel, profileImports, ...rest)
 }

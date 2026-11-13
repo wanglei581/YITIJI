@@ -464,6 +464,36 @@ async function main(): Promise<void> {
     if (otherOpen.code === 'PICKUP_CLAIM_LOCKED') fail('锁定不得蔓延到其它终端')
     pass('多次输错仍按终端锁定，其它终端不受影响')
 
+    // 走错机器和无效码回同一个拒绝，并且一样计入失败：前 10 次都是 PICKUP_CODE_INVALID（与未知码同一 message），第 11 次锁定该终端。
+    redis.reset()
+    const mismatchOrder = await memberOrders.create(
+      userId,
+      { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+      randomUUID(),
+    )
+    for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD; i += 1) {
+      const attempt = await capture(() => pickup.claim(mismatchOrder.pickupCode!, otherTerminalId, `mismatch-lock-${i}`))
+      if (
+        attempt.code !== 'PICKUP_CODE_INVALID'
+        || attempt.message !== unknownCode.message
+        || attempt.status !== unknownCode.status
+      ) {
+        fail(`第 ${i + 1} 次走错机器应与未知码一样是 ${unknownCode.status}/PICKUP_CODE_INVALID/${unknownCode.message}，实际 ${JSON.stringify(attempt)}`)
+      }
+    }
+    const mismatchLocked = await capture(() => pickup.claim('40000001', otherTerminalId, 'mismatch-lock-probe'))
+    if (mismatchLocked.code !== 'PICKUP_CLAIM_LOCKED') {
+      fail(`走错机器满 ${PICKUP_LOCKOUT_FAILURE_THRESHOLD} 次后必须锁定该终端，实际 ${JSON.stringify(mismatchLocked)}`)
+    }
+    const homeStillOpen = await capture(() => pickup.claim('40000002', terminalId, 'mismatch-lock-home'))
+    if (homeStillOpen.code === 'PICKUP_CLAIM_LOCKED') fail('走错机器的锁定不得蔓延到下单那台')
+    const mismatchRow = await prisma.order.findUniqueOrThrow({ where: { id: mismatchOrder.id } })
+    if (mismatchRow.terminalId !== terminalId || mismatchRow.pickupStatus !== 'pending' || mismatchRow.printTaskId) {
+      fail('走错机器不得改订单或建任务')
+    }
+    redis.reset()
+    pass('走错机器与无效码一样计入失败；满 10 次后下一次锁定该终端')
+
     // 1.8 P-2：成功认领只给本机失败计数「抵一次」，且只在本次把 pending 变成 claimed 的那一次。
     // 已认领的活租约可以同码幂等重领；整个清零时，一张自己的未付单（试点 0 元、建单无上限）
     // 就能夹在猜码中间无限清零，或者每新建一张单换一次清零——锁机形同虚设。

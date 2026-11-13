@@ -18,6 +18,14 @@
 .copy-touch .cc-more .cc-source { flex: 1; }
 .copy-touch .cc-more .cc-source .vis { min-height: 160px; }
 .copy-touch .cc-more .cc-source svg { max-height: 420px; }
+/* 已停止复印（稿 cs-scan-stopped?flow=copy，11/09 第三轮）：删页事实、原件提醒、示意卡按正文 14px 间距排，
+   示意卡撑满下部；玻璃台在上、进纸器在下（同提醒句的先后），两张图上下等分，不留大片空白。 */
+.copy-touch .cc-copy-stopped { flex: 1; min-height: 0; display: flex; }
+.copy-touch .cc-cstop { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: space-evenly;
+  padding: 20px 30px; border-radius: 30px; background: var(--qxt-well); }
+.copy-touch .cc-cstop svg { flex: 0 1 45%; min-height: 0; width: 100%; height: auto; }
+/* 这一屏底栏三颗（回打印扫描 / 问小青 / 回首页）：问小青回到共用字号，「怎么复印更合适」整句放得下，不出省略号。 */
+.qxt-screen.copy-touch:has(.cc-copy-stopped) .qxt-dock .qxt-askq { font-size: var(--qxt-fs-askq); }
 @media (max-width: 700px) {
   .qxt-screen.copy-touch .qxt-dock { flex-wrap: wrap; }
   .qxt-screen.copy-touch .qxt-dock .qxt-askq { order: 3; flex: 1 1 100%; }
@@ -33,4 +41,9 @@
   .copy-touch .cc-check { padding: 12px; }
   .copy-touch .cc-facts { grid-template-columns: 1fr; padding-bottom: 0; }
   .copy-touch .cc-facts > div { padding: 16px; font-size: 20px; }
+  /* 已停止复印在窄屏上：正文可滚动、示意图收小，删页事实和原件提醒不被截掉。 */
+  .qxt-screen.copy-touch:has(.cc-copy-stopped) .qxt-body { padding: 16px; overflow-y: auto; }
+  .copy-touch .cc-copy-stopped, .copy-touch .cc-cstop { flex: none; }
+  .copy-touch .cc-cstop { padding: 12px; gap: 12px; }
+  .copy-touch .cc-cstop svg { flex: none; height: 140px; }
 }

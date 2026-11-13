@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { getOrgProfile, updateOrgProfile, type PartnerOrgProfile } from '../../services/api/orgSelf'
 import { OfficialChannelsSection } from './OfficialChannelsSection'
+import { DeviceAlertNotifySection } from './DeviceAlertNotifySection'
 import { useRecruitmentHosting } from '../../services/capabilities'
 
 // 与 apps/admin/src/routes/partners/orgPresentation.ts 的 isParkedModule 使用同一清单；只影响展示。
@@ -206,6 +207,8 @@ export default function ProfilePage() {
           </p>
         </Card>
       </div>
+
+      <DeviceAlertNotifySection />
 
       {/* 内容信任与发布权限（发布闸门依据） */}
       <Card className="mt-6 p-6">
