@@ -11136,20 +11136,13 @@
         "controller": "services/api/src/jobs/jobs.controller.ts",
         "handler": "JobsController.getPartnerJobQualitySummary",
         "method": "GET",
-        "models": [
-          "Job",
-          "JobDataQualitySnapshot"
-        ],
+        "models": [],
         "path": "/api/v1/partner/jobs/quality-summary",
         "roles": [
           "partner"
         ],
-        "serviceFiles": [
-          "services/api/src/job-ai/job-quality.service.ts"
-        ],
-        "services": [
-          "JobQualityService"
-        ]
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/licenses/license.partner.controller.ts",
@@ -28750,6 +28743,9 @@
       "services/api/scripts/verify-public-fair-demo-guard.ts",
       "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
+    "services/api/src/job-ai/partner-quality-summary.ts": [
+      "services/api/scripts/verify-job-ai-ops-dashboard.ts"
+    ],
     "services/api/src/job-applications/dto/create-job-application.dto.ts": [
       "services/api/scripts/verify-job-application-track.ts"
     ],
@@ -30556,6 +30552,11 @@
     "services/api/src/recruitment-content/recruitment-wave2-target.ts": [
       "services/api/scripts/verify-recruitment-wave2-full-inventory.ts",
       "services/api/scripts/verify-recruitment-wave2-readonly.ts"
+    ],
+    "services/api/src/recruitment-hosting/deployment-ownership.ts": [
+      "scripts/verify-deploy-gates-in-sync.mjs",
+      "scripts/verify-deploy-rollback.mjs",
+      "services/api/scripts/verify-production-runtime-gates.ts"
     ],
     "services/api/src/recruitment-hosting/recruitment-emergency.controller.ts": [
       "services/api/scripts/verify-official-channels.ts",
@@ -38215,7 +38216,8 @@
           "apps/partner/src/services/api/client.ts",
           "services/api/scripts/preflight-legal-docs.mjs",
           "services/api/scripts/preflight-production-gates.mjs",
-          "services/api/src/config/production-runtime-gates.ts"
+          "services/api/src/config/production-runtime-gates.ts",
+          "services/api/src/recruitment-hosting/deployment-ownership.ts"
         ],
         "missing": []
       },
@@ -38237,7 +38239,8 @@
           ".github/workflows/server-cleanup.yml",
           "services/api/scripts/preflight-legal-docs.mjs",
           "services/api/scripts/preflight-production-gates.mjs",
-          "services/api/src/config/production-runtime-gates.ts"
+          "services/api/src/config/production-runtime-gates.ts",
+          "services/api/src/recruitment-hosting/deployment-ownership.ts"
         ],
         "missing": []
       },
@@ -42653,6 +42656,7 @@
           "services/api/src/ai/resume/llm-job-fit.service.ts",
           "services/api/src/job-ai/job-ai.service.ts",
           "services/api/src/job-ai/job-quality.service.ts",
+          "services/api/src/job-ai/partner-quality-summary.ts",
           "services/api/src/jobs/jobs.controller.ts"
         ],
         "missing": []
@@ -46502,7 +46506,8 @@
         "files": [
           "services/api/src/common/jwt-verifier.module.ts",
           "services/api/src/common/pdf/aigc-label.ts",
-          "services/api/src/config/production-runtime-gates.ts"
+          "services/api/src/config/production-runtime-gates.ts",
+          "services/api/src/recruitment-hosting/deployment-ownership.ts"
         ],
         "missing": []
       },
