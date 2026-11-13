@@ -819,6 +819,7 @@ test('预览页记令牌拿生成稿做锚，第三参传当前稿会把数记�
   assert.equal(hits.length, 1)
   assert.equal(hits[0].includes('3') && hits[0].includes('车'), true)
   const page = readFileSync(join(kioskRoot, 'src/pages/resume/ResumeGeneratePreviewPage.tsx'), 'utf8')
+  assert.equal(page.includes('const generatedResume = result.resume ?? resume'), true)
   assert.equal(page.includes('previewUserEditTokens(generatedResume, resume, next)'), true)
   assert.equal(page.includes('type GeneratedAnchor'), false)
   assert.equal(page.includes('detectUserResumeEdits('), false)
