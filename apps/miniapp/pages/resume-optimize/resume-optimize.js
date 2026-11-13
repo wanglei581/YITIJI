@@ -55,7 +55,7 @@ Page({
     factPanel: factCheck.closedPanel(),
     factsBlockedReason: '',
     LEN: buildModel.LEN,
-    DOC_LEN: docLimits.RESUME_DOC_LIMITS,
+    DOC_LEN: Object.assign({}, docLimits.RESUME_DOC_LIMITS, docLimits.LIST_BOX_LIMITS),
   },
 
   onLoad(options) {
@@ -285,6 +285,7 @@ Page({
       })
       return
     }
+    if (docLimits.stopIfListsOverLimit(buildModel.buildExportPayload(resume, { format: this.data.format, taskId: this.data.taskId }), { wx, getApp })) return
     if (this._factsConfirmedAt && !this._factsNeedRecheck) {
       this._doExport(this._factsConfirmedAt)
       return
@@ -346,6 +347,7 @@ Page({
     const payload = buildModel.buildExportPayload(resume, { format, taskId: this.data.taskId })
     if (this.data.benefitGrantId) payload.benefitGrantId = this.data.benefitGrantId
     payload.factsConfirmedAt = factsConfirmedAt
+    if (docLimits.stopIfListsOverLimit(payload, { wx, getApp })) return
     this._stopExportCountdown()
     this.setData({ exporting: true, exportResult: null, exportShare: shareFriend.viewForFile(this, '') })
     wx.showLoading({ title: '正在生成文件…', mask: true })
