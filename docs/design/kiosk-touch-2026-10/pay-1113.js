@@ -1,16 +1,17 @@
-/* pay-1113.js：收费显示与付款（2026-11-13 补稿，只画稿）
- * 1.00 元是演示数字，不是定价；真实价格每台机器在管理员后台设，不进仓库。
+/* pay-1113.js：收费显示与付款（2026-11-13 第二版，只画稿）
+ * 产品负责人 11/13 对第一版核图回「都按推荐」：
+ * 1. 能重试的失败，同一单免费再试一次；不再试、离开，或再试还不成，钱自动退回原付款账户。
+ * 2. 付一次管这一趟。收费机器上不再卖「次数用完再付一次」；这一趟里的子功能不扣每日次数。
+ * 3. 简历诊断免费，开始改写之前收。
+ * 4. 排版失败不退款（原稿「也不计次数」），只有 AI 真没做成才退。
+ * 1.00 元是演示数字，不是定价。真实价格每台机器在管理员后台设，不进仓库。
  *
- * 只在「收费点位」开着、且不是「公共就业点位」时，往现有屏上加字。
- * 两个开关都关（或只开公共就业点位）时，被包住的屏原样返回，一个字都不改。
+ * 只在「收费点位」开着、且不是「公共就业点位」时改画面。
+ * 两个开关都关（或只开公共就业点位）时，被包住的屏原样返回。
  * 新容器默认 display:none，要显示时再加 .on。
  *
- * 复用（不改原样式）：
- *   收银台骨架 screens2.js:315-340（.d3-cashier / .d3-qrframe / .sumcard）
- *   二维码 ui.js:180 UI.qr
- *   手机接着办 fix-flow-1111.js:713-754（意图带右侧二维码 + 三步 path）
- *   按钮 .btn（index.html:332，高 88px）
- * 打印收银台本身不重画。到机取件未付款仍去 cashier。
+ * 复用：收银台 .d3-cashier / .d3-qrframe / .sumcard，UI.qr，.b2a-bqr，.olist，.st3-check。
+ * 打印收银台不重画。到机取件未付款仍去 cashier。取件示例单仍是 2.00 元。
  */
 (function () {
   'use strict';
@@ -20,6 +21,12 @@
   const paid = (k) => !!(S().pyPaid && S().pyPaid[k]);
   const find = (id) => (window.SCREENS || []).find((s) => s.id === id);
   const YUAN = '1.00 元';
+  const CHANNEL = '到账时间以支付渠道为准';
+  const BACK = '自动退回原付款账户，' + CHANNEL;
+  const RETRY = '这一次没做成。可以免费再试一次；不试了或再不成，钱' + BACK + '。';
+  const CHECK_PAPER = '核查确认没出纸后，钱' + BACK + '。';
+  const TIMEOUT_FULL = '没收到这一次的钱；万一已经扣了，会' + BACK + '。';
+  const WAIT_BACK = '返回后，万一已经付了，会' + BACK + '。';
 
   /* 公共就业点位开着时，让已有稿里所有 S.fee 判断都看成没收费。
      不改 app.js 里「收费点位」那个开关的处理函数。 */
@@ -53,44 +60,33 @@
 
   const css = document.createElement('style');
   css.textContent = `
-.py-home,.py-bar,.py-refund,.py-done,.py-bill,.py-qrb,.py-fields{display:none}
+.py-home,.py-bar,.py-sample{display:none}
+.py-keep{white-space:nowrap}
+.overview .ov-item > span{color:var(--desk-ink)}
 .py-home.on{display:block;margin-top:2px;font:800 22px/1.25 var(--sans);color:var(--teal-ink)}
 .task.dark .py-home.on{color:var(--glow)}
 .d3-home .task:has(.py-home){min-height:300px;gap:8px;padding:22px 26px 16px}
 .d3-home .task:has(.py-home) h3{margin-top:0;font-size:36px}
 .d3-home .task:has(.py-home) p{font-size:21px;line-height:1.35}
-.py-bar.on,.py-refund.on{display:flex;flex-direction:column;gap:2px;margin:0 40px 6px;padding:8px 18px;border-radius:20px;background:var(--card);border:1.5px solid var(--edge)}
-.py-bar.on b,.py-refund.on b{font:800 26px/1.25 var(--sans);color:var(--deep)}
-.py-bar.on span,.py-refund.on span{font-size:20px;line-height:1.35;color:var(--ink-2)}
-.py-refund.on{background:#fff6df;border-color:#e6d3a1}
-.py-buy{height:64px;min-height:64px;width:100%;margin-top:6px}
-.screen:has(.py-bar) > main.body.tight,.screen:has(.py-refund) > main.body.tight{gap:8px;padding-top:12px;padding-bottom:8px}
-.screen:has(.st3-aidown) > .py-bar.on{margin:0 28px 4px;padding:6px 14px}
-.screen:has(.st3-aidown) .py-buy{height:56px;min-height:56px;margin-top:4px}
-.screen:has(.py-bar) > main.body.st3-aidown{gap:4px;padding:4px 40px 2px}
-.screen:has(.py-bar) .st3-aidown .howto{padding:6px 12px}
-.screen:has(.py-bar) .st3-aidown .d4-exgroup{gap:4px}
-.screen:has(.py-bar) .st3-aidown .d4-exgroup .slab.row{padding:4px 10px;gap:10px}
-.screen:has(.py-bar) .st3-aidown .d4-exgroup .slab.row .vis{min-height:60px;width:72px}
-.screen:has(.py-bar) .st3-aidown .d4-exgroup .slab.row h3{font-size:28px;line-height:1.2}
-.screen:has(.py-bar) .st3-aidown .d4-exgroup .slab.row p{font-size:20px;line-height:1.3}
-.screen:has(.py-bar) .st3-aidown .olist{padding:8px 12px;gap:2px}
-.screen:has(.py-bar) .st3-aidown .st3-check{min-height:40px;font-size:20px;line-height:1.3}
-.screen:has(.py-bar) .st3-aidown .st3-check i{width:32px;height:32px;font-size:20px}
-.py-done.on{flex:1;display:flex;flex-direction:column;gap:14px;min-height:0}
-.py-step{flex:1;display:flex;gap:16px;align-items:center;min-height:88px;padding:16px 22px;border-radius:22px;background:var(--card);border:1.5px solid var(--edge)}
-.py-step i{flex:none;width:56px;height:56px;border-radius:18px;background:var(--deep);color:var(--cream);display:grid;place-items:center;font:800 26px/1 var(--sans)}
-.py-step b{display:block;font-size:28px;line-height:1.3;color:var(--ink)}
-.py-step span{display:block;margin-top:2px;font-size:22px;line-height:1.4;color:var(--ink-2)}
-.py-pay .d3-qrframe{flex:1}
-.py-bill.on{display:flex;flex-direction:column;gap:6px;padding:12px 16px}
-.py-bill.on .py-invbtn{height:64px;min-height:64px;min-width:180px;align-self:flex-start}
-.py-qrb.on{display:flex;align-items:center;justify-content:center}
-.py-invbody{justify-content:flex-start;gap:16px}
-.py-fields.on{flex:1;display:flex;flex-direction:column;gap:14px;min-height:0}
-.py-fields.on div{flex:1;display:flex;flex-direction:column;justify-content:center;gap:6px;min-height:112px;padding:18px 24px;border-radius:24px;background:var(--card);border:1.5px solid var(--edge)}
-.py-fields.on b{font-size:30px;line-height:1.3}
-.py-fields.on span{font-size:24px;line-height:1.4;color:var(--ink-2)}
+.py-bar.on{flex:none;display:flex;flex-direction:column;gap:2px;margin:8px 0 0;padding:8px 18px;border-radius:20px;background:var(--card);border:1.5px solid var(--edge)}
+.py-bar.on b{font:800 26px/1.25 var(--sans);color:var(--deep)}
+.py-bar.on span{font-size:20px;line-height:1.35;color:var(--ink-2)}
+.py-pay.d3-cashier .d3-qrframe{flex:none;justify-content:flex-start;min-height:0;gap:8px;padding:12px 16px}
+.py-pay .sumcard{flex:none}
+.py-pay .sumcard .r{min-height:72px;padding:10px 22px}
+.py-sample.on{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;overflow:hidden}
+/* 简历样张下半截是浅灰线，门禁不算墨。拉到一半高时空白会过 320，收到 46% 且不超过 580。 */
+.py-sample.on svg{height:46%;max-height:580px;width:auto;max-width:100%;flex:none}
+.py-sample.scan svg{height:33.33%;max-height:420px}
+.py-paidscan>.tx{margin-top:-16px}
+.py-invbody{justify-content:flex-start;gap:12px;padding-top:16px;padding-bottom:12px}
+.py-invqr.b2a-bqr{width:320px;height:320px;padding:20px}
+.py-invqr.b2a-bqr svg{width:280px;height:280px}
+.band:has(.py-invqr) .ask{align-items:center}
+.band:has(.py-invqr) .ask .t{min-width:0}
+.fe-line.py-bill{flex-direction:row;align-items:center;gap:12px}
+.fe-line.py-bill .tx{flex:1;min-width:0}
+.fe-line.py-bill>.btn{align-self:center;flex:none;width:auto;min-width:168px;height:72px;min-height:72px;padding:0 22px}
 `;
   document.head.appendChild(css);
 
@@ -103,17 +99,17 @@
     const c = cents(key);
     return c ? prefix + money(c) : '免费';
   }
-  function priceSpan(text) { return `<span class="py-home on">${text}</span>`; }
-  function bar(title, desc, extra) {
-    return `<div class="py-bar on"><b>${title}</b><span>${desc}</span>${extra || ''}</div>`;
+  function priceSpan(text) { return '<span class="py-home on">' + text + '</span>'; }
+  function bar(title, desc) {
+    return '<div class="py-bar on"><b>' + title + '</b><span>' + desc + '</span></div>';
   }
-  const REFUND = '<div class="py-refund on" role="status"><b>这次没做成，付的钱会自动退回原付款账户</b><span>这一次已经付过。钱退回原来的付款账户。</span></div>';
+  /* 放进正文末尾，和同屏卡片一样宽（正文左右留白各屏不一样，不能再写死 40）。 */
   function beforeDock(h, html) {
+    const j = h.lastIndexOf('</main>');
+    if (j >= 0) return h.slice(0, j) + html + h.slice(j);
     const i = h.lastIndexOf('<footer class="dock">');
     if (i >= 0) return h.slice(0, i) + html + h.slice(i);
-    const j = h.lastIndexOf('</main>');
-    if (j < 0) return h;
-    return h.slice(0, j) + html + h.slice(j);
+    return h;
   }
   function retarget(h, label, extra) {
     const i = h.indexOf('>' + label);
@@ -124,10 +120,10 @@
     open = open.replace(/\s+$/, '') + ' ' + extra;
     return h.slice(0, start) + open + h.slice(i);
   }
-  function wrapRender(id, fn) {
+  function wrapCharge(id, fn) {
     const d = find(id); if (!d) return;
     const r0 = d.render;
-    d.render = () => { const h = r0(); return charge() ? fn(h) : h; };
+    d.render = () => { if (!charge()) return r0(); return fn(r0); };
   }
   function wrapMount(id, fn) {
     const d = find(id); if (!d) return;
@@ -148,9 +144,46 @@
       return (more || []).concat(base);
     };
   }
+  function replaceLine(h, id, html) {
+    const mark = 'data-arg="' + id + '"';
+    const i = h.indexOf(mark);
+    if (i < 0) return h;
+    const start = h.lastIndexOf('<div class="fe-line"', i);
+    const end = h.indexOf('</div>', i);
+    if (start < 0 || end < 0) return h;
+    return h.slice(0, start) + html + h.slice(end + 6);
+  }
+  /* 收费机器上「次数用完」这一态不出现：先按原稿默认样子画，再把次数说法换成这一趟。 */
+  function withoutQuota(r0) {
+    const s = S();
+    if (s.b2v !== 'quota') return r0();
+    const prev = s.b2v;
+    s.b2v = '';
+    try { return r0(); }
+    finally { s.b2v = prev; }
+  }
 
   const NAME = { resume: 'AI 简历优化', interview: 'AI 模拟面试', scan: '扫描' };
-  function whatName() { return NAME[S().pyWhat] || NAME.resume; }
+  const TRIP = {
+    resume: '付一次管这一趟：改写、对照岗位、换写法都包含，不再另收费。打印另按页计价。',
+    interview: '付一次管这一趟：这一场练习包含，不再另收费。',
+    scan: '付一次管这一趟：这一次扫描包含，不再另收费。打印另按页计价。'
+  };
+  const MISS = { resume: '没生成出来', interview: '没练成', scan: '没扫成' };
+  function whatKey() {
+    const w = S().pyWhat;
+    return w === 'interview' || w === 'scan' ? w : 'resume';
+  }
+  function whatName() { return NAME[whatKey()]; }
+  function tripText() { return TRIP[whatKey()]; }
+  function sampleOf(key) {
+    const ui = window.UI;
+    const scan = key === 'scan';
+    const a = scan ? ui.scanPaper(420) : key === 'interview' ? ui.report(420) : ui.resume(420);
+    const b = scan ? ui.scanPaper(420) : key === 'interview' ? ui.report(420) : ui.resume(420, 'annot');
+    const c = scan ? ui.scanPaper(420) : '';
+    return '<div class="py-sample on' + (scan ? ' scan' : '') + '" aria-hidden="true">' + a + b + c + '</div>';
+  }
 
   function beginPay(what, back, next, after) {
     const s = S();
@@ -192,14 +225,16 @@
     window.go(s.pyNext || 'home');
   }
 
-  /* ── 1 首页短价 ── */
-  wrapRender('home', (h) => {
-    let n = h;
+  /* ── 首页短价。页脚那句用整词不换行，只在收费时补上。 ── */
+  wrapCharge('home', (r0) => {
+    let n = r0();
     n = n.replace('<h3>改简历</h3>', '<h3>改简历</h3>' + priceSpan(homeLine('resume', '每次 ')));
     n = n.replace('<h3>练面试</h3>', '<h3>练面试</h3>' + priceSpan(homeLine('interview', '每次 ')));
     n = n.replace('<h3>打印 · 扫描</h3>', '<h3>打印 · 扫描</h3>' + priceSpan('打印 ' + homeLine('print', '黑白每页 ')) + priceSpan('扫描 ' + homeLine('scan', '每次 ')));
     const foot = '离开 3 分钟无操作自动退出登录';
-    if (n.indexOf(foot) >= 0 && n.indexOf('收费以现场公示为准') < 0) n = n.replace(foot, foot + ' · 收费以现场公示为准');
+    if (n.indexOf(foot) >= 0 && n.indexOf('收费以现场公示为准') < 0) {
+      n = n.replace(foot, foot + ' · <span class="py-keep">收费以现场公示为准</span>');
+    }
     return n;
   });
   addDemo('home', [
@@ -217,21 +252,30 @@
     return () => el.removeEventListener('proto-demo', on);
   });
 
-  /* ── 2 改简历：诊断报告上的「查看优化建议」是开始改之前那一步 ── */
-  wrapRender('diagnosis', (h) => {
+  /* ── 诊断免费。开始改之前那颗按钮才收款。收费时不写「免费试运营」。 ── */
+  wrapCharge('diagnosis', (r0) => {
+    let h = r0().replace('免费试运营，本单 0 元', '导出不另收钱');
     if (paid('resume')) return h;
     const n = retarget(h, '查看优化建议（4 条）', 'data-go="pay-service" data-set="pyWhat=resume;pyBack=diagnosis;pyNext=optimize;pyAfter=start-resume;pyState=wait"');
     if (!n) return h;
-    return beforeDock(n.replace('>查看优化建议（4 条）', '>付 ' + YUAN + '并开始'), bar('这一次 ' + YUAN, 'AI 简历优化。付好了才开始改。没生成出来，钱会退回原付款账户。'));
+    h = n.replace('>查看优化建议（4 条）', '>付 ' + YUAN + '并开始');
+    return beforeDock(h, bar('这一次 ' + YUAN, 'AI 简历优化。诊断免费，付好了才开始改。没做成可免费再试一次；再不成，钱' + BACK + '。'));
   });
 
-  /* ── 3 练面试：核对开始屏。年龄确认仍先问，问完再付款，避免未满 14 周岁先扣钱。 ── */
-  wrapRender('iv-3', (h) => {
+  /* ── 练面试：年龄确认仍先问。没创建成且已付过，主按钮是免费再试。 ── */
+  wrapCharge('iv-3', (r0) => {
+    let h = r0();
     const s = S();
-    if (s.fiStartFail && paid('interview')) return beforeDock(h, REFUND);
+    if (s.fiStartFail && paid('interview')) {
+      h = h.replace('可以直接再点一次「创建并开始练习」。', RETRY);
+      h = h.replace('>创建并开始练习', '>免费再试一次');
+      return h;
+    }
     if (s.ai === 'down' || s.fiCreating || paid('interview')) return h;
     if (h.indexOf('>创建并开始练习') < 0) return h;
-    return beforeDock(h.replace('>创建并开始练习', '>付 ' + YUAN + '开始练'), bar('这一次 ' + YUAN, 'AI 模拟面试。先确认年满 14 周岁，再付款。付好了才开始练。没练成，钱会退回原付款账户。'));
+    const n = retarget(h, '创建并开始练习', 'data-go="pay-service" data-set="pyWhat=interview;pyBack=iv-3;pyNext=iv-3;pyAfter=start-interview;pyState=wait"');
+    if (!n) return h;
+    return beforeDock(n.replace('>创建并开始练习', '>付 ' + YUAN + '开始练'), bar('这一次 ' + YUAN, 'AI 模拟面试。先确认年满 14 周岁，再付款。付好了才开始练。没练成可免费再试一次；再不成，钱' + BACK + '。'));
   });
   wrapMount('iv-3', (el) => {
     const on = (e) => {
@@ -255,63 +299,99 @@
     return () => el.removeEventListener('click', on, true);
   });
 
-  /* ── 4 扫描开始前：选类型屏的主按钮。结果页那句「本页不给价格」只在收费时改成明码。 ── */
-  wrapRender('scan-type', (h) => {
+  /* ── 扫描：开始前收款。没付过的完成页不标价（不付钱扫不了）。失败且已付，免费再试。 ── */
+  wrapCharge('scan-type', (r0) => {
+    const h = r0();
     if (paid('scan')) return h;
     const n = retarget(h, '下一步 · 建立这次扫描', 'data-go="pay-service" data-set="pyWhat=scan;pyBack=scan-type;pyNext=scan-guide;pyAfter=start-scan;pyState=wait"');
     if (!n) return h;
-    return beforeDock(n.replace('>下一步 · 建立这次扫描', '>付 ' + YUAN + '开始扫描'), bar('这一次 ' + YUAN, '扫描。付好了才建立这次扫描。没扫成，钱会退回原付款账户。打印另按页计价。'));
+    return beforeDock(n.replace('>下一步 · 建立这次扫描', '>付 ' + YUAN + '开始扫描'), bar('这一次 ' + YUAN, '扫描。付好了才建立这次扫描。没扫成可免费再试一次；再不成，钱' + BACK + '。打印另按页计价。'));
   });
-  wrapRender('scan-result', (h) => {
+  wrapCharge('scan-result', (r0) => {
+    let h = r0();
     const kind = S().fsResult;
     const fail = kind === 'timeout' || kind === 'incomplete' || kind === 'nofile';
-    if (fail) return paid('scan') ? beforeDock(h, REFUND) : h;
+    if (fail) {
+      if (!paid('scan')) return h;
+      h = h.split('重试扫描（同一份材料）').join('免费再试一次');
+      ['等待超时，这次没有拿到文件。', '扫描任务未能完成。', '系统确认这次扫描已经完成，可是同一份结果里没有带可用的文件信息。这份文件还在不在，本机没有依据判断。'].forEach((t) => {
+        h = h.replace(t, t + RETRY);
+      });
+      return h;
+    }
     const sentence = '先检查文件和个人信息。金额由系统报价，本页不给价格。';
-    if (h.indexOf(sentence) < 0) return h;
+    if (!paid('scan') || h.indexOf(sentence) < 0) return h;
     const yuan = '<span style="white-space:nowrap">' + YUAN + '</span>';
-    const next = paid('scan')
-      ? '先检查文件和个人信息。打印另按页计价，到核对价格再看。扫描这一次已经付过 ' + yuan + '。'
-      : '先检查文件和个人信息。扫描这一次 ' + yuan + '。打印另按页计价，到核对价格再看。';
-    return h.replace(sentence, next);
+    h = h.replace('<div class="fs-card fs-grow">', '<div class="fs-card fs-grow py-paidscan">');
+    return h.replace(sentence, '先检查文件和个人信息。打印另按页计价，到核对价格再看。扫描这一次已经付过 ' + yuan + '。');
   });
 
-  /* ── 6 次数用完：多一个「付 1.00 元再用一次」 ── */
-  function withBuy(h, set, backName) {
-    if (h.indexOf('明天 0 点恢复') < 0 && h.indexOf('明天恢复') < 0) return h;
-    if (h.indexOf('付 ' + YUAN + '再用一次') >= 0) return h;
-    const btn = `<button class="btn pri py-buy" type="button" data-go="pay-service" data-set="${set}">付 ${YUAN}再用一次</button>`;
-    return beforeDock(h, bar('再用一次 ' + YUAN, '今天的次数用完了。再付 ' + YUAN + '，可以用一次' + backName + '。只卖这一次。', btn));
-  }
-  wrapRender('jobfit', (h) => withBuy(h, 'pyWhat=resume;pyBack=jobfit;pyNext=jobfit;pyAfter=retry-fit;pyState=wait', '对照'));
-  wrapRender('compare', (h) => withBuy(h, 'pyWhat=resume;pyBack=compare;pyNext=compare;pyAfter=retry-compare;pyState=wait', '换写法'));
-  wrapRender('st-ai-down', (h) => {
-    if (h.indexOf('明天 0 点恢复') < 0 && h.indexOf('明天恢复') < 0) return h;
-    const set = 'pyWhat=resume;pyBack=st-ai-down;pyNext=reading;pyAfter=retry-diagnose;pyState=wait';
-    const btn = `<button class="btn pri py-buy" type="button" data-go="pay-service" data-set="${set}">付 ${YUAN}再用一次</button>`;
-    const lead = paid('resume')
-      ? '<b>这次没做成，付的钱会自动退回原付款账户</b><span>这一次已经付过。钱退回原来的付款账户。再用一次 ' + YUAN + '，可以用一次诊断。只卖这一次。</span>'
-      : '<b>再用一次 ' + YUAN + '</b><span>今天的次数用完了。再付 ' + YUAN + '，可以用一次诊断。只卖这一次。</span>';
-    return beforeDock(h, `<div class="py-bar on">${lead}${btn}</div>`);
+  /* ── 这一趟里的对照、换写法不另收费，也不再卖「再用一次」。不收费时仍走原稿。 ── */
+  wrapCharge('jobfit', (r0) => {
+    let h = withoutQuota(r0);
+    if (paid('resume') && h.indexOf('这次没对照出来') >= 0) {
+      h = h.split('>再试一次<').join('>免费再试一次<');
+      h = h.replace('这次不计次数。', '这次不计次数。' + RETRY);
+    }
+    return h;
+  });
+  wrapCharge('compare', (r0) => {
+    let h = withoutQuota(r0);
+    if (paid('resume') && h.indexOf('这次没换成') >= 0) {
+      h = h.replace('再试一次</button>', '免费再试一次</button>');
+      h = h.replace('算 1 次 · 今天还剩 17 次', RETRY);
+    }
+    h = h.split('算 1 次 · 今天还剩 17 次').join('这一趟已包含，不再另收费');
+    h = h.split('用了 1 次 · 今天还剩 16 次').join('这一条已经换过，这一趟不再另收费');
+    return h;
   });
 
-  /* ── 7 到机取件：未付款先说明，再进现有收银台 ── */
-  wrapRender('pickup-ok', (h) => {
-    const st = S().pickupState || 'unpaid';
-    if (st !== 'unpaid') return h;
+  /* ── 没诊断出来：不缩字，不卖再用一次。付过才在副标题里写退款。 ── */
+  wrapCharge('st-ai-down', (r0) => {
+    const old = '今天的 AI 次数用完了，明天恢复；可以先打印原件。';
+    const next = paid('resume')
+      ? '这次没有生成诊断结论。付过的钱会' + BACK + '。可以先打印原件。'
+      : '这次没有生成诊断结论，可以先打印原件。';
+    return r0().replace(old, next);
+  });
+
+  /* ── 到机取件未付款，以及结果未确认：都要等核查确认没出纸，才退。 ── */
+  wrapCharge('pickup-ok', (r0) => {
+    const h = r0();
+    if ((S().pickupState || 'unpaid') !== 'unpaid') return h;
     if (h.indexOf('进入现场支付') < 0) return h;
-    return beforeDock(h, bar('这台机器打印收费，本单 2.00 元，付完就出纸', '下一步进收银台。付好了才开始打印。没出纸，钱会退回原付款账户。'));
+    return beforeDock(h, bar('这台机器打印收费，本单 2.00 元，付完就出纸', '下一步进收银台。付好了才开始打印。' + CHECK_PAPER));
+  });
+  wrapCharge('st-unconfirmed', (r0) => {
+    const h = r0();
+    if (!paid('print')) return h;
+    return beforeDock(h, bar('核查之后才退', CHECK_PAPER));
   });
 
-  /* ── 8 没做成就退 ── */
-  wrapRender('st-unconfirmed', (h) => (paid('print') ? beforeDock(h, REFUND) : h));
-  wrapRender('resume-preview', (h) => (S().b2v === 'error' && paid('resume') && h.indexOf('成品没排出来') >= 0 ? beforeDock(h, REFUND) : h));
-  wrapRender('iv-run', (h) => (paid('interview') && (S().fiRunErr || '').indexOf('报告生成失败') >= 0 ? beforeDock(h, REFUND) : h));
+  /* 排版失败不包：原稿「也不计次数 / 再排一次」保持不变，不写退钱。 */
 
-  /* ── 9 订单：开发票、已退款、发票已开 ── */
+  /* ── 报告没生成：主按钮改成免费再试，不再另加一条互相矛盾的退款条。 ── */
+  wrapCharge('iv-run', (r0) => {
+    let h = r0();
+    if (!paid('interview') || (S().fiRunErr || '').indexOf('报告生成失败') < 0) return h;
+    h = h.replace('报告生成失败，请重试', RETRY);
+    h = h.replace('>提交回答', '>免费再试一次');
+    return h;
+  });
+
+  /* ── 订单与开发票 ── */
+  function bill(title, small, btn) {
+    return '<div class="fe-line py-bill"><span class="tx"><b>' + title + '</b><small>' + small + '</small></span>' + (btn || '') + '</div>';
+  }
   function invoiceHtml() {
-    const qr = `<div class="py-qrb on">${window.UI.qr(21, 220)}</div>`;
+    const qr = '<div class="b2a-bqr py-invqr">' + window.UI.qr(21, 280) + '</div>';
+    const list = '<div class="olist"><div class="olist-t">手机上要填的三项</div>'
+      + '<div class="st3-check"><i>1</i><span>抬头。个人写姓名，单位写单位名称。</span></div>'
+      + '<div class="st3-check"><i>2</i><span>税号。单位才要填。个人不用填税号。</span></div>'
+      + '<div class="st3-check"><i>3</i><span>接收邮箱。电子发票发到这个邮箱。这台屏幕不保存税号。</span></div>'
+      + '</div>';
     return window.UI.band({
-      kind: 'std',
+      kind: 'compact',
       back: true,
       eyebrow: '我的 · 订单',
       title: '用手机扫码填写开票信息',
@@ -320,27 +400,34 @@
       status: { text: '等手机填写' },
       path: ['手机扫码', '填写开票信息', '发票发到邮箱'],
       pathLabel: '三步'
-    }) + `<main class="body py-invbody"><div class="py-fields on">
-        <div><b>抬头</b><span>个人写姓名，单位写单位名称。</span></div>
-        <div><b>税号</b><span>单位才要填。个人不用填税号。</span></div>
-        <div><b>接收邮箱</b><span>电子发票发到这个邮箱。这台屏幕不保存税号。</span></div>
-      </div><p class="fine">在手机上填写并提交。没付成或已退款的单，开不了发票。</p></main>`
+    }) + '<main class="body py-invbody">' + list
+      + '<p class="fine">在手机上填写并提交。没付成或已退款的单，开不了发票。</p>'
+      + sampleOf('resume') + '</main>'
       + window.UI.dock({
         back: false,
-        left: `<button class="btn sec" type="button" data-py="inv-close">${window.UI.icon('chevL', 30, 2.4)}返回订单</button>`,
+        left: '<button class="btn sec" type="button" data-py="inv-close" data-go="my-orders">' + window.UI.icon('chevL', 30, 2.4) + '返回订单</button>',
         ask: '问小青：发票发到哪',
-        pri: { label: '填好了，返回订单', id: 'pyInvDone' }
+        pri: { label: '填好了，返回订单', id: 'pyInvDone', go: 'my-orders' }
       }) + window.UI.nav('me');
   }
-  wrapRender('my-orders', (h) => {
+  wrapCharge('my-orders', (r0) => {
     if (S().pyInv) return invoiceHtml();
-    const i = h.indexOf('<div class="fe-rows');
-    if (i < 0) return h;
-    const j = h.indexOf('>', i);
-    const rows = `<div class="fe-line py-bill on"><b>AI 简历优化</b><small>已付款 · ${YUAN}</small><button class="btn pri py-invbtn" type="button" data-py="inv">开发票</button></div>`
-      + `<div class="fe-line py-bill on"><b>扫描</b><small>已退款 · ${YUAN} · 钱会退回原付款账户</small></div>`
-      + `<div class="fe-line py-bill on"><b>练面试</b><small>发票已开 · ${YUAN} · 电子发票已发到邮箱</small></div>`;
-    return h.slice(0, i) + '<div class="fe-rows is-scroll' + h.slice(i + '<div class="fe-rows'.length, j + 1) + rows + h.slice(j + 1);
+    let h = r0();
+    if (h.indexOf('data-arg="o5"') < 0) {
+      h = h.replace('<h1>打印订单</h1>', '<h1>我的订单</h1>');
+      h = h.replace('我的 · 打印订单', '我的 · 订单');
+      return h;
+    }
+    h = replaceLine(h, 'o5', bill('AI 简历优化', '已付款 · ' + YUAN + ' · 今天 13:40', '<button type="button" class="btn pri sm" data-py="inv">开发票</button>'));
+    h = replaceLine(h, 'o2', bill('扫描', '已退款 · ' + YUAN + ' · 已退回原付款账户，' + CHANNEL + ' · 今天 11:20'));
+    h = replaceLine(h, 'o7', bill('AI 模拟面试', '发票已开 · ' + YUAN + ' · 电子发票已发到邮箱 · 昨天 15:02'));
+    h = h.split('0 元（免费试运营） · 免费').join('已付款');
+    h = h.split('0 元（免费试运营） · 待退款').join('待退款');
+    h = h.split('<p class="fe-p">免费试运营，本单 0 元。</p>').join('');
+    h = h.replace('<h1>打印订单</h1>', '<h1>我的订单</h1>');
+    h = h.replace('共 7 条已产生打印任务的单', '共 7 条');
+    h = h.replace('我的 · 打印订单', '我的 · 订单');
+    return h;
   });
   wrapMount('my-orders', (el) => {
     const on = (e) => {
@@ -348,68 +435,107 @@
       if (!b || !el.contains(b)) return;
       e.preventDefault();
       e.stopPropagation();
-      S().pyInv = b.dataset.py === 'inv';
+      S().pyInv = b.getAttribute('data-py') === 'inv';
       window.__proto.refresh();
     };
     el.addEventListener('click', on, true);
     return () => el.removeEventListener('click', on, true);
   });
+  window.SCREENS.push({
+    id: 'my-orders-invoice',
+    group: '我的',
+    name: '开发票',
+    notes: {
+      does: '订单里点「开发票」之后的那一屏，单独挂出来，总览里也能看到。码套白底码框。抬头、税号、邮箱在手机上填，屏上并成一张清单。',
+      motion: '无。',
+      keep: '1.00 元是演示数字。没付成或已退款的单开不了发票。这台屏幕不保存税号。'
+    },
+    render: invoiceHtml,
+    mount: (el) => {
+      const on = (e) => {
+        const b = e.target.closest('[data-py="inv-close"], #pyInvDone');
+        if (!b || !el.contains(b)) return;
+        if (S()) S().pyInv = false;
+      };
+      el.addEventListener('click', on, true);
+      return () => el.removeEventListener('click', on, true);
+    }
+  });
 
-  /* ── 5 付款页 ── */
-  function steps(list) {
-    return `<div class="py-done on">${list.map((s, i) => `<div class="py-step"><i>${i + 1}</i><div><b>${s[0]}</b><span>${s[1]}</span></div></div>`).join('')}</div>`;
+  /* ── 付款页。公共点位或这一项是 0 元时，只留一句免费和一颗返回。 ── */
+  function freePay() {
+    const back = S().pyBack || 'home';
+    return window.UI.band({
+      kind: 'compact',
+      eyebrow: '这一次',
+      title: '这台机器这项服务免费，不用付款',
+      seal: null,
+      place: ' ',
+      status: { text: '不收费' }
+    }) + '<main class="body d3-cashier py-pay">' + sampleOf(whatKey()) + '</main>'
+      + window.UI.dock({ back: false, ask: false, pri: { label: '返回', go: back } })
+      + window.UI.nav('home');
   }
   function payHtml() {
-    if (!charge()) {
-      return window.UI.band({
-        kind: 'compact', eyebrow: '这一次', title: '这台机器不向个人收费',
-        sub: '公共就业点位，以及没打开收费的机器，这一次都不用付钱。',
-        seal: null, place: ' ', status: { text: '不收费' }
-      }) + `<main class="body d3-cashier">${steps([['直接办就行', '不用扫码，也不会扣钱。'], ['四个功能照旧', '改简历、练面试、打印、扫描都按这台机器不收费来办。']])}</main>`
-        + window.UI.dock({ back: false, left: '<button class="btn sec" data-go="home">返回首页</button>', ask: '问小青：哪些不用付钱', pri: { label: '回首页', go: 'home' } })
-        + window.UI.nav('home');
-    }
+    if (!charge() || cents(whatKey()) === 0) return freePay();
     const st = S().pyState || 'wait';
-    const name = whatName();
+    const key = whatKey();
+    const name = NAME[key];
     const back = S().pyBack || 'home';
-    const backBtn = `<button class="btn sec" data-go="${back}">${window.UI.icon('chevL', 30, 2.4)}不付了，返回</button>`;
+    const leave = '<button class="btn sec" data-go="' + back + '">' + window.UI.icon('chevL', 30, 2.4) + '返回</button>';
+    const abort = '<button class="btn sec" data-go="' + back + '">' + window.UI.icon('chevL', 30, 2.4) + '不付了，返回</button>';
+    const sum = '<div class="sumcard"><div class="r"><span>这一次</span><b>' + name + '</b><span></span></div>'
+      + '<div class="r"><span>金额</span><b>' + YUAN + '</b><span></span></div>'
+      + '<div class="r"><span>换来</span><b>这一趟</b><span></span></div></div>';
+    const miss = '要是' + MISS[key] + '，可以免费再试一次；不试了或再不成，钱' + BACK + '。';
+    let title = '请完成这一次支付';
+    let sub = '付好了才会开始';
+    let left = abort;
     let body = '';
-    let pri = null;
-    const sum = `<div class="sumcard"><div class="r"><span>这一次</span><b>${name}</b><span></span></div><div class="r"><span>金额</span><b>${YUAN}</b><span></span></div><div class="r"><span>换来</span><b>只办这一次</b><span></span></div></div>`;
+    let pri = { label: '刷新付款结果', id: 'pyRefresh' };
+    let warn = 0;
     if (st === 'ok') {
-      body = sum + steps([
-        ['付好了，马上开始', '这一次：' + name + ' · ' + YUAN + '。已经付好，马上开始。'],
-        ['只办这一次', '这一次用完就没有了。'],
-        ['没做成会退', '没生成、没扫成或没出纸，钱会自动退回原付款账户。']
-      ]);
+      title = '付好了，马上开始';
+      sub = '这一次已经付好';
+      left = leave;
+      body = sum + '<p class="fine">' + tripText() + '</p><p class="fine">' + miss + '</p>' + sampleOf(key);
       pri = { label: '马上开始', id: 'pyGo' };
     } else if (st === 'owned') {
-      body = steps([
-        ['这次直接用', '你在手机上买过 1 次 ' + name + '，这次直接用。'],
-        ['不再扫码', '这一次不用再付 ' + YUAN + '，屏上不出收款码。'],
-        ['用完就没有了', '点「用这一次」之后，手机上买的这一次就用掉。']
-      ]);
+      title = '这次不用再付';
+      sub = '手机上买过这一次';
+      left = leave;
+      body = '<p class="d3-chline"><b>手机上买过这一次</b>这次直接用，屏上不出收款码。点「用这一次」之后，这一趟就开始。</p>'
+        + '<p class="fine">' + tripText() + '</p>' + sampleOf(key);
       pri = { label: '用这一次', id: 'pyUse' };
-    } else if (st === 'fail' || st === 'timeout') {
-      const title = st === 'timeout' ? '等了 5 分钟，这一次没有付成' : '这次没付成';
-      body = sum + steps([
-        [title, '钱没有扣。'],
-        ['可以再试', '再出一张码，或返回。返回之后这一次还没开始。'],
-        ['不会开始办理', '没付成就不会开始' + name + '。']
-      ]);
+    } else if (st === 'fail') {
+      title = '这次没付成';
+      sub = '没付成，钱没有扣';
+      warn = 1;
+      body = sum + '<p class="fine">钱没有扣。没付成就不会开始 ' + name + '。可以再出一张码，或返回。返回之后这一次还没开始。</p>' + sampleOf(key);
+      pri = { label: '再出一张码', id: 'pyRetry' };
+    } else if (st === 'timeout') {
+      title = '等了 5 分钟，这一次没有付成';
+      sub = '没收到这一次的钱';
+      warn = 1;
+      body = sum + '<p class="fine">' + TIMEOUT_FULL + '可以再出一张码，或返回。</p>' + sampleOf(key);
       pri = { label: '再出一张码', id: 'pyRetry' };
     } else {
       const check = S().pyCheck ? '<p class="fine">正在向支付渠道核实这一次的结果。这一次还没有确认到账。</p>' : '';
-      body = `<p class="d3-chline"><b>请用微信或支付宝扫这张码</b>微信、支付宝都能扫。这张码只收这一次 ${YUAN}。</p>${sum}`
-        + `<div class="d3-qrframe waiting"><b class="d3-qrt">请扫码支付</b>${window.UI.qr(11, 340)}<b>这一次：${name} · ${YUAN}</b><p>收款码 5 分钟内有效。还剩 5:00。付好了才会开始。</p>${check}</div>`;
-      pri = { label: '刷新付款结果', id: 'pyRefresh' };
+      body = '<p class="d3-chline"><b>请用微信或支付宝扫这张码</b>这一次 ' + YUAN + '。' + tripText() + '</p>' + sum
+        + '<div class="d3-qrframe"><b class="d3-qrt">请扫码支付</b>' + window.UI.qr(11, 280)
+        + '<b>这一次：' + name + ' · ' + YUAN + '</b><p>收款码 5 分钟内有效。还剩 5:00。付好了才会开始。' + WAIT_BACK + '</p>'
+        + check + '</div>' + sampleOf(key);
     }
-    const sub = st === 'ok' ? '付好了，马上开始' : st === 'owned' ? '手机上买过这一次' : st === 'timeout' ? '等待超时，钱没有扣' : st === 'fail' ? '没付成，钱没有扣' : '付好了才会开始';
     return window.UI.band({
-      kind: 'compact', eyebrow: '这一次 · ' + name, title: '请完成这一次支付', sub,
-      seal: null, place: ' ', status: { text: sub, warn: st === 'fail' || st === 'timeout' ? 1 : 0 }
-    }) + `<main class="body d3-cashier py-pay">${body}</main>`
-      + window.UI.dock({ back: false, left: backBtn, ask: '问小青：这一次怎么付', pri })
+      kind: 'compact',
+      eyebrow: '这一次 · ' + name,
+      title: title,
+      sub: sub,
+      seal: null,
+      place: ' ',
+      status: { text: sub, warn: warn }
+    }) + '<main class="body d3-cashier py-pay">' + body + '</main>'
+      + window.UI.dock({ back: false, left: left, ask: '问小青：这一次怎么付', pri })
       + window.UI.nav('home');
   }
 
@@ -418,12 +544,12 @@
     group: '打印扫描',
     name: '付款（AI 与扫描）',
     notes: {
-      does: 'AI 简历优化、AI 模拟面试、扫描共用的付款页，样子照打印收银台（screens2.js 的 cashier）。1.00 元是演示数字，不是定价；真实价格每台机器在管理员后台设，不进仓库。状态：等待付款、付款成功、超时、没付成、手机上已经买过这一次。公共就业点位或收费关掉时，这一屏只写不收费。',
-      motion: '付款成功在稿上停 1.6 秒再进入下一步（?shot=1 时停住，方便看这一态）。不自己演变成已付款。',
-      keep: '微信、支付宝都能扫同一张码。没付成或超时：钱没有扣，可以再出一张码或返回。手机上买过：不出码，按钮「用这一次」。只卖单次。打印仍走原来的收银台，不在这屏重画。'
+      does: 'AI 简历优化、AI 模拟面试、扫描共用的付款页，样子照打印收银台。1.00 元是演示数字，不是定价。状态：等待、正在核实、付好了、没付成、超时、手机上已经买过这一次。公共就业点位或这一项是 0 元时，只写不用付款。',
+      motion: '付款成功在稿上停 1.6 秒再进入下一步（?shot=1 时停住）。不自己演变成已付款。等待页的剩余时间停在 5:00。',
+      keep: '请用微信或支付宝扫这张码，不再重复「都能扫」。付一次管这一趟。确认没付成才写「钱没有扣」。超时不写死没扣：没收到这一次的钱，万一已经扣了会自动退回。返回时写明万一已经付了会退。付好了的标题是「付好了，马上开始」，左键是「返回」。手机上买过的标题是「这次不用再付」。打印仍走原来的收银台。'
     },
     render: payHtml,
-    demo: () => (charge() ? [
+    demo: () => (charge() && cents(whatKey()) > 0 ? [
       { label: '演示：付款成功', ev: 'py-ok' },
       { label: '演示：付款没成功', ev: 'py-fail' },
       { label: '演示：等待超时', ev: 'py-timeout' },
@@ -472,6 +598,7 @@
       dirty = true;
     }
     if (q.get('pyInv') === '1') { s.pyInv = true; dirty = true; }
+    if (q.get('pyCheck') === '1') { s.pyCheck = 1; dirty = true; }
     if (q.get('pyzero')) {
       s.pyZero = {};
       q.get('pyzero').split(',').forEach((k) => { if (k) s.pyZero[k] = 1; });
