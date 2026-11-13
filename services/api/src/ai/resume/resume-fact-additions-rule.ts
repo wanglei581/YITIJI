@@ -4,6 +4,9 @@
  * 一份规则、两份逐字节相同的副本（一体机与后端各一份）。不 import 任何模块，只使用语言内置。
  * 数字按完整数值比较，不按子串：原文有「2020」不能放过改写里的「20」或「202」。
  * 带百分号和不带百分号是两个事实。中文数字先折成数值，再和阿拉伯数字放在同一套记号里比。
+ * 最后一个大单位（百、千、万、亿）后面只跟一个数字、中间没有「零」、这个数字自己也没有单位时，
+ * 这个数字取下一级单位：一万二 = 12000，三千五 = 3500，两百五 = 250，1万2 = 12000。
+ * 「一万零二」有零，仍是 10002；「一万二千」末位自己带千，仍是 12000。
  * 职责词长的先占住区间，「独立负责」不再另报里面的「负责」。
  */
 
@@ -225,7 +228,11 @@ function readCnRun(text: string, index: number): { raw: string; end: number } | 
   return { raw: text.slice(index, end), end }
 }
 
-/** 中文数字折成十进制字符串。万先收进本组，亿再把本组乘一亿，避免「一万亿」收成一万。 */
+/**
+ * 中文数字折成十进制字符串。万先收进本组，亿再把本组乘一亿，避免「一万亿」收成一万。
+ * 末位省略单位：读完后若还剩恰好一个数字，它紧跟在百、千、万、亿后面，中间没有「零」，
+ * 就乘以下一级单位，不按个位加。一万二 = 12000，不是 10002。
+ */
 function parseChinese(raw: string): string | null {
   let hasUnit = false
   for (let i = 0; i < raw.length; i += 1) {
@@ -247,23 +254,37 @@ function parseChinese(raw: string): string | null {
   let section = 0n
   let number = 0n
   let pending = false
+  let lastUnit = 0n
+  let bareAfterUnit = 0
+  let zeroBreak = false
+  const markUnit = (unit: bigint) => {
+    lastUnit = unit
+    bareAfterUnit = 0
+    zeroBreak = false
+  }
   for (let i = 0; i < raw.length; i += 1) {
     const ch = raw.charAt(i)
     const digit = cnDigit(ch)
     const small = cnSmall(ch)
     if (digit !== null) {
+      if (lastUnit > 0n) {
+        bareAfterUnit = pending ? bareAfterUnit + 1 : 1
+        if (digit === 0) zeroBreak = true
+      }
       number = BigInt(digit)
       pending = true
     } else if (small !== null) {
       section += (pending ? number : 1n) * BigInt(small)
       number = 0n
       pending = false
+      markUnit(BigInt(small))
     } else if (ch === '万') {
       const current = section + (pending ? number : 0n)
       group += (current === 0n ? 1n : current) * 10000n
       section = 0n
       number = 0n
       pending = false
+      markUnit(10000n)
     } else if (ch === '亿') {
       const current = group + section + (pending ? number : 0n)
       result += (current === 0n ? 1n : current) * 100000000n
@@ -271,11 +292,28 @@ function parseChinese(raw: string): string | null {
       section = 0n
       number = 0n
       pending = false
+      markUnit(100000000n)
     } else {
       return null
     }
   }
-  return (result + group + section + (pending ? number : 0n)).toString()
+  let tail = pending ? number : 0n
+  // 十的下一级是个位，和直接相加相同。百及以上才把末位抬到下一级。
+  if (pending && bareAfterUnit === 1 && !zeroBreak && lastUnit >= 100n) {
+    tail = number * (lastUnit / 10n)
+  }
+  return (result + group + section + tail).toString()
+}
+
+/** 「1万2」里万后面那一个数字。后面还有数字或单位时不吞，留给下一次匹配。 */
+function omittedArabicTail(text: string, index: number, places: number): { end: number; value: string } | null {
+  if (places < 1) return null
+  const ch = text.charAt(index)
+  if (!isDigitChar(ch)) return null
+  const next = text.charAt(index + 1)
+  if (isDigitChar(next)) return null
+  if ('万亿千百十.．%％'.indexOf(next) !== -1) return null
+  return { end: index + 1, value: shiftDecimal(toHalfWidth(ch), places - 1) }
 }
 
 function matchArabic(
@@ -295,8 +333,14 @@ function matchArabic(
   if (!percent) {
     const unit = text.charAt(end)
     if (unit === '万' || unit === '亿') {
-      canonical = shiftDecimal(canonical, unit === '万' ? 4 : 8)
+      const places = unit === '万' ? 4 : 8
+      canonical = shiftDecimal(canonical, places)
       end += 1
+      const tail = omittedArabicTail(text, end, places)
+      if (tail && !canonical.includes('.') && !tail.value.includes('.')) {
+        canonical = (BigInt(canonical) + BigInt(tail.value)).toString()
+        end = tail.end
+      }
     }
   }
   return { end, canonical, percent }

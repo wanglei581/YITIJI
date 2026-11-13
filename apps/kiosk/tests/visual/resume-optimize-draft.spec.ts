@@ -680,3 +680,161 @@ for (const projectTag of ['@kiosk', '@mobile'] as const) {
     await checkEveryFactRow(page)
   })
 }
+
+/**
+ * 片段窗口左右各只取 10 个字，挨得近的会并成一条。
+ * 每 12 个字放一个「负责」或数字，整句并成一条约 96 字的片段；句号切开，所以是 30 条而不是 1 条。
+ * 30 条拼进「待本人确认」后，固定区会高于 1920 里核对框能留给说明的高度。说明若回到标题和按钮之间，清单被压没或按钮掉出屏外。
+ */
+const LONG_FACT_SHOPS = [
+  '台东夜市', '李村路口', '浮山后街', '麦岛码头', '燕儿岛路',
+  '湛山小区', '辽阳东路', '黄岛港区', '金沙滩口', '银滩浴场',
+  '栈桥海边', '信号山脚', '小鱼山脚', '太平角路', '大学路南',
+  '宁夏路北', '山东路中', '香港中路', '福州南路', '江苏路北',
+  '安徽路南', '江西路中', '浙江路南', '河南路北', '湖北路中',
+  '湖南路南', '广东路北', '广西路中', '锦官路南', '贵州路北',
+] as const
+
+function longFactSentence(shop: string, index: number): string {
+  return `负责${shop}早班清点${21 + index}`.repeat(8)
+}
+
+function longFactResume() {
+  return {
+    basic: { name: '周晴', phone: '', city: '青岛' },
+    intention: { position: '门店运营', city: '青岛' },
+    summary: '在青岛几家门店做过早班理货。',
+    education: [],
+    experience: [{
+      company: '',
+      role: '',
+      period: '',
+      description: LONG_FACT_SHOPS.map((shop, index) => longFactSentence(shop, index)).join('。'),
+    }],
+    projects: [],
+    skills: [],
+    certificates: [],
+  }
+}
+
+function registerLongFactExport(api: Parameters<typeof registerW6Api>[0], fileId: string): void {
+  api.respond('POST', '/api/v1/resume/generate/export', {
+    status: 200,
+    json: {
+      fileId,
+      filename: '周晴的简历.pdf',
+      sizeBytes: 4096,
+      pageCount: 1,
+      signedUrl: `/e2e-fixtures/${fileId}.pdf`,
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      printFileUrl: `/api/v1/files/${fileId}/content?expires=1&sig=test`,
+    },
+  })
+}
+
+async function expectHeadingStaysInView(page: Page, dialog: Locator): Promise<void> {
+  const scale = await stageScaleOf(page)
+  const box = await dialog.getByRole('heading', { name: '导出前核对事实' }).boundingBox()
+  expect(box).not.toBeNull()
+  const top = box!.y / scale
+  const bottom = (box!.y + box!.height) / scale
+  const viewport = page.viewportSize()
+  expect(viewport).not.toBeNull()
+  expect(top).toBeGreaterThanOrEqual(0)
+  expect(bottom).toBeLessThanOrEqual(1920)
+  expect(bottom).toBeLessThanOrEqual(viewport!.height / scale)
+}
+
+/** 说明和 30 条长片段在同一个滚动区。标题、确认导出钉在 1920 屏内，逐条滚到再勾。 */
+async function checkLongFactDialog(page: Page, dialog: Locator): Promise<void> {
+  await expect(dialog).toBeVisible()
+  const scroll = dialog.locator('.qxt-factscroll, .qx-rd-fact-scroll')
+  await expect(scroll).toHaveCount(1)
+  const metrics = await scroll.evaluate((element) => ({
+    noteInside: Boolean(element.querySelector('.qxt-pending, .qx-rd-pending')),
+    scrollHeight: element.scrollHeight,
+    clientHeight: element.clientHeight,
+  }))
+  expect(metrics.noteInside).toBe(true)
+  expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight)
+  const boxes = dialog.getByRole('checkbox')
+  await expect(boxes).toHaveCount(30)
+  const confirm = dialog.getByRole('button', { name: '确认导出' })
+  const scale = await stageScaleOf(page)
+  for (let i = 0; i < 30; i += 1) {
+    const box = boxes.nth(i)
+    await box.scrollIntoViewIfNeeded()
+    const row = await box.locator('xpath=ancestor::label[1]').boundingBox()
+    expect(row).not.toBeNull()
+    expect(row!.height / scale).toBeGreaterThanOrEqual(56)
+    await expectHeadingStaysInView(page, dialog)
+    await expectConfirmStaysInView(page, dialog)
+    await expect(confirm).toHaveAttribute('aria-disabled', 'true')
+    await box.click()
+  }
+  await expectHeadingStaysInView(page, dialog)
+  await expectConfirmStaysInView(page, dialog)
+  await expect(confirm).not.toHaveAttribute('aria-disabled', 'true')
+}
+
+test('优化页 30 条长片段说明不挤掉清单，逐条确认后能导出 @kiosk', async ({ page, api }) => {
+  test.setTimeout(90_000)
+  const taskId = 'r2c-opt-long-30'
+  registerOptimizeShell(api)
+  registerLongFactExport(api, 'r2c-opt-long-file')
+  api.respond('GET', `/api/v1/resume/records/${taskId}/optimize`, {
+    status: 200,
+    json: { taskId, status: 'completed', providerName: 'llm', modules: [], optimizedResume: longFactResume() },
+  })
+  await page.route('**/api/v1/files/r2c-opt-long-file/content**', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/pdf',
+    body: VISIBLE_PDF,
+  }))
+  await page.goto(`/resume/optimize?taskId=${encodeURIComponent(taskId)}`)
+  await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toBeVisible()
+  await page.getByRole('button', { name: '去导出', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '导出前核对事实' })
+  await checkLongFactDialog(page, dialog)
+  await dialog.getByRole('button', { name: '确认导出' }).click()
+  await expect(dialog).toHaveCount(0)
+  const pending = page.waitForRequest((request) => (
+    request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/resume/generate/export'
+  ))
+  await page.getByRole('button', { name: '导出', exact: true }).click()
+  expect((await pending).postDataJSON()).toBeTruthy()
+})
+
+test('生成预览页默认核对框 30 条长片段说明不挤掉清单，逐条确认后能导出 @kiosk', async ({ page, api }) => {
+  test.setTimeout(90_000)
+  const taskId = 'r2c-gen-long-30'
+  registerOptimizeShell(api)
+  registerLongFactExport(api, 'r2c-gen-long-file')
+  api.respond('GET', `/api/v1/resume/generate/${taskId}`, {
+    status: 200,
+    json: {
+      taskId,
+      status: 'completed',
+      providerName: 'deepseek',
+      resume: longFactResume(),
+      missingHints: [],
+    },
+  })
+  await page.route('**/api/v1/files/r2c-gen-long-file/content**', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/pdf',
+    body: VISIBLE_PDF,
+  }))
+  await page.goto(`/resume/generate/preview?taskId=${encodeURIComponent(taskId)}`)
+  await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toBeVisible()
+  await page.getByTestId('resume-generate-preview-cta-export').click()
+  await page.getByTestId('resume-generate-preview-cta-confirm-export').click()
+  const dialog = page.getByRole('dialog', { name: '导出前核对事实' })
+  await checkLongFactDialog(page, dialog)
+  const pending = page.waitForRequest((request) => (
+    request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/resume/generate/export'
+  ))
+  await dialog.getByRole('button', { name: '确认导出' }).click()
+  expect((await pending).postDataJSON()).toBeTruthy()
+  await expect(dialog).toHaveCount(0)
+})

@@ -69,6 +69,25 @@ export function ResumeFactConfirmDialog(props: {
     if (!canExport || props.busy) return
     props.onConfirm(new Date().toISOString())
   }
+  const pendingNote = props.unconfirmed.length > 0 ? (
+    <p className={touch ? 'qxt-pending' : 'qx-rd-pending'} role="note">
+      待本人确认：{props.unconfirmed.map((item) => maskPii(item)).join('、')}
+      <span className={touch ? 'qxt-pending-why' : 'qx-rd-pending-why'}>{UNCONFIRMED_WHY}</span>
+    </p>
+  ) : null
+  const checklist = nothingToCheck ? (
+    <p>这份稿里没有可勾选的学校 / 公司 / 时间段 / 证书 / 电话。</p>
+  ) : (
+    <ul className={touch ? 'qxt-factlist' : 'qx-rd-fact-list'}>
+      <FactRows
+        rowClass={touch ? 'qxt-factrow' : 'qx-rd-fact'}
+        facts={props.facts}
+        unconfirmed={props.unconfirmed}
+        checked={checked}
+        onToggle={toggle}
+      />
+    </ul>
+  )
 
   if (touch) {
     return (
@@ -86,21 +105,12 @@ export function ResumeFactConfirmDialog(props: {
         )}
       >
         <div data-qx-page="resume-fact">
-          <p>请逐项勾选「已核对」。未全勾不能出文件。系统不会替你确认学校、公司、时间段、证书或电话。</p>
-          {props.unconfirmed.length > 0 && (
-            <p className="qxt-pending" role="note">
-              待本人确认：{props.unconfirmed.map((item) => maskPii(item)).join('、')}
-              <span className="qxt-pending-why">{UNCONFIRMED_WHY}</span>
-            </p>
-          )}
-          {nothingToCheck ? (
-            <p>这份稿里没有可勾选的学校 / 公司 / 时间段 / 证书 / 电话。</p>
-          ) : (
-            <ul className="qxt-factlist">
-              <FactRows rowClass="qxt-factrow" facts={props.facts} unconfirmed={props.unconfirmed} checked={checked} onToggle={toggle} />
-            </ul>
-          )}
-          {!canExport && <p className="qxt-why-not">还有未勾选的事实，不能出文件。</p>}
+          <div className="qxt-factscroll">
+            <p>请逐项勾选「已核对」。未全勾不能出文件。系统不会替你确认学校、公司、时间段、证书或电话。</p>
+            {pendingNote}
+            {checklist}
+            {!canExport && <p className="qxt-why-not">还有未勾选的事实，不能出文件。</p>}
+          </div>
         </div>
       </QxTouchOverlay>
     )
@@ -110,22 +120,16 @@ export function ResumeFactConfirmDialog(props: {
     <div className="qx-rd-overlay" role="dialog" aria-modal="true" aria-labelledby="resume-fact-title">
       <div className="qx-rd-dialog qx-rd-fact-dialog">
         <h2 id="resume-fact-title">导出前核对事实</h2>
-        <p>
-          请逐项勾选「已核对」。未全勾不能出文件。系统不会替你确认学校、公司、时间段、证书或电话。
-        </p>
-        {props.unconfirmed.length > 0 && (
-          <p className="qx-rd-pending" role="note">
-            待本人确认：{props.unconfirmed.map((item) => maskPii(item)).join('、')}
-            <span className="qx-rd-pending-why">{UNCONFIRMED_WHY}</span>
+        <div className="qx-rd-fact-scroll">
+          <p>
+            请逐项勾选「已核对」。未全勾不能出文件。系统不会替你确认学校、公司、时间段、证书或电话。
           </p>
-        )}
-        {nothingToCheck ? (
-          <p>这份稿里没有可勾选的学校 / 公司 / 时间段 / 证书 / 电话。</p>
-        ) : (
-          <ul className="qx-rd-fact-list">
-            <FactRows rowClass="qx-rd-fact" facts={props.facts} unconfirmed={props.unconfirmed} checked={checked} onToggle={toggle} />
-          </ul>
-        )}
+          {pendingNote}
+          {checklist}
+          {!canExport && (
+            <p className="qx-rd-why">还有未勾选的事实，不能出文件。</p>
+          )}
+        </div>
         <div className="qx-rd-dialog-actions">
           <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onCancel}>
             返回修改
@@ -140,9 +144,6 @@ export function ResumeFactConfirmDialog(props: {
             {props.busy ? '正在生成文件…' : '确认导出'}
           </button>
         </div>
-        {!canExport && (
-          <p className="qx-rd-why">还有未勾选的事实，不能出文件。</p>
-        )}
       </div>
     </div>
   )

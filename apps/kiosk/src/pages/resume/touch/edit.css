@@ -330,7 +330,7 @@
 [data-qx-page='resume-export'] .qxt-fine { margin: 0; font-size: 20px; line-height: 1.5; color: var(--qxt-ink-3); text-align: center; }
 
 /* ── 导出前核对事实（弹层，在页面外层，自带范围标记） ── */
-/* 行再多也只滚勾选清单。标题、待本人确认和底部按钮留在屏内。上下各留 40px，和左右 max-width 的空一样。 */
+/* 说明再长也和勾选清单一起滚。固定区只留标题和底部按钮。上下各留 40px，和左右 max-width 的空一样。 */
 .qxt-screen .qxt-dialog:has([data-qx-page='resume-fact']) {
   max-height: calc(100% - 80px);
   overflow: hidden;
@@ -345,14 +345,23 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
-[data-qx-page='resume-fact'] { display: flex; flex-direction: column; gap: 14px; text-align: left; min-width: 0; width: 100%; }
+[data-qx-page='resume-fact'] { display: flex; flex-direction: column; min-height: 0; text-align: left; min-width: 0; width: 100%; }
+[data-qx-page='resume-fact'] > .qxt-factscroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
 .qxt-screen .qxt-dialog:has([data-qx-page='resume-fact']) h2 { align-self: flex-start; text-align: left; }
 [data-qx-page='resume-fact'] p { margin: 0; font-size: 22px; line-height: 1.45; color: var(--qxt-ink-2); }
 [data-qx-page='resume-fact'] .qxt-pending { font-size: 24px; font-weight: 700; color: var(--qxt-clay-ink); }
 [data-qx-page='resume-fact'] .qxt-pending .qxt-pending-why { display: block; margin-top: 4px; font-size: 22px; font-weight: 500; line-height: 1.45; }
 [data-qx-page='resume-fact'] .qxt-pending { overflow-wrap: anywhere; }
-[data-qx-page='resume-fact'] > :not(.qxt-factlist) { flex: none; }
 [data-qx-page='resume-fact'] .qxt-factlist {
   list-style: none;
   margin: 0;
@@ -360,9 +369,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
+  flex: none;
 }
 
 [data-qx-page='resume-fact'] .qxt-factrow {
@@ -417,7 +424,7 @@
     padding: 16px 20px 14px;
     gap: 8px;
   }
-  [data-kiosk-stage-fit='off'] .qxt-dialog:has([data-qx-page='resume-fact']) > [data-qx-page='resume-fact'] {
+  [data-kiosk-stage-fit='off'] .qxt-dialog:has([data-qx-page='resume-fact']) > [data-qx-page='resume-fact'] > .qxt-factscroll {
     gap: 8px;
   }
   /* 共用弹层正文仍是 25px。窄屏上说明和待确认会把按钮顶出 844，只收这一只框的字。勾选行仍是 72。 */

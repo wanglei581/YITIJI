@@ -1,6 +1,6 @@
 /* 稿 24 预览屏 / 选格式屏。只服务 /resume/generate/preview，不改填写步。 */
 
-/* 导出前核对事实：勾选清单在框内滚，标题、待本人确认和按钮留在屏内。上下空沿用遮罩的 24px。
+/* 导出前核对事实：待本人确认和勾选清单一起在框内滚，固定区只留标题和按钮。上下空沿用遮罩的 24px。
    遮罩钉在屏幕上。选格式页的正文滚动区在手机上会被底栏压得很矮，框若跟着那段滚，按钮会盖住第一行。 */
 .qxt-screen .qx-resume-generate .qx-rd-overlay:has(.qx-rd-fact-dialog) {
   position: fixed;
@@ -11,13 +11,21 @@
   overflow: hidden;
   min-height: 0;
 }
-.qxt-screen .qx-resume-generate .qx-rd-fact-dialog > :not(.qx-rd-fact-list) {
+.qxt-screen .qx-resume-generate .qx-rd-fact-dialog > :not(.qx-rd-fact-scroll) {
   flex: none;
 }
-.qxt-screen .qx-resume-generate .qx-rd-fact-dialog > .qx-rd-fact-list {
+.qxt-screen .qx-resume-generate .qx-rd-fact-dialog > .qx-rd-fact-scroll {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.qxt-screen .qx-resume-generate .qx-rd-fact-dialog .qx-rd-fact-list {
+  flex: none;
+  min-height: auto;
+  overflow: visible;
 }
 .qxt-screen .qx-resume-generate .qx-rd-fact-dialog .qx-rd-fact {
   min-height: 56px;

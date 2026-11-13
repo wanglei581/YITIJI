@@ -54,28 +54,219 @@ function collectBeforeText(
   return JSON.stringify(originalInput)
 }
 
-/** 路径与后端 additions.path 一致：summary、experience[0].description、skills[2]。 */
-function factFields(resume: GeneratedResume): Array<{ path: string; text: string }> {
-  const fields: Array<{ path: string; text: string }> = [
-    { path: 'summary', text: resume.summary ?? '' },
-  ]
-  resume.education.forEach((item, index) => {
-    fields.push({ path: `education[${index}].description`, text: item.description ?? '' })
-  })
-  resume.experience.forEach((item, index) => {
-    fields.push({ path: `experience[${index}].description`, text: item.description ?? '' })
-  })
-  resume.projects.forEach((item, index) => {
-    fields.push({ path: `projects[${index}].description`, text: item.description ?? '' })
-  })
-  resume.skills.forEach((item, index) => {
-    fields.push({ path: `skills[${index}]`, text: item ?? '' })
-  })
-  return fields
+/**
+ * 描述要多像才在「公司/学校/项目名 + 职务/专业/角色」对不上之后认成同一条。
+ * 字二元组 Dice：2 × 重合组数 / 两组总数，空格不参与。
+ * 「负责日常工作」和「负责日常运营」约 0.60，只是套话像，配上会把另一条里 AI 的数字豁免掉。
+ * 同一条只改几个字（「周更 2 篇」改成「每周更新 2 篇」）约 0.86。
+ * 0.72 落在这两类中间。低于它就不配，这条里的数字一律待确认。
+ */
+const DESCRIPTION_MATCH_MIN = 0.72
+
+type EntrySection = 'education' | 'experience' | 'projects'
+
+interface EntryRef {
+  name: string
+  role: string
+  description: string
+  source: object
 }
 
+function normalizeLabel(value: string): string {
+  return value.trim().replace(/\s+/g, '')
+}
+
+function stableId(source: object): string | null {
+  if (!('id' in source)) return null
+  const id = (source as { id?: unknown }).id
+  if (typeof id !== 'string') return null
+  const trimmed = id.trim()
+  return trimmed ? trimmed : null
+}
+
+function educationRefs(resume: GeneratedResume): EntryRef[] {
+  return resume.education.map((item) => ({
+    name: item.school,
+    role: item.major ?? '',
+    description: item.description ?? '',
+    source: item,
+  }))
+}
+
+function experienceRefs(resume: GeneratedResume): EntryRef[] {
+  return resume.experience.map((item) => ({
+    name: item.company,
+    role: item.role,
+    description: item.description ?? '',
+    source: item,
+  }))
+}
+
+function projectRefs(resume: GeneratedResume): EntryRef[] {
+  return resume.projects.map((item) => ({
+    name: item.name,
+    role: item.role ?? '',
+    description: item.description ?? '',
+    source: item,
+  }))
+}
+
+function sectionRefs(section: EntrySection, resume: GeneratedResume): EntryRef[] {
+  if (section === 'education') return educationRefs(resume)
+  if (section === 'experience') return experienceRefs(resume)
+  return projectRefs(resume)
+}
+
+/** 公司/学校/项目名为空时不算稳定身份，避免两条空标题被当成同一条。 */
+function nameKey(entry: EntryRef): string | null {
+  const name = normalizeLabel(entry.name)
+  if (!name) return null
+  return `${name}\u0001${normalizeLabel(entry.role)}`
+}
+
+function entryPath(section: EntrySection, entry: EntryRef): string {
+  const id = stableId(entry.source)
+  const body = id ? `id:${id}` : `name:${nameKey(entry) ?? ''}`
+  return `${section}:${body}.description`.replace(/\t/g, ' ')
+}
+
+function skillPath(value: string): string {
+  return `skill:${encodeURIComponent(value)}`
+}
+
+function charBigramCounts(text: string): Map<string, number> {
+  const normalized = text.replace(/\s+/g, '')
+  const counts = new Map<string, number>()
+  if (normalized.length < 2) return counts
+  for (let i = 0; i < normalized.length - 1; i += 1) {
+    const gram = normalized.slice(i, i + 2)
+    counts.set(gram, (counts.get(gram) ?? 0) + 1)
+  }
+  return counts
+}
+
+function diceSimilarity(left: string, right: string): number {
+  const a = charBigramCounts(left)
+  const b = charBigramCounts(right)
+  let aTotal = 0
+  let bTotal = 0
+  let overlap = 0
+  for (const count of a.values()) aTotal += count
+  for (const count of b.values()) bTotal += count
+  if (aTotal === 0 || bTotal === 0) return 0
+  for (const [gram, count] of a) overlap += Math.min(count, b.get(gram) ?? 0)
+  return (2 * overlap) / (aTotal + bTotal)
+}
+
+function indexBuckets(entries: EntryRef[], indexes: number[]): Map<string, number[]> {
+  const buckets = new Map<string, number[]>()
+  for (const index of indexes) {
+    const key = nameKey(entries[index])
+    if (!key) continue
+    const list = buckets.get(key) ?? []
+    list.push(index)
+    buckets.set(key, list)
+  }
+  return buckets
+}
+
+/**
+ * 先按条目对齐，再比字段。下标会在删除、对调后错位。
+ * 有 id 用 id；否则公司/学校/项目名 + 职务/专业/角色；还对不上就按描述相似度。
+ * 配不上的当前条目 previous 为 null，里面的数字稍后一律当 AI 新加的。
+ */
+function pairEntries(current: EntryRef[], previous: EntryRef[]): Array<{ current: EntryRef; previous: EntryRef | null }> {
+  const prevFree = previous.map(() => true)
+  const assigned: Array<EntryRef | null> = current.map(() => null)
+  const claim = (currentIndex: number, previousIndex: number) => {
+    assigned[currentIndex] = previous[previousIndex]
+    prevFree[previousIndex] = false
+  }
+  const freeCurrent = () => current.map((_, index) => index).filter((index) => assigned[index] === null)
+  const freePrevious = () => previous.map((_, index) => index).filter((index) => prevFree[index])
+
+  const idsOf = (entries: EntryRef[], indexes: number[]) => {
+    const buckets = new Map<string, number[]>()
+    for (const index of indexes) {
+      const id = stableId(entries[index].source)
+      if (!id) continue
+      const list = buckets.get(id) ?? []
+      list.push(index)
+      buckets.set(id, list)
+    }
+    return buckets
+  }
+  const currentIds = idsOf(current, current.map((_, index) => index))
+  const previousIds = idsOf(previous, previous.map((_, index) => index))
+  for (const [id, currentList] of currentIds) {
+    const previousList = previousIds.get(id)
+    if (!previousList || currentList.length !== 1 || previousList.length !== 1) continue
+    claim(currentList[0], previousList[0])
+  }
+
+  const claimUniqueNames = () => {
+    const currentNames = indexBuckets(current, freeCurrent())
+    const previousNames = indexBuckets(previous, freePrevious())
+    for (const [key, currentList] of currentNames) {
+      const previousList = previousNames.get(key)
+      if (!previousList || currentList.length !== 1 || previousList.length !== 1) continue
+      claim(currentList[0], previousList[0])
+    }
+  }
+  claimUniqueNames()
+
+  const candidates: Array<{ score: number; currentIndex: number; previousIndex: number }> = []
+  for (const currentIndex of freeCurrent()) {
+    for (const previousIndex of freePrevious()) {
+      const score = diceSimilarity(current[currentIndex].description, previous[previousIndex].description)
+      if (score < DESCRIPTION_MATCH_MIN) continue
+      candidates.push({ score, currentIndex, previousIndex })
+    }
+  }
+  candidates.sort((a, b) => b.score - a.score || a.currentIndex - b.currentIndex || a.previousIndex - b.previousIndex)
+  for (const candidate of candidates) {
+    if (assigned[candidate.currentIndex] !== null || !prevFree[candidate.previousIndex]) continue
+    claim(candidate.currentIndex, candidate.previousIndex)
+  }
+
+  const currentLeft = indexBuckets(current, freeCurrent())
+  const previousLeft = indexBuckets(previous, freePrevious())
+  for (const [key, currentList] of currentLeft) {
+    const previousList = previousLeft.get(key)
+    if (!previousList) continue
+    const count = Math.min(currentList.length, previousList.length)
+    for (let i = 0; i < count; i += 1) claim(currentList[i], previousList[i])
+  }
+
+  return current.map((entry, index) => ({ current: entry, previous: assigned[index] }))
+}
+
+interface AlignedField {
+  path: string
+  currentText: string
+  previousText: string
+  matched: boolean
+}
+
+function alignSection(section: EntrySection, current: GeneratedResume, previous: GeneratedResume): AlignedField[] {
+  return pairEntries(sectionRefs(section, current), sectionRefs(section, previous)).map((pair) => ({
+    path: entryPath(section, pair.current),
+    currentText: pair.current.description,
+    previousText: pair.previous?.description ?? '',
+    matched: pair.previous !== null,
+  }))
+}
+
+const ENTRY_SECTIONS: EntrySection[] = ['education', 'experience', 'projects']
+
 function factFieldTexts(resume: GeneratedResume): string[] {
-  return factFields(resume).map((field) => field.text)
+  return [
+    resume.summary ?? '',
+    ...resume.education.map((item) => item.description ?? ''),
+    ...resume.experience.map((item) => item.description ?? ''),
+    ...resume.projects.map((item) => item.description ?? ''),
+    ...resume.skills.map((item) => item ?? ''),
+  ]
 }
 
 /** 编辑发生时记下的本人新增：field:路径 + tab + key。页面原样累积这串字，比较时不再从片段反解。 */
@@ -115,10 +306,23 @@ function keysInField(text: string, beforeText: string): Set<string> {
   return keys
 }
 
+function userKeyMap(userAdditions: string[]): Map<string, Set<string>> {
+  const userKeys = new Map<string, Set<string>>()
+  for (const token of userAdditions) {
+    const parsed = parseUserEditToken(token)
+    if (!parsed) continue
+    const set = userKeys.get(parsed.path) ?? new Set<string>()
+    set.add(parsed.key)
+    userKeys.set(parsed.path, set)
+  }
+  return userKeys
+}
+
 /**
- * 仍留在当前稿里、且生成稿同一字段里就有的新增事实。
- * 是不是同一处，按「字段路径 + key」比：只在同一字段里豁免。
- * 本人后来自己写进去的数，用编辑当时记下的 key，不再从片段反解。
+ * 仍留在当前稿里、且能对上生成稿同一条的新增事实。
+ * 经历、教育、项目先按条目对齐，再按「这条的身份 + key」豁免，不按下标。
+ * 配不上的条目里，相对原文多出来的数字和职责词一律待确认。
+ * 技能按值集合比：本人版里多出来的整条值算本人写的；两边都有的值仍按 key 豁免。
  * 返回给人看的片段，同一片段只留一行。
  */
 export function detectGeneratedUnconfirmedAdditions(
@@ -128,43 +332,60 @@ export function detectGeneratedUnconfirmedAdditions(
   userAdditions: string[] = [],
 ): string[] {
   const beforeText = collectBeforeText(undefined, input)
-  const generatedKeys = new Map<string, Set<string>>()
-  for (const field of factFields(generated)) {
-    generatedKeys.set(field.path, keysInField(field.text, beforeText))
-  }
-  const userKeys = new Map<string, Set<string>>()
-  for (const token of userAdditions) {
-    const parsed = parseUserEditToken(token)
-    if (!parsed) continue
-    const set = userKeys.get(parsed.path) ?? new Set<string>()
-    set.add(parsed.key)
-    userKeys.set(parsed.path, set)
-  }
+  const userKeys = userKeyMap(userAdditions)
   const hits: string[] = []
-  for (const field of factFields(resume)) {
-    const fromGenerated = generatedKeys.get(field.path) ?? new Set<string>()
-    const fromUser = userKeys.get(field.path) ?? new Set<string>()
-    for (const item of findFactAdditions(field.text, beforeText)) {
-      if (!fromGenerated.has(item.key) || fromUser.has(item.key)) continue
-      if (!hits.includes(item.text)) hits.push(item.text)
+  const push = (text: string) => {
+    if (!hits.includes(text)) hits.push(text)
+  }
+  const consider = (path: string, currentText: string, generatedText: string, matched: boolean) => {
+    const fromUser = userKeys.get(path) ?? new Set<string>()
+    if (!matched) {
+      for (const item of findFactAdditions(currentText, beforeText)) push(item.text)
+      return
     }
+    const fromGenerated = keysInField(generatedText, beforeText)
+    for (const item of findFactAdditions(currentText, beforeText)) {
+      if (!fromGenerated.has(item.key) || fromUser.has(item.key)) continue
+      push(item.text)
+    }
+  }
+  consider('summary', resume.summary ?? '', generated.summary ?? '', true)
+  for (const section of ENTRY_SECTIONS) {
+    for (const field of alignSection(section, resume, generated)) {
+      consider(field.path, field.currentText, field.previousText, field.matched)
+    }
+  }
+  const generatedSkills = new Set(generated.skills)
+  for (const skill of resume.skills) {
+    const text = skill ?? ''
+    if (!generatedSkills.has(text)) continue
+    consider(skillPath(text), text, text, true)
   }
   return hits
 }
 
-/** 记录预览中每个字段由本人新增的事实。编辑发生时就记下路径和 key，技能也算。 */
+/** 记录预览中本人新增的事实。按对齐后的条目记路径和 key，不按下标；技能只记本人版多出来的值。 */
 export function detectUserResumeEdits(before: GeneratedResume, after: GeneratedResume): string[] {
-  const oldByPath = new Map(factFields(before).map((field) => [field.path, field.text]))
   const tokens: string[] = []
   const seen = new Set<string>()
-  for (const field of factFields(after)) {
-    const old = oldByPath.get(field.path) ?? ''
-    for (const item of findFactAdditions(field.text, old)) {
-      const token = userEditToken(field.path, item.key)
-      if (seen.has(token)) continue
-      seen.add(token)
-      tokens.push(token)
+  const push = (path: string, key: string) => {
+    const token = userEditToken(path, key)
+    if (seen.has(token)) return
+    seen.add(token)
+    tokens.push(token)
+  }
+  for (const item of findFactAdditions(after.summary ?? '', before.summary ?? '')) push('summary', item.key)
+  for (const section of ENTRY_SECTIONS) {
+    for (const field of alignSection(section, after, before)) {
+      if (!field.matched) continue
+      for (const item of findFactAdditions(field.currentText, field.previousText)) push(field.path, item.key)
     }
+  }
+  const beforeSkills = new Set(before.skills)
+  for (const skill of after.skills) {
+    const text = skill ?? ''
+    if (beforeSkills.has(text)) continue
+    for (const item of findFactAdditions(text, '')) push(skillPath(text), item.key)
   }
   return tokens
 }

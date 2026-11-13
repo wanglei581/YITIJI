@@ -237,7 +237,7 @@ test('教育里本人写的 2 不豁免经历里 AI 的 2', () => {
   const generated = resumeFields({ education: '完成本科学业。', experience: '负责排版，周更 2 篇。' })
   const edited = resumeFields({ education: '读了 2 年。', experience: '负责排版，周更 2 篇。' })
   const userAdditions = detectUserResumeEdits(generated, edited)
-  assert.equal(userAdditions.some((token) => token.includes('education[0].description') && token.includes('num:2')), true)
+  assert.equal(userAdditions.some((token) => token.includes('education:name:青岛大学') && token.includes('num:2')), true)
   const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
   assert.equal(hits.some((text) => text.includes('周更')), true)
   assert.equal(hits.some((text) => text.includes('读了')), false)
@@ -269,7 +269,7 @@ test('技能里本人把数字敲回去不算 AI 新增', () => {
   const cleared = resumeWith('负责学院公众号的选题、撰写和排版。', ['熟练使用工具'])
   const retyped = resumeWith('负责学院公众号的选题、撰写和排版。', ['熟练使用 5 种工具'])
   const userAdditions = detectUserResumeEdits(cleared, retyped)
-  assert.equal(userAdditions.some((token) => token.startsWith('field:skills[0]') && token.includes('num:5')), true)
+  assert.equal(userAdditions.some((token) => token.startsWith('field:skill:') && token.includes('num:5')), true)
   const hits = detectGeneratedUnconfirmedAdditions(retyped, generated, originalInput, userAdditions)
   assert.equal(hits.some((text) => text.includes('5')), false)
 })
@@ -285,4 +285,117 @@ test('技能里 AI 新写的数字也要确认', () => {
   const hits = detectUnconfirmedAdditions(resume, modules)
   assert.equal(hits.some((text) => text.includes('5')), true)
   assert.equal(hits.some((text) => text.includes('负责')), false)
+})
+
+function shellResume(experience, skills = []) {
+  return {
+    basic: { name: '周晴', phone: '', city: '青岛' },
+    intention: { position: '新媒体运营', city: '青岛' },
+    summary: '',
+    education: [],
+    experience,
+    projects: [],
+    skills,
+    certificates: [],
+  }
+}
+
+const frontExp = {
+  company: '青岛大学学生会',
+  role: '宣传部干事',
+  period: '2022-2023',
+  description: '负责学院公众号的选题、撰写和排版。',
+}
+const backExp = {
+  company: '青岛海边书店',
+  role: '店员',
+  period: '2023-2024',
+  description: '负责门店陈列，周更 2 篇。',
+}
+const twoExperienceInput = shellResume([
+  frontExp,
+  { ...backExp, description: '负责门店陈列。' },
+])
+const twoExperienceGenerated = shellResume([frontExp, backExp])
+
+test('删掉前段经历后，后段 AI 加的数字仍待确认', () => {
+  const edited = shellResume([backExp])
+  const userAdditions = detectUserResumeEdits(twoExperienceGenerated, edited)
+  const hits = detectGeneratedUnconfirmedAdditions(edited, twoExperienceGenerated, twoExperienceInput, userAdditions)
+  assert.equal(hits.some((text) => text.includes('周更') && text.includes('2')), true)
+})
+
+test('两段经历对调顺序，待确认结果不变', () => {
+  const swapped = shellResume([backExp, frontExp])
+  const kept = detectGeneratedUnconfirmedAdditions(twoExperienceGenerated, twoExperienceGenerated, twoExperienceInput, [])
+  const hits = detectGeneratedUnconfirmedAdditions(swapped, twoExperienceGenerated, twoExperienceInput, [])
+  assert.deepEqual([...hits].sort(), [...kept].sort())
+  assert.equal(hits.some((text) => text.includes('周更') && text.includes('2')), true)
+})
+
+test('删掉一项技能后，剩下的 AI 数字仍待确认，本人敲的免确认', () => {
+  const input = shellResume([frontExp], ['沟通协调', '熟练使用工具'])
+  const generated = shellResume([frontExp], ['沟通协调', '熟练使用 5 种工具'])
+  const edited = shellResume([frontExp], ['熟练使用 5 种工具', '会用 3 种排版'])
+  const userAdditions = detectUserResumeEdits(generated, edited)
+  const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
+  assert.equal(hits.some((text) => text.includes('5')), true)
+  assert.equal(hits.some((text) => text.includes('3')), false)
+})
+
+test('公司名和描述都对不上的条目，里面的数字都待确认', () => {
+  const input = shellResume([frontExp])
+  const generated = shellResume([frontExp])
+  const edited = shellResume([{
+    company: '夜班仓库',
+    role: '理货',
+    period: '2024-2025',
+    description: '独立完成夜间盘点三千件。',
+  }])
+  const userAdditions = detectUserResumeEdits(generated, edited)
+  const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
+  assert.equal(hits.some((text) => text.includes('三千')), true)
+  assert.equal(hits.some((text) => text.includes('独立完成')), true)
+})
+
+test('公司名改了但描述几乎一样时仍按描述配对，本人新写的数免确认', () => {
+  const input = shellResume([{ ...backExp, description: '负责门店陈列。' }])
+  const generated = shellResume([backExp])
+  const edited = shellResume([{
+    ...backExp,
+    company: '海边书店改名',
+    description: '负责门店陈列，周更 2 篇，另记 3 项。',
+  }])
+  const userAdditions = detectUserResumeEdits(generated, edited)
+  assert.equal(userAdditions.some((token) => token.includes('num:3')), true)
+  assert.equal(userAdditions.some((token) => token.includes('num:2')), false)
+  const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
+  assert.equal(hits.some((text) => text.includes('周更') && text.includes('2')), true)
+  assert.equal(hits.some((text) => text.includes('3')), false)
+})
+
+test('条目上有 id 时按 id 对齐，改了公司名也不放过 AI 的数字', () => {
+  const plain = { ...backExp, description: '负责门店陈列。' }
+  const generated = shellResume([{ ...backExp, id: 'exp-b' }])
+  const input = shellResume([{ ...plain, id: 'exp-b' }])
+  const edited = shellResume([{
+    ...backExp,
+    id: 'exp-b',
+    company: '另一块招牌',
+    role: '店长',
+    description: '负责门店陈列，周更 2 篇。',
+  }])
+  const userAdditions = detectUserResumeEdits(generated, edited)
+  const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
+  assert.equal(hits.some((text) => text.includes('周更') && text.includes('2')), true)
+})
+
+test('口语省略位按下一单位读，一万零二仍是 10002', () => {
+  assert.deepEqual(findFactAdditions('月薪一万二。', '月薪 12000。'), [])
+  assert.deepEqual(findFactAdditions('月薪三千五。', '月薪 3500。'), [])
+  assert.deepEqual(findFactAdditions('奖金两百五。', '奖金 250。'), [])
+  assert.deepEqual(findFactAdditions('月薪一万二千。', '月薪 12000。'), [])
+  assert.deepEqual(findFactAdditions('月薪 1万2。', '月薪 12000。'), [])
+  assert.deepEqual(findFactAdditions('月薪一万零二。', '月薪 10002。'), [])
+  assert.deepEqual(keysOf('一万二', '10002'), ['num:12000'])
 })
