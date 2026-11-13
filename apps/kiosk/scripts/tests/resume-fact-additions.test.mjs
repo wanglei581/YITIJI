@@ -473,3 +473,64 @@ test('套话相似度低于 0.72 时不把另一段配上来，AI 的数字仍�
   const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
   assert.equal(hits.some((text) => text.includes('周更') && text.includes('2')), true)
 })
+
+test('百分点、千分之里的百和千不是单位', () => {
+  assert.deepEqual(keysOf('增长1百分点', ''), ['num:1'])
+  assert.deepEqual(keysOf('降低3千分之', ''), ['num:3'])
+  assert.equal(findFactAdditions('增长1百分点', '原稿写了 100').length, 1)
+  assert.deepEqual(findFactAdditions('增长1百分点', '原稿写了 1'), [])
+  assert.equal(findFactAdditions('降低3千分之', '原稿写了 3000').length, 1)
+  assert.deepEqual(findFactAdditions('降低3千分之', '原稿写了 3'), [])
+  assert.deepEqual(keysOf('5百', ''), ['num:500'])
+  assert.deepEqual(keysOf('3千万', ''), ['num:30000000'])
+  assert.deepEqual(findFactAdditions('第3百货', ''), [])
+})
+
+test('多单位逐级变小合成一个数，单位变大就拆开', () => {
+  assert.deepEqual(keysOf('3千5百', ''), ['num:3500'])
+  assert.deepEqual(keysOf('1万2千', ''), ['num:12000'])
+  assert.deepEqual(keysOf('2千万5', ''), ['num:25000000'])
+  assert.equal(findFactAdditions('月薪3000', '月薪3千5百').length, 1)
+  assert.deepEqual(findFactAdditions('月薪3500', '月薪3千5百'), [])
+  assert.deepEqual(keysOf('5百3千', ''), ['num:500', 'num:3000'])
+})
+
+test('同名两段对调后，累计令牌仍只豁免原来那一段', () => {
+  const company = { company: '青岛海边书店', role: '店员', period: '2019-2021' }
+  const plain = { ...company, description: sharedShelf }
+  const aiLine = { ...company, description: `${sharedShelf.slice(0, -1)}，周更 2 篇。` }
+  const userLine = { ...company, description: `${sharedShelf.slice(0, -1)}，另记 2 项。` }
+  const input = shellResume([plain, plain])
+  const generated = shellResume([plain, aiLine])
+  const edited = shellResume([userLine, aiLine])
+  const swapped = shellResume([aiLine, userLine])
+  const userAdditions = detectUserResumeEdits(generated, edited)
+  const kept = [...new Set([...userAdditions, ...detectUserResumeEdits(edited, swapped, generated)])]
+  assert.equal(kept.some((token) => token.includes('同名1') && token.includes('num:2')), true)
+  assert.equal(kept.some((token) => token.includes('同名2') && token.includes('num:2')), false)
+  const hits = detectGeneratedUnconfirmedAdditions(swapped, generated, input, kept)
+  assert.equal(hits.some((text) => text.includes('周更') && text.includes('2')), true)
+  assert.equal(hits.some((text) => text.includes('另记')), false)
+})
+
+test('同名三段里改第 2 段后再和第 3 段对调，第 3 段的数仍待确认', () => {
+  const company = { company: '青岛海边书店', role: '店员', period: '2019-2021' }
+  const base = '完成门店陈列、补货、闭店卫生和每日台账交接'
+  const first = `${base}，早班开门整理门口。`
+  const second = `${base}，午间补货并核对价签。`
+  const thirdPlain = `${base}，晚班闭店清点库存。`
+  const thirdAi = `${base}，晚班闭店清点库存，周更 2 篇。`
+  const secondUser = `${base}，午间补货并核对价签，另记 2 项。`
+  const row = (description) => ({ ...company, description })
+  const input = shellResume([row(first), row(second), row(thirdPlain)])
+  const generated = shellResume([row(first), row(second), row(thirdAi)])
+  const edited = shellResume([row(first), row(secondUser), row(thirdAi)])
+  const swapped = shellResume([row(first), row(thirdAi), row(secondUser)])
+  const userAdditions = detectUserResumeEdits(generated, edited)
+  assert.equal(userAdditions.some((token) => token.includes('同名2') && token.includes('num:2')), true)
+  assert.equal(userAdditions.some((token) => token.includes('同名3') && token.includes('num:2')), false)
+  const kept = [...new Set([...userAdditions, ...detectUserResumeEdits(edited, swapped, generated)])]
+  const hits = detectGeneratedUnconfirmedAdditions(swapped, generated, input, kept)
+  assert.equal(hits.some((text) => text.includes('周更') && text.includes('2')), true)
+  assert.equal(hits.some((text) => text.includes('另记')), false)
+})

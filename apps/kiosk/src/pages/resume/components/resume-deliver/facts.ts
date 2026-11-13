@@ -126,7 +126,7 @@ function nameKey(entry: EntryRef): string | null {
 
 /**
  * 没有 id、名称键又不止一条时，在名称键后加上同名第几段。
- * 只数会走名称路径的条目，这样本人改的那一段不会把另一段的豁免带走。
+ * 序号按传入的这一份列表数。核对和记令牌都传生成稿，本人把两段对调也不改序号。
  */
 function sameNameOrdinals(entries: EntryRef[]): Array<number | null> {
   const counts = new Map<string, number>()
@@ -274,13 +274,18 @@ interface AlignedField {
 
 function alignSection(section: EntrySection, current: GeneratedResume, previous: GeneratedResume): AlignedField[] {
   const currentRefs = sectionRefs(section, current)
-  const ordinals = sameNameOrdinals(currentRefs)
-  return pairEntries(currentRefs, sectionRefs(section, previous)).map((pair, index) => ({
-    path: entryPath(section, pair.current, ordinals[index] ?? null),
-    currentText: pair.current.description,
-    previousText: pair.previous?.description ?? '',
-    matched: pair.previous !== null,
-  }))
+  const previousRefs = sectionRefs(section, previous)
+  const previousOrdinals = sameNameOrdinals(previousRefs)
+  return pairEntries(currentRefs, previousRefs).map((pair) => {
+    const previousIndex = pair.previous ? previousRefs.indexOf(pair.previous) : -1
+    const ordinal = previousIndex >= 0 ? (previousOrdinals[previousIndex] ?? null) : null
+    return {
+      path: entryPath(section, pair.current, ordinal),
+      currentText: pair.current.description,
+      previousText: pair.previous?.description ?? '',
+      matched: pair.previous !== null,
+    }
+  })
 }
 
 const ENTRY_SECTIONS: EntrySection[] = ['education', 'experience', 'projects']
@@ -347,7 +352,7 @@ function userKeyMap(userAdditions: string[]): Map<string, Set<string>> {
 /**
  * 仍留在当前稿里、且能对上生成稿同一条的新增事实。
  * 经历、教育、项目先按条目对齐，再按「这条的身份 + key」豁免，不按下标。
- * 同名同职务又没有 id 时，身份带上同名第几段，只豁免本人改的那一段。
+ * 同名同职务又没有 id 时，身份带上生成稿里的同名第几段，只豁免本人改的那一段。本人换序也不改这段序号。
  * 配不上的条目里，相对原文多出来的数字和职责词一律待确认。
  * 技能里的数字，只有本人写进去、而且 AI 版技能里没有，才免确认。
  * 这一项别的字改过、数字仍是 AI 版技能里的，照样待确认。
@@ -403,8 +408,16 @@ export function detectGeneratedUnconfirmedAdditions(
   return hits
 }
 
-/** 记录预览中本人新增的事实。按对齐后的条目记路径和 key，不按下标。技能里 AI 版已经有的数字不记成本人写的。 */
-export function detectUserResumeEdits(before: GeneratedResume, after: GeneratedResume): string[] {
+/**
+ * 记录预览中本人新增的事实。按对齐后的条目记路径和 key，不按下标。
+ * anchor 是生成稿：同名序号按它数，和核对用的是同一套。不传时按 before 数。
+ * 技能里 AI 版已经有的数字不记成本人写的。
+ */
+export function detectUserResumeEdits(
+  before: GeneratedResume,
+  after: GeneratedResume,
+  anchor: GeneratedResume = before,
+): string[] {
   const tokens: string[] = []
   const seen = new Set<string>()
   const push = (path: string, key: string) => {
@@ -415,9 +428,13 @@ export function detectUserResumeEdits(before: GeneratedResume, after: GeneratedR
   }
   for (const item of findFactAdditions(after.summary ?? '', before.summary ?? '')) push('summary', item.key)
   for (const section of ENTRY_SECTIONS) {
-    for (const field of alignSection(section, after, before)) {
-      if (!field.matched) continue
-      for (const item of findFactAdditions(field.currentText, field.previousText)) push(field.path, item.key)
+    const anchored = alignSection(section, after, anchor)
+    const changed = anchor === before ? anchored : alignSection(section, after, before)
+    for (let index = 0; index < anchored.length; index += 1) {
+      const pathField = anchored[index]
+      const diffField = changed[index]
+      if (!pathField || !diffField || !pathField.matched || !diffField.matched) continue
+      for (const item of findFactAdditions(diffField.currentText, diffField.previousText)) push(pathField.path, item.key)
     }
   }
   const beforeSkillKeys = new Set<string>()

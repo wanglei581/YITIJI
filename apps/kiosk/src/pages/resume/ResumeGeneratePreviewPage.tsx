@@ -461,7 +461,8 @@ export function ResumeGeneratePreviewPage() {
                 resume={resume}
                 summaryRef={summaryRef}
                 onChange={(next) => {
-                  setUserAdditions((words) => [...new Set([...words, ...detectUserResumeEdits(resume, next)])])
+                  const generatedResume = result.resume ?? resume
+                  setUserAdditions((words) => [...new Set([...words, ...detectUserResumeEdits(resume, next, generatedResume)])])
                   setResume(next); setExported(null); setExportError(null)
                 }}
                 previewClassName={previewClassName}

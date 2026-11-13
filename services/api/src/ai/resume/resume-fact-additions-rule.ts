@@ -5,9 +5,12 @@
  * 数字按完整数值比较，不按子串：原文有「2020」不能放过改写里的「20」或「202」。
  * 带百分号和不带百分号是两个事实。中文数字先折成数值，再和阿拉伯数字放在同一套记号里比。
  * 最后一个大单位（百、千、万、亿）后面只跟一个数字、中间没有「零」、这个数字自己也没有单位时，
- * 这个数字取下一级单位：一万二 = 12000，三千五 = 3500，两百五 = 250，1万2 = 12000，3千5 = 3500。
+ * 这个数字取下一级单位：一万二 = 12000，三千五 = 3500，两百五 = 250，1万2 = 12000，3千5 = 3500，2千万5 = 25000000。
  * 数字后面已经没有任何字符时同样按省略单位读。空字符串不是单位。
  * 「一万零二」有零，仍是 10002；「一万二千」末位自己带千，仍是 12000。
+ * 「百分点」「百分比」「百分之」「千分之」「千分比」「万分之」里的百、千、万不是单位：1百分点 = 1。
+ * 阿拉伯数字与中文单位交替、且单位逐级变小，合成一个数：3千5百 = 3500，1万2千 = 12000。
+ * 单位不是逐级变小（如 5百3千）就拆开读，不合成一个数。
  * 职责词长的先占住区间，「独立负责」不再另报里面的「负责」。
  */
 
@@ -327,6 +330,21 @@ function arabicUnitPlaces(ch: string): number {
   return 0
 }
 
+/** 这几个词里的百、千、万是「分」的说法，不是 100、1000、10000。 */
+const NOT_UNIT_PHRASES = ['百分点', '百分比', '百分之', '千分之', '千分比', '万分之']
+
+function isNotUnitPhrase(text: string, index: number): boolean {
+  for (let i = 0; i < NOT_UNIT_PHRASES.length; i += 1) {
+    if (text.startsWith(NOT_UNIT_PHRASES[i], index)) return true
+  }
+  return false
+}
+
+function readArabicUnitPlaces(text: string, index: number): number {
+  if (isNotUnitPhrase(text, index)) return 0
+  return arabicUnitPlaces(text.charAt(index))
+}
+
 function matchArabic(
   text: string,
   index: number,
@@ -342,18 +360,30 @@ function matchArabic(
   if (canonical === null) return null
   let end = index + raw.length
   if (!percent) {
-    const unitPlaces = arabicUnitPlaces(text.charAt(end))
+    const unitPlaces = readArabicUnitPlaces(text, end)
     if (unitPlaces > 0) {
       canonical = shiftDecimal(canonical, unitPlaces)
       end += 1
-      let places = unitPlaces
-      const bigger = arabicUnitPlaces(text.charAt(end))
+      let magnitude = unitPlaces
+      const bigger = readArabicUnitPlaces(text, end)
       if (bigger > unitPlaces && !canonical.includes('.')) {
         canonical = shiftDecimal(canonical, bigger)
         end += 1
-        places = bigger
+        magnitude += bigger
       }
-      const tail = omittedArabicTail(text, end, places)
+      // 3千5百、1万2千：后面每段都是「一个数字 + 更小的单位」，合进同一个数。
+      // 5百3千这种单位变大的，停在这个数字前面，留给下一次各自确认。
+      while (!canonical.includes('.')) {
+        if (!isDigitChar(text.charAt(end)) || isDigitChar(text.charAt(end + 1))) break
+        const smaller = readArabicUnitPlaces(text, end + 1)
+        if (!(smaller > 0 && smaller < magnitude)) break
+        const part = shiftDecimal(toHalfWidth(text.charAt(end)), smaller)
+        if (part.includes('.')) break
+        canonical = (BigInt(canonical) + BigInt(part)).toString()
+        end += 2
+        magnitude = smaller
+      }
+      const tail = omittedArabicTail(text, end, magnitude)
       if (tail && !canonical.includes('.') && !tail.value.includes('.')) {
         canonical = (BigInt(canonical) + BigInt(tail.value)).toString()
         end = tail.end
