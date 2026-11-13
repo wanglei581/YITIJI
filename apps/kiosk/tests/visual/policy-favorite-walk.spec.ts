@@ -289,7 +289,8 @@ test('查政策磁贴写查看政策说明，不再写带走材料清单 @kiosk'
 })
 
 test('浏览记录和打开来源各点一条政策，落到那一条；已下架落到已经撤下 @kiosk', async ({ page, api }) => {
-  test.setTimeout(60_000)
+  // 登录要逐位点键盘，再连开三条政策。会员登录态只在内存里，不能整页重开。
+  test.setTimeout(120_000)
   const state: PolicyRouteState = { broken: false, holdSlow: null, detailLog: [], withdrawn: new Set(['policy-gone']) }
   await routePolicies(page, state)
   api.respond('GET', '/api/v1/me/browse-logs', {
@@ -326,14 +327,18 @@ test('浏览记录和打开来源各点一条政策，落到那一条；已下�
   await expect(policyHeading(page, '高校毕业生求职创业补贴')).toBeVisible()
   expect(state.detailLog).toContain('policy-fav')
 
-  await page.goto('/me/activity?tab=jump')
+  // 会员 token 只在内存（auth/context.ts）。整页打开会丢掉登录，打开来源页签不会出现。
+  await page.goBack()
+  await expect(page.getByTestId('member-records-activity-tab-jump')).toBeVisible()
+  await page.getByTestId('member-records-activity-tab-jump').click()
   await page.getByTestId('member-records-activity-j-policy').click()
   await page.waitForURL((url) => url.pathname === '/renshi' && url.searchParams.get('policy') === 'policy-dated')
   await expect(policyScreen(page)).toHaveAttribute('data-qxt-state', 'ready')
   await expect(policyHeading(page, '已写明发布日期的补贴说明')).toBeVisible()
   expect(state.detailLog).toContain('policy-dated')
 
-  await page.goto('/me/activity')
+  await page.goBack()
+  await page.getByTestId('member-records-activity-tab-browse').click()
   await page.getByTestId('member-records-activity-b-gone').click()
   await page.waitForURL((url) => url.pathname === '/renshi' && url.searchParams.get('policy') === 'policy-gone')
   await expect(policyScreen(page)).toHaveAttribute('data-qxt-state', 'missing')
