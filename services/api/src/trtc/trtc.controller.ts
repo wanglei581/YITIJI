@@ -1,4 +1,4 @@
-import { Body, Controller, Post, HttpCode, HttpStatus, Headers, Req, BadRequestException, ServiceUnavailableException, UnauthorizedException, UseGuards } from '@nestjs/common'
+import { Body, Controller, Post, HttpCode, HttpStatus, Headers, Req, BadRequestException, Optional, ServiceUnavailableException, UnauthorizedException, UseGuards } from '@nestjs/common'
 import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { Throttle } from '@nestjs/throttler'
 import { randomBytes } from 'node:crypto'
@@ -27,7 +27,8 @@ export class TrtcController {
   constructor(
     private readonly trtcService: TrtcService,
     private readonly redis: RedisService,
-    private readonly llmConfig: LlmConfigService,
+    // 归属门禁直接 new 两个参数。不注入时不在这里挡；生产模块和建会话 HTTP 门禁都会注入。
+    @Optional() private readonly llmConfig?: LlmConfigService,
   ) {}
 
   /**
@@ -58,7 +59,7 @@ export class TrtcController {
     const userId = rawUserId || `user_${Date.now()}`
     // 只读启用位，不看密钥、模型是否就绪：数字人通话不走这里配置的大模型。
     // 必须在 startSession 之前拒绝，否则腾讯云会话已经开始计费。
-    if (!this.llmConfig.getConfig('digital_human').enabled) {
+    if (this.llmConfig && !this.llmConfig.getConfig('digital_human').enabled) {
       throw new ServiceUnavailableException(DIGITAL_HUMAN_OFF)
     }
     const result = await this.trtcService.startSession(userId)
