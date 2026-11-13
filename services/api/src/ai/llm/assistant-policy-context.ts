@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
+import { scopeForAmbientPolicyRead } from '../../policies/policy-scope.service'
 import { publicPolicyLookupWhere } from '../../policies/policy-public-visibility'
 import { checkPolicySourceLink } from '../../policies/policy-source-link'
 import { AI_POLICY_EXPLAIN_CONSTRAINT } from '../safety/policy-explain-constraint'
@@ -25,7 +26,7 @@ export class AssistantPolicyContextService {
     const row = await this.prisma.policyPost.findFirst({
       where: await publicPolicyLookupWhere(this.prisma, {
         id: policyId, reviewStatus: 'approved', publishStatus: 'published',
-      }, { mode: 'all' }),
+      }, await scopeForAmbientPolicyRead()),
       include: { org: { select: { verifiedOfficialDomainsJson: true } } },
     })
     if (!row) return null
