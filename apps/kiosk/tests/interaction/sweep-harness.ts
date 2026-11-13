@@ -259,6 +259,16 @@ export function isDead(obs: FourObs, disabled: boolean): boolean {
   return !obs.urlChanged && obs.apiRequests.length === 0 && !obs.domChanged && !obs.overlayOrToastOrError
 }
 
+/**
+ * 默认只把步骤错误写进证据后继续，给旧的控件扫查用。
+ * AI 简历这条走查在 beforeEach 里打开，失败的步骤会重新抛出，用例变红。
+ */
+let rethrowStepErrors = false
+
+export function failJourneySteps(enabled: boolean): void {
+  rethrowStepErrors = enabled
+}
+
 export async function recordStep(opts: {
   page: Page
   journey: string
@@ -308,6 +318,7 @@ export async function recordStep(opts: {
       note: opts.note ?? message,
     }
     appendOperation(op)
+    if (rethrowStepErrors) throw error
     return op
   }
   const apiRequests = opts.collectors.takeApiSince()

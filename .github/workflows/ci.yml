@@ -1501,6 +1501,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: kiosk-interaction-journey-failure
+          # 启动脚本失败时会先把 API 日志拷进这个目录，再删临时目录。
           path: test-results/kiosk-interaction/**
           if-no-files-found: ignore
           retention-days: 7

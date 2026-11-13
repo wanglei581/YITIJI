@@ -21,7 +21,86 @@ import {
   FIXTURE_PRICING_CHARGED,
   FIXTURE_PRICING_UNAVAILABLE,
 } from '../../resume-report-fixture'
+import { subscribeKioskSensitiveSessionClear } from '../../../../auth/kioskSensitiveSession'
 import { useStartPrintHandoff } from '../../../print/usePrintHandoff'
+
+/** 与 aiResumeSession 同一把钥匙。只追加本次导出回执，清场删整把钥匙时一起清掉。 */
+const AI_RESUME_SESSION_KEY = 'ai-job-print:current-ai-resume'
+
+function readSessionRecord(): Record<string, unknown> | null {
+  if (typeof sessionStorage === 'undefined') return null
+  try {
+    const raw = sessionStorage.getItem(AI_RESUME_SESSION_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    return parsed as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
+function readReportTakeaway(taskId: string | undefined): { kind: ResumeReportExportKind; file: ResumeReportExportResponse } | null {
+  if (!taskId) return null
+  const parsed = readSessionRecord()
+  if (!parsed || parsed.taskId !== taskId) return null
+  const takeaway = parsed.reportTakeaway
+  if (!takeaway || typeof takeaway !== 'object' || Array.isArray(takeaway)) return null
+  const row = takeaway as Record<string, unknown>
+  const kind = row.kind === 'change_list' || row.kind === 'diagnosis_report' ? row.kind : null
+  const fileId = typeof row.fileId === 'string' ? row.fileId : ''
+  const filename = typeof row.filename === 'string' ? row.filename : ''
+  const signedUrl = typeof row.signedUrl === 'string' ? row.signedUrl : ''
+  const printFileUrl = typeof row.printFileUrl === 'string' ? row.printFileUrl : ''
+  const expiresAt = typeof row.expiresAt === 'string' ? row.expiresAt : ''
+  if (!kind || !fileId || !filename || !signedUrl || !printFileUrl || !expiresAt) return null
+  return {
+    kind,
+    file: {
+      fileId,
+      filename,
+      mimeType: 'application/pdf',
+      sizeBytes: typeof row.sizeBytes === 'number' ? row.sizeBytes : 0,
+      pageCount: typeof row.pageCount === 'number' ? row.pageCount : 0,
+      signedUrl,
+      expiresAt,
+      printFileUrl,
+      savedToDocuments: row.savedToDocuments === true,
+      aiGenerated: true,
+    },
+  }
+}
+
+function writeReportTakeaway(
+  taskId: string | undefined,
+  takeaway: { kind: ResumeReportExportKind; file: ResumeReportExportResponse } | null,
+): void {
+  if (!taskId || typeof sessionStorage === 'undefined') return
+  try {
+    const parsed = readSessionRecord()
+    if (!parsed || parsed.taskId !== taskId) return
+    if (takeaway) {
+      parsed.reportTakeaway = {
+        kind: takeaway.kind,
+        fileId: takeaway.file.fileId,
+        filename: takeaway.file.filename,
+        signedUrl: takeaway.file.signedUrl,
+        printFileUrl: takeaway.file.printFileUrl,
+        expiresAt: takeaway.file.expiresAt,
+        sizeBytes: takeaway.file.sizeBytes,
+        pageCount: takeaway.file.pageCount,
+        savedToDocuments: takeaway.file.savedToDocuments,
+        mimeType: 'application/pdf',
+        aiGenerated: true,
+      }
+    } else {
+      delete parsed.reportTakeaway
+    }
+    sessionStorage.setItem(AI_RESUME_SESSION_KEY, JSON.stringify(parsed))
+  } catch {
+    // 写不进去时这一页仍用内存里的结果；不另开一把钥匙。
+  }
+}
 
 function exportErrorMessage(err: unknown): string {
   const code = errorCodeOf(err)
@@ -115,10 +194,11 @@ export function ResumeReportTakeaway(props: {
   const benefitGrantId = capture ? undefined : live.benefitGrantId
   const pricingLoading = capture ? false : live.loading
 
+  const restored = capture ? null : readReportTakeaway(props.taskId)
   const [exported, setExported] = useState<ResumeReportExportResponse | null>(
-    capture === 'export-ready' ? FIXTURE_EXPORT : null,
+    capture === 'export-ready' ? FIXTURE_EXPORT : restored?.file ?? null,
   )
-  const [exportKind, setExportKind] = useState<ResumeReportExportKind>('diagnosis_report')
+  const [exportKind, setExportKind] = useState<ResumeReportExportKind>(restored?.kind ?? 'diagnosis_report')
   const [exporting, setExporting] = useState(false)
   const [printNavigating, setPrintNavigating] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -129,6 +209,10 @@ export function ResumeReportTakeaway(props: {
   const { onExportedChange } = props
   const hasExport = Boolean(exported)
   useEffect(() => { onExportedChange?.(hasExport) }, [onExportedChange, hasExport])
+  useEffect(() => subscribeKioskSensitiveSessionClear(() => {
+    setExported(null)
+    setPreviewOpen(false)
+  }), [])
 
   if (!props.show) return null
 
@@ -157,8 +241,10 @@ export function ResumeReportTakeaway(props: {
       setExported(result)
       setExportKind(kind)
       setPreviewOpen(false)
+      if (!capture) writeReportTakeaway(props.taskId, { kind, file: result })
     } catch (err) {
       setExported(null)
+      if (!capture) writeReportTakeaway(props.taskId, null)
       setExportError(exportErrorMessage(err))
     } finally {
       setExporting(false)

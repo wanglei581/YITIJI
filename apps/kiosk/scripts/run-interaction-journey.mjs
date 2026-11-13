@@ -2,11 +2,14 @@
 /**
  * 一体机 AI 简历交互走查：私有 Redis + 新 SQLite + 真 AppModule + 一体机 dev，跑完按进程停干净。
  *
- * 不读本机 .env，也不使用真实密钥。端口默认 API 3110、一体机 5373、Redis 6493。
- * 收尾断言 git status --porcelain 为空（被忽略的 test-results/ 不算）。
+ * 子进程只用环境白名单，Vite 的 envDir 指到临时空目录，不读本机环境文件。
+ * 端口可由 INTERACTION_REDIS_PORT、INTERACTION_API_PORT、INTERACTION_VITE_PORT 覆盖。
+ * 默认 Redis 6495、API 3112、Vite 5375。被占用就直接失败，不连接别人的服务。
+ * 正常和异常结束都删临时目录；失败时先把 API 日志拷进 test-results/kiosk-interaction/。
+ * git status 看退出码，命令失败或工作区不干净都算失败。
  */
 import { spawn, spawnSync } from 'node:child_process'
-import { createWriteStream, existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { copyFileSync, createWriteStream, existsSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -18,13 +21,25 @@ import net from 'node:net'
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const apiRoot = join(repoRoot, 'services/api')
 const kioskRoot = join(repoRoot, 'apps/kiosk')
-const apiPort = Number(process.env.INTERACTION_API_PORT ?? 3110)
-const kioskPort = Number(process.env.INTERACTION_KIOSK_PORT ?? 5373)
-const redisPort = Number(process.env.INTERACTION_REDIS_PORT ?? 6493)
+function portFrom(name, fallback) {
+  const raw = process.env[name]
+  if (raw === undefined || raw === '') return fallback
+  const port = Number(raw)
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`${name}=${raw} 不是可用端口`)
+  }
+  return port
+}
+
+const redisPort = portFrom('INTERACTION_REDIS_PORT', 6495)
+const apiPort = portFrom('INTERACTION_API_PORT', 3112)
+const vitePort = portFrom('INTERACTION_VITE_PORT', 5375)
 const pepper = 'dev-secret-encryption-key-replace-in-prod-min-32-chars'
 
 const children = []
 let runDir = ''
+let apiStream = null
+const PASSTHROUGH_ENV = ['PATH', 'HOME', 'LANG', 'LC_ALL', 'CI', 'PLAYWRIGHT_BROWSERS_PATH', 'TMPDIR', 'TMP', 'TEMP']
 
 function playwrightArgs() {
   const forward = []
@@ -43,17 +58,11 @@ function playwrightArgs() {
   ]
 }
 
-function keepEnvKey(key) {
-  return ['PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'LANG', 'LC_ALL', 'TMPDIR', 'TMP', 'TEMP', 'PWD', 'CI', 'TERM', 'NODE_PATH', 'PLAYWRIGHT_BROWSERS_PATH'].includes(key)
-}
-
-function scrubbedEnv(extra) {
-  const env = { ...process.env }
-  for (const key of Object.keys(env)) {
-    if (keepEnvKey(key)) continue
-    if (/SECRET|PASSWORD|TOKEN|CREDENTIAL|DATABASE_URL|REDIS_URL|POSTGRES|COS_|OSS_|AWS_|ALIYUN|TENCENT_|BAIDU_|API_KEY|_KEY$/.test(key)) {
-      delete env[key]
-    }
+function childEnv(extra) {
+  const env = {}
+  for (const key of PASSTHROUGH_ENV) {
+    const value = process.env[key]
+    if (value) env[key] = value
   }
   return { ...env, ...extra }
 }
@@ -74,27 +83,26 @@ function track(child, kind) {
   return child
 }
 
+function signalOwned(child, signal) {
+  if (!child.pid) return
+  try { process.kill(-child.pid, signal) } catch { /* ESRCH：进程组已经没了 */ }
+  try { process.kill(child.pid, signal) } catch { /* 进程组信号没落到这个 pid 时再补一刀 */ }
+}
+
 async function stopOwned() {
-  for (const child of [...children].reverse()) {
-    if (child.exitCode !== null || child.signalCode !== null || !child.pid) continue
-    try { process.kill(-child.pid, 'SIGTERM') } catch { /* already gone */ }
-  }
+  for (const child of [...children].reverse()) signalOwned(child, 'SIGTERM')
   const deadline = Date.now() + 8_000
   while (Date.now() < deadline && children.some((child) => child.exitCode === null && child.signalCode === null)) {
     await delay(200)
   }
-  for (const child of children) {
-    if (child.exitCode === null && child.signalCode === null && child.pid) {
-      try { process.kill(-child.pid, 'SIGKILL') } catch { /* already gone */ }
-    }
-  }
+  for (const child of children) signalOwned(child, 'SIGKILL')
 }
 
 function ensureCjkFont() {
   if (process.platform !== 'linux') return
   const font = '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc'
   if (existsSync(font)) return
-  const installed = spawnSync('sudo', ['apt-get', 'install', '-y', '-q', 'fonts-wqy-microhei'], { stdio: 'inherit' })
+  const installed = spawnSync('sudo', ['apt-get', 'install', '-y', '-q', 'fonts-wqy-microhei'], { stdio: 'inherit', env: childEnv({}) })
   if (installed.status !== 0 || !existsSync(font)) {
     throw new Error('Linux 上没有中文字体，安装 fonts-wqy-microhei 失败')
   }
@@ -123,8 +131,8 @@ function assertAlive(child, log) {
 }
 
 async function main() {
-  for (const [name, port] of [['API', apiPort], ['一体机', kioskPort], ['Redis', redisPort]]) {
-    if (!(await portFree(port))) throw new Error(`${name} 端口 ${port} 已被占用，本脚本不结束别人的进程`)
+  for (const [name, port] of [['Redis', redisPort], ['API', apiPort], ['Vite', vitePort]]) {
+    if (!(await portFree(port))) throw new Error(`${name} 端口 ${port} 已被占用，本脚本不连接别人的服务`)
   }
   ensureCjkFont()
   runDir = join(tmpdir(), `kiosk-interaction-${Date.now()}`)
@@ -136,6 +144,8 @@ async function main() {
   mkdirSync(redisDir, { recursive: true })
   const emptyEnv = join(runDir, 'empty.env')
   writeFileSync(emptyEnv, '')
+  const emptyEnvDir = join(runDir, 'empty-env')
+  mkdirSync(emptyEnvDir, { recursive: true })
   const apiLog = join(runDir, 'api.log')
   const evidenceDir = join(repoRoot, 'test-results/kiosk-interaction/evidence/ai-resume')
   mkdirSync(evidenceDir, { recursive: true })
@@ -149,7 +159,7 @@ async function main() {
     '--save', '',
     '--appendonly', 'no',
     '--protected-mode', 'yes',
-  ], { detached: true, stdio: ['ignore', 'pipe', 'pipe'] }), 'redis')
+  ], { detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: childEnv({}) }), 'redis')
   let redisLog = ''
   redis.stdout.on('data', (chunk) => { redisLog = `${redisLog}${chunk}`.slice(-4000) })
   redis.stderr.on('data', (chunk) => { redisLog = `${redisLog}${chunk}`.slice(-4000) })
@@ -162,7 +172,7 @@ async function main() {
   const prismaCli = apiRequire.resolve('prisma/build/index.js')
   const swcRegister = apiRequire.resolve('@swc-node/register')
   const databaseUrl = `file:${dbPath}`
-  const apiEnv = scrubbedEnv({
+  const apiEnv = childEnv({
     NODE_ENV: 'test',
     DOTENV_CONFIG_PATH: emptyEnv,
     DATABASE_URL: databaseUrl,
@@ -213,7 +223,7 @@ async function main() {
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   }), 'api')
-  const apiStream = createWriteStream(apiLog)
+  apiStream = createWriteStream(apiLog)
   let apiTail = ''
   const capture = (chunk) => {
     apiStream.write(chunk)
@@ -231,13 +241,54 @@ async function main() {
 
   const kioskRequire = createRequire(join(kioskRoot, 'package.json'))
   const viteBin = join(dirname(kioskRequire.resolve('vite/package.json')), 'bin/vite.js')
-  const kioskOrigin = `http://127.0.0.1:${kioskPort}`
-  const kiosk = track(spawn(process.execPath, [viteBin, '--host', '127.0.0.1', '--port', String(kioskPort), '--strictPort'], {
-    cwd: kioskRoot,
-    env: scrubbedEnv({
+  const kioskOrigin = `http://127.0.0.1:${vitePort}`
+  const apiBase = `${apiOrigin}/api/v1`
+  writeFileSync(join(emptyEnvDir, '.env.interaction'), `VITE_API_MODE=http\nVITE_API_BASE_URL=${apiBase}\nVITE_API_PROXY_TARGET=${apiOrigin}\n`)
+  // Vite 会把配置打成临时 ESM。临时目录本身没有 node_modules，裸导入 'vite' 会失败。
+  // 链到一体机自己的 node_modules，不把配置写进仓库。
+  symlinkSync(join(kioskRoot, 'node_modules'), join(emptyEnvDir, 'node_modules'), 'dir')
+  const viteConfig = join(emptyEnvDir, 'vite.interaction.config.mts')
+  writeFileSync(viteConfig, `import { createRequire } from 'node:module'
+import realConfig from ${JSON.stringify(join(kioskRoot, 'vite.config.ts'))}
+
+const { mergeConfig } = createRequire(${JSON.stringify(join(kioskRoot, 'package.json'))})('vite')
+const allowed = new Set(['VITE_API_MODE', 'VITE_API_BASE_URL', 'VITE_API_PROXY_TARGET'])
+const expectedBase = ${JSON.stringify(apiBase)}
+
+export default async (env) => {
+  const resolved = await (typeof realConfig === 'function' ? realConfig(env) : realConfig)
+  return mergeConfig(resolved, {
+    envDir: ${JSON.stringify(emptyEnvDir)},
+    plugins: [{
+      name: 'interaction-env-lock',
+      configResolved(config) {
+        for (const key of Object.keys(config.env)) {
+          if (key.startsWith('VITE_') && !allowed.has(key)) {
+            throw new Error('Vite 环境超出白名单：' + key)
+          }
+        }
+        if (config.env.VITE_API_MODE !== 'http' || config.env.VITE_API_BASE_URL !== expectedBase) {
+          throw new Error('Vite API 没有指到本次走查的本机端口')
+        }
+      },
+    }],
+  })
+}
+`)
+  const kiosk = track(spawn(process.execPath, [
+    viteBin,
+    '--config', viteConfig,
+    '--mode', 'interaction',
+    '--host', '127.0.0.1',
+    '--port', String(vitePort),
+    '--strictPort',
+    kioskRoot,
+  ], {
+    cwd: emptyEnvDir,
+    env: childEnv({
       NODE_ENV: 'development',
       VITE_API_MODE: 'http',
-      VITE_API_BASE_URL: `${apiOrigin}/api/v1`,
+      VITE_API_BASE_URL: apiBase,
       VITE_API_PROXY_TARGET: apiOrigin,
     }),
     detached: true,
@@ -255,9 +306,9 @@ async function main() {
   const playwrightCli = join(dirname(kioskRequire.resolve('@playwright/test/package.json')), 'cli.js')
   // 必须异步起 Playwright：spawnSync 会堵住事件循环，API / Redis 的日志管道写满后请求会挂死。
   const testCode = await new Promise((resolveCode) => {
-    const test = spawn(process.execPath, [playwrightCli, 'test', ...playwrightArgs()], {
+    const test = track(spawn(process.execPath, [playwrightCli, 'test', ...playwrightArgs()], {
       cwd: kioskRoot,
-      env: scrubbedEnv({
+      env: childEnv({
         NODE_ENV: 'test',
         INTERACTION_KIOSK_ORIGIN: kioskOrigin,
         INTERACTION_API_ORIGIN: apiOrigin,
@@ -267,13 +318,61 @@ async function main() {
         SWEEP_API_LOG: apiLog,
         SWEEP_PDF: join(runDir, 'valid-2p.pdf'),
       }),
+      detached: true,
       stdio: 'inherit',
-    })
+    }), 'playwright')
     test.on('error', () => resolveCode(1))
     test.on('exit', (code) => resolveCode(code === null ? 1 : code))
   })
   return testCode
 }
+
+async function doFinish(code) {
+  await stopOwned()
+  if (apiStream) {
+    const stream = apiStream
+    apiStream = null
+    await new Promise((resolve) => stream.end(resolve))
+  }
+  if (code !== 0 && runDir) {
+    const destDir = join(repoRoot, 'test-results/kiosk-interaction')
+    mkdirSync(destDir, { recursive: true })
+    const src = join(runDir, 'api.log')
+    if (existsSync(src)) copyFileSync(src, join(destDir, 'api.log'))
+  }
+  if (runDir && existsSync(runDir)) rmSync(runDir, { recursive: true, force: true })
+  runDir = ''
+  const git = spawnSync('git', ['status', '--porcelain'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    env: childEnv({}),
+  })
+  if (git.error || git.status !== 0) {
+    console.error(`git status 失败（退出码 ${git.status ?? '无'}）\n${git.stderr ?? ''}${git.error ? git.error.message : ''}`)
+    process.exitCode = 1
+    return
+  }
+  const dirty = git.stdout ?? ''
+  if (dirty.trim()) {
+    console.error(`跑完后工作区不干净（被跟踪文件或未忽略的新文件）：\n${dirty}`)
+    process.exitCode = 1
+    return
+  }
+  process.exitCode = code === 0 ? 0 : code
+}
+
+let finishPromise = null
+function requestFinish(code) {
+  if (!finishPromise) finishPromise = doFinish(code)
+  return finishPromise
+}
+
+process.on('SIGINT', () => {
+  requestFinish(130).finally(() => process.exit(process.exitCode ?? 130))
+})
+process.on('SIGTERM', () => {
+  requestFinish(143).finally(() => process.exit(process.exitCode ?? 143))
+})
 
 let testCode = 1
 try {
@@ -281,19 +380,5 @@ try {
 } catch (error) {
   console.error(error instanceof Error ? error.message : error)
   testCode = 1
-} finally {
-  await stopOwned()
 }
-
-let dirty = ''
-try {
-  dirty = spawnSync('git', ['status', '--porcelain'], { cwd: repoRoot, encoding: 'utf8' }).stdout ?? ''
-} catch (error) {
-  dirty = error instanceof Error ? error.message : String(error)
-}
-if (dirty.trim()) {
-  console.error(`跑完后工作区不干净（被跟踪文件或未忽略的新文件）：\n${dirty}`)
-  process.exitCode = 1
-} else if (testCode !== 0) {
-  process.exitCode = testCode
-}
+await requestFinish(testCode)

@@ -51100,7 +51100,6 @@
           "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs",
           "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
           "apps/kiosk/scripts/verify-w3a-ai-records.mjs",
-          "apps/kiosk/tests/interaction/ai-resume-journey.spec.ts",
           "docs/acceptance/self-assessment-acceptance-package.md",
           "docs/design/kiosk-proto-2026-07-migration-matrix.md",
           "docs/design/kiosk-touch-2026-10/map.js",
