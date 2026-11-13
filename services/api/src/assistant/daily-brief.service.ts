@@ -6,6 +6,9 @@ import { publicPolicyLookupWhere } from '../policies/policy-public-visibility'
 import { RedisService } from '../common/redis/redis.service'
 
 const CACHE_TTL_SECONDS = 15 * 60
+
+/** 与社区动态同一时机清掉：早报「当日新政策」最多缓存 15 分钟。 */
+export const DAILY_BRIEF_CITY_CACHE_PREFIX = 'daily-brief:city-new:v2:'
 const HOUR_MS = 60 * 60 * 1000
 const DAY_MS = 24 * HOUR_MS
 const PUBLISHED = { reviewStatus: 'approved', publishStatus: 'published' }
@@ -102,7 +105,7 @@ export class DailyBriefService {
 
   private async cityNew(city: string, date: string, hosting: boolean): Promise<Extract<DailyReportModule, { type: 'city_new' }>> {
     const hostingKey = hosting ? 'hosting' : 'closed'
-    const cacheKey = `daily-brief:city-new:v2:${hostingKey}:${date}:${encodeURIComponent(city)}`
+    const cacheKey = `${DAILY_BRIEF_CITY_CACHE_PREFIX}${hostingKey}:${date}:${encodeURIComponent(city)}`
     const load = async () => {
       const { start, end } = shanghaiDayRange(date)
       const [newJobs, newPolicies] = await Promise.all([

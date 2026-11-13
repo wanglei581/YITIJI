@@ -17,15 +17,39 @@
 // （下架走既有 unpublish 路径，需要单独动作与单独审计）。
 // ============================================================
 
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import type { Redis } from 'ioredis'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
+import { REDIS_CLIENT } from '../common/redis/redis.service'
+import { COMMUNITY_FEED_CACHE_PREFIX } from '../community/community.service'
+import { DAILY_BRIEF_CITY_CACHE_PREFIX } from '../assistant/daily-brief.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import type { OrgContentTrustDto } from './dto/org-content-trust.dto'
 
 /** 与 docs/product/recruitment-content-domain-model-2026-08.md §Organization 一致。 */
 export const ORG_CONTENT_TRUST_STATUSES = ['pending', 'active', 'suspended', 'revoked'] as const
 export type OrgContentTrustStatus = (typeof ORG_CONTENT_TRUST_STATUSES)[number]
+
+/** 社区动态和早报共用的公开缓存。生产走 Redis SCAN；门禁可以换一块内存实现。 */
+export interface PublicContentCache {
+  deleteByPrefix(prefix: string): Promise<void>
+}
+
+@Injectable()
+export class RedisPublicContentCache implements PublicContentCache {
+  constructor(@Inject(REDIS_CLIENT) private readonly client: Redis) {}
+
+  async deleteByPrefix(prefix: string): Promise<void> {
+    let cursor = '0'
+    do {
+      const page = await this.client.scan(cursor, 'MATCH', `${prefix}*`, 'COUNT', 200)
+      cursor = page[0]
+      const keys = page[1]
+      if (keys.length > 0) await this.client.del(...keys)
+    } while (cursor !== '0')
+  }
+}
 
 export interface OrgContentTrustView {
   id: string
@@ -44,6 +68,7 @@ export class AdminOrgContentTrustService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Inject(RedisPublicContentCache) private readonly publicCache: PublicContentCache,
   ) {}
 
   async getContentTrust(id: string): Promise<OrgContentTrustView> {
@@ -126,6 +151,10 @@ export class AdminOrgContentTrustService {
     this.logger.log(
       `setContentTrust: org=${id} ${org.contentTrustStatus ?? 'null'} -> ${status} by=${user.userId}`,
     )
+    // 公开列表已经看内容可信，但社区动态和早报把结果缓存了 15 分钟。
+    // 撤销和恢复都要立刻清掉，否则已撤下的内容还会露在外面，恢复的也要等缓存过期。
+    await this.publicCache.deleteByPrefix(COMMUNITY_FEED_CACHE_PREFIX)
+    await this.publicCache.deleteByPrefix(DAILY_BRIEF_CITY_CACHE_PREFIX)
     return this.toView(updated)
   }
 

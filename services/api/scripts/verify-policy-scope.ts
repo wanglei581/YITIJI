@@ -6,9 +6,11 @@ import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ConflictException, NotFoundException } from '@nestjs/common'
-import { MODULE_METADATA } from '@nestjs/common/constants'
+import { HTTP_CODE_METADATA, MODULE_METADATA } from '@nestjs/common/constants'
+import type { Redis } from 'ioredis'
 import { PoliciesModule } from '../src/policies/policies.module'
 import { PoliciesController } from '../src/policies/policies.controller'
+import { PolicyChecklistController } from '../src/policies/policy-checklist.controller'
 import { CommunityModule } from '../src/community/community.module'
 import { MemberFavoritesController } from '../src/member-favorites/member-favorites.controller'
 import { MeActivityController } from '../src/activity/me-activity.controller'
@@ -20,7 +22,10 @@ import { ANONYMOUS_AI_CALLER, lazyAiRequestContext, runWithAiRequestContext } fr
 import { FilesService } from '../src/files/files.service'
 import { StorageService } from '../src/storage/storage.service'
 import { publicPolicyWhere, policyScopeMode } from '../src/policies/policy-public-visibility'
-import { communityFeedCacheKey } from '../src/community/community.service'
+import { COMMUNITY_FEED_CACHE_PREFIX, CommunityService, communityFeedCacheKey } from '../src/community/community.service'
+import { DAILY_BRIEF_CITY_CACHE_PREFIX, DailyBriefService, type DailyReport } from '../src/assistant/daily-brief.service'
+import { AdminOrgContentTrustService, RedisPublicContentCache } from '../src/orgs/admin-org-content-trust.service'
+import type { RedisService } from '../src/common/redis/redis.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
@@ -152,6 +157,7 @@ async function assertRevokedOrDisabledOrgPolicyLeavesPublicRead(): Promise<void>
     assert.equal(await listed(), true)
     assert.equal(await detailVisible(), true)
     await assertOrgScopeMatchesListChecklistAndAssistant(prisma, dir)
+    await assertRevokingTrustDropsCachedFeeds(prisma)
   } finally {
     await prisma.onModuleDestroy?.()
     rmSync(dir, { recursive: true, force: true })
@@ -268,6 +274,22 @@ async function assertOrgScopeMatchesListChecklistAndAssistant(prisma: PrismaServ
     await assert.rejects(() => checklist.generate(guideB, headersFor(terminalA)), NotFoundException)
     await assert.rejects(() => checklist.generate(guideA, headersFor(terminalUnbound)), NotFoundException)
     await assert.rejects(() => checklist.generate(guideA, { headers: {} }), NotFoundException)
+    assert.equal(
+      Reflect.getMetadata(HTTP_CODE_METADATA, PolicyChecklistController.prototype.generate),
+      200,
+      '办事清单走控制器成功时必须是 200',
+    )
+    const checklistController = new PolicyChecklistController(checklist)
+    const ownViaController = await checklistController.generate(guideA, terminalA, `ok:${terminalA}`)
+    assert.equal(ownViaController.data.policyId, guideA, 'org 模式下控制器带本机构终端头，本机构清单成功')
+    await assert.rejects(
+      () => checklistController.generate(guideB, terminalA, `ok:${terminalA}`),
+      (error: unknown) => {
+        assert.ok(error instanceof NotFoundException, 'org 模式下控制器带终端头，跨机构清单必须 404')
+        assert.equal(error.getStatus(), 404)
+        return true
+      },
+    )
     delete process.env['POLICY_SCOPE']
     const across = await checklist.generate(guideB, headersFor(terminalA))
     assert.equal(across.policyId, guideB, '回到 all 后，绑定甲的终端仍能生成乙的清单')
@@ -279,6 +301,65 @@ async function assertOrgScopeMatchesListChecklistAndAssistant(prisma: PrismaServ
     if (priorSigning === undefined) delete process.env['FILE_SIGNING_SECRET']
     else process.env['FILE_SIGNING_SECRET'] = priorSigning
   }
+}
+
+/** 社区动态和早报缓存 15 分钟。撤销或恢复内容可信后，下一次请求不能再看见旧结果。 */
+async function assertRevokingTrustDropsCachedFeeds(prisma: PrismaService): Promise<void> {
+  const keys = new Map<string, string>()
+  const redis = {
+    async get(key: string) { return keys.get(key) ?? null },
+    async setEx(key: string, _ttlSeconds: number, value: string) { keys.set(key, value) },
+  }
+  const client = {
+    async scan(cursor: string, matchWord: string, pattern: string, countWord: string, count: number): Promise<[string, string[]]> {
+      assert.equal(matchWord, 'MATCH')
+      assert.equal(countWord, 'COUNT')
+      assert.equal(count, 200)
+      if (cursor !== '0') return ['0', []]
+      const prefix = pattern.endsWith('*') ? pattern.slice(0, -1) : pattern
+      return ['0', [...keys.keys()].filter((key) => key.startsWith(prefix))]
+    },
+    async del(...found: string[]) {
+      for (const key of found) keys.delete(key)
+      return found.length
+    },
+  }
+  const community = new CommunityService(prisma, redis as unknown as RedisService)
+  const brief = new DailyBriefService(prisma, redis as unknown as RedisService)
+  const trust = new AdminOrgContentTrustService(prisma, new AuditService(prisma), new RedisPublicContentCache(client as unknown as Redis))
+  const orgA = 'org-scope-a'
+  const guideA = `policy:${'policy-scope-guide-a'}`
+  const city = '缓存失效验证市'
+  const adminId = 'admin-cache-bust'
+  await prisma.user.create({
+    data: { id: adminId, username: adminId, passwordHash: 'fixture', name: '缓存验证管理员', role: 'admin' },
+  })
+  const admin = { userId: adminId, role: 'admin' as const, orgId: null }
+  const containsGuide = (page: { items: Array<{ id: string }> }) => page.items.some((item) => item.id === guideA)
+  const policyCount = (report: DailyReport) => {
+    const row = report.modules.find((item) => item.type === 'city_new')
+    return row?.type === 'city_new' ? row.newPolicies : 0
+  }
+  const hasPrefix = (prefix: string) => [...keys.keys()].some((key) => key.startsWith(prefix))
+
+  const beforeFeed = await community.list()
+  assert.equal(containsGuide(beforeFeed), true, '撤销前社区动态含该机构政策')
+  const beforeCount = policyCount(await brief.create('cache-bust-user', city))
+  assert.ok(beforeCount >= 1, '撤销前早报计入了已发布政策')
+  assert.equal(hasPrefix(COMMUNITY_FEED_CACHE_PREFIX), true, '社区动态结果已进缓存')
+  assert.equal(hasPrefix(DAILY_BRIEF_CITY_CACHE_PREFIX), true, '早报结果已进缓存')
+
+  await trust.setContentTrust(orgA, { status: 'revoked', reason: '授权到期' }, admin)
+  assert.equal(hasPrefix(COMMUNITY_FEED_CACHE_PREFIX), false, '撤销后社区动态缓存已清')
+  assert.equal(hasPrefix(DAILY_BRIEF_CITY_CACHE_PREFIX), false, '撤销后早报缓存已清')
+  const afterFeed = await community.list()
+  assert.equal(containsGuide(afterFeed), false, '撤销后马上请求的社区动态不再含该机构政策')
+  const afterCount = policyCount(await brief.create('cache-bust-user', city))
+  assert.equal(afterCount, beforeCount - 1, '撤销后马上请求的早报不再计入该机构政策')
+
+  await trust.setContentTrust(orgA, { status: 'active', reason: '重新核验通过' }, admin)
+  assert.equal(containsGuide(await community.list()), true, '恢复可信后社区动态重新含该机构政策')
+  assert.equal(policyCount(await brief.create('cache-bust-user', city)), beforeCount, '恢复可信后早报重新计入该机构政策')
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1 })

@@ -353,7 +353,15 @@ export class LlmConfigService {
     const env = this.fromEnv()
     const map = {} as PersistedConfigMap
     for (const key of ACTIVE_FEATURE_KEYS) {
-      map[key] = this.withDefaults(raw[key] ?? env)
+      const saved = raw[key]
+      const config = this.withDefaults(saved ?? env)
+      // 数字人这个功能位以前后台存不了。文件里没有它，或对象没写 enabled，都按开，
+      // 跟今天线上「没有这道开关」一致。只有文件里明确写了布尔值，或管理员后来保存过，才认那个值。
+      // AI_LLM_API_KEY / TRTC_LLM_API_KEY 只决定能不能接通，不决定这个开关。
+      if (key === 'digital_human' && typeof saved?.enabled !== 'boolean') {
+        config.enabled = true
+      }
+      map[key] = config
     }
     return map
   }

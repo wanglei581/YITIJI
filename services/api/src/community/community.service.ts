@@ -7,9 +7,12 @@ import type { CommunityFeedItem, CommunityFeedKind, CommunityFeedPage } from './
 
 const CACHE_TTL_SECONDS = 15 * 60
 
+/** 撤销或恢复机构内容可信时按这个前缀整段清掉，避免 15 分钟内还吐已撤下的内容。 */
+export const COMMUNITY_FEED_CACHE_PREFIX = 'community:feeds:v2:'
+
 export function communityFeedCacheKey(hostingKey: string, scope: PolicyPublicScope, cursorValue: string | undefined, limit: number): string {
   const scopeKey = scope.mode === 'org' ? `${scope.state}:${scope.orgId ?? 'none'}` : 'all'
-  return `community:feeds:v2:${hostingKey}:${scopeKey}:${cursorValue ?? 'first'}:${limit}`
+  return `${COMMUNITY_FEED_CACHE_PREFIX}${hostingKey}:${scopeKey}:${cursorValue ?? 'first'}:${limit}`
 }
 const MAX_SUMMARY_LENGTH = 120
 

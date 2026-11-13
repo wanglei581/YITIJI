@@ -925,8 +925,8 @@
 | PUT | `/api/v1/admin/orgs/:id/accounts/:accountId/email` | AdminOrgsController.bindAccountEmail | admin | AdminOrgsService | AuditLog<br/>Organization<br/>User |
 | PATCH | `/api/v1/admin/orgs/:id/accounts/:accountId/password` | AdminOrgsController.resetAccountPassword | admin | AdminOrgsService | AuditLog<br/>Organization<br/>User |
 | PATCH | `/api/v1/admin/orgs/:id/accounts/:accountId/status` | AdminOrgsController.setAccountStatus | admin | AdminOrgsService | AuditLog<br/>Organization<br/>User |
-| GET | `/api/v1/admin/orgs/:id/content-trust` | AdminOrgsController.getContentTrust | admin | AdminOrgContentTrustService | AuditLog<br/>Organization |
-| PATCH | `/api/v1/admin/orgs/:id/content-trust` | AdminOrgsController.setContentTrust | admin | AdminOrgContentTrustService | AuditLog<br/>Organization |
+| GET | `/api/v1/admin/orgs/:id/content-trust` | AdminOrgsController.getContentTrust | admin | AdminOrgContentTrustService | AuditLog<br/>BenefitActivity<br/>Favorite<br/>Job<br/>JobFair<br/>Order<br/>Organization<br/>PolicyPost<br/>SystemBroadcast |
+| PATCH | `/api/v1/admin/orgs/:id/content-trust` | AdminOrgsController.setContentTrust | admin | AdminOrgContentTrustService | AuditLog<br/>BenefitActivity<br/>Favorite<br/>Job<br/>JobFair<br/>Order<br/>Organization<br/>PolicyPost<br/>SystemBroadcast |
 | PATCH | `/api/v1/admin/orgs/:id/status` | AdminOrgsController.setOrgStatus | admin | AdminOrgsService | AuditLog<br/>Organization<br/>User |
 
 ## `services/api/src/orgs/partner-account-action.controller.ts`

@@ -3728,7 +3728,14 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "Organization"
+          "BenefitActivity",
+          "Favorite",
+          "Job",
+          "JobFair",
+          "Order",
+          "Organization",
+          "PolicyPost",
+          "SystemBroadcast"
         ],
         "path": "/api/v1/admin/orgs/:id/content-trust",
         "roles": [
@@ -3747,7 +3754,14 @@
         "method": "PATCH",
         "models": [
           "AuditLog",
-          "Organization"
+          "BenefitActivity",
+          "Favorite",
+          "Job",
+          "JobFair",
+          "Order",
+          "Organization",
+          "PolicyPost",
+          "SystemBroadcast"
         ],
         "path": "/api/v1/admin/orgs/:id/content-trust",
         "roles": [
@@ -26912,7 +26926,8 @@
       "services/api/scripts/verify-assistant-policy-context.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-governed-job-fit.ts",
-      "services/api/scripts/verify-self-assessment-ai-gate.ts"
+      "services/api/scripts/verify-self-assessment-ai-gate.ts",
+      "services/api/scripts/verify-trtc-ownership.ts"
     ],
     "services/api/src/ai/ai.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
@@ -27066,6 +27081,7 @@
       "services/api/scripts/verify-llm-connectivity.ts",
       "services/api/scripts/verify-llm-thinking-off.ts",
       "services/api/scripts/verify-print-param-suggestion.ts",
+      "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
     "services/api/src/ai/llm/llm-failure.ts": [
@@ -27605,6 +27621,7 @@
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
+      "services/api/scripts/verify-policy-scope.ts",
       "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/audit/audit.module.ts": [
@@ -28289,6 +28306,7 @@
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
+      "services/api/scripts/verify-policy-scope.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-recruitment-hosting-default-off.ts",
@@ -29721,7 +29739,8 @@
     ],
     "services/api/src/orgs/admin-org-content-trust.service.ts": [
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs",
-      "services/api/scripts/verify-content-trust-publish-gate.ts"
+      "services/api/scripts/verify-content-trust-publish-gate.ts",
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/orgs/admin-orgs.controller.ts": [
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs",
@@ -30087,7 +30106,8 @@
       "services/api/scripts/verify-policy-checklist.ts"
     ],
     "services/api/src/policies/policy-checklist.controller.ts": [
-      "services/api/scripts/verify-policy-checklist.ts"
+      "services/api/scripts/verify-policy-checklist.ts",
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/policies/policy-checklist.service.ts": [
       "services/api/scripts/verify-policy-checklist.ts",
@@ -31156,6 +31176,7 @@
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
     "services/api/src/trtc/trtc.module.ts": [
+      "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
     "services/api/src/trtc/trtc.service.ts": [
@@ -31166,6 +31187,7 @@
       "services/api/scripts/verify-assistant-device-fault.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-llm-thinking-off.ts",
+      "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-trtc-session-deadline.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
@@ -46088,15 +46110,19 @@
           "services/api/src/activity/me-activity.controller.ts",
           "services/api/src/ai/llm/assistant-policy-context.ts",
           "services/api/src/ai/usage/ai-usage-context.ts",
+          "services/api/src/assistant/daily-brief.service.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/redis/redis.service.ts",
           "services/api/src/community/community.module.ts",
           "services/api/src/community/community.service.ts",
           "services/api/src/files/files.service.ts",
           "services/api/src/member-favorites/member-favorites.controller.ts",
+          "services/api/src/orgs/admin-org-content-trust.service.ts",
           "services/api/src/policies/policies.controller.ts",
           "services/api/src/policies/policies.module.ts",
           "services/api/src/policies/policies.service.ts",
           "services/api/src/policies/policy-checklist-metadata.ts",
+          "services/api/src/policies/policy-checklist.controller.ts",
           "services/api/src/policies/policy-checklist.service.ts",
           "services/api/src/policies/policy-public-visibility.ts",
           "services/api/src/policies/policy-scope.service.ts",
@@ -48809,9 +48835,13 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/ai/ai.module.ts",
+          "services/api/src/ai/llm/llm-config.service.ts",
           "services/api/src/app.module.ts",
           "services/api/src/common/redis/redis.service.ts",
-          "services/api/src/trtc/trtc.controller.ts"
+          "services/api/src/trtc/trtc.controller.ts",
+          "services/api/src/trtc/trtc.module.ts",
+          "services/api/src/trtc/trtc.service.ts"
         ],
         "missing": []
       },
