@@ -185,12 +185,23 @@ export class MockInterviewService {
     return { sessionId: row.id, questionTarget: row.questionTarget, ...(accessToken ? { accessToken } : {}) }
   }
 
-  async start(sessionId: string, requester: InterviewRequester, opts?: { hardDeadline?: boolean }) {
+  /** 这场已经有面试官发言。没有这场会话时先抛，调用方据此决定还没扣款。 */
+  async hasInterviewerTurn(sessionId: string, requester: InterviewRequester): Promise<boolean> {
+    const session = await this.loadAuthorized(sessionId, requester)
+    const turn = await this.prisma.mockInterviewTurn.findFirst({
+      where: { sessionId: session.id, role: 'interviewer' },
+      select: { id: true },
+    })
+    return Boolean(turn)
+  }
+
+  async start(sessionId: string, requester: InterviewRequester, opts?: { hardDeadline?: boolean; skipDailyQuota?: boolean }) {
     const identity = captureFactIdentity()
     // 鉴权必须在合并之前：否则无权请求会复用已授权 worker 的 Promise。
     await this.loadAuthorized(sessionId, requester)
     const hardDeadline = opts?.hardDeadline === true
-    return this.startInflight.run(this.coalesceKey(sessionId, requester), () => this.startOnce(sessionId, requester, identity, hardDeadline))
+    const skipDailyQuota = opts?.skipDailyQuota === true
+    return this.startInflight.run(this.coalesceKey(sessionId, requester), () => this.startOnce(sessionId, requester, identity, hardDeadline, skipDailyQuota))
   }
 
   private startOnce(
@@ -198,12 +209,13 @@ export class MockInterviewService {
     requester: InterviewRequester,
     identity: ReturnType<typeof captureFactIdentity>,
     hardDeadline: boolean,
+    skipDailyQuota = false,
   ) {
     return executeInterviewStart(
       this.interviewStartDeps(),
       sessionId,
       requester,
-      (spec) => this.runInterviewQuota(spec),
+      (spec) => this.runInterviewQuota({ ...spec, skipDailyQuota }),
       () => recordAiServiceFact(this.prisma, this.logger, identity, 'mock_interview', sessionId),
       hardDeadline,
     )

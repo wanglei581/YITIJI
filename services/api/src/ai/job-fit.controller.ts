@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Req } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Delete, Get, Optional, Param, Post, Req } from '@nestjs/common'
 import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
@@ -23,6 +23,8 @@ import {
   kioskJobBoardTerminalRef,
   type KioskJobBoardRequest,
 } from '../terminals/kiosk-job-board.service'
+import { resumeTripCover } from '../payment/service-order.intercept'
+import { ServiceOrderService } from '../payment/service-order.service'
 // ── DTO（全局 forbidNonWhitelisted）─────────────────────────────────────────
 
 class ManualJobDto {
@@ -91,6 +93,7 @@ export class JobFitController {
     private readonly prisma: PrismaService,
     private readonly governed: GovernedJobFitService,
     private readonly jobBoard?: KioskJobBoardService,
+    @Optional() private readonly serviceOrders?: ServiceOrderService,
   ) {}
 
   /**
@@ -150,7 +153,10 @@ export class JobFitController {
       throw new BadRequestException({ error: { code: 'JOB_FIT_TARGET_MISSING', message: '请选择系统内岗位或填写目标岗位' } })
     }
     const requester = await this.requesterOf(req)
-    return this.governed.analyzeForJobFit(dto, requester, quotaContextOf(req, requester), req)
+    const cover = await resumeTripCover(this.serviceOrders, req.headers)
+    return this.governed.analyzeForJobFit(dto, requester, quotaContextOf(req, requester), req, {
+      skipDailyQuota: cover.skipDailyQuota,
+    })
   }
 
   @Post('consent')

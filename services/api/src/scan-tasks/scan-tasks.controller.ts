@@ -1,6 +1,7 @@
 import { MaintenanceBlocked } from '../ai-access/ai-access.decorator'
 import {
   BadRequestException,
+  Optional,
   Body,
   Controller,
   Delete,
@@ -28,6 +29,8 @@ import { TerminalIdentityGuard } from '../terminals/terminal-identity.guard'
 import { TerminalsService } from '../terminals/terminals.service'
 import { CreateScanTaskDto } from './dto/create-scan-task.dto'
 import { ScanTasksService } from './scan-tasks.service'
+import { chargeScanStart } from '../payment/service-order.intercept'
+import { ServiceOrderService } from '../payment/service-order.service'
 
 @Controller()
 export class ScanTasksController {
@@ -37,6 +40,7 @@ export class ScanTasksController {
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
+    @Optional() private readonly serviceOrders?: ServiceOrderService,
   ) {}
 
   @Post('scan/sessions')
@@ -55,11 +59,11 @@ export class ScanTasksController {
       })
     }
     const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
-    const result = await this.scanTasks.create(
+    const result = await chargeScanStart(this.serviceOrders, req.headers, () => this.scanTasks.create(
       dto,
       endUser?.endUserId ?? null,
-      retryControlToken
-    )
+      retryControlToken,
+    ))
     return ApiResponse.ok(result)
   }
 

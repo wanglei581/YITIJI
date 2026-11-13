@@ -1,5 +1,5 @@
 import { wavDuration } from '../asr/wav-duration'
-import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Delete, Get, Optional, Param, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
 import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
@@ -19,6 +19,8 @@ import { AsrService, ASR_MAX_AUDIO_BYTES } from './asr/asr.service'
 import { TtsService } from './asr/tts.service'
 import { AiLogService } from '../ai/ai-log.service'
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
+import { chargeInterviewStart } from '../payment/service-order.intercept'
+import { ServiceOrderService } from '../payment/service-order.service'
 
 // ── DTO（全局 forbidNonWhitelisted：未知字段直接 400）─────────────────────────
 
@@ -126,6 +128,7 @@ export class MockInterviewController {
     private readonly prisma: PrismaService,
     private readonly aiLog: AiLogService,
     private readonly transcriptPrint: InterviewTranscriptPrintService,
+    @Optional() private readonly serviceOrders?: ServiceOrderService,
   ) {}
 
   private async requesterOf(req: ReqLike): Promise<InterviewRequester> {
@@ -149,9 +152,14 @@ export class MockInterviewController {
   @AiUse('generate')
 
   async start(@Param('id') id: string, @Body() dto: StartInterviewDto, @Req() req: ReqLike) {
-    return ApiResponse.ok(await this.service.start(id, await this.requesterOf(req), {
-      hardDeadline: dto?.hardDeadline === true,
-    }))
+    const requester = await this.requesterOf(req)
+    const alreadyOpen = typeof this.service.hasInterviewerTurn === 'function'
+      ? await this.service.hasInterviewerTurn(id, requester)
+      : false
+    const opened = await chargeInterviewStart(this.serviceOrders, req.headers, id, alreadyOpen, (skipDailyQuota) =>
+      this.service.start(id, requester, { hardDeadline: dto?.hardDeadline === true, skipDailyQuota }),
+    )
+    return ApiResponse.ok(opened)
   }
 
   @Post(':id/answer')

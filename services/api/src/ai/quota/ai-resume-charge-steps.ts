@@ -15,6 +15,7 @@ export async function chargeComputeResumeOptimize(
   req: QuotaAbortRequest | undefined,
   runCharge: <T>(input: ResumeChargeRunInput<T>) => Promise<T>,
   onSaved?: () => void,
+  beforeGenerate?: () => Promise<boolean>,
 ): Promise<OptimizeResumeOutput> {
   const cached = await bindings.load<OptimizeResumeOutput>(taskId, 'optimize', requester)
   if (cached) return cached
@@ -46,8 +47,10 @@ export async function chargeComputeResumeOptimize(
         }
       }
     }
+    const skipDailyQuota = beforeGenerate ? await beforeGenerate() : false
     return await runCharge({
       endUserId: parseOwner?.endUserId ?? null,
+      skipDailyQuota,
       operationKey: `${taskId}:optimize`,
       req,
       loadStored: () => bindings.load<OptimizeResumeOutput>(taskId, 'optimize', requester),
@@ -87,6 +90,7 @@ export async function chargeAdjustResumeLayout(
   requester: ResumeChargeRequester,
   req: QuotaAbortRequest | undefined,
   runCharge: <T>(input: ResumeChargeRunInput<T>) => Promise<T>,
+  skipDailyQuota = false,
 ): Promise<{ resume: GeneratedResume; warnings: string[] }> {
   const parseResult = await bindings.load<ParseResumeOutput>(taskId, 'parse', requester)
   if (!parseResult) {
@@ -113,6 +117,7 @@ export async function chargeAdjustResumeLayout(
     const charging = bindings.charging(parseOwner?.endUserId)
     return await runCharge({
       endUserId: parseOwner?.endUserId ?? null,
+      skipDailyQuota,
       operationKey: `${taskId}:layout:${quotaSequence()}`,
       req,
       work: async () => {
