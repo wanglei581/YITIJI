@@ -153,20 +153,23 @@ test.describe('机构详情：官方渠道（只读 + 紧急下架）', () => {
     const live = channelItem(channels, '人才交流中心官网')
     await expect(live.getByRole('status', { name: '机构已启用' })).toBeVisible()
     await expect(live).toContainText('https://www.rencai-demo.gov.cn/')
+    await expect(live).toContainText('面向对象：面向高校毕业生')
     await expect(live.getByRole('button', { name: '紧急下架', exact: true })).toBeVisible()
 
     const held = channelItem(channels, '线上业务大厅（旧入口）')
     await expect(held.getByRole('status', { name: '平台已紧急下架' })).toBeVisible()
+    await expect(held).toContainText('面向对象：面向社会求职者')
     await expect(held).toContainText('事由：权利人投诉')
     await expect(held).toContainText('页面冒用第三方机构标识，权利人投诉编号 TS-2026-0921')
     await expect(held.getByRole('button'), '已下架的一行不再有任何操作').toHaveCount(0)
 
+    await expect(channels.getByRole('radio')).toHaveCount(0)
     await expect(channels.getByRole('button', { name: /新增|添加|编辑|恢复/ })).toHaveCount(0)
     await shot(page, 'channels', channels)
   })
 
   test('紧急下架：事由与说明都必填；服务端确认后这一行变为已下架且不再有按钮', async ({ page }) => {
-    const { channels } = await openOrg(page, CITY_CENTER)
+    const { channels } = await openOrg(page, CITY_CENTER, { 'mock:recruitment-emergency': 'confirm' })
     await channelItem(channels, '人才交流中心官网').getByRole('button', { name: '紧急下架', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: '紧急下架机构官方渠道' })
     await expect(dialog).toBeVisible()
@@ -206,6 +209,23 @@ test.describe('机构详情：官方渠道（只读 + 紧急下架）', () => {
     await expect(channels.getByRole('button', { name: '紧急下架', exact: true })).toHaveCount(0)
     await expect(channels).toContainText('共 2 条，其中 2 条已紧急下架')
     await shot(page, 'channels-after-takedown', channels)
+  })
+
+  test('演示模式默认不执行紧急下架：如实提示，这一行不变', async ({ page }) => {
+    const { channels } = await openOrg(page, CITY_CENTER)
+    await channelItem(channels, '人才交流中心官网').getByRole('button', { name: '紧急下架', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: '紧急下架机构官方渠道' })
+    await dialog.getByRole('combobox', { name: /事由/ }).selectOption('illegal_content')
+    await dialog.getByRole('textbox', { name: /说明/ }).fill('官网首页被篡改，挂出与机构无关的收费培训广告')
+    await dialog.getByRole('button', { name: '确认紧急下架（不可恢复）' }).click()
+    await expect(dialog.getByRole('alert')).toContainText('演示模式不执行')
+    await expect(dialog.getByText('服务端已确认处置')).toHaveCount(0)
+    await dialog.getByRole('button', { name: '取消' }).click()
+    await expect(dialog).toHaveCount(0)
+    const kept = channelItem(channels, '人才交流中心官网')
+    await expect(kept.getByRole('status', { name: '机构已启用' })).toBeVisible()
+    await expect(kept.getByRole('button', { name: '紧急下架', exact: true })).toBeVisible()
+    await expect(kept.getByRole('status', { name: '平台已紧急下架' })).toHaveCount(0)
   })
 
   test('紧急下架被服务端拒绝时如实报错，这一行不变；Escape 只关弹窗不关抽屉', async ({ page }) => {

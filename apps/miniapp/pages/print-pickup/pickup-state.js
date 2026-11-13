@@ -2,6 +2,13 @@
 // 取件页的纯函数：金额、码的分组、倒计时文案、订单状态 → 屏幕状态。从 print-pickup.js 拆出来
 // （那个文件超过 800 行，CLAUDE.md §8 不再往里堆功能）。只服务取件页，不进 utils/。
 const { SUPPORT_HINT } = require('../../utils/user-error')
+const {
+  resolveSupportView,
+  supportFields,
+  splitDetailPhone,
+  reprintNoteText,
+} = require('../../utils/support-contact')
+const printParams = require('../../utils/print-params')
 
 function parseAmountCents(value) {
   if (value === undefined || value === null || value === '') return null
@@ -23,7 +30,14 @@ function formatCountdown(ms) {
   return hours > 0 ? `${hours}小时${minutes}分钟后过期` : `${Math.max(1, minutes)}分钟后过期`
 }
 
-function resolveOrderState(order) {
+function wholeRemaining(value) {
+  if (typeof value !== 'number' || !Number.isInteger(value)) return null
+  return value
+}
+
+function resolveOrderState(order, support) {
+  const view = support && typeof support === 'object' ? support : resolveSupportView(null)
+  const hint = view.hint || SUPPORT_HINT
   const pickupStatus = String(order.pickupStatus || '')
   const taskStatus = String(order.taskStatus || '')
   const isFreeOrder = parseAmountCents(order.amountCents) === 0
@@ -35,10 +49,27 @@ function resolveOrderState(order) {
     return { key: 'cancelled', title: '订单已取消', detail: '本次到机码已经失效。', showQr: false }
   }
   if (taskStatus === 'failed') {
-    return { key: 'failed', title: '打印失败', detail: `请查看终端屏幕上的提示；可以回到订单重新打印。${SUPPORT_HINT}`, showQr: false }
+    const note = reprintNoteText(order)
+    if (order.reprintAllowed === true && note) {
+      return {
+        key: 'failed',
+        title: '打印失败',
+        detail: `回到同一台一体机，再输一次这个到机码，可以接着打（${note}）。${hint}`,
+        showQr: true,
+      }
+    }
+    const remaining = wholeRemaining(order.reprintRemaining)
+    // 这一单失败后订单上没有「重打」的按钮：次数用完（或服务端不让续打）就只能重新下一单。
+    // 和一体机同一个说法（「还要打，请在手机上重新下单」），不说「回到订单重新打印」。
+    let action = '还要打，请重新下单。'
+    if (remaining === 0) action = '这一单不能再打了；还要打，请重新下单。'
+    let detail = `请查看终端屏幕上的提示；${action}`
+    if (view.suggestOtherTerminal === true) detail += '附近还有别的一体机可用。'
+    detail += hint
+    return { key: 'failed', title: '打印失败', detail, showQr: false }
   }
   if (taskStatus === 'abandoned') {
-    return { key: 'abandoned', title: '打印任务已终止', detail: `请回到订单页重新发起。${SUPPORT_HINT}`, showQr: false }
+    return { key: 'abandoned', title: '打印任务已终止', detail: `请回到订单页重新发起。${hint}`, showQr: false }
   }
   if (taskStatus === 'completed') {
     return { key: 'completed', title: '打印已完成', detail: '请及时取走纸张并检查是否齐全。', showQr: false }
@@ -57,4 +88,86 @@ function resolveOrderState(order) {
   return { key: 'pending', title: '等待终端扫码', detail: '将二维码对准一体机扫码器，或手动输入到机码。', showQr: true }
 }
 
-module.exports = { parseAmountCents, formatCode, formatCountdown, resolveOrderState }
+// 底部主按钮：只有真的打印完成才写「完成」。码还没用、还在排队或打印时写「返回首页」——
+// 写「完成」会让人以为这一单已经结束，其实还要走到一体机前扫码。
+function bottomActionLabel(statusKey) {
+  return statusKey === 'completed' ? '完成' : '返回首页'
+}
+
+// 文件名要能让人认出是哪一份：选错文件的两份往往只差中间一段（BIZ-COLOR / BIZ-PAPER），
+// 所以常见长度一律全量显示，靠换行放下；只有超过 60 个字的才截，保留开头和扩展名。
+function shortName(name, max) {
+  const text = String(name || '').trim()
+  const limit = max || 60
+  if (text.length <= limit) return text
+  const tail = Math.min(15, Math.floor(limit / 3))
+  return `${text.slice(0, limit - tail - 1)}…${text.slice(text.length - tail)}`
+}
+
+/** 取件页信息卡：文件、终端、规格。全部来自服务端订单详情；缺的项就不显示。 */
+function orderSummary(order) {
+  const o = order || {}
+  const store = [o.terminalName, o.locationLabel]
+    .map((part) => (typeof part === 'string' ? part.trim() : ''))
+    .filter(Boolean)
+    .filter((part, index, list) => list.indexOf(part) === index)
+    .join(' · ')
+  return { fileName: shortName(o.fileName), store, spec: printParams.displaySpec(o) }
+}
+
+// 下单流程里的页：取件页返回时跳过它们。下单已经完成，退回「选终端」只会让人再下一单。
+const ORDER_FLOW_ROUTES = [
+  'pages/print-upload/print-upload',
+  'pages/print-store/print-store',
+  'pages/print-pay/print-pay',
+  'pages/print-preview/print-preview',
+]
+
+/**
+ * 取件页返回要退几页。routes 是页面栈的 route 列表，最后一项是取件页自己。
+ * 返回 0 表示栈里没有下单流程以外的页，应当回首页。
+ */
+function backDeltaPastOrderFlow(routes) {
+  const list = Array.isArray(routes) ? routes : []
+  let delta = 1
+  for (let i = list.length - 2; i >= 0; i -= 1) {
+    if (ORDER_FLOW_ROUTES.indexOf(list[i]) < 0) break
+    delta += 1
+  }
+  return delta < list.length ? delta : 0
+}
+
+function paintOrder(order, support, codeRaw, codeText, hasCode) {
+  const view = support && typeof support === 'object' ? support : resolveSupportView(null)
+  const status = resolveOrderState(order, view)
+  const fields = supportFields(view)
+  const show = !!(status.showQr && hasCode)
+  const split = splitDetailPhone(status.detail, fields.canCallPhone ? fields.supportPhone : '')
+  const summary = orderSummary(order)
+  return Object.assign({
+    statusKey: status.key,
+    statusTitle: status.title,
+    statusDetail: status.detail,
+    statusLead: split.lead,
+    statusTail: split.tail,
+    detailPhone: split.hit,
+    showQr: show,
+    codeRaw: show ? codeRaw : '',
+    code: show ? codeText : '',
+    doneLabel: bottomActionLabel(status.key),
+    fileName: summary.fileName,
+    store: summary.store,
+    spec: summary.spec,
+  }, fields)
+}
+
+module.exports = {
+  parseAmountCents,
+  formatCode,
+  formatCountdown,
+  resolveOrderState,
+  paintOrder,
+  bottomActionLabel,
+  orderSummary,
+  backDeltaPastOrderFlow,
+}

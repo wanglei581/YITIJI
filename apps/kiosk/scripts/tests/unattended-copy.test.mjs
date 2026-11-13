@@ -3,9 +3,9 @@
  * 转译真实源码来跑，不另抄一份句子。
  */
 import assert from 'node:assert/strict'
-import test from 'node:test'
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import test, { mock } from 'node:test'
+import { readdirSync, readFileSync } from 'node:fs'
+import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 
@@ -120,13 +120,99 @@ test('服务端原话叫人找现场工作人员时换成登记句，干净原�
   assert.equal(copy.containsStaffHandoff('缺纸时一体机会自动停止接单'), true)
 })
 
+test('词表补的短说法：找 / 叫 / 请 / 问 / 向、现场……、会……、由……处理 的变体，服务端原话都换成登记句；隐私说明和普通提示不误伤', () => {
+  for (const handoff of [
+    '多次重试仍失败，请现场工作人员协助',
+    '可以叫现场工作人员来看看',
+    '上传一直不结束，可以叫工作人员来看一眼',
+    '打印作业未确认完成，请工作人员检查出纸状态',
+    '不会操作可以问工作人员',
+    '有问题可以向工作人员反馈',
+    '是否补打，以工作人员现场核查结果为准',
+    '工作人员会取出卡纸并补打',
+    '补打由工作人员凭订单号处理',
+  ]) {
+    assert.equal(copy.containsStaffHandoff(handoff), true, `应命中词表：${handoff}`)
+    assert.equal(copy.preferUnattended(handoff, '标准句'), '标准句', `应换成登记句：${handoff}`)
+  }
+  for (const clean of [
+    '企业、合作机构与工作人员都看不到，也不参与岗位排序',
+    '系统不保存答案原文，只留一串校验码',
+    '本机暂停接单，请稍后再来',
+  ]) {
+    assert.equal(copy.containsStaffHandoff(clean), false, `不该命中词表：${clean}`)
+    assert.equal(copy.preferUnattended(clean, '标准句'), clean, `应原样留下：${clean}`)
+  }
+})
+
 const clientStub = toDataUrl('export const API_BASE_URL = "/api/v1"')
-const screenStub = toDataUrl('export function getTerminalId() { return globalThis.__kioskTerminalId || "" }')
+// 终端身份桩：号由 globalThis.__kioskTerminalId 给，改完调 globalThis.__fireTerminalIdentity() 通知订阅者（对应 screensaver.ts 的 subscribeTerminalIdentity）。
+const screenStub = toDataUrl(`
+const listeners = new Set()
+export function getTerminalId() { return globalThis.__kioskTerminalId || "" }
+export function subscribeTerminalIdentity(listener) { listeners.add(listener); return () => listeners.delete(listener) }
+globalThis.__fireTerminalIdentity = () => { for (const listener of [...listeners]) listener() }
+`)
 const contactMod = await import(transpile(join(kioskRoot, 'src/services/api/supportContact.ts'), {
   '../../copy/unattendedCopy': transpile(join(kioskRoot, 'src/copy/unattendedCopy.ts')),
   './client': clientStub,
   './screensaver': screenStub,
 }))
+
+// 错误码表（userErrorMessage）：带号码的句子必须在取文案时现算，不能在模块加载时算死。
+const httpStub = toDataUrl('export class ApiHttpError extends Error { constructor(code, message, status) { super(message); this.code = code; this.status = status } }')
+const { ApiHttpError } = await import(httpStub)
+const userErrors = await import(transpile(join(kioskRoot, 'src/services/api/userErrorMessage.ts'), {
+  './httpAdapter': httpStub,
+  '../../copy/unattendedCopy': transpile(join(kioskRoot, 'src/copy/unattendedCopy.ts')),
+}))
+
+test('错误码表里带号码的句子在取文案时才现算：服务联系方式变了，同一个码立刻读到新的', () => {
+  // 同一个 data URL = 同一个模块实例，所以 userErrors 里的标准句读的就是这里绑的缓存。
+  try {
+    copy.bindSupportContactPeek(() => ({ ...none, servicePhone: '010-60000001', serviceHours: '工作日 9:00–17:00' }))
+    assert.equal(
+      userErrors.userMessageOf({ code: 'TERMINAL_NOT_READY' }, '兜底'),
+      '这台机器暂时不能用，请稍后再来，或拨打服务电话 010-60000001（工作日 9:00–17:00）。',
+    )
+    assert.equal(
+      userErrors.userMessageOf({ code: 'SCAN_TERMINAL_DISABLED' }, '兜底'),
+      '本机扫描功能已停用。需要帮助？拨打服务电话 010-60000001（工作日 9:00–17:00）。',
+    )
+    copy.bindSupportContactPeek(() => ({ ...none, servicePhone: '010-60000002', otherOnlineTerminalNearby: true }))
+    const second = userErrors.userMessageOf({ code: 'TERMINAL_NOT_READY' }, '兜底')
+    assert.equal(second, '这台机器暂时不能用，请换一台机器，或拨打服务电话 010-60000002。')
+    assert.doesNotMatch(second, /60000001/, '号码不能停在第一次读到的值上')
+    // 还没读到服务联系方式（或缓存过期）：保守句，没有号码，不编一个。
+    copy.bindSupportContactPeek(() => none)
+    assert.equal(
+      userErrors.userMessageOf({ code: 'TERMINAL_NOT_READY' }, '兜底'),
+      '这台机器暂时不能用，请稍后再来，或查看《隐私政策》里的联系方式。',
+    )
+  } finally {
+    copy.bindSupportContactPeek(contactMod.peekSupportContact)
+  }
+})
+
+test('错误码表整表与 5xx 通用句：任何一句都不叫用户去找现场的人，且码表没有被清空', () => {
+  const codes = userErrors.SHARED_USER_MESSAGE_CODES
+  assert.ok(codes.length > 40, '码表被清空或没读到，整表检查是空转')
+  for (const phone of [null, '010-60000001']) {
+    copy.bindSupportContactPeek(() => ({ ...none, servicePhone: phone }))
+    try {
+      for (const code of codes) {
+        const text = userErrors.userMessageOf({ code }, '兜底')
+        assert.equal(copy.containsStaffHandoff(text), false, `${code} 叫用户去找现场的人：${text}`)
+        assert.doesNotMatch(text, /工作人员/, `${code} 里还有「工作人员」：${text}`)
+      }
+      const generic = userErrors.userMessageOf(new ApiHttpError('SOMETHING_NEW', 'x', 503), '兜底')
+      assert.equal(generic, `服务暂时不可用，请稍后重试。${copy.helpNeededLine()}。`)
+      assert.equal(copy.containsStaffHandoff(generic), false)
+    } finally {
+      copy.bindSupportContactPeek(contactMod.peekSupportContact)
+    }
+  }
+})
 
 test('文案层 resolveSupportContact：缺字段或非布尔一律按保守值，不把缺省当成已发布 / 附近有终端', () => {
   const partial = copy.resolveSupportContact({ servicePhone: ' 18369161921 ', serviceHours: '', otherOnlineTerminalNearby: true })
@@ -137,6 +223,11 @@ test('文案层 resolveSupportContact：缺字段或非布尔一律按保守值�
   const truthy = copy.resolveSupportContact({ servicePhone: null, serviceHours: null, otherOnlineTerminalNearby: 'yes', miniappPublished: 1 })
   assert.equal(truthy.otherOnlineTerminalNearby, false)
   assert.equal(truthy.miniappPublished, false)
+  assert.equal(truthy.selfNoteTab, false, '求职进度页签开关缺字段或非布尔不能当成已开')
+  assert.equal(partial.selfNoteTab, false)
+  assert.equal(copy.resolveSupportContact({ ...partial, selfNoteTab: true }).selfNoteTab, true)
+  assert.equal(copy.resolveSupportContact({ ...partial, selfNoteTab: 'true' }).selfNoteTab, false)
+  assert.equal(copy.CONSERVATIVE_SUPPORT_CONTACT.selfNoteTab, false, '读不到联系方式时求职进度页签是关的')
   assert.deepEqual(copy.resolveSupportContact(null), copy.CONSERVATIVE_SUPPORT_CONTACT)
 })
 
@@ -146,8 +237,15 @@ test('联系方式缺字段按保守值，布尔只有 true 才当真', () => {
     serviceHours: null,
     otherOnlineTerminalNearby: false,
     miniappPublished: false,
+    selfNoteTab: false,
   })
   assert.equal(contactMod.supportContactFromPayload({ success: true, data: { otherOnlineTerminalNearby: 'yes' } }).otherOnlineTerminalNearby, false)
+  // 求职进度页签开关：只有 true 才开，缺省、字符串、数字、空对象都是关。
+  assert.equal(contactMod.supportContactFromPayload({ success: true, data: { selfNoteTab: true } }).selfNoteTab, true)
+  for (const value of ['true', 1, 'yes', null, undefined, false]) {
+    assert.equal(contactMod.supportContactFromPayload({ success: true, data: { selfNoteTab: value } }).selfNoteTab, false, `selfNoteTab=${String(value)} 不能当成已开`)
+  }
+  assert.equal(contactMod.supportContactFromPayload({ success: true, data: {} }).selfNoteTab, false)
   assert.deepEqual(contactMod.supportContactFromPayload({ success: true }), copy.CONSERVATIVE_SUPPORT_CONTACT)
 })
 
@@ -174,4 +272,219 @@ test('联系方式 404 与超时都缓存成最保守的一套', async () => {
     delete globalThis.__kioskTerminalId
     contactMod.resetSupportContactCacheForTests()
   }
+})
+
+// ── 运行时根读取与续期（startSupportContactKeeper）、订阅与终端号切换 ──────────────────────────
+const PHONE_A = '18369161921'
+const PHONE_B = '13800138000'
+const HOURS = '工作日 9:00–18:00'
+const flush = () => new Promise((resolve) => setImmediate(resolve))
+const contactBody = (servicePhone, serviceHours = HOURS) =>
+  new Response(JSON.stringify({
+    success: true,
+    data: { servicePhone, serviceHours, otherOnlineTerminalNearby: false, miniappPublished: false },
+  }), { status: 200, headers: { 'content-type': 'application/json' } })
+
+/** 装一个假 fetch，记下每次请求带的终端号（没带为 null）；请求头里的 x-terminal-id 记在 calls.headerIds。 */
+function installContactFetch(respond) {
+  const calls = []
+  Object.defineProperty(calls, 'headerIds', { value: [], enumerable: false }) // 不可枚举：不干扰 deepEqual(calls, [...])
+  globalThis.fetch = async (url, init) => {
+    const terminalId = new URL(String(url), 'http://kiosk.test').searchParams.get('terminalId')
+    calls.push(terminalId)
+    calls.headerIds.push(new Headers(init?.headers).get('x-terminal-id'))
+    return respond(terminalId, calls.length)
+  }
+  return calls
+}
+
+async function withContactSandbox(run) {
+  const original = globalThis.fetch
+  contactMod.resetSupportContactCacheForTests()
+  globalThis.__kioskTerminalId = 'KSK-001'
+  try {
+    await run()
+  } finally {
+    mock.timers.reset()
+    globalThis.fetch = original
+    delete globalThis.__kioskTerminalId
+    contactMod.resetSupportContactCacheForTests()
+  }
+}
+
+test('订阅：号码到了、被后台改了、被清空都通知；值没变的续期不通知也不换对象', async () => {
+  await withContactSandbox(async () => {
+    let phone = PHONE_A
+    installContactFetch(() => contactBody(phone))
+    let notified = 0
+    const unsubscribe = contactMod.subscribeSupportContact(() => { notified += 1 })
+    try {
+      assert.equal(contactMod.peekSupportContact(), copy.CONSERVATIVE_SUPPORT_CONTACT, '还没读到之前是保守值')
+      await contactMod.loadSupportContact()
+      assert.equal(notified, 1, '号码到了要通知')
+      assert.equal(contactMod.peekSupportContact().servicePhone, PHONE_A)
+      assert.match(copy.machineUnusableLine(), new RegExp(`拨打服务电话 ${PHONE_A}（${HOURS}）`), '文案层省略写法读到同一份缓存')
+
+      const held = contactMod.peekSupportContact()
+      await contactMod.refreshSupportContact()
+      assert.equal(notified, 1, '值没变的续期不通知')
+      assert.equal(contactMod.peekSupportContact(), held, '值没变就沿用旧对象，订阅者不白白重绘')
+
+      phone = PHONE_B
+      await contactMod.refreshSupportContact()
+      assert.equal(notified, 2, '后台改了号码要通知')
+      assert.equal(contactMod.peekSupportContact().servicePhone, PHONE_B)
+
+      phone = null
+      await contactMod.refreshSupportContact()
+      assert.equal(notified, 3, '后台清空号码也要通知')
+      assert.equal(contactMod.peekSupportContact().servicePhone, null)
+      assert.match(copy.machineUnusableLine(), /查看《隐私政策》里的联系方式/, '清空后回到保守句')
+
+      unsubscribe()
+      phone = PHONE_A
+      await contactMod.refreshSupportContact()
+      assert.equal(notified, 3, '取消订阅后不再通知')
+    } finally {
+      unsubscribe()
+    }
+  })
+})
+
+test('运行时根：挂载读一次（带终端号），每 4 分钟强制续一次，缓存不断档，卸载后不再读', async () => {
+  await withContactSandbox(async () => {
+    mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'], now: 1_000_000 })
+    const calls = installContactFetch(() => contactBody(PHONE_A))
+    const stop = contactMod.startSupportContactKeeper()
+    try {
+      await flush()
+      assert.deepEqual(calls, ['KSK-001'], '挂载时读一次，带终端号')
+      assert.deepEqual(calls.headerIds, ['KSK-001'], '请求头也带终端号：服务端按「出口 IP + 终端号」分限流桶，同一大厅的机器各用各的额度')
+      assert.equal(contactMod.peekSupportContact().servicePhone, PHONE_A)
+
+      mock.timers.tick(contactMod.SUPPORT_CONTACT_RENEW_MS - 1)
+      await flush()
+      assert.equal(calls.length, 1, '没到续期点不读')
+      mock.timers.tick(1)
+      await flush()
+      assert.equal(calls.length, 2, '到点强制续一次——此刻 5 分钟缓存还没过期，不强制就根本不会去读')
+
+      // 续期之后再过一个周期仍有号码：每一次续期都发生在缓存过期之前，中间没有掉回保守句的空档。
+      for (let round = 3; round <= 5; round += 1) {
+        mock.timers.tick(contactMod.SUPPORT_CONTACT_RENEW_MS)
+        await flush()
+        assert.equal(calls.length, round)
+        assert.equal(contactMod.peekSupportContact().servicePhone, PHONE_A, `第 ${round} 次续期后缓存仍新`)
+      }
+
+      stop()
+      mock.timers.tick(contactMod.SUPPORT_CONTACT_RENEW_MS * 2)
+      await flush()
+      assert.equal(calls.length, 5, '卸载后不再读')
+    } finally {
+      stop()
+    }
+  })
+})
+
+test('运行时根：开发版 StrictMode 的挂载→卸载→再挂载只有一次读取、一个续期计时', async () => {
+  await withContactSandbox(async () => {
+    mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'], now: 1_000_000 })
+    const calls = installContactFetch(() => contactBody(PHONE_A))
+    contactMod.startSupportContactKeeper()()
+    const stop = contactMod.startSupportContactKeeper()
+    try {
+      await flush()
+      assert.equal(calls.length, 1)
+      mock.timers.tick(contactMod.SUPPORT_CONTACT_RENEW_MS)
+      await flush()
+      assert.equal(calls.length, 2, '第一次挂载的计时已随卸载停掉，只剩一个')
+    } finally {
+      stop()
+    }
+  })
+})
+
+test('终端号变了：旧号缓存立刻作废、订阅者回到保守值、按新号重读；旧号晚到的结果盖不掉新号', async () => {
+  await withContactSandbox(async () => {
+    let releaseOld = () => {}
+    const calls = installContactFetch((terminalId) => terminalId === 'KSK-001'
+      ? new Promise((resolve) => { releaseOld = () => resolve(contactBody(PHONE_A)) })
+      : contactBody(PHONE_B))
+    const seen = []
+    const unsubscribe = contactMod.subscribeSupportContact(() => { seen.push(contactMod.peekSupportContact().servicePhone) })
+    const stop = contactMod.startSupportContactKeeper()
+    try {
+      await flush()
+      assert.deepEqual(calls, ['KSK-001'], '旧号的请求还没回来')
+
+      globalThis.__kioskTerminalId = 'KSK-002'
+      globalThis.__fireTerminalIdentity()
+      await flush()
+      assert.deepEqual(calls, ['KSK-001', 'KSK-002'], '换号后按新号重读，不等续期计时')
+      assert.equal(contactMod.peekSupportContact().servicePhone, PHONE_B)
+
+      releaseOld()
+      await flush()
+      assert.equal(contactMod.peekSupportContact().servicePhone, PHONE_B, '旧号晚到的结果不进缓存')
+      assert.deepEqual(seen, [null, PHONE_B], '订阅者先回到保守值（没号码），再拿到新号的结果；旧号的号码一次也没闪过')
+    } finally {
+      stop()
+      unsubscribe()
+    }
+  })
+})
+
+test('终端号变了而根没在跑：缓存认终端号，换号后不复用旧号的结果', async () => {
+  await withContactSandbox(async () => {
+    const calls = installContactFetch((terminalId) => contactBody(terminalId === 'KSK-001' ? PHONE_A : PHONE_B))
+    await contactMod.loadSupportContact()
+    assert.equal(contactMod.peekSupportContact().servicePhone, PHONE_A)
+
+    globalThis.__kioskTerminalId = 'KSK-002'
+    assert.equal(contactMod.peekSupportContact(), copy.CONSERVATIVE_SUPPORT_CONTACT, '换号后旧号的缓存不算数')
+    const reloaded = await contactMod.loadSupportContact()
+    assert.equal(reloaded.servicePhone, PHONE_B)
+    assert.deepEqual(calls, ['KSK-001', 'KSK-002'])
+  })
+})
+
+test('断网标准句是合规定字，一体机源码不得再出现「收到提醒并远程处理」', () => {
+  assert.equal(copy.networkDisconnectLine(), '网络断开时，这台机器暂时办不了需要联网的事，请稍后再来')
+  const forbidden = '收到提醒并远程处理'
+  const hits = []
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (/\.(?:ts|tsx|js|mjs|css)$/.test(entry.name) && readFileSync(full, 'utf8').includes(forbidden)) {
+        hits.push(relative(kioskRoot, full))
+      }
+    }
+  }
+  walk(join(kioskRoot, 'src'))
+  assert.deepEqual(hits, [], `源码里还有断网假承诺：${hits.join(', ')}`)
+})
+
+test('没有终端身份时也读（机器未登记正是需要电话的时候），身份到了再带终端号重读', async () => {
+  await withContactSandbox(async () => {
+    globalThis.__kioskTerminalId = ''
+    const calls = installContactFetch((terminalId) => contactBody(terminalId ? PHONE_B : PHONE_A))
+    const stop = contactMod.startSupportContactKeeper()
+    try {
+      await flush()
+      assert.deepEqual(calls, [null], '没有终端号时请求不带 terminalId')
+      assert.deepEqual(calls.headerIds, [null], '没有终端号时也不带 x-terminal-id 请求头')
+      assert.equal(contactMod.peekSupportContact().servicePhone, PHONE_A)
+
+      globalThis.__kioskTerminalId = 'KSK-001'
+      globalThis.__fireTerminalIdentity()
+      await flush()
+      assert.deepEqual(calls, [null, 'KSK-001'])
+      assert.deepEqual(calls.headerIds, [null, 'KSK-001'])
+      assert.equal(contactMod.peekSupportContact().servicePhone, PHONE_B)
+    } finally {
+      stop()
+    }
+  })
 })

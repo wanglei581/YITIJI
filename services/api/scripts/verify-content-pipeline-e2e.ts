@@ -50,7 +50,8 @@ import {
   assert, section, step, show, summary, issueInternalToken, unwrap, FIXTURE_PREFIX,
   startHarness, type HarnessEnv, type Client, type HttpResult,
 } from './support/content-pipeline-harness'
-import { createFixtures, cleanupFixtures, type Fixtures } from './support/content-pipeline-fixtures'
+import { POLICY_PUBLISH_FIXTURE, createFixtures, cleanupFixtures, type Fixtures } from './support/content-pipeline-fixtures'
+import { runPolicyOneStepHttpCases } from './support/policy-one-step-http-cases'
 
 const PORT = Number(process.env['CONTENT_PIPELINE_E2E_PORT'] ?? 3211)
 
@@ -441,7 +442,7 @@ async function policyViaManual(h: HarnessEnv, partnerToken: string): Promise<str
     token: partnerToken,
     json: {
       kind: 'policy_guide', title, audience: 'flexible',
-      summary: 'E2E 验证用政策条目', externalUrl: 'https://example.com/policy/1',
+      summary: 'E2E 验证用政策条目', ...POLICY_PUBLISH_FIXTURE,
       externalId: `POLICY-${h.run}-1`,
     },
   })
@@ -542,6 +543,8 @@ async function main(): Promise<void> {
       const list = unwrap(pub) ?? []
       assert('政策｜一体机前台可见', list.some((p) => p.id === policyId), `/policies 未返回 ${policyId}`)
     }
+    step('政策 / 保存并发布与保存前预估 —— 走真实 HTTP')
+    await runPolicyOneStepHttpCases(h, { partner: partnerToken, admin: adminToken })
 
     // ── §4 闸门:该拦的必须拦住 ────────────────────────────────────────────
     section('§4 发布闸门 —— 该拦的必须拦住')
@@ -575,7 +578,7 @@ async function main(): Promise<void> {
       ntPublish !== null && ntPublish.status === 400 && errCode(ntPublish) === 'ORG_CONTENT_TRUST_REQUIRED',
       ntPublish ? `实际 ${ntPublish.status} ${errCode(ntPublish)}` : NT_PRECOND_FAILED)
     assert('闸门｜拒绝信息指名道姓(含机构名 + 怎么办)',
-      ntPublish !== null && (errMsg(ntPublish).includes('内容可信') || errMsg(ntPublish).includes('content-trust')),
+      ntPublish !== null && errMsg(ntPublish).includes('请联系平台管理员核验开通后再发布'),
       ntPublish ? `实际文案: ${errMsg(ntPublish).slice(0, 160)}` : NT_PRECOND_FAILED)
 
     // 前台泄漏检查**不依赖**能否在后台定位到这条内容 —— 恰恰相反,后台查不到、

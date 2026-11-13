@@ -12,6 +12,8 @@
  *  8. 简历文件已清理 → 诚实 failed（不调 LLM）
  *  9. 建议单 PDF 真实渲染（%PDF + 免责声明 + 行动清单）
  * 10. 日志脱敏：简历/规划文本不出现在日志
+ * 11. 反向：托管关闭、板块仍开时，系统岗位对照不得进入生成请求
+ * 12. 简历 AI 授权：未同意拒绝且不调模型；游客放行；同意后生成；撤回后再拒绝，已生成结果仍可读取
  *
  * 运行：pnpm --filter @ai-job-print/api verify:career-plan
  */
@@ -28,6 +30,7 @@ import { CareerPlanPdfService } from '../src/ai/resume/career-plan-pdf.service'
 import { CareerPlanDegradedPdfService } from '../src/ai/resume/career-plan-degraded-pdf.service'
 import { MemberAssetsService } from '../src/member-assets/member-assets.service'
 import { AiLogService } from '../src/ai/ai-log.service'
+import { MemberPrivacyService } from '../src/member-privacy/member-privacy.service'
 
 const RESUME_TEXT = '李某某，大专，行政管理专业。曾任某商贸公司行政文员，负责档案管理与会议安排，整理合同文件300余份_简历标记CPRS。熟练使用Office办公软件。'
 
@@ -115,6 +118,7 @@ async function main() {
   const svc = new CareerPlanService(
     prisma, llm, stubExtraction as never, stubFiles as never, pdf, audit, aiLog,
     new CareerPlanDegradedPdfService(),
+    { requireActiveConsent: async () => undefined } as never,
   )
   const assets = new MemberAssetsService(prisma)
 
@@ -297,6 +301,7 @@ async function main() {
       const printRedacted = new CareerPlanService(
         prisma, llm, stubExtraction as never, stubFiles as never, capturePdf as never, audit, aiLog,
         new CareerPlanDegradedPdfService(),
+        { requireActiveConsent: async () => undefined } as never,
       )
       await printRedacted.printPlan(taskAnon, anonReq)
       if (!pdfPayload?.summary.includes('「目标岗位」') || pdfPayload.summary.includes('高级财务会计')) {
@@ -326,7 +331,8 @@ async function main() {
       if (!defensivePdf.buffer.toString('latin1', 0, 4).startsWith('%PDF')) fail('9b. PDF 渲染器未独立过滤空项')
       pass('9b. PDF 渲染器独立过滤空项')
       const closedController = new CareerPlanController(svc, {} as never, {} as never, prisma,
-        { resolve: async () => ({ enabled: false }) } as never)
+        { resolve: async () => ({ enabled: false }) } as never,
+        { requireActiveConsent: async () => undefined } as never)
       const manualHttp = await closedController.latest(taskAnon, { headers: { 'x-resume-access-token': accessToken } })
       if (manualHttp.basedOn.jobFit !== '高级财务会计') fail('9b. 手填来源被 controller 拒绝或清理')
       pass('9b. controller 在板块关闭时放行手填旧规划')
@@ -344,7 +350,8 @@ async function main() {
     }
     pass('9c. 系统来源规划在板块关闭时清理后可读')
     const closedController = new CareerPlanController(svc, {} as never, {} as never, prisma,
-      { resolve: async () => ({ enabled: false }) } as never)
+      { resolve: async () => ({ enabled: false }) } as never,
+      { requireActiveConsent: async () => undefined } as never)
     const systemHttp = await closedController.latest(taskAnon, { headers: { 'x-resume-access-token': accessToken } })
     const systemPrint = await closedController.print(taskAnon, { headers: { 'x-resume-access-token': accessToken } })
     if (systemHttp.basedOn.jobFit !== null || systemPrint.pageCount < 1) fail('9c. controller 查看或打印系统来源旧规划失败')
@@ -356,6 +363,106 @@ async function main() {
       if (joined.includes(secret)) fail(`10. 日志泄露内容: ${secret.slice(0, 10)}`)
     }
     pass('10. 日志脱敏：简历/规划文本不出现在日志')
+
+    // ── 11. 反向：托管关闭时，系统岗位对照不得进入生成请求 ──────────────────
+    // 板块仍开着（includeJobFitTitle）。手填对照不在这条里：现有 5a 在托管默认关闭时仍要求手填标题进 prompt。
+    const generationHosting = process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+    try {
+      process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+      await prisma.aiResumeResult.update({
+        where: { taskId_kind: { taskId: taskAnon, kind: 'job_fit' } },
+        data: {
+          payloadJson: JSON.stringify({
+            job: { id: 'system-cp-hosting', title: '系统标题_唯一标记SYSCP' },
+            payload: { gapPoints: [{ gap: '系统差距_唯一标记SYSGAPCP' }] },
+          }),
+          expiresAt: new Date(Date.now() + 3600_000),
+        },
+      })
+      llmRequestBodies.length = 0
+      responseQueue.push(vjson())
+      const plan = await svc.generate(taskAnon, anonReq, { includeJobFitTitle: true })
+      const request = llmRequestBodies[0] ?? ''
+      if (plan.status !== 'completed' || !('basedOn' in plan)) fail('11. 托管关闭时仍应基于简历正常生成')
+      if (!request.includes('简历标记CPRS') || !request.includes('档案管理与会议安排')) fail('11. 剔除系统对照时简历原文丢失')
+      if (request.includes('系统标题_唯一标记SYSCP') || request.includes('系统差距_唯一标记SYSGAPCP')
+        || request.includes('【最近简历对照】')
+        || plan.basedOn.jobFit !== null || plan.basedOn.jobFitSource !== null) {
+        fail('11. 托管关闭时生成输入不得出现岗位对照')
+      }
+      pass('11. 托管关闭时生成输入不得出现岗位对照')
+    } finally {
+      if (generationHosting === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+      else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = generationHosting
+    }
+
+    // ── 11. 简历 AI 授权：未同意拒绝且不调模型；同意后放行；撤回后再拒绝 ──
+    {
+      const privacy = new MemberPrivacyService(prisma)
+      const consentSvc = new CareerPlanService(
+        prisma, llm, stubExtraction as never, stubFiles as never, pdf, audit, aiLog,
+        new CareerPlanDegradedPdfService(),
+        privacy,
+      )
+      const taskConsent = `vcp_consent_${suffix}`
+      await prisma.aiResumeResult.create({
+        data: {
+          taskId: taskConsent, kind: 'parse', status: 'completed', provider: 'llm',
+          payloadJson: JSON.stringify({ taskId: taskConsent, status: 'completed', fileId: memberFileId }),
+          endUserId: endUserA, accessTokenHash: null, expiresAt: new Date(Date.now() + 3600_000),
+        },
+      })
+      const consentError = (e: unknown) => {
+        const ex = e as { getStatus?: () => number; getResponse?: () => { error?: { code?: string; message?: string } } }
+        const body = ex.getResponse?.()
+        return { status: ex.getStatus?.() ?? 0, code: body?.error?.code, message: body?.error?.message }
+      }
+      const beforeDeny = llmRequestBodies.length
+      try {
+        await consentSvc.generate(taskConsent, memberReq)
+        fail('11. 未同意不应生成职业规划')
+      } catch (e) {
+        const info = consentError(e)
+        if (info.status !== 403 || info.code !== 'USER_AI_CONSENT_REQUIRED' || info.message !== '请先确认简历 AI 服务授权') {
+          fail(`11. 拒绝形态不符: ${JSON.stringify(info)}`)
+        }
+      }
+      if (llmRequestBodies.length !== beforeDeny) fail('11. 未同意时调用了模型')
+      pass('11. 未同意 resume_ai → 403 USER_AI_CONSENT_REQUIRED，且未调模型')
+
+      const beforeGuest = llmRequestBodies.length
+      responseQueue.push(vjson())
+      const guest = await consentSvc.generate(taskAnon, anonReq)
+      if (guest.status !== 'completed' || llmRequestBodies.length !== beforeGuest + 1) fail('11g. 游客未授权仍应生成并调用模型')
+      const readable = await consentSvc.getLatest(taskAnon, anonReq)
+      const printed = await consentSvc.printPlan(taskAnon, anonReq)
+      if (readable.status !== 'completed' || printed.pageCount < 1) fail('11g. 读取或打印不应被授权拦住')
+      pass('11g. 游客不拦截；读取和打印不核授权')
+
+      await privacy.grantConsent(endUserA, 'resume_ai', null)
+      const beforeGrant = llmRequestBodies.length
+      responseQueue.push(vjson())
+      const granted = await consentSvc.generate(taskConsent, memberReq)
+      if (granted.status !== 'completed' || llmRequestBodies.length !== beforeGrant + 1) fail('12. 已同意应生成并调用模型')
+      pass('12. 已同意 resume_ai → 照常生成')
+
+      await privacy.revokeConsent(endUserA, 'resume_ai')
+      const beforeRevoke = llmRequestBodies.length
+      try {
+        await consentSvc.generate(taskConsent, memberReq)
+        fail('13. 撤回后不应再生成')
+      } catch (e) {
+        const info = consentError(e)
+        if (info.status !== 403 || info.code !== 'USER_AI_CONSENT_REQUIRED' || info.message !== '请先确认简历 AI 服务授权') {
+          fail(`13. 撤回后拒绝形态不符: ${JSON.stringify(info)}`)
+        }
+      }
+      if (llmRequestBodies.length !== beforeRevoke) fail('13. 撤回后仍调用了模型')
+      const stillThere = await consentSvc.getLatest(taskConsent, memberReq)
+      if (stillThere.status !== 'completed') fail('13. 撤回后已生成的规划应仍可读取')
+      pass('13. 同意后撤回 → 再次拒绝且未调模型；已生成结果仍可读取')
+      await prisma.aiResumeResult.deleteMany({ where: { taskId: taskConsent } }).catch(() => undefined)
+    }
 
     console.log(`\n=== ALL PASS (${passCount} checks) ===`)
   } catch (err) {

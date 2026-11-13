@@ -23,6 +23,7 @@ import { ApiResponse } from '../common/dto/api-response.dto'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { restoreMultipartUtf8Filename } from '../files/file-validation'
 import { TerminalIdentityGuard } from '../terminals/terminal-identity.guard'
 import { TerminalsService } from '../terminals/terminals.service'
 import { CreateScanTaskDto } from './dto/create-scan-task.dto'
@@ -145,6 +146,12 @@ export class ScanTasksController {
     @Body('candidateSnapshotAt') candidateSnapshotAt: unknown,
     @Body('observedAt') observedAt: unknown,
     @Headers('authorization') authHeader: string | undefined,
+    // 屏上扫描（2026-11-02）：投递来源 watcher（缺省，现有终端程序）/ device。
+    // 2026-11-03：可选 deviceRound，终端程序填它扫这份 PDF 时所在的轮次；没给照旧。
+    // deliver 不走 DTO，和上面几个字段一样逐字段取，不会被全局 forbidNonWhitelisted 拦成 400。
+    // 取值校验在 service。追加在最后，保持既有位置参数不变。
+    @Body('origin') origin?: unknown,
+    @Body('deviceRound') deviceRound?: unknown,
   ) {
     await this.terminals.assertAgentAuthorized(terminalId, authHeader)
     if (!file) {
@@ -155,10 +162,14 @@ export class ScanTasksController {
       scanTaskId: typeof scanTaskId === 'string' ? scanTaskId : '',
       deliveryLease: typeof deliveryLease === 'string' ? deliveryLease : '',
       buffer: file.buffer,
-      filename: file.originalname,
+      // multer 把 multipart 里的 UTF-8 文件名按 latin1 读，中文会成乱码（走查 I-17）；手机上传、本机上传
+      // 早就这样还原，扫描回传是漏掉的那一条。
+      filename: restoreMultipartUtf8Filename(file.originalname),
       mimeType: file.mimetype,
       candidateSnapshotAt,
       observedAt,
+      origin,
+      deviceRound,
     })
     return ApiResponse.ok(result)
   }

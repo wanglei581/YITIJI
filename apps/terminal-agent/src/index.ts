@@ -40,7 +40,14 @@ import { registerDeadLetterCommands } from './agent/dead-letter-operator'
 import { inspectScanInputFolder } from './agent/scan-input/verified-folder'
 import { globalScanDeliveryBarrier } from './agent/scan-candidate-barrier'
 import { isUnauthorized } from './agent/auth-state'
+import { checkPrintCompletionEvidenceAtStartup } from './agent/print-service-log'
 import { AGENT_RUNTIME_VERSION } from './runtime-version'
+import { copyRuntimeForConfig } from './agent/copy-device/copy-lifecycle'
+import {
+  bindScanDevicePrintFinishedProbe,
+  scanDeviceRuntimeForConfig,
+  type ScanDeviceRuntime,
+} from './agent/scan-device/scan-device-runner'
 
 const program = new Command()
 
@@ -97,6 +104,8 @@ program
     let offlineRetryTimer: NodeJS.Timeout | null = null
     let scanDeletionAuditReporterTimer: NodeJS.Timeout | null = null
     let scanWatcherHandle: ReturnType<typeof startScanWatcher> | undefined
+    let scanDeviceRuntime: ScanDeviceRuntime | undefined
+    let copyDeviceRuntime: ReturnType<typeof copyRuntimeForConfig>
 
     await runAgentBoot({
       acquireLock: async () => {
@@ -149,6 +158,7 @@ program
         }
       },
       beforeClaim: async () => {
+        checkPrintCompletionEvidenceAtStartup()
         try {
           cleanupKnownLegacyResidue()
         } catch {
@@ -160,9 +170,13 @@ program
           noteStartupPrintQueueFailure(startupQueueFailure)
         }
 
+        scanDeviceRuntime = scanDeviceRuntimeForConfig(config)
+        copyDeviceRuntime = copyRuntimeForConfig(config, scanDeviceRuntime)
         try {
       qrLocalServer = startQrLoginLocalServer(config, {
         wakePrintQueue: () => taskRunner?.wake() ?? { accepted: false, coalesced: false },
+        scanDevice: scanDeviceRuntime,
+        copyDevice: copyDeviceRuntime,
         getPanelStatus: () => ({
           runtimeVersion: AGENT_RUNTIME_VERSION,
           terminalCode: config.terminalCode,
@@ -192,6 +206,9 @@ program
       config,
       localTaskDatabaseAvailable,
       getScanInputTelemetry: () => globalScanDeliveryBarrier.getTelemetry(),
+      ...(scanDeviceRuntime
+        ? { getScanDeviceHealth: () => scanDeviceRuntime!.health() }
+        : {}),
       onConfigUpdate: (patch) => {
         // AGT-06：服务端下发的轮询间隔此前只写进 config 对象，两个 setInterval 仍按旧值跑。
         // 变化时重建定时器，让后台调整真正生效。
@@ -247,6 +264,9 @@ program
       if (shuttingDown) return
       shuttingDown = true
       log(`Agent: received ${signal}, shutting down...`)
+      bindScanDevicePrintFinishedProbe(undefined)
+      scanDeviceRuntime?.stop()
+      copyDeviceRuntime?.stop()
       if (heartbeatTimer) clearInterval(heartbeatTimer)
       taskRunner?.stop()
       if (offlineRetryTimer) clearInterval(offlineRetryTimer)

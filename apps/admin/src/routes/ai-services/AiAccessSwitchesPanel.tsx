@@ -1,13 +1,13 @@
 // ============================================================
 // AI 服务开关面板（D6 一键暂停与全机维护 + C6 使用声明 + C7 登录档位）
 //
-// 挂在 AI 服务管理页（index.tsx）的加载中、加载失败、正常三个分支里，都是 <Page> 的第一个子元素：
-// 面板自己取数，统计接口挂了也找得到紧急暂停；三个分支放在同一位置，统计数据加载完
+// 挂在 AI 服务管理页（index.tsx）的加载中、加载失败、正常三个分支里，紧跟近 24 小时概览，三个分支位置相同：
+// 面板自己取数，统计没读到也找得到紧急暂停；三个分支放在同一位置，统计数据加载完
 // 切到正常分支时面板不会被重建，写了一半的事由不会丢。
 //
 // 说明文字逐条对齐 services/api/src/ai-access/ 的行为，不许夸大：
 // - AI 暂停：AI 生成、语音、导出类接口返回 503 AI_PAUSED；读取类不受影响。
-// - 全机维护：AI（读取类除外）与标了 @MaintenanceBlocked() 的十个接口返回 503 MAINTENANCE_MODE。
+// - 全机维护：AI（读取类除外）与标了 @MaintenanceBlocked() 的十一个接口返回 503 MAINTENANCE_MODE。
 // - 登录档位：off / before_export / before_generate；没登录返回 401 AI_LOGIN_REQUIRED。
 // - 使用声明：AI 生成与语音缺声明（且会员没有留存同意）返回 403 AI_DECLARATION_REQUIRED。
 // - 生效：服务端写 Redis 保存一年，各进程缓存 30 秒；Redis 读不到时回落服务器 .env。
@@ -18,7 +18,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { StatusBadge } from '@ai-job-print/ui'
-import { AlertTriangleIcon, RefreshCwIcon } from 'lucide-react'
+import { RefreshCwIcon } from 'lucide-react'
 import {
   AI_ACCESS_DEMO,
   AI_ACCESS_REASON_MAX,
@@ -55,8 +55,8 @@ const GATE_LABEL: Record<AiLoginGate, string> = {
   before_generate: '使用 AI 前登录',
 }
 
-/** 服务端标了 @MaintenanceBlocked() 的十个接口，逐个核对过 services/api/src（#1066 起含打印前材料检查，#1112 起含自我探索的提交、追加作答与打印）。 */
-const MAINTENANCE_BLOCKED = '会员打印下单、材料包下单、格式转换（图片转 PDF）、打印任务创建、扫描任务创建、上传会话创建、打印前材料检查、自我探索（提交、追加作答、打印）'
+/** 服务端标了 @MaintenanceBlocked() 的十一个接口，逐个核对过 services/api/src（#1066 起含打印前材料检查，#1112 起含自我探索的提交、追加作答与打印，屏上复印 #1591 起含复印任务创建）。 */
+const MAINTENANCE_BLOCKED = '会员打印下单、材料包下单、格式转换（图片转 PDF）、打印任务创建、复印任务创建、扫描任务创建、上传会话创建、打印前材料检查、自我探索（提交、追加作答、打印）'
 
 const ROWS: ReadonlyArray<{ key: SwitchKey; title: string; explain: string; kioskNote?: string }> = [
   {
@@ -376,7 +376,8 @@ export function AiAccessSwitchesPanel() {
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-sm font-semibold text-neutral-800">{row.title}</h3>
                     <StatusBadge dot status={state.tone} label={state.label} />
-                    <div className="ml-auto flex flex-wrap gap-2">
+                    <p className="min-w-0 flex-1 truncate text-xs text-neutral-500" title={row.explain}>{row.explain}</p>
+                    <div className="flex flex-wrap gap-2">
                       {actionsFor(row.key, load.config).map((action) => (
                         <button
                           key={String(action.change.to)}
@@ -390,12 +391,11 @@ export function AiAccessSwitchesPanel() {
                       ))}
                     </div>
                   </div>
-                  <p className="mt-1.5 text-xs leading-relaxed text-neutral-500">{row.explain}</p>
                   {row.kioskNote && (
-                    <p className="mt-2 flex items-start gap-1.5 rounded-md border border-warning/30 bg-warning-bg px-2.5 py-1.5 text-xs leading-relaxed text-warning-fg">
-                      <AlertTriangleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                      <span>{row.kioskNote}</span>
-                    </p>
+                    <details className="mt-2 rounded-md border border-warning/30 bg-warning-bg px-2.5 py-1.5 text-xs leading-relaxed text-warning-fg">
+                      <summary className="cursor-pointer font-semibold">一体机升级说明</summary>
+                      <p className="mt-1">{row.kioskNote}</p>
+                    </details>
                   )}
                   {change?.key === row.key && renderForm(change, load.config)}
                 </li>

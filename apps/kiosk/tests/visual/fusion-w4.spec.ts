@@ -1,7 +1,7 @@
 import type { Locator, Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import { expectInterviewDirectionUnselected, chooseInterviewExperience } from './fixtures/direction-selection'
-import { registerW4Api, w4TerminalConfig } from '../fixtures/fusion-w4-api'
+import { registerW4Api } from '../fixtures/fusion-w4-api'
 import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 
 function runtimeErrors(page: Page): string[] {
@@ -15,16 +15,6 @@ async function verifyPage(page: Page, errors: string[]): Promise<void> {
   await assertKioskShellFillsViewport(page)
   expect(errors).toEqual([])
 }
-
-const SMART_CAMPUS_URLS = [
-  ['/smart-campus', '迎新指引'],
-  ['/smart-campus/welcome', '迎新流程'],
-  ['/smart-campus/service/campus-card', '校园卡办理'],
-  ['/smart-campus/service/all-in-one', '一卡通开通'],
-  ['/smart-campus/service/campus-network', '校园网开通'],
-  ['/smart-campus/service/luggage', '行李帮运'],
-  ['/smart-campus/service/panorama', 'VR校园'],
-] as const
 
 const JOB_MEMBER_TOKEN = 'jobs-w4-browser-memory-token'
 const JOB_CTA_WHITELIST = [
@@ -79,32 +69,10 @@ async function loginForJobs(page: Page, returnTo: string): Promise<void> {
   await page.waitForURL((url) => url.pathname === returnTo)
 }
 
-async function captureCapabilityRefresh(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    const callbacks: Array<() => void> = []
-    const original = window.setInterval.bind(window)
-    ;(window as typeof window & { __runCapabilityRefresh?: () => void }).__runCapabilityRefresh = () => {
-      callbacks.forEach((callback) => callback())
-    }
-    window.setInterval = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) => {
-      if (timeout === 300_000 && typeof handler === 'function') {
-        callbacks.push(() => handler(...args))
-      }
-      return original(handler, timeout, ...args)
-    }) as typeof window.setInterval
-  })
-}
-
-async function runCapabilityRefresh(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    ;(window as typeof window & { __runCapabilityRefresh?: () => void }).__runCapabilityRefresh?.()
-  })
-}
-
 test('/jobs 保留线上与线下双轨 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/jobs')
-  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.locator('[data-qxt-screen]')).toHaveCount(1)
   await expect(page.getByText('前端工程师').first()).toBeVisible()
   await expect(page.getByText('青岛公共就业服务网').first()).toBeVisible()
   await expect(page.getByText('ext-job-001').first()).toBeVisible()
@@ -159,7 +127,7 @@ test('/jobs/:id 只提供来源 CTA @w4', async ({ page, api }) => {
     }
   })
   await loginForJobs(page, '/jobs/job-001')
-  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.locator('[data-qxt-screen]')).toHaveCount(1)
   await expect(page.getByText(/信息以来源平台为准/).first()).toBeVisible()
   await expect(page.getByText('青岛公共就业服务网').first()).toBeVisible()
   await expect(page.getByText('ext-job-001').first()).toBeVisible()
@@ -280,6 +248,16 @@ test('/jobs/:id 来源四要素缺失时停发外跳与扫码 @w4', async ({ pag
   const sourceButton = page.getByRole('button', { name: '去来源平台投递' })
   const qrButtons = page.getByRole('button', { name: '扫码投递' })
   await expect(sourceButton).toHaveAttribute('aria-disabled', 'true')
+  // 底栏主按钮「去来源平台投递」是 ariaDisabled：只写 aria-disabled、不写原生 disabled，
+  // 点击照常交给页面自己的 onClick（触屏共享底栏 10/28 统一后的语义）。所以「点了不打开」
+  // 要由页面自己守。先单独点它、再点下面的扫码按钮，这样它自己的守卫被拿掉时，红在这一步，
+  // 不会被后面扫码按钮的断言抢先或遮住。终端上它走扫码，非终端上才 window.open，两条出口都要没发生。
+  let popups = 0
+  page.on('popup', () => { popups += 1 })
+  await sourceButton.dispatchEvent('click')
+  await expect(page.getByText('请使用手机扫码前往来源平台自行操作'), '底栏主按钮缺项时点了不得出码').toHaveCount(0)
+  await expect(page.getByRole('dialog', { name: '扫码投递' })).toHaveCount(0)
+  expect(popups, '来源要素缺失时点「去来源平台投递」不得打开新窗口').toBe(0)
   // 来源四要素缺失时，页面上**每一个**扫码投递都必须停发——不是只停最后一个。
   const qrCount = await qrButtons.count()
   expect(qrCount).toBeGreaterThan(0)
@@ -300,6 +278,21 @@ test('/jobs/:id 来源四要素缺失时停发外跳与扫码 @w4', async ({ pag
   await verifyPage(page, errors)
 })
 
+// 阳性对照：与上一条配对。来源四要素齐全时，同一颗底栏主按钮点了要真的出码；
+// 否则上一条里「点了没出码」可能只是这颗按钮根本接不到点击，断言就是空的。
+test('/jobs/:id 底栏主按钮「去来源平台投递」：来源齐全时点了出码 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page); registerW4Api(api)
+  await page.goto('/jobs/job-001')
+  await expect(page.getByTestId('job-detail-state-default')).toBeVisible()
+  const sourceButton = page.getByRole('button', { name: '去来源平台投递' })
+  await expect(sourceButton).not.toHaveAttribute('aria-disabled', 'true')
+  await sourceButton.dispatchEvent('click')
+  const qrDialog = page.getByRole('dialog', { name: '扫码投递' })
+  await expect(qrDialog).toBeVisible()
+  await expect(qrDialog.getByText('请使用手机扫码前往来源平台自行操作')).toBeVisible()
+  expect(errors).toEqual([])
+})
+
 // G1 #482: /offline-agencies/:id 已注册为真实路由，列表须提供导航入口
 test('/offline-agencies 列表可进入真实详情页 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
@@ -315,8 +308,8 @@ test('/offline-agencies 列表可进入真实详情页 @w4', async ({ page, api 
   await expect(page.getByText('岗位咨询', { exact: true })).toBeVisible()
   await expect(page.getByText(/服务时间以机构公示为准/)).toBeVisible()
   await expect(page.getByText(/正常收录|已核验|暂停收录/)).toHaveCount(0)
+  await expect(page.locator('[data-qxt-screen]')).toHaveCount(1)
   await expect(page.getByText('全部区域')).toHaveCount(0)
-  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
   await page.screenshot({ path: test.info().outputPath('qx-b3-offline-agencies.png'), fullPage: true })
   await expect(page.getByText('一键投递')).toHaveCount(0)
   await expect(page.getByText('立即投递')).toHaveCount(0)
@@ -358,7 +351,7 @@ test('companies 列表与详情保持来源导览 @w4', async ({ page, api }) =>
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/companies')
   await expect(page.getByText('青岛示例制造有限公司').first()).toBeVisible()
-  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.locator('[data-qxt-screen]')).toHaveCount(1)
   await page.getByRole('button', { name: '选择类型 (12)' }).click()
   const companyFilterDialog = page.getByRole('dialog', { name: '企业类型与行业' })
   await expect(companyFilterDialog).toBeVisible()
@@ -381,13 +374,39 @@ test('companies 列表与详情保持来源导览 @w4', async ({ page, api }) =>
   await verifyPage(page, errors)
 })
 
+// 底栏主按钮「查看在招岗位」是 ariaDisabled：不写原生 disabled，点了照常交给页面的 onClick。
+// 企业确实没有在招岗位（接口回了 0 条）时，点了也不能跳。先做阳性对照：有岗位时同一颗按钮真的会跳。
+test('companies/:id 底栏「查看在招岗位」：有岗位才跳，没有在招岗位时点了也不跳 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page); registerW4Api(api)
+  await page.goto('/companies/company-001')
+  const jobsButton = page.getByRole('button', { name: '查看在招岗位' })
+  await expect(jobsButton).toBeVisible()
+  await expect(jobsButton).not.toHaveAttribute('aria-disabled', 'true')
+  await jobsButton.dispatchEvent('click')
+  await expect(page).toHaveURL((url) => url.pathname === '/jobs/job-001')
+
+  api.respond('GET', '/api/v1/companies/company-001/jobs', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
+  await page.goto('/companies/company-001')
+  await expect(page.getByTestId('company-directory-state-company-sparse')).toBeVisible()
+  const blocked = page.getByRole('button', { name: '查看在招岗位' })
+  await expect(blocked).toHaveAttribute('aria-disabled', 'true')
+  await blocked.dispatchEvent('click')
+  await page.waitForTimeout(400)
+  await expect(page).toHaveURL((url) => url.pathname === '/companies/company-001')
+  await verifyPage(page, errors)
+})
+
 // 3.14：线上平台目录并入本机构官方渠道。旧地址重定向；平台目录不再写死在前端，b 版本由服务端 legacyPlatforms 下发。
 // 守的东西没变——目录页只给「扫码去来源平台」，不出现任何代投 / 平台内投递说法；而且现在连可点的外链都没有，只有二维码。
 test('/jobs/online-platforms 重定向到本机构官方渠道，只给二维码不代投 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/jobs/online-platforms')
   await page.waitForURL((url) => url.pathname === '/official-channels')
-  await expect(page.getByRole('heading', { level: 1, name: '本机构官方渠道' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '扫码，在手机上看' })).toBeVisible()
+  await expect(page.getByText('本机构官方渠道').first()).toBeVisible()
   const org = page.getByTestId('official-channels-org')
   const legacy = page.getByTestId('official-channels-legacy')
   await expect(org.getByTestId('official-channel-card')).toHaveCount(1)
@@ -395,6 +414,7 @@ test('/jobs/online-platforms 重定向到本机构官方渠道，只给二维码
   await expect(page.locator('[data-testid="official-channel-qr-code"] svg')).toHaveCount(3)
   await expect(legacy.getByText('jobs.example.com', { exact: true })).toBeVisible()
   await expect(legacy.getByText('本渠道由示例招聘平台运营公司提供，信息以其官网为准', { exact: true })).toBeVisible()
+  await expect(page.locator('[data-qx-frame="true"]')).toHaveCount(1)
   await expect(page.locator('[data-qx-frame="true"] a[href]'), '一体机不打开外部网页：整页没有可点的链接').toHaveCount(0)
   for (const word of ['一键投递', '立即投递', '一键全网分发', '授权代投', '同步投递', '扫码投递', '去来源平台投递']) {
     await expect(page.getByText(word)).toHaveCount(0)
@@ -476,24 +496,30 @@ test('/job-fairs/checkin 只展示来源签到 @w4', async ({ page, api }) => {
 test('/campus 与 /smart-campus 语义独立 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/campus')
-  await expect(page.getByText(/校园招聘专区/).first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: '挑一场校园招聘会' })).toBeVisible()
+  // 2026-11-04 产品负责人定停放：智慧校园旧链回首页，不再打开校园服务页。
   await page.goto('/smart-campus')
-  await expect(page.getByRole('heading', { name: '智慧校园', exact: true })).toBeVisible()
+  await expect(page.getByTestId('qx-home')).toBeVisible()
+  await expect(page.locator('[data-kiosk-screen="route-error"]')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: '选一项校园服务', exact: true })).toHaveCount(0)
   await verifyPage(page, errors)
 })
 
-test('/smart-campus/freshman-insights 已停放，路由不存在 @w4', async ({ page, api }) => {
+test('/smart-campus/freshman-insights 停放后回到首页 @w4', async ({ page, api }) => {
+  // 2026-11-04 产品负责人定停放：这条深链走 smart-campus/*，回到首页，不出报错页。
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/smart-campus/freshman-insights')
-  await expect(page.locator('[data-kiosk-screen="route-error"]')).toBeVisible()
-  await expect(page.getByRole('heading', { name: '页面不存在', exact: true })).toBeVisible()
-  await expect(page.getByText('当前入口可能已经调整，请返回首页重新选择服务。')).toBeVisible()
+  await expect(page).toHaveURL((url) => url.pathname === '/')
+  await expect(page.getByTestId('qx-home')).toBeVisible()
+  await expect(page.locator('[data-kiosk-screen="route-error"]')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: '页面不存在', exact: true })).toHaveCount(0)
   await verifyPage(page, errors)
 })
 
 test('/campus AI求职「开始模拟」进入面试设置 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/campus')
+  await page.getByRole('button', { name: /2026 青岛高校毕业生招聘会/ }).click()
   await page.getByRole('button', { name: 'AI求职' }).click()
   await page.getByRole('button', { name: '开始模拟' }).click()
   // /interview/setup 现在是带状态的重定向（→ /interview?stage=setup）。
@@ -516,208 +542,86 @@ test('/campus AI求职「开始模拟」进入面试设置 @w4', async ({ page, 
 test('campus 两个直达容错页诚实返回 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/campus/welcome')
-  await expect(page.getByText('当前没有独立迎新招聘内容')).toBeVisible()
+  await expect(page.locator('.rt-state').getByText('当前没有独立迎新招聘内容')).toHaveCount(1)
   await page.goto('/campus/freshman-insights')
-  await expect(page.getByText('暂无经核验的校园招聘统计')).toBeVisible()
+  await expect(page.locator('.rt-state').getByText('暂无经核验的校园招聘统计')).toHaveCount(1)
+  await expect(page.locator('.rt-state').getByText('不会展示示例数据')).toHaveCount(1)
   await verifyPage(page, errors)
 })
 
-test('smart-campus enabled 与 service 指引可达 @w4', async ({ page, api }) => {
-  const errors = runtimeErrors(page); registerW4Api(api, { smartCampusEnabled: true })
-  await page.goto('/smart-campus')
-  await expect(page.getByText('迎新指引')).toBeVisible()
-  await page.goto('/smart-campus/service/campus-card')
-  await expect(page.getByText('办理指引 · 未接线上办理')).toBeVisible()
-  await verifyPage(page, errors)
-})
-
-test('smart-campus disabled 诚实为空 @w4', async ({ page, api }) => {
-  const errors = runtimeErrors(page); registerW4Api(api, { smartCampusEnabled: false })
-  await page.goto('/smart-campus')
-  await expect(page.getByText('本机暂未开启智慧校园服务')).toBeVisible()
-  await verifyPage(page, errors)
-})
-
-test('smart-campus 总关闭时 7 条具体 URL 全部 fail-closed @w4', async ({ page, api }) => {
-  registerW4Api(api, { smartCampusEnabled: false })
-  for (const [url, forbiddenText] of SMART_CAMPUS_URLS) {
-    const before = api.requestCount('GET', '/api/v1/terminals/KSK-001/config')
-    await page.goto(url)
-    await expect.poll(() => api.requestCount('GET', '/api/v1/terminals/KSK-001/config')).toBe(before + 1)
-    await expect(page.locator('[data-capability-state="unavailable"]')).toBeVisible()
-    await expect(page.getByText(forbiddenText, { exact: false })).toHaveCount(0)
-  }
-})
-
-for (const scenario of [
-  { name: '网络中断', setup: (api: Parameters<typeof registerW4Api>[0]) => api.abort('GET', '/api/v1/terminals/KSK-001/config', 'internetdisconnected') },
-  { name: 'HTTP 503', setup: (api: Parameters<typeof registerW4Api>[0]) => api.respond('GET', '/api/v1/terminals/KSK-001/config', { status: 503, json: { error: { code: 'UNAVAILABLE' } } }) },
-  { name: '畸形配置', setup: (api: Parameters<typeof registerW4Api>[0]) => api.respond('GET', '/api/v1/terminals/KSK-001/config', { status: 200, json: { ...w4TerminalConfig(), smartCampus: { enabled: 'true', modules: {}, items: [] } } }) },
-] as const) {
-  test(`smart-campus 首次${scenario.name}不挂载业务子树 @w4`, async ({ page, api }) => {
-    registerW4Api(api)
-    scenario.setup(api)
-    await page.goto('/smart-campus/service/campus-card')
-    await expect.poll(() => api.requestCount('GET', '/api/v1/terminals/KSK-001/config')).toBe(1)
-    await expect(page.locator('[data-capability-state="unavailable"]')).toBeVisible()
-    await expect(page.getByText('办理指引 · 未接线上办理')).toHaveCount(0)
-  })
+// 2026-11-05 政策最小闭环：查政策改成「六类首页 /policy-service → 类别列表 /renshi?audience= →
+// 按编号读的详情 /renshi?policy=」。/renshi 不带参数是旧链接，回政策首页。
+// 与 fusion-w4-api.ts 登记的那一条政策同一份数据（应届高校毕业生，原文链接未核对属于登记官网）。
+const W4_POLICY = {
+  id: 'policy-001',
+  kind: 'policy_guide',
+  title: '高校毕业生就业服务指引',
+  summary: '请通过官方入口查看办理条件。',
+  audience: 'graduate',
+  sourceName: '青岛市人力资源和社会保障局',
+  syncTime: '2026-07-24T08:00:00.000Z',
+  externalUrl: 'https://hrss.example.gov.cn/policy/001',
 }
+/** 停放前常驻政策页的 5 条本机整理办事指引（源码已停放）。停放后哪一屏都不该再出现。 */
+const BUILTIN_GUIDE_TITLES = [
+  '一次性求职创业补贴',
+  '灵活就业社保补贴',
+  '高校毕业生住房 / 安家政策',
+  '职业技能培训 / 技能提升补贴',
+  '创业担保贷款 / 创业补贴',
+] as const
 
-for (const scenario of [
-  { name: '空配置', items: [] },
-  { name: '全部禁用', items: [{ key: 'one', title: '服务', description: '', icon: 'wrench', to: '/help', disabled: true, sortOrder: 1 }] },
-  { name: '缺少启动目标', items: [{ key: 'one', title: '服务', description: '', icon: 'wrench', to: null, disabled: false, sortOrder: 1 }] },
-] as const) {
-  test(`toolbox ${scenario.name}不可进入 @w4`, async ({ page, api }) => {
-    registerW4Api(api)
-    const config = w4TerminalConfig()
-    api.respond('GET', '/api/v1/terminals/KSK-001/config', {
+/**
+ * 政策首页按类别各读一次条数（?kind=policy_guide&audience=…&pageSize=1）。ApiRouter 只按路径应答，
+ * 同一份列表会被算进每一类、连公告都算上；glob 路由又连查询串一起比对。这里按路径接住，再按 kind / audience 过滤、按页切。
+ */
+async function routeW4PolicyList(page: Page, items: readonly (typeof W4_POLICY)[], seen: URL[] = []): Promise<void> {
+  await page.route((url) => url.pathname === '/api/v1/policies', async (route) => {
+    const url = new URL(route.request().url())
+    seen.push(url)
+    const kind = url.searchParams.get('kind')
+    const audience = url.searchParams.get('audience')
+    const pageNo = Math.max(1, Number(url.searchParams.get('page')) || 1)
+    const pageSize = Math.max(1, Number(url.searchParams.get('pageSize')) || 200)
+    const hits = items.filter((item) => (!kind || item.kind === kind) && (!audience || item.audience === audience))
+    await route.fulfill({
       status: 200,
-      json: { ...config, toolbox: { enabled: true, items: scenario.items } },
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: hits.slice((pageNo - 1) * pageSize, pageNo * pageSize),
+        pagination: { page: pageNo, pageSize, total: hits.length, totalPages: Math.max(1, Math.ceil(hits.length / pageSize)) },
+      }),
     })
-    await page.goto('/toolbox')
-    await expect.poll(() => api.requestCount('GET', '/api/v1/terminals/KSK-001/config')).toBe(1)
-    await expect(page.locator('[data-capability-state="unavailable"]')).toBeVisible()
-    await expect(page.locator('[data-kiosk-screen="toolbox"]')).toHaveCount(0)
   })
 }
-
-test('toolbox 畸形 item fail-closed @w4', async ({ page, api }) => {
-  registerW4Api(api)
-  const config = w4TerminalConfig()
-  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
-    status: 200,
-    json: { ...config, toolbox: { enabled: true, items: [{ key: 'broken' }] } },
-  })
-  await page.goto('/toolbox')
-  await expect.poll(() => api.requestCount('GET', '/api/v1/terminals/KSK-001/config')).toBe(1)
-  await expect(page.locator('[data-capability-state="unavailable"]')).toBeVisible()
-  await expect(page.locator('[data-kiosk-screen="toolbox"]')).toHaveCount(0)
-})
-
-test('toolbox 混合安全项与危险外链时危险项不可启动 @w4', async ({ page, api }) => {
-  registerW4Api(api)
-  const config = w4TerminalConfig()
-  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
-    status: 200,
-    json: {
-      ...config,
-      toolbox: {
-        enabled: true,
-        items: [
-          { key: 'safe', title: '使用帮助', description: '', icon: 'help-circle', to: '/help', disabled: false, sortOrder: 1, launchMode: 'internal_route' },
-          { key: 'unsafe', title: '危险外链', description: '', icon: 'wrench', to: null, disabled: false, sortOrder: 2, launchMode: 'external_url', externalUrl: 'javascript:alert(1)' },
-        ],
-      },
-    },
-  })
-  await page.goto('/toolbox')
-  await expect(page.getByRole('button', { name: /使用帮助/ })).toBeEnabled()
-  await expect(page.getByRole('button', { name: /危险外链/ })).toBeDisabled()
-})
-
-test('smart-campus 危险扩展外链不可启动 @w4', async ({ page, api }) => {
-  registerW4Api(api)
-  const config = w4TerminalConfig()
-  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
-    status: 200,
-    json: {
-      ...config,
-      smartCampus: {
-        ...config.smartCampus,
-        items: [{ key: 'unsafe', title: '危险校园外链', description: '', icon: 'wrench', to: null, disabled: false, sortOrder: 1, launchMode: 'external_url', externalUrl: 'javascript:alert(1)' }],
-      },
-    },
-  })
-  await page.goto('/smart-campus')
-  await expect(page.getByRole('button', { name: /危险校园外链/ })).toBeDisabled()
-})
-
-test('smart-campus 子模块关闭不能从深链绕过 @w4', async ({ page, api }) => {
-  registerW4Api(api, {
-    smartCampusEnabled: true,
-    smartCampusModules: { welcome: false, luggage: false, panorama: false },
-  })
-  for (const url of ['/smart-campus/welcome', '/smart-campus/service/luggage', '/smart-campus/service/panorama']) {
-    await page.goto(url)
-    await expect(page.getByText('本机暂未开启这项智慧校园服务')).toBeVisible()
-  }
-  await page.goto('/smart-campus/service/campus-card')
-  await expect(page.getByText('办理指引 · 未接线上办理')).toBeVisible()
-})
-
-// MSC-07（2026-09-07）：5 分钟定时刷新不再先置 loading 卸载子页（用户填到一半会丢状态）；
-// 刷新期间保留旧快照，拿到新结果再替换。刷新失败仍 fail-closed 关闭。
-test('smart-campus 刷新期间保留旧页面，失败后关闭 @w4', async ({ page, api }) => {
-  registerW4Api(api)
-  await captureCapabilityRefresh(page)
-  let releaseRefresh!: (value: { abort: 'internetdisconnected' }) => void
-  api.respondWith('GET', '/api/v1/terminals/KSK-001/config', (requestNumber) => {
-    if (requestNumber === 1) return { status: 200, json: w4TerminalConfig() }
-    return new Promise((resolve) => { releaseRefresh = resolve })
-  })
-
-  try {
-    await page.goto('/smart-campus/service/campus-card')
-    await expect(page.getByText('办理指引 · 未接线上办理')).toBeVisible()
-    await runCapabilityRefresh(page)
-    await expect.poll(() => api.requestCount('GET', '/api/v1/terminals/KSK-001/config')).toBe(2)
-    await expect(page.locator('[data-capability-state="loading"]')).toHaveCount(0)
-    await expect(page.getByText('办理指引 · 未接线上办理')).toBeVisible()
-    releaseRefresh({ abort: 'internetdisconnected' })
-    await expect(page.locator('[data-capability-state="unavailable"]')).toBeVisible()
-    await expect(page.getByText('办理指引 · 未接线上办理')).toHaveCount(0)
-  } finally {
-    releaseRefresh?.({ abort: 'internetdisconnected' })
-  }
-})
-
-test('smart-campus 乱序旧 ON 响应不能覆盖新 OFF @w4', async ({ page, api }) => {
-  registerW4Api(api)
-  await captureCapabilityRefresh(page)
-  let releaseLateOn!: (value: { status: number; json: unknown }) => void
-  api.respondWith('GET', '/api/v1/terminals/KSK-001/config', (requestNumber) => {
-    if (requestNumber === 1) return { status: 200, json: w4TerminalConfig() }
-    if (requestNumber === 2) {
-      return new Promise((resolve) => { releaseLateOn = resolve })
-    }
-    return { status: 200, json: w4TerminalConfig({ smartCampusEnabled: false }) }
-  })
-
-  try {
-    await page.goto('/smart-campus/service/campus-card')
-    await expect(page.getByText('办理指引 · 未接线上办理')).toBeVisible()
-    await expect.poll(() => api.requestCount('GET', '/api/v1/terminals/KSK-001/config')).toBe(1)
-    await runCapabilityRefresh(page)
-    await expect.poll(() => api.requestCount('GET', '/api/v1/terminals/KSK-001/config')).toBe(2)
-    await runCapabilityRefresh(page)
-    await expect.poll(() => api.requestCount('GET', '/api/v1/terminals/KSK-001/config')).toBe(3)
-    await expect(page.locator('[data-capability-state="unavailable"]')).toBeVisible()
-    const lateResponse = page.waitForResponse((response) =>
-      new URL(response.url()).pathname === '/api/v1/terminals/KSK-001/config' && response.status() === 200,
-    )
-    releaseLateOn({ status: 200, json: w4TerminalConfig() })
-    await lateResponse
-    await expect(page.locator('[data-capability-state="unavailable"]')).toBeVisible()
-    await expect(page.getByText('办理指引 · 未接线上办理')).toHaveCount(0)
-  } finally {
-    releaseLateOn?.({ status: 200, json: w4TerminalConfig() })
-  }
-})
 
 test('/renshi 官方信息不承诺代办 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
+  await routeW4PolicyList(page, [W4_POLICY])
+  api.respond('GET', '/api/v1/policies/policy-001', { status: 200, json: { success: true, data: W4_POLICY } })
   await page.goto('/renshi')
-  await expect(page.getByText(/以官方发布为准/).first()).toBeVisible()
+  await expect(page).toHaveURL((url) => url.pathname === '/policy-service')
+  await expect(page.getByTestId('policy-touch-hub')).toBeVisible()
+  await expect(page.getByText(/以官方原文为准/).first()).toBeVisible()
+  await expect(page.getByText(/保证到账|免申即享/)).toHaveCount(0)
+  await verifyPage(page, errors)
+
+  await page.goto('/renshi?policy=policy-001')
+  await expect(page.getByRole('heading', { level: 1, name: '高校毕业生就业服务指引' })).toBeVisible()
+  // 每条写明发布机构；机构没填办事三栏就照实写没提供，不从摘要里猜条件；
+  // 原文链接没核对过属于发布机构登记的官方网站，就不给扫码。
+  await expect(page.locator('.qxt-band .qxt-eyebrow')).toContainText('青岛市人力资源和社会保障局发布')
+  await expect(page.getByText('发布机构没有提供这部分，请以原文为准')).toHaveCount(3)
+  await expect(page.getByText('原文链接不在发布机构登记的官方网站内，暂不提供扫码')).toBeVisible()
+  await expect(page.locator('.policy-min-qr svg')).toHaveCount(0)
   await expect(page.getByText(/保证到账|免申即享/)).toHaveCount(0)
   await verifyPage(page, errors)
 })
 
-// 政策库空 ≠ 页面空。内置办事指引常驻 5 条（其中一条 audiences 含 'general'，
-// 任何身份筛选都命中），一旦和库内政策并进同一个列表，政策库为空时页面照样满屏：
-// 运营录完 30 条种子政策，打开页面无法判断自己录的到底进没进去。
-// 这两条断言钉死「两个分区各自成列、政策库有自己的空态」。
+// 政策库空 ≠ 页面空。旧版把 5 条本机整理的办事指引常驻在政策页（其中一条 audiences 含 'general'，
+// 任何身份筛选都命中），政策库为空时页面照样满屏：运营录完 30 条种子政策，打开页面无法判断自己录的到底进没进去。
+// 2026-11-05 起这 5 条指引停放、不再上屏：全库为 0 时整屏换成空态，类别列表照实写 0 条，不拿指引补位。
 test('/renshi 政策库为空时给出明确空态，内置指引不冒充库内政策 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   api.respond('GET', '/api/v1/policies', {
@@ -725,27 +629,52 @@ test('/renshi 政策库为空时给出明确空态，内置指引不冒充库内
     json: { success: true, data: [], pagination: { page: 1, pageSize: 200, total: 0, totalPages: 1 } },
   })
   await page.goto('/renshi')
+  await expect(page).toHaveURL((url) => url.pathname === '/policy-service')
 
-  const library = page.locator('[data-policy-section="library"]')
-  const builtin = page.locator('[data-policy-section="builtin"]')
-  await expect(library).toBeVisible()
-  await expect(library.getByText('政策库暂无内容')).toBeVisible()
-  await expect(library.locator('.k8-policy-list-item')).toHaveCount(0)
-  // 指引本身有真实价值（本机通用办事参考），保留但必须落在自己的分区里。
-  await expect(builtin.locator('.k8-policy-list-item')).toHaveCount(5)
+  const hub = page.getByTestId('policy-touch-hub')
+  await expect(hub).toHaveAttribute('data-qxt-state', 'empty')
+  await expect(page.getByRole('heading', { level: 1, name: '这里还没有发布的政策' })).toBeVisible()
+  await expect(page.getByText('本机不自己编写政策，也不拿别处的内容顶替')).toBeVisible()
+  await expect(hub.locator('[data-testid^="policy-category-"]')).toHaveCount(0)
+  for (const title of BUILTIN_GUIDE_TITLES) await expect(page.getByText(title)).toHaveCount(0)
+  await verifyPage(page, errors)
+
+  await page.goto('/renshi?audience=general')
+  await expect(page.getByRole('heading', { level: 1, name: '0 条政策' })).toBeVisible()
+  await expect(page.getByTestId('renshi-policy-list').locator('[data-policy-id]')).toHaveCount(0)
+  await expect(page.getByText('这个类别还没有机构发布政策。')).toBeVisible()
+  for (const title of BUILTIN_GUIDE_TITLES) await expect(page.getByText(title)).toHaveCount(0)
   await verifyPage(page, errors)
 })
 
-test('/renshi 库内政策与内置指引分区渲染 @w4', async ({ page, api }) => {
-  const errors = runtimeErrors(page); registerW4Api(api) // fixture: 1 条 kind=policy_guide
-  await page.goto('/renshi')
+// 库内政策按适用人群分六类，条数按类别向服务端要 total（不拿取回的一条推断全类条数）；
+// 本机整理的指引已停放，不混进任何一类。
+test('/renshi 库内政策按类别真实条数渲染，不混入内置指引 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page); registerW4Api(api) // fixture: 1 条 kind=policy_guide（应届高校毕业生）
+  const listRequests: URL[] = []
+  await routeW4PolicyList(page, [W4_POLICY], listRequests)
+  await page.goto('/policy-service')
 
-  const library = page.locator('[data-policy-section="library"]')
-  const builtin = page.locator('[data-policy-section="builtin"]')
-  await expect(library.locator('.k8-policy-list-item')).toHaveCount(1)
-  await expect(library.getByText('高校毕业生就业服务指引')).toBeVisible()
-  await expect(library.getByText('政策库暂无内容')).toHaveCount(0)
-  await expect(builtin.locator('.k8-policy-list-item')).toHaveCount(5)
-  await expect(builtin.getByText('高校毕业生就业服务指引')).toHaveCount(0)
+  const graduate = page.getByTestId('policy-category-graduate')
+  await expect(graduate).toContainText('1 条 · 最近：高校毕业生就业服务指引')
+  for (const audience of ['startup', 'flexible', 'hardship', 'migrant', 'general'] as const) {
+    const tile = page.getByTestId(`policy-category-${audience}`)
+    await expect(tile).toContainText('还没有机构发布')
+    await expect(tile).toHaveAttribute('aria-disabled', 'true')
+  }
+  expect(listRequests.some((url) => url.searchParams.get('kind') === 'policy_guide'
+    && url.searchParams.get('audience') === 'graduate' && url.searchParams.get('pageSize') === '1')).toBe(true)
+  // 机构公告只在有公告时出现。
+  await expect(page.getByRole('button', { name: /^机构公告/ })).toHaveCount(0)
+  for (const title of BUILTIN_GUIDE_TITLES) await expect(page.getByText(title)).toHaveCount(0)
+  await verifyPage(page, errors)
+
+  await graduate.click()
+  await expect(page).toHaveURL((url) => url.pathname === '/renshi' && url.searchParams.get('audience') === 'graduate')
+  const list = page.getByTestId('renshi-policy-list')
+  await expect(list.locator('[data-policy-id]')).toHaveCount(1)
+  await expect(list.locator('[data-policy-id="policy-001"]')).toContainText('高校毕业生就业服务指引')
+  await expect(list.locator('[data-policy-id="policy-001"]')).toContainText('青岛市人力资源和社会保障局')
+  for (const title of BUILTIN_GUIDE_TITLES) await expect(page.getByText(title)).toHaveCount(0)
   await verifyPage(page, errors)
 })

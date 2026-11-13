@@ -26,6 +26,7 @@ const FAIR_NAME = '2026 青岛高校毕业生招聘会'
 const FAIR_SOURCE_NAME = '青岛公共就业服务网'
 const FAIR_SOURCE_URL = 'https://jobs.example.gov.cn/fairs/fair-001'
 const POLICY_TITLE = '高校毕业生就业服务指引'
+const POLICY_SOURCE_NAME = '青岛市人力资源和社会保障局'
 const POLICY_ENTRY_URL = 'https://hrss.example.gov.cn/policy/001'
 
 type Step = { n: number }
@@ -163,22 +164,38 @@ function seedFairs(api: ApiRouter): void {
   api.respond('GET', '/api/v1/job-fairs/fair-001', { status: 200, json: { success: true, data: fair } })
 }
 
-function seedPolicies(api: ApiRouter): void {
+async function seedPolicies(api: ApiRouter, page: Page): Promise<void> {
   const policy = {
     id: 'policy-001',
     kind: 'policy_guide',
     title: POLICY_TITLE,
     summary: '请通过官方入口查看办理条件。',
     audience: 'graduate',
-    sourceName: '青岛市人力资源和社会保障局',
+    sourceName: POLICY_SOURCE_NAME,
     syncTime: '2026-09-06T02:00:00.000Z',
+    publishedDate: '2026-09-01',
+    whoCanApply: '毕业年度内的高校毕业生',
+    requiredMaterials: '本人身份证\n毕业证书或学籍在线验证报告',
+    whereToApply: '户籍地或常住地公共就业服务机构',
     externalUrl: POLICY_ENTRY_URL,
+    // 原文链接发布时已核对属于发布机构登记的官方网站：详情才直接画原文二维码。
+    externalUrlVerified: true,
   }
-  api.respond('GET', '/api/v1/policies', {
-    status: 200,
-    json: { success: true, data: [policy], pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 } },
+  // 2026-11-05 政策首页按类别各读一次条数（?kind=policy_guide&audience=…&pageSize=1）。ApiRouter 只按路径应答，
+  // 同一条会被算进每一类、连公告都算上；glob 路由又连查询串一起比对。这里按路径接住，再按 kind / audience 过滤。
+  await page.route((url) => url.pathname === '/api/v1/policies', async (route) => {
+    const params = new URL(route.request().url()).searchParams
+    const kind = params.get('kind')
+    const audience = params.get('audience')
+    const pageSize = Math.max(1, Number(params.get('pageSize')) || 20)
+    const data = [policy].filter((item) => (!kind || item.kind === kind) && (!audience || item.audience === audience))
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true, data: data.slice(0, pageSize), pagination: { page: 1, pageSize, total: data.length, totalPages: 1 } }),
+    })
   })
-  // W-90：打开来源入口前按条读一次。返回和列表同一条，仍在架。
+  // 详情按编号读一次，返回和列表同一条，仍在架。
   // getPublishedPolicy 只认 { data: { id, ... } }；没有这条会被 ApiRouter 判成未处理。
   api.respond('GET', '/api/v1/policies/policy-001', {
     status: 200,
@@ -193,13 +210,13 @@ test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {
     const s: Step = { n: 0 }
 
     await page.goto('/')
-    const jobsEntry = page.getByRole('button', { name: /岗位信息/ }).first()
+    const jobsEntry = page.locator('[data-action="jobs-hub"]')
     await expect(jobsEntry).toBeVisible({ timeout: 15000 })
     await step(page, s, 'home')
 
     await jobsEntry.click()
     await page.waitForURL((u) => u.pathname === '/jobs-service', { timeout: 10000 })
-    const fullTime = page.getByRole('button', { name: /全职岗位/ }).first()
+    const fullTime = page.getByRole('button', { name: /找全职/ }).first()
     await expect(fullTime).toBeEnabled({ timeout: 15000 })
     await step(page, s, 'jobs-hub')
 
@@ -256,19 +273,28 @@ test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {
     const s: Step = { n: 0 }
 
     await page.goto('/')
-    // 无障碍名是「招聘会」+「场次、企业与现场导览」，中间可能有空格。
-    // V6 首页是 `[data-domain-id="fairs"] button.v6-home-domain__main`；青序流光首页
-    // 换成带 `data-action="fairs-hub"` 的磁贴（QxHomeView.tsx:226）。钉钩子不钉 class。
-    const fairsEntry = page.locator('[data-action="fairs-hub"]')
-    await expect(fairsEntry).toBeVisible({ timeout: 15000 })
+    const jobsEntry = page.locator('[data-action="jobs-hub"]')
+    await expect(jobsEntry, '托管打开时从首页社会招聘进入').toBeVisible({ timeout: 15000 })
+    await expect(page.locator('[data-action="fairs-hub"]')).toHaveCount(0)
+    await expect(page.getByTestId('qx-home')).toBeVisible()
     await step(page, s, 'home')
 
-    await fairsEntry.click()
+    await jobsEntry.click()
+    await page.waitForURL((u) => u.pathname === '/jobs-service', { timeout: 10000 })
+    // 首页不再单列招聘会磁贴（第二包），社会招聘台换成触屏版后（第十一包）旧台的「招聘会」快捷入口
+    // （button.qx-hub-quick-item）一并退出，进招聘会台（/fairs-service）的路是台里「实习、校招岗位在『校园招聘』里」那句话里的按钮。
+    const fairEntry = page.getByRole('button', { name: '校园招聘', exact: true })
+    await expect(fairEntry, '社会招聘服务台要有进招聘会台的入口').toBeEnabled({ timeout: 15000 })
+    await step(page, s, 'jobs-to-fairs')
+    await fairEntry.click()
     await page.waitForURL((u) => u.pathname === '/fairs-service', { timeout: 10000 })
-    // /fairs-service 迁入青序流光（稿 16）后，能力卡由「社会招聘会」改称「招聘会列表」，
-    // 落点仍是 /job-fairs。本旅程夹具把 /health 打成 200，所以这张 info 卡可点；
+    // 校园招聘台「更多去处」的「全部招聘会」落到 /job-fairs，不带 audience。
+    // 可用门不写 aria-label，读屏名是「标题 + 说明」，所以按门标题定位，不把说明从名字里裁掉。
+    // 本旅程夹具把 /health 打成 200，所以这扇门可点；
     // API checking/unavailable 时它仍 fail-closed，不得理解成「永远 enabled」。
-    const social = page.getByRole('button', { name: /招聘会列表/ }).first()
+    const socialDoor = page.locator('[data-door-title="全部招聘会"]')
+    await expect(socialDoor).toHaveCount(1)
+    const social = socialDoor.getByRole('button')
     await expect(social).toBeEnabled({ timeout: 15000 })
     await step(page, s, 'fairs-hub')
 
@@ -306,38 +332,49 @@ test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {
     console.log(`\n  旅程终点：${new URL(page.url()).pathname}`)
   })
 
-  test('旅程：首页 → 政策服务 → 就业政策 → 官方入口 @kiosk', async ({ page, api }) => {
+  test('旅程：首页 → 查政策 → 类别 → 政策详情 → 原文入口 @kiosk', async ({ page, api }) => {
     registerW6Api(api)
-    seedPolicies(api)
+    await seedPolicies(api, page)
     const s: Step = { n: 0 }
 
     await page.goto('/')
-    // 青序流光首页这颗磁贴叫「就业政策」（V6 叫「政策服务」），带 data-action="policy-hub"。
+    // 青序流光首页这颗磁贴叫「查政策」，带 data-action="policy-hub"。
     const policyEntry = page.locator('[data-action="policy-hub"]')
     await expect(policyEntry).toBeVisible({ timeout: 15000 })
     await step(page, s, 'home')
 
     await policyEntry.click()
     await page.waitForURL((u) => u.pathname === '/policy-service', { timeout: 10000 })
-    const employment = page.getByRole('button', { name: /就业政策/ }).first()
-    await expect(employment).toBeEnabled({ timeout: 15000 })
+    // 2026-11-05 政策最小闭环：政策首页按适用人群分六类，条数与最近一条都从发布数据读。
+    // 夹具只有一条应届生政策：这一类写 1 条，其余照实写「还没有机构发布」。
+    const graduate = page.getByTestId('policy-category-graduate')
+    await expect(graduate, '政策首页「应届高校毕业生」一类必须写出真实条数与最近一条').toContainText(`1 条 · 最近：${POLICY_TITLE}`, { timeout: 15000 })
+    await expect(page.getByTestId('policy-category-general')).toContainText('还没有机构发布')
     await step(page, s, 'policy-hub')
 
-    await employment.click()
-    await page.waitForURL((u) => u.pathname === '/renshi', { timeout: 10000 })
-    await expect(page.getByText(POLICY_TITLE).first()).toBeVisible({ timeout: 15000 })
-    await step(page, s, 'policy-page')
+    await graduate.click()
+    await page.waitForURL((u) => u.pathname === '/renshi' && u.searchParams.get('audience') === 'graduate', { timeout: 10000 })
+    const card = page.getByTestId('renshi-policy-list').locator('[data-policy-id="policy-001"]')
+    await expect(card, `类别列表必须出现夹具政策「${POLICY_TITLE}」`).toContainText(POLICY_TITLE, { timeout: 15000 })
+    await expect(card, '每条政策都写明发布机构').toContainText(POLICY_SOURCE_NAME)
+    await step(page, s, 'policy-list')
 
-    // 4. 官方入口按钮存在且可点（页上的「扫码打开来源链接」即官方入口）。
-    const official = page.getByRole('button', { name: '扫码打开来源链接' })
-    await expect(official, '政策页缺少官方入口按钮').toBeVisible()
-    await expect(official).toBeEnabled()
+    await card.click()
+    await page.waitForURL((u) => u.pathname === '/renshi' && u.searchParams.get('policy') === 'policy-001', { timeout: 10000 })
+    await expect(page.getByRole('heading', { level: 1, name: POLICY_TITLE })).toBeVisible({ timeout: 10000 })
 
-    await official.click()
-    await expect(page.getByText(POLICY_ENTRY_URL)).toBeVisible({ timeout: 5000 })
+    // 4. 官方入口：原文链接核对过属于发布机构登记的官方网站，详情里直接画原文二维码并写出目标域名。
+    const official = page.locator('.policy-min-qr')
+    await expect(official, '政策详情缺少原文二维码').toContainText('扫码打开原文', { timeout: 5000 })
+    await expect(official).toContainText(new URL(POLICY_ENTRY_URL).host)
+    await expect(official.locator('svg'), '原文二维码必须真画出来').toHaveCount(1)
     await step(page, s, 'policy-official-entry')
 
-    console.log(`\n  政策官方入口已打开：${POLICY_ENTRY_URL}`)
+    const body = (await page.locator('body').innerText()).replace(/\s+/g, ' ')
+    const forbidden = scanForbiddenCopy(body)
+    expect(forbidden, `政策详情出现违规文案「${forbidden.join('、')}」`).toEqual([])
+
+    console.log(`\n  政策原文二维码已画出：${POLICY_ENTRY_URL}`)
     console.log(`  旅程终点：${new URL(page.url()).pathname}`)
   })
 })

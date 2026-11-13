@@ -20,6 +20,8 @@ export interface ConvertImageSource {
 
 export interface ConvertImagesResponse {
   fileId: string
+  /** 落库的文件名；旧缓存对应的文件记录不存在时可能缺省。 */
+  filename?: string
   /** 内部 HMAC 打印链路 URL（30 分钟 TTL），不是 COS 预签名 URL。 */
   printFileUrl: string
   fileMd5: string
@@ -31,4 +33,9 @@ export interface ConvertImagesResponse {
    * 对过期/无效 JWT 和 Redis 会话不匹配静默 return null，转换仍成功且 endUserId 落 null。
    */
   hasEndUser: boolean
+  /**
+   * 这份 PDF 进没进「我的文档」。绑定了会员也可能不进：用了一体机这一单里从手机传来的图片时，
+   * PDF 只用于这一单（2026-11-02 拍板）。前端说「已进我的文档」只认这个字段。
+   */
+  savedToDocuments: boolean
 }

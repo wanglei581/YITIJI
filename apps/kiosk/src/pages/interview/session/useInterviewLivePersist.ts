@@ -8,10 +8,15 @@ export function useInterviewLivePersist(args: {
   messages: InterviewMessage[]
   questionIndex: number
   remainingSec: number
+  deadlineAtLocalMs: number
+  deadlineSource: 'server' | 'local'
   omitPrintAnswers: boolean
   answersRecorded: boolean
 }): void {
-  const { state, messages, questionIndex, remainingSec, omitPrintAnswers, answersRecorded } = args
+  const {
+    state, messages, questionIndex, remainingSec, deadlineAtLocalMs, deadlineSource,
+    omitPrintAnswers, answersRecorded,
+  } = args
   useEffect(() => {
     if (!state?.sessionId) return
     patchInterviewWorkbenchSession({
@@ -27,9 +32,11 @@ export function useInterviewLivePersist(args: {
         messages,
         questionIndex,
         remainingSec,
+        deadlineAtLocalMs,
+        deadlineSource,
         omitPrintAnswers,
         answersRecorded,
       },
     })
-  }, [state, messages, questionIndex, remainingSec, omitPrintAnswers, answersRecorded])
+  }, [state, messages, questionIndex, remainingSec, deadlineAtLocalMs, deadlineSource, omitPrintAnswers, answersRecorded])
 }

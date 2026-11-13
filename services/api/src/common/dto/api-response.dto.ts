@@ -20,8 +20,25 @@ export interface ErrorResponseBody {
   error: {
     code: string
     message: string
-    /** 校验类错误的详细分项,例如 ["items[0].externalId: should not be empty"] */
-    details?: string[]
+    /**
+     * 校验类错误的详细分项,例如 ["items[0].externalId: should not be empty"]。
+     * 免费打印额度三条 429（终端每天、会员每天、游客每单）由过滤器放行有界数字对象。
+     * 下单超过每天免费上限（PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES）是 400，不在该放行集合里，不带 details。
+     * 屏上扫描 device-report 的三个 409（已结束 / 已取消 / 投递中）是有界的 taskStatus，
+     * 已结束时再加 fileDelivered；其它对象形态的 details 不透出。
+     */
+    details?: string[] | {
+      limit: number
+      used: number
+      remaining: number
+      requested: number
+      resetAt: string
+    } | {
+      taskStatus: 'completed' | 'cancelled' | 'expired' | 'failed'
+      fileDelivered: boolean
+    } | {
+      taskStatus: 'matched'
+    }
     /** 管理员注销阻塞清单，只含订单号与状态。 */
     orders?: Array<{ orderNo: string; status: string }>
     /** 手机上传二维码已过期，但文件已经记在会员名下。只有 true，不带文件名。 */

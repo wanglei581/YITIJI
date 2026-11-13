@@ -7,13 +7,6 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  Button,
-  KioskActionBar,
-  KioskModal,
-  KioskPageFrame,
-  KioskPageHeader,
-} from '@ai-job-print/ui'
 import { AI_LABEL_COPY, type ContractReviewFinding } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
@@ -21,16 +14,18 @@ import {
   CheckCircle2Icon,
   ChevronDownIcon,
   ChevronUpIcon,
-  HelpCircleIcon,
-  HomeIcon,
   InfoIcon,
   Loader2Icon,
-  SaveIcon,
-  Trash2Icon,
 } from 'lucide-react'
+import { P10BigCard, P10HelpRemind } from '../../auth/CapabilityStayCards'
+import '../../auth/capability-gate-touch.css'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
+import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
+import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchOverlay } from '../../components/qingxu/touch/QxTouchOverlay'
+import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
+import { ContractTouchFrame } from './ContractTouchFrame'
 import { deleteContractReview, keepContractReviewReport } from '../../services/api/contractReview'
 import { ContractReviewSessionNotice } from './ContractReviewSessionNotice'
 import {
@@ -62,6 +57,13 @@ const CATEGORY_LABELS: Record<string, string> = {
   offer_conditions: '录用条件',
 }
 
+/** 没有结果时，重新开始要经过的三步（与上传页的说明一致）。 */
+const RESTART_STEPS = [
+  { title: '手机扫码上传合同', detail: '单个文件不超过 10MB' },
+  { title: '阅读说明并勾选同意', detail: '勾选之后才能开始分析' },
+  { title: '开始风险分析', detail: '结果只提示需要核对的条款' },
+] as const
+
 const KEEP_RETENTION_COPY =
   '保存后仅本人可在「我的文档」查看，保存期限 90 天，可随时删除。报告不会进入打印流程，也不会发给企业或合作机构。合同原件仍按短期策略删除。'
 
@@ -80,8 +82,7 @@ function FindingCard({ finding }: { finding: ContractReviewFinding }) {
     <div className="cr-finding-card">
       <button
         type="button"
-        className="cr-finding-card__header"
-        style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer' }}
+        className={`cr-finding-card__header${expanded ? ' cr-finding-card__header--open' : ''}`}
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
       >
@@ -92,51 +93,53 @@ function FindingCard({ finding }: { finding: ContractReviewFinding }) {
         </span>
       </button>
 
-      {expanded && (
-        <div className="cr-finding-card__body">
-          {/* 原文摘录 */}
-          {finding.evidence.excerpt && (
-            <div className="cr-finding-excerpt">
-              {finding.evidence.pageNumber != null && (
-                <div className="cr-finding-excerpt__page">
-                  第 {finding.evidence.pageNumber} 页
+      <div className="cr-finding-card__body">
+        {/* 默认可见：原文摘录、核对追问、逐条 AI 标识（稿 contract-result）；说明与依据收进展开。 */}
+        {finding.evidence.excerpt && (
+          <div className="cr-finding-excerpt">
+            {finding.evidence.pageNumber != null && (
+              <div className="cr-finding-excerpt__page">
+                第 {finding.evidence.pageNumber} 页
+              </div>
+            )}
+            「{finding.evidence.excerpt}」
+          </div>
+        )}
+
+        {finding.verificationQuestion && finding.verificationQuestion !== '无' && (
+          <div className="cr-finding-question">{finding.verificationQuestion}</div>
+        )}
+
+        <p className="cr-finding-ai-label">{AI_LABEL_COPY.BASE}</p>
+
+        {expanded && (
+          <>
+            <p className="cr-finding-explanation">{finding.explanation}</p>
+
+            {/* 法律依据 / 不确定性 */}
+            <div className="cr-finding-meta">
+              {finding.basisRef && (
+                <div className="cr-finding-meta-row">
+                  <span className="cr-finding-meta-row__key">法律依据</span>
+                  <span className="cr-finding-meta-row__val">{finding.basisRef}</span>
                 </div>
               )}
-              「{finding.evidence.excerpt}」
-            </div>
-          )}
-
-          {/* 说明 */}
-          <p className="cr-finding-explanation">{finding.explanation}</p>
-
-          {/* 法律依据 / 不确定性 */}
-          <div className="cr-finding-meta">
-            {finding.basisRef && (
               <div className="cr-finding-meta-row">
-                <span className="cr-finding-meta-row__key">法律依据</span>
-                <span className="cr-finding-meta-row__val">{finding.basisRef}</span>
+                <span className="cr-finding-meta-row__key">条款类别</span>
+                <span className="cr-finding-meta-row__val">
+                  {CATEGORY_LABELS[finding.category] ?? finding.category}
+                </span>
               </div>
-            )}
-            <div className="cr-finding-meta-row">
-              <span className="cr-finding-meta-row__key">条款类别</span>
-              <span className="cr-finding-meta-row__val">
-                {CATEGORY_LABELS[finding.category] ?? finding.category}
-              </span>
+              {finding.uncertainty && finding.uncertainty !== '无' && (
+                <div className="cr-finding-meta-row">
+                  <span className="cr-finding-meta-row__key">局限性</span>
+                  <span className="cr-finding-meta-row__val">{finding.uncertainty}</span>
+                </div>
+              )}
             </div>
-            {finding.uncertainty && finding.uncertainty !== '无' && (
-              <div className="cr-finding-meta-row">
-                <span className="cr-finding-meta-row__key">局限性</span>
-                <span className="cr-finding-meta-row__val">{finding.uncertainty}</span>
-              </div>
-            )}
-          </div>
-
-          {/* 建议追问 */}
-          {finding.verificationQuestion && finding.verificationQuestion !== '无' && (
-            <div className="cr-finding-question">{finding.verificationQuestion}</div>
-          )}
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -204,37 +207,61 @@ export function ContractReviewResultPage() {
     }
   }
 
-  // 若直接进入此页但没有结果（刷新/深链），回首页
   if (!result) {
     return (
-      <KioskFullscreenShell>
-        <main className="flex min-h-0 flex-1 flex-col">
-          <KioskPageFrame
-            className="fusion-w3 fusion-w3--resume"
-            header={
-              <KioskPageHeader
-                title="AI 签约风险提示"
-                description="结果"
-                onBack={() => void deleteAndNavigate('/contract-review')}
-                backLabel="返回"
-              />
-            }
-          >
-          <div className="cr-done-screen">
-            <div className="cr-done-screen__icon">
-              <HelpCircleIcon size={52} />
+      <ContractTouchFrame>
+      <QxTouchScreen
+        testId="contract-touch"
+        stateId="missing"
+        bodyClassName="qxt-body-scroll"
+        band={(
+          <QxTouchBand
+            seal={null}
+            eyebrow="签约风险提示"
+            title="未找到审查结果"
+            sub={deleteError ?? '请重新上传合同进行审查'}
+            back={false}
+            status={{ text: '没有结果', tone: 'warn' }}
+          />
+        )}
+        dock={(
+          <QxTouchDock
+            back={false}
+            ask={{
+              label: '问小青：没有结果怎么办？',
+              draft: '没有审查结果时怎么办？请只说明可以重新上传或去打印，不要下结论。',
+            }}
+          />
+        )}
+      >
+          <div className="cr-missing">
+            <P10BigCard
+              icon="file"
+              title="重新上传"
+              desc="回到上传页，重新选择文件。"
+              onClick={() => void deleteAndNavigate('/contract-review')}
+            />
+            <P10BigCard
+              icon="printer"
+              title="去打印扫描"
+              desc="没有结果时，仍可以把合同打印出来自己看。"
+              onClick={() => navigate('/print-scan')}
+            />
+            <div className="qxt-sec">重新开始只要三步</div>
+            <div className="qxt-steps qxt-steps-big">
+              {RESTART_STEPS.map((step, index) => (
+                <div className="qxt-step" key={step.title}>
+                  <span className="qxt-step-n">{index + 1}</span>
+                  <b>{step.title}</b>
+                  <small>{step.detail}</small>
+                </div>
+              ))}
             </div>
-            <p className="cr-done-screen__title">未找到审查结果</p>
-            <p className="cr-done-screen__sub">
-              {deleteError ?? '请重新上传合同进行审查'}
-            </p>
-            <Button size="lg" disabled={deleting} onClick={() => void deleteAndNavigate('/contract-review')}>
-              重新上传
-            </Button>
+            <P10HelpRemind />
+            <p className="qxt-fine">直接打开这一页、或中途离开后，可能已经没有结果。</p>
           </div>
-          </KioskPageFrame>
-        </main>
-      </KioskFullscreenShell>
+      </QxTouchScreen>
+      </ContractTouchFrame>
     )
   }
 
@@ -243,60 +270,67 @@ export function ContractReviewResultPage() {
   const infoFindings = result.findings.filter((f) => f.priority === 'insufficient_info')
 
   return (
-    <KioskFullscreenShell>
-      <main className="flex min-h-0 flex-1 flex-col">
-        <KioskPageFrame
-          className="fusion-w3 fusion-w3--resume"
-          header={
-            <KioskPageHeader
-              title="审查结果"
-              description="AI 签约风险提示 · 仅供参考"
-              onBack={() => void deleteAndNavigate('/contract-review')}
-              backLabel="重新审查"
-            />
-          }
-          footer={
-            <KioskActionBar>
-            <Button
-              variant="outline"
-              size="lg"
-              style={{ flex: 1 }}
-              disabled={deleting}
-              onClick={() => void deleteAndNavigate('/contract-review')}
-            >
-              <HomeIcon size={20} className="mr-2" />
-              重新审查
-            </Button>
-            <Button
-              size="lg"
-              style={{ flex: 2 }}
-              disabled={!canKeep || deleting || keeping || keepDone}
-              aria-disabled={!canKeep || undefined}
-              title={keepDisabledReason ?? (keepDone ? '已保存到我的文档' : '保存到我的文档')}
-              onClick={() => {
-                if (!canKeep) return
-                setShowKeepConfirm(true)
-              }}
-            >
-              {keeping
-                ? <Loader2Icon size={20} className="mr-2 animate-spin" />
-                : <SaveIcon size={20} className="mr-2" />}
-              {keepDone ? '已保存到我的文档' : '保存到我的文档'}
-            </Button>
-            <Button
-              size="lg"
-              style={{ flex: 2 }}
-              disabled={deleting}
-              onClick={() => void deleteAndNavigate('/resume-service')}
-            >
-              {deleting
-                ? <Loader2Icon size={20} className="mr-2 animate-spin" />
-                : <Trash2Icon size={20} className="mr-2" />}
-              结束并删除
-            </Button>
-            </KioskActionBar>
-          }
+    <ContractTouchFrame>
+    <QxTouchScreen
+      testId="contract-touch"
+      stateId="result"
+      bodyClassName="qxt-body-scroll"
+      band={(
+        <QxTouchBand
+          seal={null}
+          eyebrow="签约风险提示"
+          title="审查结果"
+          sub="AI 签约风险提示 · 仅供参考"
+          back={false}
+          rail={{ labels: ['上传合同', 'AI 分析', '查看结果'], now: 2 }}
+          status={{ text: 'AI 生成，仅供参考', tone: 'unknown' }}
+        />
+      )}
+      dock={(
+        <QxTouchDock
+          back={false}
+          ask={{
+            label: '问小青：哪一条要先核对？',
+            draft: '哪一条要先核对？请只说明怎么核对，不要下结论。',
+          }}
+          primary={{
+            label: deleting ? '正在删除' : '重新审查',
+            disabled: deleting,
+            onClick: () => void deleteAndNavigate('/contract-review'),
+          }}
+        />
+      )}
+      overlay={showKeepConfirm ? (
+        <QxTouchOverlay
+          kind="dialog"
+          title="保存到我的文档"
+          onClose={() => {
+            if (!keeping) setShowKeepConfirm(false)
+          }}
+          actions={(
+            <>
+              <button type="button" className="qxt-btn qxt-btn-sec" disabled={keeping} onClick={() => setShowKeepConfirm(false)}>
+                暂不保存
+              </button>
+              <button type="button" className="qxt-btn qxt-btn-pri" disabled={keeping} onClick={() => void continueKeep()}>
+                {keeping ? <Loader2Icon size={18} className="animate-spin" aria-hidden="true" /> : null}
+                确认保存 90 天
+              </button>
+            </>
+          )}
         >
+          <div className="cr-confirm-modal">
+            <div className="cr-confirm-modal__info">{KEEP_RETENTION_COPY}</div>
+            <div>
+              <div className="cr-confirm-modal__row"><span>保存位置</span><span>我的文档（仅本人）</span></div>
+              <div className="cr-confirm-modal__row"><span>保存期限</span><span>90 天，可随时删除</span></div>
+              <div className="cr-confirm-modal__row"><span>打印</span><span>不可打印</span></div>
+            </div>
+          </div>
+        </QxTouchOverlay>
+      ) : undefined}
+    >
+      <div className="cr-touch-result">
         {deleteError && (
           <div className="cr-disclaimer-banner" role="alert" style={{ color: 'var(--error)', borderColor: 'rgba(193,74,52,.3)', background: 'var(--error-soft)' }}>
             <AlertCircleIcon />
@@ -307,12 +341,6 @@ export function ContractReviewResultPage() {
           <div className="cr-disclaimer-banner" role="alert" style={{ color: 'var(--error)', borderColor: 'rgba(193,74,52,.3)', background: 'var(--error-soft)' }}>
             <AlertCircleIcon />
             <span>{keepError}</span>
-          </div>
-        )}
-        {!canKeep && keepDisabledReason && (
-          <div className="cr-disclaimer-banner" role="status">
-            <InfoIcon />
-            <span>{keepDisabledReason}</span>
           </div>
         )}
         {session && <ContractReviewSessionNotice expiresAt={session.expiresAt} />}
@@ -458,46 +486,35 @@ export function ContractReviewResultPage() {
             </>
           )}
         </div>
-        </KioskPageFrame>
-      </main>
-      <KioskModal
-        title="保存到我的文档"
-        open={showKeepConfirm}
-        onClose={() => !keeping && setShowKeepConfirm(false)}
-        actions={
-          <div style={{ display: 'flex', gap: 16 }}>
-            <Button
-              variant="ghost"
-              disabled={keeping}
-              onClick={() => setShowKeepConfirm(false)}
-              style={{ flex: 1 }}
-            >
-              暂不保存
-            </Button>
-            <Button
-              disabled={keeping}
-              onClick={() => void continueKeep()}
-              style={{ flex: 2 }}
-            >
-              {keeping
-                ? <Loader2Icon size={18} className="animate-spin mr-1" />
-                : <SaveIcon size={18} className="mr-1" />}
-              确认保存 90 天
-            </Button>
+        {!canKeep && keepDisabledReason && (
+          <div className="cr-disclaimer-banner" role="status">
+            <InfoIcon />
+            <span>{keepDisabledReason}</span>
           </div>
-        }
-      >
-        <div className="cr-confirm-modal">
-          <div className="cr-confirm-modal__info">
-            {KEEP_RETENTION_COPY}
-          </div>
-          <div>
-            <div className="cr-confirm-modal__row"><span>保存位置</span><span>我的文档（仅本人）</span></div>
-            <div className="cr-confirm-modal__row"><span>保存期限</span><span>90 天，可随时删除</span></div>
-            <div className="cr-confirm-modal__row"><span>打印</span><span>不可打印</span></div>
-          </div>
-        </div>
-      </KioskModal>
-    </KioskFullscreenShell>
+        )}
+        <button
+          type="button"
+          className="qxt-btn qxt-btn-pri cr-body-btn"
+          disabled={!canKeep || deleting || keeping || keepDone}
+          onClick={() => {
+            if (!canKeep) return
+            setShowKeepConfirm(true)
+          }}
+        >
+          {keeping ? <Loader2Icon size={20} className="animate-spin" aria-hidden="true" /> : null}
+          {keepDone ? '已保存到我的文档' : '保存到我的文档'}
+        </button>
+        <button
+          type="button"
+          className="qxt-btn qxt-btn-sec cr-body-btn"
+          disabled={deleting}
+          onClick={() => void deleteAndNavigate('/resume-service')}
+        >
+          {deleting ? <Loader2Icon size={20} className="animate-spin" aria-hidden="true" /> : null}
+          结束并删除
+        </button>
+      </div>
+    </QxTouchScreen>
+    </ContractTouchFrame>
   )
 }

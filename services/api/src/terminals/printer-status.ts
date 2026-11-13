@@ -25,3 +25,32 @@ export function isPrinterFaultStatus(printerStatus: string | null | undefined): 
     && !isHealthyPrinterStatus(printerStatus)
     && !isLowPaperWarning(printerStatus)
 }
+
+/** 对外（公开只读的 printer-status）只给扫描输入是否可用这一档，不带原因码、恢复动作和路径。 */
+export type PublicScanInputHealth = 'healthy' | 'locked_out' | 'unknown'
+
+/**
+ * Agent 心跳里的扫描输入状态 → 一体机公开接口里的那一档。
+ * 老版本 Agent 不上报（null）原样给 null，让一体机写「读不到」；库里出现不认识的值一律当 unknown，不冒充 healthy。
+ */
+export function publicScanInputHealth(value: string | null | undefined): PublicScanInputHealth | null {
+  if (value === null || value === undefined) return null
+  return value === 'healthy' || value === 'locked_out' ? value : 'unknown'
+}
+
+/**
+ * 屏上扫描：终端程序最近一次探测扫描仪的结果。心跳 DTO 与公开接口共用这一份取值。
+ *   ready 能连上且空闲 / busy 正在被占用（如打印中）/ not_found 没找到扫描仪 / error 连接出错 / unknown 没探测成功。
+ */
+export const SCAN_DEVICE_HEALTHS = ['ready', 'busy', 'not_found', 'error', 'unknown'] as const
+export type PublicScanDeviceHealth = (typeof SCAN_DEVICE_HEALTHS)[number]
+
+/**
+ * Agent 心跳里的扫描仪探测结果 → 一体机公开接口里的那一档（写法同 publicScanInputHealth）。
+ * 老版本 Agent 不上报（null）原样给 null，让一体机写「读不到」；库里出现不认识的值一律当 unknown，
+ * 不冒充 ready —— 一体机据此决定是否显示「在这块屏上开始扫描」，宁可灰掉也不能误开。
+ */
+export function publicScanDeviceHealth(value: string | null | undefined): PublicScanDeviceHealth | null {
+  if (value === null || value === undefined) return null
+  return (SCAN_DEVICE_HEALTHS as readonly string[]).includes(value) ? (value as PublicScanDeviceHealth) : 'unknown'
+}

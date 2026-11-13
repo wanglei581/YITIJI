@@ -1,11 +1,12 @@
 import { AiContentBlockedError } from '../ai/llm/llm-guard'
 import {
-  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common'
+import { contentBlockedException } from '../ai/safety/content-blocked'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import {
@@ -31,6 +32,7 @@ import { AiEndpointNotAllowedError } from '../common/outbound/ai-endpoint-allowl
 import { LlmChatService, assistantOwnerKey } from '../ai/llm/llm-chat.service'
 import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
 import { withAiSafety } from '../ai/llm/ai-prompt-safety'
+import { DEVICE_FAULT_PROMPT_RULE, hasHandsOnMachineInstruction } from '../ai/safety/device-fault'
 
 export const ASSISTANT_SUMMARY_SYSTEM_PROMPT = withAiSafety([
   '你把求职者与小青的本次对话浓缩成要点和待办。',
@@ -40,8 +42,11 @@ export const ASSISTANT_SUMMARY_SYSTEM_PROMPT = withAiSafety([
   '3. 不出现一键投递 / 立即投递 / 平台投递；岗位申请只能提醒用户去来源平台。',
   '4. 要点 ≤8 条，待办 ≤5 条；每条不超过 80 字，口语、可执行。',
   '5. 没有待办就返回空数组，不要编「下一步」。',
+  DEVICE_FAULT_PROMPT_RULE,
   '只输出 JSON（不要 markdown 代码块）：{"highlights":["要点"],"todos":["待办"]}',
 ].join('\n'))
+import { AiQuotaService } from '../ai/quota/ai-quota.service'
+import { quotaSequence, runWithAiQuota } from '../ai/quota/ai-quota-run'
 import { AdvisorArtifactService } from './advisor-artifact.service'
 import { ADVISOR_DISCLAIMER } from './advisor-skills'
 import type { QaPinsPayload } from './advisor-artifact.types'
@@ -87,6 +92,8 @@ export interface AssistantSessionSummaryView {
   printUnavailableReason?: string
 }
 
+type SavedSummary = { row: { id: string }; saved: { artifactId: string } }
+
 @Injectable()
 export class AssistantSummaryService {
   private readonly logger = new Logger(AssistantSummaryService.name)
@@ -98,6 +105,7 @@ export class AssistantSummaryService {
     private readonly artifacts: AdvisorArtifactService,
     private readonly audit: AuditService,
     private readonly aiLog: AiLogService,
+    @Optional() private readonly quota?: AiQuotaService,
   ) {}
 
   async summarize(
@@ -128,16 +136,75 @@ export class AssistantSummaryService {
 
     const usage = new AiUsageAccumulator()
     const startedAt = Date.now()
-    let parsed: { highlights: string[]; todos: string[] }
+    const work = async (): Promise<{ highlights: string[]; todos: string[] }> => {
+      try {
+        const condensed = await this.condense(turns, usage.add)
+        this.recordLog(usage, startedAt, 'success', endUserId)
+        return condensed
+      } catch (error) {
+        this.recordLog(usage, startedAt, 'failed', endUserId, aiErrorCodeOf(error))
+        throw error
+      }
+    }
+    // 小结归小青桶，每次生成扣 1 次（设计文档第二节）。要点先存成本人「我的」里能重开的
+    // 顾问记录再结算；模型报错等服务端确认的失败归还。操作号由服务端签发。
+    let stored: SavedSummary | null = null
+    const persist = async (value: { highlights: string[]; todos: string[] }): Promise<string> => {
+      stored = await this.persistSummary(value, userTurns[0]!.content, endUserId)
+      return stored.row.id
+    }
+    const parsed = this.quota
+      ? await runWithAiQuota({
+        quota: this.quota,
+        bucket: 'ai_assistant',
+        operationKey: `assistant-summary:${quotaSequence()}`,
+        endUserId,
+      }, work, persist)
+      : await work().then(async (value) => { await persist(value); return value })
+    const { row, saved } = stored as unknown as SavedSummary
+
+    let document: AssistantSessionSummaryView['document'] = null
+    let printUnavailableReason: string | undefined
     try {
-      parsed = await this.condense(turns, usage.add)
-      this.recordLog(usage, startedAt, 'success', endUserId)
+      const printed = await this.artifacts.print(saved.artifactId, row.id, { endUserId })
+      document = {
+        fileId: printed.fileId,
+        filename: printed.filename,
+        mimeType: 'application/pdf',
+        sizeBytes: printed.sizeBytes,
+        pageCount: printed.pageCount,
+        signedUrl: printed.signedUrl,
+        expiresAt: printed.expiresAt,
+        printFileUrl: printed.printFileUrl,
+      }
     } catch (error) {
-      this.recordLog(usage, startedAt, 'failed', endUserId, aiErrorCodeOf(error))
-      throw error
+      const code = (error as { getResponse?: () => { error?: { code?: string; message?: string } } })
+        .getResponse?.()?.error?.code
+      printUnavailableReason = code === 'ADVISOR_PDF_FONT_NOT_FOUND'
+        ? '服务器缺少中文字体，要点已保存但暂时无法生成打印稿'
+        : '打印稿暂时无法生成，要点已保存，请稍后再试'
+      this.logger.warn(`assistant.summary_print_failed code=${code ?? 'unknown'}`)
     }
 
-    const firstUser = userTurns[0]!.content.trim().slice(0, 600)
+    return {
+      advisorSessionId: row.id,
+      artifactId: saved.artifactId,
+      highlights: parsed.highlights,
+      todos: parsed.todos,
+      disclaimer: ADVISOR_DISCLAIMER,
+      savedToDocuments: true,
+      document,
+      printUnavailableReason,
+    }
+  }
+
+  /** 把浓缩后的要点存成本人的顾问记录与 qa_pins 产物，写审计。结算只在这之后。 */
+  private async persistSummary(
+    parsed: { highlights: string[]; todos: string[] },
+    firstUserText: string,
+    endUserId: string,
+  ): Promise<SavedSummary> {
+    const firstUser = firstUserText.trim().slice(0, 600)
     const nowIso = new Date().toISOString()
     const expiresAt = new Date(Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000)
     const row = await this.prisma.advisorSession.create({
@@ -194,40 +261,7 @@ export class AssistantSummaryService {
       userAgent: null,
       requestId: null,
     })
-
-    let document: AssistantSessionSummaryView['document'] = null
-    let printUnavailableReason: string | undefined
-    try {
-      const printed = await this.artifacts.print(saved.artifactId, row.id, { endUserId })
-      document = {
-        fileId: printed.fileId,
-        filename: printed.filename,
-        mimeType: 'application/pdf',
-        sizeBytes: printed.sizeBytes,
-        pageCount: printed.pageCount,
-        signedUrl: printed.signedUrl,
-        expiresAt: printed.expiresAt,
-        printFileUrl: printed.printFileUrl,
-      }
-    } catch (error) {
-      const code = (error as { getResponse?: () => { error?: { code?: string; message?: string } } })
-        .getResponse?.()?.error?.code
-      printUnavailableReason = code === 'ADVISOR_PDF_FONT_NOT_FOUND'
-        ? '服务器缺少中文字体，要点已保存但暂时无法生成打印稿'
-        : '打印稿暂时无法生成，要点已保存，请稍后再试'
-      this.logger.warn(`assistant.summary_print_failed code=${code ?? 'unknown'}`)
-    }
-
-    return {
-      advisorSessionId: row.id,
-      artifactId: saved.artifactId,
-      highlights: parsed.highlights,
-      todos: parsed.todos,
-      disclaimer: ADVISOR_DISCLAIMER,
-      savedToDocuments: true,
-      document,
-      printUnavailableReason,
-    }
+    return { row, saved }
   }
 
   private async condense(
@@ -279,7 +313,7 @@ export class AssistantSummaryService {
         { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: 'assistant_summary', forbiddenWords: cfg.forbiddenWords } },
       )
     } catch (error) {
-      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
+      if (error instanceof AiContentBlockedError) throw contentBlockedException(error)
       // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
       if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       if (error instanceof LlmBusyError) {
@@ -315,7 +349,9 @@ export class AssistantSummaryService {
 
     const parsed = parseSummaryJson(raw)
     const highlights = sanitizeLines(parsed?.highlights, MAX_HIGHLIGHTS)
+      .filter((line) => !hasHandsOnMachineInstruction(line))
     const todos = sanitizeLines(parsed?.todos, MAX_TODOS)
+      .filter((line) => !hasHandsOnMachineInstruction(line))
     if (highlights.length === 0) {
       throw new ServiceUnavailableException({
         error: { code: 'ASSISTANT_SUMMARY_FAILED', message: '这一轮对话暂时总结不了，请再问几句后再试' },

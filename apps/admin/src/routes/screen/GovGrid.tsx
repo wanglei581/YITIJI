@@ -1,3 +1,4 @@
+import { usePublicBrand } from '../../services/api/publicBrand'
 import { formatTime } from '@ai-job-print/shared'
 import type { ScreenAlertItem, ScreenSnapshotMetrics } from '@ai-job-print/shared'
 import {
@@ -51,7 +52,6 @@ import { TwinShell, TwinShellEmpty, snapshotMeta, useAdminSnapshot, type ScreenC
  *      各区立柱上的「N 台」只在场景里有，照写。
  */
 
-const TITLE = '职易达 · 就业服务终端运行态势'
 const SUBTITLE = '数字孪生 · 政务总览'
 const UNASSIGNED = '未设置所在区'
 
@@ -105,11 +105,13 @@ function TaskFlow({ printByStatus, scanByStatus }: { printByStatus: Record<strin
 }
 
 export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
+  const { brandName } = usePublicBrand()
+  const title = `${brandName} · 就业服务终端运行态势`
   const gov = useAdminSnapshot('gov', 60)
   // 来源平台访问 Top 5 只在运营快照里；其余块都随政务快照下发
   const ops = useAdminSnapshot('ops', 60, 'gov-tab')
   if (!gov.data) {
-    return <TwinShellEmpty chrome={chrome} title={TITLE} subtitle={SUBTITLE} failure={gov.failure} onRetry={() => void gov.refresh()} />
+    return <TwinShellEmpty chrome={chrome} title={title} subtitle={SUBTITLE} failure={gov.failure} onRetry={() => void gov.refresh()} />
   }
   // 任务流与告警 9/26 起随政务快照下发（与运营版同一份实现、同一档缓存）
   const g: ScreenSnapshotMetrics = gov.data.metrics
@@ -159,7 +161,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
   return (
     <TwinShell
       chrome={chrome}
-      title={TITLE}
+      title={title}
       subtitle={SUBTITLE}
       layout="city"
       toolbar={toolbar}

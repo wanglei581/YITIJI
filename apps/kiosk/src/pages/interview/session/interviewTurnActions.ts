@@ -6,6 +6,7 @@ import { isAiOutage } from '../../../ai/aiOutage'
 import { aiDeclarationDeclineMessage } from '../../../ai/aiDeclarationErrors'
 import { INTERVIEW_AI_DOWN_HINT, type InterviewStage } from '../interviewWorkbenchModel'
 import { patchInterviewWorkbenchSession } from '../interviewWorkbenchSession'
+import { isAiGateDown } from '../useInterviewAiCapabilities'
 import type { InterviewMessage, InterviewSessionPhase, InterviewSessionRouteState, InterviewVoiceState } from './types'
 import {
   classifyInterviewFinishFailure,
@@ -28,6 +29,8 @@ export async function submitInterviewAnswer(ctx: {
   messages: InterviewMessage[]
   draft: string
   voiceKind: InterviewVoiceState['kind']
+  sealedRef: MutableRefObject<boolean>
+  sealAtDeadline: () => void
   questionShownAtRef: MutableRefObject<number>
   setMessages: Dispatch<SetStateAction<InterviewMessage[]>>
   setDraft: Dispatch<SetStateAction<string>>
@@ -38,9 +41,13 @@ export async function submitInterviewAnswer(ctx: {
   setMicError: Dispatch<SetStateAction<boolean>>
   setFinishRecovery: Dispatch<SetStateAction<InterviewFinishRecovery | null>>
   setAnswersRecorded: Dispatch<SetStateAction<boolean>>
+  setAiOutage: Dispatch<SetStateAction<boolean>>
+  /** 服务端 AI 闸门（暂停、额度）拦下这次调用：小青这次也用不了。 */
+  setAssistantDown: Dispatch<SetStateAction<boolean>>
   setQuestionIndex: Dispatch<SetStateAction<number>>
 }): Promise<void> {
   const { args, state, access } = ctx
+  if (ctx.sealedRef.current) return
   if (ctx.voiceKind === 'requesting_permission' || ctx.voiceKind === 'transcribing') return
   const answer = args.text.trim()
   if (!args.skip && !answer) {
@@ -71,7 +78,13 @@ export async function submitInterviewAnswer(ctx: {
           },
       access,
     )
+    ctx.setAiOutage(false)
+    ctx.setAssistantDown(false)
     if (!args.skip) ctx.setAnswersRecorded(true)
+    if (res.timeUp === true || ctx.sealedRef.current) {
+      ctx.sealAtDeadline()
+      return
+    }
     if (res.done) {
       ctx.setPhase('done_suggest')
       return
@@ -81,6 +94,10 @@ export async function submitInterviewAnswer(ctx: {
     ctx.setPhase('answering')
   } catch (err) {
     ctx.setMessages((prev) => dropAppendedTurn(prev, lengthBefore))
+    if (errorCodeOf(err) === 'INTERVIEW_DEADLINE_REACHED' || ctx.sealedRef.current) {
+      ctx.sealAtDeadline()
+      return
+    }
     const draftRestored = !args.skip
     if (args.skip) {
       ctx.setDraft(draftBefore)
@@ -88,7 +105,9 @@ export async function submitInterviewAnswer(ctx: {
       ctx.setDraft(answer)
       if (args.voiceMeta) ctx.setMode('text')
     }
-    const base = aiDeclarationDeclineMessage(err) ?? (isAiOutage(err) ? INTERVIEW_AI_DOWN_HINT : userMessageOf(err, '提交失败，请重试'))
+    ctx.setAiOutage(isAiOutage(err))
+    ctx.setAssistantDown(isAiGateDown(err))
+    const base =aiDeclarationDeclineMessage(err) ?? (isAiOutage(err) ? INTERVIEW_AI_DOWN_HINT : userMessageOf(err, '提交失败，请重试'))
     ctx.setError(submitFailureMessage(base, draftRestored))
     ctx.setPhase('answering')
   }
@@ -110,6 +129,7 @@ export async function finishInterview(ctx: {
   setError: Dispatch<SetStateAction<string | null>>
   setMicError: Dispatch<SetStateAction<boolean>>
   setFinishRecovery: Dispatch<SetStateAction<InterviewFinishRecovery | null>>
+  setAssistantDown: Dispatch<SetStateAction<boolean>>
 }): Promise<void> {
   const {
     state, access, omitPrintAnswers, onGoStage, navigate, stopPlayback, resetVoiceState,
@@ -133,6 +153,7 @@ export async function finishInterview(ctx: {
     if (onGoStage) onGoStage('report')
     else navigate('/interview/report', { state: { sessionId: state.sessionId, accessToken: state.accessToken, report } })
   } catch (err) {
+    ctx.setAssistantDown(isAiGateDown(err))
     const declined = aiDeclarationDeclineMessage(err)
     const classified = classifyInterviewFinishFailure({
       code: errorCodeOf(err),
@@ -148,5 +169,44 @@ export async function finishInterview(ctx: {
     }
     ctx.setError(declined ?? userMessageOf(err, '报告生成失败，请重试'))
     ctx.setPhase(hasNonSkippedCandidate(ctx.messages) ? 'done_suggest' : 'answering')
+  }
+}
+
+/** 到点结束：已提交的回答出报告；没有回答或报告失败停在到点屏，不回到作答。 */
+export async function endInterviewAtDeadline(ctx: {
+  state: InterviewSessionRouteState
+  access: InterviewAccess
+  omitPrintAnswers: boolean
+  pendingAnswer: Promise<void> | null
+  onGoStage?: (stage: InterviewStage) => void
+  navigate: NavigateFunction
+  setAssistantDown: Dispatch<SetStateAction<boolean>>
+}): Promise<'reported' | 'no-answers' | 'report-failed'> {
+  if (ctx.pendingAnswer) {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      await Promise.race([
+        ctx.pendingAnswer.catch(() => undefined),
+        new Promise<void>((resolve) => { timer = setTimeout(resolve, 12_000) }),
+      ])
+    } finally {
+      if (timer !== undefined) clearTimeout(timer)
+    }
+  }
+  try {
+    const report = await endInterview(ctx.state.sessionId, ctx.access, {
+      includeAnswersInPrint: !ctx.omitPrintAnswers,
+    })
+    patchInterviewWorkbenchSession({
+      stage: 'report',
+      report: { sessionId: ctx.state.sessionId, accessToken: ctx.state.accessToken },
+    })
+    if (ctx.onGoStage) ctx.onGoStage('report')
+    else ctx.navigate('/interview/report', { state: { sessionId: ctx.state.sessionId, accessToken: ctx.state.accessToken, report } })
+    return 'reported'
+  } catch (err) {
+    ctx.setAssistantDown(isAiGateDown(err))
+    if (errorCodeOf(err) === 'INTERVIEW_NO_ANSWERS') return 'no-answers'
+    return 'report-failed'
   }
 }

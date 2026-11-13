@@ -7,23 +7,24 @@
 
 import { useRef, useState, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { HomeIcon, SparklesIcon, UserIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { TouchToolScreen } from './TouchToolScreen'
+import { toolBandStatus } from './toolBand'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/files/filesApi'
 import { getTerminalId, isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
-import { getTerminalCode } from '../../services/api/terminalConfig'
 import { convertImagesToPdf } from '../../services/api/printConversion'
+import { getMyDocuments } from '../../services/api/memberAssets'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import type { PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
-import { ConvertImagesCta } from './ConvertImagesPanels'
-import { ConvertImagesView } from './ConvertImagesView'
+import { convertDockSpec } from './ConvertImagesPanels'
+import { ConvertImagesView, ConvertQrLayer } from './ConvertImagesView'
 import {
   MAX_IMAGES,
   MAX_SINGLE_IMAGE_BYTES,
   classifyConvertError,
+  convertBandCopy,
   formatBytes,
   keyForImages,
   mintIdempotencyKey,
@@ -33,12 +34,25 @@ import {
   derivePhase,
   type ConvertError,
   type ConvertIdempotency,
+  type ConvertPhase,
   type ConvertPreview,
   type SelectedImage,
 } from './convert-images-model'
 import './styles/convert-images-qx.css'
 
 const LIMIT_MESSAGE = `最多支持 ${MAX_IMAGES} 张图片，已达上限`
+
+/** 底栏「问小青」的本屏问句，逐态照稿 18（label 与带去顾问页的 draft 是同一句）。 */
+function convertAskLabel(phase: ConvertPhase, error: ConvertError | null): string {
+  if (error?.kind === 'capability') return '问小青：不能转 PDF 怎么办'
+  if (error?.kind === 'result-unknown' || error?.kind === 'in-progress') return '问小青：结果还没回来'
+  if (phase === 'usb') return '问小青：U 盘图片怎么加'
+  if (phase === 'uploading') return '问小青：上传停住了'
+  if (phase === 'converting' || phase === 'rechecking') return '问小青：合成要多久'
+  if (phase === 'completed') return '问小青：合成的 PDF 怎么打印'
+  if (phase === 'conflict') return '问小青：顺序冲突了'
+  return '问小青：照片怎么合成 PDF'
+}
 
 export function ConvertImagesPage() {
   const navigate = useNavigate()
@@ -53,9 +67,9 @@ export function ConvertImagesPage() {
   const [rechecking, setRechecking] = useState(false)
   const [error, setError] = useState<ConvertError | null>(null)
   const [showQr, setShowQr] = useState(false)
-  const [qrBusy, setQrBusy] = useState(false)
   const [usbOpen, setUsbOpen] = useState(false)
   const [result, setResult] = useState<Awaited<ReturnType<typeof convertImagesToPdf>> | null>(null)
+  const [resultName, setResultName] = useState<string | null>(null)
   const [recovered, setRecovered] = useState(false)
   const [idempotency, setIdempotency] = useState<ConvertIdempotency | null>(null)
   const [lastSubmitted, setLastSubmitted] = useState<SelectedImage[] | null>(null)
@@ -63,7 +77,7 @@ export function ConvertImagesPage() {
   const [previewFailed, setPreviewFailed] = useState(false)
   const sentRef = useRef(false)
 
-  useBusyLock(uploading || generating || qrBusy || rechecking)
+  useBusyLock(uploading || generating || rechecking)
 
   const atLimit = images.length >= MAX_IMAGES
   const kiosk = useTerminalKiosk()
@@ -71,6 +85,10 @@ export function ConvertImagesPage() {
   const loggedIn = Boolean(getToken())
   const hasEndUser =
     result != null && typeof result.hasEndUser === 'boolean' ? result.hasEndUser : undefined
+  // 「已进我的文档」只认响应里的 savedToDocuments：登录了也可能不进（用了手机传来的图片，只用于这一单，
+  // 11/02 拍板）。没有这个字段的旧后端照旧按 hasEndUser。
+  const savedToDocuments =
+    result != null && typeof result.savedToDocuments === 'boolean' ? result.savedToDocuments : hasEndUser
   const phase = derivePhase({
     usbOpen,
     uploading,
@@ -231,6 +249,14 @@ export function ConvertImagesPage() {
         },
         { token: getToken(), idempotencyKey: nextKey.key },
       )
+      let filename: string | null = converted.filename || null
+      if (!filename && converted.savedToDocuments) {
+        try {
+          const documents = await getMyDocuments(getToken(), { pageSize: 50 })
+          filename = documents.items.find((item) => item.id === converted.fileId)?.filename ?? null
+        } catch { /* 文件名不可用时沿用本机描述，不猜测服务端时间。 */ }
+      }
+      setResultName(filename)
       setRecovered(mode === 'recheck' || previousKind === 'result-unknown' || previousKind === 'in-progress')
       setResult(converted)
       setError(null)
@@ -249,7 +275,7 @@ export function ConvertImagesPage() {
     source: 'document' as const,
     returnPath: window.location.pathname,
     file: {
-      name: outputFileName(result.pages),
+      name: resultName ?? outputFileName(result.pages),
       size: formatBytes(result.sizeBytes),
       pages: result.pages,
       fileId: result.fileId,
@@ -280,65 +306,60 @@ export function ConvertImagesPage() {
     void runConvert('recheck', false, lastSubmitted)
   }
 
-  // 未登录时 PDF 不会进入「我的文档」——完成态按转换响应 hasEndUser 分别渲染，游客不得看到已保存。
-  const terminalLabel = getTerminalCode() ? `就业服务大厅 · ${getTerminalCode()}` : '就业服务大厅'
+  const dockSpec = convertDockSpec({
+    phase,
+    imageCount: images.length,
+    error,
+    generating,
+    rechecking,
+    uploading,
+    hasEndUser,
+    savedToDocuments,
+    kiosk,
+    onConvert: () => void runConvert('convert'),
+    onRecheck: () => void runConvert('recheck'),
+    onNewKey: () => void runConvert('convert', true),
+    onRestoreOrder: handleRestoreOrder,
+    onPrint: handlePrint,
+    onLogin: handleLogin,
+    onDocuments: () => navigate('/me/documents'),
+    onCancelUpload: () => {
+      uploadGen.current += 1
+      setUploading(false)
+    },
+    onCloseUsb: () => {
+      setUsbOpen(false)
+      if (!kiosk) handlePickLocal()
+    },
+    onPickLocal: handlePickLocal,
+    onBack: () => navigate('/print-scan'),
+  })
+  const band = convertBandCopy(phase, images, error)
 
+  // 未登录时 PDF 不会进入「我的文档」——完成态按转换响应 hasEndUser 分别渲染，游客不得看到已保存。
   return (
-    <QxPageFrame
-      back={{ label: '返回打印扫描', onBack: () => navigate('/print-scan') }}
-      title="图片转 PDF"
-      subtitle="几张图拼成一份 PDF。顺序你自己排，一张一页。"
-      status={status}
-      terminalLabel={terminalLabel}
-      ctabar={
-        <ConvertImagesCta
-          phase={phase}
-          imageCount={images.length}
-          error={error}
-          generating={generating}
-          rechecking={rechecking}
-          uploading={uploading}
-          hasEndUser={hasEndUser}
-          onBack={() => navigate('/print-scan')}
-          onConvert={() => void runConvert('convert')}
-          onRecheck={() => void runConvert('recheck')}
-          onNewKey={() => void runConvert('convert', true)}
-          onRestoreOrder={handleRestoreOrder}
-          onPrint={handlePrint}
-          onLogin={handleLogin}
-          onDocuments={() => navigate('/me/documents')}
-          onHelp={() => navigate('/help')}
-          onCancelUpload={() => {
-            uploadGen.current += 1
-            setUploading(false)
-          }}
-          onCloseUsb={() => {
-            setUsbOpen(false)
-            handlePickLocal()
-          }}
-          onPickLocal={handlePickLocal}
+    <TouchToolScreen
+      eyebrow="照片合成 PDF"
+      title={band.title}
+      sub={band.sub}
+      status={toolBandStatus(status)}
+      onBack={() => navigate('/print-scan')}
+      hideDockBack={error?.kind === 'capability'}
+      askLabel={convertAskLabel(phase, error)}
+      primary={dockSpec.primary}
+      overlay={showQr ? (
+        <ConvertQrLayer
+          onClose={() => setShowQr(false)}
+          onUploaded={handlePhoneUploaded}
+          onBusyChange={() => undefined}
         />
-      }
-      navbar={
-        <>
-          <button type="button" className="qx-nav-item" onClick={() => navigate('/')}>
-            <HomeIcon size={34} />
-            <span>首页</span>
-          </button>
-          <button type="button" className="qx-nav-item" onClick={() => navigate('/assistant')}>
-            <SparklesIcon size={34} />
-            <span>AI 顾问</span>
-          </button>
-          <button type="button" className="qx-nav-item" onClick={() => navigate('/profile')}>
-            <UserIcon size={34} />
-            <span>我的</span>
-          </button>
-        </>
-      }
+      ) : undefined}
     >
       <ConvertImagesView
+        extraRows={dockSpec.rows}
         loggedIn={loggedIn}
         hasEndUser={hasEndUser}
+        savedToDocuments={savedToDocuments}
         kiosk={kiosk}
         phase={phase}
         images={images}
@@ -346,11 +367,11 @@ export function ConvertImagesPage() {
         uploading={uploading}
         generating={generating}
         rechecking={rechecking}
-        showQr={showQr}
         error={error}
         result={result}
+        resultName={resultName}
         recovered={recovered}
-        requestKey={idempotency?.key ?? null}
+        previousOrder={lastSubmitted ? lastSubmitted.map((img) => img.name) : null}
         preview={preview}
         previewFailed={previewFailed}
         inputRef={inputRef}
@@ -358,10 +379,7 @@ export function ConvertImagesPage() {
         onPickLocal={handlePickLocal}
         onLocalFile={(event) => void handleLocalFile(event)}
         onShowQr={() => { setUsbOpen(false); setShowQr(true) }}
-        onPhoneUploaded={handlePhoneUploaded}
-        onQrBusy={setQrBusy}
         onOpenUsb={() => { setShowQr(false); setUsbOpen(true) }}
-        onCloseUsb={() => setUsbOpen(false)}
         onSelect={handleSelect}
         onMove={handleMove}
         onRemove={handleRemove}
@@ -369,17 +387,7 @@ export function ConvertImagesPage() {
         onPreviewOutput={(index) => { setPreviewFailed(false); setPreview({ kind: 'output', index }) }}
         onClosePreview={() => { setPreview(null); setPreviewFailed(false) }}
         onPreviewError={() => setPreviewFailed(true)}
-        onCancelUpload={() => { uploadGen.current += 1; setUploading(false) }}
-        onConvert={() => void runConvert('convert')}
-        onRecheck={() => void runConvert('recheck')}
-        onNewKey={() => void runConvert('convert', true)}
-        onRestoreOrder={handleRestoreOrder}
-        onPrint={handlePrint}
-        onLogin={handleLogin}
-        onDocuments={() => navigate('/me/documents')}
-        onHelp={() => navigate('/help')}
-        onBack={() => navigate('/print-scan')}
       />
-    </QxPageFrame>
+    </TouchToolScreen>
   )
 }

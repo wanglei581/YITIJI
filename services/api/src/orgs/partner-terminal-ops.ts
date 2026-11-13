@@ -98,6 +98,10 @@ export interface TerminalOpsRaw {
   output: OutputRaw
   segments: FaultSegment[]
   reportedInWindow: boolean
+  /** 最近一次心跳里的打印机状态原文。缺省当没上报，不据此推断告警。 */
+  printerStatus?: string | null
+  /** 当前未恢复的设备告警条数。缺省为 0，避免没带这列的旧聚合被算成离线。 */
+  openAlertCount?: number
 }
 
 /** 计数的小样本压制：0 保留，1–4 不给数字，≥5 原样。与数据大屏单台口径一致。 */
@@ -267,6 +271,31 @@ export function isOnlineAt(lastHeartbeatAt: Date | null, now: Date): boolean {
   return lastHeartbeatAt !== null && now.getTime() - lastHeartbeatAt.getTime() < TERMINAL_ONLINE_WINDOW_MS
 }
 
+/**
+ * 当前未恢复的设备告警条数，和后台派生告警同一口径：
+ * 停用或非运营中的终端不计；离线只计 1 条（不再另计打印机）；
+ * 在线时，不健康的打印机状态（含纸张或墨粉不足）计 1 条，扫描仪找不到或出错再计 1 条。
+ */
+export function countOpenDeviceAlerts(input: {
+  enabled: boolean
+  lifecycleStatus: string
+  online: boolean
+  printerStatus: string | null
+  scanDeviceFault: boolean
+}): number {
+  if (!input.enabled || input.lifecycleStatus !== 'active') return 0
+  if (!input.online) return 1
+  let count = 0
+  if (input.printerStatus && !isHealthyPrinterStatus(input.printerStatus)) count += 1
+  if (input.scanDeviceFault) count += 1
+  return count
+}
+
+/** 在线、已开通屏上扫描，且最近一次探测是找不到或出错。 */
+export function isOpenScanDeviceFault(online: boolean, scanAvailable: boolean, health: string | null): boolean {
+  return online && scanAvailable && (health === 'not_found' || health === 'error')
+}
+
 /** 出纸组的差值也算计数；统一用唯一阈值函数判断。 */
 function hasHiddenOutput(raw: OutputRaw): boolean {
   return [raw.printed, raw.settled, raw.unconfirmed, raw.settled - raw.printed]
@@ -296,6 +325,8 @@ export function projectTerminalRow(raw: TerminalOpsRaw, now: Date, reportTo: Dat
     serviceCount: suppressCount(raw.serviceCount),
     output: projectOutput(raw.output),
     faults: summarizeFaults(raw.segments, reportTo, raw.reportedInWindow),
+    printerStatus: raw.printerStatus ?? null,
+    openAlertCount: raw.openAlertCount ?? 0,
   }
 }
 

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { ResumeExportFormat, ResumeExportPricing, ResumeGenerateExportResponse, ResumeLayoutSettings, ResumeTemplate } from '@ai-job-print/shared'
+import { helpNeededLine } from '../../../../copy/unattendedCopy'
 import { ResumeLayoutControls } from '../ResumeLayoutControls'
+import { ResumeHelpLine } from '../../touch/ResumeHelpLine'
 import { COMPRESS_ONE_PAGE, type GeneratePreviewViewState } from './constants'
 import { ResumeExportResult } from './ResumeExportResult'
 import { ResumePricingBar } from './ResumePricingBar'
@@ -27,6 +29,11 @@ const FONT_CHOICES: Array<{ value: Required<ResumeLayoutSettings>['fontScale']; 
 
 function formatName(format: ResumeExportFormat): string {
   return FORMATS.find((item) => item.value === format)?.name ?? 'PDF'
+}
+
+function resumeExportAigcNote(format: ResumeExportFormat): string {
+  if (format === 'txt' || format === 'md') return '导出的文件末尾有一行：含人工智能辅助生成内容'
+  return '导出的简历每页底部有一行小字：含人工智能辅助生成内容'
 }
 
 export function ResumeFormatChooser(props: {
@@ -84,7 +91,9 @@ export function ResumeFormatChooser(props: {
       {props.screen === 'export-failed' && (
         <div className="qx-card" role="alert">
           <div className="qx-sec-h"><span className="qx-rg-no">01</span><span className="t">文件没生成出来</span><span className="hint">简历内容还在</span></div>
-          <p className="qx-rg-lead">{props.exportError || '这次没有生成文件。核对过的内容还在，可以直接再导一次。'}</p>
+          <p className="qx-rg-lead">{props.exportError || '这次没有生成文件，核对过的内容还在。'}</p>
+          <p>点底部「重新导出」，核对后可按当前格式再导一次。</p>
+          <button type="button" className="qx-btn" data-variant="ghost" disabled={props.exporting} onClick={props.onClearExport}>换个格式</button>
         </div>
       )}
 
@@ -95,27 +104,6 @@ export function ResumeFormatChooser(props: {
             <span className="t">{props.screen === 'export-url-expired' ? '扫码取件的链接过期了' : props.screen === 'export-print-unavailable' ? '这一份暂时进不了打印' : '文件已经好了'}</span>
             <span className="hint">{printReady ? '可以去打印' : '打印另说'}</span>
           </div>
-          {props.synthetic ? (
-            <SyntheticFileCard exported={props.exported} screen={props.screen} printReady={printReady} />
-          ) : (
-            <ResumeExportResult
-              exported={props.exported}
-              formatLabel={formatName(props.format)}
-              version={props.exportVersion}
-              kind="resume"
-              guest={props.guest}
-              downloadOnly={!isPdf}
-            />
-          )}
-          <p className="qx-rg-note">
-            {props.screen === 'export-url-expired'
-              ? '过期的是手机取件那一条。文件还在，打印那条还在的话仍然可以去打印。'
-              : props.screen === 'export-print-unavailable'
-                ? '这次没有打印链接，所以不放行。手机取件还能用。想现在打印，换成 PDF 再导一次。'
-                : isPdf
-                  ? (printReady ? '下载和打印是两条链接，下载过期了也不挡住打印。' : 'PDF 通常能打印。这一次没有打印链接，可以再导一次。')
-                  : '要现在打印，改选 PDF 再导一次。'}
-          </p>
           <div className="qx-rg-result-actions">
             {!props.synthetic && previewReady && (
               <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onOpenPreview}>
@@ -138,6 +126,28 @@ export function ResumeFormatChooser(props: {
             )}
             <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onClearExport}>换成别的格式</button>
           </div>
+          {props.synthetic ? (
+            <SyntheticFileCard exported={props.exported} screen={props.screen} printReady={printReady} />
+          ) : (
+            <ResumeExportResult
+              exported={props.exported}
+              formatLabel={formatName(props.format)}
+              version={props.exportVersion}
+              kind="resume"
+              guest={props.guest}
+              downloadOnly={!isPdf}
+            />
+          )}
+          <p className="qx-rg-note">
+            {props.screen === 'export-url-expired'
+              ? '过期的是手机取件那一条。文件还在，打印那条还在的话仍然可以去打印。'
+              : props.screen === 'export-print-unavailable'
+                ? '这次没有打印链接，所以不放行。手机取件还能用。想现在打印，换成 PDF 再导一次。'
+                : isPdf
+                  ? (printReady ? '下载和打印是两条链接，下载过期了也不挡住打印。' : 'PDF 通常能打印。这一次没有打印链接，可以再导一次。')
+                  : '要现在打印，改选 PDF 再导一次。'}
+          </p>
+
         </div>
       )}
 
@@ -240,16 +250,17 @@ export function ResumeFormatChooser(props: {
               : `${formatName(props.format)} 的页数固定是 0，也不套版式。这一份暂不开放打印。`}
           </p>
           <p className="qx-rg-note">导出后给你的是一条有时效的下载链接，过期后重导一次就有新链接。打印走另一条链接，下载链接进不了打印。</p>
+          <p className="qx-rg-note" data-testid="resume-export-aigc-note">{resumeExportAigcNote(props.format)}</p>
           <ResumePricingBar pricing={props.pricing} loading={props.pricingLoading} blockedReason={props.blockedReason} />
         </div>
       )}
 
       {props.screen !== 'export-chooser' && props.screen !== 'export-exporting' && (
-        <section className="qx-card qx-rg-next" aria-label="接下来怎么带走">
-          <h2>接下来可以做的</h2>
+        <details className="qx-card qx-rg-next" aria-label="接下来怎么带走">
+          <summary>更多格式与帮助</summary>
           <div className="qx-rows">
-            <button type="button" className="qx-row" disabled={props.exporting} onClick={props.onClearExport}><span className="qx-row-tx"><b className="qx-row-t">{props.screen === 'export-failed' ? '换个格式再试一次' : '再导一份别的格式'}</b><span className="qx-row-d">内容仍在；PDF 用于打印，Word、TXT、Markdown 可带走编辑</span></span><span className="qx-row-go">›</span></button>
-            <button type="button" className="qx-row" onClick={props.onHelp}><span className="qx-row-tx"><b className="qx-row-t">找工作人员帮忙</b><span className="qx-row-d">请工作人员看看当前提示，不需要重新填写经历</span></span><span className="qx-row-go">›</span></button>
+            {props.screen !== 'export-failed' && <button type="button" className="qx-row" disabled={props.exporting} onClick={props.onClearExport}><span className="qx-row-tx"><b className="qx-row-t">再导一份别的格式</b><span className="qx-row-d">内容仍在；PDF 用于打印，Word、TXT、Markdown 可带走编辑</span></span><span className="qx-row-go">›</span></button>}
+            <button type="button" className="qx-row" onClick={props.onHelp}><span className="qx-row-tx"><b className="qx-row-t">帮助中心</b><span className="qx-row-d">{helpNeededLine()}。不需要重新填写经历</span></span><span className="qx-row-go">›</span></button>
           </div>
           <div className="qx-rg-export-facts">
             <div><b>简历内容</b><span>导出只做排版与文件保存，不再润色</span></div>
@@ -257,11 +268,14 @@ export function ResumeFormatChooser(props: {
             <div><b>手机取件</b><span>真实下载链接在有效期内才显示二维码</span></div>
             <div><b>打印确认</b><span>PDF 和打印链接都就绪才可进入，不会自动打印</span></div>
           </div>
-        </section>
+        </details>
       )}
       <div className="qx-rg-help">
         <p>不确定要哪种？要打印或投简历就选 PDF；要回去自己改就选 DOCX。</p>
-        <button type="button" className="qx-rg-hbtn" data-route="/help" onClick={props.onHelp}>找工作人员</button>
+        {/* 选格式 / 出文件中没有「接下来可以做的」那一块，帮助中心的去向就放在页脚；有那一块时它已经有一行「帮助中心」。 */}
+        {props.screen !== 'export-chooser' && props.screen !== 'export-exporting'
+          ? <p className="rtp-help">{helpNeededLine()}</p>
+          : <ResumeHelpLine onHelp={props.onHelp} />}
       </div>
     </div>
   )

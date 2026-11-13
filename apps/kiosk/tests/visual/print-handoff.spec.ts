@@ -6,7 +6,7 @@
 // 报价确认页信跳转时带的临时状态。临时状态一丢（登录回跳、返回预览、旧地址重定向），
 // 页面就退回会话里那一份 —— 可能是上一位的、或上一次的文件。
 //
-// 这些用例都从**真实来源页**出发（优化稿、求职材料、小青作业、我的文档），
+// 这些用例都从**真实来源页**出发（优化稿、小青作业、我的文档；求职材料页 11/08 停放后，H3 改为按它写入的交接原样注入），
 // 在跳转丢失临时状态的那一步断言：屏幕上和报价请求里都还是这一份，上一份 0 次出现。
 // 旧代码（候选 56bd387f2）上 H1–H6 必须红；H7 是清场的回归保护，旧代码上也是绿的。
 //
@@ -25,6 +25,12 @@ const NOW = '2026-09-29T00:00:00.000Z'
 const FAR_EXPIRES = 4102444800000
 const MEMBER_TOKEN = 'p05-handoff-member-token'
 const STALE_NAME = W2_FILE.name
+const CONFIRM_QUOTE = {
+  amountCents: 200,
+  billablePages: 2,
+  billingPageSource: 'detected',
+  priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents: 200 }],
+}
 
 const CAPABILITY_KEYS = [
   'document_print', 'phone_upload', 'cloud_upload', 'usb_import', 'material_pack',
@@ -41,6 +47,12 @@ function capabilities(available: string[] = []): unknown {
         : { capabilityKey, status: 'not_verified', note: null, configured: false, updatedAt: null },
     ),
   }
+}
+
+/** 2026-10-28 稿 confirm：核对价格页的小样会取这一份文件自己的第一页。把来源文件的内容接到一份可见 PDF，不留未接的请求。 */
+async function routeFileContent(page: Page, fileId: string): Promise<void> {
+  await page.route((url) => url.pathname === `/api/v1/files/${fileId}/content`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }))
 }
 
 function runtimeErrors(page: Page): string[] {
@@ -67,12 +79,7 @@ function registerPrintShell(api: ApiRouter, available: string[] = []): void {
   })
   api.respond('POST', '/api/v1/orders/quote', {
     status: 200,
-    json: {
-      amountCents: 200,
-      billablePages: 2,
-      billingPageSource: 'detected',
-      priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents: 200 }],
-    },
+    json: CONFIRM_QUOTE,
   })
 }
 
@@ -187,20 +194,22 @@ async function registerOptimizeSource(page: Page, api: ApiRouter): Promise<void>
 async function exportOptimized(page: Page) {
   await page.goto(`/resume/optimize?taskId=${OPT_TASK}`)
   await expect(page.locator('[data-kiosk-screen="resume-optimize"]')).toBeVisible()
-  await page.getByRole('button', { name: '导出 PDF', exact: true }).first().click()
+  // 触屏版：编辑页「去导出」→ 核对事实 → 导出页（PDF 默认）→「导出」才出文件。
+  await page.getByRole('button', { name: '去导出', exact: true }).click()
   await page.getByRole('checkbox', { name: /交接验收大学/ }).click()
   await page.getByRole('button', { name: '确认导出' }).click()
+  await page.getByRole('button', { name: '导出', exact: true }).click()
   // 导出成功后预览层自动弹出（预览 = 导出 = 打印同一份）。
   const dialog = page.getByRole('dialog', { name: OPT_FILE.filename })
   await expect(dialog).toBeVisible({ timeout: 10_000 })
   return dialog
 }
 
-/** 关掉预览层，点「去打印优化版」进报价确认页。 */
+/** 关掉预览层，点导出页底栏的「去打印这一份」进报价确认页。 */
 async function printOptimizedFromPanel(page: Page): Promise<void> {
   await page.getByRole('button', { name: '关闭文件预览' }).click()
   await expect(page.getByRole('dialog', { name: OPT_FILE.filename })).toHaveCount(0)
-  await page.getByRole('button', { name: '去打印优化版' }).click()
+  await page.getByRole('button', { name: '去打印这一份', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/print/confirm')
   await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
   await expect(page.locator('.print-file-name')).toHaveText(OPT_FILE.filename)
@@ -262,7 +271,7 @@ test('H2 back to preview keeps this file instead of rehydrating a stale one @w2'
   await writePrintHandoff(page, { contextId: 'stale-ctx-000000000002' })
   await printOptimizedFromPanel(page)
 
-  await page.getByRole('button', { name: '返回预览与参数' }).click()
+  await page.getByRole('button', { name: '返回修改' }).click()
   await page.waitForURL((url) => url.pathname === '/print/desk' && url.searchParams.get('step') === 'preview')
   // 优化稿是派生产物，免检查：直接进参数页，画的是这一份。
   await expect(page.locator('[data-w2-page="print-preview"]')).toHaveAttribute('data-qx-state', 'preview')
@@ -273,14 +282,6 @@ test('H2 back to preview keeps this file instead of rehydrating a stale one @w2'
 
 // ── H3 F02：带进来的双面本机没开通，报价页不拦截 ─────────────────────────────
 
-const MATERIAL_TEMPLATE = {
-  id: 'campus-cover-letter', type: 'cover_letter', title: '校招自荐信', description: '适合应届生在校招现场生成一页自荐材料。',
-  tags: ['校招'], status: 'published', recommendedFor: '应届毕业生', outputFilename: '校招自荐信.pdf',
-  fields: [
-    { key: 'applicantName', label: '姓名', required: true, maxLength: 40, placeholder: '例：王同学' },
-    { key: 'targetRole', label: '目标岗位', required: true, maxLength: 60, placeholder: '例：前端开发工程师' },
-  ],
-}
 const MATERIAL_FILE = {
   templateId: 'campus-cover-letter', templateTitle: '校招自荐信', documentType: 'cover_letter', fileId: 'jm-p05-001',
   filename: '校招自荐信-交接验收.pdf', mimeType: 'application/pdf', sizeBytes: 132096, pageCount: 2,
@@ -292,29 +293,41 @@ const MATERIAL_FILE = {
 test('H3 F02 a two-page job material on a simplex-only terminal is quoted single-sided without blocking @w2', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerPrintShell(api) // 双面未登记 = 本机暂未开通
-  registerMemberLogin(api)
-  api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [MATERIAL_TEMPLATE] } })
-  api.respond('POST', '/api/v1/job-materials/generate', { status: 200, json: { success: true, data: MATERIAL_FILE } })
+  await routeFileContent(page, 'jm-p05-001')
   await captureQuoteBodies(page)
-
-  await page.goto(`/login?from=${encodeURIComponent('/resume/materials')}`)
-  await loginOnCurrentPage(page, '/resume/materials')
-  await page.locator('#material-field-applicantName').fill('王同学')
-  await page.locator('#material-field-targetRole').fill('用户运营专员')
-  await page.locator('.qx-ctabar').getByRole('button', { name: '生成可打印版', exact: true }).click()
-  await expect(page.getByTestId('material-workshop-file')).toHaveAttribute('data-print-ready', '1')
-  await page.locator('.qx-ctabar').getByRole('button', { name: '打印材料', exact: true }).click()
-  await page.waitForURL((url) => url.pathname === '/print/confirm')
+  // 求职材料页 11/08 停放：按它 startPrint 写入的交接原样注入（来源 job_material、免检直进确认页、
+  // 不带参数只带「两页以上建议长边双面」），继续钉确认页「建议的双面本机没开 → 按单面报价、不拦截」。
+  await seedPrintHandoff(page, {
+    origin: 'job_material',
+    checkPolicy: 'exempt',
+    materialCheck: null,
+    printParams: null,
+    paramsSuggestion: { duplex: 'duplex_long_edge' },
+    file: {
+      fileId: MATERIAL_FILE.fileId, name: MATERIAL_FILE.filename, pages: MATERIAL_FILE.pageCount,
+      size: '129 KB', mimeType: 'application/pdf', fileUrl: MATERIAL_FILE.printFileUrl,
+    },
+  })
+  await page.goto('/print/confirm')
 
   const confirm = page.locator('[data-w2-page="print-confirm"]')
   await expect(page.locator('.print-file-name')).toHaveText(MATERIAL_FILE.filename)
   // 不拦截：不再出「参数回到黑白单面后可确认」的锁死按钮（旧代码红在这一句）。
   await expect(page.getByRole('button', { name: '参数回到黑白单面后可确认' })).toHaveCount(0)
   // 被改的那一项就地写明「已按单面报价」，价格照常报出来，主按钮能点。
-  await expect(confirm.getByText('已按单面报价')).toBeVisible()
+  await expect(confirm.locator('.pcf-parameters')).toHaveJSProperty('open', false)
+  const settingNote = confirm.locator('.pct-row').filter({ has: page.getByText('设置', { exact: true }) }).locator('.pct-setting-note')
+  await expect(settingNote).toContainText('已按单面报价')
+  await expect(settingNote).toBeVisible()
+  await page.locator('.pcf-parameters > summary', { hasText: '查看全部参数' }).click()
+  await expect(confirm.locator('[data-sum-row="单双面"]')).toContainText('已按单面报价')
+  await expect(confirm.locator('[data-sum-row="单双面"] em')).toBeVisible()
   await expect.poll(() => lastQuoteBody(page).then((body) => body?.params?.['duplex'] ?? null)).toBe('simplex')
-  await expect(page.getByTestId('print-confirm-amount')).toHaveText(/2\.00/)
-  await expect(page.getByRole('button', { name: /确认并去付款/ })).toBeEnabled()
+  const amount = page.getByTestId('print-confirm-amount')
+  const quotedAmount = (CONFIRM_QUOTE.amountCents / 100).toFixed(2)
+  await expect(amount).toHaveText(quotedAmount)
+  await expect(amount.locator('..')).toHaveText(`应付 ${quotedAmount} 元`)
+  await expect(page.getByRole('button', { name: /^去付款$/ })).toBeEnabled()
   expect(errors).toEqual([])
 })
 
@@ -332,17 +345,19 @@ test('H4 F20 color and duplex picked on a verified terminal survive the round tr
   const preview = page.locator('[data-w2-page="print-preview"]')
   await expect(preview).toHaveAttribute('data-qx-state', 'preview')
   await preview.getByRole('button', { name: '彩色', exact: true }).click()
-  await preview.getByRole('button', { name: '双面（长边）', exact: true }).click()
+  await preview.getByRole('button', { name: '双面', exact: true }).click()
+  await preview.getByRole('button', { name: '长边翻页', exact: true }).click()
   await expect(preview.getByRole('button', { name: '彩色', exact: true })).toHaveAttribute('data-selected', 'true')
   await page.getByRole('button', { name: '下一步：核对价格' }).click()
   await page.waitForURL((url) => url.pathname === '/print/confirm')
   await expect(page.locator('[data-sum-row="色彩模式"] .v')).toHaveText('彩色')
 
-  await page.getByRole('button', { name: '返回预览与参数' }).click()
+  await page.getByRole('button', { name: '返回修改' }).click()
   await page.waitForURL((url) => url.pathname === '/print/desk' && url.searchParams.get('step') === 'preview')
   await expect(preview).toHaveAttribute('data-qx-state', 'preview')
   await expect(preview.getByRole('button', { name: '彩色', exact: true })).toHaveAttribute('data-selected', 'true')
-  await expect(preview.getByRole('button', { name: '双面（长边）', exact: true })).toHaveAttribute('data-selected', 'true')
+  await expect(preview.getByRole('button', { name: '长边翻页', exact: true })).toHaveAttribute('data-selected', 'true')
+  await expect(preview.getByRole('button', { name: '双面', exact: true })).toHaveAttribute('data-selected', 'true')
   expect(errors).toEqual([])
 })
 
@@ -351,6 +366,7 @@ test('H4 F20 color and duplex picked on a verified terminal survive the round tr
 test('H5 F09 advisor work print enters the print chain and a guest is never told it was saved @w2', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerPrintShell(api)
+  await routeFileContent(page, 'file-p05-art')
   api.respond('GET', '/api/v1/advisor/sessions/p05-art-sess', {
     status: 200,
     json: {
@@ -420,6 +436,7 @@ test('H7 after 结束使用 the print desk shows only the empty state @w2', asyn
   const errors = runtimeErrors(page)
   registerPrintShell(api)
   registerMemberLogin(api)
+  await routeFileContent(page, 'doc-p05-report')
   const doc = {
     id: 'doc-p05-report', filename: '简历对照-交接验收.pdf', mimeType: 'application/pdf', sizeBytes: 245_760,
     purpose: 'print_doc', sensitiveLevel: 'normal', assetCategory: 'derived', retentionPolicy: 'months_3',
@@ -439,7 +456,10 @@ test('H7 after 结束使用 the print desk shows only the empty state @w2', asyn
 
   await page.goto(`/login?from=${encodeURIComponent('/me/documents')}`)
   await loginOnCurrentPage(page, '/me/documents')
-  await page.getByTestId('member-assets-document').filter({ hasText: doc.filename }).getByRole('button', { name: '打印', exact: true }).click()
+  // 触屏版我的文档：先点一行，操作才出现在行里（行是一颗带 aria-expanded 的展开按钮）。判据不变：这份文件的「打印」把它送去打印确认。
+  const docRow = page.getByTestId('member-assets-document').filter({ hasText: doc.filename })
+  await docRow.getByRole('button', { expanded: false }).click()
+  await docRow.getByRole('button', { name: '打印', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/print/confirm')
   await expect(page.locator('.print-file-name')).toHaveText(doc.filename)
 

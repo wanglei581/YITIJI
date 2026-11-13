@@ -4,6 +4,7 @@ const storage = require('../../utils/storage')
 const N = require('../../utils/normalize')
 const auth = require('../../utils/auth')
 const fileUrls = require('../../utils/file-url')
+const shareFriend = require('../../utils/share-friend')
 
 // 结果未就绪时的轮询节奏(与解析页一致口径)
 const POLL_INTERVAL = 3000
@@ -30,6 +31,7 @@ Page({
     exportingKind: '',
     openingPdf: false,
     exportResult: null,
+    exportShare: { phase: 'idle', busy: false, message: '' },
     exportCountdown: '',
     exportExpired: false,
   },
@@ -63,6 +65,7 @@ Page({
     this._stopped = true
     if (this._pollTimer) clearTimeout(this._pollTimer)
     this._stopExportCountdown()
+    shareFriend.abandon(this)
   },
 
   /** 读取真实报告。匿名场景必须带 accessToken,否则后端一律 404。 */
@@ -139,7 +142,8 @@ Page({
       .then(async (raw) => {
         const pricing = N.resumeExportPricing(raw, loggedIn)
         let benefitGrantId = ''
-        if (pricing.mode === 'charged' && loggedIn && pricing.available > 0) {
+        // 金额不是大于 0 的整数时不查权益，避免页面写出「权益」。能不能导出仍看归一化结果。
+        if (N.exportUnitPriceKnown(pricing) && pricing.mode === 'charged' && loggedIn && pricing.available > 0) {
           const benefits = await api.getMyBenefits({ pageSize: 50 })
           benefitGrantId = N.resumeExportBenefitId(benefits)
           if (!benefitGrantId) pricing.disabledReason = '服务端显示有可用次数，但未找到可核销权益，请刷新后重试。'
@@ -149,10 +153,10 @@ Page({
       })
       .catch((err) => {
         if (this._stopped || seq !== this._pricingSeq) return
-        const reason = (err && err.message) || '暂时无法确认能否导出'
+        const copy = N.exportPricingFailureCopy(err)
         this.setData({
           pricingStatus: 'failed',
-          pricing: { mode: 'unavailable', text: reason, disabledReason: `${reason}，当前不能导出。` },
+          pricing: { mode: 'unavailable', text: copy.text, disabledReason: copy.disabledReason },
           benefitGrantId: '',
         }, () => this._syncExportAvailability())
       })
@@ -163,6 +167,7 @@ Page({
     if (this.data.status !== 'done') reason = '诊断失败或尚未完成，暂时不能导出。'
     else if (this.data.pricingStatus !== 'ready') reason = this.data.pricing.disabledReason || '正在确认能否导出，请稍候。'
     else if (this.data.pricing.disabledReason) reason = this.data.pricing.disabledReason
+    else if (!N.exportUnitPriceKnown(this.data.pricing)) reason = ''
     else if (this.data.pricing.mode === 'charged' && !this.data.benefitGrantId) reason = '未取得可核销权益，当前不能导出。'
     this.setData({ exportDisabled: Boolean(reason), exportDisabledReason: reason })
   },
@@ -178,7 +183,7 @@ Page({
     const accessToken = saved.taskId === this.data.taskId ? (saved.accessToken || '') : ''
     const label = kind === 'diagnosis_report' ? '诊断报告 PDF' : '修改清单 PDF'
     this._stopExportCountdown()
-    this.setData({ exportingKind: kind, exportResult: null, exportCountdown: '', exportExpired: false })
+    this.setData({ exportingKind: kind, exportResult: null, exportCountdown: '', exportExpired: false, exportShare: shareFriend.viewForFile(this, '') })
     wx.showLoading({ title: '正在生成 PDF…', mask: true })
     api.exportResumeReport(this.data.taskId, kind, accessToken, this.data.benefitGrantId)
       .then((raw) => {
@@ -188,7 +193,7 @@ Page({
         if (!result.fileId || !result.filename || result.mimeType !== 'application/pdf' || !result.signedUrl || !result.printFileUrl) {
           throw new Error('服务端未返回完整的 PDF 文件信息')
         }
-        this.setData({ exportingKind: '', exportResult: result }, () => this._startExportCountdown())
+        this.setData({ exportingKind: '', exportResult: result, exportShare: shareFriend.viewForFile(this, result.savedToDocuments ? result.fileId : '') }, () => this._startExportCountdown())
         if (this.data.pricing.mode === 'charged') this._loadPricing()
       })
       .catch((err) => {
@@ -262,6 +267,10 @@ Page({
     wx.navigateTo({
       url: `/pages/print-upload/print-upload?fileId=${encodeURIComponent(result.fileId)}&name=${encodeURIComponent(result.filename)}&pages=${encodeURIComponent(result.pageCount || '')}&printFileUrl=${encodeURIComponent(result.printFileUrl)}`,
     })
+  },
+
+  shareToFriend(e) {
+    shareFriend.onTap(this, e, wx, (fileId) => api.getFilePreviewUrl(fileId))
   },
 
   goBack() { wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } }) },

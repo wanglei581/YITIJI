@@ -19,6 +19,7 @@
 // ============================================================
 
 import type { PrintJobParams, PrintJobTakeawayUrl } from '@ai-job-print/shared'
+import { printProblemLine } from '../../copy/unattendedCopy'
 import type { BackendJobStatus } from '../../services/print/printJobsApi'
 import { formatCents } from './cashierStatus'
 import { countPagesInRange } from './pageRange'
@@ -92,7 +93,7 @@ export function doneTakeaway(
   if (pages == null || pages < 1) {
     return {
       pagesLabel: '全部纸张',
-      facesLabel: '请在出纸口取走并核对页数',
+      facesLabel: '页数以实际纸张为准',
     }
   }
   const totalPages = pages * copies
@@ -100,8 +101,8 @@ export function doneTakeaway(
   return {
     pagesLabel: copies > 1 ? `全部 ${totalPages} 页（${pages} 页 × ${copies} 份）` : `全部 ${totalPages} 页`,
     facesLabel: sheets
-      ? `共 ${sheets}已全部打印，请在出纸口取走并核对页数`
-      : `共 ${totalPages} 面已全部打印，请在出纸口取走并核对页数`,
+      ? `共 ${sheets}`
+      : `共 ${totalPages} 面`,
   }
 }
 
@@ -140,24 +141,52 @@ export function outOfPaperPill(money: OutOfPaperMoney): string {
   return '订单保留 · 缺纸'
 }
 
-export function outOfPaperDoing(money: OutOfPaperMoney): string {
-  return money.fact === 'paid'
-    ? '不是你操作的问题，纸匣空了。订单和已付金额都保留着，请联系工作人员处理。'
-    : '不是你操作的问题，纸匣空了。订单记录保留着，请联系工作人员处理。'
+/**
+ * 失败 / 卡纸 / 缺纸屏：到机码单且后端还允许续打时加这一句。
+ * 不按价格判断，也不把续打说成一定成功。订单视图若给出剩余次数，剩余为 0 就不再说还能续打。
+ */
+export const SAME_CODE_RESUME_LINE =
+  '没打完？等这台机器能打了，可以回到这里再输一次同一个到机码，按屏幕提示办理。符合条件时会整份重打，每单最多自助续打 2 次；次数用完后，请在手机上重新下单。'
+
+export function sameCodeResumeLine(input: {
+  pickupSource?: boolean
+  canRetry?: boolean
+  reprintAllowed?: boolean | null
+  reprintRemaining?: number | null
+}): string | null {
+  if (input.pickupSource !== true) return null
+  const remainingKnown =
+    typeof input.reprintRemaining === 'number' ||
+    input.reprintAllowed === true ||
+    input.reprintAllowed === false
+  if (remainingKnown) {
+    if (input.reprintAllowed !== true) return null
+    if (typeof input.reprintRemaining !== 'number' || !Number.isInteger(input.reprintRemaining) || input.reprintRemaining <= 0) {
+      return null
+    }
+    return SAME_CODE_RESUME_LINE
+  }
+  return input.canRetry === true ? SAME_CODE_RESUME_LINE : null
+}
+
+/** 续打进了队列，且后端标明上次可能已经出过纸或出过一部分。提醒留意出纸口，不说机器会等着取纸。 */
+export const PRIOR_OUTPUT_TRAY_LINE =
+  '上次可能已经出过纸，请留意出纸口，取走已有的纸，并留意这一次的出纸。'
+
+export function priorOutputTrayLine(flags: {
+  mayHavePrinted?: boolean
+  partialOutput?: boolean
+}): string | null {
+  if (flags.mayHavePrinted === true || flags.partialOutput === true) return PRIOR_OUTPUT_TRAY_LINE
+  return null
 }
 
 /** 卡纸说明的副标题。只有确实收过钱才提已付金额；0 元和金额未知都不说收款。 */
 export function jamOrderKeptLine(fact: PaymentFact): string {
+  // 不写「处理好后可以继续打印」：现场没人处理，说清是谁在管（我们已收到提醒）、订单还在就够了（走查 I-11）。
   return fact === 'paid'
-    ? '你的订单和已付金额都保留着'
-    : '你的订单还在，处理好后可以继续打印'
-}
-
-/** 一般失败页小青区。收费单保留原句；0 元和金额未知改成不提钱的说法。 */
-export function failureStaffDoing(fact: PaymentFact): string {
-  return fact === 'paid'
-    ? '订单和支付记录都在，请凭订单找现场工作人员处理。'
-    : '你的订单还在，请凭订单找现场工作人员处理。'
+    ? '你的订单和已付金额都保留着。机器卡纸，我们已经收到提醒，会尽快处理'
+    : '你的订单还在。机器卡纸，我们已经收到提醒，会尽快处理'
 }
 
 /** 小青区首句的前半截：先说钱的事实，再说任务阶段（稿「支付成功，正在出纸。」）。 */
@@ -195,27 +224,43 @@ export const STEPS: { key: Step; label: string; duration: number }[] = [
 ]
 
 export const FAIL_REASONS = [
-  '打印机离线，请联系工作人员或稍后重试',
-  '打印机缺纸，请联系工作人员补纸',
+  `打印机离线，请稍后重试。${printProblemLine()}`,
+  `打印机缺纸。${printProblemLine()}`,
   '任务处理超时，请稍后重试',
   '文件解析失败，请重新上传文件',
 ]
 
 const ERROR_CODE_MESSAGES: Record<string, string> = {
   DOWNLOAD_HASH_MISMATCH: '文件校验未通过（上传可能中断或文件已变化），请返回重新上传后再打印',
-  PRINTER_NOT_FOUND: '未找到打印机，请联系工作人员检查打印机连接',
-  PRINTER_OFFLINE: '打印机离线，请联系工作人员检查电源 / 网线 / USB 后重试',
-  PAPER_EMPTY: '打印机缺纸，当前无法打印，请联系工作人员补纸后重试',
-  PRINTER_ERROR: '打印机可能卡纸或发生设备故障，当前暂时无法继续使用，请联系工作人员处理',
-  PRINT_JOB_UNCONFIRMED: '打印作业已提交到打印队列，但未确认完成，请工作人员检查纸张、卡纸和出纸状态',
+  PRINTER_NOT_FOUND: `未找到打印机。${printProblemLine()}`,
+  PRINTER_OFFLINE: `打印机离线，请稍后重试。${printProblemLine()}`,
+  PAPER_EMPTY: `打印机缺纸，当前无法打印。${printProblemLine()}`,
+  PRINTER_ERROR: `打印机可能卡纸或发生设备故障，当前暂时无法继续使用。${printProblemLine()}`,
+  PRINT_JOB_UNCONFIRMED: `打印作业已提交到打印队列，但未确认完成。请先看纸张、卡纸和出纸口。${printProblemLine()}`,
   PRINT_TIMEOUT: '打印超时，请稍后重试',
-  PRINT_COMMAND_FAILED: '打印执行失败，请稍后重试或联系工作人员',
+  PRINT_QUEUE_TIMEOUT: '这单等了太久没有打印，没有出纸，可以重新提交打印。',
+  PRINT_COMMAND_FAILED: `打印执行失败，请稍后重试。${printProblemLine()}`,
   UNSUPPORTED_FILE_TYPE: '该文件格式暂不支持打印，请上传 PDF 或 JPG / PNG',
   FILE_NOT_FOUND: '打印文件已失效，请返回重新上传',
 }
 
 export function errorCodeToMessage(code?: string): string | undefined {
   return code ? ERROR_CODE_MESSAGES[code] : undefined
+}
+
+/**
+ * 进度页和失败页要显示对照表里的句子。
+ * 排队超时这一条优先用对照表，不用接口带回的 failureReasonForUser。
+ * 其它错误码仍先用接口文案，对照表只在接口没给句子时补上。
+ */
+export function screenFailureReason(input: {
+  errorCode?: string | null
+  failureReasonForUser?: string | null
+}): string | undefined {
+  if (input.errorCode === 'PRINT_QUEUE_TIMEOUT') return ERROR_CODE_MESSAGES.PRINT_QUEUE_TIMEOUT
+  const fromApi = input.failureReasonForUser?.trim()
+  if (fromApi) return fromApi
+  return input.errorCode ? ERROR_CODE_MESSAGES[input.errorCode] : undefined
 }
 
 export const stepIndex = (key: Step) => STEPS.findIndex((s) => s.key === key)
@@ -233,7 +278,7 @@ export function backendStatusToStep(status: BackendJobStatus): Step {
 export const PRINT_PROGRESS_QUIET_MS = 45_000
 
 export const PRINT_PROGRESS_QUIET_COPY =
-  '这台机器暂时没有回报打印进度，请看出纸口或找现场工作人员'
+  `这台机器暂时没有回报打印进度，请看出纸口。${printProblemLine()}`
 
 /** 同一份回报不算「新状态」。状态、失败原因或完成时间变了才重新计时。 */
 export function progressStatusFingerprint(result: {
@@ -264,8 +309,8 @@ export function progressFailurePresentation(reason: string): {
   return {
     headerTitle: '打印没有完成',
     badge: '打印未完成',
-    ask: text || '打印没有完成，请联系现场工作人员核对。',
-    doing: '可以联系现场工作人员，查看打印订单，或重新选文件再印。',
-    wayOut: '请用下面的按钮联系工作人员、查看订单，或重新打印。',
+    ask: text || `打印没有完成。${printProblemLine()}`,
+    doing: `可以查看打印订单，或重新选文件再印。${printProblemLine()}`,
+    wayOut: `请用下面的按钮查看订单或重新打印。${printProblemLine()}`,
   }
 }

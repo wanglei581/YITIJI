@@ -64,9 +64,11 @@ async function loadHandoff() {
   globalThis.window = { sessionStorage: storage }
   const session = transpile(join(kioskRoot, 'src/pages/print/printMaterialSession.ts'))
   const policy = transpile(join(kioskRoot, 'src/pages/print/printHandoffPolicy.ts'))
+  const unattended = transpile(join(kioskRoot, 'src/copy/unattendedCopy.ts'))
   const handoff = transpile(join(kioskRoot, 'src/pages/print/printHandoff.ts'), {
     './printMaterialSession': session,
     './printHandoffPolicy': policy,
+    '../../copy/unattendedCopy': unattended,
   })
   const mod = await import(`${handoff}#${seq}`)
   const sessionMod = await import(`${session}#${seq}`)
@@ -138,7 +140,7 @@ test('U1c sessionStorage 写不进时报 storage_unavailable，不静默退回',
   assert.equal(target.ok, false)
   assert.equal(target.path, '/print/confirm')
   assert.deepEqual(target.state, { printHandoffError: 'storage_unavailable' })
-  assert.match(h.printHandoffFailureText('storage_unavailable'), /本机暂时无法保存打印信息，请找现场工作人员/)
+  assert.match(h.printHandoffFailureText('storage_unavailable'), /本机暂时无法保存打印信息。打印有问题？/)
 })
 
 test('U2 归属：游客→游客、游客→会员（改绑）、同一次登录通过；换人 / 变游客 / 刷新后标记丢了一律不符并清掉', async () => {
@@ -256,7 +258,7 @@ test('U6b 入口策略表：原件去打印台检查，派生产物直达报价�
   for (const origin of ['upload', 'scan_result', 'resume_original', 'image_convert', 'sign_stamp']) {
     assert.deepEqual(printHandoffPolicyFor(origin), { checkPolicy: 'required', entry: 'check' }, origin)
   }
-  for (const origin of ['resume_report', 'resume_optimize', 'resume_generate', 'advisor_artifact', 'job_material', 'job_fit', 'career_plan', 'self_assessment', 'interview_report', 'interview_practice', 'fair_material', 'fair_visit_plan']) {
+  for (const origin of ['resume_report', 'resume_optimize', 'resume_generate', 'advisor_artifact', 'job_material', 'job_fit', 'career_plan', 'self_assessment', 'interview_report', 'interview_practice', 'fair_material', 'fair_visit_plan', 'policy_checklist']) {
     assert.deepEqual(printHandoffPolicyFor(origin), { checkPolicy: 'exempt', entry: 'confirm' }, origin)
   }
   assert.deepEqual(printHandoffPolicyFor('fair_company'), { checkPolicy: 'exempt', entry: 'preview' })
@@ -268,6 +270,24 @@ test('U6b 入口策略表：原件去打印台检查，派生产物直达报价�
   assert.equal(printHandoffEntryPath('confirm'), '/print/confirm')
   const begun = h.beginPrintHandoff({ origin: 'scan_result', file: fileB() }, GUEST, NOW)
   assert.deepEqual(h.printHandoffTarget(begun), { ok: true, path: '/print/desk?step=check', state: { printContextId: begun.context.contextId } })
+})
+
+test('U6c 政策清单直达报价并只保留公开政策编号用于返回，其他来源仍去掉查询串', async () => {
+  const h = await loadHandoff()
+  const begun = h.beginPrintHandoff({ origin: 'policy_checklist', file: fileB(), returnPath: '/renshi?policy=policy-1&token=secret#fragment' }, GUEST, NOW)
+  assert.equal(begun.context.returnPath, '/renshi?policy=policy-1')
+  assert.equal(h.printHandoffTarget(begun).path, '/print/confirm')
+  assert.equal(h.readPrintHandoff(GUEST, NOW + MINUTE).context.returnPath, '/renshi?policy=policy-1')
+  for (const [origin, path, expected] of [
+    ['upload', '/renshi?policy=policy-1&token=secret', '/renshi'],
+    ['policy_checklist', '/resume/report?taskId=task-1', '/resume/report'],
+    ['policy_checklist', '/renshi?token=secret', '/renshi'],
+    ['policy_checklist', '//evil.example/renshi?policy=x', undefined],
+    ['policy_checklist', '/login?policy=x', undefined],
+  ]) {
+    const result = h.beginPrintHandoff({ origin, file: fileB(), returnPath: path }, GUEST, NOW)
+    assert.equal(result.context.returnPath, expected, `${origin} ${path}`)
+  }
 })
 
 async function loadShared() {

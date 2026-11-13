@@ -30,6 +30,7 @@ process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
 //
 // Run: node -r @swc-node/register scripts/verify-content-trust-publish-gate.ts
 
+import { POLICY_PUBLISH_FIXTURE, POLICY_VERIFIED_DOMAINS_FIXTURE } from './support/policy-publish-fixture'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
@@ -242,7 +243,7 @@ const ORG_MISSING = 'org-does-not-exist'
 
 function orgRows(): Row[] {
   return [
-    { id: ORG_TRUSTED, name: '已核验来源机构', type: 'public_employment_service', contentTrustStatus: 'active', archivedAt: null },
+    { id: ORG_TRUSTED, name: '已核验来源机构', type: 'public_employment_service', verifiedOfficialDomainsJson: POLICY_VERIFIED_DOMAINS_FIXTURE, contentTrustStatus: 'active', archivedAt: null },
     { id: ORG_NULL, name: '腾讯招聘公开来源样本（预生产验证）', type: 'hr_company', contentTrustStatus: null, archivedAt: null },
     { id: ORG_SUSPENDED, name: '已暂停机构', type: 'hr_company', contentTrustStatus: 'suspended', archivedAt: null },
     { id: ORG_ARCHIVED, name: '已归档机构', type: 'hr_company', contentTrustStatus: 'active', archivedAt: NOW },
@@ -309,7 +310,7 @@ function buildFixture() {
   const organization = makeTable(orgRows())
   const job = makeTable(contentSet('job'))
   const jobFair = makeTable(contentSet('fair'))
-  const policyPost = makeTable(contentSet('policy'))
+  const policyPost = makeTable(contentSet('policy').map((row) => ({ ...row, ...POLICY_PUBLISH_FIXTURE })))
   const companyProfile = makeTable(contentSet('company'))
   const offlineAgency = makeTable([
     // 有来源机构(外部供稿)→ 受闸门约束
@@ -375,6 +376,18 @@ const PUBLISH_PATH_INVENTORY: { file: string; method: string; gated: boolean; no
   { file: 'jobs/jobs-admin.service.ts', method: 'publishJobSource', gated: true, note: 'Job → 来源机构 sourceOrgId' },
   { file: 'jobs/jobs-admin.service.ts', method: 'publishFairSource', gated: true, note: 'JobFair → 来源机构 sourceOrgId' },
   { file: 'policies/policies.service.ts', method: 'publishPolicy', gated: true, note: 'PolicyPost → 来源机构 sourceOrgId' },
+  {
+    file: 'policies/policy-save-and-publish.ts', method: 'saveAndPublishPartnerPolicy', gated: false,
+    note: '机构一次走完保存、审核通过、发布。不自己写 published，信任闸门在被调用的 publishPolicy 里',
+  },
+  {
+    file: 'upload-sessions/upload-session-member-bind.ts', method: 'publishConfirmed', gated: false,
+    note: '手机上传确认后把文件交给会员本人，不是政策或招聘内容发布',
+  },
+  {
+    file: 'admin-internal-accounts/internal-account-session.ts', method: 'publishInternalSessionState', gated: false,
+    note: '把登录会话状态写入缓存，不是内容发布',
+  },
   { file: 'companies/companies.service.ts', method: 'adminPublish', gated: true, note: 'CompanyProfile → 来源机构 sourceOrgId' },
   { file: 'jobs/fair-material.service.ts', method: 'publishMaterial', gated: true, note: 'FairMaterial → 所属招聘会的来源机构' },
   { file: 'offline-agencies/offline-agencies.service.ts', method: 'adminPublish', gated: true, note: 'OfflineAgency:sourceOrgId 非空时受闸门约束' },
@@ -426,10 +439,10 @@ function walk(dir: string, out: string[] = []): string[] {
   return out
 }
 
-/** 抽取文件里所有 async 方法名(顶层缩进的类方法即可,足够覆盖 service 写法)。 */
+/** 抽取 async 方法名：类方法，以及文件顶层的 `export async function`。 */
 function asyncMethodNames(code: string): string[] {
   const names: string[] = []
-  const re = /^\s*(?:private\s+|public\s+|protected\s+|static\s+)*async\s+([A-Za-z_$][\w$]*)\s*\(/gm
+  const re = /^\s*(?:export\s+)?(?:private\s+|public\s+|protected\s+|static\s+)*async\s+(?:function\s+)?([A-Za-z_$][\w$]*)\s*\(/gm
   let m: RegExpExecArray | null
   while ((m = re.exec(code)) !== null) names.push(m[1]!)
   return names
@@ -601,9 +614,9 @@ async function main(): Promise<void> {
 
     const msg = contentTrustDenialMessage(ORG_NULL, { id: ORG_NULL, name: '某机构', contentTrustStatus: null, archivedAt: null }, 'trust_not_active')
     assert('拒绝文案含机构名', msg.includes('某机构'))
-    assert('拒绝文案含机构 id', msg.includes(ORG_NULL))
-    assert('拒绝文案含当前状态', msg.includes('未标记'))
-    assert('拒绝文案给出下一步(标记入口)', msg.includes('content-trust'))
+    assert('拒绝文案不露工程字段和接口', !/contentTrustStatus|\/api\/|PATCH|\{|content-trust|fail-closed/.test(msg))
+    assert('拒绝文案说明发布资格未开通', msg.includes('发布资格还没有开通'))
+    assert('拒绝文案给出核验开通路径', msg.includes('请联系平台管理员核验开通后再发布'))
   }
 
   // ── ① 单条发布:非 active 一律被拒 ────────────────────────────────────────
@@ -713,7 +726,7 @@ async function main(): Promise<void> {
     assert('执行:3 条失败', exec.failedCount === 3, `实际 ${exec.failedCount}`)
     const denied = exec.results.filter((r) => r.errorCode === CONTENT_TRUST_DENIED_CODE)
     assert('失败明细的错误码正是闸门那一条', denied.length === 3, `实际 ${denied.length}`)
-    assert('失败明细带人类可读原因', denied.every((r) => (r.errorMessage ?? '').includes('内容信任') || (r.errorMessage ?? '').includes('归档')))
+    assert('失败明细带人类可读原因', denied.every((r) => (r.errorMessage ?? '').includes('平台管理员') && !/contentTrustStatus|\/api\/|PATCH|\{/.test(r.errorMessage ?? '')))
     assert(
       '不可信条目状态没被改动',
       ['job-null', 'job-suspended', 'job-archived'].every((id) => f.job.rows.find((r) => r.id === id)?.publishStatus === 'draft'),

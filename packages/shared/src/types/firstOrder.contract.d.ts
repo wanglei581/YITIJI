@@ -75,6 +75,42 @@ export interface FirstOrderIncidentUpdate {
   note: string
   assignee?: string
 }
+/** Admin cross-org directory. Notes, events and contact details are never included. */
+export interface FirstOrderIncidentDirectoryItem {
+  id: string
+  orgId: string
+  orgName: string
+  projectId: string
+  projectName: string
+  terminalCode: string
+  issueCode: FirstOrderIssue
+  status: FirstOrderIncidentStatus
+  assignee: string | null
+  createdAt: string
+  updatedAt: string
+}
+export interface FirstOrderIncidentDirectory {
+  items: FirstOrderIncidentDirectoryItem[]
+  total: number
+  truncated: boolean
+}
+/** Closed months use status null. Open and future months are preview-only, not missing reports. */
+export interface FirstOrderReportDirectoryItem {
+  orgId: string
+  orgName: string
+  projectId: string
+  projectName: string
+  month: string
+  reportId: string | null
+  acknowledgedAt: string | null
+  status: '本月尚未结束，只能预览' | null
+}
+export interface FirstOrderReportDirectory {
+  month: string
+  items: FirstOrderReportDirectoryItem[]
+  total: number
+  truncated: boolean
+}
 export type FirstOrderMetricState = 'measured' | 'sample_suppressed' | 'not_recorded' | 'unverified'
 export interface FirstOrderMetric {
   value: number | null

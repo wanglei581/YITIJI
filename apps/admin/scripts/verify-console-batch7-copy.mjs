@@ -115,6 +115,7 @@ export function verifyBatch7Copy({ runFile, repoRoot, fail }) {
     assert.match(rules.externalVideoTechNote, /iframe/)
     assert.match(rules.externalVideoTechNote, /直链/)
     assert.ok(assets.includes('{externalVideoHelp}') && assets.includes('title={externalVideoTechNote}'), '外链说明或技术说明悬停没有挂上')
+    assert.ok(assets.includes('aria-expanded={techOpen}') && assets.includes('setTechOpen') && assets.includes('{externalVideoTechNote}'), '技术说明必须能展开和收起，内容仍用同一段说明')
     assert.ok(!/HTTPS|iframe|直链/.test(assets), '外链术语出现在页面正文里')
     const notice = read('apps/admin/src/routes/screensaver/AssetUploadNotice.tsx')
     for (const phrase of [

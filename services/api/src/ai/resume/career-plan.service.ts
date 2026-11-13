@@ -16,11 +16,17 @@ import {
   type DegradedSelfAssessmentDimension,
 } from './career-plan-degraded'
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai-log.service'
+import { AiQuotaService } from '../quota/ai-quota.service'
+import { runWithAiQuota, type QuotaAbortRequest } from '../quota/ai-quota-run'
 import { isRecruitmentContentHostingEnabled } from '../../recruitment-hosting/recruitment-hosting'
 import { storedJobFitUsesSystemJob } from './job-fit-hosting'
 import { formatBeijingDate } from '../../common/beijing-display-time'
 import { sanitizeCareerPlanPayload } from './career-plan-payload-safety'
-import { selfAssessmentForNewAi, type SelfAssessmentExclusion } from './self-assessment-consent-reconfirm'
+import { selfAssessmentForNewAi } from './self-assessment-consent-reconfirm'
+import { MemberPrivacyService } from '../../member-privacy/member-privacy.service'
+import { redactCareerPlanSystemJobTitle, type StoredCareerPlan } from './career-plan-redact'
+
+export { redactCareerPlanSystemJobTitle }
 
 /** 职业规划建议单印在纸上的日期。 */
 export function careerPlanReportDate(at: Date): string {
@@ -61,71 +67,6 @@ function tokenMatches(token: string | null, expectedHash: string | null): boolea
   return actual.length === expected.length && timingSafeEqual(actual, expected)
 }
 
-interface StoredCareerPlan {
-  payload: CareerPlanPayload
-  /** 生成时使用的上下文来源（如实展示给用户：基于哪些材料） */
-  basedOn: {
-    resume: true
-    jobFit: string | null
-    /** 旧存档无此字段；旧 basedOn.jobFit 按系统岗位引用保守清理。 */
-    jobFitSource?: 'system' | 'manual' | null
-    interview: string | null
-    /** 自我探索记分仅作可选上下文。不参与签名门禁 / 配额。同意不是当前版本时不送进模型（这次不纳入）。 */
-    selfAssessment: string | null
-  }
-  providerName: string
-  /** 这次没纳入自我探索的原因（如实告知，不悄悄降级）；旧存档无此字段按 null。 */
-  selfAssessmentExcluded?: SelfAssessmentExclusion
-}
-
-function scrubSystemJobTitle(value: string, title: string): string {
-  // An unmarked occupation in the person's own prose is not recruitment content.
-  // Only whole, explicitly marked references are changed, and short titles are left alone.
-  if (!title.trim() || title.length < 4) return value
-  const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  return value
-    .replace(new RegExp(`([「“《])${escaped}([」”》])`, 'g'), '$1目标岗位$2')
-    .replace(new RegExp(`目标岗位[：:]\\s*${escaped}(?=$|[，。；;、\\s])`, 'g'), '目标岗位')
-}
-
-/** 去掉系统岗位标题，保留规划正文。basedOn.jobFit 清空，避免标题从依据栏漏出。 */
-export function redactCareerPlanSystemJobTitle(stored: StoredCareerPlan, title: string): StoredCareerPlan {
-  const safeStored = { ...stored, payload: sanitizeCareerPlanPayload(stored.payload) }
-  if (!safeStored.basedOn?.jobFit || safeStored.basedOn.jobFitSource === 'manual') return safeStored
-  const clean = (value: string | undefined) => scrubSystemJobTitle(value ?? '', title)
-  const cleanStructured = (value: string | undefined) => value === title && !!title.trim() ? '目标岗位' : clean(value)
-  const payload = safeStored.payload
-  const objects = <T extends object>(items: T[] | undefined): T[] => Array.isArray(items)
-    ? items.filter((item): item is T => !!item && typeof item === 'object' && !Array.isArray(item)) : []
-  return {
-    ...safeStored,
-    basedOn: { ...safeStored.basedOn, jobFit: null, jobFitSource: null },
-    payload: {
-      ...payload,
-      summary: clean(payload?.summary),
-      currentSnapshot: objects(payload?.currentSnapshot).map((item) => ({
-        ...item,
-        point: cleanStructured(item.point),
-        evidence: clean(item.evidence),
-      })),
-      directions: objects(payload?.directions).map((item) => ({
-        ...item,
-        title: cleanStructured(item.title),
-        why: clean(item.why),
-        firstStep: clean(item.firstStep),
-      })),
-      skillPlan: objects(payload?.skillPlan).map((item) => ({
-        ...item,
-        skill: cleanStructured(item.skill),
-        action: clean(item.action),
-        timeframe: clean(item.timeframe),
-      })),
-      actionChecklist: (Array.isArray(payload?.actionChecklist) ? payload.actionChecklist : [])
-        .filter((item): item is string => typeof item === 'string').map((item) => clean(item)),
-    },
-  }
-}
-
 @Injectable()
 export class CareerPlanService {
   constructor(
@@ -137,6 +78,7 @@ export class CareerPlanService {
     private readonly audit: AuditService,
     private readonly aiLog: AiLogService,
     private readonly degradedPdf: CareerPlanDegradedPdfService,
+    private readonly privacy: MemberPrivacyService,
     /**
      * 岗位要求计数（E2）。PR #636 合入前本 token 不注册 —— 拿不到就在纸上如实写
      * 「本次未取到」，绝不留白或编一张空表。见 career-plan-degraded.ts 的接线说明。
@@ -144,15 +86,19 @@ export class CareerPlanService {
     @Optional()
     @Inject(CAREER_PLAN_JOB_REQUIREMENT_STATS)
     private readonly jobRequirementStats?: CareerPlanJobRequirementStatsPort,
+    @Optional() private readonly quota?: AiQuotaService,
   ) {}
 
   async generate(
     taskId: string,
     requester: CareerPlanRequester,
     options?: { includeJobFitTitle?: boolean },
+    req?: QuotaAbortRequest,
   ) {
     const includeJobFitTitle = options?.includeJobFitTitle !== false
     const parse = await this.loadAuthorizedParse(taskId, requester)
+    // 简历原文会送进模型。登录会员须先有未撤回的 resume_ai；游客由服务放行。检查在读文件和调模型之前。
+    await this.privacy.requireActiveConsent(parse.endUserId, 'resume_ai')
 
     // 简历原文重提（2B 模式；清理后诚实失败不调 LLM）
     let resumeText: string | undefined
@@ -169,25 +115,29 @@ export class CareerPlanService {
     }
 
     // 可选上下文（如实分层，绝不跨归属）：
-    // 1) 同 taskId 的最近岗位匹配参考
+    // 1) 同 taskId 的最近岗位匹配参考。
+    // 板块关闭时整段不读。系统内岗位还要托管开着才带进生成；手填对照不是招聘内容，板块开着就保留。
     let jobFitCtx: { jobTitle: string; gaps: string[]; source: 'system' | 'manual' } | null = null
     const jobFitRow = includeJobFitTitle
       ? await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
       : null
     if (jobFitRow && jobFitRow.expiresAt && jobFitRow.expiresAt.getTime() > Date.now()) {
-      try {
-        const stored = JSON.parse(jobFitRow.payloadJson) as {
-          job?: { title?: string }
-          payload?: { gapPoints?: Array<{ gap?: string }> }
-        }
-        if (stored.job?.title) {
-          jobFitCtx = {
-            jobTitle: stored.job.title,
-            gaps: (stored.payload?.gapPoints ?? []).map((g) => g.gap ?? '').filter(Boolean).slice(0, 3),
-            source: storedJobFitUsesSystemJob(jobFitRow.payloadJson) ? 'system' : 'manual',
+      const usesSystemJob = storedJobFitUsesSystemJob(jobFitRow.payloadJson)
+      if (!usesSystemJob || isRecruitmentContentHostingEnabled()) {
+        try {
+          const stored = JSON.parse(jobFitRow.payloadJson) as {
+            job?: { title?: string }
+            payload?: { gapPoints?: Array<{ gap?: string }> }
           }
-        }
-      } catch { /* 损坏行按无上下文处理 */ }
+          if (stored.job?.title) {
+            jobFitCtx = {
+              jobTitle: stored.job.title,
+              gaps: (stored.payload?.gapPoints ?? []).map((g) => g.gap ?? '').filter(Boolean).slice(0, 3),
+              source: usesSystemJob ? 'system' : 'manual',
+            }
+          }
+        } catch { /* 损坏行按无上下文处理 */ }
+      }
     }
     // 2) 最近模拟面试表现摘要（仅会员；匿名面试凭证独立不跨链）
     let interviewCtx: { position: string; level: string; risks: string[] } | null = null
@@ -219,54 +169,68 @@ export class CareerPlanService {
 
     // A-6 成本可见性：本能力此前完全不落 AiServiceLog，Admin 看不到调用量与成本。
     // 用量按重试累计；成功/失败都落一条（失败也真实花钱）。
-    const usage = new AiUsageAccumulator()
-    const startedAt = Date.now()
-    let payload: CareerPlanPayload
-    try {
-      payload = await this.llm.build({ resumeText, jobFit: jobFitCtx, interview: interviewCtx, selfAssessment: selfAssessmentCtx, onLlmCall: usage.add })
-    } catch (error) {
-      this.recordAiLog(taskId, usage, startedAt, 'failed', parse.endUserId, aiErrorCodeOf(error, 'AI_CAREER_PLAN_FAILED'))
-      throw error
+    const produce = async () => {
+      const usage = new AiUsageAccumulator()
+      const startedAt = Date.now()
+      let payload: CareerPlanPayload
+      try {
+        payload = await this.llm.build({ resumeText, jobFit: jobFitCtx, interview: interviewCtx, selfAssessment: selfAssessmentCtx, onLlmCall: usage.add })
+      } catch (error) {
+        this.recordAiLog(taskId, usage, startedAt, 'failed', parse.endUserId, aiErrorCodeOf(error, 'AI_CAREER_PLAN_FAILED'))
+        throw error
+      }
+      this.recordAiLog(taskId, usage, startedAt, 'success', parse.endUserId)
+      const stored: StoredCareerPlan = {
+        payload,
+        basedOn: {
+          resume: true,
+          jobFit: jobFitCtx?.jobTitle ?? null,
+          jobFitSource: jobFitCtx?.source ?? null,
+          interview: interviewCtx?.position ?? null,
+          selfAssessment: selfAssessmentCtx?.dimensions.length ? 'self_assessment' : null,
+        },
+        providerName: 'llm',
+        selfAssessmentExcluded: selfAssessmentUse.excluded,
+      }
+      const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)
+      await this.prisma.aiResumeResult.upsert({
+        where: { taskId_kind: { taskId, kind: 'career_plan' } },
+        update: { status: 'completed', payloadJson: JSON.stringify(stored), expiresAt },
+        create: {
+          taskId,
+          kind: 'career_plan',
+          status: 'completed',
+          provider: 'llm',
+          payloadJson: JSON.stringify(stored),
+          endUserId: parse.endUserId,
+          accessTokenHash: parse.accessTokenHash,
+          expiresAt,
+        },
+      })
+      await this.audit.write({
+        actorId: null,
+        actorRole: parse.endUserId ? 'enduser' : 'kiosk',
+        action: 'resume.career_plan',
+        targetType: 'ai_task',
+        targetId: taskId,
+        payload: { hasJobFitCtx: !!jobFitCtx, hasInterviewCtx: !!interviewCtx, hasEndUser: !!parse.endUserId },
+        ipAddress: null, userAgent: null, requestId: null,
+      })
+      return this.toResponse(taskId, stored)
     }
-    this.recordAiLog(taskId, usage, startedAt, 'success', parse.endUserId)
-    const stored: StoredCareerPlan = {
-      payload,
-      basedOn: {
-        resume: true,
-        jobFit: jobFitCtx?.jobTitle ?? null,
-        jobFitSource: jobFitCtx?.source ?? null,
-        interview: interviewCtx?.position ?? null,
-        selfAssessment: selfAssessmentCtx?.dimensions.length ? 'self_assessment' : null,
+    if (!this.quota || !parse.endUserId) return produce()
+    return runWithAiQuota({
+      quota: this.quota,
+      bucket: 'ai_resume',
+      operationKey: `${taskId}:career_plan`,
+      endUserId: parse.endUserId,
+      req,
+      loadStored: async () => {
+        const row = await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'career_plan' } } })
+        if (!row?.expiresAt || row.expiresAt.getTime() < Date.now() || row.status !== 'completed') return null
+        try { return this.toResponse(taskId, JSON.parse(row.payloadJson) as StoredCareerPlan) } catch { return null }
       },
-      providerName: 'llm',
-      selfAssessmentExcluded: selfAssessmentUse.excluded,
-    }
-    const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)
-    await this.prisma.aiResumeResult.upsert({
-      where: { taskId_kind: { taskId, kind: 'career_plan' } },
-      update: { status: 'completed', payloadJson: JSON.stringify(stored), expiresAt },
-      create: {
-        taskId,
-        kind: 'career_plan',
-        status: 'completed',
-        provider: 'llm',
-        payloadJson: JSON.stringify(stored),
-        endUserId: parse.endUserId,
-        accessTokenHash: parse.accessTokenHash,
-        expiresAt,
-      },
-    })
-    await this.audit.write({
-      actorId: null,
-      actorRole: parse.endUserId ? 'enduser' : 'kiosk',
-      action: 'resume.career_plan',
-      targetType: 'ai_task',
-      targetId: taskId,
-      // 仅元数据：不含简历/规划内容
-      payload: { hasJobFitCtx: !!jobFitCtx, hasInterviewCtx: !!interviewCtx, hasEndUser: !!parse.endUserId },
-      ipAddress: null, userAgent: null, requestId: null,
-    })
-    return this.toResponse(taskId, stored)
+    }, produce, async () => taskId)
   }
 
   /** 读回最近一次规划（刷新恢复 / 会员回看）。 */

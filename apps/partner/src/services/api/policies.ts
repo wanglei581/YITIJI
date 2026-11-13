@@ -25,9 +25,14 @@ export interface PartnerPolicyRecord {
   title: string
   summary?: string
   content?: string
+  whoCanApply?: string
+  requiredMaterials?: string
+  whereToApply?: string
   audience?: string
   category?: string
   externalUrl?: string
+  externalId?: string
+  externalUrlVerified?: boolean
   publishedDate?: string
   sourceOrgId: string
   sourceName: string
@@ -50,6 +55,8 @@ export interface PartnerPolicyRecord {
   emergencyReasonCode?: string | null
   emergencyReasonText?: string | null
   emergencyTakedownAt?: string | null
+  /** 只在保存草稿的响应里出现：发布时会被拒的原因。公开读取不会带这个字段。 */
+  publishWarning?: string | null
 }
 
 /** 平台紧急下架（P-01）。只认服务端给的标记，本机构自己下架不算。 */
@@ -57,15 +64,20 @@ export function isPolicyEmergencyHeld(row: PartnerPolicyRecord): boolean {
   return row.emergencyTakedown === true
 }
 
+/** 编辑时 null 表示清空；新建表单不发送空字段。 */
 export interface SavePolicyInput {
   kind: PolicyKind
   title: string
-  summary?: string
-  content?: string
+  summary?: string | null
+  content?: string | null
+  whoCanApply?: string | null
+  requiredMaterials?: string | null
+  whereToApply?: string | null
   audience?: PolicyAudience
   category?: PolicyCategory
-  externalUrl?: string
-  publishedDate?: string
+  externalUrl?: string | null
+  externalId?: string | null
+  publishedDate?: string | null
 }
 
 // ─── P21 申领条件（结构化，可机械比对）───────────────────────────────────────
@@ -211,6 +223,8 @@ export interface PartnerPoliciesServiceInterface {
    * 不是 true 一律 400 POLICY_RESPONSIBILITY_ACK_REQUIRED，前端不替用户默认勾上。
    */
   releasePolicy(id: string, input: { responsibilityAcknowledged: boolean }): Promise<PartnerPolicyRecord>
+  previewDraftCheck(input: { kind: PolicyKind; externalUrl?: string; whoCanApply?: string; requiredMaterials?: string; whereToApply?: string }): Promise<{ publishWarning: string | null; checklistReady: boolean; columns: Array<{ key: string; truncated: boolean }> }>
+  saveAndPublish(input: SavePolicyInput, options: { responsibilityAcknowledged: boolean; id?: string }): Promise<PartnerPolicyRecord>
   /** 问项字典（服务端下发，前端不得硬编码） */
   getEligibilityQuestions(): Promise<PolicyEligibilityQuestionSet>
   getEligibilityRules(policyId: string): Promise<PolicyEligibilityRuleRecord[]>
@@ -226,7 +240,7 @@ export interface PartnerPoliciesServiceInterface {
 
 // ─── HTTP adapter ─────────────────────────────────────────────────────────────
 
-async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function req<T>(method: string, path: string, body?: unknown, messageOnly = false): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...authHeader() },
@@ -235,18 +249,20 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
   })
   if (!res.ok) {
     let code = `HTTP_${res.status}`
-    let message = res.statusText
+    let message = messageOnly ? '' : res.statusText
+    let details: Record<string, unknown> = {}
     try {
       const data = (await res.json()) as { error?: { code?: string; message?: string }; message?: string | string[] }
+      if (data.error && typeof data.error === 'object') details = data.error
       if (data.error?.code) code = data.error.code
-      if (data.error?.message) message = data.error.message
-      else if (Array.isArray(data.message) && data.message.length > 0) message = data.message.join('；')
+      if (typeof data.error?.message === 'string') message = data.error.message
+      else if (!messageOnly && Array.isArray(data.message) && data.message.length > 0) message = data.message.join('；')
     } catch { /* keep defaults */ }
     if (res.status === 401) {
       redirectToLogin()
-      throw new ApiHttpError(code || 'AUTH_REQUIRED', '登录已过期', res.status)
+      throw new ApiHttpError(code || 'AUTH_REQUIRED', messageOnly ? message : '登录已过期', res.status, details)
     }
-    throw new ApiHttpError(code, message, res.status)
+    throw new ApiHttpError(code, message, res.status, details)
   }
   return res.json() as Promise<T>
 }
@@ -269,7 +285,28 @@ const httpAdapter: PartnerPoliciesServiceInterface = {
   },
   approvePolicy: (id) => req<PartnerPolicyRecord>('PATCH', `/partner/policies/${id}/review`, { action: 'approve' }),
   releasePolicy: (id, input) =>
-    req<PartnerPolicyRecord>('PATCH', `/partner/policies/${id}/release`, { responsibilityAcknowledged: input.responsibilityAcknowledged }),
+    req<PartnerPolicyRecord>('PATCH', `/partner/policies/${id}/release`, { responsibilityAcknowledged: input.responsibilityAcknowledged }, true),
+  previewDraftCheck: (input) => req('POST', '/partner/policies/draft-check', input, true),
+  saveAndPublish: async (input, options) => {
+    const outcome = await req<{
+      policy: PartnerPolicyRecord
+      stopped: { at: string; code: string; message: string } | null
+    }>(
+      'POST',
+      options.id ? `/partner/policies/${options.id}/release-with-save` : '/partner/policies/release-with-save',
+      { ...input, responsibilityAcknowledged: options.responsibilityAcknowledged },
+      true,
+    )
+    // 审核或发布被拒时，内容已经保存，服务端照常返回这条政策和原因（不是报错）。
+    // 这里转成带政策编号的错误交给弹窗：弹窗显示原因，页面记下编号，改完再点时改的是同一条。
+    if (outcome.stopped) {
+      throw new ApiHttpError(outcome.stopped.code, outcome.stopped.message, 200, {
+        policyId: outcome.policy.id,
+        stoppedAt: outcome.stopped.at,
+      })
+    }
+    return outcome.policy
+  },
   getEligibilityQuestions: () => req<PolicyEligibilityQuestionSet>('GET', '/policies/eligibility-questions'),
   getEligibilityRules: (policyId) =>
     req<PolicyEligibilityRuleRecord[]>('GET', `/partner/policies/${policyId}/eligibility-rules`),
@@ -318,6 +355,38 @@ const mockRows: PartnerPolicyRecord[] = [
     emergencyTakedown: true, emergencyReasonCode: 'false_information',
     emergencyReasonText: '申领入口链接指向非官方网站（演示）', emergencyTakedownAt: now(),
   },
+  {
+    id: 'pp-mock-5', kind: 'notice', title: '校园宣讲志愿者招募（演示）',
+    summary: '演示数据：招募类待审核', category: 'recruitment', publishedDate: '2026-10-01',
+    sourceOrgId: 'mock-org', sourceName: '测试机构',
+    reviewStatus: 'pending', publishStatus: 'draft', rejectReason: null,
+    contentVersion: 1, publishConfirmedBy: null, publishConfirmedAt: null, publishConfirmedContentVersion: null,
+    syncTime: now(), updatedAt: now(),
+  },
+  {
+    id: 'pp-mock-6', kind: 'notice', title: '就业指导讲师招募（演示）',
+    summary: '演示数据：招募类已通过未发布', category: 'recruitment', publishedDate: '2026-10-02',
+    sourceOrgId: 'mock-org', sourceName: '测试机构',
+    reviewStatus: 'approved', publishStatus: 'draft', rejectReason: null,
+    contentVersion: 1, publishConfirmedBy: null, publishConfirmedAt: null, publishConfirmedContentVersion: null,
+    syncTime: now(), updatedAt: now(),
+  },
+  {
+    id: 'pp-mock-7', kind: 'notice', title: '档案服务点招募（演示）',
+    summary: '演示数据：招募类已发布', category: 'recruitment', publishedDate: '2026-10-03',
+    sourceOrgId: 'mock-org', sourceName: '测试机构',
+    reviewStatus: 'approved', publishStatus: 'published', rejectReason: null,
+    contentVersion: 1, publishConfirmedBy: 'mock-partner-001', publishConfirmedAt: now(), publishConfirmedContentVersion: 1,
+    syncTime: now(), updatedAt: now(),
+  },
+  {
+    id: 'pp-mock-8', kind: 'policy_guide', title: '见习单位招募说明（演示）',
+    summary: '演示数据：招募类扶持条目', audience: 'graduate', category: 'recruitment', publishedDate: '2026-10-04',
+    sourceOrgId: 'mock-org', sourceName: '测试机构',
+    reviewStatus: 'approved', publishStatus: 'published', rejectReason: null,
+    contentVersion: 1, publishConfirmedBy: 'mock-partner-001', publishConfirmedAt: now(), publishConfirmedContentVersion: 1,
+    syncTime: now(), updatedAt: now(),
+  },
 ]
 
 const mockAdapter: PartnerPoliciesServiceInterface = {
@@ -337,9 +406,10 @@ const mockAdapter: PartnerPoliciesServiceInterface = {
   async createPolicy(input) {
     const created: PartnerPolicyRecord = {
       id: `pp-mock-${++seq}`,
-      kind: input.kind, title: input.title, summary: input.summary, content: input.content,
-      audience: input.audience, category: input.category, externalUrl: input.externalUrl,
-      publishedDate: input.publishedDate,
+      kind: input.kind, title: input.title, summary: input.summary ?? undefined, content: input.content ?? undefined,
+      audience: input.audience, category: input.category, externalUrl: input.externalUrl ?? undefined,
+      publishedDate: input.publishedDate ?? undefined, externalId: input.externalId ?? undefined,
+      whoCanApply: input.whoCanApply ?? undefined, requiredMaterials: input.requiredMaterials ?? undefined, whereToApply: input.whereToApply ?? undefined,
       sourceOrgId: 'mock-org', sourceName: '测试机构',
       reviewStatus: 'pending', publishStatus: 'draft', rejectReason: null,
       contentVersion: 1, publishConfirmedBy: null, publishConfirmedAt: null, publishConfirmedContentVersion: null,
@@ -351,7 +421,7 @@ const mockAdapter: PartnerPoliciesServiceInterface = {
   async updatePolicy(id, input) {
     const hit = mockRows.find((r) => r.id === id)
     if (!hit) throw new ApiHttpError('POLICY_NOT_FOUND', '不存在', 404)
-    Object.assign(hit, Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)))
+    Object.assign(hit, Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined).map(([k, v]) => [k, v === null ? undefined : v])))
     hit.reviewStatus = 'pending'
     hit.publishStatus = 'draft'
     hit.rejectReason = null
@@ -405,6 +475,19 @@ const mockAdapter: PartnerPoliciesServiceInterface = {
     hit.updatedAt = now()
     return { ...hit }
   },
+  async previewDraftCheck() {
+    return { publishWarning: null, checklistReady: false, columns: [] }
+  },
+  async saveAndPublish(input, options) {
+    if (options.responsibilityAcknowledged !== true) {
+      throw new ApiHttpError('POLICY_RESPONSIBILITY_ACK_REQUIRED', '发布前必须确认对本条政策内容负责', 400)
+    }
+    const saved = options.id
+      ? await mockAdapter.updatePolicy(options.id, input)
+      : await mockAdapter.createPolicy(input)
+    const approved = await mockAdapter.approvePolicy(saved.id)
+    return mockAdapter.releasePolicy(approved.id, { responsibilityAcknowledged: true })
+  },
 
   // ── 申领条件在演示模式下**不提供**，而不是给一份假的 ────────────────────
   //
@@ -413,7 +496,7 @@ const mockAdapter: PartnerPoliciesServiceInterface = {
   //   2. 保存必须真正落库并把政策打回待审核，mock 的「已保存」是假的；
   //   3. 判定必须与用户在一体机上拿到的结论**同一条服务端路径**，
   //      前端自己算一遍就成了第二套口径 —— 那比没有预览更糟。
-  // 所以这里如实抛错，由录入面展示「演示模式不可用」，不给任何结果。
+  // 所以这里如实抛错，由录入面展示「演示模式不执行」，不给任何结果。
   async getEligibilityQuestions() { throw mockUnsupported() },
   async getEligibilityRules() { throw mockUnsupported() },
   async replaceEligibilityRules() { throw mockUnsupported() },
@@ -421,11 +504,7 @@ const mockAdapter: PartnerPoliciesServiceInterface = {
 }
 
 function mockUnsupported(): ApiHttpError {
-  return new ApiHttpError(
-    'ELIGIBILITY_REQUIRES_BACKEND',
-    '演示模式(API_MODE=mock)不提供政策申领条件的录入与试算:问项字典、保存与判定都只在服务端进行。请连接真实后端后再录入。',
-    501,
-  )
+  return new ApiHttpError('DEMO_MODE_READONLY', '演示模式不执行', 501)
 }
 
 export const partnerPoliciesService: PartnerPoliciesServiceInterface = API_MODE === 'http' ? httpAdapter : mockAdapter

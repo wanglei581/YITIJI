@@ -13,6 +13,7 @@ import { PRINT_TIMEOUT_MS } from '../config'
  *   orientation  → PrintOptions.orientation (portrait/landscape; auto = omit)
  *   scale        → PrintOptions.scale (fit/noscale; actual → noscale)
  *   pageRange    → PrintOptions.pages
+ *   paperSize    → PrintOptions.paperSize（固定 A4，不看 params）
  * Pending Windows true-machine verification:
  *   pagesPerSheet — no direct SumatraPDF support via pdf-to-printer
  *   quality       — needs DEVMODE; no SumatraPDF equivalent
@@ -62,6 +63,9 @@ function mapParams(params: Partial<PrintJobParams>): Partial<PrintOptions> {
   return opts
 }
 
+/** 这台机型只打 A4，CLAUDE.md §3。以前靠驱动默认值。真机试打前先问产品负责人。 */
+const PAPER_SIZE_A4 = 'A4'
+
 export async function printWithPdfToPrinter(
   filePath: string,
   printerName: string,
@@ -87,6 +91,7 @@ export async function printWithPdfToPrinter(
   const printOptions: PrintOptions = {
     printer: printerName,
     ...(params ? mapParams(params) : {}),
+    paperSize: PAPER_SIZE_A4,
   }
 
   try {
@@ -101,12 +106,18 @@ export async function printWithPdfToPrinter(
     const timeoutMs = dependencies.timeoutMs ?? PRINT_TIMEOUT_MS
 
     // SumatraPDF exits after spooling (not after physical print). Guard against driver hangs.
-    await Promise.race([
-      dispatch(filePath, printOptions),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('PRINT_TIMEOUT')), timeoutMs),
-      ),
-    ])
+    let timer: ReturnType<typeof setTimeout> | undefined
+    dependencies.onDispatchStart?.()
+    const reader = Promise.resolve().then(() => dispatch!(filePath, printOptions))
+      .finally(() => dependencies.onDispatchSettled?.())
+    try {
+      await Promise.race([
+        reader,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('PRINT_TIMEOUT')), timeoutMs)
+        }),
+      ])
+    } finally { if (timer) clearTimeout(timer) }
 
     return {
       success: true, method, printer: printerName, file: filePath,
@@ -133,4 +144,6 @@ export async function printWithPdfToPrinter(
 export interface PrintCommandDependencies {
   dispatch?: (file: string, options?: PrintOptions) => Promise<void>
   timeoutMs?: number
+  onDispatchStart?: () => void
+  onDispatchSettled?: () => void
 }

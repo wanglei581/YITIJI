@@ -1,30 +1,22 @@
+import { LicenseLock } from '../../../layouts/LicenseLock'
 // 我的收藏 — /me/favorites（本人）。收藏只记录本人收藏行为，不含投递 / 预约结果。
 // 招聘内容托管（next-tasks 3.13）关闭时只剩政策收藏：不摆岗位、招聘会分类，也不给「去看岗位」的出口。
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { FavoriteTargetType, MemberFavoriteItem } from '@ai-job-print/shared'
-import {
-  BriefcaseIcon,
-  CalendarDaysIcon,
-  ChevronRightIcon,
-  FileTextIcon,
-  HeartIcon,
-  SparklesIcon,
-} from 'lucide-react'
 import { getAllMyFavorites } from '../../../services/api/memberFavorites'
 import { useAuth } from '../../../auth/useAuth'
+import { useFavorites } from '../../../favorites/useFavorites'
 import { useRecruitmentHosting } from '../../../hooks/useRecruitmentHosting'
 import { formatTime } from '../assets/format'
-import { QxMeGuide, QxMePage, QxMeSummary, recordsCtabar } from './qx/QxMeChrome'
-import { QxMeErrorBlock, QxMeLoadingBlock, QxMeLoginBlock, QxMeStartRow, QxMeStructRow } from './qx/QxMeStateBits'
+import { QxMePage, recordsCtabar } from './qx/QxMeChrome'
+import { QxMeErrorBlock, QxMeLoadingBlock, QxMeLoginBlock } from './qx/QxMeStateBits'
+import { MeBtn, MeP, MeRows, MeSeg } from '../touch/MeKit'
+import { MeEmptyPack, MeExitCard } from '../touch/MeStatePacks'
 import './styles/member-records-qx.css'
 
-const TYPE_META: Record<FavoriteTargetType, { label: string; icon: typeof BriefcaseIcon; tone?: 'wheat' | 'slate' }> = {
-  job: { label: '岗位', icon: BriefcaseIcon },
-  job_fair: { label: '招聘会', icon: CalendarDaysIcon, tone: 'wheat' },
-  policy: { label: '政策', icon: FileTextIcon, tone: 'slate' },
-}
+const TYPE_LABEL: Record<FavoriteTargetType, string> = { job: '岗位', job_fair: '招聘会', policy: '政策' }
 
 type FavoriteTab = FavoriteTargetType | 'all'
 const TABS: { key: FavoriteTab; label: string }[] = [
@@ -53,10 +45,13 @@ export function MyFavoritesPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { isLoggedIn, getToken } = useAuth()
+  const favorites = useFavorites()
   const hostingOpen = useRecruitmentHosting().enabled
   const [loaded, setItems] = useState<MemberFavoriteItem[]>([])
   const [state, setState] = useState<LoadState>('loading')
   const [reloadKey, setReloadKey] = useState(0)
+  const [removing, setRemoving] = useState<string | null>(null)
+  const [removeError, setRemoveError] = useState<string | null>(null)
   const requestedTab = getFavoriteTab(searchParams)
   // 托管关闭时只有「全部」与「政策」两种视角，且两者内容相同：不摆分类条，旧链接里的岗位 / 招聘会分类回到全部。
   const tab: FavoriteTab = hostingOpen || requestedTab === 'policy' ? requestedTab : 'all'
@@ -80,6 +75,26 @@ export function MyFavoritesPage() {
 
   useEffect(() => { load() }, [load, reloadKey])
 
+  // 取消收藏：先从列表拿掉；没成功就放回原位，并照实说明收藏还在。
+  const cancelFavorite = async (item: MemberFavoriteItem) => {
+    if (removing) return
+    const index = loaded.findIndex((current) => current.id === item.id)
+    setRemoving(item.id)
+    setRemoveError(null)
+    setItems((current) => current.filter((current_) => current_.id !== item.id))
+    const ok = await favorites.unfavorite(item.targetType, item.targetId)
+    if (!ok) {
+      setItems((current) => {
+        if (current.some((current_) => current_.id === item.id)) return current
+        const next = [...current]
+        next.splice(Math.max(0, Math.min(index, next.length)), 0, item)
+        return next
+      })
+      setRemoveError(`这次没取消成功，「${item.title ?? '这条收藏'}」还在收藏里，请稍后再试`)
+    }
+    setRemoving(null)
+  }
+
   // 服务端在托管关闭时已经不返回岗位与招聘会收藏；这里再挡一次，免得点进一个开不了的详情页。
   const items = useMemo(() => (hostingOpen ? loaded : loaded.filter((i) => i.targetType === 'policy')), [hostingOpen, loaded])
   const visible = useMemo(() => (tab === 'all' ? items : items.filter((i) => i.targetType === tab)), [items, tab])
@@ -91,122 +106,87 @@ export function MyFavoritesPage() {
   }), [items])
 
   const uiState = !isLoggedIn ? 'login' : state === 'loading' ? 'loading' : state === 'error' ? 'error' : items.length === 0 ? 'empty' : 'ready'
-  const struct = (
-    <>
-      {hostingOpen ? (
-        <>
-          <QxMeStructRow icon={BriefcaseIcon} title="岗位收藏" desc="回到岗位详情，按来源平台规则投递" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-favorites-0" />
-          <QxMeStructRow icon={CalendarDaysIcon} title="招聘会收藏" desc="回到活动详情，预约以来源平台为准" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-favorites-1" />
-        </>
-      ) : null}
-      <QxMeStructRow icon={FileTextIcon} title="政策收藏" desc="再打开这则政策说明" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-favorites-2" />
-    </>
-  )
-  const minis = hostingOpen ? [`岗位 ${counts.job}`, `招聘会 ${counts.job_fair}`, `政策 ${counts.policy}`] : [`政策 ${counts.policy}`]
 
   let body: ReactNode
   if (!isLoggedIn) {
-    body = <QxMeLoginBlock title="登录后查看我的收藏" desc="收藏只在登录后与账号绑定；公共一体机不保存游客的收藏。" struct={struct} onJobs={() => navigate('/jobs')} onPrint={() => navigate('/print-scan')} />
+    body = <QxMeLoginBlock title="登录后查看我的收藏" />
   } else if (state === 'loading') {
     body = <QxMeLoadingBlock title="正在加载我的收藏" />
   } else if (state === 'error') {
-    body = <QxMeErrorBlock title="收藏这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已有收藏不会因为这次失败而消失。" struct={struct} />
+    body = <QxMeErrorBlock onRetry={() => setReloadKey((k) => k + 1)} />
   } else if (items.length === 0) {
     body = (
-      <>
-        <section className="qx-me-banner" data-testid="qx-me-fallback" data-kind="empty">
-          <span className="qx-me-banner-ico" aria-hidden="true"><HeartIcon size={34} /></span>
-          <span className="qx-me-banner-main">
-            <h2 className="qx-me-banner-t">还没有收藏</h2>
-            <span className="qx-me-banner-p">{hostingOpen ? '在岗位 / 招聘会 / 政策详情页点收藏之后，才会出现在这里。' : '在政策详情页点收藏之后，才会出现在这里。'}<b>空就是空</b>。</span>
-          </span>
-          <span className="qx-me-banner-mini"><i>共 0</i></span>
-        </section>
-        <QxMeSummary tone="plum" icon={<HeartIcon size={32} />} label="收藏夹" big={0} desc="只记录本人浏览兴趣，不含投递或预约结果" minis={hostingOpen ? ['岗位 0', '招聘会 0', '政策 0'] : ['政策 0']} />
-        <section className="qx-me-list qx-me-grow" aria-label="从这里开始">
+      <div className="me-state" data-testid="qx-me-fallback">
+        <MeEmptyPack sentence="还没有收藏。收藏只是方便下次再找，不含投递结果。">
           {hostingOpen ? (
             <>
-              <QxMeStartRow icon={BriefcaseIcon} title="看看第三方岗位" desc="来源、更新时间与外部投递入口都在详情页" label="查看岗位" route="/jobs" testid="member-records-start-jobs" onClick={() => navigate('/jobs')} />
-              <QxMeStartRow icon={CalendarDaysIcon} tone="wheat" title="看看招聘会" desc="时间、地点与官方预约入口以详情页为准" label="查看招聘会" route="/job-fairs" testid="member-records-start-fairs" onClick={() => navigate('/job-fairs')} />
+              <LicenseLock><MeExitCard art="checklist" artWidth={160} tall title="查看岗位" desc="来源、更新时间与外部投递入口都在详情页" onClick={() => navigate('/jobs')} /></LicenseLock>
+              <LicenseLock><MeExitCard art="stack" artWidth={140} tall title="查看招聘会" desc="时间、地点与官方预约入口以详情页为准" onClick={() => navigate('/job-fairs')} /></LicenseLock>
             </>
           ) : (
-            <QxMeStartRow icon={FileTextIcon} tone="slate" title="看看就业政策" desc="政策、社保与登记指引，资格以官方核验为准" label="查看政策" route="/policy-service" testid="member-records-start-policy" onClick={() => navigate('/policy-service')} />
+            <>
+              <LicenseLock><MeExitCard art="checklist" artWidth={160} tall title="查看政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} /></LicenseLock>
+              <LicenseLock><MeExitCard art="phone" artWidth={140} tall title="去打印" desc="打印和扫描现在就能办" onClick={() => navigate('/print-scan')} /></LicenseLock>
+            </>
           )}
-          <QxMeStartRow icon={SparklesIcon} tone="plum" title="先把简历准备好" desc={hostingOpen ? '诊断或生成之后再去收藏岗位会更有针对性' : '诊断或生成一份简历，当场打印带走'} label="去简历服务" route="/resume-service" testid="member-records-start-resume" onClick={() => navigate('/resume-service')} />
-          <div className="qx-me-legal">{hostingOpen ? '在岗位 / 招聘会 / 政策详情页点收藏，这里会显示你的收藏。' : '在政策详情页点收藏，这里会显示你的收藏。'}<b>空就是空</b>。</div>
-        </section>
-        <QxMeGuide items={hostingOpen
-          ? [['怎么产生', '在详情页点收藏', '岗位 / 招聘会 / 政策都可以收藏'], ['这里显示什么', '只有收藏行为', '不含投递或预约结果'], ['去哪儿办', '来源平台', '投递与预约都在来源平台完成']]
-          : [['怎么产生', '在详情页点收藏', '政策详情页可以收藏'], ['这里显示什么', '只有收藏行为', '不含办理或申领结果'], ['去哪儿办', '官方渠道', '政策办理以官方渠道为准']]} />
-      </>
+        </MeEmptyPack>
+      </div>
     )
   } else {
     body = (
       <>
-        <QxMeSummary
-          tone="plum"
-          icon={<HeartIcon size={32} />}
-          label="收藏夹"
-          big={counts.all}
-          desc="只记录本人浏览兴趣，不含投递或预约结果"
-          minis={minis}
-        />
         {hostingOpen ? (
-          <div className="qx-me-tabbar" data-n="4" role="group" aria-label="记录筛选">
-            {TABS.map((t) => (
-              <button key={t.key} type="button" className="qx-me-tab" aria-current={tab === t.key ? 'true' : undefined} data-testid={`member-records-fav-tab-${t.key}`} onClick={() => setTab(t.key)}>
-                {t.label}<i>{counts[t.key]}</i>
-              </button>
+          <MeSeg
+            label="记录筛选"
+            current={tab}
+            items={TABS.map((t) => ({ id: t.key, label: `${t.label} ${counts[t.key]}`, testId: `member-records-fav-tab-${t.key}` }))}
+            onPick={(id) => setTab(id as FavoriteTab)}
+          />
+        ) : null}
+        {visible.length === 0 ? (
+          <MeP>当前分类下没有收藏。</MeP>
+        ) : (
+          <MeRows few={visible.length < 7} testId="member-records-list" label="我的收藏">
+            {visible.map((item) => (
+              <div key={item.id} className="me-line me-fav-line" data-favorite-type={item.targetType}>
+                <button type="button" className="me-open" data-testid={`member-records-fav-${item.id}`} onClick={() => navigate(detailRoute(item))}>
+                  <b>{item.title ?? '未命名收藏'}</b>
+                  <small>{TYPE_LABEL[item.targetType]} · 收藏于 {formatTime(item.createdAt)}</small>
+                </button>
+                <MeBtn className="me-fav-remove" data-testid={`member-records-fav-remove-${item.id}`}
+                  aria-label={`取消收藏：${item.title ?? '这条收藏'}`} disabled={removing !== null}
+                  onClick={() => { void cancelFavorite(item) }}>
+                  {removing === item.id ? '正在取消…' : '取消收藏'}
+                </MeBtn>
+              </div>
             ))}
+          </MeRows>
+        )}
+        {removeError ? <div role="alert"><MeP tone="reason">{removeError}</MeP></div> : null}
+        {visible.length > 0 && visible.length < 7 ? (
+          <div className="me-stack">
+            <LicenseLock><MeExitCard art="checklist" artWidth={110} title={hostingOpen ? '查看岗位' : '查看政策'} desc={hostingOpen ? '看看第三方来源的岗位' : '看本机构发布的就业政策'} onClick={() => navigate(hostingOpen ? '/jobs' : '/policy-service')} /></LicenseLock>
+            <LicenseLock><MeExitCard art="usb" artWidth={110} title="去打印" desc="打印和扫描现在就能办" onClick={() => navigate('/print-scan')} /></LicenseLock>
           </div>
         ) : null}
-        <section className="qx-me-list qx-me-grow" data-testid="member-records-list" aria-label="我的收藏">
-          {visible.length === 0 ? (
-            <div className="qx-me-legal">当前分类下没有收藏。</div>
-          ) : visible.map((item) => {
-            const meta = TYPE_META[item.targetType]
-            const Icon = meta.icon
-            return (
-              <button key={item.id} type="button" className="qx-me-row" data-favorite-type={item.targetType} data-testid={`member-records-fav-${item.id}`} onClick={() => navigate(detailRoute(item))}>
-                <span className="qx-me-row-ico" data-tone={meta.tone} aria-hidden="true"><Icon size={28} /></span>
-                <span className="qx-me-row-main">
-                  <span className="qx-me-row-title">{item.title ?? '未命名收藏'}</span>
-                  <span className="qx-me-row-sub">{meta.label} · 收藏于 {formatTime(item.createdAt)}</span>
-                </span>
-                <span className="qx-me-row-go" aria-hidden="true"><ChevronRightIcon size={22} /></span>
-              </button>
-            )
-          })}
-          <div className="qx-me-fav-next" data-n={hostingOpen ? 3 : 1} aria-label="收藏使用说明">
-            {hostingOpen ? (
-              <>
-                <div><b>岗位收藏</b><span>打开岗位详情后，按来源平台的规则完成投递。</span></div>
-                <div><b>招聘会收藏</b><span>查看活动详情；预约和签到以来源平台或现场规则为准。</span></div>
-              </>
-            ) : null}
-            <div><b>政策收藏</b><span>再打开这则说明，办理仍以官方入口为准。</span></div>
-          </div>
-          <div className="qx-me-legal">{hostingOpen
-            ? <>收藏只记录本人收藏行为；<b>投递与预约都在来源平台完成</b>，本机不代收简历，也不记录结果。</>
-            : <>收藏只记录本人收藏行为；<b>本机不代收简历</b>，也不记录办理结果。</>}</div>
-        </section>
       </>
     )
   }
 
   return (
     <QxMePage
-      title={tab === 'policy' ? '政策收藏' : '我的收藏'}
+      title={items.length > 0 ? `你收藏的 ${tab === 'all' ? items.length : visible.length} 条${tab === 'policy' || !hostingOpen ? '政策' : ''}` : '还没有收藏'}
       view="favorites"
       screen="member-list"
       screenState={`favorites-${uiState}`}
-      eyebrow="我的收藏"
-      ask={hostingOpen ? <>收藏的岗位与招聘会，<em>随时找回</em>。</> : <>收藏的政策，<em>随时找回</em>。</>}
-      doing={<>只记录<b>本人收藏行为</b>，不含投递或预约结果。</>}
-      truth={hostingOpen ? '投递与预约都在来源平台完成；本机不代收简历，也不记录结果。' : '收藏只记录本人收藏行为；本机不代收简历，也不记录办理结果。'}
-      ctabar={hostingOpen
+      eyebrow="我的 · 收藏"
+      sub={hostingOpen ? '岗位、招聘会、政策的收藏' : '只收藏政策'}
+      fine={hostingOpen
+        ? '点一条打开详情，点右边「取消收藏」可以取消。投递与预约都在来源平台完成，本机不代收简历，也不记录结果。离开 3 分钟没操作会自动退出。'
+        : '点一条打开政策，点右边「取消收藏」可以取消。办理仍以官方入口为准，本机不代收简历，也不记录办理结果。离开 3 分钟没操作会自动退出。'}
+      ctabar={uiState === 'login' || uiState === 'loading' || uiState === 'error' ? recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/favorites', '查看政策', () => navigate('/policy-service')) : <LicenseLock>{hostingOpen
         ? recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/favorites', '查看岗位', () => navigate('/jobs'))
-        : recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/favorites', '查看政策', () => navigate('/policy-service'))}
+        : recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/favorites', '查看政策', () => navigate('/policy-service'))}</LicenseLock>}
     >
       {body}
     </QxMePage>

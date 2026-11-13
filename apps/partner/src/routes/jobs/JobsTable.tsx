@@ -77,12 +77,12 @@ export function JobsTable({
     {
       id: 'col4',
       header: '类型',
-      cellClassName: '',
+      cellClassName: 'whitespace-nowrap',
       cell: (j) => (
         <>
           {CATEGORY_MAP[j.category!] ? (
             <span
-              className={`rounded px-2 py-0.5 text-xs font-medium ${CATEGORY_MAP[j.category!].style}`}
+              className={`whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ${CATEGORY_MAP[j.category!].style}`}
             >
               {CATEGORY_MAP[j.category!].label}
             </span>

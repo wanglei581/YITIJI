@@ -1,11 +1,13 @@
+// 停放（2026-11-05 政策最小闭环）：源码保留、不注册、不打包，旧链接回政策首页
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useFavorites } from '../../favorites/useFavorites'
 import { isValidSourceUrl } from '../../lib/url'
-import { FileTextIcon, HeartIcon, PrinterIcon, QrCodeIcon } from 'lucide-react'
-import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
+import { HeartIcon, PrinterIcon, QrCodeIcon } from 'lucide-react'
+import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
+import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
 import { matchAudience, type AudienceKey, type PolicyItem } from './shared'
-import { AudienceFilter, CollapsedChevron, DetailList, SourceFacts, type SourceQrTarget } from './components'
+import { AudienceFilter, DetailList, SourceFacts, type SourceQrTarget } from './components'
 
 const SRC_RULE = '来源入口由发布方提供，本系统未核验其官方性；扫码前请核对机构和目标域名。'
 
@@ -25,43 +27,41 @@ export function PolicyPanel({
   guideItems,
   audience,
   focusId,
-  suppressAutoOpen = false,
   onAudienceChange,
   onOpened,
   onActiveId,
+  onDetailSelected,
   onUpload,
   onOfficialEntry,
-  aiLabel,
-  aiDraft,
 }: {
   libraryItems: PolicyItem[]
   guideItems: PolicyItem[]
   audience: AudienceKey
   /** 收藏或地址里点名的那一条。在列表里就展开它，不先展开第一条。 */
   focusId?: string | null
-  /** 刚撤下一条时，不要改去展开下一条。 */
-  suppressAutoOpen?: boolean
   onAudienceChange: (k: AudienceKey) => void
   onOpened: (item: PolicyItem) => void
   onActiveId: (id: string | null) => void
+  onDetailSelected: (selected: boolean) => void
   onUpload: (id: string) => void
   onOfficialEntry: (item: PolicyItem, target: SourceQrTarget) => void
-  aiLabel: string
-  aiDraft: string
 }) {
   const navigate = useNavigate()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [touched, setTouched] = useState(false)
   const openedIdRef = useRef<string | null>(null)
   const audienceSeen = useRef(audience)
-  const { isFavorite, toggle: toggleFavorite } = useFavorites()
+  const { isFavorite, toggle: toggleFavorite, source } = useFavorites()
+  const [page, setPage] = useState(0)
+  const [guideView, setGuideView] = useState(false)
   if (audienceSeen.current !== audience) {
     audienceSeen.current = audience
     setTouched(false)
     setExpandedId(null)
+    setPage(0)
+    setGuideView(false)
   }
 
-  const goHub = () => navigate('/policy-service')
   // 选了身份时服务端只回这一身份与通用事项：这时一条都没有是筛选结果，不是政策库空（稿 48 的 filtered-empty）。
   const libraryEmpty = libraryItems.length === 0 && audience === 'all'
   const visibleLibrary = useMemo(
@@ -73,14 +73,11 @@ export function PolicyPanel({
     [guideItems, audience, focusId],
   )
   const selectable = useMemo(() => [...visibleLibrary, ...visibleGuides], [visibleLibrary, visibleGuides])
-  const fallbackId = selectable[0]?.id ?? null
   const focusHit = focusId && selectable.some((item) => item.id === focusId) ? focusId : null
   const stillThere = (id: string | null) => Boolean(id && selectable.some((item) => item.id === id))
   const openId = touched
     ? (stillThere(expandedId) ? expandedId : null)
-    : suppressAutoOpen
-      ? focusHit
-      : (focusHit ?? fallbackId)
+    : focusHit
 
   useEffect(() => {
     if (touched || !focusHit || openId !== focusHit) return
@@ -91,6 +88,14 @@ export function PolicyPanel({
     onActiveId(openId)
     return () => onActiveId(null)
   }, [onActiveId, openId])
+
+  // 本人点开或地址点名的那一条独占详情内容区：
+  // 页面据此决定问小青的问句，以及被下架时是整页换成「已下架」还是只从列表里摘掉。
+  const userOpened = openId !== null && (touched || openId === focusHit)
+  useEffect(() => {
+    onDetailSelected(userOpened)
+    return () => onDetailSelected(false)
+  }, [onDetailSelected, userOpened])
 
   useEffect(() => {
     const item = selectable.find((entry) => entry.id === openId)
@@ -116,38 +121,20 @@ export function PolicyPanel({
     const urlMissing = !item.officialUrl
     return (
       <article key={item.id} className={`k8-policy-list-item${open ? ' is-open' : ''}`} data-policy-id={item.id}>
-        <div className="rq-item-head">
-          <button
-            type="button"
-            className="rq-item-main"
-            aria-expanded={open}
-            onClick={() => toggle(item)}
-          >
-            <span className={kind === 'library' ? 'rq-item-ic rq-item-ic-lib' : 'rq-item-ic'} aria-hidden="true">
-              <FileTextIcon />
-            </span>
-            <span className="rq-item-tx">
-              <b>{item.title}</b>
-              <span className="rq-item-sub">{item.summary || item.sourceName}</span>
-            </span>
-            <span className="rq-item-tail">
-              <span className={kind === 'library' ? 'rq-tag rq-tag-lib' : 'rq-tag'}>{item.tagLabel}</span>
-              <CollapsedChevron />
+        <div className={open ? 'rq-detail-card' : undefined}>
+        {!(userOpened && open) && <div className="rq-item-head">
+          <button type="button" className="rq-item-main" aria-expanded={open} onClick={() => toggle(item)}>
+            <span className="rq-item-tx"><b>{item.title}</b>
+              {!open && (kind === 'builtin' || visibleLibrary.length < 5) && item.summary ? <span className="rq-item-sub">{item.summary}</span> : null}
+              {!open && <small className="rq-item-meta">{kind === 'library' ? `${item.tagLabel} · ${item.publishedDate ? `发布于 ${item.publishedDate.slice(0, 10)}` : '发布日期未提供'} · 看原文` : '办事参考 · 查看'}</small>}
             </span>
           </button>
-          {canFavorite && (
-            <button
-              type="button"
-              className={favorite ? 'rq-fav is-on' : 'rq-fav'}
-              aria-label={favorite ? '取消收藏' : '收藏政策'}
-              onClick={() => toggleFavorite({ type: 'policy', id: item.id, title: item.title })}
-            >
-              <HeartIcon className={favorite ? 'is-on' : ''} aria-hidden="true" />
-            </button>
-          )}
-        </div>
+        </div>}
         {open && (
           <div className="rq-acc">
+            {canFavorite && <button type="button" className={favorite ? 'rq-fav is-on' : 'rq-fav'} aria-label={favorite ? '取消收藏' : '收藏政策'} onClick={() => toggleFavorite({ type: 'policy', id: item.id, title: item.title })}>
+              <HeartIcon className={favorite ? 'is-on' : ''} aria-hidden="true" /><span><b>{favorite ? '已收藏，再点取消' : '收藏这条'}</b>{source === 'local' && <small>只记在这台机器的这次办理里</small>}</span>
+            </button>}
             {kind === 'builtin' ? <p className="rq-kindchip">内置指引 · 非政策库内容</p> : null}
             {(item.content || item.summary) && !item.conditions && (
               <div className="rq-quote">
@@ -156,8 +143,8 @@ export function PolicyPanel({
               </div>
             )}
             {item.conditions && <DetailList title="先看是否符合" items={item.conditions} layout="list" />}
-            {item.materials && <DetailList title="需要准备材料" items={item.materials} layout="cols" />}
-            {item.steps && <DetailList title="建议办理路径" items={item.steps} layout="steps" />}
+            {item.materials && <DetailList title="需要准备的材料" items={item.materials} layout="cols" />}
+            {item.steps && <DetailList title="建议怎么办" items={item.steps} layout="steps" />}
             {kind === 'library' ? (
               <SourceFacts
                 sourceName={item.sourceName}
@@ -169,13 +156,16 @@ export function PolicyPanel({
             )}
             {kind === 'library' ? (
               <div className="rq-ai-off">
-                <b>本条政策暂未接入小青</b>
-                <span>小青还不能解释政策原文。看原文、来源二维码和条件核对都不经过它。</span>
-                <QxAiHelp label={aiLabel} draft={aiDraft} testId="renshi-ask-ai" />
+                <p className="rq-ai-remind"><QxTouchIcon name="sparkle" /><span>小青还不能解释这条政策。看原文、扫码和条件核对都可以继续。</span></p>
+                <QxAiHelp label="问小青别的问题，不判断能不能办" draft={`关于「${item.title}」，如何核对发布机构和来源地址？小青还不能解释政策原文，也不判断能否办理。`} testId="renshi-ask-ai" />
               </div>
             ) : (
               <p className="rq-note">{SRC_RULE}</p>
             )}
+          </div>
+        )}
+        </div>
+        {open && <>
             <div className="rq-strip">
               {urlOk ? (
                 <button
@@ -189,7 +179,7 @@ export function PolicyPanel({
                   })}
                 >
                   <QrCodeIcon aria-hidden="true" />
-                  <span><b>扫码打开来源链接</b><small>先核对机构和目标域名再用手机访问</small></span>
+                  <span><b>扫码打开来源链接</b><small>扫码前核对机构和域名</small></span>
                 </button>
               ) : (
                 <button
@@ -209,12 +199,12 @@ export function PolicyPanel({
               {kind === 'builtin' ? (
                 <button type="button" className="rq-exit" onClick={() => navigate('/print/upload')}>
                   <PrinterIcon aria-hidden="true" />
-                  <span><b>上传自备材料打印</b><small>本机只打印你自己带来的文件</small></span>
+                  <span><b>上传自备材料打印</b><small>只处理你自己带来的材料</small></span>
                 </button>
               ) : (
                 <button type="button" className="rq-exit" onClick={() => onUpload(item.id)}>
                   <PrinterIcon aria-hidden="true" />
-                  <span><b>上传自备材料打印</b><small>本机只打印你自己带来的文件</small></span>
+                  <span><b>上传自备材料打印</b><small>只处理你自己带来的材料</small></span>
                 </button>
               )}
             </div>
@@ -223,56 +213,47 @@ export function PolicyPanel({
                 {urlMissing ? '发布方没有提供来源地址' : '来源地址不是有效的网址'}；本机不会猜地址或补链接。
               </p>
             )}
-          </div>
-        )}
+        </>}
       </article>
     )
   }
 
+  const selectedLibrary = visibleLibrary.find((item) => item.id === openId)
+  const selectedGuide = visibleGuides.find((item) => item.id === openId)
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(visibleLibrary.length / 6) - 1))
+  const pageItems = visibleLibrary.slice(currentPage * 6, (currentPage + 1) * 6)
+  const remaining = Math.max(0, visibleLibrary.length - (currentPage + 1) * 6)
+  const foldedGuides = visibleLibrary.length >= 3
+  const showingGuides = foldedGuides && guideView
+
   return (
-    <div className="rq-policy">
-      <AudienceFilter value={audience} onChange={onAudienceChange} />
-      <section className="rq-sec" data-policy-section="library">
-        <header className="rq-grp">
-          <b>政策库</b>
-          <span>
-            {visibleLibrary.length === 0
-              ? (libraryEmpty ? '本次没有读到条目' : '当前筛选无匹配')
-              : '读到的条目按下面的结构展示'}
-          </span>
-        </header>
-        {visibleLibrary.length === 0 ? (
+    <div className={`rq-policy${userOpened ? ' rq-policy-detail' : ''}${visibleLibrary.length >= 5 ? ' rq-policy-dense' : ' rq-policy-roomy'}`}>
+      {!userOpened && <AudienceFilter value={audience} onChange={onAudienceChange} />}
+      {(!userOpened || selectedLibrary) && !showingGuides && <section className="rq-sec" data-policy-section="library">
+        {userOpened && selectedLibrary ? renderItem(selectedLibrary, 'library') : visibleLibrary.length === 0 ? (
           <div className="rq-state" data-kind={libraryEmpty ? 'empty' : 'filter'}>
             <b>{libraryEmpty ? '政策库暂无内容' : '当前身份暂无匹配政策'}</b>
-            <p>
-              {libraryEmpty
-                ? '这里只展示合作机构发布、管理员审核通过的政策。下方「通用办事指引」是本机整理的参考，不属于政策库。'
-                : '可切换身份或选择「全部」再看一次；这只是筛选结果，不代表库里没有政策。'}
-            </p>
+            <p>{libraryEmpty
+              ? '这里只展示发布机构自己审核并发布的政策。下方「通用办事指引」是本机整理的参考，不属于政策库。'
+              : '可切换身份或选择「全部」再看一次；这只是筛选结果，不代表库里没有政策。'}</p>
           </div>
-        ) : (
-          <div className="rq-list">{visibleLibrary.map((item) => renderItem(item, 'library'))}</div>
-        )}
-      </section>
-      <section className="rq-sec" data-policy-section="builtin">
-        <header className="rq-grp rq-grp-builtin">
-          <b>通用办事指引</b>
-          <span>本机整理的参考，不属于政策库，办理以官方发布为准</span>
-        </header>
-        {visibleGuides.length === 0 ? (
-          <div className="rq-state" data-kind="filter">
-            <b>当前身份暂无匹配指引</b>
-            <p>可切换身份或选择「全部」再看一次。</p>
-          </div>
-        ) : (
-          <div className="rq-list">{visibleGuides.map((item) => renderItem(item, 'builtin'))}</div>
-        )}
-      </section>
-      {visibleLibrary.some((item) => item.id === openId) ? null : (
-        <QxStepActions onPrev={goHub}>
-          <QxAiHelp label={aiLabel} draft={aiDraft} testId="renshi-ask-ai" />
-        </QxStepActions>
-      )}
+        ) : <>
+          <div className="rq-list">{pageItems.map((item) => renderItem(item, 'library'))}</div>
+          {remaining > 0 && <button type="button" className="rq-list-nav" onClick={() => setPage(currentPage + 1)}><b>加载更多</b><small>还有 {remaining} 条</small></button>}
+          {currentPage > 0 && <button type="button" className="rq-list-nav" onClick={() => setPage(currentPage - 1)}>上一页</button>}
+        </>}
+      </section>}
+      {(!userOpened || selectedGuide) && <section className="rq-sec" data-policy-section="builtin">
+        {userOpened && selectedGuide ? renderItem(selectedGuide, 'builtin') : foldedGuides && !showingGuides ? (
+          <button type="button" className="rq-list-nav rq-guide-fold" onClick={() => setGuideView(true)}><span><b>通用办事指引</b><small>本机整理 · {visibleGuides.length} 条 · 不属于政策库，办理以官方发布为准</small></span><b>展开</b></button>
+        ) : <>
+          <header className="rq-grp rq-grp-builtin"><b>通用办事指引</b><span>本机整理的参考，不属于政策库，办理以官方发布为准</span></header>
+          {visibleGuides.length === 0 ? <div className="rq-state" data-kind="filter"><b>当前身份暂无匹配指引</b><p>可切换身份或选择「全部」再看一次。</p></div>
+            : <div className="rq-list">{visibleGuides.map((item) => renderItem(item, 'builtin'))}</div>}
+          {showingGuides && <button type="button" className="rq-list-nav" onClick={() => setGuideView(false)}><b>返回已发布政策</b><small>回到合作机构发布的列表</small></button>}
+        </>}
+      </section>}
+      {!userOpened && <p className="rq-list-page">当前显示第 {currentPage + 1} 页。</p>}
     </div>
   )
 }

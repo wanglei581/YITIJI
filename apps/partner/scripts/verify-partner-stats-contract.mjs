@@ -197,7 +197,7 @@ mustNotContain(
   'B8b. /stats 页不承诺效果或曝光漏斗',
 )
 
-// B9. PTR-13：工作台「待审核」与统计页同一服务端口径 snapshot.pendingReview
+// B9. 工作台待审核政策与统计页同一口径：snapshot.pendingReviewPolicies（pending+reviewing）
 mustContain(
   DASHBOARD,
   ['getPartnerStats', 'stats.snapshot', 'pendingReview'],
@@ -205,18 +205,25 @@ mustContain(
 )
 mustNotContain(
   DASHBOARD,
-  ['data.pendingTotal', 'pendingTotal }'],
-  'B9b. 工作台待审核标题不再使用 dashboard.pendingTotal',
+  ['data.pendingTotal', 'pendingTotal }', 'data.policies.pending', '待确认交付'],
+  'B9b. 工作台待审核标题不再使用 dashboard.pendingTotal，也不出现待确认交付',
 )
 mustContain(
   DASHBOARD,
-  ['snapshot.pendingReviewJobs', 'snapshot.pendingReviewFairs', 'snapshot.pendingReviewPolicies', 'firstPendingPath(snapshot)'],
-  'B9c. 去查看跳转与计数同用 snapshot 的 pending+reviewing 分类型字段',
+  ['snapshot.pendingReviewPolicies', 'getPolicies', '/policy'],
+  'B9c. 待审核政策计数用 snapshot.pendingReviewPolicies，标题来自政策列表，入口去政策页',
 )
 mustNotContain(
   DASHBOARD,
-  ['data.jobs.pending > 0', 'data.fairs.pending > 0', 'data.policies.pending > 0'],
-  'B9d. firstPendingPath 不再按 dashboard 的 pending-only 计数跳转',
+  ['data.jobs.pending > 0', 'data.fairs.pending > 0', 'data.policies.pending > 0', 'firstPendingPath'],
+  'B9d. 不再按 dashboard 的 pending-only 计数跳转',
+)
+
+mustContain(DASHBOARD, ['<PartnerAiServices />'], 'B10. 工作台独立显示 AI 服务情况')
+mustContain(
+  'src/routes/dashboard/PartnerAiServices.tsx',
+  ["fetchPartnerUsage('7d')", '正在读取 AI 服务情况', 'AI 服务情况这次没读到', '演示模式不显示 AI 服务情况', '少于 5 ${unit}，暂不显示具体数字', 'min-h-11', 'min-w-11', '只统计本机构终端上成功完成的 AI 简历优化和模拟面试'],
+  'B10b. AI 服务读数和失败、演示、小样本状态',
 )
 
 // ── C. 与 honest-placeholders 门禁的交接 ───────────────────────────────────
@@ -318,9 +325,9 @@ for (const file of [OPS_PAGE, OPS_CARDS, OPS_FORMAT, 'src/routes/terminals/Termi
   )
 }
 mustContain(
-  'src/layouts/PartnerLayoutWrapper.tsx',
+  'src/layouts/partnerNav.ts',
   ["'/terminals':  'terminals'", "label: '终端数据'"],
-  'D8. 侧栏「数据与账号」组有「终端数据」入口',
+  'D8. 侧栏「终端与数据」组有「终端数据」入口',
 )
 
 console.log('\nALL PASS')

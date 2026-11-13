@@ -141,8 +141,15 @@ const login = (id) => { realAuth.logout(); realAuth.saveSession({ token: jwt(id)
 /** 最小 wx：存储 + 随机数 + 几个 UI 调用的记录。网络只到 server 路由为止。 */
 function createWx() {
   const storage = new Map()
-  const calls = { modal: [], redirectTo: [], toast: [] }
+  // nav：建单成功后的那一次跳转，两种方式都记进合集。
+  // 单件打印必须是 reLaunch，材料包必须仍是 redirectTo；方式记在 byMethod。
+  const calls = { modal: [], nav: [], byMethod: { redirectTo: [], reLaunch: [] }, toast: [] }
   const control = { navFail: false }
+  const recordNav = (method, o) => {
+    calls.byMethod[method].push(o.url)
+    calls.nav.push(o.url)
+    if (control.navFail) { if (o.fail) o.fail() } else if (o.success) o.success()
+  }
   let seed = 0
   return {
     storage, calls, control,
@@ -153,7 +160,8 @@ function createWx() {
     showModal: (o) => { calls.modal.push(o) },
     showToast: (o) => { calls.toast.push(o) },
     navigateTo() {}, switchTab() {}, navigateBack() {},
-    redirectTo: (o) => { calls.redirectTo.push(o.url); if (control.navFail) { if (o.fail) o.fail() } else if (o.success) o.success() },
+    redirectTo: (o) => recordNav('redirectTo', o),
+    reLaunch: (o) => recordNav('reLaunch', o),
     getRandomValues: (o) => {
       seed += 1
       const bytes = new Uint8Array(o.length || 16)
@@ -328,7 +336,7 @@ for (const [name, P] of Object.entries(PAGES)) {
       assert.ok(P.notice(page).includes(yuan(before)) && P.notice(page).includes(yuan(after)), P.notice(page))
       assert.ok(P.notice(page).includes('没有建单'), '要说清这一次没有建单')
       assert.equal(page.data.submitting, false)
-      assert.equal(wx.calls.redirectTo.length, 0)
+      assert.equal(wx.calls.nav.length, 0)
       assert.ok(!JSON.stringify([...wx.storage.values()]).includes('quotedAmountCents'), '金额不落盘')
 
       P.tap(page)
@@ -339,8 +347,15 @@ for (const [name, P] of Object.entries(PAGES)) {
       assert.equal(server.creates[1].data.quotedAmountCents, after)
       server.creates[1].respond(200, P.ok('ord-1', after))
       await flush()
-      assert.equal(wx.calls.redirectTo.length, 1)
-      assert.ok(wx.calls.redirectTo[0].endsWith('orderId=ord-1'))
+      assert.equal(wx.calls.nav.length, 1)
+      assert.ok(wx.calls.nav[0].endsWith('orderId=ord-1'))
+      const method = name === 'print' ? 'reLaunch' : 'redirectTo'
+      const other = name === 'print' ? 'redirectTo' : 'reLaunch'
+      const target = name === 'print' ? '/pages/print-pickup/print-pickup?' : '/pages/package-code/package-code?'
+      assert.equal(wx.calls.byMethod[method].length, 1, `${name} 建单成功必须 ${method} 一次`)
+      assert.equal(wx.calls.byMethod[other].length, 0, `${name} 不能改用 ${other}`)
+      assert.ok(wx.calls.byMethod[method][0].startsWith(target), wx.calls.byMethod[method][0])
+      assert.ok(wx.calls.byMethod[method][0].endsWith('orderId=ord-1'))
     }
   })
 

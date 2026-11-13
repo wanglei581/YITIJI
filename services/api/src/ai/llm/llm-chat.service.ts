@@ -9,7 +9,8 @@
 // ============================================================
 
 import { createHash, randomBytes } from 'crypto'
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common'
+import { AssistantPolicyContextService, appendAssistantPolicyContext, policyUnavailableResult } from './assistant-policy-context'
 import type {
   AssistantAction,
   AssistantIntent,
@@ -37,7 +38,10 @@ import {
   llmUpstreamStatusError,
 } from './llm-failure'
 import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-allowlist'
-import { AiContentBlockedError, buildGuardedSystemPrompt, configuredForbiddenWords, enforceForbiddenWords, safeRefusalReply } from './llm-guard'
+import { AiContentBlockedError, buildGuardedSystemPrompt, enforceForbiddenWords } from './llm-guard'
+import { refusalMessage } from '../safety/refusal'
+import { deviceFaultReply, hasHandsOnMachineInstruction, isAboutJobContent, isDeviceFaultQuestion } from '../safety/device-fault'
+import { requestQuotaRefund } from '../safety/block-log'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { withAiSafety } from './ai-prompt-safety'
 import { applyAssistantChannel, kioskChannelConstraint, miniappChannelConstraint, resolveAssistantChannel } from './assistant-channel'
@@ -67,6 +71,9 @@ interface SessionEntry {
   messages: ChatMessage[]
   updatedAt: number
   ownerKey: string
+  policyId?: string
+  /** 上一轮回的是设备故障的固定回答：紧接着的短追问也不送模型。 */
+  deviceFaultJustAnswered?: boolean
 }
 
 export function assistantOwnerKey(endUserId: string | null, ip: string | null): string {
@@ -268,7 +275,11 @@ export class LlmChatService {
   private readonly logger = new Logger(LlmChatService.name)
   private readonly sessions = new Map<string, SessionEntry>()
 
-  constructor(private readonly config: LlmConfigService) {}
+  constructor(private readonly config: LlmConfigService, @Optional() private readonly policyContext?: AssistantPolicyContextService) {}
+
+  readPolicyContext(policyId: string): Promise<string | null> {
+    return this.policyContext?.read(policyId) ?? Promise.resolve(null)
+  }
 
   private pruneSessions(now: number): void {
     for (const [id, s] of this.sessions) {
@@ -298,6 +309,18 @@ export class LlmChatService {
   }
 
   /**
+   * 预占之前看一眼：这句话会不会直接回设备故障的固定提示。
+   * 只读会话上「上一轮是不是故障回答」的标记，不改会话、不调模型。
+   */
+  wouldDeviceFault(input: ChatInput, ownerKey = 'anon'): boolean {
+    this.pruneSessions(Date.now())
+    const requestedId = typeof input.sessionId === 'string' ? input.sessionId.trim() : ''
+    const existing = requestedId ? this.sessions.get(requestedId) : undefined
+    const followUp = Boolean(existing && existing.ownerKey === ownerKey && existing.policyId === input.policyId && existing.deviceFaultJustAnswered)
+    return isDeviceFaultQuestion(input.message, followUp)
+  }
+
+  /**
    * 读取归属匹配的会话转写。找不到 / 过期 / 越权一律 null。
    * 调用方不得把返回的 content 写入日志或审计 payload。
    */
@@ -321,7 +344,10 @@ export class LlmChatService {
      */
     onLlmCall?: AiLlmCallSink,
     ownerKey = 'anon',
+    policyPrompt?: string,
   ): Promise<ChatOutput> {
+    const currentPolicy = policyPrompt ?? (input.policyId === undefined ? undefined : await this.readPolicyContext(input.policyId))
+    if (currentPolicy === null) return policyUnavailableResult()
     const apiKey = this.config.getApiKey('assistant_chat')
     const cfg = this.config.getConfig('assistant_chat')
 
@@ -351,15 +377,35 @@ export class LlmChatService {
       session = { messages: [], updatedAt: now, ownerKey }
       this.sessions.set(sessionId, session)
     }
+    const channel = resolveAssistantChannel(input.channel)
+    // 切换/取消政策后不再把上一条政策的对话作为本轮依据。
+    if (session.policyId !== input.policyId) {
+      session.messages = []
+      session.deviceFaultJustAnswered = false
+    }
+    session.policyId = input.policyId
+    // 说得很明白是眼前这台出了故障，才不送模型。拿不准的放给模型，由输出侧兜底。
+    // 这一问一答不进会话历史：原话没过内容检查，留在历史里下一轮会原样带给模型。
+    if (isDeviceFaultQuestion(input.message, session.deviceFaultJustAnswered)) {
+      session.deviceFaultJustAnswered = true
+      requestQuotaRefund()
+      this.logger.log(`设备故障固定回答 channel=${channel}`)
+      return {
+        sessionId,
+        reply: deviceFaultReply(channel),
+        intent: classifyIntent(input.message),
+        actions: [],
+        fixedNotice: true,
+      }
+    }
+    session.deviceFaultJustAnswered = false
     session.messages.push({ role: 'user', content: input.message })
     const skill = input.skill
-
-    const channel = resolveAssistantChannel(input.channel)
     const guarded = buildSkillScopedSystemPrompt(buildGuardedSystemPrompt(cfg), skill)
     const channelConstraint = channel === 'miniapp' ? miniappChannelConstraint() : kioskChannelConstraint()
     const systemPrompt = channelConstraint ? `${guarded}\n\n${channelConstraint}` : guarded
     const payloadMessages: ChatMessage[] = [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: withAiSafety(appendAssistantPolicyContext(systemPrompt, currentPolicy)) },
       ...maskUserTurnsForLlm(session.messages.slice(-MAX_HISTORY)),
     ]
 
@@ -368,9 +414,7 @@ export class LlmChatService {
       rawReply = await this.callLlm('assistant_chat', cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, payloadMessages, cfg.forbiddenWords, onLlmCall)
     } catch (error) {
       if (error instanceof AiContentBlockedError) {
-        // 命中禁词：和输出侧原有做法一样给礼貌拒答，不报错。
-        const reply = safeRefusalReply(configuredForbiddenWords(cfg.forbiddenWords))
-          || '这个问题超出当前助手的服务范围，请换一个合规问题。'
+        const reply = refusalMessage(error.category)
         // 被拦的原话不能留在会话历史里：下一轮会带着整段历史再发给模型，检查点会再次命中，
         // 这个会话之后每句话都会被拒答。输出侧命中时用户原话没问题，保留它，把拒答记进历史。
         if (error.direction === 'input') session.messages.pop()
@@ -382,9 +426,24 @@ export class LlmChatService {
       throw error
     }
     const guardedReply = enforceForbiddenWords(rawReply, cfg.forbiddenWords)
-    const reply = channel === 'miniapp' ? applyAssistantChannel({ reply: guardedReply }, 'miniapp').reply : guardedReply
+    let reply = channel === 'miniapp' ? applyAssistantChannel({ reply: guardedReply }, 'miniapp').reply : guardedReply
     if (reply !== rawReply) {
       this.logger.warn('LLM 回复命中禁用词，已替换为范围内兜底回复')
+    }
+
+    const intent = classifyIntent(input.message)
+    let actions = applyAssistantChannel(
+      { reply, actions: skill ? SKILL_ACTIONS[skill] : INTENT_ROUTES[intent] },
+      channel,
+    ).actions
+    let fixedNotice = false
+    // 模型已经调过：命中动手指导就整段换成固定的话，照常计次，不退。
+    if (hasHandsOnMachineInstruction(reply) && !isAboutJobContent(input.message)) {
+      reply = deviceFaultReply(channel)
+      actions = []
+      fixedNotice = true
+      session.deviceFaultJustAnswered = true
+      this.logger.log(`模型回答含动手指导，已换成固定回答 channel=${channel}`)
     }
 
     session.messages.push({ role: 'assistant', content: reply })
@@ -395,15 +454,12 @@ export class LlmChatService {
     }
     this.sessions.set(sessionId, session)
 
-    const intent = classifyIntent(input.message)
-    const routed = skill ? SKILL_ACTIONS[skill] : INTENT_ROUTES[intent]
-    const actions = applyAssistantChannel({ reply, actions: routed }, channel).actions
-
     return {
       sessionId,
       reply,
       intent,
       actions,
+      ...(fixedNotice ? { fixedNotice: true } : {}),
     }
   }
 

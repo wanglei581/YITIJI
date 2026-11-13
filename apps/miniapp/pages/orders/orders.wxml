@@ -97,7 +97,8 @@
           <view class="pk-strip" wx:if="{{item.hasPickupCode}}">
             <view class="pk-label">到机码</view>
             <view class="pk-code">{{item.pickupCode}}</view>
-            <view class="pk-hint">到一体机前，在「到机码核销」扫码或手输</view>
+            <view class="pk-hint" wx:if="{{item.reprintNote}}">{{item.reprintNote}}</view>
+            <view class="pk-hint">到一体机前，在「到机取件」扫码或手输</view>
           </view>
           <view class="oc-foot">
             <view class="oc-price">{{item.amountText}}</view>
@@ -180,7 +181,8 @@
           <view class="pk-strip" wx:if="{{item.pickup}}">
             <view class="pk-label">到机码</view>
             <view class="pk-code">{{item.pickup}}</view>
-            <view class="pk-hint">到一体机前，在「到机码核销」扫码或手输</view>
+            <view class="pk-hint" wx:if="{{item.reprintNote}}">{{item.reprintNote}}</view>
+            <view class="pk-hint">到一体机前，在「到机取件」扫码或手输</view>
           </view>
           <view class="oc-foot">
             <view class="oc-price">{{item.price}}</view>
@@ -231,7 +233,7 @@
 
   <view class="actionbar">
     <view wx:if="{{isLoggedIn}}" class="btn primary block" hover-class="tap-press" bindtap="toPrint">去打印文件</view>
-    <view wx:else class="btn primary block" hover-class="tap-press" bindtap="toLogin">微信一键登录</view>
+    <view wx:else class="btn primary block" hover-class="tap-press" bindtap="toLogin">手机号快捷登录</view>
   </view>
 
 </view>

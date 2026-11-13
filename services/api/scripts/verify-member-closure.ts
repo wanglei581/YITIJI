@@ -165,6 +165,9 @@ async function fixture(id: string, identity: ClosureScanIdentity) {
   await put('orderItem', { orderId: order.id, seq: 1, fileId: fileIds[0], colorMode: 'black_white', duplex: 'simplex', copies: 1, billablePages: 2, amountCents: 200, status: 'completed', printTaskId: task.id })
   await put('printTaskStatusLog', { taskId: task.id, fromStatus: 'printing', toStatus: 'completed', errorCode: null })
   await put('orderSubmissionLedger', { endUserId: id, idempotencyKey: randomUUID(), orderKind: 'print', payloadHash: identity.phoneHash, status: 'succeeded', orderId: order.id })
+  await put('copyJob', { terminalId, organizationId: 'closure-copy-org', endUserId: id, source: 'flatbed',
+    state: 'handed', pageCount: 2, billableSides: 2, expiresAt,
+    requestKey: identity.phoneHash, quoteSnapshot: JSON.stringify({ amountCents: 0, legacyText: identity.phone }), resultCode: identity.nickname })
   await put('paymentAttempt', { orderId: order.id, channel: 'sandbox', amountCents: 200, status: 'success', prepayId: identity.wxOpenId,
     qrCodeContent: `sandboxpay://${identity.phone}`, channelTxnNo: randomUUID(), failReason: identity.nickname })
   await put('refund', { orderId: order.id, refundNo: randomUUID(), amountCents: 50, status: 'success', reason: `${identity.nickname} ${identity.phone} 多付`, channel: 'offline' })
@@ -410,8 +413,17 @@ async function main() {
     const scan = await scanClosureDatabase(scanClient, owned.identity)
     const metadata = (scanClient as any)._runtimeDataModel.models
     const actualModels = Object.entries(metadata).filter(([, model]: any) => model.fields.some((field: any) => field.name === 'endUserId')).map(([name]) => name).sort()
-    const expectedModels = [...CLOSURE_DELETE_MODELS, 'fileObject', 'order', 'printTask', 'orderSubmissionLedger', 'redemptionRecord', 'benefitGrant', 'benefitClaim', 'feedbackTicket', 'memberLegalConsent', 'userAiConsent', 'userDataRequest', 'aiUsageRecord', 'aiServiceLog', 'aiQuotaDaily', 'aiQuotaReservation'].map((name) => name[0].toUpperCase() + name.slice(1)).sort()
+    const expectedModels = [...CLOSURE_DELETE_MODELS, 'fileObject', 'order', 'copyJob', 'printTask', 'orderSubmissionLedger', 'redemptionRecord', 'benefitGrant', 'benefitClaim', 'feedbackTicket', 'memberLegalConsent', 'userAiConsent', 'userDataRequest', 'aiUsageRecord', 'aiServiceLog', 'aiQuotaDaily', 'aiQuotaReservation'].map((name) => name[0].toUpperCase() + name.slice(1)).sort()
+    const copy = await prisma.copyJob.findFirstOrThrow({ where: { endUserId: owned.id } })
+    assert.equal(copy.billableSides, 2, '注销保留复印履约数据')
+    assert.notEqual(copy.requestKey, owned.identity.phoneHash, '注销清除复印幂等键中的身份')
+    assert.equal(JSON.parse(copy.quoteSnapshot!).amountCents, 0, '注销保留报价金额')
     assert.deepEqual(actualModels, expectedModels, '新增会员模型必须显式纳入注销处置')
+    const safetySchema = readFileSync(join(apiRoot, 'prisma/schema.prisma'), 'utf8')
+    const safetyAt = safetySchema.indexOf('model AiSafetyTerm {')
+    const safetyBlock = safetySchema.slice(safetyAt, safetySchema.indexOf('\nmodel ', safetyAt + 1))
+    assert.ok(safetyAt >= 0 && !/\bendUserId\b|\bmemberId\b/.test(safetyBlock), 'AiSafetyTerm 不含会员字段')
+    assert.equal((CLOSURE_DELETE_MODELS as readonly string[]).includes('aiSafetyTerm'), false, 'AiSafetyTerm 不进注销清单')
     const platformSetting = metadata.PlatformSetting
     assert.ok(platformSetting, 'PlatformSetting 必须存在')
     assert.equal(

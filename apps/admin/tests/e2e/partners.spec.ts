@@ -49,4 +49,62 @@ test.describe('合作机构管理（mock 口径）', () => {
     await expect(rows.first().getByRole('button', { name: /^确认(停用|启用)\?/ })).toHaveCount(0)
   })
 
+  test('演示模式不显示机构报障与月报', async ({ page }) => {
+    const guards = await openAuthed(page, '/partners')
+    await settleAdminPage(page, guards)
+    await expect(page.getByText('演示模式不显示机构报障与月报')).toBeVisible()
+    await expect(page.getByText('这类这次没读到')).toHaveCount(0)
+  })
+
+  test('地址打开机构详情并停在报障处理', async ({ page }) => {
+    const guards = await openAuthed(page, '/partners?org=org-mock-1&section=incidents')
+    await settleAdminPage(page, guards)
+    const drawer = page.getByRole('dialog')
+    await expect(drawer).toBeVisible()
+    await expect(drawer.getByRole('tab', { name: '报障处理', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await expect(drawer.getByText('项目交付与服务需要连接真实后端。当前为预览模式，不提供演示数据或模拟操作。')).toBeVisible()
+    await drawer.getByRole('tab', { name: '月报资料', exact: true }).click()
+    await expect(drawer.getByRole('tab', { name: '月报资料', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await expect(page).toHaveURL(/[?&]org=org-mock-1(?:&|$)/)
+    await expect(page).toHaveURL(/[?&]section=reports(?:&|$)/)
+    await page.keyboard.press('Escape')
+    await expect(drawer).toHaveCount(0)
+    await expect(page).not.toHaveURL(/[?&]org=/)
+    await expect(page).not.toHaveURL(/[?&]section=/)
+    await expect(page).not.toHaveURL(/[?&]projectId=/)
+  })
+
+  test('地址里的机构不存在时只提示没找到', async ({ page }) => {
+    const guards = await openAuthed(page, '/partners?org=missing-org&section=incidents')
+    await settleAdminPage(page, guards)
+    await expect(page.getByRole('status').filter({ hasText: '没找到这家机构' })).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  })
+
+  test('抽屉仍开着时移除分区参数，标签回到项目台账', async ({ page }) => {
+    const guards = await openAuthed(page, '/partners?org=org-mock-1&section=incidents')
+    await settleAdminPage(page, guards)
+    const drawer = page.getByRole('dialog')
+    await expect(drawer.getByRole('tab', { name: '报障处理' })).toHaveAttribute('aria-selected', 'true')
+    await page.evaluate(() => {
+      history.pushState(null, '', '/partners?org=org-mock-1')
+      dispatchEvent(new PopStateEvent('popstate'))
+    })
+    await expect(drawer.getByRole('tab', { name: '项目台账' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  test('抽屉打开时地址换机构，详情和表单跟随新机构', async ({ page }) => {
+    const guards = await openAuthed(page, '/partners?org=org-mock-1')
+    await settleAdminPage(page, guards)
+    const drawer = page.getByRole('dialog')
+    await expect(drawer).toContainText('市人才交流中心(演示)')
+    await page.evaluate(() => {
+      history.pushState(null, '', '/partners?org=org-mock-2')
+      dispatchEvent(new PopStateEvent('popstate'))
+    })
+    await expect(drawer).toContainText('某大学就业指导中心(演示)')
+    await expect(drawer.getByLabel('机构名称')).toHaveValue('某大学就业指导中心(演示)')
+    await expect(drawer).not.toContainText('机构详情 — 市人才交流中心(演示)')
+  })
+
 })

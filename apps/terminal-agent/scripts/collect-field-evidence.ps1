@@ -782,6 +782,39 @@ Invoke-CheckedItem -Id "5.6-21" -Name "打印队列作业数" -Body {
   Add-EvidenceRow -Id "5.6-21" -Name "打印队列作业数" -Value "count=$count" -Verdict $verdict
 }
 
+Invoke-CheckedItem -Id "5.6-22" -Name "开机打印防护任务" -Body {
+  $task = Get-ScheduledTask -TaskName "AIJobPrintBootSpoolGuard" -ErrorAction SilentlyContinue
+  if ($null -eq $task) {
+    Add-EvidenceRow -Id "5.6-22" -Name "开机打印防护任务" -Value "present=false lastResult=UNKNOWN" -Verdict "UNKNOWN"
+    return
+  }
+  $info = Get-ScheduledTaskInfo -TaskName "AIJobPrintBootSpoolGuard" -ErrorAction SilentlyContinue
+  $last = if ($null -ne $info) { [string]$info.LastTaskResult } else { "UNKNOWN" }
+  Add-EvidenceRow -Id "5.6-22" -Name "开机打印防护任务" -Value "present=true lastResult=$last" -Verdict "UNKNOWN"
+}
+
+Invoke-CheckedItem -Id "5.6-23" -Name "Spooler 启动类型" -Body {
+  $spooler = Get-Service -Name "Spooler" -ErrorAction SilentlyContinue
+  if ($null -eq $spooler) {
+    Add-EvidenceRow -Id "5.6-23" -Name "Spooler 启动类型" -Value "missing" -Verdict "FAIL"
+    return
+  }
+  $value = "StartType=$($spooler.StartType) Status=$($spooler.Status)"
+  Add-EvidenceRow -Id "5.6-23" -Name "Spooler 启动类型" -Value $value -Verdict "UNKNOWN"
+}
+
+Invoke-CheckedItem -Id "5.6-24" -Name "Spooler 启动触发器" -Body {
+  $output = & sc.exe qtriggerinfo Spooler 2>&1 | Out-String
+  $code = $LASTEXITCODE
+  $text = [string]$output
+  $text = [regex]::Replace($text, "[A-Za-z]:\\[^\s]+", "[path]")
+  $text = [regex]::Replace($text, "(?i)\b[\w.-]+\.(spl|shd|tmp|dll|exe)\b", "[file]")
+  $text = [regex]::Replace($text, "[\r\n]+", " ")
+  $text = $text.Replace("|", "/")
+  if ($text.Length -gt 500) { $text = $text.Substring(0, 500) }
+  Add-EvidenceRow -Id "5.6-24" -Name "Spooler 启动触发器" -Value ("exit=" + $code + " " + $text.Trim()) -Verdict "UNKNOWN"
+}
+
 $collectedAt = [DateTimeOffset]::Now.ToString("yyyy-MM-ddTHH:mm:ssK")
 $builder = New-Object System.Text.StringBuilder
 [void]$builder.AppendLine("# 现场取证 $collectedAt 终端 $($script:TerminalCode)")

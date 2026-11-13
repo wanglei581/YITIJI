@@ -14,6 +14,7 @@ import { API_BASE_URL } from '../api/client'
 import { ApiHttpError } from '../api/httpAdapter'
 import { getTerminalId } from '../api/screensaver'
 import { networkError, throwHttpError } from '../api/throwHttpError'
+import { machineUnusableLine } from '../../copy/unattendedCopy'
 import { terminalProtectedFetch } from '../terminalAuth'
 import type {
   BillingPageSource,
@@ -187,11 +188,20 @@ function parsePriceChangedQuote(details: unknown): PrintPriceChangedQuote | null
   return { amountCents, billablePages, priceLines }
 }
 
+/** 只保留额度错误的结构化详情，其他错误仍走通用适配器。 */
+export async function throwPrintQuotaError(res: Response): Promise<void> {
+  const body = await res.clone().json().catch(() => null) as { error?: { code?: string; message?: string; details?: unknown } } | null
+  const error = body?.error
+  if (error?.code && ['PRINT_TERMINAL_DAILY_QUOTA_REACHED', 'PRINT_MEMBER_DAILY_QUOTA_REACHED', 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED'].includes(error.code)) {
+    throw Object.assign(new ApiHttpError(error.code, error.message ?? '', res.status), { details: error.details })
+  }
+}
+
 export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJobCreated> {
   const { token, ...body } = input
   const terminalId = getTerminalId()
   if (!terminalId) {
-    throw new ApiHttpError('TERMINAL_NOT_READY', '本机设备未就绪，请联系现场工作人员后再试', 0)
+    throw new ApiHttpError('TERMINAL_NOT_READY', machineUnusableLine(), 0)
   }
   let res: Response
   try {
@@ -218,6 +228,7 @@ export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJ
         )
       }
     }
+    await throwPrintQuotaError(res)
     await throwHttpError(res, token)
   }
   return res.json() as Promise<PrintJobCreated>
@@ -258,7 +269,7 @@ export async function retryPrintJob(input: {
 }): Promise<PrintJobRetryResult> {
   const terminalId = getTerminalId()
   if (!terminalId) {
-    throw new ApiHttpError('TERMINAL_NOT_READY', '本机设备未就绪，请联系现场工作人员后再试', 0)
+    throw new ApiHttpError('TERMINAL_NOT_READY', machineUnusableLine(), 0)
   }
   let res: Response
   try {
@@ -273,7 +284,10 @@ export async function retryPrintJob(input: {
   return res.json() as Promise<PrintJobRetryResult>
 }
 
-export async function getPrintJobStatus(taskId: string): Promise<PrintJobStatusResult> {
+export async function getPrintJobStatus(
+  taskId: string,
+  options: { signal?: AbortSignal } = {},
+): Promise<PrintJobStatusResult> {
   // 限流按台计数用（后端 @TerminalScopedThrottle）。PrintProgressPage 每 3 秒轮询、
   // 最长 10 分钟；不带这个头时同一大厅第 3 台机器就会把 IP 桶打满，前端会把 429
   // 显示成「无法连接打印服务」。
@@ -285,6 +299,7 @@ export async function getPrintJobStatus(taskId: string): Promise<PrintJobStatusR
   try {
     res = await fetch(`${API_BASE_URL}/print/jobs/${taskId}`, {
       headers: terminalId ? { 'X-Terminal-Id': terminalId } : {},
+      ...(options.signal ? { signal: options.signal } : {}),
     })
   } catch (err) {
     throw networkError(err)

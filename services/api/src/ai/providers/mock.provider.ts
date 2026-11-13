@@ -50,7 +50,7 @@ export class MockAiProvider implements AiProvider {
         intention: { ...input.intention },
         summary: summaryBase ? `${summaryBase}。`.replace(/。。$/, '。') : '',
         education: input.education.map((e) => ({ ...e, description: e.description ? polishDesc(e.description) : undefined })),
-        experience: input.experience.map((e) => ({ ...e, description: polishDesc(e.description) })),
+        experience: input.experience.map((e) => ({ ...e, role: e.role ?? '', description: polishDesc(e.description) })),
         projects: input.projects.map((p) => ({ ...p, description: polishDesc(p.description) })),
         skills: input.skills.map((s) => s.trim()).filter(Boolean),
         certificates: [...input.certificates],

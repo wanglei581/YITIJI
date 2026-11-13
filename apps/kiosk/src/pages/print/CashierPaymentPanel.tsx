@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState, type KeyboardEvent } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { CheckIcon, LoaderIcon, RefreshCwIcon, SearchCheckIcon, ShieldCheckIcon, TimerOffIcon } from 'lucide-react'
 import { Button, KioskStatePanel } from '@ai-job-print/ui'
@@ -32,6 +32,8 @@ export interface CashierSnapshot {
 interface CashierPaymentPanelProps {
   /** 页面级状态条已经显示了同一句 view.title 时传 true，面板就不再重复写一遍。 */
   titleShownByPage?: boolean
+  /** 待支付说明随本次收款码展示，避免另排状态卡被底栏遮住。 */
+  qrNotice?: ReactNode
   /** 终态卡的标题 / 说明由页面按版式另给时传入（页面状态块已经讲过 view.title，卡片只讲「这张码 / 这次尝试」）。 */
   terminalTitle?: string
   terminalDescription?: string
@@ -314,7 +316,7 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
         <div className="cashier-qr-panel">
           {/* 真实收款码只来自服务端 qrCodeContent；四角取景框只是版式，不参与编码。 */}
           <div className="cashier-qr-frame">
-            <QRCodeSVG value={qrContent} size={292} level="M" marginSize={1} />
+            <QRCodeSVG value={qrContent} size={400} level="M" marginSize={1} />
             <span className="cashier-qr-corner" data-at="tl" aria-hidden="true" />
             <span className="cashier-qr-corner" data-at="tr" aria-hidden="true" />
             <span className="cashier-qr-corner" data-at="bl" aria-hidden="true" />
@@ -324,6 +326,7 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
             请使用{PAY_CHANNEL_LABEL[snapshot?.attempt?.channel ?? ''] ?? '手机'}扫码支付
           </div>
           <div className="cashier-qr-sub">这张码属于本次订单，支付主体与金额以手机端展示为准</div>
+          {props.qrNotice}
           <div className="cashier-qr-badge">
             <ShieldCheckIcon aria-hidden="true" />
             {snapshot?.attempt?.channel === 'sandbox'

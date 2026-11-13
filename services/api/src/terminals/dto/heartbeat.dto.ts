@@ -1,10 +1,33 @@
-import { IsBoolean, IsDateString, IsIn, IsNumber, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator'
+import { IsBoolean, IsDateString, IsIn, IsNumber, IsOptional, IsString, Matches, MaxLength, ValidateBy, ValidateIf, type ValidationOptions } from 'class-validator'
 import { Type } from 'class-transformer'
+import { SCAN_DEVICE_HEALTHS } from '../printer-status'
+import { isAcceptablePrinterQueueName } from '../heartbeat-printer-queue'
+
+/** 调 isAcceptablePrinterQueueName。规则和终端程序同一条，改一边要改两边。 */
+function IsAcceptablePrinterQueueName(validationOptions?: ValidationOptions) {
+  return ValidateBy(
+    {
+      name: 'isAcceptablePrinterQueueName',
+      validator: {
+        validate(value: unknown) {
+          return typeof value === 'string' && isAcceptablePrinterQueueName(value)
+        },
+        defaultMessage() {
+          return '打印队列名不符合终端程序的队列名规则'
+        },
+      },
+    },
+    validationOptions,
+  )
+}
 
 const WIRED_NETWORK_STATUSES = ['connected', 'disconnected', 'unknown'] as const
 const PRINTER_NETWORK_STATUSES = ['reachable', 'unreachable', 'not_network_printer', 'unknown'] as const
 export const SCAN_INPUT_HEALTHS = ['healthy', 'locked_out', 'unknown'] as const
 export const SCAN_INPUT_ACTIONS = ['none', 'restart_required'] as const
+export const PRINTER_QUEUE_PORT_KINDS = ['usb', 'network', 'wsd', 'other', 'unknown'] as const
+export const PRINTER_QUEUE_SPOOLERS = ['running', 'stopped', 'other', 'unknown'] as const
+export const PRINT_COMPLETION_EVIDENCE = ['available', 'unavailable'] as const
 export const SCAN_INPUT_REASONS = [
   'not_configured',
   'reparse_point_unverifiable',
@@ -113,4 +136,52 @@ export class HeartbeatDto {
   @MaxLength(64)
   @ValidateIf((_object, value) => value !== undefined)
   scanInputObservedAt?: string
+
+  @IsString()
+  @MaxLength(128)
+  @IsAcceptablePrinterQueueName()
+  @ValidateIf((_o, v) => v !== undefined)
+  printerQueueName?: string
+
+  @IsIn(PRINTER_QUEUE_PORT_KINDS)
+  @ValidateIf((_o, v) => v !== undefined)
+  printerQueuePortKind?: (typeof PRINTER_QUEUE_PORT_KINDS)[number]
+
+  @IsString()
+  @MaxLength(8)
+  @Matches(/^(USB|DOT4_)\d{1,3}$/)
+  @ValidateIf((_o, v) => v !== undefined)
+  printerQueuePortName?: string
+
+  @IsString()
+  @MaxLength(64)
+  @Matches(/^(\d{0,10},\d{0,10},(True|False)?,\d{0,10},\d{0,10}|not_found|query_failed)$/)
+  @ValidateIf((_o, v) => v !== undefined)
+  printerQueueRawStatus?: string
+
+  @IsIn(PRINTER_QUEUE_SPOOLERS)
+  @ValidateIf((_o, v) => v !== undefined)
+  printerQueueSpooler?: (typeof PRINTER_QUEUE_SPOOLERS)[number]
+
+  /**
+   * 屏上扫描：终端程序最近一次探测扫描仪的结果与探测时刻。两项都可选、可单独出现；
+   * 旧版终端程序不带，照常收下。探测时刻必须带时区（见 TerminalAgentService.parseScanDeviceObservedAt）。
+   */
+  @IsIn(SCAN_DEVICE_HEALTHS)
+  @ValidateIf((_object, value) => value !== undefined)
+  scanDeviceHealth?: (typeof SCAN_DEVICE_HEALTHS)[number]
+
+  @IsDateString({ strict: true })
+  @IsString()
+  @MaxLength(64)
+  @ValidateIf((_object, value) => value !== undefined)
+  scanDeviceObservedAt?: string
+
+  /**
+   * 打印完成判据。available：PrintService/Operational 已启用。unavailable：没启用或启用失败。
+   * 旧版终端程序不带这一项，照常收下，库里记 null，不能当成可用。
+   */
+  @IsIn(PRINT_COMPLETION_EVIDENCE)
+  @ValidateIf((_object, value) => value !== undefined)
+  printCompletionEvidence?: (typeof PRINT_COMPLETION_EVIDENCE)[number]
 }

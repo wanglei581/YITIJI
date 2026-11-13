@@ -25,6 +25,13 @@ const index = readFileSync(pagePath, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').re
 const drawer = readFileSync(join(root, 'src/routes/orders/OrderDetailDrawer.tsx'), 'utf8')
   .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 if (!index.includes('<OrderDetailDrawer controls={controls}')) fail('orders/index.tsx 必须实际挂载 OrderDetailDrawer')
+if (drawer.includes('onRetry={closeDetail}')) fail('订单详情加载失败的重试不能关掉抽屉')
+if (!drawer.includes('onRetry={retryDetail}')) fail('订单详情加载失败必须按当前订单重新加载')
+const detailHook = readFileSync(join(root, 'src/routes/orders/useOrderDetail.ts'), 'utf8')
+if (!detailHook.includes('retryDetail') || !detailHook.includes('detailIdRef') || !detailHook.includes('adminOrdersReadonlyService.getById(id)')) {
+  fail('重试必须记住当前订单并重新请求这一单的详情')
+}
+pass('订单详情失败时按当前订单重新加载，不关闭抽屉')
 for (const component of ['useOrderDetail', 'orderColumns']) {
   if (!index.includes(`${component}(`) && !index.includes(`<${component} `)) fail(`订单页必须实际调用 ${component}`)
 }
@@ -334,5 +341,22 @@ if (
 } else {
   fail('API-20 admin manual refund button/confirm/no-auto-trigger contract is incomplete')
 }
+
+const payment = readFileSync(join(root, 'src/routes/orders/OrderPaymentActions.tsx'), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+const zeroAt = payment.indexOf('{detail.refundEligible && detail.amountCents === 0 && (')
+const nonzeroAt = payment.indexOf('{detail.refundEligible && detail.amountCents !== 0 && (')
+if (zeroAt < 0 || nonzeroAt < 0 || zeroAt >= nonzeroAt) {
+  fail('0 元可退订单必须单独分支，且排在有实收退款分支之前')
+}
+const zeroBranch = payment.slice(zeroAt, nonzeroAt)
+if (!zeroBranch.includes('0 元订单无需退款') || /<button\b/.test(zeroBranch)) {
+  fail('0 元分支必须显示「0 元订单无需退款」，不得渲染按钮')
+}
+const paidBranch = payment.slice(nonzeroAt)
+if (!paidBranch.includes("detail.refundRequired ? '发起退款' : '发起全额退款'") || !/<button\b/.test(paidBranch)) {
+  fail('有实收的可退订单必须保留原有两种退款文案与按钮')
+}
+pass('0 元可退订单单独说明无需退款，有实收订单保留原退款入口')
 
 console.log('\nALL PASS')

@@ -13,6 +13,7 @@ import { log } from '../logger'
 import { clearUnauthorized } from './auth-state'
 import { loadAgentToken, saveAgentToken } from './dpapi'
 import type { AgentConfig } from './types'
+import { SCAN_MAX_PAGES_DEFAULT, WIA_MAX_PAGES_CEILING } from './scan-device/wia-script'
 
 const LEGACY_CONFIG_DIRECTORY = path.resolve(__dirname, '../../config')
 const PERSISTED_SECRET_KEYS = new Set(['_comment', 'agentToken', 'adminSecret', 'bindCode'])
@@ -126,6 +127,19 @@ function requireOptionalBoolean(value: unknown, field: string): boolean {
   throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
 }
 
+function requireScanDeviceMaxPages(value: unknown): number {
+  if (value === undefined) return SCAN_MAX_PAGES_DEFAULT
+  if (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= WIA_MAX_PAGES_CEILING
+  ) {
+    return value
+  }
+  throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', 'agent-config.json has invalid scanDeviceMaxPages')
+}
+
 function requireOptionalStringArray(value: unknown, field: string): string[] | undefined {
   if (value === undefined) return undefined
   if (Array.isArray(value) && value.every((entry) => typeof entry === 'string')) {
@@ -154,6 +168,12 @@ function validateConfigShape(config: AgentConfig): AgentConfig {
       config.holdPrinterQueueWhenIdle,
       'holdPrinterQueueWhenIdle',
     ),
+    scanDeviceEnabled: requireOptionalBoolean(config.scanDeviceEnabled, 'scanDeviceEnabled'),
+    copyDeviceEnabled: requireOptionalBoolean(config.copyDeviceEnabled, 'copyDeviceEnabled'),
+    scanAutoDeskewEnabled: config.scanAutoDeskewEnabled === true,
+    scanDeviceName: requireOptionalString(config.scanDeviceName, 'scanDeviceName') ?? '',
+    scanDeviceMaxPages: requireScanDeviceMaxPages(config.scanDeviceMaxPages),
+    scanDeviceReportSettings: requireOptionalBoolean(config.scanDeviceReportSettings, 'scanDeviceReportSettings'),
     agentVersion: requireNonEmpty(config.agentVersion, 'agentVersion'),
     heartbeatIntervalMs: requireOptionalPositiveInteger(config.heartbeatIntervalMs, 'heartbeatIntervalMs'),
     claimIntervalMs: requireOptionalPositiveInteger(config.claimIntervalMs, 'claimIntervalMs'),

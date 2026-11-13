@@ -1,6 +1,7 @@
 import type { Page, Request, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
+import { MACHINE_UNUSABLE_LINE } from '../fixtures/unattended-lines'
 
 const SCAN_TASK_ID = 'truth-scan-001'
 const CONTROL_TOKEN = 'truth-control-token'
@@ -61,7 +62,11 @@ async function fulfillCreatedSession(route: Route): Promise<void> {
 
 async function enterSettingsFromVisibleStart(page: Page): Promise<void> {
   await page.goto('/scan/start')
-  await page.getByRole('button', { name: /\u4e0b\u4e00\u6b65/ }).click()
+  await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
+  await page.getByRole('button', { name: '下一步', exact: true }).click()
+  // K1b-1：下一步只进入怎么扫。默认没有 scan_device，屏上方式被挡住，建会话发生在面板这一下。
+  await expect(page.getByRole('heading', { name: '这台机器还不能在屏上开始扫描' })).toBeVisible()
+  await page.getByTestId('scan-way-panel').click()
   await page.waitForURL(/\/scan\?stage=settings/)
 }
 
@@ -149,12 +154,16 @@ test('scan start does not probe a nonexistent device endpoint and carries explic
   })
 
   await page.goto('/scan/start')
-  await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
-  const next = page.getByRole('button', { name: /\u4e0b\u4e00\u6b65/ })
+  await expect(page.getByRole('heading', { name: '扫什么？' })).toBeVisible()
+  await expect(page.getByText('下一步会真实建立这次扫描', { exact: false })).toHaveCount(0)
+  await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历」
+  const next = page.getByRole('button', { name: '下一步', exact: true })
   await expect(next).toBeEnabled()
   expect(deviceRequests()).toBe(0)
 
   await next.click()
+  await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
+  await page.getByTestId('scan-way-panel').click()
   await page.waitForURL(/\/scan\?stage=settings/)
   const stored = await page.evaluate((key) => JSON.parse(window.sessionStorage.getItem(key) ?? '{}') as { scanType?: string }, 'ai-job-print:current-scan-workbench')
   expect(stored).toMatchObject({ scanType: 'resume' })
@@ -249,6 +258,11 @@ test('success renders only server instructions and creates and cancels once in S
 })
 
 test('a session that expires while visible is cancelled and can no longer continue @kiosk', async ({ page, api }) => {
+  // 到期不依赖墙钟（审查意见 A6）：进页面前装假时钟，会话有效期写成固定的「现在 + 90 秒」，
+  // 等「扫描任务已创建」可见之后再快进。此前 expiresAt = 桩注册时刻 + 1.5 秒：随后还要整页加载、点「下一步」、等 URL，
+  // 机器一忙，页面收到会话时它已过期，直接渲染过期屏，「扫描任务已创建」永远看不到。
+  const NOW = new Date('2026-10-29T10:00:00+08:00')
+  await page.clock.install({ time: NOW })
   registerShell(api)
   const cancelRequests = countRequests(page, 'DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`)
   const ack = registerScanAck(page, api, { controlToken: CONTROL_TOKEN })
@@ -258,7 +272,7 @@ test('a session that expires while visible is cancelled and can no longer contin
       ...createdSession(),
       data: {
         ...createdSession().data,
-        expiresAt: new Date(Date.now() + 1_500).toISOString(),
+        expiresAt: new Date(NOW.getTime() + 90_000).toISOString(),
       },
     },
   })
@@ -269,6 +283,11 @@ test('a session that expires while visible is cancelled and can no longer contin
 
   await enterSettingsFromVisibleStart(page)
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
+  // 还没到期：此刻面板指引在、没有撤销请求、也没有过期屏。
+  await expect(page.getByRole('button', { name: '我已操作，开始等待' })).toBeVisible()
+  expect(cancelRequests()).toBe(0)
+  await expect(page.getByText('这次扫描已过期', { exact: true })).toHaveCount(0)
+  await page.clock.fastForward(95_000)
   await expect(page.getByText('这次扫描已过期', { exact: true }).first()).toBeVisible({ timeout: 5_000 })
   await expect(page.getByRole('button', { name: '我已操作，开始等待' })).toHaveCount(0)
   await expect.poll(cancelRequests).toBe(1)
@@ -351,9 +370,13 @@ test('leaving while creation is in flight cancels the late-created session once 
   })
 
   await page.goto('/scan/start')
-  await page.getByRole('button', { name: /\u4e0b\u4e00\u6b65/ }).click()
+  await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
+  await page.getByRole('button', { name: '下一步', exact: true }).click()
+  // K1b-1：下一步只进入怎么扫，创建发生在面板这一下。请求按住之后再离开，迟到的会话仍须撤掉。
+  await expect(page.getByRole('heading', { name: '这台机器还不能在屏上开始扫描' })).toBeVisible()
+  await page.getByTestId('scan-way-panel').click()
   await createReceived
-  await page.getByRole('button', { name: '\u5b89\u5168\u8fd4\u56de\u626b\u63cf\u9996\u9875' }).first().click()
+  await page.getByRole('button', { name: '安全返回扫描首页', exact: true }).first().click()
   await page.waitForURL(/\/scan(\?stage=start)?$|\/scan\?stage=start/)
   releaseCreate?.()
   await expect.poll(cancelRequests).toBe(1)
@@ -456,7 +479,11 @@ test('a revoked terminal session fails the creation closed and is not retried @k
   // 换票失败后还会向本机 Agent 要一张新引导票（默认配置里配了桥接令牌），
   // 连不上要等一次 4 秒超时才落到 fail-closed —— 这条断言要能等过那一段。
   await expect(page.getByText('这台机器的安全校验没通过', { exact: true }).first()).toBeVisible({ timeout: 20_000 })
-  await expect(page.getByText('这台机器的安全校验没通过，请联系现场工作人员', { exact: false }).first()).toBeVisible()
+  // 现场不安排人：说明是无人值守标准句 3（整台机器暂时不能用），不再叫用户联系现场的人。
+  // 标题那一句「这台机器的安全校验没通过」上一行已经钉了；说明句从共享错误码表来，main #1517 换成标准句 3。
+  await expect(page.getByText(MACHINE_UNUSABLE_LINE).first()).toBeVisible()
+  await expect(page.getByText('联系现场工作人员')).toHaveCount(0)
+  await expect(page.getByText('请联系现场工作人员')).toHaveCount(0)
   await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
   await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toHaveCount(0)
   await page.waitForTimeout(500)
@@ -504,22 +531,26 @@ function seedScanWorkbenchStage(page: Page, stage: SeedStage): Promise<void> {
 
 /** 四个阶段各自的「已经落到这一屏」判据，避免还没渲染完就去点出口。 */
 const SCAN_STAGE_LANDMARK: Record<SeedStage, string> = {
-  start: '下一步会真实建立这次扫描',
+  start: '扫什么？',
   settings: '扫描任务已创建',
   progress: '等待打印机端扫描完成',
   result: '系统说已完成，但这次结果里没有可用文件',
 }
 
 /**
- * 四个出口。顶栏返回按 `.qx-topbar-back` 取 —— result 阶段的 CTA 条上另有一个同名
+ * 五个出口（顶栏返回、问小青、底栏三项）。顶栏返回按 `.qxt-band .qxt-back` 取 —— result 阶段的 CTA 条上另有一个同名
  * 「返回打印扫描」按钮（ScanResultPage 的终态出口，不在本次改动范围内），
  * 按可访问名取会一次命中两个。
  */
 const SCAN_EXITS = [
-  { label: '返回打印扫描', destination: '/print-scan', topbar: true },
-  { label: '首页', destination: '/', topbar: false },
-  { label: 'AI 顾问', destination: '/assistant', topbar: false },
-  { label: '我的', destination: '/profile', topbar: false },
+  { label: '返回打印扫描', destination: '/print-scan', topbar: true, ask: false },
+  { label: '首页', destination: '/', topbar: false, ask: false },
+  { label: 'AI 顾问', destination: '/assistant', topbar: false, ask: false },
+  { label: '我的', destination: '/profile', topbar: false, ask: false },
+  /* 底栏中间的「问小青：…」也是离开整条扫描流程的出口（稿 18：问小青离开时先记下要撤销未完成任务）。
+   * 它的名字随阶段与状态变，所以按底栏的问小青键本身取；落点同样是顾问页。
+   * 这一条之前没有用例钉：少了 beforeAsk，底栏默认「记草稿 + 直接 navigate」，服务端任务就留在原地。 */
+  { label: '问小青', destination: '/assistant', topbar: false, ask: true },
 ] as const
 
 /** 离开扫描流程之后会落到的四个目的地，各自挂载时要读的接口。 */
@@ -588,8 +619,10 @@ for (const stage of ['start', 'settings', 'progress', 'result'] as const) {
       await expect(page.getByText(SCAN_STAGE_LANDMARK[stage], { exact: false }).first()).toBeVisible()
 
       await (exit.topbar
-        ? page.locator('.qx-topbar-back')
-        : page.getByRole('button', { name: exit.label, exact: true })
+        ? page.locator('.qxt-band .qxt-back')
+        : exit.ask
+          ? page.locator('[data-qxt-ask="on"]')
+          : page.getByRole('button', { name: exit.label, exact: true })
       ).click()
       await page.waitForURL((url) => url.pathname === exit.destination)
 
@@ -674,7 +707,10 @@ test('a scan session that arrives after the user left is revoked and never writt
   })
 
   await page.goto('/scan/start')
-  await page.getByRole('button', { name: /下一步/ }).click()
+  await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
+  await page.getByRole('button', { name: '下一步', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '这台机器还不能在屏上开始扫描' })).toBeVisible()
+  await page.getByTestId('scan-way-panel').click()
   await createReceived
   await expect(page.getByText('正在创建扫描任务', { exact: false }).first()).toBeVisible()
 
@@ -859,7 +895,10 @@ test('a terminal session that recovers after the abandoned task was revoked neve
   })
 
   await page.goto('/scan/start')
-  await page.getByRole('button', { name: /下一步/ }).click()
+  await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
+  await page.getByRole('button', { name: '下一步', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '这台机器还不能在屏上开始扫描' })).toBeVisible()
+  await page.getByTestId('scan-way-panel').click()
   await createReceived
   await expect(page.getByText('正在创建扫描任务', { exact: false }).first()).toBeVisible()
 
@@ -930,7 +969,10 @@ test('a create deferred by a terminal refresh still goes out once the new ticket
   await refreshArrived
   expect(await terminalSessionStateOf(page), '续期在飞时会话状态必须真的是 checking').toBe('checking')
 
-  await page.getByRole('button', { name: /下一步/ }).click()
+  await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
+  await page.getByRole('button', { name: '下一步', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '这台机器还不能在屏上开始扫描' })).toBeVisible()
+  await page.getByTestId('scan-way-panel').click()
   await page.waitForURL(/\/scan\?stage=settings/)
   // 换票没出结果之前：不抢跑创建请求（抢跑只会拿回 401），也不谎称正在建扫描会话。
   await expect(page.getByText('正在做这台机器的安全校验', { exact: true }).first()).toBeVisible()
@@ -987,7 +1029,7 @@ test('a definitive ack refusal revokes the session and offers a plain restart, n
   await enterSettingsFromVisibleStart(page)
 
   // ① 屏幕如实说这一场没拿到投递授权，并且**明说别去面板按开始**。
-  await expect(page.getByText('这次扫描没能取得投递授权', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('这次扫描没能确认能收到扫描件', { exact: true }).first()).toBeVisible()
   await expect(page.getByText(/现在请先别在面板上按开始/).first()).toBeVisible()
   await expectNoPanelGuidance(page)
 
@@ -1122,7 +1164,7 @@ test('the wait page tells the truth when the ack is definitively refused @kiosk'
   await page.goto('/scan?stage=progress')
 
   // ① 如实落一个失败结果，不在这一屏继续假装还在等文件。
-  await expect(page.getByText(/系统没有给这一场投递授权/).first()).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByText(/系统没有确认这一场能收到扫描件/).first()).toBeVisible({ timeout: 10_000 })
   // ② 这一屏绝不许再出现那句把人支到面板上的话。
   await expect(page.getByText(/请在打印机面板完成扫描/)).toHaveCount(0)
   // ③ 服务端那条任务被撤掉（localGiveUp），用的是本机登记里那份控制凭证。

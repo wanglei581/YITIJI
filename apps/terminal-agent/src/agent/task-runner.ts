@@ -43,8 +43,10 @@ import { isUnauthorized, markUnauthorized } from './auth-state'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
 import { print as dispatchPrint } from '../printer/print'
 import { cleanupStaleOwnPrintJobs, pauseConfiguredPrinterQueue, resumeConfiguredPrinterQueue } from './print-queue-hold'
+import { globalDeviceLock } from './device-lock'
 import { claimPrintTasksIfGateOpen, preparePrinterForDispatch, settlePrinterAfterTerminal } from './print-dispatch-gate'
 import { computeMonitorTimeoutMs } from './print-monitor-timeout'
+import { notifyScanDevicePrintFinished } from './scan-device/scan-device-runner'
 
 export { computeMonitorTimeoutMs }
 import { monitorPrintJob } from './print-job-monitor'
@@ -311,6 +313,28 @@ export interface ExecuteTaskDependencies {
   monitorDependencies?: ExecuteTaskMonitorOverride
 }
 
+const ZERO_DISPATCH_COMMAND_CODES = new Set(['FILE_NOT_FOUND', 'UNSUPPORTED_FILE_TYPE'])
+
+/**
+ * print() 已经调用之后的命令失败。文件不存在或类型不支持说明没有送进假脱机，保留原码。
+ * 其余失败按未确认上报，人话保留，避免部分出纸后整单重试。
+ */
+export function reportedPrintCommandFailure(
+  errorCode: string | undefined,
+  errorMessage: string | undefined,
+): { errorCode: string; errorMessage: string } {
+  const code = errorCode ?? ''
+  if (ZERO_DISPATCH_COMMAND_CODES.has(code)) {
+    return { errorCode: code, errorMessage: errorMessage ?? code }
+  }
+  const suffix = '打印命令已经执行，出纸结果未确认，系统不会自动重印'
+  const fault = errorMessage?.trim()
+  return {
+    errorCode: 'PRINT_JOB_UNCONFIRMED',
+    errorMessage: fault ? `${fault}（${suffix}）` : suffix,
+  }
+}
+
 // ── Task execution ────────────────────────────────────────────────────────────
 
 /**
@@ -347,7 +371,7 @@ export async function executeTask(
   //
   // 只有 attempt 变大才重新下载、打印。同一 (任务号, attempt)：
   // dispatching/spooled → 报 PRINT_JOB_UNCONFIRMED，不重打；
-  // completed → 重报 completed；failed → 重报 failed，本地有错误码就带回。
+  // completed → 重报 completed；failed → 重报 failed，有错误码原样带回，没有则报 PRINT_JOB_UNCONFIRMED。
   // attempt 由服务端按 failed→pending 的状态日志计数，一体机重试和管理员重试都会加。
   // 重报时带上的 errorCode 以服务端规则为准：空则保留原值，非空则覆盖。
   bindPrintAttempt(db, task.attempt)
@@ -400,21 +424,29 @@ export async function executeTask(
       if (!ok) queue( { status: 'completed' })
     } else if (localStatus === 'failed') {
       log(`task ${task.taskId}: locally failed task was re-claimed; replaying terminal status`)
-      // 本地有 errorCode 就带回，避免重报把「打印机缺纸」冲成笼统失败。没有则不带。
+      // 两次写入：markTaskDone('failed') 先落状态，rememberTaskErrorCode 再落错误码。
+      // 中间崩溃会留下空 errorCode。空码按未确认上报，避免服务端整单重试；已有错误码原样带回。
       const localError = getTaskLocalErrorCode(db, task.taskId)
-      const ok = await patch('failed', localError)
+      const replayCode = localError ?? 'PRINT_JOB_UNCONFIRMED'
+      const replayMessage = localError
+        ? undefined
+        : '本地失败记录缺少错误码，出纸结果未确认，系统不会自动重印'
+      const ok = await patch('failed', replayCode, replayMessage)
       if (!ok) {
         queue( {
           status: 'failed',
-          ...(localError ? { errorCode: localError } : {}),
+          errorCode: replayCode,
+          ...(replayMessage ? { errorMessage: replayMessage } : {}),
         })
       }
     } else {
-      const msg = `本地打印任务状态异常（${localStatus ?? 'unknown'}），为避免重复出纸已停止自动重试，请工作人员核查`
-      warn(`task ${task.taskId}: unknown local state; refusing automatic print and reporting failed`)
+      const msg = `本地打印任务状态异常（${localStatus ?? 'unknown'}），出纸结果需要核查，请勿再次提交打印`
+      warn(`task ${task.taskId}: unknown local state; refusing automatic print and reporting unconfirmed failure`)
+      // Tighten any stale retryable code before changing status; either crash point stays blocked.
+      rememberTaskErrorCode(db, task.taskId, 'PRINT_JOB_UNCONFIRMED')
       markTaskDone(db, task.taskId, 'failed')
-      const ok = await patch('failed', 'LOCAL_TASK_STATE_UNKNOWN', msg)
-      if (!ok) queue( { status: 'failed', errorCode: 'LOCAL_TASK_STATE_UNKNOWN', errorMessage: msg })
+      const ok = await patch('failed', 'PRINT_JOB_UNCONFIRMED', msg)
+      if (!ok) queue( { status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED', errorMessage: msg })
     }
     await settlePrinterAfterTerminal({
       outcome: terminalOutcome,
@@ -600,8 +632,8 @@ export async function executeTask(
       // PaperOut requires 2 consecutive confirmations to guard against transient
       // driver state flicker.
       // Ambiguous outcomes (timeout / never observed / monitor unavailable) fail
-      // closed. Only an explicit spooler completion or an observed job followed
-      // by queue removal may reach the server as completed.
+      // closed. Only an explicit Printed/Completed status or a matching
+      // post-dispatch PrintService 307 may reach the server as completed.
       const monitorTimeoutMs = computeMonitorTimeoutMs(task.billablePages, task.params?.copies, task.params)
       log(`task ${task.taskId}: monitoring print queue for up to ${monitorTimeoutMs / 1000}s (pages=${task.billablePages ?? '?'} copies=${task.params?.copies ?? 1})`)
       const monitorOutcome = await monitorPrintJob(
@@ -666,16 +698,14 @@ export async function executeTask(
             `${dbErr instanceof Error ? dbErr.message : String(dbErr)}`,
         )
       }
-      const ok = await patch(
-        'failed',
-        result.errorCode ?? 'PRINT_COMMAND_FAILED',
-        result.errorMessage,
-      )
+      // print() 已调用。文件未送出保持原码；其余命令失败按未确认上报。
+      const reported = reportedPrintCommandFailure(result.errorCode, result.errorMessage)
+      const ok = await patch('failed', reported.errorCode, reported.errorMessage)
       if (!ok) {
         queue( {
           status: 'failed',
-          errorCode: result.errorCode ?? 'PRINT_COMMAND_FAILED',
-          errorMessage: result.errorMessage,
+          errorCode: reported.errorCode,
+          errorMessage: reported.errorMessage,
         })
       }
     }
@@ -705,11 +735,14 @@ export async function executeTask(
 
 let claimPausedUntil = 0
 let consecutiveClaimRateLimits = 0
+let lastDeviceLockSkipLogAt = 0
+const DEVICE_LOCK_SKIP_LOG_INTERVAL_MS = 60_000
 
 /** Test-only: clear module-level rate-limit state between verification cases. */
 export function __resetClaimRateLimitForTests(): void {
   claimPausedUntil = 0
   consecutiveClaimRateLimits = 0
+  lastDeviceLockSkipLogAt = 0
 }
 
 async function runClaimCycle(
@@ -730,25 +763,45 @@ async function runClaimCycle(
     return
   }
 
-  await claimPrintTasksIfGateOpen(
-    {
-      holdEnabled: config.holdPrinterQueueWhenIdle === true,
-      pause: async () => {
-        await pauseConfiguredPrinterQueue(config.printerName)
+  const printLock = (config.scanDeviceEnabled === true || config.copyDeviceEnabled === true)
+    ? globalDeviceLock.tryAcquire('print-claim')
+    : undefined
+  if ((config.scanDeviceEnabled === true || config.copyDeviceEnabled === true) && !printLock) {
+    const now = Date.now()
+    if (now - lastDeviceLockSkipLogAt >= DEVICE_LOCK_SKIP_LOG_INTERVAL_MS) {
+      lastDeviceLockSkipLogAt = now
+      warn('task-runner: device lock busy; claim skipped')
+    }
+    return
+  }
+
+  let executed = false
+  try {
+    await claimPrintTasksIfGateOpen(
+      {
+        holdEnabled: config.holdPrinterQueueWhenIdle === true,
+        pause: async () => {
+          await pauseConfiguredPrinterQueue(config.printerName)
+        },
+        cleanup: async () => {
+          await cleanupStaleOwnPrintJobs({ printerName: config.printerName })
+        },
       },
-      cleanup: async () => {
-        await cleanupStaleOwnPrintJobs({ printerName: config.printerName })
+      async () => {
+        executed = await claimConfiguredPrintTasks(config, db, activeTasks)
       },
-    },
-    () => claimConfiguredPrintTasks(config, db, activeTasks),
-  )
+    )
+  } finally {
+    printLock?.release()
+  }
+  if (executed) notifyScanDevicePrintFinished()
 }
 
 async function claimConfiguredPrintTasks(
   config: AgentConfig,
   db: AgentDatabase,
   activeTasks: Set<string>,
-): Promise<void> {
+): Promise<boolean> {
   const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
 
   let tasks: ClaimTask[]
@@ -778,26 +831,27 @@ async function claimConfiguredPrintTasks(
         `task-runner: claim rate limited (HTTP 429) — pausing claims for ` +
           `${(decision.pauseMs / 1_000).toFixed(1)}s`,
       )
-      return
+      return false
     }
     if (isUnauthorizedHttpError(e)) {
       markUnauthorized()
       writeStartupDiagnosticSafely('AGENT_UNAUTHORIZED')
       err('task-runner: claim unauthorized — credential revoked/invalid; printing stopped')
-      return
+      return false
     }
     if (status !== 404 && status !== 204) {
       warn(`task-runner: claim cycle error — ${axiosErrorMessage(e)}`)
     }
-    return
+    return false
   }
 
-  if (tasks.length === 0) return
+  if (tasks.length === 0) return false
   if (isUnauthorized()) {
     warn('task-runner: credential became unauthorized while claim was in flight; claimed work will not print')
-    return
+    return false
   }
 
+  let executed = false
   for (const task of tasks) {
     if (activeTasks.has(task.taskId)) {
       warn(`task-runner: task ${task.taskId} already active, skipping duplicate claim`)
@@ -813,6 +867,7 @@ async function claimConfiguredPrintTasks(
     log(`task-runner: claimed task ${task.taskId}`)
 
     try {
+      executed = true
       await executeTask(task, config, db)
     } catch (e) {
       err(`task-runner: unhandled error in task ${task.taskId} — ${e instanceof Error ? e.message : String(e)}`)
@@ -820,6 +875,7 @@ async function claimConfiguredPrintTasks(
       activeTasks.delete(task.taskId)
     }
   }
+  return executed
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

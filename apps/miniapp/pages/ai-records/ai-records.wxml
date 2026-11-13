@@ -39,11 +39,12 @@
       <view class="empty-slot compact">
         <view class="es-t">加载失败</view>
         <view class="es-d">{{loadError}}</view>
-        <view class="btn ghost sm" style="margin-top:24rpx" bindtap="retryLoad">重新加载</view>
+        <view class="btn ghost sm" style="margin-top:24rpx" bindtap="retryLoad">再试一次</view>
       </view>
     </view>
 
     <block wx:elif="{{groups.length}}">
+      <view class="compliance-note">AI 做出的结果默认保存 24 小时，模拟面试记录保存 7 天，要长期留请导出或存进我的文档。</view>
       <view class="card" wx:for="{{groups}}" wx:key="day" wx:for-item="g">
         <view class="rec-day">{{g.day}}</view>
         <view class="rec-item" wx:for="{{g.items}}" wx:key="id" wx:for-item="rec">
@@ -51,7 +52,7 @@
             <view class="rec-ic tone-{{rec.tone}}"><text class="ficon {{rec.icon}}"></text></view>
             <view class="rec-body">
               <view class="rec-t">{{rec.title}}</view>
-              <view class="rec-sub">{{rec.time}} · {{rec.statusLabel}}</view>
+              <view class="rec-sub">{{rec.time}} · {{rec.statusLabel}}{{rec.viewUntil ? ' · ' + rec.viewUntil : ''}}</view>
             </view>
             <view class="rec-action {{rec.canOpen ? 'ready' : ''}}">
               <text>{{rec.actionLabel}}</text><text class="ficon i-right rec-arrow"></text>
@@ -67,6 +68,7 @@
     <view class="card" wx:else>
       <view class="empty-slot">
         <text class="ficon i-robot es-ic"></text>
+        <view class="compliance-note">AI 做出的结果默认保存 24 小时，模拟面试记录保存 7 天，要长期留请导出或存进我的文档。</view>
         <view class="es-t">{{activeFilter === 'qa' ? '暂无问答要点' : '暂无 AI 服务记录'}}</view>
         <view class="es-d">{{activeFilter === 'qa' ? '在小青对话里保存本次要点后，可以在这里回看条目' : '使用简历诊断、优化、模拟面试、简历对照、职业规划，或保存小青问答要点后可在此回看'}}</view>
       </view>

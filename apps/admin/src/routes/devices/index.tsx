@@ -21,7 +21,7 @@ const isTabKey = (v: string | null): v is TabKey =>
 export default function DevicesPage() {
   const [params, setParams] = useSearchParams()
   const raw = params.get('tab')
-  const active: TabKey = isTabKey(raw) ? raw : 'terminals'
+  const active: TabKey = isTabKey(raw) ? raw : 'overview'
 
   const setActive = (key: TabKey) => {
     setParams({ tab: key }, { replace: true })

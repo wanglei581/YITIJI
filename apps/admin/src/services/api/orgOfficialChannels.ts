@@ -16,7 +16,12 @@
 //   否则演示会出现「什么都能登记」的假能力。
 // ============================================================
 
-import type { OfficialChannelAdminItem, VerifiedOfficialDomain } from '@ai-job-print/shared'
+import {
+  OFFICIAL_CHANNEL_AUDIENCES,
+  type OfficialChannelAdminItem,
+  type OfficialChannelAudience,
+  type VerifiedOfficialDomain,
+} from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, getUser, redirectToLogin } from '../auth'
 import { isCommercialRecruitmentHost, OFFICIAL_DOMAIN_MAX, parseDomainInput } from '../../routes/partners/officialDomainRules'
@@ -84,6 +89,12 @@ function asDomain(raw: unknown): VerifiedOfficialDomain {
   return { domain: row.domain, verifiedAt: row.verifiedAt, verifiedBy: row.verifiedBy }
 }
 
+function asAudience(value: unknown): OfficialChannelAudience {
+  return typeof value === 'string' && (OFFICIAL_CHANNEL_AUDIENCES as readonly string[]).includes(value)
+    ? value as OfficialChannelAudience
+    : 'general'
+}
+
 function asChannel(raw: unknown): OfficialChannelAdminItem {
   const row = (raw ?? {}) as Record<string, unknown>
   if (
@@ -97,6 +108,7 @@ function asChannel(raw: unknown): OfficialChannelAdminItem {
     url: row.url,
     displayOrder: row.displayOrder,
     enabled: row.enabled,
+    audience: asAudience(row.audience),
     emergencyTakedown: row.emergencyTakedown,
     emergencyReasonCode: typeof row.emergencyReasonCode === 'string' ? row.emergencyReasonCode : null,
     emergencyReasonText: typeof row.emergencyReasonText === 'string' ? row.emergencyReasonText : null,
@@ -131,11 +143,11 @@ const mockChannels = new Map<string, OfficialChannelAdminItem[]>([
   ['org-mock-1', [
     {
       id: 'oc-mock-a1', name: '人才交流中心官网', url: 'https://www.rencai-demo.gov.cn/',
-      displayOrder: 1, enabled: true, emergencyTakedown: false, emergencyReasonCode: null, emergencyReasonText: null,
+      displayOrder: 1, enabled: true, audience: 'graduate', emergencyTakedown: false, emergencyReasonCode: null, emergencyReasonText: null,
     },
     {
       id: 'oc-mock-a2', name: '线上业务大厅（旧入口）', url: 'https://ywdt.rencai-demo.gov.cn/old',
-      displayOrder: 2, enabled: false, emergencyTakedown: true, emergencyReasonCode: 'rights_complaint',
+      displayOrder: 2, enabled: false, audience: 'social', emergencyTakedown: true, emergencyReasonCode: 'rights_complaint',
       emergencyReasonText: '页面冒用第三方机构标识，权利人投诉编号 TS-2026-0921',
     },
   ]],

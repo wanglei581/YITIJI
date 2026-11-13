@@ -55,10 +55,11 @@ const SHARED_USER_MESSAGES = {
   AI_LOGIN_REQUIRED: '用 AI 之前需要先用手机号登录',
   AI_DECLARATION_REQUIRED: '年龄或录音确认没有记上，请稍后再试',
   AI_BUDGET_EXHAUSTED: '今天的 AI 额度已用完，明天恢复；这一步可以先用模板手动填写，打印照常可用',
+  AI_QUOTA_EXHAUSTED: '今天的 AI 次数用完了，明天 0 点恢复。',
   AI_BUDGET_UNAVAILABLE: 'AI 暂时用不了，请稍后再试；这一步可以先手动填写，打印照常可用',
   AI_PAUSED: 'AI 服务暂停中，打印等其他功能照常可以用',
   // 后端 9/29 交付：生产缺 AI 配置时 AI 路由 503；换绑手机号时没能先清掉旧登录 503（手机号没改）。
-  AI_PROVIDER_NOT_CONFIGURED: 'AI 服务暂未开通，本次没有生成结果；打印等其他功能照常',
+  AI_PROVIDER_NOT_CONFIGURED: 'AI 服务暂时不可用，本次没有生成结果；打印等其他功能照常',
   REBIND_UNAVAILABLE: '暂时无法换绑，手机号没有改动，请稍后重试',
   MAINTENANCE_MODE: '系统维护中，请稍后再来',
   AI_CONTENT_BLOCKED: 'AI 不能处理这段内容，请换个说法或修改后再试',
@@ -88,6 +89,11 @@ const PASSTHROUGH_MESSAGE_CODES = [
   'PICKUP_CODE_EXPIRED',         // 到机码已过期，请在小程序重新下单
   'PRINT_JOB_TOO_LARGE',         // 每单最多打印 100 面，请分几单打印（#1146；此前落到兜底「无法核定页数和金额」）
   'PRINT_TERMINAL_QUEUE_HALTED', // 这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端（#1150；老码 PRINTER_UNAVAILABLE 仍不放行）
+  // 免费打印额度（free-print-quota.policy.ts）。原话里有具体面数，原样给用户看。
+  // 会员那句的「屏幕上的服务电话」是写给一体机的，不放进这张表，在 displayableServerMessage 里改掉。
+  'PRINT_TERMINAL_DAILY_QUOTA_REACHED', // 今天这台机器的免费打印量已用完，明天 0 点恢复。
+  'PRINT_GUEST_ORDER_QUOTA_EXCEEDED',   // 免登录每次最多打印 N 面。用手机号登录后，可以一次打更多。
+  'PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES', // 这单 M 面，超过每天免费 N 面的上限，请减少份数或分开下单
 
   // ── 登录 / 认证链路 ────────────────────────────────────────────────
   // 2026-09-08 回归修复：本模块首版把这些码一并挡在 fail-closed 之外，
@@ -147,6 +153,7 @@ const PASSTHROUGH_MESSAGE_CODES = [
  * fail-closed：机器码、通用折叠句、空值一律不可展示。
  */
 function displayableServerMessage(message, code) {
+  if (code === 'PRINT_MEMBER_DAILY_QUOTA_REACHED') return memberPrintQuotaMessage(message);
   if (typeof message !== 'string') return '';
   const text = message.trim();
   if (!text) return '';
@@ -180,6 +187,7 @@ function userMessageOf(err, fallback) {
 /** 模拟面试、小青没有「先用模板手动填写」这条退路，额度两码只说事实（走查 MP-K18-6）。 */
 const AI_QUOTA_PLAIN_MESSAGES = {
   AI_BUDGET_EXHAUSTED: '今天的 AI 次数用完了，明天恢复。',
+  AI_QUOTA_EXHAUSTED: '今天的 AI 次数用完了，明天 0 点恢复。',
   AI_BUDGET_UNAVAILABLE: 'AI 暂时用不了，请稍后再试。',
 };
 
@@ -192,9 +200,24 @@ function plainAiMessageOf(err, fallback) {
 
 /**
  * 现场没有工作人员（2026-10-04 产品负责人：全程自助、自动）。需要人帮忙时只有一条出路：服务电话。
- * 号码以后从后端公开接口读（GET /api/v1/public/support-contact?terminalId=，开发中），在那之前只说号码在哪看，不写死。
+ * 号码从后端公开接口读（GET /api/v1/public/support-contact?terminalId=）；读不到时用这一句，不写死。
  */
 const SUPPORT_HINT = '需要帮助可拨打服务电话，号码在首页底部「经营者信息」里。'
+
+/** 一体机会员额度句尾。手机上「屏幕上的服务电话」会被读成自己的手机屏幕。 */
+const MEMBER_SCREEN_TAIL = /[。．]?\s*确有急用，可以拨打屏幕上的服务电话。?\s*$/;
+const MEMBER_QUOTA_FALLBACK = '你今天的免费打印已达到每日上限，明天 0 点恢复';
+
+function memberPrintQuotaMessage(message) {
+  const text = typeof message === 'string' ? message.trim() : '';
+  if (!text || isMachineErrorCode(text) || text === SERVER_GENERIC_MESSAGE) {
+    return `${MEMBER_QUOTA_FALLBACK}。${SUPPORT_HINT}`;
+  }
+  let base = text.replace(MEMBER_SCREEN_TAIL, '').trim().replace(/[。．]\s*$/, '');
+  if (!base || isMachineErrorCode(base)) base = MEMBER_QUOTA_FALLBACK;
+  if (base.indexOf(SUPPORT_HINT) >= 0) return /[。．]$/.test(base) ? base : `${base}。`;
+  return `${base}。${SUPPORT_HINT}`;
+}
 
 module.exports = {
   isMachineErrorCode,

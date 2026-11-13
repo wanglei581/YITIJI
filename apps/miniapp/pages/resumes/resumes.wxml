@@ -23,14 +23,14 @@
       <view class="empty-icon"><text class="ficon i-user"></text></view>
       <view class="empty-title">登录后管理简历</view>
       <view class="empty-desc">查看本人全部简历版本，并继续使用 AI 诊断、优化与打印服务。</view>
-      <view class="btn primary block tap" hover-class="tap-press" bindtap="goLogin">微信一键登录</view>
+      <view class="btn primary block tap" hover-class="tap-press" bindtap="goLogin">手机号快捷登录</view>
     </view>
 
     <block wx:elif="{{resumes.length}}">
       <view class="section-head">
         <view>
           <view class="section-title">最近更新</view>
-          <view class="section-sub">点击简历可查看诊断报告</view>
+          <view class="section-sub">上传的简历可看诊断，AI 生成的简历可看生成结果</view>
         </view>
         <view class="upload-button tap" hover-class="tap-press" bindtap="upload"
               role="button" aria-label="上传新简历">
@@ -41,13 +41,14 @@
 
       <view class="resume-list">
         <view
-          class="resume-card tap rise-d{{index + 1}}"
+          class="resume-card {{item.canOpen ? 'tap' : ''}} rise-d{{index + 1}}"
           wx:for="{{resumes}}"
           wx:key="id"
-          hover-class="tap-press"
+          hover-class="{{item.canOpen ? 'tap-press' : ''}}"
           bindtap="openResume"
           data-id="{{item.id}}"
           data-task-id="{{item.taskId}}"
+          data-kind="{{item.kind}}"
         >
           <view class="resume-file-icon"><text class="ficon i-file-text"></text></view>
           <view class="resume-main">
@@ -56,14 +57,16 @@
               <text class="chip teal" wx:if="{{item.isDefault}}">主版本</text>
             </view>
             <view class="resume-meta">{{item.fileLabel}} · {{item.updated}}</view>
+            <view class="resume-meta" wx:if="{{item.viewUntil}}">{{item.viewUntil}}</view>
             <view class="resume-status" wx:if="{{item.tag}}">
               <text class="chip ok" wx:if="{{item.tag === '已优化'}}">{{item.tag}}</text>
               <text class="chip plum" wx:elif="{{item.tag === '已诊断'}}">{{item.tag}}</text>
               <text class="chip warn" wx:else>{{item.tag}}</text>
             </view>
             <view class="resume-actions">
-              <view class="action-button tap" hover-class="tap-press" catchtap="openResume" data-task-id="{{item.taskId}}">查看诊断</view>
-              <view class="action-button primary tap" hover-class="tap-press" catchtap="optimize" data-task-id="{{item.taskId}}">继续优化</view>
+              <view wx:if="{{item.kind === 'parse'}}" class="action-button tap" hover-class="tap-press" catchtap="openResume" data-task-id="{{item.taskId}}" data-kind="parse">查看诊断</view>
+              <view wx:elif="{{item.kind === 'generate'}}" class="action-button tap" hover-class="tap-press" catchtap="openResume" data-task-id="{{item.taskId}}" data-kind="generate">查看生成结果</view>
+              <view wx:if="{{item.kind === 'parse'}}" class="action-button primary tap" hover-class="tap-press" catchtap="optimize" data-task-id="{{item.taskId}}">继续优化</view>
             </view>
           </view>
           <text class="ficon i-right resume-arrow"></text>

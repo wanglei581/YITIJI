@@ -13,7 +13,6 @@ import {
   FileTextIcon,
   InfoIcon,
   LandmarkIcon,
-  ListChecksIcon,
   LoaderCircleIcon,
   LockIcon,
   MicIcon,
@@ -46,7 +45,6 @@ function topicOf(pathname: string): Topic {
 /** 本机照常能办、不依赖招聘内容的既有入口。 */
 const ALTERNATIVES: { key: string; icon: ReactNode; title: string; desc: string; to: string }[] = [
   { key: 'resume', icon: <FileTextIcon size={28} />, title: 'AI 简历', desc: '诊断、逐条优化、生成新版本', to: '/resume-service' },
-  { key: 'job-fit', icon: <ListChecksIcon size={28} />, title: '简历对照', desc: '填一份岗位要求，AI 对照你的简历', to: '/resume/job-fit' },
   { key: 'interview', icon: <MicIcon size={28} />, title: '模拟面试', desc: '问答对练，不做录用判断', to: '/interview-service' },
   { key: 'print', icon: <PrinterIcon size={28} />, title: '打印 · 扫描', desc: '简历、证明材料与照片', to: '/print-scan' },
   { key: 'policy', icon: <LandmarkIcon size={28} />, title: '就业政策', desc: '政策、社保与登记指引，以官方核验为准', to: '/policy-service' },

@@ -30,11 +30,10 @@
 // ============================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useNavigate, useSearchParams, type NavigateFunction } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams, type NavigateFunction } from 'react-router-dom'
 import type {
   SelfAssessmentConsentLink,
   SelfAssessmentDimensionKey,
-  SelfAssessmentDimensionResult,
 } from '@ai-job-print/shared'
 import { SELF_ASSESSMENT_DIMENSIONS } from '@ai-job-print/shared'
 import {
@@ -51,7 +50,7 @@ import {
 } from '../../ai'
 import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { AI_QUOTA_SELF_ASSESSMENT_COPY, userMessageOf } from '../../services/api/userErrorMessage'
 import {
   SelfAssessmentApiError,
   getLatestSelfAssessment,
@@ -84,6 +83,8 @@ import { useSelfAssessmentConsentBundle } from './useSelfAssessmentConsentBundle
 import { interpretationGap } from './selfAssessmentInterpretation'
 import { useSelfAssessmentIdleExit } from './useSelfAssessmentIdleExit'
 import { useAuth } from '../../auth/useAuth'
+import { useKioskLicense, useWindDownViewOnly } from '../../layouts/KioskLicenseContext'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import {
@@ -96,19 +97,24 @@ import {
   SaMapGrid,
   SaMeta,
   SaNotice,
-  SaPicks,
   SaReviewGrid,
   type SaStatus,
 } from './components/self-assessment/SelfAssessmentQxKit'
 import { SaConsentBox, SaConsentLinkedCheck, SaConsentList } from './components/self-assessment/SelfAssessmentConsentKit'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
+import { ResumeTouchActs } from './touch/ResumeTouchActs'
+import { toSaActItems } from './touch/saActItems'
+import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
+import { ASKS } from './touch/resumeAsks'
+import { ResumeStepPreview } from './touch/ResumeStepPreview'
+import { unattendedReason } from './touch/unattendedReason'
+import { SaDimRow } from './touch/SaResultParts'
 
 /** 稿底部那一行不可关闭的边界声明，四个页面共用。 */
 const SA_RAIL = ['结果仅供自我参考', '不评分不排名', '不替代能力证明'] as const
-const SA_EYEBROW = '自我探索'
-const SA_TITLE = '自我探索 · 倾向参考'
-/** 四条路由共用的固定壳 props：标题、域标识与底部边界声明逐页相同。 */
-const SA_FRAME_BASE = { title: SA_TITLE, eyebrow: SA_EYEBROW, rail: SA_RAIL } as const
+const SA_EYEBROW = '改简历 · 自我探索'
+/** 四条路由共用的固定壳 props：域标识与底部边界声明逐页相同；问句与说明进意图带的标题和副题。 */
+const SA_FRAME_BASE = { eyebrow: SA_EYEBROW, rail: SA_RAIL } as const
 /** 返回口：稿的返回键指向「简历服务」服务台，不是浏览器历史（一体机没有后退键）。 */
 const SA_BACK_ROUTE = '/resume-service'
 
@@ -122,15 +128,20 @@ function GuardedButton({
   onClick,
   variant,
   testId,
+  title,
+  forceBlocked = false,
   children,
 }: {
   blockedReason: string | null
   onClick: () => void
   variant?: 'primary' | 'teal' | 'ghost' | 'danger'
   testId?: string
+  title?: string
+  /** 收尾中只读：停用，原因由页内 status 写一次，不写进常驻 blockedReason。 */
+  forceBlocked?: boolean
   children: ReactNode
 }) {
-  const blocked = Boolean(blockedReason)
+  const blocked = Boolean(blockedReason) || forceBlocked
   return (
     <span className="sa-guarded">
       <button
@@ -139,6 +150,7 @@ function GuardedButton({
         data-variant={variant}
         data-testid={testId}
         aria-disabled={blocked || undefined}
+        title={title}
         onClick={() => { if (!blocked) onClick() }}
       >
         {children}
@@ -156,9 +168,17 @@ function GhostButton({ label, route, onClick }: { label: string; route?: string;
   )
 }
 
-function PrimaryButton({ label, testId, onClick }: { label: string; testId?: string; onClick: () => void }) {
+function PrimaryButton({ label, testId, onClick, held = false, title }: { label: string; testId?: string; onClick: () => void; held?: boolean; title?: string }) {
   return (
-    <button type="button" className="qx-btn" data-variant="primary" data-testid={testId ?? 'self-assessment-primary'} onClick={onClick}>{label}</button>
+    <button
+      type="button"
+      className="qx-btn"
+      data-variant="primary"
+      data-testid={testId ?? 'self-assessment-primary'}
+      aria-disabled={held || undefined}
+      title={title}
+      onClick={() => { if (!held) onClick() }}
+    >{label}</button>
   )
 }
 
@@ -183,6 +203,8 @@ function saExits(go: NavigateFunction, from: string, resumable: boolean) {
     { key: 'login', icon: '登', title: '先登录账号', desc: '登录后账号侧记录才会归到本人名下；能否查看以实际记录为准。', route: '/login', onClick: () => go('/login', { state: { from } }) },
   ]
 }
+
+const saActItems = (go: NavigateFunction, from: string, resumable: boolean) => toSaActItems(saExits(go, from, resumable), '打开')
 
 // ============================================================
 // 1) 同意页
@@ -232,6 +254,7 @@ export function SelfAssessmentIntroPage() {
     <SaFrame
       {...SA_FRAME_BASE}
       screen="resume-self-assessment-intro"
+      aiAsk={{ ...ASKS.saIntro, testId: 'self-assessment-ai-ask' }}
       state={!bundle ? (consentBundle.state.status === 'error' ? 'intro-consent-error' : 'intro-consent-loading') : ok ? 'intro-ready' : 'intro-consent-pending'}
       status={status}
       ask={<>把职业倾向，<em>说得更明白</em>。</>}
@@ -256,33 +279,22 @@ export function SelfAssessmentIntroPage() {
         </>
       }
     >
-      <SaCard head="这次要做的事" hint={`约 6 分钟 · 不需登录`}>
-        <SaChips
-          items={[
-            { key: 'count', text: <><b>{total}</b> 道选择题</> },
-            { key: 'dims', text: <>覆盖 <b>{dimCount}</b> 个方向</> },
-            { key: 'back', text: '随时可返回修改' },
-            { key: 'norank', text: '不评分、不排名' },
-          ]}
-        />
-        <p className="sa-sub">
-          题目问的是你更愿意怎么工作，不是考你会不会。{total} 道题按
-          {bank.dimensions.map((d) => d.label).join('、')}排列，题干与选项与共享题库逐字一致，本页不改写题意、不另造题目。
-        </p>
-      </SaCard>
-
-      <SaCard head="这一页里，哪部分是 AI" hint="分工写在前面，不等结果出来才说">
-        <p className="sa-sub" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <AiCapabilityChip tone="ai" />
-          <span>记分不经过 AI，解读才经过 AI。</span>
-        </p>
-        <SaFlow
-          items={[
-            { key: 'e2', step: '记分 · 不经过 AI', title: '维度强度与依据题号', current: true, desc: `${dimCount} 个方向的强度由固定权重算出，依据只有你自己的选择 —— AI 不可用时照样出。` },
-            { key: 'e3', step: '解读 · 由 AI 生成', title: `${dimCount} 段陈述式解读`, desc: '它不打分、不排名，也不说你适合或不适合哪类岗位；AI 不可用时会如实缺，不拿别的东西顶上。' },
-          ]}
-        />
-      </SaCard>
+      <ResumeStepPreview
+        className="rtp-hero-min"
+        art="checklist"
+        kicker={`约 6 分钟 · ${total} 题 · 不需登录`}
+        title={`${total} 道选择题，覆盖 ${dimCount} 个方向`}
+        lines={[
+          `${bank.dimensions.map((d) => d.label).join('、')}。题目问的是你更愿意怎么工作，不是考你会不会。`,
+          '不评分、不排名，结果只给你自己看，随时可以返回修改。',
+        ]}
+        note={(
+          <>
+            <AiCapabilityChip tone="ai" />
+            {' '}记分不经过 AI，解读才经过 AI：AI 不可用时强度与依据题号照样出，文字解读会如实缺，不拿别的东西顶上。
+          </>
+        )}
+      />
 
       {bundle ? (
         <SaCard head="开始前请先确认" hint="勾选后才能作答" testId="self-assessment-consent">
@@ -445,6 +457,7 @@ export function SelfAssessmentQuizPage() {
       <SaFrame
         {...SA_FRAME_BASE}
         screen="resume-self-assessment-quiz"
+        aiAsk={{ ...ASKS.saBlocked, testId: 'self-assessment-ai-ask' }}
         state={blocked.state}
           status={{ tone: 'warn', label: blocked.pill }}
           ask={blocked.ask}
@@ -461,9 +474,10 @@ export function SelfAssessmentQuizPage() {
           <SaChips items={blocked.chips} />
           <p className="sa-sub">{blocked.body}</p>
         </SaCard>
-        <SaCard head="现在可以做什么" hint="都是现在就能打开的入口">
-          <SaPicks items={saExits(navigate, '/resume/self-assessment/questions', consentOk && !alreadySubmitted)} />
-        </SaCard>
+        <ResumeTouchActs
+          heading={{ title: '现在可以做什么', hint: '都是现在就能打开的入口' }}
+          items={saActItems(navigate, '/resume/self-assessment/questions', consentOk && !alreadySubmitted)}
+        />
       </SaFrame>
     )
   }
@@ -655,6 +669,10 @@ export function SelfAssessmentResultPage() {
 
 function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | null }) {
   const navigate = useNavigate()
+  const location = useLocation()
+  const windDownViewOnly = useWindDownViewOnly('self-assessment')
+  const licenseFlagViewOnly = useKioskLicense().mode === 'winding-down' && (location.state as { licenseViewOnly?: boolean } | null)?.licenseViewOnly === true
+  const viewOnly = windDownViewOnly || licenseFlagViewOnly
   const startPrint = useStartPrintHandoff()
   const { getToken } = useAuth()
   const [session, setSession] = useState<SelfAssessmentSession>(() => {
@@ -765,7 +783,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
         setTaskAiDown(isAiOutage(err))
         setTaskError(isAiOutage(err)
           ? 'AI 暂时不可用，你可以先看这次的固定记分'
-          : userMessageOf(err, mode === 'submit' ? '提交失败，请稍后重试' : '这次结果读取失败，请稍后重试'))
+          : unattendedReason(userMessageOf(err, mode === 'submit' ? '提交失败，请稍后重试' : '这次结果读取失败，请稍后重试'), mode === 'submit' ? '提交失败，请稍后重试' : '这次结果读取失败，请稍后重试'))
       })
       .finally(() => { if (mountedRef.current) setInflight(null) })
   }, [attempt, consentOk, getToken, linkedTaskId, navigate, pendingAnswers, pendingComplete, result, session.accessToken, session.consent.nonSensitive, session.consent.sensitive, session.consentVersion])
@@ -806,6 +824,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
       <SaFrame
         {...SA_FRAME_BASE}
         screen="resume-self-assessment-result"
+        aiAsk={{ ...(inflight ? ASKS.saBusy : ASKS.saResultEmpty), testId: 'self-assessment-ai-ask' }}
         state={state}
           status={status}
           ask={inflight ? <>请稍候，<em>这一步还在等结果</em>。</> : failure ? <>这次<em>没能拿到结果</em>。</> : <>还没有<em>可查看的结果</em>。</>}
@@ -813,7 +832,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
           ? <>页面不设倒计时，也不会自己变成「完成」；<b>只有系统真实返回才会换屏。</b></>
           : failure
             ? <>失败原因写在下面。<b>页面不会用别的东西顶上，也不会假装已完成。</b></>
-            : <>完成页只在本次答满并提交后才有内容。<b>直接打开这个地址不会补一个结果给你看。</b></>}
+            : <>倾向参考的结果页只在本次答满并提交后才有内容。<b>直接打开这个地址不会补一个结果给你看。</b></>}
           back={{ label: '返回简历服务', onBack: () => navigate(SA_BACK_ROUTE) }}
         ctabar={
           <>
@@ -825,12 +844,18 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
             ) : (
               <>
                 <GhostButton label="返回简历服务" route={SA_BACK_ROUTE} onClick={() => navigate(SA_BACK_ROUTE)} />
-                <PrimaryButton label={failure ? '重新作答' : '去看说明并开始'} onClick={() => navigate('/resume/self-assessment/intro')} />
+                <PrimaryButton
+                  label={failure ? '重新作答' : '去看说明并开始'}
+                  held={viewOnly}
+                  title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined}
+                  onClick={() => navigate('/resume/self-assessment/intro')}
+                />
               </>
             )}
           </>
         }
       >
+        {viewOnly ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : null}
         <AiTaskRegion task={task} label="AI 陈述式解读" className="sa-ai-region"
           fallback={{
             mode: 'result-unavailable',
@@ -864,14 +889,16 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
             </SaCard>
           }
         />
-        <SaCard head="现在可以做什么" hint="都是现在就能打开的入口">
-          <SaPicks items={saExits(navigate, '/resume/self-assessment/result', false)} />
-        </SaCard>
+        <ResumeTouchActs
+          heading={{ title: '现在可以做什么', hint: '都是现在就能打开的入口' }}
+          items={saActItems(navigate, '/resume/self-assessment/result', false)}
+        />
       </SaFrame>
     )
   }
 
   const handlePrint = async () => {
+    if (viewOnly) return
     setPrinting(true)
     setError(null)
     try {
@@ -887,7 +914,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
       })
       setPreviewOpen(true)
     } catch (err) {
-      setError(err instanceof SelfAssessmentApiError ? err.message : '打印文件生成失败')
+      setError(unattendedReason(err instanceof SelfAssessmentApiError ? err.message : null, '打印文件生成失败'))
     } finally {
       setPrinting(false)
     }
@@ -898,6 +925,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
    * 只有服务端签出的 `printFileUrl` 能被打印链路认；缺它就置灰并写清原因，不假装能打。
    */
   const handoffToPrint = () => {
+    if (viewOnly) return
     if (!printed?.printFileUrl) return
     startPrint({
       origin: 'self_assessment',
@@ -924,7 +952,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
       clearSession()
       navigate('/')
     } catch (err) {
-      setError(err instanceof SelfAssessmentApiError ? err.message : '撤回失败')
+      setError(unattendedReason(err instanceof SelfAssessmentApiError ? err.message : null, '撤回失败'))
     } finally {
       setWithdrawing(false)
     }
@@ -935,11 +963,17 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
   const hasAccess = Boolean(getToken() || session.accessToken)
   const accessReason = hasAccess ? null : '本次未拿到访问凭证（AI 解读整体失败时系统不提供），无法生成打印件或撤回；记录会在到期后自动清理。'
 
+  // 次数用完单独判：记分已经在这次响应里，不要落到「重新作答」。
+  // 停用码进共享表后 gap 也会是 stopped；这里仍显式认这个原因，避免句子被停用通稿盖掉。
+  const quotaExhausted = result.aiUnavailableReason === 'AI_QUOTA_EXHAUSTED'
+  const suppressReanswer = quotaExhausted || gap === 'stopped'
   const fallback: AiTaskFallback = {
     // AI 是这几段解读的唯一产出源，且没有「点一下重试」的入口 —— 结果区直接说办不到，
     // 不编一条假的手动路径（三种降级里只有 result-unavailable 对得上本页）。
     mode: 'result-unavailable',
-    reason: gap === 'declaration'
+    reason: quotaExhausted
+      ? AI_QUOTA_SELF_ASSESSMENT_COPY
+      : gap === 'declaration'
       ? '这次没有确认是否年满 14 周岁，所以没有生成 AI 解读。完成确认后重新作答，可以获得 AI 解读。'
       : gap === 'login'
         ? '按规定登录后才能生成 AI 解读，这次没有生成。登录后重新作答，可以获得 AI 解读。'
@@ -947,14 +981,18 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
           ? 'AI 解读当前没有开放，这次只有维度强度与依据题号；重新作答也不会有文字解读。'
           : gap === 'unavailable'
             ? 'AI 解读服务当前不可用，这几段陈述这次没有生成。前面三步（作答、记分、依据题号）都已完成。'
-            : result.failReason ?? '本次解读未能生成合规结果，已整体丢弃，不做任何替换或补写。',
-    ...(gap === 'stopped'
-      ? { retryHint: '下面的维度强度与依据题号不依赖 AI，现在就能看、能打印。' }
+            : unattendedReason(result.failReason, '本次解读未能生成合规结果，已整体丢弃，不做任何替换或补写。'),
+    ...(suppressReanswer
+      ? {
+          retryHint: quotaExhausted
+            ? '作答和记分已经完成。'
+            : '下面的维度强度与依据题号不依赖 AI，现在就能看、能打印。',
+        }
       : {
           retryHint: '答案原文不留存，服务恢复后也补不回这一次；要拿到解读需要重新作答（约 5 分钟）。下面的维度强度与依据题号不依赖 AI，现在就能看、能打印。',
           action: gap === 'login'
             ? { label: '先登录账号', onClick: () => navigate('/login', { state: { from: '/resume/self-assessment/intro' } }) }
-            : { label: '重新作答（约 5 分钟）', onClick: () => { clearSession(); navigate('/resume/self-assessment/intro') } },
+            : { label: '重新作答（约 5 分钟）', onClick: () => { if (viewOnly) return; clearSession(); navigate('/resume/self-assessment/intro') } },
         }),
   }
 
@@ -966,6 +1004,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
     <SaFrame
       {...SA_FRAME_BASE}
       screen="resume-self-assessment-result"
+      aiAsk={{ ...ASKS.saResult, testId: 'self-assessment-ai-ask' }}
       state={aiFailed ? 'result-ai-down' : 'result-ready'}
       status={aiFailed ? { tone: 'warn', label: 'AI 解读缺失' } : { tone: 'ok', label: '本次结果已生成' }}
       ask={<>本次作答<em>已完成并提交</em>。</>}
@@ -975,36 +1014,21 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
         <>
           <GhostButton label="查看记录" route="/resume/self-assessment/history" onClick={() => navigate('/resume/self-assessment/history')} />
           <GuardedButton variant="teal" testId="self-assessment-print" onClick={() => void handlePrint()}
+            forceBlocked={viewOnly} title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined}
             blockedReason={printing ? '正在生成 PDF，请稍候' : accessReason}>{printing ? '生成 PDF 中…' : '生成 PDF 预览'}</GuardedButton>
           <GuardedButton variant="danger" testId="self-assessment-withdraw" onClick={handleWithdraw}
             blockedReason={withdrawing ? '正在撤回，请稍候' : accessReason}>{withdrawing ? '撤回中…' : '撤回本次探索'}</GuardedButton>
         </>
       }
     >
-      <SaCard head="本次自我探索已完成" hint="仅供本人参考" tone="lead">
-        <SaChips
-          items={[
-            { key: 'dims', text: <>覆盖 <b>{dimensions.length}</b> 个方向</> },
-            { key: 'norank', text: '不评分、不排名' },
-            { key: 'self', text: '仅本人可见' },
-            aiFailed
-              ? { key: 'ai', text: <>AI 解读<b>本次未生成</b></>, tone: 'warn' as const }
-              : { key: 'ai', text: 'AI 解读已生成' },
-          ]}
-        />
-        <p className="sa-sub">
-          本结果基于本人作答的 {dimensions.length} 维度倾向，不含临床 / 心理 / 人格诊断；
-          不代任何招聘结果、能力证明或心理评估；不向企业、合作机构或第三方推送。
-        </p>
-        <SaMeta
-          items={[
-            { key: 'task', label: '记录编号', value: taskId, mono: true },
-            { key: 'consented', label: '同意时间', value: completedAt ?? '这台机器上的这次使用未记录' },
-            { key: 'version', label: '同意版本', value: session.consentVersion ?? '这台机器上的这次使用未记录（本次结果由记录编号读回）' },
-            { key: 'expires', label: '保留至', value: expiresAt ?? '未返回到期时间（撤回后或整体拒答时无到期）' },
-          ]}
-        />
-      </SaCard>
+      {viewOnly ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : null}
+      <ResumeStepPreview
+        className="rtp-hero-min"
+        art="report"
+        kicker={expiresAt ? `保留至 ${expiresAt}` : '只在这台机器的这次使用里保留'}
+        title={`${dimensions.length} 个方向各看你选了多少`}
+        lines={['不评分、不排名，不说适合或不适合哪类岗位。', aiFailed ? 'AI 解读这次没有生成，强度与依据题号照常有。' : '强度由固定权重算出，解读由 AI 写。']}
+      />
 
       {/* AI 只负责这一块，它挂了不影响下面的维度强度与依据题号。走到这里 result
           一定在手，四态只可能是 done / failed，running / idle 由上一支负责。 */}
@@ -1019,18 +1043,45 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
         </SaCard>
       </AiTaskRegion>
 
-      <SaCard head="维度强度与依据" hint="这一块不经过 AI">
-        <p className="sa-sub" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <EvidenceBadge level="E2" />
-          <span>
-            每一项的强度都是<b>固定权重累加</b>算出来的，依据只有你自己的选择
-            <EvidenceBadge level="E1" compact />
-            。这部分不经过 AI{aiFailed ? '，所以这次 AI 没成也照常有' : ''}。
-          </span>
+      <p className="sa-sub" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <EvidenceBadge level="E2" />
+        <span>
+          每一项的强度都是<b>固定权重累加</b>算出来的，依据只有你自己的选择
+          <EvidenceBadge level="E1" compact />
+          。这部分不经过 AI{aiFailed ? '，所以这次 AI 没成也照常有' : ''}。
+        </span>
+      </p>
+      <div className="rtp-sa-rows" aria-label="维度强度与依据">
+        {dimensions.map((d) => (
+          <SaDimRow
+            key={d.key}
+            label={SELF_ASSESSMENT_DIMENSIONS.find((dim) => dim.key === d.key)?.label ?? d.label}
+            strength={d.strength}
+            strengthLabel={`强度 ${d.strength}/5`}
+            evidence={`依据：本组第 ${d.evidenceQuestionIdx.length > 0 ? d.evidenceQuestionIdx.map((i) => i + 1).join('、') : '—'} 题的选择（只记题号，不含选项内容）。`}
+          >
+            {d.note ? <AiConclusion text={d.note} /> : (
+              <p className="sa-muted">
+                {aiFailed ? '本次解读未生成 —— 缺的只是这段文字，强度与依据题号已经算出来了。' : '本维度解读未生成。'}
+              </p>
+            )}
+          </SaDimRow>
+        ))}
+      </div>
+
+      <SaCard head="这一次的记录" hint="仅供本人参考">
+        <SaMeta
+          items={[
+            { key: 'task', label: '记录编号', value: taskId, mono: true },
+            { key: 'consented', label: '同意时间', value: completedAt ?? '这台机器上的这次使用未记录' },
+            { key: 'version', label: '同意版本', value: session.consentVersion ?? '这台机器上的这次使用未记录（本次结果由记录编号读回）' },
+            { key: 'expires', label: '保留至', value: expiresAt ?? '未返回到期时间（撤回后或整体拒答时无到期）' },
+          ]}
+        />
+        <p className="sa-sub">
+          本结果基于本人作答的 {dimensions.length} 维度倾向，不含临床 / 心理 / 人格诊断；
+          不代任何招聘结果、能力证明或心理评估；不向企业、合作机构或第三方推送。
         </p>
-        <div className="sa-dims">
-          {dimensions.map((d) => <DimensionCard key={d.key} d={d} aiFailed={aiFailed} />)}
-        </div>
       </SaCard>
 
       {error ? (
@@ -1044,6 +1095,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
           <div className="sa-quickrow">
             <button type="button" className="sa-quick" onClick={() => setPreviewOpen(true)}>页内预览 PDF</button>
             <GuardedButton onClick={handoffToPrint}
+              forceBlocked={viewOnly} title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined}
               blockedReason={printed.printFileUrl ? null : '打印链接未就绪，这份文件暂时送不到打印工作台；页内预览与扫码带走不受影响。'}>去打印工作台核价</GuardedButton>
           </div>
         </SaCard>
@@ -1059,33 +1111,12 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
 
       {previewOpen && printed ? (
         <FilePreviewDialog
-          fileUrl={printed.signedUrl} fileName={printed.filename} mimeType="application/pdf"
+          fileUrl={printed.printFileUrl || printed.signedUrl} fileName={printed.filename} mimeType="application/pdf"
           phoneDownloadUrl={printed.signedUrl} expiresAt={printed.expiresAt} regenerating={printing}
-          onRegenerate={() => { void handlePrint() }} onClose={() => setPreviewOpen(false)}
+          onRegenerate={viewOnly ? undefined : () => { void handlePrint() }} onClose={() => setPreviewOpen(false)}
         />
       ) : null}
     </SaFrame>
-  )
-}
-
-function DimensionCard({ d, aiFailed }: { d: SelfAssessmentDimensionResult; aiFailed: boolean }) {
-  const label = SELF_ASSESSMENT_DIMENSIONS.find((dim) => dim.key === d.key)?.label ?? d.label
-  return (
-    <section className="sa-dim">
-      <div className="sa-dim-h">
-        <h3>{label}</h3>
-        <span className="sa-strength">强度 {d.strength}/5</span>
-      </div>
-      {d.note ? <AiConclusion text={d.note} /> : (
-        <p className="sa-muted">
-          {aiFailed ? '本次解读未生成 —— 缺的只是这段文字，强度与依据题号已经算出来了。' : '本维度解读未生成。'}
-        </p>
-      )}
-      <footer>
-        依据：本组第 {d.evidenceQuestionIdx.length > 0 ? d.evidenceQuestionIdx.map((i) => i + 1).join('、') : '—'} 题的选择（只记题号，不含选项内容）。
-        本解读仅描述本次作答的倾向，不构成能力评价或职业推荐。
-      </footer>
-    </section>
   )
 }
 
@@ -1111,6 +1142,7 @@ export function SelfAssessmentHistoryPage() {
     <SaFrame
       {...SA_FRAME_BASE}
       screen="resume-self-assessment-history"
+      aiAsk={{ ...ASKS.saHistory, testId: 'self-assessment-ai-ask' }}
       state={current ? 'history-current' : 'history-empty'}
       status={current ? { tone: 'ok', label: '本机有 1 条记录' } : { tone: 'unknown', label: '本机无记录' }}
       ask={current ? <>这台机器上<em>有本次记录</em>。</> : <>这台机器上<em>还没有记录</em>。</>}
@@ -1124,58 +1156,44 @@ export function SelfAssessmentHistoryPage() {
       }
     >
       {current ? (
-        <SaCard head="这台机器上的本次记录" hint="只对本人可见" tone="lead" testId="self-assessment-list">
-          <SaMeta
-            items={[
-              { key: 'task', label: '记录编号', value: current, mono: true },
-              { key: 'consented', label: '同意时间', value: consentedAt ?? '未记录' },
-              { key: 'dims', label: '维度', value: answered > 0 ? `${answered} 个维度已出结果` : '未拿到结果' },
-              { key: 'expires', label: '保留至', value: expiresAt ?? '未返回到期时间' },
+        <div data-testid="self-assessment-list">
+          <ResumeStepPreview
+            className="rtp-hero-min"
+            art="report"
+            kicker="这台机器上的本次记录 · 只对本人可见"
+            title={answered > 0 ? `${answered} 个维度已出结果` : '未拿到结果'}
+            lines={[
+              `同意时间 ${consentedAt ?? '未记录'} · 保留至 ${expiresAt ?? '未返回到期时间'}`,
+              `记录编号 ${current}`,
             ]}
           />
-          <div className="sa-quickrow">
+          <div className="qxt-exits">
             <button
               type="button"
-              className="sa-quick"
+              className="qxt-btn qxt-btn-sec qxt-btn-exit"
               data-route="/resume/self-assessment/result"
               onClick={() => navigate(`/resume/self-assessment/result?taskId=${encodeURIComponent(current)}`)}
             >
               回看这次结果
             </button>
           </div>
-        </SaCard>
+        </div>
       ) : (
-        <SaCard head="这里还没有可查看的记录" hint="不是没加载出来，是本来就不存" testId="self-assessment-list">
-          <SaChips
-            items={[
-              { key: 'none', text: <>这台机器上的这次使用<b>没有记录</b></>, tone: 'warn' },
-              { key: 'nofake', text: '不生成示例历史' },
-              { key: 'nodraft', text: '未提交的答案不算记录' },
-            ]}
-          />
-          <p className="sa-sub">
-            不登录时不会保存；这次使用结束后，本机记录会自动清理。会员本人的历史可在「我的 → AI 服务记录 → 自我探索」查看与管理。
-          </p>
-        </SaCard>
+        <div data-testid="self-assessment-list" className="rtp-sa-empty">
+          <QxTouchCallout kind="howto">
+            这台机器上的这次使用没有记录。不登录时不会保存；未提交的答案不算记录，也不生成示例历史。会员本人的历史可在「我的 → AI 服务记录 → 自我探索」查看与管理。
+          </QxTouchCallout>
+        </div>
       )}
 
-      <SaCard head="这里没有什么" hint="每一条都可核对">
-        <SaMeta
-          items={[
-            { key: 'raw', label: '答案原文', value: '没有保存' },
-            { key: 'expired', label: '过期的解读', value: '到期自动清理' },
-            { key: 'withdrawn', label: '撤回的那次', value: '已物理删除，不可恢复' },
-            { key: 'enterprise', label: '企业 / 合作机构 / 工作人员', value: '都看不到，也不参与岗位排序' },
-          ]}
-        />
-        <p className="sa-sub">
-          本页不做跨次对比 —— 要能比就得留着两次的作答原文，本机选了不留，这是取舍不是漏做。
-        </p>
-      </SaCard>
+      <p className="qxt-fine">
+        答案原文没有保存；过期的解读到期自动清理；撤回的那一次已物理删除、不可恢复；企业、合作机构、工作人员都看不到，也不参与岗位排序。本页不做跨次对比——要能比就得留着两次的作答原文，本机选了不留，这是取舍不是漏做。
+      </p>
 
-      <SaCard head="现在可以做什么" hint="都是现在就能打开的入口" grow>
-        <SaPicks items={saExits(navigate, '/resume/self-assessment/history', hasRecordedConsent(session) && !session.result)} />
-      </SaCard>
+      <ResumeTouchActs
+        heading={{ title: '现在可以做什么', hint: '都是现在就能打开的入口' }}
+        items={saActItems(navigate, '/resume/self-assessment/history', hasRecordedConsent(session) && !session.result)}
+      />
 
       <SaNotice>
         本次作答只存在于这台机器的这次使用里，<b>不是账号记录</b>，退出或闲置 60 秒会被清掉，不会留给下一位使用者。

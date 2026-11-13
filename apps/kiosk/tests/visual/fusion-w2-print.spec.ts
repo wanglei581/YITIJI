@@ -4,11 +4,13 @@ import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import type { DocumentProcessTaskView } from '../../src/services/api/materials'
 import { test, expect } from '../fixtures/kiosk-test'
+import { MACHINE_UNUSABLE_LINE } from '../fixtures/unattended-lines'
 import { RECRUITMENT_HOSTING_OFF, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit, readEnabledStageScale } from './assert-layout'
 import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
 import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
 import { seedMaterialSession, seedPrintHandoff, setReactRouterState, writeMaterialSession, writePrintHandoff, W2_FILE, W2_ORDER, W2_PRINT_PARAMS, type PrintHandoffSeed } from './fixtures/fusion-w2-state'
+import { preparePrioritySeed } from './fixtures/qingxu-pair-seeds'
 
 const NOW = '2026-07-24T00:00:00.000Z'
 const LATER = '2099-07-24T00:10:00.000Z'
@@ -53,6 +55,7 @@ const UNVERIFIED_CAPABILITIES = [
   'signature_stamp',
   'color_print',
   'duplex_print',
+  'scan_device',
 ].map((capabilityKey) => ({
   capabilityKey,
   status: 'not_verified',
@@ -138,7 +141,10 @@ test('pickup scanner auto-submits once and Enter suffix is deduplicated @w2', as
   await page.goto('/print/pickup-claim')
   const input = page.getByLabel('到机码输入框')
   await expect(page.locator('[data-w2-page="pickup-claim"]')).toBeVisible()
-  // 未扫码时指引必须可见：机身扫码区位置 + 亮度（真机 A5/A3），不能等扫到才出现。
+  // 未扫码时指引必须看得到：机身扫码区位置 + 亮度（真机 A5/A3），不能等扫到才出现。
+  // 2026-10-28 稿 pickup：说明收在键盘下面常驻的「用扫码枪扫」开关里，一点就在说明卡里展开，不另起一屏。
+  await expect(page.getByRole('button', { name: '用扫码枪扫' })).toBeVisible()
+  await page.getByRole('button', { name: '用扫码枪扫' }).click()
   await expect(page.getByText('机身侧面的扫码区')).toBeVisible()
   await expect(page.getByText('亮度调高')).toBeVisible()
   await assertNoHorizontalOverflow(page)
@@ -178,7 +184,8 @@ test('pickup controls remain readable in Windows landscape @pickup-landscape', a
   // 横屏电脑走 1080×1920 舞台缩放：控件必须可见，高度除回 scale 后仍 ≥56 CSS px。
   const submit = page.getByRole('button', { name: '确认校验' })
   // 同稿 outs()：「码找不到了？」取代旧壳「怎么找到机码？」；仍是找不到码时的兜底说明。
-  const help = page.getByText('码找不到了？')
+  // 2026-10-28 稿 pickup 把它收成键盘下面的一行折叠「两种码的区别 · 码找不到了」，点开才是说明。
+  const help = page.getByText('两种码的区别 · 码找不到了')
   await expect(input).toBeVisible()
   await expect(submit).toBeVisible()
   await expect(help).toBeVisible()
@@ -285,7 +292,7 @@ test('pickup accepts 8-digit codes without truncating a legacy 10-char code @w2'
   expect(submitted).toEqual(['23456789AB'])
 
   // 8 位新码：静默 250ms 后自动核销，无需按钮。
-  await page.getByRole('button', { name: '再取一件' }).click()
+  await page.getByRole('button', { name: '重新输入', exact: true }).click()
   await input.pressSequentially('28491703', { delay: 5 })
   await expect(page.getByText('订单核验成功', { exact: true })).toBeVisible()
   expect(submitted).toEqual(['23456789AB', '28491703'])
@@ -312,28 +319,28 @@ test('pickup invalid code is rejected, cleared, and ready for the next scan @w2'
   const input = page.getByLabel('到机码输入框')
   await input.fill('AB2C7M9P3K')
 
-  await expect(page.getByRole('alert')).toHaveText(/到机码无效或已过期/)
+  await expect(page.getByRole('alert')).toHaveText(/到机码不对或已过期/)
   await expect(input).toHaveValue('')
   await expect(input).toBeFocused()
   expect(claimCount).toBe(1)
   expect(errors).toEqual([])
 })
 
-test('pickup hid guidance is visible before any scan and both draft controls work @w2', async ({ page, api }) => {
+test('pickup hid guidance is one tap away before any scan and both draft controls work @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
 
   await page.goto('/print/pickup-claim')
-  const hidEntry = page.getByRole('button', { name: /把手机上的码，对准机身侧面的扫码区/ })
+  const hidEntry = page.getByRole('button', { name: '用扫码枪扫' })
   await expect(hidEntry).toBeVisible()
-  await expect(page.getByText('亮度调高')).toBeVisible()
+  await expect(hidEntry).toHaveAttribute('aria-pressed', 'false')
   await expect(page.getByText('扫码器就绪')).toHaveCount(0)
   await assertTapTargetPointerHit(hidEntry)
   await assertNoElementCrossesViewport(page)
 
   await hidEntry.click()
+  await expect(hidEntry).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByTestId('arrival-code-state-hid')).toBeVisible()
-  await expect(page.getByText('请出示手机上的码')).toBeVisible()
   await expect(page.getByText('等待扫码输入')).toBeVisible()
   await expect(page.getByText('机身侧面的扫码区')).toBeVisible()
   await expect(page.getByText('亮度调高')).toBeVisible()
@@ -354,7 +361,7 @@ test('pickup hid guidance is visible before any scan and both draft controls wor
   await expect(page.getByRole('button', { name: '确认校验' })).toBeVisible()
   await expect(page.getByTestId('arrival-code-state-hid')).toHaveCount(0)
 
-  await page.getByRole('button', { name: '用机身扫码区' }).click()
+  await hidEntry.click()
   await expect(page.getByTestId('arrival-code-state-hid')).toBeVisible()
   await askHelp.click()
   await expect(page).toHaveURL(/\/help$/)
@@ -386,7 +393,7 @@ test('pickup 问小青 hands one draft to the assistant: prefilled once, never s
   // 读过一次就没有了：回到到机码页，再从底栏进顾问页，输入框是空的。
   await page.goBack()
   await expect(page.locator('[data-w2-page="pickup-claim"]')).toBeVisible()
-  await page.locator('.qx-nav-item', { hasText: 'AI 顾问' }).first().click()
+  await page.locator('.qxt-nav button', { hasText: 'AI 顾问' }).first().click()
   await expect(page).toHaveURL(/\/assistant$/)
   await expect(page.getByLabel('输入咨询问题')).toHaveValue('')
   expect(errors).toEqual([])
@@ -395,19 +402,28 @@ test('pickup 问小青 hands one draft to the assistant: prefilled once, never s
 for (const help of [
   { path: '/print-scan', label: '问小青：怎么选打印方式 →', draft: '我想打印一份文件，应该选手机上传、U 盘还是扫描？请帮我选一种方式。' },
   { path: '/print/upload?source=document', label: '问小青：这份文件怎么检查 →', draft: '这份文件要怎么检查？检查会看哪些内容？' },
-  { path: '/print/desk?step=check', label: '问小青：保留和遮挡有什么区别 →', draft: '材料检查发现了个人信息片段，保留和遮挡有什么区别？' },
-  { path: '/print/desk?step=preview', label: '问小青：帮我选打印参数 →', draft: '帮我选打印参数：黑白还是彩色、单面还是双面？' },
+  { path: '/print/desk?step=check', label: '问小青：文件要从哪传？', draft: '这一页没有待处理的文件。请说明文件可以从哪里传上来。不要假装已经收到文件。' },
+  // 同一条路径种上材料会话后是真的检查态，问小青换成「怎么遮挡」。上一条是没有文件的空态，两条各自覆盖，不能互相顶替。
+  { path: '/print/desk?step=check', seeded: true, name: '/print/desk?step=check (file seeded)', label: '问小青：怎么遮挡', draft: '材料检查发现了个人信息片段，保留和遮挡有什么区别？' },
+  { path: '/print/desk?step=preview', label: '问小青：选参数', draft: '帮我选打印参数：黑白还是彩色、单面还是双面？' },
 ]) {
-  test(`M1 AI help hands off the current question once: ${help.path} @w2`, async ({ page, api }) => {
+  test(`M1 AI help hands off the current question once: ${help.name ?? help.path} @w2`, async ({ page, api }) => {
     const errors = collectRuntimeErrors(page, W2_FILE.fileUrl)
     registerShell(api)
     api.respond('GET', '/api/v1/terminals/KSK-001/config', { status: 200, json: terminalConfigWithHosting(RECRUITMENT_HOSTING_OFF, 'w4-m1-assistant-draft') })
     api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', { status: 200, json: { data: { asrEnabled: false, ttsEnabled: false } } })
-    if (help.path.endsWith('preview')) {
+    if (help.seeded || help.path.endsWith('preview')) {
       registerPrice(api)
       const binary = new FusionW2BinaryRoute(page)
       await binary.install()
       await seedMaterialSession(page)
+    }
+    if (help.seeded) {
+      // 真检查态一进来就会建材料任务；让它稳定停在「材料检查未完成」。问小青在检查的每个阶段都是同一句。
+      api.respond('POST', '/api/v1/materials/tasks', {
+        status: 503,
+        json: { success: false, error: { code: 'MATERIAL_UNAVAILABLE', message: '材料服务暂不可用' } },
+      })
     }
     await page.goto(help.path)
     await page.getByRole('button', { name: help.label, exact: true }).click()
@@ -415,7 +431,7 @@ for (const help of [
     await expect(page.getByLabel('输入咨询问题')).toHaveValue(help.draft)
     expect(api.requestCount('POST', '/api/v1/assistant/chat')).toBe(0)
     await page.goto('/print/upload?source=document')
-    await page.locator('.qx-nav-item', { hasText: 'AI 顾问' }).first().click()
+    await page.locator('.qxt-nav button', { hasText: 'AI 顾问' }).first().click()
     await expect(page.getByLabel('输入咨询问题')).toHaveValue('')
     expect(api.requestCount('POST', '/api/v1/assistant/chat')).toBe(0)
     expect(errors).toEqual([])
@@ -448,7 +464,7 @@ test('pickup hid scan posts the claim payload and renders the server result @w2'
   })
 
   await page.goto('/print/pickup-claim')
-  await page.getByRole('button', { name: /把手机上的码，对准机身侧面的扫码区/ }).click()
+  await page.getByRole('button', { name: '用扫码枪扫' }).click()
   await expect(page.getByTestId('arrival-code-state-hid')).toBeVisible()
   await expect(page.getByText('等待扫码输入')).toBeVisible()
 
@@ -478,10 +494,10 @@ test('pickup hid invalid code shows the server error without fabricating success
   })
 
   await page.goto('/print/pickup-claim')
-  await page.getByRole('button', { name: /把手机上的码，对准机身侧面的扫码区/ }).click()
+  await page.getByRole('button', { name: '用扫码枪扫' }).click()
   await page.getByLabel('到机码输入框').fill('AB2C7M9P3K')
 
-  await expect(page.getByRole('alert')).toHaveText(/到机码无效或已过期/)
+  await expect(page.getByRole('alert')).toHaveText(/到机码不对或已过期/)
   await expect(page.getByText('订单核验成功')).toHaveCount(0)
   await expect(page.getByTestId('arrival-code-state-hid')).toBeVisible()
   expect(claimCount).toBe(1)
@@ -558,7 +574,8 @@ test('a terminal-session 401 on claim never replays the rejected session @w2', a
   await page.goto('/print/pickup-claim')
   await page.getByLabel('到机码输入框').pressSequentially('87654321', { delay: 5 })
 
-  await expect(page.getByRole('alert')).toHaveText(/这台机器的安全校验没通过/)
+  // 现场不安排人：会话票真的废了，说明是无人值守标准句 3（整台机器暂时不能用），不叫人找现场的人，也不说成到机码不对。
+  await expect(page.getByRole('alert')).toHaveText(MACHINE_UNUSABLE_LINE)
   await expect(page.getByText('订单核验成功')).toHaveCount(0)
   // 恰好一次，且带的就是那张票：没有用旧票重放，也没有在续期失败后继续发请求。
   expect(claimSessions).toEqual([TERMINAL_SESSION_FIXTURE])
@@ -756,7 +773,7 @@ for (const scenario of ['active', 'leave', 'privacy'] as const) {
         await expect(page.getByTestId('session-guard-state-clearing')).toBeVisible()
         await expect(page.getByLabel('到机码输入框')).toHaveCount(0)
       } else if (scenario === 'leave') {
-        await page.getByRole('button', { name: '返回打印扫描', exact: true }).click()
+        await page.getByRole('button', { name: '返回', exact: true }).click()
         await expect(page).toHaveURL(/\/print-scan$/)
       }
 
@@ -809,6 +826,15 @@ function registerQuote(api: ApiRouter, opts?: { amountCents?: number; billablePa
     status: 200,
     json: quoteResponseJson(opts),
   })
+}
+
+const decimalAmount = (cents: number): string => (cents / 100).toFixed(2)
+
+async function expectConfirmAmount(page: Page, cents: number): Promise<void> {
+  const amount = page.getByTestId('print-confirm-amount')
+  await expect(amount).toBeVisible()
+  await expect(amount).toHaveText(decimalAmount(cents))
+  await expect(amount.locator('..')).toHaveText(`应付 ${decimalAmount(cents)} 元`)
 }
 
 async function expectHealthy(page: Page, errors: string[], marker?: string): Promise<void> {
@@ -953,10 +979,8 @@ test('print intake keeps three upload sources and a separate scan CTA @w2', asyn
   await expect(page.getByRole('button', { name: /手机扫码上传/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /U 盘导入/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /扫描纸质原件|扫描原件/ })).toBeVisible()
-  const primary = page.getByTestId('file-source-primary')
-  await expect(primary).toBeVisible()
-  await expect(primary).toBeDisabled()
-  await expect(primary).toHaveText('下一步：材料检查')
+  // 稿：来源选择页没有主按钮（没有文件就没有下一步）；选好文件后才出「下一步：材料检查」。
+  await expect(page.getByTestId('file-source-primary')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '问小青：这份文件怎么检查 →' })).toBeVisible()
   const firstSource = await page.locator('.fs-ch').first().boundingBox()
   expect(firstSource!.y, '2.0 来源按钮位于顶部只读区之后').toBeGreaterThanOrEqual(500)
@@ -964,9 +988,107 @@ test('print intake keeps three upload sources and a separate scan CTA @w2', asyn
 
   await page.getByRole('button', { name: /扫描纸质原件|扫描原件/ }).click()
   await page.waitForURL((url) => url.pathname === '/scan')
-  await expect(page.getByRole('heading', { name: '材料扫描' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '扫什么？' })).toBeVisible()
   await expectHealthy(page, errors)
 })
+
+test('print source page 我的文档 row opens my documents in pick-to-print mode, also through login @w2', async ({ page, api }) => {
+  // 我的文档页按 ?pick=print 进「选一份来打印」模式（文件按能打印的排前面）。
+  // 来源页这一行、游客登录后的回跳，都必须带上它；否则用户落在普通查看页，不知道要选哪一份。
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+
+  // 游客：去登录，登录成功后的回跳地址带 pick=print。
+  await page.goto('/print/upload?source=document')
+  await expect(page.locator('[data-w2-page="print-upload"]')).toBeVisible()
+  await page.getByTestId('file-source-member-source').click()
+  await expect(page).toHaveURL(/\/login(\?|$)/)
+  const guestFrom = await page.evaluate(() => (window.history.state as { usr?: { from?: string } } | null)?.usr?.from)
+  expect(guestFrom).toBe('/me/documents?pick=print')
+
+  // 已登录：直达我的文档的选文件模式。
+  await loginThroughVisibleUi(page, '/print/upload')
+  await expect(page.locator('[data-w2-page="print-upload"]')).toBeVisible()
+  await page.getByTestId('file-source-member-source').click()
+  await page.waitForURL((url) => url.pathname === '/me/documents')
+  expect(new URL(page.url()).searchParams.get('pick')).toBe('print')
+  await expect.poll(() => api.requestCount('GET', '/api/v1/me/documents')).toBeGreaterThan(0)
+  expect(errors).toEqual([])
+})
+
+test('print empty desk: 我的文档 card follows login state and carries pick=print @w2', async ({ page, api }) => {
+  // 材料检查 / 预览没有文件时的空态（稿 st-empty）。第二张卡：游客写「登录后才能看到你保存的文件」并去登录，
+  // 已登录写「你保存过的文件在这里，选一份再来」并直达选文件模式；两条路都带 pick=print。
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+
+  await page.goto('/print/desk?step=check')
+  const docsCard = page.getByRole('button', { name: /我的文档（登录后）/ })
+  await expect(docsCard).toContainText('登录后才能看到你保存的文件')
+  await docsCard.click()
+  await expect(page).toHaveURL(/\/login(\?|$)/)
+  expect(await page.evaluate(() => (window.history.state as { usr?: { from?: string } } | null)?.usr?.from)).toBe('/me/documents?pick=print')
+
+  await loginThroughVisibleUi(page, '/print/upload')
+  // 登录会清掉上一位的材料上下文；软跳转回空态（不重载，会话是内存态）。
+  await softNavigate(page, '/print/desk?step=check', null)
+  const loggedInCard = page.getByRole('button', { name: /我的文档（登录后）/ })
+  await expect(loggedInCard).toContainText('你保存过的文件在这里，选一份再来')
+  await expect(loggedInCard).not.toContainText('登录后才能看到你保存的文件')
+  await loggedInCard.click()
+  await page.waitForURL((url) => url.pathname === '/me/documents')
+  expect(new URL(page.url()).searchParams.get('pick')).toBe('print')
+  await expect.poll(() => api.requestCount('GET', '/api/v1/me/documents')).toBeGreaterThan(0)
+  expect(errors).toEqual([])
+})
+
+// 选文件页的上传类出错屏，收成同一版式（稿 st-error）：文件卡（带「未收下」类的标；没有文件名的失败省掉）→ 原因卡 → 两张大出口卡 →
+// 求助行；意图带眉题「打印文件 · 上传」、警示色状态胶囊、无「青」印章、不画四步轴；底栏「问小青」是本屏专属问句，
+// 主键是真实的重试动作。文案保留各自的真实原因。
+for (const c of [
+  { state: 'phone-gen-failed', url: '/print/upload?tab=qr', pill: '没有收下', ask: '问小青：码出不来怎么办？', primary: '重新出一张码', file: false, help: true, reason: /还没有收到文件/ },
+  { state: 'phone-confirm-failed', url: '/print/upload?tab=qr', pill: '确认没成功', ask: '问小青：确认失败怎么办？', primary: '重试确认', file: true, help: false, reason: /当前文件仍然是空的/ },
+  { state: 'usb-import-failed', url: '/print/upload?tab=usb', pill: '没有导进来', ask: '问小青：导不进来怎么办？', primary: '重新读一次 U 盘', file: true, help: false, reason: /当前文件仍然是空的/ },
+  { state: 'usb-read-failed', url: '/print/upload?tab=usb', pill: '没有读到', ask: '问小青：读不了 U 盘怎么办？', primary: '重新读一次 U 盘', file: false, help: true, reason: /没能列出文件/ },
+  { state: 'local-rejected', url: '/print/upload?tab=file', pill: '没有收下', ask: '问小青：这种文件能打吗？', primary: '回窗口再挑一份', file: true, help: false, reason: /支持 PDF、JPG、PNG/ },
+  { state: 'local-unreadable', url: '/print/upload?tab=file', pill: '没有收下', ask: '问小青：这份读不出来', primary: '回窗口再挑一份', file: true, help: false, reason: /文件为空或者大小取不到/ },
+  { state: 'local-upload-failed', url: '/print/upload?tab=file', pill: '没有收下', ask: '问小青：传不上去怎么办？', primary: '重试上传', file: true, help: true, reason: /还没有收到这一份文件/ },
+] as const) {
+  test(`upload error screens share one board (st-error): ${c.state} @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    await preparePrioritySeed(page, api, { nn: '12', state: c.state, screen: '', runtimeUrl: c.url } as never)
+
+    const board = page.getByTestId('file-source-error-board')
+    await expect(board).toBeVisible()
+    // 意图带：眉题带「上传」、警示色胶囊写这一屏的事实、无「青」印章、不画四步轴。
+    await expect(page.locator('.qxt-band .qxt-eyebrow')).toContainText('· 上传')
+    await expect(page.locator('.qxt-band .qxt-status')).toHaveText(c.pill)
+    await expect(page.locator('.qxt-band .qxt-status')).toHaveClass(/qxt-status-warn/)
+    await expect(page.locator('.qxt-seal')).toHaveCount(0)
+    await expect(page.locator('.qxt-rail')).toHaveCount(0)
+    // 正文：文件卡（有文件名才有）→ 原因卡 → 两张大出口卡 → 求助行。
+    await expect(board.locator('.qxt-file')).toHaveCount(c.file ? 1 : 0)
+    await expect(board.getByTestId('file-source-error-reason')).toContainText(c.reason)
+    await expect(board.locator('.qxt-slab')).toHaveCount(2)
+    // 底栏主键就是第一张出口卡的那个动作，两处写同一句，不能一处改了另一处还是旧的。
+    await expect(board.locator('.qxt-slab').first()).toContainText(c.primary)
+    await expect(board).toContainText('需要帮助？')
+    await expect(board.getByTestId('file-source-help')).toHaveCount(c.help ? 1 : 0)
+    // 底栏：问小青带本屏专属问句，主键是真实的重试动作，三个键的字都不被省略号截掉。
+    await expect(page.getByRole('button', { name: c.ask, exact: true })).toBeVisible()
+    await expect(page.getByTestId('file-source-primary')).toHaveText(c.primary)
+    const clipped = await page.locator('.qxt-dock').evaluate((dock) =>
+      [...dock.querySelectorAll('button, button *')].filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => (el.textContent ?? '').trim()))
+    expect(clipped, '底栏的字不得被省略号截断').toEqual([])
+    // 现场无人值守：不让用户去找人。
+    await expect(page.locator('[data-w2-page="print-upload"]')).not.toContainText(/联系现场|联系工作人员|找现场|找工作人员/)
+    await page.screenshot({ path: test.info().outputPath(`upload-error-${c.state}.png`) })
+    expect(errors).toEqual([])
+  })
+}
 
 test('print upload does not skip privacy check without a file @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
@@ -974,7 +1096,9 @@ test('print upload does not skip privacy check without a file @w2', async ({ pag
 
   await page.goto('/print/upload?source=document')
   await expect(page.locator('[data-testid="file-source-state-source-chooser"]')).toBeVisible()
-  await page.getByTestId('file-source-primary').click({ force: true })
+  // 稿：没有文件就没有下一步——来源选择页根本没有主按钮，没有能点穿隐私检查的入口。
+  await expect(page.getByTestId('file-source-primary')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /下一步/ })).toHaveCount(0)
   await expect(page).toHaveURL(/\/print\/upload/)
   await expect(page.locator('[data-w2-page="print-upload"]')).toBeVisible()
   await expectHealthy(page, errors, 'print-upload')
@@ -1040,7 +1164,7 @@ test('material checks require a PII decision, create the redacted task, and carr
   await binary.install()
 
   await openWithHandoff(page, '/print/desk?step=check', { materialCheck: null, printParams: null })
-  await expect(page.getByRole('heading', { name: '有 1 处要你决定', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '有 1 处要你拿主意', exact: true })).toBeVisible()
   await expect(page.locator('.qpd-finding-snippet')).toHaveText('第 1 页 · 138****8000')
   await expect(page.locator('.qpd-decision-counts')).toContainText('已决定 0 / 1')
   await expect(page.getByRole('button', { name: '下一步：预览与参数' })).toBeDisabled()
@@ -1089,17 +1213,18 @@ test('direct preview restores the material session and completes the PDF respons
   const previewHost = page.locator(`[data-pdf-preview-host][data-preview-src="${W2_FILE.fileUrl}"]`)
   await expect(previewHost).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
   await expect(previewHost.locator('canvas')).toHaveCount(1)
-  await expect(page.getByRole('button', { name: '问小青：帮我选打印参数 →' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '问小青：选参数' })).toBeVisible()
   await expect(page.locator('.qpd-guide button, .qpd-guide a')).toHaveCount(0)
-  await expect(page.locator('.qpd-param-stack > .qpd-param-card')).toHaveCount(4)
-  await expect(page.locator('.qpd-device-strip > div')).toHaveCount(4)
+  // 2026-10-28 稿 preview：参数五行（份数、颜色、单双面、纸张、版面），打印机状态由顶栏胶囊说一次，不再另画四格信息行。
+  await expect(page.locator('.qpd-param-stack > .qpd-param-card')).toHaveCount(5)
+  await expect(page.locator('.qxt-status')).toContainText('打印机在线')
   await page.getByRole('button', { name: '增加十份', exact: true }).click()
   await expect(page.locator('.qpd-stepper output')).toHaveText('11 份')
   await expect(page.getByRole('region', { name: '参数摘要' })).toContainText('11 份')
   await page.getByRole('button', { name: '减少十份', exact: true }).click()
   await expect(page.locator('.qpd-stepper output')).toHaveText('1 份')
   await expect(page.getByRole('button', { name: '减少打印份数' })).toBeDisabled()
-  await page.getByRole('button', { name: '打开完整预览 · 逐页看清' }).click()
+  await page.getByRole('button', { name: /打开完整预览/ }).click()
   const dialog = page.getByRole('dialog', { name: `完整预览：${W2_FILE.name}` })
   await expect(dialog).toBeVisible()
   await expect(dialog.locator('[data-pdf-preview-host]')).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
@@ -1161,7 +1286,8 @@ test('print parameter suggestions are advisory until applied and then flow to co
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerPrice(api)
-  registerQuote(api, { amountCents: 600, billablePages: 6, unitCents: 100 })
+  const quote = { amountCents: 600, billablePages: 6, unitCents: 100 }
+  registerQuote(api, quote)
   api.respond('GET', '/api/v1/materials/tasks/w2-inspection-001/print-param-suggestions', {
     status: 200,
     json: { success: true, data: printParamSuggestions({ copies: 3 }) },
@@ -1170,7 +1296,7 @@ test('print parameter suggestions are advisory until applied and then flow to co
   await binary.install()
   await seedMaterialSession(page)
   // 预览→确认是 SPA 导航。Playwright 在这个窗口里对已拦截 POST 的 postDataJSON()
-  // 为空（页面已按 registerQuote 渲染 ¥6.00，请求确实发出了）。
+  // 为空（页面已按 registerQuote 渲染 6.00 元，请求确实发出了）。
   // page.route + fallback 会把报价挂死；自己 fulfill 也读不到 body。
   // 所以在页面 fetch 出口抓 payload，应答仍只由 registerQuote 提供。
   await page.addInitScript(() => {
@@ -1195,7 +1321,7 @@ test('print parameter suggestions are advisory until applied and then flow to co
   await page.goto('/print/desk?step=preview')
   // 2.0 份数步进器把单位写在读数里（稿 13：「1 份」）。
   await expect(page.locator('.qpd-stepper output')).toHaveText('1 份')
-  await expect(page.getByText('3 份', { exact: true })).toBeVisible()
+  await expect(page.getByText('打印份数 · 3 份', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '采用这些建议' }).click()
   await expect(page.locator('.qpd-stepper output')).toHaveText('3 份')
   await page.getByRole('button', { name: '下一步：核对价格' }).click()
@@ -1203,7 +1329,7 @@ test('print parameter suggestions are advisory until applied and then flow to co
   // 确认页摘要用 data-sum-row + <b class="v">，报价金额来自 POST /orders/quote。
   // 预览页才有「3 份」的 dd/strong；不能用它们冒充确认页断言。
   await expect(page.locator('[data-sum-row="打印份数"] .v')).toHaveText('3 份')
-  await expect(page.getByTestId('print-confirm-amount')).toHaveText(/6\.00/)
+  await expectConfirmAmount(page, quote.amountCents)
   await expect.poll(async () => {
     return page.evaluate(() => {
       const bodies = (window as Window & { __w2QuoteBodies?: Array<{ params?: { copies?: number } }> }).__w2QuoteBodies
@@ -1253,7 +1379,7 @@ test('unverified terminal disables color and duplex with an honest reason @w2', 
   await colorBtn.focus()
   await expect(colorBtn).toBeFocused()
 
-  const duplexBtn = preview.getByRole('button', { name: '双面（长边）', exact: true })
+  const duplexBtn = preview.getByRole('button', { name: '双面', exact: true })
   await expect(duplexBtn).toHaveAttribute('aria-disabled', 'true')
   await expect(duplexBtn).not.toHaveAttribute('disabled', /.*/)
   await duplexBtn.focus()
@@ -1265,6 +1391,8 @@ test('unverified terminal disables color and duplex with an honest reason @w2', 
   await duplexBtn.click({ force: true })
   await expect(preview.getByRole('button', { name: '黑白', exact: true })).toHaveAttribute('data-selected', 'true')
   await expect(preview.getByRole('button', { name: '单面', exact: true })).toHaveAttribute('data-selected', 'true')
+  await expect(preview.getByRole('button', { name: '长边翻页', exact: true })).toHaveCount(0)
+  await expect(preview.getByRole('button', { name: '短边翻页', exact: true })).toHaveCount(0)
 
   await expectHealthy(page, errors, 'print-preview')
 })
@@ -1290,8 +1418,11 @@ test('terminal verified for color and duplex can actually select them @w2', asyn
   await colorBtn.click()
   await expect(colorBtn).toHaveAttribute('data-selected', 'true')
 
-  const duplexBtn = preview.getByRole('button', { name: '双面（长边）', exact: true })
+  const duplexBtn = preview.getByRole('button', { name: '双面', exact: true })
   await duplexBtn.click()
+  const longEdgeBtn = preview.getByRole('button', { name: '长边翻页', exact: true })
+  await longEdgeBtn.click()
+  await expect(longEdgeBtn).toHaveAttribute('data-selected', 'true')
   await expect(duplexBtn).toHaveAttribute('data-selected', 'true')
 
   await expectHealthy(page, errors, 'print-preview')
@@ -1309,10 +1440,8 @@ test('retired params route redirects into preview with real printer fixtures @w2
   await page.goto('/print/params')
   await expect(page).toHaveURL(/\/print\/desk\?step=preview/)
   await expect(page.locator('[data-w2-page="print-preview"]')).toBeVisible()
-  // 2.0 把打印机卡并进页头的只读信息行（稿 13 顶部四格），它是 role=status，不在参数栅格里。
-  const deviceRow = page.getByRole('status').filter({ hasText: '纸张' })
-  await expect(deviceRow.getByText('已配置打印机', { exact: true })).toBeVisible()
-  await expect(deviceRow.getByText('打印机在线', { exact: true })).toBeVisible()
+  // 2026-10-28 稿 preview：打印机状态由顶栏胶囊说一次（取自真实打印机状态），页面里不再另画「已配置打印机」信息行。
+  await expect(page.locator('.qxt-status')).toContainText('打印机在线')
   await expectHealthy(page, errors, 'print-preview')
 })
 
@@ -1441,7 +1570,7 @@ test('paid print-job amount routes confirmation to cashier @w2', async ({ page, 
 
   await page.goto('/print/confirm')
   await expect(page.getByText('¥1.00/页 × 2 页', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: /^(确认并去付款|确认并打印)$/ }).click()
+  await page.getByRole('button', { name: /^(去付款|确认并打印)$/ }).click()
   await page.waitForURL('**/print/cashier')
   await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
   await expect(page.getByText(W2_ORDER.paymentSessionToken)).toHaveCount(0)
@@ -1465,7 +1594,10 @@ test('cashier renders a pending QR without exposing its session token @w2', asyn
   await page.goto('/print/cashier')
   await setReactRouterState(page, '/print/cashier', cashierState)
   await page.getByRole('button', { name: '手机扫屏幕上的码' }).click()
-  await expect(page.locator('.qx-state-t', { hasText: '请扫码支付' })).toBeVisible()
+  const qrNotice = page.locator('.cashier-qr-notice')
+  await expect(qrNotice).toContainText('请扫码支付')
+  await expect(qrNotice).toBeVisible()
+  await expect(qrNotice).toContainText('请勿切换方式、重复付款或重新下单')
   await expect(page.locator('svg').filter({ has: page.locator('path') })).not.toHaveCount(0)
   await expect(page.getByText(W2_ORDER.paymentSessionToken)).toHaveCount(0)
   // 稿 32-cashier 把出码等待态的主按钮定为「刷新付款结果」（稿内 5 次），
@@ -1677,7 +1809,7 @@ test('a terminal-session 401 on Order-only release fails as terminal security, n
   // 原样外抛（续期失败可能是 TypeError），这里就会变成「网络连接失败」——
   // 把一次安全失败说成网络问题，现场工作人员会照着去查网线。
   const alert = page.locator('.cashier-qx-error')
-  await expect(alert).toHaveText(/这台机器的安全校验没通过/)
+  await expect(alert).toHaveText(MACHINE_UNUSABLE_LINE)
   await expect(alert).not.toHaveText(/网络连接失败/)
   await expect(page.locator('.qx-state-t', { hasText: '打印任务尚未建立' })).toBeVisible()
   await expect(page).toHaveURL(/\/print\/cashier$/)
@@ -1867,7 +1999,8 @@ test('failed print status displays only the safe user reason and no pickup code 
   await page.goto('/print/progress')
   await setReactRouterState(page, '/print/progress', cashierState)
   await page.waitForURL('**/print/done')
-  await expect(page.getByText('打印机暂时离线，请联系现场工作人员', { exact: true })).toBeVisible()
+  await expect(page.getByText('打印有问题？拨打服务电话 18369161921（工作日 9:00–18:00），或问小青', { exact: true })).toBeVisible()
+  await expect(page.getByText('请联系现场工作人员')).toHaveCount(0)
   await expect(page.getByText('agent stack and local path must stay hidden')).toHaveCount(0)
   await expect(page.getByText('取件凭证码')).toHaveCount(0)
   await expectHealthy(page, errors, 'print-done')
@@ -1908,7 +2041,8 @@ test('takeaway-url stays a payment-token recovery path with no terminal session 
   await page.goto('/print/progress')
   await setReactRouterState(page, '/print/progress', cashierState)
   await page.waitForURL('**/print/done')
-  await expect(page.getByText('打印机暂时离线，请联系现场工作人员', { exact: true })).toBeVisible()
+  await expect(page.getByText('打印有问题？拨打服务电话 18369161921（工作日 9:00–18:00），或问小青', { exact: true })).toBeVisible()
+  await expect(page.getByText('请联系现场工作人员')).toHaveCount(0)
 
   const takeawayHeaders = (await takeawayRequest).headers()
   expect(takeawayHeaders['x-payment-session-token']).toBe(W2_ORDER.paymentSessionToken)
@@ -2036,7 +2170,8 @@ test('benefit card reports 未认领身份 for a guest and never fabricates a di
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerPrice(api)
-  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  const quote = { amountCents: 200, billablePages: 2, unitCents: 100 }
+  registerQuote(api, quote)
   await seedMaterialSession(page)
 
   await page.goto('/print/confirm')
@@ -2045,7 +2180,7 @@ test('benefit card reports 未认领身份 for a guest and never fabricates a di
   // 反向：游客态不得出现核销 CTA，也不得出现任何抵扣结论。
   await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
   await expect(page.getByText('已抵扣')).toHaveCount(0)
-  await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
+  await expectConfirmAmount(page, quote.amountCents)
   await expectHealthy(page, errors, 'print-confirm')
 })
 
@@ -2057,13 +2192,14 @@ test('benefit card survives the AI-down state and stays decoupled from 材料体
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerPrice(api)
-  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  const quote = { amountCents: 200, billablePages: 2, unitCents: 100 }
+  registerQuote(api, quote)
 
   await openWithHandoff(page, '/print/confirm', CONFIRM_HANDOFF)
   // 体检摘要缺席（ai-down），但权益卡与金额都在。
   await expect(page.getByText('隐私检查摘要')).toHaveCount(0)
   await expect(benefitCard(page)).toHaveAttribute('data-benefit-state', 'guest')
-  await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
+  await expectConfirmAmount(page, quote.amountCents)
   await expectHealthy(page, errors, 'print-confirm')
 })
 
@@ -2081,10 +2217,13 @@ test('benefit card reports 价目拉不到 when the quote fails and shows no amo
   await expect(benefitCard(page)).toHaveAttribute('data-benefit-state', 'price_unavailable')
   await expect(page.getByText('本机没能取到现行价目', { exact: true })).toBeVisible()
   // 反向：报价失败时既不显示金额，也不给出任何「有可用 / 已用完」结论。
+  await expect(page.getByTestId('print-confirm-amount')).toHaveCount(0)
+  // 换了「应付 X.XX 元」格式后，屏上任何地方都不许冒出这句或旧的 ¥ 写法（不止 testid 那一处）。
+  await expect(page.getByText('应付 2.00 元', { exact: true })).toHaveCount(0)
   await expect(page.getByText('¥2.00')).toHaveCount(0)
   await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '重新报价' })).toBeVisible()
-  await expect(page.getByRole('button', { name: /^(确认并去付款|确认并打印)$/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^(去付款|确认并打印)$/ })).toHaveCount(0)
   await expectHealthy(page, errors, 'print-confirm')
 })
 
@@ -2152,7 +2291,8 @@ test('benefit card lists usable grants but keeps redemption disabled and focusab
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerPrice(api)
-  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  const quote = { amountCents: 200, billablePages: 2, unitCents: 100 }
+  registerQuote(api, quote)
   registerMemberLogin(api)
   registerBenefits(api, [
     benefitGrant({ id: 'grant-usable', title: '打印体验券', quantityRemaining: 2, quantityTotal: 3 }),
@@ -2184,8 +2324,9 @@ test('benefit card lists usable grants but keeps redemption disabled and focusab
 
   // 资损防线：不得伪造抵扣，应付金额保持报价原值。
   await expect(page.getByText('已抵扣')).toHaveCount(0)
-  await expect(page.getByText('¥0.00')).toHaveCount(0)
-  await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
+  await expect(page.getByTestId('print-confirm-amount')).not.toHaveText(decimalAmount(0))
+  await expect(page.getByText(`应付 ${decimalAmount(0)} 元`, { exact: true })).toHaveCount(0)
+  await expectConfirmAmount(page, quote.amountCents)
   await expectHealthy(page, errors, 'print-confirm')
 })
 
@@ -2253,6 +2394,7 @@ test('print confirm renders the server quote amount and never a local estimate @
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerPrice(api)
+  const amountCents = W2_ORDER.amountCents
   let quoteBody: { fileUrl?: string; params?: { colorMode?: string; copies?: number } } | null = null
   await page.route('**/api/v1/orders/quote', async (route) => {
     if (route.request().method() !== 'POST') {
@@ -2264,17 +2406,17 @@ test('print confirm renders the server quote amount and never a local estimate @
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        amountCents: 200,
+        amountCents,
         billablePages: 2,
         billingPageSource: 'detected',
-        priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents: 200 }],
+        priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents }],
       }),
     })
   })
   await seedMaterialSession(page)
   await page.goto('/print/confirm')
   await expect(page.locator('[data-testid="print-confirm-state-quoted"]')).toBeVisible()
-  await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
+  await expectConfirmAmount(page, amountCents)
   await expect(page.getByText('¥1.00/页 × 2 页', { exact: true })).toBeVisible()
   expect(quoteBody?.fileUrl).toBe(W2_FILE.fileUrl)
   expect(quoteBody?.params?.colorMode).toBe('black_white')
@@ -2286,7 +2428,8 @@ test('print confirm create-job payload matches the quoted file and params @w2', 
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerPrice(api)
-  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  const quote = { amountCents: 200, billablePages: 2, unitCents: 100 }
+  registerQuote(api, quote)
   let jobBody: { fileUrl?: string; fileName?: string; params?: { colorMode?: string; copies?: number } } | null = null
   await page.route('**/api/v1/print/jobs', async (route) => {
     if (route.request().method() !== 'POST') {
@@ -2316,8 +2459,8 @@ test('print confirm create-job payload matches the quoted file and params @w2', 
   api.respond('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, { status: 200, json: payStatus('unpaid') })
   await seedMaterialSession(page)
   await page.goto('/print/confirm')
-  await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
-  await page.getByRole('button', { name: /^(确认并去付款|确认并打印)$/ }).click()
+  await expectConfirmAmount(page, quote.amountCents)
+  await page.getByRole('button', { name: /^(去付款|确认并打印)$/ }).click()
   await page.waitForURL('**/print/cashier')
   expect(jobBody?.fileUrl).toBe(W2_FILE.fileUrl)
   expect(jobBody?.fileName).toBe(W2_FILE.name)
@@ -2342,6 +2485,9 @@ test('print confirm fail-closes duplicate query keys and missing file context @w
   await page.goto('/print/confirm')
   await expect(page.locator('[data-testid="print-confirm-state-missing-context"]')).toBeVisible()
   await expect(page.getByText('未找到文件信息')).toBeVisible()
+  await expect(page.getByTestId('print-confirm-amount')).toHaveCount(0)
+  // 换了「应付 X.XX 元」格式后，屏上任何地方都不许冒出这句或旧的 ¥ 写法（不止 testid 那一处）。
+  await expect(page.getByText('应付 2.00 元', { exact: true })).toHaveCount(0)
   await expect(page.getByText('¥2.00')).toHaveCount(0)
   await expectHealthy(page, errors, 'print-confirm')
 })
@@ -2420,15 +2566,17 @@ test('print preview paints each PDF page on a canvas and leaves without ERR_ABOR
   await expect.poll(() => host.getAttribute('data-pdf-render'), { timeout: 20_000 }).not.toBe('0')
   await expect(host).toHaveAttribute('data-pdf-page', '1')
   await expect(host).toHaveAttribute('data-pdf-page-count', '2')
-  await expect(host).toContainText('第 1 / 共 2 页')
-  await expect(page.locator('.qpd-preview-shell iframe, .qpd-preview-shell embed, .qpd-preview-shell object')).toHaveCount(0)
+  // 2026-10-28 稿 preview：翻页条在缩略图下面（上一页 · 第 N 页 / 共 M 页 · 下一页），不在画布宿主里。
+  const pager = page.locator('.pdk-pager')
+  await expect(pager).toContainText('第 1 页 / 共 2 页')
+  await expect(page.locator('.pdk-doc iframe, .pdk-doc embed, .pdk-doc object')).toHaveCount(0)
   const canvas = host.locator('canvas')
   const first = await waitForCanvasInk(canvas)
 
   const painted = await host.getAttribute('data-pdf-render')
-  await host.getByRole('button', { name: '下一页' }).click()
+  await pager.getByRole('button', { name: '下一页' }).click()
   await expect(host).toHaveAttribute('data-pdf-page', '2')
-  await expect(host).toContainText('第 2 / 共 2 页')
+  await expect(pager).toContainText('第 2 页 / 共 2 页')
   await expect.poll(() => host.getAttribute('data-pdf-render'), { timeout: 20_000 }).not.toBe(painted)
   const second = await waitForCanvasInk(canvas)
   expect(second.checksum, '第二页和第一页不是同一幅画面').not.toBe(first.checksum)
@@ -2507,7 +2655,7 @@ test('W-118 material checks share one in-flight round across immediate back and 
   await page.goto('/print/desk?step=check')
   await expect.poll(() => counts.inspection).toBe(1)
   try {
-    await page.getByRole('button', { name: '返回选文件', exact: true }).first().click()
+    await page.getByRole('button', { name: '上一步', exact: true }).first().click()
     await expect(page).toHaveURL(/\/print\/upload/)
     await page.goBack()
     await expect(page.locator('[data-w2-page="print-material-check"]')).toHaveAttribute('data-qx-state', 'inspection')
@@ -2621,7 +2769,7 @@ test('W-118 N1 guest returns from preview to check without losing the file after
   await page.getByRole('button', { name: '全部保留', exact: true }).click()
   await page.getByRole('button', { name: '下一步：预览与参数' }).click()
   await expect(page).toHaveURL(/step=preview/)
-  await page.getByRole('button', { name: '返回材料检查', exact: true }).click()
+  await page.getByRole('button', { name: '上一步', exact: true }).click()
   await expect(page).toHaveURL(/step=check/)
   await expect(page.getByRole('heading', { name: '这一页没有待处理的文件' })).toHaveCount(0)
   await expect(page.getByText(W2_FILE.name, { exact: true }).first()).toBeVisible()
@@ -2755,7 +2903,7 @@ test('usb deep link stays closed while usb import is in maintenance @w2', async 
   await page.goto('/print/upload?source=document&tab=usb&mode=transfer')
   await expect(page.getByText('维护中，暂时不可用', { exact: true })).toBeVisible()
   await expect(page.locator('[data-testid^="file-source-usb-file"]')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '导入这一份' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '导入这份文件' })).toHaveCount(0)
   // 轮询是放行后立刻发出的，不是等 2 秒。先看到拒绝文案再等一小段，才能证明没有迟到的请求。
   await page.waitForTimeout(400)
   expect(hits.count).toBe(0)
@@ -2774,7 +2922,7 @@ test('usb deep link lists files when usb import is available @w2', async ({ page
   await expect(page.getByRole('button', { name: /求职材料\.pdf/ })).toBeVisible()
   expect(hits.count).toBeGreaterThan(0)
   await page.getByRole('button', { name: /求职材料\.pdf/ }).click()
-  await expect(page.getByRole('button', { name: '导入这一份' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '导入这份文件' })).toBeVisible()
   await expectHealthy(page, errors, 'print-upload')
 })
 
@@ -2792,7 +2940,7 @@ test('usb column explains when capability status cannot be read @w2', async ({ p
   await expect(page.getByText('暂时读不到本机的服务开通情况，请稍后再试或使用其他方式', { exact: true })).toBeVisible()
   await expect(page.getByText('boom-internal')).toHaveCount(0)
   await expect(page.locator('[data-testid^="file-source-usb-file"]')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '导入这一份' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '导入这份文件' })).toHaveCount(0)
   const retry = page.getByTestId('usb-import-retry')
   await expect(retry).toBeVisible()
   const box = await retry.boundingBox()
@@ -2830,3 +2978,67 @@ test('expired phone upload offers the usb switch when usb import is available @w
   await expect(page.getByRole('button', { name: '改用 U 盘导入' })).toBeVisible()
   await expectHealthy(page, errors, 'print-upload')
 })
+
+/*
+ * #1519 留给触屏版第三包的接线：选文件页「手机扫码上传」收到文件后，文件行写这份文件从哪来（来自小程序 / 来自手机网页），
+ * 待确认屏另有一句「不是你传的文件就取消」。句子都来自 copy/miniappLinkCopy.ts，页面不手写。
+ * 来源读不到（旧会话没有这个字段）时文件行保持原字「手机扫码上传」，提醒仍在。
+ */
+const NOT_YOUR_FILE_HINT = '不是你传的文件？请点「取消」，再重新扫码。'
+
+function installReceivedPhoneUpload(api: ApiRouter, source: string | null | undefined): void {
+  const sessionId = 'w3-received-upload'
+  const expiresAt = '2099-01-01T00:00:00.000Z'
+  api.respond('POST', '/api/v1/upload-sessions', {
+    status: 200,
+    json: { success: true, data: { sessionId, uploadUrl: '/upload/phone', uploadToken: 'w3-received-token', controlToken: 'w3-received-control', expiresAt } },
+  })
+  api.respond('GET', `/api/v1/upload-sessions/${sessionId}`, {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        sessionId,
+        status: 'uploaded',
+        purpose: 'print_doc',
+        mode: 'temporary',
+        file: {
+          fileId: 'w3-received-file',
+          filename: '手机传来的材料.pdf',
+          sizeBytes: 2048,
+          mimeType: 'application/pdf',
+          sha256: 'd'.repeat(64),
+          fileExpiresAt: null,
+          ...(source === undefined ? {} : { source }),
+        },
+        requiresKioskConfirmation: true,
+        expiresAt,
+      },
+    },
+  })
+}
+
+for (const c of [
+  { source: 'miniapp_documents', row: '来自职易达小程序「我的文档」' },
+  { source: 'miniapp', row: '来自职易达小程序' },
+  { source: 'web', row: '来自手机网页' },
+  { source: undefined, row: '手机扫码上传' },
+  { source: 'something-new', row: '手机扫码上传' },
+] as const) {
+  test(`print upload phone-received row names where the file came from and reminds to cancel a file that is not yours: ${String(c.source)} @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    installReceivedPhoneUpload(api, c.source)
+
+    await page.goto('/print/upload?source=document&tab=qr')
+    const row = page.getByTestId('file-source-phone-file')
+    await expect(row).toContainText('手机传来的材料.pdf')
+    await expect(row).toContainText(c.row)
+    // 认不得的来源不当成「来自小程序」，也不凭空编一句来源。
+    if (c.row === '手机扫码上传') await expect(row).not.toContainText('来自')
+    await expect(page.getByText(NOT_YOUR_FILE_HINT, { exact: true })).toBeVisible()
+    // 提醒说的是「取消」，本屏要真有一个叫「取消」的出口。
+    await expect(page.getByTestId('file-source-cancel')).toHaveText('取消这次上传')
+    await expectHealthy(page, errors, 'print-upload')
+  })
+}

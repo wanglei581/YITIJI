@@ -110,9 +110,15 @@ console.log('\n[4] 收银页既有口径保持为真')
 const cashierSrc = read(CASHIER)
 expectMatches(
   cashierSrc,
-  /如需退款请联系现场工作人员协助处理，本机不提供自助退款/,
-  '收银页「本机不提供自助退款」文案保留',
+  /refundApplyLine\(\)\}本机不提供自助退款/,
+  '收银页「本机不提供自助退款」文案保留，求助走服务电话',
 )
+expectMatches(
+  read('src/copy/unattendedCopy.ts'),
+  /如需退款，请\$\{servicePhoneLine\(contact\)\}/,
+  '退款标准句仍是服务电话，读不到号码时不写死号码',
+)
+expectNoMatch(cashierSrc, /如需退款请联系现场工作人员/, '收银页不再写找现场工作人员办退款')
 
 // ── 5. 前后端词表一致 ──
 console.log('\n[5] issueCode 词表与后端 DTO 一致')

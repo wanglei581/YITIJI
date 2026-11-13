@@ -7,7 +7,8 @@ engineStrict: true
 overrides:
   # CI 2026-10-22: redirect credential leaks in 1.16.0; first fix is 1.16.1.
   # GHSA-q3jh-wrc6-jgq8 / GHSA-8r9p-f939-6h3c. Keep the existing 1.x API.
-  follow-redirects: 1.16.1
+  # GHSA-mrwp-f3q8-3g9p: preserve cross-realm sensitiveHeaders on redirect.
+  follow-redirects: 1.16.2
   # GHSA-587h-7wmj-h5pm: Windows editor launch check bypass, fixed on Vite 6 in 6.4.4.
   vite: 6.4.4
   # qs: GHSA-x5fp-wj9c-mxmx (6.14.2–6.15.3 array-limit bypass) and

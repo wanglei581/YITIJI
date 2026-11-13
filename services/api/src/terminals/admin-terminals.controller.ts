@@ -35,7 +35,9 @@ import { UpdateTerminalProfileDto } from './dto/update-terminal-profile.dto'
 import { CreateTerminalBindCodeDto } from './dto/create-terminal-bind-code.dto'
 import { CreatePlannedTerminalDto } from './dto/create-planned-terminal.dto'
 import { UpdateTerminalCapabilityDto } from './dto/update-terminal-capability.dto'
+import { UpdateTerminalDailyFreeSidesDto } from './dto/update-terminal-daily-free-sides.dto'
 import { TerminalCapabilitiesService } from './terminal-capabilities.service'
+import { AUDIT_TERMINAL_DAILY_FREE_SIDES } from '../print-jobs/free-print-quota.policy'
 import { UpdateTerminalLifecycleDto } from './dto/update-terminal-lifecycle.dto'
 import { EmergencyRevokeTerminalCredentialsDto } from './dto/emergency-revoke-terminal-credentials.dto'
 
@@ -152,8 +154,12 @@ export class AdminTerminalsController {
   @Get(':terminalId/capabilities')
   async listCapabilities(
     @Param('terminalId') terminalId: string,
-  ): Promise<ApiResponse<{ terminalCode: string; capabilities: TerminalCapabilityView[] }>> {
-    return ApiResponse.ok(await this.capabilities.listForTerminal(terminalId))
+  ): Promise<ApiResponse<{ terminalCode: string; capabilities: TerminalCapabilityView[]; dailyFreePrintSides: number | null }>> {
+    const listed = await this.capabilities.listForTerminal(terminalId)
+    return ApiResponse.ok({
+      ...listed,
+      dailyFreePrintSides: await this.capabilities.readDailyFreePrintSides(terminalId),
+    })
   }
 
   // PUT /api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey
@@ -165,8 +171,15 @@ export class AdminTerminalsController {
     @Body() dto: UpdateTerminalCapabilityDto,
     @CurrentUser() user: AuthedUser,
     @Req() req: AuditReq,
-  ): Promise<ApiResponse<{ terminalCode: string; capability: TerminalCapabilityView }>> {
+  ): Promise<ApiResponse<{ terminalCode: string; capability: TerminalCapabilityView; dailyFreePrintSides: number | null }>> {
     const result = await this.capabilities.upsert(terminalId, capabilityKey, dto.status, dto.note, user.userId)
+    const hasOverride = dto.dailyFreePrintSides !== undefined
+    const savedOverride = hasOverride
+      ? await this.capabilities.setDailyFreePrintSides(terminalId, dto.dailyFreePrintSides ?? null)
+      : null
+    const dailyFreePrintSides = savedOverride
+      ? savedOverride.dailyFreePrintSides
+      : await this.capabilities.readDailyFreePrintSides(terminalId)
     await this.audit.write({
       actorId: user.userId,
       actorRole: user.role,
@@ -184,7 +197,24 @@ export class AdminTerminalsController {
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
     })
-    return ApiResponse.ok({ terminalCode: result.terminalCode, capability: result.capability })
+    if (hasOverride) {
+      await this.audit.write({
+        actorId: user.userId,
+        actorRole: user.role,
+        action: AUDIT_TERMINAL_DAILY_FREE_SIDES,
+        targetType: 'terminal',
+        targetId: result.terminalCode,
+        payload: {
+          terminalCode: result.terminalCode,
+          previous: savedOverride?.previous ?? null,
+          dailyFreePrintSides,
+        },
+        ipAddress: extractIp(req),
+        userAgent: extractUa(req),
+        requestId: req.requestId ?? null,
+      })
+    }
+    return ApiResponse.ok({ terminalCode: result.terminalCode, capability: result.capability, dailyFreePrintSides })
   }
 
   // DELETE /api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey
@@ -299,6 +329,34 @@ export class AdminTerminalsController {
       confirmationText: dto.confirmationText,
     })
     return ApiResponse.ok(result)
+  }
+
+  // PUT /api/v1/admin/terminals/:terminalId/daily-free-print-sides
+  // 只改本机每日免费面数。不走能力开关，避免顺手改能力状态或清空备注。
+  @Put(':terminalId/daily-free-print-sides')
+  async updateDailyFreePrintSides(
+    @Param('terminalId') terminalId: string,
+    @Body() dto: UpdateTerminalDailyFreeSidesDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ): Promise<ApiResponse<{ terminalCode: string; dailyFreePrintSides: number | null }>> {
+    const saved = await this.capabilities.setDailyFreePrintSides(terminalId, dto.dailyFreePrintSides)
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: AUDIT_TERMINAL_DAILY_FREE_SIDES,
+      targetType: 'terminal',
+      targetId: saved.terminalCode,
+      payload: {
+        terminalCode: saved.terminalCode,
+        previous: saved.previous,
+        dailyFreePrintSides: saved.dailyFreePrintSides,
+      },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
+    return ApiResponse.ok({ terminalCode: saved.terminalCode, dailyFreePrintSides: saved.dailyFreePrintSides })
   }
 }
 

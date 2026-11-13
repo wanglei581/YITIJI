@@ -76,6 +76,8 @@ export type AuditAction =
   | 'organization.content_trust'
   /** 管理员维护机构已核验官方域名。身份核验，不是渠道内容审核。 */
   | 'organization.verified_domains_replace'
+  /** 机构设备告警的群机器人地址。审计只记是否已配置和主机名，不记地址明文。 */
+  | 'organization.device_alert_webhook'
   /** 一次性维护命令下架开发期「（演示）」企业（scripts/unpublish-demo-companies.ts），actorRole=system-cli */
   | 'company.maintenance_unpublish'
   | 'official_channel.create'

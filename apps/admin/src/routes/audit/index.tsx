@@ -83,7 +83,7 @@ export default function AuditPage() {
           </select>
         </label>
         <label className="flex min-w-0 flex-col gap-1 text-xs text-neutral-500">
-          起始时间（年/月/日 时:分）
+          起始时间（年/月/日 时:分，北京时间）
           <input
             type="datetime-local"
             value={startAt}
@@ -92,7 +92,7 @@ export default function AuditPage() {
           />
         </label>
         <label className="flex min-w-0 flex-col gap-1 text-xs text-neutral-500">
-          结束时间（年/月/日 时:分）
+          结束时间（年/月/日 时:分，北京时间）
           <input
             type="datetime-local"
             value={endAt}

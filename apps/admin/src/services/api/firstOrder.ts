@@ -1,7 +1,7 @@
 import type {
-  FirstOrderIncident, FirstOrderIncidentInput, FirstOrderIncidentUpdate,
-  FirstOrderOverview, FirstOrderProject, FirstOrderProjectInput,
-  FirstOrderDeployment, FirstOrderReport, FirstOrderReportSnapshot,
+  FirstOrderIncident, FirstOrderIncidentDirectory, FirstOrderIncidentInput, FirstOrderIncidentUpdate,
+  FirstOrderIncidentStatus, FirstOrderOverview, FirstOrderProject, FirstOrderProjectInput,
+  FirstOrderDeployment, FirstOrderReport, FirstOrderReportDirectory, FirstOrderReportSnapshot,
 } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE } from './client'
 import { authHeader, redirectToLogin } from '../auth'
@@ -65,6 +65,20 @@ export const firstOrderApi = {
   endDeployment: (id: string) => request<FirstOrderDeployment>(`/deployments/${encodeURIComponent(id)}/end`, 'POST', {}),
   createIncident: (input: FirstOrderIncidentInput) => request<FirstOrderIncident>('/incidents', 'POST', input),
   updateIncident: (id: string, input: FirstOrderIncidentUpdate) => request<FirstOrderIncident>(`/incidents/${encodeURIComponent(id)}`, 'PATCH', input),
+  listIncidents: (params?: { status?: FirstOrderIncidentStatus; limit?: number }, signal?: AbortSignal) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.limit) q.set('limit', String(params.limit))
+    const suffix = q.toString()
+    return request<FirstOrderIncidentDirectory>(`/incidents${suffix ? `?${suffix}` : ''}`, 'GET', undefined, signal)
+  },
+  listMonthlyReports: (params?: { month?: string; limit?: number }, signal?: AbortSignal) => {
+    const q = new URLSearchParams()
+    if (params?.month) q.set('month', params.month)
+    if (params?.limit) q.set('limit', String(params.limit))
+    const suffix = q.toString()
+    return request<FirstOrderReportDirectory>(`/reports${suffix ? `?${suffix}` : ''}`, 'GET', undefined, signal)
+  },
   preview: (projectId: string, month: string, signal?: AbortSignal) => request<FirstOrderReportSnapshot>(`/projects/${encodeURIComponent(projectId)}/report-preview?month=${encodeURIComponent(month)}`, 'GET', undefined, signal),
   seal: (projectId: string, month: string) => request<FirstOrderReport>(`/projects/${encodeURIComponent(projectId)}/reports`, 'POST', { month }),
   report: (id: string, signal?: AbortSignal) => request<FirstOrderReport>(`/reports/${encodeURIComponent(id)}`, 'GET', undefined, signal),

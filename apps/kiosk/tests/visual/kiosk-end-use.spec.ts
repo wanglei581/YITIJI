@@ -129,9 +129,11 @@ test('W-75 back home, idle 31s, open 我的 → 还是你吗？→ 不是我 cle
   await allowLocalBootTicket(page)
   await loginThroughVisibleUi(page, '/', WANG.phone)
 
-  // 首页登录态：只说有人登录着，手机号（含打码）不上首页。
-  await expect(page.getByTestId('home-identity')).toHaveText('有人登录着')
-  await expect(page.getByTestId('home-end-previous')).toHaveText('结束上一位的使用')
+  // 首页登录态，手机号（含打码）不上首页。
+  // 10/29 走查 I-05：刚登录、人还在屏前（一直在点、空档没到 30 秒）时对本人说本人的话——「你已登录」+「结束使用」，
+  // 与左边那句「离开前请点结束使用」对得上；红色按钮不再叫「结束上一位的使用」让本人犹豫「这是要退我自己吗」。
+  await expect(page.getByTestId('home-identity')).toHaveText('你已登录')
+  await expect(page.getByTestId('home-end-previous')).toHaveText('结束使用')
   await expectNoTraceOf(page, WANG)
   await shot(page, '01-home-member-no-phone.png')
 
@@ -148,25 +150,73 @@ test('W-75 back home, idle 31s, open 我的 → 还是你吗？→ 不是我 cle
 
   // 离开了 31 秒，一下都没点。
   await page.clock.runFor(31_000)
+  // 空档到了 30 秒，站在屏前的可能已经不是登录的那个人：首页改回对下一位说话（W-75 原句），仍不露名字和手机号。
+  await expect(page.getByTestId('home-identity')).toHaveText('有人登录着')
+  await expect(page.getByTestId('home-end-previous')).toHaveText('结束上一位的使用')
+  await expectNoTraceOf(page, WANG)
   const beforeAsk = calls.length
   await nav(page, '我的').click()
   const dialog = page.getByTestId('handover-confirm')
   await expect(dialog).toBeVisible()
-  await expect(dialog.getByRole('heading', { name: '还是你吗？' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '还是你吗？', exact: true })).toBeVisible()
+  await expect(dialog.getByRole('heading')).toHaveCount(0)
+  await expect(page.locator('.qxt-back')).toHaveCount(0)
+  await expect(page.locator('.qxt-nav')).toHaveCount(0)
   await expect(dialog.getByRole('button', { name: '是我，继续' })).toBeVisible()
-  await expect(dialog.getByRole('button', { name: '不是我' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: '不是我，结束上一位的使用' })).toBeVisible()
+  // 稿上这一屏的底栏「问小青」（AI 是驱动层）：底栏里只有这一颗，没有返回、没有主按钮。
+  // 点它会离开这一屏，所以「弹出了没回答」是粘性的——离开再回来仍是待确认，见下面 W-75 sticky 的用例。
+  await expect(page.locator('[data-qxt-ask="on"]')).toHaveCount(1)
+  await expect(page.locator('[data-qxt-ask="on"]')).toHaveText('问小青：这一页是什么意思？')
+  await expect(page.locator('.qxt-dock button')).toHaveCount(1)
+  // 屏上能点的只有这三个：两张答案卡和问小青，再没有别的按钮（P0：不回答就离开会绕过「还是你吗？」）。
+  await expect(page.locator('[data-qxt-screen] button')).toHaveCount(3)
+  // 对话框语义：标题与说明读屏能念出来，且是模态的。
+  await expect(page.getByRole('alertdialog', { name: '还是你吗？' })).toHaveCount(1)
+  await expect(dialog).toHaveAttribute('aria-modal', 'true')
+  await expect(dialog).toHaveAccessibleDescription('确认之前不会显示上一位的文件和订单。')
+  // 10/29 走查 I-06：「不是我」卡曾配「手机 + 上传按钮」的插画，与「结束上一位的使用」的意思不搭。
+  // 现在配一叠纸（「清掉这台机器上这一次的临时信息」，同触屏稿「本机会清除」那张卡的用图），「是我」仍配简历。
+  const notMeArt = dialog.getByRole('button', { name: '不是我，结束上一位的使用' }).locator('.me-answer-art')
+  await expect(notMeArt).toHaveAttribute('data-art', 'stack')
+  await expect(notMeArt).not.toContainText('上传')
+  await expect(dialog.getByRole('button', { name: '是我，继续' }).locator('.me-answer-art')).toHaveAttribute('data-art', 'resume')
+  // 两张答案卡的可点区域不小于 64×64（现在靠 .me-answers 里 160px 起的卡高撑着，改版后不能丢）。
+  for (const name of ['是我，继续', '不是我，结束上一位的使用']) {
+    const box = await dialog.getByRole('button', { name }).boundingBox()
+    expect(box!.width, `${name} 宽度`).toBeGreaterThanOrEqual(64)
+    expect(box!.height, `${name} 高度`).toBeGreaterThanOrEqual(64)
+  }
   await expectNoTraceOf(page, WANG)
   // 先确认、后读取：确认层出现时资产页一条请求都不发。
   await page.waitForTimeout(400)
   expect(calls.slice(beforeAsk)).toEqual([])
   await shot(page, '03-still-you-after-31s.png')
 
-  await dialog.getByRole('button', { name: '不是我' }).click()
+  await dialog.getByRole('button', { name: '不是我，结束上一位的使用' }).click()
   await expectLoggedOutHome(page)
   await expectNoTraceOf(page, WANG)
   await shot(page, '04-not-me-home-clean.png')
 
   await expectNextPersonSeesNothing(page, calls, WANG, '05-after-not-me')
+})
+
+test('W-75 handover Escape is 不是我 and clears back home @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const calls = await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+  // 登录已经落在首页。首页当前项「首页」是链接不是按钮，不要用底栏按钮选择器再点一次。
+  await expect(page).toHaveURL(/\/$/)
+  await page.clock.runFor(31_000)
+  await nav(page, '我的').click()
+  const dialog = page.getByTestId('handover-confirm')
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('button', { name: '不是我，结束上一位的使用' })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expectLoggedOutHome(page)
+  await expectNoTraceOf(page, WANG)
+  await expectNextPersonSeesNothing(page, calls, WANG, '08-after-escape')
 })
 
 test('W-75 within 30s no question; 是我，继续 goes straight in @end-use', async ({ page, api }) => {
@@ -221,7 +271,8 @@ test('W-43 print done countdown reaches 0 → ends the use and logs out @end-use
     },
     { taskId: PRIVACY_CLEAR_TASK_ID, file: W2_FILE, params: W2_PRINT_PARAMS },
   )
-  await expect(page.getByText('一会儿结束本次使用')).toBeVisible()
+  // 2026-10-28 稿 done：原「走完就清」那一节没有了，倒计时说法并进帮助行：「不再点屏幕，60 秒后结束本次使用」。
+  await expect(page.getByText(/不再点屏幕，60 秒后结束本次使用/)).toBeVisible()
   await expect(page.getByText(/到点会结束本次使用并退出登录/)).toBeVisible()
   await expect(page.getByTestId('print-fulfill-primary')).toHaveText('我拿走了，结束使用')
   await shot(page, '08-print-done-countdown.png')
@@ -245,7 +296,7 @@ test('W-64 switch account: 王晓雨 → 陈立行, 陈立行 never sees 王晓�
   await nav(page, '我的').click()
   await page.getByTestId('profile-account').first().click()
   await page.getByTestId('member-settings-switch').click()
-  await page.getByRole('button', { name: '退出并切换' }).click()
+  await page.getByRole('button', { name: '结束并去登录' }).click()
 
   // 先完整清场再进登录页：登录页上没有上一位，也没落回留着上一位的首页。
   await expect(page).toHaveURL(/\/login/)
@@ -278,4 +329,384 @@ test('idle timeout exit: 3 minutes untouched → logged out, deep link reads not
   await expectLoggedOutHome(page)
   await expectNoTraceOf(page, WANG)
   await expectNextPersonSeesNothing(page, calls, WANG, '13-after-idle')
+})
+
+// 10/29 走查 I-07：「还在用吗？」只给人 30 秒决定「继续还是结束」。此前正文有五段说明、两张清单、三张常问卡和一行给开发看的话，
+// 大半屏的字，而要点（还在用就点「我还在，继续使用」）埋在第二屏中间的常问卡里。现在：要点放在说明卡的第一句，
+// 同一件事不说第二遍，只留影响这一趟的说明、两张清单（各 3 条）和一条「纸还在机器上」。
+const IDLE_WARNING_VISIBLE_CHARS_MAX = 360
+
+test('还在用吗？ 要点在最前面、字少到 30 秒读得完、同一件事不说两遍 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+
+  // 150 秒进「还在用吗？」，再过 2 秒；冻住倒计时，下面慢慢量。
+  await page.clock.runFor(152_000)
+  const screen = page.locator('[data-kiosk-screen="session-timeout"]')
+  const guard = page.locator('[data-screen="session-guard"]')
+  await expect(guard).toBeVisible()
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 500)
+
+  // 全屏可见的字（含两个按钮）不超过预算：30 秒按平均读速读得完，不靠「扫一眼」猜。
+  const visibleChars = (await screen.innerText()).replace(/\s+/g, '').length
+  expect(visibleChars, `这一屏可见字数 ${visibleChars}，预算 ${IDLE_WARNING_VISIBLE_CHARS_MAX}`).toBeLessThanOrEqual(IDLE_WARNING_VISIBLE_CHARS_MAX)
+
+  // 要点是说明卡的第一句：还在用就点哪个键、刚填的会不会丢。
+  const firstNote = guard.locator('.cg-copy .qxp-note').first()
+  await expect(firstNote).toContainText('还在用，就点下面的「我还在，继续使用」')
+  await expect(firstNote).toContainText('刚才填到一半的内容不会因此丢掉')
+  const noteBox = await firstNote.boundingBox()
+  expect(noteBox!.y, '要点要在上半屏，不是埋在第二屏').toBeLessThan(800)
+
+  // 同一件事不说两遍：这些句子的意思，两张清单、按钮名或要点里已经有了。
+  for (const dropped of [
+    '这是公用设备的隐私保护',
+    '现在结束使用，会结束并清除这台机器上的这次使用记录',
+    '我只是在看屏幕上的字',
+    '我的打印订单会不会没了',
+    '倒计时由本机时钟执行',
+    '这次读不到可用的来源页',
+  ]) {
+    await expect(screen, `不该再出现：${dropped}`).not.toContainText(dropped)
+  }
+
+  // 该留的还在：影响这一趟的说明、当前登录、回到哪一页、两张清单、纸的提醒；两个按钮在底栏。
+  await expect(guard.getByTestId('session-guard-impact')).toHaveText('登录状态和这台机器上的这次使用记录将清除')
+  await expect(guard.getByTestId('session-guard-identity')).toContainText('当前登录：')
+  await expect(guard.locator('.sg-from')).toContainText('继续后回到')
+  await expect(guard.getByRole('heading', { name: '本机会清除', exact: true })).toBeVisible()
+  await expect(guard.getByRole('heading', { name: '不因此清除', exact: true })).toBeVisible()
+  await expect(guard.locator('.cg-clear')).toHaveCount(2)
+  for (const list of await guard.locator('.cg-list').all()) expect(await list.locator('li').count(), '每张清单 3 条').toBe(3)
+  await expect(guard.getByRole('heading', { name: '纸还在机器上', exact: true })).toBeVisible()
+  await expect(screen.getByTestId('session-guard-primary')).toHaveText('我还在，继续使用')
+  await expect(screen.getByTestId('session-guard-clear')).toHaveText('现在结束使用')
+})
+
+// ── W-75 粘性：「还是你吗？」弹出了没答，就一直是「待确认」 ─────────────────────────────
+// 取证（10/28）：交接页只要有一个出口（问小青、浏览器后退……），下一位走到别处再点底部「我的」，
+// 进页前的空闲只有几秒，旧判据不会再问，直接进了上一位的「我的」，并带着上一位的令牌发出 7 条 /me 请求。
+// 现在：弹出而没回答，就记为「待确认」（本次会话内的粘性标记），直到本人答「是我，继续」、答「不是我」走清场、
+// 或这一场被清场才解除；待确认期间不管从哪条路进个人资产页，都先回到确认层，一条 /me 请求都不发。
+
+/** 真人手速：两下之间隔几秒——超过 kioskPresence 的 SAME_TOUCH_MS（1 秒）、远不到 30 秒。机器人式连点会被当成同一下触碰，把这个洞盖住。 */
+const pace = (page: Page, ms = 4_000) => page.clock.runFor(ms)
+
+/** 上一位走开 31 秒，下一位点「我的」，弹出「还是你吗？」。返回此刻已发出的 /me 请求数：之后新增的都算在「确认之前」。 */
+async function openHandover(page: Page, calls: MeCall[]): Promise<number> {
+  await page.clock.runFor(31_000)
+  await nav(page, '我的').click()
+  await expect(page.getByTestId('handover-confirm')).toBeVisible()
+  return calls.length
+}
+
+/**
+ * 仍停在「还是你吗？」：屏上没有上一位的任何痕迹；从 from（进「我的」那一下之前已发出的 /me 请求数）起，
+ * 一条 /me 请求都没有发出——更不会有带上一位令牌的。首页自己读的（继续办理）不是「进我的」，不算在内。
+ */
+async function expectStillAsked(page: Page, calls: MeCall[], from: number, label: string): Promise<void> {
+  await expect(page.getByTestId('handover-confirm'), `${label}：必须还在问「还是你吗？」`).toBeVisible()
+  await expectNoTraceOf(page, WANG)
+  await page.waitForTimeout(400)
+  expect(calls.slice(from), `${label}：确认之前不得发任何「我的」请求（含带上一位令牌的） ${JSON.stringify(calls.slice(from))}`).toEqual([])
+}
+
+/** 站内直达一个地址（不重载页面，所以上一位的登录还在内存里）。 */
+async function deepLink(page: Page, path: string): Promise<void> {
+  await page.evaluate((to) => {
+    const state = { ...(window.history.state ?? {}), key: `end-use-deeplink-${to}`, usr: null }
+    window.history.pushState(state, '', to)
+    window.dispatchEvent(new PopStateEvent('popstate', { state }))
+  }, path)
+}
+
+test('W-75 sticky: 弹出后浏览器后退，再点底部「我的」仍先问，不发 /me 请求 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const calls = await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+  await openHandover(page, calls)
+
+  await pace(page)
+  await page.goBack()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByTestId('handover-confirm')).toHaveCount(0)
+  await pace(page)
+  await page.waitForTimeout(500)
+  const before = calls.length
+  await nav(page, '我的').click()
+  await expectStillAsked(page, calls, before, '后退再点「我的」')
+  await shot(page, '14-sticky-back-then-nav.png')
+})
+
+test('W-75 sticky: 弹出后走到顾问页，再点底部「我的」仍先问，不发 /me 请求 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const calls = await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+  await openHandover(page, calls)
+
+  await pace(page)
+  await page.goBack()
+  await pace(page)
+  await page.waitForTimeout(500)
+  const beforeAssistant = calls.length
+  await nav(page, 'AI 顾问').click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  await expectNoTraceOf(page, WANG)
+  await page.waitForTimeout(500)
+  expect(calls.slice(beforeAssistant), '顾问页自己不读任何「我的」数据').toEqual([])
+  await pace(page)
+  const before = calls.length
+  await nav(page, '我的').click()
+  await expectStillAsked(page, calls, before, '顾问页再点「我的」')
+  await shot(page, '15-sticky-assistant-then-nav.png')
+})
+
+test('W-75 sticky: 弹出后站内直达 /profile 与 /me/*，都先问，不发 /me 请求 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const calls = await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+  const mark = await openHandover(page, calls)
+
+  // 一直停在确认层上换地址：每一个都先问，整个过程里一条「我的」请求都没发过。
+  for (const path of ['/me/documents', '/profile', '/me/print-orders', '/me/resumes', '/me/ai-records']) {
+    await pace(page)
+    await deepLink(page, path)
+    await expect(page).toHaveURL(new RegExp(`${path}$`))
+    await expectStillAsked(page, calls, mark, `直达 ${path}`)
+  }
+  await shot(page, '16-sticky-deeplinks.png')
+})
+
+test('W-75 sticky: 从交接页点「问小青」去顾问页，再回「我的」仍是待确认，全程不发 /me 请求 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const calls = await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+  const mark = await openHandover(page, calls)
+  const ask = page.locator('[data-qxt-ask="on"]')
+
+  // 点底栏「问小青」离开确认层，去顾问页：顾问页上没有上一位的任何东西，也不读「我的」。
+  await pace(page)
+  await expect(ask, '确认层底栏有稿上的问小青').toBeVisible()
+  await ask.click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  // 稿上的问句只填进输入框，用户自己按发送才发出（没发出就不会有 /assistant/chat 请求，ApiRouter 也会拦下没登记的请求）。
+  await expect(page.getByLabel('输入咨询问题')).toHaveValue('这一页是什么意思？')
+  await expect(page.locator('body')).not.toContainText(WANG.nickname)
+  await expectNoTraceOf(page, WANG)
+  await page.waitForTimeout(500)
+  await shot(page, '18-sticky-ask-assistant.png')
+
+  // 回来的每一条路都先问：底导航「我的」……
+  await pace(page)
+  await nav(page, '我的').click()
+  await expectStillAsked(page, calls, mark, '问小青后点底导航「我的」')
+
+  // ……浏览器后退（回到的就是确认层）……
+  await pace(page)
+  await ask.click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  await pace(page)
+  await page.goBack()
+  await expectStillAsked(page, calls, mark, '问小青后浏览器后退')
+
+  // ……从顾问页回首页再点「我的」（首页自己读的「继续办理」不是「进我的」，从点「我的」那一下起算）。
+  await pace(page)
+  await ask.click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  await pace(page)
+  await nav(page, '首页').click()
+  await expect(page).toHaveURL(/\/$/)
+  await pace(page)
+  await page.waitForTimeout(500)
+  const beforeProfile = calls.length
+  await nav(page, '我的').click()
+  await expectStillAsked(page, calls, beforeProfile, '问小青后经首页再点「我的」')
+  await shot(page, '19-sticky-ask-home-then-nav.png')
+})
+
+test('W-75 sticky: 答「是我，继续」后解除，照常进「我的」并读取 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const calls = await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+  await openHandover(page, calls)
+
+  await pace(page)
+  await page.getByTestId('handover-confirm').getByRole('button', { name: '是我，继续' }).click()
+  await expect(page.getByTestId('handover-confirm')).toHaveCount(0)
+  await expect(page.getByTestId('profile-asset-documents')).toBeVisible()
+
+  // 本人确认过了：离开几秒再回来不再问，资产页照常读取，带的是本人的令牌。
+  await pace(page)
+  await nav(page, '首页').click()
+  await pace(page)
+  const before = calls.length
+  await nav(page, '我的').click()
+  await expect(page).toHaveURL(/\/profile$/)
+  // 先等到「我的」真的画出来，再看确认层不在：只看「不在」会在路由刚换、新页还没画时空过。
+  await expect(page.getByTestId('profile-asset-documents'), '本人确认过了，不再问').toBeVisible()
+  await expect(page.getByTestId('handover-confirm')).toHaveCount(0)
+  await page.getByTestId('profile-asset-documents').click()
+  await expect(page.getByText(WANG.doc)).toBeVisible()
+  expect(calls.length, '确认之后资产页照常发 /me 请求').toBeGreaterThan(before)
+  expect(calls.slice(before).every((c) => c.auth === `Bearer ${WANG.token}`)).toBe(true)
+})
+
+test('W-75 sticky: 答「不是我」清场后，下一位看不到上一位，也不被残留的待确认标记误拦 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const calls = await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+  const mark = await openHandover(page, calls)
+
+  await pace(page)
+  await page.getByTestId('handover-confirm').getByRole('button', { name: '不是我，结束上一位的使用' }).click()
+  await expectLoggedOutHome(page)
+  await expectNoTraceOf(page, WANG)
+  await expectNextPersonSeesNothing(page, calls, WANG, '17-sticky-after-not-me')
+
+  // 下一位自己登录：不该因为上一位留下的待确认标记再被问一遍，也不该读到上一位。
+  // 清场之后直接敲地址会被守卫当成旧历史弹回首页（整页重载会打断这次导航：ERR_ABORTED，预期行为），所以从首页的登录入口走。
+  await page.goto('/').catch((error: Error) => {
+    if (!/ERR_ABORTED|frame was detached/.test(error.message)) throw error
+  })
+  await settle(page)
+  await expectLoggedOutHome(page)
+  await page.getByRole('button', { name: '登录后查看本人记录' }).click()
+  await expect(page).toHaveURL(/\/login/)
+  const beforeChen = calls.length
+  await fillPhoneLogin(page, CHEN.phone)
+  await page.waitForURL((url) => !url.pathname.startsWith('/login'))
+  await pace(page)
+  await nav(page, '我的').click()
+  await expect(page).toHaveURL(/\/profile$/)
+  await expect(page.getByTestId('profile-asset-documents'), '新的一位刚登录，不该被上一位留下的标记拦住').toBeVisible()
+  await expect(page.getByTestId('handover-confirm')).toHaveCount(0)
+  await page.getByTestId('profile-asset-documents').click()
+  await expect(page.getByText(CHEN.doc)).toBeVisible()
+  await expectNoTraceOf(page, WANG)
+  expect(calls.slice(mark).filter((c) => c.auth === `Bearer ${WANG.token}`)).toEqual([])
+  expect(calls.slice(beforeChen).every((c) => c.auth === `Bearer ${CHEN.token}`)).toBe(true)
+})
+
+test('W-75 sticky: 待确认标记只在内存里，不写进任何浏览器存储 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const calls = await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+  await openHandover(page, calls)
+
+  const stored = () => page.evaluate(() => {
+    const dump = (area: Storage) => Object.keys(area).map((key) => `${key}=${area.getItem(key) ?? ''}`)
+    return { local: dump(window.localStorage), session: dump(window.sessionStorage) }
+  })
+  const withMarker = await stored()
+  const hit = [...withMarker.local, ...withMarker.session].filter((entry) => /handover|pending|presence|confirm/i.test(entry))
+  expect(hit, `存储里不得有「待确认」之类的标记 ${JSON.stringify(hit)}`).toEqual([])
+
+  // 整页重载：登录本来就只在内存里，重载回到游客态；资产页只有登录引导，没有上一位，也一条 /me 请求都不发。
+  const mark = calls.length
+  await page.reload()
+  await expect(page.getByTestId('handover-confirm')).toHaveCount(0)
+  await expectNoTraceOf(page, WANG)
+  await page.waitForTimeout(400)
+  expect(calls.slice(mark)).toEqual([])
+})
+
+// ── W-75 空档就记：上一位走开 30 秒以上，下一位先碰别处、隔几秒再点「我的」，也要先问 ─────────────────
+// 取证（10/29，首页包实测）：「还是你吗？」原来只看「点进来那一下之前空了多久」。上一位走开 31 秒，下一位先点首页上别的卡、
+// 隔几秒再点底部「我的」或直达 /me/*，进页前只空了几秒，旧判据不问，直接进了上一位的「我的」。
+// 现在：空档一到 30 秒就当时记为「待确认」（定时判，不等进页），之后任何触碰都解除不了它；
+// 只有本人答「是我，继续」、登录成功、退出登录或清场才解除。
+
+/** 上一位走开 31 秒一下没点；下一位先点首页上别的卡（打印 · 扫描），再隔几秒。返回此刻已发出的 /me 请求数：之后新增的都算在「确认之前」。 */
+async function nextPersonTouchesElsewhere(page: Page, calls: MeCall[]): Promise<number> {
+  await page.clock.runFor(31_000)
+  await page.getByRole('button', { name: /打印 · 扫描/ }).first().click()
+  await expect(page).toHaveURL(/\/print-scan$/)
+  await pace(page)
+  await page.waitForTimeout(500)
+  return calls.length
+}
+
+test('W-75 idle mark: 走开 31 秒后下一位先点别的卡，隔几秒再点底部「我的」，仍先问，不发 /me 请求 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const calls = await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+
+  const before = await nextPersonTouchesElsewhere(page, calls)
+  await nav(page, '我的').click()
+  await expectStillAsked(page, calls, before, '先点别的卡、隔几秒再点「我的」')
+})
+
+test('W-75 idle mark: 走开 31 秒后下一位先点别的卡，隔几秒站内直达 /me/*，仍先问，不发 /me 请求 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const calls = await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+
+  const mark = await nextPersonTouchesElsewhere(page, calls)
+  for (const path of ['/me/documents', '/profile', '/me/print-orders']) {
+    await pace(page)
+    await deepLink(page, path)
+    await expect(page).toHaveURL(new RegExp(`${path}$`))
+    await expectStillAsked(page, calls, mark, `直达 ${path}`)
+  }
+})
+
+test('W-75 idle mark: 答「是我，继续」后解除，之后照常进「我的」并读取，带的是本人的令牌 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const calls = await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+
+  const before = await nextPersonTouchesElsewhere(page, calls)
+  await nav(page, '我的').click()
+  await expectStillAsked(page, calls, before, '先点别的卡、隔几秒再点「我的」')
+  await pace(page)
+  await page.getByTestId('handover-confirm').getByRole('button', { name: '是我，继续' }).click()
+  await expect(page.getByTestId('handover-confirm')).toHaveCount(0)
+  await expect(page.getByTestId('profile-asset-documents')).toBeVisible()
+
+  // 本人确认过了：离开几秒再回来不再问，资产页照常读取。
+  await pace(page)
+  await nav(page, '首页').click()
+  await pace(page)
+  const after = calls.length
+  await nav(page, '我的').click()
+  await expect(page.getByTestId('profile-asset-documents'), '本人确认过了，不再问').toBeVisible()
+  await expect(page.getByTestId('handover-confirm')).toHaveCount(0)
+  await page.getByTestId('profile-asset-documents').click()
+  await expect(page.getByText(WANG.doc)).toBeVisible()
+  expect(calls.length, '确认之后资产页照常发 /me 请求').toBeGreaterThan(after)
+  expect(calls.slice(after).every((c) => c.auth === `Bearer ${WANG.token}`)).toBe(true)
+})
+
+test('W-75 idle mark: 在场一直有操作（每两下之间都不到 30 秒）不误弹，点「我的」直接进 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const calls = await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+
+  // 累计 100 秒，任意两下之间只隔 20 秒：每一次触碰都重新计空档，不该有任何一刻被记成待确认。
+  for (const name of ['AI 顾问', '首页', 'AI 顾问', '首页']) {
+    await page.clock.runFor(20_000)
+    await nav(page, name).click()
+  }
+  await page.clock.runFor(20_000)
+  const before = calls.length
+  await nav(page, '我的').click()
+  await expect(page).toHaveURL(/\/profile$/)
+  await expect(page.getByTestId('profile-asset-documents'), '一直在场，不该被问').toBeVisible()
+  await expect(page.getByTestId('handover-confirm')).toHaveCount(0)
+  await page.getByTestId('profile-asset-documents').click()
+  await expect(page.getByText(WANG.doc)).toBeVisible()
+  expect(calls.slice(before).every((c) => c.auth === `Bearer ${WANG.token}`)).toBe(true)
 })

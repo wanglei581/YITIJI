@@ -38,7 +38,7 @@ console.log('\n=== Admin job materials UI verification ===')
 
 assertContains('package.json', '"verify:admin-job-materials-ui"', 'Admin package exposes job materials verifier')
 assertContains('src/routes/index.tsx', "path: 'job-materials'", 'Admin router exposes one /job-materials route')
-assertContains('src/layouts/AdminLayoutWrapper.tsx', "key: 'job-materials'", 'Admin nav exposes one job-materials item')
+assertContains('src/layouts/adminNav.ts', "key: 'job-materials'", 'Admin nav exposes one job-materials item')
 assertContains('src/services/api/jobMaterials.ts', 'getJobMaterialAdminSummary', 'Admin service reads job materials summary')
 assertContains('src/routes/job-materials/index.tsx', '求职材料库', 'Admin page title is job material library')
 assertContains('src/routes/job-materials/index.tsx', '只读', 'Admin page makes readonly phase explicit')

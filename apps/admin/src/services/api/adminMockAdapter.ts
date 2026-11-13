@@ -4,8 +4,10 @@ import type {
   AdminImportBatch,
   AdminSourceListQuery,
   AdminSourcePage,
+  AdminPrinterOutput,
   AdminPrinterRecord,
   AdminPrintersResponse,
+  GetPrintersOptions,
   AdminTerminalRecord,
   AdminTerminalsResponse,
   AdminOrganizationOption,
@@ -186,6 +188,16 @@ const MOCK_TERMINAL_PROFILE: Record<string, UpdateTerminalProfileResult> = {
   },
 }
 const MOCK_PLANNED_TERMINALS: PlannedTerminalCreated[] = []
+const MOCK_PRINTER_QUEUE: Record<string, NonNullable<AdminTerminalRecord['printerQueue']> | null> = {
+  'KSK-001': { printerQueueName: '前台', printerQueuePortKind: 'usb', printerQueuePortName: 'USB001', printerQueueRawStatus: '3,0,False,0,0', printerQueueSpooler: 'running' },
+  'KSK-002': { printerQueueName: '就业中心', printerQueuePortKind: 'usb', printerQueuePortName: 'USB002', printerQueueRawStatus: '3,4,False,16,4', printerQueueSpooler: 'running' },
+  'KSK-003': { printerQueueName: '大厅', printerQueuePortKind: 'network', printerQueuePortName: null, printerQueueRawStatus: '2,0,False,0,2', printerQueueSpooler: 'running' },
+  'KSK-004': { printerQueueName: '窗口', printerQueuePortKind: 'usb', printerQueuePortName: 'DOT4_001', printerQueueRawStatus: '3,0,False,0,3', printerQueueSpooler: 'running' },
+  'KSK-007': { printerQueueName: '二楼', printerQueuePortKind: 'usb', printerQueuePortName: 'USB001', printerQueueRawStatus: '3,0,False,0,0', printerQueueSpooler: 'running' },
+  'KSK-008': { printerQueueName: '服务台', printerQueuePortKind: 'usb', printerQueuePortName: 'USB001', printerQueueRawStatus: 'query_failed', printerQueueSpooler: 'stopped' },
+  'KSK-009': null,
+  'KSK-010': { printerQueueName: '南门', printerQueuePortKind: 'unknown', printerQueuePortName: null, printerQueueRawStatus: 'not_found', printerQueueSpooler: 'running' },
+}
 const MOCK_TERMINAL_LIFECYCLE: Record<string, { status: TerminalLifecycleStatus; version: number }> = {}
 const MOCK_TERMINAL_CREDENTIAL_STATE: Record<string, { generation: number; active: boolean }> = {}
 function mockOrgFields(terminalCode: string): { orgId: string | null; orgName: string | null; orgType: string | null } {
@@ -389,8 +401,10 @@ export const adminMockAdapter = {
         ipAddress: null,
         diskFreeGb: null,
         releaseObservation: null,
+        printerQueue: null,
       })), ...base.map((t) => ({
         ...t,
+        printerQueue: MOCK_PRINTER_QUEUE[t.terminalCode] ?? null,
         lifecycleStatus: MOCK_TERMINAL_LIFECYCLE[t.terminalCode]?.status ?? 'active' as const,
         lifecycleVersion: MOCK_TERMINAL_LIFECYCLE[t.terminalCode]?.version ?? 0,
         credentialGeneration: MOCK_TERMINAL_CREDENTIAL_STATE[t.terminalCode]?.generation ?? 1,
@@ -654,31 +668,53 @@ export const adminMockAdapter = {
     return { terminalId: terminal.id, terminalCode: terminal.terminalCode, bindCode, expiresAt }
   },
 
-  async getPrinters(): Promise<AdminPrintersResponse> {
+  async getPrinters(options?: GetPrintersOptions): Promise<AdminPrintersResponse> {
     await delay()
+    const includeOutput = options?.includeOutput === true
     const terminals = (await this.getTerminals()).terminals
-    return {
-      printers: terminals.map((t): AdminPrinterRecord => {
-        const status = toMockPrinterStatus(t.online, t.printerStatus)
-        return {
-          id: `printer:${t.terminalCode}`,
-          terminalId: t.id,
-          terminalCode: t.terminalCode,
-          name: `${t.terminalCode} 打印机`,
-          model: null,
-          serialNumber: null,
-          status,
-          printerStatus: t.printerStatus,
-          currentTask: null,
-          tonerLevel: null,
-          paperTrayLevel: null,
-          paperStatus: t.printerStatus === 'paper_empty' ? 'empty' : null,
-          fault: toMockPrinterFault(t.online, t.printerStatus),
-          lastHeartbeatAt: t.lastHeartbeatAt,
-          lastSyncAt: t.lastHeartbeatAt,
-        }
-      }),
+    const scenario = new URLSearchParams(window.location.search).get('mock:printerStatus')
+    if (scenario === 'empty') return includeOutput ? { printers: [], outputStatus: 'ok' } : { printers: [] }
+    // 与线上真实形状一致：终端只报总体状态，纸张只有「偏低 / 空」报警，墨粉没有余量（恒为空）
+    const shapes = {
+      offline: { status: 'offline', printerStatus: null, paperStatus: null, fault: '打印机状态未上报' },
+      low: { status: 'online', printerStatus: 'low_paper', paperStatus: 'low', fault: '纸张或墨粉不足，可打印、需补充' },
+      normal: { status: 'online', printerStatus: 'ready', paperStatus: null, fault: null },
+    } as const
+    const withOutput = (printer: AdminPrinterRecord, terminalCode: string): AdminPrinterRecord =>
+      includeOutput ? { ...printer, output: mockPrinterOutput(terminalCode) } : printer
+    if (scenario === 'offline' || scenario === 'low' || scenario === 'normal') {
+      const base = terminals[0]
+      if (base) {
+        const printers = [withOutput({
+          id: `printer:${base.terminalCode}`, terminalId: base.id, terminalCode: base.terminalCode,
+          name: `${base.terminalCode} 打印机`, model: null, serialNumber: null,
+          ...shapes[scenario], currentTask: null, tonerLevel: null, paperTrayLevel: null,
+          lastHeartbeatAt: base.lastHeartbeatAt, lastSyncAt: base.lastHeartbeatAt,
+        }, base.terminalCode)]
+        return includeOutput ? { printers, outputStatus: 'ok' } : { printers }
+      }
     }
+    const printers = terminals.map((t): AdminPrinterRecord => {
+      const status = toMockPrinterStatus(t.online, t.printerStatus)
+      return withOutput({
+        id: `printer:${t.terminalCode}`,
+        terminalId: t.id,
+        terminalCode: t.terminalCode,
+        name: `${t.terminalCode} 打印机`,
+        model: null,
+        serialNumber: null,
+        status,
+        printerStatus: t.printerStatus,
+        currentTask: null,
+        tonerLevel: null,
+        paperTrayLevel: null,
+        paperStatus: t.printerStatus === 'paper_empty' ? 'empty' : null,
+        fault: toMockPrinterFault(t.online, t.printerStatus),
+        lastHeartbeatAt: t.lastHeartbeatAt,
+        lastSyncAt: t.lastHeartbeatAt,
+      }, t.terminalCode)
+    })
+    return includeOutput ? { printers, outputStatus: 'ok' } : { printers }
   },
 
   // ── 日志审计(HIGH-5 mock,支持 action/时间筛选 + 分页)───────────────────
@@ -707,6 +743,20 @@ export const adminMockAdapter = {
       { id: 'batch-005', sourceId: 'ds2', sourceName: '高校就业信息 Excel', orgId: 'org-uni-001', orgName: '某大学就业中心', dataType: 'job',  fileName: '错误文件_test.xlsx',        totalRows: 5,  validRows: 0,  invalidRows: 5, dupRows: 0, status: 'cancelled',  createdBy: 'partner1', confirmedAt: null,                       createdAt: '2026-05-22T11:00:00.000Z' },
     ]
   },
+}
+
+function mockPrinterOutput(terminalCode: string): AdminPrinterOutput {
+  const byCode: Record<string, AdminPrinterOutput> = {
+    'KSK-001': { today: { sides: 12, colorSides: 2, duplexSides: 4 }, month: { sides: 340, colorSides: 20, duplexSides: 96 }, monthUnconfirmedTasks: 0 },
+    'KSK-002': { today: { sides: 0, colorSides: 0, duplexSides: 0 }, month: { sides: 86, colorSides: 0, duplexSides: 12 }, monthUnconfirmedTasks: 0 },
+    'KSK-003': { today: { sides: 8, colorSides: 8, duplexSides: 8 }, month: { sides: 128, colorSides: 40, duplexSides: 64 }, monthUnconfirmedTasks: 0 },
+    'KSK-004': { today: { sides: 3, colorSides: 0, duplexSides: 0 }, month: { sides: 47, colorSides: 0, duplexSides: 0 }, monthUnconfirmedTasks: 2 },
+    'KSK-007': { today: { sides: 1, colorSides: 0, duplexSides: 0 }, month: { sides: 15, colorSides: 1, duplexSides: 0 }, monthUnconfirmedTasks: 0 },
+    'KSK-008': { today: { sides: 6, colorSides: 0, duplexSides: 6 }, month: { sides: 210, colorSides: 18, duplexSides: 90 }, monthUnconfirmedTasks: 1 },
+    'KSK-009': { today: { sides: 0, colorSides: 0, duplexSides: 0 }, month: { sides: 4, colorSides: 0, duplexSides: 0 }, monthUnconfirmedTasks: 0 },
+    'KSK-010': { today: { sides: 22, colorSides: 5, duplexSides: 0 }, month: { sides: 501, colorSides: 33, duplexSides: 14 }, monthUnconfirmedTasks: 0 },
+  }
+  return byCode[terminalCode] ?? { today: { sides: 7, colorSides: 1, duplexSides: 0 }, month: { sides: 19, colorSides: 1, duplexSides: 2 }, monthUnconfirmedTasks: 0 }
 }
 
 function toMockPrinterStatus(online: boolean, printerStatus: string | null): AdminPrinterRecord['status'] {

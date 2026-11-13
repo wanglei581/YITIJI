@@ -1,3 +1,4 @@
+// 停放（2026-11-05 政策最小闭环）：源码保留、不注册、不打包，旧链接回政策首页
 import { AlertTriangleIcon, FileTextIcon, HeartIcon, InfoIcon, RotateCcwIcon } from 'lucide-react'
 import { RqDeadEnd, type DeadEndExit } from './components'
 import type { PolicyFocusPhase } from './usePolicyFocus'

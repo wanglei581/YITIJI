@@ -28,7 +28,7 @@ import type {
   FileCleanupResponse,
   UploadIntentResponse,
 } from './file.types'
-import { RESUME_EXPORT_STAGING_LOCK, RESUME_EXPORT_STAGING_MAX_MS } from './file.types'
+import { RESUME_EXPORT_STAGING_LOCK } from './file.types'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import type { UserRole } from '../common/decorators/roles.decorator'
 import { PrismaService } from '../prisma/prisma.service'
@@ -43,8 +43,13 @@ import {
   isPurpose,
   canActorUseUploadPurpose,
   rawUploadByteLimitForPurpose,
-  type UploadValidationMode,
 } from './file-validation'
+import {
+  runVerifiedDeviceScanUpload,
+  stagePreparedUpload,
+  takeVerifiedDeviceUploadPlan,
+  type FileUploadArgs,
+} from './verified-device-scan-upload'
 import { sniffDeclaredMimeMismatch } from './content-sniff'
 import { recognizeStoredPageCount } from './file-page-count.util'
 import { toMetadata } from './file-metadata'
@@ -53,6 +58,9 @@ import {
   allowedPoliciesForFile,
   computeRetentionDecision,
   defaultRetentionForUpload,
+  isOrderOnlyFile,
+  ORDER_ONLY_INHERITING_DERIVATIONS,
+  UPLOAD_SESSION_ORDER_ONLY_REASON,
 } from './retention-policy'
 import { summarizeFileLifecycleRows } from './lifecycle-summary'
 import { parseContentFileId, PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from './signing'
@@ -110,36 +118,88 @@ export class FilesService {
 
   // ── 服务端代理上传(multipart;校验后的 buffer 经服务端推送到对象存储)──────
 
-  async upload(args: {
-    buffer: Buffer
-    filename: string
-    mimeType: string
-    purpose: FilePurpose
-    sensitiveLevel?: FileSensitiveLevel
-    uploaderId: string | null
-    endUserId?: string | null
-    assetCategory?: FileAssetCategory
-    derivationKind?: import('../print-jobs/material-check-policy').DerivationKind // 派生件怎么来的（1.8 P-1）：derived / optimized 必传
-    sourceFileId?: string | null
-    actorRole?: UserRole | null
-    actorOrgId?: string | null
-    createdBy?: string | null
-    /** 仅服务端内部调用可设 intent；外部 multipart 调用省略时固定为 proxy(15MB)。 */
-    validationMode?: UploadValidationMode
-    /** 仅服务端派生成果可收紧默认 system_short 到明确到期时间。 */
-    expiresAtOverride?: Date
-    /**
-     * 收费导出预写：对象先落库为 uploading + 短寿命，会员列表和访问 URL 看不到。
-     * 核销事务提交时再激活并恢复正式保存期限。endUserId 在激活前不写入，
-     * 避免会员数据导出按 endUserId 把未付款文件列出来。
-     */
-    paidExportStaging?: { endUserId: string; expiresAt: Date }
-    /**
-     * 渲染前已经写进 AIGC.ProduceID 的编号。传入则作为 FileObject.id，
-     * 缺省时在这里生成。只接受 32 位十六进制，和对象键里的文件段一致。
-     */
-    id?: string
-  }): Promise<FileUploadResponse> {
+  async upload(args: FileUploadArgs): Promise<FileUploadResponse> {
+    const planned = takeVerifiedDeviceUploadPlan(args)
+    this.rejectDisallowedUpload(args)
+    const validation = planned ?? validateUpload({
+      purpose: args.purpose,
+      mimeType: args.mimeType,
+      filename: args.filename,
+      sizeBytes: args.buffer.length,
+      mode: args.validationMode ?? 'proxy',
+    })
+    const ready = await stagePreparedUpload(args, validation, planned !== null, {
+      warn: (message) => this.logger.warn(message),
+      resolveSensitiveLevel: (purpose, explicit) => this.resolveSensitiveLevel(purpose, explicit),
+      deriveOwner,
+      inheritsOrderOnly: (sourceFileId, derivationKind) => this.inheritsOrderOnly(sourceFileId, derivationKind),
+      putObject: (objectKey, buffer, mimeType) => this.storage.putObject(objectKey, buffer, mimeType),
+      bucket: this.storage.defaultBucket,
+      region: this.storage.defaultRegion,
+    })
+    const bucket = ready.bucket
+    let record
+    try {
+      record = await this.prisma.fileObject.create({
+        data: {
+          id: ready.id,
+          storageKey: ready.objectKey,
+          bucket,
+          region: ready.region,
+          filename: args.filename,
+          mimeType: args.mimeType,
+          sizeBytes: ready.put.sizeBytes,
+          sha256: ready.put.sha256,
+          pageCount: ready.pageCount,
+          uploaderId: args.uploaderId,
+          endUserId: ready.staging ? null : (args.endUserId ?? null),
+          ownerType: ready.owner.ownerType,
+          ownerId: ready.owner.ownerId,
+          purpose: args.purpose,
+          sensitiveLevel: ready.sensitiveLevel,
+          visibility: 'private',
+          status: ready.staging ? 'uploading' : 'active',
+          createdBy: args.createdBy ?? args.uploaderId ?? null,
+          assetCategory: args.assetCategory ?? 'original',
+          derivationKind: args.derivationKind ?? null,
+          sourceFileId: args.sourceFileId ?? null,
+          expiresAt: ready.staging ? ready.staging.expiresAt : (ready.expiresAtOverride ?? ready.retention.expiresAt),
+          retentionPolicy: ready.retention.retentionPolicy,
+          retentionSetBy: ready.retention.retentionSetBy,
+          retentionConsentAt: ready.retention.retentionConsentAt,
+          retentionConsentVersion: ready.retention.retentionConsentVersion,
+          retentionLockedReason: ready.staging
+            ? RESUME_EXPORT_STAGING_LOCK
+            : (args.purpose === 'contract_upload'
+              ? 'contract_review_session_only'
+              : (ready.orderOnly ? UPLOAD_SESSION_ORDER_ONLY_REASON : null)),
+        },
+      })
+    } catch (createError) {
+      try {
+        await this.storage.deleteObject(ready.objectKey, bucket)
+      } catch {
+        // 不记录 key / 文件名 / owner；原始 create 错误仍是调用方看到的失败。
+        this.logger.warn('Object cleanup compensation failed after file metadata persistence error')
+      }
+      throw createError
+    }
+    return this.respondToCreatedUpload(record, ready.staging)
+  }
+
+  /**
+   * 屏上扫描投递专用。只有 assertScanDeliverOriginAllowed 签发的凭据才能走证件 PDF。
+   * 凭据不是请求字段：伪造对象会退回普通 upload，证件 PDF 仍按图片白名单被拒。
+   * 控制器和 DTO 不调用本方法，upload() 也不接受这个凭据。
+   */
+  async uploadVerifiedDeviceScan(args: FileUploadArgs & { clearance: unknown }): Promise<FileUploadResponse> {
+    return runVerifiedDeviceScanUpload(args, {
+      rejectDisallowed: (rest) => this.rejectDisallowedUpload(rest),
+      upload: (tagged) => this.upload(tagged),
+    })
+  }
+
+  private rejectDisallowedUpload(args: { purpose: FilePurpose; actorRole?: UserRole | null }): void {
     if (args.purpose === 'member_data_export' || args.purpose === 'contract_review_report') {
       throw new BadRequestException({
         error: {
@@ -153,135 +213,22 @@ export class FilesService {
         error: { code: 'FILE_PURPOSE_FORBIDDEN', message: '当前身份不能使用该文件用途' },
       })
     }
-    const validation = validateUpload({
-      purpose: args.purpose,
-      mimeType: args.mimeType,
-      filename: args.filename,
-      sizeBytes: args.buffer.length,
-      mode: args.validationMode ?? 'proxy',
-    })
-    if (!validation.ok) {
-      throw new BadRequestException({
-        error: { code: validation.code, message: validation.message },
-      })
-    }
-    // 魔数校验:真实字节须与声明 MIME 签名级一致(降低纯客户端声明的混淆空间;
-    // 非结构级证明,能力边界见 content-sniff.ts 文件头注释)。
-    const sniff = sniffDeclaredMimeMismatch(args.buffer, args.mimeType)
-    if (!sniff.ok) {
-      this.logger.warn(
-        `Upload content mismatch (purpose=${args.purpose}, declared=${args.mimeType}): ${sniff.reason}`
-      )
-      throw new BadRequestException({
-        error: {
-          code: 'FILE_CONTENT_MISMATCH',
-          message: '文件内容与声明的类型不一致，请检查文件后重新上传',
-        },
-      })
-    }
+  }
 
-    const staging = args.paidExportStaging
-    if (staging) {
-      const expiresAtMs = staging.expiresAt?.getTime?.()
-      const now = Date.now()
-      if (
-        !staging.endUserId?.trim() ||
-        !Number.isFinite(expiresAtMs) ||
-        expiresAtMs <= now ||
-        expiresAtMs > now + RESUME_EXPORT_STAGING_MAX_MS
-      ) {
-        throw new BadRequestException({
-          error: { code: 'FILE_EXPIRY_INVALID', message: '文件到期时间无效' },
-        })
-      }
-    }
-    const sensitiveLevel = this.resolveSensitiveLevel(args.purpose, args.sensitiveLevel)
-    const providedId = args.id?.trim() ?? ''
-    const id = providedId.length > 0 ? providedId : randomUUID().replace(/-/g, '')
-    if (!/^[0-9a-f]{32}$/.test(id)) {
-      throw new Error('FILE_ID_INVALID')
-    }
-    const ownerEndUserId = staging?.endUserId ?? args.endUserId ?? null
-    const owner = deriveOwner({
-      endUserId: ownerEndUserId,
-      role: args.actorRole ?? null,
-      uploaderId: args.uploaderId,
-      orgId: args.actorOrgId ?? null,
-    })
-    const retention = defaultRetentionForUpload({
-      purpose: args.purpose,
-      sensitiveLevel,
-      ownerType: owner.ownerType,
-      endUserId: ownerEndUserId,
-    })
-    const expiresAtOverride =
-      args.purpose === 'contract_upload' ? undefined : args.expiresAtOverride
-    if (
-      expiresAtOverride &&
-      (!Number.isFinite(expiresAtOverride.getTime()) || expiresAtOverride.getTime() <= Date.now())
-    ) {
-      throw new BadRequestException({
-        error: { code: 'FILE_EXPIRY_INVALID', message: '文件到期时间无效' },
-      })
-    }
-    const objectKey = generateObjectKey({
-      purpose: args.purpose,
-      ownerType: owner.ownerType as ObjKeyOwnerType,
-      ownerId: owner.ownerId,
-      fileId: id,
-      ext: validation.ext,
-    })
-
-    const put = await this.storage.putObject(objectKey, args.buffer, args.mimeType)
-    const pageCount = await recognizeStoredPageCount(args.buffer, args.mimeType)
-
-    const bucket = this.storage.defaultBucket
-    const region = this.storage.defaultRegion
-    let record
-    try {
-      record = await this.prisma.fileObject.create({
-        data: {
-          id,
-          storageKey: objectKey,
-          bucket,
-          region,
-          filename: args.filename,
-          mimeType: args.mimeType,
-          sizeBytes: put.sizeBytes,
-          sha256: put.sha256,
-          pageCount,
-          uploaderId: args.uploaderId,
-          endUserId: staging ? null : (args.endUserId ?? null),
-          ownerType: owner.ownerType,
-          ownerId: owner.ownerId,
-          purpose: args.purpose,
-          sensitiveLevel,
-          visibility: 'private',
-          status: staging ? 'uploading' : 'active',
-          createdBy: args.createdBy ?? args.uploaderId ?? null,
-          assetCategory: args.assetCategory ?? 'original',
-          derivationKind: args.derivationKind ?? null,
-          sourceFileId: args.sourceFileId ?? null,
-          expiresAt: staging ? staging.expiresAt : (expiresAtOverride ?? retention.expiresAt),
-          retentionPolicy: retention.retentionPolicy,
-          retentionSetBy: retention.retentionSetBy,
-          retentionConsentAt: retention.retentionConsentAt,
-          retentionConsentVersion: retention.retentionConsentVersion,
-          retentionLockedReason: staging
-            ? RESUME_EXPORT_STAGING_LOCK
-            : (args.purpose === 'contract_upload' ? 'contract_review_session_only' : null),
-        },
-      })
-    } catch (createError) {
-      try {
-        await this.storage.deleteObject(objectKey, bucket)
-      } catch {
-        // 不记录 key / 文件名 / owner；原始 create 错误仍是调用方看到的失败。
-        this.logger.warn('Object cleanup compensation failed after file metadata persistence error')
-      }
-      throw createError
-    }
-
+  private async respondToCreatedUpload(
+    record: {
+      id: string
+      filename: string
+      sizeBytes: number
+      mimeType: string
+      sha256: string
+      storageKey: string
+      bucket: string
+      expiresAt: Date | null
+      purpose: string
+    },
+    staging: FileUploadArgs['paidExportStaging'],
+  ): Promise<FileUploadResponse> {
     // 预写行还不是已购文件：不签发下载 URL。签名失败也不能 systemDelete，
     // 否则会把尚未核销的对象提前抹掉；短 expiresAt 交给 cleanupExpired。
     if (staging) {
@@ -1370,6 +1317,13 @@ export class FilesService {
           : {}),
       },
     })
+  }
+
+  /** 这一单的打印副本（格式转换、签章、隐私遮挡）由只用于这一单的原件变出来时跟锁，调用方忘了传也不漏。 */
+  private async inheritsOrderOnly(sourceFileId?: string | null, derivationKind?: string | null): Promise<boolean> {
+    if (!sourceFileId || !derivationKind || !ORDER_ONLY_INHERITING_DERIVATIONS.has(derivationKind)) return false
+    const source = await this.prisma.fileObject.findUnique({ where: { id: sourceFileId }, select: { retentionLockedReason: true } })
+    return isOrderOnlyFile(source ?? {})
   }
 
   private resolveSensitiveLevel(

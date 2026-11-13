@@ -22,7 +22,7 @@
 //   - 连点只建一次单；报价没回来不能建单；合并版先按最终文件报价、且只生成一次。
 // ============================================================
 
-import type { Page, Route } from '@playwright/test'
+import type { Locator, Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { assertNoHorizontalOverflow } from './assert-layout'
@@ -33,6 +33,24 @@ async function openConfirmWith(page: Page, printParams: Record<string, unknown>)
   await page.goto('/print/confirm')
   await writePrintHandoff(page, { printParams, materialCheck: null })
   await page.reload({ waitUntil: 'domcontentloaded' })
+}
+
+async function expectExitInViewport(button: Locator): Promise<void> {
+  await expect(button).toBeVisible()
+  const box = await button.boundingBox()
+  expect(box).not.toBeNull()
+  expect(box!.x).toBeGreaterThanOrEqual(0)
+  expect(box!.y).toBeGreaterThanOrEqual(0)
+  expect(box!.x + box!.width).toBeLessThanOrEqual(1080)
+  expect(box!.y + box!.height).toBeLessThanOrEqual(1920)
+  const unobstructed = await button.evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    return [0.1, 0.5, 0.9].every((x) => [0.1, 0.5, 0.9].every((y) => {
+      const hit = document.elementFromPoint(rect.left + rect.width * x, rect.top + rect.height * y)
+      return hit !== null && element.contains(hit)
+    }))
+  })
+  expect(unobstructed, '出口按钮不能被其他元素遮挡').toBe(true)
 }
 
 const NOW = '2026-08-18T00:00:00.000Z'
@@ -122,6 +140,12 @@ async function routePricingQuote(page: Page, billablePages: number, seen: { colo
 
 const yuan = (cents: number): string => `¥${(cents / 100).toFixed(2)}`
 
+async function expectConfirmAmount(page: Page, cents: number): Promise<void> {
+  const amount = (cents / 100).toFixed(2)
+  await expect(amountCard(page)).toHaveText(amount)
+  await expect(amountCard(page).locator('..')).toHaveText(`应付 ${amount} 元`)
+}
+
 // 摘要卡的每一行都带 data-sum-row=<行名>，不依赖类名或 DOM 层级。
 const summaryValue = (page: Page, label: string) => page.locator(`[data-sum-row="${label}"] .v`)
 
@@ -165,13 +189,19 @@ test('print confirm falls back to black-and-white and never quotes unverified co
 
   await expect(page.locator('[data-testid="print-confirm-state-capability-invalid-params"]')).toBeVisible()
   await expect(summaryValue(page, '色彩模式')).toContainText('彩色本机暂未开通')
+  await expect(page.locator('.pcf-parameters')).toHaveJSProperty('open', false)
+  const settingNote = page.locator('.pct-row').filter({ has: page.getByText('设置', { exact: true }) }).locator('.pct-setting-note')
+  await expect(settingNote).toContainText('已按黑白报价')
+  await expect(settingNote).toBeVisible()
+  await page.locator('.pcf-parameters > summary', { hasText: '查看全部参数' }).click()
   await expect(page.locator('[data-sum-row="色彩模式"]')).toContainText('已按黑白报价')
+  await expect(page.locator('[data-sum-row="色彩模式"] em')).toBeVisible()
   await expect(page.locator('[data-sum-row="本次产物"]')).toHaveAttribute('data-file-id', W2_FILE.fileId)
   await expect(summaryValue(page, '本次产物')).toHaveText('打印件')
   await expect(page.locator('[data-cost-calc]')).toHaveText(`${yuan(UNIT_CENTS.black_white)}/页 × ${W2_FILE.pages} 页`)
   expect(seen.colorMode).toBe('black_white')
   await expect(page.getByText('金额暂不可用')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: /确认并去付款/ })).toBeEnabled()
+  await expect(page.getByRole('button', { name: /^去付款$/ })).toBeEnabled()
   expect(pageErrors).toEqual([])
 })
 
@@ -289,7 +319,7 @@ async function openConfirm(page: Page, selfAssessment = false): Promise<void> {
 }
 
 const amountCard = (page: Page) => page.getByTestId('print-confirm-amount')
-const originalConfirm = (page: Page) => page.getByRole('button', { name: /^(确认并去付款|确认并打印)$/ })
+const originalConfirm = (page: Page) => page.getByRole('button', { name: /^(去付款|确认并打印)$/ })
 const reconfirm = (page: Page, cents: number, merged = false) =>
   page.getByRole('button', { name: `按新金额 ${yuan(cents)} 确认${merged ? '（合并版）' : ''}` })
 
@@ -310,13 +340,14 @@ for (const scenario of [
     const jobs = await routeJobs(page, [{ status: 409, unitCents: scenario.toUnit }, { status: 201, unitCents: scenario.toUnit }])
 
     await openConfirm(page)
-    await expect(amountCard(page)).toHaveText(from === 0 ? '免费试运营' : yuan(from))
+    if (from === 0) await expect(amountCard(page)).toHaveText('免费试运营')
+    else await expectConfirmAmount(page, from)
     await originalConfirm(page).click()
 
     // 409 之后：屏上换成服务端现价，明确说没建单，按钮写明新金额；停在确认页。
     await expect(page.getByRole('alert')).toContainText(`你确认的是 ${yuan(from)}，现在应付 ${yuan(to)}`)
     await expect(page.getByRole('alert')).toContainText('本次没有建单，也没有扣款')
-    await expect(amountCard(page)).toHaveText(yuan(to))
+    await expectConfirmAmount(page, to)
     await expect(page.locator('[data-cost-calc]')).toHaveText(`${yuan(scenario.toUnit)}/页 × ${W2_FILE.pages} 页`)
     await expect(page.getByTestId('print-confirm-state-quoted')).toBeVisible()
     await expect(reconfirm(page, to)).toBeEnabled()
@@ -360,12 +391,13 @@ test('rapid repeated confirm sends exactly one create request @kiosk', async ({ 
 
 test('confirm cannot create an order while the quote is failed or still loading @kiosk', async ({ page, api }) => {
   registerShell(api, [])
+  const quote = { unitCents: 20, pages: W2_FILE.pages }
   let release: () => void = () => undefined
   const held = new Promise<void>((resolve) => { release = resolve })
   await routeQuote(page, async (_url, n) => {
     if (n === 1) return 'fail'
     await held
-    return { unitCents: 20, pages: W2_FILE.pages }
+    return quote
   })
   const jobs = await routeJobs(page, [{ status: 201, unitCents: 20 }])
 
@@ -380,7 +412,7 @@ test('confirm cannot create an order while the quote is failed or still loading 
   expect(jobs).toHaveLength(0)
   release()
   await expect(originalConfirm(page)).toBeEnabled()
-  await expect(amountCard(page)).toHaveText(yuan(40))
+  await expectConfirmAmount(page, quote.unitCents * quote.pages)
   expect(jobs).toHaveLength(0)
 })
 
@@ -389,6 +421,8 @@ test('merged self-assessment file is quoted before submit, generated once, and i
   page.on('pageerror', (error) => pageErrors.push(error.message))
   registerShell(api, [])
   registerCashier(api, 120)
+  const originalQuote = { unitCents: 20, pages: W2_FILE.pages }
+  const mergedQuote = { unitCents: 20, pages: 6 }
   let appendCalls = 0
   await page.route(`**/api/v1/resume/self-assessment/${SA_TASK_ID}/append`, async (route: Route) => {
     appendCalls += 1
@@ -405,16 +439,16 @@ test('merged self-assessment file is quoted before submit, generated once, and i
   const mergedHeld = new Promise<void>((resolve) => { releaseMerged = resolve })
   let mergedQuotes = 0
   const quotes = await routeQuote(page, async (fileUrl) => {
-    if (fileUrl !== MERGED_URL) return { unitCents: 20, pages: W2_FILE.pages }
+    if (fileUrl !== MERGED_URL) return originalQuote
     mergedQuotes += 1
     // 第一次合并版报价压住不回，模拟「用户已经改回原文件之后才到的迟到响应」。
     if (mergedQuotes === 1) await mergedHeld
-    return { unitCents: 20, pages: 6 }
+    return mergedQuote
   })
   const jobs = await routeJobs(page, [{ status: 201, unitCents: 20, pages: 6 }])
 
   await openConfirm(page, true)
-  await expect(amountCard(page)).toHaveText(yuan(40))
+  await expectConfirmAmount(page, originalQuote.unitCents * originalQuote.pages)
   const mergeToggle = page.getByRole('checkbox', { name: /附加自我探索/ })
   await mergeToggle.check()
   await page.getByRole('button', { name: '打印合并版（简历+自我探索）' }).click()
@@ -426,16 +460,16 @@ test('merged self-assessment file is quoted before submit, generated once, and i
 
   // 改回原文件：原文件重新报价；随后放出的迟到合并版报价不得覆盖屏上价格。
   await mergeToggle.uncheck()
-  await expect(amountCard(page)).toHaveText(yuan(40))
+  await expectConfirmAmount(page, originalQuote.unitCents * originalQuote.pages)
   releaseMerged()
   await expect.poll(() => quotes.filter((url) => url === MERGED_URL).length).toBe(1)
   await page.waitForTimeout(400)
-  await expect(amountCard(page)).toHaveText(yuan(40))
+  await expectConfirmAmount(page, originalQuote.unitCents * originalQuote.pages)
   await expect(page.getByRole('alert')).toHaveCount(0)
 
   // 再勾上：复用已生成的合并版（不重复生成），按最终文件报价并要求再确认一次。
   await mergeToggle.check()
-  await expect(amountCard(page)).toHaveText(yuan(120))
+  await expectConfirmAmount(page, mergedQuote.unitCents * mergedQuote.pages)
   await expect(page.getByRole('alert')).toContainText('已生成合并版')
   await reconfirm(page, 120, true).click()
   await page.waitForURL('**/print/cashier')
@@ -518,3 +552,57 @@ for (const state of ['loading', 'failed'] as const) {
     }
   })
 }
+
+for (const scenario of [
+  { code: 'PRINT_TERMINAL_DAILY_QUOTA_REACHED', message: '这台机器今天的免费打印量已用完，明天 0 点恢复', limit: 300 },
+  { code: 'PRINT_MEMBER_DAILY_QUOTA_REACHED', message: '你今天已免费打印 50 面，达到每日上限，明天 0 点恢复', limit: 50 },
+  { code: 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED', message: '免登录每次最多打印 20 面', limit: 20 },
+] as const) {
+  test(`free print quota ${scenario.code} gives an exit @kiosk`, async ({ page, api }) => {
+    await page.setViewportSize({ width: 1080, height: 1920 })
+    registerShell(api, [])
+    registerPriceConfig(api, [0])
+    await routeQuote(page, () => ({ unitCents: 0, pages: W2_FILE.pages }))
+    await page.route('**/api/v1/print/jobs', async (route) => {
+      await route.fulfill({ status: 429, json: { error: { code: scenario.code, message: 'server text', details: { limit: scenario.limit } } } })
+    })
+    await openConfirm(page)
+    await expect(originalConfirm(page)).toBeEnabled()
+    await originalConfirm(page).click()
+    await expect(page.getByRole('alert')).toContainText(scenario.message)
+    await expect(page.getByRole('alert')).toContainText('本次没有建单，也没有出纸')
+    if (scenario.code === 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED') {
+      await expectExitInViewport(page.getByRole('button', { name: '去登录', exact: true }))
+      await expectExitInViewport(page.getByRole('button', { name: '减少份数或页数再试' }))
+      await page.getByRole('button', { name: '去登录', exact: true }).click()
+      await expect(page).toHaveURL(/\/login\?from=%2Fprint%2Fconfirm/)
+    } else {
+      await expect(page.getByRole('alert')).toContainText('需要帮助？')
+      await expect(page.getByRole('button', { name: '返回修改' })).toBeVisible()
+    }
+  })
+}
+
+test('unfinished privacy check keeps the recovery exit on screen @kiosk', async ({ page, api }) => {
+  await page.setViewportSize({ width: 1080, height: 1920 })
+  registerShell(api, [])
+  registerPriceConfig(api, [0])
+  await routeQuote(page, () => ({ unitCents: 0, pages: W2_FILE.pages }))
+  await page.route('**/api/v1/print/jobs', async (route) => {
+    await route.fulfill({ status: 400, json: { error: { code: 'PRINT_PII_SCAN_REQUIRED', message: 'PRINT_PII_SCAN_REQUIRED' } } })
+  })
+  // 回到材料检查后，检查页一进来就建材料任务；不登记时请求有时落在用例结束前，被夹具判成未处理（CI 偶发红）。
+  // 照 fusion-w2 的做法回 503，让页面稳定停在「材料检查未完成」。
+  api.respond('POST', '/api/v1/materials/tasks', {
+    status: 503,
+    json: { success: false, error: { code: 'MATERIAL_UNAVAILABLE', message: '材料服务暂不可用' } },
+  })
+  await openConfirm(page)
+  await expect(originalConfirm(page)).toBeEnabled()
+  await originalConfirm(page).click()
+  await expect(page.getByRole('alert')).toContainText('隐私检查还没有确认完')
+  const recovery = page.getByRole('button', { name: '回到材料检查', exact: true })
+  await expectExitInViewport(recovery)
+  await recovery.click()
+  await expect(page).toHaveURL(/\/print\/desk\?step=check/)
+})

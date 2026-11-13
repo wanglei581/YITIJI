@@ -40,6 +40,8 @@ import { MemberPrivacyModule } from './member-privacy/member-privacy.module'
 import { RedisModule } from './common/redis/redis.module'
 import { SyncModule } from './sync/sync.module'
 import { TerminalsModule } from './terminals/terminals.module'
+import { FreePrintQuotaModule } from './print-jobs/free-print-quota.module'
+import { PrintQueueTimeoutModule } from './print-jobs/print-queue-timeout.module'
 import { PrintJobsModule } from './print-jobs/print-jobs.module'
 import { TrtcModule } from './trtc/trtc.module'
 import { ContentModule } from './content/content.module'
@@ -58,6 +60,8 @@ import { KioskSessionModule } from './kiosk-session/kiosk-session.module'
 import { HelpModule } from './help/help.module'
 import { LegalModule } from './legal/legal.module'
 import { SupportContactModule } from './support-contact/support-contact.module'
+import { BrandingModule } from './branding/branding.module'
+import { LicenseModule } from './licenses/license.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { ActivitiesModule } from './activities/activities.module'
 import { ScreensaverModule } from './screensaver/screensaver.module'
@@ -73,6 +77,7 @@ import { AssistantModule } from './assistant/assistant.module'
 import { DocumentConversionModule } from './document-conversion/document-conversion.module'
 import { AiAccessModule } from './ai-access/ai-access.module'
 import { FirstOrderModule } from './first-order/first-order.module'
+import { CopyJobsModule } from './copy-jobs/copy-jobs.module'
 
 function parseRedisConnection(url: string): { host: string; port: number; password?: string; db?: number } {
   const u = new URL(url)
@@ -88,6 +93,7 @@ const redisUrl = process.env['REDIS_URL']
 
 @Module({
   imports: [
+    CopyJobsModule,
     FirstOrderModule,
     // Throttler:防字典爆破。默认全局每 IP 每分钟 60 次,
     // /auth/login 单独用更严格的 5 次/60 秒(见 auth.controller)。
@@ -152,6 +158,8 @@ const redisUrl = process.env['REDIS_URL']
     SyncModule,
     TerminalsModule,
     PrintJobsModule,
+    FreePrintQuotaModule,
+    PrintQueueTimeoutModule,
     TrtcModule,
     ContentModule,
     SmartCampusModule,
@@ -170,6 +178,9 @@ const redisUrl = process.env['REDIS_URL']
     HelpModule,
     LegalModule,
     SupportContactModule,
+    // 贴牌（品牌与备案、机构覆盖、Logo、kiosk-profile）与软件使用授权（期限 + 台数 + 到期停用）。
+    BrandingModule,
+    LicenseModule,
     NotificationsModule,
     ActivitiesModule,
     ScreensaverModule,

@@ -12,6 +12,29 @@ export function monthWindow(month: string, now = new Date()) {
   return { from, to, closed: to <= now }
 }
 
+/** Previous complete calendar month in Asia/Shanghai. The directory uses this when month is omitted. */
+export function previousClosedMonth(now = new Date()) {
+  const shifted = new Date(now.getTime() + 8 * 3600_000)
+  const from = new Date(Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth() - 1, 1) - 8 * 3600_000)
+  const to = new Date(Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), 1) - 8 * 3600_000)
+  const month = new Date(from.getTime() + 8 * 3600_000).toISOString().slice(0, 7)
+  return { from, to, month }
+}
+
+/**
+ * Directory month window. Unlike monthWindow, a current or future month is not an error:
+ * the caller marks every row as preview-only instead of a missing report.
+ */
+export function reportDirectoryWindow(month: string, now = new Date()) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+    throw new BadRequestException({ error: { code: 'FIRST_ORDER_MONTH_INVALID', message: '请选择有效月份' } })
+  }
+  const [year, m] = month.split('-').map(Number)
+  const from = new Date(Date.UTC(year, m - 1, 1) - 8 * 3600_000)
+  const to = new Date(Date.UTC(year, m, 1) - 8 * 3600_000)
+  return { from, to, closed: to <= now }
+}
+
 export function reportMetric(value: number | null, note: string, unavailable = 'not_recorded' as const): FirstOrderMetric {
   if (value === null) return { value: null, state: unavailable, note }
   if (value > 0 && value < 5) return { value: null, state: 'sample_suppressed', note: '样本不足5，不显示数值' }

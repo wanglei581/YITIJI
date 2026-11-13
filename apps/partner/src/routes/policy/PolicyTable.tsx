@@ -1,12 +1,12 @@
 import { Fragment } from 'react'
 import { Card, ConsoleTable, StatusBadge } from '@ai-job-print/ui'
-import { ClipboardListIcon, PencilIcon, Trash2Icon } from 'lucide-react'
+import { PencilIcon, Trash2Icon } from 'lucide-react'
 import { isPolicyEmergencyHeld, type PartnerPolicyRecord } from '../../services/api/policies'
 import type { ReviewStatus } from '../../services/api'
 import { RejectReason } from '../../components/RejectReason'
 import { PolicyEmergencyNote } from './PolicyEmergencyNote'
 
-import { KIND_LABELS, AUDIENCE_LABELS, CATEGORY_LABELS } from './policyLabels'
+import { KIND_LABELS, AUDIENCE_LABELS, CATEGORY_LABELS, RECRUITMENT_POLICY_BLOCKED_REASON } from './policyLabels'
 
 const REVIEW_MAP: Record<
   string,
@@ -33,9 +33,9 @@ interface Props {
   reviewFilter: string
   canCreate: boolean
   cannotCreateHint: string
+  recruitmentWriteBlocked: boolean
   busyId: string | null
   openEdit: (row: PartnerPolicyRecord) => void
-  setRulesFor: (row: PartnerPolicyRecord) => void
   handleApprove: (row: PartnerPolicyRecord) => Promise<void>
   setReleasing: (row: PartnerPolicyRecord) => void
   setConfirmUnpublish: (row: PartnerPolicyRecord) => void
@@ -50,9 +50,9 @@ export function PolicyTable({
   reviewFilter,
   canCreate,
   cannotCreateHint,
+  recruitmentWriteBlocked,
   busyId,
   openEdit,
-  setRulesFor,
   handleApprove,
   setReleasing,
   setConfirmUnpublish,
@@ -91,6 +91,7 @@ export function PolicyTable({
           const review = REVIEW_MAP[r.reviewStatus] ?? REVIEW_MAP.pending
           const publish = PUBLISH_MAP[r.publishStatus] ?? PUBLISH_MAP.draft
           const held = isPolicyEmergencyHeld(r)
+          const recruitmentBlocked = recruitmentWriteBlocked && r.category === 'recruitment' && !held
           return (
             <Fragment key={r.id}>
               <tr className={held ? 'border-b-0 hover:bg-neutral-50' : 'hover:bg-neutral-50'}>
@@ -117,6 +118,11 @@ export function PolicyTable({
                       typeof r.publishConfirmedContentVersion === 'number'
                         ? ` · 已由本机构确认发布 v${r.publishConfirmedContentVersion}`
                         : ''}
+                    </p>
+                  )}
+                  {r.kind === 'policy_guide' && (
+                    <p className="mt-1 text-xs text-neutral-500">
+                      原文链接：{!r.externalUrl?.trim() ? '未填写' : r.externalUrlVerified === true ? '已核验' : '未核验'}
                     </p>
                   )}
                   <RejectReason
@@ -158,22 +164,14 @@ export function PolicyTable({
                         <PencilIcon className="h-3.5 w-3.5" />
                       </button>
                     )}
-                    {!held && r.kind === 'policy_guide' && (
-                      <button
-                        onClick={() => setRulesFor(r)}
-                        title="录入可机械比对的申领条件"
-                        className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
-                      >
-                        <ClipboardListIcon className="h-3.5 w-3.5" />
-                        申领条件
-                      </button>
-                    )}
+                    {/* 停放（2026-11-05 政策最小闭环）：条件核对整块停放，源码保留 */}
                     {!held && (r.reviewStatus === 'pending' || r.reviewStatus === 'reviewing') && (
                       <button
                         type="button"
-                        disabled={busyId === r.id}
+                        disabled={busyId === r.id || recruitmentBlocked}
+                        title={recruitmentBlocked ? RECRUITMENT_POLICY_BLOCKED_REASON : undefined}
                         onClick={() => void handleApprove(r)}
-                        className="rounded px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg disabled:opacity-50"
+                        className="inline-flex min-h-11 items-center rounded px-3 text-xs font-medium text-success-fg hover:bg-success-bg disabled:opacity-50"
                       >
                         审核通过
                       </button>
@@ -181,7 +179,8 @@ export function PolicyTable({
                     {!held && r.reviewStatus === 'approved' && r.publishStatus !== 'published' && (
                       <button
                         type="button"
-                        disabled={busyId === r.id}
+                        disabled={busyId === r.id || recruitmentBlocked}
+                        title={recruitmentBlocked ? RECRUITMENT_POLICY_BLOCKED_REASON : undefined}
                         onClick={() => setReleasing(r)}
                         className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 disabled:opacity-50"
                       >
@@ -192,7 +191,7 @@ export function PolicyTable({
                       <button
                         disabled={busyId === r.id}
                         onClick={() => setConfirmUnpublish(r)}
-                        className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg disabled:opacity-50"
+                        className="inline-flex min-h-11 items-center rounded px-3 text-xs font-medium text-warning-fg hover:bg-warning-bg disabled:opacity-50"
                       >
                         下架
                       </button>
@@ -202,13 +201,20 @@ export function PolicyTable({
                       aria-label="删除"
                       disabled={busyId === r.id}
                       onClick={() => setConfirmDelete(r)}
-                      className="rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg disabled:opacity-50"
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded text-xs font-medium text-error-fg hover:bg-error-bg disabled:opacity-50"
                     >
                       <Trash2Icon className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </td>
               </tr>
+              {recruitmentBlocked && (
+                <tr>
+                  <td colSpan={7} className="px-4 pb-3 pt-0">
+                    <p className="text-xs leading-relaxed text-neutral-500">{RECRUITMENT_POLICY_BLOCKED_REASON}</p>
+                  </td>
+                </tr>
+              )}
               {held && (
                 <tr>
                   <td colSpan={7} className="px-4 pb-3 pt-0">

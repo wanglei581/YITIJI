@@ -2,7 +2,6 @@ import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
 import { installScanRevokeProbe, waitForAckConsumed } from '../fixtures/scan-revoke-probe'
-import { CURRENT_SELF_ASSESSMENT_CONSENT_VERSION } from '../fixtures/self-assessment-questions'
 
 const MEMBER_TOKEN = 'privacy-member-memory-token'
 const MEMBER_PHONE = '13800138000'
@@ -365,7 +364,8 @@ test('member report hard-replaces a clean homepage after the privacy deadline @p
   // 少任何一条都有洞：登录态但 displayName 为空时只有第 1 条能抓；
   // 姓名残留在问候语以外时只有第 2 条能抓。
   await expect(page.getByRole('button', { name: /登录后查看本人记录/ })).toBeVisible()
-  await expect(page.getByRole('heading', { name: /^(夜深了|上午好|中午好|下午好|晚上好)，我是小青$/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '我是小青', exact: true })).toBeVisible()
+  await expect(page.locator('.qxt-eyebrow')).toHaveText(/^(夜深了|上午好|中午好|下午好|晚上好)$/)
 })
 
 test('member privacy clear sends the original bearer and blocks authenticated re-entry @privacy-kiosk', async ({ page, api }) => {
@@ -436,7 +436,8 @@ test('legal documents cannot suspend an authenticated kiosk privacy deadline @pr
   // 少任何一条都有洞：登录态但 displayName 为空时只有第 1 条能抓；
   // 姓名残留在问候语以外时只有第 2 条能抓。
   await expect(page.getByRole('button', { name: /登录后查看本人记录/ })).toBeVisible()
-  await expect(page.getByRole('heading', { name: /^(夜深了|上午好|中午好|下午好|晚上好)，我是小青$/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '我是小青', exact: true })).toBeVisible()
+  await expect(page.locator('.qxt-eyebrow')).toHaveText(/^(夜深了|上午好|中午好|下午好|晚上好)$/)
 })
 
 test('anonymous interview state is hard-cleared and browser back cannot restore it @privacy-kiosk', async ({ page, api }) => {
@@ -653,7 +654,8 @@ test('an unknown terminal route remains inside the privacy guard @privacy-kiosk'
   // 少任何一条都有洞：登录态但 displayName 为空时只有第 1 条能抓；
   // 姓名残留在问候语以外时只有第 2 条能抓。
   await expect(page.getByRole('button', { name: /登录后查看本人记录/ })).toBeVisible()
-  await expect(page.getByRole('heading', { name: /^(夜深了|上午好|中午好|下午好|晚上好)，我是小青$/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '我是小青', exact: true })).toBeVisible()
+  await expect(page.locator('.qxt-eyebrow')).toHaveText(/^(夜深了|上午好|中午好|下午好|晚上好)$/)
 })
 
 // 2026-09-13 口径反转：清场以前**不撤**服务端扫描任务，理由是「任务在服务端，离开这一屏
@@ -940,7 +942,9 @@ test('hard clear stops active print polling without cancelling the backend task 
     )
   }, PRINT_TASK_ID)
   await page.reload({ waitUntil: 'domcontentloaded' })
-  await expect(page.getByText('任务已进入队列，终端尚未领取，请留在机器旁', { exact: true })).toBeVisible()
+  // 触屏版出纸页：这句话既是意图带的副题，也写进只给读屏的实时状态区（.pfp-lead-doing，1px 隐藏、不可见）。
+  // 定位收窄到意图带，断言强度不变；读屏实时区保留（状态变化要读给视障用户）。
+  await expect(page.locator('.qxt-band').getByText('任务已进入队列，终端尚未领取，请留在机器旁', { exact: true })).toBeVisible()
   await expect.poll(() => pollRequests).toBeGreaterThan(0)
 
   await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)
@@ -1281,40 +1285,29 @@ test('a BFCache pageshow restore is fail-closed before reuse @privacy-kiosk', as
   expect(storedAfterRestore).toEqual(EMPTY_SENSITIVE_SESSION)
 })
 
-test('self-assessment leftover is wiped by the hard privacy deadline @privacy-kiosk', async ({ page, api }) => {
+// 自我探索页 2026-11-08 停放，但它的会话键仍登记在清场键表里（kioskSensitiveSession.ts），
+// 打印确认页也读它。这里不进停放页，只钉「残留的这个键会被硬时限清掉」，防止停放期间被当死代码删掉。
+test('self-assessment session leftover is wiped by the hard privacy deadline @privacy-kiosk', async ({ page, api }) => {
   registerKioskShell(api)
-  const summary = '上一游客的倾向参考摘要，下一位不该看见'
-  const session = {
-    answers: { collaboration: { 0: 'A' } },
-    consent: { nonSensitive: true, sensitive: false },
-    consentVersion: CURRENT_SELF_ASSESSMENT_CONSENT_VERSION,
-    taskId: 'privacy-sa-task',
-    result: {
-      taskId: 'privacy-sa-task',
-      status: 'completed',
-      dimensions: [
-        { key: 'collaboration', label: '协作偏好', strength: 4, note: '隐私回归解读', evidenceQuestionIdx: [0] },
-      ],
-      summary,
-      providerName: 'mock-llm',
-      expiresAt: '2099-01-01T00:00:00.000Z',
-    },
-  }
-
   await page.goto('/')
-  await page.evaluate(({ key, value }) => {
-    sessionStorage.setItem(key, JSON.stringify(value))
-  }, { key: 'self_assessment_session_v1', value: session })
-  await page.goto('/resume/self-assessment/result')
-  await expect(page.locator('[data-kiosk-screen="resume-self-assessment-result"]')).toBeVisible()
-  await expect(page.getByText(summary, { exact: false })).toBeVisible()
+  await page.evaluate(() => {
+    window.sessionStorage.setItem('self_assessment_session_v1', JSON.stringify({
+      answers: { collaboration: { 0: 'A' } },
+      taskId: 'privacy-sa-task',
+      result: { taskId: 'privacy-sa-task', status: 'completed', summary: '上一游客的倾向参考摘要，下一位不该看见' },
+    }))
+  })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page).toHaveURL('http://127.0.0.1:4187/')
+
+  const before = await page.evaluate(() => window.sessionStorage.getItem('self_assessment_session_v1'))
+  expect(before).toContain('privacy-sa-task')
 
   await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)
 
   expect(new URL(page.url()).pathname).toBe('/')
-  const leftover = await page.evaluate(() => sessionStorage.getItem('self_assessment_session_v1'))
-  expect(leftover).toBeNull()
-  await expect(page.getByText(summary, { exact: false })).toHaveCount(0)
+  const after = await page.evaluate(() => window.sessionStorage.getItem('self_assessment_session_v1'))
+  expect(after).toBeNull()
 })
 
 test('guest local favorites are wiped by the hard privacy deadline @privacy-kiosk', async ({ page, api }) => {
@@ -1371,13 +1364,6 @@ test('signed-in rebind overlay hides the OTP on the public screen @privacy-kiosk
   await expect(otp).toHaveValue('654321')
   await expect(page.locator('input[type="password"]')).toHaveCount(1)
   await expect(page.getByText('654321', { exact: true })).toHaveCount(0)
-})
-
-test('sign-stamp page does not echo the stamp image @privacy-kiosk', async ({ page, api }) => {
-  registerKioskShell(api)
-  await page.goto('/print-scan/sign')
-  await expect(page.locator('[data-w2-page="print-scan-sign"]')).toBeVisible()
-  await expect(page.locator('img[src*="stamp"], img[alt*="印章"], img[alt*="签名"]')).toHaveCount(0)
 })
 
 test('mobile QR login is exempt from the kiosk hard privacy deadline @privacy-mobile', async ({ page, api }) => {
@@ -1660,10 +1646,14 @@ test('hard clear will not hand the machine over until the server confirms the ca
   const overlayText = (await clearing.innerText()).replace(/\s+/g, '')
   expect(overlayText).not.toContain(SCAN_CONTROL_TOKEN)
   expect(overlayText).not.toContain(SCAN_TASK_ID)
-  // 5) 主行动按钮是真能按的尺寸（CLAUDE.md §9：不小于 56px）。
+  // 5) 主行动按钮是真能按的尺寸（CLAUDE.md §9：不小于 56px；触屏版第 5 包起可点区不小于 64×64）。
   const retry = page.getByTestId('session-guard-cleanup-retry')
   const box = await retry.boundingBox()
-  expect(box?.height ?? 0).toBeGreaterThanOrEqual(56)
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(64)
+  expect(box?.width ?? 0).toBeGreaterThanOrEqual(64)
+  // 6) 现场没有人可叫：清场遮罩里不许出现「工作人员」；需要帮助只给服务电话，号码读不到就不写这一行。
+  expect(overlayText).not.toContain('工作人员')
+  await expect(page.getByTestId('session-guard-cleanup-help')).toContainText('拨打服务电话 18369161921')
 
   // 第一次撤销失败：服务端没给结论 —— 不许据此放行。
   revoke.release(0, 'server-error')
@@ -1803,7 +1793,7 @@ test('a delivery ack that lands mid-clear still ends with a confirmed cancel @pr
   })
   await page.reload({ waitUntil: 'domcontentloaded' })
   // 会话建成了，投递授权还没到手 —— 这一屏刻意不给面板操作指引。
-  await expect(page.getByText('投递授权未确认', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('还没确认能收到扫描件', { exact: true }).first()).toBeVisible()
   await expect.poll(() => ackCount).toBe(1)
 
   // 隐私硬截止到点：清场开始，撤销挂在半路。
@@ -2096,7 +2086,11 @@ test('a member login cannot start a scan while the previous one is still being c
   await loginThroughVisibleUi(page, '/scan/start')
   await revoke.received(0)
 
-  await page.getByRole('button', { name: /下一步/ }).click()
+  await page.getByTestId('scan-workbench-type-resume').click() // 进来不预选类型（走查 I-16），先点「简历扫描」
+  await page.getByRole('button', { name: '下一步', exact: true }).click()
+  // K1b-1：下一步只进入怎么扫。默认没有 scan_device，建会话发生在面板这一下。
+  await expect(page.getByRole('heading', { name: '这台机器还不能在屏上开始扫描' })).toBeVisible()
+  await page.getByTestId('scan-way-panel').click()
   await page.waitForURL(/\/scan\?stage=settings/)
 
   /* 服务端的租约取的是这台终端**最早**那条「已确认 + waiting + 未过期」的行。

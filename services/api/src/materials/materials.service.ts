@@ -170,7 +170,7 @@ export class MaterialsService {
     const kind = dto.kind as MaterialTaskKind
     const now = new Date()
     const requesterMode = requester.kind === 'member' ? 'member' : 'anonymous'
-    const accessToken = requesterMode === 'anonymous' ? randomBytes(24).toString('hex') : undefined
+    const accessToken = !sourceFile.endUserId ? randomBytes(24).toString('hex') : undefined
     const params = sanitizeParams(dto.params ?? {}, kind)
     assertSupportedTaskParams(kind, params)
     const paramsJson = JSON.stringify(params)
@@ -216,7 +216,7 @@ export class MaterialsService {
         })
       }
       const extraction = buffer
-        ? await extractTextForPiiScan(buffer, sourceFile.mimeType, this.ocr)
+        ? await extractTextForPiiScan(buffer, sourceFile.mimeType, this.ocr, sourceFile.purpose)
         : { pages: [], outcome: 'degraded' as const, truncated: false as const }
       if (extraction.outcome === 'unsupported_format') {
         await persistScan({ mode: 'unsupported_format', findingCount: 0 })

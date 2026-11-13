@@ -149,6 +149,47 @@ export async function queryWin32PrinterLine(printerName: string): Promise<string
   return runPowerShell(buildWin32PrinterProbeScript(), printerName)
 }
 
+const PRINTER_QUEUE_RAW_STATUS_PATTERN =
+  /^\d{0,10},\d{0,10},(True|False)?,\d{0,10},\d{0,10}$/
+
+/**
+ * Win32_Printer 五个属性的原值行。只在符合契约，或等于 not_found / query_failed 时返回。
+ * 对不上的（含换行）丢掉，避免心跳多带一段后台不认的内容。
+ */
+export function selectPrinterQueueRawStatus(output: string | null): string | undefined {
+  if (output === 'not_found' || output === 'query_failed') return output
+  if (
+    typeof output === 'string' &&
+    output.length <= 64 &&
+    PRINTER_QUEUE_RAW_STATUS_PATTERN.test(output)
+  ) {
+    return output
+  }
+  return undefined
+}
+
+export interface PrinterStatusAndRaw {
+  status: PrinterStatus
+  /** 只读原值。不含地址。对不上契约时不出现。 */
+  rawStatus?: string
+}
+
+/**
+ * 同一次 queryWin32PrinterLine 给出映射后的状态和原值。
+ * 非 Windows、查询失败时的状态与日志与 getPrinterStatus 原来一致。
+ */
+export async function getPrinterStatusAndRaw(printerName: string): Promise<PrinterStatusAndRaw> {
+  if (process.platform !== 'win32') return { status: 'unknown' }
+
+  const output = await queryWin32PrinterLine(printerName)
+  if (output === 'not_found') {
+    warn('wmi: configured printerName not found via Win32_Printer — reporting error')
+  }
+  const status = mapWin32PrinterQuery(output)
+  const rawStatus = selectPrinterQueueRawStatus(output)
+  return rawStatus === undefined ? { status } : { status, rawStatus }
+}
+
 /**
  * Query Win32_Printer via WMI and map to PrinterStatus.
  * printerName is passed via stdin — safe against all PS special characters.
@@ -156,13 +197,7 @@ export async function queryWin32PrinterLine(printerName: string): Promise<string
  * Returns 'error' when the configured printerName is not installed.
  */
 export async function getPrinterStatus(printerName: string): Promise<PrinterStatus> {
-  if (process.platform !== 'win32') return 'unknown'
-
-  const output = await queryWin32PrinterLine(printerName)
-  if (output === 'not_found') {
-    warn('wmi: configured printerName not found via Win32_Printer — reporting error')
-  }
-  return mapWin32PrinterQuery(output)
+  return (await getPrinterStatusAndRaw(printerName)).status
 }
 
 // ── Printer pre-flight (打印前预检) ─────────────────────────────────────────────
@@ -209,7 +244,8 @@ export async function getDiskFreeGB(): Promise<number> {
  *                   NOT map this to 'completed' or 'paper_empty'; treat as unconfirmed.
  *   'completed'   - JobStatus explicitly contains Complete/Completed/Printed
  *   'paper_empty' - JobStatus contains "PaperOut" (explicit driver report — NOT Pantum CM2800ADN)
- *   'error'       - Jammed / Error / UserIntervention / Deleting (explicit driver error flags)
+ *   'error'       - Jammed / Error / UserIntervention / Cancelled (device or cancel flags)
+ *   'removing'    - Deleting / Deleted without a device-fault flag. Not completion.
  *   'not_found'   - printer exists but no job matching taskId
  *   'unknown'     - non-Windows, query failure, or printer not found
  */
@@ -219,6 +255,7 @@ export type PrintJobMonitorStatus =
   | 'completed'
   | 'paper_empty'
   | 'error'
+  | 'removing'
   | 'not_found'
   | 'unknown'
 
@@ -360,20 +397,24 @@ export function parsePrintJobStatus(
   // JobStatus can be a comma-separated list of flags (e.g. "Printing, PaperOut")
   const flags = raw.toLowerCase()
 
-  // Explicit failure flags are checked first. This priority prevents a combined
-  // state such as "Retained, Deleted" or "Printed, PaperOut" from being treated
-  // as completion.
+  // Paper, device faults, and cancel win over both completion and queue clearance.
+  // Deleting/Deleted alone is neutral removal. Explicit Printed/Completed in that
+  // same sample is completion only when Retained is absent.
   if (flags.includes('paperout')) return { status: 'paper_empty', rawStatus: raw }
   if (
     flags.includes('jammed') ||
     flags.includes('error') ||
     flags.includes('userintervention') ||
-    flags.includes('deleting') ||
-    flags.includes('deleted') ||
     flags.includes('cancelled') ||
     flags.includes('canceled')
   ) {
     return { status: 'error', rawStatus: raw }
+  }
+  if (flags.includes('deleting') || flags.includes('deleted')) {
+    const spoolerSaysPrinted =
+      !flags.includes('retained') &&
+      (flags.includes('completed') || flags.includes('complete') || flags.includes('printed'))
+    return { status: spoolerSaysPrinted ? 'completed' : 'removing', rawStatus: raw }
   }
 
   // 'Retained' — the Windows spooler kept a copy of the job after submitting it to the

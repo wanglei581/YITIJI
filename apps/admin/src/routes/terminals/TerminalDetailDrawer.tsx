@@ -10,8 +10,11 @@ import type {
   UpdateTerminalProfileInput,
 } from '../../services/api/devices'
 import { isParkedOrgType } from '../partners/orgTypeOptions'
+import { TerminalDailyFreeSidesSection } from './TerminalDailyFreeSidesSection'
 import { TerminalLifecycleActions } from './TerminalLifecycleActions'
 import { TerminalNetworkDiagnostics } from './TerminalNetworkDiagnostics'
+import { TerminalPrinterQueue } from './TerminalPrinterQueue'
+import { printCompletionEvidenceLabel } from './printCompletionEvidence'
 import { fmtDisk, lifecycleView, printerStatusView, scanInputView } from './terminalStatusViews'
 
 type Notice = { type: 'success' | 'error'; text: string }
@@ -62,6 +65,7 @@ export interface TerminalDetailDrawerProps {
   terminal: AdminTerminalRecord | null
   organizations: AdminOrganizationOption[]
   orgLoadError: string | null
+  orgLicenseError: string | null
   notice: Notice | null
   editingOrg: boolean
   editOrgValue: string
@@ -92,6 +96,7 @@ export function TerminalDetailDrawer({
   terminal,
   organizations,
   orgLoadError,
+  orgLicenseError,
   notice,
   editingOrg,
   editOrgValue,
@@ -164,6 +169,8 @@ export function TerminalDetailDrawer({
           )}
         </Section>
 
+        <TerminalDailyFreeSidesSection terminalId={terminal.id} />
+
         <Section title="所属机构">
           {editingOrg ? (
             <>
@@ -177,6 +184,7 @@ export function TerminalDetailDrawer({
                 <Button size="sm" onClick={() => onSaveOrg(terminal)} disabled={savingOrg} aria-label="保存归属"><CheckIcon className="h-4 w-4" /></Button>
                 <Button size="sm" variant="outline" onClick={onCancelOrgEdit} disabled={savingOrg} aria-label="取消"><XIcon className="h-4 w-4" /></Button>
               </div>
+              {orgLicenseError && <p role="alert" className="text-xs text-error-fg">{orgLicenseError} <a className="underline" href={`/partners?org=${encodeURIComponent(editOrgValue)}`} target="_blank" rel="noopener noreferrer">查看该机构的授权</a></p>}
             </>
           ) : (
             <>
@@ -190,9 +198,11 @@ export function TerminalDetailDrawer({
         <Section title="运行与网络">
           <DetailRow label="最近心跳"><span title={terminal.lastHeartbeatAt ? formatDateTime(terminal.lastHeartbeatAt) : undefined}>{terminal.lastHeartbeatAt ? formatRelativeTime(terminal.lastHeartbeatAt) : '从未连接'}</span></DetailRow>
           <DetailRow label="终端程序版本"><span className="font-mono text-xs">{terminal.agentVersion ?? '未上报'}</span></DetailRow>
+          <DetailRow label="打印完成判据">{printCompletionEvidenceLabel(terminal.printCompletionEvidence)}</DetailRow>
           <DetailRow label="IP 地址"><span className="font-mono text-xs">{terminal.ipAddress ?? '未上报'}</span></DetailRow>
           <DetailRow label="磁盘可用">{fmtDisk(terminal.diskFreeGb)}</DetailRow>
           <div><p className="mb-1 text-xs text-neutral-500">链路诊断</p><TerminalNetworkDiagnostics online={terminal.online} wiredNetworkStatus={terminal.wiredNetworkStatus} printerNetworkStatus={terminal.printerNetworkStatus} /></div>
+          <TerminalPrinterQueue online={terminal.online} printerQueue={terminal.printerQueue ?? null} observedAt={terminal.lastHeartbeatAt} />
           <DetailRow label="打印机状态">{terminal.online ? <StatusBadge dot status={printer.badge} label={printer.label} /> : <OfflineReportedStatus originalLabel={terminal.printerStatus ? printer.label : null} observedAt={terminal.lastHeartbeatAt} />}</DetailRow>
           <div data-testid="terminal-scan-input"><p className="mb-1 text-xs text-neutral-500">扫描输入</p><div className="space-y-1">{terminal.online ? <><StatusBadge dot status={scan.badge} label={scan.label} />{scan.detail && <p className="text-xs text-warning-fg">{scan.detail}</p>}{scan.restart && <p className="text-xs text-warning-fg">需重启终端程序（Terminal Agent）恢复（不支持远程解除）</p>}{terminal.scanInputObservedAt && <p className="text-[11px] text-neutral-500" title={formatDateTime(terminal.scanInputObservedAt)}>{formatRelativeTime(terminal.scanInputObservedAt)}</p>}</> : <OfflineReportedStatus originalLabel={terminal.scanInputHealth ? scan.label : null} observedAt={terminal.scanInputObservedAt ?? terminal.lastHeartbeatAt} />}</div></div>
         </Section>

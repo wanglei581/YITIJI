@@ -17,14 +17,17 @@ const app = getApp()
 const auth = require('../../utils/auth')
 const api = require('../../utils/api')
 const pkg = require('../../utils/package-order')
+const printParams = require('../../utils/print-params')
+const { reprintNoteText } = require('../../utils/support-contact')
 const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
 
 const PAGE_SIZE = 20
 
 // PrintTask.status (后端) → UI 展示状态映射
 const STATUS_MAP = {
-  pending:   { key: 'waiting',  label: '待取件', tone: 'wheat' },
-  claimed:   { key: 'waiting',  label: '待取件', tone: 'wheat' },
+  // 任务已建、在终端排队（取件页写「已进入打印队列」）。仍归「待取件」这一栏，但单子本身写「排队中」。
+  pending:   { key: 'waiting',  label: '排队中', tone: 'wheat' },
+  claimed:   { key: 'waiting',  label: '排队中', tone: 'wheat' },
   printing:  { key: 'printing', label: '打印中',  tone: 'teal'  },
   completed: { key: 'done',     label: '已完成', tone: 'ok'    },
   failed:    { key: 'done',     label: '打印失败', tone: 'danger'},
@@ -54,14 +57,9 @@ function resolveDisplayStatus(item) {
   return STATUS_MAP[item.status] || { key: 'done', label: item.status, tone: 'neutral' }
 }
 
-// colorMode + paperSize + copies + pages → 规格摘要
+// 规格摘要：与取件页、订单详情同一份实现（utils/print-params.js displaySpec），含单双面。
 function buildSpec(item) {
-  const parts = []
-  if (item.paperSize) parts.push(item.paperSize.toUpperCase())
-  if (item.colorMode) parts.push(item.colorMode === 'color' ? '彩色' : '黑白')
-  if (item.copies)    parts.push(`${item.copies} 份`)
-  if (item.billablePages) parts.push(`共 ${item.billablePages} 页`)
-  return parts.join(' · ') || '—'
+  return printParams.displaySpec(item) || '—'
 }
 
 // 金额：分 → 元字符串（0 分 = 免费）
@@ -72,11 +70,22 @@ function formatPrice(cents) {
   return '¥' + (amountCents / 100).toFixed(2)
 }
 
-// MP-05：仅云打印 Order-only，且拍板第 5 条 unpaid + pending。材料包没有取消端点，不放该按钮。
+// 与服务端 cancel() 同一条件：还没产生打印任务、取件仍是 pending，
+// 并且是未付款、免费已入账（amountCents 0 + paid + paymentSource free）、或关单但从未收款。
+// 材料包没有取消端点，不放该按钮（PrintTask 行带 status，这里直接排除）。
 function canCancelCloudOrder(item) {
-  return !item.status
-    && item.payStatus === 'unpaid'
-    && item.pickupStatus === 'pending'
+  if (!item || item.status || item.printTaskId) return false
+  const freeOrder = item.amountCents === 0 && item.payStatus === 'paid' && item.paymentSource === 'free'
+  const closedUnpaid = item.payStatus === 'closed' && !item.paidAt
+  return item.pickupStatus === 'pending' && (item.payStatus === 'unpaid' || freeOrder || closedUnpaid)
+}
+
+// 免费单的确认句不写付款、退款。未付款仍用原来那句。关单未收款不提付款。
+function cancelConfirmContent(item) {
+  const freeOrder = item.amountCents === 0 && item.payStatus === 'paid' && item.paymentSource === 'free'
+  if (freeOrder) return '取消后到机码立即失效，且不能恢复。确定取消这张免费订单？'
+  if (item.payStatus === 'unpaid') return '取消后到机码立即失效，且不能恢复。确定取消这张未付款订单？'
+  return '取消后到机码立即失效，且不能恢复。确定取消这张订单？'
 }
 
 // 出纸 / 领取的那台机器。后端 9/29 契约给打印历史行补 terminal { displayName, locationLabel }；
@@ -115,8 +124,9 @@ function toUiItem(item) {
   const ds = resolveDisplayStatus(item)
   const amountCents = parseAmountCents(item.amountCents)
   const effectiveStatus = item.status || item.taskStatus || ''
-  // 到机码只在尚未核销的 Order-only 阶段展示；扫码 claimed 或创建 PrintTask 后立即撤下。
-  const pickupRaw = !item.status && item.pickupStatus === 'pending' ? (item.pickupCode || '') : ''
+  // 到机码：尚未核销的 Order-only 阶段展示；失败后服务端仍允许同码续打时也展示。
+  const pendingCode = !item.status && item.pickupStatus === 'pending'
+  const pickupRaw = (pendingCode || item.reprintAllowed === true) ? (item.pickupCode || '') : ''
   const action = ds.key === 'done' && effectiveStatus === 'completed' ? 'reprint'
                : (pickupRaw && ds.key === 'waiting')              ? 'pickup'
                : null
@@ -141,16 +151,20 @@ function toUiItem(item) {
     reasonNote:  reasonNoteOf(item, effectiveStatus),
     pickup:      fmtCode(pickupRaw),
     pickupRaw,
+    reprintNote: pickupRaw ? reprintNoteText(item) : '',
     expiresAt:   item.pickupCodeExpiresAt || item.expiresAt || item.pickupExpiresAt || '',
     taskStatus:  effectiveStatus,
     payStatus:   item.payStatus || '',
+    paymentSource: item.paymentSource || '',
+    paidAt:      item.paidAt || null,
     pickupStatus: item.pickupStatus || '',
     canCancel:   canCancelCloudOrder(item),
     cancelling:  false,
     // 已完成可再打一份；到机码可见时显示"查看到机码"
     action,
     actionLabel: action === 'pickup' ? '查看到机码'
-               : action === 'reprint' ? '再打印一份'
+               // 这个按钮实际是去「我的文档」重新选文件，不是按原单原样再打一份，名字要说实话。
+               : action === 'reprint' ? '去我的文档打印'
                : '',
     orderId: item.id,
     amountCents,
@@ -477,7 +491,7 @@ Page({
     if (!item || !item.canCancel || item.cancelling) return
     wx.showModal({
       title: '取消订单',
-      content: '取消后到机码立即失效，且不能恢复。确定取消这张未付款订单？',
+      content: cancelConfirmContent(item),
       confirmText: '确认取消',
       cancelText: '再想想',
       confirmColor: '#b5643c',

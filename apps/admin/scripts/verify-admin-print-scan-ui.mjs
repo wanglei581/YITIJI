@@ -18,7 +18,7 @@ const capabilityPath = join(root, 'src/routes/print-scan/CapabilityCenter.tsx')
 const servicePath = join(root, 'src/services/api/printScan.ts')
 const closeFormPath = join(root, 'src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx')
 const routesPath = join(root, 'src/routes/index.tsx')
-const layoutPath = join(root, 'src/layouts/AdminLayoutWrapper.tsx')
+const layoutPath = join(root, 'src/layouts/adminNav.ts')
 
 function pass(message) {
   console.log(`  PASS ${message}`)
@@ -169,7 +169,7 @@ if (layout.includes("'/print-scan'") && layout.includes('打印扫描运维')) {
 
 // 6. 动作后的 refresh 必须区分 failed/stale：旧 A 闭包不能覆盖切换后的 B 查询，也不能把 stale 误报成失败。
 if (
-  page.includes("const queryKey = [taskType, status, String(page), String(pageSize)].join('\\u0000')") &&
+  page.includes("const queryKey = [taskType, status, String(page), String(pageSize), unconfirmed ? '1' : ''].join('\\u0000')") &&
   page.includes('const queryKeyRef = useRef(queryKey)') &&
   page.includes('queryKeyRef.current = queryKey') &&
   page.includes("Promise<'success' | 'failed' | 'stale'>") &&
@@ -186,7 +186,7 @@ if (
 }
 if (!page.includes('const [pageSize, setPageSize] = useState(20)') ||
     !page.includes('pageSize={pageSize}') || !page.includes('onPageSizeChange={setPageSize}') ||
-    !page.includes('page, pageSize }') || !page.includes('[taskType, status, page, pageSize, queryKey]')) fail('统一分页器每页条数必须接入请求和竞态保护')
+    !page.includes('page, pageSize }') || !page.includes('[taskType, status, page, pageSize, unconfirmed, queryKey]')) fail('统一分页器每页条数必须接入请求和竞态保护')
 
 // 7. 保存请求必须同时绑定 sequence + terminal：A 的 success/catch/finally 都不得污染切到 B 后的 UI。
 if (

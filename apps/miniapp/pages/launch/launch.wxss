@@ -1,114 +1,231 @@
-page { height: 100%; background: #eef4ff; }
+/* pages/launch/launch.wxss
+   2026-11-12 登录页改版：只动本页，共用类一个不改。
+   颜色全部取 app.wxss 的变量；字号、圆角只用 --fs-* / --r-* 刻度（verify-miniapp-visual-scale）。
+   本页不再用 .btn.wx 的绿色，主按钮是小程序品牌主色 --teal。
+   阴影只用中性的 --sh-*（app.wxss 质感层：不用彩色辉光）。 */
 
-.launch-wrap {
+page { height: 100%; background: var(--teal-soft); }
+
+.lg {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  background: #eef4ff;
+  background: linear-gradient(180deg, var(--teal-soft) 0%, var(--teal-wash) 52%, var(--paper-deep) 100%);
 }
 
-.launch-mid {
+/* ── 上半：品牌 + 出纸 ─────────────────────────────────────── */
+.lg-hero { flex: 1; position: relative; z-index: 1; display: flex; flex-direction: column; }
+
+/* 顶部留出右上角系统胶囊那一行，字标不进那一行；上多下少，字标落在胶囊和纸之间的视觉中线上 */
+.lg-brand {
   flex: 1;
-  min-height: 520rpx;
-  padding: 70rpx 48rpx 48rpx;
+  min-height: 240rpx;
+  padding: 112rpx 48rpx 24rpx;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
 }
-
-.launch-icon-wrap {
-  width: 150rpx;
-  height: 150rpx;
-  border-radius: 42rpx;
+.lg-mark {
+  width: 104rpx;
+  height: 104rpx;
+  flex-shrink: 0;
+  border-radius: var(--r);
   background: var(--teal);
-  color: #fff;
+  color: var(--surface);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 20rpx 44rpx rgba(22,119,255,.2);
 }
-.launch-icon-ic { width: 76rpx; height: 76rpx; }
-.launch-brand { margin-top: 38rpx; font-size: 54rpx; line-height: 1.2; font-weight: 850; color: #14213d; letter-spacing: 3rpx; }
-.launch-sub { margin-top: 16rpx; font-size: 24rpx; color: #536580; letter-spacing: 2rpx; }
-.launch-slogan { margin-top: 48rpx; font-size: 25rpx; color: #7b8aa1; }
+.lg-mark-ic { width: 56rpx; height: 56rpx; }
+.lg-brand-copy { margin-left: 24rpx; display: flex; flex-direction: column; }
+.lg-name { font-size: var(--fs-2xl); line-height: 1.15; font-weight: 800; letter-spacing: 6rpx; color: var(--ink); }
+.lg-tagline { margin-top: 8rpx; font-size: var(--fs-sm); line-height: 1.4; letter-spacing: 2rpx; color: var(--muted); }
 
-.launch-btns {
-  padding: 18rpx 42rpx calc(36rpx + env(safe-area-inset-bottom));
-  border-radius: 46rpx 46rpx 0 0;
-  background: #fff;
-  box-shadow: 0 -16rpx 48rpx rgba(28,45,72,.07);
+/* 出纸台：纸的下沿落到登录卡片后面，看上去是从出纸口里出来的 */
+.lg-stage { position: relative; height: 520rpx; flex-shrink: 0; }
+.lg-sheet {
+  position: absolute;
+  left: 50%;
+  top: 32rpx;
+  width: 540rpx;
+  height: 640rpx;
+  margin-left: -270rpx;
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+}
+.lg-sheet-back {
+  border-color: var(--line);
+  transform: rotate(4deg) translate(6%, 1%);
+  animation: lg-print-back 1s cubic-bezier(.16, .84, .3, 1) .05s both;
+}
+.lg-sheet-front {
+  padding: 52rpx 56rpx 0;
+  box-shadow: var(--sh-md);
+  animation: lg-print 1s cubic-bezier(.16, .84, .3, 1) .15s both;
+}
+.lg-sheet-rule { width: 56rpx; height: 8rpx; margin-bottom: 32rpx; border-radius: var(--r-full); background: var(--teal); }
+.lg-sheet-h { font-size: var(--fs-xl); line-height: 1.4; font-weight: 800; letter-spacing: 1rpx; color: var(--ink); }
+.lg-sheet-sub { margin-top: 14rpx; font-size: var(--fs-base); line-height: 1.5; font-weight: 600; letter-spacing: 2rpx; color: var(--teal-deep); }
+.lg-sheet-line { height: 10rpx; margin-top: 22rpx; border-radius: var(--r-full); background: var(--surface-3); }
+.lg-sheet-sub + .lg-sheet-line { margin-top: 44rpx; }
+.lg-w86 { width: 86%; }
+.lg-w92 { width: 92%; }
+.lg-w60 { width: 60%; }
+.lg-para { margin-top: 40rpx; }
+
+/* 打开页面时纸从出纸口里出来一次；起点整张藏在卡片后面。
+   位移写成纸自身尺寸的百分比，不在 transform / @keyframes 里写 rpx（本小程序别处没有这种写法的先例） */
+@keyframes lg-print {
+  from { transform: translateY(80%); }
+  to   { transform: translateY(0); }
+}
+@keyframes lg-print-back {
+  from { transform: rotate(4deg) translate(6%, 84%); }
+  to   { transform: rotate(4deg) translate(6%, 1%); }
+}
+
+/* ── 下半：登录卡片 ───────────────────────────────────────── */
+.lg-panel {
+  position: relative;
+  z-index: 2;
+  padding: 56rpx 44rpx calc(24rpx + env(safe-area-inset-bottom));
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  background: var(--surface);
+}
+/* 出纸口：横在卡片上沿的一道深色槽 */
+.lg-slot {
+  position: absolute;
+  left: 50%;
+  top: -12rpx;
+  width: 640rpx;
+  height: 24rpx;
+  margin-left: -320rpx;
+  border-radius: var(--r-full);
+  background: linear-gradient(180deg, var(--ink) 0%, var(--ink-soft) 100%);
+}
+
+.lg-title { font-size: var(--fs-lg); line-height: 1.3; font-weight: 750; color: var(--ink); }
+.lg-sub { margin-top: 10rpx; font-size: var(--fs-sm); line-height: 1.5; color: var(--muted); }
+
+/* 协议未发布（C4）：写清为什么不能登录、不登录还能做什么 */
+.lg-blocked { margin-top: 28rpx; padding: 22rpx 24rpx; border-radius: var(--r); background: var(--warn-soft); display: flex; align-items: flex-start; }
+.lg-blocked-ic { width: 30rpx; height: 30rpx; margin-top: 5rpx; margin-right: 14rpx; color: var(--wheat-deep); }
+.lg-blocked-body { flex: 1; min-width: 0; }
+.lg-blocked-t { font-size: var(--fs-base); line-height: 1.5; font-weight: 700; color: var(--wheat-deep); }
+.lg-blocked-d { margin-top: 6rpx; font-size: var(--fs-sm); line-height: 1.6; color: var(--ink-soft); }
+
+/* 短信验证码表单 */
+.lg-field {
+  margin-top: 32rpx;
+  height: 100rpx;
+  padding-left: 24rpx;
+  border: 2rpx solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface-2);
   display: flex;
-  flex-direction: column;
-  gap: 20rpx;
+  align-items: center;
 }
-.sheet-handle { width: 72rpx; height: 8rpx; margin: 0 auto 4rpx; border-radius: 999rpx; background: #dbe2ec; }
-.sheet-title { margin-top: 6rpx; font-size: 36rpx; font-weight: 780; color: var(--ink); }
-.sheet-sub { margin-top: -8rpx; margin-bottom: 10rpx; font-size: 22rpx; color: var(--muted); line-height: 1.5; }
+.lg-prefix { padding-right: 18rpx; margin-right: 18rpx; border-right: 1rpx solid var(--line); font-size: var(--fs-md); line-height: 1.2; color: var(--ink-soft); }
+.lg-phone { flex: 1; min-width: 0; height: 100%; font-size: var(--fs-md); color: var(--ink); }
+.lg-ph { color: var(--faint); }
+/* 整条右侧都是「发送验证码」的可点区（96rpx 高），不是一颗小胶囊 */
+.lg-send {
+  align-self: stretch;
+  flex-shrink: 0;
+  min-width: 196rpx;
+  padding: 0 24rpx;
+  border-left: 1rpx solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--link);
+  white-space: nowrap;
+}
+.lg-send.is-off { color: var(--faint); font-weight: 500; }
+.lg-hint { margin-top: 12rpx; padding-left: 4rpx; font-size: var(--fs-sm); line-height: 1.5; color: var(--muted); }
 
-.launch-btn-wx,
-.launch-btn-sms-confirm {
+.lg-otp { position: relative; margin-top: 24rpx; display: flex; justify-content: space-between; }
+.lg-otp-box {
+  width: 96rpx;
+  height: 100rpx;
+  border: 2rpx solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  color: var(--ink);
+}
+.lg-otp-box.is-filled { background: var(--surface); }
+.lg-otp-box.is-active { border-color: var(--teal); background: var(--teal-wash); }
+/* 透明输入框盖在格子上收数字。1rpx 字号沿用改版前那一行：聚焦时原生输入框可能不吃 opacity，字号压到最小免得露字 */
+.lg-otp-input { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; font-size: 1rpx; }
+
+/* 协议勾选：两行，整块可点（96rpx 起）；协议名是单独的链接 */
+.lg-consent { margin-top: 28rpx; min-height: 96rpx; padding: 10rpx 0; display: flex; align-items: flex-start; }
+.lg-check {
+  width: 36rpx;
+  height: 36rpx;
+  margin-top: 2rpx;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+  border: 2rpx solid var(--ghost);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color .18s ease, border-color .18s ease;
+}
+.lg-check.is-on { border-color: var(--teal); background: var(--teal); }
+.lg-check-ic { width: 22rpx; height: 22rpx; color: var(--surface); }
+.lg-consent-copy { flex: 1; min-width: 0; font-size: var(--fs-sm); line-height: 1.75; color: var(--muted); }
+/* 链接上下各补 34rpx 内边距，可点区到 96rpx，不撑开行距 */
+.lg-link { padding: 34rpx 2rpx; color: var(--link); }
+
+/* 主按钮：品牌蓝实底；没勾协议时整颗变淡（.btn[disabled]） */
+.lg-btn {
+  margin-top: 20rpx !important;
   height: 100rpx !important;
-  border-radius: 25rpx !important;
-  font-size: 29rpx !important;
-  font-weight: 700 !important;
-  color: #fff !important;
-  background: #07c160 !important;
+  border-radius: var(--r-md) !important;
+  background: var(--teal) !important;
+  color: var(--surface) !important;
+  font-size: var(--fs-md) !important;
+  font-weight: 650 !important;
+  letter-spacing: 2rpx;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  box-shadow: 0 12rpx 26rpx rgba(7,193,96,.15);
 }
-.launch-btn-sms-confirm { background: var(--teal) !important; box-shadow: 0 12rpx 26rpx rgba(22,119,255,.15); }
-.launch-wx-icon { width: 34rpx; height: 34rpx; margin-right: 12rpx; }
-.launch-btn-guest {
-  /* 88rpx=44px 低于 48px 可点标准（实测 45px） → 96rpx */
-  height: 96rpx !important;
-  border-radius: 23rpx !important;
-  border: 1rpx solid var(--line) !important;
-  background: var(--surface-2) !important;
-  color: var(--ink-soft) !important;
-  font-size: 27rpx !important;
-}
-.launch-btn-wx::after,
-.launch-btn-guest::after,
-.launch-btn-sms-confirm::after { border: none !important; }
-.launch-btn-wx[disabled] { opacity: .45; }
-/* 实测 348x28 → 96rpx=48px */
-.launch-alt { min-height: 96rpx; display: flex; align-items: center; justify-content: center; color: var(--teal); font-size: 23rpx; font-weight: 600; }
-.launch-back-icon { width: 20rpx; height: 20rpx; margin-right: 9rpx; transform: rotate(180deg); }
+.lg-btn::after { border: none !important; }
+.lg-btn[disabled] { opacity: .42; }
 
-.launch-legal { padding-top: 4rpx; color: var(--faint); font-size: 20rpx; line-height: 1.7; text-align: center; }
-/* 协议未发布（C4）：按钮上方一张说明卡，写清为什么不能登录、不登录还能做什么 */
-.launch-blocked { margin-bottom: 18rpx; padding: 20rpx 22rpx; border-radius: var(--r-sm); background: var(--warn-soft); }
-.lb-t { font-size: var(--fs-base); font-weight: 700; color: var(--wheat-deep); line-height: 1.5; }
-.lb-d { margin-top: 8rpx; font-size: var(--fs-sm); color: var(--ink-soft); line-height: 1.6; }
-/* 实测 348x23 → 96rpx=48px */
-.launch-agree { min-height: 96rpx; display: flex; align-items: center; justify-content: center; gap: 10rpx; color: var(--muted); }
-.launch-check { width: 30rpx; height: 30rpx; border-radius: 9rpx; border: 2rpx solid var(--ghost); display: flex; align-items: center; justify-content: center; }
-.launch-check.checked { border-color: var(--teal); background: var(--teal); }
-.check-dot { width: 11rpx; height: 11rpx; border-radius: 50%; background: #fff; }
-/* 实测 60x12：文字链，补纵向内边距把可点区撑到 48px，视觉不变 */
-.launch-link { color: var(--teal); display: inline-block; padding: 36rpx 8rpx; }
+.lg-alts { margin-top: 8rpx; display: flex; align-items: center; }
+.lg-alt { flex: 1; min-height: 96rpx; display: flex; align-items: center; justify-content: center; font-size: var(--fs-base); color: var(--muted); }
+.lg-alt-sms { font-weight: 600; color: var(--link); }
+.lg-alt-sep { width: 1rpx; height: 28rpx; background: var(--line); }
 
-.sms-field { display: flex; flex-direction: column; gap: 10rpx; }
-.sms-phone-wrap { height: 96rpx; padding: 0 22rpx; border: 2rpx solid var(--line); border-radius: 24rpx; background: var(--surface-2); display: flex; align-items: center; gap: 16rpx; }
-.sms-prefix { padding-right: 14rpx; border-right: 1rpx solid var(--line); color: var(--muted); font-size: 26rpx; }
-.sms-phone-input { flex: 1; height: 100%; color: var(--ink); font-size: 28rpx; }
-.sms-send-btn { flex-shrink: 0; padding: 12rpx 18rpx; border-radius: 15rpx; color: var(--teal); background: var(--teal-soft); font-size: 22rpx; white-space: nowrap; }
-.sms-send-btn.counting { color: var(--faint); background: var(--surface-3); }
-.sms-hint { padding-left: 6rpx; color: var(--muted); font-size: 21rpx; }
-.sms-otp-wrap { display: flex; gap: 12rpx; justify-content: space-between; padding: 4rpx 0; }
-.sms-otp-box { flex: 1; height: 82rpx; border-radius: 20rpx; border: 2rpx solid var(--line); background: var(--surface-2); color: var(--ink); font-size: 34rpx; font-weight: 650; display: flex; align-items: center; justify-content: center; }
-.sms-otp-box.active { border-color: var(--teal); background: var(--teal-wash); }
-.sms-otp-box.filled { border-color: #a9c9ff; }
-.sms-otp-hidden { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; font-size: 1rpx; }
+.lg-back { margin-top: 8rpx; min-height: 96rpx; display: flex; align-items: center; justify-content: center; font-size: var(--fs-base); font-weight: 600; color: var(--link); }
+.lg-back-ic { width: 22rpx; height: 22rpx; margin-right: 10rpx; transform: rotate(180deg); }
 
-@media (max-height: 720px) {
-  .launch-mid { min-height: 390rpx; padding-top: 32rpx; padding-bottom: 28rpx; }
-  .launch-icon-wrap { width: 116rpx; height: 116rpx; border-radius: 34rpx; }
-  .launch-icon-ic { width: 58rpx; height: 58rpx; }
-  .launch-brand { margin-top: 24rpx; font-size: 45rpx; }
-  .launch-slogan { margin-top: 24rpx; }
+/* 短信表单展开时卡片高出一截：出纸台收矮，纸只露出标题，表单不用滚动 */
+.is-sms .lg-brand { min-height: 200rpx; padding-bottom: 20rpx; }
+.is-sms .lg-stage { height: 340rpx; }
+
+/* 矮屏（iPhone SE 一类）：字标、出纸台收小，把高度让给登录卡片 */
+@media (max-height: 700px) {
+  .lg-brand { min-height: 172rpx; padding-top: 72rpx; padding-bottom: 12rpx; }
+  .lg-mark { width: 88rpx; height: 88rpx; }
+  .lg-mark-ic { width: 48rpx; height: 48rpx; }
+  .lg-name { font-size: var(--fs-xl); }
+  .lg-stage { height: 400rpx; }
+  .lg-sheet { top: 24rpx; width: 480rpx; margin-left: -240rpx; }
+  .lg-sheet-front { padding: 44rpx 48rpx 0; }
+  .is-sms .lg-brand { min-height: 172rpx; padding-bottom: 12rpx; }
+  .is-sms .lg-stage { height: 304rpx; }
 }

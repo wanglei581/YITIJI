@@ -42,7 +42,7 @@ export const ORG_CONTENT_TRUST_UNSET_LABEL = '未标记'
 
 /**
  * 「内容可信」控件在 Admin 后台里的**真实**位置，三段都必须是页面上真渲染得出来的文案：
- *   [0] 左侧导航项           → apps/admin/src/layouts/AdminLayoutWrapper.tsx 的 NAV_ITEMS
+ *   [0] 左侧导航项           → apps/admin/src/layouts/adminNav.ts 的 NAV_ITEMS
  *   [1] 机构行「详情/账号」打开的抽屉标题 → apps/admin/src/routes/partners/index.tsx
  *   [2] 抽屉内该控件的小节标题 → apps/admin/src/routes/partners/OrgContentTrustPanel.tsx
  * 任何指路文案都引用本常量，不许手写。门禁逐段核对它确实被渲染。
@@ -78,7 +78,7 @@ export function contentTrustSubmitBlock(input: {
 /** 被挡住时给运营看的话；说清「凭什么信任这个来源」要写什么。 */
 export function contentTrustSubmitBlockMessage(block: Exclude<ContentTrustSubmitBlock, null>): string {
   if (block === 'reason_required') {
-    return '标记为「内容可信」必须填写核验依据：这批岗位/招聘会/政策凭什么可以对外展示（合作协议编号、授权函编号、公开数据许可等）。依据会写进审计日志。'
+    return '标记为「内容可信」必须填写核验依据：该机构的政策与政策公告凭什么可以对外展示（合作协议编号、授权函编号、公开数据许可等）。依据会写进审计日志。'
   }
   return '该机构已归档。已归档机构即使标记为内容可信，其内容仍然发布不出去（发布闸门要求 active 且未归档）。请先取消归档再核验。'
 }

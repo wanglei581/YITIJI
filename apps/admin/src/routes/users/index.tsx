@@ -219,11 +219,11 @@ export default function UsersPage() {
             </select>
           </label>
           <label>
-            <span className="mb-1 block text-xs text-neutral-500">注册开始日期（年/月/日）</span>
+            <span className="mb-1 block text-xs text-neutral-500">注册开始日期（年/月/日，北京时间）</span>
             <input lang="zh-CN" type="date" value={draft.registeredFrom} max={draft.registeredTo || undefined} onChange={(event) => setDraft((value) => ({ ...value, registeredFrom: event.target.value }))} className="h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm outline-none focus:border-primary-400" />
           </label>
           <label>
-            <span className="mb-1 block text-xs text-neutral-500">注册结束日期（年/月/日）</span>
+            <span className="mb-1 block text-xs text-neutral-500">注册结束日期（年/月/日，北京时间）</span>
             <input lang="zh-CN" type="date" value={draft.registeredTo} min={draft.registeredFrom || undefined} onChange={(event) => setDraft((value) => ({ ...value, registeredTo: event.target.value }))} className="h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm outline-none focus:border-primary-400" />
           </label>
           <div className="flex items-center gap-2">

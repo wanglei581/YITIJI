@@ -31,6 +31,7 @@ import type {
   BackendQrCreateResult,
 } from './wire'
 import { createLocalBridgeSessionStore, type LocalBridgeSessionStore } from './bridge-session'
+import { handleDeviceRoute, type DeviceServerOptions } from './copy-device-routes'
 
 const DEFAULT_LOCAL_API_PORT = 9527
 const LOCAL_HOST = '127.0.0.1'
@@ -51,7 +52,7 @@ export interface LocalQrServerHandle {
   close: () => Promise<void>
 }
 
-export interface LocalQrServerOptions {
+export interface LocalQrServerOptions extends DeviceServerOptions {
   wakePrintQueue?: () => { accepted: boolean; coalesced: boolean }
   getPanelStatus?: () => LocalAgentPanelStatus
 }
@@ -90,9 +91,11 @@ export function startQrLoginLocalServer(
   const server = http.createServer((req, res) => {
     const origin = req.headers.origin
     void handleRequest({ req, res, origins, claims, bootTicketRequests, client: currentClient(), bridgeToken, bridgeSessions, config, options }).catch((error) => {
-      const isUsbRoute = (req.url ?? '').startsWith('/local/usb/')
-      const isPrintRoute = (req.url ?? '').startsWith('/local/print/')
-      const context = isUsbRoute ? 'usb' : isPrintRoute ? 'print' : 'qr'
+      const rawUrl = req.url ?? ''
+      const isUsbRoute = rawUrl.startsWith('/local/usb/')
+      const isPrintRoute = rawUrl.startsWith('/local/print/')
+      const isScanRoute = Boolean(options.scanDevice) && rawUrl.startsWith('/local/scan/')
+      const context = isScanRoute ? 'scan' : isUsbRoute ? 'usb' : isPrintRoute ? 'print' : 'qr'
       const mapped = localExceptionFromUnknown(error, context)
       if (mapped.status >= 500) warn(`local-qr: unexpected request error — ${safeErrorMessage(error)}`)
       sendJson(
@@ -141,6 +144,7 @@ async function handleRequest(input: {
   const url = new URL(req.url ?? '/', `http://${LOCAL_HOST}`)
   const isUsbRoute = url.pathname.startsWith('/local/usb/')
   const isPrintRoute = url.pathname.startsWith('/local/print/')
+  const isScanRoute = Boolean(options.scanDevice) && url.pathname.startsWith('/local/scan/')
 
   if (url.pathname === '/local/panel') {
     if (req.method !== 'GET') {
@@ -201,16 +205,19 @@ async function handleRequest(input: {
     sendJson(
       res,
       403,
-      isUsbRoute
-        ? { code: 'LOCAL_USB_ORIGIN_FORBIDDEN', message: 'U 盘导入来源不被允许' }
-        : isPrintRoute
-          ? { code: 'LOCAL_PRINT_ORIGIN_FORBIDDEN', message: '本机打印唤醒来源不被允许' }
-        : { code: 'LOCAL_QR_ORIGIN_FORBIDDEN', message: '扫码登录来源不被允许' },
+      isScanRoute
+        ? { code: 'LOCAL_SCAN_ORIGIN_FORBIDDEN', message: '本机扫描来源不被允许' }
+        : isUsbRoute
+          ? { code: 'LOCAL_USB_ORIGIN_FORBIDDEN', message: 'U 盘导入来源不被允许' }
+          : isPrintRoute
+            ? { code: 'LOCAL_PRINT_ORIGIN_FORBIDDEN', message: '本机打印唤醒来源不被允许' }
+            : { code: 'LOCAL_QR_ORIGIN_FORBIDDEN', message: '扫码登录来源不被允许' },
     )
     return
   }
 
-  if (req.method === 'OPTIONS') {
+  if (req.method === 'OPTIONS' && !(url.pathname.startsWith('/local/copy/') &&
+    (config.copyDeviceEnabled !== true || !options.copyDevice))) {
     sendEmpty(res, 204, origin)
     return
   }
@@ -242,6 +249,9 @@ async function handleRequest(input: {
     await handlePrintWake(req, res, origin, url, bridgeToken, bridgeSessions, options.wakePrintQueue)
     return
   }
+
+  if (await handleDeviceRoute({ req, res, origin, url, bridgeToken, bridgeSessions,
+    config, options, hooks: { sendJson, sendEnvelope } })) return
 
   if (isUsbRoute) {
     await handleUsbRoute(req, res, origin, url, client, bridgeToken, bridgeSessions, config)
@@ -580,8 +590,11 @@ function backendError(error: unknown, context: 'qr' | 'usb' = 'qr', retryable = 
   return { status: retryable ? 503 : 502, error: { code: retryable ? 'LOCAL_TERMINAL_BOOT_RETRYABLE' : fallbackCode, message: retryable ? '云端暂不可用，请稍后重试' : fallbackMessage } }
 }
 
-function localExceptionFromUnknown(error: unknown, context: 'qr' | 'usb' | 'print' = 'qr'): LocalApiException {
+function localExceptionFromUnknown(error: unknown, context: 'qr' | 'usb' | 'print' | 'scan' = 'qr'): LocalApiException {
   if (isLocalApiException(error)) return error
+  if (context === 'scan') {
+    return { status: 500, error: { code: 'LOCAL_SCAN_INTERNAL_ERROR', message: '本机扫描服务异常' } }
+  }
   if (context === 'print') {
     return { status: 500, error: { code: 'LOCAL_PRINT_INTERNAL_ERROR', message: '本机打印唤醒服务异常' } }
   }

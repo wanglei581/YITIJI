@@ -25,6 +25,14 @@ const STATUS_LABEL = {
   processing: '处理中',
 }
 
+/** 有到期时间才写月日。空值、空串、非法日期都不编一天。月日取法同 documents-helpers formatTime。 */
+function viewUntil(iso) {
+  if (iso === null || iso === undefined || iso === '') return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getMonth() + 1} 月 ${d.getDate()} 日前可查看`
+}
+
 function dayLabel(iso) {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '日期未知'
@@ -58,6 +66,7 @@ function mapRecord(item) {
     day: dayLabel(item.createdAt),
     time: timeLabel(item.createdAt),
     createdAt: item.createdAt || '',
+    viewUntil: viewUntil(item.expiresAt),
     status,
     statusLabel: STATUS_LABEL[status] || status || '状态未知',
     icon: meta.icon,
@@ -80,6 +89,7 @@ function mapInterview(item) {
     day: dayLabel(item.createdAt),
     time: timeLabel(item.createdAt),
     createdAt: item.createdAt || '',
+    viewUntil: viewUntil(item.expiresAt),
     status: item.hasReport ? 'completed' : 'failed',
     statusLabel: item.hasReport ? '已完成' : '无报告',
     icon: 'i-form',
@@ -228,9 +238,10 @@ Page({
           const iv = await api.getMyMockInterviews({ pageSize: 50 })
           if (this._stale(gen, keyAtStart)) return
           this._interviews = (iv || []).map(mapInterview)
-        } catch (_) {
+        } catch (err) {
           if (this._stale(gen, keyAtStart)) return
-          this._interviews = []
+          if (err && err.statusCode === 401) throw err
+          throw new Error('模拟面试记录读取失败，请再试一次')
         }
       }
       this._publish()
@@ -240,12 +251,9 @@ Page({
       if (err && err.statusCode === 401) {
         this._clearLoggedOut()
       } else if (append) {
-        this.setData({ loading: false })
-        if (typeof wx.showToast === 'function') {
-          wx.showToast({ title: (err && err.message) || '加载更多失败', icon: 'none' })
-        }
+        this.setData({ loading: false, loadError: '更多记录读取失败，请再试一次' })
       } else {
-        this.setData({ loading: false, loadError: (err && err.message) || '加载记录失败，请稍后重试' })
+        this.setData({ loading: false, loadError: (err && err.message) || '记录读取失败，请再试一次' })
       }
     } finally {
       // 必须在 finally 复位：未登录的提前 return 和失败分支原先都不复位，

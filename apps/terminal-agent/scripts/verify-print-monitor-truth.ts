@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { monitorPrintJob } from '../src/agent/task-runner'
+import { monitorPrintJob, reportedPrintCommandFailure } from '../src/agent/task-runner'
 import {
   buildPrintServiceCompletionEventScript,
   buildWin32PrinterProbeScript,
@@ -15,6 +15,7 @@ import {
 import { ESCAPE_WQL_LITERAL_FUNCTION, escapeWqlLiteral } from '../src/agent/wql-literal'
 import { printWithPdfToPrinter } from '../src/printer/print-with-pdf-to-printer'
 import { buildImageTempPdfFileName } from '../src/printer/image-to-pdf'
+import { verifyPrintCompletionEvidence } from './verify-print-completion-evidence'
 
 interface Scenario {
   name: string
@@ -22,8 +23,11 @@ interface Scenario {
   expectedFailed: boolean
   expectedErrorCode: string
   completionEvent?: boolean
+  completionEvents?: boolean[]
   initialNow?: number
   dispatchedAtMs?: number
+  rawStatus?: string
+  expectedMessageIncludes?: string[]
 }
 
 function verifyPrintServiceCompletionScriptContract(): void {
@@ -129,6 +133,7 @@ function verifyPrintServiceCompletionScriptContract(): void {
 async function runScenario(scenario: Scenario): Promise<void> {
   let now = scenario.initialNow ?? 0
   let cursor = 0
+  let eventCursor = 0
   const fallback = scenario.statuses.at(-1) ?? 'unknown'
 
   const result = await monitorPrintJob('Configured Printer', 'task-monitor-test', 10, 1, {
@@ -139,7 +144,7 @@ async function runScenario(scenario: Scenario): Promise<void> {
     },
     queryStatus: async () => ({
       status: scenario.statuses[cursor++] ?? fallback,
-      rawStatus: fallback === 'printing' ? 'Printing' : undefined,
+      rawStatus: scenario.rawStatus ?? (fallback === 'printing' ? 'Printing' : undefined),
     }),
     dispatchedAtMs: scenario.dispatchedAtMs,
     queryCompletionEvent: async (printerName, taskId, dispatchedAtMs) => {
@@ -152,17 +157,25 @@ async function runScenario(scenario: Scenario): Promise<void> {
           `${scenario.name}: completion dispatch lower bound`,
         )
       }
-      return scenario.completionEvent ?? false
+      return scenario.completionEvents?.[eventCursor++] ?? scenario.completionEvent ?? false
     },
   })
 
   assert.equal(result.failed, scenario.expectedFailed, `${scenario.name}: terminal disposition`)
   assert.equal(result.errorCode, scenario.expectedErrorCode, `${scenario.name}: errorCode`)
+  for (const fragment of scenario.expectedMessageIncludes ?? []) {
+    assert.equal(
+      (result.errorMessage ?? '').includes(fragment),
+      true,
+      `${scenario.name}: errorMessage must include ${fragment}`,
+    )
+  }
 }
 
 async function main(): Promise<void> {
   const failures: string[] = []
 
+  verifyPrintCompletionEvidence({ liveProbe: false })
   verifyPrintServiceCompletionScriptContract()
 
   const imageTaskId = 'ptask_kiosk_0123456789abcdef'
@@ -208,6 +221,37 @@ async function main(): Promise<void> {
   assert.equal(dispatched[1]?.side, 'duplexshort', 'short-edge duplex must be sent explicitly')
   assert.equal(dispatched[2]?.side, 'simplex', 'simplex must be sent explicitly, not left to the driver default')
   assert.equal('monochrome' in (dispatched[2] ?? {}), false, 'no colour choice in the params means no colour setting is invented')
+  assert.equal(dispatched[0]?.paperSize, 'A4', 'color long-edge duplex must send paperSize A4')
+  assert.equal(dispatched[1]?.paperSize, 'A4', 'black-and-white short-edge duplex must send paperSize A4')
+  assert.equal(dispatched[2]?.paperSize, 'A4', 'simplex must send paperSize A4')
+
+  await printWithPdfToPrinter('/params/unset.pdf', 'Configured Printer', undefined, { dispatch: capture })
+  await printWithPdfToPrinter(
+    '/params/bw-simplex.pdf',
+    'Configured Printer',
+    { colorMode: 'black_white', duplex: 'simplex', copies: 1 },
+    { dispatch: capture },
+  )
+  await printWithPdfToPrinter(
+    '/params/range.pdf',
+    'Configured Printer',
+    { pageRange: '2-4', colorMode: 'color', duplex: 'duplex_long_edge', copies: 2 },
+    { dispatch: capture },
+  )
+  assert.equal(dispatched[3]?.paperSize, 'A4', 'params undefined must still send paperSize A4')
+  assert.equal('monochrome' in (dispatched[3] ?? {}), false, 'undefined params must not invent a colour setting')
+  assert.equal('side' in (dispatched[3] ?? {}), false, 'undefined params must not invent a side setting')
+  assert.equal('copies' in (dispatched[3] ?? {}), false, 'undefined params must not invent copies')
+  assert.equal('pages' in (dispatched[3] ?? {}), false, 'undefined params must not invent a page range')
+  assert.equal(dispatched[4]?.paperSize, 'A4', 'black-and-white simplex must send paperSize A4')
+  assert.equal(dispatched[4]?.monochrome, true, 'black-and-white simplex must force monochrome')
+  assert.equal(dispatched[4]?.side, 'simplex', 'black-and-white simplex must send simplex')
+  assert.equal(dispatched[4]?.copies, 1, 'black-and-white simplex must keep copies')
+  assert.equal(dispatched[5]?.paperSize, 'A4', 'page range must send paperSize A4')
+  assert.equal(dispatched[5]?.pages, '2-4', 'page range must stay on pages')
+  assert.equal(dispatched[5]?.monochrome, false, 'color page-range job must force color')
+  assert.equal(dispatched[5]?.side, 'duplexlong', 'color page-range job must keep long-edge duplex')
+  assert.equal(dispatched[5]?.copies, 2, 'color page-range job must keep copies')
 
   try {
     const nonWindows = await monitorPrintJob('Configured Printer', 'task-non-windows', 10, 1, {
@@ -275,10 +319,18 @@ async function main(): Promise<void> {
       dispatchedAtMs: 1,
     },
     {
-      name: 'observed job then queue removal confirms completion',
+      name: 'observed job then queue removal without 307 is unconfirmed',
+      statuses: ['printing', 'not_found'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedMessageIncludes: ['不会自动重印'],
+    },
+    {
+      name: 'observed job then queue removal with matching 307 completes',
       statuses: ['printing', 'not_found'],
       expectedFailed: false,
       expectedErrorCode: '',
+      completionEvent: true,
     },
     {
       name: 'explicit completed status confirms completion',
@@ -287,10 +339,11 @@ async function main(): Promise<void> {
       expectedErrorCode: '',
     },
     {
-      name: 'two consecutive paper-out samples confirm failure',
+      name: 'two consecutive paper-out samples stay unconfirmed after dispatch',
       statuses: ['paper_empty', 'paper_empty'],
       expectedFailed: true,
-      expectedErrorCode: 'PAPER_EMPTY',
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedMessageIncludes: ['缺纸', '不会自动重印'],
     },
     {
       name: 'one paper-out sample then disappearance is not completion evidence',
@@ -312,10 +365,80 @@ async function main(): Promise<void> {
       completionEvent: true,
     },
     {
-      name: 'explicit spooler error confirms failure',
+      name: 'explicit spooler error stays unconfirmed after dispatch',
       statuses: ['error'],
       expectedFailed: true,
-      expectedErrorCode: 'PRINTER_ERROR',
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedMessageIncludes: ['设备异常', '不会自动重印'],
+    },
+    {
+      name: 'jammed queue status keeps a jam explanation',
+      statuses: ['error'],
+      rawStatus: 'Jammed',
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedMessageIncludes: ['卡纸', '不会自动重印'],
+    },
+    {
+      name: 'cancelled queue status keeps a cancel explanation',
+      statuses: ['error'],
+      rawStatus: 'Cancelled',
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedMessageIncludes: ['取消', '不会自动重印'],
+    },
+    {
+      name: 'retained then gone accepts 307 at absent poll 2',
+      statuses: ['retained', 'not_found'],
+      completionEvents: [false, false, true],
+      expectedFailed: false,
+      expectedErrorCode: '',
+    },
+    {
+      name: 'retained then gone accepts 307 at absent poll 3',
+      statuses: ['retained', 'not_found'],
+      completionEvents: [false, false, false, true],
+      expectedFailed: false,
+      expectedErrorCode: '',
+    },
+    {
+      name: 'removing then gone accepts 307 at absent poll 2',
+      statuses: ['removing', 'not_found'],
+      completionEvents: [false, false, true],
+      expectedFailed: false,
+      expectedErrorCode: '',
+    },
+    {
+      name: 'removing then gone accepts 307 at absent poll 3',
+      statuses: ['removing', 'not_found'],
+      completionEvents: [false, false, false, true],
+      expectedFailed: false,
+      expectedErrorCode: '',
+    },
+    {
+      name: 'retained job removed without 307 is unconfirmed',
+      statuses: ['retained', 'not_found'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+    },
+    {
+      name: 'removing without 307 is unconfirmed',
+      statuses: ['removing'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+    },
+    {
+      name: 'removing with matching 307 completes',
+      statuses: ['removing'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      completionEvent: true,
+    },
+    {
+      name: 'job only seen while being removed then disappears is unconfirmed',
+      statuses: ['removing', 'not_found'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
     },
   ]
 
@@ -327,34 +450,35 @@ async function main(): Promise<void> {
     }
   }
 
-  const explicitFailures = [
-    'Deleting',
-    'Deleted',
-    'Cancelled',
-    'Canceled',
-    'Jammed',
-    'Error',
-    'UserIntervention',
-    'Retained, Deleted',
-    'Printed, PaperOut',
+  const parserCases: Array<[string, PrintJobMonitorStatus]> = [
+    ['Deleting', 'removing'],
+    ['Deleted', 'removing'],
+    ['Printing, Deleting', 'removing'],
+    ['Printing, Deleted', 'removing'],
+    ['Retained, Deleted', 'removing'],
+    ['Printed, Retained, Deleted', 'removing'],
+    ['Printed, Deleting', 'completed'],
+    ['Complete, Deleted', 'completed'],
+    ['Completed, Deleting', 'completed'],
+    ['Cancelled', 'error'],
+    ['Canceled', 'error'],
+    ['Cancelled, Deleting', 'error'],
+    ['Jammed', 'error'],
+    ['Error', 'error'],
+    ['Error, Deleting', 'error'],
+    ['UserIntervention', 'error'],
+    ['Printed, PaperOut', 'paper_empty'],
+    ['Printing, PaperOut', 'paper_empty'],
+    ['Printed, PaperOut, Deleting', 'paper_empty'],
+    ['Complete', 'completed'],
+    ['Completed', 'completed'],
+    ['Printed', 'completed'],
+    ['Printing, Retained', 'retained'],
+    ['Printing', 'printing'],
   ]
-  for (const rawStatus of explicitFailures) {
-    const parsed = parsePrintJobStatus(rawStatus)
-    const expected = rawStatus.includes('PaperOut') ? 'paper_empty' : 'error'
+  for (const [rawStatus, expected] of parserCases) {
     try {
-      assert.equal(parsed.status, expected, `${rawStatus}: explicit failure must take priority`)
-    } catch (error) {
-      failures.push(`${rawStatus}: ${error instanceof Error ? error.message : String(error)}`)
-    }
-  }
-
-  for (const rawStatus of ['Complete', 'Completed', 'Printed']) {
-    try {
-      assert.equal(
-        parsePrintJobStatus(rawStatus).status,
-        'completed',
-        `${rawStatus}: explicit completion`
-      )
+      assert.equal(parsePrintJobStatus(rawStatus).status, expected, `${rawStatus}: parser precedence`)
     } catch (error) {
       failures.push(`${rawStatus}: ${error instanceof Error ? error.message : String(error)}`)
     }
@@ -468,6 +592,26 @@ async function main(): Promise<void> {
     } catch (error) {
       failures.push(`paper_empty contract: ${error instanceof Error ? error.message : String(error)}`)
     }
+  }
+
+  try {
+    assert.deepEqual(
+      reportedPrintCommandFailure('FILE_NOT_FOUND', 'missing'),
+      { errorCode: 'FILE_NOT_FOUND', errorMessage: 'missing' },
+    )
+    assert.equal(
+      reportedPrintCommandFailure('UNSUPPORTED_FILE_TYPE', 'not a pdf').errorCode,
+      'UNSUPPORTED_FILE_TYPE',
+    )
+    const partial = reportedPrintCommandFailure('PRINT_COMMAND_FAILED', 'driver rejected the job')
+    assert.equal(partial.errorCode, 'PRINT_JOB_UNCONFIRMED')
+    assert.equal(partial.errorMessage.includes('driver rejected the job'), true)
+    assert.equal(partial.errorMessage.includes('不会自动重印'), true)
+    const bare = reportedPrintCommandFailure(undefined, undefined)
+    assert.equal(bare.errorCode, 'PRINT_JOB_UNCONFIRMED')
+    assert.equal(bare.errorMessage.includes('不会自动重印'), true)
+  } catch (error) {
+    failures.push(`reported print command failure: ${error instanceof Error ? error.message : String(error)}`)
   }
 
   if (failures.length > 0) {

@@ -13,7 +13,8 @@ import { AiContentBlockedError } from '../llm/llm-guard'
 // - 复用 resume_optimize LLM 接入（密钥仅服务端）。
 // ============================================================
 
-import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { refusalMessage } from '../safety/refusal'
 import { LlmConfigService } from '../llm/llm-config.service'
 import {
   LLM_BUSY_MESSAGE,
@@ -42,6 +43,7 @@ export const SELF_ASSESSMENT_SYSTEM_PROMPT = withAiSafety(
   '\n4. 整体解读末尾追加：「本解读基于本人作答，仅作为自助参考，不代任何招聘结果、能力证明或心理评估」。' +
   '\n只输出 JSON（不要 markdown 代码块）：' +
   '{"dimensions":[{"key":"interest","note":"..."},{"key":"style","note":"..."},{"key":"team","note":"..."},{"key":"value","note":"..."},{"key":"motivation","note":"..."}],"summary":"整体解读"}',
+  { policyVariant: 'draft' },
 )
 
 const MAX_NOTE_CHARS = 300
@@ -147,6 +149,16 @@ export class LlmSelfAssessmentService {
     try {
       raw = await this.callLlm(input.scored.dimensions, input.onLlmCall)
     } catch (err) {
+      if (err instanceof AiContentBlockedError) {
+        const message = refusalMessage(err.category)
+        return {
+          status: 'rejected',
+          failReason: message,
+          dimensions: input.scored.dimensions.map((d) => ({ ...d, note: null })),
+          summary: message,
+          providerName,
+        }
+      }
       // LLM 不可用 → 优雅降级：返回 strength + null note（不阻塞主流程）
       this.logger.warn(`self_assessment.llm_unavailable degraded=${(err as Error).message}`)
       return {
@@ -272,7 +284,7 @@ export class LlmSelfAssessmentService {
         { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: 'self_assessment', forbiddenWords: cfg.forbiddenWords } },
       )
     } catch (error) {
-      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
+      if (error instanceof AiContentBlockedError) throw error
       // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
       if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       if (error instanceof LlmBusyError) {

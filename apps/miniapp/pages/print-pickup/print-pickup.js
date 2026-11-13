@@ -6,19 +6,59 @@
 // 此前本页从 URL 读 pickupCode / expiresAt / amountCents / taskStatus / orderNo
 // 做首屏渲染与失败兜底。到机码是去一体机取件的凭证：它进了 URL，一条构造出来的链接、
 // 或一张转发出去的卡片，就能在别人手机上渲染出一张带码的取件页 —— 而金额与有效期
-// 同样是本人订单状态，不该由调用方"告诉"本页。现在只收 orderId，其余一律向服务端取。
-// 与材料包的 package-code 同一口径。
-const { SUPPORT_HINT } = require('../../utils/user-error')
+// 同样是本人订单状态，不该由调用方"告诉"本页。到机码、金额、有效期仍只向服务端取。
+// 建单回包里的免费额度说明不是凭证：下单页 reLaunch 时用 URL 带 remainingSides、
+// requestedSides、resetsAt。没有这三项就不显示。与材料包的 package-code 同一口径。
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const { isMemberIdentity, resolveAccountState, sameAccount } = require('../../utils/page-guard')
 const { PICKUP_CODE_RE, createPickupQrMatrix, normalizePickupCode } = require('../../utils/pickup-qrcode')
 const pickupActions = require('../../utils/pickup-actions')
-const { parseAmountCents, formatCode, formatCountdown, resolveOrderState } = require('./pickup-state')
+const {
+  parseAmountCents, formatCode, formatCountdown, paintOrder, backDeltaPastOrderFlow,
+} = require('./pickup-state')
+const pickupSupport = require('./pickup-support')
 
 const POLL_INTERVAL_MS = 3000
 const TERMINAL_STATES = new Set(['completed', 'failed', 'expired', 'cancelled', 'abandoned'])
+
+// resetsAt 换成这台手机的本地时间。次日 0 点写成「明天 0 点」，其余写日期或钟点。
+function quotaResetPhrase(resetsAt) {
+  const d = new Date(resetsAt)
+  if (Number.isNaN(d.getTime())) return ''
+  const now = new Date()
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startThat = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const dayDiff = Math.round((startThat.getTime() - startToday.getTime()) / 86400000)
+  const h = d.getHours()
+  const m = d.getMinutes()
+  if (dayDiff === 1 && h === 0 && m === 0) return '明天 0 点'
+  const clock = m === 0 ? (h + ' 点') : (h + ' 点 ' + String(m).padStart(2, '0') + ' 分')
+  if (dayDiff === 1) return '明天 ' + clock
+  if (dayDiff === 0) return '今天 ' + clock
+  return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + clock
+}
+
+function readQueryNumber(value) {
+  if (value === undefined || value === null || value === '') return null
+  let text = String(value)
+  try { text = decodeURIComponent(text) } catch (e) { /* 已是明文 */ }
+  const n = Number(text)
+  return Number.isInteger(n) && n >= 0 ? n : null
+}
+
+function quotaNoticeFromQuery(q) {
+  if (!q) return ''
+  const remaining = readQueryNumber(q.remainingSides)
+  const requested = readQueryNumber(q.requestedSides)
+  if (remaining === null || requested === null || !q.resetsAt) return ''
+  let resetsAt = String(q.resetsAt)
+  try { resetsAt = decodeURIComponent(resetsAt) } catch (e) { /* 已是明文 */ }
+  const when = quotaResetPhrase(resetsAt)
+  if (!when) return ''
+  return '今天还能免费打印 ' + remaining + ' 面，这单 ' + requested + ' 面，' + when + '后可以到机取件'
+}
 
 /**
  * 屏幕上那张码还能被信任多久（毫秒）。
@@ -60,8 +100,7 @@ Page({
   _inflight: null,
 
   data: {
-    // 现场无人值守：需要帮助只有服务电话（utils/user-error.js SUPPORT_HINT）
-    supportHint: SUPPORT_HINT,
+    ...pickupSupport.supportData,
     statusBarHeight: 20,
     state: 'loading', // loading | ready | error
     errorMsg: '',
@@ -71,6 +110,12 @@ Page({
     orderId: '',
     fromOrders: false,
     orderNo: '',
+    // 信息卡：文件、终端、规格，全部取自服务端订单详情（pickup-state.js orderSummary）。
+    fileName: '',
+    store: '',
+    spec: '',
+    // 底部主按钮：只有打印完成才写「完成」（pickup-state.js bottomActionLabel）。
+    doneLabel: '返回首页',
     taskStatus: '',
     pickupStatus: '',
     statusKey: 'pending',
@@ -89,11 +134,12 @@ Page({
     // 分享给代取人时写在图上的网点名，只取服务端订单详情里的 share.outletName。
     outlet: '',
     reissuing: false,
+    quotaNotice: '',
   },
 
   onLoad(opts) {
     const q = opts || {}
-    // 只认 orderId；source 只是返回路径提示，不是凭证也不是状态。
+    // 只认 orderId 与额度说明；source 只是返回路径提示，不是凭证也不是状态。
     const orderId = q.orderId ? decodeURIComponent(q.orderId) : ''
     const windowInfo = typeof wx.getWindowInfo === 'function' ? wx.getWindowInfo() : { windowWidth: 375 }
     const qrSizePx = Math.round(Math.max(188, Math.min(232, windowInfo.windowWidth * 0.56)))
@@ -108,11 +154,13 @@ Page({
     this._ownerDeniedFor = ''
     this._requestEpoch = 0
     this._inflight = null
+    pickupSupport.initSupport(this, api)
 
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
       orderId,
       fromOrders: q.source === 'orders',
+      quotaNotice: quotaNoticeFromQuery(q),
       qrSizePx,
       qrStatus: 'loading',
       state: orderId ? 'loading' : 'error',
@@ -416,6 +464,8 @@ Page({
     })
   },
 
+  callSupport() { pickupSupport.callSupport(this) },
+
   onReady() {
     this._pageReady = true
     this._drawPickupQr()
@@ -538,21 +588,23 @@ Page({
         if (!this._visible || !order) return
         // 码只认服务端这一次给的值。`|| this.data.codeRaw` 会让服务端已经撤码
         // （核销后 pickupCode 不再下发）的订单继续显示上一次那张码。
+        this._lastOrder = order
+        pickupSupport.loadSupportOnce(this, order.terminalId)
         const pickupCode = normalizePickupCode(order.pickupCode)
         const hasCode = PICKUP_CODE_RE.test(pickupCode)
-        const status = resolveOrderState(order)
+        const painted = paintOrder(order, this._supportView, pickupCode, formatCode(pickupCode), hasCode)
         // 有效期同样只认这一次服务端给的值。`|| this.data.expiresAt` 会在核销后
         //（服务端不再下发 pickupCodeExpiresAt）保留上一轮那个时间，于是一张已经被
         // 消费掉的码还挂着"还有 47 分钟过期"的倒计时 —— 与上面那条"码只认服务端"
         // 是同一条理由，漏掉它等于只关了半扇门。
         const expiresAtMs = order.pickupCodeExpiresAt ? new Date(order.pickupCodeExpiresAt).getTime() : 0
         const expiresAt = Number.isFinite(expiresAtMs) ? expiresAtMs : 0
-        const shouldRedraw = status.showQr && hasCode && pickupCode !== this.data.codeRaw
+        const shouldRedraw = painted.showQr && pickupCode !== this.data.codeRaw
         const amountCents = parseAmountCents(order.amountCents)
         // 这一刻服务端确认过这张码。轮询失败时的信任窗口从这里起算。
         this._codeConfirmedAt = Date.now()
 
-        this.setData({
+        this.setData(Object.assign({
           state: 'ready',
           errorMsg: '',
           refreshing: false,
@@ -561,19 +613,13 @@ Page({
           pickupStatus: order.pickupStatus || '',
           amountCents,
           isFreeOrder: amountCents === 0,
-          statusKey: status.key,
-          statusTitle: status.title,
-          statusDetail: status.detail,
-          showQr: status.showQr && hasCode,
-          codeRaw: status.showQr && hasCode ? pickupCode : '',
-          code: status.showQr && hasCode ? formatCode(pickupCode) : '',
           outlet: (order.share && order.share.outletName) || '',
           expiresAt,
           // 码撤下时倒计时也必须跟着撤：它是这张码的说明文字，留着就是在替一张
           // 已经不显示（或已经被核销）的码继续宣称"还有效"。
-          countdown: status.showQr && hasCode ? this.data.countdown : '',
+          countdown: painted.showQr ? this.data.countdown : '',
           qrStatus: shouldRedraw ? 'loading' : this.data.qrStatus,
-        }, () => {
+        }, painted), () => {
           if (this.data.showQr) this._drawPickupQr()
           this._resumeVisibleWork()
         })
@@ -703,12 +749,7 @@ Page({
       if (ms <= 0) {
         // 过期与核销走同一个出口：凭证连同有效期一起清零，再写状态说明。
         this._clearCredentials()
-        this.setData({
-          countdown: '已过期',
-          statusKey: 'expired',
-          statusTitle: '到机码已过期',
-          statusDetail: '请返回打印订单重新发起打印。',
-        })
+        this.setData(pickupSupport.expiredCodePatch())
         this._stopTimers()
         return
       }
@@ -764,7 +805,8 @@ Page({
   },
 
   reissueCode() {
-    if (!this.data.showQr || this.data.reissuing || !this.data.orderId) return
+    // 打印失败后的续打态，后端拒绝作废重发（PICKUP_CODE_NOT_REISSUABLE）。按钮已藏，这里再挡一次。
+    if (!this.data.showQr || this.data.statusKey === 'failed' || this.data.reissuing || !this.data.orderId) return
     this.setData({ reissuing: true })
     pickupActions.reissue(this.data.orderId)
       .then((order) => {
@@ -783,14 +825,26 @@ Page({
       wx.navigateBack({ fail() { wx.redirectTo({ url: '/pages/orders/orders' }) } })
       return
     }
-    wx.redirectTo({ url: '/pages/orders/orders' })
+    // 上一页本来就不是下单流程（例如从首页卡片进来）：照旧把本页换成订单列表。
+    // 其余情况（栈里只剩本页，或下面还压着下单流程的页）一律重开订单列表：
+    // 列表不能叠在「选终端」上面，也不分「先退再进」两步跳（会闪屏、会停在半路）。
+    const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
+    const delta = backDeltaPastOrderFlow(pages.map((page) => page && page.route))
+    const url = '/pages/orders/orders'
+    if (delta === 1) { wx.redirectTo({ url }); return }
+    wx.reLaunch({ url })
   },
 
   home() {
     wx.switchTab({ url: '/pages/home/home' })
   },
 
+  // 下单后返回：跳过「上传参数 → 选终端 → 确认」这些页，不把人送回选终端再下一单。
+  // 从订单列表进来的照旧退一页。
   back() {
-    wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } })
+    const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
+    const delta = this.data.fromOrders ? 1 : backDeltaPastOrderFlow(pages.map((page) => page && page.route))
+    if (!delta) { wx.switchTab({ url: '/pages/home/home' }); return }
+    wx.navigateBack({ delta, fail() { wx.switchTab({ url: '/pages/home/home' }) } })
   },
 })

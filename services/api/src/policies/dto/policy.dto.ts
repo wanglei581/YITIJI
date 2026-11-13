@@ -2,6 +2,7 @@ import { Transform, Type } from 'class-transformer'
 import {
   ArrayMaxSize,
   ArrayNotEmpty,
+  Equals,
   IsArray,
   IsIn,
   IsISO8601,
@@ -43,6 +44,15 @@ export class CreatePolicyPostDto {
   @IsOptional() @IsString() @MaxLength(10000)
   content?: string
 
+  @IsOptional() @IsString() @MaxLength(2000)
+  whoCanApply?: string
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  requiredMaterials?: string
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  whereToApply?: string
+
   @IsOptional() @IsIn([...POLICY_AUDIENCES])
   audience?: string
 
@@ -62,18 +72,31 @@ export class CreatePolicyPostDto {
   publishedDate?: string
 }
 
-export class UpdatePolicyPostDto {
-  @IsOptional() @IsIn([...POLICY_KINDS])
-  kind?: string
+/**
+ * 保存并发布。新建和编辑走同一份字段：空值用 null 清空（与编辑一致）。
+ * 必须勾选责任确认；没勾选时请求到不了后面的三步。
+ */
+export class SaveAndPublishPolicyDto {
+  @IsIn([...POLICY_KINDS])
+  kind!: string
 
-  @IsOptional() @IsString() @IsNotEmpty() @MaxLength(200)
-  title?: string
+  @IsString() @IsNotEmpty() @MaxLength(200)
+  title!: string
 
   @IsOptional() @IsString() @MaxLength(500)
-  summary?: string
+  summary?: string | null
 
   @IsOptional() @IsString() @MaxLength(10000)
-  content?: string
+  content?: string | null
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  whoCanApply?: string | null
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  requiredMaterials?: string | null
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  whereToApply?: string | null
 
   @IsOptional() @IsIn([...POLICY_AUDIENCES])
   audience?: string
@@ -82,15 +105,80 @@ export class UpdatePolicyPostDto {
   category?: string
 
   @IsOptional()
-  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? null : value))
   @IsUrl({ protocols: ['http', 'https'], require_protocol: true }) @MaxLength(500)
-  externalUrl?: string
+  externalUrl?: string | null
 
   @IsOptional() @IsString() @MaxLength(120)
-  externalId?: string
+  externalId?: string | null
 
-  @IsOptional() @IsISO8601()
-  publishedDate?: string
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? null : value))
+  @IsISO8601()
+  publishedDate?: string | null
+
+  @Equals(true, { message: '发布前必须确认对本条政策内容负责' })
+  responsibilityAcknowledged!: boolean
+}
+
+/** 保存前预估：不落库。链接不要求已经是 https，好把发布时的原因提前说出来。 */
+export class PolicyDraftCheckDto {
+  @IsIn([...POLICY_KINDS])
+  kind!: string
+
+  @IsOptional() @IsString() @MaxLength(500)
+  externalUrl?: string
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  whoCanApply?: string
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  requiredMaterials?: string
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  whereToApply?: string
+}
+
+export class UpdatePolicyPostDto {
+  @IsOptional() @IsIn([...POLICY_KINDS])
+  kind?: string
+
+  @IsOptional() @IsString() @IsNotEmpty() @MaxLength(200)
+  title?: string
+
+  @IsOptional() @IsString() @MaxLength(500)
+  summary?: string | null
+
+  @IsOptional() @IsString() @MaxLength(10000)
+  content?: string | null
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  whoCanApply?: string | null
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  requiredMaterials?: string | null
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  whereToApply?: string | null
+
+  @IsOptional() @IsIn([...POLICY_AUDIENCES])
+  audience?: string
+
+  @IsOptional() @IsIn([...POLICY_CATEGORIES])
+  category?: string
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? null : value))
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true }) @MaxLength(500)
+  externalUrl?: string | null
+
+  @IsOptional() @IsString() @MaxLength(120)
+  externalId?: string | null
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? null : value))
+  @IsISO8601()
+  publishedDate?: string | null
 }
 
 // ── P21 政策条件核对（S3-2）────────────────────────────────────────────────

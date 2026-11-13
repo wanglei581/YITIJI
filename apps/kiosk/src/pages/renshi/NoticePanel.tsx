@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { isValidSourceUrl } from '../../lib/url'
 import type { PolicyPostView } from '../../services/api/policies'
 import { policyPublishedOn } from './policyFacts'
-import { FileTextIcon, PrinterIcon, QrCodeIcon, ScaleIcon, ScrollTextIcon } from 'lucide-react'
+import { FileTextIcon, PrinterIcon, QrCodeIcon, ScrollTextIcon } from 'lucide-react'
 import { CATEGORY_META, type TabKey } from './shared'
 import { CollapsedChevron, RqDeadEnd, SourceFacts, type SourceQrTarget } from './components'
 
@@ -64,15 +64,14 @@ export function NoticePanel({
         icon={ScrollTextIcon}
         title="暂无政策公告"
         testId="renshi-notice-empty"
-        exitsHint="公告为空不影响这三条"
+        exitsHint="可以返回政策首页办别的事"
         exits={[
-          { key: 'policy', icon: FileTextIcon, title: '去看就业政策', desc: '政策条目与办事指引', onClick: () => onTab('policy') },
-          { key: 'eligibility', icon: ScaleIcon, title: '去条件核对', desc: '按政策原文逐条比对', onClick: () => onTab('eligibility') },
+          { key: 'policy', icon: FileTextIcon, title: '返回政策首页', desc: '查看当前发布的政策类别', onClick: () => onTab('policy') },
         ]}
         uploadDesc="不受公告影响"
         note="公告正文与来源链接都由发布机构提交，本机不改写、不补写。"
       >
-        公告由合作机构发布、管理员审核后展示，目前一条都没有。这是内容进度，不是读取失败；读取失败会另有一屏说明。
+        公告由发布机构自己审核并发布，目前一条都没有。这是内容进度，不是读取失败；读取失败会另有一屏说明。
       </RqDeadEnd>
     )
   }
@@ -126,7 +125,7 @@ export function NoticePanel({
                       onClick={() => onOfficialEntry(notice, {
                         title: notice.title,
                         url: notice.externalUrl!,
-                        sourceKind: '合作机构发布 · 管理员审核',
+                        sourceKind: '机构发布 · 机构自己审核',
                         sourceDetail: notice.sourceName,
                       })}
                     >

@@ -1,0 +1,110 @@
+/* cs-scan-err-* / stopped：原稿尺寸，复用放纸小样与 qxt 令牌。 */
+[data-qx-page='scan-workbench'] :is(.cs-err, .cs-stopped) {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px;
+}
+[data-qx-page='scan-workbench'] .cs-why {
+  flex: 1; min-height: 300px; display: grid; grid-template-columns: 330px minmax(0, 1fr);
+  gap: 30px; align-items: center; padding: 22px 30px 22px 22px; border-radius: 30px;
+  background: var(--qxt-card); border: 1.5px solid var(--qxt-edge);
+}
+[data-qx-page='scan-workbench'] .cs-why .vis {
+  position: relative; width: 330px; height: 330px; border-radius: 26px; background: var(--qxt-well);
+  display: grid; place-items: center; overflow: hidden;
+}
+[data-qx-page='scan-workbench'] .cs-why .vis > :is(svg, .pa) { width: 76%; height: auto; }
+/* 忙屏没有服务电话栏，原因卡按稿的 1000×620 比例收住，不吃掉缺栏后的余量。 */
+[data-qx-page='scan-workbench'] [data-testid='scan-device-error-busy'] .cs-why {
+  flex: none; aspect-ratio: 1000 / 620;
+}
+[data-qx-page='scan-workbench'] [data-testid='scan-device-error-busy'] .cs-why .vis .pa svg {
+  width: 100%; height: auto;
+}
+[data-qx-page='scan-workbench'] .cs-why .vis .warn {
+  position: absolute; right: 14px; top: 14px; width: 62px; height: 62px; border-radius: 50%;
+  background: var(--qxt-clay-ink); color: var(--qx-on-solid); display: grid; place-items: center;
+}
+[data-qx-page='scan-workbench'] .cs-why b { display: block; font: 700 38px/1.35 var(--qx-serif); }
+[data-qx-page='scan-workbench'] .cs-why p { margin: 12px 0 0; font-size: 27px; line-height: 1.55; color: var(--qxt-ink-2); }
+[data-qx-page='scan-workbench'] .cs-err .cs-ways { flex: none; }
+[data-qx-page='scan-workbench'] .cs-err .cs-ways > .cs-way {
+  flex: none; min-height: 196px; grid-template-columns: 210px minmax(0, 1fr) 64px;
+  gap: 22px; padding: 18px 24px 18px 18px;
+}
+[data-qx-page='scan-workbench'] .cs-err2 .cs-ways > .cs-way { min-height: 232px; }
+[data-qx-page='scan-workbench'] .cs-err .cs-way .vis { min-height: 140px; }
+[data-qx-page='scan-workbench'] .cs-err .cs-way h3 { font-size: 36px; }
+[data-qx-page='scan-workbench'] .cs-err .cs-way p { font-size: 24px; }
+[data-qx-page='scan-workbench'] .cs-err [data-testid='service-phone-line'] {
+  flex: none; margin: 0; padding: 26px 34px; min-height: 104px; border-radius: 26px;
+  background: var(--qxt-clay-wash); color: var(--qxt-clay-ink); font-size: 27px; line-height: 1.55; font-weight: 700;
+}
+/* 屏上扫描中断结果屏（稿 cs-scan-failed）沿用上面的原因卡与出路卡。原因卡照 11/09 第三轮 ?fail=nofile 的排法：
+   单栏居中，插画放大把卡撑满；字号、句子不变。这一屏最多两张出路卡（照原设置再扫一次、返回首页），原因卡高出一截，
+   左图右字会在右栏留下超过 240px 的空白。11/09 产品负责人定：版式照程序，稿 cs-scan-failed 各样子跟着改。 */
+[data-qx-page='scan-workbench'] .cs-sfail .cs-why {
+  grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; justify-items: center; align-content: center;
+  gap: 24px; padding: 28px 56px; text-align: center;
+}
+[data-qx-page='scan-workbench'] .cs-sfail .cs-why .vis { width: auto; height: 100%; max-height: 600px; aspect-ratio: 1 / 1; }
+[data-qx-page='scan-workbench'] .cs-sfail .cs-why .vis > svg { width: 90%; }
+[data-qx-page='scan-workbench'] .cs-sfail .cs-why .vis .warn { right: 20px; top: 20px; width: 76px; height: 76px; }
+[data-qx-page='scan-workbench'] .cs-sfail .cs-why .vis .warn svg { width: 42px; height: 42px; }
+/* 原因句与说明都均衡断行：「超过这台机器能收的大小」那句不再把「里。」单独甩到第二行（稿同步）。 */
+[data-qx-page='scan-workbench'] .cs-sfail .cs-why :is(b, p) { text-wrap: balance; }
+[data-qx-page='scan-workbench'] .cs-stopped .cs-fact {
+  display: flex; gap: 20px; align-items: center; min-height: 116px; padding: 12px 26px 12px 20px; border-radius: 26px;
+  background: var(--qxt-card); border: 1.5px solid var(--qxt-edge); font-size: 28px; line-height: 1.5;
+}
+[data-qx-page='scan-workbench'] .cs-stopped .cs-fact.big { font-size: 32px; min-height: 148px; background: var(--qxt-teal-wash); border-color: transparent; color: var(--qxt-teal-ink); }
+[data-qx-page='scan-workbench'] .cs-stopped .ic { width: 68px; height: 68px; border-radius: 20px; background: var(--qxt-teal-wash); display: grid; place-items: center; flex: none; }
+[data-qx-page='scan-workbench'] .cs-stopped .big .ic { width: 80px; height: 80px; border-radius: 24px; background: var(--qxt-card); }
+[data-qx-page='scan-workbench'] .cs-stopped .cs-fact svg { flex: none; color: var(--qx-teal); }
+[data-qx-page='scan-workbench'] .cs-wait {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 24px; padding: 26px 34px; border-radius: 30px; background: var(--qxt-well); text-align: center;
+}
+[data-qx-page='scan-workbench'] .cs-wait .tx { display: flex; flex-direction: column; gap: 10px; }
+[data-qx-page='scan-workbench'] .cs-wait b { font: 700 44px/1.35 var(--qx-serif); }
+[data-qx-page='scan-workbench'] .cs-wait .tx span { font-size: 28px; line-height: 1.55; color: var(--qxt-ink-2); }
+[data-qx-page='scan-workbench'] .cs-ring {
+  width: 480px; height: 480px; border: 26px solid var(--qx-teal); border-radius: 50%; display: grid; place-items: center;
+}
+[data-qx-page='scan-workbench'] .cs-ring b { font: 700 180px/1 var(--qx-sans); font-variant-numeric: tabular-nums; }
+[data-qx-page='scan-workbench'] .cs-ring.is-pending b { font-size: 60px; }
+[data-qx-page='scan-workbench'] .cs-ring small { display: block; margin-top: 18px; font: 400 40px/1 var(--qx-sans); }
+@media (max-width: 760px) {
+  [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-why {
+    grid-template-columns: 100px minmax(0, 1fr); gap: 14px; padding: 16px; min-height: 180px;
+  }
+  [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-why .vis { width: 100px; height: 130px; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-why .vis .warn { width: 38px; height: 38px; right: 2px; top: 2px; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] :is(.cs-why b, .cs-why p, .cs-err .cs-way h3, .cs-err .cs-way p) { font-size: 20px; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-err .cs-ways > .cs-way {
+    grid-template-columns: 64px minmax(0, 1fr) 48px; gap: 12px; min-height: 160px; padding: 12px;
+  }
+  [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-err .cs-way .vis { min-height: 100px; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-err .cs-way .arrow { width: 48px; height: 48px; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] :is(.cs-err [data-testid='service-phone-line'], .cs-stopped .cs-fact, .cs-wait .tx span) { font-size: 20px; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-wait b { font-size: 24px; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-ring { width: 240px; height: 240px; border-width: 16px; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-ring b { font-size: 72px; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-ring.is-pending b { font-size: 32px; }
+  /* 中断结果屏的原因卡在窄屏上按内容高度排、插画收小，整页滚动，字不被卡片截掉。 */
+  [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-sfail .cs-why {
+    flex: none; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; justify-items: center; text-align: center; gap: 12px; padding: 16px;
+  }
+  [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-sfail .cs-why .vis { width: 160px; height: 160px; max-height: none; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-sfail .cs-why .vis .warn { width: 38px; height: 38px; right: 2px; top: 2px; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .cs-sfail .cs-why .vis .warn svg { width: 22px; height: 22px; }
+}
+
+/* 窄屏仍按触控下限排，问句独占一行，避免把主按钮压窄。 */
+@media (max-width: 760px) {
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch:has(.cs-err, .cs-stopped) .qxt-dock { flex-wrap: wrap; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch:has(.cs-err, .cs-stopped) .qxt-dock .qxt-btn {
+    font-size: 20px; min-height: 56px; height: auto; padding: 12px; white-space: normal;
+  }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch:has(.cs-err, .cs-stopped) .qxt-dock .qxt-askq {
+    order: 3; flex: 1 0 100%; font-size: 20px; min-height: 56px;
+  }
+}

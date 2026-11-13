@@ -176,6 +176,8 @@ section('2. 落库面：AI 模块写入的模型必须有留存期限')
  * 想新增一条，必须写清为什么它不承载用户原话（理由 < 20 字直接 FAIL）。
  */
 const NO_TTL_REGISTRY: Record<string, string> = {
+  AiSafetyTerm:
+    '只存安全词库的类别、词条和开关，不含会员身份或用户提问，作为运营配置长期保留。',
   AiServiceLog:
     '只落 operation/provider/status/latency/token 等元数据，无任何用户文本字段；按 AI_SERVICE_LOG_RETENTION_DAYS 由 AiResultCleanupTask 定期硬删',
   AuditLog:
@@ -194,6 +196,8 @@ const NO_TTL_REGISTRY: Record<string, string> = {
     '权益核销流水（机构发放的 AI 次数被用掉一次记一行），属财务与权益账，只有权益号、用途、数量与幂等键，无用户文本；随订单与权益流水的保留期走，不随 AI 会话 TTL 走',
   AiUsageMonthlySummary:
     '按月费用汇总，只存北京时间月份、功能、厂商、型号、状态、调用次数、已计量金额与未计量次数；不含会员、终端、机构或任何用户文本，长期保留，不随明细到期删除。',
+  AiServiceFact:
+    '机构 AI 服务计次事实，只存服务类型、服务编号（简历优化任务号或模拟面试会话号，只用于去重）、机构、终端与发生时间；无会员号、无用户文本，对应任务或会话按各自 TTL 删除后编号不再能关联到任何人。供机构工作台按机构计次，长期保留，不随 AI 会话 TTL 走。',
 }
 
 const writtenModels = new Map<string, string[]>()

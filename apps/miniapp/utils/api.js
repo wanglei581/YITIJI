@@ -22,6 +22,13 @@ const { withQuotedAmount } = require('./price-confirmation');
 const legalConsent = require('./api-legal-consent');
 
 /**
+ * 登录时请服务端同时签发同设备恢复凭证（FLOW1c）。用请求头而不是请求体字段：旧版 API 会忽略不认识的请求头，
+ * 不会因白名单校验回 400。服务端还要核对微信固定的 Referer 是本小程序，一体机拿不到。
+ * 线上签发开关默认关，带上这个头不改变当前线上行为。
+ */
+const KEEP_SIGNED_IN = { 'x-member-keep-signed-in': '1' };
+
+/**
  * 对列表逐项做字段适配,并保留挂在数组上的分页元数据。
  * 直接 list.map() 会丢掉 .pagination / .nextCursor / .total。
  */
@@ -387,7 +394,7 @@ const api = {
         privacyVersion: v.privacyVersion,
       };
       if (deviceId) data.deviceId = deviceId;
-      return request('/member/auth/login', { method: 'POST', data, needAuth: false });
+      return request('/member/auth/login', { method: 'POST', data, needAuth: false, header: KEEP_SIGNED_IN });
     });
   },
 
@@ -404,6 +411,15 @@ const api = {
   logout() {
     if (config.USE_MOCK) return Promise.resolve({ loggedOut: true });
     return request('/member/auth/logout', { method: 'POST', needAuth: true });
+  },
+
+  /**
+   * 主动退出时作废这台手机的恢复凭证（FLOW1c），尽力而为。不带访问令牌：退出时它可能已经过期。
+   * 本机在调用之前已经作废并落盘（auth.logout），这一次成没成都不影响「退出后不恢复」。
+   */
+  revokeRestore(restoreToken) {
+    if (config.USE_MOCK || !restoreToken) return Promise.resolve({ revoked: false });
+    return request('/member/auth/restore/revoke', { method: 'POST', data: { restoreToken }, needAuth: false });
   },
 
   /**
@@ -481,6 +497,7 @@ const api = {
           privacyVersion: v.privacyVersion,
         },
         needAuth: false,
+        header: KEEP_SIGNED_IN,
       });
     });
   },
@@ -517,7 +534,9 @@ const api = {
   },
 
   /**
-   * 上传本人通用打印文件；后端 print_doc 仅接受 PDF/JPG/PNG 并按真实 MIME/魔数校验。
+   * 上传本人通用打印文件。后端 print_doc 接受 PDF、JPG、PNG、DOC、DOCX
+   * （file-validation.ts 的 PURPOSE_POLICY.print_doc），并按真实 MIME/魔数校验。
+   * Word 不能直接算页数，上传后要先转成 PDF 再进打印。
    *
    * 文件名只能走 multipart 文件段本身（wx.uploadFile 取 filePath 的 basename），
    * 绝不能塞进 formData：后端 KioskUploadOptionsDto 只白名单了 purpose 一个字段，
@@ -554,13 +573,14 @@ const api = {
    * 凭据，那些历史日志会**追溯性地**变成凭据泄露。（契约见
    * docs/api/upload-scene-miniapp-contract.md）
    *
-   * 三条调用方必须知道的行为：
-   *   1. **一次性**：服务端用 Redis GETDEL 原子消费，第二次兑换必失败。
-   *      所以不要重试，也不要在 onShow 里重复兑换。
-   *   2. **兑换会轮换 uploadToken**：同一会话的旧网页二维码当场作废。
-   *   3. **失败一律 UPLOAD_SCENE_UNUSABLE**：格式错 / 查无此码 / 已过期 / 已用掉
+   * 调用方必须知道的行为（2026-10-29 起的契约）：
+   *   1. **会话有效期内可重复兑换**：同一张码多次兑换拿到同一把 uploadToken。
+   *      所以断网、超时、5xx 之后可以让用户点「重试」再兑换一次；但不要在 onShow 里自动兑换。
+   *   2. **失败一律 UPLOAD_SCENE_UNUSABLE**：格式错 / 查无此码 / 已过期 / 已收到文件 / 已作废
    *      都是同一个码。**不要按原因分支** —— 区分原因对用户没价值（补救动作都是
-   *      「回一体机重新生成」），对探测者却是一台预言机。
+   *      「回一体机刷新二维码」），对探测者却是一台预言机。这个码不给重试。
+   *   3. 一体机直接出的普通链接码（`https://<域名>/k/u/<scene>`）里的 scene 也走这里，
+   *      见 utils/kiosk-qr.js。
    *
    * 不返回 controlToken：那是一体机侧的凭据，手机端不该拿到。
    *
@@ -589,6 +609,30 @@ const api = {
         (err) => { prepared.cleanup(); throw err; }
       )
     );
+  },
+
+  /**
+   * 把本人「我的文档」里的一份文件递进**一体机的上传会话**（不用再从手机传一遍字节）。
+   *
+   * 与 uploadToKioskSession 同一把 uploadToken、同形回执（status=uploaded、file.fileId、
+   * sessionId、purpose）；区别是要会员登录（needAuth: true），服务端只读本人的文件，
+   * 落到会话里的是一份匿名副本。主要错误码：
+   *   FILE_NOT_FOUND（不是本人的 / 已删 / 已过期）· FILE_TOO_LARGE（超 10MB）·
+   *   UPLOAD_SESSION_MEMBER_MISMATCH（一体机登录的是另一个会员）·
+   *   UPLOAD_TOKEN_INVALID / UPLOAD_SESSION_NOT_PENDING / _EXPIRED / _NOT_FOUND（码已不能再传）·
+   *   UPLOAD_SESSION_UPLOAD_IN_PROGRESS（这张码正在收一份）· 401（会员登录失效）。
+   *
+   * @param {string} sessionId 扫码得到的会话 id
+   * @param {string} uploadToken 扫码得到的上传令牌（只进 body，不进 URL）
+   * @param {string} fileId 「我的文档」列表里的文件 id
+   */
+  sendMemberFileToKioskSession(sessionId, uploadToken, fileId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('传文件到一体机'));
+    return request(`/upload-sessions/${encodeURIComponent(sessionId)}/member-file`, {
+      method: 'POST',
+      data: { uploadToken, fileId },
+      needAuth: true,
+    });
   },
 
   uploadPrintFile(filePath, displayName) {
@@ -743,11 +787,15 @@ const api = {
    *   1. 200 + status:'failed' + failReason —— 简历原文已按隐私策略清理,要重新上传简历
    *   2. 503 AI_CAREER_PLAN_FAILED       —— 两次模型调用都没过校验,可手动重试
    *   3. 404 CAREER_PLAN_NOT_FOUND       —— 只会出现在 GET/print,不会出现在这里
+   *
+   * 这一步会把简历原文发给 AI,所以和诊断、优化一样受「简历 AI 授权」管(resumeAi):
+   * 会员没授权或已撤回时服务端回 403 USER_AI_CONSENT_REQUIRED,请求层问一次确认框;
+   * 点「暂不使用」抛 AI_RESUME_NOT_CONSENTED,页面留在原页说明,不自动再问。
    */
   generateCareerPlan(taskId, accessToken) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 职业规划'));
     return request(`/resume/career-plan/${taskId}`, {
-      method: 'POST', header: tokenHeader(accessToken), needAuth: true, timeout: config.aiTimeout, ai: 'generate',
+      method: 'POST', header: tokenHeader(accessToken), needAuth: true, timeout: config.aiTimeout, ai: 'generate', resumeAi: true,
     });
   },
 
@@ -1008,11 +1056,13 @@ const api = {
    * 注意这里不放宽任何访问策略：presetFileUrl 只能来自服务端刚刚下发的响应，
    * 前端不构造、不缓存、不复用。
    */
-  quoteMyPrintOrder(fileId, params, presetFileUrl) {
+  quoteMyPrintOrder(fileId, params, presetFileUrl, options) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印报价'));
+    // options = { terminalId }（03439f5ca）：彩色、双面要按这台终端登记的能力报价，服务端此时要求带上终端。
+    const terminalId = options && String(options.terminalId || '').trim();
     const quoteWith = (fileUrl) => request('/orders/quote', {
       method: 'POST',
-      data: { fileUrl, params },
+      data: terminalId ? { fileUrl, params, terminalId } : { fileUrl, params },
       needAuth: false,
     });
 
@@ -1028,6 +1078,17 @@ const api = {
       const fileUrl = access && access.printFileUrl;
       if (!fileUrl) throw new Error('服务端未返回可打印文件凭证');
       return quoteWith(fileUrl);
+    });
+  },
+
+  /** 读取一台终端已登记的能力。不鉴权；没有终端编号就不发请求。 */
+  getTerminalCapabilities(terminalId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('终端能力'));
+    const id = String(terminalId || '').trim();
+    if (!id) return Promise.reject(new Error('缺少终端'));
+    return request(`/terminals/${encodeURIComponent(id)}/capabilities`, {
+      method: 'GET',
+      needAuth: false,
     });
   },
 
@@ -1526,18 +1587,18 @@ const api = {
     });
   },
 
-  /** 打印前隐私检查；会员 token 保证只能检查本人文件。 */
+  /** 打印前隐私检查；会员 token 保证只能检查本人文件。服务端已豁免 AI 闸门（materials.controller 的 AiUseExempt，AI 挂了原件照样能打），这里不挂 ai、不问年龄。 */
   createPrintPiiScan(fileId) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印隐私检查'));
     return request('/materials/tasks', {
-      method: 'POST', data: { kind: 'pii_scan', sourceFileId: fileId }, needAuth: true, timeout: config.aiTimeout, ai: 'generate',
+      method: 'POST', data: { kind: 'pii_scan', sourceFileId: fileId }, needAuth: true, timeout: config.aiTimeout,
     });
   },
 
   decidePrintPiiFindings(taskId, decisions) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印隐私检查'));
     return request(`/materials/tasks/${encodeURIComponent(taskId)}/pii-findings/decisions`, {
-      method: 'POST', data: { decisions }, needAuth: true, timeout: config.aiTimeout, ai: 'generate',
+      method: 'POST', data: { decisions }, needAuth: true, timeout: config.aiTimeout,
     });
   },
 
@@ -1723,13 +1784,13 @@ const api = {
   /**
    * 今日提醒办事清单。契约：POST /assistant/daily-report { city? }
    * → { date, empty, modules[ pickup_expiring | fair_countdown | city_new | broadcast ] }
-   * 需登录。city 由页面从岗位页 storage 读取，没有就不传。
+   * 需登录。city 由页面从岗位页 storage 读取，没有就不传。规则聚合不调用模型，不经过 AI 授权或额度闸门。
    */
   getDailyBrief({ city } = {}) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('今日提醒'));
     const data = {};
     if (city) data.city = city;
-    return request('/assistant/daily-report', { method: 'POST', data, needAuth: true, ai: 'generate' });
+    return request('/assistant/daily-report', { method: 'POST', data, needAuth: true });
   },
 
   // ---------- 合同审查（后端 contract-review.controller.ts 已实现） ----------
@@ -1827,7 +1888,8 @@ const api = {
   createContractReview(payload) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
     // 建任务要落库并校验同意快照，15 秒默认值偏紧。
-    return request('/contract-reviews', { method: 'POST', data: payload, needAuth: true, timeout: config.aiTimeout });
+    // ai: 'generate'：和别的 AI 功能一样，先过未满 14 周岁的声明（服务端这条是 @AiUse('generate')）。
+    return request('/contract-reviews', { method: 'POST', data: payload, needAuth: true, timeout: config.aiTimeout, ai: 'generate' });
   },
 
   /**
@@ -1851,7 +1913,7 @@ const api = {
   confirmContractReview(id, payload) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
     return request(`/contract-reviews/${encodeURIComponent(id)}/confirm`, {
-      method: 'POST', data: payload, needAuth: true,
+      method: 'POST', data: payload, needAuth: true, ai: 'generate',
       // 确认后服务端要做状态机切换与入队，实测会超过 15 秒默认值。
       timeout: config.aiTimeout,
     });
@@ -2047,5 +2109,19 @@ api.appendSelfAssessmentToResume = function appendSelfAssessmentToResume(taskId,
     needAuth: true,
     timeout: 60000,
     ai: 'generate',
+  });
+};
+
+/**
+ * 公开服务电话。不登录。terminalId 为空就不带查询参数。
+ * 后端: GET /api/v1/public/support-contact
+ */
+api.getSupportContact = function getSupportContact(terminalId) {
+  if (config.USE_MOCK) return Promise.reject(mockUnavailable('服务电话'));
+  const ref = typeof terminalId === 'string' ? terminalId.trim() : '';
+  // 路径必须是字面量：契约门禁只抽 request('…') / request(`…`)，变量拼出来的路径会被漏掉。
+  if (!ref) return request('/public/support-contact', { method: 'GET', needAuth: false });
+  return request(`/public/support-contact?terminalId=${encodeURIComponent(ref)}`, {
+    method: 'GET', needAuth: false,
   });
 };

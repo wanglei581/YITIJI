@@ -24,11 +24,17 @@ export interface PackageOrderView {
   reprintAllowed: boolean
   /** 剩余自助续打次数（0–2）。没有任务，或没有到机码哈希，为 null。 */
   reprintRemaining: number | null
+  /** 免费单出纸提示。付费单与普通失败为 null。 */
+  reprintNotice: 'may_have_printed' | 'partial_output' | null
   expiresAt: string | null
   pickupStatus: 'pending' | 'claimed' | 'used' | 'expired' | 'cancelled' | 'none'
   payStatus: OrderPayStatus
   taskStatus: string
   amountCents: number
-  paymentSessionToken: string
+  /**
+   * 到机器前付款用的会话令牌。有机器号时签发。
+   * 没有机器号时省略，不是必有字段。
+   */
+  paymentSessionToken?: string
   items: PackageOrderItem[]
 }

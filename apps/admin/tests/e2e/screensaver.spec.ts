@@ -7,7 +7,7 @@ test.describe('宣传屏（mock 口径）', () => {
   test('三个 Tab 可切换；删除素材有二次确认', async ({ page }) => {
     const guards = await openAuthed(page, '/screensaver')
     await settleAdminPage(page, guards)
-    await expect(page.getByRole('heading', { name: '宣传屏' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '待机宣传屏' })).toBeVisible()
     await expect(page.getByText('状态获取失败')).toHaveCount(0)
     await expect(page.getByText(/AI 文生图海报：二期能力，暂未启用/)).toBeVisible()
 
@@ -68,6 +68,14 @@ test('不合规文件和超长时长不能提交', async ({ page }) => {
   await expect(page.getByRole('button', { name: '技术说明' })).toHaveAttribute('title', /HTTPS/)
   await expect(page.getByRole('button', { name: '技术说明' })).toHaveAttribute('title', /iframe/)
   await expect(page.getByRole('button', { name: '技术说明' })).toHaveAttribute('title', /直链/)
+  const tech = page.getByRole('button', { name: '技术说明' })
+  await expect(tech).toHaveAttribute('aria-expanded', 'false')
+  await tech.click()
+  await expect(tech).toHaveAttribute('aria-expanded', 'true')
+  await expect(page.getByText('须为 HTTPS 地址', { exact: false })).toBeVisible()
+  await tech.click()
+  await expect(tech).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.getByText('须为 HTTPS 地址', { exact: false })).toHaveCount(0)
 
   await page.locator('input[type=file]').setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('这不是图片') })
   await expect(page.getByRole('alert')).toContainText('请重新选择 JPG、PNG、WebP 图片，或 MP4、WebM 视频')
