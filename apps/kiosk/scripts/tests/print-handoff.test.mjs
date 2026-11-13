@@ -272,6 +272,35 @@ test('U6b 入口策略表：原件去打印台检查，派生产物直达报价�
   assert.deepEqual(h.printHandoffTarget(begun), { ok: true, path: '/print/desk?step=check', state: { printContextId: begun.context.contextId } })
 })
 
+test('U6d 返回状态只留在调用方内存，不进打印交接存储', async () => {
+  const h = await loadHandoff()
+  const filename = '林晓舟-仓储管理员-诊断报告.pdf'
+  const returnState = {
+    pathname: '/resume/report',
+    search: '?taskId=task-1',
+    state: { taskId: 'task-1', reportTakeaway: { filename, signedUrl: 'https://files.example/a' } },
+  }
+  const begun = h.beginPrintHandoff({
+    origin: 'resume_report',
+    file: fileB(),
+    returnPath: '/resume/report?taskId=task-1',
+    returnState,
+  }, GUEST, NOW)
+  assert.equal(begun.ok, true)
+  const raw = h.storage.getItem(STORAGE_KEY)
+  assert.ok(raw)
+  assert.equal(raw.includes(filename), false, '带姓名的文件名不得进打印交接存储')
+  assert.equal(raw.includes('reportTakeaway'), false)
+  assert.equal(raw.includes('files.example'), false)
+  assert.deepEqual(Object.keys(h.printHandoffTarget(begun).state), ['printContextId'])
+  assert.deepEqual(h.readPrintReturnCarry(returnState), returnState)
+  assert.equal(h.readPrintReturnCarry({ pathname: 'https://evil.example/resume/report', search: '', state: {} }), null)
+  assert.equal(h.readPrintReturnCarry({ pathname: '//evil.example/resume/report', search: '', state: {} }), null)
+  assert.equal(h.readPrintReturnCarry({ pathname: '/login', search: '', state: {} }), null)
+  assert.equal(h.readPrintReturnCarry({ pathname: '/resume/report', search: '?taskId=1#x', state: {} }), null)
+  assert.equal(h.readPrintReturnCarry({ pathname: '/resume/report?taskId=1', search: '', state: {} }), null)
+})
+
 test('U6c 政策清单直达报价并只保留公开政策编号用于返回，其他来源仍去掉查询串', async () => {
   const h = await loadHandoff()
   const begun = h.beginPrintHandoff({ origin: 'policy_checklist', file: fileB(), returnPath: '/renshi?policy=policy-1&token=secret#fragment' }, GUEST, NOW)

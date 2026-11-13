@@ -28,7 +28,7 @@ import { abandonContractReviewReport } from '../../services/api/contractReview'
 import { formatCents } from './cashierStatus'
 import { countPagesInRange } from './pageRange'
 import { clearPrintMaterialSession, printUploadPathForSource, type PrintFileState } from './printMaterialSession'
-import { patchPrintHandoff } from './printHandoff'
+import { patchPrintHandoff, readPrintReturnCarry } from './printHandoff'
 import { usePrintConfirmHandoff } from './usePrintConfirmHandoff'
 import { printPrivacyDecisionSummary } from './printDeskModel'
 import { materialRedactionBadge } from './piiRedaction'
@@ -334,9 +334,20 @@ export function PrintConfirmPage() {
     (API_MODE === 'http' && !confirmScreenAllowsOrder(screen)) ||
     (API_MODE === 'http' && quote.status !== 'ready' && quote.status !== 'demo')
 
+  const returnWithCarry = (): boolean => {
+    const routeState = location.state
+    const raw = routeState && typeof routeState === 'object' && !Array.isArray(routeState)
+      ? (routeState as { printReturnState?: unknown }).printReturnState
+      : undefined
+    const carry = readPrintReturnCarry(raw)
+    if (!carry) return false
+    navigate({ pathname: carry.pathname, search: carry.search }, { state: carry.state })
+    return true
+  }
+
   const handleBack = async () => {
     if (!contractReport) {
-      navigate(-1)
+      if (!returnWithCarry()) navigate(-1)
       return
     }
     setAbandoning(true)
@@ -595,7 +606,7 @@ export function PrintConfirmPage() {
   ) : screen === 'invalid-context' && handoffInvalid ? (
     // 交接失效（上一位的、过期、被替换）：只给「回到上一步」和「重新选文件」，不提供切到别的那一份。
     <>
-      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => (returnPath ? navigate(returnPath) : navigate(-1))}>回到上一步</button>
+      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => { if (returnWithCarry()) return; if (returnPath) navigate(returnPath); else navigate(-1) }}>回到上一步</button>
       <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(uploadPath)}>重新选文件</button>
     </>
   ) : screen === 'invalid-context' ? (

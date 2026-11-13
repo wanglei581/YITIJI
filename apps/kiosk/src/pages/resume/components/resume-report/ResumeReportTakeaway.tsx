@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import type { ResumeReportExportKind, ResumeReportExportResponse } from '@ai-job-print/shared'
 import { FilePreviewDialog } from '../../../../components/FilePreviewDialog'
 import { useCountdown } from '../../../../hooks/useCountdown'
@@ -24,29 +25,21 @@ import {
 import { subscribeKioskSensitiveSessionClear } from '../../../../auth/kioskSensitiveSession'
 import { useStartPrintHandoff } from '../../../print/usePrintHandoff'
 
-/** 与 aiResumeSession 同一把钥匙。只追加本次导出回执，清场删整把钥匙时一起清掉。 */
-const AI_RESUME_SESSION_KEY = 'ai-job-print:current-ai-resume'
-
-function readSessionRecord(): Record<string, unknown> | null {
-  if (typeof sessionStorage === 'undefined') return null
-  try {
-    const raw = sessionStorage.getItem(AI_RESUME_SESSION_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as unknown
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
-    return parsed as Record<string, unknown>
-  } catch {
-    return null
-  }
+function routeRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as Record<string, unknown>
 }
 
-function readReportTakeaway(taskId: string | undefined): { kind: ResumeReportExportKind; file: ResumeReportExportResponse } | null {
-  if (!taskId) return null
-  const parsed = readSessionRecord()
-  if (!parsed || parsed.taskId !== taskId) return null
-  const takeaway = parsed.reportTakeaway
-  if (!takeaway || typeof takeaway !== 'object' || Array.isArray(takeaway)) return null
-  const row = takeaway as Record<string, unknown>
+/** 回执只跟打印页的返回状态走，不写 sessionStorage / localStorage。文件名可能带姓名。 */
+function readRouteTakeaway(
+  routeState: unknown,
+  taskId: string | undefined,
+): { kind: ResumeReportExportKind; file: ResumeReportExportResponse } | null {
+  const state = routeRecord(routeState)
+  if (!state) return null
+  if (typeof state.taskId === 'string' && taskId && state.taskId !== taskId) return null
+  const row = routeRecord(state.reportTakeaway)
+  if (!row) return null
   const kind = row.kind === 'change_list' || row.kind === 'diagnosis_report' ? row.kind : null
   const fileId = typeof row.fileId === 'string' ? row.fileId : ''
   const filename = typeof row.filename === 'string' ? row.filename : ''
@@ -71,34 +64,19 @@ function readReportTakeaway(taskId: string | undefined): { kind: ResumeReportExp
   }
 }
 
-function writeReportTakeaway(
-  taskId: string | undefined,
-  takeaway: { kind: ResumeReportExportKind; file: ResumeReportExportResponse } | null,
-): void {
-  if (!taskId || typeof sessionStorage === 'undefined') return
-  try {
-    const parsed = readSessionRecord()
-    if (!parsed || parsed.taskId !== taskId) return
-    if (takeaway) {
-      parsed.reportTakeaway = {
-        kind: takeaway.kind,
-        fileId: takeaway.file.fileId,
-        filename: takeaway.file.filename,
-        signedUrl: takeaway.file.signedUrl,
-        printFileUrl: takeaway.file.printFileUrl,
-        expiresAt: takeaway.file.expiresAt,
-        sizeBytes: takeaway.file.sizeBytes,
-        pageCount: takeaway.file.pageCount,
-        savedToDocuments: takeaway.file.savedToDocuments,
-        mimeType: 'application/pdf',
-        aiGenerated: true,
-      }
-    } else {
-      delete parsed.reportTakeaway
-    }
-    sessionStorage.setItem(AI_RESUME_SESSION_KEY, JSON.stringify(parsed))
-  } catch {
-    // 写不进去时这一页仍用内存里的结果；不另开一把钥匙。
+function takeawayPayload(kind: ResumeReportExportKind, file: ResumeReportExportResponse) {
+  return {
+    kind,
+    fileId: file.fileId,
+    filename: file.filename,
+    signedUrl: file.signedUrl,
+    printFileUrl: file.printFileUrl,
+    expiresAt: file.expiresAt,
+    sizeBytes: file.sizeBytes,
+    pageCount: file.pageCount,
+    savedToDocuments: file.savedToDocuments,
+    mimeType: 'application/pdf' as const,
+    aiGenerated: true as const,
   }
 }
 
@@ -171,6 +149,7 @@ export function ResumeReportTakeaway(props: {
   onExportedChange?: (exported: boolean) => void
 }) {
   const startPrint = useStartPrintHandoff()
+  const location = useLocation()
   const { getToken } = useAuth()
   const token = getToken()
   const guest = !token
@@ -194,7 +173,7 @@ export function ResumeReportTakeaway(props: {
   const benefitGrantId = capture ? undefined : live.benefitGrantId
   const pricingLoading = capture ? false : live.loading
 
-  const restored = capture ? null : readReportTakeaway(props.taskId)
+  const restored = capture ? null : readRouteTakeaway(location.state, props.taskId)
   const [exported, setExported] = useState<ResumeReportExportResponse | null>(
     capture === 'export-ready' ? FIXTURE_EXPORT : restored?.file ?? null,
   )
@@ -241,10 +220,8 @@ export function ResumeReportTakeaway(props: {
       setExported(result)
       setExportKind(kind)
       setPreviewOpen(false)
-      if (!capture) writeReportTakeaway(props.taskId, { kind, file: result })
     } catch (err) {
       setExported(null)
-      if (!capture) writeReportTakeaway(props.taskId, null)
       setExportError(exportErrorMessage(err))
     } finally {
       setExporting(false)
@@ -254,9 +231,18 @@ export function ResumeReportTakeaway(props: {
   const handlePrint = () => {
     if (printNavigating || !exported?.printFileUrl) return
     setPrintNavigating(true)
+    const routeState = routeRecord(location.state) ?? {}
     startPrint({
       origin: 'resume_report',
-      returnPath: window.location.pathname,
+      returnPath: `${location.pathname}${location.search}`,
+      returnState: {
+        pathname: location.pathname,
+        search: location.search,
+        state: {
+          ...routeState,
+          reportTakeaway: takeawayPayload(exportKind, exported),
+        },
+      },
       file: {
         name: exported.filename,
         size: formatFileSize(exported.sizeBytes),

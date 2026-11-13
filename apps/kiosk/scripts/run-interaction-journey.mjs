@@ -5,7 +5,7 @@
  * 子进程只用环境白名单，Vite 的 envDir 指到临时空目录，不读本机环境文件。
  * 端口可由 INTERACTION_REDIS_PORT、INTERACTION_API_PORT、INTERACTION_VITE_PORT 覆盖。
  * 默认 Redis 6495、API 3112、Vite 5375。被占用就直接失败，不连接别人的服务。
- * 正常和异常结束都删临时目录；失败时先把 API 日志拷进 test-results/kiosk-interaction/。
+ * 正常和异常结束都删临时目录；测试失败或清洁检查失败时，先把 API 日志拷进 test-results/kiosk-interaction/。
  * git status 看退出码，命令失败或工作区不干净都算失败。
  */
 import { spawn, spawnSync } from 'node:child_process'
@@ -130,6 +130,24 @@ function assertAlive(child, log) {
   throw new StartupFailed(log.slice(-4000) || `${child.journeyKind ?? '进程'} 已退出`)
 }
 
+function watchSpawn(child, label) {
+  return new Promise((resolve, reject) => {
+    const onError = (error) => {
+      child.off('spawn', onSpawn)
+      reject(new StartupFailed(`${label} 起不来：${error instanceof Error ? error.message : String(error)}`))
+    }
+    const onSpawn = () => {
+      child.off('error', onError)
+      child.on('error', (later) => {
+        console.error(`${label} 运行中出错：${later instanceof Error ? later.message : String(later)}`)
+      })
+      resolve()
+    }
+    child.once('error', onError)
+    child.once('spawn', onSpawn)
+  })
+}
+
 async function main() {
   for (const [name, port] of [['Redis', redisPort], ['API', apiPort], ['Vite', vitePort]]) {
     if (!(await portFree(port))) throw new Error(`${name} 端口 ${port} 已被占用，本脚本不连接别人的服务`)
@@ -160,6 +178,7 @@ async function main() {
     '--appendonly', 'no',
     '--protected-mode', 'yes',
   ], { detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: childEnv({}) }), 'redis')
+  await watchSpawn(redis, 'Redis')
   let redisLog = ''
   redis.stdout.on('data', (chunk) => { redisLog = `${redisLog}${chunk}`.slice(-4000) })
   redis.stderr.on('data', (chunk) => { redisLog = `${redisLog}${chunk}`.slice(-4000) })
@@ -223,6 +242,7 @@ async function main() {
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   }), 'api')
+  await watchSpawn(api, 'API')
   apiStream = createWriteStream(apiLog)
   let apiTail = ''
   const capture = (chunk) => {
@@ -294,6 +314,7 @@ export default async (env) => {
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   }), 'kiosk')
+  await watchSpawn(kiosk, 'Vite')
   let kioskLog = ''
   kiosk.stdout.on('data', (chunk) => { kioskLog = `${kioskLog}${chunk}`.slice(-4000) })
   kiosk.stderr.on('data', (chunk) => { kioskLog = `${kioskLog}${chunk}`.slice(-4000) })
@@ -334,7 +355,14 @@ async function doFinish(code) {
     apiStream = null
     await new Promise((resolve) => stream.end(resolve))
   }
-  if (code !== 0 && runDir) {
+  const git = spawnSync('git', ['status', '--porcelain'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    env: childEnv({}),
+  })
+  const dirty = git.stdout ?? ''
+  const gitFailed = Boolean(git.error) || git.status !== 0
+  if ((code !== 0 || gitFailed || dirty.trim()) && runDir) {
     const destDir = join(repoRoot, 'test-results/kiosk-interaction')
     mkdirSync(destDir, { recursive: true })
     const src = join(runDir, 'api.log')
@@ -342,17 +370,11 @@ async function doFinish(code) {
   }
   if (runDir && existsSync(runDir)) rmSync(runDir, { recursive: true, force: true })
   runDir = ''
-  const git = spawnSync('git', ['status', '--porcelain'], {
-    cwd: repoRoot,
-    encoding: 'utf8',
-    env: childEnv({}),
-  })
   if (git.error || git.status !== 0) {
     console.error(`git status 失败（退出码 ${git.status ?? '无'}）\n${git.stderr ?? ''}${git.error ? git.error.message : ''}`)
     process.exitCode = 1
     return
   }
-  const dirty = git.stdout ?? ''
   if (dirty.trim()) {
     console.error(`跑完后工作区不干净（被跟踪文件或未忽略的新文件）：\n${dirty}`)
     process.exitCode = 1
