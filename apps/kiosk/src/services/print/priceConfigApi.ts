@@ -1,7 +1,9 @@
 // ============================================================
-// Price Config API — W-A 价格真相源统一
+// Price Config API — 一体机展示价
 //
-// Kiosk 预览/确认页展示价的**唯一来源**：GET /api/v1/print/price-config（公开只读）。
+// 预览/确认页展示的黑白、彩色单价来自本机终端配置 pricing.effective
+// （print_bw_page / print_color_page）。全站 GET /print/price-config 仍是参考价，
+// 小程序还在读它；用户实付以服务端按本机的报价为准。
 // 计费口径与服务端 PricingService 完全一致：按**内容页**计价
 // （unitCents × billablePages × copies），双面/多页合一不影响计费页数。
 //
@@ -9,29 +11,44 @@
 // - 业务页面**不得**再持有任何硬编码单价常量；估价一律经本模块计算。
 // - http 模式取价失败 → status='error'，页面显示「价格暂不可用/以收银台金额为准」，
 //   **绝不回退硬编码价、绝不显示假价格**（实际扣款由服务端建单时计算，收银台必见真价）。
-// - mock 模式（API_MODE!=='http'，仅本地演示）使用本文件内 DEMO 价目，明示演示用途；
+// - mock 模式（API_MODE!=='http'，仅本地演示）使用本文件内 DEMO 价目；
 //   生产构建强制 http 模式（client.ts 已断言），DEMO 价不可能进入生产展示。
 // ============================================================
 
 import { useEffect, useState } from 'react'
 import type { PrintPriceConfigView } from '@ai-job-print/shared'
-import { API_BASE_URL, API_MODE } from '../api/client'
+import { API_MODE } from '../api/client'
+import { getCachedKioskTerminalConfig, getTerminalId } from '../api/terminalConfig'
 
-/** 仅 mock 演示模式使用的价目（与 dev seed 同值；生产构建不可达）。 */
+/** 仅 mock 演示。默认 0，不是真实价格。生产构建不可达。 */
 const DEMO_PRICE_CONFIG: PrintPriceConfigView = {
   billingEnabled: true,
   items: [
-    { serviceKey: 'print_bw_page', unitCents: 20, unit: 'page', description: '黑白打印每页（演示价）' },
-    { serviceKey: 'print_color_page', unitCents: 50, unit: 'page', description: '彩色打印每页（演示价）' },
+    { serviceKey: 'print_bw_page', unitCents: 0, unit: 'page', description: null },
+    { serviceKey: 'print_color_page', unitCents: 0, unit: 'page', description: null },
   ],
 }
 
+function machineUnitCents(effective: Record<string, unknown> | undefined, key: string): number {
+  const value = effective?.[key]
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    throw new Error('fetchPrintPriceConfig: machine price missing')
+  }
+  return value
+}
+
 export async function fetchPrintPriceConfig(): Promise<PrintPriceConfigView> {
-  const res = await fetch(`${API_BASE_URL}/print/price-config`)
-  if (!res.ok) throw new Error(`fetchPrintPriceConfig failed: ${res.status}`)
-  const body = (await res.json()) as PrintPriceConfigView
-  if (!Array.isArray(body.items)) throw new Error('fetchPrintPriceConfig: malformed response')
-  return body
+  const terminalId = getTerminalId()
+  if (!terminalId) throw new Error('fetchPrintPriceConfig: missing terminal id')
+  const config = await getCachedKioskTerminalConfig(terminalId)
+  const effective = config.pricing?.effective as Record<string, unknown> | undefined
+  return {
+    billingEnabled: true,
+    items: [
+      { serviceKey: 'print_bw_page', unitCents: machineUnitCents(effective, 'print_bw_page'), unit: 'page', description: null },
+      { serviceKey: 'print_color_page', unitCents: machineUnitCents(effective, 'print_color_page'), unit: 'page', description: null },
+    ],
+  }
 }
 
 export interface PriceConfigState {
