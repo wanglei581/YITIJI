@@ -44,7 +44,7 @@
     "verify:prod-build-config": "node scripts/verify-prod-build-config.mjs",
     "verify:production-real-services": "node scripts/verify-production-real-services.mjs",
     "verify:print-entry-source-split": "node scripts/verify-print-entry-source-split.mjs && node --test scripts/tests/print-handoff.test.mjs",
-    "verify:pickup-claim-error-coverage": "node scripts/verify-pickup-claim-error-coverage.mjs",
+    "verify:pickup-claim-error-coverage": "node scripts/verify-pickup-claim-error-coverage.mjs && node --test scripts/tests/pickup-here-orders.test.mjs",
     "verify:backend-error-copy-coverage": "node scripts/verify-backend-error-copy-coverage.mjs",
     "verify:kiosk-session-reporting": "node scripts/verify-kiosk-session-reporting.mjs && node --test scripts/tests/kiosk-session-reporting.test.mjs",
     "verify:kiosk-support-contact": "node --test scripts/tests/unattended-copy.test.mjs scripts/tests/interview-unattended-copy.test.mjs scripts/tests/miniapp-link-copy.test.mjs scripts/tests/kiosk-code-link.test.mjs",

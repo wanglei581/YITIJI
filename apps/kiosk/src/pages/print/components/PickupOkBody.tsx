@@ -3,6 +3,7 @@ import { QxTouchIcon, type QxTouchIconName } from '../../../components/qingxu/to
 import { PrintArt } from '../art/PrintArt'
 import { PrintIcon } from '../art/PrintIcon'
 import { formatCents } from '../cashierStatus'
+import { PICKUP_HERE_RESUME_NOTE } from '../pickupHereOrders'
 import { PICKUP_SAME_CODE_RESUME_NOTE, type ClaimSuccessCopy } from '../pickupClaimModel'
 
 // 到机码核对订单页的正文（稿 pickup-ok）：订单摘要 → 续打说明 → 三步。
@@ -25,12 +26,15 @@ export function PickupOkBody({
   fileName,
   amountCents,
   privacyNote,
+  claimVia = 'code',
 }: {
   copy: ClaimSuccessCopy
   orderNo: string
   fileName?: string | null
   amountCents?: number
   privacyNote: ReactNode
+  /** 点单来的不提到机码。输码来的保持原说明。 */
+  claimVia?: 'code' | 'order'
 }) {
   const icons = stepIcons(copy.cta)
   return (
@@ -59,11 +63,17 @@ export function PickupOkBody({
         </div>
       </section>
 
-      <aside className="pok-note">
+      <aside className="pok-note" data-testid="pickup-ok-resume">
         <PrintIcon name="refresh" size={34} />
         <span>
-          <b>同一个到机码可以接着打</b>
-          {PICKUP_SAME_CODE_RESUME_NOTE}
+          {claimVia === 'order' ? (
+            <b>{PICKUP_HERE_RESUME_NOTE}</b>
+          ) : (
+            <>
+              <b>同一个到机码可以接着打</b>
+              {PICKUP_SAME_CODE_RESUME_NOTE}
+            </>
+          )}
         </span>
       </aside>
 

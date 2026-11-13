@@ -493,7 +493,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/components/qingxu/touch/QxTouchOverlay.tsx` | `verify-profile-documents-inkpaper.mjs` |
 | `apps/kiosk/src/components/qingxu/touch/QxTouchTask.tsx` | `verify-fusion-home.mjs` |
 | `apps/kiosk/src/components/qingxu/touch/QxTouchTile.tsx` | `verify-kiosk-frontend-debt.mjs`<br/>`verify-service-entry-readiness.mjs` |
-| `apps/kiosk/src/copy/miniappLinkCopy.ts` | `verify-kiosk-brand-display.mjs` |
+| `apps/kiosk/src/copy/miniappLinkCopy.ts` | `verify-kiosk-brand-display.mjs`<br/>`verify-pickup-claim-error-coverage.mjs` |
 | `apps/kiosk/src/copy/unattendedCopy.ts` | `verify-kiosk-feedback-entry.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-kiosk-unattended-copy.mjs`<br/>`verify-pickup-claim-error-coverage.mjs`<br/>`verify-resume-decisions.mjs` |
 | `apps/kiosk/src/favorites/localFavorites.ts` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-parked-policy.mjs` |
 | `apps/kiosk/src/hooks/useAiAdvisorCallSession.ts` | `verify-ai-requests-terminal-session.mjs`<br/>`verify-assistant-trtc-guard.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-prod-build-config.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
@@ -2967,12 +2967,12 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/member-print-orders/member-order-claim-here.service.ts` | `verify-member-closure.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-miniapp-cloud-print-m2.ts` |
 | `services/api/src/member-print-orders/member-order-timeline.service.ts` | `verify-copy-c1a.ts`<br/>`verify-member-closure.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-pickup-code-resume.ts` |
 | `services/api/src/member-print-orders/member-order-timeline.status.ts` | `verify-member-order-timeline.ts` |
-| `services/api/src/member-print-orders/member-print-order-create.service.ts` | `verify-package-chain.mjs`<br/>`verify-backend-p0-contracts.mjs`<br/>`verify-copy-c1a.ts`<br/>`verify-derivation-kind.ts`<br/>`verify-member-closure.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-print-color-duplex-capability.ts` |
+| `services/api/src/member-print-orders/member-print-order-create.service.ts` | `verify-package-chain.mjs`<br/>`verify-backend-p0-contracts.mjs`<br/>`verify-copy-c1a.ts`<br/>`verify-derivation-kind.ts`<br/>`verify-free-print-quota.ts`<br/>`verify-member-closure.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-print-color-duplex-capability.ts` |
 | `services/api/src/member-print-orders/member-print-orders.controller.ts` | `verify-ai-access.ts`<br/>`verify-member-closure.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-pickup-code-share.ts` |
 | `services/api/src/member-print-orders/member-print-orders.service.ts` | `verify-copy-c1a.ts`<br/>`verify-copy-c1b.ts`<br/>`verify-member-closure.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-pickup-code-resume.ts` |
 | `services/api/src/member-print-orders/member-print-orders.types.ts` | `verify-member-order-timeline.ts` |
 | `services/api/src/member-print-orders/order-submission-ledger.ts` | `verify-member-print-order-idempotency.ts`<br/>`verify-package-order-idempotency.ts` |
-| `services/api/src/member-print-orders/package-order.service.ts` | `verify-copy-c1a.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts` |
+| `services/api/src/member-print-orders/package-order.service.ts` | `verify-copy-c1a.ts`<br/>`verify-free-print-quota.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts` |
 | `services/api/src/member-print-orders/package-orders.controller.ts` | `verify-ai-access.ts`<br/>`verify-package-order-idempotency-http.ts` |
 | `services/api/src/member-print-orders/pickup-code-reissue.service.ts` | `verify-member-closure.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-pickup-code-share.ts` |
 | `services/api/src/member-privacy/admin-member-privacy.controller.ts` | `verify-job-ai-privacy.ts`<br/>`verify-member-data-request-state-machine.ts` |
@@ -3086,9 +3086,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/print-jobs/dto/create-print-job.dto.ts` | `verify-print-color-duplex-capability.ts`<br/>`verify-print-jobs.ts`<br/>`verify-print-parameter-capability.ts` |
 | `services/api/src/print-jobs/free-print-quota.controller.ts` | `verify-free-print-quota.ts` |
 | `services/api/src/print-jobs/free-print-quota.decide.ts` | `verify-copy-quota.ts`<br/>`verify-free-print-quota.ts` |
-| `services/api/src/print-jobs/free-print-quota.policy.ts` | `verify-copy-c1b.ts`<br/>`verify-copy-quota.ts`<br/>`verify-free-print-quota.ts` |
+| `services/api/src/print-jobs/free-print-quota.policy.ts` | `verify-copy-c1b.ts`<br/>`verify-copy-quota.ts`<br/>`verify-free-print-quota.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-package-order-fulfillment.ts` |
 | `services/api/src/print-jobs/free-print-quota.service.ts` | `verify-free-print-quota.ts` |
-| `services/api/src/print-jobs/free-print-quota.usage.ts` | `verify-copy-quota.ts`<br/>`verify-free-print-quota.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-print-queue-timeout.ts` |
+| `services/api/src/print-jobs/free-print-quota.usage.ts` | `verify-copy-quota.ts`<br/>`verify-free-print-quota.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-print-queue-timeout.ts` |
 | `services/api/src/print-jobs/material-check-policy.ts` | `verify-profile-documents-inkpaper.mjs`<br/>`verify-derivation-kind.ts`<br/>`verify-policy-checklist.ts`<br/>`verify-scan-device-idscan.ts` |
 | `services/api/src/print-jobs/page-range.util.ts` | `verify-pricing.ts` |
 | `services/api/src/print-jobs/paid-reprint-eligibility.ts` | `verify-pickup-code-resume.ts` |

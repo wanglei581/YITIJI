@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
+import { pickupEntryMiniappLine } from '../../copy/miniappLinkCopy'
+import { useSupportContactSnapshot } from '../../hooks/useSupportContact'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
 import { PairCard, Hit, K, Card, Note } from '../public-touch/PublicBlocks'
 import { IllusPhone, IllusStack } from '../public-touch/PublicIllus'
@@ -23,6 +25,7 @@ import './session-resume-touch.css'
 export function SessionResumePage() {
   const navigate = useNavigate()
   const { ready, isLoggedIn, getToken } = useAuth()
+  const pickupLine = pickupEntryMiniappLine(useSupportContactSnapshot())
   const [tasks, setTasks] = useState<PendingTask[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -156,7 +159,7 @@ export function SessionResumePage() {
           <K as="h2">不登录也能办</K>
           <div className="qxp-pair qxp-pair-grow">
             <PairCard title="打印与扫描" desc="上传文件或扫描原件，不用登录也能开始" art={<IllusStack w={200} n={3} />} onClick={() => navigate('/print-scan')} />
-            <PairCard title="到机码" desc="手机上已经下过的单，凭码继续" art={<IllusPhone w={150} />} onClick={() => navigate('/print/pickup-claim')} />
+            <PairCard title="到机码" desc={pickupLine || '手机上已经下过的单，凭码继续'} art={<IllusPhone w={150} />} onClick={() => navigate('/print/pickup-claim')} />
           </div>
         </div>
       ) : (

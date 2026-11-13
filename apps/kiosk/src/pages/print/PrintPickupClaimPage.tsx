@@ -46,16 +46,22 @@ import './styles/print-pickup-touch.css'
 import { PickupHidGuide, PickupThreeCodeCard } from './components/PickupHidGuide'
 // 上一行的导入形状被 verify:fusion-w2 逐字钉住，稿 11 其余展示件另起一行导入。
 import { PickupCodeBoxes, PickupFailurePanel, PickupHintCard, PickupKeypadCard, PickupLegacyNote, PickupOutsStrip, PickupScanKinds } from './components/PickupHidGuide'
+import { PickupHereList } from './components/PickupHereList'
 import { PickupOkBody } from './components/PickupOkBody'
 import { PrintFillArt } from './art/PrintFillArt'
-import { helpNeededLine, peekSupportContact } from '../../copy/unattendedCopy'
+import { pickupClaimMiniappClause } from '../../copy/miniappLinkCopy'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContactSnapshot } from '../../hooks/useSupportContact'
 import { loginPathForPrintStep } from '../../auth/returnPath'
 import { useAuth } from '../../auth/useAuth'
+import { claimHereOrder } from '../../services/api/pickupHereOrdersApi'
 import { errorCodeOf } from '../../services/api/userErrorMessage'
+import { maskPickupFileName, pickupHereClaimDropsRow, pickupHereMismatchMessage, pickupHereNetworkLine, pickupHereRecoverableLine } from './pickupHereOrders'
 import { classifyClaimFailure, claimSuccessCopy, claimSuccessDestination, failureScreen, pickupCells, pickupClaimMessage } from './pickupClaimModel'
 import type { PickupFailure, PickupScreen } from './pickupClaimModel'
 import { pickupQuotaExit, type PickupQuotaExit } from './pickupQuotaExit'
 import { clearPickupClaimCode, readPickupClaimCode, rememberPickupClaimCode } from './pickupClaimResume'
+import { usePickupHereList } from './usePickupHereList'
 
 // ── 到机码工具 ────────────────────────────────────────────────
 // 可键入字符 = 新码(纯数字) ∪ 存量码(31 字符集) 的并集，由 shared 常量反推，不手写。
@@ -165,10 +171,13 @@ async function claimPickup(code: string, staleSignal?: AbortSignal): Promise<Cla
 
 // ── 组件 ──────────────────────────────────────────────────────
 const PICKUP_RAIL = ['输到机码', '核对订单', '取件'] as const
+const PICKUP_HERE_RAIL = ['选中这一单', '核对订单', '取件'] as const
 
 export function PrintPickupClaimPage() {
   const navigate = useNavigate()
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, getToken } = useAuth()
+  const supportContact = useSupportContactSnapshot()
+  const here = usePickupHereList(isLoggedIn ? getToken() : null)
   const inputRef = useRef<HTMLInputElement>(null)
   const claimLockRef = useRef(false)
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -180,8 +189,16 @@ export function PrintPickupClaimPage() {
   const [state, setState] = useState<ClaimState>('idle')
   const [result, setResult] = useState<ClaimPickupResult | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
-  // 失败屏的种类与被拒的那串码（仅供重试用，不回显）。只在本组件内存里：离页 / 清场卸载即丢。
-  const [failure, setFailure] = useState<{ kind: PickupFailure; code: string; quotaExit: PickupQuotaExit | null } | null>(null)
+  // 失败屏的种类、来源和被拒的那串码或订单（仅供重试用，不回显）。只在本组件内存里：离页 / 清场卸载即丢。
+  const [failure, setFailure] = useState<{
+    kind: PickupFailure
+    source: 'code' | 'here'
+    code: string
+    orderId: string | null
+    quotaExit: PickupQuotaExit | null
+  } | null>(null)
+  // 成功页按领取来源换说法。只在成功屏读取；离页卸载即丢。
+  const [successVia, setSuccessVia] = useState<'code' | 'here' | null>(null)
   // true = 显示 10 格与历史码字母键盘（稿 alphaKb）；受理正则同时接受 8 位新码与 10 位历史码，
   // 这个开关不参与任何格式判定，也不影响提交。
   const [legacyMode, setLegacyMode] = useState(false)
@@ -227,7 +244,10 @@ export function PrintPickupClaimPage() {
       const data = await claimPickup(submittedCode, staleSignal)
       if (staleSignal?.aborted) return 'aborted'
       setResult(data)
+      setSuccessVia('code')
       setState('success')
+      // 手输的可能正是列表里那一单。成功后重读，不在这里放锁：再取一单走 handleReset。
+      here.reload()
       return 'ok'
     } catch (err) {
       if (staleSignal?.aborted) return 'aborted'
@@ -235,13 +255,52 @@ export function PrintPickupClaimPage() {
       // 一律清空输入框：重试用 failure.code；保留原码时扫码枪再扫会接在后面，拼出错码计入锁定。
       setCode('')
       const kind = classifyClaimFailure(err)
-      setFailure({ kind, code: submittedCode, quotaExit: pickupQuotaExit(errorCodeOf(err)) })
+      setFailure({ kind, source: 'code', code: submittedCode, orderId: null, quotaExit: pickupQuotaExit(errorCodeOf(err)) })
       // 文案按取件场景逐码登记（pickupClaimModel）；已用过 / 已退款这类终态码不许说「重试」。
       // 额度被拒的原话在 userErrorMessage，经 pickupClaimMessage 落到屏上。
-      setErrorMsg(pickupClaimMessage(err))
+      setErrorMsg(pickupClaimMessage(err, supportContact))
       setState('error')
       setTimeout(() => inputRef.current?.focus(), 80)
       return 'fail'
+    }
+  }
+
+  // 登录后点自己的单，不输码。和输码共用同一把锁，避免两路同时认领。
+  const handleClaimHere = async (orderId: string): Promise<void> => {
+    cancelSettle()
+    const token = getToken()
+    if (!token || claimLockRef.current) return
+    if (!here.rows.some((row) => row.orderId === orderId)) return
+    claimLockRef.current = true
+    setState('loading')
+    setErrorMsg('')
+    setFailure(null)
+    const staleSignal = pageAliveRef.current?.signal
+    try {
+      const data = await claimHereOrder(orderId, token, staleSignal)
+      if (staleSignal?.aborted) return
+      setResult({ ...data, fileName: maskPickupFileName(data.fileName) })
+      setSuccessVia('here')
+      setState('success')
+      here.removeRow(orderId)
+    } catch (err) {
+      if (staleSignal?.aborted) return
+      claimLockRef.current = false
+      const code = errorCodeOf(err)
+      const kind = code === 'PICKUP_TERMINAL_MISMATCH' ? 'other' : classifyClaimFailure(err)
+      if (pickupHereClaimDropsRow(kind, code)) here.removeRow(orderId)
+      const recoverable = pickupHereRecoverableLine(code)
+      if (code === 'PICKUP_TERMINAL_MISMATCH') {
+        const message = err instanceof ApiHttpError ? err.message : ''
+        setFailure({ kind: 'other', source: 'here', code: '', orderId, quotaExit: null })
+        setErrorMsg(pickupHereMismatchMessage(message))
+      } else {
+        setFailure({ kind, source: 'here', code: '', orderId, quotaExit: pickupQuotaExit(code) })
+        setErrorMsg(kind === 'network' ? pickupHereNetworkLine() : (recoverable ?? pickupClaimMessage(err, supportContact)))
+      }
+      // 扫码枪那一屏没有失败面板，重试按钮画不出来。点单失败回到手输屏，失败说明仍排在列表前面。
+      setGuide('keypad')
+      setState('error')
     }
   }
 
@@ -296,15 +355,22 @@ export function PrintPickupClaimPage() {
     setResult(null)
     setErrorMsg('')
     setFailure(null)
+    setSuccessVia(null)
     claimLockRef.current = false
     setGuide('keypad')
     setLegacyMode(false)
+    here.reload()
     setTimeout(() => inputRef.current?.focus(), 80)
   }
 
-  // 网络失败或打印机暂不可用可「重试校验」：原码重发不会重复认领或重复出纸。
+  // 网络失败或打印机暂不可用可「重试校验」。输码重发原码；点单重发同一笔 claim-here。
   const handleRetry = () => {
-    if (failure) void handleClaim(failure.code)
+    if (!failure) return
+    if (failure.source === 'here' && failure.orderId) {
+      void handleClaimHere(failure.orderId)
+      return
+    }
+    void handleClaim(failure.code)
   }
 
   // 已经登录仍撞上游客额度：再去登录不会换成另一张单，改给回首页。
@@ -324,27 +390,31 @@ export function PrintPickupClaimPage() {
     : successCopyRaw
 
   // 青序壳：输入态标题按新码 / 历史码切换；认领成功改看订单状态。返回键按稿，终态不放。
+  // 点单成功才换眉题和进度第一步。校验中和输码成功仍写到机码。
+  const claimedByOrder = screen === 'success' && successVia === 'here'
   const frame = (body: ReactNode, primaryNode?: ReactNode, subtitle?: ReactNode) => (
     <PrintTouchFrame
       page={screen === 'success' ? 'print-pickup-ok' : 'print-pickup'}
       legacyBody={false}
-      eyebrow="到机码核销"
+      eyebrow={claimedByOrder ? '本机领取' : '到机码核销'}
       kind="compact"
       seal={null}
       railNow={screen === 'success' ? 1 : 0}
-      railLabels={PICKUP_RAIL}
+      railLabels={claimedByOrder ? PICKUP_HERE_RAIL : PICKUP_RAIL}
       back={screen === 'success'
-        ? { label: '重新输入', onBack: handleReset }
+        ? { label: claimedByOrder ? '返回取件' : '重新输入', onBack: handleReset }
         : { label: '返回', onBack: () => navigate('/print-scan') }}
       title={successCopy?.title ?? (screen === 'legacy' ? '输入历史码' : '输入你的到机码')}
       subtitle={subtitle}
       // 胶囊只标页面用途，不表示任何设备状态，所以 tone 保持 unknown。
-      status={{ tone: 'unknown', label: '到机码验证' }}
+      status={{ tone: 'unknown', label: claimedByOrder ? '本机领取' : '到机码验证' }}
       terminalLabel="就业服务大厅"
-      ask={printAsk(
-        screen === 'success' ? '问小青：码在哪' : '问小青：到机码怎么找 →',
-        '手机打印订单里的到机码在哪里找？8 位新码和 10 位历史码怎么输入？',
-      )}
+      ask={claimedByOrder
+        ? printAsk('问小青：取纸或异常怎么办', '打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。')
+        : printAsk(
+          screen === 'success' ? '问小青：码在哪' : '问小青：到机码怎么找 →',
+          '手机打印订单里的到机码在哪里找？8 位新码和 10 位历史码怎么输入？',
+        )}
       primaryNode={primaryNode}
       navbar={
         <QxAppNavbar
@@ -377,6 +447,7 @@ export function PrintPickupClaimPage() {
           fileName={result.fileName}
           amountCents={result.amountCents}
           privacyNote={<>办完离开或闲置超时后，会<b>清除本机登录态和临时信息</b>，下一个人无法查看。订单与文件按系统留存期限管理。</>}
+          claimVia={claimedByOrder ? 'order' : 'code'}
         />
       </div>,
       <button
@@ -563,12 +634,22 @@ export function PrintPickupClaimPage() {
     </button>
   ) : undefined
 
+  const claimClause = pickupClaimMiniappClause(supportContact)
   const fine = (
     <p className="pcp-fine">
       这一步不收钱 · 输错可以改，不作废
-      {peekSupportContact().miniappPublished ? '。在手机小程序下的单，到这里输到机码取件；没付款的在这台机器上付' : ''}
+      {claimClause ? `。${claimClause}；没付款的在这台机器上付` : ''}
     </p>
   )
+  const hereList = isLoggedIn ? (
+    <PickupHereList
+      status={here.status}
+      rows={here.rows}
+      busy={loading}
+      onClaim={(orderId) => { void handleClaimHere(orderId) }}
+      onReload={() => here.reload()}
+    />
+  ) : null
 
   const fold = (
     <details className="pcp-more">
@@ -591,16 +672,20 @@ export function PrintPickupClaimPage() {
       onHelp={goHelp}
       onHome={() => navigate('/')}
       onLogin={goLogin}
+      retryAs={failure.source === 'here' ? 'order' : 'code'}
     />
   ) : null
 
   const legacyNote = legacyMode && showKeypad ? <PickupLegacyNote /> : null
 
+  // 登录后列表画在键盘后面。读完才出现时，不插到码格前面，避免把正在用的键盘顶下去。
+  const loggedInClass = isLoggedIn ? 'pickup-claim-logged-in' : ''
+
   // hid 指引（稿 pickup 点「用扫码枪扫」）：未扫码即可达，不报扫码硬件状态；与手输同在一屏。
   if (guide === 'hid' && !quotaExit) {
     return frame(
       <div
-        className="qx-scroll pickup-claim-page pickup-claim-hid"
+        className={['qx-scroll pickup-claim-page pickup-claim-hid', loggedInClass].filter(Boolean).join(' ')}
         data-w2-page="pickup-claim"
         data-claim-guide="hid"
         data-claim-state={state}
@@ -609,6 +694,7 @@ export function PrintPickupClaimPage() {
         {codeBoxes}
         {hint}
         {keypad}
+        {hereList}
         {modeRow}
         {legacyNote}
         {fine}
@@ -620,7 +706,7 @@ export function PrintPickupClaimPage() {
 
   return frame(
     <div
-      className="qx-scroll pickup-claim-page"
+      className={['qx-scroll pickup-claim-page', loggedInClass].filter(Boolean).join(' ')}
       data-w2-page="pickup-claim"
       data-claim-guide="keypad"
       data-claim-state={state}
@@ -631,6 +717,7 @@ export function PrintPickupClaimPage() {
       {failurePanel}
       {hint}
       {keypad}
+      {hereList}
       {showKeypad ? modeRow : null}
       {legacyNote}
       {fine}
