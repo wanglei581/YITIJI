@@ -268,7 +268,7 @@ flowchart LR
   app --> alerts["/alerts<br/>1 页 · 2 端点"]
   app --> audit["/audit<br/>1 页 · 5 端点"]
   app --> benefit_activities["/benefit-activities<br/>1 页 · 4 端点"]
-  app --> billing["/billing<br/>1 页 · 1 端点"]
+  app --> billing["/billing<br/>1 页 · 2 端点"]
   app --> companies["/companies<br/>1 页 · 20 端点"]
   app --> devices["/devices<br/>1 页 · 5 端点"]
   app --> fair_sources["/fair-sources<br/>1 页 · 19 端点"]
@@ -309,7 +309,7 @@ flowchart LR
 | `/alerts` | AlertsPage | `apps/admin/src/routes/alerts/index.tsx` | 2 | — |
 | `/audit` | AuditPage | `apps/admin/src/routes/audit/index.tsx` | 5 | — |
 | `/benefit-activities` | BenefitActivitiesPage | `apps/admin/src/routes/benefit-activities/index.tsx` | 4 | — |
-| `/billing` | BillingPage | `apps/admin/src/routes/billing/index.tsx` | 1 | — |
+| `/billing` | BillingPage | `apps/admin/src/routes/billing/index.tsx` | 2 | — |
 | `/companies` | CompaniesPage | `apps/admin/src/routes/companies/index.tsx` | 20 | — |
 | `/devices` | DevicesPage | `apps/admin/src/routes/devices/index.tsx` | 5 | — |
 | `/fair-sources` | FairSourcesPage | `apps/admin/src/routes/fair-sources/index.tsx` | 19 | — |
@@ -358,7 +358,7 @@ flowchart LR
 
 **`/benefit-activities`** → `PATCH /admin/benefit-activities/:param`、`PATCH /admin/benefit-activities/:param/end`、`PATCH /admin/benefit-activities/:param/publish`、`POST /admin/benefit-activities`
 
-**`/billing`** → `PUT /admin/billing/price-config/:param`
+**`/billing`** → `PUT /admin/billing/personal-charge`、`PUT /admin/billing/price-config/:param`
 
 **`/companies`** → `DELETE /admin/companies/:param/jobs/:param`、`GET /admin/companies`、`GET /admin/companies/:param`、`GET /admin/companies/:param/linkable-jobs`、`GET /admin/import-batches`、`GET /admin/orgs/:param/official-channels`、`GET /admin/orgs/:param/verified-official-domains`、`GET /admin/system/recruitment-hosting`、`PATCH /admin/companies/:param`、`PATCH /admin/companies/:param/publish`、`PATCH /admin/companies/:param/review`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/companies`、`POST /admin/companies/:param/jobs`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`PUT /admin/orgs/:param/verified-official-domains`
 

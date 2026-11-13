@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`650` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`654` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -954,15 +954,17 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/partner/stats` | PartnerStatsQueryDto.getStats | partner | PartnerStatsService | CompanyProfile<br/>Job<br/>JobFair<br/>JobSource<br/>PolicyPost<br/>PrintTask<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
-| GET | `/api/v1/partner/terminal-operations` | PartnerStatsQueryDto.getTerminalOperations | partner | PartnerStatsService | CompanyProfile<br/>Job<br/>JobFair<br/>JobSource<br/>PolicyPost<br/>PrintTask<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| GET | `/api/v1/partner/stats` | PartnerStatsQueryDto.getStats | partner | PartnerStatsService | CompanyProfile<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PlatformSetting<br/>PolicyPost<br/>PrintTask<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat<br/>TerminalServicePrice |
+| GET | `/api/v1/partner/terminal-operations` | PartnerStatsQueryDto.getTerminalOperations | partner | PartnerStatsService | CompanyProfile<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PlatformSetting<br/>PolicyPost<br/>PrintTask<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat<br/>TerminalServicePrice |
 
 ## `services/api/src/payment/admin-billing.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/billing/price-config` | AdminBillingController.list | admin | AdminBillingService | AuditLog<br/>PriceConfig |
-| PUT | `/api/v1/admin/billing/price-config/:serviceKey` | AdminBillingController.update | admin | AdminBillingService | AuditLog<br/>PriceConfig |
+| GET | `/api/v1/admin/billing/personal-charge` | AdminBillingController.getPersonalCharge | admin | AdminBillingService | AuditLog<br/>PlatformSetting<br/>PriceConfig<br/>Terminal<br/>TerminalServicePrice |
+| PUT | `/api/v1/admin/billing/personal-charge` | AdminBillingController.setPersonalCharge | admin | AdminBillingService | AuditLog<br/>PlatformSetting<br/>PriceConfig<br/>Terminal<br/>TerminalServicePrice |
+| GET | `/api/v1/admin/billing/price-config` | AdminBillingController.list | admin | AdminBillingService | AuditLog<br/>PlatformSetting<br/>PriceConfig<br/>Terminal<br/>TerminalServicePrice |
+| PUT | `/api/v1/admin/billing/price-config/:serviceKey` | AdminBillingController.update | admin | AdminBillingService | AuditLog<br/>PlatformSetting<br/>PriceConfig<br/>Terminal<br/>TerminalServicePrice |
 | GET | `/api/v1/admin/billing/reconciliation` | AdminBillingController.reconcile | admin | ReconciliationService | AuditLog<br/>Order<br/>PaymentAttempt<br/>Refund |
 
 ## `services/api/src/payment/admin-order-actions.controller.ts`
@@ -990,7 +992,7 @@
 | GET | `/api/v1/payment/channels` | PaymentController.getChannels | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt |
 | POST | `/api/v1/payment/sandbox/simulate` | PaymentController.simulate | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt |
 | POST | `/api/v1/payment/wechat/refund-notify` | PaymentController.wechatRefundNotify | — | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund |
-| GET | `/api/v1/print/price-config` | PaymentController.getPrintPriceConfig | — | PricingService | PriceConfig |
+| GET | `/api/v1/print/price-config` | PaymentController.getPrintPriceConfig | — | PricingService | PlatformSetting<br/>PriceConfig<br/>Terminal<br/>TerminalServicePrice |
 
 ## `services/api/src/policies/policies.controller.ts`
 
@@ -1185,6 +1187,8 @@
 | GET | `/api/v1/admin/terminals/:terminalId/capabilities` | AdminTerminalsController.listCapabilities | admin | — | — |
 | DELETE | `/api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey` | AdminTerminalsController.clearCapability | admin | — | — |
 | PUT | `/api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey` | AdminTerminalsController.updateCapability | admin | — | — |
+| GET | `/api/v1/admin/terminals/:terminalId/charge-settings` | AdminTerminalsController.getChargeSettings | admin | TerminalCapabilitiesService | Terminal<br/>TerminalCapability |
+| PUT | `/api/v1/admin/terminals/:terminalId/charge-settings` | AdminTerminalsController.updateChargeSettings | admin | AuditService<br/>TerminalCapabilitiesService | AuditLog<br/>Terminal<br/>TerminalCapability |
 | PUT | `/api/v1/admin/terminals/:terminalId/daily-free-print-sides` | AdminTerminalsController.updateDailyFreePrintSides | admin | — | — |
 | POST | `/api/v1/admin/terminals/:terminalId/emergency-revoke` | AdminTerminalsController.emergencyRevoke | admin | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | PUT | `/api/v1/admin/terminals/:terminalId/home-free-badge` | AdminTerminalsController.updateHomeFreeBadge | admin | — | — |
