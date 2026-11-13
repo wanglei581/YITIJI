@@ -185,7 +185,14 @@ function expectGridFilled(geometry: Awaited<ReturnType<typeof gridGeometry>>): v
 
 const TASK_ROWS = [['resume-hub', 'interview-hub'], ['print-hub', 'policy-hub']]
 const CLOSED_TILES = [['pickup-claim', 'help']]
-const CHANNEL_TILES = [['pickup-claim', 'official-channels', 'help']]
+
+// 2026-11-08 四核心收口：本机构官方渠道从首页磁贴挪进「查政策」页，首页底部说明指过去。
+/** 查政策首页挂载时读政策（六类、最近、公告）。给空答复，页面停在「还没有发布的政策」，官方渠道那一行照样要出。 */
+function respondNoPolicies(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/policies', { status: 200, json: { success: true, data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
+}
+const policyHubOf = (page: Page) => page.getByTestId('policy-touch-hub')
+const CHANNELS_ROW = '[data-testid="policy-official-channels"]'
 
 const screenOf = (page: Page) => page.locator('[data-kiosk-screen="official-channels"]')
 const cardsOf = (page: Page, section: 'org' | 'legacy') => page.getByTestId(`official-channels-${section}`).getByTestId('official-channel-card')
@@ -259,12 +266,9 @@ test('org terminal: each channel is a card with its own QR and the exact source 
   await assertNoElementCrossesViewport(page)
   await page.screenshot({ path: test.info().outputPath('official-channels-items-1080x1920.png') })
 
-  // AI 仍是驱动层：不确定先看什么时，直接进 AI 求职方向探索。
-  registerLandingPages(api)
-  await page.getByRole('button', { name: /AI 求职方向探索/ }).click()
-  await page.waitForURL((url) => url.pathname === '/assistant' && url.searchParams.get('intent') === 'career_explore')
-  await expect(page.locator('[data-kiosk-screen="assistant"]')).toBeVisible()
-  await expect.poll(() => api.requestCount('GET', '/api/v1/mock-interviews/capabilities/voice'), '落地页的挂载请求在用例内发完').toBeGreaterThan(0)
+  await page.getByRole('button', { name: '回首页', exact: true }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByTestId('qx-home')).toBeVisible()
   expect(errors).toEqual([])
 })
 
@@ -459,82 +463,94 @@ test('the old /jobs/online-platforms URL lands on the official channels page in 
 
 // ── 首页 ─────────────────────────────────────────────────────────────────
 
-test('home: an org terminal with channels gets one 岗位与招聘会 tile in the job/fair row @w1-kiosk', async ({ page, api }) => {
+test('org terminal with channels: home has no channels tile and points to 查政策, where one row opens the channels page @w1-kiosk', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api, RECRUITMENT_HOSTING_OFF)
+  registerLandingPages(api)
   respondChannels(api, ORG_CHANNELS)
+  respondNoPolicies(api)
 
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   const home = page.getByTestId('qx-home')
   await expect(home).toHaveAttribute('data-recruitment', 'closed')
-  const tile = home.locator('[data-action="official-channels"]')
-  await expect(tile).toBeVisible()
-  await expect(home).toHaveAttribute('data-official-channels', 'shown')
-  await expect(tile.locator('b')).toHaveText('本机构官方渠道')
-  await expect(tile.locator('small')).toHaveText('本机有 2 个渠道，扫码到机构官网')
+  // 底部说明改成指向查政策，是「渠道已经读到」的阳性对照；读到之后首页仍不摆渠道磁贴。
+  await expect(home.locator('.qxt-home-foot')).toContainText('岗位与招聘会请看「查政策」里的本机构官方渠道，本终端不代收简历。')
+  await expect(home.locator('.qxt-home-foot'), '有渠道时不再说「未开放岗位与招聘会」').not.toContainText('未开放')
+  await expect(home.locator('[data-action="official-channels"]'), '首页不再摆官方渠道磁贴').toHaveCount(0)
   for (const action of ['jobs-hub', 'fairs-hub', 'jobs-retry', 'fairs-retry', 'campus-zone']) {
     await expect(home.locator(`[data-action="${action}"]`), `托管关闭时首页不摆 ${action}`).toHaveCount(0)
   }
-  await expect(home.locator('.qxt-home-foot')).toContainText('岗位与招聘会请看本机构官方渠道，本终端不代收简历。')
-  await expect(home.locator('.qxt-home-foot'), '有渠道时不再说「未开放岗位与招聘会」').not.toContainText('未开放')
-
-  // 四张大卡仍是 2×2。渠道补进第三行，和到机取件、帮助并排。
   const tasks = await gridGeometry(page, '.qxt-home-tasks')
   expect(tasks.rows.map((row) => row.actions)).toEqual(TASK_ROWS)
   expectGridFilled(tasks)
   const tiles = await gridGeometry(page, '.qxt-home-tiles')
-  expect(tiles.rows.map((row) => row.actions)).toEqual(CHANNEL_TILES)
+  expect(tiles.rows.map((row) => row.actions), '第三行与没有渠道时相同').toEqual(CLOSED_TILES)
   expectGridFilled(tiles)
   await assertNoHorizontalOverflow(page)
-  await page.screenshot({ path: test.info().outputPath('home-official-channels-tile-1080x1920.png') })
 
-  await tile.click()
+  // 从首页「查政策」大卡进去，渠道在政策页里是一行入口。
+  await home.locator('[data-action="policy-hub"]').click()
+  await page.waitForURL((url) => url.pathname === '/policy-service')
+  await expect(policyHubOf(page)).toHaveAttribute('data-qxt-state', 'empty')
+  const row = page.locator(CHANNELS_ROW)
+  await expect(row).toHaveText('本机构官方渠道 · 2 个 · 扫码到官网或官方账号')
+  await expect(row).toBeEnabled()
+  // 空态原先另有一格「本机构官方渠道」磁贴（#1604），已并进这一行：整页只认这一个入口。
+  await expect(policyHubOf(page).getByText('本机构官方渠道'), '查政策整页只有一个官方渠道入口').toHaveCount(1)
+  await assertNoHorizontalOverflow(page)
+  await page.screenshot({ path: test.info().outputPath('policy-official-channels-row-1080x1920.png') })
+
+  await row.click()
   await page.waitForURL((url) => url.pathname === '/official-channels')
   await expect(screenOf(page)).toHaveAttribute('data-state', 'items')
   expect(errors).toEqual([])
 })
 
-test('home: no tile while the channels request is held, and it appears exactly once after @w1-kiosk', async ({ page, api }) => {
+test('policy page: no channels row while the channels request is held, and it appears exactly once after @w1-kiosk', async ({ page, api }) => {
   registerShell(api, RECRUITMENT_HOSTING_OFF)
+  respondNoPolicies(api)
   const gate = deferred()
   api.respondWith('GET', CHANNELS, async () => {
     await gate.promise
     return { status: 200, json: { items: ORG_CHANNELS, legacyPlatforms: [] } }
   })
-  await recordAppearances(page, '[data-action="official-channels"]')
+  await recordAppearances(page, CHANNELS_ROW)
 
-  await page.goto('/', { waitUntil: 'domcontentloaded' })
-  const home = page.getByTestId('qx-home')
-  await expect(home).toHaveAttribute('data-recruitment', 'closed')
-  await expect(home).toHaveAttribute('data-toolbox', 'off')
+  const configReady = page.waitForResponse((response) => new URL(response.url()).pathname === CONFIG && response.ok())
+  await page.goto('/policy-service', { waitUntil: 'domcontentloaded' })
+  await configReady
+  await expect(policyHubOf(page)).toHaveAttribute('data-qxt-state', 'empty')
   await page.waitForTimeout(600)
-  await expect(home.locator('[data-action="official-channels"]')).toHaveCount(0)
-  expect((await gridGeometry(page, '.qxt-home-tiles')).rows.map((row) => row.actions)).toEqual(CLOSED_TILES)
+  await expect(page.locator(CHANNELS_ROW), '渠道答复之前不先占位').toHaveCount(0)
 
   await markReleased(page)
   gate.resolve()
-  await expect(home.locator('[data-action="official-channels"]')).toBeVisible()
+  await expect(page.locator(CHANNELS_ROW)).toBeVisible()
   const seen = await appearances(page)
-  expect(seen.length, '答复放行后磁贴确实出现了（阳性对照）').toBeGreaterThan(0)
-  expect(seen.every(Boolean), '答复之前磁贴一次都没出现过').toBe(true)
+  expect(seen.length, '答复放行后这一行确实出现了（阳性对照）').toBeGreaterThan(0)
+  expect(seen.every(Boolean), '答复之前这一行一次都没出现过').toBe(true)
   await page.waitForTimeout(300)
-  await expect(home.locator('[data-action="official-channels"]'), '出现之后不再收回').toHaveCount(1)
+  await expect(page.locator(CHANNELS_ROW), '出现之后不再收回').toHaveCount(1)
 })
 
-test('home: no tile when the channels request fails or the org has none @w1-kiosk', async ({ page, api }) => {
+test('no channels row on the policy page when the channels request fails or the org has none; home says not open @w1-kiosk', async ({ page, api }) => {
   registerShell(api, RECRUITMENT_HOSTING_OFF)
+  respondNoPolicies(api)
   api.respond('GET', CHANNELS, { status: 500, json: { success: false, error: { code: 'INTERNAL', message: 'boom' } } })
 
   for (const label of ['读取失败', '没有渠道']) {
+    const before = api.requestCount('GET', CHANNELS)
+    await page.goto('/policy-service', { waitUntil: 'domcontentloaded' })
+    await expect(policyHubOf(page)).toHaveAttribute('data-qxt-state', 'empty')
+    await expect.poll(() => api.requestCount('GET', CHANNELS), `${label}：渠道答复已经到了`).toBeGreaterThan(before)
+    await page.waitForTimeout(400)
+    await expect(page.locator(CHANNELS_ROW), `${label}：查政策页不出渠道一行`).toHaveCount(0)
+
     await page.goto('/', { waitUntil: 'domcontentloaded' })
     const home = page.getByTestId('qx-home')
     await expect(home).toHaveAttribute('data-recruitment', 'closed')
-    await expect.poll(() => api.requestCount('GET', CHANNELS), `${label}：渠道答复已经到了`).toBeGreaterThan(label === '读取失败' ? 0 : 1)
-    await page.waitForTimeout(400)
-    await expect(home.locator('[data-action="official-channels"]'), `${label}：不摆磁贴`).toHaveCount(0)
-    await expect(home).not.toHaveAttribute('data-official-channels', 'shown')
+    await expect(home.locator('.qxt-home-foot'), `${label}：首页照常说未开放`).toContainText('本终端未开放岗位与招聘会信息，也不代收简历。')
     expect((await gridGeometry(page, '.qxt-home-tiles')).rows.map((row) => row.actions), `${label}：仍是托管关闭、没有渠道时的第三行`).toEqual(CLOSED_TILES)
-    await expect(home.locator('.qxt-home-foot')).toContainText('本终端未开放岗位与招聘会信息，也不代收简历。')
     respondChannels(api, [])
   }
 })
@@ -559,6 +575,13 @@ test('home: hosting on keeps the job and fair tiles, even when the org has chann
     ['pickup-claim', 'jobs-hub'],
     ['campus-zone', 'help'],
   ])
+
+  // 托管打开时岗位与招聘会在首页，查政策页也不出官方渠道那一行（条件与首页原来的磁贴一致）。
+  respondNoPolicies(api)
+  await page.goto('/policy-service', { waitUntil: 'domcontentloaded' })
+  await expect(policyHubOf(page)).toHaveAttribute('data-qxt-state', 'empty')
+  await page.waitForTimeout(400)
+  await expect(page.locator(CHANNELS_ROW)).toHaveCount(0)
 })
 
 // ── 首页页眉的点位小字 ────────────────────────────────────────────────────
@@ -703,19 +726,19 @@ test('phone 390x844: the empty state keeps the alternatives as compact 88px rows
   await page.screenshot({ path: test.info().outputPath('official-channels-empty-390x844.png'), fullPage: true })
 })
 
-test('phone 390x844: the home tile sits in the single column without overflow @w1-mobile', async ({ page, api }) => {
+test('phone 390x844: the policy page channels row stays inside the screen @w1-mobile', async ({ page, api }) => {
   registerShell(api, RECRUITMENT_HOSTING_OFF)
   respondChannels(api, ORG_CHANNELS)
-  await page.goto('/', { waitUntil: 'domcontentloaded' })
-  const home = page.getByTestId('qx-home')
-  const tile = home.locator('[data-action="official-channels"]')
-  await expect(tile).toBeVisible()
-  const [tileBox, gridBox] = await Promise.all([tile.boundingBox(), home.locator('.qxt-home-tiles').boundingBox()])
-  expect(Math.round(tileBox!.width), '单列里铺满整行').toBe(Math.round(gridBox!.width))
-  expect(tileBox!.height).toBeGreaterThanOrEqual(104)
-  await expectTouchTargets(page, '手机首页')
+  respondNoPolicies(api)
+  await page.goto('/policy-service', { waitUntil: 'domcontentloaded' })
+  const row = page.locator(CHANNELS_ROW)
+  await expect(row).toBeVisible()
+  await row.scrollIntoViewIfNeeded()
+  const box = await row.boundingBox()
+  expect(box!.x).toBeGreaterThanOrEqual(0)
+  expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width)
+  expect(box!.height, '这一行是可点的按钮，触控高度不低于 48px').toBeGreaterThanOrEqual(48)
   await assertNoHorizontalOverflow(page)
-  // 首页在自己的滚动容器里滚：把磁贴滚进视口再截，截图里才看得到它。
-  await tile.scrollIntoViewIfNeeded()
-  await page.screenshot({ path: test.info().outputPath('home-official-channels-tile-390x844.png') })
+  await page.screenshot({ path: test.info().outputPath('policy-official-channels-row-390x844.png') })
 })
+

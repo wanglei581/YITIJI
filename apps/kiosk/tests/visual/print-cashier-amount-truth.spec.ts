@@ -147,7 +147,7 @@ for (const scenario of [
     //    示例 / 样例 / 仅供参考。**刻意不依赖下面那些 data- 钩子** —— 钩子被重构掉时
     //    这条仍然成立，常驻写死那句话时它必红：用户正要为这个数付钱。
     const visibleText = await cashierPage(page).innerText()
-    expect(visibleText).toMatch(yuan(W2_ORDER.amountCents))
+    expect(visibleText).toMatch(new RegExp(`应付\\s+${(W2_ORDER.amountCents / 100).toFixed(2).replace('.', '\\.')} 元`))
     expect(visibleText).not.toMatch(SAMPLE_CLAIM)
 
     // ③ 展示的金额 === 订单金额（= 出码时被快照去收的那个数）。

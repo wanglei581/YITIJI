@@ -41,6 +41,16 @@ const CLAIMABLE_PAY_STATUSES = ['unpaid', 'paying', 'paid'] as const
 export const PICKUP_RELEASED_REPLAY_MS = 10 * 60 * 1000
 
 /**
+ * 材料包还没打完的各项合计（计费页数 × 份数）。
+ * 第一次放行时各项都还没打，合计就是整包。已经打完的行不再计入。单文件单不走这里。
+ */
+function unprintedPackageSides(
+  items: ReadonlyArray<{ billablePages: number; copies: number; status: string }>,
+): number {
+  return printOrderSideCount(items.filter((item) => item.status !== 'completed'))
+}
+
+/**
  * 核销入口。`pickup_code` = 一体机输入到机码（claim-pickup）；
  * `member_order` = 会员在一体机「我的打印订单」里点本机领取（claim-here）。
  * 两个入口只在「怎么找到这张单」上不同，找到之后走同一段 {@link PickupOrderService.settleClaim}。
@@ -138,7 +148,12 @@ export class PickupOrderService {
     if (order.pickupStatus === 'used' || order.printTaskId) {
       const resumed = await resumeReleasedFailure(this.prisma, order, terminal.id)
       if (resumed.action === 'resumed') {
-        return { ...this.releasedView(resumed.order), resumed: true as const }
+        return {
+          ...this.releasedView(resumed.order),
+          resumed: true as const,
+          ...(resumed.mayHavePrinted ? { mayHavePrinted: true as const } : {}),
+          ...(resumed.partialOutput ? { partialOutput: true as const } : {}),
+        }
       }
       return this.replayReleasedClaim(order, terminal.id)
     }
@@ -182,11 +197,13 @@ export class PickupOrderService {
     await assertTerminalPrinterAvailable(this.prisma, terminal.id, process.env, via === 'member_order' ? 'claim_here' : 'pickup')
     // 免费额度在写库前先预判一次：被拒时不认领、不抵失败计数，订单保持待领取，明天还能直接领。
     // release 事务里同口径再判一次，那一次才是并发下的准绳。
+    // 材料包按这单还没打完的各项合计判（第一次放行时就是整包）。单文件单仍按本单面数。
+    // 后续各项由 advance 连续派发，不再判额度：整包已在第一次放行按合计准入。
     await assertFreePrintQuota(this.prisma, {
       terminalId: terminal.id,
       endUserId: order.endUserId,
-      requestedSides: firstItem
-        ? firstItem.billablePages * firstItem.copies
+      requestedSides: packageItems.length > 0
+        ? unprintedPackageSides(packageItems)
         : printOrderSideCount([], { billablePages: order.billablePages, printParamsJson: order.printParamsJson }),
       payableCents: payableCents(order),
     })
@@ -287,9 +304,10 @@ export class PickupOrderService {
       if (current.pickupStatus !== 'claimed' || current.payStatus !== 'paid') {
         throw new BadRequestException('ORDER_RELEASE_INVALID_STATE')
       }
-      const item = !current.sourceFileId
-        ? await tx.orderItem.findFirst({ where: { orderId: current.id, seq: 0 }, orderBy: { seq: 'asc' } })
-        : null
+      const packageRows = !current.sourceFileId
+        ? await tx.orderItem.findMany({ where: { orderId: current.id }, orderBy: { seq: 'asc' } })
+        : []
+      const item = packageRows.find((row) => row.seq === 0) ?? null
       if (!current.sourceFileId && (!item || item.status !== 'pending' || item.printTaskId)) {
         throw new BadRequestException('ORDER_RELEASE_INVALID_STATE')
       }
@@ -310,11 +328,13 @@ export class PickupOrderService {
         where: { id: terminal.id, enabled: true, lifecycleStatus: 'active' },
         data: { lifecycleStatus: 'active' },
       })
+      // 与写库前那一次同一口径：材料包按还没打完的各项合计判，第一次放行时就是整包。
+      // 后续各项由 advance 连续派发，不再判额度。单文件单仍按本单面数。
       await assertFreePrintQuota(tx, {
         terminalId: terminal.id,
         endUserId: current.endUserId,
-        requestedSides: item
-          ? item.billablePages * item.copies
+        requestedSides: packageRows.length > 0
+          ? unprintedPackageSides(packageRows)
           : printOrderSideCount([], { billablePages: current.billablePages, printParamsJson: taskParams }),
         payableCents: payableCents(current),
       })

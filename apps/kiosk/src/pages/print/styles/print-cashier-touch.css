@@ -288,10 +288,10 @@
   background: var(--qxt-card);
 }
 
-[data-qx-page='print-cashier'] .cashier-qr-frame svg {
+[data-qx-page='print-cashier'] .cashier-qx-instrument .cashier-qr-frame > svg {
   display: block;
-  width: 400px;
-  height: 400px;
+  width: 380px;
+  height: 380px;
 }
 
 [data-qx-page='print-cashier'] .cashier-qr-title {
@@ -580,3 +580,23 @@
   min-height: 64px;
 }
 
+
+/* 收款码实际边长 380：覆盖老版框宽与 78% 缩放。 */
+[data-qx-page='print-cashier'] .cashier-qx-instrument .cashier-qr-frame { width: 406px; max-width: 100%; aspect-ratio: 1; }
+[data-qx-page='print-cashier'] .cashier-qx-instrument .cashier-qr-frame > svg { width: 380px; height: auto; max-width: 100%; }
+[data-qx-page='print-cashier'] .cashier-qr-notice { font-size: 20px; line-height: 1.4; }
+[data-qx-page='print-cashier'] .cashier-qr-notice p { margin: 0; font-size: 20px; }
+[data-qx-page='print-cashier'] .cashier-qx-page[data-qx-state='pending-qr'] .cashier-qx-paywrap { gap: 8px; }
+[data-qx-page='print-cashier'] .cashier-qx-page[data-qx-state='pending-qr'] .cashier-qx-instrument { padding: 10px; }
+[data-qx-page='print-cashier'] .cashier-qx-page[data-qx-state='pending-qr'] .cashier-qr-sub { font-size: 22px; }
+/* 过期只保留一张说明主卡，三段解释、四枚标签与三行事实都在卡内。 */
+[data-qx-page='print-cashier'] .cashier-qx-page[data-qx-state='expired'] .cashier-qx-state { padding: 24px 28px; background: var(--qxt-card); border: 1.5px solid var(--qxt-edge); border-radius: 30px; }
+[data-qx-page='print-cashier'] .cashier-qx-page[data-qx-state='expired'] .cashier-qx-state-h .qx-state-t { font: 700 34px/1.3 var(--qx-serif); }
+[data-qx-page='print-cashier'] .cashier-qx-page[data-qx-state='expired'] .cashier-qx-state .cashier-qx-p { margin-top: 16px; font-size: 24px; }
+[data-qx-page='print-cashier'] .cashier-expired-facts { margin-top: 16px; gap: 10px; }
+[data-qx-page='print-cashier'] .cashier-expired-facts > div { min-height: 88px; grid-template-columns: 150px minmax(0, 1fr); border: 0; border-radius: 22px; background: var(--qxt-well); }
+[data-qx-page='print-cashier'] .cashier-expired-facts dd { text-align: right; }
+
+[data-qx-page='print-cashier'] .cashier-qx-page[data-qx-state='pending-qr'] :is(.cashier-qr-area, .cashier-qr-panel) { gap: 6px; }
+[data-qx-page='print-cashier'] .cashier-qx-page[data-qx-state='pending-qr'] .cashier-tone-banner { padding: 8px 14px; }
+[data-qx-page='print-cashier'] .cashier-qx-page[data-qx-state='pending-qr'] .cashier-qx-kv > div { min-height: 60px; }

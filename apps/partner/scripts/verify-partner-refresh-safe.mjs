@@ -99,7 +99,7 @@ for (const token of [
   "jobs: '对应一体机「岗位信息」/ 小程序「求职」'",
   "fairs: '对应一体机「招聘会信息」'",
   "policy: '对应一体机首页「查政策」'",
-  "smartCampus: '对应一体机首页「智慧校园」'",
+  "smartCampus: '一体机端 2026-11-04 起暂停显示，开关先保存'",
   "profile: '对应一体机首页磁贴「机构官方渠道」，打开后页标题是「本机构官方渠道」'",
   "profileHosted: '对应一体机首页磁贴「机构官方渠道」，打开后页标题是「本机构官方渠道」；以及一体机「找企业」与岗位、政策的来源机构'",
   "companies: '对应一体机「找企业」与岗位详情来源机构'",
@@ -160,4 +160,183 @@ assert.equal(titleOf(true, []), '当前筛选条件下无企业', '全量有企�
 console.log('PASS 企业表两种空态：全量无数据 / 全量有数据但筛选为零')
 
 if (failed) process.exit(1)
+
+// 2026-11-05 政策最小闭环：执行真实表单转换与发布错误适配，保护清空语义和停放边界。
+{
+  const vm = await import('node:vm')
+  const readPolicy = (file) => readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8')
+  const load = (file, dependencies = {}, expose = '') => {
+    const module = { exports: {} }
+    const output = ts.transpileModule(readPolicy(file), {
+      fileName: file, compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+    }).outputText
+    vm.runInNewContext(output + expose, {
+      module, exports: module.exports, URL,
+      require: (name) => {
+        assert.ok(name in dependencies, `意外依赖 ${name}`)
+        return dependencies[name]
+      },
+    })
+    return module.exports
+  }
+  const jsx = (type, props) => ({ type, props })
+  const react = { useEffect: () => {}, useState: (value) => [value, () => {}] }
+  const model = load('routes/policy/policyFormModel.ts', { '../../lib/httpUrl': load('lib/httpUrl.ts') })
+  const fields = load('routes/policy/PolicyFormFields.tsx', {
+    'react/jsx-runtime': { jsx, jsxs: jsx }, react,
+    '../../services/api/officialChannels': {},
+    '../../services/api/policies': { partnerPoliciesService: { previewDraftCheck: async () => ({ publishWarning: null, checklistReady: true, columns: [] }) } },
+    '../../lib/httpUrl': load('lib/httpUrl.ts'),
+    './policyLabels': load('routes/policy/policyLabels.ts', { '@ai-job-print/shared': { PARTNER_TYPE_LABELS: {} } }),
+    './policyFormModel': model,
+  })
+  const empty = { ...model.EMPTY_FORM, title: '政策扶持条目' }
+  const keys = ['summary', 'content', 'externalUrl', 'externalId', 'publishedDate', 'whoCanApply', 'requiredMaterials', 'whereToApply']
+  for (const key of keys) {
+    const form = { ...empty, [key]: '  ' }
+    assert.ok(!(key in model.policyFormPayload(form, false)), `新建空 ${key} 必须省略`)
+    assert.equal(JSON.parse(JSON.stringify(model.policyFormPayload(form, true)))[key], null, `编辑清空 ${key} 必须发送 null`)
+    assert.equal(model.policyFormPayload({ ...form, [key]: ' 原文 ' }, true)[key], '原文')
+  }
+  assert.equal(model.EMPTY_FORM.kind, 'policy_guide', '新增默认是政策扶持条目')
+  const notice = { ...model.EMPTY_FORM, kind: 'notice', title: '政策公告' }
+  assert.equal(model.policyFormBlockReason(notice), null, '公告允许无链接和三栏')
+  const guide = { ...empty, kind: 'policy_guide', externalUrl: 'https://official.example/policy', whoCanApply: '原文条件', requiredMaterials: '原文材料', whereToApply: '原文窗口' }
+  assert.equal(model.policyFormBlockReason(guide), null, '前端不按域名名单拒绝，名单判据在服务端')
+  for (const key of ['whoCanApply', 'requiredMaterials', 'whereToApply']) {
+    assert.match(model.policyFormBlockReason({ ...guide, [key]: ' \n ' }), /请填齐/)
+    assert.match(model.policyFormBlockReason({ ...guide, [key]: '字'.repeat(2001) }), /2000/)
+  }
+  assert.match(model.policyFormBlockReason({ ...guide, externalUrl: '' }), /原文链接/)
+  assert.equal(model.policyFormBlockReason({ ...guide, externalUrl: 'http://official.example/p' }), null, 'http 不拦保存草稿')
+  for (const externalUrl of ['javascript:alert(1)', '/policy', 'https://']) {
+    assert.match(model.policyFormBlockReason({ ...guide, externalUrl }), /https/)
+  }
+  assert.equal(model.policyFormBlockReason({ ...guide, title: '字'.repeat(200) }), null)
+  assert.match(model.policyFormBlockReason({ ...guide, title: '字'.repeat(201) }), /200/)
+  const treeNodes = (node) => {
+    if (!node || typeof node !== 'object') return []
+    if (Array.isArray(node)) return node.flatMap(treeNodes)
+    return [node, ...treeNodes(node.props?.children)]
+  }
+  const render = (form) => treeNodes(fields.PolicyFormFields({ form, setForm: () => {}, recruitmentOpen: false, editingRecruitmentLocked: false }))
+  const guideNodes = render(guide)
+  assert.equal(guideNodes.filter((node) => node.type === 'textarea' && node.props.maxLength === 2000 && node.props.required).length, 3)
+  assert.equal(guideNodes.filter((node) => node.type === 'input' && node.props.maxLength === 200).length, 1)
+  assert.equal(render(notice).filter((node) => node.type === 'textarea' && node.props.maxLength === 2000).length, 0)
+  const fieldsSource = readPolicy('routes/policy/PolicyFormFields.tsx')
+  assert.equal(model.CHECKLIST_OVERFLOW_HINT, '清单上印不下，超出的部分要扫码看原文')
+  assert.ok(fieldsSource.includes('CHECKLIST_OVERFLOW_HINT'))
+  assert.ok(fieldsSource.includes('previewDraftCheck'))
+  const page = readPolicy('routes/policy/index.tsx')
+  const table = readPolicy('routes/policy/PolicyTable.tsx')
+  assert.doesNotMatch(page, /import\s+EligibilityRulesDrawer|<EligibilityRulesDrawer|setRulesFor/)
+  assert.doesNotMatch(table, /setRulesFor|ClipboardListIcon|>\s*申领条件\s*</)
+  assert.match(table, /停放（2026-11-05 政策最小闭环）：条件核对整块停放，源码保留/)
+  assert.ok(readPolicy('routes/policy/EligibilityRulesDrawer.tsx').includes('EligibilityRulesDrawer'))
+  assert.ok(readPolicy('routes/policy/EligibilityRuleEditor.tsx').length > 0)
+  assert.match(page, /disabled=\{saving \|\| !canSave\}/)
+  assert.match(page, /保存并发布/)
+  assert.match(table, />\s*审核通过\s*</)
+  assert.match(table, />\s*发布\s*</)
+  assert.match(page, /formBlockReason && !editingRecruitmentLocked && <p role="status"/)
+  class ApiHttpError extends Error {
+    constructor(codeOrMessage, message) { super(message ?? codeOrMessage) }
+  }
+  const releaseModule = load('routes/policy/PolicyReleaseDialog.tsx', {
+    'react/jsx-runtime': { jsx, jsxs: jsx }, react, '@ai-job-print/ui': {},
+    '../../services/api/client': { ApiHttpError }, '../../services/api/policies': {},
+  }, '\nmodule.exports.releaseErrorMessage = errMsg;')
+  const { releaseErrorMessage, PolicyReleaseDialog } = releaseModule
+  const renderedText = (node) => {
+    if (typeof node === 'string') return node
+    if (Array.isArray(node)) return node.map(renderedText).join('')
+    if (!node) return ''
+    return renderedText(node.props?.children)
+  }
+  const releaseText = (policy) => renderedText(PolicyReleaseDialog({ policy, onClose: () => {}, onReleased: () => {} }))
+  const releasePolicy = { ...guide, id: '1', contentVersion: 1 }
+  assert.match(releaseText(releasePolicy), /已填齐/)
+  assert.match(releaseText(releasePolicy), /原文链接还没通过官方网站核对，发布时会被拦下/)
+  assert.match(releaseText({ ...releasePolicy, externalUrlVerified: true }), /原文链接已通过官方网站核对/)
+  assert.match(releaseText({ ...releasePolicy, requiredMaterials: '  ', externalUrl: '' }), /未填齐，发布时会被拦下/)
+  assert.match(releaseText({ ...releasePolicy, requiredMaterials: '  ', externalUrl: '' }), /原文链接未填写，发布时会被拦下/)
+  const fallback = '这次没发布成功，请稍后再试；多次失败请联系平台管理员'
+  assert.equal(releaseErrorMessage(new ApiHttpError('请填齐谁可以申请、要准备的材料、去哪办')), '请填齐谁可以申请、要准备的材料、去哪办')
+  assert.equal(releaseErrorMessage(new ApiHttpError('')), fallback)
+  assert.equal(releaseErrorMessage(new ApiHttpError('POLICY_NOT_FOUND', 'Policy pp-1 not found')), fallback)
+  assert.equal(releaseErrorMessage(new Error('/api/v1/partner/policies/1/release HTTP_400 {"error":{}}')), fallback)
+
+  // 真实 HTTP 适配器：发布失败只从 error.message 取原因，不泄漏顶层 message 数组/状态文本。
+  let responseBody
+  let sent
+  const apiModule = { exports: {} }
+  const output = ts.transpileModule(readPolicy('services/api/policies.ts'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText
+  vm.runInNewContext(output, {
+    module: apiModule, exports: apiModule.exports, URLSearchParams,
+    require: (name) => name === './client'
+      ? { API_MODE: 'http', API_BASE_URL: '/api/v1', ApiHttpError }
+      : { authHeader: () => ({}), redirectToLogin: () => {} },
+    fetch: async (_url, init) => {
+      sent = JSON.parse(init.body)
+      return { ok: false, status: 400, statusText: 'Bad Request /api/v1/internal', json: async () => responseBody }
+    },
+  })
+  const api = apiModule.exports.partnerPoliciesService
+  for (const body of [
+    { error: { code: 'POLICY_HANDLING_FIELDS_REQUIRED', message: '请填齐三栏' } },
+    { message: ['HTTP_400 /api/v1/internal {"error":{}}'] }, {},
+  ]) {
+    responseBody = body
+    await assert.rejects(api.releasePolicy('1', { responsibilityAcknowledged: true }), (error) => {
+      assert.equal(releaseErrorMessage(error), body.error?.message ?? fallback)
+      return true
+    })
+  }
+  // 保存并发布：审核或发布被拒时内容已经保存，服务端正常返回 { policy, stopped }（放在报错里的编号会被服务端错误过滤器丢掉）。
+  // 适配层要把它变成带政策编号的错误：弹窗显示原因，页面记下编号，改完再点时改的是同一条、不再新建。
+  class StoppedAwareError extends Error {
+    constructor(code, message, status, details = {}) { super(message); this.code = code; this.status = status; this.details = details }
+  }
+  let okBody
+  let okSent
+  const okModule = { exports: {} }
+  vm.runInNewContext(output, {
+    module: okModule, exports: okModule.exports, URLSearchParams,
+    require: (name) => name === './client'
+      ? { API_MODE: 'http', API_BASE_URL: '/api/v1', ApiHttpError: StoppedAwareError }
+      : { authHeader: () => ({}), redirectToLogin: () => {} },
+    fetch: async (url, init) => {
+      okSent = { url: String(url), method: init.method, body: JSON.parse(init.body) }
+      return { ok: true, status: 201, statusText: 'Created', json: async () => okBody }
+    },
+  })
+  const okApi = okModule.exports.partnerPoliciesService
+  okBody = { policy: { id: 'p-1', publishStatus: 'published' }, stopped: null }
+  const finished = await okApi.saveAndPublish(model.policyFormPayload(guide, false), { responsibilityAcknowledged: true })
+  assert.equal(finished.id, 'p-1')
+  assert.equal(finished.publishStatus, 'published')
+  assert.equal(okSent.method, 'POST')
+  assert.match(okSent.url, /\/partner\/policies\/release-with-save$/)
+  assert.equal(okSent.body.responsibilityAcknowledged, true)
+  okBody = {
+    policy: { id: 'p-2', reviewStatus: 'approved', publishStatus: 'draft' },
+    stopped: { at: 'publish', code: 'POLICY_SOURCE_URL_NOT_VERIFIED', message: '内容已保存并通过审核，停在发布。原文链接不在本机构登记的官方网站内。' },
+  }
+  await assert.rejects(okApi.saveAndPublish(model.policyFormPayload(guide, true), { responsibilityAcknowledged: true, id: 'p-2' }), (error) => {
+    assert.equal(error.code, 'POLICY_SOURCE_URL_NOT_VERIFIED')
+    assert.equal(error.details.policyId, 'p-2', '停下时要把已保存的编号交给页面')
+    assert.equal(error.details.stoppedAt, 'publish')
+    assert.match(error.message, /^内容已保存并通过审核，停在发布。/)
+    return true
+  })
+  assert.match(okSent.url, /\/partner\/policies\/p-2\/release-with-save$/)
+  assert.match(page, /onStopped=\{oneStep \? \(policyId\) => \{ setDraftId\(policyId\)/, '页面收到编号后记成这一条的草稿编号')
+
+  responseBody = {}
+  await assert.rejects(api.updatePolicy('1', model.policyFormPayload(empty, true)))
+  for (const key of keys) assert.equal(sent[key], null, `PATCH 实际 JSON 中 ${key} 为 null`)
+  console.log('PASS 政策三栏/默认扶持条目/http 不拦保存/标题边界、新建省略与编辑清空、条件入口停放、分步按钮仍在、保存并发布中途停下带回编号、发布人话错误与真实 PATCH JSON')
+}
+
 console.log('verify:partner-refresh-safe passed')

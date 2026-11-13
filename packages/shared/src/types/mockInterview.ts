@@ -35,6 +35,12 @@ export interface InterviewQuestionResponse {
   qType?: string
   questionIndex: number
   questionTarget: number
+  /** 本场截止时刻；没有截止（未带标记）时为 null。 */
+  deadlineAt?: string | null
+  /** 服务器当前时刻，用来对齐剩余时间。 */
+  serverNow?: string
+  /** 已有截止时刻且服务器时间已到或已过该时刻时为 true。 */
+  timeUp?: boolean
 }
 
 export interface InterviewTurn {
@@ -56,6 +62,12 @@ export interface InterviewSessionDetail {
   durationMin: number
   questionTarget: number
   turns: InterviewTurn[]
+  /** 本场截止时刻；没有截止（未带标记）时为 null。 */
+  deadlineAt?: string | null
+  /** 服务器当前时刻，用来对齐剩余时间。 */
+  serverNow?: string
+  /** 已有截止时刻且服务器时间已到或已过该时刻时为 true。 */
+  timeUp?: boolean
 }
 
 /** 练习表现等级（不是通过率、不是录用概率）。 */

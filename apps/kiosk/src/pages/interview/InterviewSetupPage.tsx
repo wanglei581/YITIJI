@@ -7,7 +7,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent } from 'react'
 import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { AI_QUOTA_EXHAUSTED_INTERVIEW_COPY, userMessageOf } from '../../services/api/userErrorMessage'
 import { useNavigate } from 'react-router-dom'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
@@ -15,6 +15,7 @@ import { useSupportContact } from '../../hooks/useSupportContact'
 import {
   EMPLOYMENT_INDUSTRY_SECTORS,
   type CreateInterviewInput,
+  type CreateInterviewResponse,
   type InterviewDifficulty,
   type InterviewDuration,
   type InterviewExperience,
@@ -25,6 +26,7 @@ import { interviewUserLine } from './interviewMicCopy'
 import {
   AiTaskRegion,
   useAiTask,
+  aiErrorCodeOf,
   aiErrorMessageOf,
   isAiOutage,
   type AiAvailability,
@@ -35,7 +37,10 @@ import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { createInterview, printInterviewPracticeSheet, startInterview } from '../../services/api/interview'
 import { kioskUploadFile } from '../../services/api/files'
 import { useAuth } from '../../auth/useAuth'
+import { RESUME_AI_CONSENT_NEEDED_COPY } from '../resume/resumeAiConsentPrompt'
+import { useInlineResumeAiConsent } from '../resume/useInlineResumeAiConsent'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { openedInterviewDeadline } from './session/interviewDeadline'
 import { InterviewShell } from './InterviewShell'
 import { assistantOffAsk, interviewAiPill, isAiGateDown, useInterviewAiCapabilities } from './useInterviewAiCapabilities'
 import { InterviewNote, InterviewStatus } from './interviewQxParts'
@@ -55,6 +60,12 @@ import './styles/interview-touch-setup.css'
 
 const INTERVIEWER_AI_DRAFT = '我正在选择面试官。请先问我想练什么，再解释各类面试官的侧重点，由我自己选择。'
 const SETUP_AI_DRAFT = '我想开始一场模拟面试。请先问我的目标岗位，再说明岗位、面试官和时长怎么选。不要替我创建练习。'
+
+/** 开场被每人每天的模拟面试次数拦住：页面知道自己是面试，不靠服务端是否带回 bucket。 */
+function interviewStartMessage(err: unknown): string {
+  if (aiErrorCodeOf(err) === 'AI_QUOTA_EXHAUSTED') return AI_QUOTA_EXHAUSTED_INTERVIEW_COPY
+  return aiErrorMessageOf(err, '创建练习失败，请稍后重试')
+}
 
 const INTERVIEWERS: Array<{ key: InterviewerType; label: string; desc: string; mark: string }> = [
   { key: 'hr', label: 'HR 面试', desc: '自我介绍 · 求职动机 · 稳定性 · 薪资沟通', mark: 'HR' },
@@ -80,9 +91,9 @@ const DIFFICULTIES: Array<{ key: InterviewDifficulty; label: string; desc: strin
 ]
 
 const DURATIONS: Array<{ key: InterviewDuration; label: string; desc: string }> = [
-  { key: 3, label: '3 分钟 / 4 题', desc: '到点不自动交卷，回答完当前题后再结束' },
-  { key: 5, label: '5 分钟 / 6 题', desc: '到点不自动交卷，回答完当前题后再结束' },
-  { key: 8, label: '8 分钟 / 8 题', desc: '到点不自动交卷，回答完当前题后再结束' },
+  { key: 3, label: '3 分钟 / 4 题', desc: '到点自动结束' },
+  { key: 5, label: '5 分钟 / 6 题', desc: '到点自动结束' },
+  { key: 8, label: '8 分钟 / 8 题', desc: '到点自动结束' },
 ]
 
 const POSITION_EXAMPLES = ['前端开发工程师', '行政专员', '市场运营', '机械工程师', '会计', '销售代表']
@@ -106,7 +117,6 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const [resumeFile, setResumeFile] = useState<{ fileId: string; name: string } | null>(setupDraft?.resumeFile ?? null)
   const [resumeChannel, setResumeChannel] = useState<ResumeChannel | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [qrBusy, setQrBusy] = useState(false)
   const [usbBusy, setUsbBusy] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -134,8 +144,15 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
    */
   const [startFailed, setStartFailed] = useState(setupDraft?.startFailed ?? false)
   const [step, setStep] = useState<1 | 2 | 3>(1)
+  /** 带简历开始被授权拦住且本人点了暂不使用：本页留下不带简历开练的入口。 */
+  const [offerStartWithoutResume, setOfferStartWithoutResume] = useState(false)
+  const resumeAiConsent = useInlineResumeAiConsent(() => {
+    setStartFailed(false)
+    setError(RESUME_AI_CONSENT_NEEDED_COPY)
+    setOfferStartWithoutResume(true)
+  })
 
-  useBusyLock(creating || uploading || printingSheet || qrBusy || usbBusy)
+  useBusyLock(creating || uploading || printingSheet || usbBusy)
 
   useEffect(() => {
     patchInterviewWorkbenchSession({
@@ -173,7 +190,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     }
   }
 
-  const handleStart = async () => {
+  const handleStart = async (omitResume = false) => {
     const pos = position.trim()
     if (!pos) {
       setError('请先填写目标岗位，例如：前端开发工程师、行政专员')
@@ -192,6 +209,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     setAiOutage(null)
     setAssistantDown(false)
     setStartFailed(false)
+    let created: CreateInterviewResponse | undefined
     try {
       const input: CreateInterviewInput = {
         interviewerType,
@@ -200,13 +218,14 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         experience,
         difficulty,
         durationMin: duration,
-        ...(resumeFile ? { resumeFileId: resumeFile.fileId } : {}),
+        ...(!omitResume && resumeFile ? { resumeFileId: resumeFile.fileId } : {}),
       }
       const token = getToken()
-      const created = await createInterview(input, { token })
+      created = await createInterview(input, { token })
       // 先记下来再 start：start 一旦 503，这个 sessionId 就是通用题目单的落点。
       setPendingSession({ sessionId: created.sessionId, accessToken: created.accessToken })
       const first = await startInterview(created.sessionId, { token, accessToken: created.accessToken })
+      const opened = openedInterviewDeadline(first, duration)
       setProbed(true)
       patchInterviewWorkbenchSession({
         stage: 'session',
@@ -220,7 +239,9 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
           firstQuestion: first.question ?? '',
           messages: [{ role: 'interviewer', content: first.question ?? '' }],
           questionIndex: 1,
-          remainingSec: duration * 60,
+          remainingSec: opened.remainingSec,
+          deadlineAtLocalMs: opened.deadlineAtLocalMs,
+          deadlineSource: opened.deadlineSource,
           omitPrintAnswers: false,
         },
       })
@@ -237,6 +258,8 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
             interviewerType,
             position: pos,
             firstQuestion: first.question ?? '',
+            deadlineAtLocalMs: opened.deadlineAtLocalMs,
+            deadlineSource: opened.deadlineSource,
             // 不传 firstQType：会话页读的是 firstQuestion / questionTarget 等键，
             // 从未读过 qType。类型里声明过不等于有人消费。
           },
@@ -248,12 +271,84 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         setError(declined)
         return
       }
-      const message = aiErrorMessageOf(err, '创建练习失败，请稍后重试')
+      if (!omitResume && created && resumeFile) {
+        const started = created
+        setOfferStartWithoutResume(false)
+        if (resumeAiConsent.promptIfNeeded(err, Boolean(getToken()), () => { void continueWithResume(started, pos) })) return
+      }
+      const message = interviewStartMessage(err)
       setError(message)
       setStartFailed(true)
       // 服务端 AI 闸门（暂停、额度）拦下的，小青这次也用不了：底栏问小青换停用态。
       setAssistantDown(isAiGateDown(err))
       // 只有能力级故障才判成「AI 不可用」；限流 / 参数错误只是本次失败，保留重试入口。
+      if (isAiOutage(err)) setAiOutage(message)
+      else setProbed(true)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  /** 授权后重试刚才那场带简历的 start，不再新建一场。 */
+  const continueWithResume = async (created: CreateInterviewResponse, pos: string) => {
+    setCreating(true)
+    setError(null)
+    setAiOutage(null)
+    setAssistantDown(false)
+    setStartFailed(false)
+    setOfferStartWithoutResume(false)
+    try {
+      const token = getToken()
+      const first = await startInterview(created.sessionId, { token, accessToken: created.accessToken })
+      const opened = openedInterviewDeadline(first, duration)
+      setProbed(true)
+      patchInterviewWorkbenchSession({
+        stage: 'session',
+        live: {
+          sessionId: created.sessionId,
+          accessToken: created.accessToken,
+          questionTarget: created.questionTarget,
+          durationMin: duration,
+          interviewerType,
+          position: pos,
+          firstQuestion: first.question ?? '',
+          messages: [{ role: 'interviewer', content: first.question ?? '' }],
+          questionIndex: 1,
+          remainingSec: opened.remainingSec,
+          deadlineAtLocalMs: opened.deadlineAtLocalMs,
+          deadlineSource: opened.deadlineSource,
+          omitPrintAnswers: false,
+        },
+      })
+      if (onGoStage) {
+        onGoStage('session')
+      } else {
+        navigate('/interview/session', {
+          replace: true,
+          state: {
+            sessionId: created.sessionId,
+            accessToken: created.accessToken,
+            questionTarget: created.questionTarget,
+            durationMin: duration,
+            interviewerType,
+            position: pos,
+            firstQuestion: first.question ?? '',
+            deadlineAtLocalMs: opened.deadlineAtLocalMs,
+            deadlineSource: opened.deadlineSource,
+          },
+        })
+      }
+    } catch (err) {
+      const declined = aiDeclarationDeclineMessage(err)
+      if (declined) {
+        setError(declined)
+        return
+      }
+      if (resumeAiConsent.promptIfNeeded(err, Boolean(getToken()), () => { void continueWithResume(created, pos) })) return
+      const message = interviewStartMessage(err)
+      setError(message)
+      setStartFailed(true)
+      setAssistantDown(isAiGateDown(err))
       if (isAiOutage(err)) setAiOutage(message)
       else setProbed(true)
     } finally {
@@ -342,7 +437,9 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         // 用 blocked 会和底部仍可点的「开始模拟面试」自相矛盾。
         mode: 'result-unavailable',
         reason: say((startFailed ? error : null) ?? '本次没能进入 AI 面试间。') ?? '本次没能进入 AI 面试间。',
-        retryHint: `本次没有进入面试间。可以再点一次「创建并开始练习」；不想等的话，${STILL_AVAILABLE}`,
+        retryHint: pendingSession
+          ? `本次没有进入面试间。可以再点一次「创建并开始练习」；不想等的话，${STILL_AVAILABLE}`
+          : `本次没有进入面试间。可以直接再点一次「创建并开始练习」。${STILL_AVAILABLE}`,
         ...sheetAction,
       }
 
@@ -357,6 +454,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     </InterviewNote>
   ) : null
   const shownError = interviewUserLine(error, contact)
+  const fallbackReason = step === 3 && aiTask.isFailed ? fallback.reason : null
   // 换步后点下去的按钮被卸载，焦点会掉回 body。把焦点放到意图带的标题上，并回到顶。第一次进来不抢焦点。
   const seenStep = useRef<number | null>(null)
   useLayoutEffect(() => {
@@ -397,7 +495,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const stepCopy = step === 1
     ? { eyebrow: '练面试 · 岗位与经验', title: '这次练哪个岗位？', sub: '选定岗位、面试官和时长后才开始这场练习；语音能否使用，进入后按麦克风实际情况确认。' }
     : step === 2
-      ? { eyebrow: '练面试 · 面试官与时长', title: '选一位面试官', sub: '难度和时长有默认值。到点不自动交卷。' }
+      ? { eyebrow: '练面试 · 面试官与时长', title: '选一位面试官', sub: '难度和时长有默认值。到点自动结束。' }
       : { eyebrow: '练面试 · 核对开始', title: '核对一下，就开始', sub: '面试前，先设置一场练习。' }
 
   return (
@@ -415,7 +513,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
           ask={assistantState === 'available'
             ? { label: step === 2 ? '问小青：选哪位面试官' : '问小青：这场练习怎么设', draft: step === 2 ? INTERVIEWER_AI_DRAFT : SETUP_AI_DRAFT }
             : assistantOffAsk(assistantState, '可继续手动设置')}
-          alert={shownError ? <p className="qxt-iv-alert" role="alert" data-testid="interview-setup-error">{shownError}</p> : undefined}
+          alert={shownError && shownError !== fallbackReason ? <p className="qxt-iv-alert" role="alert" data-testid="interview-setup-error">{shownError}</p> : undefined}
           primary={{
             label: step < 3
               ? '下一步'
@@ -435,6 +533,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         />
       }
     >
+    {resumeAiConsent.dialog}
     <KioskFilterPickerModal
       open={showIndustryPicker}
       title="选择面试行业"
@@ -533,7 +632,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
             <InterviewNote lead={echo}>
               <span>这一场：{interviewer?.label}。{interviewer?.desc}</span>
               <span>难度：{difficultyItem?.label}。{difficultyItem?.desc}</span>
-              <span>时长：{durationItem?.label}。练习时长到了，只提示你点结束，不自动出报告。</span>
+              <span>时长：{durationItem?.label}。时间到会自动结束。</span>
             </InterviewNote>
           </section>
         )}
@@ -586,7 +685,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                 uploading={uploading}
                 onPickFile={() => { if (!isTerminalKiosk()) fileInputRef.current?.click() }}
                 onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name })}
-                onQrBusy={setQrBusy}
+                onQrBusy={() => undefined}
                 onUsbBusy={setUsbBusy}
               />
               {!kiosk && (
@@ -599,6 +698,12 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                 />
               )}
             </div>
+            {offerStartWithoutResume ? (
+              <button type="button" className="qxt-iv-wide" onClick={() => { setOfferStartWithoutResume(false); void handleStart(true) }}>
+                <b>不上传也能开始</b>
+                <small>没有简历时按通用问题练习，不会因此少一道题。</small>
+              </button>
+            ) : null}
             <button type="button" className="qxt-iv-wide" onClick={goTips}>
               <b>先看面试技巧</b>
               <small>公开的准备方法，不依赖 AI</small>

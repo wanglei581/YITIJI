@@ -464,6 +464,8 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
       'AI_PAUSED',
       'AI_ENDPOINT_NOT_ALLOWED',
       'AI_BUDGET_EXHAUSTED',
+      // 每人每天次数封顶（HTTP 429，但当天重试不会成功）。不是 AI_RATE_LIMITED 那种排队。
+      'AI_QUOTA_EXHAUSTED',
       'AI_BUDGET_UNAVAILABLE',
       // 闸门判定本身出错（self-assessment-interpretation.ts AI_ACCESS_CHECK_FAILED_CODE）：
       // 与 AI_BUDGET_UNAVAILABLE 同性质的失败关闭，服务端这次不调模型，重试不会变好。
@@ -471,7 +473,7 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
     ])
     // 必须在表里的码：这几个进不了表，页面就会把「AI 停用」当成「这次没成」继续叫人重试。
     const MUST_BE_OUTAGE = [
-      'AI_PROVIDER_NOT_CONFIGURED', 'AI_PAUSED', 'AI_ENDPOINT_NOT_ALLOWED', 'AI_BUDGET_EXHAUSTED', 'AI_BUDGET_UNAVAILABLE',
+      'AI_PROVIDER_NOT_CONFIGURED', 'AI_PAUSED', 'AI_ENDPOINT_NOT_ALLOWED', 'AI_BUDGET_EXHAUSTED', 'AI_QUOTA_EXHAUSTED', 'AI_BUDGET_UNAVAILABLE',
       'AI_PROVIDER_ACCOUNT_UNAVAILABLE', 'AI_PROVIDER_MODEL_INVALID',
     ]
     for (const code of MUST_BE_OUTAGE) {
@@ -489,7 +491,8 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
     const SINGLE_CALL_FAILURE = [
       'AI_UNAVAILABLE', 'AI_DIAGNOSIS_UNAVAILABLE', 'AI_GENERATE_UNAVAILABLE', 'AI_OPTIMIZE_UNAVAILABLE',
       // 后端拆码产出的四个「这次没成」码：限流 / 上游 5xx / 其它 4xx / 空回复。
-      // 它们进表就会把可重试的入口置灰 —— 429 尤其不能进，那等于告诉排队中的用户功能坏了。
+      // 它们进表就会把可重试的入口置灰 —— 普通限流 429 不能进，那等于告诉排队中的用户功能坏了。
+      // AI_QUOTA_EXHAUSTED 不在这张黑名单：它是每人每天的封顶，已经放进上面的能力级白名单。
       'AI_RATE_LIMITED', 'AI_PROVIDER_ERROR', 'AI_PROVIDER_REQUEST_ERROR', 'AI_EMPTY_RESPONSE',
       'AI_BUSY', 'AI_TIMEOUT', 'AI_CHAT_TIMEOUT', 'AI_CAREER_PLAN_TIMEOUT', 'AI_JOB_FIT_TIMEOUT',
       'AI_FAIR_VISIT_PLAN_TIMEOUT', 'AI_MOCK_INTERVIEW_TIMEOUT', 'AI_OPTIMIZE_TIMEOUT',
@@ -611,9 +614,10 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
     } else if (errorsMod.__loadError) {
       failures.push(`aiOutage: 声明错误模块无法加载（${errorsMod.__loadError.message}）`)
     } else {
-      for (const code of ['AI_PAUSED', 'AI_BUDGET_EXHAUSTED', 'AI_BUDGET_UNAVAILABLE', 'AI_ENDPOINT_NOT_ALLOWED', 'AI_PROVIDER_NOT_CONFIGURED', 'AI_PROVIDER_ACCOUNT_UNAVAILABLE', 'AI_PROVIDER_MODEL_INVALID']) {
+      for (const code of ['AI_PAUSED', 'AI_BUDGET_EXHAUSTED', 'AI_BUDGET_UNAVAILABLE', 'AI_ENDPOINT_NOT_ALLOWED', 'AI_PROVIDER_NOT_CONFIGURED', 'AI_PROVIDER_ACCOUNT_UNAVAILABLE', 'AI_PROVIDER_MODEL_INVALID', 'AI_QUOTA_EXHAUSTED']) {
         assert(mod.isAiOutage({ code, status: 503 }) === true, `aiOutage.isAiOutage 不认 ${code} —— 页面会把 AI 停用当成一次失败继续叫人重试`)
       }
+      assert(mod.isAiOutage({ code: 'AI_QUOTA_EXHAUSTED', status: 429 }) === true, '每人每天次数封顶虽是 429，当天重试不会成功，必须算停用')
       for (const code of ['AI_RATE_LIMITED', 'AI_PROVIDER_ERROR', 'AI_PROVIDER_REQUEST_ERROR', 'REQUEST_TIMEOUT', 'NETWORK_ERROR', 'AI_DECLARATION_DECLINED', 'AI_DECLARATION_CLEARED']) {
         assert(mod.isAiOutage({ code, status: 503 }) === false, `aiOutage.isAiOutage 把单次失败 ${code} 判成了能力级停用`)
       }

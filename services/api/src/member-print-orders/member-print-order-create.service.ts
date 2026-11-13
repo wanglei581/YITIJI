@@ -8,6 +8,7 @@ import { hashPickupCode, randomPickupCode } from '../common/pickup-code'
 import { arrivalViewForOrder, arrivalViewsForOrders, type ArrivalReprintFields } from '../print-jobs/self-service-reprint'
 import { signFileUrl } from '../files/signing'
 import { OrderQuoteService, priceChanged } from '../payment/order-quote.service'
+import { payableCents } from '../payment/pending-refund-signal'
 import {
   CLAIMED_UNPAID_LEASE_EXPIRE_DATA,
   claimedUnpaidExpiredLeaseWhere,
@@ -21,6 +22,8 @@ import type { PrintJobParamsDto } from '../print-jobs/dto/create-print-job.dto'
 import type { CancelMemberPrintOrderDto } from './dto/cancel-member-print-order.dto'
 import type { CreateMemberPrintOrderDto } from './dto/create-member-print-order.dto'
 import { assertPiiScanned } from '../print-jobs/pii-scan-gate'
+import { previewFreePrintOrderQuota, replayAttachesFreeQuotaNotice, withFreeQuotaNotice } from '../print-jobs/free-print-quota.decide'
+import { copiesFromPrintParamsJson, printOrderSideCount } from '../print-jobs/verified-print-parameters'
 import {
   acquireOrderSubmissionLease,
   completeOrderSubmission,
@@ -265,6 +268,13 @@ export class MemberPrintOrderCreateService {
     if (dto.quotedAmountCents !== undefined && dto.quotedAmountCents !== quote.amountCents) {
       throw priceChanged(quote)
     }
+    const freeQuotaNotice = await previewFreePrintOrderQuota(this.prisma, {
+      terminalId: terminal.id,
+      endUserId,
+      requestedSides: quote.billablePages * dto.copies,
+      payableCents: payableCents({ amountCents: quote.amountCents, discountCents: 0 }),
+      copies: dto.copies,
+    })
     let order
     try {
       order = await this.prisma.$transaction(async (tx) => {
@@ -333,7 +343,7 @@ export class MemberPrintOrderCreateService {
       payload: { terminalId: terminal.id, fileId: file.id, amountCents: quote.amountCents, billablePages: quote.billablePages },
     })
     const arrival = await arrivalViewForOrder(this.prisma, settled)
-    return this.toView(settled, arrival.pickupCode ?? code, terminal, arrival)
+    return withFreeQuotaNotice(this.toView(settled, arrival.pickupCode ?? code, terminal, arrival), freeQuotaNotice)
     } finally {
       if (!completed) {
         await releaseOrderSubmissionLease(this.prisma, { endUserId, idempotencyKey: key, leaseToken })
@@ -345,7 +355,7 @@ export class MemberPrintOrderCreateService {
     await this.expirePendingForUser(endUserId)
     const rows = await this.prisma.order.findMany({
       // 已释放订单由既有 PrintTask 列表展示；这里仅返回尚未产生任务的 Order-only，避免重复。
-      where: { endUserId, sourceFileId: { not: null }, printTaskId: null },
+      where: { endUserId, type: { not: 'copy' }, copyJob: { is: null }, sourceFileId: { not: null }, printTaskId: null },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: 50,
     })
@@ -359,7 +369,7 @@ export class MemberPrintOrderCreateService {
     const terminalById = new Map(terminals.map((terminal) => [terminal.id, terminal]))
     const views = await arrivalViewsForOrders(this.prisma, rows)
     return rows.map((row) => {
-      const arrival = views.get(row.id) ?? { pickupCode: null, reprintAllowed: false, reprintRemaining: null }
+      const arrival = views.get(row.id) ?? { pickupCode: null, reprintAllowed: false, reprintRemaining: null, reprintNotice: null }
       return this.toView(row, arrival.pickupCode, row.terminalId ? terminalById.get(row.terminalId) : undefined, arrival)
     })
   }
@@ -428,7 +438,7 @@ export class MemberPrintOrderCreateService {
   }
 
   private async requireOwned(endUserId: string, orderId: string) {
-    const order = await this.prisma.order.findFirst({ where: { id: orderId, endUserId, sourceFileId: { not: null } } })
+    const order = await this.prisma.order.findFirst({ where: { id: orderId, endUserId, type: { not: 'copy' }, copyJob: { is: null }, sourceFileId: { not: null } } })
     if (!order) throw new NotFoundException({ error: { code: 'PRINT_ORDER_NOT_FOUND', message: '打印订单不存在' } })
     return order
   }
@@ -460,7 +470,17 @@ export class MemberPrintOrderCreateService {
         })
       : null
     const arrival = await arrivalViewForOrder(this.prisma, order)
-    return this.toView(order, arrival.pickupCode, terminal ?? undefined, arrival)
+    // 没有机器号、或已不是待领取（放行、完成、取消、过期）时不算 notice，也不查用量。
+    const freeQuotaNotice = order.terminalId && replayAttachesFreeQuotaNotice(order)
+      ? await previewFreePrintOrderQuota(this.prisma, {
+          terminalId: order.terminalId,
+          endUserId,
+          requestedSides: printOrderSideCount([], { billablePages: order.billablePages, printParamsJson: order.printParamsJson }),
+          payableCents: payableCents(order),
+          copies: copiesFromPrintParamsJson(order.printParamsJson),
+        }, { rejectOverCap: false })
+      : null
+    return withFreeQuotaNotice(this.toView(order, arrival.pickupCode, terminal ?? undefined, arrival), freeQuotaNotice)
   }
 
   private async expireIfNeeded(order: Awaited<ReturnType<MemberPrintOrderCreateService['requireOwned']>>) {
@@ -507,7 +527,7 @@ export class MemberPrintOrderCreateService {
     order: OrderRecord,
     code: string | null,
     terminal?: TerminalSummary,
-    reprint: Pick<ArrivalReprintFields, 'reprintAllowed' | 'reprintRemaining'> = { reprintAllowed: false, reprintRemaining: null },
+    reprint: Pick<ArrivalReprintFields, 'reprintAllowed' | 'reprintRemaining' | 'reprintNotice'> = { reprintAllowed: false, reprintRemaining: null, reprintNotice: null },
   ) {
     let lines: unknown[] = []
     try { lines = Array.isArray(JSON.parse(order.itemsJson)) ? JSON.parse(order.itemsJson) : [] } catch { lines = [] }
@@ -534,6 +554,9 @@ export class MemberPrintOrderCreateService {
       paperSize: typeof params.paperSize === 'string' ? params.paperSize : null,
       priceLines: lines,
       payStatus: order.payStatus,
+      // 取消放行要和 cancel() 同一条件。这两个字段本来就在订单行上，列表和详情此前没下发。
+      paymentSource: order.paymentSource ?? null,
+      paidAt: order.paidAt ? order.paidAt.toISOString() : null,
       taskStatus: order.taskStatus,
       pickupStatus: order.pickupStatus,
       pickupCode: code,
@@ -549,6 +572,7 @@ export class MemberPrintOrderCreateService {
       createdAt: order.createdAt.toISOString(),
       reprintAllowed: reprint.reprintAllowed,
       reprintRemaining: reprint.reprintRemaining,
+      reprintNotice: reprint.reprintNotice,
     }
   }
 }

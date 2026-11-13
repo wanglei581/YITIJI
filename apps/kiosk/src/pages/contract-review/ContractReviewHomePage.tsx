@@ -87,7 +87,6 @@ export function ContractReviewHomePage() {
   const [consentScope, setConsentScope] = useState<ConsentScope | null>(null)
   const [loadingConsent, setLoadingConsent] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [qrBusy, setQrBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [aiDown, setAiDown] = useState(false)
   // 提交时服务这一头没接住（排队不可用、服务端出错、够不着服务）：不是文件的问题，也不是 AI 停用，过一会儿还能再试。
@@ -100,7 +99,7 @@ export function ContractReviewHomePage() {
   // data-aitask：已知停用 → failed；提交中 → running；其余（没有任何确认）→ idle，既不假称在算，也不假称可用。
   const aiTask = useAiTask({ availability: aiDown ? 'unavailable' : submitting ? 'available' : 'unknown', pending: submitting })
 
-  useBusyLock(submitting || qrBusy)
+  useBusyLock(submitting)
 
   // 提交失败后才判成停用时，用户多半在页面下方：把说明和「去打印扫描」带回视野。
   useEffect(() => {
@@ -323,7 +322,6 @@ export function ContractReviewHomePage() {
                   })
                   setError(null)
                 }}
-                onBusyChange={setQrBusy}
               />
             )
           ) : (

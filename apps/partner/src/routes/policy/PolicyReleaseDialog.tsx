@@ -3,13 +3,14 @@ import { Button } from '@ai-job-print/ui'
 import { ApiHttpError } from '../../services/api/client'
 import { partnerPoliciesService, type PartnerPolicyRecord } from '../../services/api/policies'
 
-/** 服务端的中文原因（如未通过审核、未确认责任、内容可信未生效、已被紧急下架）原样给出；英文状态串一律换成兜底句。 */
+/** 只使用政策服务从 error.message 解析出的原因，缺失时不展示技术信息。 */
 function errMsg(e: unknown): string {
   if (e instanceof ApiHttpError) {
     const message = e.message.trim()
-    if (message && !/^[A-Za-z0-9_\s-]+$/.test(message)) return message
+    // 只放行服务端写的中文原因；纯英文技术串（如政策被并发删掉时的「Policy xx not found」）换成兜底句。
+    if (message && /[\u4e00-\u9fff]/.test(message)) return message
   }
-  return '发布没有成功，内容状态未改变，请稍后重试'
+  return '这次没发布成功，请稍后再试；多次失败请联系平台管理员'
 }
 
 /**
@@ -23,10 +24,25 @@ export function PolicyReleaseDialog({
   policy,
   onClose,
   onReleased,
+  submit,
+  heading = '发布政策',
+  confirmLabel = '确认发布',
+  versionLabel,
+  linkNote,
+  onStopped,
 }: {
   policy: PartnerPolicyRecord | null
   onClose: () => void
   onReleased: (updated: PartnerPolicyRecord) => void
+  /** 传入时改走「保存并发布」，不再单独调发布接口。 */
+  submit?: (acknowledged: boolean) => Promise<PartnerPolicyRecord>
+  heading?: string
+  confirmLabel?: string
+  versionLabel?: string
+  /** 覆盖原文链接那一行。保存并发布还没落库，用实时核对结果。 */
+  linkNote?: string
+  /** 前面的步骤已经写上，把编号交回去，避免重试时再新建一条。 */
+  onStopped?: (policyId: string) => void
 }) {
   const [acknowledged, setAcknowledged] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -42,7 +58,7 @@ export function PolicyReleaseDialog({
   if (!policy) return null
 
   const version = policy.contentVersion
-  const versionLabel = typeof version === 'number' ? `v${version}` : '当前版本'
+  const shownVersion = versionLabel ?? (typeof version === 'number' ? `v${version}` : '当前版本')
   const publisher = policy.sourceName || '本机构'
 
   const release = async () => {
@@ -50,13 +66,16 @@ export function PolicyReleaseDialog({
     setBusy(true)
     setError(null)
     try {
-      const updated = await partnerPoliciesService.releasePolicy(policy.id, { responsibilityAcknowledged: acknowledged })
+      const updated = submit
+        ? await submit(acknowledged)
+        : await partnerPoliciesService.releasePolicy(policy.id, { responsibilityAcknowledged: acknowledged })
       if (updated.publishStatus !== 'published') {
-        setError(`服务端返回的发布状态是「${updated.publishStatus}」，不是「已发布」。请刷新列表核对这条政策的实际状态。`)
+        setError('这次没发布成功，请稍后再试；多次失败请联系平台管理员')
         return
       }
       onReleased(updated)
     } catch (e) {
+      if (e instanceof ApiHttpError && typeof e.details?.policyId === 'string') onStopped?.(e.details.policyId)
       setError(errMsg(e))
     } finally {
       setBusy(false)
@@ -71,18 +90,29 @@ export function PolicyReleaseDialog({
       aria-labelledby="policy-release-title"
     >
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-surface p-6 shadow-xl">
-        <h2 id="policy-release-title" className="text-base font-semibold text-neutral-900">发布政策</h2>
+        <h2 id="policy-release-title" className="text-base font-semibold text-neutral-900">{heading}</h2>
         <p className="mt-1 text-sm text-neutral-700">「{policy.title}」</p>
         <dl className="mt-3 grid grid-cols-[5.5rem_1fr] gap-y-1.5 rounded-lg bg-neutral-50 px-4 py-3 text-sm">
           <dt className="text-neutral-500">发布机构</dt>
           <dd className="text-neutral-800">{publisher}</dd>
           <dt className="text-neutral-500">内容版本</dt>
-          <dd className="font-medium tabular-nums text-neutral-800">{versionLabel}</dd>
+          <dd className="font-medium tabular-nums text-neutral-800">{shownVersion}</dd>
         </dl>
 
         <p className="mt-3 text-xs leading-relaxed text-neutral-600">
           发布后展示这一版本（对应一体机首页「查政策」），并标注由{publisher}发布。平台不审核、不代发政策，只在违法违规等紧急情况下单向下架。之后如需修改，保存修改会生成新的内容版本并自动撤下、回到待审核，须重新审核通过并确认发布后才会再展示。
         </p>
+
+        <ul aria-label="发布前提" className="mt-3 space-y-1 text-xs text-neutral-600">
+          <li>{policy.kind === 'policy_guide'
+            ? [policy.whoCanApply, policy.requiredMaterials, policy.whereToApply].every((value) => value?.trim())
+              ? '谁可以申请、要准备的材料、去哪办：已填齐'
+              : '谁可以申请、要准备的材料、去哪办：未填齐，发布时会被拦下'
+            : '政策公告无需填写谁可以申请、要准备的材料、去哪办'}</li>
+          <li>{linkNote ?? (policy.externalUrl?.trim()
+            ? policy.externalUrlVerified === true ? '原文链接已通过官方网站核对' : '原文链接还没通过官方网站核对，发布时会被拦下'
+            : policy.kind === 'policy_guide' ? '原文链接未填写，发布时会被拦下' : '原文链接未填写（政策公告可选）')}</li>
+        </ul>
 
         <label className="mt-4 flex items-start gap-2.5 rounded-lg border border-primary-200 bg-primary-50/40 px-3 py-3 text-sm text-neutral-800">
           <input
@@ -93,7 +123,7 @@ export function PolicyReleaseDialog({
             onChange={(e) => setAcknowledged(e.target.checked)}
           />
           <span>
-            我代表「{publisher}」确认：这条政策（{versionLabel}）的内容已核对，由本机构作为发布者对其真实性与合规性负责。
+            我代表「{publisher}」确认：这条政策（{shownVersion}）的内容已核对，由本机构作为发布者对其真实性与合规性负责。
           </span>
         </label>
 
@@ -106,7 +136,7 @@ export function PolicyReleaseDialog({
             取消
           </Button>
           <Button size="sm" variant="primary" onClick={() => void release()} disabled={busy || !acknowledged}>
-            {busy ? '发布中…' : '确认发布'}
+            {busy ? (submit ? '保存并发布中…' : '发布中…') : confirmLabel}
           </Button>
         </div>
       </div>

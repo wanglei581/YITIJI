@@ -18,15 +18,27 @@ import {
   Optional,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { revokeTerminalCopyAuthorization } from '../copy-jobs/copy-authorization'
 import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import { TerminalToolboxService } from './terminal-toolbox.service'
 import { TerminalAgentService } from './terminals-agent.service'
 import { adminPaperStatus, describePrinterFault, normalizeDiskFreeGb, toAdminPrinterStatus } from './admin-printer-status'
+import {
+  PRINTER_QUEUE_HEARTBEAT_SELECT,
+  toAdminPrinterQueue,
+  type AdminPrinterQueueView,
+} from './heartbeat-printer-queue'
 import { PARKED_TERMINAL_ORG_TYPES, isParkedTerminalOrgType, orgTypeParkedError } from './terminal-org-parking'
 import { terminalOrgBindingOnCreate } from './terminal-org-binding'
 import { assignTerminalOrganization, type TerminalOrgAssignmentAudit } from './terminal-org-assignment'
+import { withOrgTerminalQuota } from '../licenses/license-gate'
 import { TERMINAL_ONLINE_WINDOW_MS } from './printer-availability'
-import { publicScanInputHealth, type PublicScanInputHealth } from './printer-status'
+import {
+  publicScanDeviceHealth,
+  publicScanInputHealth,
+  type PublicScanDeviceHealth,
+  type PublicScanInputHealth,
+} from './printer-status'
 import type { KioskTerminalConfigView } from './terminal-config.types'
 import {
   cleanNullable,
@@ -78,10 +90,13 @@ export interface AdminTerminalView {
   printerStatus: string | null
   wiredNetworkStatus: string | null
   printerNetworkStatus: string | null
+  printerQueue: AdminPrinterQueueView | null
   scanInputHealth: string | null
   scanInputAction: string | null
   scanInputReason: string | null
   scanInputObservedAt: string | null
+  /** available / unavailable；null 表示这一版终端程序还没报，不能当成可用。 */
+  printCompletionEvidence: 'available' | 'unavailable' | null
   agentVersion: string | null
   ipAddress: string | null
   diskFreeGb: number | null
@@ -225,20 +240,22 @@ export class TerminalAdminService {
 
     const placeholder = `${PLANNED_CREDENTIAL_PREFIX}${crypto.randomBytes(32).toString('hex')}`
     try {
-      const terminal = await this.prisma.terminal.create({
-        data: {
-          id: `t_${crypto.randomBytes(8).toString('hex')}`,
-          terminalCode,
-          agentToken: placeholder,
-          credentialGeneration: 0,
-          lifecycleStatus: 'planned',
-          deviceFingerprint: `planned:${crypto.randomBytes(16).toString('hex')}`,
-          displayName: cleanNullable(dto.displayName),
-          locationLabel: cleanNullable(dto.locationLabel),
-          orgId,
-          orgBoundAt: terminalOrgBindingOnCreate(orgId, new Date()),
-        },
-      })
+      const data = {
+        id: `t_${crypto.randomBytes(8).toString('hex')}`,
+        terminalCode,
+        agentToken: placeholder,
+        credentialGeneration: 0,
+        lifecycleStatus: 'planned',
+        deviceFingerprint: `planned:${crypto.randomBytes(16).toString('hex')}`,
+        displayName: cleanNullable(dto.displayName),
+        locationLabel: cleanNullable(dto.locationLabel),
+        orgId,
+        orgBoundAt: terminalOrgBindingOnCreate(orgId, new Date()),
+      }
+      // 预创建时就绑了机构：同样过软件使用授权的台数关（在事务里锁机构、检查、再建）。
+      const terminal = orgId
+        ? await withOrgTerminalQuota(this.prisma, orgId, (tx) => tx.terminal.create({ data }))
+        : await this.prisma.terminal.create({ data })
       return {
         terminalId: terminal.id,
         terminalCode: terminal.terminalCode,
@@ -279,11 +296,13 @@ export class TerminalAdminService {
             printerStatus: true,
             wiredNetworkStatus: true,
             printerNetworkStatus: true,
+            ...PRINTER_QUEUE_HEARTBEAT_SELECT,
             localTaskDatabaseAvailable: true,
             scanInputHealth: true,
             scanInputAction: true,
             scanInputReason: true,
             scanInputObservedAt: true,
+            printCompletionEvidence: true,
             agentVersion: true,
             ipAddress: true,
             diskFreeGb: true,
@@ -339,10 +358,14 @@ export class TerminalAdminService {
         printerStatus: hb?.printerStatus ?? null,
         wiredNetworkStatus: hb?.wiredNetworkStatus ?? null,
         printerNetworkStatus: hb?.printerNetworkStatus ?? null,
+        printerQueue: toAdminPrinterQueue(hb),
         scanInputHealth: hb?.scanInputHealth ?? null,
         scanInputAction: hb?.scanInputAction ?? null,
         scanInputReason: hb?.scanInputReason ?? null,
         scanInputObservedAt: hb?.scanInputObservedAt?.toISOString() ?? null,
+        printCompletionEvidence: hb?.printCompletionEvidence === 'available' || hb?.printCompletionEvidence === 'unavailable'
+          ? hb.printCompletionEvidence
+          : null,
         agentVersion: hb?.agentVersion ?? null,
         ipAddress: hb?.ipAddress ?? null,
         diskFreeGb: normalizeDiskFreeGb(hb?.diskFreeGb),
@@ -426,20 +449,25 @@ export class TerminalAdminService {
     }
 
     const saved = await this.agent.writeWithMacConflictMapping(() =>
-      this.prisma.terminal.update({
-        where: { id: terminal.id },
-        data,
-        select: {
-          id: true,
-          terminalCode: true,
-          displayName: true,
-          macAddress: true,
-          locationLabel: true,
-          areaLabel: true,
-          geoLat: true,
-          geoLng: true,
-          enabled: true,
-        },
+      this.prisma.$transaction(async (tx) => {
+        const saved = await tx.terminal.update({
+          where: { id: terminal.id },
+          data,
+          select: {
+            id: true,
+            terminalCode: true,
+            displayName: true,
+            macAddress: true,
+            locationLabel: true,
+            areaLabel: true,
+            geoLat: true,
+            geoLng: true,
+            enabled: true,
+          },
+        })
+        // 重复停用也撤权：不依赖事务外 enabled 快照，避免并发恢复/再停用漏撤权。
+        if (data.enabled === false) await revokeTerminalCopyAuthorization(tx, terminal.id)
+        return saved
       }),
     ) as {
       id: string
@@ -624,6 +652,7 @@ export class TerminalAdminService {
           error: { code: 'TERMINAL_LIFECYCLE_CONFLICT', message: '终端运维状态已变化，请刷新后重试' },
         })
       }
+      if (lifecycleStatus !== 'active') await revokeTerminalCopyAuthorization(tx, terminal.id)
       // 每次维护轮次切换都撤销未使用绑定码，防止旧 maintenance 轮次的换机码在 ABA 后复活。
       const result: UpdateTerminalLifecycleResult = {
         terminalId: terminal.id,
@@ -784,6 +813,10 @@ export class TerminalAdminService {
     isOnline: boolean
     /** 最近一次心跳里扫描输入是否可用（一体机「机器状态」页读）。老 Agent 不上报时为 null。 */
     scanInputHealth: PublicScanInputHealth | null
+    /** 最近一次心跳里终端程序探测扫描仪的结果（屏上扫描用）。老 Agent 不上报时为 null；不认识的值给 unknown。 */
+    scanDeviceHealth: PublicScanDeviceHealth | null
+    /** 上面这次探测发生的时刻（ISO）。老 Agent 不上报时为 null。 */
+    scanDeviceObservedAt: string | null
   }> {
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: terminalId }, { terminalCode: terminalId }] },
@@ -791,12 +824,26 @@ export class TerminalAdminService {
         heartbeats: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          select: { printerStatus: true, scanInputHealth: true, createdAt: true },
+          select: {
+            printerStatus: true,
+            scanInputHealth: true,
+            scanDeviceHealth: true,
+            scanDeviceObservedAt: true,
+            createdAt: true,
+          },
         },
       },
     })
     if (!terminal) {
-      return { found: false, printerStatus: null, lastSeenAt: null, isOnline: false, scanInputHealth: null }
+      return {
+        found: false,
+        printerStatus: null,
+        lastSeenAt: null,
+        isOnline: false,
+        scanInputHealth: null,
+        scanDeviceHealth: null,
+        scanDeviceObservedAt: null,
+      }
     }
     const latest = terminal.heartbeats[0]
     const lastSeenAt = latest?.createdAt?.toISOString() ?? null
@@ -807,6 +854,8 @@ export class TerminalAdminService {
       lastSeenAt,
       isOnline,
       scanInputHealth: publicScanInputHealth(latest?.scanInputHealth),
+      scanDeviceHealth: publicScanDeviceHealth(latest?.scanDeviceHealth),
+      scanDeviceObservedAt: latest?.scanDeviceObservedAt?.toISOString() ?? null,
     }
   }
 

@@ -93,11 +93,13 @@ test('I-08 preview params: only the unavailable options are struck out; the sele
     expect(await strikeThrough(button), `${name} 不能划线`).toBe(false)
     expect(Number(await button.evaluate((el) => getComputedStyle(el).opacity)), `${name} 不能发灰`).toBeGreaterThanOrEqual(0.95)
   }
-  for (const name of ['彩色', '双面（长边）', '双面（短边）']) {
+  for (const name of ['彩色', '双面']) {
     const button = option(page, name)
     await expect(button, `${name} 本机没开通`).toHaveAttribute('aria-disabled', 'true')
     expect(await strikeThrough(button), `${name} 要划线`).toBe(true)
   }
+  await expect(option(page, '长边翻页')).toHaveCount(0)
+  await expect(option(page, '短边翻页')).toHaveCount(0)
   await shot(page, 'i08-preview-unverified')
   expect(errors).toEqual([])
 })
@@ -112,10 +114,10 @@ test('I-08 preview params: with color on and duplex off, only the duplex options
     await expect(button).not.toHaveAttribute('aria-disabled', 'true')
     expect(await strikeThrough(button), `${name} 不能划线`).toBe(false)
   }
-  for (const name of ['双面（长边）', '双面（短边）']) {
-    await expect(option(page, name)).toHaveAttribute('aria-disabled', 'true')
-    expect(await strikeThrough(option(page, name))).toBe(true)
-  }
+  await expect(option(page, '双面')).toHaveAttribute('aria-disabled', 'true')
+  expect(await strikeThrough(option(page, '双面'))).toBe(true)
+  await expect(option(page, '长边翻页')).toHaveCount(0)
+  await expect(option(page, '短边翻页')).toHaveCount(0)
   // 彩色开通了就真能选上。
   await option(page, '彩色').click()
   await expect(option(page, '彩色')).toHaveAttribute('data-selected', 'true')
@@ -356,6 +358,10 @@ for (const { kind, testId, label } of FAIL_SCREENS) {
     await expect(page).toHaveURL(/\/legal\/privacy\?/)
     expect(new URL(page.url()).searchParams.get('section')).toBe('联系')
     await expect(page.getByRole('heading', { level: 1 })).toContainText('隐私政策')
+    // 不只带上参数：真的停在「联系我们」那一章。原先由自我探索同意页的用例钉 ?section= 跳章，那页 11/08 停放，改在这里钉。
+    await expect(page.getByTestId('legal-sec-1')).toHaveAttribute('aria-current', 'true')
+    await expect(page.getByTestId('legal-sec-0')).not.toHaveAttribute('aria-current', 'true')
+    await expect(page.locator('.legal-doc-body h3')).toContainText('联系我们')
   })
 
   test(`I-11 ${label} screen: with a service phone the phone is on screen and there is no extra contact entry @w2`, async ({ page, api }) => {

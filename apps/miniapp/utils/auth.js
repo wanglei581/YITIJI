@@ -226,10 +226,10 @@ function wxLogin() {
     wx.login({
       success(res) {
         if (res.code) resolve(res.code);
-        else reject(new Error('微信登录失败:未获取到 code'));
+        else reject(new Error('登录没有成功，请再试一次'));
       },
       fail() {
-        reject(new Error('微信登录没有成功，请再试一次'));
+        reject(new Error('登录没有成功，请再试一次'));
       },
     });
   });

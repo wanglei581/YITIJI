@@ -1,4 +1,5 @@
 import { ComplianceRestrictions } from './ComplianceRestrictions'
+import { LicenseSection } from './LicenseSection'
 import { PARTNER_TYPE_LABELS, type PartnerType } from '@ai-job-print/shared'
 import { useEffect, useState } from 'react'
 import {
@@ -28,7 +29,11 @@ import {
 } from 'lucide-react'
 import { getOrgProfile, updateOrgProfile, type PartnerOrgProfile } from '../../services/api/orgSelf'
 import { OfficialChannelsSection } from './OfficialChannelsSection'
+import { DeviceAlertNotifySection } from './DeviceAlertNotifySection'
 import { useRecruitmentHosting } from '../../services/capabilities'
+
+// 与 apps/admin/src/routes/partners/orgPresentation.ts 的 isParkedModule 使用同一清单；只影响展示。
+const PARKED_RECRUITMENT_MODULES = ['job_info', 'job_fair', 'external_apply_redirect']
 
 // ─── 机构资料（审计修复：原 MOCK_PROFILE 硬编码已删除，全部走 /partner/profile 真实数据）──
 // 机构自助仅可改 联系人/联系电话；名称、类型、场景模板、启用模块由管理员管理（运营边界）。
@@ -147,6 +152,7 @@ export default function ProfilePage() {
     >
       {/* 本机构官方渠道（3.14）：二维码只在本机构终端显示；与内容信任无关，单独成块 */}
       <OfficialChannelsSection />
+      <LicenseSection />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* 基本信息（真实数据） */}
@@ -192,7 +198,7 @@ export default function ProfilePage() {
         <Card className="p-6">
           <h3 className="mb-3 text-sm font-medium text-neutral-700">接入概况</h3>
           <div className="space-y-3 text-sm">
-            <Row label="数据源" value={`${profile.sourceCount} 个`} />
+            {recruitmentHosting && <Row label="数据源" value={`${profile.sourceCount} 个`} />}
             <Row label="机构账号" value={`${profile.accountCount} 个`} />
           </div>
           <p className="mt-4 rounded-lg bg-neutral-50 px-3 py-2.5 text-xs leading-relaxed text-neutral-500">
@@ -201,6 +207,8 @@ export default function ProfilePage() {
           </p>
         </Card>
       </div>
+
+      <DeviceAlertNotifySection />
 
       {/* 内容信任与发布权限（发布闸门依据） */}
       <Card className="mt-6 p-6">
@@ -342,11 +350,20 @@ export default function ProfilePage() {
             <p className="text-xs text-neutral-400">暂未配置启用模块，请联系平台管理员开通</p>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {profile.enabledModules.map((m) => (
-                <span key={m} className="rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-600">
-                  {(MODULE_LABELS as Record<string, string>)[m] ?? m}
-                </span>
-              ))}
+              {profile.enabledModules.map((m) => {
+                const label = (MODULE_LABELS as Record<string, string>)[m] ?? m
+                const parked = !recruitmentHosting && PARKED_RECRUITMENT_MODULES.includes(m)
+                return (
+                  <span
+                    key={m}
+                    className={parked
+                      ? 'rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-400'
+                      : 'rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-600'}
+                  >
+                    {parked ? `${label}（暂不开放）` : label}
+                  </span>
+                )
+              })}
             </div>
           )}
         </div>

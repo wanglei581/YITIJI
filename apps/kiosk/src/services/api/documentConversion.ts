@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { networkDisconnectLine } from '../../copy/unattendedCopy'
 import { API_BASE_URL } from './client'
 import { ApiHttpError } from './httpAdapter'
 import { notifySessionIfInvalid } from './throwHttpError'
@@ -98,7 +99,7 @@ export async function getDocumentConversionCapabilities(options: { force?: boole
         credentials: 'include',
       })
     } catch {
-      throw new ApiHttpError('NETWORK_ERROR', '无法确认 Word 转换能力，请检查网络后重试', 0)
+      throw new ApiHttpError('NETWORK_ERROR', `无法确认 Word 转换能力。${networkDisconnectLine()}。`, 0)
     }
 
     const payload = await readPayload<DocumentConversionCapabilities>(res)
@@ -159,7 +160,7 @@ export async function convertDocumentToPdf(fileId: string, token?: string | null
       body: JSON.stringify({ target: 'pdf' }),
     })
   } catch {
-    throw new ApiHttpError('NETWORK_ERROR', 'Word 转 PDF 请求未送达服务器，请检查网络后重试', 0)
+    throw new ApiHttpError('NETWORK_ERROR', `Word 转 PDF 请求未送达服务器。${networkDisconnectLine()}。`, 0)
   }
 
   const payload = await readPayload<DocumentConversionResult>(res)

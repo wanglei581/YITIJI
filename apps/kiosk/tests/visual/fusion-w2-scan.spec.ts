@@ -292,19 +292,23 @@ test('scan start creates only after explicit continuation @w2', async ({ page, a
   })
 
   await page.goto('/scan/start')
-  await expect(page.getByText(/下一步会真实建立这次扫描/).first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: '扫什么？' })).toBeVisible()
+  await expect(page.getByText(/下一步会真实建立这次扫描/)).toHaveCount(0)
   await expect(page.getByText('可创建扫描任务 · 需面板操作', { exact: true })).toBeVisible()
   // 走查 I-16：进来不替人选类型，选了才能下一步（原来这里不点类型直接下一步，会被悄悄建成简历扫描）
   await page.getByTestId('scan-workbench-type-resume').click()
-  const next = page.getByRole('button', { name: /下一步 · 建立这次扫描/ })
+  const next = page.getByRole('button', { name: '下一步', exact: true })
   await expect(next).toBeEnabled()
   // 稿 18：底部三列口径是一次性说明，只在选类型这一屏出现，后面各屏不复读。
   await expect(page.getByTestId('scan-workbench-truth')).toBeVisible()
   expect(legacyDeviceRequests).toBe(0)
+  await next.click()
+  // K1b-1：选材料的下一步只进入怎么扫。默认没有 scan_device，屏上方式被挡住，建会话发生在面板这一下。
+  await expect(page.getByText(/下一步会真实建立这次扫描/).first()).toBeVisible()
   const createRequest = page.waitForRequest((request) =>
     request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/scan/sessions',
   )
-  await next.click()
+  await page.getByTestId('scan-way-panel').click()
   const posted = await createRequest
   const postedBody = posted.postDataJSON() as { scanType?: string; terminalId?: string }
   expect(postedBody.scanType).toBe('resume')
@@ -341,19 +345,21 @@ test('scan start pre-selects nothing, blocks next until a type is chosen, and ne
   // 没选类型：主按钮禁用并写原因，点不出去
   const blocked = page.getByRole('button', { name: '先选一种材料', exact: true })
   await expect(blocked).toBeDisabled()
-  await expect(page.getByRole('button', { name: /下一步 · 建立这次扫描/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '下一步', exact: true })).toHaveCount(0)
   await expect(page.getByText('已选「简历扫描」')).toHaveCount(0)
   expect(createdBody).toBeNull()
   await page.screenshot({ path: testInfo.outputPath('qx-scan-start-unselected.png'), fullPage: false })
   // I-18：「奔图」「面板」之外的品牌词都不该出现在这一页（只说「打印机屏幕」「打印机面板」）
   await expect(page.locator('main, [data-w2-page="scan-start"]').first()).not.toContainText(/奔图|Pantum|CM28\d0/)
-  // 点「证件扫描」才可以往下走，建出来的就是证件扫描
+  // 点「证件」才可以往下走。默认没有屏上扫描，面板路线建出来的就是证件扫描。
   await page.getByTestId('scan-workbench-type-id').click()
   await expect(page.getByTestId('scan-workbench-type-id')).toHaveAttribute('aria-checked', 'true')
   await expect(page.getByTestId('scan-workbench-type-resume')).toHaveAttribute('aria-checked', 'false')
-  const next = page.getByRole('button', { name: /下一步 · 建立这次扫描/ })
+  const next = page.getByRole('button', { name: '下一步', exact: true })
   await expect(next).toBeEnabled()
   await next.click()
+  await expect(page.getByRole('heading', { name: '这台机器还不能在屏上开始扫描' })).toBeVisible()
+  await page.getByTestId('scan-way-panel').click()
   await page.waitForURL(/\/scan\?stage=settings/)
   // 建会话的请求在设置页挂载后才发，等它出现再看建的是哪一种
   await expect.poll(() => createdBody, { timeout: 8_000 }).not.toBeNull()
@@ -377,7 +383,7 @@ test('scan start blocks continuation while scan capability is unavailable @w2', 
 
   await page.goto('/scan/start')
   await expect(page.getByText('扫描能力暂未开放', { exact: true }).first()).toBeVisible()
-  await expect(page.getByRole('button', { name: /下一步 · 建立这次扫描/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '下一步', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '改用上传文件打印' })).toBeVisible()
   await expectHealthy(page, errors)
 })
@@ -403,17 +409,20 @@ test('when 小青 is down every scan and tool screen says so and the manual path
   // 手动路径照旧：问小青还在（点过去由顾问页自己降级）、「下一步」照样能按。
   await expect(page.locator('[data-qxt-ask="on"]')).toBeVisible()
   await page.getByTestId('scan-workbench-type-document').click()
-  await expect(page.getByRole('button', { name: /下一步 · 建立这次扫描/ })).toBeEnabled()
+  await expect(page.getByRole('button', { name: '下一步', exact: true })).toBeEnabled()
 
   for (const [path, primary] of [
     ['/print-scan/feature/copy', '去打印文件'],
-    ['/print-scan/feature/id-photo', '先用照片打印'],
   ] as const) {
     await page.goto(path)
     await expect(page.getByTestId('ai-down-note'), `${path} 要写小青接不上`).toBeVisible()
     await expect(page.locator('[data-qxt-ask="on"]'), `${path} 底栏问小青还在`).toBeVisible()
     await expect(page.getByRole('button', { name: primary, exact: true }), `${path} 主按钮照常能按`).toBeEnabled()
   }
+  await page.goto('/print-scan/feature/id-photo')
+  await expect(page).toHaveURL(/\/print-scan$/)
+  await expect(page.locator('[data-w2-page="print-scan-home"]')).toBeVisible()
+  await expect(page.locator('[data-testid="print-hub-state-feature-id-photo"]')).toHaveCount(0)
   await page.goto('/print-scan/convert')
   await expect(page.getByTestId('ai-down-note')).toBeVisible()
   await expect(page.locator('[data-qxt-ask="on"]')).toBeVisible()
@@ -652,7 +661,9 @@ async function revealByUserScroll(target: Locator, block: 'start' | 'center' | '
       const box = node.getBoundingClientRect()
       const rect = el.getBoundingClientRect()
       const slack = where === 'start' ? 0 : where === 'end' ? box.height - rect.height : (box.height - rect.height) / 2
-      node.scrollTop += rect.top - box.top - Math.max(0, slack)
+      const next = node.scrollTop + rect.top - box.top - Math.max(0, slack)
+      // scrollTop 只收整数。对齐到容器底边时直接加小数会被截掉，底注会剩不到 1px 露在外面。
+      node.scrollTop = where === 'end' ? Math.ceil(next - 1e-6) : next
     }
   }, block)
 }
@@ -936,14 +947,56 @@ test('successful scan tells a guest the file will not reach 我的文档 @w2', a
   const destination = page.getByRole('button', { name: /本次不进入我的文档/ })
   await expect(destination).toBeVisible()
   await expect(destination).toBeDisabled()
-  // 走查 I-15：不再只说「请在本次操作内完成打印或识别」——补一句实话：要留在账号里，先登录，再重新扫一次（补不进账号，所以说「重新扫一次」）。
+  // 设计窗口 11/08 答复：游客「扫码带走」不做（照 10/12 定项）。先一句「不进『我的文档』」，再列三条带走的办法：
+  // 当场打印、存 U 盘（这台机器暂未开通，如实写）、下次先扫码登录再扫（补不进账号，所以说「下次」）。默认夹具小程序没发布，第三条不说手机上能看到。
+  // 没有登录按钮：游客一登录，这次扫描就会被登录那一步清掉，按钮会让人以为现在登录就能存进去（见下面 /login 出口那条断言）。
   // 游客扫码带走电子版已撤（见下面那条防回退用例），这一屏没有任何下载码入口。
-  await expect(page.getByText('未登录扫描件不会进入「我的文档」。要留在账号里：先登录，再重新扫一次。')).toBeVisible()
+  await expectGuestWays(page, false)
+  // 11/02 那一版长句与走查 I-15 那一版旧句子都不得再出现。
+  await expect(page.getByText('要带走电子版，下次先扫码登录再扫。')).toHaveCount(0)
+  await expect(page.getByText('要留在账号里：先登录，再重新扫一次')).toHaveCount(0)
   await expect(page.locator('[data-testid^="scan-takeaway"]')).toHaveCount(0)
 
   // 旧的不实承诺不得再出现在页面上。
   await expect(page.getByText(/登录后管理文件|登录后可在「我的文档」管理/)).toHaveCount(0)
   // 不能把游客送去登录、好像登录后这份会出现在「我的文档」里：这一屏没有任何去 /login 的出口
+  await expect(page.locator('a[href^="/login"]')).toHaveCount(0)
+  await expectHealthy(page, errors)
+})
+
+/**
+ * 游客三条带走的办法（scanGuestWays）：在灰着的「本次不进入我的文档」里，先一句不进「我的文档」，再按顺序三条。
+ * 第三条后半句「手机小程序里也能看到」只在小程序已发布时出现。
+ */
+async function expectGuestWays(page: Page, miniappPublished: boolean): Promise<void> {
+  const destination = page.getByRole('button', { name: /本次不进入我的文档/ })
+  await expect(destination).toBeDisabled()
+  await expect(destination.getByTestId('scan-guest-ways')).toHaveText('未登录扫描件不会进入「我的文档」。带走的办法：')
+  await expect(destination.locator('[data-guest-way]')).toHaveText([
+    '1. 当场打印：请在本次操作内完成打印或识别。',
+    '2. 存 U 盘：在打印机面板上选「扫描到 U 盘」，这台机器暂未开通。',
+    miniappPublished
+      ? '3. 存进「我的文档」：下次先扫码登录再扫，手机小程序里也能看到。'
+      : '3. 存进「我的文档」：下次先扫码登录再扫。',
+  ])
+}
+
+test('guest scan result adds the miniapp half of the third way only when the miniapp is published @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  registerShell(api)
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 200,
+    json: {
+      success: true,
+      data: { servicePhone: '18369161921', serviceHours: '工作日 9:00–18:00', otherOnlineTerminalNearby: false, miniappPublished: true },
+    },
+  })
+  await seedScanResult(page, resultState)
+  await page.goto('/scan?stage=result')
+  await expectPdfCompleted(binary)
+  await expectGuestWays(page, true)
   await expect(page.locator('a[href^="/login"]')).toHaveCount(0)
   await expectHealthy(page, errors)
 })
@@ -979,10 +1032,16 @@ test(`guest ${scanType} scan result has no download QR and no takeaway entry, on
   await expect(main.locator('svg[shape-rendering="crispEdges"], canvas:not([data-pdf-preview-host] canvas), img[src^="data:image"]')).toHaveCount(0)
   await expect(main.getByText(/扫码带走|下载码|二维码/)).toHaveCount(0)
   await expect(main.locator('[aria-label*="扫码带走"], [aria-label*="下载码"], [aria-label*="二维码"], [aria-description*="扫码带走"], [aria-description*="下载码"], [aria-description*="二维码"]')).toHaveCount(0)
-  // 只留一句实话，和灰着的「本次不进入我的文档」；这一屏没有任何去 /login 的出口。
-  await expect(page.getByText('未登录扫描件不会进入「我的文档」。要留在账号里：先登录，再重新扫一次。')).toBeVisible()
-  await expect(page.getByRole('button', { name: /本次不进入我的文档/ })).toBeDisabled()
+  // 只留实话（11/08 三条带走的办法），和灰着的「本次不进入我的文档」；这一屏没有任何去 /login 的出口。
+  await expectGuestWays(page, false)
+  await expect(page.getByText('要带走电子版，下次先扫码登录再扫。')).toHaveCount(0)
+  await expect(page.getByText('要留在账号里：先登录，再重新扫一次')).toHaveCount(0)
   await expect(page.locator('a[href^="/login"]')).toHaveCount(0)
+  // 三条在 27 寸竖屏上一屏看得全：第三条的底边在底栏之上，不用滚动。
+  const lastWay = await page.locator('[data-guest-way="documents"]').boundingBox()
+  const dock = await page.locator('.qxt-dock').first().boundingBox()
+  expect(lastWay, '第三条要画出来').not.toBeNull()
+  expect(lastWay!.y + lastWay!.height, '三条带走的办法不压在底栏下面').toBeLessThanOrEqual(dock?.y ?? page.viewportSize()!.height)
   await page.screenshot({ path: testInfo.outputPath(`qx-scan-result-guest-${scanType}.png`), fullPage: false })
   await expectHealthy(page, errors)
 })
@@ -1001,6 +1060,13 @@ test('failed scan retry strips control fields but preserves scan parameters @w2'
 
   await seedScanResult(page, failureState)
   await page.goto('/scan?stage=result')
+  // 11/09：只有屏上扫描来的结果换新屏（scan-device-k1b3a.spec.ts）；面板扫描的失败屏一个字不动：
+  // 眉题「扫描完成」、面板四步路径线、说明格照旧，不落屏上扫描那一屏。
+  await expect(page.locator('.qxt-band .qxt-eyebrow')).toHaveText('扫描完成')
+  await expect(page.locator('.qxt-band .qxt-rail span')).toHaveText(['✓ 选类型', '✓ 扫描指引', '✓ 等回传', '扫描完成'])
+  await expect(page.getByText('这次没扫成的原因', { exact: true })).toBeVisible()
+  await expect(page.getByText('同一张纸', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('scan-device-failed')).toHaveCount(0)
   const createResponse = page.waitForResponse((response) =>
     response.request().method() === 'POST'
       && new URL(response.url()).pathname === '/api/v1/scan/sessions',
@@ -1676,7 +1742,9 @@ test('ID scan explains an explicit MIME rejection and directs JPG rescan @w2', a
   })
   await page.goto('/scan/start')
   await page.getByTestId('scan-workbench-type-id').click()
-  await page.getByRole('button', { name: /下一步 · 建立这次扫描/ }).click()
+  await page.getByRole('button', { name: '下一步', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '这台机器还不能在屏上开始扫描' })).toBeVisible()
+  await page.getByTestId('scan-way-panel').click()
   await expect(page.getByText('在打印机屏幕上把文件格式选成 JPG（图片）再开始。')).toBeVisible()
   await page.getByRole('button', { name: '我已操作，开始等待' }).click()
   await expect(page.getByText('文件格式不符合证件扫描要求，请在打印机屏幕上选 JPG（图片）后重新扫描。')).toBeVisible()

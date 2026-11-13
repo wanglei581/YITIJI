@@ -67,7 +67,6 @@ export function ConvertImagesPage() {
   const [rechecking, setRechecking] = useState(false)
   const [error, setError] = useState<ConvertError | null>(null)
   const [showQr, setShowQr] = useState(false)
-  const [qrBusy, setQrBusy] = useState(false)
   const [usbOpen, setUsbOpen] = useState(false)
   const [result, setResult] = useState<Awaited<ReturnType<typeof convertImagesToPdf>> | null>(null)
   const [resultName, setResultName] = useState<string | null>(null)
@@ -78,7 +77,7 @@ export function ConvertImagesPage() {
   const [previewFailed, setPreviewFailed] = useState(false)
   const sentRef = useRef(false)
 
-  useBusyLock(uploading || generating || qrBusy || rechecking)
+  useBusyLock(uploading || generating || rechecking)
 
   const atLimit = images.length >= MAX_IMAGES
   const kiosk = useTerminalKiosk()
@@ -250,8 +249,8 @@ export function ConvertImagesPage() {
         },
         { token: getToken(), idempotencyKey: nextKey.key },
       )
-      let filename: string | null = null
-      if (converted.savedToDocuments) {
+      let filename: string | null = converted.filename || null
+      if (!filename && converted.savedToDocuments) {
         try {
           const documents = await getMyDocuments(getToken(), { pageSize: 50 })
           filename = documents.items.find((item) => item.id === converted.fileId)?.filename ?? null
@@ -345,13 +344,14 @@ export function ConvertImagesPage() {
       sub={band.sub}
       status={toolBandStatus(status)}
       onBack={() => navigate('/print-scan')}
+      hideDockBack={error?.kind === 'capability'}
       askLabel={convertAskLabel(phase, error)}
       primary={dockSpec.primary}
       overlay={showQr ? (
         <ConvertQrLayer
           onClose={() => setShowQr(false)}
           onUploaded={handlePhoneUploaded}
-          onBusyChange={setQrBusy}
+          onBusyChange={() => undefined}
         />
       ) : undefined}
     >

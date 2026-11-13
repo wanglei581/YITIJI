@@ -1,8 +1,10 @@
-import { clearKioskSensitiveSession, clearKioskSharedDeviceResidue } from '../auth/kioskSensitiveSession'
+import { clearKioskSensitiveSession, clearKioskSharedDeviceResidue, kioskSensitiveSessionScope, type KioskClearScope } from '../auth/kioskSensitiveSession'
 import { API_BASE_URL, API_MODE } from './api/client'
 import { ApiHttpError } from './api/httpAdapter'
 import { getTerminalId } from './api/screensaver'
 import { readHttpError } from './api/throwHttpError'
+import { applyE2ERecoveryView, attachRecoveryRuntime, cancelRecovery, dropRecoveryHold, hadSettled, holdRecoveryForOtherContent, isBootExchangeUnsettled, markBootExchangeSettled, markBootExchangeUnsettled, noteRejectedToken, noteStateEntered, rememberRecoveryClearScope, scheduleRecovery } from './terminalSessionRecovery'
+export { takeTerminalSessionRecoveryClearScope, terminalSessionRecoveryDeferred, terminalSessionRecoveryNeedsNewTicket } from './terminalSessionRecovery'
 
 const STORAGE_KEY = 'terminal_session_token_v1'
 const RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000]
@@ -21,10 +23,45 @@ export type TerminalSessionState = 'checking' | 'ready' | 'failed'
 
 let state: TerminalSessionState = API_MODE === 'http' && !HAS_E2E_MOCK_TOKEN ? 'checking' : 'ready'
 let refreshTimer: number | null = null
+let licenseRenewalSuspended = (() => {
+  try { return window.localStorage.getItem('kiosk_license_paused_v1') === '1' } catch { return false }
+})()
+let licenseRecheckActive = false
+let lastRenewalAttemptAt: number | null = null
+export function lastTerminalRenewalAttemptAt(): number | null { return lastRenewalAttemptAt }
 const listeners = new Set<(next: TerminalSessionState) => void>()
+let licenseRenewalRejected = false
+const licenseRejectionListeners = new Set<() => void>()
 
+export function wasTerminalLicenseRenewalRejected(): boolean { return licenseRenewalRejected }
+export function clearTerminalLicenseRenewalRejection(): void { licenseRenewalRejected = false }
+export function subscribeTerminalLicenseRenewalRejected(listener: () => void): () => void {
+  licenseRejectionListeners.add(listener)
+  return () => { licenseRejectionListeners.delete(listener) }
+}
+
+function recordLicenseRejection(error: unknown, keepSessionReady = false): boolean {
+  if (!(error instanceof ApiHttpError && error.status === 403 && error.code === 'TERMINAL_LICENSE_INACTIVE')) return false
+  licenseRenewalRejected = true
+  if (keepSessionReady) setState('ready')
+  licenseRejectionListeners.forEach((listener) => listener())
+  return true
+}
+
+// failed 不再是终点：每次落到 failed 都排一次后台恢复，离开 failed 就撤掉。
+// 放在这里而不是各个判死的分支里，是为了以后新增的判死分支不会漏排。
 function setState(next: TerminalSessionState): void {
+  noteStateEntered(next)
   state = next
+  if (next === 'failed') {
+    // 十分钟续期交给后台恢复接手：留着它会在恢复中途把状态翻回 checking，再跑一遍 60 秒重试窗口。
+    if (refreshTimer !== null) { window.clearTimeout(refreshTimer); refreshTimer = null }
+    // 授权暂停或刚被拒（403 TERMINAL_LICENSE_INACTIVE）时不排后台恢复：复查由授权闸门限频（≥5 分钟），
+    // 每分钟一轮的恢复会把它打穿。暂停解除时由 setLicenseRenewalSuspended 补排。
+    if (!licenseRenewalSuspended && !licenseRenewalRejected) scheduleRecovery()
+  } else {
+    cancelRecovery()
+  }
   listeners.forEach((listener) => listener(next))
 }
 
@@ -82,6 +119,7 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, tim
 /**
  * 引导票已经换成新的终端会话。同一标签页里上一位的打印材料、简历、问卷、
  * 材料草稿、面试、扫描和收藏还在。清场只调用 kioskSensitiveSession 那一份清单。
+ * 换引导票即清场：哪怕当时判出来什么都没有，清场函数照样调用。
  * 新令牌在清完之后写入：清单不含终端会话键；引导票在服务端已被一次性核销，
  * 清场若抛错也要把新令牌留下，否则这台机器既没有旧会话也换不回这张票。
  */
@@ -90,21 +128,30 @@ function clearSensitiveStateForNewTerminalSession(): void {
   clearKioskSharedDeviceResidue()
 }
 
-async function exchangeBootTicket(bootTicket: string, timeoutMs: number): Promise<void> {
+/** 换票成功才返回。返回值是清场之前判出来的范围，调用方决定记不记。 */
+async function exchangeBootTicket(bootTicket: string, timeoutMs: number): Promise<KioskClearScope> {
+  lastRenewalAttemptAt = Date.now()
   const response = await fetchWithTimeout(url('/terminals/session-token'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ bootTicket }),
   }, timeoutMs)
-  if (!response.ok) throw await asHttpError(response)
+  if (!response.ok) {
+    const error = await asHttpError(response)
+    recordLicenseRejection(error)
+    throw error
+  }
   const payload = (await response.json()) as { sessionToken?: string }
   if (!payload.sessionToken) throw new ApiHttpError('TERMINAL_SESSION_INVALID', '这台机器的安全校验没通过', 401)
   const sessionToken = payload.sessionToken
+  const clearScope = kioskSensitiveSessionScope()
   try {
     clearSensitiveStateForNewTerminalSession()
   } finally {
     saveToken(sessionToken)
   }
+  licenseRenewalRejected = false
+  return clearScope
 }
 
 /**
@@ -137,6 +184,7 @@ async function requestLocalBootTicket(): Promise<string | null> {
 }
 
 async function refreshOnce(timeoutMs: number): Promise<void> {
+  lastRenewalAttemptAt = Date.now()
   const response = await fetchWithTimeout(url('/terminals/session-token/refresh'), {
     method: 'POST', headers: headers({ Accept: 'application/json' }),
   }, timeoutMs)
@@ -151,11 +199,15 @@ async function asHttpError(response: Response): Promise<ApiHttpError> {
   return new ApiHttpError(error.code, error.message, response.status)
 }
 
-// 只有网络抖动 / 超时 / 服务端明确的 503 TERMINAL_SESSION_RETRYABLE（Redis 抖动）才自动重试；
-// 401 TERMINAL_SESSION_INVALID 表示票已用过、令牌过期或终端被吊销，重试不会变好，立即 fail-closed。
+// 网络抖动 / 超时自动重试；502 / 503 / 504 不看错误码一律重试 —— 既包括服务端明确的
+// 503 TERMINAL_SESSION_RETRYABLE（Redis 抖动），也包括后端重启那几十秒里网关回的错误页（没有业务错误码）。
+// 2026-10-10 走查实测：开机换票那一下撞上一次不带错误码的 503，此前一次就判死，4 分半不恢复。
+// TERMINAL_SESSION_INVALID 表示票已用过、令牌过期或终端被吊销，重试不会变好，立即 fail-closed。
+// 引导票是读出即删的：网关超时而后端其实已经用掉它时，重发会得到作废，由调用方改向本机 Agent 要新票。
 function transient(error: unknown): boolean {
   if (error instanceof TypeError || (error instanceof DOMException && error.name === 'AbortError')) return true
-  return error instanceof ApiHttpError && error.status === 503 && error.code === 'TERMINAL_SESSION_RETRYABLE'
+  if (!(error instanceof ApiHttpError)) return false
+  return error.status === 502 || error.status === 503 || error.status === 504
 }
 
 function sessionInvalid(error: unknown): boolean {
@@ -167,6 +219,8 @@ let refreshInflight: Promise<void> | null = null
 // 并发业务请求同时遇到 401 时共享同一次刷新，避免向 /session-token/refresh 涌入多次请求。
 function retryRefresh(): Promise<void> {
   if (refreshInflight) return refreshInflight
+  if (licenseRenewalSuspended && !licenseRecheckActive) return Promise.reject(new ApiHttpError('TERMINAL_LICENSE_INACTIVE', '', 403))
+  if (licenseRenewalRejected) return Promise.reject(new ApiHttpError('TERMINAL_LICENSE_INACTIVE', '', 403))
   refreshInflight = retryRefreshOnce().finally(() => { refreshInflight = null })
   return refreshInflight
 }
@@ -175,11 +229,19 @@ async function retryRefreshOnce(): Promise<void> {
   setState('checking')
   const startedAt = Date.now()
   let lastError: unknown = new ApiHttpError('TERMINAL_SESSION_INVALID', '这台机器的安全校验没通过', 401)
-  for (const delay of [0, ...RETRY_DELAYS_MS]) {
+  let invalidToken: string | null = null
+  // 带引导票打开而没换成的页不拿旧会话票续期，直接走下面「要新引导票」那条路（换票即清场）。
+  const bootExchangeUnsettled = isBootExchangeUnsettled()
+  // 授权暂停时只试一次、不等不重试（复查由授权闸门限频）。
+  for (const delay of bootExchangeUnsettled ? [] : licenseRenewalSuspended ? [0] : [0, ...RETRY_DELAYS_MS]) {
     if (delay > 0) {
+      if (licenseRenewalSuspended) break
       if (Date.now() + delay - startedAt > RETRY_WINDOW_MS) break
       await new Promise<void>((resolve) => window.setTimeout(resolve, delay))
+      if (licenseRenewalSuspended) break
     }
+    // 这一次续期带的就是这张票（refreshOnce 同步读当前票，中间没有 await）。
+    const attemptToken = token()
     try {
       const remainingMs = startedAt + RETRY_WINDOW_MS - Date.now()
       if (remainingMs <= 0) break
@@ -189,27 +251,59 @@ async function retryRefreshOnce(): Promise<void> {
       return
     } catch (error) {
       lastError = error
+      if (recordLicenseRejection(error, true)) {
+        throw error
+      }
+      if (sessionInvalid(error)) invalidToken = attemptToken
       if (!transient(error)) break
     }
   }
-  // 刷新走不通了（票被吊销 / 过期，重试无益）。在放弃之前，向本机 Agent 要一张新引导票
+  // 服务端明确作废的那一张票记下来。只记收到作废的那一张，而且它还是当前票才记。
+  // 空转的那条初始错误（带引导票没换成、循环一次都没跑）不算。
+  noteRejectedToken(invalidToken)
+  // 刷新走不通了（票被吊销 / 过期，或暂时连不上）。在放弃之前，向本机 Agent 要一张新引导票
   // 重新建会话 —— 这是看门狗重启浏览器时走的同一条路，页面自己走一遍就不必等浏览器重启。
+  // 上面还有这一位的别的内容时，reBootstrapFromLocalAgent 自己会停住，不取票。
   // 桥接令牌未配置（普通浏览器打开）时 requestLocalBootTicket 返回 null，此处仍然 fail-closed。
-  if (await reBootstrapFromLocalAgent()) return
+  // 暂停复查的续期若遭 401，留到下次复查再换票，避免两次请求不足五分钟。
+  // 正常模式的例行续期和业务 401 重试不受复查限频约束。
+  if (!licenseRenewalSuspended && await reBootstrapFromLocalAgent()) return
 
   setState('failed')
   throw lastError
 }
 
-/** 用本机 Agent 的新引导票重建会话。成功返回 true 并已置为 ready。 */
+/**
+ * 用本机 Agent 的新引导票重建会话。成功返回 true 并已置为 ready。
+ *
+ * 推迟只发生在这里，四个调用点都经过这个函数，不在调用点上各判一次。
+ * 页面刚打开（还没离开过最初那次 checking）不判。已经 settled 且还有别的内容：取票前停一次，
+ * 取到票、换票前再停一次（取票最长 4 秒，这期间人可能开始填东西）。停住时不换票。
+ * 停住时只有确实要换新票才标「压着」；原票只是暂时续不上不标，下一轮先拿原票续。
+ */
 async function reBootstrapFromLocalAgent(): Promise<boolean> {
+  const hadSettledState = hadSettled()
+  if (hadSettledState && kioskSensitiveSessionScope() === 'with-other') {
+    holdRecoveryForOtherContent()
+    return false
+  }
+  // 重建真的往下走：不再是「压着等他结束」。取票期间人又填了别的，下面还会再停一次。
+  dropRecoveryHold()
   const ticket = await requestLocalBootTicket()
   if (!ticket) return false
+  if (hadSettledState && kioskSensitiveSessionScope() === 'with-other') {
+    holdRecoveryForOtherContent()
+    return false
+  }
+  let clearedScope: KioskClearScope = 'none'
   try {
-    await exchangeBootTicket(ticket, REQUEST_TIMEOUT_MS)
+    clearedScope = await exchangeBootTicket(ticket, REQUEST_TIMEOUT_MS)
   } catch {
     return false
   }
+  markBootExchangeSettled()
+  // 清掉了什么以换票那一刻、清场之前的判断为准。页面刚打开那一次不算。
+  rememberRecoveryClearScope(hadSettledState, clearedScope)
   setState('ready')
   scheduleRefresh()
   return true
@@ -218,7 +312,20 @@ async function reBootstrapFromLocalAgent(): Promise<boolean> {
 function scheduleRefresh(): void {
   if (API_MODE !== 'http') return
   if (refreshTimer !== null) window.clearTimeout(refreshTimer)
+  refreshTimer = null
+  if (licenseRenewalSuspended) return
   refreshTimer = window.setTimeout(() => { void retryRefresh().catch(() => undefined) }, 10 * 60_000)
+}
+
+export function setLicenseRenewalSuspended(suspended: boolean): void {
+  if (licenseRenewalSuspended === suspended) return
+  licenseRenewalSuspended = suspended
+  if (refreshTimer !== null) window.clearTimeout(refreshTimer)
+  refreshTimer = null
+  if (suspended) cancelRecovery()
+  if (!suspended && state === 'ready') scheduleRefresh()
+  else if (!suspended && state === 'checking') void initializeTerminalSession()
+  else if (!suspended && state === 'failed' && !licenseRenewalRejected) scheduleRecovery()
 }
 
 let initInflight: Promise<void> | null = null
@@ -227,8 +334,18 @@ let initInflight: Promise<void> | null = null
 // 若不合并会把状态误置为 failed。进行中的初始化直接复用同一个 Promise。
 export function initializeTerminalSession(): Promise<void> {
   if (initInflight) return initInflight
+  if (licenseRenewalSuspended && !licenseRecheckActive) return Promise.resolve()
   initInflight = initializeTerminalSessionOnce().finally(() => { initInflight = null })
   return initInflight
+}
+
+/** 只在授权暂停时调用的低频复查；由授权闸门负责限频。 */
+export function recheckTerminalSessionAfterLicensePause({ credentialExpired }: { credentialExpired: boolean } = { credentialExpired: false }): Promise<void> {
+  clearTerminalLicenseRenewalRejection()
+  // 凭证已过期：清掉过期票，初始化就会走「没有存量票 → 向本机 Agent 重新取票」，而不是拿过期票去续期。
+  if (credentialExpired) { try { window.sessionStorage.removeItem(STORAGE_KEY) } catch { /* storage unavailable */ } }
+  licenseRecheckActive = true
+  return initializeTerminalSession().finally(() => { licenseRecheckActive = false })
 }
 
 async function initializeTerminalSessionOnce(): Promise<void> {
@@ -252,10 +369,12 @@ async function initializeTerminalSessionOnce(): Promise<void> {
 
 async function retryBootTicketExchange(bootTicket: string): Promise<void> {
   const startedAt = Date.now()
-  for (const delay of [0, ...RETRY_DELAYS_MS]) {
+  for (const delay of licenseRenewalSuspended ? [0] : [0, ...RETRY_DELAYS_MS]) {
     if (delay > 0) {
+      if (licenseRenewalSuspended) break
       if (Date.now() + delay - startedAt > RETRY_WINDOW_MS) break
       await new Promise<void>((resolve) => window.setTimeout(resolve, delay))
+      if (licenseRenewalSuspended) break
     }
     try {
       const remainingMs = startedAt + RETRY_WINDOW_MS - Date.now()
@@ -268,6 +387,11 @@ async function retryBootTicketExchange(bootTicket: string): Promise<void> {
       if (!transient(error)) break
     }
   }
+  // URL 上那张票只有 60 秒、只能用一次，到这里已经指望不上。与续期那条路一样，判死之前
+  // 先向本机 Agent 要一张新票；还不行才 failed，之后由后台恢复每分钟再要一次。
+  markBootExchangeUnsettled()
+  // 授权暂停或被拒时不另取新票（会再撞一次 403，且绕过复查限频）。
+  if (!licenseRenewalSuspended && !licenseRenewalRejected && await reBootstrapFromLocalAgent()) return
   setState('failed')
 }
 
@@ -289,7 +413,8 @@ export function subscribeTerminalSession(listener: (next: TerminalSessionState) 
  *
  * 边界三条，一条都不放宽：
  *   · 只等「checking 且确有在飞续期」。启动引导（checking 但没有 refreshInflight）
- *     与 failed 仍然立即失败：前者没有可等的结果，后者已经判过死。
+ *     与 failed 仍然立即失败：前者没有可等的结果，后者已经判过死
+ *     （failed 之后后台那一轮成功会把状态改回 ready，但 state 还是 failed 时本函数不等它）。
  *   · 自己绝不发起续期。等的永远是别人已经在飞的那个 Promise，因此并发业务请求
  *     仍然只对应一次 /session-token/refresh。
  *   · 等失败不降级：统一抛 TERMINAL_SESSION_INVALID，不把续期的原始错误（可能是
@@ -343,13 +468,27 @@ interface AiDeclarationBridge {
 }
 
 /**
- * 使用声明在应用启动时注册。本文件不新增 import：终端会话门禁按固定的替身表
+ * 使用声明在应用启动时注册。本文件不 import 声明模块：终端会话门禁按固定的替身表
  * 编译它，多一个运行时依赖就会让那道门禁无法判定。
  */
 let aiDeclarationBridge: AiDeclarationBridge | null = null
 
 export function registerAiDeclarationBridge(bridge: AiDeclarationBridge | null): void {
   aiDeclarationBridge = bridge
+}
+
+/**
+ * 游客用 AI 被要求先登录（401 AI_LOGIN_REQUIRED）时报一声，由启动时登记的观察者转给全局登录提示。
+ * 只报不改：响应原样交还调用方，页面照旧按错误码出字。本文件不 import 提示模块，理由同上。
+ */
+let aiLoginRequiredObserver: (() => void) | null = null
+
+export function registerAiLoginRequiredObserver(observer: (() => void) | null): void {
+  aiLoginRequiredObserver = observer
+}
+
+function reportAiLoginRequired(error: ApiHttpError): void {
+  if (error.status === 401 && error.code === 'AI_LOGIN_REQUIRED') aiLoginRequiredObserver?.()
 }
 
 async function replayDeclaration(
@@ -394,7 +533,8 @@ export async function terminalProtectedFetch(
   if (replay) return replay
   if (response.ok) return response
   const error = await asHttpError(response.clone())
-  // 业务请求 401 只触发一次会话刷新（刷新本身只对网络抖动 / 503 重试）；其它错误原样交给调用方。
+  reportAiLoginRequired(error)
+  // 业务请求 401 只触发一次会话刷新（刷新本身只对网络抖动与 502 / 503 / 504 重试）；其它错误原样交给调用方。
   if (!sessionInvalid(error)) return response
   await retryRefresh()
   // 刷新最长可达 60 秒。人已离页或本机已清场时不重放：原 401 的 body 还没被读过
@@ -443,7 +583,9 @@ export async function terminalAttributedFetch(
   if (!getTerminalId()) {
     const response = await fetch(input, init)
     const replay = await replayDeclaration(input, init, response, declarationRetried, sendAgain)
-    return replay ?? response
+    const settled = replay ?? response
+    if (settled.status === 401) reportAiLoginRequired(await asHttpError(settled.clone()))
+    return settled
   }
   const inflight = state === 'checking' ? refreshInflight : null
   if (inflight) {
@@ -453,7 +595,9 @@ export async function terminalAttributedFetch(
   const replay = await replayDeclaration(input, init, response, declarationRetried, sendAgain)
   if (replay) return replay
   if (response.status !== 401) return response
-  if (!sessionInvalid(await asHttpError(response.clone()))) return response
+  const unauthorized = await asHttpError(response.clone())
+  reportAiLoginRequired(unauthorized)
+  if (!sessionInvalid(unauthorized)) return response
   try {
     await retryRefresh()
   } catch {
@@ -471,14 +615,16 @@ export async function terminalAttributedFetch(
 //
 // 存在的理由：E2E 构建里会话恒为 ready，而真实的「续期在飞」只由十分钟定时器触发 ——
 // 浏览器用例既等不到它，也没有别的入口进到 checking 窗口，于是上面那段等待逻辑在浏览器里
-// 从来没被跑过（缺陷正是长在这段里）。这里只暴露两个动作：发起一次**真实**续期（与定时器
-// 调的是同一个 retryRefresh），和读一眼当前状态。它不放宽任何判定 —— 状态仍由真实代码写、
-// 票仍由真实代码读发，用例能控制的只是续期应答回来的时机。
+// 从来没被跑过（缺陷正是长在这段里）。这里暴露三个动作：发起一次**真实**续期（与定时器
+// 调的是同一个 retryRefresh）、读一眼当前状态，以及把三样只读恢复视图置成给定值。
+// 它不放宽任何判定 —— 状态仍由真实代码写、票仍由真实代码读发；setRecoveryView 不改会话状态、不发请求。
 export interface TerminalSessionE2EHooks {
   /** 发起一次真实续期，等价于十分钟定时器那一次。 */
   startRefresh: () => void
   /** 只读当前会话状态。 */
   state: () => TerminalSessionState
+  /** 把三样只读值置成给定值并通知订阅者。不改会话状态、不发请求；状态仍由 startRefresh 加路由应答驱动。 */
+  setRecoveryView: (view: { deferred?: boolean; needsNewTicket?: boolean; clearScope?: KioskClearScope }) => void
 }
 
 if (HAS_E2E_MOCK_TOKEN) {
@@ -487,5 +633,23 @@ if (HAS_E2E_MOCK_TOKEN) {
   host.__terminalSessionE2E = {
     startRefresh: () => { void retryRefresh().catch(() => undefined) },
     state: () => state,
+    setRecoveryView: (view) => { applyE2ERecoveryView(view) },
   }
 }
+
+attachRecoveryRuntime({
+  apiMode: () => API_MODE,
+  getState: () => state,
+  token,
+  refreshOnce,
+  reBootstrapFromLocalAgent,
+  scheduleRefresh,
+  setReady: () => { setState('ready') },
+  sessionInvalid,
+  getRefreshInflight: () => refreshInflight,
+  setRefreshInflight: (next) => { refreshInflight = next },
+  getInitInflight: () => initInflight,
+  notify: () => { listeners.forEach((listener) => listener(state)) },
+  invalidError: () => new ApiHttpError('TERMINAL_SESSION_INVALID', '这台机器的安全校验没通过', 401),
+  requestTimeoutMs: REQUEST_TIMEOUT_MS,
+})

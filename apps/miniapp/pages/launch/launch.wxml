@@ -1,94 +1,108 @@
-<!--pages/launch/launch.wxml-->
-<view class="launch-wrap">
+<!--pages/launch/launch.wxml
+  2026-11-12 登录页改版（产品负责人：「登录页面重新设计的高级些」，只放开本页外观，登录逻辑不动）。
+  上半：品牌字标，加一张从登录卡片「出纸口」里出来的纸，纸上印着服务说明，职易达做的就是简历和打印。
+  下半：登录卡片。协议勾选放在主按钮正上方：没勾时主按钮是淡的，一眼看得出先勾哪里。
+  提审驳回整改照旧：本页不出现腾讯官方的字样和标志，按钮叫「手机号快捷登录」，门禁见 verify-miniapp-static.mjs。
+-->
+<view class="lg {{showSms ? 'is-sms' : ''}}">
   <view style="height:{{statusBarHeight}}px"></view>
 
-  <view class="launch-mid">
-    <view class="launch-icon-wrap">
-      <text class="ficon i-aim launch-icon-ic"></text>
+  <view class="lg-hero">
+    <view class="lg-brand">
+      <view class="lg-mark" aria-hidden="true"><text class="ficon i-aim lg-mark-ic"></text></view>
+      <view class="lg-brand-copy">
+        <view class="lg-name">职易达</view>
+        <view class="lg-tagline">AI 简历工具 · 文档打印服务</view>
+      </view>
     </view>
-    <view class="launch-brand">职易达</view>
-    <view class="launch-sub">AI 简历 · 文档打印</view>
-    <view class="launch-slogan">简历和材料，手机上准备好，到机器前直接打印</view>
+
+    <!-- 出纸：纯样式画的两张纸，下沿压在登录卡片顶上的出纸口里。只是装饰，读屏跳过。 -->
+    <view class="lg-stage" aria-hidden="true">
+      <view class="lg-sheet lg-sheet-back"></view>
+      <view class="lg-sheet lg-sheet-front">
+        <view class="lg-sheet-rule"></view>
+        <view class="lg-sheet-h">简历和材料，</view>
+        <view class="lg-sheet-h">手机上准备好</view>
+        <view class="lg-sheet-sub">到机器前直接打印</view>
+        <view class="lg-sheet-line"></view>
+        <view class="lg-sheet-line lg-w92"></view>
+        <view class="lg-sheet-line lg-w60"></view>
+        <view class="lg-sheet-line lg-para"></view>
+        <view class="lg-sheet-line lg-w86"></view>
+      </view>
+    </view>
   </view>
 
-  <view class="launch-btns">
-    <view class="sheet-handle"></view>
-    <view class="sheet-title">登录后继续</view>
-    <view class="sheet-sub">同步本人简历、文档、打印订单和 AI 服务记录</view>
+  <view class="lg-panel">
+    <view class="lg-slot" aria-hidden="true"></view>
+
+    <view class="lg-title">{{showSms ? '短信验证码登录' : '登录后继续'}}</view>
+    <view class="lg-sub">同步本人简历、文档、打印订单和 AI 服务记录</view>
 
     <!-- 正式版协议没发布（C4）：先说清楚为什么不能登录、不登录还能做什么。 -->
-    <view wx:if="{{legalBlocked}}" class="launch-blocked" role="alert">
-      <view class="lb-t">服务协议还没有正式发布，暂时不能登录</view>
-      <view class="lb-d">不登录也可以看使用帮助和打印指引，也可以扫一体机屏幕上的码，把文件传到一体机打印。</view>
+    <view wx:if="{{legalBlocked}}" class="lg-blocked" role="alert">
+      <text class="ficon i-info lg-blocked-ic" aria-hidden="true"></text>
+      <view class="lg-blocked-body">
+        <view class="lg-blocked-t">服务协议还没有正式发布，暂时不能登录</view>
+        <view class="lg-blocked-d">不登录也可以看使用帮助和打印指引，也可以扫一体机屏幕上的码，把文件传到一体机打印。</view>
+      </view>
     </view>
 
-    <!-- ① 微信一键登录（默认） -->
-    <block wx:if="{{!showSms}}">
-      <button class="btn wx block launch-btn-wx tap" hover-class="tap-press"
-        open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber" disabled="{{!agreed || legalBlocked}}">
-        <text class="ficon i-comment launch-wx-icon"></text>微信一键登录
-      </button>
-      <view class="launch-alt tap" hover-class="tap-press" bindtap="tapSmsLogin">
-        使用短信验证码登录
-      </view>
-      <button class="btn block launch-btn-guest tap" hover-class="tap-press" bindtap="tapSkip">
-        暂不登录
-      </button>
-    </block>
-
-    <!-- ② 短信验证码登录（内嵌，不跳页面） -->
-    <block wx:else>
-      <!-- 手机号 -->
-      <view class="sms-field">
-        <view class="sms-phone-wrap">
-          <view class="sms-prefix">+86</view>
-          <input class="sms-phone-input" type="number" maxlength="11"
-            placeholder="手机号码" placeholder-style="color:#98a2b3"
-            value="{{phone}}" bindinput="onPhoneInput" focus="{{showSms}}" />
-          <view class="sms-send-btn {{counting || sending ? 'counting' : ''}} tap"
-            hover-class="tap-press" bindtap="sendCode">
-            {{sending ? '发送中' : (counting ? countDown + 's' : '发送验证码')}}
-          </view>
+    <!-- ② 短信验证码登录（内嵌，不跳页面）：先填手机号和验证码，协议与确认键在下面 -->
+    <block wx:if="{{showSms}}">
+      <view class="lg-field">
+        <view class="lg-prefix">+86</view>
+        <input class="lg-phone" type="number" maxlength="11"
+          placeholder="手机号码" placeholder-class="lg-ph"
+          value="{{phone}}" bindinput="onPhoneInput" focus="{{showSms}}" />
+        <view class="lg-send {{counting || sending ? 'is-off' : ''}} tap" hover-class="tap-press" bindtap="sendCode" role="button">
+          {{sending ? '发送中' : (counting ? countDown + 's 后重发' : '发送验证码')}}
         </view>
-        <view wx:if="{{codeHint}}" class="sms-hint">{{codeHint}}</view>
       </view>
+      <view wx:if="{{codeHint}}" class="lg-hint">{{codeHint}}</view>
 
-      <!-- 验证码格子 -->
-      <view class="sms-otp-wrap" style="position:relative">
+      <!-- 验证码格子：上面盖一个透明输入框收数字 -->
+      <view class="lg-otp">
         <block wx:for="{{otp}}" wx:key="index">
-          <view class="sms-otp-box {{item ? 'filled' : ''}} {{code.length === index ? 'active' : ''}}">
-            {{item}}
-          </view>
+          <view class="lg-otp-box {{item ? 'is-filled' : ''}} {{code.length === index ? 'is-active' : ''}}">{{item}}</view>
         </block>
-        <input class="sms-otp-hidden" type="number" maxlength="6"
+        <input class="lg-otp-input" type="number" maxlength="6"
           value="{{code}}" bindinput="onCodeInput" />
       </view>
+    </block>
 
-      <!-- 确认登录 -->
-      <button class="btn block launch-btn-sms-confirm tap" hover-class="tap-press"
+    <!-- 法律条款（两种模式共用）：整行点按切换勾选，两份协议单独点开 -->
+    <view class="lg-consent" bindtap="toggleAgree" role="checkbox" aria-checked="{{agreed}}">
+      <view class="lg-check {{agreed ? 'is-on' : ''}}">
+        <text wx:if="{{agreed}}" class="ficon i-check lg-check-ic" aria-hidden="true"></text>
+      </view>
+      <view class="lg-consent-copy">
+        <view>我已阅读并同意<text class="lg-link" role="link" catchtap="tapTerms">《用户服务协议》</text>和<text class="lg-link" role="link" catchtap="tapPrivacy">《隐私政策》</text>，</view>
+        <view>并确认已年满 14 周岁</view>
+      </view>
+    </view>
+
+    <!-- ① 手机号快捷登录（默认）。没勾协议、协议没发布时禁用。 -->
+    <block wx:if="{{!showSms}}">
+      <button class="btn block lg-btn tap" hover-class="tap-press"
+        open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber" disabled="{{!agreed || legalBlocked}}">
+        手机号快捷登录
+      </button>
+      <view class="lg-alts">
+        <view class="lg-alt lg-alt-sms tap" hover-class="tap-press" bindtap="tapSmsLogin" role="button">使用短信验证码登录</view>
+        <view class="lg-alt-sep" aria-hidden="true"></view>
+        <view class="lg-alt tap" hover-class="tap-press" bindtap="tapSkip" role="button">暂不登录</view>
+      </view>
+    </block>
+
+    <block wx:else>
+      <button class="btn block lg-btn tap" hover-class="tap-press"
         loading="{{submitting}}" disabled="{{submitting}}" bindtap="confirmSms">
         {{submitting ? '登录中' : '确认登录'}}
       </button>
-
-      <!-- 返回微信登录 -->
-      <view class="launch-alt tap" hover-class="tap-press" bindtap="tapBackToWx">
-        <text class="ficon i-right launch-back-icon"></text>返回微信一键登录
+      <view class="lg-back tap" hover-class="tap-press" bindtap="tapBackToWx" role="button">
+        <text class="ficon i-right lg-back-ic" aria-hidden="true"></text>返回手机号快捷登录
       </view>
     </block>
-
-    <!-- 法律条款（两种模式共用） -->
-    <view class="launch-legal">
-      <view class="launch-agree tap" hover-class="tap-press" bindtap="toggleAgree">
-        <view class="launch-check {{agreed ? 'checked' : ''}}">
-          <view wx:if="{{agreed}}" class="check-dot"></view>
-        </view>
-        <text>我已阅读并同意</text>
-      </view>
-      <view>
-        <text class="launch-link tap" catchtap="tapTerms">《用户服务协议》</text>和
-        <text class="launch-link tap" catchtap="tapPrivacy">《隐私政策》</text>，并确认已年满 14 周岁
-      </view>
-    </view>
-
   </view>
 </view>

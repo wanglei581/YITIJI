@@ -4,8 +4,8 @@
  */
 import assert from 'node:assert/strict'
 import test, { mock } from 'node:test'
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { readdirSync, readFileSync } from 'node:fs'
+import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 
@@ -447,6 +447,23 @@ test('终端号变了而根没在跑：缓存认终端号，换号后不复用�
     assert.equal(reloaded.servicePhone, PHONE_B)
     assert.deepEqual(calls, ['KSK-001', 'KSK-002'])
   })
+})
+
+test('断网标准句是合规定字，一体机源码不得再出现「收到提醒并远程处理」', () => {
+  assert.equal(copy.networkDisconnectLine(), '网络断开时，这台机器暂时办不了需要联网的事，请稍后再来')
+  const forbidden = '收到提醒并远程处理'
+  const hits = []
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (/\.(?:ts|tsx|js|mjs|css)$/.test(entry.name) && readFileSync(full, 'utf8').includes(forbidden)) {
+        hits.push(relative(kioskRoot, full))
+      }
+    }
+  }
+  walk(join(kioskRoot, 'src'))
+  assert.deepEqual(hits, [], `源码里还有断网假承诺：${hits.join(', ')}`)
 })
 
 test('没有终端身份时也读（机器未登记正是需要电话的时候），身份到了再带终端号重读', async () => {

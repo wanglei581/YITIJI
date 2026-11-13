@@ -11,6 +11,9 @@
  * to keep agent code self-contained.
  */
 
+import type { ScanDeviceHealthState } from './scan-device/scan-device-health'
+import type { ScanDeviceDeletionReason } from './scan-device/scan-temp-dir'
+
 export type { PrintJobParams } from '../printer/types'
 
 // ── Scan input health ──────────────────────────────────────────────────────
@@ -113,6 +116,28 @@ export interface AgentConfig {
    */
   holdPrinterQueueWhenIdle?: boolean
   /**
+   * 屏上扫描总开关。缺省 false：不注册本机扫描路由、不探测、不清残留、心跳不带扫描仪字段。
+   * 后端 B1 上生产之前不得打开，否则心跳多出的字段会被 forbidNonWhitelisted 拒成 400。
+   */
+  scanDeviceEnabled?: boolean
+  /** 屏上复印默认关闭；扫描材料只留本机。 */
+  copyDeviceEnabled?: boolean
+  /** 本机小角度纠偏开关；缺省或无效为 false，心跳不能覆盖。S4a 尚未接线。 */
+  scanAutoDeskewEnabled?: boolean
+  /**
+   * WIA 扫描仪名称。空字符串表示用第一台扫描仪（由扫描引擎读取），不在这里写死型号。
+   */
+  scanDeviceName?: string
+  /**
+   * 屏上扫描单次最多页数。缺省 20，合法范围 1–50。
+   */
+  scanDeviceMaxPages?: number
+  /**
+   * 设备回报是否带上这一场实际的 source 与 colorMode。缺省 false。
+   * 后端 B4 上生产之前不得打开：B1 的 DTO 是 forbidNonWhitelisted，多带字段会 400。
+   */
+  scanDeviceReportSettings?: boolean
+  /**
    * 打印机"扫描到 SMB/FTP 共享目录"对应的本地可访问路径（映射盘符或 UNC 路径）。
    * 显式配置，不给默认值；未配置时扫描监听整体不启动，不影响其余 Agent 功能。
    */
@@ -183,10 +208,30 @@ export interface HeartbeatPayload {
   wiredNetworkStatus?: 'connected' | 'disconnected' | 'unknown'
   /** TCP reachability of a configured Windows network-printer port, when discoverable. */
   printerNetworkStatus?: 'reachable' | 'unreachable' | 'not_network_printer' | 'unknown'
+  /**
+   * 只读打印队列诊断，不含打印机地址、端口号或口令。
+   * 老终端不带这些字段。后端还不认时，终端会去掉后再发一次。
+   */
+  printerQueueName?: string
+  printerQueuePortKind?: 'usb' | 'network' | 'wsd' | 'other' | 'unknown'
+  /** 只在 usb 且端口名匹配 USB### / DOT4_### 时出现。 */
+  printerQueuePortName?: string
+  /** Win32_Printer 五个属性原值，或 not_found / query_failed。不含地址。 */
+  printerQueueRawStatus?: string
+  printerQueueSpooler?: 'running' | 'stopped' | 'other' | 'unknown'
   scanInputHealth?: ScanInputRuntimeHealth
   scanInputAction?: ScanInputRequiredAction
   scanInputReason?: ScanInputLockoutReason | null
   scanInputObservedAt?: string
+  /** 屏上扫描开关打开时才带。后端 B1 上生产前打开开关会因多余字段被拒。 */
+  scanDeviceHealth?: ScanDeviceHealthState
+  scanDeviceObservedAt?: string
+  /**
+   * 打印完成判据。启动自检之后才带。
+   * available：PrintService/Operational 已启用。unavailable：没启用或启用失败。
+   * 自检前不带，避免把「还没看」说成可用。
+   */
+  printCompletionEvidence?: 'available' | 'unavailable'
 }
 
 export interface HeartbeatResponse {
@@ -265,7 +310,7 @@ export interface PatchStatusResponse {
 
 export interface ScanDeletionAuditReportPayload {
   eventId: string
-  reasonCode: 'UNCLAIMED_TTL_EXPIRED'
+  reasonCode: 'UNCLAIMED_TTL_EXPIRED' | ScanDeviceDeletionReason
   identifierHash: string
   createdAt: string
   deletedAt: string | null

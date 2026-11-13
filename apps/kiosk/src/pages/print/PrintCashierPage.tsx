@@ -31,7 +31,7 @@ import {
   simulateSandboxPayment,
 } from '../../services/print/paymentApi'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
-import { containsStaffHandoff, preferUnattended, printProblemLine, refundApplyLine } from '../../copy/unattendedCopy'
+import { containsStaffHandoff, networkDisconnectLine, preferUnattended, printProblemLine, refundApplyLine } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
 
 function shownIssue(error: unknown, fallback: string): string {
@@ -223,7 +223,7 @@ export function PrintCashierPage() {
         if (cancelRef.current) return
         setChannels([])
         setChannelLoadState('error')
-        setIssueError(shownIssue(err, '获取支付通道失败，请检查网络后重试'))
+        setIssueError(shownIssue(err, `获取支付通道失败。${networkDisconnectLine()}。`))
       }
     })()
     return () => {
@@ -572,7 +572,7 @@ export function PrintCashierPage() {
           <FilePlus2Icon aria-hidden="true" />改参数需重新下单
         </button>
       ) : null}
-      {isOpenUnpaidOrder ? (
+      {isOpenUnpaidOrder || qxState === 'expired' ? (
         <button
           type="button"
           className="qx-btn"

@@ -26,6 +26,8 @@ type InterviewReportView = InterviewReportResponse & {
 import { AI_LABEL_COPY, COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { getInterviewReport, printInterviewReport } from '../../services/api/interview'
 import { useAuth } from '../../auth/useAuth'
+import { useKioskLicense, useWindDownViewOnly } from '../../layouts/KioskLicenseContext'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
 import { useSupportContact } from '../../hooks/useSupportContact'
@@ -40,6 +42,7 @@ import {
   readInterviewWorkbenchSession,
 } from './interviewWorkbenchSession'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
+import { useInterviewTakeaway } from './useInterviewTakeaway'
 import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
 import './styles/interview-qx2.css'
@@ -51,6 +54,7 @@ interface ReportState {
   sessionId?: string
   accessToken?: string
   report?: InterviewReportView
+  licenseViewOnly?: boolean
 }
 
 /** 一个维度：标题是真正的标题，下面是这一维的几条观察。 */
@@ -83,6 +87,9 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
   const { getToken } = useAuth()
   const storedReport = readInterviewWorkbenchSession()?.report
   const locationState = (location.state ?? {}) as ReportState
+  const windDownViewOnly = useWindDownViewOnly('interview')
+  const licenseFlagViewOnly = useKioskLicense().mode === 'winding-down' && locationState.licenseViewOnly === true
+  const viewOnly = windDownViewOnly || licenseFlagViewOnly
   const state: ReportState = {
     sessionId: locationState.sessionId ?? storedReport?.sessionId,
     accessToken: locationState.accessToken ?? storedReport?.accessToken,
@@ -99,6 +106,7 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
   const overviewRef = useRef<HTMLHeadingElement>(null)
   const contact = useSupportContact()
   const shownPrintError = interviewUserLine(printError, contact)
+  const phoneSave = useInterviewTakeaway('interview_report')
 
   useBusyLock(printing)
 
@@ -121,7 +129,7 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
   }, [state.sessionId, state.accessToken])
 
   const handlePrint = async () => {
-    if (!data) return
+    if (viewOnly || !data) return
     setPrinting(true)
     setPrintError(null)
     try {
@@ -146,7 +154,11 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
     }
   }
 
-  const goSetup = () => onGoStage ? onGoStage('setup') : navigate('/interview/setup')
+  const goSetup = () => {
+    if (viewOnly) return
+    if (onGoStage) onGoStage('setup')
+    else navigate('/interview/setup')
+  }
   const goReports = () => onGoStage ? onGoStage('reports') : navigate('/interview/reports')
   const leave = () => navigate('/interview-service')
 
@@ -167,12 +179,15 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
         ctabar={
           <QxTouchDock
             onBack={leave}
-            ask={{ label: '问小青：报告还在读取怎么办', draft: '练习报告还在读取。请说明我可以先做什么，不要假装报告已经生成。' }}
+            ask={viewOnly
+              ? { label: '问小青：报告还在读取怎么办', disabled: true }
+              : { label: '问小青：报告还在读取怎么办', draft: '练习报告还在读取。请说明我可以先做什么，不要假装报告已经生成。' }}
           />
         }
       >
         <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
           <div className="interview-flow__scroll">
+            {viewOnly ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : null}
             <InterviewStatus label="报告读取状态" items={[{ k: '报告内容', v: '读取中' }, { k: '打印版', v: '未生成' }, { k: '录用预测', v: '不提供' }]} />
             <InterviewArt title="正在读取本场练习报告">读取完成前，这里不展示上一次的内容，也不显示评分、打印成功或可下载文件。读取没有完成之前，不能生成打印版。</InterviewArt>
           </div>
@@ -190,13 +205,21 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
         ctabar={
           <QxTouchDock
             onBack={leave}
-            ask={{ label: '问小青：这份练习报告怎么看', draft: REPORT_AI_DRAFT }}
-            primary={{ label: '重新开始练习', onClick: goSetup }}
+            ask={viewOnly
+              ? { label: '问小青：这份练习报告怎么看', disabled: true }
+              : { label: '问小青：这份练习报告怎么看', draft: REPORT_AI_DRAFT }}
+            primary={{
+              label: '重新开始练习',
+              onClick: goSetup,
+              disabled: viewOnly,
+              title: viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined,
+            }}
           />
         }
       >
         <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
           <div className="interview-flow__scroll">
+            {viewOnly ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : null}
             <button type="button" className="qxt-iv-wide" onClick={goReports}>
               <b>查看报告历史</b>
               <small>回到本人的练习记录</small>
@@ -229,13 +252,16 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
       ctabar={
         <QxTouchDock
           onBack={more ? () => setMore(false) : leave}
-          ask={{ label: '问小青：这份练习报告怎么看', draft: REPORT_AI_DRAFT }}
+          ask={viewOnly
+            ? { label: '问小青：这份练习报告怎么看', disabled: true }
+            : { label: '问小青：这份练习报告怎么看', draft: REPORT_AI_DRAFT }}
           primary={more
             ? { label: '回到这份报告', onClick: () => setMore(false), testId: 'interview-primary' }
             : {
                 label: printing ? '正在生成打印版…' : '生成打印版',
                 onClick: () => void handlePrint(),
-                disabled: printing,
+                disabled: printing || viewOnly,
+                title: viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined,
                 testId: 'interview-primary',
               }}
         />
@@ -243,6 +269,7 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
     >
       <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
         <div className="interview-flow__scroll">
+          {viewOnly ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : null}
           <AiBanner />
           {more ? (
             <>
@@ -317,9 +344,21 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
                 <b>预测题、STAR、清单、摘录</b>
                 <small>{printNote}</small>
               </button>
+              <button
+                type="button"
+                className="qxt-iv-wide"
+                data-testid="interview-report-phone-save"
+                disabled={viewOnly || printing || phoneSave.busy}
+                onClick={() => void phoneSave.open(() => printInterviewReport(data.sessionId, { token: getToken(), accessToken: state.accessToken }), '报告文件没有生成，请稍后再试')}
+              >
+                <b>{phoneSave.busy ? '正在生成报告文件…' : '扫码存到手机'}</b>
+                <small>生成这份报告的 PDF，用本人手机扫码保存；预览里也可以直接去打印。</small>
+              </button>
+              {phoneSave.error ? <p className="qxt-iv-err" role="alert">{phoneSave.error}</p> : null}
+              {phoneSave.dialog}
               <div className="qxt-iv-acts">
                 <button type="button" onClick={goReports}>查看历史报告</button>
-                <button type="button" onClick={goSetup}>重新练习</button>
+                <button type="button" onClick={goSetup} disabled={viewOnly} title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined}>重新练习</button>
               </div>
               <div className="qxt-iv-note">
                 <span>{COMPLIANCE_COPY.INTERVIEW_PRACTICE_RESULT_DISCLAIMER}</span>

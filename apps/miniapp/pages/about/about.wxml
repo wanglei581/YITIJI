@@ -18,7 +18,7 @@
     <view class="ab-logo">
       <view class="ab-mark"><text class="ficon i-aim ab-ic"></text></view>
       <view class="ab-name">职易达</view>
-      <view class="ab-ver">版本 1.0.2</view>
+      <view class="ab-ver">版本 1.0.4</view>
       <view class="ab-slogan">AI 简历工具 · 文档打印服务</view>
     </view>
 

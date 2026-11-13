@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { ResumeOptimizeModule } from '@ai-job-print/shared'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
@@ -6,6 +6,7 @@ import { resumeUserReason } from './resumeUserCopy'
 import { ResumeTouchPage } from './touch/ResumeTouchPage'
 import { useAuth } from '../../auth/useAuth'
 import { aiErrorMessageOf, isAiOutage, useAiTask } from '../../ai'
+import { AI_QUOTA_EXHAUSTED_RESUME_COPY } from '../../services/api/userErrorMessage'
 import { getResumeOptimize } from '../../services/api'
 import { readAiResumeSession } from './aiResumeSession'
 import { ResumeCompareBatchBar } from './components/resume-compare/ResumeCompareBatchBar'
@@ -61,6 +62,8 @@ export function ResumeOptimizeComparePage() {
     return focus > 0 ? focus : 0
   })
   const [decisions, setDecisions] = useState<ResumeCompareDecisions>(() => initialDecisionsFrom(state))
+  // 同一次进入（同一任务、同一重试）的 effect 重放不能把上面带进来的条目和选择清掉。
+  const appliedEntryRef = useRef<string | null>(null)
   const [confirmedByModule, setConfirmedByModule] = useState<Record<string, string[]>>({})
   const [customByModule, setCustomByModule] = useState<Record<string, string>>({})
   const [batchNote, setBatchNote] = useState<string | null>(null)
@@ -72,24 +75,36 @@ export function ResumeOptimizeComparePage() {
       return
     }
     let cancelled = false
+    const entryToken = `${taskId}|${accessToken ?? ''}|${existingOnly ? '1' : '0'}|${retryNonce}`
+    const keepEntrySelection = appliedEntryRef.current === entryToken
     setLoading(true)
     setModules([])
     setLoadedTaskId(null)
     setProviderName(null)
     setOutage(null)
     setFailure(null)
-    setCurrentIndex(0)
-    setDecisions({})
-    setConfirmedByModule({})
-    setCustomByModule({})
-    setBatchNote(null)
-    setWriteOpen(false)
+    if (!keepEntrySelection) {
+      // 换任务或点「重新读取」时清掉上一份选择。同一次进入只清一次，随后把路由带进来的条目和选择放回去。
+      setCurrentIndex(0)
+      setDecisions({})
+      setConfirmedByModule({})
+      setCustomByModule({})
+      setBatchNote(null)
+      setWriteOpen(false)
+      const focus = typeof state?.focusIndex === 'number' ? Math.floor(state.focusIndex) : 0
+      setCurrentIndex(focus > 0 ? focus : 0)
+      setDecisions(initialDecisionsFrom(state))
+    }
+    appliedEntryRef.current = entryToken
     getResumeOptimize(taskId, { token: getToken(), accessToken }, existingOnly)
       .then((response) => {
         if (cancelled) return
         setProviderName(response.providerName ?? null)
         if (response.status !== 'completed') {
-          if (isAiOutage({ code: response.failCode })) { setOutage('AI 服务当前不可用'); return }
+          if (isAiOutage({ code: response.failCode })) {
+            setOutage(response.failCode === 'AI_QUOTA_EXHAUSTED' ? AI_QUOTA_EXHAUSTED_RESUME_COPY : 'AI 服务当前不可用')
+            return
+          }
           setFailure(resumeUserReason(response.failReason, '这次没有生成逐条改写候选。'))
           return
         }
@@ -111,7 +126,7 @@ export function ResumeOptimizeComparePage() {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [taskId, accessToken, getToken, retryNonce, existingOnly])
+  }, [taskId, accessToken, getToken, retryNonce, existingOnly, state])
 
   const items = useMemo(
     () => loadedTaskId === taskId ? buildCompareItems(modules) : [],

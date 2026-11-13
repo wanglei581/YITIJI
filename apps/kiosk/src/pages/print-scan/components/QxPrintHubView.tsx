@@ -9,7 +9,9 @@
 // 不驱动任何业务状态；prefers-reduced-motion 下由 shell 与本页样式一并关掉。
 
 import { useId, type CSSProperties, type ReactNode } from 'react'
+import { pickupEntryMiniappLine } from '../../../copy/miniappLinkCopy'
 import { helpNeededLine, machineCannotPrintLine, preferUnattended } from '../../../copy/unattendedCopy'
+import { useSupportContactSnapshot } from '../../../hooks/useSupportContact'
 import { QxAppNavbar } from '../../../components/qingxu/QxAppNavbar'
 import { QxTouchChip } from '../../../components/qingxu/touch/QxTouchChip'
 import { QxTouchIcon, type QxTouchIconName } from '../../../components/qingxu/touch/QxTouchIcon'
@@ -19,6 +21,8 @@ import {
   COPY_GUIDE_KEY,
   HUB_ASK,
   HUB_TRUTH,
+  ID_PHOTO_ENTRY_PARKED,
+  SIGN_ENTRY_PARKED,
   type HubFeatureState,
   type HubUiState,
   type MfpStatus,
@@ -434,6 +438,7 @@ export function QxPrintHubView({
   onArrivalCode,
   onQuickLink,
 }: QxPrintHubViewProps) {
+  const supportContact = useSupportContactSnapshot()
   const showBanner = hubState === 'capability-error' || hubState === 'locked' || hubState === 'device-off'
   const checking = probe === 'loading'
   const byKey = (key: string) => capabilities.find((item) => item.key === key)
@@ -445,7 +450,13 @@ export function QxPrintHubView({
   const idPhoto = byKey('id-photo')
   const phone = byKey('phone-upload')
   const usb = byKey('usb-import')
-  const toolCaps = [photo, convert, idPhoto, sign].filter((item): item is QxPrintCapabilityView => Boolean(item))
+  // 停放挡住证件照卡，不管后台把 id_photo 配成什么。重新打开见 ID_PHOTO_ENTRY_PARKED。
+  const toolCaps = [
+    photo,
+    convert,
+    ID_PHOTO_ENTRY_PARKED ? undefined : idPhoto,
+    SIGN_ENTRY_PARKED ? undefined : sign,
+  ].filter((item): item is QxPrintCapabilityView => Boolean(item))
   const transferCaps = [phone, usb].filter((item): item is QxPrintCapabilityView => Boolean(item))
   const showLater = transferCaps.some((item) => item.actionable) && (!doc?.actionable || mfp === 'unavailable' || hubState === 'device-off')
   const paperOff = Boolean(printerUnavailable?.label.includes('缺纸'))
@@ -460,8 +471,10 @@ export function QxPrintHubView({
         // 离线才说离线：异常不冒充离线（W-117）。
         : `${deviceLabel?.includes('离线') ? '打印机离线' : '打印机异常'}时复印可能也用不了，以打印机屏幕为准`)
       : '在打印机屏幕上点「复印」「身份证复印」或「票据复印」；不经过这台一体机下单，也不进打印订单'
+  const arrivalBase = '凭码办理，不登录也能核销 · 8 位数字（历史 10 位码也支持）'
+  const arrivalMiniapp = pickupEntryMiniappLine(supportContact)
   const arrivalDesc = arrivalCode.stateNote
-    ?? '凭码办理，不登录也能核销 · 8 位数字（历史 10 位码也支持）'
+    ?? (arrivalMiniapp ? `${arrivalMiniapp}。${arrivalBase}` : arrivalBase)
   const recordLinks = quickLinks.filter((link) => !link.compact && link.key !== 'feedback')
   const feedback = quickLinks.find((link) => link.key === 'feedback')
 

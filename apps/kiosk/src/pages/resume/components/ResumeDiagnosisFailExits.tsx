@@ -17,6 +17,7 @@
 // ============================================================
 
 import { useNavigate } from 'react-router-dom'
+import { useOfficialChannels } from '../../../hooks/useOfficialChannels'
 import { useStartPrintHandoff } from '../../print/usePrintHandoff'
 import { ExitRow, ManualChecks } from './resume-report/ResumeReportExits'
 
@@ -43,6 +44,9 @@ export function ResumeDiagnosisFailExits({ file, fileId }: Props) {
   const navigate = useNavigate()
   const startPrint = useStartPrintHandoff()
   const canPrintOriginal = Boolean(fileId && file?.fileUrl)
+  // 本机构官方渠道一行只在本机真有渠道时出现（与首页磁贴同一判据）：没配渠道的点位点进去是空页。
+  const channels = useOfficialChannels()
+  const hasChannels = channels.status === 'ready' && channels.items.length > 0
 
   const printOriginal = () => {
     if (!file?.fileUrl) return
@@ -62,7 +66,7 @@ export function ResumeDiagnosisFailExits({ file, fileId }: Props) {
 
   return (
     <>
-      <div className="qxt-sec">这些都不需要 AI<small>现在就能做</small></div>
+      <div className="qxt-sec">这些都不需要 AI · 现在就能做</div>
       <div className="qxt-exit-col rrp-exits resume-report-fail-exits" data-testid="resume-report-fail-exits">
         {canPrintOriginal ? (
           <ExitRow icon="printer" title="打印我上传的原件" desc="不需要 AI，先检查个人信息再打印" take="去核对" route="/print/material-check" index={0} onClick={printOriginal} />
@@ -79,7 +83,9 @@ export function ResumeDiagnosisFailExits({ file, fileId }: Props) {
         )}
         <ExitRow icon="printer" title="去打印 / 扫描其他材料" desc="打印扫描不依赖 AI，照常可用" take="去打印扫描" route="/print-scan" index={1} onClick={() => navigate('/print-scan')} />
         <ExitRow icon="book" title="查政策" desc="查看本机构发布的政策与办理说明" take="去看政策" route="/policy-service" index={2} onClick={() => navigate('/policy-service')} />
-        <ExitRow icon="qr" title="本机构官方渠道" desc="扫码查看本机构官网或官方账号" take="去扫码" route="/official-channels" index={3} onClick={() => navigate('/official-channels')} />
+        {hasChannels ? (
+          <ExitRow icon="qr" title="本机构官方渠道" desc="扫码查看本机构官网或官方账号" take="去扫码" route="/official-channels" index={3} onClick={() => navigate('/official-channels')} />
+        ) : null}
       </div>
       <ManualChecks delay={5} />
     </>

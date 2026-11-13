@@ -33,7 +33,7 @@
         <!-- 未登录态原本把「微信一键登录」写成头像行里的第三行蓝字，
              与姓名、说明堆成三行，右侧箭头因而失去对齐参照、显得孤立。
              改为整行主按钮：登录是这张卡片唯一的主操作，应当有按钮的分量。 -->
-        <view wx:if="{{!isLoggedIn}}" class="profile-cta tap" hover-class="tap-press" bindtap="tapLogin" role="button" aria-label="微信一键登录，解锁完整服务">微信一键登录，解锁完整服务</view>
+        <view wx:if="{{!isLoggedIn}}" class="profile-cta tap" hover-class="tap-press" bindtap="tapLogin" role="button" aria-label="手机号快捷登录，解锁完整服务">手机号快捷登录，解锁完整服务</view>
         <!-- 「我的权益」条随 pages/membership 一起停放（首发不对 AI 收费）。
              停放后这里曾留下一个点了没反应的按钮：me.js 的 routes 表已删掉 membership。 -->
       </view>

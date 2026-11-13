@@ -256,7 +256,7 @@ const ELIG_WAIT: Record<string, string> = {
   'eligibility-error': '.k8-elig .rq-deadend, .k8-elig-notice',
   'eligibility-ask-empty': '.k8-elig-questions',
   'eligibility-ask-partial': '.k8-elig-opt[aria-pressed="true"]',
-  'eligibility-submitting': '.k8-elig-opt[aria-pressed="true"]',
+  'eligibility-submitting': 'text=正在比对…',
   'eligibility-result': '.k8-elig-headline',
 }
 
@@ -358,8 +358,12 @@ async function openRenshi(page: Page, api: ApiRouter, target: QingxuPairTarget):
   await see(page, RQ)
 
   if (tab === 'policy') {
+    if (['policy-ready', 'source-qr', 'source-missing', 'source-invalid'].includes(state)) {
+      await page.locator('[data-policy-section="library"] .rq-item-main').first().click()
+    }
     if (state === 'filtered-empty') {
       await see(page, '[data-policy-section="library"] .k8-policy-list-item')
+      await page.locator('.rq-audience-change').click()
       await page.getByRole('button', { name: '创业人员', exact: true }).click()
     } else if (state === 'source-qr') {
       await see(page, '[data-policy-section="library"] .k8-policy-list-item.is-open')
@@ -374,8 +378,10 @@ async function openRenshi(page: Page, api: ApiRouter, target: QingxuPairTarget):
     if (state === 'eligibility-ask-partial' || state === 'eligibility-submitting' || state === 'eligibility-result') {
       await see(page, '.k8-elig-questions')
       await page.getByRole('button', { name: '应届毕业生', exact: true }).click()
+      for (let index = 0; index < 4; index++) await page.locator('.k8-elig-next').click()
       await page.getByRole('button', { name: '本年度应届', exact: true }).click()
       if (state !== 'eligibility-ask-partial') {
+        for (let index = 0; index < 4; index++) await page.locator('.k8-elig-next').click()
         await page.locator('.rq-cta-host .k8-elig-submit').click()
         await see(page, state === 'eligibility-result' ? '.k8-elig-headline' : 'text=正在比对…')
       }

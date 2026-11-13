@@ -9,7 +9,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { MemberInterviewItem } from '@ai-job-print/shared'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { LICENSE_NO_NEW_TASK_REASON, networkDisconnectLine } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
+import { useKioskLicense } from '../../layouts/KioskLicenseContext'
 import { deleteMyInterview, getMyInterviews } from '../../services/api/interview'
 import { useAuth } from '../../auth/useAuth'
 import { InterviewArt } from './InterviewArt'
@@ -30,6 +32,7 @@ function formatTime(iso: string) {
 
 export function InterviewReportsPage({ onGoStage }: { onGoStage?: (stage: InterviewStage) => void } = {}) {
   const navigate = useNavigate()
+  const winding = useKioskLicense().mode === 'winding-down'
   const { isLoggedIn, getToken } = useAuth()
   const [items, setItems] = useState<MemberInterviewItem[]>([])
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
@@ -88,8 +91,18 @@ export function InterviewReportsPage({ onGoStage }: { onGoStage?: (stage: Interv
   }
   const openReport = (sessionId: string) => {
     patchInterviewWorkbenchSession({ stage: 'report', report: { sessionId } })
-    if (onGoStage) onGoStage('report')
-    else navigate('/interview/report', { state: { sessionId } })
+    // 原导航 state 只有 sessionId。收尾中并上只读标记；正常模式不带。
+    // onGoStage 只改 ?stage=，不带 location.state，报告页读不到标记，所以收尾中改走同一条 replace。
+    const reportState = { sessionId, ...(winding ? { licenseViewOnly: true } : {}) }
+    if (onGoStage && !winding) {
+      onGoStage('report')
+      return
+    }
+    if (onGoStage) {
+      navigate('?stage=report', { replace: true, state: reportState })
+      return
+    }
+    navigate('/interview/report', { state: reportState })
   }
 
   return (
@@ -108,7 +121,13 @@ export function InterviewReportsPage({ onGoStage }: { onGoStage?: (stage: Interv
         <QxTouchDock
           onBack={() => navigate('/interview-service')}
           ask={{ label: '问小青：练习记录在哪里', draft: '我想查看自己的模拟面试练习报告。请说明未登录和登录后有什么差别，不要列出别人的记录。' }}
-          primary={{ label: primaryLabel, onClick: goSetup, testId: 'interview-primary' }}
+          primary={{
+            label: primaryLabel,
+            onClick: goSetup,
+            testId: 'interview-primary',
+            disabled: winding,
+            title: winding ? LICENSE_NO_NEW_TASK_REASON : undefined,
+          }}
         />
       }
     >
@@ -156,7 +175,7 @@ export function InterviewReportsPage({ onGoStage }: { onGoStage?: (stage: Interv
               <b>先看面试技巧</b>
               <small>不依赖这份列表</small>
             </button>
-            <InterviewArt title="暂时无法加载练习报告">请检查网络后重试。没有拿到本人列表时，不显示任何固定历史。重试只回到读取中。</InterviewArt>
+            <InterviewArt title="暂时无法加载练习报告">{`${networkDisconnectLine()}。没有拿到本人列表时，不显示任何固定历史。重试只回到读取中。`}</InterviewArt>
           </>
         ) : items.length === 0 ? (
           <>

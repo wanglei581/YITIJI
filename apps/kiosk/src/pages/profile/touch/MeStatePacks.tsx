@@ -1,3 +1,4 @@
+import { LicenseLock } from '../../../layouts/LicenseLock'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
@@ -163,11 +164,8 @@ export function MeLoginGate({ page, printPick = false, boundary = false }: {
         {docs && printPick ? (
           <MeExitCard art="scan" artWidth={120} title="返回选文件" desc="回到刚才的打印" onClick={() => navigate('/print/upload')} />
         ) : null}
-        <MeExitCard art="usb" artWidth={120} title="打印扫描" desc="不登录也能打印、扫描" onClick={() => navigate('/print-scan')} />
-        <MeExitCard art="checklist" artWidth={108} title="查政策" desc="看本机构发布的就业政策" testId="member-records-guest-policy" onClick={() => navigate('/policy-service')} />
-        {page === 'my-benefits' ? (
-          <MeExitCard art="stack" artWidth={108} title="先看看有哪些活动" desc="活动列表现在就能看" onClick={() => navigate('/activities')} />
-        ) : null}
+        <LicenseLock><MeExitCard art="usb" artWidth={120} title="打印扫描" desc="不登录也能打印、扫描" onClick={() => navigate('/print-scan')} /></LicenseLock>
+        <LicenseLock><MeExitCard art="checklist" artWidth={108} title="查政策" desc="看本机构发布的就业政策" testId="member-records-guest-policy" onClick={() => navigate('/policy-service')} /></LicenseLock>
       </div>
       {boundary ? <GuestBoundary /> : null}
       <MeIdleHelp docs={docs} />
@@ -195,8 +193,8 @@ export function MeProfileGuest({ contact }: { contact?: PublicSupportContact } =
       ))}
       <section className="me-stack" aria-label="不登录也能办">
         <p className="me-k">不登录也能办</p>
-        <MeExitCard art="usb" artWidth={120} title="打印扫描" desc="不登录也能打印、扫描" onClick={() => navigate('/print-scan')} />
-        <MeExitCard art="checklist" artWidth={108} title="查政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} />
+        <LicenseLock><MeExitCard art="usb" artWidth={120} title="打印扫描" desc="不登录也能打印、扫描" onClick={() => navigate('/print-scan')} /></LicenseLock>
+        <LicenseLock><MeExitCard art="checklist" artWidth={108} title="查政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} /></LicenseLock>
       </section>
       <MeIdleHelp contact={contact} />
     </div>

@@ -205,6 +205,11 @@
   gap: 8px;
 }
 
+/* 操作行里的失败原因（如「带走本场问答」没生成）独占一行，不挤在按钮中间。 */
+[data-qx-page="interview"] .qxt-iv-acts > .qxt-iv-err {
+  flex-basis: 100%;
+}
+
 [data-qx-page="interview"] .qxt-iv-acts > button {
   min-width: var(--qxt-tap);
   min-height: var(--qxt-tap);

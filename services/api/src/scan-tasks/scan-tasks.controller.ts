@@ -146,6 +146,12 @@ export class ScanTasksController {
     @Body('candidateSnapshotAt') candidateSnapshotAt: unknown,
     @Body('observedAt') observedAt: unknown,
     @Headers('authorization') authHeader: string | undefined,
+    // 屏上扫描（2026-11-02）：投递来源 watcher（缺省，现有终端程序）/ device。
+    // 2026-11-03：可选 deviceRound，终端程序填它扫这份 PDF 时所在的轮次；没给照旧。
+    // deliver 不走 DTO，和上面几个字段一样逐字段取，不会被全局 forbidNonWhitelisted 拦成 400。
+    // 取值校验在 service。追加在最后，保持既有位置参数不变。
+    @Body('origin') origin?: unknown,
+    @Body('deviceRound') deviceRound?: unknown,
   ) {
     await this.terminals.assertAgentAuthorized(terminalId, authHeader)
     if (!file) {
@@ -162,6 +168,8 @@ export class ScanTasksController {
       mimeType: file.mimetype,
       candidateSnapshotAt,
       observedAt,
+      origin,
+      deviceRound,
     })
     return ApiResponse.ok(result)
   }

@@ -6,7 +6,7 @@ test.describe('政策公告（mock 口径）', () => {
     await injectPartnerAuth(page)
   })
 
-  test('本机构类型禁用新增；下架/删除有确认；申领条件 mock 给中文原因', async ({ page }) => {
+  test('本机构类型禁用新增；下架/删除有确认；条件核对入口已停放', async ({ page }) => {
     const { errors } = collectPageFaults(page)
     await gotoPartner(page, '/policy', '政策公告')
     await waitForMockList(page)
@@ -24,13 +24,8 @@ test.describe('政策公告（mock 口径）', () => {
     await expect(page.getByText('政策内容已下架')).toBeVisible()
 
     const guideRow = page.getByRole('row', { name: /高校毕业生就业补贴/ })
-    await guideRow.getByRole('button', { name: '申领条件' }).click()
-    const rules = page.getByRole('dialog', { name: /申领条件/ })
-    await expect(rules.getByRole('status')).toContainText('演示模式不执行')
-    await expect(rules.getByRole('button', { name: '重试' })).toBeEnabled()
-    await expect(rules.getByRole('button', { name: '保存条件并重新提审' })).toBeDisabled()
-    await expect(rules.getByRole('button', { name: '试算这条政策' })).toBeDisabled()
-    await rules.locator('button', { hasText: '关闭' }).click()
+    await expect(page.getByRole('button', { name: '申领条件' })).toHaveCount(0)
+    await expect(guideRow.getByText('原文链接：未填写')).toBeVisible()
 
     await guideRow.getByRole('button', { name: '删除' }).click()
     const del = page.getByRole('alertdialog')
@@ -75,12 +70,66 @@ test.describe('政策公告（mock 口径）', () => {
     await expect(notice.getByRole('combobox', { name: /公告标签/ }).locator('option', { hasText: '招募' })).toHaveCount(0)
     await notice.getByRole('button', { name: '取消' }).click()
 
-    await page.getByRole('row', { name: /见习单位招募说明/ }).getByRole('button', { name: '申领条件' }).click()
-    const rules = page.getByRole('dialog', { name: /申领条件/ })
-    await expect(rules.getByRole('status')).toContainText(reason)
-    await expect(rules.getByRole('button', { name: '保存条件并重新提审' })).toBeDisabled()
-    await expect(rules.getByRole('button', { name: '试算这条政策' })).toBeDisabled()
-    await expect(rules.getByText('演示模式不执行')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '申领条件' })).toHaveCount(0)
+  })
+
+  test('扶持条目三栏、标题计数、HTTPS 和公告可选字段', async ({ page }) => {
+    await gotoPartner(page, '/policy', '政策公告')
+    await waitForMockList(page)
+    await page.getByRole('row', { name: /高校毕业生就业补贴/ }).getByRole('button', { name: '编辑' }).click()
+    const form = page.getByRole('dialog', { name: '编辑政策内容' })
+    const submit = form.getByRole('button', { name: '保存并重新提审' })
+    await expect(submit).toBeDisabled()
+    await expect(form.getByRole('status')).toContainText('请填齐')
+    await expect(form.getByRole('textbox', { name: /^标题/ })).toHaveAttribute('maxlength', '200')
+    for (const name of ['谁可以申请', '要准备的材料', '去哪办']) {
+      const field = form.getByRole('textbox', { name: new RegExp(`^${name}`) })
+      await expect(field).toHaveAttribute('maxlength', '2000')
+      await field.fill('按原文填写')
+    }
+    const source = form.getByRole('textbox', { name: /^原文链接/ })
+    // 不是完整网址的仍然拦保存。
+    await source.fill('career.demo-university.edu.cn/policy')
+    await expect(submit).toBeDisabled()
+    await expect(form.getByRole('status')).toContainText('请填写以 https:// 开头的有效原文链接')
+    // http:// 开头的不拦保存草稿；发布时由服务端拒绝并说明原因（2026-11-11）。
+    await source.fill('http://career.demo-university.edu.cn/policy')
+    await expect(submit).toBeEnabled()
+    await expect(form.getByRole('button', { name: '保存并发布' })).toBeEnabled()
+    await source.fill('https://career.demo-university.edu.cn/policy')
+    await expect(form.getByText(/须是本机构登记的官方网站上的地址/)).toBeVisible()
+    await expect(submit).toBeEnabled()
+    await form.getByRole('combobox', { name: /内容类型/ }).selectOption('notice')
+    await expect(form.getByRole('textbox', { name: /^谁可以申请/ })).toHaveCount(0)
+    await source.fill('')
+    await expect(submit).toBeEnabled()
+  })
+
+  test('保存并发布：勾选责任确认后一次完成，分步按钮仍在', async ({ page }) => {
+    const { errors } = collectPageFaults(page)
+    await gotoPartner(page, '/policy', '政策公告')
+    await waitForMockList(page)
+    await expect(page.getByRole('row', { name: /校园宣讲志愿者招募/ }).getByRole('button', { name: '审核通过' })).toBeVisible()
+    await page.getByRole('row', { name: /高校毕业生就业补贴/ }).getByRole('button', { name: '编辑' }).click()
+    const form = page.getByRole('dialog', { name: '编辑政策内容' })
+    for (const name of ['谁可以申请', '要准备的材料', '去哪办']) {
+      await form.getByRole('textbox', { name: new RegExp(`^${name}`) }).fill('按原文填写')
+    }
+    await form.getByRole('textbox', { name: /^原文链接/ }).fill('https://career.demo-university.edu.cn/policy')
+    await expect(form.getByRole('button', { name: '保存并重新提审' })).toBeEnabled()
+    await form.getByRole('button', { name: '保存并发布' }).click()
+
+    const release = page.getByRole('dialog', { name: '保存并发布' })
+    await expect(release).toContainText('保存后的这一版')
+    const confirm = release.getByRole('button', { name: '确认保存并发布' })
+    await expect(confirm).toBeDisabled()
+    await release.getByRole('checkbox').check()
+    await confirm.click()
+
+    await expect(page.getByText(/已保存并发布，发布责任确认已记录/)).toBeVisible()
+    await expect(page.getByRole('dialog', { name: '编辑政策内容' })).toHaveCount(0)
+    await expect(page.getByRole('row', { name: /高校毕业生就业补贴/ }).getByText('已发布')).toBeVisible()
+    await assertPageHonest(page, errors)
   })
 
   test('能力没读到时新增表单同样不提供招募', async ({ page }) => {

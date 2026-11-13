@@ -84,6 +84,10 @@ function assertKioskFailClosed(): void {
       /import \{[^}]+\} from '\.\/useSupportContact'\n/,
       'const useSupportContactSnapshot = () => undefined\n',
     )
+    // K1b-1：扫描仪探测从同一 hook 再导出。临时文件只跑 mapTerminalPrinterStatus，
+    // 相对路径在临时目录里解析不到。剥掉再导出，上面的 printerReady 断言不改。
+    .replace(/export \{[^}]+\} from '\.\.\/services\/scan\/localScanProbe'\n/, '')
+    .replace(/export type \{[^}]+\} from '\.\.\/services\/scan\/localScanProbe'\n/, '')
     .replace(/import\.meta\.env/g, '({} as { VITE_PRINTER_NAME?: string })')
   const dir = mkdtempSync(join(tmpdir(), 'kiosk-printer-map-'))
   const file = join(dir, 'map-terminal-printer-status.ts')
@@ -118,6 +122,10 @@ async function assertAlertsDisappear(status: (typeof STATUSES)[number], label: s
     terminalHeartbeat: { groupBy: async () => [] },
     printTask: { findMany: async () => [], count: async () => 0 },
     feedbackTicket: { count: async () => 0, findFirst: async () => null },
+    // 派生告警会读计量账。这组夹具没有 AI 调用，空结果既不报账户不可用，也不报费用用完。
+    aiUsageRecord: { findMany: async () => [], groupBy: async () => [] },
+    // 扫描仪告警先查已开通的 scan_device。这组夹具没有这项能力，返回空，打印机告警断言不变。
+    terminalCapability: { findMany: async () => [] },
   }
   const fault = await collectDerivedAlerts(prisma as never, now)
   const issues = fault.alerts.filter((alert) => alert.type === 'printer_issue')

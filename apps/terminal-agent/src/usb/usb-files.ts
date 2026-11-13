@@ -87,6 +87,8 @@ interface RawUsbFileEntry {
 }
 
 async function runPowerShellJson(command: string): Promise<unknown> {
+  // Windows PowerShell 默认输出可能是系统代码页；统一为无 BOM UTF-8，与 Node 解码一致。
+  command = `[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false); ${command}`
   const { stdout } = await execFileAsync(
     'powershell',
     ['-NonInteractive', '-NoProfile', '-Command', command],

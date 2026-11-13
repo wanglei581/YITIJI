@@ -446,6 +446,7 @@ export interface AssistantAction {
 export interface ChatInput {
   message: string
   sessionId?: string
+  policyId?: string
   skill?: AssistantSkill
   /** 缺省 kiosk。miniapp 只返回已注册页面的 actions。 */
   channel?: 'kiosk' | 'miniapp'
@@ -464,6 +465,8 @@ export interface ChatOutput {
    * AiService 显式重建，不会带上它。
    */
   usage?: AiUsageReport
+  /** true 表示这段回答是设备故障时的安全提示，不是模型生成的。页面上的标由前端写成「安全提示」，后端不出这个标。没有这个字段或为 false 时和原来一样 */
+  fixedNotice?: boolean
 }
 
 /**

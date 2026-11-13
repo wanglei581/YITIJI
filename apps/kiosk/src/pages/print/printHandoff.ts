@@ -31,6 +31,23 @@ import {
 } from './printHandoffPolicy'
 
 export type PrintHandoffContext = PrintMaterialSession
+const WIND_DOWN_HANDOFF_KEY = 'kiosk_print_handoff_service_v1'
+
+/** 只保存随机交接编号和服务名，不复制文件或用户资料。 */
+export function recordPrintHandoffService(result: BeginPrintHandoffResult, service: string | null): void {
+  try {
+    if (result.ok && service) window.sessionStorage.setItem(WIND_DOWN_HANDOFF_KEY, JSON.stringify({ contextId: result.context.contextId, service }))
+    else window.sessionStorage.removeItem(WIND_DOWN_HANDOFF_KEY)
+  } catch { /* storage unavailable: fail closed */ }
+}
+export function readPrintHandoffService(owner: PrintHandoffOwner): string | null {
+  try {
+    const record = JSON.parse(window.sessionStorage.getItem(WIND_DOWN_HANDOFF_KEY) ?? 'null')
+    if (!record || typeof record.service !== 'string' || typeof record.contextId !== 'string') return null
+    const handoff = readPrintHandoff(owner)
+    return handoff.status === 'ok' && handoff.context.contextId === record.contextId ? record.service : null
+  } catch { return null }
+}
 export type { PrintHandoffOwner, PrintHandoffOrigin, PrintHandoffEntry }
 
 /** 创建后 30 分钟封顶，与一体机上传、图片转换的签名链接一致。 */
@@ -40,7 +57,7 @@ export interface PrintHandoffInput {
   origin: PrintHandoffOrigin
   file: PrintFileState
   source?: PrintMaterialSource
-  /** 回到上一步用的站内路径；只保留路径部分。 */
+  /** 回到上一步用的站内路径；政策清单只额外保留公开政策编号，其余来源只保留路径部分。 */
   returnPath?: string
   /** 来源给的参数建议（如两页以上建议双面）。只是建议，本机不支持时由打印链收口并说明。 */
   paramsSuggestion?: Partial<PrintJobParams>
@@ -128,11 +145,16 @@ export function printHandoffOwnerFor(user: object | null | undefined): PrintHand
 
 const iso = (ms: number) => new Date(ms).toISOString()
 
-function safeReturnPath(path: string | undefined): string | undefined {
+function safeReturnPath(path: string | undefined, origin: PrintHandoffOrigin): string | undefined {
   if (typeof path !== 'string') return undefined
   if (!path.startsWith('/') || path.startsWith('//') || path.includes('\\')) return undefined
   const bare = path.split(/[?#]/, 1)[0] ?? ''
   if (!bare || bare === '/login' || bare.startsWith('/login/')) return undefined
+  // 政策清单按编号回详情：只留公开 policy 编号，绝不顺带保存其他查询参数或 hash。
+  if (origin === 'policy_checklist' && bare === '/renshi') {
+    const id = new URL(path, 'http://kiosk.invalid').searchParams.get('policy')?.trim()
+    if (id) return `/renshi?policy=${encodeURIComponent(id)}`
+  }
   return bare
 }
 
@@ -197,7 +219,7 @@ export function beginPrintHandoff(
       mimeType: file.mimeType,
     },
     source: input.source,
-    returnPath: safeReturnPath(input.returnPath),
+    returnPath: safeReturnPath(input.returnPath, input.origin),
     fileUrlExpiresAt: printLinkExpiresAt(file.fileUrl),
     owner,
     createdAt: iso(now),

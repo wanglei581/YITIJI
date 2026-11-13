@@ -1,5 +1,6 @@
 import type { Page, Route } from '@playwright/test'
 import { KIOSK_AI_CAPABILITIES_PATH, kioskAiCapabilitiesResponse } from './ai-capabilities'
+import { kioskProfileBody, UNVERIFIED_KIOSK_PROFILE } from './kiosk-profile'
 import { RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from './recruitment-hosting'
 import { SELF_ASSESSMENT_QUESTIONS_PATH, selfAssessmentQuestionsResponse } from './self-assessment-questions'
 
@@ -74,8 +75,8 @@ export class ApiRouter {
     // 默认按「全部可用」应答，既有用例不因这条新请求中断，入口也不会被误停；
     // 要测某项能力关闭 / 降级 / 读不到的用例自行 respond 覆盖（见 ai-capabilities.ts）。
     this.respond('GET', KIOSK_AI_CAPABILITIES_PATH, { status: 200, json: kioskAiCapabilitiesResponse() })
-    // 3.14 本机构官方渠道：首页（「岗位与招聘会」磁贴）与 /official-channels 挂载时各读一次（同一缓存）。
-    // 默认按「本终端没有渠道」应答：首页不摆磁贴，既有用例的栅格与文案一概不变；
+    // 3.14 本机构官方渠道：首页（页眉机构名与底部说明）、查政策页（官方渠道那一行）与 /official-channels 挂载时读（同一缓存）。
+    // 默认按「本终端没有渠道」应答：首页底部不指向渠道、查政策页不出那一行，既有用例的栅格与文案一概不变；
     // 要看磁贴、渠道卡片或 b 版本「其他来源平台」的用例自行 respond 覆盖。
     this.respond('GET', '/api/v1/terminals/KSK-001/official-channels', {
       status: 200,
@@ -106,6 +107,14 @@ export class ApiRouter {
           miniappPublished: false,
         },
       },
+    })
+    // 一体机贴牌与授权信号：运行时根在每个终端业务页挂载时读一次（之后每 3 分钟续读）。
+    // 默认按「没验过签」应答——接口对没带有效会话票的请求就是这个答案：平台默认品牌，没有授权状态，
+    // acceptsNewSessions 为 true（不知道、不拦）。授权闸门只认 licenseState 非空的答复，所以既有用例的品牌、
+    // 入口与流程一概不变。要看贴牌或授权三态的用例自行 respond / route 覆盖（见 kiosk-license-gate.spec.ts）。
+    this.respond('GET', '/api/v1/public/kiosk-profile', {
+      status: 200,
+      json: kioskProfileBody(UNVERIFIED_KIOSK_PROFILE),
     })
     // 包 N2：/campus/freshman-insights 挂载时读校招聚合。默认空集合，避免冒烟撞 Unhandled API。
     this.respond('GET', '/api/v1/kiosk/campus/recruitment-stats', {
@@ -150,6 +159,17 @@ export class ApiRouter {
             body: JSON.stringify({
               error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请先提交简历解析' },
             }),
+          })
+          return
+        }
+        // 面试作答页挂载后会读一次会话来校准截止时刻（GET /mock-interviews/{id}）。
+        // 默认回一份不带时间字段的会话：页面按本机开场时刻走，既有用例不因这条新请求中断；
+        // 要测校准或失败的用例自行 respond 覆盖。
+        if (isInterviewSessionRead(request.method(), pathname)) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ data: { sessionId: decodeURIComponent(pathname.split('/').pop() ?? '') } }),
           })
           return
         }
@@ -217,6 +237,13 @@ function isAnonymousDraftOrVersions(method: string, path: string): boolean {
   const normalized = method.trim().toUpperCase()
   if (!/^\/api\/v1\/resume\/records\/[^/]+\/(draft|versions)$/.test(path)) return false
   return normalized === 'GET' || normalized === 'PUT'
+}
+
+function isInterviewSessionRead(method: string, path: string): boolean {
+  if (method.trim().toUpperCase() !== 'GET') return false
+  const match = /^\/api\/v1\/mock-interviews\/([^/]+)$/.exec(path)
+  // capabilities 是同级固定路径（下面还有 /voice），不是会话号。
+  return match !== null && match[1] !== 'capabilities'
 }
 
 function requestKey(method: string, path: string): string {

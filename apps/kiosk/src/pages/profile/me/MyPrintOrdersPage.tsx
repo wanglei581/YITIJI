@@ -1,3 +1,6 @@
+import { useKioskLicense } from '../../../layouts/KioskLicenseContext'
+import { LICENSE_NO_NEW_TASK_REASON } from '../../../copy/unattendedCopy'
+import { LicenseLock } from '../../../layouts/LicenseLock'
 // ============================================================
 // 我的打印订单 — /me/print-orders（本人，只读）。视觉真值：稿 38-member-assets（青序流光）。
 // 展示安全元数据（文件名 / 状态 / 份数 / 彩黑 / 幅面 / 时间）
@@ -86,6 +89,7 @@ function paymentLine(item: MemberPrintOrderItem): string {
 export function MyPrintOrdersPage() {
   const { isLoggedIn, getToken } = useAuth()
   const navigate = useNavigate()
+  const winding = useKioskLicense().mode === 'winding-down'
   const [items, setItems] = useState<MemberPrintOrderItem[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [total, setTotal] = useState(0)
@@ -247,9 +251,9 @@ export function MyPrintOrdersPage() {
     body = (
       <div className="me-state" data-testid="qx-me-fallback">
         <MeEmptyPack sentence="还没有打印订单。没登录时在这台机器上打的单不会进这个账号。">
-          <MeExitCard art="usb" artWidth={120} title="去打印" desc="U 盘、手机或扫描都可以" onClick={() => navigate('/print-scan')} />
+          <LicenseLock><MeExitCard art="usb" artWidth={120} title="去打印" desc="U 盘、手机或扫描都可以" onClick={() => navigate('/print-scan')} /></LicenseLock>
           {miniOn
-            ? <MeExitCard art="phone" artWidth={96} title="输到机码取件" desc="手机上下的到店单，到机器上输入到机码" onClick={() => navigate('/print/pickup-claim')} />
+            ? <LicenseLock><MeExitCard art="phone" artWidth={96} title="输到机码取件" desc="手机上下的到店单，到机器上输入到机码" onClick={() => navigate('/print/pickup-claim')} /></LicenseLock>
             : <MeExitCard art="stack" artWidth={120} title="看看我的文档" desc="选一份已保存的文件再打" onClick={() => navigate('/me/documents')} />}
         </MeEmptyPack>
       </div>
@@ -263,7 +267,7 @@ export function MyPrintOrdersPage() {
     body = (
       <>
         {miniOn ? (
-          <button type="button" className="me-line" onClick={() => navigate('/print/pickup-claim')}>
+          <button type="button" className="me-line" disabled={winding} title={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={() => navigate('/print/pickup-claim')}>
             <b>手机上下的到店单，到机器上输到机码取件</b>
             <small>还没核销出打印任务的单，不在下面的列表里</small>
           </button>
@@ -282,7 +286,7 @@ export function MyPrintOrdersPage() {
             <MeP>{filterKey !== 'all' && nextCursor ? '已加载记录中暂无此类，点「加载更多」继续查找。' : '这个筛选下没有订单。'}</MeP>
             <div className="me-stack">
               <MeExitCard art="checklist" artWidth={120} title="查看全部" desc="全部订单都在「全部」里" onClick={() => setFilterKey('all')} />
-              <MeExitCard art="usb" artWidth={120} title="去打印" desc="打一份新的，会新建一张打印任务" onClick={() => navigate('/print-scan')} />
+              <LicenseLock><MeExitCard art="usb" artWidth={120} title="去打印" desc="打一份新的，会新建一张打印任务" onClick={() => navigate('/print-scan')} /></LicenseLock>
             </div>
           </div>
         ) : (
@@ -345,7 +349,7 @@ export function MyPrintOrdersPage() {
 
         {filtered.length > 0 && filtered.length < 7 && expandedId === null ? (
           <div className="me-stack">
-            <MeExitCard art="usb" artWidth={110} title="去打印" desc="打一份新的，会新建一张打印任务" onClick={() => navigate('/print-scan')} />
+            <LicenseLock><MeExitCard art="usb" artWidth={110} title="去打印" desc="打一份新的，会新建一张打印任务" onClick={() => navigate('/print-scan')} /></LicenseLock>
             <MeExitCard art="stack" artWidth={110} title="去我的文档" desc="从已保存的文件里再选一份" onClick={() => navigate('/me/documents')} />
           </div>
         ) : null}
@@ -353,7 +357,7 @@ export function MyPrintOrdersPage() {
     )
   }
 
-  const ctabar = recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/print-orders', '去打印', () => navigate('/print-scan'))
+  const ctabar = uiState === 'login' || uiState === 'loading' || uiState === 'error' ? recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/print-orders', '去打印', () => navigate('/print-scan')) : <LicenseLock>{recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/print-orders', '去打印', () => navigate('/print-scan'))}</LicenseLock>
 
   return (
     <QxMePage

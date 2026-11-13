@@ -76,6 +76,7 @@ export function verifyBatch6Copy({ runFile, textOf, shared, ui, fail }) {
     const fmt = runFile('apps/partner/src/routes/terminals/terminalOpsFormat.ts', {
       '@ai-job-print/shared': { ...shared, ...runFile('packages/shared/src/formatDateTime.ts') },
       '../../lib/csv': runFile('apps/partner/src/lib/csv.ts'),
+      '../../lib/printerStatusLabel': runFile('apps/partner/src/lib/printerStatusLabel.ts'),
     })
     const output = { printed: null, settled: 5, unconfirmed: null, successRate: null }
     assert.equal(fmt.rateText(output), '样本不足，不显示')

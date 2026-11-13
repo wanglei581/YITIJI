@@ -103,6 +103,10 @@ const executable = (source) => ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
 }).outputText
 try {
+  const timingJs = ts.transpileModule(read('src/pages/interview/session/interviewDeadline.ts'), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+  }).outputText
+  const timing = await import(`data:text/javascript;charset=utf-8,${encodeURIComponent(timingJs)}`)
   const initial = new Function('useState', 'setupDraft', 'DEFAULT_EMPLOYMENT_INDUSTRY', executable(`return [
     ${sourceNode(setupAst, '[industry, setIndustry]')},
     ${sourceNode(setupAst, '[experience, setExperience]')},
@@ -136,12 +140,14 @@ try {
     position, industry, experience, interviewerType, difficulty, duration, resumeFile,
     setError, setCreating, setAiOutage, setAssistantDown, setStartFailed, getToken, createInterview,
     setPendingSession, startInterview, setProbed, patchInterviewWorkbenchSession, onGoStage,
+    openedInterviewDeadline,
   } = context; return ${sourceNode(setupAst, 'handleStart')};`))
   const noop = () => {}
   async function runStart(values) {
     const requests = []
     const errors = []
     const context = {
+      ...timing,
       ...draft, duration: 5, resumeFile: null,
       setError: (value) => errors.push(value), setCreating: noop, setAiOutage: noop, setAssistantDown: noop,
       setStartFailed: noop, getToken: noop, setPendingSession: noop, setProbed: noop,
@@ -178,7 +184,7 @@ const setupSurface = `${setup}\n${setupExtras}`
 check(setup.includes('<InterviewSetupResume'), `${pages[0]} — 设置页未挂上拆出的简历来源`)
 for (const token of [
   'kioskUploadFile',
-  'useBusyLock(creating || uploading || printingSheet || qrBusy || usbBusy)',
+  'useBusyLock(creating || uploading || printingSheet || usbBusy)',
   'durationMin: duration',
   'interviewerType,',
   'position: pos',
@@ -192,6 +198,12 @@ for (const token of [
 ]) {
   check(setup.includes(token), `${pages[0]} — Setup 真实链路合同缺失：${token}`)
 }
+const setupLockArg = withoutComments(setup).match(/useBusyLock\(([^)]*)\)/)?.[1] ?? 'qrBusy'
+check(setupLockArg === 'creating || uploading || printingSheet || usbBusy', '面试设置页的清场锁不含扫码面板的忙')
+check(
+  !/\b(?:qrBusy|phoneBusy|sourceBusy|showQr)\b/.test(setupLockArg),
+  '面试设置页的 useBusyLock 实参不得再出现 qrBusy / phoneBusy / sourceBusy / showQr',
+)
 for (const token of [
   'UploadSessionQrPanel',
   'ResumeUsbImportPanel',
@@ -282,6 +294,18 @@ check(
 check(interviewShellCss.includes('var(--sd-control-min, 48px)'), '普通触控目标未绑定 48px token')
 check(interviewShellCss.includes('var(--sd-primary-control-min, 56px)'), '主操作未绑定 56px token')
 check(read('src/pages/interview/session/InterviewSessionPanels.tsx').includes('role="log" aria-live="polite"'), '对话新增内容缺少读屏播报合同')
+const hubTouch = read('src/pages/interview/touch/InterviewHubTouch.tsx')
+check(
+  hubTouch.includes("['3 生成练习报告', '时间到就结束，尝试生成练习报告']"),
+  '入口第三步须写：时间到就结束，尝试生成练习报告',
+)
+check(!hubTouch.includes('马上出反馈'), '入口不得再写马上出反馈')
+const deadlineWarning = read('src/pages/interview/session/InterviewSessionPanels.tsx')
+check(
+  deadlineWarning.includes('还剩 1 分钟或更少。到点会自动结束这一场，没提交的回答不算进报告。'),
+  '剩余时间提醒须写：还剩 1 分钟或更少',
+)
+check(!deadlineWarning.includes('还剩不到 1 分钟'), '剩余时间提醒不得再写不到 1 分钟')
 check(!read('src/pages/interview/styles/interview-responsive.css').includes('.interview-session__privacy-note { display: none; }'), '短屏不得隐藏全部会话隐私说明')
 
 const packageJson = read('package.json')

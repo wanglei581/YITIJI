@@ -7,7 +7,9 @@ import {
   QrCodeIcon,
   WifiOffIcon,
 } from 'lucide-react'
-import { helpNeededLine, peekSupportContact, printProblemLine } from '../../../copy/unattendedCopy'
+import { pickupCodeFindLead, pickupLookBackTitle, pickupScanMiniappLead } from '../../../copy/miniappLinkCopy'
+import { helpNeededLine, printProblemLine } from '../../../copy/unattendedCopy'
+import { useSupportContactSnapshot } from '../../../hooks/useSupportContact'
 import {
   PICKUP_CODE_LENGTH,
   PICKUP_CODE_MAX_INPUT_LENGTH,
@@ -18,12 +20,14 @@ import {
   type PickupFailure,
   type PickupScreen,
 } from '../pickupClaimModel'
+import type { PickupQuotaExit } from '../pickupQuotaExit'
 
 // 到机码页（原型 11-arrival-code.html）的展示件。只接收页面算好的数据与回调，
 // 不发请求、不判定成败；认领、终端身份与离页作废都在 PrintPickupClaimPage 里。
 
 /** 稿 11 各屏页头的说明句。页头标题全程是「输入你的到机码」，变化的只有这一句。 */
 export function PickupSubtitle({ screen }: { screen: PickupScreen }) {
+  const findLead = pickupCodeFindLead(useSupportContactSnapshot())
   switch (screen) {
     case 'legacy':
       return <>输入早前订单中的 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位到机码</b>。核对订单、完成后续步骤，领取打印件。</>
@@ -42,8 +46,8 @@ export function PickupSubtitle({ screen }: { screen: PickupScreen }) {
     case 'success':
       return <>校验通过，<b>打印订单已认领</b>。</>
     default:
-      return peekSupportContact().miniappPublished
-        ? <>打开手机小程序<b>「我的 → 打印订单」</b>，找到 {PICKUP_CODE_LENGTH} 位到机码。核对订单后，领取打印件。</>
+      return findLead
+        ? <>{findLead}，找到 {PICKUP_CODE_LENGTH} 位到机码。核对订单后，领取打印件。</>
         : <>输入 {PICKUP_CODE_LENGTH} 位到机码。核对订单后，领取打印件。</>
   }
 }
@@ -122,12 +126,13 @@ export function PickupHidGuide({
   errorMsg: string
   actions: ReactNode
 }) {
+  const scanLead = pickupScanMiniappLead(useSupportContactSnapshot())
   return (
     <PickupHintCard
       art="scan"
       title="用扫码枪扫"
       descId="pcp-hid-hint"
-      desc={<>{peekSupportContact().miniappPublished ? '打开小程序里的到机码页面，' : ''}{HID_LINE}</>}
+      desc={<>{scanLead}{HID_LINE}</>}
     >
       {echo}
       {errorMsg ? (
@@ -292,13 +297,14 @@ export function PickupLegacyNote() {
 
 /** 稿 outs()：码找不到时的另外三条路，不是把同一条路再讲一遍。 */
 export function PickupOutsStrip({ onHid, onHelp }: { onHid: () => void; onHelp: () => void }) {
+  const lookBack = pickupLookBackTitle(useSupportContactSnapshot())
   return (
     <div className="qx-card pcp-help">
       <p className="pch-title">码找不到了？</p>
       <ul className="pch-steps pch-outs">
-        {peekSupportContact().miniappPublished ? (
+        {lookBack ? (
           <li>
-            <b>回手机小程序看</b>
+            <b>{lookBack}</b>
             <span>「我的 → 打印订单」</span>
           </li>
         ) : null}
@@ -326,18 +332,51 @@ export function PickupOutsStrip({ onHid, onHelp }: { onHid: () => void; onHelp: 
 export function PickupFailurePanel({
   failure,
   message,
+  quotaExit = null,
   onReset,
   onRetry,
   onHelp,
   onHome,
+  onLogin,
+  retryAs = 'code',
 }: {
   failure: PickupFailure
   message: string
+  /** 额度被拒才有。login 给「去登录」；wait 不给，主按钮回首页。 */
+  quotaExit?: PickupQuotaExit | null
   onReset: () => void
   onRetry: () => void
   onHelp: () => void
   onHome: () => void
+  onLogin?: () => void
+  /** 点单领取失败时重试的是同一笔订单，不是同一串到机码。 */
+  retryAs?: 'code' | 'order'
 }) {
+  if (quotaExit === 'login' || quotaExit === 'wait') {
+    return (
+      <>
+        <div id="pcp-error-msg" className="pcp-strip pcp-strip--error pcp-enter" role="alert">
+          <AlertCircleIcon size={28} aria-hidden="true" />
+          <span>{message}</span>
+        </div>
+        <div className="pcp-actions">
+          {quotaExit === 'login' ? (
+            <button type="button" className="qx-btn pcp-act pcp-act--go" data-testid="arrival-code-primary" onClick={onLogin}>
+              去登录
+            </button>
+          ) : (
+            <button type="button" className="qx-btn pcp-act pcp-act--go" data-testid="arrival-code-primary" onClick={onHome}>
+              回到首页
+            </button>
+          )}
+          <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={quotaExit === 'login' ? onHome : onReset}>
+            {quotaExit === 'login' ? '回到首页' : '输另一个到机码'}
+          </button>
+        </div>
+      </>
+    )
+  }
+
   if (failure === 'locked' || failure === 'network') {
     const locked = failure === 'locked'
     return (
@@ -355,7 +394,7 @@ export function PickupFailurePanel({
           {locked ? (
             <>这是为了防止有人在公共机器上反复试码。停用<b>过一段时间会自动解除</b>，你的码不会因为停用而作废，到时候再输就行。{helpNeededLine()}</>
           ) : (
-            <>可以用<b>同一串码重试校验</b>，系统会按这台机器核对已认领状态，不会因此重复出纸。如果仍拿不到结果，{printProblemLine()}</>
+            <>可以用<b>{retryAs === 'order' ? '同一笔订单再领一次' : '同一串码重试校验'}</b>，系统会按这台机器核对已认领状态，不会因此重复出纸。如果仍拿不到结果，{printProblemLine()}</>
           )}
         </p>
         <div className="pcp-actions">
@@ -400,6 +439,9 @@ export function PickupFailurePanel({
     )
   }
 
+  // 点单来的「其他」失败（机器暂时不能取件等）不是输错码。主按钮重试同一笔，次按钮回到输码。
+  const retryThisOrder = retryAs === 'order' && failure !== 'printer' && failure !== 'invalid'
+
   return (
     <>
       <div id="pcp-error-msg" className="pcp-strip pcp-strip--error pcp-enter" role="alert">
@@ -407,16 +449,21 @@ export function PickupFailurePanel({
         <span>
           {message}
           {failure === 'invalid' ? (
-            <small>不存在、已过期或不属于这台机器的码，都会显示这一句——不提示具体原因，是为了防止有人试探别人的码。</small>
+            <small>不存在或已过期的码显示这一句，不提示具体原因，是为了防止有人试探别人的码。</small>
           ) : null}
         </span>
       </div>
       <div className="pcp-actions">
-        <button type="button" className="qx-btn pcp-act pcp-act--go" data-testid="arrival-code-primary" onClick={failure === 'printer' ? onRetry : onReset}>
-          {failure === 'printer' ? '重试校验' : '清除，重新输入'}
+        <button
+          type="button"
+          className="qx-btn pcp-act pcp-act--go"
+          data-testid="arrival-code-primary"
+          onClick={retryThisOrder || failure === 'printer' ? onRetry : onReset}
+        >
+          {retryThisOrder ? '重试这一单' : failure === 'printer' ? '重试校验' : '清除，重新输入'}
         </button>
-        <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onHelp}>
-          {failure === 'invalid' ? '查看取码说明 / 使用帮助' : '使用帮助'}
+        <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={retryThisOrder ? onReset : onHelp}>
+          {retryThisOrder ? '改为输到机码' : failure === 'invalid' ? '查看取码说明 / 使用帮助' : '使用帮助'}
         </button>
       </div>
     </>

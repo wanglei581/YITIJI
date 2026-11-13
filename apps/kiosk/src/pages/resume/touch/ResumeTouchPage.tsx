@@ -30,7 +30,7 @@ function withVoice(ask?: QxTouchAsk): QxTouchAsk | undefined {
 /**
  * 简历三条主路共用的触屏壳：意图带、选择区、底栏、底导航。
  * 步骤条 rail 默认画四步（上传与方向 / AI 解析 / 诊断报告 / 优化打印），railNow 是当前步；
- * showRail 为假时不画步骤条。底栏中槽可以放自己的内容（mid），此时不再画问小青。
+ * showRail 为假时不画步骤条，可改传 path 在意图带下写几步路径（如首屏的三步）。底栏中槽可以放自己的内容（mid），此时不再画问小青。
  */
 export function ResumeTouchPage({
   eyebrow,
@@ -40,6 +40,8 @@ export function ResumeTouchPage({
   railNow = 0,
   railMarks,
   showRail = true,
+  path,
+  pathLabel,
   seal = null,
   back,
   backLabel,
@@ -65,6 +67,9 @@ export function ResumeTouchPage({
   /** 步骤条上失败 / 结果未确认的那一步（步号从 0 起）。不传就按 railNow 画。 */
   railMarks?: Readonly<Record<number, 'bad' | 'wait'>>
   showRail?: boolean
+  /** 步骤条不画时，意图带下的路径胶囊（QxTouchBand 的 path）。 */
+  path?: readonly string[]
+  pathLabel?: string
   seal?: QxTouchSeal | null
   back?: { label: string; onBack: () => void }
   backLabel?: string
@@ -104,6 +109,8 @@ export function ResumeTouchPage({
           status={toStatus(status)}
           statusClassName="qx-pill"
           rail={showRail ? { labels: FLOW_RAIL, now: railNow, marks: railMarks } : undefined}
+          path={showRail ? undefined : path}
+          pathLabel={pathLabel}
           onBack={goBack}
           backLabel={backName}
         />

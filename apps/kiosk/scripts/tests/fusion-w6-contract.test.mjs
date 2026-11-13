@@ -126,10 +126,11 @@ test('阴性对照：manifest 或 router 任一侧偷改一个字，上面那条
   )
 
   // ③ 重定向目标被改掉也要红（只比较源的话，改 to 就是一条静默的错误跳转）。
+  // 转义用单个反斜杠：11/08 起排在最前的源带 *（如 /activities/*），原先的双反斜杠会把 * 当量词、变异落不了地。
   const firstSource = Object.keys(routeContract(routerSource, manifestSource).manifestRedirects)[0]
   assert.ok(firstSource, 'manifest 里一条兼容重定向都没有 = 抽取器坏了')
   const rewiredManifest = manifestSource.replace(
-    new RegExp(`('${firstSource.replace(/[.*+?^$(){}|[\\\]\\\\]/g, '\\\\$&')}':\\s*)'[^']*'`),
+    new RegExp(`('${firstSource.replace(/[.*+?^$(){}|[\\\]\\\\]/g, '\\$&')}':\\s*)'[^']*'`),
     "$1'/zz-rewired-target'",
   )
   assert.notEqual(rewiredManifest, manifestSource, '变异没有落地：兼容重定向的写法变了')

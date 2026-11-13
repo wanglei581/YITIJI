@@ -32,6 +32,7 @@ import { ROLES_KEY } from '../src/common/decorators/roles.decorator'
 import { memberSessionKey } from '../src/common/guards/end-user-auth.guard'
 import { AdvisorController } from '../src/advisor/advisor.controller'
 import { AiController } from '../src/ai/ai.controller'
+import { ResumeLayoutAdjustController } from '../src/ai/resume-layout-adjust.controller'
 import { CareerPlanController } from '../src/ai/career-plan.controller'
 import { FairVisitPlanController } from '../src/ai/fair-visit-plan.controller'
 import { JobFitController } from '../src/ai/job-fit.controller'
@@ -55,6 +56,7 @@ import { OrderQuoteController } from '../src/payment/order-quote.controller'
 import { PaymentController } from '../src/payment/payment.controller'
 import { PrintConversionController } from '../src/print-conversion/print-conversion.controller'
 import { PrintJobsController } from '../src/print-jobs/print-jobs.controller'
+import { ScanDeviceController } from '../src/scan-tasks/scan-device.controller'
 import { ScanTasksController } from '../src/scan-tasks/scan-tasks.controller'
 import { SyncController } from '../src/sync/sync.controller'
 import { TerminalsController } from '../src/terminals/terminals.controller'
@@ -284,7 +286,7 @@ async function guardOnRealRoutes(): Promise<void> {
 
 function coverage(): void {
   const aiControllers: Ctor[] = [
-    AiController, CareerPlanController, FairVisitPlanController, JobFitController, SelfAssessmentController,
+    AiController, ResumeLayoutAdjustController, CareerPlanController, FairVisitPlanController, JobFitController, SelfAssessmentController,
     ResumeReportExportController, KioskAiCapabilitiesController, AdvisorController, MockInterviewController,
     MemberMockInterviewController, ContractReviewController, JobAiController, MemberJobAiSessionsController,
     MaterialsController, DailyBriefController, TrtcController, JobMaterialsController,
@@ -317,6 +319,8 @@ function coverage(): void {
     [MemberPrintOrdersController as unknown as Ctor, ['create']],
     [PackageOrdersController as unknown as Ctor, ['create']],
     [ScanTasksController as unknown as Ctor, ['create']],
+    // 屏上扫描（device 路线）：回报进度、改用面板、改设置都是「已开始的会话」上的动作，维护期间也要能继续，一个都不许拦。
+    [ScanDeviceController as unknown as Ctor, []],
     [UploadSessionsController as unknown as Ctor, ['create']],
     [PrintConversionController as unknown as Ctor, ['imagesToPdf']],
     [MaterialsController as unknown as Ctor, ['createTask']],

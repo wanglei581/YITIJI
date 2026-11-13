@@ -58,6 +58,11 @@ import {
   setFreePrintQuotaClock,
 } from '../src/print-jobs/free-print-quota.policy'
 import { AdminPrintFreeQuotaController, KioskPrintQuotaController } from '../src/print-jobs/free-print-quota.controller'
+import {
+  parseAlertPercentField,
+  parseOptionalOverrideField,
+  parseQuotaSidesField,
+} from '../../../apps/admin/src/services/api/freePrintQuotaRules'
 import { FreePrintQuotaService } from '../src/print-jobs/free-print-quota.service'
 import { StorageService } from '../src/storage/storage.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
@@ -146,8 +151,63 @@ function assertStatic(): void {
   assert.ok(/每台每天 300 面/.test(progress) && /每天 50 面/.test(progress) && /每单 20 面/.test(progress) && /80%/.test(progress))
   assert.ok(progress.includes('全部可配'))
   assert.ok(usage.includes('terminalInFlight'))
-  assert.ok(decide.includes('if (input.payableCents > 0) return'))
+  // 实付大于 0 的早退要各在各的函数体里找：整文件 includes 会被另一个函数里的同一串蒙过去。
+  assert.ok(functionSource(decide, 'assertFreePrintQuota').includes('if (input.payableCents > 0) return'))
+  assert.ok(functionSource(decide, 'previewFreePrintOrderQuota').includes('if (input.payableCents > 0) return'))
+  assert.ok(policy.includes('PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES'))
+  assert.ok(policy.includes('这台机器每天最多免费打印 ${terminalLimit} 面，这单 ${requestedSides} 面。可以换一台机器下单，或减少份数。'))
+  assert.ok(policy.includes('这台机器每天最多免费打印 ${terminalLimit} 面，这单 ${requestedSides} 面，可以换一台机器下单。'))
+  assert.ok(policy.includes('这单 ${requestedSides} 面，超过每人每天免费 ${memberLimit} 面的上限，请减少份数后再下单。'))
+  assert.ok(policy.includes('这份文件 ${requestedSides} 面，超过每人每天免费 ${memberLimit} 面的上限，暂时不能免费打印。'))
+  assert.ok(decide.includes('previewFreePrintOrderQuota'))
+  const memberCreate = read(join(API_ROOT, 'src/member-print-orders/member-print-order-create.service.ts'))
+  const packageCreate = read(join(API_ROOT, 'src/member-print-orders/package-order.service.ts'))
+  assert.ok(memberCreate.includes('previewFreePrintOrderQuota'))
+  assert.ok(packageCreate.includes('previewFreePrintOrderQuota'))
+  assert.throws(() => parseQuotaSidesField('-1', '每台每天免费面数'))
+  assert.throws(() => parseQuotaSidesField('0', '每台每天免费面数'))
+  assert.throws(() => parseQuotaSidesField('1.5', '每台每天免费面数'))
+  assert.equal(parseQuotaSidesField('300', '每台每天免费面数'), 300)
+  assert.equal(parseOptionalOverrideField(''), null)
+  assert.throws(() => parseOptionalOverrideField('-3'))
+  assert.throws(() => parseOptionalOverrideField('0'))
+  assert.equal(parseOptionalOverrideField('12'), 12)
+  assert.throws(() => parseAlertPercentField('49'))
+  assert.equal(parseAlertPercentField('80'), 80)
+  const adminService = read(join(REPO_ROOT, 'apps/admin/src/services/api/freePrintQuota.ts'))
+  const saveGlobal = functionSource(adminService, 'saveGlobalQuota')
+  const saveTerminal = functionSource(adminService, 'saveTerminalDailySides')
+  assert.ok(saveGlobal.indexOf('parseQuotaSidesField') >= 0 && saveGlobal.indexOf('parseQuotaSidesField') < saveGlobal.indexOf('httpPutGlobal'))
+  assert.ok(saveGlobal.includes('DEMO_SAVE') && saveGlobal.indexOf('DEMO_SAVE') < saveGlobal.indexOf('return httpPutGlobal'))
+  assert.ok(adminService.includes('/admin/print-free-quota') && adminService.includes("method: 'PUT'"))
+  assert.ok(saveTerminal.indexOf('parseOptionalOverrideField') < saveTerminal.indexOf('fetch('))
+  assert.ok(saveTerminal.includes('/daily-free-print-sides'))
+  assert.ok(saveTerminal.includes('DEMO_SAVE') && saveTerminal.indexOf('DEMO_SAVE') < saveTerminal.indexOf('fetch('))
+  const quotaCard = read(join(REPO_ROOT, 'apps/admin/src/routes/print-scan/FreePrintQuotaCard.tsx'))
+  const terminalSection = read(join(REPO_ROOT, 'apps/admin/src/routes/terminals/TerminalDailyFreeSidesSection.tsx'))
+  const printPage = read(join(REPO_ROOT, 'apps/admin/src/routes/print-scan/index.tsx'))
+  const drawer = read(join(REPO_ROOT, 'apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx'))
+  assert.ok(printPage.includes('<FreePrintQuotaCard />'))
+  assert.ok(drawer.includes('<TerminalDailyFreeSidesSection terminalId={terminal.id} />'))
+  assertSavedAfterAwait(quotaCard, 'saveGlobalQuota')
+  assertSavedAfterAwait(terminalSection, 'saveTerminalDailySides')
+  const controller = read(join(API_ROOT, 'src/terminals/admin-terminals.controller.ts'))
+  assert.ok(controller.includes("@Put(':terminalId/daily-free-print-sides')"))
+  assert.ok(controller.includes('AUDIT_TERMINAL_DAILY_FREE_SIDES'))
   console.log('PASS 静态契约：文案、触发器不拦新列、告警只加一处调用、CI 只在 SQLite 作业')
+}
+
+function functionSource(source: string, name: string): string {
+  const start = source.indexOf(`export async function ${name}`)
+  assert.ok(start >= 0, name)
+  const next = source.indexOf('\nexport ', start + 1)
+  return source.slice(start, next < 0 ? source.length : next)
+}
+
+function assertSavedAfterAwait(source: string, fnName: string): void {
+  const call = source.indexOf(`await ${fnName}`)
+  const saved = source.indexOf('已保存，并记入审计。')
+  assert.ok(call >= 0 && saved > call, fnName)
 }
 
 function pushSchema(url: string): void {
@@ -472,6 +532,35 @@ async function main(): Promise<void> {
     }, adminHeaders)
     assert.equal((cleared.json.data as { dailyFreePrintSides: number | null }).dailyFreePrintSides, null)
     console.log('PASS 单台覆盖：越界 400，10 与 null 都落审计')
+
+    const badDedicated = await call('PUT', `/api/v1/admin/terminals/${SHIBEI}/daily-free-print-sides`, {
+      dailyFreePrintSides: -1,
+    }, adminHeaders)
+    assert.equal(badDedicated.status, 400)
+    const zeroDedicated = await call('PUT', `/api/v1/admin/terminals/${SHIBEI}/daily-free-print-sides`, {
+      dailyFreePrintSides: 0,
+    }, adminHeaders)
+    assert.equal(zeroDedicated.status, 400)
+    const partnerDedicated = await call('PUT', `/api/v1/admin/terminals/${SHIBEI}/daily-free-print-sides`, {
+      dailyFreePrintSides: 7,
+    }, { authorization: `Bearer ${partnerToken}` })
+    assert.equal(partnerDedicated.status, 403)
+    const auditsBeforeDedicated = await prisma.auditLog.count({ where: { action: 'terminal.daily_free_print_sides.update' } })
+    const dedicated = await call('PUT', `/api/v1/admin/terminals/${SHIBEI}/daily-free-print-sides`, {
+      dailyFreePrintSides: 7,
+    }, adminHeaders)
+    assert.equal(dedicated.status, 200)
+    assert.equal((dedicated.json.data as { dailyFreePrintSides: number }).dailyFreePrintSides, 7)
+    const dedicatedClear = await call('PUT', `/api/v1/admin/terminals/${SHIBEI}/daily-free-print-sides`, {
+      dailyFreePrintSides: null,
+    }, adminHeaders)
+    assert.equal(dedicatedClear.status, 200)
+    assert.equal((dedicatedClear.json.data as { dailyFreePrintSides: number | null }).dailyFreePrintSides, null)
+    assert.equal(
+      await prisma.auditLog.count({ where: { action: 'terminal.daily_free_print_sides.update' } }),
+      auditsBeforeDedicated + 2,
+    )
+    console.log('PASS 单台额度独立接口：负数与 0 被拒，合作机构 403，7 与 null 落审计')
 
     await seedPaper({ terminalId: JIMO, sides: 40, completedAt: hoursAgo(3) })
     const isolated = await call('GET', '/api/v1/kiosk/print-quota', undefined, kioskHeaders(SHIBEI))

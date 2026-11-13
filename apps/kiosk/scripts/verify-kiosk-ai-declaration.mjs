@@ -175,7 +175,7 @@ const toDataUrl = (code) => `data:text/javascript;base64,${Buffer.from(code).toS
 const transpile = (relativePath) => ts.transpileModule(
   read(relativePath),
   { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }, fileName: relativePath },
-).outputText
+).outputText.replace("from '../pages/copy/copySession'", () => `from '${toDataUrl(transpile('src/pages/copy/copySession.ts'))}'`)
 
 async function kindTableChecks() {
   const parsed = parseServerAiUse()
@@ -280,14 +280,15 @@ function sourceChecks() {
   const auth = read('src/services/terminalAuth.ts')
   const imports = [...auth.matchAll(/^import .+$/gm)].map((match) => match[0])
   const expectedImports = [
-    "import { clearKioskSensitiveSession, clearKioskSharedDeviceResidue } from '../auth/kioskSensitiveSession'",
+    "import { clearKioskSensitiveSession, clearKioskSharedDeviceResidue, kioskSensitiveSessionScope, type KioskClearScope } from '../auth/kioskSensitiveSession'",
     "import { API_BASE_URL, API_MODE } from './api/client'",
     "import { ApiHttpError } from './api/httpAdapter'",
     "import { getTerminalId } from './api/screensaver'",
     "import { readHttpError } from './api/throwHttpError'",
+    "import { applyE2ERecoveryView, attachRecoveryRuntime, cancelRecovery, dropRecoveryHold, hadSettled, holdRecoveryForOtherContent, isBootExchangeUnsettled, markBootExchangeSettled, markBootExchangeUnsettled, noteRejectedToken, noteStateEntered, rememberRecoveryClearScope, scheduleRecovery } from './terminalSessionRecovery'",
   ]
   if (imports.length !== expectedImports.length || expectedImports.some((line) => !imports.includes(line))) {
-    fail(`terminalAuth.ts 的 import 必须仍是原来的五条，实际：${imports.join(' || ')}`)
+    fail(`terminalAuth.ts 的 import 必须仍是这六条，实际：${imports.join(' || ')}`)
   }
   if (!auth.includes('export function registerAiDeclarationBridge')) fail('terminalAuth.ts 必须导出 registerAiDeclarationBridge')
   if (!auth.includes('if (!sessionInvalid(error)) return response')) fail('terminalAuth.ts 丢掉了非会话 401 原样交还')
@@ -421,9 +422,12 @@ async function loadRuntime({ terminalId = '', enforced = null, grantOk = false, 
     "from './api/screensaver'": toDataUrl(`export function getTerminalId() { return ${JSON.stringify(terminalId)} }\n`),
     "from './api/httpAdapter'": toDataUrl('export class ApiHttpError extends Error { constructor(code, message, status) { super(message); this.name = "ApiHttpError"; this.code = code; this.status = status } }\n'),
     "from './api/throwHttpError'": toDataUrl('export async function readHttpError(r) { const b = await r.json().catch(() => ({})); return { code: b?.error?.code ?? "UNKNOWN_ERROR", message: b?.error?.message ?? "" } }\n'),
-    "from '../auth/kioskSensitiveSession'": toDataUrl('export function clearKioskSensitiveSession() {}\nexport function clearKioskSharedDeviceResidue() {}\n'),
+    "from '../auth/kioskSensitiveSession'": toDataUrl('export function clearKioskSensitiveSession() {}\nexport function clearKioskSharedDeviceResidue() {}\nexport function kioskSensitiveSessionScope() { return \'none\' }\n'),
   }
+  const recoveryUrl = toDataUrl(`${transpile('src/services/terminalSessionRecovery.ts')}${tag}`)
   let authCode = `${transpile('src/services/terminalAuth.ts')}${tag}`.replaceAll('import.meta.env', `globalThis[${JSON.stringify(envName)}]`)
+  if (!authCode.includes("from './terminalSessionRecovery'")) throw new Error('terminalAuth 不再引入 terminalSessionRecovery')
+  authCode = authCode.replaceAll("from './terminalSessionRecovery'", `from '${recoveryUrl}'`)
   for (const [from, url] of Object.entries(stubs)) {
     if (!authCode.includes(from)) throw new Error(`terminalAuth 不再引入 ${from}`)
     authCode = authCode.replaceAll(from, `from '${url}'`)
@@ -787,9 +791,15 @@ async function loadClearance() {
   const scanModelUrl = leaf('src/pages/scan/scanWorkbenchModel.ts')
   const selfAssessmentCode = `${transpile('src/pages/resume/selfAssessmentSession.ts')}${tag}`
     .replaceAll("from '@ai-job-print/shared'", `from '${questionsStub}'`)
+  const scanMaterialsUrl = toDataUrl(`${transpile('src/pages/scan/scanMaterials.ts')}${tag}`)
   const scanSessionCode = `${transpile('src/pages/scan/scanWorkbenchSession.ts')}${tag}`
     .replaceAll("from './scanWorkbench'", `from '${scanTypeStub}'`)
     .replaceAll("from './scanWorkbenchModel'", `from '${scanModelUrl}'`)
+    .replaceAll("from './scanMaterials'", `from '${scanMaterialsUrl}'`)
+  const scanSessionUrl = toDataUrl(scanSessionCode)
+  const scanHowContinueCode = `${transpile('src/pages/scan/scanHowContinue.ts')}${tag}`
+    .replaceAll("from './scanMaterials'", `from '${scanMaterialsUrl}'`)
+    .replaceAll("from './scanWorkbenchSession'", `from '${scanSessionUrl}'`)
   const interviewCode = `${transpile('src/pages/interview/interviewWorkbenchSession.ts')}${tag}`
     .replaceAll("from './interviewWorkbenchModel'", `from '${interviewModelUrl}'`)
   const assistantDraftCode = transpile('src/services/assistantDraft.ts').replaceAll("from 'react'", `from '${import.meta.resolve('react')}'`)
@@ -804,13 +814,15 @@ async function loadClearance() {
     .replaceAll("from '../ai/aiDeclarationSession'", `from '${sessionUrl}'`)
     .replaceAll("from '../ai/aiDeclarationVersions'", `from '${versionsUrl}'`)
     .replaceAll("from '../pages/print/printMaterialSession'", `from '${leaf('src/pages/print/printMaterialSession.ts')}'`)
+    .replaceAll("from '../pages/print/pickupClaimResume'", `from '${leaf('src/pages/print/pickupClaimResume.ts')}'`)
     .replaceAll("from '../pages/resume/aiResumeSession'", `from '${leaf('src/pages/resume/aiResumeSession.ts')}'`)
     .replaceAll("from '../services/resumeParseIntent'", `from '${leaf('src/services/resumeParseIntent.ts')}'`)
     .replaceAll("from '../services/assistantDraft'", `from '${toDataUrl(assistantDraftCode)}'`)
     .replaceAll("from '../pages/resume/jobMaterialDraft'", `from '${leaf('src/pages/resume/jobMaterialDraft.ts')}'`)
     .replaceAll("from '../pages/resume/selfAssessmentSession'", `from '${toDataUrl(selfAssessmentCode)}'`)
     .replaceAll("from '../pages/interview/interviewWorkbenchSession'", `from '${toDataUrl(interviewCode)}'`)
-    .replaceAll("from '../pages/scan/scanWorkbenchSession'", `from '${toDataUrl(scanSessionCode)}'`)
+    .replaceAll("from '../pages/scan/scanWorkbenchSession'", `from '${scanSessionUrl}'`)
+    .replaceAll("from '../pages/scan/scanHowContinue'", `from '${toDataUrl(scanHowContinueCode)}'`)
     .replaceAll("from '../pages/scan/scanCleanupGate'", `from '${cleanupStub}'`)
     .replaceAll("from '../favorites/localFavorites'", `from '${leaf('src/favorites/localFavorites.ts')}'`)
     .replaceAll("from '../pages/contract-review/contractReviewSession'", `from '${leaf('src/pages/contract-review/contractReviewSession.ts')}'`)

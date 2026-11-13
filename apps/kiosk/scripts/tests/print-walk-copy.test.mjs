@@ -288,6 +288,7 @@ const iconUrl = toDataUrl('export const AlertCircleIcon = () => null; export con
 const aiUrl = toDataUrl(`import { jsx } from '${jsxUrl}'; export function PrintAiHelp({label}) { return jsx('button', {children:label}) }`)
 const benefitStub = toDataUrl('export const PRINT_BENEFIT_REDEEM_CTA_LABEL = "使用权益"; export const PRINT_BENEFIT_REDEEM_DISABLED_REASON = "未开放"')
 const partsUrl = transpile(join(kioskRoot, 'src/pages/print/components/PrintConfirmParts.tsx'), {
+  react: import.meta.resolve('react'),
   'react/jsx-runtime': jsxUrl,
   'lucide-react': iconUrl,
   '../../../services/api/benefits': benefitStub,
@@ -349,21 +350,30 @@ const hubIconUrl = toDataUrl('export const ArrowRightIcon = () => null; export c
 const hubContentUrl = transpile(join(kioskRoot, 'src/pages/print-scan/printHubContent.ts'))
 const touchChipUrl = toDataUrl(`import { jsx } from '${jsxUrl}'; export function QxTouchChip({children}) { return jsx('span', {children}) }`)
 const touchIconUrl = toDataUrl(`import { jsx } from '${jsxUrl}'; export function QxTouchIcon() { return jsx('span', {}) }`)
-const hubViewUrl = transpile(join(kioskRoot, 'src/pages/print-scan/components/QxPrintHubView.tsx'), {
-  // 入口卡的读屏名取标题、说明句进描述，用 useId 配对；静态渲染只看文案，id 给个递增数即可。
-  react: toDataUrl('let n = 0; export function useId() { n += 1; return `hub-id-${n}` }'),
-  'react/jsx-runtime': jsxUrl,
-  'lucide-react': hubIconUrl,
-  '../../print/components/PrintAiHelp': aiUrl,
-  '../../../copy/unattendedCopy': unattendedUrl,
-  '../../../components/qingxu/QxAppNavbar': toDataUrl('export const QxAppNavbar = () => null'),
-  '../../../components/qingxu/touch/QxTouchChip': touchChipUrl,
-  '../../../components/qingxu/touch/QxTouchIcon': touchIconUrl,
-  // 2026-10-28 稿 print：入口卡里的实物小样是纯装饰 SVG，本测试只看文案，换成空件。
-  '../../print/art/PrintArt': toDataUrl('export const PrintArt = () => null'),
-  '../printHubContent': hubContentUrl,
-})
-const { QxPrintHubView } = await import(hubViewUrl)
+const miniappLinkCopyUrl = transpile(join(kioskRoot, 'src/copy/miniappLinkCopy.ts'), { './unattendedCopy': unattendedUrl })
+const miniappLink = await import(miniappLinkCopyUrl)
+// 静态渲染不订阅会话。缺省返回读不到联系方式的那一套（小程序未发布）；开关用例另传一份已发布。
+function loadHubView(contact) {
+  return transpile(join(kioskRoot, 'src/pages/print-scan/components/QxPrintHubView.tsx'), {
+    // 入口卡的读屏名取标题、说明句进描述，用 useId 配对；静态渲染只看文案，id 给个递增数即可。
+    react: toDataUrl('let n = 0; export function useId() { n += 1; return `hub-id-${n}` }'),
+    'react/jsx-runtime': jsxUrl,
+    'lucide-react': hubIconUrl,
+    '../../print/components/PrintAiHelp': aiUrl,
+    '../../../copy/unattendedCopy': unattendedUrl,
+    '../../../copy/miniappLinkCopy': miniappLinkCopyUrl,
+    '../../../hooks/useSupportContact': toDataUrl(
+      `export function useSupportContactSnapshot() { return ${JSON.stringify(contact)} }`,
+    ),
+    '../../../components/qingxu/QxAppNavbar': toDataUrl('export const QxAppNavbar = () => null'),
+    '../../../components/qingxu/touch/QxTouchChip': touchChipUrl,
+    '../../../components/qingxu/touch/QxTouchIcon': touchIconUrl,
+    // 2026-10-28 稿 print：入口卡里的实物小样是纯装饰 SVG，本测试只看文案，换成空件。
+    '../../print/art/PrintArt': toDataUrl('export const PrintArt = () => null'),
+    '../printHubContent': hubContentUrl,
+  })
+}
+const { QxPrintHubView } = await import(loadHubView(unattended.CONSERVATIVE_SUPPORT_CONTACT))
 test('BFIX：Hub 不额外读取价目，入口与展开说明均使用中性文案', () => {
   const home = readFileSync(join(kioskRoot, 'src/pages/print-scan/PrintScanHomePage.tsx'), 'utf8')
   assert.doesNotMatch(home, /priceConfigApi|usePrintPriceConfig|fetchPrintPriceConfig|price-config/)
@@ -412,11 +422,39 @@ test('W-117：缺纸、异常、离线分别说明，签名提示只在真开通
       assert.equal(/ph-paper/.test(html), label === '打印机缺纸')
       if (label !== '打印机离线') assert.doesNotMatch(html, /离线|无法连接/)
       const signTile = /<button[^>]*data-testid="print-hub-cap-sign"[^>]*>/.exec(html)?.[0] ?? ''
-      assert.ok(signTile)
-      if (actionable) assert.doesNotMatch(signTile, /aria-disabled="true"/)
-      else assert.match(signTile, /aria-disabled="true"/)
+      assert.equal(signTile, '', '11/08 签名入口停放，后台开通也不显示')
     }
   }
+})
+
+test('到机码入口：读不到或小程序未发布不点名，已发布才点名', async () => {
+  const props = {
+    hubState: 'default', probe: 'ok', mfp: 'ready', colorDuplexLabel: '本机暂未开通',
+    capabilities: [],
+    arrivalCode: { key: 'arrival', icon: () => null, title: '到机码', description: '输入到机码' },
+    quickLinks: [], capabilityGroupHint: '', recordsGroupHint: '', notices: [],
+    onBack: () => {}, onRetry: () => {}, onHelp: () => {}, onArrivalCode: () => {}, onQuickLink: () => {}, onCapability: () => {},
+  }
+  const arrivalText = (html) => {
+    const block = /data-testid="print-hub-primary"[\s\S]*?<\/button>/.exec(html)?.[0] ?? ''
+    assert.notEqual(block, '', '到机码入口卡要画出来')
+    return block.replace(/<[^>]*>/g, '')
+  }
+  const unpublished = { ...unattended.CONSERVATIVE_SUPPORT_CONTACT, miniappPublished: false }
+  const published = { ...unattended.CONSERVATIVE_SUPPORT_CONTACT, miniappPublished: true }
+  const offLine = miniappLink.pickupEntryMiniappLine(unattended.CONSERVATIVE_SUPPORT_CONTACT)
+  const closedLine = miniappLink.pickupEntryMiniappLine(unpublished)
+  const onLine = miniappLink.pickupEntryMiniappLine(published)
+  assert.equal(offLine, '', '读不到联系方式时入口句是空串')
+  assert.equal(closedLine, '', '小程序未发布时入口句是空串')
+  assert.match(onLine, /职易达小程序/)
+  const offArrival = arrivalText(renderToStaticMarkup(createElement(QxPrintHubView, props)))
+  assert.doesNotMatch(offArrival, /小程序|职易达/)
+  assert.match(offArrival, /凭码办理，不登录也能核销/)
+  const { QxPrintHubView: PublishedHub } = await import(loadHubView(published))
+  const onArrival = arrivalText(renderToStaticMarkup(createElement(PublishedHub, props)))
+  assert.match(onArrival, new RegExp(onLine.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+  assert.match(onArrival, /凭码办理，不登录也能核销/)
 })
 
 const cashierIcons = toDataUrl('export const AlertTriangleIcon = () => null; export const CheckCircle2Icon = () => null; export const Clock3Icon = () => null; export const FileXIcon = () => null; export const InfoIcon = () => null; export const LockIcon = () => null; export const QrCodeIcon = () => null; export const ScanLineIcon = () => null; export const Undo2Icon = () => null;')
@@ -450,7 +488,7 @@ test('B 补：零元收银台与放行失败只说免费试运营，不说收款
 
 const doneFailedModelUrl = transpile(join(kioskRoot, 'src/pages/print/components/printDoneFailedModel.ts'), {
   '../../../copy/unattendedCopy': unattendedUrl,
-  '../../../copy/miniappLinkCopy': transpile(join(kioskRoot, 'src/copy/miniappLinkCopy.ts'), { './unattendedCopy': unattendedUrl }),
+  '../../../copy/miniappLinkCopy': miniappLinkCopyUrl,
   '../../../lib/fileName': transpile(join(kioskRoot, 'src/lib/fileName.ts')),
   '../cashierStatus': cashier,
   '../printProgressModel': progressUrl,
@@ -533,6 +571,34 @@ test('I-11 缺纸、卡纸的下一步不等人「加完纸」「处理好」，
   // 有重提出口：第三步说清是机器恢复后才点，整份重打。
   assert.equal(withRetry.steps[2].title, '机器恢复后可点下方「重新提交打印」')
   assert.match(withRetry.steps[2].detail, /整份重打/)
+})
+
+test('到机码失败屏只在后端还允许续打时说出同码续打，不按价格', () => {
+  const line = progress.SAME_CODE_RESUME_LINE
+  assert.match(line, /可以回到这里再输一次同一个到机码，按屏幕提示办理/)
+  assert.match(line, /符合条件时会整份重打/)
+  assert.match(line, /请在手机上重新下单/)
+  const paid = { variant: 'failed', money: { fact: 'paid', amountCents: 200 }, orderNo: 'ORD-RESUME', canRetry: true }
+  assert.equal(failedModel.failureCopy(paid).resumeLine, null, '不是到机码单，即使能重提也不说同码续打')
+  assert.equal(failedModel.failureCopy({ ...paid, pickupSource: true }).resumeLine, line)
+  assert.equal(failedModel.failureCopy({ ...paid, pickupSource: true, canRetry: false }).resumeLine, null)
+  assert.equal(failedModel.failureCopy({ ...paid, variant: 'paper-jam', pickupSource: true }).resumeLine, line)
+  assert.equal(failedModel.failureCopy({ ...paid, variant: 'out-of-paper', money: { fact: 'free', amountCents: 0 }, pickupSource: true }).resumeLine, line)
+  assert.equal(progress.sameCodeResumeLine({ pickupSource: true, canRetry: true, reprintAllowed: false, reprintRemaining: 0 }), null)
+  assert.equal(progress.sameCodeResumeLine({ pickupSource: true, canRetry: true, reprintAllowed: true, reprintRemaining: 1 }), line)
+  assert.equal(progress.sameCodeResumeLine({ pickupSource: true, canRetry: false, reprintAllowed: true, reprintRemaining: 2 }), line)
+  assert.equal(progress.sameCodeResumeLine({ canRetry: true }), null)
+})
+
+test('续打成功只在后端标明上次可能出过纸时提醒看出纸口', () => {
+  const line = progress.PRIOR_OUTPUT_TRAY_LINE
+  assert.match(line, /请留意出纸口，取走已有的纸，并留意这一次的出纸/)
+  assert.equal(progress.priorOutputTrayLine({}), null)
+  assert.equal(progress.priorOutputTrayLine({ mayHavePrinted: false, partialOutput: false }), null)
+  assert.equal(progress.priorOutputTrayLine({ mayHavePrinted: true }), line)
+  assert.equal(progress.priorOutputTrayLine({ partialOutput: true }), line)
+  assert.match(progressPage, /priorOutputTrayLine\(/)
+  assert.match(progressPage, /print-progress-prior-output/)
 })
 
 test('I-11 重新提交打印：打印机现在不能出纸就给出原因，能出纸才返回 null', () => {

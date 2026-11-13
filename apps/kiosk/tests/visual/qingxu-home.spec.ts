@@ -168,6 +168,35 @@ async function homeAnimations(page: Page): Promise<Array<{ name: string; iterati
 test('home uses the Qingxu frame, honest states, and real destinations @w1-kiosk', async ({ page, api }) => {
   const runtimeErrors = collectRuntimeErrors(page)
   registerHomeApi(api)
+  // 2026-11-04 产品负责人定停放：终端配置里百宝箱与智慧校园都开着，首页也不摆这两块。
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
+    status: 200,
+    json: {
+      smartCampus: {
+        enabled: true,
+        modules: { welcome: true, bigdata: false, luggage: false, panorama: false },
+        items: [],
+      },
+      toolbox: {
+        enabled: true,
+        items: [{
+          key: 'parked-help',
+          title: '使用帮助',
+          description: '打开站内帮助',
+          icon: 'help-circle',
+          to: '/help',
+          disabled: false,
+          sortOrder: 1,
+          launchMode: 'internal_route',
+          placements: ['toolbox'],
+        }],
+      },
+      ...RECRUITMENT_HOSTING_ON,
+      configVersion: 'qx-home-e2e-parked',
+      refreshIntervalMs: 300000,
+      serverTime: '2026-09-07T00:00:00.000Z',
+    },
+  })
   const fairRequest = page.waitForRequest((request) => new URL(request.url()).pathname === '/api/v1/job-fairs')
 
   await page.goto('/', { waitUntil: 'domcontentloaded' })
@@ -205,10 +234,11 @@ test('home uses the Qingxu frame, honest states, and real destinations @w1-kiosk
   await expect(printTile).toHaveAccessibleDescription(/状态未知/)
   await expect(printTile).toHaveAccessibleDescription(/出纸与扫描暂停/)
   await expectReadableFeature(page)
-  // 2026-09-28 稿 01：没开通的百宝箱 / 智慧校园不占首页。配置读到「关闭」后磁贴次数为 0，
-  // 不是一颗点不动的按钮。data-* 钉的是「已经读完并且判定为关」，不是「还没渲染」。
-  await expect(home).toHaveAttribute('data-toolbox', 'off')
-  await expect(home).toHaveAttribute('data-campus', 'off')
+  // 2026-11-04 产品负责人定停放：上面这份配置两项都开着，首页也不摆，数据属性固定 parked。
+  await expect(home).toHaveAttribute('data-toolbox', 'parked')
+  await expect(home).toHaveAttribute('data-campus', 'parked')
+  await expect(home.locator('[data-action="toolbox"]')).toHaveCount(0)
+  await expect(home.locator('[data-action="smart-campus"]')).toHaveCount(0)
   await expect(home.getByRole('button', { name: /百宝箱/ })).toHaveCount(0)
   await expect(home.getByRole('button', { name: /智慧校园/ })).toHaveCount(0)
 
@@ -281,7 +311,20 @@ test('home ready state defers capability claims to entry without hiding the real
     status: 200,
     json: {
       smartCampus: { enabled: true, modules: { welcome: true, bigdata: false, luggage: false, panorama: false }, items: [] },
-      toolbox: { enabled: false, items: [] },
+      toolbox: {
+        enabled: true,
+        items: [{
+          key: 'parked-help',
+          title: '使用帮助',
+          description: '打开站内帮助',
+          icon: 'help-circle',
+          to: '/help',
+          disabled: false,
+          sortOrder: 1,
+          launchMode: 'internal_route',
+          placements: ['toolbox'],
+        }],
+      },
       ...RECRUITMENT_HOSTING_ON,
       configVersion: 'qx-home-ready',
       refreshIntervalMs: 300000,
@@ -300,14 +343,15 @@ test('home ready state defers capability claims to entry without hiding the real
   await expect(printTile.getByText('打印机在线')).toHaveCount(0)
   await expect(printTile.getByText(/付了再打|免费打印|先看价格再出纸/)).toHaveCount(0)
   await expectReadableFeature(page)
-  // 智慧校园开通只凭终端配置，首页不宣称「已授权」；开通后可点。
-  const campus = home.locator('[data-action="smart-campus"]')
-  await expect(campus).toBeEnabled()
-  await expect(campus).toContainText('按本机开通范围进入校园服务')
+  // 2026-11-04 产品负责人定停放：这份配置里百宝箱与智慧校园都开着，首页也不摆这两块。
+  await expect(home.locator('[data-action="smart-campus"]')).toHaveCount(0)
+  await expect(home.locator('[data-action="toolbox"]')).toHaveCount(0)
+  await expect(home.getByRole('button', { name: /智慧校园/ })).toHaveCount(0)
+  await expect(home.getByRole('button', { name: /百宝箱/ })).toHaveCount(0)
   await expect(home.getByText('已授权', { exact: true })).toHaveCount(0)
   await expect(home.getByText('受控开放', { exact: true })).toHaveCount(0)
-  await expect(home).toHaveAttribute('data-toolbox', 'off')
-  await expect(home.getByRole('button', { name: /百宝箱/ })).toHaveCount(0)
+  await expect(home).toHaveAttribute('data-toolbox', 'parked')
+  await expect(home).toHaveAttribute('data-campus', 'parked')
   await expect(home.getByRole('button', { name: /查看全部服务|更多服务/ })).toHaveCount(0)
   await page.screenshot({ path: test.info().outputPath('home-ready-1080x1920.png') })
 })
@@ -558,12 +602,33 @@ test('home does not invent a price when the published price request fails @w1-ki
 
 test('home tiles: every sub-line keeps its font content area inside its own clipped box @w1-kiosk', async ({ page, api }) => {
   // 磁贴说明行（small）用 line-clamp 的 overflow:hidden 裁行数。行高写 1.35 时，Qingxu Sans（CI、真机 Windows 的字体栈，内容区 1.448em）的字形上下
-  // 各被削掉约 1px；Mac 苹方量不出来。夹具用 w6 那套：托管打开、百宝箱、智慧校园都开，六块磁贴的说明行都在页上。
+  // 各被削掉约 1px；Mac 苹方量不出来。夹具用 w6 那套：托管打开，百宝箱和智慧校园配置仍开着。
+  // 2026-11-04 产品负责人定停放：这两块不摆，托管打开时小磁贴只剩四块。
   registerW6Api(api)
   await page.goto('/')
-  await expect(page.locator('[data-qx-page="home"] .qxt-home-tiles .qxt-tile')).toHaveCount(6)
+  const home = page.getByTestId('qx-home')
+  await expect(home).toHaveAttribute('data-toolbox', 'parked')
+  await expect(home).toHaveAttribute('data-campus', 'parked')
+  await expect(home.locator('[data-action="toolbox"]')).toHaveCount(0)
+  await expect(home.locator('[data-action="smart-campus"]')).toHaveCount(0)
+  await expect(home.locator('.qxt-home-tiles .qxt-tile')).toHaveCount(4)
   await page.waitForLoadState('networkidle')
-  const sublines = await page.locator('[data-qx-page="home"] .qxt-home-tiles .qxt-tx small').count()
-  expect(sublines, '六块磁贴都有说明行').toBeGreaterThanOrEqual(6)
+  const sublines = await home.locator('.qxt-home-tiles .qxt-tx small').count()
+  expect(sublines, '四块磁贴都有说明行').toBeGreaterThanOrEqual(4)
   expect(await findClippedText(page), '首页磁贴的字不得被 overflow:hidden 贴着裁').toEqual([])
 })
+
+// 2026-11-08：本轮八个旧地址及各自深链均 replace 回首页。
+for (const prefix of [
+  '/resume/career-plan', '/resume/self-assessment', '/resume/job-fit', '/resume/materials',
+  '/resume/templates', '/activities', '/print-scan/sign', '/print/scan-sign',
+]) {
+  for (const suffix of ['', '/saved-record?old=1#detail']) {
+    test(`四核心收口旧链 ${prefix}${suffix} 回首页 @w1-kiosk`, async ({ page, api }) => {
+      registerHomeApi(api)
+      await page.goto(`${prefix}${suffix}`)
+      await expect(page).toHaveURL(/\/$/)
+      await expect(page.getByTestId('qx-home')).toBeVisible()
+    })
+  }
+}

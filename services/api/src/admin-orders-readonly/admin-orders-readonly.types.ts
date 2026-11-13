@@ -13,6 +13,7 @@ export interface AdminOrderReadonlyItem {
   id: string
   orderNo: string
   type: string
+  typeLabel?: '复印'
   ownerType: 'member' | 'anonymous'
   userLabel: string
   terminalCode: string | null
@@ -27,7 +28,9 @@ export interface AdminOrderReadonlyItem {
   /** 取件码过期时间（ISO）；仅小程序云单有值 */
   pickupCodeExpiresAt: string | null
   payStatus: string
+  /** 复印单返回 CopyJob.state；不使用为注销保留的 Order.taskStatus 映射。 */
   taskStatus: string
+  taskStatusLabel?: string
   printFileName: string | null
   copies: number | null
   colorMode: 'black_white' | 'color' | null
@@ -45,7 +48,7 @@ export interface AdminOrderReadonlyItem {
    * 只读；不自动出款、不改 payStatus。
    */
   opsAttention: boolean
-  opsAttentionCode: 'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | null
+  opsAttentionCode: 'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | 'copy_result_unconfirmed' | null
   createdAt: string
   updatedAt: string
 }

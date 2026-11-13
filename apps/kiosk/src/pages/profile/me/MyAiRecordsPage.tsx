@@ -1,3 +1,5 @@
+import { useKioskLicense } from '../../../layouts/KioskLicenseContext'
+import { LicenseLock } from '../../../layouts/LicenseLock'
 import { useMemberCursorPage } from './useMemberCursorPage'
 import { MemberLoadMore } from './MemberLoadMore'
 import { QaRecords } from './QaRecords'
@@ -82,16 +84,17 @@ function RecordExitCards({ aiPaused, artWidths }: { aiPaused: boolean; artWidths
   return (
     <>
       {aiPaused ? (
-        <MeExitCard art="usb" artWidth={artWidths[0]} title="去打印" desc="打印不需要小青" testId="member-records-ai-down-print" onClick={() => navigate('/print-scan')} />
+        <LicenseLock><MeExitCard art="usb" artWidth={artWidths[0]} title="去打印" desc="打印不需要小青" testId="member-records-ai-down-print" onClick={() => navigate('/print-scan')} /></LicenseLock>
       ) : (
-        <MeExitCard art="resume" artWidth={artWidths[0]} title="去做简历诊断" desc="上传一份简历，先做诊断" onClick={() => navigate('/resume/source?intent=diagnose')} />
+        <LicenseLock><MeExitCard art="resume" artWidth={artWidths[0]} title="去做简历诊断" desc="上传一份简历，先做诊断" onClick={() => navigate('/resume/source?intent=diagnose')} /></LicenseLock>
       )}
-      <MeExitCard art="checklist" artWidth={artWidths[1]} title="查政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} />
+      <LicenseLock><MeExitCard art="checklist" artWidth={artWidths[1]} title="查政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} /></LicenseLock>
     </>
   )
 }
 
 export function MyAiRecordsPage() {
+  const winding = useKioskLicense().mode === 'winding-down'
   const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
   // 招聘内容托管（3.13）关闭时：不读、不列岗位 AI 会话与招聘会准备单，也不摆岗位 AI 类入口与说明（那些页不开放）。
@@ -246,7 +249,7 @@ export function MyAiRecordsPage() {
 
   const openFairPlan = (item: AiRecordView) => {
     if (item.kind !== 'fair_visit_plan' || item.ref?.type !== 'job_fair' || !item.ref.id) return
-    navigate(`/job-fairs/${encodeURIComponent(item.ref.id)}/visit-plan`, { state: { taskId: item.taskId } })
+    navigate(`/job-fairs/${encodeURIComponent(item.ref.id)}/visit-plan`, { state: { taskId: item.taskId, licenseViewOnly: winding } })
   }
 
   const totalCount = items.length + jobAiSessions.length + interviews.length + qaPage.items.length
@@ -313,7 +316,7 @@ export function MyAiRecordsPage() {
               // 五页合成一张工作台之后，/interview/report 是工作台的一个 stage 而不是独立路由。
               // 只 navigate 会落到工作台默认 stage（setup），看不到这条记录的报告。
               patchInterviewWorkbenchSession({ stage: 'report', report: { sessionId } })
-              navigate('/interview/report', { state: { sessionId } })
+              navigate('/interview/report', { state: { sessionId, licenseViewOnly: winding } })
             }}
             onDelete={(sessionId) => void removeInterview(sessionId)}
           />
@@ -331,7 +334,9 @@ export function MyAiRecordsPage() {
             const kind = KIND_META[item.kind] ?? { label: 'AI 服务记录', hint: '本人 AI 服务记录' }
             const status = STATUS_META[item.status]
             const openPath = aiRecordPath(item)
-            const openReason = recordUnavailableReason(item)
+            const openReason = ['job_fit', 'career_plan', 'self_assessment'].includes(item.kind)
+              ? '这项服务本机暂未开放，记录可以删除。'
+              : recordUnavailableReason(item)
             const confirming = confirmId === item.id
             const expired = confirmExpired && !confirmId && items[0]?.id === item.id
             const busy = busyId === item.id
@@ -351,7 +356,7 @@ export function MyAiRecordsPage() {
                 chips={<MeAiChip />}
                 actions={(
                   <MeActs>
-                    {openPath ? <MeBtn v="pri" disabled={busy} onClick={() => navigate(openPath)}>打开</MeBtn> : null}
+                    {openPath ? <MeBtn v="pri" disabled={busy} onClick={() => navigate(openPath, { state: { taskId: item.taskId, licenseViewOnly: winding } })}>打开</MeBtn> : null}
                     {hostingOpen && item.kind === 'fair_visit_plan' && item.ref?.type === 'job_fair' && item.ref.id && item.status === 'completed' ? (
                       <MeBtn v="sec" onClick={() => openFairPlan(item)}>打开这场招聘会规划</MeBtn>
                     ) : null}
@@ -406,14 +411,14 @@ export function MyAiRecordsPage() {
       sub="列表不显示原文、提示词和输出全文"
       fine={`仅展示本人 AI 服务记录，不展示简历原文、诊断正文或模型原始输出。诊断、优化、生成、对照、规划、自我探索和模拟面试都在这里。${confirmingLine(confirmId)}`}
       toast={toast}
-      ctabar={recordsCtabar(
-        uiState === 'login' || uiState === 'loading' || uiState === 'error' ? uiState : 'ready',
+      ctabar={uiState === 'login' || uiState === 'loading' || uiState === 'error' ? recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/ai-records', '去做简历诊断', () => navigate('/resume/source?intent=diagnose')) : <LicenseLock>{recordsCtabar(
+        'ready',
         navigate,
         () => setReloadKey((k) => k + 1),
         '/me/ai-records',
         '去做简历诊断',
         () => navigate('/resume/source?intent=diagnose'),
-      )}
+      )}</LicenseLock>}
     >
       {body}
       {isLoggedIn && state === 'ready' ? <MemberLoadMore {...recordsPage} label="加载更多简历与规划记录" /> : null}

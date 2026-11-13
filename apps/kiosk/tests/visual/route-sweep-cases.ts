@@ -19,8 +19,6 @@ const PARAM_SAMPLES = {
   '/k/u/:scene': '/k/u/sweepSceneToken_0123456',
   '/k/l/:ticketId': '/k/l/sweep-not-a-kiosk-ticket',
   '/me/activity/:id': '/me/activity/sweep-record',
-  '/activities/:id': '/activities/activity-001',
-  '/smart-campus/service/:key': '/smart-campus/service/campus-card',
   '/print-scan/feature/:key': '/print-scan/feature/id-photo',
   '/jobs/:id': '/jobs/job-001',
   '/jobs/:id/offline': '/jobs/offline-job-001/offline',
@@ -63,7 +61,23 @@ export function paramSampleKeys(): string[] {
   return Object.keys(PARAM_SAMPLES)
 }
 
+// 2026-11-04 产品负责人定停放：splat 不进参数样本表（表只覆盖含 `:` 的模式）。
+// 扫描打开旧链接本身，落地仍由 compatibilityRedirects 记成首页。
+const PARKED_SPLAT_URLS = {
+  '/resume/career-plan/*': '/resume/career-plan',
+  '/resume/self-assessment/*': '/resume/self-assessment',
+  '/resume/job-fit/*': '/resume/job-fit',
+  '/resume/materials/*': '/resume/materials',
+  '/resume/templates/*': '/resume/templates',
+  '/activities/*': '/activities',
+  '/print-scan/sign/*': '/print-scan/sign',
+  '/print/scan-sign/*': '/print/scan-sign',
+  '/toolbox/*': '/toolbox',
+  '/smart-campus/*': '/smart-campus',
+} as const satisfies Partial<Record<ProductionRoutePattern, `/${string}`>>
+
 export function resolveSweepUrl(pattern: ProductionRoutePattern): string {
+  if (pattern in PARKED_SPLAT_URLS) return PARKED_SPLAT_URLS[pattern as keyof typeof PARKED_SPLAT_URLS]
   if (!pattern.includes(':')) return pattern
   const sample = PARAM_SAMPLES[pattern as keyof typeof PARAM_SAMPLES]
   if (!sample) {
@@ -83,7 +97,10 @@ export function resolveLandedPath(pattern: ProductionRoutePattern, url: string):
     // 调用方 route-sweep.spec.ts 比的是 `url.pathname`，不含查询串，所以这里剥掉。
     return target.split('?')[0] ?? target
   }
-  return url.split('?')[0] ?? url
+  const pathOnly = url.split('?')[0] ?? url
+  // 只有证件照这一个样本回服务台。同模式的复印等说明仍停在本页。
+  if (pathOnly === '/print-scan/feature/id-photo') return '/print-scan'
+  return pathOnly
 }
 
 export const sweepCases: SweepCase[] = productionRoutePatterns.map((pattern) => {

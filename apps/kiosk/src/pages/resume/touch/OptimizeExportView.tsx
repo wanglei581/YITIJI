@@ -12,6 +12,11 @@ const FORMATS: Array<{ value: ResumeExportFormat; name: string; sub: string }> =
   { value: 'md', name: 'MD', sub: 'Markdown，会用的人拿去二次排版' },
 ]
 
+function resumeExportAigcNote(format: ResumeExportFormat): string {
+  if (format === 'txt' || format === 'md') return '导出的文件末尾有一行：含人工智能辅助生成内容'
+  return '导出的简历每页底部有一行小字：含人工智能辅助生成内容'
+}
+
 const FACTS = [
   ['简历内容', '导出只做排版与文件保存，不再润色。导出不改内容，也不会再过一遍模型。'],
   ['文件与页数', '以这次导出结果为准；未收到结果时不估算。PDF 有页数；DOCX、TXT、MD 页数 0。'],
@@ -112,6 +117,7 @@ export function OptimizeExportView(props: {
           </button>
         ))}
       </div>
+      <p className="qxt-aigc-note" data-testid="resume-export-aigc-note">{resumeExportAigcNote(props.format)}</p>
       {props.exported ? (
         <ExportedCard
           exported={props.exported}

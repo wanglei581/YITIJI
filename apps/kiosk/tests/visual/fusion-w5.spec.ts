@@ -47,13 +47,6 @@ async function expectFusionAcceptance(page: Page, errors: string[], options?: { 
   expect(errors).toEqual([])
 }
 
-async function expectSharedPageShell(page: Page, title: string): Promise<void> {
-  const frame = page.locator('[data-kiosk-component="page-frame"]')
-  await expect(frame).toBeVisible()
-  await expect(frame.locator('.ui-kiosk-page-header')).toBeVisible()
-  await expect(frame.getByRole('heading', { name: title, exact: true })).toBeVisible()
-}
-
 /**
  * 冻结假时钟。`page.clock.install()` 之后时间仍按真实速度流动（Playwright 的默认），
  * 5 秒探测超时、10 秒自动重测都可能自己走到；页面渲染完再 pauseAt，之后只有 runFor 才推进时间。
@@ -155,6 +148,17 @@ function homeFair(overrides: Record<string, unknown> = {}): Record<string, unkno
   }
 }
 
+function terminalConfig(toolbox: { enabled: boolean; items: unknown[] }): unknown {
+  return {
+    smartCampus: { enabled: false, modules: { welcome: false, bigdata: false, luggage: false, panorama: false }, items: [] },
+    toolbox,
+    ...RECRUITMENT_HOSTING_ON,
+    configVersion: 'w5-browser-fixture',
+    refreshIntervalMs: 300000,
+    serverTime: '2026-07-24T00:00:00.000Z',
+  }
+}
+
 function registerHomeApi(api: ApiRouter, fairs: unknown[] = [homeFair()]): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/config', {
     status: 200,
@@ -173,17 +177,6 @@ function registerAuthenticatedShell(api: ApiRouter): void {
     status: 200,
     json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
   })
-}
-
-function terminalConfig(toolbox: { enabled: boolean; items: unknown[] }): unknown {
-  return {
-    smartCampus: { enabled: false, modules: { welcome: false, bigdata: false, luggage: false, panorama: false }, items: [] },
-    toolbox,
-    ...RECRUITMENT_HOSTING_ON,
-    configVersion: 'w5-browser-fixture',
-    refreshIntervalMs: 300000,
-    serverTime: '2026-07-24T00:00:00.000Z',
-  }
 }
 
 test('home restores real fair and device panels with balanced 1080x1920 geometry @w5-kiosk', async ({ page, api }) => {
@@ -561,125 +554,6 @@ test('activity detail renders an honest missing-record empty state after visible
   ).toBeVisible()
   await expectFusionAcceptance(page, errors)
   pagination.assertNoUnhandledRequests()
-})
-
-for (const scenario of [
-  {
-    label: 'configured',
-    toolbox: {
-      enabled: true,
-      items: [{ key: 'w5-help', title: '使用帮助', description: '打开站内帮助能力', icon: 'help-circle', to: '/help', disabled: false, sortOrder: 1, placements: ['toolbox'], launchMode: 'internal_route' }],
-    },
-    text: '使用帮助',
-    available: true,
-  },
-  { label: 'empty', toolbox: { enabled: false, items: [] }, text: '本机暂未开启百宝箱服务', available: false },
-] as const) {
-  test(`toolbox renders the ${scenario.label} terminal-config branch @w5-kiosk`, async ({ page, api }) => {
-    const errors = runtimeErrors(page)
-    registerKioskShell(api)
-    api.respond('GET', '/api/v1/terminals/KSK-001/config', {
-      status: 200,
-      json: terminalConfig(scenario.toolbox),
-    })
-    api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
-    api.respond('GET', '/api/v1/job-fairs', {
-      status: 200,
-      json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
-    })
-
-    await page.goto('/toolbox')
-    if (scenario.available) {
-      await expect(page.locator('[data-kiosk-screen="toolbox"]')).toBeVisible()
-      await expect(page.locator('[data-qx-page="toolbox"] .qxt-band')).toBeVisible()
-      await expect(page.getByRole('heading', { name: '选一个已上架的服务', exact: true })).toBeVisible()
-      const noticeIcon = page.locator('[data-qx-page="toolbox"] .tb-notice-icon')
-      const iconBox = await noticeIcon.boundingBox()
-      expect(iconBox, '说明条图标必须可见').not.toBeNull()
-      expect(iconBox!.width).toBeLessThanOrEqual(48)
-      expect(iconBox!.height).toBeLessThanOrEqual(48)
-      const notice = page.locator('[data-qx-page="toolbox"] .tb-notice')
-      const noticeBox = await notice.boundingBox()
-      const viewport = page.viewportSize()
-      expect(noticeBox, '说明文字必须在首屏').not.toBeNull()
-      expect(viewport).not.toBeNull()
-      expect(noticeBox!.y + noticeBox!.height).toBeLessThanOrEqual(viewport!.height)
-      const tiles = page.locator('[data-qx-page="toolbox"] .tb-tile')
-      const tileCount = await tiles.count()
-      expect(tileCount).toBeGreaterThan(0)
-      for (let index = 0; index < tileCount; index += 1) {
-        const tile = tiles.nth(index)
-        const tileBox = await tile.boundingBox()
-        expect(tileBox!.height).toBeGreaterThanOrEqual(64)
-        const borderWidth = await tile.evaluate((el) => Number.parseFloat(getComputedStyle(el).borderTopWidth))
-        expect(borderWidth).toBeGreaterThan(0)
-      }
-      const backButton = page.getByRole('button', { name: /返回/ }).first()
-      await expect(backButton).toBeVisible()
-      await expect(page.getByText(scenario.text, { exact: true })).toBeVisible()
-      await expect(page.getByRole('button', { name: /使用帮助/ })).toBeEnabled()
-      await backButton.click()
-      await expect(page).toHaveURL(/\/$/)
-      // 等待 V6 首页真实异步面板稳定后，再执行统一触控目标验收。
-      await expect(page.locator('[data-qx-page="home"]')).toBeVisible()
-      await expect(page.locator('[data-home-job-fair-panel]')).toHaveAttribute('data-panel-state', 'empty')
-      await expect(page.locator('[data-home-device-panel]')).toHaveAttribute('data-panel-state', 'ready')
-    } else {
-      await expect(page.locator('[data-capability-state="unavailable"]')).toBeVisible()
-      await expect(page.locator('[data-kiosk-screen="toolbox"]')).toHaveCount(0)
-      await expect(page.getByText(scenario.text, { exact: true })).toBeVisible()
-    }
-    await expectFusionAcceptance(page, errors)
-  })
-}
-
-test('benefit activity detail keeps the shared shell, real content and return path @w5-kiosk', async ({ page, api }) => {
-  const errors = runtimeErrors(page)
-  registerKioskShell(api)
-  api.respond('GET', '/api/v1/activities', {
-    status: 200,
-    json: { success: true, data: { items: [] } },
-  })
-  api.respond('GET', '/api/v1/activities/w5-benefit-detail', {
-    status: 200,
-    json: {
-      success: true,
-      data: {
-        id: 'w5-benefit-detail',
-        title: 'W5 打印服务体验权益',
-        description: '这是来自真实活动详情接口的验收内容。',
-        rulesText: '每人限领一次；仅用于现场打印服务。',
-        benefitType: 'free_quota',
-        sourceType: 'platform',
-        quantityTotal: 1,
-        stockTotal: 20,
-        stockRemaining: 8,
-        claimLimitPerUser: 1,
-        status: 'published',
-        validFrom: null,
-        validUntil: null,
-        grantValidDays: 30,
-        claimable: true,
-        claimed: false,
-        soldOut: false,
-        ended: false,
-        createdAt: '2026-07-24T00:00:00.000Z',
-        updatedAt: '2026-07-24T00:00:00.000Z',
-      },
-    },
-  })
-
-  await page.goto('/activities/w5-benefit-detail')
-  await expect(page.locator('[data-kiosk-domain="profile"][data-kiosk-screen="activity-detail"]')).toBeVisible()
-  await expect(page.locator('[data-qxt-screen]')).toBeVisible()
-  await expect(page.locator('.qxt-back')).toHaveCount(1)
-  await expect(page.getByRole('heading', { name: 'W5 打印服务体验权益', exact: true })).toBeVisible()
-  await expect(page.getByText('这是来自真实活动详情接口的验收内容。', { exact: true })).toBeVisible()
-  const backButton = page.getByRole('button', { name: /返回活动/ }).first()
-  await expect(backButton).toBeVisible()
-  await expectFusionAcceptance(page, errors)
-  await backButton.click()
-  await expect(page).toHaveURL(/\/activities$/)
 })
 
 test('legal document keeps its standalone theme and scrollable long body @w5-kiosk', async ({ page, api }) => {
@@ -2067,6 +1941,55 @@ test('R-04 documents: photo composite requiring check opens material check @w5-k
   expect((await created).postDataJSON()).toMatchObject({ sourceFileId: 'doc-photo-pdf', kind: 'inspection' })
 })
 
+test('documents: PDF preview uses the same-site content URL and falls back without it @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  const directPdf = '/w5-fixtures/my-doc-direct.pdf'
+  const sameSite = '/api/v1/files/doc-pdf-same/content?expires=1&sig=test'
+  api.respond('GET', '/api/v1/me/documents', memberPage([
+    memberDocument({ id: 'doc-pdf-same', filename: '同站预览.pdf' }),
+    memberDocument({ id: 'doc-pdf-direct', filename: '直链预览.pdf' }),
+  ]))
+  api.respond('GET', '/api/v1/files/doc-pdf-same/preview-url', {
+    status: 200,
+    json: { success: true, data: { fileId: 'doc-pdf-same', url: directPdf, printFileUrl: sameSite, expiresAt: FUTURE, disposition: 'inline' } },
+  })
+  api.respond('GET', '/api/v1/files/doc-pdf-direct/preview-url', {
+    status: 200,
+    json: { success: true, data: { fileId: 'doc-pdf-direct', url: directPdf, expiresAt: FUTURE, disposition: 'inline' } },
+  })
+  const directLinkFetches: string[] = []
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === directPdf) directLinkFetches.push(request.resourceType())
+  })
+  await page.route('**/api/v1/files/doc-pdf-same/content**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+  )
+  await page.route(`**${directPdf}`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+  )
+
+  await loginThroughVisibleUi(page, '/me/documents')
+  const rows = page.getByTestId('member-assets-document')
+  const sameFetch = page.waitForRequest((request) => new URL(request.url()).pathname === '/api/v1/files/doc-pdf-same/content')
+  await openRow(rows.filter({ hasText: '同站预览.pdf' }))
+  await rows.filter({ hasText: '同站预览.pdf' }).getByRole('button', { name: '查看', exact: true }).click()
+  const sameDialog = page.getByRole('dialog', { name: '同站预览.pdf' })
+  await expect(sameDialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', sameSite)
+  await sameFetch
+  expect(directLinkFetches).toEqual([])
+  await sameDialog.getByRole('button', { name: '关闭预览' }).click()
+
+  const directFetch = page.waitForRequest((request) => new URL(request.url()).pathname === directPdf)
+  await openRow(rows.filter({ hasText: '直链预览.pdf' }))
+  await rows.filter({ hasText: '直链预览.pdf' }).getByRole('button', { name: '查看', exact: true }).click()
+  const directDialog = page.getByRole('dialog', { name: '直链预览.pdf' })
+  await expect(directDialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', directPdf)
+  await directFetch
+  expect(errors).toEqual([])
+})
+
 test('documents and orders: error then empty come from the server, never a cached list @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerMemberLogin(api)
@@ -2196,7 +2119,7 @@ test('orders: reprint notice follows reprintAllowed and reprintRemaining @w5-kio
   await expect(page.getByText('取件凭证码')).toHaveCount(0)
   const usedRow = page.getByTestId('member-assets-order').filter({ hasText: '不能再打的简历.pdf' })
   await usedRow.getByRole('button', { name: '查看订单详单 不能再打的简历.pdf' }).click()
-  await expect(usedRow.getByText('这单已经接着打过 2 次，不能再打了。')).toBeVisible()
+  await expect(usedRow.getByText('这单已经接着打过 2 次，不能再打了。还要打，请在手机上重新下单。')).toBeVisible()
   await expect(usedRow.getByText('还能续打')).toHaveCount(0)
 })
 

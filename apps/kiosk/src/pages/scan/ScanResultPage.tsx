@@ -1,87 +1,32 @@
-import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useLocation, type NavigateOptions } from 'react-router-dom'
-import {
-  ExpandIcon,
-  FileTextIcon,
-  FolderIcon,
-  PrinterIcon,
-  SparklesIcon,
-} from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
-import { PhoneHelpLine } from '../print-scan/phoneHelp'
-import { FileContentPreview } from '../../components/FileContentPreview'
 import { formatLabelFromMime } from './scanOutputFormat'
+import { ScanDeviceFailedView } from './ScanDeviceFailedView'
+import { ScanResultExitRow } from './ScanResultExitRow'
+import { ScanResultFailedView } from './ScanResultFailedView'
+import { ScanResultPreviewBlock } from './ScanResultPreviewBlock'
 import { ScanResultPreviewViewer } from './ScanResultPreviewViewer'
-import {
-  ScanSample,
-  ScanStatusPanel,
-  ScanWorkbenchShell,
-} from './ScanWorkbenchChrome'
-import { FsRow } from '../print-scan/FsRow'
+import { ScanWorkbenchShell } from './ScanWorkbenchChrome'
+import { deriveOutcome, type ScanResultState } from './scanResultModel'
 import { scanShownText } from './scanShownText'
-import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
-import { revokeLiveScanSession } from './scanSessionRevoke'
-import { type PrintMaterialSource } from '../print/printMaterialSession'
-import { beginPrintHandoff, printHandoffTarget } from '../print/printHandoff'
-import { usePrintHandoffOwner } from '../print/usePrintHandoff'
-import {
-  armScanRescanAuthority,
-  beginPlainScanRestart,
-  beginScanRescan,
-  clearScanRescanAuthority,
-  clearScanWorkbenchSession,
-  hasScanRescanAuthority,
-  readScanWorkbenchSession,
-  type ScanOutcome,
-} from './scanWorkbenchSession'
-
-interface ScannedFile {
-  fileId: string
-  fileUrl: string
-  name: string
-  size: string
-  pages: number | null
-  format: string
-  mimeType?: string
-}
-
-interface ScanResultState {
-  scanType?: ScanType
-  source?: string
-  pageMode?: string
-  color?: string
-  dpi?: number
-  success?: boolean
-  reason?: string
-  outcome?: ScanOutcome
-  file?: ScannedFile
-}
-
-const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason', 'file', 'outcome'])
+import { readScanWorkbenchSession } from './scanWorkbenchSession'
+import { useScanResultExits } from './useScanResultExits'
+import { useScanResultRescan } from './useScanResultRescan'
 
 /**
- * 多久重问一次「现在还有没有可用的重扫凭据」。
+ * 结果页：只做装配与渲染。
  *
- * 只影响按钮上那句话什么时候改口，不参与任何放行判断（放行由点击那一刻的
- * `beginScanRescan` 和服务端说了算）。取 5 秒：本地有效期是 15 分钟，
- * 用户在这一屏读完两段话再抬手也不止 5 秒，误导窗口足够小；再密就是白烧一体机的 CPU。
+ * 2026-11-02 K1a 起，类型与结果判定在 `scanResultModel`，重扫授权在 `useScanResultRescan`，
+ * 出口在 `useScanResultExits`，「没拿到文件」视图在 `ScanResultFailedView`，成功分支的预览块与
+ * 三个去向在 `ScanResultPreviewBlock` / `ScanResultExitRow`；它们的判据与注释都是拆分前的原文。
+ * 本页负责读路由 state 与本机登记、合并出这一屏的结果、挑走哪个视图、并持有整屏预览的开关。
+ * 2026-11-09 起屏上扫描来的「没拿到文件」走 `ScanDeviceFailedView`（稿 cs-scan-failed），面板扫描的那一屏不变。
  */
-const RESCAN_AUTHORITY_RECHECK_MS = 5_000
-
-function deriveOutcome(state: ScanResultState): ScanOutcome {
-  if (state.outcome) return state.outcome
-  if (state.success === true && state.file) return 'completed'
-  if (state.reason?.includes('未拿到文件')) return 'completed-no-file'
-  if (state.reason?.includes('超时') || state.reason?.includes('过期')) return 'expired'
-  return 'failed'
-}
-
 export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => void } = {}) {
-  const navigate = useNavigate()
-  const printOwner = usePrintHandoffOwner()
   const location = useLocation()
-  const { isLoggedIn, getToken } = useAuth()
+  const { isLoggedIn } = useAuth()
   const stored = readScanWorkbenchSession()
   const locationState = (location.state ?? {}) as ScanResultState
   const state: ScanResultState = {
@@ -107,277 +52,43 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
   // 这里只读，不改：它是「向服务端取用那枚一次性重扫授权」的唯一来源。
   const priorScanTaskId = stored?.live?.scanTaskId ?? null
   const priorControlToken = stored?.live?.controlToken ?? null
-  const [rescanAuthorized, setRescanAuthorized] = useState(false)
-  // 用户按过「重试扫描（同一份材料）」，而那一刻已经没有可用的成对授权了。
-  // 只用于**把这件事说出来**：本页没有替他改发普通重扫，出路是他自己按的那一个。
-  const [safeRescanLost, setSafeRescanLost] = useState(false)
   // 整屏预览只是这一屏的视图状态：不进地址、不进历史、不落存储。
   const [previewOpen, setPreviewOpen] = useState(false)
   const closePreview = useCallback(() => setPreviewOpen(false), [])
 
-  /**
-   * 登记这一场可能存在的重扫授权。幂等（同一场不会重新计时），所以可以被调用两次：
-   * 一次在下面的 effect 里（决定按钮说什么），一次在点击那一刻（首屏那一帧 effect
-   * 还没跑，而按钮已经可以点了 —— 少了那一次，快点两下就会落进「没有授权」分支）。
-   */
-  const armIfPossible = useCallback((): boolean => {
-    if (outcome !== 'failed' && outcome !== 'expired') return false
-    if (!priorScanTaskId || !priorControlToken) return false
-    return armScanRescanAuthority({ priorScanTaskId, priorControlToken, scanType })
-  }, [outcome, priorScanTaskId, priorControlToken, scanType])
-
-  /* ── 这一场结束了：要不要留一枚安全重扫授权 ────────────────────────────
-   *
-   * 服务端只在任务**已经取到文件**（matched，内容 hash 已落 lastAttemptHash）之后
-   * 才落到 failed / cancelled / expired 的那几条路径上铸授权。前端能看见的对应终态
-   * 就是 failed 和 expired —— 只有这两种登记。
-   *
-   * 另外两种终态必须**反过来**：completed 和「完成但没带文件」的任务服务端已经建了档
-   * （fileId 非空），按契约根本不会有授权，所以这里显式扔掉。
-   *
-   * 说清这一句的性质，免得下一个人误判它的分量：它是**纵深**，不是当前唯一的防线。
-   * 今天走到成功终态之前必然先经过一次创建，而创建那一步是一次性取用
-   * （`takeScanRescanAuthority`），槽位那时已经空了；离开这一屏的几个出口也各自
-   * 清场。它守的是那些前提被改坏的将来 —— 比如 `deriveOutcome` 的兜底分支被调整、
-   * 或者哪天成功终态不再必须经过一次创建。
-   *
-   * 登记本身不代表授权真的存在（本机看不见服务端有没有铸）。它只是「可以去取用一次」，
-   * 取不取得到由服务端 403 说了算，页面不替它下结论。 */
-  useEffect(() => {
-    if (outcome !== 'failed' && outcome !== 'expired') {
-      clearScanRescanAuthority()
-      setRescanAuthorized(false)
-      return undefined
-    }
-    armIfPossible()
-    setRescanAuthorized(hasScanRescanAuthority(scanType))
-    /* 本地有效期会走完（15 分钟，与服务端同一个值），清场也可能在别处发生。
-     * 不重新采样的话，按钮会一直挂着「（同一份材料）」那句话 —— 用户照着它把同一张纸
-     * 放回去，而那一刻本机其实已经没有可用凭据了。所以隔几秒重问一次：
-     * 这是「状态不许误导」的那一半，另一半是点击时再验一遍（handleRetry）。 */
-    const timer = window.setInterval(() => {
-      setRescanAuthorized(hasScanRescanAuthority(scanType))
-    }, RESCAN_AUTHORITY_RECHECK_MS)
-    return () => window.clearInterval(timer)
-  }, [armIfPossible, outcome, scanType])
-
-  const retryExtras = {
-    source: state.source,
-    pageMode: state.pageMode,
-    color: state.color,
-    dpi: state.dpi,
-  }
-  /** 带去设置页的路由 state：只有扫描参数，控制字段（凭证 / 结果）一律剥掉。 */
-  const retryState = Object.fromEntries(
-    Object.entries(state).filter(([k]) => !CONTROL_FIELDS.has(k)),
-  )
-
-  const goToSettings = () => {
-    if (onGoStage) {
-      onGoStage('settings')
-      return
-    }
-    navigate('/scan?stage=settings', { state: retryState })
-  }
-
-  /**
-   * 「重试扫描（同一份材料）」。**只有安全重扫这一条路**，拿不到授权就不走。
-   *
-   * 三件事按序：
-   *   1. 幂等再登记一次 —— 补上首屏那一帧 effect 还没跑完的窗口；
-   *   2. `beginScanRescan` 判有没有可用的成对授权：没有就**什么都不动**（不销毁
-   *      本机那份 live/结果快照，也不跳页），返回 false；
-   *   3. 只有拿到了才跳设置页 —— 那边取用一次，body 的 id 与重扫头成对发出。
-   *
-   * 忽略第 2 步的返回值就是这次修的缺陷：跳过去之后设置页照样会建会话，而手里没有
-   * 授权，发出去的是一个**普通**创建。用户按的是「同一份材料」，随后把同一张纸放回
-   * 面板，服务端按两小时同字节去重把文件拒掉，任务停在 waiting 直到过期 ——
-   * 人在机器前白等十分钟，屏幕上全程没有一句话解释。
-   */
-  const handleRetry = () => {
-    armIfPossible()
-    if (!beginScanRescan({ scanType, extras: retryExtras })) {
-      setSafeRescanLost(true)
-      setRescanAuthorized(false)
-      return
-    }
-    setSafeRescanLost(false)
-    goToSettings()
-  }
-
-  /**
-   * 「重新开始一次扫描」——用户显式选择的普通新会话，**不是**安全同字节重扫。
-   *
-   * 成功页上的「重新扫描」走的也是这一条：上一场已经建档，服务端那条去重管的是
-   * 「取过件但没建档成功」的字节，所以那里本来就没有安全重扫可言。
-   */
-  const handlePlainRestart = () => {
-    beginPlainScanRestart({ scanType, extras: retryExtras })
-    goToSettings()
-  }
-
-  /**
-   * 离开整条扫描流程 —— 结果页 ctabar / 底部那几个出口。
-   *
-   * 语义必须和 `ScanWorkbenchChrome` 的 `leaveScanFlow` 一模一样（顶栏返回、底栏三项
-   * 走的是那一条）。此前这几个出口只是裸 `navigate`，同一屏上就成了两种命运：从顶栏
-   * 走的人本机登记被清干净，从这里走的人把 live 登记（含刚结束那一场的 controlToken
-   * 明文）和那枚一次性重扫授权**一起留在原地**，下一位用户走到这台机器前就继承了 ——
-   * 授权会被他拿去对一个不属于他的任务发重扫请求，登记里那份凭证则一直躺到下次清场。
-   *
-   * 撤销那一句对已终态的任务是 no-op：`revokeLiveScanSession` 见到结果快照就不发 DELETE
-   * （scanSessionRevoke 的 hasResult 分支）。留着它是为了「离开的语义只有一份」——
-   * 结果页也可能在只有 live、还没写进结果快照的那一帧被按下出口。
-   *
-   * ## 为什么一律 replace，不 push
-   *
-   * 清 sessionStorage 只清掉了「下一位进 /scan 会复水到哪一屏」。**历史条目本身还在**：
-   * push 之后 `/scan?stage=result` 仍是浏览器历史里的一条，它带着当时那笔 `location.state`
-   * （结果页的 `file` 与 `scanType` 会经由 `ScanProgressPage.finishWithResult` 的
-   * 非工作台路径写进去），而结果页取数是 `stored?.result?.file ?? locationState.file` ——
-   * 存储清了，路由 state 还能把上一位那份文件名与签名内容链接补回来。
-   * 一体机没有可见的后退键，但 Kiosk 浏览器的手势/外设、以及隐私清场自己的
-   * back/forward 编排都能走到这条历史条目上。
-   *
-   * replace 把**这一条**直接换成落点：
-   *   · 后退：越过整条扫描流程，落在进 /scan 之前那一页，永远回不到结果屏；
-   *   · 前进：那条结果条目已经不存在，前进也无从复现。
-   * 落点照样立即能用这份文件（这是「保留落点立即可用文件」的要求）：解析页那一条历史
-   * 带着 `fileId`；打印台读的是离开前写好的打印材料会话（见 handlePrint）。
-   * 它们由各自页面的生命周期与隐私边界管，不在本页职责内。
-   */
-  const leaveScanFlow = (destination: string, options?: NavigateOptions): void => {
-    revokeLiveScanSession(getToken())
-    clearScanWorkbenchSession()
-    navigate(destination, { ...options, replace: true })
-  }
-
-  /* ── 成功页那三个去向也是「离开整条扫描流程」 ──────────────────────────────
-   *
-   * 打印（当时叫「直接打印」）/ AI 简历识别 / 前往我的文档，此前都是裸 navigate：本机登记原封不动留在
-   * sessionStorage 里 —— 里面有上一位的 `live.controlToken` 明文，还有
-   * `result.file`（文件名 + 那条签名内容链接）。下一位在这台机器上进 /scan，
-   * 阶段直接从登记复水到 result，他看到的是**上一位的扫描件**。
-   *
-   * 所以三个都走 leaveScanFlow：撤服务端任务（已终态时是 no-op）→ 清本机登记 →
-   * 带着文件跳过去。解析页读路由 state（`state.fileId`），打印台读打印材料会话，
-   * 都不读扫描登记，所以清掉登记不影响它们拿到这份文件。 */
-
-  /**
-   * 「拿去打印」：扫描件是用户本人原件（resume_scan / id_scan / print_doc · original）。
-   * 生产强制 PRINT_REQUIRE_PII_SCAN=true，没做完隐私检查就建单会被拒 PRINT_PII_SCAN_REQUIRED，
-   * 而隐私检查只在打印台的材料检查里做 —— 所以去材料检查，不直达报价确认页（商用收口 P0-5）。
-   *
-   * 写法与打印上传页相同：先把这份扫描件**整份**写进打印交接上下文（旧文件的检查结论、参数一并作废），
-   * 再离开（撤服务端扫描任务、清本机登记），跳转只带交接编号，打印台只认上下文。
-   */
-  const handlePrint = () => {
-    if (!file) return
-    const printFile = { fileId: file.fileId, fileUrl: file.fileUrl, name: file.name, size: file.size, pages: file.pages, mimeType: file.mimeType }
-    const source: PrintMaterialSource = scanType === 'resume' ? 'resume' : 'document'
-    const target = printHandoffTarget(beginPrintHandoff({ origin: 'scan_result', file: printFile, source,
-      returnPath: '/scan', idDocument: scanType === 'id' }, printOwner))
-    leaveScanFlow(target.path, { state: target.state })
-  }
-
-  const handleDocuments = () => {
-    if (!file || !isLoggedIn) return
-    leaveScanFlow('/me/documents')
-  }
+  const { rescanAuthorized, safeRescanLost, handleRetry, handlePlainRestart } = useScanResultRescan({
+    state, scanType, outcome, priorScanTaskId, priorControlToken, onGoStage,
+  })
+  const { leaveScanFlow, handlePrint, handleDocuments, handleResumeAI } = useScanResultExits({ file, scanType })
 
   const displayFormat = formatLabelFromMime(file?.mimeType)
 
-  const handleResumeAI = () => {
-    if (!file) return
-    leaveScanFlow('/resume/parse', {
-      state: {
-        source: 'scan',
-        // ResumeParsePage 只读顶层 state.fileId 发起解析请求，file 内的 fileId/fileUrl
-        // 仅用于展示；与 ResumeSourcePage 的既有上传流程保持同一 state 契约。
-        fileId: file.fileId,
-        file: { fileId: file.fileId, fileUrl: file.fileUrl, name: file.name, size: file.size, format: file.format },
-      },
-    })
-  }
-
   if (outcome === 'completed-no-file' || (!success && outcome !== 'completed')) {
-    const isNoFile = outcome === 'completed-no-file'
-    const isExpired = outcome === 'expired'
+    /* 11/08 产品负责人定第 2 条：屏上扫描中断后换成屏上扫描自己的结果屏（稿 cs-scan-failed），面板扫描照旧。
+     * 判据是本机登记里的 deviceFlow：只有屏上扫描建会话那一处写 true（useScanDeviceStart），改用面板扫描
+     * （scanDeviceRecovery）和任何一次生命周期终结（live: undefined、清场）都会把它清掉；它和结果快照
+     * 同在 sessionStorage，看门狗整页重载之后照样读得到。路由 state 里没有这一位，伪造地址进不来。 */
+    if (stored?.deviceFlow === true) {
+      return (
+        <ScanDeviceFailedView
+          outcome={outcome}
+          shownReason={shownReason}
+          leaveScanFlow={leaveScanFlow}
+          onGoStage={onGoStage}
+        />
+      )
+    }
     return (
-      <ScanWorkbenchShell
-        page="scan-result"
-        /* outcome 'expired' 有两个来源、同一份快照：服务端回执 expired，和本机轮询到 10 分钟
-         * 自己放弃（ScanProgressPage 的 localGiveUp，撤销是尽力而为、没有回执）。这里分不出
-         * 是哪一个，所以标题 / 状态条 / 横幅一律只说「等待超时」，不说「会话已过期」或「服务端确认」。 */
-        state={isNoFile ? 'completed-no-file' : isExpired ? 'wait-timeout' : 'failed'}
-        layout="spread"
-        title={isNoFile ? '已完成 · 结果里没有文件' : isExpired ? '等待超时' : '扫描未完成'}
-        subtitle="本次没有生成可用的扫描文件"
-        status={{ tone: isNoFile || isExpired ? 'warn' : 'bad', label: isNoFile ? '已完成 · 结果里没有文件' : isExpired ? '等待超时 · 没有文件' : '扫描未完成' }}
-        /* 两个按钮，不是一个按钮两种文案：拿到凭据时它是「同一份材料」的安全重扫，
-           拿不到时它是一次普通新会话 —— 后者会让同一张纸撞上服务端两小时的重复件
-           拒收，代价完全不同，所以文案必须分开，并且由用户自己按下那一个。 */
-        dock={{
-          left: { label: '返回打印扫描', leaveTo: '/print-scan' },
-          primary: formatFailure
-            ? (rescanAuthorized
-              ? { label: '选 JPG 格式重扫（同一份材料）', onClick: handleRetry }
-              : { label: '选 JPG 格式重新扫描', onClick: handlePlainRestart })
-            : rescanAuthorized
-            ? { label: '重试扫描（同一份材料）', onClick: handleRetry }
-            : { label: '重新开始一次扫描', onClick: handlePlainRestart },
-        }}
-      >
-        {/* 失败态：原因只写一处。此前意图带标题、状态条、面板标题三处都是「扫描未完成」，面板里的原因
-            和下面「失败原因原文」说明格又是同一句。现在第一格就是原因（标题 + 原因本身）。
-            这一屏也接本机自己放弃的两条路（轮询到点、连续查不动），那两条服务端并没有说过「失败」或「过期」，
-            所以第一格的标题只说所有成因都成立的那句话，真实成因由 reason 原样转达。 */}
-        <div className="fs-grow is-status">
-          <div className="fs-facts">
-            <div className="fs-fact wide">
-              <b>{isNoFile ? '系统说已完成，但这次结果里没有可用文件' : isExpired ? '等待超时，这次没有拿到文件' : '这次没扫成的原因'}</b>
-              {isNoFile ? (
-                <>
-                  <span>系统确认<b>这次扫描已经完成</b>，可是同一份结果里<b>没有带可用的文件信息</b>（结果里允许不带文件，这不是出错）。</span>
-                  <span>这份文件此刻还在不在系统里，<b>本机没有依据判断</b>。页面不替系统说它还在，不说它已被删掉，也不承诺能找回来。这次扫描到此结束。</span>
-                </>
-              ) : (
-                <span>{shownReason ?? '扫描任务未能完成，请重试。'}</span>
-              )}
-            </div>
-            <div className="fs-fact wide">
-              <b>同一张纸</b>
-              <span>同一张纸原样再扫，系统可能按重复件拒收（两小时内）。</span>
-            </div>
-            <div className="fs-pairgrid">
-              <div className="fs-fact">
-                <b>重试扫描（同一份材料）</b>
-                <span>{rescanAuthorized ? '这一次会带上上一场的凭据去申请安全重扫放行：系统认了，同一份材料照原样再扫一遍就行；不认会在下一页当场说明，不会悄悄按普通重扫处理。' : '本机没有可用的安全重扫凭据。这里不写成已经放行。'}</span>
-              </div>
-              <div className="fs-fact">
-                <b>重新开始一次扫描</b>
-                <span>这是一次普通新会话，不是免查重的重扫。不自动重扫。</span>
-              </div>
-            </div>
-          </div>
-          {safeRescanLost ? (
-            <p className="fs-warn" data-testid="scan-safe-rescan-lost">
-              <b>刚才那份安全重扫凭据已经用不了了</b>（超过 15 分钟，或者中间清过场 / 换过人）。
-              本页<b>没有</b>替你改成普通重扫 —— 同一张纸如果走普通扫描，系统会按重复件拒收，
-              你会在机器前白等到这次扫描过期。要继续，请自己按右下角<b>「重新开始一次扫描」</b>，
-              并且换一份材料。
-            </p>
-          ) : null}
-          <PhoneHelpLine />
-          <ScanSample />
-        </div>
-        {isNoFile ? null : (
-          <FsRow title="返回首页" desc="结束这次等待" onClick={() => leaveScanFlow('/')} />
-        )}
-        {rescanAuthorized ? (
-          <FsRow title="重新开始一次扫描" desc="回选类型，不带安全重扫凭据" onClick={handlePlainRestart} />
-        ) : null}
-      </ScanWorkbenchShell>
+      <ScanResultFailedView
+        outcome={outcome}
+        formatFailure={formatFailure}
+        shownReason={shownReason}
+        rescanAuthorized={rescanAuthorized}
+        safeRescanLost={safeRescanLost}
+        handleRetry={handleRetry}
+        handlePlainRestart={handlePlainRestart}
+        leaveScanFlow={leaveScanFlow}
+      />
     )
   }
 
@@ -401,111 +112,26 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
       }}
     >
       <div className="sw-result qx-grow">
-        {/* 稿 18「扫描完成」：预览在上，文件名、格式大小页数、类型在下，再是预览说明，最后是「整屏查看」。
-            这块原来是「文件头在上、预览在下」，预览落进了左边 28% 的窄列（两列网格是给「左示意图 + 右预览」写的）。 */}
-        <div className="sw-preview">
-          <div className="sw-pvstage">
-            <div className="sw-pvdoc">
-              {file ? (
-                <FileContentPreview
-                  fileUrl={file.fileUrl}
-                  fileName={file.name}
-                  mimeType={file.mimeType}
-                  format={displayFormat}
-                  pdfFit="page"
-                />
-              ) : (
-                <ScanStatusPanel tone="error" title="缺少扫描结果文件">
-                  <p>本页未收到真实扫描结果，不会生成占位文件。请重新开始扫描。</p>
-                </ScanStatusPanel>
-              )}
-            </div>
-          </div>
-          <div className="sw-pvhead" data-testid="scan-workbench-file-brief">
-            {file ? (
-              <div className="sw-pvh-2">
-                <b>{file.name}</b>
-                <span className="sw-pvh-meta">
-                  {displayFormat}
-                  <span className="sep">·</span>
-                  {file.size}
-                  <span className="sep">·</span>
-                  {file.pages != null ? `${file.pages} 页` : '页数以文件为准'}
-                </span>
-              </div>
-            ) : null}
-            <div className="sw-pvh-1">
-              <span className="sw-pvh-ic"><FileTextIcon size={24} aria-hidden /></span>
-              <span className="sw-pvh-t">系统结果：已完成，并带回文件</span>
-              <span className="sw-chip is-ok">{SCAN_TYPE_LABELS[scanType]}</span>
-            </div>
-          </div>
-          <p className="sw-preview-cap">
-            预览用的是结果里那条临时内容链接，不是另外再申请一条要登录的链接。打不开只证明这一次没打开，不改判扫描已完成，也不能据此判断文件是否仍可用。
-          </p>
-          {file ? (
-            <button
-              type="button"
-              className="sw-pvh-open"
-              data-testid="scan-result-preview-open"
-              onClick={() => setPreviewOpen(true)}
-            >
-              <ExpandIcon size={24} aria-hidden />
-              整屏查看
-            </button>
-          ) : null}
-        </div>
-      <div className="sw-actrow" data-testid="scan-workbench-exits">
-        <button
-          type="button"
-          className={`sw-exit${aiEnabled ? '' : ' is-off'}`}
-          disabled={!aiEnabled}
-          onClick={handleResumeAI}
-        >
-          <span className="sw-exit-ic"><SparklesIcon size={20} aria-hidden /></span>
-          <span className="sw-exit-body">
-            <span className="sw-exit-title">
-              AI 简历识别
-              {aiEnabled ? null : <span className="sw-offtag">暂不放行</span>}
-            </span>
-            <small>
-              {scanType === 'resume'
-                ? '识别扫描件内容，进入简历诊断与优化'
-                : `AI 简历识别只对简历扫描开放；这次扫的是「${SCAN_TYPE_LABELS[scanType]}」。`}
-            </small>
-          </span>
-        </button>
-        <button type="button" className="sw-exit" disabled={!printEnabled} onClick={handlePrint}>
-          <span className="sw-exit-ic"><PrinterIcon size={20} aria-hidden /></span>
-          <span className="sw-exit-body">
-            <span className="sw-exit-title">拿去打印</span>
-            <small>先检查文件和个人信息，再选打印参数。金额由系统报价决定，本页不给价格。</small>
-          </span>
-        </button>
-        <button
-          type="button"
-          className={`sw-exit${file && isLoggedIn ? '' : ' is-off'}`}
-          disabled={!file || !isLoggedIn}
-          onClick={handleDocuments}
-        >
-          <span className="sw-exit-ic"><FolderIcon size={20} aria-hidden /></span>
-          <span className="sw-exit-body">
-            <span className="sw-exit-title">
-              {isLoggedIn ? '前往我的文档' : '本次不进入我的文档'}
-              {isLoggedIn ? null : <span className="sw-offtag">暂不放行</span>}
-            </span>
-            <small>
-              {isLoggedIn
-                ? '在「我的文档」查看与管理本次扫描件'
-                : '未登录扫描件不会进入「我的文档」。要留在账号里：先登录，再重新扫一次。'}
-            </small>
-          </span>
-        </button>
-      </div>
-      <p className="fs-p fs-foot">还没选下一步的临时文件，会按保存规则清理。扫完请取回原件。</p>
-      {previewOpen && file ? (
-        <ScanResultPreviewViewer file={file} formatLabel={displayFormat} onClose={closePreview} />
-      ) : null}
+        <ScanResultPreviewBlock
+          file={file}
+          scanType={scanType}
+          displayFormat={displayFormat}
+          onOpenPreview={() => setPreviewOpen(true)}
+        />
+        <ScanResultExitRow
+          file={file}
+          scanType={scanType}
+          isLoggedIn={isLoggedIn}
+          aiEnabled={aiEnabled}
+          printEnabled={printEnabled}
+          handleResumeAI={handleResumeAI}
+          handlePrint={handlePrint}
+          handleDocuments={handleDocuments}
+        />
+        <p className="fs-p fs-foot">还没选下一步的临时文件，会按保存规则清理。扫完请取回原件。</p>
+        {previewOpen && file ? (
+          <ScanResultPreviewViewer file={file} formatLabel={displayFormat} onClose={closePreview} />
+        ) : null}
       </div>
     </ScanWorkbenchShell>
   )

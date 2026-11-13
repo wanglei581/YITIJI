@@ -30,9 +30,25 @@ interface DispatchBlock {
 export const PAUSE_RETRY_DELAYS_MS = [1_000, 2_000, 4_000]
 
 let block: DispatchBlock | null = null
+const isolations = new Set<() => Promise<boolean>>()
+
+/** 执行器退出并完成耐久清理前，普通队列恢复不得打开派发闸门。 */
+export function retainPrintDispatch(recover: () => Promise<boolean>): () => Promise<boolean> {
+  let inflight: Promise<boolean> | undefined
+  const retry = (): Promise<boolean> => {
+    if (!isolations.has(retry)) return Promise.resolve(true)
+    inflight ??= Promise.resolve().then(recover).catch(() => false).then((done) => {
+      if (done) isolations.delete(retry)
+      return done
+    }).finally(() => { inflight = undefined })
+    return inflight
+  }
+  isolations.add(retry)
+  return retry
+}
 
 export function isPrintDispatchBlocked(): boolean {
-  return block !== null
+  return block !== null || isolations.size > 0
 }
 
 export function noteStartupPrintQueueFailure(part: 'pause' | 'cleanup'): void {
@@ -65,6 +81,7 @@ export function printerStatusForHeartbeat(queried: PrinterStatus): PrinterStatus
 
 export function __resetPrintDispatchGateForTests(): void {
   block = null
+  isolations.clear()
 }
 
 export interface PrintDispatchRecovery {
@@ -74,7 +91,8 @@ export interface PrintDispatchRecovery {
 }
 
 async function recoverPrintDispatchBeforeClaim(recovery: PrintDispatchRecovery): Promise<boolean> {
-  if (!isPrintDispatchBlocked() || !block) return true
+  for (const retry of isolations) if (!await retry()) return false
+  if (!block) return true
   const kind = block.kind
   try {
     if (kind === 'startup') {
@@ -187,11 +205,13 @@ export async function settlePrinterAfterTerminal(options: {
   pauseAgain: boolean
   removeOwnJobs: () => Promise<void>
   pause: () => Promise<void>
-}): Promise<void> {
+}): Promise<boolean> {
+  let cleaned = true
   if (options.outcome === 'failed') {
     try {
       await options.removeOwnJobs() // settle-failed-terminal
     } catch {
+      cleaned = false
       noteResidualCleanupFailure()
       err('print-queue-hold: leftover jobs could not be removed after a failed print; print claims blocked')
     }
@@ -199,6 +219,7 @@ export async function settlePrinterAfterTerminal(options: {
   if (options.pauseAgain) {
     await pauseQueueAfterTerminalState(options.pause)
   }
+  return cleaned
 }
 
 /**

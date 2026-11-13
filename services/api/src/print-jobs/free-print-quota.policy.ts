@@ -25,12 +25,45 @@ export const AUDIT_TERMINAL_DAILY_FREE_SIDES = 'terminal.daily_free_print_sides.
 export const PRINT_TERMINAL_DAILY_QUOTA_REACHED = 'PRINT_TERMINAL_DAILY_QUOTA_REACHED'
 export const PRINT_MEMBER_DAILY_QUOTA_REACHED = 'PRINT_MEMBER_DAILY_QUOTA_REACHED'
 export const PRINT_GUEST_ORDER_QUOTA_EXCEEDED = 'PRINT_GUEST_ORDER_QUOTA_EXCEEDED'
+/** 小程序建单：单笔面数大于每天免费上限。400，不扣额度；取件仍用上面三条 429。 */
+export const PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES = 'PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES'
 
 export const FREE_PRINT_QUOTA_ERROR_CODES = [
   PRINT_TERMINAL_DAILY_QUOTA_REACHED,
   PRINT_MEMBER_DAILY_QUOTA_REACHED,
   PRINT_GUEST_ORDER_QUOTA_EXCEEDED,
+  PRINT_ORDER_EXCEEDS_DAILY_FREE_SIDES,
 ] as const
+
+/**
+ * 超上限的一句。本机上限更紧时告诉用户可以换机器；每人上限更紧或相等时说的是本人额度。
+ * 份数为 1 时不说「减少份数」：减不了，当天分开下单也领不出。
+ */
+export function orderExceedsDailyFreeSidesMessage(input: {
+  requestedSides: number
+  memberLimit: number
+  terminalLimit: number
+  copies: number
+}): string {
+  const { requestedSides, memberLimit, terminalLimit, copies } = input
+  if (terminalLimit < memberLimit) {
+    if (copies > 1) {
+      return `这台机器每天最多免费打印 ${terminalLimit} 面，这单 ${requestedSides} 面。可以换一台机器下单，或减少份数。`
+    }
+    return `这台机器每天最多免费打印 ${terminalLimit} 面，这单 ${requestedSides} 面，可以换一台机器下单。`
+  }
+  if (copies > 1) {
+    return `这单 ${requestedSides} 面，超过每人每天免费 ${memberLimit} 面的上限，请减少份数后再下单。`
+  }
+  return `这份文件 ${requestedSides} 面，超过每人每天免费 ${memberLimit} 面的上限，暂时不能免费打印。`
+}
+
+/** 今天剩余不够、但仍允许建单时附在创建回包上。够用时不带这个字段。 */
+export interface FreeQuotaNotice {
+  remainingSides: number
+  requestedSides: number
+  resetsAt: string
+}
 
 export const PRINT_TERMINAL_DAILY_QUOTA_MESSAGE = '今天这台机器的免费打印量已用完，明天 0 点恢复。'
 
@@ -40,6 +73,26 @@ export function memberDailyQuotaMessage(limit: number): string {
 
 export function guestOrderQuotaMessage(limit: number): string {
   return `免登录每次最多打印 ${limit} 面。用手机号登录后，可以一次打更多。`
+}
+
+/** 复印与打印共用这三条免费额度，错误码相同；复印超额时屏上不能只说「打印」。 */
+export type FreePrintQuotaSubject = 'print' | 'copy'
+
+export const COPY_TERMINAL_DAILY_QUOTA_MESSAGE = '今天这台机器的免费打印复印量已用完，明天 0 点恢复。'
+
+export function copyMemberDailyQuotaMessage(limit: number): string {
+  return `你今天已免费打印复印 ${limit} 面，达到每日上限，明天 0 点恢复。确有急用，可以拨打屏幕上的服务电话。`
+}
+
+export function copyGuestOrderQuotaMessage(limit: number): string {
+  return `免登录每次最多复印 ${limit} 面。用手机号登录后，可以一次复印更多。`
+}
+
+/** 缺省 print：打印的三句提示原样不变。 */
+export function freePrintQuotaMessages(subject: FreePrintQuotaSubject = 'print') {
+  return subject === 'copy'
+    ? { terminal: COPY_TERMINAL_DAILY_QUOTA_MESSAGE, member: copyMemberDailyQuotaMessage, guest: copyGuestOrderQuotaMessage }
+    : { terminal: PRINT_TERMINAL_DAILY_QUOTA_MESSAGE, member: memberDailyQuotaMessage, guest: guestOrderQuotaMessage }
 }
 
 /** 在途：仍会出纸、还没成功也还没失败。 */

@@ -125,7 +125,8 @@ const checks = [
     assert.match(doneRuntime, /: '拿走前记得核一下页数。'/)
     const handoff = read('src/pages/print/printHandoff.ts')
     const confirm = read('src/pages/print/PrintConfirmPage.tsx')
-    const scan = read('src/pages/scan/ScanResultPage.tsx')
+    // 2026-11-02 K1a：结果页按职责拆开，「拿去打印」的交接（idDocument）在 useScanResultExits.ts。
+    const scan = read('src/pages/scan/useScanResultExits.ts')
     const documents = read('src/pages/profile/me/MyDocumentsPage.tsx')
     assert.match(handoff, /input\.idDocument === true/)
     assert.match(confirm, /idDocument:\s*handoff\.idDocument === true/)
@@ -166,6 +167,10 @@ const checks = [
     assert.doesNotMatch(doneSections, /任务号/)
     assert.match(model, /return '重新选文件后再确认。免费试运营。'/)
     assert.doesNotMatch(model, /不免费/)
+    assert.match(progressRuntime, /priorOutputTrayLine\(/)
+    assert.match(progressRuntime, /data-testid="print-progress-prior-output"/)
+    assert.match(model, /export const SAME_CODE_RESUME_LINE =/)
+    assert.match(model, /export const PRIOR_OUTPUT_TRAY_LINE =/)
   }],
   ['失败态给出带走二维码、订单号和补打入口', () => {
     assert.match(failedViewRuntime, /文件带走/)
@@ -189,6 +194,14 @@ const checks = [
     assert.match(doneRuntime, /retry=\{\{ available: canRetry, blockedReason: retryBlockedReason\(device\), busy: retrying, error: retryError, onRetry:/)
     assert.equal((doneRuntime.match(/<PrintDoneFailed\b/g) ?? []).length, 1, '三种失败态共用同一块版式')
     assert.match(failedViewRuntime, /TESTID_BY_VARIANT[\s\S]*'print-fulfill-state-failed'[\s\S]*'print-fulfill-state-paper-jam'[\s\S]*'print-fulfill-state-out-of-paper'/)
+    assert.match(failedViewRuntime, /copy\.resumeLine \? \([\s\S]*data-testid="print-fulfill-resume-line"/)
+    assert.match(doneRuntime, /pickupSource: state\.pickupSource === true/)
+    assert.match(doneRuntime, /mayHavePrinted: retried\.mayHavePrinted === true/)
+    assert.match(doneRuntime, /partialOutput: retried\.partialOutput === true/)
+    const claimPage = withoutComments(read('src/pages/print/PrintPickupClaimPage.tsx'))
+    assert.match(claimPage, /mayHavePrinted: body\.mayHavePrinted === true/)
+    assert.match(claimPage, /result\.mayHavePrinted === true \? \{ mayHavePrinted: true \}/)
+    assert.match(claimPage, /result\.partialOutput === true \? \{ partialOutput: true \}/)
     assert.match(browserSpecSource, /old agent retry rejection stays beside the actions in the first viewport/)
     assert.match(browserSpecSource, /toBeInViewport\(\{ ratio: 1 \}\)/)
   }],

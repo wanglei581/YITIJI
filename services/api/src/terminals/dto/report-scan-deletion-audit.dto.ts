@@ -1,4 +1,5 @@
 import { IsISO8601, IsIn, IsInt, IsOptional, Matches, Max, Min } from 'class-validator'
+import { SCAN_DELETION_REASON_CODES, type ScanDeletionReasonCode } from '../scan-deletion-reason-codes'
 
 const HEX_HMAC = /^[a-f0-9]{64}$/
 const MACHINE_ERROR_CODE = /^[A-Z0-9_-]{1,64}$/
@@ -7,8 +8,9 @@ export class ReportScanDeletionAuditDto {
   @Matches(HEX_HMAC)
   eventId!: string
 
-  @IsIn(['UNCLAIMED_TTL_EXPIRED'])
-  reasonCode!: 'UNCLAIMED_TTL_EXPIRED'
+  /** 面板扫描、屏上扫描与屏上复印的删除原因，取值表见 scan-deletion-reason-codes.ts。 */
+  @IsIn(SCAN_DELETION_REASON_CODES)
+  reasonCode!: ScanDeletionReasonCode
 
   @Matches(HEX_HMAC)
   identifierHash!: string

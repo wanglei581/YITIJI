@@ -19,9 +19,13 @@ const DAILY_TTL_SECONDS = 60 * 60 * 48
 export class JobAiQuotaService {
   constructor(private readonly redis: RedisService) {}
 
-  async consume(operation: JobAiOperation, input: JobAiQuotaContext): Promise<JobAiQuotaTicket> {
+  async consume(
+    operation: JobAiOperation,
+    input: JobAiQuotaContext,
+    options?: { skipMember?: boolean },
+  ): Promise<JobAiQuotaTicket> {
     const limits = [
-      input.member ? { key: this.key(operation, 'member', input.member), limit: envLimit('JOB_AI_MEMBER_DAILY_LIMIT', 20) } : null,
+      options?.skipMember || !input.member ? null : { key: this.key(operation, 'member', input.member), limit: envLimit('JOB_AI_MEMBER_DAILY_LIMIT', 20) },
       input.terminal ? { key: this.key(operation, 'terminal', input.terminal), limit: envLimit('JOB_AI_TERMINAL_DAILY_LIMIT', 100) } : null,
       input.ip ? { key: this.key(operation, 'ip', input.ip), limit: envLimit('JOB_AI_IP_DAILY_LIMIT', 60) } : null,
     ].filter((item): item is { key: string; limit: number } => item !== null)

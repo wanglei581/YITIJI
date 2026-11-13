@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
   AlertCircleIcon,
   ChevronRightIcon,
@@ -52,6 +52,7 @@ export function Review({
   redactionText: string | null
   materialDemo: boolean
 }) {
+  const [parametersOpen, setParametersOpen] = useState(false)
   return (
     <div className="pcf-rev" data-testid="print-confirm-review">
       <div className="pcf-rev-file">
@@ -68,20 +69,23 @@ export function Review({
           ) : null}
         </span>
       </div>
-      <div className="pcf-rev-grid">
-        {summaryRows.map((row) => (
-          <div
-            key={row.label}
-            data-sum-row={row.label}
-            data-file-id={row.fileId}
-            className={row.off ? 'off' : undefined}
-          >
-            <span>{row.label}</span>
-            <b className="v">{row.off ? <LockIcon size={22} aria-hidden="true" /> : null}{row.value}</b>
-            {row.note ? <em>{row.note}</em> : null}
-          </div>
-        ))}
-      </div>
+      <details className="pcf-parameters" onToggle={(event) => setParametersOpen(event.currentTarget.open)}>
+        <summary>查看全部参数 ›</summary>
+        <div className="pcf-rev-grid">
+          {summaryRows.map((row) => (
+            <div
+              key={row.label}
+              data-sum-row={row.label}
+              data-file-id={row.fileId}
+              className={row.off ? 'off' : undefined}
+            >
+              <span>{row.label}</span>
+              <b className="v">{row.off ? <LockIcon size={22} aria-hidden="true" /> : null}{row.value}</b>
+              {parametersOpen && row.note ? <em>{row.note}</em> : null}
+            </div>
+          ))}
+        </div>
+      </details>
     </div>
   )
 }
@@ -124,7 +128,8 @@ export function FeeLines({ rows }: { rows: Array<{ label: string; value: string;
 
 export function CouponUnavailable({ free = false }: { free?: boolean }) {
   return (
-    <div className="pcf-coupon-wrap">
+    <details className="pcf-coupon-wrap">
+      <summary>不使用优惠券 ›</summary>
       <div className="pcf-coupon" data-coupon="unavailable" data-testid="print-confirm-coupon">
         <span className="c-ic"><TicketIcon size={24} aria-hidden="true" /></span>
         <span className="c-m">
@@ -138,11 +143,21 @@ export function CouponUnavailable({ free = false }: { free?: boolean }) {
         <span className="c-tag">不使用优惠券</span>
       </div>
       <p className="pcf-coupon-why">这里不扣券，也不会改这一单的价格。</p>
-    </div>
+    </details>
   )
 }
 
 export function BenefitCard({ view, onLogin }: { view: PrintBenefitView; onLogin: () => void }) {
+  if (view.showLoginAction) return (
+    <div className="pcf-benefit-guest" data-benefit-state={view.state}>
+      <button type="button" className="pcf-login" onClick={onLogin} aria-label="去登录查看我的权益">未登录 · 看不到权益{'　'}去登录 ›</button>
+      <details className="pcf-benefit-explanation">
+        <summary>权益与本单价格 ›</summary>
+        <p>{view.title} · {view.detail}</p>
+        <p>价目与权益均来自机构配置</p>
+      </details>
+    </div>
+  )
   return (
     <div className="qx-card pcf-benefit" data-benefit-state={view.state}>
       <div className="pcf-benefit-head">
@@ -291,4 +306,3 @@ export function Plan({ items }: { items: string[] }) {
     </ul>
   )
 }
-

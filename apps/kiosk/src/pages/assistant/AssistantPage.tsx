@@ -1,3 +1,4 @@
+import { isParkedRoute } from '../../routes/parkedRoutes'
 // 稿 05 青序流光 2.0；状态只由真实请求、草稿与语音相位派生。
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -6,8 +7,8 @@ import { AI_LABEL_COPY } from '@ai-job-print/shared'
 import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
-import { Hit, K } from '../public-touch/PublicBlocks'
-import { IllusChecklist, IllusReport, IllusResume } from '../public-touch/PublicIllus'
+import { Hit } from '../public-touch/PublicBlocks'
+import { IllusReport } from '../public-touch/PublicIllus'
 import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
 import { useVisibleHelpLine } from '../public-touch/publicTouchHooks'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -17,7 +18,8 @@ import { useInkRipple } from '../../hooks/useInkRipple'
 import { chatWithAssistant } from '../../services/api'
 import { API_BASE_URL } from '../../services/api/client'
 import { useAuth } from '../../auth/useAuth'
-import { AiTaskRegion, isAiOutage, useAiTask } from '../../ai'
+import { AiTaskRegion, aiErrorCodeOf, isAiOutage, useAiTask } from '../../ai'
+import { AI_QUOTA_EXHAUSTED_ASSISTANT_COPY } from '../../services/api/userErrorMessage'
 import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import { prepareAiDeclaration } from '../../ai/aiDeclarationGate'
 import { AssistantHoldToTalk } from './AssistantHoldToTalk'
@@ -26,7 +28,6 @@ import type { AiAvailability, AiTaskFallback } from '../../ai'
 import { AdvisorCockpit } from './AdvisorCockpit'
 import {
   AdvisorManualEntries,
-  AdvisorThinking,
   ChatBubble,
   ReplyBounds,
   type Message,
@@ -46,6 +47,9 @@ import {
 } from './advisorScenes'
 import { isRecruitmentRoute, useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useAssistantDraftHandoff } from '../../services/assistantDraft'
+import { AssistantPolicyMarker } from './AssistantPolicyContext'
+import { useAssistantPolicyContext } from './useAssistantPolicyContext'
+import { AssistantTurnActions, AssistantWaitingCards } from './AssistantTurnPanels'
 import { AssistantTaskPicker } from './AssistantTaskPicker'
 import { advisorDisplayText, advisorErrorMessage, advisorUserReason } from './advisorUserCopy'
 import { AI_CONTENT_COMPLAINT_ROUTE } from '../profile/me/feedback/aiComplaint'
@@ -69,10 +73,8 @@ const ALLOWED_ROUTE_PREFIXES = [
   '/resume', '/resume-service',
   '/print', '/print-scan',
   '/scan',
-  '/jobs', '/job-fairs', '/fairs-service', '/jobs-service',
   '/interview', '/interview-service',
   '/renshi', '/policy-service',
-  '/companies',
 ] as const
 
 function isAllowedRoute(route: string): boolean {
@@ -86,7 +88,7 @@ const WELCOME: Message = {
   id: 'welcome',
   role: 'assistant',
   kind: 'system',
-  text: '您好！我是小青，可以帮您梳理简历、面试、岗位选择和入职准备。请问今天想先解决什么问题？',
+  text: '您好！我是小青，可以帮您梳理简历、准备面试，也能说说打印扫描和政策怎么办。请问今天想先解决什么问题？',
 }
 
 export function AssistantPage() {
@@ -130,11 +132,14 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const [input, setInput] = useState('')
   const [sheet, setSheet] = useState<AssistantSheetKind | null>(null)
   useAssistantDraftHandoff(setInput, ASSISTANT_USER_MESSAGE_MAX_LENGTH)
+  const [policyContext, clearPolicyContext] = useAssistantPolicyContext()
   const [loading, setLoading] = useState(false)
   const [declaring, setDeclaring] = useState(false)
   const quickQuestions = selectedTask?.questions ?? GENERAL_QUESTIONS
   const [aiAvailability, setAiAvailability] = useState<AiAvailability>('unknown')
   const [turnFailed, setTurnFailed] = useState(false)
+  // 每人每天的小青次数用完：锁到明天，通知条不用「这会儿没接上」那种本轮故障说法。
+  const [quotaLocked, setQuotaLocked] = useState(false)
 
   useBusyLock(loading)
   useInkRipple('.kassist .assistant-task, .kassist .assistant-direct-question, .kassist .assistant-context-chip, .kassist .assistant-quick-questions button, .kassist .assistant-tool-button, .kassist .assistant-send, .kassist .action-chip, .kassist .assistant-manual-entry, .kassist .assistant-hold-talk-btn, .kassist .assistant-summary-save, .kassist .assistant-turn-action')
@@ -267,6 +272,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     try {
       const response = await chatWithAssistant({
         message: assistantRequestMessage,
+        policyId: policyContext?.policyId,
         sessionId: requestSessionId,
         skill: toolboxSkill,
         context: toolboxSkill
@@ -282,6 +288,12 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       if (cancelledRef.current) return
       if (requestTokenRef.current !== requestToken || sessionIdRef.current !== requestSessionId) return
       sessionIdRef.current = response.sessionId
+      if (response.providerLabel === 'fixed:policy-unavailable' && response.aiGenerated === false) {
+        setMessages(current => [...current, {
+          id: `policy-unavailable-${Date.now()}`, role: 'assistant', kind: 'not-ai', text: response.reply, providerLabel: response.providerLabel,
+        }])
+        return
+      }
       if (!isAiGeneratedReply(response)) {
         setAiAvailability('unavailable')
         // 输入条随即锁上，虚拟键盘也一并收起 —— 留着一个按不出结果的发送键更糟。
@@ -300,7 +312,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       }
 
       setAiAvailability('available')
-      const safeActions = response.actions?.filter((action) => isAllowedRoute(action.route))
+      const safeActions = response.actions?.filter((action) => isAllowedRoute(action.route) && !isParkedRoute(action.route))
       setMessages((current) => [
         ...current,
         {
@@ -319,11 +331,20 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       // AI 能力级停用（暂停 / 当日额度已到 / 未配置）：重试这一轮不会变好。与「非 AI 回复」同样
       // 锁住输入、转到不经过 AI 的四个入口；恢复后用户可点「重新检查 AI 顾问」再试。
       if (isAiOutage(error)) {
+        const quota = aiErrorCodeOf(error) === 'AI_QUOTA_EXHAUSTED'
+        setQuotaLocked(quota)
         setAiAvailability('unavailable')
         setKeyboardOpen(false)
         setMessages((current) => [
           ...current,
-          { id: `err-${Date.now()}`, role: 'assistant', kind: 'error', text: advisorErrorMessage(error, 'AI 顾问现在停用，下面几项不经过 AI，照常能办。') },
+          {
+            id: `err-${Date.now()}`,
+            role: 'assistant',
+            kind: 'error',
+            text: quota
+              ? AI_QUOTA_EXHAUSTED_ASSISTANT_COPY
+              : advisorErrorMessage(error, 'AI 顾问现在停用，下面几项不经过 AI，照常能办。'),
+          },
         ])
         return
       }
@@ -335,7 +356,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     } finally {
       if (!cancelledRef.current && requestTokenRef.current === requestToken) setLoading(false)
     }
-  }, [aiAvailability, getToken, loading, selectedTask, toolboxSkill])
+  }, [aiAvailability, getToken, loading, policyContext, selectedTask, toolboxSkill])
 
   const handleSend = useCallback(() => { void sendMessage(input) }, [input, sendMessage])
   // 用屏上键盘的「发送」把话真的发出去之后收起键盘：回答和底部导航要露出来，不能被键盘和它外面的遮罩压着（走查 I-03）。
@@ -387,7 +408,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   })
   const cockpitCopy = COCKPIT_COPY[cockpitState]
 
-  const degradedReason = aiLocked ? '这些专项需要 AI 作答，恢复后可重新选择。' : '刚才这一轮没有连上 AI 顾问。'
   const advisorFallback: AiTaskFallback = useMemo(() => ({
     mode: 'manual',
     reason: aiAvailability === 'unavailable'
@@ -466,6 +486,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
 
   // 锁死不是终局：配置修好后用户得有办法再试一次，否则本页在本次会话里永远是死的。
   const recheckAdvisor = () => {
+    setQuotaLocked(false)
     setAiAvailability('unknown')
     setTurnFailed(false)
     resetConversation()
@@ -490,9 +511,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   useEffect(() => { if (!showComposer) setKeyboardOpen(false) }, [showComposer])
   const showConversation = body !== 'picker' || messages.some((message) => message.id.startsWith('voice-'))
   const draftLength = input.trim().length
-  const toolsLine = aiLocked
-    ? 'AI 专项暂停 · 恢复后可重新选择'
-    : aiAvailability === 'available' ? '8 项 · 本轮已确认可用' : '8 项 · 首轮提问后确认可用性'
   const phoneLine = useVisibleHelpLine()
   const askQuestion = (question: string) => {
     if (loading || aiLocked) return
@@ -505,7 +523,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     <AssistantSheets
       sheet={sheet}
       onClose={() => setSheet(null)}
-      tools={{ degraded: aiLocked, degradedReason, availability: aiAvailability, activeSkill: toolboxSkill }}
       goActions={goActions}
     />
   ) : undefined
@@ -518,33 +535,11 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   ) : showComposer ? undefined : <QxTouchDock />
 
   const turnRow = (
-    <div className="assistant-task-actions" data-cols="3" role="group" aria-label="这一轮之后可以做什么">
-      {body === 'reply' ? (
-        <>
-          <AssistantSessionSummaryBar
-            sessionId={sessionIdRef.current}
-            canSave={messages.some((message) => message.kind === 'ai') && !loading && !aiLocked}
-            loggedIn={isLoggedIn}
-            token={getToken()}
-          />
-          <button type="button" className="assistant-direct-question assistant-turn-action" onClick={askAgain}>
-            <strong>再问一句</strong>
-          </button>
-        </>
-      ) : (
-        <>
-          <button type="button" className="assistant-direct-question assistant-turn-action" data-primary="true" onClick={retryLastTurn}>
-            <strong>重试这一轮</strong>
-          </button>
-          <button type="button" className="assistant-direct-question assistant-turn-action" onClick={resetConversation}>
-            <strong>换个问题</strong>
-          </button>
-        </>
-      )}
-      <button type="button" className="assistant-complaint" onClick={complaint}>
-        <strong>投诉 AI 内容</strong>
-      </button>
-    </div>
+    <AssistantTurnActions body={body} onAsk={askAgain} onRetry={retryLastTurn} onReset={resetConversation} onComplaint={complaint}
+      summary={<AssistantSessionSummaryBar sessionId={sessionIdRef.current}
+        canSave={messages.some((message) => message.kind === 'ai') && !loading && !aiLocked}
+        loggedIn={isLoggedIn} token={getToken()} />}
+    />
   )
 
   const transcript = (
@@ -593,9 +588,9 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           {body === 'picker' && (
             <AssistantTaskPicker
               selectedTask={selectedTask} scene={toolboxScene} welcome={welcomeMessage.text} questions={quickQuestions}
-              loading={loading} aiLocked={aiLocked} toolsLine={toolsLine}
+              loading={loading} aiLocked={aiLocked}
               onSelect={setSelectedTaskId} onClear={clearTask} onQuestion={askQuestion}
-              onOpenTools={() => setSheet('tools')} onOpenManual={() => setSheet('manual')}
+              onOpenManual={() => setSheet('manual')}
               onOpenActs={openActs} onComplaint={complaint}
             />
           )}
@@ -606,25 +601,10 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
               {body === 'reply' ? null : transcript}
 
               {body === 'submitting' && (
-                <div className="qxp-pair assistant-wait-pair">
-                  <div className="qxp-card assistant-wait-card">
-                    {/* 请求真的在飞（loading）才画等待说明；任务区的四态照旧挂在下面，只读不画。 */}
-                    <AdvisorThinking />
-                    <AiTaskRegion
-                      task={advisorTask}
-                      label="AI 顾问回答"
-                      className="assistant-ai-status"
-                      idle={null}
-                      fallback={advisorFallback}
-                    />
-                    <div className="qxp-artbox" aria-hidden="true"><IllusResume w={200} annot /></div>
-                  </div>
-                  <div className="qxp-card assistant-wait-card">
-                    <K as="h3">不由 AI 决定</K>
-                    <p className="qxp-note">身份、付款、打印、政策资格和录用结果都不由这一轮回答决定。</p>
-                    <div className="qxp-artbox" aria-hidden="true"><IllusChecklist w={200} /></div>
-                  </div>
-                </div>
+                <AssistantWaitingCards status={
+                  <AiTaskRegion task={advisorTask} label="AI 顾问回答" className="assistant-ai-status"
+                    idle={null} fallback={advisorFallback} />
+                } />
               )}
 
               {body !== 'submitting' && (
@@ -664,8 +644,11 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
                   {body === 'locked' ? (
                     <>
                       {/* 稿 xq ai-down 通知条的原话：先说小青没接上，再说下面这些事不用问也能办。 */}
-                      <QxTouchCallout kind="howto" icon="alert">小青这会儿没有接上。下面这些事不用问也能办。</QxTouchCallout>
-                      <Hit className="assistant-tools-open" icon={<QxTouchIcon name="sparkle" size={32} />} title="本机 AI 专项" sub={toolsLine} chevron onClick={() => setSheet('tools')} />
+                      <QxTouchCallout kind="howto" icon="alert">
+                        {quotaLocked
+                          ? AI_QUOTA_EXHAUSTED_ASSISTANT_COPY
+                          : '小青这会儿没有接上。下面这些事不用问也能办。'}
+                      </QxTouchCallout>
                     </>
                   ) : null}
                   <p className="assistant-exits-title">这些都不需要 AI · 现在就能做</p>
@@ -682,6 +665,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           )}
         </div>
 
+        <AssistantPolicyMarker context={policyContext} onClear={() => { clearPolicyContext(); resetConversation() }} />
         {showComposer && (
         <section className="assistant-composer" aria-labelledby="assistant-composer-label">
           <label id="assistant-composer-label" htmlFor="assistant-question" className="kassist-sr-only">向 AI 顾问描述你的问题</label>

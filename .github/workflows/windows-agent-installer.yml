@@ -59,7 +59,13 @@ jobs:
             -Mode Verify `
             -CandidateRoot apps/terminal-agent/installer/artifacts/candidate `
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
-            -ProductVersion "0.4.17"
+            -ProductVersion "0.4.23"
+
+      - name: Verify scan deskew C# and synthetic images
+        shell: powershell
+        run: |
+          powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File apps/terminal-agent/scripts/verify-scan-deskew-windows.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Exercise EXE install, repair, and uninstall
         shell: powershell
@@ -102,7 +108,7 @@ jobs:
             -Mode Verify `
             -CandidateRoot apps/terminal-agent/installer/artifacts/candidate `
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
-            -ProductVersion "0.4.17"
+            -ProductVersion "0.4.23"
 
       - name: Upload exact tested unsigned candidate
         uses: actions/upload-artifact@v4
@@ -197,6 +203,13 @@ jobs:
           pnpm --filter ./apps/terminal-agent verify:legacy-residue-cleanup
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Verify WIA wired deskew page without a device
+        shell: powershell
+        working-directory: apps/terminal-agent
+        run: |
+          pnpm verify:scan-wia-deskew-windows
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Build candidate upgrade fixture
         shell: powershell
         run: |
@@ -264,7 +277,7 @@ jobs:
             -Mode Create `
             -CandidateRoot $candidateRoot `
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
-            -ProductVersion "0.4.17"
+            -ProductVersion "0.4.23"
 
       - name: Build exact field predecessor 0.4.10 upgrade fixture
         shell: powershell
@@ -299,7 +312,7 @@ jobs:
             -Mode Verify `
             -CandidateRoot apps/terminal-agent/installer/artifacts/candidate `
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
-            -ProductVersion "0.4.17"
+            -ProductVersion "0.4.23"
 
       - name: Transfer exact upgrade-tested candidate
         uses: actions/upload-artifact@v4
@@ -364,7 +377,7 @@ jobs:
             -Mode Verify `
             -CandidateRoot apps/terminal-agent/installer/artifacts/candidate `
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
-            -ProductVersion "0.4.17"
+            -ProductVersion "0.4.23"
 
       - name: Exercise internal signing pipeline and signed installer lifecycles
         shell: powershell
@@ -373,7 +386,7 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-internal-signing-pipeline.ps1 `
             -UnsignedCandidateRoot apps/terminal-agent/installer/artifacts/candidate `
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
-            -ProductVersion "0.4.17" `
+            -ProductVersion "0.4.23" `
             -EvidenceRoot "$env:RUNNER_TEMP\ai-job-print-internal-signing-evidence" `
             -WixToolPath $wix `
             -ExerciseLifecycle `

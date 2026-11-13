@@ -392,6 +392,149 @@ async function legalVersionsStrictOnlyInRelease(opts) {
   assert.equal(out4.value.privacyVersion, '2026-10-pilot-1')
 }
 
+function publishedLegal(call) {
+  reply(call, 200, { success: true, data: { version: '2026-10-pilot-1', content: 'x' } })
+}
+
+/**
+ * 职业规划会把简历原文交给模型。门面必须带 resumeAi，请求层才会在
+ * 403 USER_AI_CONSENT_REQUIRED 时弹出简历 AI 授权，而不是把 403 直接交给页面。
+ */
+async function careerPlanRequestsResumeAi(opts) {
+  const ctx = memberWithAge(opts)
+  const seen = []
+  const orig = ctx.net.request
+  ctx.net.request = (path, options) => {
+    seen.push({ path, resumeAi: options && options.resumeAi })
+    return orig(path, options)
+  }
+  const api = ctx.load('api')
+  const pending = settle(api.generateCareerPlan('task-9', 'resume-token'), 2000)
+  await flush()
+  assert.equal(seen[0] && seen[0].path, '/resume/career-plan/task-9')
+  assert.equal(seen[0] && seen[0].resumeAi, true)
+  const call = ctx.aiCalls().find((c) => String(c.url).includes('/resume/career-plan/task-9'))
+  assert.ok(call, '职业规划请求已发出')
+  assert.equal(call.method, 'POST')
+  assert.equal(header(call, 'x-resume-access-token'), 'resume-token')
+  reply(call, 403, CONSENT_403)
+  await flush()
+  assert.equal(ctx.wx.calls.modal.length, 1, '没授权过的人要先看到简历 AI 授权框')
+  assert.match(ctx.wx.calls.modal[0].title, /简历 AI/)
+  answer(ctx.wx.calls.modal[0], false)
+  const result = await pending
+  assert.equal(result.ok, false)
+  assert.equal(result.error.code, 'AI_RESUME_NOT_CONSENTED')
+}
+
+/** 报价带上第 4 参里的终端；彩色 / 双面时服务端必填。没给终端时 body 保持旧形状。 */
+async function quoteSendsTerminalId() {
+  const ctx = createRuntime()
+  const api = ctx.load('api')
+  const quoted = settle(api.quoteMyPrintOrder('file-1', { copies: 1, color: true }, 'signed://preset', { terminalId: ' term-9 ' }))
+  await flush()
+  const call = ctx.wx.calls.request.find((c) => String(c.url).endsWith('/orders/quote'))
+  assert.ok(call, '预设文件地址时直接报价，不再换 preview-url')
+  assert.equal(ctx.wx.calls.request.some((c) => String(c.url).includes('/preview-url')), false)
+  assert.equal(call.method, 'POST')
+  assert.equal(call.data.fileUrl, 'signed://preset')
+  assert.equal(call.data.terminalId, 'term-9')
+  assert.equal(call.data.params.copies, 1)
+  reply(call, 200, { success: true, data: { amountCents: 100, billablePages: 1 } })
+  assert.equal((await quoted).ok, true)
+
+  const plain = settle(api.quoteMyPrintOrder('file-2', { copies: 1 }, 'signed://plain'))
+  await flush()
+  const again = ctx.wx.calls.request.filter((c) => String(c.url).endsWith('/orders/quote')).pop()
+  assert.ok(again)
+  assert.equal(again.data.fileUrl, 'signed://plain')
+  assert.equal('terminalId' in again.data, false, '没给终端时不额外带字段')
+  reply(again, 200, { success: true, data: { amountCents: 0, billablePages: 1 } })
+  assert.equal((await plain).ok, true)
+}
+
+/** GET /terminals/:terminalId/capabilities，不鉴权；空编号不发请求。 */
+async function terminalCapabilitiesPath() {
+  const ctx = createRuntime()
+  const api = ctx.load('api')
+  const missing = await settle(api.getTerminalCapabilities('  '))
+  assert.equal(missing.ok, false)
+  assert.match(missing.error.message, /缺少终端/)
+  assert.equal(ctx.wx.calls.request.length, 0)
+
+  const pending = settle(api.getTerminalCapabilities('shop/1'))
+  await flush()
+  const call = ctx.wx.calls.request[0]
+  assert.ok(call)
+  assert.equal(call.method, 'GET')
+  assert.ok(String(call.url).endsWith('/terminals/shop%2F1/capabilities'), call.url)
+  assert.equal(header(call, 'Authorization'), undefined)
+  reply(call, 200, { success: true, data: { capabilities: [] } })
+  assert.equal((await pending).ok, true)
+}
+
+/** 短信登录和微信一键登录都用请求头申请同设备恢复凭证，不放进 body。 */
+async function loginsAskKeepSignedIn() {
+  const ctx = createRuntime()
+  const api = ctx.load('api')
+  const sms = settle(api.loginBySms('13800138000', '246810', 'dev-1'), 2000)
+  await flush()
+  const legal = ctx.wx.calls.request.filter((c) => String(c.url).includes('/kiosk/legal/'))
+  assert.equal(legal.length, 2)
+  legal.forEach(publishedLegal)
+  await flush()
+  const smsCall = ctx.wx.calls.request.find((c) => String(c.url).endsWith('/member/auth/login'))
+  assert.ok(smsCall)
+  assert.equal(smsCall.method, 'POST')
+  assert.equal(header(smsCall, 'x-member-keep-signed-in'), '1')
+  assert.equal(smsCall.data.phone, '13800138000')
+  assert.equal(smsCall.data.deviceId, 'dev-1')
+  assert.equal('x-member-keep-signed-in' in smsCall.data, false)
+  reply(smsCall, 200, { success: true, data: { token: 't', user: { id: 'u' } } })
+  assert.equal((await sms).ok, true)
+
+  const phone = settle(api.loginByPhone('phone-code'), 2000)
+  await flush()
+  assert.equal(ctx.wx.calls.login.length, 1)
+  const moreLegal = ctx.wx.calls.request.filter((c) => String(c.url).includes('/kiosk/legal/')).slice(2)
+  assert.equal(moreLegal.length, 2)
+  moreLegal.forEach(publishedLegal)
+  ctx.wx.calls.login[0].success({ code: 'js-code' })
+  await flush()
+  const wxCall = ctx.wx.calls.request.find((c) => String(c.url).endsWith('/member/auth/wx-login'))
+  assert.ok(wxCall)
+  assert.equal(wxCall.method, 'POST')
+  assert.equal(header(wxCall, 'x-member-keep-signed-in'), '1')
+  assert.equal(wxCall.data.code, 'js-code')
+  assert.equal(wxCall.data.phoneCode, 'phone-code')
+  assert.equal('x-member-keep-signed-in' in wxCall.data, false)
+  reply(wxCall, 200, { success: true, data: { token: 't2', user: { id: 'u2' } } })
+  assert.equal((await phone).ok, true)
+}
+
+/** 退出时作废恢复凭证：POST /member/auth/restore/revoke，不带访问令牌。 */
+async function revokeRestorePostsToken() {
+  const ctx = createRuntime()
+  const api = ctx.load('api')
+  const empty = await settle(api.revokeRestore(''))
+  assert.equal(empty.ok, true)
+  assert.equal(empty.value && empty.value.revoked, false)
+  assert.equal(ctx.wx.calls.request.length, 0, '没有凭证就不发请求')
+
+  const pending = settle(api.revokeRestore('tok-1'))
+  await flush()
+  const call = ctx.wx.calls.request[0]
+  assert.ok(call)
+  assert.equal(call.method, 'POST')
+  assert.ok(String(call.url).endsWith('/member/auth/restore/revoke'), call.url)
+  assert.equal(call.data && call.data.restoreToken, 'tok-1')
+  assert.equal(header(call, 'Authorization'), undefined)
+  reply(call, 200, { success: true, data: { revoked: true } })
+  const result = await pending
+  assert.equal(result.ok, true)
+  assert.equal(result.value.revoked, true)
+}
+
 /** api 门面：小青带 channel=miniapp（C12），并走 AI 前置；法务门面方法并进了 api。 */
 async function assistantChatSendsMiniappChannel(opts) {
   const ctx = createRuntime(opts)
@@ -502,7 +645,71 @@ async function resumeAiConcurrentSharesOnePrompt(opts) {
   assert.equal((await b).ok, true)
 }
 
+const RESUME_AI_FIRST_SENTENCE = '简历诊断、优化、生成，以及用到这份简历的版式调整、职业规划和模拟面试，会把你上传或填写的简历内容发送到系统里的 AI 进行分析。'
+
+/**
+ * 职业规划也把简历原文发给 AI（第八次起服务端对它查 resume_ai）：经 api.generateCareerPlan
+ * 真发，会员没授权被 403 → 弹同一个确认框（第一句点到职业规划）→ 同意 → 写账号 → 重发一次。
+ */
+async function careerPlanAsksResumeAiOn403(opts) {
+  const ctx = memberWithAge(opts)
+  const api = ctx.load('api')
+  const pending = settle(api.generateCareerPlan('t1', ''), 2000)
+  await flush()
+  const first = ctx.aiCalls()[0]
+  assert.ok(first && first.url.endsWith('/resume/career-plan/t1'), '生成请求发出')
+  assert.equal(first.method, 'POST')
+  reply(first, 403, CONSENT_403)
+  await flush()
+  assert.equal(ctx.wx.calls.modal.length, 1, '职业规划被拒也弹简历 AI 授权')
+  assert.match(ctx.wx.calls.modal[0].title, /简历 AI/)
+  assert.ok(ctx.wx.calls.modal[0].content.startsWith(RESUME_AI_FIRST_SENTENCE), '第一句是合规定的新句，点到职业规划')
+  assert.match(ctx.wx.calls.modal[0].content, /不会发送给企业或合作机构/)
+  assert.equal(ctx.aiCalls().length, 1, '同意之前不重发')
+  answer(ctx.wx.calls.modal[0], true)
+  await flush()
+  const grant = ctx.consentCalls()[0]
+  assert.ok(grant, '同意后写账号授权')
+  assert.equal(grant.data.scope, 'resume_ai')
+  assert.equal(ctx.aiCalls().length, 1, '账号授权写成之前不重发')
+  reply(grant, 200, { data: { scope: 'resume_ai', granted: true } })
+  await flush()
+  assert.equal(ctx.aiCalls().length, 2, '重发一次')
+  reply(ctx.aiCalls()[1], 200, { status: 'completed', summary: '规划' })
+  const result = await pending
+  assert.equal(result.ok, true)
+  assert.equal(ctx.wx.calls.modal.length, 1, '全程只问一次')
+}
+
+/** 职业规划被拒后点「暂不使用」：不写授权、不重发、不再弹；交给页面的是可判的「没同意」。 */
+async function careerPlanDeclineStopsHere(opts) {
+  const ctx = memberWithAge(opts)
+  const api = ctx.load('api')
+  const pending = settle(api.generateCareerPlan('t1', ''))
+  await flush()
+  reply(ctx.aiCalls()[0], 403, CONSENT_403)
+  await flush()
+  assert.equal(ctx.wx.calls.modal.length, 1)
+  answer(ctx.wx.calls.modal[0], false)
+  const result = await pending
+  assert.equal(result.ok, false)
+  assert.equal(result.error.code, 'AI_RESUME_NOT_CONSENTED')
+  assert.equal(ctx.ai.isDeclined(result.error), true)
+  assert.match(result.error.message, /没有发给 AI/)
+  await flush()
+  assert.equal(ctx.consentCalls().length, 0, '不写授权')
+  assert.equal(ctx.aiCalls().length, 1, '不重发')
+  assert.equal(ctx.wx.calls.modal.length, 1, '不反复弹')
+}
+
 const SCENARIOS = {
+  careerPlanAsksResumeAiOn403,
+  careerPlanDeclineStopsHere,
+  careerPlanRequestsResumeAi,
+  quoteSendsTerminalId,
+  terminalCapabilitiesPath,
+  loginsAskKeepSignedIn,
+  revokeRestorePostsToken,
   resumeAiConsentRecoversOnce,
   resumeAiDeclineStopsHere,
   consent403OutsideResumePassesThrough,
@@ -576,6 +783,12 @@ const MUTATIONS = [
     swap('ai-access', "    if (!agreed) throw declinedError(RESUME_AI_SCOPE);\n", '')],
   ['简历授权框不单飞', 'resumeAiConcurrentSharesOnePrompt',
     swap('ai-access', '  if (resumeAiPending) return resumeAiPending;\n', '')],
+  ['职业规划不挂简历授权标记', 'careerPlanAsksResumeAiOn403',
+    swap('api', "timeout: config.aiTimeout, ai: 'generate', resumeAi: true,\n    });\n  },\n\n  /**\n   * 读取已生成的职业规划", "timeout: config.aiTimeout, ai: 'generate',\n    });\n  },\n\n  /**\n   * 读取已生成的职业规划")],
+  ['确认框第一句退回旧句', 'careerPlanAsksResumeAiOn403',
+    swap('ai-access', "content: '简历诊断、优化、生成，以及用到这份简历的版式调整、职业规划和模拟面试，会把", "content: '诊断、优化和生成会把")],
+  ['职业规划拒绝后照样重发', 'careerPlanDeclineStopsHere',
+    swap('ai-access', "    if (!agreed) throw declinedError(RESUME_AI_SCOPE);\n", '')],
   ['登录档位拒绝不提示', 'loginRequiredPromptsOnce',
     swap('api-legal-consent', "if (err && err.code === 'AI_LOGIN_REQUIRED') aiAccess.promptLogin();", '')],
 ]

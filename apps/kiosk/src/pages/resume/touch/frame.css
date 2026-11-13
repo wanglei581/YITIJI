@@ -4,6 +4,11 @@
 .qxt-screen .qxt-status.qx-pill { min-height: 0; }
 .qxt-screen .qxt-status.qx-pill::before { content: none; }
 
+.qxt-screen .qxt-body-scroll:has(> :is([data-kiosk-screen='resume-source'], [data-kiosk-screen='resume-report'], [data-kiosk-screen='resume-optimize'], [data-kiosk-screen='resume-optimize-compare'])) {
+  padding-top: 14px;
+  padding-bottom: 12px;
+}
+
 /* 授权弹层的错误一句（ResumeAiConsentDialog variant="touch"）：要看得出来是出错了。 */
 .qxt-screen .qxt-dialog p[data-tone='bad'] { color: var(--qx-cinnabar); font-weight: 700; }
 

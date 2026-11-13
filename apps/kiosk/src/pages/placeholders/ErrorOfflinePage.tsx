@@ -8,8 +8,8 @@
 // 联网、本机程序、打印机与扫描接收可读；其余照实写未检测 / 未验收 / 随请求确认。
 //   1) 联网 = GET {API_BASE_URL}/health（5s 超时）+ navigator.onLine —— 与其它接口同一个基址，
 //      VITE_API_BASE_URL 指向别的源时也探得到（写死 /api/v1 会永远探测失败、卡在本页）；
-//   2) 机器后台程序 / 打印机 = 公开只读 printer-status（后端按 5 分钟心跳窗算 isOnline），
-//      映射沿用 useTerminalDeviceStatus 的纯函数，default 分支不返回在线。
+//   2) 本机程序读本地网桥；打印机和扫描接收读公开只读 printer-status（5 分钟心跳窗），
+//      本机探不通时不把上报状态当作当前读数；未配网桥时只看云端心跳。
 // 进页立即检测 + 自动重试 + 监听 online 事件。只对带明确安全 from 的故障回退恢复来源页；
 // 主动打开设备状态时始终留在本页，展示本次检测结果。扫描存放读新鲜心跳的枚举，不暴露本机路径。
 // 自动重试退避：每多一次「检测完仍留在本页」（offline / partial），间隔翻倍 10 → 20 → 40 秒，封顶 60 秒；
@@ -26,8 +26,10 @@ import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
 import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
 import { useVisibleHelpLine } from '../public-touch/publicTouchHooks'
-import { mapTerminalPrinterStatus, normalizePrinterStatusRaw } from '../../hooks/useTerminalDeviceStatus'
+import { mapTerminalPrinterStatus, normalizePrinterStatusRaw, requestLocalScanProbe, useLocalScanProbe } from '../../hooks/useTerminalDeviceStatus'
+import { checkedAgoLabel, scannerStatusLine } from '../scan/scanProbeCopy'
 import { API_BASE_URL, getTerminalId } from '../../services/api'
+import { probeLocalAgent, type LocalAgentStatus } from '../../services/localAgentProbe'
 import './system-state-qx.css'
 import './offline-touch.css'
 
@@ -94,6 +96,7 @@ interface CheckResult {
   at: Date
   reachable: boolean
   printer: PrinterReading | null
+  agent: LocalAgentStatus
 }
 
 /** 一次探测 = 一个 AbortController + 它的 5 秒计时器。放在 ref 里，页面卸载时连同计时器一起中断。 */
@@ -178,7 +181,8 @@ function rowsFor(view: View, result: CheckResult | null): Row[] {
     const none = { dep: '这次没有读到', verdict: unread }
     return [
       { dep: '和服务器之间不通', verdict: ['这次连不上', 'bad'] },
-      none,
+      result?.agent === 'reachable' ? { dep: '只说明程序有回应', verdict: ['这次连得上', 'ok'] }
+        : result?.agent === 'unreachable' ? { dep: '只说明程序没有回应', verdict: ['这次连不上', 'bad'] } : none,
       none,
       { dep: '还没有检测', verdict: q('未检测') },
       usb,
@@ -189,15 +193,20 @@ function rowsFor(view: View, result: CheckResult | null): Row[] {
   }
   if (view === 'partial' && result?.printer) {
     const printer = result.printer
+    const agent = result.agent
+    const usableReading = agent === 'unreachable' || agent === 'checking' ? UNREAD : printer
     return [
       { dep: '只说明这条路通了', verdict: ['这次连得上', 'ok'] },
-      printer.heartbeatOnline
-        ? { dep: '只说明程序有回应', verdict: ['这次连得上', 'ok'] }
+      agent === 'unreachable' ? { dep: '只说明程序没有回应', verdict: ['这次连不上', 'bad'] }
+        : agent === 'reachable' ? { dep: '只说明程序有回应', verdict: ['这次连得上', 'ok'] }
+        : agent === 'unconfigured' && printer.heartbeatOnline
+          ? { dep: '只看云端心跳', verdict: ['这次读到可用', 'ok'] }
+        : agent === 'unconfigured' ? { dep: '只看云端心跳', verdict: unread }
         : { dep: '这次没有读到', verdict: unread },
-      printer.verdict[0] === UNREAD_LABEL
-        ? { dep: '这次没有读到', verdict: printer.verdict }
-        : { dep: '读机器上报的状态', verdict: printer.verdict },
-      { dep: '只说明本次接收状态', verdict: printer.scanVerdict },
+      usableReading.verdict[0] === UNREAD_LABEL
+        ? { dep: '这次没有读到', verdict: usableReading.verdict }
+        : { dep: '读机器上报的状态', verdict: usableReading.verdict },
+      { dep: '只说明本次接收状态', verdict: usableReading.scanVerdict },
       usb,
       { dep: asked, verdict: q('随请求确认') },
       { dep: asked, verdict: q('随请求确认') },
@@ -246,6 +255,7 @@ export default function ErrorOfflinePage() {
   const [stayStreak, setStayStreak] = useState(0)
   const checkingRef = useRef(false)
   const probeRef = useRef<ProbeWindow | null>(null)
+  const agentAbortRef = useRef<AbortController | null>(null)
   // 检测是异步的：用户在检测途中点了「返回首页 / 帮助与求助」离开本页后，迟到的结果不得再改状态或把人拽走。
   const mountedRef = useRef(true)
   const safeFrom = useMemo(() => {
@@ -256,13 +266,19 @@ export default function ErrorOfflinePage() {
   }, [location.state])
 
   const view: View = checking ? 'checking' : !result ? 'unknown' : result.reachable ? 'partial' : 'offline'
+  const scanProbe = useLocalScanProbe(false)
 
   // counted=false 只给进页那一次自动检测用：它不算「重试」；之后的自动退避、online 重测和手动重新检测都算。
-  const retry = useCallback(async (counted = true) => {
+  // probeScanner：进页和「重新检测」才问扫描仪。自动退避只复测联网和打印机，不把扫描仪读数一直刷成新鲜。
+  const retry = useCallback(async (counted = true, probeScanner = true) => {
+    if (probeScanner) requestLocalScanProbe()
     if (checkingRef.current) return
     checkingRef.current = true
     setChecking(true)
     if (counted) setAttempts((value) => value + 1)
+    const agentController = new AbortController()
+    agentAbortRef.current = agentController
+    const agentPromise = probeLocalAgent(agentController.signal)
     let reachable = false
     try {
       if (!navigator.onLine) throw new Error('offline')
@@ -285,15 +301,16 @@ export default function ErrorOfflinePage() {
         closeProbe(probeRef, false)
       }
     }
+    const agent = await agentPromise
     checkingRef.current = false
     if (!mountedRef.current) return
     // 故障回退可恢复原页；主动查看设备状态必须留在这里读到结果。
-    if (reachable && safeFrom !== null) {
+    if (reachable && safeFrom !== null && agent !== 'unreachable' && agent !== 'checking') {
       navigate(safeFrom, { replace: true })
       return
     }
     setStayStreak((value) => value + 1)
-    setResult({ at: new Date(), reachable, printer })
+    setResult({ at: new Date(), reachable, printer, agent })
     setChecking(false)
   }, [navigate, safeFrom])
 
@@ -301,6 +318,7 @@ export default function ErrorOfflinePage() {
     mountedRef.current = true
     return () => {
       mountedRef.current = false
+      agentAbortRef.current?.abort()
       closeProbe(probeRef, true)
     }
   }, [])
@@ -323,11 +341,13 @@ export default function ErrorOfflinePage() {
   useEffect(() => {
     // 每次检测结束（view 从 checking 回来）都按当前退避重新排下一次；检测进行中不排。
     if (view === 'checking') return
-    const timer = window.setTimeout(() => void retry(), autoDelayMs)
+    const timer = window.setTimeout(() => void retry(true, false), autoDelayMs)
     return () => window.clearTimeout(timer)
   }, [autoDelayMs, retry, view])
 
   const rows = rowsFor(view, result)
+  const rowAgo = checkedAgoLabel(result ? result.at.getTime() : null)
+  const scanner = scannerStatusLine(scanProbe)
   const lastCheck = result ? `最近一次检测：${clock(result.at)}` : ''
   const nextAuto = `约 ${autoDelayMs / 1000} 秒后自动再${view === 'offline' ? '试' : '检测'}`
   const outcome = outcomeOf(rows)
@@ -404,10 +424,26 @@ export default function ErrorOfflinePage() {
               {CAPS.map((cap, index) => (
                 <li key={cap.key} className="qxp-hit of-row" data-cap={cap.key}>
                   <span className="qxp-ic" data-tone={cap.tone} aria-hidden="true"><Glyph name={cap.glyph} size={30} /></span>
-                  <span className="qxp-tx"><b>{cap.name}</b><small>{rows[index].dep}</small></span>
+                  <span className="qxp-tx">
+                    <b>{cap.name}</b>
+                    <small>{rowAgo ? `${rows[index].dep} · ${rowAgo}` : rows[index].dep}</small>
+                  </span>
                   <span className="of-verdict" data-tone={rows[index].verdict[1]}>{rows[index].verdict[0]}</span>
                 </li>
               ))}
+            </ul>
+            <ul className="of-list" data-testid="system-state-scanner" aria-label="扫描仪">
+              <li className={`qxp-hit of-row of-scan${scanner.tone === 'ok' ? '' : ' is-stale'}`} data-cap="scanner">
+                <span className="qxp-ic" data-tone="teal" aria-hidden="true"><Glyph name="scan" size={36} /></span>
+                <span className="qxp-tx">
+                  <b>扫描仪</b>
+                  <small>{scanner.dep}</small>
+                </span>
+                <span className="of-st">
+                  <span className="of-chip" data-tone={scanner.tone}>{scanner.label}</span>
+                  {scanner.ago ? <span className="of-when">{scanner.ago}</span> : null}
+                </span>
+              </li>
             </ul>
             <Card className="of-machine" testId={view === 'offline' ? 'system-state-fallback' : undefined}>
               {lastCheck ? <p className="qxp-note of-last">{lastCheck}</p> : null}

@@ -41,9 +41,9 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | 风险 | 含义 | 数量 |
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
-| **high** | 仍被 CI / 门禁 / 包脚本引用 | 83 |
+| **high** | 仍被 CI / 门禁 / 包脚本引用 | 174 |
 | **medium** | 只被文档或其它文件提及 | 30 |
-| **low** | 全仓零提及 | 96 |
+| **low** | 全仓零提及 | 95 |
 
 
 ──────────────────────────────────────────────────────────────────────
@@ -69,16 +69,15 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## low — 全仓零提及（96）
+## low — 全仓零提及（95）
 
 五条证据全部满足。**仍需人确认**：脚本看不见运行时动态引用，也不知道
 某个文件是不是刻意保留的下一步入口。
 
-### 页面/组件（8）
+### 页面/组件（7）
 
 | 路径 | 判定依据 |
 | --- | --- |
-| `apps/kiosk/src/pages/home/components/HomeHeroHeader.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/pages/home/components/V6HomeFooterPanels.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/pages/home/prototypeIcons.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/pages/profile/assets/ui.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
@@ -233,9 +232,9 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## high — 仍被 CI / 门禁 / 包脚本引用（83）
+## high — 仍被 CI / 门禁 / 包脚本引用（174）
 
-### 页面/组件（36）
+### 页面/组件（109）
 
 | 路径 | 判定依据 |
 | --- | --- |
@@ -258,28 +257,103 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/admin/src/routes/offline-agencies/ReviewDialog.tsx` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-offline-agencies-ui.mjs |
 | `apps/admin/src/routes/sync-sources/SyncSourceWriteActions.tsx` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs、services/api/scripts/verify-backend-p0-contracts.mjs |
 | `apps/admin/src/services/api/offlineAgenciesAdmin.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-offline-agencies-ui.mjs、services/api/scripts/verify-backend-p0-contracts.mjs |
+| `apps/kiosk/src/auth/KioskCapabilityGuard.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-home-toolbox-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs |
 | `apps/kiosk/src/components/ComingSoonNotice.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w4.mjs |
 | `apps/kiosk/src/components/KioskDeviceStatusPills.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-device-status-honest.mjs |
+| `apps/kiosk/src/hooks/useSmartCampusConfig.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs、services/api/scripts/verify-terminal-device-config.ts |
+| `apps/kiosk/src/hooks/useToolboxConfig.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-home-toolbox-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs、services/api/scripts/verify-terminal-device-config.ts |
+| `apps/kiosk/src/pages/activities/BenefitActivitiesPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、scripts/verify-no-raw-error-render.mjs |
+| `apps/kiosk/src/pages/assistant/AdvisorTools.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-advisor-provider-gate.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs |
 | `apps/kiosk/src/pages/auth/components/MemberLoginDialog.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs、apps/kiosk/scripts/verify-member-login-dialog.mjs |
 | `apps/kiosk/src/pages/auth/components/MemberPhoneLoginPane.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs、apps/kiosk/scripts/verify-member-login-dialog.mjs |
 | `apps/kiosk/src/pages/contract-review/contractReviewReportPrintFlow.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-contract-review-report-print.mjs |
+| `apps/kiosk/src/pages/home/components/HomeHeroHeader.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-brand-display.mjs |
+| `apps/kiosk/src/pages/home/components/ToolboxLaunchModals.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-home-toolbox-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs |
+| `apps/kiosk/src/pages/home/components/kioskAppLaunch.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-home-toolbox-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs |
 | `apps/kiosk/src/pages/home/hooks/useHomeDeviceStatus.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-prod-build-config.mjs、apps/kiosk/scripts/verify-runtime-terminal-identity.mjs |
 | `apps/kiosk/src/pages/home/serviceGroups.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-material-library-ui.mjs、apps/kiosk/scripts/verify-jobfair-checkin.mjs、apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs |
 | `apps/kiosk/src/pages/jobs/OnlinePlatformsPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w4.mjs |
+| `apps/kiosk/src/pages/print-scan/SignStampPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs、apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/SignStampBits.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/SignStampGateView.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPickView.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPreview.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/SignStampStatus.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/SignStampWorkbench.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/constants.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/signStampCopy.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/signStampModel.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs、apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
 | `apps/kiosk/src/pages/print/PrintPrototypeLayout.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs、apps/kiosk/scripts/verify-print-parameter-capability.mjs |
 | `apps/kiosk/src/pages/profile/assets/useMemberProfileOverview.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs |
 | `apps/kiosk/src/pages/profile/components/ProfileEntrySection.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-inkpaper-home.mjs |
 | `apps/kiosk/src/pages/profile/components/QxMemberNavbar.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-profile-inkpaper-home.mjs |
 | `apps/kiosk/src/pages/profile/me/MeListShell.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-inkpaper-home.mjs |
 | `apps/kiosk/src/pages/profile/profileEntries.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs |
+| `apps/kiosk/src/pages/renshi/EligibilityPanel.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-policy-eligibility-ui.mjs |
+| `apps/kiosk/src/pages/renshi/EligibilityResults.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-policy-eligibility-ui.mjs |
+| `apps/kiosk/src/pages/renshi/PolicyPanel.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-renshi-policy-ui.mjs |
+| `apps/kiosk/src/pages/renshi/RegisterPanel.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-renshi-policy-ui.mjs |
+| `apps/kiosk/src/pages/renshi/SocialPanel.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-renshi-policy-ui.mjs |
+| `apps/kiosk/src/pages/renshi/builtinData.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-renshi-policy-ui.mjs |
+| `apps/kiosk/src/pages/renshi/eligibilityOutcome.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-policy-eligibility-ui.mjs |
+| `apps/kiosk/src/pages/renshi/policyFocus.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs |
+| `apps/kiosk/src/pages/renshi/usePolicyFocus.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-renshi-policy-ui.mjs |
+| `apps/kiosk/src/pages/resume/CareerPlanPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs、apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs、apps/kiosk/scripts/verify-ai-down-fallbacks.mjs |
+| `apps/kiosk/src/pages/resume/JobFitActionsPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs、apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/JobFitPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs、apps/kiosk/scripts/verify-fusion-shell.mjs、apps/kiosk/scripts/verify-fusion-w3.mjs |
+| `apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs、apps/kiosk/scripts/verify-fusion-w3.mjs、apps/kiosk/scripts/verify-job-material-library-ui.mjs |
+| `apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs、apps/kiosk/scripts/verify-job-material-library-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs、apps/kiosk/scripts/verify-ai-down-fallbacks.mjs、apps/kiosk/scripts/verify-fusion-w5.mjs |
+| `apps/kiosk/src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-lightflow-k2a-career.mjs |
+| `apps/kiosk/src/pages/resume/components/career-plan/CareerPlanGenerateKey.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/components/career-plan/CareerPlanSection.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-lightflow-k2a-career.mjs |
+| `apps/kiosk/src/pages/resume/components/career-plan/CareerPlanSelfAssessmentExcluded.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/components/career-plan/careerPlanGenerateCopy.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentConsentKit.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentQxKit.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/hooks/useRouteIdentityGuard.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/jobFit/AnonymousJobFitConsentCard.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/jobFit/AnonymousJobFitConsentDialog.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/jobFit/DecisionSummaryBar.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs |
+| `apps/kiosk/src/pages/resume/jobFit/FitSkillMap.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs |
 | `apps/kiosk/src/pages/resume/jobFit/GapActionCards.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs |
+| `apps/kiosk/src/pages/resume/jobFit/JobFitQxStates.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/jobFit/MemberJobFitConsentCard.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
 | `apps/kiosk/src/pages/resume/jobFit/ResumeRewriteCard.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs |
-| `apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w4.mjs、apps/kiosk/scripts/verify-fusion-w6.mjs、apps/kiosk/scripts/verify-smart-campus-ui.mjs |
+| `apps/kiosk/src/pages/resume/jobFit/jobFitQxKit.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-lightflow-k2a-career.mjs |
+| `apps/kiosk/src/pages/resume/jobFit/jobFitResultSpec.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/selfAssessmentConsent.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-self-assessment-consent-source.mjs |
+| `apps/kiosk/src/pages/resume/selfAssessmentInterpretation.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/self-assessment-consent-source.test.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/touch/ResumeMaterialsTouch.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/touch/ResumeStates.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-lightflow-k2a-career.mjs |
+| `apps/kiosk/src/pages/resume/touch/SaResultParts.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/touch/saActItems.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/useSelfAssessmentConsentBundle.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-self-assessment-consent-source.mjs |
+| `apps/kiosk/src/pages/resume/useSelfAssessmentIdleExit.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs |
+| `apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w4.mjs、apps/kiosk/scripts/verify-fusion-w6.mjs、apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs |
+| `apps/kiosk/src/pages/smart-campus/SmartCampusGuard.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs、apps/kiosk/scripts/verify-smart-campus-ui.mjs |
+| `apps/kiosk/src/pages/smart-campus/SmartCampusHomePage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w4.mjs、apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs、apps/kiosk/scripts/verify-smart-campus-ui.mjs |
+| `apps/kiosk/src/pages/smart-campus/SmartCampusServicePage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs、apps/kiosk/scripts/verify-smart-campus-ui.mjs |
+| `apps/kiosk/src/pages/smart-campus/SmartCampusWelcomePage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs、apps/kiosk/scripts/verify-smart-campus-ui.mjs |
+| `apps/kiosk/src/pages/toolbox/ToolboxZonePage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-home-toolbox-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs |
+| `apps/kiosk/src/services/api/benefitActivities.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-member-session-closure.mjs |
+| `apps/kiosk/src/services/api/careerPlan.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-ai-down-fallbacks.mjs、apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs、apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs |
+| `apps/kiosk/src/services/api/jobFit.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-ai-down-fallbacks.mjs、apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs、apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs |
+| `apps/kiosk/src/services/api/kioskCapabilityValidation.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-home-toolbox-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs |
+| `apps/kiosk/src/services/api/policy-eligibility.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-policy-eligibility-ui.mjs |
+| `apps/kiosk/src/services/api/printSign.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs、scripts/verify-no-raw-error-render.mjs |
+| `apps/kiosk/src/services/api/toolboxLaunchEvents.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-home-toolbox-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs、services/api/scripts/verify-toolbox-launch-events.ts |
+| `apps/partner/src/routes/policy/EligibilityRuleEditor.tsx` | 不在 apps/partner/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/partner/scripts/verify-partner-refresh-safe.mjs、services/api/scripts/verify-policy-eligibility-authoring.ts |
+| `apps/partner/src/routes/policy/EligibilityRulesDrawer.tsx` | 不在 apps/partner/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/partner/scripts/verify-partner-refresh-safe.mjs、services/api/scripts/verify-policy-eligibility-authoring.ts |
 
-### 样式（43）
+### 样式（60）
 
 | 路径 | 判定依据 |
 | --- | --- |
+| `apps/kiosk/src/pages/activities/activities-batch8.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/activities/activities-detail-inkpaper.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
 | `apps/kiosk/src/pages/assistant/assistant-advisor.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-visual-unity.mjs |
 | `apps/kiosk/src/pages/assistant/assistant-inkpaper.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-advisor-provider-gate.mjs |
 | `apps/kiosk/src/pages/auth/login.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs |
@@ -292,6 +366,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/home/styles/home-qx.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs |
 | `apps/kiosk/src/pages/print-scan/styles/print-scan-fusion.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs |
 | `apps/kiosk/src/pages/print-scan/styles/print-scan-uplift.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-visual-unity.mjs |
+| `apps/kiosk/src/pages/print-scan/styles/sign-stamp-qx.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
 | `apps/kiosk/src/pages/print/print-prototype.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs、apps/kiosk/scripts/verify-print-cta-contrast.mjs |
 | `apps/kiosk/src/pages/print/styles/print-cashier.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs、apps/kiosk/scripts/verify-print-cta-contrast.mjs |
 | `apps/kiosk/src/pages/print/styles/print-material-check.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs |
@@ -309,26 +384,41 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/profile/profile-lightflow-directory.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-inkpaper-home.mjs |
 | `apps/kiosk/src/pages/profile/profile-lightflow-shell.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-inkpaper-home.mjs |
 | `apps/kiosk/src/pages/profile/profile-lightflow-state.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-inkpaper-home.mjs |
+| `apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs、apps/kiosk/scripts/verify-policy-eligibility-ui.mjs |
+| `apps/kiosk/src/pages/renshi/renshi-narrow-qx.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-policy.mjs |
+| `apps/kiosk/src/pages/resume/job-fit-qx.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-lightflow-k2a-career.mjs |
 | `apps/kiosk/src/pages/resume/jobFit-inkpaper.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs、apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs |
 | `apps/kiosk/src/pages/resume/resume-authoring-lightflow.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs |
+| `apps/kiosk/src/pages/resume/resume-decision-qx.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-lightflow-k2a-career.mjs、apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs |
 | `apps/kiosk/src/pages/resume/resume-diagnosis-lightflow.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs |
 | `apps/kiosk/src/pages/resume/resume-fusion-youth.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs |
 | `apps/kiosk/src/pages/resume/resume-library-lightflow.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs |
+| `apps/kiosk/src/pages/resume/resume-materials-qx.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs、apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs |
+| `apps/kiosk/src/pages/resume/resume-templates-qx.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
 | `apps/kiosk/src/pages/resume/self-assessment-lightflow.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：services/api/scripts/verify-compliance.ts |
+| `apps/kiosk/src/pages/resume/self-assessment-qx.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
 | `apps/kiosk/src/pages/resume/styles/resume-fusion-authoring.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs |
 | `apps/kiosk/src/pages/resume/styles/resume-fusion-common.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs |
 | `apps/kiosk/src/pages/resume/styles/resume-fusion-diagnosis.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs |
 | `apps/kiosk/src/pages/resume/styles/resume-fusion-job-fit.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs |
 | `apps/kiosk/src/pages/resume/styles/resume-fusion-library.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs |
+| `apps/kiosk/src/pages/resume/touch/resume-fit.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/touch/resume-materials-touch.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/touch/resume-sa.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/touch/resume-states.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
+| `apps/kiosk/src/pages/resume/touch/resume-templates.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
 | `apps/kiosk/src/pages/scan/styles/scan-fusion.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs |
+| `apps/kiosk/src/pages/smart-campus/smart-campus-touch.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs |
+| `apps/kiosk/src/pages/toolbox/toolbox-zone.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs |
 | `apps/kiosk/src/styles/kiosk-uplift.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs |
 | `apps/kiosk/src/styles/prototype-v1.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-fusion-w3.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs |
 
-### 测试（4）
+### 测试（5）
 
 | 路径 | 判定依据 |
 | --- | --- |
 | `apps/admin/src/routes/member-benefits/grantFormModel.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
+| `apps/admin/src/routes/partners/licenseValidation.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
 | `apps/admin/src/routes/partners/partnerAccountActionMachine.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
 | `apps/admin/src/routes/screensaver/terminalConfigState.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
 | `apps/admin/src/routes/toolbox/toolboxActionState.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |

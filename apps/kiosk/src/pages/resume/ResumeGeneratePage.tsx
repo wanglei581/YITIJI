@@ -39,14 +39,14 @@ import {
   WrenchIcon,
 } from 'lucide-react'
 import { exportResumeDraft, submitResumeGenerate } from '../../services/api'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { AI_QUOTA_EXHAUSTED_RESUME_COPY, userMessageOf } from '../../services/api/userErrorMessage'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { useResumeAiConsent } from './resumeAiConsent'
 import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import { ResumeGenerateAdvisor } from './components/ResumeGenerateQxChrome'
 import { ASKS } from './touch/resumeAsks'
-import { ResumeGenerateReview } from './components/ResumeGenerateReview'
+import { experienceRowsForGenerate, ResumeGenerateReview } from './components/ResumeGenerateReview'
 import { ResumeVoiceInputButton } from './components/ResumeVoiceInputButton'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-generate-qx.css'
@@ -196,7 +196,7 @@ export function ResumeGeneratePage() {
       jobType: intention.jobType.trim() || undefined,
       salary: intention.salary.trim() || undefined,
     },
-    // 只提交填了关键字段的条目(学校/公司+职务/项目名),半空条目不提交
+    // 学校、项目名写了才提交。经历只要写了公司就提交，职务可以空着。
     education: education
       .filter((e) => e.school.trim())
       .map((e) => ({
@@ -206,14 +206,7 @@ export function ResumeGeneratePage() {
         period: e.period?.trim() || undefined,
         description: e.description?.trim() || undefined,
       })),
-    experience: experience
-      .filter((e) => e.company.trim() && e.role.trim())
-      .map((e) => ({
-        company: e.company.trim(),
-        role: e.role.trim(),
-        period: e.period?.trim() || undefined,
-        description: e.description.trim(),
-      })),
+    experience: experienceRowsForGenerate(experience),
     projects: projects
       .filter((p) => p.name.trim())
       .map((p) => ({ name: p.name.trim(), role: p.role?.trim() || undefined, description: p.description.trim() })),
@@ -231,7 +224,9 @@ export function ResumeGeneratePage() {
       const result: ResumeGenerateResponse = await submitResumeGenerate(input, getToken())
       if (!request.valid()) return
       if (result.failCode && isAiOutage({ code: result.failCode })) {
-        setAiOutage('AI 暂时不可用，你可以先导出并打印已填的内容')
+        setAiOutage(result.failCode === 'AI_QUOTA_EXHAUSTED'
+          ? AI_QUOTA_EXHAUSTED_RESUME_COPY
+          : 'AI 暂时不可用，你可以先导出并打印已填的内容')
         return
       }
       // 拿到结构化响应就算一次真实往返 —— 账户级 / 模型名问题除外，那种每次都会失败。
@@ -628,7 +623,7 @@ export function ResumeGeneratePage() {
                   <Field label="公司 / 单位" required>
                     <input className={inputCls} value={e.company} onChange={(ev) => setExperience((list) => list.map((x, idx) => idx === i ? { ...x, company: ev.target.value } : x))} />
                   </Field>
-                  <Field label="职位" required>
+                  <Field label="职位">
                     <input className={inputCls} value={e.role} onChange={(ev) => setExperience((list) => list.map((x, idx) => idx === i ? { ...x, role: ev.target.value } : x))} />
                   </Field>
                   <div className="md:col-span-2">
