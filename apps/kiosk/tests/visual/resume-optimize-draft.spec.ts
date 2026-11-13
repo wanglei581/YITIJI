@@ -455,9 +455,12 @@ test('改经历公司名后预览和导出都用改后的短名 @kiosk', async (
   await expect(page.getByRole('textbox', { name: '第 1 条教育的学校' })).toHaveValue('青岛大学')
   await expect(page.getByRole('textbox', { name: '第 1 条教育的专业' })).toHaveValue('工商管理')
   await expect(page.getByText('本科 · 2018-2022', { exact: true })).toBeVisible()
-  await expect(page.locator('[data-entry-field="projects-0-name"]')).toHaveValue('门店陈列项目')
-  await expect(page.locator('[data-entry-field="projects-0-role"]')).toHaveValue('执行')
-  await expect(page.getByRole('textbox', { name: /项目的名称|项目的职务/ })).toHaveCount(0)
+  // R-6（1cf730009a）要求「项目的名称|项目的职务」输入框为 0：定稿只批准改公司、职务、学校、专业，项目名保持只读的「名称 · 角色」。
+  // 定位到手改要能停在项目名称和角色上，两框改成和学校、公司一样分行，栏名用填写页已有的「项目名称」「担任角色」。
+  // 无障碍名含「项目的名称」「项目的职务」，护栏改为数到这两个框。
+  await expect(page.getByRole('textbox', { name: '第 1 条项目的名称' })).toHaveValue('门店陈列项目')
+  await expect(page.getByRole('textbox', { name: '第 1 条项目的职务' })).toHaveValue('执行')
+  await expect(page.getByRole('textbox', { name: /项目的名称|项目的职务/ })).toHaveCount(2)
 
   await company.fill(SHORT_COMPANY)
   await expect(company).toHaveValue(SHORT_COMPANY)
@@ -915,26 +918,27 @@ async function openLoginLocateChoice(page: Page, api: Parameters<typeof register
   await loginThroughVisibleUi(page, `/resume/optimize?taskId=${TASK_ID}`)
   await expect(page.locator('[data-draft-banner="choice"]')).toBeVisible()
   await expect(page.locator('[data-resume-editor]')).toHaveCount(0)
-  const goEdit = page.getByRole('button', { name: '去编辑区改这一条', exact: true })
-  await goEdit.scrollIntoViewIfNeeded()
-  await goEdit.click()
-  await expect(page.locator('[data-draft-banner="choice"]')).toBeVisible()
-  await expect(page.locator('[data-resume-editor]')).toHaveCount(0)
+  await expect(page.getByTestId('resume-optimize-overview')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '去编辑区改这一条', exact: true })).toHaveCount(0)
 }
 
-test('登录后先选继续上次，定位请求留到编辑区挂上才停在学校那一栏 @kiosk', async ({ page, api }) => {
+test('登录后先选继续上次，编辑区用的是草稿正文 @kiosk', async ({ page, api }) => {
   test.setTimeout(90_000)
   await openLoginLocateChoice(page, api)
   await page.getByRole('button', { name: /继续上次编辑/ }).click()
   await expect(page.locator('[data-draft-banner="choice"]')).toHaveCount(0)
-  await expectOriginalSelected(page, 'education-0-school', LOGIN_SCHOOL)
+  await expect(page.getByRole('textbox', { name: '个人简介' })).toHaveValue('这是上次编辑留下的草稿内容。')
+  await expect(page.locator('[data-entry-field="education-0-school"]')).toHaveValue(LOGIN_SCHOOL)
 })
 
-test('登录后先选重新开始，定位请求留到编辑区挂上才停在学校那一栏 @kiosk', async ({ page, api }) => {
+test('登录后先选重新开始，正文回到优化结果，再去编辑区停在学校那一栏 @kiosk', async ({ page, api }) => {
   test.setTimeout(90_000)
   await openLoginLocateChoice(page, api)
   await page.getByRole('button', { name: '从优化结果重新开始', exact: true }).click()
   await expect(page.locator('[data-draft-banner="choice"]')).toHaveCount(0)
+  await expect(page.getByTestId('resume-optimize-overview')).toBeVisible()
+  await page.getByRole('button', { name: '去编辑区改这一条', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: '个人简介' })).toHaveValue('这是优化结果摘要，不是草稿。')
   await expectOriginalSelected(page, 'education-0-school', LOGIN_SCHOOL)
 })
 
@@ -1015,8 +1019,14 @@ test('编辑区改一项技能、删一项、加一项后，导出请求里是�
   await page.getByRole('button', { name: '删除该条' }).nth(1).click()
   await expect(page.getByRole('textbox', { name: '技能 2', exact: true })).toHaveCount(0)
   const add = page.locator('[data-entry-add="skill"]')
+  const plus = page.getByRole('button', { name: '添加一项技能' })
+  const box = await plus.boundingBox()
+  expect(box).toBeTruthy()
+  expect(box!.width).toBeGreaterThanOrEqual(48)
+  expect(box!.height).toBeGreaterThanOrEqual(48)
+  await expect(page.getByRole('textbox', { name: '证书 / 资质' })).toBeVisible()
   await add.fill('Indesign 排版')
-  await add.press('Enter')
+  await plus.click()
   await expect(page.getByRole('textbox', { name: '技能 2', exact: true })).toHaveValue('Indesign 排版')
   const body = await exportBody(page) as { skills?: string[] }
   expect(body.skills).toEqual(['改过的方正飞腾排版', 'Indesign 排版'])

@@ -103,6 +103,26 @@ test('批量切换只更新真正换成的条目', () => {
   assert.deepEqual(result.failures.map((failure) => failure.key), ['m1:二'])
 })
 
+test('改写是原句的一部分时，保留原文后导出仍是原句一次', () => {
+  const before = '主要负责门店排班和订货。'
+  const after = '负责门店排班和订货。'
+  const item = moduleOf(before, after, '去掉虚词')
+  const base = makeResume(after)
+  const key = moduleKeyOf(item, 0)
+  const toggled = toggleModuleDecision(makeResume(after), item, 'optimized', 'original', base, {
+    modules: [item], decisions: {}, index: 0,
+  })
+  assert.equal(toggled.applied, true)
+  assert.equal(toggled.resume.summary, before)
+  const assembled = applyResumeDecisionsWithStatus(toggled.resume, [item], { [key]: 'original' })
+  assert.equal(assembled.resume.summary, before)
+  assert.equal(assembled.resume.summary.split(before).length - 1, 1)
+  assert.deepEqual(assembled.failures, [])
+  const fromRewrite = applyResumeDecisionsWithStatus(makeResume(after), [item], { [key]: 'original' })
+  assert.equal(fromRewrite.resume.summary, before)
+  assert.deepEqual(fromRewrite.failures, [])
+})
+
 test('导出组装把已经保留原文的正文视为已对齐，只报告编辑后两版都找不到', () => {
   const item = moduleOf('原文', '改写', '一')
   const aligned = applyResumeDecisionsWithStatus(makeResume('原文'), [item], { 'm0:一': 'original' })
@@ -658,6 +678,18 @@ test('去编辑区改这一条：同一句出现多处停在第一栏，没有�
   assert.equal(findResumeOriginalField(resume, '稿里根本没有的句子'), null)
   assert.equal(findResumeOriginalField(resume, '   '), null)
   assert.equal(findResumeOriginalField(resume, ''), null)
+  const projectOnly = {
+    ...makeResume('简介另写'),
+    projects: [{ name: '只在项目名称里的原句', role: '只在项目角色里的原句', description: '描述另写。' }],
+  }
+  assert.deepEqual(findResumeOriginalField(projectOnly, '只在项目名称里的原句'), { fieldId: 'projects-0-name', start: 0 })
+  assert.deepEqual(findResumeOriginalField(projectOnly, '只在项目角色里的原句'), { fieldId: 'projects-0-role', start: 0 })
+})
+
+test('总览手改行在摘录后保留句号', () => {
+  const source = readFileSync(join(kioskRoot, 'src/pages/resume/components/resume-deliver/OptimizeOverview.tsx'), 'utf8')
+  const manual = '原文：${snippet}。` : \'原文：这一条没有留下原句。\'}这一条只能在编辑区里改。'
+  assert.equal(source.includes(manual), true)
 })
 
 test('对照页逐条序号跳过无需操作条目，focusIndex 按原序号映射', () => {

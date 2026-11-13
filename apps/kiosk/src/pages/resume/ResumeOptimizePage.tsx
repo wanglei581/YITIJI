@@ -494,13 +494,16 @@ export function ResumeOptimizePage() {
             onContinue={handleContinueDraft}
             onRestart={() => {
               setDecisions({})
+              setDecisionIssues({})
+              setClearedChoices(new Set())
+              if (baseResume) setOptimizedResume(structuredClone(baseResume))
               draft.requestOverwrite()
               setDraftAccepted(true)
               setWorkView(editOriginalRef.current != null ? 'editor' : 'overview')
             }}
           />
         )}
-        {(editorOpen || choicePending) && pane === 'overview' && (
+        {editorOpen && pane === 'overview' && (
           <OptimizeOverview
             modules={modules}
             decisions={decisions}

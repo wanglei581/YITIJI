@@ -399,6 +399,28 @@ export function applyDecisionChanges(
   return { resume: nextResume, decisions: nextDecisions, failures }
 }
 
+/**
+ * 保留原文时按这一条的改写定位，整句换成原文。
+ * 改写是原句的一部分、正文里已经是原句时不再替换，避免「主要主要负责……」。
+ * 改写出现多处且分不清是哪一条时不取全文第一处。
+ */
+function replaceSentenceOnce(resume: GeneratedResume, after: string, before: string): ResumeTextReplacement {
+  const from = after.trim()
+  const to = before.trim()
+  if (!from || from === to) return { resume, applied: false }
+  const fromSpots = findTextSpots(resume, from)
+  const toSpots = findTextSpots(resume, to)
+  const insideOriginal = (spot: TextSpot) => toSpots.some((origin) =>
+    origin.path === spot.path && origin.start <= spot.start && spot.start + from.length <= origin.start + to.length,
+  )
+  if (toSpots.length > 0 && fromSpots.every(insideOriginal)) return { resume, applied: false }
+  const uncovered = fromSpots.filter((spot) => !insideOriginal(spot))
+  if (uncovered.length !== 1) return { resume, applied: false }
+  const spot = uncovered[0]
+  const replaced = replaceAt(resume, spot.path, spot.start, from, to)
+  return replaced ? { resume: replaced, applied: true } : { resume, applied: false }
+}
+
 export function applyResumeDecisionsWithStatus(
   resume: GeneratedResume,
   modules: ResumeOptimizeModule[],
@@ -417,7 +439,7 @@ export function applyResumeDecisionsWithStatus(
       })
       return
     }
-    const result = replaceResumeTextWithStatus(current, module.after, module.before)
+    const result = replaceSentenceOnce(current, module.after, module.before)
     current = result.resume
     const original = module.before.trim()
     if (!result.applied && original && !resumeContainsText(current, original)) failures.push({

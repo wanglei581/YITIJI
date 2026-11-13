@@ -239,7 +239,7 @@ export function OptimizedResumeEditor({
                       index={i}
                       name={p.name}
                       role={p.role ?? ''}
-                      className={`${taCls} mt-1.5 min-h-12`}
+                      className={`${taCls} mt-1 min-h-12`}
                       onName={(name) => onChange({
                         ...resume,
                         projects: resume.projects.map((row, idx) => idx === i ? { ...row, name } : row),
@@ -267,29 +267,25 @@ export function OptimizedResumeEditor({
             </div>
           )}
 
-          {resume.skills.length > 0 && (
-            <div>
-              <SectionTitle title="技能" />
-              <ResumeTagList
-                items={resume.skills}
-                field="skill"
-                appearance="chip"
-                onChange={(skills) => onChange({ ...resume, skills })}
-              />
-            </div>
-          )}
+          <div>
+            <SectionTitle title="技能" />
+            <ResumeTagList
+              items={resume.skills}
+              field="skill"
+              appearance="chip"
+              onChange={(skills) => onChange({ ...resume, skills })}
+            />
+          </div>
 
-          {resume.certificates.length > 0 && (
-            <div>
-              <SectionTitle title="证书 / 资质" />
-              <ResumeTagList
-                items={resume.certificates}
-                field="certificate"
-                appearance="chip"
-                onChange={(certificates) => onChange({ ...resume, certificates })}
-              />
-            </div>
-          )}
+          <div>
+            <SectionTitle title="证书 / 资质" />
+            <ResumeTagList
+              items={resume.certificates}
+              field="certificate"
+              appearance="chip"
+              onChange={(certificates) => onChange({ ...resume, certificates })}
+            />
+          </div>
         </div>
       </Card>
 

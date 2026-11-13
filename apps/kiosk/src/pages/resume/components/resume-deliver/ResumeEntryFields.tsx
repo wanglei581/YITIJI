@@ -51,7 +51,7 @@ export function ResumeTagList(props: {
         {!chip && props.items.length > 0 ? ' · ' : null}
         <input
           className={chip ? 'min-h-12 bg-transparent text-sm text-primary-700 outline-none' : 'qx-rg-title min-h-12'}
-          style={{ width: `${Math.max(draft.length, 2)}em` }}
+          style={{ width: `${Math.max(draft.length, 2)}em`, minWidth: '48px' }}
           aria-label={addLabel}
           data-entry-add={props.field}
           value={draft}
@@ -63,38 +63,51 @@ export function ResumeTagList(props: {
             commit()
           }}
         />
-        <PlusIcon className="h-4 w-4" aria-hidden="true" />
+        <button
+          type="button"
+          className="inline-flex min-h-12 min-w-12 items-center justify-center"
+          aria-label={props.field === 'skill' ? '添加一项技能' : '添加一项证书'}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={commit}
+        >
+          <PlusIcon className="h-4 w-4" aria-hidden="true" />
+        </button>
       </span>
     </div>
   )
 }
 
-/** 项目名称、角色做成和学校、公司一样的输入，不另加屏上标题。 */
+/** 项目名称、角色分行，栏名用填写页已有的「项目名称」「担任角色」。 */
 export function ProjectTitleFields(props: {
   index: number
   name: string
   role: string
   className: string
+  captionClassName?: string
+  onFocus?: () => void
   onName: (value: string) => void
   onRole: (value: string) => void
 }) {
+  const n = props.index + 1
+  const captionClass = props.captionClassName ?? 'block text-sm text-gray-500'
+  const field = (id: string, caption: string, label: string, value: string, onChange: (next: string) => void) => (
+    <div className="mt-1.5">
+      <label className={captionClass} htmlFor={id}>{caption}</label>
+      <input
+        id={id}
+        className={props.className}
+        aria-label={label}
+        data-entry-field={id}
+        value={value}
+        onFocus={props.onFocus}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
+  )
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <input
-        className={props.className}
-        aria-label={`第 ${props.index + 1} 条项目名`}
-        data-entry-field={`projects-${props.index}-name`}
-        value={props.name}
-        onChange={(event) => props.onName(event.target.value)}
-      />
-      <span aria-hidden="true">·</span>
-      <input
-        className={props.className}
-        aria-label={`第 ${props.index + 1} 条项目角色`}
-        data-entry-field={`projects-${props.index}-role`}
-        value={props.role}
-        onChange={(event) => props.onRole(event.target.value)}
-      />
+    <div>
+      {field(`projects-${props.index}-name`, '项目名称', `第 ${n} 条项目的名称`, props.name, props.onName)}
+      {field(`projects-${props.index}-role`, '担任角色', `第 ${n} 条项目的职务`, props.role, props.onRole)}
     </div>
   )
 }

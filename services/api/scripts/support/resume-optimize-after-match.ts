@@ -1,6 +1,7 @@
 import { ConsoleLogger, Logger } from '@nestjs/common'
 import type { ResumeReport } from '../../src/ai/interfaces/ai-provider.interface'
 import { LlmResumeOptimizeService, OPTIMIZE_RETRY_HINT, OPTIMIZE_SYSTEM_PROMPT } from '../../src/ai/resume/llm-resume-optimize.service'
+import { alignOriginalList } from '../../src/ai/resume/resume-optimize-coverage'
 import { resumeFieldIncludes } from '../../src/ai/resume/resume-optimize-after-align'
 
 /**
@@ -455,7 +456,8 @@ const ENTRY_MARKS = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '�
  * 原文 10 段经历、14 段项目时，模型只交回前 8 段和前 6 段，其余按原文补回。
  * 14 段项目超过导出上限 12，多出来的两段并进最后一条描述，句子仍在。
  * 技能、证书按原稿逐项补回：模型只交回 20 项技能、15 个证书时，成品仍是原稿的 25 项和 18 个，顺序照原稿。
- * 项目超过 12 条时，第 13 条起并进第 12 条；每一段的名称、角色、描述原文都要还能找到。
+ * 项目超过 12 条时，第 13 条起并进第 12 条。名称、角色都要还能找到。
+ * 前 6 段描述是 module 的 before→after：成品里只留改写，原句不再接上。没改写的原句各出现一次。
  */
 export async function verifyOptimizeEntryCountsKept(): Promise<void> {
   console.log('\n=== 优化稿经历、项目、技能、证书条数不丢原文 ===')
@@ -509,7 +511,11 @@ export async function verifyOptimizeEntryCountsKept(): Promise<void> {
       skills: skills.slice(0, 20),
       certificates: certificates.slice(0, 15),
     },
-    modules: [],
+    modules: projects.slice(0, 6).map((item) => ({
+      title: `${item.name}描述`,
+      before: item.original,
+      after: item.rewrite,
+    })),
   }), [])
   const resume = result.optimizedResume
   if (resume.experience.length !== 10) fail(`经历应为 10 条，实际 ${resume.experience.length}`)
@@ -522,11 +528,29 @@ export async function verifyOptimizeEntryCountsKept(): Promise<void> {
   })
   if (resume.projects.length !== 12) fail(`项目超过导出上限后应为 12 条，实际 ${resume.projects.length}`)
   const projectText = JSON.stringify(resume.projects)
+  const countIn = (hay: string, needle: string) => {
+    let count = 0
+    let from = 0
+    while (needle && from <= hay.length) {
+      const at = hay.indexOf(needle, from)
+      if (at < 0) break
+      count += 1
+      from = at + needle.length
+    }
+    return count
+  }
   projects.forEach((item, index) => {
     if (!projectText.includes(item.name)) fail(`第 ${index + 1} 段项目名称「${item.name}」不在成品里`)
     if (item.role && !projectText.includes(item.role)) fail(`第 ${index + 1} 段项目角色「${item.role}」不在成品里`)
-    if (!projectText.includes(item.original)) fail(`第 ${index + 1} 段项目描述原文「${item.original}」不在成品里`)
-    if (index < 6 && !projectText.includes(item.rewrite)) fail(`第 ${index + 1} 段项目的改写「${item.rewrite}」不在成品里`)
+    if (index < 6) {
+      const description = resume.projects[index]?.description ?? ''
+      const lines = description.split('\n').map((line) => line.trim()).filter(Boolean)
+      if (new Set(lines).size !== lines.length) fail(`第 ${index + 1} 段项目描述行重复：${description}`)
+      if (countIn(projectText, item.original) !== 0) fail(`改写过的原句不应再出现：${item.original}`)
+      if (countIn(projectText, item.rewrite) !== 1) fail(`改写应只出现一次：${item.rewrite}，实际 ${countIn(projectText, item.rewrite)}`)
+    } else if (countIn(projectText, item.original) !== 1) {
+      fail(`没改写的原句应出现一次：${item.original}，实际 ${countIn(projectText, item.original)}`)
+    }
   })
   if (resume.skills.length !== skills.length || skills.some((skill, index) => resume.skills[index] !== skill)) {
     fail(`技能应为原文 25 项，实际 ${resume.skills.length} 项`)
@@ -537,6 +561,31 @@ export async function verifyOptimizeEntryCountsKept(): Promise<void> {
   pass('10 段经历、14 段项目的句子都在，25 项技能和 18 个证书逐条保留')
 }
 
+/** 技能、证书按小项补回：拆项、并项、标题同行、项目符号、乱序漏交、丢二编二都不重复，顺序照原稿。 */
+export function verifyOptimizeSkillAtoms(): void {
+  console.log('\n=== 优化稿技能、证书按小项补回且不重复 ===')
+  const expectList = (label: string, lines: string[], model: string[], expected: string[]) => {
+    const result = alignOriginalList(lines, model, 60)
+    if (result.list.length !== expected.length || expected.some((item, index) => result.list[index] !== item)) {
+      fail(`${label} 应为 ${JSON.stringify(expected)}，实际 ${JSON.stringify(result.list)}`)
+    }
+    if (new Set(result.list).size !== result.list.length) fail(`${label} 有重复项`)
+  }
+  expectList(
+    '拆项',
+    ['熟练使用 Excel、Word、PPT', '用友 U8、金蝶 K3 财务软件'],
+    ['Excel', 'Word', 'PPT', '用友 U8', '金蝶 K3 财务软件'],
+    ['Excel', 'Word', 'PPT', '用友 U8', '金蝶 K3 财务软件'],
+  )
+  expectList('并项', ['Excel', 'Word', 'PPT'], ['Excel、Word、PPT'], ['Excel', 'Word', 'PPT'])
+  expectList('标题同行', ['技能：Excel、Word、PPT'], ['Excel', 'Word', 'PPT'], ['Excel', 'Word', 'PPT'])
+  expectList('证书标题同行', ['证书：初级会计职称、CET-6'], ['初级会计职称', 'CET-6'], ['初级会计职称', 'CET-6'])
+  expectList('项目符号', ['· Excel', '- Word', '· PPT'], ['Excel'], ['Excel', 'Word', 'PPT'])
+  expectList('乱序漏交补在原位', ['Excel', 'Word', 'PPT'], ['PPT', 'Excel'], ['Excel', 'Word', 'PPT'])
+  expectList('丢二编二', ['Excel', 'Word', 'PPT', '用友 U8'], ['Excel', 'Word', 'Python', 'SQL'], ['Excel', 'Word', 'PPT', '用友 U8'])
+  pass('拆项、并项、标题同行、项目符号、乱序漏交、丢二编二都不重复，漏项留在原稿的位置')
+}
+
 if (process.argv[1]?.endsWith('resume-optimize-after-match.ts')) {
   verifyOptimizeAfterMatch()
     .then(() => verifyOptimizeSummaryLimit())
@@ -544,6 +593,7 @@ if (process.argv[1]?.endsWith('resume-optimize-after-match.ts')) {
     .then(() => verifyOptimizeSkillKept())
     .then(() => verifyOptimizeLongCertificateKept())
     .then(() => verifyOptimizeEntryCountsKept())
+    .then(() => verifyOptimizeSkillAtoms())
     .catch((error: unknown) => {
       console.error(error instanceof Error ? error.message : error)
       process.exit(1)

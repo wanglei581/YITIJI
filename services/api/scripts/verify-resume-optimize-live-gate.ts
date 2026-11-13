@@ -87,6 +87,23 @@ export async function verifyResumeOptimizeLiveGate(): Promise<void> {
   } finally {
     LIVE_SAMPLES[1]!.text = saved
   }
+  const educationSaved = LIVE_SAMPLES[1]!.text
+  try {
+    const extraSchools = Array.from({ length: 12 }, (_, index) => `补${index}虚构大学 信息管理 本科 2010.09-2014.06`)
+    LIVE_SAMPLES[1]!.text += `\n教育经历\n${extraSchools.join('\n')}`
+    const droppedLines: string[] = []
+    const emptyResume: typeof fetch = async () => new Response(JSON.stringify({
+      choices: [{ message: { content: JSON.stringify({ resume: {
+        basic: {}, intention: {}, summary: '', education: [], experience: [], projects: [], skills: [], certificates: [],
+      }, modules: [] }) } }], usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 },
+    }), { status: 200 })
+    // 教育经历超过导出上限 12：补回后仍被收成 12 条，条数少于原件，必须判丢内容并退出 1。
+    assert.equal(await main({ config, fetch: emptyResume, write: (line) => droppedLines.push(line) }), 1)
+    assert(droppedLines[1]!.endsWith('结果:丢内容'), '教育条数少于原件时必须判丢内容')
+    assert(droppedLines[4]!.endsWith('结论:有丢失'))
+  } finally {
+    LIVE_SAMPLES[1]!.text = educationSaved
+  }
   const faultLines: string[] = []
   assert.equal(await main({ config, fetch: async () => { throw new Error(PRIVATE_SENTENCE + marker) }, write: (line) => faultLines.push(line) }), 1)
   assert(faultLines[0]!.endsWith('结果:失败(AI_OPTIMIZE_UNAVAILABLE)'))

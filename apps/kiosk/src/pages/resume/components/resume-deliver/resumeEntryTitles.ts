@@ -109,8 +109,8 @@ function scrollResumeEditorToTop(): void {
 
 /**
  * 滚到这句原文所在的那一栏，聚焦并选中。
- * 编辑区还没挂上、或对应输入框还没出现时返回 false，调用方保留定位请求。
- * 编辑区已经挂上、真找不到这一栏时才滚到顶部，并返回 true。
+ * 没有 document，或编辑区根节点 `[data-resume-editor]` 还没挂上时返回 false，调用方保留定位请求。
+ * 根节点已经挂上之后：对上的节点是输入框且里面有这句，就聚焦并选中；否则滚到顶部。两种都返回 true。
  */
 export function focusResumeOriginalField(resume: GeneratedResume, original: string): boolean {
   if (typeof document === 'undefined') return false

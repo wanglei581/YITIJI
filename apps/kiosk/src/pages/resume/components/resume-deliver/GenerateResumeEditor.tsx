@@ -223,6 +223,8 @@ export function GenerateResumeEditor(props: {
                   name={item.name}
                   role={item.role ?? ''}
                   className={`${taCls} qx-rg-title`}
+                  captionClassName="qx-rg-cap"
+                  onFocus={mark}
                   onName={(name) => onChange({
                     ...resume,
                     projects: resume.projects.map((row, idx) => idx === i ? { ...row, name } : row),
@@ -249,26 +251,22 @@ export function GenerateResumeEditor(props: {
             ))}
           </Block>
         )}
-        {resume.skills.length > 0 && (
-          <Block title="技能" tags={<Tag kind="pol">表达整理</Tag>}>
-            <ResumeTagList
-              items={resume.skills}
-              field="skill"
-              appearance="inline"
-              onChange={(skills) => { mark(); onChange({ ...resume, skills }) }}
-            />
-          </Block>
-        )}
-        {resume.certificates.length > 0 && (
-          <Block title="证书 / 资质" tags={<Tag kind="keep">原样保留</Tag>}>
-            <ResumeTagList
-              items={resume.certificates}
-              field="certificate"
-              appearance="inline"
-              onChange={(certificates) => { mark(); onChange({ ...resume, certificates }) }}
-            />
-          </Block>
-        )}
+        <Block title="技能" tags={<Tag kind="pol">表达整理</Tag>}>
+          <ResumeTagList
+            items={resume.skills}
+            field="skill"
+            appearance="inline"
+            onChange={(skills) => { mark(); onChange({ ...resume, skills }) }}
+          />
+        </Block>
+        <Block title="证书 / 资质" tags={<Tag kind="keep">原样保留</Tag>}>
+          <ResumeTagList
+            items={resume.certificates}
+            field="certificate"
+            appearance="inline"
+            onChange={(certificates) => { mark(); onChange({ ...resume, certificates }) }}
+          />
+        </Block>
       </div>
       {pendingDelete && (
         <EntryDeleteDialog
