@@ -580,6 +580,26 @@ test('练面试服务台：能力状态 4 秒还没读回来就按没确认处�
   await expect(page.locator('[data-qxt-ask="off"]')).toHaveText('小青状态未确认，先看面试技巧')
 })
 
+test('数字人开关关掉时，通话建不起来，人留在文字对话 @kiosk', async ({ page, api }) => {
+  // 后台关掉 digital_human 时，建会话用现有的 AI 暂停码和说法拒绝。一体机不进通话，走现有的文字退路。
+  api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', { status: 200, json: { enabled: false, idleTimeoutSec: 180, items: [] } })
+  api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', { status: 200, json: { printerStatus: 'ready', paperLevel: 'sufficient', isOnline: true } })
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', { status: 200, json: { data: { asrEnabled: false, ttsEnabled: false } } })
+  api.respond('POST', '/api/v1/trtc/session', {
+    status: 503,
+    json: { success: false, error: { code: 'AI_PAUSED', message: 'AI 服务暂停中，打印扫描照常' } },
+  })
+  await page.goto('/assistant')
+  await page.getByRole('button', { name: '语音咨询', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '和小青语音咨询' })
+  await dialog.getByRole('button', { name: /直接语音通话/ }).click()
+  await expect(dialog.getByRole('heading', { name: '这次没连上语音服务' })).toBeVisible()
+  await expect(dialog.getByText('通话已连接')).toHaveCount(0)
+  await dialog.getByRole('button', { name: '改用文字咨询', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: '和小青语音咨询' })).toHaveCount(0)
+  await expect(page.getByLabel('输入咨询问题')).toBeVisible()
+})
+
 test('小青通话层不留按了没反应的按住说话，文字退路仍在 @kiosk', async ({ page, api }) => {
   // 数字人通话本身就是语音通道。文字页的按住说话要转写进输入框，还带「语音直接发送」，
   // 接到通话层会抢麦克风、也要新字。规格是删掉这颗禁用按钮，不留「尚未开放」。

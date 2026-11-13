@@ -249,9 +249,9 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
   {
     key: 'digital_human',
     label: 'AI数字人引导',
-    status: 'planned',
-    description: '后续接入。用于一体机前台数字人引导与操作说明。',
-    runtimeNote: '后续接入，目前还没有功能在用。',
+    status: 'active',
+    description: '用于一体机前台数字人语音通话。只认启用开关，不发起这里配置的大模型调用。',
+    runtimeNote: '这个开关管一体机数字人语音通话：开着才能开始通话，关掉就拒绝建会话，人留在文字对话。厂商、模型、密钥和系统提示词对通话不起作用，只有「启用」生效。',
     allowCustomSystemPrompt: true,
   },
   {
