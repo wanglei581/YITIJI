@@ -269,20 +269,23 @@ test('错误码 → 可执行的下一步：每条都不是「请稍后重试」
   }
 })
 
-test('错误码：彩色/双面未在该机验过，必须说清是「这台机器」而不是「稍后重试」', () => {
+test('错误码：彩色/双面这台机器还没开通，必须说清原因并给出换机器或改黑白单面，不能说成文档打印没开通', () => {
   // 服务端为这两个码写的是 403 ForbiddenException。它们与 CAPABILITY_* 不是同一回事：
-  // 那两条说的是「这台机器开不开放文档打印」，这两条说的是「这台机器的彩色/双面没验过」。
+  // 那两条说的是「这台机器开不开放文档打印」，这两条说的是彩色 / 自动双面还没开通。
   // 没有映射时它们会落到 describePackageError 末尾的「操作未完成 / 请稍后重试」——
   // 而这件事重试一万次也不会变，用户只会反复点同一个按钮。
-  for (const [code, keyword] of [
-    ['PRINT_COLOR_NOT_VERIFIED_ON_TERMINAL', '彩色'],
-    ['PRINT_DUPLEX_NOT_VERIFIED_ON_TERMINAL', '双面'],
-  ]) {
+  const expectTitle = {
+    PRINT_COLOR_NOT_VERIFIED_ON_TERMINAL: '这台机器还没开通彩色打印',
+    PRINT_DUPLEX_NOT_VERIFIED_ON_TERMINAL: '这台机器还没开通自动双面',
+  }
+  for (const [code, title] of Object.entries(expectTitle)) {
     const shown = pkg.describePackageError({ code, statusCode: 403, message: '' }, '创建订单失败，请稍后重试。')
-    assert.equal(shown.recover, 'store', `${code} 的恢复动作必须是换服务点`)
-    assert.match(shown.title, new RegExp(keyword), `${code} 的标题要点名是哪一项能力`)
-    assert.ok(shown.text.includes('服务点'), `${code} 的说明必须指向「换一个服务点」这个按钮真正会做的事`)
+    assert.equal(shown.recover, 'store', `${code} 的恢复动作必须是换机器`)
+    assert.equal(shown.title, title, `${code} 的标题`)
+    assert.match(shown.text, /换一台机器，或改成黑白、单面/, `${code} 必须给出出路`)
     assert.notEqual(shown.title, '操作未完成', `${code} 不得落到未知码兜底`)
+    assert.notEqual(shown.title, '该服务点未开通文档打印', `${code} 不得说成文档打印没开通`)
+    assert.doesNotMatch(shown.title + shown.text, /真机|尚未验收|未验过/)
   }
 })
 

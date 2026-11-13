@@ -119,8 +119,23 @@ function prepareNamedFile(filePath, desiredName) {
   });
 }
 
+/**
+ * 列表和文件卡上把文件名拆成「主名 + 扩展名」：主名放进会折行的标题，扩展名交给现有的
+ * 格式标签（「PDF」块）显示，「.pdf」就不会被拆到下一行只剩一个 f（FLOW1a 实图 08）。
+ * 只在扩展名是 1–5 位字母数字、点不在开头时才拆；拆不出就整名当主名，ext 为空。
+ */
+function displayNameParts(name) {
+  const full = String(name || '').trim();
+  const dot = full.lastIndexOf('.');
+  const ext = dot > 0 ? full.slice(dot + 1) : '';
+  if (!/^[A-Za-z0-9]{1,5}$/.test(ext)) return { base: full, ext: '' };
+  const base = full.slice(0, dot).trim();
+  return base ? { base, ext: ext.toUpperCase() } : { base: full, ext: '' };
+}
+
 module.exports = {
   extOf,
+  displayNameParts,
   sanitizeFileName,
   cameraFileName,
   pickedFileName,

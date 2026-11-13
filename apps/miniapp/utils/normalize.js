@@ -663,6 +663,7 @@ function resumeOptimize(raw) {
     isCompleted: raw.status === 'completed',
     isFailed: raw.status === 'failed',
     failReason: raw.failReason || '',
+    failCode: typeof raw.failCode === 'string' ? raw.failCode : '',
     providerName: raw.providerName || '',
     isMockProvider: raw.providerName === 'mock',
     modules,
@@ -882,6 +883,27 @@ function formatCents(value) {
   const cents = Number(value);
   return Number.isSafeInteger(cents) && cents >= 0 ? `¥${(cents / 100).toFixed(2)}` : '价格未知';
 }
+const { SUPPORT_HINT } = require('./user-error');
+/** 停用或模式未知。不说钱、不说免费、不展示后台 label（label 可能带价钱）。 */
+const EXPORT_PAUSED_TEXT = '简历导出暂时用不了。';
+/** 收费模式但金额不是大于 0 的整数。只改说法，导出门与基线一致，不编原因。 */
+const EXPORT_UNCONFIRMED_TEXT = '导出暂时还不能开始。';
+const EXPORT_PRICE_UNREADABLE_TEXT = '暂时无法确认能否导出';
+const EXPORT_PRICE_WORD = /权益|单价|元|¥|￥|价目/;
+
+/** 服务端金额是大于 0 的整数时，页面才可以提单价和权益。 */
+function exportUnitPriceKnown(pricing) {
+  const cents = Number(pricing && pricing.unitCents);
+  return Number.isSafeInteger(cents) && cents > 0;
+}
+
+/** 价目接口失败时不把原文贴上页面：原文可能带单价、权益或价目。 */
+function exportPricingFailureCopy(err) {
+  const raw = err && typeof err.message === 'string' ? err.message.trim() : '';
+  const text = raw && !EXPORT_PRICE_WORD.test(raw) ? raw : EXPORT_PRICE_UNREADABLE_TEXT;
+  return { text, disabledReason: `${text}，当前不能导出。` };
+}
+
 /** mode 缺失或异常时按 unavailable，不能把未知收费状态回落成免费。 */
 function resumeExportPricing(raw, loggedIn) {
   const source = raw && typeof raw === 'object' ? raw : {};
@@ -890,21 +912,32 @@ function resumeExportPricing(raw, loggedIn) {
   const benefit = source.benefit && typeof source.benefit === 'object' ? source.benefit : null;
   const available = benefit && Number.isSafeInteger(Number(benefit.available))
     ? Math.max(0, Number(benefit.available)) : null;
-  const serverLabel = typeof source.label === 'string' ? source.label.trim() : '';
 
   if (mode === 'free') return { mode, unitCents: 0, available: null, text: '当前免费', disabledReason: '' };
   if (mode === 'charged') {
-    const price = formatCents(unitCents);
+    const priceKnown = Number.isSafeInteger(unitCents) && unitCents > 0;
     if (!loggedIn) {
       return {
         mode,
         unitCents,
         available: null,
-        text: `单价 ${price} / 次，登录后查看可用权益`,
-        disabledReason: '收费导出需登录会员账号，并核销 1 次可用权益。',
+        text: priceKnown ? `单价 ${formatCents(unitCents)} / 次，登录后查看可用权益` : EXPORT_UNCONFIRMED_TEXT,
+        disabledReason: priceKnown
+          ? '收费导出需登录会员账号，并核销 1 次可用权益。'
+          : EXPORT_UNCONFIRMED_TEXT,
       };
     }
     const count = available == null ? 0 : available;
+    if (!priceKnown) {
+      return {
+        mode,
+        unitCents,
+        available: count,
+        text: count > 0 ? '可以导出。' : EXPORT_UNCONFIRMED_TEXT,
+        disabledReason: count > 0 ? '' : EXPORT_UNCONFIRMED_TEXT,
+      };
+    }
+    const price = formatCents(unitCents);
     return {
       mode, unitCents, available: count,
       text: `单价 ${price} / 次 · 可用权益 ${count} 次`,
@@ -915,8 +948,8 @@ function resumeExportPricing(raw, loggedIn) {
     mode: 'unavailable',
     unitCents: Number.isFinite(unitCents) ? unitCents : 0,
     available: null,
-    text: serverLabel || '简历导出当前不可用（价目已停用，不是免费）',
-    disabledReason: serverLabel || '简历导出当前不可用，请待管理员启用后再试。',
+    text: EXPORT_PAUSED_TEXT,
+    disabledReason: `${EXPORT_PAUSED_TEXT}${SUPPORT_HINT}`,
   };
 }
 /** 从本人真实权益中选一条服务端允许核销的记录；不按标题猜用途。 */
@@ -967,6 +1000,8 @@ module.exports = {
   resumeExportResult,
   resumeExportBenefitId,
   resumeExportPricing,
+  exportUnitPriceKnown,
+  exportPricingFailureCopy,
   formatFileSize,
   scaleLabel,
   fairCompanyLike,

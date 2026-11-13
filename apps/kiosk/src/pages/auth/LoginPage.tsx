@@ -11,6 +11,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { isSafeInternalPath } from '../../auth/returnPath'
+import { pickupEntryMiniappLine } from '../../copy/miniappLinkCopy'
+import { useSupportContactSnapshot } from '../../hooks/useSupportContact'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
@@ -81,6 +83,7 @@ export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { login, isLoggedIn } = useAuth()
+  const supportContact = useSupportContactSnapshot()
 
   const fromState = (location.state as { from?: unknown } | null)?.from
   const hintState = (location.state as { hint?: unknown } | null)?.hint
@@ -339,6 +342,7 @@ export function LoginPage() {
               <div className="lg-entries">
                 {loginAnonEntries().map((entry, index) => {
                   const Icon = ANON_ICONS[entry.id] ?? PrinterIcon
+                  const desc = entry.id === 'code' ? (pickupEntryMiniappLine(supportContact) || entry.desc) : entry.desc
                   return (
                     <button
                       key={entry.id}
@@ -350,7 +354,7 @@ export function LoginPage() {
                       <span className="ei" data-tone={entry.id} aria-hidden="true"><Icon size={26} /></span>
                       <span className="eb">
                         <span className="en">{entry.title}</span>
-                        <span className="ed">{entry.desc}</span>
+                        <span className="ed">{desc}</span>
                       </span>
                       <span className="ego" aria-hidden="true"><ChevronRightIcon size={22} /></span>
                     </button>

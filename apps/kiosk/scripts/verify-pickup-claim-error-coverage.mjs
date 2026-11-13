@@ -129,9 +129,13 @@ const userErrorUrl = transpile('apps/kiosk/src/services/api/userErrorMessage.ts'
 })
 const cashierUrl = transpile('apps/kiosk/src/pages/print/cashierStatus.ts')
 const unattendedUrl = transpile('apps/kiosk/src/copy/unattendedCopy.ts')
+const miniappUrl = transpile('apps/kiosk/src/copy/miniappLinkCopy.ts', {
+  './unattendedCopy': unattendedUrl,
+})
 const modelUrl = transpile('apps/kiosk/src/pages/print/pickupClaimModel.ts', {
   '@ai-job-print/shared': sharedStub,
   '../../copy/unattendedCopy': unattendedUrl,
+  '../../copy/miniappLinkCopy': miniappUrl,
   '../../services/api/httpAdapter': httpAdapterStub,
   './cashierStatus': cashierUrl,
   '../../services/api/userErrorMessage': userErrorUrl,
@@ -153,6 +157,39 @@ for (const code of [...serverCodes].sort()) {
 }
 if (missing.length) fail(`一体机取件页没有登记这些认领失败码：${missing.join(', ')}`)
 else pass('服务端认领链路的每个码，一体机都有取件场景的登记文案')
+
+// 订单不可用、已退款、不能付款：开关关着不点名小程序，开着保持原句。不传联系方式等于关着。
+{
+  const published = { servicePhone: null, serviceHours: null, otherOnlineTerminalNearby: false, miniappPublished: true }
+  const unpublished = { ...published, miniappPublished: false }
+  const switched = [
+    ['PICKUP_CODE_UNAVAILABLE',
+      '这个到机码已经不能使用。请在手机上「我的 → 打印订单」查看这笔订单，需要的话重新下单',
+      '这个到机码已经不能使用。请在手机小程序「我的 → 打印订单」查看这笔订单，需要的话重新下单'],
+    ['ORDER_REFUNDED',
+      '本单已退款，不再出纸。款项按原路退回，可在手机上「我的 → 打印订单」查看退款进度',
+      '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度'],
+    ['ORDER_PAYMENT_UNAVAILABLE',
+      '这笔订单已经不能付款（可能已关闭）。请在手机上「我的 → 打印订单」查看，需要的话重新下单',
+      '这笔订单已经不能付款（可能已关闭）。请在手机小程序「我的 → 打印订单」查看，需要的话重新下单'],
+  ]
+  for (const [code, off, on] of switched) {
+    const err = new ApiHttpError(code, 'server says', 400)
+    const omitted = model.pickupClaimMessage(err)
+    const closed = model.pickupClaimMessage(err, null)
+    const offSaid = model.pickupClaimMessage(err, unpublished)
+    const onSaid = model.pickupClaimMessage(err, published)
+    if (omitted !== off || closed !== off || offSaid !== off) fail(`${code} 开关关着仍点名小程序或丢了原句：${offSaid}`)
+    else if (/小程序/.test(offSaid)) fail(`${code} 开关关着的句子含「小程序」：${offSaid}`)
+    else if (onSaid !== on) fail(`${code} 开关开着不是原句：${onSaid}`)
+    else if (!/小程序/.test(onSaid)) fail(`${code} 开关开着应点名小程序：${onSaid}`)
+    else if (table[code] !== off) fail(`${code} 码表默认句应是开关关着的那句`)
+    else pass(`${code}：开关关着只说在手机上，开着保持原句`)
+  }
+  const claimPage = read('apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx')
+  if (!/pickupClaimMessage\(err,\s*supportContact\)/.test(claimPage)) fail('取件页没有把发布开关交给失败文案')
+  else pass('取件页失败文案读取当次的小程序发布开关')
+}
 
 // 打印机拒绝不是输错码或终态；原话合格时原样显示，不合格才用取件场景固定句。
 for (const code of ['PRINT_TERMINAL_QUEUE_HALTED', 'PRINTER_UNAVAILABLE']) {
@@ -351,18 +388,23 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
     else pass(`${code}：closed，给出回手机的下一步，不写版本号`)
   }
 
+  const rejectedSentence = '到机码不对或已过期，或者这单是在别的机器上下的。请核对号码，或到下单时选的那台机器取件；还是不行的，请在手机上查看这笔订单，需要的话重新下单。'
   const rejected = userMessages.PICKUP_CODE_REJECTED_COPY
   const onlyRecheck = '到机码无效或已过期，请核对后重新输入'
+  if (rejected !== rejectedSentence) fail(`无效码定稿被改了一个字：${rejected}`)
+  else if (!rejected.includes('别的机器') || !rejected.includes('下单时选的那台机器')) fail('新句子没有同时说明可能是在别的机器下的单')
+  else pass('新句子同时说清可能是在别的机器下的单')
   for (const code of ['PICKUP_CODE_INVALID', 'PICKUP_CODE_EXPIRED', 'PICKUP_TERMINAL_MISMATCH']) {
     const err = new ApiHttpError(code, '到机码已过期，请在小程序重新下单', 404)
     const said = model.pickupClaimMessage(err)
-    if (said !== rejected) fail(`${code} 被本地码表盖成了别的句子：${said}`)
+    if (said !== rejectedSentence) fail(`${code} 被本地码表盖成了别的句子：${said}`)
     else if (said === onlyRecheck || said === `${onlyRecheck}。`) fail(`${code} 只剩「请核对后重新输入」，没有下一步`)
     else if (!/请在手机上查看这笔订单/.test(said) || !/重新下单/.test(said)) fail(`${code} 没有回手机查看或重新下单`)
+    else if (!said.includes('别的机器') || !said.includes('下单时选的那台机器')) fail(`${code} 没有说明可能是在别的机器下的单`)
     else if (model.classifyClaimFailure(err) !== 'invalid') fail(`${code} 应与无效码同一屏，实际 ${model.classifyClaimFailure(err)}`)
-    else pass(`${code}：同一句防试探，并给出回手机的下一步`)
+    else pass(`${code}：三个码同一句，并给出回手机的下一步`)
   }
-  if (userMessages.userMessageOf(new ApiHttpError('PICKUP_CODE_EXPIRED', '到机码已过期，请在小程序重新下单', 404), '兜底') !== rejected) {
+  if (userMessages.userMessageOf(new ApiHttpError('PICKUP_CODE_EXPIRED', '到机码已过期，请在小程序重新下单', 404), '兜底') !== rejectedSentence) {
     fail('共享码表的过期句和取件码表不一致')
   } else pass('过期码：共享码表与取件码表同一句，不再被短句盖住')
 

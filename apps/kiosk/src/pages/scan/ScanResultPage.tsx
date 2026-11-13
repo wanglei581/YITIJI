@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { formatLabelFromMime } from './scanOutputFormat'
+import { ScanDeviceFailedView } from './ScanDeviceFailedView'
 import { ScanResultExitRow } from './ScanResultExitRow'
 import { ScanResultFailedView } from './ScanResultFailedView'
 import { ScanResultPreviewBlock } from './ScanResultPreviewBlock'
@@ -21,6 +22,7 @@ import { useScanResultRescan } from './useScanResultRescan'
  * 出口在 `useScanResultExits`，「没拿到文件」视图在 `ScanResultFailedView`，成功分支的预览块与
  * 三个去向在 `ScanResultPreviewBlock` / `ScanResultExitRow`；它们的判据与注释都是拆分前的原文。
  * 本页负责读路由 state 与本机登记、合并出这一屏的结果、挑走哪个视图、并持有整屏预览的开关。
+ * 2026-11-09 起屏上扫描来的「没拿到文件」走 `ScanDeviceFailedView`（稿 cs-scan-failed），面板扫描的那一屏不变。
  */
 export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => void } = {}) {
   const location = useLocation()
@@ -62,6 +64,20 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
   const displayFormat = formatLabelFromMime(file?.mimeType)
 
   if (outcome === 'completed-no-file' || (!success && outcome !== 'completed')) {
+    /* 11/08 产品负责人定第 2 条：屏上扫描中断后换成屏上扫描自己的结果屏（稿 cs-scan-failed），面板扫描照旧。
+     * 判据是本机登记里的 deviceFlow：只有屏上扫描建会话那一处写 true（useScanDeviceStart），改用面板扫描
+     * （scanDeviceRecovery）和任何一次生命周期终结（live: undefined、清场）都会把它清掉；它和结果快照
+     * 同在 sessionStorage，看门狗整页重载之后照样读得到。路由 state 里没有这一位，伪造地址进不来。 */
+    if (stored?.deviceFlow === true) {
+      return (
+        <ScanDeviceFailedView
+          outcome={outcome}
+          shownReason={shownReason}
+          leaveScanFlow={leaveScanFlow}
+          onGoStage={onGoStage}
+        />
+      )
+    }
     return (
       <ScanResultFailedView
         outcome={outcome}

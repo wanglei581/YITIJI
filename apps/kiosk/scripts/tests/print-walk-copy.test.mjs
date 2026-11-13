@@ -350,21 +350,30 @@ const hubIconUrl = toDataUrl('export const ArrowRightIcon = () => null; export c
 const hubContentUrl = transpile(join(kioskRoot, 'src/pages/print-scan/printHubContent.ts'))
 const touchChipUrl = toDataUrl(`import { jsx } from '${jsxUrl}'; export function QxTouchChip({children}) { return jsx('span', {children}) }`)
 const touchIconUrl = toDataUrl(`import { jsx } from '${jsxUrl}'; export function QxTouchIcon() { return jsx('span', {}) }`)
-const hubViewUrl = transpile(join(kioskRoot, 'src/pages/print-scan/components/QxPrintHubView.tsx'), {
-  // 入口卡的读屏名取标题、说明句进描述，用 useId 配对；静态渲染只看文案，id 给个递增数即可。
-  react: toDataUrl('let n = 0; export function useId() { n += 1; return `hub-id-${n}` }'),
-  'react/jsx-runtime': jsxUrl,
-  'lucide-react': hubIconUrl,
-  '../../print/components/PrintAiHelp': aiUrl,
-  '../../../copy/unattendedCopy': unattendedUrl,
-  '../../../components/qingxu/QxAppNavbar': toDataUrl('export const QxAppNavbar = () => null'),
-  '../../../components/qingxu/touch/QxTouchChip': touchChipUrl,
-  '../../../components/qingxu/touch/QxTouchIcon': touchIconUrl,
-  // 2026-10-28 稿 print：入口卡里的实物小样是纯装饰 SVG，本测试只看文案，换成空件。
-  '../../print/art/PrintArt': toDataUrl('export const PrintArt = () => null'),
-  '../printHubContent': hubContentUrl,
-})
-const { QxPrintHubView } = await import(hubViewUrl)
+const miniappLinkCopyUrl = transpile(join(kioskRoot, 'src/copy/miniappLinkCopy.ts'), { './unattendedCopy': unattendedUrl })
+const miniappLink = await import(miniappLinkCopyUrl)
+// 静态渲染不订阅会话。缺省返回读不到联系方式的那一套（小程序未发布）；开关用例另传一份已发布。
+function loadHubView(contact) {
+  return transpile(join(kioskRoot, 'src/pages/print-scan/components/QxPrintHubView.tsx'), {
+    // 入口卡的读屏名取标题、说明句进描述，用 useId 配对；静态渲染只看文案，id 给个递增数即可。
+    react: toDataUrl('let n = 0; export function useId() { n += 1; return `hub-id-${n}` }'),
+    'react/jsx-runtime': jsxUrl,
+    'lucide-react': hubIconUrl,
+    '../../print/components/PrintAiHelp': aiUrl,
+    '../../../copy/unattendedCopy': unattendedUrl,
+    '../../../copy/miniappLinkCopy': miniappLinkCopyUrl,
+    '../../../hooks/useSupportContact': toDataUrl(
+      `export function useSupportContactSnapshot() { return ${JSON.stringify(contact)} }`,
+    ),
+    '../../../components/qingxu/QxAppNavbar': toDataUrl('export const QxAppNavbar = () => null'),
+    '../../../components/qingxu/touch/QxTouchChip': touchChipUrl,
+    '../../../components/qingxu/touch/QxTouchIcon': touchIconUrl,
+    // 2026-10-28 稿 print：入口卡里的实物小样是纯装饰 SVG，本测试只看文案，换成空件。
+    '../../print/art/PrintArt': toDataUrl('export const PrintArt = () => null'),
+    '../printHubContent': hubContentUrl,
+  })
+}
+const { QxPrintHubView } = await import(loadHubView(unattended.CONSERVATIVE_SUPPORT_CONTACT))
 test('BFIX：Hub 不额外读取价目，入口与展开说明均使用中性文案', () => {
   const home = readFileSync(join(kioskRoot, 'src/pages/print-scan/PrintScanHomePage.tsx'), 'utf8')
   assert.doesNotMatch(home, /priceConfigApi|usePrintPriceConfig|fetchPrintPriceConfig|price-config/)
@@ -418,6 +427,36 @@ test('W-117：缺纸、异常、离线分别说明，签名提示只在真开通
   }
 })
 
+test('到机码入口：读不到或小程序未发布不点名，已发布才点名', async () => {
+  const props = {
+    hubState: 'default', probe: 'ok', mfp: 'ready', colorDuplexLabel: '本机暂未开通',
+    capabilities: [],
+    arrivalCode: { key: 'arrival', icon: () => null, title: '到机码', description: '输入到机码' },
+    quickLinks: [], capabilityGroupHint: '', recordsGroupHint: '', notices: [],
+    onBack: () => {}, onRetry: () => {}, onHelp: () => {}, onArrivalCode: () => {}, onQuickLink: () => {}, onCapability: () => {},
+  }
+  const arrivalText = (html) => {
+    const block = /data-testid="print-hub-primary"[\s\S]*?<\/button>/.exec(html)?.[0] ?? ''
+    assert.notEqual(block, '', '到机码入口卡要画出来')
+    return block.replace(/<[^>]*>/g, '')
+  }
+  const unpublished = { ...unattended.CONSERVATIVE_SUPPORT_CONTACT, miniappPublished: false }
+  const published = { ...unattended.CONSERVATIVE_SUPPORT_CONTACT, miniappPublished: true }
+  const offLine = miniappLink.pickupEntryMiniappLine(unattended.CONSERVATIVE_SUPPORT_CONTACT)
+  const closedLine = miniappLink.pickupEntryMiniappLine(unpublished)
+  const onLine = miniappLink.pickupEntryMiniappLine(published)
+  assert.equal(offLine, '', '读不到联系方式时入口句是空串')
+  assert.equal(closedLine, '', '小程序未发布时入口句是空串')
+  assert.match(onLine, /职易达小程序/)
+  const offArrival = arrivalText(renderToStaticMarkup(createElement(QxPrintHubView, props)))
+  assert.doesNotMatch(offArrival, /小程序|职易达/)
+  assert.match(offArrival, /凭码办理，不登录也能核销/)
+  const { QxPrintHubView: PublishedHub } = await import(loadHubView(published))
+  const onArrival = arrivalText(renderToStaticMarkup(createElement(PublishedHub, props)))
+  assert.match(onArrival, new RegExp(onLine.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+  assert.match(onArrival, /凭码办理，不登录也能核销/)
+})
+
 const cashierIcons = toDataUrl('export const AlertTriangleIcon = () => null; export const CheckCircle2Icon = () => null; export const Clock3Icon = () => null; export const FileXIcon = () => null; export const InfoIcon = () => null; export const LockIcon = () => null; export const QrCodeIcon = () => null; export const ScanLineIcon = () => null; export const Undo2Icon = () => null;')
 const cashierModelUrl = transpile(join(kioskRoot, 'src/pages/print/cashierQxModel.tsx'), {
   'react/jsx-runtime': jsxUrl, 'lucide-react': cashierIcons, './cashierStatus': cashier,
@@ -449,7 +488,7 @@ test('B 补：零元收银台与放行失败只说免费试运营，不说收款
 
 const doneFailedModelUrl = transpile(join(kioskRoot, 'src/pages/print/components/printDoneFailedModel.ts'), {
   '../../../copy/unattendedCopy': unattendedUrl,
-  '../../../copy/miniappLinkCopy': transpile(join(kioskRoot, 'src/copy/miniappLinkCopy.ts'), { './unattendedCopy': unattendedUrl }),
+  '../../../copy/miniappLinkCopy': miniappLinkCopyUrl,
   '../../../lib/fileName': transpile(join(kioskRoot, 'src/lib/fileName.ts')),
   '../cashierStatus': cashier,
   '../printProgressModel': progressUrl,

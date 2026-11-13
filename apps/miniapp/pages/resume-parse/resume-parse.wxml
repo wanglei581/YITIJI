@@ -149,6 +149,7 @@
       <view wx:elif="{{quotaReleased}}" class="btn primary tap flex-1-5" bindtap="retry">开始新的一次</view>
       <button wx:elif="{{fileChangedBlocked}}" class="btn primary flex-1-5" disabled>暂不能开始新的一次</button>
       <view wx:elif="{{fileChanged}}" class="btn primary tap flex-1-5" bindtap="toUpload">重新上传</view>
+      <view wx:elif="{{fileMissing}}" class="btn primary tap flex-1-5" bindtap="toUpload">重新选择文件</view>
       <view wx:else class="btn primary tap flex-1-5" bindtap="retry">重试解析</view>
     </block>
     <block wx:elif="{{phase === 'unknown'}}">

@@ -40,7 +40,7 @@ export const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
  * @param {string} relPath 相对 apps/miniapp 的路径
  * @param {string} [source] 给了就跑这份源码（变异测试用），相对 require 仍按 relPath 的目录解析
  */
-export function loadPageDefinition(relPath, { wx, modules, timers = [], source }) {
+export function loadPageDefinition(relPath, { wx, modules, timers = [], source, globals = {} }) {
   const src = typeof source === 'string' ? source : fs.readFileSync(path.join(MINIAPP, relPath), 'utf8')
   let pageDef = null
   const sandbox = {
@@ -67,6 +67,8 @@ export function loadPageDefinition(relPath, { wx, modules, timers = [], source }
     setInterval: (fn) => { timers.push(fn); return timers.length },
     clearInterval: () => {},
   }
+  // 可选的额外全局（例如页面栈 getCurrentPages）。默认什么都不加，旧用例不受影响。
+  Object.assign(sandbox, globals)
   sandbox.globalThis = sandbox
   vm.createContext(sandbox)
   vm.runInContext(src, sandbox, { filename: relPath })

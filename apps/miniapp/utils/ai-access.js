@@ -63,7 +63,7 @@ const VOICE_CONSENT_ITEMS = [
 
 /**
  * 简历类 AI 的账号授权（服务端 9/06 起对登录会员强制：resume/parse、optimize、draft、
- * fact-check、generate、导出，缺了回 403 USER_AI_CONSENT_REQUIRED）。只有会员有：游客不入库、
+ * fact-check、generate、导出，第八次起加上职业规划，缺了回 403 USER_AI_CONSENT_REQUIRED）。只有会员有：游客不入库、
  * 服务端也不拦，所以它不进 SCOPES（不在本机记、不带请求头），只在服务端要时问一次、写账号。
  * 文案与一体机 ResumeAiConsentDialog 一致。
  */
@@ -213,7 +213,7 @@ function promptResumeAi() {
   if (resumeAiPending) return resumeAiPending;
   const run = showModal({
     title: '确认使用简历 AI',
-    content: '诊断、优化和生成会把你上传或填写的简历内容发送到系统里的 AI 进行分析。结果只给你本人看，不会发送给企业或合作机构。授权保存在你的账号中，可随时在「我的 → 账号设置 → 隐私与数据」撤回。',
+    content: '简历诊断、优化、生成，以及用到这份简历的版式调整、职业规划和模拟面试，会把你上传或填写的简历内容发送到系统里的 AI 进行分析。结果只给你本人看，不会发送给企业或合作机构。授权保存在你的账号中，可随时在「我的 → 账号设置 → 隐私与数据」撤回。',
     confirmText: '同意并继续',
     cancelText: '暂不使用',
   }).then((agreed) => {

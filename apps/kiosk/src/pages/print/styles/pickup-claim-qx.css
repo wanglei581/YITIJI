@@ -21,9 +21,12 @@
 /* 本页焦点环：3px 深墨环（稿 33 同口径），压过 service-desk 的全局蓝环（0,3,0）。 */
 .qx-stage .pickup-claim-page :is(button, input):focus-visible { outline: 3px solid var(--qx-deep); outline-offset: 3px; }
 
-/* ── 主体：稿里各块按 space-between 铺满定高舞台 ───────────── */
+/* ── 主体：稿里各块按 space-between 铺满定高舞台 ─────────────
+   已登录时列表会晚到。若仍 space-between，多一个子项就会把码格和键盘重新铺开。
+   登录全程改为顶端对齐：读取中、零条、读完，键盘位置一致。未登录保持铺满。 */
 .qx-scroll.pickup-claim-page { gap: 18px; padding-top: 18px; padding-bottom: 20px; }
 [data-kiosk-stage-fit='on'] .qx-scroll.pickup-claim-page { justify-content: space-between; }
+[data-kiosk-stage-fit='on'] .qx-scroll.pickup-claim-page.pickup-claim-logged-in { justify-content: flex-start; }
 
 /* ── 码位格 ───────────────────────────────────────────────────
    真实 input 透明覆盖在格子之上：HID 扫码器与物理键盘照旧直接写入它，
@@ -284,6 +287,23 @@
 .pch-out-btn:active { transform: scale(.98); background: var(--qx-teal-soft); }
 .pch-outs b { font-size: 19px; font-weight: 700; color: var(--qx-ink); }
 .pch-outs span { font-size: 17px; color: var(--qx-ink-2); }
+
+/* 登录后、键盘后面：本人在这台机器上还没取的单。复用 qx-card / qx-btn，不另起一套。 */
+.pcp-here-note { margin: 0; font-size: 18px; line-height: 1.5; color: var(--qx-ink-2); }
+.pcp-here-error { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.qx-btn.pcp-here-reload { min-height: 56px; }
+.qx-card.pcp-here { display: flex; flex-direction: column; gap: 12px; padding: 18px 22px; }
+.pcp-here ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.qx-btn.pcp-here-go {
+  min-height: 56px; width: 100%; justify-content: space-between; gap: 12px;
+  padding: 12px 18px; text-align: left; font-size: 20px;
+}
+.pcp-here-name {
+  min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  overflow-wrap: anywhere; font-weight: 700;
+}
+.pcp-here-meta { font-size: 16px; font-weight: 500; color: var(--qx-ink-2); }
+.pcp-here-act { flex: none; font-size: 18px; font-weight: 600; }
 
 /* ── hid 屏里的错误位 ─────────────────────────────────────── */
 .pcp-error {

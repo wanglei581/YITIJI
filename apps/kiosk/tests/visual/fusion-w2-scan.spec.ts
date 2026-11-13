@@ -1060,6 +1060,13 @@ test('failed scan retry strips control fields but preserves scan parameters @w2'
 
   await seedScanResult(page, failureState)
   await page.goto('/scan?stage=result')
+  // 11/09：只有屏上扫描来的结果换新屏（scan-device-k1b3a.spec.ts）；面板扫描的失败屏一个字不动：
+  // 眉题「扫描完成」、面板四步路径线、说明格照旧，不落屏上扫描那一屏。
+  await expect(page.locator('.qxt-band .qxt-eyebrow')).toHaveText('扫描完成')
+  await expect(page.locator('.qxt-band .qxt-rail span')).toHaveText(['✓ 选类型', '✓ 扫描指引', '✓ 等回传', '扫描完成'])
+  await expect(page.getByText('这次没扫成的原因', { exact: true })).toBeVisible()
+  await expect(page.getByText('同一张纸', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('scan-device-failed')).toHaveCount(0)
   const createResponse = page.waitForResponse((response) =>
     response.request().method() === 'POST'
       && new URL(response.url()).pathname === '/api/v1/scan/sessions',

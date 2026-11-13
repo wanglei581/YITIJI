@@ -1,6 +1,7 @@
 import { LicenseLock } from '../../../layouts/LicenseLock'
 import { useKioskLicense } from '../../../layouts/KioskLicenseContext'
 import { useSupportContactSnapshot } from '../../../hooks/useSupportContact'
+import { pickupEntryMiniappLine } from '../../../copy/miniappLinkCopy'
 import { LICENSE_NO_NEW_TASK_REASON, machineUnusableLine } from '../../../copy/unattendedCopy'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { QxTouchArtChecklist, QxTouchArtReport, QxTouchArtResume, QxTouchArtStack } from '../../../components/qingxu/touch/QxTouchArt'
@@ -226,7 +227,7 @@ export function HomeTouchView({
         <QxTouchTask held={winding} note={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} actionId="policy-hub" icon="landmark" title="查政策" desc="补贴、社保怎么办，要带哪些材料，以官方发布为准" chip="官方发布" chipTone="slate" take="查看政策说明" takeIcon="check" visual={<QxTouchArtChecklist />} index={4} onClick={() => onAction('policy-hub')} />
       </div>
       <div className="qxt-home-tiles" data-count={tileCount}>
-        <QxTouchTile off={winding} reason={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} chevron={false} layout="stack" icon="ticket" title="到机取件" desc="手机上下了单，来这里取" actionId="pickup-claim" index={nextTile()} onClick={() => onAction('pickup-claim')} />
+        <QxTouchTile off={winding} reason={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} chevron={false} layout="stack" icon="ticket" title="到机取件" desc={pickupEntryMiniappLine(contact) || '手机上下了单，来这里取'} actionId="pickup-claim" index={nextTile()} onClick={() => onAction('pickup-claim')} />
         {recruitmentOpen ? (
           jobs.status === 'error' ? (
             <QxTouchTile off={winding} reason={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} key={`jobs-${jobs.status}`} chevron={false} layout="stack" icon="refresh" tone="slate" title="社会招聘" desc={job.description} badge={job.badge} cue={RETRY_CUE} label={`社会招聘，${RETRY_CUE}`} actionId="jobs-retry" dataAttrs={{ 'home-jobs-panel': '', 'panel-state': 'error', 'jobs-badge': job.badge }} index={nextTile()} onClick={jobs.retry} />

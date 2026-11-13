@@ -15,7 +15,8 @@ import {
   PICKUP_CODE_LENGTH,
   PICKUP_CODE_MAX_INPUT_LENGTH,
 } from '@ai-job-print/shared'
-import { helpNeededLine, machineUnusableLine, preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
+import { pickupCodeUnavailableLine, pickupOrderPaymentUnavailableLine, pickupOrderRefundedLine } from '../../copy/miniappLinkCopy'
+import { helpNeededLine, machineUnusableLine, preferUnattended, printProblemLine, type PublicSupportContact } from '../../copy/unattendedCopy'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { formatCents } from './cashierStatus'
 import {
@@ -108,9 +109,10 @@ export const PICKUP_CLAIM_MESSAGES: Readonly<Record<string, string>> = {
   PRINT_RETRY_FILE_UNAVAILABLE: '这笔订单的文件现在无法用于打印。请在手机上重新上传文件、重新下单。',
   // 后端那句带版本号，是给维护看的，不上屏。
   PRINT_RETRY_AGENT_VERSION: '这台机器暂时不能用同一个到机码接着打。还要打，请在手机上重新下单。',
-  PICKUP_CODE_UNAVAILABLE: '这个到机码已经不能使用。请在手机小程序「我的 → 打印订单」查看这笔订单，需要的话重新下单',
-  ORDER_REFUNDED: '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度',
-  ORDER_PAYMENT_UNAVAILABLE: '这笔订单已经不能付款（可能已关闭）。请在手机小程序「我的 → 打印订单」查看，需要的话重新下单',
+  // 不传联系方式时是关着的那句。开着时由 pickupClaimMessage 按当次联系方式换回点名小程序的原句。
+  PICKUP_CODE_UNAVAILABLE: pickupCodeUnavailableLine(),
+  ORDER_REFUNDED: pickupOrderRefundedLine(),
+  ORDER_PAYMENT_UNAVAILABLE: pickupOrderPaymentUnavailableLine(),
   PRINT_FILE_EXPIRED: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
   PRINT_FILE_NOT_FOUND: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
   FILE_CONTENT_CHANGED: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
@@ -154,8 +156,12 @@ export const PICKUP_CLAIM_FALLBACK_MESSAGE = `到机码校验没有完成，请�
  * 按「本机安全校验」说。免费额度三个码不进上面的取件码表：原话在 userErrorMessage，
  * 出口（去登录 / 回首页）在 pickupQuotaExit，不在这句文案里另写按钮。
  */
-export function pickupClaimMessage(error: unknown): string {
+export function pickupClaimMessage(error: unknown, contact?: PublicSupportContact | null): string {
   const code = errorCodeOf(error)
+  // 这三句跟着「小程序已发布」走。不传、传 null、或开关关着，都是「在手机上」，不点名小程序。
+  if (code === 'PICKUP_CODE_UNAVAILABLE') return pickupCodeUnavailableLine(contact)
+  if (code === 'ORDER_REFUNDED') return pickupOrderRefundedLine(contact)
+  if (code === 'ORDER_PAYMENT_UNAVAILABLE') return pickupOrderPaymentUnavailableLine(contact)
   if (code === 'PRINT_TERMINAL_QUEUE_HALTED' && error instanceof ApiHttpError) {
     const message = error.message
     if (message.trim() && message.length <= 60 && /[\u4e00-\u9fa5]/.test(message) && !/^(HTTP\s|请求失败（)/.test(message.trim())) {

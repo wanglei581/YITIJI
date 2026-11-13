@@ -534,7 +534,9 @@ const api = {
   },
 
   /**
-   * 上传本人通用打印文件；后端 print_doc 仅接受 PDF/JPG/PNG 并按真实 MIME/魔数校验。
+   * 上传本人通用打印文件。后端 print_doc 接受 PDF、JPG、PNG、DOC、DOCX
+   * （file-validation.ts 的 PURPOSE_POLICY.print_doc），并按真实 MIME/魔数校验。
+   * Word 不能直接算页数，上传后要先转成 PDF 再进打印。
    *
    * 文件名只能走 multipart 文件段本身（wx.uploadFile 取 filePath 的 basename），
    * 绝不能塞进 formData：后端 KioskUploadOptionsDto 只白名单了 purpose 一个字段，

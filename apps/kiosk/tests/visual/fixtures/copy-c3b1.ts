@@ -23,6 +23,8 @@ export async function copyDeviceFixture(page: Page, api: ApiRouter, options: {
   /** 确认时回 429 免费额度超限（与打印同码，details 同后端 FreePrintQuotaDetails）。 */
   quota?: { code: string; limit: number }
   fail?: 'print' | 'abort' | 'cancel' | 'clear' | 'preview' | 'confirm' | 'status'; clearDelayed?: boolean
+  /** 本机 abort 回包照常是 cancelled，但 purged 回 false（删页没确认）。 */
+  abortUnpurged?: boolean
 } = {}) {
   await page.clock.install()
   const base = await copyFixture(page, api, { noPhone: options.noPhone })
@@ -105,7 +107,7 @@ export async function copyDeviceFixture(page: Page, api: ApiRouter, options: {
     if (action === 'finish') local = { ...local, state: 'scanned' }
     const state = action === 'abort' ? 'cancelled' : action === 'clear' ? 'cleared' : action === 'finish' ? 'composing' : local.state
     await route.fulfill({ status: 200, headers, contentType: 'application/json', body: JSON.stringify(ok({ ...local, state, generation: body.generation,
-      ...(['abort', 'clear'].includes(action) ? { purged: true } : {}) }).json) })
+      ...(['abort', 'clear'].includes(action) ? { purged: !(action === 'abort' && options.abortUnpurged) } : {}) }).json) })
   })
   const start = async () => {
     await base.goto('set')

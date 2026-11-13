@@ -1,3 +1,5 @@
+import { pickupEntryMiniappLine } from '../../copy/miniappLinkCopy'
+import { useSupportContactSnapshot } from '../../hooks/useSupportContact'
 import type { PendingTask } from '../../services/api/pendingTasks'
 import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
 import { ArtBox, Card, Hit, Note } from '../public-touch/PublicBlocks'
@@ -19,13 +21,14 @@ type Exit = { id: string; title: string; sub: string; route: string }
 const RESUME_BOUNDARY = '这一页不重新建单，也不删除系统里的订单或文件。'
 
 function Exits({ items, onExit }: { items: readonly Exit[]; onExit: (route: string) => void }) {
+  const pickupLine = pickupEntryMiniappLine(useSupportContactSnapshot())
   return (
     <div className="qxp-col sr-exits">
       {items.map((item) => (
         <Hit
           key={item.id}
           title={item.title}
-          sub={item.sub}
+          sub={item.id === 'code' && pickupLine ? pickupLine : item.sub}
           chevron
           testId={`session-resume-exit-${item.id}`}
           onClick={() => onExit(item.route)}

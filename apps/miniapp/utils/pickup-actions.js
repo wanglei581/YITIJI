@@ -46,7 +46,7 @@ function shareText(info) {
   const lines = [`职易达到机码：${info.code}`]
   if (info.outlet) lines.push(`取件网点：${info.outlet}`)
   if (info.expiresText) lines.push(`${info.expiresText}前有效，用一次就失效`)
-  lines.push('到一体机首页点「到机码核销」，输入上面的码或扫码取件。')
+  lines.push('到一体机首页点「到机取件」，输入上面的码或扫码取件。')
   return lines.join('\n')
 }
 
@@ -99,7 +99,7 @@ function drawCard(page, info) {
       let y = 610
       if (info.outlet) { ctx.fillText(`取件网点：${info.outlet}`, CARD_W / 2, y); y += 44 }
       if (info.expiresText) { ctx.fillText(`${info.expiresText}前有效，用一次就失效`, CARD_W / 2, y); y += 44 }
-      ctx.fillText('到一体机首页点「到机码核销」', CARD_W / 2, y); y += 40
+      ctx.fillText('到一体机首页点「到机取件」', CARD_W / 2, y); y += 40
       ctx.fillText('把二维码对准扫码器，或手动输入上面的码', CARD_W / 2, y)
       wx.canvasToTempFilePath({
         canvas,

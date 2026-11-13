@@ -365,16 +365,14 @@ const PACKAGE_ERROR_COPY = {
   // 彩色 / 自动双面是**按终端逐台**判定的第二层能力门禁
   // （terminal-capabilities.service.ts 的 assertPrintParamsAllowed，未登记即拒绝）。
   // 它与上面两条 CAPABILITY_* 不是同一回事：那两条说的是「这台机器开不开放文档打印」，
-  // 这两条说的是「这台机器的彩色/双面没验过」——EV-013 验过的是那一台，新机器各自要验。
+  // 这两条说的是「这台机器还没开通彩色打印 / 自动双面」。
   // 缺了这两条映射，服务端明确说出的拒绝理由会落到 describePackageError 末尾那个
   // 「操作未完成 / 请稍后重试」——而这件事重试一万次也不会变，用户只会反复点。
+  // 也不能落到 CAPABILITY_NOT_CONFIGURED 那句「该服务点未开通文档打印」。
   //
-  // recover 是 'store' 而不是 'files'：放行路径只有一条 —— 管理员在该终端真机验过后
-  // 把 color_print / duplex_print 配成 available。用户当下能做的就是换一台验过的机器。
-  // （改黑白/单面也能过，但那要回到第一步改参数，不是本页错误卡片这个按钮的动作；
-  //  文案里说出来，按钮仍与 recover 一致。）
-  PRINT_COLOR_NOT_VERIFIED_ON_TERMINAL: { title: '该服务点未验过彩色打印', text: '这台一体机的彩色打印还没在真机上验过，服务端不会受理彩色材料包。请换一个服务点；也可以回到第一步改成黑白再下单。', recover: 'store' },
-  PRINT_DUPLEX_NOT_VERIFIED_ON_TERMINAL: { title: '该服务点未验过自动双面', text: '这台一体机的自动双面还没在真机上验过，服务端不会受理双面材料包。请换一个服务点；也可以回到第一步改成单面再下单。', recover: 'store' },
+  // recover 仍是 'store'：按钮去换机器。改成黑白、单面要回到第一步，文案里说出来。
+  PRINT_COLOR_NOT_VERIFIED_ON_TERMINAL: { title: '这台机器还没开通彩色打印', text: '这台机器还没开通彩色打印。请换一台机器，或改成黑白、单面。', recover: 'store' },
+  PRINT_DUPLEX_NOT_VERIFIED_ON_TERMINAL: { title: '这台机器还没开通自动双面', text: '这台机器还没开通自动双面。请换一台机器，或改成黑白、单面。', recover: 'store' },
   // 打印机本身出不了纸：服务端 `terminals/printer-availability.ts` 在报价与建单两处
   // 同口径 fail-closed（最近 5 分钟没心跳 / 从未上报 / 心跳里的 printerStatus 落在
   // offline | error | paper_empty）。缺了这条映射，用户看到的是末尾那句「操作未完成 /

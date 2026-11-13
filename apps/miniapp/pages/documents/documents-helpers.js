@@ -1,3 +1,5 @@
+const uploadNames = require('../../utils/upload-name')
+
 const WORD_CONVERSION_UNAVAILABLE_COPY = 'Word 转换暂未开放，请另存为 PDF 上传'
 const WORD_CONVERSION_DISCLOSURE = '由转换引擎生成，复杂版式可能有偏差，请预览核对'
 const DOCUMENT_NOT_REPRINTABLE_COPY = '该报告仅可查看，不可打印'
@@ -113,6 +115,8 @@ function toView(item) {
   return {
     id: String(item.id || ''),
     name: filename,
+    // 标题只放主名，扩展名由左边的格式块显示（FLOW1a）；完整原名在「⋯」菜单顶部可读。
+    baseName: uploadNames.displayNameParts(filename).base,
     kind,
     ext,
     size: formatSize(item.sizeBytes),

@@ -519,10 +519,10 @@
         ['md', 'MD', 'Markdown，会用的人拿去二次排版']
       ];
       const file = {
-        pdf: ['李佳怡-行政专员-简历.pdf', '2 页 · 248 KB', true],
-        docx: ['李佳怡-行政专员-简历.docx', '页数 0 · 36 KB', false],
-        txt: ['李佳怡-行政专员-简历.txt', '页数 0 · 4 KB', false],
-        md: ['李佳怡-行政专员-简历.md', '页数 0 · 6 KB', false]
+        pdf: ['李佳怡-新媒体运营-简历.pdf', '2 页 · 248 KB', true],
+        docx: ['李佳怡-新媒体运营-简历.docx', '页数 0 · 36 KB', false],
+        txt: ['李佳怡-新媒体运营-简历.txt', '页数 0 · 4 KB', false],
+        md: ['李佳怡-新媒体运营-简历.md', '页数 0 · 6 KB', false]
       }[fmt];
       const pri = !done
         ? { label: '导出', id: 'd4DoExport' }

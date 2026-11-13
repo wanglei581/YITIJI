@@ -15,11 +15,9 @@
 // 预览只能返回，避免出现「从预览页绕过隐私确认直接进选门店」的旁路。
 const app = getApp()
 const api = require('../../utils/api')
-const config = require('../../utils/config')
+const fileUrls = require('../../utils/file-url')
 
 const IMAGE_EXT = ['jpg', 'jpeg', 'png']
-// wx.openDocument 官方支持的类型；超出这个集合就别声明 fileType，交给微信自行判断。
-const OPENABLE_EXT = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx']
 
 function extOf(name) {
   const clean = String(name || '').split('?')[0].trim()
@@ -28,25 +26,9 @@ function extOf(name) {
   return clean.slice(dot + 1).toLowerCase().slice(0, 8)
 }
 
-// 服务端 signFileUrl() 返回的是 /api/v1/files/:id/content?... 相对路径，
-// 而 wx.downloadFile / <image> 都只接受绝对地址，必须补回源站，否则必然失败。
-function absoluteUrl(url) {
-  const raw = String(url || '').trim()
-  if (!raw) return ''
-  if (/^https?:\/\//i.test(raw)) return raw
-  return `${config.baseUrl}${raw.charAt(0) === '/' ? '' : '/'}${raw}`
-}
-
-function readableDownloadError(errMsg) {
-  const text = String(errMsg || '')
-  if (/domain list|合法域名|not in domain/i.test(text)) {
-    return '微信后台尚未把文件域名加入 downloadFile 合法域名，小程序暂时无法打开原文。可先在「我的文档」核对文件，或到门店终端查看。'
-  }
-  if (/timeout/i.test(text)) return '下载原文超时，请检查网络后重试。'
-  // 页面自己给的中文句子照用；微信的英文 errMsg 不给用户看
-  if (/[\u4e00-\u9fa5]/.test(text)) return text
-  return '打开原文失败，请检查网络后重试。'
-}
+// 签名链接的绝对化、下载与打开，都走 utils/file-url.js 里的同一份实现（我的文档也用它）。
+// 预览链接是短期签名链接（最长 30 分钟，文件快到期时更短）：打开原文、放大图片前都现取一条，
+// 不复用进页面时取的那条。
 
 Page({
   data: {
@@ -105,6 +87,15 @@ Page({
     this._loadPreview()
   },
 
+  // 打开原文、放大图片都是异步的。用户中途返回时，回调里不再弹窗、不再打开全屏预览，
+  // 否则会落到上一页；加载遮罩是全局的，照样收起。
+  onUnload() {
+    this._unloaded = true
+    // 正在打开原文时用户返回：遮罩是全局的，当场收起，不等网络回来，免得挡住上一页。
+    // 只有「打开原文」挂了遮罩（放大图片不挂），所以单独记一面旗子。
+    if (this._maskShown) { this._maskShown = false; wx.hideLoading() }
+  },
+
   _loadPreview() {
     if (!this.data.fileId) {
       this.setData({ state: 'error', errorText: '缺少文件参数，请返回重新选择文档' })
@@ -117,7 +108,7 @@ Page({
         // printFileUrl 是「系统 HMAC content URL，仅供 /print/jobs 使用；
         // url 只用于预览/下载」。两者签名方案不同，拿 printFileUrl 去预览
         // 会被 verifyFileSignature 判为无效签名 → 401 → 图片加载失败。
-        const url = absoluteUrl(res && (res.url || res.previewUrl))
+        const url = fileUrls.absoluteUrl(res && (res.url || res.previewUrl))
         if (!url) throw new Error('服务端未返回可用的预览链接')
         this.setData({ fileUrl: url, state: this.data.isImage ? 'image' : 'doc' })
       })
@@ -129,59 +120,60 @@ Page({
       })
   },
 
+  // 用户自己点「重新加载预览」：图片可以再自动重取一次。
   retryPreview() {
+    this._imageRetried = false
     this._loadPreview()
   },
 
   // <image> 拿到链接却渲染不出来（签名过期 / 文件损坏）时，必须说清楚，
   // 不能停在一个空白的 A4 框上让用户以为自己的文件是空白页。
+  // 链接是短期签名链接，可能已经过期：先自动重取一次；再失败才进错误态，不循环。
   imageError() {
+    if (!this._imageRetried) {
+      this._imageRetried = true
+      this._loadPreview()
+      return
+    }
     this.setData({
       state: 'error',
-      errorText: '图片内容加载失败，可能是预览链接已过期，请重试',
+      errorText: '图片内容加载失败，可能是预览链接已过期，请点「重新加载预览」',
     })
   },
 
   zoomImage() {
-    if (this.data.state !== 'image' || !this.data.fileUrl) return
-    wx.previewImage({ urls: [this.data.fileUrl], current: this.data.fileUrl })
+    if (this.data.state !== 'image' || this.data.opening) return
+    this.setData({ opening: true })
+    api.getFilePreviewUrl(this.data.fileId)
+      .then((res) => {
+        if (this._unloaded) return
+        this.setData({ opening: false })
+        const url = fileUrls.absoluteUrl(res && (res.url || res.previewUrl))
+        if (!url) throw new Error('服务端未返回可用的预览链接')
+        wx.previewImage({ urls: [url], current: url })
+      })
+      .catch((err) => {
+        if (this._unloaded) return
+        this.setData({ opening: false })
+        wx.showToast({ title: (err && err.message) || '放大失败，请重试', icon: 'none' })
+      })
   },
 
   openDoc() {
-    if (this.data.opening || !this.data.fileUrl) return
+    if (this.data.opening || !this.data.fileId) return
     this.setData({ opening: true })
     wx.showLoading({ title: '正在打开原文…', mask: true })
-
-    const finish = () => {
-      wx.hideLoading()
+    this._maskShown = true
+    fileUrls.openSignedDocument({
+      wx,
+      fetchUrl: () => api.getFilePreviewUrl(this.data.fileId),
+      name: this.data.docName,
+    }).then((result) => {
+      if (this._maskShown) { this._maskShown = false; wx.hideLoading() }
+      if (this._unloaded) return
       this.setData({ opening: false })
-    }
-    const failWith = (errMsg) => {
-      finish()
-      wx.showModal({
-        title: '无法打开原文',
-        content: readableDownloadError(errMsg),
-        showCancel: false,
-      })
-    }
-
-    wx.downloadFile({
-      url: this.data.fileUrl,
-      success: (dl) => {
-        if (dl.statusCode !== 200) {
-          failWith(`服务端返回 ${dl.statusCode}，预览链接可能已过期`)
-          return
-        }
-        const params = {
-          filePath: dl.tempFilePath,
-          showMenu: true,
-          success: finish,
-          fail: () => failWith('微信自带阅读器无法打开该文件'),
-        }
-        if (OPENABLE_EXT.indexOf(this.data.ext) >= 0) params.fileType = this.data.ext
-        wx.openDocument(params)
-      },
-      fail: (e) => failWith(e && e.errMsg),
+      // 失败用弹窗说明原因，页面留在原处：文件信息还在，用户可以再点一次。
+      if (!result.ok) wx.showModal({ title: '无法打开原文', content: result.text, showCancel: false })
     })
   },
 

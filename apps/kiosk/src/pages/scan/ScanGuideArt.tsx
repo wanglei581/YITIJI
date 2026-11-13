@@ -2,10 +2,13 @@ import { PrintArt } from '../print/art/PrintArt'
 import { DocStackArt, IdCardArt } from '../print-scan/ToolArt'
 import type { ScanMaterial } from './scanMaterials'
 
-/** 玻璃台示意。颜色走扫描页已有的 --sx-art-* / --qxt-*，不写裸色值。 */
-export function GlassArt() {
+/**
+ * 玻璃台示意。颜色走扫描页已有的 --sx-art-* / --qxt-*，不写裸色值。
+ * viewBox 只在要裁掉四周透明边、把图放大的地方传（复印已停止，照稿 cs-scan-stopped?flow=copy 的裁法）。
+ */
+export function GlassArt({ viewBox = '0 0 150 150' }: { viewBox?: string } = {}) {
   return (
-    <svg className="sx-art" viewBox="0 0 150 150" aria-hidden="true">
+    <svg className="sx-art" viewBox={viewBox} aria-hidden="true">
       <rect x="8" y="22" width="134" height="108" rx="14" fill="var(--sx-art-base)" />
       <rect x="20" y="34" width="110" height="84" rx="8" fill="var(--qxt-teal-wash)" stroke="var(--sx-art-top)" strokeWidth="2" />
       <rect x="30" y="46" width="52" height="64" rx="3" fill="var(--sx-art-sheet)" stroke="var(--qxt-art-edge)" strokeWidth="2" />
@@ -19,10 +22,10 @@ export function GlassArt() {
   )
 }
 
-/** 进纸器示意。empty 时不画纸，给出纸口和进纸方向。 */
-export function FeederArt({ empty = false }: { empty?: boolean }) {
+/** 进纸器示意。empty 时不画纸，给出纸口和进纸方向。viewBox 同玻璃台，只在要裁边放大时传。 */
+export function FeederArt({ empty = false, viewBox = '0 0 150 150' }: { empty?: boolean; viewBox?: string }) {
   return (
-    <svg className="sx-art" viewBox="0 0 150 150" aria-hidden="true">
+    <svg className="sx-art" viewBox={viewBox} aria-hidden="true">
       <rect x="8" y="82" width="134" height="50" rx="12" fill="var(--sx-art-base)" />
       <path d="M26 82 L36 20 H116 L124 82 Z" fill="var(--qxt-art-track)" stroke="var(--sx-art-top)" strokeWidth="2" />
       {empty ? null : (

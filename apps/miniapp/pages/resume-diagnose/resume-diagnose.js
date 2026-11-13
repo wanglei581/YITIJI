@@ -142,7 +142,8 @@ Page({
       .then(async (raw) => {
         const pricing = N.resumeExportPricing(raw, loggedIn)
         let benefitGrantId = ''
-        if (pricing.mode === 'charged' && loggedIn && pricing.available > 0) {
+        // 金额不是大于 0 的整数时不查权益，避免页面写出「权益」。能不能导出仍看归一化结果。
+        if (N.exportUnitPriceKnown(pricing) && pricing.mode === 'charged' && loggedIn && pricing.available > 0) {
           const benefits = await api.getMyBenefits({ pageSize: 50 })
           benefitGrantId = N.resumeExportBenefitId(benefits)
           if (!benefitGrantId) pricing.disabledReason = '服务端显示有可用次数，但未找到可核销权益，请刷新后重试。'
@@ -152,10 +153,10 @@ Page({
       })
       .catch((err) => {
         if (this._stopped || seq !== this._pricingSeq) return
-        const reason = (err && err.message) || '暂时无法确认能否导出'
+        const copy = N.exportPricingFailureCopy(err)
         this.setData({
           pricingStatus: 'failed',
-          pricing: { mode: 'unavailable', text: reason, disabledReason: `${reason}，当前不能导出。` },
+          pricing: { mode: 'unavailable', text: copy.text, disabledReason: copy.disabledReason },
           benefitGrantId: '',
         }, () => this._syncExportAvailability())
       })
@@ -166,6 +167,7 @@ Page({
     if (this.data.status !== 'done') reason = '诊断失败或尚未完成，暂时不能导出。'
     else if (this.data.pricingStatus !== 'ready') reason = this.data.pricing.disabledReason || '正在确认能否导出，请稍候。'
     else if (this.data.pricing.disabledReason) reason = this.data.pricing.disabledReason
+    else if (!N.exportUnitPriceKnown(this.data.pricing)) reason = ''
     else if (this.data.pricing.mode === 'charged' && !this.data.benefitGrantId) reason = '未取得可核销权益，当前不能导出。'
     this.setData({ exportDisabled: Boolean(reason), exportDisabledReason: reason })
   },

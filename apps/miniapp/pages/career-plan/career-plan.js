@@ -3,6 +3,7 @@ const api = require('../../utils/api')
 const N = require('../../utils/normalize')
 const storage = require('../../utils/storage')
 const auth = require('../../utils/auth')
+const aiAccess = require('../../utils/ai-access')
 
 /**
  * 职业规划参考。
@@ -23,7 +24,7 @@ const auth = require('../../utils/auth')
 Page({
   data: {
     statusBarHeight: 20,
-    // no-task 无已解析简历 | ready 可生成 | running 生成中 | done 真实结果 | failed 失败
+    // no-task 无已解析简历 | ready 可生成 | running 生成中 | done 真实结果 | failed 失败 | consent-needed 没授权
     phase: 'no-task',
     taskId: '',
     resumeName: '',
@@ -155,7 +156,48 @@ Page({
       .catch((err) => {
         this._stopElapsed()
         if (this._stopped) return
+        if (err && (err.code === 'AI_RESUME_NOT_CONSENTED' || err.code === 'USER_AI_CONSENT_REQUIRED')) {
+          this._consentBlocked()
+          return
+        }
         this._fail((err && err.message) || '生成失败,请稍后重试')
+      })
+  },
+
+  /** 不同意把简历发给 AI：停在这一页，不自动再生成。 */
+  _consentBlocked() {
+    this.setData({
+      phase: 'consent-needed',
+      failMsg: '没有授权，职业规划不会把简历发给 AI',
+      needReupload: false,
+      plan: null,
+    })
+  },
+
+  /** 用户自己再点「重新授权」。不同意就留在说明态；同意并写上授权之后才生成一次。 */
+  tapReauthorize() {
+    if (this.data.historyMode || this.data.phase === 'running' || this._reauthorizing) return
+    this._reauthorizing = true
+    aiAccess.promptResumeAi()
+      .then(() => api.grantAiConsent(aiAccess.RESUME_AI_SCOPE))
+      .then(() => {
+        this._reauthorizing = false
+        if (this._stopped) return
+        this.tapGenerate()
+      })
+      .catch((err) => {
+        this._reauthorizing = false
+        if (this._stopped) return
+        if (aiAccess.isDeclined(err)) {
+          this._consentBlocked()
+          return
+        }
+        this.setData({
+          phase: 'consent-needed',
+          failMsg: (err && err.message) || '没有授权，职业规划不会把简历发给 AI',
+          needReupload: false,
+          plan: null,
+        })
       })
   },
 

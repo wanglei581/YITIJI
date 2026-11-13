@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test'
 import { expect, test } from '../fixtures/kiosk-test'
 import { COPY_CONTROL, expectCopyUnknownChip } from './fixtures/copy-c3a'
 import { armPrivacyReload, copyDeviceFixture } from './fixtures/copy-c3b1'
@@ -76,10 +77,71 @@ for (const fail of [undefined, 'abort', 'cancel'] as const) test(`stop is armed 
   } else {
     // 11/08 定：停止屏补原件提醒（同额度屏那句）；不画倒计时，复印取消回包不带静默期。
     await expect(page.getByText('已停止复印，已扫的页已从这台机器删除。', { exact: true })).toBeVisible()
-    await expect(page.locator('.copy-touch .cc-result-help')).toHaveText('原件还在玻璃上或进纸器里，请带走')
-    await expect(page.locator('.copy-touch .cc-result-help')).toBeVisible()
+    await expect(page.locator('.copy-touch .cc-original')).toHaveText('原件还在玻璃上或进纸器里，请带走')
+    await expect(page.locator('.copy-touch .cc-original')).toBeVisible()
     await expect(page.locator('.copy-touch').getByText(/秒后|倒计时/)).toHaveCount(0)
+    await expectCopyStoppedDraft(page)
+    // 底栏左边回打印扫描：清场后离开（撤销云端单只发过停止那一次，本机扫描页清掉）。
+    await page.getByRole('button', { name: '回打印扫描', exact: true }).click()
+    await expect(page).toHaveURL(/\/print-scan$/)
+    await expect.poll(() => f.localCalls.filter((c) => c.action === 'clear').length).toBeGreaterThan(0)
+    expect(f.cloudCalls.filter((c) => c.action === 'cancel')).toHaveLength(1)
   }
+})
+/* 11/09 照稿 cs-scan-stopped?flow=copy（11/08 定第 4 条，第三轮版式）：胶囊橙色「已停止」、没有路径线、
+ * 删页那句一栏、原件提醒大字、玻璃台在上进纸器在下撑满下部、问小青「怎么复印更合适」、底栏回打印扫描 / 回首页。 */
+async function expectCopyStoppedDraft(page: Page) {
+  const stopped = page.getByTestId('copy-stopped')
+  await expect(stopped).toBeVisible()
+  const chip = page.locator('.qxt-band .qxt-status')
+  await expect(chip).toHaveText('已停止')
+  await expect(chip).toHaveClass(/qxt-status-warn/)
+  await expect(chip).toHaveCSS('background-color', 'rgba(184, 104, 60, 0.25)')
+  await expect(chip.locator('.qxt-dot')).toHaveCSS('background-color', 'rgb(240, 168, 115)')
+  await expect(page.locator('.qxt-band .qxt-eyebrow')).toHaveText('屏上复印')
+  await expect(page.locator('.qxt-band .qxt-ask-t p')).toHaveText('这次到这里为止，不会再继续。')
+  await expect(page.locator('.qxt-band .qxt-rail')).toHaveCount(0)
+  await expect(stopped.locator('.cs-fact.big')).toHaveText('已停止复印，已扫的页已从这台机器删除。')
+  const art = await stopped.locator('.cc-cstop svg').evaluateAll((nodes) => nodes.map((node) => {
+    const box = node.getBoundingClientRect()
+    return { top: box.top, bottom: box.bottom, height: box.height, viewBox: node.getAttribute('viewBox') }
+  }))
+  expect(art.map((item) => item.viewBox)).toEqual(['4 18 142 124', '4 16 142 120'])
+  expect(art[0].bottom).toBeLessThanOrEqual(art[1].top)
+  const well = await stopped.locator('.cc-cstop').boundingBox()
+  const dock = await page.locator('.qxt-dock').boundingBox()
+  // 示意卡撑到底栏上方（正文下边距以内），两张图各占示意卡四成以上高度：不留大片空白。
+  expect(dock!.y - (well!.y + well!.height)).toBeLessThanOrEqual(40)
+  for (const item of art) expect(item.height).toBeGreaterThanOrEqual(well!.height * 0.4)
+  const ask = page.getByRole('button', { name: '问小青：怎么复印更合适', exact: true })
+  await expect(ask).toBeVisible()
+  // 整句放得下：底栏三颗时问小青那句不许被省略号截掉。
+  expect(await ask.locator('span').last().evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true)
+  await expect(page.getByRole('button', { name: '回打印扫描', exact: true })).toBeVisible()
+  await expect(page.getByTestId('copy-stopped-home')).toHaveText('回首页')
+  await expect(page.getByRole('button', { name: /停止复印|确认停止/ })).toHaveCount(0)
+}
+test('stopped screen home button clears the copy and goes home @w2', async ({ page, api }) => {
+  const f = await copyDeviceFixture(page, api)
+  await f.start()
+  await page.getByRole('button', { name: '停止复印', exact: true }).click()
+  await page.getByRole('button', { name: '再点一次确认停止', exact: true }).click()
+  await expectCopyStoppedDraft(page)
+  await page.screenshot({ path: 'test-results/align-1109-copy-stopped.png' })
+  await page.getByTestId('copy-stopped-home').click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect.poll(() => f.localCalls.filter((c) => c.action === 'clear').length).toBeGreaterThan(0)
+  expect(f.cloudCalls.filter((c) => c.action === 'cancel')).toHaveLength(1)
+})
+test('stop without a purge confirmation never claims the pages were deleted @w2', async ({ page, api }) => {
+  const f = await copyDeviceFixture(page, api, { abortUnpurged: true })
+  await f.start()
+  await page.getByRole('button', { name: '停止复印', exact: true }).click()
+  await page.getByRole('button', { name: '再点一次确认停止', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '状态未知', exact: true })).toBeVisible()
+  await expect(page.getByTestId('copy-stopped')).toHaveCount(0)
+  await expect(page.getByText(/已扫的页已从这台机器删除/)).toHaveCount(0)
+  await expectCopyUnknownChip(page, '状态未知')
 })
 test('stop arm expires in six seconds @w2', async ({ page, api }) => {
   const f = await copyDeviceFixture(page, api)

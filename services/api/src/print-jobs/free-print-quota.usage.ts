@@ -117,6 +117,94 @@ function sidesOf(task: TaskSlice, order: OrderSlice | undefined, item: ItemSlice
   })
 }
 
+/**
+ * 当前任务那一行还能不能把后面的行派发出去。
+ * advance 只在当前行变成 completed 时派发下一行（seq+1、status=pending、还没有任务）。
+ * pending / claimed / printing：这一行完成后会派发。
+ * failed：advance 当时停住，但等同码续打把这一行拉回待打印，续打成功后再完成仍会派发。
+ * completed：advance 开头看到已完成就直接返回，不会再派发。
+ * cancelled：advance 停住，续打只认 failed，不会再派发。
+ */
+function frontierStillDispatches(status: string | undefined): boolean {
+  return status === 'pending' || status === 'claimed' || status === 'printing' || status === 'failed'
+}
+
+/**
+ * 已放行、还会继续派发的免费材料包里，还没建任务的项，按面数计入今天的在途。
+ * 不论哪天放行都算今天：这些项还会在今天出纸。已经打出来的项不在这里，仍按任务的出纸日算。
+ *
+ * 计入（同时满足）：
+ * - 实付 0 元（与 isFreeOrder 同一早退）
+ * - 订单已放行（Order.printTaskId 已指向当前任务）
+ * - 这一行 status 为 pending，且 printTaskId 为空
+ * - 当前任务那一行仍会把后面的行派发出去（见 frontierStillDispatches）
+ *
+ * 不再计入：
+ * - 这一行已经有任务：按任务算，这里不再加。反向变异：去掉 printTaskId 为空，已建任务的项会再计一次
+ * - 材料包取消：pickupStatus 或 taskStatus 为 cancelled。反向变异：放行 cancelled，取消后剩余项仍占额度
+ * - 关单：payStatus 为 closed
+ * - 到机码过期：pickupStatus / taskStatus 为 expired，或 pickupCodeExpiresAt 已到
+ * - 整单已完成：taskStatus 为 completed（advance 没有下一项时写成完成，不会再派发）
+ * - 当前行已是 completed 或 cancelled（见 frontierStillDispatches）
+ */
+async function addReservedPackageInFlight(
+  db: FreePrintQuotaDb,
+  usage: FreePrintUsage,
+  terminalId: string,
+  endUserId: string | null,
+  now: Date,
+): Promise<void> {
+  if (typeof db.order?.findMany !== 'function' || typeof db.orderItem?.findMany !== 'function') return
+  const scope = endUserId ? { OR: [{ terminalId }, { endUserId }] } : { terminalId }
+  const orders = await db.order.findMany({
+    where: {
+      AND: [
+        scope,
+        { printTaskId: { not: null } },
+        // 反向变异：从下面两处 notIn 拿掉 cancelled，取消后剩余项仍占额度。
+        { pickupStatus: { notIn: ['cancelled', 'expired'] } },
+        { taskStatus: { notIn: ['cancelled', 'expired', 'completed'] } },
+        { payStatus: { not: 'closed' } },
+        { OR: [{ pickupCodeExpiresAt: null }, { pickupCodeExpiresAt: { gt: now } }] },
+        { orderItems: { some: { status: 'pending', printTaskId: null } } },
+      ],
+    },
+    select: {
+      id: true,
+      terminalId: true,
+      endUserId: true,
+      printTaskId: true,
+      amountCents: true,
+      discountCents: true,
+    },
+  })
+  const freeOrders = orders.filter((order) => order.printTaskId && isFreeOrder(order))
+  if (freeOrders.length === 0) return
+  const frontiers = await db.orderItem.findMany({
+    where: { printTaskId: { in: freeOrders.map((order) => order.printTaskId as string) } },
+    select: { printTaskId: true, status: true },
+  })
+  const frontierStatus = new Map(frontiers.map((item) => [item.printTaskId, item.status]))
+  const liveIds = freeOrders
+    .filter((order) => frontierStillDispatches(frontierStatus.get(order.printTaskId as string)))
+    .map((order) => order.id)
+  if (liveIds.length === 0) return
+  const items = await db.orderItem.findMany({
+    // 反向变异：去掉 printTaskId: null，已建任务的项会再计一次。
+    where: { orderId: { in: liveIds }, status: 'pending', printTaskId: null },
+    select: { orderId: true, billablePages: true, copies: true },
+  })
+  const orderById = new Map(freeOrders.map((order) => [order.id, order]))
+  for (const item of items) {
+    const order = orderById.get(item.orderId)
+    if (!order) continue
+    const sides = item.billablePages * item.copies
+    if (sides <= 0) continue
+    if (order.terminalId === terminalId) usage.terminalInFlight += sides
+    if (endUserId && order.endUserId === endUserId) usage.memberInFlight += sides
+  }
+}
+
 async function attachSides(
   db: FreePrintQuotaDb,
   tasks: TaskSlice[],
@@ -277,6 +365,8 @@ export async function loadFreePrintUsage(
       else usage.memberInFlight += job.billableSides
     }
   }
+  // 已放行材料包里还没建任务的项计入今天的在途。反向变异：删掉这一行，放行后插单会超限。
+  await addReservedPackageInFlight(db, usage, terminalId, endUserId, now)
   return usage
 }
 

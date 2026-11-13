@@ -53,6 +53,7 @@ export class PackageOrderFulfillmentService {
     if (!isPrintableFileRecord(file)) {
       throw new ConflictException({ error: { code: 'PACKAGE_FILE_UNAVAILABLE', message: '材料包下一份文件已不可打印' } })
     }
+    // 不在这里再判免费额度。整包已在第一次放行时按还没打完的各项合计准入，后续各项连续派发。
     const nextTaskId = `ptask_package_${crypto.randomBytes(8).toString('hex')}`
     await tx.printTask.create({
       data: {
