@@ -152,6 +152,23 @@ async function main() {
 
   try {
     await prisma.endUser.create({ data: { id: endUserA, phoneHash: `hash_${endUserA}`, phoneEnc: `enc_${endUserA}` } })
+    // 夹具里的简历有会员主人。签名地址检查因此不拦，授权断言仍发生在出题时。
+    const resumeFileId = `resume_${suffix}`
+    await prisma.fileObject.create({
+      data: {
+        id: resumeFileId,
+        storageKey: `verify/mock-interview-consent/${resumeFileId}`,
+        filename: 'resume.docx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        sizeBytes: 32,
+        sha256: 'b'.repeat(64),
+        purpose: 'resume_upload',
+        endUserId: endUserA,
+        ownerType: 'user',
+        ownerId: endUserA,
+        status: 'active',
+      },
+    })
 
     const bare = await svc.createSession(baseCfg, member)
     cleanupSessionIds.push(bare.sessionId)
@@ -163,7 +180,7 @@ async function main() {
     if (afterBare.logs !== beforeBare.logs + 1 || afterBare.meters !== beforeBare.meters + 1) fail('22. 不带简历的成功出题应留下日志和计量（后面的「不增加」才有对照）')
     pass('22. 不带简历的模拟面试不核授权，模型照常调用')
 
-    const withResume = await svc.createSession({ ...baseCfg, resumeFileId: `resume_${suffix}` }, member)
+    const withResume = await svc.createSession({ ...baseCfg, resumeFileId }, member)
     cleanupSessionIds.push(withResume.sessionId)
     const beforeDeny = await snapshot()
     try {
@@ -184,7 +201,7 @@ async function main() {
     pass('22a. 带简历未同意 → 403，模型、日志、计量未增加，会话未停在进行中')
 
     const guestCreated = await svc.createSession(
-      { ...baseCfg, resumeFileId: `resume_guest_${suffix}` },
+      { ...baseCfg, resumeFileId },
       { endUserId: null, accessToken: null },
     )
     cleanupSessionIds.push(guestCreated.sessionId)
@@ -202,7 +219,7 @@ async function main() {
     pass('22b. 带简历已同意 → 照常出题')
 
     await privacy.revokeConsent(endUserA, 'resume_ai')
-    const again = await svc.createSession({ ...baseCfg, resumeFileId: `resume_revoked_${suffix}` }, member)
+    const again = await svc.createSession({ ...baseCfg, resumeFileId }, member)
     cleanupSessionIds.push(again.sessionId)
     const beforeRevoke = await snapshot()
     try {
@@ -222,7 +239,7 @@ async function main() {
 
     // 22d. 进行中再撤回：先在仍同意时答过一题，否则结束会先被「没有任何回答」挡住，到不了授权检查。
     await privacy.grantConsent(endUserA, 'resume_ai', null)
-    const live = await svc.createSession({ ...baseCfg, resumeFileId: `resume_live_${suffix}` }, member)
+    const live = await svc.createSession({ ...baseCfg, resumeFileId }, member)
     cleanupSessionIds.push(live.sessionId)
     const savedAnswer = '我做过会议记录和档案整理。'
     responseQueue.push(q('请自我介绍', { qType: 'intro' }))
@@ -297,6 +314,7 @@ async function main() {
     await prisma.auditLog.deleteMany({ where: { targetType: 'mock_interview_session', targetId: { in: cleanupSessionIds } } }).catch(() => undefined)
     await prisma.aiServiceLog.deleteMany({ where: { endUserId: endUserA } }).catch(() => undefined)
     await prisma.aiUsageRecord.deleteMany({ where: { featureKey: 'mock_interview', createdAt: { gte: startedAt } } }).catch(() => undefined)
+    await prisma.fileObject.deleteMany({ where: { endUserId: endUserA } }).catch(() => undefined)
     await prisma.endUser.deleteMany({ where: { id: endUserA } }).catch(() => undefined)
     server.close()
     await prisma.onModuleDestroy?.()
