@@ -37,6 +37,7 @@ import {
   type PaymentProvider,
 } from './payment-provider.types'
 import { SandboxPaymentProvider } from './providers/sandbox-payment.provider'
+import { settleServiceOrderCallback } from './service-order.payment'
 import { ONLINE_PAYMENT_CHANNELS, type PaymentAttemptStatus, type PaymentChannel } from './payment.types'
 
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
@@ -712,7 +713,11 @@ export class OnlinePaymentService {
       where: { id: event.attemptId },
       include: { order: true },
     })
-    if (!attempt) throw new BadRequestException('CALLBACK_ATTEMPT_NOT_FOUND')
+    if (!attempt) {
+      const settled = await settleServiceOrderCallback(this.prisma, this.registry, this.audit, event, channel)
+      if (!settled.matched) throw new BadRequestException('CALLBACK_ATTEMPT_NOT_FOUND')
+      return { ok: true, idempotent: settled.idempotent, ack }
+    }
     if (attempt.channel !== channel) throw new BadRequestException('CALLBACK_FIELD_MISMATCH')
     if (attempt.orderId !== event.orderId) throw new BadRequestException('CALLBACK_FIELD_MISMATCH')
     if (event.attemptId !== attempt.id) throw new BadRequestException('CALLBACK_FIELD_MISMATCH')

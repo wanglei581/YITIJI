@@ -57,6 +57,7 @@ import { DeviceFleetModule } from './device-fleet/device-fleet.module'
 import { ConsoleScreenModule } from './console-screen/console-screen.module'
 import { OfflineAgenciesModule } from './offline-agencies/offline-agencies.module'
 import { KioskSessionModule } from './kiosk-session/kiosk-session.module'
+import { ServiceOrderModule } from './payment/service-order.module'
 import { HelpModule } from './help/help.module'
 import { LegalModule } from './legal/legal.module'
 import { SupportContactModule } from './support-contact/support-contact.module'
@@ -175,6 +176,7 @@ const redisUrl = process.env['REDIS_URL']
     RecruitmentHostingModule,
     OfficialChannelsModule,
     KioskSessionModule,
+    ServiceOrderModule,
     HelpModule,
     LegalModule,
     SupportContactModule,

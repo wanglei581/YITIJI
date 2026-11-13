@@ -47,6 +47,8 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261112120000_add_terminal_home_free_badge/migration.sql')])
     // 每台机器谁付钱（20261113120000）。当前客户端写 Terminal 会带上 userChargeMode，必须在第一次 terminal.create 之前执行。
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261113120000_add_terminal_charge_settings/migration.sql')])
+    // 一体机服务单（20261113140000）。新表，当前客户端写 ServiceOrder 之前必须已存在。
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261113140000_add_service_order/migration.sql')])
     // 屏上扫描会话字段（20261102230000，排在上一条之后）。升级前已有的扫描任务升级后要取默认值：此时库里的 ScanTask 还是旧结构，
     // 而当前客户端的模型已含新列，所以旧行只能用原生 SQL 写，且必须在执行这条迁移之前写；扫描任务要挂在终端下，先建一个专用终端。
     const legacyScanId = 'legacy-scan-before-device-fields'

@@ -57,6 +57,7 @@ model Terminal {
 
   heartbeats   TerminalHeartbeat[]
   servicePrices TerminalServicePrice[]
+  serviceOrders ServiceOrder[]
   printTasks   PrintTask[]
   bindCodes    TerminalBindCode[]
   credentials  TerminalCredential[]
@@ -84,6 +85,55 @@ model TerminalServicePrice {
   updatedByAdminId String?
 
   @@unique([terminalId, serviceKey])
+}
+
+/// 一体机上一次服务的付款单。金额在建单时按生效价冻住。
+/// 状态：pending 待付 / paid 已付可用 / consumed 这一趟已开始 /
+/// refunding 退款中 / refunded 已退 / closed 未付关闭。
+/// 免费再试不是单独状态：第一次没做成会回到 paid，并写下 retryUntil。
+model ServiceOrder {
+  id              String    @id @default(cuid())
+  terminalId      String
+  terminal        Terminal  @relation(fields: [terminalId], references: [id], onDelete: Cascade)
+  /// resume_optimize / mock_interview / scan
+  serviceKey      String
+  /// 第一次 + 免费再试一次，最多 2。
+  attemptsUsed    Int       @default(0)
+  /// 建单时的生效价（分）。之后改价不影响这一单。
+  amountCents     Int
+  status          String    @default("pending")
+  /// 一体机这次使用的 clientSessionId。
+  kioskSessionId  String
+  endUserId       String?
+  provider        String
+  providerOrderNo String    @unique
+  qrCodeContent   String?
+  prepayId        String?
+  channelTxnNo    String?
+  paidAt          DateTime?
+  consumedAt      DateTime?
+  /// 消费它的 AI 任务或扫描会话 id。
+  consumedRef     String?
+  /// 这一趟没做成的原因。还在免费再试窗口内时写这里，不写进退款原因。
+  failureReason   String?
+  retryUntil      DateTime?
+  refundReason    String?
+  refundedAt      DateTime?
+  refundAttempts  Int       @default(0)
+  refundNo        String?   @unique
+  channelRefundNo String?
+  nextRefundAt    DateTime?
+  /// user_cancelled / expired / session_ended / qr_failed
+  closeReason     String?
+  /// 渠道通知付款失败。单仍是 pending，钱没扣。
+  paymentFailed   Boolean   @default(false)
+  expiresAt       DateTime
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([terminalId, kioskSessionId, status])
+  @@index([status, expiresAt])
+  @@index([status, nextRefundAt])
 }
 
 // ── TerminalCredential ───────────────────────────────────────────────────────
