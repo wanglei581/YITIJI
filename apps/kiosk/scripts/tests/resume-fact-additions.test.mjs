@@ -27,7 +27,10 @@ const loadTs = (absPath) => {
 const rule = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-deliver/factAdditionsRule.ts')).exports
 const facts = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-deliver/facts.ts')).exports
 const { findFactAdditions } = rule
-const { detectUnconfirmedAdditions, detectGeneratedUnconfirmedAdditions, detectUserResumeEdits } = facts
+const { detectUnconfirmedAdditions, detectGeneratedUnconfirmedAdditions, detectUserResumeEdits, previewUserEditTokens } = facts
+const entryIndex = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-deliver/generatedEntryIndex.ts')).exports
+const { stampGeneratedEntryIndexes, copyEntryFields, readGeneratedEntryIndex } = entryIndex
+const { replaceResumeText } = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-deliver/resumeDecisions.ts')).exports
 
 const kioskRulePath = join(kioskRoot, 'src/pages/resume/components/resume-deliver/factAdditionsRule.ts')
 const apiRulePath = join(repoRoot, 'services/api/src/ai/resume/resume-fact-additions-rule.ts')
@@ -541,15 +544,15 @@ test('较小单位后面紧跟着又一个单位时不合并', () => {
   assert.deepEqual(keysOf('2千万5', ''), ['num:25000000'])
   assert.deepEqual(keysOf('5百3千', ''), ['num:500', 'num:3000'])
   assert.deepEqual(keysOf('增长1百分点', ''), ['num:1'])
-  assert.deepEqual(keysOf('3千5百万', ''), ['num:3000', 'num:5000000'])
-  assert.deepEqual(keysOf('2千5百万', ''), ['num:2000', 'num:5000000'])
-  assert.deepEqual(keysOf('2亿3千万', ''), ['num:200000000', 'num:30000000'])
-  assert.deepEqual(keysOf('1亿2千万', ''), ['num:100000000', 'num:20000000'])
-  assert.deepEqual(keysOf('1万2千5百万', ''), ['num:12000', 'num:5000000'])
+  assert.deepEqual(keysOf('3千5百万', ''), ['raw:3千5百万'])
+  assert.deepEqual(keysOf('2千5百万', ''), ['raw:2千5百万'])
+  assert.deepEqual(keysOf('2亿3千万', ''), ['raw:2亿3千万'])
+  assert.deepEqual(keysOf('1亿2千万', ''), ['raw:1亿2千万'])
+  assert.deepEqual(keysOf('1万2千5百万', ''), ['raw:1万2千5百万'])
   assert.equal(keysOf('3千5百万', '').includes('num:3500'), false)
   assert.equal(keysOf('2亿3千万', '').includes('num:200003000'), false)
   assert.equal(keysOf('1万2千5百万', '').includes('num:12500'), false)
-  assert.deepEqual(keysOf('完成销售额3千5百万', '期望月薪3500'), ['num:3000', 'num:5000000'])
+  assert.deepEqual(keysOf('完成销售额3千5百万', '期望月薪3500'), ['raw:3千5百万'])
   assert.equal(findFactAdditions('完成销售额3千5百万', '期望月薪3500').length >= 1, true)
   assert.deepEqual(keysOf('月薪3500', '营收3千5百万'), ['num:3500'])
   assert.equal(findFactAdditions('月薪3500', '营收3千5百万').length, 1)
@@ -661,4 +664,175 @@ test('同名三段删掉第 1 段后再在第 3 段写同一个数，第 2 段 A
   const hits = detectGeneratedUnconfirmedAdditions(typed, generated, input, tokens)
   assert.equal(hits.length, 1)
   assert.equal(hits[0].includes('3') && hits[0].includes('车'), true)
+})
+
+test('读不准的数整串比较，原文里的整串不放过 AI 写的数值', () => {
+  assert.deepEqual(keysOf('3千5百多万', ''), ['raw:3千5百多万'])
+  assert.deepEqual(keysOf('3千5百余万', ''), ['raw:3千5百余万'])
+  assert.deepEqual(keysOf('3千5百 万', ''), ['raw:3千5百万'])
+  assert.deepEqual(keysOf('3千5百来万', ''), ['raw:3千5百来万'])
+  assert.deepEqual(keysOf('3千5百几万', ''), ['raw:3千5百几万'])
+  assert.deepEqual(keysOf('3千5百左右万', ''), ['raw:3千5百左右万'])
+  assert.equal(keysOf('3千5百多万', '').includes('num:3500'), false)
+  assert.equal(keysOf('3千5百余万', '').includes('num:3500'), false)
+  assert.equal(keysOf('3千5百 万', '').includes('num:3500'), false)
+  assert.deepEqual(keysOf('5百万', ''), ['num:5000000'])
+  assert.deepEqual(keysOf('3500万', ''), ['num:35000000'])
+  assert.deepEqual(keysOf('1亿2千5百万', ''), ['raw:1亿2千5百万'])
+  assert.deepEqual(findFactAdditions('营收３千５百万', '营收3千5百万'), [])
+  assert.deepEqual(findFactAdditions('营收3千5百 万', '营收3千5百万'), [])
+  assert.deepEqual(findFactAdditions('营收3千5百　万', '营收3千5百万'), [])
+  assert.equal(findFactAdditions('营收3千5百多万', '营收3千5百万').length >= 1, true)
+  const leaks = [
+    ['营收3千5百万', '服务客户3000人'],
+    ['营收3千5百万', '管理5百万预算'],
+    ['销售额2亿3千万', '销售额3千万'],
+    ['销售额1亿2千万', '销售额1亿'],
+    ['营收1万2千5百万', '月薪1万2'],
+    ['团队3千人，预算5百万', '营收3千5百万'],
+    ['期望月薪3500', '营收3千5百多万'],
+    ['期望月薪3500', '营收3千5百余万'],
+    ['期望月薪3500', '营收3千5百 万'],
+    ['营收3500万', '营收3千5百万'],
+  ]
+  for (const [input, ai] of leaks) {
+    assert.equal(findFactAdditions(ai, input).length >= 1, true, `${input} -> ${ai}`)
+  }
+  assert.equal(keysOf('1万2.5千', '')[0].startsWith('raw:'), true)
+  assert.equal(keysOf('1万零2千', '')[0].startsWith('raw:'), true)
+  assert.equal(keysOf('1万2.5千', '').some((key) => key.startsWith('num:')), false)
+  assert.equal(keysOf('1万零2千', '').some((key) => key.startsWith('num:')), false)
+  assert.equal(findFactAdditions('月薪1万2.5千', '月薪10000').length >= 1, true)
+  assert.equal(findFactAdditions('月薪1万2.5千', '月薪2500').length >= 1, true)
+  assert.equal(findFactAdditions('月薪1万零2千', '月薪10000').length >= 1, true)
+  assert.equal(findFactAdditions('月薪1万零2千', '月薪2000').length >= 1, true)
+  assert.equal(keysOf('2千5百千克', '').some((key) => key.startsWith('num:')), false)
+  assert.equal(keysOf('1万2千千瓦', '').some((key) => key.startsWith('num:')), false)
+})
+
+function editExperience(resume, index, patch) {
+  return {
+    ...resume,
+    experience: resume.experience.map((row, i) => (i === index ? copyEntryFields(row, patch) : row)),
+  }
+}
+
+function deleteExperience(resume, index) {
+  return { ...resume, experience: resume.experience.filter((_, i) => i !== index) }
+}
+
+function accumulateAnchored(generated, steps) {
+  let tokens = []
+  let current = generated
+  for (const next of steps) {
+    tokens = [...new Set([...tokens, ...previewUserEditTokens(generated, current, next)])]
+    current = next
+  }
+  return tokens
+}
+
+const shelfLine = '整理仓库货架，按保质期先进先出调整摆放顺序。'
+const postsLine = '维护门店公众号，撰写新书推荐与活动预告。'
+const postsAiLine = '维护门店公众号，撰写新书推荐与活动预告，周更 2 篇。'
+
+test('有下标时互换两条公司名，AI 的数仍待确认', () => {
+  const input = shellResume([storeRow('海岸超市', '店员', shelfLine), storeRow('灯塔书店', '店员', postsLine)])
+  const generated = stampGeneratedEntryIndexes(shellResume([
+    storeRow('海岸超市', '店员', shelfLine),
+    storeRow('灯塔书店', '店员', postsAiLine),
+  ]))
+  const swapped = editExperience(editExperience(generated, 0, { company: '灯塔书店' }), 1, { company: '海岸超市' })
+  const tokens = accumulateAnchored(generated, [
+    editExperience(generated, 0, { company: '灯塔书店' }),
+    swapped,
+  ])
+  const hits = detectGeneratedUnconfirmedAdditions(swapped, generated, input, tokens)
+  assert.equal(hits.length, 1)
+  assert.equal(hits[0].includes('周更') && hits[0].includes('2'), true)
+  const unstamped = shellResume([storeRow('灯塔书店', '店员', shelfLine), storeRow('海岸超市', '店员', postsAiLine)])
+  const oldHits = detectGeneratedUnconfirmedAdditions(unstamped, shellResume([
+    storeRow('海岸超市', '店员', shelfLine),
+    storeRow('灯塔书店', '店员', postsAiLine),
+  ]), input, [])
+  assert.equal(oldHits.length, 0)
+})
+
+test('有下标时删掉第 2 条再把第 1 条改成第 2 条的名字，AI 的数仍待确认', () => {
+  const input = shellResume([storeRow('海岸超市', '店员', postsLine), storeRow('灯塔书店', '店员', shelfLine)])
+  const generated = stampGeneratedEntryIndexes(shellResume([
+    storeRow('海岸超市', '店员', postsAiLine),
+    storeRow('灯塔书店', '店员', shelfLine),
+  ]))
+  const deleted = deleteExperience(generated, 1)
+  const renamed = editExperience(deleted, 0, { company: '灯塔书店' })
+  const tokens = accumulateAnchored(generated, [deleted, renamed])
+  const hits = detectGeneratedUnconfirmedAdditions(renamed, generated, input, tokens)
+  assert.equal(hits.length, 1)
+  assert.equal(hits[0].includes('周更') && hits[0].includes('2'), true)
+  assert.equal(readGeneratedEntryIndex(renamed.experience[0]), 0)
+})
+
+test('两条空名带下标，填名后在第 1 条写同一个数，第 2 条 AI 的数仍待确认', () => {
+  const input = shellResume([storeRow(' ', '店员', shelfLine), storeRow(' ', '店员', postsLine)])
+  const generated = stampGeneratedEntryIndexes(shellResume([
+    storeRow(' ', '店员', shelfLine),
+    storeRow(' ', '店员', postsAiLine),
+  ]))
+  const namedFirst = editExperience(generated, 0, { company: '海岸超市' })
+  const namedBoth = editExperience(namedFirst, 1, { company: '灯塔书店' })
+  const typed = editExperience(namedBoth, 0, { description: shelfLine.replace(/。$/, '，另记 2 项。') })
+  const tokens = accumulateAnchored(generated, [namedFirst, namedBoth, typed])
+  assert.equal(tokens.some((token) => token.includes('experience:gen:0') && token.includes('num:2')), true)
+  assert.equal(tokens.some((token) => token.includes('experience:gen:1') && token.includes('num:2')), false)
+  const hits = detectGeneratedUnconfirmedAdditions(typed, generated, input, tokens)
+  assert.equal(hits.length, 1)
+  assert.equal(hits[0].includes('周更') && hits[0].includes('2'), true)
+  const plainGenerated = shellResume([storeRow(' ', '店员', shelfLine), storeRow(' ', '店员', postsAiLine)])
+  const plainTyped = shellResume([
+    storeRow('海岸超市', '店员', shelfLine.replace(/。$/, '，另记 2 项。')),
+    storeRow('灯塔书店', '店员', postsAiLine),
+  ])
+  const plainTokens = accumulatePageEdits(plainGenerated, [
+    shellResume([storeRow('海岸超市', '店员', shelfLine), storeRow(' ', '店员', postsAiLine)]),
+    shellResume([storeRow('海岸超市', '店员', shelfLine), storeRow('灯塔书店', '店员', postsAiLine)]),
+    plainTyped,
+  ])
+  const plainHits = detectGeneratedUnconfirmedAdditions(plainTyped, plainGenerated, input, plainTokens)
+  assert.equal(plainHits.length, 0)
+})
+
+test('预览页记令牌拿生成稿做锚，第三参传当前稿会把数记到另一条', () => {
+  const row = (description) => storeRow('滨海超市', '理货员', description)
+  const base = '负责生鲜区上货、临期商品下架和每晚盘点交接'
+  const first = `${base}。`
+  const secondAi = `${base}，夜班，日均理货 3 车。`
+  const third = `${base}，早班。`
+  const thirdUser = `${base}，早班，另带 3 名新人。`
+  const input = shellResume([row(first), row(`${base}，夜班。`), row(third)])
+  const generated = shellResume([row(first), row(secondAi), row(third)])
+  const deleted = shellResume([row(secondAi), row(third)])
+  const typed = shellResume([row(secondAi), row(thirdUser)])
+  const tokens = previewUserEditTokens(generated, deleted, typed)
+  assert.equal(tokens.some((token) => token.includes('同名3') && token.includes('num:3')), true)
+  assert.equal(tokens.some((token) => token.includes('同名2') && token.includes('num:3')), false)
+  const hits = detectGeneratedUnconfirmedAdditions(typed, generated, input, tokens)
+  assert.equal(hits.length, 1)
+  assert.equal(hits[0].includes('3') && hits[0].includes('车'), true)
+  const page = readFileSync(join(kioskRoot, 'src/pages/resume/ResumeGeneratePreviewPage.tsx'), 'utf8')
+  assert.equal(page.includes('previewUserEditTokens(generatedResume, resume, next)'), true)
+  assert.equal(page.includes('type GeneratedAnchor'), false)
+  assert.equal(page.includes('detectUserResumeEdits('), false)
+})
+
+test('生成稿下标不进 JSON，改一行和替换正文后还在', () => {
+  const stamped = stampGeneratedEntryIndexes(shellResume([storeRow('海岸超市', '店员', '整理货架。')]))
+  assert.equal(JSON.stringify(stamped).includes('generatedEntryIndex'), false)
+  assert.equal(readGeneratedEntryIndex(stamped.experience[0]), 0)
+  assert.equal(readGeneratedEntryIndex(stamped.experience[1] ?? {}), null)
+  const edited = copyEntryFields(stamped.experience[0], { company: '灯塔书店' })
+  assert.equal(readGeneratedEntryIndex(edited), 0)
+  assert.equal(JSON.stringify(edited).includes('generatedEntryIndex'), false)
+  const replaced = replaceResumeText(stamped, '整理货架', '整理货架并补货')
+  assert.equal(readGeneratedEntryIndex(replaced.experience[0]), 0)
+  assert.equal(JSON.stringify(replaced).includes('generatedEntryIndex'), false)
 })

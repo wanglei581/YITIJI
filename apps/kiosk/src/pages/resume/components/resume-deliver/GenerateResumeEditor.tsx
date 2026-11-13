@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode, Ref } from 'react'
 import { useState } from 'react'
 import { MaskedContactLine } from '../../../../components/MaskedContactLine'
 import { DeleteEntryButton, EntryDeleteDialog } from './ResumeFactConfirmDialog'
+import { copyEntryFields } from './generatedEntryIndex'
 import { resumeTitleIssues } from './resumeEntryTitles'
 
 const taCls = 'qx-rg-ta'
@@ -123,7 +124,7 @@ export function GenerateResumeEditor(props: {
                     onFocus={mark}
                     onChange={(school) => onChange({
                       ...resume,
-                      education: resume.education.map((row, idx) => idx === i ? { ...row, school } : row),
+                      education: resume.education.map((row, idx) => idx === i ? copyEntryFields(row, { school }) : row),
                     })}
                   />
                   <TitleField
@@ -135,7 +136,7 @@ export function GenerateResumeEditor(props: {
                     onFocus={mark}
                     onChange={(major) => onChange({
                       ...resume,
-                      education: resume.education.map((row, idx) => idx === i ? { ...row, major } : row),
+                      education: resume.education.map((row, idx) => idx === i ? copyEntryFields(row, { major }) : row),
                     })}
                   />
                   {(item.degree || item.period) && (
@@ -149,7 +150,7 @@ export function GenerateResumeEditor(props: {
                     onFocus={mark}
                     onChange={(ev) => onChange({
                       ...resume,
-                      education: resume.education.map((row, idx) => idx === i ? { ...row, description: ev.target.value.slice(0, 1000) } : row),
+                      education: resume.education.map((row, idx) => idx === i ? copyEntryFields(row, { description: ev.target.value.slice(0, 1000) }) : row),
                     })}
                   />
                   <DeleteEntryButton label={`删掉这一条，第 ${i + 1} 条教育`} onClick={() => setPendingDelete({ section: 'education', index: i })} />
@@ -174,7 +175,7 @@ export function GenerateResumeEditor(props: {
                     onFocus={mark}
                     onChange={(company) => onChange({
                       ...resume,
-                      experience: resume.experience.map((row, idx) => idx === i ? { ...row, company } : row),
+                      experience: resume.experience.map((row, idx) => idx === i ? copyEntryFields(row, { company }) : row),
                     })}
                   />
                   <TitleField
@@ -186,7 +187,7 @@ export function GenerateResumeEditor(props: {
                     onFocus={mark}
                     onChange={(role) => onChange({
                       ...resume,
-                      experience: resume.experience.map((row, idx) => idx === i ? { ...row, role } : row),
+                      experience: resume.experience.map((row, idx) => idx === i ? copyEntryFields(row, { role }) : row),
                     })}
                   />
                   {item.period ? <p>{item.period}</p> : null}
@@ -198,7 +199,7 @@ export function GenerateResumeEditor(props: {
                     onFocus={mark}
                     onChange={(ev) => onChange({
                       ...resume,
-                      experience: resume.experience.map((row, idx) => idx === i ? { ...row, description: ev.target.value.slice(0, 1000) } : row),
+                      experience: resume.experience.map((row, idx) => idx === i ? copyEntryFields(row, { description: ev.target.value.slice(0, 1000) }) : row),
                     })}
                   />
                   <DeleteEntryButton label={`删掉这一条，第 ${i + 1} 条经历`} onClick={() => setPendingDelete({ section: 'experience', index: i })} />
@@ -220,7 +221,7 @@ export function GenerateResumeEditor(props: {
                   onFocus={mark}
                   onChange={(ev) => onChange({
                     ...resume,
-                    projects: resume.projects.map((row, idx) => idx === i ? { ...row, description: ev.target.value.slice(0, 1000) } : row),
+                    projects: resume.projects.map((row, idx) => idx === i ? copyEntryFields(row, { description: ev.target.value.slice(0, 1000) }) : row),
                   })}
                 />
               </div>

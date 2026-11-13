@@ -1,5 +1,6 @@
 import type { GeneratedResume, ResumeGenerateInput, ResumeOptimizeModule } from '@ai-job-print/shared'
 import { findFactAdditions } from './factAdditionsRule'
+import { readGeneratedEntryIndex } from './generatedEntryIndex'
 
 export type FactKind = 'school' | 'company' | 'period' | 'certificate' | 'phone'
 
@@ -148,6 +149,8 @@ function sameNameOrdinals(entries: EntryRef[]): Array<number | null> {
 }
 
 function entryPath(section: EntrySection, entry: EntryRef, sameNameOrdinal: number | null): string {
+  const generatedIndex = readGeneratedEntryIndex(entry.source)
+  if (generatedIndex !== null) return `${section}:gen:${generatedIndex}.description`
   const id = stableId(entry.source)
   const suffix = sameNameOrdinal === null ? '' : `:同名${sameNameOrdinal}`
   const body = id ? `id:${id}` : `name:${nameKey(entry) ?? ''}${suffix}`
@@ -195,8 +198,9 @@ function indexBuckets(entries: EntryRef[], indexes: number[]): Map<string, numbe
 }
 
 /**
- * 先按条目对齐，再比字段。下标会在删除、对调后错位。
- * 有 id 用 id；否则公司/学校/项目名 + 职务/专业/角色；还对不上就按描述相似度。
+ * 先按条目对齐，再比字段。
+ * 这一行带着生成稿下标时，只和同一下标配对；对不上就留空，不再按名称补。
+ * 没有下标的旧草稿才用 id、名称、描述相似度和同名序号。
  * 配不上的当前条目 previous 为 null，里面的数字稍后一律当 AI 新加的。
  */
 function pairEntries(current: EntryRef[], previous: EntryRef[]): Array<{ current: EntryRef; previous: EntryRef | null }> {
@@ -206,7 +210,25 @@ function pairEntries(current: EntryRef[], previous: EntryRef[]): Array<{ current
     assigned[currentIndex] = previous[previousIndex]
     prevFree[previousIndex] = false
   }
-  const freeCurrent = () => current.map((_, index) => index).filter((index) => assigned[index] === null)
+  const indexLocked = current.map(() => false)
+  const previousByIndex = new Map<number, number>()
+  let previousHasIndex = false
+  previous.forEach((entry, index) => {
+    const generatedIndex = readGeneratedEntryIndex(entry.source)
+    if (generatedIndex === null) return
+    previousHasIndex = true
+    if (!previousByIndex.has(generatedIndex)) previousByIndex.set(generatedIndex, index)
+  })
+  current.forEach((entry, index) => {
+    const generatedIndex = readGeneratedEntryIndex(entry.source)
+    if (generatedIndex === null) return
+    indexLocked[index] = true
+    const previousIndex = previousHasIndex
+      ? previousByIndex.get(generatedIndex)
+      : (generatedIndex < previous.length ? generatedIndex : undefined)
+    if (previousIndex !== undefined && prevFree[previousIndex]) claim(index, previousIndex)
+  })
+  const freeCurrent = () => current.map((_, index) => index).filter((index) => assigned[index] === null && !indexLocked[index])
   const freePrevious = () => previous.map((_, index) => index).filter((index) => prevFree[index])
 
   const idsOf = (entries: EntryRef[], indexes: number[]) => {
@@ -220,11 +242,12 @@ function pairEntries(current: EntryRef[], previous: EntryRef[]): Array<{ current
     }
     return buckets
   }
-  const currentIds = idsOf(current, current.map((_, index) => index))
-  const previousIds = idsOf(previous, previous.map((_, index) => index))
+  const currentIds = idsOf(current, freeCurrent())
+  const previousIds = idsOf(previous, freePrevious())
   for (const [id, currentList] of currentIds) {
     const previousList = previousIds.get(id)
     if (!previousList || currentList.length !== 1 || previousList.length !== 1) continue
+    if (assigned[currentList[0]] !== null || !prevFree[previousList[0]]) continue
     claim(currentList[0], previousList[0])
   }
 
@@ -352,9 +375,9 @@ function userKeyMap(userAdditions: string[]): Map<string, Set<string>> {
 
 /**
  * 仍留在当前稿里、且能对上生成稿同一条的新增事实。
- * 经历、教育、项目先按条目对齐，再按「这条的身份 + key」豁免，不按下标。
- * 配上生成稿的条目，路径整条用生成稿那一条的名称、职务和同名序号，不用当前名称。
- * 同名同职务又没有 id 时，序号是生成稿里的同名第几段。本人换序、改名都不改这条路径。
+ * 经历、教育、项目先按条目对齐，再按「这条的身份 + key」豁免。
+ * 有生成稿下标时身份就是这个下标。没有下标才用生成稿那一条的名称、职务和同名序号，不用当前名称。
+ * 同名同职务又没有 id、也没有下标时，序号是生成稿里的同名第几段。本人换序、改名都不改这条路径。
  * 配不上的条目里，相对原文多出来的数字和职责词一律待确认。
  * 技能里的数字，只有本人写进去、而且 AI 版技能里没有，才免确认。
  * 这一项别的字改过、数字仍是 AI 版技能里的，照样待确认。
@@ -411,8 +434,8 @@ export function detectGeneratedUnconfirmedAdditions(
 }
 
 /**
- * 记录预览中本人新增的事实。按对齐后的条目记路径和 key，不按下标。
- * anchor 必须是生成稿：名称、职务和同名序号都按它记，和核对用的是同一套。
+ * 记录预览中本人新增的事实。身份和核对用同一套：有生成稿下标就用下标。
+ * anchor 必须是生成稿。没有下标时，名称、职务和同名序号都按它记。
  * 技能里 AI 版已经有的数字不记成本人写的。
  */
 export function detectUserResumeEdits(
@@ -453,4 +476,13 @@ export function detectUserResumeEdits(
     }
   }
   return tokens
+}
+
+/** 预览页每次改动都拿生成稿做锚。第三参传当前稿时，同名序号会记到另一条上。 */
+export function previewUserEditTokens(
+  generated: GeneratedResume,
+  current: GeneratedResume,
+  next: GeneratedResume,
+): string[] {
+  return detectUserResumeEdits(current, next, generated)
 }

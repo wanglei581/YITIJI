@@ -11,11 +11,14 @@
  * 「百分点」「百分比」「百分之」「千分之」「千分比」「万分之」里的百、千、万不是单位：1百分点 = 1。
  * 阿拉伯数字与中文单位交替、且单位逐级变小，合成一个数：3千5百 = 3500，1万2千 = 12000。
  * 单位不是逐级变小（如 5百3千）就拆开读，不合成一个数。
+ * 读不准的整串不拆、不按数值比，记成 raw: 加上去掉空格、全角转半角后的原文。
+ * 它只和另一边同样的整串相等。读不准包括：合并时较小单位后面还紧跟单位（3千5百万、2亿3千万、1万2千5百万）；
+ * 数后面隔着空格或「多、余、来、几、左右」再接百千万亿；单位链里夹了「零」或小数又再接单位（1万零2千、1万2.5千）。
  * 职责词长的先占住区间，「独立负责」不再另报里面的「负责」。
  */
 
 export interface FactAddition {
-  /** 同一事实的规范化记号。数字按值，职责词按词。例如 num:20、pct:20、duty:牵头。 */
+  /** 同一事实的规范化记号。数字按值，职责词按词，读不准的数按整串。例如 num:20、pct:20、raw:3千5百万、duty:牵头。 */
   key: string
   /** 给人看的片段：从命中处向两侧扩到标点、换行或文本两端，每侧最多 10 个字。到了 10 个字还没遇到标点，那一侧加「…」。 */
   text: string
@@ -345,54 +348,149 @@ function readArabicUnitPlaces(text: string, index: number): number {
   return arabicUnitPlaces(text.charAt(index))
 }
 
+const HEDGE_WORDS = ['左右', '多', '余', '来', '几']
+
+function skipSpaces(text: string, index: number): number {
+  let cursor = index
+  while (cursor < text.length) {
+    const ch = text.charAt(cursor)
+    if (ch !== ' ' && ch !== '\t' && ch !== '\u3000') break
+    cursor += 1
+  }
+  return cursor
+}
+
+/** 去掉空格、全角数字转半角。多、余这些字留在整串里，不和没有它们的写法相等。 */
+function rawBody(text: string, start: number, end: number): string {
+  return toHalfWidth(text.slice(start, end)).replace(/[ \t\u3000]/g, '')
+}
+
+/**
+ * 数和单位之间隔着空格或「多、余、来、几、左右」。
+ * 紧贴着的单位不算，那是读得准的「300万」。
+ */
+function hedgeUnitEnd(text: string, index: number): number | null {
+  const spaced = skipSpaces(text, index)
+  let cursor = spaced
+  let usedHedge = false
+  for (let i = 0; i < HEDGE_WORDS.length; i += 1) {
+    const word = HEDGE_WORDS[i]
+    if (text.startsWith(word, cursor)) {
+      cursor += word.length
+      usedHedge = true
+      break
+    }
+  }
+  const after = skipSpaces(text, cursor)
+  if (!usedHedge && after === index) return null
+  if (isNotUnitPhrase(text, after)) return null
+  if ('百千万亿'.indexOf(text.charAt(after)) === -1) return null
+  let end = after + 1
+  while (end < text.length && '百千万亿'.indexOf(text.charAt(end)) !== -1 && !isNotUnitPhrase(text, end)) end += 1
+  return end
+}
+
+/** 单位链后面还连着读不准的一段：隔着说法再接单位、零后再接单位、小数后再接单位。 */
+function rawTailEnd(text: string, from: number): number | null {
+  const hedge = hedgeUnitEnd(text, from)
+  if (hedge !== null) return hedge
+  const lead = text.charAt(from)
+  if (lead === '零' || lead === '〇') {
+    let cursor = from + 1
+    if (!isDigitChar(text.charAt(cursor))) return null
+    while (isDigitChar(text.charAt(cursor)) || text.charAt(cursor) === '.' || text.charAt(cursor) === '．') cursor += 1
+    if (readArabicUnitPlaces(text, cursor) <= 0) return null
+    return cursor + 1
+  }
+  if (!isDigitChar(lead)) return null
+  const matched = ARABIC_NUMBER.exec(text.slice(from))
+  if (!matched || !/[.．]/.test(matched[0])) return null
+  const unitAt = from + matched[0].length
+  if (readArabicUnitPlaces(text, unitAt) <= 0) return null
+  return unitAt + 1
+}
+
+function consumeUncertainChain(text: string, from: number): number {
+  let cursor = from
+  while (cursor < text.length) {
+    const ch = text.charAt(cursor)
+    if (isDigitChar(ch) || '十百千万亿'.indexOf(ch) !== -1) {
+      cursor += 1
+      continue
+    }
+    const tail = rawTailEnd(text, cursor)
+    if (tail !== null && tail > cursor) {
+      cursor = tail
+      continue
+    }
+    break
+  }
+  return cursor
+}
+
 function matchArabic(
   text: string,
   index: number,
   allowPercent: boolean,
-): { end: number; canonical: string; percent: boolean } | null {
+): { end: number; canonical: string; percent: boolean; raw: string | null } | null {
   if (!isDigitChar(text.charAt(index))) return null
   const matched = (allowPercent ? ARABIC_WITH_PERCENT : ARABIC_NUMBER).exec(text.slice(index))
   if (!matched || matched[0].length === 0) return null
-  const raw = matched[0]
-  const percent = /[%％]$/.test(raw)
-  const body = toHalfWidth(raw).replace(/[%％]/g, '').replace(/[ \t\u3000,，]/g, '')
+  const token = matched[0]
+  const percent = /[%％]$/.test(token)
+  const body = toHalfWidth(token).replace(/[%％]/g, '').replace(/[ \t\u3000,，]/g, '')
   let canonical = canonicalNumber(body)
   if (canonical === null) return null
-  let end = index + raw.length
-  if (!percent) {
-    const unitPlaces = readArabicUnitPlaces(text, end)
-    if (unitPlaces > 0) {
-      canonical = shiftDecimal(canonical, unitPlaces)
-      end += 1
-      let magnitude = unitPlaces
-      const bigger = readArabicUnitPlaces(text, end)
-      if (bigger > unitPlaces && !canonical.includes('.')) {
-        canonical = shiftDecimal(canonical, bigger)
-        end += 1
-        magnitude += bigger
-      }
-      // 3千5百、1万2千：后面每段都是「一个数字 + 更小的单位」，合进同一个数。
-      // 5百3千这种单位变大的，停在这个数字前面，留给下一次各自确认。
-      while (!canonical.includes('.')) {
-        if (!isDigitChar(text.charAt(end)) || isDigitChar(text.charAt(end + 1))) break
-        const smaller = readArabicUnitPlaces(text, end + 1)
-        if (!(smaller > 0 && smaller < magnitude)) break
-        // 5百万、3千万这种单位后面还跟着单位的，读不准是谁乘谁，不合并，留给下一次各自确认。
-        if (readArabicUnitPlaces(text, end + 2) > 0) break
-        const part = shiftDecimal(toHalfWidth(text.charAt(end)), smaller)
-        if (part.includes('.')) break
-        canonical = (BigInt(canonical) + BigInt(part)).toString()
-        end += 2
-        magnitude = smaller
-      }
-      const tail = omittedArabicTail(text, end, magnitude)
-      if (tail && !canonical.includes('.') && !tail.value.includes('.')) {
-        canonical = (BigInt(canonical) + BigInt(tail.value)).toString()
-        end = tail.end
-      }
-    }
+  let end = index + token.length
+  if (percent) return { end, canonical, percent, raw: null }
+  const asRaw = (rawEnd: number) => ({
+    end: rawEnd,
+    canonical: '',
+    percent: false,
+    raw: rawBody(text, index, rawEnd),
+  })
+  const unitPlaces = readArabicUnitPlaces(text, end)
+  if (unitPlaces === 0) {
+    const awkward = rawTailEnd(text, end)
+    if (awkward !== null) return asRaw(awkward)
+    return { end, canonical, percent: false, raw: null }
   }
-  return { end, canonical, percent }
+  canonical = shiftDecimal(canonical, unitPlaces)
+  end += 1
+  let magnitude = unitPlaces
+  const bigger = readArabicUnitPlaces(text, end)
+  if (bigger > unitPlaces && !canonical.includes('.')) {
+    canonical = shiftDecimal(canonical, bigger)
+    end += 1
+    magnitude += bigger
+  }
+  // 3千5百、1万2千：后面每段都是「一个数字 + 更小的单位」，合进同一个数。
+  // 5百3千这种单位变大的，停在这个数字前面，留给下一次各自确认。
+  // 较小单位后面还紧跟单位（3千5百万）读不准，整段改记整串，不再拆成两个数。
+  let uncertainFrom: number | null = null
+  while (!canonical.includes('.')) {
+    if (!isDigitChar(text.charAt(end)) || isDigitChar(text.charAt(end + 1))) break
+    const smaller = readArabicUnitPlaces(text, end + 1)
+    if (!(smaller > 0 && smaller < magnitude)) break
+    if (readArabicUnitPlaces(text, end + 2) > 0) {
+      uncertainFrom = end
+      break
+    }
+    const part = shiftDecimal(toHalfWidth(text.charAt(end)), smaller)
+    if (part.includes('.')) break
+    canonical = (BigInt(canonical) + BigInt(part)).toString()
+    end += 2
+    magnitude = smaller
+  }
+  if (uncertainFrom !== null) return asRaw(consumeUncertainChain(text, uncertainFrom))
+  const tail = omittedArabicTail(text, end, magnitude)
+  if (tail && !canonical.includes('.') && !tail.value.includes('.')) {
+    canonical = (BigInt(canonical) + BigInt(tail.value)).toString()
+    end = tail.end
+  }
+  const awkward = rawTailEnd(text, end)
+  if (awkward !== null) return asRaw(awkward)
+  return { end, canonical, percent: false, raw: null }
 }
 
 /** 百分之后面允许单个汉字，不要求再跟量词。 */
@@ -420,6 +518,7 @@ function matchPercent(text: string, index: number): RawHit | null {
   const chinese = arabic ? null : matchBareChinese(text, cursor)
   const found = arabic ?? chinese
   if (!found) return null
+  if (arabic?.raw) return { start: index, end: arabic.end, key: `raw:${arabic.raw}`, kind: 'num', word: '' }
   return { start: index, end: found.end, key: `pct:${found.canonical}`, kind: 'num', word: '' }
 }
 
@@ -439,7 +538,8 @@ function matchRank(text: string, index: number): RawHit | { skipEnd: number } | 
   const boundary = next === '' || next === '\n' || next === '\r' || STOPS.indexOf(next) !== -1
   if (next === '名' || next === '等' || boundary) {
     const end = next === '名' || next === '等' ? found.end + 1 : found.end
-    return { start: index, end, key: `num:${found.canonical}`, kind: 'num', word: '' }
+    const key = arabic?.raw ? `raw:${arabic.raw}` : `num:${found.canonical}`
+    return { start: index, end, key, kind: 'num', word: '' }
   }
   return { skipEnd: found.end }
 }
@@ -457,6 +557,10 @@ function matchChinese(text: string, index: number): RawHit | null {
   }
   const canonical = parseChinese(run.raw)
   if (canonical === null) return null
+  const tail = rawTailEnd(text, run.end)
+  if (tail !== null) {
+    return { start: index, end: tail, key: `raw:${rawBody(text, index, tail)}`, kind: 'num', word: '' }
+  }
   return { start: index, end: run.end, key: `num:${canonical}`, kind: 'num', word: '' }
 }
 
@@ -506,7 +610,7 @@ function scan(text: string): RawHit[] {
       hits.push({
         start: index,
         end: arabic.end,
-        key: `${arabic.percent ? 'pct' : 'num'}:${arabic.canonical}`,
+        key: arabic.raw ? `raw:${arabic.raw}` : `${arabic.percent ? 'pct' : 'num'}:${arabic.canonical}`,
         kind: 'num',
         word: '',
       })

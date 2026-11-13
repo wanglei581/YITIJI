@@ -6,6 +6,7 @@ import { getResumeTemplates } from '../../../../services/api/jobMaterials'
 import { AI_QUOTA_EXHAUSTED_RESUME_COPY, errorCodeOf, userMessageOf } from '../../../../services/api/userErrorMessage'
 import { AI_OUTAGE_CODES, isAiOutage } from '../../../../ai/aiOutage'
 import { SYNTHETIC_MODULES, SYNTHETIC_RESUME } from './fixtures'
+import { stampGeneratedEntryIndexes } from './generatedEntryIndex'
 import type { OptimizeViewState } from './constants'
 
 import { useBusyLock } from '../../../../contexts/KioskBusyContext'
@@ -63,7 +64,7 @@ export function useOptimizeLoad(opts: {
       setLoading(false)
       setFailMsg(null)
       setModules(requested === 'ready' ? SYNTHETIC_MODULES : [])
-      const nextResume = requested === 'ready' ? SYNTHETIC_RESUME : null
+      const nextResume = requested === 'ready' ? stampGeneratedEntryIndexes(SYNTHETIC_RESUME) : null
       setOptimizedResume(nextResume)
       setBaseResume?.(nextResume)
       return
@@ -89,8 +90,9 @@ export function useOptimizeLoad(opts: {
         if (cancelled) return
         if (res.status === 'completed') {
           setModules(res.modules ?? [])
-          setOptimizedResume(res.optimizedResume ?? null)
-          setBaseResume?.(res.optimizedResume ?? null)
+          const stamped = res.optimizedResume ? stampGeneratedEntryIndexes(res.optimizedResume) : null
+          setOptimizedResume(stamped)
+          setBaseResume?.(stamped)
           if (!res.optimizedResume && (res.modules ?? []).length === 0) {
             setFailKind('retry')
             setFailMsg('暂无优化建议，可重试一次；若仍没有内容请返回重新解析')

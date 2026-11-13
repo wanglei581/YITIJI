@@ -39,6 +39,7 @@ import { ResumeOptimizeLeaveDialog } from './components/resume-deliver/ResumeOpt
 import { useResumeExportPricing } from './components/resume-deliver/useResumeExportPricing'
 import { useResumeDraftAutosave } from './components/resume-deliver/useResumeDraftAutosave'
 import { detectUnconfirmedAdditions, extractConfirmableFacts } from './components/resume-deliver/facts'
+import { stampGeneratedEntryIndexes } from './components/resume-deliver/generatedEntryIndex'
 import { parseOptimizeQuery, resolveOptimizeView } from './components/resume-deliver/optimizeQuery'
 import { useOptimizeLoad } from './components/resume-deliver/useOptimizeLoad'
 import { printFileSizeLabel, useOptimizeSession } from './components/resume-deliver/useOptimizeSession'
@@ -250,6 +251,7 @@ export function ResumeOptimizePage() {
   })
   const handleContinueDraft = () => {
     const payload = draft.remoteDraft
+    // 草稿没有生成稿下标。续上时不重新编号，仍按名称、相似度和同名序号配对。
     if (payload?.resume) {
       const nextDecisions = parseDecisionMap(payload.decisions)
       setDecisions(nextDecisions)
@@ -319,7 +321,7 @@ export function ResumeOptimizePage() {
     const before = resume; setAdjusting(action); setAdjustError(null)
     try {
       const result = await adjustResumeLayoutDraft(taskId, resume, action, layout, access)
-      setLastResumeBeforeAiAdjust(before); setOptimizedResume(result.resume); setAdjustWarnings(result.warnings?.length ? ['调整后的内容仍需你逐项核对，确认事实无误。'] : []); setExported(null); setIsDirty(true)
+      setLastResumeBeforeAiAdjust(before); setOptimizedResume(stampGeneratedEntryIndexes(result.resume)); setAdjustWarnings(result.warnings?.length ? ['调整后的内容仍需你逐项核对，确认事实无误。'] : []); setExported(null); setIsDirty(true)
     } catch (err) {
       if (resumeAiConsent.promptIfNeeded(err, Boolean(token), () => { void handleAiAdjust(action) })) return
       if (isAiOutage(err)) setAdjustOutage(true)
