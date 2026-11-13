@@ -1,5 +1,11 @@
+import './support/verify-policy-scope-env.cjs'
 import 'reflect-metadata'
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
+import { closeSync, mkdtempSync, openSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { NotFoundException } from '@nestjs/common'
 import { MODULE_METADATA } from '@nestjs/common/constants'
 import { PoliciesModule } from '../src/policies/policies.module'
 import { PoliciesController } from '../src/policies/policies.controller'
@@ -9,6 +15,9 @@ import { MeActivityController } from '../src/activity/me-activity.controller'
 import { PolicyScopeService, resolvePolicyScope } from '../src/policies/policy-scope.service'
 import { publicPolicyWhere, policyScopeMode } from '../src/policies/policy-public-visibility'
 import { communityFeedCacheKey } from '../src/community/community.service'
+import { PrismaService } from '../src/prisma/prisma.service'
+import { AuditService } from '../src/audit/audit.service'
+import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 async function main() {
 const held = [] as string[]
@@ -51,12 +60,87 @@ delete process.env['POLICY_SCOPE']
 assert.equal(policyScopeMode(), 'all', 'POLICY_SCOPE 缺省必须是 all（今天的行为）')
 assert.equal(JSON.stringify(publicPolicyWhere({ id: 'policy-a' }, held)), JSON.stringify(publicPolicyWhere({ id: 'policy-a' }, held, { mode: 'all' })), '缺省范围的查询条件与 all 一致')
 assert.doesNotMatch(JSON.stringify(publicPolicyWhere({ id: 'policy-a' }, held)), /sourceOrgId/, '缺省范围不加机构过滤')
+const trustedWhere = JSON.stringify(publicPolicyWhere({ publishStatus: 'published' }, held))
+assert.match(trustedWhere, /"enabled":true/, '公开读取要求来源机构仍启用')
+assert.match(trustedWhere, /"archivedAt":null/, '公开读取要求来源机构未归档')
+assert.match(trustedWhere, /"contentTrustStatus":"active"/, '公开读取要求内容可信仍是 active，撤销后不再公开')
 assert.deepEqual(await resolvePolicyScope(undefined, { headers: {} }), { mode: 'all' }, '控制器没拿到服务时按 all')
 process.env['POLICY_SCOPE'] = 'all'
 assert.equal(policyScopeMode(), 'all')
 process.env['POLICY_SCOPE'] = 'org'
 assert.equal(policyScopeMode(), 'org')
 delete process.env['POLICY_SCOPE']
-console.log('verify:policy-scope passed (A/B isolation, unbound empty, all default)')
+await assertRevokedOrDisabledOrgPolicyLeavesPublicRead()
+console.log('verify:policy-scope passed (A/B isolation, unbound empty, all default, trust gate)')
+}
+
+/** 撤销可信或停用机构后，公开列表和详情都看不到；恢复后又能看到。 */
+async function assertRevokedOrDisabledOrgPolicyLeavesPublicRead(): Promise<void> {
+  const dir = mkdtempSync(join(tmpdir(), 'verify-policy-trust-'))
+  const databasePath = join(dir, 'verify-policy-trust.db')
+  const databaseUrl = `file:${databasePath}`
+  process.env['DATABASE_URL'] = databaseUrl
+  process.env['VERIFICATION_DATABASE_TARGET'] = 'isolated'
+  if (process.env['NODE_ENV']?.trim().toLowerCase() === 'production') process.env['NODE_ENV'] = 'test'
+  assertIsolatedVerificationDatabase()
+  closeSync(openSync(databasePath, 'wx'))
+  const apiRoot = join(__dirname, '..')
+  execFileSync(process.execPath, [
+    join(apiRoot, 'node_modules/prisma/build/index.js'),
+    'db', 'push', '--url', databaseUrl, '--accept-data-loss',
+  ], { cwd: apiRoot, env: { ...process.env, DATABASE_URL: databaseUrl }, stdio: 'inherit' })
+  process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-policy-scope-terminal-admin-secret'
+  process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-policy-scope-terminal-action-secret'
+  const { PoliciesService } = await import('../src/policies/policies.service')
+  const prisma = new PrismaService()
+  await prisma.onModuleInit()
+  try {
+    const orgId = 'org-trust-gate'
+    const policyId = 'policy-trust-gate'
+    await prisma.organization.create({
+      data: {
+        id: orgId,
+        name: '可信机构',
+        type: 'public_employment_service',
+        enabled: true,
+        contentTrustStatus: 'active',
+        archivedAt: null,
+      },
+    })
+    await prisma.policyPost.create({
+      data: {
+        id: policyId,
+        sourceOrgId: orgId,
+        sourceName: '可信机构',
+        title: '还能看的政策',
+        reviewStatus: 'approved',
+        publishStatus: 'published',
+      },
+    })
+    const svc = new PoliciesService(prisma, new AuditService(prisma))
+    const listed = async () => (await svc.getPublishedPolicies()).data.some((row) => row.id === policyId)
+    const detailVisible = async () => {
+      const detail = await svc.getPublishedPolicyById(policyId)
+      return detail.data.id === policyId
+    }
+    const hidden = async () => {
+      assert.equal(await listed(), false)
+      await assert.rejects(() => svc.getPublishedPolicyById(policyId), NotFoundException)
+    }
+    assert.equal(await listed(), true)
+    assert.equal(await detailVisible(), true)
+    await prisma.organization.update({ where: { id: orgId }, data: { contentTrustStatus: 'revoked' } })
+    await hidden()
+    await prisma.organization.update({ where: { id: orgId }, data: { contentTrustStatus: 'active', enabled: false } })
+    await hidden()
+    await prisma.organization.update({ where: { id: orgId }, data: { enabled: true, archivedAt: new Date() } })
+    await hidden()
+    await prisma.organization.update({ where: { id: orgId }, data: { enabled: true, archivedAt: null, contentTrustStatus: 'active' } })
+    assert.equal(await listed(), true)
+    assert.equal(await detailVisible(), true)
+  } finally {
+    await prisma.onModuleDestroy?.()
+    rmSync(dir, { recursive: true, force: true })
+  }
 }
 main().catch((error) => { console.error(error); process.exitCode = 1 })
