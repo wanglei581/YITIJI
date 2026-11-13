@@ -30,6 +30,7 @@ import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.se
 import {
   getTerminalChargeSettings,
   saveTerminalChargeSettings,
+  type ChargeSettingsAuditWriter,
   type TerminalChargeSettingsView,
 } from '../payment/terminal-charge-settings'
 import type { UpdateTerminalChargeSettingsDto } from './dto/update-terminal-charge-settings.dto'
@@ -174,8 +175,9 @@ export class TerminalCapabilitiesService {
     terminalId: string,
     body: UpdateTerminalChargeSettingsDto,
     adminId: string,
+    writeAudit?: ChargeSettingsAuditWriter,
   ): Promise<{ previous: TerminalChargeSettingsView; next: TerminalChargeSettingsView }> {
-    return saveTerminalChargeSettings(this.prisma, terminalId, body, adminId)
+    return saveTerminalChargeSettings(this.prisma, terminalId, body, adminId, writeAudit)
   }
 
   async upsert(

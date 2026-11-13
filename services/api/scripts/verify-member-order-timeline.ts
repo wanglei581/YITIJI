@@ -64,7 +64,7 @@ import {
   type MemberOrderTimelineStatusFilter,
 } from '../src/member-print-orders/member-print-orders.types'
 import { PackageOrderService } from '../src/member-print-orders/package-order.service'
-import { adoptDevPrintSeedPrices } from '../src/payment/effective-user-prices'
+import { adoptDevPrintSeedPrices } from './support/terminal-charge-fixture'
 import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'

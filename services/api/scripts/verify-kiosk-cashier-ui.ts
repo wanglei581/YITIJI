@@ -43,7 +43,7 @@ import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { createPaymentSessionToken } from '../src/payment/payment-session-token'
 import { PricingService } from '../src/payment/pricing.service'
-import { adoptDevPrintSeedPrices, setTerminalUserPrintPrices } from '../src/payment/effective-user-prices'
+import { adoptDevPrintSeedPrices, setTerminalUserPrintPrices, restoreTerminalChargeFixture } from './support/terminal-charge-fixture'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { SandboxPaymentProvider } from '../src/payment/providers/sandbox-payment.provider'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
@@ -318,6 +318,7 @@ async function main(): Promise<void> {
 
     console.log(`\n  ✅ verify:kiosk-cashier-ui 全部通过（${passed} checks）`)
   } finally {
+    await restoreTerminalChargeFixture(prisma)
     await cleanup()
     await prisma.onModuleDestroy?.()
   }

@@ -348,6 +348,7 @@ const ACTION_LABELS: Record<string, string> = {
   'terminal.daily_free_print_sides.update': '修改终端每日免费打印上限',
   'terminal.home_free_badge.update': '修改终端首页「免费使用」显示',
   'terminal.charge_settings.update': '修改终端收费设置',
+  'terminal.charge_settings.reset_on_rebind': '改绑机构，收费设置已复位',
   'billing.personal_charge.enable': '打开向个人收费',
   'billing.personal_charge.disable': '关闭向个人收费',
   'copy.cancel': '取消复印任务',

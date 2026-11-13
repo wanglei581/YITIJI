@@ -25,7 +25,7 @@ import { COPY_MAX_PAGES } from '../src/copy-jobs/copy-job.policy'
 import { COPY_MAX_COPIES, type CopyJobView, type CopyPermit } from '../src/copy-jobs/copy-job.types'
 import { SCAN_DEVICE_OTHER_MAX_PAGES } from '../src/files/file-validation'
 import { MemberPrintOrdersService } from '../src/member-print-orders/member-print-orders.service'
-import { setTerminalUserPrintPrices } from '../src/payment/effective-user-prices'
+import { setTerminalUserPrintPrices, restoreTerminalChargeFixture } from './support/terminal-charge-fixture'
 import { KEY_GUEST_PER_ORDER_SIDES } from '../src/print-jobs/free-print-quota.policy'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { verifyCopyC1c } from './support/copy-c1c-verification'
@@ -246,6 +246,7 @@ async function main() {
   } finally {
     if (oddSetting === undefined) delete process.env['COPY_ALLOW_ODD_DUPLEX_MULTICOPY']
     else process.env['COPY_ALLOW_ODD_DUPLEX_MULTICOPY'] = oddSetting
+    await restoreTerminalChargeFixture(prisma)
     const ids = (await prisma.copyJob.findMany({ where: { terminalId: { in: tids } } })).map((j) => j.id)
     const orders = (await prisma.order.findMany({ where: { terminalId: { in: tids } } })).map((j) => j.id)
     await prisma.auditLog.deleteMany({ where: { targetId: { in: [...tids, ...ids, ...orders] } } })

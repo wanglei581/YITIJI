@@ -7,7 +7,9 @@ import { revokeTerminalCopyAuthorization } from '../copy-jobs/copy-authorization
 import { assertCanBindTerminal } from '../licenses/license-gate'
 
 export type TerminalOrgAssignmentAudit = (tx: PrismaTransactionClient, result: AssignTerminalOrgResult & {
-  deploymentIds: string[]; effectiveAt: string
+  deploymentIds: string[]
+  effectiveAt: string
+  chargeSettingsReset: boolean
 }) => Promise<unknown>
 
 /** Rebinding, ownership interval closure and required audit commit or roll back together. */
@@ -55,14 +57,23 @@ export async function assignTerminalOrganization(prisma: PrismaService, terminal
     const effectiveAt = new Date(Math.max((now ?? new Date()).getTime(), active?.startedAt.getTime() ?? 0,
       current.orgBoundAt?.getTime() ?? 0, latest?.endedAt?.getTime() ?? 0))
     await tx.terminal.update({ where: { id: terminal.id }, data: terminalOrgBindingWrite(oldOrgId, orgId, effectiveAt) })
+    let chargeSettingsReset = false
     if (oldOrgId !== orgId) {
       await revokeTerminalCopyAuthorization(tx, terminal.id)
       await tx.serviceDeployment.updateMany({
         where: { terminalId: terminal.id, endedAt: null },
         data: { endedAt: effectiveAt, activeTerminalId: null },
       })
+      await tx.terminal.update({ where: { id: terminal.id }, data: { userChargeMode: 'org_pays' } })
+      await tx.terminalServicePrice.deleteMany({ where: { terminalId: terminal.id } })
+      chargeSettingsReset = true
     }
-    await writeAudit(tx, { ...result, deploymentIds: oldOrgId !== orgId && active ? [active.id] : [], effectiveAt: effectiveAt.toISOString() })
+    await writeAudit(tx, {
+      ...result,
+      deploymentIds: oldOrgId !== orgId && active ? [active.id] : [],
+      effectiveAt: effectiveAt.toISOString(),
+      chargeSettingsReset,
+    })
   })
 
   return result

@@ -68,6 +68,13 @@ test('纯判定：开关开且五个生效价都是 0 才显示', () => {
   assert.equal(kioskHomeFreeBadgeVisible({ config: configWith({}, false) }), false)
 })
 
+test('配置里没有 homeFreeBadge、五个价全 0 → 不显示', () => {
+  const { kioskHomeFreeBadgeVisible } = reader
+  const config = configWith({})
+  delete config.homeFreeBadge
+  assert.equal(kioskHomeFreeBadgeVisible({ config }), false)
+})
+
 test('纯判定：任一价大于 0、价读不齐、配置没有开关，都不显示', () => {
   const { kioskHomeFreeBadgeVisible } = reader
   assert.equal(kioskHomeFreeBadgeVisible({ config: configWith({ print_bw_page: 20 }) }), false)
@@ -368,4 +375,86 @@ test('展示价读本机 pricing 的黑白和彩色，读不到就失败', async
     throw new Error(`Unexpected dependency ${name}`)
   })
   await assert.rejects(() => missing.fetchPrintPriceConfig(), /missing terminal id/)
+
+  const unreadable = load('src/services/print/priceConfigApi.ts', (name) => {
+    if (name === 'react') return { useState: (initial) => [typeof initial === 'function' ? initial() : initial, () => undefined], useEffect: () => undefined }
+    if (name === '../api/client') return { API_MODE: 'http' }
+    if (name === '../api/terminalConfig') {
+      return {
+        getTerminalId: () => 'term-1',
+        getCachedKioskTerminalConfig: async () => ({ pricing: { effective: {} } }),
+        refreshKioskTerminalConfig: async () => { throw new Error('不该走强制刷新') },
+      }
+    }
+    throw new Error(`Unexpected dependency ${name}`)
+  })
+  await assert.rejects(() => unreadable.fetchPrintPriceConfig(), /machine price missing/)
+})
+
+test('强制重读不走缓存', async () => {
+  let cached = 0
+  let refreshed = 0
+  const priceApi = load('src/services/print/priceConfigApi.ts', (name) => {
+    if (name === 'react') return { useState: (initial) => [typeof initial === 'function' ? initial() : initial, () => undefined], useEffect: () => undefined }
+    if (name === '../api/client') return { API_MODE: 'http' }
+    if (name === '../api/terminalConfig') {
+      return {
+        getTerminalId: () => 'term-1',
+        getCachedKioskTerminalConfig: async () => {
+          cached += 1
+          return configWith({ print_bw_page: 20, print_color_page: 50 })
+        },
+        refreshKioskTerminalConfig: async () => {
+          refreshed += 1
+          return configWith({ print_bw_page: 30, print_color_page: 60 })
+        },
+      }
+    }
+    throw new Error(`Unexpected dependency ${name}`)
+  })
+  const first = await priceApi.fetchPrintPriceConfig()
+  assert.equal(priceApi.unitCentsFor(first, 'black_white'), 20)
+  assert.equal(cached, 1)
+  assert.equal(refreshed, 0)
+  const second = await priceApi.fetchPrintPriceConfig({ force: true })
+  assert.equal(priceApi.unitCentsFor(second, 'black_white'), 30)
+  assert.equal(priceApi.unitCentsFor(second, 'color'), 60)
+  assert.equal(cached, 1)
+  assert.equal(refreshed, 1)
+})
+
+test('更早发出的缓存请求不能盖掉强制刷新', async () => {
+  const pending = []
+  const previousWindow = globalThis.window
+  globalThis.window = { location: { origin: 'http://kiosk.local' } }
+  try {
+    const terminalConfig = load('src/services/api/terminalConfig.ts', (name) => {
+      if (name === '@ai-job-print/shared') return { DEFAULT_SMART_CAMPUS_MODULES: {} }
+      if (name === './client') return { API_MODE: 'http', API_BASE_URL: '/api/v1' }
+      if (name === './httpAdapter') return { ApiHttpError: class ApiHttpError extends Error {} }
+      if (name === './screensaver') return { getTerminalCode: () => null, getTerminalId: () => 'term-1' }
+      if (name === '../terminalAuth') {
+        return {
+          terminalProtectedFetch: () => {
+            let resolve
+            const gate = new Promise((done) => { resolve = done })
+            pending.push(resolve)
+            return gate.then((body) => ({ ok: true, json: async () => body }))
+          },
+        }
+      }
+      throw new Error(`Unexpected dependency ${name}`)
+    })
+    const slow = terminalConfig.getCachedKioskTerminalConfig('term-1')
+    const fresh = terminalConfig.refreshKioskTerminalConfig('term-1')
+    assert.equal(pending.length, 2)
+    pending[1]({ configVersion: 'fresh' })
+    assert.equal((await fresh).configVersion, 'fresh')
+    pending[0]({ configVersion: 'stale' })
+    assert.equal((await slow).configVersion, 'stale')
+    assert.equal(terminalConfig.peekCachedKioskTerminalConfig('term-1').configVersion, 'fresh')
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window
+    else globalThis.window = previousWindow
+  }
 })

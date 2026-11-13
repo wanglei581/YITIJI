@@ -25,7 +25,7 @@ import { PackageOrdersController } from '../src/member-print-orders/package-orde
 import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
-import { adoptDevPrintSeedPrices, setTerminalUserPrintPrices } from '../src/payment/effective-user-prices'
+import { adoptDevPrintSeedPrices, setTerminalUserPrintPrices } from './support/terminal-charge-fixture'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { PrismaService } from '../src/prisma/prisma.service'

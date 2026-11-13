@@ -134,6 +134,7 @@ export function TerminalChargeSettingsSection({
   return (
     <section className="rounded-lg border border-neutral-900/[0.08] px-4 py-3">
       <h3 className="text-[13px] font-bold text-neutral-800">收费设置</h3>
+      <p className="mt-2 text-sm text-neutral-700">改绑机构，收费设置已复位</p>
       {loading ? <p className="mt-2 text-sm text-neutral-500">正在读取…</p> : null}
       {error ? <p className="mt-2 text-sm text-error-fg" role="alert">{error}</p> : null}
       {notice ? <p className="mt-2 text-sm text-success-fg">{notice}</p> : null}

@@ -169,7 +169,7 @@ flowchart TD
 | **TerminalReleaseObservation** | 10 | AgentReleaseTarget | 1 个文件<br/>`terminals/release-observation.service.ts` |
 | **TerminalScanDeletionAudit** | 13 | Terminal | 1 个文件<br/>`terminals/terminal-scan-deletion-audit.service.ts` |
 | **TerminalScreensaverConfig** | 9 | AdPlaylist | 2 个文件<br/>`content/content.service.ts`<br/>`device-fleet/device-fleet.service.ts` |
-| **TerminalServicePrice** | 7 | Terminal | 3 个文件<br/>`orgs/partner-stats.service.ts`<br/>`payment/effective-user-prices.ts`<br/>`payment/terminal-charge-settings.ts` |
+| **TerminalServicePrice** | 7 | Terminal | 3 个文件<br/>`orgs/partner-stats.service.ts`<br/>`payment/terminal-charge-settings.ts`<br/>`terminals/terminal-org-assignment.ts` |
 | **TerminalSmartCampusConfig** | 7 | — | 3 个文件<br/>`device-fleet/device-fleet.service.ts`<br/>`smart-campus/smart-campus.service.ts`<br/>`terminals/terminals-agent.service.ts` |
 | **TerminalToolboxConfig** | 7 | — | 3 个文件<br/>`device-fleet/device-fleet.service.ts`<br/>`terminals/terminal-toolbox.service.ts`<br/>`terminals/toolbox-governance.service.ts` |
 | **ToolboxAllowedHost** | 13 | — | 1 个文件<br/>`terminals/toolbox-governance.service.ts` |

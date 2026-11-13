@@ -16,7 +16,7 @@ import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory
 import type { AdminMarkPaidDto, AdminRefundDto } from '../src/payment/dto/order-action.dto'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
-import { adoptDevPrintSeedPrices, setTerminalUserPrintPrices } from '../src/payment/effective-user-prices'
+import { adoptDevPrintSeedPrices, setTerminalUserPrintPrices, restoreTerminalChargeFixture } from './support/terminal-charge-fixture'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
@@ -707,6 +707,7 @@ async function main(): Promise<void> {
     }
     pass(`P0a payment-domain contract satisfied (${8} checks)`)
   } finally {
+    await restoreTerminalChargeFixture(prisma)
     await cleanup()
     await prisma.onModuleDestroy()
   }

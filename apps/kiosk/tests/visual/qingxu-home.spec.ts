@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
+import { machinePricing, machinePricingMissingColor } from '../fixtures/machine-pricing'
 import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
 import { assertNoHorizontalOverflow, findClippedText } from './assert-layout'
 import { registerW6Api } from './fixtures/fusion-w6-api'
@@ -28,7 +29,7 @@ function homeFair(): Record<string, unknown> {
   }
 }
 
-function registerHomeApi(api: ApiRouter, fairs: unknown[] = [homeFair()]): void {
+function registerHomeApi(api: ApiRouter, fairs: unknown[] = [homeFair()], pricing?: Record<string, unknown>): void {
   // 本套件最后一步会点主 CTA 进 /assistant，助手页挂载即请求语音能力。
   // 不 stub 的话，fixture 拆卸时会以「未处理请求」判失败——那是竞态不是缺陷。
   api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
@@ -57,6 +58,7 @@ function registerHomeApi(api: ApiRouter, fairs: unknown[] = [homeFair()]): void 
       configVersion: 'qx-home-e2e',
       refreshIntervalMs: 300000,
       serverTime: '2026-09-07T00:00:00.000Z',
+      ...(pricing ? { pricing } : {}),
     },
   })
   api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
@@ -565,7 +567,8 @@ for (const [label, bw, color, paid] of [
   ['彩色缺价', 0, null, false],
 ] as const) {
   test(`home print copy follows the published price: ${label} @w1-kiosk`, async ({ page, api }) => {
-    registerHomeApi(api)
+    const pricing = color === null ? machinePricingMissingColor(bw) : machinePricing(bw, color)
+    registerHomeApi(api, [homeFair()], pricing)
     api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
       status: 200, json: { printerStatus: 'ready', isOnline: true },
     })

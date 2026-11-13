@@ -18,7 +18,7 @@
 import { useEffect, useState } from 'react'
 import type { PrintPriceConfigView } from '@ai-job-print/shared'
 import { API_MODE } from '../api/client'
-import { getCachedKioskTerminalConfig, getTerminalId } from '../api/terminalConfig'
+import { getCachedKioskTerminalConfig, getTerminalId, refreshKioskTerminalConfig } from '../api/terminalConfig'
 
 /** 仅 mock 演示。默认 0，不是真实价格。生产构建不可达。 */
 const DEMO_PRICE_CONFIG: PrintPriceConfigView = {
@@ -37,10 +37,12 @@ function machineUnitCents(effective: Record<string, unknown> | undefined, key: s
   return value
 }
 
-export async function fetchPrintPriceConfig(): Promise<PrintPriceConfigView> {
+export async function fetchPrintPriceConfig(options?: { force?: boolean }): Promise<PrintPriceConfigView> {
   const terminalId = getTerminalId()
   if (!terminalId) throw new Error('fetchPrintPriceConfig: missing terminal id')
-  const config = await getCachedKioskTerminalConfig(terminalId)
+  const config = options?.force
+    ? await refreshKioskTerminalConfig(terminalId)
+    : await getCachedKioskTerminalConfig(terminalId)
   const effective = config.pricing?.effective as Record<string, unknown> | undefined
   return {
     billingEnabled: true,

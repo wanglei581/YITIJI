@@ -40,6 +40,7 @@ import { UpdateTerminalHomeFreeBadgeDto } from './dto/update-terminal-home-free-
 import { UpdateTerminalChargeSettingsDto } from './dto/update-terminal-charge-settings.dto'
 import { TerminalCapabilitiesService, TERMINAL_HOME_FREE_BADGE_AUDIT_ACTION } from './terminal-capabilities.service'
 import {
+  TERMINAL_CHARGE_RESET_ON_REBIND_AUDIT_ACTION,
   TERMINAL_CHARGE_SETTINGS_AUDIT_ACTION,
   chargeAuditSnapshot,
 } from '../payment/terminal-charge-settings'
@@ -135,23 +136,41 @@ export class AdminTerminalsController {
     @CurrentUser() user: AuthedUser,
     @Req() req: AuditReq,
   ): Promise<ApiResponse<AssignTerminalOrgResult>> {
-    const result = await this.terminalsService.assignTerminalOrg(terminalId, dto.orgId, undefined, (tx, assignment) => this.audit.writeRequired(tx, {
-      actorId: user.userId,
-      actorRole: user.role,
-      action: 'terminal.org.update',
-      targetType: 'terminal',
-      targetId: assignment.terminalCode,
-      payload: {
-        terminalCode: assignment.terminalCode,
-        oldOrgId: assignment.oldOrgId,
-        newOrgId: assignment.newOrgId,
-        deploymentIds: assignment.deploymentIds,
-        effectiveAt: assignment.effectiveAt,
-      },
-      ipAddress: extractIp(req),
-      userAgent: extractUa(req),
-      requestId: req.requestId ?? null,
-    }))
+    const result = await this.terminalsService.assignTerminalOrg(terminalId, dto.orgId, undefined, async (tx, assignment) => {
+      await this.audit.writeRequired(tx, {
+        actorId: user.userId,
+        actorRole: user.role,
+        action: 'terminal.org.update',
+        targetType: 'terminal',
+        targetId: assignment.terminalCode,
+        payload: {
+          terminalCode: assignment.terminalCode,
+          oldOrgId: assignment.oldOrgId,
+          newOrgId: assignment.newOrgId,
+          deploymentIds: assignment.deploymentIds,
+          effectiveAt: assignment.effectiveAt,
+        },
+        ipAddress: extractIp(req),
+        userAgent: extractUa(req),
+        requestId: req.requestId ?? null,
+      })
+      if (!assignment.chargeSettingsReset) return
+      await this.audit.writeRequired(tx, {
+        actorId: user.userId,
+        actorRole: user.role,
+        action: TERMINAL_CHARGE_RESET_ON_REBIND_AUDIT_ACTION,
+        targetType: 'terminal',
+        targetId: assignment.terminalCode,
+        payload: {
+          terminalCode: assignment.terminalCode,
+          oldOrgId: assignment.oldOrgId,
+          newOrgId: assignment.newOrgId,
+        },
+        ipAddress: extractIp(req),
+        userAgent: extractUa(req),
+        requestId: req.requestId ?? null,
+      })
+    })
     return ApiResponse.ok(result)
   }
 
@@ -407,22 +426,21 @@ export class AdminTerminalsController {
     @CurrentUser() user: AuthedUser,
     @Req() req: AuditReq,
   ): Promise<ApiResponse<Awaited<ReturnType<TerminalCapabilitiesService['getChargeSettings']>>>> {
-    const saved = await this.capabilities.saveChargeSettings(terminalId, dto, user.userId)
-    await this.audit.write({
+    const saved = await this.capabilities.saveChargeSettings(terminalId, dto, user.userId, (tx, written) => this.audit.writeRequired(tx, {
       actorId: user.userId,
       actorRole: user.role,
       action: TERMINAL_CHARGE_SETTINGS_AUDIT_ACTION,
       targetType: 'terminal',
-      targetId: saved.next.terminalCode,
+      targetId: written.next.terminalCode,
       payload: {
-        terminalCode: saved.next.terminalCode,
-        previous: chargeAuditSnapshot(saved.previous),
-        next: chargeAuditSnapshot(saved.next),
+        terminalCode: written.next.terminalCode,
+        previous: chargeAuditSnapshot(written.previous),
+        next: chargeAuditSnapshot(written.next),
       },
       ipAddress: extractIp(req),
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
-    })
+    }))
     return ApiResponse.ok(saved.next)
   }
 }
