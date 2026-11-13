@@ -256,7 +256,8 @@ test('hosting on: home keeps the job and fair entries exactly as today @w1-kiosk
 
 test('missing recruitmentHosting stays closed even when jobBoard.enabled is true @w1-kiosk', async ({ page, api }) => {
   registerShell(api, RECRUITMENT_HOSTING_OFF)
-  const { recruitmentHosting: _dropped, ...jobBoardOnly } = terminalConfigWithHosting(RECRUITMENT_HOSTING_ON)
+  const jobBoardOnly = terminalConfigWithHosting(RECRUITMENT_HOSTING_ON)
+  delete jobBoardOnly.recruitmentHosting
   api.respond('GET', CONFIG, { status: 200, json: jobBoardOnly })
   api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 3, totalPages: 3 } } })
   api.respond('GET', '/api/v1/job-fairs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } } })
@@ -276,7 +277,9 @@ test('missing recruitmentHosting stays closed even when jobBoard.enabled is true
   expect(api.requestCount('GET', '/api/v1/jobs'), '缺这一项时不请求岗位').toBe(0)
 
   // 两个字段都没有（比 3.13 更早的服务端）：按关闭处理，不因为「没说关」就放行。
-  const { recruitmentHosting: _hosting, jobBoard: _board, ...neither } = terminalConfigWithHosting(RECRUITMENT_HOSTING_ON)
+  const neither = terminalConfigWithHosting(RECRUITMENT_HOSTING_ON)
+  delete neither.recruitmentHosting
+  delete neither.jobBoard
   api.respond('GET', CONFIG, { status: 200, json: neither })
   const configReadyNeither = page.waitForResponse((response) => new URL(response.url()).pathname === CONFIG && response.ok())
   await page.goto('/', { waitUntil: 'domcontentloaded' })
