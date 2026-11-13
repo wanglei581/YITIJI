@@ -20309,6 +20309,7 @@
       "apps/kiosk/scripts/verify-deploy-vite-env-coverage.mjs",
       "scripts/verify-ci-main-runs-complete.mjs",
       "scripts/verify-deploy-authorization-gate.mjs",
+      "scripts/verify-deploy-fetch-cleanup.mjs",
       "scripts/verify-deploy-gates-in-sync.mjs",
       "scripts/verify-deploy-rollback.mjs",
       "scripts/verify-release-bundle.mjs",
@@ -38201,6 +38202,24 @@
       "package": "ai-job-print-terminal",
       "scriptNames": [
         "ai-job-print-terminal::verify:deploy-authorization-gate"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          ".github/workflows/deploy.yml"
+        ],
+        "missing": []
+      },
+      "file": "scripts/verify-deploy-fetch-cleanup.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:deploy-fetch-cleanup"
       ],
       "wired": true
     },
