@@ -54,6 +54,7 @@ export interface DocumentProcessTaskView {
 export interface CreateMaterialTaskInput {
   kind: MaterialTaskKind
   sourceFileId: string
+  fileAccessUrl?: string
   params?: Record<string, unknown>
 }
 

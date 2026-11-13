@@ -114,7 +114,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const [experience, setExperience] = useState<InterviewExperience | ''>(setupDraft?.experience ?? '')
   const [difficulty, setDifficulty] = useState<InterviewDifficulty>(setupDraft?.difficulty ?? 'standard')
   const [duration, setDuration] = useState<InterviewDuration>(setupDraft?.duration ?? 5)
-  const [resumeFile, setResumeFile] = useState<{ fileId: string; name: string } | null>(setupDraft?.resumeFile ?? null)
+  const [resumeFile, setResumeFile] = useState<{ fileId: string; name: string; fileUrl?: string } | null>(setupDraft?.resumeFile ?? null)
   const [resumeChannel, setResumeChannel] = useState<ResumeChannel | null>(null)
   const [uploading, setUploading] = useState(false)
   const [usbBusy, setUsbBusy] = useState(false)
@@ -182,7 +182,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     setError(null)
     try {
       const uploaded = await kioskUploadFile(file, 'resume_upload', getToken())
-      setResumeFile({ fileId: uploaded.fileId, name: uploaded.filename })
+      setResumeFile({ fileId: uploaded.fileId, name: uploaded.filename, fileUrl: uploaded.signedUrl })
     } catch (err) {
       setError(userMessageOf(err, '简历上传失败，请重试'))
     } finally {
@@ -211,14 +211,14 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     setStartFailed(false)
     let created: CreateInterviewResponse | undefined
     try {
-      const input: CreateInterviewInput = {
+      const input: CreateInterviewInput & { fileAccessUrl?: string } = {
         interviewerType,
         industry,
         position: pos,
         experience,
         difficulty,
         durationMin: duration,
-        ...(!omitResume && resumeFile ? { resumeFileId: resumeFile.fileId } : {}),
+        ...(!omitResume && resumeFile ? { resumeFileId: resumeFile.fileId, fileAccessUrl: resumeFile.fileUrl } : {}),
       }
       const token = getToken()
       created = await createInterview(input, { token })
@@ -684,7 +684,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                 kiosk={kiosk}
                 uploading={uploading}
                 onPickFile={() => { if (!isTerminalKiosk()) fileInputRef.current?.click() }}
-                onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name })}
+                onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name, fileUrl: file.fileUrl })}
                 onQrBusy={() => undefined}
                 onUsbBusy={setUsbBusy}
               />
