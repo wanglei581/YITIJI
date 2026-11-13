@@ -280,7 +280,8 @@ function alignSection(section: EntrySection, current: GeneratedResume, previous:
     const previousIndex = pair.previous ? previousRefs.indexOf(pair.previous) : -1
     const ordinal = previousIndex >= 0 ? (previousOrdinals[previousIndex] ?? null) : null
     return {
-      path: entryPath(section, pair.current, ordinal),
+      // 用当前名称时，本人把这一条改成另一条的名字，两条路径会撞在一起，AI 的数被豁免。
+      path: entryPath(section, pair.previous ?? pair.current, ordinal),
       currentText: pair.current.description,
       previousText: pair.previous?.description ?? '',
       matched: pair.previous !== null,
@@ -352,7 +353,8 @@ function userKeyMap(userAdditions: string[]): Map<string, Set<string>> {
 /**
  * 仍留在当前稿里、且能对上生成稿同一条的新增事实。
  * 经历、教育、项目先按条目对齐，再按「这条的身份 + key」豁免，不按下标。
- * 同名同职务又没有 id 时，身份带上生成稿里的同名第几段，只豁免本人改的那一段。本人换序也不改这段序号。
+ * 配上生成稿的条目，路径整条用生成稿那一条的名称、职务和同名序号，不用当前名称。
+ * 同名同职务又没有 id 时，序号是生成稿里的同名第几段。本人换序、改名都不改这条路径。
  * 配不上的条目里，相对原文多出来的数字和职责词一律待确认。
  * 技能里的数字，只有本人写进去、而且 AI 版技能里没有，才免确认。
  * 这一项别的字改过、数字仍是 AI 版技能里的，照样待确认。
@@ -410,13 +412,13 @@ export function detectGeneratedUnconfirmedAdditions(
 
 /**
  * 记录预览中本人新增的事实。按对齐后的条目记路径和 key，不按下标。
- * anchor 是生成稿：同名序号按它数，和核对用的是同一套。不传时按 before 数。
+ * anchor 必须是生成稿：名称、职务和同名序号都按它记，和核对用的是同一套。
  * 技能里 AI 版已经有的数字不记成本人写的。
  */
 export function detectUserResumeEdits(
   before: GeneratedResume,
   after: GeneratedResume,
-  anchor: GeneratedResume = before,
+  anchor: GeneratedResume,
 ): string[] {
   const tokens: string[] = []
   const seen = new Set<string>()

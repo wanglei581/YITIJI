@@ -142,7 +142,7 @@ test('本人自己新写的数不算 AI 新增', () => {
   const generated = resumeWith('负责学院公众号的选题、撰写和排版，周更 2 篇。')
   const cleared = resumeWith('负责学院公众号的选题、撰写和排版。')
   const retyped = resumeWith('负责学院公众号的选题、撰写和排版，一共写过 2 篇。')
-  const userAdditions = detectUserResumeEdits(cleared, retyped)
+  const userAdditions = detectUserResumeEdits(cleared, retyped, cleared)
   assert.equal(userAdditions.some((text) => text.includes('2')), true)
   const hits = detectGeneratedUnconfirmedAdditions(retyped, generated, originalInput, userAdditions)
   assert.equal(hits.some((text) => text.includes('2')), false)
@@ -236,7 +236,7 @@ test('教育里本人写的 2 不豁免经历里 AI 的 2', () => {
   const input = resumeFields({ education: '完成本科学业。', experience: '负责排版。' })
   const generated = resumeFields({ education: '完成本科学业。', experience: '负责排版，周更 2 篇。' })
   const edited = resumeFields({ education: '读了 2 年。', experience: '负责排版，周更 2 篇。' })
-  const userAdditions = detectUserResumeEdits(generated, edited)
+  const userAdditions = detectUserResumeEdits(generated, edited, generated)
   assert.equal(userAdditions.some((token) => token.includes('education:name:青岛大学') && token.includes('num:2')), true)
   const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
   assert.equal(hits.some((text) => text.includes('周更')), true)
@@ -247,7 +247,7 @@ test('项目里本人写的 2 不算 AI 新增', () => {
   const input = resumeFields({ experience: '负责排版。', project: '参与一个活动。' })
   const generated = resumeFields({ experience: '负责排版，周更 2 篇。', project: '参与一个活动。' })
   const edited = resumeFields({ experience: '负责排版，周更 2 篇。', project: '主持 2 个项目。' })
-  const userAdditions = detectUserResumeEdits(generated, edited)
+  const userAdditions = detectUserResumeEdits(generated, edited, generated)
   const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
   assert.equal(hits.some((text) => text.includes('主持')), false)
   assert.equal(hits.some((text) => text.includes('周更')), true)
@@ -256,7 +256,7 @@ test('项目里本人写的 2 不算 AI 新增', () => {
 test('同一字段里本人在 AI 的数旁边再写一个数，AI 那个仍要确认', () => {
   const generated = resumeWith('负责学院公众号的选题、撰写和排版，周更 2 篇。')
   const edited = resumeWith('负责学院公众号的选题、撰写和排版，周更 2 篇，另记 3 项。')
-  const userAdditions = detectUserResumeEdits(generated, edited)
+  const userAdditions = detectUserResumeEdits(generated, edited, generated)
   assert.equal(userAdditions.some((token) => token.includes('num:3')), true)
   assert.equal(userAdditions.some((token) => token.includes('num:2')), false)
   const hits = detectGeneratedUnconfirmedAdditions(edited, generated, originalInput, userAdditions)
@@ -268,7 +268,7 @@ test('技能里本人把数字敲回去不算 AI 新增', () => {
   const generated = resumeWith('负责学院公众号的选题、撰写和排版。', ['熟练使用 5 种工具'])
   const cleared = resumeWith('负责学院公众号的选题、撰写和排版。', ['熟练使用工具'])
   const retyped = resumeWith('负责学院公众号的选题、撰写和排版。', ['熟练使用 5 种工具'])
-  const userAdditions = detectUserResumeEdits(cleared, retyped)
+  const userAdditions = detectUserResumeEdits(cleared, retyped, cleared)
   assert.equal(userAdditions.some((token) => token.startsWith('field:skill:') && token.includes('num:5')), true)
   const hits = detectGeneratedUnconfirmedAdditions(retyped, generated, originalInput, userAdditions)
   assert.equal(hits.some((text) => text.includes('5')), false)
@@ -320,7 +320,7 @@ const twoExperienceGenerated = shellResume([frontExp, backExp])
 
 test('删掉前段经历后，后段 AI 加的数字仍待确认', () => {
   const edited = shellResume([backExp])
-  const userAdditions = detectUserResumeEdits(twoExperienceGenerated, edited)
+  const userAdditions = detectUserResumeEdits(twoExperienceGenerated, edited, twoExperienceGenerated)
   const hits = detectGeneratedUnconfirmedAdditions(edited, twoExperienceGenerated, twoExperienceInput, userAdditions)
   assert.equal(hits.some((text) => text.includes('周更') && text.includes('2')), true)
 })
@@ -337,7 +337,7 @@ test('删掉一项技能后，剩下的 AI 数字仍待确认，本人敲的免�
   const input = shellResume([frontExp], ['沟通协调', '熟练使用工具'])
   const generated = shellResume([frontExp], ['沟通协调', '熟练使用 5 种工具'])
   const edited = shellResume([frontExp], ['熟练使用 5 种工具', '会用 3 种排版'])
-  const userAdditions = detectUserResumeEdits(generated, edited)
+  const userAdditions = detectUserResumeEdits(generated, edited, generated)
   const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
   assert.equal(hits.some((text) => text.includes('5')), true)
   assert.equal(hits.some((text) => text.includes('3')), false)
@@ -352,7 +352,7 @@ test('公司名和描述都对不上的条目，里面的数字都待确认', ()
     period: '2024-2025',
     description: '独立完成夜间盘点三千件。',
   }])
-  const userAdditions = detectUserResumeEdits(generated, edited)
+  const userAdditions = detectUserResumeEdits(generated, edited, generated)
   const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
   assert.equal(hits.some((text) => text.includes('三千')), true)
   assert.equal(hits.some((text) => text.includes('独立完成')), true)
@@ -366,7 +366,7 @@ test('公司名改了但描述几乎一样时仍按描述配对，本人新写�
     company: '海边书店改名',
     description: '负责门店陈列，周更 2 篇，另记 3 项。',
   }])
-  const userAdditions = detectUserResumeEdits(generated, edited)
+  const userAdditions = detectUserResumeEdits(generated, edited, generated)
   assert.equal(userAdditions.some((token) => token.includes('num:3')), true)
   assert.equal(userAdditions.some((token) => token.includes('num:2')), false)
   const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
@@ -385,7 +385,7 @@ test('条目上有 id 时按 id 对齐，改了公司名也不放过 AI 的数�
     role: '店长',
     description: '负责门店陈列，周更 2 篇。',
   }])
-  const userAdditions = detectUserResumeEdits(generated, edited)
+  const userAdditions = detectUserResumeEdits(generated, edited, generated)
   const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
   assert.equal(hits.some((text) => text.includes('周更') && text.includes('2')), true)
 })
@@ -415,7 +415,7 @@ test('同名同职务两段里，本人在第 1 段加的同一个数不豁免�
   const input = shellResume([plain, plain])
   const generated = shellResume([plain, aiLine])
   const edited = shellResume([userLine, aiLine])
-  const userAdditions = detectUserResumeEdits(generated, edited)
+  const userAdditions = detectUserResumeEdits(generated, edited, generated)
   assert.equal(userAdditions.some((token) => token.includes('同名1') && token.includes('num:2')), true)
   assert.equal(userAdditions.some((token) => token.includes('同名2') && token.includes('num:2')), false)
   const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
@@ -431,7 +431,7 @@ test('同名同职务两段里，本人在第 1 段加的同一个职责词不�
   const input = shellResume([plain, plain])
   const generated = shellResume([plain, aiLine])
   const edited = shellResume([userLine, aiLine])
-  const userAdditions = detectUserResumeEdits(generated, edited)
+  const userAdditions = detectUserResumeEdits(generated, edited, generated)
   assert.equal(userAdditions.some((token) => token.includes('同名1') && token.includes('duty:牵头')), true)
   assert.equal(userAdditions.some((token) => token.includes('同名2') && token.includes('duty:牵头')), false)
   const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
@@ -443,7 +443,7 @@ test('技能里只改数字旁边的字，AI 写的数字仍待确认；本人�
   const input = shellResume([frontExp], ['沟通协调'])
   const generated = shellResume([frontExp], ['Excel 数据透视（3 年）'])
   const edited = shellResume([frontExp], ['Excel 数据透视熟练（3 年）', '叉车证 2 年'])
-  const userAdditions = detectUserResumeEdits(generated, edited)
+  const userAdditions = detectUserResumeEdits(generated, edited, generated)
   assert.equal(userAdditions.some((token) => token.includes('num:3')), false)
   assert.equal(userAdditions.some((token) => token.includes('num:2')), true)
   const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
@@ -469,7 +469,7 @@ test('套话相似度低于 0.72 时不把另一段配上来，AI 的数字仍�
     { company: '东岸分拣点', role: '分拣', period: '2019-2021', description: near },
     { company: '西街花店', role: '店员', period: '2017-2018', description: '接待订花顾客并按花材颜色分区摆放。' },
   ])
-  const userAdditions = detectUserResumeEdits(generated, edited)
+  const userAdditions = detectUserResumeEdits(generated, edited, generated)
   const hits = detectGeneratedUnconfirmedAdditions(edited, generated, input, userAdditions)
   assert.equal(hits.some((text) => text.includes('周更') && text.includes('2')), true)
 })
@@ -504,7 +504,7 @@ test('同名两段对调后，累计令牌仍只豁免原来那一段', () => {
   const generated = shellResume([plain, aiLine])
   const edited = shellResume([userLine, aiLine])
   const swapped = shellResume([aiLine, userLine])
-  const userAdditions = detectUserResumeEdits(generated, edited)
+  const userAdditions = detectUserResumeEdits(generated, edited, generated)
   const kept = [...new Set([...userAdditions, ...detectUserResumeEdits(edited, swapped, generated)])]
   assert.equal(kept.some((token) => token.includes('同名1') && token.includes('num:2')), true)
   assert.equal(kept.some((token) => token.includes('同名2') && token.includes('num:2')), false)
@@ -526,11 +526,139 @@ test('同名三段里改第 2 段后再和第 3 段对调，第 3 段的数仍�
   const generated = shellResume([row(first), row(second), row(thirdAi)])
   const edited = shellResume([row(first), row(secondUser), row(thirdAi)])
   const swapped = shellResume([row(first), row(thirdAi), row(secondUser)])
-  const userAdditions = detectUserResumeEdits(generated, edited)
+  const userAdditions = detectUserResumeEdits(generated, edited, generated)
   assert.equal(userAdditions.some((token) => token.includes('同名2') && token.includes('num:2')), true)
   assert.equal(userAdditions.some((token) => token.includes('同名3') && token.includes('num:2')), false)
   const kept = [...new Set([...userAdditions, ...detectUserResumeEdits(edited, swapped, generated)])]
   const hits = detectGeneratedUnconfirmedAdditions(swapped, generated, input, kept)
   assert.equal(hits.some((text) => text.includes('周更') && text.includes('2')), true)
   assert.equal(hits.some((text) => text.includes('另记')), false)
+})
+
+test('较小单位后面紧跟着又一个单位时不合并', () => {
+  assert.deepEqual(keysOf('3千5百', ''), ['num:3500'])
+  assert.deepEqual(keysOf('1万2千', ''), ['num:12000'])
+  assert.deepEqual(keysOf('2千万5', ''), ['num:25000000'])
+  assert.deepEqual(keysOf('5百3千', ''), ['num:500', 'num:3000'])
+  assert.deepEqual(keysOf('增长1百分点', ''), ['num:1'])
+  assert.deepEqual(keysOf('3千5百万', ''), ['num:3000', 'num:5000000'])
+  assert.deepEqual(keysOf('2千5百万', ''), ['num:2000', 'num:5000000'])
+  assert.deepEqual(keysOf('2亿3千万', ''), ['num:200000000', 'num:30000000'])
+  assert.deepEqual(keysOf('1亿2千万', ''), ['num:100000000', 'num:20000000'])
+  assert.deepEqual(keysOf('1万2千5百万', ''), ['num:12000', 'num:5000000'])
+  assert.equal(keysOf('3千5百万', '').includes('num:3500'), false)
+  assert.equal(keysOf('2亿3千万', '').includes('num:200003000'), false)
+  assert.equal(keysOf('1万2千5百万', '').includes('num:12500'), false)
+  assert.deepEqual(keysOf('完成销售额3千5百万', '期望月薪3500'), ['num:3000', 'num:5000000'])
+  assert.equal(findFactAdditions('完成销售额3千5百万', '期望月薪3500').length >= 1, true)
+  assert.deepEqual(keysOf('月薪3500', '营收3千5百万'), ['num:3500'])
+  assert.equal(findFactAdditions('月薪3500', '营收3千5百万').length, 1)
+})
+
+/** 预览页每次改动都拿最初的生成稿做第三参，不拿这一步之前的稿。 */
+function accumulatePageEdits(generated, steps) {
+  let tokens = []
+  let current = generated
+  for (const next of steps) {
+    tokens = [...new Set([...tokens, ...detectUserResumeEdits(current, next, generated)])]
+    current = next
+  }
+  return tokens
+}
+
+function storeRow(company, role, description) {
+  return { company, role, period: '2019-2021', description }
+}
+
+test('改公司名撞上另一条后，那一条里 AI 的数仍待确认', () => {
+  const shelf = '整理仓库货架，按保质期先进先出调整摆放顺序。'
+  const posts = '维护门店公众号，撰写新书推荐与活动预告。'
+  const postsAi = '维护门店公众号，撰写新书推荐与活动预告，周更 2 篇。'
+  const input = shellResume([storeRow('海岸超市', '店员', shelf), storeRow('灯塔书店', '店员', posts)])
+  const generated = shellResume([storeRow('海岸超市', '店员', shelf), storeRow('灯塔书店', '店员', postsAi)])
+  const renamed = shellResume([storeRow('灯塔书店', '店员', shelf), storeRow('灯塔书店', '店员', postsAi)])
+  const typed = shellResume([
+    storeRow('灯塔书店', '店员', shelf.replace(/。$/, '，另记 2 项。')),
+    storeRow('灯塔书店', '店员', postsAi),
+  ])
+  const tokens = accumulatePageEdits(generated, [renamed, typed])
+  const hits = detectGeneratedUnconfirmedAdditions(typed, generated, input, tokens)
+  assert.equal(hits.length, 1)
+  assert.equal(hits[0].includes('周更') && hits[0].includes('2'), true)
+})
+
+test('改职务撞上另一条后，那一条里 AI 的数仍待确认', () => {
+  const shelf = '整理仓库货架，按保质期先进先出调整摆放顺序。'
+  const posts = '维护门店公众号，撰写新书推荐与活动预告。'
+  const postsAi = '维护门店公众号，撰写新书推荐与活动预告，周更 2 篇。'
+  const input = shellResume([storeRow('灯塔书店', '理货员', shelf), storeRow('灯塔书店', '店员', posts)])
+  const generated = shellResume([storeRow('灯塔书店', '理货员', shelf), storeRow('灯塔书店', '店员', postsAi)])
+  const renamed = shellResume([storeRow('灯塔书店', '店员', shelf), storeRow('灯塔书店', '店员', postsAi)])
+  const typed = shellResume([
+    storeRow('灯塔书店', '店员', shelf.replace(/。$/, '，另记 2 项。')),
+    storeRow('灯塔书店', '店员', postsAi),
+  ])
+  const tokens = accumulatePageEdits(generated, [renamed, typed])
+  const hits = detectGeneratedUnconfirmedAdditions(typed, generated, input, tokens)
+  assert.equal(hits.length, 1)
+  assert.equal(hits[0].includes('周更') && hits[0].includes('2'), true)
+})
+
+test('改公司名撞上后，另一条里 AI 的职责词牵头仍待确认', () => {
+  const shelf = '整理仓库货架，按保质期先进先出调整摆放顺序。'
+  const posts = '维护门店公众号，撰写新书推荐与活动预告。'
+  const postsAi = '维护门店公众号，撰写新书推荐与活动预告，牵头周末读书会。'
+  const input = shellResume([storeRow('海岸超市', '店员', shelf), storeRow('灯塔书店', '店员', posts)])
+  const generated = shellResume([storeRow('海岸超市', '店员', shelf), storeRow('灯塔书店', '店员', postsAi)])
+  const renamed = shellResume([storeRow('灯塔书店', '店员', shelf), storeRow('灯塔书店', '店员', postsAi)])
+  const typed = shellResume([
+    storeRow('灯塔书店', '店员', shelf.replace(/。$/, '，牵头盘点。')),
+    storeRow('灯塔书店', '店员', postsAi),
+  ])
+  const tokens = accumulatePageEdits(generated, [renamed, typed])
+  const hits = detectGeneratedUnconfirmedAdditions(typed, generated, input, tokens)
+  assert.equal(hits.length, 1)
+  assert.equal(hits[0].includes('牵头') && hits[0].includes('读书会'), true)
+})
+
+test('两组同名各两条互相改名后，AI 加的数仍待确认', () => {
+  const descA = '负责收银台开闭店交接，核对备用金和当日小票。'
+  const descB = '整理仓库货架，按保质期先进先出调整摆放顺序。'
+  const descC = '接待到店顾客，介绍新到绘本并登记预订需求。'
+  const descD = '维护门店公众号，撰写新书推荐与活动预告。'
+  const descDai = '维护门店公众号，撰写新书推荐与活动预告，周更 2 篇。'
+  const row = (company, description) => storeRow(company, '店员', description)
+  const input = shellResume([row('海岸超市', descA), row('海岸超市', descB), row('灯塔书店', descC), row('灯塔书店', descD)])
+  const generated = shellResume([row('海岸超市', descA), row('海岸超市', descB), row('灯塔书店', descC), row('灯塔书店', descDai)])
+  const renamed = shellResume([row('海岸超市', descA), row('灯塔书店', descB), row('海岸超市', descC), row('灯塔书店', descDai)])
+  const typed = shellResume([
+    row('海岸超市', descA),
+    row('灯塔书店', descB.replace(/。$/, '，另记 2 项。')),
+    row('海岸超市', descC),
+    row('灯塔书店', descDai),
+  ])
+  const tokens = accumulatePageEdits(generated, [renamed, typed])
+  const hits = detectGeneratedUnconfirmedAdditions(typed, generated, input, tokens)
+  assert.equal(hits.length, 1)
+  assert.equal(hits[0].includes('周更') && hits[0].includes('2'), true)
+})
+
+test('同名三段删掉第 1 段后再在第 3 段写同一个数，第 2 段 AI 的数仍待确认', () => {
+  const row = (description) => storeRow('滨海超市', '理货员', description)
+  const base = '负责生鲜区上货、临期商品下架和每晚盘点交接'
+  const first = `${base}。`
+  const second = `${base}，夜班。`
+  const secondAi = `${base}，夜班，日均理货 3 车。`
+  const third = `${base}，早班。`
+  const thirdUser = `${base}，早班，另带 3 名新人。`
+  const input = shellResume([row(first), row(second), row(third)])
+  const generated = shellResume([row(first), row(secondAi), row(third)])
+  const deleted = shellResume([row(secondAi), row(third)])
+  const typed = shellResume([row(secondAi), row(thirdUser)])
+  const tokens = accumulatePageEdits(generated, [deleted, typed])
+  assert.equal(tokens.some((token) => token.includes('同名3') && token.includes('num:3')), true)
+  assert.equal(tokens.some((token) => token.includes('同名2') && token.includes('num:3')), false)
+  const hits = detectGeneratedUnconfirmedAdditions(typed, generated, input, tokens)
+  assert.equal(hits.length, 1)
+  assert.equal(hits[0].includes('3') && hits[0].includes('车'), true)
 })

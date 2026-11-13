@@ -377,6 +377,8 @@ function matchArabic(
         if (!isDigitChar(text.charAt(end)) || isDigitChar(text.charAt(end + 1))) break
         const smaller = readArabicUnitPlaces(text, end + 1)
         if (!(smaller > 0 && smaller < magnitude)) break
+        // 5百万、3千万这种单位后面还跟着单位的，读不准是谁乘谁，不合并，留给下一次各自确认。
+        if (readArabicUnitPlaces(text, end + 2) > 0) break
         const part = shiftDecimal(toHalfWidth(text.charAt(end)), smaller)
         if (part.includes('.')) break
         canonical = (BigInt(canonical) + BigInt(part)).toString()

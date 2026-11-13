@@ -461,7 +461,10 @@ export function ResumeGeneratePreviewPage() {
                 resume={resume}
                 summaryRef={summaryRef}
                 onChange={(next) => {
-                  const generatedResume = result.resume ?? resume
+                  // 第三参必须是生成稿。恢复默认值后这一格会带上 undefined，漏传也过不了编译。
+                  type GeneratedAnchor = Parameters<typeof detectUserResumeEdits>[2]
+                  type RequiredGeneratedAnchor = undefined extends GeneratedAnchor ? never : GeneratedAnchor
+                  const generatedResume: RequiredGeneratedAnchor = result.resume ?? resume
                   setUserAdditions((words) => [...new Set([...words, ...detectUserResumeEdits(resume, next, generatedResume)])])
                   setResume(next); setExported(null); setExportError(null)
                 }}
