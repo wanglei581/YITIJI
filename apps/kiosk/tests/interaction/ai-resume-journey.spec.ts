@@ -808,11 +808,12 @@ test('J4 匿名 · /me/documents 登录门与全部按钮 @interaction', async (
   }
 })
 
-async function openMemberRow(page: Page, kind: string, action: string): Promise<void> {
+async function openMemberRow(page: Page, kind: string, name: RegExp): Promise<void> {
   const line = page.locator(`[data-record-kind="${kind}"]`).first()
   await expect(line).toBeVisible()
-  await line.locator('button.me-open').click()
-  await line.getByRole('button', { name: action, exact: true }).click()
+  const toggle = line.locator('button.me-open')
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click()
+  await line.getByRole('button', { name }).click()
 }
 
 async function returnToMemberResumes(page: Page): Promise<void> {
@@ -956,13 +957,13 @@ test('会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interacti
       } else if (path === '/me/resumes') {
         await expect(page.getByText(/上传诊断简历/).first(), '应有这次上传诊断的简历').toBeVisible()
         await expect(page.getByText(/AI 生成简历/).first(), '应有这次生成的简历').toBeVisible()
-        await openMemberRow(page, 'generate', '查看并打印')
+        await openMemberRow(page, 'generate', /查看并打印/)
         await page.waitForURL((url) => url.pathname === '/resume/generate/preview', { timeout: 20_000 })
         await expect(page.getByText('林晓舟').first(), '这次生成的简历应写着林晓舟').toBeVisible({ timeout: 20_000 })
         await expect(page.getByText('仓储管理员').first(), '这次生成的简历应写着目标岗位').toBeVisible()
         await returnToMemberResumes(page)
         await page.evaluate(() => sessionStorage.removeItem('ai-job-print:current-ai-resume'))
-        await openMemberRow(page, 'parse', '查看报告')
+        await openMemberRow(page, 'parse', /诊断报告/)
         await page.waitForURL((url) => url.pathname === '/resume/report', { timeout: 20_000 })
         await waitReady(page)
         const historyPdf = await exportReport(page, journey, collectors, '历史报告导出 PDF', /导出 PDF/)

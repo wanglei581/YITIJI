@@ -717,7 +717,7 @@ export function PrintConfirmPage() {
         onBack: () => {
           if (guestQuotaExceeded) navigate('/print/desk?step=preview')
           else if (isContractReport) void handleBack()
-          else navigate('/print/desk?step=preview')
+          else navigate('/print/desk?step=preview', { state: location.state })
         },
       }}
       nav
