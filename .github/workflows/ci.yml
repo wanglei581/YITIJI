@@ -663,6 +663,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:terminal-home-free-badge
           # 每台机器谁付钱、五个价、公共点位锁 0、向个人收费总开关。默认配置下报价仍是 0。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:terminal-charge-settings
+          # 一体机按次付款：收费机器建单、开始前占用、没做成退款；不收费的机器不建单。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-orders
           # 排队打印单的时效（超时判失败、过期单领不走）与心跳里的打印完成判据。
           # 前两条直接调服务方法、各自建临时库；第三条起真服务走 HTTP（入参校验、鉴权、
           # 真实的重新提交路径）——心跳多一个服务端不认识的字段会被整条拒收，只有这样测得出。

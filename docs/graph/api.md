@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`654` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`658` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -637,9 +637,9 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/kiosk/session/end` | KioskSessionController.end | — | KioskSessionService | KioskSession<br/>Terminal |
-| POST | `/api/v1/kiosk/session/heartbeat` | KioskSessionController.heartbeat | — | KioskSessionService | KioskSession<br/>Terminal |
-| POST | `/api/v1/kiosk/session/start` | KioskSessionController.start | — | KioskSessionService | KioskSession<br/>Terminal |
+| POST | `/api/v1/kiosk/session/end` | KioskSessionController.end | — | KioskSessionService | KioskSession<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/kiosk/session/heartbeat` | KioskSessionController.heartbeat | — | KioskSessionService | KioskSession<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/kiosk/session/start` | KioskSessionController.start | — | KioskSessionService | KioskSession<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
 
 ## `services/api/src/legal/admin-legal-docs.controller.ts`
 
@@ -984,15 +984,29 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/orders/:id/code-pay` | PaymentController.createCodePayAttempt | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt |
-| POST | `/api/v1/orders/:id/pay` | PaymentController.createPayAttempt | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt |
-| GET | `/api/v1/orders/:id/pay-status` | PaymentController.getPayStatus | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt |
-| POST | `/api/v1/orders/:id/pay/reconcile` | PaymentController.reconcile | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt |
+| POST | `/api/v1/orders/:id/code-pay` | PaymentController.createCodePayAttempt | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
+| POST | `/api/v1/orders/:id/pay` | PaymentController.createPayAttempt | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
+| GET | `/api/v1/orders/:id/pay-status` | PaymentController.getPayStatus | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
+| POST | `/api/v1/orders/:id/pay/reconcile` | PaymentController.reconcile | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
 | POST | `/api/v1/payment/callback/:channel` | PaymentController.callback | — | — | — |
-| GET | `/api/v1/payment/channels` | PaymentController.getChannels | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt |
-| POST | `/api/v1/payment/sandbox/simulate` | PaymentController.simulate | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt |
+| GET | `/api/v1/payment/channels` | PaymentController.getChannels | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
+| POST | `/api/v1/payment/sandbox/simulate` | PaymentController.simulate | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
 | POST | `/api/v1/payment/wechat/refund-notify` | PaymentController.wechatRefundNotify | — | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund |
 | GET | `/api/v1/print/price-config` | PaymentController.getPrintPriceConfig | — | PricingService | PlatformSetting<br/>PriceConfig<br/>Terminal<br/>TerminalServicePrice |
+
+## `services/api/src/payment/service-order-admin.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/admin/orders/:id/retry-service-refund` | ServiceOrderAdminController.retry | admin | ServiceOrderService | AuditLog<br/>KioskSession<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal<br/>TerminalServicePrice |
+
+## `services/api/src/payment/service-order.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/kiosk/service-orders` | ServiceOrderController.create | — | ServiceOrderService | AuditLog<br/>KioskSession<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal<br/>TerminalServicePrice |
+| GET | `/api/v1/kiosk/service-orders/:id` | ServiceOrderController.get | — | ServiceOrderService | AuditLog<br/>KioskSession<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal<br/>TerminalServicePrice |
+| POST | `/api/v1/kiosk/service-orders/:id/close` | ServiceOrderController.close | — | ServiceOrderService | AuditLog<br/>KioskSession<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal<br/>TerminalServicePrice |
 
 ## `services/api/src/policies/policies.controller.ts`
 
