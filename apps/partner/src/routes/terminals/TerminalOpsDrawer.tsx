@@ -11,6 +11,7 @@ import {
   runState,
   shanghaiDateTime,
   terminalName,
+  userChargeLine,
   VISIT_NOT_STARTED,
   FAULTS_NOT_REPORTED,
 } from './terminalOpsFormat'
@@ -66,6 +67,7 @@ export function TerminalOpsDrawer({
             </span>
           </Item>
           <Item label="统计期内有上报">{faults.reportedInWindow ? '有' : '一次都没有'}</Item>
+          <Item label="用户收费">{userChargeLine(row)}</Item>
         </Section>
 
         <Section title="服务人次" note={METRIC_NOTES.visit}>
