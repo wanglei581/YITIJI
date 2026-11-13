@@ -17,12 +17,15 @@ export default function OrdersPage() {
   const [payStatus, setPayStatus] = useState('')
   const [refundRequiredFilter, setRefundRequiredFilter] = useState(false)
   const [opsAttentionFilter, setOpsAttentionFilter] = useState(false)
+  const [serviceOnly, setServiceOnly] = useState(false)
+  const [serviceKey, setServiceKey] = useState('')
+  const [serviceStatus, setServiceStatus] = useState('')
   const [searchDraft, setSearchDraft] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
 
-  const ordersKey = `admin:orders:${statusFilter}:${payStatus}:${refundRequiredFilter}:${opsAttentionFilter}:${search}:${page}:${pageSize}`
+  const ordersKey = `admin:orders:${statusFilter}:${payStatus}:${refundRequiredFilter}:${opsAttentionFilter}:${serviceOnly}:${serviceKey}:${serviceStatus}:${search}:${page}:${pageSize}`
 
   const {
     data: orderPage,
@@ -31,11 +34,14 @@ export default function OrdersPage() {
   } = useRefreshable(
     ordersKey,
     () => adminOrdersReadonlyService.list({
-      taskStatus: statusFilter || undefined,
+      taskStatus: serviceOnly ? undefined : (statusFilter || undefined),
       payStatus: payStatus || undefined,
       search: search || undefined,
-      refundRequired: refundRequiredFilter || undefined,
-      opsAttention: opsAttentionFilter || undefined,
+      refundRequired: serviceOnly ? undefined : (refundRequiredFilter || undefined),
+      opsAttention: serviceOnly ? undefined : (opsAttentionFilter || undefined),
+      recordKind: serviceOnly ? 'service' : undefined,
+      type: serviceOnly ? (serviceKey || undefined) : undefined,
+      serviceStatus: serviceOnly ? (serviceStatus || undefined) : undefined,
       page,
       pageSize,
     }),
@@ -76,7 +82,7 @@ export default function OrdersPage() {
   return (
     <Page
       title="订单管理"
-      subtitle={`打印 / 扫描订单 · 状态随终端上报自动更新 · 共 ${total} 条`}
+      subtitle={serviceOnly ? `服务单 · 一体机按次付款 · 共 ${total} 条` : `打印 / 扫描订单 · 状态随终端上报自动更新 · 共 ${total} 条`}
       actions={
         <button
           type="button"
@@ -114,7 +120,7 @@ export default function OrdersPage() {
                 key={f.label}
                 active={statusFilter === f.value}
                 label={f.label}
-                onClick={() => { setStatusFilter(f.value); setRefundRequiredFilter(false); setOpsAttentionFilter(false); setPage(1) }}
+                onClick={() => { setStatusFilter(f.value); setRefundRequiredFilter(false); setOpsAttentionFilter(false); setServiceOnly(false); setPage(1) }}
               />
             ))}
           </div>
@@ -125,13 +131,13 @@ export default function OrdersPage() {
                 key={f.label}
                 active={payStatus === f.value}
                 label={f.label}
-                onClick={() => { setPayStatus(f.value); setRefundRequiredFilter(false); setOpsAttentionFilter(false); setPage(1) }}
+                onClick={() => { setPayStatus(f.value); setRefundRequiredFilter(false); setOpsAttentionFilter(false); setServiceOnly(false); setPage(1) }}
               />
             ))}
             <FilterChip
               active={statusFilter === 'failed' && payStatus === 'paid' && !refundRequiredFilter && !opsAttentionFilter}
               label="已支付失败待核查"
-              onClick={() => { setStatusFilter('failed'); setPayStatus('paid'); setRefundRequiredFilter(false); setOpsAttentionFilter(false); setPage(1) }}
+              onClick={() => { setStatusFilter('failed'); setPayStatus('paid'); setRefundRequiredFilter(false); setOpsAttentionFilter(false); setServiceOnly(false); setPage(1) }}
             />
             {/*
               待退款覆盖**两类**信号单（服务端 refundRequired 的 OR 两支）：
@@ -145,7 +151,7 @@ export default function OrdersPage() {
             <FilterChip
               active={refundRequiredFilter}
               label="待退款（已收款未出纸）"
-              onClick={() => { setRefundRequiredFilter(true); setOpsAttentionFilter(false); setPayStatus(''); setStatusFilter(''); setPage(1) }}
+              onClick={() => { setRefundRequiredFilter(true); setOpsAttentionFilter(false); setServiceOnly(false); setPayStatus(''); setStatusFilter(''); setPage(1) }}
             />
             {/*
               需运营关注 = 服务端 opsAttention 的**三支 OR**：待退款、退款中、
@@ -159,9 +165,37 @@ export default function OrdersPage() {
             <FilterChip
               active={opsAttentionFilter}
               label="需运营关注"
-              onClick={() => { setOpsAttentionFilter(true); setRefundRequiredFilter(false); setPayStatus(''); setStatusFilter(''); setPage(1) }}
+              onClick={() => { setOpsAttentionFilter(true); setRefundRequiredFilter(false); setServiceOnly(false); setPayStatus(''); setStatusFilter(''); setPage(1) }}
+            />
+            <FilterChip
+              active={serviceOnly}
+              label="服务单"
+              onClick={() => { setServiceOnly(true); setRefundRequiredFilter(false); setOpsAttentionFilter(false); setPayStatus(''); setStatusFilter(''); setServiceKey(''); setServiceStatus(''); setPage(1) }}
             />
           </div>
+          {serviceOnly && (
+            <div className="mb-3.5 flex flex-wrap items-center gap-2">
+              {[
+                { label: '全部服务', value: '' },
+                { label: 'AI 简历优化', value: 'resume_optimize' },
+                { label: 'AI 模拟面试', value: 'mock_interview' },
+                { label: '扫描', value: 'scan' },
+              ].map((item) => (
+                <FilterChip key={item.label} active={serviceKey === item.value} label={item.label} onClick={() => { setServiceKey(item.value); setPage(1) }} />
+              ))}
+              {[
+                { label: '全部状态', value: '' },
+                { label: '待付款', value: 'pending' },
+                { label: '已付款', value: 'paid' },
+                { label: '已使用', value: 'consumed' },
+                { label: '退款中', value: 'refunding' },
+                { label: '已退款', value: 'refunded' },
+                { label: '已关闭', value: 'closed' },
+              ].map((item) => (
+                <FilterChip key={item.label} active={serviceStatus === item.value} label={item.label} onClick={() => { setServiceStatus(item.value); setPage(1) }} />
+              ))}
+            </div>
+          )}
         </div>
 
         <ConsoleTable items={items} columns={orderColumns(controls.openDetail)}

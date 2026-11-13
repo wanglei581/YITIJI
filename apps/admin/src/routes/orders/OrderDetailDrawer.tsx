@@ -18,7 +18,7 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
       {detailState === 'error' && <ErrorState className="py-16" onRetry={retryDetail} />}
       {detailState === 'ready' && detail && (<>
             <div className="my-4 grid grid-cols-2 gap-x-4 gap-y-3">
-              <Info label="订单类型" title={detail.type} value={detail.type === 'print' ? '打印' : detail.type === 'scan' ? '扫描' : '未归类'} />
+              <Info label="订单类型" title={detail.type} value={detail.recordKind === 'service' && detail.serviceName ? detail.serviceName : detail.type === 'print' ? '打印' : detail.type === 'scan' ? '扫描' : '未归类'} />
               <Info label="渠道" value={channelText(detail.channel)} />
               <Info label="取件" value={pickupText(detail)} />
               <Info label="取件码过期时间" value={fmt(detail.pickupCodeExpiresAt)} />
@@ -31,8 +31,9 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
               <Info label="支付状态" value={PAY_STATUS_MAP[detail.payStatus]?.label ?? detail.payStatus} />
               <Info label="任务状态" value={STATUS_MAP[detail.taskStatus]?.label ?? detail.taskStatus} />
               <Info label="用户" value={orderUserText(detail)} />
-              <Info label="终端" value={detail.terminalCode ?? '—'} />
-              <Info label="文件名" value={(detail.print ? detail.print.fileName : detail.printFileName) ?? '未记录'} />
+              <Info label="终端" value={detail.locationLabel ? `${detail.terminalCode ?? '—'} · ${detail.locationLabel}` : (detail.terminalCode ?? '—')} />
+              <Info label="文件名" value={detail.recordKind === 'service' ? (detail.serviceName ?? '服务') : ((detail.print ? detail.print.fileName : detail.printFileName) ?? '未记录')} />
+              {detail.recordKind === 'service' && detail.paidAt ? <Info label="付款时间" value={fmt(detail.paidAt)} /> : null}
               <Info label="单双面" value={duplexText(detail.print?.duplex)} />
               <Info label="彩色/黑白" value={colorModeText(detail.print ? detail.print.colorMode : detail.colorMode)} />
               <Info label="份数" value={copiesText(detail.print ? detail.print.copies : detail.copies)} />

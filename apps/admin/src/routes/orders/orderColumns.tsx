@@ -13,13 +13,15 @@ export function orderColumns(openDetail: (id: string) => Promise<void>): Console
           {order.orderNo}
         </button>
       ) },
-    { id: 'file', header: '文件名', truncate: true, title: (order) => order.printFileName ?? '未记录',
-      headerClassName: 'w-[13%]', cell: (order) => order.printFileName ?? '未记录' },
+    { id: 'file', header: '文件名', truncate: true,
+      title: (order) => order.recordKind === 'service' ? (order.serviceName ?? '服务') : (order.printFileName ?? '未记录'),
+      headerClassName: 'w-[13%]',
+      cell: (order) => order.recordKind === 'service' ? (order.serviceName ?? '服务') : (order.printFileName ?? '未记录') },
     { id: 'user', header: '用户', headerClassName: 'w-[12%]', cell: (order) => <>
       <span className="block truncate" title={orderUserText(order)}>{orderUserText(order)}</span>
       <span className="mt-1 block whitespace-nowrap text-[11px] text-neutral-500">{channelText(order.channel)}</span>
     </> },
-    { id: 'terminal', header: '终端', cellClassName: 'whitespace-nowrap', headerClassName: 'w-[10%]', cell: (order) => order.terminalCode ?? '—' },
+    { id: 'terminal', header: '终端', cellClassName: 'whitespace-nowrap', headerClassName: 'w-[10%]', cell: (order) => order.locationLabel ? `${order.terminalCode ?? '—'} · ${order.locationLabel}` : (order.terminalCode ?? '—') },
     { id: 'amount', header: '金额', align: 'right', headerClassName: 'w-[14%]',
       cell: (order) => <>
         <span className="whitespace-nowrap">{amountText(order.amountCents, order.currency)}</span>
