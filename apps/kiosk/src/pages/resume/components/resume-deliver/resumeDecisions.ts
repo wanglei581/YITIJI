@@ -355,20 +355,24 @@ export function toggleModuleDecision(
   }
   const block = moduleSwitchBlock(base, module)
   if (block) return { resume, applied: false, reason: block }
-  // A 类改写已经在基准稿里；没有基准稿时分不出类（unloaded）。
-  // 这两类换回原文，有上下文时与 B、C 同一套：含重叠的位置表里，剔除别的条目占着的文字，恰好一处才换。
-  // 不传上下文的旧调用仍走下面的整份稿第一处，生产调用点都已传上下文。
-  if (context && next === 'original' && (state.kind === 'A' || state.kind === 'unloaded')) {
-    const spots = freeSpots(resume, module.after, context, base)
+  // 没有基准稿分不出这一条占哪一段（unloaded）。两个方向都不猜，正文不动。
+  if (!base || state.kind === 'unloaded') return { resume, applied: false, reason: 'edited' }
+  // A 类：有上下文时两个方向都剔除别的条目占着的文字，恰好一处才换。
+  // 不传上下文的旧调用也按完整位置表（重叠出现算多处），不是整份稿的第一处。
+  if (state.kind === 'A') {
+    const from = next === 'original' ? module.after : module.before
+    const to = next === 'original' ? module.before : module.after
+    const spots = context ? freeSpots(resume, from, context, base) : findTextSpots(resume, from)
     if (spots.length !== 1) return { resume, applied: false, reason: 'edited' }
-    const replaced = replaceAt(resume, spots[0].path, spots[0].start, module.after, module.before)
+    const replaced = replaceAt(resume, spots[0].path, spots[0].start, from, to)
     return replaced ? { resume: replaced, applied: true } : { resume, applied: false, reason: 'edited' }
   }
   const from = next === 'original' ? module.after : module.before
   const to = next === 'original' ? module.before : module.after
-  const result = replaceResumeTextWithStatus(resume, from, to)
-  if (result.applied) return result
-  return { ...result, reason: next === 'optimized' && !module.before ? 'original-empty' : 'edited' }
+  const spots = context ? freeSpots(resume, from, context, base) : findTextSpots(resume, from)
+  if (spots.length !== 1) return { resume, applied: false, reason: next === 'optimized' && !module.before ? 'original-empty' : 'edited' }
+  const replaced = replaceAt(resume, spots[0].path, spots[0].start, from, to)
+  return replaced ? { resume: replaced, applied: true } : { resume, applied: false, reason: 'edited' }
 }
 
 export function applyDecisionChanges(

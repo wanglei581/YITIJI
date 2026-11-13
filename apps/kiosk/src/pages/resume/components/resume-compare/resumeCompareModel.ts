@@ -142,16 +142,21 @@ export function adoptEligible(
   confirmedByModule: Record<string, string[]>,
   current: ResumeCompareDecisions,
   base?: GeneratedResume | null,
-): { next: ResumeCompareDecisions; adopted: number; skipped: number } {
+): { next: ResumeCompareDecisions; adopted: number; skipped: number; skippedFacts: number; skippedManual: number } {
   const next = { ...current }
   let adopted = 0
   let skipped = 0
+  let skippedFacts = 0
+  let skippedManual = 0
   items.forEach((item, index) => {
     const key = moduleKeyOf(item, sourceIndexOf(item, index))
     if (isNoActionModule(item)) return
     const pending = pendingFacts(item.additions, confirmedByModule[key] ?? []).length > 0
-    if (pending || isManualCompareItem(item, current[key], base)) {
+    const manual = isManualCompareItem(item, current[key], base)
+    if (pending || manual) {
       skipped += 1
+      if (pending) skippedFacts += 1
+      if (manual) skippedManual += 1
       return
     }
     if (next[key] !== 'optimized') {
@@ -159,7 +164,15 @@ export function adoptEligible(
       adopted += 1
     }
   })
-  return { next, adopted, skipped }
+  return { next, adopted, skipped, skippedFacts, skippedManual }
+}
+
+/** 批量采纳后的那一行。有只能手改的，用批量按钮下已有的那句；只因事实跳过时保持原来的说明。 */
+export function adoptEligibleBatchNote(result: { adopted: number; skipped: number; skippedManual: number }): string {
+  if (result.skippedManual > 0) {
+    return `已采纳 ${result.adopted} 条；跳过 ${result.skipped} 条（有待确认事实、只能手改的那几条）。`
+  }
+  return `已采纳 ${result.adopted} 条；跳过 ${result.skipped} 条 —— 那几条的改写里有原文没有的事实，要逐项确认后才能采纳。批量动作不会绕过这道拦截。`
 }
 
 export function keepUndecided(

@@ -2,6 +2,7 @@ import type { GeneratedResume } from '@ai-job-print/shared'
 import type { CSSProperties, ReactNode, Ref } from 'react'
 import { useState } from 'react'
 import { MaskedContactLine } from '../../../../components/MaskedContactLine'
+import { ProjectTitleFields, ResumeTagList } from './ResumeEntryFields'
 import { DeleteEntryButton, EntryDeleteDialog } from './ResumeFactConfirmDialog'
 import { RESUME_EDIT_LIMITS, resumeTitleIssues } from './resumeEntryTitles'
 
@@ -86,7 +87,7 @@ export function GenerateResumeEditor(props: {
   }
 
   return (
-    <article className="qx-rg-sheet" data-testid="resume-generate-preview-sheet" style={props.previewStyle}>
+    <article className="qx-rg-sheet" data-testid="resume-generate-preview-sheet" data-resume-editor="" style={props.previewStyle}>
       <header className="qx-rg-sheet-top">
         <b>{resume.basic.name || '未填写姓名'}</b>
         <span>{[resume.intention.position, resume.basic.city || resume.intention.city].filter(Boolean).join(' · ') || '意向还没写'}</span>
@@ -217,7 +218,20 @@ export function GenerateResumeEditor(props: {
           <Block title="项目经历" tags={<><Tag kind="keep">事实原样</Tag><Tag kind="pol">描述润色</Tag></>}>
             {resume.projects.map((item, i) => (
               <div key={i} className="qx-rg-entry">
-                <p><b>{item.role ? `${item.name} · ${item.role}` : item.name}</b></p>
+                <ProjectTitleFields
+                  index={i}
+                  name={item.name}
+                  role={item.role ?? ''}
+                  className={`${taCls} qx-rg-title`}
+                  onName={(name) => onChange({
+                    ...resume,
+                    projects: resume.projects.map((row, idx) => idx === i ? { ...row, name } : row),
+                  })}
+                  onRole={(role) => onChange({
+                    ...resume,
+                    projects: resume.projects.map((row, idx) => idx === i ? { ...row, role } : row),
+                  })}
+                />
                 <textarea
                   className={taCls}
                   aria-label={`项目经历描述 ${i + 1}`}
@@ -237,19 +251,22 @@ export function GenerateResumeEditor(props: {
         )}
         {resume.skills.length > 0 && (
           <Block title="技能" tags={<Tag kind="pol">表达整理</Tag>}>
-            <p>
-              {resume.skills.map((skill, i) => (
-                <span key={i}>
-                  {i > 0 ? ' · ' : null}
-                  <span data-entry-field={`skill-${i}`}>{skill}</span>
-                </span>
-              ))}
-            </p>
+            <ResumeTagList
+              items={resume.skills}
+              field="skill"
+              appearance="inline"
+              onChange={(skills) => { mark(); onChange({ ...resume, skills }) }}
+            />
           </Block>
         )}
         {resume.certificates.length > 0 && (
           <Block title="证书 / 资质" tags={<Tag kind="keep">原样保留</Tag>}>
-            <p>{resume.certificates.join(' · ')}</p>
+            <ResumeTagList
+              items={resume.certificates}
+              field="certificate"
+              appearance="inline"
+              onChange={(certificates) => { mark(); onChange({ ...resume, certificates }) }}
+            />
           </Block>
         )}
       </div>

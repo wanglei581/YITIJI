@@ -366,7 +366,10 @@ test('AI provider outage shows an honest unavailable state without removing the 
 const LONG_COMPANY = '在门店负责日常运营并完成季度复盘'
 const SHORT_COMPANY = '青序门店'
 
-function entryResume(experience: Array<{ company: string; role: string; period: string; description: string }>) {
+function entryResume(
+  experience: Array<{ company: string; role: string; period: string; description: string }>,
+  skills: string[] = [],
+) {
   return {
     basic: { name: '标题样本', city: '青岛' },
     intention: { position: '门店运营', city: '青岛' },
@@ -374,7 +377,7 @@ function entryResume(experience: Array<{ company: string; role: string; period: 
     education: [{ school: '青岛大学', major: '工商管理', degree: '本科', period: '2018-2022' }],
     experience,
     projects: [{ name: '门店陈列项目', role: '执行', period: '2023', description: '按店里的陈列标准摆货。' }],
-    skills: [] as string[],
+    skills,
     certificates: [] as string[],
   }
 }
@@ -385,6 +388,7 @@ async function openEntryEditor(
   api: Parameters<typeof registerW6Api>[0],
   taskId: string,
   experience: Array<{ company: string; role: string; period: string; description: string }>,
+  skills: string[] = [],
 ): Promise<void> {
   registerOptimizeShell(api)
   api.respond('GET', `/api/v1/resume/records/${taskId}/optimize`, {
@@ -394,7 +398,7 @@ async function openEntryEditor(
       status: 'completed',
       providerName: 'llm',
       modules: [],
-      optimizedResume: entryResume(experience),
+      optimizedResume: entryResume(experience, skills),
     },
   })
   api.respond('POST', '/api/v1/resume/generate/export', {
@@ -451,7 +455,8 @@ test('改经历公司名后预览和导出都用改后的短名 @kiosk', async (
   await expect(page.getByRole('textbox', { name: '第 1 条教育的学校' })).toHaveValue('青岛大学')
   await expect(page.getByRole('textbox', { name: '第 1 条教育的专业' })).toHaveValue('工商管理')
   await expect(page.getByText('本科 · 2018-2022', { exact: true })).toBeVisible()
-  await expect(page.locator('p', { hasText: '门店陈列项目 · 执行' })).toBeVisible()
+  await expect(page.locator('[data-entry-field="projects-0-name"]')).toHaveValue('门店陈列项目')
+  await expect(page.locator('[data-entry-field="projects-0-role"]')).toHaveValue('执行')
   await expect(page.getByRole('textbox', { name: /项目的名称|项目的职务/ })).toHaveCount(0)
 
   await company.fill(SHORT_COMPANY)
@@ -749,4 +754,270 @@ test.describe('前一条改写含后一条原句时，两条各换在自己的�
     await expect(page.getByRole('textbox', { name: '第 1 条经历的描述' })).toHaveValue(NESTED_BEFORE_1)
     await expect(page.getByRole('textbox', { name: '第 2 条经历的描述' })).toHaveValue(NESTED_BEFORE_2)
   })
+})
+
+const LOCATE_CASES = [
+  { title: '个人简介', sentence: '本人在校期间整理过学院新闻稿件与活动记录。', fieldId: 'summary' },
+  { title: '官网维护', sentence: '维护学院官网的栏目内容和活动通知。', fieldId: 'experience-0-description' },
+  { title: '教育学校', sentence: '青州财经学院', fieldId: 'education-0-school' },
+  { title: '排版技能', sentence: '熟练使用方正飞腾排版', fieldId: 'skill-0' },
+  { title: '英语证书', sentence: '大学英语六级证书', fieldId: 'certificate-0' },
+] as const
+
+function locateSentence(title: string): string {
+  const found = LOCATE_CASES.find((item) => item.title === title)
+  if (!found) throw new Error(`missing locate case ${title}`)
+  return found.sentence
+}
+
+function locateResume() {
+  const summary = locateSentence('个人简介')
+  const experience = locateSentence('官网维护')
+  const school = locateSentence('教育学校')
+  const skill = locateSentence('排版技能')
+  const certificate = locateSentence('英语证书')
+  return {
+    basic: { name: '周启明', phone: '13800000000', city: '青岛' },
+    intention: { position: '新闻编辑', city: '青岛' },
+    summary: `${summary}${summary}`,
+    education: [{ school, major: school, degree: '本科', period: '2019-2023', description: '完成新闻学课程。' }],
+    experience: [{ company: '学院官网工作室', role: '编辑', period: '2023-2024', description: `${experience}${experience}` }],
+    projects: [],
+    skills: [skill, skill],
+    certificates: [certificate, certificate],
+  }
+}
+
+async function openLocateOptimize(page: Page, api: Parameters<typeof registerW6Api>[0]): Promise<void> {
+  registerOptimizeShell(api)
+  api.respond('GET', '/api/v1/resume/records/optimize-locate-2099/optimize', {
+    status: 200,
+    json: {
+      taskId: 'optimize-locate-2099',
+      status: 'completed',
+      providerName: 'llm',
+      optimizedResume: locateResume(),
+      modules: LOCATE_CASES.map((item) => ({
+        title: item.title,
+        before: item.sentence,
+        after: `另写一版：${item.sentence}`,
+      })),
+    },
+  })
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem('ai-job-print:current-ai-resume', JSON.stringify({
+      taskId: 'optimize-locate-2099',
+      accessToken: 'optimize-locate-access-token',
+    }))
+  })
+  await page.goto('/resume/optimize')
+  await expect(page.getByTestId('resume-optimize-overview')).toBeVisible()
+}
+
+async function expectOriginalSelected(page: Page, fieldId: string, sentence: string): Promise<void> {
+  const field = page.locator(`[data-entry-field="${fieldId}"]`)
+  await expect(field).toBeFocused()
+  await expect(field).toHaveValue(new RegExp(sentence.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+  const selected = await field.evaluate((element) => {
+    const input = element as HTMLInputElement | HTMLTextAreaElement
+    return input.value.slice(input.selectionStart ?? 0, input.selectionEnd ?? 0)
+  })
+  expect(selected).toBe(sentence)
+}
+
+test('换不上的条目从总览和对照页去编辑区，都停在那一栏并选中原句 @kiosk', async ({ page, api }) => {
+  test.setTimeout(90_000)
+  await openLocateOptimize(page, api)
+  for (const item of LOCATE_CASES) {
+    const row = page.getByTestId('resume-optimize-list').locator('li').filter({ hasText: item.title })
+    const goEdit = row.getByRole('button', { name: '去编辑区改这一条', exact: true })
+    await goEdit.scrollIntoViewIfNeeded()
+    await goEdit.click()
+    await expectOriginalSelected(page, item.fieldId, item.sentence)
+    await page.locator('.qxt-back').click()
+    await expect(page.getByTestId('resume-optimize-overview')).toBeVisible()
+  }
+  for (const item of LOCATE_CASES) {
+    const row = page.getByTestId('resume-optimize-list').locator('li').filter({ hasText: item.title })
+    await row.locator('button', { hasText: '打开' }).click()
+    await expect(page.getByRole('heading', { name: item.title })).toBeVisible()
+    const goEdit = page.getByTestId('compare-manual').getByRole('button', { name: '去编辑区改这一条', exact: true })
+    await expect(goEdit).toBeVisible()
+    await goEdit.click()
+    await expectOriginalSelected(page, item.fieldId, item.sentence)
+    await page.locator('.qxt-back').click()
+    await expect(page.getByTestId('resume-optimize-overview')).toBeVisible()
+  }
+})
+
+test('对照页可采纳的全部采纳后点应用到编辑区，换上条数与采纳条数相同且没有失败提示 @kiosk', async ({ page, api }) => {
+  await openKeepManualOptimize(page, api)
+  const manualRow = page.getByTestId('resume-optimize-list').locator('li').filter({ hasText: '迎新志愿服务' })
+  await manualRow.locator('button', { hasText: '打开' }).click()
+  await page.getByRole('button', { name: /可采纳的全部采纳/ }).click()
+  await expect(page.getByText('已采纳 2 条；跳过 1 条（有待确认事实、只能手改的那几条）。', { exact: true })).toBeVisible()
+  await page.locator('.qxt-back').click()
+  await expect(page.getByRole('dialog', { name: '对照页有 2 条裁决' })).toBeVisible()
+  await page.getByRole('button', { name: '应用到编辑区', exact: true }).click()
+  await expect(page.getByText('没能自动放进稿里')).toHaveCount(0)
+  await expect(page.getByRole('textbox', { name: '第 3 条经历的描述' })).toHaveValue(SWITCH_SITE_AFTER)
+  await expect(page.getByRole('textbox', { name: '第 2 条项目的描述' })).toHaveValue(SWITCH_FAIR_AFTER)
+  await expect(page.getByRole('textbox', { name: '第 1 条经历的描述' })).toHaveValue(MANUAL_SENTENCE)
+  const swapped = await page.locator('textarea, input[data-entry-field]').evaluateAll((nodes, afters) => {
+    const want = new Set(afters as string[])
+    return nodes.filter((node) => want.has((node as HTMLInputElement).value)).length
+  }, [SWITCH_SITE_AFTER, SWITCH_FAIR_AFTER])
+  expect(swapped).toBe(2)
+})
+
+const LOGIN_SCHOOL = '青州财经学院'
+
+function loginLocateResume(name: '草稿样本' | '优化样本') {
+  return {
+    basic: { name, phone: '13800000000', city: '青岛' },
+    intention: { position: '新闻编辑', city: '青岛' },
+    summary: name === '草稿样本' ? '这是上次编辑留下的草稿内容。' : '这是优化结果摘要，不是草稿。',
+    education: [{ school: LOGIN_SCHOOL, major: '新闻学', degree: '本科', period: '2019-2023', description: '完成新闻学课程。' }],
+    experience: [] as Array<{ company: string; role: string; description: string }>,
+    projects: [],
+    skills: ['新闻写作'],
+    certificates: [] as string[],
+  }
+}
+
+async function openLoginLocateChoice(page: Page, api: Parameters<typeof registerW6Api>[0]): Promise<void> {
+  registerW6Api(api)
+  api.respond('GET', '/api/v1/me/ai-consents/status', {
+    status: 200,
+    json: { success: true, data: [{ scope: 'resume_ai', granted: true }] },
+  })
+  api.respond('GET', `/api/v1/resume/records/${TASK_ID}/optimize`, {
+    status: 200,
+    json: {
+      taskId: TASK_ID,
+      status: 'completed',
+      providerName: 'llm',
+      modules: [{ title: '教育学校', before: LOGIN_SCHOOL, after: '负责青州财经学院校报的版面。' }],
+      optimizedResume: loginLocateResume('优化样本'),
+    },
+  })
+  api.respond('GET', `/api/v1/resume/records/${TASK_ID}/draft`, {
+    status: 200,
+    json: {
+      taskId: TASK_ID,
+      draft: { resume: loginLocateResume('草稿样本'), decisions: {}, updatedAt: DRAFT_UPDATED_AT },
+    },
+  })
+  api.respond('GET', `/api/v1/resume/records/${TASK_ID}/versions`, {
+    status: 200,
+    json: { taskId: TASK_ID, latestVersion: null, items: [] },
+  })
+  await loginThroughVisibleUi(page, `/resume/optimize?taskId=${TASK_ID}`)
+  await expect(page.locator('[data-draft-banner="choice"]')).toBeVisible()
+  await expect(page.locator('[data-resume-editor]')).toHaveCount(0)
+  const goEdit = page.getByRole('button', { name: '去编辑区改这一条', exact: true })
+  await goEdit.scrollIntoViewIfNeeded()
+  await goEdit.click()
+  await expect(page.locator('[data-draft-banner="choice"]')).toBeVisible()
+  await expect(page.locator('[data-resume-editor]')).toHaveCount(0)
+}
+
+test('登录后先选继续上次，定位请求留到编辑区挂上才停在学校那一栏 @kiosk', async ({ page, api }) => {
+  test.setTimeout(90_000)
+  await openLoginLocateChoice(page, api)
+  await page.getByRole('button', { name: /继续上次编辑/ }).click()
+  await expect(page.locator('[data-draft-banner="choice"]')).toHaveCount(0)
+  await expectOriginalSelected(page, 'education-0-school', LOGIN_SCHOOL)
+})
+
+test('登录后先选重新开始，定位请求留到编辑区挂上才停在学校那一栏 @kiosk', async ({ page, api }) => {
+  test.setTimeout(90_000)
+  await openLoginLocateChoice(page, api)
+  await page.getByRole('button', { name: '从优化结果重新开始', exact: true }).click()
+  await expect(page.locator('[data-draft-banner="choice"]')).toHaveCount(0)
+  await expectOriginalSelected(page, 'education-0-school', LOGIN_SCHOOL)
+})
+
+const EDIT_SUMMARY_UNIT = '本人在校期间整理学院新闻稿件。'
+const EDIT_DESCRIPTION_UNIT = '完成一门课程的采访并写成稿件。'
+const EDIT_SUMMARY_3000 = EDIT_SUMMARY_UNIT.repeat(Math.ceil(3000 / EDIT_SUMMARY_UNIT.length)).slice(0, 3000)
+const EDIT_DESCRIPTION_5000 = EDIT_DESCRIPTION_UNIT.repeat(Math.ceil(5000 / EDIT_DESCRIPTION_UNIT.length)).slice(0, 5000)
+
+test('生成编辑区简介 3000 字、描述 5000 字逐字留在输入框和导出请求里 @kiosk', async ({ page, api }) => {
+  test.setTimeout(90_000)
+  expect(EDIT_SUMMARY_3000).toHaveLength(3000)
+  expect(EDIT_DESCRIPTION_5000).toHaveLength(5000)
+  const taskId = 'r6-generate-long-2099'
+  registerOptimizeShell(api)
+  api.respond('GET', `/api/v1/resume/generate/${taskId}`, {
+    status: 200,
+    json: {
+      taskId,
+      status: 'completed',
+      providerName: 'deepseek',
+      missingHints: [],
+      resume: {
+        basic: { name: '周启明', phone: '13800001111', city: '青岛' },
+        intention: { position: '新闻编辑', city: '青岛' },
+        summary: '短简介。',
+        education: [{ school: '青岛大学', major: '新闻学', degree: '本科', period: '2019-2023', description: '完成新闻学课程。' }],
+        experience: [{ company: '学院官网工作室', role: '编辑', period: '2023-2024', description: '维护栏目。' }],
+        projects: [],
+        skills: ['新闻写作'],
+        certificates: [],
+      },
+    },
+  })
+  api.respond('POST', '/api/v1/resume/generate/export', {
+    status: 200,
+    json: {
+      fileId: 'gen-long-file',
+      filename: 'AI简历_周启明.pdf',
+      sizeBytes: 4096,
+      pageCount: 2,
+      signedUrl: '/e2e-fixtures/long-resume.pdf',
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      printFileUrl: '/api/v1/files/gen-long-file/content?expires=1&sig=test',
+    },
+  })
+  await page.route('**/e2e-fixtures/long-resume.pdf', (route) => route.fulfill({
+    status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n',
+  }))
+  await page.route('**/api/v1/files/gen-long-file/content**', (route) => route.fulfill({
+    status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n',
+  }))
+  await page.goto(`/resume/generate/preview?taskId=${encodeURIComponent(taskId)}`)
+  const summary = page.getByRole('textbox', { name: '个人简介' })
+  const description = page.getByRole('textbox', { name: '工作经历描述 1' })
+  await expect(summary).toBeVisible()
+  await summary.fill(EDIT_SUMMARY_3000)
+  await description.fill(EDIT_DESCRIPTION_5000)
+  await expect(summary).toHaveValue(EDIT_SUMMARY_3000)
+  await expect(description).toHaveValue(EDIT_DESCRIPTION_5000)
+  const pending = page.waitForRequest((request) => (
+    request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/resume/generate/export'
+  ))
+  await page.getByTestId('resume-generate-preview-cta-export').click()
+  await page.getByTestId('resume-generate-preview-cta-confirm-export').click()
+  await confirmExportFacts(page)
+  const body = (await pending).postDataJSON() as { summary?: string; experience?: Array<{ description?: string }> }
+  expect(body.summary).toBe(EDIT_SUMMARY_3000)
+  expect(body.experience?.[0]?.description).toBe(EDIT_DESCRIPTION_5000)
+})
+
+test('编辑区改一项技能、删一项、加一项后，导出请求里是改后的技能表 @kiosk', async ({ page, api }) => {
+  await openEntryEditor(page, api, 'r6-skill-edit-2099', [
+    { company: SHORT_COMPANY, role: '店员', period: '2022-2024', description: '负责门店日常运营。' },
+  ], ['熟练使用方正飞腾排版', '新闻摄影'])
+  const first = page.getByRole('textbox', { name: '技能 1', exact: true })
+  await expect(first).toHaveValue('熟练使用方正飞腾排版')
+  await first.fill('改过的方正飞腾排版')
+  await page.getByRole('button', { name: '删除该条' }).nth(1).click()
+  await expect(page.getByRole('textbox', { name: '技能 2', exact: true })).toHaveCount(0)
+  const add = page.locator('[data-entry-add="skill"]')
+  await add.fill('Indesign 排版')
+  await add.press('Enter')
+  await expect(page.getByRole('textbox', { name: '技能 2', exact: true })).toHaveValue('Indesign 排版')
+  const body = await exportBody(page) as { skills?: string[] }
+  expect(body.skills).toEqual(['改过的方正飞腾排版', 'Indesign 排版'])
 })

@@ -4,6 +4,7 @@ import { PencilLineIcon, ShieldCheckIcon } from 'lucide-react'
 import { Card } from '@ai-job-print/ui'
 import type { GeneratedResume, ResumeLayoutSettings } from '@ai-job-print/shared'
 import { MaskedContactLine } from '../../../components/MaskedContactLine'
+import { ProjectTitleFields, ResumeTagList } from './resume-deliver/ResumeEntryFields'
 import { DeleteEntryButton, EntryDeleteDialog } from './resume-deliver/ResumeFactConfirmDialog'
 import { RESUME_EDIT_LIMITS, resumeTitleIssues } from './resume-deliver/resumeEntryTitles'
 
@@ -105,6 +106,7 @@ export function OptimizedResumeEditor({
         <div
           className={`mt-4 space-y-5 text-[calc(1rem*var(--resume-font-scale,1))] leading-[var(--resume-line-height,1.62)] ${previewClassName}`}
           data-layout-columns={layout.columns ?? 1}
+          data-resume-editor=""
         >
           <div>
             <SectionTitle title="个人简介" />
@@ -233,7 +235,20 @@ export function OptimizedResumeEditor({
               <div className="space-y-3">
                 {resume.projects.map((p, i) => (
                   <div key={i} className="break-inside-avoid">
-                    <p className="text-sm font-semibold text-gray-800">{p.role ? `${p.name} · ${p.role}` : p.name}</p>
+                    <ProjectTitleFields
+                      index={i}
+                      name={p.name}
+                      role={p.role ?? ''}
+                      className={`${taCls} mt-1.5 min-h-12`}
+                      onName={(name) => onChange({
+                        ...resume,
+                        projects: resume.projects.map((row, idx) => idx === i ? { ...row, name } : row),
+                      })}
+                      onRole={(role) => onChange({
+                        ...resume,
+                        projects: resume.projects.map((row, idx) => idx === i ? { ...row, role } : row),
+                      })}
+                    />
                     <textarea
                       className={`${taCls} mt-1.5 min-h-24 resize-y`}
                       aria-label={`第 ${i + 1} 条项目的描述`}
@@ -255,18 +270,24 @@ export function OptimizedResumeEditor({
           {resume.skills.length > 0 && (
             <div>
               <SectionTitle title="技能" />
-              <div className="flex flex-wrap gap-2">
-                {resume.skills.map((s, i) => (
-                  <span key={i} className="rounded-lg bg-primary-50 px-2.5 py-1 text-sm text-primary-700" data-entry-field={`skill-${i}`}>{s}</span>
-                ))}
-              </div>
+              <ResumeTagList
+                items={resume.skills}
+                field="skill"
+                appearance="chip"
+                onChange={(skills) => onChange({ ...resume, skills })}
+              />
             </div>
           )}
 
           {resume.certificates.length > 0 && (
             <div>
               <SectionTitle title="证书 / 资质" />
-              <p className="text-sm text-gray-700">{resume.certificates.join(' · ')}</p>
+              <ResumeTagList
+                items={resume.certificates}
+                field="certificate"
+                appearance="chip"
+                onChange={(certificates) => onChange({ ...resume, certificates })}
+              />
             </div>
           )}
         </div>

@@ -268,7 +268,12 @@ export class LlmResumeOptimizeService {
       if (result) {
         const restored = restoreOptimizeResult(result, masked.restore)
         const missing = missingOriginalEntries(restored.optimizedResume, baseline)
-        if (attempt === 2 || missing.length === 0) {
+        // 技能、证书少交的单行就地补回，不再为此多打一次模型。整段没交（列表是空的）仍要重试。
+        const retryMissing = missing.filter((entry) => {
+          if (entry.key !== 'skills' && entry.key !== 'certificates') return true
+          return restored.optimizedResume[entry.key].length === 0
+        })
+        if (attempt === 2 || retryMissing.length === 0) {
           return this.returnAligned(preserveOriginalEntries(restored, [...missing, ...baseline.filter((entry) => entry.overflow)], baseline))
         }
         firstValid = restored
@@ -848,12 +853,14 @@ function arrayLength(value: unknown): number {
 
 function asArray(value: unknown, cap: number): Record<string, unknown>[] {
   if (!Array.isArray(value)) return []
-  return value.filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === 'object').slice(0, cap)
+  const list = value.filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === 'object')
+  return list.length > cap ? list.slice(0, cap) : list
 }
 
 function asStrArray(value: unknown, cap: number): string[] {
   if (!Array.isArray(value)) return []
-  return value.filter((x): x is string => typeof x === 'string').slice(0, cap)
+  const list = value.filter((x): x is string => typeof x === 'string')
+  return list.length > cap ? list.slice(0, cap) : list
 }
 
 function strOf(obj: Record<string, unknown>, key: string, maxLen: number): string {

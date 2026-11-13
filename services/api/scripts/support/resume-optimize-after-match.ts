@@ -454,7 +454,8 @@ const ENTRY_MARKS = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '�
 /**
  * 原文 10 段经历、14 段项目时，模型只交回前 8 段和前 6 段，其余按原文补回。
  * 14 段项目超过导出上限 12，多出来的两段并进最后一条描述，句子仍在。
- * 技能、证书整段非空就不补单行，所以模型必须交回全部 25 项和 18 个，解析上限不能再把它们切掉。
+ * 技能、证书按原稿逐项补回：模型只交回 20 项技能、15 个证书时，成品仍是原稿的 25 项和 18 个，顺序照原稿。
+ * 项目超过 12 条时，第 13 条起并进第 12 条；每一段的名称、角色、描述原文都要还能找到。
  */
 export async function verifyOptimizeEntryCountsKept(): Promise<void> {
   console.log('\n=== 优化稿经历、项目、技能、证书条数不丢原文 ===')
@@ -470,9 +471,11 @@ export async function verifyOptimizeEntryCountsKept(): Promise<void> {
   })
   const projects = ENTRY_MARKS.map((mark, index) => {
     const name = `青州${mark}项`
+    const role = `同学${mark}`
     const year = 2020 + index
     return {
       name,
+      role,
       line: `${name} ${year}.03 - ${year}.06`,
       original: `整理${mark}号同学的投稿说明。`,
       rewrite: `改写${mark}号同学的投稿说明。`,
@@ -485,7 +488,7 @@ export async function verifyOptimizeEntryCountsKept(): Promise<void> {
     '工作经历',
     ...experiences.flatMap((item) => [item.line, item.original]),
     '项目经历',
-    ...projects.flatMap((item) => [item.line, item.original]),
+    ...projects.flatMap((item) => [item.line, item.role, item.original]),
     '技能',
     ...skills,
     '证书',
@@ -503,8 +506,8 @@ export async function verifyOptimizeEntryCountsKept(): Promise<void> {
       projects: projects.slice(0, 6).map((item) => ({
         name: item.name, role: '', description: item.rewrite,
       })),
-      skills,
-      certificates,
+      skills: skills.slice(0, 20),
+      certificates: certificates.slice(0, 15),
     },
     modules: [],
   }), [])
@@ -520,8 +523,10 @@ export async function verifyOptimizeEntryCountsKept(): Promise<void> {
   if (resume.projects.length !== 12) fail(`项目超过导出上限后应为 12 条，实际 ${resume.projects.length}`)
   const projectText = JSON.stringify(resume.projects)
   projects.forEach((item, index) => {
-    const expected = index < 6 ? item.rewrite : item.original
-    if (!projectText.includes(expected)) fail(`第 ${index + 1} 段项目的「${expected}」不在优化稿里`)
+    if (!projectText.includes(item.name)) fail(`第 ${index + 1} 段项目名称「${item.name}」不在成品里`)
+    if (item.role && !projectText.includes(item.role)) fail(`第 ${index + 1} 段项目角色「${item.role}」不在成品里`)
+    if (!projectText.includes(item.original)) fail(`第 ${index + 1} 段项目描述原文「${item.original}」不在成品里`)
+    if (index < 6 && !projectText.includes(item.rewrite)) fail(`第 ${index + 1} 段项目的改写「${item.rewrite}」不在成品里`)
   })
   if (resume.skills.length !== skills.length || skills.some((skill, index) => resume.skills[index] !== skill)) {
     fail(`技能应为原文 25 项，实际 ${resume.skills.length} 项`)

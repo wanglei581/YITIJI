@@ -31,7 +31,7 @@ const {
 const compareModule = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-compare/resumeCompareModel.ts'))
 const factsModule = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-deliver/facts.ts'))
 const titlesModule = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-deliver/resumeEntryTitles.ts'))
-const { buildCompareItems, adoptEligible, visibleCompareIndices, focusToVisiblePosition } = compareModule.exports
+const { buildCompareItems, adoptEligible, adoptEligibleBatchNote, visibleCompareIndices, focusToVisiblePosition } = compareModule.exports
 const { detectUnconfirmedTextAdditions } = factsModule.exports
 const { findResumeOriginalField, RESUME_EDIT_LIMITS } = titlesModule.exports
 
@@ -49,24 +49,30 @@ test('isModuleSwitchable respects the loaded base resume and empty after text', 
   assert.equal(isModuleSwitchable(makeResume('优化句'), moduleOf('原文', '')), false)
 })
 
- test('正常切换来回会真实改正文并报告 applied', () => {
+test('正常切换来回会真实改正文并报告 applied', () => {
+  // 有基准稿、改写恰好一处时，A 类两个方向都换这一处。
+  // 没有基准稿时不猜第一处，见文末「没有基准稿」两条。
   const item = moduleOf('原来的话', '更好的话')
-  const first = toggleModuleDecision(makeResume(item.after), item, 'optimized', 'original')
+  const base = makeResume(item.after)
+  const first = toggleModuleDecision(makeResume(item.after), item, 'optimized', 'original', base)
   assert.equal(first.applied, true)
   assert.equal(first.resume.summary, item.before)
-  const second = toggleModuleDecision(first.resume, item, 'original', 'optimized')
+  const second = toggleModuleDecision(first.resume, item, 'original', 'optimized', base)
   assert.equal(second.applied, true)
   assert.equal(second.resume.summary, item.after)
 })
 
-test('原文为空时删掉改写后不能假装切回改写', () => {
+test('没有基准稿时原文为空也不猜，正文不动并报告 edited', () => {
+  // 没有基准稿分不出该删哪一处。两个方向都报 edited，正文保持调用前的样子。
+  // 有基准稿时原文为空仍是 original-empty，见「原文为空的新增句按基准稿判为只能手改」。
   const item = moduleOf('', '新增的一句')
   const removed = toggleModuleDecision(makeResume(item.after), item, 'optimized', 'original')
-  assert.equal(removed.applied, true)
-  assert.equal(removed.resume.summary, '')
-  const blocked = toggleModuleDecision(removed.resume, item, 'original', 'optimized')
+  assert.equal(removed.applied, false)
+  assert.equal(removed.reason, 'edited')
+  assert.equal(removed.resume.summary, '新增的一句')
+  const blocked = toggleModuleDecision(makeResume(''), item, 'original', 'optimized')
   assert.equal(blocked.applied, false)
-  assert.equal(blocked.reason, 'original-empty')
+  assert.equal(blocked.reason, 'edited')
   assert.equal(blocked.resume.summary, '')
 })
 
@@ -79,13 +85,17 @@ test('用户改过正文后找不到来源时保持原文并报告 edited', () =
 })
 
 test('批量切换只更新真正换成的条目', () => {
+  // 补上基准稿：第一条改写在稿里恰好一处，仍换成原文。
+  // 没有基准稿时两条都会停住，见文末「没有基准稿」两条。
   const first = moduleOf('原文一', '改写一', '一')
   const second = moduleOf('原文二', '改写二', '二')
+  const base = makeResume('改写一；用户改过二')
   const result = applyDecisionChanges(
     { ...makeResume('改写一；用户改过二'), summary: '改写一；用户改过二' },
     [first, second],
     { 'm0:一': 'optimized', 'm1:二': 'optimized' },
     [['m0:一', 'original'], ['m1:二', 'original']],
+    base,
   )
   assert.equal(result.resume.summary, '原文一；用户改过二')
   assert.equal(result.decisions['m0:一'], 'original')
@@ -688,6 +698,8 @@ test('可采纳的全部采纳跳过换不上的条目，skipped 把它们计进
   const picked = adoptEligible(visible, {}, {}, base)
   assert.equal(picked.adopted, 2)
   assert.equal(picked.skipped, 1)
+  assert.equal(picked.skippedFacts, 0)
+  assert.equal(picked.skippedManual, 1)
   assert.equal(picked.next[moduleKeyOf(manual, 2)], undefined)
   assert.equal(picked.next[moduleKeyOf(first, 3)], 'optimized')
   assert.equal(picked.next[moduleKeyOf(second, 4)], 'optimized')
@@ -696,6 +708,8 @@ test('可采纳的全部采纳跳过换不上的条目，skipped 把它们计进
   const all = adoptEligible(buildCompareItems(modules), {}, {}, base)
   assert.equal(all.adopted, 2)
   assert.equal(all.skipped, 1)
+  assert.equal(all.skippedFacts, 0)
+  assert.equal(all.skippedManual, 1)
   assert.equal(all.next[moduleKeyOf(keep, 0)], undefined)
   assert.equal(all.next[moduleKeyOf(same, 1)], undefined)
 })
@@ -831,9 +845,9 @@ test('前一条整句包住后一条原句、改写又不再含这句时，后�
   assert.equal(second.resume.summary.includes(after2), false)
 })
 
-test('没有基准稿时换回原文不按第一处猜，多处报 edited；不传上下文仍换第一处', () => {
+test('没有基准稿时两个方向都不猜，不传上下文也不换第一处', () => {
   // 没有基准稿分不出这一条占哪一段。两处都没人占时不能挑前面那处。
-  // 旧调用不传上下文，仍按整份稿的第一处换，生产调用点都已传上下文。
+  // 旧调用不传上下文，也按完整位置表判断：宁可退回手改，绝不换错字。
   const item = moduleOf('原来的话', '更好的话')
   const resume = makeResume('更好的话，更好的话')
   assert.equal(moduleBaseState(null, item).kind, 'unloaded')
@@ -844,13 +858,18 @@ test('没有基准稿时换回原文不按第一处猜，多处报 edited；不�
   assert.equal(blocked.reason, 'edited')
   assert.equal(blocked.resume.summary, '更好的话，更好的话')
   const legacy = toggleModuleDecision(resume, item, 'optimized', 'original')
-  assert.equal(legacy.applied, true)
-  assert.equal(legacy.resume.summary, '原来的话，更好的话')
+  assert.equal(legacy.applied, false)
+  assert.equal(legacy.reason, 'edited')
+  assert.equal(legacy.resume.summary, '更好的话，更好的话')
+  const forward = toggleModuleDecision(makeResume('原来的话'), item, 'original', 'optimized')
+  assert.equal(forward.applied, false)
+  assert.equal(forward.reason, 'edited')
+  assert.equal(forward.resume.summary, '原来的话')
 })
 
-test('没有基准稿时换回原文也避开别的条目占着的文字，只换自己那一处', () => {
+test('没有基准稿时即使能剔出恰好一处也不换', () => {
   // 与 A 类同一布局，只是没有基准稿：前面那处在第 j 条占着的改写里，后面那处才是第 i 条自己的。
-  // 剔除之后恰好剩一处，就换这一处，不因为没有基准稿去改第 j 条。
+  // 上一包这里期望换上后面那处。没有基准稿时不再猜，报 edited，正文保持原样。
   const afterI = '维护学院官网的栏目和活动通知。'
   const beforeI = '更新学院官网的栏目和活动通知。'
   const afterJ = `在新媒体中心${afterI}`
@@ -868,6 +887,37 @@ test('没有基准稿时换回原文也避开别的条目占着的文字，只�
     },
     index: 1,
   })
+  assert.equal(result.applied, false)
+  assert.equal(result.reason, 'edited')
+  assert.equal(result.resume.summary, field)
+})
+
+test('A 类从保留原文切回用改写时也只换自己那一处', () => {
+  // 有基准稿、有上下文。前面那处嵌在第 j 条占着的原文里，后面那处才是第 i 条自己的原句。
+  // 切回用改写必须剔除别人占着的文字，恰好一处才换。按第一处换会改到第 j 条的原文。
+  const beforeI = '整理每周的活动通知。'
+  const afterI = '核对每周的活动通知。'
+  const beforeJ = `值班时${beforeI}`
+  const itemJ = moduleOf(beforeJ, '值班时核对排班。', '值班')
+  const itemI = moduleOf(beforeI, afterI, '活动通知')
+  const modules = [itemJ, itemI]
+  const current = makeResume(`${beforeJ}${beforeI}`)
+  const base = makeResume(afterI)
+  assert.equal(beforeJ.includes(beforeI), true)
+  assert.equal(moduleBaseState(base, itemI).kind, 'A')
+  const result = toggleModuleDecision(current, itemI, 'original', 'optimized', base, {
+    modules,
+    decisions: { [moduleKeyOf(itemJ, 0)]: 'original' },
+    index: 1,
+  })
   assert.equal(result.applied, true)
-  assert.equal(result.resume.summary, `${afterJ}${beforeI}`)
+  assert.equal(result.resume.summary, `${beforeJ}${afterI}`)
+})
+
+test('批量提示只因事实跳过时保持原句，有只能手改时改用括号里那句', () => {
+  const factsOnly = '已采纳 1 条；跳过 1 条 —— 那几条的改写里有原文没有的事实，要逐项确认后才能采纳。批量动作不会绕过这道拦截。'
+  const withManual = '已采纳 2 条；跳过 1 条（有待确认事实、只能手改的那几条）。'
+  assert.equal(adoptEligibleBatchNote({ adopted: 1, skipped: 1, skippedManual: 0 }), factsOnly)
+  assert.equal(adoptEligibleBatchNote({ adopted: 2, skipped: 1, skippedManual: 1 }), withManual)
+  assert.equal(adoptEligibleBatchNote({ adopted: 0, skipped: 2, skippedManual: 2 }), '已采纳 0 条；跳过 2 条（有待确认事实、只能手改的那几条）。')
 })

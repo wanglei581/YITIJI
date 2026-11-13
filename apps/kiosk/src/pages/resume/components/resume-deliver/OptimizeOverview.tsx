@@ -95,9 +95,12 @@ export function OptimizeOverview(props: {
         {rows.map((row) => {
           const title = row.module.title || `第 ${row.index + 1} 条`
           const snippet = row.module.before.replace(/\s+/g, ' ').trim().replace(/。+$/u, '')
+          const factNote = row.additions.length > 0 ? ` 待确认：${row.additions.join('、')}` : ''
           const originalLine = row.noAction
             ? (snippet ? `原文：${snippet}。这一段保持原文。` : '原文：这一段保持原文。')
-            : `原文：${snippet || '这一条没有留下原句。'}${row.manual ? ' 这一条只能在编辑区里改。' : ''}${row.additions.length > 0 ? ` 待确认：${row.additions.join('、')}` : ''}`
+            : row.manual
+              ? `${snippet ? `原文：${snippet}。` : '原文：这一条没有留下原句。'}这一条只能在编辑区里改。${factNote}`
+              : `原文：${snippet || '这一条没有留下原句。'}${factNote}`
           return (
             <li key={row.key} className={row.noAction ? 'qxt-row qxt-keeprow' : 'qxt-row'} data-decision={row.noAction ? 'keep' : row.switchable ? row.decision : 'manual'} data-pending={row.additions.length}>
               <div className="qxt-rowtx">

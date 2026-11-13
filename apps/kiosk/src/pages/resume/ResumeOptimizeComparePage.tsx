@@ -22,6 +22,7 @@ import { MANUAL_NOTE } from './components/resume-deliver/OptimizeOverview'
 import { isNoActionModule, moduleSwitchBlock } from './components/resume-deliver/resumeDecisions'
 import {
   adoptEligible,
+  adoptEligibleBatchNote,
   decisionStats,
   decisionsWithoutNoAction,
   buildCompareItems,
@@ -285,7 +286,7 @@ export function ResumeOptimizeComparePage() {
                 onAdoptEligible={() => {
                   const result = adoptEligible(items, confirmedByModule, decisions, baseResume)
                   setDecisions(result.next)
-                  setBatchNote(`已采纳 ${result.adopted} 条；跳过 ${result.skipped} 条 —— 那几条的改写里有原文没有的事实，要逐项确认后才能采纳。批量动作不会绕过这道拦截。`)
+                  setBatchNote(adoptEligibleBatchNote(result))
                 }}
                 onKeepUndecided={() => {
                   const result = keepUndecided(items, decisions, baseResume)

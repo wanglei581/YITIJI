@@ -79,9 +79,11 @@ export async function verifyResumeOptimizeLiveGate(): Promise<void> {
         skills: ['整理数据'], certificates: [],
       }, modules: [] }) } }], usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 },
     }), { status: 200 })
-    assert.equal(await main({ config, fetch: nonemptySkill, write: (line) => lossLines.push(line) }), 1)
-    assert(lossLines[1]!.endsWith('结果:丢内容'), '某段条数少于原件必须丢内容并退出 1')
-    assert(lossLines[4]!.endsWith('结论:有丢失'))
+    // 模型只交回「整理数据」、其余段落是空的。经历和项目仍整段补回；技能少交的单行按原稿补回，不再算丢。
+    // 样例 2 因此技能条数不少于原件（多出来的是模型那一条），探针结论改为全部保留。
+    assert.equal(await main({ config, fetch: nonemptySkill, write: (line) => lossLines.push(line) }), 0)
+    assert(lossLines[1]!.endsWith('结果:通过'), '技能少交后按原稿补回，条数不得少于原件')
+    assert(lossLines[4]!.endsWith('结论:全部保留'))
   } finally {
     LIVE_SAMPLES[1]!.text = saved
   }

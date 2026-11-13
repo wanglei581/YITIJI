@@ -119,6 +119,8 @@ export function ResumeOptimizePage() {
     if (viewOnly) return
     editOriginalRef.current = original
     setEditFocusNonce((n) => n + 1)
+    // 草稿还没选「继续上次」或「重新开始」时，编辑区还没挂上。只记下这一句，选完再定位。
+    if (!draftAccepted) return
     setWorkView('editor')
   }
 
@@ -350,14 +352,22 @@ export function ResumeOptimizePage() {
   const showOverview = workView === 'overview' && modules.length > 0
   const pane: OptimizePane = view !== 'ready' ? 'overview' : workView === 'export' ? 'export' : showOverview ? 'overview' : 'editor'
   useEffect(() => {
-    if (pane !== 'editor' || !resume || editOriginalRef.current == null) return
+    if (!editorOpen || pane !== 'editor' || !resume || editOriginalRef.current == null) return
     const text = editOriginalRef.current
-    const handle = window.requestAnimationFrame(() => {
-      focusResumeOriginalField(resume, text)
-      editOriginalRef.current = null
-    })
+    let frame = 0
+    let handle = 0
+    const tick = () => {
+      if (editOriginalRef.current !== text) return
+      if (focusResumeOriginalField(resume, text)) {
+        editOriginalRef.current = null
+        return
+      }
+      frame += 1
+      if (frame < 60) handle = window.requestAnimationFrame(tick)
+    }
+    handle = window.requestAnimationFrame(tick)
     return () => window.cancelAnimationFrame(handle)
-  }, [pane, resume, editFocusNonce])
+  }, [editorOpen, pane, resume, editFocusNonce])
   const qxPage = pane === 'export' ? 'resume-export' : pane === 'editor' ? 'resume-edit' : 'optimize'
   const leaveDirty = draft.unsaved || (isDirty && !exported && !token)
   const askFor = (label: string, text: string) => ({
@@ -482,10 +492,15 @@ export function ResumeOptimizePage() {
             choicePending={choicePending}
             draftUpdatedAt={draft.remoteDraft?.updatedAt}
             onContinue={handleContinueDraft}
-            onRestart={() => { setDecisions({}); draft.requestOverwrite(); setDraftAccepted(true); setWorkView('overview') }}
+            onRestart={() => {
+              setDecisions({})
+              draft.requestOverwrite()
+              setDraftAccepted(true)
+              setWorkView(editOriginalRef.current != null ? 'editor' : 'overview')
+            }}
           />
         )}
-        {editorOpen && pane === 'overview' && (
+        {(editorOpen || choicePending) && pane === 'overview' && (
           <OptimizeOverview
             modules={modules}
             decisions={decisions}

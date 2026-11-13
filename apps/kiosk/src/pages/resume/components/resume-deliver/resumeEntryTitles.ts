@@ -76,10 +76,15 @@ function resumeOriginalFields(resume: GeneratedResume): Array<{ id: string; text
     fields.push({ id: `experience-${index}-description`, text: item.description ?? '' })
   })
   resume.projects.forEach((item, index) => {
+    fields.push({ id: `projects-${index}-name`, text: item.name ?? '' })
+    fields.push({ id: `projects-${index}-role`, text: item.role ?? '' })
     fields.push({ id: `projects-${index}-description`, text: item.description ?? '' })
   })
   resume.skills.forEach((skill, index) => {
     fields.push({ id: `skill-${index}`, text: skill ?? '' })
+  })
+  resume.certificates.forEach((certificate, index) => {
+    fields.push({ id: `certificate-${index}`, text: certificate ?? '' })
   })
   return fields
 }
@@ -102,22 +107,27 @@ function scrollResumeEditorToTop(): void {
   if (page instanceof HTMLElement) page.scrollTo({ top: 0 })
 }
 
-/** 滚到这句原文所在的那一栏，聚焦并用 setSelectionRange 选中。找不到就停在编辑区顶部。 */
-export function focusResumeOriginalField(resume: GeneratedResume, original: string): void {
-  if (typeof document === 'undefined') return
+/**
+ * 滚到这句原文所在的那一栏，聚焦并选中。
+ * 编辑区还没挂上、或对应输入框还没出现时返回 false，调用方保留定位请求。
+ * 编辑区已经挂上、真找不到这一栏时才滚到顶部，并返回 true。
+ */
+export function focusResumeOriginalField(resume: GeneratedResume, original: string): boolean {
+  if (typeof document === 'undefined') return false
+  const editor = document.querySelector('[data-resume-editor]')
+  if (!(editor instanceof HTMLElement)) return false
   const hit = findResumeOriginalField(resume, original)
-  const el = hit ? document.querySelector(`[data-entry-field="${hit.fieldId}"]`) : null
+  const el = hit ? editor.querySelector(`[data-entry-field="${hit.fieldId}"]`) : null
   const needle = original.trim()
-  if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
-    scrollResumeEditorToTop()
-    return
+  if ((el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) && needle) {
+    const start = el.value.indexOf(needle)
+    if (start >= 0) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      el.focus()
+      el.setSelectionRange(start, start + needle.length)
+      return true
+    }
   }
-  const start = el.value.indexOf(needle)
-  if (start < 0) {
-    scrollResumeEditorToTop()
-    return
-  }
-  el.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  el.focus()
-  el.setSelectionRange(start, start + needle.length)
+  scrollResumeEditorToTop()
+  return true
 }
