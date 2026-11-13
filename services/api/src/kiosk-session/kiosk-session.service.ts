@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, Optional } from '@nestjs/common'
+import { ServiceOrderService } from '../payment/service-order.service'
 import { PrismaService } from '../prisma/prisma.service'
 import type { EndKioskSessionDto, StartKioskSessionDto, TouchKioskSessionDto } from './dto/kiosk-session.dto'
 import {
@@ -47,7 +48,10 @@ function withCategory(json: string, category: KioskServiceCategory | undefined):
  */
 @Injectable()
 export class KioskSessionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly serviceOrders?: ServiceOrderService,
+  ) {}
 
   async start(terminalId: string, dto: StartKioskSessionDto, now = new Date()): Promise<KioskSessionAck> {
     const terminal = await this.prisma.terminal.findUnique({ where: { id: terminalId }, select: { orgId: true } })
@@ -93,6 +97,9 @@ export class KioskSessionService {
       where: { id: row.id },
       data: { endedAt, endReason: dto.endReason, isExpired: true, lastActiveAt: endedAt > row.lastActiveAt ? endedAt : row.lastActiveAt },
     })
+    if (this.serviceOrders && typeof this.serviceOrders.onSessionEnded === 'function') {
+      await this.serviceOrders.onSessionEnded(terminalId, dto.clientSessionId)
+    }
     return { recorded: true }
   }
 
