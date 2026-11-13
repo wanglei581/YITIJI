@@ -8,13 +8,12 @@
 // 为什么是新端点而不是复用 PATCH /admin/orgs/:id：
 //   `Organization` 从 P1 expand 起就带了 contentTrustReviewedBy /
 //   ReviewedAt / Reason 三列 —— 设计时就是「这是一次有人负责的审核决策」，
-//   而不是一个可以顺手改的档案字段。全仓检索这三列**没有任何写入方**（连
-//   backfill 脚本都没有），所以没有现成入口可复用，这里补最小的一个：
-//   一次调用 = 一次显式核验决策 = 一条审计。
+//   而不是一个可以顺手改的档案字段。入口就这一个：一次调用 = 一次显式核验
+//   决策 = 一条审计。回填脚本只对显式列出的机构写同样的三列。
 //
 // 合规：本端点只决定「该机构的内容能不能被发布」，不改机构档案、不碰账号、
-// 不碰任何内容行的 publishStatus。已发布内容不会因为这里改状态而自动下架
-// （下架走既有 unpublish 路径，需要单独动作与单独审计）。
+// 不改任何内容行的 publishStatus。撤销后，已发布政策会从一体机和小程序的
+// 公开读取里消失；恢复可信后重新显示。公开列表有缓存，所以这里要立刻清掉。
 // ============================================================
 
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common'
@@ -22,8 +21,12 @@ import type { Redis } from 'ioredis'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { REDIS_CLIENT } from '../common/redis/redis.service'
-import { COMMUNITY_FEED_CACHE_PREFIX } from '../community/community.service'
-import { DAILY_BRIEF_CITY_CACHE_PREFIX } from '../assistant/daily-brief.service'
+import { tryRedis } from '../common/redis/redis-degradation'
+import {
+  COMMUNITY_FEED_CACHE_PREFIX,
+  DAILY_BRIEF_CITY_CACHE_PREFIX,
+  PUBLIC_CONTENT_CACHE_STALE_WINDOW_SECONDS,
+} from '../common/content-trust-cache-keys'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import type { OrgContentTrustDto } from './dto/org-content-trust.dto'
 
@@ -34,6 +37,41 @@ export type OrgContentTrustStatus = (typeof ORG_CONTENT_TRUST_STATUSES)[number]
 /** 社区动态和早报共用的公开缓存。生产走 Redis SCAN；门禁可以换一块内存实现。 */
 export interface PublicContentCache {
   deleteByPrefix(prefix: string): Promise<void>
+}
+
+/**
+ * 清社区动态和早报的公开缓存。库已经提交之后调用。
+ * Redis 抖动只记警告和一条审计，不得把已经生效的撤销、恢复、停用打成 500。
+ * 两个前缀各包一次 tryRedis：第一次失败会进入静默期，第二次可能被跳过，
+ * 只要有一次没清掉就写一条审计。
+ */
+export async function invalidatePublicContentCache(
+  cache: PublicContentCache,
+  logger: Logger | undefined,
+  audit: Pick<AuditService, 'write'>,
+  actor: { userId: string | null; role: string },
+  orgId: string,
+): Promise<void> {
+  let failed = false
+  for (const prefix of [COMMUNITY_FEED_CACHE_PREFIX, DAILY_BRIEF_CITY_CACHE_PREFIX]) {
+    const attempt = await tryRedis(
+      'public-content-cache-invalidate',
+      () => cache.deleteByPrefix(prefix),
+      logger,
+    )
+    if (!attempt.ok) failed = true
+  }
+  if (!failed) return
+  const code = 'PUBLIC_CONTENT_CACHE_INVALIDATION_FAILED'
+  logger?.warn(`public content cache invalidation failed: orgId=${orgId} code=${code}`)
+  await audit.write({
+    actorId: actor.userId,
+    actorRole: actor.role,
+    action: 'organization.public_content_cache_invalidation_failed',
+    targetType: 'organization',
+    targetId: orgId,
+    payload: { orgId, code, level: 'warn', staleWindowSeconds: PUBLIC_CONTENT_CACHE_STALE_WINDOW_SECONDS },
+  })
 }
 
 @Injectable()
@@ -152,9 +190,14 @@ export class AdminOrgContentTrustService {
       `setContentTrust: org=${id} ${org.contentTrustStatus ?? 'null'} -> ${status} by=${user.userId}`,
     )
     // 公开列表已经看内容可信，但社区动态和早报把结果缓存了 15 分钟。
-    // 撤销和恢复都要立刻清掉，否则已撤下的内容还会露在外面，恢复的也要等缓存过期。
-    await this.publicCache.deleteByPrefix(COMMUNITY_FEED_CACHE_PREFIX)
-    await this.publicCache.deleteByPrefix(DAILY_BRIEF_CITY_CACHE_PREFIX)
+    // 撤销和恢复都要立刻清掉。清失败不能把已经落库的核验打成 500。
+    await invalidatePublicContentCache(
+      this.publicCache,
+      this.logger,
+      this.audit,
+      { userId: user.userId, role: 'admin' },
+      id,
+    )
     return this.toView(updated)
   }
 

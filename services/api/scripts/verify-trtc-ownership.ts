@@ -96,7 +96,7 @@ async function assertAssembledControllerPausesWhenAdminTurnsDigitalHumanOff(
   }
 }
 
-/** 后台从没保存过 digital_human.enabled 时按开；写了 false 或管理员关掉才关。密钥不决定这个开关。 */
+/** 后台没把 explicitlyConfigured 写成 true 时数字人按开；只有真正保存过才认 enabled。密钥不决定这个开关。 */
 function assertDigitalHumanSwitchDefaults(): void {
   const savedDir = process.env['FILE_STORAGE_DIR']
   const savedAi = process.env['AI_LLM_API_KEY']
@@ -126,9 +126,21 @@ function assertDigitalHumanSwitchDefaults(): void {
     writeFileSync(path.join(partial, 'ai-model-configs.json'), JSON.stringify({ digital_human: { vendor: 'deepseek' } }))
     assert.equal(new LlmConfigService().getConfig('digital_human').enabled, true, '有对象但没写 enabled 时按开')
 
-    const writtenOff = useDir()
-    writeFileSync(path.join(writtenOff, 'ai-model-configs.json'), JSON.stringify({ digital_human: { vendor: 'deepseek', enabled: false } }))
-    assert.equal(new LlmConfigService().getConfig('digital_human').enabled, false, '文件里写了 enabled false 就关')
+    const legacyOff = useDir()
+    writeFileSync(path.join(legacyOff, 'ai-model-configs.json'), JSON.stringify({
+      digital_human: { vendor: 'deepseek', enabled: false, explicitlyConfigured: false },
+    }))
+    assert.equal(new LlmConfigService().getConfig('digital_human').enabled, true, '旧文件写了 enabled false 且 explicitlyConfigured false 时按开')
+
+    const explicitOff = useDir()
+    writeFileSync(path.join(explicitOff, 'ai-model-configs.json'), JSON.stringify({
+      digital_human: { vendor: 'deepseek', enabled: false, explicitlyConfigured: true },
+    }))
+    assert.equal(new LlmConfigService().getConfig('digital_human').enabled, false, '后台保存过且 enabled false 时按关')
+
+    const enabledOnly = useDir()
+    writeFileSync(path.join(enabledOnly, 'ai-model-configs.json'), JSON.stringify({ digital_human: { vendor: 'deepseek', enabled: false } }))
+    assert.equal(new LlmConfigService().getConfig('digital_human').enabled, true, '只写了 enabled false、没有 explicitlyConfigured 时按开')
 
     delete process.env['AI_LLM_API_KEY']
     delete process.env['TRTC_LLM_API_KEY']
@@ -138,7 +150,11 @@ function assertDigitalHumanSwitchDefaults(): void {
     savedByAdmin.update({ enabled: false }, 'digital_human')
     assert.equal(savedByAdmin.getConfig('digital_human').enabled, false, '后台关掉之后是关')
     assert.equal(new LlmConfigService().getConfig('digital_human').enabled, false, '后台关掉会落盘，再读仍是关')
-    pass('数字人开关：没保存过按开，写 false 或后台关掉才关')
+    const savedFile = JSON.parse(readFileSync(path.join(process.env['FILE_STORAGE_DIR']!, 'ai-model-configs.json'), 'utf8')) as {
+      digital_human?: { explicitlyConfigured?: boolean }
+    }
+    assert.equal(savedFile.digital_human?.explicitlyConfigured, true, '后台保存会写下 explicitlyConfigured true')
+    pass('数字人开关：没保存过按开，只有 explicitlyConfigured 为 true 才认 enabled')
   } finally {
     if (savedDir === undefined) delete process.env['FILE_STORAGE_DIR']
     else process.env['FILE_STORAGE_DIR'] = savedDir

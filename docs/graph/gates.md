@@ -72,7 +72,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2196 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2198 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2362,10 +2362,11 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 149 个文件</summary>
+<summary><code>services/api/scripts/</code> — 150 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
+| `services/api/scripts/backfill-org-content-trust.ts` | `verify-policy-scope.ts` |
 | `services/api/scripts/backfill-terminal-credentials.ts` | `verify-terminal-bind-code.ts` |
 | `services/api/scripts/change-password-verify-target.ts` | `verify-change-password-target-guard.ts`<br/>`verify-change-password.ts` |
 | `services/api/scripts/check-resume-optimize-live.ts` | `verify-resume-optimize-live-gate.ts` |
@@ -2519,7 +2520,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 694 个文件</summary>
+<summary><code>services/api/src/</code> — 695 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2725,6 +2726,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/common/boot/boot-readiness.ts` | `verify-ai-platform-degradation.ts`<br/>`verify-redis-degradation-truth.ts` |
 | `services/api/src/common/client-ip.ts` | `verify-trust-proxy.ts` |
 | `services/api/src/common/constants/internal-session.constants.ts` | `verify-file-internal-auth.ts` |
+| `services/api/src/common/content-trust-cache-keys.ts` | `verify-policy-scope.ts` |
 | `services/api/src/common/content-trust.ts` | `verify-content-trust-publish-gate.ts`<br/>`verify-policy-publish-gates.ts` |
 | `services/api/src/common/crypto/email-identity.ts` | `verify-partner-email-login-alias.ts` |
 | `services/api/src/common/crypto/phone-identity.ts` | `verify-admin-login-hardening.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-admin-users.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-ai-quota.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-free-print-quota.ts`<br/>`verify-internal-accounts.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-kiosk-anonymous-feedback.ts`<br/>`verify-member-assets-c2d.ts`<br/>`verify-member-auth-races.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-member-closure.ts`<br/>`verify-member-qr-login.ts`<br/>`verify-member-restore.ts`<br/>`verify-member-step-up.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-contact-phone-registration.ts`<br/>`verify-sms-budget.ts`<br/>`verify-sms-egress-limits.ts` |
@@ -2758,7 +2760,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/common/redis/member-data-export-redis.service.ts` | `verify-member-closure.ts`<br/>`verify-member-data-export-download.ts` |
 | `services/api/src/common/redis/partner-account-action-redis.service.ts` | `verify-internal-accounts-postgres.ts`<br/>`verify-internal-accounts.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action-redis.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-contact-phone-registration.ts` |
 | `services/api/src/common/redis/redis-client-options.ts` | `verify-redis-degradation-truth.ts` |
-| `services/api/src/common/redis/redis-degradation.ts` | `verify-admin-login-hardening.ts`<br/>`verify-admin-orgs.ts`<br/>`verify-branding.ts`<br/>`verify-file-internal-auth.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-partner-contact-phone-registration.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-redis-degradation-truth.ts`<br/>`verify-sms-budget.ts` |
+| `services/api/src/common/redis/redis-degradation.ts` | `verify-admin-login-hardening.ts`<br/>`verify-admin-orgs.ts`<br/>`verify-branding.ts`<br/>`verify-file-internal-auth.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-partner-contact-phone-registration.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-policy-scope.ts`<br/>`verify-redis-degradation-truth.ts`<br/>`verify-sms-budget.ts` |
 | `services/api/src/common/redis/redis.module.ts` | `verify-internal-accounts.ts` |
 | `services/api/src/common/redis/redis.service.ts` | `verify-activity-logs.ts`<br/>`verify-admin-ops.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-admin-printer-output.ts`<br/>`verify-ai-public-quota.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-alert-push.cjs`<br/>`verify-backend-p0-http.ts`<br/>`verify-branding.ts`<br/>`verify-change-password.ts`<br/>`verify-copy-c1b.ts`<br/>`verify-copy-quota.ts`<br/>`verify-free-print-quota.ts`<br/>`verify-internal-accounts-postgres.ts`<br/>`verify-internal-accounts.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-kiosk-upload-print-contract.ts`<br/>`verify-license-runtime.ts`<br/>`verify-member-auth-races.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-closure.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-member-qr-login.ts`<br/>`verify-member-restore.ts`<br/>`verify-member-step-up.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-mock-interview-deadline.ts`<br/>`verify-org-device-alert.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-contact-phone-registration.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-pg-serialization-conflict-postgres.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-policy-scope.ts`<br/>`verify-print-jobs.ts`<br/>`verify-recruitment-content-http.ts`<br/>`verify-recruitment-hosting-default-off.ts`<br/>`verify-redis-degradation-truth.ts`<br/>`verify-resume-export-draft-source.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-parse-quota-once.ts`<br/>`verify-scan-device-sessions.ts`<br/>`verify-scan-device-settings.ts`<br/>`verify-sms-budget.ts`<br/>`verify-support-contact.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-trtc-terminal-http.ts`<br/>`verify-upload-scene.ts`<br/>`verify-upload-sessions-faults.ts`<br/>`verify-upload-sessions-member-file.ts` |
 | `services/api/src/common/text/cjk-radical-fold.ts` | `verify-resume-radical-fold.ts`<br/>`verify-resume-radical-font-fold.ts` |
@@ -3020,7 +3022,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/orgs/admin-org-account-view.ts` | `verify-admin-orgs-delete-schema.ts`<br/>`verify-partner-account-action-schema.ts` |
 | `services/api/src/orgs/admin-org-content-trust.service.ts` | `verify-admin-content-trust-ui.mjs`<br/>`verify-content-trust-publish-gate.ts`<br/>`verify-policy-scope.ts` |
 | `services/api/src/orgs/admin-orgs.controller.ts` | `verify-admin-content-trust-ui.mjs`<br/>`verify-partner-contact-phone-registration.ts` |
-| `services/api/src/orgs/admin-orgs.service.ts` | `verify-admin-orgs-delete-concurrency.ts`<br/>`verify-admin-orgs-delete-schema.ts`<br/>`verify-admin-orgs.ts`<br/>`verify-admin-session-revocation.ts`<br/>`verify-branding.ts`<br/>`verify-org-type-enum-sync.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action-schema.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-contact-phone-registration.ts`<br/>`verify-partner-email-login-alias.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-partner-smart-campus.ts`<br/>`verify-pg-serialization-conflict-postgres.ts`<br/>`verify-pg-serialization-conflict.ts` |
+| `services/api/src/orgs/admin-orgs.service.ts` | `verify-admin-orgs-delete-concurrency.ts`<br/>`verify-admin-orgs-delete-schema.ts`<br/>`verify-admin-orgs.ts`<br/>`verify-admin-session-revocation.ts`<br/>`verify-branding.ts`<br/>`verify-org-type-enum-sync.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action-schema.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-contact-phone-registration.ts`<br/>`verify-partner-email-login-alias.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-partner-smart-campus.ts`<br/>`verify-pg-serialization-conflict-postgres.ts`<br/>`verify-pg-serialization-conflict.ts`<br/>`verify-policy-scope.ts` |
 | `services/api/src/orgs/contact-phone-change.ts` | `verify-partner-contact-phone-registration.ts` |
 | `services/api/src/orgs/dto/admin-org.dto.ts` | `verify-branding.ts`<br/>`verify-org-type-enum-sync.ts` |
 | `services/api/src/orgs/dto/partner-account-action.dto.ts` | `verify-partner-account-action.ts` |

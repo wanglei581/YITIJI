@@ -22,9 +22,17 @@ import { ANONYMOUS_AI_CALLER, lazyAiRequestContext, runWithAiRequestContext } fr
 import { FilesService } from '../src/files/files.service'
 import { StorageService } from '../src/storage/storage.service'
 import { publicPolicyWhere, policyScopeMode } from '../src/policies/policy-public-visibility'
-import { COMMUNITY_FEED_CACHE_PREFIX, CommunityService, communityFeedCacheKey } from '../src/community/community.service'
-import { DAILY_BRIEF_CITY_CACHE_PREFIX, DailyBriefService, type DailyReport } from '../src/assistant/daily-brief.service'
-import { AdminOrgContentTrustService, RedisPublicContentCache } from '../src/orgs/admin-org-content-trust.service'
+import { CommunityService, communityFeedCacheKey } from '../src/community/community.service'
+import { DailyBriefService, type DailyReport } from '../src/assistant/daily-brief.service'
+import {
+  COMMUNITY_FEED_CACHE_PREFIX,
+  DAILY_BRIEF_CITY_CACHE_PREFIX,
+  PUBLIC_CONTENT_CACHE_STALE_WINDOW_SECONDS,
+} from '../src/common/content-trust-cache-keys'
+import { AdminOrgContentTrustService, RedisPublicContentCache, type PublicContentCache } from '../src/orgs/admin-org-content-trust.service'
+import { AdminOrgsService } from '../src/orgs/admin-orgs.service'
+import { resetRedisCooldownForTests } from '../src/common/redis/redis-degradation'
+import { applyOrgContentTrustBackfill } from './backfill-org-content-trust'
 import type { RedisService } from '../src/common/redis/redis.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
@@ -310,14 +318,44 @@ async function assertRevokingTrustDropsCachedFeeds(prisma: PrismaService): Promi
     async get(key: string) { return keys.get(key) ?? null },
     async setEx(key: string, _ttlSeconds: number, value: string) { keys.set(key, value) },
   }
+  // 对齐真实 SCAN：没有 * 就是精确匹配；游标按快照翻页，删掉本页键不会把后一页跳过。
+  let scanSerial = 0
+  const scanSnapshots = new Map<string, string[]>()
+  const scanPatternMatches = (pattern: string, key: string) => {
+    if (!pattern.includes('*')) return key === pattern
+    const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')
+    return new RegExp(`^${escaped}$`).test(key)
+  }
   const client = {
     async scan(cursor: string, matchWord: string, pattern: string, countWord: string, count: number): Promise<[string, string[]]> {
       assert.equal(matchWord, 'MATCH')
       assert.equal(countWord, 'COUNT')
       assert.equal(count, 200)
-      if (cursor !== '0') return ['0', []]
-      const prefix = pattern.endsWith('*') ? pattern.slice(0, -1) : pattern
-      return ['0', [...keys.keys()].filter((key) => key.startsWith(prefix))]
+      let snapshotId: string
+      let index: number
+      if (cursor === '0') {
+        scanSerial += 1
+        snapshotId = String(scanSerial)
+        index = 0
+        scanSnapshots.set(snapshotId, [...keys.keys()].filter((key) => scanPatternMatches(pattern, key)).sort())
+      } else {
+        const split = cursor.indexOf(':')
+        snapshotId = split < 0 ? '' : cursor.slice(0, split)
+        index = Number(cursor.slice(split + 1))
+        if (!scanSnapshots.has(snapshotId) || !Number.isInteger(index) || index < 0) {
+          throw new Error(`bad scan cursor ${cursor}`)
+        }
+      }
+      const snapshot = scanSnapshots.get(snapshotId)!
+      if (index >= snapshot.length) {
+        scanSnapshots.delete(snapshotId)
+        return ['0', []]
+      }
+      const key = snapshot[index]!
+      const next = index + 1
+      const nextCursor = next >= snapshot.length ? '0' : `${snapshotId}:${next}`
+      if (nextCursor === '0') scanSnapshots.delete(snapshotId)
+      return [nextCursor, keys.has(key) ? [key] : []]
     },
     async del(...found: string[]) {
       for (const key of found) keys.delete(key)
@@ -341,6 +379,13 @@ async function assertRevokingTrustDropsCachedFeeds(prisma: PrismaService): Promi
     return row?.type === 'city_new' ? row.newPolicies : 0
   }
   const hasPrefix = (prefix: string) => [...keys.keys()].some((key) => key.startsWith(prefix))
+  const keepKeys = ['community:feeds:v1:keep', 'daily-brief:city-new:v1:keep', 'unrelated:keep']
+  const plant = () => {
+    keys.set(`${COMMUNITY_FEED_CACHE_PREFIX}planted-page-2`, 'stale')
+    keys.set(`${DAILY_BRIEF_CITY_CACHE_PREFIX}planted-page-2`, 'stale')
+    for (const key of keepKeys) keys.set(key, 'keep')
+  }
+  const keepStillThere = () => keepKeys.every((key) => keys.has(key))
 
   const beforeFeed = await community.list()
   assert.equal(containsGuide(beforeFeed), true, '撤销前社区动态含该机构政策')
@@ -348,10 +393,14 @@ async function assertRevokingTrustDropsCachedFeeds(prisma: PrismaService): Promi
   assert.ok(beforeCount >= 1, '撤销前早报计入了已发布政策')
   assert.equal(hasPrefix(COMMUNITY_FEED_CACHE_PREFIX), true, '社区动态结果已进缓存')
   assert.equal(hasPrefix(DAILY_BRIEF_CITY_CACHE_PREFIX), true, '早报结果已进缓存')
+  plant()
 
   await trust.setContentTrust(orgA, { status: 'revoked', reason: '授权到期' }, admin)
   assert.equal(hasPrefix(COMMUNITY_FEED_CACHE_PREFIX), false, '撤销后社区动态缓存已清')
   assert.equal(hasPrefix(DAILY_BRIEF_CITY_CACHE_PREFIX), false, '撤销后早报缓存已清')
+  assert.equal(keys.has(`${COMMUNITY_FEED_CACHE_PREFIX}planted-page-2`), false, '多页里的社区动态前缀键也已删')
+  assert.equal(keys.has(`${DAILY_BRIEF_CITY_CACHE_PREFIX}planted-page-2`), false, '多页里的早报前缀键也已删')
+  assert.equal(keepStillThere(), true, '清缓存只删前缀键，非前缀键还在')
   const afterFeed = await community.list()
   assert.equal(containsGuide(afterFeed), false, '撤销后马上请求的社区动态不再含该机构政策')
   const afterCount = policyCount(await brief.create('cache-bust-user', city))
@@ -360,6 +409,71 @@ async function assertRevokingTrustDropsCachedFeeds(prisma: PrismaService): Promi
   await trust.setContentTrust(orgA, { status: 'active', reason: '重新核验通过' }, admin)
   assert.equal(containsGuide(await community.list()), true, '恢复可信后社区动态重新含该机构政策')
   assert.equal(policyCount(await brief.create('cache-bust-user', city)), beforeCount, '恢复可信后早报重新计入该机构政策')
+
+  resetRedisCooldownForTests()
+  const throwingCache: PublicContentCache = {
+    async deleteByPrefix() {
+      const error = new Error('Connection is closed.')
+      error.name = 'MaxRetriesPerRequestError'
+      throw error
+    },
+  }
+  const throwingTrust = new AdminOrgContentTrustService(prisma, new AuditService(prisma), throwingCache)
+  const suspended = await throwingTrust.setContentTrust(orgA, { status: 'suspended', reason: '缓存层故障仍应成功' }, admin)
+  assert.equal(suspended.contentTrustStatus, 'suspended', '缓存层抛错时 setContentTrust 仍返回成功')
+  const suspendedRow = await prisma.organization.findUnique({ where: { id: orgA }, select: { contentTrustStatus: true } })
+  assert.equal(suspendedRow?.contentTrustStatus, 'suspended', '缓存层抛错时库里的内容可信已经改掉')
+  const cacheMissAudits = await prisma.auditLog.findMany({
+    where: { targetId: orgA, action: 'organization.public_content_cache_invalidation_failed' },
+    orderBy: { createdAt: 'desc' },
+  })
+  assert.ok(cacheMissAudits.length >= 1, '缓存没清掉时要有一条审计')
+  const cacheMissPayload = JSON.parse(cacheMissAudits[0]!.payloadJson) as { staleWindowSeconds?: unknown; level?: unknown; code?: unknown }
+  assert.equal(cacheMissPayload.staleWindowSeconds, 900, '缓存未清的审计带 900 秒过期窗口')
+  assert.equal(cacheMissPayload.level, 'warn')
+  assert.equal(cacheMissPayload.code, 'PUBLIC_CONTENT_CACHE_INVALIDATION_FAILED')
+  assert.equal(PUBLIC_CONTENT_CACHE_STALE_WINDOW_SECONDS, 900, '公开缓存寿命就是审计里的 900 秒')
+
+  resetRedisCooldownForTests()
+  plant()
+  const orgs = new AdminOrgsService(
+    prisma,
+    new AuditService(prisma),
+    { async del() { return 1 } } as unknown as RedisService,
+    new RedisPublicContentCache(client as unknown as Redis),
+  )
+  await orgs.setOrgStatus(orgA, 'disable', admin)
+  assert.equal(hasPrefix(COMMUNITY_FEED_CACHE_PREFIX), false, '停用机构后社区动态缓存已清')
+  assert.equal(hasPrefix(DAILY_BRIEF_CITY_CACHE_PREFIX), false, '停用机构后早报缓存已清')
+  assert.equal(keepStillThere(), true, '停用机构清缓存时非前缀键还在')
+
+  plant()
+  const publicCache = new RedisPublicContentCache(client as unknown as Redis)
+  const dry = await applyOrgContentTrustBackfill(prisma, {
+    ids: [orgA],
+    reason: '回填演练',
+    status: 'revoked',
+    actorId: adminId,
+    operator: 'verify',
+    apply: false,
+  }, publicCache)
+  assert.equal(dry.applied, 0, 'dry-run 不写库')
+  assert.equal(hasPrefix(COMMUNITY_FEED_CACHE_PREFIX), true, '回填 dry-run 不清社区动态缓存')
+  assert.equal(hasPrefix(DAILY_BRIEF_CITY_CACHE_PREFIX), true, '回填 dry-run 不清早报缓存')
+  const applied = await applyOrgContentTrustBackfill(prisma, {
+    ids: [orgA],
+    reason: '回填核验依据',
+    status: 'revoked',
+    actorId: adminId,
+    operator: 'verify',
+    apply: true,
+  }, publicCache)
+  assert.equal(applied.applied, 1, '回填写了一条内容可信')
+  assert.equal(hasPrefix(COMMUNITY_FEED_CACHE_PREFIX), false, '回填改了内容可信后社区动态缓存已清')
+  assert.equal(hasPrefix(DAILY_BRIEF_CITY_CACHE_PREFIX), false, '回填改了内容可信后早报缓存已清')
+  assert.equal(keepStillThere(), true, '回填清缓存时非前缀键还在')
+  const backfilled = await prisma.organization.findUnique({ where: { id: orgA }, select: { contentTrustStatus: true } })
+  assert.equal(backfilled?.contentTrustStatus, 'revoked', '回填把内容可信写成了 revoked')
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1 })

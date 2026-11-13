@@ -3728,14 +3728,7 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "BenefitActivity",
-          "Favorite",
-          "Job",
-          "JobFair",
-          "Order",
-          "Organization",
-          "PolicyPost",
-          "SystemBroadcast"
+          "Organization"
         ],
         "path": "/api/v1/admin/orgs/:id/content-trust",
         "roles": [
@@ -3754,14 +3747,7 @@
         "method": "PATCH",
         "models": [
           "AuditLog",
-          "BenefitActivity",
-          "Favorite",
-          "Job",
-          "JobFair",
-          "Order",
-          "Organization",
-          "PolicyPost",
-          "SystemBroadcast"
+          "Organization"
         ],
         "path": "/api/v1/admin/orgs/:id/content-trust",
         "roles": [
@@ -26004,6 +25990,9 @@
     "services/api/prisma/seed.ts": [
       "services/api/scripts/verify-partner-account-action-schema.ts"
     ],
+    "services/api/scripts/backfill-org-content-trust.ts": [
+      "services/api/scripts/verify-policy-scope.ts"
+    ],
     "services/api/scripts/backfill-terminal-credentials.ts": [
       "services/api/scripts/verify-terminal-bind-code.ts"
     ],
@@ -27951,6 +27940,9 @@
     "services/api/src/common/constants/internal-session.constants.ts": [
       "services/api/scripts/verify-file-internal-auth.ts"
     ],
+    "services/api/src/common/content-trust-cache-keys.ts": [
+      "services/api/scripts/verify-policy-scope.ts"
+    ],
     "services/api/src/common/content-trust.ts": [
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-policy-publish-gates.ts"
@@ -28257,6 +28249,7 @@
       "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
+      "services/api/scripts/verify-policy-scope.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts",
       "services/api/scripts/verify-sms-budget.ts"
     ],
@@ -29761,7 +29754,8 @@
       "services/api/scripts/verify-partner-org-self.ts",
       "services/api/scripts/verify-partner-smart-campus.ts",
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
-      "services/api/scripts/verify-pg-serialization-conflict.ts"
+      "services/api/scripts/verify-pg-serialization-conflict.ts",
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/orgs/contact-phone-change.ts": [
       "services/api/scripts/verify-partner-contact-phone-registration.ts"
@@ -46105,6 +46099,7 @@
         "files": [
           "apps/kiosk/src/services/api/policies.ts",
           "apps/kiosk/src/services/api/policyChecklist.ts",
+          "services/api/scripts/backfill-org-content-trust.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/verify-policy-scope-env.cjs",
           "services/api/src/activity/me-activity.controller.ts",
@@ -46112,12 +46107,15 @@
           "services/api/src/ai/usage/ai-usage-context.ts",
           "services/api/src/assistant/daily-brief.service.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/content-trust-cache-keys.ts",
+          "services/api/src/common/redis/redis-degradation.ts",
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/community/community.module.ts",
           "services/api/src/community/community.service.ts",
           "services/api/src/files/files.service.ts",
           "services/api/src/member-favorites/member-favorites.controller.ts",
           "services/api/src/orgs/admin-org-content-trust.service.ts",
+          "services/api/src/orgs/admin-orgs.service.ts",
           "services/api/src/policies/policies.controller.ts",
           "services/api/src/policies/policies.module.ts",
           "services/api/src/policies/policies.service.ts",

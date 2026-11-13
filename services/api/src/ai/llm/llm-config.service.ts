@@ -355,10 +355,11 @@ export class LlmConfigService {
     for (const key of ACTIVE_FEATURE_KEYS) {
       const saved = raw[key]
       const config = this.withDefaults(saved ?? env)
-      // 数字人这个功能位以前后台存不了。文件里没有它，或对象没写 enabled，都按开，
-      // 跟今天线上「没有这道开关」一致。只有文件里明确写了布尔值，或管理员后来保存过，才认那个值。
+      // 数字人这个功能位以前后台存不了。旧文件会写成 enabled:false 且
+      // explicitlyConfigured:false。只有后台真正保存过（explicitlyConfigured === true）
+      // 才认 enabled；否则一律按开，跟「没有这道开关」一致。
       // AI_LLM_API_KEY / TRTC_LLM_API_KEY 只决定能不能接通，不决定这个开关。
-      if (key === 'digital_human' && typeof saved?.enabled !== 'boolean') {
+      if (key === 'digital_human' && saved?.explicitlyConfigured !== true) {
         config.enabled = true
       }
       map[key] = config
