@@ -76,6 +76,12 @@ export class ResumeParseRequestDto {
   @IsIn(['upload', 'scan', 'manual'])
   source!: 'upload' | 'scan' | 'manual'
 
+  /** 没有会员主人的文件须带本次签名地址。 */
+  @IsOptional()
+  @IsString()
+  @MaxLength(1024)
+  fileAccessUrl?: string
+
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(6)

@@ -25,6 +25,7 @@ import type {
 } from './materials.types'
 import { injectRedactedFileUrl, parseFindingBoxes, PiiRedactionService } from './pii-redaction.service'
 import { buildPiiFindingsFromPages, extractTextForPiiScan } from './pii-scan.util'
+import { assertGuestFileProof, fileNeedsHolderProof } from '../files/file-access-proof'
 
 const TASK_TTL_HOURS = 24
 const RAW_TEXT_PARAM_KEYS = new Set(['textsample', 'text', 'rawtext', 'fulltext', 'content', 'documenttext'])
@@ -136,6 +137,9 @@ export class MaterialsService {
   private readonly recentPiiScans = new Map<string, { at: number; view: Promise<DocumentProcessTaskView> }>()
 
   async createTask(dto: CreateMaterialTaskDto, requester: MaterialsRequester): Promise<DocumentProcessTaskView> {
+    // 没查到会员主人的源文件只认持有本次签名地址的调用方。对不上时与源文件不存在同一回应，
+    // 并且发生在去重、建任务和读取内容之前。
+    await this.assertOwnerlessSourceHeld(dto)
     if (dto.kind !== 'pii_scan') return this.createTaskOnce(dto, requester)
     const now = Date.now()
     for (const [key, entry] of this.recentPiiScans) if (now - entry.at > PII_SCAN_DEDUPE_MS) this.recentPiiScans.delete(key)
@@ -596,9 +600,17 @@ export class MaterialsService {
     }
   }
 
+  /** 没查到会员主人时，签名地址必须对上。对不上时与源文件不存在同一回应。 */
+  private async assertOwnerlessSourceHeld(dto: CreateMaterialTaskDto): Promise<void> {
+    if (!await fileNeedsHolderProof(this.prisma, dto.sourceFileId)) return
+    if (assertGuestFileProof(dto.sourceFileId, dto.fileAccessUrl)) return
+    throw new NotFoundException({ error: { code: 'SOURCE_FILE_NOT_FOUND', message: '源文件不存在或不可用' } })
+  }
+
   private async requireUsableSourceFile(sourceFileId: string): Promise<SourceFileRecord> {
     const file = await this.prisma.fileObject.findUnique({ where: { id: sourceFileId } })
-    if (!file || file.deletedAt || file.status !== 'active') {
+    const expired = Boolean(file?.expiresAt && file.expiresAt.getTime() <= Date.now())
+    if (!file || file.deletedAt || file.status !== 'active' || expired) {
       throw new NotFoundException({ error: { code: 'SOURCE_FILE_NOT_FOUND', message: '源文件不存在或不可用' } })
     }
     return file
