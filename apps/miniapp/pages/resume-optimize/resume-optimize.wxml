@@ -39,9 +39,6 @@
     <view wx:if="{{needReupload}}" class="fail-hint">
       AI 已按隐私策略清理简历原文，无法重新生成。请重新上传简历后再试。
     </view>
-    <view wx:if="{{!needReupload}}" class="fail-hint">
-      AI 生成内容未通过真实性校验。你可以手动重试，再次生成仍可能失败。
-    </view>
     <view wx:if="{{needReupload}}" class="btn primary tap fail-btn" bindtap="tapReupload">重新上传简历</view>
     <view wx:if="{{!needReupload}}" class="btn ghost tap fail-btn" bindtap="tapRetry">重试</view>
     <view class="btn ghost tap fail-btn-sm" bindtap="goBack">返回</view>
@@ -97,7 +94,7 @@
       <view class="edit-label">目标岗位</view>
       <input class="edit-input" value="{{editor.intention.position}}" maxlength="{{LEN.position}}" data-section="intention" data-key="position" data-index="-1" bindinput="onDraftInput" />
       <view class="edit-label">简介</view>
-      <textarea class="edit-input edit-area" value="{{editor.summary}}" maxlength="600" auto-height data-section="summary" data-key="summary" data-index="-1" bindinput="onDraftInput"></textarea>
+      <textarea class="edit-input edit-area" value="{{editor.summary}}" maxlength="{{DOC_LEN.summary}}" auto-height data-section="summary" data-key="summary" data-index="-1" bindinput="onDraftInput"></textarea>
     </view>
 
     <block wx:if="{{editor.education.length}}">
@@ -108,7 +105,7 @@
       <view class="edit-label">时间段</view>
       <input class="edit-input" value="{{row.period}}" maxlength="{{LEN.period}}" data-section="education" data-key="period" data-index="{{index}}" bindinput="onDraftInput" />
       <view class="edit-label">说明</view>
-      <textarea class="edit-input edit-area" value="{{row.description}}" maxlength="{{LEN.description}}" auto-height data-section="education" data-key="description" data-index="{{index}}" bindinput="onDraftInput"></textarea>
+      <textarea class="edit-input edit-area" value="{{row.description}}" maxlength="{{DOC_LEN.description}}" auto-height data-section="education" data-key="description" data-index="{{index}}" bindinput="onDraftInput"></textarea>
     </view>
     </block>
 
@@ -122,15 +119,15 @@
       <view class="edit-label">时间段</view>
       <input class="edit-input" value="{{row.period}}" maxlength="{{LEN.period}}" data-section="experience" data-key="period" data-index="{{index}}" bindinput="onDraftInput" />
       <view class="edit-label">说明</view>
-      <textarea class="edit-input edit-area" value="{{row.description}}" maxlength="{{LEN.description}}" auto-height data-section="experience" data-key="description" data-index="{{index}}" bindinput="onDraftInput"></textarea>
+      <textarea class="edit-input edit-area" value="{{row.description}}" maxlength="{{DOC_LEN.description}}" auto-height data-section="experience" data-key="description" data-index="{{index}}" bindinput="onDraftInput"></textarea>
     </view>
     </block>
 
     <view class="edit-card" id="edit-lists">
       <view class="edit-label">技能（一行一项，或用顿号/逗号分隔）</view>
-      <textarea class="edit-input edit-area" value="{{editor.skillsText}}" maxlength="800" auto-height data-section="skillsText" data-key="skillsText" data-index="-1" bindinput="onDraftInput"></textarea>
+      <textarea class="edit-input edit-area" value="{{editor.skillsText}}" maxlength="{{DOC_LEN.skillsText}}" auto-height data-section="skillsText" data-key="skillsText" data-index="-1" bindinput="onDraftInput"></textarea>
       <view class="edit-label">证书（一行一项）</view>
-      <textarea class="edit-input edit-area" value="{{editor.certsText}}" maxlength="800" auto-height data-section="certsText" data-key="certsText" data-index="-1" bindinput="onDraftInput"></textarea>
+      <textarea class="edit-input edit-area" value="{{editor.certsText}}" maxlength="{{DOC_LEN.certsText}}" auto-height data-section="certsText" data-key="certsText" data-index="-1" bindinput="onDraftInput"></textarea>
     </view>
     </block>
 

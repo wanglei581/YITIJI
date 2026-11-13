@@ -45,6 +45,19 @@ function mapReplies(replies) {
   }))
 }
 
+function readOrderNo(options) {
+  const raw = options && options.orderNo ? String(options.orderNo) : ''
+  if (!raw) return ''
+  let orderNo = raw
+  try { orderNo = decodeURIComponent(raw) } catch (e) { orderNo = raw }
+  return orderNo.trim().slice(0, 64)
+}
+
+// 订单号只定位这一单，不放进输入框，也不计入 10 字。提交时再按这个前缀拼回正文。
+function orderProblemPrefix(orderNo) {
+  return orderNo ? `订单 ${orderNo} 有问题：` : ''
+}
+
 function toView(item) {
   const st = item.status
   return Object.assign({
@@ -70,6 +83,7 @@ Page({
     category: 'general',
     title: '',
     content: '',
+    orderNo: '',
     contentLen: 0,
     contactPhone: '',
     aiReplyDays: AI_COMPLAINT_REPLY_DAYS,
@@ -85,10 +99,18 @@ Page({
 
   onLoad(options) {
     const preset = options && CAT_LABEL[options.category] ? options.category : ''
+    const orderNo = readOrderNo(options)
+    const content = orderNo ? '' : this.data.content
+    const contentLen = String(content || '').trim().length
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
       aiReplyDays: AI_COMPLAINT_REPLY_DAYS,
-      category: preset || this.data.category,
+      category: orderNo ? 'print' : (preset || this.data.category),
+      title: orderNo ? (`订单 ${orderNo}`).slice(0, 80) : this.data.title,
+      content,
+      orderNo,
+      contentLen,
+      canSubmit: contentLen >= 10,
     })
   },
 
@@ -131,16 +153,19 @@ Page({
 
   onContent(e) {
     const content = String(e.detail.value || '').slice(0, 500)
-    this.setData({ content, contentLen: content.length, canSubmit: content.trim().length >= 10 })
+    const contentLen = content.trim().length
+    this.setData({ content, contentLen, canSubmit: contentLen >= 10 })
   },
 
   onPhone(e) { this.setData({ contactPhone: e.detail.value || '' }) },
 
   submit() {
     if (this.data.submitting) return
-    const content = this.data.content.trim()
-    if (content.length < 10 || content.length > 500) {
-      wx.showToast({ title: content.length < 10 ? '请至少填写 10 个字' : '内容不能超过 500 字', icon: 'none' })
+    const own = this.data.content.trim()
+    // 输入框只计用户写的问题。拼上订单前缀后，整段仍不得超过服务端 500 字。
+    const content = `${orderProblemPrefix(this.data.orderNo)}${own}`
+    if (own.length < 10 || content.length > 500) {
+      wx.showToast({ title: own.length < 10 ? '请写一下遇到的问题' : '内容不能超过 500 字', icon: 'none' })
       return
     }
     const phone = this.data.contactPhone.trim()
@@ -155,7 +180,7 @@ Page({
     this.setData({ submitting: true })
     api.createFeedback(body)
       .then(() => {
-        this.setData({ submitting: false, title: '', content: '', contentLen: 0, contactPhone: '', canSubmit: false })
+        this.setData({ submitting: false, title: '', content: '', orderNo: '', contentLen: 0, contactPhone: '', canSubmit: false })
         wx.showToast({ title: '反馈已送出', icon: 'success' })
         this.loadList()
       })

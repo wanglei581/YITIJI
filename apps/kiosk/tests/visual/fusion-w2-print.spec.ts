@@ -319,7 +319,7 @@ test('pickup invalid code is rejected, cleared, and ready for the next scan @w2'
   const input = page.getByLabel('到机码输入框')
   await input.fill('AB2C7M9P3K')
 
-  await expect(page.getByRole('alert')).toHaveText(/到机码无效或已过期/)
+  await expect(page.getByRole('alert')).toHaveText(/到机码不对或已过期/)
   await expect(input).toHaveValue('')
   await expect(input).toBeFocused()
   expect(claimCount).toBe(1)
@@ -497,7 +497,7 @@ test('pickup hid invalid code shows the server error without fabricating success
   await page.getByRole('button', { name: '用扫码枪扫' }).click()
   await page.getByLabel('到机码输入框').fill('AB2C7M9P3K')
 
-  await expect(page.getByRole('alert')).toHaveText(/到机码无效或已过期/)
+  await expect(page.getByRole('alert')).toHaveText(/到机码不对或已过期/)
   await expect(page.getByText('订单核验成功')).toHaveCount(0)
   await expect(page.getByTestId('arrival-code-state-hid')).toBeVisible()
   expect(claimCount).toBe(1)

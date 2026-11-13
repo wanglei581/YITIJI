@@ -183,8 +183,13 @@ test('unknown create retries with the same requestKey and settings @w2', async (
   await f.goto('set')
   await page.getByTestId('copy-primary').click()
   await expect(page.getByText(/这一步的结果还没确认/)).toBeVisible()
+  // 11/09（稿 cs-copy-set?start=unknown）：提示行说状态未知时，胶囊也写「状态未知」、用状态未知色调，不再说扫描仪就绪。
+  await expectCopyUnknownChip(page, '状态未知')
+  await expect(page.getByText('扫描仪就绪 · 刚刚检查')).toHaveCount(0)
+  await page.screenshot({ path: 'test-results/align-1109-copy-set-start-unknown.png' })
   await page.getByTestId('copy-primary').click()
   await expect(page.getByTestId('copy-c3b-entry')).toBeVisible()
+  await expect(page.locator('.qxt-band .qxt-status')).not.toHaveText('状态未知')
   expect(f.calls).toHaveLength(2)
   expect(f.calls[1].body).toEqual(f.calls[0].body)
 })
