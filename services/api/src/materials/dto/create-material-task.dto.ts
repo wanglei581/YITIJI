@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator'
+import { IsIn, IsNotEmpty, IsObject, IsOptional, IsString, MaxLength } from 'class-validator'
 
 export const MATERIAL_TASK_KINDS = [
   'inspection',
@@ -23,6 +23,12 @@ export class CreateMaterialTaskDto {
   @IsString()
   @IsNotEmpty()
   sourceFileId!: string
+
+  /** 没有会员主人的源文件须带本次签名地址。 */
+  @IsOptional()
+  @IsString()
+  @MaxLength(1024)
+  fileAccessUrl?: string
 
   @IsOptional()
   @IsObject()

@@ -65,4 +65,10 @@ export class AppendSelfAssessmentDto {
   @IsNotEmpty()
   @MaxLength(128)
   resumeFileId!: string
+
+  /** 这份简历的签名地址。没有会员主人的文件，只认持有有效签名地址的调用方。 */
+  @IsOptional()
+  @IsString()
+  @MaxLength(1024)
+  resumeFileUrl?: string
 }

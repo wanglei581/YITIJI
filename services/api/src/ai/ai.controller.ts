@@ -28,6 +28,8 @@ import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import type { AdminAiUsage, AdminAiLogsResult, AiLogStatus, AiOperation } from './ai-log.service'
+import { FilesService } from '../files/files.service'
+import { assertGuestFileProof, fileNeedsHolderProof } from '../files/file-access-proof'
 import { ResumeParseRequestDto } from './dto/resume-parse.dto'
 import type { ResumeParseResponseDto } from './dto/resume-parse.dto'
 import { ResumeGenerateExportDto, ResumeGenerateRequestDto } from './dto/resume-generate.dto'
@@ -157,6 +159,9 @@ export class AiController {
     @Optional() private readonly resumeParseIntent?: ResumeParseIntentRunner,
     @Optional() private readonly terminalSessions?: TerminalSessionService,
     @Optional() private readonly quota?: AiQuotaService,
+    // 放在已有可选参数之后：必填参数不能跟在 @Optional() 后面，且已有按位置构造的门禁把次数服务放在最后。
+    // 生产模块已引入 FilesModule，Nest 仍会注入；拿不到时旧路径在扣次数前直接拒绝，不跳过文件确认。
+    @Optional() private readonly files?: FilesService,
   ) {}
 
   /** 先复用 AI 访问守卫/用量中间件的惰性缓存；直接调用 handler 时再验签。 */
@@ -214,6 +219,9 @@ export class AiController {
         error: { code: 'RESUME_PARSE_INTENT_MALFORMED', message: '简历解析意图标识无效' },
       })
     }
+    // 没查到会员主人的文件只认持有本次签名地址的调用方。对不上时与文件不存在同一回应，
+    // 并且发生在扣次数、建立解析记录和调用模型之前。带意图头和不带意图头两条路都先过这里。
+    await this.assertOwnerlessResumeFileHeld(dto.fileId, dto.fileAccessUrl)
     const quotaContext = {
       member: endUser?.endUserId ?? null,
       terminal: await this.verifiedQuotaTerminal(req),
@@ -223,6 +231,12 @@ export class AiController {
     const result = intentHeaders.status === 'present'
       ? await this.submitKeyedResumeParse(dto, quotaContext.member, quotaContext, intentHeaders.intentKey, intentHeaders.proof)
       : await (async () => {
+        if (!this.files) {
+          throw new ServiceUnavailableException({
+            error: { code: 'FILE_STORAGE_UNAVAILABLE', message: '文件暂时无法读取，请稍后重试' },
+          })
+        }
+        await this.files.assertContentAccessibleForEndUser(dto.fileId, quotaContext.member)
         const quotaTicket = await this.publicQuota.consume('resume_parse', quotaContext)
         return runWithPublicQuota(this.publicQuota, quotaTicket, req, () =>
           this.aiService.submitResumeParse(dto, quotaContext.member, undefined, req),
@@ -252,6 +266,15 @@ export class AiController {
       requestId: req.requestId ?? null,
     })
     return result
+  }
+
+  /** 没查到会员主人时，签名地址必须对上。对不上时与文件不存在同一回应。 */
+  private async assertOwnerlessResumeFileHeld(fileId: string, fileAccessUrl: string | undefined): Promise<void> {
+    if (!await fileNeedsHolderProof(this.prisma, fileId)) return
+    if (assertGuestFileProof(fileId, fileAccessUrl)) return
+    throw new NotFoundException({
+      error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' },
+    })
   }
 
   private submitKeyedResumeParse(
