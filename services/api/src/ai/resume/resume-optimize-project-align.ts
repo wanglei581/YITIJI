@@ -18,22 +18,17 @@ function projectBody(line: string): string {
   return text
 }
 
-function isPhaseMark(text: string): boolean {
-  const value = text.trim()
-  if (/^(?:第?[0-9一二三四五六七八九十]{1,3}期)$/u.test(value)) return true
-  if (/^phase\s*[0-9ivxlcdm]+$/iu.test(value)) return true
-  return /^[IVXLCDMⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]{1,6}期?$/iu.test(value)
-}
-
 function parseProjectTitle(title: string): { name: string; role: string } {
   const text = projectBody(title)
   if (/[|丨]/u.test(text)) {
     let name = ''
     let role = ''
     for (const col of text.split(/\s*[|丨]\s*/u).map((part) => part.trim()).filter(Boolean)) {
-      const dated = splitResumeDateRange(projectBody(col))
-      const cleaned = dated ? [dated.before, dated.after].filter(Boolean).join(' ').trim() : projectBody(col)
-      if (!cleaned) continue
+      // 栏里的「时间：」「角色：」先去掉。去掉日期后只剩括号补充（「（实习）」），或整栏就是括号补充时，不当名称或角色。
+      const body = projectBody(col).replace(/^(?:角色|职务|时间|日期|周期|项目时间)\s*[:：]\s*/u, '').trim()
+      const dated = splitResumeDateRange(body)
+      const cleaned = dated ? [dated.before, dated.after].filter(Boolean).join(' ').trim() : body
+      if (!cleaned || /^[（(][^）)]*[）)]$/u.test(cleaned)) continue
       if (!name) name = cleaned
       else if (!role) role = cleaned
     }
@@ -41,12 +36,7 @@ function parseProjectTitle(title: string): { name: string; role: string } {
   }
   const parts = splitResumeDateRange(text)
   const rest = (parts ? [parts.before, parts.after].filter(Boolean).join(' ') : text).trim()
-  const paren = /^(.+?)[（(]([^）)]+)[）)]$/u.exec(rest)
-  if (paren) {
-    const inside = paren[2]?.trim() ?? ''
-    if (inside && !isPhaseMark(inside)) return { name: paren[1]?.trim() ?? rest, role: inside }
-    return { name: rest, role: '' }
-  }
+  // 括号补充（毕业设计、课程设计、版本、端、期次）留在名称里。角色只认「角色：」和标题末尾的角色词。
   return { name: rest, role: '' }
 }
 
@@ -58,7 +48,8 @@ function shortModelName(modelName: string): boolean {
 
 function separateTrailingRole(namePart: string, modelName: string): { name: string; role: string } {
   const tokens = namePart.split(/\s+/u).filter(Boolean)
-  if (tokens.length < 2 || !modelName || shortModelName(modelName)) return { name: namePart, role: '' }
+  // 模型给的短名（「AI」「CRM」）只在标题只有「短名 + 一段」时不拆尾部角色；「CRM 客户管理系统 负责人」这种三段写法照样拆出角色。
+  if (tokens.length < 2 || !modelName || (shortModelName(modelName) && tokens.length < 3)) return { name: namePart, role: '' }
   const role = tokens[tokens.length - 1] ?? ''
   const name = tokens.slice(0, -1).join(' ')
   const nameMatches = name === modelName || (modelName.length >= 2 && name.startsWith(modelName) && name.length > modelName.length)
@@ -214,7 +205,13 @@ export function ensureProjectOriginalLines(
       }).slice(0, 1)
       if (chosen.length === 0) {
         const coveredModule = modules.find((module) => moduleCoversLine(text, module, description))
-        if (coveredModule) for (const part of afterLines(coveredModule)) out.push(projectBody(part))
+        // 跨行 module 的改写前一行已经放过一次，这一行不再放，避免改写印两遍。
+        if (coveredModule) {
+          for (const part of afterLines(coveredModule)) {
+            const body = projectBody(part)
+            if (!out.some((row) => projectLineKey(row) === projectLineKey(body) || optimizeAfterNearlySame(row, body))) out.push(body)
+          }
+        }
         continue
       }
       for (const index of chosen) {

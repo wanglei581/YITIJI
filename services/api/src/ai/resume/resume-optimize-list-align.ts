@@ -5,7 +5,7 @@ type AlignModule = { before: string; after: string }
 
 /** 只去掉技能、证书栏目标题。词表与 resume-optimize-coverage 的 HEADINGS 里这两栏一致。 */
 const LIST_HEADING_RE = /^(专业技能|技能证书|技能与证书|技能特长|技能)(?=$|[\s:：])|^(证书资质|证书|资格证书|获奖情况)(?=$|[\s:：])/u
-const LEADING_INDEX_RE = /^(?:\d{1,2}\s*[、.．]|[一二三四五六七八九十]{1,3}\s*[、.．]|[（(]\s*\d{1,2}\s*[）)]|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])\s*/u
+const LEADING_INDEX_RE = /^(?:\d{1,2}\s*[、.．)）]|[一二三四五六七八九十]{1,3}\s*[、.．]|[（(]\s*\d{1,2}\s*[）)]|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])\s*/u
 const BRACKET_TITLE_RE = /^【[^】]{0,20}】\s*/u
 const RESTORE_SEP = new Set(['、', '，', ',', '；'])
 const COMPARE_SEP = new Set(['、', '，', ',', '；', ';', '/', '和', '及', '与'])
@@ -130,10 +130,6 @@ export function alignOriginalList(
     const bare = stripParenText(display)
     if (bare) covered.add(norm(bare))
     for (const atom of splitCompare(display)) covered.add(norm(atom))
-    for (const piece of display.split(/\s+/u)) {
-      const part = piece.trim()
-      if (part) covered.add(norm(part))
-    }
   }
   for (const raw of options?.coveredElsewhere ?? []) remember(raw)
   const coveredText = (text: string): boolean => {
@@ -243,9 +239,12 @@ export function alignOriginalList(
     const hit = takeExact(slot.key)
     if (hit) slot.out = hit
   }
+  // 比对小项：按 `; / 和 及 与` 拆开、每段再剥行首编号（「2.」）。小项要么全部配上（逐字或相似），要么一个都不认，
+  // 整段按原稿补回——不许只配上一半、把另一半丢掉。
+  const piecesOf = (text: string) => splitCompare(text).map((part) => strippedListLine(part)).filter(Boolean)
   for (const slot of open) {
     if (slot.out !== null) continue
-    const keys = splitCompare(slot.display).map((part) => norm(part)).filter(Boolean)
+    const keys = piecesOf(slot.display).map((part) => norm(part)).filter(Boolean)
     if (keys.length < 2 || !canTakeAll(keys)) continue
     const displays: string[] = []
     let taken = true
@@ -256,9 +255,52 @@ export function alignOriginalList(
     }
     if (taken) slot.out = displays.join('\u0001')
   }
+  const pieceReserved = new Set(open.filter((slot) => slot.out === null).flatMap((slot) => [slot.key, ...piecesOf(slot.display).map((part) => norm(part))]))
+  for (const slot of open) {
+    if (slot.out !== null) continue
+    const pieces = piecesOf(slot.display)
+    if (pieces.length < 2) continue
+    const taken: Array<{ item: Item; atom: Atom; itemWasUsed: boolean }> = []
+    const displays: string[] = []
+    const own = new Set(pieces.map((part) => norm(part)))
+    for (const piece of pieces) {
+      const key = norm(piece)
+      let found: { item: Item; atom: Atom } | null = null
+      for (const item of pool) {
+        if (item.used) continue
+        const atom = item.atoms.find((part) => !part.used && part.key === key)
+        if (atom) { found = { item, atom }; break }
+      }
+      if (!found) {
+        let bestGap = Number.POSITIVE_INFINITY
+        for (const item of pool) {
+          if (item.used) continue
+          for (const atom of item.atoms) {
+            if (atom.used || (pieceReserved.has(atom.key) && !own.has(atom.key))) continue
+            if (!key.includes(atom.key) || !similarListAtom(key, atom.key)) continue
+            const gap = Math.abs(atom.key.length - key.length)
+            if (gap < bestGap) { found = { item, atom }; bestGap = gap }
+          }
+        }
+      }
+      if (!found) break
+      taken.push({ item: found.item, atom: found.atom, itemWasUsed: found.item.used })
+      found.atom.used = true
+      if (found.item.atoms.every((part) => part.used)) found.item.used = true
+      displays.push(found.atom.display)
+    }
+    if (displays.length === pieces.length) {
+      slot.out = displays.join('\u0001')
+      continue
+    }
+    for (const step of taken.reverse()) {
+      step.atom.used = false
+      step.item.used = step.itemWasUsed
+    }
+  }
   for (const slot of open) {
     if (slot.out !== null || !/\s/u.test(slot.display)) continue
-    const pieces = slot.display.split(/\s+/u).map((part) => part.trim()).filter(Boolean)
+    const pieces = slot.display.split(/\s+/u).map((part) => strippedListLine(part.trim())).filter(Boolean)
     if (pieces.length < 2) continue
     const keys = pieces.map((part) => norm(part))
     if (!canTakeAll(keys)) continue
@@ -275,7 +317,7 @@ export function alignOriginalList(
   for (const row of rows) {
     if (row.slots.length < 2) continue
     for (const slot of row.slots) {
-      if (slot.out !== null) continue
+      if (slot.out !== null || piecesOf(slot.display).length > 1) continue
       let bestItem: Item | null = null
       let bestIndex = -1
       let bestGap = Number.POSITIVE_INFINITY
@@ -304,7 +346,8 @@ export function alignOriginalList(
       continue
     }
     for (const slot of row.slots) {
-      const value = slot.out ?? slot.display
+      // 部分漏交时，补回的那项去掉「2.」「2）」这类编号；整行一个都没配上仍走上面的原稿整行。
+      const value = slot.out ?? strippedListLine(slot.display)
       const wasMissing = slot.out === null
       for (const piece of value.split('\u0001')) push(piece, wasMissing)
     }

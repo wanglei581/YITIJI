@@ -2,6 +2,7 @@ import { ConsoleLogger, Logger } from '@nestjs/common'
 import type { ResumeReport } from '../../src/ai/interfaces/ai-provider.interface'
 import { LlmResumeOptimizeService, OPTIMIZE_RETRY_HINT, OPTIMIZE_SYSTEM_PROMPT } from '../../src/ai/resume/llm-resume-optimize.service'
 import { alignOriginalList } from '../../src/ai/resume/resume-optimize-coverage'
+import { verifyOptimizeR1h } from './resume-optimize-after-match-r1h'
 import { resumeFieldIncludes } from '../../src/ai/resume/resume-optimize-after-align'
 
 /**
@@ -832,6 +833,7 @@ if (process.argv[1]?.endsWith('resume-optimize-after-match.ts')) {
     .then(() => verifyOptimizeEntryCountsKept())
     .then(() => verifyOptimizeSkillAtoms())
     .then(() => verifyOptimizeRealWriting())
+    .then(() => verifyOptimizeR1h())
     .catch((error: unknown) => {
       console.error(error instanceof Error ? error.message : error)
       process.exit(1)
