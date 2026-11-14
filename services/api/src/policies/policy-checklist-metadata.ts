@@ -1,5 +1,6 @@
 import { ConflictException } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
+import { scopeForAmbientPolicyRead } from './policy-scope.service'
 import { publicPolicyLookupWhere } from './policy-public-visibility'
 
 const PREFIX = 'policy_checklist:'
@@ -30,7 +31,7 @@ export async function assertPolicyChecklistPrintable(
   const policy = metadata && await prisma.policyPost.findFirst({
     where: await publicPolicyLookupWhere(prisma, {
       id: metadata.policyId, reviewStatus: 'approved', publishStatus: 'published',
-    }, { mode: 'all' }),
+    }, await scopeForAmbientPolicyRead()),
     select: { contentVersion: true },
   })
   if (!policy) {

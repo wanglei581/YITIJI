@@ -17,6 +17,12 @@ const DEFAULT_ENDPOINT = 'bj.bcebos.com'
 const DEFAULT_BUCKET = 'ai-job-print-release'
 const AUTH_EXPIRE_SECONDS = 1800
 const REQUEST_TIMEOUT_MS = 60_000
+// 重试默认关（服务器上取包的行为不变），CI 的 release-bundle 作业设 BOS_RELEASE_RETRIES=2。
+// 只重试换个时间可能就好的失败：408/429/5xx、超时、断连；403、404 这类重试也不会变，直接失败。
+// 2026-11-09 run 42562877308：PUT 传了 2 分 40 秒后 BOS 回 HTTP 408，包没传上去。
+const MAX_RETRIES = 5
+const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504])
+const RETRYABLE_ERROR_CODES = new Set(['ECONNRESET', 'ECONNREFUSED', 'ECONNABORTED', 'EPIPE', 'ETIMEDOUT', 'EAI_AGAIN', 'ENETUNREACH', 'EHOSTUNREACH'])
 
 function encodeRfc3986(value) {
   return encodeURIComponent(String(value)).replace(/[!'()*]/g, (character) =>
@@ -84,6 +90,34 @@ function bceDate(now = new Date()) {
   return now.toISOString().replace(/\.\d{3}Z$/, 'Z')
 }
 
+function requestTimeoutError() {
+  return Object.assign(new Error(`BOS request timed out after ${REQUEST_TIMEOUT_MS / 1000}s`), { code: 'ETIMEDOUT' })
+}
+
+function boundedIntegerEnv(name, fallback, max) {
+  const raw = process.env[name]
+  if (raw === undefined || raw === '') return fallback
+  if (!/^\d+$/.test(raw) || Number(raw) > max) throw new Error(`${name} must be an integer from 0 to ${max}`)
+  return Number(raw)
+}
+
+/** Runs one BOS request, retrying only transient failures when BOS_RELEASE_RETRIES is set. */
+async function withRetries(method, key, operation) {
+  const retries = boundedIntegerEnv('BOS_RELEASE_RETRIES', 0, MAX_RETRIES)
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await operation()
+    } catch (error) {
+      const transient = RETRYABLE_STATUS.has(error.statusCode) || RETRYABLE_ERROR_CODES.has(error.code)
+      if (!transient || attempt > retries) throw error
+      // 第 1 次失败后等 10 秒，之后每次等 30 秒；门禁用 BOS_RELEASE_RETRY_DELAY_MS 把等待压短。
+      const delayMs = boundedIntegerEnv('BOS_RELEASE_RETRY_DELAY_MS', attempt === 1 ? 10_000 : 30_000, 60_000)
+      console.error(`BOS ${method} ${key} attempt ${attempt}/${retries + 1} failed: ${error.message}; retrying in ${delayMs}ms`)
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+  }
+}
+
 function requestForKey(method, key, config) {
   const canonicalUri = canonicalUriForKey(key)
   const objectHost = `${config.bucket}.${config.endpoint}`
@@ -134,9 +168,11 @@ async function putObject(key, inputFile, config) {
         response.on('end', resolve)
       } catch (error) {
         reject(error)
+        // BOS 中途回错（如 408）时停掉这次上传，免得重试时旧连接还在抢带宽。
+        request.destroy()
       }
     })
-    request.on('timeout', () => request.destroy(new Error('BOS request timed out after 60s')))
+    request.on('timeout', () => request.destroy(requestTimeoutError()))
     request.on('error', reject)
     createReadStream(inputFile).on('error', reject).pipe(request)
   })
@@ -158,7 +194,7 @@ async function getObject(key, outputFile, config) {
           reject(error)
         }
       })
-      request.on('timeout', () => request.destroy(new Error('BOS request timed out after 60s')))
+      request.on('timeout', () => request.destroy(requestTimeoutError()))
       request.on('error', reject)
       request.end()
     })
@@ -184,7 +220,7 @@ async function headObject(key, config) {
         response.resume()
         reject(error)
       })
-      request.on('timeout', () => request.destroy(new Error('BOS request timed out after 60s')))
+      request.on('timeout', () => request.destroy(requestTimeoutError()))
       request.on('error', reject)
       request.end()
     })
@@ -201,9 +237,9 @@ async function main() {
     process.exit(1)
   }
   const config = readConfig()
-  if (command === 'get') await getObject(key, file, config)
-  if (command === 'put') await putObject(key, file, config)
-  if (command === 'head') await headObject(key, config)
+  if (command === 'get') await withRetries('GET', key, () => getObject(key, file, config))
+  if (command === 'put') await withRetries('PUT', key, () => putObject(key, file, config))
+  if (command === 'head') await withRetries('HEAD', key, () => headObject(key, config))
 }
 
 // Fixed fake-key vector. It only runs under node --test when this module is named explicitly.

@@ -88,9 +88,11 @@ async function main() {
   const priorScope = process.env['POLICY_SCOPE']
   try {
     delete process.env['KIOSK_PUBLIC_BASE_URL']
-    process.env['POLICY_SCOPE'] = 'org' // 契约要求试点 all，不受环境默认 org 干扰。
+    // 这里手动 new、不注入 PolicyScopeService：与控制器缺省注入同一口径，范围保持 all。
+    // 生产模块会注入；org 下按机构切开在 verify-policy-scope 里验。公开读取还要求来源机构内容可信。
+    process.env['POLICY_SCOPE'] = 'org'
     await prisma.organization.create({ data: {
-      id: orgId, name: '门禁发布机构', type: 'public_employment_service',
+      id: orgId, name: '门禁发布机构', type: 'public_employment_service', contentTrustStatus: 'active',
       verifiedOfficialDomainsJson: JSON.stringify([{ domain: 'example.gov.cn', verifiedAt: new Date().toISOString(), verifiedBy: 'verify' }]),
     } })
     const policy = await prisma.policyPost.create({ data: {

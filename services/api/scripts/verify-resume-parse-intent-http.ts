@@ -35,6 +35,7 @@ import { memberSessionKey } from '../src/common/guards/end-user-auth.guard'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
 import { REDIS_CLIENT, RedisService } from '../src/common/redis/redis.service'
 import { FilesService } from '../src/files/files.service'
+import { signFileUrl } from '../src/files/signing'
 import { CURRENT_RESUME_AI_CONSENT_VERSION, MemberPrivacyService } from '../src/member-privacy/member-privacy.service'
 import { PrismaModule } from '../src/prisma/prisma.module'
 import { PrismaService } from '../src/prisma/prisma.service'
@@ -101,7 +102,10 @@ function makeController() {
     prisma: {
       endUser: { findUnique: async () => ({ enabled: true, status: 'active' }) },
       terminal: { findUnique: async ({ where }: { where: { id: string } }) => (where.id === 'terminal-1' ? { orgId: null } : null) },
+      // 夹具把这份文件当成会员本人的，证明检查不拦。
+      fileObject: { findUnique: async () => ({ endUserId: 'member-1' }) },
     },
+    files: { assertContentAccessibleForEndUser: async () => undefined },
     // 公共额度只认验签的终端：只有 terminal-1 带对的会话令牌才算本终端池。
     terminalSessions: {
       validate: async (terminalId: string, sessionToken: string) => {
@@ -682,6 +686,7 @@ async function verifyKeyedFilePreflight(): Promise<void> {
           fileName: input.fileName ?? 'resume.pdf',
           fileFormat: 'pdf',
           source: 'upload',
+          fileAccessUrl: signFileUrl(input.fileId).url,
         }),
       })
       return { status: res.status, body: await res.json() as PreflightHttpBody }

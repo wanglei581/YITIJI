@@ -112,6 +112,16 @@ function verifyStaticContractsFromSources({ deploy, ci, client }) {
   required(releaseJob, /git bundle create "\$BUNDLE" refs\/release\/target\s*$/m, 'invalid baseline must create a self-contained bundle')
   assertProducerShape(releaseJob)
   assert.ok(!/echo[^\n]*(BOS_RELEASE_ACCESS_KEY|BOS_RELEASE_SECRET_KEY)/.test(releaseJob), 'CI must not echo BOS credentials')
+  // 2026-11-09 run 42562877308：PUT 回 408、包没传上去，作业仍是绿的。上传失败要重试，最终失败要摆到明面上。
+  required(releaseJob, /^ {4}env:\n {6}BOS_RELEASE_RETRIES: '2'\n/m, 'release-bundle job must turn on BOS retries')
+  required(releaseJob, /^ {6}- name: Create and upload release bundle\n {8}id: publish\n {8}continue-on-error: true\n/m, 'upload step must keep id publish and stay best-effort')
+  const warnAt = releaseJob.indexOf('- name: Warn when BOS bundle is missing')
+  assert.ok(warnAt > releaseJob.indexOf('# release-bundle-publish:end'), 'missing-bundle warning step must follow the upload step')
+  const warnStep = releaseJob.slice(warnAt)
+  required(warnStep, /^ {8}if: steps\.publish\.outcome == 'failure'$/m, 'missing-bundle warning must run when the upload step failed')
+  required(warnStep, /::warning title=/, 'missing-bundle warning must raise a ::warning annotation')
+  required(warnStep, /BOS 上没有本次包，发布会改走服务器直连 GitHub 拉取（已知不稳）/, 'missing-bundle warning must say the deploy falls back to GitHub')
+  required(warnStep, /\} >> "\$GITHUB_STEP_SUMMARY"/, 'missing-bundle warning must be written to the step summary')
 
   assert.ok(!/^import\s+(?!assert from 'node:|.*from 'node:)/m.test(client), 'BOS client may import only node built-ins')
   assert.ok(!/console\.log\([^\n]*(SECRET|Authorization)/i.test(client), 'BOS client must not log secrets or Authorization')
@@ -174,6 +184,9 @@ async function verifyMutations() {
     },
     { name: 'if true disables errexit after set -euo', sources: { ...sources, ci: sources.ci.replace('# release-bundle-pack:begin\n          set -euo pipefail\n', '# release-bundle-pack:begin\n          set -euo pipefail\n          if true; then set +e; fi\n') }, message: /fail-closed shell options/ },
     { name: 'quoted hash hides set +e', sources: { ...sources, ci: sources.ci.replace('# release-bundle-pack:begin\n          set -euo pipefail\n', "# release-bundle-pack:begin\n          set -euo pipefail\n          printf '%s\\n' \"a#b\"; set +e\n") }, message: /fail-closed shell options/ },
+    { name: 'turn off BOS retries', sources: { ...sources, ci: sources.ci.replace("BOS_RELEASE_RETRIES: '2'", "BOS_RELEASE_RETRIES: '0'") }, message: /turn on BOS retries/ },
+    { name: 'missing-bundle warning never runs', sources: { ...sources, ci: sources.ci.replace("if: steps.publish.outcome == 'failure'", "if: steps.publish.outcome == 'cancelled'") }, message: /upload step failed/ },
+    { name: 'missing-bundle warning skips the summary', sources: { ...sources, ci: sources.ci.replace('} >> "$GITHUB_STEP_SUMMARY"', '}') }, message: /step summary/ },
   ]
   for (const mutation of mutations) {
     assert.throws(() => verifyStaticContractsFromSources(mutation.sources), mutation.message, `mutation must fail: ${mutation.name}`)
@@ -191,8 +204,36 @@ function runNode(args, env) {
   })
 }
 
+// BOS 重试：默认不重试（服务器取包行为不变）；BOS_RELEASE_RETRIES=2 时只重试 408/429/5xx 这类暂时性失败，最多再试两次。
+async function verifyRetries(env, input, output, scripted, hits) {
+  const retrying = { ...env, BOS_RELEASE_RETRIES: '2', BOS_RELEASE_RETRY_DELAY_MS: '0' }
+  const retried = `${output}.retried`
+  const cases = [
+    ['PUT 408 without opt-in fails at once', env, ['put', 'retry-off.bin', input], [408], 1, 1],
+    ['PUT 408 then 503 succeeds on the third try', retrying, ['put', 'retry-on.bin', input], [408, 503], 0, 3],
+    ['PUT gives up after two retries', retrying, ['put', 'retry-exhausted.bin', input], [408, 408, 408, 408], 1, 3],
+    ['PUT 403 is not retried', retrying, ['put', 'retry-denied.bin', input], [403], 1, 1],
+    ['GET 500 is retried', retrying, ['get', 'retry-on.bin', retried], [500], 0, 2],
+    ['HEAD 404 still exits 3 without retry', retrying, ['head', 'retry-missing.bin'], [], 3, 1],
+    ['invalid BOS_RELEASE_RETRIES fails closed', { ...env, BOS_RELEASE_RETRIES: 'many' }, ['head', 'retry-on.bin'], [], 1, 0],
+  ]
+  for (const [name, caseEnv, args, plan, code, expectedHits] of cases) {
+    const key = `/${args[1]}`
+    scripted.set(key, [...plan])
+    hits.set(key, 0)
+    const result = await runNode(['scripts/release-bundle/bos-object.mjs', ...args], caseEnv)
+    scripted.delete(key)
+    assert.equal(result.code, code, `retry: ${name} exited ${result.code}: ${result.stderr}`)
+    assert.equal(hits.get(key), expectedHits, `retry: ${name} sent ${hits.get(key)} requests`)
+    console.log(`RETRY PASS: ${name}`)
+  }
+  assert.equal(await readFile(retried, 'utf8'), await readFile(input, 'utf8'), 'retried GET output must equal PUT input')
+}
+
 async function verifyLoopbackBos() {
   const objects = new Map()
+  const scripted = new Map()
+  const hits = new Map()
   let checksumHead404 = false
   let corruptGetSuffix = ''
   const server = createServer((request, response) => {
@@ -202,6 +243,13 @@ async function verifyLoopbackBos() {
       return
     }
     const key = request.url
+    hits.set(key, (hits.get(key) ?? 0) + 1)
+    const planned = scripted.get(key)?.shift()
+    if (planned) {
+      request.on('end', () => response.writeHead(planned).end())
+      request.resume()
+      return
+    }
     if (request.method === 'PUT') {
       const chunks = []
       request.on('data', (chunk) => chunks.push(chunk))
@@ -252,6 +300,7 @@ async function verifyLoopbackBos() {
       assert.equal(result.code, 0, `local BOS ${args[1]} must pass: ${result.stderr}`)
     }
     assert.equal(await readFile(output, 'utf8'), await readFile(input, 'utf8'), 'GET output must equal PUT input')
+    await verifyRetries(env, input, output, scripted, hits)
     await verifyRealBundleRoundTrip(async ({ src, releaseSha }) => {
       await proveFullProducerRoundTrip(src, releaseSha, env, objects, () => { checksumHead404 = true }, (suffix) => { corruptGetSuffix = suffix })
     })
@@ -492,7 +541,7 @@ try {
   await verifyStaticContracts()
   await verifyMutations()
   await verifyLoopbackBos()
-  console.log('ALL PASS: release bundle contracts, mutations, loopback BOS, bundle round-trips, and full download readback')
+  console.log('ALL PASS: release bundle contracts, mutations, loopback BOS with retries, bundle round-trips, and full download readback')
 } catch (error) {
   console.error(`FAIL: ${error.message}`)
   process.exit(1)

@@ -145,7 +145,7 @@ const adapter: AiServiceInterface =
 const parsesInFlight = new Map<string, Promise<ResumeParseResponse>>()
 
 export const submitResumeParse = (
-  req: ResumeParseRequest,
+  req: ResumeParseRequest & { fileAccessUrl?: string },
   token?: string | null,
   intent?: ResumeParseIntentHeaders | null,
 ) => {
