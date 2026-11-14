@@ -258,13 +258,6 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
                   <small>我同意开启麦克风</small>
                 </span>
               </button>
-              <button type="button" className="assistant-voice-choice" disabled>
-                <KIcon name="mic" />
-                <span className="assistant-voice-choice-copy">
-                  <strong>按住说话</strong>
-                  <small>尚未开放</small>
-                </span>
-              </button>
               <button type="button" className="assistant-voice-choice" onClick={() => onSwitchToText()}>
                 <KIcon name="chat" />
                 <span className="assistant-voice-choice-copy">

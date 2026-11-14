@@ -40,11 +40,6 @@ const repoRoot = resolve(kioskRoot, '../..')
  */
 const EXEMPT = new Map([
   [
-    'ai-resume-journey.spec.ts',
-    '按需联调脚本：playwright.interaction.config.ts 顶部注释即写明手动执行命令，'
-      + '跑的是真实 AI provider，进 CI 会产生外部调用与费用。',
-  ],
-  [
     'kiosk-p1-visual-evidence.spec.ts',
     '证据产出脚本（playwright.p1-evidence.config.ts），用途是生成验收截图而不是断言，'
       + '没有失败判据，进 CI 只会浪费时间。',
@@ -170,7 +165,7 @@ check(
 // 2026-09-25：qingxu-pairs.spec.ts 与既有 p1 证据脚本同类，按需截图、不进 CI。
 // 2026-11-04：touch-pairs.spec.ts 与 qingxu-pairs 同类（触屏稿 ↔ 运行页按需并排，不进 CI）。
 // 孤儿检查和理由长度检查没有放宽；这个数是新增一条豁免时门禁要求的显式登记。
-const EXEMPT_LIMIT = 4
+const EXEMPT_LIMIT = 3
 check(
   `豁免条目不超过 ${EXEMPT_LIMIT} 条（只许降）`,
   EXEMPT.size <= EXEMPT_LIMIT,

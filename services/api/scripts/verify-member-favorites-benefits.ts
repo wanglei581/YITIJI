@@ -114,7 +114,8 @@ async function main() {
       await prisma.endUser.create({ data: { id, phoneHash: `fb-${id}`, phoneEnc: `fb-enc-${id}`, nickname: n } })
     }
     pass('三个测试会员已创建')
-    await prisma.organization.create({ data: { id: orgId, name: `收藏测试机构${suffix}`, type: 'licensed_hr_agency' } })
+    // 公开读政策要求来源机构内容可信。不标的话收藏政策会 NotFound。
+    await prisma.organization.create({ data: { id: orgId, name: `收藏测试机构${suffix}`, type: 'licensed_hr_agency', contentTrustStatus: 'active' } })
     const job = await prisma.job.create({
       data: {
         sourceOrgId: orgId,

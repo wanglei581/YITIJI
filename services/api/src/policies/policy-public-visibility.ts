@@ -1,4 +1,5 @@
 import type { Prisma } from '../generated/prisma/client'
+import { CONTENT_TRUST_ACTIVE } from '../common/content-trust'
 import {
   isRecruitmentContentHostingEnabled,
   recruitmentHostingDisabledException,
@@ -67,15 +68,31 @@ function recruitmentCategoryExclusion(): Prisma.PolicyPostWhereInput {
 }
 
 /**
+ * 来源机构还必须启用、未归档，且内容可信仍是 active。
+ * 与官方渠道读取同一判据（contentTrustStatus === active 且 archivedAt 为空），另加启用开关。
+ * 撤销、停用或归档之后，已发布的政策不再出现在公开列表和详情里。
+ */
+function trustedSourceOrg(): Prisma.PolicyPostWhereInput {
+  return {
+    org: {
+      enabled: true,
+      archivedAt: null,
+      contentTrustStatus: CONTENT_TRUST_ACTIVE,
+    },
+  }
+}
+
+/**
  * 一体机和小程序的政策读取：托管关闭时去掉 recruitment 分类，
  * 并始终去掉已经写下架留痕的行（即使状态仍是 published）。
+ * 来源机构不可信、已停用或已归档时，这条政策也不再公开。
  */
 export function publicPolicyWhere(
   extra: Prisma.PolicyPostWhereInput,
   heldIds: string[],
   scope: PolicyPublicScope = { mode: 'all' },
 ): Prisma.PolicyPostWhereInput {
-  const parts: Prisma.PolicyPostWhereInput[] = [extra, recruitmentCategoryExclusion()]
+  const parts: Prisma.PolicyPostWhereInput[] = [extra, recruitmentCategoryExclusion(), trustedSourceOrg()]
   if (scope.mode === 'org') {
     parts.push(scope.orgId ? { sourceOrgId: scope.orgId } : { sourceOrgId: '__no_public_terminal__' })
   }

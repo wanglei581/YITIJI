@@ -23,6 +23,7 @@ import { encryptPhone, hashPhone, normalizePhone } from '../common/crypto/phone-
 import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../common/constants/internal-session.constants'
 import { RedisService } from '../common/redis/redis.service'
 import { tryRedis } from '../common/redis/redis-degradation'
+import { RedisPublicContentCache, invalidatePublicContentCache } from './admin-org-content-trust.service'
 import { Prisma } from '../generated/prisma/client'
 import { isPostgresBusyError } from '../common/prisma/postgres-busy'
 import { isSerializationConflict, waitBeforeSerializationRetry } from '../common/prisma/serialization-conflict'
@@ -58,7 +59,7 @@ type SessionInvalidationResult =
 // 授权开关 enabled 的全链路效果:
 //   - false → 该机构 partner 账号无法登录(auth.service 校验)
 //   - false → 导入/写接口拒绝(jobs.service 既有 org.enabled 校验)
-//   - 已发布数据不自动下架(如需下架走岗位/招聘会信息源逐条 unpublish,保持审计可溯)
+//   - publishStatus 不改；停用后公开读取不再返回该机构已发布政策，并清公开缓存
 //
 // 合规:
 //   - 启用模块白名单 = shared EnabledModule;招聘闭环模块(PROHIBITED)硬拒绝
@@ -254,6 +255,7 @@ export class AdminOrgsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly redis: RedisService,
+    private readonly publicCache?: RedisPublicContentCache,
   ) {}
 
   // ── 机构列表 / 详情 ─────────────────────────────────────────────────────────
@@ -442,7 +444,7 @@ export class AdminOrgsService {
 
   /**
    * 授权启停。disable 后:该机构 partner 账号无法登录(auth)、导入接口拒绝(jobs)。
-   * 已发布数据不自动下架 —— 如需下架,到岗位/招聘会信息源逐条操作,保持审计可溯。
+   * publishStatus 不改。停用或重新启用后清公开缓存，避免已发布政策再露最多 15 分钟。
    */
   async setOrgStatus(orgId: string, action: 'enable' | 'disable', admin: AuthedUser): Promise<AdminOrgDetail> {
     const org = await this.assertOrgExists(orgId)
@@ -460,6 +462,7 @@ export class AdminOrgsService {
         })
       })
       await this.invalidateOrgSessions(orgId)
+      if (this.publicCache) await invalidatePublicContentCache(this.publicCache, this.logger, this.audit, admin, orgId)
     }
     return this.getOrgDetail(orgId)
   }

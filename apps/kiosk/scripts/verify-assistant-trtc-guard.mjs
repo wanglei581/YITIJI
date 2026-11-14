@@ -109,10 +109,15 @@ expectNotMatches(
   /useEffect\(\(\) => \{\s*void call\.startCall\(\)/,
   'opening the choice dialog does not start or bill a TRTC session',
 )
-expectMatches(
+expectNotMatches(
   callPanel,
   /<button[^>]*disabled[\s\S]*?按住说话[\s\S]*?尚未开放/,
-  'hold-to-talk remains honestly disabled',
+  'call gate does not keep a disabled hold-to-talk control',
+)
+expectNotMatches(
+  callPanel,
+  /按住说话/,
+  'call gate does not offer hold-to-talk; the live call already owns the microphone',
 )
 expectIncludes(callPanel, 'call.endCall()', 'voice exits use the explicit idempotent end action')
 expectIncludes(callPanel, 'aria-pressed={captionsOn}', 'caption toggle exposes its actual state')

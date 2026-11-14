@@ -84,14 +84,14 @@ export function InterviewSetupResume({
   onQrBusy,
   onUsbBusy,
 }: {
-  resumeFile: { fileId: string; name: string } | null
+  resumeFile: { fileId: string; name: string; fileUrl?: string } | null
   onClearResume: () => void
   resumeChannel: ResumeChannel | null
   onResumeChannel: (channel: ResumeChannel | null) => void
   kiosk: boolean
   uploading: boolean
   onPickFile: () => void
-  onUploaded: (file: { fileId: string; name: string }) => void
+  onUploaded: (file: { fileId: string; name: string; fileUrl?: string }) => void
   onQrBusy: (busy: boolean) => void
   onUsbBusy: (busy: boolean) => void
 }) {
@@ -134,13 +134,16 @@ export function InterviewSetupResume({
             title="手机扫码上传简历"
             description="手机只负责上传；这台机器确认后才会带进本次练习。不上传也可以开始。"
             confirmLabel="确认使用这份简历"
-            onUploaded={onUploaded}
+            onUploaded={(file) => onUploaded({ fileId: file.fileId, name: file.name, fileUrl: file.fileUrl })}
             onBusyChange={onQrBusy}
           />
         </div>
       ) : resumeChannel === 'usb' ? (
         <div className="qxt-iv-panel">
-          <ResumeUsbImportPanel onUploaded={onUploaded} onBusyChange={onUsbBusy} />
+          <ResumeUsbImportPanel
+            onUploaded={(file) => onUploaded({ fileId: file.fileId, name: file.name, fileUrl: file.fileUrl })}
+            onBusyChange={onUsbBusy}
+          />
         </div>
       ) : resumeChannel === 'desktop' && !kiosk ? (
         <div className="qxt-iv-panel">

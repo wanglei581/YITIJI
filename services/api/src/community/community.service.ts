@@ -3,13 +3,12 @@ import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
 import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import { listPolicyHoldIds, publicPolicyWhere, type PolicyPublicScope } from '../policies/policy-public-visibility'
+import { COMMUNITY_FEED_CACHE_PREFIX, PUBLIC_CONTENT_CACHE_STALE_WINDOW_SECONDS } from '../common/content-trust-cache-keys'
 import type { CommunityFeedItem, CommunityFeedKind, CommunityFeedPage } from './community.types'
-
-const CACHE_TTL_SECONDS = 15 * 60
 
 export function communityFeedCacheKey(hostingKey: string, scope: PolicyPublicScope, cursorValue: string | undefined, limit: number): string {
   const scopeKey = scope.mode === 'org' ? `${scope.state}:${scope.orgId ?? 'none'}` : 'all'
-  return `community:feeds:v2:${hostingKey}:${scopeKey}:${cursorValue ?? 'first'}:${limit}`
+  return `${COMMUNITY_FEED_CACHE_PREFIX}${hostingKey}:${scopeKey}:${cursorValue ?? 'first'}:${limit}`
 }
 const MAX_SUMMARY_LENGTH = 120
 
@@ -165,7 +164,7 @@ export class CommunityService {
 
     const result = await load()
     try {
-      await this.redis.setEx(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(result))
+      await this.redis.setEx(cacheKey, PUBLIC_CONTENT_CACHE_STALE_WINDOW_SECONDS, JSON.stringify(result))
     } catch {
       // 缓存写失败不影响真实数据读路径。
     }

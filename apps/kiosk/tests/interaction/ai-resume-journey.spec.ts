@@ -1,5 +1,5 @@
 /**
- * 包 Q-AI · AI 简历 → 我的 交互走查
+ * 包 Q-AI · AI 简历 → 我的 交互走查（青序流光 · 触屏版）
  *
  * 模拟数据 = 本地真实后端 + 种子（AI_PROVIDER=mock 是服务端配置，不是前端假数据）。
  * 每条旅程独立 browser.newContext()，禁止复用 page。
@@ -9,9 +9,13 @@
  *
  * 不塞进 visual/，不走默认 playwright.config.ts（那会起 4177 preview 并 mock API）。
  */
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { QRCodeSVG } from 'qrcode.react'
 import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import {
+  API_ORIGIN,
   appendOperation,
   attachCollectors,
   clickMeTab,
@@ -20,6 +24,7 @@ import {
   closePreviewIfOpen,
   confirmAiConsent,
   confirmFactsIfOpen,
+  failJourneySteps,
   fillDiagnosisDirection,
   gotoHome,
   listVisibleControls,
@@ -27,10 +32,10 @@ import {
   newSweepContext,
   operateControl,
   recordStep,
-  scanForbidden,
   scanForbiddenCopy,
   shot,
   uploadResumePdf,
+  waitForOptimizeReady,
   waitReady,
   waitReport,
   writeSummary,
@@ -40,8 +45,9 @@ import {
 
 test.describe.configure({ mode: 'default' })
 
-test.beforeAll(() => {
-  // 证据目录由 global-setup 清空一次。这里只保证目录存在，避免 worker 重启把上一旅程 jsonl 抹掉。
+test.beforeEach(() => {
+  // 只让这一份走查的步骤失败变红。开关默认关着，别的旧走查不受影响。
+  failJourneySteps(true)
 })
 
 test.afterAll(() => {
@@ -52,6 +58,115 @@ async function assertNotProduction(collectors: ReturnType<typeof attachCollector
   expect(collectors.productionHits, '禁止访问生产 zyidai.cn / 120.48.13.190').toEqual([])
 }
 
+type ExportedFile = { fileId: string; filename: string; signedUrl: string }
+
+function asExportFile(body: unknown): ExportedFile {
+  const record = body && typeof body === 'object' ? body as Record<string, unknown> : {}
+  const nested = record.data && typeof record.data === 'object' ? record.data as Record<string, unknown> : record
+  const fileId = typeof nested.fileId === 'string' ? nested.fileId : ''
+  const filename = typeof nested.filename === 'string' ? nested.filename : ''
+  const signedUrl = typeof nested.signedUrl === 'string' ? nested.signedUrl : ''
+  expect(fileId, '导出响应应带本次文件编号').not.toBe('')
+  expect(filename, '导出响应应带本次文件名').not.toBe('')
+  expect(signedUrl, '导出响应应带本次取回链接').not.toBe('')
+  expect(signedUrl, '取回链接应指向本次文件').toContain(fileId)
+  return { fileId, filename, signedUrl }
+}
+
+function localRetrievalUrl(signedUrl: string): string {
+  const parsed = signedUrl.startsWith('http') ? new URL(signedUrl) : new URL(signedUrl, API_ORIGIN)
+  if (signedUrl.startsWith('http')) expect(parsed.hostname, '取回地址应是本机 API').toBe('127.0.0.1')
+  const path = `${parsed.pathname}${parsed.search}`
+  expect(path, '取回地址应是本机 API 签发的签名链接').toMatch(
+    /^\/api\/v1\/files\/[^/?#]+\/content\?expires=\d+&sig=[0-9a-fA-F]+$/,
+  )
+  return new URL(path, API_ORIGIN).href
+}
+
+function qrPathData(value: string): string[] {
+  const html = renderToStaticMarkup(createElement(QRCodeSVG, {
+    value,
+    size: 160,
+    level: 'M',
+    marginSize: 0,
+  }))
+  const paths = [...html.matchAll(/\sd="([^"]*)"/g)].map((match) => match[1])
+  if (paths.length < 2) throw new Error(`对照二维码应有背景和内容两条 path，实际 ${paths.length} 条`)
+  return paths
+}
+
+async function assertQrEncodes(page: Page, signedUrl: string, filename: string): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: filename })
+  await expect(dialog, '应弹出这份文件的二维码').toBeVisible()
+  const actual = await dialog.locator('aside svg[role="img"] path').evaluateAll((els) => els.map((el) => el.getAttribute('d')))
+  expect(actual, '二维码应逐字编码这次的取回链接').toEqual(qrPathData(signedUrl))
+}
+
+async function assertDownloaded(page: Page, signedUrl: string, mime: RegExp, pdfHeader: boolean): Promise<void> {
+  const response = await page.request.get(localRetrievalUrl(signedUrl))
+  expect(response.status(), '取回本次文件应成功').toBe(200)
+  expect(response.headers()['content-type'] ?? '', '内容类型应对上这次的格式').toMatch(mime)
+  const body = await response.body()
+  expect(body.byteLength, '文件不应是空的').toBeGreaterThan(0)
+  if (pdfHeader) expect(body.subarray(0, 4).toString('latin1'), 'PDF 文件头应是 %PDF').toBe('%PDF')
+}
+
+/**
+ * 回执只许留在这次跳转的内存里。会话在、任务对得上时写进任一浏览器存储，这里都要红。
+ * 不查文件名：打印交接本来就会记下 file.name。
+ * 打印交接的 fileUrl 是打印链接，会员这次可能和取回链接同一串，只把这一处拿开再查。
+ */
+async function assertTakeawayNotStored(page: Page, signedUrl: string, where: string): Promise<void> {
+  const entries = await page.evaluate(() => {
+    const dump: Array<{ key: string; value: string }> = []
+    for (const store of [sessionStorage, localStorage]) {
+      for (let i = 0; i < store.length; i += 1) {
+        const key = store.key(i) ?? ''
+        dump.push({ key, value: store.getItem(key) ?? '' })
+      }
+    }
+    return dump
+  })
+  const stored = entries.map((entry) => `${entry.key}=${entry.value}`).join('\n')
+  expect(stored, `${where}：回执不得进任何浏览器存储`).not.toContain('reportTakeaway')
+  const withoutPrintFileUrl = entries.map((entry) => {
+    if (entry.key !== 'ai-job-print:current-print-material-check') return entry.value
+    try {
+      const parsed = JSON.parse(entry.value) as { file?: { fileUrl?: unknown } }
+      const fileUrl = parsed.file && typeof parsed.file.fileUrl === 'string' ? parsed.file.fileUrl : ''
+      const at = fileUrl ? entry.value.indexOf(fileUrl) : -1
+      if (at < 0) return entry.value
+      return `${entry.value.slice(0, at)}${entry.value.slice(at + fileUrl.length)}`
+    } catch {
+      return entry.value
+    }
+  }).join('\n')
+  expect(withoutPrintFileUrl, `${where}：取回链接不得进任何浏览器存储`).not.toContain(signedUrl)
+}
+
+async function readEditorValues(page: Page): Promise<string[]> {
+  const paper = page.locator('.qxt-paperbox textarea, .qxt-paperbox input')
+  const locator = (await paper.count()) > 0 ? paper : page.locator('textarea')
+  return locator.evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value))
+}
+
+async function returnFromPrintToReport(page: Page): Promise<void> {
+  for (let i = 0; i < 4 && new URL(page.url()).pathname.startsWith('/print'); i += 1) {
+    const before = page.url()
+    const back = page.getByRole('button', { name: /^(返回修改|上一步|回到上一步)$/ }).first()
+    await expect(back, '打印页应能用屏上的返回离开').toBeVisible({ timeout: 15_000 })
+    await back.click()
+    await page.waitForURL((url) => url.href !== before, { timeout: 15_000 })
+  }
+  await page.waitForURL((url) => url.pathname === '/resume/report', { timeout: 15_000 })
+  await waitReady(page)
+}
+
+async function dismissHubSheet(page: Page): Promise<void> {
+  const close = page.getByRole('button', { name: '收起', exact: true })
+  if (await close.isVisible().catch(() => false)) await close.click()
+}
+
 async function enterResumeHub(page: Page, journey: string, collectors: ReturnType<typeof attachCollectors>): Promise<void> {
   await recordStep({
     page, journey, step: 'home', control: '(open /)', selectorHint: 'goto /', kind: 'click', collectors,
@@ -59,7 +174,7 @@ async function enterResumeHub(page: Page, journey: string, collectors: ReturnTyp
   })
   await shot(page, journey, 'home')
   await recordStep({
-    page, journey, step: 'home-resume-hub', control: 'AI 简历服务', selectorHint: '[data-domain-id=resume] .v6-home-domain__main',
+    page, journey, step: 'home-resume-hub', control: '改简历', selectorHint: '[data-action=resume-hub]',
     kind: 'click', collectors,
     act: async () => {
       const card = page.locator('[data-action="resume-hub"]')
@@ -68,11 +183,13 @@ async function enterResumeHub(page: Page, journey: string, collectors: ReturnTyp
       await page.waitForURL((url) => url.pathname === '/resume-service', { timeout: 15_000 })
     },
   })
+  await dismissHubSheet(page)
 }
 
 async function enterDiagnoseSource(page: Page, journey: string, collectors: ReturnType<typeof attachCollectors>): Promise<void> {
+  await dismissHubSheet(page)
   await recordStep({
-    page, journey, step: 'hub-diagnose', control: 'AI简历诊断', selectorHint: 'button:AI简历诊断',
+    page, journey, step: 'hub-diagnose', control: '有，帮我改一改', selectorHint: 'button:有，帮我改一改',
     kind: 'click', collectors,
     act: async () => {
       await page.getByRole('button', { name: '有，帮我改一改' }).click()
@@ -114,10 +231,6 @@ async function sweepVisible(
   const ops: ControlOp[] = []
   const originPath = new URL(page.url()).pathname
   for (const control of controls) {
-    if (extraSkip.some((item) => control.text.includes(item))) {
-      ops.push(await operateControl(page, control, journey, stepPrefix, collectors, extraSkip))
-      continue
-    }
     const op = await operateControl(page, control, journey, stepPrefix, collectors, extraSkip)
     ops.push(op)
     const nowPath = new URL(page.url()).pathname
@@ -131,6 +244,74 @@ async function sweepVisible(
   return ops
 }
 
+async function openOptimize(page: Page, journey: string, collectors: ReturnType<typeof attachCollectors>, step: string): Promise<void> {
+  await recordStep({
+    page, journey, step, control: '查看优化建议', selectorHint: '[data-testid=resume-report-primary]',
+    kind: 'click', collectors,
+    act: async () => {
+      const cta = page.getByTestId('resume-report-primary')
+      if (await cta.count()) await cta.click()
+      else await page.getByRole('button', { name: /查看优化建议|继续生成优化版简历/ }).click()
+      await page.waitForURL((url) => url.pathname === '/resume/optimize', { timeout: 30_000 })
+    },
+  })
+  await confirmAiConsent(page, journey, collectors, page.getByRole('button', { name: '逐条看（从第 1 条）' }))
+  await waitForOptimizeReady(page)
+}
+
+async function clickReportButton(
+  page: Page,
+  journey: string,
+  collectors: ReturnType<typeof attachCollectors>,
+  name: RegExp,
+  label: string,
+): Promise<void> {
+  const locator = page.getByRole('button', { name }).first()
+  await expect(locator, label).toBeVisible({ timeout: 20_000 })
+  await recordStep({
+    page, journey, step: `report-${label}`, control: label,
+    selectorHint: `button:${label}`, kind: 'click', collectors,
+    act: async () => {
+      await locator.click()
+      await confirmFactsIfOpen(page, journey, collectors)
+      if (/打印/.test(label)) {
+        await page.waitForURL((url) => url.pathname.startsWith('/print'), { timeout: 12_000 })
+        await shot(page, journey, 'report-print-landed')
+        await returnFromPrintToReport(page)
+      }
+      await closePreviewIfOpen(page)
+    },
+  })
+}
+
+async function exportReport(
+  page: Page,
+  journey: string,
+  collectors: ReturnType<typeof attachCollectors>,
+  label: string,
+  name: RegExp,
+): Promise<ExportedFile> {
+  const held: { file: ExportedFile | null } = { file: null }
+  await recordStep({
+    page, journey, step: `report-${label}`, control: label,
+    selectorHint: `button:${label}`, kind: 'click', collectors,
+    act: async () => {
+      const pending = page.waitForResponse(
+        (res) => res.request().method() === 'POST' && res.url().includes('/resume/records/') && res.url().includes('/export'),
+        { timeout: 30_000 },
+      )
+      await page.getByRole('button', { name }).first().click()
+      await confirmFactsIfOpen(page, journey, collectors)
+      const response = await pending
+      expect(response.ok(), `${label}应返回成功`).toBeTruthy()
+      held.file = asExportFile(await response.json())
+      await expect(page.getByTestId('resume-report-export-result')).toContainText(held.file.filename)
+    },
+  })
+  if (!held.file) throw new Error(`${label}没有拿到文件`)
+  return held.file
+}
+
 test('J1 匿名 · 首页→诊断→报告页按钮 @interaction', async ({ browser }) => {
   const { context, page } = await newSweepContext(browser)
   const collectors = attachCollectors(page)
@@ -138,67 +319,64 @@ test('J1 匿名 · 首页→诊断→报告页按钮 @interaction', async ({ bro
   try {
     await enterResumeHub(page, journey, collectors)
     await sweepVisible(page, journey, 'hub', collectors, [
-      'AI简历诊断', '简历打印', '去打印', 'U盘',
+      '有，帮我改一改', '没有，帮我写一份', '简历打印', '去打印', 'U盘', '我的简历', 'AI服务记录',
     ])
     await enterDiagnoseSource(page, journey, collectors)
     await startDiagnosis(page, journey, collectors)
     await shot(page, journey, 'report')
+    expect(page.url(), '诊断未走到报告页').toContain('/resume/report')
     const body = await page.locator('body').innerText()
     expect(scanForbiddenCopy(body), '合规禁词').toEqual([])
 
-    const reportButtons = [
-      { name: /导出 PDF/, skip: false },
-      { name: /导出修改清单/, skip: false },
-      { name: /生成二维码带走/, skip: false },
-      { name: /打印这份报告/, skip: false },
-      { name: /重新诊断/, skip: true },
-      { name: /查看优化建议|继续生成优化版简历/, skip: true },
-      { name: /目标岗位匹配参考/, skip: true },
-      { name: /做一次自我探索/, skip: true },
-      { name: /首页/, skip: true },
-      { name: /AI 顾问/, skip: true },
-      { name: /我的/, skip: true },
-    ]
-    for (const item of reportButtons) {
-      const locator = page.getByRole('button', { name: item.name })
-      if (!(await locator.count())) continue
-      if (item.skip) {
-        appendOperation({
-          journey, step: `report-listed-${item.name}`, route: '/resume/report',
-          control: String(item.name), selectorHint: `button:${String(item.name)}`,
-          kind: 'click', disabled: false, dead: false, skipped: 'kept-for-j1-continue-or-out-of-scope',
-          observations: { urlChanged: false, apiRequests: [], domChanged: false, overlayOrToastOrError: false, beforeUrl: '/resume/report', afterUrl: '/resume/report', beforeTextLen: 0, afterTextLen: 0 },
-          runtimeErrors: [], forbiddenCopy: [], screenshot: await shot(page, journey, 'report-skip'),
-        })
-        continue
-      }
-      await recordStep({
-        page, journey, step: `report-${String(item.name)}`, control: String(item.name),
-        selectorHint: `button:${String(item.name)}`, kind: 'click', collectors,
-        act: async () => {
-          await locator.first().click()
-          await confirmFactsIfOpen(page, journey, collectors)
-          await page.waitForTimeout(800)
-          if (page.url().includes('/print/')) {
-            await shot(page, journey, 'report-print-landed')
-            await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => undefined)
-            await waitReady(page)
-          }
-          await closePreviewIfOpen(page)
-        },
-      })
-    }
-
+    const reportPdf = await exportReport(page, journey, collectors, '导出 PDF', /导出 PDF/)
+    const reportResult = page.getByTestId('resume-report-export-result')
+    await expect(reportResult).toContainText(reportPdf.filename)
+    await assertDownloaded(page, reportPdf.signedUrl, /application\/pdf/, true)
+    await expect(page.getByRole('button', { name: '打印这份报告' })).toBeVisible({ timeout: 15_000 })
+    await page.getByRole('button', { name: '生成二维码带走' }).click()
+    await assertQrEncodes(page, reportPdf.signedUrl, reportPdf.filename)
+    await closePreviewIfOpen(page)
+    await clickReportButton(page, journey, collectors, /打印这份报告/, '打印这份报告')
+    await expect(page).toHaveURL(/\/resume\/report/)
+    await expect(reportResult, '从打印页回来，这份报告的导出结果还在').toContainText(reportPdf.filename)
+    await expect(page.getByRole('button', { name: '生成二维码带走' })).toBeVisible()
+    await assertTakeawayNotStored(page, reportPdf.signedUrl, '从打印页回来')
     await recordStep({
-      page, journey, step: 'report-optimize', control: '查看优化建议', selectorHint: '[data-testid=resume-report-primary]',
-      kind: 'click', collectors,
+      page, journey, step: 'report-生成二维码带走', control: '生成二维码带走',
+      selectorHint: 'button:生成二维码带走', kind: 'click', collectors,
       act: async () => {
-        const cta = page.getByTestId('resume-report-primary')
-        if (await cta.count()) await cta.click()
-        else await page.getByRole('button', { name: /查看优化建议|继续生成优化版简历/ }).click()
+        await page.getByRole('button', { name: '生成二维码带走' }).click()
+        const dialog = page.getByRole('dialog', { name: reportPdf.filename })
+        await expect(dialog, '应弹出这份文件的二维码').toBeVisible()
+        await expect(dialog.locator('aside svg[role="img"]'), '弹层里应有二维码').toBeVisible()
+        await expect(dialog.getByText('手机扫码保存')).toBeVisible()
       },
     })
-    await confirmAiConsent(page, journey, collectors)
+    await assertQrEncodes(page, reportPdf.signedUrl, reportPdf.filename)
+    await assertDownloaded(page, reportPdf.signedUrl, /application\/pdf/, true)
+    await closePreviewIfOpen(page)
+    const beforeChangeList = await reportResult.innerText()
+    const changeList = await exportReport(page, journey, collectors, '导出修改清单', /导出修改清单/)
+    const afterChangeList = await reportResult.innerText()
+    expect(afterChangeList, '修改清单应是这次新导出的结果').not.toBe(beforeChangeList)
+    expect(afterChangeList).toContain(changeList.filename)
+    expect(afterChangeList).toContain('修改清单')
+    await assertDownloaded(page, changeList.signedUrl, /application\/pdf/, true)
+    await expect(page.getByRole('button', { name: '打印修改清单' }), '应能打印这次的修改清单').toBeVisible()
+    await clickReportButton(page, journey, collectors, /打印修改清单/, '打印修改清单')
+    await expect(reportResult, '修改清单打印回来，这次的结果还在').toContainText(changeList.filename)
+    await page.getByRole('button', { name: '生成二维码带走' }).click()
+    await assertQrEncodes(page, changeList.signedUrl, changeList.filename)
+    await closePreviewIfOpen(page)
+
+    // 停放：docs/product/feature-scope.md:12 一体机只留四个核心，覆盖简历对照、自我探索。
+    // 停放：docs/progress/current-progress.md:176 报告页去「简历对照」「自我探索」（同日条目见 :171）。
+    await expect(page.getByRole('button', { name: '简历对照', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '自我探索', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: '简历对照', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: '自我探索', exact: true })).toHaveCount(0)
+
+    await openOptimize(page, journey, collectors, 'report-optimize')
     await shot(page, journey, 'after-optimize-cta')
     await assertNotProduction(collectors)
   } finally {
@@ -206,150 +384,314 @@ test('J1 匿名 · 首页→诊断→报告页按钮 @interaction', async ({ bro
   }
 })
 
+async function confirmCompareFacts(page: Page): Promise<void> {
+  const boxes = page.locator('[aria-label="新增事实核对"] input[type="checkbox"]')
+  const total = await boxes.count()
+  for (let i = 0; i < total; i += 1) {
+    const box = boxes.nth(i)
+    if (await box.isVisible().catch(() => false)) await box.check()
+  }
+}
+
+async function chooseCompare(page: Page, name: '用改写' | '保留原文'): Promise<void> {
+  await confirmCompareFacts(page)
+  const choice = page.getByRole('group', { name: '这一条用哪一版' }).getByRole('button', { name, exact: true })
+  await choice.click()
+  await expect(choice).toHaveAttribute('aria-pressed', 'true')
+}
+
+async function openCompareFromOverview(page: Page, journey: string, collectors: ReturnType<typeof attachCollectors>, step: string): Promise<void> {
+  const overview = page.getByRole('button', { name: '逐条看（从第 1 条）' })
+  const backToOverview = page.getByRole('button', { name: /返回建议总览/ })
+  await expect(overview.or(backToOverview).first()).toBeVisible({ timeout: 15_000 })
+  if (!(await overview.isVisible().catch(() => false)) && await backToOverview.count()) {
+    await backToOverview.first().scrollIntoViewIfNeeded()
+    await backToOverview.first().click()
+    const leave = page.getByRole('button', { name: '确认离开', exact: true })
+    const overviewWait = overview.waitFor({ state: 'visible', timeout: 10_000 }).then(() => 'overview' as const).catch(() => 'absent' as const)
+    const leaveWait = leave.waitFor({ state: 'visible', timeout: 10_000 }).then(() => 'leave' as const).catch(() => 'absent' as const)
+    const leaving = await Promise.race([overviewWait, leaveWait])
+    if (leaving === 'leave') {
+      await leave.click()
+      await expect(overview).toBeVisible({ timeout: 10_000 })
+    }
+  }
+  await recordStep({
+    page, journey, step, control: '逐条看（从第 1 条）', selectorHint: 'button:逐条看（从第 1 条）',
+    kind: 'click', collectors,
+    act: async () => {
+      await page.getByRole('button', { name: '逐条看（从第 1 条）' }).click()
+      const leave = page.getByRole('button', { name: '确认离开', exact: true })
+      if (await leave.isVisible().catch(() => false)) await leave.click()
+      await page.waitForURL((url) => url.pathname === '/resume/optimize/compare', { timeout: 20_000 })
+    },
+  })
+}
+
+/**
+ * 页面只在优化稿里有唯一原句时，才把这一条改写换进编辑区。
+ * 假模型给出的原句不在稿里，应用会停在「没能自动放进稿里」。
+ * 这里不改接口：只把第一条原句放进简介，让「应用 / 暂不应用」走页面自己的替换。
+ */
+async function plantUniqueOriginalForFirstRewrite(page: Page): Promise<void> {
+  await page.route('**/api/v1/resume/records/*/optimize**', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue()
+      return
+    }
+    const response = await route.fetch()
+    let payload: Record<string, unknown>
+    try {
+      payload = await response.json() as Record<string, unknown>
+    } catch {
+      await route.fulfill({ response })
+      return
+    }
+    const nested = payload['data']
+    const body = (payload['optimizedResume'] ? payload : nested) as {
+      optimizedResume?: { summary?: string }
+      modules?: Array<{ before?: string; after?: string }>
+    } | undefined
+    const first = body?.modules?.[0]
+    const resume = body?.optimizedResume
+    const before = first?.before?.trim() ?? ''
+    const after = first?.after?.trim() ?? ''
+    if (resume && before && after && before !== after && !JSON.stringify(resume).includes(before)) {
+      resume.summary = before
+    }
+    await route.fulfill({ response, json: payload })
+  })
+}
+
 test('J2 匿名 · 诊断→对照→应用弹层两分支→四种导出 @interaction', async ({ browser }) => {
   test.setTimeout(360_000)
   const { context, page } = await newSweepContext(browser)
   const collectors = attachCollectors(page)
   const journey = 'j2-anon'
   try {
+    await plantUniqueOriginalForFirstRewrite(page)
     await enterResumeHub(page, journey, collectors)
     await enterDiagnoseSource(page, journey, collectors)
     await startDiagnosis(page, journey, collectors)
-    await recordStep({
-      page, journey, step: 'to-optimize', control: '查看优化建议', selectorHint: '[data-testid=resume-report-primary]',
-      kind: 'click', collectors,
-      act: async () => {
-        const cta = page.getByTestId('resume-report-primary')
-        if (await cta.count()) await cta.click()
-        else await page.getByRole('button', { name: /查看优化建议|继续生成优化版简历/ }).click()
-        await page.waitForURL((url) => url.pathname === '/resume/optimize', { timeout: 30_000 })
-      },
-    })
-    await confirmAiConsent(page, journey, collectors)
-    await page.locator('[data-kiosk-screen="resume-optimize"]').waitFor({ timeout: 30_000 })
+    await openOptimize(page, journey, collectors, 'to-optimize')
+    await expect(page.getByRole('button', { name: '逐条看（从第 1 条）' })).toBeVisible({ timeout: 30_000 })
     await shot(page, journey, 'optimize-ready')
 
-    const openCompare = async (label: string) => {
-      await recordStep({
-        page, journey, step: label, control: '逐条看完整对照', selectorHint: 'button:逐条看完整对照',
-        kind: 'click', collectors,
-        act: async () => {
-          await page.getByRole('button', { name: /逐条看完整对照/ }).click()
-          const leave = page.getByRole('button', { name: '确认离开', exact: true })
-          if (await leave.count()) await leave.click()
-          await page.waitForURL((url) => url.pathname === '/resume/optimize/compare', { timeout: 20_000 })
-        },
-      })
-    }
-
-    await openCompare('open-compare-1')
+    await openCompareFromOverview(page, journey, collectors, 'open-compare-1')
     await shot(page, journey, 'compare')
-
-    const confirmAdds = async () => {
-      const boxes = page.locator('.qxc-facts input[type="checkbox"]')
-      const total = await boxes.count()
-      for (let i = 0; i < total; i += 1) {
-        await boxes.nth(i).check().catch(() => undefined)
-      }
-    }
-    await confirmAdds()
-    await recordStep({
-      page, journey, step: 'compare-rewrite', control: '用改写', selectorHint: 'button:用改写',
-      kind: 'click', collectors,
-      act: async () => { await page.getByRole('button', { name: '用改写', exact: true }).click() },
-    })
+    await chooseCompare(page, '用改写')
+    const rewrite = (await page.getByLabel('逐字差异').locator('section').nth(1).locator('p').textContent()) ?? ''
+    expect(rewrite.length, '这一条应有改写正文').toBeGreaterThan(0)
     await recordStep({
       page, journey, step: 'compare-next-1', control: '下一条', selectorHint: 'button:下一条',
       kind: 'click', collectors,
       act: async () => { await page.getByRole('button', { name: '下一条', exact: true }).click() },
     })
-    await confirmAdds()
-    await recordStep({
-      page, journey, step: 'compare-keep', control: '保留原文', selectorHint: 'button:保留原文',
-      kind: 'click', collectors,
-      act: async () => { await page.getByRole('button', { name: '保留原文', exact: true }).click() },
-    })
-    await recordStep({
-      page, journey, step: 'compare-next-2', control: '下一条', selectorHint: 'button:下一条',
-      kind: 'click', collectors,
-      act: async () => { await page.getByRole('button', { name: '下一条', exact: true }).click() },
-    })
-    for (let i = 0; i < 6 && page.url().includes('/resume/optimize/compare'); i += 1) {
+    await chooseCompare(page, '保留原文')
+    await page.getByRole('button', { name: '下一条', exact: true }).click()
+    for (let i = 0; i < 4 && page.url().includes('/resume/optimize/compare'); i += 1) {
+      const finish = page.getByRole('button', { name: '去编辑', exact: true })
       const next = page.getByRole('button', { name: '下一条', exact: true })
-      if (await next.isEnabled().catch(() => false)) {
-        await confirmAdds()
-        const keep = page.getByRole('button', { name: '保留原文', exact: true })
-        if (await keep.count()) await keep.click()
-        await next.click()
-        await page.waitForTimeout(300)
-        continue
+      await chooseCompare(page, '保留原文')
+      if (await finish.isVisible().catch(() => false)) {
+        await finish.click()
+        break
       }
-      const back = page.getByRole('button', { name: /返回优化页/ })
-      if (await back.count()) await back.first().click()
-      else break
+      await next.click()
     }
-    await page.waitForURL((url) => url.pathname === '/resume/optimize', { timeout: 15_000 }).catch(() => undefined)
+    await page.waitForURL((url) => url.pathname === '/resume/optimize', { timeout: 15_000 })
     await shot(page, journey, 'apply-dialog-1')
-    if (await page.getByRole('dialog', { name: /对照页有/ }).count()) {
-      await recordStep({
-        page, journey, step: 'apply-to-editor', control: '应用到编辑区', selectorHint: 'dialog >> 应用到编辑区',
-        kind: 'click', collectors,
-        act: async () => { await page.getByRole('button', { name: '应用到编辑区' }).click() },
-      })
-    }
-
-    await openCompare('open-compare-2')
-    await confirmAdds()
-    if (await page.getByRole('button', { name: '保留原文', exact: true }).count()) {
-      await page.getByRole('button', { name: '保留原文', exact: true }).click()
-    }
-    const back2 = page.getByRole('button', { name: /返回优化页/ })
-    if (await back2.count()) await back2.first().click()
-    await page.waitForURL((url) => url.pathname === '/resume/optimize', { timeout: 15_000 }).catch(() => undefined)
-    await shot(page, journey, 'apply-dialog-2')
-    if (await page.getByRole('dialog', { name: /对照页有/ }).count()) {
-      await recordStep({
-        page, journey, step: 'apply-skip', control: '暂不应用', selectorHint: 'dialog >> 暂不应用',
-        kind: 'click', collectors,
-        act: async () => { await page.getByRole('button', { name: '暂不应用' }).click() },
-      })
-    }
-
-    // 触屏版：编辑区「去导出」→ 核对事实 → 进导出页，再逐个选格式、点「导出」才出文件。
+    const applyDialog = page.getByRole('dialog', { name: /对照页有/ })
+    await expect(applyDialog, '对照页带回裁决后应出现应用弹层').toBeVisible()
+    const beforeApply = await readEditorValues(page)
     await recordStep({
-      page, journey, step: 'to-export', control: '去导出', selectorHint: 'button:去导出',
+      page, journey, step: 'apply-to-editor', control: '应用到编辑区', selectorHint: 'dialog >> 应用到编辑区',
+      kind: 'click', collectors,
+      act: async () => { await applyDialog.getByRole('button', { name: '应用到编辑区' }).click() },
+    })
+    await expect(applyDialog).toBeHidden()
+    const afterApply = await readEditorValues(page)
+    expect(afterApply.some((value) => value.includes(rewrite)), '编辑区应换上这一条的改写').toBe(true)
+    expect(afterApply, '应用后编辑区应和点之前不同').not.toEqual(beforeApply)
+
+    await openCompareFromOverview(page, journey, collectors, 'open-compare-2')
+    await chooseCompare(page, '用改写')
+    await recordStep({
+      page, journey, step: 'compare-back', control: '返回优化页', selectorHint: 'button:返回优化页',
+      kind: 'click', collectors,
+      act: async () => { await page.getByRole('button', { name: '返回优化页', exact: true }).click() },
+    })
+    await page.waitForURL((url) => url.pathname === '/resume/optimize', { timeout: 15_000 })
+    await shot(page, journey, 'apply-dialog-2')
+    const skipDialog = page.getByRole('dialog', { name: /对照页有/ })
+    await expect(skipDialog, '第二次带回裁决仍应出现应用弹层').toBeVisible()
+    const beforeSkip = await readEditorValues(page)
+    await recordStep({
+      page, journey, step: 'apply-skip', control: '暂不应用', selectorHint: 'dialog >> 暂不应用',
+      kind: 'click', collectors,
+      act: async () => { await skipDialog.getByRole('button', { name: '暂不应用' }).click() },
+    })
+    await expect(skipDialog).toBeHidden()
+    const afterSkip = await readEditorValues(page)
+    expect(afterSkip, '暂不应用后正文应与应用前逐字相同').toEqual(beforeSkip)
+    expect(afterSkip.join('\n'), '暂不应用后正文不应含这一条的改写').not.toContain(rewrite)
+
+    await recordStep({
+      page, journey, step: 'to-export', control: '去导出', selectorHint: '[data-testid=resume-optimize-to-export]',
       kind: 'click', collectors,
       act: async () => {
+        const toExport = page.getByRole('button', { name: '去导出', exact: true })
+        if (!(await toExport.isVisible().catch(() => false))) {
+          const toEditor = page.getByRole('button', { name: '编辑简历', exact: true })
+          await toEditor.click()
+        }
         await page.getByRole('button', { name: '去导出', exact: true }).click()
-        await confirmFactsIfOpen(page, journey, collectors)
+        await confirmFactsIfOpen(page, journey, collectors, { wait: true })
       },
     })
-    const formats = ['PDF', 'DOCX', 'TXT', 'MD'] as const
-    for (const format of formats) {
+    await expect(page.getByRole('group', { name: '导出格式' })).toBeVisible()
+    const formats = [
+      { format: 'PDF', label: 'PDF', mime: /application\/pdf/, pdf: true },
+      { format: 'DOCX', label: 'Word', mime: /wordprocessingml/, pdf: false },
+      { format: 'TXT', label: 'TXT', mime: /text\/plain/, pdf: false },
+      { format: 'MD', label: 'Markdown', mime: /text\/markdown/, pdf: false },
+    ] as const
+    for (const item of formats) {
       await closePreviewIfOpen(page)
       await recordStep({
-        page, journey, step: `format-${format}`, control: format, selectorHint: `[aria-label=导出格式] >> ${format}`,
+        page, journey, step: `format-${item.format}`, control: item.format, selectorHint: `[aria-label=导出格式] >> ${item.format}`,
         kind: 'click', collectors,
         act: async () => {
-          const btn = page.getByRole('group', { name: '导出格式' }).getByRole('button', { name: new RegExp(`^${format}`) })
-          if (await btn.count()) await btn.first().click()
+          const btn = page.getByRole('group', { name: '导出格式' }).getByRole('button', { name: new RegExp(`^${item.format}`) })
+          await btn.first().click()
         },
       })
+      const beforeResult = await page.locator('[aria-label="导出结果"]').innerText().catch(() => '')
+      const held: { file: ExportedFile | null } = { file: null }
       await recordStep({
-        page, journey, step: `export-${format}`, control: `导出 ${format}`, selectorHint: 'button:导出',
+        page, journey, step: `export-${item.format}`, control: `导出 ${item.format}`, selectorHint: 'button:导出',
         kind: 'click', collectors,
         act: async () => {
-          await page.getByRole('button', { name: '导出', exact: true }).click()
-          await page.waitForTimeout(800)
-          await closePreviewIfOpen(page)
+          const pending = page.waitForResponse(
+            (res) => res.request().method() === 'POST' && res.url().includes('/resume/generate/export'),
+            { timeout: 30_000 },
+          )
+          const exportBtn = page.getByRole('button', { name: '导出', exact: true })
+          await expect(exportBtn).toBeVisible()
+          await exportBtn.click()
+          const response = await pending
+          expect(response.ok(), `${item.format} 导出应返回成功`).toBeTruthy()
+          held.file = asExportFile(await response.json())
+          await expect(page.locator('[aria-label="导出结果"]')).toBeVisible({ timeout: 30_000 })
         },
       })
+      if (!held.file) throw new Error(`${item.format} 没有拿到文件`)
+      const exported = held.file
+      const afterResult = await page.locator('[aria-label="导出结果"]').innerText()
+      expect(afterResult, `${item.format} 应出现这次的新结果`).not.toBe(beforeResult)
+      expect(afterResult).toContain(item.label)
+      expect(afterResult).toContain(exported.filename)
+      await assertDownloaded(page, exported.signedUrl, item.mime, item.pdf)
+      await closePreviewIfOpen(page)
     }
     await assertNotProduction(collectors)
   } finally {
     await context.close()
   }
 })
+
+async function fillLabeled(page: Page, name: RegExp, value: string): Promise<void> {
+  await page.getByRole('textbox', { name }).fill(value)
+}
+
+async function clickStep(page: Page, name: string): Promise<void> {
+  await page.getByRole('button', { name, exact: true }).click()
+  await waitReady(page)
+}
+
+async function openGenerate(
+  page: Page,
+  journey: string,
+  collectors: ReturnType<typeof attachCollectors>,
+  step: string,
+): Promise<void> {
+  await dismissHubSheet(page)
+  await recordStep({
+    page, journey, step, control: '没有，帮我写一份', selectorHint: 'button:没有，帮我写一份',
+    kind: 'click', collectors,
+    act: async () => {
+      await page.getByRole('button', { name: '没有，帮我写一份' }).click()
+      await page.waitForURL((url) => url.pathname === '/resume/generate', { timeout: 15_000 })
+    },
+  })
+}
+
+async function generatePdf(
+  page: Page,
+  journey: string,
+  collectors: ReturnType<typeof attachCollectors>,
+): Promise<ExportedFile> {
+  await shot(page, journey, 'generate-step0')
+  await fillLabeled(page, /^姓名/, '林晓舟')
+  await fillLabeled(page, /^联系电话/, '13900001234')
+  await fillLabeled(page, /^所在城市/, '青岚市')
+  await fillLabeled(page, /^邮箱/, 'linxiaozhou.example@example.com')
+  await recordStep({
+    page, journey, step: 'gen-next-intention', control: '下一步：求职意向', selectorHint: 'button:下一步：求职意向',
+    kind: 'click', collectors,
+    act: async () => { await clickStep(page, '下一步：求职意向') },
+  })
+  await fillLabeled(page, /^目标岗位/, '仓储管理员')
+  await page.getByRole('combobox', { name: /^工作类型/ }).selectOption('全职')
+  await clickStep(page, '下一步：教育经历')
+  await fillLabeled(page, /^学校/, '青岚市海风职业学校')
+  await fillLabeled(page, /^专业/, '物流管理')
+  await clickStep(page, '下一步：工作经历')
+  await fillLabeled(page, /^公司 \/ 单位/, '青岚市北区晨配服务站')
+  await fillLabeled(page, /^职位/, '夜班分拣员')
+  await fillLabeled(page, /^做了什么/, '核对运单、分拣包裹，并协助把当班的货装上车。')
+  await clickStep(page, '下一步：项目经历')
+  await clickStep(page, '下一步：技能证书')
+  await fillLabeled(page, /^技能/, '手持终端扫码，库位核对，夜班交接')
+  await page.getByRole('button', { name: '去核对', exact: true }).click()
+  await recordStep({
+    page, journey, step: 'generate-submit', control: '让 AI 整理成新简历', selectorHint: 'button:让 AI 整理成新简历',
+    kind: 'click', collectors,
+    act: async () => {
+      await page.getByRole('button', { name: '让 AI 整理成新简历' }).click()
+      await confirmAiConsent(
+        page, journey, collectors,
+        page.locator('[data-kiosk-screen="resume-generate-preview"]'),
+      )
+      await page.waitForURL((url) => url.pathname === '/resume/generate/preview', { timeout: 60_000 })
+    },
+  })
+  await shot(page, journey, 'generate-preview')
+  const held: { file: ExportedFile | null } = { file: null }
+  await recordStep({
+    page, journey, step: 'preview-export-pdf', control: '内容没问题，去导出', selectorHint: '[data-testid=resume-generate-preview-cta-export]',
+    kind: 'click', collectors,
+    act: async () => {
+      const pending = page.waitForResponse(
+        (res) => res.request().method() === 'POST' && res.url().includes('/resume/generate/export'),
+        { timeout: 30_000 },
+      )
+      await page.getByTestId('resume-generate-preview-cta-export').click()
+      await page.getByTestId('resume-generate-preview-fmt-pdf').click()
+      await page.getByTestId('resume-generate-preview-cta-confirm-export').click()
+      await confirmFactsIfOpen(page, journey, collectors, { wait: true })
+      const response = await pending
+      expect(response.ok(), '生成页 PDF 导出应返回成功').toBeTruthy()
+      held.file = asExportFile(await response.json())
+      await expect(page.getByText('文件已好')).toBeVisible({ timeout: 30_000 })
+    },
+  })
+  if (!held.file) throw new Error('生成页没有拿到 PDF')
+  await assertDownloaded(page, held.file.signedUrl, /application\/pdf/, true)
+  await expect(page.getByRole('dialog', { name: held.file.filename }), '预览层应是这一份 PDF').toBeVisible()
+  await shot(page, journey, 'generate-exported')
+  return held.file
+}
 
 test('J3 匿名 · AI 帮你生成一份 → 预览 → 导出 PDF @interaction', async ({ browser }) => {
   const { context, page } = await newSweepContext(browser)
@@ -357,95 +699,63 @@ test('J3 匿名 · AI 帮你生成一份 → 预览 → 导出 PDF @interaction'
   const journey = 'j3-anon'
   try {
     await enterResumeHub(page, journey, collectors)
+    await openGenerate(page, journey, collectors, 'hub-generate')
     await recordStep({
-      page, journey, step: 'hub-generate', control: '简历生成', selectorHint: 'button:简历生成',
+      page, journey, step: 'back-to-resume-service', control: '返回简历服务', selectorHint: 'button.qxt-back',
       kind: 'click', collectors,
       act: async () => {
-        await page.getByRole('button', { name: /简历生成/ }).click()
-        await page.waitForURL((url) => url.pathname === '/resume/generate', { timeout: 15_000 })
+        await page.locator('button.qxt-back').click()
       },
     })
-    await shot(page, journey, 'generate-step0')
-    await page.getByLabel('姓名').fill('测试用户')
-    await page.getByLabel('联系电话').fill('13800000000')
+    await page.waitForURL((url) => url.pathname === '/resume-service', { timeout: 15_000 })
+    expect(new URL(page.url()).pathname, '顶栏返回简历服务应回到简历服务页').toBe('/resume-service')
+    await expect(page.getByRole('button', { name: '有，帮我改一改' }), '应回到首页卡片打开的简历服务页').toBeVisible()
+    await openGenerate(page, journey, collectors, 'hub-generate-dock')
     await recordStep({
-      page, journey, step: 'gen-next-1', control: '下一步：求职意向', selectorHint: 'button:下一步',
-      kind: 'click', collectors,
-      act: async () => { await page.getByRole('button', { name: /下一步/ }).click() },
-    })
-    await page.getByLabel('目标岗位').fill('前端工程师')
-    const jobType = page.getByLabel('工作类型')
-    if (await jobType.count()) await jobType.selectOption({ index: 1 }).catch(() => undefined)
-    await page.getByRole('button', { name: /下一步/ }).click()
-    await waitReady(page)
-    await page.getByLabel('学校').fill('测试大学')
-    await page.getByLabel('专业').fill('计算机科学与技术')
-    await page.getByRole('button', { name: /下一步/ }).click()
-    await waitReady(page)
-    await page.getByLabel('公司 / 单位').fill('测试科技')
-    await page.getByLabel('职位').fill('前端实习生')
-    const desc = page.getByLabel(/做了什么/)
-    if (await desc.count()) await desc.fill('负责页面开发与组件维护，这是交互走查填写的中文内容')
-    await page.getByRole('button', { name: /下一步/ }).click()
-    await waitReady(page)
-    await page.getByRole('button', { name: /下一步/ }).click()
-    await waitReady(page)
-    const skills = page.getByLabel(/技能/)
-    if (await skills.count()) await skills.fill('TypeScript, React')
-    // 稿 24 最后一步先「去核对」，核对屏主按钮才是「让 AI 整理成新简历」。仍用按钮角色点击，并等到预览页。
-    await page.getByRole('button', { name: '去核对' }).click()
-    await recordStep({
-      page, journey, step: 'generate-submit', control: '让 AI 整理成新简历', selectorHint: 'button:让 AI 整理成新简历',
-      kind: 'click', collectors,
+      page, journey, step: 'back-to-resume-service-dock', control: '返回简历服务',
+      selectorHint: 'footer.qxt-dock >> 返回简历服务', kind: 'click', collectors,
       act: async () => {
-        await page.getByRole('button', { name: '让 AI 整理成新简历' }).click()
-        await confirmAiConsent(page, journey, collectors)
-        await page.waitForURL((url) => url.pathname === '/resume/generate/preview', { timeout: 60_000 })
+        await page.locator('footer.qxt-dock').getByRole('button', { name: '返回简历服务', exact: true }).click()
       },
     })
-    await shot(page, journey, 'generate-preview')
-    await recordStep({
-      page, journey, step: 'preview-export-pdf', control: '内容没问题，去导出 / 导出 PDF', selectorHint: '[data-testid=resume-generate-preview-cta-export]',
-      kind: 'click', collectors,
-      act: async () => {
-        const cta = page.getByTestId('resume-generate-preview-cta-export')
-        if (await cta.count()) await cta.click()
-        else await page.getByRole('button', { name: /去导出|导出 PDF/ }).click()
-        const confirm = page.getByTestId('resume-generate-preview-cta-confirm-export')
-        if (await confirm.count()) await confirm.click()
-        await confirmFactsIfOpen(page, journey, collectors)
-        await page.waitForTimeout(1500)
-      },
-    })
-    await shot(page, journey, 'generate-exported')
+    await page.waitForURL((url) => url.pathname === '/resume-service', { timeout: 15_000 })
+    expect(new URL(page.url()).pathname, '底栏返回简历服务应回到简历服务页').toBe('/resume-service')
+    await expect(page.getByRole('button', { name: '有，帮我改一改' }), '底栏返回后应仍是简历服务页').toBeVisible()
+    await openGenerate(page, journey, collectors, 'hub-generate-again')
+    await generatePdf(page, journey, collectors)
     await assertNotProduction(collectors)
   } finally {
     await context.close()
   }
 })
 
-async function openMePage(
-  page: Page,
-  journey: string,
-  collectors: ReturnType<typeof attachCollectors>,
-  entry: string,
-  path: string,
-): Promise<void> {
+async function visitGuestProfile(page: Page, journey: string, collectors: ReturnType<typeof attachCollectors>): Promise<void> {
   await recordStep({
     page, journey, step: 'home', control: '(open /)', selectorHint: 'goto /', kind: 'click', collectors,
     act: async () => { await gotoHome(page) },
   })
   await recordStep({
-    page, journey, step: 'home-profile', control: '我的', selectorHint: '.ui-kiosk-nav__item[aria-label=我的]',
+    page, journey, step: 'home-profile', control: '我的', selectorHint: 'nav:我的',
     kind: 'click', collectors,
     act: async () => { await clickMeTab(page) },
   })
   await shot(page, journey, 'profile')
-  await recordStep({
-    page, journey, step: `profile-${entry}`, control: entry, selectorHint: `button.kp-entry:${entry}`,
-    kind: 'click', collectors,
-    act: async () => { await clickProfileEntry(page, entry, path) },
+  appendOperation({
+    journey, step: 'profile-guest-entries', route: '/profile', control: '(page-body)', selectorHint: 'body',
+    kind: 'click', disabled: false, dead: false, skipped: 'guest-profile-has-no-asset-grid',
+    observations: {
+      urlChanged: false, apiRequests: [], domChanged: false, overlayOrToastOrError: false,
+      beforeUrl: '/profile', afterUrl: '/profile', beforeTextLen: 0, afterTextLen: 0,
+    },
+    runtimeErrors: [], forbiddenCopy: [], screenshot: await shot(page, journey, 'profile-guest'),
+    note: '游客「我的」不再有简历 / 文档 / AI 记录三个入口（旧 kp-entry）。这三个登录门改从简历服务台和打印扫描进入。',
   })
+}
+
+async function expectLoginHeading(page: Page, title: string): Promise<void> {
+  await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible()
+  const text = await page.locator('body').innerText()
+  expect(text).toMatch(/登录后/)
 }
 
 test('J4 匿名 · /me/ai-records 登录门与全部按钮 @interaction', async ({ browser }) => {
@@ -453,10 +763,18 @@ test('J4 匿名 · /me/ai-records 登录门与全部按钮 @interaction', async 
   const collectors = attachCollectors(page)
   const journey = 'j4-anon-ai-records'
   try {
-    await openMePage(page, journey, collectors, 'AI服务记录', '/me/ai-records')
+    await visitGuestProfile(page, journey, collectors)
+    await enterResumeHub(page, journey, collectors)
+    await recordStep({
+      page, journey, step: 'hub-ai-records', control: 'AI服务记录', selectorHint: 'button:AI服务记录',
+      kind: 'click', collectors,
+      act: async () => {
+        await page.getByRole('button', { name: /AI服务记录/ }).click()
+        await page.waitForURL((url) => url.pathname === '/me/ai-records', { timeout: 15_000 })
+      },
+    })
     await shot(page, journey, 'ai-records-gate')
-    const text = await page.locator('body').innerText()
-    expect(text).toMatch(/登录后/)
+    await expectLoginHeading(page, '登录后看你的AI 服务记录')
     await sweepVisible(page, journey, 'ai-records', collectors)
     await assertNotProduction(collectors)
   } finally {
@@ -469,8 +787,18 @@ test('J4 匿名 · /me/resumes 登录门与全部按钮 @interaction', async ({ 
   const collectors = attachCollectors(page)
   const journey = 'j4-anon-resumes'
   try {
-    await openMePage(page, journey, collectors, '我的简历', '/me/resumes')
+    await visitGuestProfile(page, journey, collectors)
+    await enterResumeHub(page, journey, collectors)
+    await recordStep({
+      page, journey, step: 'hub-resumes', control: '我的简历', selectorHint: 'button:我的简历',
+      kind: 'click', collectors,
+      act: async () => {
+        await page.getByRole('button', { name: /我的简历/ }).click()
+        await page.waitForURL((url) => url.pathname === '/me/resumes', { timeout: 15_000 })
+      },
+    })
     await shot(page, journey, 'resumes-gate')
+    await expectLoginHeading(page, '登录后看你的简历')
     await sweepVisible(page, journey, 'resumes', collectors)
     await assertNotProduction(collectors)
   } finally {
@@ -483,14 +811,61 @@ test('J4 匿名 · /me/documents 登录门与全部按钮 @interaction', async (
   const collectors = attachCollectors(page)
   const journey = 'j4-anon-documents'
   try {
-    await openMePage(page, journey, collectors, '我的文档', '/me/documents')
+    await visitGuestProfile(page, journey, collectors)
+    await recordStep({
+      page, journey, step: 'home-print', control: '打印 · 扫描', selectorHint: '[data-action=print-hub]',
+      kind: 'click', collectors,
+      act: async () => {
+        await gotoHome(page)
+        const card = page.locator('[data-action="print-hub"]')
+        if (await card.count()) await card.click()
+        else await page.getByRole('button', { name: /打印 · 扫描/ }).click()
+        await page.waitForURL((url) => url.pathname === '/print-scan', { timeout: 15_000 })
+      },
+    })
+    await recordStep({
+      page, journey, step: 'print-documents', control: '我的文档', selectorHint: '[data-testid=print-hub-quick-documents]',
+      kind: 'click', collectors,
+      act: async () => {
+        await page.getByTestId('print-hub-quick-documents').click()
+        await page.waitForURL((url) => url.pathname === '/me/documents', { timeout: 15_000 })
+      },
+    })
     await shot(page, journey, 'documents-gate')
+    await expectLoginHeading(page, '登录后看你的文档')
     await sweepVisible(page, journey, 'documents', collectors)
     await assertNotProduction(collectors)
   } finally {
     await context.close()
   }
 })
+
+async function openMemberRow(page: Page, kind: string, name: RegExp): Promise<void> {
+  const line = page.locator(`[data-record-kind="${kind}"]`).first()
+  await expect(line).toBeVisible()
+  const toggle = line.locator('button.me-open')
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click()
+  await line.getByRole('button', { name }).click()
+}
+
+async function returnToMemberResumes(page: Page): Promise<void> {
+  await goProfile(page)
+  if (new URL(page.url()).pathname !== '/profile') {
+    await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '我的', exact: true }).click()
+    await page.waitForURL((url) => url.pathname === '/profile', { timeout: 15_000 })
+    await waitReady(page)
+  }
+  await clickProfileEntry(page, '我的简历', '/me/resumes')
+}
+
+async function goProfile(page: Page): Promise<void> {
+  await closePreviewIfOpen(page)
+  const tab = page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '我的', exact: true })
+  if (await tab.count()) await tab.click()
+  else await page.getByTestId('resume-optimize-nav-profile').click()
+  await page.waitForURL((url) => url.pathname === '/profile' || url.pathname.startsWith('/me/'), { timeout: 15_000 })
+  await waitReady(page)
+}
 
 test('会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interaction', async ({ browser }) => {
   test.setTimeout(360_000)
@@ -501,115 +876,152 @@ test('会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interacti
     await gotoHome(page)
     await shot(page, journey, 'home')
     await recordStep({
-      page, journey, step: 'home-login', control: '登录后查看本人记录', selectorHint: 'v6-home-status login',
+      page, journey, step: 'home-login', control: '登录后查看本人记录', selectorHint: '[data-testid=home-identity]',
       kind: 'click', collectors,
       act: async () => {
         const loginEntry = page.getByRole('button', { name: /登录后查看本人记录/ })
         if (await loginEntry.count()) await loginEntry.first().click()
-        else await page.getByRole('button', { name: /登录/ }).first().click()
+        else await page.getByTestId('home-identity').click()
         await page.waitForURL((url) => url.pathname === '/login', { timeout: 15_000 })
       },
     })
     const login = await loginMemberViaSms(page, journey, collectors)
-    if (!login.codeSource) {
-      appendOperation({
-        journey, step: 'member-login-failed', route: new URL(page.url()).pathname, control: '确认登录',
-        selectorHint: 'sms-log/redis', kind: 'click', disabled: false, dead: false,
-        observations: { urlChanged: false, apiRequests: [], domChanged: false, overlayOrToastOrError: true, beforeUrl: '/login', afterUrl: new URL(page.url()).pathname, beforeTextLen: 0, afterTextLen: 0 },
-        runtimeErrors: [], forbiddenCopy: [], screenshot: await shot(page, journey, 'login-no-code'),
-        note: '未覆盖：未能从 Redis 或 /tmp/sweep-api.log 读到开发验证码。会员态未走通，未使用 ApiRouter 桩。',
-      })
-      await assertNotProduction(collectors)
-      // 2026-09-08：这里原来是裸 `return` —— 拿不到验证码时用例**照常 PASS**，
-      // 8 秒跑完、零覆盖，而它正是 §4.2「AI 简历与我的闭环」唯一的会员态守卫。
-      // 「跑通了」和「什么都没做」在结果里长得一模一样，是最坏的一种绿。
-      // 改成 test.skip：结果显示 skipped 而不是 passed，人一眼能看出这轮没验到会员态。
-      test.skip(true, '未能读到开发验证码（Redis 或 /tmp/sweep-api.log），会员态未覆盖 —— 不是通过')
-      return
-    }
-    await page.waitForTimeout(1500)
+    expect(login.codeSource, '假短信应能读到验证码，读不到就是失败').toBeTruthy()
     await shot(page, journey, 'logged-in')
 
     await enterResumeHub(page, journey, collectors)
     await enterDiagnoseSource(page, journey, collectors)
     await startDiagnosis(page, journey, collectors)
-    // 会员态必须真的走到报告页。原来这里是 `if (url.includes('/resume/report'))`，
-    // 诊断没跑起来时整段优化 / 导出被静默跳过，用例仍然绿。
-    // 2026-09-08 实测就撞上了：会员登录成功、点了「开始 AI 诊断」，
-    // 但 upload-pdf 那步 0 条 API —— 文件根本没传上去，诊断自然不启动，
-    // 而当时唯一暴露它的是后面一句没加守卫的 click 超时，报的还是「找不到我的按钮」这种误导性错误。
-    expect(page.url(), '会员诊断未走到报告页：多半是简历来源页在登录态下走了另一条上传路径').toContain('/resume/report')
-    {
-      await recordStep({
-        page, journey, step: 'member-optimize', control: '查看优化建议', selectorHint: '[data-testid=resume-report-primary]',
-        kind: 'click', collectors,
-        act: async () => {
-          const cta = page.getByTestId('resume-report-primary')
-          if (await cta.count()) await cta.click()
-        },
-      })
-      await confirmAiConsent(page, journey, collectors)
-    }
+    expect(page.url(), '会员诊断未走到报告页').toContain('/resume/report')
+    await openOptimize(page, journey, collectors, 'member-optimize')
     expect(page.url(), '会员未走到优化页').toContain('/resume/optimize')
-    {
-      // 触屏版（稿 optimize → resume-edit → resume-export）：有可对照的条目时先落在建议总览（点「编辑简历」进编辑区），
-      // 没有条目时直接是编辑区；编辑区点「去导出」→ 核对事实 → 导出页选格式 → 点「导出」才出文件。
-      // 先等两者之一真的出现，再决定点不点，不靠一次不等待的 count()。
-      const toEditor = page.getByRole('button', { name: '编辑简历', exact: true })
-      const toExport = page.getByRole('button', { name: '去导出', exact: true })
-      await expect(toEditor.or(toExport).first()).toBeVisible({ timeout: 15_000 })
-      if (await toEditor.isVisible()) await toEditor.click()
-      expect(await toExport.count(), '优化页没有导出入口 —— 会员导出闭环无法验证').toBeGreaterThan(0)
-      {
-        await toExport.first().click()
-        await confirmFactsIfOpen(page, journey, collectors)
+    const toEditor = page.getByRole('button', { name: '编辑简历', exact: true })
+    const toExport = page.getByRole('button', { name: '去导出', exact: true })
+    await expect(toEditor.or(toExport).first()).toBeVisible({ timeout: 15_000 })
+    if (await toEditor.isVisible()) await toEditor.click()
+    await expect(toExport, '优化页没有导出入口').toBeVisible()
+    const optimizeHeld: { file: ExportedFile | null } = { file: null }
+    await recordStep({
+      page, journey, step: 'member-export', control: '导出', selectorHint: 'button:导出',
+      kind: 'click', collectors,
+      act: async () => {
+        const pending = page.waitForResponse(
+          (res) => res.request().method() === 'POST' && res.url().includes('/resume/generate/export'),
+          { timeout: 30_000 },
+        )
+        await toExport.click()
+        await confirmFactsIfOpen(page, journey, collectors, { wait: true })
         await page.getByRole('button', { name: '导出', exact: true }).click()
-        await page.waitForTimeout(1200)
-        await closePreviewIfOpen(page)
-      }
-    }
+        const response = await pending
+        expect(response.ok(), '会员优化导出应返回成功').toBeTruthy()
+        optimizeHeld.file = asExportFile(await response.json())
+        await expect(page.locator('[aria-label="导出结果"]')).toBeVisible({ timeout: 30_000 })
+      },
+    })
+    if (!optimizeHeld.file) throw new Error('会员优化导出没有拿到文件')
+    const optimizeFile = optimizeHeld.file
+    await expect(page.locator('[aria-label="导出结果"]')).toContainText(optimizeFile.filename)
+    await assertDownloaded(page, optimizeFile.signedUrl, /application\/pdf/, true)
+    await closePreviewIfOpen(page)
 
-    const goProfile = async () => {
-      await closePreviewIfOpen(page)
-      const tab = page.locator('.ui-kiosk-nav__item[aria-label="我的"]')
-      if (await tab.count()) await tab.click()
-      else await page.getByTestId('resume-optimize-nav-profile').click()
-      await page.waitForURL((url) => url.pathname === '/profile' || url.pathname.startsWith('/me/'), { timeout: 15_000 })
-      await waitReady(page)
-    }
-    await goProfile()
+    await enterResumeHub(page, journey, collectors)
+    await openGenerate(page, journey, collectors, 'member-generate')
+    const generatedFile = await generatePdf(page, journey, collectors)
+    await closePreviewIfOpen(page)
+
+    await goProfile(page)
     await shot(page, journey, 'profile-member')
+    await expect(page.getByRole('button', { name: '结束使用', exact: true })).toBeVisible()
+    const diagnosisTaskId = await page.evaluate(() => {
+      try {
+        const raw = sessionStorage.getItem('ai-job-print:current-ai-resume')
+        if (!raw) return ''
+        const parsed = JSON.parse(raw) as { taskId?: unknown }
+        return typeof parsed.taskId === 'string' ? parsed.taskId : ''
+      } catch {
+        return ''
+      }
+    })
+    expect(diagnosisTaskId, '本次诊断的任务编号应在会话里').not.toBe('')
+    let historyPdf: ExportedFile | null = null
     for (const [label, path] of [
       ['AI服务记录', '/me/ai-records'],
       ['我的简历', '/me/resumes'],
       ['我的文档', '/me/documents'],
     ] as const) {
       if (new URL(page.url()).pathname !== '/profile') {
-        await page.getByRole('button', { name: /返回我的/ }).click().catch(async () => { await goProfile() })
+        const back = page.getByRole('button', { name: '返回我的', exact: true })
+        if (await back.count()) await back.click()
+        else await goProfile(page)
         await waitReady(page)
       }
+      const pendingAiRecords = path === '/me/ai-records'
+        ? page.waitForResponse(
+          (res) => res.request().method() === 'GET' && res.url().includes('/api/v1/me/ai-records'),
+          { timeout: 20_000 },
+        )
+        : null
       await recordStep({
-        page, journey, step: `me-${path}`, control: label, selectorHint: `button.kp-entry:${label}`,
+        page, journey, step: `me-${path}`, control: label, selectorHint: `profile-asset:${label}`,
         kind: 'click', collectors,
         act: async () => { await clickProfileEntry(page, label, path) },
       })
       await shot(page, journey, label)
-      const body = await page.locator('body').innerText()
-      appendOperation({
-        journey, step: `${label}-presence`, route: path, control: '(page-body)', selectorHint: 'body',
-        kind: 'click', disabled: false, dead: false,
-        observations: {
-          urlChanged: false, apiRequests: collectors.takeApiSince(),
-          domChanged: true, overlayOrToastOrError: false,
-          beforeUrl: path, afterUrl: path, beforeTextLen: 0, afterTextLen: body.length,
-        },
-        runtimeErrors: [...collectors.runtimeErrors],
-        forbiddenCopy: await scanForbidden(page),
-        screenshot: await shot(page, journey, `${label}-body`),
-        note: body.includes('还没有') || body.includes('登录后')
-          ? `empty-or-gate: ${body.slice(0, 180)}`
-          : `has-content: ${body.slice(0, 180)}`,
-      })
+      await expect(page.getByRole('heading', { name: /登录后/ }), `${label}不应再弹登录门`).toHaveCount(0)
+      if (path === '/me/ai-records') {
+        const response = await pendingAiRecords
+        if (!response) throw new Error('没有截到本次 AI 记录')
+        expect(response.ok(), '本次 AI 记录接口应成功').toBeTruthy()
+        const body = await response.json() as {
+          data?: { items?: Array<{ kind?: string; taskId?: string }> }
+          items?: Array<{ kind?: string; taskId?: string }>
+        }
+        const items = body.data?.items ?? body.items ?? []
+        expect(
+          items.some((item) => item.kind === 'parse' && item.taskId === diagnosisTaskId),
+          'AI 记录应有这次诊断的任务编号',
+        ).toBe(true)
+        await expect(page.locator('[data-record-kind="parse"]').first(), '应有这次的简历诊断').toBeVisible()
+        await expect(page.locator('[data-record-kind="optimize"]').first(), '应有这次的简历优化').toBeVisible()
+        await expect(page.locator('[data-record-kind="generate"]').first(), '应有这次的 AI 简历生成').toBeVisible()
+        await expect(page.getByText('简历诊断', { exact: true }).first()).toBeVisible()
+        await expect(page.getByText('简历优化', { exact: true }).first()).toBeVisible()
+        await expect(page.getByText('AI 简历生成', { exact: true }).first()).toBeVisible()
+      } else if (path === '/me/resumes') {
+        await expect(page.getByText(/上传诊断简历/).first(), '应有这次上传诊断的简历').toBeVisible()
+        await expect(page.getByText(/AI 生成简历/).first(), '应有这次生成的简历').toBeVisible()
+        await openMemberRow(page, 'generate', /查看并打印/)
+        await page.waitForURL((url) => url.pathname === '/resume/generate/preview', { timeout: 20_000 })
+        await expect(page.getByText('林晓舟').first(), '这次生成的简历应写着林晓舟').toBeVisible({ timeout: 20_000 })
+        await expect(page.getByText('仓储管理员').first(), '这次生成的简历应写着目标岗位').toBeVisible()
+        await returnToMemberResumes(page)
+        await page.evaluate(() => sessionStorage.removeItem('ai-job-print:current-ai-resume'))
+        await openMemberRow(page, 'parse', /诊断报告/)
+        await page.waitForURL((url) => url.pathname === '/resume/report', { timeout: 20_000 })
+        await waitReady(page)
+        historyPdf = await exportReport(page, journey, collectors, '历史报告导出 PDF', /导出 PDF/)
+        await clickReportButton(page, journey, collectors, /打印这份报告/, '历史报告打印这份报告')
+        await expect(page.getByTestId('resume-report-export-result'), '从我的简历打开的报告，打印回来结果还在').toContainText(historyPdf.filename)
+        await page.getByRole('button', { name: '生成二维码带走' }).click()
+        await assertQrEncodes(page, historyPdf.signedUrl, historyPdf.filename)
+        await closePreviewIfOpen(page)
+        const stored = await page.evaluate(() => ({
+          session: sessionStorage.getItem('ai-job-print:current-ai-resume'),
+          local: localStorage.getItem('ai-job-print:current-ai-resume'),
+        }))
+        expect(stored.local, '回执不得写入 localStorage').toBeNull()
+        const sessionText = stored.session ?? ''
+        expect(sessionText, '回执不得写进简历会话').not.toContain('reportTakeaway')
+        expect(sessionText, '带姓名的文件名不得进会话').not.toContain(historyPdf.filename)
+        expect(sessionText, '取回链接不得进会话').not.toContain(historyPdf.signedUrl)
+        await assertTakeawayNotStored(page, historyPdf.signedUrl, '从我的简历打开的报告')
+        await returnToMemberResumes(page)
+      } else {
+        await expect(page.getByText(optimizeFile.filename, { exact: true }), '我的文档应有这次优化导出的文件').toBeVisible()
+        await expect(page.getByText(generatedFile.filename, { exact: true }), '我的文档应有这次生成的文件').toBeVisible()
+        if (!historyPdf) throw new Error('我的文档核历史报告之前，应先从我的简历导出')
+        await expect(page.getByText(historyPdf.filename, { exact: true }), '我的文档应有这次历史报告导出的文件').toBeVisible()
+      }
       const del = page.getByRole('button', { name: /删除/ })
       if (await del.count()) {
         await recordStep({
@@ -618,9 +1030,10 @@ test('会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interacti
           act: async () => {
             await del.first().click()
             const confirm = page.getByRole('button', { name: /确认删除/ })
-            if (await confirm.count()) await confirm.first().click()
-            else await del.first().click()
-            await page.waitForTimeout(800)
+            if (await confirm.count()) {
+              await confirm.first().click()
+              await confirm.first().waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => undefined)
+            }
           },
         })
         await shot(page, journey, `${label}-after-delete`)

@@ -24,12 +24,22 @@
  *   7. 成功终止后令牌失效，重放不会二次调用腾讯云（防重复计费）
  */
 import 'dotenv/config'
+import 'reflect-metadata'
+import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { ServiceUnavailableException } from '@nestjs/common'
+import { MODULE_METADATA } from '@nestjs/common/constants'
 import { NestFactory } from '@nestjs/core'
 import type { Request } from 'express'
 import { AppModule } from '../src/app.module'
+import { AiModule } from '../src/ai/ai.module'
+import { LlmConfigService } from '../src/ai/llm/llm-config.service'
 import { TrtcController } from '../src/trtc/trtc.controller'
+import { TrtcModule } from '../src/trtc/trtc.module'
+import { TrtcService } from '../src/trtc/trtc.service'
 import { RedisService } from '../src/common/redis/redis.service'
 import { REDIS_CLIENT } from '../src/common/redis/redis.service'
 import type { Redis } from 'ioredis'
@@ -46,8 +56,126 @@ function mockReq(): Request {
   return { headers: { 'user-agent': 'kiosk-agent' }, ip: '10.0.0.1' } as unknown as Request
 }
 
+/** 用生产模块装配出来的控制器。后台关掉开关后必须 503，而且不能先去叫腾讯。 */
+async function assertAssembledControllerPausesWhenAdminTurnsDigitalHumanOff(
+  app: { get: <T>(token: new (...args: never[]) => T) => T },
+  req: Request,
+  terminalId: string,
+): Promise<void> {
+  const dataDir = path.resolve(process.env['FILE_STORAGE_DIR'] || path.join(process.cwd(), 'data'))
+  const configPath = path.join(dataDir, 'ai-model-configs.json')
+  const existed = existsSync(configPath)
+  const before = existed ? readFileSync(configPath) : null
+  const live = app.get(TrtcController)
+  const trtc = app.get(TrtcService)
+  const llm = app.get(LlmConfigService)
+  const original = trtc.startSession.bind(trtc)
+  let billedStarts = 0
+  trtc.startSession = async (userId: string) => {
+    billedStarts += 1
+    return { taskId: 'must-not-bill', sdkAppId: 0, userId, userSig: 'stub', roomId: 'room', expireTime: 0 }
+  }
+  try {
+    llm.update({ enabled: false }, 'digital_human')
+    await assert.rejects(
+      () => live.startSession({ userId: 'e2euserOff' }, req, terminalId),
+      (error: unknown) => {
+        assert.ok(error instanceof ServiceUnavailableException, '后台关掉数字人后建会话应是 503')
+        assert.equal(error.getStatus(), 503)
+        const body = error.getResponse() as { error?: { code?: string } }
+        assert.equal(body.error?.code, 'AI_PAUSED')
+        return true
+      },
+    )
+    assert.equal(billedStarts, 0, '开关关掉后不得调用腾讯建会话')
+    pass('真实装配的 TrtcController：后台关掉数字人 → 503 AI_PAUSED，未调腾讯')
+  } finally {
+    trtc.startSession = original
+    if (before) writeFileSync(configPath, before)
+    else if (existsSync(configPath)) rmSync(configPath)
+  }
+}
+
+/** 后台没把 explicitlyConfigured 写成 true 时数字人按开；只有真正保存过才认 enabled。密钥不决定这个开关。 */
+function assertDigitalHumanSwitchDefaults(): void {
+  const savedDir = process.env['FILE_STORAGE_DIR']
+  const savedAi = process.env['AI_LLM_API_KEY']
+  const savedTrtc = process.env['TRTC_LLM_API_KEY']
+  const dirs: string[] = []
+  const useDir = () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'dh-default-'))
+    dirs.push(dir)
+    process.env['FILE_STORAGE_DIR'] = dir
+    return dir
+  }
+  try {
+    delete process.env['AI_LLM_API_KEY']
+    delete process.env['TRTC_LLM_API_KEY']
+    useDir()
+    const bare = new LlmConfigService()
+    assert.equal(bare.getConfig('digital_human').enabled, true, '没文件、没密钥时数字人开关按开')
+    assert.equal(bare.getConfig('assistant_chat').enabled, false, '其它功能位没有密钥时仍然是关')
+
+    process.env['TRTC_LLM_API_KEY'] = 'trtc-key-does-not-decide-the-switch'
+    useDir()
+    assert.equal(new LlmConfigService().getConfig('digital_human').enabled, true, '没文件、有密钥时数字人开关仍按开')
+
+    process.env['AI_LLM_API_KEY'] = 'ai-key-does-not-decide-the-switch'
+    delete process.env['TRTC_LLM_API_KEY']
+    const partial = useDir()
+    writeFileSync(path.join(partial, 'ai-model-configs.json'), JSON.stringify({ digital_human: { vendor: 'deepseek' } }))
+    assert.equal(new LlmConfigService().getConfig('digital_human').enabled, true, '有对象但没写 enabled 时按开')
+
+    const legacyOff = useDir()
+    writeFileSync(path.join(legacyOff, 'ai-model-configs.json'), JSON.stringify({
+      digital_human: { vendor: 'deepseek', enabled: false, explicitlyConfigured: false },
+    }))
+    assert.equal(new LlmConfigService().getConfig('digital_human').enabled, true, '旧文件写了 enabled false 且 explicitlyConfigured false 时按开')
+
+    const explicitOff = useDir()
+    writeFileSync(path.join(explicitOff, 'ai-model-configs.json'), JSON.stringify({
+      digital_human: { vendor: 'deepseek', enabled: false, explicitlyConfigured: true },
+    }))
+    assert.equal(new LlmConfigService().getConfig('digital_human').enabled, false, '后台保存过且 enabled false 时按关')
+
+    const enabledOnly = useDir()
+    writeFileSync(path.join(enabledOnly, 'ai-model-configs.json'), JSON.stringify({ digital_human: { vendor: 'deepseek', enabled: false } }))
+    assert.equal(new LlmConfigService().getConfig('digital_human').enabled, true, '只写了 enabled false、没有 explicitlyConfigured 时按开')
+
+    delete process.env['AI_LLM_API_KEY']
+    delete process.env['TRTC_LLM_API_KEY']
+    useDir()
+    const savedByAdmin = new LlmConfigService()
+    assert.equal(savedByAdmin.getConfig('digital_human').enabled, true)
+    savedByAdmin.update({ enabled: false }, 'digital_human')
+    assert.equal(savedByAdmin.getConfig('digital_human').enabled, false, '后台关掉之后是关')
+    assert.equal(new LlmConfigService().getConfig('digital_human').enabled, false, '后台关掉会落盘，再读仍是关')
+    const savedFile = JSON.parse(readFileSync(path.join(process.env['FILE_STORAGE_DIR']!, 'ai-model-configs.json'), 'utf8')) as {
+      digital_human?: { explicitlyConfigured?: boolean }
+    }
+    assert.equal(savedFile.digital_human?.explicitlyConfigured, true, '后台保存会写下 explicitlyConfigured true')
+    pass('数字人开关：没保存过按开，只有 explicitlyConfigured 为 true 才认 enabled')
+  } finally {
+    if (savedDir === undefined) delete process.env['FILE_STORAGE_DIR']
+    else process.env['FILE_STORAGE_DIR'] = savedDir
+    if (savedAi === undefined) delete process.env['AI_LLM_API_KEY']
+    else process.env['AI_LLM_API_KEY'] = savedAi
+    if (savedTrtc === undefined) delete process.env['TRTC_LLM_API_KEY']
+    else process.env['TRTC_LLM_API_KEY'] = savedTrtc
+    for (const dir of dirs) rmSync(dir, { recursive: true, force: true })
+  }
+}
+
+function assertTrtcModuleImportsAiModule(): void {
+  const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, TrtcModule) as unknown[] | undefined
+  assert.ok(Array.isArray(imports) && imports.includes(AiModule), 'TrtcModule 的 imports 必须包含 AiModule，否则数字人开关在生产装配里静默失效')
+  pass('TrtcModule imports 含 AiModule')
+}
+
 async function main() {
   console.log('\n=== TRTC 会话归属（Redis 停止令牌）— 后端 E2E 验证 ===')
+  assertTrtcModuleImportsAiModule()
+  assertDigitalHumanSwitchDefaults()
   execFileSync(process.execPath, ['-r', '@swc-node/register', path.join(__dirname, 'verify-trtc-terminal-http.ts')], {
     cwd: path.resolve(__dirname, '..'),
     stdio: 'inherit',
@@ -69,6 +197,8 @@ async function main() {
   const TERMINAL = 'e2e-terminal-01'
   const reqA = mockReq()
   const reqB = mockReq() // 与 A 同 IP、同 UA
+
+  await assertAssembledControllerPausesWhenAdminTurnsDigitalHumanOff(app, reqA, TERMINAL)
 
   // stub TrtcService：绝不调用腾讯云；按调用顺序发不同的真实 TaskId。
   const started: string[] = []

@@ -4,8 +4,8 @@ import { PrismaService } from '../prisma/prisma.service'
 import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import { publicPolicyLookupWhere } from '../policies/policy-public-visibility'
 import { RedisService } from '../common/redis/redis.service'
+import { DAILY_BRIEF_CITY_CACHE_PREFIX, PUBLIC_CONTENT_CACHE_STALE_WINDOW_SECONDS } from '../common/content-trust-cache-keys'
 
-const CACHE_TTL_SECONDS = 15 * 60
 const HOUR_MS = 60 * 60 * 1000
 const DAY_MS = 24 * HOUR_MS
 const PUBLISHED = { reviewStatus: 'approved', publishStatus: 'published' }
@@ -102,7 +102,7 @@ export class DailyBriefService {
 
   private async cityNew(city: string, date: string, hosting: boolean): Promise<Extract<DailyReportModule, { type: 'city_new' }>> {
     const hostingKey = hosting ? 'hosting' : 'closed'
-    const cacheKey = `daily-brief:city-new:v2:${hostingKey}:${date}:${encodeURIComponent(city)}`
+    const cacheKey = `${DAILY_BRIEF_CITY_CACHE_PREFIX}${hostingKey}:${date}:${encodeURIComponent(city)}`
     const load = async () => {
       const { start, end } = shanghaiDayRange(date)
       const [newJobs, newPolicies] = await Promise.all([
@@ -148,7 +148,7 @@ export class DailyBriefService {
     }
     const result = await load()
     try {
-      await this.redis.setEx(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(result))
+      await this.redis.setEx(cacheKey, PUBLIC_CONTENT_CACHE_STALE_WINDOW_SECONDS, JSON.stringify(result))
     } catch {
       // 缓存写失败不影响真实聚合结果。
     }

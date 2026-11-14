@@ -87,7 +87,7 @@ const DEMO_FEATURES: AiModelFeatureMeta[] = [
   { key: 'job_explain', label: '岗位解读', status: 'active', description: '岗位解读', runtimeNote: '已在岗位解读中使用。', allowCustomSystemPrompt: false, inheritsFrom: 'assistant_chat' },
   { key: 'advisor_work', label: '顾问工作台', status: 'active', description: '顾问工作台', runtimeNote: '已在顾问作业面中使用。', allowCustomSystemPrompt: false, inheritsFrom: 'assistant_chat' },
   { key: 'print_param_prefill', label: '打印参数预填', status: 'active', description: '打印参数建议', runtimeNote: '已在打印参数预填中使用。本功能按规则推算，不调用大模型。', allowCustomSystemPrompt: false },
-  { key: 'digital_human', label: 'AI数字人引导', status: 'planned', description: '后续接入。用于一体机前台数字人引导与操作说明。', runtimeNote: '后续接入，目前还没有功能在用。', allowCustomSystemPrompt: true },
+  { key: 'digital_human', label: 'AI数字人引导', status: 'active', description: '用于一体机前台数字人语音通话。只认启用开关，不发起这里配置的大模型调用。', runtimeNote: '这个开关管一体机数字人语音通话：开着才能开始通话，关掉就拒绝建会话，人留在文字对话。厂商、模型、密钥和系统提示词对通话不起作用，只有「启用」生效。', allowCustomSystemPrompt: true },
   { key: 'poster_generation', label: 'AI海报生成', status: 'planned', description: '后续接入。用于待机宣传屏 AI 海报草稿生成。', runtimeNote: '独立配置还在建设中，目前待机宣传屏的 AI 生成图片处于关闭状态。', allowCustomSystemPrompt: true },
 ]
 

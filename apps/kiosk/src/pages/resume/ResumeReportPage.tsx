@@ -374,13 +374,13 @@ export function ResumeReportPage() {
             {summary ? <p className="rrp-dir" data-testid="resume-report-target">目标方向 {summary}</p> : null}
             {displayReport ? <ResumeReportBody report={displayReport} issues={displayIssues} /> : null}
             {viewOnly ? <LicenseLock><ResumeReportTakeaway
-              key={viewState}
+              key={`${viewState}:${taskId ?? ''}`}
               show
               taskId={taskId}
               accessToken={accessToken}
               capture={isExportCaptureState(viewState) ? viewState : null}
               onExportedChange={setExportedNow}
-            /></LicenseLock> : <ResumeReportTakeaway key={viewState} show taskId={taskId} accessToken={accessToken} capture={isExportCaptureState(viewState) ? viewState : null} onExportedChange={setExportedNow} />}
+            /></LicenseLock> : <ResumeReportTakeaway key={`${viewState}:${taskId ?? ''}`} show taskId={taskId} accessToken={accessToken} capture={isExportCaptureState(viewState) ? viewState : null} onExportedChange={setExportedNow} />}
             <p className="qxt-fine" id="resume-report-why">{why}</p>
           </>
         ) : viewState === 'report-empty' ? (
