@@ -1,7 +1,8 @@
 import type { GeneratedResume, ResumeReport } from '../interfaces/ai-provider.interface'
 import type { OptimizeResult } from './llm-resume-optimize.service'
 import { RESUME_DOC_LIMITS, fitResumeToDocLimits } from './resume-doc-limits'
-import { alignOriginalList, ensureProjectOriginalLines } from './resume-optimize-list-align'
+import { alignOriginalList } from './resume-optimize-list-align'
+import { ensureProjectOriginalLines } from './resume-optimize-project-align'
 import { BULLET_RE, RESTORED_ROLE_MAX, RESTORED_TITLE_MAX, isTitleLike } from './resume-restored-text'
 import { detectResumeName, extractResumeExperienceCandidates, normalizeResumeStructureText, splitResumeDateRange } from './resume-structure'
 

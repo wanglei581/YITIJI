@@ -845,8 +845,15 @@ test('换不上的条目从总览和对照页去编辑区，都停在那一栏�
     await goEdit.click()
     await expectOriginalSelected(page, item.fieldId, item.sentence)
     if (item.fieldId.startsWith('certificate-')) {
-      await expect(page.locator('.qxt-paperbox .qxt-note')).toContainText('这一项不能在本页修改')
-      await expect(page.locator('.qxt-paperbox .qxt-note')).toContainText('得回填写页')
+      const note = page.locator('.qxt-paperbox .qxt-note')
+      await expect(note).toContainText('这一项不能在本页修改')
+      await expect(note).toContainText('请核对原简历后重新上传并诊断')
+      await expect(note).not.toContainText('格式不符合')
+      await expect(note).not.toContainText('填写页')
+      await page.locator('[data-entry-field="certificate-0"]').click()
+      await expect(note).toContainText('请核对原简历后重新上传并诊断')
+      await expect(note).not.toContainText('格式不符合')
+      await expect(note).not.toContainText('填写页')
     }
     await page.locator('.qxt-back').click()
     await expect(page.getByTestId('resume-optimize-overview')).toBeVisible()
@@ -860,8 +867,11 @@ test('换不上的条目从总览和对照页去编辑区，都停在那一栏�
     await goEdit.click()
     await expectOriginalSelected(page, item.fieldId, item.sentence)
     if (item.fieldId.startsWith('certificate-')) {
-      await expect(page.locator('.qxt-paperbox .qxt-note')).toContainText('这一项不能在本页修改')
-      await expect(page.locator('.qxt-paperbox .qxt-note')).toContainText('得回填写页')
+      const note = page.locator('.qxt-paperbox .qxt-note')
+      await expect(note).toContainText('这一项不能在本页修改')
+      await expect(note).toContainText('请核对原简历后重新上传并诊断')
+      await expect(note).not.toContainText('格式不符合')
+      await expect(note).not.toContainText('填写页')
     }
     await page.locator('.qxt-back').click()
     await expect(page.getByTestId('resume-optimize-overview')).toBeVisible()
@@ -894,9 +904,50 @@ test('去编辑区落在项目名称上时停在那一栏并选中原句 @kiosk'
   await expect(page.getByTestId('resume-optimize-overview')).toBeVisible()
   await page.getByRole('button', { name: '去编辑区改这一条', exact: true }).click()
   await expectOriginalSelected(page, 'projects-0-name', sentence)
-  await expect(page.locator('.qxt-paperbox .qxt-note')).toContainText('这一项不能在本页修改')
-  await expect(page.locator('.qxt-paperbox .qxt-note')).toContainText('得回填写页')
+  const note = page.locator('.qxt-paperbox .qxt-note')
+  await expect(note).toContainText('这一项不能在本页修改')
+  await expect(note).toContainText('请核对原简历后重新上传并诊断')
+  await expect(note).not.toContainText('格式不符合')
+  await expect(note).not.toContainText('填写页')
+  await page.locator('[data-entry-field="projects-0-name"]').click()
+  await expect(note).not.toContainText('格式不符合')
+  await expect(note).not.toContainText('填写页')
   await expect(page.getByRole('textbox', { name: /项目的名称|项目的职务/ })).toHaveCount(0)
+})
+
+test('去编辑区落在项目角色上时不编格式理由也不提填写页 @kiosk', async ({ page, api }) => {
+  const sentence = '执行'
+  registerOptimizeShell(api)
+  api.respond('GET', '/api/v1/resume/records/optimize-project-role-2099/optimize', {
+    status: 200,
+    json: {
+      taskId: 'optimize-project-role-2099',
+      status: 'completed',
+      providerName: 'llm',
+      optimizedResume: {
+        ...locateResume(),
+        projects: [{ name: '门店陈列项目', role: `${sentence}${sentence}`, period: '2023', description: '按店里的陈列标准摆货。' }],
+      },
+      modules: [{ title: '担任角色', before: sentence, after: '另写一版角色' }],
+    },
+  })
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem('ai-job-print:current-ai-resume', JSON.stringify({
+      taskId: 'optimize-project-role-2099',
+      accessToken: 'optimize-project-role-access-token',
+    }))
+  })
+  await page.goto('/resume/optimize')
+  await expect(page.getByTestId('resume-optimize-overview')).toBeVisible()
+  await page.getByRole('button', { name: '去编辑区改这一条', exact: true }).click()
+  await expectOriginalSelected(page, 'projects-0-role', sentence)
+  const note = page.locator('.qxt-paperbox .qxt-note')
+  await expect(note).toContainText('请核对原简历后重新上传并诊断')
+  await expect(note).not.toContainText('格式不符合')
+  await expect(note).not.toContainText('填写页')
+  await page.locator('[data-entry-field="projects-0-role"]').click()
+  await expect(note).not.toContainText('格式不符合')
+  await expect(note).not.toContainText('填写页')
 })
 
 test('对照页可采纳的全部采纳后点应用到编辑区，换上条数与采纳条数相同且没有失败提示 @kiosk', async ({ page, api }) => {
@@ -1129,6 +1180,8 @@ async function openGenerateSkills(
   api: Parameters<typeof registerW6Api>[0],
   taskId: string,
   skills: string[],
+  certificates: string[] = [],
+  projects: Array<{ name: string; role: string; description: string }> = [],
 ): Promise<void> {
   registerOptimizeShell(api)
   api.respond('GET', `/api/v1/resume/generate/${taskId}`, {
@@ -1144,9 +1197,9 @@ async function openGenerateSkills(
         summary: '短简介。',
         education: [{ school: '青岛大学', major: '新闻学', degree: '本科', period: '2019-2023', description: '' }],
         experience: [],
-        projects: [],
+        projects,
         skills,
-        certificates: [],
+        certificates,
       },
     },
   })
@@ -1186,10 +1239,35 @@ test('生成编辑区长技能的删除按钮在可见区内能点到 @kiosk', a
   await del.scrollIntoViewIfNeeded()
   const hit = await del.evaluate((element) => {
     const rect = element.getBoundingClientRect()
+    const sheet = document.querySelector('[data-testid="resume-generate-preview-sheet"]')?.getBoundingClientRect()
     const top = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)
-    return Boolean(top && element.contains(top))
+    return {
+      inside: Boolean(top && element.contains(top)),
+      right: rect.right,
+      sheetRight: sheet?.right ?? 0,
+    }
   })
-  expect(hit).toBe(true)
+  expect(hit.inside).toBe(true)
+  expect(hit.right).toBeLessThanOrEqual(hit.sheetRight)
   await del.click()
   await expect(page.getByRole('textbox', { name: '技能 1', exact: true })).toHaveValue('新闻摄影')
+})
+
+test('生成预览编辑区证书没有输入框，点证书和项目名称、角色仍能看到回填写页 @kiosk', async ({ page, api }) => {
+  await openGenerateSkills(
+    page,
+    api,
+    'r1g-gen-cert-readonly',
+    ['熟练使用方正飞腾排版'],
+    ['大学英语六级证书'],
+    [{ name: '门店陈列项目', role: '执行', description: '按店里的陈列标准摆货。' }],
+  )
+  await expect(page.locator('[data-entry-field="certificate-0"]')).toContainText('大学英语六级证书')
+  await expect(page.locator('input[data-entry-field^="certificate-"], textarea[data-entry-field^="certificate-"]')).toHaveCount(0)
+  await expect(page.locator('[data-entry-add="certificate"]')).toHaveCount(0)
+  await page.locator('[data-entry-field="certificate-0"]').click()
+  await page.locator('[data-entry-field="projects-0-name"]').click()
+  await page.locator('[data-entry-field="projects-0-role"]').click()
+  await expect(page.getByText('回填写页')).toBeVisible()
+  await expect(page.getByText('格式不符合')).toHaveCount(0)
 })

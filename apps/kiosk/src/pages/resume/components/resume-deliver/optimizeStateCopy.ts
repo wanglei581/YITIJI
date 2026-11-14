@@ -2,22 +2,22 @@ import type { OptimizeViewState } from './constants'
 import { errorCodeOf, userMessageOf } from '../../../../services/api/userErrorMessage'
 import { helpNeededLine } from '../../../../copy/unattendedCopy'
 
-/** 生成预览页已有的一句：项目名和证书要回填写页改。优化页落在这些栏时也用这一句，不另写。 */
+/** 生成预览页已有的一句：项目名和证书要回填写页改。 */
 export const RESUME_FILL_PAGE_HINT = '学校、专业、公司和职务改完就留在这一份上。学历、时间段、项目名和证书要改，得回填写页。'
 
-/** 优化页已有的一句：这一项不能在本页改。证书、项目名称和角色落点用它。 */
-export function resumeFieldLockedHere(label: string, reason: string): string {
-  return `${label}${reason}。这一项不能在本页修改，请核对原简历后重新上传并诊断；也可以先导出修改清单。${helpNeededLine()}。`
+/** 优化页已有的一句：这一项不能在本页改。证书、项目名称和角色落点只用这一句，不编格式理由，也不提填写页。 */
+function lockedHereBody(): string {
+  return `这一项不能在本页修改，请核对原简历后重新上传并诊断；也可以先导出修改清单。${helpNeededLine()}。`
 }
 
-/** 去编辑区落在证书或项目名称、角色上时，用上面两句告诉本人去哪改。技能和描述仍可在本页改。 */
+export function resumeFieldLockedHere(label: string, reason: string): string {
+  return `${label}${reason}。${lockedHereBody()}`
+}
+
+/** 去编辑区或点中证书、项目名称、角色时，只说回原简历核对。技能和描述仍可在本页改。 */
 export function locateLockedCopy(fieldId: string): string | null {
-  const sentence = (label: string) => `${resumeFieldLockedHere(label, '格式不符合导出要求')}${RESUME_FILL_PAGE_HINT}`
-  if (fieldId.startsWith('certificate-')) return sentence('证书')
-  const project = /^projects-(\d+)-(name|role)$/u.exec(fieldId)
-  if (!project) return null
-  const which = project[2] === 'name' ? '名称' : '职务'
-  return sentence(`项目经历第 ${Number(project[1]) + 1} 条的${which}`)
+  if (fieldId.startsWith('certificate-') || /^projects-\d+-(name|role)$/u.test(fieldId)) return lockedHereBody()
+  return null
 }
 
 /** 仅优化稿导出的字段校验提示；不修改其他调用方的公共错误文案。 */

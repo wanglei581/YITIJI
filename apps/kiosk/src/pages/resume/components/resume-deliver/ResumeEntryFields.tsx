@@ -27,28 +27,30 @@ export function ResumeTagList(props: {
     setDraft('')
   }
   const rowClass = chip
-    ? 'inline-flex w-full max-w-full items-start gap-1 rounded-lg bg-primary-50 px-2.5 py-1 text-sm text-primary-700'
-    : 'flex w-full max-w-full items-start'
+    ? 'inline-flex w-full max-w-full min-w-0 items-start gap-1 rounded-lg bg-primary-50 px-2.5 py-1 text-sm text-primary-700'
+    : 'flex w-full max-w-full min-w-0 items-start'
   return (
-    <div className={chip ? 'flex flex-wrap items-center gap-2' : undefined}>
+    <div className={chip ? 'flex max-w-full min-w-0 flex-wrap items-center gap-2' : 'max-w-full min-w-0'}>
       {props.items.map((item, index) => (
         <span key={`${props.field}-${index}`} className={rowClass}>
           {!chip && index > 0 ? ' · ' : null}
           {props.readOnly ? (
-            <input
-              className={chip ? 'min-h-12 min-w-0 flex-1 bg-transparent text-sm text-primary-700 outline-none' : 'qx-rg-title min-h-12 min-w-0 flex-1'}
+            <span
+              tabIndex={0}
+              className={chip ? 'min-h-12 min-w-0 flex-1 bg-transparent text-sm text-primary-700 outline-none' : 'qx-rg-title block min-h-12 min-w-0 flex-1'}
+              style={{ overflowWrap: 'anywhere' }}
               aria-label={`${addLabel} ${index + 1}`}
               data-entry-field={`${props.field}-${index}`}
-              value={item}
-              readOnly
-            />
+            >
+              {item}
+            </span>
           ) : (
             <textarea
               rows={1}
               className={chip
                 ? 'min-h-12 min-w-0 flex-1 resize-none bg-transparent text-sm text-primary-700 outline-none'
                 : 'qx-rg-title min-h-12 min-w-0 flex-1 resize-none'}
-              style={{ width: '16em', maxWidth: 'calc(100% - 3.5rem)', overflowWrap: 'anywhere' }}
+              style={{ overflowWrap: 'anywhere' }}
               aria-label={`${addLabel} ${index + 1}`}
               data-entry-field={`${props.field}-${index}`}
               value={item}

@@ -600,6 +600,38 @@ export function verifyOptimizeSkillAtoms(): void {
     fail(`有 module 撑腰应整句用改写，实际 ${JSON.stringify(moduleRewrite.list)}`)
   }
   pass('有 module 撑腰的整行用改写；没配 module 的改写不进成品，原稿留下')
+  expectList('参与整行', ['参与ERP系统上线', 'SQL'], ['主导ERP系统上线', 'SQL'], ['参与ERP系统上线', 'SQL'])
+  expectList('及时整行', ['能及时完成月度报表', 'SQL'], ['SQL'], ['能及时完成月度报表', 'SQL'])
+  expectList('以及整行', ['熟悉Word、Excel以及PPT', 'SQL'], ['SQL'], ['熟悉Word、Excel以及PPT', 'SQL'])
+  expectList('斜杠整行', ['熟悉TCP/IP协议', 'SQL'], ['SQL'], ['熟悉TCP/IP协议', 'SQL'])
+  expectList('证书与整行', ['计算机与网络技术等级证书', 'CET-4'], ['CET-4'], ['计算机与网络技术等级证书', 'CET-4'])
+  expectList('和整行', ['熟练使用Excel数据透视表和WPS表格', 'SQL'], ['SQL'], ['熟练使用Excel数据透视表和WPS表格', 'SQL'])
+  expectList('仓储和整行', ['了解WMS仓储系统和基础数据查询', 'SQL'], ['熟悉仓储系统与数据查询', 'SQL'], ['了解WMS仓储系统和基础数据查询', 'SQL'])
+  expectList('沟通与整行', ['具备良好的沟通与协调能力', 'SQL'], ['沟通协调能力强', 'SQL'], ['具备良好的沟通与协调能力', 'SQL'])
+  expectList('C/C++整行', ['熟练掌握C/C++', 'SQL'], ['精通C/C++编程', 'SQL'], ['熟练掌握C/C++', 'SQL'])
+  const crossModule = alignOriginalList(
+    ['Excel', 'Word'],
+    ['Excel和Word'],
+    60,
+    { modules: [{ before: 'Excel\nWord', after: 'Excel和Word' }] },
+  )
+  if (crossModule.list.length !== 1 || crossModule.list[0] !== 'Excel和Word') {
+    fail(`跨行 module 用过后一行不再补原稿，实际 ${JSON.stringify(crossModule.list)}`)
+  }
+  expectList('复合技能不被短名吃掉', ['Python 爬虫', '熟悉 Python', 'SQL'], ['Python', 'SQL'], ['Python 爬虫', '熟悉 Python', 'SQL'])
+  expectList(
+    '括号全半角不拆',
+    ['1、【办公软件】熟练使用Office（Word、Excel、PPT)', 'SQL'],
+    ['熟练使用Office（Word、Excel、PPT)', 'SQL'],
+    ['熟练使用Office（Word、Excel、PPT)', 'SQL'],
+  )
+  expectList(
+    '半括号整行补回',
+    ['熟练使用Office（Word、Excel、PPT)', 'SQL'],
+    ['SQL'],
+    ['熟练使用Office（Word、Excel、PPT)', 'SQL'],
+  )
+  pass('和、及、与、斜杠没配上时整行补回；跨行 module、复合技能和混用括号都不出碎片')
 }
 
 const PERSON = {
@@ -610,13 +642,13 @@ const PERSON = {
   experience: [{ company: '青州市恒达贸易有限公司', role: '会计助理', period: '2021.07 - 至今', description: '负责凭证录入与月末结账，协助编制月度报表。' }],
 }
 
-function writingOriginal(skills: string[], certs: string[], projectLines: string[] = []): string {
+function writingOriginal(skills: string[], certs: string[], projectLines: string[] = [], heading = '专业技能'): string {
   return [
     '韩雨桐', '手机：13912345678', '求职意向：财务助理',
     '工作经历', '青州市恒达贸易有限公司 2021.07 - 至今 会计助理', '负责凭证录入与月末结账，协助编制月度报表。',
     ...(projectLines.length ? ['项目经历', ...projectLines] : []),
     '教育经历', '青州财经学院 会计学 本科 2017.09 - 2021.06',
-    ...(skills.length ? ['专业技能', ...skills] : []),
+    ...(skills.length ? [heading, ...skills] : []),
     ...(certs.length ? ['证书', ...certs] : []),
   ].join('\n')
 }
@@ -641,8 +673,9 @@ export async function verifyOptimizeRealWriting(): Promise<void> {
     certs: string[],
     model: { skills?: string[]; certs?: string[]; projects?: Array<{ name: string; role?: string; description: string }>; modules?: Array<{ title: string; before: string; after: string }> },
     projectLines: string[] = [],
+    heading = '专业技能',
   ) => {
-    const result = await runOptimize(writingOriginal(skills, certs, projectLines), JSON.stringify({
+    const result = await runOptimize(writingOriginal(skills, certs, projectLines, heading), JSON.stringify({
       resume: { ...PERSON, projects: model.projects ?? [], skills: model.skills ?? [], certificates: model.certs ?? [] },
       modules: model.modules ?? [],
     }), [])
@@ -733,7 +766,61 @@ export async function verifyOptimizeRealWriting(): Promise<void> {
   const halfAfter = '主导自提点位选址，每周汇总订单、核对团长佣金并整理对账表。'
   const p10 = await projectOf('P10', ['社区团购自提试点项目 2023.05 - 2023.11 项目组长', half], { name: '社区团购自提试点项目', role: '项目组长', description: halfAfter }, [{ title: '项目经历', before: '负责点位选址', after: '主导自提点位选址' }])
   if (!p10 || countOf(p10.description ?? '', half) !== 0 || countOf(p10.description ?? '', halfAfter) !== 1) fail(`P10 半句改写重复：${p10?.description}`)
+  const a4 = await run('A4', ['熟练使用Office', '普通话二级甲等（2019年，87.5分）', 'CET-4 CET-6'], [], {
+    skills: ['熟练使用Office'], certs: ['普通话二级甲等', 'CET-4', 'CET-6'],
+  }, [], '技能证书')
+  if (a4.skills.length !== 1 || a4.skills[0] !== '熟练使用Office') fail(`A4 技能栏又印了证书：${JSON.stringify(a4.skills)}`)
+  for (const cert of ['普通话二级甲等', 'CET-4', 'CET-6']) {
+    if (a4.certificates.filter((item) => item === cert).length !== 1 || a4.skills.some((item) => item.includes(cert))) {
+      fail(`A4 证书应只在证书栏出现一次：技能 ${JSON.stringify(a4.skills)} 证书 ${JSON.stringify(a4.certificates)}`)
+    }
+  }
+  const a1 = await projectOf('A1', ['2023.05 - 2023.11 智慧园区管理系统 后端开发', '项目职责：负责设备接入模块与告警中心开发', '项目成果：系统稳定运行，故障率降低30%'], {
+    name: '智慧园区管理系统', role: '后端开发', description: '主导设备接入模块与实时告警中心研发\n系统稳定运行，故障率降低30%',
+  }, [{ title: '项目经历', before: '项目职责：负责设备接入模块与告警中心开发', after: '主导设备接入模块与实时告警中心研发' }])
+  if (!a1 || countOf(a1.description ?? '', '负责设备接入模块与告警中心开发') !== 0 || countOf(a1.description ?? '', '主导设备接入模块与实时告警中心研发') !== 1) {
+    fail(`A1 带标签的职责改写丢了或原句回来：${a1?.description}`)
+  }
+  const rewriteA = '负责订单创建与支付回调核心链路研发，引入Redis缓存热点数据'
+  const rewriteB = '将核心接口平均响应耗时降低50%'
+  const missedLine = '参与日常代码评审与技术文档编写'
+  const a2 = await projectOf('A2', ['2023.05 - 2023.11 订单中心系统 后端开发', '负责订单创建与支付回调开发，引入Redis缓存将接口耗时降低50%', missedLine], {
+    name: '订单中心系统', role: '后端开发', description: `${rewriteA}\n${rewriteB}`,
+  }, [{ title: '项目经历', before: '负责订单创建与支付回调开发，引入Redis缓存将接口耗时降低50%', after: `${rewriteA}\n${rewriteB}` }])
+  if (!a2 || a2.description !== `${rewriteA}\n${rewriteB}\n${missedLine}`) fail(`A2 两行改写或漏交句不对：${a2?.description}`)
+  const a5 = await projectOf('A5', ['2023.05 - 2023.11 校园二手交易小程序', '项目职责：负责前端页面开发与接口联调', '项目成果：重构商品列表虚拟列表组件，首屏渲染耗时降低60%'], {
+    name: '校园二手交易小程序', role: '', description: '负责前端页面开发与接口联调\n重构商品列表虚拟列表组件，首屏渲染耗时降低60%',
+  })
+  if (!a5 || (a5.role ?? '') !== '' || countOf(a5.description ?? '', '负责前端页面开发与接口联调') !== 1) fail(`A5 把短描述当成了角色：${JSON.stringify(a5)}`)
+  const a5b = await projectOf('A5b', ['2023.05 - 2023.11 校园二手交易小程序', '· 需求分析与原型设计', '· 重构商品列表虚拟列表组件，首屏渲染耗时降低60%'], {
+    name: '校园二手交易小程序', role: '', description: '需求分析与原型设计\n重构商品列表虚拟列表组件，首屏渲染耗时降低60%',
+  })
+  if (!a5b || (a5b.role ?? '') !== '' || countOf(a5b.description ?? '', '需求分析与原型设计') !== 1) fail(`A5b 把短描述当成了角色：${JSON.stringify(a5b)}`)
+  const a6 = await projectOf('A6', ['2023.03 - 2023.09 智慧零售商城（一期）', '· 负责商品详情页与购物车模块开发，完成性能调优'], {
+    name: '智慧零售商城（一期）', role: '', description: '负责商品详情页与购物车模块开发，完成性能调优',
+  })
+  if (!a6 || a6.role === '一期' || a6.name !== '智慧零售商城（一期）') fail(`A6 期次被当成角色：${JSON.stringify(a6)}`)
+  const a7 = await projectOf('A7', ['2023.05 - 2023.11 智慧园区管理系统 | 后端开发', '· 负责门禁设备接入模块开发', '· 负责告警规则引擎设计与落地'], {
+    name: '智慧园区管理系统', role: '', description: '负责门禁设备接入模块开发',
+  })
+  if (!a7 || a7.role !== '后端开发' || countOf(a7.description ?? '', '负责告警规则引擎设计与落地') !== 1) fail(`A7 日期标题没认出角色或漏句：${JSON.stringify(a7)}`)
+  const a11b = await projectOf('A11b', ['2023.05 - 2023.11 AI 智能客服系统', '· 负责对话意图识别模块研发'], {
+    name: 'AI', role: '', description: '负责对话意图识别模块研发',
+  })
+  if (!a11b || a11b.name !== 'AI 智能客服系统' || (a11b.role ?? '') !== '') fail(`A11b 短名被当成角色或名称没补全：${JSON.stringify(a11b)}`)
+  const a12original = '核心接口查询响应耗时降低50%'
+  const a12 = await projectOf('A12', ['2023.05 - 2023.11 报表分析平台 后端开发', a12original], {
+    name: '报表分析平台', role: '后端开发', description: '项目成果：核心接口平均查询响应耗时降低50%',
+  }, [{ title: '项目经历', before: a12original, after: '核心接口平均查询响应耗时降低了50%' }])
+  const a12lines = (a12?.description ?? '').split('\n').map((line) => line.trim())
+  if (!a12 || a12lines.includes(a12original) || !a12.description?.includes('平均')) fail(`A12 原句回来或改写丢了：${a12?.description}`)
+  const a12sentence = '核心接口查询响应耗时降低50%。周末复盘一次。'
+  const a12b = await projectOf('A12 同行多句', ['2023.05 - 2023.11 报表分析平台 后端开发', a12sentence], {
+    name: '报表分析平台', role: '后端开发', description: '项目成果：核心接口平均查询响应耗时降低50%。周末复盘一次。',
+  }, [{ title: '项目经历', before: a12sentence, after: '核心接口平均查询响应耗时降低了50%。周末复盘一次。' }])
+  if (!a12b || a12b.description?.includes(a12original) || !a12b.description?.includes('周末复盘一次')) fail(`A12 同行多句改写丢了：${a12b?.description}`)
   pass('C1–C4、K1–K6、K8–K10、P1、P4–P10 按规格对齐')
+  pass('A1–A8、A11b、A12 的改写、整行和角色按规格对齐')
 }
 
 if (process.argv[1]?.endsWith('resume-optimize-after-match.ts')) {
