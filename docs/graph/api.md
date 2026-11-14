@@ -637,9 +637,9 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/kiosk/session/end` | KioskSessionController.end | — | KioskSessionService | KioskSession<br/>MockInterviewTurn<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
-| POST | `/api/v1/kiosk/session/heartbeat` | KioskSessionController.heartbeat | — | KioskSessionService | KioskSession<br/>MockInterviewTurn<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
-| POST | `/api/v1/kiosk/session/start` | KioskSessionController.start | — | KioskSessionService | KioskSession<br/>MockInterviewTurn<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/kiosk/session/end` | KioskSessionController.end | — | KioskSessionService | KioskSession<br/>MockInterviewTurn<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/kiosk/session/heartbeat` | KioskSessionController.heartbeat | — | KioskSessionService | KioskSession<br/>MockInterviewTurn<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/kiosk/session/start` | KioskSessionController.start | — | KioskSessionService | KioskSession<br/>MockInterviewTurn<br/>ServiceOrder<br/>Terminal |
 
 ## `services/api/src/legal/admin-legal-docs.controller.ts`
 
