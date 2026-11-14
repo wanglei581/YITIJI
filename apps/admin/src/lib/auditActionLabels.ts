@@ -314,6 +314,7 @@ const ACTION_LABELS: Record<string, string> = {
   'organization.create': '机构创建',
   'organization.update': '机构资料更新（历史记录）',
   'organization.content_trust': '机构内容可信核验',
+  'organization.public_content_cache_invalidation_failed': '公开内容缓存未清掉',
   'organization.verified_domains_replace': '更新机构已核验域名',
   'organization.device_alert_webhook': '更新机构设备告警通知',
   'org.update': '机构资料更新（管理员）',

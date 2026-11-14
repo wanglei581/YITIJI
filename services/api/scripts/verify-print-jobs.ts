@@ -807,7 +807,7 @@ async function main() {
 
     // getStatus() 只回白名单安全文案。
     const userView = await printJobs.getStatus(knownFailId)
-    const safeExpected = '打印机离线，请联系工作人员检查设备'
+    const safeExpected = '打印机离线，请稍后重试。'
     if (userView.failureReasonForUser === safeExpected && userView.errorMessage === safeExpected) {
       pass('7b. getStatus 已知错误码 → failureReasonForUser/errorMessage 均为白名单安全文案')
     } else {
