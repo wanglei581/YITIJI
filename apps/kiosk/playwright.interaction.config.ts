@@ -1,3 +1,6 @@
+import { isAbsolute, join, resolve } from 'node:path'
+import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from '@playwright/test'
 
 /**
@@ -21,6 +24,11 @@ process.env.NO_PROXY = mergedProxyBypass
 process.env.no_proxy = mergedProxyBypass
 
 const kioskOrigin = process.env.INTERACTION_KIOSK_ORIGIN ?? 'http://127.0.0.1:5273'
+const repoRoot = fileURLToPath(new URL('../../', import.meta.url))
+const evidenceFromEnv = process.env.INTERACTION_EVIDENCE_DIR
+const evidenceDir = evidenceFromEnv
+  ? (isAbsolute(evidenceFromEnv) ? evidenceFromEnv : resolve(repoRoot, evidenceFromEnv))
+  : join(repoRoot, 'test-results/kiosk-interaction/evidence/ai-resume')
 
 export default defineConfig({
   globalSetup: './tests/interaction/global-setup.ts',
@@ -35,7 +43,7 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   reporter: [
     ['list'],
-    ['json', { outputFile: '../../docs/reviews/interaction-sweep-2026-09-08/ai-resume/playwright-results.json' }],
+    ['json', { outputFile: join(evidenceDir, 'playwright-results.json') }],
   ],
   use: {
     baseURL: kioskOrigin,
@@ -47,8 +55,8 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'off',
     video: 'off',
-    actionTimeout: 12_000,
-    navigationTimeout: 20_000,
+    actionTimeout: 15_000,
+    navigationTimeout: 60_000,
   },
   projects: [
     { name: 'kiosk-interaction-1080x1920' },

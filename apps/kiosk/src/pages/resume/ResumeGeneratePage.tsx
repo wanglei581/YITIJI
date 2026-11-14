@@ -393,7 +393,7 @@ export function ResumeGeneratePage() {
             setReviewing(false)
             return
           }
-          if (step === 0) navigate('/resume/source')
+          if (step === 0) navigate('/resume-service')
           else setStep((s) => s - 1)
         }}
       >
@@ -461,7 +461,7 @@ export function ResumeGeneratePage() {
                   ? '核对 · 准备提交一次'
                   : `第 ${step + 1} 步 / 共 ${STEPS.length} 步 · ${STEPS[step].title}`,
       }}
-      back={{ label: '返回简历服务', onBack: () => navigate('/resume/source') }}
+      back={{ label: '返回简历服务', onBack: () => navigate('/resume-service') }}
       ctabar={ctabar}
       ask={{ ...askSpec, testId: 'resume-generate-ai-help' }}
     >
