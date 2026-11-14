@@ -66,6 +66,11 @@ export interface PrintHandoffInput {
   contentCategory?: PrintMaterialContentCategory
   /** 证件扫描或证件用途才传 true。普通文件不传，完成页就不提水印。 */
   idDocument?: boolean
+  /**
+   * 只放进这次跳转的内存状态，确认页返回时原样带回。
+   * 不写入打印交接存储。导出回执的文件名可能带姓名，不能进 sessionStorage。
+   */
+  returnState?: unknown
 }
 
 export type PrintHandoffFailure = 'invalid_input' | 'storage_unavailable'
@@ -317,6 +322,27 @@ export type PrintHandoffRouteState = { printContextId?: unknown; printHandoffErr
 export type PrintHandoffTarget =
   | { ok: true; path: string; state: { printContextId: string } }
   | { ok: false; path: '/print/confirm'; state: { printHandoffError: PrintHandoffFailure } }
+
+export type PrintReturnCarry = {
+  pathname: string
+  search: string
+  state: Record<string, unknown>
+}
+
+/** 打印返回带的内存状态。路径不合法就丢掉，调用方退回原来的返回。 */
+export function readPrintReturnCarry(value: unknown): PrintReturnCarry | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const row = value as Record<string, unknown>
+  const { pathname, search, state } = row
+  if (typeof pathname !== 'string' || typeof search !== 'string') return null
+  if (!pathname.startsWith('/') || pathname.startsWith('//') || pathname.includes('\\')) return null
+  if (pathname.includes('?') || pathname.includes('#')) return null
+  if (pathname === '/login' || pathname.startsWith('/login/')) return null
+  if (search !== '' && !search.startsWith('?')) return null
+  if (search.includes('#') || search.includes('\\') || search.includes('//')) return null
+  if (!state || typeof state !== 'object' || Array.isArray(state)) return null
+  return { pathname, search, state: state as Record<string, unknown> }
+}
 
 /** 来源写完之后去哪：只带交接编号，不带文件、链接、参数。写失败就去确认页如实说。 */
 export function printHandoffTarget(result: BeginPrintHandoffResult): PrintHandoffTarget {

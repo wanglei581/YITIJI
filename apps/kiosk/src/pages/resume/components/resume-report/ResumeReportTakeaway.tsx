@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import type { ResumeReportExportKind, ResumeReportExportResponse } from '@ai-job-print/shared'
 import { FilePreviewDialog } from '../../../../components/FilePreviewDialog'
 import { useCountdown } from '../../../../hooks/useCountdown'
@@ -21,7 +22,63 @@ import {
   FIXTURE_PRICING_CHARGED,
   FIXTURE_PRICING_UNAVAILABLE,
 } from '../../resume-report-fixture'
+import { subscribeKioskSensitiveSessionClear } from '../../../../auth/kioskSensitiveSession'
 import { useStartPrintHandoff } from '../../../print/usePrintHandoff'
+
+function routeRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+/** 回执只跟打印页的返回状态走，不写 sessionStorage / localStorage。文件名可能带姓名。 */
+function readRouteTakeaway(
+  routeState: unknown,
+  taskId: string | undefined,
+): { kind: ResumeReportExportKind; file: ResumeReportExportResponse } | null {
+  const state = routeRecord(routeState)
+  if (!state) return null
+  if (typeof state.taskId === 'string' && taskId && state.taskId !== taskId) return null
+  const row = routeRecord(state.reportTakeaway)
+  if (!row) return null
+  const kind = row.kind === 'change_list' || row.kind === 'diagnosis_report' ? row.kind : null
+  const fileId = typeof row.fileId === 'string' ? row.fileId : ''
+  const filename = typeof row.filename === 'string' ? row.filename : ''
+  const signedUrl = typeof row.signedUrl === 'string' ? row.signedUrl : ''
+  const printFileUrl = typeof row.printFileUrl === 'string' ? row.printFileUrl : ''
+  const expiresAt = typeof row.expiresAt === 'string' ? row.expiresAt : ''
+  if (!kind || !fileId || !filename || !signedUrl || !printFileUrl || !expiresAt) return null
+  return {
+    kind,
+    file: {
+      fileId,
+      filename,
+      mimeType: 'application/pdf',
+      sizeBytes: typeof row.sizeBytes === 'number' ? row.sizeBytes : 0,
+      pageCount: typeof row.pageCount === 'number' ? row.pageCount : 0,
+      signedUrl,
+      expiresAt,
+      printFileUrl,
+      savedToDocuments: row.savedToDocuments === true,
+      aiGenerated: true,
+    },
+  }
+}
+
+function takeawayPayload(kind: ResumeReportExportKind, file: ResumeReportExportResponse) {
+  return {
+    kind,
+    fileId: file.fileId,
+    filename: file.filename,
+    signedUrl: file.signedUrl,
+    printFileUrl: file.printFileUrl,
+    expiresAt: file.expiresAt,
+    sizeBytes: file.sizeBytes,
+    pageCount: file.pageCount,
+    savedToDocuments: file.savedToDocuments,
+    mimeType: 'application/pdf' as const,
+    aiGenerated: true as const,
+  }
+}
 
 function exportErrorMessage(err: unknown): string {
   const code = errorCodeOf(err)
@@ -92,6 +149,7 @@ export function ResumeReportTakeaway(props: {
   onExportedChange?: (exported: boolean) => void
 }) {
   const startPrint = useStartPrintHandoff()
+  const location = useLocation()
   const { getToken } = useAuth()
   const token = getToken()
   const guest = !token
@@ -115,10 +173,11 @@ export function ResumeReportTakeaway(props: {
   const benefitGrantId = capture ? undefined : live.benefitGrantId
   const pricingLoading = capture ? false : live.loading
 
+  const restored = capture ? null : readRouteTakeaway(location.state, props.taskId)
   const [exported, setExported] = useState<ResumeReportExportResponse | null>(
-    capture === 'export-ready' ? FIXTURE_EXPORT : null,
+    capture === 'export-ready' ? FIXTURE_EXPORT : restored?.file ?? null,
   )
-  const [exportKind, setExportKind] = useState<ResumeReportExportKind>('diagnosis_report')
+  const [exportKind, setExportKind] = useState<ResumeReportExportKind>(restored?.kind ?? 'diagnosis_report')
   const [exporting, setExporting] = useState(false)
   const [printNavigating, setPrintNavigating] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -129,6 +188,10 @@ export function ResumeReportTakeaway(props: {
   const { onExportedChange } = props
   const hasExport = Boolean(exported)
   useEffect(() => { onExportedChange?.(hasExport) }, [onExportedChange, hasExport])
+  useEffect(() => subscribeKioskSensitiveSessionClear(() => {
+    setExported(null)
+    setPreviewOpen(false)
+  }), [])
 
   if (!props.show) return null
 
@@ -168,9 +231,18 @@ export function ResumeReportTakeaway(props: {
   const handlePrint = () => {
     if (printNavigating || !exported?.printFileUrl) return
     setPrintNavigating(true)
+    const routeState = routeRecord(location.state) ?? {}
     startPrint({
       origin: 'resume_report',
-      returnPath: window.location.pathname,
+      returnPath: `${location.pathname}${location.search}`,
+      returnState: {
+        pathname: location.pathname,
+        search: location.search,
+        state: {
+          ...routeState,
+          reportTakeaway: takeawayPayload(exportKind, exported),
+        },
+      },
       file: {
         name: exported.filename,
         size: formatFileSize(exported.sizeBytes),
