@@ -14774,7 +14774,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 308
+      "sourceFileCount": 309
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -20475,6 +20475,10 @@
     ],
     "apps/admin/src/routes/components/RecentEmergencyAuditCard.tsx": [
       "apps/admin/scripts/verify-source-publish-actions.mjs"
+    ],
+    "apps/admin/src/routes/components/recruitment/RecruitmentHostingNotice.test.tsx": [
+      "scripts/verify-compliance-copy.mjs",
+      "services/api/scripts/verify-production-runtime-gates.ts"
     ],
     "apps/admin/src/routes/dashboard/DashboardDeviceStatus.tsx": [
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
@@ -38122,6 +38126,7 @@
         "dirs": [],
         "files": [
           "apps/admin/index.html",
+          "apps/admin/src/routes/components/recruitment/RecruitmentHostingNotice.test.tsx",
           "apps/kiosk/index.html",
           "apps/partner/index.html",
           "docs/compliance/compliance-boundary.md",
@@ -46504,6 +46509,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/src/routes/components/recruitment/RecruitmentHostingNotice.test.tsx",
           "services/api/src/common/jwt-verifier.module.ts",
           "services/api/src/common/pdf/aigc-label.ts",
           "services/api/src/config/production-runtime-gates.ts",
@@ -49242,6 +49248,18 @@
         "risk": "high",
         "scope": "admin",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-content-trust-ui.mjs、apps/admin/scripts/verify-source-publish-actions.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/components/recruitment/RecruitmentHostingNotice.test.tsx",
+        "kind": "test",
+        "mentions": [
+          "scripts/verify-compliance-copy.mjs",
+          "services/api/scripts/verify-production-runtime-gates.ts"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：scripts/verify-compliance-copy.mjs、services/api/scripts/verify-production-runtime-gates.ts"
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",

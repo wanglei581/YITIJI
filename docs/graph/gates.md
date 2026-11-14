@@ -72,7 +72,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2194 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2195 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -188,7 +188,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 186 个文件</summary>
+<summary><code>apps/admin/src/</code> — 187 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -222,6 +222,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/billing/index.tsx` | `verify-admin-billing-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-price-single-source.mjs`<br/>`verify-print-color-duplex-capability.ts` |
 | `apps/admin/src/routes/components/BulkPublishButton.tsx` | `verify-admin-content-trust-ui.mjs` |
 | `apps/admin/src/routes/components/RecentEmergencyAuditCard.tsx` | `verify-source-publish-actions.mjs` |
+| `apps/admin/src/routes/components/recruitment/RecruitmentHostingNotice.test.tsx` | `verify-compliance-copy.mjs`<br/>`verify-production-runtime-gates.ts` |
 | `apps/admin/src/routes/dashboard/DashboardDeviceStatus.tsx` | `verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/dashboard/DashboardWidgets.tsx` | `verify-console-batch5-copy.mjs` |
 | `apps/admin/src/routes/dashboard/RecentActivity.tsx` | `verify-datetime-honesty.mjs` |
