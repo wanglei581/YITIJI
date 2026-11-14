@@ -116,12 +116,16 @@ async function stopOwned() {
 
 function ensureCjkFont() {
   if (process.platform !== 'linux') return
-  const font = '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc'
-  if (existsSync(font)) return
-  const installed = spawnSync('sudo', ['apt-get', 'install', '-y', '-q', 'fonts-wqy-microhei'], { stdio: 'inherit', env: childEnv({}) })
-  if (installed.status !== 0 || !existsSync(font)) {
-    throw new Error('Linux 上没有中文字体，安装 fonts-wqy-microhei 失败')
+  // 先装 Noto CJK：global-setup 里它的 PostScript 名 NotoSansCJKsc-Regular 和后端导出 PDF 用的同一个，
+  // build-and-verify 在同款 runner 上已经用过；装不上再退到文泉驿。
+  const noto = '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'
+  const wqy = '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc'
+  if (existsSync(noto) || existsSync(wqy)) return
+  for (const pkg of ['fonts-noto-cjk', 'fonts-wqy-microhei']) {
+    spawnSync('sudo', ['apt-get', 'install', '-y', '-q', pkg], { stdio: 'inherit', env: childEnv({}) })
+    if (existsSync(noto) || existsSync(wqy)) return
   }
+  throw new Error('Linux 上没有中文字体，安装 fonts-noto-cjk、fonts-wqy-microhei 都没成功')
 }
 
 class StartupFailed extends Error {}

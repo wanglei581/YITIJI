@@ -65,7 +65,8 @@ function fontCandidates(): FontCandidate[] {
   }
   return [
     { path: '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc', family: 'NotoSansCJKsc-Regular' },
-    { path: '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc', family: 'WenQuanYi Micro Hei' },
+    // .ttc 要写 PostScript 名，不是家族名「WenQuanYi Micro Hei」
+    { path: '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc', family: 'WenQuanYiMicroHei' },
   ]
 }
 
@@ -79,20 +80,23 @@ function writeFixturePdf(outPath: string): Promise<void> {
   const PDFDocument = loadPdfKit()
   const tried: string[] = []
   let chosen: FontCandidate | null = null
-  const probe = new PDFDocument({ size: 'A4', margin: 56 })
   for (const candidate of fontCandidates()) {
     tried.push(candidate.family ? `${candidate.path}#${candidate.family}` : candidate.path)
     if (!existsSync(candidate.path)) continue
+    // registerFont 只登记、不读文件，font() 才真正加载；名字对不上要在这里抛出来，才能换下一个候选。
+    const probe = new PDFDocument({ size: 'A4', margin: 56 })
     try {
       if (candidate.family) probe.registerFont('cjk', candidate.path, candidate.family)
       else probe.registerFont('cjk', candidate.path)
+      probe.font('cjk')
       chosen = candidate
-      break
     } catch {
       // 下一个候选
+    } finally {
+      probe.end()
     }
+    if (chosen) break
   }
-  probe.end()
   if (!chosen) {
     throw new Error(`生成走查简历 PDF 失败：没有可用的中文字体。试过：${tried.join(' | ')}`)
   }
