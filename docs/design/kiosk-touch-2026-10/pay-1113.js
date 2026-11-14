@@ -1,9 +1,10 @@
-/* pay-1113.js：收费显示与付款（2026-11-13 第二版，只画稿）
+/* pay-1113.js：收费显示与付款（2026-11-14 第三版，只画稿）
  * 产品负责人 11/13 对第一版核图回「都按推荐」：
  * 1. 能重试的失败，同一单免费再试一次；不再试、离开，或再试还不成，钱自动退回原付款账户。
  * 2. 付一次管这一趟。收费机器上不再卖「次数用完再付一次」；这一趟里的子功能不扣每日次数。
  * 3. 简历诊断免费，开始改写之前收。
  * 4. 排版失败不退款（原稿「也不计次数」），只有 AI 真没做成才退。
+ * 第三版只修越框和收费开时的矛盾用词：诊断价格说明放进「带走这份报告」，不另插一条把卡片压扁。
  * 1.00 元是演示数字，不是定价。真实价格每台机器在管理员后台设，不进仓库。
  *
  * 只在「收费点位」开着、且不是「公共就业点位」时改画面。
@@ -63,7 +64,8 @@
 .py-home,.py-bar,.py-sample{display:none}
 .py-keep{white-space:nowrap}
 .overview .ov-item > span{color:var(--desk-ink)}
-.py-home.on{display:block;margin-top:2px;font:800 22px/1.25 var(--sans);color:var(--teal-ink)}
+.py-home.on{display:block;margin-top:2px;font:800 22px/1.25 var(--sans);color:var(--teal-ink);white-space:nowrap}
+.d3-home .task .py-home.on{padding-right:158px}
 .task.dark .py-home.on{color:var(--glow)}
 .d3-home .task:has(.py-home){min-height:300px;gap:8px;padding:22px 26px 16px}
 .d3-home .task:has(.py-home) h3{margin-top:0;font-size:36px}
@@ -78,7 +80,8 @@
 /* 简历样张下半截是浅灰线，门禁不算墨。拉到一半高时空白会过 320，收到 46% 且不超过 580。 */
 .py-sample.on svg{height:46%;max-height:580px;width:auto;max-width:100%;flex:none}
 .py-sample.scan svg{height:33.33%;max-height:420px}
-.py-paidscan>.tx{margin-top:-16px}
+.d4-take.py-take{flex-wrap:wrap;align-items:center;align-content:center;min-height:120px;flex-shrink:0}
+.d4-take.py-take>.fine{flex:1 0 100%;line-height:1.35}
 .py-invbody{justify-content:flex-start;gap:12px;padding-top:16px;padding-bottom:12px}
 .py-invqr.b2a-bqr{width:320px;height:320px;padding:20px}
 .py-invqr.b2a-bqr svg{width:280px;height:280px}
@@ -143,6 +146,19 @@
       const more = typeof extra === 'function' ? extra() : extra;
       return (more || []).concat(base);
     };
+  }
+  function moveBlockBefore(h, blockStart, beforeMark) {
+    const start = h.indexOf(blockStart);
+    if (start < 0) return h;
+    const end = h.indexOf('</div>', start);
+    if (end < 0) return h;
+    const line = h.slice(start, end + 6);
+    const rest = h.slice(0, start) + h.slice(end + 6);
+    const bi = rest.indexOf(beforeMark);
+    if (bi < 0) return h;
+    const bstart = rest.lastIndexOf('<div class="fe-line"', bi);
+    if (bstart < 0) return h;
+    return rest.slice(0, bstart) + line + rest.slice(bstart);
   }
   function replaceLine(h, id, html) {
     const mark = 'data-arg="' + id + '"';
@@ -228,7 +244,8 @@
   /* ── 首页短价。页脚那句用整词不换行，只在收费时补上。 ── */
   wrapCharge('home', (r0) => {
     let n = r0();
-    n = n.replace('<h3>改简历</h3>', '<h3>改简历</h3>' + priceSpan(homeLine('resume', '每次 ')));
+    const resumeTxt = cents('resume') ? ('每次 ' + money(cents('resume')) + ' · 诊断免费') : '免费';
+    n = n.replace('<h3>改简历</h3>', '<h3>改简历</h3>' + priceSpan(resumeTxt));
     n = n.replace('<h3>练面试</h3>', '<h3>练面试</h3>' + priceSpan(homeLine('interview', '每次 ')));
     n = n.replace('<h3>打印 · 扫描</h3>', '<h3>打印 · 扫描</h3>' + priceSpan('打印 ' + homeLine('print', '黑白每页 ')) + priceSpan('扫描 ' + homeLine('scan', '每次 ')));
     const foot = '离开 3 分钟无操作自动退出登录';
@@ -252,14 +269,17 @@
     return () => el.removeEventListener('proto-demo', on);
   });
 
-  /* ── 诊断免费。开始改之前那颗按钮才收款。收费时不写「免费试运营」。 ── */
+  /* ── 诊断免费。开始改之前那颗按钮才收款。价格说明放进「带走」卡，不再另插一条把右侧卡片压扁。 ── */
   wrapCharge('diagnosis', (r0) => {
     let h = r0().replace('免费试运营，本单 0 元', '导出不另收钱');
     if (paid('resume')) return h;
     const n = retarget(h, '查看优化建议（4 条）', 'data-go="pay-service" data-set="pyWhat=resume;pyBack=diagnosis;pyNext=optimize;pyAfter=start-resume;pyState=wait"');
     if (!n) return h;
     h = n.replace('>查看优化建议（4 条）', '>付 ' + YUAN + '并开始');
-    return beforeDock(h, bar('这一次 ' + YUAN, 'AI 简历优化。诊断免费，付好了才开始改。没做成可免费再试一次；再不成，钱' + BACK + '。'));
+    const note = '这一次 ' + YUAN + '，AI 简历优化。诊断免费，付好了才开始改。没做成可免费再试一次；再不成，钱' + BACK + '。';
+    h = h.replace('<section class="d4-take" aria-label="带走这份报告">', '<section class="d4-take py-take" aria-label="带走这份报告">');
+    h = h.replace('<span class="d4-price">导出不另收钱</span>', '<span class="d4-price">导出不另收钱</span><p class="fine left">' + note + '</p>');
+    return h;
   });
 
   /* ── 练面试：年龄确认仍先问。没创建成且已付过，主按钮是免费再试。 ── */
@@ -314,9 +334,8 @@
     if (fail) {
       if (!paid('scan')) return h;
       h = h.split('重试扫描（同一份材料）').join('免费再试一次');
-      ['等待超时，这次没有拿到文件。', '扫描任务未能完成。', '系统确认这次扫描已经完成，可是同一份结果里没有带可用的文件信息。这份文件还在不在，本机没有依据判断。'].forEach((t) => {
-        h = h.replace(t, t + RETRY);
-      });
+      const endFacts = '</div></div><p class="fs-help">';
+      if (h.indexOf(endFacts) >= 0) h = h.replace(endFacts, '</div></div><p class="fs-p">' + RETRY + '</p><p class="fs-help">');
       return h;
     }
     const sentence = '先检查文件和个人信息。金额由系统报价，本页不给价格。';
@@ -345,6 +364,21 @@
     h = h.split('用了 1 次 · 今天还剩 16 次').join('这一条已经换过，这一趟不再另收费');
     return h;
   });
+  /* 收费机器上不演示「今天次数用完」。对照那一屏的演示按钮去掉；不收费时仍是原稿。 */
+  (function () {
+    const d = find('jobfit'); if (!d) return;
+    const d0 = d.demo;
+    d.demo = () => {
+      const base = typeof d0 === 'function' ? (d0() || []) : (d0 || []);
+      if (!charge()) return base;
+      return base.filter((x) => !x || String(x.label || '').indexOf('今天次数用完') < 0);
+    };
+  })();
+  /* 收费开时，这四屏不再写和收费矛盾的旧句。关着时原样返回。 */
+  wrapCharge('me', (r0) => r0().split('免费试运营，本单 0 元').join('已付款 · ' + YUAN));
+  wrapCharge('resume-export', (r0) => r0().split('免费试运营，本单 0 元').join('导出不另收钱'));
+  wrapCharge('done', (r0) => r0().replace('重新选文件后再确认。免费试运营。', '重新选文件后再确认。'));
+  wrapCharge('gen-preview', (r0) => r0().split('收费导出需登录会员账号并核销 1 次权益').join('导出不另收钱'));
 
   /* ── 没诊断出来：不缩字，不卖再用一次。付过才在副标题里写退款。 ── */
   wrapCharge('st-ai-down', (r0) => {
@@ -374,7 +408,7 @@
   wrapCharge('iv-run', (r0) => {
     let h = r0();
     if (!paid('interview') || (S().fiRunErr || '').indexOf('报告生成失败') < 0) return h;
-    h = h.replace('报告生成失败，请重试', RETRY);
+    h = h.replace('报告生成失败，请重试', '报告没生成。可以免费再试一次；不试了或再不成，钱' + BACK + '。');
     h = h.replace('>提交回答', '>免费再试一次');
     return h;
   });
@@ -383,7 +417,20 @@
   function bill(title, small, btn) {
     return '<div class="fe-line py-bill"><span class="tx"><b>' + title + '</b><small>' + small + '</small></span>' + (btn || '') + '</div>';
   }
+  function freeInvoice() {
+    return window.UI.band({
+      kind: 'compact',
+      eyebrow: '我的 · 订单',
+      title: '这台机器免费，没有需要开发票的订单',
+      seal: null,
+      place: ' ',
+      status: { text: '不收费' }
+    }) + '<main class="body d3-cashier py-pay">' + sampleOf('resume') + '</main>'
+      + window.UI.dock({ back: false, ask: false, pri: { label: '返回', go: 'my-orders' } })
+      + window.UI.nav('me');
+  }
   function invoiceHtml() {
+    if (!charge()) return freeInvoice();
     const qr = '<div class="b2a-bqr py-invqr">' + window.UI.qr(21, 280) + '</div>';
     const list = '<div class="olist"><div class="olist-t">手机上要填的三项</div>'
       + '<div class="st3-check"><i>1</i><span>抬头。个人写姓名，单位写单位名称。</span></div>'
@@ -414,17 +461,19 @@
     if (S().pyInv) return invoiceHtml();
     let h = r0();
     if (h.indexOf('data-arg="o5"') < 0) {
+      h = h.replace('<h1>登录后看你的打印订单</h1>', '<h1>我的订单</h1>');
       h = h.replace('<h1>打印订单</h1>', '<h1>我的订单</h1>');
       h = h.replace('我的 · 打印订单', '我的 · 订单');
       return h;
     }
     h = replaceLine(h, 'o5', bill('AI 简历优化', '已付款 · ' + YUAN + ' · 今天 13:40', '<button type="button" class="btn pri sm" data-py="inv">开发票</button>'));
+    h = h.replace('<h1>打印订单</h1>', '<h1>我的订单</h1>');
+    h = moveBlockBefore(h, '<div class="fe-line py-bill"><span class="tx"><b>AI 简历优化</b>', 'data-arg="o4"');
     h = replaceLine(h, 'o2', bill('扫描', '已退款 · ' + YUAN + ' · 已退回原付款账户，' + CHANNEL + ' · 今天 11:20'));
     h = replaceLine(h, 'o7', bill('AI 模拟面试', '发票已开 · ' + YUAN + ' · 电子发票已发到邮箱 · 昨天 15:02'));
-    h = h.split('0 元（免费试运营） · 免费').join('已付款');
+    h = h.split('0 元（免费试运营） · 免费').join('已付款 · ' + YUAN);
     h = h.split('0 元（免费试运营） · 待退款').join('待退款');
     h = h.split('<p class="fe-p">免费试运营，本单 0 元。</p>').join('');
-    h = h.replace('<h1>打印订单</h1>', '<h1>我的订单</h1>');
     h = h.replace('共 7 条已产生打印任务的单', '共 7 条');
     h = h.replace('我的 · 打印订单', '我的 · 订单');
     return h;
@@ -511,7 +560,8 @@
       title = '这次没付成';
       sub = '没付成，钱没有扣';
       warn = 1;
-      body = sum + '<p class="fine">钱没有扣。没付成就不会开始 ' + name + '。可以再出一张码，或返回。返回之后这一次还没开始。</p>' + sampleOf(key);
+      const sp = name.charAt(0) === 'A' ? ' ' : '';
+      body = sum + '<p class="fine">钱没有扣。没付成就不会开始' + sp + name + '。可以再出一张码，或返回。返回之后这一次还没开始。</p>' + sampleOf(key);
       pri = { label: '再出一张码', id: 'pyRetry' };
     } else if (st === 'timeout') {
       title = '等了 5 分钟，这一次没有付成';

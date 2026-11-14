@@ -228,6 +228,18 @@
 
 复用，不另起一套：打印收银台 `.d3-cashier`、`.d3-qrframe`、`.sumcard`；二维码 `UI.qr`；白底码框 `.b2a-bqr`；清单 `.olist`、`.st3-check`。打印收银台不重画。卡片按内容定高，空处放这一次要办的事的小样。
 
+## 收费显示与付款（2026-11-14 补稿，第三版）
+
+仍只改 `pay-1113.js`。四条定稿不动。这一版修第二版核图没过的地方，收费关掉时画面与改前稿一致。
+
+| 改了什么 | 在哪一屏 | 怎么看 |
+|---|---|---|
+| 诊断价格说明写进「带走这份报告」，不再在正文末尾另插一条 | `diagnosis` | `?fee=1#diagnosis`。右栏三张卡不再被压扁。按钮仍是「付 1.00 元并开始」「导出不另收钱」 |
+| 扫描完成页文件名不再上移 | `scan-result` | `?fee=1&paid=scan#scan-result` |
+| 「我的」待办和订单列表同一单都写「已付款 · 1.00 元」 | `me`、`my-orders` | `?fee=1&login=1#me`。订单按时间倒序，13:40 在 13:05 前 |
+| 导出写「导出不另收钱」；打印完成去掉「免费试运营」；从零生成核对未登录也写「导出不另收钱」 | `resume-export`、`done`、`gen-preview` | `?fee=1` 打开这三屏。不出现「会员」「核销」「权益」 |
+| 报告没生成补回「报告」；扫描失败的再试一句单独成行；对照岗位去掉「今天次数用完」演示；免费机器的开发票屏不写 1.00 元；首页「改简历」写「诊断免费」 | `iv-run`、`scan-result`、`jobfit`、`my-orders-invoice`、`home` | 开发票收费关：`#my-orders-invoice`。对照进行中：`?fee=1&b2v=loading#jobfit` |
+
 ## 冻结
 
 `apps/kiosk/scripts/verify-kiosk-touch-frozen.mjs`（`pnpm --filter @ai-job-print/kiosk verify:kiosk-touch-frozen`，进 CI）逐个比对本目录稿文件与 `FROZEN.json` 里的 sha256，改动、新增、删除都算红；`README.md`、`FROZEN.json` 不在冻结范围。改稿只在产品负责人同意之后：改完在 `apps/kiosk` 下跑 `node scripts/verify-kiosk-touch-frozen.mjs --update` 重写清单，并在 `docs/progress/current-progress.md` 写明谁同意的、改了什么、为什么。
