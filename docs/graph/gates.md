@@ -72,7 +72,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2202 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2205 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -188,7 +188,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 186 个文件</summary>
+<summary><code>apps/admin/src/</code> — 187 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -222,6 +222,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/billing/index.tsx` | `verify-admin-billing-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-price-single-source.mjs`<br/>`verify-print-color-duplex-capability.ts` |
 | `apps/admin/src/routes/components/BulkPublishButton.tsx` | `verify-admin-content-trust-ui.mjs` |
 | `apps/admin/src/routes/components/RecentEmergencyAuditCard.tsx` | `verify-source-publish-actions.mjs` |
+| `apps/admin/src/routes/components/recruitment/RecruitmentHostingNotice.test.tsx` | `verify-compliance-copy.mjs`<br/>`verify-production-runtime-gates.ts` |
 | `apps/admin/src/routes/dashboard/DashboardDeviceStatus.tsx` | `verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/dashboard/DashboardWidgets.tsx` | `verify-console-batch5-copy.mjs` |
 | `apps/admin/src/routes/dashboard/RecentActivity.tsx` | `verify-datetime-honesty.mjs` |
@@ -2522,7 +2523,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 697 个文件</summary>
+<summary><code>services/api/src/</code> — 699 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2846,6 +2847,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/job-ai/job-ai.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-job-ai-backend.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-job-ai-privacy.ts`<br/>`verify-job-validity-expiry.ts` |
 | `services/api/src/job-ai/job-context.service.ts` | `verify-ai-quota-coverage.ts`<br/>`verify-job-ai-backend.ts` |
 | `services/api/src/job-ai/job-quality.service.ts` | `verify-admin-fairs.ts`<br/>`verify-ai-throttle-dimension.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-fair-company-positions.ts`<br/>`verify-fair-info-fields.ts`<br/>`verify-fair-list-integrity.ts`<br/>`verify-field-mapping-rule.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-job-data-quality.ts`<br/>`verify-job-review.ts`<br/>`verify-job-sync.ts`<br/>`verify-jobfair-campus-priority.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-partner-edit.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-partner-source-capabilities.ts`<br/>`verify-public-fair-demo-guard.ts`<br/>`verify-recruitment-hosting-default-off.ts` |
+| `services/api/src/job-ai/partner-quality-summary.ts` | `verify-job-ai-ops-dashboard.ts` |
 | `services/api/src/job-applications/dto/create-job-application.dto.ts` | `verify-job-application-track.ts` |
 | `services/api/src/job-applications/dto/update-job-application.dto.ts` | `verify-job-application-track.ts` |
 | `services/api/src/job-applications/job-application.types.ts` | `verify-job-application-track.ts` |
@@ -3133,6 +3135,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/recruitment-content/recruitment-wave2-proposed-governance-rules.ts` | `verify-recruitment-wave2-proposed-governance.ts` |
 | `services/api/src/recruitment-content/recruitment-wave2-proposed-governance.types.ts` | `verify-recruitment-wave2-proposed-governance.ts` |
 | `services/api/src/recruitment-content/recruitment-wave2-target.ts` | `verify-recruitment-wave2-full-inventory.ts`<br/>`verify-recruitment-wave2-readonly.ts` |
+| `services/api/src/recruitment-hosting/deployment-ownership.ts` | `verify-deploy-gates-in-sync.mjs`<br/>`verify-deploy-rollback.mjs`<br/>`verify-production-runtime-gates.ts` |
 | `services/api/src/recruitment-hosting/recruitment-emergency.controller.ts` | `verify-official-channels.ts`<br/>`verify-recruitment-emergency-scope.ts` |
 | `services/api/src/recruitment-hosting/recruitment-emergency.service.ts` | `verify-compliance-copy.mjs`<br/>`verify-companies.ts`<br/>`verify-job-review.ts`<br/>`verify-official-channels.ts`<br/>`verify-recruitment-emergency-scope.ts` |
 | `services/api/src/recruitment-hosting/recruitment-hosting.ts` | `verify-recruitment-hosting-default-off.ts` |

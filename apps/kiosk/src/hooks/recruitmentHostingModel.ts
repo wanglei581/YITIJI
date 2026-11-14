@@ -16,15 +16,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** 纯判定：这份终端配置有没有打开招聘内容托管。 */
+/**
+ * 纯判定：终端配置里有 `recruitmentHosting` 且 `enabled === true` 才算打开。
+ * 没有这一项一律按关，不看 `jobBoard`。不是对象也按关。
+ */
 export function recruitmentHostingOpen(config: unknown): boolean {
   if (!isRecord(config)) return false
-  if ('recruitmentHosting' in config) {
-    const hosting = config['recruitmentHosting']
-    return isRecord(hosting) && hosting['enabled'] === true
-  }
-  const jobBoard = config['jobBoard']
-  return isRecord(jobBoard) && jobBoard['enabled'] === true
+  if (!('recruitmentHosting' in config)) return false
+  const hosting = config['recruitmentHosting']
+  return isRecord(hosting) && hosting['enabled'] === true
 }
 
 /**

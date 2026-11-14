@@ -11136,20 +11136,13 @@
         "controller": "services/api/src/jobs/jobs.controller.ts",
         "handler": "JobsController.getPartnerJobQualitySummary",
         "method": "GET",
-        "models": [
-          "Job",
-          "JobDataQualitySnapshot"
-        ],
+        "models": [],
         "path": "/api/v1/partner/jobs/quality-summary",
         "roles": [
           "partner"
         ],
-        "serviceFiles": [
-          "services/api/src/job-ai/job-quality.service.ts"
-        ],
-        "services": [
-          "JobQualityService"
-        ]
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/licenses/license.partner.controller.ts",
@@ -14783,7 +14776,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 308
+      "sourceFileCount": 309
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -20486,6 +20479,10 @@
     ],
     "apps/admin/src/routes/components/RecentEmergencyAuditCard.tsx": [
       "apps/admin/scripts/verify-source-publish-actions.mjs"
+    ],
+    "apps/admin/src/routes/components/recruitment/RecruitmentHostingNotice.test.tsx": [
+      "scripts/verify-compliance-copy.mjs",
+      "services/api/scripts/verify-production-runtime-gates.ts"
     ],
     "apps/admin/src/routes/dashboard/DashboardDeviceStatus.tsx": [
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
@@ -28826,6 +28823,9 @@
       "services/api/scripts/verify-public-fair-demo-guard.ts",
       "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
+    "services/api/src/job-ai/partner-quality-summary.ts": [
+      "services/api/scripts/verify-job-ai-ops-dashboard.ts"
+    ],
     "services/api/src/job-applications/dto/create-job-application.dto.ts": [
       "services/api/scripts/verify-job-application-track.ts"
     ],
@@ -30649,6 +30649,11 @@
     "services/api/src/recruitment-content/recruitment-wave2-target.ts": [
       "services/api/scripts/verify-recruitment-wave2-full-inventory.ts",
       "services/api/scripts/verify-recruitment-wave2-readonly.ts"
+    ],
+    "services/api/src/recruitment-hosting/deployment-ownership.ts": [
+      "scripts/verify-deploy-gates-in-sync.mjs",
+      "scripts/verify-deploy-rollback.mjs",
+      "services/api/scripts/verify-production-runtime-gates.ts"
     ],
     "services/api/src/recruitment-hosting/recruitment-emergency.controller.ts": [
       "services/api/scripts/verify-official-channels.ts",
@@ -38237,6 +38242,7 @@
         "dirs": [],
         "files": [
           "apps/admin/index.html",
+          "apps/admin/src/routes/components/recruitment/RecruitmentHostingNotice.test.tsx",
           "apps/kiosk/index.html",
           "apps/partner/index.html",
           "docs/compliance/compliance-boundary.md",
@@ -38349,7 +38355,8 @@
           "apps/partner/src/services/api/client.ts",
           "services/api/scripts/preflight-legal-docs.mjs",
           "services/api/scripts/preflight-production-gates.mjs",
-          "services/api/src/config/production-runtime-gates.ts"
+          "services/api/src/config/production-runtime-gates.ts",
+          "services/api/src/recruitment-hosting/deployment-ownership.ts"
         ],
         "missing": []
       },
@@ -38371,7 +38378,8 @@
           ".github/workflows/server-cleanup.yml",
           "services/api/scripts/preflight-legal-docs.mjs",
           "services/api/scripts/preflight-production-gates.mjs",
-          "services/api/src/config/production-runtime-gates.ts"
+          "services/api/src/config/production-runtime-gates.ts",
+          "services/api/src/recruitment-hosting/deployment-ownership.ts"
         ],
         "missing": []
       },
@@ -42832,6 +42840,7 @@
           "services/api/src/ai/resume/llm-job-fit.service.ts",
           "services/api/src/job-ai/job-ai.service.ts",
           "services/api/src/job-ai/job-quality.service.ts",
+          "services/api/src/job-ai/partner-quality-summary.ts",
           "services/api/src/jobs/jobs.controller.ts"
         ],
         "missing": []
@@ -46703,9 +46712,11 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/src/routes/components/recruitment/RecruitmentHostingNotice.test.tsx",
           "services/api/src/common/jwt-verifier.module.ts",
           "services/api/src/common/pdf/aigc-label.ts",
-          "services/api/src/config/production-runtime-gates.ts"
+          "services/api/src/config/production-runtime-gates.ts",
+          "services/api/src/recruitment-hosting/deployment-ownership.ts"
         ],
         "missing": []
       },
@@ -49478,6 +49489,18 @@
         "risk": "high",
         "scope": "admin",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-content-trust-ui.mjs、apps/admin/scripts/verify-source-publish-actions.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/components/recruitment/RecruitmentHostingNotice.test.tsx",
+        "kind": "test",
+        "mentions": [
+          "scripts/verify-compliance-copy.mjs",
+          "services/api/scripts/verify-production-runtime-gates.ts"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：scripts/verify-compliance-copy.mjs、services/api/scripts/verify-production-runtime-gates.ts"
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",

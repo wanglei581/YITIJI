@@ -53,5 +53,15 @@ export function RecruitmentHostingNotice({
     )
   }
 
+  if (hosting.operatorSelfReport) {
+    const { name, licenseNumber } = hosting.operatorSelfReport
+    return (
+      <div role="status" className="mb-4 flex items-start gap-2.5 rounded-lg border border-info/20 bg-info-bg px-4 py-3 text-sm text-info-fg">
+        <InfoIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <p>运营单位自报：{name}，人力资源服务许可证编号 {licenseNumber}。本软件未核验。</p>
+      </div>
+    )
+  }
+
   return null
 }

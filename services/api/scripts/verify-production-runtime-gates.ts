@@ -1,8 +1,21 @@
-import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { assertProductionRuntimeGates } from '../src/config/production-runtime-gates'
 import { AIGC_DEFAULT_PRODUCER } from '../src/common/pdf/aigc-label'
 import { resolveJwtSecret } from '../src/common/jwt-verifier.module'
+import {
+  evaluateRecruitmentLock,
+  operatorSelfReportNoticeText,
+  recruitmentLockProductionError,
+  recruitmentLockStartupLine,
+} from '../src/recruitment-hosting/deployment-ownership'
+
+if (process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED === undefined) {
+  process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+}
 
 type Env = Parameters<typeof assertProductionRuntimeGates>[0]
 type FontProbe = Parameters<typeof assertProductionRuntimeGates>[1]
@@ -497,7 +510,340 @@ function main(): void {
   }
   console.log('  PASS .env.example 未写入真实 COS 桶名')
 
+  assertRecruitmentLockCases()
+  assertRecruitmentLockCopy()
+  assertAdminSelfReportNoticeRendered()
+  assertPreflightForceValue()
+
   console.log('\n=== ALL PASS ===')
+}
+
+function assertAdminSelfReportNoticeRendered(): void {
+  const repoRoot = join(__dirname, '../../..')
+  const testFile = join(repoRoot, 'apps/admin/src/routes/components/recruitment/RecruitmentHostingNotice.test.tsx')
+  const env = { ...process.env, NO_COLOR: '1' }
+  delete env.FORCE_COLOR
+  const result = spawnSync(process.execPath, [
+    '--import',
+    pathToFileURL(join(repoRoot, 'services/api/node_modules/tsx/dist/esm/index.mjs')).href,
+    '--test',
+    testFile,
+  ], {
+    cwd: join(repoRoot, 'apps/admin'),
+    encoding: 'utf8',
+    env,
+  })
+  const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`
+  if (result.status !== 0) {
+    throw new Error(`后台自报提示条两态用例失败\n${output.slice(-1500)}`)
+  }
+  console.log('  PASS 后台自报提示条两态：有自报时整句等于「运营单位自报：…本软件未核验。」，空自报不出现')
+}
+
+function assertRecruitmentLockCases(): void {
+  console.log('\n=== 招聘锁（只在生产拒绝启动）===')
+  const hostingOn = { ...PROD_OK, RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true' }
+  const privateReady = {
+    ...hostingOn,
+    DEPLOYMENT_OWNERSHIP: 'customer_private',
+    RECRUITMENT_OPERATOR_NAME: '示例职业介绍所',
+    RECRUITMENT_OPERATOR_LICENSE_NO: '鲁人社证字〔2026〕第001号',
+  }
+  expectRejected(hostingOn, 'PRODUCTION_RECRUITMENT_HOSTING_LOCKED', '生产 + 托管开 + 归属不写 → 拒')
+  expectRejected(
+    { ...hostingOn, DEPLOYMENT_OWNERSHIP: 'cloud' },
+    'PRODUCTION_RECRUITMENT_HOSTING_LOCKED',
+    '生产 + 托管开 + 归属写错 cloud → 拒',
+  )
+  expectRejected(
+    { ...hostingOn, DEPLOYMENT_OWNERSHIP: 'vendor_cloud' },
+    'PRODUCTION_RECRUITMENT_HOSTING_LOCKED',
+    '生产 + 托管开 + 归属 vendor_cloud → 拒',
+  )
+  expectRejected(
+    { ...hostingOn, DEPLOYMENT_OWNERSHIP: '' },
+    'PRODUCTION_RECRUITMENT_HOSTING_LOCKED',
+    '生产 + 托管开 + 归属空串 → 拒',
+  )
+  expectRejected(
+    { ...hostingOn, DEPLOYMENT_OWNERSHIP: 'CUSTOMER_PRIVATE' },
+    'PRODUCTION_RECRUITMENT_HOSTING_LOCKED',
+    '生产 + 托管开 + 归属 CUSTOMER_PRIVATE → 拒',
+  )
+  for (const value of ['yes', 'on', '1', ' TRUE ']) {
+    expectRejected(
+      { ...PROD_OK, RECRUITMENT_CONTENT_HOSTING_ENABLED: value },
+      'PRODUCTION_RECRUITMENT_HOSTING_LOCKED',
+      `生产 + 托管写成 ${JSON.stringify(value)} + 归属不写 → 拒`,
+    )
+  }
+  expectRejected(
+    { ...privateReady, RECRUITMENT_OPERATOR_NAME: undefined },
+    'PRODUCTION_RECRUITMENT_OPERATOR_SELF_REPORT_MISSING',
+    '生产 + 私有化 + 托管开 + 缺名称 → 拒',
+  )
+  expectRejected(
+    { ...privateReady, RECRUITMENT_OPERATOR_LICENSE_NO: undefined },
+    'PRODUCTION_RECRUITMENT_OPERATOR_SELF_REPORT_MISSING',
+    '生产 + 私有化 + 托管开 + 缺编号 → 拒',
+  )
+  expectRejected(
+    { ...privateReady, RECRUITMENT_OPERATOR_NAME: '   ', RECRUITMENT_OPERATOR_LICENSE_NO: ' \t ' },
+    'PRODUCTION_RECRUITMENT_OPERATOR_SELF_REPORT_MISSING',
+    '生产 + 私有化 + 托管开 + 两项只有空格 → 拒',
+  )
+  expectAllowed(privateReady, '生产 + 私有化 + 托管开 + 两项齐全 → 通过')
+  expectRejected(
+    { ...privateReady, DEPLOYMENT_OWNERSHIP: ' Customer_Private ' },
+    'PRODUCTION_RECRUITMENT_HOSTING_LOCKED',
+    '生产 + 归属写成 Customer_Private（带空格）→ 拒绝（LOCKED）',
+  )
+  expectAllowed(
+    { ...privateReady, DEPLOYMENT_OWNERSHIP: 'customer_private ' },
+    '生产 + 归属写成 customer_private（尾部空格）+ 两项齐全 → 通过',
+  )
+  expectAllowed(
+    { ...privateReady, DEPLOYMENT_OWNERSHIP: ' customer_private ' },
+    '生产 + 归属写成 customer_private（首尾空格）+ 两项齐全 → 通过',
+  )
+  expectAllowed(PROD_OK, '生产 + 托管关 + 归属不写 → 通过')
+  expectAllowed(
+    { NODE_ENV: 'development', RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true' },
+    '非生产 + 托管开 + 归属不写 → 不拒',
+  )
+}
+
+function assertRecruitmentLockCopy(): void {
+  const fullLicense = '鲁人社证字〔2026〕第001号'
+  const reported = evaluateRecruitmentLock({
+    DEPLOYMENT_OWNERSHIP: 'customer_private',
+    RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true',
+    RECRUITMENT_OPERATOR_NAME: ' 示例职业介绍所 ',
+    RECRUITMENT_OPERATOR_LICENSE_NO: `  ${fullLicense}  `,
+  })
+  const selfReport = reported.selfReport
+  if (!selfReport || selfReport.name !== '示例职业介绍所' || selfReport.licenseNumber !== fullLicense) {
+    throw new Error(`selfReport 必须是去首尾空格后的全文，实际 ${JSON.stringify(reported.selfReport)}`)
+  }
+  const notice = operatorSelfReportNoticeText(selfReport)
+  const startupOn = recruitmentLockStartupLine(reported)
+  const startupOff = recruitmentLockStartupLine(evaluateRecruitmentLock({}))
+  const startupPrivateOff = recruitmentLockStartupLine(
+    evaluateRecruitmentLock({ DEPLOYMENT_OWNERSHIP: 'customer_private' }),
+  )
+  const locked = recruitmentLockProductionError('locked_vendor_cloud')
+  const missing = recruitmentLockProductionError('operator_self_report_missing')
+  const vendorOnNonProd =
+    '[WARN] RECRUITMENT_LOCK: 非生产环境：部署归属=我方云；招聘内容托管=开（生产环境会拒绝启动）'
+  const privateMissingNonProd =
+    '[WARN] RECRUITMENT_LOCK: 非生产环境：部署归属=客户私有化部署；招聘内容托管=开；运营单位自报缺项（生产环境会拒绝启动）'
+  const vendorOn = recruitmentLockStartupLine(
+    evaluateRecruitmentLock({ RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true' }),
+  )
+  const privateOnMissing = recruitmentLockStartupLine(
+    evaluateRecruitmentLock({
+      DEPLOYMENT_OWNERSHIP: 'customer_private',
+      RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true',
+    }),
+  )
+  const texts = [notice, startupOn, locked?.message ?? '', missing?.message ?? '', vendorOn, privateOnMissing]
+  for (const text of texts) {
+    if (text.includes('已核验') || text.includes('已认证') || text.includes('持证') || text.includes('认证')) {
+      throw new Error(`文案含禁用词：${text}`)
+    }
+  }
+  if (!notice.includes('本软件未核验') || !startupOn.includes('本软件未核验') || !notice.includes(fullLicense)) {
+    throw new Error('自报文案必须含「本软件未核验」和编号全文')
+  }
+  if (startupOff !== '[INFO] RECRUITMENT_LOCK: 部署归属=我方云；招聘内容托管=关') {
+    throw new Error(`我方云启动日志不符：${startupOff}`)
+  }
+  if (startupPrivateOff !== '[INFO] RECRUITMENT_LOCK: 部署归属=客户私有化部署；招聘内容托管=关') {
+    throw new Error(`私有化托管关启动日志不符：${startupPrivateOff}`)
+  }
+  if (vendorOn !== vendorOnNonProd) {
+    throw new Error(`我方云托管开的非生产启动日志不符：${vendorOn}`)
+  }
+  if (privateOnMissing !== privateMissingNonProd) {
+    throw new Error(`缺自报时不得写成已自报：${privateOnMissing}`)
+  }
+  for (const text of [vendorOn, privateOnMissing]) {
+    if (!text.includes('非生产环境')) {
+      throw new Error(`非生产启动日志必须写明非生产环境：${text}`)
+    }
+    if (text.includes('已核验') || text.includes('已认证') || text.includes('持证')) {
+      throw new Error(`非生产启动日志含禁用词：${text}`)
+    }
+  }
+  if (
+    startupOn !==
+    `[INFO] RECRUITMENT_OPERATOR_SELF_REPORTED: 部署归属=客户私有化部署；招聘内容托管=开；${notice}`
+  ) {
+    throw new Error(`私有化托管开启动日志不符：${startupOn}`)
+  }
+  console.log('  PASS 自报文案含「本软件未核验」、不含禁用词，编号为全文')
+}
+
+/** 键名像密钥。从用例实际写给预检的 .env 文本里取，不手抄值。 */
+const PREFLIGHT_SECRET_KEY = /SECRET|_KEY|TOKEN|PASSWORD|DATABASE_URL|REDIS_URL/
+
+function unquoteEnvValue(raw: string): string {
+  const trimmed = raw.trim()
+  if (trimmed.length >= 2) {
+    const quote = trimmed[0]
+    if ((quote === '"' || quote === "'") && trimmed.endsWith(quote)) return trimmed.slice(1, -1)
+  }
+  return trimmed
+}
+
+/**
+ * 按行解析这条用例喂给预检的 .env。命中密钥键的值（去掉引号）都不许出现在输出里。
+ * DATABASE_URL 的账号口令段（夹具里是 user:pass）单独再罩一层。
+ */
+function secretValuesFromEnvText(envText: string): string[] {
+  const values: string[] = []
+  const seen = new Set<string>()
+  const add = (value: string) => {
+    if (!value || seen.has(value)) return
+    seen.add(value)
+    values.push(value)
+  }
+  for (const rawLine of envText.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+    const body = /^export\s+/.test(line) ? line.replace(/^export\s+/, '') : line
+    const eq = body.indexOf('=')
+    if (eq <= 0) continue
+    const key = body.slice(0, eq).trim()
+    if (!PREFLIGHT_SECRET_KEY.test(key)) continue
+    const value = unquoteEnvValue(body.slice(eq + 1))
+    add(value)
+    if (!/DATABASE_URL/.test(key)) continue
+    const scheme = value.indexOf('://')
+    if (scheme < 0) continue
+    const rest = value.slice(scheme + 3)
+    const at = rest.indexOf('@')
+    if (at > 0) add(rest.slice(0, at))
+  }
+  return values
+}
+
+function assertPreflightForceValue(): void {
+  console.log('\n=== 预检 --force-value ===')
+  const script = join(__dirname, 'preflight-production-gates.mjs')
+  const run = (extraArgs: string[], envBody = 'RECRUITMENT_CONTENT_HOSTING_ENABLED=true\n') => {
+    const dir = mkdtempSync(join(tmpdir(), 'recruitlock-preflight-'))
+    const envFile = join(dir, '.env')
+    writeFileSync(envFile, envBody, 'utf8')
+    try {
+      const result = spawnSync(process.execPath, [script, '--env-file', envFile, ...extraArgs], { encoding: 'utf8' })
+      return { status: result.status, output: `${result.stdout ?? ''}\n${result.stderr ?? ''}` }
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+  const expectFail = (extraArgs: string[], needle: string, label: string, hiddenValues: string[] = [], envBody?: string) => {
+    const body = envBody ?? 'RECRUITMENT_CONTENT_HOSTING_ENABLED=true\n'
+    const result = run(extraArgs, body)
+    const forbidden = hiddenValues.concat(secretValuesFromEnvText(body).filter((value) => !hiddenValues.includes(value)))
+    const leaked = forbidden.find((value) => result.output.includes(value))
+    if (result.status === 0 || !result.output.includes(needle) || leaked) {
+      throw new Error(`${label}: 期望失败且含 ${needle}，status=${result.status} leaked=${leaked ?? ''} output=${result.output.slice(0, 500)}`)
+    }
+    console.log(`  PASS ${label}`)
+  }
+  const expectOk = (extraArgs: string[], label: string, envBody: string) => {
+    const result = run(extraArgs, envBody)
+    if (result.status !== 0 || !result.output.includes('PREFLIGHT OK')) {
+      throw new Error(`${label}: 期望 PREFLIGHT OK，status=${result.status} output=${result.output.slice(0, 800)}`)
+    }
+    console.log(`  PASS ${label}`)
+  }
+  const hostingOnPrivate = [
+    'JWT_SECRET=a-strong-production-secret-0123456789',
+    'FILE_SIGNING_SECRET=a-strong-file-signing-secret-0123456789',
+    'SECRET_ENCRYPTION_KEY=a-strong-encryption-key-0123456789ab',
+    'FILE_STORAGE_DRIVER=cos',
+    'DATABASE_URL="postgresql://user:pass@127.0.0.1:5432/ai_job_print"',
+    'REDIS_URL=redis://127.0.0.1:6379/0',
+    'SMS_PROVIDER=tencent',
+    'TENCENT_SMS_SECRET_ID=sms-secret-id',
+    'TENCENT_SMS_SECRET_KEY=sms-secret-key',
+    'TENCENT_SMS_SDK_APP_ID=sms-sdk-app-id',
+    'TENCENT_SMS_SIGN_NAME=sms-sign-name',
+    'TENCENT_SMS_TEMPLATE_ID=sms-template-id',
+    'OCR_PROVIDER=baidu',
+    'BAIDU_OCR_API_KEY=baidu-api-key',
+    'BAIDU_OCR_SECRET_KEY=baidu-secret-key',
+    'AI_PROVIDER=llm',
+    'AI_LLM_API_KEY=llm-api-key',
+    'AIGC_CONTENT_PRODUCER=示例信息技术有限公司',
+    'PAYMENT_SESSION_SECRET=payment-session-secret-0123456789',
+    'TERMINAL_ADMIN_SECRET=a-strong-terminal-admin-secret-01234567',
+    'TERMINAL_ACTION_TOKEN_SECRET=a-strong-terminal-action-secret-0123456',
+    'PRINT_REQUIRE_PII_SCAN=true',
+    'PRINT_REQUIRE_PRINTER_ONLINE=true',
+    'PRINT_SCAN_CAPABILITY_MODE=managed',
+    'TRUST_PROXY_HOPS=1',
+    'TERMINAL_LEGACY_REGISTER_ENABLED=false',
+    'TERMINAL_PLANNED_PROVISIONING_ENABLED=true',
+    'RECRUITMENT_CONTENT_HOSTING_ENABLED=true',
+    'DEPLOYMENT_OWNERSHIP=customer_private',
+    'RECRUITMENT_OPERATOR_NAME=示例职业介绍所',
+    'RECRUITMENT_OPERATOR_LICENSE_NO=鲁人社证字〔2026〕第001号',
+    '',
+  ].join('\n')
+  const hostingOffPrivate = hostingOnPrivate.replace('RECRUITMENT_CONTENT_HOSTING_ENABLED=true\n', '')
+  const forceVendor = ['--force-value', 'DEPLOYMENT_OWNERSHIP=vendor_cloud']
+  expectFail([], 'PRODUCTION_RECRUITMENT_HOSTING_LOCKED', '.env 没写归属 + 托管开 → 预检失败')
+  expectFail(
+    ['--force-value', 'DEPLOYMENT_OWNERSHIP=customer_private'],
+    'PRODUCTION_RECRUITMENT_OPERATOR_SELF_REPORT_MISSING',
+    '--force-value 私有化但缺自报 → 预检失败',
+  )
+  expectFail(
+    ['--force-value', 'deployment_ownership=vendor_cloud'],
+    'PREFLIGHT_USAGE',
+    '键名小写 → PREFLIGHT_USAGE',
+  )
+  expectFail(
+    ['--force-value', 'DEPLOYMENT_OWNERSHIP=zz-empty-sentinel,'],
+    'PREFLIGHT_USAGE',
+    '--force-value 空项 → PREFLIGHT_USAGE',
+    ['zz-empty-sentinel'],
+  )
+  expectFail(
+    ['--force-value', 'DUP_FORCE_KEY=zz-dup-one,DUP_FORCE_KEY=zz-dup-two'],
+    'PREFLIGHT_USAGE',
+    '--force-value 重复键 → PREFLIGHT_USAGE',
+    ['zz-dup-one', 'zz-dup-two'],
+  )
+  expectFail(
+    ['--force-true', 'PRINT_REQUIRE_PII_SCAN', '--force-value', 'PRINT_REQUIRE_PII_SCAN=zz-overlap-secret'],
+    'PREFLIGHT_USAGE',
+    '--force-value 与 --force-true 同名键 → PREFLIGHT_USAGE',
+    ['zz-overlap-secret'],
+  )
+  const hiddenFixtureValues = [
+    'ci-only-hidden-value-alpha',
+    'ci-only-hidden-value-bravo',
+    'ci-only-hidden-value-charlie',
+  ]
+  const hostingOnPrivateWithHidden = `${hostingOnPrivate}${hiddenFixtureValues
+    .map((value, index) => `CI_ONLY_HIDDEN_${index}=${value}`)
+    .join('\n')}\n`
+  expectFail(
+    forceVendor,
+    'PRODUCTION_RECRUITMENT_HOSTING_LOCKED',
+    '.env 写私有化且托管开，--force-value 压成 vendor_cloud → 预检失败，且不回显夹具 .env 的值',
+    hiddenFixtureValues,
+    hostingOnPrivateWithHidden,
+  )
+  expectOk(
+    forceVendor,
+    '同一份 .env 去掉托管开，--force-value 仍是 vendor_cloud → 预检通过',
+    hostingOffPrivate,
+  )
 }
 
 main()

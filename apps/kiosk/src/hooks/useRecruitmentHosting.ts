@@ -1,8 +1,8 @@
 // 招聘内容托管开关（next-tasks 3.13，一体机侧）。
 //
-// 只有终端配置明确下发 `recruitmentHosting.enabled === true` 才算打开；旧服务端没有这个
-// 字段时退回 `jobBoard.enabled`，同样必须是 true。配置还没读到、读取失败、字段畸形、
-// 本机没有终端身份，一律按关闭处理：与我们云上的默认（托管 a）一致，也不会出现
+// 只有终端配置明确下发 `recruitmentHosting.enabled === true` 才算打开。终端配置里没有
+// `recruitmentHosting` 这一项时一律按关，不再退回 `jobBoard.enabled`。配置还没读到、读取失败、
+// 字段畸形、本机没有终端身份，一律按关闭处理：与我们云上的默认（托管 a）一致，也不会出现
 // 「入口先闪出来再消失」。打开时（客户私有化部署 b）页面行为与今天相同。
 //
 // 读的是 getCachedKioskTerminalConfig（30 秒内存缓存 + 在途请求合并），同一页里几处

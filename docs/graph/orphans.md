@@ -41,7 +41,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | 风险 | 含义 | 数量 |
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
-| **high** | 仍被 CI / 门禁 / 包脚本引用 | 174 |
+| **high** | 仍被 CI / 门禁 / 包脚本引用 | 175 |
 | **medium** | 只被文档或其它文件提及 | 30 |
 | **low** | 全仓零提及 | 95 |
 
@@ -232,7 +232,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## high — 仍被 CI / 门禁 / 包脚本引用（174）
+## high — 仍被 CI / 门禁 / 包脚本引用（175）
 
 ### 页面/组件（109）
 
@@ -413,10 +413,11 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/styles/kiosk-uplift.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs |
 | `apps/kiosk/src/styles/prototype-v1.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-fusion-w3.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs |
 
-### 测试（5）
+### 测试（6）
 
 | 路径 | 判定依据 |
 | --- | --- |
+| `apps/admin/src/routes/components/recruitment/RecruitmentHostingNotice.test.tsx` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：scripts/verify-compliance-copy.mjs、services/api/scripts/verify-production-runtime-gates.ts |
 | `apps/admin/src/routes/member-benefits/grantFormModel.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
 | `apps/admin/src/routes/partners/licenseValidation.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
 | `apps/admin/src/routes/partners/partnerAccountActionMachine.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |

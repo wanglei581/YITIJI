@@ -9,6 +9,7 @@ import { registerAiPlatformDegradation } from './common/boot/ai-platform-degrada
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 import { installBodyParsers } from './config/body-parsers'
 import { assertProductionRuntimeGates } from './config/production-runtime-gates'
+import { evaluateRecruitmentLock, recruitmentLockStartupLine } from './recruitment-hosting/deployment-ownership'
 import { assertSmsTrustedEgressConfig } from './member-auth/sms/sms-egress-config'
 import { resolveTrustProxyHops } from './config/trust-proxy'
 import { installUnhandledRejectionGuard } from './common/process/background-task'
@@ -135,6 +136,8 @@ async function bootstrap(): Promise<void> {
   const port = process.env['PORT'] ?? 3010
   await app.listen(port)
   console.log(`AI Job Print API running on http://localhost:${port}/api/v1`)
+  // 所有环境都打。自报句带运营单位名称和许可证编号全文；其它环境变量值不打印。
+  console.log(recruitmentLockStartupLine(evaluateRecruitmentLock()))
 
   // 启动期降级如实上屏：运维在部署日只看控制台也能知道「起来了但不完整」。
   // 明细同时可从 GET /api/v1/health 与 GET /api/v1/health/ready 读到。
