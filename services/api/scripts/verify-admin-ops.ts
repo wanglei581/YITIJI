@@ -106,6 +106,11 @@ function mockOpsPrisma(
       count: async () => 0,
       groupBy: async () => [],
     },
+    // 服务单退款待人工处理会查 ServiceOrder。这组夹具没有这种单，空结果不能把整份列表打崩。
+    serviceOrder: {
+      findMany: async () => [],
+      findFirst: async () => null,
+    },
     feedbackTicket: {
       count: async (args?: FeedbackQuery) => matchFeedback(feedbackRows, args).length,
       findFirst: async (args?: FeedbackQuery) => {
