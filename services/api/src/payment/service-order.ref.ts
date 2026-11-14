@@ -139,6 +139,7 @@ export async function attachServiceOrderConsumedRef(db: Db, orderId: string, con
 async function judgeOpenSibling(deps: OpenRefDeps, sibling: OpenOrder): Promise<'yield' | 'block'> {
   const ref = sibling.consumedRef
   if (!ref || ref === 'pending') return 'block'
+  if (sibling.settledAt) return 'block'
   if (sibling.serviceKey === 'resume_optimize') return judgeResumeSibling(deps.prisma, ref)
   if (sibling.serviceKey === 'mock_interview') return judgeInterviewSibling(deps.prisma, ref)
   if (sibling.serviceKey === 'scan') return judgeScanSibling(deps, sibling, ref)
