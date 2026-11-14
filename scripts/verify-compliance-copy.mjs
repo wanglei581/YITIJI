@@ -20,6 +20,7 @@
  * 扫描范围只含前端用户可见代码。services/api/src 故意排除:那里的禁词是 7 个运行时
  * 守卫的正则/数组**数据**,以及告诉 LLM 不要输出这些词的 prompt 文本,属合法持有。
  */
+import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -497,6 +498,36 @@ for (const { rel, exact } of TITLE_RULES) {
   }
 }
 if (titleMismatch === 0) pass(`6. 三端页面标题与备案名「${FILING_NAME}」一致（${TITLE_RULES.length} 个入口）`)
+
+// ---------- 7. 后台运营单位自报提示条（两态渲染） ----------
+//
+// 文案在 RecruitmentHostingNotice.tsx。后台 mock 适配器恒回 operatorSelfReport: null，
+// 浏览器用例因此看不到这行。这里直接渲染组件：有自报必须逐字出现，自报为空不得出现。
+{
+  const testFile = path.join(root, 'apps/admin/src/routes/components/recruitment/RecruitmentHostingNotice.test.tsx')
+  if (!fs.existsSync(testFile)) {
+    fail(`7. 后台自报提示条用例不存在: ${path.relative(root, testFile)}`)
+  } else {
+    const env = { ...process.env, NO_COLOR: '1' }
+    delete env.FORCE_COLOR
+    const result = spawnSync(process.execPath, [
+      '--import',
+      path.join(root, 'services/api/node_modules/tsx/dist/esm/index.mjs'),
+      '--test',
+      testFile,
+    ], {
+      cwd: path.join(root, 'apps/admin'),
+      encoding: 'utf8',
+      env,
+    })
+    const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`
+    if (result.status !== 0) {
+      fail(`7. 后台自报提示条两态用例失败\n${output.slice(-1500)}`)
+    } else {
+      pass('7. 后台自报提示条：有自报逐字含「运营单位自报：」与「本软件未核验。」，不含已认证/已核验；自报为空不出现')
+    }
+  }
+}
 
 // ---------- 结果 ----------
 

@@ -511,9 +511,32 @@ function main(): void {
 
   assertRecruitmentLockCases()
   assertRecruitmentLockCopy()
+  assertAdminSelfReportNoticeRendered()
   assertPreflightForceValue()
 
   console.log('\n=== ALL PASS ===')
+}
+
+function assertAdminSelfReportNoticeRendered(): void {
+  const repoRoot = join(__dirname, '../../..')
+  const testFile = join(repoRoot, 'apps/admin/src/routes/components/recruitment/RecruitmentHostingNotice.test.tsx')
+  const env = { ...process.env, NO_COLOR: '1' }
+  delete env.FORCE_COLOR
+  const result = spawnSync(process.execPath, [
+    '--import',
+    join(repoRoot, 'services/api/node_modules/tsx/dist/esm/index.mjs'),
+    '--test',
+    testFile,
+  ], {
+    cwd: join(repoRoot, 'apps/admin'),
+    encoding: 'utf8',
+    env,
+  })
+  const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`
+  if (result.status !== 0) {
+    throw new Error(`后台自报提示条两态用例失败\n${output.slice(-1500)}`)
+  }
+  console.log('  PASS 后台自报提示条两态：有自报逐字含「运营单位自报：」与「本软件未核验。」，空自报不出现')
 }
 
 function assertRecruitmentLockCases(): void {
@@ -663,10 +686,10 @@ function assertRecruitmentLockCopy(): void {
 function assertPreflightForceValue(): void {
   console.log('\n=== 预检 --force-value ===')
   const script = join(__dirname, 'preflight-production-gates.mjs')
-  const run = (extraArgs: string[]) => {
+  const run = (extraArgs: string[], envBody = 'RECRUITMENT_CONTENT_HOSTING_ENABLED=true\n') => {
     const dir = mkdtempSync(join(tmpdir(), 'recruitlock-preflight-'))
     const envFile = join(dir, '.env')
-    writeFileSync(envFile, 'RECRUITMENT_CONTENT_HOSTING_ENABLED=true\n', 'utf8')
+    writeFileSync(envFile, envBody, 'utf8')
     try {
       const result = spawnSync(process.execPath, [script, '--env-file', envFile, ...extraArgs], { encoding: 'utf8' })
       return { status: result.status, output: `${result.stdout ?? ''}\n${result.stderr ?? ''}` }
@@ -674,14 +697,57 @@ function assertPreflightForceValue(): void {
       rmSync(dir, { recursive: true, force: true })
     }
   }
-  const expectFail = (extraArgs: string[], needle: string, label: string, hiddenValues: string[] = []) => {
-    const result = run(extraArgs)
+  const expectFail = (extraArgs: string[], needle: string, label: string, hiddenValues: string[] = [], envBody?: string) => {
+    const result = envBody === undefined ? run(extraArgs) : run(extraArgs, envBody)
     const leaked = hiddenValues.find((value) => result.output.includes(value))
     if (result.status === 0 || !result.output.includes(needle) || leaked) {
       throw new Error(`${label}: 期望失败且含 ${needle}，status=${result.status} leaked=${leaked ?? ''} output=${result.output.slice(0, 500)}`)
     }
     console.log(`  PASS ${label}`)
   }
+  const expectOk = (extraArgs: string[], label: string, envBody: string) => {
+    const result = run(extraArgs, envBody)
+    if (result.status !== 0 || !result.output.includes('PREFLIGHT OK')) {
+      throw new Error(`${label}: 期望 PREFLIGHT OK，status=${result.status} output=${result.output.slice(0, 800)}`)
+    }
+    console.log(`  PASS ${label}`)
+  }
+  const hostingOnPrivate = [
+    'JWT_SECRET=a-strong-production-secret-0123456789',
+    'FILE_SIGNING_SECRET=a-strong-file-signing-secret-0123456789',
+    'SECRET_ENCRYPTION_KEY=a-strong-encryption-key-0123456789ab',
+    'FILE_STORAGE_DRIVER=cos',
+    'DATABASE_URL="postgresql://user:pass@127.0.0.1:5432/ai_job_print"',
+    'REDIS_URL=redis://127.0.0.1:6379/0',
+    'SMS_PROVIDER=tencent',
+    'TENCENT_SMS_SECRET_ID=sms-secret-id',
+    'TENCENT_SMS_SECRET_KEY=sms-secret-key',
+    'TENCENT_SMS_SDK_APP_ID=sms-sdk-app-id',
+    'TENCENT_SMS_SIGN_NAME=sms-sign-name',
+    'TENCENT_SMS_TEMPLATE_ID=sms-template-id',
+    'OCR_PROVIDER=baidu',
+    'BAIDU_OCR_API_KEY=baidu-api-key',
+    'BAIDU_OCR_SECRET_KEY=baidu-secret-key',
+    'AI_PROVIDER=llm',
+    'AI_LLM_API_KEY=llm-api-key',
+    'AIGC_CONTENT_PRODUCER=示例信息技术有限公司',
+    'PAYMENT_SESSION_SECRET=payment-session-secret-0123456789',
+    'TERMINAL_ADMIN_SECRET=a-strong-terminal-admin-secret-01234567',
+    'TERMINAL_ACTION_TOKEN_SECRET=a-strong-terminal-action-secret-0123456',
+    'PRINT_REQUIRE_PII_SCAN=true',
+    'PRINT_REQUIRE_PRINTER_ONLINE=true',
+    'PRINT_SCAN_CAPABILITY_MODE=managed',
+    'TRUST_PROXY_HOPS=1',
+    'TERMINAL_LEGACY_REGISTER_ENABLED=false',
+    'TERMINAL_PLANNED_PROVISIONING_ENABLED=true',
+    'RECRUITMENT_CONTENT_HOSTING_ENABLED=true',
+    'DEPLOYMENT_OWNERSHIP=customer_private',
+    'RECRUITMENT_OPERATOR_NAME=示例职业介绍所',
+    'RECRUITMENT_OPERATOR_LICENSE_NO=鲁人社证字〔2026〕第001号',
+    '',
+  ].join('\n')
+  const hostingOffPrivate = hostingOnPrivate.replace('RECRUITMENT_CONTENT_HOSTING_ENABLED=true\n', '')
+  const forceVendor = ['--force-value', 'DEPLOYMENT_OWNERSHIP=vendor_cloud']
   expectFail([], 'PRODUCTION_RECRUITMENT_HOSTING_LOCKED', '.env 没写归属 + 托管开 → 预检失败')
   expectFail(
     ['--force-value', 'DEPLOYMENT_OWNERSHIP=customer_private'],
@@ -710,6 +776,18 @@ function assertPreflightForceValue(): void {
     'PREFLIGHT_USAGE',
     '--force-value 与 --force-true 同名键 → PREFLIGHT_USAGE',
     ['zz-overlap-secret'],
+  )
+  expectFail(
+    forceVendor,
+    'PRODUCTION_RECRUITMENT_HOSTING_LOCKED',
+    '.env 写私有化且托管开，--force-value 压成 vendor_cloud → 预检失败',
+    [],
+    hostingOnPrivate,
+  )
+  expectOk(
+    forceVendor,
+    '同一份 .env 去掉托管开，--force-value 仍是 vendor_cloud → 预检通过',
+    hostingOffPrivate,
   )
 }
 

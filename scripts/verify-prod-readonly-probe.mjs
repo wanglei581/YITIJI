@@ -272,6 +272,10 @@ function handle(req, res) {
       send(res, 200, { success: true, data: null })
       return
     }
+    if (mutation === 'hosting_wrong_code') {
+      send(res, 403, { error: { code: 'FORBIDDEN', message: '别的拒绝' } })
+      return
+    }
     send(res, 403, { error: { code: 'RECRUITMENT_HOSTING_DISABLED', message: '招聘内容托管已关闭' } })
     return
   }
@@ -503,6 +507,18 @@ try {
     pass('200 被判失败：招聘内容托管在生产上是开的（招聘锁没生效）')
   } else {
     fail(`200 必须判失败并写出招聘锁没生效: ${openLine.trim() || '(该行未出现)'}`)
+  }
+  mutation = 'ok'
+
+  console.log('\n=== 变异：403 但 error.code 不是 RECRUITMENT_HOSTING_DISABLED ===')
+  mutation = 'hosting_wrong_code'
+  const wrongCode = await runProbe(port)
+  expectExit(wrongCode, 1, '403 错 code')
+  const wrongLine = lineOf(wrongCode.stdout, '/api/v1/job-fairs/00000000000000000000000000000000')
+  if (/\sFAIL\s/.test(wrongLine) && wrongLine.includes('不是 RECRUITMENT_HOSTING_DISABLED')) {
+    pass('403 但 code 不对判 FAIL')
+  } else {
+    fail(`403 错 code 必须 FAIL 并写明不是 RECRUITMENT_HOSTING_DISABLED: ${wrongLine.trim() || '(该行未出现)'}`)
   }
   mutation = 'ok'
 

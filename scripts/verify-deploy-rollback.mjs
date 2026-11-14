@@ -234,7 +234,7 @@ exec "${dateBin}" "$@"
 `)
 }
 
-function makeSandbox({ oldGroups = 0, pointerUnwritable = false, omitOwnershipFile = false } = {}) {
+function makeSandbox({ oldGroups = 0, pointerUnwritable = false, omitOwnershipFile = false, ownershipSource = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'deploy-drill-'))
   const bin = join(dir, 'bin')
   const checkout = join(dir, 'checkout')
@@ -252,7 +252,7 @@ function makeSandbox({ oldGroups = 0, pointerUnwritable = false, omitOwnershipFi
   if (!omitOwnershipFile) {
     writeFileSync(
       join(checkout, 'services/api/src/recruitment-hosting/deployment-ownership.ts'),
-      "export const DEPLOYMENT_OWNERSHIP_ENV = 'DEPLOYMENT_OWNERSHIP'\n",
+      ownershipSource ?? "export const DEPLOYMENT_OWNERSHIP_ENV = 'DEPLOYMENT_OWNERSHIP'\n",
     )
   }
   writeFileSync(join(checkout, 'services/api/scripts/preflight-production-gates.mjs'), 'process.exit(0)\n')
@@ -374,6 +374,8 @@ try {
   {
     const box = makeSandbox(); boxes.push(box)
     // 跳过变量写成 first-install 以外的值不算跳过：预检照常执行
+    const envPath = join(box.runtime, 'services/api/.env')
+    writeFileSync(envPath, 'DATABASE_URL="postgres://drill@127.0.0.1/drill"\nDEPLOYMENT_OWNERSHIP=customer_private\n')
     const r = runDeploy(box, { DRILL_HEALTH: 'always', DEPLOY_SKIP_LEGAL_DOCS_PREFLIGHT: 'true' })
     check(r.code === 0, '场景 1：就绪检查通过时发布成功', `退出码 ${r.code}\n${r.out.slice(-800)}`)
     check(r.calls.includes('legal-preflight --base-url http://drill.invalid/api/v1\n'),
@@ -391,8 +393,13 @@ try {
     check(r.out.includes('FLOOR_MB=10240'), '场景 1：空间下限默认 10240MB', r.out.match(/FLOOR_MB=\d+/)?.[0] ?? '')
     check(r.out.includes('::warning::pm2-logrotate 未安装') && r.out.includes('services/api/scripts/pm2-logrotate-setup.sh') && !r.calls.includes('pm2 install'),
       '场景 1：没装 pm2-logrotate 时只告警并指出安装脚本，不安装', r.out.slice(-400))
-    check(read(join(box.runtime, 'services/api/.env')).split('\n').includes('DEPLOYMENT_OWNERSHIP=vendor_cloud'),
+    const envText = read(join(box.runtime, 'services/api/.env'))
+    const ownershipLines = envText.split('\n').map((line) => line.trim()).filter((line) => /^(export\s+)?DEPLOYMENT_OWNERSHIP\s*=/.test(line))
+    check(envText.split('\n').includes('DEPLOYMENT_OWNERSHIP=vendor_cloud'),
       '场景 1：3b 写出 DEPLOYMENT_OWNERSHIP=vendor_cloud')
+    check(ownershipLines.length === 1 && ownershipLines[0] === 'DEPLOYMENT_OWNERSHIP=vendor_cloud',
+      '场景 1：.env 里原有 DEPLOYMENT_OWNERSHIP 时，3b 替换成恰好一行 vendor_cloud',
+      ownershipLines.join(' | ') || envText)
   }
   // 0a. 没有部署归属文件的旧提交不能当发布目标：在备份和迁移之前失败
   {
@@ -406,6 +413,23 @@ try {
     check(!r.out.includes('=== 6. 收敛运行目录') && !r.calls.includes('db:pg:deploy') && !r.out.includes('Applying migration'),
       '场景 0a：迁移没有发生', r.calls.slice(0, 300))
     check(read(join(box.runtime, 'VERSION')) === 'old', '场景 0a：运行目录仍是发布前')
+  }
+  // 0a. 归属文件在，但里面没有固定键名：同样必须在备份之前停在 0a
+  {
+    const box = makeSandbox({ ownershipSource: "export const UNRELATED = 'other'\n" }); boxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always' })
+    const backupNames = existsSync(box.backups) ? readdirSync(box.backups) : []
+    check(
+      r.code !== 0
+        && r.out.includes('=== 0a.')
+        && r.out.includes('目标提交的部署归属文件不认识固定键：DEPLOYMENT_OWNERSHIP')
+        && !r.out.includes('=== 2. PostgreSQL')
+        && !r.calls.includes('pg_dump')
+        && backupNames.length === 0,
+      '场景 0a：归属文件不认识 DEPLOYMENT_OWNERSHIP 时停在 0a，备份没有发生',
+      `退出码 ${r.code} backups=${backupNames.join(',')}\n${r.out.slice(-800)}`,
+    )
+    check(read(join(box.runtime, 'VERSION')) === 'old', '场景 0a 缺键：运行目录仍是发布前')
   }
   // 2. 就绪检查一直失败 → 恢复并重启回旧版
   {

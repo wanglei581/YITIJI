@@ -348,6 +348,13 @@ if (deployWorkflow.includes(staticRoot) && precheckScript.includes(staticRoot)) 
     } else {
       fail('3b 必须在 KEY=true 循环之外把固定值写成 print key "=" value')
     }
+    const fixedAwkAt = deploySource.indexOf('awk -v key="$FIXED_KEY" -v value="$FIXED_VALUE"')
+    const fixedAwk = fixedAwkAt < 0 ? '' : deploySource.slice(fixedAwkAt, fixedAwkAt + 700)
+    if (/print key "=" value[\s\S]*?\n\s*next\n/.test(fixedAwk)) {
+      pass('3b 已有同名行写出新值后 next，不把旧行再打出来')
+    } else {
+      fail('3b 替换已有同名行时必须 next 跳过旧行，改完该键只能剩一行')
+    }
     const restartAt = deploySource.lastIndexOf('pm2 restart "$PM2_NAME" --update-env')
     const beforeRestart = restartAt < 0 ? '' : deploySource.slice(0, restartAt)
     if (/^export "\$\{FIXED_PRODUCTION_VALUES\[@\]\}"$/m.test(beforeRestart)) {
@@ -357,11 +364,12 @@ if (deployWorkflow.includes(staticRoot) && precheckScript.includes(staticRoot)) 
     }
     if (
       deploySource.includes('services/api/src/recruitment-hosting/deployment-ownership.ts') &&
-      /for FIXED_PAIR in "\$\{FIXED_PRODUCTION_VALUES\[@\]\}"/.test(deploySource)
+      /for FIXED_PAIR in "\$\{FIXED_PRODUCTION_VALUES\[@\]\}"/.test(deploySource) &&
+      deploySource.includes('grep -Eq "(^|[^A-Z_])${FIXED_KEY}([^A-Z_]|$)" "$TARGET_OWNERSHIP_SOURCE"')
     ) {
       pass('0a 核对目标提交含部署归属文件且认识每个固定键名')
     } else {
-      fail('0a 必须另起循环：目标提交要有 deployment-ownership.ts，且其中出现每个固定键名')
+      fail('0a 必须另起循环：目标提交要有 deployment-ownership.ts，且用 grep 核每个固定键名出现在该文件')
     }
   }
 }
