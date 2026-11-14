@@ -115,14 +115,18 @@ async function main(): Promise<void> {
   const storage = new StorageService()
   const files = new FilesService(prisma, audit, storage)
   const contentReads = { n: 0 }
+  const readContentCalls = { n: 0 }
+  const readContentForEndUserCalls = { n: 0 }
   const readContent = files.readContent.bind(files)
   const readContentForEndUser = files.readContentForEndUser.bind(files)
   files.readContent = async (fileId) => {
     contentReads.n += 1
+    readContentCalls.n += 1
     return readContent(fileId)
   }
   files.readContentForEndUser = async (fileId, endUserId) => {
     contentReads.n += 1
+    readContentForEndUserCalls.n += 1
     return readContentForEndUser(fileId, endUserId)
   }
   const appendix = await onePagePdf()
@@ -207,7 +211,12 @@ async function main(): Promise<void> {
   ): Promise<void> {
     const filesBefore = await prisma.fileObject.count()
     const auditsBefore = await appendAuditCount(access)
+    const ownerReadsBefore = readContentForEndUserCalls.n
+    const plainReadsBefore = readContentCalls.n
     const out = await service.appendToResume({ taskId, requester, resumeFileId, resumeFileUrl })
+    if (access === 'owner' && (readContentForEndUserCalls.n !== ownerReadsBefore + 1 || readContentCalls.n !== plainReadsBefore)) {
+      fail(`${label}：有会员主人的文件必须走 readContentForEndUser（${ownerReadsBefore}→${readContentForEndUserCalls.n}），不能走 readContent（${plainReadsBefore}→${readContentCalls.n}）`)
+    }
     if (!out.printFileUrl || !PRINT_URL.test(out.printFileUrl)) {
       fail(`${label}：没有返回本次合并文件的签名地址`)
     }
@@ -366,7 +375,9 @@ async function main(): Promise<void> {
     }
 
     // 场景4 的请求体此前只扫源码。这里按实际路由打一次，确认签名地址过了校验管道并交给合并。
+    // 访客不带地址时控制器不得自己签一条地址：必须拒绝，而且文件内容一次都没被读。
     const routeFileId = await uploadPdf(null)
+    const bareFileId = await uploadPdf(null)
     const routeUrl = signFileUrl(routeFileId).url
     @Module({
       controllers: [SelfAssessmentController],
@@ -387,6 +398,25 @@ async function main(): Promise<void> {
       app.useGlobalFilters(new HttpExceptionFilter())
       await app.listen(0, '127.0.0.1')
       const base = await app.getUrl()
+      const readsBeforeBare = contentReads.n
+      const filesBeforeBare = await prisma.fileObject.count()
+      const bareRes = await fetch(`${base}/api/v1/resume/self-assessment/${encodeURIComponent(taskId)}/append`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-resume-access-token': accessToken,
+        },
+        body: JSON.stringify({ resumeFileId: bareFileId }),
+      })
+      const bareBody = await bareRes.json() as { error?: { code?: string; message?: string } }
+      if (bareRes.status !== 404 || bareBody.error?.code !== 'RESUME_FILE_NOT_FOUND') {
+        fail(`场景4 访客不带签名地址：应当拒绝，实际 ${bareRes.status} ${JSON.stringify(bareBody).slice(0, 300)}`)
+      }
+      if (contentReads.n !== readsBeforeBare) {
+        fail(`场景4 访客不带签名地址：文件内容被读了 ${contentReads.n - readsBeforeBare} 次`)
+      }
+      if ((await prisma.fileObject.count()) !== filesBeforeBare) fail('场景4 访客不带签名地址：多出了文件')
+      pass('场景4 访客不带签名地址被拒且没有读文件内容')
       const res = await fetch(`${base}/api/v1/resume/self-assessment/${encodeURIComponent(taskId)}/append`, {
         method: 'POST',
         headers: {

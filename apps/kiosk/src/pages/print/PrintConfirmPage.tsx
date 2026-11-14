@@ -23,7 +23,7 @@ import {
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import { machineCannotPrintLine, preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
-import { appendSelfAssessmentToResume } from '../../services/api/selfAssessment'
+import { appendSelfAssessmentToResume, SelfAssessmentApiError } from '../../services/api/selfAssessment'
 import { abandonContractReviewReport } from '../../services/api/contractReview'
 import { formatCents } from './cashierStatus'
 import { countPagesInRange } from './pageRange'
@@ -154,6 +154,8 @@ export function PrintConfirmPage() {
   const [quotaCode, setQuotaCode] = useState<string | undefined>()
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [appendSelfAssessment, setAppendSelfAssessment] = useState(false)
+  // 这份文件本页附不上：复选框停用。换文件或离开本页时状态自然丢掉。
+  const [appendBlocked, setAppendBlocked] = useState(false)
   const [quoteNonce, setQuoteNonce] = useState(0)
   const selfAssessmentSnapshot = useMemo(() => readSelfAssessmentSnapshot(), [])
   const appendEligible =
@@ -164,6 +166,7 @@ export function PrintConfirmPage() {
     (file.mimeType === undefined || file.mimeType === 'application/pdf')
 
   useEffect(() => subscribeTerminalSession(setTerminalSession), [])
+  useEffect(() => { setAppendBlocked(false) }, [file.fileId])
   // 自我探索合并版只生成一次；二次确认复用同一份材料，不重复生成。
   const [mergedMaterial, setMergedMaterial] = useState<{ printFileUrl: string; name: string } | null>(null)
   const mergedFileUrl = appendEligible ? mergedMaterial?.printFileUrl ?? null : null
@@ -398,12 +401,26 @@ export function PrintConfirmPage() {
         let printFileMd5: string | undefined = file.fileMd5
         if (appendEligible && selfAssessmentSnapshot?.taskId && file.fileId) {
           if (!mergedMaterial) {
-            const merged = await appendSelfAssessmentToResume(
-              selfAssessmentSnapshot.taskId,
-              file.fileId,
-              file.fileUrl,
-              { token: getToken(), accessToken: selfAssessmentSnapshot.accessToken ?? null },
-            )
+            let merged: Awaited<ReturnType<typeof appendSelfAssessmentToResume>>
+            try {
+              merged = await appendSelfAssessmentToResume(
+                selfAssessmentSnapshot.taskId,
+                file.fileId,
+                file.fileUrl,
+                { token: getToken(), accessToken: selfAssessmentSnapshot.accessToken ?? null },
+              )
+            } catch (err) {
+              // 附录接口还没建单。附不上就停用勾选；其它失败保持勾选，允许再试。
+              if (err instanceof SelfAssessmentApiError && (err.code === 'RESUME_FILE_NOT_FOUND' || err.status === 404)) {
+                setAppendSelfAssessment(false)
+                setMergedMaterial(null)
+                setAppendBlocked(true)
+                setSubmitError('这份文件不能附加自我探索，已帮你取消勾选。本次没有建单；再点一次确认，就按原文件打印。')
+              } else {
+                setSubmitError('合并版没有生成，本次没有建单。可以再点一次确认重试，或取消勾选「附加自我探索」直接打印原文件。')
+              }
+              return
+            }
             if (!merged.printFileUrl) {
               setSubmitError('合并版文件还没有就绪，本次没有建单。请稍后再试。')
               return
@@ -634,13 +651,14 @@ export function PrintConfirmPage() {
           type="checkbox"
           checked={appendSelfAssessment}
           onChange={(e) => setAppendSelfAssessment(e.target.checked)}
-          disabled={submitting || !file.fileId || file.mimeType === 'image/jpeg' || file.mimeType === 'image/png'}
+          disabled={submitting || appendBlocked || !file.fileId || file.mimeType === 'image/jpeg' || file.mimeType === 'image/png'}
         />
         <span>附加自我探索 · 倾向参考摘要</span>
       </label>
       <p>
         仅在本人简历下方合并一份本人自助参考摘要；勾选后系统会即时生成仅供本人打印的合并 PDF，文件名追加 <code>-self-assessment</code>；合并结果不会进入任何企业、合作机构、Partner 或第三方可见的分享链路。
       </p>
+      {appendBlocked ? <p role="status">这份文件不能附加自我探索。</p> : null}
       {appendSelfAssessment && !file.fileId ? (
         <p role="alert">当前文件不支持合并：请在简历页生成可合并的简历 PDF 后再勾选此项。</p>
       ) : null}
