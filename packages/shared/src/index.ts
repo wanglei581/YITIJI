@@ -65,6 +65,7 @@ export {
   ADMIN_DATA_REQUEST_REJECT_HINT,
 } from './types/memberPrivacy'
 export * from './types/copyJob'
+export * from './types/terminalCharge'
 export * from './types/scanDeletionAudit'
 
 export * from './types/branding'

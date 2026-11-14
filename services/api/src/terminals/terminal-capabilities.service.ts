@@ -27,6 +27,16 @@ import {
 } from './terminal-capabilities.types'
 import { revokeTerminalCopyAuthorization } from '../copy-jobs/copy-authorization'
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
+import {
+  getTerminalChargeSettings,
+  saveTerminalChargeSettings,
+  type ChargeSettingsAuditWriter,
+  type TerminalChargeSettingsView,
+} from '../payment/terminal-charge-settings'
+import type { UpdateTerminalChargeSettingsDto } from './dto/update-terminal-charge-settings.dto'
+
+/** 管理员改某台机器首页「免费使用」开关。变量名含 ACTION，审计门禁才会收进动作全集。 */
+export const TERMINAL_HOME_FREE_BADGE_AUDIT_ACTION = 'terminal.home_free_badge.update'
 
 export interface UpsertCapabilityResult {
   terminalCode: string
@@ -132,6 +142,42 @@ export class TerminalCapabilitiesService {
       data: { dailyFreePrintSides: value },
     })
     return { terminalCode: terminal.terminalCode, previous: terminal.dailyFreePrintSides, dailyFreePrintSides: value }
+  }
+
+  async setHomeFreeBadge(
+    terminalId: string,
+    enabled: boolean,
+  ): Promise<{ terminalCode: string; previous: boolean; next: boolean }> {
+    if (typeof enabled !== 'boolean') {
+      throw new BadRequestException({
+        error: { code: 'VALIDATION_FAILED', message: '首页「免费使用」开关必须是布尔值' },
+      })
+    }
+    const terminal = await this.prisma.terminal.findUnique({
+      where: { id: terminalId },
+      select: { terminalCode: true, homeFreeBadge: true },
+    })
+    if (!terminal) {
+      throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
+    }
+    await this.prisma.terminal.update({
+      where: { id: terminalId },
+      data: { homeFreeBadge: enabled },
+    })
+    return { terminalCode: terminal.terminalCode, previous: terminal.homeFreeBadge, next: enabled }
+  }
+
+  getChargeSettings(terminalId: string): Promise<TerminalChargeSettingsView> {
+    return getTerminalChargeSettings(this.prisma, terminalId)
+  }
+
+  saveChargeSettings(
+    terminalId: string,
+    body: UpdateTerminalChargeSettingsDto,
+    adminId: string,
+    writeAudit?: ChargeSettingsAuditWriter,
+  ): Promise<{ previous: TerminalChargeSettingsView; next: TerminalChargeSettingsView }> {
+    return saveTerminalChargeSettings(this.prisma, terminalId, body, adminId, writeAudit)
   }
 
   async upsert(

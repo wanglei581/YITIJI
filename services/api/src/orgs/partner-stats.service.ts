@@ -23,6 +23,12 @@
 
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import {
+  PERSONAL_CHARGE_SETTING_KEY,
+  TERMINAL_CHARGE_SERVICE_KEYS,
+  type TerminalChargeServiceKey,
+} from '../payment/terminal-charge.contract'
+import { decideEffectiveUserPrices, toPartnerChargeView } from '../payment/effective-user-prices'
 import { requirePartnerOrgId, type PartnerOrgId } from '../console-screen/console-screen.org'
 import { countKioskVisitsByTerminal, hasKioskVisitsForOrg } from '../kiosk-session/kiosk-session.queries'
 import {
@@ -236,7 +242,10 @@ export class PartnerStatsService {
     const terminals = await this.prisma.terminal.findMany({
       where: { orgId: scopedOrgId },
       orderBy: { terminalCode: 'asc' },
-      select: { id: true, terminalCode: true, displayName: true, locationLabel: true, orgBoundAt: true, enabled: true, lifecycleStatus: true },
+      select: {
+        id: true, terminalCode: true, displayName: true, locationLabel: true,
+        orgBoundAt: true, enabled: true, lifecycleStatus: true, userChargeMode: true,
+      },
     })
     if (terminals.length === 0) {
       return assembleTerminalOperations({ period, from, to, now, rows: [], visitRecordingStarted: false })
@@ -249,7 +258,7 @@ export class PartnerStatsService {
     })
     const scanAvailable = new Set(scanCaps.map((cap) => cap.terminalId))
     const since = (orgBoundAt: Date | null) => terminalOpsEffectiveFrom(from, orgBoundAt)
-    const [printCreated, scanCreated, settled, visits, visitRecordingStarted] = await Promise.all([
+    const [printCreated, scanCreated, settled, visits, visitRecordingStarted, org, chargeSetting, servicePrices] = await Promise.all([
       this.prisma.printTask.groupBy({
         by: ['terminalId'],
         where: {
@@ -284,7 +293,14 @@ export class PartnerStatsService {
       // 服务人次只数机构快照为本机构的会话，终端改绑前的历史不带过来
       countKioskVisitsByTerminal(this.prisma, { orgId: scopedOrgId, terminalIds: ids, from, to }),
       hasKioskVisitsForOrg(this.prisma, scopedOrgId),
+      this.prisma.organization.findUnique({ where: { id: scopedOrgId }, select: { type: true } }),
+      this.prisma.platformSetting.findUnique({ where: { key: PERSONAL_CHARGE_SETTING_KEY } }),
+      this.prisma.terminalServicePrice.findMany({
+        where: { terminalId: { in: ids } },
+        select: { terminalId: true, serviceKey: true, unitCents: true },
+      }),
     ])
+    const personalChargeEnabled = chargeSetting?.value === 'true'
 
     const rows: TerminalOpsRaw[] = []
     for (const terminal of terminals) {
@@ -307,10 +323,24 @@ export class PartnerStatsService {
       const lastHeartbeatAt = currentHeartbeat?.createdAt ?? null
       const online = isOnlineAt(lastHeartbeatAt, now)
       const printerStatus = currentHeartbeat?.printerStatus ?? null
+      const configuredCents: Partial<Record<TerminalChargeServiceKey, number>> = {}
+      for (const price of servicePrices) {
+        if (price.terminalId !== terminal.id) continue
+        if ((TERMINAL_CHARGE_SERVICE_KEYS as readonly string[]).includes(price.serviceKey)) {
+          configuredCents[price.serviceKey as TerminalChargeServiceKey] = price.unitCents
+        }
+      }
       rows.push({
         terminalCode: terminal.terminalCode,
         displayName: terminal.displayName,
         locationLabel: terminal.locationLabel,
+        charge: toPartnerChargeView(decideEffectiveUserPrices({
+          terminalFound: true,
+          orgType: org?.type ?? null,
+          userChargeMode: terminal.userChargeMode,
+          personalChargeEnabled,
+          configuredCents,
+        })),
         lastHeartbeatAt,
         visitCount: visits.get(terminal.id) ?? 0,
         serviceCount: printCount + scanCount,

@@ -38,3 +38,13 @@ export class AdminUpdatePriceConfigDto {
   @MaxLength(200)
   description?: string
 }
+
+/** 向个人收费总开关。打开必须另带 confirm: true。不用 @Type(() => Boolean)，避免把字符串 "false" 收成 true。 */
+export class UpdatePersonalChargeDto {
+  @IsBoolean()
+  enabled!: boolean
+
+  @IsOptional()
+  @IsBoolean()
+  confirm?: boolean
+}

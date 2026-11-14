@@ -41,6 +41,7 @@ import {
   printerStatusSummary,
   terminalName,
   terminalOpsCsvName,
+  userChargeLine,
   windowText,
 } from './terminalOpsFormat'
 
@@ -152,7 +153,7 @@ export default function TerminalsPage() {
   const ready = state === 'ready' && data
   const hasTerminals = Boolean(ready && data.terminals.length > 0)
   const columns: ConsoleColumn<TerminalOpsRow>[] = [
-    { id: 'terminal', header: '终端', truncate: true, title: (row) => `${terminalName(row)} · ${row.terminalCode}`, cell: (row) => <button type="button" onClick={() => setSelectedCode(row.terminalCode)} className="block max-w-full text-left"><p className="truncate font-semibold text-neutral-900">{terminalName(row)}</p><p className="mt-0.5 truncate text-xs text-neutral-500"><span className="font-mono">{row.terminalCode}</span>{row.locationLabel ? ` · ${row.locationLabel}` : ''}</p></button> },
+    { id: 'terminal', header: '终端', truncate: true, title: (row) => `${terminalName(row)} · ${row.terminalCode}`, cell: (row) => <button type="button" onClick={() => setSelectedCode(row.terminalCode)} className="block max-w-full text-left"><p className="truncate font-semibold text-neutral-900">{terminalName(row)}</p><p className="mt-0.5 truncate text-xs text-neutral-500"><span className="font-mono">{row.terminalCode}</span>{row.locationLabel ? ` · ${row.locationLabel}` : ''}</p><p className="mt-0.5 truncate text-xs text-neutral-500">{userChargeLine(row)}</p></button> },
     { id: 'status', header: '当前状态', cell: (row) => { const run = RUN_STATE_VIEW[runState(row)]; return <div><StatusBadge dot status={run.status} label={run.label} /><p className="mt-1 text-[11px] text-neutral-500" title={row.lastHeartbeatAt ? formatDateTime(row.lastHeartbeatAt) : undefined}>{relativeTime(row.lastHeartbeatAt)}</p></div> } },
     { id: 'printer', header: '打印机状态', cell: (row) => printerStatusSummary(row.printerStatus, row.openAlertCount, row.online) },
     { id: 'visits', header: '服务人次', align: 'right', cell: (row) => visitText(data!, row.visitCount) },
@@ -264,6 +265,7 @@ export default function TerminalsPage() {
                     <li key={row.terminalCode}>
                       <button type="button" onClick={() => setSelectedCode(row.terminalCode)} className="flex w-full min-h-11 flex-col items-start gap-1 px-4 py-3 text-left">
                         <span className="font-semibold text-neutral-900">{terminalName(row)}</span>
+                        <span className="text-sm text-neutral-600">{userChargeLine(row)}</span>
                         <span className="text-sm text-neutral-600">{run.label}</span>
                         <span className="text-sm text-neutral-600">{printerStatusSummary(row.printerStatus, row.openAlertCount, row.online)}</span>
                         <span className="text-sm text-neutral-600">未恢复：{unrecovered}</span>

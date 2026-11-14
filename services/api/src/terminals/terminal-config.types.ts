@@ -1,4 +1,5 @@
 import type { KioskSmartCampusConfig } from '../smart-campus/smart-campus.types'
+import type { TerminalPricingView } from '../payment/terminal-charge.contract'
 
 export interface KioskToolboxItemView {
   key: string
@@ -41,6 +42,10 @@ export interface KioskTerminalConfigView {
   recruitmentHosting: RecruitmentHostingPublicView
   ai: { loginGate: 'off' | 'before_export' | 'before_generate'; declarationEnforced: boolean; paused: boolean }
   maintenance: boolean
+  /** 本机是否允许首页显示「免费使用」。未登记的终端按关。 */
+  homeFreeBadge: boolean
+  /** 本机生效价。只含这一台终端。 */
+  pricing: TerminalPricingView
   configVersion: string
   refreshIntervalMs: number
   serverTime: string

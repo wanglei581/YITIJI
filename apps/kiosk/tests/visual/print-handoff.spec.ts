@@ -15,6 +15,7 @@
 
 import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
+import { attachMachinePricing } from '../fixtures/machine-pricing'
 import { test, expect } from '../fixtures/kiosk-test'
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
@@ -77,6 +78,7 @@ function registerPrintShell(api: ApiRouter, available: string[] = []): void {
       ],
     },
   })
+  attachMachinePricing(api, 100, 200)
   api.respond('POST', '/api/v1/orders/quote', {
     status: 200,
     json: CONFIRM_QUOTE,

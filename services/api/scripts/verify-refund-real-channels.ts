@@ -38,6 +38,7 @@ import { buildPaymentCallbackPath } from '../src/payment/payment-provider.types'
 import { PricingService } from '../src/payment/pricing.service'
 import { ONLINE_PAID_PENDING_REFUND_REASON } from '../src/payment/pending-refund-signal'
 import { RefundService } from '../src/payment/refund.service'
+import { adoptDevPrintSeedPrices, restoreTerminalChargeFixture } from './support/terminal-charge-fixture'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { AlipayProvider, alipayTimestamp, buildAlipaySignBase } from '../src/payment/providers/alipay.provider'
 import {
@@ -66,7 +67,7 @@ function pass(message: string): void {
 }
 function fail(message: string): never {
   console.error(`  FAIL ${message}`)
-  process.exit(1)
+  throw new Error(message)
 }
 async function expectCode(label: string, code: string, fn: () => Promise<unknown>): Promise<void> {
   try {
@@ -380,6 +381,7 @@ async function main(): Promise<void> {
       data: { id: terminalId, terminalCode: `KSK-REFUNDREAL-${suffix}`, agentToken: `agt_${suffix}`, deviceFingerprint: 'verify-refundreal' },
     })
     await seedDevDefaultPriceConfig(prisma)
+    await adoptDevPrintSeedPrices(prisma, terminalId)
     pass('test fixtures created')
 
     // ── (W1) wechat 同步退款成功 ─────────────────────────────────────────
@@ -821,6 +823,7 @@ async function main(): Promise<void> {
 
     console.log(`\n  ✅ verify:refund-real-channels 全部通过（${passCount} checks）\n`)
   } finally {
+    await restoreTerminalChargeFixture(prisma)
     await cleanup()
     await prisma.onModuleDestroy()
   }

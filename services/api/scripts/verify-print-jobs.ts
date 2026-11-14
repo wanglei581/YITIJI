@@ -47,6 +47,7 @@ import { createPaymentSessionToken } from '../src/payment/payment-session-token'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
 import { isPaidUnfulfilledRefundRequired } from '../src/payment/pending-refund-signal'
+import { adoptDevPrintSeedPrices, setTerminalUserPrintPrices, restoreTerminalChargeFixture } from './support/terminal-charge-fixture'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { StorageService } from '../src/storage/storage.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
@@ -66,7 +67,7 @@ function fixtureFileSignature(fileId: string, expiresAtMs: number): string {
   if (!secret) fail('测试签名密钥未设置')
   return createHmac('sha256', secret).update(`${fileId}.${expiresAtMs}`).digest('hex')
 }
-function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
+function fail(m: string): never { console.error(`  FAIL ${m}`); throw new Error(m) }
 
 function sliceBetween(source: string, startMarker: string, endMarker: string): string {
   const start = source.indexOf(startMarker)
@@ -400,6 +401,7 @@ async function main() {
 
     // 计费接线后 create() 需真实 FileObject + 存储内容识别页数 + PriceConfig 报价（否则 fail-closed）。
     await seedDevDefaultPriceConfig(prisma)
+    await adoptDevPrintSeedPrices(prisma, terminalId)
     const pdfBytes = buildRealPdf(1)
     const reportSha256 = createHash('sha256').update(pdfBytes).digest('hex')
     await Promise.all(fixtureStorageKeys.map((key) =>
@@ -1662,6 +1664,7 @@ async function main() {
         deviceFingerprint: `fp-ver-${suffix}`,
       },
     })
+    await adoptDevPrintSeedPrices(prisma, versionTerminalId)
     const versionMessage = '这台终端的打印程序版本过旧，升级到 0.4.13 后才能重新提交'
     const versionCases: Array<{ label: string; version: string | null; allow: boolean }> = [
       { label: '0.4.12', version: '0.4.12', allow: false },
@@ -1754,8 +1757,10 @@ async function main() {
       params: { ...priceParams },
       ...extra,
     })
-    const setBwUnit = (unitCents: number) =>
-      prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents } })
+    const setBwUnit = async (unitCents: number) => {
+      await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents } })
+      await setTerminalUserPrintPrices(prisma, terminalId, { print_bw_page: unitCents })
+    }
     const sideEffects = async () => JSON.stringify({
       orders: await prisma.order.count({ where: { terminalId } }),
       tasks: await prisma.printTask.count({ where: { terminalId } }),
@@ -1998,6 +2003,7 @@ async function main() {
       pass('检查后软删除：旧任务仍被领取但 content 拒绝，下一条 active 可领取且读回字节（本地存储，非 COS / 非出纸）')
     }
   } finally {
+    await restoreTerminalChargeFixture(prisma)
     await cleanup()
     await prisma.onModuleDestroy()
   }

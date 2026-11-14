@@ -1,5 +1,6 @@
 import type { ApiRouter } from '../../fixtures/api-router'
 import { registerW4Api } from '../../fixtures/fusion-w4-api'
+import { machinePricing } from '../../fixtures/machine-pricing'
 import { RECRUITMENT_HOSTING_ON } from '../../fixtures/recruitment-hosting'
 
 const success = (data: unknown) => ({ success: true, data })
@@ -45,6 +46,7 @@ export function registerW6Api(api: ApiRouter): void {
     configVersion: 'w6-fixture',
     refreshIntervalMs: 300000,
     serverTime: '2026-07-24T08:00:00.000Z',
+    pricing: machinePricing(100, 100),
   })
 
   get('/api/v1/health', { success: true, data: { status: 'ok' } })

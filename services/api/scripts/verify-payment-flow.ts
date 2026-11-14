@@ -48,6 +48,7 @@ import { createPaymentSessionToken, paymentSessionTtlMs } from '../src/payment/p
 import { PaymentProviderRegistry, resolvePaymentProvider } from '../src/payment/payment-provider.factory'
 import { buildPaymentCallbackPath } from '../src/payment/payment-provider.types'
 import { PricingService } from '../src/payment/pricing.service'
+import { adoptDevPrintSeedPrices, restoreTerminalChargeFixture } from './support/terminal-charge-fixture'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import {
   SANDBOX_NONCE_HEADER,
@@ -77,7 +78,7 @@ function pass(message: string): void {
 
 function fail(message: string): never {
   console.error(`  FAIL ${message}`)
-  process.exit(1)
+  throw new Error(message)
 }
 
 async function expectCode(label: string, code: string, fn: () => Promise<unknown>): Promise<void> {
@@ -263,6 +264,7 @@ async function main(): Promise<void> {
       data: { id: endUserId, phoneHash: `hash_${suffix}`, phoneEnc: `enc_${suffix}` },
     })
     await seedDevDefaultPriceConfig(prisma)
+    await adoptDevPrintSeedPrices(prisma, terminalId)
     pass('test fixtures created')
 
     // ── (1) 真实建单链路：itemsJson 计费明细快照 ────────────────────────────
@@ -2269,6 +2271,7 @@ async function main(): Promise<void> {
 
     console.log('\nAll payment-flow assertions passed.\n')
   } finally {
+    await restoreTerminalChargeFixture(prisma)
     await cleanup()
     await prisma.onModuleDestroy()
   }

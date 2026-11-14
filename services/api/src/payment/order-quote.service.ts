@@ -46,13 +46,14 @@ export function aggregatePrintPriceQuotes(quotes: readonly PrintPriceQuote[]): P
 /**
  * P0-1 打印报价（支付域，不落库）。
  *
- * 复用 PrintPageCountService（签名 fileUrl 验签 + 真实页数识别）与 PricingService（PriceConfig），
+ * 复用 PrintPageCountService（签名 fileUrl 验签 + 真实页数识别）与 PricingService（本机生效价），
  * 并接入 countPagesInRange，使报价与建单 / Agent 出纸页数一致。
  *
  * 硬约束：
  * - **不落库**：不建 Order / PrintTask，不写 PriceConfig，不触发 markPaid。
  * - **不信任前端金额 / 页数**：只接受签名 fileUrl + 打印参数。
- * - **fail-closed**：签名无效 / 页数识别失败 / 页码范围非法 / 无 active 价目 → 抛错。
+ * - **fail-closed**：签名无效 / 页数识别失败 / 页码范围非法 → 抛错。
+ * - 不带终端一律 0 元。到机补价由 P2 做。缺全站价目不再让报价失败。
  */
 @Injectable()
 export class OrderQuoteService {
@@ -103,7 +104,10 @@ export class OrderQuoteService {
     const colorMode = dto.params?.colorMode ?? DEFAULT_COLOR_MODE
     // 面数 = 计费页数 × 份数。双面、多页合一都不改这个数；计价之前拒绝，避免先给出付不起的价。
     assertPrintOrderSides(billablePages * copies)
-    return this.pricing.quotePrint({ billablePages, billingPageSource, copies, colorMode })
+    // 带终端用本机生效价。不带终端一律 0 元；到机补价由 P2 做。
+    return this.pricing.quotePrint({
+      billablePages, billingPageSource, copies, colorMode, terminalId: dto.terminalId,
+    })
   }
 
   /**

@@ -20,6 +20,12 @@ export const TERMINAL_OPS_KEY_PATHS = new Set<string>([
   'terminals',
   ...['terminalCode', 'displayName', 'locationLabel', 'online', 'lastHeartbeatAt', 'visitCount', 'serviceCount', 'output', 'faults', 'printerStatus', 'openAlertCount']
     .map((key) => `terminals[].${key}`),
+  'terminals[].charge',
+  'terminals[].charge.userChargeMode',
+  'terminals[].charge.isPublicSite',
+  'terminals[].charge.effective',
+  ...['resume_optimize', 'mock_interview', 'print_bw_page', 'print_color_page', 'scan']
+    .map((key) => `terminals[].charge.effective.${key}`),
   ...OUTPUT_KEYS.map((key) => `terminals[].output.${key}`),
   ...ROW_FAULT_KEYS.map((key) => `terminals[].faults.${key}`),
   'totals',

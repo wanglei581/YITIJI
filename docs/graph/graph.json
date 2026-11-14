@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 649,
+    "endpointCount": 654,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -859,11 +859,58 @@
       },
       {
         "controller": "services/api/src/payment/admin-billing.controller.ts",
+        "handler": "AdminBillingController.getPersonalCharge",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "PlatformSetting",
+          "PriceConfig",
+          "Terminal",
+          "TerminalServicePrice"
+        ],
+        "path": "/api/v1/admin/billing/personal-charge",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/payment/admin-billing.service.ts"
+        ],
+        "services": [
+          "AdminBillingService"
+        ]
+      },
+      {
+        "controller": "services/api/src/payment/admin-billing.controller.ts",
+        "handler": "AdminBillingController.setPersonalCharge",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "PlatformSetting",
+          "PriceConfig",
+          "Terminal",
+          "TerminalServicePrice"
+        ],
+        "path": "/api/v1/admin/billing/personal-charge",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/payment/admin-billing.service.ts"
+        ],
+        "services": [
+          "AdminBillingService"
+        ]
+      },
+      {
+        "controller": "services/api/src/payment/admin-billing.controller.ts",
         "handler": "AdminBillingController.list",
         "method": "GET",
         "models": [
           "AuditLog",
-          "PriceConfig"
+          "PlatformSetting",
+          "PriceConfig",
+          "Terminal",
+          "TerminalServicePrice"
         ],
         "path": "/api/v1/admin/billing/price-config",
         "roles": [
@@ -882,7 +929,10 @@
         "method": "PUT",
         "models": [
           "AuditLog",
-          "PriceConfig"
+          "PlatformSetting",
+          "PriceConfig",
+          "Terminal",
+          "TerminalServicePrice"
         ],
         "path": "/api/v1/admin/billing/price-config/:serviceKey",
         "roles": [
@@ -4433,6 +4483,7 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/admin/printers",
@@ -5031,6 +5082,7 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/admin/terminals",
@@ -5064,6 +5116,7 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/bind-code",
@@ -5115,6 +5168,47 @@
       },
       {
         "controller": "services/api/src/terminals/admin-terminals.controller.ts",
+        "handler": "AdminTerminalsController.getChargeSettings",
+        "method": "GET",
+        "models": [
+          "Terminal",
+          "TerminalCapability"
+        ],
+        "path": "/api/v1/admin/terminals/:terminalId/charge-settings",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/terminals/terminal-capabilities.service.ts"
+        ],
+        "services": [
+          "TerminalCapabilitiesService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/admin-terminals.controller.ts",
+        "handler": "AdminTerminalsController.updateChargeSettings",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "Terminal",
+          "TerminalCapability"
+        ],
+        "path": "/api/v1/admin/terminals/:terminalId/charge-settings",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts"
+        ],
+        "services": [
+          "AuditService",
+          "TerminalCapabilitiesService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/admin-terminals.controller.ts",
         "handler": "AdminTerminalsController.updateDailyFreePrintSides",
         "method": "PUT",
         "models": [],
@@ -5143,6 +5237,7 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/emergency-revoke",
@@ -5155,6 +5250,18 @@
         "services": [
           "TerminalsService"
         ]
+      },
+      {
+        "controller": "services/api/src/terminals/admin-terminals.controller.ts",
+        "handler": "AdminTerminalsController.updateHomeFreeBadge",
+        "method": "PUT",
+        "models": [],
+        "path": "/api/v1/admin/terminals/:terminalId/home-free-badge",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/terminals/admin-kiosk-job-board.controller.ts",
@@ -5215,6 +5322,7 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/lifecycle",
@@ -5246,6 +5354,7 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/org",
@@ -5279,6 +5388,7 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/profile",
@@ -6528,6 +6638,7 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/auth/terminal/exchange-bind-code",
@@ -6557,6 +6668,7 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/auth/terminal/register",
@@ -11757,13 +11869,16 @@
           "Job",
           "JobFair",
           "JobSource",
+          "Organization",
+          "PlatformSetting",
           "PolicyPost",
           "PrintTask",
           "ScanTask",
           "SyncLog",
           "Terminal",
           "TerminalCapability",
-          "TerminalHeartbeat"
+          "TerminalHeartbeat",
+          "TerminalServicePrice"
         ],
         "path": "/api/v1/partner/stats",
         "roles": [
@@ -11814,13 +11929,16 @@
           "Job",
           "JobFair",
           "JobSource",
+          "Organization",
+          "PlatformSetting",
           "PolicyPost",
           "PrintTask",
           "ScanTask",
           "SyncLog",
           "Terminal",
           "TerminalCapability",
-          "TerminalHeartbeat"
+          "TerminalHeartbeat",
+          "TerminalServicePrice"
         ],
         "path": "/api/v1/partner/terminal-operations",
         "roles": [
@@ -12015,6 +12133,7 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/print-tasks/:taskId/status",
@@ -12214,7 +12333,9 @@
         "handler": "PaymentController.getPrintPriceConfig",
         "method": "GET",
         "models": [
-          "PriceConfig"
+          "PlatformSetting",
+          "PriceConfig",
+          "Terminal"
         ],
         "path": "/api/v1/print/price-config",
         "roles": [],
@@ -13262,6 +13383,7 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/terminals/:terminalId/config",
@@ -13293,6 +13415,7 @@
           "TerminalCapability",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/terminals/:terminalId/copy/jobs/:id/permit",
@@ -13326,6 +13449,7 @@
           "TerminalCapability",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/terminals/:terminalId/copy/jobs/:id/result",
@@ -13359,6 +13483,7 @@
           "TerminalCapability",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/terminals/:terminalId/copy/jobs/:id/scan-result",
@@ -13390,6 +13515,7 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/terminals/:terminalId/heartbeat",
@@ -13442,6 +13568,7 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/terminals/:terminalId/printer-status",
@@ -13521,6 +13648,7 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/terminals/:terminalId/scan-deletion-audits",
@@ -13552,6 +13680,7 @@
           "TerminalCapability",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/terminals/:terminalId/scan-sessions/deliver",
@@ -13584,6 +13713,7 @@
           "TerminalCapability",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/terminals/:terminalId/scan-tasks/:taskId/device-report",
@@ -13617,6 +13747,7 @@
           "TerminalCapability",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/terminals/:terminalId/scan-tasks/current-lease",
@@ -13693,6 +13824,7 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/terminals/:terminalId/tasks/claim",
@@ -13757,6 +13889,7 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
+          "TerminalServicePrice",
           "TerminalSmartCampusConfig"
         ],
         "path": "/api/v1/terminals/public",
@@ -14001,7 +14134,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 281,
+      "reachableFileCount": 288,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -14158,6 +14291,7 @@
         {
           "component": "BillingPage",
           "endpoints": [
+            "PUT /admin/billing/personal-charge",
             "PUT /admin/billing/price-config/:param"
           ],
           "file": "apps/admin/src/routes/billing/index.tsx",
@@ -14783,7 +14917,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 308
+      "sourceFileCount": 315
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -17868,7 +18002,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1014
+      "sourceFileCount": 1016
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -18400,7 +18534,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 122,
+    "modelCount": 123,
     "models": [
       {
         "fieldCount": 7,
@@ -19557,6 +19691,7 @@
           "services/api/src/orgs/admin-org-content-trust.service.ts",
           "services/api/src/orgs/admin-orgs.service.ts",
           "services/api/src/orgs/partner-contact-phone-registration.service.ts",
+          "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/policies/policies.service.ts",
           "services/api/src/recruitment-content/recruitment-content-read.service.ts",
           "services/api/src/recruitment-hosting/recruitment-emergency.service.ts",
@@ -19616,6 +19751,9 @@
         "usedBy": [
           "services/api/src/branding/brand-logo.service.ts",
           "services/api/src/branding/branding.service.ts",
+          "services/api/src/orgs/partner-stats.service.ts",
+          "services/api/src/payment/effective-user-prices.ts",
+          "services/api/src/payment/terminal-charge-settings.ts",
           "services/api/src/print-jobs/free-print-quota.config.ts",
           "services/api/src/print-jobs/print-queue-timeout.ts",
           "services/api/src/support-contact/support-contact.service.ts"
@@ -19945,7 +20083,7 @@
         ]
       },
       {
-        "fieldCount": 31,
+        "fieldCount": 34,
         "name": "Terminal",
         "relations": [
           "ActiveReleaseObservationAssignment",
@@ -19958,7 +20096,8 @@
           "TerminalCapability",
           "TerminalCredential",
           "TerminalHeartbeat",
-          "TerminalScanDeletionAudit"
+          "TerminalScanDeletionAudit",
+          "TerminalServicePrice"
         ],
         "usedBy": [
           "services/api/src/activity/activity.controller.ts",
@@ -19992,7 +20131,9 @@
           "services/api/src/member-print-orders/package-order.service.ts",
           "services/api/src/official-channels/official-channels.service.ts",
           "services/api/src/orgs/partner-stats.service.ts",
+          "services/api/src/payment/effective-user-prices.ts",
           "services/api/src/payment/order-quote.service.ts",
+          "services/api/src/payment/terminal-charge-settings.ts",
           "services/api/src/policies/policy-scope.service.ts",
           "services/api/src/print-jobs/free-print-quota.decide.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
@@ -20095,6 +20236,18 @@
         "usedBy": [
           "services/api/src/content/content.service.ts",
           "services/api/src/device-fleet/device-fleet.service.ts"
+        ]
+      },
+      {
+        "fieldCount": 7,
+        "name": "TerminalServicePrice",
+        "relations": [
+          "Terminal"
+        ],
+        "usedBy": [
+          "services/api/src/orgs/partner-stats.service.ts",
+          "services/api/src/payment/terminal-charge-settings.ts",
+          "services/api/src/terminals/terminal-org-assignment.ts"
         ]
       },
       {
@@ -26319,6 +26472,8 @@
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions.ts"
@@ -26409,6 +26564,32 @@
     ],
     "services/api/scripts/support/sqlite-cli.ts": [
       "services/api/scripts/verify-scan-tasks.ts"
+    ],
+    "services/api/scripts/support/terminal-charge-fixture.ts": [
+      "services/api/scripts/verify-admin-billing.ts",
+      "services/api/scripts/verify-career-plan-degraded.ts",
+      "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-kiosk-cashier-ui.ts",
+      "services/api/scripts/verify-member-order-timeline.ts",
+      "services/api/scripts/verify-member-print-order-idempotency-http.ts",
+      "services/api/scripts/verify-member-print-order-idempotency.ts",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
+      "services/api/scripts/verify-order.ts",
+      "services/api/scripts/verify-package-order-fulfillment.ts",
+      "services/api/scripts/verify-package-order-idempotency-http.ts",
+      "services/api/scripts/verify-package-order-idempotency.ts",
+      "services/api/scripts/verify-payment-flow.ts",
+      "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
+      "services/api/scripts/verify-pricing.ts",
+      "services/api/scripts/verify-print-color-duplex-capability.ts",
+      "services/api/scripts/verify-print-jobs.ts",
+      "services/api/scripts/verify-refund-idempotent.ts",
+      "services/api/scripts/verify-refund-real-channels.ts",
+      "services/api/scripts/verify-wechat-refund-notify.ts",
+      "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
     "services/api/scripts/support/upload-session-verifier.ts": [
       "services/api/scripts/verify-upload-sessions-bind.ts",
@@ -27784,8 +27965,10 @@
       "services/api/scripts/verify-screensaver-content.ts",
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
@@ -28103,6 +28286,8 @@
       "services/api/scripts/verify-scan-device-b8.ts",
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-sessions-http.ts",
       "services/api/scripts/verify-upload-sessions-member-file.ts",
@@ -28154,7 +28339,9 @@
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts",
-      "services/api/scripts/verify-support-contact.ts"
+      "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts"
     ],
     "services/api/src/common/guards/member-closure-receipt.guard.ts": [
       "services/api/scripts/verify-member-account-status.ts"
@@ -28180,7 +28367,9 @@
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
-      "services/api/scripts/verify-support-contact.ts"
+      "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts"
     ],
     "services/api/src/common/health.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
@@ -28345,6 +28534,8 @@
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-sms-budget.ts",
       "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-scene.ts",
@@ -29809,7 +30000,8 @@
       "services/api/scripts/verify-partner-smart-campus.ts",
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
       "services/api/scripts/verify-pg-serialization-conflict.ts",
-      "services/api/scripts/verify-policy-scope.ts"
+      "services/api/scripts/verify-policy-scope.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts"
     ],
     "services/api/src/orgs/contact-phone-change.ts": [
       "services/api/scripts/verify-partner-contact-phone-registration.ts"
@@ -29831,20 +30023,24 @@
       "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/orgs/partner-stats.controller.ts": [
-      "services/api/scripts/verify-partner-stats-contract.ts"
+      "services/api/scripts/verify-partner-stats-contract.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts"
     ],
     "services/api/src/orgs/partner-stats.service.ts": [
-      "services/api/scripts/verify-partner-stats-contract.ts"
+      "services/api/scripts/verify-partner-stats-contract.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts"
     ],
     "services/api/src/orgs/partner-terminal-ops.ts": [
       "services/api/scripts/verify-org-device-alert.ts"
     ],
     "services/api/src/payment/admin-billing.controller.ts": [
-      "services/api/scripts/verify-admin-billing.ts"
+      "services/api/scripts/verify-admin-billing.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts"
     ],
     "services/api/src/payment/admin-billing.service.ts": [
       "services/api/scripts/verify-admin-billing.ts",
-      "services/api/scripts/verify-copy-quota.ts"
+      "services/api/scripts/verify-copy-quota.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts"
     ],
     "services/api/src/payment/admin-order-actions.controller.ts": [
       "services/api/scripts/verify-api20-manual-refund.ts",
@@ -29862,7 +30058,8 @@
     ],
     "services/api/src/payment/copy-pricing.ts": [
       "services/api/scripts/verify-copy-c1a.ts",
-      "services/api/scripts/verify-copy-quota.ts"
+      "services/api/scripts/verify-copy-quota.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts"
     ],
     "services/api/src/payment/dto/admin-billing.dto.ts": [
       "services/api/scripts/verify-admin-billing.ts"
@@ -29871,6 +30068,9 @@
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-refund-idempotent.ts"
+    ],
+    "services/api/src/payment/effective-user-prices.ts": [
+      "services/api/scripts/verify-terminal-charge-settings.ts"
     ],
     "services/api/src/payment/online-payment.service.ts": [
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
@@ -30068,6 +30268,7 @@
       "services/api/scripts/verify-print-rollout-config.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
@@ -30097,6 +30298,7 @@
       "apps/admin/scripts/verify-admin-billing-ui.mjs",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-reconciliation.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
     "services/api/src/payment/refund-amount-hold.ts": [
@@ -30116,6 +30318,20 @@
       "services/api/scripts/verify-refund-convergence.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
+      "services/api/scripts/verify-wechat-refund-notify.ts",
+      "services/api/scripts/verify-wechat-refund-regression.ts"
+    ],
+    "services/api/src/payment/terminal-charge-settings.ts": [
+      "services/api/scripts/verify-terminal-charge-settings.ts"
+    ],
+    "services/api/src/payment/terminal-charge.contract.ts": [
+      "services/api/scripts/verify-admin-billing.ts",
+      "services/api/scripts/verify-member-order-timeline.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
+      "services/api/scripts/verify-pickup-code-share.ts",
+      "services/api/scripts/verify-pricing.ts",
+      "services/api/scripts/verify-refund-idempotent.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
@@ -30609,8 +30825,10 @@
       "services/api/scripts/verify-screensaver-content.ts",
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-terminal-test-print-seed-guard.ts",
       "services/api/scripts/verify-toolbox-review-workflow.ts",
@@ -30918,7 +31136,9 @@
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-provisioning.ts"
     ],
     "services/api/src/terminals/admin-toolbox.controller.ts": [
@@ -30977,7 +31197,9 @@
     "services/api/src/terminals/release-observation.service.ts": [
       "services/api/scripts/verify-pg-serialization-conflict.ts",
       "services/api/scripts/verify-release-observation-contract.mjs",
-      "services/api/scripts/verify-scan-deletion-audit-reporting.ts"
+      "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts"
     ],
     "services/api/src/terminals/scan-deletion-reason-codes.ts": [
       "services/api/scripts/verify-copy-c1a.ts",
@@ -31018,7 +31240,9 @@
       "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-device-settings.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
@@ -31047,6 +31271,8 @@
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-scan-tasks.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-identity.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
@@ -31072,6 +31298,8 @@
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-device-settings.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-identity.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
@@ -31084,8 +31312,10 @@
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-terminal-test-print-seed-guard.ts",
       "services/api/scripts/verify-toolbox-launch-events.ts",
@@ -31114,8 +31344,10 @@
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-network-diagnostics.ts",
       "services/api/scripts/verify-terminal-printer-queue.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
@@ -31148,8 +31380,10 @@
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-network-diagnostics.ts",
       "services/api/scripts/verify-terminal-printer-queue.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
@@ -31162,7 +31396,9 @@
       "services/api/scripts/verify-release-observation-contract.mjs",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-identity.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-throttle-dimension.ts",
@@ -31189,8 +31425,10 @@
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
+      "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
+      "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-terminal-test-print-seed-guard.ts"
     ],
@@ -39198,12 +39436,14 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/payment/admin-billing.controller.ts",
           "services/api/src/payment/admin-billing.service.ts",
           "services/api/src/payment/dto/admin-billing.dto.ts",
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts",
+          "services/api/src/payment/terminal-charge.contract.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
         "missing": []
@@ -41057,6 +41297,7 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/ai/ai-log.service.ts",
           "services/api/src/ai/resume/career-plan-degraded-pdf.service.ts",
           "services/api/src/ai/resume/career-plan-degraded.ts",
@@ -41581,6 +41822,7 @@
           "services/api/scripts/support/copy-c1c-verification.ts",
           "services/api/scripts/support/copy-c1e-verification.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/app.module.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
@@ -42484,6 +42726,7 @@
           "services/api/prisma/schema.prisma",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/admin-ops/derived-alert-identity.ts",
           "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/admin-print-scan/admin-print-scan.controller.ts",
@@ -43472,6 +43715,7 @@
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/payment/online-payment.service.ts",
@@ -44387,6 +44631,7 @@
           "packages/shared/src/types/memberPrintOrders.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/common/redis/redis.service.ts",
@@ -44402,6 +44647,7 @@
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts",
+          "services/api/src/payment/terminal-charge.contract.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-page-count.service.ts",
           "services/api/src/prisma/prisma.service.ts",
@@ -44454,6 +44700,7 @@
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/common/guards/end-user-auth.guard.ts",
@@ -44493,6 +44740,7 @@
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/crypto/secret-cipher.ts",
           "services/api/src/common/pickup-code.ts",
@@ -44732,6 +44980,7 @@
           "packages/shared/src/types/print.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/pickup-code.ts",
@@ -45056,6 +45305,7 @@
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/member-print-orders/member-print-orders.service.ts",
@@ -45169,6 +45419,7 @@
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/files/files.service.ts",
@@ -45207,6 +45458,7 @@
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/common/guards/end-user-auth.guard.ts",
@@ -45241,6 +45493,7 @@
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/crypto/secret-cipher.ts",
           "services/api/src/common/pickup-code.ts",
@@ -45708,6 +45961,7 @@
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
           "services/api/scripts/support/payment-callback-race-cases.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
@@ -45754,6 +46008,7 @@
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/config/body-parsers.ts",
           "services/api/src/files/signing.ts",
@@ -45915,6 +46170,7 @@
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/redis/redis.service.ts",
@@ -45933,6 +46189,7 @@
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts",
           "services/api/src/payment/refund.service.ts",
+          "services/api/src/payment/terminal-charge.contract.ts",
           "services/api/src/print-jobs/free-print-quota.usage.ts",
           "services/api/src/print-jobs/paid-reprint-eligibility.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
@@ -45963,6 +46220,7 @@
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/redis/redis-degradation.ts",
           "services/api/src/common/redis/redis.service.ts",
@@ -45980,6 +46238,7 @@
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts",
           "services/api/src/payment/refund.service.ts",
+          "services/api/src/payment/terminal-charge.contract.ts",
           "services/api/src/print-jobs/pickup-claim-lockout.ts",
           "services/api/src/print-jobs/pickup-claim-memory.ts",
           "services/api/src/print-jobs/pickup-claim-rate-limit.ts",
@@ -46285,8 +46544,10 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts",
+          "services/api/src/payment/terminal-charge.contract.ts",
           "services/api/src/print-jobs/page-range.util.ts",
           "services/api/src/print-jobs/print-pricing.ts",
           "services/api/src/prisma/prisma.service.ts"
@@ -46317,6 +46578,7 @@
           "apps/kiosk/src/pages/print/PrintPreviewPage.tsx",
           "apps/kiosk/tests/visual/fusion-w2-print.spec.ts",
           "packages/shared/src/types/printScanCapability.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/payment/order-quote.service.ts",
           "services/api/src/payment/price-config.seed.ts",
@@ -46402,6 +46664,7 @@
           "services/api/scripts/support/ai-artifact-print-pii-gate.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
@@ -47245,6 +47508,7 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/files/signing.ts",
@@ -47259,6 +47523,7 @@
           "services/api/src/payment/providers/sandbox-payment.provider.ts",
           "services/api/src/payment/refund-amount-hold.ts",
           "services/api/src/payment/refund.service.ts",
+          "services/api/src/payment/terminal-charge.contract.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/print-jobs/print-page-count.service.ts",
           "services/api/src/prisma/prisma.service.ts",
@@ -47288,6 +47553,7 @@
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/payment/online-payment.service.ts",
@@ -48591,6 +48857,51 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/orgs/admin-orgs.service.ts",
+          "services/api/src/orgs/partner-stats.controller.ts",
+          "services/api/src/orgs/partner-stats.service.ts",
+          "services/api/src/payment/admin-billing.controller.ts",
+          "services/api/src/payment/admin-billing.service.ts",
+          "services/api/src/payment/copy-pricing.ts",
+          "services/api/src/payment/effective-user-prices.ts",
+          "services/api/src/payment/pricing.service.ts",
+          "services/api/src/payment/reconciliation.service.ts",
+          "services/api/src/payment/terminal-charge-settings.ts",
+          "services/api/src/payment/terminal-charge.contract.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/admin-terminals.controller.ts",
+          "services/api/src/terminals/release-observation.service.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts",
+          "services/api/src/terminals/terminal-identity.guard.ts",
+          "services/api/src/terminals/terminal-session.service.ts",
+          "services/api/src/terminals/terminal-toolbox.service.ts",
+          "services/api/src/terminals/terminals-admin.service.ts",
+          "services/api/src/terminals/terminals-agent.service.ts",
+          "services/api/src/terminals/terminals.controller.ts",
+          "services/api/src/terminals/terminals.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-terminal-charge-settings.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:terminal-charge-settings"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/src/audit/audit.service.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/terminals/terminal-toolbox.service.ts",
@@ -48656,6 +48967,40 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:terminal-device-config"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/admin-terminals.controller.ts",
+          "services/api/src/terminals/release-observation.service.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts",
+          "services/api/src/terminals/terminal-identity.guard.ts",
+          "services/api/src/terminals/terminal-session.service.ts",
+          "services/api/src/terminals/terminal-toolbox.service.ts",
+          "services/api/src/terminals/terminals-admin.service.ts",
+          "services/api/src/terminals/terminals-agent.service.ts",
+          "services/api/src/terminals/terminals.controller.ts",
+          "services/api/src/terminals/terminals.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-terminal-home-free-badge.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:terminal-home-free-badge"
       ],
       "wired": true
     },
@@ -49318,6 +49663,7 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/payment/order-status.service.ts",
@@ -49326,6 +49672,7 @@
           "services/api/src/payment/pricing.service.ts",
           "services/api/src/payment/providers/wechat-pay.provider.ts",
           "services/api/src/payment/refund.service.ts",
+          "services/api/src/payment/terminal-charge.contract.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/print-jobs/print-page-count.service.ts",
           "services/api/src/prisma/prisma.service.ts",
@@ -49350,6 +49697,7 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/payment/order-status.service.ts",
@@ -49359,6 +49707,7 @@
           "services/api/src/payment/providers/wechat-pay.provider.ts",
           "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/payment/refund.service.ts",
+          "services/api/src/payment/terminal-charge.contract.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/print-jobs/print-page-count.service.ts",
           "services/api/src/prisma/prisma.service.ts",
@@ -49810,6 +50159,28 @@
         "risk": "medium",
         "scope": "kiosk",
         "why": "仅被文档提及：docs/progress/archive/2026-06-20-current-progress-pre-normalization.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/hooks/kioskHomeFreeBadgeReader.ts",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/tests/home-free-badge.test.mjs"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/home-free-badge.test.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/hooks/useKioskHomeFreeBadge.ts",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/tests/home-free-badge.test.mjs"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/home-free-badge.test.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

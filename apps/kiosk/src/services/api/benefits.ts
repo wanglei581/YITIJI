@@ -97,7 +97,7 @@ export interface PrintBenefitInput {
   quote:
     | { status: 'loading' | 'unavailable' }
     | { status: 'ready'; amountCents: number; unitCents: number }
-  /** GET /print/price-config 的真实结果（公示价唯一来源）。 */
+  /** 本机打印生效价（终端配置 pricing，经 priceConfigApi）。用来和报价单价对一下。 */
   priceConfig: { status: 'loading' | 'ready' | 'error'; unitCents: number | null }
   now: number
 }
@@ -129,7 +129,7 @@ export const PRINT_BENEFIT_REDEEM_CTA_LABEL = '本轮暂不支持在这台机器
 
 /**
  * 六态判定。**全部依据真实数据**：登录态、GET /me/benefits、POST /orders/quote、
- * GET /print/price-config。没有任何一态靠前端猜测或 URL 参数。
+ * 本机打印生效价。没有任何一态靠前端猜测或 URL 参数。
  *
  * 判定顺序是「最阻塞的先说」：价目取不到 → 还在读 → 价目对不上 → 本单不需要
  * → 不知道你是谁 → 权益读不出来 → 没有可用的 → 有可用。
@@ -160,8 +160,8 @@ export function resolvePrintBenefitState(input: PrintBenefitInput): PrintBenefit
     }
   }
 
-  // ③ 后台刚调价：报价与公示价是对同一份 PriceConfig 的两次独立读取，
-  //    单价不一致说明后台在这两次读取之间改过价 —— 本屏金额已经不是现价。
+  // ③ 报价与本机展示价是两次读取。单价不一致说明这两次之间价格变了，
+  //    本屏金额已经不是现价。全站参考价不再拿来比。
   const configUnitCents = input.priceConfig.unitCents
   if (
     input.quote.status === 'ready'

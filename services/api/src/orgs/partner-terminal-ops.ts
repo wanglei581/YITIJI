@@ -11,7 +11,20 @@ import { suppressAggregateCount } from '../console-screen/console-screen.metric'
 import { isHealthyPrinterStatus, isLowPaperWarning, isPrinterFaultStatus } from '../terminals/printer-status'
 import { TERMINAL_ONLINE_WINDOW_MS } from '../terminals/printer-availability'
 import { SCREEN_MIN_AGGREGATE_SAMPLE, SCREEN_TIMEZONE } from '../console-screen/console-screen.types'
+import type { PartnerTerminalChargeView } from '../payment/terminal-charge.contract'
 import type { StatsPeriod } from './partner-stats.service'
+
+const ORG_PAYS_CHARGE: PartnerTerminalChargeView = {
+  userChargeMode: 'org_pays',
+  isPublicSite: false,
+  effective: {
+    resume_optimize: 0,
+    mock_interview: 0,
+    print_bw_page: 0,
+    print_color_page: 0,
+    scan: 0,
+  },
+}
 
 /** 最小样本：与数据大屏、/partner/stats 归因同一个 5。 */
 export const TERMINAL_OPS_MIN_SAMPLE = SCREEN_MIN_AGGREGATE_SAMPLE
@@ -102,6 +115,8 @@ export interface TerminalOpsRaw {
   printerStatus?: string | null
   /** 当前未恢复的设备告警条数。缺省为 0，避免没带这列的旧聚合被算成离线。 */
   openAlertCount?: number
+  /** 本机向用户收不收费。缺省按机构承担、五个生效价都是 0。 */
+  charge?: PartnerTerminalChargeView
 }
 
 /** 计数的小样本压制：0 保留，1–4 不给数字，≥5 原样。与数据大屏单台口径一致。 */
@@ -327,6 +342,11 @@ export function projectTerminalRow(raw: TerminalOpsRaw, now: Date, reportTo: Dat
     faults: summarizeFaults(raw.segments, reportTo, raw.reportedInWindow),
     printerStatus: raw.printerStatus ?? null,
     openAlertCount: raw.openAlertCount ?? 0,
+    charge: raw.charge ?? {
+      userChargeMode: ORG_PAYS_CHARGE.userChargeMode,
+      isPublicSite: ORG_PAYS_CHARGE.isPublicSite,
+      effective: { ...ORG_PAYS_CHARGE.effective },
+    },
   }
 }
 

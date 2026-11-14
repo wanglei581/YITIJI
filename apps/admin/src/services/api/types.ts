@@ -1,4 +1,4 @@
-import type { JobSourceQualitySummaryDTO, ReviewStatus, PublishStatus } from '@ai-job-print/shared'
+import type { EffectiveUserPrices, JobSourceQualitySummaryDTO, ReviewStatus, PublishStatus } from '@ai-job-print/shared'
 import type { JobFairStatus } from '@ai-job-print/shared'
 import type { AuditLogRecord, AuditLogListResponse, AuditLogListQuery } from '@ai-job-print/shared'
 
@@ -193,6 +193,10 @@ export interface AdminTerminalRecord {
     observedAt: string | null
     state: 'draft' | 'paused' | 'expired' | 'not_seen' | 'unverified' | 'current' | 'mismatch' | 'stale'
   } | null
+  /** 一体机首页是否允许显示「免费使用」。缺省时抽屉按关显示。 */
+  homeFreeBadge?: boolean
+  /** 本机谁付钱和五个生效价。缺省时收费设置节自己再读一次。 */
+  charge?: EffectiveUserPrices
 }
 
 export interface CreatePlannedTerminalInput {
@@ -275,6 +279,8 @@ export interface AssignTerminalOrgResult {
   oldOrgId: string | null
   newOrgId: string | null
   orgName: string | null
+  /** 这次归属变了，收费设置已复位。没变就是 false。 */
+  chargeSettingsReset: boolean
 }
 
 export interface UpdateTerminalProfileInput {
