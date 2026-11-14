@@ -27,7 +27,9 @@ function parseProjectTitle(title: string): { name: string; role: string } {
       // 栏里的「时间：」「角色：」先去掉。去掉日期后只剩括号补充（「（实习）」），或整栏就是括号补充时，不当名称或角色。
       const body = projectBody(col).replace(/^(?:角色|职务|时间|日期|周期|项目时间)\s*[:：]\s*/u, '').trim()
       const dated = splitResumeDateRange(body)
-      const cleaned = dated ? [dated.before, dated.after].filter(Boolean).join(' ').trim() : body
+      // 「项目周期：日期」「起止时间：日期」这类栏：日期前是「栏名：」时，栏名不当名称或角色。
+      const labelled = dated ? /[:：]\s*$/u.test(body.slice(0, body.indexOf(dated.period))) : false
+      const cleaned = dated ? [labelled ? '' : dated.before, dated.after].filter(Boolean).join(' ').trim() : body
       if (!cleaned || /^[（(][^）)]*[）)]$/u.test(cleaned)) continue
       if (!name) name = cleaned
       else if (!role) role = cleaned
@@ -51,6 +53,8 @@ function separateTrailingRole(namePart: string, modelName: string): { name: stri
   // 模型给的短名（「AI」「CRM」）只在标题只有「短名 + 一段」时不拆尾部角色；「CRM 客户管理系统 负责人」这种三段写法照样拆出角色。
   if (tokens.length < 2 || !modelName || (shortModelName(modelName) && tokens.length < 3)) return { name: namePart, role: '' }
   const role = tokens[tokens.length - 1] ?? ''
+  // 末尾整段是括号补充（「 （毕业设计）」「 (V2.0)」）时不当角色，留在名称里。
+  if (/^[（(][^）)]*[）)]$/u.test(role)) return { name: namePart, role: '' }
   const name = tokens.slice(0, -1).join(' ')
   const nameMatches = name === modelName || (modelName.length >= 2 && name.startsWith(modelName) && name.length > modelName.length)
   if (!nameMatches || !isTitleLike(role, RESTORED_ROLE_MAX) || splitResumeDateRange(role) || splitResumeDateRange(name)) {

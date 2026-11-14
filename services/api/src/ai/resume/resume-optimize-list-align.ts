@@ -5,7 +5,7 @@ type AlignModule = { before: string; after: string }
 
 /** 只去掉技能、证书栏目标题。词表与 resume-optimize-coverage 的 HEADINGS 里这两栏一致。 */
 const LIST_HEADING_RE = /^(专业技能|技能证书|技能与证书|技能特长|技能)(?=$|[\s:：])|^(证书资质|证书|资格证书|获奖情况)(?=$|[\s:：])/u
-const LEADING_INDEX_RE = /^(?:\d{1,2}\s*[、.．)）]|[一二三四五六七八九十]{1,3}\s*[、.．]|[（(]\s*\d{1,2}\s*[）)]|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])\s*/u
+const LEADING_INDEX_RE = /^(?:\d{1,2}\s*[、.．)）](?!\d)|[一二三四五六七八九十]{1,3}\s*[、.．]|[（(]\s*\d{1,2}\s*[）)]|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])\s*/u
 const BRACKET_TITLE_RE = /^【[^】]{0,20}】\s*/u
 const RESTORE_SEP = new Set(['、', '，', ',', '；'])
 const COMPARE_SEP = new Set(['、', '，', ',', '；', ';', '/', '和', '及', '与'])
@@ -159,16 +159,33 @@ export function alignOriginalList(
     list.push(display)
     if (wasMissing) missing.push(display)
   }
-  const takeExact = (key: string): string | null => {
+  const takeExactRef = (key: string): { item: Item; atom: Atom } | null => {
     for (const item of pool) {
       if (item.used) continue
       const atom = item.atoms.find((part) => !part.used && part.key === key)
       if (!atom) continue
       atom.used = true
       if (item.atoms.every((part) => part.used)) item.used = true
-      return atom.display
+      return { item, atom }
     }
     return null
+  }
+  const takeExact = (key: string): string | null => takeExactRef(key)?.atom.display ?? null
+  // 一槽用到同一个模型项拆出的全部小块（「CI/CD」→「CI」「CD」，「亲和力」→「亲」「力」，「及时响应」→「时响应」）时，按模型整项输出。
+  const joinTaken = (taken: Array<{ item: Item; atom: Atom }>): string => {
+    const out: string[] = []
+    const done = new Set<Item>()
+    for (const { item, atom } of taken) {
+      if (done.has(item)) continue
+      const whole = item.atoms.every((part) => taken.some((step) => step.atom === part))
+      if (whole && (item.atoms.length > 1 || atom.display !== item.display)) {
+        out.push(item.display)
+        done.add(item)
+        continue
+      }
+      out.push(atom.display)
+    }
+    return out.join('\u0001')
   }
   const canTakeAll = (keys: string[]): boolean => {
     const used = new Set<string>()
@@ -222,7 +239,8 @@ export function alignOriginalList(
       rows.push({ whole: display, slots: [{ display: whole.display, key: whole.key, out: whole.display }] })
       continue
     }
-    const segments = splitRestore(display)
+    // 「1、A，2、B」按顿号拆出来的纯数字段是下一项的编号，不单独成项。
+    const segments = splitRestore(display).filter((part, index, all) => !(index < all.length - 1 && /^\d{1,2}$/u.test(part)))
     const slots = (segments.length > 0 ? segments : [display]).map((part) => {
       const item = pool.find((candidate) => !candidate.used && candidate.key === norm(part))
       if (item) {
@@ -246,14 +264,13 @@ export function alignOriginalList(
     if (slot.out !== null) continue
     const keys = piecesOf(slot.display).map((part) => norm(part)).filter(Boolean)
     if (keys.length < 2 || !canTakeAll(keys)) continue
-    const displays: string[] = []
-    let taken = true
+    const got: Array<{ item: Item; atom: Atom }> = []
     for (const key of keys) {
-      const hit = takeExact(key)
-      if (!hit) { taken = false; break }
-      displays.push(hit)
+      const hit = takeExactRef(key)
+      if (!hit) break
+      got.push(hit)
     }
-    if (taken) slot.out = displays.join('\u0001')
+    if (got.length === keys.length) slot.out = joinTaken(got)
   }
   const pieceReserved = new Set(open.filter((slot) => slot.out === null).flatMap((slot) => [slot.key, ...piecesOf(slot.display).map((part) => norm(part))]))
   for (const slot of open) {
@@ -290,7 +307,7 @@ export function alignOriginalList(
       displays.push(found.atom.display)
     }
     if (displays.length === pieces.length) {
-      slot.out = displays.join('\u0001')
+      slot.out = joinTaken(taken)
       continue
     }
     for (const step of taken.reverse()) {
@@ -304,14 +321,13 @@ export function alignOriginalList(
     if (pieces.length < 2) continue
     const keys = pieces.map((part) => norm(part))
     if (!canTakeAll(keys)) continue
-    const displays: string[] = []
-    let taken = true
+    const got: Array<{ item: Item; atom: Atom }> = []
     for (const key of keys) {
-      const hit = takeExact(key)
-      if (!hit) { taken = false; break }
-      displays.push(hit)
+      const hit = takeExactRef(key)
+      if (!hit) break
+      got.push(hit)
     }
-    if (taken) slot.out = displays.join('\u0001')
+    if (got.length === keys.length) slot.out = joinTaken(got)
   }
   const reserved = new Set(open.filter((slot) => slot.out === null).map((slot) => slot.key))
   for (const row of rows) {

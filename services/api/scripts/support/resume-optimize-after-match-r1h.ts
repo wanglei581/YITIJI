@@ -5,6 +5,8 @@ import { ensureProjectOriginalLines } from '../../src/ai/resume/resume-optimize-
 /**
  * 第八段夹具：第七段相对 b3569c179 退步的六处，加上括号补充不当角色、
  * 部分漏交不带编号，以及 Kk / U2r / U5r / U8r 四处原先改不红的缺口。
+ * 第九段再锁：斜杠技能不拆碎、小数和版本号补回原样、四种周期栏名不当角色、
+ * 括号前带空格的补充不当角色，以及收货方三条缺口（O2 / O4 / O5）。
  * 断言按规格写。跑法与 resume-optimize-after-match 相同，由 verify:resume-optimize 调起。
  */
 
@@ -154,6 +156,51 @@ export function verifyOptimizeR1h(): void {
     fail(`U8r 模型角色被标题角色盖住：${JSON.stringify(u8)}`)
   }
   pass('模型角色和标题角色不一样时，留下模型写的角色')
+
+  // 收货方补（第十七任收第八段反向检查没红的三处新代码）：
+  // 小项相似配对要避让别的槽逐字预留的小项（list-align 279 行），否则「熟悉Python爬虫」被换成「Python」。
+  expectList('预留小项不被相似配对抢走', ['熟悉Python爬虫和SQL', 'Python与Go'], ['Python', 'SQL'], ['熟悉Python爬虫和SQL', 'Python与Go'])
+  // 空格隔开的编号证书（list-align 303 行剥编号），模型拆对两张时不留「2.」半截。
+  expectList('空格编号证书', ['1. 初级会计职称 2. 全国计算机等级考试二级'], ['初级会计职称', '全国计算机等级考试二级'], ['初级会计职称', '全国计算机等级考试二级'])
+  // 竖线标题里没带日期、整栏只是括号补充（project-align 31 行），不当角色。
+  const pipeParen = projectAt(
+    ['校园二手交易平台 | （毕业设计） | 2023.03 - 2023.09', '· 负责商品发布与订单模块开发'],
+    { name: '校园二手交易平台', role: '', description: '负责商品发布与订单模块开发' },
+  )
+  if ((pipeParen.role ?? '') !== '') fail(`竖线整栏括号补充被当成角色：${JSON.stringify(pipeParen)}`)
+  pass('预留小项不被相似配对抢走；空格编号证书不留半截；竖线整栏括号不当角色')
+
+  // 第九段：同一模型项拆出的小块要按整项输出，不许出「CI」「CD」。
+  expectList('熟悉CI/CD与Docker不拆碎', ['熟悉CI/CD与Docker'], ['CI/CD', 'Docker'], ['CI/CD', 'Docker'])
+  // 补回时剥编号，点号后面紧跟数字的是小数或版本号，不是编号。
+  expectList('2.5D补回不剥小数', ['Maya、2.5D动画制作'], ['Maya'], ['Maya', '2.5D动画制作'])
+  expectList('3.0版本迁移补回不剥小数', ['Unity、3.0版本迁移'], ['Unity'], ['Unity', '3.0版本迁移'])
+  expectList('3.0版本迁移整行补回', ['3.0版本迁移'], [], ['3.0版本迁移'])
+  // 「1、A，2、B」按顿号拆出的纯数字段是下一项编号，不单独成项。
+  expectList('顿号纯数字段不当成一项', ['1、A，2、B'], ['A', 'B'], ['A', 'B'])
+  pass('斜杠技能不拆碎；小数和版本号补回原样；顿号编号不单独成项')
+
+  for (const label of ['项目周期', '起止时间', '时间段', '项目时长'] as const) {
+    const item = projectAt(
+      [`项目名称：智慧园区管理系统 | ${label}：2023.03 - 2023.09`, '· 负责设备接入模块开发'],
+      { name: '智慧园区管理系统', role: '', description: '负责设备接入模块开发' },
+    )
+    if ((item.role ?? '') !== '' || item.name !== '智慧园区管理系统') fail(`${label} 栏名被当成角色：${JSON.stringify(item)}`)
+  }
+  pass('竖线标题四种周期栏名不当角色')
+
+  for (const [label, title, name, mark] of [
+    ['空格毕业设计', '2022.09 - 2023.05 校园二手交易平台 （毕业设计）', '校园二手交易平台', '毕业设计'],
+    ['空格半角版本', '2023.03 - 2023.09 门店巡检小程序 (V2.0)', '门店巡检小程序', 'V2.0'],
+    ['空格前端开发', '2023.01 - 2023.06 智慧电商平台 （前端开发）', '智慧电商平台', '前端开发'],
+  ] as const) {
+    const item = projectAt(
+      [title, '· 负责商品发布与订单模块开发'],
+      { name, role: '', description: '负责商品发布与订单模块开发' },
+    )
+    if ((item.role ?? '') !== '' || !item.name.includes(mark)) fail(`${label} 括号补充被当成角色：${JSON.stringify(item)}`)
+  }
+  pass('括号前带空格的补充留在名称里，不当角色')
 }
 
 if (process.argv[1]?.endsWith('resume-optimize-after-match-r1h.ts')) {
