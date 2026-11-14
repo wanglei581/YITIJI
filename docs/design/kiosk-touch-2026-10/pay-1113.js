@@ -1,10 +1,12 @@
-/* pay-1113.js：收费显示与付款（2026-11-14 第三版，只画稿）
+/* pay-1113.js：收费显示与付款（2026-11-14 第四版，只画稿）
  * 产品负责人 11/13 对第一版核图回「都按推荐」：
  * 1. 能重试的失败，同一单免费再试一次；不再试、离开，或再试还不成，钱自动退回原付款账户。
  * 2. 付一次管这一趟。收费机器上不再卖「次数用完再付一次」；这一趟里的子功能不扣每日次数。
  * 3. 简历诊断免费，开始改写之前收。
  * 4. 排版失败不退款（原稿「也不计次数」），只有 AI 真没做成才退。
- * 第三版只修越框和收费开时的矛盾用词：诊断价格说明放进「带走这份报告」，不另插一条把卡片压扁。
+ * 第三版把诊断价格说明放进「带走这份报告」。第四版：说明缩成一行并取消最低高度，
+ * 登录后右栏卡片不再被压出边框；待付款和出纸中分开写；从零生成先按不收费画；
+ * 首页已登录时压低收费卡片，页脚三行放得下；打印订单按首页公示的黑白单价乘页数乘份数。
  * 1.00 元是演示数字，不是定价。真实价格每台机器在管理员后台设，不进仓库。
  *
  * 只在「收费点位」开着、且不是「公共就业点位」时改画面。
@@ -70,6 +72,15 @@
 .d3-home .task:has(.py-home){min-height:300px;gap:8px;padding:22px 26px 16px}
 .d3-home .task:has(.py-home) h3{margin-top:0;font-size:36px}
 .d3-home .task:has(.py-home) p{font-size:21px;line-height:1.35}
+/* 已登录又多一条「打印任务进行中」。收费卡片再按未登录的最低高度，页脚备案号会被底部导航挡住。只压这一态。 */
+.d3-home.d3-on.body:has(.py-home){gap:8px;padding-top:8px;padding-bottom:4px}
+.d3-home.d3-on.body:has(.py-home) .grid2.tasks{gap:12px}
+.d3-home.d3-on.body:has(.py-home) .task{min-height:0;gap:2px;padding:10px 14px 8px}
+.d3-home.d3-on.body:has(.py-home) .task h3{margin-top:0;font-size:32px;line-height:1.15}
+.d3-home.d3-on.body:has(.py-home) .task .ic{width:52px;height:52px;border-radius:16px}
+.d3-home.d3-on.body:has(.py-home) .task p{font-size:20px;line-height:1.25}
+.d3-home.d3-on.body:has(.py-home) .py-home.on{margin-top:0;font-size:20px;line-height:1.2}
+.d3-home.d3-on.body:has(.py-home) .d3-go{min-height:72px;padding:6px 10px 6px 14px}
 .py-bar.on{flex:none;display:flex;flex-direction:column;gap:2px;margin:8px 0 0;padding:8px 18px;border-radius:20px;background:var(--card);border:1.5px solid var(--edge)}
 .py-bar.on b{font:800 26px/1.25 var(--sans);color:var(--deep)}
 .py-bar.on span{font-size:20px;line-height:1.35;color:var(--ink-2)}
@@ -80,8 +91,11 @@
 /* 简历样张下半截是浅灰线，门禁不算墨。拉到一半高时空白会过 320，收到 46% 且不超过 580。 */
 .py-sample.on svg{height:46%;max-height:580px;width:auto;max-width:100%;flex:none}
 .py-sample.scan svg{height:33.33%;max-height:420px}
-.d4-take.py-take{flex-wrap:wrap;align-items:center;align-content:center;min-height:120px;flex-shrink:0}
-.d4-take.py-take>.fine{flex:1 0 100%;line-height:1.35}
+.d4-take.py-take{flex-wrap:wrap;align-items:center;align-content:center;min-height:0;flex-shrink:0}
+.d4-take.py-take>button{order:1}
+.d4-take.py-take>.fine{flex:1 0 100%;order:2;line-height:1.35;margin:0;white-space:nowrap}
+.body.d4-diag:has(.py-take){gap:8px}
+.body.d4-diag.b2r-out:has(.py-take){gap:6px}
 .py-invbody{justify-content:flex-start;gap:12px;padding-top:16px;padding-bottom:12px}
 .py-invqr.b2a-bqr{width:320px;height:320px;padding:20px}
 .py-invqr.b2a-bqr svg{width:280px;height:280px}
@@ -98,6 +112,12 @@
     return z[key] ? 0 : 100;
   }
   function money(c) { return (c / 100).toFixed(2) + ' 元'; }
+  /* 打印订单金额 = 首页公示的黑白单价 × 页数 × 份数。稿上没有彩色单价，示例单都按黑白算。 */
+  function printBill(pages, copies) {
+    const unit = cents('print');
+    if (!unit) return '免费';
+    return money(unit * pages * copies);
+  }
   function homeLine(key, prefix) {
     const c = cents(key);
     return c ? prefix + money(c) : '免费';
@@ -159,6 +179,15 @@
     const bstart = rest.lastIndexOf('<div class="fe-line"', bi);
     if (bstart < 0) return h;
     return rest.slice(0, bstart) + line + rest.slice(bstart);
+  }
+  function setPrintPay(h, file, amount) {
+    const tag = '<b>' + file + '</b>';
+    const i = h.indexOf(tag);
+    if (i < 0) return h;
+    const pay = '0 元（免费试运营） · 免费';
+    const j = h.indexOf(pay, i);
+    if (j < 0 || j - i > 500) return h;
+    return h.slice(0, j) + '已付款 · ' + amount + h.slice(j + pay.length);
   }
   function replaceLine(h, id, html) {
     const mark = 'data-arg="' + id + '"';
@@ -276,7 +305,7 @@
     const n = retarget(h, '查看优化建议（4 条）', 'data-go="pay-service" data-set="pyWhat=resume;pyBack=diagnosis;pyNext=optimize;pyAfter=start-resume;pyState=wait"');
     if (!n) return h;
     h = n.replace('>查看优化建议（4 条）', '>付 ' + YUAN + '并开始');
-    const note = '这一次 ' + YUAN + '，AI 简历优化。诊断免费，付好了才开始改。没做成可免费再试一次；再不成，钱' + BACK + '。';
+    const note = '这一次 ' + YUAN + '。诊断免费，付好了才开始改。没做成可免费再试，再不成钱自动退回。';
     h = h.replace('<section class="d4-take" aria-label="带走这份报告">', '<section class="d4-take py-take" aria-label="带走这份报告">');
     h = h.replace('<span class="d4-price">导出不另收钱</span>', '<span class="d4-price">导出不另收钱</span><p class="fine left">' + note + '</p>');
     return h;
@@ -364,21 +393,46 @@
     h = h.split('用了 1 次 · 今天还剩 16 次').join('这一条已经换过，这一趟不再另收费');
     return h;
   });
-  /* 收费机器上不演示「今天次数用完」。对照那一屏的演示按钮去掉；不收费时仍是原稿。 */
+  /* 收费机器上不演示「今天次数用完」。对照、换写法正在进行时都去掉；不收费时仍是原稿。 */
   (function () {
-    const d = find('jobfit'); if (!d) return;
-    const d0 = d.demo;
-    d.demo = () => {
-      const base = typeof d0 === 'function' ? (d0() || []) : (d0 || []);
-      if (!charge()) return base;
-      return base.filter((x) => !x || String(x.label || '').indexOf('今天次数用完') < 0);
-    };
+    ['jobfit', 'compare'].forEach((id) => {
+      const d = find(id); if (!d) return;
+      const d0 = d.demo;
+      d.demo = () => {
+        const base = typeof d0 === 'function' ? (d0() || []) : (d0 || []);
+        if (!charge()) return base;
+        return base.filter((x) => !x || String(x.label || '').indexOf('今天次数用完') < 0);
+      };
+    });
   })();
-  /* 收费开时，这四屏不再写和收费矛盾的旧句。关着时原样返回。 */
-  wrapCharge('me', (r0) => r0().split('免费试运营，本单 0 元').join('已付款 · ' + YUAN));
+  /* 收费开时，这四屏不再写和收费矛盾的旧句。关着时原样返回。
+     待付款只写本单金额；「已付款」只给出纸中。推荐表 2 页 1 份，按首页黑白单价算。 */
+  wrapCharge('me', (r0) => {
+    const h = r0();
+    const amt = printBill(2, 1);
+    if (S().feTodo === 'paper') return h.replace('免费试运营，本单 0 元', '已付款 · ' + amt);
+    return h.replace(
+      '毕业生就业推荐表.pdf · 免费试运营，本单 0 元。付款前不会开始出纸。',
+      '毕业生就业推荐表.pdf · 本单 ' + amt + '。付款前不会开始出纸。'
+    );
+  });
   wrapCharge('resume-export', (r0) => r0().split('免费试运营，本单 0 元').join('导出不另收钱'));
   wrapCharge('done', (r0) => r0().replace('重新选文件后再确认。免费试运营。', '重新选文件后再确认。'));
-  wrapCharge('gen-preview', (r0) => r0().split('收费导出需登录会员账号并核销 1 次权益').join('导出不另收钱'));
+  /* 从零生成这一期不单独标价。先按不收费画，确认事实后导出键能点；「导出不另收钱」另起一行，不放进警告框。 */
+  wrapCharge('gen-preview', (r0) => {
+    const s = S();
+    const prev = s.feeWanted;
+    s.feeWanted = false;
+    let h;
+    try { h = r0(); }
+    finally { s.feeWanted = prev; }
+    const facts = 'data-fr="facts"';
+    const fi = h.indexOf(facts);
+    if (fi < 0) return h;
+    const start = h.lastIndexOf('<div class="fr-rowbtns">', fi);
+    if (start < 0) return h;
+    return h.slice(0, start) + '<p class="fine left"><span class="d4-price">导出不另收钱</span></p>' + h.slice(start);
+  });
 
   /* ── 没诊断出来：不缩字，不卖再用一次。付过才在副标题里写退款。 ── */
   wrapCharge('st-ai-down', (r0) => {
@@ -471,7 +525,8 @@
     h = moveBlockBefore(h, '<div class="fe-line py-bill"><span class="tx"><b>AI 简历优化</b>', 'data-arg="o4"');
     h = replaceLine(h, 'o2', bill('扫描', '已退款 · ' + YUAN + ' · 已退回原付款账户，' + CHANNEL + ' · 今天 11:20'));
     h = replaceLine(h, 'o7', bill('AI 模拟面试', '发票已开 · ' + YUAN + ' · 电子发票已发到邮箱 · 昨天 15:02'));
-    h = h.split('0 元（免费试运营） · 免费').join('已付款 · ' + YUAN);
+    h = setPrintPay(h, '毕业生就业推荐表.pdf', printBill(2, 1));
+    h = setPrintPay(h, '成绩单-2026春.pdf', printBill(3, 2));
     h = h.split('0 元（免费试运营） · 待退款').join('待退款');
     h = h.split('<p class="fe-p">免费试运营，本单 0 元。</p>').join('');
     h = h.replace('共 7 条已产生打印任务的单', '共 7 条');
