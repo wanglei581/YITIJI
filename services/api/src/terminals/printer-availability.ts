@@ -83,7 +83,8 @@ const PICKUP_SCENE_MESSAGES: Partial<Record<'order' | 'pickup' | 'claim_here', {
 
 /**
  * 队列闸门抛 400 PRINT_TERMINAL_QUEUE_HALTED。
- * 其余不可用状态在开关打开时抛 400 PRINTER_UNAVAILABLE，两句旧文案一个字不改。
+ * 下单被打印机挡住时抛 400 PRINTER_UNAVAILABLE。这两句不叫人去找工作人员，
+ * 下一步与暂停接单那句相同：请稍后再试或换一台终端。取件场景仍用上面的原话。
  * 不透出心跳时间戳或内部状态串。
  */
 export async function assertTerminalPrinterAvailable(
@@ -103,8 +104,8 @@ export async function assertTerminalPrinterAvailable(
   if (availability.available) return
   const message =
     availability.reason === 'printer_unavailable'
-      ? '本机打印机当前不可用（离线、缺纸或故障），暂不能下单，请联系工作人员'
-      : '本机打印服务暂未就绪，暂不能下单，请稍后再试或联系工作人员'
+      ? '本机打印机当前不可用（离线、缺纸或故障），暂不能下单，请稍后再试或换一台终端'
+      : '本机打印服务暂未就绪，暂不能下单，请稍后再试或换一台终端'
   throw new BadRequestException({
     error: { code: 'PRINTER_UNAVAILABLE', message: PICKUP_SCENE_MESSAGES[scene]?.unavailable ?? message },
   })

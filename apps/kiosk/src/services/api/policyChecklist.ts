@@ -10,6 +10,7 @@
 //   404 { error: { code: 'POLICY_NOT_FOUND' } } —— 没有这条、未发布、已撤下或被紧急下架
 //   其它 —— 失败，页面如实说「这次没生成」，给重试；不冒充「已撤下」。
 
+import { terminalAttributedFetch } from '../terminalAuth'
 import { API_BASE_URL, API_MODE } from './client'
 
 export interface PolicyChecklistFile {
@@ -40,7 +41,7 @@ export async function createPolicyChecklist(policyId: string): Promise<PolicyChe
   // 演示模式没有后端，生成不了真实文件；如实失败，不造一份假清单。
   if (API_MODE !== 'http') return { status: 'failed' }
   try {
-    const res = await fetch(`${API_BASE_URL}/policies/${encodeURIComponent(id)}/checklist`, {
+    const res = await terminalAttributedFetch(`${API_BASE_URL}/policies/${encodeURIComponent(id)}/checklist`, {
       method: 'POST',
       headers: { Accept: 'application/json' },
     })
