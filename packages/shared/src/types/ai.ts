@@ -539,6 +539,8 @@ export interface ResumeFactCheckResponse {
   taskId: string
   originalAvailable: true
   items: ResumeFactItem[]
+  /** 优化稿相对原文新增的数字和职责词片段。小程序窗口以后用，旧客户端可以忽略。 */
+  additions: Array<{ text: string; path: string }>
 }
 
 /**
