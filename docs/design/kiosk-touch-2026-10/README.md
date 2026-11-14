@@ -253,6 +253,15 @@
 | 打印订单金额 = 首页公示的黑白每页 1.00 元 × 页数 × 份数。推荐表 2 页 1 份是 2.00 元，成绩单 3 页 2 份是 6.00 元。稿上没有彩色单价，这两单都按黑白算。取件示例单仍是 2.00 元 | `me`、`my-orders` | 同一份推荐表在待办、订单、收银台都是 2.00 元 |
 | 换写法正在换时，收费机器上去掉「今天次数用完」演示。收费关仍保留。对照岗位的这颗演示仍按第三版去掉 | `compare`、`jobfit` | 正在换：`?fee=1` 且 `b2v=regen`。收费关三颗演示都在 |
 
+## 收费显示与付款（2026-11-14 补稿，第五版）
+
+仍只改 `pay-1113.js`，只修第四版核图没过的一处，顺带补一个字。
+
+| 改了什么 | 在哪一屏 | 怎么看 |
+|---|---|---|
+| 首页已登录且收费开时，四张入口卡压到约 255px 后，右下角小样图会盖住「AI 诊断改写」「AI 模拟面试」「官方发布」等角标。只在这一态把小样图按右下角缩到 0.78，角标与小样不再重叠；页脚与字号不变 | `home` | `?fee=1&login=1#home` |
+| 诊断页价格说明补回「一次」：「没做成可免费再试一次，再不成钱自动退回。」 | `diagnosis` | `?fee=1#diagnosis` |
+
 ## 冻结
 
 `apps/kiosk/scripts/verify-kiosk-touch-frozen.mjs`（`pnpm --filter @ai-job-print/kiosk verify:kiosk-touch-frozen`，进 CI）逐个比对本目录稿文件与 `FROZEN.json` 里的 sha256，改动、新增、删除都算红；`README.md`、`FROZEN.json` 不在冻结范围。改稿只在产品负责人同意之后：改完在 `apps/kiosk` 下跑 `node scripts/verify-kiosk-touch-frozen.mjs --update` 重写清单，并在 `docs/progress/current-progress.md` 写明谁同意的、改了什么、为什么。

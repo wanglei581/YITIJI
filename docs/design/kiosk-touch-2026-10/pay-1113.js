@@ -81,6 +81,8 @@
 .d3-home.d3-on.body:has(.py-home) .task p{font-size:20px;line-height:1.25}
 .d3-home.d3-on.body:has(.py-home) .py-home.on{margin-top:0;font-size:20px;line-height:1.2}
 .d3-home.d3-on.body:has(.py-home) .d3-go{min-height:72px;padding:6px 10px 6px 14px}
+/* 卡片压到约 255px 后，右下角小样图会顶到角标行；只在这一态把小样按右下角缩到 0.78，角标与小样不再重叠。 */
+.d3-home.d3-on.body:has(.py-home) .task .mini{transform:scale(.78);transform-origin:right bottom}
 .py-bar.on{flex:none;display:flex;flex-direction:column;gap:2px;margin:8px 0 0;padding:8px 18px;border-radius:20px;background:var(--card);border:1.5px solid var(--edge)}
 .py-bar.on b{font:800 26px/1.25 var(--sans);color:var(--deep)}
 .py-bar.on span{font-size:20px;line-height:1.35;color:var(--ink-2)}
@@ -305,7 +307,7 @@
     const n = retarget(h, '查看优化建议（4 条）', 'data-go="pay-service" data-set="pyWhat=resume;pyBack=diagnosis;pyNext=optimize;pyAfter=start-resume;pyState=wait"');
     if (!n) return h;
     h = n.replace('>查看优化建议（4 条）', '>付 ' + YUAN + '并开始');
-    const note = '这一次 ' + YUAN + '。诊断免费，付好了才开始改。没做成可免费再试，再不成钱自动退回。';
+    const note = '这一次 ' + YUAN + '。诊断免费，付好了才开始改。没做成可免费再试一次，再不成钱自动退回。';
     h = h.replace('<section class="d4-take" aria-label="带走这份报告">', '<section class="d4-take py-take" aria-label="带走这份报告">');
     h = h.replace('<span class="d4-price">导出不另收钱</span>', '<span class="d4-price">导出不另收钱</span><p class="fine left">' + note + '</p>');
     return h;
