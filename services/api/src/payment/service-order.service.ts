@@ -64,6 +64,7 @@ export interface ServiceOrderView {
   failureReason: string | null
   retryUntil: string | null
   attemptsUsed: number
+  settledAt: string | null
   closeReason: string | null
   paymentFailed: boolean
   checking: boolean
@@ -535,11 +536,16 @@ export class ServiceOrderService {
     } else {
       const task = await this.prisma.scanTask.findUnique({
         where: { id: ref },
-        select: { fileId: true, status: true },
+        select: { fileId: true, status: true, expiresAt: true },
       })
       if (task?.fileId) return false
-      const dead = Boolean(task && (task.status === 'failed' || task.status === 'cancelled' || task.status === 'expired'))
-      notMade = !task || dead || pendingTooLong
+      if (!task) {
+        notMade = pendingTooLong
+      } else {
+        const dead = task.status === 'failed' || task.status === 'cancelled' || task.status === 'expired'
+        const sessionOver = task.expiresAt.getTime() <= Date.now()
+        notMade = dead || sessionOver
+      }
     }
     if (!notMade) return false
     await this.markNotMade(row.id, 'scan_no_file')
@@ -666,22 +672,28 @@ export class ServiceOrderService {
       where: { id: ref },
       select: { fileId: true, status: true },
     })
-    if (!task) return null
-    if (!task.fileId && (task.status === 'failed' || task.status === 'cancelled' || task.status === 'expired')) return null
+    if (!task || task.fileId) return null
+    if (task.status === 'failed' || task.status === 'cancelled' || task.status === 'expired' || task.status === 'completed') return null
     return row.id
   }
 
-  /** 这次占用没挂上任务。退回已付，次数减一，好让这一单还能用，也不会和别人共有一个任务。 */
+  /** 这次占用没挂上任务。退回已付。用过的次数还在的，必须留着再试期限，不能变成没人管。 */
   async releasePendingConsume(orderId: string): Promise<void> {
+    const row = await this.prisma.serviceOrder.findUnique({
+      where: { id: orderId },
+      select: { attemptsUsed: true, status: true, consumedRef: true },
+    })
+    if (!row || row.status !== 'consumed' || row.consumedRef !== 'pending' || row.attemptsUsed < 1) return
+    const attemptsLeft = row.attemptsUsed - 1
     await this.prisma.serviceOrder.updateMany({
-      where: { id: orderId, status: 'consumed', consumedRef: 'pending', attemptsUsed: { gte: 1 } },
+      where: { id: orderId, status: 'consumed', consumedRef: 'pending', attemptsUsed: row.attemptsUsed },
       data: {
         status: 'paid',
         attemptsUsed: { decrement: 1 },
         consumedAt: null,
         consumedRef: null,
         failureReason: null,
-        retryUntil: null,
+        retryUntil: attemptsLeft >= 1 ? new Date(Date.now() + SERVICE_RETRY_WINDOW_MS) : null,
       },
     })
   }
@@ -736,6 +748,7 @@ export class ServiceOrderService {
       failureReason: row.failureReason,
       retryUntil: iso(row.retryUntil),
       attemptsUsed: row.attemptsUsed,
+      settledAt: iso(row.settledAt),
       closeReason: row.closeReason,
       paymentFailed: row.paymentFailed,
       checking,

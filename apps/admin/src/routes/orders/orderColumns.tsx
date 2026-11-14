@@ -1,7 +1,7 @@
 import { StatusBadge, type ConsoleColumn } from '@ai-job-print/ui'
 import type { AdminOrderReadonlyItem } from '../../services/api/adminOrdersReadonly'
 import { printErrorText } from '../../lib/printErrorText'
-import { amountText, channelText, orderPagesText, orderUserText, PAY_STATUS_MAP, STATUS_MAP } from './orderDisplay'
+import { amountText, channelText, orderPagesText, orderUserText, payStatusPresentation, STATUS_MAP } from './orderDisplay'
 import { opsAttentionText } from './orderHonestyCopy'
 
 export function orderColumns(openDetail: (id: string) => Promise<void>): ConsoleColumn<AdminOrderReadonlyItem>[] {
@@ -30,7 +30,7 @@ export function orderColumns(openDetail: (id: string) => Promise<void>): Console
         )}
       </> },
     { id: 'payment', header: '支付状态', headerClassName: 'w-[10%]', cell: (order) => {
-      const pay = PAY_STATUS_MAP[order.payStatus] ?? { badge: 'default' as const, label: '未归类' }
+      const pay = payStatusPresentation(order.payStatus, order.recordKind)
       return <><StatusBadge dot status={pay.badge} label={pay.label} />
         {opsAttentionText(order.opsAttentionCode) ? (
           <span className="mt-1 block text-[11px] font-bold text-warning-fg">{opsAttentionText(order.opsAttentionCode)}</span>

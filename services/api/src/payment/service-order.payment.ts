@@ -292,7 +292,15 @@ async function applyRefundQuery(
   return markRefundFailed(db, redis, existing.id, manual)
 }
 
-/** 微信退款通知里 svc-rfd- 开头的单号属于服务单，不进打印退款表。 */
+function serviceRefundNotifyKey(event: Pick<RefundNotifyEvent, 'refundNo' | 'status' | 'refundAmountCents' | 'channelRefundNo'>): string {
+  const amount = event.refundAmountCents === null || event.refundAmountCents === undefined ? '' : String(event.refundAmountCents)
+  return `${event.refundNo}|${event.status}|${event.channelRefundNo ?? ''}|${amount}`
+}
+
+/**
+ * 微信退款通知里 svc-rfd- 开头的单号属于服务单，不进打印退款表。
+ * 验签已经通过。对不上、重复、金额不符都回「已处理」，不靠 400 让渠道不停重发。
+ */
 export async function settleServiceRefundNotify(
   db: PrismaService,
   audit: AuditService,
@@ -300,15 +308,34 @@ export async function settleServiceRefundNotify(
   event: Pick<RefundNotifyEvent, 'refundNo' | 'status' | 'refundAmountCents' | 'channelRefundNo'>,
 ): Promise<{ handled: true; idempotent?: boolean }> {
   const prefix = 'svc-rfd-'
-  if (!event.refundNo.startsWith(prefix)) throw new BadRequestException('REFUND_NOTIFY_UNKNOWN_REFUND')
+  if (!event.refundNo.startsWith(prefix)) return { handled: true }
   const row = await db.serviceOrder.findUnique({ where: { id: event.refundNo.slice(prefix.length) } })
-  if (!row || row.refundNo !== event.refundNo) throw new BadRequestException('REFUND_NOTIFY_UNKNOWN_REFUND')
-  if (row.status === 'refunded') return { handled: true, idempotent: true }
+  if (!row || row.refundNo !== event.refundNo) {
+    logger.warn(`service refund notify unmatched refundNo=${event.refundNo}`)
+    return { handled: true }
+  }
+  const fingerprint = serviceRefundNotifyKey(event)
+  if (row.refundNotifyKey === fingerprint) return { handled: true, idempotent: true }
+  const mismatch = event.status === 'success'
+    && event.refundAmountCents !== null
+    && event.refundAmountCents !== row.amountCents
+  const claimed = await db.serviceOrder.updateMany({
+    where: {
+      id: row.id,
+      OR: [{ refundNotifyKey: null }, { refundNotifyKey: { not: fingerprint } }],
+    },
+    data: {
+      refundNotifyKey: fingerprint,
+      ...(mismatch ? { refundAnomaly: '退款通知金额和这一单不一致' } : {}),
+    },
+  })
+  if (claimed.count !== 1) return { handled: true, idempotent: true }
+  if (mismatch) return { handled: true }
   if (event.status === 'success') {
-    if (event.refundAmountCents !== null && event.refundAmountCents !== row.amountCents) {
-      throw new BadRequestException('REFUND_NOTIFY_AMOUNT_MISMATCH')
-    }
-    const updated = await markRefunded(db, audit, row, row.refundReason ?? SERVICE_REFUND_REASON_LATE_PAYMENT, event.refundNo, event.channelRefundNo)
+    if (row.status === 'refunded') return { handled: true, idempotent: true }
+    const updated = await markRefunded(
+      db, audit, row, row.refundReason ?? SERVICE_REFUND_REASON_LATE_PAYMENT, event.refundNo, event.channelRefundNo,
+    )
     return { handled: true, idempotent: updated !== 'refunded' }
   }
   if (row.status === 'refunding' || row.status === 'refund_failed') {
@@ -368,6 +395,7 @@ async function markRefunded(
       nextRefundAt: null,
       refundLeaseUntil: null,
       refundChannelState: 'success',
+      refundAnomaly: null,
     },
   })
   if (updated.count !== 1) return 'skipped'
@@ -408,6 +436,7 @@ async function markRefundFailed(
   orderId: string,
   manual: boolean,
 ): Promise<'refunding' | 'refund_failed'> {
+  void manual
   await db.serviceOrder.updateMany({
     where: { id: orderId, status: 'refunding' },
     data: { refundAttempts: { increment: 1 }, refundLeaseUntil: null, refundChannelState: 'failed' },
@@ -417,7 +446,7 @@ async function markRefundFailed(
     select: { refundAttempts: true },
   })
   const attempts = row?.refundAttempts ?? 0
-  const exhausted = manual ? attempts >= SERVICE_REFUND_RETRY_CAP + 1 : attempts >= SERVICE_REFUND_RETRY_CAP
+  const exhausted = attempts >= SERVICE_REFUND_RETRY_CAP
   if (exhausted) {
     await db.serviceOrder.updateMany({
       where: { id: orderId, status: 'refunding' },

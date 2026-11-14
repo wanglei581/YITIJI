@@ -173,8 +173,8 @@ export function OrderPaymentActions({ controls }: { controls: OrderDetailControl
               <div className="mt-6 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-3.5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[13px] font-bold text-neutral-800">退款还没完成</p>
-                    <p className="mt-0.5 text-xs text-neutral-500">按原路再试一次。已经退成的不会再退第二次。</p>
+                    <p className="text-[13px] font-bold text-neutral-800">{detail.serviceStatus === 'refund_failed' ? '退款待人工处理' : '退款还没完成'}</p>
+                    <p className="mt-0.5 text-xs text-neutral-500">{detail.serviceStatus === 'refund_failed' ? '自动处理已到上限。再试一次如果还是失败，仍留在这里。' : '按原路再试一次。已经退成的不会再退第二次。'}</p>
                   </div>
                   <button
                     type="button"

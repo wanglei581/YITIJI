@@ -35,7 +35,7 @@ export async function retirePendingServiceOrders(
   const audit = new AuditService(db)
   let cursor: string | null = null
   for (;;) {
-    const rows = await db.serviceOrder.findMany({
+    const rows: OrderRow[] = await db.serviceOrder.findMany({
       where: {
         status: 'pending',
         ...(input.terminalId ? { terminalId: input.terminalId } : {}),
@@ -52,7 +52,7 @@ export async function retirePendingServiceOrders(
         logger.warn(`关闭待付单失败 ${row.id}：${(error as Error).message}`)
       }
     }
-    const next = rows[rows.length - 1]?.id
+    const next: string | undefined = rows[rows.length - 1]?.id
     if (!next || rows.length < SERVICE_SWEEP_BATCH) return
     cursor = next
   }
@@ -67,7 +67,7 @@ export async function retryPendingChannelCloses(
 ): Promise<void> {
   let cursor: string | null = null
   for (;;) {
-    const rows = await db.serviceOrder.findMany({
+    const rows: OrderRow[] = await db.serviceOrder.findMany({
       where: {
         status: 'closed',
         channelClosePending: true,
@@ -84,7 +84,7 @@ export async function retryPendingChannelCloses(
         logger.warn(`重试关单失败 ${row.id}：${(error as Error).message}`)
       }
     }
-    const next = rows[rows.length - 1]?.id
+    const next: string | undefined = rows[rows.length - 1]?.id
     if (!next || rows.length < SERVICE_SWEEP_BATCH) return
     cursor = next
   }

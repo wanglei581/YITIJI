@@ -32,7 +32,9 @@ const SCAN_TERMINAL = ['failed', 'cancelled', 'expired'] as const
  */
 export async function drainServiceOrderSweep(deps: ServiceOrderSweepDeps): Promise<void> {
   await sweepRetryExpired(deps)
+  await sweepPaidWithoutRetryWindow(deps)
   await sweepRefunding(deps)
+  await sweepRefundNeedsPerson(deps)
   await sweepPaidUnused(deps)
   await sweepConsumedTrips(deps)
   await releaseStuckInterviews(deps)
@@ -74,6 +76,50 @@ async function sweepRefunding(deps: ServiceOrderSweepDeps): Promise<void> {
     })
     for (const row of rows) {
       await deps.refund(row.id, row.refundReason ?? SERVICE_REFUND_REASON_LEFT)
+    }
+    return rows.map((row) => row.id)
+  })
+}
+
+/** 已经用过一次、却没有再试期限的已付单。不能停在没人管的状态。 */
+async function sweepPaidWithoutRetryWindow(deps: ServiceOrderSweepDeps): Promise<void> {
+  await eachBatch(async (cursor) => {
+    const rows = await deps.prisma.serviceOrder.findMany({
+      where: {
+        status: 'paid',
+        attemptsUsed: { gte: 1 },
+        retryUntil: null,
+        ...(cursor ? { id: { gt: cursor } } : {}),
+      },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+      take: SERVICE_SWEEP_BATCH,
+    })
+    for (const row of rows) {
+      await deps.refund(row.id, SERVICE_REFUND_REASON_RETRY_EXPIRED)
+    }
+    return rows.map((row) => row.id)
+  })
+}
+
+/** 次数已经到顶还停在退款中的，直接交给人工，不再打渠道。 */
+async function sweepRefundNeedsPerson(deps: ServiceOrderSweepDeps): Promise<void> {
+  await eachBatch(async (cursor) => {
+    const rows = await deps.prisma.serviceOrder.findMany({
+      where: {
+        status: 'refunding',
+        refundAttempts: { gte: SERVICE_REFUND_RETRY_CAP },
+        ...(cursor ? { id: { gt: cursor } } : {}),
+      },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+      take: SERVICE_SWEEP_BATCH,
+    })
+    for (const row of rows) {
+      await deps.prisma.serviceOrder.updateMany({
+        where: { id: row.id, status: 'refunding', refundAttempts: { gte: SERVICE_REFUND_RETRY_CAP } },
+        data: { status: 'refund_failed', nextRefundAt: null, refundLeaseUntil: null },
+      })
     }
     return rows.map((row) => row.id)
   })
@@ -239,18 +285,21 @@ async function judgeScan(
   }
   const task = await deps.prisma.scanTask.findUnique({
     where: { id: ref },
-    select: { fileId: true, status: true },
+    select: { fileId: true, status: true, expiresAt: true },
   })
   if (task?.fileId) {
     await deps.finishMade(row.id)
     return
   }
-  const missing = !task
-  const dead = Boolean(task && (SCAN_TERMINAL as readonly string[]).includes(task.status) && !task.fileId)
-  const pendingTooLong = Boolean(
-    row.consumedAt && row.consumedAt.getTime() < deps.now.getTime() - SERVICE_SCAN_PENDING_LIMIT_MS,
-  )
-  if (missing || dead || pendingTooLong) await deps.markNotMade(row.id, 'scan_no_file')
+  if (!task) {
+    if (row.consumedAt && row.consumedAt.getTime() < deps.now.getTime() - SERVICE_SCAN_PENDING_LIMIT_MS) {
+      await deps.markNotMade(row.id, 'scan_no_file')
+    }
+    return
+  }
+  const dead = (SCAN_TERMINAL as readonly string[]).includes(task.status)
+  const sessionOver = task.expiresAt.getTime() <= deps.now.getTime()
+  if (dead || sessionOver) await deps.markNotMade(row.id, 'scan_no_file')
 }
 
 /** 游标只往前走。处理完的行会离开条件；没离开的也不会被反复选中。 */

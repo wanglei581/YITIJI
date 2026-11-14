@@ -37,7 +37,8 @@ import { TerminalIdentityGuard } from '../src/terminals/terminal-identity.guard'
 import { TERMINAL_TOKEN_VALIDATOR, TerminalSessionService } from '../src/terminals/terminal-session.service'
 import { RedisInflightLock } from '../src/ai/redis-inflight-lock'
 import { setTerminalUserPrintPrices } from './support/terminal-charge-fixture'
-import { executeServiceOrderRefund } from '../src/payment/service-order.payment'
+import { executeServiceOrderRefund, settleServiceRefundNotify } from '../src/payment/service-order.payment'
+import { collectDerivedAlerts } from '../src/admin-ops/derived-alerts'
 import { isServiceOrderOpenRefConflict } from '../src/payment/service-order.ref'
 import { TripCoverService } from '../src/payment/trip-cover.service'
 import { PERSONAL_CHARGE_SETTING_KEY } from '../src/payment/terminal-charge.contract'
@@ -347,9 +348,11 @@ async function main(): Promise<void> {
   }
   let scanMode: 'ok' | 'throw' = 'ok'
   let scanReturnId = 'scan-return'
+  let scanCreates = 0
   const scans = {
     async create() {
       if (scanMode === 'throw') throw new Error('scan down')
+      scanCreates += 1
       return { scanTaskId: scanReturnId }
     },
   }
@@ -1099,7 +1102,7 @@ async function main(): Promise<void> {
     pass('C-2 简历和面试中断后能判定，没有首题不算做成')
 
     const c3Session = await openKiosk(TERM_CHARGE, chargeToken, 'scan')
-    const c3Base = Date.now() - 120_000
+    const c3Base = Date.now() - 180_000
     const c3Made: string[] = []
     for (let i = 0; i < 35; i += 1) {
       const taskId = `c3-made-${i}`
@@ -1118,7 +1121,7 @@ async function main(): Promise<void> {
           kioskSessionId: c3Session,
           provider: 'sandbox',
           providerOrderNo: `c3-made-${id}`,
-          consumedAt: new Date(c3Base + (i + 1) * 1000),
+          consumedAt: new Date(c3Base + i * 1000),
           consumedRef: taskId,
           expiresAt: new Date(Date.now() + 60_000),
           paidAt: new Date(),
@@ -1139,7 +1142,7 @@ async function main(): Promise<void> {
         kioskSessionId: c3Session,
         provider: 'sandbox',
         providerOrderNo: `c3-victim-${c3Victim}`,
-        consumedAt: new Date(c3Base),
+        consumedAt: new Date(c3Base + 35 * 1000),
         consumedRef: 'c3-missing-task',
         expiresAt: new Date(Date.now() + 60_000),
         paidAt: new Date(),
@@ -1147,11 +1150,10 @@ async function main(): Promise<void> {
       },
     })
     await serviceOrders.sweep()
-    assert.equal((await loadOrder(c3Victim)).status, 'refunded', 'C-3 没出文件的最老一张要退')
+    await serviceOrders.sweep()
+    assert.equal((await loadOrder(c3Victim)).status, 'refunded', 'C-3 排在做成的后面，两拍内也要退')
     const c3Settled = await prisma.serviceOrder.count({ where: { id: { in: c3Made }, settledAt: { not: null } } })
-    assert.equal(c3Settled, 29, '这一拍只结案最早的 30 张里做成的那 29 张')
-    const c3LateSettled = await prisma.serviceOrder.count({ where: { id: { in: c3Made.slice(29) }, settledAt: { not: null } } })
-    assert.equal(c3LateSettled, 0, '更晚做成的这一拍不能插到更早的前面')
+    assert.equal(c3Settled, c3Made.length, '做成的都结案')
     pass('C-3 做成的扫描让出名额，没出文件的能退')
 
     const n1Session = await openKiosk(TERM_CHARGE, chargeToken, 'scan')
@@ -1600,6 +1602,220 @@ async function main(): Promise<void> {
     await assignTerminalOrganization(prisma, TERM_CHARGE, null, new Date(), async () => undefined)
     await setTerminalUserPrintPrices(prisma, TERM_CHARGE, DEMO_PRICES)
     pass('R19 改绑后旧付款码不能收')
+
+    const r20Session = await openKiosk(TERM_CHARGE, chargeToken, 'scan')
+    await prisma.scanTask.create({
+      data: { id: 'r20-dup', terminalId: TERM_CHARGE, scanType: 'resume', status: 'waiting', expiresAt: new Date(Date.now() + 3600_000) },
+    })
+    scanReturnId = 'r20-dup'
+    const r20Holder = await paidOrder(r20Session, 'scan', 'sbx_txn_r20_x')
+    expectStatus(await call('POST', '/api/v1/scan/sessions', { scanType: 'resume', terminalId: TERM_CHARGE }, termHeaders(TERM_CHARGE, chargeToken, r20Session, r20Holder.id)), 201, 'R20 先占上这一次扫描')
+    const r20Order = await paidOrder(r20Session, 'scan', 'sbx_txn_r20_o')
+    await prisma.serviceOrder.update({
+      where: { id: r20Order.id },
+      data: { attemptsUsed: 1, failureReason: '扫描没出文件', retryUntil: new Date(Date.now() + 10 * 60_000) },
+    })
+    expectStatus(await call('POST', '/api/v1/scan/sessions', { scanType: 'resume', terminalId: TERM_CHARGE }, termHeaders(TERM_CHARGE, chargeToken, r20Session, r20Order.id)), 201, 'R20 挂不上就退回')
+    const r20Released = await loadOrder(r20Order.id)
+    assert.equal(r20Released.status, 'paid', 'R20 退回后仍是已付')
+    assert.ok(r20Released.attemptsUsed >= 1, 'R20 用过的次数还在')
+    assert.ok(r20Released.retryUntil, 'R20 退回后必须还在可重用期内')
+    await serviceOrders.sweep()
+    assert.equal((await loadOrder(r20Order.id)).status, 'paid', 'R20 还在可重用期内不能退')
+    await prisma.serviceOrder.update({ where: { id: r20Order.id }, data: { retryUntil: null } })
+    await serviceOrders.sweep()
+    const r20Final = await loadOrder(r20Order.id)
+    assert.equal(r20Final.status, 'refunded', 'R20 没了再试期限必须由清扫退')
+    assert.equal(r20Final.refundReason, '免费再试已过期')
+    pass('R20 再试被退回后，要么还能再试，要么清扫退款')
+
+    const r21Session = await openKiosk(TERM_CHARGE, chargeToken, 'scan')
+    const r21Order = await paidOrder(r21Session, 'scan', 'sbx_txn_r21')
+    await prisma.serviceOrder.update({
+      where: { id: r21Order.id },
+      data: {
+        status: 'refunding',
+        refundAttempts: 7,
+        refundNo: `svc-rfd-${r21Order.id}`,
+        refundReason: '人已离开，这一次还没用',
+        refundChannelState: 'failed',
+        nextRefundAt: new Date(Date.now() - 1000),
+        refundLeaseUntil: null,
+      },
+    })
+    refundMode = 'throw'
+    const r21Manual = await call('POST', `/api/v1/admin/orders/${r21Order.id}/retry-service-refund`, {}, adminHeaders)
+    expectStatus(r21Manual, 200, 'R21 手动再试')
+    const r21After = await loadOrder(r21Order.id)
+    assert.equal(r21After.status, 'refund_failed', 'R21 到上限后进入退款待人工处理')
+    assert.equal(r21After.refundAttempts, 8)
+    assert.equal(await prisma.auditLog.count({ where: { action: 'service_order.refund_retry', targetId: r21Order.id, actorId: ADMIN } }), 1, 'R21 手动失败要记审计')
+    const r21Listed = await call('GET', '/api/v1/admin/orders?recordKind=service&serviceStatus=refund_failed', undefined, adminHeaders)
+    expectStatus(r21Listed, 200, 'R21 后台能筛退款待人工处理')
+    assert.ok((r21Listed.json.items ?? []).some((item) => item['id'] === r21Order.id), 'R21 这张单要出现在筛选里')
+    await serviceOrders.sweep()
+    await serviceOrders.sweep()
+    await serviceOrders.sweep()
+    const r21Held = await loadOrder(r21Order.id)
+    assert.equal(r21Held.status, 'refund_failed', 'R21 清扫不能把它留在退款中，也不能当成已退')
+    assert.equal(r21Held.refundAttempts, 8, 'R21 到上限后清扫不再打渠道')
+    const r21Leak = randomUUID()
+    await prisma.serviceOrder.create({
+      data: {
+        id: r21Leak,
+        terminalId: TERM_CHARGE,
+        serviceKey: 'scan',
+        amountCents: 100,
+        status: 'refunding',
+        attemptsUsed: 1,
+        refundAttempts: 8,
+        refundNo: `svc-rfd-${r21Leak}`,
+        refundReason: '人已离开，这一次还没用',
+        kioskSessionId: r21Session,
+        provider: 'sandbox',
+        providerOrderNo: `r21-leak-${r21Leak}`,
+        expiresAt: new Date(Date.now() + 60_000),
+        paidAt: new Date(),
+        channelTxnNo: `r21-txn-${r21Leak}`,
+        nextRefundAt: null,
+        refundLeaseUntil: null,
+      },
+    })
+    await serviceOrders.sweep()
+    const r21LeakAfter = await loadOrder(r21Leak)
+    assert.equal(r21LeakAfter.status, 'refund_failed', 'R21 漏在退款中的到顶单要交给人工')
+    assert.equal(r21LeakAfter.refundAttempts, 8, 'R21 交给人工时不再打渠道')
+    const r21Alerts = await collectDerivedAlerts(prisma, new Date())
+    assert.ok(r21Alerts.alerts.some((alert) => alert.type === 'service_return_manual' && alert.subjectId === r21Order.id), 'R21 告警中心要有这一张')
+    assert.equal(r21Alerts.firingTotal, r21Alerts.alerts.length + r21Alerts.omitted)
+    refundMode = 'ok'
+    const r21Again = await call('POST', `/api/v1/admin/orders/${r21Order.id}/retry-service-refund`, {}, adminHeaders)
+    expectStatus(r21Again, 200, 'R21 人工再试一次可以退成')
+    assert.equal((await loadOrder(r21Order.id)).status, 'refunded')
+    const r21AlertsAfter = await collectDerivedAlerts(prisma, new Date())
+    assert.equal(r21AlertsAfter.alerts.some((alert) => alert.subjectId === r21Order.id), false, 'R21 退成后告警消失')
+    pass('R21 退款到上限后待人工处理，失败也留在那里')
+
+    const r22Session = await openKiosk(TERM_CHARGE, chargeToken, 'scan')
+    await prisma.scanTask.create({
+      data: { id: 'r22-1', terminalId: TERM_CHARGE, scanType: 'resume', status: 'waiting', expiresAt: new Date(Date.now() + 3600_000) },
+    })
+    scanReturnId = 'r22-1'
+    const r22Order = await paidOrder(r22Session, 'scan', 'sbx_txn_r22')
+    const r22Creates = scanCreates
+    expectStatus(await call('POST', '/api/v1/scan/sessions', { scanType: 'resume', terminalId: TERM_CHARGE }, termHeaders(TERM_CHARGE, chargeToken, r22Session, r22Order.id)), 201, 'R22 第一次扫描')
+    assert.equal(scanCreates, r22Creates + 1)
+    await prisma.scanTask.update({ where: { id: 'r22-1' }, data: { status: 'completed', fileId: 'file-r22-1' } })
+    await prisma.scanTask.create({
+      data: { id: 'r22-2', terminalId: TERM_CHARGE, scanType: 'resume', status: 'waiting', expiresAt: new Date(Date.now() + 3600_000) },
+    })
+    scanReturnId = 'r22-2'
+    const r22BeforeSecond = scanCreates
+    const r22Second = await call('POST', '/api/v1/scan/sessions', { scanType: 'resume', terminalId: TERM_CHARGE }, termHeaders(TERM_CHARGE, chargeToken, r22Session, r22Order.id))
+    expectStatus(r22Second, 409, 'R22 已经有文件不能再开新扫描')
+    assert.equal(r22Second.json.error?.code, 'SERVICE_ORDER_IN_USE')
+    assert.equal(scanCreates, r22BeforeSecond, 'R22 有文件时不能再创建扫描任务')
+    assert.equal((await loadOrder(r22Order.id)).consumedRef, 'r22-1')
+    const r22LiveSession = await openKiosk(TERM_CHARGE, chargeToken, 'scan')
+    await prisma.scanTask.create({
+      data: { id: 'r22-live', terminalId: TERM_CHARGE, scanType: 'resume', status: 'waiting', expiresAt: new Date(Date.now() + 3600_000) },
+    })
+    scanReturnId = 'r22-live'
+    const r22Live = await paidOrder(r22LiveSession, 'scan', 'sbx_txn_r22_live')
+    expectStatus(await call('POST', '/api/v1/scan/sessions', { scanType: 'resume', terminalId: TERM_CHARGE }, termHeaders(TERM_CHARGE, chargeToken, r22LiveSession, r22Live.id)), 201, 'R22 活着的扫描')
+    await prisma.scanTask.create({
+      data: { id: 'r22-other', terminalId: TERM_CHARGE, scanType: 'resume', status: 'waiting', expiresAt: new Date(Date.now() + 3600_000) },
+    })
+    scanReturnId = 'r22-other'
+    const r22Attach = await call('POST', '/api/v1/scan/sessions', { scanType: 'resume', terminalId: TERM_CHARGE }, termHeaders(TERM_CHARGE, chargeToken, r22LiveSession, r22Live.id))
+    expectStatus(r22Attach, 409, 'R22 换一个任务挂上来要拒绝')
+    assert.equal(r22Attach.json.error?.code, 'SERVICE_ORDER_IN_USE')
+    assert.equal((await loadOrder(r22Live.id)).consumedRef, 'r22-live', 'R22 拒绝后原任务还在这张单上')
+    await prisma.serviceOrder.update({ where: { id: r22Order.id }, data: { consumedAt: new Date(Date.now() - 20_000) } })
+    await serviceOrders.sweep()
+    assert.ok((await loadOrder(r22Order.id)).settledAt, 'R22 出了文件要结案')
+    await prisma.scanTask.create({
+      data: { id: 'r22-3', terminalId: TERM_CHARGE, scanType: 'resume', status: 'waiting', expiresAt: new Date(Date.now() + 3600_000) },
+    })
+    scanReturnId = 'r22-3'
+    const r22Third = await call('POST', '/api/v1/scan/sessions', { scanType: 'resume', terminalId: TERM_CHARGE }, termHeaders(TERM_CHARGE, chargeToken, r22Session, r22Order.id))
+    expectStatus(r22Third, 409, 'R22 结案后不能再开')
+    const r22View = await call('GET', `/api/v1/kiosk/service-orders/${r22Order.id}`, undefined, termHeaders(TERM_CHARGE, chargeToken, r22Session))
+    expectStatus(r22View, 200, 'R22 读单')
+    assert.equal(Object.prototype.hasOwnProperty.call(r22View.json.data ?? {}, 'settledAt'), true, 'R22 读单要带结案时间')
+    assert.equal(typeof r22View.json.data?.['settledAt'], 'string')
+    pass('R22 一张单用过之后不能再开新扫描，读单能看到结案时间')
+
+    const r23Session = await openKiosk(TERM_CHARGE, chargeToken, 'scan')
+    await prisma.scanTask.create({
+      data: { id: 'r23-slow', terminalId: TERM_CHARGE, scanType: 'resume', status: 'waiting', expiresAt: new Date(Date.now() + 10 * 60_000) },
+    })
+    scanReturnId = 'r23-slow'
+    const r23Order = await paidOrder(r23Session, 'scan', 'sbx_txn_r23')
+    expectStatus(await call('POST', '/api/v1/scan/sessions', { scanType: 'resume', terminalId: TERM_CHARGE }, termHeaders(TERM_CHARGE, chargeToken, r23Session, r23Order.id)), 201, 'R23 扫描开始')
+    await prisma.serviceOrder.update({ where: { id: r23Order.id }, data: { consumedAt: new Date(Date.now() - 30 * 60_000) } })
+    await serviceOrders.sweep()
+    const r23Live = await loadOrder(r23Order.id)
+    assert.equal(r23Live.status, 'consumed', 'R23 会话还活着不能判没做成')
+    assert.equal(r23Live.refundedAt, null)
+    await prisma.serviceOrder.update({ where: { id: r23Order.id }, data: { attemptsUsed: 2 } })
+    await prisma.scanTask.update({ where: { id: 'r23-slow' }, data: { expiresAt: new Date(Date.now() - 1000) } })
+    await serviceOrders.sweep()
+    const r23Expired = await loadOrder(r23Order.id)
+    assert.equal(r23Expired.status, 'refunded', 'R23 过了有效期还没文件才退')
+    await prisma.scanTask.update({ where: { id: 'r23-slow' }, data: { status: 'completed', fileId: 'file-r23' } })
+    await serviceOrders.sweep()
+    const r23Later = await loadOrder(r23Order.id)
+    assert.equal(r23Later.status, 'refunded', 'R23 退了之后文件出来也不再收')
+    assert.equal(r23Later.amountCents, 100)
+    pass('R23 活着的扫描不判，过期才退，之后出文件不再收')
+
+    const r24Session = await openKiosk(TERM_CHARGE, chargeToken, 'scan')
+    const r24Ok = await paidOrder(r24Session, 'scan', 'sbx_txn_r24')
+    refundMode = 'processing'
+    await executeServiceOrderRefund(prisma, registry, audit, redis as unknown as RedisService, r24Ok.id, '人已离开，这一次还没用')
+    refundMode = 'ok'
+    const r24Success = { refundNo: `svc-rfd-${r24Ok.id}`, channelRefundNo: 'wx-rfd-r24', refundAmountCents: 100, status: 'success' as const }
+    const r24First = await settleServiceRefundNotify(prisma, audit, null, r24Success)
+    const r24Second = await settleServiceRefundNotify(prisma, audit, null, r24Success)
+    assert.equal((await loadOrder(r24Ok.id)).status, 'refunded', 'R24 成功通知记已退')
+    assert.equal(await prisma.auditLog.count({ where: { action: 'service_order.refunded', targetId: r24Ok.id } }), 1, 'R24 成功通知只记一次')
+    assert.equal(r24Second.idempotent, true)
+    assert.equal(r24First.handled, true)
+    const r24Fail = await paidOrder(r24Session, 'scan', 'sbx_txn_r24b')
+    refundMode = 'processing'
+    await executeServiceOrderRefund(prisma, registry, audit, redis as unknown as RedisService, r24Fail.id, '人已离开，这一次还没用')
+    refundMode = 'ok'
+    const r24FailNotice = { refundNo: `svc-rfd-${r24Fail.id}`, channelRefundNo: null, refundAmountCents: null, status: 'failed' as const }
+    await settleServiceRefundNotify(prisma, audit, null, r24FailNotice)
+    const r24FailOnce = await loadOrder(r24Fail.id)
+    await settleServiceRefundNotify(prisma, audit, null, r24FailNotice)
+    const r24FailTwice = await loadOrder(r24Fail.id)
+    assert.equal(r24FailTwice.refundAttempts, r24FailOnce.refundAttempts, 'R24 同一条失败通知不能记两次')
+    assert.equal(r24FailTwice.refundAttempts, 1)
+    const r24ThenOk = await settleServiceRefundNotify(prisma, audit, null, {
+      refundNo: `svc-rfd-${r24Fail.id}`, channelRefundNo: 'wx-rfd-r24-ok', refundAmountCents: 100, status: 'success',
+    })
+    assert.equal(r24ThenOk.handled, true)
+    assert.equal((await loadOrder(r24Fail.id)).status, 'refunded', 'R24 失败之后换一条成功通知要收下')
+    const r24Mismatch = await paidOrder(r24Session, 'scan', 'sbx_txn_r24c')
+    refundMode = 'processing'
+    await executeServiceOrderRefund(prisma, registry, audit, redis as unknown as RedisService, r24Mismatch.id, '人已离开，这一次还没用')
+    refundMode = 'ok'
+    const r24Bad = await settleServiceRefundNotify(prisma, audit, null, {
+      refundNo: `svc-rfd-${r24Mismatch.id}`, channelRefundNo: 'wx-rfd-bad', refundAmountCents: 1, status: 'success',
+    })
+    assert.equal(r24Bad.handled, true, 'R24 金额不符也要回已处理')
+    const r24BadRow = await loadOrder(r24Mismatch.id)
+    assert.notEqual(r24BadRow.status, 'refunded', 'R24 金额不符不能记成已退')
+    assert.ok(r24BadRow.refundAnomaly, 'R24 金额不符要记下来')
+    const r24Alerts = await collectDerivedAlerts(prisma, new Date())
+    assert.ok(r24Alerts.alerts.some((alert) => alert.type === 'service_return_manual' && alert.subjectId === r24Mismatch.id), 'R24 金额不符要进告警中心')
+    const r24Unknown = await settleServiceRefundNotify(prisma, audit, null, {
+      refundNo: 'svc-rfd-missing-order', channelRefundNo: 'wx-rfd-missing', refundAmountCents: 100, status: 'success',
+    })
+    assert.equal(r24Unknown.handled, true, 'R24 对不上的服务单退款通知也不再让渠道重发')
+    pass('R24 退款通知只处理一次，对不上也回成功')
   } catch (error) {
     failed = true
     console.error(error)

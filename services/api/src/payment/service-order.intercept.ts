@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common'
 import type { ServiceOrderService, TripHold } from './service-order.service'
 
 type Headers = Record<string, string | string[] | undefined> | undefined
@@ -106,7 +107,12 @@ export async function chargeScanStart<T extends { scanTaskId: string }>(
   if (replayId && hold) {
     hold.adopt(replayId)
     const result = await run()
-    await hold.attachRef(result.scanTaskId)
+    const attached = await hold.attachRef(result.scanTaskId)
+    if (!attached) {
+      throw new ConflictException({
+        error: { code: 'SERVICE_ORDER_IN_USE', message: '这一次已经在进行', consumedRef: result.scanTaskId },
+      })
+    }
     return result
   }
   if (!hold?.required) return run()

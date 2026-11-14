@@ -1,6 +1,6 @@
 import { Drawer, LoadingState, ErrorState } from '@ai-job-print/ui'
 import type { OrderDetailControls } from './useOrderDetail'
-import { amountText, billablePagesText, channelText, pageRangeText, fmt, orderUserText, PAY_STATUS_MAP, pickupText, REFUND_REASON_LABELS, STATUS_MAP } from './orderDisplay'
+import { amountText, billablePagesText, channelText, pageRangeText, fmt, orderUserText, payStatusPresentation, pickupText, REFUND_REASON_LABELS, STATUS_MAP } from './orderDisplay'
 import { colorModeText, copiesText, duplexText, NET_PAID_UNRECORDED, recordedCentsText } from './orderHonestyCopy'
 import { printErrorText } from '../../lib/printErrorText'
 import { OrderAftercare } from './OrderAftercare'
@@ -28,7 +28,7 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
               <Info label="优惠/权益抵扣" value={recordedCentsText(detail.discountCents, detail.currency)} />
               <Info label="已退款" value={recordedCentsText(detail.refundedAmountCents, detail.currency)} />
               <Info label="实付" value={NET_PAID_UNRECORDED} />
-              <Info label="支付状态" value={PAY_STATUS_MAP[detail.payStatus]?.label ?? detail.payStatus} />
+              <Info label="支付状态" value={payStatusPresentation(detail.payStatus, detail.recordKind).label} />
               <Info label="任务状态" value={STATUS_MAP[detail.taskStatus]?.label ?? detail.taskStatus} />
               <Info label="用户" value={orderUserText(detail)} />
               <Info label="终端" value={detail.locationLabel ? `${detail.terminalCode ?? '—'} · ${detail.locationLabel}` : (detail.terminalCode ?? '—')} />

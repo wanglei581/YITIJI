@@ -28,6 +28,17 @@ export const PAY_STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warn
   closed:           { badge: 'default', label: '已关闭' },
 }
 
+/** 打印单仍写「退款失败」。服务单到了人工这一步，列表和详情写「退款待人工处理」。 */
+export function payStatusPresentation(
+  payStatus: string,
+  recordKind?: string | null,
+): { badge: 'success' | 'error' | 'warning' | 'default'; label: string } {
+  if (recordKind === 'service' && payStatus === 'refund_failed') {
+    return { badge: 'error', label: '退款待人工处理' }
+  }
+  return PAY_STATUS_MAP[payStatus] ?? { badge: 'default', label: '未归类' }
+}
+
 export const STATUS_FILTERS = [
   { label: '全部', value: '' },
   { label: '待领取', value: 'pending' },
