@@ -34,7 +34,7 @@ import type {
   RefundNotifyVerifyResult,
   RefundQueryResult,
 } from '../payment-provider.types'
-import { buildPaymentCallbackPath } from '../payment-provider.types'
+import { buildPaymentCallbackPath, channelChargeDescription } from '../payment-provider.types'
 
 export const WECHAT_TIMESTAMP_HEADER = 'wechatpay-timestamp'
 export const WECHAT_NONCE_HEADER = 'wechatpay-nonce'
@@ -217,7 +217,7 @@ export class WechatPayProvider implements PaymentProvider {
     const resp = await this.request('POST', '/v3/pay/transactions/native', {
       appid: this.cfg.appid,
       mchid: this.cfg.mchid,
-      description: `打印服务订单 ${input.orderNo}`,
+      description: channelChargeDescription(input.description),
       out_trade_no: input.attemptId, // 服务端 cuid，回调经 out_trade_no 找回 attempt
       notify_url: notifyUrl,
       // attach 回调原样回带 —— 业务层全字段匹配 orderId 的通道侧来源
@@ -255,7 +255,7 @@ export class WechatPayProvider implements PaymentProvider {
       resp = await this.request('POST', '/v3/pay/transactions/codepay', {
         appid: this.cfg.appid,
         mchid: this.cfg.mchid,
-        description: `打印服务订单 ${input.orderNo}`,
+        description: channelChargeDescription(input.description),
         out_trade_no: input.attemptId,
         attach: JSON.stringify({ orderId: input.orderId }),
         payer: { auth_code: input.authCode },

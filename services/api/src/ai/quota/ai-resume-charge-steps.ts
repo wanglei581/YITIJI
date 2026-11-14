@@ -28,6 +28,8 @@ export async function chargeComputeResumeOptimize(
   const report = parseResult.report
   if (!report) return { taskId, status: 'failed', failReason: '简历解析未成功，无法生成优化建议' }
 
+  // 要付款时先退回，不抽原文，也不记成一次 AI 失败。诊断仍走上面的缓存和解析，不经过这里。
+  const skipDailyQuota = beforeGenerate ? await beforeGenerate() : false
   const t0 = Date.now()
   try {
     const parseOwner = await bindings.parseOwner(taskId)
@@ -47,7 +49,6 @@ export async function chargeComputeResumeOptimize(
         }
       }
     }
-    const skipDailyQuota = beforeGenerate ? await beforeGenerate() : false
     return await runCharge({
       endUserId: parseOwner?.endUserId ?? null,
       skipDailyQuota,
@@ -75,9 +76,19 @@ export async function chargeComputeResumeOptimize(
     })
   } catch (err) {
     rethrowQuota(err)
-    bindings.log.optimizeThrown(taskId, t0, err)
+    if (!isServiceChargeGate(err)) bindings.log.optimizeThrown(taskId, t0, err)
     throw err
   }
+}
+
+function isServiceChargeGate(err: unknown): boolean {
+  if (!err || typeof err !== 'object' || !('getStatus' in err) || !('getResponse' in err)) return false
+  const status = (err as { getStatus: () => number }).getStatus()
+  if (status === 402 || status === 409) return true
+  const body = (err as { getResponse: () => unknown }).getResponse()
+  if (!body || typeof body !== 'object' || !('error' in body)) return false
+  const code = (body as { error?: { code?: string } }).error?.code
+  return code === 'SERVICE_PAYMENT_REQUIRED' || code === 'SERVICE_ORDER_IN_USE'
 }
 
 /** 排版调整。未接账本时不另存一行；接入后先落库再结算，断开也能重开。 */
