@@ -360,6 +360,11 @@ const ACTION_LABELS: Record<string, string> = {
   'policy.publish': '政策发布',
   'policy.review': '政策审核',
   'screensaver_config.update': '待机宣传屏配置更新',
+  'service_order.layout_only': '排版失败，这一单不退款',
+  'service_order.paid': '服务单已付款',
+  'service_order.refund_retry': '再试一次服务单退款',
+  'service_order.refunded': '服务单已原路退款',
+  'service_order.admin_refund': '管理员发起服务单原路退款',
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -384,6 +389,7 @@ const TARGET_LABELS: Record<string, string> = {
   EndUser: '用户',
   AiQuotaReservation: 'AI 额度预占记录',
   order: '订单',
+  service_order: '服务单',
   ai_resume_result: 'AI 简历结果',
   job_ai_session: '岗位 AI 会话',
   file: '文件',

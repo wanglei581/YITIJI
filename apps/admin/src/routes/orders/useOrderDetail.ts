@@ -22,6 +22,9 @@ export function useOrderDetail(refresh: () => unknown) {
   const [markPaidResult, setMarkPaidResult] = useState<AdminOrderMarkPaidResult | null>(null)
   const [serviceRefundSubmitting, setServiceRefundSubmitting] = useState(false)
   const [serviceRefundError, setServiceRefundError] = useState<string | null>(null)
+  const [adminRefundOpen, setAdminRefundOpen] = useState(false)
+  const [adminRefundSubmitting, setAdminRefundSubmitting] = useState(false)
+  const [adminRefundError, setAdminRefundError] = useState<string | null>(null)
 
   // 废弃孤单对话框状态（仅 pending + claimedAt=null 任务可见）
   const [abandonConfirmOpen, setAbandonConfirmOpen] = useState(false)
@@ -41,6 +44,8 @@ export function useOrderDetail(refresh: () => unknown) {
     setMarkPaidSource('offline')
     setMarkPaidError(null)
     setMarkPaidResult(null)
+    setAdminRefundOpen(false)
+    setAdminRefundError(null)
     try {
       const data = await adminOrdersReadonlyService.getById(id)
       setDetail(data)
@@ -141,6 +146,22 @@ export function useOrderDetail(refresh: () => unknown) {
     }
   }, [detail, refresh])
 
+  const handleAdminServiceRefund = useCallback(async () => {
+    if (!detail) return
+    setAdminRefundSubmitting(true)
+    setAdminRefundError(null)
+    try {
+      const updated = await adminOrdersReadonlyService.refundServiceOrder(detail.id)
+      setDetail(updated)
+      setAdminRefundOpen(false)
+      void refresh()
+    } catch (err) {
+      setAdminRefundError(userMessageOf(err, '原路退款失败，请稍后重试'))
+    } finally {
+      setAdminRefundSubmitting(false)
+    }
+  }, [detail, refresh])
+
   const handleAbandon = useCallback(async () => {
     if (!detail?.printTaskId) return
     setAbandonSubmitting(true)
@@ -180,7 +201,7 @@ export function useOrderDetail(refresh: () => unknown) {
     }
   }, [detail, refresh, verifyConfirm, verifyOpen])
 
-  return { detail, detailState, refundOpen, setRefundOpen, refundReason, setRefundReason, refundSubmitting, refundError, setRefundError, markPaidOpen, setMarkPaidOpen, markPaidSource, setMarkPaidSource, markPaidSubmitting, markPaidError, setMarkPaidError, markPaidResult, setMarkPaidResult, serviceRefundSubmitting, serviceRefundError, abandonConfirmOpen, setAbandonConfirmOpen, abandonSubmitting, abandonError, setAbandonError, verifyOpen, setVerifyOpen, verifyConfirm, setVerifyConfirm, verifySubmitting, verifyError, setVerifyError, openDetail, retryDetail, closeDetail, handleRefund, handleMarkPaid, handleRetryServiceRefund, handleAbandon, handleVerifyOutcome }
+  return { detail, detailState, refundOpen, setRefundOpen, refundReason, setRefundReason, refundSubmitting, refundError, setRefundError, markPaidOpen, setMarkPaidOpen, markPaidSource, setMarkPaidSource, markPaidSubmitting, markPaidError, setMarkPaidError, markPaidResult, setMarkPaidResult, serviceRefundSubmitting, serviceRefundError, adminRefundOpen, setAdminRefundOpen, adminRefundSubmitting, adminRefundError, setAdminRefundError, abandonConfirmOpen, setAbandonConfirmOpen, abandonSubmitting, abandonError, setAbandonError, verifyOpen, setVerifyOpen, verifyConfirm, setVerifyConfirm, verifySubmitting, verifyError, setVerifyError, openDetail, retryDetail, closeDetail, handleRefund, handleMarkPaid, handleRetryServiceRefund, handleAdminServiceRefund, handleAbandon, handleVerifyOutcome }
 }
 
 export type OrderDetailControls = ReturnType<typeof useOrderDetail>

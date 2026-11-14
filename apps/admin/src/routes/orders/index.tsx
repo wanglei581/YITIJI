@@ -189,6 +189,7 @@ export default function OrdersPage() {
                 { label: '已付款', value: 'paid' },
                 { label: '已使用', value: 'consumed' },
                 { label: '退款中', value: 'refunding' },
+                { label: '退款失败', value: 'refund_failed' },
                 { label: '已退款', value: 'refunded' },
                 { label: '已关闭', value: 'closed' },
               ].map((item) => (

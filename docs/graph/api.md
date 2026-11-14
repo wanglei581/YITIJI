@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`658` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`659` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -84,7 +84,7 @@
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/users` | AdminUsersController.list | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
 | GET | `/api/v1/admin/users/:endUserId` | AdminUsersController.getDetail | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
-| POST | `/api/v1/admin/users/:endUserId/closure` | AdminUsersController.closure | admin | MemberClosureService | AdvisorArtifact<br/>AdvisorPin<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitClaim<br/>BenefitGrant<br/>ContractReviewTask<br/>CopyJob<br/>DocumentProcessTask<br/>EndUser<br/>FairMaterialPrintBridge<br/>FeedbackReply<br/>FeedbackTicket<br/>FileObject<br/>JobAiRecommendation<br/>KioskSession<br/>MemberLegalConsent<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>Order<br/>OrderItem<br/>OrderSubmissionLedger<br/>PaymentAttempt<br/>PiiFinding<br/>PrintTask<br/>PrintTaskStatusLog<br/>RedemptionRecord<br/>Refund<br/>ScanTask<br/>StorageDeletion<br/>UserAiConsent<br/>UserDataRequest<br/>UserNotification |
+| POST | `/api/v1/admin/users/:endUserId/closure` | AdminUsersController.closure | admin | MemberClosureService | AdvisorArtifact<br/>AdvisorPin<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitClaim<br/>BenefitGrant<br/>ContractReviewTask<br/>CopyJob<br/>DocumentProcessTask<br/>EndUser<br/>FairMaterialPrintBridge<br/>FeedbackReply<br/>FeedbackTicket<br/>FileObject<br/>JobAiRecommendation<br/>KioskSession<br/>MemberLegalConsent<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>Order<br/>OrderItem<br/>OrderSubmissionLedger<br/>PaymentAttempt<br/>PiiFinding<br/>PrintTask<br/>PrintTaskStatusLog<br/>RedemptionRecord<br/>Refund<br/>ScanTask<br/>ServiceOrder<br/>StorageDeletion<br/>UserAiConsent<br/>UserDataRequest<br/>UserNotification |
 | POST | `/api/v1/admin/users/:endUserId/disable` | AdminUsersController.disable | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
 | POST | `/api/v1/admin/users/:endUserId/restore` | AdminUsersController.restore | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
 
@@ -637,9 +637,9 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/kiosk/session/end` | KioskSessionController.end | — | KioskSessionService | KioskSession<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
-| POST | `/api/v1/kiosk/session/heartbeat` | KioskSessionController.heartbeat | — | KioskSessionService | KioskSession<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
-| POST | `/api/v1/kiosk/session/start` | KioskSessionController.start | — | KioskSessionService | KioskSession<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/kiosk/session/end` | KioskSessionController.end | — | KioskSessionService | KioskSession<br/>MockInterviewTurn<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/kiosk/session/heartbeat` | KioskSessionController.heartbeat | — | KioskSessionService | KioskSession<br/>MockInterviewTurn<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/kiosk/session/start` | KioskSessionController.start | — | KioskSessionService | KioskSession<br/>MockInterviewTurn<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
 
 ## `services/api/src/legal/admin-legal-docs.controller.ts`
 
@@ -972,7 +972,7 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | POST | `/api/v1/admin/orders/:id/mark-paid` | AdminOrderActionsController.markPaid | admin | OrderStatusService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem |
-| POST | `/api/v1/admin/orders/:id/refund` | AdminOrderActionsController.refund | admin | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund |
+| POST | `/api/v1/admin/orders/:id/refund` | AdminOrderActionsController.refund | admin | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund<br/>ServiceOrder |
 
 ## `services/api/src/payment/order-quote.controller.ts`
 
@@ -991,22 +991,23 @@
 | POST | `/api/v1/payment/callback/:channel` | PaymentController.callback | — | — | — |
 | GET | `/api/v1/payment/channels` | PaymentController.getChannels | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
 | POST | `/api/v1/payment/sandbox/simulate` | PaymentController.simulate | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
-| POST | `/api/v1/payment/wechat/refund-notify` | PaymentController.wechatRefundNotify | — | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund |
+| POST | `/api/v1/payment/wechat/refund-notify` | PaymentController.wechatRefundNotify | — | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund<br/>ServiceOrder |
 | GET | `/api/v1/print/price-config` | PaymentController.getPrintPriceConfig | — | PricingService | PlatformSetting<br/>PriceConfig<br/>Terminal |
 
 ## `services/api/src/payment/service-order-admin.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/admin/orders/:id/retry-service-refund` | ServiceOrderAdminController.retry | admin | ServiceOrderService | AuditLog<br/>KioskSession<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/admin/orders/:id/refund-service` | ServiceOrderAdminController.refund | admin | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/admin/orders/:id/retry-service-refund` | ServiceOrderAdminController.retry | admin | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
 
 ## `services/api/src/payment/service-order.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/kiosk/service-orders` | ServiceOrderController.create | — | ServiceOrderService | AuditLog<br/>KioskSession<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
-| GET | `/api/v1/kiosk/service-orders/:id` | ServiceOrderController.get | — | ServiceOrderService | AuditLog<br/>KioskSession<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
-| POST | `/api/v1/kiosk/service-orders/:id/close` | ServiceOrderController.close | — | ServiceOrderService | AuditLog<br/>KioskSession<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/kiosk/service-orders` | ServiceOrderController.create | — | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| GET | `/api/v1/kiosk/service-orders/:id` | ServiceOrderController.get | — | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/kiosk/service-orders/:id/close` | ServiceOrderController.close | — | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
 
 ## `services/api/src/policies/policies.controller.ts`
 

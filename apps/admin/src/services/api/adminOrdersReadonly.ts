@@ -154,6 +154,8 @@ interface AdminOrdersReadonlyService {
   /** 线下 / 人工确认收款入账；仅 `payStatus==='unpaid'` 的订单可成功，其余由后端拒绝并回错误码。 */
   markPaidOrder(id: string, paymentSource: AdminOrderMarkPaidSource): Promise<AdminOrderMarkPaidResult>
   retryServiceRefund(id: string): Promise<AdminOrderReadonlyDetail>
+  /** 卡住的已付或未结案服务单。必须二次确认后才发，请求体带 confirm:true。 */
+  refundServiceOrder(id: string): Promise<AdminOrderReadonlyDetail>
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -223,6 +225,7 @@ const httpAdapter: AdminOrdersReadonlyService = {
     }),
   getById: (id) => get<AdminOrderReadonlyDetail>(`/admin/orders/${encodeURIComponent(id)}`),
   retryServiceRefund: (id) => post<AdminOrderReadonlyDetail>(`/admin/orders/${encodeURIComponent(id)}/retry-service-refund`, {}),
+  refundServiceOrder: (id) => post<AdminOrderReadonlyDetail>(`/admin/orders/${encodeURIComponent(id)}/refund-service`, { confirm: true }),
   refundOrder: (id, refundReason) =>
     post<AdminOrderRefundResult>(`/admin/orders/${encodeURIComponent(id)}/refund`, { refundReason }),
   markPaidOrder: (id, paymentSource) =>
@@ -436,6 +439,56 @@ function demoServiceOrders(): AdminOrderReadonlyDetail[] {
       closeReason: null,
       updatedAt: '2026-11-13T11:28:00+08:00',
     },
+    {
+      ...base,
+      id: 'svc_demo_paid',
+      orderNo: 'SVC-DEMO-HD-04',
+      type: 'scan',
+      serviceKey: 'scan',
+      serviceName: '扫描',
+      serviceStatus: 'paid',
+      terminalCode: 'ZYD-HD-04',
+      locationLabel: '黄岛 · 长江路',
+      amountCents: 100,
+      payStatus: 'paid',
+      taskStatus: 'pending',
+      paidAt: '2026-11-13T12:05:00+08:00',
+      refundReason: null,
+      refundedAt: null,
+      refundedAmountCents: 0,
+      refundAttempts: 0,
+      retryForbidden: true,
+      opsAttention: false,
+      opsAttentionCode: null,
+      failureReason: null,
+      closeReason: null,
+      updatedAt: '2026-11-13T12:05:00+08:00',
+    },
+    {
+      ...base,
+      id: 'svc_demo_running',
+      orderNo: 'SVC-DEMO-SN-05',
+      type: 'scan',
+      serviceKey: 'scan',
+      serviceName: '扫描',
+      serviceStatus: 'consumed',
+      terminalCode: 'ZYD-SN-01',
+      locationLabel: '市南 · 香港中路',
+      amountCents: 100,
+      payStatus: 'paid',
+      taskStatus: 'in_progress',
+      paidAt: '2026-11-13T12:20:00+08:00',
+      refundReason: null,
+      refundedAt: null,
+      refundedAmountCents: 0,
+      refundAttempts: 0,
+      retryForbidden: true,
+      opsAttention: false,
+      opsAttentionCode: null,
+      failureReason: null,
+      closeReason: null,
+      updatedAt: '2026-11-13T12:21:00+08:00',
+    },
   ]
 }
 
@@ -472,7 +525,7 @@ const mockAdapter: AdminOrdersReadonlyService = {
   async retryServiceRefund(id) {
     const index = serviceDemoState.findIndex((row) => row.id === id)
     const row = index >= 0 ? serviceDemoState[index] : undefined
-    if (!row || row.serviceStatus !== 'refunding') {
+    if (!row || (row.serviceStatus !== 'refunding' && row.serviceStatus !== 'refund_failed')) {
       throw new ApiHttpError('SERVICE_REFUND_NOT_RETRYABLE', '这张单现在不在退款中', 409)
     }
     const refundedAt = now()
@@ -481,6 +534,30 @@ const mockAdapter: AdminOrdersReadonlyService = {
       serviceStatus: 'refunded',
       payStatus: 'refunded',
       taskStatus: 'cancelled',
+      refundedAt,
+      refundedAmountCents: row.amountCents,
+      opsAttention: false,
+      opsAttentionCode: null,
+      retryForbidden: true,
+      updatedAt: refundedAt,
+    }
+    serviceDemoState = serviceDemoState.map((item, i) => (i === index ? next : item))
+    return next
+  },
+  async refundServiceOrder(id) {
+    const index = serviceDemoState.findIndex((row) => row.id === id)
+    const row = index >= 0 ? serviceDemoState[index] : undefined
+    const stuck = row?.serviceStatus === 'paid' || (row?.serviceStatus === 'consumed' && row.taskStatus === 'in_progress')
+    if (!row || !stuck) {
+      throw new ApiHttpError('SERVICE_REFUND_NOT_RETRYABLE', '这张单现在不能原路退款', 409)
+    }
+    const refundedAt = now()
+    const next: AdminOrderReadonlyDetail = {
+      ...row,
+      serviceStatus: 'refunded',
+      payStatus: 'refunded',
+      taskStatus: 'cancelled',
+      refundReason: '管理员原路退款',
       refundedAt,
       refundedAmountCents: row.amountCents,
       opsAttention: false,

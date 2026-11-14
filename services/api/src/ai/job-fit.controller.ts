@@ -23,8 +23,7 @@ import {
   kioskJobBoardTerminalRef,
   type KioskJobBoardRequest,
 } from '../terminals/kiosk-job-board.service'
-import { resumeTripCover } from '../payment/service-order.intercept'
-import { ServiceOrderService } from '../payment/service-order.service'
+import { TripCoverService } from '../payment/trip-cover.service'
 // ── DTO（全局 forbidNonWhitelisted）─────────────────────────────────────────
 
 class ManualJobDto {
@@ -93,7 +92,7 @@ export class JobFitController {
     private readonly prisma: PrismaService,
     private readonly governed: GovernedJobFitService,
     private readonly jobBoard?: KioskJobBoardService,
-    @Optional() private readonly serviceOrders?: ServiceOrderService,
+    @Optional() private readonly tripCover?: TripCoverService,
   ) {}
 
   /**
@@ -153,10 +152,10 @@ export class JobFitController {
       throw new BadRequestException({ error: { code: 'JOB_FIT_TARGET_MISSING', message: '请选择系统内岗位或填写目标岗位' } })
     }
     const requester = await this.requesterOf(req)
-    const cover = await resumeTripCover(this.serviceOrders, req.headers)
-    return this.governed.analyzeForJobFit(dto, requester, quotaContextOf(req, requester), req, {
-      skipDailyQuota: cover.skipDailyQuota,
-    })
+    const quotaContext = quotaContextOf(req, requester)
+    const cover = await this.tripCover?.cover(req.headers)
+    const chargeOptions = { skipDailyQuota: cover?.skipDailyQuota === true }
+    return this.governed.analyzeForJobFit(dto, requester, quotaContext, req, chargeOptions)
   }
 
   @Post('consent')

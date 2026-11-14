@@ -2,7 +2,7 @@ import type { OrderDetailControls } from './useOrderDetail'
 import { PAY_STATUS_MAP, MARK_PAID_SOURCES, markPaidSourceLabel, amountText, fmt } from './orderDisplay'
 
 export function OrderPaymentActions({ controls }: { controls: OrderDetailControls }) {
-  const { detail, markPaidResult, setMarkPaidResult, markPaidOpen, setMarkPaidOpen, markPaidSource, setMarkPaidSource, markPaidError, setMarkPaidError, markPaidSubmitting, handleMarkPaid, refundOpen, setRefundOpen, refundReason, setRefundReason, refundError, setRefundError, refundSubmitting, handleRefund } = controls
+  const { detail, markPaidResult, setMarkPaidResult, markPaidOpen, setMarkPaidOpen, markPaidSource, setMarkPaidSource, markPaidError, setMarkPaidError, markPaidSubmitting, handleMarkPaid, refundOpen, setRefundOpen, refundReason, setRefundReason, refundError, setRefundError, refundSubmitting, handleRefund, adminRefundOpen, setAdminRefundOpen, adminRefundSubmitting, adminRefundError, setAdminRefundError, handleAdminServiceRefund } = controls
   if (!detail) return null
   return (<>
             {/*
@@ -126,7 +126,50 @@ export function OrderPaymentActions({ controls }: { controls: OrderDetailControl
               canonical RefundService（POST /admin/orders/:id/refund）。
               待退款信号单走同一入口，文案改成「发起退款」并二次确认；不点确认不会发。
             */}
-            {detail.recordKind === 'service' && detail.serviceStatus === 'refunding' && (
+            {detail.recordKind === 'service' && (detail.serviceStatus === 'paid' || (detail.serviceStatus === 'consumed' && detail.taskStatus === 'in_progress')) && (
+              <div className="mt-6 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-3.5">
+                {!adminRefundOpen ? (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[13px] font-bold text-neutral-800">原路退款</p>
+                      <p className="mt-0.5 text-xs text-neutral-500">这一次付了还没用，或占用后还没做成。点确认后才会按原路退回。</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setAdminRefundOpen(true); setAdminRefundError(null) }}
+                      className="ml-4 inline-flex h-9 shrink-0 items-center rounded-[9px] bg-warning px-4 text-[13px] font-bold text-white transition-colors hover:bg-warning/90"
+                    >
+                      原路退款
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    <p className="text-[13px] font-bold text-neutral-800">确认原路退款</p>
+                    <p className="text-xs text-neutral-500">退回 {amountText(detail.amountCents, detail.currency)}。做成的单不从这里退。</p>
+                    {adminRefundError ? <p className="text-xs font-semibold text-error-fg">{adminRefundError}</p> : null}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={adminRefundSubmitting}
+                        onClick={() => void handleAdminServiceRefund()}
+                        className="inline-flex h-9 items-center rounded-[9px] bg-warning px-4 text-[13px] font-bold text-white transition-colors hover:bg-warning/90 disabled:opacity-40"
+                      >
+                        {adminRefundSubmitting ? '处理中…' : '确认原路退款'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={adminRefundSubmitting}
+                        onClick={() => { setAdminRefundOpen(false); setAdminRefundError(null) }}
+                        className="inline-flex h-9 items-center rounded-[9px] border border-neutral-900/10 bg-surface px-4 text-[13px] font-bold text-neutral-700 transition-colors hover:bg-neutral-50 disabled:opacity-40"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {detail.recordKind === 'service' && (detail.serviceStatus === 'refunding' || detail.serviceStatus === 'refund_failed') && (
               <div className="mt-6 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-3.5">
                 <div className="flex items-center justify-between">
                   <div>

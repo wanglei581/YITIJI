@@ -69,7 +69,7 @@ flowchart TD
 | **AgentReleaseTarget** | 10 | ActiveReleaseObservationAssignment、AgentReleasePlan、Terminal、TerminalReleaseObservation | 1 个文件<br/>`terminals/release-observation.service.ts` |
 | **AiQuotaDaily** | 4 | — | 2 个文件<br/>`ai/quota/ai-quota.service.ts`<br/>`member-privacy/member-closure.service.ts` |
 | **AiQuotaReservation** | 12 | — | 2 个文件<br/>`ai/quota/ai-quota.service.ts`<br/>`member-privacy/member-closure.service.ts` |
-| **AiResumeResult** | 16 | EndUser | 15 个文件<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>`ai/resume-parse-submission.service.ts`<br/>… |
+| **AiResumeResult** | 16 | EndUser | 16 个文件<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>`ai/resume-parse-submission.service.ts`<br/>… |
 | **AiSafetyTerm** | 7 | — | 1 个文件<br/>`ai/safety/ai-safety-lexicon.service.ts` |
 | **AiServiceFact** | 6 | — | 2 个文件<br/>`ai/usage/ai-service-fact.ts`<br/>`console-screen/console-screen.partner-ai.ts` |
 | **AiServiceLog** | 13 | EndUser | 5 个文件<br/>`ai/ai-log.service.ts`<br/>`ai/ai-result.cleanup.task.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
@@ -117,14 +117,14 @@ flowchart TD
 | **JobSource** | 30 | FieldMappingRule、ImportBatch、Job、JobFair、Organization、SyncLog | 7 个文件<br/>`job-sync/job-sync.service.ts`<br/>`jobs/data-source-credential-policy.ts`<br/>`jobs/jobs-excel.service.ts`<br/>… |
 | **KioskActivity** | 12 | — | **无代码读写** |
 | **KioskJobBoardConfig** | 6 | — | 1 个文件<br/>`terminals/kiosk-job-board.service.ts` |
-| **KioskSession** | 14 | — | 8 个文件<br/>`ai/resume/resume-draft-source.service.ts`<br/>`console-screen/console-screen.visits.ts`<br/>`first-order/first-order-report-builder.ts`<br/>… |
+| **KioskSession** | 14 | — | 9 个文件<br/>`ai/resume/resume-draft-source.service.ts`<br/>`console-screen/console-screen.visits.ts`<br/>`first-order/first-order-report-builder.ts`<br/>… |
 | **LegalDocVersion** | 10 | — | 3 个文件<br/>`ai/resume/resume-unlabeled-export.ts`<br/>`legal/legal.service.ts`<br/>`member-auth/member-auth.service.ts` |
 | **License** | 21 | Organization | 4 个文件<br/>`licenses/license-gate.ts`<br/>`licenses/license-queries.ts`<br/>`licenses/license-write.ts`<br/>… |
 | **MemberLegalConsent** | 10 | EndUser | 3 个文件<br/>`ai/resume/resume-unlabeled-export.ts`<br/>`member-auth/member-auth.service.ts`<br/>`member-privacy/member-closure-retention.ts` |
 | **MemberNotification** | 12 | EndUser | 2 个文件<br/>`member-notifications/member-notifications.service.ts`<br/>`member-privacy/member-data-export.mapper.ts` |
 | **MockInterviewReport** | 6 | MockInterviewSession | 2 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/mock-interview.service.ts` |
-| **MockInterviewSession** | 22 | MockInterviewReport、MockInterviewTurn | 6 个文件<br/>`ai/resume/career-plan.service.ts`<br/>`member-privacy/member-closure-files.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
-| **MockInterviewTurn** | 13 | MockInterviewSession | 4 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/interview-transcript-print.service.ts`<br/>`mock-interview/mock-interview-charge.ts`<br/>… |
+| **MockInterviewSession** | 22 | MockInterviewReport、MockInterviewTurn | 7 个文件<br/>`ai/resume/career-plan.service.ts`<br/>`member-privacy/member-closure-files.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
+| **MockInterviewTurn** | 13 | MockInterviewSession | 6 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/interview-transcript-print.service.ts`<br/>`mock-interview/mock-interview-charge.ts`<br/>… |
 | **OfflineAgency** | 23 | OfflineJob | 2 个文件<br/>`offline-agencies/offline-agencies.service.ts`<br/>`recruitment-hosting/recruitment-emergency.service.ts` |
 | **OfflineAgencyBranch** | 31 | Job、OfflineAgencyProfile、QualificationRecord | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
 | **OfflineAgencyProfile** | 19 | OfflineAgencyBranch、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
@@ -151,12 +151,12 @@ flowchart TD
 | **RedemptionRecord** | 11 | — | 5 个文件<br/>`ai/quota/ai-quota.service.ts`<br/>`benefit-redemption/benefit-redemption.service.ts`<br/>`benefit-redemption/resume-export-gate.service.ts`<br/>… |
 | **Refund** | 12 | Order | 4 个文件<br/>`member-privacy/member-closure-retention.ts`<br/>`payment/reconciliation.service.ts`<br/>`payment/refund-amount-hold.ts`<br/>… |
 | **ReviewDecision** | 18 | User | **无代码读写** |
-| **ScanTask** | 31 | EndUser、Terminal | 13 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`console-screen/console-screen.fleet.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
+| **ScanTask** | 31 | EndUser、Terminal | 14 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`console-screen/console-screen.fleet.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **ScreensaverContent** | 9 | — | **无代码读写** |
 | **ServiceDeployment** | 12 | ServiceIncident、ServiceProject、Terminal | 4 个文件<br/>`first-order/first-order-access.service.ts`<br/>`first-order/first-order-incidents.service.ts`<br/>`first-order/first-order-projects.service.ts`<br/>… |
 | **ServiceIncident** | 19 | ServiceDeployment、ServiceIncidentEvent、ServiceProject | 2 个文件<br/>`first-order/first-order-incidents.service.ts`<br/>`first-order/first-order-report-builder.ts` |
 | **ServiceIncidentEvent** | 7 | ServiceIncident | 1 个文件<br/>`first-order/first-order-incidents.service.ts` |
-| **ServiceOrder** | 30 | Terminal | 2 个文件<br/>`payment/service-order.payment.ts`<br/>`payment/service-order.service.ts` |
+| **ServiceOrder** | 34 | Terminal | 4 个文件<br/>`member-privacy/member-closure-retention.ts`<br/>`payment/service-order.payment.ts`<br/>`payment/service-order.service.ts`<br/>… |
 | **ServiceProject** | 15 | Organization、ServiceDeployment、ServiceIncident、ServiceReport | 3 个文件<br/>`first-order/first-order-access.service.ts`<br/>`first-order/first-order-projects.service.ts`<br/>`first-order/first-order-reports.service.ts` |
 | **ServiceReport** | 9 | ServiceProject | 3 个文件<br/>`first-order/first-order-access.service.ts`<br/>`first-order/first-order-projects.service.ts`<br/>`first-order/first-order-reports.service.ts` |
 | **StorageDeletion** | 6 | — | 2 个文件<br/>`files/closure-file-deletion.ts`<br/>`member-privacy/member-closure-redis.service.ts` |

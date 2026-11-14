@@ -72,7 +72,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2202 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2204 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2440,7 +2440,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/scan-panel-wording.ts` | `verify-scan-tasks.ts` |
 | `services/api/scripts/support/serializable-race-barrier.ts` | `verify-first-admin-bootstrap-postgres.ts`<br/>`verify-pg-serialization-conflict-postgres.ts`<br/>`verify-print-retry-lock-postgres.ts` |
 | `services/api/scripts/support/sqlite-cli.ts` | `verify-scan-tasks.ts` |
-| `services/api/scripts/support/terminal-charge-fixture.ts` | `verify-admin-billing.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-copy-c1b.ts`<br/>`verify-free-print-quota.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pricing.ts`<br/>`verify-print-color-duplex-capability.ts`<br/>`verify-print-jobs.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
+| `services/api/scripts/support/terminal-charge-fixture.ts` | `verify-admin-billing.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-copy-c1b.ts`<br/>`verify-free-print-quota.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pricing.ts`<br/>`verify-print-color-duplex-capability.ts`<br/>`verify-print-jobs.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-service-orders.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/scripts/support/upload-session-verifier.ts` | `verify-upload-sessions-bind.ts`<br/>`verify-upload-sessions-faults.ts`<br/>`verify-upload-sessions-member-file.ts`<br/>`verify-upload-sessions-signature.ts`<br/>`verify-upload-sessions.ts` |
 | `services/api/scripts/unpublish-demo-companies.ts` | `verify-demo-company-unpublish.ts` |
 | `services/api/scripts/verify-admin-fairs.ts` | `verify-profile-commercial-first-batch.mjs` |
@@ -2517,7 +2517,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 702 个文件</summary>
+<summary><code>services/api/src/</code> — 704 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2609,7 +2609,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/quota/ai-quota.service.ts` | `verify-ai-quota-coverage.ts`<br/>`verify-ai-quota.ts` |
 | `services/api/src/ai/quota/ai-resume-charge-steps.ts` | `verify-service-orders.ts` |
 | `services/api/src/ai/quota/ai-resume-charge.ts` | `verify-service-orders.ts` |
-| `services/api/src/ai/redis-inflight-lock.ts` | `verify-resume-optimize.ts` |
+| `services/api/src/ai/redis-inflight-lock.ts` | `verify-resume-optimize.ts`<br/>`verify-service-orders.ts` |
 | `services/api/src/ai/resume-layout-adjust.controller.ts` | `verify-ai-access.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-resume-ai-consent-wiring.ts`<br/>`verify-resume-layout-adjust.ts`<br/>`verify-service-orders.ts` |
 | `services/api/src/ai/resume-parse-intent-runner.service.ts` | `verify-llm-account-unavailable.ts`<br/>`verify-member-assets-c2d.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-parse-intent-runner.ts` |
 | `services/api/src/ai/resume-parse-intent.ts` | `verify-member-assets-c2d.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-parse-intent-runner.ts`<br/>`verify-resume-parse-quota-once.ts`<br/>`verify-resume-parse-submission.ts` |
@@ -3038,7 +3038,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/payment/copy-pricing.ts` | `verify-copy-c1a.ts`<br/>`verify-copy-quota.ts`<br/>`verify-terminal-charge-settings.ts` |
 | `services/api/src/payment/dto/admin-billing.dto.ts` | `verify-admin-billing.ts` |
 | `services/api/src/payment/dto/order-action.dto.ts` | `verify-order.ts`<br/>`verify-payment-flow.ts`<br/>`verify-refund-idempotent.ts` |
-| `services/api/src/payment/effective-user-prices.ts` | `verify-service-orders.ts`<br/>`verify-terminal-charge-settings.ts` |
+| `services/api/src/payment/effective-user-prices.ts` | `verify-terminal-charge-settings.ts` |
 | `services/api/src/payment/online-payment.service.ts` | `verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-admin-print-scan.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-payment-codepay.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-service-orders.ts` |
 | `services/api/src/payment/order-quote.controller.ts` | `verify-ai-access.ts` |
 | `services/api/src/payment/order-quote.service.ts` | `verify-kiosk-cashier-ui.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-print-color-duplex-capability.ts`<br/>`verify-print-param-suggestion.ts`<br/>`verify-print-parameter-capability.ts`<br/>`verify-queue-dispatch-printer-status.ts` |
@@ -3065,10 +3065,12 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/payment/refund.service.ts` | `verify-admin-orders-refund.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-api20-manual-refund.ts`<br/>`verify-order.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-refund-convergence.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-service-orders.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/src/payment/service-order-admin.controller.ts` | `verify-service-orders.ts` |
 | `services/api/src/payment/service-order.controller.ts` | `verify-service-orders.ts` |
+| `services/api/src/payment/service-order.payment.ts` | `verify-service-orders.ts` |
 | `services/api/src/payment/service-order.policy.ts` | `verify-service-orders.ts` |
 | `services/api/src/payment/service-order.service.ts` | `verify-service-orders.ts` |
 | `services/api/src/payment/terminal-charge-settings.ts` | `verify-terminal-charge-settings.ts` |
-| `services/api/src/payment/terminal-charge.contract.ts` | `verify-admin-billing.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pricing.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-terminal-charge-settings.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
+| `services/api/src/payment/terminal-charge.contract.ts` | `verify-admin-billing.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pricing.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-service-orders.ts`<br/>`verify-terminal-charge-settings.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
+| `services/api/src/payment/trip-cover.service.ts` | `verify-service-orders.ts` |
 | `services/api/src/policies/dto/policy.dto.ts` | `verify-policies.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-policy-publish-gates.ts` |
 | `services/api/src/policies/policies.controller.ts` | `verify-license-state.ts`<br/>`verify-policies.ts`<br/>`verify-policy-scope.ts` |
 | `services/api/src/policies/policies.module.ts` | `verify-policy-scope.ts` |

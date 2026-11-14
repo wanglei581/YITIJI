@@ -413,7 +413,7 @@ async function main() {
     const scan = await scanClosureDatabase(scanClient, owned.identity)
     const metadata = (scanClient as any)._runtimeDataModel.models
     const actualModels = Object.entries(metadata).filter(([, model]: any) => model.fields.some((field: any) => field.name === 'endUserId')).map(([name]) => name).sort()
-    const expectedModels = [...CLOSURE_DELETE_MODELS, 'fileObject', 'order', 'copyJob', 'printTask', 'orderSubmissionLedger', 'redemptionRecord', 'benefitGrant', 'benefitClaim', 'feedbackTicket', 'memberLegalConsent', 'userAiConsent', 'userDataRequest', 'aiUsageRecord', 'aiServiceLog', 'aiQuotaDaily', 'aiQuotaReservation'].map((name) => name[0].toUpperCase() + name.slice(1)).sort()
+    const expectedModels = [...CLOSURE_DELETE_MODELS, 'fileObject', 'order', 'copyJob', 'printTask', 'orderSubmissionLedger', 'redemptionRecord', 'benefitGrant', 'benefitClaim', 'feedbackTicket', 'memberLegalConsent', 'userAiConsent', 'userDataRequest', 'aiUsageRecord', 'aiServiceLog', 'aiQuotaDaily', 'aiQuotaReservation', 'serviceOrder'].map((name) => name[0].toUpperCase() + name.slice(1)).sort()
     const copy = await prisma.copyJob.findFirstOrThrow({ where: { endUserId: owned.id } })
     assert.equal(copy.billableSides, 2, '注销保留复印履约数据')
     assert.notEqual(copy.requestKey, owned.identity.phoneHash, '注销清除复印幂等键中的身份')

@@ -283,7 +283,7 @@ flowchart LR
   app --> member_feedback["/member-feedback<br/>1 页 · 3 端点"]
   app --> member_notifications["/member-notifications<br/>1 页 · 2 端点"]
   app --> offline_agencies["/offline-agencies<br/>1 页 · 0 端点"]
-  app --> orders["/orders<br/>1 页 · 5 端点"]
+  app --> orders["/orders<br/>1 页 · 6 端点"]
   app --> partners["/partners<br/>1 页 · 36 端点"]
   app --> peripherals["/peripherals<br/>1 页 · 0 端点"]
   app --> permissions["/permissions<br/>1 页 · 4 端点"]
@@ -297,7 +297,7 @@ flowchart LR
   app --> sync_sources["/sync-sources<br/>1 页 · 11 端点"]
   app --> terminals["/terminals<br/>1 页 · 0 端点"]
   app --> toolbox["/toolbox<br/>1 页 · 15 端点"]
-  app --> users["/users<br/>1 页 · 10 端点"]
+  app --> users["/users<br/>1 页 · 11 端点"]
 ```
 
 | 路由 | 页面组件 | 页面文件 | 端点数 | 样式 |
@@ -324,7 +324,7 @@ flowchart LR
 | `/member-feedback` | MemberFeedbackPage | `apps/admin/src/routes/member-feedback/index.tsx` | 3 | — |
 | `/member-notifications` | MemberNotificationsPage | `apps/admin/src/routes/member-notifications/index.tsx` | 2 | — |
 | `/offline-agencies` | Navigate | — _(重定向)_ | 0 | — |
-| `/orders` | OrdersPage | `apps/admin/src/routes/orders/index.tsx` | 5 | — |
+| `/orders` | OrdersPage | `apps/admin/src/routes/orders/index.tsx` | 6 | — |
 | `/partners` | PartnersPage | `apps/admin/src/routes/partners/index.tsx` | 36 | — |
 | `/peripherals` | Navigate | — _(重定向)_ | 0 | — |
 | `/permissions` | PermissionsPage | `apps/admin/src/routes/permissions/index.tsx` | 4 | — |
@@ -339,7 +339,7 @@ flowchart LR
 | `/sync-sources` | SyncSourcesPage | `apps/admin/src/routes/sync-sources/index.tsx` | 11 | — |
 | `/terminals` | Navigate | — _(重定向)_ | 0 | — |
 | `/toolbox` | ToolboxPage | `apps/admin/src/routes/toolbox/index.tsx` | 15 | — |
-| `/users` | UsersPage | `apps/admin/src/routes/users/index.tsx` | 10 | — |
+| `/users` | UsersPage | `apps/admin/src/routes/users/index.tsx` | 11 | — |
 
 <details>
 <summary>展开：每个路由触达的端点（30 个路由）</summary>
@@ -384,7 +384,7 @@ flowchart LR
 
 **`/member-notifications`** → `DELETE /admin/notifications/broadcasts/:param`、`POST /admin/notifications/broadcasts`
 
-**`/orders`** → `GET /admin/orders`、`GET /admin/orders/:param`、`POST /admin/orders/:param/mark-paid`、`POST /admin/orders/:param/refund`、`POST /admin/orders/:param/retry-service-refund`
+**`/orders`** → `GET /admin/orders`、`GET /admin/orders/:param`、`POST /admin/orders/:param/mark-paid`、`POST /admin/orders/:param/refund`、`POST /admin/orders/:param/refund-service`、`POST /admin/orders/:param/retry-service-refund`
 
 **`/partners`** → `DELETE /admin/orgs/:param/accounts/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-challenges/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-tickets/current`、`DELETE /admin/orgs/:param/accounts/:param/phone-rebind/current`、`GET /admin/import-batches`、`GET /admin/orgs`、`GET /admin/orgs/:param`、`GET /admin/orgs/:param/content-trust`、`GET /admin/orgs/:param/device-alert-notify`、`GET /admin/orgs/:param/official-channels`、`GET /admin/orgs/:param/verified-official-domains`、`GET /admin/system/recruitment-hosting`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`PATCH /admin/orgs/:param`、`PATCH /admin/orgs/:param/accounts/:param/password`、`PATCH /admin/orgs/:param/accounts/:param/status`、`PATCH /admin/orgs/:param/content-trust`、`PATCH /admin/orgs/:param/status`、`POST /admin/branding/logo`、`POST /admin/orgs`、`POST /admin/orgs/:param/accounts`、`POST /admin/orgs/:param/accounts/:param/action-challenges`、`POST /admin/orgs/:param/accounts/:param/action-challenges/:param/verify`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/start`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/verify`、`POST /admin/orgs/:param/device-alert-notify/test`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`PUT /admin/branding`、`PUT /admin/orgs/:param/accounts/:param/email`、`PUT /admin/orgs/:param/device-alert-notify`、`PUT /admin/orgs/:param/verified-official-domains`
 
@@ -402,7 +402,7 @@ flowchart LR
 
 **`/toolbox`** → `GET /admin/toolbox/allowed-hosts`、`GET /admin/toolbox/apps`、`GET /admin/toolbox/apps/:param/versions`、`GET /admin/toolbox/launch-summary`、`GET /admin/toolbox/terminals`、`POST /admin/toolbox/allowed-hosts`、`POST /admin/toolbox/allowed-hosts/:param/review`、`POST /admin/toolbox/apps`、`POST /admin/toolbox/apps/:param/suspend`、`POST /admin/toolbox/apps/:param/versions`、`POST /admin/toolbox/apps/:param/versions/:param/approve`、`POST /admin/toolbox/apps/:param/versions/:param/publish`、`POST /admin/toolbox/apps/:param/versions/:param/reject`、`POST /admin/toolbox/apps/:param/versions/:param/submit`、`PUT /admin/terminals/:param/toolbox-config`
 
-**`/users`** → `GET /admin/orders`、`GET /admin/orders/:param`、`GET /admin/users`、`GET /admin/users/:param`、`POST /admin/orders/:param/mark-paid`、`POST /admin/orders/:param/refund`、`POST /admin/orders/:param/retry-service-refund`、`POST /admin/users/:param/closure`、`POST /admin/users/:param/disable`、`POST /admin/users/:param/restore`
+**`/users`** → `GET /admin/orders`、`GET /admin/orders/:param`、`GET /admin/users`、`GET /admin/users/:param`、`POST /admin/orders/:param/mark-paid`、`POST /admin/orders/:param/refund`、`POST /admin/orders/:param/refund-service`、`POST /admin/orders/:param/retry-service-refund`、`POST /admin/users/:param/closure`、`POST /admin/users/:param/disable`、`POST /admin/users/:param/restore`
 
 </details>
 

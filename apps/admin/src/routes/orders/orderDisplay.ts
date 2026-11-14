@@ -8,6 +8,7 @@ export const STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning'
   pending:   { badge: 'warning', label: '待领取' },
   claimed:   { badge: 'info',    label: '已领取' },
   printing:  { badge: 'info',    label: '打印中' },
+  in_progress: { badge: 'info',  label: '进行中' },
   completed: { badge: 'success', label: '已完成' },
   failed:    { badge: 'error',   label: '失败' },
   cancelled: { badge: 'default', label: '已取消' },
@@ -19,6 +20,7 @@ export const PAY_STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warn
   paying:           { badge: 'warning', label: '支付中' },
   paid:             { badge: 'success', label: '已支付' },
   refunding:        { badge: 'warning', label: '退款中' },
+  refund_failed:    { badge: 'error',   label: '退款失败' },
   refunded:         { badge: 'default', label: '已退款' },
   // 产品只做整单退款，服务端不再写入 partial_refunded；万一出现即为异常，需人工核对。
   partial_refunded: { badge: 'warning', label: '退款异常·待核对' },
