@@ -41,6 +41,8 @@ import { executeServiceOrderRefund } from '../src/payment/service-order.payment'
 import { isServiceOrderOpenRefConflict } from '../src/payment/service-order.ref'
 import { TripCoverService } from '../src/payment/trip-cover.service'
 import { PERSONAL_CHARGE_SETTING_KEY } from '../src/payment/terminal-charge.contract'
+import { saveTerminalChargeSettings, writePersonalChargeEnabled } from '../src/payment/terminal-charge-settings'
+import { assignTerminalOrganization } from '../src/terminals/terminal-org-assignment'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PaymentController } from '../src/payment/payment.controller'
@@ -598,6 +600,10 @@ async function main(): Promise<void> {
     const stillPending = await loadOrder(createdRow.id)
     assert.equal(stillPending.status, 'pending')
     assert.equal(stillPending.amountCents, 100, '建单金额不随后续改价变')
+    await prisma.terminalServicePrice.update({
+      where: { terminalId_serviceKey: { terminalId: TERM_CHARGE, serviceKey: 'resume_optimize' } },
+      data: { unitCents: 100 },
+    })
     const failedNotice = await callback(createdRow, 'failed')
     expectStatus(failedNotice, 200, '支付失败通知')
     const failedRow = await loadOrder(createdRow.id)
@@ -626,10 +632,6 @@ async function main(): Promise<void> {
     const wrongSession = await call('GET', `/api/v1/kiosk/service-orders/${createdRow.id}`, undefined, termHeaders(TERM_CHARGE, chargeToken, randomUUID()))
     expectStatus(wrongSession, 404, '别的会话不能看')
     assert.equal(wrongSession.json.error?.code, 'SERVICE_ORDER_NOT_FOUND')
-    await prisma.terminalServicePrice.update({
-      where: { terminalId_serviceKey: { terminalId: TERM_CHARGE, serviceKey: 'resume_optimize' } },
-      data: { unitCents: 100 },
-    })
     pass('建单、验签、失败仍待付、重复通知不重复记账、金额按建单时锁定')
 
     const missing = await call('GET', `/api/v1/resume/records/task-missing/optimize`, undefined, termHeaders(TERM_CHARGE, chargeToken, chargeSession))
@@ -1525,6 +1527,79 @@ async function main(): Promise<void> {
     for (const release of r17Releases) release()
     await new Promise((resolve) => setTimeout(resolve, 50))
     pass('R17 面试中断后再付，只收开起来的那一笔')
+
+    async function pendingChargeOrder() {
+      const sessionId = await openKiosk(TERM_CHARGE, chargeToken)
+      const made = await call('POST', '/api/v1/kiosk/service-orders', {
+        serviceKey: 'resume_optimize', kioskSessionId: sessionId,
+      }, termHeaders(TERM_CHARGE, chargeToken))
+      expectStatus(made, 200, '待付建单')
+      const row = await loadOrder(String(made.json.data?.['id']))
+      assert.equal(row.status, 'pending')
+      return { sessionId, row }
+    }
+
+    async function payOldCode(
+      row: { id: string; providerOrderNo: string; prepayId: string | null; amountCents: number },
+      txn: string,
+      reason: string,
+    ): Promise<void> {
+      const before = refundCalls
+      expectStatus(await callback(row, 'success', txn), 200, txn)
+      const after = await loadOrder(row.id)
+      assert.equal(after.status, 'refunded', `${txn} 当场退`)
+      assert.equal(after.refundReason, reason)
+      assert.equal(after.consumedAt, null, `${txn} 退了就不能用`)
+      assert.equal(refundCalls, before + 1, `${txn} 只退一次`)
+      expectStatus(await callback(row, 'success', txn), 200, `${txn} 再通知`)
+      assert.equal(refundCalls, before + 1, `${txn} 不能退第二次`)
+      assert.equal((await loadOrder(row.id)).status, 'refunded')
+    }
+
+    const recheck = await pendingChargeOrder()
+    await prisma.terminalServicePrice.update({
+      where: { terminalId_serviceKey: { terminalId: TERM_CHARGE, serviceKey: 'resume_optimize' } },
+      data: { unitCents: 180 },
+    })
+    const recheckBeforePay = await loadOrder(recheck.row.id)
+    assert.equal(recheckBeforePay.status, 'pending', '直接改价不关单，通知前仍是待付')
+    await payOldCode(recheck.row, 'sbx_txn_price_recheck', '这一项的价格已经变了')
+    await prisma.terminalServicePrice.update({
+      where: { terminalId_serviceKey: { terminalId: TERM_CHARGE, serviceKey: 'resume_optimize' } },
+      data: { unitCents: 100 },
+    })
+    pass('生效价变了，原码付款当场退，只退一次')
+
+    const repriced = await pendingChargeOrder()
+    await saveTerminalChargeSettings(prisma, TERM_CHARGE, {
+      userChargeMode: 'user_pays',
+      prices: { ...DEMO_PRICES, resume_optimize: 180 },
+    }, ADMIN)
+    const repricedClosed = await loadOrder(repriced.row.id)
+    assert.equal(repricedClosed.status, 'closed', '改价成功后、付款通知前必须已经关掉')
+    assert.equal(repricedClosed.closeReason, 'price_changed')
+    await payOldCode(repriced.row, 'sbx_txn_price_change', '付款时这一单已经关闭')
+    await setTerminalUserPrintPrices(prisma, TERM_CHARGE, DEMO_PRICES)
+    pass('改价后旧付款码不能按旧价收')
+
+    const switched = await pendingChargeOrder()
+    await writePersonalChargeEnabled(prisma, false, undefined, ADMIN)
+    const switchedClosed = await loadOrder(switched.row.id)
+    assert.equal(switchedClosed.status, 'closed', '关掉总开关后、付款通知前必须已经关掉')
+    assert.equal(switchedClosed.closeReason, 'personal_charge_changed')
+    await payOldCode(switched.row, 'sbx_txn_r18', '付款时这一单已经关闭')
+    await writePersonalChargeEnabled(prisma, true, true, ADMIN)
+    pass('R18 关掉总开关后旧付款码不能收')
+
+    const rebound = await pendingChargeOrder()
+    await assignTerminalOrganization(prisma, TERM_CHARGE, ORG_SCHOOL, new Date(), async () => undefined)
+    const reboundClosed = await loadOrder(rebound.row.id)
+    assert.equal(reboundClosed.status, 'closed', '改绑成功后、付款通知前必须已经关掉')
+    assert.equal(reboundClosed.closeReason, 'org_rebound')
+    await payOldCode(rebound.row, 'sbx_txn_r19', '付款时这一单已经关闭')
+    await assignTerminalOrganization(prisma, TERM_CHARGE, null, new Date(), async () => undefined)
+    await setTerminalUserPrintPrices(prisma, TERM_CHARGE, DEMO_PRICES)
+    pass('R19 改绑后旧付款码不能收')
   } catch (error) {
     failed = true
     console.error(error)

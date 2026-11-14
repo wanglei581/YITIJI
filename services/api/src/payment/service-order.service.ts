@@ -17,6 +17,7 @@ import { PAYMENT_PROVIDER_TOKEN, type PaymentProviderRegistry } from './payment-
 import {
   chargingProvider,
   executeServiceOrderRefund,
+  markServiceOrderPaid,
   newProviderOrderNo,
 } from './service-order.payment'
 import {
@@ -25,6 +26,7 @@ import {
   isServiceOrderOpenRefConflict,
   serviceOrderRefOccupied,
 } from './service-order.ref'
+import { retryPendingChannelCloses } from './service-order.retire'
 import { drainServiceOrderSweep, releaseInterviewSession } from './service-order.sweep'
 import {
   SERVICE_ORDER_NAMES,
@@ -214,11 +216,9 @@ export class ServiceOrderService {
         try {
           const found = await provider.queryPayment({ attemptId: row.providerOrderNo, orderId: row.id })
           if (found.status === 'paid' && found.channelTxnNo && found.amountCents === row.amountCents) {
-            const marked = await this.prisma.serviceOrder.updateMany({
-              where: { id: row.id, status: 'pending' },
-              data: { status: 'paid', paidAt: new Date(), channelTxnNo: found.channelTxnNo, paymentFailed: false },
-            })
-            if (marked.count === 1) await this.auditPaid(row)
+            await markServiceOrderPaid(
+              this.prisma, this.registry, this.audit, row, found.channelTxnNo, row.prepayId ?? '', this.redis ?? null,
+            )
             checking = false
           } else if (found.status === 'failed') {
             await this.prisma.serviceOrder.updateMany({
@@ -355,6 +355,7 @@ export class ServiceOrderService {
 
   async sweep(now = new Date()): Promise<void> {
     await this.closeExpiredPending(now)
+    await retryPendingChannelCloses(this.prisma, this.registry, this.audit, this.redis ?? null)
     await drainServiceOrderSweep({
       prisma: this.prisma,
       now,

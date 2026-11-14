@@ -3,6 +3,7 @@ import { BadRequestException, Logger } from '@nestjs/common'
 import { deliverOpsAlert } from '../admin-ops/admin-alert-push.service'
 import { AuditService } from '../audit/audit.service'
 import type { PrismaService } from '../prisma/prisma.service'
+import { getEffectiveUserPrices } from './effective-user-prices'
 import type { PaymentCallbackEvent, PaymentProvider } from './payment-provider.types'
 import type { PaymentProviderRegistry } from './payment-provider.factory'
 import type { RefundNotifyEvent, RefundQueryResult } from './payment-provider.types'
@@ -10,8 +11,11 @@ import {
   SERVICE_REFUND_BACKOFF_MS,
   SERVICE_REFUND_LEASE_MS,
   SERVICE_REFUND_REASON_LATE_PAYMENT,
+  SERVICE_REFUND_REASON_NOW_FREE,
+  SERVICE_REFUND_REASON_PRICE_CHANGED,
   SERVICE_REFUND_RETRY_CAP,
   SERVICE_REFUND_RETRY_INTERVAL_MS,
+  isServiceOrderKey,
 } from './service-order.policy'
 
 const logger = new Logger('ServiceOrderPayment')
@@ -82,7 +86,7 @@ export async function settleServiceOrderCallback(
   return markServiceOrderPaid(db, registry, audit, row, event.channelTxnNo, event.prepayId, redis)
 }
 
-async function markServiceOrderPaid(
+export async function markServiceOrderPaid(
   db: PrismaService,
   registry: PaymentProviderRegistry,
   audit: AuditService,
@@ -157,7 +161,23 @@ async function markServiceOrderPaid(
     targetId: row.id,
     payload: { amountCents: row.amountCents, serviceKey: row.serviceKey, provider: row.provider },
   })
+  await refundIfEffectivePriceMoved(db, registry, audit, redis, row)
   return { matched: true }
+}
+
+/** 记成已付之后再看这台机器此刻的生效价。变了（含变成 0）当场原路退，不等下一拍清扫。 */
+async function refundIfEffectivePriceMoved(
+  db: PrismaService,
+  registry: PaymentProviderRegistry,
+  audit: AuditService,
+  redis: RefundRedis | null,
+  row: ServiceOrderRow,
+): Promise<void> {
+  const prices = await getEffectiveUserPrices(db, row.terminalId)
+  const effective = isServiceOrderKey(row.serviceKey) ? prices.prices[row.serviceKey].effectiveCents : 0
+  if (effective === row.amountCents) return
+  const reason = effective === 0 ? SERVICE_REFUND_REASON_NOW_FREE : SERVICE_REFUND_REASON_PRICE_CHANGED
+  await executeServiceOrderRefund(db, registry, audit, redis, row.id, reason)
 }
 
 export interface ServiceRefundOptions {
