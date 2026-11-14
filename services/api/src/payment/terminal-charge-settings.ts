@@ -10,6 +10,7 @@ import {
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common'
 import type { PrismaService, PrismaTransactionClient } from '../prisma/prisma.service'
 import { getEffectiveUserPrices, normalizeUserChargeMode } from './effective-user-prices'
+import { retirePendingServiceOrders } from './service-order.retire'
 
 export const TERMINAL_CHARGE_SETTINGS_AUDIT_ACTION = 'terminal.charge_settings.update'
 export const TERMINAL_CHARGE_RESET_ON_REBIND_AUDIT_ACTION = 'terminal.charge_settings.reset_on_rebind'
@@ -103,7 +104,7 @@ export async function saveTerminalChargeSettings(
   writeAudit?: ChargeSettingsAuditWriter,
 ): Promise<{ previous: TerminalChargeSettingsView; next: TerminalChargeSettingsView }> {
   const input = parseChargeSettingsBody(raw)
-  return db.$transaction(async (tx) => {
+  const saved = await db.$transaction(async (tx) => {
     const existing = await tx.terminal.findUnique({
       where: { id: terminalId },
       select: { id: true, org: { select: { type: true } } },
@@ -130,6 +131,12 @@ export async function saveTerminalChargeSettings(
     if (writeAudit) await writeAudit(tx, { previous, next })
     return { previous, next }
   })
+  const watched = ['resume_optimize', 'mock_interview', 'scan'] as const
+  const priceMoved = watched.some((key) => saved.previous.prices[key].effectiveCents !== saved.next.prices[key].effectiveCents)
+  if (priceMoved) {
+    await retirePendingServiceOrders(db, { terminalId, closeReason: 'price_changed' })
+  }
+  return saved
 }
 
 export function chargeAuditSnapshot(view: TerminalChargeSettingsView): {
@@ -194,7 +201,7 @@ export async function writePersonalChargeEnabled(
       error: { code: 'PERSONAL_CHARGE_CONFIRM_REQUIRED', message: '打开向个人收费必须确认' },
     })
   }
-  return db.$transaction(async (tx) => {
+  const saved = await db.$transaction(async (tx) => {
     const previousRow = await tx.platformSetting.findUnique({ where: { key: PERSONAL_CHARGE_SETTING_KEY } })
     const previous = previousRow?.value === 'true'
     const saved = { previous, next: enabled }
@@ -206,4 +213,8 @@ export async function writePersonalChargeEnabled(
     if (writeAudit) await writeAudit(tx, saved)
     return saved
   })
+  if (saved.previous !== saved.next) {
+    await retirePendingServiceOrders(db, { closeReason: 'personal_charge_changed' })
+  }
+  return saved
 }

@@ -61,6 +61,16 @@ export interface AdminOrderStatusLogItem {
 }
 
 export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
+  /** 服务单才有，打印单不返回。与 toAdminItem 对齐。 */
+  recordKind?: 'service'
+  serviceKey?: string
+  serviceName?: string
+  serviceStatus?: string
+  paidAt?: string | null
+  refundAttempts?: number
+  locationLabel?: string | null
+  failureReason?: string | null
+  closeReason?: string | null
   refundedAt: string | null
   refundReason: string | null
   /** 券/权益抵扣（分）。Order.discountCents，无抵扣为 0。 */

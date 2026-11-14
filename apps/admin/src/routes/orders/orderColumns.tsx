@@ -1,7 +1,7 @@
 import { StatusBadge, type ConsoleColumn } from '@ai-job-print/ui'
 import type { AdminOrderReadonlyItem } from '../../services/api/adminOrdersReadonly'
 import { printErrorText } from '../../lib/printErrorText'
-import { amountText, channelText, orderPagesText, orderUserText, PAY_STATUS_MAP, STATUS_MAP } from './orderDisplay'
+import { amountText, channelText, orderPagesText, orderUserText, payStatusPresentation, STATUS_MAP } from './orderDisplay'
 import { opsAttentionText } from './orderHonestyCopy'
 
 export function orderColumns(openDetail: (id: string) => Promise<void>): ConsoleColumn<AdminOrderReadonlyItem>[] {
@@ -13,13 +13,15 @@ export function orderColumns(openDetail: (id: string) => Promise<void>): Console
           {order.orderNo}
         </button>
       ) },
-    { id: 'file', header: '文件名', truncate: true, title: (order) => order.printFileName ?? '未记录',
-      headerClassName: 'w-[13%]', cell: (order) => order.printFileName ?? '未记录' },
+    { id: 'file', header: '文件名', truncate: true,
+      title: (order) => order.recordKind === 'service' ? (order.serviceName ?? '服务') : (order.printFileName ?? '未记录'),
+      headerClassName: 'w-[13%]',
+      cell: (order) => order.recordKind === 'service' ? (order.serviceName ?? '服务') : (order.printFileName ?? '未记录') },
     { id: 'user', header: '用户', headerClassName: 'w-[12%]', cell: (order) => <>
       <span className="block truncate" title={orderUserText(order)}>{orderUserText(order)}</span>
       <span className="mt-1 block whitespace-nowrap text-[11px] text-neutral-500">{channelText(order.channel)}</span>
     </> },
-    { id: 'terminal', header: '终端', cellClassName: 'whitespace-nowrap', headerClassName: 'w-[10%]', cell: (order) => order.terminalCode ?? '—' },
+    { id: 'terminal', header: '终端', cellClassName: 'whitespace-nowrap', headerClassName: 'w-[10%]', cell: (order) => order.locationLabel ? `${order.terminalCode ?? '—'} · ${order.locationLabel}` : (order.terminalCode ?? '—') },
     { id: 'amount', header: '金额', align: 'right', headerClassName: 'w-[14%]',
       cell: (order) => <>
         <span className="whitespace-nowrap">{amountText(order.amountCents, order.currency)}</span>
@@ -28,7 +30,7 @@ export function orderColumns(openDetail: (id: string) => Promise<void>): Console
         )}
       </> },
     { id: 'payment', header: '支付状态', headerClassName: 'w-[10%]', cell: (order) => {
-      const pay = PAY_STATUS_MAP[order.payStatus] ?? { badge: 'default' as const, label: '未归类' }
+      const pay = payStatusPresentation(order.payStatus, order.recordKind)
       return <><StatusBadge dot status={pay.badge} label={pay.label} />
         {opsAttentionText(order.opsAttentionCode) ? (
           <span className="mt-1 block text-[11px] font-bold text-warning-fg">{opsAttentionText(order.opsAttentionCode)}</span>

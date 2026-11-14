@@ -37,6 +37,6 @@ import { RefundService } from './refund.service'
     // sandbox 与真实通道混配 / 未知取值 → 直接拒绝启动。
     { provide: PAYMENT_PROVIDER_TOKEN, useFactory: () => resolvePaymentProviders(process.env) },
   ],
-  exports: [PricingService, OrderStatusService, OnlinePaymentService, RefundService, PickupExpiryRefundService],
+  exports: [PricingService, OrderStatusService, OnlinePaymentService, RefundService, PickupExpiryRefundService, PAYMENT_PROVIDER_TOKEN],
 })
 export class PaymentModule {}

@@ -66,6 +66,7 @@ export {
 } from './types/memberPrivacy'
 export * from './types/copyJob'
 export * from './types/terminalCharge'
+export * from './types/serviceOrder'
 export * from './types/scanDeletionAudit'
 
 export * from './types/branding'

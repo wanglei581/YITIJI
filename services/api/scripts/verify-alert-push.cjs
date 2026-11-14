@@ -34,6 +34,7 @@ function scanFixture() {
     printTask: { findMany: async () => [], count: async () => 0 },
     feedbackTicket: { count: async () => 0, findFirst: async () => null },
     aiUsageRecord: { findMany: async () => [], groupBy: async () => [], count: async () => 0 },
+    serviceOrder: { findMany: async () => [], findFirst: async () => null },
   }
   const calls = []
   const service = make('https://example.invalid', {}, calls)

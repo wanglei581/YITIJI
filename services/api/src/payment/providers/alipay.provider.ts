@@ -33,7 +33,7 @@ import type {
   RefundExecuteResult,
   RefundQueryResult,
 } from '../payment-provider.types'
-import { buildPaymentCallbackPath } from '../payment-provider.types'
+import { buildPaymentCallbackPath, channelChargeDescription } from '../payment-provider.types'
 
 /** 回调时间窗 ±5 分钟（对齐 sandbox / wechat 口径）。 */
 const CALLBACK_TIMESTAMP_WINDOW_MS = 5 * 60 * 1000
@@ -264,7 +264,7 @@ export class AlipayProvider implements PaymentProvider {
       {
         out_trade_no: input.attemptId, // 服务端 cuid，notify 经 out_trade_no 找回 attempt
         total_amount: centsToYuan(input.amountCents),
-        subject: `打印服务订单 ${input.orderNo}`,
+        subject: channelChargeDescription(input.description),
         // 与服务端 expiresAt 对齐，避免 Kiosk 判过期后旧二维码仍可继续付款。
         timeout_express: alipayTimeoutExpress(input.expiresAt),
         // passback_params 原样回带 —— 业务层全字段匹配 orderId 的通道侧来源（协议要求 URL 编码）
@@ -303,7 +303,7 @@ export class AlipayProvider implements PaymentProvider {
         scene: 'bar_code',
         auth_code: input.authCode,
         total_amount: centsToYuan(input.amountCents),
-        subject: `打印服务订单 ${input.orderNo}`,
+        subject: channelChargeDescription(input.description),
         timeout_express: '5m',
         ...(input.terminalId ? { terminal_id: input.terminalId.slice(0, 32) } : {}),
       })

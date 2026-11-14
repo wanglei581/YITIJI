@@ -61,6 +61,7 @@ import { ResumeReportExportController } from './resume-report-export.controller'
 import { DiagnosisReportPdfService } from './resume/diagnosis-report-pdf.service'
 import { KioskAiCapabilitiesController } from './kiosk-ai-capabilities.controller'
 import { TerminalsModule } from '../terminals/terminals.module'
+import { ServiceOrderModule } from '../payment/service-order.module'
 import { ResumeDraftSourceService } from './resume/resume-draft-source.service'
 import { AiSafetyLexiconController } from './safety/ai-safety-lexicon.controller'
 import { AiSafetyLexiconService } from './safety/ai-safety-lexicon.service'
@@ -69,7 +70,7 @@ import { AiSafetyLexiconService } from './safety/ai-safety-lexicon.service'
   // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
   // BenefitRedemptionModule：AI 简历优化端点可选核销会员权益（P1 权益核销 SSOT）。
   // AiAccessModule：自我探索提交 / 打印在接口内按同一 AI 闸门判定（打分不被 AI 闸门拦）
-  imports: [AiQuotaModule, AuthModule, FilesModule, AsrModule, BenefitRedemptionModule, MemberPrivacyModule, JobMaterialsModule, TerminalsModule, AiAccessModule],
+  imports: [AiQuotaModule, AuthModule, FilesModule, AsrModule, BenefitRedemptionModule, MemberPrivacyModule, JobMaterialsModule, TerminalsModule, AiAccessModule, ServiceOrderModule],
   controllers: [AiController, ResumeLayoutAdjustController, ResumeReportExportController, KioskAiCapabilitiesController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController, SelfAssessmentController, AiSafetyLexiconController],
   providers: [
     AiService,
@@ -134,6 +135,6 @@ import { AiSafetyLexiconService } from './safety/ai-safety-lexicon.service'
   ],
   // 导出 ResumeExtractionService 供 Phase 1B 的 AiService / 诊断 provider 复用。
   // 导出 OcrService 供 MaterialsModule 复用做打印材料真实内容扫描（文件体检真实化）。
-  exports: [AiQuotaModule, AiService, AiLogService, ResumeExtractionService, LlmConfigService, JobFitService, LlmJobFitService, OcrService],
+  exports: [AiQuotaModule, AiService, AiLogService, ResumeExtractionService, LlmConfigService, JobFitService, LlmJobFitService, OcrService, ServiceOrderModule],
 })
 export class AiModule {}

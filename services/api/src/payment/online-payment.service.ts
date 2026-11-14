@@ -16,7 +16,8 @@
  * - 待退款（refundReason=ONLINE_PAID_PENDING_REFUND）或已有 success PaymentAttempt 的
  *   unpaid/paying/closed 单禁止再出码：不调渠道、不铸第二码。paid 仍走 ORDER_ALREADY_PAID。
  */
-import { BadRequestException, Inject, Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, NotFoundException, Optional, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common'
+import { RedisService } from '../common/redis/redis.service'
 import { randomBytes } from 'crypto'
 import { AuditService } from '../audit/audit.service'
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
@@ -37,6 +38,7 @@ import {
   type PaymentProvider,
 } from './payment-provider.types'
 import { SandboxPaymentProvider } from './providers/sandbox-payment.provider'
+import { settleServiceOrderCallback } from './service-order.payment'
 import { ONLINE_PAYMENT_CHANNELS, type PaymentAttemptStatus, type PaymentChannel } from './payment.types'
 
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
@@ -168,6 +170,7 @@ export class OnlinePaymentService {
     private readonly audit: AuditService,
     private readonly orderStatus: OrderStatusService,
     @Inject(PAYMENT_PROVIDER_TOKEN) private readonly registry: PaymentProviderRegistry,
+    @Optional() private readonly redis?: RedisService,
   ) {}
 
   /** 当前已启用通道（Kiosk 收银页据此渲染通道选择；无任何密钥信息）。 */
@@ -328,6 +331,7 @@ export class OnlinePaymentService {
         attemptId: attempt.id,
         amountCents: order.amountCents,
         expiresAt: attemptExpiresAt,
+        description: '打印',
       })
     } catch (error) {
       // 普通 Error 不能区分「渠道拒绝」和「请求已送达但响应丢失」。一律保持互斥。
@@ -469,6 +473,7 @@ export class OnlinePaymentService {
         terminalId: order.terminalId,
         amountCents: order.amountCents,
         authCode,
+        description: '打印',
       })
     } catch {
       // Provider 抛出异常时结果不可知（可能已被渠道受理），必须查单收敛，不能回退 unpaid。
@@ -712,7 +717,11 @@ export class OnlinePaymentService {
       where: { id: event.attemptId },
       include: { order: true },
     })
-    if (!attempt) throw new BadRequestException('CALLBACK_ATTEMPT_NOT_FOUND')
+    if (!attempt) {
+      const settled = await settleServiceOrderCallback(this.prisma, this.registry, this.audit, event, channel, this.redis ?? null)
+      if (!settled.matched) throw new BadRequestException('CALLBACK_ATTEMPT_NOT_FOUND')
+      return { ok: true, idempotent: settled.idempotent, ack }
+    }
     if (attempt.channel !== channel) throw new BadRequestException('CALLBACK_FIELD_MISMATCH')
     if (attempt.orderId !== event.orderId) throw new BadRequestException('CALLBACK_FIELD_MISMATCH')
     if (event.attemptId !== attempt.id) throw new BadRequestException('CALLBACK_FIELD_MISMATCH')

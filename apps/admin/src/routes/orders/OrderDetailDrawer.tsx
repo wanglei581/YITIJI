@@ -1,6 +1,6 @@
 import { Drawer, LoadingState, ErrorState } from '@ai-job-print/ui'
 import type { OrderDetailControls } from './useOrderDetail'
-import { amountText, billablePagesText, channelText, pageRangeText, fmt, orderUserText, PAY_STATUS_MAP, pickupText, REFUND_REASON_LABELS, STATUS_MAP } from './orderDisplay'
+import { amountText, billablePagesText, channelText, pageRangeText, fmt, orderUserText, payStatusPresentation, pickupText, REFUND_REASON_LABELS, STATUS_MAP } from './orderDisplay'
 import { colorModeText, copiesText, duplexText, NET_PAID_UNRECORDED, recordedCentsText } from './orderHonestyCopy'
 import { printErrorText } from '../../lib/printErrorText'
 import { OrderAftercare } from './OrderAftercare'
@@ -18,7 +18,7 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
       {detailState === 'error' && <ErrorState className="py-16" onRetry={retryDetail} />}
       {detailState === 'ready' && detail && (<>
             <div className="my-4 grid grid-cols-2 gap-x-4 gap-y-3">
-              <Info label="订单类型" title={detail.type} value={detail.type === 'print' ? '打印' : detail.type === 'scan' ? '扫描' : '未归类'} />
+              <Info label="订单类型" title={detail.type} value={detail.recordKind === 'service' && detail.serviceName ? detail.serviceName : detail.type === 'print' ? '打印' : detail.type === 'scan' ? '扫描' : '未归类'} />
               <Info label="渠道" value={channelText(detail.channel)} />
               <Info label="取件" value={pickupText(detail)} />
               <Info label="取件码过期时间" value={fmt(detail.pickupCodeExpiresAt)} />
@@ -28,11 +28,12 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
               <Info label="优惠/权益抵扣" value={recordedCentsText(detail.discountCents, detail.currency)} />
               <Info label="已退款" value={recordedCentsText(detail.refundedAmountCents, detail.currency)} />
               <Info label="实付" value={NET_PAID_UNRECORDED} />
-              <Info label="支付状态" value={PAY_STATUS_MAP[detail.payStatus]?.label ?? detail.payStatus} />
+              <Info label="支付状态" value={payStatusPresentation(detail.payStatus, detail.recordKind).label} />
               <Info label="任务状态" value={STATUS_MAP[detail.taskStatus]?.label ?? detail.taskStatus} />
               <Info label="用户" value={orderUserText(detail)} />
-              <Info label="终端" value={detail.terminalCode ?? '—'} />
-              <Info label="文件名" value={(detail.print ? detail.print.fileName : detail.printFileName) ?? '未记录'} />
+              <Info label="终端" value={detail.locationLabel ? `${detail.terminalCode ?? '—'} · ${detail.locationLabel}` : (detail.terminalCode ?? '—')} />
+              <Info label="文件名" value={detail.recordKind === 'service' ? (detail.serviceName ?? '服务') : ((detail.print ? detail.print.fileName : detail.printFileName) ?? '未记录')} />
+              {detail.recordKind === 'service' && detail.paidAt ? <Info label="付款时间" value={fmt(detail.paidAt)} /> : null}
               <Info label="单双面" value={duplexText(detail.print?.duplex)} />
               <Info label="彩色/黑白" value={colorModeText(detail.print ? detail.print.colorMode : detail.colorMode)} />
               <Info label="份数" value={copiesText(detail.print ? detail.print.copies : detail.copies)} />

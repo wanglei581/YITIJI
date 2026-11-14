@@ -50,6 +50,8 @@ import { readResumeParseIntentHeaders } from './resume-parse-intent'
 import { ResumeParseIntentRunner } from './resume-parse-intent-runner.service'
 import { assistantOwnerKey } from './llm/llm-chat.service'
 import { AssistantSummaryService } from '../advisor/assistant-summary.service'
+import { chargeResumeOptimizeStart } from '../payment/service-order.intercept'
+import { ServiceOrderService } from '../payment/service-order.service'
 
 import { resolveClientIp } from '../common/client-ip'
 import { prepareUnlabeledExport } from './resume/resume-unlabeled-export'
@@ -162,6 +164,7 @@ export class AiController {
     // 放在已有可选参数之后：必填参数不能跟在 @Optional() 后面，且已有按位置构造的门禁把次数服务放在最后。
     // 生产模块已引入 FilesModule，Nest 仍会注入；拿不到时旧路径在扣次数前直接拒绝，不跳过文件确认。
     @Optional() private readonly files?: FilesService,
+    @Optional() private readonly serviceOrders?: ServiceOrderService,
   ) {}
 
   /** 先复用 AI 访问守卫/用量中间件的惰性缓存；直接调用 handler 时再验签。 */
@@ -329,7 +332,9 @@ export class AiController {
     }
     // 历史记录回看不懒生成，也不核销权益。
     if (existingOnly === '1') return this.aiService.getResumeOptimize(taskId, requester, true)
-    const result = await this.aiService.getResumeOptimize(taskId, requester, false, req)
+    const result = await chargeResumeOptimizeStart(this.serviceOrders, req.headers, taskId, (beforeGenerate) =>
+      this.aiService.getResumeOptimize(taskId, requester, false, req, beforeGenerate),
+    )
     await this.draftSource.tagOptimizeTerminal(taskId, req)
 
     // 权益核销：仅当优化结果真实生成（completed）且显式传入 benefitGrantId 时才核销；

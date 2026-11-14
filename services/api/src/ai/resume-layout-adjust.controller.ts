@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post, Req } from '@nestjs/common'
+import { Body, Controller, Optional, Param, Post, Req } from '@nestjs/common'
 import { AiUse } from '../ai-access/ai-access.decorator'
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
 import { JwtService } from '@nestjs/jwt'
@@ -10,6 +10,8 @@ import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { resolveClientIp } from '../common/client-ip'
 import { AiService, type AiResultRequester } from './ai.service'
 import { ResumeLayoutAdjustDto } from './dto/resume-generate.dto'
+import { resumeTripCover } from '../payment/service-order.intercept'
+import { ServiceOrderService } from '../payment/service-order.service'
 
 interface ReqLike {
   requestId?: string
@@ -60,6 +62,7 @@ export class ResumeLayoutAdjustController {
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
     private readonly privacy: MemberPrivacyService,
+    @Optional() private readonly serviceOrders?: ServiceOrderService,
   ) {}
 
   private async resolveAiResultRequester(req: ReqLike): Promise<AiResultRequester> {
@@ -78,7 +81,14 @@ export class ResumeLayoutAdjustController {
   ) {
     const requester = await this.resolveAiResultRequester(req)
     await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
-    const result = await this.aiService.adjustResumeLayout(taskId, dto.resume, dto.action, dto.layout, requester, req)
+    const cover = await resumeTripCover(this.serviceOrders, req.headers)
+    let result: { resume: unknown; warnings: string[] }
+    try {
+      result = await this.aiService.adjustResumeLayout(taskId, dto.resume, dto.action, dto.layout, requester, req, cover.skipDailyQuota)
+    } catch (error) {
+      if (cover.orderId) await this.serviceOrders?.noteLayoutOnly(cover.orderId)
+      throw error
+    }
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',

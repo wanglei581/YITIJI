@@ -1,8 +1,10 @@
-import { BadRequestException, Controller, Get, Param, Query, UseGuards } from '@nestjs/common'
+import { BadRequestException, Controller, Get, NotFoundException, Optional, Param, Query, UseGuards } from '@nestjs/common'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
 import { ORDER_PAY_STATUSES } from '../payment/payment.types'
+import { SERVICE_ORDER_STATUSES, isServiceOrderKey } from '../payment/service-order.policy'
+import { ServiceOrderService } from '../payment/service-order.service'
 import { AdminOrdersReadonlyService } from './admin-orders-readonly.service'
 
 const VALID_TYPES = ['print', 'scan', 'photo', 'ai', 'copy'] as const
@@ -74,7 +76,10 @@ function pickFilter(
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin')
 export class AdminOrdersReadonlyController {
-  constructor(private readonly orders: AdminOrdersReadonlyService) {}
+  constructor(
+    private readonly orders: AdminOrdersReadonlyService,
+    @Optional() private readonly serviceOrders?: ServiceOrderService,
+  ) {}
 
   @Get('admin/orders')
   list(
@@ -92,7 +97,12 @@ export class AdminOrdersReadonlyController {
     // refundRequired 被解析成 true，整条用例莫名 400）。
     @Query('refundRequired') refundRequiredRaw?: string,
     @Query('opsAttention') opsAttentionRaw?: string,
+    @Query('recordKind') recordKind?: string,
+    @Query('serviceStatus') serviceStatus?: string,
   ) {
+    if (recordKind === 'service') {
+      return this.listServiceOrders(type, payStatus, serviceStatus, search, pageStr, sizeStr)
+    }
     const refundRequired = pickRefundRequired(refundRequiredRaw)
     const opsAttention = pickBoolQuery('opsAttention', opsAttentionRaw) === true ? true : undefined
     const resolvedPayStatus = pickFilter('payStatus', payStatus, VALID_PAY_STATUS)
@@ -121,7 +131,47 @@ export class AdminOrdersReadonlyController {
   }
 
   @Get('admin/orders/:id')
-  getById(@Param('id') id: string) {
-    return this.orders.getById(id)
+  async getById(@Param('id') id: string) {
+    try {
+      return await this.orders.getById(id)
+    } catch (error) {
+      if (!(error instanceof NotFoundException) || !this.serviceOrders) throw error
+      const service = await this.serviceOrders.adminGet(id)
+      if (!service) throw error
+      return service
+    }
   }
+
+  private listServiceOrders(
+    type: string | undefined,
+    payStatus: string | undefined,
+    serviceStatus: string | undefined,
+    search: string | undefined,
+    pageStr: string | undefined,
+    sizeStr: string | undefined,
+  ) {
+    const page = safeInt(pageStr, 1, 1, 10_000)
+    const pageSize = safeInt(sizeStr, 20, 1, 100)
+    const empty = { items: [], pagination: { page, pageSize, total: 0, totalPages: 1 } }
+    if (!this.serviceOrders) return empty
+    if (type === 'print' || type === 'photo' || type === 'copy' || type === 'ai') return empty
+    if (type && !isServiceOrderKey(type)) return empty
+    const status = serviceListStatus(serviceStatus, payStatus)
+    if (status === null) return empty
+    return this.serviceOrders.adminList({
+      serviceKey: type && isServiceOrderKey(type) ? type : undefined,
+      status,
+      search: search?.trim() || undefined,
+      page,
+      pageSize,
+    })
+  }
+}
+
+function serviceListStatus(serviceStatus: string | undefined, payStatus: string | undefined): string | undefined | null {
+  const raw = serviceStatus || payStatus
+  if (!raw) return undefined
+  if ((SERVICE_ORDER_STATUSES as readonly string[]).includes(raw)) return raw
+  if (raw === 'unpaid') return 'pending'
+  return null
 }
