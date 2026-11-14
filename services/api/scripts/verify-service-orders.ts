@@ -1460,6 +1460,38 @@ async function main(): Promise<void> {
     const r16B = await loadOrder(r16O2.id)
     assert.equal([r16A, r16B].filter(stillCharged).length, 1, 'R16 同一份优化稿只收一笔')
     assert.equal([r16A, r16B].filter((row) => row.status === 'refunded').length, 1, 'R16 另一张要退')
+    // 认领拦截还在时，上面那两张到不了复核。这里直接摆两张已占用、同一任务、稿已做成的单，复核必须退一张。
+    await prisma.$transaction((tx) => tx.$executeRaw`DROP INDEX IF EXISTS "ServiceOrder_open_consumed_ref_key"`)
+    const reviewRef = 'r16-review-only'
+    await prisma.aiResumeResult.upsert({
+      where: { taskId_kind: { taskId: reviewRef, kind: 'optimize' } },
+      create: { taskId: reviewRef, kind: 'optimize', status: 'completed', provider: 'rules' },
+      update: { status: 'completed' },
+    })
+    const reviewBase = {
+      terminalId: TERM_CHARGE,
+      serviceKey: 'resume_optimize',
+      amountCents: 100,
+      status: 'consumed',
+      attemptsUsed: 1,
+      kioskSessionId: r16Session,
+      provider: 'sandbox',
+      consumedRef: reviewRef,
+      consumedAt: new Date(Date.now() - 10 * 60_000),
+      expiresAt: new Date(Date.now() + 60_000),
+      paidAt: new Date(),
+    }
+    const reviewOld = await prisma.serviceOrder.create({
+      data: { ...reviewBase, id: 'r16-review-old', providerOrderNo: 'r16-review-old-no', channelTxnNo: 'r16-review-old-txn' },
+    })
+    const reviewNew = await prisma.serviceOrder.create({
+      data: { ...reviewBase, id: 'r16-review-new', providerOrderNo: 'r16-review-new-no', channelTxnNo: 'r16-review-new-txn' },
+    })
+    await serviceOrders.sweep(new Date())
+    const reviewRows = [await loadOrder(reviewOld.id), await loadOrder(reviewNew.id)]
+    assert.equal(reviewRows.filter(stillCharged).length, 1, 'R16 复核看到别的单占着同一任务时只留一笔')
+    assert.equal(reviewRows.filter((row) => row.status === 'refunded').length, 1, 'R16 复核要把另一张退掉')
+    applyOpenRefIndex(databasePath)
     for (const release of r16Releases) release()
     await new Promise((resolve) => setTimeout(resolve, 50))
     pass('R16 简历中断后再付，只收做出稿的那一笔')
