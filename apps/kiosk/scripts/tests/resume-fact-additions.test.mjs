@@ -34,6 +34,21 @@ const { replaceResumeText } = loadTs(join(kioskRoot, 'src/pages/resume/component
 
 const kioskRulePath = join(kioskRoot, 'src/pages/resume/components/resume-deliver/factAdditionsRule.ts')
 const apiRulePath = join(repoRoot, 'services/api/src/ai/resume/resume-fact-additions-rule.ts')
+const apiFindFactAdditions = loadTs(apiRulePath).exports.findFactAdditions
+
+function keysFrom(find, after, before) {
+  return find(after, before).map((item) => item.key)
+}
+
+function assertBothKeys(after, before, expected) {
+  assert.deepEqual(keysFrom(findFactAdditions, after, before), expected)
+  assert.deepEqual(keysFrom(apiFindFactAdditions, after, before), expected)
+}
+
+function assertBothEmpty(after, before) {
+  assert.deepEqual(findFactAdditions(after, before), [])
+  assert.deepEqual(apiFindFactAdditions(after, before), [])
+}
 
 const FALSE_PHRASES = [
   '一起', '一直', '一定', '一些', '一般', '一样', '一切', '一致', '一体', '一线', '一流',
@@ -927,4 +942,63 @@ test('带下标的行不参与按名称认领', () => {
   assert.equal(readGeneratedEntryIndex(current.experience[1]), 1)
   const hits = detectGeneratedUnconfirmedAdditions(current, generated, input, [])
   assert.equal(hits.some((hit) => hit.includes('周更') && hit.includes('2')), true)
+})
+
+test('混写链不把后面的中文数词粘进来，标点也断开', () => {
+  const split = [
+    ['月销量3万十分稳定。', ['num:30000']],
+    ['月销量3万，十分稳定。', ['num:30000']],
+    ['预算1万十五天花完', ['num:10000', 'num:15']],
+    ['预算1万，15天花完', ['num:10000', 'num:15']],
+    ['投入1000万一百人参与', ['num:10000000', 'num:100']],
+    ['投入1000万，100人参与', ['num:10000000', 'num:100']],
+    ['月薪1万，两千', ['num:10000', 'num:2000']],
+    ['月薪1万、两千', ['num:10000', 'num:2000']],
+    ['月薪1万。两千', ['num:10000', 'num:2000']],
+    ['月薪1万,两千', ['num:10000', 'num:2000']],
+    ['月薪1万.两千', ['num:10000', 'num:2000']],
+  ]
+  for (const [text, expected] of split) assertBothKeys(text, '', expected)
+  assertBothEmpty('月销量3万十分稳定。', '月销量3万，十分稳定。')
+  assertBothEmpty('月销量3万，十分稳定。', '月销量3万十分稳定。')
+  assertBothEmpty('预算1万十五天花完', '预算1万，15天花完')
+  assertBothEmpty('预算1万，15天花完', '预算1万十五天花完')
+  assertBothEmpty('投入1000万一百人参与', '投入1000万，100人参与')
+  assertBothEmpty('投入1000万，100人参与', '投入1000万一百人参与')
+  assertBothEmpty('月销量3万，十分稳定。', '月销量3万，十分稳定。')
+  assertBothEmpty('预算1万，15天花完', '预算1万，15天花完')
+  assertBothEmpty('投入1000万，100人参与', '投入1000万，100人参与')
+})
+
+test('第八版点名的三组混写仍整串读，和另一边对不上', () => {
+  assertBothKeys('月薪1万两千', '', ['raw:1万两千'])
+  assertBothKeys('营收3千五百万', '', ['raw:3千五百万'])
+  assertBothKeys('销售额2亿三千万', '', ['raw:2亿三千万'])
+  assertBothKeys('月薪一万2千', '', ['raw:一万2千'])
+  const mixed = [
+    ['月薪1万两千', '月薪1万'],
+    ['营收3千五百万', '服务客户3000人'],
+    ['销售额2亿三千万', '销售额3千万'],
+  ]
+  for (const [input, ai] of mixed) {
+    assert.equal(findFactAdditions(ai, input).length >= 1, true, `${input} -> ${ai}`)
+    assert.equal(apiFindFactAdditions(ai, input).length >= 1, true, `api ${input} -> ${ai}`)
+  }
+})
+
+test('删掉第二条后把第一条里 AI 写大的数改短，仍要本人确认', () => {
+  const base = '负责生鲜区上货和每晚盘点交接'
+  const input = shellResume([
+    storeRow('滨海超市', '店员', `${base}。`),
+    storeRow('滨海超市二店', '店员', `${base}。`),
+  ])
+  const generated = loadStampedGeneratedResume(shellResume([
+    storeRow('滨海超市', '店员', `${base}，日均理货 3 车。`),
+    storeRow('滨海超市二店', '店员', `${base}。`),
+  ]))
+  const deleted = deleteExperience(generated, 1)
+  const shortened = editExperience(deleted, 0, { description: `${base} 3 车。` })
+  const tokens = accumulateAnchored(generated, [deleted, shortened])
+  const hits = detectGeneratedUnconfirmedAdditions(shortened, generated, input, tokens)
+  assert.equal(hits.some((hit) => hit.includes('3') && hit.includes('车')), true)
 })

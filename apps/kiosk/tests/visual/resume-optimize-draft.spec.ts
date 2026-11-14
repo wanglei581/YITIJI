@@ -76,6 +76,30 @@ function registerOptimizeShell(api: Parameters<typeof registerW6Api>[0]): void {
   })
 }
 
+/** 生成页六步填到核对。工作经历填两条，第二条描述里没有「周更」。 */
+async function fillGenerateFormToReview(page: Page): Promise<void> {
+  await page.goto('/resume/generate')
+  await page.getByRole('textbox', { name: /^姓名/ }).fill('林岚')
+  await page.getByRole('button', { name: /^下一步：求职意向/ }).click()
+  await page.getByRole('textbox', { name: /^目标岗位/ }).fill('门店运营')
+  await page.getByRole('button', { name: /^下一步：教育经历/ }).click()
+  await page.getByRole('textbox', { name: /^学校/ }).fill('烟台职业学院')
+  await page.getByRole('button', { name: /^下一步：工作经历/ }).click()
+  const company = page.getByRole('textbox', { name: /^公司/ })
+  const role = page.getByRole('textbox', { name: /^职位/ })
+  const did = page.getByRole('textbox', { name: /^做了什么/ })
+  await company.nth(0).fill('海岸超市')
+  await role.nth(0).fill('店员')
+  await did.nth(0).fill('整理仓库货架，按保质期先进先出调整摆放顺序。')
+  await page.getByRole('button', { name: '添加一段实习 / 工作经历' }).click()
+  await company.nth(1).fill('灯塔书店')
+  await role.nth(1).fill('店员')
+  await did.nth(1).fill('维护门店公众号，撰写新书推荐与活动预告。')
+  await page.getByRole('button', { name: /^下一步：项目经历/ }).click()
+  await page.getByRole('button', { name: /^下一步：技能证书/ }).click()
+  await page.getByRole('button', { name: '去核对' }).click()
+}
+
 function registerEmptyOptimize(api: Parameters<typeof registerW6Api>[0]): void {
   api.respond('GET', `/api/v1/resume/records/${EMPTY_TASK_ID}/optimize`, {
     status: 200,
@@ -896,4 +920,48 @@ test('预览页互换两条公司名后，AI 加的数仍待确认，本人写�
   await expect(pending).toContainText('周更 2 篇')
   await expect(pending).not.toContainText('另记')
   await expect(pending).not.toContainText('3 项')
+})
+
+test('生成页进入预览后互换公司名并改写描述，AI 加的数仍待确认 @kiosk', async ({ page, api }) => {
+  const shelf = '整理仓库货架，按保质期先进先出调整摆放顺序。'
+  const posts = '维护门店公众号，撰写新书推荐与活动预告，周更 2 篇。'
+  const row = (company: string, description: string) => ({ company, role: '店员', period: '2019-2021', description })
+  registerOptimizeShell(api)
+  api.respond('POST', '/api/v1/resume/generate', {
+    status: 200,
+    json: {
+      taskId: 'r2i-generate-main',
+      status: 'completed',
+      providerName: 'llm',
+      resume: {
+        basic: { name: '林岚', phone: '', city: '烟台' },
+        intention: { position: '门店运营', city: '烟台' },
+        summary: '在烟台做过门店理货和书店运营。',
+        education: [{ school: '烟台职业学院', major: '', period: '' }],
+        experience: [row('海岸超市', shelf), row('灯塔书店', posts)],
+        projects: [],
+        skills: [],
+        certificates: [],
+      },
+      missingHints: [],
+    },
+  })
+  await fillGenerateFormToReview(page)
+  await page.getByRole('button', { name: /让 AI 整理成新简历/ }).click()
+  await expect(page).toHaveURL(/\/resume\/generate\/preview$/)
+  expect(new URL(page.url()).searchParams.get('taskId')).toBeNull()
+  await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toBeVisible()
+  const pending = page.locator('p.qx-rd-pending')
+  await expect(pending).toContainText('周更 2 篇')
+  await page.getByRole('textbox', { name: '第 1 条经历的公司' }).fill('灯塔书店')
+  await page.getByRole('textbox', { name: '第 2 条经历的公司' }).fill('海岸超市')
+  await page.getByRole('textbox', { name: '工作经历描述 1' }).fill('另记 3 项。')
+  await expect(pending).toContainText('周更 2 篇')
+  await expect(pending).not.toContainText('另记')
+  const pendingText = (await pending.innerText()).replace(/\s+/g, '')
+  const role = page.getByRole('textbox', { name: '第 2 条经历的职务' })
+  await expect(role).toHaveAttribute('data-gen-index', '1')
+  await role.fill('运营')
+  await expect.poll(async () => (await pending.innerText()).replace(/\s+/g, '')).toBe(pendingText)
+  await expect(role).toHaveAttribute('data-gen-index', '1')
 })

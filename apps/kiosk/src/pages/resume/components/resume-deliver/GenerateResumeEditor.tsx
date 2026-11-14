@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode, Ref } from 'react'
 import { useState } from 'react'
 import { MaskedContactLine } from '../../../../components/MaskedContactLine'
 import { DeleteEntryButton, EntryDeleteDialog } from './ResumeFactConfirmDialog'
-import { editStampedEntry } from './generatedEntryIndex'
+import { editStampedEntry, readGeneratedEntryIndex } from './generatedEntryIndex'
 import { resumeTitleIssues } from './resumeEntryTitles'
 
 const taCls = 'qx-rg-ta'
@@ -34,6 +34,7 @@ function TitleField(props: {
   message?: string
   onFocus: () => void
   onChange: (value: string) => void
+  generatedIndex?: number | null
 }) {
   const errorId = `${props.fieldId}-error`
   return (
@@ -44,6 +45,7 @@ function TitleField(props: {
         className={`${taCls} qx-rg-title`}
         aria-label={props.label}
         data-entry-field={props.fieldId}
+        data-gen-index={props.generatedIndex == null ? undefined : String(props.generatedIndex)}
         data-entry-invalid={props.message ? 'true' : undefined}
         aria-invalid={props.message ? true : undefined}
         aria-describedby={props.message ? errorId : undefined}
@@ -185,6 +187,7 @@ export function GenerateResumeEditor(props: {
                     value={item.role}
                     message={issues.get(roleId)}
                     onFocus={mark}
+                    generatedIndex={readGeneratedEntryIndex(item)}
                     onChange={(role) => onChange({
                       ...resume,
                       experience: resume.experience.map((row, idx) => idx === i ? editStampedEntry(row, { role }) : row),

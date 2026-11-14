@@ -15,6 +15,9 @@
  * 它只和另一边同样的整串相等。读不准包括：合并时较小单位后面还紧跟单位（3千5百万、2亿3千万、1万2千5百万）；
  * 数后面隔着空格或「多、余、来、几、左右」再接百千万亿；单位链里夹了「零」或小数又再接单位（1万零2千、1万2.5千）；
  * 中文数字和阿拉伯数字混在同一条单位链里（1万两千、3千五百万、2亿三千万、一万2千）。
+ * 混写链的后一段中文必须以一到九或两开头，不收十开头。「3万十分」「1万十五」在万处断开，各自读。
+ * 后一段的单位只比前一段末尾的单位低一级才算同一条链：万后面只接千，千后面只接百，亿后面只接千万。
+ * 「1000万一百」低了两级，不是一条链。逗号、顿号、句号（全角和半角）一律断开，不把标点从整串里拿掉。
  * 字段在空格或「多、余、来、几、左右」处结束、后面没有百千万亿时，仍按数值读。单字「十」后面隔着这些字或空格再接单位，同样整串读。
  * 职责词长的先占住区间，「独立负责」不再另报里面的「负责」。
  */
@@ -431,41 +434,124 @@ function consumeUncertainChain(text: string, from: number): number {
   return cursor
 }
 
-function chineseUnitChainEnd(text: string, from: number): number | null {
-  const lead = text.charAt(from)
-  if (cnDigit(lead) === null && lead !== '十') return null
-  const run = readCnRun(text, from)
-  if (!run) return null
-  for (let i = 0; i < run.raw.length; i += 1) {
-    if (cnSmall(run.raw.charAt(i)) !== null || cnBig(run.raw.charAt(i)) !== null) return run.end
-  }
+function isChainPunct(ch: string): boolean {
+  return ch === '，' || ch === ',' || ch === '、' || ch === '。' || ch === '.'
+}
+
+/** 后一段只许低一级：万→千，千→百，亿→千万。 */
+function oneStepLower(places: number): number | null {
+  if (places === 8) return 7
+  if (places === 4) return 3
+  if (places === 3) return 2
   return null
 }
 
-function arabicUnitChainEnd(text: string, from: number): number | null {
+function unitCharPlaces(ch: string): number {
+  if (ch === '十') return 1
+  return arabicUnitPlaces(ch)
+}
+
+function trailingUnitPlaces(raw: string): number {
+  let last = 0
+  for (let i = 0; i < raw.length; i += 1) {
+    const places = unitCharPlaces(raw.charAt(i))
+    if (places > 0) last = places
+  }
+  return last
+}
+
+/** 这一段开头的单位。千后面紧跟万是千万，其余只看第一个单位。 */
+function chineseLinkPlaces(raw: string): number | null {
+  let index = 0
+  while (index < raw.length) {
+    const digit = cnDigit(raw.charAt(index))
+    if (digit === null || digit === 0) break
+    index += 1
+  }
+  if (index >= raw.length) return null
+  const first = raw.charAt(index)
+  const firstPlaces = unitCharPlaces(first)
+  if (firstPlaces <= 0) return null
+  if (first === '千' && raw.charAt(index + 1) === '万') return 7
+  return firstPlaces
+}
+
+/** 十开头的「十分」「十五」不是混写链的后段。 */
+function rejectsTenLead(ch: string): boolean {
+  return ch === '十'
+}
+
+function mixedChineseLead(ch: string): 'digit' | 'ten' | null {
+  if (rejectsTenLead(ch)) return null
+  if (ch === '十') return 'ten'
+  const digit = cnDigit(ch)
+  if (digit === null || digit === 0) return null
+  return 'digit'
+}
+
+function takeChineseLink(
+  text: string,
+  from: number,
+  prevPlaces: number,
+): { end: number; trailing: number } | null {
+  const leadKind = mixedChineseLead(text.charAt(from))
+  if (leadKind === null) return null
+  const run = readCnRun(text, from)
+  if (!run) return null
+  let hasUnit = false
+  for (let i = 0; i < run.raw.length; i += 1) {
+    if (cnSmall(run.raw.charAt(i)) !== null || cnBig(run.raw.charAt(i)) !== null) hasUnit = true
+  }
+  if (!hasUnit) return null
+  if (leadKind === 'digit') {
+    const places = chineseLinkPlaces(run.raw)
+    if (places !== oneStepLower(prevPlaces)) return null
+  }
+  return { end: run.end, trailing: trailingUnitPlaces(run.raw) }
+}
+
+function takeArabicLink(
+  text: string,
+  from: number,
+  prevPlaces: number,
+): { end: number; trailing: number } | null {
   if (!isDigitChar(text.charAt(from))) return null
   const matched = ARABIC_NUMBER.exec(text.slice(from))
   if (!matched) return null
+  if (/[,，.．]/.test(matched[0])) return null
   let end = from + matched[0].length
-  if (readArabicUnitPlaces(text, end) <= 0) return null
+  const first = readArabicUnitPlaces(text, end)
+  if (first <= 0) return null
   end += 1
-  while (end < text.length && readArabicUnitPlaces(text, end) > 0) end += 1
-  while (isDigitChar(text.charAt(end)) && !isDigitChar(text.charAt(end + 1)) && readArabicUnitPlaces(text, end + 1) > 0) {
-    end += 2
-    while (end < text.length && readArabicUnitPlaces(text, end) > 0) end += 1
+  let places = first
+  let trailing = first
+  const second = readArabicUnitPlaces(text, end)
+  if (second > first) {
+    places = first + second
+    trailing = second
+    end += 1
   }
-  return end
+  if (places !== oneStepLower(prevPlaces)) return null
+  return { end, trailing }
 }
 
-/** 中文数字和阿拉伯数字混在同一条单位链里。firstCn 表示下一段是中文数字。 */
-function mixedUnitChainEnd(text: string, from: number, firstCn: boolean): number | null {
+/**
+ * 中文数字和阿拉伯数字混在同一条单位链里。
+ * firstCn 表示下一段是中文数字。prevPlaces 是上一段末尾的单位。
+ * 逗号、顿号、句号先断开。后面跳过标点的循环只有在断开被拿掉时才会吃掉标点。
+ */
+function mixedUnitChainEnd(text: string, from: number, firstCn: boolean, prevPlaces: number): number | null {
   let cursor = from
   let expectCn = firstCn
   let consumed = false
+  let places = prevPlaces
   while (cursor < text.length) {
-    const end = expectCn ? chineseUnitChainEnd(text, cursor) : arabicUnitChainEnd(text, cursor)
-    if (end === null) break
-    cursor = end
+    if (isChainPunct(text.charAt(cursor))) break
+    while (isChainPunct(text.charAt(cursor))) cursor += 1
+    const link = expectCn ? takeChineseLink(text, cursor, places) : takeArabicLink(text, cursor, places)
+    if (link === null) break
+    cursor = link.end
+    places = link.trailing
     consumed = true
     expectCn = !expectCn
   }
@@ -534,7 +620,7 @@ function matchArabic(
   }
   const awkward = rawTailEnd(text, end)
   if (awkward !== null) return asRaw(awkward)
-  const mixed = mixedUnitChainEnd(text, end, true)
+  const mixed = mixedUnitChainEnd(text, end, true, magnitude)
   if (mixed !== null) return asRaw(mixed)
   return { end, canonical, percent: false, raw: null }
 }
@@ -603,7 +689,7 @@ function matchChinese(text: string, index: number): RawHit | null {
   }
   const canonical = parseChinese(run.raw)
   if (canonical === null) return null
-  const mixed = mixedUnitChainEnd(text, run.end, false)
+  const mixed = mixedUnitChainEnd(text, run.end, false, trailingUnitPlaces(run.raw))
   if (mixed !== null) {
     return { start: index, end: mixed, key: `raw:${rawBody(text, index, mixed)}`, kind: 'num', word: '' }
   }
