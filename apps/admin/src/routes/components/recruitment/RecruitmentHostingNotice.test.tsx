@@ -23,8 +23,16 @@ function markup(hosting: RecruitmentHostingView): string {
   return renderToStaticMarkup(createElement(RecruitmentHostingNotice, { hosting, subject: '岗位' }))
 }
 
-test('有自报内容时提示条逐字出现，且不出现已认证、已核验', () => {
+/** 提示条那一段的可见文字。整句相等，句后再加字（例如「资质已获认证」）不能通过。 */
+function noticeSentence(html: string): string {
+  const paragraphs = [...html.matchAll(/<p>([^<]*)<\/p>/g)].map((match) => match[1] ?? '')
+  assert.equal(paragraphs.length, 1, html)
+  return paragraphs[0] ?? ''
+}
+
+test('有自报内容时提示条整句等于源码全文，且不出现已认证、已核验', () => {
   const html = markup(ready({ name: NAME, licenseNumber: LICENSE }))
+  assert.equal(noticeSentence(html), EXACT, html)
   assert.ok(html.includes(EXACT), html)
   assert.ok(html.includes('运营单位自报：'), html)
   assert.ok(html.includes('本软件未核验。'), html)

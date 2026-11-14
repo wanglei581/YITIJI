@@ -373,9 +373,8 @@ try {
   // 1. 就绪检查通过
   {
     const box = makeSandbox(); boxes.push(box)
-    // 跳过变量写成 first-install 以外的值不算跳过：预检照常执行
-    const envPath = join(box.runtime, 'services/api/.env')
-    writeFileSync(envPath, 'DATABASE_URL="postgres://drill@127.0.0.1/drill"\nDEPLOYMENT_OWNERSHIP=customer_private\n')
+    // 跳过变量写成 first-install 以外的值不算跳过：预检照常执行。
+    // 沙箱 .env 只有 DATABASE_URL，没有 DEPLOYMENT_OWNERSHIP：生产现状也没有这个键，第一次发布走 3b 的 END 追加。
     const r = runDeploy(box, { DRILL_HEALTH: 'always', DEPLOY_SKIP_LEGAL_DOCS_PREFLIGHT: 'true' })
     check(r.code === 0, '场景 1：就绪检查通过时发布成功', `退出码 ${r.code}\n${r.out.slice(-800)}`)
     check(r.calls.includes('legal-preflight --base-url http://drill.invalid/api/v1\n'),
@@ -398,8 +397,31 @@ try {
     check(envText.split('\n').includes('DEPLOYMENT_OWNERSHIP=vendor_cloud'),
       '场景 1：3b 写出 DEPLOYMENT_OWNERSHIP=vendor_cloud')
     check(ownershipLines.length === 1 && ownershipLines[0] === 'DEPLOYMENT_OWNERSHIP=vendor_cloud',
-      '场景 1：.env 里原有 DEPLOYMENT_OWNERSHIP 时，3b 替换成恰好一行 vendor_cloud',
+      '场景 1：.env 里没有 DEPLOYMENT_OWNERSHIP 时，3b 追加恰好一行 vendor_cloud',
       ownershipLines.join(' | ') || envText)
+  }
+  // 1b. .env 里已有两行同名归属键：3b 替换成恰好一行，两行旧值都不留
+  {
+    const box = makeSandbox(); boxes.push(box)
+    const envPath = join(box.runtime, 'services/api/.env')
+    writeFileSync(
+      envPath,
+      'DATABASE_URL="postgres://drill@127.0.0.1/drill"\nDEPLOYMENT_OWNERSHIP=customer_private\nexport DEPLOYMENT_OWNERSHIP=x\n',
+    )
+    const r = runDeploy(box, { DRILL_HEALTH: 'always' })
+    check(r.code === 0, '场景 1b：已有两行同名键时发布仍成功', `退出码 ${r.code}\n${r.out.slice(-800)}`)
+    const envText = read(envPath)
+    const ownershipLines = envText.split('\n').map((line) => line.trim()).filter((line) => /^(export\s+)?DEPLOYMENT_OWNERSHIP\s*=/.test(line))
+    check(
+      ownershipLines.length === 1 && ownershipLines[0] === 'DEPLOYMENT_OWNERSHIP=vendor_cloud',
+      '场景 1b：两行同名键替换成恰好一行 DEPLOYMENT_OWNERSHIP=vendor_cloud',
+      ownershipLines.join(' | ') || envText,
+    )
+    check(
+      !envText.includes('DEPLOYMENT_OWNERSHIP=customer_private') && !envText.includes('DEPLOYMENT_OWNERSHIP=x'),
+      '场景 1b：customer_private 与 export DEPLOYMENT_OWNERSHIP=x 都不在',
+      envText,
+    )
   }
   // 0a. 没有部署归属文件的旧提交不能当发布目标：在备份和迁移之前失败
   {

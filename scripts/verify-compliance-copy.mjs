@@ -23,7 +23,7 @@
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
@@ -512,7 +512,7 @@ if (titleMismatch === 0) pass(`6. 三端页面标题与备案名「${FILING_NAME
     delete env.FORCE_COLOR
     const result = spawnSync(process.execPath, [
       '--import',
-      path.join(root, 'services/api/node_modules/tsx/dist/esm/index.mjs'),
+      pathToFileURL(path.join(root, 'services/api/node_modules/tsx/dist/esm/index.mjs')).href,
       '--test',
       testFile,
     ], {
@@ -524,7 +524,7 @@ if (titleMismatch === 0) pass(`6. 三端页面标题与备案名「${FILING_NAME
     if (result.status !== 0) {
       fail(`7. 后台自报提示条两态用例失败\n${output.slice(-1500)}`)
     } else {
-      pass('7. 后台自报提示条：有自报逐字含「运营单位自报：」与「本软件未核验。」，不含已认证/已核验；自报为空不出现')
+      pass('7. 后台自报提示条：有自报时整句等于「运营单位自报：…本软件未核验。」，自报为空不出现')
     }
   }
 }

@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { assertProductionRuntimeGates } from '../src/config/production-runtime-gates'
 import { AIGC_DEFAULT_PRODUCER } from '../src/common/pdf/aigc-label'
 import { resolveJwtSecret } from '../src/common/jwt-verifier.module'
@@ -524,7 +525,7 @@ function assertAdminSelfReportNoticeRendered(): void {
   delete env.FORCE_COLOR
   const result = spawnSync(process.execPath, [
     '--import',
-    join(repoRoot, 'services/api/node_modules/tsx/dist/esm/index.mjs'),
+    pathToFileURL(join(repoRoot, 'services/api/node_modules/tsx/dist/esm/index.mjs')).href,
     '--test',
     testFile,
   ], {
@@ -536,7 +537,7 @@ function assertAdminSelfReportNoticeRendered(): void {
   if (result.status !== 0) {
     throw new Error(`后台自报提示条两态用例失败\n${output.slice(-1500)}`)
   }
-  console.log('  PASS 后台自报提示条两态：有自报逐字含「运营单位自报：」与「本软件未核验。」，空自报不出现')
+  console.log('  PASS 后台自报提示条两态：有自报时整句等于「运营单位自报：…本软件未核验。」，空自报不出现')
 }
 
 function assertRecruitmentLockCases(): void {
@@ -777,12 +778,20 @@ function assertPreflightForceValue(): void {
     '--force-value 与 --force-true 同名键 → PREFLIGHT_USAGE',
     ['zz-overlap-secret'],
   )
+  const hiddenFixtureValues = [
+    'ci-only-hidden-value-alpha',
+    'ci-only-hidden-value-bravo',
+    'ci-only-hidden-value-charlie',
+  ]
+  const hostingOnPrivateWithHidden = `${hostingOnPrivate}${hiddenFixtureValues
+    .map((value, index) => `CI_ONLY_HIDDEN_${index}=${value}`)
+    .join('\n')}\n`
   expectFail(
     forceVendor,
     'PRODUCTION_RECRUITMENT_HOSTING_LOCKED',
-    '.env 写私有化且托管开，--force-value 压成 vendor_cloud → 预检失败',
-    [],
-    hostingOnPrivate,
+    '.env 写私有化且托管开，--force-value 压成 vendor_cloud → 预检失败，且不回显夹具 .env 的值',
+    hiddenFixtureValues,
+    hostingOnPrivateWithHidden,
   )
   expectOk(
     forceVendor,

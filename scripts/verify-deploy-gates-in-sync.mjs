@@ -343,13 +343,15 @@ if (deployWorkflow.includes(staticRoot) && precheckScript.includes(staticRoot)) 
     } else {
       fail('3c 预检必须带 --force-value 并引用 FIXED_PRODUCTION_VALUES')
     }
-    if (/print key "=" value/.test(deploySource)) {
-      pass('3b 把固定归属写成 KEY=VALUE')
-    } else {
-      fail('3b 必须在 KEY=true 循环之外把固定值写成 print key "=" value')
-    }
     const fixedAwkAt = deploySource.indexOf('awk -v key="$FIXED_KEY" -v value="$FIXED_VALUE"')
     const fixedAwk = fixedAwkAt < 0 ? '' : deploySource.slice(fixedAwkAt, fixedAwkAt + 700)
+    // 替换分支里也有 print key "=" value。只认任意一处时，删掉 END 的追加句仍然通过。
+    // 生产 .env 现在没有这个键，第一次发布走的是 END 追加，必须单独看见这一句。
+    if (/END\s*\{[^}]*if \(!written\) print key "=" value/.test(fixedAwk)) {
+      pass('3b 固定值 awk 的 END 在键尚未写出时追加 if (!written) print key "=" value')
+    } else {
+      fail('3b 固定值 awk 的 END 必须有追加句 if (!written) print key "=" value，不能只认替换分支里任意一处 print key "=" value')
+    }
     if (/print key "=" value[\s\S]*?\n\s*next\n/.test(fixedAwk)) {
       pass('3b 已有同名行写出新值后 next，不把旧行再打出来')
     } else {
