@@ -2,13 +2,20 @@ import type { ServiceOrderService, TripHold } from './service-order.service'
 
 type Headers = Record<string, string | string[] | undefined> | undefined
 
-type HoldOrders = Pick<ServiceOrderService, 'beginTrip' | 'coversTrip' | 'noteLayoutOnly'>
+type HoldOrders = Pick<ServiceOrderService, 'beginTrip' | 'coversTrip' | 'noteLayoutOnly'> & Partial<
+  Pick<ServiceOrderService, 'replayOpenScan' | 'releasePendingConsume' | 'interviewHasOpening' | 'releaseStuckInterview'>
+>
 
 function errorCode(error: unknown): string | null {
   if (!error || typeof error !== 'object' || !('getResponse' in error)) return null
   const getResponse = (error as { getResponse?: () => unknown }).getResponse
   if (typeof getResponse !== 'function') return null
-  const response = getResponse()
+  let response: unknown
+  try {
+    response = getResponse.call(error)
+  } catch {
+    return null
+  }
   if (typeof response === 'string') return response
   if (response && typeof response === 'object' && 'error' in response) {
     const code = (response as { error?: { code?: string } }).error?.code
@@ -68,26 +75,48 @@ export async function chargeInterviewStart<T>(
     await hold.noteMade()
     return result
   } catch (error) {
-    if (errorCode(error) === 'INTERVIEW_ALREADY_STARTED') await hold.noteMade()
-    else await hold.noteNotMade('interview_not_opened')
+    if (errorCode(error) === 'INTERVIEW_ALREADY_STARTED') {
+      const opened = typeof orders.interviewHasOpening === 'function'
+        ? await orders.interviewHasOpening(sessionId)
+        : false
+      if (opened) await hold.noteMade()
+      else {
+        await hold.noteNotMade('interview_not_opened')
+        if (typeof orders.releaseStuckInterview === 'function') await orders.releaseStuckInterview(sessionId)
+      }
+    } else {
+      await hold.noteNotMade('interview_not_opened')
+    }
     throw error
   }
 }
 
-/** 扫描先占单，文件稍后才到。创建失败记没出文件。 */
+/** 扫描先占单，文件稍后才到。同一血缘上已经占着的单直接接着做，不再收第二笔。 */
 export async function chargeScanStart<T extends { scanTaskId: string }>(
   orders: HoldOrders | undefined,
   headers: Headers,
   run: () => Promise<T>,
 ): Promise<T> {
+  const replayId = orders && typeof orders.replayOpenScan === 'function'
+    ? await orders.replayOpenScan(headers)
+    : null
   const hold = orders && typeof orders.beginTrip === 'function'
     ? await orders.beginTrip(headers, 'scan')
     : null
+  if (replayId && hold) {
+    hold.adopt(replayId)
+    const result = await run()
+    await hold.attachRef(result.scanTaskId)
+    return result
+  }
   if (!hold?.required) return run()
   await hold.consume('pending')
   try {
     const result = await run()
-    await hold.attachRef(result.scanTaskId)
+    const attached = await hold.attachRef(result.scanTaskId)
+    if (!attached && hold.orderId && typeof orders?.releasePendingConsume === 'function') {
+      await orders.releasePendingConsume(hold.orderId)
+    }
     return result
   } catch (error) {
     await hold.noteNotMade('scan_no_file')

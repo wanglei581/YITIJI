@@ -106,6 +106,15 @@ function pickServicePaymentRequired(err: Record<string, unknown>): {
   }
 }
 
+/** 只在「这一次已经在进行」时带出占用引用，便于一体机接着查，而不是再带去付款。 */
+function pickConsumedRef(err: Record<string, unknown>): string | undefined {
+  const value = err['consumedRef']
+  if (typeof value !== 'string') return undefined
+  const text = value.trim()
+  if (!text || text.length > 128 || /[\r\n]/.test(text)) return undefined
+  return text
+}
+
 /**
  * 全局异常过滤器。除了把异常整形成统一错误响应，还负责**唯一一条**
  * 服务端异常日志 —— 此前这里一行日志都不写，所有 500 在服务端零痕迹。
@@ -133,6 +142,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let closureOrders: Array<{ orderNo: string; status: string }> | undefined
     let nextAction: string | undefined
     let servicePayment: { amountCents: number; serviceKey: 'resume_optimize' | 'mock_interview' | 'scan'; serviceName: string } | undefined
+    let consumedRef: string | undefined
 
     if (exception instanceof HttpException) {
       status = exception.getStatus()
@@ -171,6 +181,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
           }
           if (isNextActionId(err['nextAction'])) nextAction = err['nextAction']
           if (err['code'] === 'SERVICE_PAYMENT_REQUIRED') servicePayment = pickServicePaymentRequired(err)
+          if (err['code'] === 'SERVICE_ORDER_IN_USE') consumedRef = pickConsumedRef(err)
         } else if (typeof errField === 'string') {
           const bodyMessage = b['message']
           if (typeof bodyMessage === 'string' && isMachineErrorCode(bodyMessage)) {
@@ -266,6 +277,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ...(closureOrders ? { orders: closureOrders } : {}),
         ...(nextAction ? { nextAction } : {}),
         ...(servicePayment ?? {}),
+        ...(consumedRef ? { consumedRef } : {}),
       },
       requestId: request.requestId,
     }

@@ -54,6 +54,8 @@ export interface ErrorResponseBody {
     amountCents?: number
     serviceKey?: 'resume_optimize' | 'mock_interview' | 'scan'
     serviceName?: string
+    /** 仅 SERVICE_ORDER_IN_USE：这一张单正在占用的任务或扫描号。 */
+    consumedRef?: string
   }
   requestId?: string
 }
