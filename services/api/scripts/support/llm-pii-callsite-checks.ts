@@ -138,6 +138,10 @@ async function mockInterviewChecks(
       findUnique: async () => null,
       create: async ({ data }: { data: Record<string, unknown> }) => data,
     },
+    // 夹具把 file-1 当成会员本人的文件，证明检查不拦。
+    fileObject: {
+      findUnique: async () => ({ endUserId: 'user-1' }),
+    },
     $transaction: async (fn: unknown) => (typeof fn === 'function' ? (fn as (tx: unknown) => Promise<unknown>)(prisma) : Promise.all(fn as unknown[])),
   }
   const service = new MockInterviewService(

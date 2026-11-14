@@ -74,7 +74,7 @@ async function main() {
   const system = () => sent.at(-1)?.messages.find(m => m.role === 'system')?.content ?? ''
   try {
     await prisma.organization.create({ data: {
-      id: orgId, name: '验证发布机构', type: 'government',
+      id: orgId, name: '验证发布机构', type: 'government', contentTrustStatus: 'active',
       verifiedOfficialDomainsJson: JSON.stringify([{ domain: 'mohrss.gov.cn', verifiedAt: new Date().toISOString(), verifiedBy: 'verify' }]),
     } })
     const row = await prisma.policyPost.create({ data: {

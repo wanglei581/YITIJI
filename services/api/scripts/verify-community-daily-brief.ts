@@ -103,7 +103,7 @@ async function main(): Promise<void> {
 
   try {
     await cleanup()
-    await prisma.organization.create({ data: { id: orgId, name: '动态验证合作机构', type: 'partner' } })
+    await prisma.organization.create({ data: { id: orgId, name: '动态验证合作机构', type: 'partner', contentTrustStatus: 'active' } })
     await prisma.endUser.createMany({ data: [
       { id: userA, phoneHash: `cdb-a-${suffix}`, phoneEnc: `cdb-a-enc-${suffix}`, nickname: '动态会员A' },
       { id: userB, phoneHash: `cdb-b-${suffix}`, phoneEnc: `cdb-b-enc-${suffix}`, nickname: '动态会员B' },

@@ -147,6 +147,7 @@ async function main() {
   const endUserA = `vmi_a_${suffix}`
   const endUserB = `vmi_b_${suffix}`
   const cleanupSessionIds: string[] = []
+  let ownedResumeFileIdForCleanup: string | null = null
 
   try {
     // 真实 EndUser 行（外键 / 审计无关，但保持数据自洽）
@@ -159,6 +160,22 @@ async function main() {
     // ── 0. resumeFileId 必须随当前会员身份传入提取层 ───────────────────────
     {
       const ownedResumeFileId = `owned_resume_${suffix}`
+      ownedResumeFileIdForCleanup = ownedResumeFileId
+      await prisma.fileObject.create({
+        data: {
+          id: ownedResumeFileId,
+          storageKey: `verify/mock-interview/${ownedResumeFileId}`,
+          filename: 'resume.docx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          sizeBytes: 32,
+          sha256: 'a'.repeat(64),
+          purpose: 'resume_upload',
+          endUserId: endUserA,
+          ownerType: 'user',
+          ownerId: endUserA,
+          status: 'active',
+        },
+      })
       const guardedExtraction = {
         extractResumeText: async ({ fileId, endUserId }: { fileId: string; endUserId?: string | null }) => {
           if (fileId === ownedResumeFileId && endUserId === endUserA) {
@@ -1122,6 +1139,9 @@ async function main() {
     console.error(err instanceof Error ? err.message : err)
   } finally {
     await prisma.mockInterviewSession.deleteMany({ where: { id: { in: cleanupSessionIds } } }).catch(() => undefined)
+    if (ownedResumeFileIdForCleanup) {
+      await prisma.fileObject.deleteMany({ where: { id: ownedResumeFileIdForCleanup } }).catch(() => undefined)
+    }
     await prisma.auditLog.deleteMany({ where: { targetType: 'mock_interview_session' } }).catch(() => undefined)
     await prisma.endUser.deleteMany({ where: { id: { in: [endUserA, endUserB] } } }).catch(() => undefined)
     server.close()

@@ -1,4 +1,4 @@
-import { Controller, HttpCode, Param, Post } from '@nestjs/common'
+import { Controller, Headers, HttpCode, Param, Post } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { PolicyChecklistService } from './policy-checklist.service'
@@ -10,7 +10,13 @@ export class PolicyChecklistController {
   @Post(':id/checklist')
   @HttpCode(200)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
-  async generate(@Param('id') id: string) {
-    return ApiResponse.ok(await this.checklist.generate(id))
+  async generate(
+    @Param('id') id: string,
+    @Headers('x-terminal-id') terminalId?: string,
+    @Headers('x-terminal-session-token') sessionToken?: string,
+  ) {
+    return ApiResponse.ok(await this.checklist.generate(id, {
+      headers: { 'x-terminal-id': terminalId, 'x-terminal-session-token': sessionToken },
+    }))
   }
 }

@@ -1,12 +1,14 @@
-import { Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common'
+import { Injectable, NotFoundException, OnModuleDestroy, Optional } from '@nestjs/common'
 import { createHash } from 'node:crypto'
 import { FilesService } from '../files/files.service'
 import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { createPrismaClient, type AppPrismaClient } from '../prisma/create-client'
+import type { KioskJobBoardRequest } from '../terminals/kiosk-job-board.service'
 import { checklistMetadata } from './policy-checklist-metadata'
 import { renderPolicyChecklist } from './policy-checklist-pdf'
-import { publicPolicyLookupWhere } from './policy-public-visibility'
+import { PolicyScopeService, resolvePolicyScope } from './policy-scope.service'
+import { publicPolicyLookupWhere, type PolicyPublicScope } from './policy-public-visibility'
 
 // 开发 SQLite 与同进程多个 service 实例共享；生产多进程再由 PostgreSQL 事务锁串行化。
 const pendingFiles = new Map<string, Promise<string>>()
@@ -15,19 +17,24 @@ const pendingFiles = new Map<string, Promise<string>>()
 export class PolicyChecklistService implements OnModuleDestroy {
   private lockClient: AppPrismaClient | null = null
 
-  constructor(private readonly prisma: PrismaService, private readonly files: FilesService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly files: FilesService,
+    @Optional() private readonly policyScope?: PolicyScopeService,
+  ) {}
 
   async onModuleDestroy(): Promise<void> {
     await this.lockClient?.$disconnect()
     this.lockClient = null
   }
 
-  async generate(policyId: string) {
+  async generate(policyId: string, req?: KioskJobBoardRequest) {
+    const scope = await this.readScope(req)
     // 办事清单只给扶持条目：公告没有三栏，按编号来也当不在可查看范围。
     const policy = await this.prisma.policyPost.findFirst({
       where: await publicPolicyLookupWhere(this.prisma, {
         id: policyId, kind: 'policy_guide', reviewStatus: 'approved', publishStatus: 'published',
-      }, { mode: 'all' }),
+      }, scope),
       include: { org: { select: { verifiedOfficialDomainsJson: true } } },
     })
     if (!policy) throw policyNotFound()
@@ -46,7 +53,7 @@ export class PolicyChecklistService implements OnModuleDestroy {
     const current = await this.prisma.policyPost.findFirst({
       where: await publicPolicyLookupWhere(this.prisma, {
         id: policy.id, contentVersion: policy.contentVersion, reviewStatus: 'approved', publishStatus: 'published',
-      }, { mode: 'all' }),
+      }, scope),
       select: { id: true },
     })
     if (!current) throw policyNotFound()
@@ -59,6 +66,11 @@ export class PolicyChecklistService implements OnModuleDestroy {
       printFileUrl: signed.url, phoneUrl,
       phoneUrlExpiresAt: phoneUrl ? signed.expiresAt.toISOString() : null,
     }
+  }
+
+  /** 没注入范围服务时按 all，与列表控制器缺省注入同一口径。生产模块会注入。 */
+  private readScope(req?: KioskJobBoardRequest): Promise<PolicyPublicScope> {
+    return resolvePolicyScope(this.policyScope, req)
   }
 
   private async withGenerationLock(policy: Parameters<typeof renderPolicyChecklist>[0] & { id: string; contentVersion: number }, metadata: string) {

@@ -132,9 +132,9 @@ export interface PrintJobStatusResult {
 const USER_FAILURE_REASONS: Record<string, string> = {
   DOWNLOAD_HASH_MISMATCH: '文件校验未通过，请返回重新上传后再打印',
   PRINTER_NOT_FOUND:      '未找到打印机，请联系工作人员检查打印机连接',
-  PRINTER_OFFLINE:        '打印机离线，请联系工作人员检查设备',
-  PAPER_EMPTY:            '打印机缺纸，请联系工作人员补纸',
-  PRINTER_ERROR:          '打印机可能卡纸或发生设备故障，请联系工作人员处理',
+  PRINTER_OFFLINE:        '打印机离线，请稍后重试。',
+  PAPER_EMPTY:            '打印机缺纸，当前无法打印。',
+  PRINTER_ERROR:          '打印机可能卡纸或发生设备故障，当前暂时无法继续使用。',
   PRINT_JOB_UNCONFIRMED:  '打印作业未确认完成，请工作人员检查出纸状态',
   PRINT_TIMEOUT:          '打印超时，请稍后重试',
   PRINT_QUEUE_TIMEOUT:    '这单等了太久没有打印，没有出纸，可以重新提交打印。',
