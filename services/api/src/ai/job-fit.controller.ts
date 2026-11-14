@@ -153,7 +153,10 @@ export class JobFitController {
     }
     const requester = await this.requesterOf(req)
     const quotaContext = quotaContextOf(req, requester)
-    const cover = await this.tripCover?.cover(req.headers)
+    // 配额探针会塞一个空对象占位。没有 cover 方法就按没付过这一趟，不把占位当成已付。
+    const cover = typeof this.tripCover?.cover === 'function'
+      ? await this.tripCover.cover(req.headers)
+      : undefined
     const chargeOptions = { skipDailyQuota: cover?.skipDailyQuota === true }
     return this.governed.analyzeForJobFit(dto, requester, quotaContext, req, chargeOptions)
   }
