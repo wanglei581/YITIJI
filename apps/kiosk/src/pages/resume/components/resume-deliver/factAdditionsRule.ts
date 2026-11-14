@@ -13,7 +13,9 @@
  * 单位不是逐级变小（如 5百3千）就拆开读，不合成一个数。
  * 读不准的整串不拆、不按数值比，记成 raw: 加上去掉空格、全角转半角后的原文。
  * 它只和另一边同样的整串相等。读不准包括：合并时较小单位后面还紧跟单位（3千5百万、2亿3千万、1万2千5百万）；
- * 数后面隔着空格或「多、余、来、几、左右」再接百千万亿；单位链里夹了「零」或小数又再接单位（1万零2千、1万2.5千）。
+ * 数后面隔着空格或「多、余、来、几、左右」再接百千万亿；单位链里夹了「零」或小数又再接单位（1万零2千、1万2.5千）；
+ * 中文数字和阿拉伯数字混在同一条单位链里（1万两千、3千五百万、2亿三千万、一万2千）。
+ * 字段在空格或「多、余、来、几、左右」处结束、后面没有百千万亿时，仍按数值读。单字「十」后面隔着这些字或空格再接单位，同样整串读。
  * 职责词长的先占住区间，「独立负责」不再另报里面的「负责」。
  */
 
@@ -384,7 +386,8 @@ function hedgeUnitEnd(text: string, index: number): number | null {
   const after = skipSpaces(text, cursor)
   if (!usedHedge && after === index) return null
   if (isNotUnitPhrase(text, after)) return null
-  if ('百千万亿'.indexOf(text.charAt(after)) === -1) return null
+  // 文本在这里结束时 charAt 得到空字符串。indexOf('') 是 0，不能当成后面还有单位。
+  if (after >= text.length || '百千万亿'.indexOf(text.charAt(after)) === -1) return null
   let end = after + 1
   while (end < text.length && '百千万亿'.indexOf(text.charAt(end)) !== -1 && !isNotUnitPhrase(text, end)) end += 1
   return end
@@ -426,6 +429,47 @@ function consumeUncertainChain(text: string, from: number): number {
     break
   }
   return cursor
+}
+
+function chineseUnitChainEnd(text: string, from: number): number | null {
+  const lead = text.charAt(from)
+  if (cnDigit(lead) === null && lead !== '十') return null
+  const run = readCnRun(text, from)
+  if (!run) return null
+  for (let i = 0; i < run.raw.length; i += 1) {
+    if (cnSmall(run.raw.charAt(i)) !== null || cnBig(run.raw.charAt(i)) !== null) return run.end
+  }
+  return null
+}
+
+function arabicUnitChainEnd(text: string, from: number): number | null {
+  if (!isDigitChar(text.charAt(from))) return null
+  const matched = ARABIC_NUMBER.exec(text.slice(from))
+  if (!matched) return null
+  let end = from + matched[0].length
+  if (readArabicUnitPlaces(text, end) <= 0) return null
+  end += 1
+  while (end < text.length && readArabicUnitPlaces(text, end) > 0) end += 1
+  while (isDigitChar(text.charAt(end)) && !isDigitChar(text.charAt(end + 1)) && readArabicUnitPlaces(text, end + 1) > 0) {
+    end += 2
+    while (end < text.length && readArabicUnitPlaces(text, end) > 0) end += 1
+  }
+  return end
+}
+
+/** 中文数字和阿拉伯数字混在同一条单位链里。firstCn 表示下一段是中文数字。 */
+function mixedUnitChainEnd(text: string, from: number, firstCn: boolean): number | null {
+  let cursor = from
+  let expectCn = firstCn
+  let consumed = false
+  while (cursor < text.length) {
+    const end = expectCn ? chineseUnitChainEnd(text, cursor) : arabicUnitChainEnd(text, cursor)
+    if (end === null) break
+    cursor = end
+    consumed = true
+    expectCn = !expectCn
+  }
+  return consumed ? cursor : null
 }
 
 function matchArabic(
@@ -490,6 +534,8 @@ function matchArabic(
   }
   const awkward = rawTailEnd(text, end)
   if (awkward !== null) return asRaw(awkward)
+  const mixed = mixedUnitChainEnd(text, end, true)
+  if (mixed !== null) return asRaw(mixed)
   return { end, canonical, percent: false, raw: null }
 }
 
@@ -553,10 +599,14 @@ function matchChinese(text: string, index: number): RawHit | null {
     if (!month && run.raw === '一' && startsWithWord(text, run.end, YI_SKIP)) return null
     const rank = text.startsWith('等', run.end)
     const measure = startsWithWord(text, run.end, MEASURES)
-    if (!rank && !measure) return null
+    if (!rank && !measure && rawTailEnd(text, run.end) === null) return null
   }
   const canonical = parseChinese(run.raw)
   if (canonical === null) return null
+  const mixed = mixedUnitChainEnd(text, run.end, false)
+  if (mixed !== null) {
+    return { start: index, end: mixed, key: `raw:${rawBody(text, index, mixed)}`, kind: 'num', word: '' }
+  }
   const tail = rawTailEnd(text, run.end)
   if (tail !== null) {
     return { start: index, end: tail, key: `raw:${rawBody(text, index, tail)}`, kind: 'num', word: '' }

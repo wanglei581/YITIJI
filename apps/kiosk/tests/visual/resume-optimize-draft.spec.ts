@@ -857,3 +857,42 @@ test('生成预览页默认核对框 30 条长片段说明不挤掉清单，逐�
   expect((await pending).postDataJSON()).toBeTruthy()
   await expect(dialog).toHaveCount(0)
 })
+
+test('预览页互换两条公司名后，AI 加的数仍待确认，本人写的数不列 @kiosk', async ({ page, api }) => {
+  const taskId = 'r2h-preview-swap'
+  const shelf = '整理仓库货架，按保质期先进先出调整摆放顺序。'
+  const aiLine = '维护门店公众号，撰写新书推荐与活动预告，周更 2 篇。'
+  const row = (company: string, description: string) => ({ company, role: '店员', period: '2019-2021', description })
+  registerOptimizeShell(api)
+  api.respond('GET', `/api/v1/resume/generate/${taskId}`, {
+    status: 200,
+    json: {
+      taskId,
+      status: 'completed',
+      providerName: 'llm',
+      resume: {
+        basic: { name: '林岚', phone: '', city: '烟台' },
+        intention: { position: '门店运营', city: '烟台' },
+        summary: '在烟台做过门店理货和书店运营。',
+        education: [],
+        experience: [row('海岸超市', shelf), row('灯塔书店', aiLine)],
+        projects: [],
+        skills: [],
+        certificates: [],
+      },
+      missingHints: [],
+    },
+  })
+  await page.goto(`/resume/generate/preview?taskId=${encodeURIComponent(taskId)}`)
+  await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toBeVisible()
+  const pending = page.locator('p.qx-rd-pending')
+  await expect(pending).toContainText('周更 2 篇')
+  await page.getByRole('textbox', { name: '第 1 条经历的公司' }).fill('灯塔书店')
+  await page.getByRole('textbox', { name: '第 2 条经历的公司' }).fill('海岸超市')
+  await page.getByRole('textbox', { name: '工作经历描述 1' }).fill(shelf.replace(/。$/, '，另记 3 项。'))
+  await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toHaveValue('灯塔书店')
+  await expect(page.getByRole('textbox', { name: '第 2 条经历的公司' })).toHaveValue('海岸超市')
+  await expect(pending).toContainText('周更 2 篇')
+  await expect(pending).not.toContainText('另记')
+  await expect(pending).not.toContainText('3 项')
+})

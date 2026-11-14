@@ -46,3 +46,18 @@ export function copyEntryFields<T extends object>(row: T, patch: Partial<T>): T 
   if (index !== null) defineGeneratedEntryIndex(next, index)
   return next as T
 }
+
+/** 预览页载入生成稿时盖下标。没有稿就返回 null。页面和用例都走这里。 */
+export function loadStampedGeneratedResume<T extends {
+  education: object[]
+  experience: object[]
+  projects: object[]
+}>(resume: T | null | undefined): T | null {
+  if (!resume) return null
+  return stampGeneratedEntryIndexes(resume)
+}
+
+/** 编辑区改一行。页面编辑器和用例都走这里，避免展开对象时丢掉下标。 */
+export function editStampedEntry<T extends object>(row: T, patch: Partial<T>): T {
+  return copyEntryFields(row, patch)
+}

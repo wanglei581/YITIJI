@@ -29,7 +29,7 @@ const facts = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-deliver
 const { findFactAdditions } = rule
 const { detectUnconfirmedAdditions, detectGeneratedUnconfirmedAdditions, detectUserResumeEdits, previewUserEditTokens } = facts
 const entryIndex = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-deliver/generatedEntryIndex.ts')).exports
-const { stampGeneratedEntryIndexes, copyEntryFields, readGeneratedEntryIndex } = entryIndex
+const { loadStampedGeneratedResume, editStampedEntry, readGeneratedEntryIndex } = entryIndex
 const { replaceResumeText } = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-deliver/resumeDecisions.ts')).exports
 
 const kioskRulePath = join(kioskRoot, 'src/pages/resume/components/resume-deliver/factAdditionsRule.ts')
@@ -713,7 +713,7 @@ test('读不准的数整串比较，原文里的整串不放过 AI 写的数值'
 function editExperience(resume, index, patch) {
   return {
     ...resume,
-    experience: resume.experience.map((row, i) => (i === index ? copyEntryFields(row, patch) : row)),
+    experience: resume.experience.map((row, i) => (i === index ? editStampedEntry(row, patch) : row)),
   }
 }
 
@@ -735,9 +735,16 @@ const shelfLine = '整理仓库货架，按保质期先进先出调整摆放顺�
 const postsLine = '维护门店公众号，撰写新书推荐与活动预告。'
 const postsAiLine = '维护门店公众号，撰写新书推荐与活动预告，周更 2 篇。'
 
+// 第六版（7c4b71c7c）没有下标时的退路结果。按名称配对会把 AI 新写的数配走。
+// 只用来核对旧草稿退路没有偏离第六版，不是规格。
+const SIXTH_EDITION_OLD_DRAFT_HITS = {
+  swapCompanies: [],
+  blankNamesTyped: [],
+}
+
 test('有下标时互换两条公司名，AI 的数仍待确认', () => {
   const input = shellResume([storeRow('海岸超市', '店员', shelfLine), storeRow('灯塔书店', '店员', postsLine)])
-  const generated = stampGeneratedEntryIndexes(shellResume([
+  const generated = loadStampedGeneratedResume(shellResume([
     storeRow('海岸超市', '店员', shelfLine),
     storeRow('灯塔书店', '店员', postsAiLine),
   ]))
@@ -749,17 +756,19 @@ test('有下标时互换两条公司名，AI 的数仍待确认', () => {
   const hits = detectGeneratedUnconfirmedAdditions(swapped, generated, input, tokens)
   assert.equal(hits.length, 1)
   assert.equal(hits[0].includes('周更') && hits[0].includes('2'), true)
+  // 旧草稿没有生成稿下标，退回按名称、相似度和同名序号配对。这是第六版旧路径，
+  // 已知会把 AI 的数配走。这里只核对退路结果与第六版一致，不是「待确认应该为空」的规格。
   const unstamped = shellResume([storeRow('灯塔书店', '店员', shelfLine), storeRow('海岸超市', '店员', postsAiLine)])
   const oldHits = detectGeneratedUnconfirmedAdditions(unstamped, shellResume([
     storeRow('海岸超市', '店员', shelfLine),
     storeRow('灯塔书店', '店员', postsAiLine),
   ]), input, [])
-  assert.equal(oldHits.length, 0)
+  assert.deepEqual(oldHits, SIXTH_EDITION_OLD_DRAFT_HITS.swapCompanies)
 })
 
 test('有下标时删掉第 2 条再把第 1 条改成第 2 条的名字，AI 的数仍待确认', () => {
   const input = shellResume([storeRow('海岸超市', '店员', postsLine), storeRow('灯塔书店', '店员', shelfLine)])
-  const generated = stampGeneratedEntryIndexes(shellResume([
+  const generated = loadStampedGeneratedResume(shellResume([
     storeRow('海岸超市', '店员', postsAiLine),
     storeRow('灯塔书店', '店员', shelfLine),
   ]))
@@ -774,7 +783,7 @@ test('有下标时删掉第 2 条再把第 1 条改成第 2 条的名字，AI �
 
 test('两条空名带下标，填名后在第 1 条写同一个数，第 2 条 AI 的数仍待确认', () => {
   const input = shellResume([storeRow(' ', '店员', shelfLine), storeRow(' ', '店员', postsLine)])
-  const generated = stampGeneratedEntryIndexes(shellResume([
+  const generated = loadStampedGeneratedResume(shellResume([
     storeRow(' ', '店员', shelfLine),
     storeRow(' ', '店员', postsAiLine),
   ]))
@@ -797,8 +806,10 @@ test('两条空名带下标，填名后在第 1 条写同一个数，第 2 条 A
     shellResume([storeRow('海岸超市', '店员', shelfLine), storeRow('灯塔书店', '店员', postsAiLine)]),
     plainTyped,
   ])
+  // 旧草稿退路：两条都没有下标。第六版按名称配对后，本人写的「2」把 AI 的「周更 2 篇」一起配走。
+  // 与第六版旧路径一致，不是规格上的「待确认为空」。
   const plainHits = detectGeneratedUnconfirmedAdditions(plainTyped, plainGenerated, input, plainTokens)
-  assert.equal(plainHits.length, 0)
+  assert.deepEqual(plainHits, SIXTH_EDITION_OLD_DRAFT_HITS.blankNamesTyped)
 })
 
 test('预览页记令牌拿生成稿做锚，第三参传当前稿会把数记到另一条', () => {
@@ -826,14 +837,94 @@ test('预览页记令牌拿生成稿做锚，第三参传当前稿会把数记�
 })
 
 test('生成稿下标不进 JSON，改一行和替换正文后还在', () => {
-  const stamped = stampGeneratedEntryIndexes(shellResume([storeRow('海岸超市', '店员', '整理货架。')]))
-  assert.equal(JSON.stringify(stamped).includes('generatedEntryIndex'), false)
+  const plain = shellResume([storeRow('海岸超市', '店员', '整理货架。')])
+  const stamped = loadStampedGeneratedResume(plain)
+  assert.equal(JSON.stringify(stamped), JSON.stringify(plain))
   assert.equal(readGeneratedEntryIndex(stamped.experience[0]), 0)
   assert.equal(readGeneratedEntryIndex(stamped.experience[1] ?? {}), null)
-  const edited = copyEntryFields(stamped.experience[0], { company: '灯塔书店' })
+  const edited = editStampedEntry(stamped.experience[0], { company: '灯塔书店' })
   assert.equal(readGeneratedEntryIndex(edited), 0)
-  assert.equal(JSON.stringify(edited).includes('generatedEntryIndex'), false)
+  assert.equal(JSON.stringify(edited), JSON.stringify({ ...plain.experience[0], company: '灯塔书店' }))
   const replaced = replaceResumeText(stamped, '整理货架', '整理货架并补货')
   assert.equal(readGeneratedEntryIndex(replaced.experience[0]), 0)
-  assert.equal(JSON.stringify(replaced).includes('generatedEntryIndex'), false)
+  assert.equal(JSON.stringify(replaced), JSON.stringify({
+    ...plain,
+    experience: [{ ...plain.experience[0], description: '整理货架并补货。' }],
+  }))
+})
+
+test('字段末尾的多、左右和空格仍读成数值', () => {
+  assert.deepEqual(keysOf('月薪3千5百 ', ''), ['num:3500'])
+  assert.deepEqual(keysOf('6千左右', ''), ['num:6000'])
+  assert.deepEqual(keysOf('1万多', ''), ['num:10000'])
+  assert.deepEqual(keysOf('500万左右', ''), ['num:5000000'])
+  const phrases = ['月薪3千5百 ', '能接受月薪6千左右', '目前月薪1万多', '年营收500万左右']
+  for (const phrase of phrases) {
+    assert.deepEqual(findFactAdditions(phrase, JSON.stringify({ summary: phrase })), [], phrase)
+  }
+})
+
+test('优化页保留以多或左右结尾的原文，不报成 AI 新写', () => {
+  const kept = [
+    '负责三家门店日常运营，月均营业额86万左右',
+    '管理门店员工20多',
+    '期望月薪8千左右',
+    '目前月薪1万多',
+  ]
+  for (const first of kept) {
+    const second = '带新人熟悉收银与盘点流程'
+    const modules = [{ before: first, after: `${first}（AI 改写）` }, { before: second, after: second }]
+    const assembled = shellResume([storeRow('海岸超市', '店长', first), storeRow('灯塔书店', '店长', second)])
+    assert.deepEqual(detectUnconfirmedAdditions(assembled, modules), [], first)
+  }
+})
+
+test('单字十后面隔着几、来或空格再接万，读成整串', () => {
+  assert.deepEqual(keysOf('年销售额十几万', ''), ['raw:十几万'])
+  assert.deepEqual(keysOf('年销售额十来万', ''), ['raw:十来万'])
+  assert.deepEqual(keysOf('年销售额十 万', ''), ['raw:十万'])
+  const input = '期望月薪3000'
+  for (const ai of ['年销售额十几万', '年销售额十来万', '年销售额十 万']) {
+    assert.equal(findFactAdditions(ai, input).length >= 1, true, ai)
+  }
+})
+
+test('中文和阿拉伯数字混写的单位链读成整串', () => {
+  assert.deepEqual(keysOf('月薪1万两千', ''), ['raw:1万两千'])
+  assert.deepEqual(keysOf('营收3千五百万', ''), ['raw:3千五百万'])
+  assert.deepEqual(keysOf('销售额2亿三千万', ''), ['raw:2亿三千万'])
+  assert.deepEqual(keysOf('月薪一万2千', ''), ['raw:一万2千'])
+  assert.deepEqual(keysOf('3千5百', ''), ['num:3500'])
+  assert.deepEqual(keysOf('1万2千', ''), ['num:12000'])
+  assert.deepEqual(keysOf('2千万5', ''), ['num:25000000'])
+  assert.deepEqual(keysOf('增长1百分点', ''), ['num:1'])
+  assert.deepEqual(keysOf('5百3千', ''), ['num:500', 'num:3000'])
+  const mixed = [
+    ['月薪1万两千', '月薪1万'],
+    ['营收3千五百万', '服务客户3000人'],
+    ['销售额2亿三千万', '销售额3千万'],
+  ]
+  for (const [input, ai] of mixed) {
+    assert.equal(findFactAdditions(ai, input).length >= 1, true, `${input} -> ${ai}`)
+  }
+})
+
+test('带下标的行不参与按名称认领', () => {
+  const input = shellResume([storeRow('海岸超市', '店员', shelfLine), storeRow('灯塔书店', '店员', postsLine)])
+  const generated = loadStampedGeneratedResume(shellResume([
+    storeRow('海岸超市', '店员', shelfLine),
+    storeRow('灯塔书店', '店员', postsAiLine),
+  ]))
+  const stampedCurrent = loadStampedGeneratedResume(shellResume([
+    storeRow('海岸超市', '店员', postsAiLine),
+    storeRow('灯塔书店', '店员', shelfLine),
+  ]))
+  const current = {
+    ...stampedCurrent,
+    experience: [{ ...stampedCurrent.experience[0] }, stampedCurrent.experience[1]],
+  }
+  assert.equal(readGeneratedEntryIndex(current.experience[0]), null)
+  assert.equal(readGeneratedEntryIndex(current.experience[1]), 1)
+  const hits = detectGeneratedUnconfirmedAdditions(current, generated, input, [])
+  assert.equal(hits.some((hit) => hit.includes('周更') && hit.includes('2')), true)
 })

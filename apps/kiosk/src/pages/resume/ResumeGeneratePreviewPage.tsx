@@ -31,7 +31,7 @@ import { focusResumeTitleIssue, resumeTitleIssues } from './components/resume-de
 import { ResumeFormatChooser } from './components/resume-deliver/ResumeFormatChooser'
 import { useResumeExportPricing } from './components/resume-deliver/useResumeExportPricing'
 import { detectGeneratedUnconfirmedAdditions, extractConfirmableFacts, previewUserEditTokens, UNCONFIRMED_WHY } from './components/resume-deliver/facts'
-import { stampGeneratedEntryIndexes } from './components/resume-deliver/generatedEntryIndex'
+import { loadStampedGeneratedResume } from './components/resume-deliver/generatedEntryIndex'
 import { SYNTHETIC_GENERATE } from './components/resume-deliver/fixtures'
 import { parseGeneratePreviewQuery, resolveGeneratePreviewView } from './components/resume-deliver/generatePreviewQuery'
 import type { GeneratePreviewViewState } from './components/resume-deliver/constants'
@@ -117,7 +117,7 @@ export function ResumeGeneratePreviewPage() {
   const summaryRef = useRef<HTMLTextAreaElement>(null)
   const pendingTitleFocus = useRef<string | null>(null)
 
-  const openedResume = state?.result?.resume ? stampGeneratedEntryIndexes(state.result.resume) : null
+  const openedResume = loadStampedGeneratedResume(state?.result?.resume)
   const [resume, setResume] = useState<GeneratedResume | null>(openedResume)
   const [result, setResult] = useState<ResumeGenerateResponse | null>(
     state?.result ? (openedResume ? { ...state.result, resume: openedResume } : state.result) : null,
@@ -147,7 +147,7 @@ export function ResumeGeneratePreviewPage() {
     const requested = query.requested
     const fixture = synthetic && requested && requested !== 'session-lost' && requested !== 'preview-no-result' && requested !== 'illegal'
     if (fixture && requested) {
-      const stampedFixture = SYNTHETIC_GENERATE.resume ? stampGeneratedEntryIndexes(SYNTHETIC_GENERATE.resume) : null
+      const stampedFixture = loadStampedGeneratedResume(SYNTHETIC_GENERATE.resume)
       setResult(stampedFixture ? { ...SYNTHETIC_GENERATE, resume: stampedFixture } : SYNTHETIC_GENERATE)
       setResume(stampedFixture)
       setRestoring(false)
@@ -178,7 +178,7 @@ export function ResumeGeneratePreviewPage() {
     getResumeGenerate(restoreTaskId, { token })
       .then((res) => {
         if (cancelled) return
-        const stamped = res.resume ? stampGeneratedEntryIndexes(res.resume) : null
+        const stamped = loadStampedGeneratedResume(res.resume)
         setResult(stamped ? { ...res, resume: stamped } : res)
         setResume(stamped)
         setRestoreFailed(res.status === 'failed' || !res.resume)

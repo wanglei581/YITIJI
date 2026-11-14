@@ -185,6 +185,16 @@ function diceSimilarity(left: string, right: string): number {
   return (2 * overlap) / (aTotal + bTotal)
 }
 
+/** 按名称认领时跳过带着生成稿下标的行。下标行只走下标配对。 */
+function nameClaimIndexes(entries: EntryRef[], indexes: number[]): number[] {
+  const open: number[] = []
+  for (const index of indexes) {
+    if (readGeneratedEntryIndex(entries[index].source) !== null) continue
+    open.push(index)
+  }
+  return open
+}
+
 function indexBuckets(entries: EntryRef[], indexes: number[]): Map<string, number[]> {
   const buckets = new Map<string, number[]>()
   for (const index of indexes) {
@@ -200,6 +210,7 @@ function indexBuckets(entries: EntryRef[], indexes: number[]): Map<string, numbe
 /**
  * 先按条目对齐，再比字段。
  * 这一行带着生成稿下标时，只和同一下标配对；对不上就留空，不再按名称补。
+ * 带下标的行不参与按名称认领：没有下标的行不能按名称把带下标的行认走。
  * 没有下标的旧草稿才用 id、名称、描述相似度和同名序号。
  * 配不上的当前条目 previous 为 null，里面的数字稍后一律当 AI 新加的。
  */
@@ -252,8 +263,8 @@ function pairEntries(current: EntryRef[], previous: EntryRef[]): Array<{ current
   }
 
   const claimUniqueNames = () => {
-    const currentNames = indexBuckets(current, freeCurrent())
-    const previousNames = indexBuckets(previous, freePrevious())
+    const currentNames = indexBuckets(current, nameClaimIndexes(current, freeCurrent()))
+    const previousNames = indexBuckets(previous, nameClaimIndexes(previous, freePrevious()))
     for (const [key, currentList] of currentNames) {
       const previousList = previousNames.get(key)
       if (!previousList || currentList.length !== 1 || previousList.length !== 1) continue
@@ -276,8 +287,8 @@ function pairEntries(current: EntryRef[], previous: EntryRef[]): Array<{ current
     claim(candidate.currentIndex, candidate.previousIndex)
   }
 
-  const currentLeft = indexBuckets(current, freeCurrent())
-  const previousLeft = indexBuckets(previous, freePrevious())
+  const currentLeft = indexBuckets(current, nameClaimIndexes(current, freeCurrent()))
+  const previousLeft = indexBuckets(previous, nameClaimIndexes(previous, freePrevious()))
   for (const [key, currentList] of currentLeft) {
     const previousList = previousLeft.get(key)
     if (!previousList) continue
