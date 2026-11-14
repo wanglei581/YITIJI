@@ -166,7 +166,7 @@ export async function markServiceOrderPaid(
 }
 
 /** 记成已付之后再看这台机器此刻的生效价。变了（含变成 0）当场原路退，不等下一拍清扫。 */
-async function refundIfEffectivePriceMoved(
+export async function refundIfEffectivePriceMoved(
   db: PrismaService,
   registry: PaymentProviderRegistry,
   audit: AuditService,

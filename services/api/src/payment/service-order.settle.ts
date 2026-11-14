@@ -2,7 +2,7 @@ import { ConflictException, HttpException, HttpStatus } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
 import type { PrismaService } from '../prisma/prisma.service'
 import type { PaymentProviderRegistry } from './payment-provider.factory'
-import { executeServiceOrderRefund, type RefundRedis } from './service-order.payment'
+import { executeServiceOrderRefund, refundIfEffectivePriceMoved, type RefundRedis } from './service-order.payment'
 import {
   displaceOrBlockOpenRef,
   isServiceOrderOpenRefConflict,
@@ -249,7 +249,10 @@ export async function closeExpiredServiceOrders(deps: ServiceOrderSettleDeps, no
                 where: { id: row.id, status: 'pending' },
                 data: { status: 'paid', paidAt: new Date(), channelTxnNo: closed.channelTxnNo, paymentFailed: false },
               })
-              if (marked.count === 1) await auditPaid(deps.audit, row)
+              if (marked.count === 1) {
+                await auditPaid(deps.audit, row)
+                await refundIfEffectivePriceMoved(deps.prisma, deps.registry, deps.audit, deps.redis, row)
+              }
             }
             leaveOpen = true
           } else if (closed.status !== 'closed' && closed.status !== 'failed') {
