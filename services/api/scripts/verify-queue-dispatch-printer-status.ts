@@ -188,8 +188,8 @@ function quoteService(prisma: object): { quote: () => Promise<{ billablePages: n
 
 const HALT_CODE = 'PRINT_TERMINAL_QUEUE_HALTED'
 const HALT_MESSAGE = '这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端'
-const OFFLINE_MESSAGE = '本机打印机当前不可用（离线、缺纸或故障），暂不能下单，请联系工作人员'
-const NOT_READY_MESSAGE = '本机打印服务暂未就绪，暂不能下单，请稍后再试或联系工作人员'
+const OFFLINE_MESSAGE = '本机打印机当前不可用（离线、缺纸或故障），暂不能下单，请稍后再试或换一台终端'
+const NOT_READY_MESSAGE = '本机打印服务暂未就绪，暂不能下单，请稍后再试或换一台终端'
 
 function haltedPayload(error: unknown): { code?: string; message?: string } {
   assert.ok(error instanceof BadRequestException)
@@ -214,11 +214,12 @@ async function expectUnavailable(run: () => Promise<unknown>, message: string): 
     const body = haltedPayload(error)
     assert.equal(body.code, 'PRINTER_UNAVAILABLE')
     assert.equal(body.message, message)
+    assert.equal(body.message?.includes('工作人员'), false)
     return true
   })
 }
 
-/** offline / error / paper_empty / 没有心跳仍用旧码和旧文案。报价与建单同一条函数。 */
+/** offline / error / paper_empty / 没有心跳仍用 PRINTER_UNAVAILABLE。文案不叫人去找工作人员。报价与建单同一条函数。 */
 async function assertOtherStatusesKeepPrinterUnavailable(): Promise<void> {
   await withPrinterSwitch('true', async () => {
     for (const status of ['offline', 'error', 'paper_empty'] as const) {

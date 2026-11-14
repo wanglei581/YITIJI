@@ -1024,7 +1024,7 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/policies/:id/checklist` | PolicyChecklistController.generate | — | PolicyChecklistService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PolicyPost<br/>PrintTask |
+| POST | `/api/v1/policies/:id/checklist` | PolicyChecklistController.generate | — | PolicyChecklistService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>KioskJobBoardConfig<br/>PolicyPost<br/>PrintTask<br/>Terminal |
 
 ## `services/api/src/print-conversion/print-conversion.controller.ts`
 

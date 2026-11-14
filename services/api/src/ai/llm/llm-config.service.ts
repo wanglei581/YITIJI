@@ -249,9 +249,9 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
   {
     key: 'digital_human',
     label: 'AI数字人引导',
-    status: 'planned',
-    description: '后续接入。用于一体机前台数字人引导与操作说明。',
-    runtimeNote: '后续接入，目前还没有功能在用。',
+    status: 'active',
+    description: '用于一体机前台数字人语音通话。只认启用开关，不发起这里配置的大模型调用。',
+    runtimeNote: '这个开关管一体机数字人语音通话：开着才能开始通话，关掉就拒绝建会话，人留在文字对话。厂商、模型、密钥和系统提示词对通话不起作用，只有「启用」生效。',
     allowCustomSystemPrompt: true,
   },
   {
@@ -353,7 +353,16 @@ export class LlmConfigService {
     const env = this.fromEnv()
     const map = {} as PersistedConfigMap
     for (const key of ACTIVE_FEATURE_KEYS) {
-      map[key] = this.withDefaults(raw[key] ?? env)
+      const saved = raw[key]
+      const config = this.withDefaults(saved ?? env)
+      // 数字人这个功能位以前后台存不了。旧文件会写成 enabled:false 且
+      // explicitlyConfigured:false。只有后台真正保存过（explicitlyConfigured === true）
+      // 才认 enabled；否则一律按开，跟「没有这道开关」一致。
+      // AI_LLM_API_KEY / TRTC_LLM_API_KEY 只决定能不能接通，不决定这个开关。
+      if (key === 'digital_human' && saved?.explicitlyConfigured !== true) {
+        config.enabled = true
+      }
+      map[key] = config
     }
     return map
   }

@@ -32,6 +32,9 @@ export function detailRoute(
       return externalId ? `/job-fairs/${externalId}/companies/${targetId}` : '/job-fairs'
     case 'offline_agency':
       return '/offline-agencies'
+    case 'policy':
+      // 与收藏页同一条路：政策页按 ?policy= 打开那一条；已下架由详情页现有「已经撤下」承接。
+      return `/renshi?policy=${encodeURIComponent(targetId)}`
     default:
       return '/renshi'
   }

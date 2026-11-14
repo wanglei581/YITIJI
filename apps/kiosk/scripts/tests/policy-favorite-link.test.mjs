@@ -8,6 +8,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (rel) => readFileSync(join(root, rel), 'utf8')
 
 const favorites = read('src/pages/profile/me/MyFavoritesPage.tsx')
+const activity = read('src/pages/profile/me/activityPresentation.ts')
 const home = read('src/pages/home/components/HomeTouchView.tsx')
 const page = read('src/pages/renshi/RenshiPage.tsx')
 const detail = read('src/pages/renshi/PolicyDetail.tsx')
@@ -15,6 +16,13 @@ const notices = read('src/pages/renshi/PolicyNotices.tsx')
 const notice = read('src/pages/renshi/NoticePanel.tsx')
 const channelPage = read('src/pages/official-channels/OfficialChannelsPage.tsx')
 const channelHook = read('src/hooks/useOfficialChannels.ts')
+
+test('浏览记录和打开来源都按编号打开那一条政策', () => {
+  // 规格：点浏览或打开来源里的政策，必须落到 /renshi?policy=<编号>，与收藏同一条路。
+  // 落到 /renshi 会丢掉编号，政策页打不开那一条。编号要编码，避免查询串被拆开。
+  assert.match(activity, /case 'policy':[\s\S]*?return `\/renshi\?policy=\$\{encodeURIComponent\(targetId\)\}`/)
+  assert.match(activity, /function detailRoute/)
+})
 
 test('收藏的政策打开对应那一条，不再停在待建设', () => {
   assert.match(favorites, /return `\/renshi\?policy=\$\{encodeURIComponent\(item\.targetId\)\}`/)

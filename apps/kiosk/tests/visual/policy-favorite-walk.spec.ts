@@ -288,6 +288,63 @@ test('查政策磁贴写查看政策说明，不再写带走材料清单 @kiosk'
   await assertNoHorizontalOverflow(page)
 })
 
+test('浏览记录和打开来源各点一条政策，落到那一条；已下架落到已经撤下 @kiosk', async ({ page, api }) => {
+  // 登录要逐位点键盘，再连开三条政策。会员登录态只在内存里，不能整页重开。
+  test.setTimeout(120_000)
+  const state: PolicyRouteState = { broken: false, holdSlow: null, detailLog: [], withdrawn: new Set(['policy-gone']) }
+  await routePolicies(page, state)
+  api.respond('GET', '/api/v1/me/browse-logs', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        items: [
+          { id: 'b-policy', targetType: 'policy', targetId: 'policy-fav', targetTitle: '高校毕业生求职创业补贴', sourceName: '示例人社局', sourceUrl: null, externalId: null, createdAt: '2026-09-28T08:00:00.000Z' },
+          { id: 'b-gone', targetType: 'policy', targetId: 'policy-gone', targetTitle: '已经撤下的补贴说明', sourceName: '示例人社局', sourceUrl: null, externalId: null, createdAt: '2026-09-27T08:00:00.000Z' },
+        ],
+        nextCursor: null,
+        total: 2,
+      },
+    },
+  })
+  api.respond('GET', '/api/v1/me/external-jump-logs', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        items: [
+          { id: 'j-policy', targetType: 'policy', targetId: 'policy-dated', targetTitle: '已写明发布日期的补贴说明', action: 'external_open', sourceName: '示例人社局', sourceUrl: 'https://hrss.example.gov.cn/dated', externalId: null, createdAt: '2026-09-28T09:00:00.000Z' },
+        ],
+        nextCursor: null,
+        total: 1,
+      },
+    },
+  })
+  await loginThroughVisibleUi(page, '/me/activity')
+  await page.getByTestId('member-records-activity-b-policy').click()
+  await page.waitForURL((url) => url.pathname === '/renshi' && url.searchParams.get('policy') === 'policy-fav')
+  await expect(policyScreen(page)).toHaveAttribute('data-qxt-state', 'ready')
+  await expect(policyHeading(page, '高校毕业生求职创业补贴')).toBeVisible()
+  expect(state.detailLog).toContain('policy-fav')
+
+  // 会员 token 只在内存（auth/context.ts）。整页打开会丢掉登录，打开来源页签不会出现。
+  await page.goBack()
+  await expect(page.getByTestId('member-records-activity-tab-jump')).toBeVisible()
+  await page.getByTestId('member-records-activity-tab-jump').click()
+  await page.getByTestId('member-records-activity-j-policy').click()
+  await page.waitForURL((url) => url.pathname === '/renshi' && url.searchParams.get('policy') === 'policy-dated')
+  await expect(policyScreen(page)).toHaveAttribute('data-qxt-state', 'ready')
+  await expect(policyHeading(page, '已写明发布日期的补贴说明')).toBeVisible()
+  expect(state.detailLog).toContain('policy-dated')
+
+  await page.goBack()
+  await page.getByTestId('member-records-activity-tab-browse').click()
+  await page.getByTestId('member-records-activity-b-gone').click()
+  await page.waitForURL((url) => url.pathname === '/renshi' && url.searchParams.get('policy') === 'policy-gone')
+  await expect(policyScreen(page)).toHaveAttribute('data-qxt-state', 'missing')
+  await expect(policyHeading(page, '这条政策已经撤下或不在可查看范围')).toBeVisible()
+})
+
 test('收藏的政策打开那一条，发布日期用确认发布时间 @kiosk', async ({ page }) => {
   test.setTimeout(60_000)
   const state: PolicyRouteState = { broken: false, holdSlow: null, detailLog: [] }
