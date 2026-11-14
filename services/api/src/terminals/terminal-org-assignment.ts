@@ -5,6 +5,7 @@ import { isParkedTerminalOrgType, orgTypeParkedError } from './terminal-org-park
 import { terminalOrgBindingWrite } from './terminal-org-binding'
 import { revokeTerminalCopyAuthorization } from '../copy-jobs/copy-authorization'
 import { assertCanBindTerminal } from '../licenses/license-gate'
+import { retirePendingServiceOrders } from '../payment/service-order.retire'
 
 export type TerminalOrgAssignmentAudit = (tx: PrismaTransactionClient, result: AssignTerminalOrgResult & {
   deploymentIds: string[]
@@ -75,6 +76,9 @@ export async function assignTerminalOrganization(prisma: PrismaService, terminal
       chargeSettingsReset,
     })
   })
+  if (oldOrgId !== orgId) {
+    await retirePendingServiceOrders(prisma, { terminalId: terminal.id, closeReason: 'org_rebound' })
+  }
 
   return { ...result, chargeSettingsReset }
 }

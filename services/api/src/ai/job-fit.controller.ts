@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Req } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Delete, Get, Optional, Param, Post, Req } from '@nestjs/common'
 import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
@@ -23,6 +23,7 @@ import {
   kioskJobBoardTerminalRef,
   type KioskJobBoardRequest,
 } from '../terminals/kiosk-job-board.service'
+import { TripCoverService } from '../payment/trip-cover.service'
 // ── DTO（全局 forbidNonWhitelisted）─────────────────────────────────────────
 
 class ManualJobDto {
@@ -91,6 +92,7 @@ export class JobFitController {
     private readonly prisma: PrismaService,
     private readonly governed: GovernedJobFitService,
     private readonly jobBoard?: KioskJobBoardService,
+    @Optional() private readonly tripCover?: TripCoverService,
   ) {}
 
   /**
@@ -150,7 +152,13 @@ export class JobFitController {
       throw new BadRequestException({ error: { code: 'JOB_FIT_TARGET_MISSING', message: '请选择系统内岗位或填写目标岗位' } })
     }
     const requester = await this.requesterOf(req)
-    return this.governed.analyzeForJobFit(dto, requester, quotaContextOf(req, requester), req)
+    const quotaContext = quotaContextOf(req, requester)
+    // 配额探针会塞一个空对象占位。没有 cover 方法就按没付过这一趟，不把占位当成已付。
+    const cover = typeof this.tripCover?.cover === 'function'
+      ? await this.tripCover.cover(req.headers)
+      : undefined
+    const chargeOptions = { skipDailyQuota: cover?.skipDailyQuota === true }
+    return this.governed.analyzeForJobFit(dto, requester, quotaContext, req, chargeOptions)
   }
 
   @Post('consent')

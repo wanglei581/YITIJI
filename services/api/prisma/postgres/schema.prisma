@@ -62,6 +62,7 @@ model Terminal {
 
   heartbeats   TerminalHeartbeat[]
   servicePrices TerminalServicePrice[]
+  serviceOrders ServiceOrder[]
   printTasks   PrintTask[]
   bindCodes    TerminalBindCode[]
   credentials  TerminalCredential[]
@@ -89,6 +90,74 @@ model TerminalServicePrice {
   updatedByAdminId String?
 
   @@unique([terminalId, serviceKey])
+}
+
+/// 一体机上一次服务的付款单。金额在建单时按生效价冻住。
+/// 状态：pending 待付 / paid 已付可用 / consumed 这一趟已开始 /
+/// refunding 退款中 / refunded 已退 / closed 未付关闭。
+/// 免费再试不是单独状态：第一次没做成会回到 paid，并写下 retryUntil。
+model ServiceOrder {
+  id              String    @id @default(cuid())
+  terminalId      String
+  terminal        Terminal  @relation(fields: [terminalId], references: [id], onDelete: Cascade)
+  /// resume_optimize / mock_interview / scan
+  serviceKey      String
+  /// 第一次 + 免费再试一次，最多 2。
+  attemptsUsed    Int       @default(0)
+  /// 建单时的生效价（分）。之后改价不影响这一单。
+  amountCents     Int
+  status          String    @default("pending")
+  /// 一体机这次使用的 clientSessionId。
+  kioskSessionId  String
+  endUserId       String?
+  provider        String
+  providerOrderNo String    @unique
+  qrCodeContent   String?
+  prepayId        String?
+  channelTxnNo    String?
+  paidAt          DateTime?
+  consumedAt      DateTime?
+  /// 消费它的 AI 任务或扫描会话 id。
+  consumedRef     String?
+  /// 这一趟没做成的原因。还在免费再试窗口内时写这里，不写进退款原因。
+  failureReason   String?
+  retryUntil      DateTime?
+  /// 做成了才写。清扫只看还没结案的单，避免做成的扫描一直占着名额。
+  settledAt       DateTime?
+  refundReason    String?
+  refundedAt      DateTime?
+  refundAttempts  Int       @default(0)
+  refundNo        String?   @unique
+  channelRefundNo String?
+  nextRefundAt    DateTime?
+  /// 正在向渠道退款的短租约。自动和手动都要先拿到它，避免两笔一起打渠道。
+  refundLeaseUntil DateTime?
+  /// processing / failed / success。上次是受理中时，下一拍先查单，不再发一笔新退款。
+  refundChannelState String?
+  refundProcessingTries Int @default(0)
+  /// user_cancelled / expired / session_ended / qr_failed / personal_charge_changed / price_changed / org_rebound
+  closeReason     String?
+  /// 渠道通知付款失败。单仍是 pending，钱没扣。
+  paymentFailed   Boolean   @default(false)
+  /// 最近一次已处理的退款通知指纹。同一通知只记一次。
+  refundNotifyKey String?
+  /// 退款通知金额等对不上。单不靠渠道重发，告警中心能看见。
+  refundAnomaly   String?
+  /// 库里已经关掉，渠道关单还没成功。清扫重试，不回滚已经改过的价或绑定。
+  channelClosePending Boolean @default(false)
+  expiresAt       DateTime
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // 数据库层另有 partial unique index `ServiceOrder_open_consumed_ref_key`
+  // （migration 20261114170000_service_order_open_ref）：同一 serviceKey + consumedRef
+  // 同时只能有一张 status IN ('pending','paid','consumed') 且 consumedRef 不是 pending 的单。
+  // Prisma `@@unique` 表达不了 WHERE，故不在此声明。结案后仍是 consumed 的继续占着；
+  // 退款中及之后腾出名额。违反时认领与挂任务都按冲突处理，不能收两笔。
+
+  @@index([terminalId, kioskSessionId, status])
+  @@index([status, expiresAt])
+  @@index([status, nextRefundAt])
 }
 
 // ── TerminalCredential ───────────────────────────────────────────────────────

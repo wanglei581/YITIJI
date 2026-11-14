@@ -47,6 +47,17 @@ export interface ErrorResponseBody {
     terminal?: { id: string; displayName: string | null; locationLabel: string | null } | null
     /** 前端可用的下一步标识（小写蛇形），如 export_ai_labeled；只在拒绝时附带。 */
     nextAction?: string
+    /**
+     * 仅 SERVICE_PAYMENT_REQUIRED：这一次要先付的金额（分）和是哪一项。
+     * 金额是 0 到价目上限之间的整数；服务名只认三项目录里的字。
+     */
+    amountCents?: number
+    serviceKey?: 'resume_optimize' | 'mock_interview' | 'scan'
+    serviceName?: string
+    /** 仅 SERVICE_ORDER_IN_USE：这一张单正在占用的任务或扫描号。 */
+    consumedRef?: string
+    /** 仅 SERVICE_ORDER_REF_OCCUPIED：还没结案的那张旧单。新单保持已付未用。 */
+    existingOrderId?: string
   }
   requestId?: string
 }
