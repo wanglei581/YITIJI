@@ -6,6 +6,7 @@ type AlignModule = { before: string; after: string }
 /** 只去掉技能、证书栏目标题。词表与 resume-optimize-coverage 的 HEADINGS 里这两栏一致。 */
 const LIST_HEADING_RE = /^(专业技能|技能证书|技能与证书|技能特长|技能)(?=$|[\s:：])|^(证书资质|证书|资格证书|获奖情况)(?=$|[\s:：])/u
 const LEADING_INDEX_RE = /^(?:\d{1,2}\s*[、.．)）](?!\d)|[一二三四五六七八九十]{1,3}\s*[、.．]|[（(]\s*\d{1,2}\s*[）)]|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])\s*/u
+const COLUMN_INDEX_RE = /^(\d{1,2})\s*([、.．)）])/u
 const BRACKET_TITLE_RE = /^【[^】]{0,20}】\s*/u
 const RESTORE_SEP = new Set(['、', '，', ',', '；'])
 const COMPARE_SEP = new Set(['、', '，', ',', '；', ';', '/', '和', '及', '与'])
@@ -14,6 +15,48 @@ export interface AlignOriginalListOptions {
   modules?: AlignModule[]
   /** 已经落在别的栏里的小项（技能对齐时传入证书），不再补进这一栏。 */
   coveredElsewhere?: string[]
+}
+
+type ColumnKind = 'dot' | 'dun' | 'paren'
+type ColumnHit = { kind: ColumnKind; num: number; maybe: boolean; rest: string }
+
+/** 行首像编号时拆开。点号后 1–3 位再接普通字算「可能是小数」（「1.3D」「2.5D」）；紧跟「年 / 版本 / 寸」或不是这种形状就不当编号。四位年份仍是明确编号。 */
+function classifyLeadingIndex(line: string): ColumnHit | null {
+  const text = line.trim().replace(BULLET_RE, '').trim()
+  const match = COLUMN_INDEX_RE.exec(text)
+  const digits = match?.[1]
+  const mark = match?.[2]
+  if (!match || digits === undefined || mark === undefined) return null
+  const num = Number(digits)
+  if (!Number.isInteger(num) || num < 1) return null
+  const rawRest = text.slice(match[0].length)
+  const rest = rawRest.trim()
+  const kind: ColumnKind = mark === '、' ? 'dun' : mark === '.' || mark === '．' ? 'dot' : 'paren'
+  if (kind !== 'dot' || !/^\d/u.test(rawRest)) return { kind, num, maybe: false, rest }
+  if (/^\d{4}(?!\d)/u.test(rawRest)) return { kind, num, maybe: false, rest }
+  const short = /^(\d{1,3})(?!\d)/u.exec(rawRest)
+  if (!short) return null
+  const tail = rawRest.slice(short[0].length)
+  if (/^(?:年|寸|版本)/u.test(tail)) return null
+  return { kind, num, maybe: true, rest }
+}
+
+/**
+ * 一整栏（技能、证书或一段描述）各行成套用「1. 2. 3.」「1、2、」「1）2）」这类递增编号时，只剥行首编号。
+ * 只有一行、数字不连续、或「2.5D」「3.0版本」「1.5年」这种不成套的，原样留下。
+ * 「1.3D」只有在同栏其余行是明确的 2. 3. … 时才剥，剥完正文仍是「3D」。
+ */
+export function stripNumberedColumn(lines: string[]): string[] {
+  const prepared = lines.map((line) => ({ line, hit: classifyLeadingIndex(line), empty: !line.trim() }))
+  const filled = prepared.filter((row) => !row.empty)
+  if (filled.length < 2 || filled.some((row) => !row.hit)) return lines
+  const kind = filled[0]?.hit?.kind
+  if (!kind || !filled.every((row) => row.hit?.kind === kind)) return lines
+  if (!filled.every((row, index) => row.hit?.num === index + 1)) return lines
+  const maybes = filled.filter((row) => row.hit?.maybe)
+  const witnessed = maybes.length === 1 && filled[0]?.hit?.maybe === true && filled.slice(1).every((row) => row.hit?.maybe === false)
+  if (maybes.length > 0 && !witnessed) return lines
+  return prepared.map((row) => (row.hit && !row.empty ? row.hit.rest : row.line))
 }
 
 /** 短的一边至少 2 字，且不短于长的一边的一半，才算同一小项的改写。 */
@@ -101,12 +144,21 @@ function stripParenText(text: string): string {
   return out.trim()
 }
 
+function listLineKey(text: string): string {
+  return normalizeResumeStructureText(strippedListLine(text))
+}
+
 function lineCoveredByModule(line: string, module: AlignModule): boolean {
-  const key = normalizeResumeStructureText(strippedListLine(line))
+  const key = listLineKey(line)
   if (!key) return false
+  const matches = (raw: string) => {
+    if (listLineKey(raw) === key) return true
+    const hit = classifyLeadingIndex(raw)
+    return Boolean(hit && listLineKey(hit.rest) === key)
+  }
   const before = module.before ?? ''
-  if (normalizeResumeStructureText(strippedListLine(before)) === key) return true
-  return before.split(/\n/u).some((beforeLine) => normalizeResumeStructureText(strippedListLine(beforeLine)) === key)
+  if (matches(before)) return true
+  return before.split(/\n/u).some((beforeLine) => matches(beforeLine))
 }
 
 /**
@@ -120,6 +172,8 @@ export function alignOriginalList(
   max: number,
   options?: AlignOriginalListOptions,
 ): { list: string[]; missing: string[] } {
+  const sourceLines = stripNumberedColumn(lines)
+  const sourceModel = stripNumberedColumn(model)
   const norm = normalizeResumeStructureText
   const modules = (options?.modules ?? []).map((module) => ({ module, used: false }))
   const covered = new Set<string>()
@@ -143,10 +197,10 @@ export function alignOriginalList(
     const spaces = text.split(/\s+/u).map((part) => norm(part.trim())).filter(Boolean)
     return spaces.length > 1 && spaces.every((part) => covered.has(part))
   }
-  const originals = lines.map((line) => line.trim()).filter(Boolean)
+  const originals = sourceLines.map((line) => line.trim()).filter(Boolean)
   type Atom = { display: string; key: string; used: boolean }
   type Item = { display: string; key: string; atoms: Atom[]; used: boolean }
-  const pool: Item[] = model.map((raw) => {
+  const pool: Item[] = sourceModel.map((raw) => {
     const display = strippedListLine(raw)
     const atoms = splitCompare(display).map((part) => ({ display: part, key: norm(part), used: false }))
     return { display, key: norm(display), atoms, used: false }

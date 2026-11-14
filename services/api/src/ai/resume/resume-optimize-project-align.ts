@@ -1,5 +1,6 @@
 import type { GeneratedResume } from '../interfaces/ai-provider.interface'
 import { optimizeAfterNearlySame } from './resume-optimize-after-align'
+import { stripNumberedColumn } from './resume-optimize-list-align'
 import { BULLET_RE, RESTORED_ROLE_MAX, RESTORED_TITLE_MAX, isTitleLike } from './resume-restored-text'
 import { normalizeResumeStructureText, splitResumeDateRange } from './resume-structure'
 
@@ -7,6 +8,7 @@ type ProjectBaselineEntry = { key: string; overflow: boolean; lines: string[] }
 type AlignModule = { before: string; after: string }
 
 const PROJECT_LABEL_RE = /^(?:项目名称|项目角色|担任角色|项目描述|项目职责|项目成果|职责|成果)\s*[:：]\s*/u
+const SUPPLEMENT_RE = /^(?:[（(][^）)]*[）)]|【[^】]*】|\[[^\]]*\])$/u
 
 function projectLineKey(line: string): string {
   return normalizeResumeStructureText(line.replace(BULLET_RE, ''))
@@ -18,19 +20,19 @@ function projectBody(line: string): string {
   return text
 }
 
-function parseProjectTitle(title: string): { name: string; role: string } {
+function parseProjectTitle(title: string, keepLabels = false): { name: string; role: string } {
   const text = projectBody(title)
   if (/[|丨]/u.test(text)) {
     let name = ''
     let role = ''
     for (const col of text.split(/\s*[|丨]\s*/u).map((part) => part.trim()).filter(Boolean)) {
-      // 栏里的「时间：」「角色：」先去掉。去掉日期后只剩括号补充（「（实习）」），或整栏就是括号补充时，不当名称或角色。
+      // 栏里的「时间：」「角色：」先去掉。去掉日期后只剩括号补充（「（实习）」「【毕业设计】」「[V2.0]」），或整栏就是括号补充时，不当名称或角色。
       const body = projectBody(col).replace(/^(?:角色|职务|时间|日期|周期|项目时间)\s*[:：]\s*/u, '').trim()
       const dated = splitResumeDateRange(body)
       // 「项目周期：日期」「起止时间：日期」这类栏：日期前是「栏名：」时，栏名不当名称或角色。
-      const labelled = dated ? /[:：]\s*$/u.test(body.slice(0, body.indexOf(dated.period))) : false
+      const labelled = !keepLabels && dated ? /[:：]\s*$/u.test(body.slice(0, body.indexOf(dated.period))) : false
       const cleaned = dated ? [labelled ? '' : dated.before, dated.after].filter(Boolean).join(' ').trim() : body
-      if (!cleaned || /^[（(][^）)]*[）)]$/u.test(cleaned)) continue
+      if (!cleaned || SUPPLEMENT_RE.test(cleaned)) continue
       if (!name) name = cleaned
       else if (!role) role = cleaned
     }
@@ -53,8 +55,8 @@ function separateTrailingRole(namePart: string, modelName: string): { name: stri
   // 模型给的短名（「AI」「CRM」）只在标题只有「短名 + 一段」时不拆尾部角色；「CRM 客户管理系统 负责人」这种三段写法照样拆出角色。
   if (tokens.length < 2 || !modelName || (shortModelName(modelName) && tokens.length < 3)) return { name: namePart, role: '' }
   const role = tokens[tokens.length - 1] ?? ''
-  // 末尾整段是括号补充（「 （毕业设计）」「 (V2.0)」）时不当角色，留在名称里。
-  if (/^[（(][^）)]*[）)]$/u.test(role)) return { name: namePart, role: '' }
+  // 末尾整段是括号补充（「 （毕业设计）」「 (V2.0)」「 【毕业设计】」「 [V2.0]」）时不当角色，留在名称里。
+  if (SUPPLEMENT_RE.test(role)) return { name: namePart, role: '' }
   const name = tokens.slice(0, -1).join(' ')
   const nameMatches = name === modelName || (modelName.length >= 2 && name.startsWith(modelName) && name.length > modelName.length)
   if (!nameMatches || !isTitleLike(role, RESTORED_ROLE_MAX) || splitResumeDateRange(role) || splitResumeDateRange(name)) {
@@ -147,20 +149,31 @@ export function ensureProjectOriginalLines(
   const used = new Set<number>()
   for (const entry of baseline) {
     if (entry.key !== 'projects' || entry.overflow) continue
-    const [title, ...rest] = entry.lines
+    const [title, ...rawRest] = entry.lines
     if (!title) continue
-    const parsed = parseProjectTitle(title)
-    const nameKey = projectLineKey(parsed.name)
-    if (!nameKey) continue
-    let best = -1
-    let bestScore = 0
-    resume.projects.forEach((item, index) => {
-      if (used.has(index)) return
-      const itemKey = projectLineKey(item.name)
-      if (!itemKey || (!nameKey.includes(itemKey) && !itemKey.includes(nameKey))) return
-      const score = (itemKey === nameKey ? 10000 : 0) + Math.min(itemKey.length, nameKey.length)
-      if (score > bestScore) { best = index; bestScore = score }
-    })
+    const rest = stripNumberedColumn(rawRest)
+    const pick = (name: string): number => {
+      const nameKey = projectLineKey(name)
+      if (!nameKey) return -1
+      let found = -1
+      let bestScore = 0
+      resume.projects.forEach((item, index) => {
+        if (used.has(index)) return
+        const itemKey = projectLineKey(item.name)
+        if (!itemKey || (!nameKey.includes(itemKey) && !itemKey.includes(nameKey))) return
+        const score = (itemKey === nameKey ? 10000 : 0) + Math.min(itemKey.length, nameKey.length)
+        if (score > bestScore) { found = index; bestScore = score }
+      })
+      return found
+    }
+    let parsed = parseProjectTitle(title)
+    let best = pick(parsed.name)
+    // 「名称：日期 | 角色」：首栏冒号前是项目名、不是栏名。按栏名丢掉后配不上任何模型项目时，留下冒号前那段再配一次。
+    if (best < 0) {
+      const keptLabels = parseProjectTitle(title, true)
+      const retry = pick(keptLabels.name)
+      if (retry >= 0) { parsed = keptLabels; best = retry }
+    }
     if (best < 0) continue
     used.add(best)
     const item = resume.projects[best]!
@@ -175,7 +188,9 @@ export function ensureProjectOriginalLines(
       && safeProjectName(namePart, item.role?.trim() || roleFromTitle)
     ) item.name = namePart
     if (!item.role?.trim() && roleFromTitle && isTitleLike(roleFromTitle, RESTORED_ROLE_MAX)) item.role = roleFromTitle
-    const description = item.description ?? ''
+    const rawDescription = item.description ?? ''
+    const description = stripNumberedColumn(rawDescription.split('\n')).join('\n')
+    if (description !== rawDescription) item.description = description
     const role = item.role?.trim() ?? ''
     const uncovered = rest.filter((line) => {
       const text = projectBody(line)

@@ -72,7 +72,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2203 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2204 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2364,7 +2364,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 151 个文件</summary>
+<summary><code>services/api/scripts/</code> — 152 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2443,6 +2443,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/resume-optimize-export-contract.ts` | `verify-resume-optimize.ts` |
 | `services/api/scripts/support/resume-optimize-fetch-stub.ts` | `verify-resume-optimize.ts` |
 | `services/api/scripts/support/resume-optimize-original-content.ts` | `verify-resume-optimize.ts` |
+| `services/api/scripts/support/resume-optimize-regression-corpus.ts` | `verify-resume-optimize.ts` |
 | `services/api/scripts/support/scan-panel-wording.ts` | `verify-scan-tasks.ts` |
 | `services/api/scripts/support/serializable-race-barrier.ts` | `verify-first-admin-bootstrap-postgres.ts`<br/>`verify-pg-serialization-conflict-postgres.ts`<br/>`verify-print-retry-lock-postgres.ts` |
 | `services/api/scripts/support/sqlite-cli.ts` | `verify-scan-tasks.ts` |

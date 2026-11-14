@@ -201,6 +201,97 @@ export function verifyOptimizeR1h(): void {
     if ((item.role ?? '') !== '' || !item.name.includes(mark)) fail(`${label} 括号补充被当成角色：${JSON.stringify(item)}`)
   }
   pass('括号前带空格的补充留在名称里，不当角色')
+
+  // 第十段：行首编号后面紧跟年份，整栏成套时才剥；有 module 撑腰时照样用改写。
+  const plainCerts = ['2021年获得初级会计职称', '2022年通过英语六级']
+  for (const [label, mark] of [['点号', '.'], ['全角点', '．'], ['右括号', '）'], ['顿号', '、']] as const) {
+    expectList(`编号${label}紧跟年份`, [`1${mark}2021年获得初级会计职称`, `2${mark}2022年通过英语六级`], plainCerts, plainCerts)
+  }
+  expectList('编号紧跟年月', ['1.2019.06 全国大学英语六级', '2.2020.09 初级会计职称'], ['2019.06 全国大学英语六级', '2020.09 初级会计职称'], ['2019.06 全国大学英语六级', '2020.09 初级会计职称'])
+  expectList('编号紧跟年份·漏第二张', ['1.2021年获得初级会计职称', '2.2022年通过英语六级'], [plainCerts[0]!], plainCerts)
+  const certRewrite = '2021年取得初级会计专业技术资格'
+  for (const mark of ['.', '、', '）']) {
+    const got = alignOriginalList(
+      [`1${mark}2021年获得初级会计职称`, `2${mark}2022年通过英语六级`],
+      [certRewrite, plainCerts[1]!],
+      60,
+      { modules: [{ before: plainCerts[0]!, after: certRewrite }] },
+    ).list
+    if (JSON.stringify(got) !== JSON.stringify([certRewrite, plainCerts[1]])) fail(`编号「${mark}」紧跟年份配 module 应用改写，实际 ${JSON.stringify(got)}`)
+  }
+  const numberedBefore = alignOriginalList(
+    ['1.2021年获得初级会计职称', '2.2022年通过英语六级'],
+    [certRewrite, plainCerts[1]!],
+    60,
+    { modules: [{ before: '1.2021年获得初级会计职称', after: certRewrite }] },
+  ).list
+  if (JSON.stringify(numberedBefore) !== JSON.stringify([certRewrite, plainCerts[1]])) {
+    fail(`module.before 带编号时也应改写，实际 ${JSON.stringify(numberedBefore)}`)
+  }
+  pass('行首编号后面紧跟年份仍按编号剥掉，有 module 撑腰时照样用改写')
+
+  expectList('沟通能力与亲和力', ['沟通能力与亲和力'], ['沟通能力', '亲和力'], ['沟通能力', '亲和力'])
+  expectList('UI/UX设计与Figma', ['UI/UX设计与Figma'], ['UI/UX设计', 'Figma'], ['UI/UX设计', 'Figma'])
+  pass('「亲和力」「UI/UX设计」按整项输出，不出「亲」「力」「UI」')
+
+  const nameColon = projectAt(
+    ['智慧园区管理系统：2023.03 - 2023.09 | 前端开发', '· 负责前端架构与页面开发', '· 负责首屏性能优化，加载时间缩短40%'],
+    { name: '智慧园区管理系统', role: '', description: '负责前端架构与页面开发' },
+  )
+  if (nameColon.name !== '智慧园区管理系统' || (nameColon.role ?? '') !== '前端开发' || nameColon.description !== '负责前端架构与页面开发\n负责首屏性能优化，加载时间缩短40%') {
+    fail(`首栏「名称：日期」被当成栏名：${JSON.stringify(nameColon)}`)
+  }
+  const nameColonSpace = projectAt(
+    ['智慧园区管理系统： 2023.03 - 2023.09 | 前端开发', '· 负责前端架构与页面开发', '· 负责首屏性能优化，加载时间缩短40%'],
+    { name: '智慧园区管理系统', role: '', description: '负责前端架构与页面开发' },
+  )
+  if (nameColonSpace.name !== '智慧园区管理系统' || (nameColonSpace.role ?? '') !== '前端开发' || !nameColonSpace.description?.includes('负责首屏性能优化，加载时间缩短40%')) {
+    fail(`首栏「名称： 日期」带空格被当成栏名：${JSON.stringify(nameColonSpace)}`)
+  }
+  pass('竖线标题首栏「名称：日期」认出名称，角色留下、漏交描述补回')
+
+  expectList('成套1.3D只剥编号', ['1.3D角色建模', '2.贴图绘制', '3.场景搭建'], ['3D角色建模', '贴图绘制', '场景搭建'], ['3D角色建模', '贴图绘制', '场景搭建'])
+  expectList('成套1.3D漏中间补回', ['1.3D角色建模', '2.贴图绘制', '3.场景搭建'], ['3D角色建模', '场景搭建'], ['3D角色建模', '贴图绘制', '场景搭建'])
+  expectList('2.5D夹在编号中间不剥', ['1.Java', '2.5D动画制作', '3.Python'], ['Java', '2.5D动画制作', 'Python'], ['Java', '2.5D动画制作', 'Python'])
+  expectList('两行小数都不剥', ['1.3D角色建模', '2.5D动画制作'], ['1.3D角色建模', '2.5D动画制作'], ['1.3D角色建模', '2.5D动画制作'])
+  expectList('单行1.3D不剥', ['1.3D角色建模'], ['3D角色建模'], ['1.3D角色建模'])
+  expectList('1.5年经验不成套不剥', ['1.5年经验', '2.沟通能力'], ['1.5年经验', '沟通能力'], ['1.5年经验', '沟通能力'])
+  expectList('3.0版本不成套不剥', ['3.0版本迁移', '2.文档整理'], ['3.0版本迁移', '文档整理'], ['3.0版本迁移', '文档整理'])
+  expectList('单行右括号紧跟年份不剥', ['1）2021年获得初级会计职称'], ['2021年获得初级会计职称'], ['1）2021年获得初级会计职称'])
+  pass('编号按整栏判断：成套才剥，「1.3D」有旁证才剥，「2.5D」「1.5年」「3.0版本」和单行不剥')
+
+  const numberedBody = projectAt(
+    ['智慧园区管理系统 | 2023.03 - 2023.09 | 前端开发', '1.负责前端架构与页面开发', '2.负责首屏性能优化，加载时间缩短40%'],
+    { name: '智慧园区管理系统', role: '前端开发', description: '负责前端架构与页面开发' },
+  )
+  if (numberedBody.role !== '前端开发' || numberedBody.description !== '负责前端架构与页面开发\n负责首屏性能优化，加载时间缩短40%') {
+    fail(`描述栏成套编号没剥掉：${JSON.stringify(numberedBody)}`)
+  }
+  pass('项目描述成套编号只剥编号，漏交句补回原位')
+
+  for (const [label, title, name, mark] of [
+    ['方头毕业设计', '2022.09 - 2023.05 校园二手交易平台 【毕业设计】', '校园二手交易平台', '【毕业设计】'],
+    ['方括号版本', '2023.03 - 2023.09 门店巡检小程序 [V2.0]', '门店巡检小程序', '[V2.0]'],
+  ] as const) {
+    const item = projectAt(
+      [title, '· 负责商品发布与订单模块开发'],
+      { name, role: '', description: '负责商品发布与订单模块开发' },
+    )
+    if ((item.role ?? '') !== '' || !item.name.includes(mark)) fail(`${label} 括号补充被当成角色：${JSON.stringify(item)}`)
+  }
+  for (const [label, title] of [
+    ['竖线方头', '校园二手交易平台 | 【毕业设计】 | 2023.03 - 2023.09'],
+    ['竖线方括号', '门店巡检小程序 | [V2.0] | 2023.03 - 2023.09'],
+  ] as const) {
+    const item = projectAt(
+      [title, '· 负责商品发布与订单模块开发'],
+      { name: title.split('|')[0]!.trim(), role: '', description: '负责商品发布与订单模块开发' },
+    )
+    if ((item.role ?? '') !== '' || item.name.includes('毕业设计') || item.name.includes('V2.0')) {
+      fail(`${label} 整栏括号补充被当成角色：${JSON.stringify(item)}`)
+    }
+  }
+  pass('【】和 [] 与圆括号一样，整段补充不当角色')
 }
 
 if (process.argv[1]?.endsWith('resume-optimize-after-match-r1h.ts')) {

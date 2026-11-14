@@ -26402,6 +26402,9 @@
     "services/api/scripts/support/resume-optimize-original-content.ts": [
       "services/api/scripts/verify-resume-optimize.ts"
     ],
+    "services/api/scripts/support/resume-optimize-regression-corpus.ts": [
+      "services/api/scripts/verify-resume-optimize.ts"
+    ],
     "services/api/scripts/support/scan-panel-wording.ts": [
       "services/api/scripts/verify-scan-tasks.ts"
     ],
@@ -47702,6 +47705,7 @@
           "services/api/scripts/support/resume-optimize-export-contract.ts",
           "services/api/scripts/support/resume-optimize-fetch-stub.ts",
           "services/api/scripts/support/resume-optimize-original-content.ts",
+          "services/api/scripts/support/resume-optimize-regression-corpus.ts",
           "services/api/src/ai/ai.service.ts",
           "services/api/src/ai/providers/llm.provider.ts",
           "services/api/src/ai/redis-inflight-lock.ts",
