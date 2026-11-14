@@ -480,6 +480,72 @@ test('merged self-assessment file is quoted before submit, generated once, and i
   expect(pageErrors).toEqual([])
 })
 
+const APPEND_UNAVAILABLE = '这份文件不能附加自我探索，已帮你取消勾选。本次没有建单；再点一次确认，就按原文件打印。'
+const APPEND_UNAVAILABLE_SHORT = '这份文件不能附加自我探索。'
+const APPEND_RETRY = '合并版没有生成，本次没有建单。可以再点一次确认重试，或取消勾选「附加自我探索」直接打印原文件。'
+
+test('append 404 tells the truth, unchecks, and the next confirm prints the original file @kiosk', async ({ page, api }) => {
+  registerShell(api, [])
+  registerCashier(api, 40)
+  await routeQuote(page, () => ({ unitCents: 20, pages: W2_FILE.pages }))
+  const jobs = await routeJobs(page, [{ status: 201, unitCents: 20 }])
+  await page.route(`**/api/v1/resume/self-assessment/${SA_TASK_ID}/append`, async (route: Route) => {
+    await route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'RESUME_FILE_NOT_FOUND', message: '简历文件不存在' } }),
+    })
+  })
+
+  await openConfirm(page, true)
+  const mergeToggle = page.getByRole('checkbox', { name: /附加自我探索/ })
+  await mergeToggle.check()
+  await page.getByRole('button', { name: '打印合并版（简历+自我探索）' }).click()
+
+  await expect(mergeToggle).not.toBeChecked()
+  await expect(mergeToggle).toBeDisabled()
+  await expect(page.getByText(APPEND_UNAVAILABLE, { exact: true })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: APPEND_UNAVAILABLE_SHORT })).toBeVisible()
+  await expect(page.getByText('稍后重试')).toHaveCount(0)
+  await expect(page.getByText('提交失败')).toHaveCount(0)
+  expect(jobs).toHaveLength(0)
+
+  await originalConfirm(page).click()
+  await page.waitForURL('**/print/cashier')
+  expect(jobs).toHaveLength(1)
+  expect(jobs[0]?.['fileUrl']).toBe(W2_FILE.fileUrl)
+})
+
+test('append 500 keeps the checkbox and a second confirm calls append again @kiosk', async ({ page, api }) => {
+  registerShell(api, [])
+  await routeQuote(page, () => ({ unitCents: 20, pages: W2_FILE.pages }))
+  const jobs = await routeJobs(page, [{ status: 201, unitCents: 20 }])
+  let appendCalls = 0
+  await page.route(`**/api/v1/resume/self-assessment/${SA_TASK_ID}/append`, async (route: Route) => {
+    appendCalls += 1
+    await route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'INTERNAL_SERVER_ERROR', message: '服务器内部错误' } }),
+    })
+  })
+
+  await openConfirm(page, true)
+  const mergeToggle = page.getByRole('checkbox', { name: /附加自我探索/ })
+  await mergeToggle.check()
+  const mergeButton = page.getByRole('button', { name: '打印合并版（简历+自我探索）' })
+  await mergeButton.click()
+
+  await expect(page.getByText(APPEND_RETRY, { exact: true })).toBeVisible()
+  await expect(mergeToggle).toBeChecked()
+  await expect(mergeToggle).toBeEnabled()
+  expect(jobs).toHaveLength(0)
+
+  await mergeButton.click()
+  await expect.poll(() => appendCalls).toBe(2)
+  expect(jobs).toHaveLength(0)
+})
+
 for (const viewport of [
   { name: '1080x1920', width: 1080, height: 1920 },
   { name: '390x844', width: 390, height: 844 },

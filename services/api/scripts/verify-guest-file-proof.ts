@@ -175,6 +175,10 @@ function assertParser(): void {
     assertUnusable('前面多一段', id, `/api/v1/extra/files/${id}/content${query}`, false)
   }
   {
+    const { id, query } = queryOf('path-x-prefix')
+    assertUnusable('前面多 /x', id, `/x/api/v1/files/${id}/content${query}`, false)
+  }
+  {
     const { id, query } = queryOf('path-after')
     assertUnusable('后面多一段', id, `/api/v1/files/${id}/content/extra${query}`, false)
   }
@@ -821,6 +825,11 @@ async function main(): Promise<void> {
     // 别的会员、未登录拿会员文件，回应同样与旧路径文件不存在一致，且不扣次数。
     await expectLegacyReject('旧路径别的会员拿会员文件', () => controller.submitResumeParse(
       parseBody(memberResume),
+      req({ authorization: `Bearer ${memberB}` }),
+    ))
+    // 正确的签名地址也不能跳过扣次数前的文件可用性检查：别的会员仍要被拒，次数账前后相等。
+    await expectLegacyReject('旧路径别的会员拿着有会员主人的文件和这份文件正确的签名地址', () => controller.submitResumeParse(
+      parseBody(memberResume, signFileUrl(memberResume).url),
       req({ authorization: `Bearer ${memberB}` }),
     ))
     await expectLegacyReject('旧路径未登录拿会员文件', () => controller.submitResumeParse(
